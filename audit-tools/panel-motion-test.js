@@ -129,6 +129,63 @@ function seedBig(n) {
     };
 }
 
+// ⛔ iOS ពិតមិនផ្គូផ្គង `@supports (not (-webkit-touch-callout: none))` ទេ ➜ ការក្លែង iOS ក្នុង Chromium
+// ត្រូវ **ដកប្លុកទាំងនោះចេញ** បន្ថែមលើការចាក់ប្លុក iOS បើមិនដូច្នេះ ស៊ុមក្លែងរបស់ Android (clip-path + ::before/::after
+// លើកាត) កាត់កាត iOS ក្លែង ➜ «ឯកសារយោង iOS» មិនមែន iOS ទៀតទេ។
+const dropAndroidOnlyCss = () => {
+    let n = 0;
+    const walk = (list, owner) => {
+        for (let i = list.length - 1; i >= 0; i--) {
+            const r = list[i];
+            if (r instanceof CSSSupportsRule && /not\s*\(\s*-webkit-touch-callout/.test(r.conditionText)) { owner.deleteRule(i); n++; }
+            else if (r.cssRules) walk(r.cssRules, r);
+        }
+    };
+    for (const sh of Array.from(document.styleSheets)) { let rules; try { rules = sh.cssRules; } catch (e) { continue; } walk(rules, sh); }
+    return n;
+};
+
+// អ្នកស្រាយ PNG តូច (8-bit · non-interlaced · ទម្រង់ដែល Chromium ថត) ➜ ប្រៀប pixel ផ្ទាល់ មិនមែនប្រៀបលេខ geometry
+// ដែលមើលមិនឃើញថាស៊ុមត្រូវ **គូរ** ឬអត់។
+function decodePng(buf) {
+    const zlib = require('zlib');
+    let p = 8, w = 0, h = 0, ct = 0, bd = 0; const idat = [];
+    while (p < buf.length) {
+        const len = buf.readUInt32BE(p), type = buf.toString('ascii', p + 4, p + 8), data = buf.slice(p + 8, p + 8 + len);
+        if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); bd = data[8]; ct = data[9]; }
+        else if (type === 'IDAT') idat.push(data);
+        p += 12 + len;
+    }
+    const bpp = ct === 6 ? 4 : ct === 2 ? 3 : 0;
+    if (bd !== 8 || !bpp) throw new Error('PNG មិនគាំទ្រ ៖ bitDepth ' + bd + ' colorType ' + ct);
+    const raw = zlib.inflateSync(Buffer.concat(idat)), stride = w * bpp, px = Buffer.alloc(h * stride);
+    for (let y = 0; y < h; y++) {
+        const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1;
+        for (let x = 0; x < stride; x++) {
+            const a = x >= bpp ? px[y * stride + x - bpp] : 0, b = y ? px[(y - 1) * stride + x] : 0;
+            const c = (x >= bpp && y) ? px[(y - 1) * stride + x - bpp] : 0;
+            let v = raw[src + x];
+            if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
+            else if (f === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+            px[y * stride + x] = v & 255;
+        }
+    }
+    return { w, h, bpp, px };
+}
+function pngDiff(bufA, bufB, tol) {
+    const A = decodePng(bufA), B = decodePng(bufB);
+    if (A.w !== B.w || A.h !== B.h) return { n: Infinity, size: [A.w, A.h, B.w, B.h] };
+    let n = 0, max = 0, dark = 0;
+    for (let i = 0; i < A.w * A.h; i++) {
+        let d = 0;
+        for (let k = 0; k < 3; k++) d = Math.max(d, Math.abs(A.px[i * A.bpp + k] - B.px[i * B.bpp + k]));
+        if (d > tol) n++;
+        if (d > max) max = d;
+        if (B.px[i * B.bpp] < 128) dark++;
+    }
+    return { n, max, dark, px: A.w * A.h };
+}
+
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     const server = await serve(path.join(ROOT, 'ZoeW'));
@@ -203,19 +260,39 @@ function seedBig(n) {
             // ៥ខ — កន្លែងរបា Tab ត្រូវប្រគល់មកវិញ **ស្របគ្នានឹងរបា** មិនមែនពន្យារ
             // ១៨០ms ក្រោយរមូរស្ងប់ទេ។ មុនកំណែ 2.11.0 អ្នកប្រើឃើញចន្លោះទទេប្រផេះ
             // មួយភ្លែត ហើយជួរដេកចុងក្រោយត្រូវកាត់ពាក់កណ្តាល (វីដេអូពីអ្នកប្រើ)។
+            // គែម **ដែលមើលឃើញ** = តូចបំផុតនៃគែមតារាង និង (គែមក្រោម − clip inset) របស់ **រាល់** ឪពុកដល់ `.page-main`
+            // ⛔ មិនមែនតែ `.page-main` ទេ ៖ ស៊ុមរបស់ Android កាត់លើ **កាត** ➜ ការអានតែ `.page-main` វាស់ខុសកន្លែង ហើយបៃតងជានិច្ច។
             const visBottom = () => {
                 const t = document.getElementById('tableResponsive');
                 const mn = t.closest('.page-main');
-                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(mn).clipPath || '');
-                const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
-                return Math.round(Math.min(t.getBoundingClientRect().bottom,
-                                           mn.getBoundingClientRect().bottom - ins));
+                let vis = t.getBoundingClientRect().bottom;
+                for (let el = t.parentElement; el; el = el.parentElement) {
+                    const m = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath || '');
+                    if (m) {
+                        const tk = m[1].split('round')[0].trim().split(/\s+/);
+                        vis = Math.min(vis, el.getBoundingClientRect().bottom - (parseFloat(tk.length >= 3 ? tk[2] : tk[0]) || 0));
+                    }
+                    if (el === mn) break;
+                }
+                return Math.round(vis);
             };
             side.classList.add('collapsed'); window.syncHistoryExpandedLock(); await wait(80);
             document.body.classList.remove('chrome-hidden'); await wait(80);
             const visShown = visBottom();
             out.gapVisibleToBar = Math.round(
                 document.getElementById('pageTabBar').getBoundingClientRect().top - visShown);
+            // ⛔ ស៊ុមក្លែងគ្របជួរដេកដែលលាក់ ➜ ការចុចលើវាមិនត្រូវទៅដល់ប៊ូតុង «ខល»/«បិទ» ដែលមើលមិនឃើញ
+            {
+                const cardEl = table.closest('.app-card');
+                const cr = cardEl.getBoundingClientRect();
+                const cx = Math.round((cr.left + cr.right) / 2);
+                const inBand = document.elementFromPoint(cx, visShown - 4);
+                const inRows = document.elementFromPoint(cx, visShown - 36);
+                const inGap = document.elementFromPoint(cx, visShown + 3);
+                out.bandHit = inBand === cardEl ? 'card' : (inBand && table.contains(inBand) ? 'row' : String(inBand && inBand.className));
+                out.rowsHit = !!(inRows && table.contains(inRows));
+                out.gapHit = inGap && cardEl.contains(inGap) ? 'card' : 'outside';
+            }
             const hShown = table.clientHeight;
             document.body.classList.add('chrome-hidden');
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -269,13 +346,106 @@ function seedBig(n) {
         ok(tag + ': snap ឈប់ត្រឹម 0 (PTR កេះបាន)', r.snapRestNearTop <= 1, 'scrollTop=' + r.snapRestNearTop);
         ok(tag + ': គ្មាន transform សេសសល់ក្រោយចលនា', r.residualTransform === 'none' || r.residualTransform === 'matrix(1, 0, 0, 1, 0, 0)', r.residualTransform);
         ok(tag + ': ចុចដងអូស ២ ដង ➜ ត្រឡប់ដើម', r.sideAfterToggles === false, String(r.sideAfterToggles));
-        ok(tag + ': បញ្ជីដែលមើលឃើញចុះចំគែមរបា Tab (គ្មានចន្លោះទទេក្រាស់)',
-            Math.abs(r.gapVisibleToBar) <= 4, 'gap=' + r.gapVisibleToBar + 'px');
+        // ⛔ ២ ខាង ៖ មិនលិចក្រោមរបា (≥ 6) · មិនមែនចន្លោះក្រាស់ (≤ 10) ➜ កាតឈប់ខាងលើរបា **៨px ដូច iOS** ហើយ
+        // ស៊ុមក្រោមកាតត្រូវគូរ (ការប្រៀប pixel ជាមួយ iOS ខាងក្រោម)។ អ្នកប្រើរាយការណ៍ (រូបថត iPhone ធៀប Android) ៖ ការកាត់
+        // ចំគែមរបា (gap ≈ 0) ធ្វើឲ្យជួរដេករត់ចូលក្រោមរបា ហើយគែមក្រោម/ជ្រុងមូលរបស់កាតមិនដែលលេច។
+        ok(tag + ': កាតដែលមើលឃើញឈប់ខាងលើរបា Tab ៨px ដូច iOS (6–10px)',
+            r.gapVisibleToBar >= 6 && r.gapVisibleToBar <= 10, 'gap=' + r.gapVisibleToBar + 'px');
+        ok(tag + ': ចុចលើស៊ុមក្រោមកាត ➜ ទៅកាត មិនមែនជួរដេកដែលលាក់', r.bandHit === 'card', 'hit=' + r.bandHit);
+        ok(tag + ': ជួរដេកខាងលើស៊ុមនៅតែចុចបាន', r.rowsHit === true, String(r.rowsHit));
+        ok(tag + ': ចន្លោះរវាងកាត និងរបា មិនមែនកាត (clip កាត់ការចុចដែរ)', r.gapHit === 'outside', 'hit=' + r.gapHit);
         ok(tag + ': កន្លែងរបា Tab ប្រគល់មកវិញក្នុង ២ ស៊ុម (ស្របនឹងរបា មិនពន្យារ)',
             r.visReleasedImmediately >= 20, 'delta=' + r.visReleasedImmediately + 'px');
         ok(tag + ': ការលាក់របាមិនប្តូរកម្ពស់កន្សោមរមូរ', r.heightStableOnHide === true, String(r.heightStableOnHide));
         ok(tag + ': ទំព័រ ២ កាតមានកម្ពស់ត្រឹមត្រូវ', r.entryCardH > 100, 'h=' + r.entryCardH);
         ok(tag + ': គ្មានការហូរផ្តេក', r.hOverflow <= 0, 'overflow=' + r.hOverflow);
+
+        // ៩ — ⛔ ស៊ុមក្រោមកាតលើ Android ត្រូវ **ដូច iOS pixel ទល់ pixel** (សំណើអ្នកប្រើ ៖ «iOS រក្សាកម្លាត ស៊ុមស្អាត តែ
+        // Android …»)។ ផ្លូវ Android រក្សាកម្ពស់កន្សោមរមូរថេរ (clip-path) ➜ គែមតារាង · កម្លាតកាត · គែមកាត · ជ្រុងមូល ត្រូវ
+        // **គូរក្លែង** ➜ ការវាស់ geometry មិនឃើញថាវាត្រូវគូរឬអត់ ➜ ប្រៀបរូបថតតំបន់ក្រោមកាតនៃផ្លូវទាំង ២ លើស្ថានភាពដដែល។
+        // ⛔ សេណារីយ៉ូ ៥ ៖ តារាងប្រវត្តិរមូរកណ្តាល · បញ្ជីទំព័រស្កេន · បញ្ជីទំព័រស្កេន **ទទេ** (សារ «មិនទាន់មាន…» ជាកូនចុងក្រោយ
+        // របស់កាត មិនមែនតារាង ➜ ផ្លូវ Android ធ្លាប់រុញវាលិចក្រោមរបា Tab ទាំងស្រុង) · និងទាំង ២ ពេល **ផ្ទាំងខាងលើបើក** (`-open` ៖ កាត
+        // មានកម្ពស់តាមមាតិកា ➜ ស៊ុមត្រូវឈរចុងមាតិកា មិនមែនចំរបា)។ ⛔ ប្រអប់ថតជារបស់ **Android** ហើយប្រើដដែលលើ iOS ➜ ការឃ្លាតទីតាំង
+        // ក៏ជា pixel ខុសដែរ។ ⛔ ពិដាន ២០ (មិនមែន ៤៨) ៖ គែម `--border-color` ខុសពីពណ៌ស **២៩** ➜ ពិដានធំជាងនេះមើលមិនឃើញគែមដែលបាត់
+        // (វាស់បាន ៖ mutation «ដកគែមកាត» រស់រានលើពិដាន ៤៨)។ ប្រអប់ឈប់ **ត្រឹមគែមកាត** ៖ ស្រមោល `--shadow-sm` ក្រោមកាត iOS (ខុស ≤ ១៨)
+        // ស្ថិតក្នុងចន្លោះ ៨px ដែល clip របស់ Android កាត់ចោល ➜ ចន្លោះនោះវាស់ដោយ gap (6–10px) និងទីតាំង `vis` ជំនួសវិញ។
+        const SCENES = ['data', 'entry', 'entry-empty', 'entry-open', 'entry-empty-open'];
+        const band = async (scene, fixedBox) => page.evaluate(async ({ scene, fixedBox }) => {
+            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+            const entry = scene !== 'data';
+            const open = /-open$/.test(scene);
+            window.switchAppPage(entry ? 'entry' : 'data'); await wait(80);
+            document.getElementById(entry ? 'entrySideSection' : 'dataSideSection').classList.toggle('collapsed', !open);
+            window.syncHistoryExpandedLock();
+            document.body.classList.remove('chrome-hidden');
+            if (entry) {
+                const q = document.getElementById('entryListSearchInput');
+                q.value = /empty/.test(scene) ? 'zz-no-such-row' : '';
+                q.dispatchEvent(new Event('input', { bubbles: true }));
+                await wait(150);
+            }
+            const pages = document.getElementById('appPages');
+            pages.scrollTop = open ? pages.scrollHeight : 0;
+            const t = document.getElementById(entry ? 'entryTableResponsive' : 'tableResponsive');
+            t.scrollTop = entry ? 0 : 160;
+            await wait(400);
+            const cardEl = t.closest('.app-card');
+            const card = cardEl.getBoundingClientRect();
+            let vis = card.bottom;
+            for (let el = cardEl; el; el = el.parentElement) {
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath || '');
+                if (m) {
+                    const tk = m[1].split('round')[0].trim().split(/\s+/);
+                    vis = Math.min(vis, el.getBoundingClientRect().bottom - (parseFloat(tk.length >= 3 ? tk[2] : tk[0]) || 0));
+                }
+                if (el.classList.contains('page-main')) break;
+            }
+            vis = Math.min(vis, document.getElementById('pageTabBar').getBoundingClientRect().top);
+            const empty = cardEl.querySelector(':scope > .empty-state');
+            return { box: fixedBox || { x: Math.ceil(card.left), y: Math.round(vis) - 110, width: Math.floor(card.right) - Math.ceil(card.left), height: 110 },
+                     vis: Math.round(vis), scrollTop: t.scrollTop, pagesTop: pages.scrollTop, cardClip: getComputedStyle(cardEl).clipPath,
+                     after: getComputedStyle(cardEl, '::after').content,
+                     emptyShown: !!(empty && empty.offsetParent) };
+        }, { scene, fixedBox });
+        await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; } .toast-container { display: none !important; }' });
+        const shots = { android: {}, ios: {} };
+        for (const scene of SCENES) {
+            const b = await band(scene, null);
+            shots.android[scene] = { b, png: await page.screenshot({ clip: b.box }) };
+        }
+        const iosCss = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
+        const iosAt = iosCss.indexOf('@supports (-webkit-touch-callout: none) {');
+        let iosDepth = 0, iosStart = iosCss.indexOf('{', iosAt), iosEnd = iosStart;
+        for (let k = iosStart; iosAt !== -1 && k < iosCss.length; k++) {
+            if (iosCss[k] === '{') iosDepth++;
+            else if (iosCss[k] === '}') { iosDepth--; if (!iosDepth) { iosEnd = k; break; } }
+        }
+        if (iosAt !== -1) await page.addStyleTag({ content: iosCss.slice(iosStart + 1, iosEnd) });
+        await page.evaluate(dropAndroidOnlyCss);
+        for (const scene of SCENES) {
+            const b = await band(scene, shots.android[scene].b.box);
+            shots.ios[scene] = { b, png: await page.screenshot({ clip: b.box }) };
+        }
+        for (const scene of SCENES) {
+            const A = shots.android[scene], I = shots.ios[scene];
+            const d = pngDiff(A.png, I.png, 20);
+            if (process.env.PANELMOTION_SHOT_DIR) {
+                fs.mkdirSync(process.env.PANELMOTION_SHOT_DIR, { recursive: true });
+                fs.writeFileSync(path.join(process.env.PANELMOTION_SHOT_DIR, tag + '-' + scene + '-android.png'), A.png);
+                fs.writeFileSync(path.join(process.env.PANELMOTION_SHOT_DIR, tag + '-' + scene + '-ios.png'), I.png);
+            }
+            console.log('    ' + tag + ' ' + scene + ' ៖ គែមមើលឃើញ Android ' + A.b.vis + ' · iOS ' + I.b.vis + ' · pixel ខុស ' + d.n + '/' + d.px + ' (max ' + d.max + ')');
+            ok(tag + ' ' + scene + ': ការក្លែង iOS គ្មានស៊ុមក្លែងរបស់ Android (clip · ::after)',
+                I.b.cardClip === 'none' && I.b.after === 'none', JSON.stringify(I.b));
+            ok(tag + ' ' + scene + ': ជាន់អប្បបរមា ៖ តំបន់ប្រៀបមានមាតិកាពិត · ស្ថានភាពដដែលទាំង ២ ផ្លូវ',
+                d.dark > 50 && A.b.scrollTop === I.b.scrollTop && A.b.pagesTop === I.b.pagesTop &&
+                A.b.emptyShown === I.b.emptyShown && A.b.emptyShown === /empty/.test(scene),
+                'dark=' + d.dark + ' scroll=' + A.b.scrollTop + '/' + I.b.scrollTop + ' pages=' + A.b.pagesTop + '/' + I.b.pagesTop +
+                ' empty=' + A.b.emptyShown + '/' + I.b.emptyShown);
+            ok(tag + ' ' + scene + ': ⛔ ស៊ុមក្រោមកាត Android ដូច iOS (ទីតាំង ±1 · pixel ខុស ≤ ១២)',
+                Math.abs(A.b.vis - I.b.vis) <= 1 && d.n <= 12,
+                'vis=' + A.b.vis + '/' + I.b.vis + ' n=' + d.n + ' max=' + d.max + ' box=' + JSON.stringify(A.b.box));
+        }
         await ctx.close();
     }
     // ---- ផ្លូវ iOS ដាច់ដោយឡែក ----
@@ -309,6 +479,7 @@ function seedBig(n) {
                 else if (cssSrc[k] === '}') { depth--; if (!depth) { end = k; break; } }
             }
             await page2.addStyleTag({ content: cssSrc.slice(start + 1, end) });
+            await page2.evaluate(dropAndroidOnlyCss);
             await page2.waitForTimeout(200);
             const r2 = await page2.evaluate(async () => {
                 const wait = (ms) => new Promise((x) => setTimeout(x, ms));

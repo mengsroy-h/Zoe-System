@@ -349,7 +349,7 @@ bash audit-tools/emu/rules.sh
 | `fluid-type-focus-test.js` | មាត្រដ្ឋានអក្សរ ៣ ជំហាន និងសញ្ញាផ្តោត | `FLUIDTYPE_APP_DIR` |
 | `gesture-test.js` | PTR · ការលាក់របា Tab · ចង្វាក់ស៊ុម | `GESTURE_APP_DIR` |
 | `history-menu-dismiss-test.js` | Chromium ពិត៖ ម៉ឺនុយ (...) បិទពេលអូសផ្ទាំង/រមូរខាងក្រៅ · ចលនាបើក និង Reduce Motion · ចុច/រមូរក្នុងម៉ឺនុយ | `HISTORYMENU_APP_DIR` |
-| `panel-motion-test.js` | ចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើ · snap ↔ PTR) | `PANELMOTION_APP_DIR` |
+| `panel-motion-test.js` | ចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើ · snap ↔ PTR) · ស៊ុមក្រោមកាតលើ Android ដូច iOS (ប្រៀបរូបថត pixel) | `PANELMOTION_APP_DIR` · `PANELMOTION_SHOT_DIR` (រក្សារូបថត) |
 | `panel-snap-ownership-test.js` | កូដពិតក្នុង VM៖ callback ចាស់ក្រោយ watchdog/cleanup មិនដោះ pause ថ្មី · ចលនាស្របគ្នា · deadline · ផ្លូវ finish/reject | `PANELSNAP_APP_DIR` |
 | `ios-panel-glide-test.js` | ចលនាលើ iOS មិនឃ្លាតពី Android | `IOSGLIDE_APP_DIR` |
 | `phone-search-swipe-test.js` | កាយវិការអូស និង auto pull up | `SWIPE_APP_DIR` |

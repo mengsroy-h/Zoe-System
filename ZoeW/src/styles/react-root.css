@@ -135,6 +135,59 @@
     }
 }
 
+@supports (not (-webkit-touch-callout: none)) and selector(:has(*)) {
+    @media (max-width: 991px) {
+        .app-page.active > .page-main .app-card {
+            position: relative;
+            clip-path: inset(-8px 0 var(--tabbar-height, 62px) 0 round 0 0 var(--radius-lg) var(--radius-lg));
+        }
+        .app-page.active > .page-main .app-card::before,
+        .app-page.active > .page-main .app-card::after {
+            content: '';
+            position: absolute;
+            z-index: 11;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-top: 0;
+        }
+        .app-page.active > .page-main .app-card::before {
+            left: 10px;
+            right: 10px;
+            bottom: calc(var(--tabbar-height, 62px) + 10px);
+            height: var(--radius-md);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            box-shadow: 0 10px 0 10px var(--card-bg);
+            pointer-events: none;
+        }
+        .app-page.active > .page-main .app-card::after {
+            left: -1px;
+            right: -1px;
+            bottom: calc(var(--tabbar-height, 62px) - 1px);
+            height: var(--radius-lg);
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        }
+        .app-page.active > .page-main .app-card > .empty-state {
+            margin-bottom: var(--tabbar-height, 62px);
+        }
+        .app-page.active > .page-main .app-card:has(> .empty-state:not(.hidden))::before {
+            content: none;
+        }
+        .app-page.active > .page-main .app-card:has(> .empty-state:not(.hidden)) > .table-responsive {
+            padding-bottom: 0;
+        }
+        body.chrome-hidden .app-page.active > .page-main .app-card {
+            clip-path: none;
+        }
+        body.chrome-hidden .app-page.active > .page-main .app-card::before,
+        body.chrome-hidden .app-page.active > .page-main .app-card::after {
+            visibility: hidden;
+        }
+        body.chrome-hidden .app-page.active > .page-main .app-card > .empty-state {
+            margin-bottom: 0;
+        }
+    }
+}
+
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }
 .history-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }

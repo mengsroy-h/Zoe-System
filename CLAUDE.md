@@ -99,8 +99,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.43.0` (`zoew-v239`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.7` (`zoekeygen-v106`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.44.0` (`zoew-v240`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.21.0` (`zoekeygen-v107`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
 > កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
@@ -375,6 +375,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **App ↔ ម៉ូឌុល License** | ⛔ ទង់ «sync រួច» ត្រូវបើកតែដោយតម្លៃ **ពី server ពិត** | `license-clock-trust-test` |
 | **License ↔ ការប្តូរម៉ោង** | ⛔ ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `license-clock-rollback-test` |
 | **Key ១ ➜ ឧបករណ៍តាមពិដាន** | ⛔ **អ្នកសម្រេចឈរនៅ rules** (កូដ client ជាការតុបតែង) ៖ កៅអី `license_seats/<appCode>/<keyId>` ក្នុង License Project សរសេរបានតែ (ក) គ្មានវត្តមាន **និង** Key មានពិត ឬ (ខ) `device` ដដែល · client លុបមិនបាន · ការរាយបញ្ជីបដិសេធ (`.read` ត្រឹម `$keyId`)។ ⛔ `getDeviceId()` អានត្រឡប់វិញក្រោយសរសេរ · «សម្គាល់មិនបាន ≠ កៅអីជារបស់គេ» ➜ `ok: null` មិនលុប record (មានតែ `seat-taken` ពិតទេដែលលុប) · `activate()` ទាមទារ `seat === 'mine'` ពិត · record ចាស់ + កៅអីទទេ ➜ កក់ឲ្យខ្លួន (បើអត់ deploy មួយចាក់សោអតិថិជនទាំងអស់) · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · `checkOnline()` គ្មាន `claimSeat` មិនសរសេរ · ការដោះឧបករណ៍ជារបស់ admin តាម ZoeKeyGen · ⛔ កុំធ្វើឲ្យ seat ធូរ។ ⛔ ពិដាន `license_keys/<app>/<keyId>/maxDevices` (admin តែម្នាក់សរសេរ · អវត្តមាន = ១) អនុវត្តដោយ **slot ឈ្មោះថេរ `d1..d5`** (RTDB rules រាប់កូនមិនបាន ➜ ចំនួន slot = ពិដានក្នុង schema) · ឈ្មោះ slot រស់ ៣ ឯកសារ (`license-verify.js` · `ZoeKeyGen/app.js` · rules) ត្រូវស៊ីគ្នា · ការប្រណាំងរំកិលទៅ slot ទំនេរ (`LICENSE_SEAT_CLAIM_TRIES`) · ZoeKeyGen រាប់តែក្នុងពិដាន។ ⚠️ iOS ៖ PWA និង Safari មាន Storage ដាច់ពីគ្នា ➜ ដំឡើង PWA **មុន** Activate | `license-seat-test` · `emu/license-seat-rules-test` · `license-app-code-test` |
+| **ដំណឹងពីអ្នកលក់ (ZoeKeyGen ➜ ZoeW 🔔)** | ⛔ ZoeKeyGen សរសេរ `license_announcements/<App>/<id>` ក្នុង **License Project** ៖ rules **អានសាធារណៈ · សរសេរ/លុបតែ admin** · schema ចាក់សោ (ប្រភេទ `notice`/`maintenance` ⛔ មិនមែន `update` · ចំណងជើង ១–120 · ខ្លឹមសារ ≤ 600 · id `n` + ម៉ោង ១៣ ខ្ទង់ + ៦ តួ ➜ តម្រៀបតាមពេល · `$other` បដិសេធ)។ ⛔ ប្រភេទ · ព្រំដែនប្រវែង · ពិដានចំនួន រស់ក្នុង `ZoeKeyGen/app.js` · `ZoeKeyGen/index.html` · rules · `ZoeW/src/features/notifications.ts` ➜ ត្រូវស៊ីគ្នា (អ្នកយាមដេរីវេពីកូដទាំង ២ ខាង មិនមែន literal)។ ⛔ ZoeW អានតាម `ZoeLicense.announcementsUrl()` (URL License តែមួយ · `orderBy $key` + `limitToLast`) · ⛔ «ទាញមិនបាន» (401 មុន Publish · បណ្តាញ · JSON ខូច) ≠ «គ្មាន» ➜ រក្សាដំណឹងចាស់ · `null` ពី server = គ្មានពិត · ⛔ ដំណឹងពីអ្នកលក់ **មិនប៉ះ** «📱 កំណែ App» (វាអានតែ `announcements.json`)។ ⛔ ZoeKeyGen ៖ ✅ តែក្រោយ commit · ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់» (⛔ មិនមែន «មិនបាន») + ✅ ពេល commit យឺត · បដិសេធ ➜ «មិនបាន» · session ប្តូរ ➜ ស្ងាត់ · រក្សា ២០ ចុងក្រោយ (លុបចាស់ក្នុង update ដដែល) · ⚠️ អ្នកណាក៏អានបាន ➜ កុំដាក់ព័ត៌មានសម្ងាត់ | `keygen-notice-test` · `emu/license-seat-rules-test` ផ្នែក ១២ · `ZoeW/tests/seller-notices.test.tsx` |
 | ការការពារ inspect element | ⛔ ពង្រឹងមិនបានទេ — កុំព្យាយាម | 📝 (រចនាសម្ព័ន្ធ) |
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **អត្តសញ្ញាណអតិថិជន ៖ លេខទូរស័ព្ទ** | ⛔ លេខដែលរក្សាទុកជាកូនសោ merge (`phone`+`scanDate`) និងជាមូលដ្ឋាននៃ `getPickupPhoneKey()` ➜ តួអក្សរកាកសំណល់តែមួយបំបែកអតិថិជនម្នាក់ជា **ពីរ**។ `normalizeOneStoredPhone()` ត្រូវលុប `= " '` **ស៊ីមេទ្រី ទាំងមុខ ទាំងចុង** (ទម្រង់ `="012…"` របស់ Sheets/Excel) — វាស់បាន (2.31.8) ៖ ខាងចុងមិនត្រូវលុប ➜ រក្សាទុក `012345678"`។ ⛔ សញ្ញាបំបែក **ខាងក្នុង** ត្រូវនៅដដែល (ការប្តូរទម្រង់បំបែក merge នឹងទិន្នន័យចាស់) | `phone-suggest-test` |
@@ -571,6 +572,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | Secret របស់ Lookup API សល់ជាអក្សរធម្មតា | `lookup-config-secret-test.js` |
 | ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen; Extend/Revoke ចាប់យក Key និង database មុន await ហើយ callback ត្រូវនៅក្នុងវគ្គដដែល | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` |
 | បញ្ជី Key បង្ហាញ revoked/expired ត្រឹមត្រូវ និងទទួល Firebase key `__proto__`/`constructor`/`toString` ដោយមិនប៉ះ prototype | `keylist-consistency-test.js` |
+| **ដំណឹងពីអ្នកលក់ (ZoeKeyGen ➜ ZoeW)** ៖ ZoeKeyGen ផ្ញើអ្វីដែល rules បដិសេធ (ព្រំដែនឃ្លាតរវាង `app.js` ↔ `index.html` ↔ rules) · toast ✅ មុន commit · ការផ្ញើព្យួររាយ «មិនបាន» ខណៈវា commit យឺត ➜ ដំណឹងស្ទួន · XSS ក្នុងបញ្ជីដំណឹង | `keygen-notice-test.js` |
 | cache ខាង **server** របស់ Apps Script (កូនសោ ↔ ចំនួនជួរដេក) | `google-sheets-cache-test.js` |
 | SheetJS ដែល ship មានកំណែ/hash រង CVE | `dependency-security-test.js` |
 | ការណែនាំលេខទូរស័ព្ទ (`collectPhoneSuggestions`) · **ការធ្វើឲ្យលេខទូរស័ព្ទដែលរក្សាទុកមានទម្រង់តែមួយ** (`normalizeStoredPhone`) | `phone-suggest-test.js` |
@@ -899,7 +901,7 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | **Category ៤ បត់បាន** (`.drawer-group`, បត់ជាលំនាំដើម, ស្ថានភាពក្នុង `zoew_drawer_groups_v1`) ៖ **ការតភ្ជាប់ និងទិន្នន័យ** (Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · នាំចូល Excel ទៅ Sheet) · **ZTO** (បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO — ⛔ ២ នេះ និង**ក្បាល Category ខ្លួនវា** លេចតែពេល Fast Mode គូស) · **ចាក់សោ និងសុវត្ថិភាព** (ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ) · **ឧបករណ៍** (កំណត់ទូ Locker · ពិនិត្យសុខភាពប្រព័ន្ធ)។ ⛔ **ចូល/ចាកចេញ ឈរក្នុង `.drawer-foot`** ជាមួយលេខកំណែ មិនមែនក្នុង `.drawer-body` |
 | ប៊ូតុង (...) ខាងលើ | `globalMoreMenu` | Export Data · របាយការណ៍អាជីវកម្មប្រចាំខែ · កែទឹកប្រាក់/កញ្ចប់ (PIN) · អត្រាប្រាក់ · ធុងសំរាម · Reset ចំនួនយករួច (PIN) · លុបទាំងអស់ (PIN) |
 | ប៊ូតុង (...) តាមជួរ | `globalMoreMenu` | កែតម្លៃកញ្ចប់ · កែលេខទូរស័ព្ទ · លុប |
-| ផ្ទាំងជូនដំណឹង (🔔 ជ្រុងស្តាំ navbar) | `notifyDrawer` | បើកពីខាងស្តាំ ៖ 📦 កញ្ចប់ជិតផុតកំណត់ (២៤ ម៉ោង) · 📱 កំណែ App · 📢 សេចក្តីប្រកាស/ថែទាំ (`public/announcements.json`) · ⛔ **«Powered By ZoeW» ឈរក្នុងជើងផ្ទាំងនេះ** មិនមែន navbar |
+| ផ្ទាំងជូនដំណឹង (🔔 ជ្រុងស្តាំ navbar) | `notifyDrawer` | បើកពីខាងស្តាំ ៖ 📦 កញ្ចប់ជិតផុតកំណត់ (២៤ ម៉ោង) · 📱 កំណែ App · 📢 សេចក្តីប្រកាស/ថែទាំ (`public/announcements.json` + ដំណឹងពីអ្នកលក់ តាម ZoeKeyGen) · ⛔ **«Powered By ZoeW» ឈរក្នុងជើងផ្ទាំងនេះ** មិនមែន navbar |
 
 ម៉ឺនុយ (...) ខាងលើ និងតាមជួរ ត្រូវបិទពេលចាប់ផ្តើមអូសផ្ទាំងខាងក្រៅ ឬ
 រមូរប្រវត្តិ។ ការចុច/រមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។ ការអូសផ្ទាំងដោយ transform
@@ -2207,6 +2209,7 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **2.44.0 / ZoeKeyGen 2.21.0 (branch) ៖ Publish rules របស់ License Project** (`ZoeKeyGen/firebase-database.rules.json` ៖ node `license_announcements`) ➜ បើមិនទាន់ ZoeKeyGen រាយ «⚠️ អានបញ្ជីដំណឹងមិនបាន» ហើយការផ្ញើធ្លាក់ · ZoeW មិនឃើញដំណឹង (ដំណើរការផ្សេងៗនៅដដែល)។ ក្រោយ Publish ៖ ផ្ញើដំណឹងសាកពី ZoeKeyGen ➜ មើលផ្ទាំង 🔔 លើ PWA និង APK · លុបវា ➜ វាបាត់ពេលទាញលើកក្រោយ។
 - ⏳ **2.43.0 / ZoeKeyGen 2.20.7 (branch) ៖ មើល logo និងផ្ទាំង 🔔 លើ iPhone PWA · Android PWA · APK** — ផ្ទាំងបើកពីស្តាំ · badge · កញ្ចប់ជិតផុតកំណត់ ·
   សារពី `announcements.json` (APK ទាញតាម `VITE_NATIVE_WEB_ORIGIN` ➜ ត្រូវការ deploy ដែលមាន header CORS ក្នុង `netlify.toml`)។
 - ⏳ **2.42.11 (branch) ៖ ប្រៀបលេខ «អេក្រង់ NNHz · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11])។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។

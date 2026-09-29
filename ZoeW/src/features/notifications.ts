@@ -1,10 +1,12 @@
 import { getServerNow } from '../core/clock';
+import { getZoneDateKey } from '../core/timezone';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../core/text';
 import { APP_VERSION } from '../core/version';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeAbandonIsRipe, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { LICENSE_APP_CODE } from './license';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
@@ -49,6 +51,11 @@ export const NOTIFY_FEED_KINDS = ['update', 'maintenance', 'notice'];
 export const NOTIFY_SEEN_KEY = 'zoew_notify_seen_v1';
 export const NOTIFY_FEED_CACHE_KEY = 'zoew_notify_feed_v1';
 export const NOTIFY_SEEN_MAX = 60;
+export const NOTIFY_SELLER_MAX_ITEMS = 20;
+export const NOTIFY_SELLER_KINDS = ['notice', 'maintenance'];
+export const NOTIFY_SELLER_CACHE_KEY = 'zoew_notify_seller_v1';
+export const NOTIFY_SELLER_ID_PREFIX = 'kg:';
+export const NOTIFY_SELLER_TITLE_MAX = 120;
 export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
 
 export function hoursUntilAbandon(barcode, parentAt, now) {
@@ -154,6 +161,51 @@ export function sanitizeFeed(raw): NotifyFeedItem[] | null {
     return out;
 }
 
+export function sanitizeSellerNotices(raw): NotifyFeedItem[] | null {
+    if (raw === null) return [];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const out: NotifyFeedItem[] = [];
+    const keys = Object.keys(raw).sort().reverse();
+    for (let i = 0; i < keys.length && out.length < NOTIFY_SELLER_MAX_ITEMS; i++) {
+        const key = keys[i];
+        const it = raw[key];
+        if (!it || typeof it !== 'object') continue;
+        const id = cleanText(key).slice(0, 80);
+        const kind = NOTIFY_SELLER_KINDS.indexOf(it.kind) === -1 ? '' : it.kind;
+        const title = cleanText(it.title).slice(0, NOTIFY_SELLER_TITLE_MAX);
+        const at = typeof it.at === 'number' && isFinite(it.at) && it.at > 0 ? it.at : 0;
+        if (!id || !kind || !title) continue;
+        out.push({
+            id: NOTIFY_SELLER_ID_PREFIX + id,
+            kind: kind,
+            title: title,
+            body: cleanText(it.body),
+            points: [],
+            version: '',
+            date: at ? getZoneDateKey(at, 0) : ''
+        });
+    }
+    return out;
+}
+
+export function combinedNotifyFeed(fileFeed, sellerFeed): NotifyFeedItem[] {
+    const all = (Array.isArray(sellerFeed) ? sellerFeed : []).concat(Array.isArray(fileFeed) ? fileFeed : []);
+    return all
+        .map((it, i) => ({ it: it, i: i }))
+        .sort((a, b) => String(b.it.date || '').localeCompare(String(a.it.date || '')) || a.i - b.i)
+        .map((x) => x.it);
+}
+
+export function sellerNoticesUrl() {
+    const lic = typeof window !== 'undefined' ? window.ZoeLicense : undefined;
+    if (!lic || typeof lic.announcementsUrl !== 'function') return '';
+    try {
+        return String(lic.announcementsUrl(LICENSE_APP_CODE, NOTIFY_SELLER_MAX_ITEMS) || '');
+    } catch (e) {
+        return '';
+    }
+}
+
 export function latestFeedVersion(items) {
     let best = '';
     (Array.isArray(items) ? items : []).forEach((it) => {
@@ -186,6 +238,15 @@ export function loadCachedNotifyFeed() {
     if (cached && !uiState.notifyFeed.length) uiState.notifyFeed = cached;
 }
 
+export function loadCachedSellerNotices() {
+    const cached = readJson(NOTIFY_SELLER_CACHE_KEY);
+    const items = cached && Array.isArray(cached.items) ? sanitizeFeed(cached) : null;
+    if (items && !uiState.notifySellerFeed.length) {
+        uiState.notifySellerFeed = items.filter((it) => it.id.indexOf(NOTIFY_SELLER_ID_PREFIX) === 0 && !it.version
+            && NOTIFY_SELLER_KINDS.indexOf(it.kind) !== -1);
+    }
+}
+
 export function unseenFeedCount(items, seen) {
     const seenSet = new Set(Array.isArray(seen) ? seen : []);
     return (Array.isArray(items) ? items : []).filter((it) => it && !seenSet.has(it.id)).length;
@@ -197,7 +258,7 @@ export function notifyBadgeCount(view, items, seen) {
 }
 
 export function markNotifyFeedSeen() {
-    const ids = uiState.notifyFeed.map((it) => it.id);
+    const ids = combinedNotifyFeed(uiState.notifyFeed, uiState.notifySellerFeed).map((it) => it.id);
     if (!ids.length) return;
     const merged = uiState.notifySeenIds.filter((id) => ids.indexOf(id) === -1).concat(ids).slice(-NOTIFY_SEEN_MAX);
     const same = merged.length === uiState.notifySeenIds.length && merged.every((id, i) => id === uiState.notifySeenIds[i]);
@@ -212,16 +273,8 @@ export function notifyFeedUrl() {
     return origin ? origin + NOTIFY_FEED_PATH : '';
 }
 
-export function fetchNotifyFeed(userAsked?) {
-    if (uiState.notifyFeedInFlight) return Promise.resolve(false);
-    if (!userAsked) {
-        if ((navigator.onLine as boolean) === false || linkIsFrugal()) return Promise.resolve(false);
-        if (elapsedSince(uiState.notifyFeedFetchedAt) < NOTIFY_FEED_MIN_GAP_MS) return Promise.resolve(false);
-    }
-    const url = notifyFeedUrl();
+function fetchFileFeed(url) {
     if (!url) return Promise.resolve(false);
-    uiState.notifyFeedInFlight = true;
-    uiState.notifyFeedFetchedAt = Date.now();
     return fetchWithTimeout(url, { cache: 'no-store' }, NOTIFY_FEED_TIMEOUT_MS, 'Notify feed timed out',
         (res) => (res && res.ok ? res.json() : null))
         .then((out) => {
@@ -230,7 +283,35 @@ export function fetchNotifyFeed(userAsked?) {
             uiState.notifyFeed = items;
             safeStoreSet(appLocalStore, NOTIFY_FEED_CACHE_KEY, JSON.stringify({ items: items }));
             return true;
-        }, () => false)
+        }, () => false);
+}
+
+function fetchSellerNotices(url) {
+    if (!url) return Promise.resolve(false);
+    return fetchWithTimeout(url, { cache: 'no-store' }, NOTIFY_FEED_TIMEOUT_MS, 'Seller notices timed out',
+        (res) => (res && res.ok ? res.json().then((data) => ({ data: data })) : null))
+        .then((out) => {
+            const items = out && out.body ? sanitizeSellerNotices(out.body.data) : null;
+            if (!items) return false;
+            uiState.notifySellerFeed = items;
+            safeStoreSet(appLocalStore, NOTIFY_SELLER_CACHE_KEY, JSON.stringify({ items: items }));
+            return true;
+        }, () => false);
+}
+
+export function fetchNotifyFeed(userAsked?) {
+    if (uiState.notifyFeedInFlight) return Promise.resolve(false);
+    if (!userAsked) {
+        if ((navigator.onLine as boolean) === false || linkIsFrugal()) return Promise.resolve(false);
+        if (elapsedSince(uiState.notifyFeedFetchedAt) < NOTIFY_FEED_MIN_GAP_MS) return Promise.resolve(false);
+    }
+    const url = notifyFeedUrl();
+    const sellerUrl = sellerNoticesUrl();
+    if (!url && !sellerUrl) return Promise.resolve(false);
+    uiState.notifyFeedInFlight = true;
+    uiState.notifyFeedFetchedAt = Date.now();
+    return Promise.all([fetchFileFeed(url), fetchSellerNotices(sellerUrl)])
+        .then((results) => results[0] || results[1], () => false)
         .then((ok) => {
             uiState.notifyFeedInFlight = false;
             return ok;
@@ -247,6 +328,7 @@ export function openNotifyDrawer() {
 export function initNotifications() {
     loadNotifySeen();
     loadCachedNotifyFeed();
+    loadCachedSellerNotices();
     refreshNotifyView();
     fetchNotifyFeed(false);
 }

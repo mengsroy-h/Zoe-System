@@ -290,6 +290,15 @@
             + (slot ? '/' + slot : '') + '.json';
     }
 
+    function announcementsUrl(appCode, limit) {
+        if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return '';
+        if (!/^[A-Z]{2,8}$/.test(String(appCode || ''))) return '';
+        const n = Math.floor(Number(limit));
+        const cap = isFinite(n) && n >= 1 ? Math.min(n, 50) : 20;
+        return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_announcements/' + appCode
+            + '.json?orderBy=%22%24key%22&limitToLast=' + cap;
+    }
+
     function seatLimitOf(maxDevices) {
         const n = Math.floor(Number(maxDevices));
         if (!isFinite(n) || n < 1) return 1;
@@ -504,6 +513,7 @@
         verifyKeyString: verifyKeyString,
         parseKeyString: parseKeyString,
         checkOnline: checkOnline,
+        announcementsUrl: announcementsUrl,
         signNewKey: signNewKey,
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,

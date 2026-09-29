@@ -279,6 +279,7 @@ export interface UiState {
     notifyDrawerOpen: boolean;
     notifyView: import('../features/notifications').NotifyView | null;
     notifyFeed: import('../features/notifications').NotifyFeedItem[];
+    notifySellerFeed: import('../features/notifications').NotifyFeedItem[];
     notifySeenIds: string[];
     notifyFeedFetchedAt: number;
     notifyFeedInFlight: boolean;
@@ -363,6 +364,7 @@ export const uiState = createStore<UiState>('uiState', {
     notifyDrawerOpen: false,
     notifyView: null,
     notifyFeed: [],
+    notifySellerFeed: [],
     notifySeenIds: [],
     notifyFeedFetchedAt: 0,
     notifyFeedInFlight: false,

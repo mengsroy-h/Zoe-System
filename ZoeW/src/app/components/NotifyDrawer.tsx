@@ -1,6 +1,6 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, combinedNotifyFeed, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
@@ -110,7 +110,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySeenIds', 'updateReady']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'updateReady']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -129,7 +129,7 @@ export function NotifyDrawer() {
             <div className="drawer-body">
                 <ExpirySection view={s.notifyView} />
                 <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
-                <FeedSection feed={s.notifyFeed} seen={s.notifySeenIds} />
+                <FeedSection feed={combinedNotifyFeed(s.notifyFeed, s.notifySellerFeed)} seen={s.notifySeenIds} />
             </div>
             <div className="drawer-foot notify-foot">
                 <div className="credit-tag">Powered By ZoeW</div>

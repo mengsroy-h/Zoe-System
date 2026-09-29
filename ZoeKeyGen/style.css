@@ -312,6 +312,15 @@ td.note-cell { white-space: normal; max-width: 140px; }
 .hidden { display: none !important; }
 .text-muted { color: var(--text-muted); }
 .mb-8 { margin-bottom: 8px; }
+.notice-body-input { font-family: inherit; font-size: calc(12.5 * var(--fs-unit)); }
+.notice-send-btn { width: 100%; margin-bottom: 12px; }
+.notice-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.notice-empty { font-size: calc(11.5 * var(--fs-unit)); color: var(--text-muted); padding: 10px; text-align: center; border: 1px dashed var(--border-color); border-radius: 8px; }
+.notice-item { border: 1px solid var(--border-color); border-radius: 8px; padding: 9px 11px; background: var(--body-bg); }
+.notice-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.notice-title { font-weight: 700; font-size: calc(12.5 * var(--fs-unit)); overflow-wrap: anywhere; }
+.notice-body { margin-top: 4px; font-size: calc(12 * var(--fs-unit)); white-space: pre-line; overflow-wrap: anywhere; }
+.notice-meta { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: calc(10.5 * var(--fs-unit)); color: var(--text-muted); }
 
 .ptr-indicator {
     position: fixed; top: 10px; top: calc(env(safe-area-inset-top) + 10px); left: 50%; width: 28px; height: 28px;

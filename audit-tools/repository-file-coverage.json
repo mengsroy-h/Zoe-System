@@ -112,6 +112,7 @@
       "category": "behavior",
       "guards": [
         "audit-tools/function-surface-test.js",
+        "audit-tools/keygen-notice-test.js",
         "audit-tools/keygen-session-security-test.js"
       ],
       "evidence": "Function inventory និងតេស្តឥរិយាបថ session របស់ ZoeKeyGen អាន app.js ពិត។",
@@ -1623,6 +1624,9 @@
     "ZoeW/tests/registry-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/seller-notices.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/setup.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1852,6 +1856,9 @@
       "policy": "guard-1"
     },
     "audit-tools/item-money-integrity-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keygen-notice-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/keygen-pin-flow-test.js": {

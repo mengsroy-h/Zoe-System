@@ -117,7 +117,7 @@
 .notify-feed-title { flex: 1; min-width: 0; font-size: calc(12 * var(--fs-unit)); font-weight: 700; color: var(--text-main); }
 .notify-new-tag { flex-shrink: 0; padding: 1px 7px; border-radius: 999px; background: var(--danger); color: #ffffff; font-size: calc(9.5 * var(--fs-unit)); font-weight: 700; }
 .notify-feed-date { font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); }
-.notify-feed-body { margin-top: 3px; font-size: calc(11.5 * var(--fs-unit)); color: var(--text-main); line-height: 1.55; }
+.notify-feed-body { margin-top: 3px; font-size: calc(11.5 * var(--fs-unit)); color: var(--text-main); line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
 .notify-feed-points { margin: 4px 0 0; padding-left: 18px; font-size: calc(11 * var(--fs-unit)); color: var(--text-main); line-height: 1.55; }
 .notify-foot { align-items: center; }
 

@@ -43,6 +43,21 @@
         }
       }
     },
+    "license_announcements": {
+      "$appCode": {
+        ".read": true,
+        ".validate": "$appCode === 'ZOE'",
+        "$msgId": {
+          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          ".validate": "newData.hasChildren(['kind', 'title', 'at']) && $msgId.matches(/^n[0-9]{13}[a-z0-9]{6}$/)",
+          "kind":  { ".validate": "newData.isString() && (newData.val() === 'notice' || newData.val() === 'maintenance')" },
+          "title": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120" },
+          "body":  { ".validate": "newData.isString() && newData.val().length <= 600" },
+          "at":    { ".validate": "newData.isNumber() && newData.val() > 0" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "license_keys_meta": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {

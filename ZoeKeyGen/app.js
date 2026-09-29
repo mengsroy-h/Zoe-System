@@ -1,4 +1,4 @@
-const APP_VERSION = '2.20.7';
+const APP_VERSION = '2.21.0';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -23,8 +23,10 @@ const ACTION_ALLOWLIST = [
     "navAuthFlow",
     "openConfigFlow",
     "refreshKeyList",
+    "refreshNoticeList",
     "saveFirebaseConfig",
     "saveNewSecurityPin",
+    "sendNotice",
     "verifySecurityPin"
 ];
 function readActionArgs(el, event) {
@@ -1281,6 +1283,14 @@ function showLoginModalWithPrefill() {
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
     if (keyListBody) keyListBody.innerHTML = '';
+    noticeListCache = [];
+    noticeReadFailed = false;
+    const noticeListBody = document.getElementById('noticeListBody');
+    if (noticeListBody) noticeListBody.innerHTML = '';
+    const noticeTitleInput = document.getElementById('noticeTitleInput');
+    if (noticeTitleInput) noticeTitleInput.value = '';
+    const noticeBodyInput = document.getElementById('noticeBodyInput');
+    if (noticeBodyInput) noticeBodyInput.value = '';
     document.querySelectorAll('.modal').forEach((m) => {
         if (m.id !== 'loginModal') closeModal(m.id);
     });
@@ -1540,6 +1550,7 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     if (!wasAlreadySignedIn) showLiveToast('signin');
     requestSessionSigningKeyRestoreIfEligible();
     refreshKeyList();
+    refreshNoticeList();
 }
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
@@ -2323,6 +2334,194 @@ async function confirmExtendKey() {
     }
 }
 
+const NOTICE_TITLE_MAX = 120;
+const NOTICE_BODY_MAX = 600;
+const NOTICE_KEEP_MAX = 20;
+const NOTICE_KIND_LABELS = { notice: '📢 សេចក្តីប្រកាស', maintenance: '🛠️ ការថែទាំប្រព័ន្ធ' };
+const NOTICE_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
+let noticeListCache = [];
+let noticeReadFailed = false;
+let isSendingNotice = false;
+
+function noticeBucketPath() {
+    return 'license_announcements/' + LICENSE_APP_CODE;
+}
+
+function cleanNoticeText(value) {
+    return String(value == null ? '' : value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim();
+}
+
+function buildNoticePayload(kind, title, body, at) {
+    if (!Object.prototype.hasOwnProperty.call(NOTICE_KIND_LABELS, kind)) return { error: 'kind' };
+    const cleanTitle = cleanNoticeText(title);
+    const cleanBody = cleanNoticeText(body);
+    if (!cleanTitle) return { error: 'title-empty' };
+    if (cleanTitle.length > NOTICE_TITLE_MAX) return { error: 'title-long', length: cleanTitle.length };
+    if (cleanBody.length > NOTICE_BODY_MAX) return { error: 'body-long', length: cleanBody.length };
+    if (typeof at !== 'number' || !isFinite(at) || at <= 0) return { error: 'at' };
+    const payload = { kind: kind, title: cleanTitle, at: Math.floor(at) };
+    if (cleanBody) payload.body = cleanBody;
+    return { payload: payload };
+}
+
+function noticeErrorMessage(built) {
+    if (built.error === 'title-empty') return 'សូមវាយចំណងជើងដំណឹង!';
+    if (built.error === 'title-long') return 'ចំណងជើងវែងពេក ៖ ' + built.length + ' តួ (ដល់ ' + NOTICE_TITLE_MAX + ' តួ)!';
+    if (built.error === 'body-long') return 'ខ្លឹមសារវែងពេក ៖ ' + built.length + ' តួ (ដល់ ' + NOTICE_BODY_MAX + ' តួ)!';
+    if (built.error === 'at') return 'មិនអាចអានម៉ោងបានទេ! សូម Refresh ហើយសាកល្បងម្តងទៀត។';
+    return 'សូមជ្រើសប្រភេទដំណឹង!';
+}
+
+function newNoticeId(at) {
+    const stamp = String(Math.floor(at)).padStart(13, '0').slice(-13);
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    let tail = '';
+    for (let i = 0; i < bytes.length; i++) tail += NOTICE_ID_ALPHABET.charAt(bytes[i] % NOTICE_ID_ALPHABET.length);
+    return 'n' + stamp + tail;
+}
+
+function noticeIdsToTrim(existingIds, keepMax) {
+    const ids = (Array.isArray(existingIds) ? existingIds : []).filter((id) => typeof id === 'string').sort();
+    const excess = ids.length - (keepMax - 1);
+    return excess > 0 ? ids.slice(0, excess) : [];
+}
+
+function noticeRowsOf(raw) {
+    if (!raw || typeof raw !== 'object') return [];
+    return Object.keys(raw).filter((id) => raw[id] && typeof raw[id] === 'object').sort().reverse().map((id) => ({
+        id: id,
+        kind: String(raw[id].kind || ''),
+        title: String(raw[id].title || ''),
+        body: String(raw[id].body || ''),
+        at: typeof raw[id].at === 'number' ? raw[id].at : 0
+    }));
+}
+
+function setNoticeSendBusy(busy) {
+    const btn = document.getElementById('noticeSendBtn');
+    if (!btn) return;
+    btn.disabled = !!busy;
+    btn.textContent = busy ? '⏳ កំពុងផ្ញើ...' : '📨 ផ្ញើដំណឹង';
+}
+
+async function refreshNoticeList() {
+    const list = document.getElementById('noticeListBody');
+    const operationDb = db;
+    if (!list || !operationDb) return;
+    const myGeneration = keyListSessionGeneration;
+    list.innerHTML = '<li class="notice-empty">កំពុងផ្ទុក...</li>';
+    try {
+        const snap = await withTimeout(fb.get(fb.ref(operationDb, noticeBucketPath())), 15000, 'Notice list timed out');
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        noticeReadFailed = false;
+        noticeListCache = noticeRowsOf(snap.exists() ? snap.val() : null);
+    } catch (e) {
+        if (myGeneration !== keyListSessionGeneration || db !== operationDb) return;
+        console.error(e);
+        noticeReadFailed = true;
+        noticeListCache = [];
+    }
+    renderNoticeList();
+}
+
+function renderNoticeList() {
+    const list = document.getElementById('noticeListBody');
+    if (!list) return;
+    if (noticeReadFailed) {
+        list.innerHTML = '<li class="notice-empty">⚠️ អានបញ្ជីដំណឹងមិនបាន — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច ហើយពិនិត្យអ៊ីនធឺណិត</li>';
+        return;
+    }
+    if (!noticeListCache.length) {
+        list.innerHTML = '<li class="notice-empty">មិនទាន់មានដំណឹងដែលបានផ្ញើ</li>';
+        return;
+    }
+    list.innerHTML = noticeListCache.map((row) => `<li class="notice-item">
+            <div class="notice-head">
+                <span class="badge badge-scope">${escapeHtml(NOTICE_KIND_LABELS[row.kind] || row.kind)}</span>
+                <span class="notice-title">${escapeHtml(row.title)}</span>
+            </div>
+            ${row.body ? `<div class="notice-body">${escapeHtml(row.body)}</div>` : ''}
+            <div class="notice-meta">
+                <span>${escapeHtml(row.at > 0 ? new Date(row.at).toLocaleString('km-KH') : '-')}</span>
+                <button class="btn-mini" data-notice-id="${escapeHtml(row.id)}" data-action="delete-notice">🗑️ លុប</button>
+            </div>
+        </li>`).join('');
+}
+
+async function sendNotice() {
+    if (isSendingNotice) return;
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
+    const kindEl = document.getElementById('noticeKindInput');
+    const titleEl = document.getElementById('noticeTitleInput');
+    const bodyEl = document.getElementById('noticeBodyInput');
+    const built = buildNoticePayload(kindEl ? kindEl.value : '', titleEl ? titleEl.value : '', bodyEl ? bodyEl.value : '', getServerNow());
+    if (!built.payload) { alert(noticeErrorMessage(built)); return; }
+    if (!confirm('ផ្ញើដំណឹងនេះទៅ ZoeW គ្រប់ឧបករណ៍?\n\n' + NOTICE_KIND_LABELS[built.payload.kind] + ' ៖ ' + built.payload.title)) return;
+    if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+    const bucket = noticeBucketPath();
+    const id = newNoticeId(built.payload.at);
+    isSendingNotice = true;
+    setNoticeSendBusy(true);
+    let write = null;
+    let writeFailed = false;
+    try {
+        const snap = await withTimeout(fb.get(fb.ref(operationDb, bucket)), 15000, 'Notice read timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        const updates = {};
+        noticeIdsToTrim(snap.exists() ? Object.keys(snap.val() || {}) : [], NOTICE_KEEP_MAX)
+            .forEach((oldId) => { updates[bucket + '/' + oldId] = null; });
+        updates[bucket + '/' + id] = built.payload;
+        write = retryAsync(() => fb.update(fb.ref(operationDb), updates), 3, 1000);
+        write.catch(() => { writeFailed = true; });
+        await withTimeout(write, 15000, 'Notice send timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (titleEl) titleEl.value = '';
+        if (bodyEl) bodyEl.value = '';
+        showToast('✅ បានផ្ញើដំណឹង! ZoeW នឹងឃើញវាក្នុងផ្ទាំង 🔔 ពេលវាទាញលើកក្រោយ');
+        refreshNoticeList();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'sendNotice' });
+        if (write && !writeFailed) {
+            write.then(() => {
+                if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+                showToast('✅ ដំណឹងដែលរង់ចាំ ត្រូវបានផ្ញើរួចហើយ!');
+                refreshNoticeList();
+            }, () => {});
+            alert('⏳ ការផ្ញើមិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ ដំណឹងអាចនឹងផ្ញើដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើលបញ្ជីខាងក្រោម មុនផ្ញើម្តងទៀត។');
+        } else {
+            alert('ផ្ញើដំណឹងមិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច ហើយពិនិត្យអ៊ីនធឺណិត រួចសាកល្បងម្តងទៀត។');
+        }
+    } finally {
+        isSendingNotice = false;
+        setNoticeSendBusy(false);
+    }
+}
+
+async function deleteNotice(id) {
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) return;
+    const row = noticeListCache.find((r) => r.id === id);
+    if (!row) return;
+    if (!confirm('លុបដំណឹង «' + row.title + '»?\n\nZoeW នឹងលែងបង្ហាញវា ពេលទាញលើកក្រោយ។')) return;
+    try {
+        await withTimeout(retryAsync(() => fb.set(fb.ref(operationDb, noticeBucketPath() + '/' + row.id), null), 3, 1000), 15000, 'Notice delete timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        showToast('✅ បានលុបដំណឹង!');
+        refreshNoticeList();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'deleteNotice' });
+        alert('លុបដំណឹងមិនបានទេ! សូមពិនិត្យអ៊ីនធឺណិត រួចសាកល្បងម្តងទៀត។');
+    }
+}
+
 function setupIOSPullToRefresh() {
     if (window.navigator.standalone !== true) return;
 
@@ -2425,6 +2624,15 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'extend') openExtendModal(id);
             else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
+        });
+    }
+
+    const noticeListBody = document.getElementById('noticeListBody');
+    if (noticeListBody) {
+        noticeListBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-notice-id]');
+            if (!btn || btn.dataset.action !== 'delete-notice') return;
+            deleteNotice(btn.dataset.noticeId);
         });
     }
 

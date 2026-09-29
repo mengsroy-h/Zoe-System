@@ -171,6 +171,37 @@ const firebaseConfig = {
 
     <div class="app-card card-wide">
         <div class="card-header">
+            <div class="card-title">🔔 ផ្ញើដំណឹងទៅ ZoeW</div>
+            <button class="btn-mini" data-act="refreshNoticeList">🔄 Refresh</button>
+        </div>
+        <div class="card-subtitle mb-8">
+            ដំណឹងលេចក្នុងផ្ទាំង 🔔 របស់ ZoeW គ្រប់ឧបករណ៍ ពេល ZoeW ទាញលើកក្រោយ (ពេលបើក App · ពេលបើកផ្ទាំង 🔔 · រាល់ ៥ នាទី)។
+            ⚠️ អ្នកណាក៏អានដំណឹងនេះបាន — កុំដាក់ព័ត៌មានសម្ងាត់។ រក្សាទុកតែ ២០ ចុងក្រោយ (ចាស់ជាងគេលុបដោយស្វ័យប្រវត្តិ)។
+        </div>
+        <div class="form-grid">
+            <div class="col-half">
+                <label for="noticeKindInput">ប្រភេទ</label>
+                <select id="noticeKindInput">
+                    <option value="notice">📢 សេចក្តីប្រកាស</option>
+                    <option value="maintenance">🛠️ ការថែទាំប្រព័ន្ធ</option>
+                </select>
+            </div>
+            <div class="col-half">
+                <label for="noticeTitleInput">ចំណងជើង (ដល់ 120 តួ)</label>
+                <input type="text" id="noticeTitleInput" maxlength="120" placeholder="ឧ. ថែទាំប្រព័ន្ធ ថ្ងៃអាទិត្យ ម៉ោង ៩ យប់">
+            </div>
+        </div>
+        <label for="noticeBodyInput">ខ្លឹមសារ (ស្រេចចិត្ត · ដល់ 600 តួ)</label>
+        <textarea id="noticeBodyInput" class="notice-body-input" maxlength="600" placeholder="ឧ. App អាចភ្ជាប់មិនបានប្រហែល ១០ នាទី។"></textarea>
+        <button class="btn-primary notice-send-btn" id="noticeSendBtn" data-act="sendNotice">📨 ផ្ញើដំណឹង</button>
+        <label>ដំណឹងដែលបានផ្ញើ</label>
+        <ul class="notice-list" id="noticeListBody">
+            <li class="notice-empty">កំពុងផ្ទុក...</li>
+        </ul>
+    </div>
+
+    <div class="app-card card-wide">
+        <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
             <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
             <button class="btn-mini" data-act="migrateLegacyLicenseKeyMetadata" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>

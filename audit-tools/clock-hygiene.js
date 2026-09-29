@@ -47,6 +47,7 @@ const LOCAL_CLOCK_OK = {
         noteAppLockExcuse: 'ត្រាពេលនៃសកម្មភាពដែលនាំអ្នកប្រើចេញពី App ដោយចេតនា (ខល · រើសឯកសារ · ស្កេនជីវមាត្រ) — local សុទ្ធសាធ ហើយអ្នកអានវា (`noteAppLockAway`) ឆ្លងកាត់ `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ Infinity ➜ **ចាក់សោ** ដែលជាទិសសុវត្ថិភាព',
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល',
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
+        fetchNotifyFeed: 'ពិដានល្បឿនការទាញសារជូនដំណឹង ៦០ វិ. — local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ទាញ)',
         seedCustomerTableFromImport: 'ត្រាថា cache តារាងអតិថិជនស្រស់ពេលណា — TTL local ដដែល គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         setFastLookupRow: 'ត្រាពេល cache Lookup ក្នុងសតិ — TTL local សុទ្ធសាធ គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         scheduleCustomerTableSoonRefresh: 'ត្រាពេលតាំងម៉ោងទាញឡើងវិញ — វាស់តាម elapsedSince() ដែល fail-open ពេលនាឡិកាថយក្រោយ',

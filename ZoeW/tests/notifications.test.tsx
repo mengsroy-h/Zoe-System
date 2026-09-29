@@ -17,7 +17,7 @@ import { barcodeAbandonIsRipe } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
-    NOTIFY_EMPTY_EXPIRY_TEXT, NOTIFY_FEED_CACHE_KEY, NOTIFY_HOUR_MS, NOTIFY_NEAR_EXPIRY_HOURS, NOTIFY_SEEN_KEY,
+    NOTIFY_EMPTY_EXPIRY_TEXT, NOTIFY_FEED_CACHE_KEY, NOTIFY_HOUR_MS, NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_SEEN_KEY,
     compareVersions, fetchNotifyFeed, hoursUntilAbandon, nearExpiryView, newerAppVersion, notifyBadgeCount,
     openNotifyDrawer, refreshNotifyView, sanitizeFeed
 } from '../src/features/notifications';
@@ -65,7 +65,7 @@ describe('ជិតផុតកំណត់ ៖ ព្រំដែនដដែ�
         expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS - 1, NOW)).toBe(0);
         expect(barcodeAbandonIsRipe(open, NOW - ABANDON_AGE_MS - 1, NOW)).toBe(true);
         expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS + DAY, NOW)).toBe(-1);
-        expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS + DAY - 1, NOW)).toBe(NOTIFY_NEAR_EXPIRY_HOURS);
+        expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS + DAY - 1, NOW)).toBe(NOTIFY_EXPIRY_HOURS_MAX);
         expect(hoursUntilAbandon({ code: 'B2', isClosed: true }, NOW - ABANDON_AGE_MS - DAY, NOW)).toBe(-1);
         const restored = { code: 'B3', isClosed: false, restoredAt: NOW - 3 * DAY };
         expect(hoursUntilAbandon(restored, NOW - ABANDON_AGE_MS - DAY, NOW)).toBe(-1);

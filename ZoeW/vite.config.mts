@@ -34,6 +34,8 @@ function walk(dir: string, base = dir): string[] {
     return out;
 }
 
+const NETWORK_ONLY = new Set(['./announcements.json']);
+
 function serviceWorkerPlugin(): Plugin {
     let outDir = 'dist';
     return {
@@ -45,7 +47,7 @@ function serviceWorkerPlugin(): Plugin {
         async closeBundle() {
             const dist = path.resolve(ROOT, outDir);
             if (!existsSync(dist)) return;
-            const emitted = walk(dist).filter((p) => p !== './sw.js' && !p.endsWith('.map') && !NATIVE_CHUNK_RE.test(p));
+            const emitted = walk(dist).filter((p) => p !== './sw.js' && !NETWORK_ONLY.has(p) && !p.endsWith('.map') && !NATIVE_CHUNK_RE.test(p));
 
             const core = emitted.filter((p) =>
                 p === './index.html' ||

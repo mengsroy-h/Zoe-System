@@ -1,11 +1,17 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_NEAR_EXPIRY_HOURS, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
 
 const KIND_ICON: Record<string, string> = { update: '🆕', maintenance: '🛠️', notice: '📢' };
+
+const KIND_CLASS: Record<string, string> = {
+    update: 'notify-feed-item notify-kind-update',
+    maintenance: 'notify-feed-item notify-kind-maintenance',
+    notice: 'notify-feed-item notify-kind-notice'
+};
 
 function hoursText(h: number): string {
     return h <= 0 ? 'ដល់ពេលហើយ' : '≤ ' + h + ' ម៉ោង';
@@ -21,7 +27,7 @@ function ExpirySection({ view }: { view: NotifyView | null }) {
                 <>
                     <div className="notify-summary is-warn" id="notifyExpirySummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
-                        {' '}នឹងផុតកំណត់ក្នុង {NOTIFY_NEAR_EXPIRY_HOURS} ម៉ោងខាងមុខ ➜ ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ (ដកលុយ) បើមិនទាន់យក
+                        {' '}នឹងផុតកំណត់ក្នុង {NOTIFY_EXPIRY_HOURS_MAX} ម៉ោងខាងមុខ ➜ ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ (ដកលុយ) បើមិនទាន់យក
                     </div>
                     <ul className="notify-expiry-list" id="notifyExpiryList">
                         {rows.map((row) => (
@@ -80,7 +86,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
             {feed.length ? (
                 <ul className="notify-feed-list" id="notifyFeedList">
                     {feed.map((item) => (
-                        <li key={item.id} className={'notify-feed-item kind-' + item.kind}>
+                        <li key={item.id} className={KIND_CLASS[item.kind] || 'notify-feed-item'}>
                             <div className="notify-feed-head">
                                 <span className="notify-feed-ico" aria-hidden="true">{KIND_ICON[item.kind] || '📢'}</span>
                                 <span className="notify-feed-title">{item.title}</span>

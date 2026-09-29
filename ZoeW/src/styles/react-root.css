@@ -109,9 +109,9 @@
 .notify-version-line { font-size: calc(11.5 * var(--fs-unit)); color: var(--text-main); }
 .notify-refresh-btn { min-height: 40px; border: none; border-radius: var(--radius-md); background: var(--action-primary); color: #ffffff; font-size: calc(12 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
 .notify-feed-item { padding: 8px 10px; border-radius: var(--radius-md); background: var(--body-bg); border-left: 3px solid var(--border-color); }
-.notify-feed-item.kind-update { border-left-color: var(--action-primary); }
-.notify-feed-item.kind-maintenance { border-left-color: var(--warning); }
-.notify-feed-item.kind-notice { border-left-color: var(--accent-purple); }
+.notify-feed-item.notify-kind-update { border-left-color: var(--action-primary); }
+.notify-feed-item.notify-kind-maintenance { border-left-color: var(--warning); }
+.notify-feed-item.notify-kind-notice { border-left-color: var(--accent-purple); }
 .notify-feed-head { display: flex; align-items: flex-start; gap: 6px; }
 .notify-feed-ico { flex-shrink: 0; font-size: calc(13 * var(--fs-unit)); }
 .notify-feed-title { flex: 1; min-width: 0; font-size: calc(12 * var(--fs-unit)); font-weight: 700; color: var(--text-main); }

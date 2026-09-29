@@ -36,7 +36,7 @@ export interface NotifyFeedItem {
     date: string;
 }
 
-export const NOTIFY_NEAR_EXPIRY_HOURS = 24;
+export const NOTIFY_EXPIRY_HOURS_MAX = 24;
 export const NOTIFY_HOUR_MS = 60 * 60 * 1000;
 export const NOTIFY_EXPIRY_LIST_MAX = 60;
 export const NOTIFY_FEED_PATH = '/announcements.json';
@@ -49,12 +49,12 @@ export const NOTIFY_FEED_KINDS = ['update', 'maintenance', 'notice'];
 export const NOTIFY_SEEN_KEY = 'zoew_notify_seen_v1';
 export const NOTIFY_FEED_CACHE_KEY = 'zoew_notify_feed_v1';
 export const NOTIFY_SEEN_MAX = 60;
-export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_NEAR_EXPIRY_HOURS + ' ម៉ោងខាងមុខទេ';
+export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
 
 export function hoursUntilAbandon(barcode, parentAt, now) {
     if (!barcode || barcode.isClosed) return -1;
     if (barcodeAbandonIsRipe(barcode, parentAt, now)) return 0;
-    for (let h = 1; h <= NOTIFY_NEAR_EXPIRY_HOURS; h++) {
+    for (let h = 1; h <= NOTIFY_EXPIRY_HOURS_MAX; h++) {
         if (barcodeAbandonIsRipe(barcode, parentAt, now + h * NOTIFY_HOUR_MS)) return h;
     }
     return -1;

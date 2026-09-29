@@ -1551,6 +1551,9 @@
     "ZoeW/tests/ledger-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/list-render-scope.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
       "policy": "zoew-self-verification"
     },

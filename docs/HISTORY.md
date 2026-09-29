@@ -39,6 +39,63 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.10] — 2026-09-29 · ZoeW ៖ **ជួរដេកច្រើន (filter «ទាំងអស់») ៖ ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម លែងគូរតារាងទាំងមូលឡើងវិញ** (branch · មិនទាន់ merge)
+
+**ZoeW `2.42.10` (`zoew-v237`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។
+
+**របាយការណ៍ម្ចាស់គម្រោង (ទូរស័ព្ទពិត)** ៖ *«capacitor app នៅតែមិន smooth ដូច PWA»* · *«ពេលឈរលើ filter ទាំងអស់ មានបញ្ជីជួរដេកច្រើន
+ចលនាហូតប្រអប់ប្រវត្តិ អាក់អាក់ និង បើកធុងសំរាមក៏ដូច glitch មិនអាក់ខ្លាំងតែមើលទៅឃើញថាមិនរលូន»*។
+
+#### មូលហេតុ (វាស់ មិនមែនស្មាន)
+
+- `HistoryTableBody` subscribe **`uiState` ទាំងមូល** (`useStore(dataState, uiState)`) ហើយ `HistoryRow` មាន `memo` តែ `row` ជា object ថ្មី
+  រាល់ការគូរ ➜ `memo` មិនដែលរារាំងអ្វីសោះ ➜ **រាល់** ការប្រែ `uiState` (ហូតប្រអប់ · បើកម៉ឺនុយ (...) · បើកប្រអប់ · លាក់របា Tab ខណៈរមូរ ·
+  ប្តូរទំព័រ) គូរ **ជួរដេកទាំងអស់** ឡើងវិញ។ វាលទាំងនោះនៅក្នុង `markImmediate` ➜ commit **ភ្លាម** ➜ ការគូរ ១៥០០ ជួររត់ **ខាងក្នុងផ្លូវចលនា**
+  (មុន FLIP វាស់ · ក្នុង rAF នៃការរមូរ)។ តារាងប្រវត្តិ **គ្មានពិដាន** (ខុសពីបញ្ជីស្កេន/Locker/ធុងសំរាម ២០០) ➜ filter «ទាំងអស់» ធ្ងន់ជាងគេ។
+- ពាក់កណ្តាលទី ២ ៖ ឪពុក (`PageData` · `PageEntry`) គូរឡើងវិញរាល់ការហូត/បង្រួម ➜ React គូរកូនដែលមិនមែន `memo` តាម ➜ ការសាង model
+  ១៥០០ ជួរ ទោះ subscription ត្រូវរួចក៏ដោយ (trace ៖ React ~២៤០ ms/ការហូត នៅសល់ក្រោយកែតែ subscription)។
+- ⚠️ វាមិនមែនកំហុសតែលើ APK ទេ — PWA ក៏ដូចគ្នា (ផ្លូវកូដដដែល)។ ភាពខុសគ្នាដែលវាស់បានរវាង web និង APK ក្នុង Chromium តូច ៖
+  `measureStatusBarTone()` (`elementsFromPoint`) លើ APK បង្ខំ layout មុនពេល ➜ ~១៥ ms/ការហូត (CPU ×4)។
+
+#### ការកែ
+
+- `HistoryTableBody` subscribe តែ `historyView` + `historyRenderSeq` (លេខរៀងថ្មីក្នុង `renderHistory()` ជំនួស `uiState.touch()` ➜ ធាតុកែ
+  **នៅនឹងកន្លែង** + `renderHistory()` នៅតែគូរ) · `dataState` (អត្រាប្តូរ) · `firebaseState` (listener ធ្លាក់ ➜ សារ «វាស់មិនបាន» ពេលបញ្ជីទទេ ៖
+  ពីមុនវាពឹងលើការប្រែ `uiState` ផ្សេងដោយចៃដន្យ)។
+- `HistoryRow` ប្រៀបតាម **តម្លៃ** (`sameHistoryRowModel()` ៖ វាលកម្រិតទី ១ + object រាបស្មើមួយជាន់ដូច `money`) ➜ snapshot Firebase ថ្មីដែល
+  តម្លៃដដែល ➜ ០ ជួរគូរ · ធាតុ ១ ប្រែ ➜ ១ ជួរ · អត្រាប្តូរប្រែ ➜ គ្រប់ជួរ។
+- បញ្ជីស្កេន · Locker · ធុងសំរាម subscribe តែវាល view របស់ខ្លួន (អ្នកផលិតវា assign object ថ្មីជានិច្ច — ផ្ទៀងរួច) ·
+  ឪពុកប្រើ `MemoHistoryTableBody` · `MemoEntryListTableBody` · `MemoLockerListTableBody` (function ដើមនៅតែ export សម្រាប់ `react-view`)។
+
+#### ការវាស់ (Chromium · CPU ×4 · ១៥០០ ជួរលើ ៧ ថ្ងៃ · filter «ទាំងអស់» · ធុងសំរាម ២០០ · web / APK ក្លែង)
+
+| សេណារីយ៉ូ | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| ហូតប្រអប់ ៤ ដង ៖ long task សរុប (median) | 2078 / 1959 ms | **419 / 479 ms** |
+| ហូតប្រអប់ ៖ ស៊ុមជាប់យូរបំផុត (median) | 1650 / 1533 ms | **267 / 300 ms** |
+| រមូរ (របា Tab លាក់) ៖ long task | 2122 / 2061 ms | **423 / 387 ms** |
+| បើកធុងសំរាម ៖ JavaScript ក្នុងការចុច | 766 ms | **89 ms** |
+
+⛔ **អ្វីដែលនៅសល់ (វាស់រួច · មិនកែក្នុងជុំនេះ)** ៖ (១) PrePaint ~២៥០ ms និង HitTest ~១០០ ms ក្នុងមួយការហូត ដែលកើនតាមទំហំ DOM
+(តារាង ៤២,០០០ node) ៖ `will-change: transform` លើ `.page-main` បន្ថយ PrePaint ~៣០–៥០% តែជា CSS ក្នុង **តំបន់ហាមចូល** ➜ ត្រូវវាស់លើ iPhone
+និង Android ពិតមុន · (២) layout តារាងធុងសំរាម ២០០ ក្រុម (~៦០០ ms ក្រោម CPU ×4 ក្នុងម៉ាស៊ីននេះ · `table-layout: fixed` មិនជួយ ·
+`body { overflow }` មិនមែនមូលហេតុ) — ផ្នែកធំអាចជាការរកពុម្ពអក្សរខ្មែរ/emoji ដែលម៉ាស៊ីននេះគ្មាន ➜ ត្រូវវាស់លើទូរស័ព្ទ ·
+(៣) ភាពខុសគ្នារចនាសម្ព័ន្ធតែមួយរវាង APK និង PWA Android ៖ `touchmove` **non-passive** របស់ PTR លើ `document` (APK តែប៉ុណ្ណោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/list-render-scope.test.tsx` (៨ ៖ mount `PageData` · `PageEntry` · `RecentlyDeletedModal` **ពិត** · រាប់ការគូរ body តាម getter លើ
+  `phone` របស់ទិន្នន័យ · ការប្រែ `uiState` ១៦ ប្រភេទ ➜ ០ · បើកធុងសំរាម ➜ តែធុងសំរាម · ទិសផ្ទុយ ៦)។ **`main` ធ្លាក់ ៦/៨** ·
+  mutation **១៣/១៣ ចាប់បាន** (body subscribe `uiState` ទាំងមូល · `memo` លំនាំដើម · គ្មាន `historyRenderSeq` · comparator ស្មើជានិច្ច ·
+  គ្មាន `firebaseState` · ការប្រៀបរំលង `money` · ឪពុកប្រើ function ធម្មតា ×៣ · បញ្ជីស្កេន/ធុងសំរាម subscribe វាលផ្សេង ×២)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ⛔ **សាកលើ Android (APK + PWA) និង iPhone (PWA) ពិត** ជាមួយ filter «ទាំងអស់» និងជួរដេកច្រើន ៖ ហូតប្រអប់ប្រវត្តិឡើង/ចុះ · រមូរតារាង ·
+  បើក/បិទធុងសំរាម · ចុច «យក»/«ដក»/កែតម្លៃលើជួរមួយ ➜ ជួរនោះប្រែភ្លាម · ប្តូរអត្រាប្រាក់ ➜ លេខរៀលប្រែគ្រប់ជួរ។
+- APK ៖ build ថ្មីពី branch/`main` (web ផ្ទុកក្នុង APK)។ PWA ៖ ទទួលតាម Netlify ក្រោយ merge។
+- គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
 ### [2.42.9] — 2026-09-28 · ZoeW ៖ **ហូតប្រអប់ប្រវត្តិលឿនជាងមុន ~១០ ដង** (PWA និង APK) · **ស្កេន ZTO លើ APK លែងចំណាយ preflight រាល់ការស្កេន** (merge រួចក្នុង PR #260)
 
 **ZoeW `2.42.9` (`zoew-v236`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។
@@ -1655,6 +1712,7 @@ Function ដែល export ៖ 978
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `price-edit-abort-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `react-view` | ផ្នែក ១ | — |
 | `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list` | — | ផ្នែក ១ |

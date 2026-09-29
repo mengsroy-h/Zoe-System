@@ -1,19 +1,21 @@
-import { dataState, uiState } from '../../../core/state';
+import { memo } from 'react';
+import { dataState, firebaseState, uiState } from '../../../core/state';
 import { getServerNow } from '../../../core/clock';
 import { parseTimestampFromId } from '../../../domain/barcode';
 import { emptyViewMessage } from '../../../services/db-listeners';
 import { DB_LISTENER_KEY_HISTORY } from '../../../core/text';
 import { FOUR_HOURS_MS } from '../../../features/session';
-import { useStore } from '../../hooks/useStore';
+import { useStore, useStoreFields } from '../../hooks/useStore';
 import { buildHistoryRowModel } from './rowModel';
 import { HistoryRow } from './HistoryRow';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-export function HistoryTableBody() {
-    useStore(dataState, uiState);
+const HISTORY_VIEW_FIELDS = ['historyView', 'historyRenderSeq'] as const;
 
-    const view = uiState.historyView;
+export function HistoryTableBody() {
+    useStore(dataState, firebaseState);
+    const view = useStoreFields(uiState, HISTORY_VIEW_FIELDS).historyView;
     if (view === null || view === undefined) return null;
 
     if (view.length === 0) {
@@ -43,3 +45,5 @@ export function HistoryTableBody() {
     }
     return <>{rows}</>;
 }
+
+export const MemoHistoryTableBody = memo(HistoryTableBody);

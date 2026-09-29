@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { onAct } from '../../actions';
-import type { HistoryRowModel } from './rowModel';
+import { sameHistoryRowModel, type HistoryRowModel } from './rowModel';
 
 const MONEY_SM = { fontSize: 'calc(10 * var(--fs-unit))' } as const;
 const MONEY_MD = { fontSize: 'calc(10.5 * var(--fs-unit))' } as const;
@@ -106,4 +106,4 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
             </td>
         </>
     );
-});
+}, (prev, next) => sameHistoryRowModel(prev.row, next.row));

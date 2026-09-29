@@ -1,5 +1,8 @@
+import { memo } from 'react';
 import { uiState } from '../../../core/state';
-import { useStore } from '../../hooks/useStore';
+import { useStoreFields } from '../../hooks/useStore';
+
+const ENTRY_LIST_FIELDS = ['entryListView'] as const;
 
 export interface EntryListRow {
     n: number;
@@ -10,8 +13,7 @@ export interface EntryListRow {
 }
 
 export function EntryListTableBody() {
-    useStore(uiState);
-    const rows = uiState.entryListView as EntryListRow[] | null;
+    const rows = useStoreFields(uiState, ENTRY_LIST_FIELDS).entryListView as EntryListRow[] | null;
     if (!rows || !rows.length) return null;
     return (
         <>
@@ -31,3 +33,5 @@ export function EntryListTableBody() {
         </>
     );
 }
+
+export const MemoEntryListTableBody = memo(EntryListTableBody);

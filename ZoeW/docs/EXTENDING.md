@@ -47,6 +47,8 @@ export function UpdateBanner() {
   អាន* ប្រែ (primitive ប្រៀបតាម `Object.is`; object/array ចាត់ថាប្រែរាល់ការសរសេរ)
 - **`useStore(...stores)`** ៖ component ដែលអានវាលច្រើន ឬវត្ថុដែលកែខាងក្នុង
 - **`useStoreFields(store, ['a', 'b'])`** ៖ component ដែលអានវាលច្រើនពីឃ្លាំងតែមួយ
+- ⛔ **បញ្ជីដែលមានជួរដេកច្រើន** ៖ subscribe តែវាល view របស់ខ្លួន (⛔ មិនមែន `useStore(uiState)` ទាំងមូល) ហើយឪពុកដែលគូរឡើងវិញញឹកញាប់
+  ប្រើកំណែ `memo` — ច្បាប់ពេញ ៖ `CLAUDE.md` ជួរ «បញ្ជីធំៗ ↔ ការគូរឡើងវិញ»
 - ⛔ ចលនារាល់ស៊ុម (PTR · អូសផ្ទាំង) **មិនចូល state របស់ React** — វារស់នៅ
   `src/app/behaviors/` ហើយកែ `style` តាម ref (តំបន់ហាមចូល `CLAUDE.md` ច្បាប់ ១១)
 - ⛔ ធាតុដែល React ជាម្ចាស់ មិនត្រូវឲ្យកូដ imperative ប៉ះ **កូន** របស់វា

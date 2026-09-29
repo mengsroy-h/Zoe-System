@@ -1,5 +1,8 @@
+import { memo } from 'react';
 import { uiState } from '../../../core/state';
-import { useStore } from '../../hooks/useStore';
+import { useStoreFields } from '../../hooks/useStore';
+
+const LOCKER_LIST_FIELDS = ['lockerListView'] as const;
 
 export interface LockerListRow {
     n: number;
@@ -13,8 +16,7 @@ export interface LockerListView {
 }
 
 export function LockerListTableBody() {
-    useStore(uiState);
-    const view = uiState.lockerListView as LockerListView | null;
+    const view = useStoreFields(uiState, LOCKER_LIST_FIELDS).lockerListView as LockerListView | null;
     if (!view || !view.rows.length) return null;
     return (
         <>
@@ -39,3 +41,5 @@ export function LockerListTableBody() {
         </>
     );
 }
+
+export const MemoLockerListTableBody = memo(LockerListTableBody);

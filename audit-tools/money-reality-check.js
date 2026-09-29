@@ -125,9 +125,11 @@ const N = {
     pickup: 'zoew_daily_pickup_cod_dod',
     collected: 'zoew_daily_collected_cod_dod'
 };
+// ⛔ `window` ទទេ ៖ កូដលុយ (`rawSnapshotToItemList()`) រាយការណ៍ record ខូចតាម `window.ZoeErrors` ➜ Node គ្មាន `window` ➜ dump ដែលមាន
+//    record មិនមែន object នឹងគាំង CLI (`ReferenceError`) ជំនួសការវាស់ record ល្អ (`money-reality-test`)
 const sb = {
     console, PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
-    scanHistory: [], deletedItems: []
+    scanHistory: [], deletedItems: [], window: {}
 };
 vm.createContext(sb);
 vm.runInContext(bodies, sb);

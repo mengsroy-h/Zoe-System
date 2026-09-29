@@ -35,7 +35,8 @@ import { ABANDON_AGE_MS } from '../src/features/session';
 import { abandonAtOf, expiryScheduleTimes, loadNotifyDismissed, NOTIFY_DISMISSED_KEY, NOTIFY_DISMISSED_MAX, NOTIFY_SCHEDULE_HORIZON_MS, sanitizeSellerNotices } from '../src/features/notifications';
 import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
-    pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners
+    pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
+    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -256,6 +257,91 @@ describe('APK (FCM)', () => {
         expect(await enablePush()).toBe(false);
         expect(uiState.pushStatus).toBe('denied');
         expect(pn.register).not.toHaveBeenCalled();
+    });
+});
+
+describe('⛔ ការព្យួរ ≠ ការធ្លាក់ ៖ ស្ថានភាព «កំពុងភ្ជាប់» មិនត្រូវជាប់ជារៀងរហូត', () => {
+    beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('web ៖ pushManager.subscribe() ព្យួរ ➜ error ក្នុងពិដាន (មិនមែន busy) · ចុចម្តងទៀតបាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        w.pushManager.subscribe.mockImplementationOnce(() => new Promise(() => {}));
+        let done: boolean | null = null;
+        enablePush().then((v) => { done = v; });
+        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
+        expect(done).toBe(false);
+        expect(uiState.pushStatus).toBe('error');
+        expect(await togglePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
+    });
+
+    it('web ៖ pushManager.getSubscription() ព្យួរ ➜ error ក្នុងពិដាន · បិទ ➜ off ក្នុងពិដាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        w.pushManager.getSubscription.mockImplementation(() => new Promise(() => {}));
+        let done: boolean | null = null;
+        enablePush().then((v) => { done = v; });
+        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
+        expect(done).toBe(false);
+        expect(uiState.pushStatus).toBe('error');
+        let off: boolean | null = null;
+        disablePush().then((v) => { off = v; });
+        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
+        expect(off).toBe(true);
+        expect(uiState.pushStatus).toBe('off');
+    });
+
+    it('web ៖ sub.unsubscribe() ព្យួរ ➜ បិទនៅតែចប់ (off) ក្នុងពិដាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        w.sub.unsubscribe.mockImplementationOnce(() => new Promise(() => {}));
+        let off: boolean | null = null;
+        disablePush().then((v) => { off = v; });
+        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
+        expect(off).toBe(true);
+        expect(uiState.pushStatus).toBe('off');
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(false);
+    });
+
+    it('APK ៖ register() ចប់ តែ token មិនដែលមក ➜ error ក្នុងពិដាន · token មកយឺត ➜ on (ការងារបញ្ចប់)', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('busy');
+        await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS + 50);
+        expect(uiState.pushStatus).toBe('error');
+        expect(pushRuntime.nativeEnabling).toBe(false);
+        await pn.listeners.registration({ value: 'fcmToken:' + 'y'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(true);
+    });
+
+    it('APK ៖ token មកមុនពិដាន តែ server ឆ្លើយយឺត ➜ watchdog មិនកាត់ការងារដែលកំពុងដើរ (នៅ busy រហូតដល់សាលក្រម)', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        const pending: ((r: Response) => void)[] = [];
+        vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { pending.push(resolve); })));
+        expect(await enablePush()).toBe(true);
+        await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS - 1000);
+        pn.listeners.registration({ value: 'fcmToken:' + 'w'.repeat(40) });
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(pending.length).toBe(1);
+        expect(uiState.pushStatus).toBe('busy');
+        expect(pushRuntime.nativeEnabling).toBe(true);
+        pending[0](jsonResponse({ ok: true }));
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+    });
+
+    it('APK ៖ token មកទាន់ពេល ➜ watchdog មិនសរសេរជាន់ on', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        await pn.listeners.registration({ value: 'fcmToken:' + 'z'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS + 50);
+        expect(uiState.pushStatus).toBe('on');
     });
 });
 

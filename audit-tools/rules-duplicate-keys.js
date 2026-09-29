@@ -5,6 +5,7 @@ const path = require('path');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.RULESDUP_APP_DIR ? path.resolve(process.env.RULESDUP_APP_DIR) : path.resolve(__dirname, '..');
 const files = ['firebase-database.rules.json', 'ZoeKeyGen/firebase-database.rules.json'];
+const { objectShapeNodes, requiresObject } = require('./rules-shape.js');
 
 function assertNoDuplicateKeys(source, file) {
     let index = 0;
@@ -138,5 +139,22 @@ files.forEach((file) => {
     }
 });
 
+// ⛔ node ដែលរំពឹង object (មាន schema កូន · អាចសរសេរបាន) ត្រូវមាន `.validate` ដែលទាមទារ object ៖ primitive គ្មានកូន ➜
+//    ការពិនិត្យកូនមិនរត់ ➜ server ទទួល ➜ listener របស់គ្រប់ឧបករណ៍ធ្លាក់ (2.45.4 · បញ្ជីដេរីវេពី rules ពិតក្នុង `rules-shape.js`)។
+//    ពិនិត្យដាច់ពី try ខាងលើ ➜ កូនសោស្ទួនមិនបិទបាំងការធ្លាក់នេះ។ ការវាស់លើ engine ពិត ៖ `emu/crud-rules-flow` · `emu/license-seat-rules-test`។
+files.forEach((file) => {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+        const shapes = objectShapeNodes(parsed.rules || {});
+        const loose = shapes.filter((n) => !requiresObject(n.validate));
+        if (!shapes.length) throw new Error(file + ' ៖ រក node ដែលរំពឹង object មិនឃើញ (ជាន់អប្បបរមា ➜ ការវាស់ខូច)');
+        if (loose.length) throw new Error(file + ' ៖ node ដែលរំពឹង object តែគ្មាន `newData.hasChildren(…)` ក្នុង .validate (' + loose.length + '/' + shapes.length + ') ៖ ' + loose.map((n) => n.rulePath).join(' · '));
+        console.log('   ok    ' + file + ' ៖ node ដែលរំពឹង object ទាំង ' + shapes.length + ' ទាមទារ object (primitive ត្រូវបដិសេធ)');
+    } catch (error) {
+        failed = true;
+        console.log('  FAIL   ' + (error && error.message ? error.message : error));
+    }
+});
+
 if (failed) process.exit(1);
-console.log('✅ rules JSON ទាំងអស់គ្មាន key ស្ទួន');
+console.log('✅ rules JSON ទាំងអស់គ្មាន key ស្ទួន · node ដែលរំពឹង object ទាមទារ object');

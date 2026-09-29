@@ -6,6 +6,7 @@
       ".read": "auth != null",
       "$itemId": {
         ".write": "(auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))) && (!data.child('restoreClaimId').isString() || !data.child('restoreClaimToken').isString() || (newData.child('restoreClaimId').val() === data.child('restoreClaimId').val() && newData.child('restoreClaimToken').val() === data.child('restoreClaimToken').val()) || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('token').val() !== data.child('restoreClaimToken').val() || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('claimedAt').val() <= now - 120000 || (!newData.parent().parent().child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).exists() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('token').val() === data.child('restoreClaimToken').val() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('targetId').val() === $itemId))",
+        ".validate": "newData.hasChildren()",
         "id": {
           ".validate": "newData.isString()"
         },
@@ -64,7 +65,9 @@
           ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
         },
         "barcodes": {
+          ".validate": "newData.hasChildren()",
           "$idx": {
+            ".validate": "newData.hasChildren()",
             "cod": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
@@ -139,6 +142,7 @@
       ".read": "auth != null",
       "$itemId": {
         ".write": "auth != null && (newData.exists() || !data.child('restoreClaim').exists() || (data.child('restoreClaim').child('token').isString() && data.child('restoreClaim').child('targetId').isString() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('token').val() === data.child('restoreClaim').child('token').val() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('targetId').val() === data.child('restoreClaim').child('targetId').val()))",
+        ".validate": "newData.hasChildren()",
         "id": {
           ".validate": "newData.isString()"
         },
@@ -221,7 +225,9 @@
           }
         },
         "barcodes": {
+          ".validate": "newData.hasChildren()",
           "$idx": {
+            ".validate": "newData.hasChildren()",
             "cod": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
@@ -313,6 +319,7 @@
       ".read": "auth != null",
       "$date": {
         ".write": "auth != null",
+        ".validate": "newData.hasChildren()",
         "codDollar": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },
@@ -334,15 +341,18 @@
       ".read": "auth != null",
       "$date": {
         ".write": "auth != null",
+        ".validate": "newData.hasChildren()",
         "packagesPickedUp": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },
         "pickedUpPhones": {
+          ".validate": "newData.hasChildren()",
           "$phoneKey": {
             ".validate": "newData.isNumber() && newData.val() > 0"
           }
         },
         "pickedUpBarcodes": {
+          ".validate": "newData.hasChildren()",
           "$barcodeKey": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
           }
@@ -355,8 +365,11 @@
     "zoew_daily_collected_cod_dod": {
       ".read": "auth != null",
       ".write": "auth != null",
+      ".validate": "newData.hasChildren()",
       "$date": {
+        ".validate": "newData.hasChildren()",
         "$barcodeKey": {
+          ".validate": "newData.hasChildren()",
           "c": {
             ".validate": "newData.isNumber() && newData.val() >= 0"
           },
@@ -372,7 +385,9 @@
     "zoew_monthly_revenue_cod_dod": {
       ".read": "auth != null",
       ".write": "auth != null",
+      ".validate": "newData.hasChildren()",
       "$month": {
+        ".validate": "newData.hasChildren()",
         "codDollar": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },

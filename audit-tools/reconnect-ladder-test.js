@@ -225,5 +225,82 @@ results.filter((r) => r.sc.needsCycle).forEach(({ sc, newR }) => {
         newR.goOffline >= 1, newR.goOffline);
 });
 
+// ៤. ⛔ `offline` ➜ `online` ត្រូវចាប់ផ្តើមជណ្តើរ **ពីជំហានដំបូង** — handler `offline` ក្នុង `setupConnectionRecovery()` ពិត
+//    ដក timer ចាស់ និង reset ចំនួនការព្យាយាម។ បើអត់ ៖ timer ជំហានវែង (៦០ វិ.) នៅរស់ឆ្លងការដាច់ **ខ្លី** ➜ `online` ហៅ
+//    `scheduleReconnectWatchdog()` ដែល `return` ភ្លាម (timer មានរួច) ➜ ការព្យាយាមបន្ទាប់រង់ចាំ timer ចាស់ ជំនួសជំហាន ៥ វិ.
+//    ហើយចំនួនការព្យាយាមដែលមិន reset បិទស្ថានភាព «កំពុងភ្ជាប់…» (`connectionIsSettlingIn()`)។ ⛔ ការដាច់ត្រូវ **ខ្លីជាង**
+//    ពេលដែលនៅសល់របស់ timer ចាស់ ៖ ការដាច់វែងឲ្យ timer ចាស់បាញ់ខណៈក្រៅបណ្តាញ ហើយសម្អាតខ្លួនឯង ➜ mutation បាត់ពីការវាស់។
+//    វាស់បាន ៖ mutation «`offline` មិនហៅ `clearReconnectWatchdog()`» រស់រានលើ checker បណ្តាញ ៣៦ (2.45.4) ព្រោះគ្មាននរណារត់ handler នោះ។
+function runOfflineOnline() {
+    const clock = { now: 0, seq: 0, timers: [] };
+    const setTimeoutFake = (fn, ms) => { const t = { fn, at: clock.now + (ms || 0), id: ++clock.seq }; clock.timers.push(t); return t.id; };
+    const clearTimeoutFake = (id) => { const t = clock.timers.find((x) => x.id === id); if (t) t.cleared = true; };
+    const net = { up: true };
+    const handlers = {};
+    const goOnlineAt = [];
+    const ctx = {
+        console, Set, Math, Date: { now: () => clock.now },
+        setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
+        navigator: { get onLine() { return net.up; } },
+        window: { addEventListener: (name, fn) => { handlers[name] = fn; } },
+        document: { getElementById: () => null },
+        fb: { goOffline: () => {}, goOnline: () => { goOnlineAt.push(clock.now); } }, db: {},
+        isDatabaseConnected: false, dbListenersFailed: false,
+        renderConnectionStatus: () => {}, retryFirebaseSdkNow: () => {}, retryFailedDbListenersNow: () => {},
+        resumeZtoStatusSweep: () => {}, onDocumentVisibilityChange: () => {}, documentIsHidden: () => false
+    };
+    vm.createContext(ctx);
+    vm.runInContext([sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') + '\n' +
+        FNS.map(sliceFn).join('\n\n') + '\n' + sliceFn('setupConnectionRecovery') + '\n' +
+        (sliceFn('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }') + '\n' +
+        'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
+        'let hasEverConnectedToDatabase = true;\nlet networkJustReturned = false;\nlet ztoStatusFailStreak = 0;\n' +
+        'setupConnectionRecovery();\nthis.__nudge = nudgeDatabaseConnection;\n' +
+        'this.__watchdog = () => ({ timer: reconnectWatchdogTimer !== null, attempt: reconnectWatchdogAttempt });\n' +
+        'this.__steps = RECONNECT_WATCHDOG_STEPS_MS;\n', ctx);
+    const advanceTo = (target) => {
+        for (;;) {
+            const due = clock.timers.filter((x) => !x.cleared && !x.done && x.at <= target).sort((a, b) => a.at - b.at || a.id - b.id)[0];
+            if (!due) break;
+            clock.now = due.at; due.done = true; due.fn();
+        }
+        clock.now = target;
+    };
+    const steps = ctx.__steps;
+    const deep = steps.slice(0, steps.length - 1).reduce((a, b) => a + b, 0);
+    ctx.__nudge();
+    advanceTo(deep + 1000);
+    const beforeOffline = ctx.__watchdog();
+    net.up = false;
+    handlers.offline && handlers.offline();
+    const afterOffline = ctx.__watchdog();
+    advanceTo(clock.now + steps[0] * 2);
+    net.up = true;
+    const onlineAt = clock.now;
+    handlers.online && handlers.online();
+    advanceTo(onlineAt + steps[0] * 4);
+    const nextRetry = goOnlineAt.filter((t) => t > onlineAt)[0];
+    net.up = false;
+    handlers.offline && handlers.offline();
+    const goOnlineWhileOffline = goOnlineAt.length;
+    advanceTo(clock.now + steps[steps.length - 1] * 3);
+    const offlineCalls = goOnlineAt.length - goOnlineWhileOffline;
+    return { handlers: Object.keys(handlers), steps, beforeOffline, afterOffline, offlineCalls, onlineAt, nextRetry,
+        retryDelay: nextRetry === undefined ? null : nextRetry - onlineAt };
+}
+if (!sliceFn('setupConnectionRecovery')) {
+    ok('រក setupConnectionRecovery() ឃើញ (handler offline/online ពិត)', false);
+} else {
+    const oo = runOfflineOnline();
+    ok('handler `offline` និង `online` ពិតត្រូវចុះឈ្មោះ', oo.handlers.indexOf('offline') !== -1 && oo.handlers.indexOf('online') !== -1, oo.handlers);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ជណ្តើរឡើងដល់ជំហានវែង មុន `offline`',
+        oo.beforeOffline.timer && oo.beforeOffline.attempt >= oo.steps.length - 1, oo.beforeOffline);
+    ok('⛔ `offline` ➜ ដក timer របស់ watchdog និង reset ចំនួនការព្យាយាម',
+        !oo.afterOffline.timer && oo.afterOffline.attempt === 0, oo.afterOffline);
+    ok('⛔ ទិសផ្ទុយ ៖ ក្រៅបណ្តាញ ➜ watchdog មិនវដ្តការតភ្ជាប់', oo.offlineCalls === 0, oo.offlineCalls);
+    ok('⛔ `online` ➜ ការព្យាយាមបន្ទាប់នៅជំហានដំបូង (' + oo.steps[0] + ' ms) មិនមែន timer ចាស់',
+        oo.retryDelay !== null && oo.retryDelay <= oo.steps[0], { retryDelay: oo.retryDelay, steps: oo.steps });
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

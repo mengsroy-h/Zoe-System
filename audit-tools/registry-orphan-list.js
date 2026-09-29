@@ -105,7 +105,9 @@ if (missing.indexOf('barcodeRegistryKey') !== -1) {
     die('barcodeRegistryKey() not found in ' + APP_JS + ' -> cannot derive registry keys');
 }
 
-const sb = { console, String, Object, Array };
+// ⛔ `window` ទទេ ៖ `rawSnapshotToItemList()` រាយការណ៍ record ខូចតាម `window.ZoeErrors` ➜ Node គ្មាន `window` ➜ dump ដែលមាន record
+//    មិនមែន object នឹងគាំងជំនួសការរាយកំព្រា (`registry-orphan-list-test` ៣គ)
+const sb = { console, String, Object, Array, window: {} };
 vm.createContext(sb);
 vm.runInContext(bodies, sb);
 

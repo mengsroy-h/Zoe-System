@@ -264,6 +264,7 @@ export interface UiState {
     dailyStatsView: any | null;
     collectedStatsView: any | null;
     healthRows: import('../app/components/health/model').HealthRow[] | null;
+    healthRunSeq: number;
     viewListView: any[] | null;
     lockerGridView: any | null;
     moreMenuItems: any[] | null;
@@ -353,6 +354,7 @@ export const uiState = createStore<UiState>('uiState', {
     dailyStatsView: null,
     collectedStatsView: null,
     healthRows: null,
+    healthRunSeq: 0,
     viewListView: null,
     lockerGridView: null,
     moreMenuItems: null,

@@ -68,6 +68,13 @@ const BOOT = function (seed) {
     // ទទួលយកការសរសេរ **ណាមួយ** ធ្វើឲ្យ «server បដិសេធ» ក្លាយជា
     // **របៀបបរាជ័យដែលមិនដែលត្រូវសាក** — មេរៀន 2.25.5 ។
     window.__ruleRejects = 0;
+    // ⛔ កំណត់ត្រាការសរសេរ **ដែល fake ទទួល** (App ពិត · លំដាប់ពិត) ➜ `emu/app-writes-rules-test` ចាក់វាទៅ RTDB emulator
+    //    ជាមួយ rules ពិត ៖ fake ដែលទទួលគ្រប់យ៉ាង មិនអាចប្រាប់ថា server ពិតនឹងបដិសេធការសរសេរណាទេ (មេរៀន 2.25.5)។
+    //    `owner` = ការប្តូររបស់ harness (ឧបករណ៍ផ្សេង · ការធ្វើឲ្យចាស់) ដែលរំលង rules ដូច Console។
+    window.__writeLog = [];
+    const logWrite = (entry) => {
+        try { window.__writeLog.push(JSON.parse(JSON.stringify(entry))); } catch (e) { window.__writeLog.push({ bad: String(e && e.message) }); }
+    };
     function ledgerRuleViolation(p, val) {
         const parts = p.split('/').filter(Boolean);
         const root = parts[0];
@@ -136,7 +143,7 @@ const BOOT = function (seed) {
     function fire(p) { listeners.filter((l) => l.path === p).forEach((l) => { try { l.cb(snapOf(p)); } catch (e) { window.__listenerThrew = String(e && e.message); } }); }
     function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
     window.__fireAll = fireAll;
-    window.__setPath = (p, v) => { setPath(p, v); fireAll(); };
+    window.__setPath = (p, v) => { setPath(p, v); logWrite({ owner: true, m: 'PUT', p: p, v: v }); fireAll(); };
     // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
     window.__otherDevice = (kind, pick) => {
         const hist = store.zoew_scan_history_cod_dod || {};
@@ -186,6 +193,13 @@ const BOOT = function (seed) {
         return null;
     };
 
+    const otherDeviceWrite = window.__otherDevice;
+    window.__otherDevice = (kind, pick) => {
+        const done = otherDeviceWrite(kind, pick);
+        if (done) logWrite({ owner: true, m: 'SNAP', v: store });
+        return done;
+    };
+
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
         initializeApp: () => ({ name: 'fake' }), getApps: () => [], deleteApp: () => Promise.resolve(),
@@ -207,7 +221,7 @@ const BOOT = function (seed) {
         set: (r, v) => {
             const why = ledgerRuleViolation(r.path, v);
             if (why) return ruleDenied(why);
-            setPath(r.path, v); fireAll(); return Promise.resolve();
+            setPath(r.path, v); logWrite({ m: 'PUT', p: r.path, v: v === undefined ? null : v }); fireAll(); return Promise.resolve();
         },
         update: (r, obj) => {
             const base = r.path ? r.path + '/' : '';
@@ -215,7 +229,7 @@ const BOOT = function (seed) {
                 const why = ledgerRuleViolation(base + k, obj[k]);
                 if (why) return ruleDenied(why);
             }
-            Object.keys(obj).forEach((k) => setPath(base + k, obj[k])); fireAll(); return Promise.resolve();
+            Object.keys(obj).forEach((k) => setPath(base + k, obj[k])); logWrite({ m: 'PATCH', p: r.path, v: obj }); fireAll(); return Promise.resolve();
         },
         runTransaction: (r, fn) => {
             const cur = getPath(r.path);
@@ -223,7 +237,7 @@ const BOOT = function (seed) {
             if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(r.path) });
             const why = ledgerRuleViolation(r.path, next);
             if (why) return ruleDenied(why);
-            setPath(r.path, next); fireAll();
+            setPath(r.path, next); logWrite({ m: 'PUT', p: r.path, v: next, tx: true }); fireAll();
             return Promise.resolve({ committed: true, snapshot: snapOf(r.path) });
         }
     };
@@ -343,6 +357,8 @@ function seedData() {
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
 const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup'];
+// `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ (seed + log តាមលំដាប់) សម្រាប់ `emu/app-writes-rules-test`
+const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
@@ -488,6 +504,7 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                     break;
                 }
             }
+            if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;
             if (trail.indexOf('other:remove') !== -1) staleViewRuns++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
@@ -501,6 +518,10 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
         server.close();
     }
     await browser.close();
+    if (CAPTURE) {
+        fs.writeFileSync(process.env.FUZZ_CAPTURE, JSON.stringify(CAPTURE));
+        console.log('capture ៖ ' + CAPTURE.length + ' លំដាប់ · ' + CAPTURE.reduce((sum, c) => sum + c.log.length, 0) + ' ការសរសេរ ➜ ' + process.env.FUZZ_CAPTURE);
+    }
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));
     process.exit(fail ? 1 : 0);
 })();

@@ -57,9 +57,11 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // ដែលគ្មាន build) មិនមែន checker ៖ អ្នកយាមរបស់វាគឺ `money-reality-test` (ភាពស្រស់ + ការវាស់ដូច app.js)។
 // `ts-comments.js` ជា **ម៉ូឌុលរួម** របស់ `comments.js` (អ្នកយាម · មាន `COMMENTS_APP_DIR`) និង `strip-comments.js` ៖ គ្មានការអះអាង
 // ផ្ទាល់ខ្លួន ➜ អ្នកយាមរបស់វាគឺ `repository-contract-test` (TSX ពិត · ករណី ASI ត្រូវបោះបង់)។
+// `rules-shape.js` ជា **ម៉ូឌុលរួម** ៖ ដេរីវេ node ដែលរំពឹង object ពី rules ពិត ➜ អ្នកយាមរបស់វាគឺ `rules-duplicate-keys` (ស្តាទិច)
+// · `emu/crud-rules-flow` · `emu/license-seat-rules-test` (ការវាស់ពីរជំហានលើ emulator)។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
     'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
-    'idtoken-fixture.js', 'react-view.js', 'money-core.js', 'ts-comments.js']);
+    'idtoken-fixture.js', 'react-view.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js']);
 const CLI_GUARDS = new Map([
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],

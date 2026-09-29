@@ -141,6 +141,24 @@ console.log('\n=== ៣ខ. កូនសោ registry មិនមែនទម្�
     ok('កូនសោកំព្រាពិតនៅតែចាប់បាន', keys.length === 1 && keys[0] === 'DEADKEY2', keys);
 }
 
+// ── សេណារីយ៉ូ ៣គ ៖ record មិនមែន object ក្នុងប្រវត្តិ/ធុងសំរាម ─────────────────────
+// ⛔ `rawSnapshotToItemList()` ពិតរំលង record ខូច + រាយការណ៍តាម `window.ZoeErrors` ➜ sandbox (Node · គ្មាន `window`) ត្រូវបញ្ចប់
+//    ការងារ មិនមែនគាំង `ReferenceError` (វាស់បាន 2.45.4)។ ⛔ ម្ចាស់ពិតនៅក្បែរ record ខូចត្រូវនៅតែជាម្ចាស់ (មិនចូលបញ្ជីលុប)។
+console.log('\n=== ៣គ. record មិនមែន object ➜ មិនគាំង · ម្ចាស់ពិតនៅតែជាម្ចាស់ ===');
+{
+    const dump = writeDump('junk-records.json', {
+        zoew_scan_history_cod_dod: { i1: { id: 'i1', barcodes: [{ code: 'OWN0000011' }] }, j1: 'junk', j2: 7 },
+        zoew_recently_deleted_cod_dod: { t1: { id: 't1', barcodes: [{ code: 'OWN0000012' }] }, j3: true },
+        zoew_barcode_registry: { OWN0000011: true, OWN0000012: true, ORPHAN0011: true }
+    });
+    const outFile = path.join(TMP, 'out3c.json');
+    const r = run(dump, outFile);
+    ok('⛔ record មិនមែន object ➜ ចេញ exit 0 (មិនគាំង)', r.code === 0, r.out);
+    const keys = r.payload ? Object.keys(r.payload) : [];
+    ok('⛔ លុបតែកូនសោកំព្រាពិត (ម្ចាស់ក្បែរ record ខូចនៅតែជាម្ចាស់)',
+        keys.length === 1 && keys[0] === 'ORPHAN0011', keys);
+}
+
 // ── សេណារីយ៉ូ ៤ ៖ ច្រកទ្វារសុវត្ថិភាព ៣ ត្រូវ **បដិសេធ** ─────────────────
 console.log('\n=== ៤. ច្រកទ្វារសុវត្ថិភាព ៖ ការបដិសេធជាលទ្ធផលត្រឹមត្រូវ ===');
 {

@@ -314,6 +314,22 @@ try {
         fs.writeFileSync(path.join(staleTree, 'ZoeW', 'src', 'main.tsx'), '');
         const noCore = run('money-reality-check.js', [dump], { MONEYREAL_APP_DIR: staleTree });
         ok('ទិសផ្ទុយ ៖ repo React គ្មាន money-core.js ➜ exit 3 (មិនវាស់ដោយគ្មានកូដ)', noCore.status === 3);
+        // ⛔ record មិនមែន object (ខ្សែអក្សរ · លេខ · `null` ក្រោម `$itemId`) ជាករណីដែល `rawSnapshotToItemList()` រំលង + រាយការណ៍តាម
+        //    `window.ZoeErrors` ➜ sandbox របស់ CLI (Node · គ្មាន `window`) ត្រូវវាស់ dump នោះបាន **ដូច dump ស្អាត** មិនមែនគាំង
+        //    `ReferenceError` (វាស់បាន 2.45.4 ៖ money-core ថ្មី + sandbox គ្មាន `window` ➜ CLI ធ្លាក់ exit 1 គ្មានការវាស់)។
+        const junk = copy();
+        junk.zoew_scan_history_cod_dod['-junk-string'] = 'junk';
+        junk.zoew_scan_history_cod_dod['-junk-number'] = 5;
+        junk.zoew_recently_deleted_cod_dod['-junk-bool'] = true;
+        const junkDump = save('fixture junk-records.json', junk);
+        const junkCore = run('money-reality-check.js', [junkDump], { MONEYREAL_APP_DIR: reactTree });
+        const junkApp = run('money-reality-check.js', [junkDump]);
+        ok('⛔ dump មាន record មិនមែន object ➜ CLI (money-core.js) វាស់ដូច dump ស្អាត (មិនគាំង)',
+            junkCore.status === viaCore.status && measured(junkCore.text).replace(/fixture junk-records\.json/g, 'fixture dump.json') === measured(viaCore.text),
+            [junkCore.status, viaCore.status, junkCore.text.split('\n').filter((l) => /Error|at /.test(l)).slice(0, 2)]);
+        ok('⛔ dump មាន record មិនមែន object ➜ CLI (app.js) វាស់ដូច dump ស្អាត (មិនគាំង)',
+            junkApp.status === viaApp.status && measured(junkApp.text).replace(/fixture junk-records\.json/g, 'fixture dump.json') === measured(viaApp.text),
+            [junkApp.status, viaApp.status]);
     });
 
     scenario('Windows launcher មានកិច្ចសន្យាការហៅ CLI ពេញលេញ', () => {

@@ -357,6 +357,29 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         check(!(JSON.parse(afterDel.body || 'null') || {})[ids[0]], 'ហើយ ZoeW លែងឃើញដំណឹងដែលលុប', afterDel.body.slice(0, 80));
     }
 
+    // ── ១៣. ⛔ node ដែលរំពឹង object ➜ primitive ត្រូវបដិសេធ (ដេរីវេពី rules ពិតក្នុង `rules-shape.js`) ─
+    //    primitive គ្មានកូន ➜ ការពិនិត្យវាលកូនមិនរត់ ➜ rules ចាស់ទទួល ➜ `checkOnline()` · បញ្ជី Key របស់ ZoeKeyGen អានតម្លៃខូច (2.45.4)។
+    //    វាស់ដោយ admin (អ្នកតែម្នាក់ដែល `.write` អនុញ្ញាត) · control ដក guard របស់ node ➜ ត្រូវទទួល (probe ទៅដល់)។ រត់ចុងក្រោយ (reset លុបផ្លូវ probe)។
+    {
+        const { probeObjectShapes } = require('../rules-shape.js');
+        const shapes = await probeObjectShapes({
+            rules: JSON.parse(fs.readFileSync(rulesFile, 'utf8')), file: 'ZoeKeyGen/firebase-database.rules.json',
+            samples: { $appCode: APP, $keyId: KEY1, $slot: SLOTS[0], $msgId: 'n1700000000000abc123', $idx: '0' },
+            loadRules: (r) => req('PUT', '/.settings/rules.json?' + NS, r, OWNER).then((x) => x.status === 200),
+            reset: (p) => owner('PUT', p + '.json', null),
+            write: (p, v) => asUser('PUT', p + '.json', v, ADMIN),
+            denied: (r) => !allowed(r)
+        });
+        check(shapes.length >= 1, 'ជាន់អប្បបរមា ៖ node ដែលរំពឹង object ដេរីវេពី rules ពិត (' + shapes.length + ')');
+        for (const r of shapes) {
+            check(r.reachable, 'probe ទៅដល់ ' + r.rulePath + ' (control ដក guard របស់ node ➜ primitive ត្រូវទទួល)', r.detail.join(' · '));
+            check(r.rejected, '⛔ rules ពិត ៖ ' + r.rulePath + ' ➜ primitive (ខ្សែអក្សរ · លេខ · bool) ត្រូវបដិសេធ', r.detail.join(' · '));
+        }
+        const keyOk = await asUser('PUT', keyPath(KEY1), { expiresAt: 4102444800000, revoked: false }, ADMIN);
+        const metaOk = await asUser('PUT', '/license_keys_meta/' + APP + '/' + KEY1 + '.json', { issuedAt: 1700000000000, scope: 'ZOE', appPaths: ['a'] }, ADMIN);
+        check(allowed(keyOk) && allowed(metaOk), '⛔ ទិសផ្ទុយ ៖ admin សរសេរ Key និង meta ធម្មតា ➜ នៅតែទទួល', keyOk.status + ' · ' + metaOk.status + ' ' + metaOk.body.slice(0, 80));
+    }
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;
 })();

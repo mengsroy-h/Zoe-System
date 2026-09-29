@@ -39,6 +39,98 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.45.4] — 2026-09-29 · ZoeW ៖ **Deep audit ៖ ប្រវត្តិ/ធុងសំរាមលែងងាប់ដោយ record ខូចតែមួយ · rules ទាមទារ object · ចំណុច «ភ្ជាប់ Server» និងប៊ូតុង «ខលម្តងទៀត» ឈប់គូរស៊ុមពេលស្ងៀម · Push «⏳ កំពុងភ្ជាប់…» លែងជាប់ជារៀងរហូត**
+
+**ZoeW `2.45.4` (`zoew-v244` ➜ `zoew-v245`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.22.0` · មានតែ `ZoeKeyGen/firebase-database.rules.json` ដែលមិនមែនកូដ ship)។
+⛔ **rules ទាំង ២ ឯកសារប្រែ ➜ ត្រូវ Publish ដោយដៃ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **🔴 record មិនមែន object តែមួយ ➜ ប្រវត្តិ/ធុងសំរាមងាប់លើគ្រប់ឧបករណ៍** ៖ rules គ្មាន `.validate` នៅ `$itemId` ➜ តម្លៃ
+  ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `zoew_scan_history_cod_dod` ឬ `zoew_recently_deleted_cod_dod` (ការសរសេរដោយដៃក្នុង Console ·
+  Import ខុស) ធ្វើឲ្យ callback បោះ `TypeError` (`v.id = key` លើ primitive ក្នុង strict mode · `item.id` លើធាតុ `null`) ➜ callback
+  `onValue` ធ្លាក់ ➜ listener ជាប់ «pending» ➜ តារាង និងធុងសំរាមរាយ «វាស់មិនបាន» **ជារៀងរហូត** លើគ្រប់ឧបករណ៍ដែលចែក Project។
+  ការកែ ៖ រំលងធាតុដែលមិនមែន object (array ក៏រំលង) + Sentry `zone: 'data'` (ស្លាក `history`/`deleted` · ចំនួនដែលរំលង) ➜ record
+  ល្អទាំងអស់បង្ហាញដូចមុន។
+- **rules ទាមទារ object លើរាល់ node ដែលរំពឹង object** (ការពង្រឹង A ពីខាង server · សំណើម្ចាស់គម្រោង) ៖ node ដែលមាន schema កូន
+  ពិនិត្យតែ **កូន** ➜ primitive គ្មានកូន ➜ ការពិនិត្យមិនរត់ ➜ server ទទួល។ ស្កេន rules ពិត ៖ ចន្លោះ **១៩** (Business ១៥ ៖ record ប្រវត្តិ/ធុងសំរាម ·
+  `barcodes` · ledger ថ្ងៃ/ខែ · ស្ថិតិយក · កញ្ចក់ចំណូល · License ៤ ៖ Key · seat · meta · `appPaths`) ➜ `.validate: "newData.hasChildren()"` គ្រប់ node
+  (បន្ថែមតែ ១៩ បន្ទាត់ · គ្មានបន្ទាត់លុប)។ ⚠️ ការសរសេរក្នុង Firebase Console ដោយម្ចាស់ Project **រំលង rules** ➜ ការរំលង record ខូចក្នុង App (A) នៅតែចាំបាច់។
+- **ចំណុចស្ថានភាព «ភ្ជាប់ Server» ភ្លឹប ៣ ជុំ រួចឈប់** ៖ `pulseDot 2s infinite` ធ្វើឲ្យ compositor គូរស៊ុមជាប់ៗ ខណៈ App ស្ងៀម
+  (វាស់បាន ៖ DrawFrame **១៤៦ / ៣ វិ.**) ➜ អេក្រង់ LTPO (10–120Hz) ចុះ Hz ទាបមិនបាន · ស៊ីថ្ម។ ក្រោយកែ ៖ **០ ស៊ុម**។
+  «កំពុងភ្ជាប់…» (ពណ៌លឿង) **នៅភ្លឹបជាប់** ដូចមុន (សញ្ញាសកម្មភាពពិត)។
+- **ប៊ូតុង «ខលម្តងទៀត» (📞 ក្រហម) ភ្លឹប ៥.៥ ជុំ រួចនៅក្រហមជាប់** ៖ `callRecallBlink 1s infinite` ប្តូរ `background-color` ➜ animation
+  **លើ main thread** (មិនមែន compositor) ➜ រាល់ជួរដេកដែល «មិនលើក» ៣ ម៉ោងឡើង ធ្វើឲ្យ main thread គូររាល់ស៊ុមជារៀងរហូត ខណៈ App ស្ងៀម
+  (វាស់បាន ៖ BeginMainThreadFrame **១៨១ / ៣ វិ.** ➜ ក្រោយកែ **១**)។ ក្រោយ ៥.៥ ជុំ ប៊ូតុងឈប់លើពណ៌ **`--action-danger`** (ក្រហម) ➜ សញ្ញានៅដដែល ·
+  អ្នកប្រើដែលបើក «Reduce Motion» ក៏ឃើញក្រហមដែរ (មុននេះ ៖ ពណ៌បៃតងធម្មតា ➜ **គ្មានសញ្ញាសោះ**)។ CSS ក្នុង `react-root.css` (`app.css` parity មិនប្រែ)។
+- **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ ជុំចាស់លែងជាន់ជុំថ្មី** ៖ បិទ ➜ បើកប្រអប់វិញ ខណៈជុំមុននៅរង់ចាំ License/Lookup (រហូតដល់ ~១១ វិ.) ➜ ជុំ ២ រត់ស្របគ្នា ➜
+  ជុំចាស់ចប់មុន ➜ ជាន់ «⏳» ដោយលទ្ធផលដែលវាស់ **មុន** ការបើកវិញ (ឧ. «❌ ក្រៅបណ្ដាញ» ខណៈអ្នកប្រើទើបបើក WiFi) និងដោះប៊ូតុង «ពិនិត្យម្តងទៀត» ខណៈជុំថ្មីនៅរត់។
+  ការកែ ៖ ត្រាជុំ `uiState.healthRunSeq` ➜ មានតែជុំចុងក្រោយទេដែលសរសេរលទ្ធផល និងដោះប៊ូតុង។
+- **Push «⏳ កំពុងភ្ជាប់…» លែងជាប់ជារៀងរហូត** (ថ្នាក់ «ការព្យួរ ≠ ការធ្លាក់») ៖ `busy` ជាសោ (`togglePush()` បដិសេធការចុច)
+  តែការរង់ចាំខាងក្រោយវាគ្មានពិដាន ៖ web ៖ `getSubscription` · `subscribe` · `unsubscribe` · `serviceWorker.ready` (resync) ·
+  APK ៖ `register()` រង់ចាំព្រឹត្តិការណ៍ `registration` ដែលអាចមិនដែលមក (FCM គ្មានបណ្តាញ/គ្មាន Google services) ➜ ប៊ូតុងកកជារៀងរហូត
+  រហូតដល់បិទ App។ ការកែ ៖ web ឆ្លង `withTimeout(…, PUSH_TIMEOUT_MS)` · APK ៖ watchdog `PUSH_NATIVE_REGISTER_TIMEOUT_MS` (២០ វិ.)
+  ➜ `error` (ចុចម្តងទៀតបាន) · token មកយឺត ➜ នៅតែបញ្ចប់ជា `on` · token មកហើយ server ឆ្លើយយឺត ➜ watchdog មិនកាត់។
+
+#### អ្នកយាម
+
+- `field-shape-test` context ទី ២ (record primitive ក្នុងប្រវត្តិ + ធុងសំរាម លើ App ពិតក្នុង Chromium) ៖ tree មុនកែ **FAIL ៥** ➜ **១៦/១៦** ·
+  ថតទទេ exit 1។
+- `perf-check` «ស៊ុមពេលស្ងៀម» (trace ពិត DrawFrame · App online ស្ងៀម ៣ វិ. ≤ ៣ ស៊ុម) + probe ទិសផ្ទុយ (animation `infinite` ចាក់ចូល ➜ ≥ ៣០)
+  + «កំពុងភ្ជាប់» នៅភ្លឹប ៖ tree មុនកែ FAIL ➜ **០ ស៊ុម** (១៧/១៧)។
+  🔴 **ចំណុចងងឹតរបស់ការវាស់នេះខ្លួនឯង (រកឃើញក្នុងជុំដដែល)** ៖ DrawFrame រាប់តែស៊ុម **compositor** ➜ Chromium headless **មិនចេញ DrawFrame**
+  សម្រាប់ animation ពណ៌លើ main thread ➜ ប៊ូតុង «ខលម្តងទៀត» ភ្លឹបជារៀងរហូត **ខណៈការវាស់រាយ ០ ស៊ុម** (seed ក៏គ្មានជួរដេក «មិនលើក» ដែរ)។ ការពង្រីក ៖
+  រាប់ **ទាំង DrawFrame និង BeginMainThreadFrame** · seed ដាក់ជួរដេក «មិនលើក» ៥ ម៉ោង ២ (ប៊ូតុង recall ≥ ១ ជាលក្ខខណ្ឌចាំបាច់) · probe ទិសផ្ទុយ **២**
+  (compositor ➜ DrawFrame ≥ ៣០ · main thread `background-color` ➜ BeginMainThreadFrame ≥ ៣០) · ពណ៌ចុងក្រោយ = `--action-danger` ពិត (ដេរីវេពី CSS) ·
+  ប៊ូតុងខលធម្មតាមិនក្រហម ៖ tree មុនកែ **FAIL ២** (main **១៨១** · ពណ៌ពាក់កណ្តាល animation) ➜ **២១/២១**។
+- `health-check-test` (ជុំ ២ ស្របគ្នា · License របស់ជុំចាស់ដោះមុន) ៖ tree មុនកែ **FAIL ២** (ជួរ «⏳» ត្រូវជាន់ដោយ ៩ ជួរចាស់ · ប៊ូតុងដោះមុនពេល) ➜
+  **១១៨/១១៨** · ទិសផ្ទុយ ៖ ជុំថ្មីនៅបង្ហាញ ៩ ជួរ (License ✅ របស់ជុំថ្មី) ហើយដោះប៊ូតុង។
+- `ZoeW/tests/push-client.test.tsx` សេណារីយ៉ូ ៦ ៖ tree មុនកែ **FAIL ៤** (subscribe ព្យួរ · getSubscription ព្យួរ · unsubscribe ព្យួរ ·
+  token មិនមក) ➜ **២៦/២៦** · ទិសផ្ទុយ ២ (token ទាន់ពេល · server ឆ្លើយយឺត) · mutation «ដក `nativeWatchdogSeq++` ពី `onNativeToken`» ➜ ចាប់។
+
+- 🔴 **ការថយក្រោយដែល `run-all` ចាប់ក្រោយការកែ A** ៖ `rawSnapshotToItemList()` ជាកូដលុយ ➜ `money-core.js` ចាស់ (`money-reality` ធ្លាក់ ១) ➜
+  បង្កើតឡើងវិញ (`npm --prefix ZoeW run money:core`) បង្ហាញថា CLI អានសុទ្ធសាធលើ dump ពិត (`money-reality-check.js` · `registry-orphan-list.js`)
+  រត់កូដនោះក្នុង sandbox Node **គ្មាន `window`** ➜ dump ដែលមាន record មិនមែន object (ករណីដែល A កែ) នឹងគាំង `ReferenceError` ជំនួសការវាស់។
+  អ្នកយាមមុន ៖ `money-reality-test` (dump មាន record ខូច ➜ វាស់ដូច dump ស្អាត ទាំងផ្លូវ `money-core.js` និង `app.js`) **ធ្លាក់ ២** ·
+  `registry-orphan-list-test` ៣គ (មិនគាំង · ម្ចាស់ក្បែរ record ខូចនៅតែជាម្ចាស់) **ធ្លាក់ ២** ➜ ការកែ ៖ sandbox ទាំង ២ មាន `window: {}` ➜ **៥៤/៥៤** · **៤១/៤១**។
+- rules ទាមទារ object ៖ helper `audit-tools/rules-shape.js` ដេរីវេ node ដែលរំពឹង object ពី rules ពិត (មាន schema កូន · អាចសរសេរបាន) ➜
+  `rules-duplicate-keys` (ស្តាទិច) ៖ rules របស់ `main` **FAIL** (Business ១៥/១៩ · License ៤/៦) ➜ ១៩/១៩ · ៦/៦ · `emu/crud-rules-flow` ០ខ (ការវាស់ពីរជំហាន ៖ control
+  ដក guard របស់ node ➜ primitive ទទួល · rules ពិត ➜ បដិសេធ · ទិសផ្ទុយ record/PATCH/វាល/លុប ទទួល) ៖ `main` **ធ្លាក់ ១៥** ➜ **១១៦/១១៦** (រួម replay ផ្លូវសរសេរពិតរបស់ App) ·
+  `emu/license-seat-rules-test` ១៣ (admin) ៖ `main` **ធ្លាក់ ៤** ➜ **៨២/៨២**។ ⛔ ជំនាន់ដំបូងរបស់ control ដកតែ `.validate` ➜ node finalizations ២ «មិនទៅដល់»
+  ព្រោះ `.write` របស់វាទាមទារ `token` រួចហើយ ➜ control ត្រូវជំនួស `.write` **ផ្ទាល់ខ្លួន** ដោយ `auth != null` ផង (ឪពុកនៅដដែល)។
+- **🔴 ចន្លោះ ៖ checker ១៨៦ គ្មានមួយណាឃើញការសរសេរពិតរបស់ App ត្រូវ rules ពិតបដិសេធ** ៖ fake SDK របស់ `revenue-fuzz` · `ui-flow` · … ទទួលយក
+  គ្រប់ការសរសេរ ➜ «server បដិសេធ» ជារបៀបបរាជ័យដែលមិនដែលសាក (ការព្រមាន ២ ក្នុង `CLAUDE.md`)។ ការកែ rules ជុំនេះ (`hasChildren()` ១៩ node) ទើបតែ
+  បង្កើនហានិភ័យនោះ ➜ អ្នកយាមថ្មី **`emu/app-writes-rules-test`** ៖ `revenue-fuzz` (`FUZZ_CAPTURE`) កត់ការសរសេរ **ពិត** របស់ App (set · update ·
+  transaction · `increment()`) ➜ replay លើ RTDB emulator ជាមួយ rules ពិត ជា **អ្នកប្រើ** (`auth_variable_override`) · ការប្តូររបស់ harness
+  (ឧបករណ៍ផ្សេង) ជា **owner** ➜ ត្រូវមាន **០ ការបដិសេធ** · ជាន់អប្បបរមា ៖ ការសរសេរអ្នកប្រើ ≥ ១៥០ · គ្រប root **៩** (ប្រវត្តិ · ធុងសំរាម · root ·
+  ledger ថ្ងៃ/ខែ · ស្ថិតិយក · កញ្ចក់ចំណូល · registry · finalizations) · probe ភាពរស់ (ledger អវិជ្ជមាន ➜ បដិសេធ) · probe ភាពរសើប (`$itemId`
+  `.validate: false` ➜ ការបដិសេធ ≥ ការសរសេរប្រវត្តិមិនមែន null)។ លទ្ធផល ៖ **៤០២** ការសរសេរ · បដិសេធ **០** · root **៩/៩** · probe **៨០ ≥ ៦៣** · ៦៦ វិ. ·
+  mutation rules ដែលធ្វើឲ្យ node កញ្ចក់ចំណូលបដិសេធរូបរាងដែល App សរសេរពិត ➜ **FAIL ១** · គ្មាន emulator ➜ SKIP (STRICT ➜ FAIL)។
+- **ការផ្ទៀងផ្ទាត់ rules ថ្មីហ្មត់ចត់ (សំណើម្ចាស់គម្រោង)** ៖ (១) **differential** ៖ ការសរសេរពិតរបស់ App **៩៥៥** (fuzz ១២ ជុំ · harness ១៤៨) replay លើ rules
+  របស់ `main` និង rules ថ្មី ➜ បដិសេធ **០ / ០** · (២) **probe ភាពរសើប** ៖ rules តឹងក្លែង (`hasChildren(['__never'])` គ្រប node ដែលរំពឹង object) ➜
+  **៧៩៤** ការបដិសេធ · តឹងតែ node មួយ ➜ **៧៧** ➜ replay ពិតជាឆ្លងកាត់ node ទាំងនោះ មិនមែនទទួលស្ងាត់ៗ · (៣) **ស្តាទិច** ៖ រាប់រាល់កន្លែងសរសេររបស់
+  ZoeW (`src/**`) និង ZoeKeyGen ➜ គ្មានកន្លែងណាសរសេរ primitive ទៅ node ដែលឥឡូវទាមទារ object (ការលុប = `null` ➜ `.validate` មិនរត់) ·
+  (៤) `emu/crud-rules-flow` ០ខ · `emu/license-seat-rules-test` ១៣ (ខាងលើ)។
+- **🔴 ចន្លោះ ៖ ខ្សែភ្ជាប់ SW ↔ ទំព័រ ក្នុង `registerServiceWorker()` គ្មាននរណារត់** (mutation ជុំ ២ ៖ N28 · N29 · N30 **រស់រានលើ checker ទាំងអស់**) ៖
+  SW ផ្ញើសារ (`push-client.test.tsx`) និងអ្នកដោះសារ (`handleServiceWorkerMessage()`) មានតេស្តរៀងខ្លួន តែ listener ដែលភ្ជាប់ពួកវាក្នុង `boot.ts` មិនមាន ➜
+  ការដក `'message'` · `controllerchange` · `visibilitychange` ចេញ = ចុចការជូនដំណឹងពេល App បើក ➜ ផ្ទាំង 🔔 មិនបើក · push ➜ បញ្ជីមិនស្រស់ · deploy ថ្មី ➜
+  ផ្ទាំង «មានកំណែថ្មី» មិនលេច · ត្រឡប់មក App ➜ មិនពិនិត្យកំណែថ្មី។ អ្នកយាមថ្មី **`sw-client-wiring-test`** (App · SW · Chromium ពិត ៖ សារផ្ញើពីបរិបទ SW ·
+  ប្រភេទសារដេរីវេពី `sw.js` · នាឡិកាទំព័ររំកិលឆ្លងពិដាន ១៥ នាទី · deploy ថ្មីតាម `sw.js` ដែល server ប្តូរ) ៖ **១៦/១៦** លើ tree បច្ចុប្បន្ន · mutation **៧/៧** ចាប់
+  (N28 ផ្ទាំង 🔔 + ការទាញដំណឹង · N29 · N29b ផ្ទាំងលេចលើការដំឡើងដំបូង · N30 · `focus` · `online` · ដកពិដាន) · ថតទទេ ➜ exit 1។ ⛔ កូដ ship មិនប្រែ។
+- mutation testing ផ្នែកបណ្តាញ (M01–M15 · checker ៣៦) ៖ ចន្លោះ ២ ត្រូវបិទ — `reconnect-ladder-test` (`offline` ➜ `online` ➜ ជំហានដំបូង) ·
+  `lookup-failure-identity-test` (cooldown តាមកូដដែល Function ពិតជាផ្ញើ) — លម្អិតក្នុងផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ⛔ **Publish rules ទាំង ២** ៖ `firebase-database.rules.json` ➜ **Business Project** · `ZoeKeyGen/firebase-database.rules.json` ➜ **License Project**
+  (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ។
+  ក្រោយ Publish ៖ សាកកំណត់ Locker · បិទ/បើក · ដក · ស្តារ លើ ZoeW និងបង្កើត/Extend Key លើ ZoeKeyGen ម្តង។
+- គ្មាន env ថ្មី។ Deploy ZoeW · build APK ថ្មី។ ZoeKeyGen មិនត្រូវ Deploy (កូដមិនប្រែ)។
+- សាកលើឧបករណ៍ពិត ៖ ចុចបើក/បិទ Push ពេលគ្មានអ៊ីនធឺណិត ➜ ក្នុង ~១២–២០ វិ. ស្ថានភាពត្រូវប្តូរជា «⚠️ បើកការជូនដំណឹងមិនបាន…» (មិនជាប់ «⏳»)
+  · App ស្ងៀមលើទូរស័ព្ទ ១២០Hz ➜ ចំណុចបៃតងភ្លឹប ៣ ដង រួចឈប់។
+- ប៊ូតុង «ខលម្តងទៀត» ៖ ជួរដេកដែលសម្គាល់ «មិនលើក» ជាង ៣ ម៉ោង ➜ ប៊ូតុង 📞 ភ្លឹបប្រហែល ៥ ដង រួច **នៅក្រហមជាប់** (មិនមែនត្រឡប់ទៅបៃតង)។
+  បើម្ចាស់គម្រោងចង់បានការភ្លឹបជាប់វិញ ➜ ជាការសម្រេច (ថ្លៃ ៖ main thread គូរ ~៦០ ស៊ុម/វិ. រាល់ពេលមានជួរដេកនោះ)។
+
 ### [2.45.3] — 2026-09-29 · ZoeW ៖ **ស៊ុមក្រោមប្រអប់ប្រវត្តិលើ Android ដូច iPhone** (merge រួច · PR #270 · ✅ ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត ៖ «ស្អាតអស់ហើយ»)
 
 **ZoeW `2.45.3` (`zoew-v243` ➜ `zoew-v244`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.22.0`)។
@@ -1352,6 +1444,88 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### Mutation testing ជុំ ២ ៖ ១៥ mutation + ៣ ផ្ទៀងផ្ទាត់ ➜ ចន្លោះ ៣ (ខ្សែភ្ជាប់ SW ↔ ទំព័រ) · control ១ (2026-09-29 · ZoeW 2.45.4)
+
+- **វិធី** ៖ ដូចជុំ ១ តែរត់ក្នុង **git worktree ដាច់ដោយឡែក** (tree ធ្វើការមិនប៉ះ) · subset checker ៣០ ក្នុងមួយ mutation (~១៩០ វិ.)។ ⛔ worktree
+  ត្រូវ **គ្មាន symlink `node_modules` នៅ root** — ការផ្គុំ measure root ចម្លងវាចូល repo មេជា `node_modules/node_modules` ➜ mutation ៨ ចេញ
+  «UNKNOWN» ក្នុង ៧ វិ. (វាស់បាន ៖ ការរត់លើកទី ១ ត្រូវបោះបង់)។
+
+| # | Mutation | អ្នកចាប់ |
+|---|---|---|
+| N16 | SW `pushOpenUrl` ទទួល URL ក្រៅ origin | `zoew-suite-test` |
+| N17 | ការទាញដំណឹងមិនដោះ `notifyFeedInFlight` | `zoew-suite-test` |
+| N18 | តារាងអតិថិជនមិនគោរព `linkIsFrugal()` | `lookup-prefetch-test` · `adaptive-link-test` |
+| N19 | តារាងអតិថិជនទាញខណៈប្រអប់បើក | `lookup-prefetch-test` · `lookup-freshness-test` |
+| N20 | SW install គ្មាន `cache: 'no-cache'` | `sw-install-integrity-test` |
+| N21 | License រំលងបណ្តាញ ➜ `ok:false` (App ទាំង ២) | `license-clock-trust-test` · `license-network-pressure-test` |
+| N22 | ជុំបោស ZTO មិនដោះ in-flight ក្នុង `finally` | `zto-sync-banner-test` |
+| N23 | Push ដក `pushStep` លើ `subscribe` | `zoew-suite-test` |
+| N24 | Push token មិនបញ្ឈប់ watchdog | `zoew-suite-test` (+ `sw-install-integrity-test` ជុំទី ៤ **ធ្លាក់ម្តងម្កាល** — មិនពាក់ព័ន្ធ · មើលខាងក្រោម) |
+| N25 | `.status-dot` `infinite` វិញ | `perf-check` |
+| N26 | record primitive មិនរំលង | `field-shape-test` |
+| N27 | ប្តូរឈ្មោះអថេរក្នុងស្រុក (control) | រស់រាន (ត្រឹមត្រូវ) |
+| N28 | ដក listener `navigator.serviceWorker` ➜ `'message'` | 🔴 **រស់រាន** ➜ ឥឡូវ `sw-client-wiring-test` |
+| N29 | `controllerchange` មិនបង្ហាញផ្ទាំងកំណែថ្មី | 🔴 **រស់រាន** ➜ ឥឡូវ `sw-client-wiring-test` |
+| N30 | `visibilitychange` មិនពិនិត្យ SW update | 🔴 **រស់រាន** ➜ ឥឡូវ `sw-client-wiring-test` |
+| R1 | rules ៖ ដក `hasChildren()` ពី `$itemId` ប្រវត្តិ | `rules-duplicate-keys` · `emu/crud-rules-flow` |
+| M14 · M11b | (ជុំ ១ · ផ្ទៀងផ្ទាត់ការកែ) | `reconnect-ladder-test` · `lookup-failure-identity-test` |
+
+- **N28–N30 ៖ មូលហេតុដែលរស់រាន** — ថ្នាក់ដដែលនឹង M14 ៖ handler ព្រឹត្តិការណ៍ជា arrow ក្នុង `registerServiceWorker()` ហើយ **ចុងទាំង ២** នៃស្នាមភ្ជាប់
+  មានតេស្តដាច់ពីគ្នា (`client.postMessage` ក្នុង SW · `handleServiceWorkerMessage()` ផ្ទាល់ · `showUpdateAvailableBanner()` ផ្ទាល់) ➜ គ្មាននរណាសួរថា
+  «សារដែល SW ពិតផ្ញើ ទៅដល់ handler ទេ?»។ ⛔ `ctx.serviceWorkers()` របស់ Playwright អនុញ្ញាត `evaluate` ក្នុងបរិបទ SW ពិត ➜ ផ្ញើតាម
+  `clients.matchAll()` ដូច `notificationclick`។ ⛔ ពិដាន ១៥ នាទីវាស់ដោយនាឡិកាទំព័រដែលរំកិល (`Date.now` ក្នុង `addInitScript`) ➜ ទិសផ្ទុយ
+  «មុនពិដាន ➜ គ្មានការហៅ» ចាប់ការដកពិដាន។ `notifyDrawerOpen` · `notifyFeedInFlight` **មិនបើកលើ `window`** (មិននៅក្នុង `_generated-state.json`) ➜
+  អានពី DOM (`#notifyDrawer.open` · `#zoeUpdateBanner`) និងការហៅ server។
+- **`sw-install-integrity-test` ជុំទី ៤ (B ➜ C) ធ្លាក់ម្តងម្កាល ៖ ការប្រណាំងក្នុង checker (App ត្រឹមត្រូវ)** — ធ្លាក់ក្នុង N24 (កែតែ `push.ts`) និងម្តងទៀតក្នុង CI ពេញ។
+  ⛔ «flake» មិនមែនមូលហេតុ ➜ ជំហានទី ១ ៖ ការធ្លាក់រាយមូលហេតុ ➜ CI ពេញ ៖ `serverWasmHits: 0 · serverSwHits: 1 · effectiveType: 4g · controller: activated` ➜
+  **មិនមែន** link «frugal» · `sw.js` ត្រូវទាញ ១ ដង តែ `.wasm` មិនដែល ➜ SW **A** (ចាស់) នៅគ្រប់គ្រង ៖ វាពិនិត្យ deploy ឃើញ `-b` ➜ មិន revalidate (**ត្រឹមត្រូវ** តាមច្បាប់
+  «មិនចាក់ឯកសារ deploy ថ្មីចូល cache ចាស់»)។ មូលហេតុ ៖ `install` ដាក់ `CORE_SHELL` (រួម `.wasm`) សិន រួចទើប `OPTIONAL_SHELL` ➜ `skipWaiting()` ➜ `clients.claim()`
+  ខណៈជំហាន B របស់ checker ឈប់រង់ចាំពេល `.wasm` ចូល cache `-b` ➜ ពេលម៉ាស៊ីនរវល់ ចន្លោះនោះលើសបង្អួច ១២ វិ.។ ⛔ ការសាកក្រោមបន្ទុក ១៦ ដង (រួម CPU ពេញ) **មិន**
+  បង្កើតវាឡើងវិញ — ការពន្យារដោយចេតនាទើបបង្កើតបាន ៖ server សាកល្បងពន្យារ `OPTIONAL_SHELL` ទី ១ (ដេរីវេពី `sw.js` ពិត) ១៣ វិ. ពេល install B ➜ ចន្លោះប្រណាំង
+  កើត **ជានិច្ច** (លក្ខខណ្ឌចាំបាច់ថ្មី) ➜ កំណែគ្មានការរង់ចាំ ធ្លាក់ **ជាប់លាប់** ដោយហត្ថលេខាដូចការធ្លាក់ក្នុង CI បេះបិទ · កំណែកែ (រង់ចាំ B ចាប់យកទំព័រ ៖ `installing`/`waiting`
+  ទទេ · cache `-a` លុប) ➜ **២៧/២៧**។ ⛔ មេរៀន ៖ ការរង់ចាំ «ទិន្នន័យថ្មីនៅក្នុង cache» មិនមែន «SW ថ្មីគ្រប់គ្រង» · ការប្រណាំងដែលកើតម្តងម្កាល ត្រូវបង្កើត
+  **ដោយការពន្យារដោយចេតនា** មិនមែនដោយការរត់ច្រើនដង។
+
+### Mutation testing ផ្នែកបណ្តាញ ៖ ១៥ mutation ➜ ចន្លោះ ២ · equivalent ១ · control ១ (2026-09-29 · ZoeW 2.45.4)
+
+- **វិធី** ៖ ក្នុងមួយ mutation កែ `ZoeW/src` ១ កន្លែង ➜ `RUNALL_ONLY=<checker បណ្តាញ ៣៦ រួម zoew-suite-test>` + `RUNALL_STATE=` ➜ ស្តារ
+  (~១៥២ វិ./mutation · BASE ៣៦/៣៦ បៃតង ១៥៩ វិ. ➜ ការធ្លាក់ = ការចាប់ពិត)។ ⛔ អានឈ្មោះ checker ពីបន្ទាត់ `❌ ធ្លាក់ (N) ៖ …` របស់ run-all
+  មិនមែន regex លើបន្ទាត់ checker (`*** FAIL ***` ខកខាន)។ ⛔ harness កែ `ZoeW/src` **នៅនឹងកន្លែង** ➜ កុំកែ `audit-tools/` · `ZoeW/tests` ខណៈវារត់
+  (measure root ចម្លង `audit-tools/` ថ្មីរាល់ mutation)។
+
+| # | Mutation | អ្នកចាប់ |
+|---|---|---|
+| M01 | `visibilitychange` មិនហៅ `retryFailedDbListenersNow()` | `connection-recovery-test` |
+| M02 | `.info/connected=true` មិនហៅ `flushPendingHistoryPatches()` | `history-patch-retry-test` |
+| M03 | ដកពិដាន `RECONNECT_FORCE_MIN_GAP_MS` | `monotonic-gate-test` · `connection-recovery-test` |
+| M04 | `.info/serverTimeOffset` ងាប់ ➜ `isDatabaseConnected = false` | `connection-recovery-test` |
+| M05 | ដក `dbListenerReportedFailures.delete(pathKey)` | `connection-recovery-test` |
+| M06 | ដកច្រកទ្វារជំនាន់ពី callback `dailyCollected` | `connection-recovery-test` |
+| M07 | timeout របស់ `fetchWithTimeout` មិន `abort()` | `network-timeout-test` |
+| M08 | `retryAsync` មិនគោរព `noRetry` | `lookup-failure-identity-test` · `health-check-test` |
+| M09 | SW revalidate HTML ចូល cache | `zoew-suite-test` (`sw-revalidation-timeout.test.ts`) |
+| M10 | ដក `anyModalIsOpen()` ពី `reloadForFirebaseSdk()` | `connection-recovery-test` |
+| M11 | ដក `ZTO_AUTH_EXPIRED` ពី `lookupFailureIsDefinitive()` | **equivalent** — Function ផ្ញើវាជាមួយ **401** ➜ សារ `HTTP 401` ធ្វើឲ្យស្ថាពរដដែល |
+| M11b | ដក `ZTO_AUTH_NOT_CONFIGURED` | 🔴 **រស់រាន** checker lookup ៧ ➜ ឥឡូវ `lookup-failure-identity-test` |
+| M12 | `online` មិនដាក់ `networkJustReturned = true` | `connection-recovery-test` |
+| M13 | `/disconnect\|already deleted/i` ➜ `/disconnect/i` | `history-patch-retry-test` |
+| M14 | `offline` មិនហៅ `clearReconnectWatchdog()` | 🔴 **រស់រាន** checker ៣៦ ➜ ឥឡូវ `reconnect-ladder-test` |
+| M15 | ប្តូរឈ្មោះអថេរក្នុងស្រុក (control) | រស់រាន (ត្រឹមត្រូវ) |
+
+- **M14 ៖ មូលហេតុដែលរស់រាន** ៖ `reconnect-ladder-test` ក្លែងជណ្តើរ តែ **មិនដែលរត់ handler `offline`/`online`** ក្នុង `setupConnectionRecovery()`។
+  ផលពិត ៖ timer ជំហានវែង (៦០ វិ.) នៅរស់ឆ្លងការដាច់ ➜ `online` ➜ `scheduleReconnectWatchdog()` `return` (timer មានរួច) ➜ ការព្យាយាមបន្ទាប់រង់ចាំ
+  timer ចាស់ ជំនួសជំហាន ៥ វិ. · ចំនួនការព្យាយាមមិន reset ➜ «កំពុងភ្ជាប់…» មិនលេច។ ⛔ ការវាស់ជំនាន់ដំបូងប្រើការដាច់ **៣ × ៦០ វិ.** ➜ ចាប់បានតែ ១
+  ការអះអាង ព្រោះ timer ចាស់បាញ់ខណៈក្រៅបណ្តាញ ហើយសម្អាតខ្លួនឯង ➜ ការដាច់ត្រូវ **ខ្លីជាង** ពេលនៅសល់របស់ timer (២ × ជំហានដំបូង)។
+  ក្រោយពង្រីក ៖ M14 ➜ **ធ្លាក់ ២** · tree ស្អាត **២៦/២៦** · ថតទទេ exit 1។
+- **M11b ៖ មូលហេតុដែលរស់រាន** ៖ ការអះអាង cooldown ចាស់វាស់ `lookupFailureCooldownMs("definitive")` (ថេរ) និងការបរាជ័យ timeout តែប៉ុណ្ណោះ ➜
+  គ្មាននរណាសួរថា **កូដណា** ទៅដល់ «definitive» លើផ្លូវ `attemptAutoLookup()` ពិត។ `ZTO_AUTH_NOT_CONFIGURED` · `ZTO_CONFIG_INVALID` ·
+  `ZTO_PROXY_NOT_CONFIGURED` មកជាមួយ **503** ➜ មានតែការពិនិត្យកូដទេដែលធ្វើឲ្យវាស្ថាពរ ➜ បើបាត់ ការស្កេនសាកម្តងទៀតរាល់ ៦ វិ. ទៅ Function
+  ដែលមិនទាន់កំណត់។ ក្រោយពង្រីក (កូដ ➜ status **ដេរីវេពី `zto-order-detail.js`** ៖ auth/config ៤ ➜ ៣០ វិ. · 429/5xx ៦ ➜ ខ្លីជាង) ៖ M11b ➜ **ធ្លាក់**
+  (`6000`) · tree ស្អាត **៥០/៥០** · M11 នៅ **៥០/៥០** (equivalent មិនត្រូវចាក់សោ) · ថតទទេ exit 1។
+- ⛔ **មេរៀន** ៖ «ធ្លាក់ត្រឹមតែម្ខាងនៃឯកសារ» — M14 រស់ព្រោះ checker ស្រង់តែ function ដែលមានឈ្មោះ ខណៈ handler ព្រឹត្តិការណ៍ជា arrow function
+  ក្នុង `setupConnectionRecovery()` (ថ្នាក់ដដែលនឹង `retryFirebaseSdkNow()` ក្នុង `CLAUDE.md` ៖ «`shared-fns.js` មើលមិនឃើញ handler») ➜ សួរ
+  «តើ handler ព្រឹត្តិការណ៍ណាខ្លះ **គ្មាននរណារត់**?»។
+
 ### `run-all.sh` ស្របគ្នា · state ដែលបន្តបាន (2026-09-28 · ឧបករណ៍ប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ App)
 
 ⛔ **កូដ ship មិនប្រែ** (`ZoeW/` · `ZoeKeyGen/` មិនប៉ះ) ➜ `APP_VERSION`/`CACHE_VERSION` មិនឡើង (ច្បាប់ ៦ · `version-bump-scope`)។
@@ -1964,7 +2138,8 @@ Function ដែល export ៖ 978
 | `duplicate-money-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `emu/crud-rules-flow` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `emu/app-writes-rules-test` | ផ្នែក ១ | — |
+| `emu/crud-rules-flow` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `emu/license-seat-rules-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៥ |
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -1974,7 +2149,7 @@ Function ដែល export ៖ 978
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `field-shape-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ |
 | `fluid-type-focus-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -1982,7 +2157,7 @@ Function ដែល export ៖ 978
 | `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `health-check-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `health-check-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `html-sink-escaping` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -2011,27 +2186,27 @@ Function ដែល export ៖ 978
 | `locker-claim-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `lookup-burst-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-config-secret-test` | — | ផ្នែក ១ |
-| `lookup-failure-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-failure-identity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-freshness-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-prefetch-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `money-core` | ផ្នែក ១ (កូដស្រង់សម្រាប់ money checker) | — |
 | `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `money-reality-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `monotonic-gate-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
+| `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `netlify-config-scope-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `network-timeout-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `network-timeout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `offline-shell-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `panel-snap-ownership-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | — | ផ្នែក ៣ · ផ្នែក ៤ |
-| `perf-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `perf-check` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `phone-suggest-test` | — | ផ្នែក ១ |
@@ -2044,10 +2219,10 @@ Function ដែល export ៖ 978
 | `price-edit-abort-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | ផ្នែក ១ | — |
-| `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `registry-orphan-list` | — | ផ្នែក ១ |
-| `registry-orphan-list-test` | — | ផ្នែក ១ |
+| `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
+| `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-release-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -2055,7 +2230,8 @@ Function ដែល export ៖ 978
 | `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `revenue-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `rules-duplicate-keys` | — | ផ្នែក ៣ |
+| `rules-duplicate-keys` | ផ្នែក ១ | ផ្នែក ៣ |
+| `rules-shape` | ផ្នែក ១ | — |
 | `runall-runner-test` | ផ្នែក ២ | — |
 | `scan-engine-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `scan-remove-mode-test` | — | ផ្នែក ១ |
@@ -2084,6 +2260,7 @@ Function ដែល export ៖ 978
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-client-wiring-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-shell-latency-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -2098,7 +2275,7 @@ Function ដែល export ៖ 978
 | `version-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zoew-suite-test` | ផ្នែក ១ | — |
+| `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `zto-budget-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `zto-cookie-session-test` | — | ផ្នែក ២ |

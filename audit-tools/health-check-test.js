@@ -435,6 +435,29 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('ប៊ូតុងពិនិត្យម្តងទៀតត្រូវដោះវិញក្រោយចប់', vm.runInContext('viewState.healthRecheckBusy', rt.ctx) === false);
     }
     {
+        // ⛔ បិទ ➜ បើកប្រអប់វិញ ខណៈជុំចាស់នៅរង់ចាំ License/Lookup (រហូតដល់ ~១១ វិ.) ➜ ជុំ ២ រត់ស្របគ្នា។ ជុំចាស់ដែលចប់មុន
+        //    មិនត្រូវជាន់ «⏳» របស់ជុំថ្មីដោយលទ្ធផលដែលវាស់ **មុន** ការបើកវិញ (ឧ. អ្នកប្រើទើបបើក WiFi) ហើយមិនត្រូវដោះប៊ូតុង
+        //    «ពិនិត្យម្តងទៀត» ខណៈជុំថ្មីនៅរត់។
+        const licenseWaits = [];
+        const rt = buildRuntime({ cfg: ZTO_CFG, license: () => new Promise((resolve) => licenseWaits.push(resolve)) });
+        const runOld = rt.api.runHealthCheck();
+        const runNew = rt.api.runHealthCheck();
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំទាំង ២ កំពុងរង់ចាំ License', licenseWaits.length === 2, licenseWaits.length);
+        licenseWaits[0]({ state: 'expired' });
+        await runOld;
+        const afterOld = vm.runInContext('uiState.healthRows', rt.ctx) || [];
+        ok('⛔ ជុំចាស់ចប់ក្រោយជុំថ្មីចាប់ផ្តើម ➜ មិនជាន់ជួរ «⏳» របស់ជុំថ្មី', afterOld.length === 1, afterOld.length);
+        ok('⛔ ជុំចាស់មិនដោះប៊ូតុង «ពិនិត្យម្តងទៀត» ខណៈជុំថ្មីនៅរត់', vm.runInContext('viewState.healthRecheckBusy', rt.ctx) === true);
+        licenseWaits[1]({ state: 'active' });
+        await runNew;
+        const afterNew = vm.runInContext('uiState.healthRows', rt.ctx) || [];
+        const licenseRow = afterNew.find((r) => r && r.label === 'អាជ្ញាប័ណ្ណ');
+        ok('ទិសផ្ទុយ ៖ ជុំថ្មីបង្ហាញជួរគ្រប់ ៩ (License របស់ជុំថ្មី ✅) ហើយដោះប៊ូតុង',
+            afterNew.length === 9 && vm.runInContext('viewState.healthRecheckBusy', rt.ctx) === false
+                && !!licenseRow && state(renderHealthRow(licenseRow)) === 'ok',
+            afterNew.length + ' · ' + (licenseRow ? state(renderHealthRow(licenseRow)) : 'គ្មានជួរ License'));
+    }
+    {
         ok('⛔ Lookup មិនប្រើ Sheet ➜ ជួរកំណែ Script ជា ℹ️ (មិនពាក់ព័ន្ធ)',
             state(buildRuntime({ cfg: ZTO_CFG, scriptSeen: 1 }).api.healthSheetScriptRow()) === 'info');
         ok('⛔ មិនទាន់ឃើញកំណែសោះ ➜ ℹ️ ព្រមទាំងវិធីដឹង (មិនមែន ❌)',

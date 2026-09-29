@@ -193,7 +193,7 @@ bash audit-tools/emu/rules.sh
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |
 | `pickup-repair-test.js` | ការជួសជុលស្ថិតិយកស្វ័យប្រវត្តិ | `PICKUPREPAIR_APP_DIR` |
 | `pickup-barcode-identity-test.js` | ស្ថិតិយករាប់តាម **សំណុំ barcode** ៖ ឧបករណ៍ ២ ចែក store តែមួយ · rules ពិត · ការចូជួរក្រៅបណ្តាញ | `PICKUPID_APP_DIR` |
-| `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ (rules ពិត · អថេរ registry និងធុងសំរាម) | `FUZZ_APP_DIR` |
+| `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ (rules ពិត · អថេរ registry និងធុងសំរាម) · `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ដែល fake ទទួល (សម្រាប់ `emu/app-writes-rules-test.js`) | `FUZZ_APP_DIR` · `FUZZ_CAPTURE` |
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `ledger-failed-apply-revert-test.js` | ការសរសេរ ledger **ធ្លាក់** រួចការដកវិញ **ជោគជ័យ** ➜ មិនត្រូវដកលេខដែលមិនដែលត្រូវបូក | `LEDGERFAIL_APP_DIR` |
@@ -235,7 +235,8 @@ bash audit-tools/emu/rules.sh
 | `idtoken-fixture.js` | helper ៖ វិញ្ញាបនបត្រ និងការចុះហត្ថលេខា **Firebase ID token សាកល្បង** (RS256 ពិត) ➜ checker ដែលរត់ `zto-order-detail.js` ពិត វាស់ការផ្ទៀងផ្ទាត់ token ដោយមិនចម្លងតក្កវិជ្ជា (សោសាកល្បងប៉ុណ្ណោះ — គ្មានសិទ្ធិលើផលិតកម្ម) | — |
 | `react-view.js` | helper ៖ **ស្រទាប់ React** របស់ ZoeW (`createStore` · ឃ្លាំង · `fieldValue` · ប្រអប់ · `document-io`) ស្រង់ជា **កូដពិត** ពីទិដ្ឋភាព `app.js` ➜ checker ដែលស្រង់ function ចូល `vm` រត់តួអាជីវកម្មដែលហៅ helper ទាំងនោះបាន (DOM ក្លែងរបស់ checker នៅតែជាអ្វីដែលត្រូវវាស់) | — |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
-| `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
+| `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន · វង់ក្រចកស្មើ · **node ដែលរំពឹង object ទាមទារ object** (`newData.hasChildren(…)` ➜ primitive ត្រូវបដិសេធ · បញ្ជីដេរីវេពី rules ពិតទាំង ២) | `RULESDUP_APP_DIR` |
+| `rules-shape.js` | helper ៖ ដេរីវេ node ដែលរំពឹង object ពី rules ពិត (មាន schema កូន · អាចសរសេរបាន) និងការវាស់ពីរជំហានលើ emulator (control ដក guard របស់ node ➜ primitive ទទួល · rules ពិត ➜ បដិសេធ) សម្រាប់ `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` | — |
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
 | `connection-state-fuzz-test.js` | ស្ថានភាព listener លើ **លំដាប់ចៃដន្យ** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស · សារ «ភ្ជាប់មកវិញ» មុនពេល | `CONNFUZZ_APP_DIR` |
 | `ledger-count-integrity-test.js` | ការដកលុយស្វ័យប្រវត្តិត្រូវដក **ចំនួនកញ្ចប់** (`totalCount`) ជាមួយលុយ លើ ledger **ពិត** (មិន stub) ៖ ថ្ងៃ · ខែ · សតិ ត្រូវស៊ីគ្នា; «យករួច» មិនប៉ះទាំង ២ | `LEDGERCOUNT_APP_DIR` |
@@ -278,6 +279,7 @@ bash audit-tools/emu/rules.sh
 | `sw-cache-failure-test.js` | Cache API បរាជ័យ ≠ App ដាច់ | `SWFAIL_APP_DIR` |
 | `sw-revalidate-pressure-test.js` | ការធ្វើឲ្យសំបកស្រស់ មិនស៊ីកូតាការតភ្ជាប់ | `SWREVAL_APP_DIR` |
 | `sw-abort-propagation-test.js` | SW គោរព caller abort | `SWABORT_APP_DIR` |
+| `sw-client-wiring-test.js` | ខ្សែភ្ជាប់ SW ↔ ទំព័រ ក្នុង `registerServiceWorker()` លើ App · SW · Chromium ពិត ៖ សារដែល SW ពិតផ្ញើ (`zoew-open-notify` ➜ ផ្ទាំង 🔔 · `zoew-push` ➜ ទាញដំណឹង · ប្រភេទដេរីវេពី `sw.js`) · `visibilitychange`/`focus`/`online` ➜ `reg.update()` ក្រោយពិដាន ១៥ នាទី · deploy ថ្មី ➜ `controllerchange` ➜ ផ្ទាំង «មានកំណែថ្មី» (ទិសផ្ទុយ ៖ ការដំឡើងដំបូង · សារមិនស្គាល់ · មុនពិដាន) | `SWWIRE_APP_DIR` |
 | `offline-shell-test.js` | ស្កេនដើរពេលបណ្តាញដាច់ (គ្មានការពឹងលើ CDN) | `OFFLINE_APP_DIR` |
 | `sdk-surface.js` | `fb.X` ដែល loader មិន export ➜ `undefined` ស្ងាត់ | `SDKSURFACE_APP_DIR` |
 | `sdk-offline-boot-test.js` | បើកក្រៅបណ្តាញ ➜ ស្ថានភាព «ក្រៅបណ្ដាញ» មិនមែនប្រអប់ Config | `SDKBOOT_APP_DIR` |
@@ -333,6 +335,7 @@ bash audit-tools/emu/rules.sh
 | `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
 | `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ · **ដំណឹង `license_announcements`** ៖ payload/id ពី `buildNoticePayload()`/`newNoticeId()` ពិត · admin តែម្នាក់សរសេរ/លុប · ZoeW អានតាម `announcementsUrl()` ពិតដោយគ្មាន auth (`limitToLast`) · schema បដិសេធប្រភេទ `update` និងប្រវែងលើស | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
 | `emu/tx-disconnect-emu-test.js` | ថ្នាក់ `disconnect` វាស់លើ **SDK Firebase ពិត** (កំណែដដែលនឹង CDN) · RTDB emulator ពិត · proxy TCP ៖ ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` ខណៈ server ប្រែរួច · wrapper ពិតរបស់ App សម្រេចត្រូវទាំង ២ ករណី · registry ៖ SDK ពិតរត់ updater លើ cache ទទេ ➜ `claimBarcodeInRegistry()` ពិតមិន `claimed` លើ barcode ដែលចុះឈ្មោះរួច · ledger ៖ ឧបករណ៍ផ្សេងសរសេរតម្លៃដូចគ្នាមុន put របស់យើងត្រូវកាត់ ➜ `runLedgerTransaction()` ពិតមិន `committed` | `TXEMU_APP_DIR` · `TXEMU_PORT` |
+| `emu/app-writes-rules-test.js` | **ការសរសេរពិតរបស់ App ↔ rules ពិត** ៖ រត់ `revenue-fuzz-test.js` (App ពិតក្នុង Chromium · ស្កេន · បិទ/បើក · ដក · លុប · ស្តារ · កែតម្លៃ · សម្អាត ២ម៉ោង/៧ថ្ងៃ · ឧបករណ៍ផ្សេង) ជាមួយ `FUZZ_CAPTURE` ➜ ចាក់ការសរសេរតាមលំដាប់ពិតទៅ RTDB emulator ជាមួយ `firebase-database.rules.json` ពិត ៖ App ➜ user · harness ➜ owner ➜ ការបដិសេធណាមួយ = FAIL · probe ទិសផ្ទុយ (record ប្រវត្តិ `.validate: false` ➜ ត្រូវបដិសេធ) · ជាន់ ≥ ១៥០ ការសរសេរ · គ្រប root ៩ | `APPWRITES_APP_DIR` · `APPWRITES_STRICT` · `APPWRITES_RUNS` · `APPWRITES_OPS` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keygen-notice-test.js` | ដំណឹង ZoeKeyGen ➜ ZoeW (ផ្ទាំង 🔔) ៖ ប្រភេទ · ព្រំដែនប្រវែង · ទម្រង់ id ស៊ីគ្នារវាង `app.js` ↔ `index.html` ↔ rules · `sendNotice()`/`deleteNotice()` ពិតក្នុងរបៀបបរាជ័យ (បដិសេធ · ព្យួរហើយ commit យឺត · ការអានធ្លាក់ · logout កណ្តាលទី) ➜ toast ✅ តែក្រោយ commit · បញ្ជី escape HTML | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |

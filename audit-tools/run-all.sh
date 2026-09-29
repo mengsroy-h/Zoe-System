@@ -611,6 +611,7 @@ run "emu/ledger-revert" node audit-tools/emu/ledger-revert-emu-test.js
 run "emu/restore-mutation" node audit-tools/emu/restore-mutation-emu-test.js
 run "emu/license-seat-rules" node audit-tools/emu/license-seat-rules-test.js
 run "emu/tx-disconnect" node audit-tools/emu/tx-disconnect-emu-test.js
+run "emu/app-writes-rules" node audit-tools/emu/app-writes-rules-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
@@ -662,6 +663,7 @@ run "offline-shell (browser ពិត)" node audit-tools/offline-shell-test.js
 run "sw-install-integrity (browser ពិត)" node audit-tools/sw-install-integrity-test.js
 run "network-timeout (browser ពិត)" node audit-tools/network-timeout-test.js
 run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
+run "sw-client-wiring (browser ពិត)" node audit-tools/sw-client-wiring-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
 run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
 run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
@@ -787,6 +789,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWREVAL_APP_DIR="$BASE" node audit-tools/sw-revalidate-pressure-test.js 2>&1 | tail -1 | sed 's/^/   sw-revalidate:   /'
     SWFAIL_APP_DIR="$BASE"  node audit-tools/sw-cache-failure-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-failure:/'
     SWABORT_APP_DIR="$BASE" node audit-tools/sw-abort-propagation-test.js 2>&1 | tail -1 | sed 's/^/   sw-abort:        /'
+    SWWIRE_APP_DIR="$BASE" node audit-tools/sw-client-wiring-test.js 2>&1 | tail -1 | sed 's/^/   sw-wiring:       /'
     PERIODICGUARD_APP_DIR="$BASE" node audit-tools/periodic-network-guard-test.js 2>&1 | tail -1 | sed 's/^/   periodic-guard:   /'
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
     PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
@@ -859,6 +862,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LICSEAT_APP_DIR="$BASE" node audit-tools/license-seat-test.js 2>&1 | tail -1 | sed 's/^/   license-seat:    /'
     LICSEATEMU_APP_DIR="$BASE" node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
     TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
+    APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

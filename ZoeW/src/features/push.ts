@@ -15,6 +15,7 @@ export type PushStatus = 'unknown' | 'unsupported' | 'needs-install' | 'native-u
 export const PUSH_FUNCTION_PATH = '/.netlify/functions/push';
 export const PUSH_STATE_KEY = 'zoew_push_v1';
 export const PUSH_TIMEOUT_MS = 12000;
+export const PUSH_NATIVE_REGISTER_TIMEOUT_MS = 20000;
 export const PUSH_RESYNC_MS = 24 * 60 * 60 * 1000;
 export const PUSH_SCHEDULE_MIN_GAP_MS = 10 * 60 * 1000;
 export const PUSH_SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000;
@@ -47,6 +48,7 @@ interface PushSaved {
 export const pushRuntime = {
     nativeListeners: false,
     nativeEnabling: false,
+    nativeWatchdogSeq: 0,
     scheduleAttemptAt: 0,
     scheduleInFlight: false
 };
@@ -71,6 +73,19 @@ function writeSaved(patch: Partial<PushSaved>) {
 
 function setStatus(status: PushStatus) {
     uiState.pushStatus = status;
+}
+
+function pushStep<T>(value: T | Promise<T>, label: string): Promise<T> {
+    return withTimeout(Promise.resolve(value), PUSH_TIMEOUT_MS, label) as Promise<T>;
+}
+
+function armNativeRegisterWatchdog() {
+    const seq = ++pushRuntime.nativeWatchdogSeq;
+    setTimeout(() => {
+        if (seq !== pushRuntime.nativeWatchdogSeq || !pushRuntime.nativeEnabling || uiState.pushStatus !== 'busy') return;
+        pushRuntime.nativeEnabling = false;
+        setStatus('error');
+    }, PUSH_NATIVE_REGISTER_TIMEOUT_MS);
 }
 
 export function pushSupport(): 'native' | 'web' | 'needs-install' | 'native-unconfigured' | 'unsupported' {
@@ -168,13 +183,16 @@ async function subscribeWeb(license: string): Promise<PushStatus> {
     const cfg = await fetchPushConfig();
     if (!cfg || !cfg.web || !cfg.vapidPublicKey) return 'server-off';
     const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');
-    let sub = await reg.pushManager.getSubscription();
+    let sub: any = await pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out');
     const wantKey = cfg.vapidPublicKey;
     if (sub && sub.options && sub.options.applicationServerKey && bytesToB64url(sub.options.applicationServerKey) !== wantKey) {
-        try { await sub.unsubscribe(); } catch (e) {}
+        try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
         sub = null;
     }
-    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(wantKey) });
+    if (!sub) {
+        sub = await pushStep(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(wantKey) }),
+            'Push subscribe timed out');
+    }
     const json = sub && typeof sub.toJSON === 'function' ? sub.toJSON() : null;
     if (!json || !json.endpoint || !json.keys) return 'error';
     const nav: any = navigator;
@@ -193,6 +211,7 @@ function loadNativePush(): Promise<any> {
 }
 
 async function onNativeToken(token: string) {
+    pushRuntime.nativeWatchdogSeq++;
     const license = activationKey();
     if (!license) { setStatus('no-license'); pushRuntime.nativeEnabling = false; return; }
     const reply = await postPush('subscribe', { license: license, platform: 'android', sub: { kind: 'fcm', token: token } });
@@ -242,6 +261,7 @@ async function enableNative(): Promise<boolean> {
         });
         await ensureNativePushListeners(PN);
         pushRuntime.nativeEnabling = true;
+        armNativeRegisterWatchdog();
         await PN.register();
         return true;
     } catch (e) {
@@ -286,13 +306,13 @@ export async function disablePush(): Promise<boolean> {
     try {
         if (support === 'web') {
             const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');
-            const sub = await reg.pushManager.getSubscription();
+            const sub: any = await pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out');
             if (sub) {
                 const json = typeof sub.toJSON === 'function' ? sub.toJSON() : null;
                 if (json && json.endpoint && json.keys) {
                     await postPush('unsubscribe', { sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys } });
                 }
-                try { await sub.unsubscribe(); } catch (e) {}
+                try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
             }
         } else if (support === 'native') {
             const PN = await loadNativePush();
@@ -344,7 +364,8 @@ export function resyncPush(): Promise<boolean> {
     if (pushSupport() === 'native') {
         return loadNativePush().then((PN) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
     }
-    return navigator.serviceWorker.ready.then((reg: any) => reg.pushManager.getSubscription()).then((sub: any) => {
+    return withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
+        .then((reg: any) => pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out')).then((sub: any) => {
         if (!sub) {
             writeSaved({ on: false, syncedAt: 0 });
             setStatus('off');

@@ -302,7 +302,59 @@ function seedBig(n) {
             check(paging.scrollable && paging.afterScroll > paging.first && paging.afterScroll <= paging.total,
                 app + ': រមូរកន្សោមតារាងដល់ចុង ➜ IntersectionObserver ពិតទាញជួរបន្ថែម', JSON.stringify(paging));
         }
-        await ctx.close(); server.close();
+        await ctx.close();
+
+        // ⛔ App ស្ងៀម (online · គ្មានការប៉ះ) ត្រូវគូរ **០ ស៊ុម** ៖ animation `infinite` ណាមួយធ្វើឲ្យ compositor គូររាល់ vsync ជារៀងរហូត
+        // ➜ អេក្រង់ LTPO (10–120Hz) ចុះល្បឿនមិនបាន · ស៊ីថ្ម។ វាស់បាន ៖ `pulseDot 2s infinite` លើចំណុច «ភ្ជាប់ Server» ➜ DrawFrame
+        // **២៣០ / ៥ វិ.** ពេលស្ងៀម ធៀប ០ ពេលគ្មានវា។ ⛔ ការវាស់ត្រូវជា **trace ពិត** (DrawFrame) មិនមែនអាន CSS; probe ទិសផ្ទុយ ៖
+        // animation infinite ដែលចាក់ចូលដោយចេតនា ➜ ត្រូវឃើញស៊ុម (បើមិនឃើញ ការវាស់ខូច); «កំពុងភ្ជាប់» នៅតែភ្លឹប (សញ្ញាសកម្មភាពពិត)។
+        const idleCtx = await browser.newContext({ viewport: { width: 412, height: 780 }, hasTouch: true, isMobile: true });
+        const idle = await idleCtx.newPage();
+        await idle.route('**', (r) => {
+            const u = r.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
+            return r.abort();
+        });
+        await idle.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await idle.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(30)) + ');');
+        await idle.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await idle.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 0, null, { timeout: 30000 });
+        await idle.waitForTimeout(8000);
+        const drawFrames = async (ms) => {
+            await browser.startTracing(idle, { categories: ['disabled-by-default-devtools.timeline.frame', 'viz'] });
+            await idle.waitForTimeout(ms);
+            const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
+            return ev.filter((e) => e.name === 'DrawFrame').length;
+        };
+        const idleState = await idle.evaluate(() => ({
+            dot: (document.querySelector('.status-dot') || {}).className || '',
+            lite: document.body.classList.contains('perf-lite'),
+            running: document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x')
+        }));
+        const idleFrames = await drawFrames(3000);
+        const probe = await idle.addStyleTag({ content: '.status-dot::after{animation:pulseDot 1s infinite!important}' });
+        await idle.waitForTimeout(200);
+        const probeFrames = await drawFrames(2000);
+        await probe.evaluate((el) => el.remove());
+        await idle.evaluate(() => { window.viewState.connectionStatus = 'connecting'; if (typeof window.commitNow === 'function') window.commitNow(); });
+        await idle.waitForTimeout(8000);
+        const connecting = await idle.evaluate(() => ({
+            dot: (document.querySelector('.status-dot') || {}).className || '',
+            running: document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x')
+        }));
+        console.log('    ស្ងៀម ៣ វិ. ៖ DrawFrame=' + idleFrames + ' · probe infinite ២ វិ. ៖ ' + probeFrames + ' · ' + JSON.stringify(idleState));
+        if (!REPORT) {
+            check(idleState.dot === 'status-dot' && !idleState.lite,
+                app + ': ស្ងៀម ៖ លក្ខខណ្ឌចាំបាច់ — online (`status-dot`) និងមិនមែន perf-lite', JSON.stringify(idleState));
+            check(probeFrames >= 30, app + ': ស្ងៀម ៖ probe ទិសផ្ទុយ — animation infinite ត្រូវឃើញស៊ុម (ការវាស់រសើប)', 'DrawFrame=' + probeFrames);
+            check(idleFrames <= 3 && idleState.running.length === 0,
+                app + ': ⛔ App ស្ងៀម online មិនគូរស៊ុម (គ្មាន animation infinite) ➜ LTPO ចុះល្បឿនបាន', 'DrawFrame=' + idleFrames + ' running=' + JSON.stringify(idleState.running));
+            check(/connecting/.test(connecting.dot) && connecting.running.indexOf('pulseDot') !== -1,
+                app + ': «កំពុងភ្ជាប់» នៅតែភ្លឹប (សញ្ញាសកម្មភាពពិត មិនត្រូវបិទជាមួយ)', JSON.stringify(connecting));
+        }
+        await idleCtx.close();
+        server.close();
     }
     await browser.close();
     if (REPORT) { console.log('\n(របាយការណ៍តែប៉ុណ្ណោះ)'); process.exit(0); }

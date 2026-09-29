@@ -2102,13 +2102,14 @@ build វាស់ដោយស្វ័យប្រវត្តិដែរ (`ru
 ```bash
 node --check <ឯកសារ .js ដែលកែ>
 node audit-tools/strip-comments.js
-bash audit-tools/run-all.sh
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh   # emulator រស់ (ជំហានទី ០)
 git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
 ```
 
-រួច bump `CACHE_VERSION` និង `APP_VERSION` ក្នុង App ណាដែលកូដ ship ប្រែ
-(`node audit-tools/version-check.js` · `version-bump-scope.js`) ហើយបន្ថែម
-ផ្នែកថ្មីក្នុង `docs/HISTORY.md` ផ្នែក ១។
+រួច bump `CACHE_VERSION` និង `APP_VERSION` ក្នុង App ណាដែលកូដ ship ប្រែ ហើយបន្ថែម
+ផ្នែកថ្មីក្នុង `docs/HISTORY.md` ផ្នែក ១។ ⛔ `version-check` · `version-bump-scope` · `doc-scope-test` រត់ **ក្នុង** `run-all.sh` —
+⛔ ការរត់វា **ដោយផ្ទាល់លើ repo** (`node audit-tools/<x>.js`) ធ្លាក់ក្លែងក្លាយ (វាស់បាន ៖ `doc-scope-test` FAIL 19 · `version-bump-scope`
+«មិនបានឃើញកូដ») ➜ checker តែមួយ ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
 
 ### ⛔ ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់ — ចាំបាច់ចុងរាល់ការងារ (សំណើអ្នកប្រើ)
 

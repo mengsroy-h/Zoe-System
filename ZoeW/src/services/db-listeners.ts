@@ -218,7 +218,7 @@ export function initDatabaseListeners() {
     firebaseState.fb.onValue(firebaseState.dbRefHistory, (snapshot) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
         const data = snapshot.val();
-        dataState.scanHistory = rawSnapshotToItemList(data);
+        dataState.scanHistory = rawSnapshotToItemList(data, 'history');
 
         dataState.scanHistory.forEach(item => {
             if(!item.id) item.id = generateUniqueId();
@@ -268,7 +268,7 @@ export function initDatabaseListeners() {
     firebaseState.fb.onValue(firebaseState.dbRefDeleted, (snapshot) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
         const data = snapshot.val();
-        dataState.deletedItems = rawSnapshotToItemList(data);
+        dataState.deletedItems = rawSnapshotToItemList(data, 'deleted');
 
         dataState.deletedItems.forEach(item => {
             if(!item.id) item.id = generateUniqueId();

@@ -54,6 +54,8 @@
     height: 100%;
 }
 
+.status-dot::after { animation-iteration-count: 3; }
+
 .nav-bell-btn {
     position: relative;
     display: inline-flex;

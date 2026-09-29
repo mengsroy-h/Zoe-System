@@ -191,7 +191,59 @@ function seedData(extra) {
         const real = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
         check(real.length === 0, app + ': គ្មានកំហុស runtime លើទិន្នន័យខូច', real.slice(0, 4).join('\n        '));
 
-        await ctx.close(); server.close();
+        await ctx.close();
+
+        // ⛔ record **ទាំងមូល** ជា primitive (string · លេខ · boolean) ៖ rules មិនមាន `.validate` នៅកម្រិត `$itemId` ➜ ការសរសេរ
+        // តម្លៃមួយ (Console · import · កំហុសកូដ) ឆ្លងកាត់។ មុនកែ `rawSnapshotToItemList()` សរសេរ `v.id` លើ primitive ➜ `TypeError`
+        // (strict mode) រាល់ snapshot ➜ `noteDbListenerAlive()` មិនដែលរត់ ➜ តារាង/ធុងសំរាមជាប់ «⏳ វាស់មិនបាន» លើ **គ្រប់ឧបករណ៍**។
+        const ctx2 = await browser.newContext({ viewport: { width: 412, height: 780 } });
+        const page2 = await ctx2.newPage();
+        const errors2 = [];
+        page2.on('pageerror', (e) => errors2.push('pageerror: ' + e.message));
+        page2.on('dialog', (d) => d.accept());
+        await page2.route('**', (route) => {
+            const u = route.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + port)) return route.continue();
+            return route.abort();
+        });
+        const goodA = { id: 'good_a', phone: '011000901', scanDate: D, cod: 5, dod: 0, count: 1, barcode: 'G1', time: '09:10', isClosed: false, barcodes: [{ code: 'G1', cod: 5, dod: 0, isClosed: false, time: '09:10' }] };
+        const goodB = { id: 'good_b', phone: '011000902', scanDate: D, cod: 3, dod: 1, count: 1, barcode: 'G2', time: '09:11', isClosed: false, barcodes: [{ code: 'G2', cod: 3, dod: 1, isClosed: false, time: '09:11' }] };
+        const goodTrash = { id: 'good_t', phone: '011000903', scanDate: D, cod: 2, dod: 0, count: 1, barcode: 'T1', time: '09:12', isClosed: false, trashReason: 'delete', isFromDeletion: true, deletedAt: Date.now(), barcodes: [{ code: 'T1', cod: 2, dod: 0, isClosed: false }] };
+        await page2.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await page2.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seedData({
+            zoew_scan_history_cod_dod: { good_a: goodA, junk_text: 'junk', junk_number: 5, good_b: goodB, junk_bool: true },
+            zoew_recently_deleted_cod_dod: { good_t: goodTrash, junk_trash: 'x' }
+        })) + ');');
+        await page2.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page2.waitForTimeout(2500);
+        const prim = await page2.evaluate(() => {
+            const stale = (k) => (typeof window.dbListenerViewIsStale === 'function' ? window.dbListenerViewIsStale(k) : 'n/a');
+            return {
+                seeded: typeof (window.__fakeStore.zoew_scan_history_cod_dod || {}).junk_text === 'string',
+                listenerErrs: window.__errs || [],
+                historyStale: stale('history'),
+                deletedStale: stale('deleted'),
+                history: (window.scanHistory || []).map((i) => (i && typeof i === 'object' ? i.id : typeof i)),
+                trash: (window.deletedItems || []).map((i) => (i && typeof i === 'object' ? i.id : typeof i))
+            };
+        });
+        check(prim.seeded, app + ': primitive ៖ ស្ថានភាពចាប់ផ្តើម — record string ស្ថិតក្នុង store (លក្ខខណ្ឌចាំបាច់)', JSON.stringify(prim));
+        check(prim.listenerErrs.length === 0, app + ': primitive ៖ listener history/ធុងសំរាម មិន throw', JSON.stringify(prim.listenerErrs).slice(0, 300));
+        check(prim.historyStale === false && prim.deletedStale === false,
+            app + ': primitive ៖ ទិដ្ឋភាព history/ធុងសំរាម មិនជាប់ «វាស់មិនបាន»', 'history=' + prim.historyStale + ' deleted=' + prim.deletedStale);
+        check(prim.history.length === 2 && prim.history.indexOf('good_a') !== -1 && prim.history.indexOf('good_b') !== -1,
+            app + ': primitive ៖ record ល្អ ២ នៅក្នុងប្រវត្តិ ហើយ primitive ត្រូវរំលង', JSON.stringify(prim.history));
+        check(prim.trash.length === 1 && prim.trash[0] === 'good_t',
+            app + ': primitive ៖ record ល្អក្នុងធុងសំរាមនៅ ហើយ primitive ត្រូវរំលង', JSON.stringify(prim.trash));
+        await page2.evaluate(() => { const b = document.getElementById('btnFilterAll'); if (b) b.click(); else window.filterDataByDate('all'); });
+        await page2.waitForTimeout(500);
+        const primRows = await page2.evaluate(() => document.querySelectorAll('#historyTableBody tr[data-id]').length);
+        check(primRows === 2, app + ': primitive ៖ តារាងគូរជួរដេកល្អ ២', 'rows=' + primRows);
+        const real2 = errors2.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
+        check(real2.length === 0, app + ': primitive ៖ គ្មានកំហុស runtime', real2.slice(0, 4).join('\n        '));
+        await ctx2.close();
+        server.close();
     }
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));

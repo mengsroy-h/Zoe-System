@@ -54,7 +54,7 @@ transaction ដែលបានផ្ញើរួចដោយ `disconnect` ទោ
 ⛔ **មេរៀនជុំ 2.42.3 ៖ ការលើកលែងដែល *ធំជាងច្បាប់* = ចន្លោះស្ងាត់** — ច្បាប់ ៩ លើកលែង `docs/` **នៅ root** ខណៈ
 `doc-scope-test` រំលងថតឈ្មោះ `docs` **គ្រប់ជម្រៅ** ➜ `ZoeW/docs/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ) មិនដែលត្រូវ
 ស្កេនរកប្រវត្តិសោះ។ ⛔ សួរជានិច្ច ៖ «ការលើកលែងនេះ ផ្គូតាម *ផ្លូវ* ឬតាម *ឈ្មោះ*?»។ ⛔ CI ពេញរត់ **ក្នុង session**
-(`bash audit-tools/run-all.sh` build tree វាស់ដោយខ្លួនឯង · ~១ ម៉ោង) — checker តែមួយ ៖
+(`bash audit-tools/run-all.sh` build tree វាស់ដោយខ្លួនឯង · ~១០ នាទីលើ ៤ CPU) — checker តែមួយ ៖
 `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
 ⛔ React ៖ កំហុសដែល error boundary **ចាប់** ទៅត្រឹម `console.error` ➜ Sentry មិនឃើញ លុះត្រាតែ `onCaughtError`
 បញ្ជូនវា (`src/app/root-errors.ts`)។ ⛔ bridge វាស់ (`expose-globals` · `__auditRebind`) មិនត្រូវចូល build ផលិតកម្ម ➜
@@ -179,21 +179,17 @@ fuzz helper សុទ្ធ **២៨២** (ZoeW ១៨៣ + ZoeKeyGen ២៨ ស
 
 ## ជំហាន ០ — baseline ពិត (SKIP ០) · ⛔ **រត់ក្នុង session នេះ មិនមែន GitHub**
 
-```bash
-npm i acorn playwright-core firebase-tools
-npx --no-install firebase setup:emulators:database
-setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
-    --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
-cp firebase-database.rules.json audit-tools/emu/real.rules.json
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 bash audit-tools/run-all.sh
-MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
-```
+⛔ **ពាក្យបញ្ជារស់នៅ `CLAUDE.md` Runbook ជំហានទី ០ តែមួយកន្លែង** (ដំឡើង · បើក emulator ជា task រស់ · `curl` មុនរត់ ·
+`CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh`) — កុំចម្លងមកទីនេះ (ច្បាប់ ១២)។
+⛔ **checker ណាក៏ដោយ (រួម `money-guardian-test` · `version-check` · `doc-scope-test`) មិនត្រូវរត់ដោយផ្ទាល់លើ repo ទេ** ៖ វាស្វែងរក
+`ZoeW/app.js` ដែលលែងមាន ➜ ធ្លាក់ក្លែងក្លាយ (វាស់បាន ៖ `doc-scope-test` **FAIL 19** · `version-bump-scope` «មិនបានឃើញកូដ») ➜ រត់តាម
+`run-all.sh` ឬ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
 
 ⛔ **`SKIP` មិនមែន `PASS` ទេ** — មាន SKIP សូម្បី ១ កុំអះអាងថា tree បៃតង។
 ⛔ រាយ **ចំនួន PASS · FAIL · SKIP · PARTIAL ពិត** ពីការរត់ក្នុង session នេះ; កុំយកលេខជុំមុនមកបញ្ជាក់ tree បច្ចុប្បន្ន។
-⚠️ កុំបិទ emulator ដោយ `pkill -f firebase-database-emulator` (វាសម្លាប់ session)។
-⚠️ `run-all.sh` ចំណាយ **~៤០ នាទី** ➜ រត់វាជា background រួចធ្វើការស្រាវជ្រាវ
-ស្របគ្នា; ⛔ កុំរត់ checker browser ស្របគ្នានឹងវា (ប្រណាំងធនធាន)។
+⚠️ កុំបិទ emulator ដោយ `pkill -f …` ណាមួយ (វាសម្លាប់ session)។
+⚠️ `run-all.sh` ចំណាយ **~១០ នាទី** លើ ៤ CPU (lane ស្របគ្នា) ➜ រត់វាជា background រួចធ្វើការស្រាវជ្រាវស្របគ្នា;
+⛔ កុំរត់ checker browser ស្របគ្នានឹងវា (ប្រណាំងធនធាន)។
 
 ## ជំហាន ១ — ⛔ ផ្នត់គំនិត
 
@@ -333,12 +329,9 @@ helper ដែលត្រូវប្រុងបំផុតគឺពួកដ�
 
 **រកឃើញកំហុស ➜ សាង checker ជាមុន ➜ បញ្ជាក់ថាវាធ្លាក់លើ `origin/main` ➜ ទើបកែកូដ។**
 
-```bash
-rm -rf /tmp/baseline && mkdir /tmp/baseline
-git fetch origin main && git archive origin/main | tar -x -C /tmp/baseline
-<CHECKER>_APP_DIR=/tmp/baseline node audit-tools/<checker>.js   # ត្រូវធ្លាក់!
-mkdir -p /tmp/emptytree && <CHECKER>_APP_DIR=/tmp/emptytree node audit-tools/<checker>.js  # ត្រូវធ្លាក់ដែរ!
-```
+⛔ tree មុនកែត្រូវ **build វាស់** មុនចង្អុល `*_APP_DIR` ទៅវា (`git archive` ឆៅគ្មាន `ZoeW/app.js` ➜ checker ធ្លាក់ «មិនឃើញកូដ» ដែល
+**មិនមែន** ភស្តុតាងថាវាចាប់កំហុស) ➜ ពាក្យបញ្ជា ៖ `CLAUDE.md` Runbook ជំហានទី ២ (`bash audit-tools/run-all.sh /tmp/baseline`)។ checker
+ថ្មីត្រូវធ្លាក់ **ទាំង** លើ tree មុនកែ (ការអះអាងដែលមានឈ្មោះ) **និង** លើថតទទេ (`checker-coverage.js`)។
 
 - បើតេស្តថ្មី**ជោគជ័យ**លើ tree មុនកែ ➜ វាមិនចាប់អ្វីទេ ➜ សរសេរឡើងវិញ
 - ⛔ checker ថ្មីត្រូវ ៖ `*_APP_DIR` · ចុះឈ្មោះក្នុង `run-all.sh` **ទាំង ២ កន្លែង** ·
@@ -401,14 +394,8 @@ function ណាដែល *តួរបស់វា* ផ្ទុកអក្ស�
 
 ## ជំហាន ៤ — មុន commit (⛔ គ្មានជំហានណារំលងបាន)
 
-```bash
-node --check ZoeW/app.js && node --check ZoeKeyGen/app.js
-node audit-tools/strip-comments.js
-git diff origin/main -- ZoeW/app.js | grep '^-'    # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 bash audit-tools/run-all.sh
-MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
-node audit-tools/version-check.js && node audit-tools/version-bump-scope.js
-```
+⛔ ពាក្យបញ្ជារស់នៅ `CLAUDE.md` Runbook ជំហានទី ៣ (`strip-comments` · `run-all.sh` ពេញជាមួយទង់ STRICT · `git diff "$BASE_REF" --
+ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'`) — `version-check` · `version-bump-scope` រត់ **ក្នុង** `run-all.sh` រួចហើយ។
 
 រួចធ្វើ **ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់ទាំង ៦ ជំហាន** (Runbook ជំហានទី ៣ ក្នុង
 `CLAUDE.md`) — ជាពិសេសជំហាន ៤ (ឥរិយាបថ **មុន/ក្រោយ** ក្នុង `vm`, >= ១០០ ករណី)។

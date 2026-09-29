@@ -1,6 +1,6 @@
 import { uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
-import { combinedNotifyFeed, notifyBadgeCount } from '../../features/notifications';
+import { notifyBadgeCount, visibleNotifyFeed } from '../../features/notifications';
 import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
 import { refTo } from '../refs';
@@ -16,8 +16,8 @@ function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
 export function AppNavbar() {
     const v = useStoreFields(viewState, ['connectionStatus', 'connectionText']);
     const cls = statusClasses(v.connectionStatus);
-    const n = useStoreFields(uiState, ['notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'updateReady']);
-    const badge = notifyBadgeCount(n.notifyView, combinedNotifyFeed(n.notifyFeed, n.notifySellerFeed), n.notifySeenIds) + (n.updateReady ? 1 : 0);
+    const n = useStoreFields(uiState, ['notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady']);
+    const badge = notifyBadgeCount(n.notifyView, visibleNotifyFeed(n.notifyFeed, n.notifySellerFeed, n.notifyDismissedIds), n.notifySeenIds) + (n.updateReady ? 1 : 0);
     const bellLabel = badge ? 'ជូនដំណឹង (' + badge + ' ថ្មី)' : 'ជូនដំណឹង';
     return (
         <header className="app-navbar" ref={refTo('navbar')}>

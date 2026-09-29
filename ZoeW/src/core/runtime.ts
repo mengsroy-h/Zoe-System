@@ -77,6 +77,7 @@ export const ACTION_ALLOWLIST = [
     "promptPermanentDelete",
     "promptRestoreDeletedItem",
     "togglePush",
+    "clearNotifications",
     "closeZtoListSyncModal",
     "closeZtoSyncModal",
     "recheckZtoPickupStatus",

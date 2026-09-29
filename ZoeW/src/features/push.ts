@@ -7,7 +7,7 @@ import { isNativeAndroid } from '../platform/native';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { LICENSE_APP_CODE } from './license';
-import { expiryScheduleTimes, fetchNotifyFeed, openNotifyDrawer } from './notifications';
+import { dismissNotifyFeed, expiryScheduleTimes, fetchNotifyFeed, openNotifyDrawer } from './notifications';
 
 export type PushStatus = 'unknown' | 'unsupported' | 'needs-install' | 'native-unconfigured' | 'no-license'
     | 'off' | 'busy' | 'on' | 'denied' | 'server-off' | 'error';
@@ -302,6 +302,30 @@ export async function disablePush(): Promise<boolean> {
     writeSaved({ on: false, kind: '', syncedAt: 0, schedSig: '', schedAt: 0 });
     setStatus('off');
     return true;
+}
+
+export function clearDeliveredNotifications(): Promise<number> {
+    if (isNativeAndroid()) {
+        if (!pushNativeBuild.fcm) return Promise.resolve(0);
+        return loadNativePush().then((PN) => PN.removeAllDeliveredNotifications()).then(() => 1, () => 0);
+    }
+    try {
+        const nav: any = navigator;
+        if (!nav || !('serviceWorker' in nav)) return Promise.resolve(0);
+        return withTimeout(nav.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
+            .then((reg: any) => (reg && typeof reg.getNotifications === 'function' ? reg.getNotifications() : []))
+            .then((list: any[]) => {
+                (Array.isArray(list) ? list : []).forEach((n) => { try { n.close(); } catch (e) {} });
+                return Array.isArray(list) ? list.length : 0;
+            }, () => 0);
+    } catch (e) {
+        return Promise.resolve(0);
+    }
+}
+
+export function clearNotifications(): Promise<number> {
+    const hidden = dismissNotifyFeed();
+    return clearDeliveredNotifications().then(() => hidden, () => hidden);
 }
 
 export function togglePush(): Promise<boolean> {

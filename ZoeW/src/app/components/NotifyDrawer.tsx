@@ -1,6 +1,6 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, combinedNotifyFeed, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
@@ -105,7 +105,14 @@ function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateR
 function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] }) {
     return (
         <section className="notify-section" id="notifyFeedSection">
-            <div className="notify-section-title">📢 សេចក្តីប្រកាស និងការថែទាំ</div>
+            <div className="notify-section-title notify-title-row">
+                <span>📢 សេចក្តីប្រកាស និងការថែទាំ</span>
+                {feed.length ? (
+                    <button type="button" className="notify-clear-btn" id="notifyClearBtn" onClick={onAct("clearNotifications")}>
+                        🧹 សម្អាត
+                    </button>
+                ) : null}
+            </div>
             {feed.length ? (
                 <ul className="notify-feed-list" id="notifyFeedList">
                     {feed.map((item) => (
@@ -133,7 +140,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'updateReady', 'pushStatus']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -153,7 +160,7 @@ export function NotifyDrawer() {
                 <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
                 <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
-                <FeedSection feed={combinedNotifyFeed(s.notifyFeed, s.notifySellerFeed)} seen={s.notifySeenIds} />
+                <FeedSection feed={visibleNotifyFeed(s.notifyFeed, s.notifySellerFeed, s.notifyDismissedIds)} seen={s.notifySeenIds} />
             </div>
             <div className="drawer-foot notify-foot">
                 <div className="credit-tag">Powered By ZoeW</div>

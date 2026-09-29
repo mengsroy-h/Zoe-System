@@ -21,6 +21,7 @@ const pn = vi.hoisted(() => {
         createChannel: vi.fn(async () => {}),
         register: vi.fn(async () => {}),
         unregister: vi.fn(async () => {}),
+        removeAllDeliveredNotifications: vi.fn(async () => {}),
         addListener: vi.fn(async (name: string, fn: (x: any) => void) => { listeners[name] = fn; return { remove: async () => {} }; })
     };
     return api;
@@ -31,13 +32,14 @@ import { dataState, firebaseState, uiState } from '../src/core/state';
 import { dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
 import { barcodeAbandonIsRipe } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
-import { abandonAtOf, expiryScheduleTimes, NOTIFY_SCHEDULE_HORIZON_MS } from '../src/features/notifications';
+import { abandonAtOf, expiryScheduleTimes, loadNotifyDismissed, NOTIFY_DISMISSED_KEY, NOTIFY_DISMISSED_MAX, NOTIFY_SCHEDULE_HORIZON_MS, sanitizeSellerNotices } from '../src/features/notifications';
 import {
-    FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
+    FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
+import { AppNavbar } from '../src/app/components/AppNavbar';
 import { DrawerBackdrop } from '../src/app/components/DrawerBackdrop';
 import { mount, step, unmount } from './native/react-harness';
 
@@ -100,6 +102,12 @@ beforeEach(() => {
     firebaseState.isDatabaseInitialized = true;
     dbListenerPendingPaths.clear();
     dataState.scanHistory = [];
+    uiState.notifyFeed = [];
+    uiState.notifySellerFeed = [];
+    uiState.notifySeenIds = [];
+    uiState.notifyDismissedIds = [];
+    uiState.notifyView = null;
+    uiState.updateReady = false;
 });
 
 afterEach(() => {
@@ -412,5 +420,60 @@ describe('Service Worker ៖ push · notificationclick', () => {
         expect(client.postMessage).toHaveBeenCalledWith({ type: 'zoew-open-notify' });
         expect(client.focus).toHaveBeenCalled();
         expect(h.opened).toHaveLength(1);
+    });
+});
+
+describe('🧹 សម្អាតការជូនដំណឹង', () => {
+    const FILE_ITEM = { id: '2.45.0', kind: 'update', title: 'កំណែ 2.45.0', body: '', points: [], version: '2.45.0', date: '2026-09-29' };
+    function seller(title: string, at: number) {
+        return sanitizeSellerNotices({ ['n' + String(at) + 'aaaaaa']: { kind: 'notice', title, at } })!;
+    }
+
+    it('លាក់ដំណឹងទាំង ២ ប្រភព · badge ០ · រក្សាទុកពេលបើក App ឡើងវិញ · ដំណឹងថ្មីនៅលេច · បញ្ជីកញ្ចប់ និងកំណែ App មិនប៉ះ', async () => {
+        const w = stubWebPush('granted');
+        const shown = [{ close: vi.fn() }, { close: vi.fn() }];
+        Object.defineProperty(window.navigator, 'serviceWorker', { configurable: true, value: { ready: Promise.resolve({ pushManager: w.pushManager, getNotifications: async () => shown }) } });
+        vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ items: [] })));
+        uiState.notifyFeed = [FILE_ITEM];
+        uiState.notifySellerFeed = seller('ដំណឹងចាស់', 1790000000000);
+        uiState.notifyView = { measurable: true, emptyText: '', packages: 2, customers: 1, more: 0, rows: [{ key: 'r', phone: '012', locker: '', count: 2, hoursLeft: 3 }] };
+        mount(<><AppNavbar /><DrawerBackdrop /><NotifyDrawer /></>);
+        expect(document.getElementById('navNotifyBadge')!.textContent).toBe('4');
+        expect(document.getElementById('notifyFeedList')!.children).toHaveLength(2);
+        let cleared: Promise<number> = Promise.resolve(0);
+        step(() => { cleared = clearNotifications(); });
+        expect(await cleared).toBe(2);
+        expect(document.getElementById('notifyFeedList')).toBeNull();
+        expect(document.getElementById('notifyFeedSection')!.textContent).toContain('គ្មានសេចក្តីប្រកាស');
+        expect(document.getElementById('notifyClearBtn')).toBeNull();
+        expect(shown.every((n) => n.close.mock.calls.length === 1)).toBe(true);
+        expect(document.getElementById('navNotifyBadge')!.textContent).toBe('2');
+        expect(document.getElementById('notifyExpiryList')!.children).toHaveLength(1);
+        expect(document.getElementById('notifyVersionSection')!.textContent).toContain('✅');
+        uiState.notifyDismissedIds = [];
+        loadNotifyDismissed();
+        expect(uiState.notifyDismissedIds.sort()).toEqual([FILE_ITEM.id, uiState.notifySellerFeed[0].id].sort());
+        step(() => { uiState.notifySellerFeed = seller('ដំណឹងថ្មី', 1790000100000).concat(uiState.notifySellerFeed); });
+        expect(document.getElementById('notifyFeedList')!.textContent).toContain('ដំណឹងថ្មី');
+        expect(document.getElementById('notifyFeedList')!.textContent).not.toContain('ដំណឹងចាស់');
+        expect(document.getElementById('navNotifyBadge')!.textContent).toBe('3');
+    });
+
+    it('ប៊ូតុង 🧹 ក្នុង UI ពិត ➜ សម្អាត · APK ➜ លុបការជូនដំណឹងលើរបាទូរស័ព្ទ · ពិដានបញ្ជីលាក់', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ items: [] })));
+        uiState.notifySellerFeed = seller('សួស្តី', 1790000000000);
+        mount(<><DrawerBackdrop /><NotifyDrawer /></>);
+        const btn = document.getElementById('notifyClearBtn') as HTMLButtonElement;
+        expect(btn.textContent).toContain('សម្អាត');
+        step(() => { btn.click(); });
+        await vi.waitFor(() => expect(pn.removeAllDeliveredNotifications).toHaveBeenCalled());
+        expect(document.getElementById('notifyFeedList')).toBeNull();
+        uiState.notifyDismissedIds = Array.from({ length: NOTIFY_DISMISSED_MAX }, (_, i) => 'old' + i);
+        uiState.notifySellerFeed = seller('ថ្មី', 1790000200000);
+        await clearNotifications();
+        expect(uiState.notifyDismissedIds).toHaveLength(NOTIFY_DISMISSED_MAX);
+        expect(uiState.notifyDismissedIds[NOTIFY_DISMISSED_MAX - 1]).toBe(uiState.notifySellerFeed[0].id);
+        expect(JSON.parse(localStorage.getItem(NOTIFY_DISMISSED_KEY)!)).toHaveLength(NOTIFY_DISMISSED_MAX);
     });
 });

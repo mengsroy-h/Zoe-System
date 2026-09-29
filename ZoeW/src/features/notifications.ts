@@ -51,6 +51,8 @@ export const NOTIFY_FEED_KINDS = ['update', 'maintenance', 'notice'];
 export const NOTIFY_SEEN_KEY = 'zoew_notify_seen_v1';
 export const NOTIFY_FEED_CACHE_KEY = 'zoew_notify_feed_v1';
 export const NOTIFY_SEEN_MAX = 60;
+export const NOTIFY_DISMISSED_KEY = 'zoew_notify_dismissed_v1';
+export const NOTIFY_DISMISSED_MAX = 200;
 export const NOTIFY_SELLER_MAX_ITEMS = 20;
 export const NOTIFY_SELLER_KINDS = ['notice', 'maintenance'];
 export const NOTIFY_SELLER_CACHE_KEY = 'zoew_notify_seller_v1';
@@ -268,6 +270,27 @@ function readJson(key) {
     }
 }
 
+export function loadNotifyDismissed() {
+    const list = readJson(NOTIFY_DISMISSED_KEY);
+    uiState.notifyDismissedIds = Array.isArray(list) ? list.filter((x) => typeof x === 'string').slice(-NOTIFY_DISMISSED_MAX) : [];
+}
+
+export function visibleNotifyFeed(fileFeed, sellerFeed, dismissed): NotifyFeedItem[] {
+    const hidden = new Set(Array.isArray(dismissed) ? dismissed : []);
+    return combinedNotifyFeed(fileFeed, sellerFeed).filter((it) => it && !hidden.has(it.id));
+}
+
+export function dismissNotifyFeed(): number {
+    const ids = visibleNotifyFeed(uiState.notifyFeed, uiState.notifySellerFeed, uiState.notifyDismissedIds).map((it) => it.id);
+    markNotifyFeedSeen();
+    clearAppBadge();
+    if (!ids.length) return 0;
+    const merged = uiState.notifyDismissedIds.filter((id) => ids.indexOf(id) === -1).concat(ids).slice(-NOTIFY_DISMISSED_MAX);
+    uiState.notifyDismissedIds = merged;
+    safeStoreSet(appLocalStore, NOTIFY_DISMISSED_KEY, JSON.stringify(merged));
+    return ids.length;
+}
+
 export function loadNotifySeen() {
     const list = readJson(NOTIFY_SEEN_KEY);
     uiState.notifySeenIds = Array.isArray(list) ? list.filter((x) => typeof x === 'string').slice(-NOTIFY_SEEN_MAX) : [];
@@ -375,6 +398,7 @@ export function openNotifyDrawer() {
 
 export function initNotifications() {
     loadNotifySeen();
+    loadNotifyDismissed();
     loadCachedNotifyFeed();
     loadCachedSellerNotices();
     refreshNotifyView();

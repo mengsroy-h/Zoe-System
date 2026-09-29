@@ -66,7 +66,9 @@ const OTHER = licenseKey({ a: 'ZOE', id: OTHER_KEY, iat: NOW / 1000 - 10, exp: N
 function vapidEnv() {
     const ecdh = crypto.createECDH('prime256v1');
     ecdh.generateKeys();
-    return { VAPID_PUBLIC_KEY: b64urlEncode(ecdh.getPublicKey()), VAPID_PRIVATE_KEY: b64urlEncode(ecdh.getPrivateKey()), VAPID_SUBJECT: 'mailto:ops@zoew.test' };
+    // ⛔ `getPrivateKey()` ត្រឡប់ ៣១ byte ពេល byte ដំបូងជា ០ (~១/២៥៦) ➜ បំពេញឲ្យគ្រប់ ៣២ ដូច `scripts/gen-vapid.mjs` (បើអត់ តេស្តធ្លាក់ដោយចៃដន្យ)
+    const priv = ecdh.getPrivateKey();
+    return { VAPID_PUBLIC_KEY: b64urlEncode(ecdh.getPublicKey()), VAPID_PRIVATE_KEY: b64urlEncode(Buffer.concat([Buffer.alloc(32 - priv.length), priv])), VAPID_SUBJECT: 'mailto:ops@zoew.test' };
 }
 
 const fcmKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });

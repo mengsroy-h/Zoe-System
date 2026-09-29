@@ -116,6 +116,26 @@ const jankOk = jank.supported.includes('long-animation-frame') && jankCount >= 1
 if (jankOk) console.log(`✅ ស៊ុមកកត្រូវវាស់ពី boot ពិត ៖ «${jank.text}»`);
 else console.log('⛔ បន្ទាត់ «ស៊ុមកក» មិនលេច ឬលេខខុស (boot មិនចាប់ផ្តើម observer?) ៖ ' + JSON.stringify(jank));
 
+/* ⛔ «ពេលរមូរ NNfps» ត្រូវវាស់ពីព្រឹត្តិការណ៍ scroll ពិត ៖ អេក្រង់ LTPO (10–120Hz) ឲ្យស៊ុម ៦០ ពេលស្ងៀម តែ ១២០ ពេលរមូរ ➜ ការវាស់តែពេលបើក
+ *    របា Slide រាយ «60» ខុស។ ព្រឹត្តិការណ៍ scroll លើកន្សោមណាមួយ (capture លើ window) ➜ វាស់ ➜ បើករបា ➜ បន្ទាត់ត្រូវមាន «ពេលរមូរ»។
+ *    ការដកអ្នកស្តាប់ចេញពី boot ➜ គ្មាន «ពេលរមូរ» ➜ smoke ធ្លាក់។ */
+await page.evaluate(() => {
+    const close = document.querySelector('#sideDrawer .drawer-close');
+    if (close) close.click();
+});
+await page.waitForTimeout(200);
+await page.evaluate(() => {
+    const target = document.getElementById('appPages') || document.body;
+    target.dispatchEvent(new Event('scroll'));
+});
+await page.waitForTimeout(800);
+await page.evaluate(() => document.getElementById('navMenuBtn').click());
+await page.waitForTimeout(900);
+const rateText = await page.evaluate(() => { const el = document.getElementById('displayRateLine'); return el ? el.textContent : null; });
+const scrollRateOk = !!rateText && /ស៊ុម App \d+fps · ពេលរមូរ \d+fps/.test(rateText);
+if (scrollRateOk) console.log(`✅ ស៊ុមពេលរមូរត្រូវវាស់ពី scroll ពិត ៖ «${rateText}»`);
+else console.log('⛔ បន្ទាត់ស៊ុមមិនមាន «ពេលរមូរ» (boot មិនភ្ជាប់អ្នកស្តាប់ scroll?) ៖ ' + JSON.stringify(rateText));
+
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk || !scrollRateOk ? 1 : 0);

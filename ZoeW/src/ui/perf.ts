@@ -1,4 +1,5 @@
 import { viewState } from '../core/view-state';
+import { elapsedSince } from '../core/elapsed';
 import { uiState } from '../core/state';
 
 export const DISPLAY_HZ_MIN = 10;
@@ -62,11 +63,52 @@ export function engineLabel(ua) {
     return '';
 }
 
-export function displayRateLabel(hz, engine) {
+export function frameRateText(hz) {
+    return Math.max(DISPLAY_HZ_MIN, Math.min(DISPLAY_RATE_MAX_HZ, Math.round(hz))) + 'fps';
+}
+
+export function displayRateLabel(hz, engine, scrollHz?) {
     const parts = [];
-    if (isFinite(hz) && hz > 0) parts.push('អេក្រង់ ' + Math.max(DISPLAY_HZ_MIN, Math.min(DISPLAY_RATE_MAX_HZ, Math.round(hz))) + 'Hz');
+    if (isFinite(hz) && hz > 0) parts.push('ស៊ុម App ' + frameRateText(hz));
+    if (isFinite(scrollHz) && scrollHz > 0) parts.push('ពេលរមូរ ' + frameRateText(scrollHz));
     if (engine) parts.push(engine);
     return parts.join(' · ');
+}
+
+export function medianFrameRate(gaps) {
+    const sorted = (Array.isArray(gaps) ? gaps : []).filter((g) => isFinite(g) && g > 0).sort((a, b) => a - b);
+    return sorted.length ? 1000 / sorted[sorted.length >> 1] : NaN;
+}
+
+export const SCROLL_RATE_SAMPLES = 20;
+
+export const SCROLL_RATE_GAP_MS = 5000;
+
+export const scrollFrameRate = { peak: 0, sampling: false, lastAt: 0 };
+
+export function noteScrollFrameRate() {
+    if (scrollFrameRate.sampling) return;
+    if (elapsedSince(scrollFrameRate.lastAt) < SCROLL_RATE_GAP_MS) return;
+    scrollFrameRate.sampling = true;
+    scrollFrameRate.lastAt = Date.now();
+    const gaps = [];
+    let last = 0;
+    const tick = (timestamp) => {
+        if (last && timestamp > last) gaps.push(timestamp - last);
+        last = timestamp;
+        if (gaps.length < SCROLL_RATE_SAMPLES) {
+            try { requestAnimationFrame(tick); } catch (e) { scrollFrameRate.sampling = false; }
+            return;
+        }
+        scrollFrameRate.sampling = false;
+        const hz = medianFrameRate(gaps);
+        if (isFinite(hz) && hz > scrollFrameRate.peak) scrollFrameRate.peak = hz;
+    };
+    try {
+        requestAnimationFrame(tick);
+    } catch (e) {
+        scrollFrameRate.sampling = false;
+    }
 }
 
 export function measureDisplayRateForDrawer() {
@@ -79,9 +121,8 @@ export function measureDisplayRateForDrawer() {
         last = timestamp;
         if (gaps.length < DISPLAY_RATE_SAMPLES) { requestAnimationFrame(tick); return; }
         displayRateSampling = false;
-        gaps.sort((a, b) => a - b);
         const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-        viewState.displayRateText = displayRateLabel(1000 / gaps[gaps.length >> 1], engineLabel(ua));
+        viewState.displayRateText = displayRateLabel(medianFrameRate(gaps), engineLabel(ua), scrollFrameRate.peak);
     };
     try {
         requestAnimationFrame(tick);

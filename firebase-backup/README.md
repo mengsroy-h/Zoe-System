@@ -248,7 +248,7 @@ Firebase project បណ្ដោះអាសន្នសិន ហើយបិ�
 
 - **Service-account key ជា credential ពិត** — `config.json` · `secrets/` និង
   `backups/` ស្ថិតក្នុង `.gitignore`។ ⛔ កុំ commit វា។
-- **ការសរសេរជា atomic** — សរសេរទៅ `.partial` រួច `rename()` ចូលកន្លែង ➜
+- **ការសរសេរជា atomic** — សរសេរទៅ `.partial` រួច `renameSync()` ចូលកន្លែង ➜
   ការរត់ដែលដាច់ពាក់កណ្តាល **មិនបន្សល់ `.json.gz` កាត់ខ្លី** ដែលមើលទៅដូច
   backup ល្អទេ។
 - **Timeout និង retry** សម្រាប់បណ្តាញដែលដាច់បណ្តោះអាសន្ន។

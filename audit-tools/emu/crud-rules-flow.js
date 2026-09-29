@@ -451,6 +451,43 @@ async function clearOrphanBeforeRetry(w, label) {
             'rules ពិត៖ ផ្លាស់ barcode និងកែ barcode ផ្សេងស្របគ្នា ➜ រក្សាលទ្ធផលទាំងពីរ');
     }
 
+    // ---------- record មិនមែន object ----------
+    // ⛔ node ដែលរំពឹង object (ដេរីវេពី rules ពិតក្នុង `rules-shape.js`) ៖ primitive **គ្មានកូន** ➜ ការពិនិត្យកូនមិនរត់ ➜ rules ចាស់ទទួល
+    //    ខ្សែអក្សរ/លេខ/bool ➜ callback `onValue` របស់គ្រប់ឧបករណ៍ធ្លាក់ (2.45.4)។ ការវាស់ពីរជំហាន ៖ control ដក guard របស់ node ➜ ត្រូវទទួល (probe ទៅដល់)
+    //    · rules ពិត ➜ ត្រូវបដិសេធ។ ⚠️ Firebase Console ដោយម្ចាស់ Project រំលង rules ➜ អ្នកយាមនេះវាស់តែការសរសេររបស់អ្នកប្រើ login (`asUser`)។
+    console.log('=== ០ខ. node ដែលរំពឹង object ➜ rules ពិតបដិសេធ primitive · ទិសផ្ទុយ ៖ record/វាល/ការលុប ធម្មតាទទួល ===');
+    const { probeObjectShapes } = require('../rules-shape.js');
+    const realRules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
+    const shapes = await probeObjectShapes({
+        rules: realRules, file: 'firebase-database.rules.json',
+        samples: { $itemId: 'shape_probe', $idx: '0', $date: '2026-08-26', $month: '2026-08', $barcodeKey: 'SHAPEPROBE' },
+        loadRules: (r) => asOwner('PUT', '/.settings/rules.json', r).then((x) => /"status"\s*:\s*"ok"/.test(x.body)),
+        reset: (p) => asOwner('PUT', p + '.json', null),
+        write: (p, v) => asUser('PUT', p + '.json', v),
+        denied
+    });
+    check(shapes.length >= 1, 'ជាន់អប្បបរមា ៖ node ដែលរំពឹង object ដេរីវេពី rules ពិត (' + shapes.length + ')');
+    for (const r of shapes) {
+        check(r.reachable, 'probe ទៅដល់ ' + r.rulePath + ' (control ដក guard របស់ node ➜ primitive ត្រូវទទួល)', r.detail.join(' · '));
+        check(r.rejected, 'rules ពិត៖ ' + r.rulePath + ' ➜ primitive (ខ្សែអក្សរ · លេខ · bool) ត្រូវបដិសេធ', r.detail.join(' · '));
+    }
+    for (const node of ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod']) {
+        await asOwner('PUT', '/' + node + '.json', null);
+        const record = node === 'zoew_scan_history_cod_dod'
+            ? parcel('id_ok', [bc('B1', 4.57, false)])
+            : Object.assign(parcel('id_ok', [bc('B1', 4.57, false)]), { deletedAt: T0, isFromDeletion: true, trashReason: 'delete' });
+        const put = await asUser('PUT', '/' + node + '/id_ok.json', record);
+        const patch = await asUser('PATCH', '/' + node + '/id_ok.json', { phone: '012345678' });
+        const field = await asUser('PUT', '/' + node + '/id_ok/phone.json', '098765432');
+        const after = JSON.parse((await asOwner('GET', '/' + node + '/id_ok.json')).body || 'null');
+        check(!denied(put) && !denied(patch) && !denied(field) && after && after.phone === '098765432',
+            'ទិសផ្ទុយ ៖ ' + node + ' ➜ record ពេញ · PATCH វាល · PUT វាលកូន នៅតែទទួល',
+            [put.status, patch.status, field.status, put.body.slice(0, 80)].join(' · '));
+        const del = await asUser('PUT', '/' + node + '/id_ok.json', null);
+        const gone = (await asOwner('GET', '/' + node + '/id_ok.json')).body.trim() === 'null';
+        check(!denied(del) && gone, 'ទិសផ្ទុយ ៖ ' + node + ' ➜ ការលុប record (null) នៅតែទទួល', del.status + ' ' + del.body.slice(0, 80));
+    }
+
     // ---------- បិទ / បើក ----------
     console.log('=== ១. បិទ «យក» / បើកវិញ (barcode តែមួយ និងកញ្ចប់ទាំងមូល) ===');
     for (const [label, fn, args, extra] of [

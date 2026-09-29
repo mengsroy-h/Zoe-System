@@ -235,7 +235,8 @@ bash audit-tools/emu/rules.sh
 | `idtoken-fixture.js` | helper ៖ វិញ្ញាបនបត្រ និងការចុះហត្ថលេខា **Firebase ID token សាកល្បង** (RS256 ពិត) ➜ checker ដែលរត់ `zto-order-detail.js` ពិត វាស់ការផ្ទៀងផ្ទាត់ token ដោយមិនចម្លងតក្កវិជ្ជា (សោសាកល្បងប៉ុណ្ណោះ — គ្មានសិទ្ធិលើផលិតកម្ម) | — |
 | `react-view.js` | helper ៖ **ស្រទាប់ React** របស់ ZoeW (`createStore` · ឃ្លាំង · `fieldValue` · ប្រអប់ · `document-io`) ស្រង់ជា **កូដពិត** ពីទិដ្ឋភាព `app.js` ➜ checker ដែលស្រង់ function ចូល `vm` រត់តួអាជីវកម្មដែលហៅ helper ទាំងនោះបាន (DOM ក្លែងរបស់ checker នៅតែជាអ្វីដែលត្រូវវាស់) | — |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
-| `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
+| `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន · វង់ក្រចកស្មើ · **node ដែលរំពឹង object ទាមទារ object** (`newData.hasChildren(…)` ➜ primitive ត្រូវបដិសេធ · បញ្ជីដេរីវេពី rules ពិតទាំង ២) | `RULESDUP_APP_DIR` |
+| `rules-shape.js` | helper ៖ ដេរីវេ node ដែលរំពឹង object ពី rules ពិត (មាន schema កូន · អាចសរសេរបាន) និងការវាស់ពីរជំហានលើ emulator (control ដក guard របស់ node ➜ primitive ទទួល · rules ពិត ➜ បដិសេធ) សម្រាប់ `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` | — |
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
 | `connection-state-fuzz-test.js` | ស្ថានភាព listener លើ **លំដាប់ចៃដន្យ** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស · សារ «ភ្ជាប់មកវិញ» មុនពេល | `CONNFUZZ_APP_DIR` |
 | `ledger-count-integrity-test.js` | ការដកលុយស្វ័យប្រវត្តិត្រូវដក **ចំនួនកញ្ចប់** (`totalCount`) ជាមួយលុយ លើ ledger **ពិត** (មិន stub) ៖ ថ្ងៃ · ខែ · សតិ ត្រូវស៊ីគ្នា; «យករួច» មិនប៉ះទាំង ២ | `LEDGERCOUNT_APP_DIR` |

@@ -315,6 +315,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **Reset ស្ថិតិយក** តាមតម្រង | node ត្រូវ **នៅមាន** ជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `pickup-reset-test` |
 | សម្អាត ២ម៉ោង/៨ថ្ងៃ | ដើរតាម **barcode** មិនមែនកញ្ចប់ | `partial-pickup-cleanup-test` |
 | Rules fence · deadlock | witness មិនត្រូវចាក់សោ id | `emu/restore-deadlock-test` |
+| **Rules ៖ node ដែលរំពឹង object** | ⛔ node ដែលមាន schema កូន (វាល ឬ wildcard) ហើយអាចសរសេរបាន ត្រូវមាន `.validate` ដែលទាមទារ object (`newData.hasChildren(…)`) — primitive **គ្មានកូន** ➜ ការពិនិត្យកូនមិនរត់ ➜ server ទទួល ➜ listener របស់គ្រប់ឧបករណ៍ធ្លាក់។ ⛔ បញ្ជីដេរីវេពី rules ពិតទាំង ២ ឯកសារ (`rules-shape.js`) ➜ node ថ្មីត្រូវគ្របដោយស្វ័យប្រវត្តិ · emulator វាស់ពីរជំហាន (control ដក guard ➜ ទទួល · rules ពិត ➜ បដិសេធ)។ ⚠️ Console ដោយម្ចាស់ Project រំលង rules ➜ `rawSnapshotToItemList()` រំលង record ខូចនៅតែចាំបាច់ | `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` |
 | នាឡិកា | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `clock-hygiene` |
 | **ពិដានល្បឿន ↔ នាឡិកា** | ⛔ រយៈពេលកន្លងផុតត្រូវឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `monotonic-gate-test` |
 | **ពិដានល្បឿន ↔ *មូលដ្ឋាន* នាឡិកា** | ⛔ ត្រាដែល `elapsedSince()` វាស់ ត្រូវ **បោះដោយ `Date.now()`** (ត្រា `getServerNow()` ➜ `−offset` ➜ `Infinity` ➜ ពិដាន និងជណ្តើរ backoff **រលាយ**)។ ⛔ ត្រារស់ទាំងជា **អថេរ** និងជា **property** (`{ at: … }` · `x.deletedAt = …`)។ ⛔ ការកែមាន ២ ទិស ៖ ត្រា **local** (TTL) ➜ ប្តូរ *ការបោះ* ទៅ `Date.now()`; ត្រា **retention** (`deletedAt` ក្នុង Firebase) ➜ ⛔ កុំប្តូរការបោះ — វាស់ដោយ `getServerNow() - mark`។ ⛔ property តែមួយមិនផ្ទុកមូលដ្ឋាន ២ | `clock-basis-test` · `zto-sync-banner-test` (ឥរិយាបថ) |
@@ -463,7 +464,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | អន្តរកម្ម UI ជម្រៅ + ការប្រណាំងឧបករណ៍ច្រើន + ផ្លូវបរាជ័យ | `ui-flow-test.js` |
 | រចនាសម្ព័ន្ធទំព័រ/របា Slide/Locker/លុបទាំងអស់ | `page-nav-test.js` |
 | CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង** | `layout-check.js` |
-| រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) · **record ខ្លួនវាមិនមែន object** (ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `$itemId` ➜ callback `onValue` បោះ ➜ ប្រវត្តិ/ធុងសំរាមងាប់ «វាស់មិនបាន» គ្រប់ឧបករណ៍ ➜ `rawSnapshotToItemList()` រំលង + Sentry `zone: 'data'`) | `field-shape-test.js` |
+| រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) · **record ខ្លួនវាមិនមែន object** (ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `$itemId` ➜ callback `onValue` បោះ ➜ ប្រវត្តិ/ធុងសំរាមងាប់ «វាស់មិនបាន» គ្រប់ឧបករណ៍ ➜ `rawSnapshotToItemList()` រំលង + Sentry `zone: 'data'`) | `field-shape-test.js` · rules ៖ `rules-duplicate-keys.js` · `emu/crud-rules-flow.js` (០ខ) · `emu/license-seat-rules-test.js` (១៣) |
 | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `revenue-fuzz-test.js` |
 | ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |
 | ដំណើរការនៅទិន្នន័យធំ | `perf-check.js` |
@@ -1809,6 +1810,9 @@ handshake រត់មុន)។ ⛔ **fail-open ទាំងស្រុង** �
 - **`license_keys/$appCode/$keyId` អានបានជាសាធារណៈ** (តែ `expiresAt` និង
   `revoked`) ព្រោះ `checkOnline()` ជា REST គ្មាន auth។ Metadata រសើប ស្ថិតក្នុង
   `license_keys_meta` ដែលអាន/សរសេរបានតែ admin។
+- **node ដែលរំពឹង object ទាមទារ object** — `.validate: "newData.hasChildren()"` (ឬ `hasChildren([...])`) លើរាល់ node ដែលមាន
+  schema កូន ហើយអាចសរសេរបាន (record ប្រវត្តិ/ធុងសំរាម · `barcodes` · ledger ថ្ងៃ/ខែ · ស្ថិតិយក · កញ្ចក់ចំណូល · License Key/seat/meta)។
+  ⛔ **កុំដកវាចេញ** — ជួរ «Rules ៖ node ដែលរំពឹង object» ក្នុងតារាងស្នូល។ ⛔ `.validate` មិនរត់លើការលុប (`null`) ➜ ការលុបធម្មតាមិនប៉ះ។
 - `ZoeKeyGen/firebase-database.rules.json` នៅរក្សា `user_roles` និងតួនាទី
   `admin` **ដោយចេតនា** — វាជា Project ដាច់ដោយឡែក។
 
@@ -2225,6 +2229,9 @@ bash audit-tools/emu/rules.sh
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
   ⛔ វាស់បាន (2026-09-29) ៖ **០ Release** · run `Android APK` ទាំងអស់ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា) ➜ មិនមែនភស្តុតាងថា secret ខុស។
+- ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
+  ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
+  (`emu/*` replay ផ្លូវសរសេរពិតលើ rules ថ្មី ➜ បៃតង)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
 - ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·

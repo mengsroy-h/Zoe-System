@@ -19,7 +19,8 @@
 (១) ស្ថានភាព `busy` របស់ Push ជា **សោ** តែការរង់ចាំខាងក្រោយវា (`pushManager.*` · ព្រឹត្តិការណ៍ `registration` របស់ FCM) គ្មានពិដាន ➜ ⛔ រាល់
 ស្ថានភាព UI ដែល **បដិសេធការចុច** ត្រូវសួរ «អ្វីដោះវា ប្រសិនបើ dependency **ព្យួរ**?» (`push-client.test.tsx` ៖ fake timers + promise មិនដែលដោះ)។
 (២) record មិនមែន object តែមួយក្រោម `$itemId` ធ្វើឲ្យ callback `onValue` បោះ ➜ listener ជាប់ «pending» គ្រប់ឧបករណ៍ ➜ ⛔ fake snapshot ត្រូវមាន
-**រូបរាង record ខុស** មិនត្រឹមវាលខុស (`field-shape-test` context ទី ២)។ (៣) animation `infinite` ពេល App ស្ងៀម ➜ LTPO ចុះ Hz មិនបាន ➜ វាស់ដោយ
+**រូបរាង record ខុស** មិនត្រឹមវាលខុស (`field-shape-test` context ទី ២) · ⛔ ខាង server ៖ node rules ដែលមាន schema កូន ពិនិត្យតែ **កូន** ➜ primitive
+រំលងការពិនិត្យទាំងស្រុង (ចន្លោះ ១៩ ក្នុង rules ២ ឯកសារ) ➜ `rules-shape.js` ដេរីវេ node ពី rules ពិត · emulator វាស់ពីរជំហាន (control ត្រូវ **ទៅដល់** node មុនជឿការបដិសេធ)។ (៣) animation `infinite` ពេល App ស្ងៀម ➜ LTPO ចុះ Hz មិនបាន ➜ វាស់ដោយ
 **trace DrawFrame ពិត** + probe ទិសផ្ទុយ (`perf-check`)។ (៤) mutation testing ផ្នែកបណ្តាញ (១៥ + M11b) ៖ M14 រស់ព្រោះ checker ស្រង់តែ function មានឈ្មោះ
 ខណៈ handler `offline`/`online` ជា arrow ក្នុង `setupConnectionRecovery()` ➜ ⛔ សួរ «handler ព្រឹត្តិការណ៍ណាខ្លះគ្មាននរណារត់?»។ M11b រស់ព្រោះការអះអាង
 cooldown វាស់ **ថេរ** មិនមែនផ្លូវពិត ➜ ⛔ ពេលកូដមួយក្លាយជាស្ថាពរដោយ **កូដ ឬ HTTP status** ត្រូវវាស់កូដដែលមក **ជាមួយ status ផ្សេង** (503) — ករណី 401

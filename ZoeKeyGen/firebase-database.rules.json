@@ -18,6 +18,7 @@
         "$keyId": {
           ".read": true,
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          ".validate": "newData.hasChildren()",
           "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":    { ".validate": "newData.isBoolean()" },
           "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
@@ -33,6 +34,7 @@
         "$keyId": {
           ".read": true,
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          ".validate": "newData.hasChildren()",
           "$slot": {
             ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()))",
             ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40 && ($slot === 'd1' || ($slot === 'd2' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 2) || ($slot === 'd3' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 3) || ($slot === 'd4' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 4) || ($slot === 'd5' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 5))",
@@ -64,11 +66,13 @@
         ".validate": "$appCode === 'ZOE'",
         "$keyId": {
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          ".validate": "newData.hasChildren()",
           "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "scope":     { ".validate": "newData.isString() && (newData.val() === 'ZOE' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },
           "createdBy": { ".validate": "newData.isString()" },
           "appPaths": {
+            ".validate": "newData.hasChildren()",
             "$idx": { ".validate": "newData.isString()" }
           },
           "$other": { ".validate": false }

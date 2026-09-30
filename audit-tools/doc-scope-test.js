@@ -35,8 +35,7 @@ const SECTIONED = [
     'zto-import/README.md',
     'tools/zto-cookie-sync-windows/README-KH.md',
     'tools/zto-cookie-sync-windows/README-ANDROID-KH.md',
-    'tools/money-check-windows/README-KH.md',
-    'supabase/README.md'
+    'tools/money-check-windows/README-KH.md'
 ];
 // ឯកសារ «របៀបប្រើ» ដទៃ ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
 const CONTENT_ONLY = [

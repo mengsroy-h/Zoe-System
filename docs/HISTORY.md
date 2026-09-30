@@ -1585,50 +1585,12 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### Supabase ផ្លូវ ខ ៖ ជំហាន ០–១ — tenant · RLS · Edge Function ចុះឈ្មោះ OTP (2026-09-30 · មិនប៉ះ ZoeW/ZoeKeyGen ➜ គ្មានការឡើងកំណែ)
+### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)
 
-សំណើម្ចាស់គម្រោង ៖ Supabase Project **តែមួយ** ជំនួស «Firebase Project មួយក្នុងមួយអតិថិជន» · OTP តាម Firebase Phone Auth · Login ដោយ username/password ·
-កូដអញ្ជើញចងលេខសាខា · config dynamic · «ផ្ទៀងផ្ទាត់ឲ្យបានច្រើនដង» · «ពិនិត្យសុវត្ថិភាព ក្រែងលេចធ្លាយ» · «យក Supabase ជំនាន់ចុងក្រោយ»។ ⛔ ZoeW/ZoeKeyGen
-**មិនទាន់ប្រើ** ថត `supabase/` ទេ ➜ `version-bump-scope` ៖ គ្មានការឡើងកំណែ។
-
-**ជំនាន់ដែលវាស់** ៖ `@supabase/supabase-js` **2.117.2** (npm ចុងក្រោយ) · CLI npm **2.118.0** (deploy តាម `npx supabase@latest` ៖ postinstall ទាញ binary ពី GitHub
-release ដែល proxy នៅទីនេះបិទ) · Postgres **17** (`supabase/postgres` `ansible/vars.yml` ៖ `postgres17: 17.11.0.002`) ➜ អ្នកយាមរត់ **PostgreSQL 17.10** ពិតពី npm
-`@embedded-postgres/linux-x64` (Docker daemon គ្មាន · apt មានត្រឹម 16)។
-
-**អ្នកយាមមុនកូដ (ឧបករណ៍ជាការចងចាំ)** ៖
-- `supabase-rls-test` ៖ role · schema `auth` · default privileges **ចម្លងបេះបិទ** ពី `supabase/postgres` init-scripts + migration demote-postgres (ផ្ទៀងលើប្រភព ៖
-  `postgres` = `NOSUPERUSER … BYPASSRLS` · សមាជិក `anon/authenticated/service_role/supabase_auth_admin`) និង `auth.uid()/jwt()` + `auth.sessions` ពី `supabase/auth`
-  ➜ ធ្វើត្រាប់ PostgREST (`set local role` + `request.jwt.claims`) ➜ **២ របៀប** grant លំនាំដើម (បើក ៖ Supabase ចាស់ · បិទ ៖ «មិន expose តារាងថ្មី») ➜ **២៤៣**
-  ការអះអាង · mutation **២៧/២៧** ក្រហម (mutation ដែល SQL អនុវត្តមិនបាន មិនរាប់) · ~៧ វិ.។ វាស់ ៖ SIGKILL អ្នកយាម ➜ Postgres ស្លាប់តាម (`setpriv --pdeathsig`) ·
-  TERM ➜ ថតបណ្តោះអាសន្នលុប។
-- `supabase-functions-test` ៖ module TS ពិត (Node type stripping) · token OTP ដោយសោ RSA ពិត · supabase-js ពិតទល់នឹងម៉ាស៊ីនមេក្លែង GoTrue/PostgREST · tsc strict លើ type
-  ពិតរបស់ SDK ➜ **២០៤** ការអះអាង · mutation **២៩/២៩** ក្រហម · ~១៧ វិ.។
-
-**អ្វីដែលការវាស់រកឃើញ (មុន commit)** ៖
-- **ភាពចៃដន្យនៃកូដអញ្ជើញ** ៖ `uuid_send(gen_random_uuid())` មាន bit ថេរ (version · variant) ➜ ការប្រើ byte ទី ៦ ផ្តល់តួអក្សរតែ **១៦/៣២** ក្នុងទីតាំងនោះ ➜ ការវាស់
-  «រាល់ទីតាំងប្រើ ≥ ២៦/៣២ តួលើកូដ ៣០០» ចាប់ mutation នោះ (កូដពិតរំលង byte ៦ ➜ ១០០ bit)។
-- **domain អ៊ីមែលខាងក្នុង** ៖ អាន `supabase/auth` `internal/api/mail.go` ៖ admin API ពិនិត្យតែ **ទម្រង់** អ៊ីមែល ➜ domain ដែលគេផ្សេងកាន់ ➜ `/recover` ផ្ញើតំណកំណត់
-  ពាក្យសម្ងាត់ទៅប្រអប់សំបុត្ររបស់គេ ➜ **យកគណនីបាន** ➜ `ZOE_LOGIN_DOMAIN` ត្រូវ `.invalid` (RFC 2606) + Confirm email/Secure change បើក ➜ ផ្លូវកំណត់ថ្មីមានតែ OTP។
-- **ការកំណត់ពាក្យសម្ងាត់ថ្មីមិនផ្តាច់ session ចាស់** ➜ `revoke_user_sessions()` (cascade ទៅ refresh token · ហាងផ្សេងមិនប៉ះ)។
-- **លទ្ធផលមិនដឹង ≠ មិនបានអនុវត្ត** (ច្បាប់ដដែលនឹង `disconnect`) ៖ `finish_registration` ផុតពិដាន ➜ ការលុបគណនីវិញនឹងបំផ្លាញការចុះឈ្មោះដែលប្រហែលជាជោគជ័យ ➜ RPC
-  idempotent + សាកម្តងទៀត · លុបតែលើការបដិសេធច្បាស់។ ការពិនិត្យកូដអញ្ជើញ **មុន** `createUser` (កូដខុសលែងបង្កើត/លុបគណនីឥតប្រយោជន៍)។
-- **supabase-js 2.117 ពិនិត្យ UUID** ក្នុង `deleteUser`/`updateUserById` (បោះ synchronous) ➜ mock ដែលប្រើ id ដូច `uuid-1` ធ្លាក់ ➜ ម៉ាស៊ីនមេក្លែងប្រើ UUID ពិត ·
-  adapter ត្រូវរុំ `try` (វាស់ ៖ id មិនមែន UUID ➜ `false` មិនគាំង)។
-- **key ប្រភេទថ្មី** ៖ SDK មិនផ្ញើ `sb_publishable_…`/`sb_secret_…` ជា Bearer ➜ Edge Function ត្រូវ `--no-verify-jwt` (ចុះឈ្មោះ ៖ គ្មានគណនីនៅឡើយ) ហើយផ្ទៀង OTP ខ្លួនឯង ·
-  Allow-Headers ដេរីវេពី `@supabase/supabase-js/cors` + `x-region` (វាស់ ៖ header ដែល `functions.invoke` ផ្ញើពិតទាំងអស់ ⊂ បញ្ជី)។
-- **body គ្មាន `content-length`** (stream) ៖ `request.text()` អានទាំងមូលមុនពិនិត្យទំហំ ➜ អានតាម reader ហើយឈប់ + cancel ត្រឹម 8 KB (វាស់ ៖ stream ២០០ KB ➜ 413 ក្រោយ
-  ≤ ៤ chunk) · UTF-8 ខូចក្នុង JSON ត្រឹមត្រូវ ➜ 400 (⛔ តេស្តដំបូងប្រើ JSON ខូចស្រាប់ ➜ mutation «decoder ធូរ» **រស់រាន** ព្រោះវាធ្លាក់ 400 ដោយហេតុផលផ្សេង)។
-
-**CI ពេញ** (emulator · `*_STRICT` · `SUPABASE_STRICT=1` · `RUNALL_JOBS=4`) លើ `e97590a` ៖ ធ្លាក់ ១ ត្រង់ `zoew-suite` ➜ `rules:check` របស់ ZoeW (tree ZoeW **មិនប្រែ**)
-«ស្តារ MR1» `page.click` ផុត 5 វិ. រួចការអះអាងបន្តបន្ទាប់ធ្លាក់តាម ➜ `RUNALL_RESUME=1` លើ tree ដដែល ➜ **ឆ្លង** ➜ **១៩២ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង**។ ⚠️ ការធ្លាក់កើត
-តែក្រោមបន្ទុក lane ពេញ (អ្នកយាម Supabase ថែម Postgres + RSA keygen) ➜ ពិដាន 5 វិ. របស់ `rules:check` ងាយរងបន្ទុក CPU ➜ ⛔ មិនបង្កើនពិដានដើម្បីលាក់វា ៖ បើវាលេចម្តងទៀត
-ត្រូវវាស់ពេលចុចពិតក្រោមបន្ទុក (មិនមែនប្តូរលេខ)។ CI ពេញលើកទី ២ (`d25b1ca`) ៖ `zoew-suite` ឆ្លង តែ `zoew-parity` ➜ `parity:deep` ធ្លាក់ ១ ជំហាន («ស្កេន ZL5 ➜ ZTO
-បំពេញស្វ័យប្រវត្តិ» អេក្រង់ខុស) ➜ ថ្នាក់ដដែលនឹង baseline 2.45.7 (មុនការងារ Supabase) ➜ `RUNALL_RESUME=1` ➜ **ឆ្លង** ➜ **១៩២ ពេញលេញ**។ ⚠️ checker browser ពីរ
-របស់ ZoeW ងាយរងបន្ទុក CPU ពេល lane ពេញ — ជាចំណុចត្រូវវាស់ជុំក្រោយ (អ្នកយាម Supabase ចំណាយ ~២៦ វិ. ក្នុង ~២០៦០ វិ. ផលបូកពេល checker)។
-
-**សកម្មភាពដែលត្រូវធ្វើដោយដៃ** (ម្ចាស់គម្រោង · តាម [`supabase/README.md`](../supabase/README.md)) ៖ បង្កើត Supabase Project (Pro) · កំណត់ Auth លើ Dashboard ·
-`db push` · admin ដំបូង · Firebase Project OTP (Blaze · SMS region KH · budget) · `secrets set` + `functions deploy --no-verify-jwt` ⛔ secret វាយក្នុង terminal
-ផ្ទាល់ខ្លួន។ ZoeW/ZoeKeyGen/rules **មិនប្រែ** ➜ គ្មាន Deploy · គ្មាន Publish។
+ម្ចាស់គម្រោងស្នើ Supabase Project តែមួយ (tenant · RLS · ចុះឈ្មោះ OTP) ➜ ជំហាន ០–១ ត្រូវសាង និងផ្ទៀងផ្ទាត់ (commit `e97590a` · `d25b1ca` · `f89cb34`) រួច
+**ដកចេញវិញ** តាមការសម្រេចរបស់ម្ចាស់គម្រោង ៖ **មិនចង់បង់ប្រាក់** — Supabase Pro (backup · មិនផ្អាក) និង SMS OTP របស់ Firebase (Blaze) សុទ្ធតែគិតប្រាក់ ហើយ Project
+តែមួយធ្វើឲ្យអតិថិជនទាំងអស់ចែកកូតាឥតគិតថ្លៃតែមួយ (ខណៈ «មួយ Project ក្នុងមួយអតិថិជន» ឲ្យកូតាឥតគិតថ្លៃរៀងខ្លួន)។ ⛔ កុំស្នើផ្លូវនេះម្តងទៀតដោយមិនលើកថ្លៃមកជាមុន។
+កូដ និងអ្នកយាមនៅក្នុងប្រវត្តិ git (`git show e97590a`) បើត្រូវការយោង។
 
 ### APK splash · PTR លើ tablet ផ្តេក (2026-09-30 · ZoeW 2.45.8)
 
@@ -2589,8 +2551,6 @@ Function ដែល export ៖ 978
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ | ផ្នែក ១ |
-| `supabase-functions-test` | ផ្នែក ២ | — |
-| `supabase-rls-test` | ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

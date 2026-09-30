@@ -10,8 +10,42 @@ import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from
 import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
 import { armLateFirebaseSdkListener, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
-import { withTransactionOutcomeResolution } from './tx-outcome';
+import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
+import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
+
+let supabaseSdkPromise = null;
+
+function supabaseEnv() {
+    return {
+        onListenerError: (e) => {
+            console.error(e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Supabase listener callback' });
+        },
+        onAccountBlocked: (message) => {
+            showToast('⚠️ ' + message);
+        },
+        onTxOutcomeUnknown: (segs) => {
+            const path = '/' + (Array.isArray(segs) ? segs.join('/') : '');
+            if (txOutcomeUnknownReported.has(path)) return;
+            txOutcomeUnknownReported.add(path);
+            if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
+        }
+    };
+}
+
+export function loadSupabaseFb() {
+    if (!supabaseSdkPromise) {
+        supabaseSdkPromise = import('./supabase-backend').then((m) => m.createZoeSupabaseSdk(supabaseEnv()), (e) => {
+            supabaseSdkPromise = null;
+            const err: any = new Error('Supabase SDK is not ready');
+            err.code = 'SDK_UNAVAILABLE';
+            err.cause = e;
+            throw err;
+        });
+    }
+    return supabaseSdkPromise;
+}
 
 export async function initFirebase() {
     const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
@@ -25,13 +59,27 @@ export async function initFirebase() {
 
     try {
         firebaseState.firebaseConfig = JSON.parse(savedConfig);
-        preconnectToDatabaseHost(firebaseState.firebaseConfig);
-        firebaseState.fb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
+        const useSupabase = isSupabaseConfig(firebaseState.firebaseConfig);
+        const previousFb = firebaseState.fb;
+        let nextFb;
+        if (useSupabase) {
+            nextFb = await loadSupabaseFb();
+        } else {
+            preconnectToDatabaseHost(firebaseState.firebaseConfig);
+            nextFb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
+        }
+        firebaseState.fb = nextFb;
+        viewState.backendKind = useSupabase ? 'supabase' : 'firebase';
         firebaseState.firebaseSdkUnavailable = false;
         firebaseState.sdkUnavailableNoticeShown = false;
         resetFirebaseSdkRetryHealth();
 
-        const existingApps = firebaseState.fb.getApps();
+        const staleApps = [];
+        if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
+            previousFb.getApps().forEach((a) => staleApps.push([previousFb, a]));
+        }
+        firebaseState.fb.getApps().forEach((a) => staleApps.push([firebaseState.fb, a]));
+        const existingApps = staleApps;
         if (existingApps.length) {
             firebaseState.authGeneration++;
             viewState.phoneModalBusy = false;
@@ -56,9 +104,7 @@ export async function initFirebase() {
             dataState.dailyPickupData = {};
             dataState.dailyCollectedData = {};
             uiState.lockerBarcodeIndex = {};
-            if (typeof firebaseState.fb.deleteApp === 'function') {
-                await Promise.all(existingApps.map(a => firebaseState.fb.deleteApp(a).catch(() => {})));
-            }
+            await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
         }
 
         const firebaseApp = firebaseState.fb.getApps().length ? firebaseState.fb.getApps()[0] : firebaseState.fb.initializeApp(firebaseState.firebaseConfig);

@@ -6,6 +6,7 @@ import { dataState, firebaseState, lookupState, securityState, uiState, ztoState
 import { getServerNow, pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ENTRY_SCAN_MODE_KEY } from '../core/storage-keys';
+import { hasPendingInvite, openRegisterForm } from './account';
 import { cancelPendingLookupUnlock, clearLookupStatus } from './auto-lookup';
 import { isPinFlowPending } from './config';
 import { closeConfigQrScanner } from './config-qr';
@@ -159,6 +160,8 @@ export function clearSensitiveModalFields() {
         'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
         'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
         'appLockPinInput', 'appLockMsg',
+        'registerInviteInput', 'registerPasswordInput', 'registerPasswordConfirmInput',
+        'resetCodeInput', 'resetPasswordInput', 'resetPasswordConfirmInput',
         'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
     ];
     fieldsToBlank.forEach((id) => {
@@ -175,6 +178,7 @@ export function clearSensitiveModalFields() {
 }
 
 export function showLoginModalWithPrefill() {
+    viewState.loginMode = 'login';
     clearSensitiveModalFields();
     refreshLiveToasts();
     closeConfigQrScanner();
@@ -187,4 +191,5 @@ export function showLoginModalWithPrefill() {
         setFieldValue('loginEmailInput', savedEmail);
         setFieldChecked('rememberMeCheckbox', true);
     }
+    if (viewState.backendKind === 'supabase' && hasPendingInvite()) openRegisterForm();
 }

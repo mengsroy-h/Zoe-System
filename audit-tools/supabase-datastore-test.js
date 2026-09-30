@@ -161,24 +161,53 @@ async function body(c, rec, extra) {
         { k: 'set', p: [HIST, 'item1', 'isCalled'], v: true }, { k: 'set', p: [HIST, 'item1'], v: item('item1') }])]);
     rec('update ដែល path ជាន់គ្នា ➜ invalid_op (ដូច SDK RTDB)', !!overlap.error && overlap.error.message === 'invalid_op', overlap);
     const casMulti = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([
-        { k: 'cas', p: [HIST, 'item1'], e: 1, v: item('item1') }, { k: 'set', p: [REG, 'K2'], v: true }])]);
+        { k: 'cas', p: [HIST, 'item1'], x: null, v: item('item1') }, { k: 'set', p: [REG, 'K2'], v: true }])]);
     rec('cas ជាមួយ op ផ្សេង ➜ invalid_op', !!casMulti.error && casMulti.error.message === 'invalid_op', casMulti);
 
     const deepSet = await write(A.who, [{ k: 'set', p: [HIST, 'item1', 'isCalled'], v: true }, { k: 'set', p: [HIST, 'item1', 'barcodes', '0', 'isClosed'], v: true }]);
     const d1 = docOf(deepSet, HIST, 'item1');
     rec('update ជ្រៅ ៖ វាលផ្សេងនៅដដែល · barcodes/0/isClosed ប្រែ', !!d1 && d1.v.isCalled === true && d1.v.barcodes['0'].isClosed === true && d1.v.phone === '012345678', d1);
     const seqItem1 = d1.s;
-    const casOld = await write(A.who, [{ k: 'cas', p: [HIST, 'item1'], e: seqItem1 - 1, v: item('item1', { cod: 99 }) }]);
-    rec('cas ៖ seq ចាស់ ➜ conflict + តម្លៃ/seq បច្ចុប្បន្ន (មិនសរសេរ)', !!casOld && casOld.ok === false && casOld.conflict === true && casOld.doc.s === seqItem1
-        && casOld.doc.v.isCalled === true, casOld);
-    const casGood = await write(A.who, [{ k: 'cas', p: [HIST, 'item1'], e: seqItem1, v: item('item1', { cod: 11, barcodes: [{ code: 'ZTitem1', cod: 11, dod: 2, isClosed: false }] }) }]);
-    rec('cas ៖ seq ត្រូវ ➜ ok · seq ថ្មីធំជាង', !!casGood && casGood.ok === true && docOf(casGood, HIST, 'item1').s > seqItem1, casGood);
-    const casNew = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], e: 0, v: item('fresh1') }]);
-    rec('cas ៖ doc មិនទាន់មាន + e=0 ➜ ok', !!casNew && casNew.ok === true, casNew);
-    const casDelete = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], e: docOf(casNew, HIST, 'fresh1').s, v: null }]);
+    const staleValue = item('item1');
+    const casOld = await write(A.who, [{ k: 'cas', p: [HIST, 'item1'], x: staleValue, v: item('item1', { cod: 99 }) }]);
+    rec('cas ៖ តម្លៃរំពឹងចាស់ ➜ conflict + តម្លៃបច្ចុប្បន្ន (មិនសរសេរ)', !!casOld && casOld.ok === false && casOld.conflict === true
+        && casOld.value.isCalled === true && ((await read(A.who, HIST, 'item1')).docs[0].v.cod === 10), casOld);
+    const casGood = await write(A.who, [{ k: 'cas', p: [HIST, 'item1'], x: d1.v, v: item('item1', { cod: 11, barcodes: [{ code: 'ZTitem1', cod: 11, dod: 2, isClosed: false }] }) }]);
+    rec('cas ៖ តម្លៃរំពឹងត្រូវ (array ជា object · លេខ double) ➜ ok · seq ថ្មីធំជាង', !!casGood && casGood.ok === true && docOf(casGood, HIST, 'item1').s > seqItem1, casGood);
+    const casArrayForm = await write(A.who, [{ k: 'cas', p: [HIST, 'item1', 'barcodes'], x: [{ code: 'ZTitem1', cod: 11, dod: 2, isClosed: false }],
+        v: [{ code: 'ZTitem1', cod: 11, dod: 2, isClosed: true }] }]);
+    rec('cas ជ្រៅ ៖ តម្លៃរំពឹងជា array (JS) ស្មើ object ដែលផ្ទុក ➜ ok', !!casArrayForm && casArrayForm.ok === true, casArrayForm);
+    const casNew = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], x: null, v: item('fresh1') }]);
+    rec('cas ៖ doc មិនទាន់មាន + x=null ➜ ok', !!casNew && casNew.ok === true, casNew);
+    const casTaken = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], x: null, v: item('fresh1', { cod: 5 }) }]);
+    rec('cas ៖ doc មានរួច + x=null ➜ conflict (ការចុះឈ្មោះស្ទួនមិនអាច)', !!casTaken && casTaken.conflict === true, casTaken);
+    const casDelete = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], x: docOf(casNew, HIST, 'fresh1').v, v: null }]);
     rec('cas ៖ លុប (v null) ➜ ok · tombstone', !!casDelete && casDelete.ok === true && docOf(casDelete, HIST, 'fresh1').v === null, casDelete);
-    const casAfterDelete = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], e: 0, v: item('fresh1') }]);
-    rec('cas ៖ លើ tombstone ជាមួយ e=0 ➜ ok (tombstone = មិនមាន)', !!casAfterDelete && casAfterDelete.ok === true, casAfterDelete);
+    const casAfterDelete = await write(A.who, [{ k: 'cas', p: [HIST, 'fresh1'], x: null, v: item('fresh1') }]);
+    rec('cas ៖ លើ tombstone ជាមួយ x=null ➜ ok (tombstone = មិនមាន)', !!casAfterDelete && casAfterDelete.ok === true, casAfterDelete);
+    const MONTH = 'zoew_monthly_revenue_cod_dod';
+    const m0 = await write(A.who, [{ k: 'cas', p: [MONTH], x: null, v: { '2026-08': { codDollar: 1, dodDollar: 0, totalCount: 1 },
+        '2026-09': { codDollar: 2, dodDollar: 0, totalCount: 1 }, '2026-10': { codDollar: 3, dodDollar: 0, totalCount: 1 } } }]);
+    rec('cas លើ node ទាំងមូល (ledger ខែ ៖ runTransaction លើ root) ➜ ok · ៣ doc', !!m0 && m0.ok === true && m0.docs.filter((d) => d.r === MONTH).length === 3, m0);
+    const monthsNow = { '2026-08': { codDollar: 1, dodDollar: 0, totalCount: 1 }, '2026-09': { codDollar: 2, dodDollar: 0, totalCount: 1 }, '2026-10': { codDollar: 3, dodDollar: 0, totalCount: 1 } };
+    const m1 = await write(A.who, [{ k: 'cas', p: [MONTH], x: monthsNow, v: { '2026-09': monthsNow['2026-09'], '2026-10': monthsNow['2026-10'],
+        '2026-11': { codDollar: 4, dodDollar: 0, totalCount: 1 } } }]);
+    const monthsRead = (await read(A.who, MONTH)).docs.map((d) => d.k).sort();
+    rec('cas node ៖ ខែចាស់ជាងគេលុប (tombstone) · ខែថ្មីចូល (រក្សា ៣ ខែ)', !!m1 && m1.ok === true && JSON.stringify(monthsRead) === '["2026-09","2026-10","2026-11"]', { m1, monthsRead });
+    const m2 = await write(A.who, [{ k: 'cas', p: [MONTH], x: monthsNow, v: {} }]);
+    rec('cas node ៖ តម្លៃរំពឹងចាស់ ➜ conflict + node បច្ចុប្បន្ន', !!m2 && m2.conflict === true && Object.keys(m2.value).sort().join() === '2026-09,2026-10,2026-11', m2);
+    const m3 = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [MONTH], v: { '2026-12': { codDollar: -5, dodDollar: 0, totalCount: 0 } } }])]);
+    rec('set node ទាំងមូល ៖ rules រត់លើកូនទាំងអស់ (ledger អវិជ្ជមាន ➜ បដិសេធ) · មិនប៉ះខែដែលមាន', !!m3.error && m3.error.message === 'permission_denied'
+        && (await read(A.who, MONTH)).docs.length === 3, m3);
+    const m4 = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [MONTH], v: 5 }])]);
+    rec('set node ទាំងមូលជា scalar ➜ បដិសេធ', !!m4.error, m4);
+    const m5 = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'inc', p: [MONTH], d: 1 }])]);
+    rec('inc លើ node ទាំងមូល ➜ invalid_op', !!m5.error && m5.error.message === 'invalid_op', m5);
+    const m6 = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [MONTH], v: {} },
+        { k: 'set', p: [MONTH, '2026-09', 'codDollar'], v: 1 }])]);
+    rec('set node + path ក្រោមវា ➜ invalid_op (ជាន់)', !!m6.error && m6.error.message === 'invalid_op', m6);
+    const regWhole = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [REG], v: {} }])]);
+    rec('set node registry ទាំងមូល (គ្មាន .write នៅ node) ➜ បដិសេធ', !!regWhole.error && regWhole.error.message === 'permission_denied', regWhole);
 
     const incOp = newOp();
     const inc1 = await write(A.who, [{ k: 'inc', p: [DAILY, '2026-10-01', 'codDollar'], d: 10 }, { k: 'inc', p: [DAILY, '2026-10-01', 'dodDollar'], d: 2 },
@@ -190,6 +219,12 @@ async function body(c, rec, extra) {
     const ledgerNow = (await read(A.who, DAILY, '2026-10-01')).docs[0];
     rec('op_id ដដែល (ការឆ្លើយបាត់ ➜ ផ្ញើម្តងទៀត) ➜ replayed · លុយមិនបូក ២ ដង', !!replay && replay.replayed === true && replay.ok === true
         && ledgerNow.v.codDollar === 10 && ledgerNow.v.totalCount === 1, { replay, ledgerNow });
+    const longNum = await as(c, A.who, "select public.zoe_write($1, jsonb_build_array(jsonb_build_object('k', 'set', 'p', jsonb_build_array('zoew_daily_revenue_cod_dod', '2026-10-04'), "
+        + "'v', '{\"codDollar\": 0.1000000000000000055511151231257827, \"dodDollar\": 0, \"totalCount\": 1}'::jsonb))) as r", [newOp()]);
+    const seenByJs = (await read(A.who, DAILY, '2026-10-04')).docs[0];
+    const casJs = await write(A.who, [{ k: 'cas', p: [DAILY, '2026-10-04'], x: seenByJs.v, v: Object.assign({}, seenByJs.v, { totalCount: 2 }) }]);
+    rec('លេខ decimal វែងលើស double ➜ ផ្ទុកជា double (0.1) ➜ cas ដោយតម្លៃដែល JS អាន ➜ ok (មិន conflict ជារៀងរហូត)',
+        !!longNum.rows && seenByJs.v.codDollar === 0.1 && !!casJs && casJs.ok === true, { longNum, seenByJs, casJs });
     const inc2 = await write(A.who, [{ k: 'inc', p: [DAILY, '2026-10-01', 'codDollar'], d: 2.5 }]);
     rec('inc ទសភាគ ➜ 12.5', docOf(inc2, DAILY, '2026-10-01').v.codDollar === 12.5, inc2);
     await admin(A.id, [{ k: 'set', p: [DAILY, '2026-10-03'], v: { codDollar: 10.1, dodDollar: 0, totalCount: 1 } }]);
@@ -328,7 +363,12 @@ const MUTATIONS = [
     ['canon មិនបម្លែង array', "    when 'array' then\n        for child in", "    when 'array_disabled' then\n        for child in"],
     ['canon មិនបដិសេធកូនសោហាម', "            if not private.zoe_key_ok(child_key) then\n                raise exception 'invalid_data' using errcode = '22023', detail = 'key';\n            end if;\n", ''],
     ['canon មិនបដិសេធលេខលើស double', "        if abs((p_value #>> '{}')::numeric) > 1.7976931348623157e308 then", "        if false then"],
-    ['cas មិនប្រៀប seq', "            if (op ->> 'e')::bigint <> (pre_seq ->> doc_key)::bigint then", "            if false then"],
+    ['cas មិនប្រៀបតម្លៃ (doc)', "            current_value := coalesce((work -> doc_key) #> op_path[3:], 'null'::jsonb);\n            if current_value <> private.zoe_canon(op -> 'x') then",
+        "            current_value := coalesce((work -> doc_key) #> op_path[3:], 'null'::jsonb);\n            if false then"],
+    ['cas មិនប្រៀបតម្លៃ (node)', "                if current_value <> private.zoe_canon(op -> 'x') then", "                if false then"],
+    ['set node មិនលុបកូនចាស់', "                work := jsonb_set(work, array[doc_key], coalesce(new_value -> substr(doc_key, char_length(op_path[1]) + 2), 'null'::jsonb));",
+        "                work := jsonb_set(work, array[doc_key], coalesce(new_value -> substr(doc_key, char_length(op_path[1]) + 2), work -> doc_key));"],
+    ['canon មិនបម្លែងលេខជា double', "        return to_jsonb((p_value #>> '{}')::float8);", "        return p_value;"],
     ['op_id មិន idempotent', "    if found then\n        return prior || jsonb_build_object('replayed', true, 'now', now_ms);\n    end if;", ''],
     ['មិនពិនិត្យ path ជាន់', "            if cardinality(a) <= cardinality(b) and b[1:cardinality(a)] = a then", "            if false then"],
     ['មិន enforce rules', "    if p_enforce then\n        rules := private.zoe_rules();", "    if false then\n        rules := private.zoe_rules();"],

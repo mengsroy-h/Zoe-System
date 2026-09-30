@@ -22,6 +22,8 @@ export interface ViewState {
     documentTitle: string | null;
 
     loginBusy: boolean;
+    backendKind: 'firebase' | 'supabase';
+    loginMode: 'login' | 'register' | 'reset';
 
     appLockOpen: boolean;
     appLockMessage: string;
@@ -113,6 +115,8 @@ export const viewState = createStore<ViewState>('viewState', {
     documentTitle: null,
 
     loginBusy: false,
+    backendKind: 'firebase',
+    loginMode: 'login',
 
     appLockOpen: false,
     appLockMessage: '',

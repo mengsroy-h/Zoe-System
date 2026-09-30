@@ -41,6 +41,29 @@
     cursor: pointer;
 }
 
+.modal-content .login-alt-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+.modal-content .login-alt-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--primary);
+    font-size: calc(11.5 * var(--fs-unit));
+    font-weight: 600;
+    min-height: 40px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+.modal-content .login-alt-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
 .brand-logo,
 .boot-splash-logo {
     background: none;

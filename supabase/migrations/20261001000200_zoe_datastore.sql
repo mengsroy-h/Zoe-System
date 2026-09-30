@@ -86,7 +86,10 @@ begin
         if abs((p_value #>> '{}')::numeric) > 1.7976931348623157e308 then
             raise exception 'invalid_data' using errcode = '22023', detail = 'number';
         end if;
-        return p_value;
+        if abs((p_value #>> '{}')::numeric) < 2.2250738585072014e-308 then
+            return '0'::jsonb;
+        end if;
+        return to_jsonb((p_value #>> '{}')::float8);
     else
         return p_value;
     end case;
@@ -494,7 +497,7 @@ as $$
 declare
     result text[];
 begin
-    if jsonb_typeof(p_raw) <> 'array' or jsonb_array_length(p_raw) < 2 or jsonb_array_length(p_raw) > 32 then
+    if jsonb_typeof(p_raw) <> 'array' or jsonb_array_length(p_raw) < 1 or jsonb_array_length(p_raw) > 32 then
         raise exception 'invalid_path' using errcode = '22023';
     end if;
     if exists (select 1 from jsonb_array_elements(p_raw) e where jsonb_typeof(e.value) <> 'string') then
@@ -506,6 +509,14 @@ begin
     end if;
     return result;
 end
+$$;
+
+create function private.zoe_root_value(p_work jsonb, p_root text) returns jsonb
+language sql immutable set search_path = ''
+as $$
+    select coalesce(jsonb_object_agg(substr(e.key, char_length(p_root) + 2), e.value) filter (where e.value <> 'null'::jsonb), 'null'::jsonb)
+    from jsonb_each(p_work) e
+    where starts_with(e.key, p_root || '/')
 $$;
 
 create function private.zoe_apply(p_tenant uuid, p_op_id text, p_ops jsonb, p_enforce boolean, p_replace boolean) returns jsonb
@@ -523,16 +534,20 @@ declare
     doc_key text;
     pre jsonb := '{}'::jsonb;
     pre_seq jsonb := '{}'::jsonb;
-    work jsonb := '{}'::jsonb;
+    locked_roots text[] := '{}'::text[];
+    work jsonb;
     locations jsonb := '[]'::jsonb;
     rules jsonb;
     ctx jsonb;
     loc jsonb;
     loc_path text[];
     current_value jsonb;
-    current_seq bigint;
     delta float8;
     new_value jsonb;
+    child_key text;
+    row_key text;
+    row_value jsonb;
+    row_seq bigint;
     changed boolean := false;
     out_docs jsonb := '[]'::jsonb;
     stored_docs jsonb := '[]'::jsonb;
@@ -581,24 +596,55 @@ begin
         if kind = 'cas' and ops_count <> 1 then
             raise exception 'invalid_op' using errcode = '22023';
         end if;
+        if kind <> 'inc' and not op ? 'v' then
+            raise exception 'invalid_op' using errcode = '22023';
+        end if;
         op_path := private.zoe_path_of(op -> 'p');
-        if kind = 'cas' and cardinality(op_path) <> 2 then
+        if cardinality(op_path) = 1 and kind = 'inc' then
             raise exception 'invalid_op' using errcode = '22023';
         end if;
         locations := locations || jsonb_build_array(to_jsonb(op_path));
+        if cardinality(op_path) = 1 then
+            if not op_path[1] = any(locked_roots) then
+                for row_key, row_value, row_seq in
+                    select z.key, z.value, z.seq from public.zoe_docs z
+                    where z.tenant_id = tenant and z.root = op_path[1]
+                    order by z.key
+                    for update
+                loop
+                    doc_key := op_path[1] || '/' || row_key;
+                    if not pre ? doc_key then
+                        pre := pre || jsonb_build_object(doc_key, coalesce(row_value, 'null'::jsonb));
+                        pre_seq := pre_seq || jsonb_build_object(doc_key, case when row_value is null then 0 else row_seq end);
+                    end if;
+                end loop;
+                locked_roots := locked_roots || op_path[1];
+            end if;
+            new_value := private.zoe_canon(op -> 'v');
+            if jsonb_typeof(new_value) = 'object' then
+                for child_key in select jsonb_object_keys(new_value) loop
+                    doc_key := op_path[1] || '/' || child_key;
+                    if not pre ? doc_key then
+                        pre := pre || jsonb_build_object(doc_key, 'null'::jsonb);
+                        pre_seq := pre_seq || jsonb_build_object(doc_key, 0);
+                    end if;
+                end loop;
+            end if;
+            continue;
+        end if;
         doc_key := op_path[1] || '/' || op_path[2];
         if not pre ? doc_key then
             select coalesce(z.value, 'null'::jsonb), case when z.value is null then 0 else z.seq end
-                into current_value, current_seq
+                into current_value, row_seq
             from public.zoe_docs z
             where z.tenant_id = tenant and z.root = op_path[1] and z.key = op_path[2]
             for update;
             if not found then
                 current_value := 'null'::jsonb;
-                current_seq := 0;
+                row_seq := 0;
             end if;
             pre := pre || jsonb_build_object(doc_key, current_value);
-            pre_seq := pre_seq || jsonb_build_object(doc_key, current_seq);
+            pre_seq := pre_seq || jsonb_build_object(doc_key, row_seq);
         end if;
     end loop;
 
@@ -617,11 +663,24 @@ begin
     for op in select e.value from jsonb_array_elements(p_ops) e loop
         kind := op ->> 'k';
         op_path := private.zoe_path_of(op -> 'p');
+        if cardinality(op_path) = 1 then
+            if kind = 'cas' then
+                current_value := private.zoe_root_value(work, op_path[1]);
+                if current_value <> private.zoe_canon(op -> 'x') then
+                    return jsonb_build_object('ok', false, 'conflict', true, 'now', now_ms, 'value', current_value);
+                end if;
+            end if;
+            new_value := private.zoe_canon(op -> 'v');
+            if new_value <> 'null'::jsonb and jsonb_typeof(new_value) <> 'object' then
+                raise exception 'invalid_data' using errcode = '22023', detail = 'root';
+            end if;
+            for doc_key in select e.key from jsonb_each(work) e where starts_with(e.key, op_path[1] || '/') loop
+                work := jsonb_set(work, array[doc_key], coalesce(new_value -> substr(doc_key, char_length(op_path[1]) + 2), 'null'::jsonb));
+            end loop;
+            continue;
+        end if;
         doc_key := op_path[1] || '/' || op_path[2];
         if kind = 'set' then
-            if not op ? 'v' then
-                raise exception 'invalid_op' using errcode = '22023';
-            end if;
             work := jsonb_set(work, array[doc_key], private.zoe_set_path(work -> doc_key, op_path[3:], private.zoe_canon(op -> 'v')));
         elsif kind = 'inc' then
             if jsonb_typeof(op -> 'd') <> 'number' then
@@ -632,14 +691,11 @@ begin
             new_value := to_jsonb(case when jsonb_typeof(current_value) = 'number' then (current_value #>> '{}')::float8 else 0::float8 end + delta);
             work := jsonb_set(work, array[doc_key], private.zoe_set_path(work -> doc_key, op_path[3:], private.zoe_canon(new_value)));
         else
-            if jsonb_typeof(op -> 'e') <> 'number' or not op ? 'v' then
-                raise exception 'invalid_op' using errcode = '22023';
+            current_value := coalesce((work -> doc_key) #> op_path[3:], 'null'::jsonb);
+            if current_value <> private.zoe_canon(op -> 'x') then
+                return jsonb_build_object('ok', false, 'conflict', true, 'now', now_ms, 'value', current_value);
             end if;
-            if (op ->> 'e')::bigint <> (pre_seq ->> doc_key)::bigint then
-                return jsonb_build_object('ok', false, 'conflict', true, 'now', now_ms,
-                    'doc', jsonb_build_object('r', op_path[1], 'k', op_path[2], 'v', pre -> doc_key, 's', (pre_seq ->> doc_key)::bigint));
-            end if;
-            work := jsonb_set(work, array[doc_key], private.zoe_canon(op -> 'v'));
+            work := jsonb_set(work, array[doc_key], private.zoe_set_path(work -> doc_key, op_path[3:], private.zoe_canon(op -> 'v')));
         end if;
     end loop;
 
@@ -838,7 +894,7 @@ revoke all on function private.zoe_now_ms(), private.zoe_key_ok(text), private.z
     private.zoe_snap_val(jsonb, jsonb), private.zoe_eval(jsonb, jsonb), private.zoe_rule_true(jsonb, jsonb),
     private.zoe_validate_tree(jsonb, text[], jsonb, jsonb, jsonb), private.zoe_check_location(jsonb, text[], jsonb),
     private.zoe_path_of(jsonb), private.zoe_housekeeping(uuid), private.zoe_broadcast_seq(),
-    private.zoe_apply(uuid, text, jsonb, boolean, boolean)
+    private.zoe_apply(uuid, text, jsonb, boolean, boolean), private.zoe_root_value(jsonb, text)
     from public;
 grant execute on function private.zoe_now_ms() to authenticated;
 revoke all on function public.zoe_write(text, jsonb), public.zoe_read(text, text), public.zoe_pull(bigint, integer), public.zoe_now(),

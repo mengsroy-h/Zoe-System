@@ -94,7 +94,8 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_path_of: [],
     zoe_housekeeping: [],
     zoe_broadcast_seq: [],
-    zoe_apply: []
+    zoe_apply: [],
+    zoe_root_value: []
 };
 const EXPECT_AUTH_SELECT = ['member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_docs', 'zoe_tenant_state'];
 const API_ROLES = ['anon', 'authenticated', 'service_role'];

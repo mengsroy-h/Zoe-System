@@ -613,6 +613,7 @@ run "emu/license-seat-rules" node audit-tools/emu/license-seat-rules-test.js
 run "emu/tx-disconnect" node audit-tools/emu/tx-disconnect-emu-test.js
 run "emu/app-writes-rules" node audit-tools/emu/app-writes-rules-test.js
 run "emu/app-network-e2e" node audit-tools/emu/app-network-e2e-test.js
+run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
@@ -696,6 +697,14 @@ section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ដែលរស់នៅក្នុង ZoeW តាំងពីកំណែ 2.21.0 (App `ZoeImport` ត្រូវលុបចេញហើយ) ➜
 # វាកាន់តែសំខាន់ជាងមុន។ ខាង client ចាក់សោដោយ `sheet-import-test.js`។
 run "zto-import/test.js" node zto-import/test.js
+
+section "== Supabase (Project តែមួយ ៖ tenant · RLS · ឃ្លាំងទិន្នន័យ · Edge Functions) =="
+# ⛔ Postgres ពិត (major ពី supabase/config.toml) + supabase-js ពិត ➜ `npm ci --prefix supabase`
+#    គ្មាន dependency ➜ SKIP/PARTIAL · `SUPABASE_STRICT=1` ➜ FAIL (ដូច emu/*)
+#    ភាពដូច RTDB នៃ rules ៖ `emu/supabase-rules-parity` (RTDB emulator ជា oracle) ក្នុងផ្នែក emulator ខាងលើ
+run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
+run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
+run "supabase-functions" node audit-tools/supabase-functions-test.js
 
 section "== ទម្លាប់គម្រោង =="
 run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
@@ -866,6 +875,10 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
     APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
     NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
+    SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
+    SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
+    SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

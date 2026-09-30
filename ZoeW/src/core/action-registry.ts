@@ -1,6 +1,7 @@
 import { cancelLogout, confirmLogout, drawerAuthFlow, drawerBiometricFlow, drawerConfigFlow, drawerCustomerTableFlow, drawerLockerSettingsFlow, drawerLookupApiFlow, submitLoginForm, toggleDrawerGroup } from './actions';
 import { drawerAppLockFlow, forgetAppLockPin, runAppLockBiometric, submitAppLockForm } from '../features/app-lock';
 import { logoutApp } from '../features/auth';
+import { backToLoginForm, openRegisterForm, openResetPasswordForm, submitRegisterForm, submitResetPasswordForm } from '../features/account';
 import { closeEditBarcodeModal, openEditBarcodePriceModal, openViewListModal, saveEditedBarcodePrice, toggleIndividualBarcodeClose } from '../features/barcode-ops';
 import { runBiometricUnlock } from '../features/biometric';
 import { cancelPinEntryFlow, cancelPinSetupFlow, saveFirebaseConfig } from '../features/config';
@@ -38,6 +39,7 @@ import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
     applySheetImportHeaderRow,
+    backToLoginForm,
     cancelLocationChange,
     cancelLogout,
     cancelPermanentDelete,
@@ -109,6 +111,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openHealthCheck,
     openLockerPicker,
     openNotifyDrawer,
+    openRegisterForm,
+    openResetPasswordForm,
     togglePush,
     clearNotifications,
     openSideDrawer,
@@ -148,6 +152,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     submitActivationKey,
     submitAppLockForm,
     submitLoginForm,
+    submitRegisterForm,
+    submitResetPasswordForm,
     submitManualAdjustment,
     submitManualBarcode,
     switchAppPage,

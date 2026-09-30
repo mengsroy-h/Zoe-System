@@ -92,11 +92,25 @@ let member = null;
 let opN = 0;
 const opId = () => 'par' + process.pid + 'x' + (++opN).toString(36).padStart(12, '0');
 
-async function pgSetupTenant() {
+const ENGINE_MUTANTS = [
+    ['មិនរត់ .validate របស់ ancestor', "        if node ? 'v' then\n            post := private.zoe_snap_val(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx);",
+        "        if node ? 'v' and i = depth then\n            post := private.zoe_snap_val(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx);"],
+    ['null ក្នុងការប្រៀប <= ជា 0 (coercion)', "            return 'false'::jsonb;\n        end if;\n        if op = '+' and left_type = 'string'",
+        "            return to_jsonb(coalesce((left_value #>> '{}')::numeric, 0) <= coalesce((right_value #>> '{}')::numeric, 0));\n        end if;\n        if op = '+' and left_type = 'string'"],
+    ['.validate រត់លើកូនដែលមិនប្រែរបស់ ancestor', "        if i = depth and (node ? 'c' or node ? 'x') then",
+        "        if i >= 2 and (node ? 'c' or node ? 'x') then"]
+];
+
+async function pgSetupTenant(transform) {
+    if (pg) { try { await pg.end(); } catch (e) {} pg = null; }
     const { c } = await H.freshDb('default-grants');
     const migDir = path.join(ROOT, 'supabase', 'migrations');
-    const sql = fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()
+    let sql = fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()
         .map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n');
+    if (transform) {
+        if (sql.split(transform[1]).length !== 2) throw new Error('engine mutant anchor must appear once: ' + transform[0]);
+        sql = sql.replace(transform[1], transform[2]);
+    }
     await c.query(sql);
     const t = await c.query("insert into public.tenants (name, branch_code, expires_at) values ('parity', '100001', now() + interval '30 days') returning id");
     const uid = await H.makeAuthUser(c, 'parity@u.zoe.test');
@@ -116,12 +130,12 @@ function toPgOps(method, p, v) {
         const ops = [];
         for (const key of Object.keys(v || {})) {
             const full = base.concat(segs(key));
-            if (full.length < 2) return null;
+            if (full.length < 1 || (full.length === 1 && isInc(v[key]))) return null;
             ops.push(isInc(v[key]) ? { k: 'inc', p: full, d: incOf(v[key]) } : { k: 'set', p: full, v: v[key] === undefined ? null : v[key] });
         }
         return ops;
     }
-    if (base.length < 2) return null;
+    if (base.length < 1 || (base.length === 1 && isInc(v))) return null;
     if (isInc(v)) return [{ k: 'inc', p: base, d: incOf(v) }];
     return [{ k: 'set', p: base, v: v === undefined ? null : v }];
 }
@@ -157,16 +171,16 @@ async function pgOwnerSnapshot(tree) {
 
 async function pgOwner(method, p, v) {
     const base = segs(p);
-    if (method === 'SNAP' || base.length === 0) return pgOwnerSnapshot(v);
-    if (base.length === 1) {
+    if (method === 'SNAP' || (base.length === 0 && method !== 'PATCH')) return pgOwnerSnapshot(v);
+    if (base.length === 1 && method !== 'PATCH') {
         const existing = await pg.query('select key from public.zoe_docs where tenant_id = $1 and root = $2 and value is not null', [tenant, base[0]]);
-        const ops = existing.rows.map((r) => ({ k: 'set', p: [base[0], r.key], v: null }));
-        if (method !== 'PATCH' && v && typeof v === 'object') {
+        const next = new Map(existing.rows.map((r) => [r.key, null]));
+        if (v && typeof v === 'object') {
             const keys = Array.isArray(v) ? v.map((_, i) => String(i)) : Object.keys(v);
-            for (const key of keys) ops.push({ k: 'set', p: [base[0], key], v: v[key] });
-            const seen = new Set();
-            return pgOwnerOps(ops.reverse().filter((o) => { const k = o.p.join('/'); if (seen.has(k)) return false; seen.add(k); return true; }), false);
+            for (const key of keys) next.set(key, v[key] === undefined ? null : v[key]);
         }
+        const ops = [...next.entries()].map(([key, val]) => ({ k: 'set', p: [base[0], key], v: val }));
+        return ops.length ? pgOwnerOps(ops, false) : undefined;
     }
     const ops = toPgOps(method, p, v);
     if (!ops) throw new Error('owner op unsupported on Postgres: ' + method + ' ' + p);
@@ -341,6 +355,7 @@ function mutate(entry, rand) {
     if (v === null) return { v: { zzUnknown: 1 }, name: 'null ➜ object' };
     if (isInc(v)) return { v: { __increment: -1e9 }, name: 'increment ធំអវិជ្ជមាន' };
     const ls = leaves(v, [], []);
+    if (!ls.length) return null;
     for (let tries = 0; tries < 8; tries++) {
         const pth = ls[Math.floor(rand() * ls.length)];
         const [name, fn] = MUTATORS[Math.floor(rand() * MUTATORS.length)];
@@ -405,8 +420,8 @@ function capture() {
             const [who, m, p, v] = PROBE_STEPS[i];
             const r = await both(sc, who, m, p, v, 'probe#' + i);
             if (r) { if (r.emuDenied) probeDenied++; else probeAllowed++; }
+            await compareState(sc, 'probe#' + i + ' ' + who + ' ' + m + ' ' + (p || '/'));
         }
-        await compareState(sc, 'probe');
         await sc.drop();
         const probeMis = stats.mismatches.slice(before);
         console.log('    probe ៖ ' + PROBE_STEPS.length + ' ជំហាន · RTDB បដិសេធ ' + probeDenied + ' · ទទួល ' + probeAllowed);
@@ -415,6 +430,30 @@ function capture() {
         check(probeDenied >= 20 && probeAllowed >= 20, 'probe មិនទទេ ៖ បដិសេធ ≥ ២០ និងទទួល ≥ ២០', 'deny=' + probeDenied + ' allow=' + probeAllowed);
         check(stats.stateDiffs.length === 0, 'probe ៖ ទិន្នន័យចុងក្រោយ Postgres = RTDB (array/null/ការលុប)', stats.stateDiffs.join('\n        '));
 
+        for (const mutant of ENGINE_MUTANTS) {
+            await pgSetupTenant(mutant);
+            await pgSetRules(PROBE_RULES, compileRules, rulesSql);
+            const ms = makeScenario('mutant');
+            await ms.loadRules(PROBE_RULES);
+            const misStart = stats.mismatches.length;
+            const diffStart = stats.stateDiffs.length;
+            for (let i = 0; i < PROBE_STEPS.length; i++) {
+                const [who, m, p, v] = PROBE_STEPS[i];
+                await both(ms, who, m, p, v, 'mutant#' + i);
+                await compareState(ms, 'mutant#' + i);
+            }
+            await ms.drop();
+            const caught = (stats.mismatches.length - misStart) + (stats.stateDiffs.length - diffStart);
+            stats.mismatches.length = misStart;
+            stats.stateDiffs.length = diffStart;
+            check(caught > 0, 'ការវាស់រសើប ៖ engine Postgres ខូច «' + mutant[0] + '» ➜ probe ឃើញភាពខុសគ្នា (' + caught + ')');
+        }
+        await pgSetupTenant();
+        if (process.env.SBPARITY_PROBE_ONLY === '1') {
+            console.log('\nSBPARITY_PROBE_ONLY=1 ៖ រំលងផ្នែក ខ–គ (ការ debug តែប៉ុណ្ណោះ · មិនមែនភស្តុតាង)');
+            fail++;
+            return;
+        }
         console.log('\n── ខ–គ. ការសរសេរពិតរបស់ App + ការបំប្លែង (rules ពិត) ──');
         await pgSetRules(realRules, compileRules, rulesSql);
         const cap = await capture();
@@ -459,7 +498,7 @@ function capture() {
         const realMis = stats.mismatches.slice(misBefore);
         console.log('    ការសរសេរ user ' + stats.user + ' (RTDB បដិសេធ ' + stats.denied + ') · probe បំប្លែង ' + stats.probes + ' (បដិសេធទាំង ២ ' + stats.probesDeniedBoth
             + ' · ទទួលទាំង ២ ' + stats.probesAcceptedBoth + ') · ប្រភេទបំប្លែង ' + mutNames.size + ' · root ' + JSON.stringify([...stats.roots].sort()));
-        check(stats.unsupported.length === 0, 'ការសរសេររបស់ App ទាំងអស់បង្ហាញជា op Postgres បាន (path ≥ ២ ជាន់)', stats.unsupported.slice(0, 5).join(' · '));
+        check(stats.unsupported.length === 0, 'ការសរសេររបស់ App ទាំងអស់បង្ហាញជា op Postgres បាន (path ≥ ១ ជាន់)', stats.unsupported.slice(0, 5).join(' · '));
         check(stats.user >= MIN_USER_WRITES, 'ជាន់អប្បបរមា ៖ ការសរសេររបស់ App ≥ ' + MIN_USER_WRITES, 'user=' + stats.user);
         const missingRoots = REQUIRED_ROOTS.filter((r) => !stats.roots.has(r));
         check(missingRoots.length === 0, 'គ្រប root ដែលផ្លូវអាជីវកម្មសរសេរ (' + REQUIRED_ROOTS.length + ')', 'ខ្វះ ' + missingRoots.join(' · '));

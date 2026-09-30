@@ -129,7 +129,12 @@ export function cleanupJournalScope() {
         const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
         if (!raw) return '';
         const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        return found ? found[1] : '';
+        if (found) return found[1];
+        const supabase = /supabaseUrl"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
+        if (!supabase) return '';
+        const fb = firebaseState.fb;
+        const tenant = fb && typeof fb.tenantScope === 'function' ? fb.tenantScope(firebaseState.auth) : '';
+        return tenant ? supabase[1] + '#' + tenant : '';
     } catch (e) {
         return '';
     }

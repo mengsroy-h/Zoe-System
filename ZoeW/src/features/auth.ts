@@ -95,10 +95,15 @@ export function loginWithFirebase() {
     const rememberMe = fieldChecked('rememberMeCheckbox');
 
     if (!email || !password) {
-        alert("សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
+        alert(viewState.backendKind === 'supabase' ? "សូមបញ្ចូល ឈ្មោះគណនី និង ពាក្យសម្ងាត់!" : "សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
         return;
     }
 
+    performLogin(email, password, rememberMe);
+}
+
+export function performLogin(email, password, rememberMe) {
+    if (!firebaseState.auth || viewState.loginBusy) return;
     viewState.loginBusy = true;
 
     const generationAtLogin = firebaseState.authGeneration;

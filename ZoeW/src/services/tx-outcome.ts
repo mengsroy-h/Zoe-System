@@ -1,6 +1,9 @@
 import { firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { fetchWithTimeout, withTimeout } from './network';
+import { txDisconnectResolving } from './tx-disconnect';
+
+export { txDisconnectResolving };
 
 export const TX_OUTCOME_READ_TIMEOUT_MS = 8000;
 
@@ -11,8 +14,6 @@ export const TX_OUTCOME_MAX_ATTEMPTS = 30;
 export const TX_OUTCOME_MAX_WAIT_MS = 60000;
 
 export const txOutcomeUnknownReported = new Set();
-
-export const txDisconnectResolving = new WeakMap();
 
 export function transactionDisconnectPending(promise) {
     if (!promise || typeof promise !== 'object') return null;

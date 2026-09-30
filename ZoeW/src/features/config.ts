@@ -5,6 +5,8 @@ import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { cancelPendingLookupUnlock } from './auto-lookup';
 import { applyPinPromptText, requestPinBeforeConfig } from './pin';
 import { initFirebase } from '../services/firebase-init';
+import { looksLikeSupabaseConfig, normalizeSupabaseConfig, supabaseConfigErrorMessage } from '../services/supabase-config';
+import { rememberSetupInvite } from './account';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showLiveToast, showToast } from '../ui/toast';
 
@@ -170,6 +172,7 @@ export function normalizeFirebaseConfig(raw) {
         }
     }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('NO_OBJECT');
+    if (looksLikeSupabaseConfig(parsed)) return normalizeSupabaseConfig(parsed);
     const config: any = {};
     const extras = [];
     Object.keys(parsed).forEach((key) => {
@@ -196,6 +199,9 @@ export function firebaseConfigErrorMessage(err) {
     const code = err && err.message ? err.message : '';
     const missing = err && err.missing ? err.missing : [];
     if (code === 'EMPTY') return 'សូមបញ្ចូល Firebase Config!';
+    const supabaseText = supabaseConfigErrorMessage(code);
+    if (supabaseText) return supabaseText;
+    if (code === 'MISSING' && (missing.indexOf('supabaseUrl') !== -1 || missing.indexOf('supabaseKey') !== -1)) return 'Config Supabase ត្រូវមាន supabaseUrl និង supabaseKey (Publishable key)!';
     if (code === 'NO_OBJECT') return 'រកមិនឃើញ Firebase Config ក្នុងអត្ថបទដែលបានបិទភ្ជាប់ទេ។ សូម copy ទាំងស្រុងពី Firebase Console ➜ Project settings ➜ Your apps។';
     if (code === 'BAD_SYNTAX') return 'អានទម្រង់ Config មិនកើតទេ។ សូម copy ពី Firebase Console ម្តងទៀត ដោយកុំកែអ្វីសោះ។';
     if (code === 'MISSING' && missing.indexOf('databaseURL') !== -1) return 'Config នេះគ្មាន databaseURL ទេ។ Firebase មិនដាក់វាក្នុង snippet ទេ បើមិនទាន់បង្កើត Realtime Database — សូមបើក Firebase Console ➜ Realtime Database ➜ Create Database រួច copy Config ម្តងទៀត។';
@@ -241,6 +247,11 @@ export function saveFirebaseConfig() {
 export function decodeSetupPayload(setupParam) {
     const json = decodeURIComponent(escape(atob(setupParam)));
     const parsed = JSON.parse(json);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('bad setup payload');
+    if (parsed.supabaseUrl || parsed.supabaseKey) {
+        if (!parsed.supabaseUrl || !parsed.supabaseKey) throw new Error('missing supabaseUrl/supabaseKey');
+        return parsed;
+    }
     if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
     return parsed;
 }
@@ -270,14 +281,17 @@ export function applySetupLinkFromUrl() {
     }
 
     const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
+    const linkInvite = parsed.supabaseUrl && typeof parsed.invite === 'string' ? parsed.invite : '';
     const linkConfig = Object.assign({}, parsed);
     delete linkConfig.dsn;
+    delete linkConfig.invite;
 
     requestPinBeforeConfig(() => {
         if (linkDsn && window.ZoeErrors) {
             ZoeErrors.setDsn(linkDsn);
             ZoeErrors.init('zoew');
         }
+        rememberSetupInvite(linkInvite);
         openConfigModal();
         setFieldValue('firebaseConfigInput', JSON.stringify(linkConfig, null, 2));
         showToast(linkDsn

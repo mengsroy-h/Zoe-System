@@ -254,6 +254,26 @@
       "name": "licenseRecheckInFlight",
       "init": "false",
       "line": 4860
+    },
+    {
+      "name": "dbLivenessProbe",
+      "init": "null",
+      "line": 4860
+    },
+    {
+      "name": "lastDbLivenessOkAt",
+      "init": "0",
+      "line": 4860
+    },
+    {
+      "name": "lastDbLivenessCycleAt",
+      "init": "0",
+      "line": 4860
+    },
+    {
+      "name": "documentHiddenAt",
+      "init": "0",
+      "line": 4860
     }
   ],
   "dataState": [

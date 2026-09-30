@@ -16,6 +16,7 @@ import { handleRemoveScan } from './scan-remove';
 import { updateRecentPhonesList } from '../services/db-listeners';
 import { mergeBarcodeIntoHistoryItem, playBeep, saveSingleHistoryItemToFirebase } from '../services/history-write';
 import { withTimeout } from '../services/network';
+import { probeDatabaseLiveness } from '../services/connection';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes, rejectScanAndRefocus } from '../ui/modal-stack';
@@ -130,6 +131,7 @@ export async function confirmPhone(isSkip = false) {
             claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
         } catch (claimError) {
             if (current()) releaseLateBarcodeClaim(claimPromise, barcodeToSave);
+            probeDatabaseLiveness('claim');
             throw claimError;
         }
         if (!current()) return;
@@ -161,6 +163,7 @@ export async function confirmPhone(isSkip = false) {
         } catch (saveError) {
             if (!current()) return;
             if (saveError && saveError.message === 'Save timed out') {
+                probeDatabaseLiveness('save');
                 savePromise.then((lateStatus) => {
                     if (!current()) return;
                     if (lateStatus === true) showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);

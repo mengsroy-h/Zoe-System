@@ -27,11 +27,11 @@
 | **តក្កវិជ្ជាអាជីវកម្ម** | ច្បាប់លុប/ដក · ធុងសំរាម · ការសម្អាតស្វ័យប្រវត្តិ · ស្ថិតិយក · ចំណូល |
 | **បណ្តាញ និងការតភ្ជាប់** | timeout · retry · ការស្តារ listener · សម្ពាធសំណើ · បណ្តាញ «ភ្ជាប់តែស្លាប់» |
 | **Service Worker** | សំបក cache · ការធ្វើឲ្យស្រស់ · ការធ្លាក់របស់ Cache API · ល្បឿនបើក App |
-| **UI និងទម្រង់បង្ហាញ** | កាយវិការ · ចលនាផ្ទាំង · មាត្រដ្ឋានអក្សរ · ទម្រង់លើអេក្រង់ ៦ ទំហំ |
+| **UI និងទម្រង់បង្ហាញ** | កាយវិការ · ចលនាផ្ទាំង · មាត្រដ្ឋានអក្សរ · ទម្រង់លើអេក្រង់ ៣២០–១៤៤០px (ទូរស័ព្ទ · ថេប្លេត · ផ្តេក · desktop ៖ `SIZES` ក្នុង `layout-check.js`) |
 | **សុវត្ថិភាព** | CSP · XSS · ការលាក់ secret · storage · License · ចាក់សោ App |
 | **Meta (ឧបករណ៍ត្រួតពិនិត្យឧបករណ៍)** | checker អាចធ្លាក់បានទេ · ព្យួរបានទេ · ការធ្លាក់ឡើងដល់ exit code ទេ |
 
-ការត្រួតពិនិត្យ **៣៥** បើក **Chromium ពិត** ហើយវាស់ឥរិយាបថពិត មិនមែនអានកូដទេ។
+ការត្រួតពិនិត្យដែលហៅ `chromium.launch(` (រាប់បាន ៖ `grep -l 'chromium\.launch(' audit-tools/*.js audit-tools/emu/*.js`) បើក **Chromium ពិត** ហើយវាស់ឥរិយាបថពិត មិនមែនអានកូដទេ — ⛔ កុំចម្លងចំនួនមកទីនេះ (វាចាស់លឿន)។
 
 ---
 
@@ -336,6 +336,7 @@ bash audit-tools/emu/rules.sh
 | `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ · **ដំណឹង `license_announcements`** ៖ payload/id ពី `buildNoticePayload()`/`newNoticeId()` ពិត · admin តែម្នាក់សរសេរ/លុប · ZoeW អានតាម `announcementsUrl()` ពិតដោយគ្មាន auth (`limitToLast`) · schema បដិសេធប្រភេទ `update` និងប្រវែងលើស | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
 | `emu/tx-disconnect-emu-test.js` | ថ្នាក់ `disconnect` វាស់លើ **SDK Firebase ពិត** (កំណែដដែលនឹង CDN) · RTDB emulator ពិត · proxy TCP ៖ ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` ខណៈ server ប្រែរួច · wrapper ពិតរបស់ App សម្រេចត្រូវទាំង ២ ករណី · registry ៖ SDK ពិតរត់ updater លើ cache ទទេ ➜ `claimBarcodeInRegistry()` ពិតមិន `claimed` លើ barcode ដែលចុះឈ្មោះរួច · ledger ៖ ឧបករណ៍ផ្សេងសរសេរតម្លៃដូចគ្នាមុន put របស់យើងត្រូវកាត់ ➜ `runLedgerTransaction()` ពិតមិន `committed` | `TXEMU_APP_DIR` · `TXEMU_PORT` |
 | `emu/app-writes-rules-test.js` | **ការសរសេរពិតរបស់ App ↔ rules ពិត** ៖ រត់ `revenue-fuzz-test.js` (App ពិតក្នុង Chromium · ស្កេន · បិទ/បើក · ដក · លុប · ស្តារ · កែតម្លៃ · សម្អាត ២ម៉ោង/៧ថ្ងៃ · ឧបករណ៍ផ្សេង) ជាមួយ `FUZZ_CAPTURE` ➜ ចាក់ការសរសេរតាមលំដាប់ពិតទៅ RTDB emulator ជាមួយ `firebase-database.rules.json` ពិត ៖ App ➜ user · harness ➜ owner ➜ ការបដិសេធណាមួយ = FAIL · probe ទិសផ្ទុយ (record ប្រវត្តិ `.validate: false` ➜ ត្រូវបដិសេធ) · ជាន់ ≥ ១៥០ ការសរសេរ · គ្រប root ៩ | `APPWRITES_APP_DIR` · `APPWRITES_STRICT` · `APPWRITES_RUNS` · `APPWRITES_OPS` |
+| `emu/app-network-e2e-test.js` | **App ពិត** (build វាស់ក្នុង Chromium) · **SDK Firebase ពិត** (កំណែដដែលនឹង CDN · បម្រើក្នុងស្រុក) · RTDB emulator ពិត + rules ពិត · proxy TCP ៖ offline/online ពិត ➜ ស្ថានភាព និងទិន្នន័យ · ការតភ្ជាប់ «ងាប់ស្ងាត់» (socket បើកតែឈប់បញ្ជូន · `navigator.onLine` នៅ `true`) ➜ App ត្រូវឈប់រាយ «ភ្ជាប់ Server រួចរាល់» ហើយភ្ជាប់វិញពេលបណ្តាញមកវិញ តាមទ្វារ ៣ (ការសរសេរព្យួរ · ភ្ញាក់ពី background · វដ្ត ៦០ វិ.) · ទិសផ្ទុយ ៖ យឺតតែរស់ ➜ មិនផ្តាច់ · listener មិនស្ទួនលើ SDK ពិត | `NETE2E_APP_DIR` · `NETE2E_EMU_PORT` · `NETE2E_STRICT` · `NETE2E_CHROME` · `NETE2E_DEBUG` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keygen-notice-test.js` | ដំណឹង ZoeKeyGen ➜ ZoeW (ផ្ទាំង 🔔) ៖ ប្រភេទ · ព្រំដែនប្រវែង · ទម្រង់ id ស៊ីគ្នារវាង `app.js` ↔ `index.html` ↔ rules · `sendNotice()`/`deleteNotice()` ពិតក្នុងរបៀបបរាជ័យ (បដិសេធ · ព្យួរហើយ commit យឺត · ការអានធ្លាក់ · logout កណ្តាលទី) ➜ toast ✅ តែក្រោយ commit · បញ្ជី escape HTML | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |

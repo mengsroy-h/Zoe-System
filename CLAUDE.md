@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.6` (`zoew-v247`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.7` (`zoew-v248`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.22.1` (`zoekeygen-v109`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -323,6 +323,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ពិដានល្បឿន ↔ នាឡិកា** | ⛔ រយៈពេលកន្លងផុតត្រូវឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `monotonic-gate-test` |
 | **ពិដានល្បឿន ↔ *មូលដ្ឋាន* នាឡិកា** | ⛔ ត្រាដែល `elapsedSince()` វាស់ ត្រូវ **បោះដោយ `Date.now()`** (ត្រា `getServerNow()` ➜ `−offset` ➜ `Infinity` ➜ ពិដាន និងជណ្តើរ backoff **រលាយ**)។ ⛔ ត្រារស់ទាំងជា **អថេរ** និងជា **property** (`{ at: … }` · `x.deletedAt = …`)។ ⛔ ការកែមាន ២ ទិស ៖ ត្រា **local** (TTL) ➜ ប្តូរ *ការបោះ* ទៅ `Date.now()`; ត្រា **retention** (`deletedAt` ក្នុង Firebase) ➜ ⛔ កុំប្តូរការបោះ — វាស់ដោយ `getServerNow() - mark`។ ⛔ property តែមួយមិនផ្ទុកមូលដ្ឋាន ២ | `clock-basis-test` · `zto-sync-banner-test` (ឥរិយាបថ) |
 | ការតភ្ជាប់ · ស្តារ | listener ដែលធ្លាក់ត្រូវត្រឡប់មកវិញ; SDK ស្តារបានពិត · ⛔ ការផ្ទុកឡើងវិញដើម្បីស្តារ SDK **វាស់ការឈានដល់ host របស់ SDK មុន** ចំណាយពិដាន (`navigator.onLine` កុហកលើ WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យអស់ ➜ បើអត់ ពិដាន ៣ អស់ខណៈបណ្តាញស្លាប់ ➜ SDK មិនដែលស្តារ) · CSP `connect-src` អនុញ្ញាត origin នោះ | `connection-recovery-test` · `netlify-config-scope-test` |
+| **ការតភ្ជាប់ «ងាប់ស្ងាត់» (zombie socket)** | ⛔ `.info/connected` = `true` **មិនមែនភស្តុតាង** ថា socket ដឹកចម្លើយ — SDK បិទការតភ្ជាប់តែលើ `window` `offline` (keepalive ៤៥ វិ. មិនរង់ចាំចម្លើយ) ➜ WiFi គ្មានអ៊ីនធឺណិតខាងលើ · NAT ផុត · ភ្ញាក់ពី background ➜ «ភ្ជាប់ Server រួចរាល់» រាប់នាទី ខណៈគ្មានអ្វីដើរ។ `probeDatabaseLiveness()` ជាអ្នកសម្រេចតែមួយ ៖ round trip ពិត (`get()` លើ `DB_LIVENESS_PROBE_PATH` ដែលគ្មាន listener ➜ ចម្លើយណាក៏ដោយ រួម `permission_denied` = រស់) · តែការផុតពិដាន (១០ វិ.) ទេដែលផ្តាច់ (`forceDatabaseReconnect()` = ផលដូចព្រឹត្តិការណ៍ `offline` របស់ SDK)។ ទ្វារ ៣ ៖ `dbOp` ព្យួរ + claim/save ការស្កេនព្យួរ · ភ្ញាក់ពី background ≥ ៣០ វិ. · វដ្ត ៦០ វិ. (មើលឃើញ + គ្មាន round trip ៥៥ វិ.)។ ⛔ មិនវាស់ពេល listener នៅ pending (ការទាញដំបូងលើបណ្តាញយឺតដាក់ចម្លើយខាងក្រោយ ➜ ផ្តាច់ខុស ➜ ទាញឡើងវិញគ្មានទីបញ្ចប់) · ផ្តាច់ ≤ ១ ដង/៣០ វិ. · ទិសផ្ទុយ ៖ យឺតតែរស់ ➜ មិនផ្តាច់ | `emu/app-network-e2e-test` (App · SDK · emulator ពិត) |
 | **listener ដែលងាប់តែឯង** | ⛔ បងប្អូនមិនត្រូវប្រកាសជំនួសវាថាជាសះស្បើយ | `connection-recovery-test` |
 | **listener `.info/*` ដែលងាប់តែឯង** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `.info/connected` និង `.info/serverTimeOffset` ដែរ | `connection-recovery-test` |
 | **callback ចាស់ក្រោយភ្ជាប់ឡើងវិញ** | ⛔ រាល់ callback របស់ `onValue` ត្រូវមានច្រកទ្វារជំនាន់ (`listenerGeneration !== dbListenerGeneration`) — `fb.off()` រុំក្នុង `try/catch` ➜ វាអាចធ្លាក់ ហើយ snapshot ដែលកំពុងហោះក៏មកដល់ **ក្រោយ** ការប្តូរ database/auth ដែរ ➜ callback ចាស់ (១) សរសេរទិន្នន័យ **Project ចាស់** ចូលសតិ និង (២) ហៅ `noteDbListenerAlive()` ➜ **ប្រកាសថាទិដ្ឋភាពស្រស់** ➜ ច្បាប់ «បញ្ជីទទេ ↔ សិទ្ធិវាស់» ងាប់ ហើយការសម្អាតបំផ្លាញរត់លើទិដ្ឋភាពចាស់។ ⛔ **ការវាស់ត្រូវដេរីវេពី `DB_LISTENER_KEYS` ពិត** — ជំនាន់មុនវាស់តែ `history` ➜ ការដកច្រកទ្វារចេញពី listener **ណាមួយផ្សេង** រស់រាន។ វាស់បាន (2.36.3) ៖ ការដកវាចេញពី `deleted` **រស់រានសំណុំពេញ (១៧៥ ពេញលេញ · SKIP ០)** | `connection-recovery-test` |
@@ -492,6 +493,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
 | Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ; checker រង់ចាំ script load ក្នុងពិដាន ដាច់ពីចំនួន event ដែលត្រូវវាស់ | `sentry-load-race-test.js` |
 | listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
+| **ការតភ្ជាប់ «ងាប់ស្ងាត់»** (socket បើកតែឈប់បញ្ជូន · `navigator.onLine` នៅ `true`) ➜ «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានអ្វីដើរ · មិនភ្ជាប់វិញពេលបណ្តាញមកវិញ · និង offline/online · listener ស្ទួន លើ **SDK ពិត** (checker បណ្តាញផ្សេងប្រើ SDK ក្លែងដែលបាញ់ `.info/connected` តាមតេស្ត) | `emu/app-network-e2e-test.js` |
 | **ledger ដកលុយ តែភ្លេចដកចំនួនកញ្ចប់** (ឬបញ្ច្រាស) ➜ លេខ «ស្កេនតាមថ្ងៃ» និងលុយឈប់ស៊ីគ្នាជាអចិន្ត្រៃយ៍ — ⚠️ `db-stall-guard-test` រត់ `claimAndCleanupItem` ពិត តែ **stub `addRevenueToDailyAndMonthlyRecord` ចោល** ➜ វាវាស់ត្រឹម «ការហៅកើតឡើង» មិនមែន «អ្វីដែលចុះលើ server» | `ledger-count-integrity-test.js` |
 | **ស្ថានភាព listener និយាយមិនពិត លើ *លំដាប់ចៃដន្យ*** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ ឃ្លាតគ្នា · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស listener ដែលនៅងាប់ · សារ «ភ្ជាប់មកវិញ» ចេញមុនកូនសោទាំងអស់ស្រស់ — ⚠️ `connection-recovery-test` មានសេណារីយ៉ូ **សរសេរដោយដៃ** ➜ វាវាស់តែលំដាប់ដែលអ្នកសរសេរគិតដល់ | `connection-state-fuzz-test.js` |
 | URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
@@ -2028,7 +2030,7 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 «CI បៃតងលើ GitHub» ជាការរង់ចាំដែលមិនចប់។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
 
 ```bash
-npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect)
+npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect · emu/app-network-e2e)
 bash audit-tools/run-all.sh
 ```
 
@@ -2053,8 +2055,8 @@ lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំ�
 `emu/license-seat-rules` មកជាមួយ 2.37.0) ➜ session ដែលរាប់តាមលេខរឹង
 សន្និដ្ឋានខុសថាមាន checker ១ ធ្លាក់ពិត។ `doc-scope-test` ចាក់សោវាឥឡូវនេះ។
 វាស់បាន (2026-09-11) ៖ ការធ្លាក់ចុះមាន **២ រូបរាង** ➜
-`emu/restore-deadlock` · `emu/ledger-revert` · `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules`
-ចេញ **`SKIPPED`** ត្រង់ៗ ចំណែក `emu/crud-rules-flow` និង
+`emu/restore-deadlock` · `emu/ledger-revert` · `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` ·
+`emu/app-network-e2e` ចេញ **`SKIPPED`** ត្រង់ៗ ចំណែក `emu/crud-rules-flow` និង
 `emu/restore-mutation` ចេញ **`PARTIAL PASS (3; SKIP …)`** / **`(1; SKIP …)`**។ ⛔ រូបរាងទី ២ ជា
 គ្រោះថ្នាក់ជាង ព្រោះវា **ផ្ទុកពាក្យ `PASS`** ➜ ងាយអានរំលងជាបៃតង ខណៈ
 ការអះអាងស្នូលរបស់វា (rules ពិត) **មិនដែលរត់សោះ**។ ⛔ បន្ទាត់សង្ខេបរបស់
@@ -2227,7 +2229,9 @@ bash audit-tools/emu/rules.sh
   (មិនប៉ះទិន្នន័យ ឬលុយ)។
 - **`setInterval` ទាំង ៧ របស់ ZoeW រត់ខណៈទំព័រ `hidden`** — ⛔ **កុំបន្ថែម
   ច្រកទ្វារ `document.hidden`** ៖ browser throttle រួចហើយ ហើយច្រកទ្វារបង្កើត
-  ហានិភ័យថា cache តារាងអតិថិជន **ចាស់ពេលអ្នកប្រើត្រឡប់មក**។
+  ហានិភ័យថា cache តារាងអតិថិជន **ចាស់ពេលអ្នកប្រើត្រឡប់មក**។ ⚠️ ការលើកលែងតែមួយ **ខាងក្នុង** វដ្ត ៖
+  `probeDatabaseLivenessIfIdle()` មិនវាស់ពេល `hidden` (វាជា round trip បណ្តាញសុទ្ធ ហើយទ្វារ «ភ្ញាក់ពី background»
+  វាស់ភ្លាមពេលត្រឡប់មក) — វដ្តខ្លួនវានៅរត់ដដែល។
 - **`revenue-fuzz` មិនកេះផ្លូវ «៧ ថ្ងៃ + កញ្ចប់លាយ»** — សំណាញ់ការពារនៃផ្លូវនោះ
   គឺ `partial-pickup-cleanup-test` ⛔ **កុំសន្មតថា `revenue-fuzz` គ្របវា**។
 - **ZTO ៖ ⛔ កុំបន្ថែម circuit breaker សកល** — វាស់រួច ៖ ១២ កញ្ចប់ ➜ ១២ ការហៅ
@@ -2248,6 +2252,9 @@ bash audit-tools/emu/rules.sh
 - ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
   ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
   (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
+- ⏳ **2.45.7 (ZoeW) ៖ Deploy + build APK ថ្មី ហើយសាកការតភ្ជាប់ «ងាប់ស្ងាត់» លើឧបករណ៍ពិត** — ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ) ➜ ក្នុង ~១ នាទី
+  ចំណុចស្ថានភាពឈប់បៃតង (ឬ ~២៥ វិ. ក្រោយស្កេនដែលព្យួរ) ➜ ដោតវិញ ➜ បៃតងវិញខ្លួនឯង + ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · 🩺 ជួរ Firebase ❌ ពេល Server មិនឆ្លើយ។
+  ⛔ ZoeKeyGen **មិនទាន់មាន** ការវាស់ភាពរស់នេះ (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយដូចគ្នា)។
 - ⏳ **2.45.5 (ZoeW) · 2.22.1 (ZoeKeyGen) ៖ Deploy ទាំង ២ site + build APK ថ្មី** — CSP ថ្មី (`connect-src` + `https://www.gstatic.com`) មកជាមួយ
   `netlify.toml` ក្នុង deploy ដដែល · សិទ្ធិ `ACCESS_NETWORK_STATE` ចូលតែតាម **APK ថ្មី**។ សាកលើឧបករណ៍ពិត ៖ APK បើក Airplane mode ➜ ចំណុចស្ថានភាព
   ប្តូរជា «ក្រៅបណ្ដាញ» ក្នុងប៉ុន្មានវិនាទី (មុននេះ «កំពុងភ្ជាប់…» ~៣៥ វិ.) · បិទ Airplane ➜ «ភ្ជាប់ Server រួចរាល់» វិញភ្លាម · 🩺 ជួរ «អ៊ីនធឺណិត»

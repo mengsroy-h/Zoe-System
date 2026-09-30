@@ -1574,6 +1574,9 @@
     "ZoeW/tests/code128-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/db-liveness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/fixtures.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1824,6 +1827,9 @@
       "policy": "guard-32"
     },
     "audit-tools/emu/app-writes-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/app-network-e2e-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/emu/restore-deadlock-test.js": {

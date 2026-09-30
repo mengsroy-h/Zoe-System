@@ -56,6 +56,10 @@ export interface FirebaseState {
     sdkUnavailableNoticeShown: boolean;
     sessionExpiryCheckInFlight: boolean;
     licenseRecheckInFlight: boolean;
+    dbLivenessProbe: Promise<boolean | null> | null;
+    lastDbLivenessOkAt: number;
+    lastDbLivenessCycleAt: number;
+    documentHiddenAt: number;
 }
 
 export const firebaseState = createStore<FirebaseState>('firebaseState', {
@@ -110,6 +114,10 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     sdkUnavailableNoticeShown: false,
     sessionExpiryCheckInFlight: false,
     licenseRecheckInFlight: false,
+    dbLivenessProbe: null,
+    lastDbLivenessOkAt: 0,
+    lastDbLivenessCycleAt: 0,
+    documentHiddenAt: 0,
 });
 registerStore(firebaseState);
 

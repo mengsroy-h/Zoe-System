@@ -184,7 +184,7 @@ ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @drawable/splash_icon (v
     iconRef === '@drawable/splash_icon', iconRef || 'អវត្តមាន');
 const splashXml = read('android/app/src/main/res/drawable/splash_icon.xml');
 const iconSvg = read('resources/icon.svg');
-let splashWant = '';
+let splashWant;
 let splashGeo = null;
 try { splashWant = splashIconVector(iconSvg); splashGeo = splashPlateGeometry(parseIconSvg(iconSvg)); } catch (e) { splashWant = 'ERROR ' + e.message; }
 ok('splash_icon.xml ជា <vector> ទំហំ ' + SPLASH_ICON_DP + 'dp', /^<\?xml[^>]*>\s*<vector\b/.test(splashXml) &&

@@ -2256,7 +2256,6 @@ bash audit-tools/emu/rules.sh
 - ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
   ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
   (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
-- ⏳ **2.45.8 (ZoeW) ៖ tablet 11.5"** — logo ពេលបើក APK ជ្រុងមូលច្បាស់ (មិនមែនការ៉េព្រិល) · អេក្រង់ផ្តេក ៖ PTR លេចក្រោមរបា Tab មិនបាំងវា · បញ្ឈរ/ទូរស័ព្ទ ៖ PTR ដូចមុន។
 - ⏳ **2.45.7 (ZoeW) ៖ Deploy + build APK ថ្មី ហើយសាកការតភ្ជាប់ «ងាប់ស្ងាត់» លើឧបករណ៍ពិត** — ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ) ➜ ក្នុង ~១ នាទី
   ចំណុចស្ថានភាពឈប់បៃតង (ឬ ~២៥ វិ. ក្រោយស្កេនដែលព្យួរ) ➜ ដោតវិញ ➜ បៃតងវិញខ្លួនឯង + ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · 🩺 ជួរ Firebase ❌ ពេល Server មិនឆ្លើយ។
   ⛔ ZoeKeyGen **មិនទាន់មាន** ការវាស់ភាពរស់នេះ (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយដូចគ្នា)។

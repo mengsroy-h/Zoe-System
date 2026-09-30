@@ -1622,7 +1622,9 @@ release ដែល proxy នៅទីនេះបិទ) · Postgres **17** (`sup
 **CI ពេញ** (emulator · `*_STRICT` · `SUPABASE_STRICT=1` · `RUNALL_JOBS=4`) លើ `e97590a` ៖ ធ្លាក់ ១ ត្រង់ `zoew-suite` ➜ `rules:check` របស់ ZoeW (tree ZoeW **មិនប្រែ**)
 «ស្តារ MR1» `page.click` ផុត 5 វិ. រួចការអះអាងបន្តបន្ទាប់ធ្លាក់តាម ➜ `RUNALL_RESUME=1` លើ tree ដដែល ➜ **ឆ្លង** ➜ **១៩២ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង**។ ⚠️ ការធ្លាក់កើត
 តែក្រោមបន្ទុក lane ពេញ (អ្នកយាម Supabase ថែម Postgres + RSA keygen) ➜ ពិដាន 5 វិ. របស់ `rules:check` ងាយរងបន្ទុក CPU ➜ ⛔ មិនបង្កើនពិដានដើម្បីលាក់វា ៖ បើវាលេចម្តងទៀត
-ត្រូវវាស់ពេលចុចពិតក្រោមបន្ទុក (មិនមែនប្តូរលេខ)។
+ត្រូវវាស់ពេលចុចពិតក្រោមបន្ទុក (មិនមែនប្តូរលេខ)។ CI ពេញលើកទី ២ (`d25b1ca`) ៖ `zoew-suite` ឆ្លង តែ `zoew-parity` ➜ `parity:deep` ធ្លាក់ ១ ជំហាន («ស្កេន ZL5 ➜ ZTO
+បំពេញស្វ័យប្រវត្តិ» អេក្រង់ខុស) ➜ ថ្នាក់ដដែលនឹង baseline 2.45.7 (មុនការងារ Supabase) ➜ `RUNALL_RESUME=1` ➜ **ឆ្លង** ➜ **១៩២ ពេញលេញ**។ ⚠️ checker browser ពីរ
+របស់ ZoeW ងាយរងបន្ទុក CPU ពេល lane ពេញ — ជាចំណុចត្រូវវាស់ជុំក្រោយ (អ្នកយាម Supabase ចំណាយ ~២៦ វិ. ក្នុង ~២០៦០ វិ. ផលបូកពេល checker)។
 
 **សកម្មភាពដែលត្រូវធ្វើដោយដៃ** (ម្ចាស់គម្រោង · តាម [`supabase/README.md`](../supabase/README.md)) ៖ បង្កើត Supabase Project (Pro) · កំណត់ Auth លើ Dashboard ·
 `db push` · admin ដំបូង · Firebase Project OTP (Blaze · SMS region KH · budget) · `secrets set` + `functions deploy --no-verify-jwt` ⛔ secret វាយក្នុង terminal

@@ -425,6 +425,19 @@ async function groupHttp(m, rec) {
     rec('HTTP ៖ body > 8192 byte ➜ 413 · handler មិនរត់', res.status === 413 && handled.length === 0);
     res = await call(req('POST', 'https://localhost', '{}', { 'content-length': '999999' }));
     rec('HTTP ៖ content-length ប្រកាសធំ ➜ 413', res.status === 413 && handled.length === 0);
+    let pulled = 0, cancelled = false;
+    const chunk = new Uint8Array(4000).fill(65);
+    const stream = new ReadableStream({
+        pull(ctl) { if (pulled >= 50) { ctl.close(); return; } pulled++; ctl.enqueue(chunk.slice()); },
+        cancel() { cancelled = true; }
+    });
+    handled = [];
+    res = await H.handleHttp(new Request('https://x.supabase.co/functions/v1/register', { method: 'POST', body: stream, duplex: 'half',
+        headers: { origin: 'https://localhost' } }), base, ALLOW, handler);
+    rec('HTTP ៖ body stream គ្មាន content-length ➜ 413 · អានឈប់ត្រឹមព្រំដែន (មិនអាន ២០០KB ទាំងអស់) · stream ត្រូវ cancel',
+        res.status === 413 && handled.length === 0 && pulled <= 4 && cancelled, { status: res.status, pulled, cancelled });
+    res = await call(req('POST', 'https://localhost', Buffer.concat([Buffer.from('{"username":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}')])));
+    rec('HTTP ៖ JSON ត្រឹមត្រូវ តែមាន byte មិនមែន UTF-8 ➜ 400 · handler មិនទទួល U+FFFD', res.status === 400 && handled.length === 0, handled);
     res = await call(req('POST', 'https://localhost', '{bad json'));
     rec('HTTP ៖ JSON ខូច ➜ 400', res.status === 400 && handled.length === 0);
     res = await call(req('POST', 'https://localhost', JSON.stringify({ boom: 1 })));
@@ -608,7 +621,8 @@ const MUTATIONS = [
     ['admin-deps.ts', 'revokeSessions ជឿកំហុស', "                return !error && typeof data === 'number';", '                return true;'],
     ['account-core.ts', 'មិនកំណត់ ៧២ byte', "    if (new TextEncoder().encode(raw).length > PASSWORD_MAX_BYTES) return 'password-long';\n", ''],
     ['http.ts', 'មិនបដិសេធ origin មិនស្គាល់', "    if (origin !== null && !allowed) return json(403, { ok: false, code: 'origin-denied' }, cors);\n", ''],
-    ['http.ts', 'មិនកំណត់ទំហំ body', 'if (new TextEncoder().encode(text).length > MAX_BODY_BYTES)', 'if (false)'],
+    ['http.ts', 'មិនកំណត់ទំហំ body', '            if (total > maxBytes) {', '            if (false) {'],
+    ['http.ts', 'មិនបដិសេធ UTF-8 ខូច', "new TextDecoder('utf-8', { fatal: true })", "new TextDecoder('utf-8')"],
     ['admin-deps.ts', 'email_confirm false', 'email_confirm: true', 'email_confirm: false'],
     ['admin-deps.ts', 'ឈ្មោះ argument RPC ខុស', 'p_code_hash: input.codeHash', 'p_invite_hash: input.codeHash'],
     ['admin-deps.ts', 'កំហុស invite_is_usable ➜ false', "                if (error || typeof data !== 'boolean') return null;", "                if (error || typeof data !== 'boolean') return false;"]

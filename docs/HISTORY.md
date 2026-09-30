@@ -1602,7 +1602,7 @@ release ដែល proxy នៅទីនេះបិទ) · Postgres **17** (`sup
   ការអះអាង · mutation **២៧/២៧** ក្រហម (mutation ដែល SQL អនុវត្តមិនបាន មិនរាប់) · ~៧ វិ.។ វាស់ ៖ SIGKILL អ្នកយាម ➜ Postgres ស្លាប់តាម (`setpriv --pdeathsig`) ·
   TERM ➜ ថតបណ្តោះអាសន្នលុប។
 - `supabase-functions-test` ៖ module TS ពិត (Node type stripping) · token OTP ដោយសោ RSA ពិត · supabase-js ពិតទល់នឹងម៉ាស៊ីនមេក្លែង GoTrue/PostgREST · tsc strict លើ type
-  ពិតរបស់ SDK ➜ **២០១** ការអះអាង · mutation **២៨/២៨** ក្រហម · ~១៥ វិ.។
+  ពិតរបស់ SDK ➜ **២០៤** ការអះអាង · mutation **២៩/២៩** ក្រហម · ~១៧ វិ.។
 
 **អ្វីដែលការវាស់រកឃើញ (មុន commit)** ៖
 - **ភាពចៃដន្យនៃកូដអញ្ជើញ** ៖ `uuid_send(gen_random_uuid())` មាន bit ថេរ (version · variant) ➜ ការប្រើ byte ទី ៦ ផ្តល់តួអក្សរតែ **១៦/៣២** ក្នុងទីតាំងនោះ ➜ ការវាស់
@@ -1616,6 +1616,13 @@ release ដែល proxy នៅទីនេះបិទ) · Postgres **17** (`sup
   adapter ត្រូវរុំ `try` (វាស់ ៖ id មិនមែន UUID ➜ `false` មិនគាំង)។
 - **key ប្រភេទថ្មី** ៖ SDK មិនផ្ញើ `sb_publishable_…`/`sb_secret_…` ជា Bearer ➜ Edge Function ត្រូវ `--no-verify-jwt` (ចុះឈ្មោះ ៖ គ្មានគណនីនៅឡើយ) ហើយផ្ទៀង OTP ខ្លួនឯង ·
   Allow-Headers ដេរីវេពី `@supabase/supabase-js/cors` + `x-region` (វាស់ ៖ header ដែល `functions.invoke` ផ្ញើពិតទាំងអស់ ⊂ បញ្ជី)។
+- **body គ្មាន `content-length`** (stream) ៖ `request.text()` អានទាំងមូលមុនពិនិត្យទំហំ ➜ អានតាម reader ហើយឈប់ + cancel ត្រឹម 8 KB (វាស់ ៖ stream ២០០ KB ➜ 413 ក្រោយ
+  ≤ ៤ chunk) · UTF-8 ខូចក្នុង JSON ត្រឹមត្រូវ ➜ 400 (⛔ តេស្តដំបូងប្រើ JSON ខូចស្រាប់ ➜ mutation «decoder ធូរ» **រស់រាន** ព្រោះវាធ្លាក់ 400 ដោយហេតុផលផ្សេង)។
+
+**CI ពេញ** (emulator · `*_STRICT` · `SUPABASE_STRICT=1` · `RUNALL_JOBS=4`) លើ `e97590a` ៖ ធ្លាក់ ១ ត្រង់ `zoew-suite` ➜ `rules:check` របស់ ZoeW (tree ZoeW **មិនប្រែ**)
+«ស្តារ MR1» `page.click` ផុត 5 វិ. រួចការអះអាងបន្តបន្ទាប់ធ្លាក់តាម ➜ `RUNALL_RESUME=1` លើ tree ដដែល ➜ **ឆ្លង** ➜ **១៩២ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង**។ ⚠️ ការធ្លាក់កើត
+តែក្រោមបន្ទុក lane ពេញ (អ្នកយាម Supabase ថែម Postgres + RSA keygen) ➜ ពិដាន 5 វិ. របស់ `rules:check` ងាយរងបន្ទុក CPU ➜ ⛔ មិនបង្កើនពិដានដើម្បីលាក់វា ៖ បើវាលេចម្តងទៀត
+ត្រូវវាស់ពេលចុចពិតក្រោមបន្ទុក (មិនមែនប្តូរលេខ)។
 
 **សកម្មភាពដែលត្រូវធ្វើដោយដៃ** (ម្ចាស់គម្រោង · តាម [`supabase/README.md`](../supabase/README.md)) ៖ បង្កើត Supabase Project (Pro) · កំណត់ Auth លើ Dashboard ·
 `db push` · admin ដំបូង · Firebase Project OTP (Blaze · SMS region KH · budget) · `secrets set` + `functions deploy --no-verify-jwt` ⛔ secret វាយក្នុង terminal

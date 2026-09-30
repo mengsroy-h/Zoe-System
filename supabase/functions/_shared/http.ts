@@ -54,6 +54,38 @@ export function readConfig(get: (name: string) => string | undefined): FunctionC
     return { ok: problems.length === 0, problems, supabaseUrl, secretKey, otpProjectId, loginDomain, allowedOrigins, phonePrefixes };
 }
 
+async function readLimited(request: Request, maxBytes: number): Promise<{ ok: true; text: string } | { ok: false; code: string }> {
+    if (!request.body) return { ok: true, text: '' };
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > maxBytes) {
+                await reader.cancel().catch(() => undefined);
+                return { ok: false, code: 'body-too-large' };
+            }
+            chunks.push(value);
+        }
+    } catch {
+        return { ok: false, code: 'bad-request' };
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    try {
+        return { ok: true, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) };
+    } catch {
+        return { ok: false, code: 'bad-request' };
+    }
+}
+
 function json(status: number, body: unknown, headers: Record<string, string>): Response {
     return new Response(JSON.stringify(body), {
         status,
@@ -84,16 +116,11 @@ export async function handleHttp(
     if (!config.ok) return json(503, { ok: false, code: 'server-unconfigured' }, cors);
     const declared = Number(request.headers.get('content-length') ?? '0');
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return json(413, { ok: false, code: 'body-too-large' }, cors);
-    let text: string;
-    try {
-        text = await request.text();
-    } catch {
-        return json(400, { ok: false, code: 'bad-request' }, cors);
-    }
-    if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return json(413, { ok: false, code: 'body-too-large' }, cors);
+    const read = await readLimited(request, MAX_BODY_BYTES);
+    if (!read.ok) return json(read.code === 'body-too-large' ? 413 : 400, { ok: false, code: read.code }, cors);
     let body: unknown;
     try {
-        body = JSON.parse(text);
+        body = JSON.parse(read.text);
     } catch {
         return json(400, { ok: false, code: 'bad-request' }, cors);
     }

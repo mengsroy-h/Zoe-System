@@ -401,6 +401,79 @@ const GESTURE = function (steps) {
     ok('អូសខ្លី 14px ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ ទុកជា tap/scroll ធម្មតា',
         rowControlShort.prevented === 0 && !rowControlShort.reloaded, rowControlShort);
 
+    // === ទីតាំងសញ្ញា PTR ធៀបនឹងរបាខាងលើ តាមទំហំអេក្រង់ ===
+    // ⛔ tablet ផ្តេក (≥992px) ៖ របា Tab ផ្លាស់ទៅនៅក្រោម navbar ➜ សញ្ញា PTR (fixed · តម្លៃកំណត់សម្រាប់ទូរស័ព្ទ) ធ្លាក់ជាន់លើរបា Tab
+    //    (វីដេអូ tablet 11.5" របស់ម្ចាស់គម្រោង)។ ច្បាប់ ៖ ពេល «ready» គម្លាតពីគែមក្រោមរបាខាងលើ ត្រូវស្មើទូរស័ព្ទ (±2px) · មិនជាន់។
+    console.log('\n=== ទីតាំងសញ្ញា PTR ធៀបនឹងរបាខាងលើ (ទូរស័ព្ទ · tablet បញ្ឈរ/ផ្តេក) ===');
+    const PULL_TO_READY = (opts) => new Promise((resolve) => {
+        const target = document.elementFromPoint(opts.x, opts.startY);
+        const ind = document.querySelector('.ptr-indicator');
+        const touch = (y) => new Touch({ identifier: 7, target: target, clientX: opts.x, clientY: y, pageX: opts.x, pageY: y });
+        const fire = (type, touches, changed) => target.dispatchEvent(new TouchEvent(type, {
+            bubbles: true, cancelable: type !== 'touchcancel', touches: touches, targetTouches: touches, changedTouches: changed }));
+        let y = opts.startY;
+        let n = 0;
+        let t = touch(y);
+        fire('touchstart', [t], [t]);
+        const tick = () => {
+            y += 6;
+            n++;
+            t = touch(y);
+            fire('touchmove', [t], [t]);
+            requestAnimationFrame(() => {
+                const ready = ind.classList.contains('ready');
+                if (!ready && n < 120) return tick();
+                const r = ind.getBoundingClientRect();
+                const nav = document.querySelector('.app-navbar').getBoundingClientRect();
+                const tabEl = document.getElementById('pageTabBar');
+                const tab = tabEl ? tabEl.getBoundingClientRect() : null;
+                const tabAtTop = !!tab && tab.top < window.innerHeight / 2;
+                const chromeBottom = Math.max(nav.bottom, tabAtTop ? tab.bottom : 0);
+                fire('touchcancel', [], [t]);
+                resolve({ target: target ? (target.id || target.className || target.tagName) : null, ready: ready, width: window.innerWidth, top: Math.round(r.top * 10) / 10,
+                    navBottom: Math.round(nav.bottom * 10) / 10, tabAtTop: tabAtTop,
+                    chromeBottom: Math.round(chromeBottom * 10) / 10, gap: Math.round((r.top - chromeBottom) * 10) / 10 });
+            });
+        };
+        requestAnimationFrame(tick);
+    });
+    const measurePtrAt = async (width, height) => {
+        await page.setViewportSize({ width: width, height: height });
+        await page.waitForTimeout(450);
+        await resetState();
+        const start = await page.evaluate(() => {
+            const zone = Math.round(window.innerHeight * 0.4);
+            const top = document.querySelector('.app-navbar').getBoundingClientRect().bottom;
+            const blocked = 'button, a, input, textarea, select, [contenteditable="true"], .app-navbar, .page-tabbar';
+            const xs = [0.62, 0.5, 0.8, 0.3].map((f) => Math.round(window.innerWidth * f));
+            for (let y = zone - 12; y > top + 16; y -= 10) {
+                for (const x of xs) {
+                    const el = document.elementFromPoint(x, y);
+                    if (el && el.closest && !el.closest(blocked) && el.closest('#appPages')) return { x: x, y: y };
+                }
+            }
+            return { x: Math.round(window.innerWidth / 2), y: zone - 12 };
+        });
+        const out = await page.evaluate('(' + PULL_TO_READY.toString() + ')(' + JSON.stringify({ x: start.x, startY: start.y }) + ')');
+        out.reloaded = takeReloads() > 0;
+        await page.waitForTimeout(350);
+        return out;
+    };
+    const ptrPhone = await measurePtrAt(412, 780);
+    ok('ទូរស័ព្ទ (412px) ៖ ទាញដល់ ready ពិត (លក្ខខណ្ឌចាំបាច់)', ptrPhone.ready && !ptrPhone.tabAtTop && !ptrPhone.reloaded, ptrPhone);
+    ok('ទូរស័ព្ទ ៖ សញ្ញា PTR ពេល ready មិនជាន់ navbar', ptrPhone.gap >= 0, ptrPhone);
+    for (const [w, h, label] of [[1280, 800, 'tablet ផ្តេក 1280×800'], [1194, 834, 'iPad ផ្តេក 1194×834'], [800, 1280, 'tablet បញ្ឈរ 800×1280']]) {
+        const m = await measurePtrAt(w, h);
+        const wide = w >= 992;
+        ok(`${label} ៖ ទាញដល់ ready ពិត · របា Tab ${wide ? 'នៅខាងលើ' : 'នៅខាងក្រោម'} (លក្ខខណ្ឌចាំបាច់)`,
+            m.ready && m.tabAtTop === wide && !m.reloaded, m);
+        ok(`${label} ៖ សញ្ញា PTR ពេល ready មិនជាន់របាខាងលើ (navbar${wide ? ' + Tab' : ''})`, m.gap >= 0, m);
+        ok(`${label} ៖ គម្លាតពីរបាខាងលើស្មើទូរស័ព្ទ (${ptrPhone.gap}px ±2)`, Math.abs(m.gap - ptrPhone.gap) <= 2, { tablet: m.gap, phone: ptrPhone.gap });
+    }
+    await page.setViewportSize({ width: 412, height: 780 });
+    await page.waitForTimeout(450);
+    await resetState();
+
     console.log('\n=== PTR និងកាយវិការបើកផ្ទាំង មិនប្រជែងគ្នា ===');
     await resetState();
     const collapsedReady = await setCollapsed();

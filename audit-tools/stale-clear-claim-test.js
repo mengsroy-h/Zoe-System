@@ -126,6 +126,8 @@ function barcodeCloseIsRipe(b, n) { return !!(b && b.isClosed && typeof b.closed
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',
         'cleanupClockIsTrustworthy', 'itemHasRestoreMarkers',
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     vm.runInContext(preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
         + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

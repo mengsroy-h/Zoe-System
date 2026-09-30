@@ -43,6 +43,15 @@ function bad(label, detail) {
 function tail(text, n) {
     return String(text || '').split('\n').filter((l) => l.trim()).slice(-n).join('\n');
 }
+// ⛔ tail តែម្យ៉ាងលាក់ **ជំហានណា** ដែលធ្លាក់ ៖ parity:deep រាយលទ្ធផលតាមសេណារីយ៉ូ ហើយ tail ១០ បន្ទាត់ឃើញតែសេណារីយ៉ូចុងក្រោយ
+//    (វាស់បាន ៖ `❌ ជំហានខុស 3` ក្នុង CI ពេញ ខណៈ tail បង្ហាញតែជំហាន ✅ របស់សេណារីយ៉ូ Google Sheet) ➜ ដាក់បន្ទាត់ ❌ · ភាពខុសគ្នា
+//    · កំហុស ពីគ្រប់ទីកន្លែង មុន tail
+function failureDetail(text, n) {
+    const lines = String(text || '').split('\n').filter((l) => l.trim());
+    const flagged = lines.filter((l) => /❌|FAIL|💥|^\s+\[[^\]]+\]\s|ចុច ៖/.test(l)).slice(0, 40);
+    const last = lines.slice(-n);
+    return flagged.filter((l) => last.indexOf(l) === -1).concat(flagged.length ? ['…'] : [], last).join('\n');
+}
 
 const pkgFile = path.join(APP, 'package.json');
 let pkg = null;
@@ -89,7 +98,7 @@ if (isReactSource && hasModules && !missing.length) {
         });
         const secs = ((Date.now() - started) / 1000).toFixed(1);
         if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', tail(r.stdout + r.stderr, 6));
-        else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', tail(r.stdout + r.stderr, 10));
+        else if (r.status !== 0) bad('npm run ' + step + ' (exit ' + r.status + ')', failureDetail(r.stdout + r.stderr, 10));
         else ok('npm run ' + step + ' · ' + secs + 's');
     }
 }

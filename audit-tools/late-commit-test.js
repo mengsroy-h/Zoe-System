@@ -296,6 +296,8 @@ function buildWorld(seed, opts) {
         optionalSrc
     ].join('\n\n');
     new vm.Script(code).runInContext(context);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
 
     world.context = context;
     world.getPath = getPath;

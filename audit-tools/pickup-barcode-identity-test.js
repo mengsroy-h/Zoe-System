@@ -289,6 +289,8 @@ function makeDevice(shared, name) {
         window: {}
     });
     ctx.window = ctx;
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     new vm.Script([
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',

@@ -9,6 +9,7 @@ import { retryFailedDbListenersNow } from './db-listeners';
 import { retryFirebaseSdkNow } from './firebase-sdk';
 import { flushPendingHistoryPatches } from './history-write';
 import { refreshLiveToasts } from '../ui/toast';
+import { dbListenerPendingPaths } from '../core/text';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 
@@ -29,6 +30,16 @@ export const CONNECTING_GRACE_ATTEMPTS = 3;
 export const DB_LISTENER_RETRY_MIN_GAP_MS = 3000;
 
 export const DB_LISTENER_PROGRESS_GRACE_MS = 20000;
+
+export const DB_LIVENESS_PROBE_PATH = 'zoew_barcode_registry/__zoew_liveness__';
+
+export const DB_LIVENESS_PROBE_TIMEOUT_MS = 10000;
+
+export const DB_LIVENESS_IDLE_MS = 55000;
+
+export const DB_LIVENESS_RESUME_HIDDEN_MS = 30000;
+
+export const DB_LIVENESS_CYCLE_MIN_GAP_MS = 30000;
 
 export function connectionLooksOnline() {
     return firebaseState.isDatabaseConnected && (navigator.onLine as boolean) !== false && !firebaseState.dbListenersFailed;
@@ -101,6 +112,55 @@ export function nudgeDatabaseConnection() {
     scheduleReconnectWatchdog();
 }
 
+export function databaseLivenessProbeAllowed() {
+    if (!firebaseState.fb || !firebaseState.db || typeof firebaseState.fb.get !== 'function' || typeof firebaseState.fb.ref !== 'function') return false;
+    if (!firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) return false;
+    return !dbListenerPendingPaths.size;
+}
+
+export function noteDatabaseLinkUnresponsive(reason?) {
+    if (!firebaseState.isDatabaseConnected || (navigator.onLine as boolean) === false) return false;
+    if (elapsedSince(firebaseState.lastDbLivenessCycleAt) < DB_LIVENESS_CYCLE_MIN_GAP_MS) return false;
+    if (!canCycleDatabaseConnection() || !forceDatabaseReconnect()) return false;
+    firebaseState.lastDbLivenessCycleAt = Date.now();
+    renderConnectionStatus();
+    scheduleReconnectWatchdog();
+    if (window.ZoeErrors) ZoeErrors.capture(new Error('Database link unresponsive'), { zone: 'network', context: 'probeDatabaseLiveness ' + (reason || '') });
+    return true;
+}
+
+export function probeDatabaseLiveness(reason?) {
+    if (firebaseState.dbLivenessProbe) return firebaseState.dbLivenessProbe;
+    if (!databaseLivenessProbeAllowed()) return Promise.resolve(null);
+    const fb = firebaseState.fb;
+    const db = firebaseState.db;
+    const generation = firebaseState.infoListenerGeneration;
+    const probe = new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
+        const answered = () => { clearTimeout(timer); resolve(true); };
+        let started = null;
+        try { started = fb.get(fb.ref(db, DB_LIVENESS_PROBE_PATH)); } catch (e) { started = null; }
+        Promise.resolve(started).then(answered, answered);
+    }).then((alive) => {
+        firebaseState.dbLivenessProbe = null;
+        if (firebaseState.db !== db || firebaseState.infoListenerGeneration !== generation) return null;
+        if (alive) {
+            firebaseState.lastDbLivenessOkAt = Date.now();
+            return true;
+        }
+        noteDatabaseLinkUnresponsive(reason);
+        return false;
+    });
+    firebaseState.dbLivenessProbe = probe;
+    return probe;
+}
+
+export function probeDatabaseLivenessIfIdle() {
+    if (documentIsHidden()) return null;
+    if (elapsedSince(firebaseState.lastDbLivenessOkAt) < DB_LIVENESS_IDLE_MS) return null;
+    return probeDatabaseLiveness('idle');
+}
+
 export function setupConnectionRecovery() {
     window.addEventListener('online', () => {
         firebaseState.networkJustReturned = true;
@@ -119,11 +179,17 @@ export function setupConnectionRecovery() {
         renderConnectionStatus();
     });
     onDocumentVisibilityChange(() => {
-        if (documentIsHidden()) return;
+        if (documentIsHidden()) {
+            firebaseState.documentHiddenAt = Date.now();
+            return;
+        }
+        const hiddenFor = firebaseState.documentHiddenAt ? elapsedSince(firebaseState.documentHiddenAt) : 0;
+        firebaseState.documentHiddenAt = 0;
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();
         retryFailedDbListenersNow();
+        if (hiddenFor >= DB_LIVENESS_RESUME_HIDDEN_MS) probeDatabaseLiveness('resume');
     });
 }
 
@@ -186,6 +252,7 @@ export function attachInfoListeners() {
         firebaseState.isDatabaseConnected = snap.val() === true;
         if (firebaseState.isDatabaseConnected) {
             firebaseState.hasEverConnectedToDatabase = true;
+            firebaseState.lastDbLivenessOkAt = Date.now();
             clearReconnectWatchdog();
             retryFailedDbListenersNow();
             flushPendingHistoryPatches();

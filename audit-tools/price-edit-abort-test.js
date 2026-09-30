@@ -193,6 +193,8 @@ function makeCtx(mode) {
     const COLLECTED_DAYS = /const DAILY_COLLECTED_KEEP_DAYS = (\d+);/.exec(SRC);
     // ⛔ ស្រទាប់ React (វាលបញ្ចូល · ប្រអប់ · ឃ្លាំង) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED }), ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
         + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
         + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'

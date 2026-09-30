@@ -46,7 +46,7 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
+const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healthDatabaseLiveRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
     'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
@@ -79,6 +79,7 @@ function buildRuntime(over) {
     const alerts = [];
     const lookupStatuses = [];
     const fills = [];
+    const probes = [];
     const inputs = {
         lookupApiUrlInput: { value: o.cfg && o.cfg.url || '' },
         lookupApiHeaderNameInput: { value: o.cfg && o.cfg.headerName || '' },
@@ -129,6 +130,9 @@ function buildRuntime(over) {
         SHEET_SCRIPT_VERSION_EXPECTED: 1,
         sheetScriptVersionSeen: o.scriptSeen === undefined ? null : o.scriptSeen,
         dbListenerViewIsStale: () => !!o.stale,
+        // ⛔ ✅ របស់ Firebase ត្រូវជា round trip ពិត (`probeDatabaseLiveness()` ➜ true/false/null) មិនមែន `.info/connected` តែម្យ៉ាង
+        DB_LIVENESS_PROBE_TIMEOUT_MS: 10000,
+        probeDatabaseLiveness: (reason) => { probes.push(reason); return Promise.resolve(o.probe === undefined ? true : o.probe); },
         cleanupClockIsTrustworthy: () => o.cleanupOk !== false,
         getServerNow: () => 1770000000000,
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
@@ -165,7 +169,7 @@ function buildRuntime(over) {
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED, context: ctx }), ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n')
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
-        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
+        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthDatabaseLiveRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
     vm.runInContext(code, ctx);
     // ⛔ ជួរ (model) ➜ markup ដដែលនឹងអ្វីដែល `HealthCheckList` គូរ (class · រូប · ស្លាក · ព័ត៌មាន) ➜ ការអះអាងលើ
     //    អត្ថបទដែលអ្នកប្រើឃើញ នៅដដែល។ ខ្សែអក្សរ (App ចាស់) ឆ្លងកាត់ត្រង់ៗ។
@@ -176,7 +180,7 @@ function buildRuntime(over) {
             return out && typeof out.then === 'function' ? out.then(renderHealthRow) : renderHealthRow(out);
         };
     }
-    return { api, ctx, fetches, pinPrompts, listEl, btnEl, alerts, lookupStatuses, fills };
+    return { api, ctx, fetches, pinPrompts, listEl, btnEl, alerts, lookupStatuses, fills, probes };
 }
 
 function escapeText(t) {
@@ -407,6 +411,27 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ភ្ជាប់រួច តែទិន្នន័យមិនមកដល់ ➜ ⚠️ («ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់»)', state(rt2.api.healthDatabaseRow()) === 'warn');
         const rt3 = buildRuntime({});
         ok('Firebase ធម្មតា ➜ ✅ (ទិសវិជ្ជមាន)', state(rt3.api.healthDatabaseRow()) === 'ok');
+    }
+    {
+        // ⛔ «ការតភ្ជាប់ងាប់ស្ងាត់» ៖ `.info/connected` = true តែ Server មិនឆ្លើយ ➜ ✅ លើអ្វីដែលមិនបានវាស់ = កុហក
+        const dead = buildRuntime({ probe: false });
+        const deadHtml = await dead.api.healthDatabaseLiveRow();
+        ok('⛔ ភ្ជាប់តែ round trip ផុតពិដាន ➜ ❌ (មិនមែន ✅ តាម `.info/connected`)', state(deadHtml) === 'bad' && /មិនឆ្លើយ/.test(deadHtml), deadHtml);
+        ok('⛔ ការវាស់ពិតត្រូវរត់ (ហេតុផល «health»)', dead.probes.join() === 'health', dead.probes);
+        const live = buildRuntime({ probe: true });
+        ok('round trip ឆ្លើយ ➜ ✅ (ទិសវិជ្ជមាន)', state(await live.api.healthDatabaseLiveRow()) === 'ok');
+        const unmeasured = buildRuntime({ probe: null });
+        ok('វាស់មិនបាន (null) ➜ សាលក្រមមូលដ្ឋានដដែល', state(await unmeasured.api.healthDatabaseLiveRow()) === 'ok');
+        const down = buildRuntime({ dbConnected: false, probe: false });
+        ok('ដាច់រួច ➜ ❌ ដោយមិនចំណាយការវាស់', state(await down.api.healthDatabaseLiveRow()) === 'bad' && down.probes.length === 0, down.probes);
+        const stale = buildRuntime({ stale: true, probe: false });
+        ok('ទិន្នន័យមិនទាន់មកដល់ ➜ ⚠️ ដោយមិនចំណាយការវាស់', state(await stale.api.healthDatabaseLiveRow()) === 'warn' && stale.probes.length === 0, stale.probes);
+        const whole = buildRuntime({ cfg: ZTO_CFG, probe: false });
+        await whole.api.runHealthCheck();
+        const wholeRows = vm.runInContext('uiState.healthRows', whole.ctx) || [];
+        const fbRow = wholeRows.find((r) => r && r.label === 'Firebase');
+        ok('⛔ runHealthCheck() ប្រើការវាស់ពិត ➜ ជួរ Firebase ជា ❌ ពេល Server មិនឆ្លើយ (ជួរទី ២)', !!fbRow && fbRow.state === 'bad' && wholeRows.indexOf(fbRow) === 1,
+            wholeRows.map((r) => r && r.label + ':' + r.state));
     }
     {
         ok('⛔ នាឡិកាមិនទាន់ sync ➜ ⚠️', state(buildRuntime({ clockTrusted: false }).api.healthClockRow()) === 'warn');

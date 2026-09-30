@@ -39,6 +39,69 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.45.8] — 2026-09-30 · ZoeW ៖ **APK ៖ logo ពេលបើកព្រិល/ការ៉េ · tablet ផ្តេក ៖ សញ្ញា Pull to refresh បាំងរបា Tab** (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ រូបថត + វីដេអូ tablet 11.5")
+
+**ZoeW `2.45.8`** (`zoew-v248` ➜ `zoew-v249`)។ ⛔ ZoeKeyGen មិនប្រែ · rules មិនប្រែ ➜ គ្មាន Publish · server មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **📱 logo ពេលបើក APK** ៖ 2.45.7 ដាក់ `@mipmap/ic_launcher` (adaptive icon · ស្រទាប់ PNG) ជា icon splash ➜ Android គូរវាទំហំ 288dp ➜ PNG ពង្រីក ➜ **ព្រិល** ហើយ
+  ROM លើ tablet 11.5" **មិនបិទជ្រុង** ➜ **ការ៉េពេញ**។ ឥឡូវ icon splash ជា **vector** `drawable/splash_icon.xml` ដេរីវេពី `resources/icon.svg` (ប្រអប់ជ្រុងមូល
+  150dp ក្នុងរង្វង់សុវត្ថិភាព 192dp) ➜ ច្បាស់គ្រប់ density · រូបដដែលទាំង ROM បិទជ្រុងជារង្វង់ និងមិនបិទ។
+- **↓ Pull to refresh លើ tablet/កុំព្យូទ័រអេក្រង់ផ្តេក (≥992px)** ៖ របា Tab ផ្លាស់ទៅនៅក្រោម navbar ខណៈសញ្ញា PTR (`position: fixed` · តម្លៃកំណត់សម្រាប់ navbar
+  ទូរស័ព្ទ) ធ្លាក់ **ជាន់របា Tab** (វាស់បាន ៖ −48.8px នៅ 1280×800)។ ឥឡូវ ≥992px ៖ `top` = `--chrome-top` + `--tabbar-height` − 41px (`react-root.css`) ➜ ពេល «ready»
+  វាឈរក្រោមរបា Tab **10.2px** ស្មើទូរស័ព្ទ។ ⛔ ទូរស័ព្ទ · tablet បញ្ឈរ (<992px) មិនប្រែ។
+
+#### អ្នកយាម
+
+- `npm run android:check` ៖ icon splash = `@drawable/splash_icon` · ជា `<vector>` 288dp · **ស្មើលទ្ធផលរបស់ `android-splash-vector.mjs` លើ `icon.svg`** (logo ប្តូរ ➜
+  ធ្លាក់រហូតដល់ `npm run android:icons`) · ប្រអប់ក្នុងរង្វង់ 192dp ➜ commit មុនធ្លាក់ **៣** ➜ **៩៣/៩៣**។
+- `gesture-test` ផ្នែកថ្មី ៖ ទាញពិតរហូតដល់ «ready» លើ 412×780 · 1280×800 · 1194×834 · 800×1280 ➜ គម្លាតពីគែមក្រោមរបាខាងលើ ≥ 0 និងស្មើទូរស័ព្ទ ±2px ➜ មុនកែ
+  tablet ផ្តេក **−48.8 / −47.8** (FAIL) ➜ **១១៨/១១៨**។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy **ZoeW** (CSS PTR ក្នុងសំបក PWA) · **build APK ថ្មី** (icon splash)។ គ្មាន env ថ្មី · rules មិនប្រែ។
+- សាកលើ tablet 11.5" ៖ បើក App ➜ logo ជ្រុងមូលច្បាស់ (មិនមែនការ៉េព្រិល) · អេក្រង់ផ្តេក ➜ ទាញចុះ ➜ រង្វង់ PTR លេចក្រោមរបា «ទិន្នន័យ · ស្កេន» មិនបាំងវា
+  · អេក្រង់បញ្ឈរ និងទូរស័ព្ទ ៖ PTR ដូចមុនបេះបិទ។
+- ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើ tablet 11.5" ពិត** (APK 2.45.8) ៖ «ស្អាតអស់ហើយ» — logo ពេលបើក និង PTR អេក្រង់ផ្តេក។
+
+### [2.45.7] — 2026-09-30 · ZoeW ៖ **Deep audit ៖ «ភ្ជាប់ Server រួចរាល់» ត្រូវវាស់ពិត — ការតភ្ជាប់ «ងាប់ស្ងាត់» (WiFi គ្មានអ៊ីនធឺណិត · NAT ផុត · ភ្ញាក់ពី background) លែងជាប់បៃតងក្លែងក្លាយ ហើយភ្ជាប់វិញដោយខ្លួនឯង**
+
+**ZoeW `2.45.7`** (`zoew-v247` ➜ `zoew-v248`)។ ⛔ **ZoeKeyGen មិនប្រែ** · rules មិនប្រែ ➜ គ្មាន Publish · server (`netlify/`) មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **🔴 ការតភ្ជាប់ «ងាប់ស្ងាត់»** ៖ ពេល WiFi នៅភ្ជាប់តែ router បាត់អ៊ីនធឺណិតខាងលើ · NAT ផុតកំណត់ · ទូរស័ព្ទភ្ញាក់ពី background ដោយ socket ពាក់កណ្តាលបើក
+  ➜ App រាយ **«ភ្ជាប់ Server រួចរាល់» (បៃតង) ជាប់** ខណៈការស្កេនព្យួរ ១៥ វិ. ម្តងៗ ហើយទិន្នន័យពីឧបករណ៍ផ្សេងមិនមកដល់ — ហើយពេលអ៊ីនធឺណិតមកវិញ App
+  **មិនភ្ជាប់វិញ** (វាស់បាន ៖ ២ នាទី+ · ធាតុថ្មី ៣ លើ server មិនមកដល់ · SDK Firebase ពិត + emulator ពិត)។ មូលហេតុក្នុង SDK ៖ វាបិទការតភ្ជាប់តែលើព្រឹត្តិការណ៍
+  `offline` របស់ browser ហើយ keepalive រាល់ ៤៥ វិ. **មិនរង់ចាំចម្លើយ** ➜ `.info/connected` នៅ `true`។ ការកែ ៖ App **សួរ Server ពិត** (round trip តូចមួយ
+  លើ path ដែលគ្មាន listener) ពេល ៖ ការសរសេរ/ការស្កេនព្យួរ · ភ្ញាក់ពី background (≥ ៣០ វិ.) · រាល់ ៦០ វិ. ពេល App បើកមើល ➜ Server មិនឆ្លើយក្នុង
+  **១០ វិ.** ➜ ស្ថានភាពប្តូរទៅ «កំពុងភ្ជាប់…» ហើយ App ផ្តាច់ socket ចាស់ (ផលដូចព្រឹត្តិការណ៍ `offline`) ➜ អ៊ីនធឺណិតមកវិញ ➜ ភ្ជាប់វិញក្នុង **~០.២ វិ.**
+  ដោយមិនបាច់ Refresh។ ការតភ្ជាប់ **យឺតតែរស់** (៣ វិ./ជុំ) **មិន** ត្រូវផ្តាច់ · ការទាញទិន្នន័យដំបូង (listener នៅ pending) មិនត្រូវវាស់។
+- **🩺 ពិនិត្យសុខភាព** ៖ ជួរ Firebase សួរ Server ពិតដូចគ្នា ➜ **❌ «ភ្ជាប់តែ Server មិនឆ្លើយ»** ជំនួស ✅ ក្លែងក្លាយ។
+- សៀវភៅក្នុង App (ផ្នែក ១៥) · `ZoeW/README.md` ៖ អត្ថន័យ «ភ្ជាប់ Server រួចរាល់» ដែលវាស់ពិត។
+- **📱 Splash ពេលបើក APK លើ tablet ធំ** (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ រូបថត tablet 11.5") ៖ អេក្រង់ចាប់ផ្តើមបង្ហាញរបា **«ZoeW»** ខាងលើ ហើយ logo
+  ក្រហម **ពង្រីក/ច្របាច់** ក្នុងរបានោះ។ មូលហេតុ ៖ launch theme (`AppTheme.NoActionBarLaunch` — ដូច template Capacitor បេះបិទ) ដាក់
+  `android:background="@drawable/splash"` ដែល Android យកជា background លំនាំដើមរបស់ **គ្រប់ View** (មិនមែនតែ window) ហើយគ្មាន
+  `postSplashScreenTheme` ច្បាស់ (លំនាំដើម `?android:attr/theme`)។ ការកែ ៖ ដក `android:background` · ផ្ទៃ `@color/splash_background`
+  (`#f8fafc` ស្មើ `SplashScreen.backgroundColor`) + adaptive icon នៅកណ្តាល (ទំហំ dp ថេរ) · គ្មាន title/ActionBar · `postSplashScreenTheme` =
+  `AppTheme.NoActionBar` (theme ដែល `BridgeActivity` ប្រើ)។ ⚠️ រូបរាងថ្មី ៖ logo ក្រហមរាង **រង្វង់** (Android បិទជ្រុង icon ដូច App ផ្សេងទៀត) លើផ្ទៃស។
+
+#### អ្នកយាម
+
+- **`emu/app-network-e2e-test` (ថ្មី)** ៖ App ពិត (build វាស់ក្នុង Chromium) + **SDK Firebase ពិត** (កំណែដដែលនឹង CDN · បម្រើក្នុងស្រុក) + RTDB emulator ពិត +
+  rules ពិត + proxy TCP ដែលអាចធ្វើឲ្យ socket «ងាប់ស្ងាត់» ➜ tree មុនកែ **FAIL ៩** ➜ **២៧/២៧** · mutation ៥ លើការកែ ➜ ក្រហមទាំង ៥ (ផ្នែក ២)។
+- `health-check-test` ៖ ជួរ Firebase ពេល round trip ផុតពិដាន ➜ ❌ · ឆ្លើយ ➜ ✅ · ដាច់/ទិន្នន័យមិនទាន់មក ➜ មិនចំណាយការវាស់ · `runHealthCheck()` ប្រើការវាស់ពិត។
+- `npm run android:check` ផ្នែក ៤ខ (splash ពេលបើក) ៖ tree មុនកែ **FAIL ៦** ➜ **៩០/៩០** · ឈ្មោះ theme របស់ `BridgeActivity` ដេរីវេពីប្រភព Capacitor ដែលដំឡើង · ពណ៌ផ្ទៃដេរីវេពី `capacitor.config.ts`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy **ZoeW** (សំបក PWA ថ្មី) · **build APK ថ្មី** (ការកែនៅក្នុង bundle)។ គ្មាន env ថ្មី · rules មិនប្រែ។
+- សាកលើឧបករណ៍ពិត ៖ ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ តែគ្មានអ៊ីនធឺណិត) ➜ ក្នុង ~១ នាទី ចំណុចស្ថានភាពប្តូរពីបៃតង (ឬភ្លាមៗក្រោយស្កេនដែលព្យួរ ~២៥ វិ.)
+  ➜ ដោត cable វិញ ➜ បៃតងវិញខ្លួនឯង ហើយទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · ដាក់ App ចោលក្នុង background ពេល WiFi ប្តូរ ➜ ត្រឡប់មក ➜ មិនជាប់បៃតងក្លែងក្លាយ។
+- APK លើ tablet (ជាពិសេស 11.5") និងទូរស័ព្ទ ៖ បើក App ➜ អេក្រង់ចាប់ផ្តើមគ្មានរបា «ZoeW» · logo ក្រហមនៅកណ្តាលមួយគត់ ច្បាស់ មិនខូចរាង (ទាំងបញ្ឈរ និងផ្តេក)។
+
 ### [2.45.6] — 2026-09-30 · ZoeW ៖ **Push លើ App Android ដើរពិតប្រាកដ ៖ ចុច «បើក» លែងជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត** (✅ ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត ៖ «ដើរហើយ» · APK 2.45.6 sign ក្នុង session Claude ព្រោះកូតា Actions អស់ · server `?op=config` ➜ `web:true · fcm:true`)
 
 **ZoeW `2.45.6`** (`zoew-v246` ➜ `zoew-v247`)។ ⛔ **ZoeKeyGen មិនប្រែ** · rules មិនប្រែ ➜ គ្មាន Publish · server (`netlify/`) មិនប្រែ។
@@ -1522,6 +1585,86 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)
+
+ម្ចាស់គម្រោងស្នើ Supabase Project តែមួយ (tenant · RLS · ចុះឈ្មោះ OTP) ➜ ជំហាន ០–១ ត្រូវសាង និងផ្ទៀងផ្ទាត់ (commit `e97590a` · `d25b1ca` · `f89cb34`) រួច
+**ដកចេញវិញ** តាមការសម្រេចរបស់ម្ចាស់គម្រោង ៖ **មិនចង់បង់ប្រាក់** — Supabase Pro (backup · មិនផ្អាក) និង SMS OTP របស់ Firebase (Blaze) សុទ្ធតែគិតប្រាក់ ហើយ Project
+តែមួយធ្វើឲ្យអតិថិជនទាំងអស់ចែកកូតាឥតគិតថ្លៃតែមួយ (ខណៈ «មួយ Project ក្នុងមួយអតិថិជន» ឲ្យកូតាឥតគិតថ្លៃរៀងខ្លួន)។ ⛔ កុំស្នើផ្លូវនេះម្តងទៀតដោយមិនលើកថ្លៃមកជាមុន។
+កូដ និងអ្នកយាមនៅក្នុងប្រវត្តិ git (`git show e97590a`) បើត្រូវការយោង។
+
+### APK splash · PTR លើ tablet ផ្តេក (2026-09-30 · ZoeW 2.45.8)
+
+រកឃើញដោយ **ម្ចាស់គម្រោង** (រូបថត + វីដេអូ tablet 11.5") — មិនមែនដោយឧបករណ៍ទេ ៖ checker ទាំងអស់រត់ក្នុង Chromium ដែល (១) មិនមាន launch theme របស់ Android
+និង (២) វាស់ PTR តែទំហំទូរស័ព្ទ។
+
+**១. launch theme** ៖ template Capacitor (`styles.xml` ដូចបេះបិទ) ដាក់ `android:background="@drawable/splash"` ➜ theme attribute ជា **background លំនាំដើមរបស់
+គ្រប់ View** ➜ រូបថតទី ១ ៖ របា «ZoeW» + logo ច្របាច់ ២ ក្នុងរបា។ ការកែលើកទី ១ (2.45.7 ៖ ដក `android:background` · `postSplashScreenTheme` ច្បាស់ · icon =
+`@mipmap/ic_launcher`) ដើរតាមឯកសារ Android តែរូបថតទី ២ ៖ **ការ៉េ ព្រិល** ➜ icon splash 288dp ពង្រីកស្រទាប់ PNG របស់ adaptive icon ហើយ ROM នោះមិនបិទជ្រុង
+(ឯកសារនិយាយថា Android 12+ បិទជារង្វង់ — ROM មិនធ្វើ)។ ⛔ មេរៀន ៖ រូបរាងលើ ROM មិនអាចសន្មតពីឯកសារ ➜ រចនាឲ្យ **មិនអាស្រ័យ** លើការបិទជ្រុង ៖ vector ដែល
+មាតិកានៅក្នុងរង្វង់ 192dp។ vector ដេរីវេពី `icon.svg` ដោយ function តែមួយ (`android-splash-vector.mjs`) ដែលទាំងស្គ្រីបបង្កើត និង `android:check` ប្រើ ➜ logo មាន
+ច្បាប់ចម្លងទី ២ តែ **មិនអាចឃ្លាត** ដោយស្ងាត់។ ⛔ ការវាស់ ៖ build APK ពិត (sign · FCM) ➜ `aapt2 dump resources` បញ្ជាក់ theme ក្នុង APK · render vector (ទាំងមាន/គ្មាន
+mask 192dp) ក្នុង Chromium ➜ រូបដូចគ្នា។ ឧបករណ៍ពិតនៅតែជាការវាស់ចុងក្រោយ (📌)។
+
+**២. PTR ≥992px** ៖ វីដេអូ ➜ ស៊ុម ៦ fps តាម ffmpeg ➜ រង្វង់ PTR ឈរលើគែមក្រោមរបា Tab។ វាស់ក្នុង Chromium (iOS standalone ក្លែង · ទាញពិតរហូតដល់ class `ready`) ៖
+ទូរស័ព្ទ គម្លាត **+10.2px** ក្រោម navbar · tablet បញ្ឈរ **+10.2** · tablet ផ្តេក **−48.8** · iPad ផ្តេក **−47.8**។ ការកែ ៖ CSS តែក្នុង `@media (min-width: 992px)`
+(`react-root.css` ➜ `app.css` នៅ byte-identical នឹង vanilla) ➜ ទាំង ៤ ទំហំ **+10.2**។ ⛔ ការអះអាងជា **ទំនាក់ទំនង** (ស្មើទូរស័ព្ទ ±2px) មិនមែនលេខថេរ ➜ navbar
+ទូរស័ព្ទប្រែ ➜ អ្នកយាមធ្លាក់ មិនមែនបៃតងលើលេខចាស់។ ⛔ តំបន់ហាមចូល (ច្បាប់ ១១) ៖ ប៉ះតែ `top` របស់សញ្ញានៅ ≥992px · គ្មានការប្តូរ gesture/threshold/ចលនា។
+
+### Deep audit 2.45.7 ៖ ការតភ្ជាប់ «ងាប់ស្ងាត់» លើ SDK ពិត · parity:deep ដែលលាក់ជំហានដែលធ្លាក់ (2026-09-30 · ZoeW 2.45.7)
+
+baseline (tree មិនប៉ះ `737ca05` · emulator · `*_STRICT` · `RUNALL_JOBS=4`) ៖ **១៨៨ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ធ្លាក់ ១** (`zoew-parity` ៖ `parity:deep`
+«ជំហានខុស ៣»)។ ⛔ ជំហាន **ណា** មិនដឹង ៖ `zoew-suite-test` បោះពុម្ពតែ tail ១០ បន្ទាត់ ➜ ឃើញតែសេណារីយ៉ូចុងក្រោយ (Google Sheet · ✅ ទាំងអស់)។ ការបង្កើតឡើងវិញ
+**៥ ដង** (ម្នាក់ឯង · បន្ទុក CPU ៤ · `Emulation.setCPUThrottlingRate` ៦ ដង · ស្របជាមួយ checker browser ៣ · ស្របជាមួយ `zoew-suite` + `money-guardian` +
+`revenue-fuzz`) ➜ **៧៩/៧៩ រាល់ដង** ➜ មូលហេតុមិនទាន់ដឹង (សម្មតិកម្ម ៖ `waitForTimeout(150)` ពេលពិតថេរក្នុងជំហាន ខណៈ I/O ពិតរត់លើនាឡិកាពិត) ➜ ⛔ មិនកែ settle
+ដោយគ្មានភស្តុតាង · `zoew-suite-test` ឥឡូវបោះពុម្ព **បន្ទាត់ ❌ · `[ស្រទាប់] ភាពខុសគ្នា` · 💥 ពីគ្រប់សេណារីយ៉ូ** មុន tail ➜ ការធ្លាក់លើកក្រោយប្រាប់ជំហាន និងស្រទាប់។
+
+**១. 🔴 ការតភ្ជាប់ «ងាប់ស្ងាត់» (zombie socket)** ៖ រកឃើញដោយសួរ «checker បណ្តាញណាប្រើ SDK *ពិត*?» ➜ គ្មាន (`connection-recovery-test` ·
+`reconnect-ladder-test` · `connection-state-fuzz-test` បាញ់ `.info/connected` តាមតេស្ត) ➜ អានប្រភព SDK 12.19.0 ៖ `WebSocketConnection.resetKeepAlive()` ផ្ញើ `0`
+រាល់ ៤៥ វិ. **ដោយមិនរង់ចាំចម្លើយ** · `OnlineMonitor` បិទការតភ្ជាប់តែលើ `window` `offline` ➜ វាស់ (Node · SDK ពិត · emulator · proxy TCP ដែលឈប់បញ្ជូនដោយ
+គ្មាន FIN/RST) ៖ `.info/connected` = **`true` ១០០ វិ. ពេញ** · `get()` លើ path គ្មាន listener ➜ **ផុតពិដាន**។ លើ App ពិត (`emu/app-network-e2e-test` · tree មុនកែ) ៖
+«ភ្ជាប់ Server រួចរាល់» ជាប់ **១២០ វិ.+** ហើយក្រោយបណ្តាញមកវិញ (socket ចាស់ងាប់) **មិនភ្ជាប់វិញ** — ធាតុថ្មី ៣ លើ server មិនមកដល់ ➜ **FAIL ៩**។
+
+ការកែ ៖ `probeDatabaseLiveness()` (round trip ពិត ៖ `get()` លើ `zoew_barcode_registry/__zoew_liveness__` — អក្សរតូច ➜ មិនអាចប៉ះកូនសោ registry ដែលជាអក្សរធំ ·
+ចម្លើយណាក៏ដោយ រួម `permission_denied` = រស់ · ពិដាន ១០ វិ.) ➜ ផុត ➜ `noteDatabaseLinkUnresponsive()` ➜ `forceDatabaseReconnect()` (ផលដូច `offline` របស់ SDK ៖
+transaction ដែលផ្ញើរួចទៅផ្លូវ `disconnect` ដែល wrapper ដោះរួចហើយ) · ទ្វារ ៣ ៖ `dbOp` ព្យួរ + claim/save ការស្កេនព្យួរ · ភ្ញាក់ពី background ≥ ៣០ វិ. · វដ្ត ៦០ វិ.
+(មើលឃើញ · គ្មាន round trip ៥៥ វិ.) · ⛔ មិនវាស់ពេល listener នៅ pending (ការទាញដំបូងធំលើបណ្តាញយឺតដាក់ចម្លើយ `g` ខាងក្រោយ ➜ ការផ្តាច់ខុស ➜ ទាញឡើងវិញគ្មានទីបញ្ចប់) ·
+ផ្តាច់ ≤ ១ ដង/៣០ វិ. · 🩺 ជួរ Firebase ប្រើការវាស់ដដែល។ វាស់បាន (tree ក្រោយកែ) ៖ offline ➜ «ក្រៅបណ្ដាញ» **៤ ms** · online ➜ បៃតង **~២១០ ms** · zombie ➜ ឈប់បៃតង
+**២៥ វិ.** (ការសរសេរ ៖ ១៥ + ១០) · **១០ វិ.** (ភ្ញាក់ · វដ្ត) · បណ្តាញមកវិញ ➜ ភ្ជាប់វិញ + ទិន្នន័យថ្មី **~២០០ ms** · យឺត ៣ វិ./ជុំ ➜ រស់ (មិនផ្តាច់) · onValue សកម្ម
+**១** ក្នុងមួយ path ក្រោយការឆ្លង ៦ ដង · WebSocket រស់ **១** ➜ **២៧/២៧**។
+
+mutation លើការកែ (build វាស់ពេញ · e2e ពេញ) ៖
+
+| # | mutation | លទ្ធផល |
+|---|---|---|
+| M1 | ដកទ្វារ `dbOp` ព្យួរ | ❌ ២ (ង ៖ ជាប់បៃតង · មិនភ្ជាប់វិញ) |
+| M2 | ដកទ្វារភ្ញាក់ពី background | ❌ ២ (ច) |
+| M3 | ដកការហៅក្នុងវដ្ត ៦០ វិ. | ❌ ៣ (ជ) |
+| M4 | វាស់ ➜ មិនផ្តាច់ | ❌ ៧ (ង · ច · ជ ៖ ជាប់បៃតង · មិនភ្ជាប់វិញ · WebSocket រស់ ០) |
+| M5 | ពិដានវាស់ ១០ ➜ ២ វិ. (ទិសផ្ទុយ ៖ យឺតតែរស់) | ❌ ១ (គ ៖ ការតភ្ជាប់យឺត ៣ វិ. ត្រូវច្រឡំជា zombie) |
+
+⛔ អន្ទាក់ harness ដែលធ្វើឲ្យការរត់ដំបូង **បៃតងក្លែងក្លាយលើកូដមុនកែ** («ភ្ជាប់វិញ ✅») ៖ (១) Chromium ចរចា `permessage-deflate` ➜ frame handshake ត្រូវបង្ហាប់ ➜
+ការសរសេរ host `"h":"127.0.0.1:9000"` ឡើងវិញមិនកើត ➜ SDK ភ្ជាប់ឡើងវិញទៅ emulator **ផ្ទាល់** (ដក `Sec-WebSocket-Extensions`) · (២) ក្រោយ WebSocket បរាជ័យ
+(`previous_websocket_failure` ក្នុង `localStorage`) SDK ចាប់ផ្តើមដោយ **long-poll** (`/.lp` · JSONP) ហើយ upgrade ទៅ WebSocket តាម host ក្នុងតួ HTTP ➜ ត្រូវសរសេរ
+ឡើងវិញទាំងនោះដែរ (`Content-Length` ថ្មី) · (៣) proxy ដែលធ្វើឲ្យ socket ថ្មីក្នុងពេលដាច់ **ងាប់ជារៀងរហូត** បង្កើតការភ្ជាប់វិញ ៣៥ វិ. ក្លែងក្លាយ (Chromium ជាប់
+handshake នោះ) ➜ ពិតប្រាកដ SYN ដែលគ្មានចម្លើយត្រូវផ្ញើឡើងវិញ ហើយជោគជ័យពេលបណ្តាញមកវិញ ➜ proxy **ទប់** វា ហើយ **ដោះ** ពេល restore · (៤) វដ្ត ≥ ៦០ វិ. ត្រូវចាប់ទុក
+(`__fireIntervals`) ➜ ផ្នែកនីមួយៗវាស់តែទ្វាររបស់វា។ ⛔ ការសង្កេតដែល **បដិសេធ** ៖ long-poll ក្រោយ offline/online **មិនមែន** មកពី `forceDatabaseReconnect()`
+របស់ App (rebind វាជា no-op ➜ លំនាំដូចគ្នា ws · lp · ws · lp · បៃតងក្នុង ~២១០ ms) ➜ មិនកែ។
+
+⛔ ចន្លោះដែលនៅសល់ ៖ **ZoeKeyGen មិនទាន់មានការវាស់ភាពរស់** (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយ) ·
+ឧបករណ៍ពិត (iOS resume · WiFi គ្មានអ៊ីនធឺណិត) មិនទាន់វាស់ ➜ `CLAUDE.md` 📌។
+
+ផលប៉ះពាល់លើ checker ៖ `dbOp` ពិតឥឡូវហៅ `probeDatabaseLiveness()` ពេលព្យួរ ➜ sandbox `vm` **១២ ឯកសារ** ដែលរត់ `dbOp` ពិតដោយគ្មានវាលស្ថានភាពថ្មី ធ្លាក់
+`ReferenceError` (សញ្ញាល្អ ៖ ពួកវារត់កូដ ship ពិត) ➜ stub «មិនវាស់» (`null`) ក្នុង sandbox (ការវាស់ពិតរស់ក្នុង `emu/app-network-e2e`) · `daily-collected-test` មាន
+sandbox **២** (ទី ២ ផ្ទុក FunctionDeclaration ទាំងអស់) ➜ stub ទាំង ២ · `clock-hygiene` អនុញ្ញាត function ៤ (ត្រា local `Date.now()` ដែល `elapsedSince()` វាស់ ➜ ច្បាប់
+«មូលដ្ឋាននាឡិកា») · `state-hygiene` ទទួល `documentHiddenAt` (ត្រាពេល មិនមែនទិន្នន័យអតិថិជន)។ run-all ចុងក្រោយ (emulator · `*_STRICT` · `NETE2E_STRICT=1`) ៖
+**១៩០ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ធ្លាក់ ០** (៦១៣ វិ. · lane ៤)។
+
+**២. ការវាស់ដែល *បដិសេធ* សម្មតិកម្ម** (កុំវាស់ឡើងវិញដោយគ្មានហេតុផលថ្មី) ៖
+- XSS ៖ `ZoeW/src/**` គ្មាន `innerHTML` (ក្រៅ `audit-compat.ts` ដែលជា build វាស់) · URL ថាមវន្តតែ `tel:` · ZoeKeyGen `innerHTML` ទាំងអស់ឆ្លង `escapeHtml()`
+  (`html-sink-escaping` ចាក់សោ)។ secret ក្នុង URL ៖ `auth=` (ID token ក្នុងការអាន REST របស់ wrapper) ស្ថិតក្នុង `SECRET_PARAM_PATTERN`។
+- ឯកសារ «មិនមាននរណាយោង» ក្នុង repo (ក្រៅ manifest · ប្រវត្តិ) ៖ `.npmrc` · `push-cron.mjs` (Netlify រកតាមថត) · `tsconfig.json` (`tsc -b`) ➜ ប្រើពិតទាំង ៣។
+- `MIGRATION.md` «កូនសោ `localStorage` ទាំង ៤៦» ៖ លេខរឹងដែលគ្មានអ្នកវាស់ (ឥឡូវច្រើនជាងនោះ) ➜ យោង `npm run parity` ផ្នែក ៤ ជំនួស។
+
 ### Push លើ APK ព្យួរ ៖ plugin Capacitor ជា thenable (2026-09-30 · ZoeW 2.45.6)
 
 រកឃើញដោយ **ម្ចាស់គម្រោង** (រូបថតអេក្រង់ ៖ «⏳ កំពុងភ្ជាប់…» ជាប់ · គ្មានប្រអប់សុំសិទ្ធិ) លើ APK ដែល sign + FCM ដំបូងគេ — **មិនមែនដោយឧបករណ៍ទេ** ៖
@@ -2287,6 +2430,7 @@ Function ដែល export ៖ 978
 | `duplicate-money-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/app-writes-rules-test` | ផ្នែក ១ | — |
 | `emu/crud-rules-flow` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -2306,7 +2450,7 @@ Function ដែល export ៖ 978
 | `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `health-check-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `health-check-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `html-sink-escaping` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

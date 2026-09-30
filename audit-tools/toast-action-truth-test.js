@@ -196,6 +196,8 @@ async function runRateSessionChecks() {
                 });
                 // ⛔ ស្រទាប់ React (`fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
                 vm.runInContext(reactRuntime(APP, { exclude: names, context }), context);
+                // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+                vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
                 vm.runInContext('const DB_OP_TIMEOUT_MS = 15000;\n' + functions, context);
                 const pending = context.saveExchangeRate();
                 const timeout = [...timers.values()].find((entry) => entry.ms === 15000);

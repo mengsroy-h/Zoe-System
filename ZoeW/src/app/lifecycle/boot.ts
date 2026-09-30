@@ -16,7 +16,7 @@ import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
 import { refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
 import { scrollWindowToTop } from '../../platform/document-io';
-import { setupConnectionRecovery } from '../../services/connection';
+import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
@@ -135,6 +135,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        probeDatabaseLivenessIfIdle();
     });
     scope.listen(document, 'visibilitychange', () => {
         if (document.hidden) return;

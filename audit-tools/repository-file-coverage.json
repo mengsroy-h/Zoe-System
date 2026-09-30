@@ -668,6 +668,9 @@
     "ZoeW/android/app/src/main/res/drawable/ic_stat_notify.xml": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/res/drawable/splash_icon.xml": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/res/drawable/splash.png": {
       "policy": "guard-8",
       "sha256": "0a999fb3960abcc00bcdb0d1f9b193d32d1b50b937f0106be4f3b84bc1d47396"
@@ -760,6 +763,9 @@
     "ZoeW/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
       "policy": "guard-8",
       "sha256": "1de7117443b13f544ef6626864e00931ce8ca83ff64d2e17d05e27d44dacb091"
+    },
+    "ZoeW/android/app/src/main/res/values/colors.xml": {
+      "policy": "zoew-android"
     },
     "ZoeW/android/app/src/main/res/values/ic_launcher_background.xml": {
       "policy": "zoew-android"
@@ -903,6 +909,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/android-icons.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/android-splash-vector.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/build-audit.mjs": {
@@ -1574,6 +1583,9 @@
     "ZoeW/tests/code128-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/db-liveness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/fixtures.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1824,6 +1836,9 @@
       "policy": "guard-32"
     },
     "audit-tools/emu/app-writes-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/app-network-e2e-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/emu/restore-deadlock-test.js": {

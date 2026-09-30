@@ -159,6 +159,8 @@ function makeSandbox(state) {
     // ⛔ ZoeW ជា React ៖ `openCollectedStatsModal()` សរសេរ `uiState.collectedStatsView` ហើយ JSX (`StatsCards.tsx`) គូរ ➜
     //    ឃ្លាំងពិតចូល sandbox · `__container` គូរ component ពិតពីស្ថានភាពរបស់ sandbox រាល់ការអាន
     vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', box);
     vm.runInContext(bodies, box);
     box.__container = renderedContainer(ROOT, box, 'src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards');
     return box;
@@ -445,7 +447,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         getServerNow: () => now, getFormattedDate: () => new Date(now).toISOString().slice(0, 10),
         showToast: message => messages.push(message), refreshCurrentHistoryView() {}, closeModal() {},
         updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
-        generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })()
+        generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })(),
+        // ⛔ `dbOp` ពិតហៅវាពេលព្យួរ ➜ stub «មិនវាស់» (ការវាស់ភាពរស់ពិតរស់ក្នុង `emu/app-network-e2e-test`)
+        probeDatabaseLiveness: () => Promise.resolve(null)
     });
     return { box, server, calls, messages, read, write, sync() {
         box.scanHistory = Object.values(clone(server[HISTORY] || {}));

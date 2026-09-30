@@ -12,6 +12,7 @@ import { LICENSE_APP_CODE } from './license';
 import { lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
+import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services/connection';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
@@ -50,6 +51,17 @@ export function healthDatabaseRow() {
             + ' ផ្នែកមិនទាន់មកដល់ (' + stale.join(', ') + ')');
     }
     return healthRow('ok', 'Firebase', 'ភ្ជាប់ ហើយទិន្នន័យមកដល់គ្រប់ផ្នែក');
+}
+
+export async function healthDatabaseLiveRow() {
+    const base = healthDatabaseRow();
+    if (base.state !== 'ok') return base;
+    const alive = await probeDatabaseLiveness('health');
+    if (alive === false) {
+        return healthRow('bad', 'Firebase', 'ភ្ជាប់តែ Server មិនឆ្លើយក្នុង ' + Math.round(DB_LIVENESS_PROBE_TIMEOUT_MS / 1000)
+            + ' វិនាទី (ការតភ្ជាប់ងាប់ស្ងាត់) — កំពុងភ្ជាប់ឡើងវិញ');
+    }
+    return base;
 }
 
 export function healthClockRow() {
@@ -235,8 +247,9 @@ export async function runHealthCheck() {
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.touch();
-    const rows = [healthNetworkRow(), healthDatabaseRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
-    const [licenseRow, lookupRow] = await Promise.all([healthLicenseRow(), healthLookupRow()]);
+    const rows = [healthNetworkRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
+    const [databaseRow, licenseRow, lookupRow] = await Promise.all([healthDatabaseLiveRow(), healthLicenseRow(), healthLookupRow()]);
+    rows.splice(1, 0, databaseRow);
     rows.splice(3, 0, licenseRow);
     rows.push(lookupRow);
     if (run !== uiState.healthRunSeq || !modalIsOpen('healthCheckModal')) return;

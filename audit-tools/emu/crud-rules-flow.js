@@ -273,6 +273,8 @@ function makeSandbox(store, now) {
     ].join('\n\n');
     SANDBOX_SOURCE = assembled;
     new vm.Script(assembled).runInContext(ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     w.ctx = ctx;
     w.sync = () => {
         const h = get('zoew_scan_history_cod_dod') || {};

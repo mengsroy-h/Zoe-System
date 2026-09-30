@@ -11,6 +11,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 import { nativeFunctionRequest, resolveNativeApiUrl } from '../platform/native';
 import { refreshNotifyView } from '../features/notifications';
+import { probeDatabaseLiveness } from './connection';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -81,7 +82,12 @@ export function withTimeout(promise, ms, timeoutMsg) {
 export const DB_OP_TIMEOUT_MS = 15000;
 
 export function dbOp(promise, timeoutMsg?) {
-    return withTimeout(promise, DB_OP_TIMEOUT_MS, timeoutMsg || 'Database operation stalled');
+    const message = timeoutMsg || 'Database operation stalled';
+    const guarded = withTimeout(promise, DB_OP_TIMEOUT_MS, message);
+    guarded.catch((error) => {
+        if (error && error.message === message) probeDatabaseLiveness('stall');
+    });
+    return guarded;
 }
 
 export function dbOpStalled(error) {

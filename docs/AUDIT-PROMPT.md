@@ -13,7 +13,29 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-30 · ZoeW 2.45.6 · ZoeKeyGen 2.22.1)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-30 · ZoeW 2.45.8 · ZoeKeyGen 2.22.1)
+
+⛔ **មេរៀនជុំ 2.45.8 ៖ ឧបករណ៍ពិតឃើញអ្វីដែល Chromium មិនឃើញ — ហើយ «ការកែតាមឯកសារ» ក៏ត្រូវវាស់ដែរ** — (១) launch theme របស់ template Capacitor ដាក់
+`android:background` (background លំនាំដើមរបស់ **គ្រប់ View**) ➜ tablet បង្ហាញរបា «ZoeW» + logo ច្របាច់ · ការកែលើកទី ១ (`@mipmap/ic_launcher`) ដើរតាមឯកសារ
+Android តែ icon splash 288dp ពង្រីក PNG ➜ **ព្រិល** ហើយ ROM នោះ **មិនបិទជ្រុង** ➜ ការ៉េ ➜ ⛔ icon splash ជា vector ដេរីវេពី `icon.svg` · ប្រអប់ក្នុងរង្វង់ 192dp
+(រូបដដែលទាំង ROM បិទ/មិនបិទ)។ (២) សញ្ញា PTR (fixed · តម្លៃកំណត់សម្រាប់ navbar ទូរស័ព្ទ) ជាន់របា Tab ពេល ≥992px ➜ ⛔ ការវាស់ត្រូវជា **ទំនាក់ទំនង**
+(គម្លាតពីគែមក្រោមរបាខាងលើ ស្មើទូរស័ព្ទ ±2px) លើទំហំច្រើន (`gesture-test`) មិនមែនលេខថេរ។ លម្អិត ៖ `docs/HISTORY.md` ផ្នែក ២។
+
+## តារាងជុំមុន (2026-09-30 · ZoeW 2.45.7 · ZoeKeyGen 2.22.1)
+
+⛔ **មេរៀនជុំ 2.45.7 ៖ សញ្ញា «ភ្ជាប់រួច» របស់ *SDK* ក៏អាចកុហកដែរ · checker បណ្តាញទាំងអស់ប្រើ SDK *ក្លែង*** — `.info/connected` នៅ `true` ពេល socket
+«ងាប់ស្ងាត់» (WiFi គ្មានអ៊ីនធឺណិតខាងលើ · NAT ផុត · ភ្ញាក់ពី background) ព្រោះ SDK បិទការតភ្ជាប់តែលើ `window` `offline` ហើយ keepalive មិនរង់ចាំចម្លើយ
+(អានក្នុងប្រភព SDK ពិត ➜ វាស់ ៖ ១០០ វិ. `true` · `get()` មិនឆ្លើយ) ➜ App ជាប់បៃតងក្លែងក្លាយ ហើយ **មិនភ្ជាប់វិញ** ពេលបណ្តាញមកវិញ ខណៈ checker ១៨៨ បៃតង ៖
+`connection-recovery-test` · `reconnect-ladder-test` · `connection-state-fuzz-test` បាញ់ `.info/connected` តាមអ្វីដែលតេស្តសរសេរ ➜ ⛔ សួរ «សញ្ញាណាដែល
+fake **ផ្តល់ឲ្យ** ខណៈ dependency ពិតប្រហែលមិនផ្តល់?» ➜ `emu/app-network-e2e-test` ៖ App ពិត + SDK ពិត (route `www.gstatic.com` ➜ `node_modules/firebase`) +
+emulator + proxy TCP ដែល **ទប់ socket ថ្មី** ពេលដាច់ (SYN គ្មានចម្លើយ) និង **ងាប់ socket ចាស់ជារៀងរហូត** (NAT បាត់)។ ⛔ អន្ទាក់ harness ៖ (១) Chromium ចរចា
+`permessage-deflate` ➜ ការសរសេរ host `"h"` ឡើងវិញមើលមិនឃើញ ➜ SDK ភ្ជាប់ emulator ផ្ទាល់ (ដក header extension) · (២) ក្រោយ WebSocket បរាជ័យ SDK ចាប់ផ្តើមដោយ
+**long-poll** (`/.lp` · `previous_websocket_failure`) ➜ ត្រូវសរសេរ host ក្នុងតួ HTTP ដែរ បើមិនដូច្នេះការ upgrade រំលង proxy ➜ **blackhole គ្មានផល ហើយ FAIL/PASS
+គ្មានន័យ** (វាស់បាន ៖ ការរត់ដំបូងរាយ «ភ្ជាប់វិញ ✅» លើកូដមុនកែ) · (៣) វដ្ត ≥ ៦០ វិ. ត្រូវចាប់ទុក (`__fireIntervals`) បើមិនដូច្នេះវដ្តរកឃើញ zombie ជំនួសទ្វារដែល
+ផ្នែកនីមួយៗវាស់ ➜ mutation លើទ្វាររស់រានដោយចៃដន្យ។ ⛔ parity:deep ធ្លាក់ ៣ ជំហានក្នុង baseline ពេញ តែបង្កើតឡើងវិញមិនបាន ៥ ដង ➜ `zoew-suite-test` ឥឡូវរាយ
+**បន្ទាត់ ❌ ទាំងអស់** (មុននេះ tail ១០ បន្ទាត់លាក់ជំហានដែលធ្លាក់)។ លម្អិត ៖ `docs/HISTORY.md` ផ្នែក ២។
+
+## តារាងជុំមុន (2026-09-30 · ZoeW 2.45.6 · ZoeKeyGen 2.22.1)
 
 ⛔ **មេរៀនជុំ 2.45.6 ៖ mock ដែលចម្លង *ផ្ទៃ* តែមិនចម្លង *អត្ថន័យ*** — plugin Capacitor ជា Proxy ដែលឆ្លើយ property ណាក៏ដោយ (រួម `then`) ➜ promise
 ដែល resolve ទៅ plugin ផ្ទាល់ **មិនដែល settle** ➜ Push លើ APK ជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត ខណៈ `push-client.test.tsx` ២៩ តេស្តបៃតង (mock ជា

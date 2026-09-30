@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { splashIconVector, splashPlateGeometry, parseIconSvg, SPLASH_ICON_DP, SPLASH_SAFE_DIAMETER_DP } from './android-splash-vector.mjs';
 
 const ROOT = process.env.ANDROIDCHECK_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -140,6 +141,58 @@ for (const n of ['ic_launcher', 'ic_launcher_round']) {
 }
 ok('រូបមេ resources/icon.svg មាន', exists('resources/icon.svg'));
 ok('splash.png មិនមែន template របស់ Capacitor (កើតពីរូបមេ)', !!pngSize('android/app/src/main/res/drawable-port-xxxhdpi/splash.png'));
+
+/* ── ៤ខ. Splash ពេលបើក (launch theme) ────────────────────────────────────
+ * ⛔ `android:background` ក្នុង theme ជា background លំនាំដើមរបស់ **គ្រប់ View** (មិនមែនតែ window) ➜ អេក្រង់ចាប់ផ្តើម
+ *    គូរ splash.png ពង្រីក/ច្របាច់ក្នុងរាល់ View (រួមរបា «ZoeW») ➜ វាស់បានលើ tablet 11.5" (រូបថតម្ចាស់គម្រោង)។
+ * ⛔ `postSplashScreenTheme` លំនាំដើមរបស់ core-splashscreen គឺ `?android:attr/theme` ➜ ត្រូវចង្អុលទៅ theme ដែល
+ *    `BridgeActivity` ប្រើ (ដេរីវេពីប្រភព Capacitor ដែលដំឡើង) មិនមែនធ្លាក់ទៅ `AppTheme` ដែលមាន ActionBar។ */
+function styleItems(xml, name) {
+    const m = xml.match(new RegExp(`<style\\s+name="${name.replace(/\./g, '\\.')}"[^>]*>([\\s\\S]*?)</style>`));
+    if (!m) return null;
+    const items = new Map();
+    for (const it of m[1].matchAll(/<item\s+name="([^"]+)"\s*>\s*([^<]*?)\s*<\/item>/g)) items.set(it[1], it[2]);
+    return items;
+}
+const stylesXml = read('android/app/src/main/res/values/styles.xml');
+const manifestXml = read('android/app/src/main/AndroidManifest.xml');
+const launchTheme = ((manifestXml.match(/<activity[\s\S]*?android:theme="@style\/([^"]+)"[\s\S]*?android\.intent\.category\.LAUNCHER/) || [])[1]) || '';
+ok('Activity ចាប់ផ្តើមមាន launch theme', !!launchTheme, launchTheme || 'អវត្តមាន');
+const launch = styleItems(stylesXml, launchTheme) || new Map();
+ok(`${launchTheme} ៖ parent Theme.SplashScreen`, new RegExp(`name="${launchTheme.replace(/\./g, '\\.')}"\\s+parent="Theme\\.SplashScreen"`).test(stylesXml));
+ok(`${launchTheme} ៖ ⛔ គ្មាន android:background (វាលាតចូលគ្រប់ View)`, !launch.has('android:background'), launch.get('android:background'));
+ok(`${launchTheme} ៖ គ្មាន title (android:windowNoTitle · windowNoTitle = true)`,
+    launch.get('android:windowNoTitle') === 'true' && launch.get('windowNoTitle') === 'true',
+    [launch.get('android:windowNoTitle'), launch.get('windowNoTitle')].join(' · '));
+ok(`${launchTheme} ៖ គ្មាន ActionBar (android:windowActionBar · windowActionBar = false)`,
+    launch.get('android:windowActionBar') === 'false' && launch.get('windowActionBar') === 'false',
+    [launch.get('android:windowActionBar'), launch.get('windowActionBar')].join(' · '));
+const bridgeSrc = read('node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/BridgeActivity.java');
+const bridgeTheme = ((bridgeSrc.match(/setTheme\(R\.style\.(\w+)\)/) || [])[1] || '').replace(/_/g, '.');
+ok('ជាន់អប្បបរមា ៖ theme ដែល BridgeActivity ប្រើ (ពីប្រភព Capacitor)', !!bridgeTheme && !!styleItems(stylesXml, bridgeTheme), bridgeTheme || 'អវត្តមាន');
+ok(`${launchTheme} ៖ postSplashScreenTheme = @style/${bridgeTheme}`, launch.get('postSplashScreenTheme') === `@style/${bridgeTheme}`, launch.get('postSplashScreenTheme'));
+const capSplashBg = ((read('capacitor.config.ts').match(/SplashScreen:\s*\{[\s\S]*?backgroundColor:\s*'([^']+)'/) || [])[1] || '').toLowerCase();
+const bgRef = launch.get('windowSplashScreenBackground') || '';
+const bgName = (bgRef.match(/^@color\/(\w+)$/) || [])[1];
+const colorsXml = fs.existsSync(path.join(ROOT, 'android/app/src/main/res/values')) ?
+    fs.readdirSync(path.join(ROOT, 'android/app/src/main/res/values')).map((f) => read(`android/app/src/main/res/values/${f}`)).join('\n') : '';
+const bgValue = bgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${bgName}"\\s*>\\s*([^<\\s]+)\\s*</color>`)) || [])[1]) || '').toLowerCase() : '';
+ok(`${launchTheme} ៖ windowSplashScreenBackground ស្មើ SplashScreen.backgroundColor (${capSplashBg || '?'})`,
+    !!capSplashBg && bgValue === capSplashBg, bgRef + ' = ' + (bgValue || 'អវត្តមាន'));
+const iconRef = launch.get('windowSplashScreenAnimatedIcon') || '';
+ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @drawable/splash_icon (vector · មិនមែន PNG/mipmap ដែលព្រិលពេលពង្រីក ឬ sym_def_app_icon លំនាំដើម)`,
+    iconRef === '@drawable/splash_icon', iconRef || 'អវត្តមាន');
+const splashXml = read('android/app/src/main/res/drawable/splash_icon.xml');
+const iconSvg = read('resources/icon.svg');
+let splashWant;
+let splashGeo = null;
+try { splashWant = splashIconVector(iconSvg); splashGeo = splashPlateGeometry(parseIconSvg(iconSvg)); } catch (e) { splashWant = 'ERROR ' + e.message; }
+ok('splash_icon.xml ជា <vector> ទំហំ ' + SPLASH_ICON_DP + 'dp', /^<\?xml[^>]*>\s*<vector\b/.test(splashXml) &&
+    splashXml.includes(`android:width="${SPLASH_ICON_DP}dp"`) && splashXml.includes(`android:height="${SPLASH_ICON_DP}dp"`));
+ok('splash_icon.xml ដេរីវេពី resources/icon.svg (logo ប្តូរ ➜ `npm run android:icons`)', !!splashXml && splashXml === splashWant,
+    splashXml ? (splashWant.startsWith('ERROR') ? splashWant : 'ខុសពីលទ្ធផលរបស់ android-splash-vector.mjs') : 'អវត្តមាន');
+ok(`ប្រអប់ splash ស្ថិតក្នុងរង្វង់សុវត្ថិភាព ${SPLASH_SAFE_DIAMETER_DP}dp (ROM បិទជ្រុង ឬមិនបិទ ➜ រូបដដែល)`,
+    !!splashGeo && splashGeo.reach <= SPLASH_SAFE_DIAMETER_DP / 2, splashGeo ? splashGeo.reach.toFixed(1) + 'dp ពីកណ្តាល' : 'វាស់មិនបាន');
 
 /* ── ៥. Plugin ────────────────────────────────────────────────────────── */
 const pkg = JSON.parse(read('package.json') || '{}');

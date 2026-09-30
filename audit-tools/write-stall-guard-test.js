@@ -161,6 +161,8 @@ globalThis.__clearStale = clearStaleRestoreMarkers;
 globalThis.__notifyIfSlow = notifyIfSlow;
 `;
     vm.runInContext(code, ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
 
     const hang = () => new Promise(() => {});
     const later = [];

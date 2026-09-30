@@ -225,6 +225,8 @@ function makeRun(opts) {
         parts.push(body);
     });
     vm.runInContext(parts.join('\n\n'), ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     return { ctx, box, server, storage, toasts, timers, writeCount: () => writes };
 }
 

@@ -39,6 +39,36 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.45.6] — 2026-09-30 · ZoeW ៖ **Push លើ App Android ដើរពិតប្រាកដ ៖ ចុច «បើក» លែងជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត** (✅ ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត ៖ «ដើរហើយ» · APK 2.45.6 sign ក្នុង session Claude ព្រោះកូតា Actions អស់ · server `?op=config` ➜ `web:true · fcm:true`)
+
+**ZoeW `2.45.6`** (`zoew-v246` ➜ `zoew-v247`)។ ⛔ **ZoeKeyGen មិនប្រែ** · rules មិនប្រែ ➜ គ្មាន Publish · server (`netlify/`) មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **🔴 App Android ៖ Push មិនដែលដើរតាំងពី 2.45.0** ៖ ចុច «🔔 បើកការជូនដំណឹង» ➜ «⏳ កំពុងភ្ជាប់…» ជាប់ជារៀងរហូត · **គ្មានប្រអប់សុំសិទ្ធិ** (វាស់បានលើ
+  ទូរស័ព្ទពិតរបស់ម្ចាស់គម្រោង ជាមួយ APK 2.45.5 ដែល sign + FCM ដំបូងគេ)។ មូលហេតុ ៖ `loadNativePush()` resolve promise ទៅ plugin របស់ Capacitor **ផ្ទាល់** —
+  plugin ជា Proxy ដែលឆ្លើយ property ណាក៏ដោយ រួម `then` ➜ promise ហៅ `plugin.then(resolve, reject)` ➜ Capacitor បដិសេធ «`then()` is not implemented on
+  android» ដោយមិនហៅ callback ណាមួយ ➜ promise **មិនដែល settle** ➜ watchdog (ដែល arm ក្រោយ `register()`) មិនដែលដល់។ ផ្លូវ APK ទាំងអស់ (បើក · បិទ · 🧹
+  សម្អាតការជូនដំណឹងលើរបា · resync · listener ពេល boot) ព្យួរដូចគ្នា។ ការកែ ៖ ផ្ទុក plugin ក្នុងសំបក `{ PN }` (មិនមែន thenable)។
+- ជំហានមុន `register()` ដែល **មិនសួរអ្នកប្រើ** (ផ្ទុក plugin · `checkPermissions` · `createChannel` · listener) និង `unregister()` ពេលបិទ ឥឡូវមានពិដាន
+  `PUSH_TIMEOUT_MS` (ច្បាប់ «`busy` ជាសោ ➜ គ្រប់ការរង់ចាំមានពិដាន») ➜ ព្យួរ ➜ «បើកមិនបាន» ហើយចុចម្តងទៀតបាន។ ប្រអប់សុំសិទ្ធិ (អ្នកប្រើកំពុងសម្រេច)
+  គ្មានពិដានដោយចេតនា ដូច `Notification.requestPermission()` លើ web។
+- web/PWA ៖ ផ្លូវ Push មិនប្រែ (មិនប្រើ plugin Capacitor)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/push-client.test.tsx` ៖ mock plugin ជា **Proxy ដូច Capacitor ពិត** (property ណាក៏ដោយ រួម `then` ➜ method) ជំនួស object ធម្មតា + តេស្ត
+  «Capacitor ពិតជា thenable» (`registerPlugin` ពី `@capacitor/core` ដែលដំឡើង) ចងការស្មោះនោះ · សេណារីយ៉ូថ្មី ២ (plugin thenable ➜ បើក/បិទ/សម្អាត settle ·
+  ជំហានមុន `register()` ព្យួរ ៣ ករណី ➜ `error` ក្នុងពិដាន ➜ ចុចម្តងទៀត ➜ `on`)។ កូដមុនកែ **FAIL ១២** (តេស្ត APK ទាំងអស់) ➜ **៣២/៣២** · mutation «ដកពិដាន
+  `checkPermissions`» ➜ FAIL ១។
+- ការបង្កើតឡើងវិញដោយ `@capacitor/core` 8.5.2 ពិតក្នុង Node (bridge Android ក្លែង) ៖ `.then((m) => m.PushNotifications)` ➜ **ព្យួរ** · `.then((m) => ({ PN: … }))` ➜ settle។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **build APK ថ្មី** (2.45.6 · keystore ដដែល · `google-services.json`) ➜ ដំឡើងជាន់ ➜ 🔔 ➜ «🔔 បើកការជូនដំណឹង» ➜ Allow ➜ «✅ បើករួច» ➜ ផ្ញើដំណឹងពី
+  ZoeKeyGen ➜ ទូរស័ព្ទលោតក្នុង ~៥ នាទី។
+- Deploy ZoeW (សារ «កំណែ App» · សំបក PWA)។ គ្មាន env ថ្មី · rules មិនប្រែ។
+
 ### [2.45.5] — 2026-09-30 · ZoeW · ZoeKeyGen `2.22.1` ៖ **Deep audit ៖ ភ្ជាប់ Server វិញដោយខ្លួនឯង ក្រោយបណ្តាញ «ភ្ជាប់តែស្លាប់» · App Android ដឹងពេលអ៊ីនធឺណិតដាច់/មកវិញ · បិទ Push លើ APK ឈប់ទទួលពិត · parity ធៀប ZoeW ដើមរស់ឡើងវិញ**
 
 **ZoeW `2.45.5`** (`zoew-v245` ➜ `zoew-v246`) · **ZoeKeyGen `2.22.1`** (`zoekeygen-v108` ➜ `zoekeygen-v109`)។ ⛔ rules មិនប្រែ ➜ គ្មាន Publish។
@@ -1491,6 +1521,23 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### Push លើ APK ព្យួរ ៖ plugin Capacitor ជា thenable (2026-09-30 · ZoeW 2.45.6)
+
+រកឃើញដោយ **ម្ចាស់គម្រោង** (រូបថតអេក្រង់ ៖ «⏳ កំពុងភ្ជាប់…» ជាប់ · គ្មានប្រអប់សុំសិទ្ធិ) លើ APK ដែល sign + FCM ដំបូងគេ — **មិនមែនដោយឧបករណ៍ទេ** ៖
+`push-client.test.tsx` មាន ២៩ តេស្តបៃតង រួមទាំង «watchdog ➜ `error` ក្នុងពិដាន» ព្រោះ mock ជា **object ធម្មតា** (`then` = `undefined`) ➜ ថ្នាក់ «stub ដែល
+ទទួលយកគ្រប់យ៉ាង» (ការព្រមាន ២ ក្នុង `CLAUDE.md`) លើស្នាមភ្ជាប់ App ↔ Capacitor។ ⛔ មូលហេតុដែលវារស់រាន ៖ ផ្លូវ APK មិនដែលរត់លើឧបករណ៍ពិតមុន (workflow
+`Android APK` មិនដែលបង្កើត Release ➜ APK ដែលមាន FCM មិនដែលមាន) ហើយ vitest · `native:check` មិនប្រើ `@capacitor/core` ពិត។
+
+⛔ មេរៀន ៖ **mock ត្រូវចម្លង *អត្ថន័យ* របស់ dependency ពិត មិនមែនត្រឹម *ផ្ទៃ* (ឈ្មោះ method) ទេ** — Proxy ដែលឆ្លើយ property ណាក៏ដោយ ជាលក្ខណៈ
+ពិសេសរបស់ plugin Capacitor ហើយ mock ដែលខ្វះវា បាំងថ្នាក់ «resolve ទៅ plugin» ទាំងមូល ➜ តេស្ត «Capacitor ពិតជា thenable» ចងការស្មោះនោះទៅកំណែ
+`@capacitor/core` ដែលដំឡើង។ ⛔ plugin ផ្សេងទៀត (`haptics` · `share` · `filesystem` · `printer` · `app` · `native-biometric`) បំបែកពី module namespace ឬ
+static import ➜ មិនដែល resolve ទៅ plugin ➜ មិនរងផល (ពិនិត្យលើ `import('@capacitor/…'|'@capgo/…')` ទាំងអស់ក្នុង `src/**`)។ ⛔ ជាន់ទី ២ ៖ ការព្យួរណាមួយ
+**មុន** watchdog បង្កើត «`busy` ជារៀងរហូត» (សោ) ➜ ពិដានលើជំហានដែលមិនសួរអ្នកប្រើ។
+
+⛔ ចំហៀង ៖ ការ build APK (Gradle) ក្នុងម៉ាស៊ីនដដែល ធ្វើឲ្យ `npm run lint` ក្នុង `zoew-suite` ធ្លាក់ ព្រោះ ESLint ស្កេន output ក្រោម
+`android/app/build/` (`native-bridge.js` · ២៩ ឯកសារ) ➜ `eslint.config.mjs` មិនស្កេន `android` (git មិនតាមដាន JS/TS នៅទីនោះទេ · ឯកសារដែលស្កេន ៣០៨ ➜ ២៧៩ =
+ត្រឹម `android/` ២៩ · `src/` និង `tests/` ដដែល)។ run-all លើកដំបូង ៖ **១៨៨ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ធ្លាក់ ១** (`zoew-suite` ៖ lint តែប៉ុណ្ណោះ)។
 
 ### Deep audit 2.45.5 ៖ `navigator.onLine` ដែលកុហក · អ្នកយាម parity ដែលគ្មាននរណារត់ (2026-09-30 · ZoeW 2.45.5 · ZoeKeyGen 2.22.1)
 

@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { splashIconVector, splashPlateGeometry, parseIconSvg, SPLASH_ICON_DP, SPLASH_SAFE_DIAMETER_DP } from './android-splash-vector.mjs';
 
 const ROOT = process.env.ANDROIDCHECK_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fails = [];
@@ -179,8 +180,19 @@ const bgValue = bgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${bgName
 ok(`${launchTheme} ៖ windowSplashScreenBackground ស្មើ SplashScreen.backgroundColor (${capSplashBg || '?'})`,
     !!capSplashBg && bgValue === capSplashBg, bgRef + ' = ' + (bgValue || 'អវត្តមាន'));
 const iconRef = launch.get('windowSplashScreenAnimatedIcon') || '';
-const iconOk = /^@mipmap\/ic_launcher$/.test(iconRef) && exists('android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml');
-ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @mipmap/ic_launcher (adaptive · មិនមែន sym_def_app_icon លំនាំដើម)`, iconOk, iconRef || 'អវត្តមាន');
+ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @drawable/splash_icon (vector · មិនមែន PNG/mipmap ដែលព្រិលពេលពង្រីក ឬ sym_def_app_icon លំនាំដើម)`,
+    iconRef === '@drawable/splash_icon', iconRef || 'អវត្តមាន');
+const splashXml = read('android/app/src/main/res/drawable/splash_icon.xml');
+const iconSvg = read('resources/icon.svg');
+let splashWant = '';
+let splashGeo = null;
+try { splashWant = splashIconVector(iconSvg); splashGeo = splashPlateGeometry(parseIconSvg(iconSvg)); } catch (e) { splashWant = 'ERROR ' + e.message; }
+ok('splash_icon.xml ជា <vector> ទំហំ ' + SPLASH_ICON_DP + 'dp', /^<\?xml[^>]*>\s*<vector\b/.test(splashXml) &&
+    splashXml.includes(`android:width="${SPLASH_ICON_DP}dp"`) && splashXml.includes(`android:height="${SPLASH_ICON_DP}dp"`));
+ok('splash_icon.xml ដេរីវេពី resources/icon.svg (logo ប្តូរ ➜ `npm run android:icons`)', !!splashXml && splashXml === splashWant,
+    splashXml ? (splashWant.startsWith('ERROR') ? splashWant : 'ខុសពីលទ្ធផលរបស់ android-splash-vector.mjs') : 'អវត្តមាន');
+ok(`ប្រអប់ splash ស្ថិតក្នុងរង្វង់សុវត្ថិភាព ${SPLASH_SAFE_DIAMETER_DP}dp (ROM បិទជ្រុង ឬមិនបិទ ➜ រូបដដែល)`,
+    !!splashGeo && splashGeo.reach <= SPLASH_SAFE_DIAMETER_DP / 2, splashGeo ? splashGeo.reach.toFixed(1) + 'dp ពីកណ្តាល' : 'វាស់មិនបាន');
 
 /* ── ៥. Plugin ────────────────────────────────────────────────────────── */
 const pkg = JSON.parse(read('package.json') || '{}');

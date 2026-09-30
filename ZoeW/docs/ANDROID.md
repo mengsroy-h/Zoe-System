@@ -144,8 +144,8 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 - **Themed icon** (Android 13+) ៖ ស្រមោលគូបពណ៌តែមួយ (បន្ទាត់កណ្តាលកាត់ចេញ)
 - **Legacy** (Android 7) ៖ PNG រាងប្រអប់មូល និងរង្វង់
 - **Splash ពេលបើក** (`AppTheme.NoActionBarLaunch` ក្នុង `values/styles.xml`) ៖ ផ្ទៃ `@color/splash_background` (ស្មើ
-  `SplashScreen.backgroundColor` ក្នុង `capacitor.config.ts`) + adaptive icon នៅកណ្តាល (ទំហំ dp ថេរ ➜ ច្បាស់ និងមិនខូចរាងលើ
-  tablet ធំ) · គ្មាន title/ActionBar · `postSplashScreenTheme` = `AppTheme.NoActionBar`។ ⛔ កុំដាក់ `android:background` ក្នុង
+  `SplashScreen.backgroundColor` ក្នុង `capacitor.config.ts`) + icon vector `drawable/splash_icon.xml` (ដេរីវេពីរូបមេ ដោយ
+  `npm run android:icons` · ប្រអប់ជ្រុងមូលក្នុងរង្វង់ 192dp ➜ ច្បាស់គ្រប់ទំហំ ទោះ ROM បិទជ្រុងឬអត់) · គ្មាន title/ActionBar · `postSplashScreenTheme` = `AppTheme.NoActionBar`។ ⛔ កុំដាក់ `android:background` ក្នុង
   theme នោះវិញ (វាក្លាយជា background លំនាំដើមរបស់ **គ្រប់ View** ➜ splash.png ពង្រីក/ច្របាច់ក្នុងរាល់ View)។ `splash.png`
   នៅសម្រាប់ផ្លូវបម្រុងរបស់ plugin តែប៉ុណ្ណោះ។ `npm run android:check` ចាក់សោទាំងនេះ
 

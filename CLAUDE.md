@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.7` (`zoew-v248`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.8` (`zoew-v249`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.22.1` (`zoekeygen-v109`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -128,7 +128,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
 > `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo · **ល្បឿនអេក្រង់** (`MainActivity` ស្នើ mode Hz ខ្ពស់បំផុតក្នុងទំហំដដែល ⛔ កុំដកចេញ — ROM ជាច្រើនកំណត់ App ត្រឹម 60Hz ខណៈ Chrome 120Hz) ·
-> splash ពេលបើក (launch theme ៖ ⛔ គ្មាន `android:background` — វាលាតចូលគ្រប់ View ➜ logo ពង្រីក/ច្របាច់លើ tablet · គ្មាន title/ActionBar · `postSplashScreenTheme` = theme របស់ `BridgeActivity`) ·
+> splash ពេលបើក (launch theme ៖ ⛔ គ្មាន `android:background` — វាលាតចូលគ្រប់ View ➜ logo ពង្រីក/ច្របាច់លើ tablet · គ្មាន title/ActionBar · `postSplashScreenTheme` = theme របស់ `BridgeActivity` ·
+> icon = vector `drawable/splash_icon.xml` ដេរីវេពី `icon.svg` ក្នុងរង្វង់ 192dp ⛔ មិនមែន `@mipmap` — PNG ពង្រីក 288dp ➜ ព្រិល · ROM ខ្លះមិនបិទជ្រុង ➜ ការ៉េ) ·
 > plugin · ⛔ សិទ្ធិ `ACCESS_NETWORK_STATE` (បើអត់ WebView ឲ្យ `navigator.onLine` = `true` ជានិច្ច ហើយ `online`/`offline` មិនបាញ់) · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
 > ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
 > ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·
@@ -1049,6 +1050,8 @@ Android)។ **បរិស្ថាន audit ជា Chromium — `env(safe-area-
   បិទទាំងស្រុង** ៖ គ្មាន indicator, `preventDefault`, reload។ Safari កំណត់
   cancelability មុន `touchstart` ចប់ ➜ non-passive listener ត្រូវត្រៀមជាមុន
   នៅ state ធម្មតា ហើយដកចេញតាម `MutationObserver`; **កុំដំឡើងវាក្រោយ touchstart**។
+- ⛔ **≥992px (tablet/កុំព្យូទ័រផ្តេក) របា Tab ឈរក្រោម navbar** ➜ `.ptr-indicator` ទទួល `top: calc(var(--chrome-top) + var(--tabbar-height) - 41px)` (`react-root.css` តែក្នុង
+  media នោះ) ➜ ពេល `ready` គម្លាតពីគែមក្រោមរបាខាងលើ **ស្មើទូរស័ព្ទ ±2px** (`gesture-test` ៖ 412 · 1280×800 · 1194×834 · 800×1280)។ ⛔ ទូរស័ព្ទ <992px មិនប៉ះ។
 - `iosTouchArbiter` ប្រើ `Touch.identifier` ៖ 0–30px គ្មាន action; ~56–212px
   spring back; ~213px+ refresh។ ម្រាមដៃទី ២ ➜ cancel ទាំងពីរ។ Panel swipe
   ត្រូវទាមទារ vertical-axis ratio 1.6 ដូច PTR។
@@ -2253,6 +2256,7 @@ bash audit-tools/emu/rules.sh
 - ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
   ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
   (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
+- ⏳ **2.45.8 (ZoeW) ៖ tablet 11.5"** — logo ពេលបើក APK ជ្រុងមូលច្បាស់ (មិនមែនការ៉េព្រិល) · អេក្រង់ផ្តេក ៖ PTR លេចក្រោមរបា Tab មិនបាំងវា · បញ្ឈរ/ទូរស័ព្ទ ៖ PTR ដូចមុន។
 - ⏳ **2.45.7 (ZoeW) ៖ Deploy + build APK ថ្មី ហើយសាកការតភ្ជាប់ «ងាប់ស្ងាត់» លើឧបករណ៍ពិត** — ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ) ➜ ក្នុង ~១ នាទី
   ចំណុចស្ថានភាពឈប់បៃតង (ឬ ~២៥ វិ. ក្រោយស្កេនដែលព្យួរ) ➜ ដោតវិញ ➜ បៃតងវិញខ្លួនឯង + ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · 🩺 ជួរ Firebase ❌ ពេល Server មិនឆ្លើយ។
   ⛔ ZoeKeyGen **មិនទាន់មាន** ការវាស់ភាពរស់នេះ (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយដូចគ្នា)។

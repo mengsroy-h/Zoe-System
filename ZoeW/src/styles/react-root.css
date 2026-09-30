@@ -197,3 +197,7 @@
 .trash-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }
 .zto-sync-more { text-align: center; padding: 8px 0; }
 .zto-sync-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }
+
+@media (min-width: 992px) {
+    .ptr-indicator { top: calc(var(--chrome-top, 65px) + var(--tabbar-height, 45px) - 41px); }
+}

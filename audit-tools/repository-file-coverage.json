@@ -668,6 +668,9 @@
     "ZoeW/android/app/src/main/res/drawable/ic_stat_notify.xml": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/res/drawable/splash_icon.xml": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/res/drawable/splash.png": {
       "policy": "guard-8",
       "sha256": "0a999fb3960abcc00bcdb0d1f9b193d32d1b50b937f0106be4f3b84bc1d47396"
@@ -906,6 +909,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/android-icons.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/android-splash-vector.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/build-audit.mjs": {

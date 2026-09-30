@@ -8,6 +8,7 @@
  * ⛔ Adaptive icon (Android 8+) ៖ ផ្ទៃក្រោយ = gradient ក្រហម (vector) ·
  *    ផ្ទៃមុខ = គូបតែឯង ក្នុងតំបន់សុវត្ថិភាព 66dp · themed icon (Android 13+) =
  *    ស្រមោលគូបពណ៌តែមួយ។ Android 7 (API 24–25) ប្រើ PNG legacy ។
+ * ⛔ Icon ពេលបើក (splash) = vector `drawable/splash_icon.xml` (`android-splash-vector.mjs`) — មិនមែន PNG។
  * ⛔ ត្រូវការ Chromium ៖ `CHROMIUM_PATH` · `/opt/pw-browsers/chromium` ·
  *    ឬ Chrome/Edge ដែលដំឡើងរួច (Windows)។
  */
@@ -15,6 +16,7 @@ import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { splashIconVector } from './android-splash-vector.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RES = path.join(ROOT, 'android/app/src/main/res');
@@ -122,5 +124,7 @@ for (const [density, scale] of Object.entries(DENSITIES)) {
 for (const [dir, [w, h]] of Object.entries(SPLASH)) {
     written.push(write(`${dir}/splash.png`, await render('splash', w, h)));
 }
+fs.writeFileSync(path.join(RES, 'drawable/splash_icon.xml'), splashIconVector(svg));
+written.push('drawable/splash_icon.xml');
 await browser.close();
 console.log(`✅ បង្កើតរូប ${written.length} ក្នុង android/app/src/main/res`);

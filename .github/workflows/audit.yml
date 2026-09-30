@@ -182,10 +182,15 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
+      # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-functions ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL
+      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
+        run: npm ci --prefix supabase --no-audit --no-fund
+
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: run-all.sh
         env:
           VERSIONSCOPE_STRICT: '1'
+          SUPABASE_STRICT: '1'
         run: bash audit-tools/run-all.sh

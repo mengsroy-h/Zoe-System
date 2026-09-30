@@ -697,6 +697,12 @@ section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # វាកាន់តែសំខាន់ជាងមុន។ ខាង client ចាក់សោដោយ `sheet-import-test.js`។
 run "zto-import/test.js" node zto-import/test.js
 
+section "== Supabase (Project តែមួយ ៖ tenant · RLS · Edge Functions) =="
+# ⛔ Postgres ពិត (major ពី supabase/config.toml) + supabase-js ពិត ➜ `npm ci --prefix supabase`
+#    គ្មាន dependency ➜ SKIP/PARTIAL · `SUPABASE_STRICT=1` ➜ FAIL (ដូច emu/*)
+run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
+run "supabase-functions" node audit-tools/supabase-functions-test.js
+
 section "== ទម្លាប់គម្រោង =="
 run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
 run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));"
@@ -866,6 +872,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
     APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
     NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
+    SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

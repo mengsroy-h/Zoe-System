@@ -501,6 +501,32 @@
       ],
       "evidence": "rules-duplicate-keys អនុវត្ត objectShapeNodes/requiresObject លើ rules ពិតទាំង ២ (rules របស់ main ➜ ធ្លាក់ Business ១៥ · License ៤) ហើយ emu checker ទាំង ២ រត់ probeObjectShapes ពិតលើ RTDB emulator (control ទៅដល់គ្រប់ node · rules ពិតបដិសេធ primitive)",
       "limitation": "វាស់តែការសរសេររបស់អ្នកប្រើ login/admin។ Firebase Console ដោយម្ចាស់ Project រំលង rules ➜ ការរំលង record ខូចក្នុង App នៅតែចាំបាច់។"
+    },
+    "supabase-db": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "supabase-rls-test អនុវត្ត migration ពិតលើ Postgres ពិត (major ពី config.toml) ក្រោយ shim role/grant ចម្លងពី supabase/postgres · supabase/auth ➜ ធ្វើត្រាប់ PostgREST (anon · authenticated · service_role + request.jwt.claims) ២ របៀប grant លំនាំដើម ➜ RLS · EXECUTE · ឆ្លង tenant · claim ក្លែង · កូដអញ្ជើញ · ការប្រណាំង · mutation លើ migration ត្រូវក្រហម។",
+      "limitation": "shim មិនមែន Supabase ពេញ (គ្មាន GoTrue · PostgREST · Realtime ពិត) ➜ ការដំឡើងលើ Project ពិតនៅតែត្រូវសាកដោយដៃ។"
+    },
+    "supabase-functions": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/supabase-functions-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "supabase-functions-test ផ្ទុក module TS ពិត (Node type stripping) ➜ token Firebase ដោយសោ RSA ពិត · លំហូរចុះឈ្មោះ/កំណត់ថ្មី · HTTP/CORS · adapter ដោយ supabase-js ពិតទល់នឹងម៉ាស៊ីនមេក្លែង (argument RPC ស្មើ SQL ពិត) · mutation លើ TS ត្រូវក្រហម · supabase-rls-test ប្រៀប hash កូដអញ្ជើញ TS ↔ SQL។",
+      "limitation": "Deno runtime និង Supabase Edge gateway មិនបានរត់នៅទីនេះ ➜ index.ts វាស់តាម tsc + wiring ស្តាទិច។"
+    },
+    "supabase-config": {
+      "category": "static",
+      "guards": [
+        "audit-tools/supabase-functions-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "អ្នកយាមអាន config.toml (major_version · [functions.*] verify_jwt · auth signup/confirmations) · package.json (កំណែ supabase-js pin ស្មើ npm: specifier) · tsconfig/types តាម tsc strict ពិត។",
+      "limitation": "config.toml ប៉ះតែ CLI ក្នុងស្រុក ➜ ការកំណត់ Auth លើ Dashboard ពិតត្រូវធ្វើដោយដៃ (README)។"
     }
   },
   "files": {
@@ -2404,6 +2430,82 @@
     },
     "zto-import/test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/supabase-functions-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-rls-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-shim/00-initial-schema.sql": {
+      "policy": "supabase-db"
+    },
+    "audit-tools/supabase-shim/01-auth-schema.sql": {
+      "policy": "supabase-db"
+    },
+    "audit-tools/supabase-shim/02-auth-functions.sql": {
+      "policy": "supabase-db"
+    },
+    "audit-tools/supabase-shim/03-demote-postgres.sql": {
+      "policy": "supabase-db"
+    },
+    "audit-tools/supabase-shim/04-auth-sessions.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/README.md": {
+      "policy": "guard-13"
+    },
+    "supabase/config.toml": {
+      "policy": "supabase-config"
+    },
+    "supabase/functions/_shared/account-core.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/_shared/admin-deps.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/_shared/firebase-phone-token.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/_shared/http.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/_shared/invite-code.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/_shared/timeout.ts": {
+      "policy": "supabase-functions"
+    },
+    "supabase/functions/register/index.ts": {
+      "policy": "supabase-config"
+    },
+    "supabase/functions/reset-password/index.ts": {
+      "policy": "supabase-config"
+    },
+    "supabase/migrations/20260930120000_zoe_tenancy.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/package-lock.json": {
+      "policy": "supabase-config"
+    },
+    "supabase/package.json": {
+      "policy": "supabase-config"
+    },
+    "supabase/tsconfig.json": {
+      "policy": "supabase-config"
+    },
+    "supabase/types/deno.d.ts": {
+      "policy": "supabase-config"
+    },
+    "LICENSES/PostgreSQL-supabase-postgres.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "fd313c784c2e3c964fe043fdb7bcffa8f84627d53d2cf3a61c61586ff6c3f4c1"
+    },
+    "LICENSES/MIT-supabase-auth.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "68c80ef00664ea62a2c6f38c0ef044497caacc6648a8bd92eec7fdb81e01f904"
     }
   }
 }

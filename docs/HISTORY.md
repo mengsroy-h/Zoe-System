@@ -1585,6 +1585,42 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### Supabase ផ្លូវ ខ ៖ ជំហាន ០–១ — tenant · RLS · Edge Function ចុះឈ្មោះ OTP (2026-09-30 · មិនប៉ះ ZoeW/ZoeKeyGen ➜ គ្មានការឡើងកំណែ)
+
+សំណើម្ចាស់គម្រោង ៖ Supabase Project **តែមួយ** ជំនួស «Firebase Project មួយក្នុងមួយអតិថិជន» · OTP តាម Firebase Phone Auth · Login ដោយ username/password ·
+កូដអញ្ជើញចងលេខសាខា · config dynamic · «ផ្ទៀងផ្ទាត់ឲ្យបានច្រើនដង» · «ពិនិត្យសុវត្ថិភាព ក្រែងលេចធ្លាយ» · «យក Supabase ជំនាន់ចុងក្រោយ»។ ⛔ ZoeW/ZoeKeyGen
+**មិនទាន់ប្រើ** ថត `supabase/` ទេ ➜ `version-bump-scope` ៖ គ្មានការឡើងកំណែ។
+
+**ជំនាន់ដែលវាស់** ៖ `@supabase/supabase-js` **2.117.2** (npm ចុងក្រោយ) · CLI npm **2.118.0** (deploy តាម `npx supabase@latest` ៖ postinstall ទាញ binary ពី GitHub
+release ដែល proxy នៅទីនេះបិទ) · Postgres **17** (`supabase/postgres` `ansible/vars.yml` ៖ `postgres17: 17.11.0.002`) ➜ អ្នកយាមរត់ **PostgreSQL 17.10** ពិតពី npm
+`@embedded-postgres/linux-x64` (Docker daemon គ្មាន · apt មានត្រឹម 16)។
+
+**អ្នកយាមមុនកូដ (ឧបករណ៍ជាការចងចាំ)** ៖
+- `supabase-rls-test` ៖ role · schema `auth` · default privileges **ចម្លងបេះបិទ** ពី `supabase/postgres` init-scripts + migration demote-postgres (ផ្ទៀងលើប្រភព ៖
+  `postgres` = `NOSUPERUSER … BYPASSRLS` · សមាជិក `anon/authenticated/service_role/supabase_auth_admin`) និង `auth.uid()/jwt()` + `auth.sessions` ពី `supabase/auth`
+  ➜ ធ្វើត្រាប់ PostgREST (`set local role` + `request.jwt.claims`) ➜ **២ របៀប** grant លំនាំដើម (បើក ៖ Supabase ចាស់ · បិទ ៖ «មិន expose តារាងថ្មី») ➜ **២៤៣**
+  ការអះអាង · mutation **២៧/២៧** ក្រហម (mutation ដែល SQL អនុវត្តមិនបាន មិនរាប់) · ~៧ វិ.។ វាស់ ៖ SIGKILL អ្នកយាម ➜ Postgres ស្លាប់តាម (`setpriv --pdeathsig`) ·
+  TERM ➜ ថតបណ្តោះអាសន្នលុប។
+- `supabase-functions-test` ៖ module TS ពិត (Node type stripping) · token OTP ដោយសោ RSA ពិត · supabase-js ពិតទល់នឹងម៉ាស៊ីនមេក្លែង GoTrue/PostgREST · tsc strict លើ type
+  ពិតរបស់ SDK ➜ **២០១** ការអះអាង · mutation **២៨/២៨** ក្រហម · ~១៥ វិ.។
+
+**អ្វីដែលការវាស់រកឃើញ (មុន commit)** ៖
+- **ភាពចៃដន្យនៃកូដអញ្ជើញ** ៖ `uuid_send(gen_random_uuid())` មាន bit ថេរ (version · variant) ➜ ការប្រើ byte ទី ៦ ផ្តល់តួអក្សរតែ **១៦/៣២** ក្នុងទីតាំងនោះ ➜ ការវាស់
+  «រាល់ទីតាំងប្រើ ≥ ២៦/៣២ តួលើកូដ ៣០០» ចាប់ mutation នោះ (កូដពិតរំលង byte ៦ ➜ ១០០ bit)។
+- **domain អ៊ីមែលខាងក្នុង** ៖ អាន `supabase/auth` `internal/api/mail.go` ៖ admin API ពិនិត្យតែ **ទម្រង់** អ៊ីមែល ➜ domain ដែលគេផ្សេងកាន់ ➜ `/recover` ផ្ញើតំណកំណត់
+  ពាក្យសម្ងាត់ទៅប្រអប់សំបុត្ររបស់គេ ➜ **យកគណនីបាន** ➜ `ZOE_LOGIN_DOMAIN` ត្រូវ `.invalid` (RFC 2606) + Confirm email/Secure change បើក ➜ ផ្លូវកំណត់ថ្មីមានតែ OTP។
+- **ការកំណត់ពាក្យសម្ងាត់ថ្មីមិនផ្តាច់ session ចាស់** ➜ `revoke_user_sessions()` (cascade ទៅ refresh token · ហាងផ្សេងមិនប៉ះ)។
+- **លទ្ធផលមិនដឹង ≠ មិនបានអនុវត្ត** (ច្បាប់ដដែលនឹង `disconnect`) ៖ `finish_registration` ផុតពិដាន ➜ ការលុបគណនីវិញនឹងបំផ្លាញការចុះឈ្មោះដែលប្រហែលជាជោគជ័យ ➜ RPC
+  idempotent + សាកម្តងទៀត · លុបតែលើការបដិសេធច្បាស់។ ការពិនិត្យកូដអញ្ជើញ **មុន** `createUser` (កូដខុសលែងបង្កើត/លុបគណនីឥតប្រយោជន៍)។
+- **supabase-js 2.117 ពិនិត្យ UUID** ក្នុង `deleteUser`/`updateUserById` (បោះ synchronous) ➜ mock ដែលប្រើ id ដូច `uuid-1` ធ្លាក់ ➜ ម៉ាស៊ីនមេក្លែងប្រើ UUID ពិត ·
+  adapter ត្រូវរុំ `try` (វាស់ ៖ id មិនមែន UUID ➜ `false` មិនគាំង)។
+- **key ប្រភេទថ្មី** ៖ SDK មិនផ្ញើ `sb_publishable_…`/`sb_secret_…` ជា Bearer ➜ Edge Function ត្រូវ `--no-verify-jwt` (ចុះឈ្មោះ ៖ គ្មានគណនីនៅឡើយ) ហើយផ្ទៀង OTP ខ្លួនឯង ·
+  Allow-Headers ដេរីវេពី `@supabase/supabase-js/cors` + `x-region` (វាស់ ៖ header ដែល `functions.invoke` ផ្ញើពិតទាំងអស់ ⊂ បញ្ជី)។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ** (ម្ចាស់គម្រោង · តាម [`supabase/README.md`](../supabase/README.md)) ៖ បង្កើត Supabase Project (Pro) · កំណត់ Auth លើ Dashboard ·
+`db push` · admin ដំបូង · Firebase Project OTP (Blaze · SMS region KH · budget) · `secrets set` + `functions deploy --no-verify-jwt` ⛔ secret វាយក្នុង terminal
+ផ្ទាល់ខ្លួន។ ZoeW/ZoeKeyGen/rules **មិនប្រែ** ➜ គ្មាន Deploy · គ្មាន Publish។
+
 ### APK splash · PTR លើ tablet ផ្តេក (2026-09-30 · ZoeW 2.45.8)
 
 រកឃើញដោយ **ម្ចាស់គម្រោង** (រូបថត + វីដេអូ tablet 11.5") — មិនមែនដោយឧបករណ៍ទេ ៖ checker ទាំងអស់រត់ក្នុង Chromium ដែល (១) មិនមាន launch theme របស់ Android
@@ -2544,6 +2580,8 @@ Function ដែល export ៖ 978
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ | ផ្នែក ១ |
+| `supabase-functions-test` | ផ្នែក ២ | — |
+| `supabase-rls-test` | ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

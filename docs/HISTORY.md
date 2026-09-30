@@ -1585,6 +1585,39 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### ឧបករណ៍បង្កើតអតិថិជនថ្មីលើ Firebase (2026-09-30 · `tools/` + `audit-tools/` តែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ)
+
+សំណើម្ចាស់គម្រោង (ម្តងទៀត) ៖ Supabase Project **តែមួយ** (`tenant_id` · RLS) ព្រោះការបង្កើត Firebase Project · Security Rules · គណនី Login
+ដោយដៃរាល់អតិថិជនថ្មី ហត់ និងយូរ។ តាមការសម្រេចខាងក្រោម («⛔ កុំស្នើផ្លូវនេះម្តងទៀតដោយមិនលើកថ្លៃមកជាមុន») ថ្លៃ និងកូតារួមត្រូវលើកមុនសាងអ្វី ➜
+ម្ចាស់គម្រោងជ្រើស **Firebase ស្វ័យប្រវត្តិ** ៖ $0 · នៅមួយ Project ក្នុងមួយអតិថិជន (កូតា Spark រៀងខ្លួន) · ZoeW/ZoeKeyGen/rules **មិនប្រែ**។
+
+**អ្វីដែលសាង** ៖ `tools/firebase-provision/` (`new` · `rules --all` · `user` · `verify` · `show` · launcher `.cmd` ៣) ប្រើ `firebase-tools` **15.32.0**
+(pin) ជាបណ្ណាល័យ ៖ Login ផ្លូវការរបស់វា (គ្មាន OAuth client ផ្ទាល់ខ្លួន) · function management ផ្លូវការ (`createCloudProject` · `addFirebaseToCloudProject` ·
+`createWebApp` · `ensure` · `createInstance` · `updateRulesWithClient`) · endpoint ២ ដែល CLI គ្មាន (Authentication `admin/v2 …/config` · `v1/projects/…/accounts`)
+ចម្លងទម្រង់ពី `gcp/auth.js` របស់វា (`x-goog-user-project`)។ ជំហាននីមួយៗកត់ក្នុង `state/` ➜ រត់ម្តងទៀតបន្តពីកន្លែងធ្លាក់។
+
+**អ្វីដែលការវាស់រកឃើញ (មុន commit)** ៖
+- **firebase-tools ផ្ញើ `Bearer owner` លើ URL `http://`** (`isLocalInsecureRequest`) ➜ Google ក្លែងលើ http **មិនដែលរត់ផ្លូវ token** ➜ mutation «ដក `requireAuth`»
+  នឹងរស់រាន ➜ Google ក្លែងត្រូវជា **HTTPS** (CA ពី openssl ➜ `NODE_EXTRA_CA_CERTS`) ហើយបដិសេធ Bearer ដែល token endpoint មិនបានចេញ ➜ mutation នោះក្រហម **១៨**។
+- apiv2 របស់ firebase-tools ប្រើ `HTTPS_PROXY` **ដោយគ្មាន `NO_PROXY`** ➜ env របស់ child ត្រូវសាងពីទទេ។
+- `rtdb.updateRules()` បន្ថែម `?ns=` លើ host ដែលមិនមែន firebase ➜ path ខូច (`/?ns=x/.settings/rules.json`) ➜ ឧបករណ៍ប្រើ `updateRulesWithClient()` លើ
+  `databaseUrl` របស់ instance (លើ Google ពិត host ផ្ទុក namespace រួច ➜ ដូចគ្នា)។
+- **409 លើ Project ដែលការហៅរបស់យើងទើបបង្កើត** (ចម្លើយបាត់ · firebase-tools retry បណ្តាញ) ➜ កូដដំបូងចាត់ទុកថា «មានគេយក» ហើយបង្កើត `zoew-<សាខា>-xxxx`
+  ទី ២ ➜ ពិនិត្យ `GET projects/<id>` ឡើងវិញមុនប្តូរ ID (ថ្នាក់ដដែលនឹង «`disconnect` ≠ មិនបានអនុវត្ត»)។
+- ការកំណត់ Authentication ៖ server ដែលទទួល PATCH តែមិនអនុវត្តវាល (updateMask) ➜ ឧបករណ៍ **អានត្រឡប់** ហើយធ្លាក់ «did not stick» · `verify` សាកចុះឈ្មោះពិតតាម
+  apiKey សាធារណៈ ➜ ចុះបាន ➜ លុបគណនី probe + FAIL។
+- ការបើក API របស់ firebase-tools រង់ចាំ ១០ វិ. ក្នុងមួយជុំ (`POLL_SETTINGS`) ➜ `ZOE_PROVISION_API_POLL_MS` សម្រាប់តេស្ត។
+
+**`firebase-provision-test`** ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិត · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()`
+ពិត · DSN · `.cmd` ASCII+CRLF · lock) + សេណារីយ៉ូ ៨ លើ CLI ពិត + firebase-tools ពិតទល់ Google ក្លែងដែលមានស្ថានភាព (API បិទ · operation ដែលត្រូវ poll ·
+sign-up · rules · updateMask) + **mutation ១២/១២ ក្រហម** ➜ **៨៨ ok** · ~១១០ វិ.។ ⛔ ព្រំដែន ៖ Google **ពិត** មិនត្រូវបានហៅ (session នេះគ្មានគណនី/បណ្តាញ) ➜
+ការរត់លើកដំបូងលើគណនីពិតជាសកម្មភាពដោយដៃ ហើយ `verify` ជាអ្នកវាស់លទ្ធផលពិត។ ⚠️ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (**១៦**) ➜
+លើសនោះ មុខងារ «ទាញបញ្ជី ZTO» បិទសម្រាប់ទាំងអស់គ្នា — មិនទាន់កែ (ឧបករណ៍ និង README ប្រាប់ពិដាននេះ)។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ** ៖ `tools/firebase-provision/setup.cmd` (Login Google ម្តង) ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ exit 0 ➜ Login ក្នុង
+ZoeW ➜ អតិថិជនចាស់ ៖ `node provision.js new --project-id <id> --branch <សាខា> --adopt` ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។ ⛔ គ្មាន Deploy · គ្មាន Publish ·
+ZoeW/ZoeKeyGen មិនប្រែ។
+
 ### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)
 
 ម្ចាស់គម្រោងស្នើ Supabase Project តែមួយ (tenant · RLS · ចុះឈ្មោះ OTP) ➜ ជំហាន ០–១ ត្រូវសាង និងផ្ទៀងផ្ទាត់ (commit `e97590a` · `d25b1ca` · `f89cb34`) រួច
@@ -2445,6 +2478,7 @@ Function ដែល export ៖ 978
 | `field-shape-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ |
+| `firebase-provision-test` | ផ្នែក ២ | — |
 | `fluid-type-focus-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

@@ -99,7 +99,14 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `
 - `firebase-database.rules.json` — Firebase Project របស់ **អាជីវកម្ម**
 - `ZoeKeyGen/firebase-database.rules.json` — Firebase Project របស់ **License**
 
+Rules **អាជីវកម្ម** ទៅអតិថិជនទាំងអស់ក្នុងពេលតែមួយ ៖
+[`tools/firebase-provision/deploy-rules.cmd`](tools/firebase-provision/README-KH.md) (ដំឡើង ➜ អានត្រឡប់ ➜ វាស់)។
+
 ### ២. ដំឡើងឧបករណ៍ថ្មី (ZoeW)
+
+**អតិថិជនថ្មី** ត្រូវការ Firebase Project ផ្ទាល់ខ្លួន ៖ អ្នកលក់រត់
+[`tools/firebase-provision/new-customer.cmd`](tools/firebase-provision/README-KH.md) ➜ Project · Database ·
+Rules · ការបិទ sign-up · គណនីបុគ្គលិក បង្កើតដោយពាក្យបញ្ជាតែមួយ ហើយវាបង្ហាញ Firebase Config / Setup Link សម្រាប់ជំហានទី ៣។
 
 1. បើក URL របស់ site ➜ ប្រអប់សុំ **Activation Key** លេចឡើង។
 2. Paste Key ដែលចេញពី ZoeKeyGen ➜ ✅ (ត្រូវការអ៊ីនធឺណិត)។
@@ -212,7 +219,9 @@ Secret របស់ Lookup API និងការតភ្ជាប់នាំ�
   វាលចម្លែក។ នេះជាការការពារតែមួយប្រឆាំងទិន្នន័យខូច។
 - **Claim/witness fence** លើការស្តារ និងការលុបទាំងអស់ ➜ ការ replay និង
   ការគិតលុយស្ទួនកើតមិនបាន។
-- ⛔ Rules ក្នុង repo **មិន deploy ស្វ័យប្រវត្តិទេ** — paste ចូល Console ➜ Publish។
+- ⛔ Rules ក្នុង repo **មិន deploy ស្វ័យប្រវត្តិទេ** — paste ចូល Console ➜ Publish ឬ `tools/firebase-provision/deploy-rules.cmd`។
+- **ការចុះឈ្មោះសាធារណៈបិទ** លើ Project អាជីវកម្ម (Rules អនុញ្ញាតគ្រប់គណនីដែល Login) — `tools/firebase-provision/` បិទវា
+  ហើយ **វាស់** វាដោយការសាកចុះឈ្មោះពិត។
 
 ### ស្រទាប់ទី ៥ — ការការពារខាង Browser
 
@@ -260,6 +269,7 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
 | [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
+| [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
 | [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ---

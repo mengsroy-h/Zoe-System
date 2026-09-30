@@ -147,7 +147,9 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 ថតផ្សេងទៀត ៖ `audit-tools/` (បញ្ជី checker ៖ [`audit-tools/README.md`](audit-tools/README.md)
 ផ្នែក ៦ — ⛔ **កុំចម្លងចំនួនមកទីនេះ វាចាស់លឿន**) · `zto-import/` (Apps Script ខាង
-server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup/`
+server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `tools/firebase-provision/` (អតិថិជនថ្មី ៖
+Firebase Project · Database · Rules · sign-up បិទ · គណនី ដោយពាក្យបញ្ជាតែមួយ + ដំឡើង Rules ទៅអតិថិជនទាំងអស់ ·
+[`README-KH.md`](tools/firebase-provision/README-KH.md)) · `firebase-backup/`
 (CLI ដាច់ដោយឡែក + workflow backup) · `.github/workflows/` (`audit.yml` ·
 `backup.yml`) · `docs/HISTORY.md`។
 
@@ -195,7 +197,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**។
    ⛔ កុំសរសេរប្រវត្តិកំហុស ឬកំណត់ត្រាតាមកំណែ («កំណែ 2.23.4 កែ…») ក្នុង README។
    ⛔ កុំចម្លងចំនួន assertion ចូល README (វាចាស់លឿន)។ README ដែលត្រូវពិនិត្យរាល់ជុំ ៖ root · `ZoeW/` ·
-   `ZoeKeyGen/` · `audit-tools/` · `tools/zto-cookie-sync-windows/` · `firebase-backup/` · `zto-import/`
+   `ZoeKeyGen/` · `audit-tools/` · `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` · `firebase-backup/` · `zto-import/`
    (និង `google-sheets-api/`) · [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md)។ **README ចាស់ គឺជាឯកសារខុស។**
    ⛔⛔ **វិសាលភាពគឺ គ្រប់ឯកសារ `*.md` ក្នុង repo** ៖ **ប្រវត្តិកំហុសរស់នៅ `docs/HISTORY.md` និង
    `docs/HISTORY-ARCHIVE.md` តែមួយកន្លែងគត់** (ថត `docs/` នៅ root) ៖ [`docs/HISTORY.md`](docs/HISTORY.md) =
@@ -209,7 +211,9 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    static។ រាល់ពេលបន្ថែម path ថ្មី ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយ
    **ប្រាប់អ្នកប្រើថាត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ**។
    មាន rules ២ ឯកសារ ៖ `firebase-database.rules.json` (Business) និង
-   `ZoeKeyGen/firebase-database.rules.json` (License)។
+   `ZoeKeyGen/firebase-database.rules.json` (License)។ Business ៖ ម្ចាស់គម្រោងអាចរត់
+   `tools/firebase-provision/deploy-rules.cmd` ជំនួសការ paste (ដំឡើងទៅគ្រប់ Project ដែលឧបករណ៍ស្គាល់ ➜ អានត្រឡប់ ➜
+   `verify`) — វានៅតែជា **សកម្មភាពដោយដៃ** ដែលត្រូវប្រាប់ · License ៖ paste ដដែល។
 ១១. **⛔ កុំប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ភាពរលូននៃការរមូរ ដោយគ្មានការស្នើ
    ច្បាស់លាស់។** មើលផ្នែកបន្ទាប់។
 ១២. **⛔ មុននឹងកត់ត្រាអ្វីថ្មីចូល `CLAUDE.md` ឬ `docs/HISTORY.md` ត្រូវ `rg` រកជាមុនសិន។** ពង្រីកច្បាប់ដែលមានស្រាប់។ ច្បាប់ស្ទួន ២ កន្លែង ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **ច្បាប់ ២ ផ្ទុយគ្នា** ➜
@@ -436,6 +440,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **បញ្ជីធំៗ ↔ ការគូរឡើងវិញ (ZoeW)** | ⛔ តារាងប្រវត្តិ **គ្មានពិដាន** (filter «ទាំងអស់» = ជួរដេករាប់ពាន់) ➜ body នៃបញ្ជី subscribe **តែវាល view របស់ខ្លួន** (`useStoreFields`) មិនមែន `useStore(uiState)` ទាំងមូល — វាល `markImmediate` (ហូតប្រអប់ · ម៉ឺនុយ · ប្រអប់ · `chromeHidden` ខណៈរមូរ) commit **ភ្លាម** ➜ ការគូរជួរដេកទាំងអស់រត់ខាងក្នុងផ្លូវចលនា។ ⛔ ឪពុកដែលគូរឡើងវិញរាល់ការហូត (`PageData` · `PageEntry`) ប្រើកំណែ `Memo…` (function ដើមនៅ export សម្រាប់ `react-view`) · `HistoryRow` ប្រៀបតាម **តម្លៃ** (`sameHistoryRowModel()` — Firebase ផ្តល់ object ថ្មីរាល់ snapshot)។ ⛔ ទិសផ្ទុយ ៖ ធាតុកែនៅនឹងកន្លែង + `renderHistory()` ត្រូវគូរ (`historyRenderSeq` ⛔ មិនមែន `uiState.touch()`) · listener ធ្លាក់ពេលបញ្ជីទទេ ➜ សារ «វាស់មិនបាន» (`firebaseState`) · អ្នកផលិត view ផ្សេងត្រូវ assign object **ថ្មី** (ការកែនៅនឹងកន្លែងមិនកេះការគូរ)។ ⛔ ប្រអប់បញ្ជីធំ (ធុងសំរាម · ZTO មិនទាន់បិទ) គូរ **ទំព័រ ២០** + ទាញបន្ថែម (IntersectionObserver/ប៊ូតុង) · សរុប/ស្វែងរកលើធាតុ **ទាំងអស់** · ស្វែងរក/បើកម្តងទៀត ➜ ទំព័រដំបូង។ ⛔ **តារាងប្រវត្តិ** គូរ **៥០ ជួរ** (`HISTORY_PAGE_ROWS`) + ទាញបន្ថែមមុនដល់ចុង (sentinel លើ `.table-responsive` · `rootMargin` ខាងក្រោម) · ចំនួនសរុបលើក្បាលរាប់ធាតុ **ទាំងអស់** · `renderHistory(data, viewKey)` ៖ sync ពី Firebase (កូនសោដដែល) **មិនរុញអ្នកប្រើត្រឡប់ទៅ ៥០** · ប្តូរ filter/ស្វែងរក (កូនសោថ្មី) ➜ ៥០។ ⛔ APK ៖ ការវាស់ពណ៌របាស្ថានភាព (បង្ខំ layout + hit-test) រត់តែពេល **ស្រទាប់ក្រោមរបា** ប្រែ (`statusBarLayerSignature()`) មិនមែនរាល់ការប្រែ `uiState` | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` (Chromium ពិត) · `npm run native:check` ៤ឃ |
 | **ផ្ទាំងជូនដំណឹង 🔔 (ZoeW)** | ⛔ «ជិតផុតកំណត់» សួរ **`barcodeAbandonIsRipe()` ដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (គ្មានរូបមន្តព្រំដែនទី ២) · អានសុទ្ធសាធ (មិនប៉ះលុយ/Firebase) · ទិដ្ឋភាពប្រវត្តិមិនស្រស់ ឬ Database មិនទាន់ភ្ជាប់ ➜ «វាស់មិនបាន» · ចាកចេញ ➜ បញ្ជីលុបចេញពី DOM។ ⛔ ផ្ទាំង 🔔 និងរបា Slide ជា **ស្រទាប់តែមួយ** (`isSideDrawerOpen()` រាប់ទាំង ២ ➜ PTR · Back · Escape · ផ្ទៃខាងក្រោយ)។ ⛔ សារ ៖ `public/announcements.json` ទាញ **network-only** (មិនចូលសំបក SW · APK តាម `VITE_NATIVE_WEB_ORIGIN` + CORS) ➜ **រាល់ការឡើងកំណែ ZoeW ត្រូវមានធាតុ `update` ថ្មីបំផុត = `APP_VERSION`** · សារ `maintenance` សុទ្ធ **មិនឡើងកំណែ** (`version-bump-scope` មិនរាប់វា)។ ⛔ logo ក្នុង App (navbar · boot splash · guide) = App icon ដេរីវេពី `resources/icon.svg` / `manifest.json` របស់ ZoeKeyGen | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
 | **Toolchain ↔ អ្វីដែល ship (ZoeW)** | ⛔ checker CSS/ប្លង់វាស់ CSS **ប្រភព** ហើយ Chromium parse syntax ថ្មីបាន ➜ ការឡើង Vite/minifier អាចប្តូរ **output** ដោយគ្មានអ្នកវាស់។ ⛔ minifier CSS ជា **esbuild** (`cssMinify`) ៖ Lightning CSS (លំនាំដើម Vite) សរសេរ design token ឡើងវិញ និងរៀបលំដាប់ declaration ក្នុង CSS ដែលគ្រប PTR/ចលនាផ្ទាំង · JS ក្នុង build ត្រូវ parse បានក្នុង `build.target` (iPhone ចាស់) · ⛔ chunk ត្រូវបែងចែកតាម `codeSplitting` + `priority` (Rolldown ចាប់ dependency របស់ group ➜ helper `__vitePreload` ធ្លាក់ចូល chunk native ➜ web ផ្ទុកវា ➜ **ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត**)។ ⛔ config Android (SDK · AndroidX · AGP · Gradle) ស្ថិតក្នុងខ្សែ template របស់ **Capacitor ដែលដំឡើង** — លើសខ្សែនោះ = ឡើង Capacitor major (`ZoeW/docs/ANDROID.md`) ព្រោះ build Android វាស់មិនបាននៅទីនេះ | `npm run smoke` · `npm run android:check` · `npm run native:check` (ZoeW) |
+| **Firebase Project ថ្មី (ឧបករណ៍អ្នកលក់)** | ⛔ **មួយ Project ក្នុងមួយអតិថិជន** (Spark ឥតគិតថ្លៃ · កូតារៀងខ្លួន — Project តែមួយ/Supabase ត្រូវបដិសេធដោយសារថ្លៃ ៖ `docs/HISTORY.md` ផ្នែក ២) · ⛔ Rules អនុញ្ញាតគ្រប់ `auth != null` ➜ **sign-up ត្រូវបិទ ហើយត្រូវវាស់** ដោយការចុះឈ្មោះពិតតាម apiKey សាធារណៈ (ចុះបាន ➜ លុបគណនី probe + FAIL) · ការកំណត់ Authentication អានត្រឡប់ (server ទទួល PATCH ≠ អនុវត្ត) · Rules = ឯកសារ repo អានត្រឡប់ប្រៀប · ⛔ មិនយក Project មានស្រាប់ដោយស្ងាត់ (`--adopt`) · មិនប្តូរពាក្យសម្ងាត់គណនីមានស្រាប់ (`--reset`) · `pendingProject` កត់ **មុន** ការបង្កើត ➜ «យឺតតែជោគជ័យ» និង 409 លើ Project ខ្លួនឯង មិនបង្កើត Project ទី ២ · ពិដានជំហាន · ពាក្យសម្ងាត់ **មិនចូលឯកសារ** · អ៊ីមែល ↔ `siteCodeFromEmail()` ពិត · Setup Link ↔ `decodeSetupPayload()` ពិត · `firebase-tools` pin ពិតប្រាកដ (ប្រើ function ខាងក្នុង)។ ⛔ ការវាស់ត្រូវរត់ `firebase-tools` **ពិត** លើ **HTTPS** (លើ http វាផ្ញើ `Bearer owner` ➜ ផ្លូវ token មិនដែលរត់) | `firebase-provision-test` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
 | **វិសាលភាពឯកសារ** | ⛔ README និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** (ច្បាប់ ៩) · ប្រវត្តិទៅ `docs/HISTORY.md` / `docs/HISTORY-ARCHIVE.md` ប៉ុណ្ណោះ។ ⛔ **ភាពស្រស់** ៖ ក្បាលតារាង [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) ត្រូវរាយឈ្មោះ App នីមួយៗ **អមដោយកំណែ ship របស់ខ្លួន** (ព្រំដែនពាក្យ ៖ `ZoeKeyGen` ផ្ទុក `ZoeW`) · ការអះអាងកំណែ **បច្ចុប្បន្ន** (root README · README នីមួយៗ · តារាងក្បាលនៃឯកសារនេះ រួម `CACHE_VERSION`) ដេរីវេពីកូដពិត · ការយោង *ប្រវត្តិ* មិនប៉ះ។ ⛔ **បញ្ជីរឹងក្នុង checker = កាលបរិច្ឆេទផុតកំណត់** ➜ ដេរីវេ ឬប្រៀបនឹងការពិត ៖ ពាក្យចាំបាច់ក្នុង `guide.html` ពីកុងតាក់ពិត · បញ្ជី README ពីថតពិត (`listReadmeFiles()`) · ផ្ទៃ UI · ចំនួនជួរ 🩺 · ចំនួនអេក្រង់ `collectedValueOf()` · ចំនួនតំបន់ 📝 ស្រង់ពីកូដពិត · helper «នៅរស់» វាស់ជា **និយមន័យ** · រាល់ `.js` ក្នុង `audit-tools/` មានឈ្មោះក្នុង `audit-tools/README.md` · ចំនួនការវាស់របស់ `money-reality-check.js` ស្មើផ្នែក `── N.` ពិតក្នុង **គ្រប់ឯកសារ** ដែលអះអាងវា។ ⛔ **ទិសផ្ទុយ ៖ ផ្ទៃដែលដកចេញរួច មិនត្រូវរស់ក្នុងឯកសារ** ៖ កូនសោ `localStorage` ដែលឯកសារនេះយោង ត្រូវមានក្នុងកូដ ship · ច្រកទ្វារលក្ខខណ្ឌ (វាលបំពេញសាខាគ្មានក្នុង App ➜ គ្មានឯកសារណែនាំឲ្យបំពេញ · ការបដិសេធ «**គ្មាន**…» ឆ្លង)។ ⛔ ផ្ទៃថ្មីត្រូវលេចក្នុង **សៀវភៅក្នុង App** (`guide.html`) មិនត្រឹម README (សារ `licenseFailureMessage()` ពិត · ច្រកទ្វារលក្ខខណ្ឌលើ `LICENSE_SEAT_SLOTS`)។ ⛔ កាតាឡុក `emu/*` ៖ រាល់ `run "emu/…"` ក្នុង `run-all.sh` ត្រូវមានឈ្មោះក្នុង **កថាខណ្ឌធ្លាក់ចុះ** នៃ Runbook | `doc-scope-test` · `user-guide-test` |
@@ -592,6 +597,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ជាន់ការពារ devtools (⚠️ **ជាឧបសគ្គ មិនមែនការការពារ** — មើលច្បាប់ 📝) | `devtools-guard-test.js` |
 | config Netlify ៖ root file ដែលបង្វែរ build · CSP ឃ្លាតពីតម្រូវការ App · config ដែលគ្មាន checker អាន | `netlify-config-scope-test.js` |
 | ឧបករណ៍ Backup ៖ `.partial` ➜ `renameSync()` · lock · retry · គ្មាន credential ក្នុង output · ⛔ **artifact ត្រូវអ៊ិនគ្រីប ហើយ plaintext ត្រូវលុប *មុន* upload** | `firebase-backup-test.js` |
+| ឧបករណ៍បង្កើតអតិថិជនថ្មី ៖ sign-up នៅបើក · Rules ឃ្លាត · Project/App/Database ស្ទួនពេលរត់ម្តងទៀត · Project មានស្រាប់ត្រូវយកដោយស្ងាត់ · ពាក្យសម្ងាត់/token ក្នុង state · ការព្យួរ | `firebase-provision-test.js` |
 | **ការរំខានពាក់កណ្តាល (deploy · PTR · បិទ tab · បណ្តាញដាច់) ➜ កញ្ចប់បាត់ពីទាំងប្រវត្តិ ទាំងធុងសំរាម** ➜ ledger រាប់កញ្ចប់ដែលលែងមាន · កូនសោ registry កំព្រា · «ស្កេនតាមថ្ងៃ» ធំជាង «យករួច + នៅសល់» ជាអចិន្ត្រៃយ៍ | `cleanup-interrupt-atomicity-test.js` |
 | **សោការងារជាប់អស់កល្ប** ក្រោមការសរសេរធុងសំរាមដែលព្យួរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) · របៀបស្កេនដកងាប់ | `stall-lock-release-test.js` |
 | **ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់»** ➜ ការងារអ្នកប្រើបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ ជោគជ័យ | `locker-claim-guard-test.js` |
@@ -2035,6 +2041,7 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 
 ```bash
 npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect · emu/app-network-e2e)
+npm ci --prefix tools/firebase-provision --ignore-scripts   # firebase-tools ពិតសម្រាប់ firebase-provision-test
 bash audit-tools/run-all.sh
 ```
 
@@ -2075,7 +2082,7 @@ setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.
     --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
 curl -s "http://127.0.0.1:9000/.json?ns=x"    # ត្រូវឆ្លើយ null — បើអត់ emulator ងាប់ហើយ
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh
 ```
 
 ⛔ **emulator អាចងាប់ពេល shell call ដែលបើកវាចប់** (វាស់បាន 2026-09-26 ៖ `setsid nohup … &` រស់ក្នុង call នោះ តែ run-all
@@ -2125,7 +2132,7 @@ build វាស់ដោយស្វ័យប្រវត្តិដែរ (`ru
 ```bash
 node --check <ឯកសារ .js ដែលកែ>
 node audit-tools/strip-comments.js
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh   # emulator រស់ (ជំហានទី ០)
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh   # emulator រស់ (ជំហានទី ០)
 git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
 ```
 
@@ -2249,6 +2256,10 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **`tools/firebase-provision/` ៖ ការរត់លើកដំបូងលើគណនី Google ពិត** — checker រត់ `firebase-tools` ពិតទល់ Google **ក្លែង** តែប៉ុណ្ណោះ
+  (session នេះហៅ Google ពិតមិនបាន) ➜ ម្ចាស់គម្រោង ៖ `setup.cmd` ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ ត្រូវ exit 0 (ការវាស់ ៦ `OK`)
+  ➜ Login ក្នុង ZoeW ដោយគណនីនោះ។ បន្ទាប់មក `new --project-id <id> --branch <សាខា> --adopt` សម្រាប់អតិថិជនចាស់ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។
+  ⛔ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (លើស ➜ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា)។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

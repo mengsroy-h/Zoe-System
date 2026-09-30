@@ -41,6 +41,7 @@
 
 ```bash
 npm ci --prefix ZoeW
+npm ci --prefix tools/firebase-provision --ignore-scripts   # firebase-tools ពិតសម្រាប់ firebase-provision-test
 ```
 
 ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playwright-core` · `esbuild`) ក៏ជា dependency របស់ checker ដែរ
@@ -51,6 +52,7 @@ ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playw
 | `acorn` | checker ស្តាទិចដែល parse តាម AST |
 | `playwright-core` | តេស្តដែលបើក Chromium ពិត |
 | `xlsx` | ការត្រួតពិនិត្យ XML ដែល Export emit ចេញ |
+| `firebase-tools` (`tools/firebase-provision/node_modules`) · `openssl` | `firebase-provision-test` ៖ រត់ CLI បង្កើតអតិថិជនពិតទល់ Google ក្លែងលើ HTTPS |
 
 បើខ្វះមួយណា checker ដែលពឹងលើវា **SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់
 ហើយរាយ `SKIPPED`/`PARTIAL PASS` **ដាច់ពី `PASS`** ដើម្បីកុំឲ្យការគ្របតេស្ត
@@ -344,6 +346,7 @@ bash audit-tools/emu/rules.sh
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |
 | `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket | `FBACKUP_APP_DIR` |
+| `firebase-provision-test.js` | **ឧបករណ៍បង្កើតអតិថិជនថ្មី** (`tools/firebase-provision/`) ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW · DSN · `.cmd` ASCII+CRLF · pin កំណែ · លេខក្នុង README) · **CLI ពិត + `firebase-tools` ពិត ទល់ Google ក្លែងលើ HTTPS** (CA ពី openssl ➜ ផ្លូវ token ពិត) ដែលមានស្ថានភាព (API បិទ/បើក · updateMask · sign-up · rules · គណនី) ៖ ការបង្កើត · បន្តក្រោយធ្លាក់ · ID មានគេយក · `--adopt` · sign-up ដែល server មិនអនុវត្ត · rules ឃ្លាត/ដំឡើងឡើងវិញ · យឺតតែជោគជ័យ · 409 លើ Project ខ្លួនឯង · state គ្មាន secret · **mutation លើ tool ត្រូវក្រហម** (`FBPROVISION_MUTATIONS=0` ➜ រំលង) | `FBPROVISION_APP_DIR` · `FBPROVISION_STRICT` · `FBPROVISION_DEPS_DIR` |
 
 #### UI · ទម្រង់បង្ហាញ · កាយវិការ
 

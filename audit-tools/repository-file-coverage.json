@@ -501,6 +501,22 @@
       ],
       "evidence": "rules-duplicate-keys អនុវត្ត objectShapeNodes/requiresObject លើ rules ពិតទាំង ២ (rules របស់ main ➜ ធ្លាក់ Business ១៥ · License ៤) ហើយ emu checker ទាំង ២ រត់ probeObjectShapes ពិតលើ RTDB emulator (control ទៅដល់គ្រប់ node · rules ពិតបដិសេធ primitive)",
       "limitation": "វាស់តែការសរសេររបស់អ្នកប្រើ login/admin។ Firebase Console ដោយម្ចាស់ Project រំលង rules ➜ ការរំលង record ខូចក្នុង App នៅតែចាំបាច់។"
+    },
+    "guard-firebase-provision": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/firebase-provision-test.js"
+      ],
+      "evidence": "firebase-provision-test រត់ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ដែលមានស្ថានភាព (ផ្លូវ token ពិត · API បិទ/បើក · updateMask · sign-up សាធារណៈ · rules · គណនី) លើសេណារីយ៉ូបង្កើត · បន្ត · ID មានគេយក · adopt · lockdown មិនចូល · rules ឃ្លាត · យឺតតែជោគជ័យ ហើយ mutation លើ tool ត្រូវក្រហម",
+      "limitation": "Google ពិតមិនត្រូវបានហៅ ៖ ឈ្មោះវាល/endpoint ចម្លងពីប្រភព firebase-tools ផ្លូវការ តែការរត់លើគណនី Google ពិតលើកដំបូងត្រូវធ្វើដោយម្ចាស់គម្រោង (verify វាស់លទ្ធផលពិត)។"
+    },
+    "guard-firebase-provision-contract": {
+      "category": "static",
+      "guards": [
+        "audit-tools/firebase-provision-test.js"
+      ],
+      "evidence": "firebase-provision-test ពិនិត្យ pin កំណែ firebase-tools · lock ស្របនឹង package.json · engines · .cmd ASCII+CRLF · ពាក្យបញ្ជាដែល launcher ហៅ",
+      "limitation": "មិនបញ្ជាក់ថា npm registry ឬ Windows cmd.exe ពិតដំណើរការលើម៉ាស៊ីនរបស់ម្ចាស់គម្រោង។"
     }
   },
   "files": {
@@ -1871,6 +1887,9 @@
     "audit-tools/firebase-config-paste-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/firebase-provision-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/fluid-type-focus-test.js": {
       "policy": "guard-1"
     },
@@ -2326,6 +2345,30 @@
     },
     "firebase-database.rules.json": {
       "policy": "guard-40"
+    },
+    "tools/firebase-provision/README-KH.md": {
+      "policy": "guard-13"
+    },
+    "tools/firebase-provision/deploy-rules.cmd": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/firebase-api.js": {
+      "policy": "guard-firebase-provision"
+    },
+    "tools/firebase-provision/new-customer.cmd": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/package-lock.json": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/package.json": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/provision.js": {
+      "policy": "guard-firebase-provision"
+    },
+    "tools/firebase-provision/setup.cmd": {
+      "policy": "guard-firebase-provision-contract"
     },
     "tools/money-check-windows/README-KH.md": {
       "policy": "guard-13"

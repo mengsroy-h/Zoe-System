@@ -448,6 +448,9 @@ Firebase Console ➜ **Authentication ➜ Settings ➜ User actions** ៖
 
 រួចចុច **Save**។
 
+✅ Project ដែលបង្កើតដោយ [`tools/firebase-provision/`](../tools/firebase-provision/README-KH.md) ត្រូវបានចាក់សោរួច
+ហើយ **វាស់** ដោយការសាកចុះឈ្មោះពិត ➜ Project ចាស់ ៖ `node provision.js new --project-id <id> --branch <សាខា> --adopt`។
+
 > ⛔ **ហេតុអ្វីវាចាំបាច់** ៖ `apiKey` ចែកទៅគ្រប់ឧបករណ៍តាម Setup Link/QR ➜
 > បើ sign-up បើកចំហ អ្នកណាក៏បង្កើត `x@zoew<សាខា>.com` ដោយខ្លួនឯងបាន។
 >
@@ -493,6 +496,9 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 **បង្កើត** ៖ Firebase Console ➜ **Authentication ➜ Users ➜ Add user** ➜
 បំពេញ email តាមទម្រង់ខាងលើ បូកពាក្យសម្ងាត់ ➜ ប្រាប់បុគ្គលិក។ **ចប់** —
 ⛔ គ្មានអ្វីត្រូវវាយក្នុងទូរស័ព្ទ និងគ្មានការប៉ះ Netlify ទេ។
+
+ឬ ៖ `node provision.js user --project <id> --branch <សាខា> --user sok` ក្នុង [`tools/firebase-provision/`](../tools/firebase-provision/README-KH.md)
+➜ បង្កើត `sok@zoew<សាខា>.com` ជាមួយពាក្យសម្ងាត់ចៃដន្យ ហើយសាក Login ពិត។
 
 **លេខសាខារកនៅឯណា** ៖ Argus ➜ **Scan Management ➜ Arrival Scan** ➜ DevTools
 ➜ **Network** ➜ ចុច «ស្វែងរក» ➜ សំណើ `scan/page/scan` ➜ **Payload** ➜ វាល

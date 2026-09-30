@@ -209,8 +209,8 @@ async function subscribeWeb(license: string): Promise<PushStatus> {
     return 'on';
 }
 
-function loadNativePush(): Promise<any> {
-    return import('@capacitor/push-notifications').then((m) => m.PushNotifications);
+function loadNativePush(): Promise<{ PN: any }> {
+    return import('@capacitor/push-notifications').then((m) => ({ PN: m.PushNotifications }));
 }
 
 function unsubscribeNativeToken(token: string) {
@@ -242,7 +242,7 @@ export async function ensureNativePushListeners(PN?: any) {
     if (pushRuntime.nativeListeners || !isNativeAndroid() || !pushNativeBuild.fcm) return;
     pushRuntime.nativeListeners = true;
     try {
-        const plugin = PN || await loadNativePush();
+        const plugin = PN || (await loadNativePush()).PN;
         await plugin.addListener('registration', (t: any) => { if (t && typeof t.value === 'string') onNativeToken(t.value); });
         await plugin.addListener('registrationError', () => {
             if (pushRuntime.nativeEnabling) { pushRuntime.nativeEnabling = false; setStatus('error'); }
@@ -260,19 +260,19 @@ async function enableNative(): Promise<boolean> {
     pushRuntime.nativeWanted = true;
     setStatus('busy');
     try {
-        const PN = await loadNativePush();
-        let perm = await PN.checkPermissions();
+        const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
+        let perm = await pushStep(PN.checkPermissions(), 'Push checkPermissions timed out');
         if (perm.receive !== 'granted' && perm.receive !== 'denied') perm = await PN.requestPermissions();
         if (perm.receive !== 'granted') { setStatus('denied'); return false; }
-        await PN.createChannel({
+        await pushStep(PN.createChannel({
             id: FCM_CHANNEL_ID,
             name: 'ការជូនដំណឹង ZoeW',
             description: 'ដំណឹងពីអ្នកលក់ និងកញ្ចប់ជិតផុតកំណត់',
             importance: 5,
             visibility: 1,
             vibration: true
-        });
-        await ensureNativePushListeners(PN);
+        }), 'Push createChannel timed out');
+        await pushStep(ensureNativePushListeners(PN), 'Push listeners timed out');
         pushRuntime.nativeEnabling = true;
         armNativeRegisterWatchdog();
         await PN.register();
@@ -333,8 +333,8 @@ export async function disablePush(): Promise<boolean> {
             const token = readSaved().token;
             writeSaved({ on: false });
             await unsubscribeNativeToken(token);
-            const PN = await loadNativePush();
-            try { await PN.unregister(); } catch (e) {}
+            const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
+            try { await pushStep(PN.unregister(), 'Push unregister timed out'); } catch (e) {}
         }
     } catch (e) {}
     writeSaved({ on: false, kind: '', token: '', syncedAt: 0, schedSig: '', schedAt: 0 });
@@ -345,7 +345,7 @@ export async function disablePush(): Promise<boolean> {
 export function clearDeliveredNotifications(): Promise<number> {
     if (isNativeAndroid()) {
         if (!pushNativeBuild.fcm) return Promise.resolve(0);
-        return loadNativePush().then((PN) => PN.removeAllDeliveredNotifications()).then(() => 1, () => 0);
+        return loadNativePush().then(({ PN }) => PN.removeAllDeliveredNotifications()).then(() => 1, () => 0);
     }
     try {
         const nav: any = navigator;
@@ -380,7 +380,7 @@ export function resyncPush(): Promise<boolean> {
     const license = activationKey();
     if (!license) return Promise.resolve(false);
     if (pushSupport() === 'native') {
-        return loadNativePush().then((PN) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
+        return loadNativePush().then(({ PN }) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
     }
     return withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
         .then((reg: any) => pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out')).then((sub: any) => {

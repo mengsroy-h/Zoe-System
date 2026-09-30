@@ -13,7 +13,12 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-30 · ZoeW 2.45.5 · ZoeKeyGen 2.22.1)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-30 · ZoeW 2.45.6 · ZoeKeyGen 2.22.1)
+
+⛔ **មេរៀនជុំ 2.45.6 ៖ mock ដែលចម្លង *ផ្ទៃ* តែមិនចម្លង *អត្ថន័យ*** — plugin Capacitor ជា Proxy ដែលឆ្លើយ property ណាក៏ដោយ (រួម `then`) ➜ promise
+ដែល resolve ទៅ plugin ផ្ទាល់ **មិនដែល settle** ➜ Push លើ APK ជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត ខណៈ `push-client.test.tsx` ២៩ តេស្តបៃតង (mock ជា
+object ធម្មតា)។ ម្ចាស់គម្រោងរកឃើញលើទូរស័ព្ទពិត មិនមែនឧបករណ៍ ➜ ⛔ រាល់ mock របស់ dependency ត្រូវសួរ «dependency ពិតមានឥរិយាបថពិសេសអ្វីដែល mock
+ខ្វះ?» ហើយមានតេស្តដែលចង mock នោះទៅ dependency **ដែលដំឡើង** (`registerPlugin` ពិត ➜ `typeof then`)។ លម្អិត ៖ `docs/HISTORY.md` ផ្នែក ២។
 
 ⛔ **មេរៀនជុំ 2.45.5 ៖ សញ្ញាដែល *browser* ផ្តល់ក៏អាចកុហកដែរ · អ្នកយាមដែលគ្មាននរណារត់ ក្រហមស្ងាត់ៗ** —
 (១) `navigator.onLine` = `true` ជានិច្ចលើ App Android (WebView គ្មាន `ACCESS_NETWORK_STATE` ➜ `online`/`offline` មិនដែលបាញ់ · ផ្ទៀងក្នុងប្រភព Chromium

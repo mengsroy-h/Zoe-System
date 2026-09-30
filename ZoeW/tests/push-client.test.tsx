@@ -26,7 +26,23 @@ const pn = vi.hoisted(() => {
     };
     return api;
 });
-vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: pn }));
+/**
+ * ⛔ plugin របស់ Capacitor ពិតជា **Proxy** ៖ property ណាក៏ដោយ (រួម `then`) ត្រឡប់ function ➜ plugin ជា **thenable**។
+ *    promise ដែល resolve ទៅ plugin ផ្ទាល់ ហៅ `plugin.then(resolve, reject)` ➜ Capacitor បដិសេធ «then() is not implemented»
+ *    ដោយមិនហៅ callback ណាមួយ ➜ promise នោះ **មិនដែល settle** ➜ APK ជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត គ្មានប្រអប់សុំសិទ្ធិ។
+ *    mock ជា object ធម្មតា (គ្មាន `then`) បាំងថ្នាក់នេះទាំងស្រុង ➜ mock ត្រូវចម្លងឥរិយាបថនោះ ហើយតេស្ត
+ *    «Capacitor ពិតជា thenable» ផ្ទៀងថា mock នៅស្មោះនឹង `@capacitor/core` ដែលដំឡើង។
+ */
+vi.mock('@capacitor/push-notifications', () => ({
+    PushNotifications: new Proxy(pn, {
+        get(target, prop) {
+            if (prop === '$$typeof') return undefined;
+            if (prop === 'toJSON') return () => ({});
+            if (typeof prop === 'string' && prop in target) return (target as any)[prop];
+            return () => Promise.reject(new Error('"PushNotifications.' + String(prop) + '()" is not implemented on android'));
+        }
+    })
+}));
 
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
@@ -304,6 +320,34 @@ describe('APK (FCM)', () => {
         expect(uiState.pushStatus).toBe('off');
     });
 
+    it('⛔ plugin របស់ Capacitor ពិតជា thenable ➜ mock ក្នុងឯកសារនេះត្រូវដូចគ្នា', async () => {
+        const core: any = await vi.importActual('@capacitor/core');
+        const probe = core.registerPlugin('ZoeThenableProbe');
+        expect(typeof probe.then).toBe('function');
+        const mod: any = await import('@capacitor/push-notifications');
+        expect(typeof mod.PushNotifications.then).toBe('function');
+    });
+
+    it('⛔ plugin thenable ➜ ចុច «បើក» ទៅដល់ប្រអប់សុំសិទ្ធិ · register ➜ on (មិនជាប់ «កំពុងភ្ជាប់…»)', async () => {
+        stubServer();
+        const outcome = await Promise.race([
+            enablePush().then(() => 'settled'),
+            new Promise((r) => setTimeout(() => r('hang'), 1000))
+        ]);
+        expect(outcome).toBe('settled');
+        expect(pn.requestPermissions).toHaveBeenCalled();
+        expect(pn.register).toHaveBeenCalled();
+        await pn.listeners.registration({ value: 'fcmToken:' + 't'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        const off = await Promise.race([disablePush().then(() => 'settled'), new Promise((r) => setTimeout(() => r('hang'), 1000))]);
+        expect(off).toBe('settled');
+        expect(pn.unregister).toHaveBeenCalled();
+        expect(uiState.pushStatus).toBe('off');
+        const cleared = await Promise.race([clearNotifications().then(() => 'settled'), new Promise((r) => setTimeout(() => r('hang'), 1000))]);
+        expect(cleared).toBe('settled');
+        expect(pn.removeAllDeliveredNotifications).toHaveBeenCalled();
+    });
+
     it('បដិសេធសិទ្ធិ ➜ denied មិន register', async () => {
         pn.requestPermissions.mockResolvedValueOnce({ receive: 'denied' });
         stubServer();
@@ -395,6 +439,27 @@ describe('⛔ ការព្យួរ ≠ ការធ្លាក់ ៖ ស�
         await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
         await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS + 50);
         expect(uiState.pushStatus).toBe('on');
+    });
+
+    it('⛔ APK ៖ ជំហានមុន register() ដែលមិនសួរអ្នកប្រើ (checkPermissions · createChannel · listener) ព្យួរ ➜ error ក្នុងពិដាន · ចុចម្តងទៀតបាន', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        for (const hang of ['addListener', 'checkPermissions', 'createChannel'] as const) {
+            uiState.pushStatus = 'off';
+            Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false });
+            pn.register.mockClear();
+            (pn[hang] as any).mockImplementationOnce(() => new Promise(() => {}));
+            let done: boolean | null = null;
+            enablePush().then((v) => { done = v; });
+            await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
+            expect([hang, done]).toEqual([hang, false]);
+            expect([hang, uiState.pushStatus]).toEqual([hang, 'error']);
+            expect(pn.register).not.toHaveBeenCalled();
+        }
+        expect(await togglePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('busy');
+        await pn.listeners.registration({ value: 'fcmToken:' + 'r'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
     });
 });
 

@@ -34,6 +34,7 @@ const ACCEPTED = {
         authUnsubscribe: 'the listener must survive logout to see the next login',
         authRecoveryTimeout: 'cleared in the auth callback itself',
         authGeneration: 'monotonic counter, resetting it would break generation guards',
+        documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',
         sessionExpiryCheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
         licenseRecheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
         exchangeRateSaveInFlight: 'bounded Firebase write mutex that settles in finally or its late handlers; retaining it across logout prevents an older rate write from racing a newer session and it holds no customer data',

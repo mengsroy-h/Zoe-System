@@ -274,6 +274,8 @@ function loadCommon(ctx, src) {
         const s = sliceFrom(src, fn);
         if (s) vm.runInContext(s, ctx);
     }
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     const cap = sliceConst(src, 'DB_OP_TIMEOUT_MS');
     if (cap) vm.runInContext(cap, ctx);
 }

@@ -119,6 +119,8 @@ function tab(suffix, hooks) {
         appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()
     });
     vm.runInContext(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n'), context);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
     Object.assign(context, {
         getServerNow: () => NOW, getFormattedDate: () => DATE,
         generateUniqueId: () => suffix + '_' + (++seq),
@@ -583,6 +585,8 @@ async function serverFenceScenario(mode) {
     });
     const names = new Set(['clearStaleRestoreMarkers', 'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dbOp', 'dbOpStalled', 'withTimeout']);
     vm.runInContext(FNS.filter((node) => names.has(node.id.name)).map((node) => SOURCE.slice(node.start, node.end)).join('\n'), context);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', context);
     context.clearStaleRestoreMarkers(clone(live));
     for (let attempt = 0; attempt < 500 && context.staleRestoreMarkerSweeps.size; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 5));

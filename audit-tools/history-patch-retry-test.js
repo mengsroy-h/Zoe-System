@@ -150,6 +150,8 @@ function build(mode, opts) {
     };
     vm.createContext(ctx);
     vm.runInContext(reactRuntime(SRC, { exclude: FNS, context: ctx }), ctx);
+    // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
+    vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
     FNS.forEach((n) => { if (src[n]) { try { vm.runInContext(src[n], ctx); } catch (e) {} } });
     return ctx;

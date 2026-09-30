@@ -1607,10 +1607,18 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 - ការកំណត់ Authentication ៖ server ដែលទទួល PATCH តែមិនអនុវត្តវាល (updateMask) ➜ ឧបករណ៍ **អានត្រឡប់** ហើយធ្លាក់ «did not stick» · `verify` សាកចុះឈ្មោះពិតតាម
   apiKey សាធារណៈ ➜ ចុះបាន ➜ លុបគណនី probe + FAIL។
 - ការបើក API របស់ firebase-tools រង់ចាំ ១០ វិ. ក្នុងមួយជុំ (`POLL_SETTINGS`) ➜ `ZOE_PROVISION_API_POLL_MS` សម្រាប់តេស្ត។
+- ឈ្មោះ Project របស់ Google ទទួលតែ អក្សរ · លេខ · ដកឃ្លា · `-` `'` `!` (៤–៣០ តួ) ➜ regex ដំបូងអនុញ្ញាត `_` `.` ហើយឈ្មោះលំនាំដើមលើសាខាវែងលើស ៣០
+  តួ ➜ Google នឹងបដិសេធការបង្កើត ➜ regex ស្របច្បាប់ Google · ឈ្មោះលំនាំដើមកាត់ត្រឹម ៣០ · Google ក្លែងបដិសេធដូចពិត។
+- Email enumeration protection ជា **វាលស្រេចចិត្ត** ៖ PATCH តែមួយរួមវាលចាំបាច់ ➜ Google បដិសេធវាលមួយ (400) ➜ sign-up **មិនត្រូវបិទ** ➜ PATCH វាលចាំបាច់ម្តងទៀត ·
+  `verify` រាយ enumeration ជា `SKIP` (មិនប៉ះ exit code)។
+- **meta-checker ចាប់ checker ថ្មីរបស់ខ្ញុំ ២ ដង** (CI ពេញលើកទី ១) ៖ `checker-coverage` ៖ baseline ត្រូវជា `FBPROVISION_APP_DIR="$BASE" node …` ត្រង់ៗ (env ទី ២
+  ចន្លោះ ➜ រាប់មិនឃើញ) · `exit-code-integrity` ៖ checker ដែលពុល `ok()` ត្រូវចប់ក្នុង **៦០ វិ.** តែវាចំណាយ ~១១០ វិ. (សេណារីយ៉ូ + mutation ជាជួរ) ➜ «ផុតថវិកា ≠
+  ការធ្លាក់» ➜ ⛔ មិនបង្កើនពិដាន ៖ សេណារីយ៉ូ និង mutation រត់ **ស្របគ្នា** (Google ក្លែង · state · port ផ្ទាល់ខ្លួន) ហើយការអះអាងចាក់ចូល `ok()` **តាមលំដាប់ថេរ**
+  ក្រោយចប់ (ការពុលគ្របទាំងអស់) ➜ ~២៨ វិ. · ~៣២ វិ. ក្រោមបន្ទុក CPU ៣/៤ · ពុល ➜ `0 ok, 93 FAIL` ក្នុង ~៣៤ វិ.។
 
 **`firebase-provision-test`** ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិត · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()`
-ពិត · DSN · `.cmd` ASCII+CRLF · lock) + សេណារីយ៉ូ ៨ លើ CLI ពិត + firebase-tools ពិតទល់ Google ក្លែងដែលមានស្ថានភាព (API បិទ · operation ដែលត្រូវ poll ·
-sign-up · rules · updateMask) + **mutation ១២/១២ ក្រហម** ➜ **៨៨ ok** · ~១១០ វិ.។ ⛔ ព្រំដែន ៖ Google **ពិត** មិនត្រូវបានហៅ (session នេះគ្មានគណនី/បណ្តាញ) ➜
+ពិត · DSN · `.cmd` ASCII+CRLF · lock · ឈ្មោះ Project) + សេណារីយ៉ូ ១១ លើ CLI ពិត + firebase-tools ពិតទល់ Google ក្លែងដែលមានស្ថានភាព (API បិទ · operation ដែលត្រូវ
+poll · sign-up · rules · updateMask · វាលដែលបដិសេធ) + **mutation ១៤/១៤ ក្រហម** ➜ **៩៣ ok** · ~៣០ វិ.។ ⛔ ព្រំដែន ៖ Google **ពិត** មិនត្រូវបានហៅ (session នេះគ្មានគណនី/បណ្តាញ) ➜
 ការរត់លើកដំបូងលើគណនីពិតជាសកម្មភាពដោយដៃ ហើយ `verify` ជាអ្នកវាស់លទ្ធផលពិត។ ⚠️ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (**១៦**) ➜
 លើសនោះ មុខងារ «ទាញបញ្ជី ZTO» បិទសម្រាប់ទាំងអស់គ្នា — មិនទាន់កែ (ឧបករណ៍ និង README ប្រាប់ពិដាននេះ)។
 

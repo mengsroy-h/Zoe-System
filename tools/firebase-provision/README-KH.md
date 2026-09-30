@@ -41,7 +41,7 @@ Firebase config (បូក Setup Link បើអ្នកចង់)។
 5. **Realtime Database** លំនាំដើម (តំបន់ `asia-southeast1` = សិង្ហបុរី)
 6. **Security Rules** ពី `firebase-database.rules.json` របស់ repo ➜ អានត្រឡប់មកវិញ ហើយប្រៀបធៀប
 7. **Authentication** ៖ បើក Email/Password · **បិទ «Enable create (sign-up)»** · **បិទ «Enable delete»** ·
-   បើក Email enumeration protection
+   បើក Email enumeration protection (ស្រេចចិត្ត ៖ បើ Google មិនទទួលវាលនេះ វារាយ `SKIP` ហើយការបិទ sign-up នៅតែអនុវត្ត)
 8. **គណនីបុគ្គលិក** `<ឈ្មោះ>@zoew<លេខសាខា>.com` ជាមួយពាក្យសម្ងាត់ចៃដន្យ ១៤ តួ
 
 បន្ទាប់មកវា **វាស់សុវត្ថិភាពដោយផ្ទាល់** ដូចអ្នកវាយប្រហារនឹងធ្វើ ៖

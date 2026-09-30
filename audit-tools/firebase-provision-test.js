@@ -148,6 +148,12 @@ function staticContract() {
             ids.every((id) => (tool.PROJECT_ID_RE.test(id) || id.length > 30) && (id.length > 30 || ctx.PROJECT_ID_RE.test(id)))
             && tool.PROJECT_ID_RE.test(ids[3]) && tool.PROJECT_ID_RE.test(ids[4]) && ctx.PROJECT_ID_RE.test(ids[4]), ids);
     }
+    const GCP_NAME_RE = /^[A-Za-z0-9 '!-]{4,30}$/;
+    const names = ['1', '881859', '12345678901234567890123456789012'].map((b) => tool.defaultDisplayName(b));
+    ok('ឈ្មោះ Project លំនាំដើមឆ្លងច្បាប់ Google (អក្សរ · លេខ · ដកឃ្លា · - \' ! · ៤–៣០ តួ) សូម្បីសាខា ៣២ ខ្ទង់',
+        names.every((n) => GCP_NAME_RE.test(n) && tool.displayNameIsValid(n)), names);
+    ok('--name ដែល Google បដិសេធ (_ · . · វែងពេក) ➜ ឧបករណ៍បដិសេធមុនហៅ Google',
+        ['Shop_1', 'Shop.1', 'x'.repeat(31), 'abc'].every((n) => !tool.displayNameIsValid(n)));
     let badName = false;
     try { tool.userEmail('bad name', 'zoew', '1'); } catch (e) { badName = true; }
     let noBranch = false;
@@ -258,7 +264,7 @@ function defaultAuthConfig() {
 function createFake(tls) {
     const F = {
         knobs: {
-            pollsBeforeDone: 2, authInitOnCreate: true, ignoreMask: new Set(), failOnce: [],
+            pollsBeforeDone: 1, authInitOnCreate: true, ignoreMask: new Set(), rejectMask: new Set(), failOnce: [],
             neverFinishCreate: false, createConflictButCreates: false, signUpStatus: 0, servicesEnabledOnCreate: false
         },
         log: [], tokens: new Set(), tokenRequests: [], ops: {}, opSeq: 0, projects: {}, idTokens: new Map(),
@@ -411,6 +417,9 @@ function createFake(tls) {
         }
         if (m === 'POST' && p === '/v1/projects') {
             const id = json.projectId;
+            if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(String(id || '')) || !/^[A-Za-z0-9 '!-]{4,30}$/.test(String(json.name || ''))) {
+                return err(res, 400, 'Request contains an invalid argument.', 'INVALID_ARGUMENT');
+            }
             if (F.projects[id]) return err(res, 409, 'Requested entity already exists', 'ALREADY_EXISTS');
             const proj = newProject(id, 'owner');
             proj.displayName = json.name;
@@ -498,6 +507,7 @@ function createFake(tls) {
             if (m === 'GET') return send(res, 200, proj.auth.config);
             if (m === 'PATCH') {
                 const mask = String(u.searchParams.get('updateMask') || u.searchParams.get('update_mask') || '').split(',').filter(Boolean);
+                if (mask.some((key) => F.knobs.rejectMask.has(key))) return err(res, 400, 'INVALID_CONFIG : field not supported', 'INVALID_ARGUMENT');
                 mask.forEach((key) => {
                     if (F.knobs.ignoreMask.has(key)) return;
                     const v = getPath(json, key);
@@ -656,8 +666,9 @@ function securityLine(stdout, name) {
 const NEW_ARGS = ['new', '--branch', '881859', '--user', 'sok,chan', '--app-url', 'https://zoew.example.app',
     '--sentry-dsn', 'https://abc@o1.ingest.sentry.io/9'];
 
-async function scenarioHappy(t, ctx, toolDir) {
+async function scenarioCore(t, ctx, toolDir) {
     const fake = await createFake(ctx.tls).start();
+    fake.knobs.pollsBeforeDone = 3;
     const env = makeEnvironment(fake, ctx.deps, ctx.tls.caFile);
     try {
         const r = await runTool(toolDir, NEW_ARGS, env);
@@ -685,7 +696,8 @@ async function scenarioHappy(t, ctx, toolDir) {
         t('ហ.១ ការវាស់ ៖ sign-up ត្រូវបដិសេធ · rules ដូចគ្នា · អានគ្មាន Login បដិសេធ · Login · អានក្រោយ Login',
             securityLine(r.stdout, 'public sign-up blocked') === 'OK  ' && securityLine(r.stdout, 'database rules') === 'OK  '
             && securityLine(r.stdout, 'anonymous read denied') === 'OK  ' && securityLine(r.stdout, 'signed-in read allowed') === 'OK  '
-            && securityLine(r.stdout, 'staff login sok@zoew881859.com') === 'OK  ');
+            && securityLine(r.stdout, 'staff login sok@zoew881859.com') === 'OK  '
+            && securityLine(r.stdout, 'auth settings') === 'OK  ' && securityLine(r.stdout, 'e-mail enumeration protection') === 'OK  ');
         const mgmt = fake.log.filter((e) => e.host === 'api' && !/^\/(oauth2|v1\/accounts:)/.test(e.path));
         t('ហ.១ ⛔ ផ្លូវ token ពិតរបស់ firebase-tools ៖ refresh ដោយ RT-OWNER ➜ រាល់ការហៅ management មាន Bearer ដែល token endpoint ចេញ',
             fake.tokenRequests.length >= 1 && fake.tokenRequests.every((rt) => rt === 'RT-OWNER')
@@ -712,14 +724,37 @@ async function scenarioHappy(t, ctx, toolDir) {
         t('ហ.១ គ្មាន firebase-debug.log (អាចផ្ទុក token) ក្នុង cwd ឬថតឧបករណ៍', stray.length === 0, stray);
 
         if (!proj || !db) {
-            t('ហ.២–៥ ត្រូវការ Project + Database ពីជំហាន ហ.១', false);
-            return { code: r.code };
+            t('ហ.២ ត្រូវការ Project + Database ពីជំហាន ហ.១', false);
+            return;
         }
+        if (ctx.quick) return;
         const again = await runTool(toolDir, NEW_ARGS, env);
         t('ហ.២ រត់ម្តងទៀត ៖ exit 0 គ្មានការបង្កើតស្ទួន (Project · App · Database · គណនី)', again.code === 0
             && fake.count('POST', /^\/v1\/projects$/) === 1 && proj.apps.length === 1 && Object.keys(proj.instances).length === 1
             && Object.keys(passwordsFrom(again.stdout)).length === 0, again.stdout.slice(-800));
 
+    } finally {
+        await fake.stop();
+        fs.rmSync(env.base, { recursive: true, force: true });
+    }
+}
+
+async function seeded(t, ctx, label, args) {
+    const fake = await createFake(ctx.tls).start();
+    const env = makeEnvironment(fake, ctx.deps, ctx.tls.caFile);
+    const seed = await runTool(ctx.toolDir, args, env);
+    const proj = fake.projects['zoew-881859'];
+    const db = proj && proj.defaultDb ? proj.instances[proj.defaultDb] : null;
+    if (seed.code !== 0 || !proj || !db) t(label + ' ត្រូវការ Project ដែលបង្កើតរួច (new exit 0)', false, seed.stderr + seed.stdout.slice(-500));
+    return { fake, env, seed, proj, db, ok: seed.code === 0 && !!proj && !!db,
+        done: async () => { await fake.stop(); fs.rmSync(env.base, { recursive: true, force: true }); } };
+}
+
+async function scenarioDrift(t, ctx, toolDir) {
+    const w = await seeded(t, Object.assign({}, ctx, { toolDir }), 'ហ.៣', ['new', '--branch', '881859', '--user', 'sok']);
+    try {
+        if (!w.ok) return;
+        const { env, db } = w;
         db.rules = '{"rules":{".read":true,".write":true}}';
         const drift = await runTool(toolDir, ['verify', '--project', 'zoew-881859'], env);
         t('ហ.៣ rules ឃ្លាត (.read true) ➜ verify exit 1 · rules FAIL · អានគ្មាន Login FAIL', drift.code === 1
@@ -733,7 +768,17 @@ async function scenarioHappy(t, ctx, toolDir) {
         t('ហ.៣ rules --all --yes ➜ ដំឡើងឡើងវិញ ហើយអានត្រឡប់ស្មើ repo', fixed.code === 0 && sameRules(db.rules, ctx.rulesText), fixed.stdout.slice(-500));
         const clean = await runTool(toolDir, ['verify', '--all'], env);
         t('ហ.៣ verify ក្រោយជួសជុល ➜ exit 0', clean.code === 0, clean.stdout.slice(-900));
+    } finally {
+        await w.done();
+    }
+}
 
+async function scenarioUsers(t, ctx, toolDir) {
+    const w = await seeded(t, Object.assign({}, ctx, { toolDir }), 'ហ.៤', ['new', '--branch', '881859', '--user', 'sok,chan']);
+    try {
+        if (!w.ok) return;
+        const { env, proj } = w;
+        const pw = passwordsFrom(w.seed.stdout);
         const noReset = await runTool(toolDir, ['user', '--project', 'zoew-881859', '--user', 'sok'], env);
         t('ហ.៤ user មានរួច ដោយគ្មាន --reset ➜ មិនប្តូរពាក្យសម្ងាត់ (exit 2)', noReset.code === 2 && proj.users['sok@zoew881859.com'].password === pw['sok@zoew881859.com']);
         const reset = await runTool(toolDir, ['user', '--project', 'zoew-881859', '--user', 'sok', '--reset'], env);
@@ -743,16 +788,23 @@ async function scenarioHappy(t, ctx, toolDir) {
         const added = await runTool(toolDir, ['user', '--project', 'zoew-881859', '--user', 'dara'], env);
         t('ហ.៤ user ថ្មី ➜ បង្កើត · Login ដើរ · ចូល state', added.code === 0 && !!proj.users['dara@zoew881859.com']
             && (stateOf(env, 'zoew-881859') || { users: [] }).users.indexOf('dara@zoew881859.com') !== -1, added.stdout.slice(-400));
+    } finally {
+        await w.done();
+    }
+}
 
+async function scenarioUnmeasured(t, ctx, toolDir) {
+    const w = await seeded(t, Object.assign({}, ctx, { toolDir }), 'ហ.៥', ['new', '--branch', '881859', '--user', 'sok']);
+    try {
+        if (!w.ok) return;
+        const { env, fake } = w;
         fake.knobs.signUpStatus = 500;
         const unmeasured = await runTool(toolDir, ['verify', '--project', 'zoew-881859'], env);
         t('ហ.៥ sign-up endpoint ធ្លាក់ 500 ➜ «វាស់មិនបាន» exit 3 (មិនមែន 0 ឬ 1)', unmeasured.code === 3
             && securityLine(unmeasured.stdout, 'public sign-up blocked') === 'WARN', unmeasured.stdout.slice(-600));
         fake.knobs.signUpStatus = 0;
-        return { code: r.code };
     } finally {
-        await fake.stop();
-        fs.rmSync(env.base, { recursive: true, force: true });
+        await w.done();
     }
 }
 
@@ -860,7 +912,7 @@ async function scenarioSlow(t, ctx, toolDir) {
     fake.knobs.neverFinishCreate = true;
     const env = makeEnvironment(fake, ctx.deps, ctx.tls.caFile);
     try {
-        const r = await runTool(toolDir, ['new', '--branch', '6060', '--user', 'sok'], env, { ZOE_PROVISION_STEP_TIMEOUT_MS: '3000' }, 25000);
+        const r = await runTool(toolDir, ['new', '--branch', '6060', '--user', 'sok'], env, { ZOE_PROVISION_STEP_TIMEOUT_MS: '1500' }, 12000);
         const st = stateOf(env, 'zoew-6060');
         t('ដ.១ ការបង្កើត Project មិនចប់ ➜ tool ចេញក្នុងពិដាន (timed out) · state ចងចាំ pendingProject', r.code === 1 && !r.killed && r.ms < 15000
             && /timed out/.test(r.stderr) && !!st && st.pendingProject === 'zoew-6060', { code: r.code, ms: r.ms, err: r.stderr });
@@ -890,6 +942,14 @@ async function scenarioAuthInit(t, ctx, toolDir) {
         const proj = fake.projects['zoew-9090'];
         t('ឋ.១ Authentication មិនទាន់ initialize (404) ➜ ផ្លូវ provisioning ផ្លូវការ ➜ PATCH ម្តងទៀត ➜ exit 0',
             r.code === 0 && fake.provisionCalls === 1 && !!proj && proj.auth.config.client.permissions.disabledUserSignup === true, r.stderr + r.stdout.slice(-600));
+        fake.knobs.authInitOnCreate = true;
+        fake.knobs.rejectMask.add('emailPrivacyConfig.enableImprovedEmailPrivacy');
+        const r2 = await runTool(toolDir, ['new', '--branch', '9191', '--user', 'sok'], env);
+        const p2 = fake.projects['zoew-9191'];
+        t('ឋ.២ server បដិសេធវាលស្រេចចិត្ត (enumeration protection) ➜ PATCH វាលចាំបាច់ម្តងទៀត ➜ sign-up នៅតែបិទ · exit 0 · រាយ SKIP',
+            r2.code === 0 && !!p2 && p2.auth.config.client.permissions.disabledUserSignup === true
+            && securityLine(r2.stdout, 'e-mail enumeration protection') === 'SKIP' && securityLine(r2.stdout, 'public sign-up blocked') === 'OK  ',
+            r2.stderr + r2.stdout.slice(-700));
     } finally {
         await fake.stop();
         fs.rmSync(env.base, { recursive: true, force: true });
@@ -899,27 +959,49 @@ async function scenarioAuthInit(t, ctx, toolDir) {
 // ── គ. mutation ─────────────────────────────────────────────────────────────────────────
 
 const MUTATIONS = [
-    { name: 'ដក disabledUserSignup ចេញពី AUTH_LOCKDOWN', file: 'firebase-api.js', from: "    'client.permissions.disabledUserSignup': true,\n", to: '', scenario: 'happy' },
+    { name: 'ដក disabledUserSignup ចេញពី AUTH_LOCKDOWN', file: 'firebase-api.js', from: "    'client.permissions.disabledUserSignup': true,\n", to: '', scenario: 'core' },
     { name: 'sign-up ដែលបើក រាយ ok', file: 'provision.js', from: "add('public sign-up blocked', 'fail', 'ANYONE", to: "add('public sign-up blocked', 'ok', 'ANYONE", scenario: 'lockdown' },
-    { name: 'state ផ្ទុកពាក្យសម្ងាត់', file: 'provision.js', from: '    state.complete = true;\n', to: '    state.complete = true;\n    state.lastPasswords = passwords;\n', scenario: 'happy' },
-    { name: 'មិនដំឡើង rules', file: 'provision.js', from: '            await api.deployRules(state.databaseURL, rules.text, false);\n', to: '', scenario: 'happy' },
-    { name: 'គ្មាន x-goog-user-project', file: 'firebase-api.js', from: "        headers: { 'x-goog-user-project': projectId },\n        body: nestedPatch", to: '        body: nestedPatch', scenario: 'happy' },
+    { name: 'state ផ្ទុកពាក្យសម្ងាត់', file: 'provision.js', from: '    state.complete = true;\n', to: '    state.complete = true;\n    state.lastPasswords = passwords;\n', scenario: 'core' },
+    { name: 'មិនដំឡើង rules', file: 'provision.js', from: '            await api.deployRules(state.databaseURL, rules.text, false);\n', to: '', scenario: 'core' },
+    { name: 'គ្មាន x-goog-user-project', file: 'firebase-api.js', from: "        headers: { 'x-goog-user-project': projectId },\n        body: nestedPatch", to: '        body: nestedPatch', scenario: 'core' },
     { name: 'យក Project មានស្រាប់ដោយគ្មាន --adopt', file: 'provision.js', from: "if (state.pendingProject !== id && opts.adopt !== true) {", to: 'if (false) {', scenario: 'adopt' },
     { name: 'មិនកត់ pendingProject មុនបង្កើត', file: 'provision.js', from: '        state.pendingProject = id;\n        saveState(state);\n', to: '', scenario: 'slow' },
     { name: 'មិនពិនិត្យ 409 លើ Project ខ្លួនឯង', file: 'provision.js', from: '        if ((await api.cloudProject(id)).accessible) return;\n', to: '', scenario: 'slow' },
-    { name: 'អានគ្មាន Login ដែលបើក រាយ ok', file: 'provision.js', from: "else if (res.status === 200) add('anonymous read denied', 'fail'", to: "else if (res.status === 200) add('anonymous read denied', 'ok'", scenario: 'happy' },
-    { name: 'គ្មាន requireAuth (token seam)', file: 'firebase-api.js', from: '    await m.requireAuth.requireAuth({ user: account.user, tokens: account.tokens });\n', to: '', scenario: 'happy' },
+    { name: 'អានគ្មាន Login ដែលបើក រាយ ok', file: 'provision.js', from: "else if (res.status === 200) add('anonymous read denied', 'fail'", to: "else if (res.status === 200) add('anonymous read denied', 'ok'", scenario: 'drift' },
+    { name: 'គ្មាន requireAuth (token seam)', file: 'firebase-api.js', from: '    await m.requireAuth.requireAuth({ user: account.user, tokens: account.tokens });\n', to: '', scenario: 'core' },
     { name: 'គ្មានពិដានជំហាន', file: 'provision.js', from: "    return api.withDeadline(fn(), STEP_TIMEOUT_MS, 'step \"' + name + '\"');", to: '    return fn();', scenario: 'slow' },
-    { name: 'user --reset មិនបាច់ ➜ ប្តូរពាក្យសម្ងាត់គណនីមានស្រាប់', file: 'provision.js', from: '    } else if (opts.reset === true) {', to: '    } else if (true) {', scenario: 'happy' }
+    { name: 'user --reset មិនបាច់ ➜ ប្តូរពាក្យសម្ងាត់គណនីមានស្រាប់', file: 'provision.js', from: '    } else if (opts.reset === true) {', to: '    } else if (true) {', scenario: 'users' },
+    { name: 'វាលស្រេចចិត្តត្រូវបដិសេធ ➜ មិន PATCH វាលចាំបាច់ម្តងទៀត', file: 'firebase-api.js', from: '    if (res.status === 400) res = await patchAuthConfig(projectId, AUTH_LOCKDOWN);\n', to: '', scenario: 'authinit' },
+    { name: 'Authentication មិនទាន់ initialize ➜ មិនហៅ provisioning', file: 'firebase-api.js', from: '        await initAuth(projectId, appId);\n', to: '', scenario: 'authinit' }
 ];
 
 const SCENARIOS = {
-    happy: scenarioHappy, lockdown: scenarioLockdownIgnored, adopt: scenarioAdopt, slow: scenarioSlow
+    core: scenarioCore, drift: scenarioDrift, users: scenarioUsers, lockdown: scenarioLockdownIgnored, adopt: scenarioAdopt,
+    slow: scenarioSlow, authinit: scenarioAuthInit
 };
+const JOBS = (() => {
+    const asked = parseInt(process.env.FBPROVISION_JOBS || '', 10);
+    if (Number.isFinite(asked) && asked >= 1) return Math.min(asked, 16);
+    return Math.min(6, Math.max(2, os.cpus().length || 2));
+})();
+
+// ⛔ រត់ស្របគ្នា (សេណារីយ៉ូនីមួយៗមាន Google ក្លែង · state · port ផ្ទាល់ខ្លួន) តែការអះអាង **ចាក់ចូល ok() តាមលំដាប់ថេរ**
+//    ក្រោយចប់ ➜ output មិនប្រែតាមពេល ហើយការពុល ok() របស់ exit-code-integrity គ្របគ្រប់ការអះអាង។
+async function pool(items, limit, fn) {
+    const out = new Array(items.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (next < items.length) {
+            const k = next++;
+            out[k] = await fn(items[k], k);
+        }
+    }));
+    return out;
+}
 
 async function mutationRound(ctx) {
     console.log('\n── គ. mutation លើ tool ពិត ➜ សេណារីយ៉ូត្រូវក្រហម ──');
-    for (const mut of MUTATIONS) {
+    const results = await pool(MUTATIONS, JOBS, async (mut) => {
         const dir = tempDir('zoe-provision-mut-');
         try {
             const toolDir = path.join(dir, 'tools', 'firebase-provision');
@@ -928,22 +1010,24 @@ async function mutationRound(ctx) {
             fs.copyFileSync(path.join(ROOT, 'firebase-database.rules.json'), path.join(dir, 'firebase-database.rules.json'));
             const file = path.join(toolDir, mut.file);
             const src = fs.readFileSync(file, 'utf8');
-            if (src.indexOf(mut.from) === -1) {
-                ok('M ' + mut.name + ' ៖ mutation ចុះលើកូដពិត', false, 'រកមិនឃើញអត្ថបទគោលដៅ');
-                continue;
-            }
+            if (src.indexOf(mut.from) === -1) return { applied: false, red: 0 };
             fs.writeFileSync(file, src.replace(mut.from, mut.to));
             let red = 0;
             try {
-                await SCENARIOS[mut.scenario]((label, cond) => { if (!cond) red += 1; }, ctx, toolDir);
+                await SCENARIOS[mut.scenario]((label, cond) => { if (!cond) red += 1; }, Object.assign({}, ctx, { quick: true }), toolDir);
             } catch (e) {
                 red += 1;
             }
-            ok('M ' + mut.name + ' ➜ ក្រហម (' + red + ')', red > 0);
+            return { applied: true, red: red };
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
-    }
+    });
+    MUTATIONS.forEach((mut, i) => {
+        const r = results[i];
+        if (!r.applied) ok('M ' + mut.name + ' ៖ mutation ចុះលើកូដពិត', false, 'រកមិនឃើញអត្ថបទគោលដៅ');
+        else ok('M ' + mut.name + ' ➜ ក្រហម (' + r.red + ')', r.red > 0);
+    });
 }
 
 function skip(reason) {
@@ -979,14 +1063,18 @@ function skip(reason) {
                 if (decodeFn) vm.runInContext(decodeFn + '\nthis.decode = decodeSetupPayload;', dctx);
                 const ctx = { tls: tls, deps: deps, rulesText: read('firebase-database.rules.json'), decode: decodeFn ? dctx.decode : null };
                 console.log('\n── ខ. ឥរិយាបថ ៖ CLI ពិត + firebase-tools ' + pin['firebase-tools'] + ' ពិត ទល់ Google ក្លែង (HTTPS) ──');
-                for (const fn of [scenarioHappy, scenarioNotLoggedIn, scenarioResume, scenarioIds, scenarioAdopt,
-                    scenarioLockdownIgnored, scenarioSlow, scenarioAuthInit]) {
+                const fns = [scenarioCore, scenarioDrift, scenarioUsers, scenarioUnmeasured, scenarioNotLoggedIn, scenarioResume,
+                    scenarioIds, scenarioAdopt, scenarioLockdownIgnored, scenarioSlow, scenarioAuthInit];
+                const recorded = await pool(fns, JOBS, async (fn) => {
+                    const rec = [];
                     try {
-                        await fn(ok, ctx, TOOL);
+                        await fn((label, cond, detail) => rec.push([label, !!cond, detail]), ctx, TOOL);
                     } catch (e) {
-                        ok(fn.name + ' ៖ រត់ចប់ដោយគ្មាន exception', false, e && e.stack ? e.stack : String(e));
+                        rec.push([fn.name + ' ៖ រត់ចប់ដោយគ្មាន exception', false, e && e.stack ? e.stack : String(e)]);
                     }
-                }
+                    return rec;
+                });
+                recorded.forEach((rec) => rec.forEach(([label, cond, detail]) => ok(label, cond, detail)));
                 if (process.env.FBPROVISION_MUTATIONS !== '0') await mutationRound(ctx);
             }
         }

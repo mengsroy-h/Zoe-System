@@ -23,7 +23,7 @@ const BRANCH_RE = /^[0-9]{1,32}$/;
 const PROJECT_ID_RE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 const USER_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const EMAIL_RE = /^[a-z0-9][a-z0-9._+-]{0,63}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
-const DISPLAY_NAME_RE = /^[A-Za-z0-9 ._-]{4,30}$/;
+const DISPLAY_NAME_RE = /^[A-Za-z0-9 '!-]{4,30}$/;
 const REGIONS = ['asia-southeast1', 'us-central1', 'europe-west1'];
 const DEFAULT_REGION = 'asia-southeast1';
 const FIREBASE_CONFIG_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
@@ -147,6 +147,14 @@ function randomFrom(alphabet, length) {
 
 function generatePassword() {
     return randomFrom(PASSWORD_ALPHABET, PASSWORD_LENGTH);
+}
+
+function defaultDisplayName(branch) {
+    return ('ZoeW ' + branch).slice(0, 30);
+}
+
+function displayNameIsValid(name) {
+    return DISPLAY_NAME_RE.test(String(name || ''));
 }
 
 function derivedProjectId(branch) {
@@ -380,7 +388,7 @@ function newState(projectId, branch, prefix, region, idExplicit) {
     return {
         projectId: projectId,
         idExplicit: !!idExplicit,
-        displayName: 'ZoeW ' + branch,
+        displayName: defaultDisplayName(branch),
         branch: branch,
         emailPrefix: prefix,
         region: region,
@@ -424,6 +432,8 @@ async function verifyProject(state, rules, passwords) {
         else {
             const gaps = api.lockdownGaps(cfg);
             add('auth settings', gaps.length ? 'fail' : 'ok', gaps.length ? 'not set: ' + gaps.join(', ') : 'sign-up and delete disabled');
+            const extra = api.lockdownGaps(cfg, api.AUTH_OPTIONAL);
+            add('e-mail enumeration protection', extra.length ? 'skip' : 'ok', extra.length ? 'off (optional; turn it on in the Console if you can)' : '');
         }
     } catch (e) {
         add('auth settings', 'unmeasured', api.messageOf(e));
@@ -568,8 +578,12 @@ async function cmdNew(opts) {
     if (!emails.length && opts.adopt !== true) throw new UsageError('Give at least one --user');
     const region = flagText(opts, 'region') || DEFAULT_REGION;
     if (REGIONS.indexOf(region) === -1) throw new UsageError('--region must be one of: ' + REGIONS.join(', '));
-    const displayName = flagText(opts, 'name') || ('ZoeW ' + branch);
-    if (!DISPLAY_NAME_RE.test(displayName)) throw new UsageError('--name must be 4-30 plain letters/digits');
+    const displayName = flagText(opts, 'name') || defaultDisplayName(branch);
+    if (!DISPLAY_NAME_RE.test(displayName)) throw new UsageError('--name must be 4-30 characters: letters, digits, space, dash');
+    if (typeof opts['app-url'] !== 'string' && !settings.appUrl) {
+        const typed = await ask('ZoeW site URL for the Setup Link (Enter to skip): ');
+        if (typed) opts['app-url'] = typed;
+    }
     rememberSettings(opts, settings);
     const rules = readRulesFile(flagText(opts, 'rules') || DEFAULT_RULES_FILE);
 
@@ -840,6 +854,8 @@ module.exports = {
     PROJECT_ID_RE,
     BRANCH_RE,
     FIREBASE_CONFIG_KEYS,
+    defaultDisplayName,
+    displayNameIsValid,
     derivedProjectId,
     suffixedProjectId,
     userEmail,

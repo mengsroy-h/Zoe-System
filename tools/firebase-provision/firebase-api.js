@@ -24,7 +24,9 @@ const AUTH_LOCKDOWN = {
     'signIn.email.enabled': true,
     'signIn.email.passwordRequired': true,
     'client.permissions.disabledUserSignup': true,
-    'client.permissions.disabledUserDeletion': true,
+    'client.permissions.disabledUserDeletion': true
+};
+const AUTH_OPTIONAL = {
     'emailPrivacyConfig.enableImprovedEmailPrivacy': true
 };
 
@@ -293,7 +295,7 @@ async function readAuthConfig(projectId) {
         resolveOnHTTPError: true
     });
     if (res.status === 200) return res.body || {};
-    if (res.status === 404) return null;
+    if (authNotInitialized(res)) return null;
     const err = new Error('Could not read Authentication settings (HTTP ' + res.status + ')');
     err.status = res.status;
     throw err;
@@ -317,17 +319,22 @@ function readPath(obj, key) {
     return key.split('.').reduce((cur, part) => (cur && typeof cur === 'object' ? cur[part] : undefined), obj);
 }
 
-function lockdownGaps(config) {
-    return Object.keys(AUTH_LOCKDOWN).filter((key) => readPath(config, key) !== AUTH_LOCKDOWN[key]);
+function lockdownGaps(config, fields) {
+    const want = fields || AUTH_LOCKDOWN;
+    return Object.keys(want).filter((key) => readPath(config, key) !== want[key]);
 }
 
-async function patchAuthConfig(projectId) {
+function authNotInitialized(res) {
+    return res.status === 404 || errorCodeOf(res) === 'CONFIGURATION_NOT_FOUND';
+}
+
+async function patchAuthConfig(projectId, fields) {
     return identityAdmin().request({
         method: 'PATCH',
         path: '/admin/v2/projects/' + projectId + '/config',
-        queryParams: { updateMask: Object.keys(AUTH_LOCKDOWN).join(',') },
+        queryParams: { updateMask: Object.keys(fields).join(',') },
         headers: { 'x-goog-user-project': projectId },
-        body: nestedPatch(AUTH_LOCKDOWN),
+        body: nestedPatch(fields),
         timeout: REQUEST_TIMEOUT_MS,
         resolveOnHTTPError: true
     });
@@ -343,11 +350,13 @@ async function initAuth(projectId, appId) {
 }
 
 async function lockDownAuth(projectId, appId) {
-    let res = await patchAuthConfig(projectId);
-    if (res.status === 404) {
+    const all = Object.assign({}, AUTH_LOCKDOWN, AUTH_OPTIONAL);
+    let res = await patchAuthConfig(projectId, all);
+    if (authNotInitialized(res)) {
         await initAuth(projectId, appId);
-        res = await patchAuthConfig(projectId);
+        res = await patchAuthConfig(projectId, all);
     }
+    if (res.status === 400) res = await patchAuthConfig(projectId, AUTH_LOCKDOWN);
     if (res.status !== 200) {
         const detail = res.body && res.body.error && res.body.error.message ? ': ' + res.body.error.message : '';
         const err = new Error('Could not update Authentication settings (HTTP ' + res.status + detail + ')');
@@ -454,6 +463,7 @@ module.exports = {
     REQUIRED_SURFACE,
     REQUIRED_APIS,
     AUTH_LOCKDOWN,
+    AUTH_OPTIONAL,
     WEB_APP_NAME,
     load,
     toolsVersion,

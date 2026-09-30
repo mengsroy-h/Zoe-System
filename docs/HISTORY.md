@@ -1541,6 +1541,11 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 **៥. ការសម្អាត** ៖ លុប `ExampleUnitTest.java` · `ExampleInstrumentedTest.java` (template Capacitor · package `com.getcapacitor.myapp`) — តេស្ត instrumented
 អះអាង package `com.getcapacitor.app` ➜ **ធ្លាក់** បើនរណារត់វាលើ `com.zoesystem.zoew` ➜ ជាឯកសារបំភ្លៃ មិនមែនអ្នកយាម។
 
+**៦. CI ចុងក្រោយ** (tree `a93decc` · emulator · `*_STRICT` · `RUNALL_JOBS=4`) ៖ **១៨៩ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ០ ធ្លាក់** (៦០២ វិ. · ផលបូកពេល checker
+១៩២២ វិ.) — ១៨៨ របស់ baseline បូក `zoew-parity` (១៧៤ វិ.)។ ⚠️ ការរត់កណ្តាលទី (ពេល `push-server.test.ts` កំពុងកែ) ធ្លាក់ `zoew-suite` ម្តង ➜ រត់ឡើងវិញលើ tree
+ដែល commit រួច ➜ ១៦/១៦ · output នៃការរត់នោះត្រូវរក្សាទុកតែជាសង្ខេបដែលច្រោះ (`run-all.sh` បោះពុម្ព output របស់ checker ដែលធ្លាក់ តែ state មិនរក្សាវា) ➜
+មូលហេតុនៃការធ្លាក់នោះមិនអាចវាស់ពី log បានទេ ⛔ រក្សា log ពេញ (`> file 2>&1`) មុនច្រោះ។
+
 ### Mutation testing ជុំ ២ ៖ ១៥ mutation + ៣ ផ្ទៀងផ្ទាត់ ➜ ចន្លោះ ៣ (ខ្សែភ្ជាប់ SW ↔ ទំព័រ) · control ១ (2026-09-29 · ZoeW 2.45.4)
 
 - **វិធី** ៖ ដូចជុំ ១ តែរត់ក្នុង **git worktree ដាច់ដោយឡែក** (tree ធ្វើការមិនប៉ះ) · subset checker ៣០ ក្នុងមួយ mutation (~១៩០ វិ.)។ ⛔ worktree

@@ -2248,8 +2248,6 @@ bash audit-tools/emu/rules.sh
 - ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
   ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
   (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
-- ⏳ **2.45.6 (ZoeW) ៖ build APK ថ្មី ➜ សាក Push លើ Android ពិត** — APK 2.45.5 ជាប់ «⏳ កំពុងភ្ជាប់…» (plugin Capacitor ជា thenable · `docs/HISTORY.md`)។
-  ដំឡើងជាន់ ➜ 🔔 ➜ «🔔 បើកការជូនដំណឹង» ➜ ត្រូវមានប្រអប់សុំសិទ្ធិ (Android 13+) ➜ «✅ បើករួច» ➜ ផ្ញើដំណឹងពី ZoeKeyGen ➜ ទូរស័ព្ទលោតក្នុង ~៥ នាទី ទោះ App បិទ។
 - ⏳ **2.45.5 (ZoeW) · 2.22.1 (ZoeKeyGen) ៖ Deploy ទាំង ២ site + build APK ថ្មី** — CSP ថ្មី (`connect-src` + `https://www.gstatic.com`) មកជាមួយ
   `netlify.toml` ក្នុង deploy ដដែល · សិទ្ធិ `ACCESS_NETWORK_STATE` ចូលតែតាម **APK ថ្មី**។ សាកលើឧបករណ៍ពិត ៖ APK បើក Airplane mode ➜ ចំណុចស្ថានភាព
   ប្តូរជា «ក្រៅបណ្ដាញ» ក្នុងប៉ុន្មានវិនាទី (មុននេះ «កំពុងភ្ជាប់…» ~៣៥ វិ.) · បិទ Airplane ➜ «ភ្ជាប់ Server រួចរាល់» វិញភ្លាម · 🩺 ជួរ «អ៊ីនធឺណិត»

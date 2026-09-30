@@ -1622,6 +1622,10 @@ poll · sign-up · rules · updateMask · វាលដែលបដិសេធ) 
 ការរត់លើកដំបូងលើគណនីពិតជាសកម្មភាពដោយដៃ ហើយ `verify` ជាអ្នកវាស់លទ្ធផលពិត។ ⚠️ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (**១៦**) ➜
 លើសនោះ មុខងារ «ទាញបញ្ជី ZTO» បិទសម្រាប់ទាំងអស់គ្នា — មិនទាន់កែ (ឧបករណ៍ និង README ប្រាប់ពិដាននេះ)។
 
+**CI ពេញ** (emulator · `*_STRICT` · `FBPROVISION_STRICT=1` · `RUNALL_JOBS=4`) ៖ លើកទី ១ ធ្លាក់ ៣ ➜ meta-checker ២ ខាងលើ (ជួសជុល) · `zoew-suite` ➜ `rules:check`
+Android «ស្តារ MR1» (ZoeW **មិនប្រែ** ➜ ថ្នាក់ដដែលនឹងការធ្លាក់ក្រោមបន្ទុកដែលកត់ក្នុងធាតុ Supabase ខាងក្រោម) ➜ លើកទី ២ លើ tree ចុងក្រោយ ៖ **១៩១ ពេញលេញ · ០ មួយផ្នែក ·
+០ រំលង**។ checker លើ tree មុនកែ (`origin/main`) ➜ `0 ok, 1 FAIL`។
+
 **សកម្មភាពដែលត្រូវធ្វើដោយដៃ** ៖ `tools/firebase-provision/setup.cmd` (Login Google ម្តង) ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ exit 0 ➜ Login ក្នុង
 ZoeW ➜ អតិថិជនចាស់ ៖ `node provision.js new --project-id <id> --branch <សាខា> --adopt` ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។ ⛔ គ្មាន Deploy · គ្មាន Publish ·
 ZoeW/ZoeKeyGen មិនប្រែ។

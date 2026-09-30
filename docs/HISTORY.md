@@ -1535,6 +1535,10 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 static import ➜ មិនដែល resolve ទៅ plugin ➜ មិនរងផល (ពិនិត្យលើ `import('@capacitor/…'|'@capgo/…')` ទាំងអស់ក្នុង `src/**`)។ ⛔ ជាន់ទី ២ ៖ ការព្យួរណាមួយ
 **មុន** watchdog បង្កើត «`busy` ជារៀងរហូត» (សោ) ➜ ពិដានលើជំហានដែលមិនសួរអ្នកប្រើ។
 
+⛔ ចំហៀង ៖ ការ build APK (Gradle) ក្នុងម៉ាស៊ីនដដែល ធ្វើឲ្យ `npm run lint` ក្នុង `zoew-suite` ធ្លាក់ ព្រោះ ESLint ស្កេន output ក្រោម
+`android/app/build/` (`native-bridge.js` · ២៩ ឯកសារ) ➜ `eslint.config.mjs` មិនស្កេន `android` (git មិនតាមដាន JS/TS នៅទីនោះទេ · ឯកសារដែលស្កេន ៣០៨ ➜ ២៧៩ =
+ត្រឹម `android/` ២៩ · `src/` និង `tests/` ដដែល)។ run-all លើកដំបូង ៖ **១៨៨ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ធ្លាក់ ១** (`zoew-suite` ៖ lint តែប៉ុណ្ណោះ)។
+
 ### Deep audit 2.45.5 ៖ `navigator.onLine` ដែលកុហក · អ្នកយាម parity ដែលគ្មាននរណារត់ (2026-09-30 · ZoeW 2.45.5 · ZoeKeyGen 2.22.1)
 
 baseline (tree មិនប៉ះ · emulator · `*_STRICT`) ៖ **១៨៨ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ០ ធ្លាក់** (៥៦៩ វិ.)។ កំហុសទាំងអស់ខាងក្រោម **បៃតងលើសំណុំនោះ**។

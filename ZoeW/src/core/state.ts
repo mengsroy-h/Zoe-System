@@ -50,6 +50,7 @@ export interface FirebaseState {
     firebaseSdkRetryAttempt: number;
     lastFirebaseSdkAttemptAt: number;
     lastFirebaseSdkReloadAt: number;
+    firebaseSdkProbeInFlight: boolean;
     lateFirebaseSdkListenerArmed: boolean;
     firebaseSdkUnavailable: boolean;
     sdkUnavailableNoticeShown: boolean;
@@ -103,6 +104,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     firebaseSdkRetryAttempt: 0,
     lastFirebaseSdkAttemptAt: 0,
     lastFirebaseSdkReloadAt: 0,
+    firebaseSdkProbeInFlight: false,
     lateFirebaseSdkListenerArmed: false,
     firebaseSdkUnavailable: false,
     sdkUnavailableNoticeShown: false,

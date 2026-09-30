@@ -2,7 +2,7 @@
   "name": "ZoeW - ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់",
   "short_name": "ZoeW",
   "description": "ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (Admin)",
-  "version": "2.45.4",
+  "version": "2.45.5",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

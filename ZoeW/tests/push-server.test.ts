@@ -15,7 +15,7 @@ import {
     FCM_CHANNEL_ID as SERVER_FCM_CHANNEL, LICENSE_APP_CODE, LICENSE_DB_URL_DEFAULT, LICENSE_KEY_PREFIX, LICENSE_PUBLIC_KEYS_JWK,
     PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX,
     b64urlDecode, b64urlEncode, createPushService, encryptWebPushPayload, handlePushRequest, readPushConfig,
-    resetPushStateForTests, vapidAuthorization, webPushEndpointAllowed
+    resetPushStateForTests, runPushCron, vapidAuthorization, webPushEndpointAllowed
 } from '../netlify/lib/push-core.mjs';
 import { LICENSE_APP_CODE as CLIENT_APP_CODE } from '../src/features/license';
 import { FCM_CHANNEL_ID as CLIENT_FCM_CHANNEL, PUSH_OPEN_PARAM } from '../src/features/push';
@@ -446,6 +446,49 @@ describe('ការរំលឹកកញ្ចប់ជិតផុតកំណ�
         h2.push = () => { count++; return { status: 201 }; };
         await h2.service.dispatchExpiry();
         expect(count).toBe(0);
+    });
+});
+
+describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify scheduled function', () => {
+    const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+    const NETLIFY_SCHEDULED_LIMIT_MS = 30000;
+
+    it('ដំណាក់ ២ (ដំណឹង ➜ រំលឹក) ចែកពិដានតែមួយ ៖ ការផ្ញើយឺត ➜ ការរត់ទាំងមូលនៅក្នុង ៣០ វិ. (មិនត្រូវសម្លាប់ក្រោយ ledger ចាក់សោរួច)', async () => {
+        const h = harness({ notices: {} });
+        h.clock.now = at8 - 3600e3;
+        for (let i = 0; i < 4; i++) await h.service.subscribe(GOOD, webSub().sub);
+        await h.service.saveSchedule(GOOD, [at8 + 3600e3]);
+        h.clock.now = at8;
+        await h.service.dispatchNotices();
+        h.notices = { [noticeId(at8)]: { kind: 'notice', title: 'ថ្មី', at: at8 } };
+        h.push = () => { h.clock.now += 7000; return { status: 201 }; };
+        const t0 = h.clock.now;
+        const out = await runPushCron(h.service, () => h.clock.now);
+        expect(out.notices).toMatchObject({ reason: 'sent' });
+        expect(h.clock.now - t0).toBeLessThanOrEqual(NETLIFY_SCHEDULED_LIMIT_MS);
+        expect(await h.store.getWithMetadata('state/expiry/' + KEY_ID)).toBeNull();
+    });
+
+    it('⛔ ពិដានអស់ក្រោយការអាន ➜ មិនចាក់សោរំលឹកថ្ងៃនេះ (រត់បន្ទាប់ក្នុងម៉ោង ៨ នៅផ្ញើបាន)', async () => {
+        const h = harness();
+        h.clock.now = at8 - 3600e3;
+        await h.service.subscribe(GOOD, webSub().sub);
+        await h.service.saveSchedule(GOOD, [at8 + 3600e3]);
+        h.clock.now = at8;
+        const read = h.store.getWithMetadata.bind(h.store);
+        let slow = true;
+        h.store.getWithMetadata = async (key: string) => {
+            if (slow && key.startsWith('sched/')) h.clock.now += 21000;
+            return read(key);
+        };
+        let sent = 0;
+        h.push = () => { sent++; return { status: 201 }; };
+        await h.service.dispatchExpiry();
+        expect(sent).toBe(0);
+        slow = false;
+        h.clock.now = at8 + 5 * 60e3;
+        await h.service.dispatchExpiry();
+        expect(sent).toBe(1);
     });
 });
 

@@ -487,8 +487,12 @@ export function createPushService(deps) {
         };
     }
 
-    async function dispatchNotices() {
-        const startedAt = now();
+    function runStart(runStartedAt) {
+        return typeof runStartedAt === 'number' && isFinite(runStartedAt) ? runStartedAt : now();
+    }
+
+    async function dispatchNotices(runStartedAt) {
+        const startedAt = runStart(runStartedAt);
         const notices = await readNotices();
         if (!notices) return { ok: false, reason: 'notices:read' };
         const latest = notices.length ? notices[notices.length - 1].id : '';
@@ -539,8 +543,8 @@ export function createPushService(deps) {
         };
     }
 
-    async function dispatchExpiry() {
-        const startedAt = now();
+    async function dispatchExpiry(runStartedAt) {
+        const startedAt = runStart(runStartedAt);
         const zone = zoneParts(startedAt);
         if (zone.hour !== PUSH_EXPIRY_HOUR) return { ok: true, reason: 'not-hour', sent: 0 };
         const listed = await store.list({ prefix: 'sched/' });
@@ -558,6 +562,7 @@ export function createPushService(deps) {
             const ledgerKey = 'state/expiry/' + keyId;
             const ledger = await readJson(ledgerKey);
             if (ledger && ledger.data && ledger.data.day === zone.day) continue;
+            if (elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS) { total.cut++; continue; }
             const claim = await store.setJSON(ledgerKey, { day: zone.day, at: startedAt }, ledger ? { onlyIfMatch: ledger.etag } : { onlyIfNew: true });
             if (!claim || !claim.modified) continue;
             const index = await readJson('bykey/' + keyId);
@@ -596,6 +601,14 @@ export function jsonResponse(status, body) {
         status: status,
         headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, PUSH_CORS_HEADERS)
     });
+}
+
+export async function runPushCron(service, nowFn) {
+    const now = nowFn || (() => Date.now());
+    const startedAt = now();
+    const notices = await service.dispatchNotices(startedAt).catch(() => ({ ok: false, reason: 'error' }));
+    const expiry = await service.dispatchExpiry(startedAt).catch(() => ({ ok: false, reason: 'error' }));
+    return { notices: notices, expiry: expiry };
 }
 
 const kickState = { at: 0, inFlight: null };

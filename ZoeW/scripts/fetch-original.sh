@@ -16,7 +16,9 @@ if ! git -C "$TOP" cat-file -e "$REF":ZoeW/app.js 2>/dev/null; then
     echo "⛔ ref «$REF» គ្មាន ZoeW/app.js (មិនមែន ZoeW vanilla JS)" >&2
     exit 2
 fi
-rm -rf .original
-mkdir -p .original
-git -C "$TOP" archive "$REF" ZoeW | tar -x -C .original
-echo "✅ ZoeW ដើម ➜ .original/ZoeW (ref $(git -C "$TOP" rev-parse --short "$REF"))"
+# ORIGINAL_DIR ៖ ថតឯកជន (ឧ. ការវាស់ parity ក្នុង run-all) ➜ មិនប៉ះ `.original` ដែលការរត់ស្របគ្នាផ្សេងអាន
+OUT="${ORIGINAL_DIR:-.original}"
+rm -rf "$OUT"
+mkdir -p "$OUT"
+git -C "$TOP" archive "$REF" ZoeW | tar -x -C "$OUT"
+echo "✅ ZoeW ដើម ➜ $OUT/ZoeW (ref $(git -C "$TOP" rev-parse --short "$REF"))"

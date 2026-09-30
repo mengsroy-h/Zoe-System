@@ -1189,6 +1189,35 @@ function buildContext() {
         const calls = [];
         const reloads = [];
         const store = {};
+        // ⛔ ការឈានដល់ host របស់ SDK ត្រូវ **វាស់** មុនចំណាយពិដានផ្ទុកឡើងវិញ ➜ stub ៖ `__sdkHost` = up · down · hang
+        //    (hang ➜ ការឆ្លើយជាប់ក្នុង `pendingProbes` រហូតដល់តេស្តដោះវា)។ thenable ដោះ **ភ្លាម** (synchronous) ដើម្បីឲ្យ
+        //    ការអះអាងចាស់ (ដែលរត់ជាជួរ) វាស់ផលក្រោយការឈានដល់ ដោយមិនបាច់ flush microtask
+        const probes = [];
+        const pendingProbes = [];
+        const thenable = () => {
+            let state = 'pending', value;
+            const subs = [];
+            const settle = (s, v) => { if (state !== 'pending') return; state = s; value = v; subs.splice(0).forEach((fn) => fn()); };
+            const t = {
+                then(onOk, onFail) {
+                    const next = thenable();
+                    const run = () => {
+                        const cb = state === 'ok' ? onOk : onFail;
+                        if (typeof cb !== 'function') { next.settle(state, value); return; }
+                        try {
+                            const r = cb(value);
+                            if (r && typeof r.then === 'function') r.then((v) => next.settle('ok', v), (e) => next.settle('fail', e));
+                            else next.settle('ok', r);
+                        } catch (e) { next.settle('fail', e); }
+                    };
+                    if (state === 'pending') subs.push(run); else run();
+                    return next.t;
+                },
+                catch(f) { return t.then(undefined, f); },
+                finally(f) { return t.then((v) => { f(); return v; }, (e) => { f(); throw e; }); }
+            };
+            return { t, settle };
+        };
         const ctx = vm.createContext({
             console, Math,
             Date: { now: () => clock },
@@ -1200,7 +1229,11 @@ function buildContext() {
             // ផ្លូវស្តារពិតគឺការផ្ទុកទំព័រឡើងវិញ។ stub នេះរាប់វា។
             window: { location: { reload: () => reloads.push(clock) } },
             // ⛔ ZoeW ជា React ៖ ស្ថានភាពប្រអប់ = `style.display` របស់ធាតុ (`modalIsOpen()` ក្នុងទិដ្ឋភាព) ➜ `__openModal`
-            document: { querySelectorAll: () => [], getElementById: (id) => (id === ctx.__openModal ? { style: { display: 'flex' } } : null) },
+            // ZoeKeyGen (vanilla) អាន `.modal` ដែល `display: flex` ➜ `__openModal` ត្រូវលេចតាមផ្លូវនោះដែរ
+            document: {
+                querySelectorAll: (sel) => (sel === '.modal' && ctx.__openModal ? [{ classList: { contains: () => false }, style: { display: 'flex' } }] : []),
+                getElementById: (id) => (id === ctx.__openModal ? { style: { display: 'flex' } } : null)
+            },
             queueMicrotask,
             __openModal: null,
             sessionStorage: {
@@ -1209,6 +1242,15 @@ function buildContext() {
                 removeItem: (k) => { delete store[k]; }
             },
             initFirebase: () => { calls.push(clock); return Promise.resolve(false); },
+            __sdkHost: 'up',
+            fetchWithTimeout: (url, opts, ms) => {
+                probes.push({ url, opts, ms, at: clock });
+                const d = thenable();
+                if (ctx.__sdkHost === 'up') d.settle('ok', { res: { status: 0, type: 'opaque' } });
+                else if (ctx.__sdkHost === 'down') d.settle('fail', new TypeError('Failed to fetch'));
+                else pendingProbes.push(d);
+                return d.t;
+            },
             firebaseSdkUnavailable: true, isDatabaseInitialized: false, isInitializingFirebase: false
         });
         // ⛔ កំណែ 2.22.5 ៖ `reloadForFirebaseSdk()` ចូលប្រើ storage តាម shim
@@ -1229,6 +1271,9 @@ function buildContext() {
             /lastFirebaseSdkReloadAt/.test(appSrc) ? 'let lastFirebaseSdkReloadAt = 0;' : '',
             pick('safeStoreSet') || '', pick('safeStoreRemove') || '', pick('safeStoreGet') || '',
             pick('anyModalIsOpen') || '', pick('firebaseSdkReloadCount') || '',
+            konst('FIREBASE_SDK_PROBE_URL') || '', konst('FIREBASE_SDK_PROBE_TIMEOUT_MS') || '',
+            /firebaseSdkProbeInFlight/.test(appSrc) ? 'let firebaseSdkProbeInFlight = false;' : '',
+            pick('probeFirebaseSdkHost') || '', pick('firebaseSdkReloadAllowed') || '',
             pick('reloadForFirebaseSdk') || '', pick('recoverFirebaseSdk') || '',
             // ពិដានល្បឿនឥឡូវឆ្លងកាត់ `elapsedSince()` (2.20.7) — ត្រូវផ្ទុក helper ពិត
             pick('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }',
@@ -1237,7 +1282,7 @@ function buildContext() {
             'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry, resetFirebaseSdkRetryHealth };'
         ].filter(Boolean).join('\n\n')).runInContext(ctx);
         return {
-            calls, ctx, reloads,
+            calls, ctx, reloads, probes, pendingProbes,
             advance(ms) {
                 const end = clock + ms;
                 for (;;) {
@@ -1346,6 +1391,70 @@ function buildContext() {
         r5.ctx.api.retryFirebaseSdkNow();
         ok('ភ្ជាប់ជោគជ័យ ➜ ពិដានផ្ទុកឡើងវិញត្រូវសងមកវិញសម្រាប់ការដាច់លើកក្រោយ',
             r5.reloads.length === 2, r5.reloads.length);
+    }
+
+    // ── ១០ខ៥. ពិដានផ្ទុកឡើងវិញ មិនត្រូវចំណាយ ខណៈបណ្តាញ «ភ្ជាប់តែស្លាប់» ─────────
+    // 🔴 `navigator.onLine` និយាយមិនពិត ៖ App Android (WebView គ្មាន ACCESS_NETWORK_STATE ➜ `true` ជានិច្ច) ·
+    // WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យទូរស័ព្ទអស់លុយ ➜ ជណ្តើរផ្ទុកទំព័រឡើងវិញ ៣ ដងក្នុង ~១ នាទី (រាល់ដងធ្លាក់ដដែល) ➜ ពិដាន
+    // `FIREBASE_SDK_RELOAD_MAX` អស់ ➜ ពេលបណ្តាញមកវិញ SDK **មិនដែលស្តារ** (module map cache ការបរាជ័យ) ➜ App ជាប់ «ក្រៅបណ្ដាញ»
+    // រហូតដល់អ្នកប្រើ Refresh ដោយដៃ។ ⛔ ការផ្ទុកឡើងវិញត្រូវ **វាស់ការឈានដល់ host របស់ SDK** មុនចំណាយពិដាន។
+    for (const [name, src] of [['ZoeW', SRC], ['ZoeKeyGen', fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8')]]) {
+        const d = buildSdkRetry(src);
+        d.ctx.__sdkHost = 'down';
+        for (let i = 0; i < 12; i++) { d.advance(30000); d.ctx.api.retryFirebaseSdkNow(); }
+        ok(name + ' ៖ ⛔ បណ្តាញស្លាប់ (onLine=true) ៦ នាទី ➜ មិនផ្ទុកទំព័រឡើងវិញ (ពិដានមិនត្រូវចំណាយ)',
+            d.reloads.length === 0, 'reload=' + d.reloads.length);
+        ok(name + ' ៖ បណ្តាញស្លាប់ ➜ ការស្តារនៅតែព្យាយាម (វាស់ការឈានដល់ មិនមែនឈប់ស្ងាត់)',
+            d.probes.length >= 6, 'probe=' + d.probes.length);
+        d.ctx.__sdkHost = 'up';
+        const upAt = d.ctx.Date.now();
+        d.ctx.api.retryFirebaseSdkNow();
+        d.advance(30000);
+        ok(name + ' ៖ ⛔ បណ្តាញមកវិញ ➜ ផ្ទុកទំព័រឡើងវិញ (SDK ស្តារបាន) · ការផ្ទុកទាំងអស់កើតក្រោយបណ្តាញមកវិញ',
+            d.reloads.length >= 1 && d.reloads.every((at) => at >= upAt), 'reload=' + JSON.stringify(d.reloads) + ' upAt=' + upAt);
+
+        // ជណ្តើរ (មិនមែនព្រឹត្តិការណ៍) ក៏ត្រូវនាំទៅការស្តារដែរ ៖ `online` មិនបាញ់ (onLine មិនដែល false)
+        const l = buildSdkRetry(src);
+        l.ctx.__sdkHost = 'down';
+        l.ctx.api.scheduleFirebaseSdkRetry();
+        l.advance(120000);
+        const probesWhileDown = l.probes.length;
+        l.ctx.__sdkHost = 'up';
+        l.advance(120000);
+        ok(name + ' ៖ ជណ្តើរតែឯង (គ្មាន online/visibility) ➜ វាស់ការឈានដល់រាល់ជំហាន ហើយផ្ទុកឡើងវិញពេលមកវិញ',
+            probesWhileDown >= 2 && l.reloads.length === 1, 'probe=' + probesWhileDown + ' reload=' + l.reloads.length);
+
+        // ការវាស់ដែលព្យួរ ➜ មិនបាញ់ស្ទួន · ការឆ្លើយយឺតនៅតែនាំទៅការស្តារ
+        const h = buildSdkRetry(src);
+        h.ctx.__sdkHost = 'hang';
+        h.ctx.api.retryFirebaseSdkNow();
+        for (let i = 0; i < 5; i++) { h.advance(4000); h.ctx.api.retryFirebaseSdkNow(); }
+        ok(name + ' ៖ ការវាស់មួយកំពុងហោះ ➜ online/visibility ជាប់ៗ មិនបាញ់ការវាស់ស្ទួន',
+            h.pendingProbes.length === 1 && h.reloads.length === 0, 'pending=' + h.pendingProbes.length + ' reload=' + h.reloads.length);
+        const hangReloads = h.reloads.length;
+        if (h.pendingProbes[0]) h.pendingProbes[0].settle('ok', { res: { status: 0 } });
+        ok(name + ' ៖ ការវាស់ដែលឆ្លើយយឺត (ឈានដល់) ➜ ផ្ទុកឡើងវិញម្តង',
+            hangReloads === 0 && h.reloads.length === 1, 'reload មុន=' + hangReloads + ' ក្រោយ=' + h.reloads.length);
+
+        // ⛔ សាលក្រមវាស់ត្រូវពិនិត្យច្រកទ្វារម្តងទៀត ៖ ប្រអប់បើកខណៈកំពុងវាស់ ➜ មិនផ្ទុកឡើងវិញ (PIN · Config)
+        const m = buildSdkRetry(src);
+        m.ctx.__sdkHost = 'hang';
+        m.ctx.api.retryFirebaseSdkNow();
+        m.ctx.__openModal = 'configModal';
+        if (m.pendingProbes[0]) m.pendingProbes[0].settle('ok', { res: { status: 0 } });
+        ok(name + ' ៖ ⛔ ប្រអប់បើកខណៈកំពុងវាស់ ➜ មិនផ្ទុកឡើងវិញ (កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ)',
+            m.pendingProbes.length === 1 && m.reloads.length === 0, 'pending=' + m.pendingProbes.length + ' reload=' + m.reloads.length);
+        m.ctx.__openModal = null;
+        m.ctx.__sdkHost = 'up';
+        m.advance(60000);
+        ok(name + ' ៖ ប្រអប់បិទវិញ ➜ ជណ្តើរនៅរស់ ហើយស្តារបាន',
+            m.reloads.length === 1, 'reload=' + m.reloads.length);
+
+        const probe = d.probes[0] || {};
+        const opts = probe.opts || {};
+        ok(name + ' ៖ ការវាស់ ៖ https · no-cors (មិនអាន body) · no-store · មានពិដានពេល ≤ ១០ វិ.',
+            /^https:\/\//.test(String(probe.url || '')) && opts.mode === 'no-cors' && opts.cache === 'no-store' &&
+            Number.isFinite(probe.ms) && probe.ms > 0 && probe.ms <= 10000, probe);
     }
 
     // ── ១០ខ៤. ព្រឹត្តិការណ៍ដែលដាស់ការស្តារ SDK ត្រូវដូចគ្នាទាំង ២ App ────

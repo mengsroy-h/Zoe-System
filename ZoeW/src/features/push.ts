@@ -40,6 +40,7 @@ export const PUSH_STATUS_TEXT: Record<PushStatus, string> = {
 interface PushSaved {
     on: boolean;
     kind: string;
+    token: string;
     syncedAt: number;
     schedSig: string;
     schedAt: number;
@@ -48,6 +49,7 @@ interface PushSaved {
 export const pushRuntime = {
     nativeListeners: false,
     nativeEnabling: false,
+    nativeWanted: false,
     nativeWatchdogSeq: 0,
     scheduleAttemptAt: 0,
     scheduleInFlight: false
@@ -59,6 +61,7 @@ function readSaved(): PushSaved {
     return {
         on: !!(raw && raw.on === true),
         kind: raw && typeof raw.kind === 'string' ? raw.kind : '',
+        token: raw && typeof raw.token === 'string' ? raw.token : '',
         syncedAt: raw && typeof raw.syncedAt === 'number' ? raw.syncedAt : 0,
         schedSig: raw && typeof raw.schedSig === 'string' ? raw.schedSig : '',
         schedAt: raw && typeof raw.schedAt === 'number' ? raw.schedAt : 0
@@ -210,15 +213,24 @@ function loadNativePush(): Promise<any> {
     return import('@capacitor/push-notifications').then((m) => m.PushNotifications);
 }
 
+function unsubscribeNativeToken(token: string) {
+    return token ? postPush('unsubscribe', { sub: { kind: 'fcm', token: token } }) : Promise.resolve(null);
+}
+
 async function onNativeToken(token: string) {
     pushRuntime.nativeWatchdogSeq++;
+    if (!pushRuntime.nativeEnabling && !pushRuntime.nativeWanted && !readSaved().on) return;
     const license = activationKey();
     if (!license) { setStatus('no-license'); pushRuntime.nativeEnabling = false; return; }
     const reply = await postPush('subscribe', { license: license, platform: 'android', sub: { kind: 'fcm', token: token } });
     const enabling = pushRuntime.nativeEnabling;
     pushRuntime.nativeEnabling = false;
+    if (!enabling && !pushRuntime.nativeWanted && !readSaved().on) {
+        if (replyOk(reply)) unsubscribeNativeToken(token);
+        return;
+    }
     if (replyOk(reply)) {
-        writeSaved({ on: true, kind: 'fcm', syncedAt: Date.now() });
+        writeSaved({ on: true, kind: 'fcm', token: token, syncedAt: Date.now() });
         setStatus('on');
         syncExpirySchedule(true);
         return;
@@ -245,6 +257,7 @@ export async function ensureNativePushListeners(PN?: any) {
 async function enableNative(): Promise<boolean> {
     const license = activationKey();
     if (!license) { setStatus('no-license'); return false; }
+    pushRuntime.nativeWanted = true;
     setStatus('busy');
     try {
         const PN = await loadNativePush();
@@ -315,11 +328,16 @@ export async function disablePush(): Promise<boolean> {
                 try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
             }
         } else if (support === 'native') {
+            pushRuntime.nativeEnabling = false;
+            pushRuntime.nativeWanted = false;
+            const token = readSaved().token;
+            writeSaved({ on: false });
+            await unsubscribeNativeToken(token);
             const PN = await loadNativePush();
             try { await PN.unregister(); } catch (e) {}
         }
     } catch (e) {}
-    writeSaved({ on: false, kind: '', syncedAt: 0, schedSig: '', schedAt: 0 });
+    writeSaved({ on: false, kind: '', token: '', syncedAt: 0, schedSig: '', schedAt: 0 });
     setStatus('off');
     return true;
 }

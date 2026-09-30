@@ -112,6 +112,11 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run parity:live` | ប្រៀបធៀប **ជាមួយទិន្នន័យពិត** (RTDB ក្លែងក្លាយ) រួមទាំងការសរសេរទៅ server |
 | `npm run parity:deep` | ប្រៀបធៀប **ផ្លូវលុយក្នុងសេណារីយ៉ូតេស្ត** · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF — ៦ ជាន់រាល់ជំហាន (អេក្រង់ · ការសរសេរពេញ · DB ទាំងមូល · ប្រអប់ native · សំណើទៅ Apps Script/ZTO · សារ toast) |
 | `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ បូក `rules:check` |
+| `npm run build:parity` | build ផលិតកម្មចូល `dist-parity/` ឯកជន ៖ `run-all.sh` រត់ `parity:dom` · `parity:live` · `parity:deep` លើវា (ការងារ `zoew-parity`) ដោយមិនប្រណាំង `dist/` ជាមួយ `zoew-suite` (`ZOEW_PARITY_DIST`) |
+
+⛔ **ការខុសគ្នាពី ZoeW ដើមដោយចេតនា** (ផ្ទាំង 🔔 · logo SVG · navbar ទាបជាង ១៤px លើទូរស័ព្ទ · ល្បឿនស៊ុមក្នុងរបា Slide · token `op`
+ក្នុង ledger) រស់ក្នុង **បញ្ជីតែមួយ** `INTENTIONAL_UI` (`scripts/snapshot.mjs`) ដែល parity ទាំង ៣ ប្រើរួម — ⛔ បន្ថែមធាតុ **តែ** ពេល
+ផ្ទៃពិតជាប្តូរដោយចេតនា ហើយសរសេរកំណែជាប់ · កុំប្រើវាដើម្បីបិទការខុសគ្នាដែលមិនយល់។
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |

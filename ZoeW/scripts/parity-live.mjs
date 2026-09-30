@@ -12,11 +12,12 @@ import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB, seedData } from './fake-fi
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveOldRoot } from './old-app.mjs';
-import { SNAPSHOT } from './snapshot.mjs';
+import { INTENTIONAL_UI, SNAPSHOT } from './snapshot.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OLD_DIR = resolveOldRoot(HERE);
-const NEW_DIR = path.join(HERE, '..', 'dist');
+// ZOEW_PARITY_DIST ៖ build ឯកជន (`npm run build:parity`) ➜ run-all មិនប្រណាំង `dist` ជាមួយ zoew-suite
+const NEW_DIR = process.env.ZOEW_PARITY_DIST ? path.resolve(process.env.ZOEW_PARITY_DIST) : path.join(HERE, '..', 'dist');
 
 const CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' });
 const seed = seedData();
@@ -162,7 +163,7 @@ let stepBad = 0;
 let vacuous = 0;
 // ⛔ ជាន់អប្បបរមា ៖ ជំហានដែល **មិនប្តូរអេក្រង់សោះ** មិនបានវាស់អ្វីទេ។
 //    ការអះអាង «ដូចគ្នា» លើអេក្រង់ដែលមិនប្រែ ពិតដោយស្វ័យប្រវត្តិ។
-let prev = JSON.stringify(await A.page.evaluate(SNAPSHOT));
+let prev = JSON.stringify(await A.page.evaluate(SNAPSHOT, { ui: INTENTIONAL_UI }));
 for (const [label, fn] of STEPS.slice(1)) {
     // ⛔ ជំហានត្រូវជា **ការចុចរបស់អ្នកប្រើ** ប៉ុណ្ណោះ ៖ ការហៅ function
     //    តាម `window.<name>` ដើរតែលើ App ចាស់ (script សកល) ➜ វានឹងវាស់
@@ -173,8 +174,8 @@ for (const [label, fn] of STEPS.slice(1)) {
     try { await fn(B.page, { timeout: 4000 }); } catch (e) { okB = false; }
     await A.page.waitForTimeout(1100);
     await B.page.waitForTimeout(1100);
-    const sa = await A.page.evaluate(SNAPSHOT);
-    const sb = await B.page.evaluate(SNAPSHOT);
+    const sa = await A.page.evaluate(SNAPSHOT, { ui: INTENTIONAL_UI });
+    const sb = await B.page.evaluate(SNAPSHOT, { ui: INTENTIONAL_UI });
     const keyA = JSON.stringify(sa);
     const same = keyA === JSON.stringify(sb);
     const changed = keyA !== prev;

@@ -761,6 +761,9 @@
       "policy": "guard-8",
       "sha256": "1de7117443b13f544ef6626864e00931ce8ca83ff64d2e17d05e27d44dacb091"
     },
+    "ZoeW/android/app/src/main/res/values/colors.xml": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/res/values/ic_launcher_background.xml": {
       "policy": "zoew-android"
     },

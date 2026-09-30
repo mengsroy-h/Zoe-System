@@ -128,6 +128,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
 > `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo · **ល្បឿនអេក្រង់** (`MainActivity` ស្នើ mode Hz ខ្ពស់បំផុតក្នុងទំហំដដែល ⛔ កុំដកចេញ — ROM ជាច្រើនកំណត់ App ត្រឹម 60Hz ខណៈ Chrome 120Hz) ·
+> splash ពេលបើក (launch theme ៖ ⛔ គ្មាន `android:background` — វាលាតចូលគ្រប់ View ➜ logo ពង្រីក/ច្របាច់លើ tablet · គ្មាន title/ActionBar · `postSplashScreenTheme` = theme របស់ `BridgeActivity`) ·
 > plugin · ⛔ សិទ្ធិ `ACCESS_NETWORK_STATE` (បើអត់ WebView ឲ្យ `navigator.onLine` = `true` ជានិច្ច ហើយ `online`/`offline` មិនបាញ់) · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
 > ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
 > ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·

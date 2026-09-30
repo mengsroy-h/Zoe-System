@@ -54,18 +54,26 @@
   ដោយមិនបាច់ Refresh។ ការតភ្ជាប់ **យឺតតែរស់** (៣ វិ./ជុំ) **មិន** ត្រូវផ្តាច់ · ការទាញទិន្នន័យដំបូង (listener នៅ pending) មិនត្រូវវាស់។
 - **🩺 ពិនិត្យសុខភាព** ៖ ជួរ Firebase សួរ Server ពិតដូចគ្នា ➜ **❌ «ភ្ជាប់តែ Server មិនឆ្លើយ»** ជំនួស ✅ ក្លែងក្លាយ។
 - សៀវភៅក្នុង App (ផ្នែក ១៥) · `ZoeW/README.md` ៖ អត្ថន័យ «ភ្ជាប់ Server រួចរាល់» ដែលវាស់ពិត។
+- **📱 Splash ពេលបើក APK លើ tablet ធំ** (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ រូបថត tablet 11.5") ៖ អេក្រង់ចាប់ផ្តើមបង្ហាញរបា **«ZoeW»** ខាងលើ ហើយ logo
+  ក្រហម **ពង្រីក/ច្របាច់** ក្នុងរបានោះ។ មូលហេតុ ៖ launch theme (`AppTheme.NoActionBarLaunch` — ដូច template Capacitor បេះបិទ) ដាក់
+  `android:background="@drawable/splash"` ដែល Android យកជា background លំនាំដើមរបស់ **គ្រប់ View** (មិនមែនតែ window) ហើយគ្មាន
+  `postSplashScreenTheme` ច្បាស់ (លំនាំដើម `?android:attr/theme`)។ ការកែ ៖ ដក `android:background` · ផ្ទៃ `@color/splash_background`
+  (`#f8fafc` ស្មើ `SplashScreen.backgroundColor`) + adaptive icon នៅកណ្តាល (ទំហំ dp ថេរ) · គ្មាន title/ActionBar · `postSplashScreenTheme` =
+  `AppTheme.NoActionBar` (theme ដែល `BridgeActivity` ប្រើ)។ ⚠️ រូបរាងថ្មី ៖ logo ក្រហមរាង **រង្វង់** (Android បិទជ្រុង icon ដូច App ផ្សេងទៀត) លើផ្ទៃស។
 
 #### អ្នកយាម
 
 - **`emu/app-network-e2e-test` (ថ្មី)** ៖ App ពិត (build វាស់ក្នុង Chromium) + **SDK Firebase ពិត** (កំណែដដែលនឹង CDN · បម្រើក្នុងស្រុក) + RTDB emulator ពិត +
   rules ពិត + proxy TCP ដែលអាចធ្វើឲ្យ socket «ងាប់ស្ងាត់» ➜ tree មុនកែ **FAIL ៩** ➜ **២៧/២៧** · mutation ៥ លើការកែ ➜ ក្រហមទាំង ៥ (ផ្នែក ២)។
 - `health-check-test` ៖ ជួរ Firebase ពេល round trip ផុតពិដាន ➜ ❌ · ឆ្លើយ ➜ ✅ · ដាច់/ទិន្នន័យមិនទាន់មក ➜ មិនចំណាយការវាស់ · `runHealthCheck()` ប្រើការវាស់ពិត។
+- `npm run android:check` ផ្នែក ៤ខ (splash ពេលបើក) ៖ tree មុនកែ **FAIL ៦** ➜ **៩០/៩០** · ឈ្មោះ theme របស់ `BridgeActivity` ដេរីវេពីប្រភព Capacitor ដែលដំឡើង · ពណ៌ផ្ទៃដេរីវេពី `capacitor.config.ts`។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - Deploy **ZoeW** (សំបក PWA ថ្មី) · **build APK ថ្មី** (ការកែនៅក្នុង bundle)។ គ្មាន env ថ្មី · rules មិនប្រែ។
 - សាកលើឧបករណ៍ពិត ៖ ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ តែគ្មានអ៊ីនធឺណិត) ➜ ក្នុង ~១ នាទី ចំណុចស្ថានភាពប្តូរពីបៃតង (ឬភ្លាមៗក្រោយស្កេនដែលព្យួរ ~២៥ វិ.)
   ➜ ដោត cable វិញ ➜ បៃតងវិញខ្លួនឯង ហើយទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · ដាក់ App ចោលក្នុង background ពេល WiFi ប្តូរ ➜ ត្រឡប់មក ➜ មិនជាប់បៃតងក្លែងក្លាយ។
+- APK លើ tablet (ជាពិសេស 11.5") និងទូរស័ព្ទ ៖ បើក App ➜ អេក្រង់ចាប់ផ្តើមគ្មានរបា «ZoeW» · logo ក្រហមនៅកណ្តាលមួយគត់ ច្បាស់ មិនខូចរាង (ទាំងបញ្ឈរ និងផ្តេក)។
 
 ### [2.45.6] — 2026-09-30 · ZoeW ៖ **Push លើ App Android ដើរពិតប្រាកដ ៖ ចុច «បើក» លែងជាប់ «⏳ កំពុងភ្ជាប់…» ជារៀងរហូត** (✅ ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត ៖ «ដើរហើយ» · APK 2.45.6 sign ក្នុង session Claude ព្រោះកូតា Actions អស់ · server `?op=config` ➜ `web:true · fcm:true`)
 

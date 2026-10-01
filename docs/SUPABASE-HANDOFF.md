@@ -62,6 +62,27 @@
   `rpc()` វាស់ RTT · `noteServerTime` — ជា local timer ➜ អាចត្រូវដាក់ក្នុង allowlist ដោយមានហេតុផល) · `secret-hygiene` · `storage-guard`
   (`supabase-transport.ts` ប្រើ storage តាម `createModeStorage` ដែលរុំ try)។
 
+#### លទ្ធផល run-all ពេញលើ commit `3cb1686` (emulator រស់ · STRICT ទាំងអស់) ៖ ❌ ធ្លាក់ ២២ · ជោគជ័យ ១៧៣ · រំលង ០
+(⛔ រត់ម្តងទៀតមុនជឿ — tree អាចប្រែ។ ការណែនាំខាងក្រោមជាតម្រុយពី log មិនមែនការវិនិច្ឆ័យពេញលេញ)
+- **sandbox របស់ checker ខ្វះឈ្មោះថ្មី** (រំពឹងទុក — ការធ្លាក់ល្អ ៖ checker រត់កូដពិត) ➜ បន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់/stub ៖
+  `firebase-config-paste-test` (`looksLikeSupabaseConfig`) · `health-check-test` (`databaseHealthLabel`) · `emu/crud-rules-flow`
+  (dependency sandbox) · `connection-recovery-test` (ផ្នែក Reconfig ៖ `initFirebase()` ថ្មី — `previousFb`/`loadSupabaseFb`) ·
+  `tx-outcome` (ការអះអាងស្វែងរកអក្សរ `withTransactionOutcomeResolution(await waitForFirebaseSDK())` ក្នុង `initFirebase` — ឥឡូវ `nextFb = …`) ·
+  `money-guardian` (ធ្លាក់តាម `tx-outcome-test` ខាងលើ)។
+- **ច្បាប់ពិតដែលត្រូវកែកូដ** ៖ `monotonic-gate-test` + `clock-hygiene` (`Date.now() - startedAt` ក្នុង `supabase-rtdb.ts`
+  ➜ ប្រើ `elapsedSince()`) · `sdk-surface` (`fb.X` ថ្មីដែល loader Firebase មិន export ៖ `tenantScope` · `accountOf` · `__supabase` ·
+  `registerAccount` · `resetPassword` ➜ ហៅតាម `typeof … === 'function'` ឬ allowlist មានហេតុផល) · `html-sink-escaping` (១ កន្លែង —
+  ទំនងជា `renderSbTenantList()` ក្នុង ZoeKeyGen ៖ `labels[state][1]`/`members`) · `shared-fns` (`firebaseConfigErrorMessage`
+  ឃ្លាតរវាង ZoeW និង ZoeKeyGen ➜ ផ្លាស់ផ្នែក Supabase ទៅ helper ដាច់ ឬ allowlist មានហេតុផល) · `dom-hygiene` (៦ វាល) ·
+  `state-hygiene` (១ អថេរ) · `secret-hygiene` (`sbAdminPasswordInput` ត្រូវសម្អាតក្នុងផ្លូវចាកចេញដែល checker ស្គាល់) ·
+  `csp-enforced` (អានសារវាលទទេ `loginWithFirebase()` មិនបាន — ការអះអាងស្វែងរកអក្សរ alert ចាស់ · ការ submit ទម្រង់ចូល) ·
+  `zoew-suite` (`npm run purity:check` — ទំនងជា `commitNow`/ref ក្នុង `features/account.ts` ឬ `document`/`window` ក្នុង `supabase-sdk.ts`) ·
+  `zoew-parity` (`parity:deep` ៖ «ស្កេន ZL5 ➜ ZTO បំពេញស្វ័យប្រវត្តិ» — ពិនិត្យថាជា flake ក្រោមបន្ទុក ឬផលពី `performLogin`/`ensureAppActivated`) ·
+  `supabase-datastore` (មើល log — ប្រហែលការប្តូរ fake server ឬ CAS) · `checker-coverage` (`emu/supabase-adapter-parity-test.js` គ្មាន
+  `*_APP_DIR` ដែល checker-coverage ស្គាល់ ➜ `SBADAPTER_APP_DIR` ត្រូវប្រើ/ចុះបញ្ជី)។
+- **រំពឹងទុក (ការងារ ៣គ)** ៖ `version-bump-scope` (ZoeW + ZoeKeyGen) · `doc-scope-test` (README `supabase/` មិនក្នុងបញ្ជី · `audit-tools/README.md`
+  កាតាឡុក · `emu/supabase-adapter-parity` ក្នុង Runbook) · `repository-file-coverage` (ឯកសារថ្មី)។
+
 ### ៣គ. កំណែ · ឯកសារ · ច្បាប់ (ច្បាប់ ៦ · ៨ · ៩ · ១២)
 - ZoeW ៖ ឡើង `APP_VERSION` (MINOR — មុខងារថ្មី) ក្នុង `ZoeW/src/core/version.ts` · `manifest.json` · `index.html` · `CACHE_VERSION` ·
   ធាតុ `update` ថ្មីក្នុង `ZoeW/public/announcements.json`។ ZoeKeyGen ៖ ឡើង `APP_VERSION` · `manifest.json` · `index.html` · `CACHE_VERSION` (`sw.js`)។

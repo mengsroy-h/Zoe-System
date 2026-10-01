@@ -24,6 +24,10 @@ const EXPECTED_DIVERGENT = new Set([
     'saveNewSecurityPin',
     'setupAuthListener', 'setupIOSPullToRefresh', 'showLoginModalWithPrefill',
     'submitActivationKey', 'updateAuthButton', 'verifySecurityPin', 'verifyStoredPin',
+    // normalizeFirebaseConfig · firebaseConfigErrorMessage ៖ ZoeW ទទួល Config **Supabase** ផង (backend អាជីវកម្ម ៖ `supabaseUrl` ➜
+    // `normalizeSupabaseConfig()`) ចំណែក ZoeKeyGen ភ្ជាប់តែ License Project Firebase ➜ ផ្នែក Firebase ក្នុង function ទាំង ២ នៅដូចគ្នា
+    // (`firebase-config-paste-test` វាស់សារកំហុសរបស់ App ទាំង ២ លើ input ដដែល)
+    'normalizeFirebaseConfig', 'firebaseConfigErrorMessage',
 
     // ស្ថានភាពការតភ្ជាប់៖ **យន្តការភ្ជាប់ឡើងវិញរួមគ្នា** (forceDatabaseReconnect,
     // scheduleReconnectWatchdog, clearReconnectWatchdog, nudgeDatabaseConnection)

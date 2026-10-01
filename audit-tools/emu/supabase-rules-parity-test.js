@@ -27,7 +27,9 @@ const { createPgHarness } = require('../supabase-pg.js');
 
 const ROOT = process.env.SBPARITY_APP_DIR ? path.resolve(process.env.SBPARITY_APP_DIR) : path.join(__dirname, '..', '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
-const STRICT = process.env.SBPARITY_STRICT === '1' || process.env.SUPABASE_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
+// ⛔ STRICT តាម emulator (`CRUD_FLOW_STRICT` ដូច emu/* ដទៃ) មិនមែន `SUPABASE_STRICT` ៖ job `audit-suite` របស់ CI គ្មាន emulator តែមាន
+//    `SUPABASE_STRICT=1` ➜ checker នេះ SKIP ស្អាតនៅទីនោះ ហើយរត់ STRICT ក្នុង job `firebase-rules` (មាន emulator · `.github/workflows/audit.yml`)
+const STRICT = process.env.SBPARITY_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
 const RUNS = parseInt(process.env.SBPARITY_RUNS || '6', 10);
 const OPS = parseInt(process.env.SBPARITY_OPS || '40', 10);
 const SEED = parseInt(process.env.SBPARITY_SEED || '20261001', 10);

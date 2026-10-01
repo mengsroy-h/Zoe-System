@@ -1691,6 +1691,8 @@ function buildContext() {
             'function checkPinAndOpenConfig() {}',
             'function showToast(m) { __log.toasts.push(m); }',
             sliceFn('withTransactionOutcomeResolution') || 'function withTransactionOutcomeResolution(sdk) { return sdk; }',
+            sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',
+            'function loadSupabaseFb() { __log.supabaseLoads = (__log.supabaseLoads || 0) + 1; return Promise.reject(new Error("Supabase SDK is not ready")); }',
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
             'globalThis.__start = () => initFirebase();',

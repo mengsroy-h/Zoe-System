@@ -25,7 +25,9 @@ const { startFakeSupabase } = require('../supabase-fake-server.js');
 
 const ROOT = process.env.SBADAPTER_APP_DIR ? path.resolve(process.env.SBADAPTER_APP_DIR) : path.join(__dirname, '..', '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : ROOT;
-const STRICT = process.env.SBADAPTER_STRICT === '1' || process.env.SUPABASE_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
+// ⛔ STRICT តាម emulator (`CRUD_FLOW_STRICT` ដូច emu/* ដទៃ) មិនមែន `SUPABASE_STRICT` ៖ job `audit-suite` របស់ CI គ្មាន emulator តែមាន
+//    `SUPABASE_STRICT=1` ➜ checker នេះ SKIP ស្អាតនៅទីនោះ ហើយរត់ STRICT ក្នុង job `firebase-rules` (មាន emulator · `.github/workflows/audit.yml`)
+const STRICT = process.env.SBADAPTER_STRICT === '1' || process.env.CRUD_FLOW_STRICT === '1';
 const SRC = [path.join(ROOT, 'ZoeW', 'src', 'services'), path.join(REPO, 'ZoeW', 'src', 'services')].find((d) => fs.existsSync(path.join(d, 'supabase-rtdb.ts')));
 const ZOEW_MODULES = [path.join(REPO, 'ZoeW', 'node_modules'), path.join(ROOT, 'ZoeW', 'node_modules'), path.join(ROOT, 'node_modules')].find((d) => fs.existsSync(path.join(d, 'firebase')));
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);

@@ -54,8 +54,7 @@ export function normalizeAccountUsername(raw) {
 }
 
 function accountApp() {
-    const fb = firebaseState.fb;
-    if (!fb || !fb.__supabase || !firebaseState.auth || !firebaseState.auth.app) return null;
+    if (!firebaseState.fb || !firebaseState.fb.__supabase || !firebaseState.auth || !firebaseState.auth.app) return null;
     return firebaseState.auth.app;
 }
 

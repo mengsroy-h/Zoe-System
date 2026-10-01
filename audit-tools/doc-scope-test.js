@@ -33,6 +33,7 @@ const SECTIONED = [
     'audit-tools/README.md',
     'firebase-backup/README.md',
     'zto-import/README.md',
+    'supabase/README.md',
     'tools/zto-cookie-sync-windows/README-KH.md',
     'tools/zto-cookie-sync-windows/README-ANDROID-KH.md',
     'tools/money-check-windows/README-KH.md'
@@ -808,6 +809,22 @@ const SHIPPED_APP_TEXT = ['ZoeW/app.js', 'ZoeKeyGen/app.js', 'ZoeW/sw.js',
     'ZoeW/license-verify.js', 'ZoeW/error-reporting.js']
     .map((rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return ''; } })
     .join('\n');
+// ⛔ ផ្នែក server របស់ Supabase (migration · Edge Function) ក៏ deploy ពិតដែរ ➜ ឈ្មោះ table/RPC ដែល CLAUDE.md យោង ត្រូវរស់នៅទីនោះ (ដេរីវេពីថតពិត)
+const SUPABASE_SERVER_TEXT = (() => {
+    const out = [];
+    const walkDir = (dir) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+        for (const e of entries) {
+            const abs = path.join(dir, e.name);
+            if (e.isDirectory()) walkDir(abs);
+            else if (/\.(sql|ts)$/.test(e.name)) out.push(fs.readFileSync(abs, 'utf8'));
+        }
+    };
+    walkDir(path.join(ROOT, 'supabase', 'migrations'));
+    walkDir(path.join(ROOT, 'supabase', 'functions'));
+    return out.join('\n');
+})();
 
 check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា ៖ អានកូដ ship ទាំង ២ App បានពិត',
     'អានបាន ' + SHIPPED_APP_TEXT.length + ' តួ');
@@ -869,7 +886,7 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
 // ហើយវារស់នៅកូដ ship ពិត ➜ ការប្រៀបមិនមានសំឡេងរំខាន (វាស់បាន ៖ ២៤ កូនសោ
 // ក្នុង CLAUDE.md ➜ ១ ដែលងាប់ ➜ ០ false positive)។
 const docKeys = [...new Set((claudeText.match(/zoe[a-z]*_[a-z0-9_]{3,}/g) || []))];
-const deadKeys = docKeys.filter((k) => SHIPPED_APP_TEXT.indexOf(k) === -1);
+const deadKeys = docKeys.filter((k) => SHIPPED_APP_TEXT.indexOf(k) === -1 && SUPABASE_SERVER_TEXT.indexOf(k) === -1);
 check(docKeys.length >= 15, 'ជាន់អប្បបរមា ៖ CLAUDE.md យោងកូនសោ storage យ៉ាងតិច ១៥',
     'រកបាន ' + docKeys.length);
 check(deadKeys.length === 0,

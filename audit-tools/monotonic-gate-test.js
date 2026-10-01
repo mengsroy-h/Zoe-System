@@ -202,6 +202,8 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 const HELPER = extractFn(src, 'elapsedSince')
     || 'function elapsedSince(mark) { return Date.now() - mark; }';
 
+// ⛔ stub ខាងលើរក្សាឥរិយាបថចាស់ ➜ បើស្រង់ helper ពិតមិនបាន (ឧ. វាឈរនៅតួអក្សរទី ០ គ្មាន `\n` មុន) ការធ្លាក់ខាងក្រោមនិយាយខុសមូលហេតុ
+ok('ជាន់អប្បបរមា ៖ `elapsedSince()` ស្រង់ពីកូដពិត (មិនមែន stub)', !!extractFn(src, 'elapsedSince'));
 const NEEDED = ['forceDatabaseReconnect', 'dbListenerResyncIsProgressing', 'retryFirebaseSdkNow'];
 const foundFns = NEEDED.filter((n) => !!extractFn(src, n));
 ok('ជាន់អប្បបរមា ៖ រកឃើញច្រកទ្វារដែលត្រូវវាស់ ' + NEEDED.length,

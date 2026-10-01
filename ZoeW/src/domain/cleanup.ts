@@ -132,8 +132,7 @@ export function cleanupJournalScope() {
         if (found) return found[1];
         const supabase = /supabaseUrl"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
         if (!supabase) return '';
-        const fb = firebaseState.fb;
-        const tenant = fb && typeof fb.tenantScope === 'function' ? fb.tenantScope(firebaseState.auth) : '';
+        const tenant = firebaseState.fb && typeof firebaseState.fb.tenantScope === 'function' ? firebaseState.fb.tenantScope(firebaseState.auth) : '';
         return tenant ? supabase[1] + '#' + tenant : '';
     } catch (e) {
         return '';

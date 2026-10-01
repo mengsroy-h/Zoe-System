@@ -1,4 +1,4 @@
-const APP_VERSION = '2.22.1';
+const APP_VERSION = '2.23.0';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2624,7 +2624,7 @@ function sbAdminConfigProblem(url, key) {
     let parsed;
     try { parsed = new URL(url); } catch (e) { return 'Supabase URL មិនត្រឹមត្រូវ!'; }
     const local = parsed.protocol === 'http:' && (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
-    if ((parsed.protocol !== 'https:' && !local) || (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash || parsed.username) {
+    if ((parsed.protocol !== 'https:' && !local) || (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash || parsed.username || parsed.password) {
         return 'Supabase URL ត្រូវជា https://<project>.supabase.co (គ្មាន path)!';
     }
     if (!key) return 'សូមបញ្ចូល Publishable key!';
@@ -2721,6 +2721,8 @@ async function sbAdminLogin() {
         if (panel) panel.classList.remove('hidden');
         const logoutBtn = document.getElementById('sbAdminLogoutBtn');
         if (logoutBtn) logoutBtn.classList.remove('hidden');
+        const loginBtn = document.getElementById('sbAdminLoginBtn');
+        if (loginBtn) loginBtn.classList.add('hidden');
         showToast('✅ ចូល Supabase ជា Admin រួចរាល់');
         await sbAdminRefresh();
     } catch (e) {
@@ -2748,7 +2750,7 @@ function sbAdminReset(expired) {
     setSbAdminBusy(false);
     const body = document.getElementById('sbTenantListBody');
     if (body) body.innerHTML = '';
-    ['sbInviteCodeText', 'sbInviteLinkText', 'sbResetCodeText'].forEach((id) => {
+    ['sbInviteResultLabel', 'sbInviteCodeText', 'sbInviteLinkText', 'sbResetCodeText'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.textContent = '';
     });
@@ -2758,6 +2760,8 @@ function sbAdminReset(expired) {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
+    const loginBtn = document.getElementById('sbAdminLoginBtn');
+    if (loginBtn) loginBtn.classList.remove('hidden');
     ['sbAdminPasswordInput', 'sbTenantNameInput', 'sbTenantBranchInput', 'sbResetUsernameInput'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -2811,19 +2815,23 @@ function renderSbTenantList() {
         body.innerHTML = '<tr class="empty-row"><td colspan="6">មិនទាន់មានហាង</td></tr>';
         return;
     }
-    const labels = { active: ['badge-active', 'សកម្ម'], expired: ['badge-expired', 'ផុតកំណត់'], revoked: ['badge-revoked', 'បិទ'] };
+    const badges = {
+        active: '<span class="badge badge-active">សកម្ម</span>',
+        expired: '<span class="badge badge-expired">ផុតកំណត់</span>',
+        revoked: '<span class="badge badge-revoked">បិទ</span>'
+    };
     body.innerHTML = sbTenantCache.map((row) => {
-        const state = sbTenantState(row);
-        const members = sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => `<span class="sb-member">${m.role === 'owner' ? '👑 ' : ''}${escapeHtml(m.username)}</span>`).join('') || '-';
+        const sbStatusHtml = badges[sbTenantState(row)];
+        const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
+            .map((m) => '<span class="sb-member">' + (m.role === 'owner' ? '👑 ' : '') + escapeHtml(m.username) + '</span>').join('') || '-';
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
         return `<tr>
             <td>${escapeHtml(row.name)}</td>
             <td>${escapeHtml(row.branch_code)}</td>
-            <td>${members}</td>
+            <td>${sbMembersHtml}</td>
             <td>${escapeHtml(untilText)}</td>
-            <td><span class="badge ${labels[state][0]}">${labels[state][1]}</span></td>
+            <td>${sbStatusHtml}</td>
             <td>
                 <div class="btn-row">
                     <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-invite">🎟️ កូដអញ្ជើញ</button>

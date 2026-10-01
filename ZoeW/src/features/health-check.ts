@@ -81,8 +81,7 @@ export function healthClockRow() {
 }
 
 export function healthTenantRow() {
-    const fb = firebaseState.fb;
-    const account = fb && typeof fb.accountOf === 'function' ? fb.accountOf(firebaseState.auth) : null;
+    const account = firebaseState.fb && typeof firebaseState.fb.accountOf === 'function' ? firebaseState.fb.accountOf(firebaseState.auth) : null;
     if (!account || !account.tenant_id) return healthRow('warn', 'ហាង (Supabase)', 'មិនទាន់ដឹងស្ថានភាពហាង — សូមចូលប្រព័ន្ធ ហើយភ្ជាប់អ៊ីនធឺណិត');
     const until = Date.parse(String(account.expires_at || ''));
     const untilText = Number.isFinite(until) ? getZoneDateKey(until, 0) : '—';

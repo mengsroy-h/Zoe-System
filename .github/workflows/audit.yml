@@ -119,6 +119,26 @@ jobs:
         working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/app-network-e2e-test.js
 
+      # ⛔ Supabase ៖ rules RTDB ក្នុង Postgres · adapter `fb` របស់ ZoeW ធៀប RTDB emulator ពិត (oracle) ➜ ត្រូវការ emulator · Postgres ពិត · Chromium
+      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
+        run: npm ci --prefix supabase --no-audit --no-fund
+
+      - name: rules RTDB ដែល Postgres អនុវត្ត ស្មើ RTDB ពិត (Supabase)
+        env:
+          CRUD_FLOW_STRICT: '1'
+          SUPABASE_STRICT: '1'
+          ZOE_REPO_ROOT: ${{ github.workspace }}
+        working-directory: ${{ env.MEASURE }}
+        run: node audit-tools/emu/supabase-rules-parity-test.js
+
+      - name: adapter fb លើ Supabase ស្មើ SDK Firebase ពិត
+        env:
+          CRUD_FLOW_STRICT: '1'
+          SUPABASE_STRICT: '1'
+          ZOE_REPO_ROOT: ${{ github.workspace }}
+        working-directory: ${{ env.MEASURE }}
+        run: node audit-tools/emu/supabase-adapter-parity-test.js
+
       # ⛔ job នេះ **មាន** emulator ➜ `MONEYGUARD_STRICT=1` ធ្វើឲ្យ SKIP របស់
       # អ្នកយាមណាមួយក្លាយជា **ការធ្លាក់**។ (ក្នុង job `run-all.sh` ដែលគ្មាន
       # emulator វារត់ដោយគ្មាន STRICT ➜ mutation ដែលត្រូវការ emulator រាយជា
@@ -182,10 +202,16 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
+      # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-datastore · supabase-functions · keygen-supabase-admin
+      #    ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL (emu/supabase-* រត់ក្នុង job firebase-rules)
+      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
+        run: npm ci --prefix supabase --no-audit --no-fund
+
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: run-all.sh
         env:
           VERSIONSCOPE_STRICT: '1'
+          SUPABASE_STRICT: '1'
         run: bash audit-tools/run-all.sh

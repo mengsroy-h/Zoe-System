@@ -1,4 +1,5 @@
 import { txDisconnectResolving } from './tx-disconnect';
+import { elapsedSince } from '../core/elapsed';
 
 export const INVALID_KEY_RE = /[[\].#$/\u0000-\u001F\u007F]/;
 export const INVALID_PATH_RE = /[[\].#$\u0000-\u001F\u007F]/;
@@ -824,12 +825,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 lost = disconnectError();
                                 txDisconnectResolving.set(outer, lost);
                             }
-                            if (closed || Date.now() - startedAt >= txOutcomeMaxWaitMs) {
+                            if (closed || elapsedSince(startedAt) >= txOutcomeMaxWaitMs) {
                                 lost.txOutcome = 'unknown';
                                 hooks.onTxOutcomeUnknown(path);
                                 throw lost;
                             }
-                            await delay(Math.max(1, Math.min(2000, txOutcomeMaxWaitMs - (Date.now() - startedAt))));
+                            await delay(Math.max(1, Math.min(2000, txOutcomeMaxWaitMs - elapsedSince(startedAt))));
                         }
                     }
                     setConnected(true);

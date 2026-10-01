@@ -260,8 +260,11 @@ function runTx(run, p, updaterSrc) {
     console.log('\n── ១. `initFirebase()` ដំឡើង wrapper លើ SDK ពិត (ចំណុចច្របាច់តែមួយ) ──');
     {
         const init = sliceFrom(SRC, 'initFirebase');
-        ok('initFirebase() រុំ SDK ដោយ withTransactionOutcomeResolution()',
-            /fb\s*=\s*withTransactionOutcomeResolution\s*\(\s*await\s+waitForFirebaseSDK\s*\(/.test(init), init.slice(0, 200));
+        // ⛔ ដេរីវេ ៖ តម្លៃដែលរុំ (អថេរណាក៏ដោយ) ត្រូវក្លាយជា `fb` ពិត — backend Supabase មានផ្លូវ outcome ផ្ទាល់ខ្លួន (`emu/supabase-adapter-parity`)
+        const wrapped = init.match(/\b([A-Za-z_$][\w$]*)\s*=\s*withTransactionOutcomeResolution\s*\(\s*await\s+waitForFirebaseSDK\s*\(/);
+        const becomesFb = !!wrapped && (wrapped[1] === 'fb'
+            || new RegExp('(?:firebaseState\\.)?\\bfb\\s*=\\s*' + wrapped[1].replace(/\$/g, '\\$') + '\\s*;').test(init));
+        ok('initFirebase() រុំ SDK ដោយ withTransactionOutcomeResolution() ហើយតម្លៃដែលរុំក្លាយជា fb', becomesFb, init.slice(0, 200));
         const calls = (SRC.match(/\bfb\.runTransaction\s*\(/g) || []).length;
         ok('ជាន់អប្បបរមា ៖ កន្លែងហៅ fb.runTransaction ក្នុងកូដ ship >= 20 (គ្រប់វាឆ្លង wrapper ដដែល)', calls >= 20, calls);
         const direct = SRC.replace(sliceFrom(SRC, 'runTransactionResolved'), '').match(/\brawFb\b|firebaseSDK\.runTransaction/g) || [];

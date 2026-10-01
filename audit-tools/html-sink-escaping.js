@@ -103,7 +103,9 @@ const BUILDER_ALLOW = {
         seatHtml: 'HTML សាងខាងលើពី badge ថេរ; លេខសម្គាល់ឧបករណ៍ និងកាលបរិច្ឆេទឆ្លង escapeHtml()',
         scopeHtml: 'HTML សាងខាងលើ; scopeLabel ឆ្លង escapeHtml()',
         scopeLabel: 'លទ្ធផលផ្ទាល់នៃ escapeHtml()',
-        expStr: "toLocaleDateString('km-KH') ឬ '-'"
+        expStr: "toLocaleDateString('km-KH') ឬ '-'",
+        sbStatusHtml: 'badge ថេរ ៣ (សកម្ម · ផុតកំណត់ · បិទ) ជ្រើសតាម sbTenantState()',
+        sbMembersHtml: 'HTML សាងខាងលើ; ឈ្មោះគណនីឆ្លង escapeHtml() · 👑 ថេរ (`keygen-supabase-admin-test` ៖ XSS ឈ្មោះហាង)'
     },
 };
 

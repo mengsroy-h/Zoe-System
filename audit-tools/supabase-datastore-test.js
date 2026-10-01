@@ -301,8 +301,15 @@ async function body(c, rec, extra) {
     await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: A.who.sub })]);
     await c1.query('set local role authenticated');
     const first = await c1.query('select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'C1'], v: true }])]);
+    const c2pid = (await c2.query('select pg_backend_pid() as p')).rows[0].p;
     const secondP = as(c2, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'C2'], v: true }])]);
-    await new Promise((r) => setTimeout(r, 300));
+    // ⛔ រង់ចាំរហូតការសរសេរទី ២ **ជាប់ lock ពិត** (មិនមែនពេលថេរ) ៖ ពេលម៉ាស៊ីនរវល់ ការរង់ចាំ ៣០០ms ធ្វើឲ្យទី ២ ចាប់ផ្តើមក្រោយ commit
+    //    ➜ គ្មានការប្រណាំង ➜ mutation «គ្មាន tenant lock» រស់រាន (វាស់បានក្នុង run-all ពេញ)
+    for (let i = 0; i < 200; i++) {
+        const w = await c.query("select wait_event_type from pg_stat_activity where pid = $1", [c2pid]);
+        if (w.rows[0] && w.rows[0].wait_event_type === 'Lock') break;
+        await new Promise((r) => setTimeout(r, 50));
+    }
     const midPull = await pull(A.who, headBefore);
     await c1.query('commit');
     const second = await secondP;
@@ -311,6 +318,29 @@ async function body(c, rec, extra) {
     rec('ការទាញកណ្តាលការសរសេរដែលមិនទាន់ commit ➜ មិនឃើញ · cursor មិនឡើងហួស', midPull.rows.length === 0 && midPull.seq === headBefore, midPull);
     const afterBoth = await pull(A.who, headBefore);
     rec('ការទាញក្រោយ commit ➜ ឃើញ C1 និង C2 តាមលំដាប់ seq', afterBoth.rows.map((r) => r.k).join() === 'C1,C2', afterBoth);
+    // ⛔ ចន្លោះដែលការប្រណាំងខាងលើមិនឃើញ ៖ ទី ១ **កាន់ lock តែមិនទាន់ update** seq ➜ ទី ២ ត្រូវរង់ចាំមុនអាន seq
+    //    (បើអត់ `for update` ទី ២ អាន seq ចាស់ ➜ seq ស្ទួន · ការទាញ delta រំលងការសរសេរ) — វាស់ដោយ lock ពិតពី session ទី ៣
+    const c3 = await H.connect('postgres', c.database);
+    const c4 = await H.connect('postgres', c.database);
+    extra.push(c3, c4);
+    const lockBefore = (await pull(A.who, 0)).seq;
+    await c3.query('begin');
+    await c3.query('select seq from public.zoe_tenant_state where tenant_id = $1 for update', [A.id]);
+    const c4pid = (await c4.query('select pg_backend_pid() as p')).rows[0].p;
+    const lateP = as(c4, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'L2'], v: true }])]);
+    let lateWaited = false;
+    for (let i = 0; i < 200 && !lateWaited; i++) {
+        const w = await c.query('select wait_event_type from pg_stat_activity where pid = $1', [c4pid]);
+        lateWaited = !!w.rows[0] && w.rows[0].wait_event_type === 'Lock';
+        if (!lateWaited) await new Promise((r) => setTimeout(r, 50));
+    }
+    await c3.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: A.who.sub })]);
+    await c3.query('set local role authenticated');
+    const early = await c3.query('select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'L1'], v: true }])]);
+    await c3.query('commit');
+    const late = await lateP;
+    rec('tenant lock ៖ ការសរសេរដែលចាប់ផ្តើមខណៈ lock ត្រូវរង់ចាំមុនអាន seq ➜ seq មិនស្ទួន', lateWaited && early.rows[0].r.seq === lockBefore + 1
+        && !!late.rows && late.rows[0].r.seq === lockBefore + 2, { lateWaited, early: early.rows[0].r.seq, late: late.rows ? late.rows[0].r.seq : late.error, lockBefore });
     const bothCas = await Promise.all([
         as(c1, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'cas', p: [REG, 'RACE'], e: 0, v: true }])]),
         as(c2, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'cas', p: [REG, 'RACE'], e: 0, v: true }])])
@@ -392,7 +422,28 @@ const MUTATIONS = [
         'grant execute on function public.zoe_admin_write(uuid, text, jsonb, boolean) to service_role, authenticated;']
 ];
 
+async function rulesMigrationFreshness() {
+    console.log('\n── ០. migration rules ↔ firebase-database.rules.json (ប្រភពតែមួយ) ──');
+    const file = migrationFiles.find((f) => /_zoe_rules\.sql$/.test(f));
+    ok('មាន migration rules (*_zoe_rules.sql)', !!file, migrationFiles);
+    let gen = null;
+    try { gen = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs')).href); } catch (e) { gen = null; }
+    let rules = null;
+    try { rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')); } catch (e) { rules = null; }
+    ok('ផ្ទុក generator ពិត (supabase/scripts/rtdb-rules.mjs) និង rules ពិតបាន', !!gen && typeof gen.rulesSql === 'function' && !!rules);
+    if (!file || !gen || !rules) return;
+    const want = gen.rulesSql(gen.compileRules(rules));
+    const have = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+    ok('⛔ ' + file + ' = rulesSql(compileRules(firebase-database.rules.json)) — កែ rules ➜ node supabase/scripts/generate-rules-sql.mjs', have === want,
+        { haveBytes: have.length, wantBytes: want.length });
+    const probe = JSON.parse(JSON.stringify(rules));
+    const node = probe.rules.zoew_barcode_registry.$barcodeKey;
+    node['.validate'] = '(' + node['.validate'] + ') && auth != null';
+    ok('ទិសផ្ទុយ ៖ rules ប្រែ ➜ SQL ដែលបង្កើតប្រែ (generator មិនមែនថេរ)', gen.rulesSql(gen.compileRules(probe)) !== want);
+}
+
 async function main() {
+    await rulesMigrationFreshness();
     const reason = H.unavailableReason();
     if (reason) {
         if (STRICT) ok('SUPABASE_STRICT=1 ៖ ' + reason, false);

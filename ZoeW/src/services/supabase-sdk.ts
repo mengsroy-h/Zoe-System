@@ -1,5 +1,6 @@
 import { SbIncrement, SbNetworkError, SbRpcError, createSupabaseDatabase } from './supabase-rtdb';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
+import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
 export { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig };
 
@@ -266,14 +267,14 @@ export function createSupabaseSdk(makeTransport, env) {
                 if (typeof window !== 'undefined' && window && typeof window.addEventListener === 'function') {
                     const onOnline = () => { if (app._db) app._db.onBrowserOnline(); };
                     const onOffline = () => { if (app._db) app._db.onBrowserOffline(); };
-                    const onVisible = () => { if (app._db && typeof document !== 'undefined' && document.visibilityState === 'visible') app._db.onBrowserOnline(); };
+                    const onVisible = () => { if (app._db && !documentIsHidden()) app._db.onBrowserOnline(); };
                     window.addEventListener('online', onOnline);
                     window.addEventListener('offline', onOffline);
-                    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+                    const offVisible = typeof document !== 'undefined' ? onDocumentVisibilityChange(onVisible) : null;
                     app._unlisten = () => {
                         window.removeEventListener('online', onOnline);
                         window.removeEventListener('offline', onOffline);
-                        if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+                        if (offVisible) offVisible();
                     };
                 }
             }

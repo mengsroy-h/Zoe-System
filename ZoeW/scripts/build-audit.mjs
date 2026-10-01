@@ -147,7 +147,9 @@ rmSync(entry);
             modalIsOpen: 'function modalIsOpen(id) {\n        return modalDisplay(id) === \'flex\';\n    }'
         }
     };
-    let text = '';
+    // ⛔ checker ជាច្រើនរក declaration តាម `\n<ចន្លោះ>function X(` (`app.js` ដើមមិនដែលចាប់ផ្តើមដោយ declaration) ➜ module ដំបូងរបស់
+    //    bundle (ឧ. `core/elapsed.ts`) ឈរនៅតួអក្សរទី ០ ➜ រកមិនឃើញ ➜ checker ធ្លាក់ទៅ stub ចាស់ស្ងាត់ៗ ➜ ទិដ្ឋភាពចាប់ផ្តើមដោយបន្ទាត់ទទេ
+    let text = '\n';
     // ⛔ តួ **ដើម** នៃ function ដែល override ➜ `view-originals.js` ៖ ការយោងក្នុងតួនោះ (ឧ. `commitNow` ➜ `allStores()`)
     //    ជាការយោងពិតក្នុងកូដ ship ដែលទិដ្ឋភាពជំនួស ➜ `function-surface` រាប់វា (បើអត់ វារាយ function រស់ថា «ងាប់»)
     const originals = [];
@@ -167,6 +169,9 @@ rmSync(entry);
     const aliased = aliasStateFields(text, stateGroups);
     text = aliased.text;
     if (aliased.count < 500) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` តិចពេក ៖ ' + aliased.count);
+    const selfRefs = [...text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\1\s*[;,]/g)]
+        .map((m) => m[0] + ' (ជួរ ' + text.slice(0, m.index).split('\n').length + ')');
+    if (selfRefs.length) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` បង្កើតការប្រកាសដែលយោងខ្លួនឯង (TDZ ក្នុងទិដ្ឋភាព checker) ➜ ប្តូរឈ្មោះអថេរ local ក្នុងប្រភព ៖ ' + selfRefs.join(' · '));
     writeFileSync(appPath, text);
     writeFileSync(path.join(APP, 'view-originals.js'), originals.join('\n\n') + '\n');
     for (const rel of Object.keys(moduleViews)) {

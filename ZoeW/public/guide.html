@@ -223,6 +223,7 @@
                 <li><a href="#overview">ស្គាល់ ZoeW</a></li>
                 <li><a href="#getting-started">ចាប់ផ្ដើម និងដំឡើង</a></li>
                 <li><a href="#setup">Activation និង Firebase</a></li>
+                <li><a href="#shop-account">គណនីហាង (កូដអញ្ជើញ)</a></li>
                 <li><a href="#security">ចូលប្រព័ន្ធ និងសុវត្ថិភាព</a></li>
                 <li><a href="#interface">ផ្នែកនៃ App</a></li>
                 <li><a href="#scan">ការស្កេនកញ្ចប់</a></li>
@@ -262,7 +263,7 @@
                 <h2>២. ចាប់ផ្ដើម និងដំឡើង</h2>
                 <ol class="steps">
                     <li><strong>បើក URL ផ្លូវការ</strong><br>ប្រើ Chrome, Edge ឬ Safari កំណែថ្មី។ កុំប្រើ URL ដែលផ្ញើពីប្រភពមិនស្គាល់។</li>
-                    <li><strong>ដាក់ Activation Key</strong><br>ការផ្ទៀងផ្ទាត់លើកដំបូងត្រូវការអ៊ីនធឺណិត។</li>
+                    <li><strong>ដាក់ Activation Key</strong><br>ការផ្ទៀងផ្ទាត់លើកដំបូងត្រូវការអ៊ីនធឺណិត។ ហាងដែលចូលប្រើដោយ <a href="#shop-account">កូដអញ្ជើញ</a> ➜ មើលផ្នែក ៣ខ។</li>
                     <li><strong>កំណត់ Firebase និងចូលប្រព័ន្ធ</strong><br>ប្រើ Setup Link/QR ឬបញ្ចូល Config ដោយដៃ រួចចូលដោយគណនី Firebase។</li>
                     <li><strong>កំណត់ Security PIN</strong><br>PIN ការពារសកម្មភាពសំខាន់ និងអ៊ិនគ្រីបការកំណត់រសើបលើឧបករណ៍។</li>
                     <li><strong>ដំឡើងជា PWA</strong><br>Android/Chrome៖ ម៉ឺនុយ browser → Install app។ iPhone/Safari៖ Share → Add to Home Screen។ ឬប្រើ <a href="#android">App Android</a> ដែលអ្នកលក់ផ្ញើជាឯកសារ APK។</li>
@@ -291,6 +292,33 @@
                 <h3>បញ្ចូល Firebase Config ដោយដៃ</h3>
                 <p>ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</p>
                 <div class="callout danger"><strong>សុវត្ថិភាព៖</strong> Firebase Config មិនមែនជាពាក្យសម្ងាត់ ប៉ុន្តែ Database Rules និង Authentication ត្រូវតែកំណត់ត្រឹមត្រូវ។ កុំផ្ញើ PIN, ពាក្យសម្ងាត់ ឬ API secret ក្នុង chat ឬ screenshot។</div>
+            </section>
+
+            <section id="shop-account">
+                <h2>៣ខ. គណនីហាង ៖ ចុះឈ្មោះដោយកូដអញ្ជើញ</h2>
+                <p>ហាងដែលអ្នកលក់បង្កើតក្នុង <strong>ប្រព័ន្ធរួម (Supabase)</strong> ចូលប្រើដោយ <strong>កូដអញ្ជើញ</strong> ៖ អ្នកចុះឈ្មោះដោយខ្លួនឯង ហើយគណនីចងនឹងហាង និងលេខសាខា ZTO របស់ហាងដោយស្វ័យប្រវត្តិ។</p>
+                <h3>ម្ចាស់ហាងចុះឈ្មោះលើកដំបូង</h3>
+                <ol class="steps">
+                    <li><strong>បើក Setup Link ឬស្កេន QR</strong> ដែលអ្នកលក់ផ្ញើ (Link ផ្ទុកកូដអញ្ជើញ)។</li>
+                    <li><strong>វាយ Security PIN</strong> រួចចុច <strong>រក្សាទុក និងភ្ជាប់</strong>។</li>
+                    <li>ប្រអប់ចូលប្រព័ន្ធលេច ➜ ចុច <strong>📝 ចុះឈ្មោះដោយកូដអញ្ជើញ</strong> (កូដបំពេញរួច)។</li>
+                    <li>ជ្រើស <strong>ឈ្មោះគណនី</strong> (៣–៣២ តួ ៖ a–z · 0–9 · <code>.</code> · <code>_</code>) និង <strong>ពាក្យសម្ងាត់</strong> យ៉ាងតិច ៨ តួ (វាយ ២ ដង) ➜ <strong>ចុះឈ្មោះ</strong> ➜ App ចូលប្រព័ន្ធភ្លាម។</li>
+                </ol>
+                <div class="callout warning"><strong>កូដអញ្ជើញប្រើបានតែ ១ ដង</strong> ហើយផុតកំណត់ក្នុង ៧ ថ្ងៃ។ កូដខុស ប្រើរួច ឬផុត ➜ សុំកូដថ្មីពីអ្នកលក់។</div>
+                <h3>បុគ្គលិក និងឧបករណ៍ផ្សេង</h3>
+                <ul>
+                    <li>បុគ្គលិកម្នាក់ៗមានគណនីផ្ទាល់ខ្លួន ៖ សុំ <strong>កូដអញ្ជើញបុគ្គលិក</strong> ពីអ្នកលក់ ➜ ចុះឈ្មោះលើឧបករណ៍របស់គេ ដូចជំហានខាងលើ។</li>
+                    <li>ឧបករណ៍ទី ២ របស់គណនីដដែល ៖ បើក Setup Link ដដែល ➜ <strong>ចូលប្រព័ន្ធ</strong> ដោយឈ្មោះគណនី និងពាក្យសម្ងាត់ (មិនបាច់ចុះឈ្មោះម្ដងទៀតទេ)។</li>
+                    <li>ការ Login ប្រចាំថ្ងៃប្រើ <strong>ឈ្មោះគណនី</strong> មិនមែនអ៊ីមែល។</li>
+                </ul>
+                <h3>ភ្លេចពាក្យសម្ងាត់</h3>
+                <ol>
+                    <li>សុំ <strong>កូដប្ដូរពាក្យសម្ងាត់</strong> ពីអ្នកលក់ (ប្រើបាន ១ ដង · ២៤ ម៉ោង)។</li>
+                    <li>ប្រអប់ចូលប្រព័ន្ធ ➜ <strong>🔑 ភ្លេចពាក្យសម្ងាត់?</strong> ➜ ឈ្មោះគណនី · កូដ · ពាក្យសម្ងាត់ថ្មី (២ ដង)។</li>
+                    <li>ឧបករណ៍ផ្សេងដែលចូលដោយពាក្យសម្ងាត់ចាស់ត្រូវចាកចេញ (យឺតបំផុតពេលវគ្គរបស់វាផុត) ➜ ចូលវិញដោយពាក្យសម្ងាត់ថ្មី។</li>
+                </ol>
+                <h3>ហាងផុតកំណត់ ឬត្រូវបានបិទ</h3>
+                <p>គណនីទាំងអស់របស់ហាងចាកចេញ ហើយចូលមិនបាន រហូតដល់អ្នកលក់ពន្យារ ឬបើកហាងវិញ។ ទិន្នន័យកញ្ចប់ <strong>មិនត្រូវលុប</strong> ទេ។ ស្ថានភាពហាង (ឈ្មោះ · សាខា · ថ្ងៃផុត) មើលបានក្នុង <a href="#health">🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</a> ជួរ <strong>ហាង (Supabase)</strong>។</p>
             </section>
 
             <section id="security">

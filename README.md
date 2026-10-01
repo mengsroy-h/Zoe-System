@@ -2,12 +2,14 @@
 
 ប្រព័ន្ធ PWA សម្រាប់អាជីវកម្មដឹកជញ្ជូន — **ZoeW** សរសេរលើ React + TypeScript
 + Vite (មាន build step) ចំណែក **ZoeKeyGen** ជា vanilla JavaScript គ្មាន build
-step; App ទាំង ២ deploy ជា Netlify site។
+step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័យអាជីវកម្មរស់លើ **Firebase Project
+មួយក្នុងមួយអតិថិជន** ឬលើ **[Supabase Project តែមួយ](supabase/README.md)** ដែលហាងចុះឈ្មោះ
+ដោយខ្លួនឯងតាមកូដអញ្ជើញ (ជ្រើសតាម Config នៃឧបករណ៍នីមួយៗ)។
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.45.8` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.22.1` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.46.0` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.23.0` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -54,6 +56,7 @@ node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដ�
 | **ផ្ទាំងប្រវត្តិ** | ចុចរបាចាប់ ឬអូសឡើង/ចុះ ដើម្បីបង្រួម/ពង្រីកផ្ទាំង; ម៉ឺនុយ (...) បើកដោយចលនាស្រាល និងបិទពេលចាប់ផ្តើមអូសខាងក្រៅ |
 | **ធុងសំរាម** | កញ្ចប់ដែលលុប/ដក ស្តារមកវិញបាន |
 | **ចាក់សោ App** | PIN ឬក្រយៅដៃ/មុខ ពេលបើក App និងពេលត្រឡប់ចូលវិញ |
+| **គណនីហាង (Supabase)** | ចុះឈ្មោះដោយ **កូដអញ្ជើញ** · Login ដោយឈ្មោះគណនី · ភ្លេចពាក្យសម្ងាត់ ➜ កូដពីអ្នកលក់ · គណនីចងនឹងហាង និងលេខសាខា ZTO ដោយ server |
 | **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** | ជួរ **អានសុទ្ធសាធ** ៩ ជួរ ៖ បណ្ដាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន · កំណែ Apps Script · Lookup |
 | **នាំចូល Excel ទៅ Sheet** | អាន `.xlsx` · `.xls` · `.csv` ➜ ផ្គូផ្គង Column ➜ សរសេរចូល Google Sheet (ការពារដោយ PIN) |
 | **ការសម្អាតស្វ័យប្រវត្តិ** | Barcode ដែលបិទ «យករួច» ➜ ធុងសំរាមក្រោយ ២ ម៉ោង; មិនទាន់បិទ ➜ ចូលថ្ងៃទី ៨; `expired` ➜ លុបអចិន្ត្រៃយ៍ក្រោយ ២ ថ្ងៃ; ប្រភេទផ្សេង ➜ ៣០ ថ្ងៃ |
@@ -76,6 +79,7 @@ node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដ�
 | **Revoke / Extend** | ដកសិទ្ធិ ឬបន្ថែមសុពលភាព Key ដែលចេញរួច |
 | **Setup Link និង QR** | Provision ឧបករណ៍អតិថិជនថ្មីដោយមិនបាច់វាយ Config ដោយដៃ |
 | **តារាង Key** | Note · ថ្ងៃចេញ · ស្ថានភាព |
+| **🏪 ហាង Supabase** | ចូលជា Admin ➜ បង្កើតហាង (ឈ្មោះ · លេខសាខា · សុពលភាព) ➜ កូដអញ្ជើញ + Setup Link/QR · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ |
 
 ---
 
@@ -99,6 +103,10 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `
 - `firebase-database.rules.json` — Firebase Project របស់ **អាជីវកម្ម**
 - `ZoeKeyGen/firebase-database.rules.json` — Firebase Project របស់ **License**
 
+⛔ **Supabase ក៏មិន deploy ស្វ័យប្រវត្តិដែរ** — migration · Edge Function ដាក់ដោយ CLI ឬ SQL Editor
+([`supabase/README.md`](supabase/README.md))។ `firebase-database.rules.json` ជាប្រភពរបស់ rules ដែល Supabase អនុវត្ត ➜
+កែវា ➜ Publish លើ Firebase **និង** paste `supabase/migrations/*_zoe_rules.sql` ដែលបង្កើតឡើងវិញ។
+
 ### ២. ដំឡើងឧបករណ៍ថ្មី (ZoeW)
 
 1. បើក URL របស់ site ➜ ប្រអប់សុំ **Activation Key** លេចឡើង។
@@ -111,6 +119,15 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `
    Reset ស្ថិតិ · លុបទាំងអស់ · Locker · នាំចូល Excel។
 6. (ស្រេចចិត្ត) បើក **ក្រយៅដៃ/មុខ** ក្នុងរបា Slide ➜ ដោះសោ PIN លឿនជាង។
 7. (ស្រេចចិត្ត) ដំឡើង PWA ៖ Chrome/Edge ➜ «Install»; iPhone Safari ➜ «Add to Home Screen»។
+
+### ២ខ. ហាងថ្មីលើ Supabase (ចុះឈ្មោះដោយកូដអញ្ជើញ)
+
+1. អ្នកលក់ ៖ ZoeKeyGen ➜ **🏪 ហាង Supabase** ➜ បង្កើតហាង ➜ ផ្ញើ **Setup Link/QR** (មានកូដអញ្ជើញ)។
+2. ម្ចាស់ហាង ៖ បើក Link ➜ វាយ PIN ➜ រក្សាទុក ➜ **📝 ចុះឈ្មោះដោយកូដអញ្ជើញ** ➜ ឈ្មោះគណនី + ពាក្យសម្ងាត់ ➜ ចូលប្រព័ន្ធភ្លាម
+   (គ្មាន Activation Key · គ្មានគណនី Firebase)។
+3. បុគ្គលិក ៖ សុំកូដអញ្ជើញបុគ្គលិកពីអ្នកលក់ ➜ ចុះឈ្មោះលើឧបករណ៍របស់គេ។
+
+ការដំឡើង Supabase ម្តងគត់ (Project · migration · Edge Function · Admin) ៖ [`supabase/README.md`](supabase/README.md)។
 
 ### ៣. ការងារប្រចាំថ្ងៃ (ZoeW)
 
@@ -157,8 +174,9 @@ Extend · Setup Link/QR។
 ### ៦. ការធានាគុណភាព (សម្រាប់អ្នកថែទាំ)
 
 ```bash
-npm i acorn playwright-core     # ម្តងក្នុងមួយ session
-bash audit-tools/run-all.sh          # រត់ការត្រួតពិនិត្យទាំងអស់
+npm ci --prefix ZoeW              # ម្តងក្នុងមួយ session (vite · acorn · playwright-core)
+npm ci --prefix supabase          # អ្នកយាម Supabase (Postgres ពិត · supabase-js)
+bash audit-tools/run-all.sh       # រត់ការត្រួតពិនិត្យទាំងអស់
 ```
 
 មើល **[audit-tools/README.md](audit-tools/README.md)** សម្រាប់របៀបរត់ checker
@@ -213,6 +231,8 @@ Secret របស់ Lookup API និងការតភ្ជាប់នាំ�
 - **Claim/witness fence** លើការស្តារ និងការលុបទាំងអស់ ➜ ការ replay និង
   ការគិតលុយស្ទួនកើតមិនបាន។
 - ⛔ Rules ក្នុង repo **មិន deploy ស្វ័យប្រវត្តិទេ** — paste ចូល Console ➜ Publish។
+- **ហាង Supabase** ៖ rules ដដែលអនុវត្តក្នុង Postgres លើរាល់ការសរសេរ បូក Row Level Security តាមហាង ➜ ហាងមិនឃើញទិន្នន័យគ្នា ·
+  ហាងផុតកំណត់/បិទ ➜ ចូលមិនបានភ្លាម (លម្អិត ៖ [`supabase/README.md`](supabase/README.md))។
 
 ### ស្រទាប់ទី ៥ — ការការពារខាង Browser
 

@@ -706,6 +706,7 @@ section "== Supabase (Project តែមួយ ៖ tenant · RLS · ឃ្លា�
 run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
+run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
 
 section "== ទម្លាប់គម្រោង =="
 run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
@@ -881,6 +882,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
+    KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

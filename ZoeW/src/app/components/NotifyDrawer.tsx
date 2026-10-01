@@ -19,8 +19,8 @@ function hoursText(h: number): string {
 }
 
 function PushSection({ status }: { status: PushStatus }) {
-    const canToggle = status === 'on' || status === 'off' || status === 'error' || status === 'server-off';
-    const cls = status === 'on' ? 'notify-summary is-info' : (status === 'denied' || status === 'error' || status === 'server-off' ? 'notify-summary is-warn' : 'notify-summary');
+    const canToggle = status === 'on' || status === 'off' || status === 'error' || status === 'server-off' || status === 'no-account';
+    const cls = status === 'on' ? 'notify-summary is-info' : (status === 'denied' || status === 'error' || status === 'server-off' || status === 'no-account' || status === 'shop-inactive' ? 'notify-summary is-warn' : 'notify-summary');
     return (
         <section className="notify-section" id="notifyPushSection">
             <div className="notify-section-title">📲 ជូនដំណឹងលើទូរស័ព្ទ</div>

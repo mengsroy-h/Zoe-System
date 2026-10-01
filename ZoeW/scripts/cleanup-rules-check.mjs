@@ -28,6 +28,7 @@ import { serveDir } from './serve.mjs';
 import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB } from './fake-firebase.mjs';
 import { FAKE_BRIDGE, RESPOND_DEFAULT } from './fake-capacitor.mjs';
 import { resolveOldRoot } from './old-app.mjs';
+import { SCROLL_PROBE, openMenuItem } from './menu-scroll.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -127,6 +128,13 @@ const T = 5000;
 const tick = async (p, ms = 400) => { await p.clock.runFor(ms); await p.waitForTimeout(60); };
 const click = async (p, sel) => { await p.click(sel, { timeout: T }); await tick(p); };
 const row = (text) => `#historyTableBody tr:has-text("${text}")`;
+/** ⛔ ម៉ឺនុយ (...) ឆ្លង `openMenuItem()` ៖ scroll-snap របស់ browser បិទវាតាមម៉ោងពិត (`menu-scroll.mjs`) */
+const menuReopens = [];
+const menuItem = async (p, label, opener, item) => {
+    const attempts = await openMenuItem(p, opener, item, { tick, timeout: T });
+    if (attempts > 1) menuReopens.push(label + ' ×' + attempts);
+    await tick(p);
+};
 
 async function run(label, dir, native) {
     const srv = await serveDir(dir);
@@ -141,6 +149,7 @@ async function run(label, dir, native) {
         return u.includes('127.0.0.1') ? r.continue() : r.abort();
     });
     await page.addInitScript(`window.addEventListener('unhandledrejection', (e) => { (window.__rejections ||= []).push(String((e.reason && e.reason.message) || e.reason)); });`);
+    await page.addInitScript(SCROLL_PROBE);
     if (native) {
         await page.addInitScript('(' + FAKE_BRIDGE.toString() + ')();');
         await page.addInitScript('(' + RESPOND_DEFAULT.toString() + ')();');
@@ -163,8 +172,7 @@ async function run(label, dir, native) {
     };
     await click(page, '#btnFilterAll');
     await step('លុប 0106', async () => {
-        await click(page, `${row('0106')} .more-btn`);
-        await click(page, '#menuContentContainer [data-act="moreMenuDelete"]');
+        await menuItem(page, label + ' ៖ លុប 0106', `${row('0106')} .more-btn`, '#menuContentContainer [data-act="moreMenuDelete"]');
         await tick(page, 800);
     });
     await step('ដក MR1', async () => {
@@ -178,8 +186,7 @@ async function run(label, dir, native) {
         await click(page, '#pageTabData');
     });
     const restore = (phone) => async () => {
-        await click(page, '.header-more-btn');
-        await click(page, '#menuContentContainer [data-act="moreMenuRecentlyDeleted"]');
+        await menuItem(page, label + ' ៖ ស្តារ ' + phone, '.header-more-btn', '#menuContentContainer [data-act="moreMenuRecentlyDeleted"]');
         await click(page, `#deletedTableBody tr:has-text("${phone}") .trash-restore-btn`);
         await click(page, '#restoreConfirmBtn');
         await tick(page, 800);
@@ -358,5 +365,6 @@ for (const res of results.slice(1)) {
     }
 }
 
+if (menuReopens.length) console.log(`\nℹ️  ម៉ឺនុយ (...) ត្រូវ scroll-snap របស់ browser បិទ ➜ បើកម្តងទៀត ៖ ${menuReopens.join(' · ')}`);
 console.log(`\n${fails.length ? '❌' : '✅'} cleanup-rules-check — ${passes} ok, ${fails.length} FAIL`);
 process.exitCode = fails.length ? 1 : 0;

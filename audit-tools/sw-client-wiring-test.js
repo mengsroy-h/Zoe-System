@@ -184,20 +184,29 @@ if (!chromium || !fs.existsSync(CHROME) || !fs.existsSync(path.join(DIR, 'index.
     }
 
     // === ផ្នែកទី ៤ — ព្រឹត្តិការណ៍ដែលពិនិត្យកំណែថ្មី ➜ `reg.update()` (ពិដាន ១៥ នាទី) ===
-    const probeUpdate = async (fire) => {
+    // ⛔ job ពិនិត្យកំណែមុនដែលនៅដំណើរការ (CI រវល់ ៖ lane browser ៤) ➜ `reg.update()` ថ្មីត្រូវបញ្ចូលក្នុង job ដដែល (spec ៖ job ស្មើគ្នា
+    //    ត្រូវរួម) ➜ គ្មានការទាញ `sw.js` ថ្មី ➜ ការអះអាងវិជ្ជមានក្រហមតាមល្បឿនម៉ាស៊ីន (វាស់បាន ៖ `focus` ធ្លាក់ក្នុង CI ពេញ · ឆ្លងពេលរត់ម្នាក់ឯង)។
+    //    ការកែជា **រចនាសម្ព័ន្ធ** ៖ រង់ចាំ job មុនចប់ (`reg.update()` ផ្ទាល់ resolve ពេល job ចប់) **មុន** ថតចំនួន ➜ មិនមែនពង្រីកពិដានតែម្យ៉ាង
+    const settleUpdates = () => page.evaluate(() => navigator.serviceWorker.getRegistration()
+        .then((r) => (r ? r.update() : null)).then(() => true, () => false));
+    const probeUpdate = async (fire, waitMs = 8000) => {
         const before = state.swHits;
         await page.evaluate(fire);
-        await until(() => state.swHits > before, 3000);
+        await until(() => state.swHits > before, waitMs);
         return state.swHits - before;
     };
     const fireVisible = () => document.dispatchEvent(new Event('visibilitychange'));
     const fireFocus = () => window.dispatchEvent(new Event('focus'));
     const fireOnline = () => window.dispatchEvent(new Event('online'));
-    ok('ទិសផ្ទុយ ៖ ព្រឹត្តិការណ៍មុនពិដាន ១៥ នាទី ➜ មិនហៅ `reg.update()`', (await probeUpdate(fireVisible)) === 0);
+    await settleUpdates();
+    ok('ទិសផ្ទុយ ៖ ព្រឹត្តិការណ៍មុនពិដាន ១៥ នាទី ➜ មិនហៅ `reg.update()`', (await probeUpdate(fireVisible, 3000)) === 0);
     await page.evaluate(() => window.__zoeSkew(16 * 60 * 1000));
+    await settleUpdates();
     ok('⛔ `visibilitychange` (ត្រឡប់មក App) ក្រោយពិដាន ➜ ពិនិត្យកំណែថ្មី (`sw.js` ពី server)', (await probeUpdate(fireVisible)) >= 1);
     await page.evaluate(() => window.__zoeSkew(16 * 60 * 1000));
+    await settleUpdates();
     ok('⛔ `focus` ក្រោយពិដាន ➜ ពិនិត្យកំណែថ្មី', (await probeUpdate(fireFocus)) >= 1);
+    await settleUpdates();
 
     // === ផ្នែកទី ៥ — deploy ថ្មី ➜ SW ថ្មីចាប់យកទំព័រ ➜ `controllerchange` ➜ ផ្ទាំង «មានកំណែថ្មី» ===
     {

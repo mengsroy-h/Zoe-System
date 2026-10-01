@@ -231,7 +231,10 @@ function makeScenario(tag) {
 
 const stats = { user: 0, denied: 0, mismatches: [], stateDiffs: [], unsupported: [], roots: new Set(), probes: 0, probesDeniedBoth: 0, probesAcceptedBoth: 0 };
 
-async function both(sc, who, method, p, v, label) {
+// ⛔ `probe` ៖ ការសរសេរក្លែង (mutation) ដែល rules ទាំង ២ បដិសេធ **មិនត្រូវ** អនុវត្តជា owner ទេ — មានតែការសរសេរពិតរបស់ App (fake ក្នុង fuzz
+//    ទទួលវា) ទេដែលត្រូវចម្លងជា owner ដើម្បីរក្សាស្ថានភាពឲ្យស្មើ fuzz។ បើអត់ mutant ដែល rules បដិសេធចូលទិន្នន័យ (វាស់បាន ៖ `op` ក្រោម root
+//    នៃ PATCH ច្រើនផ្លូវ ➜ `zoe_admin_write` បដិសេធផ្លូវ root ➜ checker គាំង «owner write on Postgres failed» ខណៈ rules ទាំង ២ និយាយដូចគ្នា)
+async function both(sc, who, method, p, v, label, probe) {
     if (who === 'owner') {
         await sc.owner(method, p, v);
         await pgOwner(method, p, v);
@@ -241,7 +244,8 @@ async function both(sc, who, method, p, v, label) {
     const g = await pgUser(method, p, v);
     if (g.unsupported) {
         stats.unsupported.push(method + ' ' + (p || '/'));
-        await pgOwner(method, p, v);
+        if (!probe) await pgOwner(method, p, v);
+        else if (!emuDenied(e)) await pgOwnerSnapshot(await sc.tree());
         return { emuDenied: emuDenied(e), pgDenied: null };
     }
     const ed = emuDenied(e);
@@ -251,7 +255,7 @@ async function both(sc, who, method, p, v, label) {
             value: JSON.stringify(v).slice(0, 300) });
         const t = await sc.tree();
         await pgOwnerSnapshot(t);
-    } else if (ed) {
+    } else if (ed && !probe) {
         await sc.owner(method, p, v);
         await pgOwner(method, p, v);
     }
@@ -484,7 +488,7 @@ function capture() {
                     if (mut) {
                         stats.probes++;
                         mutNames.add(mut.name);
-                        const r = await both(s, 'user', entry.m, entry.p, mut.v, 'run' + run.run + '#' + i + ' ' + mut.name);
+                        const r = await both(s, 'user', entry.m, entry.p, mut.v, 'run' + run.run + '#' + i + ' ' + mut.name, true);
                         if (r && r.emuDenied && r.pgDenied) stats.probesDeniedBoth++;
                         if (r && !r.emuDenied && r.pgDenied === false) stats.probesAcceptedBoth++;
                     }

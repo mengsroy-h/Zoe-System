@@ -45,6 +45,7 @@ vi.mock('@capacitor/push-notifications', () => ({
 }));
 
 import { dataState, firebaseState, uiState } from '../src/core/state';
+import { viewState } from '../src/core/view-state';
 import { dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
 import { barcodeAbandonIsRipe } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
@@ -130,6 +131,8 @@ beforeEach(() => {
 afterEach(() => {
     unmount();
     closeSideDrawer();
+    viewState.backendKind = 'firebase';
+    firebaseState.auth = null;
     delete (window as any).ZoeLicense;
     delete (window as any).Capacitor;
     delete (window.navigator as any).serviceWorker;
@@ -515,6 +518,80 @@ describe('កាលវិភាគផុតកំណត់ (ផ្ញើទៅ s
 
     it('push បិទ ➜ មិនផ្ញើកាលវិភាគ', async () => {
         stubServer();
+        expect(await syncExpirySchedule(true)).toBe(false);
+        expect(posts).toHaveLength(0);
+    });
+});
+
+describe('⛔ ហាង Supabase ៖ អត្តសញ្ញាណ = គណនីហាង (គ្មាន Activation Key)', () => {
+    // ម្ចាស់គម្រោងរាយការណ៍ ៖ ហាង Supabase ចុចបើក ➜ «ឧបករណ៍នេះមិនទាន់ Activate — ការជូនដំណឹងត្រូវការ Activation Key» ខណៈហាង Supabase
+    // គ្មាន Key ដោយការរចនា (`ensureAppActivated()`) ➜ App ផ្ញើ session token របស់គណនីហាងជំនួស Key (server ផ្ទៀងតាម `my_account()`)
+    const SB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.sig';
+    const signIn = (token: string | null = SB_TOKEN) => {
+        firebaseState.auth = token === null ? { currentUser: null } : { currentUser: { uid: 'u1', getIdToken: async () => { order.push('getIdToken'); return token; } } } as any;
+    };
+    beforeEach(() => {
+        viewState.backendKind = 'supabase';
+        setLicense(null);
+        signIn();
+    });
+
+    it('web ៖ requestPermission មុន await ណាមួយ · subscribe ផ្ញើ `supabase` (មិនមែន license) · ស្ថានភាព on', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        const p = enablePush();
+        expect(order[0]).toBe('requestPermission');
+        expect(await p).toBe(true);
+        expect(uiState.pushStatus).toBe('on');
+        const sub = posts.find((x) => x.op === 'subscribe')!;
+        expect(sub.body).toMatchObject({ supabase: SB_TOKEN, sub: { kind: 'web', endpoint: w.sub.endpoint } });
+        expect('license' in sub.body).toBe(false);
+        expect(order.indexOf('getIdToken')).toBeGreaterThan(order.indexOf('requestPermission'));
+    });
+
+    it('មិនទាន់ចូលប្រព័ន្ធ ➜ no-account មុនសុំសិទ្ធិ (មិនមែន «ត្រូវការ Activation Key») · ប៊ូតុងនៅចុចសាកម្តងទៀតបាន', async () => {
+        const w = stubWebPush('granted');
+        stubServer();
+        signIn(null);
+        expect(await enablePush()).toBe(false);
+        expect(uiState.pushStatus).toBe('no-account');
+        expect(w.Notification.requestPermission).not.toHaveBeenCalled();
+        expect(PUSH_STATUS_TEXT['no-account']).not.toMatch(/Activation|Activate/);
+        mount(<NotifyDrawer />);
+        expect(document.getElementById('notifyPushStatus')!.textContent).toBe(PUSH_STATUS_TEXT['no-account']);
+        expect(document.getElementById('notifyPushBtn')).not.toBeNull();
+    });
+
+    it('សាលក្រម server ៖ ហាងផុត/បិទ ➜ shop-inactive · session ខុស ➜ no-account · env Supabase មិនកំណត់ ➜ server-off', async () => {
+        for (const [reason, status] of [['supabase:inactive', 'shop-inactive'], ['supabase:session', 'no-account'], ['supabase:account', 'no-account'], ['supabase:unset', 'server-off']]) {
+            stubWebPush('granted');
+            stubServer({ subscribe: { status: 403, body: { ok: false, reason } } });
+            await enablePush();
+            expect(uiState.pushStatus).toBe(status);
+        }
+        expect(PUSH_STATUS_TEXT['shop-inactive']).toMatch(/ផុតកំណត់|បិទ/);
+    });
+
+    it('APK ៖ token FCM ➜ subscribe ផ្ញើ `supabase` + platform android ➜ on', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        pn.requestPermissions.mockClear();
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        await pn.listeners.registration({ value: 'fcmToken:' + 'y'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        const sub = posts.find((x) => x.op === 'subscribe')!;
+        expect(sub.body).toMatchObject({ supabase: SB_TOKEN, platform: 'android', sub: { kind: 'fcm' } });
+        expect('license' in sub.body).toBe(false);
+    });
+
+    it('កាលវិភាគផុតកំណត់ ៖ ផ្ញើ `supabase` + times · មិនទាន់ចូល ➜ មិនផ្ញើ', async () => {
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true }));
+        stubServer();
+        expect(await syncExpirySchedule(true)).toBe(true);
+        const sent = posts.find((x) => x.op === 'schedule')!;
+        expect(sent.body).toMatchObject({ supabase: SB_TOKEN, times: [] });
+        posts.length = 0;
+        signIn(null);
         expect(await syncExpirySchedule(true)).toBe(false);
         expect(posts).toHaveLength(0);
     });

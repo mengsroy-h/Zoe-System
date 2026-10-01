@@ -15,7 +15,7 @@ import {
     FCM_CHANNEL_ID as SERVER_FCM_CHANNEL, LICENSE_APP_CODE, LICENSE_DB_URL_DEFAULT, LICENSE_KEY_PREFIX, LICENSE_PUBLIC_KEYS_JWK,
     PUSH_EXPIRY_HOUR, PUSH_NOTICE_MAX_AGE_MS, PUSH_OPEN_URL, PUSH_SCHEDULE_MAX_AGE_MS, PUSH_SUBS_PER_KEY_MAX,
     b64urlDecode, b64urlEncode, createPushService, encryptWebPushPayload, handlePushRequest, readPushConfig,
-    resetPushStateForTests, runPushCron, vapidAuthorization, webPushEndpointAllowed
+    resetPushStateForTests, runPushCron, supabaseTenantKeyId, vapidAuthorization, webPushEndpointAllowed
 } from '../netlify/lib/push-core.mjs';
 import { LICENSE_APP_CODE as CLIENT_APP_CODE } from '../src/features/license';
 import { FCM_CHANNEL_ID as CLIENT_FCM_CHANNEL, PUSH_OPEN_PARAM } from '../src/features/push';
@@ -109,7 +109,7 @@ interface Harness {
     push: (url: string, init: any) => { status: number; body?: any };
 }
 
-function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown?: boolean } = {}): Harness {
+function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown?: boolean; sbDown?: boolean } = {}): Harness {
     const store = makeStore();
     const clock = { now: NOW };
     const h: Harness = {
@@ -128,6 +128,13 @@ function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown
         }
         if (url.startsWith(LICENSE_DB_URL_DEFAULT + '/license_announcements/')) return reply(200, h.notices);
         if (url === 'https://oauth2.googleapis.com/token') return reply(200, { access_token: 'ya29.test', expires_in: 3600 });
+        if (url === SB_URL + '/rest/v1/rpc/my_account') {
+            if (opts.sbDown) throw new TypeError('Failed to fetch');
+            const auth = String((init.headers || {}).Authorization || '').replace(/^Bearer /, '');
+            if ((init.headers || {}).apikey !== SB_KEY) return reply(401, { message: 'bad apikey' });
+            const acct = SB_ACCOUNTS[auth];
+            return acct === undefined ? reply(401, { message: 'JWT invalid' }) : reply(200, acct === null ? [] : [acct]);
+        }
         const r = h.push(url, init);
         return reply(r.status, r.body);
     };
@@ -137,6 +144,27 @@ function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown
     });
     return h;
 }
+
+const SB_URL = 'https://abcdefghijklmnopqrst.supabase.co';
+const SB_KEY = 'sb_publishable_' + 'k'.repeat(30);
+const sbEnv = () => Object.assign(vapidEnv(), { FCM_SERVICE_ACCOUNT: JSON.stringify(FCM_SA), SUPABASE_URL: SB_URL, SUPABASE_PUBLISHABLE_KEY: SB_KEY });
+const sbJwt = (sub: string, claims: Record<string, any> = {}) => [{ alg: 'HS256', typ: 'JWT' },
+    Object.assign({ iss: SB_URL + '/auth/v1', sub, role: 'authenticated', exp: Math.floor(NOW / 1000) + 3600 }, claims), 'sig']
+    .map((x) => (typeof x === 'string' ? x : Buffer.from(JSON.stringify(x)).toString('base64url'))).join('.');
+const TENANT_A = '11111111-2222-3333-4444-555555555555';
+const TENANT_B = '99999999-8888-7777-6666-555555555555';
+const SB_OWNER = sbJwt('u-owner');
+const SB_STAFF = sbJwt('u-staff');
+const SB_OTHER = sbJwt('u-other');
+const SB_EXPIRED_SHOP = sbJwt('u-expired');
+const SB_NO_SHOP = sbJwt('u-none');
+const SB_ACCOUNTS: Record<string, any> = {
+    [SB_OWNER]: { tenant_id: TENANT_A, status: 'active', role: 'owner' },
+    [SB_STAFF]: { tenant_id: TENANT_A, status: 'active', role: 'member' },
+    [SB_OTHER]: { tenant_id: TENANT_B, status: 'active', role: 'owner' },
+    [SB_EXPIRED_SHOP]: { tenant_id: TENANT_B, status: 'expired', role: 'owner' },
+    [SB_NO_SHOP]: null
+};
 
 function webSub(host = 'fcm.googleapis.com') {
     const ua = uaKeys();
@@ -489,6 +517,92 @@ describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify sched
         h.clock.now = at8 + 5 * 60e3;
         await h.service.dispatchExpiry();
         expect(sent).toBe(1);
+    });
+});
+
+describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase (គ្មាន Activation Key)', () => {
+    // ម្ចាស់គម្រោងរាយការណ៍ ៖ ហាង Supabase ចុចបើកការជូនដំណឹង ➜ «ត្រូវការ Activation Key» ខណៈហាង Supabase គ្មាន Key ដោយការរចនា។
+    // អត្តសញ្ញាណ = session Supabase ពិត ➜ `my_account()` លើ Project ក្នុង env (ដូច Function ZTO) ➜ កូនសោតាមហាង (tenant) មិនមែនតាមឧបករណ៍
+    it('session សកម្ម ➜ ចុះឈ្មោះបាន · ឧបករណ៍ ២ ក្នុងហាងដដែល ➜ index តែមួយ · ហាងផ្សេង ➜ index ផ្សេង', async () => {
+        const h = harness({ env: sbEnv() });
+        const owner = webSub();
+        const staff = webSub();
+        const other = webSub();
+        expect(await h.service.subscribe({ supabase: SB_OWNER }, owner.sub, 'android')).toMatchObject({ ok: true });
+        expect(await h.service.subscribe({ supabase: SB_STAFF }, staff.sub, 'web')).toMatchObject({ ok: true });
+        expect(await h.service.subscribe({ supabase: SB_OTHER }, other.sub, 'web')).toMatchObject({ ok: true });
+        const idA = supabaseTenantKeyId(TENANT_A);
+        const idB = supabaseTenantKeyId(TENANT_B);
+        expect(idA).toMatch(/^[0-9A-Z]{16,40}$/);
+        expect(idA).not.toBe(idB);
+        const indexA = JSON.parse(h.store.data.get('bykey/' + idA)!.value).subs;
+        const indexB = JSON.parse(h.store.data.get('bykey/' + idB)!.value).subs;
+        expect(indexA).toHaveLength(2);
+        expect(indexB).toHaveLength(1);
+        const rpc = h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account');
+        expect(rpc.length).toBe(3);
+        expect(rpc.every((c) => c.init.method === 'POST' && c.init.headers.apikey === SB_KEY)).toBe(true);
+        expect(JSON.stringify([...h.store.data.values()])).not.toContain(SB_OWNER);
+    });
+
+    it('កាលវិភាគ + ការរំលឹកម៉ោង ៨ ៖ តាមហាង · ហាងផ្សេងមិនទទួល', async () => {
+        const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+        const h = harness({ env: sbEnv() });
+        h.clock.now = at8 - 3600e3;
+        const mine = webSub();
+        const other = webSub();
+        await h.service.subscribe({ supabase: SB_STAFF }, mine.sub);
+        await h.service.subscribe({ supabase: SB_OTHER }, other.sub);
+        expect(await h.service.saveSchedule({ supabase: SB_OWNER }, [at8 + 3600e3])).toMatchObject({ ok: true, count: 1 });
+        h.clock.now = at8;
+        const sent: string[] = [];
+        h.push = (url) => { sent.push(url); return { status: 201 }; };
+        expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 1, keys: 1 });
+        expect(sent).toEqual([mine.sub.endpoint]);
+    });
+
+    it('ផ្ទៀង ៖ issuer ផ្សេង/ផុត/មិនមែន authenticated ➜ session (មិនហៅ Supabase) · 401 ➜ session · ហាងផុត ➜ inactive · គ្មានហាង ➜ account', async () => {
+        const h = harness({ env: sbEnv() });
+        const sub = () => webSub().sub;
+        expect(await h.service.subscribe({ supabase: sbJwt('x', { iss: 'https://evil.supabase.co/auth/v1' }) }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:session' });
+        expect(await h.service.subscribe({ supabase: sbJwt('x', { exp: Math.floor(NOW / 1000) - 10 }) }, sub())).toMatchObject({ reason: 'supabase:session' });
+        expect(await h.service.subscribe({ supabase: sbJwt('x', { role: 'anon' }) }, sub())).toMatchObject({ reason: 'supabase:session' });
+        expect(await h.service.subscribe({ supabase: 'not-a-jwt' }, sub())).toMatchObject({ reason: 'supabase:session' });
+        expect(h.calls.filter((c) => c.url.startsWith(SB_URL)).length).toBe(0);
+        expect(await h.service.subscribe({ supabase: sbJwt('forged') }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:session' });
+        expect(await h.service.subscribe({ supabase: SB_EXPIRED_SHOP }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:inactive' });
+        expect(await h.service.subscribe({ supabase: SB_NO_SHOP }, sub())).toMatchObject({ ok: false, status: 403, reason: 'supabase:account' });
+        expect([...h.store.data.keys()].filter((k) => k.startsWith('sub/'))).toHaveLength(0);
+    });
+
+    it('⛔ «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ខុស» ៖ Supabase ដាច់ ➜ 503 · env មិនកំណត់ ➜ 503 supabase:unset · Secret key ក្នុង env ➜ មិនប្រើ', async () => {
+        const down = harness({ env: sbEnv(), sbDown: true });
+        expect(await down.service.subscribe({ supabase: SB_OWNER }, webSub().sub)).toMatchObject({ ok: false, status: 503, reason: 'supabase:unverified' });
+        const unset = harness();
+        expect(await unset.service.subscribe({ supabase: SB_OWNER }, webSub().sub)).toMatchObject({ ok: false, status: 503, reason: 'supabase:unset' });
+        expect(readPushConfig(Object.assign(sbEnv(), { SUPABASE_PUBLISHABLE_KEY: 'sb_secret_' + 'z'.repeat(30) })).supabase).toBeNull();
+        expect(readPushConfig(Object.assign(sbEnv(), { SUPABASE_URL: 'http://evil.example.com' })).supabase).toBeNull();
+    });
+
+    it('cache ៖ token ដដែលក្នុង ១០ នាទី ➜ ហៅ Supabase ម្តង · Activation Key នៅដើរដូចមុនលើ service ដដែល', async () => {
+        const h = harness({ env: sbEnv() });
+        await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
+        await h.service.subscribe({ supabase: SB_OWNER }, webSub().sub);
+        expect(h.calls.filter((c) => c.url === SB_URL + '/rest/v1/rpc/my_account').length).toBe(1);
+        expect(await h.service.subscribe(GOOD, webSub().sub)).toMatchObject({ ok: true });
+        expect(await h.service.subscribe({ license: GOOD }, webSub().sub)).toMatchObject({ ok: true });
+    });
+
+    it('HTTP ៖ body `supabase` ➜ អត្តសញ្ញាណហាង · token មិនលេចក្នុងចម្លើយ', async () => {
+        const h = harness({ env: sbEnv() });
+        const req = (body: string) => new Request('https://zoew.netlify.app/.netlify/functions/push?op=subscribe', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        const ok = await handlePushRequest(req(JSON.stringify({ supabase: SB_OWNER, sub: webSub().sub, platform: 'web' })), h.service);
+        expect(ok.status).toBe(200);
+        const bad = await handlePushRequest(req(JSON.stringify({ supabase: SB_EXPIRED_SHOP, sub: webSub().sub })), h.service);
+        const text = await bad.text();
+        expect(bad.status).toBe(403);
+        expect(JSON.parse(text)).toMatchObject({ ok: false, reason: 'supabase:inactive' });
+        expect(text).not.toContain(SB_EXPIRED_SHOP);
     });
 });
 

@@ -1021,6 +1021,30 @@ check(siteOffenders.length === 0,
         'រកឃើញ ' + hits.length + ' ជួរ ៖\n        ' + hits.slice(0, 10).join('\n        '));
 })();
 
+// ── លេខក្នុងជួរតែមួយ ៖ ខ្មែរ ឬឡាតាំង មិនលាយ ───────────────────────────────────────────────
+// ⛔ ជួរ «ក–ខ» ដែលក្បាលជាលេខខ្មែរ ហើយចុងជាថេរ JS (បង្ហាញជាលេខឡាតាំង) ➜ អ្នកប្រើឃើញ «(១–3650)»។ វាស់បាន ៖ ម្ចាស់គម្រោងចាប់បាន
+// លើប្រអប់ «ពន្យារហាង» របស់ ZoeKeyGen (រូបថត) មិនមែនឧបករណ៍។ ការស្កេន ៖ literal ដែលបញ្ចប់ដោយ «លេខខ្មែរ–» រួចភ្ជាប់ `+`/`${` (តម្លៃ
+// ឡាតាំង) · ទិសផ្ទុយ «–លេខខ្មែរ» នៅក្រោយ `+` · និងជួរលាយក្នុងអក្សរតែមួយ។ App ទាំង ២ (កូដ ship · HTML · សៀវភៅ)។
+(function () {
+    const KH = '[\u17E0-\u17E9]';
+    const MIXED = new RegExp(KH + '[\u2013-](?:[\'"`]\\s*\\+|\\$\\{|[0-9])|(?:\\+\\s*[\'"`]|\\})[\u2013-]' + KH + '|[0-9][\u2013-]' + KH);
+    const bad = "alert('ថ្ងៃ \u17E1\u2013' + MAX)";
+    const good = "alert('ថ្ងៃ 1\u2013' + MAX + ' · \u17E1\u2013\u17E5')";
+    check(MIXED.test(bad) && MIXED.test('(\u17E1\u2013${MAX})') && MIXED.test('1\u2013\u17E5') && !MIXED.test(good),
+        'probe ៖ ការស្កេនចាប់ជួរលេខលាយ ហើយមិនចាប់ជួរខ្មែរសុទ្ធ/ឡាតាំងសុទ្ធ (ទិសផ្ទុយ)');
+    const files = ['ZoeKeyGen/app.js', 'ZoeKeyGen/index.html', 'ZoeW/app.js', 'ZoeW/index.html', 'ZoeW/guide.html', 'ZoeW/public/guide.html']
+        .filter((f) => fs.existsSync(path.join(ROOT, f)));
+    const hits = [];
+    files.forEach((f) => {
+        fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n').forEach((line, i) => {
+            if (MIXED.test(line)) hits.push(f + ':' + (i + 1) + '  ' + line.trim().slice(0, 100));
+        });
+    });
+    check(files.includes('ZoeKeyGen/app.js') && files.includes('ZoeW/app.js'), 'ជាន់អប្បបរមា ៖ ស្កេនកូដ ship របស់ App ទាំង ២ រកជួរលេខលាយ', files.join(' · '));
+    check(hits.length === 0, '⛔ ជួរលេខ «ក–ខ» មិនលាយលេខខ្មែរ និងឡាតាំង (ឧ. «(១–3650)») — App ទាំង ២',
+        'រកឃើញ ' + hits.length + ' ៖\n        ' + hits.slice(0, 10).join('\n        '));
+})();
+
 // ════════════════════════════════════════════════════════════════════════
 // ⛔ អត្ថបទក្នុង App មិននិយាយពីអ្វីដែល «លែងមាន» ឬ «ធ្លាប់ដក» (ច្បាប់ ៧ · សំណើម្ចាស់គម្រោង ៖ «ក្នុង App ទាំងអស់កុំ mention អ្វីដែលលែងមាន
 //    អ្វីដែលធ្លាប់ដក») ➜ សរសេរតែ «វាដើរបែបនេះ» (បច្ចុប្បន្នកាល)។ វាស់បាន ៖ កំណត់ចំណាំកំណែក្នុង 🔔 រាយ «លែងបាំងរបា…ទៀតហើយ» ·

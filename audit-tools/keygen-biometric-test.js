@@ -53,7 +53,7 @@ ok('ជាន់អប្បបរមា ៖ អាន ZoeKeyGen/app.js · index
 
 const FNS = ['safeStoreGet', 'safeStoreSet', 'safeStoreRemove', 'requestPinBeforeConfig', 'bytesToB64', 'b64ToBytes',
     'readBiometricRecord', 'clearBiometricRecord', 'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey',
-    'unwrapPinWithRawKey', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',
+    'unwrapPinWithRawKey', 'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',
     'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock', 'completePinUnlock',
     'isPinFlowPending', 'invalidateSensitiveSession', 'captureSensitiveSession', 'isSensitiveSessionCurrent'];
 const sliced = slice(FNS);
@@ -80,22 +80,31 @@ function build(opts) {
         return els[id];
     };
     const log = { toasts: [], alerts: [], targets: [], creates: 0, gets: 0, closed: [] };
+    // ⛔ authenticator ក្លែងតាមរូបរាងវេទិកាពិត ៖ `android` = Google Password Manager (PRF តែលើ passkey ដែល discoverable ៖
+    //    `residentKey: 'discouraged'` ➜ credential ចាស់គ្មាន hmac-secret ➜ `prf.enabled: false`) · `prfAtCreate` = Chrome ដែលវាយតម្លៃ
+    //    PRF ក្នុង `create()` ខ្លួនវា (ប្រអប់ស្កេនតែម្តង) · `enabledMissing` = `prf: {}` គ្មានវាល `enabled` (មិនដឹង ➜ សួរ `get()`)
+    const prfOf = (req) => {
+        const salt = Buffer.from(req.publicKey.extensions && req.publicKey.extensions.prf ? req.publicKey.extensions.prf.eval.first : []);
+        return new Uint8Array(nodeCrypto.createHmac('sha256', o.wrongPrf ? nodeCrypto.randomBytes(32) : prfSecret).update(salt).digest()).buffer;
+    };
+    let credPrf = o.prf;
     const credentials = {
         create: async (req) => {
             log.creates++;
+            log.createReq = req;
             if (o.createReject) throw new Error('NotAllowedError');
-            return {
-                rawId: new Uint8Array([7, 7, 7, 7]).buffer,
-                getClientExtensionResults: () => (o.prf ? { prf: { enabled: true } } : {})
-            };
+            const sel = req.publicKey.authenticatorSelection || {};
+            credPrf = o.prf && (!o.android || sel.residentKey === 'required' || sel.residentKey === 'preferred' || sel.requireResidentKey === true);
+            const ext = !credPrf ? (o.android ? { prf: { enabled: false } } : {})
+                : o.prfAtCreate ? { prf: { enabled: true, results: { first: prfOf(req) } } }
+                : o.enabledMissing ? { prf: {} } : { prf: { enabled: true } };
+            return { rawId: new Uint8Array([7, 7, 7, 7]).buffer, getClientExtensionResults: () => ext };
         },
         get: async (req) => {
             log.gets++;
             if (o.getHook) await o.getHook();
             if (o.getReject) throw new Error('NotAllowedError');
-            const salt = Buffer.from(req.publicKey.extensions && req.publicKey.extensions.prf ? req.publicKey.extensions.prf.eval.first : []);
-            const first = nodeCrypto.createHmac('sha256', o.wrongPrf ? nodeCrypto.randomBytes(32) : prfSecret).update(salt).digest();
-            return { getClientExtensionResults: () => (o.prf ? { prf: { results: { first: new Uint8Array(first).buffer } } } : {}) };
+            return { getClientExtensionResults: () => (credPrf ? { prf: { results: { first: prfOf(req) } } } : {}) };
         }
     };
     const sandbox = {
@@ -151,6 +160,30 @@ const until = async (cond, ms = 8000) => { const end = Date.now() + ms; while (!
     vm.runInContext('auth = { currentUser: null };', h2.ctx);
     await h2.ctx.startBiometricEnrollment(PIN);
     ok('មិនទាន់ចូលប្រព័ន្ធ ➜ មិនចង', h2.log.creates === 0 && !h2.store.has(KEY));
+
+    // ⛔ Android (Google Password Manager) ៖ PRF មានតែលើ passkey ដែល discoverable ➜ `residentKey: 'discouraged'` = «មិនគាំទ្រ»
+    //    ក្លែងក្លាយលើទូរស័ព្ទដែលគាំទ្រពិត (អ្នកប្រើរាយការណ៍ ៖ ZoeW ដើរ · ZoeKeyGen «មិនគាំទ្រ» លើទូរស័ព្ទដដែល)
+    h2 = build({ android: true, storage: { zoew_security_pin_hash: HASH } });
+    await h2.ctx.startBiometricEnrollment(PIN);
+    const sel = (h2.log.createReq && h2.log.createReq.publicKey.authenticatorSelection) || {};
+    ok('Android (PRF តែ passkey discoverable) ➜ ចងបាន · ស្នើ residentKey required', h2.store.has(KEY) && !h2.log.alerts.length
+        && sel.residentKey === 'required' && sel.requireResidentKey === true, { alerts: h2.log.alerts, sel });
+    const androidRec = h2.store.get(KEY);
+    let a2 = build({ android: true, storage: { zoew_security_pin_hash: HASH, [KEY]: androidRec } });
+    a2.el('pinModal').classList.add('active');
+    ok('Android ៖ កំណត់ត្រាដែលចង ➜ ស្រាយ PIN ចេញវិញបាន', (await a2.ctx.biometricUnlockPin()) === PIN);
+    h2 = build({ prfAtCreate: true, storage: { zoew_security_pin_hash: HASH } });
+    await h2.ctx.startBiometricEnrollment(PIN);
+    ok('PRF ក្នុង create() ➜ ប្រើវាផ្ទាល់ · ប្រអប់ស្កេនតែម្តង (គ្មាន get)', h2.store.has(KEY) && h2.log.creates === 1 && h2.log.gets === 0, h2.log);
+    a2 = build({ storage: { zoew_security_pin_hash: HASH, [KEY]: h2.store.get(KEY) } });
+    ok('PRF ពី create() ស្មើ PRF ពី get() ➜ ស្រាយ PIN ចេញ', (await a2.ctx.biometricUnlockPin()) === PIN);
+    h2 = build({ enabledMissing: true, storage: { zoew_security_pin_hash: HASH } });
+    await h2.ctx.startBiometricEnrollment(PIN);
+    ok('`prf: {}` (គ្មាន enabled) ➜ សួរ get() ➜ ចងបាន', h2.store.has(KEY) && h2.log.gets === 1 && !h2.log.alerts.length, h2.log.alerts);
+    h2 = build({ getReject: true, storage: { zoew_security_pin_hash: HASH } });
+    await h2.ctx.startBiometricEnrollment(PIN);
+    ok('⛔ បោះបង់ការស្កេនទី ២ ≠ «មិនគាំទ្រ PRF» ➜ មិនរក្សា · toast បោះបង់ · គ្មាន alert PRF', !h2.store.has(KEY)
+        && !h2.log.alerts.some((a) => /PRF/.test(a)) && h2.log.toasts.some((t) => /បោះបង់/.test(t)), { alerts: h2.log.alerts, toasts: h2.log.toasts });
 
     console.log('-- ២. ដោះសោ ➜ ផ្លូវជោគជ័យដូចការវាយ PIN --');
     const enrolled = h.store.get(KEY);

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.0';
+const APP_VERSION = '2.24.1';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -30,6 +30,8 @@ const ACTION_ALLOWLIST = [
     "runBiometricUnlock",
     "saveFirebaseConfig",
     "saveNewSecurityPin",
+    "saveSbInviteQr",
+    "saveSetupLinkQr",
     "sbAdminLogin",
     "sbAdminLogout",
     "sbAdminRefresh",
@@ -989,21 +991,28 @@ async function unwrapPinWithRawKey(wrapped, rawKey) {
     }
 }
 
+function biometricPrfFirst(results) {
+    const first = results && results.prf && results.prf.results && results.prf.results.first;
+    return first ? new Uint8Array(first) : null;
+}
+
+async function biometricPrfEval(credentialId) {
+    const assertion = await navigator.credentials.get({
+        publicKey: {
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            rpId: window.location.hostname,
+            allowCredentials: [{ type: 'public-key', id: b64ToBytes(credentialId), transports: ['internal'] }],
+            userVerification: 'required',
+            timeout: 60000,
+            extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
+        }
+    });
+    return biometricPrfFirst(assertion && assertion.getClientExtensionResults());
+}
+
 async function biometricPrfBytes(credentialId) {
     try {
-        const assertion = await navigator.credentials.get({
-            publicKey: {
-                challenge: crypto.getRandomValues(new Uint8Array(32)),
-                rpId: window.location.hostname,
-                allowCredentials: [{ type: 'public-key', id: b64ToBytes(credentialId), transports: ['internal'] }],
-                userVerification: 'required',
-                timeout: 60000,
-                extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
-            }
-        });
-        const results = assertion && assertion.getClientExtensionResults();
-        const first = results && results.prf && results.prf.results && results.prf.results.first;
-        return first ? new Uint8Array(first) : null;
+        return await biometricPrfEval(credentialId);
     } catch (e) {
         return null;
     }
@@ -1023,8 +1032,8 @@ async function enrollBiometricRecord(pin) {
             authenticatorSelection: {
                 authenticatorAttachment: 'platform',
                 userVerification: 'required',
-                residentKey: 'discouraged',
-                requireResidentKey: false
+                residentKey: 'required',
+                requireResidentKey: true
             },
             timeout: 60000,
             attestation: 'none',
@@ -1039,8 +1048,8 @@ async function enrollBiometricRecord(pin) {
     } catch (e) {
         ext = {};
     }
-    if (!ext.prf || !ext.prf.enabled) return { unsupported: true };
-    const rawKey = await biometricPrfBytes(credentialId);
+    if (!ext.prf || ext.prf.enabled === false) return { unsupported: true };
+    const rawKey = biometricPrfFirst(ext) || await biometricPrfEval(credentialId);
     if (!rawKey) return { unsupported: true };
     return { mode: 'prf', credentialId, wrapped: await wrapPinWithRawKey(pin, rawKey) };
 }
@@ -1114,7 +1123,7 @@ async function startBiometricEnrollment(verifiedPin) {
             return;
         }
         if (rec.unsupported) {
-            alert('Browser/ឧបករណ៍នេះមិនគាំទ្រការចាក់សោ PIN ដោយក្រយៅដៃ ឬមុខពិត (WebAuthn PRF) ទេ ➜ ZoeKeyGen មិនរក្សា PIN ក្នុងឧបករណ៍ដោយគ្មានការការពារ។ សូមប្រើ Chrome/Edge ថ្មី ឬ Safari 18+ ។');
+            alert('Browser/ឧបករណ៍នេះមិនគាំទ្រការចាក់សោ PIN ដោយក្រយៅដៃ ឬមុខពិត (WebAuthn PRF) ទេ ➜ ZoeKeyGen មិនរក្សា PIN ក្នុងឧបករណ៍ដោយគ្មានការការពារ។ សូមប្រើ Chrome/Edge ថ្មី ឬ Safari 18+ · លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager ។');
             return;
         }
         if (!safeStoreSet(appLocalStore, BIOMETRIC_STORAGE_KEY, JSON.stringify(rec))) {
@@ -2279,20 +2288,81 @@ function generateSetupLink() {
     if (resultBox) resultBox.classList.remove('hidden');
 
     const qrContainer = document.getElementById('setupLinkQrContainer');
-    if (qrContainer) {
-        qrContainer.innerHTML = '';
-        try {
-            if (window.qrcode) {
-                const qr = qrcode(0, 'M');
-                qr.addData(lastGeneratedSetupLink);
-                qr.make();
-                qrContainer.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8 });
-            }
-        } catch (e) {
-            qrContainer.innerHTML = '';
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+    try {
+        renderQrInto(qrContainer, lastGeneratedSetupLink);
+    } catch (e) {
+        if (qrContainer) qrContainer.innerHTML = '';
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+    }
+}
+
+function makeQrCode(text) {
+    if (!text || !window.qrcode) return null;
+    const code = qrcode(0, 'M');
+    code.addData(text);
+    code.make();
+    return code;
+}
+
+function renderQrInto(container, text) {
+    if (!container) return false;
+    container.innerHTML = '';
+    const code = makeQrCode(text);
+    if (!code) return false;
+    container.innerHTML = code.createSvgTag({ cellSize: 4, margin: 16, scalable: true });
+    return true;
+}
+
+const QR_MAX_MODULES = 177;
+
+function downloadQrPng(text, fileName) {
+    const code = makeQrCode(text);
+    if (!code) return false;
+    const modules = Math.min(code.getModuleCount(), QR_MAX_MODULES);
+    const cell = 8;
+    const quiet = cell * 4;
+    const size = modules * cell + quiet * 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000000';
+    for (let r = 0; r < modules; r++) {
+        for (let c = 0; c < modules; c++) {
+            if (code.isDark(r, c)) ctx.fillRect(quiet + c * cell, quiet + r * cell, cell, cell);
         }
     }
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return true;
+}
+
+function saveQrImage(text, fileName) {
+    if (!text) {
+        showToast('⚠️ មិនទាន់មាន Link សម្រាប់ QR ទេ!');
+        return false;
+    }
+    let saved = false;
+    try {
+        saved = downloadQrPng(text, fileName);
+    } catch (e) {
+        saved = false;
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'saveQrImage' });
+    }
+    showToast(saved ? '✅ បានរក្សាទុក QR ជារូបភាព (PNG)' : '❌ រក្សាទុក QR មិនបាន!');
+    return saved;
+}
+
+function saveSetupLinkQr() {
+    return saveQrImage(lastGeneratedSetupLink, 'zoew-setup-link-qr.png');
 }
 
 function copySetupLink() {
@@ -3138,18 +3208,14 @@ function renderSbInviteResult() {
     if (codeText) codeText.textContent = sbLastInvite.code;
     if (linkText) linkText.textContent = sbLastInvite.link || '⚠️ មិនទាន់មាន Base URL របស់ ZoeW — សូមបំពេញវាក្នុងកាត «🔗 បង្កើត Setup Link» រួចចេញកូដម្តងទៀត (ឬផ្ញើតែកូដ)';
     if (qr) {
-        qr.innerHTML = '';
-        if (sbLastInvite.link && window.qrcode) {
-            try {
-                const code = qrcode(0, 'M');
-                code.addData(sbLastInvite.link);
-                code.make();
-                qr.innerHTML = code.createSvgTag({ cellSize: 4, margin: 8 });
-            } catch (e) {
-                qr.innerHTML = '';
-            }
+        try {
+            renderQrInto(qr, sbLastInvite.link);
+        } catch (e) {
+            qr.innerHTML = '';
         }
     }
+    const qrSave = document.getElementById('sbInviteQrSaveBtn');
+    if (qrSave) qrSave.classList.toggle('hidden', !sbLastInvite.link);
     box.classList.remove('hidden');
 }
 
@@ -3178,7 +3244,7 @@ async function sbCreateTenant() {
     const days = Number(sbInputValue('sbTenantDaysInput'));
     if (!name || name.length > 120) { alert('សូមបញ្ចូលឈ្មោះហាង (១–១២០ តួ)!'); return; }
     if (!SB_BRANCH_CODE_RE.test(branch)) { alert(SB_ADMIN_ERROR_TEXT['tenant-invalid']); return; }
-    if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('សុពលភាពត្រូវជាចំនួនថ្ងៃ ១–' + SB_TENANT_DAYS_MAX + '!'); return; }
+    if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('សុពលភាពត្រូវជាចំនួនថ្ងៃ 1–' + SB_TENANT_DAYS_MAX + '!'); return; }
     if (!confirm('បង្កើតហាង «' + name + '» សាខា ' + branch + ' សុពលភាព ' + days + ' ថ្ងៃ?')) return;
     if (!sbAdminIsCurrent(session)) return;
     sbAdminBusy = true;
@@ -3228,7 +3294,7 @@ async function sbTenantAction(tenantId, action) {
         return;
     }
     if (action === 'sb-extend') {
-        const raw = prompt('ពន្យារហាង «' + tenant.name + '» ប៉ុន្មានថ្ងៃ? (១–' + SB_TENANT_DAYS_MAX + ')', '30');
+        const raw = prompt('ពន្យារហាង «' + tenant.name + '» ប៉ុន្មានថ្ងៃ? (1–' + SB_TENANT_DAYS_MAX + ')', '30');
         if (raw === null) return;
         const days = Number(String(raw).trim());
         if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('ចំនួនថ្ងៃមិនត្រឹមត្រូវ!'); return; }
@@ -3279,6 +3345,11 @@ function copySbInviteLink() {
     const invite = sbLastInvite;
     if (!invite || !invite.link) return;
     return copySensitiveText(invite.link, () => sbLastInvite === invite, () => showToast('✅ បានចម្លង Setup Link!'));
+}
+
+function saveSbInviteQr() {
+    const invite = sbLastInvite;
+    return saveQrImage(invite && invite.link, 'zoew-invite-qr.png');
 }
 
 function copySbInviteCode() {

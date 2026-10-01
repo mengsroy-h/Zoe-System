@@ -1051,6 +1051,9 @@
     "ZoeW/scripts/logic-identity.mjs": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/scripts/menu-scroll.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/scripts/native-check.mjs": {
       "policy": "zoew-self-verification"
     },

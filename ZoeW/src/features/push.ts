@@ -1,6 +1,7 @@
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { dataState, firebaseState, uiState } from '../core/state';
+import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { isNativeAndroid } from '../platform/native';
@@ -10,7 +11,7 @@ import { LICENSE_APP_CODE } from './license';
 import { dismissNotifyFeed, expiryScheduleTimes, fetchNotifyFeed, openNotifyDrawer } from './notifications';
 
 export type PushStatus = 'unknown' | 'unsupported' | 'needs-install' | 'native-unconfigured' | 'no-license'
-    | 'off' | 'busy' | 'on' | 'denied' | 'server-off' | 'error';
+    | 'no-account' | 'shop-inactive' | 'off' | 'busy' | 'on' | 'denied' | 'server-off' | 'error';
 
 export const PUSH_FUNCTION_PATH = '/.netlify/functions/push';
 export const PUSH_STATE_KEY = 'zoew_push_v1';
@@ -29,6 +30,8 @@ export const PUSH_STATUS_TEXT: Record<PushStatus, string> = {
     'needs-install': 'iPhone ៖ ចុច Share ➜ «Add to Home Screen» រួចបើក ZoeW ពីរូបនៅលើអេក្រង់ ទើបបើកការជូនដំណឹងបាន',
     'native-unconfigured': '⚠️ APK នេះមិនទាន់ភ្ជាប់ FCM (google-services.json) — សូមដំឡើង APK ថ្មី',
     'no-license': '⚠️ ឧបករណ៍នេះមិនទាន់ Activate — ការជូនដំណឹងត្រូវការ Activation Key',
+    'no-account': '⚠️ សូមចូលប្រព័ន្ធម្តងទៀត រួចបើកការជូនដំណឹង — ការជូនដំណឹងចងនឹងគណនីហាង',
+    'shop-inactive': '⛔ ហាងនេះផុតកំណត់ ឬត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់',
     off: 'ការជូនដំណឹងលើទូរស័ព្ទបិទ — បើកវាដើម្បីទទួលដំណឹងពីអ្នកលក់ និងកញ្ចប់ជិតផុតកំណត់ ទោះ App បិទ',
     busy: '⏳ កំពុងភ្ជាប់…',
     on: '✅ បើករួច — ដំណឹងពីអ្នកលក់ និងការរំលឹកកញ្ចប់ជិតផុតកំណត់ (ម៉ោង ៨ ព្រឹក) លោតលើទូរស័ព្ទ ទោះ App បិទ',
@@ -115,6 +118,37 @@ export function activationKey(): string {
     }
 }
 
+export function pushUsesShopAccount(): boolean {
+    return viewState.backendKind === 'supabase';
+}
+
+export function pushIdentityMissing(): PushStatus | '' {
+    if (pushUsesShopAccount()) {
+        const user: any = firebaseState.auth && firebaseState.auth.currentUser;
+        return user && typeof user.getIdToken === 'function' ? '' : 'no-account';
+    }
+    return activationKey() ? '' : 'no-license';
+}
+
+export async function pushCredential(): Promise<{ license: string } | { supabase: string } | null> {
+    if (pushUsesShopAccount()) {
+        const user: any = firebaseState.auth && firebaseState.auth.currentUser;
+        if (!user || typeof user.getIdToken !== 'function') return null;
+        try {
+            const token = String(await pushStep(user.getIdToken(), 'Push identity timed out') || '');
+            return token ? { supabase: token } : null;
+        } catch (e) {
+            return null;
+        }
+    }
+    const license = activationKey();
+    return license ? { license: license } : null;
+}
+
+function missingIdentityStatus(): PushStatus {
+    return pushUsesShopAccount() ? 'no-account' : 'no-license';
+}
+
 export function b64urlToBytes(text: string): Uint8Array {
     const raw = String(text || '').replace(/-/g, '+').replace(/_/g, '/');
     const pad = raw.length % 4 ? '===='.slice(raw.length % 4) : '';
@@ -161,6 +195,9 @@ function statusFromReply(reply: { status: number; body: any }): PushStatus {
     const reason = reply && reply.body && typeof reply.body.reason === 'string' ? reply.body.reason : '';
     if (/^(vapid|fcm):unset$/.test(reason)) return 'server-off';
     if (/^license:(format|signature|app|unknown|revoked|expired)$/.test(reason)) return 'no-license';
+    if (reason === 'supabase:unset') return 'server-off';
+    if (reason === 'supabase:session' || reason === 'supabase:account') return 'no-account';
+    if (reason === 'supabase:inactive') return 'shop-inactive';
     return 'error';
 }
 
@@ -182,7 +219,7 @@ export function refreshPushStatus() {
     setStatus(saved.on ? 'on' : 'off');
 }
 
-async function subscribeWeb(license: string): Promise<PushStatus> {
+async function subscribeWeb(): Promise<PushStatus> {
     const cfg = await fetchPushConfig();
     if (!cfg || !cfg.web || !cfg.vapidPublicKey) return 'server-off';
     const reg: any = await withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready');
@@ -198,12 +235,13 @@ async function subscribeWeb(license: string): Promise<PushStatus> {
     }
     const json = sub && typeof sub.toJSON === 'function' ? sub.toJSON() : null;
     if (!json || !json.endpoint || !json.keys) return 'error';
+    const credential = await pushCredential();
+    if (!credential) return missingIdentityStatus();
     const nav: any = navigator;
-    const reply = await postPush('subscribe', {
-        license: license,
+    const reply = await postPush('subscribe', Object.assign({}, credential, {
         platform: nav.standalone === true ? 'ios' : 'web',
         sub: { kind: 'web', endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }
-    });
+    }));
     if (!replyOk(reply)) return statusFromReply(reply);
     writeSaved({ on: true, kind: 'web', syncedAt: Date.now() });
     return 'on';
@@ -220,9 +258,9 @@ function unsubscribeNativeToken(token: string) {
 async function onNativeToken(token: string) {
     pushRuntime.nativeWatchdogSeq++;
     if (!pushRuntime.nativeEnabling && !pushRuntime.nativeWanted && !readSaved().on) return;
-    const license = activationKey();
-    if (!license) { setStatus('no-license'); pushRuntime.nativeEnabling = false; return; }
-    const reply = await postPush('subscribe', { license: license, platform: 'android', sub: { kind: 'fcm', token: token } });
+    const credential = await pushCredential();
+    if (!credential) { setStatus(missingIdentityStatus()); pushRuntime.nativeEnabling = false; return; }
+    const reply = await postPush('subscribe', Object.assign({}, credential, { platform: 'android', sub: { kind: 'fcm', token: token } }));
     const enabling = pushRuntime.nativeEnabling;
     pushRuntime.nativeEnabling = false;
     if (!enabling && !pushRuntime.nativeWanted && !readSaved().on) {
@@ -255,8 +293,8 @@ export async function ensureNativePushListeners(PN?: any) {
 }
 
 async function enableNative(): Promise<boolean> {
-    const license = activationKey();
-    if (!license) { setStatus('no-license'); return false; }
+    const missing = pushIdentityMissing();
+    if (missing) { setStatus(missing); return false; }
     pushRuntime.nativeWanted = true;
     setStatus('busy');
     try {
@@ -288,8 +326,8 @@ export function enablePush(): Promise<boolean> {
     const support = pushSupport();
     if (support === 'native') return enableNative();
     if (support !== 'web') { setStatus(support); return Promise.resolve(false); }
-    const license = activationKey();
-    if (!license) { setStatus('no-license'); return Promise.resolve(false); }
+    const missing = pushIdentityMissing();
+    if (missing) { setStatus(missing); return Promise.resolve(false); }
     let permission: Promise<string>;
     try {
         permission = Promise.resolve(Notification.requestPermission());
@@ -302,7 +340,7 @@ export function enablePush(): Promise<boolean> {
             setStatus(perm === 'denied' ? 'denied' : 'off');
             return false;
         }
-        return subscribeWeb(license).then((status) => {
+        return subscribeWeb().then((status) => {
             setStatus(status);
             if (status === 'on') syncExpirySchedule(true);
             return status === 'on';
@@ -377,8 +415,7 @@ export function resyncPush(): Promise<boolean> {
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
     if (elapsedSince(saved.syncedAt) < PUSH_RESYNC_MS) return Promise.resolve(false);
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
-    const license = activationKey();
-    if (!license) return Promise.resolve(false);
+    if (pushIdentityMissing()) return Promise.resolve(false);
     if (pushSupport() === 'native') {
         return loadNativePush().then(({ PN }) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
     }
@@ -391,13 +428,12 @@ export function resyncPush(): Promise<boolean> {
         }
         const json = sub.toJSON();
         const nav: any = navigator;
-        return postPush('subscribe', {
-            license: license,
+        return pushCredential().then((credential) => (credential ? postPush('subscribe', Object.assign({}, credential, {
             platform: nav.standalone === true ? 'ios' : 'web',
             sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys }
-        }).then((reply) => {
-            if (replyOk(reply)) writeSaved({ syncedAt: Date.now() });
-            return replyOk(reply);
+        })) : null)).then((reply) => {
+            if (reply && replyOk(reply)) writeSaved({ syncedAt: Date.now() });
+            return !!reply && replyOk(reply);
         });
     }).catch(() => false);
 }
@@ -416,18 +452,20 @@ export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     if (!saved.on || pushRuntime.scheduleInFlight) return Promise.resolve(false);
     if (!firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
     if (!force && elapsedSince(pushRuntime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
-    const license = activationKey();
-    if (!license) return Promise.resolve(false);
+    if (pushIdentityMissing()) return Promise.resolve(false);
     const times = expiryScheduleTimes(dataState.scanHistory, getServerNow());
     const sig = scheduleSignature(times);
     if (!force && sig === saved.schedSig && elapsedSince(saved.schedAt) < PUSH_SCHEDULE_REFRESH_MS) return Promise.resolve(false);
     pushRuntime.scheduleAttemptAt = Date.now();
     pushRuntime.scheduleInFlight = true;
-    return postPush('schedule', { license: license, times: times }).then((reply) => {
+    return pushCredential().then((credential) => (credential ? postPush('schedule', Object.assign({}, credential, { times: times })) : null)).then((reply) => {
         pushRuntime.scheduleInFlight = false;
-        if (!replyOk(reply)) return false;
+        if (!reply || !replyOk(reply)) return false;
         writeSaved({ schedSig: sig, schedAt: Date.now() });
         return true;
+    }, () => {
+        pushRuntime.scheduleInFlight = false;
+        return false;
     });
 }
 

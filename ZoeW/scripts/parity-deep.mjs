@@ -20,6 +20,7 @@ import { serveDir } from './serve.mjs';
 import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB, seedData } from './fake-firebase.mjs';
 import { resolveOldRoot } from './old-app.mjs';
 import { INTENTIONAL_UI, SNAPSHOT } from './snapshot.mjs';
+import { SCROLL_PROBE, openMenuItem } from './menu-scroll.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OLD_DIR = resolveOldRoot(HERE);
@@ -108,25 +109,22 @@ async function advance(p, ms) {
     await netQuiet(p);
 }
 /* ── ការរមូរ ↔ ម៉ឺនុយ (...) ─────────────────────────────────────────────
- * App ទាំង ២ បិទម៉ឺនុយ (...) លើ **រាល់** ព្រឹត្តិការណ៍ `scroll` (capture លើ `window`) ➜ ការប្តូរទំព័រ (`#pageTabData`)
- * បញ្ចេញការរមូរ/scroll-snap ដែលតាំងលំនឹងតាម **ម៉ោងពិត** ➜ ពេល CI រវល់ វាបាញ់ **ក្រោយ** ការបើកម៉ឺនុយ ➜ ធាតុម៉ឺនុយ
- * «មើលមិនឃើញ» តែម្ខាង (វាស់បាន ៖ busy loop ៦ លើ ៤ CPU ➜ «ធុងសំរាមក្រោយចូលវិញ» ធ្លាក់ខាងដើម ដូច CI លើ main)។
- * ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖ រង់ចាំការរមូរស្ងប់ (`window.__scrollEvents` មិនប្រែ ៣ ដងជាប់ៗ) **មុន** ចុចប៊ូតុងបើកម៉ឺនុយ —
- * ដូចអ្នកប្រើដែលចុចពេលអេក្រង់ឈប់ ⛔ មិនមែនការចុចម្តងទៀត (វានឹងលាក់ម៉ឺនុយដែលមិនបើកពិត)។ */
-const SCROLL_SETTLE_MS = 10000;
-async function scrollQuiet(p) {
-    const deadline = Date.now() + SCROLL_SETTLE_MS;
-    let last = -1;
-    let still = 0;
-    for (;;) {
-        const n = await p.evaluate(() => window.__scrollEvents || 0);
-        still = n === last ? still + 1 : 0;
-        last = n;
-        if (still >= 3) return;
-        if (Date.now() > deadline) throw new Error('ការរមូរមិនស្ងប់ក្នុង ' + SCROLL_SETTLE_MS / 1000 + ' វិ.');
-        await p.waitForTimeout(80);
-    }
-}
+ * App ទាំង ២ បិទម៉ឺនុយ (...) លើ **រាល់** ព្រឹត្តិការណ៍ `scroll` ➜ scroll-snap របស់ browser (ម៉ោងពិត) អាចបិទម៉ឺនុយដែល harness
+ * ទើបបើក (វាស់បាន ៖ busy loop ៦ លើ ៤ CPU ➜ «ធុងសំរាមក្រោយចូលវិញ» ធ្លាក់ខាងដើម ដូច CI លើ main)។ ⛔ ច្បាប់ និងការវាស់រស់ក្នុង
+ * `menu-scroll.mjs` **តែមួយកន្លែង** (ប្រើរួមជាមួយ `cleanup-rules-check.mjs`) ៖ រង់ចាំការរមូរស្ងប់មុនបើក · បើកម្តងទៀត **តែពេល**
+ * វាស់ឃើញ scroll · ម៉ឺនុយបិទដោយគ្មាន scroll ➜ ធ្លាក់។ */
+
+/* ── ម៉ោងនៃបង្អួចផ្ទុក ↔ ម៉ោងពិត ────────────────────────────────────────
+ * `session()` ទុកនាឡិកា **ហូរតាមម៉ោងពិត** ពី `HARNESS_CLOCK_START` រហូតដល់ `pauseAt(+10 វិ.)` (ការផ្ទុកទំព័រត្រូវការ timer ពិត)
+ * ➜ ត្រាដែល App បោះក្នុងបង្អួចនោះ (ឧ. «ទាញយកចុងក្រោយ» របស់ការទាញតារាងអតិថិជនពេលផ្ទុក) អាស្រ័យលើ **ល្បឿនម៉ាស៊ីន** មិនមែនលើ App
+ * (វាស់បាន ៖ CI លើ main ធ្លាក់ ៦ ជំហាន ដោយ «13:00:01» ធៀប «13:00:00» តែប៉ុណ្ណោះ)។ ⛔ ក្រោយ `pauseAt` នាឡិកាឈប់ ➜ ម៉ោងនៅក្រៅបង្អួច
+ * នៅប្រៀបពេញ។ បង្អួចដេរីវេពី `HARNESS_CLOCK_START` ពិត (ទម្រង់ `getFormattedClockTime()` · Asia/Phnom_Penh) មិនមែន literal។ */
+const BOOT_WINDOW_MS = 10000;
+const bootClockParts = (ms) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Phnom_Penh', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(ms);
+const BOOT_WINDOW_TIMES = Array.from({ length: BOOT_WINDOW_MS / 1000 }, (_, i) => bootClockParts(HARNESS_CLOCK_START + i * 1000));
+if (new Set(BOOT_WINDOW_TIMES).size !== BOOT_WINDOW_TIMES.length) throw new Error('បង្អួចផ្ទុក ៖ ម៉ោងស្ទួន ' + BOOT_WINDOW_TIMES.join(','));
+const BOOT_WINDOW_RE = new RegExp('\\b(?:' + BOOT_WINDOW_TIMES.join('|') + ')\\b', 'g');
+const stableTree = (tree) => String(tree).replace(BOOT_WINDOW_RE, '<ម៉ោងផ្ទុក>');
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const oldSrv = await serveDir(OLD_DIR);
@@ -191,7 +189,7 @@ async function session(port, extraStorage = {}, zto = null) {
         await page.addInitScript(`if (window.localStorage.getItem(${JSON.stringify(k)}) === null) window.localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`);
     }
     await page.addInitScript(`window.addEventListener('unhandledrejection', (e) => { (window.__rejections ||= []).push(String((e.reason && e.reason.message) || e.reason)); });`);
-    await page.addInitScript(`window.__scrollEvents = 0; window.addEventListener('scroll', () => { window.__scrollEvents++; }, { capture: true, passive: true });`);
+    await page.addInitScript(SCROLL_PROBE);
     // ⛔ សំណើបណ្តាញដែល **កំពុងហោះ** (fetch + ការអាន body) ➜ `advance()` រង់ចាំវាស្ងប់មុនរំកិលនាឡិកា
     //    (ដូចគ្នាទាំង ២ App ៖ App មិនពិនិត្យអត្តសញ្ញាណ `fetch` ហើយមិនប្រើ XHR)
     await page.addInitScript(`(() => {
@@ -245,7 +243,7 @@ async function session(port, extraStorage = {}, zto = null) {
     //    ដែលលេចលើអេក្រង់ (ម៉ោងស្កេន) និងក្នុង DB ស្មើគ្នាបេះបិទ។ បើទុកឲ្យ
     //    ហូរ App ដែលរត់ជំហានក្រោយបន្តិច ឃើញម៉ោងខុស ២ វិនាទី ➜ ភាពខុសគ្នា
     //    ក្លែងក្លាយរាល់ជំហាន (វាស់បាន ៖ 13:00:14 ធៀប 13:00:12)។
-    await page.clock.pauseAt(HARNESS_CLOCK_START + 10000);
+    await page.clock.pauseAt(HARNESS_CLOCK_START + BOOT_WINDOW_MS);
     await advance(page, 2000);
     return { ctx, page, errors, dialogs, appsScript, ztoCalls, mark: 0, dialogMark: 0, errMark: 0, asMark: 0, toastMark: 0, ztoMark: 0 };
 }
@@ -256,9 +254,10 @@ const click = (sel) => named('ចុច ' + sel, (p) => p.click(sel, { timeout: 
 const fill = (sel, v) => named('វាយ ' + sel, (p) => p.fill(sel, v, { timeout: T }));
 const seq = (...fns) => async (p) => { for (const f of fns) { await f(p); await advance(p, 300); await p.waitForTimeout(60); } };
 const row = (text) => `#historyTableBody tr:has-text("${text}")`;
-const openMenu = (sel) => async (p) => { await named('ការរមូរស្ងប់មុនបើក ' + sel, scrollQuiet)(p); await click(sel)(p); };
-const menu = (act) => seq(openMenu('.header-more-btn'), click(`#menuContentContainer [data-act="${act}"]`));
-const rowMenu = (text, act) => seq(openMenu(`${row(text)} .more-btn`), click(`#menuContentContainer [data-act="${act}"]`));
+const menuTick = async (p) => { await advance(p, 300); await p.waitForTimeout(60); };
+const openMenu = (sel, act) => named('ម៉ឺនុយ ' + sel + ' ➜ ' + act, (p) => openMenuItem(p, sel, `#menuContentContainer [data-act="${act}"]`, { tick: menuTick, timeout: T }));
+const menu = (act) => seq(openMenu('.header-more-btn', act));
+const rowMenu = (text, act) => seq(openMenu(`${row(text)} .more-btn`, act));
 const scanCode = (code) => seq(fill('#hwScannerInput', code), click('.btn-submit-barcode'));
 /** វាយ PIN **តែពេលវាសុំ** ៖ App ចងចាំការផ្ទៀងផ្ទាត់មួយរយៈ ➜ ប្រអប់ PIN មិនលេចរាល់ដង */
 const pinIfAsked = async (p) => {
@@ -460,6 +459,7 @@ const firstDiff = (x, y) => {
 
 async function state(S) {
     const snap = await S.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI });
+    snap.tree = stableTree(snap.tree);
     const toastAll = await S.page.evaluate(() => window.__toastLog || []);
     const toasts = toastAll.slice(S.toastMark).join(' ‖ ');
     S.toastMark = toastAll.length;
@@ -489,7 +489,7 @@ async function runScenario(title, steps, storage = {}, zto = null) {
     const A = await session(oldSrv.port, storage, zto);
     const B = await session(newSrv.port, storage, zto);
     await state(A); await state(B);   // មូលដ្ឋាន ៖ ការសរសេរពេលផ្ទុកត្រូវ parity-live វាស់រួច
-    let prevTree = (await A.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI })).tree;
+    let prevTree = stableTree((await A.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI })).tree);
     const DEBUG = () => ({
         modals: Array.from(document.querySelectorAll('.modal')).filter((m) => m.style.display === 'flex').map((m) => m.id),
         siFileMsg: (document.getElementById('siFileMsg') || {}).textContent,

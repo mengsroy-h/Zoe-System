@@ -708,6 +708,11 @@ run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastor
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
 
+section "== ឧបករណ៍បង្កើតអតិថិជនថ្មី (tools/firebase-provision) =="
+# ⛔ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ➜ `npm ci --prefix tools/firebase-provision` + openssl
+#    គ្មាន dependency ➜ SKIP · `FBPROVISION_STRICT=1` ➜ FAIL (ដូច emu/*)
+run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
+
 section "== ទម្លាប់គម្រោង =="
 run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
 run "rules JSON valid" node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));"
@@ -830,6 +835,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTOLIST_APP_DIR="$BASE" node audit-tools/zto-list-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-list-sync:   /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
+    FBPROVISION_APP_DIR="$BASE" node audit-tools/firebase-provision-test.js 2>&1 | tail -1 | sed 's/^/   fb-provision:    /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     LEDGEREMU_APP_DIR="$BASE" node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'

@@ -1,0 +1,18 @@
+{
+  "name": "zoe-firebase-provision",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Creates and hardens one Firebase project per ZoeW customer (project, Realtime Database, rules, locked sign-up, staff accounts) and deploys rules to all customers.",
+  "main": "provision.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "doctor": "node provision.js doctor",
+    "test": "node ../../audit-tools/firebase-provision-test.js"
+  },
+  "dependencies": {
+    "firebase-tools": "15.32.0"
+  }
+}

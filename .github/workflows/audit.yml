@@ -212,6 +212,9 @@ jobs:
       #    ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL (emu/supabase-* រត់ក្នុង job firebase-rules)
       - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
         run: npm ci --prefix supabase --no-audit --no-fund
+      # ⛔ firebase-tools ពិត (កំណែ pin) សម្រាប់ firebase-provision-test ➜ `FBPROVISION_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL
+      - name: ដំឡើង dependency របស់ tools/firebase-provision (firebase-tools)
+        run: npm ci --prefix tools/firebase-provision --ignore-scripts --no-audit --no-fund
 
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
@@ -220,4 +223,5 @@ jobs:
         env:
           VERSIONSCOPE_STRICT: '1'
           SUPABASE_STRICT: '1'
+          FBPROVISION_STRICT: '1'
         run: bash audit-tools/run-all.sh

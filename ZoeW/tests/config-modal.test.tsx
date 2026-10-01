@@ -39,7 +39,7 @@ const link = (o: object) => 'https://zoew.example/?setup=' + encodeURIComponent(
 const toastTexts = () => uiState.toasts.map((t: any) => t.msg);
 
 beforeEach(() => {
-    appLocalStore && appLocalStore.clear();
+    if (appLocalStore) appLocalStore.clear();
     clearPendingInvite();
     viewState.backendKind = 'firebase';
     viewState.configBackend = 'firebase';

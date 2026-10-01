@@ -2297,6 +2297,9 @@
     "docs/AUDIT-PROMPT.md": {
       "policy": "guard-36"
     },
+    "docs/SUPABASE-HANDOFF.md": {
+      "policy": "guard-36"
+    },
     "docs/HISTORY-ARCHIVE.md": {
       "policy": "guard-37"
     },

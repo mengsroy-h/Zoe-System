@@ -65,9 +65,10 @@ async function startFakeSupabase(opts) {
         const c = await pool.connect();
         try {
             const r = await c.query(`select p.proargnames as names, array(select format_type(t, null) from unnest(p.proargtypes) t) as types,
-                    p.proretset as setof, format_type(p.prorettype, null) as ret
-                from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1`, [fn]);
-            const sig = r.rows[0] ? { names: r.rows[0].names || [], types: r.rows[0].types || [], setof: r.rows[0].setof, ret: r.rows[0].ret } : null;
+                    p.proretset as setof, format_type(p.prorettype, null) as ret, rt.typtype as rettype
+                from pg_proc p join pg_namespace n on n.oid = p.pronamespace join pg_type rt on rt.oid = p.prorettype
+                where n.nspname = 'public' and p.proname = $1`, [fn]);
+            const sig = r.rows[0] ? { names: r.rows[0].names || [], types: r.rows[0].types || [], setof: r.rows[0].setof, ret: r.rows[0].ret, composite: r.rows[0].rettype === 'c' } : null;
             signatures.set(fn, sig);
             return sig;
         } finally {
@@ -107,7 +108,7 @@ async function startFakeSupabase(opts) {
             parts.push(name + ' => $' + params.length + '::' + type);
         }
         const call = 'public.' + fn + '(' + parts.join(', ') + ')';
-        const sql = sig.setof || /^record$/.test(sig.ret) ? 'select * from ' + call : 'select ' + call + ' as r';
+        const sql = sig.setof || sig.composite || /^record$/.test(sig.ret) ? 'select * from ' + call : 'select ' + call + ' as r';
         const c = await pool.connect();
         try {
             await c.query('begin');
@@ -117,11 +118,49 @@ async function startFakeSupabase(opts) {
             await c.query('commit');
             if (mode === 'drop-response') { req.socket.destroy(); return; }
             if (sig.setof) return send(res, 200, r.rows);
+            if (sig.composite) return send(res, 200, r.rows[0] && Object.values(r.rows[0]).some((v) => v !== null) ? r.rows[0] : null);
             return send(res, 200, r.rows[0] ? r.rows[0].r : null);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
-            const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : 400);
+            const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : e.code === '23505' ? 409 : 400);
             return send(res, status, { code: e.code || '', message: e.message, details: e.detail || null, hint: null });
+        } finally {
+            c.release();
+        }
+    }
+
+    async function selectTable(req, res, table, params) {
+        const auth = String(req.headers.authorization || '');
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        let role = 'anon';
+        let claims = { role: 'anon' };
+        if (token && token.split('.').length === 3) {
+            const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
+            if (!v.ok || v.claims.iat < expireBefore) return send(res, 401, { code: 'PGRST303', message: 'JWT expired', details: null, hint: null });
+            claims = v.claims;
+            role = v.claims.role === 'authenticated' ? 'authenticated' : 'anon';
+        }
+        const ident = /^[a-z_][a-z0-9_]*$/;
+        const cols = String(params.get('select') || '*').split(',').map((x) => x.trim());
+        if (!cols.every((x) => x === '*' || ident.test(x))) return send(res, 400, { code: 'PGRST100', message: 'bad select' });
+        let order = '';
+        const ord = params.get('order');
+        if (ord) {
+            const m = /^([a-z_][a-z0-9_]*)\.(asc|desc)$/.exec(ord);
+            if (!m) return send(res, 400, { code: 'PGRST100', message: 'bad order' });
+            order = ' order by ' + m[1] + ' ' + m[2];
+        }
+        const c = await pool.connect();
+        try {
+            await c.query('begin');
+            await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
+            await c.query('set local role ' + role);
+            const r = await c.query('select ' + cols.join(', ') + ' from public.' + table + order);
+            await c.query('commit');
+            return send(res, 200, r.rows);
+        } catch (e) {
+            try { await c.query('rollback'); } catch (x) {}
+            return send(res, e.code === '42501' ? (role === 'anon' ? 401 : 403) : 400, { code: e.code || '', message: e.message, details: null, hint: null });
         } finally {
             c.release();
         }
@@ -166,6 +205,8 @@ async function startFakeSupabase(opts) {
                 }
                 const m = u.pathname.match(/^\/rest\/v1\/rpc\/([a-z_][a-z0-9_]*)$/);
                 if (m && req.method === 'POST') return await rpc(req, res, m[1], body);
+                const t = u.pathname.match(/^\/rest\/v1\/([a-z_][a-z0-9_]*)$/);
+                if (t && req.method === 'GET') return await selectTable(req, res, t[1], u.searchParams);
                 const f = u.pathname.match(/^\/functions\/v1\/([a-z0-9-]+)$/);
                 if (f && functions[f[1]]) {
                     const out = await functions[f[1]](body, req);

@@ -2623,7 +2623,8 @@ function sbAdminJwtRole(key) {
 function sbAdminConfigProblem(url, key) {
     let parsed;
     try { parsed = new URL(url); } catch (e) { return 'Supabase URL មិនត្រឹមត្រូវ!'; }
-    if (parsed.protocol !== 'https:' || (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash || parsed.username) {
+    const local = parsed.protocol === 'http:' && (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
+    if ((parsed.protocol !== 'https:' && !local) || (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash || parsed.username) {
         return 'Supabase URL ត្រូវជា https://<project>.supabase.co (គ្មាន path)!';
     }
     if (!key) return 'សូមបញ្ចូល Publishable key!';

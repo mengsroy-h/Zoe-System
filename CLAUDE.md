@@ -2249,6 +2249,9 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- 🚧 **Supabase (Project តែមួយ · ហាងច្រើន · កូដអញ្ជើញ) កំពុងធ្វើ** លើ branch `claude/great-ritchie-47ujj5` (មិនទាន់ merge) ➜
+  **អាន [`docs/SUPABASE-HANDOFF.md`](docs/SUPABASE-HANDOFF.md) ជាមុន** ៖ អ្វីដែលធ្វើរួច · អ្នកយាម · ការងារនៅសល់តាមលំដាប់ · សកម្មភាពដោយដៃ។
+
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

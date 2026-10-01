@@ -212,11 +212,13 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         const ciText = fs.readFileSync(wf, 'utf8');
         const ciCheckers = new Set();
         for (const m of ciText.matchAll(/node\s+audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) ciCheckers.add(m[1]);
-        // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ
-        if (ciCheckers.size < 3) {
-            bad('ជាន់អប្បបរមា៖ CI រត់ checker >= ៣', 'រកឃើញ ' + ciCheckers.size);
+        // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ ៖ `bash audit-tools/run-all.sh` (បញ្ជីពេញ · ផ្នែកនៃ matrix
+        // ផ្ទៀងដោយ runall-runner-test) ឬ checker ផ្ទាល់ >= ៣
+        const ciRunsAll = /^\s*run:\s*bash audit-tools\/run-all\.sh\s*$/m.test(ciText);
+        if (!ciRunsAll && ciCheckers.size < 3) {
+            bad('ជាន់អប្បបរមា៖ CI រត់ run-all.sh ឬ checker >= ៣', 'រកឃើញ ' + ciCheckers.size);
         } else {
-            ok('ជាន់អប្បបរមា៖ CI រត់ checker ' + ciCheckers.size);
+            ok('ជាន់អប្បបរមា៖ CI រត់ ' + (ciRunsAll ? 'run-all.sh' : '') + (ciCheckers.size ? ' + checker ' + ciCheckers.size : ''));
         }
         // ⛔ ពិនិត្យតែ **ផ្នែករត់ធម្មតា** — ផ្នែក baseline (`if [ -n "$BASE" ]`)
         // រត់តែពេលមាន argument ដូច្នេះការលេចត្រឹមទីនោះ **មិនធានាថា checker

@@ -107,6 +107,26 @@ async function advance(p, ms) {
     }
     await netQuiet(p);
 }
+/* ── ការរមូរ ↔ ម៉ឺនុយ (...) ─────────────────────────────────────────────
+ * App ទាំង ២ បិទម៉ឺនុយ (...) លើ **រាល់** ព្រឹត្តិការណ៍ `scroll` (capture លើ `window`) ➜ ការប្តូរទំព័រ (`#pageTabData`)
+ * បញ្ចេញការរមូរ/scroll-snap ដែលតាំងលំនឹងតាម **ម៉ោងពិត** ➜ ពេល CI រវល់ វាបាញ់ **ក្រោយ** ការបើកម៉ឺនុយ ➜ ធាតុម៉ឺនុយ
+ * «មើលមិនឃើញ» តែម្ខាង (វាស់បាន ៖ busy loop ៦ លើ ៤ CPU ➜ «ធុងសំរាមក្រោយចូលវិញ» ធ្លាក់ខាងដើម ដូច CI លើ main)។
+ * ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖ រង់ចាំការរមូរស្ងប់ (`window.__scrollEvents` មិនប្រែ ៣ ដងជាប់ៗ) **មុន** ចុចប៊ូតុងបើកម៉ឺនុយ —
+ * ដូចអ្នកប្រើដែលចុចពេលអេក្រង់ឈប់ ⛔ មិនមែនការចុចម្តងទៀត (វានឹងលាក់ម៉ឺនុយដែលមិនបើកពិត)។ */
+const SCROLL_SETTLE_MS = 10000;
+async function scrollQuiet(p) {
+    const deadline = Date.now() + SCROLL_SETTLE_MS;
+    let last = -1;
+    let still = 0;
+    for (;;) {
+        const n = await p.evaluate(() => window.__scrollEvents || 0);
+        still = n === last ? still + 1 : 0;
+        last = n;
+        if (still >= 3) return;
+        if (Date.now() > deadline) throw new Error('ការរមូរមិនស្ងប់ក្នុង ' + SCROLL_SETTLE_MS / 1000 + ' វិ.');
+        await p.waitForTimeout(80);
+    }
+}
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const oldSrv = await serveDir(OLD_DIR);
@@ -171,6 +191,7 @@ async function session(port, extraStorage = {}, zto = null) {
         await page.addInitScript(`if (window.localStorage.getItem(${JSON.stringify(k)}) === null) window.localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`);
     }
     await page.addInitScript(`window.addEventListener('unhandledrejection', (e) => { (window.__rejections ||= []).push(String((e.reason && e.reason.message) || e.reason)); });`);
+    await page.addInitScript(`window.__scrollEvents = 0; window.addEventListener('scroll', () => { window.__scrollEvents++; }, { capture: true, passive: true });`);
     // ⛔ សំណើបណ្តាញដែល **កំពុងហោះ** (fetch + ការអាន body) ➜ `advance()` រង់ចាំវាស្ងប់មុនរំកិលនាឡិកា
     //    (ដូចគ្នាទាំង ២ App ៖ App មិនពិនិត្យអត្តសញ្ញាណ `fetch` ហើយមិនប្រើ XHR)
     await page.addInitScript(`(() => {
@@ -235,16 +256,17 @@ const click = (sel) => named('ចុច ' + sel, (p) => p.click(sel, { timeout: 
 const fill = (sel, v) => named('វាយ ' + sel, (p) => p.fill(sel, v, { timeout: T }));
 const seq = (...fns) => async (p) => { for (const f of fns) { await f(p); await advance(p, 300); await p.waitForTimeout(60); } };
 const row = (text) => `#historyTableBody tr:has-text("${text}")`;
-const menu = (act) => seq(click('.header-more-btn'), click(`#menuContentContainer [data-act="${act}"]`));
-const rowMenu = (text, act) => seq(click(`${row(text)} .more-btn`), click(`#menuContentContainer [data-act="${act}"]`));
+const openMenu = (sel) => async (p) => { await named('ការរមូរស្ងប់មុនបើក ' + sel, scrollQuiet)(p); await click(sel)(p); };
+const menu = (act) => seq(openMenu('.header-more-btn'), click(`#menuContentContainer [data-act="${act}"]`));
+const rowMenu = (text, act) => seq(openMenu(`${row(text)} .more-btn`), click(`#menuContentContainer [data-act="${act}"]`));
 const scanCode = (code) => seq(fill('#hwScannerInput', code), click('.btn-submit-barcode'));
 /** វាយ PIN **តែពេលវាសុំ** ៖ App ចងចាំការផ្ទៀងផ្ទាត់មួយរយៈ ➜ ប្រអប់ PIN មិនលេចរាល់ដង */
 const pinIfAsked = async (p) => {
-    await p.clock.runFor(300);
+    await advance(p, 300);
     if (await p.isVisible('#pinModal')) {
         await p.fill('#securityPinInput', '123456', { timeout: T });
         await p.click('#pinConfirmBtn', { timeout: T });
-        await p.clock.runFor(400);
+        await advance(p, 400);
     }
 };
 /**
@@ -255,7 +277,7 @@ const pinIfAsked = async (p) => {
  */
 const drawerItem = (text) => async (p) => {
     await named('ចុច #navMenuBtn', (q) => q.click('#navMenuBtn', { timeout: T }))(p);
-    await p.clock.runFor(300);
+    await advance(p, 300);
     await p.waitForSelector('#sideDrawer.open', { timeout: T });
     await p.waitForTimeout(450);
     const opened = await p.evaluate((t) => {
@@ -267,7 +289,7 @@ const drawerItem = (text) => async (p) => {
         return 'expanded';
     }, text);
     if (opened === 'no-group') throw new Error('រក Category នៃ «' + text + '» មិនឃើញ');
-    await p.clock.runFor(200);
+    await advance(p, 200);
     const item = `#sideDrawer .drawer-item:has-text("${text}")`;
     await named('ចុច ' + item, (q) => q.click(item, { timeout: T }))(p);
 };
@@ -382,7 +404,7 @@ const ZTO_STEPS = [
     ['ពិនិត្យម្តងទៀត', click('#ztoSyncRecheckBtn')],
     ['បិទបញ្ជី', click('#ztoSyncCloseBtn')],
     ['បើកទាញបញ្ជី ZTO ➜ កំណត់ PIN', seq(click('#ztoListSyncBtn'), async (p) => {
-        await p.clock.runFor(300);
+        await advance(p, 300);
         if (await p.isVisible('#pinSetupModal')) {
             await p.fill('#newSecurityPinInput', '123456', { timeout: T });
             await p.click('#pinSetupSaveBtn', { timeout: T });
@@ -409,7 +431,7 @@ const SHEET_STORAGE = {
 };
 const SHEET_STEPS = [
     ['តារាងអតិថិជន (PIN)', seq(drawerItem('តារាងអតិថិជន'), async (p) => {
-        await p.clock.runFor(300);
+        await advance(p, 300);
         if (await p.isVisible('#pinSetupModal')) {
             await p.fill('#newSecurityPinInput', '123456', { timeout: T });
             await p.click('#pinSetupSaveBtn', { timeout: T });

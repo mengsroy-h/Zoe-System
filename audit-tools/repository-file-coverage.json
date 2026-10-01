@@ -987,6 +987,9 @@
     "ZoeW/scripts/android-icons.mjs": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/scripts/apk-cert-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/scripts/android-splash-vector.mjs": {
       "policy": "zoew-self-verification"
     },

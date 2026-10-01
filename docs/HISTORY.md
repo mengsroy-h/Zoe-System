@@ -39,7 +39,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (branch `claude/great-ritchie-47ujj5` · មិនទាន់ merge)
+### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (merge រួចក្នុង PR #276 · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»)
 
 **ZoeW `2.46.0`** (`zoew-v249` ➜ `zoew-v250`) · **ZoeKeyGen `2.23.0`** (`zoekeygen-v109` ➜ `zoekeygen-v110`)។ សំណើម្ចាស់គម្រោង ៖ ឈប់បង្កើត Firebase
 Project · Rules · គណនី Login ដោយដៃក្នុងមួយអតិថិជន ➜ **Supabase Project តែមួយ** (Free · Upgrade ទៅ Pro លើ Project ដដែល) · ហាងបំបែកដោយ
@@ -1631,6 +1631,30 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### CI លើ main ក្រហម · Release APK ធ្លាក់ · CI GitHub យឺត ២៣ នាទី (2026-10-01 · `audit-tools/` · `ZoeW/scripts/` · workflow តែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ)
+
+ម្ចាស់គម្រោងរាយការណ៍ ៖ «CI លើ main និង Android APK ធ្លាក់ តែ CI ពេល PR ឆ្លងទាំងអស់» · «បង្កើនល្បឿន CI ក្នុង GitHub ឲ្យលឿនដូចរត់ក្នុង session»។
+
+- **`zoew-parity` (parity:deep) ក្រហមលើ main** (run 36823040166) ខណៈ PR #276 ឆ្លង ៖ ការវាស់ដដែលធ្លាក់/ឆ្លងតាមបន្ទុក CPU (ការកត់ចុងក្រោយ
+  របស់ PR #276 ៖ «ក្រោមបន្ទុក CPU ធ្ងន់ zoew-parity នៅធ្លាក់ ៣ ជំហាន — មិនទាន់វិភាគ»)។ បង្កើតឡើងវិញក្នុង session ៖ busy loop ៦ លើ CPU ៤ ➜
+  ធ្លាក់ ៣ ជំហានដូច CI បេះបិទ («ធុងសំរាមក្រោយចូលវិញ» ៖ ធាតុម៉ឺនុយ «មើលមិនឃើញ» ខាង ZoeW ដើម)។ មូលហេតុ **២** ក្នុង harness (មិនមែន App) ៖
+  (១) App ទាំង ២ បិទម៉ឺនុយ (...) លើ **រាល់** `scroll` (capture លើ `window`) ➜ ការប្តូរទំព័របញ្ចេញ scroll-snap ដែលតាំងលំនឹងតាម **ម៉ោងពិត** ➜
+  ពេល CI រវល់ វាបាញ់ក្រោយការបើកម៉ឺនុយ ➜ ការកែ ៖ `scrollQuiet()` រង់ចាំ `window.__scrollEvents` មិនប្រែ ៣ ដងជាប់ **មុន** ចុចប៊ូតុងបើកម៉ឺនុយ
+  (⛔ មិនមែនការចុចម្តងទៀត — វានឹងលាក់ម៉ឺនុយដែលមិនបើកពិត) · (២) `pinIfAsked()` · `drawerItem()` · ជំហាន PIN រំកិលនាឡិកាដោយ `clock.runFor()`
+  ផ្ទាល់ (មិនរង់ចាំបណ្តាញស្ងប់) ➜ ចម្លើយ Apps Script ចុះលើម៉ោងក្លែងខុសគ្នា ➜ «ទាញយកចុងក្រោយ 13:00:01» ធៀប «13:00:00» (សេណារីយ៉ូ Sheet លើ
+  main) ➜ ការកែ ៖ គ្រប់ការរំកិលឆ្លង `advance()`។ វាស់ ៖ បន្ទុកដដែល ➜ **៧៩/៧៩** · ជំហានដែលមិនប្តូរអ្វីសោះ ១ ➜ ០។
+- **Release APK ធ្លាក់** (run 36823040118) ៖ `apksigner` ថ្មីសរសេរ `V2 Signer: certificate SHA-256 digest` ខណៈ workflow `grep 'Signer #1 …'` ➜
+  អានបាន «គ្មាន» ➜ «មិនស្មើ pin» ខណៈវិញ្ញាបនបត្រ **ស្មើ pin បេះបិទ** (`c2a1b725…`)។ `android:check` ផ្ទៀងតែ *អក្សរ* នៃច្រកទ្វារ ➜ មិនដែលរត់ការស្រង់
+  លើ output ពិត។ ការកែ ៖ `ZoeW/scripts/apk-cert-check.mjs` (ស្រង់ទម្រង់ទាំង ២ · ទាមទារ `Verifies` · signer ១ · វិញ្ញាបនបត្រតែមួយគ្រប់ scheme ·
+  ស្មើ pin) · workflow ហៅវា · `android:check` រត់វាលើ output ពិតរបស់ runner + ករណីបដិសេធ ៦ (mutation ៣/៣ ចាប់ ៖ កាត់ `exit 1` · ឈប់ប្រៀប pin ·
+  ដកទម្រង់ `V2 Signer:`)។ ⚠️ workflow រត់ពេល `version.ts` ប្រែលើ main ➜ Release 2.46.0 មិនកើតទេ — ការឡើងកំណែ ZoeW បន្ទាប់ ឬ «Run workflow» ដោយដៃ។
+- **CI GitHub ២៣ នាទី** ៖ runner (repo ឯកជន) មាន CPU **២** ➜ lane 2 ហើយ `checker-coverage` + `exit-code-integrity` រត់ម្នាក់ឯង ~៣៧៣ វិ. ·
+  job «Firebase rules» ១០ នាទីរត់អ្នកយាម emu/* ស្ទួន។ ការកែ ៖ `RUNALL_SHARD=k/n` ក្នុងម៉ាស៊ីនរត់ (LPT តាម `RUNALL_HINTS` ដែលវាស់លើ runner ពិត ➜
+  ទម្ងន់ ៨០៩–៨១១ ក្នុងមួយផ្នែក) · `audit.yml` = matrix ៤ ផ្នែក · ផ្នែកនីមួយៗបើក emulator ហើយរត់ទង់ STRICT ដូច Runbook ➜ job «Firebase rules» លុប។
+  អ្នកយាម (`runall-runner-test` ៧ក/៧ខ) ៖ ផ្នែកមិនជាន់ · មិនខ្វះ (fixture + បញ្ជីពិត ១៩៧) · matrix ↔ n · ទង់ STRICT ↔ Runbook · តម្លៃខុស ៦ ➜ បដិសេធ ·
+  mutation ៣/៣ ចាប់ (matrix ខ្វះផ្នែក ៤ · ដក `MONEYGUARD_STRICT` · ការបែងចែកជាន់)។ ⚠️ នាទីគិតថ្លៃ ៖ ផ្នែក ៤ × (~២ នាទីរៀបចំ + ការងារ)
+  ប្រហែលស្មើមុន (២៣ + ១០) ព្រោះ job «Firebase rules» ស្ទួនត្រូវលុប។
 
 ### Supabase + កូដអញ្ជើញ ៖ អ្វីដែលការវាស់រកឃើញពេលបញ្ចប់ (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
 

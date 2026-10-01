@@ -304,7 +304,7 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់។ ⛔ meta-checker ដែលរត់ checker កូនច្រើន (`checker-coverage` · `exit-code-integrity`) រត់ **ស្របគ្នាក្នុងពិដាន** មិនមែនជាជួរ ហើយកូនដែល **ផុតថវិកា** ខណៈពុល = FAIL (វាស់មិនបាន) មិនមែន «ធ្លាក់ត្រឹមត្រូវ» · ⛔ កុំកែការលើសពិដានដោយបង្កើន `CHECKER_TIMEOUT` (វាលាក់ checker ដែលព្យួរពិត) | `hang-guard.js` |
-| **ឧបករណ៍ខ្លួនវា ៖ ម៉ាស៊ីនរត់ `run-all.sh`** | ⛔ lane ស្របគ្នាមានព្រំដែន តែ output **តាមលំដាប់បញ្ជីជានិច្ច** · `emu/*` + `money-guardian` ម្តងមួយ (emulator តែមួយ) · checker ដែលសរសេរ/បោស `.tmp-poison-*` (`checker-coverage` · `exit-code-integrity`) **រត់ម្នាក់ឯង** · lane ដេរីវេពីប្រភព ហើយផ្ទៀង **ទាំង ២ ទិស** (checker ថ្មីដែលប្រើ emulator ឬបោសស្រមោល ➜ ត្រូវចូល `runall_lane()`) · `RUNALL_STATE` សរសេរ **ភ្លាមពេល checker ចប់** · `RUNALL_RESUME=1` **បដិសេធលើ tree ផ្សេង** (hash មាតិកា + ទង់ `*_STRICT`) · `RUNALL_ONLY` ឈ្មោះមិនស្គាល់ ➜ បដិសេធ ហើយការរត់មិនពេញ **មិនដែលរាយ «ជោគជ័យទាំងអស់»** · TERM មិនបន្សល់ process កំព្រា | `runall-runner-test` · `hang-guard` |
+| **ឧបករណ៍ខ្លួនវា ៖ ម៉ាស៊ីនរត់ `run-all.sh`** | ⛔ lane ស្របគ្នាមានព្រំដែន តែ output **តាមលំដាប់បញ្ជីជានិច្ច** · `emu/*` + `money-guardian` ម្តងមួយ (emulator តែមួយ) · checker ដែលសរសេរ/បោស `.tmp-poison-*` (`checker-coverage` · `exit-code-integrity`) **រត់ម្នាក់ឯង** · lane ដេរីវេពីប្រភព ហើយផ្ទៀង **ទាំង ២ ទិស** (checker ថ្មីដែលប្រើ emulator ឬបោសស្រមោល ➜ ត្រូវចូល `runall_lane()`) · `RUNALL_STATE` សរសេរ **ភ្លាមពេល checker ចប់** · `RUNALL_RESUME=1` **បដិសេធលើ tree ផ្សេង** (hash មាតិកា + ទង់ `*_STRICT`) · `RUNALL_ONLY` ឈ្មោះមិនស្គាល់ ➜ បដិសេធ ហើយការរត់មិនពេញ **មិនដែលរាយ «ជោគជ័យទាំងអស់»** · TERM មិនបន្សល់ process កំព្រា · ⛔ `RUNALL_SHARD=k/n` (CI ស្របគ្នា) ជាអនុគមន៍នៃ **បញ្ជី + `RUNALL_HINTS` តែប៉ុណ្ណោះ** (មិនមែន state/nproc ដែលខុសតាម runner) ➜ ផ្នែកទាំង n មិនជាន់ · មិនខ្វះ · matrix ក្នុង `audit.yml` = 1..n · ទង់ STRICT របស់ CI ⊇ ប្លុក Runbook ជំហានទី ០ · តម្លៃខុស ➜ បដិសេធ | `runall-runner-test` · `hang-guard` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ checker ត្រូវរត់ធម្មតា និង baseline; CLI ដែលទាមទារ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា | `checker-coverage.js` |
 | **ឯកសារគម្រោងទាំងមូល** | ⛔ ឯកសារថ្មីត្រូវមានការយាមក្នុង `repository-file-coverage.json`; ធាតុចាស់ ឬ guard ដែលបាត់ត្រូវធ្លាក់; ប្រភេទ integrity/manual មិនមែន behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
 | **របាយការណ៍ និងទិន្នន័យសម្រាប់ផ្ញើ** | ⛔ CLI ពិតត្រូវរកឃើញកំហុសលុយមុន/ក្រោយ redaction ដូចគ្នា; launcher មិនប្រកាសថាផ្ញើបានពេល redaction ធ្លាក់ | `money-reality-test.js` |
@@ -2050,9 +2050,9 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 
 ## ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
 
-⛔ **CI ត្រូវរត់ក្នុង session នេះ។** ម្ចាស់គម្រោងអស់កូតា GitHub Actions
-(2026-09-09) ➜ `.github/workflows/audit.yml` **លែងរត់** ➜ ⛔ ការរង់ចាំ
-«CI បៃតងលើ GitHub» ជាការរង់ចាំដែលមិនចប់។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
+⛔ **CI ត្រូវរត់ក្នុង session នេះផង** មុន push ៖ GitHub Actions ធ្លាប់អស់កូតា (2026-09-09) ➜ ការរង់ចាំ «CI បៃតងលើ GitHub»
+អាចជាការរង់ចាំដែលមិនចប់។ `.github/workflows/audit.yml` រត់ `run-all.sh` ពេញជា **៤ ផ្នែកស្របគ្នា** (`RUNALL_SHARD=k/4` ·
+emulator ក្នុងផ្នែកនីមួយៗ · ទង់ STRICT ដូចប្លុកខាងក្រោម) ➜ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
 
 ```bash
 npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect · emu/app-network-e2e)
@@ -2071,7 +2071,7 @@ lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំ�
 ចូល `RUNALL_STATE` (`<git-dir>/zoe-runall-state.tsv`) **ភ្លាម** ➜ session ដែលអស់កូតាកណ្តាលទី ៖ session បន្ទាប់រត់
 `RUNALL_RESUME=1` **ជាមួយទង់ `*_STRICT` ដដែល** (វាចូល hash) ➜ រត់តែ checker ដែលធ្លាក់ ឬគ្មានលទ្ធផល ⛔ **កុំផ្គុំ log ដោយដៃ**។
 ⛔ tree ប្រែ (ឯកសារណាមួយ · ទង់ STRICT) ➜ RESUME **បដិសេធ** ៖ លទ្ធផលចាស់មិនមែនភស្តុតាងរបស់ tree ថ្មី ➜ រត់ពេញ។
-⛔ `RUNALL_ONLY=…` = **«មិនពេញលេញ»** — មិនមែនភស្តុតាងថា tree បៃតង (សេចក្តីសង្ខេបមិនរាយ «ជោគជ័យទាំងអស់» ទេ)។
+⛔ `RUNALL_ONLY=…` និង `RUNALL_SHARD=k/n` = **«មិនពេញលេញ»** — មិនមែនភស្តុតាងថា tree បៃតង (សេចក្តីសង្ខេបមិនរាយ «ជោគជ័យទាំងអស់» ទេ · tree បៃតងតែពេលផ្នែកទាំង n បៃតង)។
 ⛔ checker ថ្មីដែលប្រើ emulator ឬសរសេរ/បោស `.tmp-poison-*` ត្រូវចូល lane `emu`/`excl` ក្នុង `runall_lane()` —
 `runall-runner-test` ធ្លាក់បើភ្លេច។ ⛔ `RUNALL_JOBS=1` ផ្តល់លំដាប់ជាជួរដូចមុន (សម្រាប់ដេញតាមការធ្លាក់ដែលសង្ស័យថាមកពីការរត់ស្របគ្នា)។
 
@@ -2275,7 +2275,7 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **Supabase (ZoeW 2.46.0 · ZoeKeyGen 2.23.0) — មិនទាន់ merge ចូល `main`** (branch `claude/great-ritchie-47ujj5`) ៖ សកម្មភាពដោយដៃ
+- ⏳ **Supabase (ZoeW 2.46.0 · ZoeKeyGen 2.23.0) — merge រួច (PR #276) · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»** ៖ សកម្មភាពដោយដៃ
   (Project · migration ៣ · Admin · Edge Function + secrets · Netlify env · ហាងដំបូង) នៅ `docs/HISTORY.md` ផ្នែក ១ [2.46.0] ·
   ការដំឡើង ៖ [`supabase/README.md`](supabase/README.md)។ ⏳ សាកលើ iPhone + Android ពិត ៖ ចុះឈ្មោះ · ចូល · ស្កេន · ក្រៅបណ្តាញ ➜ ភ្ជាប់វិញ ·
   ឧបករណ៍ ២ ក្នុងហាងដដែល · ភ្លេចពាក្យសម្ងាត់ · ហាងបិទ ➜ ចាកចេញ។ **ចំណុចបើក** (សម្រេចជាមួយម្ចាស់គម្រោង) ៖ (១) **Push** ចងនឹង Activation

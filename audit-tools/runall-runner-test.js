@@ -291,6 +291,30 @@ const st6 = runHarness(c4, body4, { RUNALL_JOBS: '3', RUNALL_ONLY: 'fx-p2,គ្
 ok('⛔ RUNALL_ONLY ឈ្មោះមិនស្គាល់ ➜ បដិសេធ (exit 2 · គ្មាន checker រត់) មិនមែនបៃតងទទេ',
     st6.rc === 2 && st6.events.length === 0 && /គ្មាន-ឈ្មោះ/.test(st6.out), { rc: st6.rc, out: st6.out.slice(0, 300) });
 
+// ═══ ៧ក. RUNALL_SHARD=k/n ៖ ផ្នែកមិនជាន់ · មិនខ្វះ · ប្រកាស «មិនពេញលេញ» · តម្លៃខុស ➜ បដិសេធ ═══
+console.log('\n=== ៧ក. RUNALL_SHARD ៖ ផ្នែកទាំង n រួមគ្នា = បញ្ជីពេញ · គ្មានការជាន់ · ផ្នែកមួយមិនមែនភស្តុតាងនៃ tree ===');
+const shardNames = Array.from({ length: 11 }, (_, i) => 'fx-s' + String(i).padStart(2, '0'));
+const c7 = newCase(shardNames.map((t, i) => ['audit-tools/' + t + '.js', i === 5 ? { ms: 20, code: 1, out: ['  FAIL  ក្លែង'] } : { ms: 20 }]));
+const body7 = 'section "== ក ==" \n' + shardNames.map((t) => 'run "' + t + '" node audit-tools/' + t + '.js').join('\n');
+const shardRuns = [1, 2, 3].map((k) => runHarness(c7, body7, { RUNALL_JOBS: '2', RUNALL_SHARD: k + '/3' }));
+const shardSets = shardRuns.map((r) => [...started(r.events)].sort());
+const shardAll = shardSets.flat();
+ok('⛔ ផ្នែកទាំង ៣ រួមគ្នា = បញ្ជីពេញ ហើយមិនជាន់ (' + shardSets.map((x) => x.length).join('+') + ')',
+    shardAll.length === shardNames.length && new Set(shardAll).size === shardNames.length && shardSets.every((x) => x.length > 0), shardSets);
+const again = runHarness(c7, body7, { RUNALL_JOBS: '1', RUNALL_SHARD: '2/3' });
+ok('ការបែងចែកមិនអាស្រ័យលើ RUNALL_JOBS (ផ្នែក 2/3 ដដែលពេល JOBS=1)',
+    JSON.stringify([...started(again.events)].sort()) === JSON.stringify(shardSets[1]), [...started(again.events)]);
+ok('⛔ ផ្នែកនីមួយៗប្រកាស «មិនពេញលេញ» + RUNALL_SHARD មិនមែន «ជោគជ័យទាំងអស់»',
+    shardRuns.every((r) => /មិនពេញលេញ ៖ វាស់ \d+\/11 checker \(RUNALL_SHARD \d\/3/.test(r.out) && !/ជោគជ័យទាំងអស់/.test(r.out)),
+    shardRuns.map((r) => r.out.slice(-300)));
+const failShard = shardRuns.findIndex((r) => started(r.events).has('audit-tools/fx-s05.js'));
+ok('FAIL ក្នុងផ្នែកមួយ ➜ តែផ្នែកនោះ exit ≠ 0', failShard !== -1
+    && shardRuns.every((r, k) => (k === failShard ? r.rc === 1 : r.rc === 0)), shardRuns.map((r) => r.rc));
+const badShard = ['0/3', '4/3', 'x/3', '1/0', '1/3 x', '2'].map((v) => [v, runHarness(c7, body7, { RUNALL_JOBS: '2', RUNALL_SHARD: v })]);
+ok('⛔ RUNALL_SHARD ខុស (0/3 · 4/3 · x/3 · 1/0 · «1/3 x» · 2) ➜ បដិសេធ (exit 2 · គ្មាន checker រត់)',
+    badShard.every(([, r]) => r.rc === 2 && r.events.length === 0 && /RUNALL_SHARD/.test(r.out)),
+    badShard.map(([v, r]) => v + ' ➜ rc ' + r.rc + ' · ' + r.events.length));
+
 // ═══ ៥. ការរំខាន ➜ បញ្ឈប់ checker ដែលកំពុងរត់ ═══
 async function sectionFive() {
     console.log('\n=== ៥. TERM ➜ checker ដែលកំពុងរត់ត្រូវបញ្ឈប់ (គ្មាន process កំព្រា) ===');
@@ -391,6 +415,45 @@ async function sectionSix() {
         exclN >= 2 && emuN >= 6 && browserN >= 25, { exclN, emuN, browserN });
     ok('⛔ រាល់ checker ដែលប្រភពបង្ហាញភស្តុតាង (.tmp-poison-* · emulator · browser) ឈរ lane ត្រូវ', wrong.length === 0, wrong.join('\n'));
     ok('⛔ ទិសផ្ទុយ ៖ lane លើកលែងទាំងអស់មានភស្តុតាងក្នុងប្រភព (គ្មានធាតុចាស់)', unjustified.length === 0, unjustified.join('\n'));
+
+    // ═══ ៧ខ. matrix ក្នុង audit.yml ↔ ការបែងចែកបញ្ជី **ពិត** ═══
+    // ⛔ CI ពេញ = ផ្នែកទាំង N បៃតង ➜ matrix ដែលភ្លេចផ្នែកណាមួយ (ឧ. [1, 2, 3] ជាមួយ «/4») បោះបង់ checker មួយភាគបួនដោយស្ងាត់
+    let wf = '';
+    try { wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'audit.yml'), 'utf8'); } catch (e) { wf = ''; }
+    const shardEnv = /RUNALL_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}\/(\d+)/.exec(wf);
+    const matrixRow = /^\s*shard:\s*\[([0-9,\s]+)\]\s*$/m.exec(wf);
+    const N = shardEnv ? Number(shardEnv[1]) : 0;
+    const matrix = matrixRow ? matrixRow[1].split(',').map((x) => Number(x.trim())) : [];
+    ok('audit.yml ៖ matrix shard = 1..N ដែល N ស្មើ «/N» ក្នុង RUNALL_SHARD (ឃើញ [' + matrix.join(',') + '] · /' + N + ')',
+        N >= 1 && JSON.stringify(matrix) === JSON.stringify(Array.from({ length: N }, (_, i) => i + 1)), { matrix, N });
+    const runbook = (() => { try { return fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'); } catch (e) { return ''; } })();
+    const rbLine = (runbook.match(/^[A-Z_=1 ]*_STRICT=1[A-Z_=1 ]* bash audit-tools\/run-all\.sh/m) || [''])[0];
+    const rbFlags = [...rbLine.matchAll(/([A-Z0-9_]+_STRICT)=1/g)].map((m) => m[1]);
+    const shardStep = (wf.match(/- name: run-all\.sh \(ផ្នែក[\s\S]*?run: bash audit-tools\/run-all\.sh/) || [''])[0];
+    const missingFlags = rbFlags.filter((f) => !new RegExp('\\b' + f + ":\\s*'1'").test(shardStep));
+    ok('⛔ ជំហាន run-all ក្នុង CI មានទង់ STRICT ទាំងអស់របស់ Runbook (' + rbFlags.length + ') ➜ CI ស្មើការរត់ក្នុង session',
+        rbFlags.length >= 4 && shardStep.length > 0 && missingFlags.length === 0, { rbFlags, missingFlags });
+    ok('CI បើក RTDB emulator មុន run-all (emu/* · money-guardian ពេញ មិនមែន SKIP)',
+        wf.indexOf('java -jar') !== -1 && shardStep.length > 0 && wf.indexOf('java -jar') < wf.indexOf(shardStep));
+    if (N >= 1 && blockAt !== -1 && listAt !== -1 && listEnd > listAt) {
+        const dir2 = path.join(TMP, 'shards');
+        fs.mkdirSync(dir2, { recursive: true });
+        const h2 = path.join(dir2, 'shards.sh');
+        fs.writeFileSync(h2, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\npass=0; fail=0; skip=0; partial=0\n' + block + '\n'
+            + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
+            + 'for ((k = 1; k <= ' + N + '; k++)); do RUNALL_SHARD="$k/' + N + '"; runall_select >/dev/null || exit 3; '
+            + 'for i in "${!J_KIND[@]}"; do [ "${J_ST[$i]}" = queue ] && printf \'%s\\t%s\\t%s\\n\' "$k" "${J_LABEL[$i]}" "$RUNALL_SHARD_LOAD"; done; done\nexit 0\n');
+        const r2 = cp.spawnSync('bash', [h2], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir2) });
+        const rowsS = String(r2.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'));
+        const labels = rowsS.map((x) => x[1]);
+        const allJobs = plan.filter((p) => p.kind === 'job').map((p) => p.label);
+        const loads = [...new Set(rowsS.map((x) => x[0] + ':' + x[2]))].map((x) => Number(x.split(':')[1]));
+        ok('⛔ បញ្ជីពិត ៖ ផ្នែកទាំង ' + N + ' រួមគ្នា = checker ទាំង ' + allJobs.length + ' គ្មានការជាន់',
+            r2.status === 0 && labels.length === allJobs.length && new Set(labels).size === labels.length
+            && allJobs.every((l) => labels.includes(l)), { status: r2.status, got: labels.length, want: allJobs.length });
+        ok('បញ្ជីពិត ៖ ទម្ងន់ផ្នែកស្មើគ្នាក្នុង ២០% (' + loads.join(' · ') + ')',
+            loads.length === N && Math.max(...loads) <= Math.min(...loads) * 1.2, loads);
+    }
 
     // លំនាំដើម RUNALL_JOBS = CPU ក្នុងព្រំដែន 2–6 (nproc ក្លែងក្នុង PATH)
     const dir = path.join(TMP, 'nproc');

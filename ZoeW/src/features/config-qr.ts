@@ -128,9 +128,14 @@ export function decodeConfigQrImage(e?) {
     reader.readAsDataURL(file);
 }
 
+let configQrImageSeq = 0;
+
 export function decodeConfigQrDataUrl(dataUrl) {
-    const notFound = () => showToast("⚠️ រកមិនឃើញ QR Setup Link ក្នុងរូបភាពនេះទេ។ សូមប្រើរូបថតអេក្រង់ QR ដែលច្បាស់ ឬបិទភ្ជាប់ Link ផ្ទាល់។");
+    const seq = ++configQrImageSeq;
+    const current = () => seq === configQrImageSeq && modalIsOpen('configModal');
+    const notFound = () => { if (current()) showToast("⚠️ រកមិនឃើញ QR Setup Link ក្នុងរូបភាពនេះទេ។ សូមប្រើរូបថតអេក្រង់ QR ដែលច្បាស់ ឬបិទភ្ជាប់ Link ផ្ទាល់។"); };
     loadScratchImage(dataUrl, async (img) => {
+        if (!current()) return;
         const scale = Math.min(1, CONFIG_QR_IMAGE_MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
         const canvas = createScratchCanvas();
         canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
@@ -144,8 +149,8 @@ export function decodeConfigQrDataUrl(dataUrl) {
         } catch (err) {
             text = '';
         }
+        if (!current()) return;
         if (!text) { notFound(); return; }
-        if (!modalIsOpen('configModal')) return;
         const result: any = parseSetupLinkText(text);
         if (!result.parsed) {
             showToast(result.error === 'not-link' ? "❌ QR នេះមិនមែនជា Setup Link ត្រឹមត្រូវទេ!" : "❌ QR Setup Link មិនត្រឹមត្រូវទេ!");

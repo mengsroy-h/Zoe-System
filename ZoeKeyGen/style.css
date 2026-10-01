@@ -251,7 +251,6 @@ body.boot-reveal .app-container { animation: bootFadeIn 420ms ease-out 70ms both
     .app-container.kg-tab-link > .app-card:not([data-tab="link"]),
     .app-container.kg-tab-shop > .app-card:not([data-tab="shop"]),
     .app-container.kg-tab-notice > .app-card:not([data-tab="notice"]) { display: none; }
-    .toast-container { bottom: calc(80px + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
     .kg-tab { transition: none; }
@@ -344,6 +343,9 @@ td.note-cell { white-space: normal; max-width: 140px; }
     min-width: 36px;
 }
 .toast-container { position: fixed; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; padding: 0 16px; pointer-events: none; }
+@media (max-width: 899px) {
+    .toast-container { bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
 .toast { background: var(--dark-bg); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: calc(12 * var(--fs-unit)); font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(10px); transition: opacity 0.25s ease, transform 0.25s ease; max-width: 90%; text-align: center; }
 .toast.show { opacity: 1; transform: translateY(0); }
 .toast-info { background: var(--dark-bg); color: #fff; }

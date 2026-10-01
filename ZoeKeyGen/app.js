@@ -1913,8 +1913,10 @@ function expireIdleSigningKey() {
     signingKeySessionKey = null;
     signingKeyLastUseAt = 0;
     updateSigningKeyBadge();
-    showToast('🔒 Signing Key ត្រូវបានដកចេញពីសតិ ក្រោយមិនប្រើ ១៥ នាទី — សូម Load ម្តងទៀត');
     requestSessionSigningKeyRestoreIfEligible();
+    showToast(isPinFlowPending()
+        ? '🔒 Signing Key ត្រូវបានដកចេញពីសតិ ក្រោយមិនប្រើ ១៥ នាទី — វាយ PIN ដើម្បីស្ដារវិញ'
+        : '🔒 Signing Key ត្រូវបានដកចេញពីសតិ ក្រោយមិនប្រើ ១៥ នាទី — សូម Load ម្តងទៀត');
     return true;
 }
 

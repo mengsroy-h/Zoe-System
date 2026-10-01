@@ -2588,6 +2588,9 @@
     "ZoeW/tests/toast-backend.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/network-toast.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "audit-tools/emu/supabase-adapter-parity-test.js": {
       "policy": "guard-1"
     },

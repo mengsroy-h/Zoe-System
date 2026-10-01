@@ -434,7 +434,7 @@ async function run() {
         f.ctx.__pinPrompts = 0;
         vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 0;', f.ctx);
         vm.runInContext(slice(['elapsedSince', 'noteSigningKeyActivity', 'expireIdleSigningKey', 'requestSessionSigningKeyRestoreIfEligible']), f.ctx);
-        f.ctx.isPinFlowPending = () => false;
+        f.ctx.isPinFlowPending = () => f.ctx.__pinPrompts > 0;
         f.ctx.requestPinBeforeConfig = () => { f.ctx.__pinPrompts++; };
         f.storage.set('zoekeygen_signing_key_enc', '{"iv":[1],"data":[2]}');
         vm.runInContext('signingKeyLastUseAt = Date.now();', f.ctx);
@@ -455,6 +455,14 @@ async function run() {
         && vm.runInContext('sensitiveSessionGeneration', idle.ctx) > genBefore);
     ok('ច្បាប់ចម្លងអ៊ិនគ្រីបក្នុង Session នៅ ➜ សុំ PIN ដើម្បីស្តារ · សារប្រាប់អ្នកប្រើ',
         idle.storage.has('zoekeygen_signing_key_enc') && idle.ctx.__pinPrompts === 1 && idle.log.toasts.some((t) => /ដកចេញពីសតិ/.test(t)), idle.log.toasts);
+    ok('សារប្រាប់ផ្លូវពិត ៖ ប្រអប់ PIN បើក ➜ «វាយ PIN ដើម្បីស្ដារ» (មិនមែន «Load»)',
+        idle.log.toasts.some((t) => /វាយ PIN ដើម្បីស្ដារ/.test(t)) && !idle.log.toasts.some((t) => /Load/.test(t)), idle.log.toasts);
+    idle = idleFixture();
+    idle.storage.delete('zoekeygen_signing_key_enc');
+    idle.clock.now += idleMs + 1000;
+    idle.ctx.expireIdleSigningKey();
+    ok('គ្មានច្បាប់ចម្លងក្នុង Session ➜ មិនសុំ PIN · សារ «Load ម្តងទៀត»',
+        idle.ctx.__pinPrompts === 0 && idle.log.toasts.some((t) => /Load ម្តងទៀត/.test(t)), idle.log.toasts);
     idle = idleFixture();
     vm.runInContext('isGeneratingKey = true;', idle.ctx);
     idle.clock.now += idleMs * 3;

@@ -177,6 +177,31 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            // ⛔ របា Tab ខាងក្រោម (ZoeKeyGen ទូរស័ព្ទ) ៖ toast ត្រូវឈរ **ខាងលើ** របា — មិនមែនពីក្រោយវា (វាស់ធរណីមាត្រពិត
+            //    មិនមែនលំដាប់ CSS ៖ ច្បាប់ `@media` ដែលឈរមុនច្បាប់មូលដ្ឋាន ស្លាប់ស្ងាត់ៗ ➜ toast លិចក្រោមរបា)
+            const tabOverlap = await page.evaluate(() => {
+                const bar = document.getElementById('kgTabBar');
+                if (!bar) return { skip: true };
+                const app = document.getElementById('appContainer');
+                const wasHidden = app && app.classList.contains('hidden');
+                if (wasHidden) app.classList.remove('hidden');
+                const host = document.getElementById('toastContainer') || document.querySelector('.toast-container');
+                if (!host) { if (wasHidden) app.classList.add('hidden'); return { skip: true, why: 'គ្មាន .toast-container' }; }
+                const probe = document.createElement('div');
+                probe.className = 'toast show';
+                probe.textContent = 'probe';
+                host.appendChild(probe);
+                const barRect = bar.getBoundingClientRect();
+                const visible = getComputedStyle(bar).display !== 'none' && barRect.height > 0;
+                const t = probe.getBoundingClientRect();
+                probe.remove();
+                if (wasHidden) app.classList.add('hidden');
+                return { visible, toastBottom: Math.round(t.bottom), barTop: Math.round(barRect.top) };
+            });
+            if (!tabOverlap.skip && tabOverlap.visible) {
+                check(tabOverlap.toastBottom <= tabOverlap.barTop + 1, label + ': toast ឈរខាងលើរបា Tab (មិនលិចក្រោមវា)', tabOverlap);
+            }
+
             if (app === 'ZoeW') {
                 const headers = reportHeaders(ROOT);
                 const cellR = headers.length ? await page.evaluate((hs) => {

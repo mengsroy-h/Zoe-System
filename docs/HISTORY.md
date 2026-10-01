@@ -64,8 +64,17 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
 - **ZoeKeyGen ៖ ដោះសោដោយក្រយៅដៃ/មុខ** ៖ ⚙️ ➜ «បើក» ➜ វាយ PIN ពិត ➜ ឧបករណ៍ចុះឈ្មោះ ➜ ក្រោយមកប្រអប់ PIN សួរក្រយៅដៃ/មុខភ្លាម។ PIN រុំដោយ AES-GCM
   ពីកូនសោ **WebAuthn PRF** (⛔ ឧបករណ៍គ្មាន PRF ➜ «មិនគាំទ្រ» មិនមានរបៀបរក្សា PIN ធម្មតា) · PIN ដែលស្រាយត្រូវស្មើ hash មុនទុកចិត្ត (មិនស្មើ ➜ លុបការចង) ·
   ប្តូរ PIN ➜ លុបការចង · ពិដាន/lockout PIN ដដែល · ផ្លូវជោគជ័យតែមួយ `completePinUnlock()`។
-- **ZoeKeyGen ៖ Signing Key ផុតពីសតិ** ក្រោយមិនប៉ះ ១៥ នាទី (pointer/key) ➜ toast «🔒 … សូម Load ម្តងទៀត» · ពិនិត្យរាល់ ៣០ វិ. និងពេលត្រឡប់មក App
+- **ZoeKeyGen ៖ Signing Key ផុតពីសតិ** ក្រោយមិនប៉ះ ១៥ នាទី (pointer/key) ➜ toast «🔒 …» ប្រាប់ផ្លូវពិត (មាន Key ចងចាំក្នុង Session ➜ ប្រអប់ PIN «វាយ PIN ដើម្បីស្ដារវិញ» · គ្មាន ➜ «សូម Load ម្តងទៀត») · ពិនិត្យរាល់ ៣០ វិ. និងពេលត្រឡប់មក App
   (Signing Key ជា secret ធំជាងគេរបស់អ្នកលក់ ➜ ឧបករណ៍ដែលទុកចោលបើក មិនកាន់វាជារៀងរហូត)។
+- **ZoeW ៖ toast បណ្តាញ «រស់»** (សំណើ ៖ «toast realtime») — App ដែលចូលប្រព័ន្ធ ធ្លាក់ពី «ភ្ជាប់» ទៅ «ក្រៅបណ្ដាញ» (browser offline ឬផុត grace
+  ភ្ជាប់ឡើងវិញ) ➜ toast **តែមួយ** ដែលប្តូរខ្លួនឯង ៖ «⚠️ ឧបករណ៍ក្រៅបណ្ដាញ…» ➜ «🔄 កំពុងភ្ជាប់ Server ឡើងវិញ…» ➜ «🔄 …កំពុងទាញទិន្នន័យ…» ➜
+  «✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ» (✅ តែពេល listener ទាំងអស់ស្រស់ · listener ងាប់ ➜ មិន ✅) · toast ផុតពេល (២០ វិ.) ខណៈនៅក្រៅបណ្ដាញ ➜
+  ពេលភ្ជាប់វិញ សារ ✅ លេចម្តងទៀត · ការភ្លាត់ខ្លី (grace) · មិនទាន់ចូល · មិនដែលភ្ជាប់តាំងពីបើក · toast ចូលប្រព័ន្ធ/Config រស់រួច ➜ **គ្មាន** toast ស្ទួន។
+- 🐛 **Setup Link មាន `%` ខូច** (បិទភ្ជាប់/QR) ➜ `decodeURIComponent` បោះ `URIError` ចេញពី handler ➜ **គ្មានសារអ្វីសោះ** ➜ ឥឡូវ «❌ Setup Link មិនត្រឹមត្រូវទេ!»។
+- 🐛 **QR ពីរូបភាព ២ ជាន់គ្នា** ៖ រូបចាស់ដែលឌិកូដចប់ក្រោយ សរសេរជាន់ Config របស់រូបថ្មី · បិទប្រអប់កណ្តាលការឌិកូដ ➜ សារនៅលេច ➜ ឥឡូវតែការឌិកូដ
+  ចុងក្រោយ ហើយតែពេលប្រអប់នៅបើក (`configQrImageSeq`)។
+- 🐛 **ZoeKeyGen ទូរស័ព្ទ ៖ toast លិចក្រោមរបា Tab** — ច្បាប់ `@media` ឈរ **មុន** ច្បាប់មូលដ្ឋាន `.toast-container` ➜ ស្លាប់ស្ងាត់ៗ (រកឃើញដោយ
+  `css-media-override` ក្នុង CI ពេញ — ការរត់ checker តែមួយផ្នែកមិនបានរត់វា) ➜ ផ្លាស់ក្រោយច្បាប់មូលដ្ឋាន។
 - **សុវត្ថិភាព (App ទាំង ២)** ៖ Sentry លាក់ `invite` · `reset_code` (កូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ក្នុង URL ឬ breadcrumb) · វាល Setup Link ក្នុងបញ្ជីសម្អាតពេល
   ចាកចេញ · header `Cross-Origin-Opener-Policy: same-origin` (ទំព័រផ្សេងដែលបើក App ក្នុងបង្អួចថ្មី ចាប់ `window.opener` មិនបាន)។
 
@@ -76,6 +85,14 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
   ចាស់ **ធ្លាក់**) · `keygen-biometric-test` (២១ ៖ function ពិតក្នុង `vm` · WebAuthn ក្លែងដែលមាន PRF ពិត · AES ពិត ➜ mutation ៤/៤ ចាប់ ៖ របៀបគ្មាន PRF ·
   រំលង hash · ប្តូរ PIN រក្សាការចង · ដកច្រកទ្វារប្រអប់)។ mutation លើ toast/Config ៖ ដក `toastBackendText` · ប្តូរ «Config» ផង · ដក `applySetupPayload`
   ពីផ្លូវកាមេរ៉ា ➜ ចាប់ទាំងអស់។
+- ថ្មី (ជុំ deep audit) ៖ `ZoeW/tests/network-toast.test.tsx` (៩ ៖ លំដាប់ពេញ · listener ងាប់ · grace · ដាច់យឺតៗ · មិនដែលភ្ជាប់ · toast ស្ទួន · មិនទាន់ចូល ·
+  ផុតពេល ➜ ✅ ម្តងទៀត · វគ្គថ្មី ➜ tree មុនកែ ធ្លាក់ ៤ · mutation «✅ ខណៈ listener ងាប់» ចាប់) · `config-modal.test.tsx` +២ (`%` ខូច · រូប ២ ជាន់គ្នា ➜ មុនកែ ធ្លាក់ ២) ·
+  `layout-check` ៖ toast ឈរខាងលើរបា Tab ZoeKeyGen (វាស់ធរណីមាត្រពិត · CSS ចាស់ ➜ ធ្លាក់ ៥ ទំហំ) · `toast-truth-test` ៖ toast បណ្តាញរស់ក្នុង browser ពិត ·
+  `keygen-session-security-test` ៖ សារផុតពីសតិប្រាប់ផ្លូវពិត (PIN ឬ Load ➜ កូដចាស់ធ្លាក់)។
+- ជួសជុលអ្នកយាម ៖ `network-pressure-test` ដេរីវេ helper ដែលអានវាល Config (`configInputText()`) ជំនួសការចាក់អក្សរ (probe ៖ ដកការអាន ➜ ធ្លាក់) ·
+  `clock-hygiene` បញ្ជីអនុញ្ញាតត្រាសកម្មភាព Signing Key (local · fail-closed) · `run-all.sh` baseline + `keygen-biometric-test` (checker-coverage)។
+- Mutation sweep លើការការពារបណ្តាញ/toast ៖ ដក `retryFailedDbListenersNow` ពី `online` ➜ `connection-recovery` · timeout មិន abort ➜ `network-timeout` +
+  `network-pressure` · ដកច្រកទ្វារជំនាន់ listener `exchangeRate` ➜ `connection-recovery` · toast ចូលប្រព័ន្ធ ✅ ខណៈកំពុងទាញ ➜ `toast-truth` ➜ **៥/៥ ចាប់**។
 - ពង្រីក ៖ `keygen-session-security-test` (៩៥ ៖ Signing Key ផុតក្រោយ ១៥ នាទីតាមនាឡិកាក្លែង · សកម្មភាពពន្យារ · ខ្សែភ្ជាប់ពិត) · `secret-hygiene` (២២១ ៖ វាល
   credential ដេរីវេរួម `Invite`/`resetCode`/`setupLink` · mutation ដក `invite` ➜ ចាប់) · `netlify-config-scope-test` ផ្នែក ៦ (header សុវត្ថិភាព `/*` ៖ XFO ·
   frame-ancestors · nosniff · HSTS · Referrer · COOP · Permissions-Policy កាមេរ៉ាដេរីវេពី `getUserMedia` ➜ mutation ៣/៣)។

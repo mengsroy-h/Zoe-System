@@ -335,7 +335,12 @@ export function setupParamFromText(text) {
         if (fromUrl) return fromUrl;
     } catch (e) {}
     const bare = value.replace(/^\??setup=/, '');
-    return /^[A-Za-z0-9+/=_%-]{16,}$/.test(bare) ? decodeURIComponent(bare) : '';
+    if (!/^[A-Za-z0-9+/=_%-]{16,}$/.test(bare)) return '';
+    try {
+        return decodeURIComponent(bare);
+    } catch (e) {
+        return '';
+    }
 }
 
 export function parseSetupLinkText(text) {
@@ -354,11 +359,14 @@ export function applySetupLinkText(text) {
         showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
         return false;
     }
-    const linkDsn = applySetupPayload(result.parsed);
+    announceSetupApplied(applySetupPayload(result.parsed));
+    return true;
+}
+
+export function announceSetupApplied(linkDsn) {
     showToast(linkDsn
         ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
         : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
-    return true;
 }
 
 export function applySetupLinkFromInput() {
@@ -383,10 +391,7 @@ export function applySetupLinkFromUrl() {
 
     requestPinBeforeConfig(() => {
         openConfigModal();
-        const linkDsn = applySetupPayload(parsed);
-        showToast(linkDsn
-            ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
-            : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+        announceSetupApplied(applySetupPayload(parsed));
     }, 'setupLink');
 }
 

@@ -155,11 +155,59 @@ export function refreshLiveToasts() {
         const state = liveToastState(el.live);
         if (!state) { settleLiveToast(el.id); continue; }
         paintToast(el.id, state.msg, state.kind);
-        if (state.settled) settleLiveToast(el.id);
+        if (state.settled) {
+            if (el.live === 'network') networkToastEpisode = false;
+            settleLiveToast(el.id);
+        }
+    }
+}
+
+let networkToastEpisode = false;
+let connectionWasOnline = false;
+
+function signedInForToast() {
+    return !!(firebaseState.auth && firebaseState.auth.currentUser) && firebaseState.sessionExpiryCheck !== 'expired';
+}
+
+export function noteConnectionTransition(prev, next) {
+    if (!signedInForToast()) {
+        networkToastEpisode = false;
+        connectionWasOnline = next === 'online';
+        return;
+    }
+    if (uiState.toasts.some((t) => t.live !== null && t.live !== 'network')) {
+        networkToastEpisode = false;
+        if (next === 'online') connectionWasOnline = true;
+        return;
+    }
+    const showing = uiState.toasts.some((t) => t.live === 'network');
+    if (next === 'offline' && prev !== 'offline' && connectionWasOnline) {
+        networkToastEpisode = true;
+        if (!showing) showLiveToast('network');
+        return;
+    }
+    if (next !== 'online') return;
+    connectionWasOnline = true;
+    if (networkToastEpisode && !showing) {
+        const id = showLiveToast('network');
+        if (id !== null && !uiState.toasts.some((t) => t.live === 'network')) networkToastEpisode = false;
     }
 }
 
 export function liveToastState(key) {
+    if (key === 'network') {
+        if (!signedInForToast()) return null;
+        if ((navigator.onLine as boolean) === false) {
+            return { msg: '⚠️ ឧបករណ៍ក្រៅបណ្ដាញ — លេខដែលអ្នកឃើញអាចមិនទាន់សម័យ', kind: 'warn', settled: false };
+        }
+        if (!firebaseState.isDatabaseConnected) {
+            return { msg: '🔄 កំពុងភ្ជាប់ Server ឡើងវិញ...', kind: 'info', settled: false };
+        }
+        if (firebaseState.dbListenersFailed || dbListenerPendingPaths.size) {
+            return { msg: '🔄 ភ្ជាប់ Server វិញ — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
+        }
+        return { msg: '✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
+    }
     if (key !== 'signin' && key !== 'config') return null;
     if (key === 'signin' && (firebaseState.sessionExpiryCheck === 'expired' || !firebaseState.auth || !firebaseState.auth.currentUser)) {
         return firebaseState.sessionExpiryCheck === 'expired'

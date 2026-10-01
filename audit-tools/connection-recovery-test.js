@@ -116,6 +116,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
+        'const noteConnectionTransition = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
         'const flushPendingRegistryReleases = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +
@@ -333,6 +334,7 @@ function buildContext() {
         'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
+        'const noteConnectionTransition = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
         'const flushPendingRegistryReleases = () => {};\n' +
         'const pendingRegistryReleases = new Map();\n' +

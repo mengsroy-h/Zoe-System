@@ -464,6 +464,15 @@ function readToast(page) {
                 ok(app + ' ៖ អត្ថបទស្លាកនៅតែផ្លាស់តាមស្ថានភាពដដែល',
                     colours.online.text !== colours.offline.text, colours);
 
+                // ⛔ ការវាស់ពណ៌ខាងលើដើរ «ភ្ជាប់ ➜ កំពុងភ្ជាប់ ➜ ក្រៅបណ្ដាញ» ខណៈចូលប្រព័ន្ធ ➜ ZoeW លេច toast បណ្តាញរស់ (`noteConnectionTransition`)
+                //    ➜ អះអាងវា រួចសម្អាត មុនសេណារីយ៉ូ toast ចូលប្រព័ន្ធ (បើអត់ toast បណ្តាញឈរមុខ ➜ ការអានខាងក្រោមអាន toast ខុស)
+                if (app === 'ZoeW') {
+                    const net = await readToast(page);
+                    ok(app + ' ៖ ភ្ជាប់ ➜ ក្រៅបណ្ដាញ ➜ toast បណ្តាញរស់ (មិនអះអាងជោគជ័យ)',
+                        !!net && net.live === 'network' && net.text.indexOf('✅') === -1, net);
+                }
+                await page.evaluate(() => window.__toastProbe.clear());
+
                 // toast ដែលរស់ ៖ សេចក្តីពិតត្រូវផ្លាស់ **ក្នុងធាតុដដែល**
                 await page.evaluate(() => {
                     window.__toastProbe.set({ connected: false });

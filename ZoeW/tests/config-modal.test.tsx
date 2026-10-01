@@ -153,4 +153,47 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         expect(parseSetupLinkText('hello')).toEqual({ error: 'not-link' });
         expect(parseSetupLinkText('https://x.example/?setup=' + enc({ nope: 1 }))).toEqual({ error: 'bad' });
     });
+
+    it('⛔ អត្ថបទមាន % ខូច ➜ សារ «មិនត្រឹមត្រូវ» (មិនបោះ URIError ចេញពី handler)', () => {
+        for (const bad of ['%'.repeat(20), 'setup=%E0%A4%A' + 'A'.repeat(20), 'AAAAAAAAAAAAAAAA%zz']) {
+            expect(() => parseSetupLinkText(bad)).not.toThrow();
+            expect((parseSetupLinkText(bad) as any).parsed).toBeUndefined();
+        }
+        step(() => openConfigModal());
+        uiState.toasts = [];
+        let ok: any;
+        expect(() => { ok = applySetupLinkText('%'.repeat(20)); }).not.toThrow();
+        expect(ok).toBe(false);
+        expect(toastTexts().some((t) => /Setup Link មិនត្រឹមត្រូវ/.test(t))).toBe(true);
+    });
+
+    it('⛔ QR ពីរូបភាព ២ ជាន់គ្នា ៖ រូបចាស់ដែលឌិកូដចប់ក្រោយ មិនសរសេរជាន់រូបថ្មី · បិទប្រអប់ ➜ គ្មានសារ', async () => {
+        const scan: any = await import('../src/services/scan-engine');
+        const release: Array<() => void> = [];
+        const texts = [link(Object.assign({}, FB, { apiKey: 'OLD' })), link(Object.assign({}, FB, { apiKey: 'NEW' }))];
+        scan.decodeBarcodeFromCanvasManual.mockImplementation(() => {
+            const text = texts[release.length];
+            return new Promise((resolve) => { release.push(() => resolve(text)); });
+        });
+        try {
+            step(() => openConfigModal());
+            step(() => decodeConfigQrDataUrl('data:image/png;base64,AAAA'));
+            step(() => decodeConfigQrDataUrl('data:image/png;base64,BBBB'));
+            release[1]();
+            await new Promise((r) => setTimeout(r, 0));
+            release[0]();
+            await new Promise((r) => setTimeout(r, 0));
+            step(() => {});
+            expect(JSON.parse(fieldValue('firebaseConfigInput')).apiKey).toBe('NEW');
+            uiState.toasts = [];
+            step(() => decodeConfigQrDataUrl('data:image/png;base64,CCCC'));
+            step(() => { uiState.modalDisplay = Object.assign({}, uiState.modalDisplay, { configModal: false }); });
+            texts.push('');
+            release[2]();
+            await new Promise((r) => setTimeout(r, 0));
+            expect(toastTexts()).toEqual([]);
+        } finally {
+            scan.decodeBarcodeFromCanvasManual.mockImplementation(async () => (globalThis as any).__qrText || '');
+        }
+    });
 });

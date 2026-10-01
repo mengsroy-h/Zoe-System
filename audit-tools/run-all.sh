@@ -921,6 +921,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-pin-flow-test.js 2>&1 | tail -1 | sed 's/^/   keygen-pin-flow: /'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-session-security-test.js 2>&1 | tail -1 | sed 's/^/   keygen-session:  /'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-notice-test.js 2>&1 | tail -1 | sed 's/^/   keygen-notice:   /'
+    KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-biometric-test.js 2>&1 | tail -1 | sed 's/^/   keygen-bio:      /'
     KEYLIST_APP_DIR="$BASE" node audit-tools/keylist-consistency-test.js 2>&1 | tail -1 | sed 's/^/   keylist-consistency:/'
     LICGRACE_APP_DIR="$BASE" node audit-tools/license-grace-test.js 2>&1 | tail -1 | sed 's/^/   license-grace:   /'
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'

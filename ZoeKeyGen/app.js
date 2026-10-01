@@ -3343,14 +3343,15 @@ function setupIOSPullToRefresh() {
     }, { passive: true });
 }
 
-const KG_TABS = ['create', 'list', 'link', 'shop', 'notice'];
+const KG_TAB_CLASS = { create: 'kg-tab-create', list: 'kg-tab-list', link: 'kg-tab-link', shop: 'kg-tab-shop', notice: 'kg-tab-notice' };
+const KG_TABS = Object.keys(KG_TAB_CLASS);
 const KG_TAB_KEY = 'zoekeygen_tab_v1';
 
 function switchKgTab(name) {
     const tab = KG_TABS.indexOf(name) === -1 ? 'create' : name;
     const box = document.getElementById('appContainer');
     if (!box) return;
-    KG_TABS.forEach((t) => box.classList.toggle('kg-tab-' + t, t === tab));
+    KG_TABS.forEach((t) => box.classList.toggle(KG_TAB_CLASS[t], t === tab));
     document.querySelectorAll('#kgTabBar .kg-tab').forEach((b) => {
         const on = b.getAttribute('data-tab') === tab;
         b.classList.toggle('active', on);

@@ -51,6 +51,9 @@ function build(savedPin, savedSigningKey) {
         openConfigModal: function openConfigModal() { sandbox.__ran = 'config'; },
         persistSigningKeyForSession: function persistSigningKeyForSession() { sandbox.__ran = 'persistKey'; },
         tryRestoreSigningKeyFromSession: function tryRestoreSigningKeyFromSession() { sandbox.__ran = 'restoreKey'; },
+        refreshBiometricUi: function refreshBiometricUi() {},
+        isBiometricEnabled: function isBiometricEnabled() { return false; },
+        runBiometricUnlock: function runBiometricUnlock() {},
         __ran: null
     };
     const ctx = vm.createContext(sandbox);

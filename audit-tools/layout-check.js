@@ -226,9 +226,9 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                 check(d && d.width >= DESKTOP_MIN_CONTAINER,
                     app + ' @' + w + 'px: ខ្លឹមសារប្រើទទឹងយ៉ាងតិច ' + DESKTOP_MIN_CONTAINER + 'px',
                     d ? 'ឃើញ ' + d.width + 'px — App នៅជាជួរឈរទទឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
-                check(d && shape[412].rows > 0 && d.rows < shape[412].rows,
-                    app + ' @' + w + 'px: កាតបត់ជាជួរឈរច្រើន (' + (shape[412] ? shape[412].rows : '?') + ' ➜ ' + (d ? d.rows : '?') + ' ជួរដេក)',
-                    d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' ដដែលនឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
+                check(d && d.cards > 1 && d.cards >= shape[412].cards && d.rows < d.cards,
+                    app + ' @' + w + 'px: កាតបត់ជាជួរឈរច្រើន (កាត ' + (d ? d.cards : '?') + ' ➜ ' + (d ? d.rows : '?') + ' ជួរដេក)',
+                    d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' (ជួរឈរតែមួយ)' : 'វាស់មិនបាន');
             }
         }
         // ⛔ ការគ្រប់គ្រងក្នុងប្រអប់ ៖ `min-height: 46px` របស់កំណែ 2.22.2 ត្រូវ

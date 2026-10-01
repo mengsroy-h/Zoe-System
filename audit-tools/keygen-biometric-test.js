@@ -131,6 +131,7 @@ const PIN = '482913';
 const HASH = 'pbkdf2:' + nodeCrypto.createHash('sha256').update('zoekeygen_pin_verify_v1|' + PIN).digest('hex');
 const KEY = (realDecl('BIOMETRIC_STORAGE_KEY').match(/'([^']+)'/) || [])[1] || '?';
 const flush = () => new Promise((r) => setImmediate(r));
+const until = async (cond, ms = 8000) => { const end = Date.now() + ms; while (!cond() && Date.now() < end) await new Promise((r) => setTimeout(r, 10)); };
 
 (async () => {
     console.log('-- ១. ចង (PRF ពិត) · ⛔ គ្មាន PRF ➜ បដិសេធ --');
@@ -156,7 +157,7 @@ const flush = () => new Promise((r) => setImmediate(r));
     let u = build({ storage: { zoew_security_pin_hash: HASH, [KEY]: enrolled, zoew_pin_fail_count: '3' } });
     u.ctx.requestPinBeforeConfig(u.ctx.openConfigModal, 'x');
     await flush(); await flush(); await flush();
-    for (let i = 0; i < 10 && !u.log.targets.length; i++) await flush();
+    await until(() => u.log.targets.length > 0);
     ok('PIN modal បើក ➜ ស្កេនស្វ័យប្រវត្តិ ➜ targetAction ទទួល PIN · modal បិទ · fail count លុប',
         u.log.gets >= 1 && u.log.targets.length === 1 && u.log.targets[0][1] === PIN && u.log.closed.includes('pinModal') && !u.store.has('zoew_pin_fail_count'), u.log);
     ok('សោ Session របស់ Signing Key ដេរីវេពី PIN ដដែល', vm.runInContext('signingKeySessionKey && signingKeySessionKey.derivedFrom', u.ctx) === PIN);

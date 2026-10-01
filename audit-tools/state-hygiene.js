@@ -60,6 +60,7 @@ const ACCEPTED = {
         searchTimer: 'debounce timer, no user data',
         isVerifyingPin: 'reset by the PIN flow itself',
         configQrReader: 'torn down by closeConfigQrScanner',
+        configQrImageSeq: 'ជំនាន់នៃការឌិកូដ QR ពីរូបភាព — លេខរាប់ឡើងសុទ្ធ (គ្មានទិន្នន័យ) ៖ ការរស់រានក្រោយចាកចេញធ្វើឲ្យការឌិកូដចាស់ដែលកំពុងហោះ **មិនត្រូវ** បំពេញប្រអប់ (ការ reset វិញនឹងបើកវាឡើងវិញ)',
         configQrScanActive: 'reset by closeConfigQrScanner',
         lookupLockedNoticeShown: 'one-shot notice flag, no user data',
         autoLookupLastFailedAt: 'cooldown timestamp, no user data',

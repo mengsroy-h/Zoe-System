@@ -66,6 +66,16 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
         echo "*** FAIL *** ត្រូវការ dependency របស់ ZoeW (vite · acorn · playwright-core) — រត់ ៖ npm ci --prefix ZoeW"
         exit 1
     fi
+    # ⛔ root វាស់ (`ZoeW/dist-audit`) ចែករំលែកក្នុងមួយ repo ៖ build ទី ២ (run-all ឬ `ZOE_MEASURE_ONLY=1`) **លុបវា**
+    #    ពីក្រោម checker ដែលកំពុងរត់ ➜ ការធ្លាក់ចៃដន្យ ➜ សោក្នុង git-dir កាន់ពេញការរត់ (fd 9 ឆ្លង `exec`)
+    RUNALL_LOCK="$(git rev-parse --absolute-git-dir 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}")/zoe-runall-measure.lock"
+    if command -v flock >/dev/null 2>&1 && exec 9>"$RUNALL_LOCK"; then
+        if ! flock -n 9; then
+            echo "*** FAIL *** run-all.sh ឬ ZOE_MEASURE_ONLY កំពុងរត់លើ repo នេះរួចហើយ — build វាស់ម្តងទៀតនឹងលុប root វាស់ពីក្រោមវា"
+            echo "    ➜ រង់ចាំវាចប់ ឬរត់លើច្បាប់ចម្លង repo (សោ ៖ $RUNALL_LOCK)"
+            exit 2
+        fi
+    fi
     echo "== ZoeW React ៖ build វាស់ពីប្រភពពិត (ZoeW/dist-audit) =="
     zoe_build_audit "$REPO" || exit 1
     MEASURE="$REPO/ZoeW/dist-audit/measure-root"

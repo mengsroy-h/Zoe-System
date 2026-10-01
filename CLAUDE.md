@@ -198,7 +198,10 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
    **កូដ (ឈ្មោះអថេរ/function) នៅជាភាសាអង់គ្លេសដដែល**។ ⛔ **អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ** ➜ ពាក្យថៃដែល
    លាយចូលរអិលកាត់ភ្នែក (វាកើតពិតក្នុងការសន្ទនា) ➜ `doc-scope-test` ធ្លាក់ពេលមានអក្សរថៃក្នុងឯកសារអត្ថបទណាមួយនៃ repo (រួម
    `ZoeW/src/**`) · ⛔ កុំសរសេរឧទាហរណ៍ជាអក្សរថៃ សូម្បីក្នុង comment។ ⛔ **អត្ថបទក្នុង App** (`index.html` · `guide.html` · សារ) សរសេរតែ
-   «វាដើរបែបនេះ» — កុំប្រៀបធៀបនឹងប្រព័ន្ធចាស់ (ឧ. «គ្មាន Firebase Project · Rules … ទៀតទេ») (សំណើម្ចាស់គម្រោង · 📝 គ្មានអ្នកយាម)។
+   «វាដើរបែបនេះ» — កុំប្រៀបធៀបនឹងប្រព័ន្ធចាស់ (ឧ. «គ្មាន Firebase Project · Rules … ទៀតទេ») ហើយ **កុំនិយាយពីអ្វីដែលលែងមាន ឬធ្លាប់ដក**
+   («ប៊ូតុង…លែងមានទៀតហើយ» · «(មុននេះ…)» · «ដូចមុន» · «លែងបាំង…ទៀតហើយ») — រួមទាំង **កំណត់ចំណាំកំណែក្នុង 🔔** (`announcements.json`) ៖ ពិពណ៌នា
+   មុខងារ/ឥរិយាបថថ្មីជាបច្ចុប្បន្នកាល (សំណើម្ចាស់គម្រោង)។ អ្នកយាម ៖ `doc-scope-test` (សៀវភៅ · HTML ទាំង ២ App · JSX · កំណត់ចំណាំកំណែ ·
+   សារក្នុងកូដ ៖ ហាមតែការប្រៀបនឹងកំណែ/ប្រព័ន្ធមុន ព្រោះ «កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ» ជាស្ថានភាពទិន្នន័យពិត)។
 ៨. **រាល់ជុំ audit ដែលប្រែកូដ ship ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស · តែ App ដែលកែពិត — ច្បាប់ ៦) —
    **និងត្រូវបន្ថែមផ្នែកថ្មីក្នុង [`docs/HISTORY.md`](docs/HISTORY.md) ផ្នែក ១
    ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។ ⛔ ជុំដែលប្រែតែ `audit-tools/` ឬឯកសារ ➜
@@ -386,7 +389,7 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | ទម្រង់បង្ហាញ | អះអាង **២ ខាង** (មិនលើស **និង** មិនច្របាច់) | `layout-check` · `fluid-type-focus-test` |
 | **អថេរ CSS ដែលមិនប្រកាស** | ⛔ `var(--x)` គ្មាន `--x` ➜ **ច្បាប់ទាំងមូលស្លាប់ស្ងាត់ៗ** (មិនមែនត្រឹមពណ៌) | `css-var-test` |
 | **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
-| Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»; success នៃ write ត្រូវក្រោយ durable commit មិនមែន optimistic UI | `toast-truth-test` · `toast-action-truth-test` |
+| Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»; success នៃ write ត្រូវក្រោយ durable commit មិនមែន optimistic UI · ⛔ toast បណ្តាញរស់ (`noteConnectionTransition` ៖ ភ្ជាប់ ➜ ក្រៅបណ្ដាញ ពេលចូលប្រព័ន្ធ) ជាធាតុ **តែមួយ** ដែលប្តូរខ្លួនឯង · ✅ តែពេល listener ទាំងអស់ស្រស់ · grace «កំពុងភ្ជាប់» · មិនដែលភ្ជាប់តាំងពីបើក · toast ចូលប្រព័ន្ធ/Config រស់រួច ➜ គ្មាន toast | `toast-truth-test` · `toast-action-truth-test` · `ZoeW/tests/network-toast.test.tsx` |
 | helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
 | **តក្កវិជ្ជាដដែលក្នុងឯកសារតែមួយ** | ⛔ រូបមន្តតែមួយមិនត្រូវរស់នៅ ២ កន្លែង — ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **២ ច្បាប់ផ្ទុយគ្នាក្នុងកូដតែមួយ** (ច្បាប់ ១២ តែលើ *កូដ*)។ ⛔ **checker រាយ ≠ «ត្រូវលុប»** — «អក្សរដូចគ្នា តែមុខងារខុសគ្នា» ជារឿងពិត ➜ មុនរួបរួម ត្រូវវាស់ **អថេរសេរី** (helper ដែលអានតែ parameter + function ថ្នាក់កំពូល ទើបសុវត្ថិភាព) រួច **រក្សាភាពខុសគ្នាជា parameter ឬទុកនៅកន្លែងហៅ** មិនមែនលុបវា។ ⛔ **ការស្កេនតាមអក្សរខកខានពាក់កណ្តាល** — វាស់បាន (2.30.2) ៖ រូបមន្តលុយរស់នៅ **១១ កន្លែង** ខណៈ detector អក្សរចាប់បានតែ **៥**; ៦ ទៀតខុសត្រឹមឈ្មោះ parameter/array ➜ ត្រូវការ detector **រចនាសម្ព័ន្ធ** ដែល **រក្សាឈ្មោះ property** (`.cod` ≠ `.dod`) | `code-duplication-test` |
 | `fb.X` ដែល loader មិន export | `undefined` ស្ងាត់លើផលិតកម្ម | `sdk-surface` |
@@ -489,11 +492,11 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | កំហុស runtime ពេល boot (App ពិតក្នុង Chromium) | `boot-runtime.js` |
 | អន្តរកម្ម UI ជម្រៅ + ការប្រណាំងឧបករណ៍ច្រើន + ផ្លូវបរាជ័យ | `ui-flow-test.js` |
 | រចនាសម្ព័ន្ធទំព័រ/របា Slide/Locker/លុបទាំងអស់ | `page-nav-test.js` |
-| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង** | `layout-check.js` |
+| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង**  · **toast ឈរខាងលើរបា Tab ZoeKeyGen** (ធរណីមាត្រពិត)| `layout-check.js` |
 | រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) · **record ខ្លួនវាមិនមែន object** (ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `$itemId` ➜ callback `onValue` បោះ ➜ ប្រវត្តិ/ធុងសំរាមងាប់ «វាស់មិនបាន» គ្រប់ឧបករណ៍ ➜ `rawSnapshotToItemList()` រំលង + Sentry `zone: 'data'`) | `field-shape-test.js` · rules ៖ `rules-duplicate-keys.js` · `emu/crud-rules-flow.js` (០ខ) · `emu/license-seat-rules-test.js` (១៣) |
 | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `revenue-fuzz-test.js` |
 | ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |
-| ដំណើរការនៅទិន្នន័យធំ · **ស៊ុមពេលស្ងៀម** (animation `infinite` ពេល App ស្ងៀម ➜ LTPO 10–120Hz ចុះ Hz មិនបាន ៖ រាប់ **DrawFrame** (compositor) **និង BeginMainThreadFrame** (paint · ពណ៌) — DrawFrame តែម្យ៉ាងខ្វាក់ចំពោះ animation ពណ៌ · seed មានជួរដេក «ខលម្តងទៀត» · probe ទិសផ្ទុយម្នាក់ៗ) | `perf-check.js` |
+| ដំណើរការនៅទិន្នន័យធំ · **ស៊ុមពេលស្ងៀម** (animation `infinite` ពេល App ស្ងៀម ➜ LTPO 10–120Hz ចុះ Hz មិនបាន ៖ រាប់ **DrawFrame** (compositor) **និង BeginMainThreadFrame** (paint · ពណ៌) — DrawFrame តែម្យ៉ាងខ្វាក់ចំពោះ animation ពណ៌ · seed មានជួរដេក «ខលម្តងទៀត» · probe ទិសផ្ទុយម្នាក់ៗ)  · ZoeKeyGen ៖ អេក្រង់ចូល + ផ្ទាំងការងារ ០ ស៊ុមពេលស្ងៀម ដូចគ្នា | `perf-check.js` |
 | ការសរសេរធម្មតារបស់ App ដែល **rules ពិត** បដិសេធ (fake SDK ទទួលគ្រប់យ៉ាង) | `emu/app-writes-rules-test.js` |
 | Setup Link៖ ZoeKeyGen encode ↔ App decode | `setup-link-roundtrip-test.js`, `setup-link-browser-test.js` |
 | កាយវិការអូស + auto pull up នៃប្រអប់ស្វែងរក | `phone-search-swipe-test.js` |
@@ -602,7 +605,7 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | ការប្រណាំងនៃការស្តារ · claim របស់ «លុបទាំងអស់» | `restore-race-test.js` · `clear-history-claim-test.js` |
 | fence នៃ finalization (⚠️ **គំរូ rules សរសេរដោយដៃ** — មិនឃើញការឃ្លាតពី rules ពិត; អ្នកចាប់ពិតគឺ `emu/restore-deadlock-test.js`) | `restore-finalization-fence-test.js` · `clear-history-finalization-fence-test.js` |
 | Secret របស់ Lookup API សល់ជាអក្សរធម្មតា | `lookup-config-secret-test.js` |
-| ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen; Extend/Revoke ចាប់យក Key និង database មុន await ហើយ callback ត្រូវនៅក្នុងវគ្គដដែល | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` |
+| ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen; Extend/Revoke ចាប់យក Key និង database មុន await ហើយ callback ត្រូវនៅក្នុងវគ្គដដែល · Signing Key ផុតពីសតិក្រោយទុកចោល (`SIGNING_KEY_IDLE_MS` · `elapsedSince` ➜ ថយក្រោយ ➜ ដក) · ក្រយៅដៃ/មុខ ៖ **WebAuthn PRF តែប៉ុណ្ណោះ** (គ្មាន PRF ➜ មិនរក្សា PIN) · PIN ស្រាយ ➜ ផ្ទៀង hash · ប្តូរ PIN ➜ លុបការចង | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` |
 | បញ្ជី Key បង្ហាញ revoked/expired ត្រឹមត្រូវ និងទទួល Firebase key `__proto__`/`constructor`/`toString` ដោយមិនប៉ះ prototype | `keylist-consistency-test.js` |
 | **ដំណឹងពីអ្នកលក់ (ZoeKeyGen ➜ ZoeW)** ៖ ZoeKeyGen ផ្ញើអ្វីដែល rules បដិសេធ (ព្រំដែនឃ្លាតរវាង `app.js` ↔ `index.html` ↔ rules) · toast ✅ មុន commit · ការផ្ញើព្យួររាយ «មិនបាន» ខណៈវា commit យឺត ➜ ដំណឹងស្ទួន · XSS ក្នុងបញ្ជីដំណឹង | `keygen-notice-test.js` |
 | **Push ៖** ការអ៊ិនគ្រីប Web Push ខុស (ឧបករណ៍ឌិគ្រីបមិនបាន) · ផ្ញើស្ទួនពេល cron និង kick ស្របគ្នា · ផ្ញើដំណឹងចាស់ទាំងអស់ពេលដាក់មុខងារដំបូង · Key ដែល Revoke នៅទទួល · endpoint ក្លែង (SSRF) · APK គ្មាន FCM គាំង · ការសុំសិទ្ធិក្រោយ `await` (iPhone បដិសេធស្ងាត់) · កាលវិភាគផុតកំណត់លេចលេខទូរស័ព្ទ | `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/push-client.test.tsx` |
@@ -1438,6 +1441,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   វាយ PIN ពិតជាមុនជានិច្ច; PIN ដែលស្រាយចេញ **ត្រូវផ្ទៀងផ្ទាត់នឹង
   `zoew_security_pin_hash` មុនទុកចិត្ត**; ការប្តូរ PIN ➜ លុបការចងចាស់។
   `completePinUnlock()` ជា **ផ្លូវជោគជ័យតែមួយ** សម្រាប់ទាំង PIN និងជីវមាត្រ។
+  ⛔ **ZoeKeyGen ទទួលតែ WebAuthn PRF** (មិនមានរបៀប «device» ដែលរក្សា PIN ក្នុង storage) ➜ ឧបករណ៍គ្មាន PRF ➜ «មិនគាំទ្រ» (`keygen-biometric-test`)។
 - **`linkIsFrugal()` ត្រូវ *fail open*** (Safari គ្មាន API នេះ) ហើយរំលងតែការងារ
   **ស្រេចចិត្ត** — ⛔ កុំរំលងការងារចាំបាច់តាមវា។
 - ⛔ **JavaScript អនុញ្ញាត declaration ឈ្មោះស្ទួន ហើយ function ក្រោយសរសេរជាន់
@@ -2072,6 +2076,9 @@ lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំ�
 `RUNALL_RESUME=1` **ជាមួយទង់ `*_STRICT` ដដែល** (វាចូល hash) ➜ រត់តែ checker ដែលធ្លាក់ ឬគ្មានលទ្ធផល ⛔ **កុំផ្គុំ log ដោយដៃ**។
 ⛔ tree ប្រែ (ឯកសារណាមួយ · ទង់ STRICT) ➜ RESUME **បដិសេធ** ៖ លទ្ធផលចាស់មិនមែនភស្តុតាងរបស់ tree ថ្មី ➜ រត់ពេញ។
 ⛔ `RUNALL_ONLY=…` និង `RUNALL_SHARD=k/n` = **«មិនពេញលេញ»** — មិនមែនភស្តុតាងថា tree បៃតង (សេចក្តីសង្ខេបមិនរាយ «ជោគជ័យទាំងអស់» ទេ · tree បៃតងតែពេលផ្នែកទាំង n បៃតង)។
+⛔ **run-all មួយក្នុងមួយ repo** ៖ root វាស់ (`ZoeW/dist-audit`) ចែករំលែក ➜ ការរត់ទី ២ ឬ `ZOE_MEASURE_ONLY=1` ខណៈវាកំពុងរត់ ➜ **exit 2** (សោ
+`<git-dir>/zoe-runall-measure.lock`) — បើអត់ build ថ្មីលុប root វាស់ពីក្រោម checker ដែលកំពុងរត់ ➜ ការធ្លាក់ចៃដន្យ ➜ ចង់វាស់ស្របគ្នា ៖ ច្បាប់ចម្លង repo
+(`tar` ដោយដក `node_modules` · `dist-audit` រួច symlink `node_modules`) ហើយរត់ `ZOE_MEASURE_ONLY=1` ក្នុងច្បាប់ចម្លង។
 ⛔ checker ថ្មីដែលប្រើ emulator ឬសរសេរ/បោស `.tmp-poison-*` ត្រូវចូល lane `emu`/`excl` ក្នុង `runall_lane()` —
 `runall-runner-test` ធ្លាក់បើភ្លេច។ ⛔ `RUNALL_JOBS=1` ផ្តល់លំដាប់ជាជួរដូចមុន (សម្រាប់ដេញតាមការធ្លាក់ដែលសង្ស័យថាមកពីការរត់ស្របគ្នា)។
 
@@ -2283,6 +2290,9 @@ bash audit-tools/emu/rules.sh
   (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
   (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
   (៤) `firebase-loader.js` នៅទាញ SDK Firebase ទោះ Config ជា Supabase (~150 KB) · chunk `supabase-backend` ចូលសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។
+- ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 (branch `claude/stoic-bell-duxgyy` ៖ មិនទាន់ merge)** — Deploy site ទាំង ២ (header COOP ថ្មី) ➜ សាកលើឧបករណ៍ពិត ៖
+  ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
+  ZoeKeyGen ៖ Tab ទូរស័ព្ទ · ក្រយៅដៃ/មុខ (PRF ៖ Chrome/Edge ថ្មី · Safari 18+) · Signing Key ផុត ១៥ នាទី (លម្អិត ៖ `docs/HISTORY.md` [2.47.0])។
 - ⏳ **សំណើម្ចាស់គម្រោង ៖ «ពេល Supabase រួចសព្វគ្រប់ លុបឯកសារ Firebase ដែលលែងប្រើ»** — ⛔ **កុំលុបមុនលក្ខខណ្ឌទាំងអស់ពិត** ៖ Supabase
   deploy · សាកលើឧបករណ៍ពិត · CLI ផ្ទេរទិន្នន័យ (ចំណុចបើក ៣) · **អតិថិជន Firebase ចុងក្រោយផ្ទេររួច** (លុយពិត) · ម្ចាស់គម្រោងបញ្ជាក់។ ពេលនោះ
   ⛔ **ត្រូវរក្សា** ៖ `firebase-database.rules.json` (ប្រភព rules របស់ Supabase) · License Project/`license-verify.js`/`ZoeKeyGen/firebase-*`

@@ -393,6 +393,54 @@ function seedBig(n) {
         await idleCtx.close();
         server.close();
     }
+
+    // ⛔ ZoeKeyGen ក៏ត្រូវស្ងៀម ០ ស៊ុម ដូច ZoeW (LTPO 10–120Hz) — ទាំងអេក្រង់ចូល និងផ្ទាំងការងារ (Tab លើទូរស័ព្ទ) ·
+    //    probe ទិសផ្ទុយ ៖ animation infinite ដែលចាក់ចូល ➜ ត្រូវឃើញស៊ុម (បើមិនឃើញ ការវាស់ខូច)
+    {
+        const app = 'ZoeKeyGen';
+        console.log('\n=== ' + app + ' (ស៊ុមពេលស្ងៀម) ===');
+        const server = await serve(path.join(ROOT, app));
+        const port = server.address().port;
+        const kctx = await browser.newContext({ viewport: { width: 412, height: 780 }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
+        const kpage = await kctx.newPage();
+        await kpage.route('**', (r) => (r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort()));
+        await kpage.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'load', timeout: 30000 });
+        const frames = async (ms) => {
+            await browser.startTracing(kpage, { categories: ['disabled-by-default-devtools.timeline.frame', 'devtools.timeline', 'viz'] });
+            await kpage.waitForTimeout(ms);
+            const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
+            return { draw: ev.filter((e) => e.name === 'DrawFrame').length, main: ev.filter((e) => e.name === 'BeginMainThreadFrame').length };
+        };
+        const running = () => kpage.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x'));
+        await kpage.waitForTimeout(5000);
+        const loginIdle = await frames(3000);
+        const loginRunning = await running();
+        await kpage.evaluate(() => {
+            document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+            const box = document.getElementById('appContainer');
+            if (box) box.classList.remove('hidden');
+        });
+        const tabVisible = await kpage.evaluate(() => { const b = document.getElementById('kgTabBar'); return !!b && getComputedStyle(b).display !== 'none'; });
+        await kpage.waitForTimeout(2000);
+        const appIdle = await frames(3000);
+        const appRunning = await running();
+        const kprobe = await kpage.addStyleTag({ content: '.status-dot{animation:zoeKgProbe 1s linear infinite!important}@keyframes zoeKgProbe{to{transform:rotate(360deg)}}' });
+        await kpage.waitForTimeout(200);
+        const probeIdle = await frames(2000);
+        await kprobe.evaluate((el) => el.remove());
+        console.log('    ចូល ៖ ' + JSON.stringify(loginIdle) + ' ' + JSON.stringify(loginRunning) + ' · ផ្ទាំងការងារ ៖ ' + JSON.stringify(appIdle) + ' ' +
+            JSON.stringify(appRunning) + ' · probe ៖ ' + JSON.stringify(probeIdle));
+        if (!REPORT) {
+            check(tabVisible, app + ': ស្ងៀម ៖ លក្ខខណ្ឌចាំបាច់ — ផ្ទាំងការងារ + របា Tab ទូរស័ព្ទបង្ហាញ', String(tabVisible));
+            check(probeIdle.draw >= 30, app + ': ស្ងៀម ៖ probe ទិសផ្ទុយ — animation ដែលចាក់ចូលត្រូវឃើញ DrawFrame', JSON.stringify(probeIdle));
+            check(loginIdle.draw <= 3 && loginIdle.main <= 3 && loginRunning.length === 0,
+                app + ': ⛔ អេក្រង់ចូលស្ងៀម មិនគូរស៊ុម (LTPO ចុះល្បឿនបាន)', JSON.stringify(loginIdle) + ' running=' + JSON.stringify(loginRunning));
+            check(appIdle.draw <= 3 && appIdle.main <= 3 && appRunning.length === 0,
+                app + ': ⛔ ផ្ទាំងការងារស្ងៀម មិនគូរស៊ុម (LTPO ចុះល្បឿនបាន)', JSON.stringify(appIdle) + ' running=' + JSON.stringify(appRunning));
+        }
+        await kctx.close();
+        server.close();
+    }
     await browser.close();
     if (REPORT) { console.log('\n(របាយការណ៍តែប៉ុណ្ណោះ)'); process.exit(0); }
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));

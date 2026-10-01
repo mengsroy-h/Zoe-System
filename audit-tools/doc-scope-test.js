@@ -1021,5 +1021,76 @@ check(siteOffenders.length === 0,
         'រកឃើញ ' + hits.length + ' ជួរ ៖\n        ' + hits.slice(0, 10).join('\n        '));
 })();
 
+// ════════════════════════════════════════════════════════════════════════
+// ⛔ អត្ថបទក្នុង App មិននិយាយពីអ្វីដែល «លែងមាន» ឬ «ធ្លាប់ដក» (ច្បាប់ ៧ · សំណើម្ចាស់គម្រោង ៖ «ក្នុង App ទាំងអស់កុំ mention អ្វីដែលលែងមាន
+//    អ្វីដែលធ្លាប់ដក») ➜ សរសេរតែ «វាដើរបែបនេះ» (បច្ចុប្បន្នកាល)។ វាស់បាន ៖ កំណត់ចំណាំកំណែក្នុង 🔔 រាយ «លែងបាំងរបា…ទៀតហើយ» ·
+//    «(មុននេះបៃតងជាប់…)» · «ដូចមុន» ហើយសៀវភៅរាយ «ប៊ូតុងដកដោយដៃ…លែងមានទៀតហើយ» ខណៈច្បាប់ ៧ ជា 📝 (គ្មានអ្នកយាម)។
+//    ⛔ ជាន់ ២ ៖ អត្ថបទឋិតិវន្ត (សៀវភៅ · HTML · កំណត់ចំណាំកំណែ) ហាមពាក្យ «អតីតកាល» ទាំងអស់; សារក្នុងកូដ (toast/alert) ហាមតែការប្រៀប
+//    ធៀបនឹងកំណែ/ប្រព័ន្ធមុន — «កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ» ជា **ស្ថានភាពទិន្នន័យពេលនោះ** (ឧបករណ៍ផ្សេងលុប) មិនមែនមុខងារដែលដក។
+// ════════════════════════════════════════════════════════════════════════
+(function inAppTextTense() {
+    // ⛔ «លែង» នៅក្នុង «កន្លែង» (ន្ + លែង) ➜ lookbehind `(?<!្)` · «លែងដៃ» (ទាញ PTR) ជាពាក្យធម្មតា ➜ មិននៅក្នុងបញ្ជី
+    const STATIC_RE = /មុននេះ|ដូចមុន|ជាងមុន|ពីមុន|កំណែមុន|កំណែចាស់|ប្រព័ន្ធចាស់|ទៀតហើយ|ឈប់ប្រើ|ដកចេញរួច|(?<!្)លែង(?:មាន|ប្រើ|រត់|លិច|ជាប់|ស៊ី|វាស់|បាំង)/;
+    // ⛔ សារក្នុងកូដ ៖ «ពីមុន» · «ដូចមុនវិញ» · «លែងប្រើបាន» ពិពណ៌នា **ព្រឹត្តិការណ៍ ឬផលវិបាកពេលនោះ** (ការសម្អាតដែលត្រូវរំខានពីមុន ·
+    //    ការចងក្រយៅដៃចាស់ក្រោយប្តូរក្រយៅដៃ · ឧបករណ៍លើសពិដាន) ➜ ហាមតែការប្រៀបនឹងកំណែ/ប្រព័ន្ធមុន
+    const CODE_RE = /មុននេះ|កំណែមុន|កំណែចាស់|ប្រព័ន្ធចាស់|ដកចេញរួច/;
+    const first = (cands) => cands.map((c) => path.join(ROOT, c)).find((f) => fs.existsSync(f)) || '';
+    const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (e) { return ''; } };
+    const htmlText = (src) => src.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, '\n');
+    const literals = (src) => (src.match(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g) || []);
+    const walkFiles = (dir, re) => {
+        const out = [];
+        (function w(d) {
+            let ents = [];
+            try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+            ents.forEach((e) => {
+                const f = path.join(d, e.name);
+                if (e.isDirectory()) { if (e.name !== 'node_modules') w(f); } else if (re.test(e.name)) out.push(f);
+            });
+        })(dir);
+        return out;
+    };
+    const hits = [];
+    const scanText = (label, text, re) => text.split('\n').forEach((line, i) => {
+        const m = re.exec(line);
+        if (m) hits.push(label + ':' + (i + 1) + ' «' + m[0] + '» ' + line.trim().slice(0, 70));
+    });
+    const sources = [];
+    const guide = first(['ZoeW/public/guide.html', 'ZoeW/guide.html']);
+    const notes = first(['ZoeW/public/announcements.json', 'ZoeW/announcements.json']);
+    const kgHtml = first(['ZoeKeyGen/index.html']);
+    if (guide) { sources.push(guide); scanText(path.relative(ROOT, guide), htmlText(read(guide)), STATIC_RE); }
+    if (kgHtml) { sources.push(kgHtml); scanText(path.relative(ROOT, kgHtml), htmlText(read(kgHtml)), STATIC_RE); }
+    let noteItems = 0;
+    if (notes) {
+        sources.push(notes);
+        let parsed = null;
+        try { parsed = JSON.parse(read(notes)); } catch (e) {}
+        const items = (parsed && Array.isArray(parsed.items)) ? parsed.items : [];
+        noteItems = items.length;
+        items.forEach((it) => [it.title, it.body].concat(it.points || []).forEach((t) => {
+            if (typeof t === 'string' && STATIC_RE.test(t)) hits.push(path.relative(ROOT, notes) + ' [' + it.id + '] «' + STATIC_RE.exec(t)[0] + '» ' + t.slice(0, 70));
+        }));
+    }
+    const jsx = walkFiles(path.join(ROOT, 'ZoeW', 'src', 'app', 'components'), /\.tsx$/);
+    const shell = first(['ZoeW/index.shipped.html']);
+    if (jsx.length) jsx.forEach((f) => { sources.push(f); scanText(path.relative(ROOT, f), read(f).replace(/\{[^{}]*\}/g, ' ').replace(/<[^>]+>/g, '\n'), STATIC_RE); });
+    else if (shell) { sources.push(shell); scanText(path.relative(ROOT, shell), htmlText(read(shell)), STATIC_RE); }
+    const codeFiles = walkFiles(path.join(ROOT, 'ZoeW', 'src'), /\.tsx?$/).concat(['ZoeW/app.js', 'ZoeKeyGen/app.js'].map((c) => path.join(ROOT, c)).filter((f) => fs.existsSync(f)));
+    codeFiles.forEach((f) => literals(read(f)).forEach((lit) => {
+        const m = CODE_RE.exec(lit);
+        if (m) hits.push(path.relative(ROOT, f) + ' «' + m[0] + '» ' + lit.slice(0, 80));
+    }));
+    const probeBad = ['សញ្ញាលេចក្រោមរបា Tab មិនបាំងរបាទៀតហើយ', '(មុននេះបៃតងជាប់រាប់នាទី)', 'ប្រអប់នៅតែរីកចុះដូចមុន', 'ជួរដេកលែងរត់ចូលក្រោមរបា', 'ប៊ូតុងដកដោយដៃលែងមាន'];
+    const probeGood = ['ចុចកន្លែងណាក៏បាន', 'រក្សាទុកនៅកន្លែងមានសុវត្ថិភាព', 'ទាញគ្រប់ ➜ លែងដៃដើម្បីផ្ទុក', 'Key នេះ លែងអាច Activate លើគ្រឿងថ្មី'];
+    check(probeBad.every((t) => STATIC_RE.test(t)) && probeGood.every((t) => !STATIC_RE.test(t)),
+        'អត្ថបទក្នុង App ៖ probe ទិសទាំង ២ (ពាក្យអតីតកាលត្រូវចាប់ · «កន្លែង» · «លែងដៃ» · ច្បាប់បច្ចុប្បន្ន មិនចាប់)');
+    check(!!guide && !!kgHtml && !!notes && noteItems >= 5 && codeFiles.length >= 2,
+        'អត្ថបទក្នុង App ៖ ជាន់អប្បបរមា — សៀវភៅ · ZoeKeyGen · កំណត់ចំណាំកំណែ (≥ ៥) · កូដ App ទាំង ២',
+        JSON.stringify({ guide: !!guide, kgHtml: !!kgHtml, notes: noteItems, code: codeFiles.length }));
+    check(hits.length === 0, '⛔ អត្ថបទក្នុង App មិននិយាយពីអ្វីដែលលែងមាន/ធ្លាប់ដក ឬប្រៀបនឹងកំណែមុន (សរសេរ «វាដើរបែបនេះ»)',
+        'រកឃើញ ' + hits.length + ' ៖\n        ' + hits.slice(0, 12).join('\n        '));
+})();
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

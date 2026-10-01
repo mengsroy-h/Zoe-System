@@ -475,9 +475,48 @@ async function sectionSix() {
         { jBad, jOne, j16 });
 }
 
+// ═══ ៨. សោ root វាស់ ៖ build ទី ២ ខណៈ run-all កំពុងរត់ ➜ បដិសេធ (មិនលុប ZoeW/dist-audit ពីក្រោម checker) ═══
+//    វាស់ `run-all.sh` ពិតលើ repo fixture (React ៖ `ZoeW/src/main.tsx` · គ្មាន `ZoeW/app.js`) ៖ សោកាន់ ➜ exit 2 + សារ · សោទំនេរ ➜ ឆ្លងច្រកទ្វារ
+function sectionLock() {
+    console.log('\n=== ៨. សោ root វាស់ (ការរត់ទី ២ ខណៈ run-all កំពុងរត់) ===');
+    if (!fs.existsSync('/usr/bin/flock') && cp.spawnSync('sh', ['-c', 'command -v flock']).status !== 0) {
+        ok('សោ root វាស់ ៖ គ្មាន flock លើម៉ាស៊ីននេះ ➜ run-all រំលងសោ (fail-open)', /command -v flock/.test(runall));
+        return;
+    }
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-runall-lock-'));
+    try {
+        fs.mkdirSync(path.join(repo, 'audit-tools'), { recursive: true });
+        fs.mkdirSync(path.join(repo, 'ZoeW', 'src'), { recursive: true });
+        ['vite', 'playwright-core'].forEach((m) => fs.mkdirSync(path.join(repo, 'ZoeW', 'node_modules', m), { recursive: true }));
+        fs.writeFileSync(path.join(repo, 'ZoeW', 'src', 'main.tsx'), '');
+        fs.copyFileSync(RUNALL, path.join(repo, 'audit-tools', 'run-all.sh'));
+        cp.spawnSync('git', ['init', '-q'], { cwd: repo });
+        const lock = path.join(repo, '.git', 'zoe-runall-measure.lock');
+        const env = Object.assign({}, process.env, { ZOE_MEASURE_ONLY: '1' });
+        Object.keys(env).forEach((k) => { if (/^(RUNALL_|ZOE_MEASURE_ROOT|ZOE_REPO_ROOT)/.test(k)) delete env[k]; });
+        const holder = cp.spawn('bash', ['-c', 'exec 9>"$1"; flock 9; exec sleep 30', '_', lock], { stdio: 'ignore' });
+        const until = Date.now() + 5000;
+        while (Date.now() < until && cp.spawnSync('flock', ['-n', lock, 'true']).status === 0) cp.spawnSync('sleep', ['0.1']);
+        const held = cp.spawnSync('bash', ['audit-tools/run-all.sh'], { cwd: repo, env, encoding: 'utf8', timeout: 30000 });
+        holder.kill('SIGKILL');
+        const freeUntil = Date.now() + 5000;
+        while (Date.now() < freeUntil && cp.spawnSync('flock', ['-n', lock, 'true']).status !== 0) cp.spawnSync('sleep', ['0.1']);
+        const free = cp.spawnSync('bash', ['audit-tools/run-all.sh'], { cwd: repo, env, encoding: 'utf8', timeout: 30000 });
+        ok('សោកាន់ (run-all មួយទៀតកំពុងរត់) ➜ build ទី ២ បដិសេធ exit 2 មុនប៉ះ ZoeW/dist-audit',
+            held.status === 2 && /កំពុងរត់លើ repo នេះរួចហើយ/.test(held.stdout || ''),
+            JSON.stringify({ status: held.status, out: String(held.stdout || '').slice(0, 200) }));
+        ok('ទិសផ្ទុយ ៖ សោទំនេរ ➜ ឆ្លងច្រកទ្វារទៅ build (មិនបដិសេធខុស)',
+            !/កំពុងរត់លើ repo នេះរួចហើយ/.test(free.stdout || '') && /build វាស់ពីប្រភពពិត/.test(free.stdout || ''),
+            JSON.stringify({ status: free.status, out: String(free.stdout || '').slice(0, 200) }));
+    } finally {
+        fs.rmSync(repo, { recursive: true, force: true });
+    }
+}
+
 (async () => {
     await sectionFive();
     await sectionSix();
+    sectionLock();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exitCode = fail ? 1 : 0;
 })().catch((error) => {

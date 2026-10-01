@@ -75,6 +75,9 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
   ចុងក្រោយ ហើយតែពេលប្រអប់នៅបើក (`configQrImageSeq`)។
 - 🐛 **ZoeKeyGen ទូរស័ព្ទ ៖ toast លិចក្រោមរបា Tab** — ច្បាប់ `@media` ឈរ **មុន** ច្បាប់មូលដ្ឋាន `.toast-container` ➜ ស្លាប់ស្ងាត់ៗ (រកឃើញដោយ
   `css-media-override` ក្នុង CI ពេញ — ការរត់ checker តែមួយផ្នែកមិនបានរត់វា) ➜ ផ្លាស់ក្រោយច្បាប់មូលដ្ឋាន។
+- **អត្ថបទក្នុង App** (សំណើម្ចាស់គម្រោង ៖ «ក្នុង App ទាំងអស់កុំ mention អ្វីដែលលែងមាន អ្វីដែលធ្លាប់ដក») — កំណត់ចំណាំកំណែក្នុង 🔔
+  (2.43.0–2.47.0) សរសេរឡើងវិញជាបច្ចុប្បន្នកាល (ដក «លែង…ទៀតហើយ» · «(មុននេះ…)» · «ដូចមុន» · «ជាងមុន» · «logo ថ្មី») · សៀវភៅ ៖ «ប៊ូតុងដកដោយដៃ…លែងមាន
+  ទៀតហើយ» ➜ «ការដក Barcode ធ្វើតាមរបៀប «ស្កេនដកកញ្ចប់» នេះ»។
 - **សុវត្ថិភាព (App ទាំង ២)** ៖ Sentry លាក់ `invite` · `reset_code` (កូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ក្នុង URL ឬ breadcrumb) · វាល Setup Link ក្នុងបញ្ជីសម្អាតពេល
   ចាកចេញ · header `Cross-Origin-Opener-Policy: same-origin` (ទំព័រផ្សេងដែលបើក App ក្នុងបង្អួចថ្មី ចាប់ `window.opener` មិនបាន)។
 
@@ -91,6 +94,15 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
   `keygen-session-security-test` ៖ សារផុតពីសតិប្រាប់ផ្លូវពិត (PIN ឬ Load ➜ កូដចាស់ធ្លាក់)។
 - ជួសជុលអ្នកយាម ៖ `network-pressure-test` ដេរីវេ helper ដែលអានវាល Config (`configInputText()`) ជំនួសការចាក់អក្សរ (probe ៖ ដកការអាន ➜ ធ្លាក់) ·
   `clock-hygiene` បញ្ជីអនុញ្ញាតត្រាសកម្មភាព Signing Key (local · fail-closed) · `run-all.sh` baseline + `keygen-biometric-test` (checker-coverage)។
+- ថ្មី ៖ `doc-scope-test` «អត្ថបទក្នុង App មិននិយាយពីអ្វីដែលលែងមាន/ធ្លាប់ដក» (សៀវភៅ · HTML ទាំង ២ App · JSX · កំណត់ចំណាំកំណែ · សារក្នុងកូដ ៖ ជាន់តូចជាង
+  ព្រោះ «កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ» ជាស្ថានភាពទិន្នន័យពិត · probe ៖ អត្ថបទចាស់ ➜ ចាប់ **១៧** · «កន្លែង»/«លែងដៃ» មិនចាប់) · `perf-check` ZoeKeyGen
+  ស្ងៀម ០ ស៊ុម (អេក្រង់ចូល + ផ្ទាំងការងារ · probe ១២០ DrawFrame) — វាស់មុនកែ ៖ ការសង្ស័យ «`.ptr-spinner` infinite គូរស៊ុម» **មិនពិត** ➜ មិនកែ ·
+  `run-all.sh` **សោ root វាស់** (`zoe-runall-measure.lock` · fd ឆ្លង `exec`) ៖ ការរត់ទី ២ ឬ `ZOE_MEASURE_ONLY=1` ខណៈ run-all កំពុងរត់ ➜ exit 2
+  ជំនួសការលុប `ZoeW/dist-audit` ពីក្រោម checker ដែលកំពុងរត់ (`runall-runner-test` ៨ ៖ សោកាន់ ➜ បដិសេធ · ទំនេរ ➜ ឆ្លង) · `state-hygiene` ទទួល
+  `configQrImageSeq` (លេខជំនាន់ គ្មានទិន្នន័យ)។
+- CI ពេញក្នុង session (emulator · `*_STRICT` ទាំង ៥) ៖ ជុំទី ១ ធ្លាក់ **៥** (`css-media-override` ➜ toast ZoeKeyGen លិចក្រោមរបា Tab · `clock-hygiene` ·
+  `repository-file-coverage` · `checker-coverage` · `network-pressure`) — ការរត់ `RUNALL_ONLY` មុននោះ **មិនបានរត់** checker ទាំងនោះ ➜ ជុំទី ២ ធ្លាក់ ១
+  (`state-hygiene`) ➜ ជួសជុលទាំងអស់។
 - Mutation sweep លើការការពារបណ្តាញ/toast ៖ ដក `retryFailedDbListenersNow` ពី `online` ➜ `connection-recovery` · timeout មិន abort ➜ `network-timeout` +
   `network-pressure` · ដកច្រកទ្វារជំនាន់ listener `exchangeRate` ➜ `connection-recovery` · toast ចូលប្រព័ន្ធ ✅ ខណៈកំពុងទាញ ➜ `toast-truth` ➜ **៥/៥ ចាប់**។
 - ពង្រីក ៖ `keygen-session-security-test` (៩៥ ៖ Signing Key ផុតក្រោយ ១៥ នាទីតាមនាឡិកាក្លែង · សកម្មភាពពន្យារ · ខ្សែភ្ជាប់ពិត) · `secret-hygiene` (២២១ ៖ វាល

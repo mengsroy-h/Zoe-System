@@ -288,6 +288,7 @@ export interface UiState {
     updateBannerOpen: boolean;
     sheetImportView: any | null;
     modalDisplay: Record<string, 'flex' | 'none'>;
+    modalStack: string[];
     drawerOpen: boolean;
     notifyDrawerOpen: boolean;
     notifyView: import('../features/notifications').NotifyView | null;
@@ -378,6 +379,7 @@ export const uiState = createStore<UiState>('uiState', {
     updateBannerOpen: false,
     sheetImportView: null,
     modalDisplay: {},
+    modalStack: [],
     drawerOpen: false,
     notifyDrawerOpen: false,
     notifyView: null,
@@ -403,7 +405,7 @@ export const uiState = createStore<UiState>('uiState', {
     chromeBottomVar: '',
 });
 registerStore(uiState);
-uiState.markImmediate(['modalDisplay', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
+uiState.markImmediate(['modalDisplay', 'modalStack', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden']);
 

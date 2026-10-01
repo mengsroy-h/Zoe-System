@@ -1,6 +1,7 @@
 import { commitNow } from './app/flush';
 import { elementOf, type RefName } from './app/refs';
 import { uiState } from './core/state';
+import { noteModalStack } from './core/modals';
 import { annotateActions } from './audit-annotate';
 import { REACT_OWNED_IDS, resetReactOwned } from './app/slot-resets';
 
@@ -104,6 +105,7 @@ function wrapModalStyle(el: HTMLElement): void {
                 if ((uiState.modalDisplay[id] || '') !== want) {
                     const next: Record<string, any> = Object.assign({}, uiState.modalDisplay);
                     if (want) next[id] = want; else delete next[id];
+                    noteModalStack(id, want === 'flex');
                     uiState.modalDisplay = next;
                     commitNow();
                 }

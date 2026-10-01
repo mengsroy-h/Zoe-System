@@ -136,7 +136,7 @@ if (body) {
         '\nif declare -F runall_drain >/dev/null; then runall_drain; fi' +
         '\necho "FAILCOUNT=$fail PASSCOUNT=$pass"\n');
     const env = Object.assign({}, process.env, { RUNALL_JOBS: '2', RUNALL_STATE: '' });
-    delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_TREE_HASH;
+    delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_SHARD; delete env.RUNALL_TREE_HASH;
     const t0 = Date.now();
     try {
         behaviour.out = execFileSync('bash', [harness], { encoding: 'utf8', timeout: 60000, env });

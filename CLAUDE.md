@@ -352,6 +352,7 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | **ការសរសេរ ↔ ការចាកចេញទៅខល** | Retry រក្សា rollback គ្រប់វាល និងជម្រើសថ្មីជាង; callback ចាស់មិនអាចសរសេរ/ដកស្ថិតិ/បង្ហាញសារក្រោយប្ដូរ auth ឬ database | `history-patch-retry-test` |
 | **ការទាញតារាងជាមុន** | ព្យាយាមវិញលឿន **តែមិនបាញ់ចំពេលស្កេន** | `lookup-prefetch-test` |
 | **ស្ថានភាព ↔ ម្ចាស់ប្រអប់** | ⛔ `closeModal()` សម្អាតតែស្ថានភាពរបស់ប្រអប់ **នោះ** (ឬពេលជង់ទទេ) — ប្រអប់ជាន់លើមិនត្រូវលុប Barcode · ការកែលេខ · ការសម្គាល់ខល របស់ប្រអប់ខាងក្រោម | `lookup-prefetch-test` · `ui-flow-test` |
+| **ប្រអប់ជាន់គ្នា** | ⛔ ប្រអប់ដែល **បើកក្រោយគេនៅលើគេ** (រួមការបើកប្រអប់ដែលបើករួច) — `.modal` z-index ស្មើគ្នា ➜ លំដាប់ DOM ឈ្នះ ➜ PIN ពី Config លោតពីក្រោយ ➜ ZoeKeyGen `openModalHelper()` រៀប z-index ឡើងវិញ · ZoeW `uiState.modalStack` ➜ `Modal.tsx` (តែពេល ≥ ២ បើក ➜ parity) · ⛔ កុំតម្រៀបប្រអប់ដោយ z-index ថេរ ឬលំដាប់ DOM | `layout-check` |
 | **Keyboard ↔ ការស្វែងរក** | ⛔ មិនលោតកាត់ខណៈ lookup កំពុងធ្វើការ; ចប់ ➜ មកភ្លាម; ពិដាន ១៥ វិ. (fail-open) | `lookup-prefetch-test` |
 | **អត្តសញ្ញាណនៃការបរាជ័យ Lookup** | ⛔ `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ; សារ Cookie ត្រូវតាម Windows sync tool ➜ Netlify Blobs មិនមែន workflow paste env ចាស់ | `lookup-failure-identity-test` |
 | **ការស្កេនជាបន្តបន្ទាប់** | ⛔ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `lookup-burst-test` |
@@ -492,7 +493,7 @@ Firebase Project · Database · Rules · sign-up បិទ · គណនី ដ�
 | កំហុស runtime ពេល boot (App ពិតក្នុង Chromium) | `boot-runtime.js` |
 | អន្តរកម្ម UI ជម្រៅ + ការប្រណាំងឧបករណ៍ច្រើន + ផ្លូវបរាជ័យ | `ui-flow-test.js` |
 | រចនាសម្ព័ន្ធទំព័រ/របា Slide/Locker/លុបទាំងអស់ | `page-nav-test.js` |
-| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង**  · **toast ឈរខាងលើរបា Tab ZoeKeyGen** (ធរណីមាត្រពិត)| `layout-check.js` |
+| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង**  · **toast ឈរខាងលើរបា Tab ZoeKeyGen** (ធរណីមាត្រពិត) · **ប្រអប់ដែលបើកក្រោយលោតពីក្រោយ** (គ្រប់គូ · App ទាំង ២)| `layout-check.js` |
 | រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) · **record ខ្លួនវាមិនមែន object** (ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `$itemId` ➜ callback `onValue` បោះ ➜ ប្រវត្តិ/ធុងសំរាមងាប់ «វាស់មិនបាន» គ្រប់ឧបករណ៍ ➜ `rawSnapshotToItemList()` រំលង + Sentry `zone: 'data'`) | `field-shape-test.js` · rules ៖ `rules-duplicate-keys.js` · `emu/crud-rules-flow.js` (០ខ) · `emu/license-seat-rules-test.js` (១៣) |
 | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `revenue-fuzz-test.js` |
 | ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |

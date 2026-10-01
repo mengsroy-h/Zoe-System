@@ -365,7 +365,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 #    clone ស្អាត ➜ គ្មាន `<git-dir>/zoe-runall-state.tsv`) និង (២) ជាទម្ងន់ **តែមួយ** នៃការបែងចែក `RUNALL_SHARD`។ ប៉ះតែលំដាប់ ·
 #    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
 #    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
-RUNALL_HINTS="money-guardian-test:292 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
+RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
     ui-flow-test:96 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:68 collected-mirror-fuzz-test:50
     layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:36
     emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
@@ -518,6 +518,9 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     fi
     RUNALL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall.XXXXXX")" || { echo "*** FAIL *** mktemp"; fail=$((fail + 1)); return 1; }
     runall_select || { rm -rf "$RUNALL_DIR"; return 2; }
+    # ⛔ ការជ្រើស (SHARD · ONLY · RESUME) ជារបស់ run-all នេះតែប៉ុណ្ណោះ ៖ checker កូនដែលរត់ម៉ាស៊ីននេះខាងក្នុង (hang-guard ·
+    #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
+    export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
     runall_order
     echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន ${CHECKER_TIMEOUT}s/checker)"
     trap 'runall_abort' INT TERM HUP
@@ -675,7 +678,8 @@ run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-t
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
-run "money-guardian" node audit-tools/money-guardian-test.js
+run "money-guardian 1/2" node audit-tools/money-guardian-test.js --part=1/2
+run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
 run "repository-contract" node audit-tools/repository-contract-test.js

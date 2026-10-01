@@ -63,13 +63,14 @@ let caseNo = 0;
 
 // checker ក្លែង ៖ កត់ «start/end <ឈ្មោះ> <ms> <pid>» ចូល FX_LOG · ដេក ms · បោះពុម្ព out · ចេញ code
 function fixture(dir, rel, opts) {
-    const o = Object.assign({ ms: 0, code: 0, out: ['   ok    ' + rel], hang: false, browser: false }, opts || {});
+    const o = Object.assign({ ms: 0, code: 0, out: ['   ok    ' + rel], hang: false, browser: false, envProbe: false }, opts || {});
     const name = JSON.stringify(rel);
     const lines = [
         "const fs = require('fs');",
         o.browser ? '// ' + BROWSER_MARK + ' — សញ្ញា lane browser (មិនបើក browser ពិតទេ)' : '',
         "const log = (w) => fs.appendFileSync(process.env.FX_LOG, w + ' ' + " + name + " + ' ' + Date.now() + ' ' + process.pid + '\\n');",
-        "log('start');"
+        "log('start');",
+        o.envProbe ? "fs.writeFileSync(process.env.FX_LOG + '.env', JSON.stringify(Object.keys(process.env).filter((k) => /^RUNALL_(SHARD|ONLY|RESUME)$/.test(k))));" : ''
     ];
     if (o.hang) lines.push('setInterval(() => {}, 1 << 30);');
     else {
@@ -314,6 +315,19 @@ const badShard = ['0/3', '4/3', 'x/3', '1/0', '1/3 x', '2'].map((v) => [v, runHa
 ok('⛔ RUNALL_SHARD ខុស (0/3 · 4/3 · x/3 · 1/0 · «1/3 x» · 2) ➜ បដិសេធ (exit 2 · គ្មាន checker រត់)',
     badShard.every(([, r]) => r.rc === 2 && r.events.length === 0 && /RUNALL_SHARD/.test(r.out)),
     badShard.map(([v, r]) => v + ' ➜ rc ' + r.rc + ' · ' + r.events.length));
+
+// ═══ ៧ខ. checker កូនមិនទទួល RUNALL_SHARD/ONLY/RESUME ═══
+// ⛔ ការជ្រើសជារបស់ run-all **ខាងក្រៅ** តែប៉ុណ្ណោះ ៖ checker ដែលរត់ម៉ាស៊ីននេះខាងក្នុង (hang-guard · runall-runner-test) ទទួល
+//    RUNALL_SHARD របស់ CI ➜ fixture របស់វាត្រូវបែងចែកចោល ➜ «checker ដែលព្យួរ ➜ FAIL» ធ្លាក់តែលើ GitHub (វាស់បាន run 480 ផ្នែក ២/៤)
+console.log('\n=== ៧ខ. env របស់ checker កូន ៖ គ្មាន RUNALL_SHARD/ONLY/RESUME ===');
+const c7b = newCase([['audit-tools/fx-env.js', { envProbe: true }], ['audit-tools/fx-other.js', {}]]);
+const body7b = 'run "fx-env" node audit-tools/fx-env.js\nrun "fx-other" node audit-tools/fx-other.js';
+const envRun = runHarness(c7b, body7b, { RUNALL_JOBS: '1', RUNALL_SHARD: '1/1', RUNALL_ONLY: 'fx-env' });
+let childEnv = null;
+try { childEnv = JSON.parse(fs.readFileSync(path.join(c7b, 'fx.log.env'), 'utf8')); } catch (e) {}
+ok('ការជ្រើសនៅដើរ ៖ RUNALL_ONLY=fx-env ➜ រត់តែ fx-env', started(envRun.events).has('audit-tools/fx-env.js')
+    && !started(envRun.events).has('audit-tools/fx-other.js'), [...started(envRun.events)]);
+ok('⛔ checker កូនមិនទទួល RUNALL_SHARD · RUNALL_ONLY · RUNALL_RESUME (env)', Array.isArray(childEnv) && childEnv.length === 0, childEnv);
 
 // ═══ ៥. ការរំខាន ➜ បញ្ឈប់ checker ដែលកំពុងរត់ ═══
 async function sectionFive() {

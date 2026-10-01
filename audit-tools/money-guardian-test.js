@@ -152,6 +152,18 @@ const MUTATIONS = [
     }
 ];
 
+// ⛔ `--part=k/n` ៖ mutation ទី i ជារបស់ផ្នែក (i mod n) + 1 ➜ ផ្នែកទាំង n រួមគ្នា = mutation ទាំងអស់ (តាមរចនាសម្ព័ន្ធ) ·
+//    អ្នកយាមលើ tree ស្អាតរត់គ្រប់ផ្នែក (លក្ខខណ្ឌចាំបាច់)។ មូលហេតុ ៖ runner GitHub (CPU ២ + lane browser ស្របគ្នា) ចំណាយ > ៣០០ វិ.
+//    លើការរត់ពេញ (run 480 ផ្នែក ២/៤ ៖ «ព្យួរ — លើសពិដាន 300s») ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT
+const PART = (() => {
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
+    if (!arg) return { k: 1, n: 1 };
+    const m = /^--part=(\d+)\/(\d+)$/.exec(arg);
+    if (!m || +m[2] < 1 || +m[2] > MUTATIONS.length || +m[1] < 1 || +m[1] > +m[2]) return null;
+    return { k: +m[1], n: +m[2] };
+})();
+const MINE = PART ? MUTATIONS.filter((_, i) => i % PART.n === PART.k - 1) : [];
+
 function buildMutant(mutation) {
     if (SRC.indexOf(mutation.from) === -1) return null;
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-moneyguard-'));
@@ -209,6 +221,20 @@ if (process.env.EXITCODE_CHILD) {
     ok(false, '⛔ EXITCODE_CHILD ៖ រំលងអ្នកយាម និង mutation (វាស់តែផ្លូវ exit) — របៀបនេះមិនដែលបៃតង');
     finish();
 }
+if (!PART) {
+    ok(false, '⛔ --part ត្រូវជា k/n (1 ≤ k ≤ n ≤ ' + MUTATIONS.length + ')', process.argv.slice(2).join(' '));
+    finish();
+}
+if (PART.n > 1) {
+    console.log('  ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ mutation ' + MINE.length + ' ក្នុង ' + MUTATIONS.length);
+    let runall = '';
+    try { runall = fs.readFileSync(path.join(__dirname, 'run-all.sh'), 'utf8').replace(/^\s*#.*$/gm, ''); } catch (e) {}
+    const listed = [];
+    for (let k = 1; k <= PART.n; k++) {
+        if (new RegExp('node\\s+audit-tools/money-guardian-test\\.js\\s+--part=' + k + '/' + PART.n + '(?=\\s|$)', 'm').test(runall)) listed.push(k);
+    }
+    ok(listed.length === PART.n, '⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = mutation ដែលគ្មាននរណាវាស់)', 'ឃើញ ' + listed.join(','));
+}
 // ⛔ ជាន់ចាំបាច់ ៖ អ្នកយាមត្រូវ **បៃតងលើ tree ស្អាត** បើមិនដូច្នេះ «ក្រហម
 // លើ mutant» គ្មានន័យទេ (វាក្រហមជានិច្ច)។
 const alive = [];
@@ -228,7 +254,7 @@ GUARDS.forEach((g, i) => {
 ok(alive.length > 0, '⛔ ជាន់អប្បបរមា៖ មានអ្នកយាមយ៉ាងតិច ១ ដែលរត់បាន', 'alive=' + alive.length);
 if (STRICT) ok(absent.size === 0, '⛔ STRICT ៖ អ្នកយាមទាំងអស់ត្រូវរត់បាន (គ្មាន SKIP)', Array.from(absent).join(', '));
 
-const mutants = MUTATIONS.map((m) => ({ m, dir: buildMutant(m) }));
+const mutants = MINE.map((m) => ({ m, dir: buildMutant(m) }));
 const tasks = [];
 mutants.forEach((entry, mi) => {
     if (!entry.dir) return;
@@ -269,13 +295,13 @@ mutants.forEach(({ m, dir }, mi) => {
     }
     fs.rmSync(dir, { recursive: true, force: true });
 });
-ok(applicable === MUTATIONS.length, '⛔ ជាន់អប្បបរមា៖ mutation ទាំង ' + MUTATIONS.length + ' ចាក់បានពិត', 'ចាក់បាន ' + applicable);
+ok(MINE.length > 0 && applicable === MINE.length, '⛔ ជាន់អប្បបរមា៖ mutation ទាំង ' + MINE.length + ' (ផ្នែក ' + PART.k + '/' + PART.n + ') ចាក់បានពិត', 'ចាក់បាន ' + applicable);
 
 // ⛔ រាល់កំហុសក្នុងផ្លូវលុយ ត្រូវ **ជូនដំណឹងបាន** ៖ Sentry alert rule ស្វែងរក
 // បានតែលើ **tag** ➜ `ZoeErrors.capture()` ក្នុង function លុយត្រូវបញ្ជូន
 // `zone: 'money'`។ បើគ្មានវា កំហុសលុយដេកក្នុង dashboard ដោយគ្មាននរណាដឹង —
 // ដែលស្មើនឹងគ្មានការរាយការណ៍សោះសម្រាប់ប្រព័ន្ធដែលមានអ្នកប្រើតែម្នាក់។
-{
+if (PART.k === 1) {
     let acorn = null;
     try { acorn = require('acorn'); } catch (e) {}
     if (!acorn) {

@@ -665,14 +665,23 @@ function safeStoreRemove(store, key) {
     try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; }
 }
 
+const MODAL_BASE_Z = 1000;
+
 function openModalHelper(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.add('active');
+    if (!el) return;
+    const zOf = (m) => { const z = parseInt(m.style.zIndex, 10); return Number.isFinite(z) ? z : MODAL_BASE_Z; };
+    const below = Array.from(document.querySelectorAll('.modal.active')).filter((m) => m !== el).sort((a, b) => zOf(a) - zOf(b));
+    below.concat(el).forEach((m, i) => { m.style.zIndex = String(MODAL_BASE_Z + 1 + i); });
+    el.classList.add('active');
 }
 
 function closeModal(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.remove('active');
+    if (el) {
+        el.classList.remove('active');
+        el.style.zIndex = '';
+    }
     if (id === 'pinModal' || id === 'pinSetupModal') {
         invalidateSensitiveSession();
         clearPinInputValues();

@@ -1,5 +1,5 @@
 import { useCallback, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
-import { registerModalMeta, unregisterModalMeta, type ModalId } from '../../../core/modals';
+import { modalStackZ, registerModalMeta, unregisterModalMeta, type ModalId } from '../../../core/modals';
 import { uiState } from '../../../core/state';
 import { useStoreValue } from '../../hooks/useStore';
 
@@ -19,6 +19,7 @@ interface ModalProps extends Omit<HTMLAttributes<HTMLDivElement>, 'id' | 'style'
 
 export function Modal({ id, close, noDismiss, style, className, children, ...rest }: ModalProps) {
     const display = useStoreValue(uiState, (s) => s.modalDisplay[id]);
+    const zIndex = useStoreValue(uiState, (s) => modalStackZ(s, id));
     const ref = useCallback((el: HTMLDivElement | null) => {
         if (el) {
             elements.set(id, el);
@@ -28,7 +29,8 @@ export function Modal({ id, close, noDismiss, style, className, children, ...res
             unregisterModalMeta(id);
         }
     }, [id, close, noDismiss]);
-    const finalStyle = display ? Object.assign({}, style, { display }) : style;
+    const layered = zIndex === null ? style : Object.assign({}, style, { zIndex });
+    const finalStyle = display ? Object.assign({}, layered, { display }) : layered;
     return (
         <div
             id={id}

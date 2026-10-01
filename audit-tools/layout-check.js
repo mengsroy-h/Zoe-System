@@ -177,6 +177,51 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            // ⛔ modal ជាន់គ្នា (App ទាំង ២) ៖ modal ដែល **បើកក្រោយ** ត្រូវនៅខាងលើជានិច្ច — z-index ស្មើគ្នា ➜ លំដាប់ក្នុង DOM ឈ្នះ ➜ ឧ. ប្រអប់ PIN
+            //    (ឈរមុន Config ក្នុង DOM) បើកពី ⚙️ Config ➜ លោតពីក្រោយ (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ ZoeKeyGen បើកក្រយៅដៃ/មុខ · វាស់បាន ZoeW ខុស
+            //    ៤៦៥/៩៣០ គូ · ZoeKeyGen ១៥/៣០)។ វាស់គ្រប់គូ (A ➜ B) តាម `openModalHelper()` ពិត និង `elementFromPoint()` ចំកណ្តាលប្រអប់ B · បើក A
+            //    **ម្តងទៀត** ខណៈវាបើករួច ➜ A ត្រូវឡើងលើ (ការបើកឡើងវិញដែលមិនលើក = ប្រអប់ដដែលនៅពីក្រោយ) · បិទទាំងអស់ ➜ z-index ត្រឡប់ទៅតម្លៃដើមរបស់ប្រអប់
+            //    (ZoeW ៖ modal តែមួយរក្សា z-index ដើមរបស់វា ➜ parity ជាមួយ App ដើមនៅដដែល)
+            if (size.w === 412) {
+                await page.waitForFunction(() => typeof window.openModalHelper === 'function' && typeof window.closeModal === 'function', null, { timeout: 20000 }).catch(() => {});
+                const stack = await page.evaluate(() => {
+                    if (typeof openModalHelper !== 'function' || typeof closeModal !== 'function') return { skip: true };
+                    const flush = () => { if (typeof window.commitNow === 'function') window.commitNow(); };
+                    const ids = Array.from(document.querySelectorAll('.modal')).map((m) => m.id).filter(Boolean);
+                    const onTop = (id) => {
+                        const el = document.getElementById(id);
+                        const box = el.querySelector('.modal-content') || el;
+                        const r = box.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) return false;
+                        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 40));
+                        return !!hit && el.contains(hit);
+                    };
+                    const wrong = [];
+                    let pairs = 0;
+                    ids.forEach((m) => closeModal(m));
+                    flush();
+                    const ownZ = new Map(ids.map((id) => [id, document.getElementById(id).style.zIndex]));
+                    ids.forEach((a) => ids.forEach((b) => {
+                        if (a === b) return;
+                        openModalHelper(a);
+                        openModalHelper(b);
+                        flush();
+                        pairs++;
+                        if (!onTop(b)) wrong.push(a + ' ➜ ' + b);
+                        openModalHelper(a);
+                        flush();
+                        if (!onTop(a)) wrong.push(a + ' ➜ ' + b + ' ➜ ' + a);
+                        closeModal(b);
+                        closeModal(a);
+                        flush();
+                    }));
+                    const leftover = ids.filter((id) => document.getElementById(id).style.zIndex !== ownZ.get(id));
+                    return { pairs, ids: ids.length, wrongCount: wrong.length, wrong: wrong.slice(0, 12), leftover };
+                });
+                check(!stack.skip && stack.ids >= 5 && stack.pairs >= stack.ids * (stack.ids - 1) && stack.wrongCount === 0 && stack.leftover.length === 0,
+                    label + ': ⛔ modal ដែលបើកក្រោយនៅខាងលើជានិច្ច (គ្រប់គូ A ➜ B · បើក A ម្តងទៀត)', JSON.stringify(stack).slice(0, 500));
+            }
+
             // ⛔ របា Tab ខាងក្រោម (ZoeKeyGen ទូរស័ព្ទ) ៖ toast ត្រូវឈរ **ខាងលើ** របា — មិនមែនពីក្រោយវា (វាស់ធរណីមាត្រពិត
             //    មិនមែនលំដាប់ CSS ៖ ច្បាប់ `@media` ដែលឈរមុនច្បាប់មូលដ្ឋាន ស្លាប់ស្ងាត់ៗ ➜ toast លិចក្រោមរបា)
             const tabOverlap = await page.evaluate(() => {

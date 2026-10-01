@@ -78,6 +78,12 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
 - **អត្ថបទក្នុង App** (សំណើម្ចាស់គម្រោង ៖ «ក្នុង App ទាំងអស់កុំ mention អ្វីដែលលែងមាន អ្វីដែលធ្លាប់ដក») — កំណត់ចំណាំកំណែក្នុង 🔔
   (2.43.0–2.47.0) សរសេរឡើងវិញជាបច្ចុប្បន្នកាល (ដក «លែង…ទៀតហើយ» · «(មុននេះ…)» · «ដូចមុន» · «ជាងមុន» · «logo ថ្មី») · សៀវភៅ ៖ «ប៊ូតុងដកដោយដៃ…លែងមាន
   ទៀតហើយ» ➜ «ការដក Barcode ធ្វើតាមរបៀប «ស្កេនដកកញ្ចប់» នេះ»។
+- 🐛 **ប្រអប់ជាន់គ្នា (App ទាំង ២)** — រាយការណ៍ដោយម្ចាស់គម្រោង ៖ «ZoeKeyGen ចុចបើក Biometric ប្រអប់បញ្ជាក់ PIN លោតពីក្រោយប្រអប់ Config» ➜ ពិនិត្យ
+  **គ្រប់ប្រអប់** ៖ `.modal` ទាំងអស់ `z-index: 1000` ស្មើគ្នា ➜ **លំដាប់ក្នុង DOM** ឈ្នះ មិនមែនលំដាប់បើក ➜ ប្រអប់ដែលបើកក្រោយ តែឈរមុនក្នុង DOM (ឧ. PIN ពី
+  Config) លោតពីក្រោយ។ វាស់បាន ៖ ZoeKeyGen ខុស **១៥/៣០** គូ · ZoeW ខុស **៤៦៥/៩៣០** គូ (ឧ. `configModal ➜ pinModal` · `pinSetupModal ➜ pinModal`)។ ការកែ ៖
+  ប្រអប់ដែល **បើកក្រោយគេនៅលើគេ** ជានិច្ច (រួមទាំងការបើកប្រអប់ដែលបើករួច ➜ លើកវាឡើង) ៖ ZoeKeyGen `openModalHelper()` រៀប z-index ឡើងវិញ
+  (`1001…` តាមលំដាប់ · មានព្រំដែន) · `closeModal()` ដកវាចេញ · ZoeW `uiState.modalStack` (`noteModalStack()` ក្នុង `setModalDisplay()`) ➜ `Modal.tsx` ដាក់
+  z-index **តែពេលប្រអប់ ≥ ២ បើក** (ប្រអប់តែមួយរក្សា z-index ដើម ➜ parity ជាមួយ App ដើមនៅដដែល) · ពិដាន `1000 + ចំនួនប្រអប់` (ក្រោម ម៉ឺនុយ (...) `1040`)។
 - **សុវត្ថិភាព (App ទាំង ២)** ៖ Sentry លាក់ `invite` · `reset_code` (កូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ក្នុង URL ឬ breadcrumb) · វាល Setup Link ក្នុងបញ្ជីសម្អាតពេល
   ចាកចេញ · header `Cross-Origin-Opener-Policy: same-origin` (ទំព័រផ្សេងដែលបើក App ក្នុងបង្អួចថ្មី ចាប់ `window.opener` មិនបាន)។
 
@@ -105,6 +111,15 @@ Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ�
   (`state-hygiene`) ➜ ជួសជុលទាំងអស់។
 - Mutation sweep លើការការពារបណ្តាញ/toast ៖ ដក `retryFailedDbListenersNow` ពី `online` ➜ `connection-recovery` · timeout មិន abort ➜ `network-timeout` +
   `network-pressure` · ដកច្រកទ្វារជំនាន់ listener `exchangeRate` ➜ `connection-recovery` · toast ចូលប្រព័ន្ធ ✅ ខណៈកំពុងទាញ ➜ `toast-truth` ➜ **៥/៥ ចាប់**។
+- ថ្មី ៖ `layout-check` «ប្រអប់ដែលបើកក្រោយនៅខាងលើជានិច្ច» (App ទាំង ២ @412 ៖ គ្រប់គូ A ➜ B តាម `openModalHelper()` ពិត + `elementFromPoint()` ·
+  បើក A ម្តងទៀត ➜ A ឡើងលើ · បិទទាំងអស់ ➜ z-index ត្រឡប់ទៅតម្លៃដើម) ➜ tree មុនកែ ធ្លាក់ (ZoeKeyGen ១៥ · ZoeW ៤៦៥) · mutation ៥ ៖ ដក z-index ZoeW · ការបើក
+  ម្តងទៀតមិនលើក · ដក z ZoeKeyGen · បិទមិន reset z ➜ **ចាប់ ៤** · «បិទមិនដកពី `modalStack`» **រស់រាន** ព្រោះសមមូល (stack ច្រោះតាម `modalDisplay` រួច ➜
+  គ្មានអ្វីដែលអ្នកប្រើឃើញប្រែ) ➜ ⛔ មិនសរសេរការអះអាងដែលចាក់សោវា។
+- CI GitHub ជាផ្នែក (run 480) ធ្លាក់ ៣ ៖ (១) `RUNALL_SHARD`/`RUNALL_ONLY` ជ្រាបចូល checker កូន ➜ fixture របស់ `hang-guard` ត្រូវបែងចែកចោល ➜ ម៉ាស៊ីនរត់
+  `export -n` វា + `runall-runner-test` ៧ខ (មុនកែធ្លាក់ · ក្រោយកែ ៥៦/៥៦ · hang-guard ផ្នែក 1/4–4/4 បៃតង) · (២) `money-guardian` លើសពិដាន ៣០០ វិ. លើ runner
+  CPU ២ ➜ បំបែក `--part=k/n` (mutation i ➜ ផ្នែក (i mod n)+1 · ផ្នែកនីមួយៗអះអាងថា run-all រត់ផ្នែកទាំង n) · (៣) `emu/supabase-adapter-parity` ៖ SDK ពិត
+  បញ្ជូនតម្លៃដំបូងយឺត ➜ រង់ចាំ listener ទាំងអស់បាញ់ម្តង (ពិដាន ១៥ វិ.) មុនជំហានទី ១ · `keygen-pin-flow-test` stub `querySelectorAll` + `MODAL_BASE_Z` ដេរីវេ។
+  ⚠️ `money-guardian --part` និង CI ពេញ មិនទាន់រត់ក្នុង session (usage) ➜ ពិនិត្យលើ CI បន្ទាប់។
 - ពង្រីក ៖ `keygen-session-security-test` (៩៥ ៖ Signing Key ផុតក្រោយ ១៥ នាទីតាមនាឡិកាក្លែង · សកម្មភាពពន្យារ · ខ្សែភ្ជាប់ពិត) · `secret-hygiene` (២២១ ៖ វាល
   credential ដេរីវេរួម `Invite`/`resetCode`/`setupLink` · mutation ដក `invite` ➜ ចាប់) · `netlify-config-scope-test` ផ្នែក ៦ (header សុវត្ថិភាព `/*` ៖ XFO ·
   frame-ancestors · nosniff · HSTS · Referrer · COOP · Permissions-Policy កាមេរ៉ាដេរីវេពី `getUserMedia` ➜ mutation ៣/៣)។

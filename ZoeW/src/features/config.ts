@@ -1,11 +1,12 @@
 import { modalIsOpen } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { securityState } from '../core/state';
+import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { cancelPendingLookupUnlock } from './auto-lookup';
 import { applyPinPromptText, requestPinBeforeConfig } from './pin';
 import { initFirebase } from '../services/firebase-init';
-import { looksLikeSupabaseConfig, normalizeSupabaseConfig, supabaseConfigErrorMessage } from '../services/supabase-config';
+import { isSupabaseConfig, looksLikeSupabaseConfig, normalizeSupabaseConfig, supabaseConfigErrorMessage } from '../services/supabase-config';
 import { rememberSetupInvite } from './account';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showLiveToast, showToast } from '../ui/toast';
@@ -22,13 +23,55 @@ export function checkPinAndOpenConfig(isFirstTime = false) {
     }
 }
 
+export function savedConfigObject() {
+    const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    if (!savedConfig) return null;
+    try {
+        const parsed = JSON.parse(savedConfig);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+export function fillConfigFields(config) {
+    if (isSupabaseConfig(config)) {
+        viewState.configBackend = 'supabase';
+        setFieldValue('sbUrlInput', String(config.supabaseUrl || ''));
+        setFieldValue('sbKeyInput', String(config.supabaseKey || ''));
+        setFieldValue('sbDomainInput', typeof config.loginDomain === 'string' ? config.loginDomain : '');
+        return;
+    }
+    viewState.configBackend = 'firebase';
+    setFieldValue('firebaseConfigInput', JSON.stringify(config, null, 2));
+}
+
 export function openConfigModal() {
     const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
-    if (savedConfig) {
-        setFieldValue('firebaseConfigInput', savedConfig);
+    const saved = savedConfigObject();
+    if (saved && isSupabaseConfig(saved)) {
+        fillConfigFields(saved);
+    } else {
+        viewState.configBackend = 'firebase';
+        if (savedConfig) {
+            setFieldValue('firebaseConfigInput', savedConfig);
+        }
     }
+    setFieldValue('setupLinkInput', '');
     if (window.ZoeErrors) setFieldValue('sentryDsnInput', ZoeErrors.getDsn());
     openModalHelper('configModal');
+}
+
+export function selectConfigBackend(kind) {
+    viewState.configBackend = kind === 'supabase' ? 'supabase' : 'firebase';
+}
+
+export function configInputText() {
+    if (viewState.configBackend !== 'supabase') return fieldValue('firebaseConfigInput').trim();
+    const config: any = { supabaseUrl: fieldValue('sbUrlInput').trim(), supabaseKey: fieldValue('sbKeyInput').trim() };
+    const domain = fieldValue('sbDomainInput').trim();
+    if (domain) config.loginDomain = domain;
+    return JSON.stringify(config);
 }
 
 export const FIREBASE_CONFIG_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
@@ -210,7 +253,7 @@ export function firebaseConfigErrorMessage(err) {
 }
 
 export function saveFirebaseConfig() {
-    const raw = fieldValue('firebaseConfigInput').trim();
+    const raw = configInputText();
     const dsnEntered = fieldValue('sentryDsnInput').trim();
     if (window.ZoeErrors) {
         ZoeErrors.setDsn(fieldValue('sentryDsnInput'));
@@ -231,13 +274,15 @@ export function saveFirebaseConfig() {
         alert(firebaseConfigErrorMessage(e));
         return;
     }
-    setFieldValue('firebaseConfigInput', JSON.stringify(normalized.config, null, 2));
+    fillConfigFields(normalized.config);
     if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
         return;
     }
     if (normalized.extras.length) {
-        showToast("ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+        showToast(normalized.config.supabaseUrl
+            ? "ℹ️ រំលងវាលដែលមិនមែនរបស់ Supabase៖ " + normalized.extras.join(', ')
+            : "ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
     }
     closeModal('configModal');
     initFirebase();
@@ -265,6 +310,70 @@ export function setupLinkDsnIsValid(dsn) {
     return host === 'sentry.io' || host.endsWith('.sentry.io');
 }
 
+export function applySetupPayload(parsed) {
+    const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
+    const linkInvite = parsed.supabaseUrl && typeof parsed.invite === 'string' ? parsed.invite : '';
+    const linkConfig = Object.assign({}, parsed);
+    delete linkConfig.dsn;
+    delete linkConfig.invite;
+    if (linkDsn && window.ZoeErrors) {
+        ZoeErrors.setDsn(linkDsn);
+        ZoeErrors.init('zoew');
+        setFieldValue('sentryDsnInput', linkDsn);
+    }
+    rememberSetupInvite(linkInvite);
+    fillConfigFields(linkConfig);
+    setFieldValue('setupLinkInput', '');
+    return linkDsn;
+}
+
+export function setupParamFromText(text) {
+    const value = String(text === null || text === undefined ? '' : text).trim();
+    if (!value) return '';
+    try {
+        const fromUrl = new URL(value).searchParams.get('setup');
+        if (fromUrl) return fromUrl;
+    } catch (e) {}
+    const bare = value.replace(/^\??setup=/, '');
+    if (!/^[A-Za-z0-9+/=_%-]{16,}$/.test(bare)) return '';
+    try {
+        return decodeURIComponent(bare);
+    } catch (e) {
+        return '';
+    }
+}
+
+export function parseSetupLinkText(text) {
+    const setupParam = setupParamFromText(text);
+    if (!setupParam) return { error: 'not-link' };
+    try {
+        return { parsed: decodeSetupPayload(setupParam) };
+    } catch (e) {
+        return { error: 'bad' };
+    }
+}
+
+export function applySetupLinkText(text) {
+    const result: any = parseSetupLinkText(text);
+    if (!result.parsed) {
+        showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
+        return false;
+    }
+    announceSetupApplied(applySetupPayload(result.parsed));
+    return true;
+}
+
+export function announceSetupApplied(linkDsn) {
+    showToast(linkDsn
+        ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
+        : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+}
+
+export function applySetupLinkFromInput() {
+    if (!modalIsOpen('configModal')) return;
+    applySetupLinkText(fieldValue('setupLinkInput'));
+}
+
 export function applySetupLinkFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const setupParam = params.get('setup');
@@ -280,23 +389,9 @@ export function applySetupLinkFromUrl() {
         return;
     }
 
-    const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
-    const linkInvite = parsed.supabaseUrl && typeof parsed.invite === 'string' ? parsed.invite : '';
-    const linkConfig = Object.assign({}, parsed);
-    delete linkConfig.dsn;
-    delete linkConfig.invite;
-
     requestPinBeforeConfig(() => {
-        if (linkDsn && window.ZoeErrors) {
-            ZoeErrors.setDsn(linkDsn);
-            ZoeErrors.init('zoew');
-        }
-        rememberSetupInvite(linkInvite);
         openConfigModal();
-        setFieldValue('firebaseConfigInput', JSON.stringify(linkConfig, null, 2));
-        showToast(linkDsn
-            ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
-            : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+        announceSetupApplied(applySetupPayload(parsed));
     }, 'setupLink');
 }
 

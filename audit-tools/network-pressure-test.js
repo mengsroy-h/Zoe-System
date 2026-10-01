@@ -56,7 +56,18 @@ function ok(label, cond, detail) {
     const body = (/function saveFirebaseConfig\(\)[\s\S]*?\n    \}\n/.exec(app) || [''])[0];
     const awaitPos = body.indexOf('await');
     // ⛔ React ៖ វាលអានតាមច្រកចេញ `fieldValue('firebaseConfigInput')` (App ដើម ៖ `cfgInput.value`)
-    const reads = [body.indexOf('cfgInput.value'), body.indexOf("fieldValue('firebaseConfigInput')")].filter((i) => i !== -1);
+    // ⛔ ការអានអាចផ្លាស់ចូល helper ដោយត្រឹមត្រូវ (`configInputText()` ៖ Firebase ឬ Supabase តាមជម្រើស) ➜ **ដេរីវេ** ៖
+    //    function ណាដែលតួរបស់វាអានវាល Config ➜ ការហៅវាក៏ជាការអានដដែល (មិនមែនចាក់ឈ្មោះ helper ជា literal ទី ២)
+    const readTokens = ['cfgInput.value', "fieldValue('firebaseConfigInput')"];
+    const fnRe = /\n\s*(?:export\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/g;
+    let fm;
+    while ((fm = fnRe.exec(app))) {
+        const name = fm[1];
+        if (name === 'saveFirebaseConfig') continue;
+        const fnBody = (new RegExp('function ' + name + '\\([\\s\\S]*?\\n    \\}\\n').exec(app.slice(fm.index)) || [''])[0];
+        if (readTokens.some((t) => fnBody.indexOf(t) !== -1)) readTokens.push(name + '(');
+    }
+    const reads = readTokens.map((t) => body.indexOf(t)).filter((i) => i !== -1);
     const readPos = reads.length ? Math.min.apply(null, reads) : -1;
     ok('ZoeW: `saveFirebaseConfig()` អានប្រអប់ Config **មុន** `await` ណាមួយ',
         readPos !== -1 && (awaitPos === -1 || readPos < awaitPos),

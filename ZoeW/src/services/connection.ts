@@ -8,7 +8,7 @@ import { resumeZtoStatusSweep } from '../features/zto-status';
 import { retryFailedDbListenersNow } from './db-listeners';
 import { retryFirebaseSdkNow } from './firebase-sdk';
 import { flushPendingHistoryPatches } from './history-write';
-import { refreshLiveToasts } from '../ui/toast';
+import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
@@ -55,6 +55,7 @@ export function renderConnectionStatus() {
     const online = connectionLooksOnline();
     const reconnecting = !online && firebaseState.isDatabaseConnected && firebaseState.dbListenersFailed && (navigator.onLine as boolean) !== false;
     const settling = !online && !reconnecting && connectionIsSettlingIn();
+    const prevStatus = viewState.connectionStatus;
     viewState.connectionStatus = online ? 'online' : ((reconnecting || settling) ? 'connecting' : 'offline');
     viewState.connectionText = online
         ? "ភ្ជាប់ Server រួចរាល់"
@@ -62,6 +63,7 @@ export function renderConnectionStatus() {
             ? "កំពុងភ្ជាប់ឡើងវិញ..."
             : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
     refreshLiveToasts();
+    noteConnectionTransition(prevStatus, viewState.connectionStatus);
 }
 
 export function clearReconnectWatchdog() {

@@ -65,8 +65,27 @@ export function modalDisplay(id: string): ModalDisplay | undefined {
     return uiState.modalDisplay[id];
 }
 
+export const MODAL_BASE_Z = 1000;
+
+export function noteModalStack(id: string, open: boolean): void {
+    const stack = uiState.modalStack;
+    if (open) {
+        if (stack[stack.length - 1] !== id) uiState.modalStack = stack.filter((m) => m !== id).concat(id);
+    } else if (stack.includes(id)) {
+        uiState.modalStack = stack.filter((m) => m !== id);
+    }
+}
+
+export function modalStackZ(state: { modalStack: string[]; modalDisplay: Record<string, string> }, id: string): number | null {
+    const open = state.modalStack.filter((m) => state.modalDisplay[m] === 'flex');
+    if (open.length < 2) return null;
+    const rank = open.indexOf(id);
+    return rank < 0 ? null : MODAL_BASE_Z + 1 + rank;
+}
+
 export function setModalDisplay(id: string | null | undefined, display: ModalDisplay): void {
     if (!id || !modalIsMounted(id)) return;
+    noteModalStack(id, display === 'flex');
     if (uiState.modalDisplay[id] === display) return;
     uiState.modalDisplay = Object.assign({}, uiState.modalDisplay, { [id]: display });
 }

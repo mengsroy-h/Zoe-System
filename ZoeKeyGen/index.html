@@ -15,7 +15,7 @@
     <link rel="manifest" href="./manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-    <link rel="apple-touch-icon" href="./icon-192.png">
+    <link rel="apple-touch-icon" href="./icon-maskable-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -64,9 +64,9 @@
     </div>
 </header>
 
-<div class="app-container hidden" id="appContainer">
+<div class="app-container hidden kg-tab-create" id="appContainer">
 
-    <div class="app-card card-wide">
+    <div class="app-card card-wide" data-tab="create">
         <div class="card-header">
             <div class="card-title">🔑 Signing Key</div>
             <span class="badge" id="signingKeyStatusBadge" style="background:var(--danger-light); color:#a3123a;">មិនទាន់ Load</span>
@@ -100,7 +100,7 @@
         </details>
     </div>
 
-    <div class="app-card">
+    <div class="app-card" data-tab="create">
         <div class="card-header">
             <div class="card-title">✨ បង្កើត Key ថ្មី</div>
         </div>
@@ -128,7 +128,7 @@
         </div>
     </div>
 
-    <div class="app-card">
+    <div class="app-card" data-tab="link">
         <div class="card-header">
             <div class="card-title">🔗 បង្កើត Setup Link</div>
         </div>
@@ -169,7 +169,7 @@ const firebaseConfig = {
         </div>
     </div>
 
-    <div class="app-card card-wide">
+    <div class="app-card card-wide" data-tab="notice">
         <div class="card-header">
             <div class="card-title">🔔 ផ្ញើដំណឹងទៅ ZoeW</div>
             <button class="btn-mini" data-act="refreshNoticeList">🔄 Refresh</button>
@@ -200,7 +200,7 @@ const firebaseConfig = {
         </ul>
     </div>
 
-    <div class="app-card card-wide">
+    <div class="app-card card-wide" data-tab="shop">
         <div class="card-header">
             <div class="card-title">🏪 ហាង Supabase (Project តែមួយ)</div>
             <button class="btn-mini" data-act="sbAdminRefresh">🔄 Refresh</button>
@@ -286,7 +286,7 @@ const firebaseConfig = {
         </div>
     </div>
 
-    <div class="app-card card-wide">
+    <div class="app-card card-wide" data-tab="list">
         <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
             <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
@@ -311,6 +311,14 @@ const firebaseConfig = {
         </div>
     </div>
 
+    <nav class="kg-tabbar" id="kgTabBar" aria-label="ផ្ទាំង">
+        <button type="button" class="kg-tab active" data-tab="create" data-act="switchKgTab" data-args='["create"]'><span class="tab-ico">✨</span><span>បង្កើត</span></button>
+        <button type="button" class="kg-tab" data-tab="list" data-act="switchKgTab" data-args='["list"]'><span class="tab-ico">📋</span><span>បញ្ជី</span></button>
+        <button type="button" class="kg-tab" data-tab="link" data-act="switchKgTab" data-args='["link"]'><span class="tab-ico">🔗</span><span>Link</span></button>
+        <button type="button" class="kg-tab" data-tab="shop" data-act="switchKgTab" data-args='["shop"]'><span class="tab-ico">🏪</span><span>ហាង</span></button>
+        <button type="button" class="kg-tab" data-tab="notice" data-act="switchKgTab" data-args='["notice"]'><span class="tab-ico">🔔</span><span>ដំណឹង</span></button>
+    </nav>
+
 </div>
 
 <div id="pinModal" class="modal">
@@ -318,6 +326,7 @@ const firebaseConfig = {
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p id="pinModalMsg">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN" autocomplete="off">
+        <button type="button" class="btn-biometric hidden" id="pinBiometricBtn" data-act="runBiometricUnlock"><span class="bio-ico">🫆</span><span class="bio-label">ស្កេនក្រយៅដៃ ឬមុខ</span></button>
         <div class="modal-btns">
             <div class="modal-btns-row">
                 <button class="btn-confirm" data-act="verifySecurityPin">ផ្ទៀងផ្ទាត់</button>
@@ -352,6 +361,10 @@ const firebaseConfig = {
 };'></textarea>
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
+        <div class="bio-toggle-row">
+            <span>🫆 ចូលដោយក្រយៅដៃ ឬមុខ ៖ <b id="biometricToggleState">បិទ</b></span>
+            <button type="button" class="btn-mini" id="biometricToggleBtn" data-act="toggleBiometricUnlock">ប្តូរ</button>
+        </div>
         <div class="modal-btns">
             <button class="btn-confirm" data-act="saveFirebaseConfig">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" data-act="closeModal" data-args='["configModal"]'>បោះបង់</button>

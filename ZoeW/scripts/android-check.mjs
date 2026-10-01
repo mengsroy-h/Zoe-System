@@ -313,11 +313,29 @@ ok('FCM ៖ vite ដេរីវេ __FCM_CONFIGURED__ ពីវត្តមា�
     /__FCM_CONFIGURED__:\s*JSON\.stringify\(existsSync\(path\.join\(ROOT, 'android\/app\/google-services\.json'\)\)\)/.test(read('vite.config.mts')));
 const certPin = read('android/release-cert.sha256').trim();
 ok('វិញ្ញាបនបត្រ keystore pin ក្នុង android/release-cert.sha256 (SHA-256 · 64 hex)', /^[0-9a-f]{64}$/.test(certPin), certPin.slice(0, 12) + '…');
-const pinAt = releaseWf.indexOf('< ZoeW/android/release-cert.sha256');
+const pinAt = releaseWf.indexOf('if ! GOT=$(node ZoeW/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256');
 const pinGate = releaseWf.slice(pinAt, releaseWf.indexOf('gh release create'));
-ok('workflow ប្រៀបវិញ្ញាបនបត្រ APK នឹង pin (signer ១ តែមួយ) ហើយធ្លាក់មុន Release',
-    pinAt > 0 && releaseWf.indexOf('apksigner') < pinAt && /"\$SIGNERS" != "1"/.test(pinGate) &&
-    /"\$GOT" != "\$PIN"[^\n]*then[\s\S]*?exit 1/.test(pinGate));
+ok('workflow ប្រៀបវិញ្ញាបនបត្រ APK នឹង pin តាម apk-cert-check.mjs ហើយធ្លាក់មុន Release',
+    pinAt > 0 && releaseWf.indexOf('apksigner') < pinAt && /^if ! GOT=\$\(node ZoeW\/scripts\/apk-cert-check\.mjs[^\n]*then\s*\n[^\n]*\n\s*exit 1/.test(pinGate) &&
+    !/grep[^\n]*SHA-256 digest/.test(releaseWf));
+/* ⛔ ការស្រង់វិញ្ញាបនបត្រត្រូវរត់លើ output **ពិត** របស់ apksigner ទាំង ២ ទម្រង់ — ទម្រង់ `V2 Signer:` ជាអ្វីដែល runner
+ *    GitHub សរសេរ (ការធ្លាក់ Release លើ main 2026-10-01) · `Signer #1` ជាទម្រង់ v1+v2+v3 · ករណីបដិសេធត្រូវបដិសេធ */
+const { apkCertVerdict } = await import('./apk-cert-check.mjs');
+const certOut = (lines) => ['Verifies', 'Verified using v1 scheme (JAR signing): false', 'Verified using v2 scheme (APK Signature Scheme v2): true', ...lines].join('\n');
+const otherDigest = certPin.split('').reverse().join('');
+const certCases = [
+    ['ទម្រង់ `V2 Signer:` (runner GitHub)', certOut(['Number of signers: 1', 'V2 Signer: certificate DN: CN=ZoeW, O=Zoe System, C=KH', 'V2 Signer: certificate SHA-256 digest: ' + certPin, 'V2 Signer: public key SHA-256 digest: ' + otherDigest]), true],
+    ['ទម្រង់ `Signer #1` (v1+v2+v3)', certOut(['Number of signers: 1', 'Signer #1 certificate DN: CN=ZoeW', 'Signer #1 certificate SHA-256 digest: ' + certPin, 'Signer #1 public key SHA-256 digest: ' + otherDigest]), true],
+    ['scheme ២ វិញ្ញាបនបត្រដដែល', certOut(['Number of signers: 1', 'V2 Signer: certificate SHA-256 digest: ' + certPin, 'V3 Signer: certificate SHA-256 digest: ' + certPin]), true],
+    ['digest ផ្សេង ➜ បដិសេធ', certOut(['Number of signers: 1', 'V2 Signer: certificate SHA-256 digest: ' + otherDigest]), false],
+    ['signer ២ ➜ បដិសេធ', certOut(['Number of signers: 2', 'Signer #1 certificate SHA-256 digest: ' + certPin, 'Signer #2 certificate SHA-256 digest: ' + otherDigest]), false],
+    ['scheme ខុសគ្នា ➜ បដិសេធ', certOut(['Number of signers: 1', 'V2 Signer: certificate SHA-256 digest: ' + certPin, 'V3 Signer: certificate SHA-256 digest: ' + otherDigest]), false],
+    ['public key ស្មើ pin តែវិញ្ញាបនបត្រផ្សេង ➜ បដិសេធ', certOut(['Number of signers: 1', 'V2 Signer: certificate SHA-256 digest: ' + otherDigest, 'V2 Signer: public key SHA-256 digest: ' + certPin]), false],
+    ['គ្មាន «Verifies» ➜ បដិសេធ', certOut(['Number of signers: 1', 'V2 Signer: certificate SHA-256 digest: ' + certPin]).replace('Verifies\n', 'DOES NOT VERIFY\n'), false],
+    ['គ្មាន digest ➜ បដិសេធ', certOut(['Number of signers: 1']), false]
+];
+const certBad = certCases.filter(([, text, want]) => apkCertVerdict(text, certPin).ok !== want).map(([n]) => n);
+ok('apk-cert-check ៖ ទទួល output ពិត ២ ទម្រង់ · បដិសេធ ' + certCases.filter((c) => !c[2]).length + ' ករណី', certBad.length === 0, certBad.join(' · '));
 ok('keystore ត្រូវលុបចេញពី runner ជានិច្ច (if: always())', /if: always\(\)\s*\n\s*run: rm -f "\$RUNNER_TEMP\/zoew-release\.jks"/.test(releaseWf));
 const keystoreFiles = [];
 (function walkKs(dir) {

@@ -33,7 +33,7 @@ function build(savedPin, savedSigningKey) {
         if (!els[id]) {
             const classes = {};
             els[id] = {
-                id, value: '', textContent: '',
+                id, value: '', textContent: '', style: {},
                 classList: {
                     add: (c) => { classes[c] = true; },
                     remove: (c) => { delete classes[c]; },
@@ -45,12 +45,18 @@ function build(savedPin, savedSigningKey) {
     };
     const sandbox = {
         console, String, Object, JSON, Boolean,
-        document: { getElementById: getEl },
+        document: {
+            getElementById: getEl,
+            querySelectorAll: (sel) => (sel === '.modal.active' ? Object.values(els).filter((e) => e.classList.contains('active')) : [])
+        },
         localStorage: { getItem: (k) => (k === 'zoew_security_pin_hash' ? savedPin : null), setItem() {}, removeItem() {} },
         sessionStorage: { getItem: (k) => (k === 'zoekeygen_signing_key_enc' ? savedSigningKey : null), setItem() {}, removeItem() {} },
         openConfigModal: function openConfigModal() { sandbox.__ran = 'config'; },
         persistSigningKeyForSession: function persistSigningKeyForSession() { sandbox.__ran = 'persistKey'; },
         tryRestoreSigningKeyFromSession: function tryRestoreSigningKeyFromSession() { sandbox.__ran = 'restoreKey'; },
+        refreshBiometricUi: function refreshBiometricUi() {},
+        isBiometricEnabled: function isBiometricEnabled() { return false; },
+        runBiometricUnlock: function runBiometricUnlock() {},
         __ran: null
     };
     const ctx = vm.createContext(sandbox);
@@ -58,7 +64,8 @@ function build(savedPin, savedSigningKey) {
     // បូក `safeStoreGet()` ថ្មី ➜ sandbox ត្រូវផ្តល់ពួកវា។
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
     vm.runInContext('var pinTargetAction = null; var sensitiveSessionGeneration = 0; var isSignedInUiActive = false; var auth = { currentUser: null }; var signingPrivateKeyJwk = null; var SIGNING_KEY_SESSION_STORAGE_KEY = "zoekeygen_signing_key_enc";', ctx);
-    vm.runInContext(slice(['invalidateSensitiveSession', 'clearPinInputValues', 'openModalHelper', 'closeModal', 'isPinFlowPending', 'requestPinBeforeConfig', 'requestSessionSigningKeyRestoreIfEligible', 'checkPinAndOpenConfig']), ctx);
+    const baseZ = src.match(/^const MODAL_BASE_Z = \d+;$/m);
+    vm.runInContext((baseZ ? baseZ[0] + '\n' : '') + slice(['invalidateSensitiveSession', 'clearPinInputValues', 'openModalHelper', 'closeModal', 'isPinFlowPending', 'requestPinBeforeConfig', 'requestSessionSigningKeyRestoreIfEligible', 'checkPinAndOpenConfig']), ctx);
     return { ctx, els, getEl };
 }
 

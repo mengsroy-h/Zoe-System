@@ -39,7 +39,103 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (branch `claude/great-ritchie-47ujj5` · មិនទាន់ merge)
+### [2.47.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.24.0` ៖ **toast និយាយឈ្មោះ backend ពិត · ប្រអប់ Config ជ្រើស Firebase/Supabase · បិទភ្ជាប់ Setup Link · QR ពីរូបភាព · icon គ្មានគែមស · ZoeKeyGen ៖ Tab លើទូរស័ព្ទ · ក្រយៅដៃ/មុខ · Signing Key ផុតពីសតិក្រោយ ១៥ នាទី**
+
+**ZoeW `2.47.0`** (`zoew-v250` ➜ `zoew-v251`) · **ZoeKeyGen `2.24.0`** (`zoekeygen-v110` ➜ `zoekeygen-v111`)។ សំណើម្ចាស់គម្រោង ៖ «toast នៅនិយាយ
+Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ្យមានកន្លែងជ្រើស Firebase និង Supabase» · «កន្លែងបិទភ្ជាប់ Setup Link និងយក QR ពីរូបភាព» · «ZoeKeyGen
+លើទូរស័ព្ទឲ្យមាន Tab ដូច ZoeW» · «ពង្រឹងសុវត្ថិភាព ការពារ secret លេចធ្លាយ» · «icon ដំឡើងពី Chrome មក desktop សល់គែមស និងមិនច្បាស់» · «logo ZoeKeyGen
+សល់គែមសខ្លួនឯង» · «ZoeKeyGen ដាក់ biometric»។ ⛔ Firebase rules **មិនប្រែ** ➜ គ្មាន Publish · Supabase migration **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ZoeW ៖ toast** — ហាង Supabase ឃើញ «Supabase» ជំនួស «Firebase» ក្នុងសារស្ថានភាព/កំហុស (`toastBackendText()` ក្នុង `showToast` ·
+  `reannounceOrShowToast` · `paintToast`) ⛔ មិនប្តូរពាក្យ «Firebase Config» · «Firebase Console» (ឈ្មោះអ្វីដែលអ្នកប្រើត្រូវបើកពិត) · ហាង Firebase មិនប្រែ។
+- **ZoeW ៖ ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ»** — បន្ថែមលើ 📷 ស្កេន QR ៖ **🖼️ QR ពីរូបភាព** (រូបថតអេក្រង់ ➜ ZXing ក្នុង App ដដែល) · វាល **បិទភ្ជាប់ Setup Link** +
+  «ប្រើ Link» · ជម្រើស **Firebase / Supabase** ៖ Firebase ➜ បិទភ្ជាប់ Config ដូចមុន · Supabase ➜ វាល **Project URL** · **Publishable key** · Domain (ស្រេចចិត្ត)។
+  ការរក្សាទុកឆ្លងច្រកដដែល (PIN · `normalizeFirebaseConfig` · Secret key ➜ បដិសេធ)។ សៀវភៅក្នុង App ៖ ផ្នែក «បញ្ចូល Config ដោយដៃ»។
+- 🐛 **ស្កេន QR ដោយកាមេរ៉ា បាត់កូដអញ្ជើញ/DSN** — ផ្លូវកាមេរ៉ាចាក់ JSON ទាំងមូល (រួម `invite` · `dsn`) ចូល textarea ➜ `normalizeFirebaseConfig` បោះវាលដែលមិនមែន
+  Config ចោល ➜ កូដអញ្ជើញមិនបំពេញប្រអប់ចុះឈ្មោះ · Sentry DSN មិនរក្សា ខណៈ Setup Link តាម URL ធ្វើបានត្រូវ ➜ ផ្លូវទាំង ៤ (URL · កាមេរ៉ា · រូបភាព · បិទភ្ជាប់)
+  ឥឡូវឆ្លង `applySetupPayload()` តែមួយ។
+- **icon PWA (App ទាំង ២)** — PNG ZoeKeyGen ដើមមាន **ជ្រុងសពិត** (ភីកសែល (0,0) = ស មិនថ្លា) ➜ Chrome/Windows បង្ហាញគែមស · `"purpose": "any maskable"`
+  រួម ➜ Chrome ពង្រីក/កាត់រូបមានគែម ➜ ព្រិល ➜ icon `any` (ជ្រុងថ្លា) ដាច់ពី `maskable` (ពេញផ្ទៃ · 192/512/1024) · `apple-touch-icon` = maskable (iOS
+  បិទជ្រុងខ្លួនឯង) · logo ZoeKeyGen ក្នុង App = icon `any` · រូប ZoeKeyGen គូរឡើងវិញពី SVG (`ZoeW/resources/keygen-icon.svg` · `ZoeW/scripts/pwa-icons.mjs`)។
+- **ZoeKeyGen ៖ Tab ខាងក្រោមលើទូរស័ព្ទ** (`< 900px`) ៖ 🔑 បង្កើត · 🔗 Link · 📢 ដំណឹង · 🏪 ហាង · 📋 បញ្ជី ➜ បង្ហាញតែកាតរបស់ Tab នោះ (ចងចាំក្នុង
+  `zoekeygen_tab_v1`) · `≥ 900px` ដូចមុន (grid ២ ជួរ · គ្មាន Tab)។
+- **ZoeKeyGen ៖ ដោះសោដោយក្រយៅដៃ/មុខ** ៖ ⚙️ ➜ «បើក» ➜ វាយ PIN ពិត ➜ ឧបករណ៍ចុះឈ្មោះ ➜ ក្រោយមកប្រអប់ PIN សួរក្រយៅដៃ/មុខភ្លាម។ PIN រុំដោយ AES-GCM
+  ពីកូនសោ **WebAuthn PRF** (⛔ ឧបករណ៍គ្មាន PRF ➜ «មិនគាំទ្រ» មិនមានរបៀបរក្សា PIN ធម្មតា) · PIN ដែលស្រាយត្រូវស្មើ hash មុនទុកចិត្ត (មិនស្មើ ➜ លុបការចង) ·
+  ប្តូរ PIN ➜ លុបការចង · ពិដាន/lockout PIN ដដែល · ផ្លូវជោគជ័យតែមួយ `completePinUnlock()`។
+- **ZoeKeyGen ៖ Signing Key ផុតពីសតិ** ក្រោយមិនប៉ះ ១៥ នាទី (pointer/key) ➜ toast «🔒 …» ប្រាប់ផ្លូវពិត (មាន Key ចងចាំក្នុង Session ➜ ប្រអប់ PIN «វាយ PIN ដើម្បីស្ដារវិញ» · គ្មាន ➜ «សូម Load ម្តងទៀត») · ពិនិត្យរាល់ ៣០ វិ. និងពេលត្រឡប់មក App
+  (Signing Key ជា secret ធំជាងគេរបស់អ្នកលក់ ➜ ឧបករណ៍ដែលទុកចោលបើក មិនកាន់វាជារៀងរហូត)។
+- **ZoeW ៖ toast បណ្តាញ «រស់»** (សំណើ ៖ «toast realtime») — App ដែលចូលប្រព័ន្ធ ធ្លាក់ពី «ភ្ជាប់» ទៅ «ក្រៅបណ្ដាញ» (browser offline ឬផុត grace
+  ភ្ជាប់ឡើងវិញ) ➜ toast **តែមួយ** ដែលប្តូរខ្លួនឯង ៖ «⚠️ ឧបករណ៍ក្រៅបណ្ដាញ…» ➜ «🔄 កំពុងភ្ជាប់ Server ឡើងវិញ…» ➜ «🔄 …កំពុងទាញទិន្នន័យ…» ➜
+  «✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ» (✅ តែពេល listener ទាំងអស់ស្រស់ · listener ងាប់ ➜ មិន ✅) · toast ផុតពេល (២០ វិ.) ខណៈនៅក្រៅបណ្ដាញ ➜
+  ពេលភ្ជាប់វិញ សារ ✅ លេចម្តងទៀត · ការភ្លាត់ខ្លី (grace) · មិនទាន់ចូល · មិនដែលភ្ជាប់តាំងពីបើក · toast ចូលប្រព័ន្ធ/Config រស់រួច ➜ **គ្មាន** toast ស្ទួន។
+- 🐛 **Setup Link មាន `%` ខូច** (បិទភ្ជាប់/QR) ➜ `decodeURIComponent` បោះ `URIError` ចេញពី handler ➜ **គ្មានសារអ្វីសោះ** ➜ ឥឡូវ «❌ Setup Link មិនត្រឹមត្រូវទេ!»។
+- 🐛 **QR ពីរូបភាព ២ ជាន់គ្នា** ៖ រូបចាស់ដែលឌិកូដចប់ក្រោយ សរសេរជាន់ Config របស់រូបថ្មី · បិទប្រអប់កណ្តាលការឌិកូដ ➜ សារនៅលេច ➜ ឥឡូវតែការឌិកូដ
+  ចុងក្រោយ ហើយតែពេលប្រអប់នៅបើក (`configQrImageSeq`)។
+- 🐛 **ZoeKeyGen ទូរស័ព្ទ ៖ toast លិចក្រោមរបា Tab** — ច្បាប់ `@media` ឈរ **មុន** ច្បាប់មូលដ្ឋាន `.toast-container` ➜ ស្លាប់ស្ងាត់ៗ (រកឃើញដោយ
+  `css-media-override` ក្នុង CI ពេញ — ការរត់ checker តែមួយផ្នែកមិនបានរត់វា) ➜ ផ្លាស់ក្រោយច្បាប់មូលដ្ឋាន។
+- **អត្ថបទក្នុង App** (សំណើម្ចាស់គម្រោង ៖ «ក្នុង App ទាំងអស់កុំ mention អ្វីដែលលែងមាន អ្វីដែលធ្លាប់ដក») — កំណត់ចំណាំកំណែក្នុង 🔔
+  (2.43.0–2.47.0) សរសេរឡើងវិញជាបច្ចុប្បន្នកាល (ដក «លែង…ទៀតហើយ» · «(មុននេះ…)» · «ដូចមុន» · «ជាងមុន» · «logo ថ្មី») · សៀវភៅ ៖ «ប៊ូតុងដកដោយដៃ…លែងមាន
+  ទៀតហើយ» ➜ «ការដក Barcode ធ្វើតាមរបៀប «ស្កេនដកកញ្ចប់» នេះ»។
+- 🐛 **ប្រអប់ជាន់គ្នា (App ទាំង ២)** — រាយការណ៍ដោយម្ចាស់គម្រោង ៖ «ZoeKeyGen ចុចបើក Biometric ប្រអប់បញ្ជាក់ PIN លោតពីក្រោយប្រអប់ Config» ➜ ពិនិត្យ
+  **គ្រប់ប្រអប់** ៖ `.modal` ទាំងអស់ `z-index: 1000` ស្មើគ្នា ➜ **លំដាប់ក្នុង DOM** ឈ្នះ មិនមែនលំដាប់បើក ➜ ប្រអប់ដែលបើកក្រោយ តែឈរមុនក្នុង DOM (ឧ. PIN ពី
+  Config) លោតពីក្រោយ។ វាស់បាន ៖ ZoeKeyGen ខុស **១៥/៣០** គូ · ZoeW ខុស **៤៦៥/៩៣០** គូ (ឧ. `configModal ➜ pinModal` · `pinSetupModal ➜ pinModal`)។ ការកែ ៖
+  ប្រអប់ដែល **បើកក្រោយគេនៅលើគេ** ជានិច្ច (រួមទាំងការបើកប្រអប់ដែលបើករួច ➜ លើកវាឡើង) ៖ ZoeKeyGen `openModalHelper()` រៀប z-index ឡើងវិញ
+  (`1001…` តាមលំដាប់ · មានព្រំដែន) · `closeModal()` ដកវាចេញ · ZoeW `uiState.modalStack` (`noteModalStack()` ក្នុង `setModalDisplay()`) ➜ `Modal.tsx` ដាក់
+  z-index **តែពេលប្រអប់ ≥ ២ បើក** (ប្រអប់តែមួយរក្សា z-index ដើម ➜ parity ជាមួយ App ដើមនៅដដែល) · ពិដាន `1000 + ចំនួនប្រអប់` (ក្រោម ម៉ឺនុយ (...) `1040`)។
+- **សុវត្ថិភាព (App ទាំង ២)** ៖ Sentry លាក់ `invite` · `reset_code` (កូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ក្នុង URL ឬ breadcrumb) · វាល Setup Link ក្នុងបញ្ជីសម្អាតពេល
+  ចាកចេញ · header `Cross-Origin-Opener-Policy: same-origin` (ទំព័រផ្សេងដែលបើក App ក្នុងបង្អួចថ្មី ចាប់ `window.opener` មិនបាន)។
+
+#### អ្នកយាម
+
+- ថ្មី ៖ `ZoeW/tests/toast-backend.test.tsx` (៤) · `ZoeW/tests/config-modal.test.tsx` (៨ ៖ ជ្រើស backend · Supabase JSON · Link បិទភ្ជាប់ ➜ invite + DSN · Link ខូច ·
+  QR កាមេរ៉ា ➜ invite មិនបាត់) · `ZoeW/tests/pwa-icons.test.ts` (ឌិកូដ PNG ពិត ៖ ជ្រុងថ្លា · គ្មានគែមស · maskable/apple មិនថ្លា · ទំហំ ↔ manifest ➜ icon
+  ចាស់ **ធ្លាក់**) · `keygen-biometric-test` (២១ ៖ function ពិតក្នុង `vm` · WebAuthn ក្លែងដែលមាន PRF ពិត · AES ពិត ➜ mutation ៤/៤ ចាប់ ៖ របៀបគ្មាន PRF ·
+  រំលង hash · ប្តូរ PIN រក្សាការចង · ដកច្រកទ្វារប្រអប់)។ mutation លើ toast/Config ៖ ដក `toastBackendText` · ប្តូរ «Config» ផង · ដក `applySetupPayload`
+  ពីផ្លូវកាមេរ៉ា ➜ ចាប់ទាំងអស់។
+- ថ្មី (ជុំ deep audit) ៖ `ZoeW/tests/network-toast.test.tsx` (៩ ៖ លំដាប់ពេញ · listener ងាប់ · grace · ដាច់យឺតៗ · មិនដែលភ្ជាប់ · toast ស្ទួន · មិនទាន់ចូល ·
+  ផុតពេល ➜ ✅ ម្តងទៀត · វគ្គថ្មី ➜ tree មុនកែ ធ្លាក់ ៤ · mutation «✅ ខណៈ listener ងាប់» ចាប់) · `config-modal.test.tsx` +២ (`%` ខូច · រូប ២ ជាន់គ្នា ➜ មុនកែ ធ្លាក់ ២) ·
+  `layout-check` ៖ toast ឈរខាងលើរបា Tab ZoeKeyGen (វាស់ធរណីមាត្រពិត · CSS ចាស់ ➜ ធ្លាក់ ៥ ទំហំ) · `toast-truth-test` ៖ toast បណ្តាញរស់ក្នុង browser ពិត ·
+  `keygen-session-security-test` ៖ សារផុតពីសតិប្រាប់ផ្លូវពិត (PIN ឬ Load ➜ កូដចាស់ធ្លាក់)។
+- ជួសជុលអ្នកយាម ៖ `network-pressure-test` ដេរីវេ helper ដែលអានវាល Config (`configInputText()`) ជំនួសការចាក់អក្សរ (probe ៖ ដកការអាន ➜ ធ្លាក់) ·
+  `clock-hygiene` បញ្ជីអនុញ្ញាតត្រាសកម្មភាព Signing Key (local · fail-closed) · `run-all.sh` baseline + `keygen-biometric-test` (checker-coverage)។
+- ថ្មី ៖ `doc-scope-test` «អត្ថបទក្នុង App មិននិយាយពីអ្វីដែលលែងមាន/ធ្លាប់ដក» (សៀវភៅ · HTML ទាំង ២ App · JSX · កំណត់ចំណាំកំណែ · សារក្នុងកូដ ៖ ជាន់តូចជាង
+  ព្រោះ «កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ» ជាស្ថានភាពទិន្នន័យពិត · probe ៖ អត្ថបទចាស់ ➜ ចាប់ **១៧** · «កន្លែង»/«លែងដៃ» មិនចាប់) · `perf-check` ZoeKeyGen
+  ស្ងៀម ០ ស៊ុម (អេក្រង់ចូល + ផ្ទាំងការងារ · probe ១២០ DrawFrame) — វាស់មុនកែ ៖ ការសង្ស័យ «`.ptr-spinner` infinite គូរស៊ុម» **មិនពិត** ➜ មិនកែ ·
+  `run-all.sh` **សោ root វាស់** (`zoe-runall-measure.lock` · fd ឆ្លង `exec`) ៖ ការរត់ទី ២ ឬ `ZOE_MEASURE_ONLY=1` ខណៈ run-all កំពុងរត់ ➜ exit 2
+  ជំនួសការលុប `ZoeW/dist-audit` ពីក្រោម checker ដែលកំពុងរត់ (`runall-runner-test` ៨ ៖ សោកាន់ ➜ បដិសេធ · ទំនេរ ➜ ឆ្លង) · `state-hygiene` ទទួល
+  `configQrImageSeq` (លេខជំនាន់ គ្មានទិន្នន័យ)។
+- CI ពេញក្នុង session (emulator · `*_STRICT` ទាំង ៥) ៖ ជុំទី ១ ធ្លាក់ **៥** (`css-media-override` ➜ toast ZoeKeyGen លិចក្រោមរបា Tab · `clock-hygiene` ·
+  `repository-file-coverage` · `checker-coverage` · `network-pressure`) — ការរត់ `RUNALL_ONLY` មុននោះ **មិនបានរត់** checker ទាំងនោះ ➜ ជុំទី ២ ធ្លាក់ ១
+  (`state-hygiene`) ➜ ជួសជុលទាំងអស់។
+- Mutation sweep លើការការពារបណ្តាញ/toast ៖ ដក `retryFailedDbListenersNow` ពី `online` ➜ `connection-recovery` · timeout មិន abort ➜ `network-timeout` +
+  `network-pressure` · ដកច្រកទ្វារជំនាន់ listener `exchangeRate` ➜ `connection-recovery` · toast ចូលប្រព័ន្ធ ✅ ខណៈកំពុងទាញ ➜ `toast-truth` ➜ **៥/៥ ចាប់**។
+- ថ្មី ៖ `layout-check` «ប្រអប់ដែលបើកក្រោយនៅខាងលើជានិច្ច» (App ទាំង ២ @412 ៖ គ្រប់គូ A ➜ B តាម `openModalHelper()` ពិត + `elementFromPoint()` ·
+  បើក A ម្តងទៀត ➜ A ឡើងលើ · បិទទាំងអស់ ➜ z-index ត្រឡប់ទៅតម្លៃដើម) ➜ tree មុនកែ ធ្លាក់ (ZoeKeyGen ១៥ · ZoeW ៤៦៥) · mutation ៥ ៖ ដក z-index ZoeW · ការបើក
+  ម្តងទៀតមិនលើក · ដក z ZoeKeyGen · បិទមិន reset z ➜ **ចាប់ ៤** · «បិទមិនដកពី `modalStack`» **រស់រាន** ព្រោះសមមូល (stack ច្រោះតាម `modalDisplay` រួច ➜
+  គ្មានអ្វីដែលអ្នកប្រើឃើញប្រែ) ➜ ⛔ មិនសរសេរការអះអាងដែលចាក់សោវា។
+- CI GitHub ជាផ្នែក (run 480) ធ្លាក់ ៣ ៖ (១) `RUNALL_SHARD`/`RUNALL_ONLY` ជ្រាបចូល checker កូន ➜ fixture របស់ `hang-guard` ត្រូវបែងចែកចោល ➜ ម៉ាស៊ីនរត់
+  `export -n` វា + `runall-runner-test` ៧ខ (មុនកែធ្លាក់ · ក្រោយកែ ៥៦/៥៦ · hang-guard ផ្នែក 1/4–4/4 បៃតង) · (២) `money-guardian` លើសពិដាន ៣០០ វិ. លើ runner
+  CPU ២ ➜ បំបែក `--part=k/n` (mutation i ➜ ផ្នែក (i mod n)+1 · ផ្នែកនីមួយៗអះអាងថា run-all រត់ផ្នែកទាំង n) · (៣) `emu/supabase-adapter-parity` ៖ SDK ពិត
+  បញ្ជូនតម្លៃដំបូងយឺត ➜ រង់ចាំ listener ទាំងអស់បាញ់ម្តង (ពិដាន ១៥ វិ.) មុនជំហានទី ១ · `keygen-pin-flow-test` stub `querySelectorAll` + `MODAL_BASE_Z` ដេរីវេ។
+  ⚠️ `money-guardian --part` និង CI ពេញ មិនទាន់រត់ក្នុង session (usage) ➜ ពិនិត្យលើ CI បន្ទាប់។
+- ពង្រីក ៖ `keygen-session-security-test` (៩៥ ៖ Signing Key ផុតក្រោយ ១៥ នាទីតាមនាឡិកាក្លែង · សកម្មភាពពន្យារ · ខ្សែភ្ជាប់ពិត) · `secret-hygiene` (២២១ ៖ វាល
+  credential ដេរីវេរួម `Invite`/`resetCode`/`setupLink` · mutation ដក `invite` ➜ ចាប់) · `netlify-config-scope-test` ផ្នែក ៦ (header សុវត្ថិភាព `/*` ៖ XFO ·
+  frame-ancestors · nosniff · HSTS · Referrer · COOP · Permissions-Policy កាមេរ៉ាដេរីវេពី `getUserMedia` ➜ mutation ៣/៣)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** និង **ZoeKeyGen** លើ Netlify (header COOP ថ្មីមកជាមួយ `netlify.toml` ក្នុង deploy ដដែល)។
+2. **icon ថ្មី** ៖ PWA ដែលដំឡើងរួចប្តូរ icon ពេល Chrome ពិនិត្យ manifest ឡើងវិញ (អាចចំណាយពេលរាប់ថ្ងៃ) ➜ ចង់ឃើញភ្លាម ៖ លុប App ពី desktop ➜ ដំឡើងម្តងទៀត ·
+   iPhone ៖ លុបពីអេក្រង់ដើម ➜ «Add to Home Screen» ម្តងទៀត។
+3. សាកលើឧបករណ៍ពិត ៖ ZoeW (ហាង Supabase) ➜ toast និយាយ «Supabase» · ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ 🖼️ QR ពីរូបថតអេក្រង់ Setup Link · បិទភ្ជាប់ Link · ជ្រើស Supabase
+   វាយ URL/Key ដោយដៃ · ZoeKeyGen លើទូរស័ព្ទ ➜ Tab ទាំង ៥ · ⚙️ ➜ បើកក្រយៅដៃ/មុខ (iPhone · Android · កុំព្យូទ័រ Windows Hello) ➜ ដោះសោដោយវា · ទុក Signing Key
+   ១៥ នាទី ➜ toast ផុត។
+4. **APK ៖** workflow `Android APK` រត់ពេល `version.ts` ប្រែលើ `main` ➜ Release 2.47.0 (កូតា Actions · secret ៤ ត្រូវមាន)។
+5. ⛔ គ្មានការកែ Firebase rules · Supabase migration · env។
+
+### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (merge រួចក្នុង PR #276 · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»)
 
 **ZoeW `2.46.0`** (`zoew-v249` ➜ `zoew-v250`) · **ZoeKeyGen `2.23.0`** (`zoekeygen-v109` ➜ `zoekeygen-v110`)។ សំណើម្ចាស់គម្រោង ៖ ឈប់បង្កើត Firebase
 Project · Rules · គណនី Login ដោយដៃក្នុងមួយអតិថិជន ➜ **Supabase Project តែមួយ** (Free · Upgrade ទៅ Pro លើ Project ដដែល) · ហាងបំបែកដោយ
@@ -1632,6 +1728,30 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### CI លើ main ក្រហម · Release APK ធ្លាក់ · CI GitHub យឺត ២៣ នាទី (2026-10-01 · `audit-tools/` · `ZoeW/scripts/` · workflow តែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ)
+
+ម្ចាស់គម្រោងរាយការណ៍ ៖ «CI លើ main និង Android APK ធ្លាក់ តែ CI ពេល PR ឆ្លងទាំងអស់» · «បង្កើនល្បឿន CI ក្នុង GitHub ឲ្យលឿនដូចរត់ក្នុង session»។
+
+- **`zoew-parity` (parity:deep) ក្រហមលើ main** (run 36823040166) ខណៈ PR #276 ឆ្លង ៖ ការវាស់ដដែលធ្លាក់/ឆ្លងតាមបន្ទុក CPU (ការកត់ចុងក្រោយ
+  របស់ PR #276 ៖ «ក្រោមបន្ទុក CPU ធ្ងន់ zoew-parity នៅធ្លាក់ ៣ ជំហាន — មិនទាន់វិភាគ»)។ បង្កើតឡើងវិញក្នុង session ៖ busy loop ៦ លើ CPU ៤ ➜
+  ធ្លាក់ ៣ ជំហានដូច CI បេះបិទ («ធុងសំរាមក្រោយចូលវិញ» ៖ ធាតុម៉ឺនុយ «មើលមិនឃើញ» ខាង ZoeW ដើម)។ មូលហេតុ **២** ក្នុង harness (មិនមែន App) ៖
+  (១) App ទាំង ២ បិទម៉ឺនុយ (...) លើ **រាល់** `scroll` (capture លើ `window`) ➜ ការប្តូរទំព័របញ្ចេញ scroll-snap ដែលតាំងលំនឹងតាម **ម៉ោងពិត** ➜
+  ពេល CI រវល់ វាបាញ់ក្រោយការបើកម៉ឺនុយ ➜ ការកែ ៖ `scrollQuiet()` រង់ចាំ `window.__scrollEvents` មិនប្រែ ៣ ដងជាប់ **មុន** ចុចប៊ូតុងបើកម៉ឺនុយ
+  (⛔ មិនមែនការចុចម្តងទៀត — វានឹងលាក់ម៉ឺនុយដែលមិនបើកពិត) · (២) `pinIfAsked()` · `drawerItem()` · ជំហាន PIN រំកិលនាឡិកាដោយ `clock.runFor()`
+  ផ្ទាល់ (មិនរង់ចាំបណ្តាញស្ងប់) ➜ ចម្លើយ Apps Script ចុះលើម៉ោងក្លែងខុសគ្នា ➜ «ទាញយកចុងក្រោយ 13:00:01» ធៀប «13:00:00» (សេណារីយ៉ូ Sheet លើ
+  main) ➜ ការកែ ៖ គ្រប់ការរំកិលឆ្លង `advance()`។ វាស់ ៖ បន្ទុកដដែល ➜ **៧៩/៧៩** · ជំហានដែលមិនប្តូរអ្វីសោះ ១ ➜ ០។
+- **Release APK ធ្លាក់** (run 36823040118) ៖ `apksigner` ថ្មីសរសេរ `V2 Signer: certificate SHA-256 digest` ខណៈ workflow `grep 'Signer #1 …'` ➜
+  អានបាន «គ្មាន» ➜ «មិនស្មើ pin» ខណៈវិញ្ញាបនបត្រ **ស្មើ pin បេះបិទ** (`c2a1b725…`)។ `android:check` ផ្ទៀងតែ *អក្សរ* នៃច្រកទ្វារ ➜ មិនដែលរត់ការស្រង់
+  លើ output ពិត។ ការកែ ៖ `ZoeW/scripts/apk-cert-check.mjs` (ស្រង់ទម្រង់ទាំង ២ · ទាមទារ `Verifies` · signer ១ · វិញ្ញាបនបត្រតែមួយគ្រប់ scheme ·
+  ស្មើ pin) · workflow ហៅវា · `android:check` រត់វាលើ output ពិតរបស់ runner + ករណីបដិសេធ ៦ (mutation ៣/៣ ចាប់ ៖ កាត់ `exit 1` · ឈប់ប្រៀប pin ·
+  ដកទម្រង់ `V2 Signer:`)។ ⚠️ workflow រត់ពេល `version.ts` ប្រែលើ main ➜ Release 2.46.0 មិនកើតទេ — ការឡើងកំណែ ZoeW បន្ទាប់ ឬ «Run workflow» ដោយដៃ។
+- **CI GitHub ២៣ នាទី** ៖ runner (repo ឯកជន) មាន CPU **២** ➜ lane 2 ហើយ `checker-coverage` + `exit-code-integrity` រត់ម្នាក់ឯង ~៣៧៣ វិ. ·
+  job «Firebase rules» ១០ នាទីរត់អ្នកយាម emu/* ស្ទួន។ ការកែ ៖ `RUNALL_SHARD=k/n` ក្នុងម៉ាស៊ីនរត់ (LPT តាម `RUNALL_HINTS` ដែលវាស់លើ runner ពិត ➜
+  ទម្ងន់ ៨០៩–៨១១ ក្នុងមួយផ្នែក) · `audit.yml` = matrix ៤ ផ្នែក · ផ្នែកនីមួយៗបើក emulator ហើយរត់ទង់ STRICT ដូច Runbook ➜ job «Firebase rules» លុប។
+  អ្នកយាម (`runall-runner-test` ៧ក/៧ខ) ៖ ផ្នែកមិនជាន់ · មិនខ្វះ (fixture + បញ្ជីពិត ១៩៧) · matrix ↔ n · ទង់ STRICT ↔ Runbook · តម្លៃខុស ៦ ➜ បដិសេធ ·
+  mutation ៣/៣ ចាប់ (matrix ខ្វះផ្នែក ៤ · ដក `MONEYGUARD_STRICT` · ការបែងចែកជាន់)។ ⚠️ នាទីគិតថ្លៃ ៖ ផ្នែក ៤ × (~២ នាទីរៀបចំ + ការងារ)
+  ប្រហែលស្មើមុន (២៣ + ១០) ព្រោះ job «Firebase rules» ស្ទួនត្រូវលុប។
+
 ### Supabase + កូដអញ្ជើញ ៖ អ្វីដែលការវាស់រកឃើញពេលបញ្ចប់ (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
 
 ម្ចាស់គម្រោងបើកផ្លូវ Supabase ម្តងទៀតក្នុងទម្រង់ **ឥតគិតថ្លៃ** ៖ Free tier · **កូដអញ្ជើញ** ជំនួស SMS OTP (ការសម្រេច «មិនផ្ទេរ» ខាងក្រោមជាប់នឹងថ្លៃ
@@ -1676,6 +1796,51 @@ SMS + Pro)។ ការងាររៀបចំលើ ៤ commit (`8ff2d6e` ➜ 
   បរិស្ថាន** (មានលើ `main` តាំងពី React · មិនដែលរត់លើ GitHub)។ ការកែ ៖ smoke ផ្តាច់រាល់ការហៅទៅក្រៅ (`page.route` ➜ `abort`) · probe ៖ ក្លែង 401 លើ host License ➜
   មុនកែធ្លាក់ដូច CI · ក្រោយកែឆ្លង។
 - ⚠️ រូបថតផ្ទាំងក្នុង Chromium នៅទីនេះ ៖ គ្មាន font ខ្មែរក្នុងប្រព័ន្ធ ➜ អក្សរបាក់ រហូតដល់ផ្ទុក **Kantumruy Pro** ពិត (`document.fonts.load`) — មិនមែនកំហុស App។
+
+### ឧបករណ៍បង្កើតអតិថិជនថ្មីលើ Firebase (2026-09-30 · `tools/` + `audit-tools/` តែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ)
+
+សំណើម្ចាស់គម្រោង (ម្តងទៀត) ៖ Supabase Project **តែមួយ** (`tenant_id` · RLS) ព្រោះការបង្កើត Firebase Project · Security Rules · គណនី Login
+ដោយដៃរាល់អតិថិជនថ្មី ហត់ និងយូរ។ តាមការសម្រេចខាងក្រោម («⛔ កុំស្នើផ្លូវនេះម្តងទៀតដោយមិនលើកថ្លៃមកជាមុន») ថ្លៃ និងកូតារួមត្រូវលើកមុនសាងអ្វី ➜
+ម្ចាស់គម្រោងជ្រើស **Firebase ស្វ័យប្រវត្តិ** ៖ $0 · នៅមួយ Project ក្នុងមួយអតិថិជន (កូតា Spark រៀងខ្លួន) · ZoeW/ZoeKeyGen/rules **មិនប្រែ**។
+
+**អ្វីដែលសាង** ៖ `tools/firebase-provision/` (`new` · `rules --all` · `user` · `verify` · `show` · launcher `.cmd` ៣) ប្រើ `firebase-tools` **15.32.0**
+(pin) ជាបណ្ណាល័យ ៖ Login ផ្លូវការរបស់វា (គ្មាន OAuth client ផ្ទាល់ខ្លួន) · function management ផ្លូវការ (`createCloudProject` · `addFirebaseToCloudProject` ·
+`createWebApp` · `ensure` · `createInstance` · `updateRulesWithClient`) · endpoint ២ ដែល CLI គ្មាន (Authentication `admin/v2 …/config` · `v1/projects/…/accounts`)
+ចម្លងទម្រង់ពី `gcp/auth.js` របស់វា (`x-goog-user-project`)។ ជំហាននីមួយៗកត់ក្នុង `state/` ➜ រត់ម្តងទៀតបន្តពីកន្លែងធ្លាក់។
+
+**អ្វីដែលការវាស់រកឃើញ (មុន commit)** ៖
+- **firebase-tools ផ្ញើ `Bearer owner` លើ URL `http://`** (`isLocalInsecureRequest`) ➜ Google ក្លែងលើ http **មិនដែលរត់ផ្លូវ token** ➜ mutation «ដក `requireAuth`»
+  នឹងរស់រាន ➜ Google ក្លែងត្រូវជា **HTTPS** (CA ពី openssl ➜ `NODE_EXTRA_CA_CERTS`) ហើយបដិសេធ Bearer ដែល token endpoint មិនបានចេញ ➜ mutation នោះក្រហម **១៨**។
+- apiv2 របស់ firebase-tools ប្រើ `HTTPS_PROXY` **ដោយគ្មាន `NO_PROXY`** ➜ env របស់ child ត្រូវសាងពីទទេ។
+- `rtdb.updateRules()` បន្ថែម `?ns=` លើ host ដែលមិនមែន firebase ➜ path ខូច (`/?ns=x/.settings/rules.json`) ➜ ឧបករណ៍ប្រើ `updateRulesWithClient()` លើ
+  `databaseUrl` របស់ instance (លើ Google ពិត host ផ្ទុក namespace រួច ➜ ដូចគ្នា)។
+- **409 លើ Project ដែលការហៅរបស់យើងទើបបង្កើត** (ចម្លើយបាត់ · firebase-tools retry បណ្តាញ) ➜ កូដដំបូងចាត់ទុកថា «មានគេយក» ហើយបង្កើត `zoew-<សាខា>-xxxx`
+  ទី ២ ➜ ពិនិត្យ `GET projects/<id>` ឡើងវិញមុនប្តូរ ID (ថ្នាក់ដដែលនឹង «`disconnect` ≠ មិនបានអនុវត្ត»)។
+- ការកំណត់ Authentication ៖ server ដែលទទួល PATCH តែមិនអនុវត្តវាល (updateMask) ➜ ឧបករណ៍ **អានត្រឡប់** ហើយធ្លាក់ «did not stick» · `verify` សាកចុះឈ្មោះពិតតាម
+  apiKey សាធារណៈ ➜ ចុះបាន ➜ លុបគណនី probe + FAIL។
+- ការបើក API របស់ firebase-tools រង់ចាំ ១០ វិ. ក្នុងមួយជុំ (`POLL_SETTINGS`) ➜ `ZOE_PROVISION_API_POLL_MS` សម្រាប់តេស្ត។
+- ឈ្មោះ Project របស់ Google ទទួលតែ អក្សរ · លេខ · ដកឃ្លា · `-` `'` `!` (៤–៣០ តួ) ➜ regex ដំបូងអនុញ្ញាត `_` `.` ហើយឈ្មោះលំនាំដើមលើសាខាវែងលើស ៣០
+  តួ ➜ Google នឹងបដិសេធការបង្កើត ➜ regex ស្របច្បាប់ Google · ឈ្មោះលំនាំដើមកាត់ត្រឹម ៣០ · Google ក្លែងបដិសេធដូចពិត។
+- Email enumeration protection ជា **វាលស្រេចចិត្ត** ៖ PATCH តែមួយរួមវាលចាំបាច់ ➜ Google បដិសេធវាលមួយ (400) ➜ sign-up **មិនត្រូវបិទ** ➜ PATCH វាលចាំបាច់ម្តងទៀត ·
+  `verify` រាយ enumeration ជា `SKIP` (មិនប៉ះ exit code)។
+- **meta-checker ចាប់ checker ថ្មីរបស់ខ្ញុំ ២ ដង** (CI ពេញលើកទី ១) ៖ `checker-coverage` ៖ baseline ត្រូវជា `FBPROVISION_APP_DIR="$BASE" node …` ត្រង់ៗ (env ទី ២
+  ចន្លោះ ➜ រាប់មិនឃើញ) · `exit-code-integrity` ៖ checker ដែលពុល `ok()` ត្រូវចប់ក្នុង **៦០ វិ.** តែវាចំណាយ ~១១០ វិ. (សេណារីយ៉ូ + mutation ជាជួរ) ➜ «ផុតថវិកា ≠
+  ការធ្លាក់» ➜ ⛔ មិនបង្កើនពិដាន ៖ សេណារីយ៉ូ និង mutation រត់ **ស្របគ្នា** (Google ក្លែង · state · port ផ្ទាល់ខ្លួន) ហើយការអះអាងចាក់ចូល `ok()` **តាមលំដាប់ថេរ**
+  ក្រោយចប់ (ការពុលគ្របទាំងអស់) ➜ ~២៨ វិ. · ~៣២ វិ. ក្រោមបន្ទុក CPU ៣/៤ · ពុល ➜ `0 ok, 93 FAIL` ក្នុង ~៣៤ វិ.។
+
+**`firebase-provision-test`** ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិត · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()`
+ពិត · DSN · `.cmd` ASCII+CRLF · lock · ឈ្មោះ Project) + សេណារីយ៉ូ ១១ លើ CLI ពិត + firebase-tools ពិតទល់ Google ក្លែងដែលមានស្ថានភាព (API បិទ · operation ដែលត្រូវ
+poll · sign-up · rules · updateMask · វាលដែលបដិសេធ) + **mutation ១៤/១៤ ក្រហម** ➜ **៩៣ ok** · ~៣០ វិ.។ ⛔ ព្រំដែន ៖ Google **ពិត** មិនត្រូវបានហៅ (session នេះគ្មានគណនី/បណ្តាញ) ➜
+ការរត់លើកដំបូងលើគណនីពិតជាសកម្មភាពដោយដៃ ហើយ `verify` ជាអ្នកវាស់លទ្ធផលពិត។ ⚠️ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (**១៦**) ➜
+លើសនោះ មុខងារ «ទាញបញ្ជី ZTO» បិទសម្រាប់ទាំងអស់គ្នា — មិនទាន់កែ (ឧបករណ៍ និង README ប្រាប់ពិដាននេះ)។
+
+**CI ពេញ** (emulator · `*_STRICT` · `FBPROVISION_STRICT=1` · `RUNALL_JOBS=4`) ៖ លើកទី ១ ធ្លាក់ ៣ ➜ meta-checker ២ ខាងលើ (ជួសជុល) · `zoew-suite` ➜ `rules:check`
+Android «ស្តារ MR1» (ZoeW **មិនប្រែ** ➜ ថ្នាក់ដដែលនឹងការធ្លាក់ក្រោមបន្ទុកដែលកត់ក្នុងធាតុ Supabase ខាងក្រោម) ➜ លើកទី ២ លើ tree ចុងក្រោយ ៖ **១៩១ ពេញលេញ · ០ មួយផ្នែក ·
+០ រំលង**។ checker លើ tree មុនកែ (`origin/main`) ➜ `0 ok, 1 FAIL`។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ** ៖ `tools/firebase-provision/setup.cmd` (Login Google ម្តង) ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ exit 0 ➜ Login ក្នុង
+ZoeW ➜ អតិថិជនចាស់ ៖ `node provision.js new --project-id <id> --branch <សាខា> --adopt` ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។ ⛔ គ្មាន Deploy · គ្មាន Publish ·
+ZoeW/ZoeKeyGen មិនប្រែ។
 
 ### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)
 
@@ -2537,6 +2702,7 @@ Function ដែល export ៖ 978
 | `field-shape-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | — | ផ្នែក ៣ |
+| `firebase-provision-test` | ផ្នែក ២ | — |
 | `fluid-type-focus-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -2550,8 +2716,10 @@ Function ដែល export ៖ 978
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `item-money-integrity-test` | — | ផ្នែក ១ |
+| `keygen-biometric-test` | ផ្នែក ១ | — |
 | `keygen-notice-test` | ផ្នែក ១ | — |
-| `keygen-session-security-test` | — | ផ្នែក ២ |
+| `keygen-pin-flow-test` | ផ្នែក ១ | — |
+| `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | — | ផ្នែក ១ |
 | `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |

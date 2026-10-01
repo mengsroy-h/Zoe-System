@@ -13,7 +13,17 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-10-01 · ZoeW 2.47.0 · ZoeKeyGen 2.24.0)
+
+⛔ **មេរៀនជុំ 2.47.0 ៖ checker ដែល «ដេរីវេ» តែតាមលំនាំឈ្មោះចង្អៀត ក៏ខ្វាក់ដែរ** — `secret-hygiene` ដេរីវេវាល credential ពី `fieldsToBlank` តែតាមចុង
+`Pin|Password|Key|Secret|Token` ➜ **កូដអញ្ជើញ** (ចុះឈ្មោះចូលហាង) · កូដប្តូរពាក្យសម្ងាត់ · Setup Link រំលង ➜ `invite` មិនស្ថិតក្នុងបញ្ជីលាក់ Sentry ខណៈ checker បៃតង ·
+**គ្មាន checker ណាវាស់ header សុវត្ថិភាព** (frame-ancestors · nosniff · HSTS) · `apksigner` ប្តូរទម្រង់ output ➜ Release ធ្លាក់ខណៈ `android:check` ផ្ទៀងតែ
+អក្សរនៃច្រកទ្វារ · PNG icon ZoeKeyGen មានជ្រុង **សពិត** (គ្មាននរណាអានភីកសែល)។ ⛔ សួរបន្ថែម ៖ (១) តើបញ្ជីដេរីវេគ្របប្រភេទ secret **ថ្មី** ទេ? (២) តើ config
+ដែលធ្វើឲ្យ App មានសុវត្ថិភាព មានអ្នកវាស់ **តម្លៃ** ទេ? (៣) តើ parser ក្នុង workflow ត្រូវរត់លើ **output ពិត** ទេ? (៤) តើ asset (រូប) ត្រូវវាស់តាម **ភីកសែល** ទេ?
+⛔ CI parity:deep ៖ ការរំកិលនាឡិកាដោយ `clock.runFor()` ផ្ទាល់ និងការចុចម៉ឺនុយពេលការរមូរមិនទាន់ស្ងប់ ធ្លាក់តែក្រោមបន្ទុក ➜ បង្កើតឡើងវិញដោយ busy loop
+(៦ លើ CPU ៤) មុនកែ។ លម្អិត ៖ `docs/HISTORY.md` ផ្នែក ១ [2.47.0] · ផ្នែក ២។
+
+## តារាងជុំមុន (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
 
 ⛔ **មេរៀនជុំ 2.46.0 ៖ backend ទី ២ = ផ្ទៃដែលអ្នកយាមចាស់គិតថាជា «ការពិតតែមួយ»** — ZoeW ដើរលើ Firebase **ឬ** Supabase (adapter `fb` លើ zoe_docs · rules
 compile ទៅ Postgres) ហើយ ZoeKeyGen មានផ្ទាំងហាង Supabase។ CI ពេញលើកដំបូងធ្លាក់ **២១** ៖ កំហុសពិតតិច (`document` ផ្ទាល់ · `Date.now() - startedAt` ·

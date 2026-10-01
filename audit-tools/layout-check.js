@@ -177,6 +177,76 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            // ⛔ modal ជាន់គ្នា (App ទាំង ២) ៖ modal ដែល **បើកក្រោយ** ត្រូវនៅខាងលើជានិច្ច — z-index ស្មើគ្នា ➜ លំដាប់ក្នុង DOM ឈ្នះ ➜ ឧ. ប្រអប់ PIN
+            //    (ឈរមុន Config ក្នុង DOM) បើកពី ⚙️ Config ➜ លោតពីក្រោយ (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ ZoeKeyGen បើកក្រយៅដៃ/មុខ · វាស់បាន ZoeW ខុស
+            //    ៤៦៥/៩៣០ គូ · ZoeKeyGen ១៥/៣០)។ វាស់គ្រប់គូ (A ➜ B) តាម `openModalHelper()` ពិត និង `elementFromPoint()` ចំកណ្តាលប្រអប់ B · បើក A
+            //    **ម្តងទៀត** ខណៈវាបើករួច ➜ A ត្រូវឡើងលើ (ការបើកឡើងវិញដែលមិនលើក = ប្រអប់ដដែលនៅពីក្រោយ) · បិទទាំងអស់ ➜ z-index ត្រឡប់ទៅតម្លៃដើមរបស់ប្រអប់
+            //    (ZoeW ៖ modal តែមួយរក្សា z-index ដើមរបស់វា ➜ parity ជាមួយ App ដើមនៅដដែល)
+            if (size.w === 412) {
+                await page.waitForFunction(() => typeof window.openModalHelper === 'function' && typeof window.closeModal === 'function', null, { timeout: 20000 }).catch(() => {});
+                const stack = await page.evaluate(() => {
+                    if (typeof openModalHelper !== 'function' || typeof closeModal !== 'function') return { skip: true };
+                    const flush = () => { if (typeof window.commitNow === 'function') window.commitNow(); };
+                    const ids = Array.from(document.querySelectorAll('.modal')).map((m) => m.id).filter(Boolean);
+                    const onTop = (id) => {
+                        const el = document.getElementById(id);
+                        const box = el.querySelector('.modal-content') || el;
+                        const r = box.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) return false;
+                        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 40));
+                        return !!hit && el.contains(hit);
+                    };
+                    const wrong = [];
+                    let pairs = 0;
+                    ids.forEach((m) => closeModal(m));
+                    flush();
+                    const ownZ = new Map(ids.map((id) => [id, document.getElementById(id).style.zIndex]));
+                    ids.forEach((a) => ids.forEach((b) => {
+                        if (a === b) return;
+                        openModalHelper(a);
+                        openModalHelper(b);
+                        flush();
+                        pairs++;
+                        if (!onTop(b)) wrong.push(a + ' ➜ ' + b);
+                        openModalHelper(a);
+                        flush();
+                        if (!onTop(a)) wrong.push(a + ' ➜ ' + b + ' ➜ ' + a);
+                        closeModal(b);
+                        closeModal(a);
+                        flush();
+                    }));
+                    const leftover = ids.filter((id) => document.getElementById(id).style.zIndex !== ownZ.get(id));
+                    return { pairs, ids: ids.length, wrongCount: wrong.length, wrong: wrong.slice(0, 12), leftover };
+                });
+                check(!stack.skip && stack.ids >= 5 && stack.pairs >= stack.ids * (stack.ids - 1) && stack.wrongCount === 0 && stack.leftover.length === 0,
+                    label + ': ⛔ modal ដែលបើកក្រោយនៅខាងលើជានិច្ច (គ្រប់គូ A ➜ B · បើក A ម្តងទៀត)', JSON.stringify(stack).slice(0, 500));
+            }
+
+            // ⛔ របា Tab ខាងក្រោម (ZoeKeyGen ទូរស័ព្ទ) ៖ toast ត្រូវឈរ **ខាងលើ** របា — មិនមែនពីក្រោយវា (វាស់ធរណីមាត្រពិត
+            //    មិនមែនលំដាប់ CSS ៖ ច្បាប់ `@media` ដែលឈរមុនច្បាប់មូលដ្ឋាន ស្លាប់ស្ងាត់ៗ ➜ toast លិចក្រោមរបា)
+            const tabOverlap = await page.evaluate(() => {
+                const bar = document.getElementById('kgTabBar');
+                if (!bar) return { skip: true };
+                const app = document.getElementById('appContainer');
+                const wasHidden = app && app.classList.contains('hidden');
+                if (wasHidden) app.classList.remove('hidden');
+                const host = document.getElementById('toastContainer') || document.querySelector('.toast-container');
+                if (!host) { if (wasHidden) app.classList.add('hidden'); return { skip: true, why: 'គ្មាន .toast-container' }; }
+                const probe = document.createElement('div');
+                probe.className = 'toast show';
+                probe.textContent = 'probe';
+                host.appendChild(probe);
+                const barRect = bar.getBoundingClientRect();
+                const visible = getComputedStyle(bar).display !== 'none' && barRect.height > 0;
+                const t = probe.getBoundingClientRect();
+                probe.remove();
+                if (wasHidden) app.classList.add('hidden');
+                return { visible, toastBottom: Math.round(t.bottom), barTop: Math.round(barRect.top) };
+            });
+            if (!tabOverlap.skip && tabOverlap.visible) {
+                check(tabOverlap.toastBottom <= tabOverlap.barTop + 1, label + ': toast ឈរខាងលើរបា Tab (មិនលិចក្រោមវា)', tabOverlap);
+            }
+
             if (app === 'ZoeW') {
                 const headers = reportHeaders(ROOT);
                 const cellR = headers.length ? await page.evaluate((hs) => {
@@ -226,9 +296,9 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                 check(d && d.width >= DESKTOP_MIN_CONTAINER,
                     app + ' @' + w + 'px: ខ្លឹមសារប្រើទទឹងយ៉ាងតិច ' + DESKTOP_MIN_CONTAINER + 'px',
                     d ? 'ឃើញ ' + d.width + 'px — App នៅជាជួរឈរទទឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
-                check(d && shape[412].rows > 0 && d.rows < shape[412].rows,
-                    app + ' @' + w + 'px: កាតបត់ជាជួរឈរច្រើន (' + (shape[412] ? shape[412].rows : '?') + ' ➜ ' + (d ? d.rows : '?') + ' ជួរដេក)',
-                    d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' ដដែលនឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
+                check(d && d.cards > 1 && d.cards >= shape[412].cards && d.rows < d.cards,
+                    app + ' @' + w + 'px: កាតបត់ជាជួរឈរច្រើន (កាត ' + (d ? d.cards : '?') + ' ➜ ' + (d ? d.rows : '?') + ' ជួរដេក)',
+                    d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' (ជួរឈរតែមួយ)' : 'វាស់មិនបាន');
             }
         }
         // ⛔ ការគ្រប់គ្រងក្នុងប្រអប់ ៖ `min-height: 46px` របស់កំណែ 2.22.2 ត្រូវ

@@ -1,13 +1,8 @@
-# ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR។
+# ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR និង main ៖ `run-all.sh` ពេញ (រួមតេស្ត browser · RTDB emulator ពិត · Postgres ពិត)
+# បែងចែកជា ៤ ផ្នែករត់ស្របគ្នា (`RUNALL_SHARD`)។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
 #
-# ហេតុអ្វីមាន job ២៖
-#   · firebase-rules — សាកកូដពិត **ធៀបនឹង firebase-database.rules.json ពិត**
-#     លើ RTDB emulator។ នេះជាចន្លោះដែលធ្វើឲ្យកំហុស 2.17.2/2.17.3 ship បាន៖
-#     តេស្ត ៧៩ បៃតង ខណៈផលិតកម្មខូច ព្រោះគ្មានអ្វីសាកនឹង rules ពិត។
-#   · audit-suite — `run-all.sh` ពេញ (រួមតេស្ត browser)។
-#
-# ⛔ CRUD_FLOW_STRICT=1 ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator មិនឡើង
-#    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ។
+# ⛔ ទង់ *_STRICT ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator · Postgres · firebase-tools មិនឡើង
+#    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ (កំហុស 2.17.2/2.17.3 ship បាន ព្រោះគ្មានអ្វីសាកនឹង rules ពិត)។
 name: Audit
 
 on:
@@ -23,153 +18,19 @@ permissions:
   contents: read
 
 jobs:
-  firebase-rules:
-    name: Firebase rules ↔ payload (RTDB emulator)
+  # ⛔ runner GitHub (repo ឯកជន) មាន CPU ២ ➜ run-all.sh ពេញមួយ job ចំណាយ ~២៣ នាទី (lane 2 · meta រត់ម្នាក់ឯង) ខណៈ session
+  #    (CPU ៤) ~១០ នាទី។ ការកែ ៖ បែងចែកបញ្ជីទៅ job ស្របគ្នា `RUNALL_SHARD=k/N` (`run-all.sh` ៖ LPT តាម RUNALL_HINTS ➜ ផ្នែក
+  #    ទាំង N មិនជាន់ · មិនខ្វះ តាមរចនាសម្ព័ន្ធ · runall-runner-test ផ្ទៀង matrix ខាងក្រោម ↔ N)។
+  # ⛔ shard នីមួយៗបើក RTDB emulator ផ្ទាល់ ហើយរត់ទង់ STRICT ដូច Runbook ជំហានទី ០ ➜ CI ស្មើការរត់ពេញក្នុង session
+  #    (emu/* · money-guardian រត់ពេញ មិនមែន SKIP) ➜ job «Firebase rules» ដាច់លែងត្រូវការ។
+  audit-shard:
+    name: run-all.sh ផ្នែក ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: ដំឡើង dependency
-        run: npm install --no-save --no-audit --no-fund acorn firebase-tools
-
-      # ⛔ ZoeW ជា React ➜ checker វាស់ **tree វាស់** (`ZoeW/dist-audit/measure-root`) មិនមែន repo
-      #    (repo គ្មាន `ZoeW/app.js`) ➜ build វាដោយ `run-all.sh` ដដែល រួចរត់ checker ក្នុងថតនោះ។
-      - name: ដំឡើង dependency របស់ ZoeW (React)
-        run: npm ci --prefix ZoeW --no-audit --no-fund
-
-      # ⛔ build វាស់គូរ `index.html` ពិតក្នុង Chromium (`build-audit.mjs` ៖ `/opt/pw-browsers/chromium`) ➜ Chromium ត្រូវមាន **មុន** build
-      #    (emu/app-network-e2e ក៏ប្រើវាដែរ)
-      - name: ទាញ Chromium (build វាស់ · emu/app-network-e2e)
-        run: |
-          set -euo pipefail
-          npx --yes playwright install --with-deps chromium
-          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
-          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
-          sudo mkdir -p /opt/pw-browsers/chromium-1194
-          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
-          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
-          test -x /opt/pw-browsers/chromium
-
-      # ⛔ output ពេញត្រូវបង្ហាញពេលធ្លាក់ ៖ `| tail -1` តែម្យ៉ាងលាក់មូលហេតុ (log រាយត្រឹម «exit code 1»)
-      - name: build វាស់ (ZoeW React ➜ tree វាស់)
-        run: |
-          set -euo pipefail
-          if ! OUT=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh 2>/tmp/measure.err); then printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; fi
-          M=$(printf '%s\n' "$OUT" | tail -1)
-          test -f "$M/ZoeW/app.js" || { printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; }
-          echo "MEASURE=$M" >> "$GITHUB_ENV"
-
-      - name: Cache RTDB emulator jar
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/firebase/emulators
-          key: rtdb-emulator-${{ runner.os }}-v1
-
-      - name: ទាញ RTDB emulator
-        run: npx --yes firebase setup:emulators:database
-
-      - name: បើក emulator
-        run: |
-          set -euo pipefail
-          JAR=$(ls "$HOME"/.cache/firebase/emulators/firebase-database-emulator-*.jar | head -1)
-          echo "jar: $JAR"
-          nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -sf --noproxy "*" -o /dev/null "http://127.0.0.1:9000/.json?ns=demo-zoe"; then
-              echo "emulator UP"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "❌ emulator មិនឡើងក្នុង ៦០ វិនាទី"
-          cat /tmp/emu.log
-          exit 1
-
-      - name: payload ពិត ធៀបនឹង rules ពិត
-        env:
-          CRUD_FLOW_STRICT: '1'
-          CRUD_FLOW_MIN_ASSERTS: '70'
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/crud-rules-flow.js
-
-      - name: witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង)
-        env:
-          CRUD_FLOW_STRICT: '1'
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/restore-deadlock-test.js
-
-      - name: «អនុវត្ត ➜ ដកវិញ» ជាគូបញ្ច្រាសពិត (ledger លើ RTDB ពិត)
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/ledger-revert-emu-test.js
-
-      - name: ស្តារកំពុងដំណើរការ មិនត្រូវជាន់ដោយលុប ដក ឬកែតម្លៃ
-        env:
-          CRUD_FLOW_STRICT: '1'
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/restore-mutation-emu-test.js
-
-      # ⛔ App ពិត · SDK Firebase ពិត · emulator ពិត ➜ ត្រូវការ Chromium ក្នុង job នេះ (job audit-suite គ្មាន emulator ➜ SKIP)
-      - name: ការតភ្ជាប់ «ងាប់ស្ងាត់» ➜ App ឈប់រាយបៃតង ហើយភ្ជាប់វិញ (App · SDK · emulator ពិត)
-        env:
-          NETE2E_STRICT: '1'
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/app-network-e2e-test.js
-
-      # ⛔ Supabase ៖ rules RTDB ក្នុង Postgres · adapter `fb` របស់ ZoeW ធៀប RTDB emulator ពិត (oracle) ➜ ត្រូវការ emulator · Postgres ពិត · Chromium
-      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
-        run: npm ci --prefix supabase --no-audit --no-fund
-
-      - name: rules RTDB ដែល Postgres អនុវត្ត ស្មើ RTDB ពិត (Supabase)
-        env:
-          CRUD_FLOW_STRICT: '1'
-          SUPABASE_STRICT: '1'
-          ZOE_REPO_ROOT: ${{ github.workspace }}
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/supabase-rules-parity-test.js
-
-      - name: adapter fb លើ Supabase ស្មើ SDK Firebase ពិត
-        env:
-          CRUD_FLOW_STRICT: '1'
-          SUPABASE_STRICT: '1'
-          ZOE_REPO_ROOT: ${{ github.workspace }}
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/emu/supabase-adapter-parity-test.js
-
-      # ⛔ job នេះ **មាន** emulator ➜ `MONEYGUARD_STRICT=1` ធ្វើឲ្យ SKIP របស់
-      # អ្នកយាមណាមួយក្លាយជា **ការធ្លាក់**។ (ក្នុង job `run-all.sh` ដែលគ្មាន
-      # emulator វារត់ដោយគ្មាន STRICT ➜ mutation ដែលត្រូវការ emulator រាយជា
-      # `--` ដោយស្មោះត្រង់ ជំនួសការធ្លាក់ក្លែងក្លាយ។)
-      - name: ថ្នាក់លុយត្រូវមានអ្នកយាមដែលក្រហមពិត
-        env:
-          MONEYGUARD_STRICT: '1'
-        working-directory: ${{ env.MEASURE }}
-        run: node audit-tools/money-guardian-test.js
-
-      - name: rules ↔ schema (ស្តាទិច)
-        working-directory: ${{ env.MEASURE }}
-        run: |
-          node audit-tools/payload-schema.js
-          node audit-tools/rules-duplicate-keys.js
-          node audit-tools/restore-marker-hygiene-test.js
-
-      - name: log របស់ emulator ពេលធ្លាក់
-        if: failure()
-        run: cat /tmp/emu.log || true
-
-  audit-suite:
-    name: run-all.sh (រួមតេស្ត browser)
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       # ⛔ `fetch-depth: 0` ចាំបាច់។ លំនាំដើម (`1`) ទាញតែ commit តែមួយ ➜
       # គ្មាន `origin/main` ➜ `version-bump-scope.js` **SKIP រាល់ការរត់**
@@ -183,6 +44,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            ZoeW/package-lock.json
+            supabase/package-lock.json
+            tools/firebase-provision/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: ដំឡើង dependency
         run: npm install --no-save --no-audit --no-fund acorn playwright-core playwright
@@ -208,16 +79,58 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
-      # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-datastore · supabase-functions · keygen-supabase-admin
-      #    ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL (emu/supabase-* រត់ក្នុង job firebase-rules)
+      # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-datastore · supabase-functions · keygen-supabase-admin ·
+      #    emu/supabase-* ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL
       - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
         run: npm ci --prefix supabase --no-audit --no-fund
+
+      # ⛔ firebase-tools ពិត (កំណែ pin) សម្រាប់ firebase-provision-test ➜ `FBPROVISION_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL ·
+      #    CLI ដដែលទាញ RTDB emulator ខាងក្រោម (គ្មានការដំឡើង firebase-tools ទី ២)
+      - name: ដំឡើង dependency របស់ tools/firebase-provision (firebase-tools)
+        run: npm ci --prefix tools/firebase-provision --ignore-scripts --no-audit --no-fund
 
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
-      - name: run-all.sh
+      - name: Cache RTDB emulator jar
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: rtdb-emulator-${{ runner.os }}-v1
+
+      - name: ទាញ RTDB emulator
+        run: tools/firebase-provision/node_modules/.bin/firebase setup:emulators:database
+
+      # ⛔ emulator ត្រូវរស់ **មុន** run-all ➜ emu/* · money-guardian រត់ពេញ (STRICT ៖ ការតភ្ជាប់មិនបាន = FAIL មិនមែន SKIP)
+      - name: បើក emulator
+        run: |
+          set -euo pipefail
+          JAR=$(ls "$HOME"/.cache/firebase/emulators/firebase-database-emulator-*.jar | head -1)
+          echo "jar: $JAR"
+          nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf --noproxy "*" -o /dev/null "http://127.0.0.1:9000/.json?ns=demo-zoe"; then
+              echo "emulator UP"
+              cp firebase-database.rules.json audit-tools/emu/real.rules.json
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "❌ emulator មិនឡើងក្នុង ៦០ វិនាទី"
+          cat /tmp/emu.log
+          exit 1
+
+      # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
+      - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
         env:
+          RUNALL_SHARD: ${{ matrix.shard }}/4
+          CRUD_FLOW_STRICT: '1'
           VERSIONSCOPE_STRICT: '1'
+          MONEYGUARD_STRICT: '1'
           SUPABASE_STRICT: '1'
+          FBPROVISION_STRICT: '1'
         run: bash audit-tools/run-all.sh
+
+      - name: log របស់ emulator ពេលធ្លាក់
+        if: failure()
+        run: cat /tmp/emu.log || true

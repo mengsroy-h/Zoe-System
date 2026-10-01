@@ -42,6 +42,7 @@
 ```bash
 npm ci --prefix ZoeW
 npm ci --prefix supabase      # អ្នកយាម Supabase ៖ Postgres ពិត (`@embedded-postgres`) · `pg` · supabase-js · typescript
+npm ci --prefix tools/firebase-provision --ignore-scripts   # firebase-tools ពិតសម្រាប់ firebase-provision-test
 ```
 
 ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playwright-core` · `esbuild`) ក៏ជា dependency របស់ checker ដែរ
@@ -52,6 +53,7 @@ ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playw
 | `acorn` | checker ស្តាទិចដែល parse តាម AST |
 | `playwright-core` | តេស្តដែលបើក Chromium ពិត |
 | `xlsx` | ការត្រួតពិនិត្យ XML ដែល Export emit ចេញ |
+| `firebase-tools` (`tools/firebase-provision/node_modules`) · `openssl` | `firebase-provision-test` ៖ រត់ CLI បង្កើតអតិថិជនពិតទល់ Google ក្លែងលើ HTTPS |
 
 បើខ្វះមួយណា checker ដែលពឹងលើវា **SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់
 ហើយរាយ `SKIPPED`/`PARTIAL PASS` **ដាច់ពី `PASS`** ដើម្បីកុំឲ្យការគ្របតេស្ត
@@ -83,11 +85,13 @@ bash audit-tools/run-all.sh
 | `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
 | `RUNALL_RESUME=1` | បិទ | រត់តែ checker ដែល **ធ្លាក់ ឬគ្មានលទ្ធផល** · លទ្ធផលផ្សេងយកពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
 | `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
+| `RUNALL_SHARD=k/n` | — | រត់តែផ្នែកទី k ក្នុង n (CI ៖ `audit.yml` រត់ ៤ ផ្នែកលើ runner ស្របគ្នា) · ការបែងចែកដេរីវេពីបញ្ជី + `RUNALL_HINTS` តែប៉ុណ្ណោះ ➜ ផ្នែកទាំង n មិនជាន់ · មិនខ្វះ · តម្លៃខុស ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» (tree បៃតងតែពេលផ្នែកទាំង n បៃតង) |
 
 ```bash
 bash audit-tools/run-all.sh                                   # ពេញ (lane ស្របគ្នា)
 RUNALL_RESUME=1 bash audit-tools/run-all.sh                   # session ងាប់កណ្តាលទី ➜ បន្តតែអ្វីដែលខ្វះ/ធ្លាក់
 RUNALL_ONLY=layout-check,emu/crud-rules-flow bash audit-tools/run-all.sh   # រត់ឡើងវិញតែ ២
+RUNALL_SHARD=2/4 bash audit-tools/run-all.sh                  # ផ្នែកទី ២ ក្នុង ៤ (ដូច job CI មួយ)
 cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # មើលវឌ្ឍនភាពខណៈកំពុងរត់
 ```
 
@@ -170,7 +174,7 @@ bash audit-tools/emu/rules.sh
 | `repository-contract-test.js` | ផ្ទៀងផ្ទាត់ Apps Script manifest, CSV template, backup config example និង package lock ធៀបនឹងកិច្ចសន្យាកូដដែលប្រើវា | `REPOCONTRACT_APP_DIR` |
 | `money-reality-test.js` | រត់ CLI របាយការណ៍ និង redaction លើ fixture ពិត; លទ្ធផលមុន/ក្រោយត្រូវស៊ីគ្នា; ទិន្នន័យរសើបត្រូវលាក់; launcher មិនប្រកាសជោគជ័យពេល redaction ធ្លាក់។ ⛔ **ការឃ្លាតរវាងកញ្ចក់ `zoew_daily_collected_cod_dod` និងប្រវត្តិ ត្រូវចេញ exit 1 ពិត** (៥ អ័ក្ស បូកជាន់អប្បបរមា «វិសាលភាពទទេ») ហើយ ៤ សេណារីយ៉ូទិសផ្ទុយត្រូវ **នៅ exit 0** ៖ កញ្ចក់ស៊ីគ្នា (រួម barcode បិទក្នុងធុងសំរាម) · កូនសោគ្មានម្ចាស់ · ថ្ងៃខុស · barcode ដែលបិទមុនកញ្ចក់ចាប់ផ្តើម | `MONEYREALTEST_APP_DIR` |
 | `hang-guard.js` | checker ត្រូវអាចធ្លាក់បាន **ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ · រត់ `exit-code-integrity.js` លើ fixture ៤០ checker ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ · ការពុលរត់ស្របគ្នា | `HANGGUARD_APP_DIR` |
-| `runall-runner-test.js` | ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា (ប្លុក `#@runner-begin`…`#@runner-end` ពិត លើ checker ក្លែង) ៖ ស្របគ្នាពិត (វាស់ពីចន្លោះ start/end) · output តាមលំដាប់បញ្ជី ≡ ជាជួរ · emu ម្តងមួយ · meta ម្នាក់ឯង · browser មានពិដាន · ព្យួរ ➜ FAIL · state/`RUNALL_RESUME` (tree ផ្សេង ➜ បដិសេធ)/`RUNALL_ONLY` (ឈ្មោះមិនស្គាល់ ➜ បដិសេធ) · TERM មិនបន្សល់ process កំព្រា · lane នៃបញ្ជីពិតត្រូវនឹងភស្តុតាងក្នុងប្រភព (ទាំង ២ ទិស) | `RUNALLRUNNER_APP_DIR` |
+| `runall-runner-test.js` | ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា (ប្លុក `#@runner-begin`…`#@runner-end` ពិត លើ checker ក្លែង) ៖ ស្របគ្នាពិត (វាស់ពីចន្លោះ start/end) · output តាមលំដាប់បញ្ជី ≡ ជាជួរ · emu ម្តងមួយ · meta ម្នាក់ឯង · browser មានពិដាន · ព្យួរ ➜ FAIL · state/`RUNALL_RESUME` (tree ផ្សេង ➜ បដិសេធ)/`RUNALL_ONLY` (ឈ្មោះមិនស្គាល់ ➜ បដិសេធ) · TERM មិនបន្សល់ process កំព្រា · lane នៃបញ្ជីពិតត្រូវនឹងភស្តុតាងក្នុងប្រភព (ទាំង ២ ទិស) · `RUNALL_SHARD` (ផ្នែកមិនជាន់ · មិនខ្វះ លើ fixture និងបញ្ជីពិត · matrix `audit.yml` ↔ n · ទង់ STRICT ↔ Runbook · តម្លៃខុស ➜ បដិសេធ) | `RUNALLRUNNER_APP_DIR` |
 | `exit-code-integrity.js` | ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ · ពុល checker កូន **ស្របគ្នា** (`emu/*` ម្តងមួយ) · កូនដែលផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល = FAIL (វាស់មិនបាន) · បោះពុម្ពពេលសរុប និងកូនយឺតជាងគេ ៥ | `EXITCODE_APP_DIR` · `EXITCODE_CONCURRENCY` (លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ២–៨) · `EXITCODE_TIMEOUT_MS` (ថវិកាកូនមួយ · លំនាំដើម ៦០០០០) |
 | `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | — |
 | `version-check.js` | `app.js` ↔ `manifest.json` ↔ `index.html` ក្នុង App នីមួយៗ | `VERSION_APP_DIR` |
@@ -355,12 +359,14 @@ bash audit-tools/emu/rules.sh
 | `emu/app-writes-rules-test.js` | **ការសរសេរពិតរបស់ App ↔ rules ពិត** ៖ រត់ `revenue-fuzz-test.js` (App ពិតក្នុង Chromium · ស្កេន · បិទ/បើក · ដក · លុប · ស្តារ · កែតម្លៃ · សម្អាត ២ម៉ោង/៧ថ្ងៃ · ឧបករណ៍ផ្សេង) ជាមួយ `FUZZ_CAPTURE` ➜ ចាក់ការសរសេរតាមលំដាប់ពិតទៅ RTDB emulator ជាមួយ `firebase-database.rules.json` ពិត ៖ App ➜ user · harness ➜ owner ➜ ការបដិសេធណាមួយ = FAIL · probe ទិសផ្ទុយ (record ប្រវត្តិ `.validate: false` ➜ ត្រូវបដិសេធ) · ជាន់ ≥ ១៥០ ការសរសេរ · គ្រប root ៩ | `APPWRITES_APP_DIR` · `APPWRITES_STRICT` · `APPWRITES_RUNS` · `APPWRITES_OPS` |
 | `emu/app-network-e2e-test.js` | **App ពិត** (build វាស់ក្នុង Chromium) · **SDK Firebase ពិត** (កំណែដដែលនឹង CDN · បម្រើក្នុងស្រុក) · RTDB emulator ពិត + rules ពិត · proxy TCP ៖ offline/online ពិត ➜ ស្ថានភាព និងទិន្នន័យ · ការតភ្ជាប់ «ងាប់ស្ងាត់» (socket បើកតែឈប់បញ្ជូន · `navigator.onLine` នៅ `true`) ➜ App ត្រូវឈប់រាយ «ភ្ជាប់ Server រួចរាល់» ហើយភ្ជាប់វិញពេលបណ្តាញមកវិញ តាមទ្វារ ៣ (ការសរសេរព្យួរ · ភ្ញាក់ពី background · វដ្ត ៦០ វិ.) · ទិសផ្ទុយ ៖ យឺតតែរស់ ➜ មិនផ្តាច់ · listener មិនស្ទួនលើ SDK ពិត | `NETE2E_APP_DIR` · `NETE2E_EMU_PORT` · `NETE2E_STRICT` · `NETE2E_CHROME` · `NETE2E_DEBUG` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
+| `keygen-biometric-test.js` | ការដោះសោ PIN ដោយក្រយៅដៃ/មុខក្នុង ZoeKeyGen (កូដពិត · WebAuthn PRF ក្លែង · AES-GCM ពិត) ៖ ⛔ តែរបៀប PRF (គ្មាន PRF ➜ បដិសេធ មិនរក្សា PIN ក្បែរសោ) · PIN ស្រាយចេញផ្ទៀងនឹង hash · ការប្តូរ PIN ➜ លុបការចង · ផ្លូវជោគជ័យ `completePinUnlock()` · lockout · PIN modal បិទ/ចាកចេញកណ្តាលការស្កេន ➜ មិនដោះ · ខ្សែភ្ជាប់ HTML/ACTION_ALLOWLIST | `KEYGEN_APP_DIR` |
 | `keygen-notice-test.js` | ដំណឹង ZoeKeyGen ➜ ZoeW (ផ្ទាំង 🔔) ៖ ប្រភេទ · ព្រំដែនប្រវែង · ទម្រង់ id ស៊ីគ្នារវាង `app.js` ↔ `index.html` ↔ rules · `sendNotice()`/`deleteNotice()` ពិតក្នុងរបៀបបរាជ័យ (បដិសេធ · ព្យួរហើយ commit យឺត · ការអានធ្លាក់ · logout កណ្តាលទី) ➜ toast ✅ តែក្រោយ commit · បញ្ជី escape HTML | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |
 | `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket | `FBACKUP_APP_DIR` |
+| `firebase-provision-test.js` | **ឧបករណ៍បង្កើតអតិថិជនថ្មី** (`tools/firebase-provision/`) ៖ កិច្ចសន្យាឆ្លងឯកសារ (អ៊ីមែល ↔ `siteCodeFromEmail()` ពិតរបស់ Function ZTO · Project ID ↔ `PROJECT_ID_RE` · Setup Link ↔ `decodeSetupPayload()` ពិតរបស់ ZoeW · DSN · `.cmd` ASCII+CRLF · pin កំណែ · លេខក្នុង README) · **CLI ពិត + `firebase-tools` ពិត ទល់ Google ក្លែងលើ HTTPS** (CA ពី openssl ➜ ផ្លូវ token ពិត) ដែលមានស្ថានភាព (API បិទ/បើក · updateMask · sign-up · rules · គណនី) ៖ ការបង្កើត · បន្តក្រោយធ្លាក់ · ID មានគេយក · `--adopt` · sign-up ដែល server មិនអនុវត្ត · rules ឃ្លាត/ដំឡើងឡើងវិញ · យឺតតែជោគជ័យ · 409 លើ Project ខ្លួនឯង · state គ្មាន secret · **mutation លើ tool ត្រូវក្រហម** (`FBPROVISION_MUTATIONS=0` ➜ រំលង) · សេណារីយ៉ូ/mutation រត់ស្របគ្នា (`FBPROVISION_JOBS`) តែការអះអាងចេញតាមលំដាប់ថេរ | `FBPROVISION_APP_DIR` · `FBPROVISION_STRICT` · `FBPROVISION_DEPS_DIR` · `FBPROVISION_JOBS` |
 
 #### UI · ទម្រង់បង្ហាញ · កាយវិការ
 

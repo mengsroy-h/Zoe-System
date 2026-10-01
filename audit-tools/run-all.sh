@@ -9,6 +9,7 @@
 #   RUNALL_STATE=<ផ្លូវ>   ឯកសារលទ្ធផល (លំនាំដើម <git-dir>/zoe-runall-state.tsv · ទទេ = បិទ)
 #   RUNALL_RESUME=1        រត់តែ checker ដែលធ្លាក់ ឬមិនទាន់មានលទ្ធផល លើ tree ដដែល
 #   RUNALL_ONLY=a,b        រត់តែ checker ដែលមានឈ្មោះ (ស្លាក ឬ audit-tools/<ឈ្មោះ>.js)
+#   RUNALL_SHARD=k/n       រត់តែផ្នែកទី k ក្នុង n (CI ៖ job ស្របគ្នាលើ runner ច្រើន · ផ្នែកទាំង n រួមគ្នា = បញ្ជីពេញ)
 RUNALL_CALLER_PWD="$PWD"
 cd "$(dirname "$0")/.." || exit 1
 BASE="$1"
@@ -64,6 +65,16 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
     if [ ! -d "$ZOE_NODE_MODULES/vite" ] || [ ! -d "$ZOE_NODE_MODULES/playwright-core" ]; then
         echo "*** FAIL *** ត្រូវការ dependency របស់ ZoeW (vite · acorn · playwright-core) — រត់ ៖ npm ci --prefix ZoeW"
         exit 1
+    fi
+    # ⛔ root វាស់ (`ZoeW/dist-audit`) ចែករំលែកក្នុងមួយ repo ៖ build ទី ២ (run-all ឬ `ZOE_MEASURE_ONLY=1`) **លុបវា**
+    #    ពីក្រោម checker ដែលកំពុងរត់ ➜ ការធ្លាក់ចៃដន្យ ➜ សោក្នុង git-dir កាន់ពេញការរត់ (fd 9 ឆ្លង `exec`)
+    RUNALL_LOCK="$(git rev-parse --absolute-git-dir 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}")/zoe-runall-measure.lock"
+    if command -v flock >/dev/null 2>&1 && exec 9>"$RUNALL_LOCK"; then
+        if ! flock -n 9; then
+            echo "*** FAIL *** run-all.sh ឬ ZOE_MEASURE_ONLY កំពុងរត់លើ repo នេះរួចហើយ — build វាស់ម្តងទៀតនឹងលុប root វាស់ពីក្រោមវា"
+            echo "    ➜ រង់ចាំវាចប់ ឬរត់លើច្បាប់ចម្លង repo (សោ ៖ $RUNALL_LOCK)"
+            exit 2
+        fi
     fi
     echo "== ZoeW React ៖ build វាស់ពីប្រភពពិត (ZoeW/dist-audit) =="
     zoe_build_audit "$REPO" || exit 1
@@ -304,6 +315,8 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
             return 2
         fi
     fi
+    RUNALL_MINE=()
+    if [ -n "${RUNALL_SHARD:-}" ]; then runall_shard_pick || return 2; fi
     if [ "$resume" = 1 ]; then
         if [ -z "$RUNALL_STATE" ]; then echo "*** FAIL *** RUNALL_RESUME=1 តែ RUNALL_STATE ទទេ (បិទ)"; return 2; fi
         if ! runall_state_read; then
@@ -318,7 +331,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
         append=1
     else
         runall_state_read
-        [ -n "${RUNALL_ONLY:-}" ] && [ "$RS_HASHES" = "$RUNALL_TREE_HASH" ] && append=1
+        [ -n "${RUNALL_ONLY:-}${RUNALL_SHARD:-}" ] && [ "$RS_HASHES" = "$RUNALL_TREE_HASH" ] && append=1
     fi
     if [ -n "$RUNALL_STATE" ] && [ "$append" = 0 ]; then
         mkdir -p "$(dirname "$RUNALL_STATE")" 2>/dev/null
@@ -330,7 +343,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
     for ((i = 0; i < n; i++)); do
         label="${J_LABEL[$i]}"
         if [ "${J_KIND[$i]}" = hdr ]; then J_ST[$i]=hdr; continue; fi
-        if [ -n "${RUNALL_ONLY:-}" ] && [ -z "${RUNALL_WANT[$i]:-}" ]; then
+        if { [ -n "${RUNALL_ONLY:-}" ] && [ -z "${RUNALL_WANT[$i]:-}" ]; } || { [ -n "${RUNALL_SHARD:-}" ] && [ -z "${RUNALL_MINE[$i]:-}" ]; }; then
             J_ST[$i]=off
             [ "$resume" = 1 ] && [ -n "${RS_V[$label]:-}" ] && J_ST[$i]=carried
         elif [ "$resume" = 1 ] && case "${RS_V[$label]:-}" in PASS|PARTIAL|SKIPPED) true ;; *) false ;; esac; then
@@ -348,12 +361,52 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
     return 0
 }
 
-# ⛔ ពេលប្រហែល (វិ.) របស់ checker យឺតជាងគេ ៖ ប្រើតែពេល state គ្មានពេលរបស់វា (session ថ្មីចាប់ផ្តើមពី clone ស្អាត ➜ គ្មាន
-#    `<git-dir>/zoe-runall-state.tsv`)។ ប៉ះតែ **លំដាប់រត់** (យូរ ➜ មុន ➜ កន្ទុយខ្លី) មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច
-#    មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ ការរត់ជាជួរ 2026-09-28។
-RUNALL_HINTS="money-guardian-test:165 zoew-suite-test:130 revenue-fuzz-test:125 app-lock-test:100 ui-flow-test:95
-    collected-mirror-fuzz-test:50 write-stall-guard-test:40 gesture-test:35 fluid-type-focus-test:32 layout-check:30
-    sheet-import-test:30 cleanup-interrupt-atomicity-test:24 ledger-clamp-symmetry-test:24 late-commit-test:20 ios-panel-glide-test:20"
+# ⛔ ពេលប្រហែល (វិ.) របស់ checker យឺតជាងគេ ៖ ប្រើ (១) ក្នុង `runall_order` តែពេល state គ្មានពេលរបស់វា (session ថ្មីចាប់ផ្តើមពី
+#    clone ស្អាត ➜ គ្មាន `<git-dir>/zoe-runall-state.tsv`) និង (២) ជាទម្ងន់ **តែមួយ** នៃការបែងចែក `RUNALL_SHARD`។ ប៉ះតែលំដាប់ ·
+#    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
+#    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
+RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
+    ui-flow-test:96 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:68 collected-mirror-fuzz-test:50
+    layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:36
+    emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
+    ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
+    slow-write-test:18 stale-clear-claim-test:17 ios-panel-glide-test:16 listener-leak-test:14 scan-remove-mode-test:14
+    collected-mirror-lifecycle-test:14 sw-client-wiring-test:13 setup-link-browser-test:13 item-money-integrity-test:13
+    page-nav-test:12 lookup-burst-test:12 hang-guard:11 supabase-datastore-test:11 supabase-rls-test:10"
+# ── RUNALL_SHARD=k/n ៖ ការបែងចែកបញ្ជីទៅ job CI ស្របគ្នា (runner GitHub មាន CPU ២ ➜ ការរត់ពេញ ~២៣ នាទី) ──────────────
+# ⛔ ការបែងចែកជា **អនុគមន៍នៃបញ្ជី + RUNALL_HINTS តែប៉ុណ្ណោះ** (LPT ៖ ធ្ងន់ ➜ មុន ➜ ផ្នែកដែលស្រាលបំផុត · ស្មើ ➜ លេខតូច) ➜
+#    runner ទាំង n គណនាការបែងចែកដដែលបេះបិទ ➜ ផ្នែកទាំង n **មិនជាន់ · មិនខ្វះ** តាមរចនាសម្ព័ន្ធ (⛔ មិនប្រើ state ឬ nproc ៖
+#    ពួកវាខុសគ្នាតាម runner)។ excl (រត់ម្នាក់ឯង) ទម្ងន់ ×២ ព្រោះវាទប់ lane ទាំងអស់។ ⛔ ផ្នែកមួយមិនមែនភស្តុតាងនៃ tree ទេ ៖
+#    សេចក្តីសង្ខេបរាយ «មិនពេញលេញ» ហើយ CI ពេញ = ផ្នែកទាំង n បៃតង (runall-runner-test ផ្ទៀង matrix ក្នុង audit.yml)។
+runall_shard_pick() {  # RUNALL_SHARD ➜ RUNALL_MINE[i]=1 · RUNALL_SHARD_K/N · RUNALL_SHARD_LOAD (វិ.) · ខុស ➜ 1
+    local k n i w s best h
+    local -A hints=()
+    if ! [[ "$RUNALL_SHARD" =~ ^([0-9]+)/([0-9]+)$ ]] || [ "${BASH_REMATCH[2]}" -lt 1 ] || [ "${BASH_REMATCH[2]}" -gt 32 ] \
+        || [ "${BASH_REMATCH[1]}" -lt 1 ] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+        echo "*** FAIL *** RUNALL_SHARD ត្រូវជា k/n (1 ≤ k ≤ n ≤ 32) — ទទួល «${RUNALL_SHARD}»"
+        return 1
+    fi
+    k="${BASH_REMATCH[1]}"; n="${BASH_REMATCH[2]}"
+    for h in $RUNALL_HINTS; do hints[${h%%:*}]="${h##*:}"; done
+    local -a load=()
+    for ((s = 1; s <= n; s++)); do load[$s]=0; done
+    RUNALL_MINE=()
+    while IFS=$'\t' read -r w i; do
+        best=1
+        for ((s = 2; s <= n; s++)); do [ "${load[$s]}" -lt "${load[$best]}" ] && best=$s; done
+        load[$best]=$(( load[best] + w ))
+        [ "$best" = "$k" ] && RUNALL_MINE[$i]=1
+    done < <(
+        for ((i = 0; i < ${#J_KIND[@]}; i++)); do
+            [ "${J_KIND[$i]}" = hdr ] && continue
+            w=""; [ -n "${J_ID[$i]}" ] && w="${hints[${J_ID[$i]}]:-}"
+            if [ -z "$w" ]; then case "${J_LANE[$i]}" in emu) w=15 ;; browser) w=12 ;; *) w=2 ;; esac; fi
+            [ "${J_LANE[$i]}" = excl ] && w=$(( w * 2 ))
+            printf '%s\t%s\n' "$w" "$i"
+        done | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2n)
+    RUNALL_SHARD_K="$k"; RUNALL_SHARD_N="$n"; RUNALL_SHARD_LOAD="${load[$k]}"
+    return 0
+}
 runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នាក់ឯងពេលគ្មានអ្វីរត់) រួចយូរ ➜ មុន (state មុន · RUNALL_HINTS · lane) · ស្មើ ➜ លំដាប់បញ្ជី
     local i rank hint h
     local -A hints=()
@@ -465,6 +518,9 @@ runall_drain() {  # រត់បញ្ជីទាំងមូល ➜ 0 · ប�
     fi
     RUNALL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zoe-runall.XXXXXX")" || { echo "*** FAIL *** mktemp"; fail=$((fail + 1)); return 1; }
     runall_select || { rm -rf "$RUNALL_DIR"; return 2; }
+    # ⛔ ការជ្រើស (SHARD · ONLY · RESUME) ជារបស់ run-all នេះតែប៉ុណ្ណោះ ៖ checker កូនដែលរត់ម៉ាស៊ីននេះខាងក្នុង (hang-guard ·
+    #    runall-runner-test) ទទួលវា ➜ fixture ត្រូវបែងចែកចោល ➜ ធ្លាក់តែលើ CI ជាផ្នែក (runall-runner-test ៧ខ)
+    export -n RUNALL_SHARD RUNALL_ONLY RUNALL_RESUME
     runall_order
     echo "   (lane ${RUNALL_JOBS} · browser ≤ ${RUNALL_BROWSER_JOBS} · emu ≤ 1 · meta ម្នាក់ឯង · ពិដាន ${CHECKER_TIMEOUT}s/checker)"
     trap 'runall_abort' INT TERM HUP
@@ -535,7 +591,11 @@ runall_summary() {  # សេចក្តីសង្ខេប ៖ ពេល · F
         printf '      %8s  %s%s\n' "$(runall_fmt_ms "$i")" "$line" "$mark"
     done
     if [ "$off" -gt 0 ]; then
-        echo "⚠️  មិនពេញលេញ ៖ វាស់ $((total - off))/${total} checker (RUNALL_ONLY) — នេះមិនមែនភស្តុតាងថា tree បៃតងទេ"
+        if [ -n "${RUNALL_SHARD_N:-}" ]; then
+            echo "⚠️  មិនពេញលេញ ៖ វាស់ $((total - off))/${total} checker (RUNALL_SHARD ${RUNALL_SHARD_K}/${RUNALL_SHARD_N} · ទម្ងន់ ~${RUNALL_SHARD_LOAD}s${RUNALL_ONLY:+ · RUNALL_ONLY}) — tree បៃតងតែពេលផ្នែកទាំង ${RUNALL_SHARD_N} បៃតង"
+        else
+            echo "⚠️  មិនពេញលេញ ៖ វាស់ $((total - off))/${total} checker (RUNALL_ONLY) — នេះមិនមែនភស្តុតាងថា tree បៃតងទេ"
+        fi
         if [ "$fail" -eq 0 ]; then
             echo "✅ ជោគជ័យលើ checker ដែលបានវាស់ (មិនពេញលេញ)  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
         else
@@ -556,7 +616,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
-         keygen-session-security-test keygen-notice-test \
+         keygen-session-security-test keygen-notice-test keygen-biometric-test \
          barcode-shape-test setup-link-logout-test \
          raw-read-shape-test devtools-guard-test concurrent-scan-test \
          restore-finalization-fence-test \
@@ -618,7 +678,8 @@ run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-t
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
-run "money-guardian" node audit-tools/money-guardian-test.js
+run "money-guardian 1/2" node audit-tools/money-guardian-test.js --part=1/2
+run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
 run "repository-contract" node audit-tools/repository-contract-test.js
@@ -707,6 +768,11 @@ run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
+
+section "== ឧបករណ៍បង្កើតអតិថិជនថ្មី (tools/firebase-provision) =="
+# ⛔ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ➜ `npm ci --prefix tools/firebase-provision` + openssl
+#    គ្មាន dependency ➜ SKIP · `FBPROVISION_STRICT=1` ➜ FAIL (ដូច emu/*)
+run "firebase-provision (CLI + firebase-tools ពិត · mutation)" node audit-tools/firebase-provision-test.js
 
 section "== ទម្លាប់គម្រោង =="
 run "node --check លើ app.js ទាំង ២" bash -c 'for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done'
@@ -830,6 +896,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTOLIST_APP_DIR="$BASE" node audit-tools/zto-list-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-list-sync:   /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
+    FBPROVISION_APP_DIR="$BASE" node audit-tools/firebase-provision-test.js 2>&1 | tail -1 | sed 's/^/   fb-provision:    /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     LEDGEREMU_APP_DIR="$BASE" node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
@@ -868,6 +935,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-pin-flow-test.js 2>&1 | tail -1 | sed 's/^/   keygen-pin-flow: /'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-session-security-test.js 2>&1 | tail -1 | sed 's/^/   keygen-session:  /'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-notice-test.js 2>&1 | tail -1 | sed 's/^/   keygen-notice:   /'
+    KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-biometric-test.js 2>&1 | tail -1 | sed 's/^/   keygen-bio:      /'
     KEYLIST_APP_DIR="$BASE" node audit-tools/keylist-consistency-test.js 2>&1 | tail -1 | sed 's/^/   keylist-consistency:/'
     LICGRACE_APP_DIR="$BASE" node audit-tools/license-grace-test.js 2>&1 | tail -1 | sed 's/^/   license-grace:   /'
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'

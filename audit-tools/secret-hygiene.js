@@ -257,7 +257,9 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
             const appSrc = readApp('ZoeW');
             const listMatch = /const fieldsToBlank = \[([\s\S]*?)\];/.exec(appSrc);
             const ids = listMatch ? (listMatch[1].match(/'([^']+)'/g) || []).map((q) => q.slice(1, -1)) : [];
-            const credentialIds = ids.filter((id) => /(Pin|Password|Key|Secret|Token)Input$/.test(id));
+            // ⛔ កូដអញ្ជើញ (ចុះឈ្មោះចូលហាង) · កូដប្តូរពាក្យសម្ងាត់ · Setup Link (ផ្ទុក invite) ក៏ជា credential ដែរ —
+            //    ចុងឈ្មោះ ៥ ដើមរំលងពួកវា ➜ `invite` មិនស្ថិតក្នុងបញ្ជីលាក់ ខណៈ checker នេះបៃតង (វាស់បាន ZoeW 2.47.0)
+            const credentialIds = ids.filter((id) => /(Pin|Password|Key|Secret|Token|Invite|resetCode|setupLink)Input$/.test(id));
             const credentialNames = credentialIds.map((id) => id.replace(/Input$/, ''));
 
             ok('ជាន់អប្បបរមា ៖ ដេរីវេវាល credential ពី `fieldsToBlank` បានយ៉ាងតិច ៤',

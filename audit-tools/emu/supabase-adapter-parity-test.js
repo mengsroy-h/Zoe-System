@@ -162,6 +162,9 @@ async function scenario(api) {
     listen('t1/a/list', 'sbp_t1/a/list');
     listen('t2', 'sbp_t2');
     listen('missing', 'sbp_t1/nothing/here');
+    // ⛔ ការតភ្ជាប់ដំបូងរបស់ SDK ពិតទៅ emulator យឺតលើ runner រវល់ (CI ផ្នែក ៖ > settle ២៥០ms) ➜ តម្លៃដំបូងផ្ទុះចូលជំហានបន្ទាប់
+    //    ➜ រង់ចាំ listener ទាំងអស់បាញ់ម្តង (ពិដាន ១៥ វិ.) មុនជំហានទី ១ ៖ ការប្រៀបបន្ទាប់វាស់ semantics មិនមែនល្បឿនតភ្ជាប់
+    await until(() => Object.keys(counts).every((k) => counts[k] > 0), 15000);
     await step('initial listener values', () => null, { immediate: false });
     await step('set object + array', () => api.set(api.ref('sbp_t1/a'), { name: 'x', n: 1, list: [{ c: 1 }, { c: 2 }], flag: true }));
     await step('get doc', () => api.get(api.ref('sbp_t1/a')).then(snapVal));

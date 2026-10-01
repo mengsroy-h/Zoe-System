@@ -39,3 +39,6 @@ tools/zto-cookie-sync-windows/package-lock.json
 # ⛔ keystore សម្រាប់ sign APK ជា credential ពិត (មើល ZoeW/docs/ANDROID.md) — មិនត្រូវ commit ដាច់ខាត
 *.jks
 *.keystore
+
+# Firebase provisioning tool: per-customer state (project IDs, settings) stays on the owner machine
+tools/firebase-provision/state/

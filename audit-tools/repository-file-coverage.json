@@ -113,9 +113,10 @@
       "guards": [
         "audit-tools/function-surface-test.js",
         "audit-tools/keygen-notice-test.js",
-        "audit-tools/keygen-session-security-test.js"
+        "audit-tools/keygen-session-security-test.js",
+        "audit-tools/keygen-biometric-test.js"
       ],
-      "evidence": "Function inventory និងតេស្តឥរិយាបថ session របស់ ZoeKeyGen អាន app.js ពិត។",
+      "evidence": "Function inventory និងតេស្តឥរិយាបថ session · ជីវមាត្រ (WebAuthn PRF ក្លែង + crypto ពិត) របស់ ZoeKeyGen អាន app.js ពិត។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
     },
     "guard-15": {
@@ -561,6 +562,22 @@
       ],
       "evidence": "emu/supabase-adapter-parity bundle ប្រភព TS ពិត ហើយប្រៀបលទ្ធផលនឹង SDK Firebase ពិត + RTDB emulator (val · update · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP) · zoew-suite (vitest supabase-account · tsc · purity) · firebase-config-paste/keygen-supabase-admin វាស់ helper Config ពិតពី build វាស់ · sdk-surface ទាមទារផ្ទៃ adapter ⊇ ផ្ទៃ SDK ដែល App ប្រើ។",
       "limitation": "Realtime websocket ពិតរបស់ Supabase មិនបានរត់នៅទីនេះ (adapter ធ្លាក់ចុះទៅការទាញតាមវដ្តក្នុងតេស្ត) ➜ ការសាកលើ Project ពិត និងឧបករណ៍ពិតនៅតែចាំបាច់។"
+    },
+    "guard-firebase-provision": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/firebase-provision-test.js"
+      ],
+      "evidence": "firebase-provision-test រត់ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ដែលមានស្ថានភាព (ផ្លូវ token ពិត · API បិទ/បើក · updateMask · sign-up សាធារណៈ · rules · គណនី) លើសេណារីយ៉ូបង្កើត · បន្ត · ID មានគេយក · adopt · lockdown មិនចូល · rules ឃ្លាត · យឺតតែជោគជ័យ ហើយ mutation លើ tool ត្រូវក្រហម",
+      "limitation": "Google ពិតមិនត្រូវបានហៅ ៖ ឈ្មោះវាល/endpoint ចម្លងពីប្រភព firebase-tools ផ្លូវការ តែការរត់លើគណនី Google ពិតលើកដំបូងត្រូវធ្វើដោយម្ចាស់គម្រោង (verify វាស់លទ្ធផលពិត)។"
+    },
+    "guard-firebase-provision-contract": {
+      "category": "static",
+      "guards": [
+        "audit-tools/firebase-provision-test.js"
+      ],
+      "evidence": "firebase-provision-test ពិនិត្យ pin កំណែ firebase-tools · lock ស្របនឹង package.json · engines · .cmd ASCII+CRLF · ពាក្យបញ្ជាដែល launcher ហៅ",
+      "limitation": "មិនបញ្ជាក់ថា npm registry ឬ Windows cmd.exe ពិតដំណើរការលើម៉ាស៊ីនរបស់ម្ចាស់គម្រោង។"
     }
   },
   "files": {
@@ -617,11 +634,23 @@
     },
     "ZoeKeyGen/icon-192.png": {
       "policy": "guard-8",
-      "sha256": "0d5ce383c684907bb54e52899714d447c5e09f149d400d14e311e9374aea8def"
+      "sha256": "7d4a0dd82c43c9281e69046d26e28aa1a5bd0275be0f9b843b2957c6b3c2eb5c"
     },
     "ZoeKeyGen/icon-512.png": {
       "policy": "guard-8",
-      "sha256": "4359a51f0463b8c0360746cb3da57a2906a8bc4212bb2a9208b6b72d1104ed2b"
+      "sha256": "5e28e196b4bc39e21f3dae3cd7507c27e6c4c0e474d793db02735631b53482af"
+    },
+    "ZoeKeyGen/icon-maskable-192.png": {
+      "policy": "guard-8",
+      "sha256": "364f5dbd8247de5cf97eba8d80ab550f19553ce9977cb36b3a97595b6df41066"
+    },
+    "ZoeKeyGen/icon-maskable-512.png": {
+      "policy": "guard-8",
+      "sha256": "504afd83c4c75776f95c74963ab08e95f941919b5452cc7343243e6c3ae67bdf"
+    },
+    "ZoeKeyGen/icon-maskable-1024.png": {
+      "policy": "guard-8",
+      "sha256": "2654549bb36971390efe057fff15cb5e14a326edeb0a87b6d20684555db2d145"
     },
     "ZoeKeyGen/index.html": {
       "policy": "guard-19"
@@ -941,11 +970,23 @@
     },
     "ZoeW/public/icon-192.png": {
       "policy": "guard-8",
-      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
+      "sha256": "bb0a837a28a19a1432d078d045fe6e2f431c396008ed33b915cf667891de10b7"
     },
     "ZoeW/public/icon-512.png": {
       "policy": "guard-8",
-      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
+      "sha256": "d6c40843ed3480141ec74e95281f49a83996a3b96dda95414b0c5bc249bded37"
+    },
+    "ZoeW/public/icon-maskable-192.png": {
+      "policy": "guard-8",
+      "sha256": "1dddab68e70ea0e4dad76b3f237d919f63c7b936ed6936469cad8512140e95f2"
+    },
+    "ZoeW/public/icon-maskable-512.png": {
+      "policy": "guard-8",
+      "sha256": "876e2cd1ea8639724edf4dd1be6a21648e03731941ac5fcdb18c99c9256404ea"
+    },
+    "ZoeW/public/icon-maskable-1024.png": {
+      "policy": "guard-8",
+      "sha256": "8c2b7868dce7fe17dd47abc859d3c7b96530159899d7b8ede34b3235c6a78a93"
     },
     "ZoeW/public/license-verify.js": {
       "policy": "guard-20"
@@ -965,10 +1006,16 @@
     "ZoeW/resources/icon.svg": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/resources/keygen-icon.svg": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/scripts/android-check.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/android-icons.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/apk-cert-check.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/android-splash-vector.mjs": {
@@ -1020,6 +1067,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/parity-static.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/pwa-icons.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/react-purity-check.mjs": {
@@ -1643,6 +1693,9 @@
     "ZoeW/tests/code128-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/config-modal.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/db-liveness.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1725,6 +1778,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/push-server.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/pwa-icons.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/registry-session-race.test.ts": {
@@ -1931,6 +1987,9 @@
     "audit-tools/firebase-config-paste-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/firebase-provision-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/fluid-type-focus-test.js": {
       "policy": "guard-1"
     },
@@ -1977,6 +2036,9 @@
       "policy": "guard-1"
     },
     "audit-tools/keygen-session-security-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keygen-biometric-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/keylist-consistency-test.js": {
@@ -2387,6 +2449,30 @@
     "firebase-database.rules.json": {
       "policy": "guard-40"
     },
+    "tools/firebase-provision/README-KH.md": {
+      "policy": "guard-13"
+    },
+    "tools/firebase-provision/deploy-rules.cmd": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/firebase-api.js": {
+      "policy": "guard-firebase-provision"
+    },
+    "tools/firebase-provision/new-customer.cmd": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/package-lock.json": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/package.json": {
+      "policy": "guard-firebase-provision-contract"
+    },
+    "tools/firebase-provision/provision.js": {
+      "policy": "guard-firebase-provision"
+    },
+    "tools/firebase-provision/setup.cmd": {
+      "policy": "guard-firebase-provision-contract"
+    },
     "tools/money-check-windows/README-KH.md": {
       "policy": "guard-13"
     },
@@ -2497,6 +2583,12 @@
       "policy": "zoew-app"
     },
     "ZoeW/tests/supabase-account.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/toast-backend.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/network-toast.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "audit-tools/emu/supabase-adapter-parity-test.js": {

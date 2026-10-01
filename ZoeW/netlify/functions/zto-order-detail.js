@@ -638,6 +638,91 @@ const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
 
 const certsState = { at: 0, keys: null, inFlight: null };
 
+const SUPABASE_ACCOUNT_TTL_MS = 5 * 60 * 1000;
+const SUPABASE_ACCOUNT_CACHE_MAX = 500;
+const supabaseAccountCache = new Map();
+
+function readSupabaseIdentity(env) {
+    const rawUrl = String((env && env.SUPABASE_URL) || '').trim();
+    const key = String((env && env.SUPABASE_PUBLISHABLE_KEY) || '').trim();
+    if (!rawUrl || !key || /^sb_secret_/i.test(key)) return null;
+    let url;
+    try { url = new URL(rawUrl); } catch (_) { return null; }
+    const local = url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+    if (url.protocol !== 'https:' && !local) return null;
+    if (url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) return null;
+    return { base: url.origin, issuer: url.origin + '/auth/v1', key: key };
+}
+
+function tokenIssuer(token) {
+    const parsed = decodeIdToken(token);
+    return parsed && typeof parsed.payload.iss === 'string' ? parsed.payload.iss : '';
+}
+
+function rememberSupabaseVerdict(cacheKey, verdict, until) {
+    if (supabaseAccountCache.size >= SUPABASE_ACCOUNT_CACHE_MAX) {
+        const oldest = supabaseAccountCache.keys().next();
+        if (!oldest.done) supabaseAccountCache.delete(oldest.value);
+    }
+    supabaseAccountCache.set(cacheKey, { verdict: verdict, until: until });
+}
+
+async function verifySupabaseToken(token, identity, timeoutMs) {
+    const parsed = decodeIdToken(token);
+    if (!parsed) return { ok: false, reason: 'idtoken:malformed' };
+    if (parsed.payload.iss !== identity.issuer) return { ok: false, reason: 'idtoken:iss' };
+    const now = Date.now();
+    const exp = Number(parsed.payload.exp) * 1000;
+    if (!Number.isFinite(exp) || exp + ID_TOKEN_SKEW_MS < now) return { ok: false, reason: 'idtoken:expired' };
+    if (parsed.payload.role !== 'authenticated' || typeof parsed.payload.sub !== 'string' || !parsed.payload.sub) {
+        return { ok: false, reason: 'idtoken:sub' };
+    }
+    const cacheKey = crypto.createHash('sha256').update(identity.issuer + '|' + token).digest('hex');
+    const hit = supabaseAccountCache.get(cacheKey);
+    if (hit && hit.until > now) return hit.verdict;
+    if (hit) supabaseAccountCache.delete(cacheKey);
+    const out = await settleWithin(async () => {
+        const res = await fetch(identity.base + '/rest/v1/rpc/my_account', {
+            method: 'POST',
+            headers: { apikey: identity.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: '{}'
+        });
+        if (!res) throw new Error('supabase:http');
+        if (res.status === 401 || res.status === 403) return { denied: true };
+        if (!res.ok) throw new Error('supabase:http');
+        return { rows: await res.json() };
+    }, timeoutMs, 'supabase');
+    if (!out.ok || !out.value) return { ok: false, reason: 'idtoken:supabase-unreachable' };
+    const until = Math.min(exp, now + SUPABASE_ACCOUNT_TTL_MS);
+    let verdict;
+    if (out.value.denied) {
+        verdict = { ok: false, reason: 'idtoken:signature' };
+    } else {
+        const rows = Array.isArray(out.value.rows) ? out.value.rows : [];
+        const row = rows.length === 1 && rows[0] && typeof rows[0] === 'object' ? rows[0] : null;
+        if (!row) verdict = { ok: true, siteCode: '', reason: '' };
+        else if (row.status !== 'active') verdict = { ok: false, reason: 'site:tenant-' + (row.status === 'expired' ? 'expired' : 'revoked') };
+        else verdict = { ok: true, siteCode: typeof row.branch_code === 'string' ? row.branch_code : '', reason: '' };
+    }
+    rememberSupabaseVerdict(cacheKey, verdict, until);
+    return verdict;
+}
+
+async function resolveListIdentity(idToken, config, startedAt, env) {
+    const supabase = readSupabaseIdentity(env);
+    const issuer = idToken ? tokenIssuer(idToken) : '';
+    if (supabase && issuer === supabase.issuer) {
+        const auth = await verifySupabaseToken(idToken, supabase, certsTimeoutMs(config, startedAt));
+        return { auth: auth, site: auth.ok ? listSiteCodeOf(auth.siteCode) : { code: '', reason: auth.reason } };
+    }
+    if (!supabase && /\/auth\/v1$/.test(issuer)) {
+        const auth = { ok: false, reason: 'idtoken:supabase-unset' };
+        return { auth: auth, site: { code: '', reason: auth.reason } };
+    }
+    const auth = await verifyIdToken(idToken, readProjectIds(env), certsTimeoutMs(config, startedAt));
+    return { auth: auth, site: auth.ok ? listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(env))) : { code: '', reason: auth.reason } };
+}
+
 function readProjectIds(env) {
     const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
     if (!raw) return [];
@@ -1554,12 +1639,10 @@ async function handleRequest(event) {
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
     let plan = null;
     if (wantsList) {
-        const projectIds = readProjectIds(process.env);
         const idToken = (event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '';
-        const auth = await verifyIdToken(idToken, projectIds, certsTimeoutMs(config, startedAt));
-        const site = auth.ok
-            ? listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(process.env)))
-            : { code: '', reason: auth.reason };
+        const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
+        const auth = identity.auth;
+        const site = identity.site;
         if (!auth.ok && site.reason === auth.reason) {
             return json(200, {
                 success: false, list: true, enabled: false,
@@ -1697,6 +1780,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.at = 0;
     certsState.keys = null;
     certsState.inFlight = null;
+    supabaseAccountCache.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

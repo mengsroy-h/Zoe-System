@@ -189,6 +189,18 @@ EXPECTED.forEach((rel) => {
     } else {
         ok(app + ' ៖ គ្មានការវាស់ host SDK ➜ មិនបង្ខំ (ទិសផ្ទុយ)', true);
     }
+
+    // ង. backend Supabase ៖ App ship adapter (`createSupabaseTransport` · URL ពី Config dynamic) ➜ connect-src ត្រូវអនុញ្ញាត REST (https)
+    //     និង Realtime (wss) របស់ `*.supabase.co` ⛔ បើ CSP ទប់ ➜ fetch បោះដូចបណ្តាញដាច់ ➜ adapter ជាប់ «ក្រៅបណ្ដាញ» ជារៀងរហូតលើផលិតកម្ម
+    //     ខណៈតេស្តគ្មាន CSP ជោគជ័យ · ទិសផ្ទុយ ៖ App ដែលគ្មាន adapter មិនបង្ខំ
+    if (read(app + '/app.js').indexOf('function createSupabaseTransport(') !== -1) {
+        derived++;
+        const connect = directive(csp, 'connect-src').split(/\s+/);
+        ok(app + ' ៖ ship adapter Supabase ➜ `connect-src` អនុញ្ញាត `https://*.supabase.co` និង `wss://*.supabase.co`',
+            connect.indexOf('https://*.supabase.co') !== -1 && connect.indexOf('wss://*.supabase.co') !== -1, directive(csp, 'connect-src'));
+    } else {
+        ok(app + ' ៖ គ្មាន adapter Supabase ➜ មិនបង្ខំ host នោះ (ទិសផ្ទុយ)', true);
+    }
 });
 
 ok('⛔ ជាន់អប្បបរមា៖ តម្រូវការដេរីវេយ៉ាងតិច ៣ បានបាញ់ពិត', derived >= 3, derived);

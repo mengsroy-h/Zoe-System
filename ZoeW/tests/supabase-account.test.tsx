@@ -14,6 +14,7 @@ import { ACCOUNT_REPLY_TEXT, backToLoginForm, clearPendingInvite, openRegisterFo
 import { ensureAppActivated } from '../src/features/license';
 import { cleanupJournalScope } from '../src/domain/cleanup';
 import { supabaseKeyIsSecret } from '../src/services/supabase-config';
+import { databaseHealthLabel, healthLicenseRow } from '../src/features/health-check';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
 import { fieldValue, setFieldValue } from '../src/app/refs';
 import { byId, mount, step, unmount } from './native/react-harness';
@@ -195,6 +196,27 @@ describe('License · journal scope', () => {
         viewState.backendKind = 'supabase';
         expect(await ensureAppActivated()).toBe(true);
         expect(getStatus).not.toHaveBeenCalled();
+    });
+    it('🩺 Supabase ៖ ជួរ License = ស្ថានភាពហាងពី server (មិនមែន Activation Key) · ស្លាក Database = Supabase', async () => {
+        const getStatus = vi.fn(async () => ({ state: 'none' }));
+        (window as any).ZoeLicense = { getStatus };
+        viewState.backendKind = 'supabase';
+        const account: any = { tenant_id: 't1', tenant_name: 'ហាង A', branch_code: '881859', status: 'active', expires_at: new Date(Date.now() + 86400000 * 30).toISOString() };
+        firebaseState.fb = { accountOf: () => account };
+        firebaseState.auth = {};
+        const good: any = await healthLicenseRow();
+        expect(JSON.stringify(good)).toContain('881859');
+        expect(good.state).toBe('ok');
+        account.status = 'revoked';
+        const bad: any = await healthLicenseRow();
+        expect(bad.state).toBe('bad');
+        firebaseState.fb = { accountOf: () => null };
+        const unknown: any = await healthLicenseRow();
+        expect(unknown.state).toBe('warn');
+        expect(getStatus).not.toHaveBeenCalled();
+        expect(databaseHealthLabel()).toBe('Supabase');
+        viewState.backendKind = 'firebase';
+        expect(databaseHealthLabel()).toBe('Firebase');
     });
     it('journal scope ៖ Firebase = databaseURL · Supabase = URL + tenant (ហាង ២ លើឧបករណ៍ដដែលមិនលាយគ្នា) · មិនស្គាល់ tenant ➜ ទទេ', () => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'A', databaseURL: 'https://x.firebaseio.com' }));

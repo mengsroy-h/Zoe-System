@@ -47,11 +47,26 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
+      # ⛔ build វាស់គូរ `index.html` ពិតក្នុង Chromium (`build-audit.mjs` ៖ `/opt/pw-browsers/chromium`) ➜ Chromium ត្រូវមាន **មុន** build
+      #    (emu/app-network-e2e ក៏ប្រើវាដែរ)
+      - name: ទាញ Chromium (build វាស់ · emu/app-network-e2e)
+        run: |
+          set -euo pipefail
+          npx --yes playwright install --with-deps chromium
+          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
+          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
+          sudo mkdir -p /opt/pw-browsers/chromium-1194
+          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
+          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          test -x /opt/pw-browsers/chromium
+
+      # ⛔ output ពេញត្រូវបង្ហាញពេលធ្លាក់ ៖ `| tail -1` តែម្យ៉ាងលាក់មូលហេតុ (log រាយត្រឹម «exit code 1»)
       - name: build វាស់ (ZoeW React ➜ tree វាស់)
         run: |
           set -euo pipefail
-          M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)
-          test -f "$M/ZoeW/app.js"
+          if ! OUT=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh 2>/tmp/measure.err); then printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; fi
+          M=$(printf '%s\n' "$OUT" | tail -1)
+          test -f "$M/ZoeW/app.js" || { printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; }
           echo "MEASURE=$M" >> "$GITHUB_ENV"
 
       - name: Cache RTDB emulator jar
@@ -104,15 +119,6 @@ jobs:
         run: node audit-tools/emu/restore-mutation-emu-test.js
 
       # ⛔ App ពិត · SDK Firebase ពិត · emulator ពិត ➜ ត្រូវការ Chromium ក្នុង job នេះ (job audit-suite គ្មាន emulator ➜ SKIP)
-      - name: ទាញ Chromium (emu/app-network-e2e)
-        run: |
-          set -euo pipefail
-          npx --yes playwright install --with-deps chromium
-          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
-          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
-          sudo mkdir -p /opt/pw-browsers/chromium-1194
-          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
-
       - name: ការតភ្ជាប់ «ងាប់ស្ងាត់» ➜ App ឈប់រាយបៃតង ហើយភ្ជាប់វិញ (App · SDK · emulator ពិត)
         env:
           NETE2E_STRICT: '1'

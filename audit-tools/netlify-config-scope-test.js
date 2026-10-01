@@ -282,6 +282,56 @@ ok('ទិសផ្ទុយ ៖ អ្នកកំណត់ hash ៖ `index-Px_
     isHashedName('/assets/index-Px_7oZO9.js') && !isHashedName('/vendor/zxing_reader.wasm') &&
     !isHashedName('/icon-192.png') && !isHashedName('/error-reporting.js'));
 
+// ៦ — header សុវត្ថិភាពលើគ្រប់ទំព័រ ៖ ⛔ មុននេះគ្មាន checker ណាវាស់វាទេ ➜ ការលុប `frame-ancestors` (clickjacking ផ្ទាំង admin) ·
+//     `nosniff` · HSTS ដោយចៃដន្យ រអិលកាត់ស្ងាត់ៗ។ សិទ្ធិកាមេរ៉ាដេរីវេពីកូដ ship (`getUserMedia`) ➜ App ដែលមិនប្រើ ត្រូវបិទ។
+console.log('\n=== ៦. header សុវត្ថិភាពលើគ្រប់ទំព័រ (`/*`) ===');
+function globalHeaders(src) {
+    const m = /for\s*=\s*"\/\*"\s*\n\s*\[headers\.values\]([\s\S]*?)(?=\n\s*\[\[|$)/.exec(src);
+    const out = {};
+    if (!m) return out;
+    for (const line of m[1].split('\n')) {
+        const kv = /^\s*([A-Za-z-]+)\s*=\s*"(.*)"\s*$/.exec(line);
+        if (kv) out[kv[1].toLowerCase()] = kv[2];
+    }
+    return out;
+}
+function usesCamera(app) {
+    let hit = false;
+    (function scan(dir) {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+        for (const e of entries) {
+            if (hit || e.name === 'node_modules' || e.name.startsWith('.') || e.name === 'dist' || e.name.startsWith('dist-')) continue;
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) scan(full);
+            else if (/\.(js|ts|tsx)$/.test(e.name) && /getUserMedia\s*\(/.test(fs.readFileSync(full, 'utf8'))) hit = true;
+        }
+    })(path.join(ROOT, app));
+    return hit;
+}
+let headerApps = 0;
+EXPECTED.forEach((rel) => {
+    const app = rel.split('/')[0];
+    const h = globalHeaders(read(rel));
+    if (Object.keys(h).length) headerApps++;
+    const csp = h['content-security-policy'] || '';
+    const hsts = /max-age=(\d+)/.exec(h['strict-transport-security'] || '');
+    const scriptSrc = (/script-src([^;]*)/.exec(csp) || ['', ''])[1];
+    ok(app + ' ៖ X-Frame-Options DENY + CSP frame-ancestors \'none\' (clickjacking)', h['x-frame-options'] === 'DENY' && /frame-ancestors 'none'/.test(csp), h['x-frame-options']);
+    ok(app + ' ៖ CSP default-src/base-uri/form-action \'self\' · object-src \'none\'',
+        /default-src 'self'/.test(csp) && /base-uri 'self'/.test(csp) && /form-action 'self'/.test(csp) && /object-src 'none'/.test(csp));
+    ok(app + ' ៖ script-src គ្មាន \'unsafe-inline\' · \'unsafe-eval\'', scriptSrc.length > 0 && !/'unsafe-inline'|'unsafe-eval'/.test(scriptSrc), scriptSrc.trim());
+    ok(app + ' ៖ X-Content-Type-Options nosniff', h['x-content-type-options'] === 'nosniff');
+    ok(app + ' ៖ HSTS ≥ ១ ឆ្នាំ', !!hsts && Number(hsts[1]) >= 31536000, h['strict-transport-security']);
+    ok(app + ' ៖ Referrer-Policy មិនបញ្ជូន path/query ឆ្លង origin', /^(strict-origin-when-cross-origin|strict-origin|same-origin|no-referrer)$/.test(h['referrer-policy'] || ''), h['referrer-policy']);
+    ok(app + ' ៖ Cross-Origin-Opener-Policy same-origin (បំបែក window ពីទំព័រឆ្លង origin)', h['cross-origin-opener-policy'] === 'same-origin', h['cross-origin-opener-policy']);
+    const pp = h['permissions-policy'] || '';
+    const camera = usesCamera(app);
+    ok(app + ' ៖ Permissions-Policy បិទ microphone · geolocation · payment · កាមេរ៉ា ' + (camera ? '(self) ព្រោះ App ស្កេន' : '() ព្រោះ App មិនប្រើ'),
+        /microphone=\(\)/.test(pp) && /geolocation=\(\)/.test(pp) && /payment=\(\)/.test(pp) && pp.indexOf(camera ? 'camera=(self)' : 'camera=()') !== -1, pp);
+});
+ok('⛔ ជាន់អប្បបរមា ៖ រក header `/*` ឃើញក្នុង App ទាំង ' + EXPECTED.length, headerApps === EXPECTED.length, headerApps);
+
 console.log('');
 console.log(fail ? ('❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')') : ('✅ គ្មានបញ្ហា — ok ' + pass));
 process.exit(fail ? 1 : 0);

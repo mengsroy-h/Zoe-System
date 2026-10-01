@@ -4,8 +4,8 @@ import { logoutApp } from '../features/auth';
 import { backToLoginForm, openRegisterForm, openResetPasswordForm, submitRegisterForm, submitResetPasswordForm } from '../features/account';
 import { closeEditBarcodeModal, openEditBarcodePriceModal, openViewListModal, saveEditedBarcodePrice, toggleIndividualBarcodeClose } from '../features/barcode-ops';
 import { runBiometricUnlock } from '../features/biometric';
-import { cancelPinEntryFlow, cancelPinSetupFlow, saveFirebaseConfig } from '../features/config';
-import { closeConfigQrScanner, openConfigQrScanner } from '../features/config-qr';
+import { applySetupLinkFromInput, cancelPinEntryFlow, cancelPinSetupFlow, saveFirebaseConfig, selectConfigBackend } from '../features/config';
+import { closeConfigQrScanner, decodeConfigQrImage, openConfigQrScanner } from '../features/config-qr';
 import { fetchCustomerDataTableRows, filterCustomerDataTable } from '../features/customer-table';
 import { closeCameraManually, submitManualBarcode } from '../features/daily-stats';
 import { handleCallAction, openCallMarkModal, openEditModal, saveEditedPhone, setCallMark, toggleCloseStatus } from '../features/entry-ops';
@@ -38,6 +38,7 @@ import { showMoreHistoryRows } from '../ui/history-render';
 import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
+    applySetupLinkFromInput,
     applySheetImportHeaderRow,
     backToLoginForm,
     cancelLocationChange,
@@ -61,6 +62,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     confirmPhone,
     confirmScannedRemoval,
     debouncedSearchByPhone,
+    decodeConfigQrImage,
     decodeImageFile,
     dismissPhoneModal,
     drawerAppLockFlow,
@@ -144,6 +146,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     saveNewSecurityPin,
     saveSheetImportConfig,
     searchByPhone,
+    selectConfigBackend,
     selectCustomLocker,
     setCallMark,
     setEntryScanMode,

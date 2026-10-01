@@ -1,4 +1,5 @@
 import { uiState } from '../core/state';
+import { viewState } from '../core/view-state';
 
 let toastSeq = 0;
 const toastTimers = new Map();
@@ -53,6 +54,7 @@ export function toastKindOf(msg) {
 export function paintToast(el, msg, kind) {
     const item = toastItem(el);
     if (!item) return;
+    msg = toastBackendText(msg);
     item.kind = TOAST_CLASSES[kind] ? kind : toastKindOf(msg);
     item.msg = msg;
     uiState.touch();
@@ -86,7 +88,15 @@ export function dropOldestToast(_container?) {
     removeToastItem(victim.id);
 }
 
+export const TOAST_BACKEND_WORD = /\bFirebase\b(?!\s*(?:Config|Console|៖))/g;
+
+export function toastBackendText(msg) {
+    if (typeof msg !== 'string' || viewState.backendKind !== 'supabase') return msg;
+    return msg.replace(TOAST_BACKEND_WORD, 'Supabase');
+}
+
 export function showToast(msg, kind?) {
+    msg = toastBackendText(msg);
     while (uiState.toasts.length >= 4) dropOldestToast();
     const id = ++toastSeq;
     uiState.toasts = uiState.toasts.concat([{
@@ -115,6 +125,7 @@ export function settleLiveToast(el) {
 }
 
 export function reannounceOrShowToast(msg) {
+    msg = toastBackendText(msg);
     const list = uiState.toasts;
     for (let i = 0; i < list.length; i++) {
         if (list[i].msg !== msg) continue;

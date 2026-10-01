@@ -160,7 +160,7 @@ export function clearSensitiveModalFields() {
         'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
         'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
         'appLockPinInput', 'appLockMsg',
-        'registerInviteInput', 'registerPasswordInput', 'registerPasswordConfirmInput',
+        'registerInviteInput', 'registerPasswordInput', 'registerPasswordConfirmInput', 'setupLinkInput',
         'resetCodeInput', 'resetPasswordInput', 'resetPasswordConfirmInput',
         'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
     ];

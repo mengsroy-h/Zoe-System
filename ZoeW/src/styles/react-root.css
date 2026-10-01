@@ -224,3 +224,77 @@
 @media (min-width: 992px) {
     .ptr-indicator { top: calc(var(--chrome-top, 65px) + var(--tabbar-height, 45px) - 41px); }
 }
+
+#configModal .cfg-extra {
+    margin-bottom: 12px;
+    text-align: center;
+}
+#configModal .cfg-image-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--primary);
+    font-size: calc(12 * var(--fs-unit));
+    font-weight: 600;
+    cursor: pointer;
+}
+#configModal .cfg-link-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+#configModal .cfg-link-row input {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+#configModal .cfg-link-row button {
+    flex: none;
+    min-height: 46px;
+    padding: 0 14px;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+}
+#configModal .cfg-choice-title {
+    margin: 6px 0 8px;
+    font-size: calc(11.5 * var(--fs-unit));
+    color: var(--text-muted);
+}
+#configModal .cfg-choice {
+    display: flex;
+    gap: 8px;
+}
+#configModal .cfg-choice-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: calc(12.5 * var(--fs-unit));
+    font-weight: 600;
+    cursor: pointer;
+}
+#configModal .cfg-choice-item.is-on {
+    border-color: var(--action-primary);
+    color: var(--action-primary);
+    background: rgba(0, 102, 255, 0.06);
+}
+#configModal .cfg-choice-item input[type="radio"] {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    flex: none;
+}
+#configModal .cfg-supabase input {
+    text-align: left;
+}

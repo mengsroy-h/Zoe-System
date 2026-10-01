@@ -1,7 +1,8 @@
 import { setFieldValue, videoElement } from '../app/refs';
-import { createScratchCanvas } from '../platform/document-io';
+import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { scanState, securityState } from '../core/state';
-import { decodeSetupPayload } from './config';
+import { applySetupPayload, parseSetupLinkText } from './config';
+import { modalIsOpen } from '../core/modals';
 import { CONFIG_QR_FORMAT_NAMES, CONFIG_QR_SCAN_WIDTH, buildReaderOptions, decodeBarcodeFromCanvasManual, scanEngineReady, scheduleScanFrame } from '../services/scan-engine';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
@@ -94,26 +95,63 @@ export function runConfigQrLoop(videoElement) {
 
 export function handleConfigQrResult(text) {
     if (!securityState.configQrScanActive) return;
-    let setupParam = null;
-    try {
-        setupParam = new URL(text).searchParams.get('setup');
-    } catch (e) {
-        setupParam = null;
-    }
-    if (!setupParam) {
+    const result: any = parseSetupLinkText(text);
+    if (result.error === 'not-link') {
         showToast("❌ QR នេះមិនមែនជា Setup Link ត្រឹមត្រូវទេ!");
         return;
     }
-
-    let parsed;
-    try {
-        parsed = decodeSetupPayload(setupParam);
-    } catch (e) {
+    if (!result.parsed) {
         showToast("❌ QR Setup Link មិនត្រឹមត្រូវទេ!");
         return;
     }
 
     closeConfigQrScanner();
-    setFieldValue('firebaseConfigInput', JSON.stringify(parsed, null, 2));
+    applySetupPayload(result.parsed);
     showToast('✅ បានស្កេន QR ជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+}
+
+export const CONFIG_QR_IMAGE_MAX_DIM = 1600;
+
+export function decodeConfigQrImage(e?) {
+    const files = e && e.target && e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    setFieldValue('configQrImageInput', '');
+    if (!modalIsOpen('configModal')) return;
+    if (!scanEngineReady()) {
+        showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => decodeConfigQrDataUrl(evt.target.result);
+    reader.onerror = () => showToast("❌ មិនអាចអានរូបភាពនេះបានទេ។ សូមសាកល្បងរូបភាពផ្សេង។");
+    reader.readAsDataURL(file);
+}
+
+export function decodeConfigQrDataUrl(dataUrl) {
+    const notFound = () => showToast("⚠️ រកមិនឃើញ QR Setup Link ក្នុងរូបភាពនេះទេ។ សូមប្រើរូបថតអេក្រង់ QR ដែលច្បាស់ ឬបិទភ្ជាប់ Link ផ្ទាល់។");
+    loadScratchImage(dataUrl, async (img) => {
+        const scale = Math.min(1, CONFIG_QR_IMAGE_MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = createScratchCanvas();
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) { notFound(); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        let text = '';
+        try {
+            text = await decodeBarcodeFromCanvasManual(buildReaderOptions(true, CONFIG_QR_FORMAT_NAMES), canvas);
+        } catch (err) {
+            text = '';
+        }
+        if (!text) { notFound(); return; }
+        if (!modalIsOpen('configModal')) return;
+        const result: any = parseSetupLinkText(text);
+        if (!result.parsed) {
+            showToast(result.error === 'not-link' ? "❌ QR នេះមិនមែនជា Setup Link ត្រឹមត្រូវទេ!" : "❌ QR Setup Link មិនត្រឹមត្រូវទេ!");
+            return;
+        }
+        applySetupPayload(result.parsed);
+        showToast('✅ បានស្កេន QR ពីរូបភាពជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+    }, notFound);
 }

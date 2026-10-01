@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "id": "2.47.0",
+      "kind": "update",
+      "version": "2.47.0",
+      "date": "2026-10-01",
+      "title": "កំណែ 2.47.0 ៖ ភ្ជាប់ប្រព័ន្ធងាយជាងមុន និង icon ច្បាស់",
+      "body": "ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ទទួល Setup Link តាមវិធីច្រើន ហើយជ្រើស Server Firebase ឬ Supabase បាន · សារជូនដំណឹងនិយាយឈ្មោះ Server ដែលអ្នកប្រើពិត · icon ពេលដំឡើងលើកុំព្យូទ័រ/ទូរស័ព្ទ ច្បាស់ គ្មានគែមស។",
+      "points": [
+        "🖼️ ស្កេន QR Setup Link ពីរូបភាព (រូបថតអេក្រង់ក្នុង chat) ឬបិទភ្ជាប់ Link ផ្ទាល់",
+        "☑️ ជ្រើសប្រភេទ Server ៖ Firebase ឬ Supabase (បំពេញ Project URL និង Publishable key)",
+        "🔔 សារជូនដំណឹងនិយាយ «Supabase» ពេលហាងប្រើ Supabase",
+        "🎨 icon App ច្បាស់លើ Retina និងគ្មានគែមសពេលដំឡើងពី Chrome"
+      ]
+    },
+    {
       "id": "2.46.0",
       "kind": "update",
       "version": "2.46.0",

@@ -99,8 +99,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង · backend **Firebase ឬ Supabase** តាម Config | `2.46.0` (`zoew-v250`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR · កាត «🏪 ហាង Supabase» (ហាង · កូដអញ្ជើញ · កូដប្តូរពាក្យសម្ងាត់)។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.23.0` (`zoekeygen-v110`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង · backend **Firebase ឬ Supabase** តាម Config | `2.47.0` (`zoew-v251`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR · កាត «🏪 ហាង Supabase» (ហាង · កូដអញ្ជើញ · កូដប្តូរពាក្យសម្ងាត់)។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.24.0` (`zoekeygen-v111`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
 > កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**

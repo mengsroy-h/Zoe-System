@@ -423,6 +423,62 @@ async function run() {
         }
     }
 
+    // ⛔ Signing Private Key (អ្នកណាមានវាក្លែង Activation Key បានទាំងអស់) មិនត្រូវនៅក្នុងសតិជារៀងរហូតពេល ZoeKeyGen បើកទុកចោល ៖
+    //    មិនប្រើ ≥ SIGNING_KEY_IDLE_MS ➜ ដកចេញពីសតិ (សោ AES របស់ Session ផង ➜ ការស្តារត្រូវការ PIN) · ច្បាប់ចម្លងអ៊ិនគ្រីបក្នុង Session នៅ ·
+    //    សកម្មភាព (ចុច/វាយ) ពន្យារពេល · កំពុង Generate ➜ មិនដក · នាឡិកាថយក្រោយ ➜ ដក (fail-closed)
+    console.log('-- Signing Key ទុកចោល ➜ ដកចេញពីសតិ --');
+    function idleFixture() {
+        const f = build({ privateKey: { kty: 'EC', crv: 'P-256', d: 'idle-private', x: 'x', y: 'y' } });
+        f.clock = { now: 1700000000000 };
+        f.ctx.Date = class extends Date { static now() { return f.clock.now; } };
+        f.ctx.__pinPrompts = 0;
+        vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 0;', f.ctx);
+        vm.runInContext(slice(['elapsedSince', 'noteSigningKeyActivity', 'expireIdleSigningKey', 'requestSessionSigningKeyRestoreIfEligible']), f.ctx);
+        f.ctx.isPinFlowPending = () => false;
+        f.ctx.requestPinBeforeConfig = () => { f.ctx.__pinPrompts++; };
+        f.storage.set('zoekeygen_signing_key_enc', '{"iv":[1],"data":[2]}');
+        vm.runInContext('signingKeyLastUseAt = Date.now();', f.ctx);
+        return f;
+    }
+    const idleMs = vm.runInNewContext(realDecl('SIGNING_KEY_IDLE_MS').replace(/^const /, 'var ') + '; SIGNING_KEY_IDLE_MS');
+    ok('SIGNING_KEY_IDLE_MS ជាលេខ ៥–៣០ នាទី', idleMs >= 5 * 60000 && idleMs <= 30 * 60000, idleMs);
+    let idle = idleFixture();
+    idle.clock.now += idleMs - 1000;
+    ok('មិនទាន់ដល់ពិដាន ➜ Key នៅ', idle.ctx.expireIdleSigningKey() === false && vm.runInContext('!!signingPrivateKeyJwk', idle.ctx));
+    idle.ctx.noteSigningKeyActivity();
+    idle.clock.now += idleMs - 1000;
+    ok('សកម្មភាពពន្យារពិដាន ➜ Key នៅ', idle.ctx.expireIdleSigningKey() === false && vm.runInContext('!!signingPrivateKeyJwk', idle.ctx));
+    idle.clock.now += 2000;
+    const genBefore = vm.runInContext('sensitiveSessionGeneration', idle.ctx);
+    ok('⛔ ដល់ពិដាន ➜ Key ចេញពីសតិ · សោ Session ចេញ · ប្រតិបត្តិការដែលកំពុងហោះអស់សុពលភាព',
+        idle.ctx.expireIdleSigningKey() === true && vm.runInContext('signingPrivateKeyJwk === null && signingKeySessionKey === null', idle.ctx)
+        && vm.runInContext('sensitiveSessionGeneration', idle.ctx) > genBefore);
+    ok('ច្បាប់ចម្លងអ៊ិនគ្រីបក្នុង Session នៅ ➜ សុំ PIN ដើម្បីស្តារ · សារប្រាប់អ្នកប្រើ',
+        idle.storage.has('zoekeygen_signing_key_enc') && idle.ctx.__pinPrompts === 1 && idle.log.toasts.some((t) => /ដកចេញពីសតិ/.test(t)), idle.log.toasts);
+    idle = idleFixture();
+    vm.runInContext('isGeneratingKey = true;', idle.ctx);
+    idle.clock.now += idleMs * 3;
+    ok('កំពុង Generate Key ➜ មិនដក', idle.ctx.expireIdleSigningKey() === false && vm.runInContext('!!signingPrivateKeyJwk', idle.ctx));
+    idle = idleFixture();
+    idle.clock.now -= 60000;
+    ok('⛔ នាឡិកាថយក្រោយ ➜ ដក (fail-closed)', idle.ctx.expireIdleSigningKey() === true && vm.runInContext('signingPrivateKeyJwk === null', idle.ctx));
+    idle = build();
+    vm.runInContext(realDecl('SIGNING_KEY_IDLE_MS') + '\nvar signingKeyLastUseAt = 5;', idle.ctx);
+    vm.runInContext(slice(['clearSigningKey']), idle.ctx);
+    idle.ctx.clearSigningKey(true);
+    ok('ចាកចេញ/សម្អាត ➜ ត្រាសកម្មភាពត្រឡប់ ០', vm.runInContext('signingKeyLastUseAt', idle.ctx) === 0);
+    idle = build();
+    vm.runInContext('var signingKeyLastUseAt = 0;', idle.ctx);
+    idle.getElementById('privateKeyInput').value = JSON.stringify({ kty: 'EC', crv: 'P-256', d: 'fresh', x: 'x', y: 'y' });
+    await idle.ctx.loadSigningKey();
+    await drain();
+    ok('Load Signing Key ➜ ចាប់ផ្តើមនាឡិកាទុកចោល (ត្រា > 0)', vm.runInContext('!!signingPrivateKeyJwk && signingKeyLastUseAt > 0', idle.ctx));
+    const bootBlock = src.slice(src.indexOf("document.addEventListener('DOMContentLoaded'"));
+    ok('⛔ ខ្សែភ្ជាប់ ៖ DOMContentLoaded ចង pointerdown/keydown ➜ noteSigningKeyActivity · setInterval ➜ expireIdleSigningKey · visibilitychange (មើលឃើញ) ➜ expireIdleSigningKey',
+        /addEventListener\('pointerdown', noteSigningKeyActivity/.test(bootBlock) && /addEventListener\('keydown', noteSigningKeyActivity/.test(bootBlock)
+        && /setInterval\(expireIdleSigningKey, \d+\)/.test(bootBlock)
+        && /'visibilitychange', \(\) => \{\s*if \(document\.hidden\) return;\s*expireIdleSigningKey\(\);/.test(bootBlock));
+
     console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));
     process.exit(fail === 0 ? 0 : 1);
 }

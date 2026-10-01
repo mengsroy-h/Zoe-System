@@ -39,6 +39,58 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.47.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.24.0` ៖ **toast និយាយឈ្មោះ backend ពិត · ប្រអប់ Config ជ្រើស Firebase/Supabase · បិទភ្ជាប់ Setup Link · QR ពីរូបភាព · icon គ្មានគែមស · ZoeKeyGen ៖ Tab លើទូរស័ព្ទ · ក្រយៅដៃ/មុខ · Signing Key ផុតពីសតិក្រោយ ១៥ នាទី**
+
+**ZoeW `2.47.0`** (`zoew-v250` ➜ `zoew-v251`) · **ZoeKeyGen `2.24.0`** (`zoekeygen-v110` ➜ `zoekeygen-v111`)។ សំណើម្ចាស់គម្រោង ៖ «toast នៅនិយាយ
+Firebase ពេល App ប្រើ Supabase» · «ក្នុង Config ឲ្យមានកន្លែងជ្រើស Firebase និង Supabase» · «កន្លែងបិទភ្ជាប់ Setup Link និងយក QR ពីរូបភាព» · «ZoeKeyGen
+លើទូរស័ព្ទឲ្យមាន Tab ដូច ZoeW» · «ពង្រឹងសុវត្ថិភាព ការពារ secret លេចធ្លាយ» · «icon ដំឡើងពី Chrome មក desktop សល់គែមស និងមិនច្បាស់» · «logo ZoeKeyGen
+សល់គែមសខ្លួនឯង» · «ZoeKeyGen ដាក់ biometric»។ ⛔ Firebase rules **មិនប្រែ** ➜ គ្មាន Publish · Supabase migration **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ZoeW ៖ toast** — ហាង Supabase ឃើញ «Supabase» ជំនួស «Firebase» ក្នុងសារស្ថានភាព/កំហុស (`toastBackendText()` ក្នុង `showToast` ·
+  `reannounceOrShowToast` · `paintToast`) ⛔ មិនប្តូរពាក្យ «Firebase Config» · «Firebase Console» (ឈ្មោះអ្វីដែលអ្នកប្រើត្រូវបើកពិត) · ហាង Firebase មិនប្រែ។
+- **ZoeW ៖ ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ»** — បន្ថែមលើ 📷 ស្កេន QR ៖ **🖼️ QR ពីរូបភាព** (រូបថតអេក្រង់ ➜ ZXing ក្នុង App ដដែល) · វាល **បិទភ្ជាប់ Setup Link** +
+  «ប្រើ Link» · ជម្រើស **Firebase / Supabase** ៖ Firebase ➜ បិទភ្ជាប់ Config ដូចមុន · Supabase ➜ វាល **Project URL** · **Publishable key** · Domain (ស្រេចចិត្ត)។
+  ការរក្សាទុកឆ្លងច្រកដដែល (PIN · `normalizeFirebaseConfig` · Secret key ➜ បដិសេធ)។ សៀវភៅក្នុង App ៖ ផ្នែក «បញ្ចូល Config ដោយដៃ»។
+- 🐛 **ស្កេន QR ដោយកាមេរ៉ា បាត់កូដអញ្ជើញ/DSN** — ផ្លូវកាមេរ៉ាចាក់ JSON ទាំងមូល (រួម `invite` · `dsn`) ចូល textarea ➜ `normalizeFirebaseConfig` បោះវាលដែលមិនមែន
+  Config ចោល ➜ កូដអញ្ជើញមិនបំពេញប្រអប់ចុះឈ្មោះ · Sentry DSN មិនរក្សា ខណៈ Setup Link តាម URL ធ្វើបានត្រូវ ➜ ផ្លូវទាំង ៤ (URL · កាមេរ៉ា · រូបភាព · បិទភ្ជាប់)
+  ឥឡូវឆ្លង `applySetupPayload()` តែមួយ។
+- **icon PWA (App ទាំង ២)** — PNG ZoeKeyGen ដើមមាន **ជ្រុងសពិត** (ភីកសែល (0,0) = ស មិនថ្លា) ➜ Chrome/Windows បង្ហាញគែមស · `"purpose": "any maskable"`
+  រួម ➜ Chrome ពង្រីក/កាត់រូបមានគែម ➜ ព្រិល ➜ icon `any` (ជ្រុងថ្លា) ដាច់ពី `maskable` (ពេញផ្ទៃ · 192/512/1024) · `apple-touch-icon` = maskable (iOS
+  បិទជ្រុងខ្លួនឯង) · logo ZoeKeyGen ក្នុង App = icon `any` · រូប ZoeKeyGen គូរឡើងវិញពី SVG (`ZoeW/resources/keygen-icon.svg` · `ZoeW/scripts/pwa-icons.mjs`)។
+- **ZoeKeyGen ៖ Tab ខាងក្រោមលើទូរស័ព្ទ** (`< 900px`) ៖ 🔑 បង្កើត · 🔗 Link · 📢 ដំណឹង · 🏪 ហាង · 📋 បញ្ជី ➜ បង្ហាញតែកាតរបស់ Tab នោះ (ចងចាំក្នុង
+  `zoekeygen_tab_v1`) · `≥ 900px` ដូចមុន (grid ២ ជួរ · គ្មាន Tab)។
+- **ZoeKeyGen ៖ ដោះសោដោយក្រយៅដៃ/មុខ** ៖ ⚙️ ➜ «បើក» ➜ វាយ PIN ពិត ➜ ឧបករណ៍ចុះឈ្មោះ ➜ ក្រោយមកប្រអប់ PIN សួរក្រយៅដៃ/មុខភ្លាម។ PIN រុំដោយ AES-GCM
+  ពីកូនសោ **WebAuthn PRF** (⛔ ឧបករណ៍គ្មាន PRF ➜ «មិនគាំទ្រ» មិនមានរបៀបរក្សា PIN ធម្មតា) · PIN ដែលស្រាយត្រូវស្មើ hash មុនទុកចិត្ត (មិនស្មើ ➜ លុបការចង) ·
+  ប្តូរ PIN ➜ លុបការចង · ពិដាន/lockout PIN ដដែល · ផ្លូវជោគជ័យតែមួយ `completePinUnlock()`។
+- **ZoeKeyGen ៖ Signing Key ផុតពីសតិ** ក្រោយមិនប៉ះ ១៥ នាទី (pointer/key) ➜ toast «🔒 … សូម Load ម្តងទៀត» · ពិនិត្យរាល់ ៣០ វិ. និងពេលត្រឡប់មក App
+  (Signing Key ជា secret ធំជាងគេរបស់អ្នកលក់ ➜ ឧបករណ៍ដែលទុកចោលបើក មិនកាន់វាជារៀងរហូត)។
+- **សុវត្ថិភាព (App ទាំង ២)** ៖ Sentry លាក់ `invite` · `reset_code` (កូដអញ្ជើញ/ប្តូរពាក្យសម្ងាត់ក្នុង URL ឬ breadcrumb) · វាល Setup Link ក្នុងបញ្ជីសម្អាតពេល
+  ចាកចេញ · header `Cross-Origin-Opener-Policy: same-origin` (ទំព័រផ្សេងដែលបើក App ក្នុងបង្អួចថ្មី ចាប់ `window.opener` មិនបាន)។
+
+#### អ្នកយាម
+
+- ថ្មី ៖ `ZoeW/tests/toast-backend.test.tsx` (៤) · `ZoeW/tests/config-modal.test.tsx` (៨ ៖ ជ្រើស backend · Supabase JSON · Link បិទភ្ជាប់ ➜ invite + DSN · Link ខូច ·
+  QR កាមេរ៉ា ➜ invite មិនបាត់) · `ZoeW/tests/pwa-icons.test.ts` (ឌិកូដ PNG ពិត ៖ ជ្រុងថ្លា · គ្មានគែមស · maskable/apple មិនថ្លា · ទំហំ ↔ manifest ➜ icon
+  ចាស់ **ធ្លាក់**) · `keygen-biometric-test` (២១ ៖ function ពិតក្នុង `vm` · WebAuthn ក្លែងដែលមាន PRF ពិត · AES ពិត ➜ mutation ៤/៤ ចាប់ ៖ របៀបគ្មាន PRF ·
+  រំលង hash · ប្តូរ PIN រក្សាការចង · ដកច្រកទ្វារប្រអប់)។ mutation លើ toast/Config ៖ ដក `toastBackendText` · ប្តូរ «Config» ផង · ដក `applySetupPayload`
+  ពីផ្លូវកាមេរ៉ា ➜ ចាប់ទាំងអស់។
+- ពង្រីក ៖ `keygen-session-security-test` (៩៥ ៖ Signing Key ផុតក្រោយ ១៥ នាទីតាមនាឡិកាក្លែង · សកម្មភាពពន្យារ · ខ្សែភ្ជាប់ពិត) · `secret-hygiene` (២២១ ៖ វាល
+  credential ដេរីវេរួម `Invite`/`resetCode`/`setupLink` · mutation ដក `invite` ➜ ចាប់) · `netlify-config-scope-test` ផ្នែក ៦ (header សុវត្ថិភាព `/*` ៖ XFO ·
+  frame-ancestors · nosniff · HSTS · Referrer · COOP · Permissions-Policy កាមេរ៉ាដេរីវេពី `getUserMedia` ➜ mutation ៣/៣)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** និង **ZoeKeyGen** លើ Netlify (header COOP ថ្មីមកជាមួយ `netlify.toml` ក្នុង deploy ដដែល)។
+2. **icon ថ្មី** ៖ PWA ដែលដំឡើងរួចប្តូរ icon ពេល Chrome ពិនិត្យ manifest ឡើងវិញ (អាចចំណាយពេលរាប់ថ្ងៃ) ➜ ចង់ឃើញភ្លាម ៖ លុប App ពី desktop ➜ ដំឡើងម្តងទៀត ·
+   iPhone ៖ លុបពីអេក្រង់ដើម ➜ «Add to Home Screen» ម្តងទៀត។
+3. សាកលើឧបករណ៍ពិត ៖ ZoeW (ហាង Supabase) ➜ toast និយាយ «Supabase» · ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ 🖼️ QR ពីរូបថតអេក្រង់ Setup Link · បិទភ្ជាប់ Link · ជ្រើស Supabase
+   វាយ URL/Key ដោយដៃ · ZoeKeyGen លើទូរស័ព្ទ ➜ Tab ទាំង ៥ · ⚙️ ➜ បើកក្រយៅដៃ/មុខ (iPhone · Android · កុំព្យូទ័រ Windows Hello) ➜ ដោះសោដោយវា · ទុក Signing Key
+   ១៥ នាទី ➜ toast ផុត។
+4. **APK ៖** workflow `Android APK` រត់ពេល `version.ts` ប្រែលើ `main` ➜ Release 2.47.0 (កូតា Actions · secret ៤ ត្រូវមាន)។
+5. ⛔ គ្មានការកែ Firebase rules · Supabase migration · env។
+
 ### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (merge រួចក្នុង PR #276 · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»)
 
 **ZoeW `2.46.0`** (`zoew-v249` ➜ `zoew-v250`) · **ZoeKeyGen `2.23.0`** (`zoekeygen-v109` ➜ `zoekeygen-v110`)។ សំណើម្ចាស់គម្រោង ៖ ឈប់បង្កើត Firebase
@@ -2620,8 +2672,9 @@ Function ដែល export ៖ 978
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `item-money-integrity-test` | — | ផ្នែក ១ |
+| `keygen-biometric-test` | ផ្នែក ១ | — |
 | `keygen-notice-test` | ផ្នែក ១ | — |
-| `keygen-session-security-test` | — | ផ្នែក ២ |
+| `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | — | ផ្នែក ១ |
 | `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |

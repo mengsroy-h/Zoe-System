@@ -1,4 +1,5 @@
 export const ACTION_ALLOWLIST = [
+    "applySetupLinkFromInput",
     "applySheetImportHeaderRow",
     "backToLoginForm",
     "cancelLocationChange",
@@ -20,6 +21,7 @@ export const ACTION_ALLOWLIST = [
     "confirmPhone",
     "confirmScannedRemoval",
     "debouncedSearchByPhone",
+    "decodeConfigQrImage",
     "decodeImageFile",
     "dismissPhoneModal",
     "drawerAppLockFlow",
@@ -105,6 +107,7 @@ export const ACTION_ALLOWLIST = [
     "saveNewSecurityPin",
     "saveSheetImportConfig",
     "searchByPhone",
+    "selectConfigBackend",
     "selectCustomLocker",
     "setCallMark",
     "setEntryScanMode",

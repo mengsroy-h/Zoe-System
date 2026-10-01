@@ -603,7 +603,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
-         keygen-session-security-test keygen-notice-test \
+         keygen-session-security-test keygen-notice-test keygen-biometric-test \
          barcode-shape-test setup-link-logout-test \
          raw-read-shape-test devtools-guard-test concurrent-scan-test \
          restore-finalization-fence-test \

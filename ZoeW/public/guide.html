@@ -285,12 +285,16 @@
                 <h3>Setup Link/QR</h3>
                 <ol>
                     <li>ទទួល Setup Link ឬ QR ពី ZoeKeyGen ដែលទុកចិត្តបាន។</li>
-                    <li>បើក link នោះ ឬនៅ ZoeW ចូលរបា Slide → <strong>Config / Reconfig</strong> → ប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> → <strong>📷 ស្កេន QR (Setup Link)</strong>។</li>
+                    <li>បើក link នោះ ឬនៅ ZoeW ចូលរបា Slide → <strong>Config / Reconfig</strong> → ប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ហើយជ្រើសមួយ ៖ <strong>📷 ស្កេន QR (Setup Link)</strong> ដោយកាមេរ៉ា · <strong>🖼️ QR ពីរូបភាព</strong> (រូបថតអេក្រង់ QR ដែលទទួលតាម chat) · ឬបិទភ្ជាប់ Link ក្នុងវាល <strong>Setup Link</strong> រួចចុច <strong>ប្រើ Link</strong>។</li>
                     <li>ផ្ទៀងផ្ទាត់ Security PIN មុនរក្សាទុក។</li>
-                    <li>ចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ហើយរង់ចាំស្ថានភាព Firebase បង្ហាញថាភ្ជាប់រួច។</li>
+                    <li>ចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ហើយរង់ចាំស្ថានភាពបង្ហាញថា «ភ្ជាប់ Server រួចរាល់»។</li>
                 </ol>
-                <h3>បញ្ចូល Firebase Config ដោយដៃ</h3>
-                <p>ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</p>
+                <h3>បញ្ចូល Config ដោយដៃ</h3>
+                <p>ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ជ្រើសប្រភេទ Server ៖</p>
+                <ul>
+                    <li><strong>Firebase</strong> ៖ ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</li>
+                    <li><strong>Supabase</strong> ៖ បំពេញ <strong>Project URL</strong> (<code>https://….supabase.co</code>) និង <strong>Publishable key</strong> (<code>sb_publishable_…</code>) ពី Supabase → Project Settings → API។ ⛔ App បដិសេធ Secret key (<code>sb_secret_…</code>)។</li>
+                </ul>
                 <div class="callout danger"><strong>សុវត្ថិភាព៖</strong> Firebase Config មិនមែនជាពាក្យសម្ងាត់ ប៉ុន្តែ Database Rules និង Authentication ត្រូវតែកំណត់ត្រឹមត្រូវ។ កុំផ្ញើ PIN, ពាក្យសម្ងាត់ ឬ API secret ក្នុង chat ឬ screenshot។</div>
             </section>
 

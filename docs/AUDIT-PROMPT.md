@@ -13,7 +13,18 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-30 · ZoeW 2.45.8 · ZoeKeyGen 2.22.1)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
+
+⛔ **មេរៀនជុំ 2.46.0 ៖ backend ទី ២ = ផ្ទៃដែលអ្នកយាមចាស់គិតថាជា «ការពិតតែមួយ»** — ZoeW ដើរលើ Firebase **ឬ** Supabase (adapter `fb` លើ zoe_docs · rules
+compile ទៅ Postgres) ហើយ ZoeKeyGen មានផ្ទាំងហាង Supabase។ CI ពេញលើកដំបូងធ្លាក់ **២១** ៖ កំហុសពិតតិច (`document` ផ្ទាល់ · `Date.now() - startedAt` ·
+badge មិន escape) ចំណែកភាគច្រើនជា **អ្នកយាមដែលស្កេនអក្សរ/បញ្ជីរឹង** (`tx-outcome` រកអថេរ `fb =` ផ្ទាល់ · `sdk-surface` ស្គាល់តែ export របស់ loader ·
+`csp-enforced` អានសារជា literal) ➜ ⛔ ការកែជា **ការដេរីវេ** មិនមែនបន្ថែមឈ្មោះ។ ⛔ សួរបន្ថែម ៖ (១) តើ artifact ដែល **បង្កើតពីឯកសារមួយទៀត** មានអ្នកយាម
+ភាពស្រស់ទេ? (`*_zoe_rules.sql` ↔ `firebase-database.rules.json` ➜ គ្មាន ➜ បន្ថែមក្នុង `supabase-datastore-test`) · (២) mutation ដែល **ឆ្លងពេលរត់ម្នាក់ឯង តែរស់រាន
+ក្នុង run-all ពេញ** = ការអះអាងពឹងលើការប្រណាំង ➜ ធ្វើឲ្យ **កំណត់** (session ទី ៣ កាន់ lock + រង់ចាំ `pg_stat_activity` `Lock`) · (៣) ផ្ទាំង admin ថ្មីត្រូវវាស់
+ទាំង **Postgres ពិត** និង **helper ពិតរបស់ App ម្ខាងទៀត** (`keygen-supabase-admin-test` ៖ Setup Link ដែល ZoeKeyGen ចេញ ត្រូវ decode ដោយ ZoeW ពិត)។
+⛔ អន្ទាក់ ៖ កុំដាក់ឯកសារបណ្តោះអាសន្នក្នុង `measure-root` ខណៈ suite រត់ (`doc-scope-test` ធ្លាក់លើ `.tmp-*`)។ លម្អិត ៖ `docs/HISTORY.md` ផ្នែក ២។
+
+## តារាងជុំមុន (2026-09-30 · ZoeW 2.45.8 · ZoeKeyGen 2.22.1)
 
 ⛔ **មេរៀនជុំ 2.45.8 ៖ ឧបករណ៍ពិតឃើញអ្វីដែល Chromium មិនឃើញ — ហើយ «ការកែតាមឯកសារ» ក៏ត្រូវវាស់ដែរ** — (១) launch theme របស់ template Capacitor ដាក់
 `android:background` (background លំនាំដើមរបស់ **គ្រប់ View**) ➜ tablet បង្ហាញរបា «ZoeW» + logo ច្របាច់ · ការកែលើកទី ១ (`@mipmap/ic_launcher`) ដើរតាមឯកសារ
@@ -241,7 +252,7 @@ fuzz helper សុទ្ធ **២៨២** (ZoeW ១៨៣ + ZoeKeyGen ២៨ ស
 ## ជំហាន ០ — baseline ពិត (SKIP ០) · ⛔ **រត់ក្នុង session នេះ មិនមែន GitHub**
 
 ⛔ **ពាក្យបញ្ជារស់នៅ `CLAUDE.md` Runbook ជំហានទី ០ តែមួយកន្លែង** (ដំឡើង · បើក emulator ជា task រស់ · `curl` មុនរត់ ·
-`CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh`) — កុំចម្លងមកទីនេះ (ច្បាប់ ១២)។
+`CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 bash audit-tools/run-all.sh`) — កុំចម្លងមកទីនេះ (ច្បាប់ ១២)។
 ⛔ **checker ណាក៏ដោយ (រួម `money-guardian-test` · `version-check` · `doc-scope-test`) មិនត្រូវរត់ដោយផ្ទាល់លើ repo ទេ** ៖ វាស្វែងរក
 `ZoeW/app.js` ដែលលែងមាន ➜ ធ្លាក់ក្លែងក្លាយ (វាស់បាន ៖ `doc-scope-test` **FAIL 19** · `version-bump-scope` «មិនបានឃើញកូដ») ➜ រត់តាម
 `run-all.sh` ឬ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។

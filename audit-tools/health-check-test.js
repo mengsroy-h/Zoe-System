@@ -55,7 +55,9 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs', 'lookupFailureIsDefinitive',
     'retryTransientLookupResponse', 'noteSheetScriptVersion', 'getNestedField', 'dropAutoLookupQueueEntry',
     // ⛔ App React ៖ ជួរជា **model** (`healthRow()`) ដែល `HealthCheckList` គូរ មិនមែនខ្សែអក្សរ HTML
-    'healthRow', 'healthPendingRow'];
+    'healthRow', 'healthPendingRow',
+    // ⛔ backend Supabase ៖ ស្លាកជួរ Database · ជួរ License ក្លាយជាស្ថានភាពហាង
+    'databaseHealthLabel', 'healthTenantRow'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -135,6 +137,9 @@ function buildRuntime(over) {
         probeDatabaseLiveness: (reason) => { probes.push(reason); return Promise.resolve(o.probe === undefined ? true : o.probe); },
         cleanupClockIsTrustworthy: () => o.cleanupOk !== false,
         getServerNow: () => 1770000000000,
+        getZoneDateKey: (ms) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10),
+        fb: o.account === undefined ? null : { accountOf: () => o.account },
+        auth: o.account === undefined ? null : {},
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
         decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? SECRET : o.secretPlain),
         withTimeout: (p) => p,
@@ -171,6 +176,7 @@ function buildRuntime(over) {
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
         + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthDatabaseLiveRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
     vm.runInContext(code, ctx);
+    if (o.backend) vm.runInContext('viewState.backendKind = ' + JSON.stringify(o.backend) + ';', ctx);
     // ⛔ ជួរ (model) ➜ markup ដដែលនឹងអ្វីដែល `HealthCheckList` គូរ (class · រូប · ស្លាក · ព័ត៌មាន) ➜ ការអះអាងលើ
     //    អត្ថបទដែលអ្នកប្រើឃើញ នៅដដែល។ ខ្សែអក្សរ (App ចាស់) ឆ្លងកាត់ត្រង់ៗ។
     const api = {};
@@ -411,6 +417,25 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ភ្ជាប់រួច តែទិន្នន័យមិនមកដល់ ➜ ⚠️ («ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់»)', state(rt2.api.healthDatabaseRow()) === 'warn');
         const rt3 = buildRuntime({});
         ok('Firebase ធម្មតា ➜ ✅ (ទិសវិជ្ជមាន)', state(rt3.api.healthDatabaseRow()) === 'ok');
+        ok('Config Firebase ➜ ស្លាកជួរ «Firebase»', /<b>Firebase<\/b>/.test(rt3.api.healthDatabaseRow()));
+    }
+    {
+        // ⛔ backend Supabase ៖ គ្មាន Activation Key ➜ ជួរ License = ស្ថានភាពហាងពី server (`my_account()`) · ⛔ ផុត/បិទ ➜ ❌ មិនមែន ✅
+        const future = new Date(1770000000000 + 30 * 86400000).toISOString();
+        const shop = (over) => Object.assign({ tenant_id: 't1', tenant_name: 'ហាង <b>សុខា</b>', branch_code: '881859', status: 'active', expires_at: future }, over || {});
+        const sb = buildRuntime({ backend: 'supabase', account: shop() });
+        ok('Supabase ៖ ស្លាកជួរ Database = «Supabase»', /<b>Supabase<\/b>/.test(sb.api.healthDatabaseRow()), sb.api.healthDatabaseRow());
+        const active = await sb.api.healthLicenseRow();
+        ok('Supabase ៖ ហាងសកម្ម ➜ ✅ ឈ្មោះហាង (escape) · សាខា · ថ្ងៃផុត', state(active) === 'ok' && /881859/.test(active)
+            && /&lt;b&gt;សុខា/.test(active) && /2026-03-0[34]/.test(active), active);
+        const expired = await buildRuntime({ backend: 'supabase', account: shop({ status: 'expired', expires_at: new Date(1760000000000).toISOString() }) }).api.healthLicenseRow();
+        ok('⛔ Supabase ៖ ហាងផុតកំណត់ ➜ ❌ «ផុតកំណត់»', state(expired) === 'bad' && /ផុតកំណត់/.test(expired), expired);
+        const revoked = await buildRuntime({ backend: 'supabase', account: shop({ status: 'revoked' }) }).api.healthLicenseRow();
+        ok('⛔ Supabase ៖ ហាងត្រូវបិទ ➜ ❌ «ត្រូវបានបិទ» (ទោះថ្ងៃផុតនៅអនាគត)', state(revoked) === 'bad' && /ត្រូវបានបិទ/.test(revoked), revoked);
+        const stale = await buildRuntime({ backend: 'supabase', account: shop({ expires_at: new Date(1760000000000).toISOString() }) }).api.healthLicenseRow();
+        ok('⛔ Supabase ៖ status «active» តែថ្ងៃផុតកន្លងរួច (cache ចាស់) ➜ ❌', state(stale) === 'bad', stale);
+        const unknown = await buildRuntime({ backend: 'supabase', account: null }).api.healthLicenseRow();
+        ok('⛔ Supabase ៖ មិនទាន់ដឹងស្ថានភាពហាង ➜ ⚠️ (មិនមែន ✅ ឬ ❌)', state(unknown) === 'warn', unknown);
     }
     {
         // ⛔ «ការតភ្ជាប់ងាប់ស្ងាត់» ៖ `.info/connected` = true តែ Server មិនឆ្លើយ ➜ ✅ លើអ្វីដែលមិនបានវាស់ = កុហក

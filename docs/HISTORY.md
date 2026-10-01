@@ -39,6 +39,53 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.46.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.23.0` ៖ **ហាងចុះឈ្មោះដោយកូដអញ្ជើញលើ Supabase Project តែមួយ** (branch `claude/great-ritchie-47ujj5` · មិនទាន់ merge)
+
+**ZoeW `2.46.0`** (`zoew-v249` ➜ `zoew-v250`) · **ZoeKeyGen `2.23.0`** (`zoekeygen-v109` ➜ `zoekeygen-v110`)។ សំណើម្ចាស់គម្រោង ៖ ឈប់បង្កើត Firebase
+Project · Rules · គណនី Login ដោយដៃក្នុងមួយអតិថិជន ➜ **Supabase Project តែមួយ** (Free · Upgrade ទៅ Pro លើ Project ដដែល) · ហាងបំបែកដោយ
+`tenant_id` + RLS · **កូដអញ្ជើញ** (ជម្រើសរបស់ម្ចាស់គម្រោង ៖ មិនមែន SMS OTP ព្រោះវាគិតប្រាក់) ចងលេខសាខា ZTO · ការតភ្ជាប់ dynamic (Config/Setup Link)។
+⛔ Firebase rules **មិនប្រែ** ➜ គ្មាន Publish · អតិថិជន Firebase ចាស់ដើរដដែល។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ZoeW** ៖ Config/Setup Link ទទួល `{supabaseUrl, supabaseKey, loginDomain?, invite?}` (⛔ Secret key ➜ បដិសេធ) ➜ `initFirebase()` ផ្ទុក adapter
+  `fb` លើ Supabase (chunk `supabase-backend`) ➜ កូដលុយ/listener ដដែលដើរលើ backend ទាំង ២ · ប្រអប់ចូល ៖ **ឈ្មោះគណនី** · **📝 ចុះឈ្មោះដោយកូដអញ្ជើញ**
+  (កូដពី Setup Link បំពេញរួច) · **🔑 ភ្លេចពាក្យសម្ងាត់?** (កូដពីអ្នកលក់) · គ្មាន Activation Key (ស្ថានភាពហាងពី server ជំនួស · ហាងផុត/បិទ ➜
+  ចាកចេញ) · 🩺 ជួរ «ហាង (Supabase)» (ឈ្មោះ · សាខា · ថ្ងៃផុត) · «ទាញបញ្ជីពី ZTO» យកសាខាពីហាង · សៀវភៅក្នុង App ផ្នែក ៣ខ។
+- **ប្រអប់ Config** (សំណើម្ចាស់គម្រោង ក្រោយឃើញវានៅនិយាយតែ Firebase លើ deploy preview) ៖ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ➜ ស្កេន QR / Setup Link ពីអ្នកលក់
+  **មុន** · បិទភ្ជាប់ Config Firebase **ក្រោម** (អតិថិជនចាស់ Reconfig បានដដែល) · សារពេលមិនទាន់ភ្ជាប់ ៖ «សូមភ្ជាប់ប្រព័ន្ធជាមុនសិន ៖ ស្កេន QR ឬបើក Setup Link
+  ពីអ្នកលក់!» · parity ៖ `INTENTIONAL_UI` រំលងតែអត្ថបទណែនាំ (`h3` + `p` គ្មាន style) ➜ textarea · ប៊ូតុង · Sentry នៅប្រៀបធៀបដដែល។
+- **ZoeKeyGen** ៖ កាត **🏪 ហាង Supabase** ៖ ចូលជា Admin (`platform_admins`) · បង្កើតហាង + កូដអញ្ជើញម្ចាស់ហាង + Setup Link/QR · កូដអញ្ជើញបុគ្គលិក ·
+  ពន្យារ · បិទ/បើកវិញ · កូដប្តូរពាក្យសម្ងាត់ · CSP `connect-src` + `https://*.supabase.co`។
+- ការរកឃើញដោយអ្នកយាមថ្មី (មុន commit) ៖ ZoeKeyGen ទទួល URL ដែលមានពាក្យសម្ងាត់ (`https://:pw@…`) ខណៈ ZoeW បដិសេធ ➜ Link ដែល ZoeW មិនទទួល ·
+  ក្រោយចាកចេញ ស្លាកកូដអញ្ជើញនៅផ្ទុក **ឈ្មោះហាង** ក្នុង DOM · ប៊ូតុង «ចូល Supabase ជា Admin» នៅបង្ហាញក្រោយចូលរួច ➜ កែទាំង ៣។
+
+#### អ្នកយាម
+
+- ថ្មី ៖ `keygen-supabase-admin-test` (Postgres ពិត + migration ពិត · function `sb*` ពិតក្នុង `vm` · DOM ដេរីវេពី `index.html` · helper Config ពិតរបស់ ZoeW
+  ពី build វាស់) ➜ **៨៨** · mutation **២៣/២៣** ក្រហម · tree មុនកែ ➜ ធ្លាក់ **២** (URL ពាក្យសម្ងាត់ · ស្លាកឈ្មោះហាង)។
+- build វាស់ (`build-audit.mjs`) ៖ បដិសេធការប្រកាសយោងខ្លួនឯងក្នុងទិដ្ឋភាព `app.js` · ទិដ្ឋភាពចាប់ផ្តើមដោយ `\n`។
+- ពង្រីក ៖ `supabase-datastore-test` (ភាពស្រស់ `*_zoe_rules.sql` ↔ rules · tenant lock វាស់ដោយ lock ពិត) · `health-check-test` (ជួរហាង ៖ សកម្ម/ផុត/បិទ/
+  មិនដឹង) · `firebase-config-paste-test` (Config Supabase) · `sdk-surface` (ផ្ទៃ adapter ⊇ `fb.X`) · `tx-outcome-test` (ដេរីវេអថេរដែលរុំ)។
+- CI (`audit.yml`) ៖ `npm ci --prefix supabase` · `SUPABASE_STRICT=1` · job `firebase-rules` រត់ `emu/supabase-rules-parity` · `emu/supabase-adapter-parity`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. បង្កើត **Supabase Project** (Free · Region **Singapore**) ➜ Authentication ៖ Allow new users to sign up = **បិទ** · Confirm email = **បើក** · Secure email/
+   password change = **បើក** · Anonymous = បិទ (លម្អិត ៖ [`supabase/README.md`](../supabase/README.md) ជំហាន ១)។
+2. **Database** ៖ `npx supabase@latest db push` (ឬ SQL Editor ➜ paste តាមលំដាប់ ៖ `20260930120000_zoe_tenancy.sql` · `20261001000100_zoe_rules.sql` ·
+   `20261001000200_zoe_datastore.sql`)។
+3. **Admin** ៖ Authentication ➜ Users ➜ Add user (ឧ. `boss@admin.zoew.invalid` · Auto Confirm) ➜ SQL ៖
+   `insert into public.platform_admins (user_id) select id from auth.users where email = 'boss@admin.zoew.invalid';`
+4. **Edge Function** ៖ `supabase secrets set ZOE_SECRET_KEY=<sb_secret_…> ZOE_LOGIN_DOMAIN=users.zoew.invalid ZOE_ALLOWED_ORIGINS=https://<site-zoew>.netlify.app,https://localhost`
+   ➜ `supabase functions deploy register --no-verify-jwt` · `supabase functions deploy reset-password --no-verify-jwt` (⛔ Secret key តែក្នុង secrets)។
+5. **Netlify (site ZoeW)** env ៖ `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` (សម្រាប់ «ទាញបញ្ជីពី ZTO» តាមសាខាហាង) ➜ Deploy **ZoeW** និង **ZoeKeyGen** (CSP)
+   · build **APK ថ្មី** (2.46.0)។
+6. **ហាងដំបូង** ៖ ZoeKeyGen ➜ 🔗 Base URL របស់ ZoeW ➜ 🏪 ហាង Supabase ➜ ចូលជា Admin ➜ បង្កើតហាង ➜ ផ្ញើ Setup Link ➜ សាកចុះឈ្មោះ · ចូល · ស្កេន ·
+   ក្រៅបណ្តាញ ➜ ភ្ជាប់វិញ · ឧបករណ៍ ២ ក្នុងហាងដដែល · ភ្លេចពាក្យសម្ងាត់ · បិទហាង ➜ ចាកចេញ (iPhone + Android ពិត)។
+7. Firebase rules **មិនប្រែ** · ⛔ កែ `firebase-database.rules.json` នៅថ្ងៃក្រោយ ➜ Publish លើ Firebase **និង** paste `*_zoe_rules.sql` ដែលបង្កើតឡើងវិញ។
+8. ⚠️ ហាង Supabase **មិនទាន់ទទួល Push** (ចងនឹង Activation Key) · Free tier គ្មាន backup ស្វ័យប្រវត្តិ — មើល `CLAUDE.md` «ការងារដែលនៅសល់»។
+
 ### [2.45.8] — 2026-09-30 · ZoeW ៖ **APK ៖ logo ពេលបើកព្រិល/ការ៉េ · tablet ផ្តេក ៖ សញ្ញា Pull to refresh បាំងរបា Tab** (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ រូបថត + វីដេអូ tablet 11.5")
 
 **ZoeW `2.45.8`** (`zoew-v248` ➜ `zoew-v249`)។ ⛔ ZoeKeyGen មិនប្រែ · rules មិនប្រែ ➜ គ្មាន Publish · server មិនប្រែ។
@@ -1585,6 +1632,51 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### Supabase + កូដអញ្ជើញ ៖ អ្វីដែលការវាស់រកឃើញពេលបញ្ចប់ (2026-10-01 · ZoeW 2.46.0 · ZoeKeyGen 2.23.0)
+
+ម្ចាស់គម្រោងបើកផ្លូវ Supabase ម្តងទៀតក្នុងទម្រង់ **ឥតគិតថ្លៃ** ៖ Free tier · **កូដអញ្ជើញ** ជំនួស SMS OTP (ការសម្រេច «មិនផ្ទេរ» ខាងក្រោមជាប់នឹងថ្លៃ
+SMS + Pro)។ ការងាររៀបចំលើ ៤ commit (`8ff2d6e` ➜ `3cb1686`) ហើយជុំនេះបញ្ចប់ជំហាន ៣ក–៣ឃ។ CI ពេញលើកដំបូង (emulator · `*_STRICT` · `SUPABASE_STRICT=1`)
+ធ្លាក់ **២១** ៖
+
+- **ការធ្លាក់ពិតក្នុងកូដ** ៖ `supabase-sdk.ts` ប៉ះ `document` ផ្ទាល់ (៣ · `purity:check`) ➜ ឆ្លង `platform/document-io.ts` · `supabase-rtdb.ts` ដក `Date.now() - startedAt`
+  (`monotonic-gate`) ➜ `elapsedSince()` · ZoeKeyGen ៖ `${labels[state][0]}` មិន escape (`html-sink-escaping` ៖ ថេរ ➜ badge ថេរ ៣) · `sbAdminPasswordInput`/ស្លាក
+  ហាងមិនស្ថិតក្នុងផ្លូវចាកចេញដែល checker ស្គាល់ (`secret-hygiene` · `dom-hygiene` ➜ helper សម្អាតរាប់ **តែពេល** `showLoginModalWithPrefill()` ហៅវាពិត)។
+- **អ្នកយាមដែលស្កេនអក្សរចាស់** ៖ `tx-outcome-test` រក `fb = withTransactionOutcomeResolution(await waitForFirebaseSDK(` ➜ កូដថ្មីប្រើ `nextFb = …` ➜ FAIL ខណៈការធានានៅដដែល
+  ➜ ដេរីវេ ៖ អថេរណាដែលរុំ ត្រូវក្លាយជា `fb` (probe ៖ ដក wrapper ➜ FAIL) · `csp-enforced` អានសារ «វាលទទេ» ជា literal ➜ ternary តាម backend ➜ យកសាខា Firebase ·
+  sandbox ខ្វះឈ្មោះថ្មី (`connection-recovery` ៖ `isSupabaseConfig` · `health-check` ៖ `databaseHealthLabel` · `firebase-config-paste` ៖ helper Supabase · `crud-rules-flow` ៖ `auth`)។
+- **បញ្ជីរឹង** ៖ `checker-coverage` (harness `supabase-pg.js` · `supabase-fake-server.js` មិនមែន checker) · `sdk-surface` (`fb.accountOf` … មិនមែន export របស់ loader ➜
+  ផ្ទៃ adapter ដេរីវេពី `createSupabaseSdk()` ពិត បូកការអះអាងថ្មី **២** ៖ `fb.X` ដែល SDK Firebase មាន ត្រូវមានក្នុង adapter · ឈ្មោះ adapter-only ប្រើក្រោមច្រកទ្វារ) ·
+  `shared-fns` (`normalizeFirebaseConfig` ZoeW ទទួល Supabase ➜ divergent មានហេតុផល) · `state-hygiene` (`pendingInvite` ➜ ផ្លូវចាកចេញខ្លួនវាអានវា) · coverage · README · emu ក្នុង Runbook។
+- **ការវាស់តាមពេល ➜ ធ្លាក់ពេលម៉ាស៊ីនរវល់** ៖ `supabase-datastore` mutation «គ្មាន tenant lock» **រស់រាន** ក្នុង run-all ពេញ (ឆ្លងពេលរត់ម្នាក់ឯង) ៖ ការអះអាង «ទី ២ រង់ចាំ lock»
+  មិនដែលឃើញ mutation នោះសោះ (`insert … on conflict do nothing` ក៏រង់ចាំ tuple ដែល T1 កំពុង update) ➜ មានតែការប្រណាំង `Promise.all` ដែលចាប់វា ដោយសំណាង ➜
+  សេណារីយ៉ូថ្មី ៖ session ទី ៣ កាន់ `for update` លើ `zoe_tenant_state` ➜ ទី ២ ចាប់ផ្តើម ➜ រង់ចាំរហូត `pg_stat_activity` រាយ `Lock` ➜ ទី ១ សរសេរ ➜ seq ត្រូវ +1/+2 ➜
+  mutation ចាប់ **ជានិច្ច**។ ⛔ `migrations/*_zoe_rules.sql` គ្មានអ្នកយាមភាពស្រស់ធៀប rules ➜ ការកែ rules អាចភ្លេច generate ➜ Postgres អនុវត្ត rules ចាស់ ➜ បន្ថែម (probe
+  ៖ rules ប្រែ ➜ FAIL)។
+- **ផ្ទាំងអ្នកលក់ ZoeKeyGen** (`keygen-supabase-admin-test`) ៖ mutation ៣ ដំបូងរស់រាន ➜ (១) ស្កេនអក្សរ «ឈ្មោះគណនី» ប្រកាន់អក្សរតូចធំ (` SoKha ` នៅក្នុងវាល) ➜ មិនប្រកាន់ ·
+  (២) ការដក gate ក្រោយ `/token` មិនប្រែលទ្ធផលដែលមើលឃើញ តែផ្ញើសំណើក្រោយចាកចេញ ➜ អះអាង «គ្មានសំណើក្រោយចាកចេញ» · (៣) `parseInt` ទទួល «5abc» ➜ ករណី ៤ ➜ **២៣/២៣**។
+- **ទិដ្ឋភាព checker ខុសពីកូដ ship (ជុំទី ២ នៃការកែ)** ៖ (១) `build-audit.mjs` ប្តូរ `firebaseState.fb` ➜ `fb` ➜ `const fb = firebaseState.fb;` ក្លាយជា
+  `const fb = fb;` (**៥** កន្លែង ៖ ៤ ថ្មី + `probeDatabaseLiveness()` លើ `main` ដែលក្លាយជា `db !== db`) ➜ TDZ ក្នុង `vm` ➜ `health-check-test` ធ្លាក់ ·
+  `cleanupJournalScope()` ត្រឡប់ `''` ស្ងាត់ៗ (`catch` លេប) ➜ checker វាស់ឥរិយាបថដែល App មិនមាន ➜ ប្រភពប្រើ `firebaseState.fb` ផ្ទាល់ (`fb.X` នៅមើលឃើញ
+  សម្រាប់ `sdk-surface`) · build វាស់បដិសេធការប្រកាសយោងខ្លួនឯង (probe ៖ ទិដ្ឋភាពចាស់ ➜ ៥/៥ · ករណីធម្មតា ➜ ០)។ (២) `supabase-rtdb.ts` នាំចូល
+  `core/elapsed` ➜ module នោះឡើងជាដំបូង ➜ `function elapsedSince` នៅតួអក្សរទី ០ ➜ `extractFn()` (`\n` មុន `function`) រកមិនឃើញ ➜ stub ចាស់ ➜
+  `monotonic-gate-test` ក្រហម **៥** ដោយមូលហេតុខុស ➜ ទិដ្ឋភាពចាប់ផ្តើមដោយ `\n` + ជាន់ «ស្រង់ពីកូដពិត»។ (៣) `doc-scope-test` រាយ `zoe_docs` ·
+  `zoe_admin_write` ថា «លែងមានក្នុងកូដ ship» ➜ កូដ server របស់ Supabase (migration · Edge Function) ចូលវិសាលភាព (ដេរីវេពីថតពិត)។
+- **CI លើ GitHub (ការរត់ពិតលើកដំបូងក្រោយកូតាវិលមក · PR #276)** ៖ job «Firebase rules ↔ payload» ធ្លាក់ក្នុង ៥ វិ. នៅជំហាន build វាស់ ដោយ log
+  រាយត្រឹម «exit code 1» (`M=$(… | tail -1)` លាក់ output) ➜ មូលហេតុ ៖ `build-audit.mjs` គូរ `index.html` ពិតក្នុង Chromium (`/opt/pw-browsers/chromium`)
+  ខណៈ job នោះទាញ Chromium **ក្រោយ** build ហើយមិនភ្ជាប់ផ្លូវនោះ (លំដាប់នេះមានលើ `main` តាំងពីប្តូរទៅ React · run ចាស់ៗធ្លាក់ ៤ វិ. ព្រោះ **គ្មាន runner**
+  ➜ មិនដែលវាស់)។ ការបង្កើតឡើងវិញក្នុងស្រុក (worktree ស្អាត · `npm ci` · deps root ដូច CI) **ឆ្លង** ព្រោះម៉ាស៊ីននេះមាន Chromium ស្រាប់ ➜ probe ៖ ប្តូរផ្លូវ
+  Chromium ទៅថតទទេ ➜ ធ្លាក់ ៣ វិ. `executable doesn't exist`។ ការកែ ៖ ទាញ Chromium **មុន** build + ភ្ជាប់ `/opt/pw-browsers/chromium` · ជំហាន build
+  បង្ហាញ output/stderr ពេញពេលធ្លាក់ (ផ្លូវ tree យកពី stdout តែប៉ុណ្ណោះ)។
+- **probe ដែលវាស់ build ចាស់ ➜ សន្និដ្ឋានខុស** ៖ ក្រោយកែប្រអប់ Config ខ្ញុំដកធាតុ `INTENTIONAL_UI` ចេញ ព្រោះ «គ្មានធាតុ ➜ `parity:dom` នៅតែឆ្លង»
+  ➜ CI លើ GitHub ក្រហម (`parity:dom` ៧២២/៧២០ · `live` · `deep` ៧៩/៧៩) ៖ ប្រអប់ mount ជានិច្ច។ `parity-dom.mjs` វាស់ **`dist/`** (មិនមែន `dist-parity/`
+  ដែលខ្ញុំទើប build) ហើយ `dist/` នៅជា build **មុន** ការកែ ➜ សញ្ញា ៖ ចំនួនធាតុក្នុងស្រុក ៧១៥/៧១៥ ≠ CI ៧២០។ probe ឡើងវិញលើ build ស្រស់ ៖ គ្មានធាតុ ➜ ៧២២/៧២០ ·
+  មានធាតុ ➜ ៧១៥/៧១៥ ➜ ធាតុត្រឡប់មកវិញ។ ⛔ មុនជឿ probe ត្រូវបញ្ជាក់ថា artifact ដែលវាស់មានការកែ (`grep` អត្ថបទថ្មីក្នុង bundle) — សំណួរ ១៣ លើ **build** មិនត្រឹម `*_APP_DIR`។
+- **`smoke` ក្រហមតែលើ GitHub** ៖ `console.error: Failed to load resource: … 401` ➜ `syncServerTime()` (`license-verify.js`) អាន root License Project
+  (`/.json?shallow=true` · default-deny ➜ 401 ដោយចេតនា ៖ ត្រូវការតែ header `Date`)។ ក្នុងស្រុក proxy ទប់ ➜ `ERR_…` ➜ ត្រូវតម្រង ➜ បៃតង ➜ smoke **អាស្រ័យលើ
+  បរិស្ថាន** (មានលើ `main` តាំងពី React · មិនដែលរត់លើ GitHub)។ ការកែ ៖ smoke ផ្តាច់រាល់ការហៅទៅក្រៅ (`page.route` ➜ `abort`) · probe ៖ ក្លែង 401 លើ host License ➜
+  មុនកែធ្លាក់ដូច CI · ក្រោយកែឆ្លង។
+- ⚠️ រូបថតផ្ទាំងក្នុង Chromium នៅទីនេះ ៖ គ្មាន font ខ្មែរក្នុងប្រព័ន្ធ ➜ អក្សរបាក់ រហូតដល់ផ្ទុក **Kantumruy Pro** ពិត (`document.fonts.load`) — មិនមែនកំហុស App។
+
 ### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)
 
 ម្ចាស់គម្រោងស្នើ Supabase Project តែមួយ (tenant · RLS · ចុះឈ្មោះ OTP) ➜ ជំហាន ០–១ ត្រូវសាង និងផ្ទៀងផ្ទាត់ (commit `e97590a` · `d25b1ca` · `f89cb34`) រួច
@@ -2460,6 +2552,7 @@ Function ដែល export ៖ 978
 | `item-money-integrity-test` | — | ផ្នែក ១ |
 | `keygen-notice-test` | ផ្នែក ១ | — |
 | `keygen-session-security-test` | — | ផ្នែក ២ |
+| `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | — | ផ្នែក ១ |
 | `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -2551,6 +2644,9 @@ Function ដែល export ៖ 978
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ | ផ្នែក ១ |
+| `supabase-datastore-test` | ផ្នែក ១ | — |
+| `supabase-fake-server` | ផ្នែក ២ | — |
+| `supabase-pg` | ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

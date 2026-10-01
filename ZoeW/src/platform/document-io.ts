@@ -2,8 +2,9 @@ export function documentIsHidden(): boolean {
     return document.hidden;
 }
 
-export function onDocumentVisibilityChange(fn: () => void): void {
+export function onDocumentVisibilityChange(fn: () => void): () => void {
     document.addEventListener('visibilitychange', fn);
+    return () => document.removeEventListener('visibilitychange', fn);
 }
 
 export function resetDocumentScroll(inner?: () => void): void {

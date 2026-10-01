@@ -41,6 +41,7 @@
 
 ```bash
 npm ci --prefix ZoeW
+npm ci --prefix supabase      # អ្នកយាម Supabase ៖ Postgres ពិត (`@embedded-postgres`) · `pg` · supabase-js · typescript
 ```
 
 ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playwright-core` · `esbuild`) ក៏ជា dependency របស់ checker ដែរ
@@ -179,6 +180,22 @@ bash audit-tools/emu/rules.sh
 | `netlify-config-scope-test.js` | ⛔ **គ្មាន root `netlify.toml`** (វាបង្វែរ build របស់ App មួយទៀត) · config ត្រូវស៊ីនឹងអ្វីដែល App ship · រាល់ config ត្រូវមាន checker អាន | `NETLIFYSCOPE_APP_DIR` |
 | `function-surface-test.js` | ផ្ទៃ function ទាំងមូល · ទប់ declaration ឈ្មោះស្ទួន · រាល់ `data-act` មាន function ពិត | `FNSURFACE_APP_DIR` |
 | `code-duplication-test.js` | តក្កវិជ្ជាដដែលរស់ **២ កន្លែង** ក្នុងឯកសារ ship តែមួយ (តួ function · ប្លុក statement) ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ | `DUPCODE_APP_DIR` |
+
+#### Supabase (Project តែមួយ · ហាងច្រើន) — Postgres ពិត · RTDB emulator ជា oracle
+
+គ្មាន `supabase/node_modules` ➜ SKIP/PARTIAL · `SUPABASE_STRICT=1` ➜ FAIL។ env រួម ៖ `SUPABASE_STRICT` · `SUPABASE_DEPS_DIR` (ថត node_modules ផ្សេង) ·
+`SUPABASE_PG_BIN` (ថត `bin` របស់ Postgres ផ្សេង · major ត្រូវស្មើ `supabase/config.toml`)។
+
+| File | ចាក់សោអ្វី | Override |
+|---|---|---|
+| `supabase-rls-test.js` | RLS/grant លើ migration ពិត ជា `postgres` (មិនមែន superuser) ៖ role · schema `auth` ដូច Supabase ពិត · ធ្វើត្រាប់ PostgREST · ២ របៀប grant លំនាំដើម · បញ្ជីអ្នកមានសិទ្ធិដេរីវេពី catalog ពិត · mutation លើ migration ➜ ក្រហម | `SUPABASE_APP_DIR` |
+| `supabase-datastore-test.js` | ឃ្លាំងទិន្នន័យដូច RTDB (`zoe_write`/`zoe_read`/`zoe_pull`) ៖ ការឆ្លង tenant · រូបរាង RTDB · CAS · `op_id` idempotent · delta/tombstone/paging · broadcast តាម topic · ⛔ **`*_zoe_rules.sql` ស្មើ `rulesSql(compileRules(firebase-database.rules.json))`** (កែ rules ➜ `node supabase/scripts/generate-rules-sql.mjs`) · mutation ➜ ក្រហម | `SUPABASE_DS_APP_DIR` |
+| `supabase-functions-test.js` | Edge Function `register`/`reset-password` (TS ពិត) ៖ លំដាប់ការហៅ · rollback តែលើការបដិសេធច្បាស់ · លទ្ធផលមិនដឹង ➜ មិនលុបគណនី · CORS/ទំហំ/កំហុស · supabase-js ពិតទល់នឹងម៉ាស៊ីនមេក្លែង · tsc strict · mutation ➜ ក្រហម | `SUPABASE_FN_APP_DIR` |
+| `keygen-supabase-admin-test.js` | ផ្ទាំងអ្នកលក់ «🏪 ហាង Supabase» ក្នុង ZoeKeyGen ៖ ស្នាមភ្ជាប់ `app.js` ↔ `index.html` ↔ migration (regex សាខា · ប្រវែង · ម៉ោងកូដ · ឈ្មោះគណនី · កូដកំហុស RPC ទាំង ២ ទិស) និង ↔ ZoeW (`supabaseKeyIsSecret`/`supabaseUrlIsAllowed` ពី build វាស់) · function `sb*` ពិតក្នុង `vm` ទល់នឹងម៉ាស៊ីនមេក្លែងលើ Postgres ពិត ៖ Secret key · គណនីមិនមែន Admin · XSS · កូដអញ្ជើញក្នុង DB ប្រើចុះឈ្មោះបាន · Setup Link ដែល `decodeSetupPayload()`/`normalizeSupabaseConfig()` ពិតរបស់ ZoeW ទទួល · សាខាស្ទួន · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · JWT ផុត · ចាកចេញពី ZoeKeyGen (`showLoginModalWithPrefill()` ពិត) កណ្តាលការងារ ➜ គ្មាន toast/សំណើ/DOM ក្រោយ · `sbAdminReset()` លុបរាល់តម្លៃរសើប | `KEYGEN_SBADMIN_APP_DIR` |
+| `emu/supabase-rules-parity-test.js` | rules RTDB ដែល Postgres អនុវត្ត ធៀប **RTDB emulator ពិត** (verdict ទល់ verdict) ៖ probe semantics · ការសរសេរពិតរបស់ App (`revenue-fuzz-test` + `FUZZ_CAPTURE`) · ការសរសេរបំប្លែងចៃដន្យ ➜ ស្ថានភាពចុងក្រោយដូចគ្នា | `SBPARITY_APP_DIR` · `SBPARITY_STRICT` · `SBPARITY_RUNS` · `SBPARITY_OPS` · `SBPARITY_SEED` · `SBPARITY_PROBE_ONLY` |
+| `emu/supabase-adapter-parity-test.js` | adapter `fb` របស់ ZoeW លើ Supabase (ប្រភព TS ពិត) ធៀប **SDK Firebase ពិត** + emulator ៖ val() · លំដាប់កូនសោ · update ជ្រៅ · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP (ចម្លើយបាត់ក្រោយ commit ➜ មិនអនុវត្ត ២ ដង · token ផុត ➜ refresh · ហាងបិទ ➜ ចាកចេញ) | `SBADAPTER_APP_DIR` · `SBADAPTER_STRICT` |
+| `supabase-pg.js` | helper ៖ Postgres ពិតតាម major (initdb/postgres ជា user មិនមែន root · port ចៃដន្យលើ 127.0.0.1 · ស្លាប់តាមអ្នកយាម) · template role/schema ពី `supabase-shim/*.sql` · database ថ្មីក្នុងមួយសេណារីយ៉ូ · ធ្វើត្រាប់ PostgREST | — |
+| `supabase-fake-server.js` | helper ៖ ម៉ាស៊ីនមេ Supabase ក្លែងលើ Postgres ពិត ៖ GoTrue (JWT HS256 ពិត · refresh · logout) · PostgREST (`rpc/<fn>` តាមឈ្មោះ argument · GET តារាងជាមួយ `select`/`order` · កំហុស + status ដូច PostgREST) · Edge Function · របៀបបរាជ័យ (`down` · `hang` · `drop-response`) · `expireTokens()` | — |
 
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត
 

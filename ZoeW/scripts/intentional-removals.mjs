@@ -22,5 +22,6 @@ export const REMOVED = {
 
 /** អត្ថបទដែលអ្នកប្រើអាន (ដកចេញជាមួយសាខាដែលលែងអាចទៅដល់) */
 export const REMOVED_STRINGS = {
+    'សូមកំណត់រចនាសម្ព័ន្ធ FirebaseConfig ជាមុនសិន!': 'ZoeW 2.46.0 ៖ backend Firebase ឬ Supabase តាម Config ➜ `loginWithFirebase()` ពេលមិនទាន់ភ្ជាប់ ប្រាប់ផ្លូវ Setup Link (QR) មុន ហើយបើកប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ដដែល (Setup Link + Config Firebase) · សំណើម្ចាស់គម្រោង',
     '🫆 ស្កេនក្រយៅដៃ ឬមុខ': 'React ១០០% ៖ សាខាបម្រុងរបស់ `setBiometricLabel()` ពេលប៊ូតុង **គ្មាន** `.bio-label` — `BiometricLabel` (JSX) គូរ `.bio-ico` (🫆) និង `.bio-label` ជានិច្ច ➜ សាខានោះលែងអាចទៅដល់ · អ្វីដែលអ្នកប្រើឃើញ (🫆 + «ស្កេនក្រយៅដៃ ឬមុខ») ដដែល (parity:dom)',
 };

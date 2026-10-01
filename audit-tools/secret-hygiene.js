@@ -49,8 +49,14 @@ function logoutClearedIds(src) {
     }
 
     // ២) ការសម្អាតដោយផ្ទាល់ក្នុង showLoginModalWithPrefill / clearSensitiveModalFields / clearSigningKey
-    ['showLoginModalWithPrefill', 'clearSensitiveModalFields', 'clearSigningKey',
-     'lockApp', 'resetSessionState', 'clearSensitiveFields'].forEach((fnName) => {
+    //    ⛔ helper សម្អាតរបស់មុខងារមួយ (`sbAdminReset()` ៖ ផ្ទាំង Supabase ក្នុង ZoeKeyGen) រាប់ **តែពេល** showLoginModalWithPrefill ហៅវាពិត
+    const fns = ['showLoginModalWithPrefill', 'clearSensitiveModalFields', 'clearSigningKey',
+        'lockApp', 'resetSessionState', 'clearSensitiveFields'];
+    const logoutAt = src.indexOf('function showLoginModalWithPrefill(');
+    const logoutEnd = logoutAt === -1 ? -1 : src.indexOf('\n}', logoutAt);
+    const logoutBody = logoutAt === -1 ? '' : src.slice(logoutAt, logoutEnd === -1 ? src.length : logoutEnd);
+    ['sbAdminReset'].forEach((fn) => { if (new RegExp('\\b' + fn + '\\(').test(logoutBody)) fns.push(fn); });
+    fns.forEach((fnName) => {
         const start = src.indexOf('function ' + fnName + '(');
         if (start === -1) return;
         let depth = 0, started = false, i = src.indexOf('{', start);

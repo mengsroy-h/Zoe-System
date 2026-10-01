@@ -75,6 +75,7 @@ const LOCAL_CLOCK_OK = {
         probeDatabaseLiveness: 'ត្រាពេលនៃ round trip ដែលឆ្លើយចុងក្រោយ — local សុទ្ធសាធ ហើយអ្នកអាន (`probeDatabaseLivenessIfIdle`) ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ វាស់ (ទិសសុវត្ថិភាព) · ⛔ ត្រូវតែជា Date.now() (`clock-basis-test.js`)',
         setupConnectionRecovery: 'ត្រាពេលដែលទំព័រ hidden ➜ រយៈពេលនៅ background វាស់តាម `elapsedSince()` ដើម្បីសម្រេចវាស់ភាពរស់ពេលត្រឡប់មក — local សុទ្ធសាធ',
         attachInfoListeners: 'ត្រាពេលដែល `.info/connected` ក្លាយជា true (round trip ថ្មី) — local វាស់តាម `elapsedSince()` · មិនប៉ះ retention ឬលុយ',
+        createSupabaseDatabase: 'adapter Supabase ៖ RTT របស់ RPC (t0/t1 ➜ offset នាឡិកា server ដូច `.info/serverTimeOffset` ៖ ត្រង់នេះជាអ្នកផ្តល់ getServerNow() មិនមែនអ្នកប្រើ) · ត្រាចាប់ផ្តើមការរង់ចាំលទ្ធផល transaction វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ `unknown` ភ្លាម មិនប៉ះលុយ) — local សុទ្ធសាធ មិនប៉ះ retention ឬលុយ',
         generateUniqueId: 'salt នៃ id — មិនមែនការសម្រេច retention',
         waitForZXingThenInitScanEngine: 'deadline ផ្ទុក script — local',
         confirmLiveScan: 'បង្អួច «២ ស៊ុមជាប់គ្នា» — local',

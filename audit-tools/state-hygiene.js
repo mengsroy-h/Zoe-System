@@ -108,7 +108,8 @@ const ACCEPTED = {
         appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
         // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន
         immediateCommit: 'React store plumbing: the commitNow() hook registered once by the React layer (a function, no customer data)',
-        immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)'
+        immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)',
+        pendingInvite: 'Supabase invite code from the Setup Link (device provisioning, like firebaseConfig): showLoginModalWithPrefill() — the logout path itself — reads it to open the register form, so clearing it there would break registration; cleared by clearPendingInvite() once registration succeeds'
     }
 };
 ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeW, {

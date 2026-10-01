@@ -14,11 +14,13 @@
  *    · `opaque` ៖ logo (ផ្ទាំង boot · navbar) ប្តូរពីអក្សរ «Zoe» ទៅ App icon SVG (2.43.0) ➜ ប្រៀបធាតុខ្លួនវា មិនមែនមាតិកាខាងក្នុង
  *    · `floating` ៖ ម៉ឺនុយ (...) និងប្រអប់ណែនាំលេខ ជាស្រទាប់ `position: fixed` ដែលតាំងតាមធាតុយុថ្កា ➜ `top`/`left` ជាលទ្ធផល layout
  *      (navbar ទាបជាងដើម ១៤px ក្រោយ «Powered By» ផ្លាស់ចេញ · 2.43.0) មិនមែនឥរិយាបថ ➜ ប្រៀបតែ display · ទទឹង
+ *      · អត្ថបទណែនាំនៃប្រអប់ Config (`h3` + `p` គ្មាន style) ៖ Setup Link មុន · Config Firebase ក្រោម (2.46.0 ៖ backend Firebase ឬ Supabase)
+ *        ➜ textarea · ប៊ូតុង · វាល Sentry នៅប្រៀបធៀបដដែល (ប្រអប់ mount ជានិច្ច ➜ គ្រប់អេក្រង់របស់ dom · live · deep)
  *    · `navbarShrinkPx` ៖ navbar លើទូរស័ព្ទទាបជាងដើម **១៤px តែប៉ុណ្ណោះ** (65 ➜ 51 · 2.43.0) ➜ `parity:dom` ទទួលយក **តែ** ការរំកិល
  *      ឡើងលើ ១៤px និងកម្ពស់បន្ថែម ១៤px របស់ផ្ទាំងដែលបំពេញអេក្រង់ — x · ទទឹង · តម្លៃ CSS ផ្សេងទៀត ត្រូវដូចដើមបេះបិទ
  */
 export const INTENTIONAL_UI = {
-    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine',
+    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content > h3, #configModal .modal-content > p:not([style])',
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',
     navbarShrinkPx: 14

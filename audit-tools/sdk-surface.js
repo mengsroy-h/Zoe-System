@@ -93,7 +93,65 @@ for (const app of APPS) {
     }
     ok(app + ' ៖ app.js ប្រើ `fb.X` ' + used.size + ' ឈ្មោះ');
 
-    const missing = [...used.keys()].filter((n) => !exported.has(n));
+    // ⛔ ZoeW ៖ `fb` អាចជា SDK Firebase **ឬ** adapter Supabase (`createSupabaseSdk()` · តាម Config) ➜ ផ្ទៃ adapter ដេរីវេពីកូដពិត ៖
+    //    (ក) រាល់ `fb.X` ដែល loader export ត្រូវមានក្នុង adapter ដែរ (បើអត់ ➜ `undefined` លើហាង Supabase)
+    //    (ខ) ឈ្មោះដែលមានតែក្នុង adapter ត្រូវប្រើក្រោមច្រកទ្វារ (`typeof fb.X === 'function'` ឬ function ដែលពិនិត្យ `__supabase`)
+    const sbStart = appSrc.search(/\n[ \t]*function createSupabaseSdk\(/);
+    const sbSurface = new Set();
+    if (sbStart !== -1) {
+        let i = appSrc.indexOf('{', sbStart);
+        let depth = 0;
+        for (; i < appSrc.length; i++) {
+            if (appSrc[i] === '{') depth++;
+            else if (appSrc[i] === '}') { depth--; if (depth === 0) break; }
+        }
+        const body = appSrc.slice(sbStart, i);
+        const fnIndent = (body.match(/^\n([ \t]*)function/) || ['', ''])[1].length;
+        const top = ' '.repeat(fnIndent + 4);
+        const ret = body.match(new RegExp('\\n' + top + 'return (?:([A-Za-z_$][\\w$]*);|\\{)'));
+        const open = !ret ? -1 : ret[1]
+            ? body.search(new RegExp('\\n' + top + '(?:const|let|var) ' + ret[1].replace(/\$/g, '\\$') + ' = \\{\\n'))
+            : ret.index;
+        if (open !== -1) {
+            const close = body.indexOf('\n' + top + '}', open + 1);
+            const literal = body.slice(open, close === -1 ? body.length : close);
+            const keyIndent = fnIndent + 8;
+            for (const mm of literal.matchAll(new RegExp('^ {' + keyIndent + '}(?:async\\s+)?([A-Za-z_$][\\w$]*)\\s*(?:\\(|:)', 'mg'))) sbSurface.add(mm[1]);
+        }
+        sbSurface.size >= 15
+            ? ok(app + ' ៖ ផ្ទៃ adapter Supabase ដេរីវេពី createSupabaseSdk() ពិត ' + sbSurface.size + ' ឈ្មោះ')
+            : bad(app + ' ៖ ជាន់អប្បបរមា ៖ ស្រង់ផ្ទៃ adapter Supabase មិនបាន (< ១៥)', [...sbSurface].join(', '));
+        const notOnSupabase = [...used.keys()].filter((n) => exported.has(n) && !sbSurface.has(n));
+        notOnSupabase.length === 0
+            ? ok(app + ' ៖ រាល់ `fb.X` ដែល SDK Firebase មាន ក៏មានក្នុង adapter Supabase ដែរ')
+            : bad(app + ' ៖ `fb.X` គ្មានក្នុង adapter Supabase ➜ `undefined` លើហាង Supabase',
+                notOnSupabase.map((n) => 'fb.' + n + ' (app.js:' + used.get(n) + ')').join(', '));
+        const enclosing = (index) => {
+            const before = appSrc.slice(0, index);
+            const fnAt = Math.max(before.lastIndexOf('\n    function '), before.lastIndexOf('\n    async function '));
+            const name = (appSrc.slice(fnAt).match(/^\n    (?:async )?function (\w+)/) || [])[1];
+            const end = appSrc.indexOf('\n    }\n', index);
+            return { name, text: appSrc.slice(fnAt, end === -1 ? appSrc.length : end) };
+        };
+        const unguarded = [];
+        for (const n of [...used.keys()].filter((x) => !exported.has(x) && sbSurface.has(x) && x !== '__supabase')) {
+            for (const mm of appSrc.matchAll(new RegExp('\\bfb\\.' + n.replace(/\$/g, '\\$') + '\\b', 'g'))) {
+                const lineStart = appSrc.lastIndexOf('\n', mm.index) + 1;
+                const line = appSrc.slice(lineStart, appSrc.indexOf('\n', mm.index));
+                if (new RegExp('typeof fb\\.' + n + " === 'function'").test(line)) continue;
+                const fn = enclosing(mm.index);
+                if (/fb\.__supabase/.test(fn.text)) continue;
+                const helper = (fn.text.match(/\b(\w+)\(\)/g) || []).map((x) => x.slice(0, -2))
+                    .find((h) => h !== fn.name && /fb\.__supabase/.test(enclosing(appSrc.indexOf('function ' + h + '(') + 1).text));
+                if (helper) continue;
+                unguarded.push('fb.' + n + ' (app.js:' + appSrc.slice(0, mm.index).split('\n').length + ')');
+            }
+        }
+        unguarded.length === 0
+            ? ok(app + ' ៖ ឈ្មោះដែលមានតែក្នុង adapter Supabase ប្រើក្រោមច្រកទ្វារគ្រប់កន្លែង')
+            : bad(app + ' ៖ `fb.X` មានតែក្នុង adapter Supabase តែគ្មានច្រកទ្វារ ➜ `undefined` លើហាង Firebase', unguarded.join(', '));
+    }
+    const missing = [...used.keys()].filter((n) => !exported.has(n) && !sbSurface.has(n));
     missing.length === 0
         ? ok(app + ' ៖ **គ្រប់ `fb.X` មានក្នុង window.firebaseSDK**')
         : bad(app + ' ៖ `fb.X` ដែល loader មិន export ➜ `undefined` លើផលិតកម្ម',

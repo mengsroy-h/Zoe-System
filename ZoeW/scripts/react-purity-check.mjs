@@ -42,6 +42,7 @@ const IO_WHY = 'ការប៉ះ `document` ដែល **មិនមែន UI*
 const ALLOWED = {
     [IO + ':document.hidden']: [1, IO_WHY + 'វដ្តជីវិតទំព័រ (ការស្តារការតភ្ជាប់ពេលត្រឡប់មក)'],
     [IO + ':document.addEventListener']: [1, IO_WHY + '`visibilitychange` ជាព្រឹត្តិការណ៍របស់ browser មិនមែន DOM ដែល React គូរ'],
+    [IO + ':document.removeEventListener']: [1, IO_WHY + 'ដក listener `visibilitychange` វិញ (adapter Supabase ពេល `deleteApp`)'],
     [IO + ':document.createElement']: [4, IO_WHY + 'canvas ក្រៅអេក្រង់ · `<link rel=preconnect>` · `<script>` បណ្ណាល័យ · តំណទាញយក'],
     [IO + ':.src =']: [2, IO_WHY + 'រូបភាពក្រៅអេក្រង់ · `<script>` បណ្ណាល័យ (ធាតុដែលទើបសាង មិនមែនរបស់ React)'],
     [IO + ':.href =']: [2, IO_WHY + 'preconnect · តំណទាញយក (ធាតុដែលទើបសាង)'],

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.22.1';
+const APP_VERSION = '2.23.0';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -11,6 +11,9 @@ const ACTION_ALLOWLIST = [
     "closeModal",
     "confirmExtendKey",
     "copyGeneratedKey",
+    "copySbInviteCode",
+    "copySbInviteLink",
+    "copySbResetCode",
     "copySetupLink",
     "copyTextarea",
     "dismissKeypairModal",
@@ -26,6 +29,11 @@ const ACTION_ALLOWLIST = [
     "refreshNoticeList",
     "saveFirebaseConfig",
     "saveNewSecurityPin",
+    "sbAdminLogin",
+    "sbAdminLogout",
+    "sbAdminRefresh",
+    "sbCreateTenant",
+    "sbIssueResetCode",
     "sendNotice",
     "verifySecurityPin"
 ];
@@ -1335,6 +1343,7 @@ function showLoginModalWithPrefill() {
     const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
     if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
 
+    sbAdminReset(false);
     clearSigningKey(true);
     openModalHelper('loginModal');
     if (losingUncopiedKeypair) {
@@ -2573,6 +2582,445 @@ async function deleteNotice(id) {
     }
 }
 
+const SB_ADMIN_CONFIG_KEY = 'zoekeygen_supabase_v1';
+const SB_ADMIN_TIMEOUT_MS = 15000;
+const SB_INVITE_VALID_HOURS = 168;
+const SB_RESET_VALID_HOURS = 24;
+const SB_TENANT_DAYS_MAX = 3650;
+const SB_BRANCH_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
+const SB_ADMIN_ERROR_TEXT = {
+    'branch-taken': 'លេខសាខានេះមានហាងផ្សេងប្រើរួច!',
+    'tenant-invalid': 'ឈ្មោះហាង ឬលេខសាខាមិនត្រឹមត្រូវ (លេខសាខា ៖ អក្សរ/លេខ ១–៣២ តួ)!',
+    'expires-invalid': 'ថ្ងៃផុតកំណត់ត្រូវនៅអនាគត!',
+    'tenant-inactive': 'ហាងនេះផុតកំណត់ ឬត្រូវបានបិទ — សូមពន្យារ ឬបើកវាសិន!',
+    'tenant-not-found': 'រកហាងនេះមិនឃើញ!',
+    'member-not-found': 'រកឈ្មោះគណនីនេះមិនឃើញ!',
+    'invite-invalid': 'ការកំណត់កូដអញ្ជើញមិនត្រឹមត្រូវ!',
+    'reset-invalid': 'ការកំណត់កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ!',
+    'forbidden': 'គណនីនេះមិនមែន Admin របស់ Supabase ទេ (តារាង platform_admins)!'
+};
+let sbAdminSession = null;
+let sbAdminGeneration = 0;
+let sbAdminBusy = false;
+let sbTenantCache = [];
+let sbMemberCache = [];
+let sbTenantReadFailed = false;
+let sbLastInvite = null;
+let sbLastResetCode = '';
+
+function sbAdminJwtRole(key) {
+    const parts = String(key || '').split('.');
+    if (parts.length !== 3) return '';
+    try {
+        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((parts[1].length + 3) % 4);
+        const claims = JSON.parse(atob(b64));
+        return claims && typeof claims.role === 'string' ? claims.role : '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function sbAdminConfigProblem(url, key) {
+    let parsed;
+    try { parsed = new URL(url); } catch (e) { return 'Supabase URL មិនត្រឹមត្រូវ!'; }
+    const local = parsed.protocol === 'http:' && (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
+    if ((parsed.protocol !== 'https:' && !local) || (parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash || parsed.username || parsed.password) {
+        return 'Supabase URL ត្រូវជា https://<project>.supabase.co (គ្មាន path)!';
+    }
+    if (!key) return 'សូមបញ្ចូល Publishable key!';
+    if (/^sb_secret_/i.test(key) || sbAdminJwtRole(key) === 'service_role') {
+        return 'ហាមដាក់ Secret key (sb_secret_… ឬ service_role) ទីនេះដាច់ខាត! សូមប្រើ Publishable key ហើយ Rotate Secret key ដែលលេចនោះ។';
+    }
+    return '';
+}
+
+function restoreSbAdminConfig() {
+    let saved = null;
+    try { saved = JSON.parse(safeStoreGet(appLocalStore, SB_ADMIN_CONFIG_KEY) || 'null'); } catch (e) { saved = null; }
+    if (!saved || typeof saved !== 'object') return;
+    const fields = { sbAdminUrlInput: saved.url, sbAdminKeyInput: saved.key, sbAdminEmailInput: saved.email };
+    Object.keys(fields).forEach((id) => {
+        const el = document.getElementById(id);
+        if (el && typeof fields[id] === 'string' && !el.value) el.value = fields[id];
+    });
+}
+
+function sbInputValue(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+}
+
+async function sbAdminRequest(session, path, method, body) {
+    const headers = { apikey: session.key, 'Content-Type': 'application/json', Accept: 'application/json' };
+    if (session.token) headers.Authorization = 'Bearer ' + session.token;
+    const init = { method: method, headers: headers, cache: 'no-store', credentials: 'omit' };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    const out = await fetchWithTimeout(session.url + path, init, SB_ADMIN_TIMEOUT_MS, 'Supabase request timed out', (res) => res.text());
+    let parsed = null;
+    try { parsed = out.body ? JSON.parse(out.body) : null; } catch (e) { parsed = null; }
+    return { ok: !!out.res.ok, status: out.res.status, body: parsed };
+}
+
+function sbAdminIsCurrent(session) {
+    return !!session && sbAdminSession === session && isSensitiveSessionCurrent(session.operation, true);
+}
+
+function sbAdminErrorText(result) {
+    if (result && result.status === 401) return 'Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!';
+    const code = result && result.body && typeof result.body.message === 'string' ? result.body.message : '';
+    if (Object.prototype.hasOwnProperty.call(SB_ADMIN_ERROR_TEXT, code)) return SB_ADMIN_ERROR_TEXT[code];
+    return 'Supabase បដិសេធ (' + (code || (result ? result.status : '?')) + ')';
+}
+
+function setSbAdminBusy(busy) {
+    ['sbAdminLoginBtn', 'sbCreateTenantBtn'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !!busy;
+    });
+}
+
+async function sbAdminRpc(session, fn, args) {
+    const result = await sbAdminRequest(session, '/rest/v1/rpc/' + fn, 'POST', args);
+    if (result.status === 401 && sbAdminIsCurrent(session)) sbAdminReset(true);
+    return result;
+}
+
+async function sbAdminLogin() {
+    if (sbAdminBusy) return;
+    const operation = captureSensitiveSession(true);
+    if (!operation) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
+    const url = sbInputValue('sbAdminUrlInput').replace(/\/+$/, '');
+    const key = sbInputValue('sbAdminKeyInput');
+    const email = sbInputValue('sbAdminEmailInput').toLowerCase();
+    const passEl = document.getElementById('sbAdminPasswordInput');
+    const password = passEl ? String(passEl.value || '') : '';
+    const problem = sbAdminConfigProblem(url, key);
+    if (problem) { alert(problem); return; }
+    if (!email || !password) { alert('សូមបញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់ Admin របស់ Supabase!'); return; }
+    safeStoreSet(appLocalStore, SB_ADMIN_CONFIG_KEY, JSON.stringify({ url: url, key: key, email: email }));
+    const generation = ++sbAdminGeneration;
+    sbAdminBusy = true;
+    setSbAdminBusy(true);
+    try {
+        const login = await sbAdminRequest({ url: url, key: key, token: '' }, '/auth/v1/token?grant_type=password', 'POST', { email: email, password: password });
+        if (passEl) passEl.value = '';
+        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        if (!login.ok || !login.body || typeof login.body.access_token !== 'string') {
+            alert(login.status === 400 ? 'អ៊ីមែល ឬពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវ!' : 'ចូល Supabase មិនបាន (' + login.status + ')');
+            return;
+        }
+        const session = { url: url, key: key, token: login.body.access_token, operation: operation };
+        const admins = await sbAdminRequest(session, '/rest/v1/platform_admins?select=user_id', 'GET');
+        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        if (!admins.ok || !Array.isArray(admins.body) || admins.body.length !== 1) {
+            alert(SB_ADMIN_ERROR_TEXT.forbidden);
+            return;
+        }
+        sbAdminSession = session;
+        const panel = document.getElementById('sbAdminPanel');
+        if (panel) panel.classList.remove('hidden');
+        const logoutBtn = document.getElementById('sbAdminLogoutBtn');
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        const loginBtn = document.getElementById('sbAdminLoginBtn');
+        if (loginBtn) loginBtn.classList.add('hidden');
+        showToast('✅ ចូល Supabase ជា Admin រួចរាល់');
+        await sbAdminRefresh();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        console.error(e);
+        alert('ភ្ជាប់ Supabase មិនបានទេ — សូមពិនិត្យ URL និងអ៊ីនធឺណិត!');
+    } finally {
+        if (passEl) passEl.value = '';
+        if (generation === sbAdminGeneration) {
+            sbAdminBusy = false;
+            setSbAdminBusy(false);
+        }
+    }
+}
+
+function sbAdminReset(expired) {
+    sbAdminGeneration++;
+    sbAdminSession = null;
+    sbAdminBusy = false;
+    sbTenantCache = [];
+    sbMemberCache = [];
+    sbTenantReadFailed = false;
+    sbLastInvite = null;
+    sbLastResetCode = '';
+    setSbAdminBusy(false);
+    const body = document.getElementById('sbTenantListBody');
+    if (body) body.innerHTML = '';
+    ['sbInviteResultLabel', 'sbInviteCodeText', 'sbInviteLinkText', 'sbResetCodeText'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+    const qr = document.getElementById('sbInviteQrContainer');
+    if (qr) qr.innerHTML = '';
+    ['sbInviteResultBox', 'sbResetResultBox', 'sbAdminPanel', 'sbAdminLogoutBtn'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    const loginBtn = document.getElementById('sbAdminLoginBtn');
+    if (loginBtn) loginBtn.classList.remove('hidden');
+    ['sbAdminPasswordInput', 'sbTenantNameInput', 'sbTenantBranchInput', 'sbResetUsernameInput'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    if (expired === true) alert('Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!');
+}
+
+function sbAdminLogout() {
+    const session = sbAdminSession;
+    sbAdminReset(false);
+    if (session) sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+}
+
+async function sbAdminRefresh() {
+    const session = sbAdminSession;
+    if (!session || !sbAdminIsCurrent(session)) return;
+    const body = document.getElementById('sbTenantListBody');
+    if (body) body.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
+    let tenants = null;
+    let members = null;
+    try {
+        [tenants, members] = await Promise.all([
+            sbAdminRequest(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc', 'GET'),
+            sbAdminRequest(session, '/rest/v1/tenant_members?select=tenant_id,username,role&order=created_at.asc', 'GET')
+        ]);
+    } catch (e) {
+        tenants = null;
+    }
+    if (!sbAdminIsCurrent(session)) return;
+    if (tenants && tenants.status === 401) { sbAdminReset(true); return; }
+    sbTenantReadFailed = !tenants || !tenants.ok || !Array.isArray(tenants.body);
+    sbTenantCache = sbTenantReadFailed ? [] : tenants.body;
+    sbMemberCache = members && members.ok && Array.isArray(members.body) ? members.body : [];
+    renderSbTenantList();
+}
+
+function sbTenantState(row) {
+    if (row.revoked) return 'revoked';
+    const until = Date.parse(String(row.expires_at || ''));
+    return isFinite(until) && until > getServerNow() ? 'active' : 'expired';
+}
+
+function renderSbTenantList() {
+    const body = document.getElementById('sbTenantListBody');
+    if (!body) return;
+    if (sbTenantReadFailed) {
+        body.innerHTML = '<tr class="empty-row"><td colspan="6">⚠️ អានបញ្ជីហាងមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុច 🔄 Refresh</td></tr>';
+        return;
+    }
+    if (!sbTenantCache.length) {
+        body.innerHTML = '<tr class="empty-row"><td colspan="6">មិនទាន់មានហាង</td></tr>';
+        return;
+    }
+    const badges = {
+        active: '<span class="badge badge-active">សកម្ម</span>',
+        expired: '<span class="badge badge-expired">ផុតកំណត់</span>',
+        revoked: '<span class="badge badge-revoked">បិទ</span>'
+    };
+    body.innerHTML = sbTenantCache.map((row) => {
+        const sbStatusHtml = badges[sbTenantState(row)];
+        const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
+            .map((m) => '<span class="sb-member">' + (m.role === 'owner' ? '👑 ' : '') + escapeHtml(m.username) + '</span>').join('') || '-';
+        const until = Date.parse(String(row.expires_at || ''));
+        const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
+        return `<tr>
+            <td>${escapeHtml(row.name)}</td>
+            <td>${escapeHtml(row.branch_code)}</td>
+            <td>${sbMembersHtml}</td>
+            <td>${escapeHtml(untilText)}</td>
+            <td>${sbStatusHtml}</td>
+            <td>
+                <div class="btn-row">
+                    <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-invite">🎟️ កូដអញ្ជើញ</button>
+                    <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-extend">⏳ ពន្យារ</button>
+                    <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-revoke">${row.revoked ? '✅ បើកវិញ' : '⛔ បិទ'}</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function sbInviteSetupLink(session, code) {
+    const baseUrl = String(safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || sbInputValue('setupLinkUrlInput')).replace(/\/+$/, '');
+    if (!/^https:\/\/.+/.test(baseUrl)) return '';
+    const dsn = safeStoreGet(appLocalStore, SETUP_LINK_DSN_KEY) || '';
+    const payload = { supabaseUrl: session.url, supabaseKey: session.key, invite: code };
+    if (setupLinkDsnIsValid(dsn)) payload.dsn = dsn;
+    try {
+        return baseUrl + '/?setup=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+    } catch (e) {
+        return '';
+    }
+}
+
+function renderSbInviteResult() {
+    const box = document.getElementById('sbInviteResultBox');
+    const label = document.getElementById('sbInviteResultLabel');
+    const codeText = document.getElementById('sbInviteCodeText');
+    const linkText = document.getElementById('sbInviteLinkText');
+    const qr = document.getElementById('sbInviteQrContainer');
+    if (!box || !sbLastInvite) return;
+    if (label) label.textContent = 'កូដអញ្ជើញ ' + (sbLastInvite.role === 'owner' ? 'ម្ចាស់ហាង' : 'បុគ្គលិក') + ' សម្រាប់ «' + sbLastInvite.tenantName + '» (បង្ហាញតែម្តង · ប្រើបាន ១ ដង · ផុត ' + sbLastInvite.untilText + ')';
+    if (codeText) codeText.textContent = sbLastInvite.code;
+    if (linkText) linkText.textContent = sbLastInvite.link || '⚠️ មិនទាន់មាន Base URL របស់ ZoeW — សូមបំពេញវាក្នុងកាត «🔗 បង្កើត Setup Link» រួចចេញកូដម្តងទៀត (ឬផ្ញើតែកូដ)';
+    if (qr) {
+        qr.innerHTML = '';
+        if (sbLastInvite.link && window.qrcode) {
+            try {
+                const code = qrcode(0, 'M');
+                code.addData(sbLastInvite.link);
+                code.make();
+                qr.innerHTML = code.createSvgTag({ cellSize: 4, margin: 8 });
+            } catch (e) {
+                qr.innerHTML = '';
+            }
+        }
+    }
+    box.classList.remove('hidden');
+}
+
+async function sbIssueInvite(session, tenant, role) {
+    const out = await sbAdminRpc(session, 'admin_issue_invite', { p_tenant_id: tenant.id, p_role: role, p_max_uses: 1, p_valid_hours: SB_INVITE_VALID_HOURS });
+    if (!sbAdminIsCurrent(session)) return false;
+    const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
+    if (!row || typeof row.code !== 'string') { alert('ចេញកូដអញ្ជើញមិនបាន ៖ ' + sbAdminErrorText(out)); return false; }
+    const until = Date.parse(String(row.expires_at || ''));
+    sbLastInvite = {
+        code: row.code,
+        link: sbInviteSetupLink(session, row.code),
+        role: role,
+        tenantName: String(tenant.name || ''),
+        untilText: isFinite(until) ? new Date(until).toLocaleString('km-KH') : '-'
+    };
+    renderSbInviteResult();
+    return true;
+}
+
+async function sbCreateTenant() {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy || !sbAdminIsCurrent(session)) return;
+    const name = sbInputValue('sbTenantNameInput');
+    const branch = sbInputValue('sbTenantBranchInput');
+    const days = Number(sbInputValue('sbTenantDaysInput'));
+    if (!name || name.length > 120) { alert('សូមបញ្ចូលឈ្មោះហាង (១–១២០ តួ)!'); return; }
+    if (!SB_BRANCH_CODE_RE.test(branch)) { alert(SB_ADMIN_ERROR_TEXT['tenant-invalid']); return; }
+    if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('សុពលភាពត្រូវជាចំនួនថ្ងៃ ១–' + SB_TENANT_DAYS_MAX + '!'); return; }
+    if (!confirm('បង្កើតហាង «' + name + '» សាខា ' + branch + ' សុពលភាព ' + days + ' ថ្ងៃ?')) return;
+    if (!sbAdminIsCurrent(session)) return;
+    sbAdminBusy = true;
+    setSbAdminBusy(true);
+    const generation = sbAdminGeneration;
+    try {
+        const created = await sbAdminRpc(session, 'admin_create_tenant', {
+            p_name: name, p_branch_code: branch, p_expires_at: new Date(getServerNow() + days * 86400000).toISOString()
+        });
+        if (!sbAdminIsCurrent(session)) return;
+        if (!created.ok || !created.body || typeof created.body.id !== 'string') { alert('បង្កើតហាងមិនបាន ៖ ' + sbAdminErrorText(created)); return; }
+        ['sbTenantNameInput', 'sbTenantBranchInput'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        showToast('✅ បានបង្កើតហាង «' + name + '»');
+        await sbIssueInvite(session, created.body, 'owner');
+        await sbAdminRefresh();
+    } catch (e) {
+        if (!sbAdminIsCurrent(session)) return;
+        console.error(e);
+        alert('បង្កើតហាងមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុច 🔄 Refresh មុនសាកម្តងទៀត (ហាងអាចបានបង្កើតរួច)!');
+    } finally {
+        if (generation === sbAdminGeneration) {
+            sbAdminBusy = false;
+            setSbAdminBusy(false);
+        }
+    }
+}
+
+async function sbTenantAction(tenantId, action) {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy || !sbAdminIsCurrent(session)) return;
+    const tenant = sbTenantCache.find((t) => t.id === tenantId);
+    if (!tenant) return;
+    let args = null;
+    if (action === 'sb-invite') {
+        const hasOwner = sbMemberCache.some((m) => m.tenant_id === tenant.id && m.role === 'owner');
+        const role = hasOwner ? 'member' : 'owner';
+        if (!confirm('ចេញកូដអញ្ជើញ' + (role === 'owner' ? 'ម្ចាស់ហាង' : 'បុគ្គលិក') + 'សម្រាប់ «' + tenant.name + '»?')) return;
+        if (!sbAdminIsCurrent(session)) return;
+        try {
+            await sbIssueInvite(session, tenant, role);
+        } catch (e) {
+            if (sbAdminIsCurrent(session)) alert('ចេញកូដអញ្ជើញមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
+        }
+        return;
+    }
+    if (action === 'sb-extend') {
+        const raw = prompt('ពន្យារហាង «' + tenant.name + '» ប៉ុន្មានថ្ងៃ? (១–' + SB_TENANT_DAYS_MAX + ')', '30');
+        if (raw === null) return;
+        const days = Number(String(raw).trim());
+        if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('ចំនួនថ្ងៃមិនត្រឹមត្រូវ!'); return; }
+        const current = Date.parse(String(tenant.expires_at || ''));
+        const base = isFinite(current) && current > getServerNow() ? current : getServerNow();
+        args = { p_tenant_id: tenant.id, p_expires_at: new Date(base + days * 86400000).toISOString() };
+    } else if (action === 'sb-revoke') {
+        if (!confirm((tenant.revoked ? 'បើកហាង «' : 'បិទហាង «') + tenant.name + '» វិញ?' + (tenant.revoked ? '' : '\n\nគណនីទាំងអស់របស់ហាងនេះនឹងចាកចេញ ហើយចូលមិនបានទៀត។'))) return;
+        args = { p_tenant_id: tenant.id, p_revoked: !tenant.revoked };
+    } else {
+        return;
+    }
+    if (!sbAdminIsCurrent(session)) return;
+    try {
+        const out = await sbAdminRpc(session, 'admin_update_tenant', args);
+        if (!sbAdminIsCurrent(session)) return;
+        if (!out.ok) { alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+        showToast('✅ បានកែហាង «' + tenant.name + '»');
+        await sbAdminRefresh();
+    } catch (e) {
+        if (sbAdminIsCurrent(session)) alert('កែហាងមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុច 🔄 Refresh!');
+    }
+}
+
+async function sbIssueResetCode() {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy || !sbAdminIsCurrent(session)) return;
+    const username = sbInputValue('sbResetUsernameInput').toLowerCase();
+    if (!/^[a-z0-9_.]{3,32}$/.test(username)) { alert('ឈ្មោះគណនីមិនត្រឹមត្រូវ!'); return; }
+    if (!confirm('ចេញកូដប្តូរពាក្យសម្ងាត់សម្រាប់ «' + username + '»? (ប្រើបាន ១ ដង · ' + SB_RESET_VALID_HOURS + ' ម៉ោង)')) return;
+    if (!sbAdminIsCurrent(session)) return;
+    try {
+        const out = await sbAdminRpc(session, 'admin_issue_reset_code', { p_username: username, p_valid_hours: SB_RESET_VALID_HOURS });
+        if (!sbAdminIsCurrent(session)) return;
+        const row = out.ok && Array.isArray(out.body) ? out.body[0] : null;
+        if (!row || typeof row.code !== 'string') { alert('ចេញកូដមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+        sbLastResetCode = row.code;
+        const text = document.getElementById('sbResetCodeText');
+        if (text) text.textContent = username + ' ➜ ' + row.code;
+        const box = document.getElementById('sbResetResultBox');
+        if (box) box.classList.remove('hidden');
+    } catch (e) {
+        if (sbAdminIsCurrent(session)) alert('ចេញកូដមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត!');
+    }
+}
+
+function copySbInviteLink() {
+    const invite = sbLastInvite;
+    if (!invite || !invite.link) return;
+    return copySensitiveText(invite.link, () => sbLastInvite === invite, () => showToast('✅ បានចម្លង Setup Link!'));
+}
+
+function copySbInviteCode() {
+    const invite = sbLastInvite;
+    if (!invite) return;
+    return copySensitiveText(invite.code, () => sbLastInvite === invite, () => showToast('✅ បានចម្លងកូដអញ្ជើញ!'));
+}
+
+function copySbResetCode() {
+    const code = sbLastResetCode;
+    return copySensitiveText(code, () => sbLastResetCode === code, () => showToast('✅ បានចម្លងកូដ!'));
+}
+
 function setupIOSPullToRefresh() {
     if (window.navigator.standalone !== true) return;
 
@@ -2641,6 +3089,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFirebase();
     updateSigningKeyBadge();
     restoreSetupLinkBaseUrl();
+    restoreSbAdminConfig();
     setupIOSPullToRefresh();
 
     setupActionDelegation();
@@ -2675,6 +3124,15 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'extend') openExtendModal(id);
             else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
+        });
+    }
+
+    const sbTenantListBody = document.getElementById('sbTenantListBody');
+    if (sbTenantListBody) {
+        sbTenantListBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-tenant-id]');
+            if (!btn) return;
+            sbTenantAction(btn.dataset.tenantId, btn.dataset.action);
         });
     }
 

@@ -370,7 +370,16 @@ export async function runZtoListSyncPreview() {
         renderZtoListSyncPreview();
         if (e && e.notConfigured) {
             const reason = e.listReason || 'site:no-account';
-            if (reason.indexOf('site:') === 0 || reason.indexOf('idtoken:') === 0) {
+            if (reason === 'idtoken:supabase-unset') {
+                setZtoListSyncNote('⚠️ Server មិនទាន់កំណត់ SUPABASE_URL និង SUPABASE_PUBLISHABLE_KEY នៅ Netlify — សូមមើល ZTO-SETUP-KH.md ផ្នែក ៤គ');
+                showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
+            } else if (reason === 'idtoken:supabase-unreachable') {
+                setZtoListSyncNote('⚠️ ផ្ទៀងផ្ទាត់ហាងជាមួយ Server មិនបាន — សូមសាកម្ដងទៀត');
+                showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
+            } else if (reason === 'site:tenant-expired' || reason === 'site:tenant-revoked') {
+                setZtoListSyncNote(reason === 'site:tenant-expired' ? '🏢 ហាងនេះផុតកំណត់ — សូមទាក់ទងអ្នកលក់ដើម្បីពន្យារ' : '🏢 ហាងនេះត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់');
+                showToast('ℹ️ ហាងនេះមិនអាចទាញបញ្ជី ZTO បានទេ');
+            } else if (reason.indexOf('site:') === 0 || reason.indexOf('idtoken:') === 0) {
                 setZtoListSyncNote('🏢 គណនីនេះគ្មានលេខសាខា ZTO — សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ');
                 showToast('ℹ️ គណនីនេះមិនទាន់ភ្ជាប់នឹងសាខា ZTO ទេ');
             } else {

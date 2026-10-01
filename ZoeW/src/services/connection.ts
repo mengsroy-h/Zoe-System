@@ -132,18 +132,17 @@ export function noteDatabaseLinkUnresponsive(reason?) {
 export function probeDatabaseLiveness(reason?) {
     if (firebaseState.dbLivenessProbe) return firebaseState.dbLivenessProbe;
     if (!databaseLivenessProbeAllowed()) return Promise.resolve(null);
-    const fb = firebaseState.fb;
-    const db = firebaseState.db;
+    const probeDb = firebaseState.db;
     const generation = firebaseState.infoListenerGeneration;
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
         const answered = () => { clearTimeout(timer); resolve(true); };
         let started = null;
-        try { started = fb.get(fb.ref(db, DB_LIVENESS_PROBE_PATH)); } catch (e) { started = null; }
+        try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { started = null; }
         Promise.resolve(started).then(answered, answered);
     }).then((alive) => {
         firebaseState.dbLivenessProbe = null;
-        if (firebaseState.db !== db || firebaseState.infoListenerGeneration !== generation) return null;
+        if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation) return null;
         if (alive) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;

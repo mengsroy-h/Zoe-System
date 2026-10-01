@@ -47,11 +47,26 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
+      # ⛔ build វាស់គូរ `index.html` ពិតក្នុង Chromium (`build-audit.mjs` ៖ `/opt/pw-browsers/chromium`) ➜ Chromium ត្រូវមាន **មុន** build
+      #    (emu/app-network-e2e ក៏ប្រើវាដែរ)
+      - name: ទាញ Chromium (build វាស់ · emu/app-network-e2e)
+        run: |
+          set -euo pipefail
+          npx --yes playwright install --with-deps chromium
+          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
+          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
+          sudo mkdir -p /opt/pw-browsers/chromium-1194
+          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
+          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          test -x /opt/pw-browsers/chromium
+
+      # ⛔ output ពេញត្រូវបង្ហាញពេលធ្លាក់ ៖ `| tail -1` តែម្យ៉ាងលាក់មូលហេតុ (log រាយត្រឹម «exit code 1»)
       - name: build វាស់ (ZoeW React ➜ tree វាស់)
         run: |
           set -euo pipefail
-          M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)
-          test -f "$M/ZoeW/app.js"
+          if ! OUT=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh 2>/tmp/measure.err); then printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; fi
+          M=$(printf '%s\n' "$OUT" | tail -1)
+          test -f "$M/ZoeW/app.js" || { printf '%s\n' "$OUT"; cat /tmp/measure.err; exit 1; }
           echo "MEASURE=$M" >> "$GITHUB_ENV"
 
       - name: Cache RTDB emulator jar
@@ -104,20 +119,31 @@ jobs:
         run: node audit-tools/emu/restore-mutation-emu-test.js
 
       # ⛔ App ពិត · SDK Firebase ពិត · emulator ពិត ➜ ត្រូវការ Chromium ក្នុង job នេះ (job audit-suite គ្មាន emulator ➜ SKIP)
-      - name: ទាញ Chromium (emu/app-network-e2e)
-        run: |
-          set -euo pipefail
-          npx --yes playwright install --with-deps chromium
-          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
-          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
-          sudo mkdir -p /opt/pw-browsers/chromium-1194
-          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
-
       - name: ការតភ្ជាប់ «ងាប់ស្ងាត់» ➜ App ឈប់រាយបៃតង ហើយភ្ជាប់វិញ (App · SDK · emulator ពិត)
         env:
           NETE2E_STRICT: '1'
         working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/app-network-e2e-test.js
+
+      # ⛔ Supabase ៖ rules RTDB ក្នុង Postgres · adapter `fb` របស់ ZoeW ធៀប RTDB emulator ពិត (oracle) ➜ ត្រូវការ emulator · Postgres ពិត · Chromium
+      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
+        run: npm ci --prefix supabase --no-audit --no-fund
+
+      - name: rules RTDB ដែល Postgres អនុវត្ត ស្មើ RTDB ពិត (Supabase)
+        env:
+          CRUD_FLOW_STRICT: '1'
+          SUPABASE_STRICT: '1'
+          ZOE_REPO_ROOT: ${{ github.workspace }}
+        working-directory: ${{ env.MEASURE }}
+        run: node audit-tools/emu/supabase-rules-parity-test.js
+
+      - name: adapter fb លើ Supabase ស្មើ SDK Firebase ពិត
+        env:
+          CRUD_FLOW_STRICT: '1'
+          SUPABASE_STRICT: '1'
+          ZOE_REPO_ROOT: ${{ github.workspace }}
+        working-directory: ${{ env.MEASURE }}
+        run: node audit-tools/emu/supabase-adapter-parity-test.js
 
       # ⛔ job នេះ **មាន** emulator ➜ `MONEYGUARD_STRICT=1` ធ្វើឲ្យ SKIP របស់
       # អ្នកយាមណាមួយក្លាយជា **ការធ្លាក់**។ (ក្នុង job `run-all.sh` ដែលគ្មាន
@@ -182,10 +208,16 @@ jobs:
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
         run: npm ci --prefix ZoeW --no-audit --no-fund
 
+      # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-datastore · supabase-functions · keygen-supabase-admin
+      #    ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL (emu/supabase-* រត់ក្នុង job firebase-rules)
+      - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
+        run: npm ci --prefix supabase --no-audit --no-fund
+
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: run-all.sh
         env:
           VERSIONSCOPE_STRICT: '1'
+          SUPABASE_STRICT: '1'
         run: bash audit-tools/run-all.sh

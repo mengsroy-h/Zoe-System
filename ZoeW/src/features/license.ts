@@ -36,6 +36,10 @@ export function licenseFailureMessage(reason) {
 }
 
 export async function ensureAppActivated() {
+    if (viewState.backendKind === 'supabase') {
+        closeModal('activationModal');
+        return true;
+    }
     const sessionIsCurrent = captureAuthDatabaseGuard();
     const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
     if (!sessionIsCurrent()) return false;

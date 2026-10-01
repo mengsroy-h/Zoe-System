@@ -155,15 +155,24 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     // what clearSensitiveModalFields / showLoginModalWithPrefill actually blanks
     const cleared = new Set();
     const clearFns = ['clearSensitiveModalFields', 'clearLookupStatus', 'showLoginModalWithPrefill', 'clearGeneratedKeyResult'];
-    for (const fn of clearFns) {
+    // ⛔ helper សម្អាតរបស់មុខងារមួយ (ឧ. `sbAdminReset()` ក្នុង ZoeKeyGen) រាប់ **តែពេល** ផ្លូវចាកចេញ (`showLoginModalWithPrefill`) ហៅវាពិត
+    const REACHABLE_CLEAR_FNS = ['sbAdminReset'];
+    const bodyOf = (fn) => {
         const i = src.indexOf('function ' + fn + '(');
-        if (i === -1) continue;
+        if (i === -1) return '';
         let d = 0, j = src.indexOf('{', i), started = false, end = j;
         for (; j < src.length; j++) {
             if (src[j] === '{') { d++; started = true; }
             else if (src[j] === '}') { d--; if (started && d === 0) { end = j; break; } }
         }
-        const body = src.slice(i, end);
+        return src.slice(i, end);
+    };
+    const logoutBody = bodyOf('showLoginModalWithPrefill');
+    for (const fn of REACHABLE_CLEAR_FNS) {
+        if (new RegExp('\\b' + fn + '\\(').test(logoutBody)) clearFns.push(fn);
+    }
+    for (const fn of clearFns) {
+        const body = bodyOf(fn);
         for (const m of body.matchAll(/'([A-Za-z][\w-]*)'/g)) cleared.add(m[1]);
     }
 

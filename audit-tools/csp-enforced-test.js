@@ -198,8 +198,14 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
     const dialogs = [];
     page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
     // សារដែល `loginWithFirebase()` បង្ហាញពេលវាលទទេ — អានចេញពី `app.js` ពិត (មិនមែន literal ទី ២)
-    const loginEmptyMessage = (/if \(!email \|\| !password\) \{\s*alert\((["'])([^"']+)\1\)/.exec(
-        fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8')) || [])[2] || null;
+    //    ⛔ ZoeW មាន backend ២ ៖ `alert(viewState.backendKind === 'supabase' ? «ឈ្មោះគណនី…» : «អ៊ីមែល…»)` ➜ ទំព័រតេស្តគ្មាន Config Supabase
+    //       ➜ សារដែលរំពឹង = សាខា **មិនមែន** Supabase (literal ចុងក្រោយនៃ ternary)
+    const loginEmptyArg = (/if \(!email \|\| !password\) \{\s*alert\(([^;\n]+)\);/.exec(
+        fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8')) || [])[1] || '';
+    const loginEmptyLiterals = [...loginEmptyArg.matchAll(/(["'])([^"']+)\1/g)].map((m) => m[2]).filter((t) => t !== 'supabase');
+    const loginEmptyMessage = /backendKind === 'supabase' \?/.test(loginEmptyArg)
+        ? loginEmptyLiterals[loginEmptyLiterals.length - 1] || null
+        : (loginEmptyLiterals.length === 1 ? loginEmptyLiterals[0] : null);
     ok('អានសារ «វាលទទេ» របស់ `loginWithFirebase()` ពី app.js បាន', !!loginEmptyMessage);
     await page.addInitScript(() => {
         window.__cspViolations = [];

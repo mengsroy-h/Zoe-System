@@ -145,7 +145,8 @@ const ENV_NAMES = [
     'ZTO_UPSTREAM_RETRIES', 'ZTO_CACHE_TTL_MS', 'ZTO_NOT_FOUND_CACHE_TTL_MS',
     'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN',
     'ZTO_LIST_SITE_CODE', 'ZTO_LIST_URL', 'ZTO_LIST_SCAN_TYPE',
-    'ZTO_LIST_PAGE_SIZE', 'ZTO_LIST_MAX_PAGES', 'ZTO_LIST_SCAN_DESC'
+    'ZTO_LIST_PAGE_SIZE', 'ZTO_LIST_MAX_PAGES', 'ZTO_LIST_SCAN_DESC',
+    'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'
 ];
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 const SAVED_FETCH = global.fetch;
@@ -848,11 +849,16 @@ function firstBody(requests) {
 
     // ⛔ ផ្លូវបណ្តាញត្រូវ **តែមួយ** — `fetch(` ត្រូវលេចម្តងគត់ក្នុង Function
     const fetchCalls = (FUNCTION_SRC.match(/(?:^|[^.\w])fetch\s*\(/g) || []).length;
-    // ⛔ ការហៅ `fetch(` មាន **២** ៖ ផ្លូវ ZTO រួម (`requestOnce`) និងការទាញ
-    // វិញ្ញាបនបត្ររបស់ **Google** — upstream ផ្សេងគ្នាទាំងស្រុង។ អ្វីដែល
-    // ច្បាប់នេះហាមគឺ **ការចម្លងផ្លូវ ZTO** មិនមែនការហៅ upstream ទី ២ ទេ។
-    ok('⛔ `fetch(` លេចត្រឹម ២ ដង (ZTO រួម + វិញ្ញាបនបត្រ Google)',
-        fetchCalls === 2, fetchCalls);
+    // ⛔ ការហៅ `fetch(` មាន **៣** ៖ ផ្លូវ ZTO រួម (`requestOnce`) · ការទាញវិញ្ញាបនបត្ររបស់ **Google** · និង `my_account` របស់
+    // **Supabase** (អត្តសញ្ញាណហាង) — upstream ផ្សេងគ្នាទាំងស្រុង។ អ្វីដែលច្បាប់នេះហាមគឺ **ការចម្លងផ្លូវ ZTO** ➜ អត្តសញ្ញាណ
+    // ដេរីវេ ៖ ការហៅដែលមិនមែន ZTO ត្រូវទៅ URL ថេររបស់វា ហើយនៅសល់ **មួយគត់** សម្រាប់ ZTO។
+    const fetchArgs = [];
+    const fetchRe = /(?:^|[^.\w])fetch\s*\(([^,)]*)/g;
+    let fm;
+    while ((fm = fetchRe.exec(FUNCTION_SRC))) fetchArgs.push(fm[1].trim());
+    const identityFetches = fetchArgs.filter((a) => a === 'FIREBASE_CERTS_URL' || /^identity\.base \+ '\/rest\/v1\/rpc\/my_account'$/.test(a));
+    ok('⛔ `fetch(` លេចត្រឹម ៣ ដង (ZTO រួម + វិញ្ញាបនបត្រ Google + `my_account` របស់ Supabase) ហើយមានតែ ១ សម្រាប់ ZTO',
+        fetchCalls === 3 && identityFetches.length === 2 && fetchArgs.length - identityFetches.length === 1, fetchArgs);
 
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ៩. `?diag=1` ៖ ស្ថានភាពបញ្ជី គ្មានតម្លៃសម្ងាត់ ==');
@@ -2075,6 +2081,113 @@ function firstBody(requests) {
     const leak = JSON.stringify(hijack.body || {});
     ok('⛔ email និង token មិនត្រូវលេចក្នុងចម្លើយ',
         leak.indexOf('zoew881859.com') === -1 && leak.indexOf('eyJ') === -1, leak.slice(0, 160));
+
+    // ========================================================================
+    // ផ្នែក ២០ — ⛔ **អត្តសញ្ញាណ Supabase (Project តែមួយ · ហាងច្រើន)** ៖ សាខា = `branch_code` របស់ **ហាង (tenant)**
+    // ដែលអ្នកលក់កំណត់ពេលបង្កើតហាង ➜ Function សួរ `my_account` លើ Supabase **ដោយ token របស់អ្នកប្រើផ្ទាល់** (Supabase ផ្ទៀងហត្ថលេខា
+    // + RLS) ⛔ មិនជឿ claim ណាមួយក្នុង token · `?site=` បោះចោលដូចផ្លូវ Firebase · ហាងផុតកំណត់/បិទ ➜ បញ្ជីបិទ · Supabase មិនឆ្លើយ ➜
+    // បិទ (fail-closed) តែ **មិនចងចាំ** · issuer របស់ Project ផ្សេង ➜ មិនសួរ Supabase ទាល់តែសោះ · Secret key ក្នុង env ➜ មិនប្រើ
+    // ========================================================================
+    console.log('\n== ២០. អត្តសញ្ញាណ Supabase ➜ សាខាពីហាង (tenant) ==');
+    const SB_URL = 'https://abcd1234.supabase.co';
+    const SB_KEY = 'sb_publishable_' + 'q'.repeat(24);
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const sbToken = (sub, extra) => b64({ alg: 'ES256', typ: 'JWT', kid: 'k1' }) + '.' + b64(Object.assign({
+        iss: SB_URL + '/auth/v1', aud: 'authenticated', role: 'authenticated', sub: sub,
+        exp: Math.floor(Date.now() / 1000) + 3600, iat: Math.floor(Date.now() / 1000)
+    }, extra || {})) + '.' + Buffer.from('sig-' + sub).toString('base64url');
+    const ACCOUNTS = {};
+    const sbCalls = [];
+    let sbMode = 'ok';
+    function withSupabase(inner) {
+        return async (href, init) => {
+            if (String(href).indexOf(SB_URL) === 0) {
+                const headers = (init && init.headers) || {};
+                sbCalls.push({ href: String(href), apikey: headers.apikey, auth: headers.Authorization });
+                if (sbMode === 'down') throw new TypeError('fetch failed');
+                const token = String(headers.Authorization || '').replace(/^Bearer /, '');
+                const acct = headers.apikey === SB_KEY ? ACCOUNTS[token] : undefined;
+                if (acct === undefined) return { ok: false, status: 401, headers: { get: () => 'application/json' }, json: async () => ({ code: 'PGRST301' }) };
+                return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => acct };
+            }
+            return inner(href, init);
+        };
+    }
+    async function sbList(token, query, env) {
+        resetEnv(Object.assign({ SUPABASE_URL: SB_URL, SUPABASE_PUBLISHABLE_KEY: SB_KEY }, env || {}));
+        seenRequests.length = 0;
+        sbCalls.length = 0;
+        global.fetch = withSupabase(responder(listPayload([listRow()])));
+        const res = await call(listQuery(query), { 'x-zoe-id-token': token || '' });
+        let body = null;
+        try { body = JSON.parse(res.body); } catch (e) { body = null; }
+        return { res: res, body: body };
+    }
+    const tokA = sbToken('user-a');
+    ACCOUNTS[tokA] = [{ username: 'sokha', role: 'owner', tenant_id: 't-a', tenant_name: 'A', branch_code: '881859', status: 'active' }];
+    const sbHijack = await sbList(tokA, { site: '999999' });
+    ok('⛔ Supabase ៖ សាខាមកពីហាងរបស់គណនី (881859) មិនមែនពី `?site=`',
+        siteSent() === '881859' && ztoCalls() === 1, { sent: siteSent(), body: sbHijack.body });
+    ok('⛔ Supabase ៖ Function សួរ `my_account` ដោយ token ផ្ទាល់ + Publishable key (មិនមែន secret)',
+        sbCalls.length === 1 && /\/rest\/v1\/rpc\/my_account$/.test(sbCalls[0].href) && sbCalls[0].apikey === SB_KEY
+        && sbCalls[0].auth === 'Bearer ' + tokA, sbCalls);
+    const sbLeak = JSON.stringify(sbHijack.body || {});
+    ok('⛔ Supabase ៖ token មិនលេចក្នុងចម្លើយ', sbLeak.indexOf(tokA.split('.')[1]) === -1, sbLeak.slice(0, 160));
+
+    resetEnv({ SUPABASE_URL: SB_URL, SUPABASE_PUBLISHABLE_KEY: SB_KEY });
+    sbCalls.length = 0;
+    seenRequests.length = 0;
+    global.fetch = withSupabase(responder(listPayload([listRow()])));
+    await call(listQuery({ page: '1' }), { 'x-zoe-id-token': tokA });
+    await call(listQuery({ from: '2026-09-09' }), { 'x-zoe-id-token': tokA });
+    ok('Supabase ៖ សាលក្រមចងចាំតាម token (សំណើទី ២ មិនសួរ Supabase ម្តងទៀត)', sbCalls.length === 1, sbCalls.length);
+
+    const tokRevoked = sbToken('user-r');
+    ACCOUNTS[tokRevoked] = [{ tenant_id: 't-r', branch_code: '770022', status: 'revoked' }];
+    const revoked = await sbList(tokRevoked, {});
+    ok('⛔ Supabase ៖ ហាងត្រូវបិទ ➜ បញ្ជីបិទ · គ្មានការហៅ ZTO',
+        !!revoked.body && revoked.body.enabled === false && /tenant-revoked/.test(String(revoked.body.reason)) && ztoCalls() === 0, revoked.body);
+    const tokExpiredShop = sbToken('user-e');
+    ACCOUNTS[tokExpiredShop] = [{ tenant_id: 't-e', branch_code: '770022', status: 'expired' }];
+    const expiredShop = await sbList(tokExpiredShop, {});
+    ok('⛔ Supabase ៖ ហាងផុតកំណត់ ➜ បញ្ជីបិទ', !!expiredShop.body && /tenant-expired/.test(String(expiredShop.body.reason)) && ztoCalls() === 0, expiredShop.body);
+
+    const tokNoShop = sbToken('user-n');
+    ACCOUNTS[tokNoShop] = [];
+    const noShop = await sbList(tokNoShop, {});
+    ok('⛔ Supabase ៖ គណនីគ្មានហាង ➜ `site:no-account`', !!noShop.body && noShop.body.reason === 'site:no-account' && ztoCalls() === 0, noShop.body);
+
+    const forgedSb = await sbList(sbToken('user-x'), {});
+    ok('⛔ Supabase ៖ token ដែល Supabase បដិសេធ (401) ➜ បញ្ជីបិទ · គ្មានការហៅ ZTO',
+        !!forgedSb.body && forgedSb.body.enabled === false && ztoCalls() === 0, forgedSb.body);
+
+    const staleSb = await sbList(sbToken('user-a', { exp: Math.floor(Date.now() / 1000) - 600 }), {});
+    ok('⛔ Supabase ៖ token ផុតកំណត់ ➜ បដិសេធមុនសួរ Supabase', !!staleSb.body && staleSb.body.reason === 'idtoken:expired' && sbCalls.length === 0, staleSb.body);
+
+    const foreign = await sbList(sbToken('user-a', { iss: 'https://evil000.supabase.co/auth/v1' }), {});
+    ok('⛔ Supabase ៖ issuer របស់ Project ផ្សេង ➜ មិនសួរ Supabase · បដិសេធ',
+        !!foreign.body && foreign.body.enabled === false && sbCalls.length === 0 && ztoCalls() === 0, { body: foreign.body, calls: sbCalls.length });
+
+    const tokDown = sbToken('user-d');
+    ACCOUNTS[tokDown] = [{ tenant_id: 't-a', branch_code: '881859', status: 'active' }];
+    sbMode = 'down';
+    const down = await sbList(tokDown, {});
+    ok('⛔ Supabase មិនឆ្លើយ ➜ បញ្ជីបិទ (fail-closed) · គ្មានការហៅ ZTO',
+        !!down.body && down.body.reason === 'idtoken:supabase-unreachable' && ztoCalls() === 0, down.body);
+    sbMode = 'ok';
+    seenRequests.length = 0;
+    await call(listQuery({}), { 'x-zoe-id-token': tokDown });
+    ok('⛔ ការមិនឆ្លើយមិនត្រូវចងចាំ ➜ Supabase មកវិញ ➜ បញ្ជីដើរភ្លាម', siteSent() === '881859', siteSent());
+
+    const unset = await sbList(tokA, {}, { SUPABASE_URL: undefined });
+    ok('⛔ `SUPABASE_URL` មិនទាន់ដាក់ ➜ token Supabase បិទបញ្ជី ដោយប្រាប់មូលហេតុ',
+        !!unset.body && unset.body.reason === 'idtoken:supabase-unset' && ztoCalls() === 0, unset.body);
+    const secretEnv = await sbList(tokA, {}, { SUPABASE_PUBLISHABLE_KEY: 'sb_secret_' + 'z'.repeat(24) });
+    ok('⛔ Secret key ក្នុង `SUPABASE_PUBLISHABLE_KEY` ➜ មិនប្រើវា (មិនផ្ញើទៅណាទាំងអស់)',
+        !!secretEnv.body && secretEnv.body.enabled === false && sbCalls.length === 0, { body: secretEnv.body, calls: sbCalls });
+
+    const fbStill = await sbList(tokenFor('sok@zoew881859.com'), {});
+    ok('⛔ ទិសផ្ទុយ ៖ ដាក់ Supabase env ហើយ ID token Firebase នៅដើរ (សាខាពី email)', siteSent() === '881859' && sbCalls.length === 0, { sent: siteSent(), body: fbStill.body });
     }
     console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     ENV_NAMES.forEach((name) => {

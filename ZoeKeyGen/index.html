@@ -202,6 +202,92 @@ const firebaseConfig = {
 
     <div class="app-card card-wide">
         <div class="card-header">
+            <div class="card-title">🏪 ហាង Supabase (Project តែមួយ)</div>
+            <button class="btn-mini" data-act="sbAdminRefresh">🔄 Refresh</button>
+        </div>
+        <div class="card-subtitle mb-8">
+            បង្កើតហាងថ្មី (ឈ្មោះ · លេខសាខា ZTO · សុពលភាព) រួចផ្ញើ <b>Setup Link ដែលមានកូដអញ្ជើញ</b> ឲ្យម្ចាស់ហាង ៖ គាត់បើក Link ➜ ចុះឈ្មោះដោយខ្លួនឯង
+            ➜ គណនីចងនឹងហាង និងសាខាដោយស្វ័យប្រវត្តិ។ ចូលដោយគណនី Admin របស់ Supabase
+            (តារាង <code>platform_admins</code>)។ ⛔ ប្រើតែ <b>Publishable key</b> — ហាមដាក់ Secret key ទីនេះ។
+        </div>
+        <div class="form-grid">
+            <div class="col-half">
+                <label for="sbAdminUrlInput">Supabase URL</label>
+                <input type="text" id="sbAdminUrlInput" placeholder="https://xxxx.supabase.co" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="col-half">
+                <label for="sbAdminKeyInput">Publishable key</label>
+                <input type="text" id="sbAdminKeyInput" placeholder="sb_publishable_..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="col-half">
+                <label for="sbAdminEmailInput">អ៊ីមែល Admin (Supabase)</label>
+                <input type="email" id="sbAdminEmailInput" autocomplete="username">
+            </div>
+            <div class="col-half">
+                <label for="sbAdminPasswordInput">ពាក្យសម្ងាត់ Admin</label>
+                <input type="password" id="sbAdminPasswordInput" autocomplete="current-password">
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-primary" id="sbAdminLoginBtn" data-act="sbAdminLogin">🔐 ចូល Supabase ជា Admin</button>
+            <button class="btn-secondary hidden" id="sbAdminLogoutBtn" data-act="sbAdminLogout">🚪 ចាកចេញ Supabase</button>
+        </div>
+        <div id="sbAdminPanel" class="hidden">
+            <label>➕ ហាងថ្មី</label>
+            <div class="form-grid">
+                <div class="col-half">
+                    <label for="sbTenantNameInput">ឈ្មោះហាង</label>
+                    <input type="text" id="sbTenantNameInput" maxlength="120" placeholder="ឧ. ហាង សុខា">
+                </div>
+                <div class="col-half">
+                    <label for="sbTenantBranchInput">លេខសាខា ZTO</label>
+                    <input type="text" id="sbTenantBranchInput" maxlength="32" inputmode="numeric" placeholder="ឧ. 881859">
+                </div>
+                <div class="col-half">
+                    <label for="sbTenantDaysInput">សុពលភាព (ថ្ងៃ)</label>
+                    <input type="number" id="sbTenantDaysInput" min="1" max="3650" value="30">
+                </div>
+            </div>
+            <button class="btn-primary" id="sbCreateTenantBtn" data-act="sbCreateTenant">➕ បង្កើតហាង + កូដអញ្ជើញម្ចាស់ហាង</button>
+            <div id="sbInviteResultBox" class="hidden">
+                <label id="sbInviteResultLabel">កូដអញ្ជើញ (បង្ហាញតែម្តង)</label>
+                <div class="key-output" id="sbInviteCodeText"></div>
+                <div class="key-output sb-link-output" id="sbInviteLinkText"></div>
+                <div class="btn-row">
+                    <button class="btn-secondary" data-act="copySbInviteLink">📋 ចម្លង Setup Link</button>
+                    <button class="btn-secondary" data-act="copySbInviteCode">📋 ចម្លងកូដ</button>
+                </div>
+                <div id="sbInviteQrContainer" class="sb-qr"></div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ហាង</th>
+                            <th>សាខា</th>
+                            <th>គណនី</th>
+                            <th>ផុតកំណត់</th>
+                            <th>ស្ថានភាព</th>
+                            <th>សកម្មភាព</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sbTenantListBody"></tbody>
+                </table>
+            </div>
+            <label for="sbResetUsernameInput">🔑 អតិថិជនភ្លេចពាក្យសម្ងាត់ — ឈ្មោះគណនី</label>
+            <div class="btn-row">
+                <input type="text" id="sbResetUsernameInput" maxlength="32" placeholder="ឧ. sokha" autocomplete="off" spellcheck="false">
+                <button class="btn-secondary" data-act="sbIssueResetCode">🔑 ចេញកូដប្តូរពាក្យសម្ងាត់</button>
+            </div>
+            <div id="sbResetResultBox" class="hidden">
+                <div class="key-output" id="sbResetCodeText"></div>
+                <button class="btn-secondary" data-act="copySbResetCode">📋 ចម្លងកូដ</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-card card-wide">
+        <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
             <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
             <button class="btn-mini" data-act="migrateLegacyLicenseKeyMetadata" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>

@@ -1,0 +1,124 @@
+import type { HandlerResult } from './account-core.ts';
+
+export const MAX_BODY_BYTES = 8192;
+const LOGIN_DOMAIN_RE = /^(?=.{4,190}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+export interface FunctionConfig {
+    ok: boolean;
+    problems: string[];
+    supabaseUrl: string;
+    secretKey: string;
+    loginDomain: string;
+    allowedOrigins: string[];
+}
+
+function list(raw: string | undefined): string[] {
+    return String(raw ?? '').split(',').map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
+function exactOrigin(raw: string): boolean {
+    try {
+        const url = new URL(raw);
+        return (url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')) && url.origin === raw;
+    } catch {
+        return false;
+    }
+}
+
+export function readConfig(get: (name: string) => string | undefined): FunctionConfig {
+    const problems: string[] = [];
+    const supabaseUrl = String(get('SUPABASE_URL') ?? '').trim();
+    let urlOk = false;
+    try {
+        const url = new URL(supabaseUrl);
+        urlOk = url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', 'kong'].includes(url.hostname));
+    } catch {
+        urlOk = false;
+    }
+    if (!urlOk) problems.push('SUPABASE_URL');
+    const secretKey = String(get('ZOE_SECRET_KEY') || get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+    if (secretKey.length < 20) problems.push('ZOE_SECRET_KEY');
+    const loginDomain = String(get('ZOE_LOGIN_DOMAIN') ?? '').trim().toLowerCase();
+    if (!LOGIN_DOMAIN_RE.test(loginDomain) || !loginDomain.endsWith('.invalid')) problems.push('ZOE_LOGIN_DOMAIN');
+    const allowedOrigins = list(get('ZOE_ALLOWED_ORIGINS'));
+    if (allowedOrigins.length === 0 || !allowedOrigins.every(exactOrigin)) problems.push('ZOE_ALLOWED_ORIGINS');
+    return { ok: problems.length === 0, problems, supabaseUrl, secretKey, loginDomain, allowedOrigins };
+}
+
+async function readLimited(request: Request, maxBytes: number): Promise<{ ok: true; text: string } | { ok: false; code: string }> {
+    if (!request.body) return { ok: true, text: '' };
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > maxBytes) {
+                await reader.cancel().catch(() => undefined);
+                return { ok: false, code: 'body-too-large' };
+            }
+            chunks.push(value);
+        }
+    } catch {
+        return { ok: false, code: 'bad-request' };
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    try {
+        return { ok: true, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) };
+    } catch {
+        return { ok: false, code: 'bad-request' };
+    }
+}
+
+function json(status: number, body: unknown, headers: Record<string, string>): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+    });
+}
+
+export async function handleHttp(
+    request: Request,
+    config: FunctionConfig,
+    allowHeaders: string,
+    handler: (body: unknown) => Promise<HandlerResult>
+): Promise<Response> {
+    const origin = request.headers.get('origin');
+    const allowed = origin !== null && config.allowedOrigins.includes(origin);
+    const cors: Record<string, string> = allowed
+        ? {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': allowHeaders,
+            'Access-Control-Max-Age': '7200',
+            Vary: 'Origin'
+        }
+        : { Vary: 'Origin' };
+    if (origin !== null && !allowed) return json(403, { ok: false, code: 'origin-denied' }, cors);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    if (request.method !== 'POST') return json(405, { ok: false, code: 'method-not-allowed' }, { ...cors, Allow: 'POST, OPTIONS' });
+    if (!config.ok) return json(503, { ok: false, code: 'server-unconfigured' }, cors);
+    const declared = Number(request.headers.get('content-length') ?? '0');
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return json(413, { ok: false, code: 'body-too-large' }, cors);
+    const read = await readLimited(request, MAX_BODY_BYTES);
+    if (!read.ok) return json(read.code === 'body-too-large' ? 413 : 400, { ok: false, code: read.code }, cors);
+    let body: unknown;
+    try {
+        body = JSON.parse(read.text);
+    } catch {
+        return json(400, { ok: false, code: 'bad-request' }, cors);
+    }
+    try {
+        const result = await handler(body);
+        return json(result.status, result.body, cors);
+    } catch {
+        return json(500, { ok: false, code: 'internal' }, cors);
+    }
+}

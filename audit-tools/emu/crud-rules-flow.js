@@ -170,6 +170,8 @@ function makeSandbox(store, now) {
         console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
         navigator: { onLine: true },
         db: {}, authGeneration: 0, fb,
+        // `cleanupJournalScope()` អាន `auth` តែលើ Config Supabase (Firebase ➜ `databaseURL` មុន) ➜ គ្មាន user ក្នុង sandbox នេះ
+        auth: null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),

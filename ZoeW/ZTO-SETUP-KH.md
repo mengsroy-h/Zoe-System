@@ -505,6 +505,17 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 > **មិនទាមទារ `email_verified`** ទេ — ព្រំដែនពិតគឺ **ការគ្រប់គ្រងការបង្កើត
 > គណនី** (ជំហានទី ១)។
 
+### ហាង Supabase ៖ សាខាមកពីហាង
+
+ហាងដែលចូលប្រើដោយ **កូដអញ្ជើញ** (Supabase · [`../supabase/README.md`](../supabase/README.md)) មិនប្រើ email តាមសាខាទេ ៖ លេខសាខាជារបស់ **ហាង**
+ដែលអ្នកលក់កំណត់ពេលបង្កើតហាងក្នុង ZoeKeyGen ➜ Function សួរ Supabase (`my_account`) ដោយ token របស់អ្នកប្រើ ហើយយក `branch_code` របស់ហាងនោះ។
+ជំហានទី ១ និងទី ៣ ខាងលើ **មិនអនុវត្ត** ចំពោះហាងទាំងនេះ។ Site `zoew` ➜ **Environment variables** ៖
+
+| Key | តម្លៃ | ចាំបាច់? |
+| --- | --- | --- |
+| `SUPABASE_URL` | `https://<project>.supabase.co` | ⛔ ចាំបាច់សម្រាប់ហាង Supabase |
+| `SUPABASE_PUBLISHABLE_KEY` | **Publishable key** (`sb_publishable_…`) — ⛔ មិនមែន Secret key | ⛔ ចាំបាច់សម្រាប់ហាង Supabase |
+
 ### ជំហានទី ៤ — បើកមុខងារក្នុង ZoeW
 
 **១. គូស «Fast Mode សម្រាប់ ZTO Lookup»** — ⚙️ របា Slide ➜ **API ស្វែងរក
@@ -528,6 +539,9 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 | `idtoken:signature` · `idtoken:malformed` | token មិនមែនរបស់ Firebase ពិត | ⛔ សញ្ញានៃការក្លែង |
 | `site:no-account` | គណនីនោះគ្មានលេខសាខាក្នុង email | Console ➜ ជំហានទី ៣ |
 | `url:invalid` · `scan-type:invalid` | env របស់បញ្ជីខូច | Netlify env ➜ `?diag=1` |
+| `idtoken:supabase-unset` | ហាង Supabase តែ `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` មិនទាន់ដាក់ | Netlify env ➜ «ហាង Supabase» ខាងលើ |
+| `idtoken:supabase-unreachable` | Function សួរ Supabase មិនបាន (បណ្តាញ/ផុតពិដាន) | សាកម្តងទៀត · ពិនិត្យ `SUPABASE_URL` |
+| `site:tenant-expired` · `site:tenant-revoked` | ហាងផុតកំណត់ ឬត្រូវបានបិទ | ZoeKeyGen ➜ 🏪 ហាង Supabase ➜ ពន្យារ/បើកវិញ |
 
 > ⛔ **លេខសាខាមកពីអត្តសញ្ញាណ មិនមែនពីឧបករណ៍** ៖ Cookie ZTO ផ្ទុកសិទ្ធិអាន
 > **ទូទាំងប្រទេស** ➜ លេខសាខាដែលធ្វើដំណើរជា parameter ជាព្រំដែនក្លែងក្លាយ

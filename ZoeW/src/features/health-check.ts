@@ -2,8 +2,9 @@ import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
 import { viewState } from '../core/view-state';
 import { firebaseState, lookupState, securityState, uiState } from '../core/state';
-import { cleanupClockIsTrustworthy } from '../core/clock';
+import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
+import { getZoneDateKey } from '../core/timezone';
 import { appLocalStore, appSessionStore } from '../core/storage';
 import { DB_LISTENER_KEYS } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
@@ -23,6 +24,10 @@ export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
 
 export const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
 
+export function databaseHealthLabel() {
+    return viewState.backendKind === 'supabase' ? 'Supabase' : 'Firebase';
+}
+
 export function healthAgeText(mark) {
     const ms = elapsedSince(mark);
     if (!isFinite(ms)) return 'មិនស្គាល់';
@@ -41,16 +46,16 @@ export function healthNetworkRow() {
 
 export function healthDatabaseRow() {
     if (!firebaseState.isDatabaseConnected) {
-        return healthRow('bad', 'Firebase', firebaseState.hasEverConnectedToDatabase
+        return healthRow('bad', databaseHealthLabel(), firebaseState.hasEverConnectedToDatabase
             ? 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ'
             : 'មិនទាន់ភ្ជាប់ម្តងណាទេ — សូមពិនិត្យ Config');
     }
     const stale = DB_LISTENER_KEYS.filter((k) => dbListenerViewIsStale(k));
     if (stale.length) {
-        return healthRow('warn', 'Firebase', 'ភ្ជាប់រួច តែទិន្នន័យ ' + stale.length
+        return healthRow('warn', databaseHealthLabel(), 'ភ្ជាប់រួច តែទិន្នន័យ ' + stale.length
             + ' ផ្នែកមិនទាន់មកដល់ (' + stale.join(', ') + ')');
     }
-    return healthRow('ok', 'Firebase', 'ភ្ជាប់ ហើយទិន្នន័យមកដល់គ្រប់ផ្នែក');
+    return healthRow('ok', databaseHealthLabel(), 'ភ្ជាប់ ហើយទិន្នន័យមកដល់គ្រប់ផ្នែក');
 }
 
 export async function healthDatabaseLiveRow() {
@@ -58,7 +63,7 @@ export async function healthDatabaseLiveRow() {
     if (base.state !== 'ok') return base;
     const alive = await probeDatabaseLiveness('health');
     if (alive === false) {
-        return healthRow('bad', 'Firebase', 'ភ្ជាប់តែ Server មិនឆ្លើយក្នុង ' + Math.round(DB_LIVENESS_PROBE_TIMEOUT_MS / 1000)
+        return healthRow('bad', databaseHealthLabel(), 'ភ្ជាប់តែ Server មិនឆ្លើយក្នុង ' + Math.round(DB_LIVENESS_PROBE_TIMEOUT_MS / 1000)
             + ' វិនាទី (ការតភ្ជាប់ងាប់ស្ងាត់) — កំពុងភ្ជាប់ឡើងវិញ');
     }
     return base;
@@ -75,7 +80,18 @@ export function healthClockRow() {
         + (cleanupReady ? '' : ' · ការសម្អាតផ្អាកព្រោះការតភ្ជាប់មិនរស់'));
 }
 
+export function healthTenantRow() {
+    const account = firebaseState.fb && typeof firebaseState.fb.accountOf === 'function' ? firebaseState.fb.accountOf(firebaseState.auth) : null;
+    if (!account || !account.tenant_id) return healthRow('warn', 'ហាង (Supabase)', 'មិនទាន់ដឹងស្ថានភាពហាង — សូមចូលប្រព័ន្ធ ហើយភ្ជាប់អ៊ីនធឺណិត');
+    const until = Date.parse(String(account.expires_at || ''));
+    const untilText = Number.isFinite(until) ? getZoneDateKey(until, 0) : '—';
+    const label = 'ហាង «' + String(account.tenant_name || '') + '» · សាខា ' + String(account.branch_code || '—') + ' · ផុត ' + untilText;
+    if (account.status === 'active' && Number.isFinite(until) && until > getServerNow()) return healthRow('ok', 'ហាង (Supabase)', label);
+    return healthRow('bad', 'ហាង (Supabase)', label + ' — ' + (account.status === 'revoked' ? 'ត្រូវបានបិទ' : 'ផុតកំណត់'));
+}
+
 export async function healthLicenseRow() {
+    if (viewState.backendKind === 'supabase') return healthTenantRow();
     if (!window.ZoeLicense || typeof ZoeLicense.getStatus !== 'function') {
         return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'ម៉ូឌុល License មិនទាន់ផ្ទុក');
     }

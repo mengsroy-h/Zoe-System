@@ -2718,6 +2718,7 @@ Function ដែល export ៖ 978
 | `item-money-integrity-test` | — | ផ្នែក ១ |
 | `keygen-biometric-test` | ផ្នែក ១ | — |
 | `keygen-notice-test` | ផ្នែក ១ | — |
+| `keygen-pin-flow-test` | ផ្នែក ១ | — |
 | `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | — | ផ្នែក ១ |

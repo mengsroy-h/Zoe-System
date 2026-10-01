@@ -72,6 +72,42 @@ function normalize(value, sig = new Map()) {
 /* ── ទិន្នន័យអតិថិជនដែលមិនត្រូវសល់ក្រោយចាកចេញ ──────────────────────── */
 const CUSTOMER_MARKERS = ['012345678', '0977777777', '0888888', '011223344', '015999888', 'AA1', 'AA2', 'CC1', 'DD1', 'EE1', 'NEW1'];
 
+/* ── បណ្តាញ ↔ នាឡិកាឈប់ ───────────────────────────────────────────────
+ * ចម្លើយ ZTO/Apps Script (SW ➜ `ctx.route`/`page.route`) មកដល់តាម **ម៉ោងពិត** ខណៈនាឡិកា JS ឈប់ ➜
+ * ការរង់ចាំម៉ោងពិតថេរ (~២១០ms ក្នុងមួយជំហាន) បាក់ពេល CI រវល់ ➜ App មួយឃើញ «✅ រកឃើញពី ZTO» ម្ខាងទៀត
+ * «🔎 កំពុងស្វែងរក…» ➜ ជំហាន «ស្កេន ZL5» ធ្លាក់ «អេក្រង់» ដោយ App គ្មានកំហុស (វាស់បាន ៖ `DEEP_NET_DELAY_MS=800`
+ * ធ្លាក់ ៧/១៣ ជំហាន ZTO មុនការកែ)។ ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖ `advance()` រំកិលនាឡិកាជាដុំ `NET_STEP_MS`
+ * ហើយរង់ចាំសំណើដែលកំពុងហោះ (`window.__netPending`) ស្ងប់ **មុន** ដុំនីមួយៗ ➜ ម៉ោងក្លែងសរុបដដែលទាំង ២ App
+ * ហើយចម្លើយចុះលើម៉ោងក្លែងដដែល មិនអាស្រ័យលើល្បឿនម៉ាស៊ីន។ ⛔ កុំកែវាដោយបង្កើន `waitForTimeout` (ការសំណាង)។
+ * `DEEP_NET_DELAY_MS` ៖ probe ពន្យារចម្លើយក្លែង · `DEEP_NET_DELAY_ONLY=old|new` ពន្យារតែ App មួយ (ពេលមិនស្មើគ្នា ៖
+ * រូបរាងពិតនៃការធ្លាក់ CI ➜ ស្គ្រីបមុនការកែធ្លាក់ជួរទី 641 ដូច CI បេះបិទ)។ */
+const NET_STEP_MS = 100;
+const NET_SETTLE_MS = 20000;
+const NET_DELAY_MS = Number(process.env.DEEP_NET_DELAY_MS) || 0;
+const NET_DELAY_ONLY = process.env.DEEP_NET_DELAY_ONLY || '';
+const netDelay = (port) => (NET_DELAY_MS > 0 && (!NET_DELAY_ONLY || (NET_DELAY_ONLY === 'new') === (port === newSrv.port))
+    ? new Promise((res) => setTimeout(res, NET_DELAY_MS)) : Promise.resolve());
+async function netQuiet(p) {
+    const deadline = Date.now() + NET_SETTLE_MS;
+    for (;;) {
+        let n;
+        try { n = await p.evaluate(() => window.__netPending || 0); } catch (e) {
+            if (!/context was destroyed|navigat/i.test(String(e.message))) throw e;
+            n = 'ទំព័រកំពុងផ្ទុក';
+        }
+        if (typeof n === 'number' && n <= 0) return;
+        if (Date.now() > deadline) throw new Error('បណ្តាញមិនស្ងប់ក្នុង ' + NET_SETTLE_MS / 1000 + ' វិ. (សំណើកំពុងហោះ ' + n + ')');
+        await p.waitForTimeout(20);
+    }
+}
+async function advance(p, ms) {
+    for (let left = ms; left > 0; left -= NET_STEP_MS) {
+        await netQuiet(p);
+        await p.clock.runFor(Math.min(NET_STEP_MS, left));
+    }
+    await netQuiet(p);
+}
+
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const oldSrv = await serveDir(OLD_DIR);
 const newSrv = await serveDir(NEW_DIR);
@@ -92,6 +128,7 @@ async function session(port, extraStorage = {}, zto = null) {
     //    លេខទូរស័ព្ទ) ដែល App ផ្ញើ ត្រូវប្រៀបធៀបដូចការសរសេរ Firebase ដែរ។
     const appsScript = [];
     await page.route('https://script.google.com/**', async (r) => {
+        await netDelay(port);
         if (r.request().method() === 'GET') {
             // ⛔ Lookup តាម Google Sheet ៖ `?list=1` (តារាងអតិថិជនទាំងមូល) ឬ `?code=` (មួយ barcode)
             const u = new URL(r.request().url());
@@ -122,6 +159,7 @@ async function session(port, extraStorage = {}, zto = null) {
         await ctx.route('**/.netlify/functions/zto-order-detail**', async (r) => {
             const u = new URL(r.request().url());
             ztoCalls.push(u.search);
+            await netDelay(port);
             const code = (u.searchParams.get('code') || '').toUpperCase();
             const body = u.searchParams.get('list') === '1'
                 ? { enabled: true, rows: zto.listRows, pages: 1, total: zto.listRows.length }
@@ -133,6 +171,18 @@ async function session(port, extraStorage = {}, zto = null) {
         await page.addInitScript(`if (window.localStorage.getItem(${JSON.stringify(k)}) === null) window.localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`);
     }
     await page.addInitScript(`window.addEventListener('unhandledrejection', (e) => { (window.__rejections ||= []).push(String((e.reason && e.reason.message) || e.reason)); });`);
+    // ⛔ សំណើបណ្តាញដែល **កំពុងហោះ** (fetch + ការអាន body) ➜ `advance()` រង់ចាំវាស្ងប់មុនរំកិលនាឡិកា
+    //    (ដូចគ្នាទាំង ២ App ៖ App មិនពិនិត្យអត្តសញ្ញាណ `fetch` ហើយមិនប្រើ XHR)
+    await page.addInitScript(`(() => {
+        window.__netPending = 0;
+        const track = (p) => { window.__netPending++; const done = () => { window.__netPending--; }; p.then(done, done); return p; };
+        const origFetch = window.fetch;
+        window.fetch = function () { return track(origFetch.apply(window, arguments)); };
+        for (const m of ['json', 'text', 'arrayBuffer', 'blob', 'formData']) {
+            const orig = Response.prototype[m];
+            if (typeof orig === 'function') Response.prototype[m] = function () { return track(orig.apply(this, arguments)); };
+        }
+    })();`);
     // ⛔ Math.random ដូចគ្នាទាំង ២ ➜ ផ្នែកចៃដន្យនៃ id ស្មើគ្នា
     await page.addInitScript(`(() => { let a = 20260922; Math.random = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();`);
     // ⛔ កំណត់ហេតុ toast ៖ រាល់សារដែល App បង្ហាញ (តាមលំដាប់) — មិនអាស្រ័យលើ
@@ -175,7 +225,7 @@ async function session(port, extraStorage = {}, zto = null) {
     //    ហូរ App ដែលរត់ជំហានក្រោយបន្តិច ឃើញម៉ោងខុស ២ វិនាទី ➜ ភាពខុសគ្នា
     //    ក្លែងក្លាយរាល់ជំហាន (វាស់បាន ៖ 13:00:14 ធៀប 13:00:12)។
     await page.clock.pauseAt(HARNESS_CLOCK_START + 10000);
-    await page.clock.runFor(2000);
+    await advance(page, 2000);
     return { ctx, page, errors, dialogs, appsScript, ztoCalls, mark: 0, dialogMark: 0, errMark: 0, asMark: 0, toastMark: 0, ztoMark: 0 };
 }
 
@@ -183,7 +233,7 @@ const T = 4000;
 const named = (label, fn) => async (p) => { try { await fn(p); } catch (e) { const why = String(e.message).split('\n').filter((l) => /intercepts|not visible|not enabled|not stable|detached|outside/.test(l)).slice(-1)[0] || ''; throw new Error(label + ' ➜ ' + String(e.message).split('\n')[0] + (why ? ' · ' + why.trim() : ''), { cause: e }); } };
 const click = (sel) => named('ចុច ' + sel, (p) => p.click(sel, { timeout: T }));
 const fill = (sel, v) => named('វាយ ' + sel, (p) => p.fill(sel, v, { timeout: T }));
-const seq = (...fns) => async (p) => { for (const f of fns) { await f(p); await p.clock.runFor(300); await p.waitForTimeout(60); } };
+const seq = (...fns) => async (p) => { for (const f of fns) { await f(p); await advance(p, 300); await p.waitForTimeout(60); } };
 const row = (text) => `#historyTableBody tr:has-text("${text}")`;
 const menu = (act) => seq(click('.header-more-btn'), click(`#menuContentContainer [data-act="${act}"]`));
 const rowMenu = (text, act) => seq(click(`${row(text)} .more-btn`), click(`#menuContentContainer [data-act="${act}"]`));
@@ -431,7 +481,10 @@ async function runScenario(title, steps, storage = {}, zto = null) {
         let okA = true; let okB = true; let errA = ''; let errB = '';
         try { await fn(A.page); } catch (e) { okA = false; errA = String(e.message).split('\n')[0]; }
         try { await fn(B.page); } catch (e) { okB = false; errB = String(e.message).split('\n')[0]; }
-        for (const S of [A, B]) { await S.page.clock.runFor(1500); await S.page.waitForTimeout(150); await S.page.clock.runFor(100); }
+        let netA = ''; let netB = '';
+        for (const S of [A, B]) {
+            try { await advance(S.page, 1500); await S.page.waitForTimeout(150); await advance(S.page, 100); } catch (e) { if (S === A) netA = String(e.message); else netB = String(e.message); }
+        }
         const a = await state(A);
         const b = await state(B);
         const layers = {
@@ -453,10 +506,11 @@ async function runScenario(title, steps, storage = {}, zto = null) {
         prevTree = a.snap.tree;
         if (!changed) vacuous++;
         if (process.env.DEEP_DEBUG) console.log('      🔎 ' + JSON.stringify(await A.page.evaluate(DEBUG)) + (a.toasts ? '\n      🔔 ' + a.toasts : '') + (a.ztoReq ? '\n      🚚 ' + a.ztoReq : ''));
-        const ok = !diffs.length && okA === okB && okA && changed;
+        const ok = !diffs.length && okA === okB && okA && changed && !netA && !netB;
         if (!ok) bad++;
         console.log(`${ok ? '✅' : '❌'} ${label.padEnd(34)} សរសេរ ${String(writes).padStart(2)}${a.toasts ? '  🔔' : ''}${a.dialogs ? '  💬' : ''}${a.appsScript !== '[]' ? '  📤' : ''}${changed ? '' : '  ⚠️ មិនប្តូរអ្វីសោះ'}${clickNote}${diffs.length ? '  ≠ ' + diffs.join(' · ') : ''}`);
         if (!okA || !okB) console.log(`      ចុច ៖ ដើម ${okA ? 'OK' : errA} · ថ្មី ${okB ? 'OK' : errB}`);
+        if (netA || netB) console.log(`      ⏳ ${netA ? 'ដើម ៖ ' + netA : ''}${netA && netB ? ' · ' : ''}${netB ? 'ថ្មី ៖ ' + netB : ''}`);
         for (const e of b.errs) console.log(`      💥 ថ្មី ៖ ${String(e).slice(0, 200)}`);
         for (const e of a.errs) console.log(`      💥 ដើម ៖ ${String(e).slice(0, 200)}`);
         if (b.errs.length > a.errs.length) bad++;

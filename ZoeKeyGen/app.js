@@ -2313,10 +2313,12 @@ function renderQrInto(container, text) {
     return true;
 }
 
+const QR_MAX_MODULES = 177;
+
 function downloadQrPng(text, fileName) {
     const code = makeQrCode(text);
     if (!code) return false;
-    const modules = code.getModuleCount();
+    const modules = Math.min(code.getModuleCount(), QR_MAX_MODULES);
     const cell = 8;
     const quiet = cell * 4;
     const size = modules * cell + quiet * 2;

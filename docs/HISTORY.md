@@ -1774,6 +1774,16 @@ run 36877553261 (merge PR #277) ៖ ផ្នែក 3/4 ធ្លាក់ `pari
 ម៉ោងដែលធ្លាក់ក្នុងបង្អួចផ្ទុក (ដេរីវេពី `HARNESS_CLOCK_START` ពិត · `BOOT_WINDOW_MS` ដដែលនឹង `pauseAt`) ប្រៀបជា `<ម៉ោងផ្ទុក>` ក្នុងអេក្រង់ · ម៉ោងក្រៅបង្អួច
 នៅប្រៀបពេញ។ វាស់ ៖ probe `DEEP_NET_DELAY_MS=1200 DEEP_NET_DELAY_ONLY=old` ➜ ស្គ្រីបមុនកែធ្លាក់ **៦ ជំហានដូច CI បេះបិទ** · ក្រោយកែ **៧៩/៧៩**។
 
+CI ពេញក្នុង session លើ `f2e4148` ៖ ១៩៤ ពេញលេញ · **ធ្លាក់ ៥** ➜ ជួសជុល ៖ (១) `shared-fns` ៖ `biometricPrfBytes` របស់ ZoeKeyGen ឥឡូវរុំ
+`biometricPrfEval()` ➜ ចូលក្រុម `EXPECTED_DIVERGENT` ក្រយៅដៃ/មុខ ជាមួយហេតុផល · (២) `loop-termination` ៖ រង្វិលជុំគូរ PNG របស់ QR ត្រូវការពិដាន ➜
+`QR_MAX_MODULES` (១៧៧ = QR version 40) · (៣) `keygen-supabase-admin` ៖ helper QR ថ្មីត្រូវស្រង់ចូល sandbox (QR កូដអញ្ជើញទទេ ➜ «QR = Link ពេញ» ធ្លាក់ ៖
+អ្នកយាមចាប់ការរៀបចំឡើងវិញត្រឹមត្រូវ) · (៤) `emu/supabase-rules-parity` ៖ **កំហុស harness** ៖ ការសរសេរក្លែង (probe mutation) ដែល rules ទាំង ២ បដិសេធ
+ត្រូវអនុវត្តជា owner ដូចការសរសេរពិតរបស់ App ➜ mutation `op` លើ root នៃ PATCH ច្រើនផ្លូវ ➜ `zoe_admin_write` បដិសេធផ្លូវ root ➜ checker គាំង
+(«owner write on Postgres failed») ខណៈ rules ទាំង ២ និយាយដូចគ្នា ➜ probe លែងត្រូវចម្លងជា owner · (៥) `sw-client-wiring` «`focus` ក្រោយពិដាន» ធ្លាក់ក្នុង
+CI ពេញ (lane browser ៤) · ឆ្លងពេលរត់ម្នាក់ឯង និង ៤ ច្បាប់ស្របគ្នា + busy loop (ទាំងកូដមុន/ក្រោយ ➜ **មិនទាន់បង្កើតឡើងវិញបាន**) ➜ យន្តការសង្ស័យ ៖ job
+`update()` មុនដែលនៅដំណើរការ ត្រូវរួម (spec) ➜ គ្មានការទាញ `sw.js` ថ្មី ➜ test រង់ចាំ job មុនចប់ (`settleUpdates()`) មុនថតចំនួន · ពិដានវិជ្ជមាន ៨ វិ.
+(ទិសផ្ទុយនៅ ៣ វិ.)។ ⛔ បើវាធ្លាក់ម្តងទៀត ៖ យន្តការនេះមិនមែនមូលហេតុ ➜ ត្រូវវាស់បន្ថែម។
+
 អ្នកយាមថ្មីក្នុងជុំ 2.47.1 (ធ្លាក់លើ tree មុនកែ) ៖ `keygen-biometric-test` +៦ (Android passkey · PRF ពី `create()` · `prf: {}` · បោះបង់ ≠ មិនគាំទ្រ) ·
 `layout-check` +១១ (QR ៨ ទំហំ ៖ ៤១២px ➜ ហួស ៣៨px · 💾 PNG ធៀបគ្រប់ module · ទិសផ្ទុយ) · `doc-scope-test` +៣ (ជួរលេខលាយ ៖ ២ កន្លែង) ·
 `ZoeW/tests/config-modal.test.tsx` +២ · `push-server.test.ts` +៦ · `push-client.test.tsx` +៥។

@@ -54,7 +54,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ចាកចេញ) · 🩺 ជួរ «ហាង (Supabase)» (ឈ្មោះ · សាខា · ថ្ងៃផុត) · «ទាញបញ្ជីពី ZTO» យកសាខាពីហាង · សៀវភៅក្នុង App ផ្នែក ៣ខ។
 - **ប្រអប់ Config** (សំណើម្ចាស់គម្រោង ក្រោយឃើញវានៅនិយាយតែ Firebase លើ deploy preview) ៖ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ➜ ស្កេន QR / Setup Link ពីអ្នកលក់
   **មុន** · បិទភ្ជាប់ Config Firebase **ក្រោម** (អតិថិជនចាស់ Reconfig បានដដែល) · សារពេលមិនទាន់ភ្ជាប់ ៖ «សូមភ្ជាប់ប្រព័ន្ធជាមុនសិន ៖ ស្កេន QR ឬបើក Setup Link
-  ពីអ្នកលក់!» · ⛔ គ្មានធាតុ `INTENTIONAL_UI` ៖ `parity:dom`/`live`/`deep` មិនបើកប្រអប់នេះ (វាមិន mount ពេលបិទ · probe ៖ គ្មានធាតុ ➜ នៅតែឆ្លង)។
+  ពីអ្នកលក់!» · parity ៖ `INTENTIONAL_UI` រំលងតែអត្ថបទណែនាំ (`h3` + `p` គ្មាន style) ➜ textarea · ប៊ូតុង · Sentry នៅប្រៀបធៀបដដែល។
 - **ZoeKeyGen** ៖ កាត **🏪 ហាង Supabase** ៖ ចូលជា Admin (`platform_admins`) · បង្កើតហាង + កូដអញ្ជើញម្ចាស់ហាង + Setup Link/QR · កូដអញ្ជើញបុគ្គលិក ·
   ពន្យារ · បិទ/បើកវិញ · កូដប្តូរពាក្យសម្ងាត់ · CSP `connect-src` + `https://*.supabase.co`។
 - ការរកឃើញដោយអ្នកយាមថ្មី (មុន commit) ៖ ZoeKeyGen ទទួល URL ដែលមានពាក្យសម្ងាត់ (`https://:pw@…`) ខណៈ ZoeW បដិសេធ ➜ Link ដែល ZoeW មិនទទួល ·
@@ -1667,6 +1667,14 @@ SMS + Pro)។ ការងាររៀបចំលើ ៤ commit (`8ff2d6e` ➜ 
   ➜ មិនដែលវាស់)។ ការបង្កើតឡើងវិញក្នុងស្រុក (worktree ស្អាត · `npm ci` · deps root ដូច CI) **ឆ្លង** ព្រោះម៉ាស៊ីននេះមាន Chromium ស្រាប់ ➜ probe ៖ ប្តូរផ្លូវ
   Chromium ទៅថតទទេ ➜ ធ្លាក់ ៣ វិ. `executable doesn't exist`។ ការកែ ៖ ទាញ Chromium **មុន** build + ភ្ជាប់ `/opt/pw-browsers/chromium` · ជំហាន build
   បង្ហាញ output/stderr ពេញពេលធ្លាក់ (ផ្លូវ tree យកពី stdout តែប៉ុណ្ណោះ)។
+- **probe ដែលវាស់ build ចាស់ ➜ សន្និដ្ឋានខុស** ៖ ក្រោយកែប្រអប់ Config ខ្ញុំដកធាតុ `INTENTIONAL_UI` ចេញ ព្រោះ «គ្មានធាតុ ➜ `parity:dom` នៅតែឆ្លង»
+  ➜ CI លើ GitHub ក្រហម (`parity:dom` ៧២២/៧២០ · `live` · `deep` ៧៩/៧៩) ៖ ប្រអប់ mount ជានិច្ច។ `parity-dom.mjs` វាស់ **`dist/`** (មិនមែន `dist-parity/`
+  ដែលខ្ញុំទើប build) ហើយ `dist/` នៅជា build **មុន** ការកែ ➜ សញ្ញា ៖ ចំនួនធាតុក្នុងស្រុក ៧១៥/៧១៥ ≠ CI ៧២០។ probe ឡើងវិញលើ build ស្រស់ ៖ គ្មានធាតុ ➜ ៧២២/៧២០ ·
+  មានធាតុ ➜ ៧១៥/៧១៥ ➜ ធាតុត្រឡប់មកវិញ។ ⛔ មុនជឿ probe ត្រូវបញ្ជាក់ថា artifact ដែលវាស់មានការកែ (`grep` អត្ថបទថ្មីក្នុង bundle) — សំណួរ ១៣ លើ **build** មិនត្រឹម `*_APP_DIR`។
+- **`smoke` ក្រហមតែលើ GitHub** ៖ `console.error: Failed to load resource: … 401` ➜ `syncServerTime()` (`license-verify.js`) អាន root License Project
+  (`/.json?shallow=true` · default-deny ➜ 401 ដោយចេតនា ៖ ត្រូវការតែ header `Date`)។ ក្នុងស្រុក proxy ទប់ ➜ `ERR_…` ➜ ត្រូវតម្រង ➜ បៃតង ➜ smoke **អាស្រ័យលើ
+  បរិស្ថាន** (មានលើ `main` តាំងពី React · មិនដែលរត់លើ GitHub)។ ការកែ ៖ smoke ផ្តាច់រាល់ការហៅទៅក្រៅ (`page.route` ➜ `abort`) · probe ៖ ក្លែង 401 លើ host License ➜
+  មុនកែធ្លាក់ដូច CI · ក្រោយកែឆ្លង។
 - ⚠️ រូបថតផ្ទាំងក្នុង Chromium នៅទីនេះ ៖ គ្មាន font ខ្មែរក្នុងប្រព័ន្ធ ➜ អក្សរបាក់ រហូតដល់ផ្ទុក **Kantumruy Pro** ពិត (`document.fonts.load`) — មិនមែនកំហុស App។
 
 ### ការសម្រេច ៖ មិនផ្ទេរទៅ Supabase (2026-09-30)

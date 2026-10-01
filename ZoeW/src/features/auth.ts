@@ -84,7 +84,7 @@ export function setupAuthListener() {
 
 export function loginWithFirebase() {
     if (!firebaseState.auth) {
-        alert("សូមកំណត់រចនាសម្ព័ន្ធ FirebaseConfig ជាមុនសិន!");
+        alert("សូមភ្ជាប់ប្រព័ន្ធជាមុនសិន ៖ ស្កេន QR ឬបើក Setup Link ពីអ្នកលក់!");
         checkPinAndOpenConfig();
         return;
     }

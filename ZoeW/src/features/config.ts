@@ -285,6 +285,7 @@ export function saveFirebaseConfig() {
             : "ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
     }
     closeModal('configModal');
+    closeModal('loginModal');
     initFirebase();
     showLiveToast('config');
 }

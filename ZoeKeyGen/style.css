@@ -389,5 +389,9 @@ input[type="checkbox"]:focus-visible,
 }
 .sb-link-output { word-break: break-all; }
 .sb-qr { margin-top: 10px; text-align: center; }
+.qr-box { margin-top: 10px; display: flex; justify-content: center; }
+.qr-box:empty { display: none; }
+.qr-box svg { display: block; width: 100%; max-width: 280px; height: auto; aspect-ratio: 1 / 1; border-radius: var(--radius-md); }
+.qr-save-btn { width: 100%; margin-top: 10px; }
 .sb-member { display: inline-block; margin: 0 4px 2px 0; }
 #sbAdminPanel { margin-top: 12px; }

@@ -23,6 +23,7 @@ vi.mock('../src/platform/document-io', async (orig) => {
 });
 
 import { ConfigModal } from '../src/app/components/modals/ConfigModal';
+import { LoginModal } from '../src/app/components/modals/LoginModal';
 import { viewState } from '../src/core/view-state';
 import { securityState, uiState } from '../src/core/state';
 import { fieldValue } from '../src/app/refs';
@@ -30,6 +31,8 @@ import { appLocalStore } from '../src/core/storage';
 import { applySetupLinkText, openConfigModal, parseSetupLinkText, saveFirebaseConfig, selectConfigBackend } from '../src/features/config';
 import { decodeConfigQrDataUrl, handleConfigQrResult } from '../src/features/config-qr';
 import { clearPendingInvite, hasPendingInvite } from '../src/features/account';
+import { openModalHelper } from '../src/ui/modal';
+import { initFirebase } from '../src/services/firebase-init';
 import { byId, mount, step, unmount } from './native/react-harness';
 
 const SB = { supabaseUrl: 'https://abcd1234.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24) };
@@ -99,6 +102,44 @@ describe('ប្រអប់ Config ៖ ជ្រើស Firebase / Supabase', ()
         step(() => { (byId('firebaseConfigInput') as HTMLTextAreaElement).value = 'const firebaseConfig = ' + JSON.stringify(FB) + ';'; });
         step(() => saveFirebaseConfig());
         expect(JSON.parse(appLocalStore!.getItem('zoew_firebase_config')!)).toEqual(FB);
+    });
+});
+
+describe('⛔ រក្សាទុក Config ➜ ប្រអប់ចូលប្រព័ន្ធរបស់ប្រព័ន្ធចាស់មិនលេចមួយភ្លែត', () => {
+    // ម្ចាស់គម្រោងរាយការណ៍ ៖ Config ចាស់ Firebase (មិនទាន់ចូល ➜ ប្រអប់ចូលប្រព័ន្ធបើកនៅខាងក្រោម) ➜ បើក Setup Link/⚙️ ➜ រក្សាទុក
+    // Config Supabase ➜ ប្រអប់ «អ៊ីមែល/User ID» លេចមួយភ្លែត (ខណៈ chunk Supabase កំពុងផ្ទុក) រួចបាត់ពេល session ស្តារ។ ប្រអប់នោះជារបស់
+    // ប្រព័ន្ធចាស់ ➜ ត្រូវបិទពេលរក្សាទុក · auth របស់ប្រព័ន្ធថ្មីជាអ្នកសម្រេចបើកវាវិញ (គ្មាន session ➜ `showLoginModalWithPrefill()`)
+    it('រក្សាទុក Config Supabase ពីលើប្រអប់ចូលប្រព័ន្ធ ➜ បិទទាំង ២ ភ្លាម មុន initFirebase', () => {
+        vi.mocked(initFirebase).mockClear();
+        let loginAtInit = '';
+        vi.mocked(initFirebase).mockImplementation((() => { loginAtInit = String(uiState.modalDisplay.loginModal); return Promise.resolve(true); }) as any);
+        unmount();
+        mount(<><ConfigModal /><LoginModal /></>);
+        step(() => openModalHelper('loginModal'));
+        expect(uiState.modalDisplay.loginModal).toBe('flex');
+        step(() => { openConfigModal(); selectConfigBackend('supabase'); });
+        step(() => {
+            (byId('sbUrlInput') as HTMLInputElement).value = SB.supabaseUrl;
+            (byId('sbKeyInput') as HTMLInputElement).value = SB.supabaseKey;
+        });
+        step(() => saveFirebaseConfig());
+        expect(initFirebase).toHaveBeenCalledTimes(1);
+        expect(loginAtInit).toBe('none');
+        expect(uiState.modalDisplay.loginModal).toBe('none');
+        expect(uiState.modalDisplay.configModal).toBe('none');
+        vi.mocked(initFirebase).mockReset();
+    });
+
+    it('ទិសផ្ទុយ ៖ Config ខុស ➜ មិនរក្សាទុក ➜ ប្រអប់ចូលប្រព័ន្ធនៅដដែល', () => {
+        (window as any).alert = () => {};
+        vi.mocked(initFirebase).mockClear();
+        unmount();
+        mount(<><ConfigModal /><LoginModal /></>);
+        step(() => openModalHelper('loginModal'));
+        step(() => { openConfigModal(); selectConfigBackend('supabase'); });
+        step(() => saveFirebaseConfig());
+        expect(initFirebase).not.toHaveBeenCalled();
+        expect(uiState.modalDisplay.loginModal).toBe('flex');
     });
 });
 

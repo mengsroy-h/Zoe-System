@@ -39,6 +39,44 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.47.1] — 2026-10-01 · ZoeW · ZoeKeyGen `2.24.1` ៖ **Push សម្រាប់ហាង Supabase (គ្មាន Activation Key) · ប្រអប់ចូលប្រព័ន្ធលែងលេចមួយភ្លែតពេលរក្សាទុក Config · ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android · QR ចំកណ្តាល + 💾 រក្សាទុក QR · លេខ «1–3650»**
+
+**ZoeW `2.47.1`** (`zoew-v251` ➜ `zoew-v252`) · **ZoeKeyGen `2.24.1`** (`zoekeygen-v111` ➜ `zoekeygen-v112`)។ ម្ចាស់គម្រោងរាយការណ៍ (រូបថត) ៖
+«ZoeW ការជូនដំណឹងទាមទារ Activate key ទាំងដែលប្រើ supabase ហើយ» · «ពេលចុច save config ឃើញលេច modal login email password មួយភ្លែតហើយបាត់វិញ» ·
+«ZoeKeyGen biometric មិនគាំទ្រលើទូរស័ព្ទ» (ZoeW ដើរលើទូរស័ព្ទដដែល) · «ZoeKeyGen QR code អត់ចំកណ្តាល ហើយសូមបន្ថែមឲ្យ save QR code បានផង» ·
+«(១–3650)»។ ⛔ Firebase rules **មិនប្រែ** · Supabase migration **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ZoeW ៖ ហាង Supabase បើក Push មិនបាន** — អត្តសញ្ញាណ Push ជា Activation Key តែមួយ ➜ ហាង Supabase (គ្មាន Key ដោយការរចនា) ទទួល
+  «⚠️ ឧបករណ៍នេះមិនទាន់ Activate» ជានិច្ច · គ្មានប៊ូតុងសាកម្តងទៀត ➜ ឥឡូវ App ផ្ញើ **session token** របស់គណនីហាង ➜ Function `push` ផ្ទៀងតាម
+  `my_account()` លើ Project ក្នុង env (`SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ដដែលនឹង «ទាញបញ្ជីពី ZTO») ➜ ការចុះឈ្មោះ · កាលវិភាគផុតកំណត់ ·
+  ការរំលឹកម៉ោង ៨ **តាមហាង** (ទូរស័ព្ទទាំងអស់ក្នុងហាងដដែលចែក index/កាលវិភាគ) · ហាងផុត/បិទ ➜ «⛔ ហាងនេះផុតកំណត់ ឬត្រូវបានបិទ» · session ខុស ➜
+  «សូមចូលប្រព័ន្ធម្តងទៀត» (ប៊ូតុងនៅសាកបាន) · ⛔ `requestPermission()` នៅមុន `await` ណាមួយ (token យកក្រោយ) · ហាង Firebase មិនប្រែ (Activation Key)។
+- 🐛 **ZoeW ៖ ប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែតពេលរក្សាទុក Config** — Config ចាស់មិនទាន់ចូល ➜ ប្រអប់ចូលប្រព័ន្ធ (អ៊ីមែល/User ID) បើកនៅក្រោម ⚙️ ➜ រក្សាទុក ➜
+  ប្រអប់នោះនៅមើលឃើញ **ពេញរយៈ** ដែល Supabase ស្តារ session (token ផុត ➜ refresh តាមបណ្តាញ) រួចទើបបាត់ ➜ ឥឡូវ `saveFirebaseConfig()` បិទប្រអប់ចូលប្រព័ន្ធ
+  របស់ប្រព័ន្ធចាស់ ➜ auth របស់ប្រព័ន្ធថ្មីជាអ្នកសម្រេច (គ្មាន session ➜ បើកវិញ)។ វាស់ក្នុង Chromium ពិត (Firebase SDK ពិត ➜ Supabase · refresh ពន្យារ ១,៥ វិ.) ៖
+  មុនកែ ប្រអប់លេច **១,៥ វិ.** · ក្រោយកែ បិទភ្លាមពេលរក្សាទុក។
+- 🐛 **ZoeKeyGen ៖ ក្រយៅដៃ/មុខ «មិនគាំទ្រ» លើ Android** — credential ត្រូវបង្កើតជា `residentKey: 'discouraged'` ➜ Android (Google Password Manager)
+  ផ្តល់ PRF តែលើ **passkey** (discoverable) ➜ `prf.enabled: false` ➜ «មិនគាំទ្រ» ក្លែងក្លាយ ➜ ឥឡូវ `residentKey: 'required'` · PRF ដែល `create()`
+  ផ្តល់ផ្ទាល់ ➜ ប្រើភ្លាម (ស្កេនតែម្តង) · `prf: {}` គ្មាន `enabled` ➜ សួរ `get()` · ⛔ បោះបង់ការស្កេនទី ២ លែងរាយ «មិនគាំទ្រ PRF» (toast «បោះបង់») ·
+  សារមិនគាំទ្រណែនាំ «លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager»។ ⛔ PRF-only ដដែល (គ្មានរបៀបរក្សា PIN ធម្មតា)។
+- 🐛 **ZoeKeyGen ៖ QR មិនចំកណ្តាល** — Setup Link ពិត (Config + DSN ~៧០០ តួ ➜ QR ~៩៥ module) គូរជា SVG ទទឹងថេរ **៣៨៨px** ➜ ធំជាងកាតលើទូរស័ព្ទ ➜
+  `text-align: center` ដាក់កណ្តាលមិនបាន ➜ ហៀរស្តាំ (វាស់ ៖ ៤១២px ➜ ហួសគែម **៣៨px** · ៣២០px ➜ **១៣០px**) ➜ ឥឡូវ SVG ពង្រីក/បង្រួមតាមកាត (ពិដាន
+  ២៨០px · ការ៉េ · ចំកណ្តាល) · ផ្លូវតែមួយ `renderQrInto()` (Setup Link + កូដអញ្ជើញ)។
+- **ZoeKeyGen ៖ 💾 រក្សាទុក QR (រូបភាព)** ក្រោម QR Setup Link និង QR កូដអញ្ជើញ ➜ ទាញយក PNG (៨px ក្នុងមួយ module · quiet zone ៤ module) ➜ ផ្ញើតាម chat ·
+  បោះពុម្ព · អតិថិជនស្កេនពីរូបភាពក្នុង «🖼️ QR ពីរូបភាព» របស់ ZoeW។
+- **ZoeKeyGen ៖ លេខ** — «ពន្យារហាង … (១–3650)» · «សុពលភាព … ១–3650» ➜ «1–3650» (ក្បាលជួរខ្មែរ · ចុងជួរជាថេរ JS ឡាតាំង)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Deploy site ទាំង ២** (Netlify ៖ `zoew` · `zoekeygen`)។ ⛔ Netlify env របស់ site ZoeW ត្រូវមាន `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` (កំណត់រួចសម្រាប់
+   ZTO ➜ Push ប្រើវាដដែល · គ្មាន ➜ ហាង Supabase ឃើញ «Server មិនទាន់កំណត់ការជូនដំណឹង»)។
+2. សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 ➜ «🔔 បើកការជូនដំណឹង» ➜ ✅ · ទូរស័ព្ទទី ២ ក្នុងហាងដដែល ➜ បើក ➜ ការរំលឹកម៉ោង ៨ មកទាំង ២ ·
+   ZoeKeyGen លើ Android Chrome ➜ ⚙️ ➜ ក្រយៅដៃ/មុខ ➜ ជ្រើស Google Password Manager ពេលបង្កើត passkey ➜ បើកជោគជ័យ ➜ ប្រអប់ PIN ស្កេនក្រយៅដៃ ·
+   Tab 🔗 Link ➜ QR ចំកណ្តាល · 💾 ➜ PNG ស្កេនបានពី ZoeW «🖼️ QR ពីរូបភាព»។
+3. ⛔ Firebase rules · Supabase migration **មិនប្រែ** ➜ គ្មាន Publish/paste។
+
 ### [2.47.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.24.0` ៖ **toast និយាយឈ្មោះ backend ពិត · ប្រអប់ Config ជ្រើស Firebase/Supabase · បិទភ្ជាប់ Setup Link · QR ពីរូបភាព · icon គ្មានគែមស · ZoeKeyGen ៖ Tab លើទូរស័ព្ទ · ក្រយៅដៃ/មុខ · Signing Key ផុតពីសតិក្រោយ ១៥ នាទី**
 
 **ZoeW `2.47.0`** (`zoew-v250` ➜ `zoew-v251`) · **ZoeKeyGen `2.24.0`** (`zoekeygen-v110` ➜ `zoekeygen-v111`)។ សំណើម្ចាស់គម្រោង ៖ «toast នៅនិយាយ
@@ -1727,6 +1765,18 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### `zoew-parity` ក្រហមលើ main ម្តងទៀត ៖ «13:00:01» ធៀប «13:00:00» មកពី **បង្អួចផ្ទុក** (2026-10-01 · `ZoeW/scripts/parity-deep.mjs`)
+
+run 36877553261 (merge PR #277) ៖ ផ្នែក 3/4 ធ្លាក់ `parity:deep` **៦ ជំហាន** ដោយភាពខុសគ្នាតែមួយ ៖ «ទាញយកចុងក្រោយ 13:00:01» (ដើម) ធៀប «13:00:00» (ថ្មី) ខណៈ
+ការកែមុន (គ្រប់ការរំកិលឆ្លង `advance()`) ចាក់សោតែម៉ោងក្រោយ `pauseAt`។ មូលហេតុទី ២ ៖ `session()` ទុកនាឡិកា **ហូរតាមម៉ោងពិត** ពី `HARNESS_CLOCK_START`
+ដល់ `pauseAt(+10 វិ.)` (ការផ្ទុកទំព័រត្រូវការ timer ពិត) ➜ ការទាញតារាងអតិថិជនពេលផ្ទុកបោះត្រា `Date.now()` តាម **ល្បឿនម៉ាស៊ីន** (App នីមួយៗ)។ ⛔ ការកែ ៖
+ម៉ោងដែលធ្លាក់ក្នុងបង្អួចផ្ទុក (ដេរីវេពី `HARNESS_CLOCK_START` ពិត · `BOOT_WINDOW_MS` ដដែលនឹង `pauseAt`) ប្រៀបជា `<ម៉ោងផ្ទុក>` ក្នុងអេក្រង់ · ម៉ោងក្រៅបង្អួច
+នៅប្រៀបពេញ។ វាស់ ៖ probe `DEEP_NET_DELAY_MS=1200 DEEP_NET_DELAY_ONLY=old` ➜ ស្គ្រីបមុនកែធ្លាក់ **៦ ជំហានដូច CI បេះបិទ** · ក្រោយកែ **៧៩/៧៩**។
+
+អ្នកយាមថ្មីក្នុងជុំ 2.47.1 (ធ្លាក់លើ tree មុនកែ) ៖ `keygen-biometric-test` +៦ (Android passkey · PRF ពី `create()` · `prf: {}` · បោះបង់ ≠ មិនគាំទ្រ) ·
+`layout-check` +១១ (QR ៨ ទំហំ ៖ ៤១២px ➜ ហួស ៣៨px · 💾 PNG ធៀបគ្រប់ module · ទិសផ្ទុយ) · `doc-scope-test` +៣ (ជួរលេខលាយ ៖ ២ កន្លែង) ·
+`ZoeW/tests/config-modal.test.tsx` +២ · `push-server.test.ts` +៦ · `push-client.test.tsx` +៥។
 
 ### CI លើ main ក្រហម · Release APK ធ្លាក់ · CI GitHub យឺត ២៣ នាទី (2026-10-01 · `audit-tools/` · `ZoeW/scripts/` · workflow តែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ)
 

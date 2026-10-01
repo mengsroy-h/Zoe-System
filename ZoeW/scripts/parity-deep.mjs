@@ -128,6 +128,18 @@ async function scrollQuiet(p) {
     }
 }
 
+/* ── ម៉ោងនៃបង្អួចផ្ទុក ↔ ម៉ោងពិត ────────────────────────────────────────
+ * `session()` ទុកនាឡិកា **ហូរតាមម៉ោងពិត** ពី `HARNESS_CLOCK_START` រហូតដល់ `pauseAt(+10 វិ.)` (ការផ្ទុកទំព័រត្រូវការ timer ពិត)
+ * ➜ ត្រាដែល App បោះក្នុងបង្អួចនោះ (ឧ. «ទាញយកចុងក្រោយ» របស់ការទាញតារាងអតិថិជនពេលផ្ទុក) អាស្រ័យលើ **ល្បឿនម៉ាស៊ីន** មិនមែនលើ App
+ * (វាស់បាន ៖ CI លើ main ធ្លាក់ ៦ ជំហាន ដោយ «13:00:01» ធៀប «13:00:00» តែប៉ុណ្ណោះ)។ ⛔ ក្រោយ `pauseAt` នាឡិកាឈប់ ➜ ម៉ោងនៅក្រៅបង្អួច
+ * នៅប្រៀបពេញ។ បង្អួចដេរីវេពី `HARNESS_CLOCK_START` ពិត (ទម្រង់ `getFormattedClockTime()` · Asia/Phnom_Penh) មិនមែន literal។ */
+const BOOT_WINDOW_MS = 10000;
+const bootClockParts = (ms) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Phnom_Penh', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(ms);
+const BOOT_WINDOW_TIMES = Array.from({ length: BOOT_WINDOW_MS / 1000 }, (_, i) => bootClockParts(HARNESS_CLOCK_START + i * 1000));
+if (new Set(BOOT_WINDOW_TIMES).size !== BOOT_WINDOW_TIMES.length) throw new Error('បង្អួចផ្ទុក ៖ ម៉ោងស្ទួន ' + BOOT_WINDOW_TIMES.join(','));
+const BOOT_WINDOW_RE = new RegExp('\\b(?:' + BOOT_WINDOW_TIMES.join('|') + ')\\b', 'g');
+const stableTree = (tree) => String(tree).replace(BOOT_WINDOW_RE, '<ម៉ោងផ្ទុក>');
+
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const oldSrv = await serveDir(OLD_DIR);
 const newSrv = await serveDir(NEW_DIR);
@@ -245,7 +257,7 @@ async function session(port, extraStorage = {}, zto = null) {
     //    ដែលលេចលើអេក្រង់ (ម៉ោងស្កេន) និងក្នុង DB ស្មើគ្នាបេះបិទ។ បើទុកឲ្យ
     //    ហូរ App ដែលរត់ជំហានក្រោយបន្តិច ឃើញម៉ោងខុស ២ វិនាទី ➜ ភាពខុសគ្នា
     //    ក្លែងក្លាយរាល់ជំហាន (វាស់បាន ៖ 13:00:14 ធៀប 13:00:12)។
-    await page.clock.pauseAt(HARNESS_CLOCK_START + 10000);
+    await page.clock.pauseAt(HARNESS_CLOCK_START + BOOT_WINDOW_MS);
     await advance(page, 2000);
     return { ctx, page, errors, dialogs, appsScript, ztoCalls, mark: 0, dialogMark: 0, errMark: 0, asMark: 0, toastMark: 0, ztoMark: 0 };
 }
@@ -460,6 +472,7 @@ const firstDiff = (x, y) => {
 
 async function state(S) {
     const snap = await S.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI });
+    snap.tree = stableTree(snap.tree);
     const toastAll = await S.page.evaluate(() => window.__toastLog || []);
     const toasts = toastAll.slice(S.toastMark).join(' ‖ ');
     S.toastMark = toastAll.length;
@@ -489,7 +502,7 @@ async function runScenario(title, steps, storage = {}, zto = null) {
     const A = await session(oldSrv.port, storage, zto);
     const B = await session(newSrv.port, storage, zto);
     await state(A); await state(B);   // មូលដ្ឋាន ៖ ការសរសេរពេលផ្ទុកត្រូវ parity-live វាស់រួច
-    let prevTree = (await A.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI })).tree;
+    let prevTree = stableTree((await A.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI })).tree);
     const DEBUG = () => ({
         modals: Array.from(document.querySelectorAll('.modal')).filter((m) => m.style.display === 'flex').map((m) => m.id),
         siFileMsg: (document.getElementById('siFileMsg') || {}).textContent,

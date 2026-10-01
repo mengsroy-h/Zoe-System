@@ -24,6 +24,7 @@ export const PUSH_SEND_TIMEOUT_MS = 6000;
 export const PUSH_READ_TIMEOUT_MS = 4000;
 export const PUSH_RUN_BUDGET_MS = 20000;
 export const PUSH_LICENSE_CACHE_MS = 10 * 60 * 1000;
+export const PUSH_IDENTITY_CACHE_MAX = 500;
 export const PUSH_TTL_SECONDS = 24 * 60 * 60;
 export const PUSH_TITLE_MAX = 120;
 export const PUSH_BODY_MAX = 240;
@@ -74,7 +75,7 @@ export function settleWithin(run, timeoutMs) {
 
 export function readPushConfig(env) {
     const e = env || {};
-    const cfg = { vapid: null, fcm: null, licenseDbUrl: LICENSE_DB_URL_DEFAULT, reasons: [] };
+    const cfg = { vapid: null, fcm: null, supabase: null, licenseDbUrl: LICENSE_DB_URL_DEFAULT, reasons: [] };
     const pub = b64urlDecode(String(e.VAPID_PUBLIC_KEY || '').trim());
     const priv = b64urlDecode(String(e.VAPID_PRIVATE_KEY || '').trim());
     if (pub && priv && pub.length === 65 && pub[0] === 4 && priv.length === 32) {
@@ -107,7 +108,36 @@ export function readPushConfig(env) {
     }
     const dbRaw = String(e.LICENSE_DB_URL || '').trim().replace(/\/+$/, '');
     if (dbRaw && /^https:\/\/[a-z0-9-]+\.(firebaseio\.com|[a-z0-9-]+\.firebasedatabase\.app)$/.test(dbRaw)) cfg.licenseDbUrl = dbRaw;
+    cfg.supabase = readSupabaseIdentity(e);
+    if (!cfg.supabase) cfg.reasons.push('supabase:unset');
     return cfg;
+}
+
+export function readSupabaseIdentity(env) {
+    const rawUrl = String((env && env.SUPABASE_URL) || '').trim();
+    const key = String((env && env.SUPABASE_PUBLISHABLE_KEY) || '').trim();
+    if (!rawUrl || !key || /^sb_secret_/i.test(key)) return null;
+    let url;
+    try { url = new URL(rawUrl); } catch (_) { return null; }
+    const local = url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+    if (url.protocol !== 'https:' && !local) return null;
+    if (url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) return null;
+    return { base: url.origin, issuer: url.origin + '/auth/v1', key: key };
+}
+
+export function jwtPayload(token) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3 || parts.some((p) => !/^[A-Za-z0-9_-]+$/.test(p))) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+        return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+export function supabaseTenantKeyId(tenantId) {
+    return 'SB' + crypto.createHash('sha256').update('zoew-push-tenant|' + String(tenantId)).digest('hex').slice(0, 32).toUpperCase();
 }
 
 export function encryptWebPushPayload(payload, uaPublicB64, authSecretB64, options) {
@@ -257,6 +287,45 @@ export function createPushService(deps) {
         return verdict;
     }
 
+    async function verifySupabase(token) {
+        const sb = cfg.supabase;
+        if (!sb) return { ok: false, status: 503, reason: 'supabase:unset' };
+        const payload = jwtPayload(token);
+        if (!payload || payload.iss !== sb.issuer || payload.role !== 'authenticated' || typeof payload.sub !== 'string' || !payload.sub) {
+            return { ok: false, status: 403, reason: 'supabase:session' };
+        }
+        const exp = Number(payload.exp) * 1000;
+        if (!isFinite(exp) || exp <= now()) return { ok: false, status: 403, reason: 'supabase:session' };
+        const cacheKey = 'sb:' + crypto.createHash('sha256').update(sb.issuer + '|' + token).digest('hex');
+        const cached = licenseCache.get(cacheKey);
+        if (cached && cached.until > now()) return cached.verdict;
+        const res = await fetchJson(sb.base + '/rest/v1/rpc/my_account', {
+            method: 'POST',
+            headers: { apikey: sb.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: '{}'
+        });
+        if (res.status === 401 || res.status === 403) return { ok: false, status: 403, reason: 'supabase:session' };
+        if (!res.ok || res.body === undefined) return { ok: false, status: 503, reason: 'supabase:unverified' };
+        const rows = Array.isArray(res.body) ? res.body : [];
+        const row = rows.length === 1 && rows[0] && typeof rows[0] === 'object' ? rows[0] : null;
+        let verdict;
+        if (!row || typeof row.tenant_id !== 'string' || !row.tenant_id) verdict = { ok: false, status: 403, reason: 'supabase:account' };
+        else if (row.status !== 'active') verdict = { ok: false, status: 403, reason: 'supabase:inactive' };
+        else verdict = { ok: true, keyId: supabaseTenantKeyId(row.tenant_id) };
+        if (licenseCache.size >= PUSH_IDENTITY_CACHE_MAX) {
+            const oldest = licenseCache.keys().next();
+            if (!oldest.done) licenseCache.delete(oldest.value);
+        }
+        licenseCache.set(cacheKey, { until: Math.min(exp, now() + PUSH_LICENSE_CACHE_MS), verdict: verdict });
+        return verdict;
+    }
+
+    function verifyIdentity(credential) {
+        if (credential && typeof credential === 'object' && typeof credential.supabase === 'string') return verifySupabase(credential.supabase);
+        const license = credential && typeof credential === 'object' ? credential.license : credential;
+        return verifyLicense(license);
+    }
+
     async function readJson(key) {
         const out = await store.getWithMetadata(key, { type: 'json' });
         return out ? { data: out.data, etag: out.etag } : null;
@@ -274,8 +343,8 @@ export function createPushService(deps) {
         return null;
     }
 
-    async function subscribe(licenseKey, rawSub, platform) {
-        const lic = await verifyLicense(licenseKey);
+    async function subscribe(credential, rawSub, platform) {
+        const lic = await verifyIdentity(credential);
         if (!lic.ok) return lic;
         const norm = normalizeSubscription(rawSub);
         if (!norm.ok) return { ok: false, status: 400, reason: norm.reason };
@@ -321,8 +390,8 @@ export function createPushService(deps) {
         return { ok: true, status: 200 };
     }
 
-    async function saveSchedule(licenseKey, times) {
-        const lic = await verifyLicense(licenseKey);
+    async function saveSchedule(credential, times) {
+        const lic = await verifyIdentity(credential);
         if (!lic.ok) return lic;
         if (!Array.isArray(times) || times.length > PUSH_SCHEDULE_MAX_TIMES) return { ok: false, status: 400, reason: 'schedule:shape' };
         const at = now();
@@ -578,6 +647,7 @@ export function createPushService(deps) {
     return {
         config: cfg,
         verifyLicense: verifyLicense,
+        verifySupabase: verifySupabase,
         subscribe: subscribe,
         unsubscribe: unsubscribe,
         saveSchedule: saveSchedule,
@@ -647,9 +717,10 @@ export async function handlePushRequest(req, service, nowFn) {
     } catch (_) { body = null; }
     if (!body || typeof body !== 'object') return jsonResponse(400, { ok: false, reason: 'body:json' });
     let out;
-    if (op === 'subscribe') out = await service.subscribe(body.license, body.sub, body.platform);
+    const credential = typeof body.supabase === 'string' ? { supabase: body.supabase } : { license: body.license };
+    if (op === 'subscribe') out = await service.subscribe(credential, body.sub, body.platform);
     else if (op === 'unsubscribe') out = await service.unsubscribe(body.sub);
-    else if (op === 'schedule') out = await service.saveSchedule(body.license, body.times);
+    else if (op === 'schedule') out = await service.saveSchedule(credential, body.times);
     else return jsonResponse(404, { ok: false, reason: 'op' });
     return jsonResponse(out.status || (out.ok ? 200 : 400), { ok: !!out.ok, reason: out.reason || '' });
 }

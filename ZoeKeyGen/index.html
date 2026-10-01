@@ -165,7 +165,8 @@ const firebaseConfig = {
             <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
             <div class="key-output" id="setupLinkResultText" style="word-break:break-all;"></div>
             <button class="btn-secondary" style="width:100%;" data-act="copySetupLink">📋 ចម្លង Link</button>
-            <div id="setupLinkQrContainer" style="margin-top:10px; text-align:center;"></div>
+            <div id="setupLinkQrContainer" class="qr-box"></div>
+            <button class="btn-secondary qr-save-btn" style="width:100%;" data-act="saveSetupLinkQr">💾 រក្សាទុក QR (រូបភាព)</button>
         </div>
     </div>
 
@@ -257,7 +258,8 @@ const firebaseConfig = {
                     <button class="btn-secondary" data-act="copySbInviteLink">📋 ចម្លង Setup Link</button>
                     <button class="btn-secondary" data-act="copySbInviteCode">📋 ចម្លងកូដ</button>
                 </div>
-                <div id="sbInviteQrContainer" class="sb-qr"></div>
+                <div id="sbInviteQrContainer" class="sb-qr qr-box"></div>
+                <button type="button" id="sbInviteQrSaveBtn" class="btn-secondary qr-save-btn hidden" data-act="saveSbInviteQr">💾 រក្សាទុក QR (រូបភាព)</button>
             </div>
             <div class="table-wrap">
                 <table>

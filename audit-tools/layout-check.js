@@ -18,6 +18,18 @@ const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': '
 const SIZES = [{ w: 320, h: 568 }, { w: 360, h: 640 }, { w: 412, h: 780 }, { w: 768, h: 1024 },
                { w: 834, h: 1112 }, { w: 932, h: 430 }, { w: 1280, h: 800 }, { w: 1440, h: 900 }];
 
+// Setup Link ប្រវែងពិត ៖ Config Firebase ពេញ + DSN ➜ ~៧០០ តួ ➜ QR ~៩០ module (ទំហំដែលអតិថិជនពិតទទួល)
+const QR_PROBE = {
+    base: 'https://zoew-shop.netlify.app',
+    config: JSON.stringify({ apiKey: 'AIza' + 'Sy' + 'x'.repeat(33), authDomain: 'zoe-shop-123.firebaseapp.com',
+        databaseURL: 'https://zoe-shop-123-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'zoe-shop-123',
+        storageBucket: 'zoe-shop-123.appspot.com', messagingSenderId: '123456789012', appId: '1:123456789012:web:' + 'a'.repeat(22) }),
+    dsn: 'https://' + 'b'.repeat(32) + '@o123456.ingest.sentry.io/1234567',
+    inviteLink: 'https://zoew-shop.netlify.app/?setup=' + Buffer.from(JSON.stringify({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co',
+        supabaseKey: 'sb_publishable_' + 'k'.repeat(30), invite: 'ABCD-EFGH-IJKL-MNOP-QRST' })).toString('base64')
+};
+const QR_PROBE_TEXT = QR_PROBE.base + '/?setup=' + Buffer.from(QR_PROBE.config).toString('base64') + 'x'.repeat(120);
+
 let pass = 0, fail = 0;
 const ok = (n) => { console.log('  ok    ' + n); pass++; };
 const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')); fail++; };
@@ -283,6 +295,66 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                 }
             }
 
+            // ⛔ QR របស់ ZoeKeyGen (Setup Link · កូដអញ្ជើញ) ៖ Link ពិតវែង (Config + DSN ➜ ~៧០០ តួ ➜ QR ~៩០ module) ➜ SVG ទំហំថេរ
+            //    (`cellSize` × module) ធំជាងកាតលើទូរស័ព្ទ ➜ `text-align: center` មិនអាចដាក់កណ្តាលធាតុធំជាងកន្សោម ➜ ហៀរស្តាំ (រូបថតម្ចាស់គម្រោង)។
+            //    វាស់តាម `renderQrInto()` ពិត ៖ ការ៉េ · ក្នុងកាត · គម្លាតឆ្វេង ≈ ស្តាំ · គ្រប់ទំហំអេក្រង់។
+            if (app === 'ZoeKeyGen') {
+                const qrGeo = await page.evaluate((cfg) => {
+                    if (typeof generateSetupLink !== 'function' || typeof renderSbInviteResult !== 'function' || typeof switchKgTab !== 'function') {
+                        return { skip: 'រក generateSetupLink/renderSbInviteResult/switchKgTab មិនឃើញ' };
+                    }
+                    document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; m.classList.remove('active'); });
+                    const host = document.getElementById('appContainer');
+                    const hostHidden = host && host.classList.contains('hidden');
+                    if (hostHidden) host.classList.remove('hidden');
+                    const measure = (id) => {
+                        const box = document.getElementById(id);
+                        const svg = box && box.querySelector('svg');
+                        const card = box && box.closest('.app-card');
+                        if (!svg || !card) return { id, missing: !box ? 'box' : !svg ? 'svg' : 'card' };
+                        const r = svg.getBoundingClientRect();
+                        const cr = card.getBoundingClientRect();
+                        const cs = getComputedStyle(card);
+                        const inL = cr.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+                        const inR = cr.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+                        return { id, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10,
+                            left: Math.round((r.left - inL) * 10) / 10, right: Math.round((inR - r.right) * 10) / 10 };
+                    };
+                    const reveal = (id) => {
+                        const out = [];
+                        for (let el = document.getElementById(id); el && el !== document.body; el = el.parentElement) {
+                            if (el.classList.contains('hidden')) { el.classList.remove('hidden'); out.push(el); }
+                        }
+                        return out;
+                    };
+                    const list = [];
+                    switchKgTab('link');
+                    document.getElementById('setupLinkUrlInput').value = cfg.base;
+                    document.getElementById('setupLinkConfigInput').value = cfg.config;
+                    document.getElementById('setupLinkDsnInput').value = cfg.dsn;
+                    generateSetupLink();
+                    list.push(measure('setupLinkQrContainer'));
+                    document.getElementById('setupLinkResultBox').classList.add('hidden');
+                    document.getElementById('setupLinkQrContainer').innerHTML = '';
+                    switchKgTab('shop');
+                    const shown = reveal('sbInviteResultBox');
+                    sbLastInvite = { link: cfg.inviteLink, code: 'ABCD-EFGH', role: 'owner', tenantName: 'Zoe', untilText: '—' };
+                    renderSbInviteResult();
+                    list.push(measure('sbInviteQrContainer'));
+                    sbLastInvite = null;
+                    document.getElementById('sbInviteQrContainer').innerHTML = '';
+                    document.getElementById('sbInviteResultBox').classList.add('hidden');
+                    shown.forEach((el) => el.classList.add('hidden'));
+                    switchKgTab('create');
+                    if (hostHidden) host.classList.add('hidden');
+                    return { list };
+                }, QR_PROBE);
+                const qrBad = (qrGeo.list || []).filter((q) => q.missing || !(q.w >= 160 && Math.abs(q.w - q.h) <= 1
+                    && q.left >= -0.5 && q.right >= -0.5 && Math.abs(q.left - q.right) <= 1.5));
+                check(!qrGeo.skip && (qrGeo.list || []).length === 2 && qrBad.length === 0,
+                    label + ': QR (Setup Link · កូដអញ្ជើញ) ការ៉េ · នៅក្នុងកាត · ចំកណ្តាល', qrGeo.skip || JSON.stringify(qrBad.length ? qrBad : qrGeo.list));
+            }
+
             if (DESKTOP[app] && (size.w === 412 || size.w === 1280 || size.w === 1440)) {
                 shape[size.w] = await cardRowsAt(page, DESKTOP[app]);
             }
@@ -309,6 +381,56 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
         // ហើយ `.trash-search-box input` ធ្លាប់ឈរ **មុន** `.modal-content input`
         // ➜ specificity ដូចគ្នា តែលំដាប់ចាញ់ ➜ ច្បាប់ទាំងអស់ស្លាប់ ➜
         // input រក្សា background + border-radius ➜ **ប្រអប់ក្នុងប្រអប់**។
+        // ⛔ «💾 រក្សាទុក QR» (ZoeKeyGen) ៖ ការទាញយកពិត (PNG) ➜ រូបភាពត្រូវជា QR **ដដែល** នឹង Link (ធៀបគ្រប់ module នឹង
+        //    `makeQrCode().isDark()` ពិត) · quiet zone ៤ module · គ្មាន Link ➜ មិនទាញយក (ទិសផ្ទុយ)
+        if (app === 'ZoeKeyGen') {
+            const ctx = await browser.newContext({ viewport: { width: 412, height: 900 }, acceptDownloads: true });
+            const page = await ctx.newPage();
+            page.on('dialog', (d) => d.dismiss().catch(() => {}));
+            await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(800);
+            const ready = await page.evaluate(() => typeof saveSetupLinkQr === 'function' && typeof saveSbInviteQr === 'function' && typeof makeQrCode === 'function');
+            check(ready, 'ZoeKeyGen ៖ មាន saveSetupLinkQr · saveSbInviteQr · makeQrCode');
+            const grab = async (setup, act) => { try {
+                await page.evaluate(setup, QR_PROBE_TEXT);
+                const dl = page.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+                await page.evaluate((a) => window[a](), act);
+                const d = await dl;
+                if (!d) return null;
+                const file = await d.path();
+                const buf = fs.readFileSync(file);
+                const verdict = await page.evaluate(async ([b64, text]) => {
+                    const img = new Image();
+                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data:image/png;base64,' + b64; });
+                    const code = makeQrCode(text);
+                    const n = code.getModuleCount();
+                    const cell = img.width / (n + 8);
+                    const c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    const g = c.getContext('2d');
+                    g.drawImage(img, 0, 0);
+                    const px = g.getImageData(0, 0, c.width, c.height).data;
+                    const dark = (x, y) => px[(Math.floor(y) * c.width + Math.floor(x)) * 4] < 128;
+                    let wrong = 0;
+                    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (dark((k + 4.5) * cell, (r + 4.5) * cell) !== code.isDark(r, k)) wrong++;
+                    let quietDark = 0;
+                    for (let i = 0; i < img.width; i += Math.max(1, Math.floor(cell / 2))) if (dark(i, cell) || dark(cell, i)) quietDark++;
+                    return { w: img.width, h: img.height, n, cell, wrong, quietDark };
+                }, [buf.toString('base64'), QR_PROBE_TEXT]);
+                return { name: d.suggestedFilename(), png: buf.slice(1, 4).toString() === 'PNG', ...verdict };
+            } catch (e) { return { error: String(e && e.message).split('\n')[0] }; } };
+            const setupDl = await grab((t) => { lastGeneratedSetupLink = t; }, 'saveSetupLinkQr');
+            check(!!setupDl && setupDl.png && /\.png$/.test(setupDl.name) && setupDl.w === setupDl.h && setupDl.cell >= 4
+                && Number.isInteger(setupDl.cell) && setupDl.wrong === 0 && setupDl.quietDark === 0,
+                'ZoeKeyGen ៖ 💾 QR Setup Link ➜ PNG ជា QR ដដែលនឹង Link (គ្រប់ module · quiet zone)', JSON.stringify(setupDl));
+            const inviteDl = await grab((t) => { sbLastInvite = { link: t, code: 'x', role: 'owner', tenantName: 'x', untilText: 'x' }; }, 'saveSbInviteQr');
+            check(!!inviteDl && inviteDl.png && inviteDl.wrong === 0 && inviteDl.name !== (setupDl && setupDl.name),
+                'ZoeKeyGen ៖ 💾 QR កូដអញ្ជើញ ➜ PNG ជា QR ដដែល (ឈ្មោះឯកសារដាច់ពី Setup Link)', JSON.stringify(inviteDl));
+            const none = await grab(() => { lastGeneratedSetupLink = ''; }, 'saveSetupLinkQr');
+            check(none === null, 'ZoeKeyGen ៖ ទិសផ្ទុយ ៖ គ្មាន Link ➜ មិនទាញយកអ្វីសោះ', JSON.stringify(none));
+            await ctx.close();
+        }
         if (app === 'ZoeW') {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
             const page = await ctx.newPage();

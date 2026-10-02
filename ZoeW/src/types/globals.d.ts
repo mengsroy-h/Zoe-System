@@ -24,6 +24,7 @@ declare global {
         ZoeErrors?: ZoeErrorsApi;
         ZoeLicense?: ZoeLicenseApi;
         firebaseSDK?: any;
+        loadFirebaseSDK?: () => void;
         XLSX?: any;
         ZXingWASM?: any;
         Sentry?: any;

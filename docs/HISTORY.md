@@ -39,6 +39,30 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
+### 🤝 Handoff សម្រាប់ session បន្ទាប់ (PR #279 · branch `claude/focused-brown-3xf7am` · មិនទាន់ merge)
+
+⛔ **ផ្ទៀងផ្ទាត់ស្ថានភាព git មុនជឿអត្ថបទនេះ** (`git log origin/main..origin/claude/focused-brown-3xf7am`)។ CI ៤ ផ្នែកបៃតងរហូតដល់ `4e08640`;
+commit loader ក្រោយនោះត្រូវរង់ចាំ CI។ ⛔ **កុំ merge** ដោយគ្មានការស្នើពីម្ចាស់គម្រោង (ច្បាប់ ១)។
+
+**ធ្វើរួចក្នុង PR នេះ** (លម្អិតក្នុងផ្នែក ១ [2.48.0] និងផ្នែក ២) ៖ Config ➜ Login ➜ ចុះឈ្មោះឆ្លាតវៃ · 🩺 License/ZTO Cookie · toast រស់និយាយការពិត ·
+✅ មិនស្ទួនពេលភ្ជាប់មកវិញ · Supabase Security Advisor ៧ ➜ ០ (SECURITY DEFINER ➜ `private`) · migration append-only + generator rules បង្កើតឯកសារថ្មី ·
+migration history លើ Project `xrobehzmmwjfxwkjysgg` repair រួច · ហាង Supabase មិនទាញ SDK Firebase · `CLAUDE.md` ជាអង់គ្លេស ទុកតែច្បាប់ + អ្នកយាមលេខកំណែ/កាលបរិច្ឆេទ ·
+`announcements.json` 2.48.0។
+
+**នៅសល់ (តាមលំដាប់)** ៖
+1. **CI លើ commit ចុងក្រោយ** ៖ ធ្លាក់ ➜ កែ (`RUNALL_ONLY=<checker>` មុន ➜ រត់ពេញ)។
+2. **ផ្ទៀងផ្ទាត់ Supabase ច្រើនជុំ** (សំណើម្ចាស់គម្រោង) ៖ ជុំ ១ (finder ៦ ៖ SQL authz · rules engine · Edge Functions · adapter ក្នុង App · ZoeKeyGen+Netlify ·
+   deploy/ops/tests) រត់ក្នុង session មុន — លទ្ធផលមិនបានកត់ទីនេះ ➜ **រត់ម្តងទៀត** (អាន repo + Postgres ពិតតាម `audit-tools/supabase-pg.js` · មិនកែ repo ·
+   កំហុសពិតនីមួយៗ ➜ អ្នកយាមមុន រួចកែ)។ ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
+3. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
+   `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` · (គ) chunk `supabase-backend` ក្នុងសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។
+4. **សម្អាត `docs/HISTORY.md`** (សំណើម្ចាស់គម្រោង · ពន្យារដោយចេតនា) ៖ ប្រវត្តិដែលលែងប្រើ ➜ `docs/HISTORY-ARCHIVE.md` ឬលុបចោល (ច្បាប់ ១២)។
+5. **Audit ដើមដែលនៅសល់** ៖ បណ្តាញ · សុវត្ថិភាព · ឯកសារ `.md` ទាំងអស់ធៀបកូដ។
+6. **ក្រោយ merge** ៖ integration អនុវត្ត migration `20261002000100` + deploy `register`/`reset-password` ➜ ពិនិត្យ Security Advisor · សាកលើឧបករណ៍ពិត (ធាតុ 2.48.0 ខាងក្រោម)
+   បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
+
+⛔ **សន្សំកូតា** ៖ រត់តែ checker ពាក់ព័ន្ធក្នុង session (`RUNALL_ONLY=…`) ហើយទុកឲ្យ CI លើ GitHub (៤ ផ្នែកស្របគ្នា ~១០ នាទី) វាស់ពេញ · ឆ្លើយម្ចាស់គម្រោងជាខ្មែរ។
+
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
@@ -136,6 +160,9 @@
 - 📦 **`@netlify/blobs` 11.1.1 ➜ 11.1.3** (ជំនាន់ចុងក្រោយ) — diff ក្នុង `dist` ៖ ប្តូរតែសារកំហុសពេលសរសេរ (`edgeAccess`) ➜ API ដែល Function ប្រើមិនប្រែ។
 - 📶 **toast រស់បញ្ចប់ដោយការពិត** — មុន toast «🔄 កំពុងតភ្ជាប់…» បាត់ស្ងាត់ពេលផុត ២០ វិ. ➜ អ្នកប្រើមិនដឹងថាចប់ឬនៅ។ ឥឡូវ «⚠️ … — យូរជាងធម្មតា App នៅ
   ព្យាយាមបន្ត» (Config ៖ + «សូមពិនិត្យ Config ឬអ៊ីនធឺណិត») ហើយជោគជ័យយឺត ➜ ✅ ម្តង (`expireLiveToast()`)។ សារ ⚠️ ក្រៅបណ្ដាញ ➜ បាត់ដូចដើម។
+- ⚡ **ហាង Supabase មិនទាញ SDK Firebase** — `firebase-loader.js` ទាញ SDK តែពេល Config មិនមែន Supabase (អាន storage មិនបាន ➜ ទាញដូចដើម · fail-open) ·
+  `waitForFirebaseSDK()` ហៅ `window.loadFirebaseSDK()` ពេលត្រូវការ (ប្តូរ Config ទៅ Firebase ក្នុងវគ្គដដែល ➜ ទាញភ្លាម មិនរង់ចាំ ១៥ វិ.)។ អ្នកយាម ៖
+  `ZoeW/tests/firebase-loader-gate.test.ts` (ធ្លាក់ ៣/៦ លើកូដមុនកែ)។
 - 🔑 **ZoeKeyGen ៖ Revoke · ពន្យារ · ចំនួនឧបករណ៍ · ដោះឧបករណ៍ ដែលព្យួរ (អស់ពេល ១៥ វិ.) ➜ «⏳ មិនទាន់បញ្ជាក់»** — RTDB ចាក់ការសរសេរក្នុងជួរ ហើយវាចុះ
   ពេលបណ្តាញមកវិញ ➜ មុន alert «មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ! / …មិនបានទេ! សូមប្រាកដថា Firebase Rules …» (កុហក ៖ ការកែនៅតែចុះ) ➜ admin ធ្វើម្តងទៀត ឬរករឿង
   Rules ខុសផ្លូវ។ ឥឡូវ «⏳ ការកែមិនទាន់បញ្ជាក់ទេ … សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនធ្វើម្តងទៀត» ហើយចុះយឺត ➜ «✅ … (ចុះយឺត)» + Refresh (`armAdminLateWrite()` ·

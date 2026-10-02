@@ -64,6 +64,8 @@ const EXPECT_PUBLIC_EXEC = {
     admin_issue_reset_code: ['authenticated'],
     reset_code_user: ['service_role'],
     consume_reset_code: ['service_role'],
+    claim_reset_code: ['service_role'],
+    settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
@@ -503,6 +505,71 @@ async function body(c, rec, extra, mode) {
     await c.query("update public.member_reset_codes set expires_at = now() - interval '1 second' where code_hash = $1", [rsHash3]);
     rec('កូដកំណត់ថ្មីផុតកំណត់ ➜ null', (await resetUser('sokha', rsHash3)) === null);
 
+    const claimId = '11111111-1111-4111-8111-111111111111';
+    const otherClaimId = '22222222-2222-4222-8222-222222222222';
+    const claim = async (username, hash, token, client = c) => {
+        const r = await as(client, SERVICE, 'select public.claim_reset_code($1, $2, $3) as id', [username, hash, token]);
+        return r.rows ? r.rows[0].id : r;
+    };
+    const settle = async (username, hash, token, consumed) => {
+        const r = await as(c, SERVICE, 'select public.settle_reset_code($1, $2, $3, $4) as ok', [username, hash, token, consumed]);
+        return r.rows ? r.rows[0].ok : r;
+    };
+    const newResetHash = async () => resetHashOf((await issueReset(ADMIN, 'sokha', 24)).rows[0].code);
+    for (const who of [ANON, WA, ADMIN]) {
+        rec(who.role + ' claim_reset_code ➜ permission denied', denied(await as(c, who,
+            'select public.claim_reset_code($1, $2, $3)', ['sokha', rsHash3, claimId])));
+        rec(who.role + ' settle_reset_code ➜ permission denied', denied(await as(c, who,
+            'select public.settle_reset_code($1, $2, $3, true)', ['sokha', rsHash3, claimId])));
+    }
+    rec('claim ៖ កូដប្រើរួច/ផុតកំណត់ត្រូវបដិសេធ', (await claim('sokha', rsHash2, claimId)) === null
+        && (await claim('sokha', rsHash3, claimId)) === null);
+    const claimHash = await newResetHash();
+    rec('claim ៖ username/hash ខុស ឬ claim ទទេត្រូវបដិសេធ', (await claim('dara', claimHash, claimId)) === null
+        && (await claim('sokha', '0'.repeat(64), claimId)) === null && (await claim('sokha', claimHash, null)) === null);
+    rec('claim ៖ កូដត្រូវបាន user id', (await claim('sokha', claimHash, claimId)) === uA1);
+    rec('claim ៖ retry សំណើដដែលបាន user ដដែល; សំណើផ្សេងចាញ់', (await claim('sokha', claimHash, claimId)) === uA1
+        && (await claim('sokha', claimHash, otherClaimId)) === null);
+    rec('lookup/consume ចាស់មិនរំលងការកក់ដែលកំពុងរង់ចាំ', (await resetUser('sokha', claimHash)) === null
+        && (await consume('sokha', claimHash)) === false);
+    rec('settle ៖ username/hash/claim ខុស ឬទទេមិនអាចដោះការកក់',
+        (await settle('dara', claimHash, claimId, false)) === false
+        && (await settle('sokha', '0'.repeat(64), claimId, false)) === false
+        && (await settle('sokha', claimHash, otherClaimId, false)) === false
+        && (await settle('sokha', claimHash, null, false)) === false
+        && (await settle('sokha', claimHash, claimId, null)) === false);
+    rec('settle ៖ username/hash/claim ខុសមិនអាចស៊ីកូដ',
+        (await settle('dara', claimHash, claimId, true)) === false
+        && (await settle('sokha', '0'.repeat(64), claimId, true)) === false
+        && (await settle('sokha', claimHash, otherClaimId, true)) === false);
+    rec('release ៖ ដោះការកក់ខ្លួន; retry ក្រោយចម្លើយបាត់មិនស្ទួន',
+        (await settle('sokha', claimHash, claimId, false)) === true
+        && (await settle('sokha', claimHash, claimId, false)) === true
+        && (await resetUser('sokha', claimHash)) === uA1);
+    rec('កូដដែលដោះរួចទទួលសំណើថ្មី; release ចាស់មិនដោះការកក់ថ្មី',
+        (await claim('sokha', claimHash, otherClaimId)) === uA1
+        && (await settle('sokha', claimHash, claimId, false)) === false
+        && (await claim('sokha', claimHash, claimId)) === null);
+    rec('ការស៊ីកូដដោយម្ចាស់ claim មិនស្ទួន', (await settle('sokha', claimHash, otherClaimId, true)) === true
+        && (await settle('sokha', claimHash, otherClaimId, true)) === true);
+    rec('កូដស៊ីរួចមិនអាចដោះឬកក់វិញ (សូម្បី claim ដដែល)',
+        (await settle('sokha', claimHash, otherClaimId, false)) === false
+        && (await settle('sokha', claimHash, claimId, true)) === false
+        && (await claim('sokha', claimHash, otherClaimId)) === null
+        && (await resetUser('sokha', claimHash)) === null);
+    const invalidatedHash = await newResetHash();
+    await claim('sokha', invalidatedHash, claimId);
+    const newerHash = await newResetHash();
+    rec('admin ចេញកូដថ្មីបិទ claim ចាស់; release មិនធ្វើឱ្យកូដចាស់រស់វិញ',
+        (await settle('sokha', invalidatedHash, claimId, false)) === false
+        && (await claim('sokha', invalidatedHash, claimId)) === null
+        && (await resetUser('sokha', invalidatedHash)) === null
+        && (await claim('sokha', newerHash, otherClaimId)) === uA1);
+    await c.query("update public.member_reset_codes set expires_at = now() - interval '1 second' where code_hash = $1", [newerHash]);
+    rec('ផុតកំណត់បិទ retry claim; ម្ចាស់អាចបញ្ចប់ Auth ដែលឆ្លើយយឺត',
+        (await claim('sokha', newerHash, otherClaimId)) === null
+        && (await settle('sokha', newerHash, otherClaimId, true)) === true);
+
     const addSession = async (uid, n) => {
         for (let i = 0; i < n; i++) {
             const sid = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [uid]))[0].id;
@@ -543,6 +610,23 @@ async function body(c, rec, extra, mode) {
     rec('ការប្រណាំង ២ ការតភ្ជាប់លើកូដ max_uses=1 ➜ ជោគជ័យតែ ១', first === true && raised(second, 'invite-invalid'), { first, second });
     const usedRace = (await one('select used_count from public.tenant_invites where code_hash = $1', [hRace]))[0].used_count;
     rec('ការប្រណាំង ➜ used_count = 1', usedRace === 1, usedRace);
+
+    const resetRaceHash = await newResetHash();
+    await c1.query('begin');
+    await c1.query('set local role service_role');
+    const resetFirst = await c1.query('select public.claim_reset_code($1, $2, $3) as id', ['sokha', resetRaceHash, claimId]);
+    let resetSecondFinished = false;
+    const resetSecondP = claim('sokha', resetRaceHash, otherClaimId, c2).then((value) => {
+        resetSecondFinished = true;
+        return value;
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    const resetSecondBlocked = !resetSecondFinished;
+    await c1.query('commit');
+    const resetSecond = await resetSecondP;
+    rec('ការកក់ reset ដំណាលគ្នាចូលជាជួរ; សំណើតែមួយបាន user id',
+        resetSecondBlocked && resetFirst.rows[0].id === uA1 && resetSecond === null, { resetSecondBlocked, resetSecond });
+    rec('ចម្លើយ claim បាត់៖ retry ដោយ id ឈ្នះបាន user ដដែល', (await claim('sokha', resetRaceHash, claimId, c2)) === uA1);
 }
 
 const MUTATIONS = [
@@ -579,9 +663,25 @@ const MUTATIONS = [
     ['new_invite_code ប្រើ byte ថេរ (version របស់ uuid)', 'array[0, 1, 2, 3, 4, 5, 7, 8,', 'array[0, 1, 2, 3, 4, 5, 6, 8,'],
     ['new_invite_code ប្រើតែ ៤ bit', '(get_byte(raw, positions[i]) & 31)', '(get_byte(raw, positions[i]) & 15)'],
     ['username លែង unique', "    username text not null unique check (username ~", "    username text not null check (username ~"],
-    ['reset_code_user មិនពិនិត្យ username', 'where r.code_hash = p_code_hash and m.username = p_username and not r.used', 'where r.code_hash = p_code_hash and not r.used'],
-    ['reset_code_user ទទួលកូដដែលប្រើរួច', 'and m.username = p_username and not r.used and r.expires_at > now()', 'and m.username = p_username and r.expires_at > now()'],
-    ['reset_code_user ទទួលកូដផុតកំណត់', 'and not r.used and r.expires_at > now()', 'and not r.used'],
+    ['reset_code_user មិនពិនិត្យ username', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and not r.used'],
+    ['reset_code_user ទទួលកូដដែលប្រើរួច', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and r.expires_at > now()'],
+    ['reset_code_user ទទួលកូដផុតកំណត់', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used'],
+    ['lookup ចាស់រំលងការកក់', 'where r.code_hash = p_code_hash and r.claim_id is null', 'where r.code_hash = p_code_hash'],
+    ['consume ចាស់រំលងការកក់', 'and m.username = p_username\n        and r.claim_id is null;', 'and m.username = p_username;'],
+    ['claim ទទួល request id ទទេ', '    if p_claim_id is null then return null; end if;\n', ''],
+    ['claim រំលងម្ចាស់ការកក់', '        and (r.claim_id is null or r.claim_id = p_claim_id)\n', ''],
+    ['claim ទទួលកូដប្រើរួច', '        and not r.used and r.expires_at > now()\n        and (r.claim_id is null',
+        '        and r.expires_at > now()\n        and (r.claim_id is null'],
+    ['claim ទទួលកូដផុតកំណត់', '        and not r.used and r.expires_at > now()\n        and (r.claim_id is null',
+        '        and not r.used\n        and (r.claim_id is null'],
+    ['settle ស៊ីកូដនៃ claim ផ្សេង', 'and m.username = p_username and r.claim_id = p_claim_id;', 'and m.username = p_username;'],
+    ['release ដោះ claim ផ្សេង', '            and (r.claim_id = p_claim_id or r.claim_id is null);', ';'],
+    ['release ទទួលកូដប្រើរួច/បិទដោយ admin', '            and m.username = p_username and not r.used\n', '            and m.username = p_username\n'],
+    ['claim/settle ផ្តល់សិទ្ធិដល់ authenticated', 'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role;',
+        'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role, authenticated;'],
     ['admin_issue_reset_code មិនបិទកូដចាស់', '    update public.member_reset_codes r set used = true where r.user_id = member_id and not r.used;\n', ''],
     ['admin_issue_reset_code គ្មានច្រកទ្វារ admin',
         "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_valid_hours is null or p_valid_hours not between 1 and 168",

@@ -26,9 +26,9 @@ export interface RegisterDeps {
 }
 
 export interface ResetDeps {
-    resetCodeUser(username: string, codeHash: string): Promise<string | null | undefined>;
+    claimResetCode(username: string, codeHash: string, claimId: string): Promise<string | null | undefined>;
     updatePassword(userId: string, password: string): Promise<UpdatePasswordResult>;
-    consumeResetCode(username: string, codeHash: string): Promise<boolean>;
+    settleResetCode(username: string, codeHash: string, claimId: string, consumed: boolean): Promise<boolean>;
     revokeSessions(userId: string): Promise<boolean>;
 }
 
@@ -110,13 +110,18 @@ export async function handleResetPassword(input: unknown, deps: ResetDeps): Prom
     const passwordIssue = passwordProblem(body.password);
     if (passwordIssue) return reply(400, passwordIssue);
     const codeHash = await resetCodeHash(code);
-    const userId = await deps.resetCodeUser(username, codeHash);
+    const claimId = crypto.randomUUID();
+    let userId = await deps.claimResetCode(username, codeHash, claimId);
+    if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);
     if (userId === undefined) return reply(502, 'db-unavailable');
     if (userId === null) return reply(403, 'reset-code-invalid');
     const updated = await deps.updatePassword(userId, body.password as string);
-    if (updated === 'weak') return reply(400, 'password-weak');
-    if (updated !== 'ok') return reply(502, 'auth-unavailable');
-    const consumed = (await deps.consumeResetCode(username, codeHash)) || (await deps.consumeResetCode(username, codeHash));
+    if (updated === 'weak') {
+        const released = (await deps.settleResetCode(username, codeHash, claimId, false)) || (await deps.settleResetCode(username, codeHash, claimId, false));
+        return released ? reply(400, 'password-weak') : reply(502, 'password-reset-unknown');
+    }
+    if (updated !== 'ok') return reply(502, 'password-reset-unknown');
+    const consumed = (await deps.settleResetCode(username, codeHash, claimId, true)) || (await deps.settleResetCode(username, codeHash, claimId, true));
     const revoked = (await deps.revokeSessions(userId)) || (await deps.revokeSessions(userId));
     return reply(200, consumed && revoked ? 'password-reset' : 'password-reset-incomplete');
 }

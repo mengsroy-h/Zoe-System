@@ -48,7 +48,7 @@ function finish() {
     console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
     process.exitCode = fail === 0 ? 0 : 1;
 }
-const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '');
+const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n') : '');
 const depPath = (rel) => DEPS_DIRS.map((d) => path.join(d, rel)).find((p) => fs.existsSync(p)) || null;
 
 const KEY = 'sb_secret_' + 'k'.repeat(40);
@@ -84,9 +84,9 @@ function fakeDeps(over) {
             return queue || { ok: true, tenantId: 't-1', role: 'member' };
         },
         deleteUser: async (id) => { log.push(['delete', id]); return over && 'deleted' in over ? over.deleted : true; },
-        resetCodeUser: async (u, h) => { log.push(['check', u, h]); return over && 'member' in over ? over.member : 'user-9'; },
+        claimResetCode: async (u, h, id) => { log.push(['check', u, h, id]); return over && Array.isArray(over.members) ? over.members.shift() : over && 'member' in over ? over.member : 'user-9'; },
         updatePassword: async (id, pw) => { log.push(['update', id, pw]); return over && over.update ? over.update : 'ok'; },
-        consumeResetCode: async (u, h) => { log.push(['consume', u, h]); return over && 'consumed' in over ? over.consumed : true; },
+        settleResetCode: async (u, h, id, consumed) => { log.push([consumed ? 'consume' : 'release', u, h, id]); return over && 'consumed' in over ? over.consumed : true; },
         revokeSessions: async (id) => { log.push(['revoke', id]); return over && 'revoked' in over ? over.revoked : true; },
         loginDomain: 'u.zoew.invalid'
     };
@@ -193,7 +193,7 @@ async function groupAccount(m, rec) {
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពិនិត្យដោយ username តូច + hash «zoe-reset:» (មិនមែន hash អញ្ជើញ)', !!chk && chk[1] === 'sokha' && chk[2] === wantReset, chk);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ប្តូរពាក្យសម្ងាត់របស់ user id ដែលកូដចង', !!upd && upd[1] === 'user-9' && upd[2] === 'new-secret', upd);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ លំដាប់ check ➜ update ➜ consume ➜ revoke (កូដមិនស៊ីមុនប្តូរជោគជ័យ)',
-        f.kinds() === 'check,update,consume,revoke' && !!cons && cons[2] === wantReset && JSON.stringify(f.log[3]) === JSON.stringify(['revoke', 'user-9']), f.kinds());
+        f.kinds() === 'check,update,consume,revoke' && !!cons && cons[2] === wantReset && cons[3] === chk[3] && /^[a-f0-9-]{36}$/.test(chk[3]) && JSON.stringify(f.log[3]) === JSON.stringify(['revoke', 'user-9']), f.kinds());
     f = fakeDeps({ revoked: false });
     r = await A.handleResetPassword(RESET, f.deps);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ផ្តាច់ session មិនបាន ➜ សាក ២ ដង ➜ 200 password-reset-incomplete (និយាយការពិត)',
@@ -207,14 +207,22 @@ async function groupAccount(m, rec) {
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ កូដមិនត្រូវនឹង username ➜ 403 reset-code-invalid · មិនប្តូរ', r.status === 403 && r.body.code === 'reset-code-invalid' && f.kinds() === 'check', { r, log: f.kinds() });
     f = fakeDeps({ member: undefined });
     r = await A.handleResetPassword(RESET, f.deps);
-    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ DB មិនឆ្លើយ ➜ 502 · មិនប្តូរ', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'check', { r, log: f.kinds() });
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ DB មិនឆ្លើយ ➜ សាក ២ ដង · 502 · មិនប្តូរ', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'check,check' && f.log[0][3] === f.log[1][3], { r, log: f.kinds() });
+    f = fakeDeps({ members: [undefined, 'user-9'] });
+    r = await A.handleResetPassword(RESET, f.deps);
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ចម្លើយចាប់កូដបាត់ ➜ សាកដោយ claim ដដែល · ប្តូរម្តង',
+        r.status === 200 && f.kinds() === 'check,check,update,consume,revoke' && f.log[0][3] === f.log[1][3] && f.log[0][3] === f.log[3][3], { r, log: f.kinds() });
     f = fakeDeps({ update: 'weak' });
     r = await A.handleResetPassword(RESET, f.deps);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពាក្យសម្ងាត់ខ្សោយ ➜ 400 password-weak · កូដមិនស៊ី · មិនផ្តាច់ session', r.status === 400 && r.body.code === 'password-weak'
-        && f.kinds() === 'check,update', { r, log: f.kinds() });
+        && f.kinds() === 'check,update,release', { r, log: f.kinds() });
+    f = fakeDeps({ update: 'weak', consumed: false });
+    r = await A.handleResetPassword(RESET, f.deps);
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពាក្យសម្ងាត់ខ្សោយ តែដោះ claim មិនបាន ➜ 502 password-reset-unknown',
+        r.status === 502 && r.body.code === 'password-reset-unknown' && f.kinds() === 'check,update,release,release', { r, log: f.kinds() });
     f = fakeDeps({ update: 'unavailable' });
     r = await A.handleResetPassword(RESET, f.deps);
-    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ GoTrue មិនឆ្លើយ ➜ 502 · កូដមិនស៊ី (សាកម្តងទៀតបាន)', r.status === 502 && r.body.code === 'auth-unavailable'
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ GoTrue មិនឆ្លើយ ➜ 502 password-reset-unknown · មិនដោះ claim', r.status === 502 && r.body.code === 'password-reset-unknown'
         && f.kinds() === 'check,update', { r, log: f.kinds() });
     const resetEarly = [
         ['body ជា array', [RESET], 'bad-request'],
@@ -228,6 +236,53 @@ async function groupAccount(m, rec) {
         r = await A.handleResetPassword(body, f.deps);
         rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ' + label + ' ➜ 400 ' + code + ' · មិនប៉ះ DB', r.status === 400 && r.body.code === code && f.log.length === 0, { r, log: f.kinds() });
     }
+}
+
+async function groupResetConcurrency(m, rec) {
+    let used = false;
+    let claim = null;
+    let releaseUpdate;
+    let signalUpdate;
+    const updateGate = new Promise((resolve) => { releaseUpdate = resolve; });
+    const updateStarted = new Promise((resolve) => { signalUpdate = resolve; });
+    const updates = [];
+    const deps = {
+        resetCodeUser: async () => used ? null : 'user-race',
+        claimResetCode: async (username, hash, claimId) => {
+            if (used || (claim !== null && claim !== claimId)) return null;
+            claim = claimId;
+            return 'user-race';
+        },
+        updatePassword: async (userId, password) => {
+            if (password === 'first-password') {
+                signalUpdate();
+                await updateGate;
+            }
+            updates.push(password);
+            return 'ok';
+        },
+        consumeResetCode: async () => { used = true; return true; },
+        settleResetCode: async (username, hash, claimId, consumed) => {
+            if (claim !== claimId) return false;
+            used = consumed;
+            if (!consumed) claim = null;
+            return true;
+        },
+        revokeSessions: async () => true
+    };
+    const body = { username: 'sokha', resetCode: INVITE, password: 'first-password' };
+    const first = m.account.handleResetPassword(body, deps);
+    let second;
+    try {
+        await m.timeout.withTimeout(updateStarted, 1000, 'first-update-not-started');
+        second = await m.timeout.withTimeout(m.account.handleResetPassword({ ...body, password: 'second-password' }, deps), 1000, 'second-reset-hung');
+    } finally {
+        releaseUpdate();
+    }
+    const firstResult = await first;
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ កូដតែមួយស្របពេលគ្នា ➜ ប្តូរតែម្តង · សំណើទីពីរបដិសេធមុនប៉ះ Auth',
+        firstResult.status === 200 && second.status === 403 && updates.length === 1 && updates[0] === 'first-password',
+        { firstResult, second, updates });
 }
 
 const ENV = {
@@ -354,13 +409,13 @@ async function startMock() {
             if (req.method === 'POST' && u === '/rest/v1/rpc/revoke_user_sessions') {
                 return body && body.p_user_id === FAIL_ID ? send(500, { code: 'XX000', message: 'x', details: null, hint: null }) : send(200, 2);
             }
-            if (req.method === 'POST' && u === '/rest/v1/rpc/reset_code_user') {
+            if (req.method === 'POST' && u === '/rest/v1/rpc/claim_reset_code') {
                 if (body && body.p_username === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
-                return send(200, body && body.p_username === 'sokha' && body.p_code_hash === 'good' ? USER_ID : null);
+                return send(200, body && body.p_username === 'sokha' && body.p_code_hash === 'good' && body.p_claim_id === USER_ID ? USER_ID : null);
             }
-            if (req.method === 'POST' && u === '/rest/v1/rpc/consume_reset_code') {
+            if (req.method === 'POST' && u === '/rest/v1/rpc/settle_reset_code') {
                 if (body && body.p_username === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
-                return send(200, !!body && body.p_username === 'sokha');
+                return send(200, !!body && body.p_username === 'sokha' && body.p_claim_id === USER_ID && typeof body.p_consumed === 'boolean');
             }
             if (req.method === 'POST' && u.startsWith('/functions/v1/')) return send(200, { ok: true });
             return send(404, { message: 'no route' });
@@ -412,18 +467,21 @@ async function groupAdapter(m, rec, env) {
     rec('ស្នាមភ្ជាប់ ៖ argument RPC invite_is_usable ស្មើ SQL ពិត', !!ur && !!wantU && JSON.stringify(Object.keys(ur.body).sort()) === JSON.stringify(wantU),
         { sent: ur && Object.keys(ur.body), wantU });
     rec('adapter ៖ invite_is_usable កំហុស ➜ null (មិនមែន false)', (await D.inviteIsUsable('err')) === null);
-    rec('adapter ៖ reset_code_user ➜ id / null', (await D.resetCodeUser('sokha', 'good')) === USER_ID && (await D.resetCodeUser('none', 'good')) === null);
-    const mr = last((x) => x.url === '/rest/v1/rpc/reset_code_user');
-    const wantM = sqlArgs(env.migrationSql, 'reset_code_user');
-    rec('ស្នាមភ្ជាប់ ៖ argument RPC reset_code_user ស្មើ SQL ពិត', !!mr && !!wantM && JSON.stringify(Object.keys(mr.body).sort()) === JSON.stringify(wantM),
+    rec('adapter ៖ claim_reset_code ➜ id / null', (await D.claimResetCode('sokha', 'good', USER_ID)) === USER_ID && (await D.claimResetCode('none', 'good', USER_ID)) === null);
+    const mr = last((x) => x.url === '/rest/v1/rpc/claim_reset_code');
+    const wantM = sqlArgs(env.migrationSql, 'claim_reset_code');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC claim_reset_code ស្មើ SQL ពិត', !!mr && !!wantM && JSON.stringify(Object.keys(mr.body).sort()) === JSON.stringify(wantM),
         { sent: mr && Object.keys(mr.body), wantM });
-    rec('adapter ៖ reset_code_user កំហុស ➜ undefined (មិនមែន null «កូដខុស»)', (await D.resetCodeUser('err', 'good')) === undefined);
-    rec('adapter ៖ consume_reset_code ➜ true / false', (await D.consumeResetCode('sokha', 'h')) === true && (await D.consumeResetCode('none', 'h')) === false);
-    const cr2 = last((x) => x.url === '/rest/v1/rpc/consume_reset_code');
-    const wantC = sqlArgs(env.migrationSql, 'consume_reset_code');
-    rec('ស្នាមភ្ជាប់ ៖ argument RPC consume_reset_code ស្មើ SQL ពិត', !!cr2 && !!wantC && JSON.stringify(Object.keys(cr2.body).sort()) === JSON.stringify(wantC),
+    rec('adapter ៖ claim_reset_code កំហុស ➜ undefined (មិនមែន null «កូដខុស»)', (await D.claimResetCode('err', 'good', USER_ID)) === undefined);
+    rec('adapter ៖ settle_reset_code ➜ true / false', (await D.settleResetCode('sokha', 'h', USER_ID, true)) === true && (await D.settleResetCode('none', 'h', USER_ID, true)) === false);
+    const cr2 = last((x) => x.url === '/rest/v1/rpc/settle_reset_code');
+    const wantC = sqlArgs(env.migrationSql, 'settle_reset_code');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC settle_reset_code ស្មើ SQL ពិត', !!cr2 && !!wantC && JSON.stringify(Object.keys(cr2.body).sort()) === JSON.stringify(wantC),
         { sent: cr2 && Object.keys(cr2.body), wantC });
-    rec('adapter ៖ consume_reset_code កំហុស ➜ false', (await D.consumeResetCode('err', 'h')) === false);
+    rec('adapter ៖ settle_reset_code កំហុស ➜ false', (await D.settleResetCode('err', 'h', USER_ID, true)) === false);
+    rec('adapter ៖ settle_reset_code ដោះ claim ➜ consumed=false និង claim id ដដែល', (await D.settleResetCode('sokha', 'h', USER_ID, false)) === true
+        && last((x) => x.url === '/rest/v1/rpc/settle_reset_code').body.p_consumed === false
+        && last((x) => x.url === '/rest/v1/rpc/settle_reset_code').body.p_claim_id === USER_ID);
     rec('adapter ៖ deleteUser ➜ DELETE /auth/v1/admin/users/<id>', (await D.deleteUser(USER_ID)) === true
         && !!last((x) => x.method === 'DELETE' && x.url.split('?')[0] === '/auth/v1/admin/users/' + USER_ID));
     rec('adapter ៖ deleteUser ធ្លាក់ ➜ false', (await D.deleteUser(FAIL_ID)) === false);
@@ -448,7 +506,7 @@ async function runGroups(m, env, stopOnFail) {
         results.push({ label, pass: !!cond, detail });
         if (!cond && stopOnFail) throw STOP;
     };
-    const groups = [['invite', groupInvite], ['account', groupAccount], ['http', groupHttp]];
+    const groups = [['invite', groupInvite], ['account', groupAccount], ['reset-concurrency', groupResetConcurrency], ['http', groupHttp]];
     if (env.createClient) groups.push(['adapter', groupAdapter]);
     for (const [name, fn] of groups) {
         try {
@@ -480,16 +538,18 @@ const MUTATIONS = [
     ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);\n', ''],
     ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!finished.ok && finished.reason === 'unavailable') finished = await deps.finishRegistration(request);\n", ''],
     ['account-core.ts', 'reset មិនពិនិត្យកូដ', "    if (userId === null) return reply(403, 'reset-code-invalid');\n", "    if (userId === null) return reply(200, 'password-reset');\n"],
-    ['account-core.ts', 'reset ស៊ីកូដមុនប្តូរពាក្យសម្ងាត់', "    const updated = await deps.updatePassword(userId, body.password as string);\n    if (updated === 'weak') return reply(400, 'password-weak');\n    if (updated !== 'ok') return reply(502, 'auth-unavailable');\n    const consumed = (await deps.consumeResetCode(username, codeHash)) || (await deps.consumeResetCode(username, codeHash));\n",
-        "    const consumed = (await deps.consumeResetCode(username, codeHash)) || (await deps.consumeResetCode(username, codeHash));\n    const updated = await deps.updatePassword(userId, body.password as string);\n    if (updated === 'weak') return reply(400, 'password-weak');\n    if (updated !== 'ok') return reply(502, 'auth-unavailable');\n"],
+    ['account-core.ts', 'reset មិនសាក claim ដដែល', "    if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);\n", ''],
+    ['account-core.ts', 'reset claim សាកដោយ id ថ្មី', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, crypto.randomUUID());'],
+    ['account-core.ts', 'reset ពាក្យសម្ងាត់ខ្សោយមិនដោះ claim', 'const released = (await deps.settleResetCode(username, codeHash, claimId, false)) || (await deps.settleResetCode(username, codeHash, claimId, false));', 'const released = true;'],
+    ['account-core.ts', 'reset ប្តូរពាក្យសម្ងាត់មុន claim', '    const claimId = crypto.randomUUID();', "    await deps.updatePassword('user-race', body.password as string);\n    const claimId = crypto.randomUUID();"],
     ['account-core.ts', 'reset ប្រើ hash អញ្ជើញ', '    const codeHash = await resetCodeHash(code);', '    const codeHash = await inviteCodeHash(code);'],
     ['account-core.ts', 'មិនផ្តាច់ session ក្រោយកំណត់ថ្មី', "    const revoked = (await deps.revokeSessions(userId)) || (await deps.revokeSessions(userId));", '    const revoked = true;'],
     ['account-core.ts', 'reset រាយជោគជ័យពេញលេញទោះស៊ីកូដមិនបាន', "consumed && revoked ? 'password-reset'", "revoked ? 'password-reset'"],
     ['http.ts', 'loginDomain មិនបង្ខំ .invalid', " || !loginDomain.endsWith('.invalid')", ''],
     ['admin-deps.ts', 'revokeSessions ជឿកំហុស', "                return !error && typeof data === 'number';", '                return true;'],
-    ['admin-deps.ts', 'consumeResetCode ជឿកំហុស', "                return !error && data === true;", '                return !error;'],
-    ['admin-deps.ts', 'resetCodeUser កំហុស ➜ null', "                if (error) return undefined;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async consumeResetCode",
-        "                if (error) return null;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async consumeResetCode"],
+    ['admin-deps.ts', 'settleResetCode ជឿកំហុស', "                return !error && data === true;", '                return !error;'],
+    ['admin-deps.ts', 'claimResetCode កំហុស ➜ null', "                if (error) return undefined;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async settleResetCode",
+        "                if (error) return null;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async settleResetCode"],
     ['account-core.ts', 'មិនកំណត់ ៧២ byte', "    if (new TextEncoder().encode(raw).length > PASSWORD_MAX_BYTES) return 'password-long';\n", ''],
     ['http.ts', 'មិនបដិសេធ origin មិនស្គាល់', "    if (origin !== null && !allowed) return json(403, { ok: false, code: 'origin-denied' }, cors);\n", ''],
     ['http.ts', 'មិនកំណត់ទំហំ body', '            if (total > maxBytes) {', '            if (false) {'],
@@ -593,18 +653,18 @@ async function main() {
     if (tscBin && sdkTypes && corsTypes && sdkVersion) {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-sbtsc-'));
         const conf = {
-            extends: path.join(SB, 'tsconfig.json'),
-            compilerOptions: { paths: { ['npm:@supabase/supabase-js@' + sdkVersion]: [sdkTypes], ['npm:@supabase/supabase-js@' + sdkVersion + '/cors']: [corsTypes] } },
-            include: [path.join(FN_DIR, '**', '*.ts'), path.join(SB, 'types', '*.d.ts')]
+            extends: path.join(SB, 'tsconfig.json').replace(/\\/g, '/'),
+            compilerOptions: { paths: { ['npm:@supabase/supabase-js@' + sdkVersion]: [sdkTypes.replace(/\\/g, '/')], ['npm:@supabase/supabase-js@' + sdkVersion + '/cors']: [corsTypes.replace(/\\/g, '/')] } },
+            include: [path.join(FN_DIR, '**', '*.ts'), path.join(SB, 'types', '*.d.ts')].map((p) => p.replace(/\\/g, '/'))
         };
         fs.writeFileSync(path.join(tmp, 'tsconfig.json'), JSON.stringify(conf));
         const r = cp.spawnSync(process.execPath, [tscBin, '-p', path.join(tmp, 'tsconfig.json'), '--listFiles'], { encoding: 'utf8', timeout: 120000 });
         fs.rmSync(tmp, { recursive: true, force: true });
         const out = String(r.stdout || '') + String(r.stderr || '');
-        const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR)).length;
+        const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR.replace(/\\/g, '/'))).length;
         ok('tsc strict ៖ ០ កំហុស (ឯកសារ function ដែលពិនិត្យ ' + checked + ')', r.status === 0 && checked >= tsFiles.length && tsFiles.length >= 7,
             out.split('\n').filter((l) => /error TS/.test(l)).slice(0, 8));
-        ok('tsc ៖ type មកពី supabase-js ពិត (មិនមែន any)', out.includes(sdkTypes));
+        ok('tsc ៖ type មកពី supabase-js ពិត (មិនមែន any)', out.includes(sdkTypes.replace(/\\/g, '/')));
     } else {
         skipPart('គ្មាន typescript/supabase-js ➜ tsc មិនបានរត់');
     }

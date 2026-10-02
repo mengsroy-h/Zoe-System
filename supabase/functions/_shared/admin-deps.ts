@@ -70,9 +70,9 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return false;
             }
         },
-        async resetCodeUser(username: string, codeHash: string): Promise<string | null | undefined> {
+        async claimResetCode(username: string, codeHash: string, claimId: string): Promise<string | null | undefined> {
             try {
-                const { data, error } = await withTimeout(Promise.resolve(client.rpc('reset_code_user', { p_username: username, p_code_hash: codeHash })), timeoutMs, 'timeout');
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('claim_reset_code', { p_username: username, p_code_hash: codeHash, p_claim_id: claimId })), timeoutMs, 'timeout');
                 if (error) return undefined;
                 if (data === null) return null;
                 return typeof data === 'string' ? data : undefined;
@@ -80,9 +80,9 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return undefined;
             }
         },
-        async consumeResetCode(username: string, codeHash: string): Promise<boolean> {
+        async settleResetCode(username: string, codeHash: string, claimId: string, consumed: boolean): Promise<boolean> {
             try {
-                const { data, error } = await withTimeout(Promise.resolve(client.rpc('consume_reset_code', { p_username: username, p_code_hash: codeHash })), timeoutMs, 'timeout');
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('settle_reset_code', { p_username: username, p_code_hash: codeHash, p_claim_id: claimId, p_consumed: consumed })), timeoutMs, 'timeout');
                 return !error && data === true;
             } catch {
                 return false;

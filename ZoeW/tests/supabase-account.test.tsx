@@ -160,6 +160,25 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         expect(calls.some((c) => c[0] === 'signIn')).toBe(false);
     });
 
+    it('Supabase ៖ លទ្ធផលប្តូរពាក្យសម្ងាត់មិនដឹង ➜ សារណែនាំសាកចូលមុនសុំកូដថ្មី', async () => {
+        const { fb, calls } = fakeSupabaseFb();
+        fb.resetReply = { status: 502, body: { ok: false, code: 'password-reset-unknown' } };
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
+        setFieldValue('resetUsernameInput', 'dara');
+        setFieldValue('resetCodeInput', 'CODE-1');
+        setFieldValue('resetPasswordInput', 'newpass99');
+        setFieldValue('resetPasswordConfirmInput', 'newpass99');
+        await submitResetPasswordForm();
+        await settle();
+        expect(alerts.join(' ')).toMatch(/សាកចូល/);
+        expect(alerts.join(' ')).toMatch(/កូដថ្មី/);
+        expect(viewState.loginMode).toBe('reset');
+        expect(calls.map((c) => c[0])).toEqual(['reset']);
+    });
+
     it('Supabase ៖ ប្តូរពាក្យសម្ងាត់ ➜ ផ្ញើ username + resetCode ➜ ត្រឡប់ទៅ Modal ចូល ជាមួយ username', async () => {
         const { fb, calls } = fakeSupabaseFb();
         firebaseState.fb = fb;

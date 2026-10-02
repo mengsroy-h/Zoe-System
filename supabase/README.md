@@ -56,7 +56,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 
 `code` ពេលបរាជ័យ (ZoeW បកប្រែជាអក្សរខ្មែរ) ៖ `bad-request` · `invite-invalid` · `username-invalid` · `password-short` · `password-long` (លើស ៧២ byte) ·
 `password-weak` · `username-taken` · `reset-code-invalid` · `account-invalid` · `origin-denied` · `body-too-large` · `server-unconfigured` · `db-unavailable` ·
-`auth-unavailable` · `registration-unknown` (សូមសាក Login មុនចុះឈ្មោះម្តងទៀត) · `registration-incomplete` · `password-reset-incomplete` (ពាក្យសម្ងាត់ប្តូររួច
+`auth-unavailable` · `password-reset-unknown` (សាកចូលដោយពាក្យសម្ងាត់ថ្មីជាមុន; បើចូលមិនបាន សុំកូដថ្មីពីអ្នកលក់) · `registration-unknown` (សូមសាក Login មុនចុះឈ្មោះម្តងទៀត) · `registration-incomplete` · `password-reset-incomplete` (ពាក្យសម្ងាត់ប្តូររួច
 តែឧបករណ៍ចាស់ខ្លះនៅចូលបានរហូតដល់វាចាកចេញ) · `internal`។
 
 ### លំហូរ
@@ -68,7 +68,8 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 3. **បុគ្គលិក** ៖ អ្នកលក់ចុច «🎟️ កូដអញ្ជើញ» លើហាងដែលមានម្ចាស់រួច ➜ កូដ «បុគ្គលិក» (role `member`)។
 4. **Login ប្រចាំថ្ងៃ** ៖ ឈ្មោះគណនី + ពាក្យសម្ងាត់ (ZoeW បម្លែងជា `username@<loginDomain>` ខាងក្នុង)។
 5. **ភ្លេចពាក្យសម្ងាត់** ៖ អ្នកលក់ចេញ **កូដប្តូរពាក្យសម្ងាត់** (ZoeKeyGen) ➜ អតិថិជនចុច **🔑 ភ្លេចពាក្យសម្ងាត់?** ក្នុងប្រអប់ចូលរបស់ ZoeW ➜ វាយកូដ + ពាក្យសម្ងាត់ថ្មី ➜
-   session ចាស់ទាំងអស់ត្រូវផ្តាច់។
+   session ចាស់ទាំងអស់ត្រូវផ្តាច់។ កូដត្រូវកក់សម្រាប់សំណើតែមួយ; ពាក្យសម្ងាត់ខ្សោយដែល Server បដិសេធច្បាស់ ➜ កូដអាចប្រើវិញ។
+   លទ្ធផល Auth មិនដឹង ➜ កូដនៅជាប់ការកក់ (គ្មានការដោះតាមពេលវេលា) ដើម្បីរាំងសំណើដដែលសរសេរជាន់ពាក្យសម្ងាត់។
 6. **ផុតកំណត់ / បិទហាង** ៖ គណនីទាំងអស់របស់ហាងនោះចាកចេញ ហើយចូលមិនបាន រហូតដល់អ្នកលក់ពន្យារ ឬបើកវិញ។
 
 ## របៀបប្រើប្រាស់

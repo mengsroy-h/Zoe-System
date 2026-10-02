@@ -20,6 +20,7 @@ export const ACCOUNT_REPLY_TEXT = {
     'password-weak': 'ពាក្យសម្ងាត់នេះខ្សោយពេក ឬធ្លាប់លេចធ្លាយលើអ៊ីនធឺណិត — សូមជ្រើសពាក្យសម្ងាត់ផ្សេង (លាយអក្សរ និងលេខ)',
     'username-taken': 'ឈ្មោះគណនីនេះមានគេប្រើរួច — សូមជ្រើសឈ្មោះផ្សេង',
     'reset-code-invalid': 'កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ ប្រើរួច ឬផុតកំណត់ — សូមសុំកូដថ្មីពីអ្នកលក់',
+    'password-reset-unknown': 'មិនទាន់ដឹងលទ្ធផលនៃការប្តូរពាក្យសម្ងាត់ — សូមសាកចូលដោយពាក្យសម្ងាត់ថ្មីជាមុន។ បើចូលមិនបាន សូមទាក់ទងអ្នកលក់ដើម្បីសុំកូដថ្មី',
     'registration-unknown': 'មិនដឹងថាការចុះឈ្មោះបានសម្រេចឬអត់ — សូមសាកចូលប្រព័ន្ធដោយឈ្មោះ និងពាក្យសម្ងាត់ដដែល មុនចុះឈ្មោះម្តងទៀត',
     'registration-incomplete': 'ការចុះឈ្មោះមិនពេញលេញ — សូមទាក់ទងអ្នកលក់',
     'account-invalid': 'គណនីនេះមិនត្រឹមត្រូវ — សូមទាក់ទងអ្នកលក់',
@@ -278,7 +279,7 @@ export async function submitResetPasswordForm(event?) {
         viewState.loginBusy = false;
     }
     if (!reply.ok) {
-        alert('ប្តូរពាក្យសម្ងាត់មិនបាន៖ ' + accountReplyText(reply.code));
+        alert((reply.code === 'password-reset-unknown' ? '' : 'ប្តូរពាក្យសម្ងាត់មិនបាន៖ ') + accountReplyText(reply.code));
         return;
     }
     setFieldValue('resetCodeInput', '');

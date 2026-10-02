@@ -28,6 +28,10 @@ const EXPECTED_DIVERGENT = new Set([
     // `normalizeSupabaseConfig()`) ចំណែក ZoeKeyGen ភ្ជាប់តែ License Project Firebase ➜ ផ្នែក Firebase ក្នុង function ទាំង ២ នៅដូចគ្នា
     // (`firebase-config-paste-test` វាស់សារកំហុសរបស់ App ទាំង ២ លើ input ដដែល)
     'normalizeFirebaseConfig', 'firebaseConfigErrorMessage',
+    // ZoeW ទាញ SDK Firebase តាមតម្រូវការ ពេលប្តូរ Config Supabase ➜ Firebase (`window.loadFirebaseSDK`) ចំណែក ZoeKeyGen
+    // ទាញ SDK ពេលបើកជានិច្ច ព្រោះវាភ្ជាប់តែ License Project Firebase។ ផ្លូវ ZoeW វាស់ដោយ `firebase-loader-gate.test.ts`
+    // (មាន SDK រួច · ប្តូរ Config · ទាញម្តងគត់ · storage បោះ) និង `sdk-surface`។
+    'waitForFirebaseSDK',
     // ក្រយៅដៃ/មុខ ៖ ZoeKeyGen ទទួល **តែ** WebAuthn PRF (គ្មានរបៀបរក្សា PIN ធម្មតា ➜ `enrollBiometricRecord` ត្រឡប់ `unsupported`) ·
     // UI ជា DOM ផ្ទាល់ (`#pinBiometricBtn` · `#biometricToggleBtn`) ខណៈ ZoeW ជា state React + ផ្លូវ native (APK) · `completePinUnlock`
     // របស់ ZoeKeyGen ដេរីវេសោ Session របស់ Signing Key ➜ ឥរិយាបថរបស់ ZoeKeyGen វាស់ដោយ `keygen-biometric-test` · ZoeW ដោយ `biometric-unlock-test`

@@ -41,8 +41,9 @@
 
 ### 🤝 Handoff សម្រាប់ session បន្ទាប់ (PR #279 · branch `claude/focused-brown-3xf7am` · មិនទាន់ merge)
 
-⛔ **ផ្ទៀងផ្ទាត់ស្ថានភាព git មុនជឿអត្ថបទនេះ** (`git log origin/main..origin/claude/focused-brown-3xf7am`)។ CI ៤ ផ្នែកបៃតងរហូតដល់ `4e08640`;
-commit loader ក្រោយនោះត្រូវរង់ចាំ CI។ ⛔ **កុំ merge** ដោយគ្មានការស្នើពីម្ចាស់គម្រោង (ច្បាប់ ១)។
+⛔ **ផ្ទៀងផ្ទាត់ស្ថានភាព git មុនជឿអត្ថបទនេះ** (`git log origin/main..origin/claude/focused-brown-3xf7am`)។ CI លើ `9f0524f` ៖ shard ១ · ២ · ៤ ជាប់;
+shard ៣ ធ្លាក់តែ `shared-fns` (`waitForFirebaseSDK`) ➜ កត់ភាពខុសគ្នាដោយចេតនាក្នុង checker រួច (លម្អិតផ្នែក ២ · 2026-10-02)។
+⏳ CI លើ commit ជួសជុលត្រូវផ្ទៀងផ្ទាត់តាម GitHub Actions។ ⛔ **កុំ merge** ដោយគ្មានការស្នើពីម្ចាស់គម្រោង (ច្បាប់ ១)។
 
 **ធ្វើរួចក្នុង PR នេះ** (លម្អិតក្នុងផ្នែក ១ [2.48.0] និងផ្នែក ២) ៖ Config ➜ Login ➜ ចុះឈ្មោះឆ្លាតវៃ · 🩺 License/ZTO Cookie · toast រស់និយាយការពិត ·
 ✅ មិនស្ទួនពេលភ្ជាប់មកវិញ · Supabase Security Advisor ៧ ➜ ០ (SECURITY DEFINER ➜ `private`) · migration append-only + generator rules បង្កើតឯកសារថ្មី ·
@@ -73,7 +74,7 @@ migration history លើ Project `xrobehzmmwjfxwkjysgg` repair រួច · ហ�
   (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
   (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
   (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
-  (៤) `firebase-loader.js` នៅទាញ SDK Firebase ទោះ Config ជា Supabase (~150 KB) · chunk `supabase-backend` ចូលសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។
+  (៤) chunk `supabase-backend` ចូលសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។ ការទាញ SDK Firebase ពេល Config ជា Supabase កែរួចក្នុង PR #279 ➜ នៅរង់ចាំ merge និងសាកលើឧបករណ៍ពិត។
 - ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merge រួច (PR #277)** — សាកលើឧបករណ៍ពិត ៖
   ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
   ZoeKeyGen ៖ Tab ទូរស័ព្ទ · Signing Key ផុត ១៥ នាទី (លម្អិត ៖ `docs/HISTORY.md` [2.47.0])។
@@ -1939,6 +1940,23 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### CI របស់ PR #279 ៖ ភាពខុសគ្នា loader ដែលមានចេតនា (2026-10-02 · audit-tools និងឯកសារតែប៉ុណ្ណោះ)
+
+- **ភស្តុតាង** ៖ [Audit run 36992474164](https://github.com/mengsroy-h/Zoe-System/actions/runs/36992474164) លើ HEAD `9f0524f`
+  (merge tree `494ab0a`) ៖ shard ១ · ២ · ៤ ជាប់; shard ៣ មាន ៥០ ជាប់ · ១ ធ្លាក់ · partial ០ · skip ០។ ការធ្លាក់តែមួយគឺ
+  `shared-fns` ៖ `waitForFirebaseSDK` របស់ ZoeW ចាប់ផ្តើម `window.loadFirebaseSDK()` ពេលប្តូរ Config Supabase ➜ Firebase
+  ចំណែក ZoeKeyGen ទាញ SDK ពេលបើកជានិច្ច សម្រាប់ License Project។
+- **ការកែ** ៖ កត់ helper នេះក្នុង `EXPECTED_DIVERGENT` ជាមួយមូលហេតុ និងតំណទៅ `firebase-loader-gate.test.ts`។ គ្មានកូដផលិតកម្មប្រែ
+  និងគ្មានការឡើងកំណែ App។ `docs/HISTORY.md` ក៏ដកការពិពណ៌នាដែលហួសសម័យថា loader នៅទាញ Firebase សម្រាប់ Config Supabase។
+- **ការវាស់ក្នុង session** ៖ `shared-fns` ពិតអាន `network.ts` តាម `checker-view.mjs` ពិត និង `ZoeKeyGen/app.js` ពិត
+  (តែ module បណ្តាញ · helper រួម ៤) ៖ checker មុនកែធ្លាក់តែ `waitForFirebaseSDK`; ក្រោយកែជាប់; mutation លើ `withTimeout`
+  ដែលមិននៅក្នុងបញ្ជីលើកលែង ➜ checker នៅតែធ្លាក់ (ទិសផ្ទុយ)។ `node --check` ជាប់។
+- **ដែនកំណត់** ៖ GitHub CLI ក្នុងម៉ាស៊ីនអានការកំណត់ចូលប្រើមិនបាន ទោះបានស្នើសិទ្ធិអានរួច ➜ ទាញឯកសារតាម GitHub connector;
+  មិនបានសាង audit tree ពេញ ឬរត់ `run-all.sh` ក្នុងម៉ាស៊ីននេះទេ។ ទុក CI ៤ shard វាស់ពេញតាមសំណើសន្សំកូតា។
+  ជុំ audit Supabase ថ្មី (Postgres ពិត · finder ៦) និងការងារបន្ទាប់ក្នុង handoff **មិនទាន់បានរត់**។
+- **សកម្មភាពដោយដៃ** ៖ គ្មានសម្រាប់ការកែ checker នេះ។
+
 
 ### Deep Audit 2.48.0 ៖ កំហុសដែល suite បៃតង (១៩៧ + ២) មិនឃើញ (2026-10-01)
 

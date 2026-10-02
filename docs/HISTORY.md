@@ -53,8 +53,8 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
    ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
 2. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
    `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)`។ ⛔ ទាំង ២ ប៉ះ adapter/Postgres ➜ ត្រូវរត់ `emu/supabase-adapter-parity` · `supabase-*` ពេលកែ។
-3. **Audit បណ្តាញ** (ផ្នែកដែលនៅសល់នៃ audit ដើម) ៖ ឯកសារ `.md` ធៀបកូដ · ការស្កេន secret · សម្អាត `docs/HISTORY.md` ធ្វើរួច (ផ្នែក ២ ·
-   2026-10-02 «សម្អាត HISTORY · announcements តែមួយ»)។
+3. **Audit បណ្តាញ** ៖ ពិដាន fetch គ្រប់កន្លែងធ្វើរួច (ZoeW 2.48.1 · ផ្នែក ២ «Audit បណ្តាញ») · ⏳ នៅសល់ ៖ realtime WebSocket របស់ Supabase
+   ពេលព្យួរ (adapter មាន poll ជំនួស · មិនទាន់វាស់ក្នុងជុំនេះ)។
 4. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** (ធាតុ 2.48.0 ខាងក្រោម) បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase
    ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
 
@@ -79,6 +79,9 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
 - ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merge រួច (PR #278)** — សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 បើកការជូនដំណឹង
   (គ្មាន Activation Key · ទូរស័ព្ទ ២ ក្នុងហាងដដែលទទួលការរំលឹកម៉ោង ៨) · រក្សាទុក Config Supabase ➜ គ្មានប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែត ·
   ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android (Chrome · Google Password Manager) · QR ចំកណ្តាល + 💾 រក្សាទុក QR (លម្អិត ៖ `docs/HISTORY.md` [2.47.1])។
+- ⏳ **ZoeW 2.48.1 (branch `claude/handoff-remaining-work-ekyw6e` ៖ មិនទាន់ merge)** — ហាង Supabase ៖ ទុក App បើកលើ WiFi ដែលដក cable អ៊ីនធឺណិតពី router
+  លើសពី ១ ម៉ោង (token ផុត) ➜ ដោតវិញ ➜ ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ខ្លួនឯង (មិនបិទបើក App) · ចូលប្រព័ន្ធពេលបណ្តាញព្យួរ ➜ សារ «ភ្ជាប់ Server មិនបានទេ»
+  ក្នុងប្រហែល ១៥–៣០ វិ.។ 🔔 បង្ហាញតែសារកំណែ 2.48.1 មួយ។
 - ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 — merge រួច (PR #279)** — Supabase ៖ ✅ migration `20261002000100` (SECURITY DEFINER ➜ schema `private`)
   អនុវត្តរួច · `register`/`reset-password` deploy រួច · Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
   សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
@@ -123,6 +126,29 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.48.1] — 2026-10-02 · ZoeW ៖ **ហាង Supabase ៖ ការបន្តសម័យចូលប្រព័ន្ធដែលព្យួរមានពិដាន · 🔔 សារកំណែតែមួយ**
+
+**ZoeW `2.48.1`** (`zoew-v253` ➜ `zoew-v254`)។ ⛔ **ZoeKeyGen មិនប្រែ** · Firebase rules · Supabase migration **មិនប្រែ**។ សំណើម្ចាស់គម្រោង ៖
+«Audit បណ្តាញ» · «announcement កុំរក្សាទុកច្រើនពេក ប្រាប់តែមួយចុងក្រោយ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ហាង Supabase លើបណ្តាញ «ភ្ជាប់តែមិនឆ្លើយ»** ៖ fetch ទាំងអស់របស់ supabase-js (បន្តសម័យ · ចូល · ចាកចេញ) ឆ្លងកាត់ `sbFetchWithCeiling()`
+  (`SB_FETCH_TIMEOUT_MS` ១៥ វិ. · abort ពិត · គ្របទាំង body) ហើយជំហានយក token ក្នុង `rpc()` មានពិដានដូច POST របស់វា (`sbWithin()`) ➜ ការបន្តសម័យដែលព្យួរ
+  លែងរាំង RPC ទាំងអស់ជារៀងរហូត ៖ RPC ធ្លាក់ជា `SbNetworkError` (adapter សាកម្តងទៀតតាមជណ្តើររបស់វា) · បណ្តាញល្អវិញ ➜ ការបន្តសម័យបន្ទាប់ជោគជ័យខ្លួនឯង។
+- **ប្រអប់ចូលប្រព័ន្ធ (Supabase)** លើបណ្តាញព្យួរ ➜ «ភ្ជាប់ Server មិនបានទេ» ក្នុងពិដាន fetch ជំនួសការរង់ចាំគ្មានទីបញ្ចប់។
+- **🔔 កំណែ App** ៖ `announcements.json` ទុកតែធាតុ `update` ចុងក្រោយមួយ (= `APP_VERSION`)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-transport-hang.test.ts` (supabase-js ពិត · fetch ក្លែងដែលព្យួរ និងគោរព `signal`) ៖ មុនកែ **១/៤** (តែទិសផ្ទុយជាប់ · ៣ នៅ pending
+  ក្រោយ ៣ វិ.) ➜ ក្រោយកែ **៤/៤**។
+- `ZoeW/tests/notifications.test.tsx` «ទុកតែធាតុ update ចុងក្រោយមួយ»។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function ត្រូវ deploy។
 
 ### [2.48.0] — 2026-10-01 · ZoeW · ZoeKeyGen `2.24.2` ៖ **Config ➜ ចូលប្រព័ន្ធ ➜ ចុះឈ្មោះ ឆ្លាតវៃ · 🩺 សុពលភាព Activation Key + អាយុ Cookie ZTO ក្នុង Blob ពិត · toast រស់បញ្ចប់ដោយការពិត · License យឺតមិនជាប់ · ZoeKeyGen ការកែ Key ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់»**
 
@@ -910,6 +936,24 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### Audit បណ្តាញ ៖ token Supabase ព្យួរ ➜ RPC ព្យួរគ្មានទីបញ្ចប់ (2026-10-02 · ZoeW 2.48.1)
+
+- **វិធី** ៖ រាប់ `fetch(` ទាំងអស់ក្នុងកូដ ship និង server (`ZoeW/src` · `public/*.js` · `ZoeKeyGen` · `netlify/functions` · `netlify/lib` · `supabase/functions`)
+  ហើយសួរ «ពិដាននីមួយៗគ្របអ្វី?»។ ZoeW `fetchWithTimeout` (រួម fallback ផ្លូវចាស់ ៖ signal ដដែល) · SW `timedFetch` · `license-verify.js` ·
+  Function ZTO (`settleWithin` លើ `my_account` · certs Firebase · cache គណនីមានពិដាន ៥០០) ➜ មានពិដានទាំងអស់។
+- **ចន្លោះ** ៖ `createClient(…, { global: { fetch } })` ប្រគល់ fetch **គ្មានពិដាន** ទៅ supabase-js ហើយ `rpc()` រង់ចាំ `client.auth.getSession()` (ដែលបន្តសម័យ
+  ពេល token ផុត) **មុន** POST ដែលមានពិដាន ➜ ពិដាន `timeoutMs` មិនគ្របជំហាន token។ auth-js ចែក refresh តែមួយដែលកំពុងរត់ ➜ refresh ដែលព្យួរម្តង
+  រាំងរាល់ការស្នើ token បន្ទាប់ ➜ poll/សរសេររបស់ adapter នៅស្ងៀម រហូតដល់ socket របស់ browser ងាប់ខ្លួនឯង។ `withTimeout` របស់ App (១៥ វិ.) បញ្ចប់តែការរង់ចាំ
+  របស់អ្នកហៅ មិនមែនការព្យួរខាងក្នុងទេ។
+- **ការវាស់** (bundle `supabase-transport.ts` ពិត + `@supabase/supabase-js` 2.117.2 · node) ៖ session ផុត + endpoint `/auth/v1/token` ព្យួរ ➜
+  `rpc('zoe_pull', {}, 1000)` នៅ **pending ក្រោយ ២០ ០១១ ms** (ឃើញតែសំណើ refresh) · ទិសផ្ទុយ (refresh ឆ្លើយ) ➜ ជោគជ័យក្នុង **៥ ms**។
+- **ការកែ** ៖ `sbFetchWithCeiling()` (ភ្ជាប់ signal ដើម · abort ពេលផុតពិដាន · អាន body ក្នុងពិដាន) ជា `global.fetch` · `sbWithin()` លើ `getSession()` និង
+  `refreshSession()` ក្នុង `rpc()` ➜ ផុតពិដាន = `SbNetworkError('timeout')` (មិនផ្ញើ RPC ដោយគ្មាន token)។ auth-js បន្ត retry refresh ក្នុងបង្អួច ៣០ វិ. របស់វា
+  ➜ refresh ដែលព្យួរមិនរស់ហួសបង្អួចនោះទៀតទេ។
+- **អ្នកយាម** ៖ `ZoeW/tests/supabase-transport-hang.test.ts` (មុនកែ ១/៤ ➜ ក្រោយកែ ៤/៤) · `supabase-account.test.tsx` ១២/១២ នៅជាប់។
+  ⛔ មិនបានរត់ `emu/supabase-adapter-parity` (Postgres ពិត) តាមសំណើសន្សំកូតា ➜ CI (`SUPABASE_STRICT=1`) វាស់។
+- **មិនទាន់វាស់** ៖ WebSocket realtime ដែលព្យួរ (adapter មាន poll ជំនួស `SB_POLL_FALLBACK_MS`)។
 
 ### សម្អាត HISTORY · announcements តែមួយ · audit `.md` (2026-10-02 · ឯកសារ · អ្នកយាម · ទិន្នន័យ feed តែប៉ុណ្ណោះ)
 

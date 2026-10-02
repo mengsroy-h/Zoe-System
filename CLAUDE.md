@@ -52,7 +52,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.48.0` (`zoew-v253`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.48.1` (`zoew-v254`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.2` (`zoekeygen-v113`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -227,7 +227,7 @@ only this text protects them.
 | **Cleanup labels ↔ constants** | User-facing text is read from the constants | `trash-modal-test` |
 | **Progress trackers** | Polling never consumes evidence (idempotent) | `connection-recovery-test` |
 | Reconnect ladder | The cycle never cuts a handshake | `reconnect-ladder-test` |
-| Timeout · retry | Every `fetch` truly aborts | `network-timeout-test` |
+| Timeout · retry | Every `fetch` truly aborts — supabase-js too (`sbFetchWithCeiling()` is its `global.fetch`) · the Supabase `rpc()` token step has the same ceiling as its POST (`sbWithin()`) | `network-timeout-test` · `ZoeW/tests/supabase-transport-hang.test.ts` |
 | Network pressure | Concurrency ceilings | `network-pressure` · `license-network-pressure` |
 | Service worker | Cache-first. Every fetch filling the SW cache uses `cache: 'no-cache'` · `immutable` only on hashed names (`/assets/*`) · Cache API failure ≠ app down · navigation and direct assets like `/app.js` ➜ `index.html`; `guide.html` and `/guide` ➜ guide cache · sensitive queries never in cache keys · ⛔ background refresh never puts a **new deploy** into an **old** cache (`shellDeployIsCurrent()` gate; new versions arrive only as one install group) · both apps | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` · `netlify-config-scope-test` part 5 |
 | **SW ↔ page wiring** | Measured with real app · SW · browser, posting from the SW context: `zoew-open-notify` ➜ 🔔 panel · `zoew-push` ➜ fetch notices · message types derived from `sw.js` · `visibilitychange`/`focus`/`online` ➜ `reg.update()` after a 15-minute ceiling · `controllerchange` ➜ "new version" only when a controller existed since load | `sw-client-wiring-test` |

@@ -2588,6 +2588,9 @@
     "ZoeW/tests/supabase-account.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-transport-hang.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/toast-backend.test.tsx": {
       "policy": "zoew-self-verification"
     },

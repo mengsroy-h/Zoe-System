@@ -623,7 +623,7 @@ async function main() {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-sbmut-'));
         for (const f of SHARED_FILES) fs.copyFileSync(path.join(SHARED, f), path.join(tmp, f));
         fs.writeFileSync(path.join(tmp, 'package.json'), '{"type":"module"}');
-        fs.writeFileSync(path.join(tmp, file), src.replace(from, to));
+        fs.writeFileSync(path.join(tmp, file), src.replace(from, () => to));
         let caught = null, loaded = true;
         try {
             const mm = await loadModules(tmp);

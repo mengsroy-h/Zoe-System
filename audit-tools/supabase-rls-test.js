@@ -95,8 +95,18 @@ const EXPECT_PRIVATE_EXEC = {
     zoe_housekeeping: [],
     zoe_broadcast_seq: [],
     zoe_apply: [],
-    zoe_root_value: []
+    zoe_root_value: [],
+    my_account: ['authenticated'],
+    admin_create_tenant: ['authenticated'],
+    admin_update_tenant: ['authenticated'],
+    admin_issue_invite: ['authenticated'],
+    admin_revoke_invite: ['authenticated'],
+    admin_issue_reset_code: ['authenticated'],
+    zoe_write: ['authenticated']
 };
+const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
+    'graphql', 'graphql_public', 'information_schema', 'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog', 'realtime',
+    'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'];
 const EXPECT_AUTH_SELECT = ['member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_docs', 'zoe_tenant_state'];
 const API_ROLES = ['anon', 'authenticated', 'service_role'];
 const TABLE_PRIVS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
@@ -227,6 +237,18 @@ async function body(c, rec, extra, mode) {
     const lostPath = fns.filter((f) => f.prosecdef && !f.cfg.some((x) => /^search_path=("")?$/.test(x)));
     rec('រាល់ SECURITY DEFINER មាន search_path = \'\' (ការពារការចាប់យក schema)', lostPath.length === 0,
         lostPath.map((f) => f.nspname + '.' + f.proname));
+    const exposedSchemas = (await one(`select array(select trim(unnest(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ','))))::text[] as s`))[0].s;
+    rec('schema ដែល API បើក (pgrst.db_schemas ដូច Supabase linter) រួម public · មិនរួម private', exposedSchemas.includes('public') && !exposedSchemas.includes('private'),
+        exposedSchemas);
+    const definerExposed = await one(`select n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid) as args, r.rolname
+        from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        cross join (select rolname from pg_roles where rolname in ('anon', 'authenticated')) r
+        where p.prosecdef and pg_catalog.has_function_privilege(r.rolname, p.oid, 'EXECUTE')
+            and n.nspname = any(array(select trim(unnest(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
+            and n.nspname not in (${SPLINTER_EXCLUDED_SCHEMAS.map((x) => "'" + x + "'").join(', ')})
+        order by 1, 2, 4`);
+    rec('Supabase linter 0028/0029 ៖ គ្មាន SECURITY DEFINER ក្នុង schema ដែល API បើក ដែល anon/authenticated ហៅបាន (definer ➜ private · public ➜ invoker)',
+        definerExposed.length === 0, definerExposed.map((f) => f.rolname + ' ➜ ' + f.nspname + '.' + f.proname + '(' + f.args + ')'));
     const schemaUse = await one(`select r.rolname, has_schema_privilege(r.rolname, 'private', 'USAGE') as u
         from pg_roles r where r.rolname = any($1) order by 1`, [API_ROLES]);
     rec('schema private ៖ USAGE តែ authenticated',
@@ -570,7 +592,13 @@ const MUTATIONS = [
     ['private.new_invite_code អាចហៅដោយ PUBLIC', 'private.invite_code_hash(text), private.reset_code_hash(text), private.new_invite_code()\n    from public;',
         'private.invite_code_hash(text), private.reset_code_hash(text)\n    from public;'],
     ['anon ទទួល USAGE លើ private', 'grant usage on schema private to authenticated;', 'grant usage on schema private to authenticated, anon;'],
-    ['policy platform_admins ឃើញទាំងអស់', 'using (user_id = (select auth.uid()));', 'using (true);']
+    ['policy platform_admins ឃើញទាំងអស់', 'using (user_id = (select auth.uid()));', 'using (true);'],
+    ['public.my_account ជា SECURITY DEFINER (Supabase linter 0029)', "language sql stable security invoker set search_path = ''\nas $$\n    select a.username",
+        "language sql stable security definer set search_path = ''\nas $$\n    select a.username"],
+    ['public.zoe_write ជា SECURITY DEFINER (Supabase linter 0029)', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write",
+        "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write"],
+    ['private.zoe_write អាចហៅដោយ anon', '    private.zoe_write(text, jsonb)\n    to authenticated;', '    private.zoe_write(text, jsonb)\n    to authenticated, anon;'],
+    ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;']
 ];
 
 async function main() {
@@ -602,7 +630,7 @@ async function main() {
             ok('mutation «' + label + '» ៖ anchor ត្រូវលេចម្តងគត់ក្នុង migration (ឃើញ ' + hits + ')', false);
             continue;
         }
-        const { results, applied } = await suite('default-grants', migrationSql.replace(from, to), true);
+        const { results, applied } = await suite('default-grants', migrationSql.replace(from, () => to), true);
         const caught = results.filter((r) => !r.pass);
         ok('mutation «' + label + '» ➜ ' + (applied ? 'ចាប់ដោយ «' + (caught[0] ? caught[0].label : '—') + '»' : 'SQL អនុវត្តមិនបាន (មិនរាប់)'),
             applied && caught.length > 0);

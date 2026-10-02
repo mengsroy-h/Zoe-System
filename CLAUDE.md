@@ -2300,8 +2300,8 @@ bash audit-tools/emu/rules.sh
 - ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merge រួច (PR #278)** — សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 បើកការជូនដំណឹង
   (គ្មាន Activation Key · ទូរស័ព្ទ ២ ក្នុងហាងដដែលទទួលការរំលឹកម៉ោង ៨) · រក្សាទុក Config Supabase ➜ គ្មានប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែត ·
   ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android (Chrome · Google Password Manager) · QR ចំកណ្តាល + 💾 រក្សាទុក QR (លម្អិត ៖ `docs/HISTORY.md` [2.47.1])។
-- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 (branch `claude/focused-brown-3xf7am` ៖ មិនទាន់ merge)** — Supabase ៖ **មុន merge** ពិនិត្យ
-  `supabase_migrations.schema_migrations` ➜ `migration repair` សម្រាប់ migration ដែលធ្លាប់ paste ក្នុង SQL Editor (`supabase/README.md` ជំហានទី ២) ➜ merge ➜
+- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 (branch `claude/focused-brown-3xf7am` ៖ មិនទាន់ merge)** — Supabase ៖ ✅ history ត្រូវ repair រួច (Project `xrobehzmmwjfxwkjysgg` ៖
+  migration ៣ ដំបូងផ្ទៀងលើ server ៖ តារាង · function · md5 `private.zoe_rules()` ស្មើ repo ➜ កត់ក្នុង `schema_migrations`) ➜ merge ➜
   integration អនុវត្ត `20261002000100_zoe_definer_private.sql` + deploy `register`/`reset-password` ➜ Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
   សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
   (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។

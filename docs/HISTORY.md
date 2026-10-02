@@ -107,9 +107,9 @@
 
 1. **Netlify (ZoeW · ZoeKeyGen)** ៖ Deploy ទាំង ២ site (merge ➜ auto) — Function ZTO អាន metadata ថ្មី · `@netlify/blobs` 11.1.3។
 2. **Supabase** (GitHub integration ៖ Working directory `.` · Deploy to production បើក · branch `main` — កំណត់រួច) ៖
-   (ក) **មុន merge** ៖ SQL Editor ➜ `select version, name from supabase_migrations.schema_migrations order by version;` ➜ version `20260930120000` ·
-   `20261001000100` · `20261001000200` ដែលអនុវត្តរួចតាម SQL Editor តែមិនលេច ➜ `npx supabase@latest migration repair --status applied <version> …`
-   (`supabase/README.md` ជំហានទី ២) · (ខ) merge ចូល `main` ➜ integration អនុវត្ត `20261002000100_zoe_definer_private.sql` + deploy `register` ·
+   (ក) ✅ **ធ្វើរួច** (តាម Supabase connector ក្នុង session · ម្ចាស់គម្រោងអនុញ្ញាត) ៖ history ទទេ (paste ក្នុង SQL Editor) ➜ ផ្ទៀងលើ server ថា migration ៣ អនុវត្ត
+   រួចពិត (តារាង ៨ · function ទាំងអស់ · md5 `private.zoe_rules()` = `ea074882…` ស្មើ repo លើ Postgres ក្នុងម៉ាស៊ីន) ➜ កត់ `20260930120000` · `20261001000100` ·
+   `20261001000200` ក្នុង `supabase_migrations.schema_migrations` (ស្មើ `migration repair --status applied`) · (ខ) merge ចូល `main` ➜ integration អនុវត្ត `20261002000100_zoe_definer_private.sql` + deploy `register` ·
    `reset-password` (ឬដោយដៃ ៖ paste migration នោះក្នុង SQL Editor + `npx supabase@latest functions deploy register --no-verify-jwt`) — មុននោះ ZoeW ដើរដូចដើម
    (ឧបករណ៍ថ្មី ➜ ប្រអប់ចុះឈ្មោះ) · (គ) Security Advisor ➜ Refresh ➜ សល់តែ «Leaked Password Protection Disabled» (Pro) · ⛔ កុំបន្ថែម `private` ចូល Exposed
    schemas · ពេល Upgrade ទៅ Pro ៖ `supabase/README.md` «ពេល Upgrade ទៅ Pro»។

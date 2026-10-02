@@ -180,7 +180,7 @@ check(scanned === alreadyScanned.size,
 // ចោល នោះ checker នេះក្លាយជាការចាក់សោដោយគ្មានមូលដ្ឋាន។
 const claude = fs.existsSync(path.join(ROOT, 'CLAUDE.md'))
     ? fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8') : '';
-check(/README files describe \*{0,2}usage only/.test(claude) && /Never copy assertion counts into a README/.test(claude),
+check(/README files describe\s+\*{0,2}usage only/.test(claude) && /Never\s+copy\s+assertion\s+counts\s+into\s+a\s+README/.test(claude),
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ ៩ នៅរស់ក្នុង CLAUDE.md (មូលដ្ឋាននៃ checker នេះ)');
 // ⛔ ទិសផ្ទុយ ៖ ច្បាប់ដែលពង្រីកវិសាលភាពទៅ **គ្រប់ `.md`** ក៏ត្រូវរស់ក្នុង
 // `CLAUDE.md` ដែរ — បើអត់ ការស្កេនទូលាយក្លាយជាការចាក់សោគ្មានមូលដ្ឋាន។
@@ -423,6 +423,18 @@ check(claudeStale.length === 0,
     '⛔ CLAUDE.md ៖ តារាងក្បាលត្រូវរាយ `APP_VERSION` និង `CACHE_VERSION` ដែល App **ពិតជា ship**',
     claudeStale.map((r) => r.app + ' ៖ តារាងរាយ `' + r.ver + '` (`' + r.cache
         + '`) ខណៈកូដ ship `' + shippedVersion[r.app] + '` (`' + cacheVersion[r.app] + '`)').join('\n        '));
+
+// ⛔ CLAUDE.md ផ្ទុកតែច្បាប់ និងការហាមឃាត់ (សំណើម្ចាស់គម្រោង) ៖ រឿងរ៉ាវ «វាស់បានក្នុងកំណែ x.y.z» · លេខកំណែ · កាលបរិច្ឆេទ
+// រស់ក្នុង docs/HISTORY.md តែប៉ុណ្ណោះ ➜ លើកលែងតែជួរតារាងក្បាល (កំណែ ship ដែលការពិនិត្យខាងលើដេរីវេពីកូដ)។
+const CLAUDE_NARRATIVE_RE = /(?<![\w.])\d+\.\d+\.\d+(?![\w.])|\b20\d\d-\d\d-\d\d\b/;
+const claudeNarrative = claudeText.split('\n')
+    .map((line, i) => ({ line: line, n: i + 1 }))
+    .filter((x) => !/^\| \*\*(ZoeW|ZoeKeyGen)\*\* \|/.test(x.line) && CLAUDE_NARRATIVE_RE.test(x.line));
+check(CLAUDE_NARRATIVE_RE.test('ក្នុងកំណែ 2.31.7 (2026-09-03)') && !CLAUDE_NARRATIVE_RE.test("listen(0, '127.0.0.1')"),
+    'ជាន់អប្បបរមា ៖ ការស្កេនលេខកំណែ/កាលបរិច្ឆេទចាប់ទម្រង់ពិត ហើយមិនចាប់ IP');
+check(claudeText.length > 20000 && claudeNarrative.length === 0,
+    '⛔ CLAUDE.md ៖ គ្មានលេខកំណែ ឬកាលបរិច្ឆេទក្រៅតារាងក្បាល (ប្រវត្តិ ➜ docs/HISTORY.md)',
+    claudeNarrative.slice(0, 8).map((x) => 'បន្ទាត់ ' + x.n + ' ៖ ' + x.line.trim().slice(0, 90)).join('\n        '));
 
 // ⛔ ទិសផ្ទុយ ៖ ការយោង **ប្រវត្តិ** មិនត្រូវធ្វើឲ្យធ្លាក់ — បើច្បាប់នេះហាមរាល់
 // លេខកំណែក្នុង README នោះវាជាទោស មិនមែនការការពារ។

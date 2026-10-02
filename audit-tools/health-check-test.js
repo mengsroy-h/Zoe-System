@@ -57,12 +57,27 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ App React ៖ ជួរជា **model** (`healthRow()`) ដែល `HealthCheckList` គូរ មិនមែនខ្សែអក្សរ HTML
     'healthRow', 'healthPendingRow',
     // ⛔ backend Supabase ៖ ស្លាកជួរ Database · ជួរ License ក្លាយជាស្ថានភាពហាង
-    'databaseHealthLabel', 'healthTenantRow'];
+    'databaseHealthLabel', 'healthTenantRow',
+    // ⛔ ជួរ License (Firebase) ៖ សុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) · សារមូលហេតុពី `licenseFailureMessage()` ពិត
+    'healthKeyValidityText', 'licenseFailureMessage',
+    // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob
+    'durationText', 'ztoBlobAgeText'];
+// ⛔ ថេរដេរីវេពីកូដពិត (មិនមែន literal ក្នុង checker)
+function sliceConst(name) {
+    const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
+    return m ? 'const ' + name + ' = ' + m[1] + ';' : '';
+}
+const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
     ok('រកឃើញ function ' + n + '()', !!src[n]);
 });
+const constSrc = NEEDED_CONSTS.map((n) => {
+    const text = sliceConst(n);
+    ok('រកឃើញថេរ ' + n, !!text);
+    return text;
+}).join('\n');
 // App ដើម ៖ ជួរជាខ្សែអក្សរ HTML (`healthRowHtml()`) — App React លុបវាចេញ (JSX គូរពី `healthRow()`) ➜ យកតែពេលមាន
 ['healthRowHtml'].forEach((n) => {
     const body = sliceFn(n);
@@ -172,7 +187,7 @@ function buildRuntime(over) {
     vm.createContext(ctx);
     // ⛔ ស្រទាប់ React (ឃ្លាំង `uiState`/`viewState` · `fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាព (`react-view.js`)
     vm.runInContext(reactRuntime(SRC, { exclude: NEEDED, context: ctx }), ctx);
-    const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n')
+    const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n') + '\n' + constSrc
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
         + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthDatabaseLiveRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
     vm.runInContext(code, ctx);
@@ -315,6 +330,23 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ ឈ្មោះ cookie មិនត្រូវឡើងដល់ DOM',
             !/BOS-MAN-SESSION/.test(renewedHtml) && !/BOS-MAN-SESSION/.test(canRenewHtml), renewedHtml.slice(0, 300));
 
+        // ⛔ សំណើម្ចាស់គម្រោង ៖ អាយុ **ពិត** របស់ Cookie ក្នុង Blob (metadata `syncedAt` ពីឧបករណ៍ Sync · `renewedAt` ពី Function)
+        //    ⛔ មិនមែនអាយុ cache ក្នុង container (`ageMs`) ដែលជំនាន់មុនរាយជា «អាយុ» ➜ អ្នកប្រើអានថា Cookie ទើប Sync
+        const agedHtml = await rowFor({ renewals: 0, ageMs: 120000, blobSyncAgeMs: 3 * 3600000 + 5 * 60000, blobRenewAgeMs: 25 * 60000 },
+            { observed: true, setCookie: true, names: [], ageMs: 1000 });
+        ok('Blob មានត្រា ➜ «Sync ចូល Blob 3 ម៉ោងមុន» + «បន្តអាយុចុងក្រោយ 25 នាទីមុន»',
+            /Sync ចូល Blob 3 ម៉ោងមុន/.test(agedHtml) && /បន្តអាយុចុងក្រោយ 25 នាទីមុន/.test(agedHtml), agedHtml.slice(0, 400));
+        ok('⛔ អាយុ cache ក្នុង container មិនរាយជា «អាយុ» Cookie ទៀត (ស្លាក «Server អានចុងក្រោយ»)',
+            /Server អានចុងក្រោយ 2 នាទីមុន/.test(agedHtml) && !/អាយុ 2 នាទី/.test(agedHtml), agedHtml.slice(0, 400));
+        ok('ការបន្ថែមមិនប្តូរសាលក្រម auth (នៅ ✅)', state(agedHtml) === 'ok', state(agedHtml));
+        const daysHtml = await rowFor({ renewals: 0, blobSyncAgeMs: 3 * 86400000 + 3600000, blobRenewAgeMs: null }, { observed: false });
+        ok('Sync ៣ ថ្ងៃមុន ➜ «3 ថ្ងៃមុន»', /Sync ចូល Blob 3 ថ្ងៃមុន/.test(daysHtml), daysHtml.slice(0, 400));
+        const unknownHtml = await rowFor({ renewals: 0, blobSyncAgeMs: null, blobRenewAgeMs: null }, { observed: false });
+        ok('⛔ Blob គ្មានត្រា (Sync ដោយឧបករណ៍ចាស់) ➜ «មិនទាន់ស្គាល់» មិនមែនលេខទាយ', /អាយុក្នុង Blob ៖ មិនទាន់ស្គាល់/.test(unknownHtml), unknownHtml.slice(0, 400));
+        const envRt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: { source: 'env', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000, blobSyncAgeMs: 3600000 } } });
+        const envHtml = await envRt.api.healthLookupRow();
+        ok('ទិសផ្ទុយ ៖ Cookie ពី env ➜ គ្មានអាយុ Blob', !/Blob/.test(envHtml), envHtml.slice(0, 400));
+
         for (const bad of [null, 'x', 42, [], { observed: 'yes' }]) {
             const junkHtml = await rowFor({ renewals: bad }, bad);
             ok('⛔ sessionRenewal ខូច (' + JSON.stringify(bad) + ') ➜ នៅតែរាយជួរបាន',
@@ -409,6 +441,30 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const rt = buildRuntime({});
         const html = await rt.api.healthLicenseRow();
         ok('អាជ្ញាប័ណ្ណសកម្ម ➜ ✅ (ទិសវិជ្ជមាន)', state(html) === 'ok', state(html));
+    }
+    {
+        // ⛔ សំណើម្ចាស់គម្រោង ៖ ជួរ License (Firebase) បង្ហាញ **សុពលភាព** Activation Key ៖ ថ្ងៃផុត (ប្រតិទិនកម្ពុជា) · ថ្ងៃនៅសល់ ·
+        //    ជិតផុត (≤ LICENSE_NEAR_EXPIRY_DAYS) ➜ ⚠️ · ផុត/Revoke ពិត ➜ ❌ · ផ្ទៀងផ្ទាត់មិនបាន ➜ ⚠️ (មិនមែន ❌) · ⛔ Key មិនឡើងដល់អត្ថបទ
+        const NEAR = vm.runInNewContext(sliceConst('LICENSE_NEAR_EXPIRY_DAYS').replace(/^const \w+ = /, '').replace(/;$/, ''));
+        const exp = 1770000000000 + 40 * 86400000;
+        const KEY = 'ZOE1.secret-key-string';
+        const active = await buildRuntime({ license: () => Promise.resolve({ state: 'active', exp, daysLeft: 40, note: 'x', keyString: KEY }) }).api.healthLicenseRow();
+        ok('Key សកម្ម ➜ ✅ + ថ្ងៃផុត (2026-03-14) + «នៅសល់ 40 ថ្ងៃ»', state(active) === 'ok' && /2026-03-14/.test(active) && /នៅសល់ 40 ថ្ងៃ/.test(active), active);
+        ok('⛔ Key/keyString មិនឡើងដល់ជួរ 🩺', active.indexOf(KEY) === -1);
+        const near = await buildRuntime({ license: () => Promise.resolve({ state: 'active', exp, daysLeft: NEAR }) }).api.healthLicenseRow();
+        ok('Key សកម្មតែនៅសល់ ' + NEAR + ' ថ្ងៃ (= ព្រំដែន) ➜ ⚠️ «ជិតផុតកំណត់»', state(near) === 'warn' && /ជិតផុតកំណត់/.test(near), near);
+        const farther = await buildRuntime({ license: () => Promise.resolve({ state: 'active', exp, daysLeft: NEAR + 1 }) }).api.healthLicenseRow();
+        ok('ទិសផ្ទុយ ៖ នៅសល់ ' + (NEAR + 1) + ' ថ្ងៃ ➜ ✅ (មិនព្រមានលឿនពេក)', state(farther) === 'ok', farther);
+        const grace = await buildRuntime({ license: () => Promise.resolve({ state: 'offline-grace-exceeded', exp }) }).api.healthLicenseRow();
+        ok('ហួសពេលក្រៅបណ្តាញ ➜ ⚠️ + ថ្ងៃផុត (មិនមែន ❌)', state(grace) === 'warn' && /2026-03-14/.test(grace), grace);
+        const revoked = await buildRuntime({ license: () => Promise.resolve({ state: 'required', reason: 'revoked' }) }).api.healthLicenseRow();
+        ok('⛔ Key ត្រូវ Revoke ➜ ❌ + សារពី licenseFailureMessage()', state(revoked) === 'bad' && /Revoked/.test(revoked), revoked);
+        const expired = await buildRuntime({ license: () => Promise.resolve({ state: 'required', reason: 'expired' }) }).api.healthLicenseRow();
+        ok('⛔ Key ផុតកំណត់ ➜ ❌', state(expired) === 'bad' && /ផុតកំណត់/.test(expired), expired);
+        const net = await buildRuntime({ license: () => Promise.resolve({ state: 'required', reason: 'network' }) }).api.healthLicenseRow();
+        ok('⛔ ផ្ទៀងផ្ទាត់មិនបាន (network) ➜ ⚠️ មិនមែន ❌ («មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស»)', state(net) === 'warn' && /មិនមែនមានន័យថា/.test(net), net);
+        const none = await buildRuntime({ license: () => Promise.resolve({ state: 'required' }) }).api.healthLicenseRow();
+        ok('ឧបករណ៍គ្មាន Activation Key ➜ ❌ (សាលក្រមច្បាស់ មិនមែន «ពិនិត្យមិនបាន»)', state(none) === 'bad', none);
     }
     {
         const rt = buildRuntime({ dbConnected: false });

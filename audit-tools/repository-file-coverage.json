@@ -2672,6 +2672,9 @@
     "supabase/migrations/20261001000200_zoe_datastore.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261002000100_zoe_definer_private.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -2689,6 +2692,24 @@
     },
     "supabase/types/deno.d.ts": {
       "policy": "supabase-config"
+    },
+    "ZoeW/src/features/login-memory.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/login-routing.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/recovery-toast-dedup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/firebase-loader-gate.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/toast-live-expiry.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/activation-retry.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

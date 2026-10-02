@@ -486,16 +486,30 @@ async function getNetlifySite(siteId, token, controls) {
     );
 }
 
-async function requestBlobUploadUrl(siteId, token, controls) {
+// ⛔ ត្រាពេល Sync រស់ក្នុង **metadata របស់ Blob** (ទម្រង់ដដែលនឹង `@netlify/blobs` ៖ `b64;` + base64(JSON)) ➜ Function ZTO
+// អានវាត្រឡប់តាម `getWithMetadata()` ➜ 🩺 បង្ហាញអាយុពិតរបស់ Cookie ក្នុង Blob (មិនមែនអាយុ cache ក្នុង container)។
+// ⛔ signed URL ត្រូវបានចុះហត្ថលេខាជាមួយ metadata ➜ header ទាំង ២ (API · upload) ត្រូវផ្ទុកតម្លៃដដែល។
+const BLOB_METADATA_HEADER_API = 'netlify-blobs-metadata';
+const BLOB_METADATA_HEADER_UPLOAD = 'x-amz-meta-user';
+
+function cookieBlobMetadata(nowMs) {
+    const syncedAt = Math.floor(Number(nowMs));
+    if (!Number.isFinite(syncedAt) || syncedAt <= 0) return '';
+    return 'b64;' + Buffer.from(JSON.stringify({ syncedAt: syncedAt }), 'utf8').toString('base64');
+}
+
+async function requestBlobUploadUrl(siteId, token, controls, metadata) {
     const cleanSiteId = validateSiteId(siteId);
     const pathname = '/api/v1/blobs/' + encodeURIComponent(cleanSiteId)
         + '/' + BLOB_STORE_PATH + '/' + BLOB_KEY;
+    const headers = {
+        accept: SIGNED_URL_ACCEPT,
+        Authorization: 'Bearer ' + validateToken(token)
+    };
+    if (metadata) headers[BLOB_METADATA_HEADER_API] = metadata;
     return timedFetch(netlifyApiUrl(pathname), {
         method: 'PUT',
-        headers: {
-            accept: SIGNED_URL_ACCEPT,
-            Authorization: 'Bearer ' + validateToken(token)
-        }
+        headers
     }, controls, async (response) => {
         if (!response || !response.ok) {
             const status = response ? response.status : 0;
@@ -507,12 +521,14 @@ async function requestBlobUploadUrl(siteId, token, controls) {
     });
 }
 
-async function uploadCookieToBlob(signedUrl, cookieHeader, controls) {
+async function uploadCookieToBlob(signedUrl, cookieHeader, controls, metadata) {
     const cleanCookie = validateCookieHeader(cookieHeader);
+    const headers = { 'cache-control': 'max-age=0, stale-while-revalidate=60' };
+    if (metadata) headers[BLOB_METADATA_HEADER_UPLOAD] = metadata;
     await timedFetch(signedUrl, {
         method: 'PUT',
         redirect: 'manual',
-        headers: { 'cache-control': 'max-age=0, stale-while-revalidate=60' },
+        headers,
         body: cleanCookie
     }, controls, async (response) => {
         if (response && response.status >= 300 && response.status < 400) {
@@ -724,8 +740,9 @@ async function syncNetlifyCookie(cookieHeader, options) {
     try {
         for (let attempt = 1; ; attempt++) {
             try {
-                const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options);
-                await uploadCookieToBlob(signedUrl, cleanCookie, options);
+                const metadata = cookieBlobMetadata(typeof config.nowImpl === 'function' ? config.nowImpl() : Date.now());
+                const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options, metadata);
+                await uploadCookieToBlob(signedUrl, cleanCookie, options, metadata);
                 return;
             } catch (error) {
                 if (!error || !error.transient || attempt >= maxAttempts) throw error;
@@ -1297,6 +1314,7 @@ module.exports = {
     readStoredSecret,
     readTokenViaPowerShell,
     requestBlobUploadUrl,
+    cookieBlobMetadata,
     resolveVerification,
     shouldRefreshInAuto,
     safeFailureMessage,

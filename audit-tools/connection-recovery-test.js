@@ -39,6 +39,9 @@ function sliceFn(name) {
     return sliceFnFrom(SRC, name);
 }
 
+// ⛔ `refreshLiveToasts()` · `liveSuccessCount()` អានអថេរ module `liveSuccessAnnounced` ➜ ការប្រកាស **ពិត** ពី SRC (tree ចាស់គ្មាន ➜ 0)
+const LIVE_SUCCESS_DECL = ((typeof SRC === 'string' ? SRC : '').match(/^\s*let liveSuccessAnnounced = [^;]+;/m) || ['let liveSuccessAnnounced = 0;'])[0].trim();
+
 function sliceConst(name) {
     const re = new RegExp('^\\s*const ' + name + ' = [^;]+;', 'm');
     const m = SRC.match(re);
@@ -96,11 +99,13 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         if (core.appLocalStore === undefined) core.appLocalStore = core.localStorage || null;
         if (core.appSessionStore === undefined) core.appSessionStore = core.sessionStorage || null;
         const extras = [
-            'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
+            'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
             'rawSnapshotToItemList'
         ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
-        const src = 'let dbListenersFailed = false;\n' +
+        // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
+        const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
+        const src = expiredDecl + '\n' + LIVE_SUCCESS_DECL + '\n' + 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
@@ -140,7 +145,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
 }
 
 const REQUIRED_FNS = [
-    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts',
+    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount',
     'nudgeDatabaseConnection',
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
@@ -185,11 +190,13 @@ const REAL_LISTENER_REF_NAMES = (function () {
 })();
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
-    'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS',
+    // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` (toast រស់ដែលផុតពិដាន) ➜ ការប្រកាស **ពិត**
+    'expiredLiveKeys'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
 missingConsts.forEach((n) => ok('ថេរ `' + n + '` មានក្នុង app.js', false));
 const CONST_STUBS = missingConsts
-    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1')) + ';')
+    .map((n) => 'const ' + n + ' = ' + (n === 'expiredLiveKeys' ? 'new Set()' : (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1'))) + ';')
     .join('\n');
 
 function buildContext() {
@@ -297,7 +304,7 @@ function buildContext() {
     if (ctx.appLocalStore === undefined) ctx.appLocalStore = ctx.localStorage || null;
     if (ctx.appSessionStore === undefined) ctx.appSessionStore = ctx.sessionStorage || null;
 
-    const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
+    const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + LIVE_SUCCESS_DECL + '\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
         REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' + ELAPSED_HELPER + '\n' +
         'const DB_LISTENER_KEYS = ' + JSON.stringify(REAL_LISTENER_KEYS) + ';\n' +

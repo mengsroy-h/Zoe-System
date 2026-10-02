@@ -25,7 +25,12 @@ export const INTENTIONAL_UI = {
     skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content > h3, #configModal .modal-content > p:not([style]), #configModal .cfg-extra, #configModal .cfg-supabase',
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',
-    navbarShrinkPx: 14
+    navbarShrinkPx: 14,
+    // ⛔ អត្ថបទដែលប្តូរដោយចេតនា ៖ [regex (ខ្សែអក្សរ) · អត្ថបទដើម] ➜ ធ្វើឲ្យស្មើ **តែទម្រង់ថ្មីដែលប្រកាស** (ទម្រង់ផ្សេងនៅប្រៀបពេញ)
+    //    2.48.0 ៖ 🩺 ជួរ «អាជ្ញាប័ណ្ណ» បង្ហាញសុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) ជំនួស «សកម្ម» (សំណើម្ចាស់គម្រោង)
+    texts: [
+        ['^Key សកម្ម(?: · ផុត \\d{4}-\\d{2}-\\d{2} \\(នៅសល់ \\d+ ថ្ងៃ\\))?$', 'សកម្ម']
+    ]
 };
 
 export const SNAPSHOT = (opts) => {
@@ -58,7 +63,8 @@ export const SNAPSHOT = (opts) => {
             .sort().join('|');
         // ⛔ ស្លាកកំណែ **ខុសគ្នាដោយចេតនា** (App ថ្មីមានកំណែថ្មី) ➜ ធ្វើឲ្យស្មើតែស្លាកនោះ
         const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.data).join('').replace(/\s+/g, ' ').trim()
-            .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>');
+            .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>')
+            .replace(/^.*$/, (t) => (ui.texts || []).reduce((acc, [re, to]) => acc.replace(new RegExp(re), to), t));
         const cs = getComputedStyle(el);
         // ⛔ តម្លៃរបស់ form control ជាស្ថានភាពដែលអ្នកប្រើឃើញ ➜ វាត្រូវចូល
         //    ការប្រៀបធៀបដែរ (attribute `value` មិនប្រែពេលវាយ)។

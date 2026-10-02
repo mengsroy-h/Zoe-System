@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.1';
+const APP_VERSION = '2.24.2';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2206,7 +2206,7 @@ async function generateLicenseKey() {
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
-            ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+            ? '⏳ ការបង្កើត Key មិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ Key អាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើល Key List មុនបង្កើតម្តងទៀត (កុំបង្កើត Key ត្រួតគ្នា)។'
             : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
         if (!isSensitiveSessionCurrent(operation, true)) return;
@@ -2590,8 +2590,11 @@ async function toggleRevokeKey(id) {
     if (!row) return;
     const newRevoked = !row.revoked;
     if (!confirm(newRevoked ? 'តើអ្នកចង់ Revoke Key នេះមែនទេ? អ្នកប្រើប្រាស់នឹងលែងចូល App បានក្នុងពេលឆាប់ៗ។' : 'សង្គ្រោះ Key នេះមកវិញ?')) return;
+    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    let write = null;
     try {
-        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
+        write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { revoked: newRevoked })));
+        const results = await withTimeout(write, 15000, 'Update timed out');
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
@@ -2605,6 +2608,13 @@ async function toggleRevokeKey(id) {
     } catch (e) {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
+        if (write && e && e.message === 'Update timed out') {
+            armAdminLateWrite(write, isCurrent, (late) => {
+                if (late.every((r) => r.status !== 'rejected')) showToast(newRevoked ? '✅ Key ត្រូវបាន Revoke (ចុះយឺត)!' : '✅ Key ត្រូវបានសង្គ្រោះមកវិញ (ចុះយឺត)!');
+            });
+            alert(ADMIN_WRITE_PENDING_TEXT);
+            return;
+        }
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
     }
 }
@@ -2625,8 +2635,11 @@ async function setKeySeatLimit(id) {
     if (next === row.maxDevices) return;
     if (next < row.seatDevices.length
         && !confirm('Key នេះចងនឹងឧបករណ៍ ' + row.seatDevices.length + ' រួចហើយ។\n\nការបន្ថយមក ' + next + ' ធ្វើឲ្យឧបករណ៍ដែលលើសលែងប្រើ Key នេះបាន។ បន្តទេ?')) return;
+    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    let write = null;
     try {
-        await withTimeout(retryAsync(() => Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next }))), 3, 1000), 15000, 'Seat limit update timed out');
+        write = retryAsync(() => Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next }))), 3, 1000);
+        await withTimeout(write, 15000, 'Seat limit update timed out');
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ!');
         refreshKeyList();
@@ -2634,6 +2647,11 @@ async function setKeySeatLimit(id) {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'setKeySeatLimit' });
+        if (write && e && e.message === 'Seat limit update timed out') {
+            armAdminLateWrite(write, isCurrent, () => showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ (ចុះយឺត)!'));
+            alert(ADMIN_WRITE_PENDING_TEXT);
+            return;
+        }
         alert('កំណត់ចំនួនឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
     }
 }
@@ -2653,8 +2671,11 @@ async function releaseKeySeat(id) {
         return;
     }
     if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
+    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    let write = null;
     try {
-        await withTimeout(retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000), 15000, 'Release timed out');
+        write = retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000);
+        await withTimeout(write, 15000, 'Release timed out');
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
         refreshKeyList();
@@ -2662,11 +2683,29 @@ async function releaseKeySeat(id) {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
+        if (write && e && e.message === 'Release timed out') {
+            armAdminLateWrite(write, isCurrent, () => showToast('✅ បានដោះឧបករណ៍ (ចុះយឺត)! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។'));
+            alert(ADMIN_WRITE_PENDING_TEXT);
+            return;
+        }
         alert('ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
     }
 }
 
 let extendTargetId = null;
+
+const ADMIN_WRITE_PENDING_TEXT = '⏳ ការកែមិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ វាអាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនធ្វើម្តងទៀត។';
+
+function armAdminLateWrite(write, isCurrent, onLanded) {
+    Promise.resolve(write).then((value) => {
+        if (!isCurrent()) return;
+        onLanded(value);
+        refreshKeyList();
+    }, () => {
+        if (!isCurrent()) return;
+        refreshKeyList();
+    });
+}
 
 function openExtendModal(id) {
     extendTargetId = id;
@@ -2690,8 +2729,11 @@ async function confirmExtendKey() {
         return;
     }
     const newExpiresAt = getServerNow() + Math.round(days * 86400000);
+    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    let write = null;
     try {
-        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${targetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
+        write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${targetId}`), { expiresAt: newExpiresAt })));
+        const results = await withTimeout(write, 15000, 'Update timed out');
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
@@ -2707,6 +2749,13 @@ async function confirmExtendKey() {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
         if (extendTargetId === targetId) closeModal('extendModal');
+        if (write && e && e.message === 'Update timed out') {
+            armAdminLateWrite(write, isCurrent, (late) => {
+                if (late.every((r) => r.status !== 'rejected')) showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់ (ចុះយឺត)!');
+            });
+            alert(ADMIN_WRITE_PENDING_TEXT);
+            return;
+        }
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
         refreshKeyList();
     }

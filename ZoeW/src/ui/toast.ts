@@ -32,6 +32,35 @@ export const TOAST_LIFETIME_MS = 3000;
 
 export const TOAST_LIVE_LIMIT_MS = 20000;
 
+export const TOAST_STALLED_MS = 5000;
+
+export const TOAST_STALLED_SUFFIX = ' — យូរជាងធម្មតា App នៅព្យាយាមបន្ត';
+
+const expiredLiveKeys = new Set();
+
+export function stalledToastText(msg, key?) {
+    const text = String(msg || '');
+    if (text.indexOf('🔄') !== 0) return '';
+    return '⚠️' + text.slice('🔄'.length).replace(/\.\.\.$|…$/, '') + TOAST_STALLED_SUFFIX
+        + (key === 'config' ? ' (សូមពិនិត្យ Config ឬអ៊ីនធឺណិត)' : '');
+}
+
+export function expireLiveToast(toast) {
+    const key = toast.live;
+    const state = liveToastState(key);
+    toast.live = null;
+    if (!state || state.settled) return false;
+    if (key !== 'network') expiredLiveKeys.add(key);
+    const stalled = stalledToastText(state.msg, key);
+    if (!stalled) return false;
+    toast.msg = toastBackendText(stalled);
+    toast.kind = 'warn';
+    toast.show = true;
+    uiState.touch();
+    armToastDismiss(toast.id, TOAST_STALLED_MS);
+    return true;
+}
+
 export const TOAST_CLASSES = { info: 'toast-info', success: 'toast-success', warn: 'toast-warn', error: 'toast-error' };
 
 export const TOAST_KIND_MARKS = [
@@ -68,6 +97,7 @@ export function armToastDismiss(el, delay) {
         toastTimers.delete(item.id);
         const live = toastItem(item.id);
         if (!live) return;
+        if (live.live !== null && expireLiveToast(live)) return;
         live.show = false;
         uiState.touch();
         setTimeout(() => removeToastItem(item.id), 300);
@@ -137,10 +167,18 @@ export function reannounceOrShowToast(msg) {
     return showToast(msg);
 }
 
+let liveSuccessAnnounced = 0;
+
+export function liveSuccessCount() {
+    return liveSuccessAnnounced;
+}
+
 export function showLiveToast(key) {
+    expiredLiveKeys.delete(key);
     const state = liveToastState(key);
     if (!state) return null;
     const id = showToast(state.msg, state.kind);
+    if (id !== null && state.settled && state.kind === 'success') liveSuccessAnnounced++;
     if (id === null || state.settled) return id;
     const item = toastItem(id);
     if (item) { item.live = key; uiState.touch(); }
@@ -157,9 +195,16 @@ export function refreshLiveToasts() {
         paintToast(el.id, state.msg, state.kind);
         if (state.settled) {
             if (el.live === 'network') networkToastEpisode = false;
+            if (state.kind === 'success') liveSuccessAnnounced++;
             settleLiveToast(el.id);
         }
     }
+    expiredLiveKeys.forEach((key) => {
+        const state = liveToastState(key);
+        if (state && !state.settled) return;
+        expiredLiveKeys.delete(key);
+        if (state && state.kind === 'success' && showToast(state.msg, 'success') !== null) liveSuccessAnnounced++;
+    });
 }
 
 let networkToastEpisode = false;

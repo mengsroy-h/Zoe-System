@@ -5,6 +5,20 @@ export const SB_AUTH_STORAGE_KEY = 'zoew-sb-auth';
 
 export const SB_ACCOUNT_STORAGE_KEY = 'zoew-sb-account';
 
+export const SB_AUTH_OWNER_KEY = 'zoew-sb-auth-owner';
+
+export const SB_AUTH_KEY_SUFFIXES = ['', '-code-verifier', '-user'];
+
+export function claimSessionStorageFor(storage, url) {
+    const owner = storage.getItem(SB_AUTH_OWNER_KEY);
+    if (owner !== null && owner !== url) {
+        SB_AUTH_KEY_SUFFIXES.forEach((suffix) => storage.removeItem(SB_AUTH_STORAGE_KEY + suffix));
+        storage.removeItem(SB_ACCOUNT_STORAGE_KEY);
+    }
+    if (owner !== url) storage.setItem(SB_AUTH_OWNER_KEY, url);
+    return owner === null || owner === url;
+}
+
 function storeOf(name) {
     try {
         const s = (window as any)[name];
@@ -88,6 +102,7 @@ export function createSupabaseTransport(config, deps?) {
     const key = String(config.supabaseKey || '');
     const fetchImpl = (deps && deps.fetch) || ((...args) => (globalThis.fetch as any)(...args));
     const storage = createModeStorage((deps && deps.localStorage) || storeOf('localStorage'), (deps && deps.sessionStorage) || storeOf('sessionStorage'));
+    claimSessionStorageFor(storage, url);
     const client = createClient(url, key, {
         auth: {
             storage,

@@ -37,6 +37,9 @@ export function preconnectToDatabaseHost(cfg) {
 
 export function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
+    if (typeof window.loadFirebaseSDK === 'function') {
+        try { window.loadFirebaseSDK(); } catch (e) {}
+    }
     return new Promise((resolve, reject) => {
         const notReadyErr: any = new Error('Firebase SDK failed to load (network/CDN issue)');
         notReadyErr.code = 'SDK_UNAVAILABLE';

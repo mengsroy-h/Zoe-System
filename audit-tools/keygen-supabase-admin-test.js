@@ -341,6 +341,7 @@ async function behavior() {
         await c.query('insert into public.platform_admins (user_id) values ($1)', [adminId]);
         const clerkId = await H.makeAuthUser(c, 'clerk@admin.zoe.test');
         pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 8 });
+        pool.on('error', () => {});
         fake = await startFakeSupabase({ pool });
         fake.addUser('boss@admin.zoe.test', 'boss-pass-123', adminId);
         fake.addUser('clerk@admin.zoe.test', 'clerk-pass-123', clerkId);

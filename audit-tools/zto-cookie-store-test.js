@@ -94,14 +94,15 @@ function makeBlobs(behavior) {
         },
         async getWithMetadata(key, options) {
             const value = await store.get(key, options);
-            return value === null ? null : { data: value, etag: etagOf(value), metadata: {} };
+            return value === null ? null : { data: value, etag: etagOf(value), metadata: state.metadata || {} };
         },
         set(key, value, options) {
-            calls.push({ fn: 'set', key, value });
+            calls.push({ fn: 'set', key, value, metadata: options && options.metadata });
             if (state.writeThrows) return Promise.reject(new Error('write failed'));
             if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(state.value)) return Promise.resolve({ modified: false });
             if (options && options.onlyIfNew && state.value !== null) return Promise.resolve({ modified: false });
             state.value = value;
+            state.metadata = options && options.metadata ? options.metadata : {};
             return Promise.resolve({ modified: true, etag: etagOf(value) });
         }
     };
@@ -211,6 +212,7 @@ async function run() {
             'blob ទទេ ➜ diag ប្រាប់មូលហេតុ', 'មូលហេតុមិនបាត់ក្រោយ cache',
             'ការអានធ្លាក់ ➜ មូលហេតុនៅមើលឃើញ', 'blob ដើរធម្មតា ➜ គ្មានមូលហេតុសល់',
             'diag ប្រាប់ថា Cookie ត្រូវ ZTO បដិសេធពេលណា',
+            'diag ប្រាប់អាយុពិតរបស់ Cookie ក្នុង Blob (metadata syncedAt)', 'ការបន្តអាយុរក្សា syncedAt + បោះ renewedAt',
             'OPTIONS ➜ 204 ដដែល', 'OPTIONS មិនបញ្ចេញតម្លៃ Cookie',
             'warm-up អាន store ជាមុន', 'ការស្កេនដំបូងក្រោយ warm-up មិនអានស្ទួន',
             'warm-up ក្នុង cache មិនអានម្តងទៀត', 'store ព្យួរ ➜ OPTIONS នៅ 204',
@@ -530,6 +532,51 @@ async function run() {
     upstream();
     let diag = JSON.parse((await call({ diag: '1' })).body);
     ok('diag ប្រាប់ថាកំពុងប្រើ blob', diag.cookie && diag.cookie.source === 'blob', diag.cookie);
+    ok('Blob គ្មាន metadata (Sync ដោយឧបករណ៍ចាស់) ➜ អាយុក្នុង Blob = null (មិនទាយ)',
+        diag.cookie && diag.cookie.blobSyncAgeMs === null && diag.cookie.blobRenewAgeMs === null, diag.cookie);
+
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ 🩺 បង្ហាញ **អាយុពិត** របស់ Cookie ក្នុង Blob (ពេល Sync) — មិនមែនអាយុ cache ក្នុង container (`ageMs`)។
+    //    ឧបករណ៍ Sync សរសេរ metadata `{ syncedAt }` · Function អានតាម `getWithMetadata()` · ការបន្តអាយុរក្សា `syncedAt` ហើយបោះ `renewedAt`។
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    const syncedAt = Date.now() - 3 * 3600000;
+    blobs = useBlobs({ metadata: { syncedAt: syncedAt } });
+    upstream();
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('diag ប្រាប់អាយុពិតរបស់ Cookie ក្នុង Blob (metadata syncedAt ➜ ~3 ម៉ោង)',
+        diag.cookie && typeof diag.cookie.blobSyncAgeMs === 'number'
+            && Math.abs(diag.cookie.blobSyncAgeMs - 3 * 3600000) < 60000 && diag.cookie.blobRenewAgeMs === null,
+        diag.cookie);
+    ok('⛔ អាយុក្នុង Blob ≠ អាយុ cache ក្នុង container (ageMs ទើបអាន ➜ តូច)',
+        diag.cookie && typeof diag.cookie.ageMs === 'number' && diag.cookie.ageMs < 60000, diag.cookie);
+    net = upstream(['BOS-MAN-SESSION=renewed-value-55667788; Path=/; HttpOnly']);
+    await call({ barcode: BARCODE });
+    const renewWrite = blobs.calls.filter((c) => c.fn === 'set')[0];
+    ok('ការបន្តអាយុរក្សា syncedAt + បោះ renewedAt',
+        !!renewWrite && renewWrite.metadata && renewWrite.metadata.syncedAt === syncedAt
+            && typeof renewWrite.metadata.renewedAt === 'number' && Date.now() - renewWrite.metadata.renewedAt < 60000,
+        renewWrite && renewWrite.metadata);
+    upstream();
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('ក្រោយបន្តអាយុ ➜ diag ប្រាប់អាយុការបន្ត (តូច) ហើយ Sync នៅ ~3 ម៉ោង',
+        diag.cookie && typeof diag.cookie.blobRenewAgeMs === 'number' && diag.cookie.blobRenewAgeMs < 60000
+            && Math.abs(diag.cookie.blobSyncAgeMs - 3 * 3600000) < 60000, diag.cookie);
+    for (const bad of [{ syncedAt: 'yesterday' }, { syncedAt: Date.now() + 7 * 86400000 }, { syncedAt: 5 }, []]) {
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        useBlobs({ metadata: bad });
+        upstream();
+        diag = JSON.parse((await call({ diag: '1' })).body);
+        ok('metadata ខូច ' + JSON.stringify(bad) + ' ➜ null (មិនបង្ហាញអាយុក្លែង)', diag.cookie && diag.cookie.blobSyncAgeMs === null, diag.cookie);
+    }
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs({ getStoreThrows: true, metadata: { syncedAt: syncedAt } });
+    upstream();
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('ទិសផ្ទុយ ៖ Cookie ពី env ➜ គ្មានអាយុក្នុង Blob', diag.cookie && diag.cookie.source === 'env' && diag.cookie.blobSyncAgeMs === null, diag.cookie);
+
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs();
+    upstream();
+    diag = JSON.parse((await call({ diag: '1' })).body);
     ok('diag មាន fingerprint សម្រាប់ផ្ទៀងផ្ទាត់',
         !!(diag.cookie && diag.cookie.fingerprint && diag.cookie.fingerprint.length >= 6),
         diag.cookie);

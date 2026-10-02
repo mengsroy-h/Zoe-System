@@ -17,6 +17,7 @@ process.exitCode = 1;
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT = process.env.SUPABASE_DS_APP_DIR ? path.resolve(process.env.SUPABASE_DS_APP_DIR) : path.join(__dirname, '..');
 const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT) : path.join(__dirname, '..');
@@ -38,7 +39,9 @@ function finish() {
 }
 
 console.log('=== supabase-datastore ៖ Postgres ពិត · tenant · រូបរាង RTDB · transaction · delta · realtime · mutation ===');
-const migrationFiles = fs.existsSync(MIGRATIONS_DIR) ? fs.readdirSync(MIGRATIONS_DIR).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort() : [];
+const MIGRATION_RE = /^\d{14}_[a-z0-9_]+\.sql$/;
+const MIGRATION_BASE = process.env.SUPABASE_MIGRATION_BASE || process.env.VERSIONSCOPE_BASE || 'origin/main';
+const migrationFiles = fs.existsSync(MIGRATIONS_DIR) ? fs.readdirSync(MIGRATIONS_DIR).filter((f) => MIGRATION_RE.test(f)).sort() : [];
 const migrationSql = migrationFiles.map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n;\n');
 ok('migration ឃ្លាំងទិន្នន័យមាន (zoe_docs · zoe_write · zoe_pull)', /create table public\.zoe_docs/.test(migrationSql)
     && /create function public\.zoe_write\(/.test(migrationSql) && /create function public\.zoe_pull\(/.test(migrationSql));
@@ -422,9 +425,58 @@ const MUTATIONS = [
         'grant execute on function public.zoe_admin_write(uuid, text, jsonb, boolean) to service_role, authenticated;']
 ];
 
+function migrationHistoryProblems(base, current) {
+    const problems = [];
+    const baseNames = [...base.keys()].sort();
+    const lastBase = baseNames.length ? baseNames[baseNames.length - 1].slice(0, 14) : '';
+    for (const [name, text] of base) {
+        if (!current.has(name)) problems.push('លុប ' + name);
+        else if (current.get(name) !== text) problems.push('កែ ' + name);
+    }
+    const versions = new Map();
+    for (const name of current.keys()) {
+        const v = name.slice(0, 14);
+        versions.set(v, (versions.get(v) || 0) + 1);
+        if (!base.has(name) && v <= lastBase) problems.push('ថ្មី តែ version មិនក្រោយ ' + lastBase + ' ៖ ' + name);
+    }
+    for (const [v, n] of versions) if (n > 1) problems.push('version ស្ទួន ' + v + ' (' + n + ' ឯកសារ)');
+    return problems;
+}
+
+function migrationAppendOnly() {
+    console.log('\n── ០ខ. migration ក្នុង ' + MIGRATION_BASE + ' មិនត្រូវកែ/លុប ៖ Deploy ពី GitHub (និង db push) អនុវត្តតែ version ដែលមិនទាន់អនុវត្ត ──');
+    const A = '20260101000000_a.sql', B = '20260102000000_b.sql', C = '20260103000000_c.sql', OLD = '20260101120000_old.sql';
+    const probeBase = new Map([[A, 'x'], [B, 'y']]);
+    ok('ទិសផ្ទុយ ៖ កែ migration ចាស់ ➜ រកឃើញ', migrationHistoryProblems(probeBase, new Map([[A, 'x2'], [B, 'y']])).length === 1);
+    ok('ទិសផ្ទុយ ៖ លុប migration ចាស់ ➜ រកឃើញ', migrationHistoryProblems(probeBase, new Map([[B, 'y']])).length === 1);
+    ok('ទិសផ្ទុយ ៖ migration ថ្មីមាន version មុនចុងក្រោយ ➜ រកឃើញ', migrationHistoryProblems(probeBase, new Map([[A, 'x'], [B, 'y'], [OLD, 'z']])).length === 1);
+    ok('ទិសផ្ទុយ ៖ version ស្ទួន ➜ រកឃើញ',
+        migrationHistoryProblems(probeBase, new Map([[A, 'x'], [B, 'y'], [C, 'z'], ['20260103000000_d.sql', 'w']])).length === 1);
+    ok('ទិសផ្ទុយ ៖ បន្ថែម migration ថ្មីក្រោយគេ ➜ មិនមែនបញ្ហា', migrationHistoryProblems(probeBase, new Map([[A, 'x'], [B, 'y'], [C, 'z']])).length === 0);
+    const git = (args) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+    let baseNames = null;
+    try {
+        git(['rev-parse', '--verify', MIGRATION_BASE + '^{commit}']);
+        baseNames = git(['ls-tree', '--name-only', MIGRATION_BASE, 'supabase/migrations/']).split('\n').filter(Boolean)
+            .map((p) => path.basename(p)).filter((f) => MIGRATION_RE.test(f));
+    } catch (e) {
+        baseNames = null;
+    }
+    if (!baseNames) {
+        if (STRICT) ok('SUPABASE_STRICT=1 ៖ រកមិនឃើញ base ' + MIGRATION_BASE + ' (ត្រូវការ git · fetch-depth 0)', false);
+        else skipped.push('គ្មាន base ' + MIGRATION_BASE + ' ➜ មិនបានវាស់ migration append-only');
+        return;
+    }
+    const base = new Map(baseNames.map((f) => [f, git(['show', MIGRATION_BASE + ':supabase/migrations/' + f])]));
+    const current = new Map(migrationFiles.map((f) => [f, fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')]));
+    const problems = migrationHistoryProblems(base, current);
+    ok('migration ក្នុង ' + MIGRATION_BASE + ' (' + base.size + ') នៅដដែល · migration ថ្មី (' + [...current.keys()].filter((f) => !base.has(f)).length
+        + ') មាន version ក្រោយគេ · គ្មាន version ស្ទួន (កែ rules ➜ node supabase/scripts/generate-rules-sql.mjs បង្កើតឯកសារថ្មី)', problems.length === 0, problems);
+}
+
 async function rulesMigrationFreshness() {
-    console.log('\n── ០. migration rules ↔ firebase-database.rules.json (ប្រភពតែមួយ) ──');
-    const file = migrationFiles.find((f) => /_zoe_rules\.sql$/.test(f));
+    console.log('\n── ០. migration rules ចុងក្រោយ ↔ firebase-database.rules.json (ប្រភពតែមួយ) ──');
+    const file = migrationFiles.filter((f) => /_zoe_rules\.sql$/.test(f)).pop();
     ok('មាន migration rules (*_zoe_rules.sql)', !!file, migrationFiles);
     let gen = null;
     try { gen = await import(require('url').pathToFileURL(path.join(ROOT, 'supabase', 'scripts', 'rtdb-rules.mjs')).href); } catch (e) { gen = null; }
@@ -444,6 +496,7 @@ async function rulesMigrationFreshness() {
 
 async function main() {
     await rulesMigrationFreshness();
+    migrationAppendOnly();
     const reason = H.unavailableReason();
     if (reason) {
         if (STRICT) ok('SUPABASE_STRICT=1 ៖ ' + reason, false);
@@ -471,7 +524,7 @@ async function main() {
             ok('mutation «' + label + '» ៖ anchor ត្រូវលេចម្តងគត់ (ឃើញ ' + badAnchor + ')', false);
             continue;
         }
-        for (const [from, to] of pairs) mutated = mutated.replace(from, to);
+        for (const [from, to] of pairs) mutated = mutated.replace(from, () => to);
         const r = await suite(mutated, !equivalent);
         const caught = r.results.filter((x) => !x.pass);
         if (equivalent) {

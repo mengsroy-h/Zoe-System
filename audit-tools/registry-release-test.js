@@ -302,6 +302,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
                 'const dbListenerFailedPaths = new Set();',
                 'const dbListenerReportedFailures = new Set();',
                 'function refreshLiveToasts() {}',
+                'function liveSuccessCount() { return 0; }',
                 'function clearDbListenerRecovery() {}',
                 'function renderConnectionStatus() {}',
                 'function showToast() {}',
@@ -348,6 +349,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
                 'const dbListenerFailedPaths = new Set();',
                 'const dbListenerReportedFailures = new Set();',
                 'function refreshLiveToasts() {}',
+                'function liveSuccessCount() { return 0; }',
                 'function clearDbListenerRecovery() {}',
                 'function renderConnectionStatus() {}',
                 'function showToast() {}',
@@ -372,7 +374,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
                 DB_LISTENER_KEYS: ['history', 'deleted'], dbListenerGeneration: 0,
                 dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
                 dbListenerProgressAt: 0, dbListenerPendingSeen: 0, dbListenersFailed: false,
-                refreshLiveToasts() {}, clearDbListenerRecovery() {}, renderConnectionStatus() {}, showToast() {},
+                refreshLiveToasts() {}, liveSuccessCount: () => 0, clearDbListenerRecovery() {}, renderConnectionStatus() {}, showToast() {},
                 debouncedRenderAfterHistorySync() {}, runAutomaticDeletedCleanup() {},
                 generateUniqueId: () => 'fixture', parseTimestampFromId: () => 1, getServerNow: () => 1000
             });

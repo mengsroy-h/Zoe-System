@@ -23,5 +23,6 @@ export const REMOVED = {
 /** អត្ថបទដែលអ្នកប្រើអាន (ដកចេញជាមួយសាខាដែលលែងអាចទៅដល់) */
 export const REMOVED_STRINGS = {
     'សូមកំណត់រចនាសម្ព័ន្ធ FirebaseConfig ជាមុនសិន!': 'ZoeW 2.46.0 ៖ backend Firebase ឬ Supabase តាម Config ➜ `loginWithFirebase()` ពេលមិនទាន់ភ្ជាប់ ប្រាប់ផ្លូវ Setup Link (QR) មុន ហើយបើកប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ដដែល (Setup Link + Config Firebase) · សំណើម្ចាស់គម្រោង',
+    '⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។': 'ZoeW 2.48.0 ៖ License យឺតក្រោយចូលប្រព័ន្ធ (លើស ២០ វិ.) ➜ `proceedAfterLogin()` សាកម្តងទៀតដោយស្វ័យប្រវត្តិ (`ACTIVATION_RETRY_STEPS_MS`) ជំនួស toast «សូមសាកល្បងចូលម្តងទៀត» ហើយឈប់ (ការស្តារវគ្គក្រោយ reload គ្មានប្រអប់ចូល ➜ App ទទេ) · សារថ្មី `ACTIVATION_RETRY_TOAST` / `ACTIVATION_GIVE_UP_TOAST`',
     '🫆 ស្កេនក្រយៅដៃ ឬមុខ': 'React ១០០% ៖ សាខាបម្រុងរបស់ `setBiometricLabel()` ពេលប៊ូតុង **គ្មាន** `.bio-label` — `BiometricLabel` (JSX) គូរ `.bio-ico` (🫆) និង `.bio-label` ជានិច្ច ➜ សាខានោះលែងអាចទៅដល់ · អ្វីដែលអ្នកប្រើឃើញ (🫆 + «ស្កេនក្រយៅដៃ ឬមុខ») ដដែល (parity:dom)',
 };

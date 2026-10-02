@@ -128,6 +128,23 @@ async function groupAccount(m, rec) {
     f = fakeDeps();
     r = await A.handleRegister(Object.assign({}, REG, { password: 'ក'.repeat(8) }), f.deps);
     rec('ចុះឈ្មោះ ៖ ពាក្យសម្ងាត់ខ្មែរ ៨ តួ (២៤ byte) ➜ ទទួល', r.status === 200, r);
+    const CHECK = { invite: INVITE, check: true };
+    f = fakeDeps();
+    r = await A.handleRegister(CHECK, f.deps);
+    rec('ពិនិត្យកូដ (check) ៖ ប្រើបាន ➜ 200 invite-usable · ពិនិត្យដោយ hash · ⛔ មិនបង្កើតគណនី មិនស៊ីកូដ',
+        r.status === 200 && r.body.code === 'invite-usable' && f.kinds() === 'usable' && f.log[0][1] === wantHash, { r, log: f.kinds() });
+    f = fakeDeps({ usable: false });
+    r = await A.handleRegister(CHECK, f.deps);
+    rec('ពិនិត្យកូដ (check) ៖ ប្រើរួច/ផុត ➜ 403 invite-invalid · មិនបង្កើតគណនី', r.status === 403 && r.body.code === 'invite-invalid' && f.kinds() === 'usable', { r, log: f.kinds() });
+    f = fakeDeps({ usable: null });
+    r = await A.handleRegister(CHECK, f.deps);
+    rec('ពិនិត្យកូដ (check) ៖ DB មិនឆ្លើយ ➜ 502 db-unavailable (⛔ មិនមែន «ប្រើរួច»)', r.status === 502 && r.body.code === 'db-unavailable', { r, log: f.kinds() });
+    f = fakeDeps();
+    r = await A.handleRegister(Object.assign({}, REG, { check: 'yes' }), f.deps);
+    rec('ពិនិត្យកូដ ៖ check មិនមែន true ➜ ចុះឈ្មោះធម្មតា (មិនមែនផ្លូវពិនិត្យ)', r.status === 200 && r.body.code === 'registered', { r, log: f.kinds() });
+    f = fakeDeps();
+    r = await A.handleRegister({ invite: 'short', check: true }, f.deps);
+    rec('ពិនិត្យកូដ ៖ ខុសទម្រង់ ➜ 400 invite-invalid · មិនប៉ះ DB', r.status === 400 && r.body.code === 'invite-invalid' && f.log.length === 0, { r, log: f.kinds() });
     f = fakeDeps({ usable: false });
     r = await A.handleRegister(REG, f.deps);
     rec('ចុះឈ្មោះ ៖ កូដអញ្ជើញប្រើមិនបាន ➜ 403 · មិនបង្កើតគណនី', r.status === 403 && r.body.code === 'invite-invalid' && f.kinds() === 'usable', { r, log: f.kinds() });
@@ -458,6 +475,8 @@ const MUTATIONS = [
     ['invite-code.ts', 'កូដកំណត់ថ្មីប្រើ prefix អញ្ជើញ', 'return prefixedHash(RESET_HASH_PREFIX, normalized);', 'return prefixedHash(INVITE_HASH_PREFIX, normalized);'],
     ['account-core.ts', 'មិនពិនិត្យកូដមុនបង្កើតគណនី', "    if (!usable) return reply(403, 'invite-invalid');\n", ''],
     ['account-core.ts', 'DB មិនឆ្លើយ ➜ ចាត់ទុកកូដត្រឹមត្រូវ', "    if (usable === null) return reply(502, 'db-unavailable');\n", ''],
+    ['account-core.ts', 'check DB មិនឆ្លើយ ➜ «ប្រើរួច»', "        if (usableNow === null) return reply(502, 'db-unavailable');\n", ''],
+    ['account-core.ts', 'check ធ្លាក់ចូលការចុះឈ្មោះ', '    if (body.check === true) {', '    if (body.check === false) {'],
     ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);\n', ''],
     ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!finished.ok && finished.reason === 'unavailable') finished = await deps.finishRegistration(request);\n", ''],
     ['account-core.ts', 'reset មិនពិនិត្យកូដ', "    if (userId === null) return reply(403, 'reset-code-invalid');\n", "    if (userId === null) return reply(200, 'password-reset');\n"],

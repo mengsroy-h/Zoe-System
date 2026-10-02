@@ -685,15 +685,45 @@ async function run() {
             if (calls.length === 1) return fakeResponse(200, { url: SIGNED_URL });
             return fakeResponse(200, {});
         };
+        const SYNC_NOW = Date.UTC(2026, 9, 1, 8, 30);
         await api.syncNetlifyCookie(COOKIE, {
             siteId: SITE_ID,
             token: TOKEN,
             fetchImpl,
-            timeoutMs: 100
+            timeoutMs: 100,
+            nowImpl: () => SYNC_NOW
         });
 
         ok('ហៅ API ២ ដងតែប៉ុណ្ណោះ ៖ signed URL ➜ upload (គ្មាន build)',
             calls.length === 2, calls.length);
+        // ⛔ ត្រាពេល Sync ចូល metadata របស់ Blob (ទម្រង់ `@netlify/blobs` ៖ `b64;` + base64(JSON)) ➜ Function អាន `getWithMetadata()` ➜ 🩺 អាយុពិត។
+        //    signed URL ចុះហត្ថលេខាជាមួយ metadata ➜ header API (`netlify-blobs-metadata`) និង upload (`x-amz-meta-user`) ត្រូវដូចគ្នាបេះបិទ។
+        const metaApi = calls[0] && calls[0].options.headers['netlify-blobs-metadata'];
+        const metaUpload = calls[1] && calls[1].options.headers['x-amz-meta-user'];
+        let metaDecoded = null;
+        try { metaDecoded = JSON.parse(Buffer.from(String(metaApi).replace(/^b64;/, ''), 'base64').toString('utf8')); } catch (e) { metaDecoded = null; }
+        ok('metadata ៖ header API = header upload (signed URL ផ្ទៀងហត្ថលេខា)', !!metaApi && metaApi === metaUpload, [metaApi, metaUpload]);
+        ok('metadata ៖ ទម្រង់ b64; + JSON { syncedAt } = ម៉ោង Sync ពិត', /^b64;/.test(String(metaApi)) && !!metaDecoded && metaDecoded.syncedAt === SYNC_NOW
+            && JSON.stringify(Object.keys(metaDecoded)) === '["syncedAt"]', metaDecoded);
+        ok('⛔ metadata មិនផ្ទុក Cookie ឬ PAT', String(metaApi).indexOf(COOKIE) === -1 && String(metaApi).indexOf(TOKEN) === -1
+            && JSON.stringify(metaDecoded).indexOf(COOKIE) === -1);
+        // ⛔ ស្នាមភ្ជាប់ ៖ Function អាន metadata ដែលឧបករណ៍សរសេរ ដោយ decoder ពិតរបស់ `@netlify/blobs` (មិនមែនការសន្មត)
+        let blobsMain = null;
+        try { blobsMain = require(require.resolve('@netlify/blobs', { paths: [path.join(ROOT, 'ZoeW')] })); } catch (e) { blobsMain = null; }
+        if (blobsMain && typeof blobsMain.getStore === 'function') {
+            let seen = null;
+            const fakeFetch = async () => ({ status: 200, headers: new Map([['etag', '"e1"'], ['x-amz-meta-user', metaUpload]]), text: async () => 'c=1' });
+            fakeFetch.toString = () => 'fake';
+            const store = blobsMain.getStore({ name: 'probe', siteID: 'site-1', token: 't', edgeURL: 'https://edge.test', fetch: async (url, init) => {
+                const res = await fakeFetch(url, init);
+                return { status: res.status, headers: { get: (k) => res.headers.get(String(k).toLowerCase()) || null }, text: res.text };
+            } });
+            try { seen = await store.getWithMetadata('cookie', { type: 'text' }); } catch (e) { seen = { error: String(e && e.message) }; }
+            ok('ស្នាមភ្ជាប់ ៖ @netlify/blobs ពិតឌិកូដ metadata របស់ឧបករណ៍ ➜ { syncedAt }',
+                !!seen && seen.metadata && seen.metadata.syncedAt === SYNC_NOW, seen);
+        } else {
+            ok('ស្នាមភ្ជាប់ ៖ @netlify/blobs ពិតត្រូវផ្ទុកបាន (npm ci --prefix ZoeW)', false);
+        }
         ok('ស្នើ signed URL តាមផ្លូវ blob ត្រឹមត្រូវ',
             calls[0] && calls[0].options.method === 'PUT' && calls[0].url === BLOB_URL,
             calls[0] && calls[0].url);

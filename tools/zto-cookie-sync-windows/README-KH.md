@@ -190,6 +190,9 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 អាយុសុពលភាព session សម្រេចដោយ ZTO។ ការទើប Sync ឬលេខ fingerprint ដូចគ្នា
 មិនធានាថានៅសល់សុពលភាពប៉ុន្មាននាទីទេ។
 
+ឧបករណ៍ដាក់ **ម៉ោង Sync** ជាមួយ Cookie ក្នុង Netlify Blobs ➜ ZoeW 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ (ជួរ Lookup ZTO)
+បង្ហាញ «Sync ចូល Blob … មុន» (អាយុពិតរបស់ Cookie ក្នុង Blob)។ បើវារាយ «មិនទាន់ស្គាល់» ➜ Sync ម្តង។
+
 ⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** ៖
 
 ```text

@@ -104,6 +104,40 @@ export async function submitActivationKey() {
     }
 }
 
+export const ACTIVATION_RETRY_STEPS_MS = [5000, 15000, 30000, 60000];
+
+export const ACTIVATION_RETRY_TOAST = '⚠️ ផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់មិនទាន់បាន (បណ្តាញយឺត ឬដាច់) — កំពុងសាកម្តងទៀតដោយស្វ័យប្រវត្តិ...';
+
+export const ACTIVATION_GIVE_UP_TOAST = '⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមពិនិត្យអ៊ីនធឺណិត រួចបិទបើក App ម្តងទៀត។';
+
+let activationRetry = { generation: -1, attempt: 0, timer: null };
+
+export function cancelActivationRetry() {
+    if (activationRetry.timer) clearTimeout(activationRetry.timer);
+    activationRetry = { generation: -1, attempt: 0, timer: null };
+}
+
+export function scheduleActivationRetry(user, myAuthGeneration) {
+    if (activationRetry.generation !== myAuthGeneration) cancelActivationRetry();
+    const attempt = activationRetry.attempt;
+    if (attempt >= ACTIVATION_RETRY_STEPS_MS.length) {
+        cancelActivationRetry();
+        showToast(ACTIVATION_GIVE_UP_TOAST);
+        return false;
+    }
+    if (activationRetry.timer) clearTimeout(activationRetry.timer);
+    activationRetry.generation = myAuthGeneration;
+    activationRetry.attempt = attempt + 1;
+    activationRetry.timer = setTimeout(() => {
+        activationRetry.timer = null;
+        if (myAuthGeneration !== firebaseState.authGeneration) return;
+        if (!firebaseState.auth || firebaseState.auth.currentUser !== user) return;
+        proceedAfterLogin(user, myAuthGeneration);
+    }, ACTIVATION_RETRY_STEPS_MS[attempt]);
+    if (attempt === 0) showToast(ACTIVATION_RETRY_TOAST);
+    return true;
+}
+
 export async function proceedAfterLogin(user, myAuthGeneration) {
     let activated;
     try {
@@ -112,10 +146,11 @@ export async function proceedAfterLogin(user, myAuthGeneration) {
         if (myAuthGeneration !== firebaseState.authGeneration) return;
         console.error("Activation check failed:", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Activation check after login" });
-        showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។");
+        scheduleActivationRetry(user, myAuthGeneration);
         return;
     }
     if (myAuthGeneration !== firebaseState.authGeneration) return;
+    cancelActivationRetry();
     if (!activated) {
         closeModal('loginModal');
         return;

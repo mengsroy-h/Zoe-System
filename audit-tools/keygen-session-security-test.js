@@ -146,6 +146,10 @@ function build(options) {
         + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', ctx);
     vm.runInContext(realLicenseAppCodeDecl(src), ctx);
     vm.runInContext([realDecl('LICENSE_SEAT_SLOT_NAMES'), realDecl('LICENSE_SEAT_MAX')].join('\n'), ctx);
+    // ⛔ ថេរ/function ថ្មីរបស់ផ្លូវ «ព្យួរ ➜ ⏳» ៖ អវត្តមាន (កូដមុនកែ) ➜ stub ដែលធ្វើឲ្យការអះអាងខាងក្រោម **ធ្លាក់ដោយមានឈ្មោះ** មិនមែនគាំង
+    const pendingDecl = (src.match(/^const ADMIN_WRITE_PENDING_TEXT = .*;$/m) || [])[0];
+    vm.runInContext(pendingDecl || "const ADMIN_WRITE_PENDING_TEXT = '(អវត្តមាន)';", ctx);
+    if (src.indexOf('function armAdminLateWrite(') === -1) vm.runInContext('function armAdminLateWrite() {}', ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
         var authGeneration = 7;
@@ -157,7 +161,8 @@ function build(options) {
         var keyListSessionGeneration = 0;
         var lastGeneratedKey = '';
         var extendTargetId = 'key-a';
-        var keyListCache = [{ id: 'key-a', paths: ['ADM'], revoked: false }, { id: 'key-b', paths: ['ADM'], revoked: false }];
+        var keyListCache = [{ id: 'key-a', paths: ['ADM'], revoked: false, maxDevices: 1, seatDevices: [{ device: 'device-1', at: 1 }] }, { id: 'key-b', paths: ['ADM'], revoked: false, maxDevices: 1, seatDevices: [] }];
+        var seatReadFailed = false;
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
     vm.runInContext(slice([
@@ -175,6 +180,9 @@ function build(options) {
         'openExtendModal',
         'confirmExtendKey',
         'toggleRevokeKey',
+        ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
+        'setKeySeatLimit',
+        'releaseKeySeat',
         'copySensitiveText',
         'copyTextarea',
         'copyGeneratedKey',
@@ -349,6 +357,54 @@ async function run() {
                     !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed && !h.log.closed && !h.log.captures, h.log);
             }
         }
+    }
+
+    // ⛔ ការកែ Key ដែល **ព្យួរ** (អស់ពេល ១៥ វិ.) ខណៈ session នៅដដែល ៖ RTDB ចាក់ការសរសេរក្នុងជួរ ➜ វាអាចចុះពេលបណ្តាញមកវិញ ➜
+    //    សារត្រូវជា «⏳ មិនទាន់បញ្ជាក់» (⛔ មិនមែន «មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ» ដែលធ្វើឲ្យ admin ធ្វើម្តងទៀត) ហើយការចុះយឺត ➜ ✅ (ចុះយឺត) + Refresh។
+    //    ទិសផ្ទុយ ៖ ការបដិសេធពិត ➜ «មិនបាន» ដដែល · session ប្តូរ ➜ ស្ងាត់ (ផ្នែកខាងលើ)។
+    console.log('-- ការកែ Key ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់» · ចុះយឺត ➜ ✅ --');
+    const PENDING_RE = /^⏳ /;
+    for (const kind of ['extend', 'revoke', 'seat', 'release']) {
+        h = build(); h.ctx.openExtendModal('key-a');
+        h.ctx.prompt = () => '3';
+        const pending = deferred(); const timed = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
+        h.ctx.fb.set = () => { h.log.updates++; return pending.promise; };
+        h.ctx.withTimeout = () => timed.promise;
+        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a')
+            : kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok(kind + '/ព្យួរ ៖ write ចាប់ផ្តើមពិត', h.log.updates === 1, h.log.updates);
+        timed.reject(new Error(kind === 'seat' ? 'Seat limit update timed out' : kind === 'release' ? 'Release timed out' : 'Update timed out'));
+        await task; await drain();
+        ok(kind + '/ព្យួរ ៖ សារ «⏳ មិនទាន់បញ្ជាក់» (មិនមែន «មិនបាន») · គ្មាន ✅ មុន commit',
+            h.log.alerts.length === 1 && PENDING_RE.test(h.log.alerts[0]) && !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
+        pending.resolve(); await drain(); await drain();
+        ok(kind + '/ព្យួរ ➜ ចុះយឺត ៖ ✅ (ចុះយឺត) + Refresh បញ្ជី',
+            h.log.toasts.filter((t) => t.startsWith('✅') && /ចុះយឺត/.test(t)).length === 1 && h.log.refreshed >= 1, h.log);
+    }
+    for (const kind of ['seat', 'release']) {
+        h = build();
+        h.ctx.prompt = () => '3';
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.reject(new Error('PERMISSION_DENIED')); };
+        h.ctx.fb.set = () => { h.log.updates++; return Promise.reject(new Error('PERMISSION_DENIED')); };
+        await (kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a'));
+        await drain();
+        ok(kind + '/បដិសេធពិត ➜ «មិនបាន» (ទិសផ្ទុយ ៖ មិនមែន ⏳)',
+            h.log.alerts.length === 1 && !PENDING_RE.test(h.log.alerts[0]) && /មិនបាន/.test(h.log.alerts[0]), h.log);
+    }
+    {
+        h = build(); h.ctx.openExtendModal('key-a');
+        const pending = deferred(); const timed = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
+        h.ctx.withTimeout = () => timed.promise;
+        const task = h.ctx.confirmExtendKey();
+        await drain();
+        timed.reject(new Error('Update timed out'));
+        await task; await drain();
+        h.ctx.invalidateSensitiveSession();
+        pending.resolve(); await drain(); await drain();
+        ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
     }
 
     console.log('-- Clipboard៖ API មិនមាន ឬបដិសេធ មិនត្រូវចម្លងស្ងាត់ ឬអះអាងក្លែងក្លាយ --');

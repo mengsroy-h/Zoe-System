@@ -242,6 +242,8 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
     "source": "blob",
     "fingerprint": "a1b2c3d4",
     "ageMs": 12345,
+    "blobSyncAgeMs": 10800000,
+    "blobRenewAgeMs": null,
     "storeReason": null,
     "renewals": 0
   },
@@ -264,7 +266,9 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | --- | --- |
 | `source` | `blob` = អានពី Netlify Blobs (helper ដើរត្រឹមត្រូវ) · `env` = ធ្លាក់ចុះទៅ `ZTO_COOKIE` · `none` = គ្មានសោះ |
 | `fingerprint` | ៨ តួនៃ SHA-256 របស់ Cookie — ⛔ **មិនមែនតម្លៃ Cookie** ទេ; ប្រើដើម្បីមើលថាតម្លៃប្រែឬអត់ |
-| `ageMs` | ពេលតាំងពី cache ត្រូវបានអាន/ធ្វើឲ្យស្រស់; ប្រើសម្រាប់ cache ដែលមាន TTL ៦០ វិនាទី |
+| `ageMs` | ពេលតាំងពី cache ត្រូវបានអាន/ធ្វើឲ្យស្រស់; ប្រើសម្រាប់ cache ដែលមាន TTL ៦០ វិនាទី — ⛔ **មិនមែនអាយុ Cookie** |
+| `blobSyncAgeMs` | អាយុពិតរបស់ Cookie ក្នុង Blob ៖ ពេលតាំងពីឧបករណ៍ Sync សរសេរវា (metadata `syncedAt`) · `null` = Blob ត្រូវ Sync ដោយឧបករណ៍ដែលមិនដាក់ត្រា ឬ `source` មិនមែន `blob` ➜ Sync ម្តងទៀតដើម្បីវាស់ |
+| `blobRenewAgeMs` | ពេលតាំងពី Function បន្តអាយុ Cookie ចូល Blob ចុងក្រោយ (metadata `renewedAt`) · `null` = មិនទាន់បន្ត |
 | `storeReason` | មូលហេតុពេលអានចេញពី Blobs មិនបាន (`no-context` · `getstore` · `read:timeout` · `invalid` · `empty` …) |
 | `renewals` | ចំនួនការរក្សាទុក Cookie បន្តពី Argus ដែលបានបញ្ជាក់ជោគជ័យក្នុង instance នេះ |
 | `authRejectedAgeMs` | ZTO ទើបបដិសេធ Cookie នេះនៅប៉ុន្មាន ms មុន (`null` = មិនដែលបដិសេធ ឬការស្កេនក្រោយនោះជោគជ័យ) — ជាមូលដ្ឋានរបស់របៀប `--auto` |

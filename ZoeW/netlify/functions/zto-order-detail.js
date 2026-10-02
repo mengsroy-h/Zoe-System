@@ -72,6 +72,7 @@ const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
     authIdentity: '', version: 0, storeCookie: '', storeEtag: '', storeMissing: false,
+    blobSyncedAt: 0, blobRenewedAt: 0,
     renewAttemptValue: '', renewAttemptEtag: '',
     pendingRenewal: null, obsolete: new Set(), mustRevalidate: false
 };
@@ -199,7 +200,26 @@ function replaceCookieValue(value) {
     cookieState.authAcceptedAt = 0;
 }
 
-function adoptStoredCookie(stored, etag, version) {
+const BLOB_STAMP_MIN_MS = Date.UTC(2020, 0, 1);
+
+function blobStamp(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < BLOB_STAMP_MIN_MS || n > Date.now() + 86400000) return 0;
+    return Math.floor(n);
+}
+
+function noteBlobStamps(metadata) {
+    const meta = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
+    cookieState.blobSyncedAt = blobStamp(meta.syncedAt);
+    cookieState.blobRenewedAt = blobStamp(meta.renewedAt);
+}
+
+function blobStampAgeMs(stamp) {
+    if (!stamp) return null;
+    return Math.max(0, Date.now() - stamp);
+}
+
+function adoptStoredCookie(stored, etag, version, metadata) {
     if (version !== cookieState.version) return false;
     const pending = cookieState.pendingRenewal;
     if (pending && (stored === pending.baseCookie || pending.ancestors.has(stored))) {
@@ -210,6 +230,7 @@ function adoptStoredCookie(stored, etag, version) {
             cookieState.storeCookie = stored;
             cookieState.storeEtag = etag;
             cookieState.storeMissing = false;
+            noteBlobStamps(metadata);
         }
         return false;
     }
@@ -221,6 +242,7 @@ function adoptStoredCookie(stored, etag, version) {
     cookieState.storeCookie = stored;
     cookieState.storeEtag = etag || '';
     cookieState.storeMissing = false;
+    noteBlobStamps(metadata);
     cookieState.pendingRenewal = null;
     cookieState.mustRevalidate = false;
     return true;
@@ -304,7 +326,7 @@ function refreshCookieInBackground(store) {
             cookieState.storeReason = entry && entry.data ? 'invalid' : 'empty';
             return;
         }
-        adoptStoredCookie(stored, entry.etag, seen);
+        adoptStoredCookie(stored, entry.etag, seen, entry.metadata);
     }, () => {}).then(() => {
         cookieRefreshInFlight = false;
     }, () => {
@@ -343,7 +365,7 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
             const entry = read.value;
             const stored = sanitizeStoredCookie(entry && entry.data);
             if (stored) {
-                adoptStoredCookie(stored, entry.etag, version);
+                adoptStoredCookie(stored, entry.etag, version, entry.metadata);
                 return currentCookieCredential(opened.store);
             }
             storeWitness = { cookie: entry && typeof entry.data === 'string' ? entry.data : '',
@@ -364,6 +386,7 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     cookieState.storeCookie = storeWitness ? storeWitness.cookie : '';
     cookieState.storeEtag = storeWitness ? storeWitness.etag : '';
     cookieState.storeMissing = !!(storeWitness && storeWitness.missing);
+    noteBlobStamps(null);
     cookieState.pendingRenewal = null;
     cookieState.mustRevalidate = false;
     return currentCookieCredential(opened.store);
@@ -436,7 +459,9 @@ async function flushCookieRenewal(session, timeoutMs) {
     cookieState.renewAttemptEtag = pending.etag;
     const baseCookie = pending.baseCookie;
     const baseEtag = pending.etag;
-    const options = baseEtag ? { onlyIfMatch: baseEtag } : { onlyIfNew: true };
+    const renewedAt = Date.now();
+    const metadata = cookieState.blobSyncedAt ? { syncedAt: cookieState.blobSyncedAt, renewedAt: renewedAt } : { renewedAt: renewedAt };
+    const options = baseEtag ? { onlyIfMatch: baseEtag, metadata: metadata } : { onlyIfNew: true, metadata: metadata };
     const run = Promise.resolve().then(() => session.store.set(COOKIE_STORE_KEY, pending.value, options)).then((result) => {
         if (cookieState.storeCookie !== baseCookie || cookieState.storeEtag !== baseEtag) return;
         if (!result || result.modified !== true || typeof result.etag !== 'string' || !result.etag) {
@@ -448,6 +473,7 @@ async function flushCookieRenewal(session, timeoutMs) {
         cookieState.storeCookie = pending.value;
         cookieState.storeEtag = result.etag;
         cookieState.storeMissing = false;
+        noteBlobStamps(metadata);
         const current = cookieState.pendingRenewal;
         if (current === pending) cookieState.pendingRenewal = null;
         else if (current && current.baseCookie === baseCookie && current.etag === baseEtag) {
@@ -1485,6 +1511,8 @@ function diagnosticsBody(config, headers, authKind, credential) {
             source: (credential && credential.source) || 'none',
             fingerprint: cookieFingerprint(credential && credential.cookie) || null,
             ageMs: cookieState.at ? elapsedSince(cookieState.at) : null,
+            blobSyncAgeMs: credential && credential.source === 'blob' ? blobStampAgeMs(cookieState.blobSyncedAt) : null,
+            blobRenewAgeMs: credential && credential.source === 'blob' ? blobStampAgeMs(cookieState.blobRenewedAt) : null,
             storeReason: cookieState.storeReason || null,
             renewals: cookieState.renewals,
             authRejectedAgeMs: verdictMatches && cookieState.authRejectedAt
@@ -1797,6 +1825,8 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.storeCookie = '';
     cookieState.storeEtag = '';
     cookieState.storeMissing = false;
+    cookieState.blobSyncedAt = 0;
+    cookieState.blobRenewedAt = 0;
     cookieState.pendingRenewal = null;
     cookieState.obsolete.clear();
     cookieState.renewAttemptValue = '';

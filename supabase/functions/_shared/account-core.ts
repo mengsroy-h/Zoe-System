@@ -70,6 +70,11 @@ export async function handleRegister(input: unknown, deps: RegisterDeps): Promis
     if (!body) return reply(400, 'bad-request');
     const invite = normalizeInviteCode(body.invite);
     if (!invite) return reply(400, 'invite-invalid');
+    if (body.check === true) {
+        const usableNow = await deps.inviteIsUsable(await inviteCodeHash(invite));
+        if (usableNow === null) return reply(502, 'db-unavailable');
+        return usableNow ? reply(200, 'invite-usable') : reply(403, 'invite-invalid');
+    }
     const username = normalizeUsername(body.username);
     if (!username) return reply(400, 'username-invalid');
     const passwordIssue = passwordProblem(body.password);

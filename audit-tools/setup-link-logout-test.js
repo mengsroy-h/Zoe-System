@@ -55,6 +55,8 @@ for (const app of ['ZoeW']) {
             closeModal() {}, openModalHelper() {}, openConfigModal() {}
         };
         ctx[stateVar] = { projectId: 'business-B' };
+        // ⛔ Config ដែលកំពុងភ្ជាប់ (store `firebaseState.firebaseConfig` ➜ `firebaseConfig` ក្នុងទិដ្ឋភាពវាស់) ➜ scope ការចងចាំគណនី
+        ctx.firebaseConfig = { apiKey: 'A', databaseURL: 'https://business-b.firebaseio.com' };
         ctx.pendingRestoreId = null; ctx.pendingPermanentDeleteId = null;
         ctx.activeParentItemId = null; ctx.lookupSecretKey = 'secret';
         vm.createContext(ctx);
@@ -134,7 +136,24 @@ for (const app of ['ZoeW']) {
         // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜
         // ចាក់ **កូដពិត** ចូល sandbox។ វាត្រឡប់នៅបន្ទាត់ដំបូងព្រោះ fake DOM
         // គ្មាន `toastContainer` — ដូច្នេះវាមិនត្រូវការ `liveToastState` ទេ។
+        // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` (toast រស់ដែលផុតពិដាន) ➜ ចាក់ការប្រកាស **ពិត** (មិនមែន stub)
+        const expiredDecl = (src.match(/^ *const expiredLiveKeys = .*$/m) || [])[0];
+        ok(!!expiredDecl, 'រកឃើញការប្រកាស expiredLiveKeys ក្នុង app.js');
+        if (expiredDecl) vm.runInContext(expiredDecl, ctx);
         vm.runInContext(sliceFn(src, 'refreshLiveToasts'), ctx);
+        // ⛔ ការបំពេញគណនីចងនឹង backend + Project (`login-memory.ts`) ➜ ចាក់កូដ **ពិត** (ថេរ · function · `loginPrefillScope`)
+        ['REMEMBERED_LOGIN_KEY', 'REMEMBERED_LOGIN_SCOPE_KEY'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [])[0];
+            ok(!!decl, 'រកឃើញ ' + n + ' ក្នុង app.js');
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        const prefillScopeDecl = (src.match(/^ *let loginPrefillScope = .*$/m) || [])[0];
+        if (prefillScopeDecl) vm.runInContext(prefillScopeDecl, ctx);
+        ['loginBackendScope', 'rememberedLoginKind', 'rememberedLoginFor'].forEach((n) => {
+            const fn = sliceFn(src, n);
+            ok(!!fn, n + '() មានក្នុង app.js');
+            if (fn) vm.runInContext(fn, ctx);
+        });
         vm.runInContext(sliceFn(src, 'showLoginModalWithPrefill'), ctx);
 
         let threw = null;

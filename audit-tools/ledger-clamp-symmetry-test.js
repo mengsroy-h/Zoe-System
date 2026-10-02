@@ -151,9 +151,14 @@ const BOOT = function (seed) {
     window.dispatchEvent(new Event('firebasesdkready'));
 };
 
-function today() {
+// ⛔ កូនសោថ្ងៃត្រូវ **កកម្តង** ក្នុងមួយការរត់ ៖ seed (ថ្ងៃ X) និងការអាន ledger (ថ្ងៃ X) ត្រូវជាថ្ងៃដដែល។ វាស់បាន (2.48.0) ៖ ការរត់ឆ្លងម៉ោង
+//    ០០:០០ (ម៉ោងម៉ាស៊ីន) ➜ seed ថ្ងៃ 10-01 តែ `rev()` អានថ្ងៃ 10-02 ➜ `null` ➜ FAIL ក្លែងក្លាយ «ចំណូលថ្ងៃត្រឡប់ទៅ 2» ខណៈ ledger ខែត្រឹមត្រូវ
+const TODAY_KEY = (() => {
     const t = new Date();
     return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+})();
+function today() {
+    return TODAY_KEY;
 }
 
 function bc(code, cod, dod, closed) {

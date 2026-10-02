@@ -1,14 +1,16 @@
 import { fieldChecked, fieldValue, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
+import { appSessionStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { AUTH_STUCK_RECOVERY_FLAG } from '../core/storage-keys';
+import { clearPendingInvite } from './account';
 import { clearAppUnlockedForSession } from './app-lock';
 import { resetClearHistoryOperationState } from './clear-history';
 import { checkPinAndOpenConfig } from './config';
 import { clearCustomerDataTableCache } from './customer-table';
 import { proceedAfterLogin } from './license';
 import { applyCurrentFilter } from './monthly-report';
+import { forgetRememberedLogin, loginBackendScope, rememberLogin } from './login-memory';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
@@ -107,6 +109,7 @@ export function performLogin(email, password, rememberMe) {
     viewState.loginBusy = true;
 
     const generationAtLogin = firebaseState.authGeneration;
+    const scopeAtLogin = loginBackendScope();
 
     firebaseState.fb.setPersistence(firebaseState.auth, rememberMe ? firebaseState.fb.browserLocalPersistence : firebaseState.fb.browserSessionPersistence)
         .then(() => {
@@ -116,10 +119,11 @@ export function performLogin(email, password, rememberMe) {
             firebaseState.autoLoginAttempted = false;
 
             if (rememberMe) {
-                safeStoreSet(appLocalStore, 'remembered_email', email);
+                rememberLogin(email, scopeAtLogin);
             } else {
-                safeStoreRemove(appLocalStore, 'remembered_email');
+                forgetRememberedLogin();
             }
+            clearPendingInvite();
 
             if (firebaseState.authGeneration === generationAtLogin && userCredential && userCredential.user) {
                 firebaseState.authGeneration++;

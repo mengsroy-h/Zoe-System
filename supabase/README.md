@@ -49,6 +49,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | Function | Body (JSON) | លទ្ធផលជោគជ័យ |
 |---|---|---|
 | `register` | `invite` · `username` · `password` | `200 {ok:true, code:"registered", tenantId, role}` |
+| `register` (ពិនិត្យកូដ) | `invite` · `check: true` | `200 {ok:true, code:"invite-usable"}` · `403 invite-invalid` (ប្រើរួច/ផុត) — ⛔ មិនបង្កើតគណនី មិនស៊ីកូដ ៖ ZoeW ប្រើវាសម្រេចថាត្រូវបើកប្រអប់ចុះឈ្មោះ ឬចូលប្រព័ន្ធ |
 | `reset-password` | `username` · `resetCode` · `password` | `200 {ok:true, code:"password-reset"}` |
 
 `code` ពេលបរាជ័យ (ZoeW បកប្រែជាអក្សរខ្មែរ) ៖ `bad-request` · `invite-invalid` · `username-invalid` · `password-short` · `password-long` (លើស ៧២ byte) ·

@@ -100,7 +100,9 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
             'rawSnapshotToItemList'
         ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
-        const src = 'let dbListenersFailed = false;\n' +
+        // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
+        const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
+        const src = expiredDecl + '\n' + 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
@@ -185,11 +187,13 @@ const REAL_LISTENER_REF_NAMES = (function () {
 })();
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
-    'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS',
+    // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` (toast រស់ដែលផុតពិដាន) ➜ ការប្រកាស **ពិត**
+    'expiredLiveKeys'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
 missingConsts.forEach((n) => ok('ថេរ `' + n + '` មានក្នុង app.js', false));
 const CONST_STUBS = missingConsts
-    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1')) + ';')
+    .map((n) => 'const ' + n + ' = ' + (n === 'expiredLiveKeys' ? 'new Set()' : (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1'))) + ';')
     .join('\n');
 
 function buildContext() {

@@ -4,11 +4,12 @@ import { fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow, pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
-import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
+import { appLocalStore, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ENTRY_SCAN_MODE_KEY } from '../core/storage-keys';
-import { hasPendingInvite, openRegisterForm } from './account';
+import { hasPendingInvite, routePendingInvite } from './account';
 import { cancelPendingLookupUnlock, clearLookupStatus } from './auto-lookup';
 import { isPinFlowPending } from './config';
+import { forgetRememberedLogin, loginBackendScope, rememberedLoginFor } from './login-memory';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { expandedTrashGroups } from './locker';
@@ -38,9 +39,11 @@ export const TRASH_WRITE_SLOW_NOTICE_MS = 15000;
 
 export function clearRememberedSession(keepEmail) {
     safeStoreRemove(appLocalStore, 'zoew_login_time');
-    if (!keepEmail) safeStoreRemove(appLocalStore, 'remembered_email');
+    if (!keepEmail) forgetRememberedLogin();
     clearZtoPickupStatusStore();
 }
+
+let loginPrefillScope = null;
 
 export async function isFirebaseSessionExpired(user) {
     try {
@@ -186,10 +189,14 @@ export function showLoginModalWithPrefill() {
         if (id !== 'loginModal') closeModal(id);
     });
     openModalHelper('loginModal');
-    const savedEmail = safeStoreGet(appLocalStore, 'remembered_email');
+    const scope = loginBackendScope();
+    const savedEmail = rememberedLoginFor(scope);
     if (savedEmail) {
         setFieldValue('loginEmailInput', savedEmail);
         setFieldChecked('rememberMeCheckbox', true);
+    } else if (loginPrefillScope !== null && loginPrefillScope !== scope) {
+        setFieldValue('loginEmailInput', '');
     }
-    if (viewState.backendKind === 'supabase' && hasPendingInvite()) openRegisterForm();
+    loginPrefillScope = scope;
+    if (viewState.backendKind === 'supabase' && hasPendingInvite()) routePendingInvite();
 }

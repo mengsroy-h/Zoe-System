@@ -2689,6 +2689,18 @@
     },
     "supabase/types/deno.d.ts": {
       "policy": "supabase-config"
+    },
+    "ZoeW/src/features/login-memory.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/login-routing.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/toast-live-expiry.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/activation-retry.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -322,7 +322,7 @@ export function applySetupPayload(parsed) {
         ZoeErrors.init('zoew');
         setFieldValue('sentryDsnInput', linkDsn);
     }
-    rememberSetupInvite(linkInvite);
+    rememberSetupInvite(linkInvite, linkInvite ? String(parsed.supabaseUrl) : '');
     fillConfigFields(linkConfig);
     setFieldValue('setupLinkInput', '');
     return linkDsn;

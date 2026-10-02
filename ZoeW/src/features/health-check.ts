@@ -9,7 +9,7 @@ import { appLocalStore, appSessionStore } from '../core/storage';
 import { DB_LISTENER_KEYS } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
-import { LICENSE_APP_CODE } from './license';
+import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
 import { lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
@@ -90,6 +90,17 @@ export function healthTenantRow() {
     return healthRow('bad', 'ហាង (Supabase)', label + ' — ' + (account.status === 'revoked' ? 'ត្រូវបានបិទ' : 'ផុតកំណត់'));
 }
 
+export const LICENSE_NEAR_EXPIRY_DAYS = 7;
+
+export const LICENSE_DEFINITIVE_REASONS = ['expired', 'expired-server', 'revoked', 'not-found', 'signature', 'app-mismatch', 'seat-taken', 'format'];
+
+export function healthKeyValidityText(status) {
+    const exp = Number(status && status.exp);
+    if (!Number.isFinite(exp) || exp <= 0) return '';
+    const days = Number(status.daysLeft);
+    return 'ផុត ' + getZoneDateKey(exp, 0) + (Number.isFinite(days) && days >= 0 ? ' (នៅសល់ ' + days + ' ថ្ងៃ)' : '');
+}
+
 export async function healthLicenseRow() {
     if (viewState.backendKind === 'supabase') return healthTenantRow();
     if (!window.ZoeLicense || typeof ZoeLicense.getStatus !== 'function') {
@@ -97,12 +108,27 @@ export async function healthLicenseRow() {
     }
     try {
         const status = await withTimeout(ZoeLicense.getStatus(LICENSE_APP_CODE), 8000, 'License check timed out');
+        const validity = healthKeyValidityText(status);
         if (status && status.state === 'active') {
-            return healthRow('ok', 'អាជ្ញាប័ណ្ណ', 'សកម្ម');
+            const days = Number(status.daysLeft);
+            if (Number.isFinite(days) && days <= LICENSE_NEAR_EXPIRY_DAYS) {
+                return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'Key សកម្ម · ' + validity + ' — ជិតផុតកំណត់ សូមទាក់ទងអ្នកលក់ដើម្បីពន្យារ');
+            }
+            return healthRow('ok', 'អាជ្ញាប័ណ្ណ', validity ? 'Key សកម្ម · ' + validity : 'Key សកម្ម');
+        }
+        if (status && status.state === 'offline-grace-exceeded') {
+            return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'Key ត្រូវភ្ជាប់អ៊ីនធឺណិតដើម្បីផ្ទៀងផ្ទាត់ម្តងទៀត' + (validity ? ' · ' + validity : ''));
         }
         const reason = safeLookupReason(status && status.reason);
-        return healthRow('warn', 'អាជ្ញាប័ណ្ណ',
-            'ស្ថានភាព ៖ ' + ((status && status.state) || 'មិនស្គាល់') + (reason ? ' (' + reason + ')' : ''));
+        if (status && status.state === 'required' && !reason) {
+            return healthRow('bad', 'អាជ្ញាប័ណ្ណ', 'ឧបករណ៍នេះមិនទាន់មាន Activation Key');
+        }
+        if (status && status.state === 'required' && LICENSE_DEFINITIVE_REASONS.indexOf(reason) !== -1) {
+            return healthRow('bad', 'អាជ្ញាប័ណ្ណ', licenseFailureMessage(reason));
+        }
+        return healthRow('warn', 'អាជ្ញាប័ណ្ណ', reason
+            ? 'ផ្ទៀងផ្ទាត់ Key មិនបាន — ' + licenseFailureMessage(reason) + ' (មិនមែនមានន័យថា Key ខុសទេ)'
+            : 'ស្ថានភាព ៖ ' + ((status && status.state) || 'មិនស្គាល់'));
     } catch (e) {
         return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'ពិនិត្យមិនបាន — មិនមែនមានន័យថា Key ខុសទេ');
     }
@@ -166,6 +192,24 @@ export function ztoDiagnosticsUrl(cfg) {
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
     return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + '?diag=1';
+}
+
+export function durationText(ms) {
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
+    const min = Math.floor(ms / 60000);
+    if (min < 1) return 'មិនដល់ ១ នាទី';
+    if (min < 60) return min + ' នាទី';
+    const hours = Math.floor(min / 60);
+    if (hours < 48) return hours + ' ម៉ោង';
+    return Math.floor(hours / 24) + ' ថ្ងៃ';
+}
+
+export function ztoBlobAgeText(cookie) {
+    if (!cookie || cookie.source !== 'blob') return '';
+    const synced = durationText(cookie.blobSyncAgeMs);
+    const renewed = durationText(cookie.blobRenewAgeMs);
+    if (!synced && !renewed) return ' · អាយុក្នុង Blob ៖ មិនទាន់ស្គាល់ (Sync ម្តងទៀតដើម្បីវាស់)';
+    return (synced ? ' · Sync ចូល Blob ' + synced + 'មុន' : '') + (renewed ? ' · បន្តអាយុចុងក្រោយ ' + renewed + 'មុន' : '');
 }
 
 export function ztoRenewalText(body) {
@@ -233,7 +277,8 @@ export async function healthLookupRow() {
         const rejectedAgeMs = body && body.cookie && body.cookie.authRejectedAgeMs;
         const acceptedAgeMs = body && body.cookie && body.cookie.authAcceptedAgeMs;
         const cookieText = 'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
-            + (typeof ageMs === 'number' ? ' · អាយុ ' + Math.round(ageMs / 60000) + ' នាទី' : '')
+            + ztoBlobAgeText(body && body.cookie)
+            + (typeof ageMs === 'number' ? ' · Server អានចុងក្រោយ ' + (durationText(ageMs) || '0 នាទី') + 'មុន' : '')
             + (reason ? ' · ' + reason : '')
             + ztoRenewalText(body);
         if (typeof rejectedAgeMs === 'number') {

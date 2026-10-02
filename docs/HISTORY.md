@@ -39,28 +39,24 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-### 🤝 Handoff សម្រាប់ session បន្ទាប់ (PR #279 · branch `claude/focused-brown-3xf7am` · មិនទាន់ merge)
+### 🤝 Handoff សម្រាប់ session បន្ទាប់ (PR #279 merge រួច ➜ `main` `e07b2ef`)
 
-⛔ **ផ្ទៀងផ្ទាត់ស្ថានភាព git មុនជឿអត្ថបទនេះ** (`git log origin/main..origin/claude/focused-brown-3xf7am`)។ CI លើ `9f0524f` ៖ shard ១ · ២ · ៤ ជាប់;
-shard ៣ ធ្លាក់តែ `shared-fns` (`waitForFirebaseSDK`) ➜ កត់ភាពខុសគ្នាដោយចេតនាក្នុង checker រួច (លម្អិតផ្នែក ២ · 2026-10-02)។
-⏳ CI លើ commit ជួសជុលត្រូវផ្ទៀងផ្ទាត់តាម GitHub Actions។ ⛔ **កុំ merge** ដោយគ្មានការស្នើពីម្ចាស់គម្រោង (ច្បាប់ ១)។
+⛔ **ផ្ទៀងផ្ទាត់ស្ថានភាព git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main`)។ ⛔ **កុំ merge** ដោយគ្មានការស្នើពីម្ចាស់គម្រោង (ច្បាប់ ១)។
 
-**ធ្វើរួចក្នុង PR នេះ** (លម្អិតក្នុងផ្នែក ១ [2.48.0] និងផ្នែក ២) ៖ Config ➜ Login ➜ ចុះឈ្មោះឆ្លាតវៃ · 🩺 License/ZTO Cookie · toast រស់និយាយការពិត ·
-✅ មិនស្ទួនពេលភ្ជាប់មកវិញ · Supabase Security Advisor ៧ ➜ ០ (SECURITY DEFINER ➜ `private`) · migration append-only + generator rules បង្កើតឯកសារថ្មី ·
-migration history លើ Project `xrobehzmmwjfxwkjysgg` repair រួច · ហាង Supabase មិនទាញ SDK Firebase · `CLAUDE.md` ជាអង់គ្លេស ទុកតែច្បាប់ + អ្នកយាមលេខកំណែ/កាលបរិច្ឆេទ ·
-`announcements.json` 2.48.0។
+**ផ្ទៀងរួចក្រោយ merge** (ភស្តុតាងក្នុងផ្នែក ២ · 2026-10-02 «Handoff ក្រោយ merge PR #279») ៖ CI `Audit` លើ `main` ជាប់ ៤ shard · APK 2.48.0 ចេញ Release
+ស្វ័យប្រវត្តិ · Supabase `xrobehzmmwjfxwkjysgg` ៖ migration ៤ កត់ក្នុង history (រួម `20261002000100`) · `register`/`reset-password` ACTIVE ·
+Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO ១ `zoe_ops` គ្មាន policy (ដោយចេតនា ៖ `revoke all` ➜ ចូលតែតាម function definer)។
 
 **នៅសល់ (តាមលំដាប់)** ៖
-1. **CI លើ commit ចុងក្រោយ** ៖ ធ្លាក់ ➜ កែ (`RUNALL_ONLY=<checker>` មុន ➜ រត់ពេញ)។
-2. **ផ្ទៀងផ្ទាត់ Supabase ច្រើនជុំ** (សំណើម្ចាស់គម្រោង) ៖ ជុំ ១ (finder ៦ ៖ SQL authz · rules engine · Edge Functions · adapter ក្នុង App · ZoeKeyGen+Netlify ·
-   deploy/ops/tests) រត់ក្នុង session មុន — លទ្ធផលមិនបានកត់ទីនេះ ➜ **រត់ម្តងទៀត** (អាន repo + Postgres ពិតតាម `audit-tools/supabase-pg.js` · មិនកែ repo ·
-   កំហុសពិតនីមួយៗ ➜ អ្នកយាមមុន រួចកែ)។ ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
-3. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
-   `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` · (គ) chunk `supabase-backend` ក្នុងសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។
-4. **សម្អាត `docs/HISTORY.md`** (សំណើម្ចាស់គម្រោង · ពន្យារដោយចេតនា) ៖ ប្រវត្តិដែលលែងប្រើ ➜ `docs/HISTORY-ARCHIVE.md` ឬលុបចោល (ច្បាប់ ១២)។
-5. **Audit ដើមដែលនៅសល់** ៖ បណ្តាញ · សុវត្ថិភាព · ឯកសារ `.md` ទាំងអស់ធៀបកូដ។
-6. **ក្រោយ merge** ៖ integration អនុវត្ត migration `20261002000100` + deploy `register`/`reset-password` ➜ ពិនិត្យ Security Advisor · សាកលើឧបករណ៍ពិត (ធាតុ 2.48.0 ខាងក្រោម)
-   បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
+1. **ផ្ទៀងផ្ទាត់ Supabase ច្រើនជុំ** (សំណើម្ចាស់គម្រោង · ⏸️ ពន្យារដើម្បីសន្សំកូតា) ៖ finder ៦ (SQL authz · rules engine · Edge Functions · adapter ក្នុង App ·
+   ZoeKeyGen+Netlify · deploy/ops/tests) អាន repo + Postgres ពិតតាម `audit-tools/supabase-pg.js` · កំហុសពិតនីមួយៗ ➜ អ្នកយាមមុន រួចកែ។
+   ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
+2. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
+   `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)`។ ⛔ ទាំង ២ ប៉ះ adapter/Postgres ➜ ត្រូវរត់ `emu/supabase-adapter-parity` · `supabase-*` ពេលកែ។
+3. **សម្អាត `docs/HISTORY.md`** (សំណើម្ចាស់គម្រោង · ពន្យារដោយចេតនា) ៖ ប្រវត្តិដែលលែងប្រើ ➜ `docs/HISTORY-ARCHIVE.md` ឬលុបចោល (ច្បាប់ ១២)។
+4. **Audit ដើមដែលនៅសល់** ៖ បណ្តាញ · សុវត្ថិភាព · ឯកសារ `.md` ទាំងអស់ធៀបកូដ។
+5. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** (ធាតុ 2.48.0 ខាងក្រោម) បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase
+   ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
 
 ⛔ **សន្សំកូតា** ៖ រត់តែ checker ពាក់ព័ន្ធក្នុង session (`RUNALL_ONLY=…`) ហើយទុកឲ្យ CI លើ GitHub (៤ ផ្នែកស្របគ្នា ~១០ នាទី) វាស់ពេញ · ឆ្លើយម្ចាស់គម្រោងជាខ្មែរ។
 
@@ -74,16 +70,17 @@ migration history លើ Project `xrobehzmmwjfxwkjysgg` repair រួច · ហ�
   (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
   (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
   (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
-  (៤) chunk `supabase-backend` ចូលសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។ ការទាញ SDK Firebase ពេល Config ជា Supabase កែរួចក្នុង PR #279 ➜ នៅរង់ចាំ merge និងសាកលើឧបករណ៍ពិត។
+  (៤) chunk `supabase-backend` ស្ថិតក្នុង `CORE_SHELL` រួចសម្រាប់អ្នកប្រើទាំងអស់ (វាស់ ៖ ~២៤១ KB · gzip ~៦៤ KB · ទាញម្តងក្នុងមួយ `CACHE_VERSION`)
+  ➜ ហាង Supabase បើកក្រៅបណ្តាញបាន · ការដកវាចេញពីអ្នកប្រើ Firebase ត្រូវឲ្យ SW ដឹង Config ➜ ⛔ មិនប្តូរដោយគ្មានការសម្រេចពីម្ចាស់គម្រោង។
+  ការទាញ SDK Firebase ពេល Config ជា Supabase ៖ merge រួច (PR #279) ➜ ⏳ សាកលើឧបករណ៍ពិត។
 - ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merge រួច (PR #277)** — សាកលើឧបករណ៍ពិត ៖
   ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
   ZoeKeyGen ៖ Tab ទូរស័ព្ទ · Signing Key ផុត ១៥ នាទី (លម្អិត ៖ `docs/HISTORY.md` [2.47.0])។
 - ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merge រួច (PR #278)** — សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 បើកការជូនដំណឹង
   (គ្មាន Activation Key · ទូរស័ព្ទ ២ ក្នុងហាងដដែលទទួលការរំលឹកម៉ោង ៨) · រក្សាទុក Config Supabase ➜ គ្មានប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែត ·
   ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android (Chrome · Google Password Manager) · QR ចំកណ្តាល + 💾 រក្សាទុក QR (លម្អិត ៖ `docs/HISTORY.md` [2.47.1])។
-- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 (branch `claude/focused-brown-3xf7am` ៖ មិនទាន់ merge)** — Supabase ៖ ✅ history ត្រូវ repair រួច (Project `xrobehzmmwjfxwkjysgg` ៖
-  migration ៣ ដំបូងផ្ទៀងលើ server ៖ តារាង · function · md5 `private.zoe_rules()` ស្មើ repo ➜ កត់ក្នុង `schema_migrations`) ➜ merge ➜
-  integration អនុវត្ត migration `20261002000100` (SECURITY DEFINER ➜ schema `private`) + deploy `register`/`reset-password` ➜ Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
+- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 — merge រួច (PR #279)** — Supabase ៖ ✅ migration `20261002000100` (SECURITY DEFINER ➜ schema `private`)
+  អនុវត្តរួច · `register`/`reset-password` deploy រួច · Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
   សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
   (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។
 - ⏳ **សំណើម្ចាស់គម្រោង ៖ «ពេល Supabase រួចសព្វគ្រប់ លុបឯកសារ Firebase ដែលលែងប្រើ»** — ⛔ **កុំលុបមុនលក្ខខណ្ឌទាំងអស់ពិត** ៖ Supabase
@@ -97,10 +94,6 @@ migration history លើ Project `xrobehzmmwjfxwkjysgg` repair រួច · ហ�
   (session នេះហៅ Google ពិតមិនបាន) ➜ ម្ចាស់គម្រោង ៖ `setup.cmd` ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ ត្រូវ exit 0 (គ្មាន `FAIL` · `WARN`)
   ➜ Login ក្នុង ZoeW ដោយគណនីនោះ។ បន្ទាប់មក `new --project-id <id> --branch <សាខា> --adopt` សម្រាប់អតិថិជនចាស់ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។
   ⛔ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (លើស ➜ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា)។
-- ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
-  បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
-  ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
-  ⛔ វាស់បាន (2026-09-29) ៖ **០ Release** · run `Android APK` ទាំងអស់ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា) ➜ មិនមែនភស្តុតាងថា secret ខុស។
 - ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
   ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
   (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
@@ -1940,6 +1933,23 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### Handoff ក្រោយ merge PR #279 ៖ ផ្ទៀងស្ថានភាព និងវាស់ chunk `supabase-backend` (2026-10-02 · ឯកសារតែប៉ុណ្ណោះ)
+
+- **git** ៖ `origin/main` = `e07b2ef` (merge PR #279) · branch `claude/handoff-remaining-work-ekyw6e` ចាប់ផ្តើមពីវា (`rev-list` ០/០)។
+- **CI** ៖ [Audit run 36996655322](https://github.com/mengsroy-h/Zoe-System/actions/runs/36996655322) លើ `e07b2ef` ➜ `success` ·
+  [Android APK run 36996655215](https://github.com/mengsroy-h/Zoe-System/actions/runs/36996655215) ➜ `success` · Release `zoew-android-v2.48.0` និង
+  `zoew-android-v2.47.1` មានរួច ➜ ធាតុ ⏳ «Release APK ស្វ័យប្រវត្តិ» (secret ៤ · កូតា runner) ដកចេញពីបញ្ជីរង់ចាំ។
+- **Supabase** (Project `xrobehzmmwjfxwkjysgg` · អានតាម MCP តែប៉ុណ្ណោះ គ្មានការសរសេរ) ៖ `list_migrations` ➜ ៤ version ស្មើ `supabase/migrations/` ·
+  Edge Function `register` · `reset-password` ACTIVE (version 7) · Security Advisor ៖ WARN ១ `auth_leaked_password_protection` (Pro) ·
+  INFO ១ `rls_enabled_no_policy` លើ `public.zoe_ops` — ដោយចេតនា ៖ `20261001000200_zoe_datastore.sql` `revoke all` ពី `anon` · `authenticated` ·
+  `service_role` ➜ client មិនចូលដោយផ្ទាល់ទាល់តែសោះ (policy មិនចាំបាច់)។
+- **chunk `supabase-backend`** ៖ `vite build` លើ `e07b2ef` ➜ `assets/supabase-backend-*.js` ២៤១ ០៧៨ byte (gzip -9 ៖ ៦៣ ៩២២) · `index-*.js` ៥២៣ ៦៥១
+  (gzip ១៣៩ ៩៥០) · ឈ្មោះ chunk នៅក្នុងបញ្ជីទីមួយរបស់ `sw.js` (`CORE_SHELL` ៖ regex `^./assets/.*\.(js|css)$` ក្នុង `vite.config.mts`) ➜ អ្នកប្រើ
+  Firebase ក៏ទាញវាម្តងក្នុងមួយ `CACHE_VERSION`។ ការផ្លាស់ទៅ `OPTIONAL_SHELL` មិនសន្សំអ្វីទេ (វាក៏ install សម្រាប់អ្នកប្រើទាំងអស់) · ការដកចេញទាំងស្រុង
+  ធ្វើឲ្យហាង Supabase បើកក្រៅបណ្តាញមិនបាន ➜ ទុកដដែល · ការសម្រេចផ្សេងជារបស់ម្ចាស់គម្រោង។
+- **មិនបានរត់** ៖ `run-all.sh` · checker Supabase (ម្ចាស់គម្រោងស្នើសន្សំកូតា) ➜ ជុំ audit Supabase ច្រើនជុំនៅ ⏸️ ក្នុង handoff។
+- **សកម្មភាពដោយដៃ** ៖ គ្មាន។
 
 ### CI របស់ PR #279 ៖ ភាពខុសគ្នា loader ដែលមានចេតនា (2026-10-02 · audit-tools និងឯកសារតែប៉ុណ្ណោះ)
 

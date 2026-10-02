@@ -1,2106 +1,1533 @@
-# Zoe-System
+# Zoe-System — rules for Claude sessions
 
-> ## ⚡ START HERE — អានច្បាប់មុនប៉ះកូដ
->
-> ឯកសារនេះសរសេរឲ្យ **session Claude ថ្មីទាំងស្រុង** អាចបន្តការងារបាន ដោយ
-> គ្មានប្រវត្តិការសន្ទនាមុន។ ឯកសារនេះមានច្បាប់ និង runbook ច្រើន; ប្រើផែនទីខាងក្រោម
-> ដើម្បីរកផ្នែកពាក់ព័ន្ធ ហើយអានច្បាប់មុនកែ។ ប្រវត្តិកំហុស · លេខដែលវាស់បាន · កំណត់ត្រាតាមកំណែ ស្ថិតក្នុង
-> **[`docs/HISTORY.md`](docs/HISTORY.md)** (សម័យ React) និង **[`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md)**
-> (សម័យ vanilla) ដែលជា **ឯកសារយោង មិនមែនឯកសារអាន**។
->
-> ### ⛔ មេរៀនតែមួយដែលសំខាន់ជាងគេ
->
-> **ការកត់ត្រាមិនមែនជាការអនុវត្តទេ។** មេរៀន «checker មិនបានពិនិត្យអ្វីសោះ»
-> ត្រូវបានសរសេរក្នុងឯកសារនេះ (ជំនាន់ចាស់ ៥,០៦៥ បន្ទាត់) **១៣ ដង** ឆ្លងកាត់
-> ៥ កំណែ — ហើយវានៅតែកើតឡើងជុំបន្ទាប់រៀងរាល់ដង។ ដូច្នេះ ៖
->
-> **រកឃើញកំហុស ➜ សាងឧបករណ៍ជាមុន ➜ បញ្ជាក់ថាវាធ្លាក់លើ tree មុនកែ ➜ ទើបកែកូដ។**
->
-> ការសរសេរប្រយោគព្រមានជំនួសឧបករណ៍ គឺជាការធានាថាកំហុសនោះនឹងវិលមកវិញ។
-> នោះជាមូលហេតុដែលឯកសារនេះមាន **តារាង «ច្បាប់ ➜ ឧបករណ៍»** ជាស្នូល ៖ ច្បាប់
-> ណាដែលមានឧបករណ៍ សរសេរខ្លីបាន ព្រោះ **ឧបករណ៍ជាការចងចាំ**។ ច្បាប់ណាគ្មាន
-> ឧបករណ៍ ត្រូវសរសេរឲ្យវែង ព្រោះ **គ្មានអ្វីក្រៅពីអត្ថបទចងចាំវាទេ**។
+> Written for **Claude**, not for the owner. This file is English by owner request (fewer tokens);
+> **everything else stays Khmer** (rule 7). It holds rules and runbooks only. Bug history, measured numbers and
+> per-version notes live in [`docs/HISTORY.md`](docs/HISTORY.md) (React era) and
+> [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) (vanilla era) — reference files, not reading material.
+> The previous long Khmer edition of this file is in git history (`git log -- CLAUDE.md`).
 
----
+## ⛔ The one lesson that matters most
 
-## 🗺️ ផែនទីឯកសារនេះ
+**Writing a lesson down is not enforcing it.** "The checker checked nothing" was written into the old version of
+this file **13 times** across 5 versions and still recurred the next round every time. So:
 
-| ផ្នែក | អ្នកត្រូវអានវាពេលណា |
+**Bug found ➜ build the tool first ➜ prove it fails on the pre-fix tree ➜ only then fix the code.**
+
+Rules with a tool can be short because **the tool is the memory**. Rules marked 📝 have no tool — only this text
+remembers them.
+
+## 🗺️ Map
+
+| Section | Read when |
 |---|---|
-| 🛑 **ការព្រមាន** · ⛔ **ច្បាប់ដែលមិនអាចរំលងបាន** · ⛔ **តំបន់ហាមចូល** | **រាល់ជុំ — មុនប៉ះកូដ** |
-| 🔒 **ច្បាប់ ➜ ឧបករណ៍** (តារាងស្នូល) | **រាល់ជុំ** — ជាបញ្ជីអ្វីដែលអ្នកមិនត្រូវបំពាន |
-| 🧰 **ថ្នាក់កំហុសដែលមានឧបករណ៍រួចហើយ** | មុនរកកំហុសដោយភ្នែក ឬមុនសាង checker ថ្មី |
-| 💰 **Core business rule** | មុនប៉ះកូដលុយ · ធុងសំរាម · ស្ថិតិយក · ការសម្អាត |
-| 🏗️ **ស្ថាបត្យកម្ម** | មុនប៉ះ UI · កាយវិការ · CSS · CSP · ម៉ាស៊ីនស្កេន · នាឡិកា |
-| 🌐 **បណ្តាញ · SW · License** | មុនប៉ះការតភ្ជាប់ · listener · Service Worker · ZTO · License |
-| 🔬 **វិន័យរបស់ឧបករណ៍** | មុនសរសេរ ឬជឿ checker ណាមួយ |
-| 📘 **Runbook** | ដើមជុំ (ការរៀបចំ) និងចុងជុំ (មុន commit) |
-| ⚠️ **Error patterns** | ពេលឃើញកំហុសក្នុង Sentry ឬ console |
-| 📌 **ការងារដែលនៅសល់** | ពេលអ្នកប្រើសួរថា «តើត្រូវសាកអ្វី?» |
+| Warnings · Non-negotiable rules · Forbidden zone | **every round, before touching code** |
+| Core table (rule ➜ tool) | **every round** — what you must not violate |
+| Core business rule | before touching money · trash · pickup stats · cleanup |
+| Architecture | before touching UI · gestures · CSS · CSP · scanner · clock |
+| Network · SW · License | before touching connection · listeners · Service Worker · ZTO · License |
+| Checker discipline | before writing or trusting any checker |
+| Runbook | start of round (setup) and end of round (before commit) |
+| Expected error patterns | when you see an error in Sentry or console |
+| Pending work | when the user asks "what should I test?" |
 
 ---
 
-## 🛑 ការព្រមាន — អានមុនចាប់ផ្តើមជុំ audit ថ្មី
+## 🛑 Warnings before a new audit round
 
-> **សំណួររបស់ម្ចាស់គម្រោង** ៖ *«ហេតុអ្វីបានជា audit ជាង ២០០ ជុំ តែងតែជួប bug
-> មិនចេះចប់?»* — ជុំនីមួយៗចំណាយថវិកា និងពេលវេលាពិត។ ចម្លើយស្មោះត្រង់ ៖
->
-> **១. `run-all.sh` បៃតង ≠ គ្មានកំហុស។** ជុំ 2026-09-03 រកឃើញ **កំហុសលុយពិត**
->    (ចំណូលកើតឡើងពីអាកាសធាតុ) ខណៈ checker **១៣០ បៃតងទាំងអស់ · SKIP 0**។
->    ជុំ 2.25.6 · 2.25.8 · 2.25.9 ក៏ដូចគ្នា។ **សំណុំបៃតងបញ្ជាក់តែថា
->    កំហុសដែល*មានអ្នកវាស់* មិនបានវិលមកវិញ** — មិនប្រាប់អ្វីអំពីអ្វីដែល
->    គ្មានអ្នកវាស់ទេ។
->
->    ⛔ **១ខ. កំហុសដដែលដែលវិលមក ៣ ដងតាមទ្វារ ៣ = *រចនាសម្ព័ន្ធ* ខូច
->    មិនមែនទ្វារខូច។** ស្ថិតិយកកើតពីអាកាសធាតុត្រូវកែ ៣ ជុំ (2.26.0 ·
->    2.26.1 · 2.26.2) ដោយការកែនីមួយៗ **ត្រឹមត្រូវ** និង **មានឧបករណ៍
->    ចាក់សោ** — តែពួកវាកែ *អ្នកគណនា* ខណៈបញ្ហាឋិតនៅ *អ្វីដែលត្រូវរាប់*។
->    ការឈប់រាប់ជា **ចំនួន** ហើយរាប់ជា **អត្តសញ្ញាណ** (សំណុំ barcode)
->    លុបថ្នាក់ទាំងមូល (2.27.0)។ សួរជានិច្ច ៖ «តើលេខនេះមានអត្តសញ្ញាណទេ?»
->
-> **២. កំហុសរស់នៅ *ចន្លោះ* ដែលឧបករណ៍មិនមើល។** ទម្រង់ដដែលៗ ៖
->    - **stub ដែលទទួលយកគ្រប់យ៉ាង** — checker ១២៣ គ្មានមួយណាធ្វើឲ្យការសរសេរ
->      ត្រូវ **rules ពិតបដិសេធ** ➜ «server បដិសេធ» ជារបៀបបរាជ័យដែលមិនដែលសាក។
->    - **ស្ថានភាពដែលមិនដែលដាក់ចូល** — ledger តូចជាង delta ដែលនឹងដក ·
->      ទិដ្ឋភាពមូលដ្ឋានចាស់ធៀបនឹងឧបករណ៍ផ្សេង · `fetch` ដែល **ព្យួរ** ជំនួស
->      ការធ្លាក់ · promise ដែលដោះ **យឺតជាងពិដាន**។
->    - **ស្នាមភ្ជាប់រវាងឯកសារ ២** — ខាងសរសេរចាក់សោ · ខាងអានចាក់សោ · តែ
->      គ្មាននរណាសួរថាពួកវានិយាយពីរឿងដដែលឬអត់។
->
-> **៣. ដូច្នេះរាល់ជុំត្រូវសួរ «តើអ្វី *មិនទាន់* មានអ្នកវាស់?»** មិនមែន
->    «តើ checker ណាក្រហម?»។ វិធីដែលវាស់រួចថាដំណើរការ ៖
->    - ដាក់ fake SDK ក្នុង **របៀបបដិសេធតាម rules ពិត** មិនមែនទទួលយកគ្រប់ការសរសេរ។
->    - ដាក់ dependency ក្នុង **របៀបបរាជ័យថ្មី** ៖ ព្យួរ · យឺតតែជោគជ័យ · អវត្តមាន។
->    - រត់ `revenue-fuzz-test.js` **ក្រៅជួរ seed លំនាំដើម** ៖
->      `FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50 node audit-tools/revenue-fuzz-test.js`
->      (កំហុសលុយ 2026-09-03 ធ្លាក់នៅ **run=102**)។ ⛔ **`FUZZ_RUNS=30` តែម្យ៉ាង
->      *មិន* បង្កើតវាឡើងវិញទេ** — វាគ្រប seed 0–29 ប៉ុណ្ណោះ។ ដូច្នេះ «រត់ជ្រៅ
->      ជាងមុន» **ជាការសំណាង មិនមែនយុទ្ធសាស្ត្រ** ៖ វាមានតម្លៃសម្រាប់ **រកឃើញ
->      ថ្នាក់ថ្មី** មិនមែនការពារថ្នាក់ចាស់ទេ។
->
-> **៤. រាល់ការកែត្រូវពិនិត្យ *បន្ទាត់ដែលលុបចេញ* ដែរ។** ជុំ 2.25.4 កែកំហុសលុយ
->    មួយ ហើយ **លុបការការពារ ៣ បន្ទាត់ចេញដោយចៃដន្យ** ក្នុង commit ដដែល ➜
->    កំហុសលុយថ្មី ដោយគ្មាន checker ណាធ្លាក់។ មុន commit រាល់ជុំ ៖
->    `git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'` — **ការលុបដែលពន្យល់
->    មិនបាន គឺជាការថយក្រោយ**។ ⛔ ការលុបជា **ជំហានទី ១ ក្នុងចំណោម ៦** ៖
->    មើល **«ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់»** ក្នុង Runbook ជំហានទី ៣។
->
-> **៥. កុំកែតំបន់ដែលផ្ទៀងផ្ទាត់រួច ដោយផ្អែកលើការសង្ស័យ។** មើលផ្នែក
->    «⛔ តំបន់ហាមចូល» ខាងក្រោម។ កំណែ 2.11.3 ដកចលនាចេញ **ដោយផ្អែកលើទ្រឹស្តី**
->    ➜ អ្នកប្រើរាយការណ៍ថា «មើលទៅដូច App ២ ផ្សេងគ្នា» ➜ ជុំបន្ទាប់ត្រូវប្រគល់
->    វាមកវិញ។ **ការវាស់ទើបជាភស្តុតាង មិនមែនការអានកូដទេ។**
+1. **`run-all.sh` green ≠ no bugs.** A real money bug (revenue created from thin air) was found with **130 checkers
+   green, SKIP 0**; same for 2.25.6 · 2.25.8 · 2.25.9. Green only proves that *measured* bugs did not return.
+   - **The same bug returning 3 times through 3 doors = broken *structure*, not broken doors.** Weather-made pickup
+     stats were fixed 3 rounds (2.26.0 · 2.26.1 · 2.26.2), each fix correct and locked by a tool — but they fixed the
+     *calculator* while the problem was *what is counted*. Counting **identities** (a barcode set) instead of
+     **numbers** removed the class (2.27.0). Always ask: "does this number have an identity?"
+2. **Bugs live in the gaps tools don't watch:** stubs that accept everything (no checker made real rules reject a
+   write) · states never entered (ledger smaller than the delta, stale local view vs another device, a `fetch` that
+   **hangs** instead of failing, a promise that resolves **after** the ceiling) · seams between two files (writer side
+   locked, reader side locked, nobody checks they talk about the same thing).
+3. **Every round ask "what is *not yet* measured?"**, not "which checker is red?". Proven methods: fake SDK in
+   **real-rules reject mode** · dependencies in new failure modes (hang · slow success · absent) · fuzz outside the
+   default seed range: `FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50 node audit-tools/revenue-fuzz-test.js` (the 2026-09-03
+   money bug fails at **run=102**; `FUZZ_RUNS=30` alone covers seeds 0–29 and does **not** reproduce it). Deeper runs
+   are luck — useful for **finding new classes**, not for protecting old ones.
+4. **Review deleted lines in every fix.** 2.25.4 fixed one money bug and accidentally deleted 3 guard lines in the
+   same commit ➜ new money bug, no checker failed. Before every commit:
+   `git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'` — **an unexplained deletion is a regression**.
+   Deletions are step 1 of 6 of the impact verification (Runbook step 3).
+5. **Don't change verified areas on suspicion** (see Forbidden zone). 2.11.3 removed motion **based on theory** ➜
+   user reported "looks like two different apps" ➜ next round restored it. **Measurement is evidence, reading code
+   is not.**
 
 ---
 
-## ប្រព័ន្ធនេះជាអ្វី
+## What the system is
 
-**PWA ចំនួន ២** — deploy ជា Netlify site ដាច់ដោយឡែក ៖ **ZoeW** ជា **React +
-TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (គ្មាន build step) ៖
+**Two PWAs**, deployed as separate Netlify sites: **ZoeW** is **React + TypeScript + Vite** (build step);
+**ZoeKeyGen** is vanilla JS (no build step).
 
-| App | តួនាទី | កំណែឥឡូវ | Sentry tag |
+| App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង · backend **Firebase ឬ Supabase** តាម Config | `2.48.0` (`zoew-v253`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR · កាត «🏪 ហាង Supabase» (ហាង · កូដអញ្ជើញ · កូដប្តូរពាក្យសម្ងាត់)។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.24.2` (`zoekeygen-v113`) | `zoekeygen` |
+| **ZoeW** | Single business app — add/edit parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.48.0` (`zoew-v253`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys and Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes). Uses a **separate Firebase project** | `2.24.2` (`zoekeygen-v113`) | `zoekeygen` |
 
-> ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
-> កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
-> (កែដោយដៃ)។ កន្លែងណាក្នុងឯកសារនេះនិយាយ «`ZoeW/app.js`» · «`ZoeW/index.html`» · «`ZoeW/sw.js`»
-> ➜ **ច្បាប់នៅដដែល** តែកូដរស់នៅ `src/**` · JSX · `src/sw/sw.ts`។ ស្ថាបត្យកម្ម ៖
-> [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md) · ការអភិវឌ្ឍ និងការវាស់ parity ៖
-> [`ZoeW/docs/DEVELOPMENT.md`](ZoeW/docs/DEVELOPMENT.md)។
-> 🔬 **`audit-tools/` វាស់ App React តាម *build វាស់*** (`ZoeW/scripts/build-audit.mjs` ➜
-> `ZoeW/dist-audit/ZoeW` ៖ ទិដ្ឋភាពអត្ថបទ `app.js` ពីប្រភព TS · `index.html` ដែល React គូរពិត ·
-> `sw.js` · bundle ពិតដែលបើក function លើ `window` តែក្នុង build វាស់)។ ⛔ `bash audit-tools/run-all.sh`
-> **build វាដោយខ្លួនឯង** ហើយរត់ checker ទាំងអស់លើ tree វាស់ (`ZoeW/dist-audit/measure-root`) —
-> ⛔ ការរត់ checker **ដោយផ្ទាល់លើ repo** (`node audit-tools/<x>.js`) វាស់ `ZoeW/app.js` ដែល **លែងមាន**
-> ➜ ធ្លាក់ «មិនឃើញកូដ» (មិនមែនកំហុសក្នុង App)។ អ្នកយាមផ្ទាល់ខ្លួនរបស់ ZoeW React (tsc · eslint ·
-> vitest · purity · native · android · parity) រត់តាម `zoew-suite-test.js` ក្នុង `run-all.sh` · parity **DOM · layout · live · deep**
-> ធៀប ZoeW ដើម រត់ជាការងារ `zoew-parity` (`zoew-suite-test.js --parity`) ⛔ ការខុសគ្នាដោយចេតនាពីដើមរស់ក្នុង **បញ្ជីតែមួយ**
-> `INTENTIONAL_UI` (`ZoeW/scripts/snapshot.mjs`) — វាស់បាន ៖ ពេលវានៅក្រៅ CI វាក្រហម **៧៩/៧៩** ជំហាន ដោយគ្មាននរណាដឹង។
-> 💰 `check-money.cmd` (`money-reality-check.js`) អានកូដលុយពី **`audit-tools/money-core.js`** (ស្រង់ពីកូដ
-> ពិតដោយ `npm --prefix ZoeW run money:core`) ⛔ កូដលុយប្រែ ➜ ត្រូវបង្កើតវាឡើងវិញ (អ្នកយាមភាពស្រស់ធ្លាក់)។
-> ⛔ **App React ជាផលិតកម្មរួច** (`main` ផ្ទុក `ZoeW/src/**` — ផ្ទៀងផ្ទាត់ ៖ `git cat-file -e origin/main:ZoeW/src/main.tsx`)។
-> ការសាកលើ iPhone + Android ពិត ([`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ផ្នែក ៥) នៅតែជាការវាស់ដែលម៉ាស៊ីននេះធ្វើមិនបាន។
-> 📱 **App Android (Capacitor · Android តែមួយ)** ៖ `ZoeW/android/` ·
-> [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md)។ ⛔ web ត្រូវ **fail closed** ៖
-> `src/platform/native.ts` ជាអ្នកសម្រេចតែមួយ · plugin ផ្ទុកតាម dynamic import តែលើ
-> native · ផ្លូវ web/iOS មិនប្រែ។ ⛔ **PTR លើ Android native** (សំណើច្បាស់របស់
-> ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
-> «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
-> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo · **ល្បឿនអេក្រង់** (`MainActivity` ស្នើ mode Hz ខ្ពស់បំផុតក្នុងទំហំដដែល ⛔ កុំដកចេញ — ROM ជាច្រើនកំណត់ App ត្រឹម 60Hz ខណៈ Chrome 120Hz) ·
-> splash ពេលបើក (launch theme ៖ ⛔ គ្មាន `android:background` — វាលាតចូលគ្រប់ View ➜ logo ពង្រីក/ច្របាច់លើ tablet · គ្មាន title/ActionBar · `postSplashScreenTheme` = theme របស់ `BridgeActivity` ·
-> icon = vector `drawable/splash_icon.xml` ដេរីវេពី `icon.svg` ក្នុងរង្វង់ 192dp ⛔ មិនមែន `@mipmap` — PNG ពង្រីក 288dp ➜ ព្រិល · ROM ខ្លះមិនបិទជ្រុង ➜ ការ៉េ) ·
-> plugin · ⛔ សិទ្ធិ `ACCESS_NETWORK_STATE` (បើអត់ WebView ឲ្យ `navigator.onLine` = `true` ជានិច្ច ហើយ `online`/`offline` មិនបាញ់) · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
-> ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
-> ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·
-> ប្រវត្តិ · pause/resume · Share/Print · ជីវមាត្រ · PTR/latch) · `npm run
-> rules:check` (លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ លើ ZoeW ដើម · web ·
-> Android)។ ⛔ **Back មិនត្រឡប់ចូលរបៀប «ដក» វិញ** (`safeScreen()`)។
-> ⚛️ **React ១០០%** ៖ React ជាម្ចាស់ DOM តែមួយ ➜ កូដមុខងារ (`src/core` · `domain` ·
-> `features` · `services` · `ui` · `platform`) **សរសេរតែ state/ref** ហើយស្រទាប់ React
-> ខ្លួនឯង (`src/app/**`) សរសេរ DOM **តែតាមច្រកចេញ** (`refs.ts` · `DocumentEffects`) —
-> មើលជួរ «React ១០០%» ក្នុងតារាងស្នូល និង `ZoeW/docs/ARCHITECTURE.md` ផ្នែក ១០–១១។
+**ZoeW is React since `2.38.0`.** Code lives in `ZoeW/src/**` (same function names and storage keys as vanilla
+ZoeW) and builds to `ZoeW/dist/`. `src/**` is the single hand-edited source. Wherever this file says `ZoeW/app.js` ·
+`ZoeW/index.html` · `ZoeW/sw.js` the rule still applies; the code lives in `src/**` · JSX · `src/sw/sw.ts`.
+Architecture: [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md) · development and parity measurement:
+[`ZoeW/docs/DEVELOPMENT.md`](ZoeW/docs/DEVELOPMENT.md).
 
-**គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
-ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
-`admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា — កុំយកទៅច្រឡំគ្នា។
+- 🔬 **`audit-tools/` measure the React app through the audit build** (`ZoeW/scripts/build-audit.mjs` ➜
+  `ZoeW/dist-audit/ZoeW`: a text view `app.js` from TS sources · the `index.html` React really renders · `sw.js` · the
+  real bundle exposing functions on `window` only in the audit build). ⛔ `bash audit-tools/run-all.sh` builds it and
+  runs every checker on the measure tree (`ZoeW/dist-audit/measure-root`). ⛔ Running a checker **directly on the repo**
+  (`node audit-tools/<x>.js`) measures a `ZoeW/app.js` that no longer exists ➜ "code not found" (not an app bug).
+- ZoeW's own guards (tsc · eslint · vitest · purity · native · android · parity) run via `zoew-suite-test.js` in
+  `run-all.sh`. Parity **DOM · layout · live · deep** against original ZoeW runs as job `zoew-parity`
+  (`zoew-suite-test.js --parity`). ⛔ Intentional differences live in **one list**, `INTENTIONAL_UI`
+  (`ZoeW/scripts/snapshot.mjs`). Measured: outside CI it was red **79/79** steps with nobody noticing.
+- 💰 `check-money.cmd` (`money-reality-check.js`) reads money code from **`audit-tools/money-core.js`** (extracted from
+  real code by `npm --prefix ZoeW run money:core`). ⛔ Money code changes ➜ regenerate it (freshness guard fails).
+- ⛔ **React is in production** (`main` carries `ZoeW/src/**` — verify: `git cat-file -e origin/main:ZoeW/src/main.tsx`).
+  Real iPhone + Android testing ([`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) section 5) is the one measurement
+  this machine cannot do.
+- 📱 **Android app (Capacitor, Android only)**: `ZoeW/android/` · [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md).
+  ⛔ Web must **fail closed**: `src/platform/native.ts` is the single decider · plugins load by dynamic import only on
+  native · web/iOS paths unchanged. ⛔ **PTR on Android native** (explicit owner request — rule 11) goes through the
+  same `setupIOSPullToRefresh()` plus a "pre-slop capture" **only on Android native**; the iOS path is unchanged.
+  Guards: `npm run android:check` (APK version = `APP_VERSION` · appId · permissions · logo · **display rate**:
+  `MainActivity` requests the highest-Hz mode at the same resolution — ⛔ don't remove; many ROMs cap apps at 60Hz
+  while Chrome runs 120Hz · launch splash: ⛔ no `android:background` (it stretches into every View ➜ logo
+  scaled/squashed on tablets) · no title/ActionBar · `postSplashScreenTheme` = `BridgeActivity` theme · icon = vector
+  `drawable/splash_icon.xml` derived from `icon.svg` in a 192dp circle ⛔ not `@mipmap` (288dp PNG ➜ blurry; some
+  ROMs don't round it) · plugins · ⛔ permission `ACCESS_NETWORK_STATE` (without it WebView reports
+  `navigator.onLine === true` forever and never fires `online`/`offline`) · web never loads native code ·
+  Gradle/AGP/SDK ↔ Capacitor template · release workflow ↔ keystore: ⛔ APKs are signed by **one keystore forever** ·
+  no debug-key path · certificate pinned in `ZoeW/android/release-cert.sha256` ➜ another keystore = no Release ·
+  ⛔ the keystore **never enters the repo** — it lives only with the owner and in a GitHub secret) ·
+  `npm run native:check` (fake bridge: Back · history · pause/resume · Share/Print · biometrics · PTR/latch) ·
+  `npm run rules:check` (delete/remove · 2h · 7d · 2d · 30d on original ZoeW · web · Android).
+  ⛔ **Back never returns into "remove" mode** (`safeScreen()`).
+- ⚛️ **React 100%**: React is the single DOM owner ➜ feature code (`src/core` · `domain` · `features` · `services` ·
+  `ui` · `platform`) writes **only state/refs**; the React layer (`src/app/**`) writes DOM **only through exits**
+  (`refs.ts` · `DocumentEffects`). See the "React 100%" core-table row and `ZoeW/docs/ARCHITECTURE.md` sections 10–11.
 
-🏪 **Backend ២ ប្រភេទ តាម Config នៃឧបករណ៍នីមួយៗ** ៖ Config Firebase (`databaseURL`) ➜ Firebase Project មួយក្នុងមួយអតិថិជន (ដូចមុន) ·
-Config Supabase (`supabaseUrl` · `supabaseKey` · `loginDomain?`) ➜ **Supabase Project តែមួយ ហាងច្រើន** (`tenant_id` + RLS · ចុះឈ្មោះដោយ
-**កូដអញ្ជើញ** ដែលចងលេខសាខា ZTO)។ `initFirebase()` ផ្ទុក chunk `supabase-backend` តាម dynamic import **តែពេល** Config មាន `supabaseUrl` ហើយ adapter
-(`src/services/supabase-*.ts`) ផ្តល់ surface `fb` ដូច SDK Firebase ➜ ⛔ កូដលុយ/listener **មិនបែងចែក backend** — ភាពខុសគ្នារស់ក្នុង adapter តែមួយ
-(`emu/supabase-adapter-parity`)។ ⛔ **rules RTDB ជាប្រភពតែមួយ** ៖ `firebase-database.rules.json` ➜ `supabase/migrations/*_zoe_rules.sql`
-(`node supabase/scripts/generate-rules-sql.mjs` បង្កើត `<ម៉ោង>_zoe_rules.sql` **ថ្មី** · `supabase-datastore-test` ធ្លាក់បើចាស់) ➜ កែ rules = Publish លើ Firebase **និង**
-merge ចូល `main` (Supabase GitHub integration «Deploy to production» អនុវត្ត migration ថ្មី) ឬ paste ឯកសារថ្មីនោះក្នុង SQL Editor។ ⛔ migration ក្នុង `main` កែ/លុបមិនបាន
-(ការ deploy អនុវត្តតែ version ថ្មី)។ Supabase ៖ គ្មាន Activation Key (ស្ថានភាពហាងជំនួស · `ensureAppActivated()`) · `owner`/`member` ជាស្លាកគណនី (App មិនបែងចែកសិទ្ធិ)។
-ការដំឡើង ៖ [`supabase/README.md`](supabase/README.md)។
+**No `admin`/`worker`/`scanner` roles in the business app** — every signed-in user (`auth != null`) has the same
+rights. ZoeKeyGen **still** uses an `admin` role in its separate License Project — don't confuse them.
 
-ថតផ្សេងទៀត ៖ `audit-tools/` (បញ្ជី checker ៖ [`audit-tools/README.md`](audit-tools/README.md)
-ផ្នែក ៦ — ⛔ **កុំចម្លងចំនួនមកទីនេះ វាចាស់លឿន**) · `zto-import/` (Apps Script ខាង
-server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `tools/firebase-provision/` (អតិថិជនថ្មី ៖
-Firebase Project · Database · Rules · sign-up បិទ · គណនី ដោយពាក្យបញ្ជាតែមួយ + ដំឡើង Rules ទៅអតិថិជនទាំងអស់ ·
-[`README-KH.md`](tools/firebase-provision/README-KH.md)) · `firebase-backup/`
-(CLI ដាច់ដោយឡែក + workflow backup) · `supabase/` (migration · Edge Function · generator rules ៖ deploy ដោយ CLI មិនមែន Netlify) ·
-`.github/workflows/` (`audit.yml` · `backup.yml`) · `docs/HISTORY.md`។
+🏪 **Two backend kinds, per device Config**: Firebase Config (`databaseURL`) ➜ one Firebase project per customer.
+Supabase Config (`supabaseUrl` · `supabaseKey` · `loginDomain?`) ➜ **one Supabase project, many shops** (`tenant_id` +
+RLS · sign-up by **invite code** bound to a ZTO branch number). `initFirebase()` loads chunk `supabase-backend` by
+dynamic import **only** when Config has `supabaseUrl`; the adapter (`src/services/supabase-*.ts`) exposes the same
+`fb` surface as the Firebase SDK ➜ ⛔ money/listener code **never branches on backend** — differences live in the
+adapter only (`emu/supabase-adapter-parity`). ⛔ **RTDB rules are the single source**: `firebase-database.rules.json`
+➜ `node supabase/scripts/generate-rules-sql.mjs` writes a **new** `<timestamp>_zoe_rules.sql` (`supabase-datastore-test`
+fails when stale) ➜ changing rules = Publish on Firebase **and** merge to `main` (Supabase GitHub integration "Deploy to
+production" applies new migrations) or paste the new file in the SQL Editor. ⛔ Migrations in `main` cannot be
+edited/deleted (deploy applies only new versions). Supabase: no Activation Key (shop status instead ·
+`ensureAppActivated()`) · `owner`/`member` are account labels (the app grants no different rights). Setup:
+[`supabase/README.md`](supabase/README.md).
 
----
-
-## ⛔ ច្បាប់ដែលមិនអាចរំលងបាន
-
-១. **ប្រព័ន្ធនេះកំពុងដំណើរការជាមួយអតិថិជនពិត និងលុយពិត (COD/DOD)។**
-   កុំ merge ចូល `main` ដោយគ្មានការស្នើច្បាស់លាស់ពីអ្នកប្រើ។
-២. **«លុប» (Delete) ទល់នឹង «ដក» (Remove) ជាគោលការណ៍អាជីវកម្ម មិនមែនកំហុសទេ** —
-   អានផ្នែក «Core business rule» ខាងក្រោមឲ្យចប់ មុននឹងប៉ះកូដណាមួយដែលទាក់ទងលុយ។
-៣. **កូដ App ដែល ship ត្រូវគ្មាន comment** (`.js` និង `.css` ក្នុង `ZoeW/` ·
-   `ZoeKeyGen/`)។ ⛔ ពេលចប់រាល់ជុំត្រូវរត់ `node audit-tools/strip-comments.js`
-   ដែលផ្ទៀងផ្ទាត់ថាការសម្អាត **មិនប្តូរកូដ** (JS៖ diff token-for-token;
-   CSS៖ diff declaration stream) ហើយបោះបង់ឯកសារណាដែលមិនប្រាកដ។
-   **លើកលែង** ៖ `audit-tools/` · `*/test.js` · `vendor/` · `qrcode.js`។
-   ⛔ **ZoeW React ក៏គ្មាន comment ដែរ** (សំណើម្ចាស់គម្រោង) ៖ `ZoeW/public/*.js` · **`ZoeW/src/**`** (TS/TSX/CSS) ·
-   `ZoeW/netlify/functions/*.js` · config (`vite.config.mts` · `capacitor.config.ts` · `eslint.config.mjs` · …) ·
-   **Gradle** (`android/**/*.gradle` · `gradle.properties` ⛔ លើកលែងឯកសារដែល Capacitor សាងឡើងវិញ ៖ header «DO NOT EDIT») និង
-   **HTML ដែល ship** (`index.html` ទាំង ២ App · `guide.html`)។ `strip-comments.js` សម្អាត React តាម
-   `ts-comments.js` (TypeScript AST · ផ្ទៀងផ្ទាត់ថា **esbuild compile មុន/ក្រោយដូចគ្នាបេះបិទ** ➜ ខុស ➜ មិនប៉ះឯកសារ ·
-   `/// <reference …>` ជា directive ➜ រក្សា) ហើយ `comments.js` ធ្លាក់ពេល comment វិលមក។ ⛔ catch ទទេជាការលេបដោយចេតនា ➜
-   ESLint `no-empty` មាន `allowEmptyCatch` (កុំបន្ថែម comment ដើម្បីបំពេញវា)។
-   ចំណេះដឹងត្រូវរស់នៅក្នុង **`CLAUDE.md`** (ច្បាប់) និង **`docs/HISTORY.md`**
-   (ប្រវត្តិ) មិនមែនក្នុងកូដទេ។
-៤. **`license-verify.js` និង `error-reporting.js` ត្រូវតែ byte-identical
-   ទាំង ២ App។** ប្រើ `cp` + `md5sum` កុំកែម្តងមួយ App។
-៥. **កុំសរសេរការអះអាងអំពី git/branch/merge ដោយមិនផ្ទៀងផ្ទាត់** — ប្រើ
-   `git rev-list --count origin/main..origin/<branch>`។ **ឯកសារនេះមិនមែនជា
-   ភស្តុតាងទេ — git ទើបជាភស្តុតាង។**
-៦. **កំណែ App (`APP_VERSION`) ជារបស់ App នីមួយៗ — ⛔ ឡើងតែ App ដែលកែពិត។**
-   អ្វីដែលត្រូវស៊ីគ្នាគឺ **ខាងក្នុង App នីមួយៗ** ៖ `app.js` ↔ `manifest.json`
-   ↔ `index.html`។ `version-bump-scope.js` ចាក់សោវា ៖ កូដ ship ប្រែ ➜ **ត្រូវ**
-   ឡើង; គ្មានការកែពិត ➜ **មិនត្រូវ** ឡើង។ ⛔ វា **មិនមែន** `CACHE_VERSION` ទេ។
-៧. **រាល់ការសរសេរត្រូវជាភាសាខ្មែរ** — ចម្លើយក្នុងការសន្ទនា, សារ commit,
-   ចំណងជើង និងខ្លឹមសារ PR, ឯកសារ និងអត្ថបទដែលបង្ហាញដល់អ្នកប្រើក្នុង App។
-   **កូដ (ឈ្មោះអថេរ/function) នៅជាភាសាអង់គ្លេសដដែល**។ ⛔ **អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ** ➜ ពាក្យថៃដែល
-   លាយចូលរអិលកាត់ភ្នែក (វាកើតពិតក្នុងការសន្ទនា) ➜ `doc-scope-test` ធ្លាក់ពេលមានអក្សរថៃក្នុងឯកសារអត្ថបទណាមួយនៃ repo (រួម
-   `ZoeW/src/**`) · ⛔ កុំសរសេរឧទាហរណ៍ជាអក្សរថៃ សូម្បីក្នុង comment។ ⛔ ជួរលេខ «ក–ខ» ក្នុង App **មិនលាយ** លេខខ្មែរ និងឡាតាំង (ឧ. `'(១–' + MAX + ')'` ➜ «(១–3650)») ➜ ថេរ JS បង្ហាញជាឡាតាំង ➜ ក្បាលជួរត្រូវឡាតាំងដែរ (`doc-scope-test`)។ ⛔ **អត្ថបទក្នុង App** (`index.html` · `guide.html` · សារ) សរសេរតែ
-   «វាដើរបែបនេះ» — កុំប្រៀបធៀបនឹងប្រព័ន្ធចាស់ (ឧ. «គ្មាន Firebase Project · Rules … ទៀតទេ») ហើយ **កុំនិយាយពីអ្វីដែលលែងមាន ឬធ្លាប់ដក**
-   («ប៊ូតុង…លែងមានទៀតហើយ» · «(មុននេះ…)» · «ដូចមុន» · «លែងបាំង…ទៀតហើយ») — រួមទាំង **កំណត់ចំណាំកំណែក្នុង 🔔** (`announcements.json`) ៖ ពិពណ៌នា
-   មុខងារ/ឥរិយាបថថ្មីជាបច្ចុប្បន្នកាល (សំណើម្ចាស់គម្រោង)។ អ្នកយាម ៖ `doc-scope-test` (សៀវភៅ · HTML ទាំង ២ App · JSX · កំណត់ចំណាំកំណែ ·
-   សារក្នុងកូដ ៖ ហាមតែការប្រៀបនឹងកំណែ/ប្រព័ន្ធមុន ព្រោះ «កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ» ជាស្ថានភាពទិន្នន័យពិត)។
-៨. **រាល់ជុំ audit ដែលប្រែកូដ ship ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស · តែ App ដែលកែពិត — ច្បាប់ ៦) —
-   **និងត្រូវបន្ថែមផ្នែកថ្មីក្នុង [`docs/HISTORY.md`](docs/HISTORY.md) ផ្នែក ១
-   ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។ ⛔ ជុំដែលប្រែតែ `audit-tools/` ឬឯកសារ ➜
-   **មិនឡើងកំណែ** (`version-bump-scope` ធ្លាក់បើឡើង) តែកត់ត្រាក្នុង `docs/HISTORY.md` **ផ្នែក ២** ជំនួសវិញ។
-៩. **README សរសេរតែ *របៀបប្រើ*។** រាល់ README មានផ្នែក **៥** តាមលំដាប់ ៖
-   **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**។
-   ⛔ កុំសរសេរប្រវត្តិកំហុស ឬកំណត់ត្រាតាមកំណែ («កំណែ 2.23.4 កែ…») ក្នុង README។
-   ⛔ កុំចម្លងចំនួន assertion ចូល README (វាចាស់លឿន)។ README ដែលត្រូវពិនិត្យរាល់ជុំ ៖ root · `ZoeW/` ·
-   `ZoeKeyGen/` · `audit-tools/` · `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` · `firebase-backup/` · `zto-import/`
-   (និង `google-sheets-api/`) · `supabase/` · [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md)។ **README ចាស់ គឺជាឯកសារខុស។**
-   ⛔⛔ **វិសាលភាពគឺ គ្រប់ឯកសារ `*.md` ក្នុង repo** ៖ **ប្រវត្តិកំហុសរស់នៅ `docs/HISTORY.md` និង
-   `docs/HISTORY-ARCHIVE.md` តែមួយកន្លែងគត់** (ថត `docs/` នៅ root) ៖ [`docs/HISTORY.md`](docs/HISTORY.md) =
-   សម័យ ZoeW React (**ធាតុថ្មីទាំងអស់**) · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) = សម័យ vanilla
-   (**អានបាន តែមិនបន្ថែម**) · ⛔ គ្មានឯកសារប្រវត្តិទី ៣។ ⛔ លើកលែង ៖ ថត `docs/` **នៅ root** (ឯកសារប្រវត្តិ ·
-   `AUDIT-PROMPT.md` ជា prompt ធ្វើការ) និង `CLAUDE.md` (វា *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់) ·
-   ⛔ `ZoeW/docs/` **មិនមែន** ការលើកលែង។ ⛔ អ្វីដែលហាមក្នុងឯកសារដទៃ ៖ លេខកំណែ (`កំណែ 2.x.y`) · សំណើចងនឹង
-   កាលបរិច្ឆេទ · ការវាស់ចងនឹងកំណែ ឬកាលបរិច្ឆេទ ➜ សរសេរជា **បច្ចុប្បន្នកាល** («វាដើរបែបនេះ»)។ ⛔ បញ្ជីឯកសារ
-   ត្រូវ **ដេរីវេពីថតពិត** មិនមែនបញ្ជីរឹង។ `doc-scope-test.js` ចាក់សោច្បាប់នេះ។
-១០. **Firebase rules មិន deploy ស្វ័យប្រវត្តិទេ** — Netlify បម្រើតែឯកសារ
-   static។ រាល់ពេលបន្ថែម path ថ្មី ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយ
-   **ប្រាប់អ្នកប្រើថាត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ**។
-   មាន rules ២ ឯកសារ ៖ `firebase-database.rules.json` (Business) និង
-   `ZoeKeyGen/firebase-database.rules.json` (License)។ Business ៖ ម្ចាស់គម្រោងអាចរត់
-   `tools/firebase-provision/deploy-rules.cmd` ជំនួសការ paste (ដំឡើងទៅគ្រប់ Project ដែលឧបករណ៍ស្គាល់ ➜ អានត្រឡប់ ➜
-   `verify`) — វានៅតែជា **សកម្មភាពដោយដៃ** ដែលត្រូវប្រាប់ · License ៖ paste ដដែល។
-១១. **⛔ កុំប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ភាពរលូននៃការរមូរ ដោយគ្មានការស្នើ
-   ច្បាស់លាស់។** មើលផ្នែកបន្ទាប់។
-១២. **⛔ មុននឹងកត់ត្រាអ្វីថ្មីចូល `CLAUDE.md` ឬ `docs/HISTORY.md` ត្រូវ `rg` រកជាមុនសិន។** ពង្រីកច្បាប់ដែលមានស្រាប់។ ច្បាប់ស្ទួន ២ កន្លែង ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **ច្បាប់ ២ ផ្ទុយគ្នា** ➜
-   session បន្ទាប់ជឿមួយណាក៏បាន (វាកើតពិត ៣ ដង ៖ ច្បាប់ · នីតិវិធី emulator · «សំណួរ ១៣» — លម្អិតក្នុង
-   `docs/HISTORY-ARCHIVE.md` ផ្នែក ៥)។ ⛔ ភាពស្ទួនឈឺចាប់នៅជុំក្រោយ ➜ លុបវា **ពេលឃើញ**។ ⛔ ឯកសារដទៃត្រូវ **យោង**
-   ច្បាប់ក្នុងឯកសារនេះ មិនមែនចម្លងវា។ ⛔ ច្បាប់ដដែលលើសាខាថ្មី ➜ **ពង្រីកច្បាប់ដើម** · ជួរថ្មីក្នុងតារាងស្នូលតែពេល
-   ច្បាប់ទទួល **អ្នកយាមថ្មី**។ ⛔ ក្នុងតារាងស្នូល សរសេរ **ច្បាប់** ខ្លីៗ — narrative «វាស់បាន (x.y.z)» ទៅ `docs/HISTORY.md`។
-   `doc-scope-test` ធ្លាក់ពេលប្លុក ` ``` ` ដដែលរស់នៅ ២ ឯកសារ (⛔ `docs/` លើកលែង)។
+Other dirs: `audit-tools/` (checker catalog: [`audit-tools/README.md`](audit-tools/README.md) section 6 — ⛔ don't copy
+counts here, they go stale) · `zto-import/` (server-side Apps Script) · `tools/zto-cookie-sync-windows/` (Windows
+helper) · `tools/firebase-provision/` (new customer: Firebase project · database · rules · sign-up disabled · account in
+one command + deploy rules to all customers · [`README-KH.md`](tools/firebase-provision/README-KH.md)) ·
+`firebase-backup/` (standalone CLI + backup workflow) · `supabase/` (migrations · Edge Functions · rules generator;
+deployed by CLI/GitHub integration, not Netlify) · `.github/workflows/` (`audit.yml` · `backup.yml`) ·
+`docs/HISTORY.md`.
 
 ---
 
-## ⛔ តំបន់ហាមចូល — PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ
+## ⛔ Non-negotiable rules
 
-**អ្នកប្រើបានស្នើដោយផ្ទាល់ឲ្យកត់ត្រាចំណុចនេះទុក** (2026-08-25) ៖ បីតំបន់នេះ
-«ពិបាកកែជាងគេ» ហើយត្រូវការ **~១១ ជុំ** និង **ការថយក្រោយ ២ ដង** ទំរាំត្រូវ
-(2.5.0 · 2.8.0 · 2.8.1 · `661ad27` · `0afa229` · `ec9772d` · 2.8.5 · 2.9.0 ·
-2.11.2 · 2.11.3 · 2.11.4 — លម្អិតក្នុង `docs/HISTORY-ARCHIVE.md`)។
-
-**មេរៀនសំខាន់បំផុត (2.11.3 ➜ 2.11.4)** ៖ ជុំ 2.11.3 ដកចលនាចេញ **ដោយផ្អែកលើ
-ការសង្ស័យតាមទ្រឹស្តី** អំពី `scroll-snap` ដោយគ្មានការវាស់ ➜ អ្នកប្រើរាយការណ៍ថា
-«មើលទៅដូច App ២ ផ្សេងគ្នា» (វាស់បាន ៖ iOS **0px** ធៀប Android **357px**) ➜
-ជុំបន្ទាប់ត្រូវប្រគល់វាមកវិញ។ ដំណោះស្រាយត្រឹមត្រូវគឺ **ផ្អាក snap** មិនមែន
-ដកចលនា។
-
-**ច្បាប់សម្រាប់ session បន្ទាប់ ៖**
-
-- តំបន់ទាំងនេះ **ត្រូវបានផ្ទៀងផ្ទាត់លើ iPhone និង Android ពិតរួចហើយ** —
-  **វាមិនមែនជាកូដដែលមិនទាន់សាកទេ**។ កុំ «កែ» វាដោយផ្អែកលើការសង្ស័យ ការអានកូដ
-  ឬទ្រឹស្តីអំពី WebKit។
-- `run-all.sh` **បៃតង** បញ្ជាក់តែសេណារីយ៉ូដែលបានរត់; វាមិនបញ្ជាក់ថាតំបន់នេះគ្មាន bug ទេ។ ការកែត្រូវមានភស្តុតាងបញ្ហាពិត។
-  `gesture-test.js` · `panel-motion-test.js` · `ios-panel-glide-test.js` ·
-  `panel-snap-ownership-test.js` និង `phone-search-swipe-test.js` ចាក់សោវាទុករួចហើយ។
-- កែបានតែពេល **អ្នកប្រើរាយការណ៍បញ្ហាពិត** (វីដេអូ ឬការពិពណ៌នាជាក់លាក់)។
-- បើចាំបាច់ត្រូវប៉ះមែន ៖ អាន «តារាងចំណុច ៥ នៃចលនាផ្ទាំង» ខាងក្រោមឲ្យចប់សិន
-  រួច **វាស់** iOS ធៀប Android ដោយផ្ទាល់ — កុំសន្មត់ — ហើយសាកលើ **ឧបករណ៍ពិត
-  ទាំង ២ ប្រព័ន្ធ** មុន merge។
+1. **Real customers and real money (COD/DOD).** Never merge to `main` without an explicit user request.
+2. **"Delete" vs "Remove" is a business rule, not a bug** — read "Core business rule" fully before touching any
+   money code.
+3. **Shipped app code has no comments** (`.js`/`.css` in `ZoeW/` · `ZoeKeyGen/`; also `ZoeW/public/*.js` ·
+   **`ZoeW/src/**`** TS/TSX/CSS · `ZoeW/netlify/functions/*.js` · configs (`vite.config.mts` · `capacitor.config.ts` ·
+   `eslint.config.mjs` · …) · **Gradle** (`android/**/*.gradle` · `gradle.properties`; ⛔ except files Capacitor
+   regenerates with a "DO NOT EDIT" header) · **shipped HTML** (`index.html` of both apps · `guide.html`)).
+   ⛔ End every round with `node audit-tools/strip-comments.js`: it verifies stripping **doesn't change code** (JS:
+   token-for-token diff · CSS: declaration stream · React via `ts-comments.js`: TypeScript AST and **esbuild output
+   identical before/after**, else the file is untouched; `/// <reference …>` is a directive ➜ kept) and `comments.js`
+   fails when comments return. **Exceptions**: `audit-tools/` · `*/test.js` · `vendor/` · `qrcode.js`.
+   ⛔ An empty `catch` is an intentional swallow ➜ ESLint `no-empty` has `allowEmptyCatch` (don't add a comment to
+   fill it). Knowledge lives in **`CLAUDE.md`** (rules) and **`docs/HISTORY.md`** (history), not in code.
+4. **`license-verify.js` and `error-reporting.js` are byte-identical in both apps.** Use `cp` + `md5sum`, never edit
+   one app at a time.
+5. **Never claim git/branch/merge state without verifying** — `git rev-list --count origin/main..origin/<branch>`.
+   **This file is not evidence — git is.**
+6. **`APP_VERSION` belongs to each app — ⛔ bump only the app that really changed.** What must match is **inside each
+   app**: `app.js` ↔ `manifest.json` ↔ `index.html`. `version-bump-scope.js` locks both directions: shipped code
+   changed ➜ **must** bump; no real change ➜ **must not**. ⛔ It is not `CACHE_VERSION`.
+7. **Language.** This file (`CLAUDE.md`) is English. **Everything else is Khmer**: chat replies, commit messages, PR
+   titles and bodies, all other docs, user-facing text in the apps. Code identifiers stay English.
+   ⛔ **Thai script (U+0E00–U+0E7F) looks like Khmer** and slips past the eye ➜ `doc-scope-test` fails on any Thai
+   character in any repo text file (incl. `ZoeW/src/**`); never write Thai examples, even in comments.
+   ⛔ Number ranges in app text **never mix** Khmer and Latin digits (a JS constant renders Latin ➜ the range head is
+   Latin too). ⛔ **In-app text** (`index.html` · `guide.html` · messages · release notes in 🔔
+   `announcements.json`) describes **current behavior in present tense** — never compare with the old system and
+   **never mention what was removed** ("button X no longer exists" · "(before…)" · "as before"). Code messages may
+   state real data status ("this parcel is no longer in the system"); only comparisons with old versions are banned.
+   Guard: `doc-scope-test`.
+8. **Every audit round that changes shipped code bumps `APP_VERSION`** (PATCH for fix rounds · only apps really
+   changed — rule 6) **and adds a new section in [`docs/HISTORY.md`](docs/HISTORY.md) part 1 in the same commit**,
+   always stating the **"actions to do by hand"**. ⛔ Rounds that change only `audit-tools/` or docs ➜ **no bump**
+   (`version-bump-scope` fails if bumped) and are recorded in `docs/HISTORY.md` **part 2** instead.
+9. **README files describe **usage only**.** Every README has **5** sections in this order:
+   **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**. ⛔ No bug history or per-version notes
+   in a README. Never copy assertion counts into a README (they go stale). READMEs checked every round: root ·
+   `ZoeW/` · `ZoeKeyGen/` · `audit-tools/` · `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` ·
+   `firebase-backup/` · `zto-import/` (and `google-sheets-api/`) · `supabase/` ·
+   [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md). **A stale README is a wrong document.**
+   ⛔⛔ **Scope is every `*.md` file in the repo**: bug history lives only in `docs/HISTORY.md` and
+   `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (**all new entries**) · `HISTORY-ARCHIVE.md` = vanilla era
+   (**read, never append**) · no third history file. ⛔ Exceptions: root `docs/` (history files · `AUDIT-PROMPT.md`)
+   and `CLAUDE.md` (it *must* cite measurements as reasons for rules). ⛔ `ZoeW/docs/` is **not** an exception.
+   ⛔ Banned elsewhere: version numbers (`កំណែ 2.x.y`) · date-bound requests · measurements bound to a version or date
+   ➜ write in **present tense**. ⛔ File lists are **derived from real directories**, not hard-coded.
+   `doc-scope-test.js` locks this rule.
+10. **Firebase rules don't deploy automatically** — Netlify serves only static files. Every new path gets its rule in
+    the same commit, and **tell the user to paste it in Firebase Console ➜ Publish by hand**. Two files:
+    `firebase-database.rules.json` (Business) and `ZoeKeyGen/firebase-database.rules.json` (License). Business: the
+    owner may run `tools/firebase-provision/deploy-rules.cmd` instead (deploys to every known project ➜ reads back ➜
+    `verify`) — still a **manual action** to report. License: paste.
+11. **⛔ Don't touch PTR · history-panel motion · scroll smoothness without an explicit request.** See next section.
+12. **⛔ `rg` before writing anything new into `CLAUDE.md` or `docs/HISTORY.md`.** Extend existing rules. A rule in two
+    places ➜ next round edits one, forgets the other ➜ **two contradictory rules** ➜ the next session believes either
+    (happened 3 times: a rule · the emulator procedure · "question 13" — `docs/HISTORY-ARCHIVE.md` part 5).
+    ⛔ Delete duplication **when you see it**. ⛔ Other docs **reference** rules here, never copy them. ⛔ Same rule on
+    a new branch ➜ **extend the original**; a new core-table row only when the rule gets a **new guard**. ⛔ Core-table
+    cells hold short **rules**; "measured (x.y.z)" narratives go to `docs/HISTORY.md`. `doc-scope-test` fails when the
+    same ```` ``` ```` block lives in 2 files (⛔ `docs/` exempt).
 
 ---
 
-## អ្វីដែលទទួលយកដោយចេតនា — កុំរាយការណ៍ជាកំហុសថ្មី
+## ⛔ Forbidden zone — PTR · history-panel motion · scrolling
 
-- **អ្នកប្រើអាចសរសេរតួលេខ revenue/pickup ដោយផ្ទាល់** — គ្មាន rule ណាអាច
-  ផ្ទៀងផ្ទាត់ប្រវត្តិនៃ delta បានទេ ដោយគ្មាន backend ដែលទុកចិត្តបាន
-  (Cloud Functions)។ គម្រោងនេះគ្មាន backend។ **គ្មានការផ្ទៀងផ្ទាត់ aggregate**
-  ដោយហេតុផលដដែល។
-- **ការការពារ «inspect element» ពង្រឹងមិនបានទេ** — កូដ client ទាំងអស់មើលឃើញ
-  ដោយអ្នកប្រើ។ ⛔ កុំព្យាយាមសាងវា ៖ រាល់ជាន់ (`devtools-guard`) ជាឧបសគ្គ
-  មិនមែនការការពារ ហើយការធ្វើឲ្យវា «រឹង» ជាងនេះ បង្កើតតែហានិភ័យបំបែក App ពិត។
-- **`zto-import/google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo
-  **មិនប្តូរ script ដែល deploy រួច**។ ត្រូវ copy-paste ចូល script.google.com
-  ដោយដៃ រួច Deploy ជាកំណែថ្មី។
-- **Base directory របស់ Netlify រស់ក្នុង UI** — `zoew` ➜ **`ZoeW`** ·
-  `zoekeygen` ➜ **`ZoeKeyGen`** (**ប្រកាន់អក្សរតូចធំ** — Linux)។ checker ក្នុង
-  repo មើលមិនឃើញវា ហើយ PAT ក្នុង Netlify env ត្រូវហាម។ មើលផ្នែក «config
-  របស់ Netlify» ខាងក្រោម។
-- **ការលុប site data បាត់ `seenMax` របស់ License** — តែវាមិនផ្តល់សិទ្ធិអ្វី
-  ដោយគ្មាន server ទេ (`activate()` ទាមទារ `checkOnline().ok === true`)។
+The user explicitly asked to record this (2026-08-25): these three areas were "the hardest to fix" and took **~11
+rounds and 2 reverts** (details in `docs/HISTORY-ARCHIVE.md`). Key lesson (2.11.3 ➜ 2.11.4): motion was removed on a
+theory about `scroll-snap` without measuring ➜ "looks like two different apps" (measured: iOS **0px** vs Android
+**357px**) ➜ restored next round. The right fix was **pausing snap**, not removing motion.
 
-⛔ **បួនធាតុដំបូងគឺជាតំបន់ 📝 (គ្មានឧបករណ៍ចាក់សោ) — ពួកវាជាការទទួលយកដោយ
-ចេតនា មិនមែនចន្លោះទេ។ កុំសាងឧបករណ៍សម្រាប់ពួកវាដោយគ្មានការស្នើ។**
+- These areas **are verified on real iPhone and Android** — not untested code. Don't "fix" them on suspicion, code
+  reading or WebKit theory.
+- Green `run-all.sh` proves only the scenarios run; it does not prove this area is bug-free. A fix needs evidence of a
+  real problem. `gesture-test.js` · `panel-motion-test.js` · `ios-panel-glide-test.js` ·
+  `panel-snap-ownership-test.js` · `phone-search-swipe-test.js` lock it.
+- Change only when **the user reports a real problem** (video or a precise description).
+- If you truly must touch it: read the "5-point table" below fully, **measure** iOS vs Android directly (never
+  assume), and test on **real devices of both systems** before merge.
+
+## Accepted by design — don't report as new bugs
+
+- **Users can write revenue/pickup numbers directly** — no rule can verify delta history without a trusted backend
+  (Cloud Functions); this project has none. **No aggregate validation** for the same reason.
+- **"Inspect element" protection cannot be hardened** — all client code is visible. ⛔ Don't try: every layer
+  (`devtools-guard`) is an obstacle, not protection, and "hardening" only risks breaking the real app.
+- **`zto-import/google-sheets-api/Code.gs` is a template** — repo edits **don't change the deployed script**; it must be
+  pasted into script.google.com and deployed as a new version by hand.
+- **Netlify Base directory lives in the UI** — `zoew` ➜ **`ZoeW`** · `zoekeygen` ➜ **`ZoeKeyGen`** (**case-sensitive**,
+  Linux). Repo checkers can't see it and a PAT in Netlify env is banned. See "Netlify config" below.
+- **Clearing site data loses License `seenMax`** — it grants nothing without the server (`activate()` requires
+  `checkOnline().ok === true`).
+
+⛔ The first four are 📝 zones (no tool) — intentional acceptances, not gaps. Don't build tools for them unasked.
 
 ---
 
-## 🔒 ច្បាប់ ➜ ឧបករណ៍ដែលចាក់សោវា (តារាងស្នូល — អានមុនជឿច្បាប់ណាមួយ)
+## 🔒 Core table: rule ➜ tool that locks it (read before trusting any rule)
 
-> **របៀបប្រើតារាងនេះ** ៖ ច្បាប់នីមួយៗសរសេរខ្លី ព្រោះ **ឧបករណ៍ជាការចងចាំ** —
-> បើអ្នកបំពានច្បាប់ ឧបករណ៍នោះក្រហម។ ចង់ដឹង *ហេតុអ្វី* ច្បាប់មួយមាន ➜
-> `grep` ឈ្មោះឧបករណ៍នោះក្នុង `docs/HISTORY*.md` (ឬលិបិក្រមនៅចុង [`docs/HISTORY.md`](docs/HISTORY.md))។
->
-> **📝 = គ្មានឧបករណ៍ចាក់សោ** ➜ ច្បាប់នោះពឹងលើការប្រុងប្រយ័ត្នរបស់មនុស្ស
-> តែម្យ៉ាង ➜ **វាជាកន្លែងដែលកំហុសបន្ទាប់នឹងកើត**។ បើអ្នកប៉ះតំបន់ 📝 ណាមួយ
-> សូមសាងឧបករណ៍ជាមុនសិន។ (ឥឡូវនៅសល់ **៣** ជួរ 📝 ក្នុងតារាងនេះ — សុទ្ធតែជា
-> **ការទទួលយកដោយចេតនា** មិនមែនចន្លោះទេ; មើលផ្នែក «អ្វីដែលទទួលយកដោយចេតនា»
-> ខាងលើ។ ⛔ លេខនេះដេរីវេបានពីតារាង ➜ `doc-scope-test` ផ្នែក ៦ ចាក់សោវា។)
+> Each rule is short because **the tool is the memory**: violate it and the tool goes red. Want the *why*? `grep` the
+> tool name in `docs/HISTORY*.md` (or the index at the end of [`docs/HISTORY.md`](docs/HISTORY.md)).
+> **📝 = no tool** ➜ only human care protects it ➜ **that is where the next bug happens**; build a tool before
+> touching a 📝 area. **3** 📝 rows remain in this table — all **intentional acceptances**, not gaps (see above).
+> ⛔ That count is derived from the table — `doc-scope-test` part 6 locks it.
 
-| តំបន់ | ច្បាប់ខ្លី | ឧបករណ៍ |
+| Area | Short rule | Tool |
 |---|---|---|
-| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
-| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់។ ⛔ meta-checker ដែលរត់ checker កូនច្រើន (`checker-coverage` · `exit-code-integrity`) រត់ **ស្របគ្នាក្នុងពិដាន** មិនមែនជាជួរ ហើយកូនដែល **ផុតថវិកា** ខណៈពុល = FAIL (វាស់មិនបាន) មិនមែន «ធ្លាក់ត្រឹមត្រូវ» · ⛔ កុំកែការលើសពិដានដោយបង្កើន `CHECKER_TIMEOUT` (វាលាក់ checker ដែលព្យួរពិត) | `hang-guard.js` |
-| **ឧបករណ៍ខ្លួនវា ៖ ម៉ាស៊ីនរត់ `run-all.sh`** | ⛔ lane ស្របគ្នាមានព្រំដែន តែ output **តាមលំដាប់បញ្ជីជានិច្ច** · `emu/*` + `money-guardian` ម្តងមួយ (emulator តែមួយ) · checker ដែលសរសេរ/បោស `.tmp-poison-*` (`checker-coverage` · `exit-code-integrity`) **រត់ម្នាក់ឯង** · lane ដេរីវេពីប្រភព ហើយផ្ទៀង **ទាំង ២ ទិស** (checker ថ្មីដែលប្រើ emulator ឬបោសស្រមោល ➜ ត្រូវចូល `runall_lane()`) · `RUNALL_STATE` សរសេរ **ភ្លាមពេល checker ចប់** · `RUNALL_RESUME=1` **បដិសេធលើ tree ផ្សេង** (hash មាតិកា + ទង់ `*_STRICT`) · `RUNALL_ONLY` ឈ្មោះមិនស្គាល់ ➜ បដិសេធ ហើយការរត់មិនពេញ **មិនដែលរាយ «ជោគជ័យទាំងអស់»** · TERM មិនបន្សល់ process កំព្រា · ⛔ `RUNALL_SHARD=k/n` (CI ស្របគ្នា) ជាអនុគមន៍នៃ **បញ្ជី + `RUNALL_HINTS` តែប៉ុណ្ណោះ** (មិនមែន state/nproc ដែលខុសតាម runner) ➜ ផ្នែកទាំង n មិនជាន់ · មិនខ្វះ · matrix ក្នុង `audit.yml` = 1..n · ទង់ STRICT របស់ CI ⊇ ប្លុក Runbook ជំហានទី ០ · តម្លៃខុស ➜ បដិសេធ | `runall-runner-test` · `hang-guard` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ checker ត្រូវរត់ធម្មតា និង baseline; CLI ដែលទាមទារ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា | `checker-coverage.js` |
-| **ឯកសារគម្រោងទាំងមូល** | ⛔ ឯកសារថ្មីត្រូវមានការយាមក្នុង `repository-file-coverage.json`; ធាតុចាស់ ឬ guard ដែលបាត់ត្រូវធ្លាក់; ប្រភេទ integrity/manual មិនមែន behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
-| **របាយការណ៍ និងទិន្នន័យសម្រាប់ផ្ញើ** | ⛔ CLI ពិតត្រូវរកឃើញកំហុសលុយមុន/ក្រោយ redaction ដូចគ្នា; launcher មិនប្រកាសថាផ្ញើបានពេល redaction ធ្លាក់ | `money-reality-test.js` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ dependency របស់ sandbox ត្រូវមានក្នុង scope ពិត (function/state/ថេរ); smoke ត្រូវរត់ផ្លូវ collected ពិតមុនច្រក emulator | `emu/crud-rules-flow.js` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ។ ⛔ **ពាក់កណ្តាលទី ២ ៖ ការអះអាងដែល *មិនដែលរត់* ក៏ចេញ exit 0 ដែរ** — `await` លើ promise ដែល **គ្មានអ្នកដោះ** (ឧ. stub ដែលតេស្តជាអ្នក resolve) មិនបោះ មិនព្យួរជារៀងរហូតទេ ៖ event loop **ស្ងួត** ➜ node ចេញ **០** ដោយស្ងាត់ ➜ បន្ទាត់សង្ខេប និងការអះអាងខាងក្រោមទាំងអស់ **មិនដែលរត់** ➜ `run-all.sh` រាយ **PASS**។ វាស់បាន (2.33.2) ៖ ប្លុកថ្មីរបស់ `periodic-network-guard-test` កាត់ការអះអាង License ២ ចោល ខណៈ checker រាយ PASS — **`exit-code-integrity` ជាអ្នកចាប់ តែម្នាក់ឯង**។ ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖ `process.exitCode = 1` នៅដើមឯកសារ ហើយមានតែបន្ទាត់សង្ខេបទេ ដែលបន្ទាបវា — ⛔ មិនមែនការពិនិត្យដោយភ្នែកថា «តេស្តខ្ញុំដោះគ្រប់ promise» | `exit-code-integrity.js` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ `pageerror` មិនឃើញការបដិសេធ promise — ត្រូវមើល `unhandledrejection` ដែរ | `checker-coverage.js` ផ្នែក ៨ |
-| **listener ដែលកកកុញ** | ⛔ វដ្តពិត N ជុំ ➜ ចំនួន listener និង node មិនត្រូវកើន | `listener-leak-test.js` |
-| លុប ទល់នឹង ដក | `isDeducted` ជាវាល **តែមួយ** ដែលកំណត់លុយ | `policy-test` · `revenue-fuzz` |
-| **barcode ស្ទួន ↔ លុយ** | ⛔ រក្សាទុកបានតែពេលមានសាលក្រម `'claimed'` ពិត។ ⛔ registry សរសេរ **`true` ថេរ** ➜ ការអាន server ក្រោយ `disconnect` ដែលឃើញ `true` មិនអាចបែងចែក «យើងចាប់បាន» ពី «កញ្ចប់ផ្សេងចាប់រួច» ➜ `claimBarcodeInRegistry()` ត្រឡប់ **`unknown`** លើ `txOutcome: 'applied'` (អន្ទាក់ថ្លៃតិចជាងលុយស្ទួន) | `duplicate-money-test` · `tx-outcome-test` ផ្នែក ៥ · `emu/tx-disconnect-emu-test` ផ្នែក គ (SDK ពិត) |
-| **លុយសរុបរបស់ *ជួរដេក*** | ⚠️ វាក្យស័ព្ទ ៖ **`barcode` = កញ្ចប់ ១** · **`item` = ជួរដេក = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ** (`addOrUpdateEntry` merge តាម `phone`+`scanDate`) ➜ `item.count` = **ចំនួនកញ្ចប់** ➜ ស្លាក «កញ្ចប់សរុប» ត្រឹមត្រូវ។ ⛔ `item.cod/.dod/.price` ត្រូវស្មើ **ផលបូក barcodes** ជានិច្ច (ឈរតែពេល `barcodes` មិនទទេ — item ចាស់ដេរីវេពី `price`)។ ⛔ **ត្រូវពិនិត្យលើ server ដែរ** ៖ `initDatabaseListeners` គណនា `price` ឡើងវិញពេលអាន ➜ វា **ព្យាបាល** កំហុសក្នុងសតិ ខណៈលេខខុសអង្គុយលើ server និងចេញក្នុង Excel។ ⛔ អ្នកយាម ledger **មិនឃើញថ្នាក់នេះទេ** (វាស់បាន ៖ កំហុស ០.០១ ➜ ១៣០/១៣១ checker បៃតង) | `item-money-integrity-test` |
-| **ពណ៌ ៖ COD ធៀបនឹង DOD** | ⛔ ក្នុងជួរដេកតែមួយ COD និង DOD ត្រូវ **មើលឃើញខុសគ្នា** — ពណ៌ចាស់បំបែកតែ **ស្ថានភាព** (យករួច ធៀបនឹង មិនទាន់យក) ➜ លេខ ២ ជាប់គ្នាចេញពណ៌ដូចគ្នាបេះបិទ ➜ អ្នកប្រើអានច្រឡំ។ ⛔ COD **រក្សាពណ៌ស្ថានភាពដដែល** (`money-collected`/`money-pending` — កុំប្តូរ ៖ `semantic-ui-color-test` ចាក់សោអក្សរពិតរបស់វា) ចំណែក DOD ទទួល modifier `kind-dod` ➜ `--money-dod-collected` / `--money-dod-pending`។ ⛔ ការវាស់ត្រូវជា **ពណ៌គណនាពិត** ក្នុង browser មិនមែនវត្តមាន class (class គ្មានច្បាប់ CSS ➜ អ្នកយាមបៃតងលើអេក្រង់ដែលនៅដដែល) ហើយបញ្ជីកន្លែងគូរត្រូវ **ដេរីវេពី `app.js`** មិនមែនបញ្ជីរឹង។ ⛔ **ទិសផ្ទុយ ៖ បន្ទាត់ COD សុទ្ធ មិនត្រូវមាន `kind-dod`** — បើមាន ពណ៌ត្រឡប់ដូចគ្នាវិញ ខណៈការអះអាងវិជ្ជមាននៅតែបៃតង | `semantic-ui-color-test` · `page-nav-test` |
-| **របា Slide ៖ Category បត់បាន** | ⛔ ធាតុរៀបជា `.drawer-group` បត់ជាលំនាំដើម · ស្ថានភាពចងចាំក្នុង `zoew_drawer_groups_v1` · ការពន្លាមួយមិនពន្លាមួយទៀត។ ⛔ **Category ដែលធាតុទាំងអស់លាក់ ត្រូវលាក់ទាំងក្បាល** (ក្បាលទទេ = អ្នកប្រើចុចហើយឃើញអ្វីទាំងអស់) ➜ `refreshDrawerGroups()` ជាចំណុចច្របាច់តែមួយ។ ⛔ **ការវាស់ត្រូវជា `getBoundingClientRect()`** — `getComputedStyle(child).display` នៅតែ resolve ទោះ **ឪពុក** ជា `display:none` ➜ វាមិនឆ្លើយថា «អ្នកប្រើឃើញឬអត់» ទេ (⚠️ ការវាស់តាម `getComputedStyle` ត្រឹមត្រូវ **តែពេល** `.hidden` ឈរលើធាតុខ្លួនឯង ដូច `zto-sync-banner-test` ផ្នែក ២២) | `page-nav-test` · `zto-sync-banner-test` |
-| **តម្លៃដែល rules បដិសេធ** | ⛔ លេខអវិជ្ជមានត្រូវ **clamp មុនសរសេរ** — សតិត្រូវស៊ីនឹង server | `revenue-rules-clamp-test` |
-| **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
-| **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
-| **ការដកវិញក្រោយការអនុវត្តដែល *ធ្លាក់*** | ⛔ ច្បាប់ «ដកតាម delta ពិតដែលអនុវត្ត» (ជួរខាងលើ) អនុវត្តលើសាលក្រម **`null`** ដែរ ៖ `null` = «server មិនបានអនុវត្ត» ➜ **គ្មានអ្វីត្រូវដក** (⛔ កុំធ្លាក់ចុះទៅ delta របស់សតិ)។ ការដកវិញក្នុងសតិត្រូវ **idempotent** ព្រោះ `catch` របស់ commit ដក memory រួចហើយ | `ledger-failed-apply-revert-test` |
-| **transaction ៖ `disconnect` ↔ លទ្ធផលពិត** | ⛔ `disconnect` = «មិនដឹង» មិនមែន «មិនបានអនុវត្ត» ➜ `runTransactionResolved()` (wrapper លើ `fb` តែមួយ) អាន server តាម REST មុនបញ្ច្រាស · `applied` ➜ ជោគជ័យ · `unknown` ➜ មិនប៉ះលុយ + Sentry money · ការសម្អាតយឺតមិនសរសេរធុងសំរាមស្ទួន។ ⛔ **ការសម្រេចផ្អែកលើ «ស្មើតម្លៃដែលផ្ញើ» ត្រឹមត្រូវតែពេលតម្លៃនោះជារបស់អ្នកសរសេរម្នាក់** (token · ទិន្នន័យកញ្ចប់) ➜ តម្លៃថេរ (registry `true`) មិនត្រូវជឿ · ការសម្អាតពិនិត្យម្ចាស់ធុងសំរាម · ledger ថ្ងៃ/ខែ ផ្ទុក token `op` តែមួយក្នុងមួយការសរសេរ (`runLedgerTransaction()` ជាចំណុចច្របាច់ ⛔ មិនមែន `fb.runTransaction` ផ្ទាល់លើ ledger) ➜ rules មិនទាន់ Publish (`permission_denied`) ➜ ផ្ញើម្តងទៀតគ្មាន `op`។ ⛔ wrapper **ពន្យារ** `disconnect` (អាន REST រហូតដល់ ៦០ វិ.) ➜ ផ្លូវដែលចូលជួរលើ `disconnect` (`patchHistoryItemFields` · ការសម្គាល់ខល) ត្រូវអាន `transactionDisconnectPending()` ពេល `dbOp` ផុត — បើមិនដូច្នេះ ការដាច់បណ្តាញក្លាយជា revert + «បរាជ័យ» | `tx-outcome-test` · `emu/tx-disconnect-emu-test` (SDK ពិត) · `money-guardian-test` · `history-patch-retry-test` (wrapper ពិត) |
-| **ស្ថិតិយក ៖ អត្តសញ្ញាណ** | ⛔ រាប់តាម **សំណុំ barcode** (`pickedUpBarcodes`) — លេខទាំង ២ ជា **កញ្ចក់ដេរីវេ** មិនមែន counter | `pickup-barcode-identity-test` · `pickup-ledger-test` |
-| **ស្ថិតិយក ↔ កូនសោ registry** | ⛔ កូនសោ barcode ត្រូវជា `barcodeRegistryKey()` ដដែល — កូនសោ ២ រូបមន្ត = ការរាប់ស្ទួន | `pickup-ledger-test` |
-| **ស្ថិតិយក ↔ សាលក្រម server** | ⛔ ការសរសេរជា **ស្ថានភាព idempotent** — គ្មាននព្វន្ធលើ `packagesPickedUp` | `revenue-rules-clamp-test` · `money-guardian-test` |
-| **transaction ដែល *បោះបង់*** | ⛔ `committed: false` ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល (`throw` ក្នុង handler ជោគជ័យ **មិន**ទៅដល់ handler បរាជ័យ) | `price-edit-abort-test` |
-| **កូនសោ registry កំព្រា** | ⛔ ការដោះដែលធ្លាក់ត្រូវចូលជួរ រួចរត់ឡើងវិញ — មិនលេបស្ងាត់ | `registry-release-test` |
-| **ជួរដោះ registry ↔ អ្នកដោះ** | ⛔ ការពន្យារត្រូវមានច្រកចេញទី ២ (ទិដ្ឋភាពមកដល់) | `registry-release-test` |
-| ធុងសំរាម · `trashReason` | ស្លាកបង្ហាញ ≠ ការសម្រេចលុយ។ ⛔ **តួលេខសរុប ២ ក្រុមត្រូវដេរីវេពី `TRASH_REASON_META[r].deducted`** មិនមែនចាក់ literal ហើយត្រូវ **រក្សាសេន**។ វាស់បាន (2.31.7ខ) ៖ mutation «ត្រឡប់ក្រុម» និង «បង្គត់ត្រឹមដុល្លារ» **រស់រានលើ checker ១៦០ ទាំងអស់** ព្រោះគ្មានអ្នកណា រត់ `renderTrashSummary()` ហើយអានលេខដែលអ្នកប្រើឃើញ | `trash-modal-test` · `restore-marker-hygiene-test` |
-| **ស្ថិតិយក** ៖ អតិថិជន ↔ កញ្ចប់ | រាប់លើ **មូលដ្ឋានតែមួយ** (barcode បិទ) | `pickup-ledger-test` |
-| **Reset ស្ថិតិយក** តាមតម្រង | node ត្រូវ **នៅមាន** ជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `pickup-reset-test` |
-| សម្អាត ២ម៉ោង/៨ថ្ងៃ | ដើរតាម **barcode** មិនមែនកញ្ចប់ | `partial-pickup-cleanup-test` |
-| Rules fence · deadlock | witness មិនត្រូវចាក់សោ id | `emu/restore-deadlock-test` |
-| **Rules ៖ node ដែលរំពឹង object** | ⛔ node ដែលមាន schema កូន (វាល ឬ wildcard) ហើយអាចសរសេរបាន ត្រូវមាន `.validate` ដែលទាមទារ object (`newData.hasChildren(…)`) — primitive **គ្មានកូន** ➜ ការពិនិត្យកូនមិនរត់ ➜ server ទទួល ➜ listener របស់គ្រប់ឧបករណ៍ធ្លាក់។ ⛔ បញ្ជីដេរីវេពី rules ពិតទាំង ២ ឯកសារ (`rules-shape.js`) ➜ node ថ្មីត្រូវគ្របដោយស្វ័យប្រវត្តិ · emulator វាស់ពីរជំហាន (control ដក guard ➜ ទទួល · rules ពិត ➜ បដិសេធ)។ ⚠️ Console ដោយម្ចាស់ Project រំលង rules ➜ `rawSnapshotToItemList()` រំលង record ខូចនៅតែចាំបាច់ | `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` |
-| **Rules ↔ ការសរសេរពិតរបស់ App** | ⛔ fake SDK របស់ checker browser ទទួល **គ្រប់ការសរសេរ** ➜ «rules ពិតបដិសេធការសរសេរធម្មតារបស់ App» មើលមិនឃើញ ➜ រាល់ការប្តូរ rules (ឬផ្លូវសរសេរថ្មី) ត្រូវបញ្ជាក់លើ **ការសរសេរពិតតាមលំដាប់ពិត** ៖ `revenue-fuzz-test` (`FUZZ_CAPTURE`) ចាប់ការសរសេរដែល fake ទទួល ➜ ចាក់ទៅ emulator ជាមួយ rules ពិត (App ➜ user · harness ➜ owner) ➜ បដិសេធ **០** · probe ទិសផ្ទុយ (record ប្រវត្តិ `.validate: false` ➜ ត្រូវបដិសេធ) · ជាន់ ≥ ១៥០ ការសរសេរ · root ៩។ ⛔ ផ្លូវសរសេរថ្មីដែល fuzz មិនទាន់រត់ ➜ បន្ថែម op ក្នុង `revenue-fuzz-test` មុនជឿ rules | `emu/app-writes-rules-test` |
-| នាឡិកា | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `clock-hygiene` |
-| **ពិដានល្បឿន ↔ នាឡិកា** | ⛔ រយៈពេលកន្លងផុតត្រូវឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `monotonic-gate-test` |
-| **ពិដានល្បឿន ↔ *មូលដ្ឋាន* នាឡិកា** | ⛔ ត្រាដែល `elapsedSince()` វាស់ ត្រូវ **បោះដោយ `Date.now()`** (ត្រា `getServerNow()` ➜ `−offset` ➜ `Infinity` ➜ ពិដាន និងជណ្តើរ backoff **រលាយ**)។ ⛔ ត្រារស់ទាំងជា **អថេរ** និងជា **property** (`{ at: … }` · `x.deletedAt = …`)។ ⛔ ការកែមាន ២ ទិស ៖ ត្រា **local** (TTL) ➜ ប្តូរ *ការបោះ* ទៅ `Date.now()`; ត្រា **retention** (`deletedAt` ក្នុង Firebase) ➜ ⛔ កុំប្តូរការបោះ — វាស់ដោយ `getServerNow() - mark`។ ⛔ property តែមួយមិនផ្ទុកមូលដ្ឋាន ២ | `clock-basis-test` · `zto-sync-banner-test` (ឥរិយាបថ) |
-| ការតភ្ជាប់ · ស្តារ | listener ដែលធ្លាក់ត្រូវត្រឡប់មកវិញ; SDK ស្តារបានពិត · ⛔ ការផ្ទុកឡើងវិញដើម្បីស្តារ SDK **វាស់ការឈានដល់ host របស់ SDK មុន** ចំណាយពិដាន (`navigator.onLine` កុហកលើ WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យអស់ ➜ បើអត់ ពិដាន ៣ អស់ខណៈបណ្តាញស្លាប់ ➜ SDK មិនដែលស្តារ) · CSP `connect-src` អនុញ្ញាត origin នោះ | `connection-recovery-test` · `netlify-config-scope-test` |
-| **ការតភ្ជាប់ «ងាប់ស្ងាត់» (zombie socket)** | ⛔ `.info/connected` = `true` **មិនមែនភស្តុតាង** ថា socket ដឹកចម្លើយ — SDK បិទការតភ្ជាប់តែលើ `window` `offline` (keepalive ៤៥ វិ. មិនរង់ចាំចម្លើយ) ➜ WiFi គ្មានអ៊ីនធឺណិតខាងលើ · NAT ផុត · ភ្ញាក់ពី background ➜ «ភ្ជាប់ Server រួចរាល់» រាប់នាទី ខណៈគ្មានអ្វីដើរ។ `probeDatabaseLiveness()` ជាអ្នកសម្រេចតែមួយ ៖ round trip ពិត (`get()` លើ `DB_LIVENESS_PROBE_PATH` ដែលគ្មាន listener ➜ ចម្លើយណាក៏ដោយ រួម `permission_denied` = រស់) · តែការផុតពិដាន (១០ វិ.) ទេដែលផ្តាច់ (`forceDatabaseReconnect()` = ផលដូចព្រឹត្តិការណ៍ `offline` របស់ SDK)។ ទ្វារ ៣ ៖ `dbOp` ព្យួរ + claim/save ការស្កេនព្យួរ · ភ្ញាក់ពី background ≥ ៣០ វិ. · វដ្ត ៦០ វិ. (មើលឃើញ + គ្មាន round trip ៥៥ វិ.)។ ⛔ មិនវាស់ពេល listener នៅ pending (ការទាញដំបូងលើបណ្តាញយឺតដាក់ចម្លើយខាងក្រោយ ➜ ផ្តាច់ខុស ➜ ទាញឡើងវិញគ្មានទីបញ្ចប់) · ផ្តាច់ ≤ ១ ដង/៣០ វិ. · ទិសផ្ទុយ ៖ យឺតតែរស់ ➜ មិនផ្តាច់ | `emu/app-network-e2e-test` (App · SDK · emulator ពិត) |
-| **listener ដែលងាប់តែឯង** | ⛔ បងប្អូនមិនត្រូវប្រកាសជំនួសវាថាជាសះស្បើយ | `connection-recovery-test` |
-| **listener `.info/*` ដែលងាប់តែឯង** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `.info/connected` និង `.info/serverTimeOffset` ដែរ | `connection-recovery-test` |
-| **callback ចាស់ក្រោយភ្ជាប់ឡើងវិញ** | ⛔ រាល់ callback របស់ `onValue` ត្រូវមានច្រកទ្វារជំនាន់ (`listenerGeneration !== dbListenerGeneration`) — `fb.off()` រុំក្នុង `try/catch` ➜ វាអាចធ្លាក់ ហើយ snapshot ដែលកំពុងហោះក៏មកដល់ **ក្រោយ** ការប្តូរ database/auth ដែរ ➜ callback ចាស់ (១) សរសេរទិន្នន័យ **Project ចាស់** ចូលសតិ និង (២) ហៅ `noteDbListenerAlive()` ➜ **ប្រកាសថាទិដ្ឋភាពស្រស់** ➜ ច្បាប់ «បញ្ជីទទេ ↔ សិទ្ធិវាស់» ងាប់ ហើយការសម្អាតបំផ្លាញរត់លើទិដ្ឋភាពចាស់។ ⛔ **ការវាស់ត្រូវដេរីវេពី `DB_LISTENER_KEYS` ពិត** — ជំនាន់មុនវាស់តែ `history` ➜ ការដកច្រកទ្វារចេញពី listener **ណាមួយផ្សេង** រស់រាន។ វាស់បាន (2.36.3) ៖ ការដកវាចេញពី `deleted` **រស់រានសំណុំពេញ (១៧៥ ពេញលេញ · SKIP ០)** | `connection-recovery-test` |
-| **ការលាក់ secret** | វត្ថុ frozen លាក់តាមច្បាប់ចម្លង · private/signing key និង private JWK (រួម JSON string) ត្រូវលាក់ · public JWK និងវាលលុយ `d` នៅដដែល។ ⛔ `SECRET_KEY_PATTERN` (កូនសោវត្ថុ) និង `SECRET_PARAM_PATTERN` (ខ្សែអក្សរ `x=…` — ផ្លូវធំជាងគេព្រោះ Sentry ចាប់ breadcrumb `console`) ជា **បញ្ជី ២ ដាច់ពីគ្នា** ➜ ត្រូវគ្រប secret ដែលប្រព័ន្ធ **ពិតជាកាន់** ទាំង ២ ផ្លូវ (`headerValue` · `headerValueEnc` · `X-Zoe-Proxy-Key` · `ZTO_PROXY_KEY` · `BOS-MAN-SESSION` · `activationKey` · `keyString` · …) · បញ្ជីវាល credential ដេរីវេពី `fieldsToBlank` របស់ `clearSensitiveModalFields()` · ការវាស់ដេរីវេពីកូដពិត។ ⛔ ទិសផ្ទុយ ៖ មិនលេបឈ្មោះដែលមិនមែន secret (`path` · `patch` · `dispatch` · `headerName`) · បញ្ជី param ធំជាងបញ្ជីកូនសោដោយចេតនា (`key` ទទេ) | `secret-hygiene` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ ការពុលត្រូវធ្វើលើឯកសារស្រមោល — SIGKILL មិនត្រូវប៉ះឯកសារដើម | `checker-coverage` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ គ្មានធនធានចែករំលែក **ថេរ** ៖ `listen(0, '127.0.0.1')` ជានិច្ច · RTDB namespace របស់ `emu/*` ត្រូវតែមួយក្នុងមួយការរត់ | `checker-coverage` |
-| **ការសរសេរ ↔ ការចាកចេញទៅខល** | Retry រក្សា rollback គ្រប់វាល និងជម្រើសថ្មីជាង; callback ចាស់មិនអាចសរសេរ/ដកស្ថិតិ/បង្ហាញសារក្រោយប្ដូរ auth ឬ database | `history-patch-retry-test` |
-| **ការទាញតារាងជាមុន** | ព្យាយាមវិញលឿន **តែមិនបាញ់ចំពេលស្កេន** | `lookup-prefetch-test` |
-| **ស្ថានភាព ↔ ម្ចាស់ប្រអប់** | ⛔ `closeModal()` សម្អាតតែស្ថានភាពរបស់ប្រអប់ **នោះ** (ឬពេលជង់ទទេ) — ប្រអប់ជាន់លើមិនត្រូវលុប Barcode · ការកែលេខ · ការសម្គាល់ខល របស់ប្រអប់ខាងក្រោម | `lookup-prefetch-test` · `ui-flow-test` |
-| **ប្រអប់ជាន់គ្នា** | ⛔ ប្រអប់ដែល **បើកក្រោយគេនៅលើគេ** (រួមការបើកប្រអប់ដែលបើករួច) — `.modal` z-index ស្មើគ្នា ➜ លំដាប់ DOM ឈ្នះ ➜ PIN ពី Config លោតពីក្រោយ ➜ ZoeKeyGen `openModalHelper()` រៀប z-index ឡើងវិញ · ZoeW `uiState.modalStack` ➜ `Modal.tsx` (តែពេល ≥ ២ បើក ➜ parity) · ⛔ កុំតម្រៀបប្រអប់ដោយ z-index ថេរ ឬលំដាប់ DOM | `layout-check` |
-| **Keyboard ↔ ការស្វែងរក** | ⛔ មិនលោតកាត់ខណៈ lookup កំពុងធ្វើការ; ចប់ ➜ មកភ្លាម; ពិដាន ១៥ វិ. (fail-open) | `lookup-prefetch-test` |
-| **អត្តសញ្ញាណនៃការបរាជ័យ Lookup** | ⛔ `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ; សារ Cookie ត្រូវតាម Windows sync tool ➜ Netlify Blobs មិនមែន workflow paste env ចាស់ | `lookup-failure-identity-test` |
-| **ការស្កេនជាបន្តបន្ទាប់** | ⛔ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `lookup-burst-test` |
-| **ធាតុជួរ lookup កំព្រា** | ⛔ ផ្លូវចេញមុន **ត្រូវដោះ** ធាតុជួរ; ពិដានវាស់តែការរង់ចាំ **ពិត** | `lookup-burst-test` |
-| **ស្លាកច្បាប់សម្អាត ↔ ថេរ** | ⛔ អត្ថបទដែលអ្នកប្រើអាន ត្រូវអានចេញពីថេរ | `trash-modal-test` |
-| **អ្នកតាមដានវឌ្ឍនភាព** | ⛔ ការសួរមិនត្រូវលេបភស្តុតាង (idempotent) | `connection-recovery-test` |
-| **កូនសោដែលសួរ ↔ កូនសោដែលដាក់ចូល** | ⛔ ការការពារដែលងាប់ = គ្មានការការពារ។ ⛔ **កូនសោត្រូវ *មាន* មិនគ្រប់គ្រាន់ — listener នីមួយៗត្រូវរាយការណ៍ *កូនសោរបស់ខ្លួន*** ៖ callback ដែលបញ្ជូនកូនសោ **បងប្អូន** ធ្វើឲ្យ (១) ការងាប់របស់វាមិនចុះក្នុង `dbListenerFailedPaths` ➜ `dbListenerViewIsStale()` **ងាប់ស្ងាត់ៗ** និង (២) បងប្អូន ត្រូវប្រកាសជំនួសវា។ វាស់បាន (2.31.7) ៖ mutation ដែលប្តូរកូនសោនៃ error callback **រស់រានលើ checker ១៥៨ ទាំងអស់** | `listener-pending-key-test` |
-| ជណ្តើរភ្ជាប់ឡើងវិញ | វដ្តមិនត្រូវកាត់ handshake | `reconnect-ladder-test` |
-| Timeout · retry | រាល់ `fetch` ត្រូវ abort ពិត | `network-timeout-test` |
-| សម្ពាធបណ្តាញ | ពិដានចំនួនស្របគ្នា | `network-pressure` · `license-network-pressure` |
-| Service worker | cache-first; ⛔ រាល់ការទាញដែលចាក់ចូល cache SW (install · revalidate · cache miss) ជា `cache: 'no-cache'` — HTTP cache ចាស់លើឧបករណ៍ (`immutable` លើឈ្មោះគ្មាន hash) មិនប្រែតាម header ថ្មី ➜ JS ថ្មី + wasm ចាស់ = `LinkError` ➜ iPhone ស្កេនមិនបាន · `immutable` អនុញ្ញាតតែលើឈ្មោះមាន hash (`/assets/*`); Cache API បរាជ័យ ≠ App ដាច់; navigation ធម្មតា និង direct asset ដូច `/app.js` ➜ `index.html`; `guide.html` និង Netlify Pretty URL `/guide` ➜ cache សៀវភៅ; query រសើបមិនត្រូវជាប់ក្នុង cache key; ⛔ **ការធ្វើឲ្យស្រស់ខាងក្រោយមិនចាក់ឯកសារ *deploy ថ្មី* ចូល cache *ចាស់*** ៖ SW ចាស់នៅគ្រប់គ្រងពេល install ថ្មីមិនជោគជ័យ ➜ `index.html` ថ្មីយោង asset ថ្មីដែលគ្មានក្នុង cache ➜ **ក្រៅបណ្តាញ App ស** ➜ `shellDeployIsCurrent()` (sw.js លើ server នៅជាកំណែ `CACHE_VERSION` ខ្លួនឯង) ជាច្រកទ្វារ · កំណែថ្មីមកតាម install ជាក្រុមតែមួយផ្លូវ · App ទាំង ២ | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` (ជុំទី ៤ ៖ HTTP cache ចាស់ · ជុំទី ៥ ៖ install ថ្មីធ្លាក់) · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` · `netlify-config-scope-test` ផ្នែក ៥ |
-| **ការរង់ចាំគ្មានពិដាន** | ⛔ បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `stall-guard-test` |
-| **SW ↔ ទំព័រ ៖ ខ្សែភ្ជាប់ក្នុង `registerServiceWorker()`** | ⛔ ចុងទាំង ២ មានតេស្ត (SW ផ្ញើសារ · អ្នកដោះសារ · ផ្ទាំងកំណែថ្មី) តែ **listener ក្នុង `boot.ts` ជាអ្នកភ្ជាប់** ➜ ការវាស់ត្រូវរត់ App · SW · browser ពិត ហើយផ្ញើសារពី **បរិបទ SW** (`clients.matchAll()` ➜ `postMessage`) មិនមែន `dispatchEvent` ក្នុងទំព័រ ៖ `zoew-open-notify` ➜ ផ្ទាំង 🔔 · `zoew-push` ➜ ទាញដំណឹង · ប្រភេទសារដេរីវេពី `sw.js` (ប្រភេទថ្មីគ្មានការអះអាង ➜ ធ្លាក់) · `visibilitychange`/`focus`/`online` ➜ `reg.update()` ក្រោយពិដាន ១៥ នាទីតែប៉ុណ្ណោះ · `controllerchange` ➜ ផ្ទាំង «មានកំណែថ្មី» តែពេលមាន controller តាំងពីផ្ទុក (⛔ មិនមែនការដំឡើងដំបូង) | `sw-client-wiring-test` |
-| **រង្វិលជុំដែលមិនចេះឈប់** | ⛔ tab ដែលជាប់ **មិនឆ្លើយអ្វីទាំងអស់** (គ្មាន toast · ការរក្សាទុក · Sentry) ➜ ធ្ងន់ជាងការធ្លាក់ដែលមានឈ្មោះ។ ⛔ ព្រំដែនត្រូវជា **រចនាសម្ព័ន្ធ** ៖ នព្វន្ធលើ `Infinity` មិនឈប់ · លេខពី Firebase មិនមែនព្រំដែន · `Number.isFinite()` មិនគ្រប់គ្រាន់ (`1e12`) ➜ ពិដានតាមរចនាសម្ព័ន្ធពិត។ ⛔ រូបរាងដែលត្រូវវាស់ ៖ `while` · `do-while` · `for` គ្មានលក្ខខណ្ឌ · **`for` ដែលរាប់តាមលេខ** · **ចំណុចចាប់ផ្តើមពីអាគុយម៉ង់** (`matchingBraceIndex(src, -Infinity)` ➜ ធ្វើឲ្យចំណុចចាប់ផ្តើម **រឹង** ៖ `Number.isFinite` + `< 0 ➜ 0` ខាងក្នុង helper មិនមែនកន្លែងហៅ)។ ⛔ **clamp ម្ខាង** គឺគ្មានការការពារ ➜ `clampLockerCount()` ជាចំណុចច្របាច់ដែល **ការអាន និងការសរសេរ** ឆ្លងកាត់។ ⛔ ការវាស់ ៖ **រត់ពិតក្នុង process ដាច់ដោយឡែក** (ពិដានពេល + heap) · មាន **ទិសផ្ទុយ** (តម្លៃធម្មតាផ្តល់លទ្ធផលដដែល) · វិសាលភាព **App ទាំង ២** | `loop-termination-test` |
-| **ការហៅ Firebase ដែលព្យួរ** | ⛔ RTDB មិនបដិសេធពេលក្រៅបណ្តាញ — វាព្យួរ ➜ សោ in-flight ជាប់រហូត | `db-stall-guard-test` |
-| **ការសរសេរដែលព្យួរ ខាងក្រោយ helper** | ⛔ សោសម្អាតត្រូវដោះ · ការសរសេរយឺតត្រូវបញ្ចប់ការងារ · អ្នកប្រើត្រូវឃើញសារ | `write-stall-guard-test` |
-| **សោការងារ ↔ ការសរសេរធុងសំរាមដែលព្យួរ** | ⛔ ច្បាប់ជួរខាងលើអនុវត្តលើសោដែលឈរខាងក្រោយការសរសេរ **គ្មានពិដាន** ដែរ ៖ លំដាប់ «transaction ចុះលឿន ➜ បណ្តាញដាច់ ➜ `fb.update` ព្យួរ» ធ្វើឲ្យ `finally` **មិនរត់** ➜ សោជាប់អស់កល្ប ➜ ⛔ ច្បាប់ **២ ម៉ោង/៧ ថ្ងៃ** ងាប់លើកញ្ចប់នោះ (**លុយមិនត្រូវដក**) និងរបៀបស្កេនដកងាប់។ ⛔ ការកែជា `settleLockWithin()` លើ **សោ** — **មិនមែន** `dbOp()` លើការសរសេរ (នោះនឹងបញ្ច្រាសលុយខុសពេលការសរសេរចុះយឺត) | `stall-lock-release-test` |
-| **ការកំណត់ Locker ↔ claim** | ⛔ `assignLockerToEntry()` ត្រូវមាន gate `clearClaim` **ដូចផ្លូវសរសេរដទៃទាំង ១០** — Firebase rules មិនទប់វាទេ (fence អនុញ្ញាតរាល់ការសរសេរដែល `newData.exists()`; វាការពារត្រឹមតែ **ការលុប**)។ បើគ្មាន ➜ «លុបទាំងអស់» សរសេរ trash ពី snapshot **មុន** Locker ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ **✅**។ ⛔ **កុំបន្ថែម gate សម្រាប់ restore markers** — វាស់រួច ៖ ផ្លូវស្តារ **មិនបាត់** Locker (`applyClaimedRestoreToHistory` merge លើ `currentItem` · `finalizeClaimedRestore` សរសេរតែ field-level) | `locker-claim-guard-test` |
-| **`clearClaim` ដែលងាប់** | ⛔ marker **គ្មានម្ចាស់** ជាអន្ទាក់ស្ថាពរ (ថ្នាក់ដដែលនឹង «កូនសោ registry កំព្រា») ៖ `runAutomaticCleanupRules()` abort លើ **វត្តមាន** នៃ `clearClaim` ➜ claim ដែល lease ផុត ➜ ⛔ ច្បាប់ **២ ម៉ោង/៧ ថ្ងៃ** ងាប់លើកញ្ចប់នោះជារៀងរហូត ➜ **លុយមិនត្រូវដក**។ `releaseStaleClearHistoryClaim()` ជាអ្នកដោះតែមួយ ៖ ⛔ សម្រេចតាម **ទិដ្ឋភាព server ក្នុង transaction** · ⛔ មិនប៉ះ claim **រស់** ឬ claim របស់ **ឧបករណ៍នេះ** (`activeClearHistoryClaims`) | `stale-clear-claim-test` |
-| **ZTO ៖ ថវិកា ↔ ពិដាន Netlify** | ⛔ ថវិកាលំនាំដើមត្រូវសមក្នុង **១០ វិ.** បើមិនដូច្នេះ Function ត្រូវសម្លាប់មុនឆ្លើយ | `zto-budget-test` |
-| **ZTO ៖ cache ↔ ការបន្តអាយុ Cookie** | ⛔ កូនសោ cache មិនផ្ទុក Cookie; cache hit មិនប៉ះ Blobs | `zto-budget-test` |
-| **ZTO ៖ សាលក្រម «រកមិនឃើញ»** | ⛔ ត្រូវចូល cache (TTL ខ្លី); ការបរាជ័យបណ្តោះអាសន្ន **មិនត្រូវ** | `zto-negative-cache-test` |
-| **ZTO ៖ លេខកែសម្រួល ↔ ឯកសារ** | ⛔ លំនាំដើមក្នុងឯកសារ ត្រូវអានចេញពីកូដពិត | `zto-negative-cache-test` |
-| **ការ commit យឺតក្រោយពិដាន** | ⛔ ការព្យួរ ≠ ការមិនកើត — ការងារក្រោយ commit ត្រូវរត់ពេលវាមកដល់ | `late-commit-test` |
-| **storage ដែលត្រូវបិទ** | ⛔ `window.localStorage` **getter ខ្លួនវា** បោះ | `storage-guard` · `storage-blocked-boot-test` |
-| **dependency អវត្តមាន** | ⛔ `TypeError` synchronous រំលង `.catch()` | `camera-resume-test` |
-| **ធាតុ `data-act` ↔ អ្នកស្តាប់ទី ២** | ⛔ ច្បាប់ ៤ នៃផ្នែក «CSP និង `data-act`» ទទួល **អ្នកយាមរចនាសម្ព័ន្ធ** ៖ `el.on<evt> =` លើធាតុដែលមាន `data-act` រួច ➜ ធ្លាក់ (ដេរីវេពី `index.html` ពិត · គោរព scope · មាន **ទិសផ្ទុយ** ៖ ធាតុគ្មាន `data-act` ចងតាម JS បានសេរី) | `action-binding-test` |
-| CSP | គ្មាន `on*=`; ធនធានផ្ទុកយឺតត្រូវឆ្លង CSP | `csp-enforced-test` · `csp-lazy-resource-test` |
-| XSS | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `html-sink-escaping` · `inline-handler-xss-test` |
-| ការលេចធ្លាយ secret | redaction ដើរលើ event ទាំងមូល | `secret-hygiene` |
-| **Sentry ៖ ព្យុះកំហុសដដែល** | ⛔ listener ដែលបដិសេធជាប់ៗ រាយការណ៍ **១ ដង/path/ការដាច់** (`dbListenerReportedFailures` ➜ លុបពេល path រស់វិញ) · `ZoeErrors.capture()` ដក event ដដែល (zone·context·message) ក្នុង ១០ នាទី (`suppressedRepeats` · fail-open) — App ទាំង ២។ ⛔ **ការដកមិនលេបអត្តសញ្ញាណ** ៖ `itemId` · `item` · `barcode` · `keyId` · `date` · `path` ផ្សេងគ្នា ➜ ផ្ញើ (ពិដាន ៥/ហត្ថលេខា/បង្អួច) — Admin ត្រូវការ id កញ្ចប់នីមួយៗ | `connection-recovery-test` · `sentry-load-race-test` |
-| **ការជូនដំណឹងពីកំហុស** | ⛔ alert rule ស្វែងរកបានតែលើ **tag** ➜ ផ្លូវលុយត្រូវផ្ញើ `zone: 'money'` | `money-guardian-test` · `sentry-load-race-test` |
-| DOM · state ក្រោយចាកចេញ | គ្មានទិន្នន័យអតិថិជនសល់ | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
-| PTR · ចលនាផ្ទាំង · រមូរ | ⛔ កុំប៉ះដោយគ្មានការស្នើ | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` |
-| ទម្រង់បង្ហាញ | អះអាង **២ ខាង** (មិនលើស **និង** មិនច្របាច់) | `layout-check` · `fluid-type-focus-test` |
-| **អថេរ CSS ដែលមិនប្រកាស** | ⛔ `var(--x)` គ្មាន `--x` ➜ **ច្បាប់ទាំងមូលស្លាប់ស្ងាត់ៗ** (មិនមែនត្រឹមពណ៌) | `css-var-test` |
-| **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
-| Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»; success នៃ write ត្រូវក្រោយ durable commit មិនមែន optimistic UI · ⛔ toast បណ្តាញរស់ (`noteConnectionTransition` ៖ ភ្ជាប់ ➜ ក្រៅបណ្ដាញ ពេលចូលប្រព័ន្ធ) ជាធាតុ **តែមួយ** ដែលប្តូរខ្លួនឯង · ✅ តែពេល listener ទាំងអស់ស្រស់ · grace «កំពុងភ្ជាប់» · មិនដែលភ្ជាប់តាំងពីបើក · toast ចូលប្រព័ន្ធ/Config រស់រួច ➜ គ្មាន toast · ⛔ toast រស់ផុតពិដាន (២០ វិ.) ខណៈ «🔄 កំពុង…» ➜ ប្តូរជា «⚠️ … យូរជាងធម្មតា» មុនបាត់ (⛔ មិនបាត់ស្ងាត់) ហើយជោគជ័យយឺត ➜ ✅ ម្តង (`expireLiveToast()`) · ⛔ ការជាសះស្បើយតែមួយ ➜ ✅ តែមួយ ៖ toast រស់ប្រកាសរួច ➜ `noteDbListenerAlive()` មិនបន្ថែមសារទី ២ (`liveSuccessCount()`) | `toast-truth-test` · `toast-action-truth-test` · `ZoeW/tests/network-toast.test.tsx` · `ZoeW/tests/toast-live-expiry.test.tsx` · `ZoeW/tests/recovery-toast-dedup.test.tsx` |
-| helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
-| **តក្កវិជ្ជាដដែលក្នុងឯកសារតែមួយ** | ⛔ រូបមន្តតែមួយមិនត្រូវរស់នៅ ២ កន្លែង — ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **២ ច្បាប់ផ្ទុយគ្នាក្នុងកូដតែមួយ** (ច្បាប់ ១២ តែលើ *កូដ*)។ ⛔ **checker រាយ ≠ «ត្រូវលុប»** — «អក្សរដូចគ្នា តែមុខងារខុសគ្នា» ជារឿងពិត ➜ មុនរួបរួម ត្រូវវាស់ **អថេរសេរី** (helper ដែលអានតែ parameter + function ថ្នាក់កំពូល ទើបសុវត្ថិភាព) រួច **រក្សាភាពខុសគ្នាជា parameter ឬទុកនៅកន្លែងហៅ** មិនមែនលុបវា។ ⛔ **ការស្កេនតាមអក្សរខកខានពាក់កណ្តាល** — វាស់បាន (2.30.2) ៖ រូបមន្តលុយរស់នៅ **១១ កន្លែង** ខណៈ detector អក្សរចាប់បានតែ **៥**; ៦ ទៀតខុសត្រឹមឈ្មោះ parameter/array ➜ ត្រូវការ detector **រចនាសម្ព័ន្ធ** ដែល **រក្សាឈ្មោះ property** (`.cod` ≠ `.dod`) | `code-duplication-test` |
-| `fb.X` ដែល loader មិន export | `undefined` ស្ងាត់លើផលិតកម្ម | `sdk-surface` |
-| កំណែ App | `app.js` ↔ `manifest.json` ↔ `index.html` **ក្នុង App នីមួយៗ** | `version-check` |
-| **វិសាលភាពនៃការឡើងកំណែ** | ⛔ ឡើងតែ App ដែលកែពិត (កុំបង្ខំអ្នកប្រើទាញឡើងវិញ) — ⛔ ហើយ **កូដខាង server** (`netlify/` · `tools/`) **មិនរាប់ជា «កូដ ship»** ➜ វាមិនត្រូវបង្ខំសំបក PWA ឲ្យឡើងទេ | `version-bump-scope` |
-| License ↔ crypto | ⛔ «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record | `license-grace-test` |
-| **License ↔ នាឡិកា** | ⛔ នាឡិកាដែលមិន sync **មិនអាចលុប** record បានទេ | `license-grace-test` |
-| **App ↔ ម៉ូឌុល License** | ⛔ ទង់ «sync រួច» ត្រូវបើកតែដោយតម្លៃ **ពី server ពិត** · ⛔ ការផ្ទៀងផ្ទាត់ក្រោយចូលប្រព័ន្ធលើស ២០ វិ. (បណ្តាញយឺត) ➜ សាកម្តងទៀតតាមជណ្តើរ `ACTIVATION_RETRY_STEPS_MS` (ការប្តូរវគ្គបោះបង់ · ជណ្តើរអស់ ➜ សារណែនាំ) — ⛔ មិនមែន toast ហើយឈប់ (App ទទេគ្មានប្រអប់) | `license-clock-trust-test` · `ZoeW/tests/activation-retry.test.ts` |
-| **License ↔ ការប្តូរម៉ោង** | ⛔ ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `license-clock-rollback-test` |
-| **Key ១ ➜ ឧបករណ៍តាមពិដាន** | ⛔ **អ្នកសម្រេចឈរនៅ rules** (កូដ client ជាការតុបតែង) ៖ កៅអី `license_seats/<appCode>/<keyId>` ក្នុង License Project សរសេរបានតែ (ក) គ្មានវត្តមាន **និង** Key មានពិត ឬ (ខ) `device` ដដែល · client លុបមិនបាន · ការរាយបញ្ជីបដិសេធ (`.read` ត្រឹម `$keyId`)។ ⛔ `getDeviceId()` អានត្រឡប់វិញក្រោយសរសេរ · «សម្គាល់មិនបាន ≠ កៅអីជារបស់គេ» ➜ `ok: null` មិនលុប record (មានតែ `seat-taken` ពិតទេដែលលុប) · `activate()` ទាមទារ `seat === 'mine'` ពិត · record ចាស់ + កៅអីទទេ ➜ កក់ឲ្យខ្លួន (បើអត់ deploy មួយចាក់សោអតិថិជនទាំងអស់) · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · `checkOnline()` គ្មាន `claimSeat` មិនសរសេរ · ការដោះឧបករណ៍ជារបស់ admin តាម ZoeKeyGen · ⛔ កុំធ្វើឲ្យ seat ធូរ។ ⛔ ពិដាន `license_keys/<app>/<keyId>/maxDevices` (admin តែម្នាក់សរសេរ · អវត្តមាន = ១) អនុវត្តដោយ **slot ឈ្មោះថេរ `d1..d5`** (RTDB rules រាប់កូនមិនបាន ➜ ចំនួន slot = ពិដានក្នុង schema) · ឈ្មោះ slot រស់ ៣ ឯកសារ (`license-verify.js` · `ZoeKeyGen/app.js` · rules) ត្រូវស៊ីគ្នា · ការប្រណាំងរំកិលទៅ slot ទំនេរ (`LICENSE_SEAT_CLAIM_TRIES`) · ZoeKeyGen រាប់តែក្នុងពិដាន។ ⚠️ iOS ៖ PWA និង Safari មាន Storage ដាច់ពីគ្នា ➜ ដំឡើង PWA **មុន** Activate | `license-seat-test` · `emu/license-seat-rules-test` · `license-app-code-test` |
-| **ដំណឹងពីអ្នកលក់ (ZoeKeyGen ➜ ZoeW 🔔)** | ⛔ ZoeKeyGen សរសេរ `license_announcements/<App>/<id>` ក្នុង **License Project** ៖ rules **អានសាធារណៈ · សរសេរ/លុបតែ admin** · schema ចាក់សោ (ប្រភេទ `notice`/`maintenance` ⛔ មិនមែន `update` · ចំណងជើង ១–120 · ខ្លឹមសារ ≤ 600 · id `n` + ម៉ោង ១៣ ខ្ទង់ + ៦ តួ ➜ តម្រៀបតាមពេល · `$other` បដិសេធ)។ ⛔ ប្រភេទ · ព្រំដែនប្រវែង · ពិដានចំនួន រស់ក្នុង `ZoeKeyGen/app.js` · `ZoeKeyGen/index.html` · rules · `ZoeW/src/features/notifications.ts` ➜ ត្រូវស៊ីគ្នា (អ្នកយាមដេរីវេពីកូដទាំង ២ ខាង មិនមែន literal)។ ⛔ ZoeW អានតាម `ZoeLicense.announcementsUrl()` (URL License តែមួយ · `orderBy $key` + `limitToLast`) · ⛔ «ទាញមិនបាន» (401 មុន Publish · បណ្តាញ · JSON ខូច) ≠ «គ្មាន» ➜ រក្សាដំណឹងចាស់ · `null` ពី server = គ្មានពិត · ⛔ ដំណឹងពីអ្នកលក់ **មិនប៉ះ** «📱 កំណែ App» (វាអានតែ `announcements.json`)។ ⛔ ZoeKeyGen ៖ ✅ តែក្រោយ commit · ព្យួរ ➜ «⏳ មិនទាន់បញ្ជាក់» (⛔ មិនមែន «មិនបាន») + ✅ ពេល commit យឺត · បដិសេធ ➜ «មិនបាន» · session ប្តូរ ➜ ស្ងាត់ · រក្សា ២០ ចុងក្រោយ (លុបចាស់ក្នុង update ដដែល) · ⚠️ អ្នកណាក៏អានបាន ➜ កុំដាក់ព័ត៌មានសម្ងាត់ | `keygen-notice-test` · `emu/license-seat-rules-test` ផ្នែក ១២ · `ZoeW/tests/seller-notices.test.tsx` |
-| **Supabase ៖ adapter `fb` ↔ SDK Firebase (ZoeW)** | ⛔ កូដលុយ/listener **មិនបែងចែក backend** ➜ ភាពខុសគ្នាទាំងអស់រស់ក្នុង adapter (`src/services/supabase-*.ts`) ហើយវាត្រូវស្មើ SDK Firebase ពិត (val · លំដាប់កូនសោ · update ជ្រៅ · increment · transaction · listener · កំហុស sync/async)។ ⛔ ផ្ទៃ adapter ⊇ រាល់ `fb.X` ដែល App ប្រើ · ឈ្មោះមានតែក្នុង adapter (`accountOf` · `tenantScope` · `registerAccount` · `resetPassword`) ប្រើក្រោមច្រកទ្វារ (`typeof` ឬ `__supabase`) · ចម្លើយបាត់ក្រោយ commit ➜ `op_id` ដដែល (increment មិនអនុវត្ត ២ ដង) · transaction ➜ `txOutcome` `applied`/`unknown` (ច្បាប់ `disconnect` ដដែល · ត្រាពេលតាម `elapsedSince()`) · ការប៉ះ `document` ឆ្លង `platform/document-io.ts` | `emu/supabase-adapter-parity` · `sdk-surface` · `npm run purity:check` |
-| **Supabase ៖ rules RTDB ក្នុង Postgres** | ⛔ `firebase-database.rules.json` ជាប្រភពតែមួយ ➜ `*_zoe_rules.sql` **ចុងក្រោយ** ត្រូវស្មើ `rulesSql(compileRules(…))` (កែ rules ➜ `node supabase/scripts/generate-rules-sql.mjs` បង្កើតឯកសារថ្មី ➜ Publish លើ Firebase **និង** merge/paste ឯកសារថ្មី) · verdict រាល់ការសរសេរពិតរបស់ App ស្មើ RTDB emulator ពិត។ ⛔ ការឆ្លង tenant (RLS · `zoe_read`/`zoe_pull` · broadcast តាម topic) · `zoe_write` ចាក់សោ tenant (`for update`) **មុន** អាន seq (វាស់ដោយ lock ពិតពី session ទី ៣ មិនមែនការប្រណាំងតាមពេល) | `emu/supabase-rules-parity` · `supabase-datastore-test` · `supabase-rls-test` |
-| **Supabase ៖ គណនី · កូដអញ្ជើញ · ស្ថានភាពហាង** | ⛔ អត្តសញ្ញាណ = `auth.uid()` + `tenant_members` (មានតែ server សរសេរ) មិនមែន claim/`user_metadata` · កូដអញ្ជើញ/កូដប្តូរពាក្យសម្ងាត់ ១០០ bit · DB ផ្ទុកតែ hash · ពិនិត្យកូដ **មុន** បង្កើតគណនី · លទ្ធផលមិនដឹង ➜ **មិនលុប** គណនី។ ⛔ ZoeW បដិសេធ Secret key/`service_role` · `loginDomain` ត្រូវ `.invalid` · គ្មាន Activation Key (`ensureAppActivated()`) ➜ 🩺 ជួរ License = ស្ថានភាពហាង (ផុត/បិទ ➜ ❌ · មិនដឹង ➜ ⚠️) · journal ការសម្អាតចងនឹង tenant · ⛔ **Setup Link ដែលកូដអញ្ជើញប្រើរួច/ផុត ➜ ប្រអប់ចូលប្រព័ន្ធ មិនមែនចុះឈ្មោះ** (`routePendingInvite()` ៖ hash កូដក្នុងឧបករណ៍ `zoew_used_invites_v1` · `register` + `check: true` មិនស៊ីកូដ · Function ចាស់/មិនដឹង ➜ ចុះឈ្មោះ លុះត្រាឧបករណ៍ធ្លាប់ចូល Project នោះ · ⛔ មិនប្តូរទម្រង់ពីក្រោមអ្នកប្រើ · កូដរបស់ Project ផ្សេង ➜ បោះចោល) · ការចងចាំគណនីចងនឹង **backend + Project** (`login-memory.ts` ៖ `remembered_email` + `remembered_email_scope`) · session Supabase ចងនឹង URL (`zoew-sb-auth-owner`) | `supabase-rls-test` · `supabase-functions-test` · `ZoeW/tests/supabase-account.test.tsx` · `ZoeW/tests/login-routing.test.tsx` · `health-check-test` · `firebase-config-paste-test` |
-| **Supabase ៖ SECURITY DEFINER ↔ API** | ⛔ function `security definer` ដែល anon/authenticated ហៅបាន **មិននៅក្នុង schema ដែល PostgREST បើក** (`pgrst.db_schemas` ៖ `public`) ➜ តួ definer រស់ក្នុង `private` · `public.*` ជា `security invoker` ដែលហៅវា (ឈ្មោះ · argument · default · លទ្ធផលដដែល) — ច្បាប់ Supabase Database Linter 0028/0029 ចម្លងពី `supabase/splinter` ពិត ⛔ កុំបន្ថែម `private` ចូល Exposed schemas · RPC ថ្មីដែលអ្នកប្រើហៅ ➜ គំរូដដែល · service_role-only (`finish_registration` …) មិនស្ថិតក្នុងច្បាប់នេះ | `supabase-rls-test` |
-| **Supabase ៖ migration ↔ Deploy ពី GitHub** | ⛔ integration («Deploy to production» ពេល merge ចូល `main` · Working directory `.`) អនុវត្តតែ version ដែលមិនទាន់មានក្នុង `supabase_migrations.schema_migrations` ➜ ឯកសារក្នុង `origin/main` **កែ · លុប · ប្តូរឈ្មោះមិនបាន** (ការកែមិនទៅដល់ Database ស្ងាត់ៗ) · version ថ្មីត្រូវក្រោយគេ · គ្មានស្ទួន · migration ម្តងមួយក្នុង transaction (គ្មាន `concurrently`) · migration ដែល paste ក្នុង SQL Editor ➜ `migration repair` មុន · ⛔ secret មិនចូល `config.toml` (Auth/API config មិនត្រូវអនុវត្តលើផលិតកម្ម · Edge Function ក្នុង `config.toml` deploy) | `supabase-datastore-test` ផ្នែក ០ខ |
-| **ZoeKeyGen ៖ ផ្ទាំង «🏪 ហាង Supabase»** | ⛔ regex សាខា · ប្រវែងឈ្មោះ · ថ្ងៃ · ម៉ោងកូដ · ឈ្មោះគណនី ស្មើ check ក្នុង migration · រាល់កូដកំហុសដែល RPC `admin_*` បោះ មានអត្ថបទខ្មែរ (ទាំង ២ ទិស)។ ⛔ `sbAdminConfigProblem()` ស្របនឹង `supabaseUrlIsAllowed`/`supabaseKeyIsSecret` របស់ ZoeW (Link ដែល ZoeKeyGen ចេញ ZoeW ត្រូវទទួល) · Setup Link `{supabaseUrl, supabaseKey, invite, dsn?}` គ្មាន token/ពាក្យសម្ងាត់។ ⛔ រាល់ការងារក្រោយ `await` ពិនិត្យ `sbAdminIsCurrent()` (ចាកចេញកណ្តាលទី ➜ គ្មាន toast · សំណើ · DOM) · `sbAdminReset()` (ហៅពី `showLoginModalWithPrefill()`) លុបរាល់តម្លៃរសើប (រួមស្លាកដែលមានឈ្មោះហាង) · 401 ➜ reset + «ផុតកំណត់» តែមួយ | `keygen-supabase-admin-test` · `dom-hygiene` · `secret-hygiene` · `html-sink-escaping` |
-| **ការជូនដំណឹងលើទូរស័ព្ទ (Push · ZoeW)** | ⛔ អត្តសញ្ញាណ = **Activation Key** (ហត្ថលេខា ECDSA ពិត + Revoke/ផុតកំណត់ពី License Project · Extend ក្នុង DB ឈ្នះ) ➜ អតិថិជនថ្មីគ្មានការកំណត់បន្ថែម · «ផ្ទៀងផ្ទាត់មិនបាន» = 503 ≠ «ខុស» 403 · public key/prefix/URL License ក្នុង `netlify/lib/push-core.mjs` ដេរីវេស្មើ `license-verify.js`។ ⛔ **ហាង Supabase** (គ្មាន Key ដោយការរចនា) ៖ អត្តសញ្ញាណ = session token ➜ `my_account()` លើ Project ក្នុង env (`SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ដដែលនឹង Function ZTO ⛔ Secret key បដិសេធ) ➜ កូនសោតាម **ហាង** (`supabaseTenantKeyId()` ➜ ឧបករណ៍ក្នុងហាងចែក index/កាលវិភាគ) · issuer ផ្សេង/ផុត ➜ មិនហៅ Supabase · ហាងផុត/បិទ ➜ `shop-inactive` · token ខុស/គ្មានហាង ➜ `no-account` · ដាច់ ➜ 503 · env គ្មាន ➜ `server-off` · App ៖ `pushIdentityMissing()` ពិនិត្យ **sync** មុន `requestPermission()` ហើយ token យកក្រោយ (iPhone gesture)។ ⛔ Web Push ៖ aes128gcm (RFC 8291 · test vector ផ្លូវការ) + VAPID ES256 · endpoint តែ host សេវា push ពិត (SSRF) · 404/410 ➜ លុប sub។ ⛔ APK ៖ FCM តាម service account របស់ **License Project តែមួយ** (មិនមែន Project អតិថិជន) · `__FCM_CONFIGURED__` (វត្តមាន `google-services.json` ពេល build) ➜ គ្មាន ➜ **មិនផ្ទុក plugin** (FirebaseMessaging គាំង App) · channel `zoew_notify` (importance ខ្ពស់) ស្មើ server/manifest។ ⛔ ការបញ្ជូន at-most-once ៖ ledger ចាក់សោដោយ ETag (`onlyIfMatch`/`onlyIfNew`) ➜ cron + kick ស្របគ្នាផ្ញើម្តង · លើកដំបូង = baseline (មិនផ្ញើដំណឹងចាស់) · ដំណឹង > ២៤ ម៉ោង មិនផ្ញើ។ ⛔ scheduled function របស់ Netlify មានពិដាន **៣០ វិ.** ➜ ដំណាក់ ២ របស់ cron (ដំណឹង ➜ រំលឹក) **ចែកពិដានតែមួយ** (`runPushCron()` · ពិដានផ្ញើ + ពិដានការផ្ញើចុងក្រោយ < ៣០ វិ.) · ពិដានអស់ ➜ **មិនចាក់សោ** រំលឹកថ្ងៃនោះ (ការរត់បន្ទាប់ក្នុងម៉ោង ៨ ផ្ញើ) — បើអត់ ការសម្លាប់ក្រោយ ledger ចាក់សោ = រំលឹកបាត់ស្ងាត់។ ⛔ កញ្ចប់ជិតផុតកំណត់ ៖ App ផ្ញើ **តែម៉ោង** (គ្មានលេខទូរស័ព្ទ/barcode) ដែលគណនាពី `barcodeAbandonIsRipe()` ដដែល (ស្វែងរកគោលពីរ ± ១ នាទី · គ្មានរូបមន្តទី ២) តែពេលទិដ្ឋភាពស្រស់ · server រំលឹកម្តង/ថ្ងៃ ម៉ោង ៨ Asia/Phnom_Penh · កាលវិភាគ > ៤៨ ម៉ោង ➜ មិនរំលឹក · សារប្រាប់ម៉ោងទិន្នន័យ។ ⛔ App ៖ `Notification.requestPermission()` មុន `await` ណាមួយ (iPhone gesture) · ⛔ ស្ថានភាព `busy` ជា **សោ** (`togglePush()` បដិសេធ) ➜ **គ្រប់ការរង់ចាំខាងក្រោយវាមានពិដាន** ៖ web ៖ `getSubscription`/`subscribe`/`unsubscribe`/`serviceWorker.ready` ឆ្លង `withTimeout(…, PUSH_TIMEOUT_MS)` · APK ៖ ជំហានមុន `register()` ដែលមិនសួរអ្នកប្រើ (ផ្ទុក plugin · `checkPermissions` · `createChannel` · listener) ឆ្លង `pushStep` (ប្រអប់សុំសិទ្ធិគ្មានពិដានដោយចេតនា ដូច web) + watchdog `PUSH_NATIVE_REGISTER_TIMEOUT_MS` ក្រោយ `register()` (token មិនមក ➜ `error` · token មកយឺត ➜ នៅតែបញ្ចប់ជា `on` · token មកហើយ server ឆ្លើយយឺត ➜ watchdog មិនកាត់) · ⛔ **promise មិនត្រូវ resolve ទៅ plugin Capacitor ផ្ទាល់** ៖ plugin ជា Proxy ដែលឆ្លើយ `then` ➜ promise ព្យួរជារៀងរហូត (វាស់បាន 2.45.6 ៖ APK ជាប់ «⏳ កំពុងភ្ជាប់…» គ្មានប្រអប់សុំសិទ្ធិ ខណៈ ២៩ តេស្តបៃតង) ➜ `loadNativePush()` ត្រឡប់សំបក `{ PN }` · mock ក្នុងតេស្តត្រូវជា Proxy ដូចពិត (តេស្ត «Capacitor ពិតជា thenable» ចងវានឹង `@capacitor/core` ដែលដំឡើង) · ⛔ APK **បិទ** ➜ ផ្ញើ `unsubscribe` token ទៅ server (រក្សា token ក្នុង `zoew_push_v1`) មុន `unregister()` — ការលុប token របស់ FCM ក្នុង plugin ធ្លាក់ស្ងាត់ពេលក្រៅបណ្តាញ ➜ បើអត់ server នៅផ្ញើ ខណៈអ្នកប្រើបានបិទ · ⛔ token ត្រូវទទួល **តែ** ពេលអ្នកប្រើចង់បើក (`nativeWanted` · `nativeEnabling` · `saved.on`) ៖ token ពី FCM auto-init ពេល boot · token យឺតក្រោយបិទ ➜ មិនចុះឈ្មោះ · ចុះឈ្មោះរួចខណៈបិទ ➜ លុបវាចេញវិញ · ស្ថានភាពនិយាយការពិត (server-off · no-license · denied · needs-install · native-unconfigured) · ចុច ➜ ផ្ទាំង 🔔 (`?notify=1` · សារ SW · `pushNotificationActionPerformed`) · SW បង្ហាញរាល់ push (userVisibleOnly) ហើយ URL ត្រូវក្នុង origin។ ⛔ **🧹 សម្អាត** លាក់តែសេចក្តីប្រកាស/ដំណឹង (`zoew_notify_dismissed_v1`) + ការជូនដំណឹងលើរបាទូរស័ព្ទ ⛔ មិនលាក់បញ្ជីកញ្ចប់ជិតផុតកំណត់ ឬ «កំណែ App» | `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/push-client.test.tsx` · `npm run android:check` · `keygen-notice-test` (ការដាស់) |
-| ការការពារ inspect element | ⛔ ពង្រឹងមិនបានទេ — កុំព្យាយាម | 📝 (រចនាសម្ព័ន្ធ) |
-| **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
-| **អត្តសញ្ញាណអតិថិជន ៖ លេខទូរស័ព្ទ** | ⛔ លេខដែលរក្សាទុកជាកូនសោ merge (`phone`+`scanDate`) និងជាមូលដ្ឋាននៃ `getPickupPhoneKey()` ➜ តួអក្សរកាកសំណល់តែមួយបំបែកអតិថិជនម្នាក់ជា **ពីរ**។ `normalizeOneStoredPhone()` ត្រូវលុប `= " '` **ស៊ីមេទ្រី ទាំងមុខ ទាំងចុង** (ទម្រង់ `="012…"` របស់ Sheets/Excel) — វាស់បាន (2.31.8) ៖ ខាងចុងមិនត្រូវលុប ➜ រក្សាទុក `012345678"`។ ⛔ សញ្ញាបំបែក **ខាងក្នុង** ត្រូវនៅដដែល (ការប្តូរទម្រង់បំបែក merge នឹងទិន្នន័យចាស់) | `phone-suggest-test` |
-| **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
-| **របាយការណ៍ខែ** | ⛔ ដេរីវេពី **ថ្ងៃ** (node ខែរក្សាតែ ៣ ខែ) · **អានសុទ្ធសាធ** · មូលដ្ឋានដូចអេក្រង់ដើម។ ⛔ **គ្រប់ជួរឈរនាំចេញត្រូវផ្ទុកវាលដែលចំណងជើងសន្យា** — វាស់បាន (2.31.7ខ) ៖ ការប្តូរជួរឈរ «COD យករួច ($)» ទៅ `d.total` **រស់រាន** ព្រោះការអះអាងគ្របតែ ៣ ជួរឈរ។ ការអះអាងត្រូវ **ដេរីវេពីចំណងជើង** បូកជាន់ «តម្លៃខុសគ្នាទាំងអស់» និង «មានសេន» | `monthly-report-test` |
-| **ledger ខែ ↔ ledger ថ្ងៃ** | ⛔ `monthly[M]` ត្រូវ **ស្មើផលបូក `daily[d ∈ M]`** លើ server។ `ledgerDeltaWithClamp()` clamp **ក្នុងមួយធុង** ➜ ការដកធំជាង ledger *របស់ថ្ងៃ* clamp ខាងថ្ងៃ តែ **មិន** clamp ខាងខែ ➜ 📊 ស្ថិតិ ៣ ខែ ឃ្លាតពីរបាយការណ៍ខែ **ជាអចិន្ត្រៃយ៍**។ `alignMonthlyLedgerToDaily()` ជាអ្នកតម្រឹមតែមួយ (⛔ ផ្លូវធម្មតា **គ្មានការសរសេរបន្ថែម**)។ ⛔ **ការស្តារត្រូវបូកត្រឡប់ *គ្រប់វាល* ចូល *ទាំង ២ ធុង*** (`appendRestoreRevenueIncrements`) — វាស់បាន (2.31.7ខ) ៖ mutation `monthly[month].dod += 0` **រស់រានលើ checker ១៦០ ទាំងអស់** រួម checker នេះខ្លួនឯង ព្រោះសេណារីយ៉ូរបស់វាហៅដោយ **`dod: 0` ជានិច្ច** ➜ មិនដែលដាក់ប្រព័ន្ធ ក្នុងស្ថានភាព DOD សោះ។ ⛔ សាលក្រមរបស់ខែត្រូវអានចេញពី **អ្វីដែល server រក្សាទុកពិត** — node កាត់ត្រឹម ៣ ខែ ➜ ខែដែលកាត់ចោល ➜ សាលក្រម **`0`** | `monthly-ledger-agreement-test` |
-| **«ចំណូល» ↔ កញ្ចប់មិនទាន់យក** | ⛔ ចំណូល = ledger **ដក** តម្លៃ barcode `!isDeducted && !isClosed` · clamp ក្នុងមួយរូបិយវត្ថុ · វាស់មិនបាន ➜ `—` · អេក្រង់ស្ថិតិទាំង ២ ប្រើ helper ដដែល។ ⛔ អ្នកយាម **៥ ជាន់** ៖ (១) ការហៅ + «សរុបខែ = ផលបូកថ្ងៃ» (ស្តាទិច) · (២) **លេខដែលអ្នកប្រើអាន** ក្នុង browser ពិត · (៣) **កម្រិតបូក** ៖ ចំណូលខែ = **ផលបូកចំណូលថ្ងៃ** (`buildMonthlyReport()` បូក `collectedValueOf()` ក្នុងមួយថ្ងៃ · ⛔ គ្មានរូបមន្តកម្រិតខែ · `buildStatCardItem()` ទទួលចំណូលដែលគណនារួច) · (៤) **សិទ្ធិវាស់** គ្របខាង `ledger` ដែរ · (៥) **លំដាប់ចៃដន្យ** លើផ្លូវបង្ហាញ (`collected-value-fuzz-test`) | `monthly-report-test` · `stats-collected-truth-test` · `stats-screen-agreement-test` · `stats-measurable-gate-test` · `collected-value-fuzz-test` |
-| **បញ្ជីទទេ ↔ សិទ្ធិវាស់** | ⛔ «គ្មានទិន្នន័យ» ជាការអះអាងអំពីអាជីវកម្ម ➜ ទិដ្ឋភាពមិនស្រស់ = «មិនទាន់មកដល់»។ `emptyViewMessage(pathKeys, emptyText)` ជាអ្នកសម្រេចតែមួយ (ពី `dbListenerViewIsStale()`) ➜ គ្រប **អេក្រង់ ៥** (ស្ថិតិថ្ងៃ · ចំណូលប្រចាំថ្ងៃ · របាយការណ៍ខែ · ធុងសំរាម · តារាងប្រវត្តិ) · **Export ៥** · និងរបា/ប្រអប់ «ZTO មិនទាន់បិទ» (`ZTO_SYNC_VIEW_KEYS` = `history` + `deleted` ៖ ប្រភពរបស់រូបមន្ត = ប្រភពដែលច្រកទ្វារពិនិត្យ)។ ⛔ ភាពមិនពេញចូល signature ផង | `empty-state-truth-test` |
-| **«ចំណូលប្រចាំថ្ងៃ» ៖ តាមថ្ងៃយក** | `zoew_daily_collected_cod_dod` រាប់សំណុំ barcode `{c,d}` តាមថ្ងៃបិទ (ledger ថ្ងៃ/ខែ តាមថ្ងៃស្កេន)។ ⛔ Close ឆ្លង history transaction សិន រួច reconcile ពីតម្លៃ server · បើកវិញដកពីថ្ងៃដែលមានធាតុស្រាប់ · ការផ្លាស់ថ្ងៃ = multipath update តែមួយ · ការកែតម្លៃសម្រេចក្នុង server transaction · រក្សាថ្ងៃថ្មីបំផុត ដកស្ទួនចាស់ · មិនបង្កើត key/ថ្ងៃដែល cleanup លុបរួច · retry ការបដិសេធរបស់ Native SDK តែក្នុងពិដាន ដោយអាន history ម្តងទៀត និងផ្ទៀង auth/database។ ⛔ Mirror ក្នុងសតិអានពី listener តែមួយ (មិនសរសេរ/rollback ដោយ snapshot local) · ការបដិសេធមិនបង្ហាញ Sync ជោគជ័យ · late callback ត្រូវនៅក្នុង auth/database ដដែល · Delete/pickup មិនលុប collected · គ្មានការប៉ះ `isDeducted` · ledger · `packagesPickedUp` ពី mirror។ ⛔ Cleanup ៧ ថ្ងៃ ៖ នាឡិកា server + ទិដ្ឋភាពស្រស់ · រក្សាកូនសោមិនស្គាល់ · មិនទាន់ cleanup ≠ ថ្ងៃបាត់។ ⛔ history និង mirror ជា write ២ ដាច់ពីគ្នា ➜ ការឃ្លាតវាស់បានតែលើ **dump ពិត** (`money-reality-check.js` ផ្នែក ៥ខ ៖ ព្រំដែនដេរីវេពី dump មិនមែននាឡិកា) | `daily-collected-test` · `emu/restore-mutation-emu-test` · `money-reality-check` (dump ពិត) |
-| **កញ្ចក់ចំណូល ↔ ledger** | ⛔ ពាក់កណ្តាលទី ២ នៃជួរ «ចំណូលប្រចាំថ្ងៃ ៖ តាមថ្ងៃយក» ខាងលើ ៖ កញ្ចក់ `zoew_daily_collected_cod_dod` មានអ្នកសរសេរ ៣ (បិទ/បើក barcode · បិទ/បើកកញ្ចប់ · កែទឹកប្រាក់) — តែ **ផ្លូវដែលធ្វើឲ្យកញ្ចប់ *ចេញពីប្រព័ន្ធ* ក៏ត្រូវប៉ះវាដែរ**។ ⛔ **«ដក» (ជួរ ៤) ដក ledger ➜ វាត្រូវលុបធាតុកញ្ចក់ផង**; ⛔ **«ស្តារ» (ជួរ ៩) បូក ledger ត្រឡប់ ➜ វាត្រូវសាងកញ្ចក់ឡើងវិញ លើថ្ងៃនៃ `closedAt` **ថ្មី**** (`reconcileCollectedHistory()` ជាចំណុចច្របាច់ — ⛔ មិនមែនរូបមន្តទី ២)។ វាស់បាន (2.35.2) ៖ បិទ «យក» B1 ($10/$2) ➜ **ដក** វា ➜ ledger ចុះត្រឹមត្រូវ ខណៈ 💵 «ចំណូលប្រចាំថ្ងៃ» នៅរាយ **១ កញ្ចប់ · $12.00** ➜ អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា **ខណៈ checker ១៧១ បៃតងទាំងអស់**។ ⛔ **ទិសផ្ទុយ ៖ «លុប» (ជួរ ៥) មិនប៉ះ ledger ➜ វាក៏ *មិនត្រូវ* ប៉ះកញ្ចក់** — បើគ្មានការអះអាងនេះ ការកែ «លុបកញ្ចក់រាល់ផ្លូវចេញ» នឹងបៃតង ខណៈវាលុបចំណូលពិតរបស់អតិថិជនដែលយករួច | `collected-mirror-lifecycle-test` · `collected-mirror-fuzz-test` (លំដាប់ចៃដន្យ) |
-| **ការរំខានពាក់កណ្តាលនៃការសម្អាត** | ⛔ `claimAndCleanupItem()` សរសេរ **៤ ដងដាច់ពីគ្នា** (ប្រវត្តិ ➜ ធុងសំរាម ➜ ledger ថ្ងៃ ➜ ខែ) ➜ ការរំខានរវាងជំហាន (deploy · PTR · បិទ tab · បណ្តាញដាច់) ធ្វើឲ្យកញ្ចប់បាត់ពីទាំង ២ កន្លែង។ ⛔ ការកែ = **journal ក្នុង `localStorage`** (`zoew_cleanup_journal_v1`) សរសេរ **មុន** ការសរសេរបណ្តាញ · `resumeInterruptedCleanups()` បញ្ចប់នៅ tab បន្ទាប់ · ⛔ មិនមែន marker ថ្មីលើ server។ ⛔ ledger ឈរ **ក្រោយ** ធុងសំរាម ៖ សាលក្រម `moved` ➜ ស្តារដកបាន · `ledger` = មិនច្បាស់ ➜ **មិនប៉ះលុយ** តែប្រាប់អ្នកប្រើ។ ⛔ ទិសផ្ទុយ ៖ `ledger` + ធុងសំរាមទទេ ➜ មិនដាស់ឡើងវិញ · ការសម្អាតស្រួលមិនបន្សល់ journal · «យករួច» មិនប៉ះលុយ។ ⛔ វាស់ជា **ការអភិរក្ស barcode** · ការហៅ journal **fail-open** (`noteCleanupJournalEntry`) · កូនសោ = id **ធុងសំរាម** · `cleanupJournalScope()` (`databaseURL`) ការពារ Project ខុសក្រោយ Reconfig។ ⛔ **journal របស់ការសម្អាតដែល *នៅរស់* មិនមែនការរំខាន** ៖ journal ចុះ **មុន** ការសរសេរធុងសំរាម ➜ វដ្ត ៦០ វិ. / `visibilitychange` / tab ទី ២ ឃើញធាតុ `moved` ខណៈការសរសេរកំពុងហោះ ➜ **ដកលុយ ២ ដង** ➜ `withCleanupEntryOwnership()` ជាច្រកទ្វារ (`cleanupJournalLive` ក្នុង page · Web Locks `zoew-cleanup-live-<id>` ឆ្លង tab ដែល browser ដោះពេល tab ស្លាប់ · fail-open ពេលគ្មាន API) ហើយអានធាតុ **ស្រស់** ក្រោយបានសិទ្ធិ | `cleanup-interrupt-atomicity-test` · `money-guardian-test` |
-| **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
-| **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ។ ⛔ អាយុទង់ដោះសោ = អាយុ `lookupSecretKey` ៖ `CryptoKey` រក្សាក្នុង **IndexedDB** (⛔ មិនមែន sessionStorage — នោះទាមទារ `extractable: true`) · ការលុបតាម `clearAppUnlockedForSession()` តែមួយ · ការការពារ ២ ជាន់ (`appLockShouldArm()` · ការលុបពេលចាក់សោ) វាស់ដាច់ពីគ្នា។ ⛔ កុងតាក់មាន **ទិសបិទ** ៖ ទង់ `zoew_app_lock_v1` ក្នុង `localStorage` · `appLockIsEnabled()` ជាអ្នកសម្រេចតែមួយ (ច្រកទ្វារ · ការបាំង task switcher · ស្លាក) · កូនសោអវត្តមាន = **បើក** (តែ `'0'` បិទ) · ការបិទឆ្លង PIN ជាមួយ `promptKey` ផ្ទាល់ខ្លួន `appLockOff` · ⛔ ការបិទសោ **មិនមែន** ការលុប PIN (PIN · session ៤ ម៉ោង · អ៊ីមែល នៅដដែល) | `app-lock-test` |
-| **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub** · ⛔ ជុំចាស់ (បិទ ➜ បើកវិញ) មិនជាន់ «⏳» ឬដោះប៊ូតុងរបស់ជុំថ្មី (`uiState.healthRunSeq`)។ ⛔ **ច្បាប់ដដែលអនុវត្តលើ *ទិសផ្ទុយ* ផង** ៖ **✅ ក៏ត្រូវវាស់ដែរ** — ការរាយ ✅ លើអ្វីដែលមិនបានវាស់ **អាក្រក់ជាង** ❌ ក្លែងក្លាយ ព្រោះវាបញ្ជូនអ្នកប្រើទៅរកមូលហេតុខុស។ វាស់បាន (2.30.5) ៖ ជួរ ZTO រាយ ✅ ត្រឹម **វត្តមាន** នៃ Cookie ខណៈការស្កេនឆ្លើយ «ផុតកំណត់» — សាលក្រម `authRejectedAgeMs`/`authAcceptedAgeMs` មានក្នុង `?diag=1` រួចហើយ តែគ្មាននរណាអាន។ ⛔ **`cookieState` ជារបស់ container នីមួយៗ** ➜ «មិនទាន់ដែលប្រើ» = **⚠️** មិនមែន ✅ ⛔ **ជួរ ZTO បង្ហាញការបន្តអាយុ Cookie ដែរ** ៖ `renewals > 0` ➜ ភស្តុតាងច្បាស់; `observed:false` ➜ **«មិនទាន់វាស់»** (⛔ មិនមែន «បន្តអាយុមិនបាន» — `upstreamCookieSignal` ជារបស់ container នីមួយៗ); `observed && !setCookie` ➜ Argus មិនផ្ញើ ➜ ត្រូវ Sync ដោយដៃ។ ⛔ ព័ត៌មាននេះ **មិនប្តូរសាលក្រម** ❌/⚠️/✅ ហើយ **ឈ្មោះ cookie មិនឡើងដល់ DOM** · ⛔ **អាយុ Cookie = អាយុក្នុង Blob ពិត** (`blobSyncAgeMs` ពី metadata `syncedAt` របស់ឧបករណ៍ Sync · `blobRenewAgeMs`) មិនមែន `ageMs` (អាយុ cache ក្នុង container) · គ្មានត្រា ➜ «មិនទាន់ស្គាល់» · ⛔ ជួរ License (Firebase) បង្ហាញ **សុពលភាព Key** (ថ្ងៃផុត · ថ្ងៃនៅសល់ · ≤ `LICENSE_NEAR_EXPIRY_DAYS` ➜ ⚠️ · ផុត/Revoke ➜ ❌ · ផ្ទៀងមិនបាន ➜ ⚠️) | `health-check-test` · `zto-cookie-store-test` · `zto-cookie-sync-test` |
-| **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
-| **APK ↔ Function ZTO ៖ preflight** | ⛔ APK (origin `https://localhost`) ហៅ Function ជា cross-origin ➜ cache របស់ preflight ចងនឹង **URL ពេញ** ➜ query ត្រូវផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ (`nativeFunctionRequest()` ក្នុង `fetchWithTimeout` ជាច្រកតែមួយ · web មិនប្រែ) · ⛔ កុំប្រើ `cache: 'no-store'` លើផ្លូវនោះ (រំលង cache preflight) · Function អាន header តែពេលគ្មាន query string · Max-Age 7200 · Function ចាស់ ➜ 400 ➜ App សាក URL មាន query ហើយចងចាំ | `zto-proxy-test` ផ្នែក ២ខ · `ZoeW/tests/native/zto-preflight.test.ts` |
-| **Apps Script ↔ simple request** | ⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវ Lookup ផង** — គ្មាន header ផ្ទាល់ខ្លួន ហើយ **មិនសុំ PIN** សម្រាប់វា | `lookup-prefetch-test` |
-| **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
-| **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
-| **ZTO ៖ auto-login** | ⛔ **ដកចេញរួច (2.25.0)** — IdP មិនបើកឲ្យ IP របស់ Netlify; កុំនាំវាមកវិញ | `zto-proxy-test` |
-| **ZTO ៖ Cookie store** | ⛔ Blobs ដាច់/ព្យួរ ➜ ត្រូវធ្លាក់ចុះទៅ env មិនមែនធ្លាក់ lookup។ ⛔ **«អានឡើងវិញមិនបាន» ≠ «Cookie បាត់»** ៖ ការធ្លាក់ចុះនោះត្រូវ **មិនសរសេរជាន់សតិ** — Cookie blob ក្នុងសតិរស់រហូតដល់មានសាលក្រម **401 ពិត** (`mustRevalidate`); បើមិនដូច្នេះ ការតំឡើងដែលប្រើ Blobs (គ្មាន `ZTO_COOKIE` env) ឆ្លើយ **503 `ZTO_AUTH_NOT_CONFIGURED`** ខណៈ Cookie ពិតជានៅដដែល។ ⛔ ការធ្វើឲ្យស្រស់ **ខាងក្រោយ** មិនត្រូវចាក់សោក្រោយថវិកា *សំណើ* (វាមានពិដានផ្ទាល់ខ្លួន) — បើចាក់ ថវិកាតឹងនឹង **បង្កក Cookie ជារៀងរហូត** | `zto-cookie-store-test` · `zto-budget-test` |
-| **ZTO ៖ ស្ថានភាព «បិទរួច»** | ⛔ សាលក្រម **៣** ៖ `true` · `false` · `null` (វាលរកមិនឃើញ ➜ `null` មិនមែន `false`)។ ⛔ វាលជាស្រេចចិត្ត ➜ ការកំណត់ខុស (`ZTO_FIELD_SIGNED`/`ZTO_SIGNED_VALUES`) **បិទតែមុខងារនេះ** + មូលហេតុក្នុង `?diag=1` (⛔ មិនបោះ `ZtoConfigError` ➜ 503) · តម្លៃដែលកំណត់មិនលេចក្នុង `?diag=1`។ ⛔ ផ្លូវ field **រាបស្មើ** (គ្មាន `data.` · `orderCandidates()` ស្រាយសំបករួច) រួមទាំងឧទាហរណ៍ក្នុងឯកសារ។ ⛔ តម្លៃផលិតកម្ម ៖ `ZTO_FIELD_SIGNED` = **`billStatus`** · `ZTO_SIGNED_VALUES` = **`5`** — ជារបស់ ZTO ➜ អាចប្តូរ ៖ កញ្ចប់យករួចលេចលើរបាវិញ ➜ ពិនិត្យលេខក្នុង Argus រួចបន្ថែម `ZTO_SIGNED_VALUES=5,<លេខថ្មី>` (⛔ កុំសង្ស័យកូដជាមុន) | `zto-signed-status-test` |
-| **របា «ZTO មិនទាន់បិទ»** | ⛔ សាលក្រមរស់តែក្នុង `localStorage` (`zoew_zto_pickup_status_v1`) — **មិនប៉ះលុយ · `isDeducted` · Firebase ដោយផ្ទាល់**; ការសរសេរតែតាមទ្វារ **តែមួយ** `applyBarcodeCloseChange()`។ ⛔ របាលេចតែពេលមានសាលក្រម `false` ពិត · Barcode បើកវិញ ➜ ធ្លាក់ចេញភ្លាម · ស្កេនទាំង `scanHistory` និង `deletedItems` (តែ `trashReason === 'pickup'` ក្នុង ១២ ម៉ោង) · Lookup មិនមែន ZTO ➜ ដេកលក់ · ចាកចេញ ➜ លុប DOM + storage។ ⛔ **គ្មានការហៅជាប់រហូត** ៖ ១ ដង/barcode · ១០/ជុំ · ចន្លោះ ២០ វិ. · មិនរត់ខណៈស្កេន (`autoLookupInFlight.size > 0`) ឬក្រៅបណ្តាញ · `ztoClosed: null` ត្រូវ **ចងចាំ** ដូចសាលក្រម · ការធ្លាក់ upstream **មិនចងចាំ** តែការសាកឡើងវិញមានព្រំដែន (`ZTO_STATUS_FAIL_BACKOFF_MS` · លុបពេលជោគជ័យ/`online`/`clearZtoPickupStatusStore()` · `force` រំលង) · `resumeZtoStatusSweep()` ប៉ះតែម៉ោងដែលដាក់រួច។ ⛔ ការបោះចោលពេលពេញ (`ZTO_STATUS_MAX`) ដើរតាម **តម្លៃ** (`true`/`null` មុន `false`) · ធាតុទើបចាក់ចូលមិនអាចជាជនរងគ្រោះ · ជនរងគ្រោះជំនួស = **ចាស់ជាងគេ** · `while` មាន `break` · ការវាស់ត្រូវដាក់ធាតុមិនមែន `false` **ច្រើនជាង ១**។ ⛔ ជុំស្វ័យប្រវត្តិជាការងារស្រេចចិត្ត ➜ `ztoStatusNetworkAllowed(userAsked)` គ្រប `linkIsFrugal()` · `isModalOpen` (ការចុចឈ្នះ) · ការទប់រយៈពេលវែង ➜ មិនតាំងម៉ោងភ្ញាក់ (`ztoStatusBlockIsTransient()`)។ ⛔ របា/ប្រអប់ប្រាប់ថាការរាប់មិនទាន់ចប់ («កំពុងពិនិត្យបន្ត N») ហើយ N ចូល signature (`ztoStatusModalSig`) · Locker អាន `barcode.locker || item.locker` · ឈ្មោះវាល `ztoClosed` ដេរីវេពី Function ពិត។ ⛔ ប្រអប់បញ្ជីផ្ទុកតែ barcode ដែលមានសាលក្រម `false` ពិត · រូប Barcode = `Code128Svg` (JSX) ពី `code128Bars()` (មិនមែន HTML string) · `clearSensitiveModalFields()` លុបបញ្ជី (មានលេខទូរស័ព្ទ)។ ⛔ Code 128 ផ្ទៀងដោយ **ការអានវិញដោយ ZXing ពិត** + probe ទិសផ្ទុយ · quiet zone ១០ module វាស់ជា **រចនាសម្ព័ន្ធ** (`CODE128_QUIET`) · គំរូ round-trip គ្រប **លេខគូ និងលេខសេស** · ទំហំវាស់ជា **ទទឹងក្នុងមួយ module** (ពិដាន 1.5px) · ⚠️ លេខ ≥១៥ តួ CSS កែមិនបាន (ទទួលយកដោយចេតនា)។ ⛔ ជុំបោសមានអ្នកបើក **៣** ៖ វដ្ត ៦០ វិ. · `visibilitychange` · ការដោះសោ PIN (⛔ កុំដាក់ការហៅក្នុង `runScheduledCleanup()` ខ្លួនវា)។ ⛔ **ZTO បិទរួច ➜ ZoeW បិទតាម** ៖ កុងតាក់ `zoew_zto_autoclose_v1` (លំនាំដើមបើក) · កុងតាក់ ZTO លេចតែពេល `ztoFastModeIsOn()` ហើយការលាក់ **បិទមុខងារ** (`ztoAutoCloseEnabled()`/`ztoListSyncEnabled()`) · ការកំណត់ចាស់មិនលុប · សួរតែ barcode **បើក** ក្នុង `scanHistory` (មិនរាប់ធុងសំរាម · រំលង `clearClaim`/marker ស្តារ) · សួរឡើងវិញរាល់ ១ ម៉ោង (`ZTO_OPEN_RECHECK_MS` តាម `elapsedSince()`) · បិទតែលើ `true` ពិត · ឆ្លង `applyBarcodeCloseChange()` (លុយមិនប៉ះ) ជាមួយ `silent: true` · `showModal: false` · សារសរុប ១/ជុំ (តែសារបរាជ័យ/យឺតនៅដដែល)។ ⛔ ជួរបោស **បង្វិល** (`rotateZtoSweepQueue(queue, ztoStatusSweepCursor)` · cursor រំកិលក្នុង `finally`) មិនមែនកាត់ក្បាលដដែល · មិនបង្កើតការហៅបន្ថែម | `zto-sync-banner-test` |
-| **ZTO ៖ សិទ្ធិសាខា** | ⛔ **លេខសាខាមកពី *អត្តសញ្ញាណ* មិនមែនពី parameter** ៖ Cookie `BOS-MAN-SESSION` អានបាន **ទូទាំងប្រទេស** ហើយ `ZTO_PROXY_KEY` ចែករំលែកគ្រប់ឧបករណ៍ ➜ ការចងសាខាខាង client **មិនមែនការការពារ**។ អ្នកសម្រេចនៅ server ៖ Firebase **ID token** (RS256 · `aud` ∈ `FIREBASE_PROJECT_IDS` · `iss` · `exp`) ➜ សាខាពី email `@zoew<លេខ>.com` (**ខ្ទង់ប៉ុន្មានក៏បាន**) · `?site=` បោះចោល · សាខាចូលកូនសោ cache។ ⛔ ជាន់នេះឈរលើ **ការបិទ «Enable create (sign-up)»** ក្នុង Firebase Console · `email_verified` **មិនទាមទារ** · ការធ្លាក់បិទតែមុខងារបញ្ជី (`enabled:false` គ្មាន `error`) · **ការស្កេនមិនត្រូវការ token**។ ✅ Function ហៅតែ endpoint **អាន** ➜ ZoeW សរសេរទៅ ZTO មិនបាន។ ⛔ **ហាង Supabase** ៖ token Supabase ➜ `my_account()` (env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ⛔ មិនមែន Secret key) ➜ `branch_code` របស់ **ហាង** · ហាងផុត/បិទ ➜ `site:tenant-*` · env ខ្វះ ➜ `idtoken:supabase-unset` | `zto-list-sync-test` ផ្នែក ១៨–២០ |
-| **ZTO ៖ ការទាញ *បញ្ជី*** | ⛔ ផ្លូវ `?list=1` រស់ក្នុង **Function ដដែល** (Cookie · ថវិកា · auth · `?diag=1` រួម · `requestOnce()` តាម `plan` · **`fetch(` លេចម្តងគត់**)។ ⛔ ការកំណត់ខុស ➜ បិទតែមុខងារបញ្ជី (`readListConfig()` មិនបោះ) · «បិទ» = HTTP 200 `enabled:false` **គ្មានវាល `error`** (វាល `error` ➜ cooldown ៣០ វិ.) · `result` មិនមែន array = ការធ្លាក់ (មិនមែន «០ ជួរដេក»)។ ⛔ លេខសាខាមកពី **អត្តសញ្ញាណ** (ជួរ «ZTO ៖ សិទ្ធិសាខា») ៖ `query.site` បោះចោល · `ZTO_LIST_SITE_CODE` លែងអាន · **គ្មានផ្ទៃបំពេញសាខាខាង client** · សាខាត្រូវចូល **កូនសោ cache** (`…\|L\|…` · TTL ≤ `cacheTtlMs`) ហើយមិនលេចក្នុង `?diag=1`។ ⛔ server បញ្ចាំងតែ `barcode·phone·cod·dod·at`។ ⛔ **DOD = `fcAmount`** លើ **ផ្លូវទាំង ២** (`DOD_PATHS` តែមួយ · ឈរ **ធាតុទី ១** ព្រោះ `arrivalServiceCharge` ជា `0.00` ជានិច្ច) · ⛔ `freightFee` **មិនមែន** DOD (គិតលុយលើថ្លៃដឹកដែលបង់រួច) · `ZTO_FIELD_DOD` ឈ្នះ · លុយអវិជ្ជមាន **clamp ត្រឹម 0** នៅ `pickNumber()` (⛔ មិនមែនរំលងទៅវាលបន្ទាប់) · ទិសផ្ទុយ ៖ `0` ជាតម្លៃត្រឹមត្រូវ។ ⛔ «មិនមែនអតិថិជន» = **លេខទូរស័ព្ទ** `"0"`/ទទេ (មិនមែន `cod === 0`) · de-dupe ក្នុងបញ្ជី (ធាតុចុងក្រោយឈ្នះ) · `fresh+existing+duplicate+skipped` = ចំនួនជួរដេកដើមជានិច្ច · ក្រុម «ថ្មី/មានរួច» គ្របដោយ `ZTO_SYNC_VIEW_KEYS`។ ⛔ ជាន់ `scanTypeCode` + `scanTypeDesc` **ឯករាជ្យ** (barcode ដដែលលេច `03`·`04`·`05` ➜ បើអត់ លុយ ៣ ដង) · វាលមាន តែខុស ➜ `skip:'scan-type'` · វាលអវត្តមាន/ទទេ ➜ **មិនរំលង** · តម្លៃវាលមិនឡើងដល់ browser។ ⛔ មើលជាមុន **មិនសរសេរអ្វីសោះ**; ការបញ្ចូល (`importZtoListRows`) ឆ្លង `claimBarcodeInRegistry()` ➜ `addOrUpdateEntry()` ដូចការស្កេន ៖ សាលក្រម `'claimed'` ពិត · ការធ្លាក់ ➜ `releaseBarcodesInRegistry()` · ជាលំដាប់ · ពិដាន `ZTO_LIST_IMPORT_MAX` · ទិដ្ឋភាពមិនស្រស់ ➜ បដិសេធទាំងស្រុង · គោរព **របៀបបរាជ័យ ៤** (claim timeout ➜ `releaseLateBarcodeClaim()` · write timeout ➜ `armLateWrite()` ⛔ មិនដោះកូនសោភ្លាម · សារ «⏳ កំពុងរក្សាទុក»)។ ⛔ កាលបរិច្ឆេទ = **ថ្ងៃស្កេន ZTO** (`ztoScanStampMillis()` · wall clock `Asia/Phnom_Penh` · អាគុយម៉ង់ទី ៦ **ស្រេចចិត្ត** របស់ `addOrUpdateEntry()`) ➜ លុយចុះលើថ្ងៃស្កេន ZTO · ត្រាខូច ➜ `getServerNow()` · គ្មានត្រា ➜ មិនរំលង តែប្រាប់ចំនួន។ ⛔ ជួរដេកចាស់ ៖ អ្នកសម្រេចដដែលនឹងការសម្អាត `barcodeAbandonIsRipe()` (⛔ គ្មានរូបមន្តព្រំដែនទី ៤ · មិនឆ្លង `elapsedSince()`) រួចសម្រេចតាមសាលក្រម ZTO ៖ `true` ➜ បញ្ចូល **បិទស្រាប់** (អាគុយម៉ង់ទី ៧ ➜ `applyBarcodeCloseState()` · ត្រា `getServerNow()` · ស្ថិតិយកតាម `applyBarcodeCloseChange()` · ⛔ រំលង merge · ការធ្លាក់មិនដោះ registry) · `false` ➜ `too-old-open` · `null` ➜ `too-old-unknown` · ចាស់ជាង `trashRetentionMs({trashReason:'pickup'})` ➜ `too-old-purged` (ដេរីវេ · ការពារលុយស្ទួនក្រោយ purge)។ ⛔ សាលក្រមប្រភព ២ (`pickSignedVerdict()` ➜ `resolveZtoListSignedVerdicts()` · ពិដាន `ZTO_LIST_SIGNED_PROBE_MAX`) · ការធ្លាក់មិនចងចាំ។ ⛔ រាល់មូលហេតុរំលងមានអត្ថបទ (`ZTO_LIST_SKIP_TEXT` ➜ `ztoListSkipText()`) · សារបញ្ចប់រាយ **ថ្ងៃដែលកញ្ចប់ចុះ**។ ⛔ កុងតាក់ `zoew_zto_listsync_v1` (លំនាំដើមបិទ · ក្រោម `ztoFastModeIsOn()`) · PIN `ztoListSync` · ការចុចមិនទប់ដោយ `linkIsFrugal()` | `zto-list-sync-test` |
-| **ZTO ៖ ការត្រៀម (warm-up)** | ត្រៀមតាម **ចេតនាអ្នកប្រើ** ហើយត្រៀម **Cookie** ផង មិនត្រឹម container; ⛔ **រវល់ពេលដល់ម៉ោង ➜ តាំងម៉ោងឡើងវិញ មិនបោះបង់** (ពិដាន ៩០ វិ.) | `lookup-prefetch-test` · `zto-cookie-store-test` |
-| **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
-| **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
-| **ZTO helper ៖ ផ្លូវ Android/Termux** | ⛔ ផ្លូវទី ២ រស់ក្នុង **helper ដដែល** ៖ អ្នកសម្រេច ៤ (`isTargetApiUrl` · `validateCookieHeader` · `captureResponseSucceeded` · `cookieAfterResponse`) ត្រូវ **បញ្ជូនចូល** ពី `sync-zto-cookie.js` ⛔ មិនមែនសរសេរឡើងវិញ (validator ច្បាប់ចម្លងទី ២ = ២ ច្បាប់ផ្ទុយគ្នាក្នុងឧបករណ៍តែមួយ)។ ⛔ **`--auto` ត្រូវការ ADB** (វាធ្លាក់ចុះទៅការចាប់) ➜ ការដាក់វាក្នុងសំណុំ «មិនត្រូវការ ADB» ធានាការធ្លាក់ **១០០%**; ការភ្ជាប់ត្រូវជា **ការព្យាយាម** (`|| true`) ដើម្បីកុំឲ្យ Cookie ល្អក៏ធ្លាក់ដែរ។ ⛔ **unzip បោះ exec bit ចោល** ➜ `chmod +x ./*.sh` ត្រូវ **ឥតលក្ខខណ្ឌ** ហើយ helper ត្រូវហៅតាម `bash` (`set -e` + «Permission denied» = setup ងាប់)។ ⛔ **ថតគម្រោងត្រូវដេរីវេ** មិនមែន literal `$HOME/ZTO-Cookie-Sync` (អ្នកដែល unzip ទៅឈ្មោះផ្សេងទទួល «Run setup-termux.sh first» ខណៈ setup ទើបតែហៅវា)។ ⛔ **URL របស់ intent ត្រូវជា https ធម្មតា គ្មានតួ shell** — `adb shell` ស្រាយ argument ម្តងទៀត **លើឧបករណ៍** ➜ `#` ចាប់ផ្តើម comment ➜ វាលេប `-p com.android.chrome` ស្ងាត់ៗ។ ⛔ secret រស់ក្នុង Termux private storage mode **600** (ថត **700**) ➜ ការអានបដិសេធ file ដែលធូរជាងនោះ និងបដិសេធ symlink; Windows រក្សា **DPAPI** ដដែល | `zto-cookie-sync-test` ផ្នែក ៩ |
-| **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
-| **ZTO ៖ ការបន្តអាយុ Cookie** | មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag; response ពី attempt ដែល timeout មិនអាចជាន់ renewal ថ្មី។ Auth បដិសេធក្នុង `code/errorCode/statusCode` ណាមួយត្រូវឈ្នះ success envelope | `zto-cookie-store-test` · `zto-cookie-session-test` |
-| **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | Cookie ជំនួយ/retry ដដែលមានពិដាន ៦០ វិ.; session ស្នូលថ្មីសាកសរសេរភ្លាមក្នុងថវិកា ហើយ pending រស់រហូតដល់បញ្ជាក់ការរក្សាទុក | `zto-cookie-session-test` |
-| **ZTO ៖ ការអាន Blobs ↔ ផ្លូវឆ្លើយតប** | ⛔ មានតម្លៃក្នុងសតិ ➜ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់**ខាងក្រោយ**; ⛔ សតិទទេ ឬក្រោយ 401 ➜ អាន**ទប់**ដដែល | `zto-cookie-store-test` |
-| **ZTO helper ៖ បណ្តាញដាច់មួយភ្លែត** | ⛔ ការធ្លាក់បណ្តោះអាសន្នព្យាយាមឡើងវិញ **ក្នុងពិដាន** (signed URL ថ្មីរាល់ជុំ); 401/403/404/422 **មិនព្យាយាម** | `zto-cookie-sync-test` |
-| **ZTO ៖ របៀបស្វ័យប្រវត្តិ** | ⛔ មិនបើក browser ដោយមិនដឹងស្ថានភាព | `zto-cookie-sync-test` |
-| **ZTO ៖ ផ្លូវ setup** | ⛔ រត់ឡើងវិញត្រូវរក្សា PAT — Netlify បង្ហាញវាតែម្តង | `zto-cookie-sync-test` |
-| **ZTO ៖ ច្រកទ្វារ `--auto`** | ⛔ វាស់តម្លៃដែលដោះសោបាន មិនមែនវត្តមានឯកសារ | `zto-cookie-sync-test` |
-| **ZTO ៖ jar របស់ Argus** | ⛔ គូខូច ➜ រំលង; គ្មាន session ➜ បដិសេធ | `zto-cookie-sync-test` · `zto-cookie-store-test` |
-| **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
-| **ZTO ៖ ពិដានពេលរបស់ Netlify** | ⛔ Function ត្រូវឆ្លើយ JSON មុនត្រូវសម្លាប់ | `zto-proxy-test` |
-| **ZTO ៖ ថវិកា ↔ handler ទាំងមូល** | ⛔ ការអាន/សរសេរ Cookie store ស្ថិត **ក្នុង** ថវិកា — មិនមែនក្រៅ | `zto-budget-test` |
-| **ZTO ៖ 401 ដោយ Cookie ចាស់** | អាន store ឡើងវិញ ១ ដង; សាកម្តងទៀត **តែពេល fingerprint ប្រែ** | `zto-budget-test` |
-| **ZTO ៖ ថវិកាពេល ↔ នាឡិកា** | ⛔ ថវិកាវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ fail-open) លើ **គ្រប់មូលដ្ឋានថវិកា** (`budgetLeftMs()` ➜ `cookieReadTimeoutMs()` · `cookieRenewTimeoutMs()` · `retryAfterAuthRejected()`)។ ⛔ ទិសផ្ទុយ ៖ ថវិកាតឹងពេកក៏ជាកំហុស ៖ សតិទទេ ➜ ការអាន Cookie ជា **សំណើទាំងមូល** ➜ ទទួលពិដាន store ពេញ ដោយកក់ត្រឹម `COOKIE_COLD_UPSTREAM_RESERVE_MS` (បើអត់ ➜ 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie នៅក្នុង Blobs); សតិមានតម្លៃ ➜ ការអានជាស្រេចចិត្ត ➜ រំលងបាន។ ⛔ ព្រំដែនអ្នកយាមដេរីវេពី `COOKIE_STORE_TIMEOUT_MS` ពិត ហើយករណីអាក្រក់បំផុត (អានពេញ + upstream) < ១០ វិ. | `zto-proxy-test` · `zto-budget-test` |
-| **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
-| **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
-| **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
-| **ZTO ៖ `ZTO_UPSTREAM_REJECTED` ជាកន្តុំរួម** | ⛔ វាលាយ **សាលក្រមស្ថាពរ** («លេខមិនស្គាល់» ៖ លេខតេស្ត · កញ្ចប់មិនមែន ZTO ➜ ការសាកម្តងទៀត **ឥតប្រយោជន៍**) ជាមួយ **សាលក្រមបណ្តោះអាសន្ន** («ZTO ដាច់ពិត» ➜ ការសាកម្តងទៀត **ត្រឹមត្រូវ**)។ ខាង client 5xx ជា retryable ➜ ការស្កេនលេខមិនស្គាល់ចំណាយ **២ ជុំ** រួចចេញ Sentry event។ ⛔ **កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់** — នោះនឹងបាំង **ការដាច់របស់ ZTO ពិត**។ ⛔ ហើយ **កុំទាយកូដណាមួយ** ៖ ការបំបែកត្រូវការ **payload ពិតរបស់ ZTO**។ ដូច្នេះជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ** ៖ `noteUpstreamReject()` កត់ `count · status · code` ចូល `?diag=1` ⛔ **ដោយមិនប្តូរសាលក្រម · cache · ការសាកម្តងទៀត** ➜ ជុំក្រោយសម្រេចដោយ **លេខ** មិនមែនការស្មាន។ ⛔ កូដត្រូវអានតាម `upstreamCodeText()` ដែលជា **ចំណុចច្របាច់តែមួយ** រួមនឹង `upstreamSucceeded()` (ច្បាប់ចម្លងទី ២ ➜ សាលក្រម និងការវិនិច្ឆ័យនិយាយផ្ទុយគ្នា) ហើយត្រូវឆ្លង `SAFE_REASON_RE` ➜ **សារឆៅរបស់ upstream មិនលេច** | `zto-proxy-test` |
-| **React ១០០% ៖ ម្ចាស់ DOM តែមួយ (ZoeW)** | ⛔ កូដមុខងារ **មិនប៉ះ DOM** ៖ ប្រអប់ = `uiState.modalDisplay` · អត្ថបទ/ទង់ = `viewState` · focus/តម្លៃ/វាស់ = `src/app/refs.ts` · ការលើកលែងក្នុង `platform/document-io.ts` (ហេតុផល + ពិដាន)។ ⛔ ស្រទាប់ React (`src/app/**`) ៖ class · style · attribute · អត្ថបទ · listener ជា JSX; ការសរសេរ DOM ដែលនៅសល់ (focus · រមូរ · `animate()` · input uncontrolled · `<html>`/`<body>` · `touch*` non-passive · `muted`) តែក្នុងច្រកចេញ `APP_ALLOWED`។ ⛔ សញ្ញា PTR គូរពី `ptrState` (មិនមែន `uiState`) · `boot-flags.js` មិនប៉ះធាតុរបស់ React · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិត (AST) · `commitNow()` មុនការវាស់/focus · input ជា **uncontrolled** (`defaultValue`/`defaultChecked`) · checker ដើមដែលសរសេរ class បកប្រែតែក្នុង build វាស់ (`src/audit-compat.ts`) | `npm run purity:check` (ZoeW) |
-| **បញ្ជីធំៗ ↔ ការគូរឡើងវិញ (ZoeW)** | ⛔ តារាងប្រវត្តិ **គ្មានពិដាន** (filter «ទាំងអស់» = ជួរដេករាប់ពាន់) ➜ body នៃបញ្ជី subscribe **តែវាល view របស់ខ្លួន** (`useStoreFields`) មិនមែន `useStore(uiState)` ទាំងមូល — វាល `markImmediate` (ហូតប្រអប់ · ម៉ឺនុយ · ប្រអប់ · `chromeHidden` ខណៈរមូរ) commit **ភ្លាម** ➜ ការគូរជួរដេកទាំងអស់រត់ខាងក្នុងផ្លូវចលនា។ ⛔ ឪពុកដែលគូរឡើងវិញរាល់ការហូត (`PageData` · `PageEntry`) ប្រើកំណែ `Memo…` (function ដើមនៅ export សម្រាប់ `react-view`) · `HistoryRow` ប្រៀបតាម **តម្លៃ** (`sameHistoryRowModel()` — Firebase ផ្តល់ object ថ្មីរាល់ snapshot)។ ⛔ ទិសផ្ទុយ ៖ ធាតុកែនៅនឹងកន្លែង + `renderHistory()` ត្រូវគូរ (`historyRenderSeq` ⛔ មិនមែន `uiState.touch()`) · listener ធ្លាក់ពេលបញ្ជីទទេ ➜ សារ «វាស់មិនបាន» (`firebaseState`) · អ្នកផលិត view ផ្សេងត្រូវ assign object **ថ្មី** (ការកែនៅនឹងកន្លែងមិនកេះការគូរ)។ ⛔ ប្រអប់បញ្ជីធំ (ធុងសំរាម · ZTO មិនទាន់បិទ) គូរ **ទំព័រ ២០** + ទាញបន្ថែម (IntersectionObserver/ប៊ូតុង) · សរុប/ស្វែងរកលើធាតុ **ទាំងអស់** · ស្វែងរក/បើកម្តងទៀត ➜ ទំព័រដំបូង។ ⛔ **តារាងប្រវត្តិ** គូរ **៥០ ជួរ** (`HISTORY_PAGE_ROWS`) + ទាញបន្ថែមមុនដល់ចុង (sentinel លើ `.table-responsive` · `rootMargin` ខាងក្រោម) · ចំនួនសរុបលើក្បាលរាប់ធាតុ **ទាំងអស់** · `renderHistory(data, viewKey)` ៖ sync ពី Firebase (កូនសោដដែល) **មិនរុញអ្នកប្រើត្រឡប់ទៅ ៥០** · ប្តូរ filter/ស្វែងរក (កូនសោថ្មី) ➜ ៥០។ ⛔ APK ៖ ការវាស់ពណ៌របាស្ថានភាព (បង្ខំ layout + hit-test) រត់តែពេល **ស្រទាប់ក្រោមរបា** ប្រែ (`statusBarLayerSignature()`) មិនមែនរាល់ការប្រែ `uiState` | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` (Chromium ពិត) · `npm run native:check` ៤ឃ |
-| **ផ្ទាំងជូនដំណឹង 🔔 (ZoeW)** | ⛔ «ជិតផុតកំណត់» សួរ **`barcodeAbandonIsRipe()` ដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (គ្មានរូបមន្តព្រំដែនទី ២) · អានសុទ្ធសាធ (មិនប៉ះលុយ/Firebase) · ទិដ្ឋភាពប្រវត្តិមិនស្រស់ ឬ Database មិនទាន់ភ្ជាប់ ➜ «វាស់មិនបាន» · ចាកចេញ ➜ បញ្ជីលុបចេញពី DOM។ ⛔ ផ្ទាំង 🔔 និងរបា Slide ជា **ស្រទាប់តែមួយ** (`isSideDrawerOpen()` រាប់ទាំង ២ ➜ PTR · Back · Escape · ផ្ទៃខាងក្រោយ)។ ⛔ សារ ៖ `public/announcements.json` ទាញ **network-only** (មិនចូលសំបក SW · APK តាម `VITE_NATIVE_WEB_ORIGIN` + CORS) ➜ **រាល់ការឡើងកំណែ ZoeW ត្រូវមានធាតុ `update` ថ្មីបំផុត = `APP_VERSION`** · សារ `maintenance` សុទ្ធ **មិនឡើងកំណែ** (`version-bump-scope` មិនរាប់វា)។ ⛔ logo ក្នុង App (navbar · boot splash · guide) = App icon ដេរីវេពី `resources/icon.svg` / `manifest.json` របស់ ZoeKeyGen | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
-| **Toolchain ↔ អ្វីដែល ship (ZoeW)** | ⛔ checker CSS/ប្លង់វាស់ CSS **ប្រភព** ហើយ Chromium parse syntax ថ្មីបាន ➜ ការឡើង Vite/minifier អាចប្តូរ **output** ដោយគ្មានអ្នកវាស់។ ⛔ minifier CSS ជា **esbuild** (`cssMinify`) ៖ Lightning CSS (លំនាំដើម Vite) សរសេរ design token ឡើងវិញ និងរៀបលំដាប់ declaration ក្នុង CSS ដែលគ្រប PTR/ចលនាផ្ទាំង · JS ក្នុង build ត្រូវ parse បានក្នុង `build.target` (iPhone ចាស់) · ⛔ chunk ត្រូវបែងចែកតាម `codeSplitting` + `priority` (Rolldown ចាប់ dependency របស់ group ➜ helper `__vitePreload` ធ្លាក់ចូល chunk native ➜ web ផ្ទុកវា ➜ **ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត**)។ ⛔ config Android (SDK · AndroidX · AGP · Gradle) ស្ថិតក្នុងខ្សែ template របស់ **Capacitor ដែលដំឡើង** — លើសខ្សែនោះ = ឡើង Capacitor major (`ZoeW/docs/ANDROID.md`) ព្រោះ build Android វាស់មិនបាននៅទីនេះ | `npm run smoke` · `npm run android:check` · `npm run native:check` (ZoeW) |
-| **Firebase Project ថ្មី (ឧបករណ៍អ្នកលក់)** | ⛔ **មួយ Project ក្នុងមួយអតិថិជន** (Spark ឥតគិតថ្លៃ · កូតារៀងខ្លួន — Project តែមួយ/Supabase ត្រូវបដិសេធដោយសារថ្លៃ ៖ `docs/HISTORY.md` ផ្នែក ២) · ⛔ Rules អនុញ្ញាតគ្រប់ `auth != null` ➜ **sign-up ត្រូវបិទ ហើយត្រូវវាស់** ដោយការចុះឈ្មោះពិតតាម apiKey សាធារណៈ (ចុះបាន ➜ លុបគណនី probe + FAIL) · ការកំណត់ Authentication អានត្រឡប់ (server ទទួល PATCH ≠ អនុវត្ត) · Rules = ឯកសារ repo អានត្រឡប់ប្រៀប · ⛔ មិនយក Project មានស្រាប់ដោយស្ងាត់ (`--adopt`) · មិនប្តូរពាក្យសម្ងាត់គណនីមានស្រាប់ (`--reset`) · `pendingProject` កត់ **មុន** ការបង្កើត ➜ «យឺតតែជោគជ័យ» និង 409 លើ Project ខ្លួនឯង មិនបង្កើត Project ទី ២ · ពិដានជំហាន · ពាក្យសម្ងាត់ **មិនចូលឯកសារ** · អ៊ីមែល ↔ `siteCodeFromEmail()` ពិត · Setup Link ↔ `decodeSetupPayload()` ពិត · `firebase-tools` pin ពិតប្រាកដ (ប្រើ function ខាងក្នុង)។ ⛔ ការវាស់ត្រូវរត់ `firebase-tools` **ពិត** លើ **HTTPS** (លើ http វាផ្ញើ `Bearer owner` ➜ ផ្លូវ token មិនដែលរត់) | `firebase-provision-test` |
-| **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
-| **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
-| **វិសាលភាពឯកសារ** | ⛔ README និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** (ច្បាប់ ៩) · ប្រវត្តិទៅ `docs/HISTORY.md` / `docs/HISTORY-ARCHIVE.md` ប៉ុណ្ណោះ។ ⛔ **ភាពស្រស់** ៖ ក្បាលតារាង [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) ត្រូវរាយឈ្មោះ App នីមួយៗ **អមដោយកំណែ ship របស់ខ្លួន** (ព្រំដែនពាក្យ ៖ `ZoeKeyGen` ផ្ទុក `ZoeW`) · ការអះអាងកំណែ **បច្ចុប្បន្ន** (root README · README នីមួយៗ · តារាងក្បាលនៃឯកសារនេះ រួម `CACHE_VERSION`) ដេរីវេពីកូដពិត · ការយោង *ប្រវត្តិ* មិនប៉ះ។ ⛔ **បញ្ជីរឹងក្នុង checker = កាលបរិច្ឆេទផុតកំណត់** ➜ ដេរីវេ ឬប្រៀបនឹងការពិត ៖ ពាក្យចាំបាច់ក្នុង `guide.html` ពីកុងតាក់ពិត · បញ្ជី README ពីថតពិត (`listReadmeFiles()`) · ផ្ទៃ UI · ចំនួនជួរ 🩺 · ចំនួនអេក្រង់ `collectedValueOf()` · ចំនួនតំបន់ 📝 ស្រង់ពីកូដពិត · helper «នៅរស់» វាស់ជា **និយមន័យ** · រាល់ `.js` ក្នុង `audit-tools/` មានឈ្មោះក្នុង `audit-tools/README.md` · ចំនួនការវាស់របស់ `money-reality-check.js` ស្មើផ្នែក `── N.` ពិតក្នុង **គ្រប់ឯកសារ** ដែលអះអាងវា។ ⛔ **ទិសផ្ទុយ ៖ ផ្ទៃដែលដកចេញរួច មិនត្រូវរស់ក្នុងឯកសារ** ៖ កូនសោ `localStorage` ដែលឯកសារនេះយោង ត្រូវមានក្នុងកូដ ship · ច្រកទ្វារលក្ខខណ្ឌ (វាលបំពេញសាខាគ្មានក្នុង App ➜ គ្មានឯកសារណែនាំឲ្យបំពេញ · ការបដិសេធ «**គ្មាន**…» ឆ្លង)។ ⛔ ផ្ទៃថ្មីត្រូវលេចក្នុង **សៀវភៅក្នុង App** (`guide.html`) មិនត្រឹម README (សារ `licenseFailureMessage()` ពិត · ច្រកទ្វារលក្ខខណ្ឌលើ `LICENSE_SEAT_SLOTS`)។ ⛔ កាតាឡុក `emu/*` ៖ រាល់ `run "emu/…"` ក្នុង `run-all.sh` ត្រូវមានឈ្មោះក្នុង **កថាខណ្ឌធ្លាក់ចុះ** នៃ Runbook | `doc-scope-test` · `user-guide-test` |
-| **Base directory របស់ Netlify** | ⛔ **ប្រកាន់អក្សរតូចធំ** ៖ `ZoeW` · `ZoeKeyGen` (រស់ក្នុង UI) | 📝 |
-| **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច ➜ `SCRIPT_VERSION` ត្រូវឡើងលើ **រាល់ចម្លើយ** ពីចំណុចចេញ **តែមួយ** | `google-sheets-cache-test` · `health-check-test` |
+| **Tools themselves** | A checker must **be able to fail** — empty dir ➜ none green; ⛔ an `ok()` that takes **only a label** must never be called conditionally | `checker-coverage.js` |
+| **Tools themselves** | ⛔ **A "green set" is not evidence** — every money class needs a guard that goes *really red* | `money-guardian-test.js` |
+| **Tools themselves** | A checker must **fail within a time limit** — hang ≠ fail. ⛔ Meta-checkers running many children (`checker-coverage` · `exit-code-integrity`) run them **in parallel under a ceiling**, not serially; a child that **exhausts its budget** while poisoned = FAIL (unmeasurable), not "failed correctly" · ⛔ never fix overruns by raising `CHECKER_TIMEOUT` (hides real hangs) | `hang-guard.js` |
+| **Tools: the `run-all.sh` runner** | ⛔ Bounded parallel lanes, output **always in list order** · `emu/*` + `money-guardian` one at a time (single emulator) · checkers writing/sweeping `.tmp-poison-*` (`checker-coverage` · `exit-code-integrity`) **run alone** · lanes derived from source and verified **both directions** (a new checker using the emulator or sweeping shadows ➜ must enter `runall_lane()`) · `RUNALL_STATE` written **as soon as a checker ends** · `RUNALL_RESUME=1` **refuses on a different tree** (content hash + `*_STRICT` flags) · unknown `RUNALL_ONLY` name ➜ refuse; a partial run **never prints "all passed"** · TERM leaves no orphans · ⛔ `RUNALL_SHARD=k/n` (parallel CI) is a function of **the list + `RUNALL_HINTS` only** (not state/nproc which differ per runner) ➜ shards never overlap or miss · matrix in `audit.yml` = 1..n · CI STRICT flags ⊇ Runbook step 0 block · bad value ➜ refuse | `runall-runner-test` · `hang-guard` |
+| **Tools themselves** | ⛔ Every checker runs normally and as baseline; a CLI needing a dump has a fixture checker; CI and runner agree | `checker-coverage.js` |
+| **Every repo file** | ⛔ New files need a guard mapping in `repository-file-coverage.json`; stale entries or missing guards fail; integrity/manual kinds are not behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
+| **Reports and data to send** | ⛔ The real CLI finds money bugs identically before/after redaction; the launcher never claims "sent" when redaction fails | `money-reality-test.js` |
+| **Tools themselves** | ⛔ Every sandbox dependency exists in real scope (function/state/constant); smoke runs the real collected path before the emulator gate | `emu/crud-rules-flow.js` |
+| **Tools themselves** | ⛔ Failure must reach the **exit code** — "FAIL" with exit 0 = fake green. ⛔ **Second half: assertions that *never run* also exit 0** — `await` on a promise **nobody resolves** (e.g. a stub the test is supposed to resolve) neither throws nor hangs: the event loop **drains** ➜ node exits **0** silently ➜ summary and all later assertions **never run** ➜ `run-all.sh` lists **PASS**. ⛔ The fix is **structural**: `process.exitCode = 1` at the top and only the summary line lowers it — not eyeballing "my test resolves every promise" | `exit-code-integrity.js` |
+| **Tools themselves** | ⛔ `pageerror` doesn't see promise rejections — watch `unhandledrejection` too | `checker-coverage.js` part 8 |
+| **Accumulating listeners** | ⛔ N real cycles ➜ listener and node counts must not grow | `listener-leak-test.js` |
+| Delete vs Remove | `isDeducted` is the **single** field that decides money | `policy-test` · `revenue-fuzz` |
+| **Duplicate barcode ↔ money** | ⛔ Save only with a real `'claimed'` verdict. ⛔ The registry writes **constant `true`** ➜ a server read after `disconnect` seeing `true` can't tell "we claimed" from "another parcel claimed" ➜ `claimBarcodeInRegistry()` returns **`unknown`** on `txOutcome: 'applied'` (a trap is cheaper than duplicate money) | `duplicate-money-test` · `tx-outcome-test` part 5 · `emu/tx-disconnect-emu-test` part គ (real SDK) |
+| **Row money totals** | ⚠️ Terms: **`barcode` = 1 parcel** · **`item` = row = one customer on one day** (`addOrUpdateEntry` merges by `phone`+`scanDate`) ➜ `item.count` = **parcel count** ➜ label "កញ្ចប់សរុប" is right. ⛔ `item.cod/.dod/.price` must **equal the sum over barcodes** (when `barcodes` is non-empty — legacy items derive from `price`). ⛔ **Check the server too**: `initDatabaseListeners` recomputes `price` on read ➜ it **heals** memory while wrong numbers sit on the server and reach Excel. ⛔ Ledger guards **don't see this class** | `item-money-integrity-test` |
+| **Colors: COD vs DOD** | ⛔ In one row COD and DOD must **look different**. ⛔ COD **keeps status colors** (`money-collected`/`money-pending` — `semantic-ui-color-test` locks their literals); DOD gets modifier `kind-dod` ➜ `--money-dod-collected` / `--money-dod-pending`. ⛔ Measure the **computed color** in a real browser, not class presence; draw sites **derived from `app.js`**. ⛔ **Reverse: a pure COD line must not carry `kind-dod`** | `semantic-ui-color-test` · `page-nav-test` |
+| **Drawer: collapsible categories** | ⛔ Items grouped in `.drawer-group`, collapsed by default · state in `zoew_drawer_groups_v1` · opening one doesn't open another. ⛔ **A category whose items are all hidden hides its header too** ➜ `refreshDrawerGroups()` is the single choke point. ⛔ **Measure with `getBoundingClientRect()`** — `getComputedStyle(child).display` still resolves when the **parent** is `display:none` (⚠️ computed style is valid **only when** `.hidden` sits on the element itself, as in `zto-sync-banner-test` part 22) | `page-nav-test` · `zto-sync-banner-test` |
+| **Values rules reject** | ⛔ Clamp negatives **before writing** — memory must match the server | `revenue-rules-clamp-test` |
+| **Clamp at 0 ↔ revert** | ⛔ "apply ➜ revert" must be a **true inverse** — revert by the delta the *server applied* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
+| **Revert after clamp** | ⛔ Revert the **actually applied delta**, not the requested one | `revenue-rules-clamp-test` |
+| **Revert after a *failed* apply** | ⛔ Same rule for verdict **`null`**: `null` = "server did not apply" ➜ **nothing to revert** (⛔ never fall back to the memory delta). In-memory revert is **idempotent** because the commit's `catch` already reverted memory | `ledger-failed-apply-revert-test` |
+| **Transactions: `disconnect` ↔ real outcome** | ⛔ `disconnect` = "unknown", not "not applied" ➜ `runTransactionResolved()` (wrapper on the single `fb`) reads the server via REST before reversing · `applied` ➜ success · `unknown` ➜ don't touch money + Sentry money · late cleanup never writes duplicate trash. ⛔ **"Equals the sent value" is valid only when that value belongs to one writer** (token · parcel data) ➜ constant values (registry `true`) are not trusted · cleanup checks the trash owner · daily/monthly ledger carry a unique `op` token per write (`runLedgerTransaction()` is the choke point ⛔ never `fb.runTransaction` directly on the ledger) ➜ rules not yet Published (`permission_denied`) ➜ resend without `op`. ⛔ The wrapper **delays** `disconnect` (REST read up to 60s) ➜ paths queuing on `disconnect` (`patchHistoryItemFields` · call marking) must check `transactionDisconnectPending()` when `dbOp` times out — otherwise a network drop becomes revert + "failed" | `tx-outcome-test` · `emu/tx-disconnect-emu-test` (real SDK) · `money-guardian-test` · `history-patch-retry-test` (real wrapper) |
+| **Pickup stats: identity** | ⛔ Count by **barcode set** (`pickedUpBarcodes`) — both numbers are **derived mirrors**, not counters | `pickup-barcode-identity-test` · `pickup-ledger-test` |
+| **Pickup stats ↔ registry key** | ⛔ Barcode key is the same `barcodeRegistryKey()` — two key formulas = double counting | `pickup-ledger-test` |
+| **Pickup stats ↔ server verdict** | ⛔ Writes are **idempotent state** — no arithmetic on `packagesPickedUp` | `revenue-rules-clamp-test` · `money-guardian-test` |
+| **Aborted transactions** | ⛔ `committed: false` ➜ the money reversal still runs (a `throw` inside the success handler **does not** reach the failure handler) | `price-edit-abort-test` |
+| **Orphan registry keys** | ⛔ A failed release is queued and retried — never swallowed | `registry-release-test` |
+| **Registry release queue ↔ releaser** | ⛔ Deferral needs a second exit (view arrival) | `registry-release-test` |
+| Trash · `trashReason` | Display label ≠ money decision. ⛔ **The two group totals derive from `TRASH_REASON_META[r].deducted`**, not literals, and **keep cents** (`renderTrashSummary()` must be run and the user-visible number read) | `trash-modal-test` · `restore-marker-hygiene-test` |
+| **Pickup stats**: customers ↔ parcels | Counted on **one basis** (closed barcodes) | `pickup-ledger-test` |
+| **Reset pickup stats** by filter | Node **remains** with `0` · honors filter · never touches money | `pickup-reset-test` |
+| 2h/8d cleanup | Walks **barcodes**, not parcels | `partial-pickup-cleanup-test` |
+| Rules fence · deadlock | A witness must not lock the id | `emu/restore-deadlock-test` |
+| **Rules: nodes expecting objects** | ⛔ A writable node with child schema (fields or wildcard) needs a `.validate` requiring an object (`newData.hasChildren(…)`) — a primitive **has no children** ➜ child checks don't run ➜ server accepts ➜ every device's listener fails. ⛔ List derived from both real rules files (`rules-shape.js`) ➜ new nodes covered automatically · emulator two steps (control without guard ➜ accepts · real rules ➜ rejects). ⚠️ Console writes by the project owner bypass rules ➜ `rawSnapshotToItemList()` skipping broken records stays necessary | `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` |
+| **Rules ↔ the app's real writes** | ⛔ Browser checkers' fake SDK accepts **every write** ➜ "real rules reject a normal app write" is invisible ➜ every rules change (or new write path) is proven on **real writes in real order**: `revenue-fuzz-test` (`FUZZ_CAPTURE`) captures what the fake accepted ➜ replays to the emulator with real rules (app ➜ user · harness ➜ owner) ➜ **0** rejections · reverse probe (history record `.validate: false` ➜ must reject) · floor ≥ 150 writes · 9 roots. ⛔ A new write path fuzz doesn't exercise ➜ add an op to `revenue-fuzz-test` before trusting rules | `emu/app-writes-rules-test` |
+| Clock | Retention uses `getServerNow()`, not `Date.now()` | `clock-hygiene` |
+| **Rate ceilings ↔ clock** | ⛔ Elapsed time goes through `elapsedSince()` (backwards ➜ fail-open) | `monotonic-gate-test` |
+| **Rate ceilings ↔ clock *basis*** | ⛔ Stamps measured by `elapsedSince()` must be **minted with `Date.now()`** (a `getServerNow()` stamp ➜ `−offset` ➜ `Infinity` ➜ ceilings and backoff ladders **dissolve**). ⛔ Stamps live as **variables** and **properties** (`{ at: … }` · `x.deletedAt = …`). ⛔ Two fix directions: **local** stamps (TTL) ➜ mint with `Date.now()`; **retention** stamps (`deletedAt` in Firebase) ➜ ⛔ don't change minting — measure `getServerNow() - mark`. ⛔ One property never holds two bases | `clock-basis-test` · `zto-sync-banner-test` (behavior) |
+| Connection · recovery | A failed listener must come back; the SDK is really recoverable · ⛔ reloading to recover the SDK **measures reachability of the SDK host first** before spending the ceiling (`navigator.onLine` lies on WiFi without internet / data exhausted ➜ otherwise 3 reloads burn while the network is dead and the SDK never recovers) · CSP `connect-src` allows that origin | `connection-recovery-test` · `netlify-config-scope-test` |
+| **Zombie socket** | ⛔ `.info/connected` = `true` **is not proof** the socket carries answers — the SDK closes only on `window` `offline` (keepalive 45s doesn't wait for replies) ➜ WiFi without upstream · NAT expiry · wake from background ➜ "connected" for minutes while nothing works. `probeDatabaseLiveness()` is the single decider: real round trip (`get()` on `DB_LIVENESS_PROBE_PATH` which has no listener ➜ any reply incl. `permission_denied` = alive) · only a timeout (10s) disconnects (`forceDatabaseReconnect()` = same effect as the SDK's `offline`). 3 doors: hung `dbOp` + hung scan claim/save · wake from background ≥ 30s · 60s cycle (visible + no round trip in 55s). ⛔ Never probe while a listener is pending (first pull on a slow network queues the reply ➜ false disconnect ➜ endless re-pull) · disconnect ≤ 1 per 30s · reverse: slow but alive ➜ no disconnect | `emu/app-network-e2e-test` (app · SDK · real emulator) |
+| **A listener dying alone** | ⛔ Siblings must not announce recovery on its behalf | `connection-recovery-test` |
+| **An `.info/*` listener dying alone** | ⛔ Same rule for `.info/connected` and `.info/serverTimeOffset` | `connection-recovery-test` |
+| **Stale callbacks after reconnect** | ⛔ Every `onValue` callback has a generation gate (`listenerGeneration !== dbListenerGeneration`) — `fb.off()` is wrapped in `try/catch` so it can fail, and in-flight snapshots arrive **after** a database/auth switch ➜ an old callback (1) writes **old project** data into memory and (2) calls `noteDbListenerAlive()` ➜ **declares the view fresh** ➜ "empty list ↔ measurable" dies and destructive cleanup runs on a stale view. ⛔ **The measurement derives from real `DB_LISTENER_KEYS`** (measuring only `history` let a gate removal on any other listener survive) | `connection-recovery-test` |
+| **Secret redaction** | Frozen objects redacted by copying · private/signing keys and private JWK (incl. as JSON string) redacted · public JWK and money field `d` kept. ⛔ `SECRET_KEY_PATTERN` (object keys) and `SECRET_PARAM_PATTERN` (`x=…` strings — the biggest path because Sentry captures `console` breadcrumbs) are **two separate lists** ➜ both must cover every secret the system **really holds** (`headerValue` · `headerValueEnc` · `X-Zoe-Proxy-Key` · `ZTO_PROXY_KEY` · `BOS-MAN-SESSION` · `activationKey` · `keyString` · …) · credential field list derived from `fieldsToBlank` of `clearSensitiveModalFields()` · measured from real code. ⛔ Reverse: don't swallow non-secrets (`path` · `patch` · `dispatch` · `headerName`) · the param list is intentionally larger than the key list (`key` empty) | `secret-hygiene` |
+| **Tools themselves** | ⛔ Poisoning happens on shadow files — SIGKILL never touches originals | `checker-coverage` |
+| **Tools themselves** | ⛔ No **fixed** shared resources: always `listen(0, '127.0.0.1')` · the RTDB namespace of `emu/*` is unique per run | `checker-coverage` |
+| **Writes ↔ leaving to make a call** | Retry keeps rollback of every field and newer choices; old callbacks can't write/deduct stats/show messages after an auth or database switch | `history-patch-retry-test` |
+| **Table prefetch** | Retry fast **but never fire during a scan** | `lookup-prefetch-test` |
+| **State ↔ modal owner** | ⛔ `closeModal()` clears only the state of **that** modal (or when the stack is empty) — a modal on top must not erase the Barcode · price edit · call mark of the modal below | `lookup-prefetch-test` · `ui-flow-test` |
+| **Stacked modals** | ⛔ The **last opened is on top** (incl. re-opening an open modal) — `.modal` z-index is equal ➜ DOM order wins ➜ the PIN from Config hid behind ➜ ZoeKeyGen `openModalHelper()` re-orders z-index · ZoeW `uiState.modalStack` ➜ `Modal.tsx` (only when ≥ 2 open ➜ parity) · ⛔ never order modals by fixed z-index or DOM order | `layout-check` |
+| **Keyboard ↔ search** | ⛔ Don't jump while a lookup works; done ➜ come at once; ceiling 15s (fail-open) | `lookup-prefetch-test` |
+| **Lookup failure identity** | ⛔ `lookupCode` survives retries; the Cookie message points to the Windows sync tool ➜ Netlify Blobs, not the old env-paste workflow | `lookup-failure-identity-test` |
+| **Consecutive scans** | ⛔ Busy is a *wait*, not an *end* | `lookup-burst-test` |
+| **Orphan lookup queue entries** | ⛔ Early exits **release** their queue entry; the ceiling measures **real** waits only | `lookup-burst-test` |
+| **Cleanup rule labels ↔ constants** | ⛔ User-facing text is read from the constants | `trash-modal-test` |
+| **Progress trackers** | ⛔ Polling must not consume the evidence (idempotent) | `connection-recovery-test` |
+| **Queried key ↔ registered key** | ⛔ A dead guard = no guard. ⛔ **The key existing is not enough — each listener reports *its own key***: a callback passing a **sibling** key (1) keeps its death out of `dbListenerFailedPaths` ➜ `dbListenerViewIsStale()` **dies silently** and (2) lets the sibling announce for it | `listener-pending-key-test` |
+| Reconnect ladder | The cycle must not cut a handshake | `reconnect-ladder-test` |
+| Timeout · retry | Every `fetch` truly aborts | `network-timeout-test` |
+| Network pressure | Concurrency ceilings | `network-pressure` · `license-network-pressure` |
+| Service worker | Cache-first; ⛔ every fetch that fills the SW cache (install · revalidate · cache miss) uses `cache: 'no-cache'` — a stale device HTTP cache (`immutable` on unhashed names) ignores new headers ➜ new JS + old wasm = `LinkError` ➜ iPhone can't scan · `immutable` only on hashed names (`/assets/*`); Cache API failure ≠ app down; normal navigation and direct assets like `/app.js` ➜ `index.html`; `guide.html` and Netlify Pretty URL `/guide` ➜ guide cache; sensitive queries never enter the cache key; ⛔ **background refresh never puts a *new deploy* into an *old* cache**: the old SW stays in control while a new install fails ➜ new `index.html` references assets missing from the cache ➜ **offline white screen** ➜ `shellDeployIsCurrent()` (server sw.js still at this `CACHE_VERSION`) is the gate · new versions arrive only as one install group · both apps | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` (round 4: stale HTTP cache · round 5: failed new install) · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` · `netlify-config-scope-test` part 5 |
+| **Unbounded waits** | ⛔ "Connected but dead" networks hang — they don't throw | `stall-guard-test` |
+| **SW ↔ page: wiring in `registerServiceWorker()`** | ⛔ Both ends have tests (SW posts · handler · update banner) but **the listener in `boot.ts` connects them** ➜ measure with real app · SW · browser and post from the **SW context** (`clients.matchAll()` ➜ `postMessage`), not `dispatchEvent` in the page: `zoew-open-notify` ➜ 🔔 panel · `zoew-push` ➜ fetch notices · message types derived from `sw.js` (new type without assertion ➜ fail) · `visibilitychange`/`focus`/`online` ➜ `reg.update()` only after a 15-minute ceiling · `controllerchange` ➜ "new version" banner only when a controller existed since load (⛔ not on first install) | `sw-client-wiring-test` |
+| **Loops that never end** | ⛔ A stuck tab **answers nothing** (no toast · save · Sentry) ➜ worse than a named failure. ⛔ Bounds are **structural**: arithmetic on `Infinity` never ends · numbers from Firebase are not bounds · `Number.isFinite()` is not enough (`1e12`) ➜ ceilings by real structure. ⛔ Shapes to measure: `while` · `do-while` · condition-less `for` · **numeric-counting `for`** · **start points from arguments** (`matchingBraceIndex(src, -Infinity)` ➜ harden the start inside the helper: `Number.isFinite` + `< 0 ➜ 0`, not at call sites). ⛔ A **one-sided clamp** is no protection ➜ `clampLockerCount()` is the choke point **reads and writes** pass. ⛔ Measure by **really running in a separate process** (time + heap ceiling) · with a **reverse** direction (normal values give the same result) · scope **both apps** | `loop-termination-test` |
+| **Hung Firebase calls** | ⛔ RTDB doesn't reject offline — it hangs ➜ in-flight locks stick forever | `db-stall-guard-test` |
+| **Hung writes behind helpers** | ⛔ Cleanup locks release · late writes finish their work · the user sees a message | `write-stall-guard-test` |
+| **Work locks ↔ hung trash writes** | ⛔ Same rule for locks behind writes **without a ceiling**: "transaction lands fast ➜ network drops ➜ `fb.update` hangs" ➜ `finally` **never runs** ➜ lock stuck forever ➜ ⛔ the **2h/7d** rules die for that parcel (**money never deducted**) and remove-scan mode dies. ⛔ The fix is `settleLockWithin()` on the **lock** — **not** `dbOp()` on the write (that would reverse money wrongly when the write lands late) | `stall-lock-release-test` |
+| **Locker assignment ↔ claim** | ⛔ `assignLockerToEntry()` has the `clearClaim` gate **like the other 10 write paths** — Firebase rules don't block it (the fence allows every write with `newData.exists()`; it only protects **deletes**). Without it ➜ "delete all" writes trash from the snapshot **before** the Locker ➜ the change vanishes while the toast shows **✅**. ⛔ **Don't add a gate for restore markers** — measured: restore paths **don't lose** the Locker (`applyClaimedRestoreToHistory` merges onto `currentItem` · `finalizeClaimedRestore` writes field-level only) | `locker-claim-guard-test` |
+| **Dead `clearClaim`** | ⛔ An **ownerless** marker is a permanent trap: `runAutomaticCleanupRules()` aborts on the **presence** of `clearClaim` ➜ an expired-lease claim ➜ ⛔ **2h/7d** rules die for that parcel forever ➜ **money never deducted**. `releaseStaleClearHistoryClaim()` is the single releaser: ⛔ decides on the **server view inside a transaction** · ⛔ never touches **live** claims or claims of **this device** (`activeClearHistoryClaims`) | `stale-clear-claim-test` |
+| **ZTO: budget ↔ Netlify ceiling** | ⛔ The default budget fits in **10s**, otherwise the Function is killed before answering | `zto-budget-test` |
+| **ZTO: cache ↔ Cookie renewal** | ⛔ The cache key holds no Cookie; a cache hit never touches Blobs | `zto-budget-test` |
+| **ZTO: "not found" verdict** | ⛔ Cached (short TTL); transient failures **must not** be | `zto-negative-cache-test` |
+| **ZTO: tuning numbers ↔ docs** | ⛔ Defaults in docs are read from real code | `zto-negative-cache-test` |
+| **Late commit after a ceiling** | ⛔ Hang ≠ didn't happen — post-commit work runs when the commit arrives | `late-commit-test` |
+| **Blocked storage** | ⛔ The `window.localStorage` **getter itself** throws | `storage-guard` · `storage-blocked-boot-test` |
+| **Absent dependency** | ⛔ A synchronous `TypeError` bypasses `.catch()` | `camera-resume-test` |
+| **`data-act` element ↔ second listener** | ⛔ Rule 4 of "CSP and `data-act`" has a **structural guard**: `el.on<evt> =` on an element that already has `data-act` ➜ fail (derived from real `index.html` · honors scope · **reverse**: elements without `data-act` bind freely from JS) | `action-binding-test` |
+| CSP | No `on*=`; lazily loaded resources must pass CSP | `csp-enforced-test` · `csp-lazy-resource-test` |
+| XSS | Every value into HTML goes through `sanitizeInput()` (**both forms**) | `html-sink-escaping` · `inline-handler-xss-test` |
+| Secret leaks | Redaction walks the whole event | `secret-hygiene` |
+| **Sentry: error storms** | ⛔ A listener rejecting repeatedly reports **once per path per outage** (`dbListenerReportedFailures` ➜ cleared when the path lives again) · `ZoeErrors.capture()` drops identical events (zone·context·message) for 10 minutes (`suppressedRepeats` · fail-open) — both apps. ⛔ **Dedup never swallows identity**: different `itemId` · `item` · `barcode` · `keyId` · `date` · `path` ➜ send (cap 5/signature/window) — the admin needs each parcel id | `connection-recovery-test` · `sentry-load-race-test` |
+| **Error alerts** | ⛔ Alert rules search only **tags** ➜ money paths send `zone: 'money'` | `money-guardian-test` · `sentry-load-race-test` |
+| DOM · state after logout | No customer data left | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
+| PTR · panel motion · scrolling | ⛔ Don't touch without a request | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` |
+| Layout | Assert **both sides** (no overflow **and** no squeeze) | `layout-check` · `fluid-type-focus-test` |
+| **Undeclared CSS variables** | ⛔ `var(--x)` without `--x` ➜ **the whole declaration dies silently** (not just the color) | `css-var-test` |
+| **3-step type scale** | Phone `<700` · tablet `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
+| Toasts tell the truth | "connected" ≠ "data arrived" ≠ "still signed in"; a write's success comes after a durable commit, not optimistic UI · ⛔ the live network toast (`noteConnectionTransition`: connected ➜ offline while signed in) is **one** element that changes itself · ✅ only when every listener is fresh · "connecting" grace · never connected since open · a live login/Config toast exists ➜ no toast · ⛔ a live toast past its ceiling (20s) while "🔄 …" ➜ turns into "⚠️ … longer than usual" before vanishing (⛔ never vanishes silently) and a late success ➜ ✅ once (`expireLiveToast()`) · ⛔ one recovery ➜ one ✅: once the live toast announced, `noteDbListenerAlive()` adds no second message (`liveSuccessCount()`) | `toast-truth-test` · `toast-action-truth-test` · `ZoeW/tests/network-toast.test.tsx` · `ZoeW/tests/toast-live-expiry.test.tsx` · `ZoeW/tests/recovery-toast-dedup.test.tsx` |
+| Helpers shared by both apps | Byte-identical except a reasoned list | `shared-fns` |
+| **Same logic twice in one file** | ⛔ One formula must not live in 2 places — next round fixes one, forgets the other (rule 12 for *code*). ⛔ **Reported ≠ "delete it"** — "same text, different function" is real ➜ before unifying, measure **free variables** (only helpers reading parameters + top-level functions are safe) and **keep the difference as a parameter or at the call site**, never delete it. ⛔ **Text scanning misses half** — measured (2.30.2): a money formula lived in **11 places** while a text detector caught **5** ➜ needs a **structural** detector that **keeps property names** (`.cod` ≠ `.dod`) | `code-duplication-test` |
+| `fb.X` the loader doesn't export | Silent `undefined` in production | `sdk-surface` |
+| App version | `app.js` ↔ `manifest.json` ↔ `index.html` **inside each app** | `version-check` |
+| **Version bump scope** | ⛔ Bump only apps really changed (don't force users to re-download) — ⛔ **server code** (`netlify/` · `tools/`) **is not "shipped code"** ➜ it must not force a PWA shell bump | `version-bump-scope` |
+| License ↔ crypto | ⛔ "Can't verify" ≠ "bad signature" — never delete the record | `license-grace-test` |
+| **License ↔ clock** | ⛔ An unsynced clock **cannot delete** a record | `license-grace-test` |
+| **App ↔ License module** | ⛔ The "synced" flag is set only by a value **from the real server** · ⛔ post-login verification over 20s (slow network) ➜ retry per `ACTIVATION_RETRY_STEPS_MS` (session switch aborts · ladder exhausted ➜ guidance message) — ⛔ never toast-and-stop (empty app, no dialog) | `license-clock-trust-test` · `ZoeW/tests/activation-retry.test.ts` |
+| **License ↔ clock changes** | ⛔ Time can't go backward; Activate needs a server verdict | `license-clock-rollback-test` |
+| **Key 1 ➜ devices by ceiling** | ⛔ **The decider is the rules** (client code is cosmetic): seat `license_seats/<appCode>/<keyId>` in the License Project is writable only if (a) absent **and** the Key really exists, or (b) same `device` · clients can't delete · listing denied (`.read` at `$keyId`). ⛔ `getDeviceId()` reads back after writing · "can't identify ≠ seat belongs to someone else" ➜ `ok: null` doesn't delete the record (only a real `seat-taken` does) · `activate()` requires a real `seat === 'mine'` · old record + empty seat ➜ claim it (otherwise one deploy locks every customer) · the same device can Activate again · `checkOnline()` without `claimSeat` never writes · releasing devices is the admin's job via ZoeKeyGen · ⛔ never loosen seats. ⛔ Ceiling `license_keys/<app>/<keyId>/maxDevices` (admin-only write · absent = 1) enforced by **fixed slot names `d1..d5`** (RTDB rules can't count children ➜ slot count = ceiling in the schema) · slot names live in 3 files (`license-verify.js` · `ZoeKeyGen/app.js` · rules) and must agree · races move to a free slot (`LICENSE_SEAT_CLAIM_TRIES`) · ZoeKeyGen counts only within the ceiling. ⚠️ iOS: PWA and Safari have separate storage ➜ install the PWA **before** Activating | `license-seat-test` · `emu/license-seat-rules-test` · `license-app-code-test` |
+| **Seller notices (ZoeKeyGen ➜ ZoeW 🔔)** | ⛔ ZoeKeyGen writes `license_announcements/<App>/<id>` in the **License Project**: rules **public read · admin-only write/delete** · locked schema (kind `notice`/`maintenance` ⛔ not `update` · title 1–120 · body ≤ 600 · id `n` + 13-digit time + 6 chars ➜ time-ordered · `$other` rejected). ⛔ Kinds · length bounds · count cap live in `ZoeKeyGen/app.js` · `ZoeKeyGen/index.html` · rules · `ZoeW/src/features/notifications.ts` ➜ must agree (guard derives from both sides, not literals). ⛔ ZoeW reads via `ZoeLicense.announcementsUrl()` (one License URL · `orderBy $key` + `limitToLast`) · ⛔ "can't fetch" (401 before Publish · network · bad JSON) ≠ "none" ➜ keep old notices · `null` from the server = truly none · ⛔ seller notices **never touch** "📱 កំណែ App" (it reads only `announcements.json`). ⛔ ZoeKeyGen: ✅ only after commit · hang ➜ "⏳ not confirmed" (⛔ not "failed") + ✅ on late commit · rejection ➜ "failed" · session switch ➜ silent · keep the last 20 (delete old in the same update) · ⚠️ anyone can read ➜ never put secrets there | `keygen-notice-test` · `emu/license-seat-rules-test` part 12 · `ZoeW/tests/seller-notices.test.tsx` |
+| **Supabase: `fb` adapter ↔ Firebase SDK (ZoeW)** | ⛔ Money/listener code **never branches on backend** ➜ every difference lives in the adapter (`src/services/supabase-*.ts`) and it must equal the real Firebase SDK (val · key order · deep update · increment · transaction · listener · sync/async errors). ⛔ Adapter surface ⊇ every `fb.X` the app uses · adapter-only names (`accountOf` · `tenantScope` · `registerAccount` · `resetPassword`) used behind gates (`typeof` or `__supabase`) · reply lost after commit ➜ same `op_id` (increment never applied twice) · transaction ➜ `txOutcome` `applied`/`unknown` (same `disconnect` rule · stamps via `elapsedSince()`) · `document` access goes through `platform/document-io.ts` | `emu/supabase-adapter-parity` · `sdk-surface` · `npm run purity:check` |
+| **Supabase: RTDB rules in Postgres** | ⛔ `firebase-database.rules.json` is the single source ➜ the **latest** `*_zoe_rules.sql` must equal `rulesSql(compileRules(…))` (change rules ➜ `node supabase/scripts/generate-rules-sql.mjs` writes a new file ➜ Publish on Firebase **and** merge/paste the new file) · the verdict on every real app write equals the real RTDB emulator. ⛔ Cross-tenant (RLS · `zoe_read`/`zoe_pull` · broadcast by topic) · `zoe_write` locks the tenant (`for update`) **before** reading seq (measured with a real lock from a third session, not a timing race) | `emu/supabase-rules-parity` · `supabase-datastore-test` · `supabase-rls-test` |
+| **Supabase: accounts · invite codes · shop status** | ⛔ Identity = `auth.uid()` + `tenant_members` (server-written only), not claims/`user_metadata` · invite/reset codes 100 bits · DB stores only hashes · code checked **before** creating the account · unknown outcome ➜ **don't delete** the account. ⛔ ZoeW refuses Secret key/`service_role` · `loginDomain` must be `.invalid` · no Activation Key (`ensureAppActivated()`) ➜ 🩺 License row = shop status (expired/disabled ➜ ❌ · unknown ➜ ⚠️) · cleanup journal bound to tenant · ⛔ **a Setup Link whose invite code was used/expired ➜ login dialog, not sign-up** (`routePendingInvite()`: code hash on device `zoew_used_invites_v1` · `register` + `check: true` mismatch · old/unknown Function ➜ sign-up only if this device ever signed into that project · ⛔ never swap forms under the user · another project's code ➜ discard) · login memory bound to **backend + project** (`login-memory.ts`: `remembered_email` + `remembered_email_scope`) · Supabase session bound to URL (`zoew-sb-auth-owner`) | `supabase-rls-test` · `supabase-functions-test` · `ZoeW/tests/supabase-account.test.tsx` · `ZoeW/tests/login-routing.test.tsx` · `health-check-test` · `firebase-config-paste-test` |
+| **Supabase: SECURITY DEFINER ↔ API** | ⛔ A `security definer` function callable by anon/authenticated **is never in a schema PostgREST exposes** (`pgrst.db_schemas`: `public`) ➜ definer bodies live in `private` · `public.*` are `security invoker` wrappers calling them (same name · arguments · defaults · result) — Supabase Database Linter rules 0028/0029 replicated from the real `supabase/splinter` · ⛔ never add `private` to Exposed schemas · a new user-callable RPC ➜ same pattern · service_role-only functions (`finish_registration` …) are outside this rule | `supabase-rls-test` |
+| **Supabase: migrations ↔ Deploy from GitHub** | ⛔ The integration ("Deploy to production" on merge to `main` · Working directory `.`) applies only versions missing from `supabase_migrations.schema_migrations` ➜ files in `origin/main` **can't be edited · deleted · renamed** (edits never reach the database, silently) · new versions sort last · no duplicates · one migration per transaction (no `concurrently`) · a migration pasted in the SQL Editor ➜ `migration repair` first · ⛔ no secrets in `config.toml` (Auth/API config is not applied to production · Edge Functions declared in `config.toml` are deployed) | `supabase-datastore-test` part 0ខ |
+| **ZoeKeyGen: "🏪 ហាង Supabase" panel** | ⛔ Branch regex · name length · days · code hours · account name equal the checks in the migration · every error code the `admin_*` RPCs raise has Khmer text (both directions). ⛔ `sbAdminConfigProblem()` agrees with ZoeW's `supabaseUrlIsAllowed`/`supabaseKeyIsSecret` (a Link ZoeKeyGen issues must be accepted by ZoeW) · Setup Link `{supabaseUrl, supabaseKey, invite, dsn?}` carries no token/password. ⛔ Every step after `await` checks `sbAdminIsCurrent()` (logout midway ➜ no toast · request · DOM) · `sbAdminReset()` (called from `showLoginModalWithPrefill()`) clears every sensitive value (incl. labels with shop names) · 401 ➜ reset + a single "expired" | `keygen-supabase-admin-test` · `dom-hygiene` · `secret-hygiene` · `html-sink-escaping` |
+| **Phone notifications (Push · ZoeW)** | ⛔ Identity = **Activation Key** (real ECDSA signature + Revoke/expiry from the License Project · Extend in DB wins) ➜ no extra setup per customer · "can't verify" = 503 ≠ "bad" 403 · public key/prefix/License URL in `netlify/lib/push-core.mjs` derived equal to `license-verify.js`. ⛔ **Supabase shops** (no Key by design): identity = session token ➜ `my_account()` on the project in env (`SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY`, same as the ZTO Function ⛔ Secret key refused) ➜ key per **shop** (`supabaseTenantKeyId()` ➜ devices in a shop share index/schedule) · foreign/expired issuer ➜ never call Supabase · shop expired/disabled ➜ `shop-inactive` · bad token/no shop ➜ `no-account` · down ➜ 503 · env missing ➜ `server-off` · app: `pushIdentityMissing()` checks **synchronously** before `requestPermission()` and fetches the token after (iPhone gesture). ⛔ Web Push: aes128gcm (RFC 8291 · official test vector) + VAPID ES256 · endpoints only on real push-service hosts (SSRF) · 404/410 ➜ delete sub. ⛔ APK: FCM via the service account of the **single License Project** (not customer projects) · `__FCM_CONFIGURED__` (presence of `google-services.json` at build) ➜ absent ➜ **don't load the plugin** (FirebaseMessaging crashes the app) · channel `zoew_notify` (high importance) equal in server/manifest. ⛔ At-most-once delivery: ledger locked by ETag (`onlyIfMatch`/`onlyIfNew`) ➜ cron + kick in parallel send once · first run = baseline (no old notices) · notices > 24h never sent. ⛔ Netlify scheduled functions have a **30s** ceiling ➜ the cron's 2 stages (notices ➜ reminders) **share one ceiling** (`runPushCron()` · send ceiling + last-send ceiling < 30s) · ceiling exhausted ➜ **don't lock** that day's reminder (the next run within 8am sends) — otherwise a kill after the ledger lock = reminder silently lost. ⛔ Near-expiry parcels: the app sends **only times** (no phone/barcode) computed from the same `barcodeAbandonIsRipe()` (binary search ± 1 minute · no second formula) and only when the view is fresh · server reminds once a day at 8am Asia/Phnom_Penh · schedule > 48h ➜ no reminder · message states data time. ⛔ App: `Notification.requestPermission()` before any `await` (iPhone gesture) · ⛔ `busy` is a **lock** (`togglePush()` refuses) ➜ **every wait behind it has a ceiling**: web: `getSubscription`/`subscribe`/`unsubscribe`/`serviceWorker.ready` through `withTimeout(…, PUSH_TIMEOUT_MS)` · APK: steps before `register()` that don't ask the user (load plugin · `checkPermissions` · `createChannel` · listeners) through `pushStep` (the permission prompt has no ceiling by design, like web) + watchdog `PUSH_NATIVE_REGISTER_TIMEOUT_MS` after `register()` (no token ➜ `error` · late token ➜ still ends `on` · token arrived and server slow ➜ watchdog doesn't cut) · ⛔ **a promise must never resolve to a Capacitor plugin directly**: the plugin is a Proxy answering `then` ➜ the promise hangs forever (APK stuck at "⏳" with 29 tests green) ➜ `loadNativePush()` returns a `{ PN }` shell · test mocks must be Proxies like the real one (a test binds this to installed `@capacitor/core`) · ⛔ APK **off** ➜ send `unsubscribe` for the token to the server (token kept in `zoew_push_v1`) before `unregister()` — the plugin's FCM token delete fails silently offline ➜ otherwise the server keeps sending after the user turned it off · ⛔ accept a token **only** when the user wants it on (`nativeWanted` · `nativeEnabling` · `saved.on`): FCM auto-init tokens at boot · late tokens after off ➜ don't register · registered while off ➜ remove it again · status tells the truth (server-off · no-license · denied · needs-install · native-unconfigured) · tap ➜ 🔔 panel (`?notify=1` · SW message · `pushNotificationActionPerformed`) · SW shows every push (userVisibleOnly) and URLs stay in-origin. ⛔ **🧹 សម្អាត** hides only announcements/notices (`zoew_notify_dismissed_v1`) + OS notifications ⛔ never the near-expiry list or "កំណែ App" | `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/push-client.test.tsx` · `npm run android:check` · `keygen-notice-test` (wake-up) |
+| Inspect-element protection | ⛔ Can't be hardened — don't try | 📝 (structural) |
+| **Users write revenue numbers directly** | Accepted by design (no backend) | 📝 |
+| **Customer identity: phone number** | ⛔ The stored number is the merge key (`phone`+`scanDate`) and the basis of `getPickupPhoneKey()` ➜ one junk character splits a customer in **two**. `normalizeOneStoredPhone()` strips `= " '` **symmetrically at both ends** (Sheets/Excel `="012…"` form). ⛔ **Inner** separators stay (changing the format splits merges with old data) | `phone-suggest-test` |
+| **Dates and times** | The business calendar is `Asia/Phnom_Penh` on every device | `khmer-timezone-test` |
+| **Monthly report** | ⛔ Derived from **days** (month nodes keep only 3 months) · **read-only** · same basis as the original screen. ⛔ **Every exported column carries the field its header promises** — assertions **derived from headers** plus layers "all values differ" and "has cents" | `monthly-report-test` |
+| **Monthly ledger ↔ daily ledger** | ⛔ `monthly[M]` must **equal the sum of `daily[d ∈ M]`** on the server. `ledgerDeltaWithClamp()` clamps **per bucket** ➜ a deduction larger than the *day's* ledger clamps on the day but **not** on the month ➜ 📊 drifts from the monthly report **permanently**. `alignMonthlyLedgerToDaily()` is the single aligner (⛔ the normal path **writes nothing extra**). ⛔ **Restore adds back *every field* into *both buckets*** (`appendRestoreRevenueIncrements`) — scenarios must run with non-zero DOD. ⛔ The month verdict reads **what the server really stores** — nodes trimmed to 3 months ➜ a trimmed month ➜ verdict **`0`** | `monthly-ledger-agreement-test` |
+| **"Revenue" ↔ uncollected parcels** | ⛔ Revenue = ledger **minus** barcode values with `!isDeducted && !isClosed` · clamp per currency · unmeasurable ➜ `—` · **2** stats screens use the same helper. ⛔ **5** guard layers: (1) calls + "month total = sum of days" (static) · (2) **the number the user reads** in a real browser · (3) **summation level**: month revenue = **sum of daily revenues** (`buildMonthlyReport()` sums `collectedValueOf()` per day · ⛔ no month-level formula · `buildStatCardItem()` receives already-computed revenue) · (4) **measurability** covers the `ledger` side too · (5) **random order** on the display path (`collected-value-fuzz-test`) | `monthly-report-test` · `stats-collected-truth-test` · `stats-screen-agreement-test` · `stats-measurable-gate-test` · `collected-value-fuzz-test` |
+| **Empty list ↔ measurability** | ⛔ "No data" is a business claim ➜ a non-fresh view = "not arrived yet". `emptyViewMessage(pathKeys, emptyText)` is the single decider (from `dbListenerViewIsStale()`) ➜ covers **5 screens** (daily stats · daily revenue · monthly report · trash · history table) · **5 exports** · and the "ZTO មិនទាន់បិទ" bar/dialog (`ZTO_SYNC_VIEW_KEYS` = `history` + `deleted`: the formula's sources = the gate's sources). ⛔ Incompleteness enters the signature too | `empty-state-truth-test` |
+| **"ចំណូលប្រចាំថ្ងៃ": by pickup day** | `zoew_daily_collected_cod_dod` counts barcode sets `{c,d}` by closing day (daily/monthly ledger by scan day). ⛔ Close goes through the history transaction first, then reconciles from server values · reopening deducts from the day holding the entry · moving days = one multipath update · price edits decided in a server transaction · keep the newest day, drop old duplicates · never create keys/days cleanup already deleted · retry Native SDK rejections only within a ceiling, re-reading history and re-checking auth/database. ⛔ The memory mirror reads from one listener (no writes/rollbacks from local snapshots) · rejection never shows Sync success · late callbacks stay within the same auth/database · Delete/pickup never delete collected · never touch `isDeducted` · ledger · `packagesPickedUp` from the mirror. ⛔ 7-day cleanup: server clock + fresh view · keep unknown keys · not cleaned yet ≠ missing day. ⛔ History and mirror are 2 separate writes ➜ drift is measurable only on a **real dump** (`money-reality-check.js` part 5ខ: bounds derived from the dump, not the clock) | `daily-collected-test` · `emu/restore-mutation-emu-test` · `money-reality-check` (real dump) |
+| **Revenue mirror ↔ ledger** | ⛔ Second half of the row above: mirror `zoew_daily_collected_cod_dod` has 3 writers (close/reopen barcode · close/reopen parcel · price edit) — **paths that take a parcel *out of the system* must touch it too**. ⛔ **"Remove" (row 4) deducts the ledger ➜ it must delete the mirror entry**; ⛔ **"Restore" (row 9) adds the ledger back ➜ it must rebuild the mirror on the day of the **new** `closedAt`** (`reconcileCollectedHistory()` is the choke point — ⛔ no second formula). ⛔ **Reverse: "Delete" (row 5) doesn't touch the ledger ➜ it must *not* touch the mirror** (deleting it would erase real revenue of a customer who picked up) | `collected-mirror-lifecycle-test` · `collected-mirror-fuzz-test` (random order) |
+| **Interrupted cleanup** | ⛔ `claimAndCleanupItem()` writes **4 separate times** (history ➜ trash ➜ daily ledger ➜ monthly) ➜ interruption between steps (deploy · PTR · tab close · network drop) loses the parcel from both places. ⛔ The fix = **a journal in `localStorage`** (`zoew_cleanup_journal_v1`) written **before** network writes · `resumeInterruptedCleanups()` finishes on the next tab · ⛔ not a new server marker. ⛔ The ledger step sits **after** trash: verdict `moved` ➜ restore can deduct · `ledger` = uncertain ➜ **don't touch money**, tell the user. ⛔ Reverse: `ledger` + empty trash ➜ don't revive · clean cleanups leave no journal · "picked up" never touches money. ⛔ Measured as **barcode conservation** · journal calls are **fail-open** (`noteCleanupJournalEntry`) · key = **trash** id · `cleanupJournalScope()` (`databaseURL`) protects against the wrong project after Reconfig. ⛔ **The journal of a cleanup that is *still running* is not an interruption**: the journal lands **before** the trash write ➜ the 60s cycle / `visibilitychange` / a second tab sees a `moved` entry while the write is in flight ➜ **double deduction** ➜ `withCleanupEntryOwnership()` is the gate (`cleanupJournalLive` in page · Web Locks `zoew-cleanup-live-<id>` across tabs, released by the browser when a tab dies · fail-open without the API) and re-reads the entry **fresh** after acquiring | `cleanup-interrupt-atomicity-test` · `money-guardian-test` |
+| **Destructive cleanup** | ⛔ Needs the real server clock **and a live connection** | `cleanup-clock-guard-test` |
+| **App lock on open/return** | The lock never touches the 4-hour session · Refresh and calls don't lock. ⛔ Unlock-flag lifetime = `lookupSecretKey` lifetime: `CryptoKey` kept in **IndexedDB** (⛔ not sessionStorage — that needs `extractable: true`) · cleared only via `clearAppUnlockedForSession()` · the two protection layers (`appLockShouldArm()` · clearing on lock) measured separately. ⛔ The switch has an **off direction**: flag `zoew_app_lock_v1` in `localStorage` · `appLockIsEnabled()` is the single decider (gate · task-switcher cover · label) · absent key = **on** (only `'0'` is off) · turning off goes through PIN with its own `promptKey` `appLockOff` · ⛔ turning the lock off **is not** deleting the PIN (PIN · 4h session · email stay) | `app-lock-test` |
+| **System health check** | ⛔ Read-only · never forces PIN · "can't check" is ⚠️ not ❌ · secrets never reach the DOM · ⛔ **real `fetchWithTimeout`, not a stub** · ⛔ an old round (close ➜ reopen) never overwrites "⏳" or unlocks buttons of the new round (`uiState.healthRunSeq`). ⛔ **The reverse too: ✅ must be measured** — ✅ on something unmeasured is **worse** than a false ❌ (it sends the user to the wrong cause). ⛔ **`cookieState` belongs to each container** ➜ "never used yet" = **⚠️** not ✅ · ⛔ the ZTO row shows Cookie renewal: `renewals > 0` ➜ clear evidence; `observed:false` ➜ **"not measured yet"** (⛔ not "can't renew" — `upstreamCookieSignal` is per container); `observed && !setCookie` ➜ Argus didn't send ➜ manual Sync needed. ⛔ This info **doesn't change the verdict** ❌/⚠️/✅ and **cookie names never reach the DOM** · ⛔ **Cookie age = real age in the Blob** (`blobSyncAgeMs` from the Sync tool's `syncedAt` metadata · `blobRenewAgeMs`), not `ageMs` (container cache age) · no stamp ➜ "unknown" · ⛔ the License row (Firebase) shows **Key validity** (expiry · days left · ≤ `LICENSE_NEAR_EXPIRY_DAYS` ➜ ⚠️ · expired/revoked ➜ ❌ · unverifiable ➜ ⚠️) | `health-check-test` · `zto-cookie-store-test` · `zto-cookie-sync-test` |
+| **Excel import to Sheet (in ZoeW)** | PIN is the gate · requests must be *simple requests* · secrets encrypted | `sheet-import-test` |
+| **APK ↔ ZTO Function: preflight** | ⛔ The APK (origin `https://localhost`) calls the Function cross-origin ➜ the preflight cache is keyed by **full URL** ➜ the query goes in header `X-Zoe-Query` to a fixed URL (`nativeFunctionRequest()` inside `fetchWithTimeout` is the single path · web unchanged) · ⛔ no `cache: 'no-store'` on that path (it bypasses the preflight cache) · the Function reads the header only when there is no query string · Max-Age 7200 · old Function ➜ 400 ➜ the app tries the URL with a query and remembers | `zto-proxy-test` part 2ខ · `ZoeW/tests/native/zto-preflight.test.ts` |
+| **Apps Script ↔ simple request** | ⛔ Same rule for the **Lookup path** — no custom header and **no PIN** for it | `lookup-prefetch-test` |
+| **CSV/TSV import** | ⛔ Leading zeros never lost (`raw` only for text) | `sheet-import-test` |
+| **Import done ➜ data arrives at once** | Table filled from the file · `fresh=1` opens the cache · cleanup never resurrects | `lookup-freshness-test` |
+| **ZTO: auto-login** | ⛔ **Removed (2.25.0)** — the IdP doesn't open to Netlify IPs; never bring it back | `zto-proxy-test` |
+| **ZTO: Cookie store** | ⛔ Blobs down/hung ➜ fall back to env, never fail the lookup. ⛔ **"Can't re-read" ≠ "Cookie gone"**: that fallback **must not overwrite memory** — the in-memory blob Cookie lives until a **real 401** (`mustRevalidate`); otherwise Blobs-based installs (no `ZTO_COOKIE` env) answer **503 `ZTO_AUTH_NOT_CONFIGURED`** while the Cookie is fine. ⛔ **Background** refresh is never locked behind the *request* budget (it has its own ceiling) — otherwise a tight budget **freezes the Cookie forever** | `zto-cookie-store-test` · `zto-budget-test` |
+| **ZTO: "signed" status** | ⛔ **3** verdicts: `true` · `false` · `null` (field missing ➜ `null`, not `false`). ⛔ The field is optional ➜ misconfiguration (`ZTO_FIELD_SIGNED`/`ZTO_SIGNED_VALUES`) **disables only this feature** + reason in `?diag=1` (⛔ never throw `ZtoConfigError` ➜ 503) · configured values never appear in `?diag=1`. ⛔ Field paths are **flat** (no `data.` · `orderCandidates()` already unwrapped), incl. doc examples. ⛔ Production values: `ZTO_FIELD_SIGNED` = **`billStatus`** · `ZTO_SIGNED_VALUES` = **`5`** — ZTO owns them ➜ they can change: picked-up parcels reappear on the bar ➜ check the number in Argus and add `ZTO_SIGNED_VALUES=5,<new>` (⛔ don't suspect code first) | `zto-signed-status-test` |
+| **"ZTO មិនទាន់បិទ" bar** | ⛔ Verdicts live only in `localStorage` (`zoew_zto_pickup_status_v1`) — **never touch money · `isDeducted` · Firebase directly**; writes only through the **single** door `applyBarcodeCloseChange()`. ⛔ The bar appears only on a real `false` verdict · a reopened barcode leaves at once · scans both `scanHistory` and `deletedItems` (only `trashReason === 'pickup'` within 12h) · non-ZTO Lookup ➜ dormant · logout ➜ clear DOM + storage. ⛔ **No endless calls**: 1 per barcode · 10 per round · 20s apart · never while scanning (`autoLookupInFlight.size > 0`) or offline · `ztoClosed: null` is **remembered** like a verdict · upstream failures are **not remembered** but retry is bounded (`ZTO_STATUS_FAIL_BACKOFF_MS` · cleared on success/`online`/`clearZtoPickupStatusStore()` · `force` bypasses) · `resumeZtoStatusSweep()` only touches timers already set. ⛔ Eviction when full (`ZTO_STATUS_MAX`) goes by **value** (`true`/`null` before `false`) · the entry just inserted can't be the victim · fallback victim = **oldest** · `while` has a `break` · measurement inserts **more than 1** non-`false` entry. ⛔ Automatic rounds are optional work ➜ `ztoStatusNetworkAllowed(userAsked)` covers `linkIsFrugal()` · `isModalOpen` (a tap wins) · long blocks ➜ no wake timer (`ztoStatusBlockIsTransient()`). ⛔ Bar/dialog say counting isn't finished ("កំពុងពិនិត្យបន្ត N") and N enters the signature (`ztoStatusModalSig`) · Locker reads `barcode.locker || item.locker` · field name `ztoClosed` derived from the real Function. ⛔ The list dialog holds only barcodes with a real `false` · Barcode image = `Code128Svg` (JSX) from `code128Bars()` (not an HTML string) · `clearSensitiveModalFields()` clears the list (it has phone numbers). ⛔ Code 128 verified by **real ZXing read-back** + reverse probe · quiet zone 10 modules measured **structurally** (`CODE128_QUIET`) · round-trip samples cover **even and odd** lengths · size measured as **width per module** (ceiling 1.5px) · ⚠️ ≥15-digit codes can't be fixed by CSS (accepted). ⛔ The sweep has **3** triggers: 60s cycle · `visibilitychange` · PIN unlock (⛔ never call it from `runScheduledCleanup()` itself). ⛔ **ZTO closed ➜ ZoeW closes too**: switch `zoew_zto_autoclose_v1` (default on) · ZTO switches appear only when `ztoFastModeIsOn()` and hiding **disables the feature** (`ztoAutoCloseEnabled()`/`ztoListSyncEnabled()`) · old settings kept · asks only about **open** barcodes in `scanHistory` (not trash · skips `clearClaim`/restore markers) · re-asks every hour (`ZTO_OPEN_RECHECK_MS` via `elapsedSince()`) · closes only on a real `true` · through `applyBarcodeCloseChange()` (money untouched) with `silent: true` · `showModal: false` · one summary message per round (failure/slow messages unchanged). ⛔ The sweep queue **rotates** (`rotateZtoSweepQueue(queue, ztoStatusSweepCursor)` · cursor advances in `finally`) instead of cutting the same head · no extra calls | `zto-sync-banner-test` |
+| **ZTO: branch rights** | ⛔ **The branch number comes from *identity*, not a parameter**: Cookie `BOS-MAN-SESSION` reads **nationwide** and `ZTO_PROXY_KEY` is shared by every device ➜ binding the branch client-side **is not protection**. The server decides: Firebase **ID token** (RS256 · `aud` ∈ `FIREBASE_PROJECT_IDS` · `iss` · `exp`) ➜ branch from email `@zoew<number>.com` (**any digit count**) · `?site=` ignored · branch enters the cache key. ⛔ This layer rests on **"Enable create (sign-up)" being off** in Firebase Console · `email_verified` **not required** · failure disables only the list feature (`enabled:false` without `error`) · **scanning needs no token**. ✅ The Function calls only **read** endpoints ➜ ZoeW can't write to ZTO. ⛔ **Supabase shops**: Supabase token ➜ `my_account()` (env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY` ⛔ never the Secret key) ➜ the **shop's** `branch_code` · shop expired/disabled ➜ `site:tenant-*` · env missing ➜ `idtoken:supabase-unset` | `zto-list-sync-test` parts 18–20 |
+| **ZTO: pulling the *list*** | ⛔ `?list=1` lives in the **same Function** (Cookie · budget · auth · `?diag=1` shared · `requestOnce()` per `plan` · **`fetch(` appears once**). ⛔ Misconfiguration ➜ disables only the list feature (`readListConfig()` never throws) · "disabled" = HTTP 200 `enabled:false` **without an `error` field** (an `error` field ➜ 30s cooldown) · non-array `result` = failure (not "0 rows"). ⛔ Branch from **identity** (row above): `query.site` ignored · `ZTO_LIST_SITE_CODE` no longer read · **no client-side branch field** · branch enters the **cache key** (`…\|L\|…` · TTL ≤ `cacheTtlMs`) and never appears in `?diag=1`. ⛔ The server projects only `barcode·phone·cod·dod·at`. ⛔ **DOD = `fcAmount`** on **both paths** (one `DOD_PATHS` · **first** because `arrivalServiceCharge` is always `0.00`) · ⛔ `freightFee` is **not** DOD (it charges freight already paid) · `ZTO_FIELD_DOD` wins · negative money **clamped to 0** in `pickNumber()` (⛔ not skipped to the next field) · reverse: `0` is valid. ⛔ "Not a customer" = **phone** `"0"`/empty (not `cod === 0`) · de-dupe within the list (last wins) · `fresh+existing+duplicate+skipped` = raw row count always · "new/existing" groups covered by `ZTO_SYNC_VIEW_KEYS`. ⛔ `scanTypeCode` + `scanTypeDesc` layers are **independent** (the same barcode appears as `03`·`04`·`05` ➜ otherwise money ×3) · field present but wrong ➜ `skip:'scan-type'` · field absent/empty ➜ **don't skip** · field values never reach the browser. ⛔ Preview **writes nothing**; import (`importZtoListRows`) goes through `claimBarcodeInRegistry()` ➜ `addOrUpdateEntry()` like a scan: real `'claimed'` verdict · failure ➜ `releaseBarcodesInRegistry()` · sequential · ceiling `ZTO_LIST_IMPORT_MAX` · stale view ➜ refuse entirely · honors **4 failure modes** (claim timeout ➜ `releaseLateBarcodeClaim()` · write timeout ➜ `armLateWrite()` ⛔ never release the key at once · "⏳ saving" message). ⛔ Date = **ZTO scan day** (`ztoScanStampMillis()` · wall clock `Asia/Phnom_Penh` · **optional** 6th argument of `addOrUpdateEntry()`) ➜ money lands on the ZTO scan day · bad stamp ➜ `getServerNow()` · no stamp ➜ not skipped but counted in the message. ⛔ Old rows: same decider as cleanup, `barcodeAbandonIsRipe()` (⛔ no fourth boundary formula · not via `elapsedSince()`), then by ZTO verdict: `true` ➜ import **already closed** (7th argument ➜ `applyBarcodeCloseState()` · stamp `getServerNow()` · pickup stats via `applyBarcodeCloseChange()` · ⛔ skip merge · failure doesn't release registry) · `false` ➜ `too-old-open` · `null` ➜ `too-old-unknown` · older than `trashRetentionMs({trashReason:'pickup'})` ➜ `too-old-purged` (derived · prevents duplicate money after purge). ⛔ Two-source verdicts (`pickSignedVerdict()` ➜ `resolveZtoListSignedVerdicts()` · ceiling `ZTO_LIST_SIGNED_PROBE_MAX`) · failures not remembered. ⛔ Every skip reason has text (`ZTO_LIST_SKIP_TEXT` ➜ `ztoListSkipText()`) · the end message lists **the days parcels landed on**. ⛔ Switch `zoew_zto_listsync_v1` (default off · under `ztoFastModeIsOn()`) · PIN `ztoListSync` · taps are not blocked by `linkIsFrugal()` | `zto-list-sync-test` |
+| **ZTO: warm-up** | Warm by **user intent** and warm the **Cookie** too, not just the container; ⛔ **busy at the scheduled time ➜ reschedule, never give up** (ceiling 90s) | `lookup-prefetch-test` · `zto-cookie-store-test` |
+| **ZTO: store name on both sides** | ⛔ The helper writes to the same `site:<store>` that `getStore()` reads | `zto-cookie-sync-test` |
+| **ZTO: store failure reason** | ⛔ The reason survives the 60s env cache | `zto-cookie-store-test` |
+| **ZTO helper: Android/Termux path** | ⛔ The second path lives in the **same helper**: the 4 deciders (`isTargetApiUrl` · `validateCookieHeader` · `captureResponseSucceeded` · `cookieAfterResponse`) are **imported** from `sync-zto-cookie.js` ⛔ never rewritten. ⛔ **`--auto` needs ADB** (it falls back to capture) ➜ putting it in the "no ADB" set guarantees **100%** failure; connecting must be an **attempt** (`|| true`). ⛔ **unzip drops exec bits** ➜ `chmod +x ./*.sh` **unconditionally** and helpers called via `bash`. ⛔ **The project dir is derived**, not literal `$HOME/ZTO-Cookie-Sync`. ⛔ **Intent URLs are plain https with no shell characters** — `adb shell` re-parses arguments **on the device** ➜ `#` starts a comment and swallows `-p com.android.chrome`. ⛔ Secrets live in Termux private storage mode **600** (dir **700**) ➜ reads refuse looser files and symlinks; Windows keeps **DPAPI** | `zto-cookie-sync-test` part 9 |
+| **ZTO helper: cmd screen** | Messages are English ASCII · Cookie shown · keys never shown | `zto-cookie-sync-test` |
+| **ZTO: Cookie renewal** | Never write a value that lost its session; write with ETag; a response from a timed-out attempt can't overwrite a newer renewal. An auth rejection in any of `code/errorCode/statusCode` wins over a success envelope | `zto-cookie-store-test` · `zto-cookie-session-test` |
+| **ZTO: rate ceiling ↔ memory** | Auxiliary Cookies/same-value retries have a 60s ceiling; a new core session tries to write at once within budget, and pending lives until the write is confirmed | `zto-cookie-session-test` |
+| **ZTO: Blobs reads ↔ response path** | ⛔ A value in memory ➜ answer at once, then refresh **in the background**; ⛔ empty memory or after a 401 ➜ a **blocking** read | `zto-cookie-store-test` |
+| **ZTO helper: brief network drops** | ⛔ Transient failures retry **within a ceiling** (fresh signed URL each round); 401/403/404/422 **never retry** | `zto-cookie-sync-test` |
+| **ZTO: auto mode** | ⛔ Never opens a browser without knowing the state | `zto-cookie-sync-test` |
+| **ZTO: setup path** | ⛔ Re-running keeps the PAT — Netlify shows it once | `zto-cookie-sync-test` |
+| **ZTO: `--auto` gate** | ⛔ Measure the value that decrypts, not file presence | `zto-cookie-sync-test` |
+| **ZTO: Argus jar** | ⛔ Bad pairs ➜ skipped; no session ➜ rejected | `zto-cookie-sync-test` · `zto-cookie-store-test` |
+| **ZTO: "not logged in"** | ⛔ ZTO answers with an **IdP URL**, not an auth code | `zto-proxy-test` |
+| **ZTO: Netlify time ceiling** | ⛔ The Function answers JSON before being killed | `zto-proxy-test` |
+| **ZTO: budget ↔ whole handler** | ⛔ Cookie store reads/writes sit **inside** the budget | `zto-budget-test` |
+| **ZTO: 401 from a stale Cookie** | Re-read the store once; retry **only if the fingerprint changed** | `zto-budget-test` |
+| **ZTO: time budget ↔ clock** | ⛔ The budget is measured via `elapsedSince()` (backwards ➜ fail-open) on **every budget basis** (`budgetLeftMs()` ➜ `cookieReadTimeoutMs()` · `cookieRenewTimeoutMs()` · `retryAfterAuthRejected()`). ⛔ Reverse: a budget too tight is also a bug: empty memory ➜ the Cookie read is **the whole request** ➜ gets the full store ceiling, reserving `COOKIE_COLD_UPSTREAM_RESERVE_MS` (otherwise 503 `ZTO_AUTH_NOT_CONFIGURED` while the Cookie is in Blobs); memory has a value ➜ the read is optional ➜ skippable. ⛔ Guard bounds derived from the real `COOKIE_STORE_TIMEOUT_MS` and the worst case (full read + upstream) < 10s | `zto-proxy-test` · `zto-budget-test` |
+| **ZTO: hung network** | ⛔ Settling is guaranteed **structurally**, not by `AbortController` | `zto-proxy-test` |
+| **ZTO: official API** | ⛔ Argus fake headers **are never sent** to Token/Authorization | `zto-proxy-test` |
+| **ZTO: "not found"** | ⛔ ≠ error — HTTP 200 `found:false` with no `error` field | `zto-proxy-test` |
+| **ZTO: `ZTO_UPSTREAM_REJECTED` is a mixed bucket** | ⛔ It mixes **permanent verdicts** (unknown number: test codes · non-ZTO parcels ➜ retrying is **useless**) with **transient ones** (ZTO really down ➜ retrying is **right**). Client-side 5xx is retryable ➜ an unknown code costs **2 rounds** and a Sentry event. ⛔ **Never silence it all** — that hides **real ZTO outages**. ⛔ **Never guess codes**: splitting needs **real ZTO payloads**. Step 1 is **visibility**: `noteUpstreamReject()` records `count · status · code` in `?diag=1` ⛔ **without changing verdict · cache · retry**. ⛔ The code is read via `upstreamCodeText()`, the **single choke point** shared with `upstreamSucceeded()`, and passes `SAFE_REASON_RE` ➜ **raw upstream text never appears** | `zto-proxy-test` |
+| **React 100%: single DOM owner (ZoeW)** | ⛔ Feature code **never touches DOM**: modals = `uiState.modalDisplay` · text/flags = `viewState` · focus/value/measure = `src/app/refs.ts` · exceptions in `platform/document-io.ts` (reason + ceiling). ⛔ React layer (`src/app/**`): class · style · attribute · text · listener as JSX; remaining DOM writes (focus · scroll · `animate()` · uncontrolled inputs · `<html>`/`<body>` · non-passive `touch*` · `muted`) only in exits in `APP_ALLOWED`. ⛔ PTR indicator drawn from `ptrState` (not `uiState`) · `boot-flags.js` never touches React elements · every ref name has a real `ref={…}` (AST) · `commitNow()` before measuring/focus · inputs are **uncontrolled** (`defaultValue`/`defaultChecked`) · original checkers that write classes are translated only in the audit build (`src/audit-compat.ts`) | `npm run purity:check` (ZoeW) |
+| **Big lists ↔ re-rendering (ZoeW)** | ⛔ The history table is **unbounded** (filter "ទាំងអស់" = thousands of rows) ➜ list bodies subscribe **only to their own view fields** (`useStoreFields`), not all of `useStore(uiState)` — `markImmediate` fields (sheet drag · menu · modal · `chromeHidden` while scrolling) commit **at once** ➜ rendering every row inside a motion path. ⛔ Parents re-rendered on every drag (`PageData` · `PageEntry`) use `Memo…` versions (the original function stays exported for `react-view`) · `HistoryRow` compares by **value** (`sameHistoryRowModel()` — Firebase gives new objects every snapshot). ⛔ Reverse: in-place edits + `renderHistory()` must render (`historyRenderSeq` ⛔ not `uiState.touch()`) · a listener failing on an empty list ➜ "unmeasurable" message (`firebaseState`) · other view producers assign a **new** object (in-place edits don't trigger rendering). ⛔ Big list dialogs (trash · ZTO not closed) render **pages of 20** + load more (IntersectionObserver/button) · totals/search over **all** items · search/reopen ➜ first page. ⛔ **The history table** renders **50 rows** (`HISTORY_PAGE_ROWS`) + loads more before the end (sentinel on `.table-responsive` · bottom `rootMargin`) · header count over **all** items · `renderHistory(data, viewKey)`: a Firebase sync (same key) **never pushes the user back to 50** · filter/search change (new key) ➜ 50. ⛔ APK: status-bar color measurement (forced layout + hit-test) runs only when **the layer under the bar** changes (`statusBarLayerSignature()`), not on every `uiState` change | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` (real Chromium) · `npm run native:check` 4ឃ |
+| **🔔 notification panel (ZoeW)** | ⛔ "Near expiry" asks the **same `barcodeAbandonIsRipe()`** as the 7-day cleanup (no second boundary formula) · read-only (never touches money/Firebase) · stale history view or no database ➜ "unmeasurable" · logout ➜ list removed from DOM. ⛔ The 🔔 panel and the drawer are **one layer** (`isSideDrawerOpen()` counts both ➜ PTR · Back · Escape · backdrop). ⛔ Messages: `public/announcements.json` fetched **network-only** (not in the SW shell · APK via `VITE_NATIVE_WEB_ORIGIN` + CORS) ➜ **every ZoeW version bump needs a newest `update` entry = `APP_VERSION`** · pure `maintenance` messages **don't bump** (`version-bump-scope` ignores them). ⛔ Logos in the app (navbar · boot splash · guide) = the app icon derived from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
+| **Toolchain ↔ what ships (ZoeW)** | ⛔ CSS/layout checkers measure **source** CSS and Chromium parses new syntax ➜ a Vite/minifier upgrade can change **output** unmeasured. ⛔ The CSS minifier is **esbuild** (`cssMinify`): Lightning CSS (Vite default) rewrites design tokens and reorders declarations in CSS that covers PTR/panel motion · built JS must parse in `build.target` (old iPhones) · ⛔ chunks split by `codeSplitting` + `priority` (Rolldown captures group dependencies ➜ the `__vitePreload` helper falls into the native chunk ➜ web loads it ➜ **offline boot fails**). ⛔ Android config (SDK · AndroidX · AGP · Gradle) stays on the template line of the **installed Capacitor** — beyond it = a Capacitor major upgrade (`ZoeW/docs/ANDROID.md`) because Android builds can't be measured here | `npm run smoke` · `npm run android:check` · `npm run native:check` (ZoeW) |
+| **New Firebase project (seller tool)** | ⛔ **One project per customer** (free Spark · own quotas — a single project/Supabase was rejected on cost: `docs/HISTORY.md` part 2) · ⛔ rules allow every `auth != null` ➜ **sign-up must be disabled, and measured** by a real sign-up via the public apiKey (succeeds ➜ delete the probe account + FAIL) · Authentication settings read back (server accepting PATCH ≠ applied) · rules = repo file read back and compared · ⛔ never adopt an existing project silently (`--adopt`) · never change an existing account's password (`--reset`) · `pendingProject` recorded **before** creation ➜ "slow but succeeded" and 409 on our own project never create a second project · step ceilings · passwords **never in files** · email ↔ real `siteCodeFromEmail()` · Setup Link ↔ real `decodeSetupPayload()` · `firebase-tools` pinned exactly (internal functions used). ⛔ Measured with **real** `firebase-tools` over **HTTPS** (over http it sends `Bearer owner` ➜ the token path never runs) | `firebase-provision-test` |
+| **Netlify config ↔ 2 sites** | ⛔ **No root `netlify.toml`** — it is read for both sites ➜ redirects the other app's build | `netlify-config-scope-test` |
+| **Netlify config ↔ app needs** | ⛔ CSP · `functions` · headers match what the app **really ships** | `netlify-config-scope-test` |
+| **Document scope** | ⛔ README and `ZTO-SETUP-KH.md` describe **usage only** (rule 9) · history goes only to `docs/HISTORY.md` / `docs/HISTORY-ARCHIVE.md`. ⛔ **Freshness**: the header table of [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) names each app **with its own shipped version** (word boundary: `ZoeKeyGen` contains `ZoeW`) · **current** version claims (root README · each README · this file's header table incl. `CACHE_VERSION`) derived from real code · *historical* references untouched. ⛔ **Hard-coded lists in checkers = expiry dates** ➜ derive or compare with reality: required words in `guide.html` from real switches · README list from real dirs (`listReadmeFiles()`) · UI surfaces · 🩺 row count · `collectedValueOf()` screen count · 📝 count extracted from the real table · "alive" helpers measured by **definition** · every `.js` in `audit-tools/` named in `audit-tools/README.md` · `money-reality-check.js` measurement count equals real `── N.` sections in **every file** that claims it. ⛔ **Reverse: removed surfaces must not live in docs**: `localStorage` keys this file references must exist in shipped code · conditional gates (no branch field in the app ➜ no doc tells users to fill one · negations "**គ្មាន**…" pass). ⛔ New surfaces appear in the **in-app guide** (`guide.html`), not only README (real `licenseFailureMessage()` messages · gate on `LICENSE_SEAT_SLOTS`). ⛔ `emu/*` catalog: every `run "emu/…"` in `run-all.sh` is named in the **degradation paragraph** of the Runbook | `doc-scope-test` · `user-guide-test` |
+| **Netlify Base directory** | ⛔ **Case-sensitive**: `ZoeW` · `ZoeKeyGen` (lives in the UI) | 📝 |
+| **`zto-import` · Apps Script** | Repo edits don't change the deployed script ➜ `SCRIPT_VERSION` rises on **every response** from **one** exit point | `google-sheets-cache-test` · `health-check-test` |
 
----
+### Extra rules carried by specific checkers (not repeated above)
 
-# 🧰 ថ្នាក់កំហុសដែលមាន *ឧបករណ៍រួចហើយ* — អានកូដផ្គូផ្គងតេស្ត · កុំសាងស្ទួន
-
-> តារាងខាងលើ («ច្បាប់ ➜ ឧបករណ៍») ប្រាប់ថា **អ្វីដែលអ្នកមិនត្រូវបំពាន**។
-> តារាងនេះប្រាប់ថា **អ្វីដែលត្រូវបានវាស់រួច** ➜ កុំចំណាយពេលរកវាដោយភ្នែក
-> ហើយ ⛔ **កុំសាងឧបករណ៍ស្ទួន** (checker ស្ទួនបន្ថែមពេលរត់ CI ដោយគ្មានតម្លៃ
-> ហើយធ្វើឲ្យជុំក្រោយជឿថាមានការគ្របច្រើនជាងការពិត)។
-
-| ថ្នាក់ | ឧបករណ៍ |
+| Rule | Tool |
 |---|---|
-| helper ចែករំលែក ZoeW↔ZoeKeyGen បែកគ្នា | `shared-fns.js` — **រត់នេះមុនគេ** |
-| HTML↔JS មិនត្រូវគ្នា (id, `on*=`, `data-close`) | `wiring.js` |
-| ទិន្នន័យអតិថិជនសល់ក្នុង DOM ក្រោយចាកចេញ | `dom-hygiene.js` |
-| អថេរ state សល់ក្រោយចាកចេញ | `state-hygiene.js` |
-| class គ្មានច្បាប់ CSS | `css-classes.js` |
-| ច្បាប់ក្នុង `@media` ដែលស្លាប់ដោយច្បាប់មូលដ្ឋានក្រោយវា · **class variant (`X-<base>` ឬ `<base>-X`) ដែលឈរ *មុន* base លើធាតុដែលពាក់ class ទាំង ២** ➜ specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ | `css-media-override.js` |
-| animation ដែលបង្កើត layout/paint រាល់ស៊ុម និង `transition: all` | `animation-cost.js` |
-| ការបង្ខំ layout ឡើងវិញក្នុង handler របស់ touch/scroll/rAF | `layout-thrash.js` |
-| លក្ខខណ្ឌនៃចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើគ្នា, snap ↔ PTR) | `panel-motion-test.js` |
-| callback ចាស់ក្រោយ watchdog/cleanup ដោះ snap pause របស់ចលនាថ្មី | `panel-snap-ownership-test.js` (`PANELSNAP_APP_DIR`) |
-| comment / trailing whitespace | `comments.js` |
-| payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
-| សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |
-| `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `compensation-order.js` |
-| កំហុស runtime ពេល boot (App ពិតក្នុង Chromium) | `boot-runtime.js` |
-| អន្តរកម្ម UI ជម្រៅ + ការប្រណាំងឧបករណ៍ច្រើន + ផ្លូវបរាជ័យ | `ui-flow-test.js` |
-| រចនាសម្ព័ន្ធទំព័រ/របា Slide/Locker/លុបទាំងអស់ | `page-nav-test.js` |
-| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង**  · **toast ឈរខាងលើរបា Tab ZoeKeyGen** (ធរណីមាត្រពិត) · **ប្រអប់ដែលបើកក្រោយលោតពីក្រោយ** (គ្រប់គូ · App ទាំង ២) · **QR របស់ ZoeKeyGen ហៀរ/មិនចំកណ្តាល** (Link ប្រវែងពិត · គ្រប់ទំហំ · តាម `generateSetupLink()`/`renderSbInviteResult()` ពិត) · **💾 រក្សាទុក QR** (PNG ធៀបគ្រប់ module នឹង `makeQrCode()` · quiet zone · គ្មាន Link ➜ មិនទាញយក)| `layout-check.js` |
-| រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) · **record ខ្លួនវាមិនមែន object** (ខ្សែអក្សរ/លេខ/bool តែមួយក្រោម `$itemId` ➜ callback `onValue` បោះ ➜ ប្រវត្តិ/ធុងសំរាមងាប់ «វាស់មិនបាន» គ្រប់ឧបករណ៍ ➜ `rawSnapshotToItemList()` រំលង + Sentry `zone: 'data'`) | `field-shape-test.js` · rules ៖ `rules-duplicate-keys.js` · `emu/crud-rules-flow.js` (០ខ) · `emu/license-seat-rules-test.js` (១៣) |
-| invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `revenue-fuzz-test.js` |
-| ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |
-| ដំណើរការនៅទិន្នន័យធំ · **ស៊ុមពេលស្ងៀម** (animation `infinite` ពេល App ស្ងៀម ➜ LTPO 10–120Hz ចុះ Hz មិនបាន ៖ រាប់ **DrawFrame** (compositor) **និង BeginMainThreadFrame** (paint · ពណ៌) — DrawFrame តែម្យ៉ាងខ្វាក់ចំពោះ animation ពណ៌ · seed មានជួរដេក «ខលម្តងទៀត» · probe ទិសផ្ទុយម្នាក់ៗ)  · ZoeKeyGen ៖ អេក្រង់ចូល + ផ្ទាំងការងារ ០ ស៊ុមពេលស្ងៀម ដូចគ្នា | `perf-check.js` |
-| ការសរសេរធម្មតារបស់ App ដែល **rules ពិត** បដិសេធ (fake SDK ទទួលគ្រប់យ៉ាង) | `emu/app-writes-rules-test.js` |
-| Setup Link៖ ZoeKeyGen encode ↔ App decode | `setup-link-roundtrip-test.js`, `setup-link-browser-test.js` |
-| កាយវិការអូស + auto pull up នៃប្រអប់ស្វែងរក | `phone-search-swipe-test.js` |
-| សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `pin-prompt-test.js` |
-| ការដោះសោដោយក្រយៅដៃ/មុខ (WebAuthn) | `biometric-unlock-test.js` |
-| ការសរសេរទៅ localStorage/sessionStorage គ្មានការការពារ | `storage-guard.js` |
-| credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
-| pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
-| លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
-| **របាយការណ៍ខែ** ៖ ខែចាស់បាត់ (ដេរីវេពី node ខែ) · លុយ NaN/អវិជ្ជមាន · ២ មូលដ្ឋានធៀបអេក្រង់ដើម · ថ្ងៃក្លាយជាកាលបរិច្ឆេទក្នុង Excel | `monthly-report-test.js` |
-| **ledger ខែឃ្លាតពីផលបូក ledger ថ្ងៃ** ➜ 📊 ស្ថិតិ ៣ ខែ បង្ហាញលេខខុសជាអចិន្ត្រៃយ៍ (clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ) — ⛔ `revenue-fuzz-test` វាស់ **ថ្ងៃតែម្យ៉ាង** | `monthly-ledger-agreement-test.js` |
-| **«ចំណូល» ដែលរាប់កញ្ចប់មិនទាន់យក** ➜ លេខប៉ោង រហូតដល់ការសម្អាត ៧ ថ្ងៃដកវាចេញ · ច្បាប់ចម្លងទី ២ នៃរូបមន្តលុយក្នុងម៉ូឌុលស្ថិតិផ្សេង | `monthly-report-test.js` |
-| **`var(--x)` ដែលគ្មានការប្រកាស** ➜ `border`/`background` ស្លាប់ស្ងាត់ៗ ខណៈ `css-classes` បៃតង | `css-var-test.js` |
-| ល្បឿន, **ជួរអាន** និងភាពត្រឹមត្រូវនៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
-| ការពឹងផ្អែកលើ CDN ដែលមិន cache ➜ ស្កេនមិនកើតពេលបណ្តាញដាច់ | `offline-shell-test.js` |
-| SW activate ដោយ APP_SHELL មិនពេញ ➜ ស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ | `sw-install-integrity-test.js` |
-| timeout ដែលមិន abort សំណើ ➜ សំណើជាន់គ្នា និងការអានតួព្យួររហូត | `network-timeout-test.js` |
-| ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
-| Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ; checker រង់ចាំ script load ក្នុងពិដាន ដាច់ពីចំនួន event ដែលត្រូវវាស់ | `sentry-load-race-test.js` |
-| listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
-| **ការតភ្ជាប់ «ងាប់ស្ងាត់»** (socket បើកតែឈប់បញ្ជូន · `navigator.onLine` នៅ `true`) ➜ «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានអ្វីដើរ · មិនភ្ជាប់វិញពេលបណ្តាញមកវិញ · និង offline/online · listener ស្ទួន លើ **SDK ពិត** (checker បណ្តាញផ្សេងប្រើ SDK ក្លែងដែលបាញ់ `.info/connected` តាមតេស្ត) | `emu/app-network-e2e-test.js` |
-| **ledger ដកលុយ តែភ្លេចដកចំនួនកញ្ចប់** (ឬបញ្ច្រាស) ➜ លេខ «ស្កេនតាមថ្ងៃ» និងលុយឈប់ស៊ីគ្នាជាអចិន្ត្រៃយ៍ — ⚠️ `db-stall-guard-test` រត់ `claimAndCleanupItem` ពិត តែ **stub `addRevenueToDailyAndMonthlyRecord` ចោល** ➜ វាវាស់ត្រឹម «ការហៅកើតឡើង» មិនមែន «អ្វីដែលចុះលើ server» | `ledger-count-integrity-test.js` |
-| **ស្ថានភាព listener និយាយមិនពិត លើ *លំដាប់ចៃដន្យ*** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ ឃ្លាតគ្នា · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស listener ដែលនៅងាប់ · សារ «ភ្ជាប់មកវិញ» ចេញមុនកូនសោទាំងអស់ស្រស់ — ⚠️ `connection-recovery-test` មានសេណារីយ៉ូ **សរសេរដោយដៃ** ➜ វាវាស់តែលំដាប់ដែលអ្នកសរសេរគិតដល់ | `connection-state-fuzz-test.js` |
-| URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
-| ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
-| ស្កេនដកកញ្ចប់ ៖ preview · in-flight fence · trash/ledger · responsive · reload safe | `scan-remove-mode-test.js` |
-| **barcode ស្ទួន ➜ លុយបូកស្ទួន** ៖ ជាន់ ១–៣ អានសតិ; ជាន់ ៤ ជាសាលក្រម server តែមួយ | `duplicate-money-test.js` |
-| **អេក្រង់ស្ថិតិបង្ហាញ ledger ឆៅជា «ចំណូល»** ➜ លេខ **ធំជាងការពិត** ក្នុង ៧ ថ្ងៃដំបូង (រាប់កញ្ចប់មិនទាន់យក) — checker ស្តាទិចមើលមិនឃើញ ព្រោះការហៅនៅដដែល ប្តូរតែអាគុយម៉ង់ | `stats-collected-truth-test.js` |
-| **អេក្រង់ស្ថិតិ ២ បង្ហាញលេខ «ចំណូល (យករួច)» ខុសគ្នា លើទិន្នន័យតែមួយ** ➜ *កម្រិតបូក* ខុសគ្នា (ថ្ងៃ ធៀប ខែ) ខណៈ helper ដដែល ➜ checker ស្តាទិចបៃតងទាំង ២ ខាងនៃកំហុស | `stats-screen-agreement-test.js` |
-| **អេក្រង់ស្ថិតិរាយ `$0.00` ជា «ចំណូល» ខណៈ listener ledger ព្យួរ ឬងាប់** ➜ លេខកុហកជំនួស `—` (ច្រកទ្វារវាស់បានគ្របតែខាង `open`) · listener ដែលរាយការណ៍កូនសោ **បងប្អូន** ➜ ការការពារងាប់ស្ងាត់ៗ | `stats-measurable-gate-test.js` · `listener-pending-key-test.js` |
-| **លុយក្នុងប្រព័ន្ធ *ថ្ងៃនេះ* ខុស ខណៈ checker ទាំងអស់បៃតង** ➜ checker វាស់ **កូដ** គ្មានមួយណាវាស់ **ទិន្នន័យពិត** — ⚠️ ត្រូវការ dump ➜ **មិនរត់ក្នុង `run-all.sh`**។ រួមទាំង **កញ្ចក់ `zoew_daily_collected_cod_dod` ឃ្លាតពីប្រវត្តិ** (write ២ ដាច់ពីគ្នា ➜ App បិទកណ្តាលទី ➜ កាតរាយតិចជាងការពិត ដោយស្ងាត់) | `money-reality-check.js` (អានសុទ្ធសាធ) · `money-reality-test.js` (fixture) |
-| **«ថ្ងៃនេះទទួលលុយប៉ុន្មាន» គ្មានលេខណាឆ្លើយបាន** ➜ លេខទាំងអស់កូនសោតាម *ថ្ងៃស្កេនចូល* · ការបិទ ២ ដងបង្កើតលុយ · ការបើកវិញដកខុសថ្ងៃ · ការសម្អាត ៧ ថ្ងៃលុបអ្វីដែលមិនយល់ | `daily-collected-test.js` |
-| **អេក្រង់រាយ «គ្មានទិន្នន័យ» ខណៈ listener មិនទាន់មកដល់ ឬងាប់** ➜ អ្នកប្រើសន្និដ្ឋានថា កំណត់ត្រាលុយ ឬកញ្ចប់ក្នុងធុងសំរាម **បាត់** ➜ ធ្វើសកម្មភាពខុស (ស្កេនឡើងវិញ · ឈប់រកកញ្ចប់) | `empty-state-truth-test.js` |
-| **លេខលុយលើអេក្រង់ខុស ខណៈ ledger លើ server ត្រឹមត្រូវ** ➜ ថ្នាក់បង្ហាញដែល សេណារីយ៉ូសរសេរដោយដៃមើលមិនឃើញ ៖ កម្រិតបូក · សិទ្ធិវាស់ · ការបង្គត់ · ច្បាប់មាស `isDeducted` · ការអភិរក្ស «ចំណូល + មិនទាន់យក = តម្លៃទាំងអស់» — លើលំដាប់ចៃដន្យ **រួមទាំងការឃ្លាតពិត** («កែទឹកប្រាក់» ដោយដៃ · ថ្ងៃគ្មានជួរ ledger · ledger ខែឃ្លាតពីថ្ងៃ · listener ព្យួរ) | `collected-value-fuzz-test.js` |
-| **លុយសរុបរបស់ជួរដេកខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់/Excel; តម្លៃបញ្ចូល និងកែ Barcode ត្រូវបង្គត់ដល់សេន **មុនរក្សាទុក** ដើម្បីឲ្យការដកប្រើតម្លៃដូច ledger | `item-money-integrity-test.js` |
-| **ស្ថិតិយកកើតពីអាកាសធាតុ** ៖ ក្រៅបណ្តាញ ➜ ឧបករណ៍ផ្សេងបើកមុន ➜ ភ្ជាប់មកវិញ · ការជាន់គ្នា · ទិដ្ឋភាព barcode ក្នុងស្រុកចាស់ (ឧបករណ៍ ២ ចែក store តែមួយ + rules ពិត) | `pickup-barcode-identity-test.js` |
-| **តម្លៃដែល Firebase rules ពិតបដិសេធ** ➜ ចំណូល **ឡើង** ជំនួសការចុះ · revert មិនមែនបញ្ច្រាសនៃ apply | `revenue-rules-clamp-test.js` |
-| **កូនសោ `zoew_barcode_registry` កំព្រា** ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត | `registry-release-test.js` |
-| សំបកដែល cache ទុករួច នៅតែរង់ចាំបណ្តាញ ➜ បើក App យឺតលើបណ្តាញខ្សោយ | `sw-shell-latency-test.js` |
-| សំណើកកកុញពេលបណ្តាញ «ភ្ជាប់តែស្លាប់» ➜ ពេញកូតា connection | `network-pressure-test.js` |
-| ខ្សែអក្សរពី Firebase ធ្លាក់ចូល attribute របស់ handler | `inline-handler-xss-test.js` |
-| CSP បិទមុខងារលើផលិតកម្ម ខណៈតេស្តគ្មាន CSP ជោគជ័យ | `csp-enforced-test.js` |
-| វដ្តភ្ជាប់ឡើងវិញកាត់ផ្តាច់ handshake ដែលកំពុងដំណើរការ | `reconnect-ladder-test.js` |
-| កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
-| ការចាត់ថ្នាក់/merge/សរុបលុយ របស់ធុងសំរាម និង `trashReason` ↔ rules | `trash-modal-test.js` |
-| marker ស្តារធ្លាក់ចូលធុងសំរាម ➜ «ដក»/«លុប» ស្លាប់ជារៀងរហូត · ការសម្អាតលួចដណ្តើមធាតុដែលកំពុងស្តារ | `restore-marker-hygiene-test.js` |
-| witness ដែលបន្សល់ ➜ **ស្តារមិនបាន · លុបមិនបាន ជារៀងរហូត** (rules ពិតលើ emulator ពិត) | `emu/restore-deadlock-test.js` |
-| barcode ដែលយករួច មិនចេញក្នុង ២ ម៉ោង ឬត្រូវដកលុយខុសពេលបងប្អូនផុតកំណត់ | `partial-pickup-cleanup-test.js` |
-| ប៊ូតុង Reset ស្ថិតិយក ៖ លុប node ចោល ➜ លេខលោតត្រឡប់មកវិញ · មិនគោរពតម្រង · ប៉ះលុយ | `pickup-reset-test.js` |
-| `fb.X` ដែល `firebase-loader.js` មិន export ➜ `undefined` លើផលិតកម្ម | `sdk-surface.js` |
-| ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
-| នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |
-| **ត្រាដែលបោះដោយនាឡិកាមួយ តែវាស់ដោយនាឡិកាមួយទៀត** ➜ `elapsedSince()` ត្រឡប់ `Infinity` ➜ ពិដានល្បឿន និងជណ្តើរ backoff **រលាយស្ងាត់ៗ** លើឧបករណ៍ដែលនាឡិកាឃ្លាតពី server | `clock-basis-test.js` |
-| **ឯកសារ «របៀបប្រើ» ដែលប្រែជាឯកសារប្រវត្តិ** ➜ ចំនួន assertion ចាក់ជា literal ចាស់ស្ងាត់ៗ · ប្រវត្តិកំហុសរាយ ២ កន្លែងផ្ទុយគ្នា | `doc-scope-test.js` |
-| **នាឡិកាថយក្រោយ ➜ ពិដានល្បឿនបិទជាអចិន្ត្រៃយ៍** ➜ App លែងភ្ជាប់ឡើងវិញ · lookup ងាប់ · `setTimeout` យក្ស | `monotonic-gate-test.js` |
-| សំណើ License កកកុញ ➜ សំណើចាំបាច់ជាប់គាំង (ផ្លូវបណ្តាញទី ៣) | `license-network-pressure-test.js` |
-| App ប្រាប់ម៉ូឌុល License ថានាឡិកា «sync រួច» មុន handshake ➜ **លុប License របស់អតិថិជន** | `license-clock-trust-test.js` |
-| **Key តែមួយ Activate បានលើឧបករណ៍គ្មានដែនកំណត់** ➜ អតិថិជនចែករំលែក ឬលក់បន្ត Key · **ឬផ្ទុយមកវិញ ៖ អតិថិជនដែលមានទូរស័ព្ទច្រើន ជាប់សោ** ➜ ពិដានតាម Key (`maxDevices`) ដែលអនុវត្តខាង server | `license-seat-test.js` · `emu/license-seat-rules-test.js` |
-| **rules របស់ License រាយ App ដែលលុបចោលរួច** ➜ ផ្ទៃដែលគ្មានអ្នកវាស់ ហើយនិយាយផ្ទុយនឹងកូដ · កូដ App ឃ្លាតរវាង ZoeW និង ZoeKeyGen ➜ **Key ចេញរួចទាំងអស់ធ្លាក់ `app-mismatch`** · ឈ្មោះ slot កៅអីឃ្លាតរវាង ៣ ឯកសារ | `license-app-code-test.js` |
-| ការបង្វិលនាឡិកាថយក្រោយ ➜ **reset ការអនុគ្រោះ** និង **ធ្វើឲ្យ Key ដែលផុតកំណត់រស់ឡើងវិញ** | `license-clock-rollback-test.js` |
-| ការសម្អាតស្វ័យប្រវត្តិ និង purge ធុងសំរាម រត់ដោយនាឡិកាឧបករណ៍ខុស ➜ **បាត់ទិន្នន័យ និងដកលុយ** | `cleanup-clock-guard-test.js` |
-| ថ្ងៃចំណូល/តម្រង/ម៉ោង គណនាតាមតំបន់ម៉ោងឧបករណ៍ ➜ ឧបករណ៍ ២ ចុះខុសថ្ងៃគ្នា | `khmer-timezone-test.js` |
-| ការងារបណ្តាញស្រេចចិត្តមិនសម្របតាម 2G/Data Saver | `adaptive-link-test.js` |
-| ការសម្គាល់ការខលបាត់ ព្រោះតំណ `tel:` ផ្អាក App កណ្តាល transaction | `history-patch-retry-test.js` |
-| ការទាញតារាងអតិថិជនធ្លាក់ ➜ រាល់ការស្កេនឆ្លងបណ្តាញ ១៥ នាទី · ការព្យាយាមវិញជាន់ការស្កេន | `lookup-prefetch-test.js` |
-| **នាំចូល Excel ➜ Sheet** ៖ រំលង PIN · preflight `OPTIONS` សម្លាប់ការនាំចូល · secret ជាអក្សរធម្មតា · toast កុហក | `sheet-import-test.js` |
-| **header ផ្ទាល់ខ្លួន ➜ preflight ➜ Apps Script ស្លាប់** (ផ្លូវ Lookup) · ការសុំ PIN សម្រាប់ header ដែលមិនដែលផ្ញើ | `lookup-prefetch-test.js` |
-| **នាំចូលរួច តែទិន្នន័យអតិថិជនមិនមកដល់** ៖ តារាងត្រូវលុបចោលដោយគ្មានអ្នកបំពេញវិញ · cache ៥ នាទីរបស់ Apps Script បាំង barcode ថ្មី | `lookup-freshness-test.js` |
-| **ចាក់សោ App** ៖ សោដែលមិនចាក់ (បើក **ឬត្រឡប់មក**) · ទិន្នន័យលេចពីក្រោយសោ · សោដែលបំផ្លាញ PTR ឬការខល · សោដែលកាត់ session ៤ ម៉ោង | `app-lock-test.js` |
-| **ការវិនិច្ឆ័យដែលនិយាយមិនពិត** ៖ រាយ ❌ លើអ្វីដែល *មិនបានវាស់* · **និងទិសផ្ទុយ ៖ រាយ ✅ លើ Cookie ZTO ដែលផុតកំណត់** (អ្នកប្រើឃើញ ✅ ខណៈការស្កេនឆ្លើយ «ផុតកំណត់» ក្នុងនាទីដដែល) · បង្ខំ PIN ពេល App មានបញ្ហារួច · secret ធ្លាក់ចូល DOM · Apps Script ទទួល header | `health-check-test.js` |
-| **listener/node ដែលកកកុញ** ៖ សកម្មភាពរត់ស្ទួន · handler រត់ N ដងក្នុង ១ snapshot · ការរមូរញាក់ | `listener-leak-test.js` |
-| `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |
-| ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយស៊ីកូតាការតភ្ជាប់អស់ ➜ សំណើចាំបាច់ចេញមិនបាន | `sw-revalidate-pressure-test.js` |
-| ចលនា boot + **ធនធានឆ្លង origin ក្នុង `<head>` ដែលទប់ការគូរ** | `boot-animation-test.js` |
-| មាត្រដ្ឋានអក្សរបែកគ្នា + សញ្ញាផ្តោតតាមក្តារចុចដែលបាត់ | `fluid-type-focus-test.js` |
-| toast អះអាងជោគជ័យខណៈក្រៅបណ្ដាញ **ឬក្រោយវគ្គចូលប្រព័ន្ធស្លាប់** · ថ្នាក់ toast គ្មានពណ៌ខុសគ្នា · ស្លាកស្ថានភាពពណ៌ថេរ | `toast-truth-test.js` |
-| ធនធានផ្ទុក**យឺត** ដែល CSP ទប់ (Export Excel ស្លាប់លើផលិតកម្ម) | `csp-lazy-resource-test.js` |
-| Cache Storage បរាជ័យ ➜ **រាល់សំណើធ្លាក់** ➜ អេក្រង់សទទេ ខណៈបណ្តាញដើរធម្មតា | `sw-cache-failure-test.js` |
-| **បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ** ➜ `respondWith` មិន settle · Export Excel ជាប់ជារៀងរហូត | `stall-guard-test.js` |
-| **checker ខ្លួនវាបៃតងក្លែងក្លាយ** — ជោគជ័យលើថតទទេ · ចង្អុលទៅ tree ផ្សេងមិនបាន · បិទបាំងការអះអាង | `checker-coverage.js` (**រត់នេះមុនគេ**) |
-| **checker ខ្លួនវាព្យួរ** ➜ GitHub cancel job នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ | `hang-guard.js` (**រត់នេះមុនគេដែរ**) |
-| **ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា** ៖ lane ស្របគ្នា · លំដាប់ output · state/resume/only · lane នៃបញ្ជីពិត ↔ ភស្តុតាងប្រភព | `runall-runner-test.js` |
-| **checker បោះ «FAIL» តែចេញ exit 0** ➜ `run-all.sh` រាយថា PASS | `exit-code-integrity.js` (**រត់នេះមុនគេដែរ**) |
-| **រង្វិលជុំដែលមិនចេះឈប់ ➜ tab ជាប់ស្ងាត់ៗ** ៖ នព្វន្ធលើ `Infinity` · ព្រំដែនដែលមកពីលេខក្នុង Firebase | `loop-termination-test.js` |
-| **កញ្ចក់ «ចំណូលប្រចាំថ្ងៃ» ឃ្លាតពី ledger លើ *លំដាប់ចៃដន្យ*** ➜ អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា (💵 អានកញ្ចក់ · 📅 គណនា `ledger − open`) | `collected-mirror-fuzz-test.js` |
-| **Supabase ៖ ហាងលេចទិន្នន័យគ្នា** (RLS/grant) · rules ក្នុង Postgres ឃ្លាតពី RTDB · adapter `fb` ឃ្លាតពី SDK Firebase (លុយ/listener ខុសស្ងាត់) · Edge Function ចុះឈ្មោះ/ប្តូរពាក្យសម្ងាត់ · ផ្ទាំងអ្នកលក់ ZoeKeyGen | `supabase-rls-test.js` · `supabase-datastore-test.js` · `emu/supabase-rules-parity-test.js` · `emu/supabase-adapter-parity-test.js` · `supabase-functions-test.js` · `keygen-supabase-admin-test.js` |
+| Run first: helper drift between the two apps | `shared-fns.js` |
+| Run first: fake-green checkers (empty dir · wrong tree · masked assertions) · hangs · exit codes | `checker-coverage.js` · `hang-guard.js` · `exit-code-integrity.js` |
+| Rules in `@media` killed by a later base rule · a class variant (`X-<base>` / `<base>-X`) placed **before** its base on elements wearing both ➜ equal specificity ➜ order wins ➜ silent death | `css-media-override.js` |
+| Callbacks of an old glide released by watchdog/cleanup must not release the snap pause of a newer glide | `panel-snap-ownership-test.js` (`PANELSNAP_APP_DIR`) |
+| A record that is not an object (string/number/bool under `$itemId`) ➜ `onValue` throws ➜ history/trash "unmeasurable" on every device ➜ `rawSnapshotToItemList()` skips + Sentry `zone: 'data'` | `field-shape-test.js` |
+| Idle frames: an `infinite` animation while idle ➜ LTPO screens can't drop Hz; count **DrawFrame and BeginMainThreadFrame** (DrawFrame alone is blind to color animation) · per-mutation reverse probes · ZoeKeyGen login + workspace 0 idle frames | `perf-check.js` |
+| Ledger deducts money but forgets parcel count (or the reverse) ➜ "scan by day" and money disagree permanently — `db-stall-guard-test` stubs `addRevenueToDailyAndMonthlyRecord`, so it can't see this | `ledger-count-integrity-test.js` |
+| ⛔ A `sessionExpiryCheck === 'pending'` gate nobody settles is a permanent trap (`runSessionExpiryCheck()` has one caller, a 60s `setInterval`) ➜ every path that makes the app **usable** arms it via `armSessionExpiryCheck()` (single choke point) | `periodic-network-guard-test.js` |
+| SW must pass the abort signal on: on `navigate` the target is a **string** (`'./index.html'`, no `.signal`) ➜ the only path is `networkOptions` ➜ measure the real `fetch` handler, not just `timedFetch()` | `sw-abort-propagation-test.js` |
+| ZoeKeyGen biometrics: **WebAuthn PRF only** (no PRF ➜ PIN not kept) · credential is a **discoverable passkey** (`residentKey: 'required'` — Android/Google Password Manager give PRF only on passkeys) · PRF from `create()` used directly · `prf: {}` without `enabled` ➜ ask `get()` · cancelled scan ≠ "unsupported" · decrypted PIN verified against the hash · PIN change ➜ unbind. Extend/Revoke/device count/release **hang** ➜ "⏳ not confirmed" + ✅ on late commit via `armAdminLateWrite()` · real rejection ➜ "failed" · Signing Key expires from memory after idle (`SIGNING_KEY_IDLE_MS` via `elapsedSince`) | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` |
+| Money in the system *today* is wrong while all checkers are green ➜ checkers measure **code**, this measures **real data** — ⚠️ needs a dump ➜ **not in `run-all.sh`** | `money-reality-check.js` (read-only) · `money-reality-test.js` (fixture) |
+| Duplicate declarations JS hoists/overwrites silently · dead functions | `function-surface-test.js` |
+| Behavior differs from original ZoeW: DOM · layout (3 screens) · 18 interaction steps · money/logout/ZTO/Sheet/PDF paths 79 steps ⛔ intentional differences ➜ `INTENTIONAL_UI` only | `zoew-suite-test.js --parity` |
 
-| **ការទាញបញ្ជីពី ZTO** ៖ ការកំណត់ខុសសម្លាប់ការស្កេន · ជួរដេកបាត់ស្ងាត់ៗ · barcode ស្ទួនក្នុងទំព័រតែមួយ ➜ លុយបូកស្ទួន · ឈ្មោះ/អាសយដ្ឋានហូរមក browser · កូនសោ cache ប៉ះគ្នារវាងបញ្ជី និង barcode · ការសរសេរលេចចូលផ្លូវ «មើលជាមុន» | `zto-list-sync-test.js` |
-| **transaction បដិសេធ `disconnect` តែ server commit រួច** ➜ ការសម្អាតបាត់កញ្ចប់ពីទាំង ២ កន្លែង · ledger ដក ២ ដង | `tx-outcome-test.js` · `emu/tx-disconnect-emu-test.js` |
-| **ledger ៖ «អនុវត្ត ➜ ដកវិញ» លែងជាគូបញ្ច្រាស** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ | `ledger-clamp-symmetry-test.js` · **`emu/ledger-revert-emu-test.js`** (RTDB ពិត + rules ពិត) |
-| **ការសរសេរ ledger ធ្លាក់ ➜ ការដកវិញ *ជោគជ័យ*** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ · សតិឃ្លាតពី server · ការកែទឹកប្រាក់បាត់ស្ងាត់ៗ | `ledger-failed-apply-revert-test.js` |
-| **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៧ ➜ អ្នកយាមត្រូវក្រហម) |
-| declaration ឈ្មោះ **ស្ទួន** ដែល JS hoist/សរសេរជាន់ស្ងាត់ · function ងាប់ | `function-surface-test.js` |
-| **កូដជាន់គ្នា** ៖ តួ function ដដែល ឬប្លុក statement ដដែល ក្នុងឯកសារ ship តែមួយ (⚠️ ការជាន់គ្នា **ឆ្លង App** ជាចេតនា ➜ `shared-fns.js` មិនមែនឧបករណ៍នេះ) | `code-duplication-test.js` |
-| ជួរ barcode ខូច (sparse · `null`) ➜ **បញ្ជីកក** | `barcode-shape-test.js` |
-| រូបរាងទិន្នន័យឆៅពី Firebase (object ជំនួស array …) | `raw-read-shape-test.js` |
-| ការស្តារស្ថានភាព auth · ការព្យាយាមពិនិត្យតួនាទីឡើងវិញ | `auth-recovery-test.js` |
-| timer តាមកាលកំណត់ ៖ ការអាន token គ្មានពិដាន · សោ session មិនដោះ · ⛔ **ច្រកទ្វារ `sessionExpiryCheck === 'pending'` ដែលគ្មាននរណា settle** (ថ្នាក់ដដែលនឹង «កូនសោ registry កំព្រា» ៖ អន្ទាក់ស្ថាពរ) — `runSessionExpiryCheck()` មានអ្នកហៅ **តែមួយ** គឺ `setInterval(…, 60000)` ➜ ទង់ជាប់ = ច្បាប់ ៤ ម៉ោង **ងាប់ពេញអាយុទំព័រ**។ ⛔ រាល់ផ្លូវដែលធ្វើឲ្យ App **ប្រើបាន** ត្រូវ arm ច្រកទ្វារនោះតាម `armSessionExpiryCheck()` (ចំណុចច្របាច់តែមួយ) — វាស់បាន (2.33.2) ៖ `submitActivationKey()` ហៅ `initDatabaseListeners()` **ដោយផ្ទាល់** ➜ ឧបករណ៍ដែលទើប Activate ដើរដោយច្រកទ្វារងាប់ ខណៈ **checker ១៦៧ បៃតង** ព្រោះ sandbox ចាក់ `sessionExpiryCheck = "live"` ➜ ស្ថានភាព `'pending'` មិនដែលត្រូវវាស់ | `periodic-network-guard-test.js` |
-| **ខ្សែភ្ជាប់ SW ↔ ទំព័រដែលគ្មាននរណារត់** ៖ ចុចការជូនដំណឹងពេល App បើក ➜ ផ្ទាំង 🔔 មិនបើក · push មកដល់ ➜ បញ្ជីដំណឹងមិនស្រស់ · deploy ថ្មី ➜ ផ្ទាំង «មានកំណែថ្មី» មិនលេច · ត្រឡប់មក App ➜ មិនពិនិត្យកំណែថ្មី (វាស់បាន 2.45.4 ៖ mutation ៣ រស់រានលើ checker ទាំងអស់) | `sw-client-wiring-test.js` |
-| SW មិនបញ្ជូនសញ្ញា abort បន្ត ➜ ការចាកចេញពីទំព័រ បន្សល់សំណើរស់ ២០ វិ. ។ ⛔ **ការវាស់ត្រូវបើក handler `fetch` ពិត មិនមែនត្រឹម `timedFetch()`** ៖ លើផ្លូវ `navigate` គោលដៅជា **ខ្សែអក្សរ** (`'./index.html'`) ➜ គ្មាន `.signal` ➜ ផ្លូវតែមួយគឺ `networkOptions`។ វាស់បាន (2.37.3) ៖ ការដក `{ signal: request.signal }` ចេញ **រស់រានលើ checker ១៧២ ទាំងអស់** រួមឯកសារនេះខ្លួនឯង ព្រោះវាហៅ helper ដោយផ្ទាល់ | `sw-abort-propagation-test.js` |
-| សារកំហុសពេល paste Firebase config មិនបែងចែកមូលហេតុ (App ២ ត្រូវដូចគ្នា) | `firebase-config-paste-test.js` |
-| កូនសោស្ទួនក្នុង rules JSON ➜ ធាតុមុនត្រូវសរសេរជាន់ស្ងាត់ | `rules-duplicate-keys.js` |
-| ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` ឃ្លាតពីគ្នា | `expired-trash-retention-test.js` |
-| ការជួសជុលលេខស្ថិតិយក **ថ្ងៃចាស់** ត្រូវសុវត្ថិភាពតាមរចនាសម្ព័ន្ធ | `pickup-repair-test.js` |
-| ការស្កេនស្របគ្នាលើឧបករណ៍ ២ | `concurrent-scan-test.js` |
-| ការប្រណាំងនៃការស្តារ · claim របស់ «លុបទាំងអស់» | `restore-race-test.js` · `clear-history-claim-test.js` |
-| fence នៃ finalization (⚠️ **គំរូ rules សរសេរដោយដៃ** — មិនឃើញការឃ្លាតពី rules ពិត; អ្នកចាប់ពិតគឺ `emu/restore-deadlock-test.js`) | `restore-finalization-fence-test.js` · `clear-history-finalization-fence-test.js` |
-| Secret របស់ Lookup API សល់ជាអក្សរធម្មតា | `lookup-config-secret-test.js` |
-| ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen; Extend/Revoke ចាប់យក Key និង database មុន await ហើយ callback ត្រូវនៅក្នុងវគ្គដដែល · ⛔ Extend/Revoke/ចំនួនឧបករណ៍/ដោះឧបករណ៍ **ព្យួរ** (អស់ពេល) ➜ «⏳ មិនទាន់បញ្ជាក់» (⛔ មិនមែន «មិនបាន» ៖ RTDB ចាក់ការសរសេរក្នុងជួរ) + ចុះយឺត ➜ ✅ (ចុះយឺត) តាម `armAdminLateWrite()` · ការបដិសេធពិត ➜ «មិនបាន» · Signing Key ផុតពីសតិក្រោយទុកចោល (`SIGNING_KEY_IDLE_MS` · `elapsedSince` ➜ ថយក្រោយ ➜ ដក) · ក្រយៅដៃ/មុខ ៖ **WebAuthn PRF តែប៉ុណ្ណោះ** (គ្មាន PRF ➜ មិនរក្សា PIN) · ⛔ credential ជា **passkey discoverable** (`residentKey: 'required'` ៖ Android/Google Password Manager ផ្តល់ PRF តែលើ passkey ➜ `discouraged` = «មិនគាំទ្រ» ក្លែងក្លាយលើទូរស័ព្ទដែលគាំទ្រ) · PRF ពី `create()` ប្រើផ្ទាល់ (ស្កេនម្តង) · `prf: {}` គ្មាន `enabled` ➜ សួរ `get()` · បោះបង់ការស្កេន ≠ «មិនគាំទ្រ» · PIN ស្រាយ ➜ ផ្ទៀង hash · ប្តូរ PIN ➜ លុបការចង | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` |
-| បញ្ជី Key បង្ហាញ revoked/expired ត្រឹមត្រូវ និងទទួល Firebase key `__proto__`/`constructor`/`toString` ដោយមិនប៉ះ prototype | `keylist-consistency-test.js` |
-| **ដំណឹងពីអ្នកលក់ (ZoeKeyGen ➜ ZoeW)** ៖ ZoeKeyGen ផ្ញើអ្វីដែល rules បដិសេធ (ព្រំដែនឃ្លាតរវាង `app.js` ↔ `index.html` ↔ rules) · toast ✅ មុន commit · ការផ្ញើព្យួររាយ «មិនបាន» ខណៈវា commit យឺត ➜ ដំណឹងស្ទួន · XSS ក្នុងបញ្ជីដំណឹង | `keygen-notice-test.js` |
-| **Push ៖** ការអ៊ិនគ្រីប Web Push ខុស (ឧបករណ៍ឌិគ្រីបមិនបាន) · ផ្ញើស្ទួនពេល cron និង kick ស្របគ្នា · ផ្ញើដំណឹងចាស់ទាំងអស់ពេលដាក់មុខងារដំបូង · Key ដែល Revoke នៅទទួល · endpoint ក្លែង (SSRF) · APK គ្មាន FCM គាំង · ការសុំសិទ្ធិក្រោយ `await` (iPhone បដិសេធស្ងាត់) · កាលវិភាគផុតកំណត់លេចលេខទូរស័ព្ទ | `ZoeW/tests/push-server.test.ts` · `ZoeW/tests/push-client.test.tsx` |
-| cache ខាង **server** របស់ Apps Script (កូនសោ ↔ ចំនួនជួរដេក) | `google-sheets-cache-test.js` |
-| SheetJS ដែល ship មានកំណែ/hash រង CVE | `dependency-security-test.js` |
-| ការណែនាំលេខទូរស័ព្ទ (`collectPhoneSuggestions`) · **ការធ្វើឲ្យលេខទូរស័ព្ទដែលរក្សាទុកមានទម្រង់តែមួយ** (`normalizeStoredPhone`) | `phone-suggest-test.js` |
-| ជាន់ការពារ devtools (⚠️ **ជាឧបសគ្គ មិនមែនការការពារ** — មើលច្បាប់ 📝) | `devtools-guard-test.js` |
-| config Netlify ៖ root file ដែលបង្វែរ build · CSP ឃ្លាតពីតម្រូវការ App · config ដែលគ្មាន checker អាន | `netlify-config-scope-test.js` |
-| ឧបករណ៍ Backup ៖ `.partial` ➜ `renameSync()` · lock · retry · គ្មាន credential ក្នុង output · ⛔ **artifact ត្រូវអ៊ិនគ្រីប ហើយ plaintext ត្រូវលុប *មុន* upload** | `firebase-backup-test.js` |
-| ឧបករណ៍បង្កើតអតិថិជនថ្មី ៖ sign-up នៅបើក · Rules ឃ្លាត · Project/App/Database ស្ទួនពេលរត់ម្តងទៀត · Project មានស្រាប់ត្រូវយកដោយស្ងាត់ · ពាក្យសម្ងាត់/token ក្នុង state · ការព្យួរ | `firebase-provision-test.js` |
-| **ការរំខានពាក់កណ្តាល (deploy · PTR · បិទ tab · បណ្តាញដាច់) ➜ កញ្ចប់បាត់ពីទាំងប្រវត្តិ ទាំងធុងសំរាម** ➜ ledger រាប់កញ្ចប់ដែលលែងមាន · កូនសោ registry កំព្រា · «ស្កេនតាមថ្ងៃ» ធំជាង «យករួច + នៅសល់» ជាអចិន្ត្រៃយ៍ | `cleanup-interrupt-atomicity-test.js` |
-| **សោការងារជាប់អស់កល្ប** ក្រោមការសរសេរធុងសំរាមដែលព្យួរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) · របៀបស្កេនដកងាប់ | `stall-lock-release-test.js` |
-| **ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់»** ➜ ការងារអ្នកប្រើបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ ជោគជ័យ | `locker-claim-guard-test.js` |
-| **`clearClaim` ងាប់** ➜ ការសម្អាតស្វ័យប្រវត្តិងាប់លើកញ្ចប់នោះជារៀងរហូត (លុយមិនត្រូវដក) · ដក/លុប/បិទ/Locker ក៏ទប់ដែរ | `stale-clear-claim-test.js` |
-| comment និង trailing whitespace ក្នុងកូដ ship | `comments.js` (សម្អាតដោយ `strip-comments.js`; `trimws.js` ជា helper) |
-| **ឥរិយាបថខុសពី ZoeW ដើម** ៖ DOM · layout (៣ អេក្រង់) · ជំហានអន្តរកម្ម ១៨ · ផ្លូវលុយ/ចាកចេញ/ZTO/Sheet/PDF ៧៩ ជំហាន (អេក្រង់ · ការសរសេរ · DB · ប្រអប់ · toast) ⛔ ការខុសគ្នាដោយចេតនា ➜ `INTENTIONAL_UI` តែមួយ | `zoew-suite-test.js --parity` (`parity:dom` · `parity:live` · `parity:deep`) |
-
-ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
-សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
-
+For everything else each checker measures, see [`audit-tools/README.md`](audit-tools/README.md) section 6.
+⛔ **Don't build duplicate checkers** — duplicates cost CI time and make the next round believe coverage is larger
+than it is. Some tools have allowlists (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) where **every entry has a written
+reason** — never add an entry without real tracing.
 
 ---
 
-# 💰 Core business rule — «លុប» (Delete) ទល់នឹង «ដក» (Remove)
+# 💰 Core business rule — "Delete" vs "Remove"
 
-> ⛔ **READ BEFORE TOUCHING REVENUE CODE.** នេះជាគោលការណ៍អាជីវកម្មដោយចេតនា
-> មិនមែនកំហុសទេ ហើយងាយត្រូវវិនិច្ឆ័យខុស។
+> ⛔ **READ BEFORE TOUCHING REVENUE CODE.** Intentional business policy, not a bug, and easy to misjudge.
 
-- **លុប / Delete** = លុបកញ្ចប់ទាំងមូល។ **មិនត្រូវប៉ះ** `zoew_daily_revenue_cod_dod`
-  / `zoew_monthly_revenue_cod_dod` ក្នុងទិសណាក៏ដោយ — មិនប៉ះពេលលុប, មិនប៉ះពេល
-  ស្តារ, មិនប៉ះពេលលុប/ស្តារច្រើនជុំ។ **Idempotent ដោយការរចនា។**
-- **ដក / Remove** = ដក barcode តែមួយចេញ (ឬការសម្អាតស្វ័យប្រវត្តិ ៧ ថ្ងៃ)។ វា
-  **ដក** តម្លៃ cod/dod របស់ barcode នោះចេញពីស្ថិតិភ្លាមៗ, **ត្រូវបូកមកវិញ**
-  ពេលស្តារពីធុងសំរាម, ហើយដកម្តងទៀតបើដកម្តងទៀត។ តាមដានតាមទង់ `isDeducted`។
+- **Delete (លុប)** = delete the whole parcel. **Never touches** `zoew_daily_revenue_cod_dod` /
+  `zoew_monthly_revenue_cod_dod` in any direction — not on delete, restore, or repeated rounds. **Idempotent by design.**
+- **Remove (ដក)** = remove one barcode (or the 7-day automatic cleanup). It **deducts** that barcode's cod/dod at once,
+  **adds it back** on restore from trash, and deducts again if removed again. Tracked by `isDeducted`.
 
-**បើតួលេខចំណូលមិនធម្មតា ត្រូវកំណត់ជាមុនថាវាជាផ្លូវណាក្នុងចំណោម ២ នេះ**
-(ពិនិត្យ `isFromDeletion` និងថាតើ item ក្នុងធុងសំរាមមាន barcode ១ ឬពេញសំណុំដើម)
-មុននឹងស្នើការកែ។
+**If revenue looks odd, first decide which of the two paths it is** (check `isFromDeletion` and whether the trash item
+has 1 barcode or the full original set) before proposing a fix.
 
-## ⛔⛔ «ចំណូល» = តម្លៃកញ្ចប់ដែល **យករួច** — មិនមែនផលបូកកញ្ចប់ទាំងអស់ទេ
+## ⛔⛔ "Revenue" = value of parcels **picked up**, not the sum of all parcels
 
-> **អ្នកប្រើកែការយល់ដឹងនេះដោយផ្ទាល់ (2026-09-05)** ៖ *«កញ្ចប់ដែលអតិថិជនមិនយក
-> ស្មើនឹង «ផុតកំណត់» លើស ៧ ថ្ងៃ ➜ ដកទិន្នន័យចេញស្វ័យប្រវត្តិ ហើយកញ្ចប់នោះ
-> ត្រឡប់ទៅសាខាកណ្តាលវិញ ដូច្នេះមិនត្រូវទុកទិន្នន័យវាក្នុងប្រព័ន្ធយើងទេ»*។
+> Owner correction (2026-09-05): uncollected parcels = "expired" after 7 days ➜ removed automatically and returned to
+> the central branch, so their data must not stay in our system.
 
-`zoew_daily_revenue_cod_dod` **មិនមែនលុយដែលទទួលបានទេ** ៖
+`zoew_daily_revenue_cod_dod` **is not money received**:
 
 ```
-ledger = (យករួច) + (កំពុងរង់ចាំ · មិនទាន់គ្រប់ ៧ ថ្ងៃ) + (លុបដោយដៃ)
+ledger = (picked up) + (waiting, < 7 days) + (deleted by hand)
 ```
 
-កញ្ចប់ដែលមិនយក ➜ `claimAndCleanupItem('abandon')` ➜ `isDeducted: true` ➜
-**ដកលុយចេញ** ➜ purge ក្នុង **២ ថ្ងៃ** (`EXPIRED_TRASH_RETENTION_MS`)។ ដូច្នេះ
-ledger **ប៉ោងបណ្តោះអាសន្ន** រហូតដល់កញ្ចប់ដោះស្រាយចប់ ➜ ការបង្ហាញ ledger ឆៅ
-ជា «ចំណូល» គឺ **កុហកក្នុងអំឡុង ៧ ថ្ងៃដំបូង**។
+Uncollected ➜ `claimAndCleanupItem('abandon')` ➜ `isDeducted: true` ➜ **money deducted** ➜ purge in **2 days**
+(`EXPIRED_TRASH_RETENTION_MS`). So the ledger is **temporarily inflated** until parcels resolve ➜ showing the raw
+ledger as "revenue" **lies during the first 7 days**.
 
-- ⛔ **អេក្រង់ស្ថិតិទាំង ២ បង្ហាញ «ចំណូល (យករួច)»** មិនមែន ledger ឆៅ ៖
-  របាយការណ៍ខែ · ស្ថិតិប្រចាំថ្ងៃ។ ពួកវាបង្ហាញ **តម្លៃកញ្ចប់ទាំងអស់** ជាជួរ
-  ដាច់ដោយឡែកដែរ (តម្លាភាព — មិនលាក់លេខណាមួយ)។ ⛔ **អេក្រង់ «ស្ថិតិ ៣ ខែ»
-  ត្រូវដកចេញក្នុង 2.34.0** (សំណើអ្នកប្រើ) ➜ អ្នកយាមដែលធ្លាប់ប្រើវាជាឧបករណ៍
-  វាស់ ប្តូរទៅប្រៀប **ផលបូកកាតថ្ងៃពិត** នឹង **សរុបរបស់របាយការណ៍ខែ** —
-  ⛔ ការលុបការអះអាងចោលជំនួស នឹងបើកថ្នាក់ «កម្រិតបូក» ឡើងវិញ។
-- **រូបមន្តតែមួយ** ៖ `collectedValueOf(ledgerCod, ledgerDod, uncollected)` ដែល
-  `uncollectedValueByDate()` រាប់តែ barcode ដែល **`!isDeducted`** (លុយនៅក្នុង
-  ledger) **និង `!isClosed`** (មិនទាន់យក) ឆ្លងកាត់ `scanHistory` **និង**
-  `deletedItems`។ នេះជាច្បាប់មាស «`isDeducted` ជាវាលតែមួយ» ដដែល។
-- ⛔ **clamp ឈរក្នុងមួយរូបិយវត្ថុ** (COD ដាច់ពី DOD) — កុំបូកមុន clamp
-  បើមិនដូច្នេះ DOD ដែលមិនស៊ីគ្នានឹងកាត់ COD ដែលទទួលបានពិត។
-- ⛔ **ត្រូវការទិដ្ឋភាព *ពេញលេញ* ទាំង *សងខាង* នៃការដក** ៖ រូបមន្តគឺ
-  `collected = ledger − open` ➜ `collectedValueIsMeasurable()` ត្រូវគ្រប
-  **ទាំង ៣** listener ៖ `DB_LISTENER_KEY_HISTORY` · `DB_LISTENER_KEY_DELETED`
-  (ខាង `open`) **និង `DB_LISTENER_KEY_DAILY_REVENUE`** (ខាង `ledger`)។
-  មិនគ្រប់ ➜ បង្ហាញ **`—`** មិនមែនលេខ។ ⛔ ហេតុផលឈរ **ស៊ីមេទ្រី** ៖ ប្រវត្តិទទេ
-  ➜ ចំណូល = ledger (ធំជាងការពិត) · **ledger ចាស់/ងាប់ ➜ ចំណូល = `max(0, ledger
-  ចាស់ − open ថ្មី)` = `$0.00`** (តូចជាងការពិត) — លេខកុហកទាំង ២ ខាង។ វាស់បាន
-  (2.31.7) ៖ ledger ងាប់ត្រឹម $15 ខណៈកញ្ចប់បើក $35 ➜ អេក្រង់រាយ **ចំណូល
-  $0.00 · មិនទាន់យក $15.00** ខណៈការពិតគឺ យករួច $10.00 · បើក $35.00។
-- ⚠️ **ព្រំដែនតែមួយដែលទទួលយកដោយចេតនា** ៖ «**លុប**» (ជួរ ៥) **មិនដកលុយ** ➜
-  ក្នុង ៣០ ថ្ងៃដំបូង ធាតុនោះនៅក្នុងធុងសំរាមដោយ `!isDeducted` ➜ **ត្រូវដកចេញ
-  ត្រឹមត្រូវ**; ក្រោយ purge វាលែងមើលឃើញ ➜ **ចំណូលប៉ោងបន្តិច**។ ⛔ កុំ «កែ»
-  វាដោយប្តូរច្បាប់ «លុប» ឲ្យដកលុយ — នោះជាការប្តូរគោលការណ៍អាជីវកម្ម។
+- ⛔ **Both stats screens show "ចំណូល (យករួច)"**, not the raw ledger: monthly report · daily stats. They show **total
+  parcel value** as a separate row too (transparency). ⛔ The "3-month stats" screen was removed (2.34.0, user
+  request) ➜ guards that used it now compare the **sum of real day cards** with the **monthly report total** — ⛔
+  dropping that assertion would reopen the "summation level" class.
+- **One formula**: `collectedValueOf(ledgerCod, ledgerDod, uncollected)` where `uncollectedValueByDate()` counts only
+  barcodes **`!isDeducted`** (money still in the ledger) **and `!isClosed`** (not picked up) across `scanHistory`
+  **and** `deletedItems`. Same golden rule: `isDeducted` is the single field.
+- ⛔ **Clamp per currency** (COD separate from DOD) — never sum before clamping.
+- ⛔ **Needs a complete view of *both sides*** of the subtraction: `collected = ledger − open` ➜
+  `collectedValueIsMeasurable()` covers **all 3** listeners `DB_LISTENER_KEY_HISTORY` · `DB_LISTENER_KEY_DELETED`
+  (`open` side) **and `DB_LISTENER_KEY_DAILY_REVENUE`** (`ledger` side). Incomplete ➜ show **`—`**, not a number.
+  Symmetric reason: empty history ➜ revenue = ledger (too high) · stale ledger ➜ `max(0, stale ledger − fresh open)` =
+  `$0.00` (too low).
+- ⚠️ **One accepted boundary**: "Delete" (row 5) **doesn't deduct** ➜ within the first 30 days the item sits in trash
+  with `!isDeducted` ➜ **subtracted correctly**; after purge it is invisible ➜ revenue slightly inflated. ⛔ Don't
+  "fix" it by making Delete deduct — that changes business policy.
 
-## 📋 តារាងសេណារីយ៉ូពេញលេញ — ប្រភពការពិតតែមួយ
+## 📋 Full scenario table — single source of truth
 
-> **អ្នកប្រើស្នើឲ្យកត់ត្រាទុក (2026-08-26)។ កូដត្រូវផ្គូផ្គងតារាងនេះ។**
+> User asked to record this (2026-08-26). **Code must match this table.**
 
-| # | សកម្មភាព | Function | `trashReason` | `isFromDeletion` | `isDeducted` | **លុយ** | ត្រា `closedAt` |
+| # | Action | Function | `trashReason` | `isFromDeletion` | `isDeducted` | **Money** | `closedAt` stamp |
 |---|---|---|---|---|---|---|---|
-| ១ | **បិទ «យក»** barcode ១ | `toggleIndividualBarcodeClose` | — | — | — | **មិនប៉ះ** | បោះលើ barcode នោះ |
-| ២ | **បិទ** កញ្ចប់ទាំងមូល | `toggleCloseStatus` | — | — | — | **មិនប៉ះ** | បោះលើ barcode គ្រប់ |
-| ៣ | **បើកវិញ** (ទាំង ២ ផ្លូវ) | ដដែល | — | — | — | **មិនប៉ះ** | **លុបត្រាចេញ** |
-| ៤ | **ដក** barcode ១ | `removeSingleBarcode` | `remove` | `false` | **`true`** | **ដកចេញ** | រក្សាតាម barcode |
-| ៥ | **លុប** កញ្ចប់ | `deleteSingleItem` | `delete` | `true` | មិនប៉ះ | **មិនប៉ះ** | រក្សា |
-| ៦ | **លុបទាំងអស់** | `buildClearHistoryTrashItem` | `delete` | `true` | មិនប៉ះ | **មិនប៉ះ** | រក្សា |
-| ៧ | **សម្អាត ២ ម៉ោង** (barcode បិទរួច) | `claimAndCleanupItem('close')` | `pickup` | `true` | មិនប៉ះ | **មិនប៉ះ** | ជាអ្នកសម្រេច |
-| ៨ | **សម្អាត ៧ ថ្ងៃ** (មិនទាន់យក) | `claimAndCleanupItem('abandon')` | `expired` | `false` | **`true`** | **ដកចេញ** | — |
-| ៩ | **ស្តារ** ពីធុងសំរាម | `executeRestoreItem` | លុបចោល | លុបចោល | **reset** | **បូកត្រឡប់** បើធ្លាប់ដក | **reset ជា «ឥឡូវ»** |
-| ១០ | **✖️ លុបជាអចិន្ត្រៃយ៍** | `executePermanentDelete` | — | — | — | **មិនប៉ះ** | — |
+| 1 | **Close "picked up"** 1 barcode | `toggleIndividualBarcodeClose` | — | — | — | **untouched** | stamped on that barcode |
+| 2 | **Close** whole parcel | `toggleCloseStatus` | — | — | — | **untouched** | stamped on every barcode |
+| 3 | **Reopen** (both paths) | same | — | — | — | **untouched** | **stamp removed** |
+| 4 | **Remove** 1 barcode | `removeSingleBarcode` | `remove` | `false` | **`true`** | **deducted** | kept per barcode |
+| 5 | **Delete** parcel | `deleteSingleItem` | `delete` | `true` | untouched | **untouched** | kept |
+| 6 | **Delete all** | `buildClearHistoryTrashItem` | `delete` | `true` | untouched | **untouched** | kept |
+| 7 | **2-hour cleanup** (closed barcodes) | `claimAndCleanupItem('close')` | `pickup` | `true` | untouched | **untouched** | is the decider |
+| 8 | **7-day cleanup** (not picked up) | `claimAndCleanupItem('abandon')` | `expired` | `false` | **`true`** | **deducted** | — |
+| 9 | **Restore** from trash | `executeRestoreItem` | removed | removed | **reset** | **added back** if deducted | **reset to "now"** |
+| 10 | **✖️ Permanent delete** | `executePermanentDelete` | — | — | — | **untouched** | — |
 
-**ច្បាប់មាស ៖ `isDeducted` ជាវាល *តែមួយគត់* ដែលកំណត់លុយ។** `trashReason` ជា
-**ស្លាកបង្ហាញ** ប៉ុណ្ណោះ។ **ជួរ ៤ និង ៨ ដកប្រាក់; ជួរ ៩ បូកត្រឡប់តែទឹកប្រាក់ដែលធ្លាប់ដក។**
+**Golden rule: `isDeducted` is the *only* field that decides money.** `trashReason` is a **display label** only.
+**Rows 4 and 8 deduct; row 9 adds back only what was deducted.**
 
-## ⛔ ការសម្អាតស្វ័យប្រវត្តិ — ថេរដែលមិនត្រូវប្តូរដោយគ្មានការស្នើ
+## ⛔ Automatic cleanup — constants that must not change without a request
 
-| ច្បាប់ | អ្វីត្រូវវាស់ | លទ្ធផល | លុយ |
+| Rule | Measures | Result | Money |
 |---|---|---|---|
-| **២ ម៉ោង** (`TWO_HOURS_MS`) | `barcode.closedAt` **របស់ barcode នីមួយៗ** | ➜ ធុងសំរាម `pickup` | មិនប៉ះ |
-| **លើស ៧×២៤ ម៉ោង** (`ABANDON_AGE_MS`) | `item.createdAt`; Barcode ដែលស្តារបើកវិញប្រើម៉ោងក្រោយរវាង parent និង `barcode.restoredAt` រួចបែងចែកតាម `barcode.isClosed` | ➜ ធុងសំរាម `expired` | **ដកចេញ** |
-| **២ ថ្ងៃ** | ធាតុ `expired` ក្នុងធុងសំរាម | ➜ purge អចិន្ត្រៃយ៍ | — |
-| **៣០ ថ្ងៃ** (`TRASH_RETENTION_MS`) | ធាតុប្រភេទផ្សេងក្នុងធុងសំរាម | ➜ purge អចិន្ត្រៃយ៍ | — |
+| **2 hours** (`TWO_HOURS_MS`) | `barcode.closedAt` **of each barcode** | ➜ trash `pickup` | untouched |
+| **over 7×24 hours** (`ABANDON_AGE_MS`) | `item.createdAt`; restored-open barcodes use the later of parent and `barcode.restoredAt`, then split by `barcode.isClosed` | ➜ trash `expired` | **deducted** |
+| **2 days** | `expired` items in trash | ➜ permanent purge | — |
+| **30 days** (`TRASH_RETENTION_MS`) | other trash items | ➜ permanent purge | — |
 
-⛔ **រយៈពេល = ៧ ថ្ងៃ តែ *ថ្ងៃលំដាប់* = ថ្ងៃទី ៨** ព្រោះការប្រៀបធៀបជា
-`now - createdAt > ABANDON_AGE_MS` (**`>` មិនមែន `>=`**) — វាស់រួច ៖ នៅ ៧×២៤
-ម៉ោងគត់ កញ្ចប់ **នៅក្នុងបញ្ជី** ; នៅ `+ ៦០ វិនាទី` ទើបចូលធុងសំរាម។ ដូច្នេះ
-ស្លាក «ផុតកំណត់ ៨ថ្ងៃ» **ត្រឹមត្រូវ** — កុំ «កែ» វាទៅ ៧ថ្ងៃ។ ស្លាកមិនត្រូវ
-ចាក់ជាលេខឯករាជ្យទេ ៖ `trash-modal-test.js` **អាន `ABANDON_AGE_MS` ចេញពី
-`app.js`** រួចដេរីវេ `ABANDON_LABEL_DAY = ABANDON_DAYS + 1` ហើយផ្គូផ្គងនឹង
-អត្ថបទក្នុង `index.html` និងសារ «ជួរទៀត» — **បូកអះអាងថាការប្រៀបធៀបនៅតែជា
-`>`** (បើថ្ងៃណាវាក្លាយជា `>=` នោះការ `+ 1` ខុសភ្លាម ➜ ធ្លាក់)។ ការស្កេន
-«លេខថ្ងៃចាស់សល់» ត្រូវគ្រប **ទម្រង់ទាំង ២** («៨ ថ្ងៃ» និង «៨ថ្ងៃ»)។
+⛔ **Duration = 7 days but *ordinal day* = day 8** because the comparison is `now - createdAt > ABANDON_AGE_MS`
+(**`>` not `>=`**) — at exactly 7×24h the parcel **stays**; at `+60s` it goes to trash. So the label "ផុតកំណត់ ៨ថ្ងៃ" is
+**correct** — don't "fix" it to 7. `trash-modal-test.js` reads `ABANDON_AGE_MS` from `app.js`, derives
+`ABANDON_LABEL_DAY = ABANDON_DAYS + 1`, matches `index.html` text and the "rows more" message, and **asserts the
+comparison is still `>`**. Scans for stale day numbers cover **both forms** ("៨ ថ្ងៃ" and "៨ថ្ងៃ").
 
-**ការស្តារបើកវិញមានត្រា `barcode.restoredAt` ស្រេចចិត្ត**៖ កុំប្តូរនាឡិកា
-របស់ parent ឬ siblings។ Barcode ដែលគ្មានត្រានេះនៅគោរពអាយុ parent ដដែល។
-ការជ្រើសសម្អាត និង transaction ត្រូវប្រើ helper អាយុតែមួយ; ក្រោយដកចេញតែ
-ខ្លះ ត្រូវគណនា `isClosed` ពី Barcode ដែលនៅសល់ពិត។
+**Restored-open barcodes carry an optional `barcode.restoredAt`**: never change the parent's or siblings' clock.
+Barcodes without it follow the parent's age. Selection and transaction use one age helper; after a partial removal,
+`isClosed` is computed from the barcodes really remaining.
 
-**ការបែងចែកតាម barcode លើកញ្ចប់លាយ** (A បិទ · B បើក) ៖
+**Per-barcode split on mixed parcels** (A closed · B open):
 
-| ច្បាប់ | អ្វីចេញ | អ្វីនៅ | លុយ |
+| Rule | Leaves | Stays | Money |
 |---|---|---|---|
-| ២ ម៉ោង | **A តែឯង** ជា `pickup` | B និងនាឡិកា ៧ ថ្ងៃរបស់វា | មិនប៉ះ |
-| ៧ ថ្ងៃ | **B តែឯង** ជា `expired` | A (បិទ) ➜ រង់ចាំច្បាប់ ២ ម៉ោង | ដកតែ B |
+| 2 hours | **A only** as `pickup` | B and its 7-day clock | untouched |
+| 7 days | **B only** as `expired` | A (closed) ➜ waits for the 2-hour rule | deduct B only |
 
-⛔ **ការបិទ/បើកគ្រប់កន្លែងឆ្លងកាត់ `applyBarcodeCloseState(barcode, closed, at)`** —
-កុំសរសេរ `b.isClosed = x` ត្រង់ៗ បើមិនដូច្នេះត្រានឹងឃ្លាតពីស្ថានភាព។
-`barcodeCloseIsRipe()` ជាអ្នកសម្រេចតែមួយ; `normalizeBarcodeCloseStamps()` គ្រប
-ទិន្នន័យចាស់ដោយ **បោះត្រា** (មិនមែនលុបភ្លាម)។ `executeRestoreItem()` ត្រូវ
-**reset `closedAt`** ទៅ `getServerNow()` បើមិនដូច្នេះការស្តារលោតចូលធុងសំរាមវិញ។
+⛔ **Every close/open goes through `applyBarcodeCloseState(barcode, closed, at)`** — never `b.isClosed = x` directly.
+`barcodeCloseIsRipe()` is the single decider; `normalizeBarcodeCloseStamps()` covers old data by **stamping** (not
+deleting at once). `executeRestoreItem()` must **reset `closedAt`** to `getServerNow()`, otherwise restored items jump
+back into trash.
 
-## ធុងសំរាម និង `trashReason`
+## Trash and `trashReason`
 
-| ផ្លូវ | `trashReason` | ស្លាក UI | ស្ថិតិចំណូល |
+| Path | `trashReason` | UI label | Revenue stats |
 |---|---|---|---|
-| `deleteSingleItem` · `buildClearHistoryTrashItem` | `'delete'` | លុប | **មិនប៉ះ** |
-| `claimAndCleanupItem('close')` | `'pickup'` | យករួច | **មិនប៉ះ** |
-| `claimAndCleanupItem('abandon')` | `'expired'` | ផុតកំណត់ | **ដករួច** |
-| `removeSingleBarcode` | `'remove'` | ដក | **ដករួច** |
+| `deleteSingleItem` · `buildClearHistoryTrashItem` | `'delete'` | លុប | **untouched** |
+| `claimAndCleanupItem('close')` | `'pickup'` | យករួច | **untouched** |
+| `claimAndCleanupItem('abandon')` | `'expired'` | ផុតកំណត់ | **deducted** |
+| `removeSingleBarcode` | `'remove'` | ដក | **deducted** |
 
-- `trashReasonOf()` មាន fallback សម្រាប់ធាតុចាស់ ៖ `isFromDeletion === true`
-  ➜ `isClosed ? 'pickup' : 'delete'`; បើអត់ ➜ `'remove'`។
-- ⛔ **`executeRestoreItem()` ត្រូវ `delete itemToRestore.trashReason`** មុន
-  សរសេរត្រឡប់ចូល `zoew_scan_history_cod_dod` — node នោះមាន
-  `$other: { ".validate": false }` ➜ បើភ្លេច **ការស្តារត្រូវបដិសេធទាំងស្រុង**។
-- **ការ merge ក្នុងតារាងជាការបង្ហាញសុទ្ធសាធ** — កូនសោក្រុមជា
-  `[trashReason, phone, scanDate, time].join('~')`; ប៊ូតុង 🔄/✖️ **នៅតែធ្វើការ
-  លើ `id` តែមួយជានិច្ច**។ ⛔ កុំប្តូរវាទៅ bulk restore/purge ដោយគ្មានការស្នើ —
-  ផ្លូវស្តារមាន claim token និង fence ក្នុង rules ដែលសរសេរសម្រាប់ធាតុតែមួយ។
-- **តួលេខសរុបបែកជា ២ ក្រុម** តាម `TRASH_REASON_META[reason].deducted` ៖
-  `remove`+`expired` ធៀបនឹង `pickup`+`delete`។ តម្រងស្វែងរកត្រង **ទាំងតារាង
-  និងតួលេខសរុប**។
+- `trashReasonOf()` falls back for old items: `isFromDeletion === true` ➜ `isClosed ? 'pickup' : 'delete'`; else
+  `'remove'`.
+- ⛔ **`executeRestoreItem()` must `delete itemToRestore.trashReason`** before writing back to
+  `zoew_scan_history_cod_dod` — that node has `$other: { ".validate": false }` ➜ forgetting it **rejects the restore**.
+- **Merging in the table is display-only** — group key `[trashReason, phone, scanDate, time].join('~')`; 🔄/✖️ **still
+  act on one `id`**. ⛔ Don't switch to bulk restore/purge without a request — restore has claim tokens and rules
+  fences written for single items.
+- **Totals split in 2 groups** by `TRASH_REASON_META[reason].deducted`: `remove`+`expired` vs `pickup`+`delete`. The
+  search filter filters **both table and totals**.
 
-## ⛔ Marker ដែលមិនត្រូវច្រឡំ (បើច្រឡំ ➜ `permission_denied` ជារៀងរហូត)
+## ⛔ Markers that must not be confused (confusion ➜ `permission_denied` forever)
 
-| Marker | ជាកម្មសិទ្ធិរបស់ | ត្រូវលុបមុនសរសេរទៅ |
+| Marker | Belongs to | Strip before writing to |
 |---|---|---|
-| `restoreClaimId` · `restoreClaimToken` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** (`stripHistoryOnlyMarkers`) |
-| `clearClaim` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** |
-| `restoreClaim` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`executeRestoreItem`) |
-| `trashReason` · `deletedAt` · `isFromDeletion` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`executeRestoreItem`) |
+| `restoreClaimId` · `restoreClaimToken` | `zoew_scan_history_cod_dod` | **trash** (`stripHistoryOnlyMarkers`) |
+| `clearClaim` | `zoew_scan_history_cod_dod` | **trash** |
+| `restoreClaim` | `zoew_recently_deleted_cod_dod` | **history** (`executeRestoreItem`) |
+| `trashReason` · `deletedAt` · `isFromDeletion` | `zoew_recently_deleted_cod_dod` | **history** (`executeRestoreItem`) |
 
-- **ការសម្អាត លុប ដក និងកែតម្លៃត្រូវរំលងធាតុដែលកំពុងស្តារ**
-  (`itemHasRestoreMarkers()` ជា gate ក្នុង transaction)។
-- **claim ដែលងាប់ត្រូវដោះ** — `clearStaleRestoreMarkers()` អាន source មុន
-  ដោះ history marker នៅពេល source បាត់ ឬគ្មាន claim រស់។
-  `releaseStaleRestoreClaimForPurge()` ដោះ trash claim ក្នុង transaction
-  តែពេលវាមិនរស់; lease គឺ `RESTORE_CLAIM_LEASE_MS` (២ នាទី)។ Claim ដែលនៅរស់
-  មានន័យថាឧបករណ៍ផ្សេងកំពុងស្តារ ➜ **កុំប៉ះ**។
-  ទិដ្ឋភាពក្នុងស្រុក ឬ `fb.get()` តែមួយមិនមែនជាភស្តុតាង atomic ទេ៖
-  history `.write` ត្រូវទប់ការលុប/ប្តូរ marker ដែល source មាន matching claim
-  រស់តាម `now` របស់ server។ Finalize ត្រូវមាន witness ត្រូវគ្នា និងលុប source
-  ក្នុង atomic write ដដែល (`emu/restore-mutation-emu-test.js`)។
-- **ការ purge ជាក្រុមជា atomic** — ធាតុ ១ ដែលមានបញ្ហាចាក់សោធាតុស្អាតទាំងអស់
-  ➜ ក្រុមធ្លាក់ ត្រូវ **ថយទៅលុបមួយៗ**។
+- **Cleanup, delete, remove and price edits skip items being restored** (`itemHasRestoreMarkers()` gates the
+  transaction).
+- **Dead claims are released** — `clearStaleRestoreMarkers()` reads the source before releasing a history marker when
+  the source is gone or has no live claim. `releaseStaleRestoreClaimForPurge()` releases a trash claim inside a
+  transaction only when it isn't live; lease = `RESTORE_CLAIM_LEASE_MS` (2 minutes). A live claim = another device is
+  restoring ➜ **don't touch**. A local view or a single `fb.get()` is not atomic evidence: history `.write` blocks
+  deleting/changing markers whose source has a matching live claim by server `now`. Finalize needs a matching witness
+  and deletes the source in the same atomic write (`emu/restore-mutation-emu-test.js`).
+- **Group purge is atomic** — one bad item locks all clean ones ➜ a failed group **falls back to one-by-one**.
 
-## ⛔ ស្ថិតិ «យក» — សំណុំ barcode ជាមូលដ្ឋានតែមួយ (កំណែ 2.27.0)
+## ⛔ Pickup stats — barcode set as the single basis (2.27.0)
 
-**ប្រភពការពិតជា *សំណុំ*** មិនមែន counter ៖
+**Source of truth is a *set*, not a counter**:
 
 ```
-zoew_daily_pickup_cod_dod/<ថ្ងៃ>/pickedUpBarcodes/<barcodeKey> = <phoneKey>
-packagesPickedUp = ចំនួនកូនសោ      ← កញ្ចក់ដេរីវេ
-pickedUpPhones   = ការរាប់តម្លៃ     ← កញ្ចក់ដេរីវេ
+zoew_daily_pickup_cod_dod/<day>/pickedUpBarcodes/<barcodeKey> = <phoneKey>
+packagesPickedUp = number of keys        ← derived mirror
+pickedUpPhones   = count per value        ← derived mirror
 ```
 
-- **អតិថិជន = លេខទូរស័ព្ទផ្សេងៗគ្នាដែលមាន barcode បិទ >= ១។ កញ្ចប់ = ចំនួន
-  barcode បិទ។** អថេរ `sum(pickedUpPhones) === packagesPickedUp` ក្លាយជា
-  **ពិតតាមរចនាសម្ព័ន្ធ** ព្រោះទាំង ២ ដេរីវេពីសំណុំដដែល។
-- ⛔ **គ្មាននព្វន្ធលើ `packagesPickedUp` ឬ `pickedUpPhones[...]` នៅកន្លែងណា
-  ទាំងអស់** — ការបិទ «យក» = សរសេរកូនសោ · ការបើកវិញ = លុបកូនសោ។ ការសរសេរជា
-  **idempotent** ➜ ការជាន់គ្នា · ការចូជួរក្រៅបណ្តាញ · ការព្យាយាមឡើងវិញ
-  **មិនអាចបង្កើតកញ្ចប់បានទេ**។ (ថ្នាក់នេះវិលមក ៣ ដងក្នុងម៉ូដែល delta ៖
-  2.26.0 · 2.26.1 · 2.26.2។)
-- ⛔ **កូនសោ barcode = `barcodeRegistryKey(code)`** ដដែលនឹង `zoew_barcode_registry`។
-- ⛔ **សាលក្រម server ឈ្នះទិដ្ឋភាពក្នុងស្រុក** — `reapplyPickupMarks()` សរសេរ
-  សាលក្រម *និងដកចេញ* ការសម្គាល់ក្នុងស្រុកដែលសាលក្រមមិនរាប់បញ្ចូល (ឧបករណ៍
-  ផ្សេងអាចដក barcode ចេញរួច — វាស់បានដោយ `revenue-fuzz-test` run=5)។
-- ⛔ **ការសរសេរដែលធ្លាក់ មិនត្រូវដកសតិត្រឡប់ទៅទិដ្ឋភាពចាស់** — ទិដ្ឋភាពចាស់
-  ជាប្រភពនៃការផ្ទុះ។ បង្ហាញ toast រួចទុកឲ្យ **snapshot បន្ទាប់ព្យាបាល**។
-- **ការប្តូរលេខទូរស័ព្ទ = ការប្តូរ *ម្ចាស់* នៃកូនសោ barcode បិទទាំងអស់**
-  មិនមែន ±1។ ការ merge ស្កេន **មិនប្តូរអ្វី** (គ្មាន barcode ណាប្តូរស្ថានភាព)។
-- **ទិន្នន័យចាស់ (គ្មានសំណុំ)** ៖ `pickupSetFromRecord(record, seed)` seed ដោយ
-  ការរាប់ឡើងវិញពីប្រវត្តិ+ធុងសំរាម **តែពេលវាស្មើ `packagesPickedUp`**;
-  បើមិនស្មើ ➜ កូនសោជំនួស `_lg_<phone>_<n>` ដែល **រក្សាលេខបេះបិទ**។
-  ⛔ ច្រកទ្វារស្មើភាពនោះជាអ្វីដែលធ្វើឲ្យ **ការ Reset មិនរស់ឡើងវិញ**។
-- **Reset ស្ថិតិយក** ៖ ត្រូវសរសេរ **`{ packagesPickedUp: 0 }`** (សំណុំក៏បាត់ដែរ) — ⛔ **កុំលុប
-  node ចោល** (`return null`) ព្រោះការបង្ហាញធ្លាក់ទៅរាប់ពីប្រវត្តិវិញ ➜ លេខ
-  **លោតត្រឡប់មកវិញភ្លាមៗ**។ `getFilterTargetDateKey()` ជាមូលដ្ឋានថ្ងៃតែមួយ
-  សម្រាប់ទាំងការបង្ហាញ និងការ Reset។ ⛔ លុយមិនត្រូវប៉ះ។
+- **Customers = distinct phones with ≥ 1 closed barcode. Parcels = closed barcodes.** `sum(pickedUpPhones) ===
+  packagesPickedUp` is **true by structure**.
+- ⛔ **No arithmetic on `packagesPickedUp` or `pickedUpPhones[...]` anywhere** — closing = write a key · reopening =
+  delete a key. **Idempotent** ➜ overlap · offline queueing · retries **can't create parcels** (this class returned 3
+  times in the delta model: 2.26.0 · 2.26.1 · 2.26.2).
+- ⛔ **Barcode key = `barcodeRegistryKey(code)`**, same as `zoew_barcode_registry`.
+- ⛔ **The server verdict beats the local view** — `reapplyPickupMarks()` writes the verdict *and removes* local marks
+  the verdict doesn't include.
+- ⛔ **A failed write never rolls memory back to the old view** — show a toast and let the **next snapshot heal**.
+- **Changing a phone number = changing the *owner* of every closed barcode key**, not ±1. Scan merges change
+  **nothing**.
+- **Old data (no set)**: `pickupSetFromRecord(record, seed)` seeds from a recount of history+trash **only when it equals
+  `packagesPickedUp`**; otherwise placeholder keys `_lg_<phone>_<n>` that **keep the number exactly**. ⛔ That equality
+  gate is what keeps **Reset from resurrecting**.
+- **Reset pickup stats** writes **`{ packagesPickedUp: 0 }`** (the set goes too) — ⛔ **never delete the node**
+  (`return null`): display falls back to counting history ➜ the number **jumps back at once**.
+  `getFilterTargetDateKey()` is the single day basis for display and Reset. ⛔ Money untouched.
 
-## ⛔⛔ ledger ៖ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត**
+## ⛔⛔ Ledger: "apply ➜ revert" must be a **true** inverse
 
-> 🔴 **កំហុសលុយពិត (កំណែ 2.26.0)** — `run-all.sh` **បៃតងទាំង ១៣០ · SKIP 0**
-> លើ tree ដែលមានវា។
+> 🔴 Real money bug (2.26.0) — `run-all.sh` **green 130 · SKIP 0** on the tree that had it.
 
-ការ clamp ត្រឹម 0 ធ្វើឲ្យ «អនុវត្ត» និង «ដកវិញ» **លែងជាគូបញ្ច្រាស** ពេល
-ledger តូចជាង delta ដែលកំពុងដក ៖ ការអនុវត្តលេប **ផ្នែកលើស** ចំណែកការដកវិញ
-បូកមកវិញ **ពេញចំនួន** ➜ **ចំណូលកើតឡើងពីអាកាសធាតុ**។
+Clamping at 0 breaks the inverse when the ledger is smaller than the delta: apply swallows **the excess**, revert adds
+back **the full amount** ➜ **revenue from thin air**.
 
-ច្បាប់ ៖
+- **`ledgerAppliedDelta(before, after)` is the single revert basis** — revert **the actually applied delta**
+  (`after - before`), not the requested one.
+- ⛔ **Verdict `null` = "server did not apply", not "unknown"** — `ledgerServerVerdict(serverPromise)`: rejection or
+  `committed: false` ➜ `{cod:0,dod:0,count:0}` ➜ **nothing to revert**. ⛔ Falling back to the memory delta deducts
+  numbers never added (measured: a blip during apply ➜ revert succeeds ➜ day goes **$10.00 ➜ $14.00**). ⛔ The
+  **in-memory** revert is idempotent (`ledgerMemoryCompensationClaimed`) — **both orders**.
+- ⛔ **Server-side revert waits for the *server verdict*** — `commitDailyRevenueDelta` and `commitMonthlyRevenueDelta`
+  capture `serverBefore`/`serverAfter` **inside the transaction** and return `ledgerAppliedDelta(...)`.
+- **Every write to a stats node clamps before returning** — day · month · pickup (real rules reject negatives).
+  ⛔ `ZoeErrors.capture('… clamped to 0')` **is not a clamp**.
+- **`pickedUpPhones/$phoneKey` requires `> 0`** ➜ a key reaching 0 is **deleted**, not written as `0`.
+- 🔴 **2.27.0: pickup stats left the delta model entirely** ➜ rules live in the pickup section above. ⛔ **Never bring
+  delta arithmetic back to pickup stats.** Old functions of that path (`addPickupToDailyRecord` ·
+  `commitDailyPickupDelta` · `applyPickupMemoryDelta` · `pickupAppliedDelta` · `revertPickupOnServer` ·
+  `revertPickupLedgerDelta` · `correctPickupServerToActual` · `correctPickupLedgerToActual` · `closedBarcodeCount`)
+  **no longer exist** — seeing those names anywhere means a history record, not a rule. Full story:
+  `docs/HISTORY-ARCHIVE.md` part 2.
+- ⛔ **Keep the reverse**: a normal deduction (`50 - 12.5`) writes exactly `37.5`, no early clamp.
 
-- **`ledgerAppliedDelta(before, after)` ជាមូលដ្ឋាននៃ revert តែមួយ** — revert
-  ត្រូវដក **delta ពិតដែលបានអនុវត្ត** (`after - before`) មិនមែន delta ដែលស្នើ។
-- ⛔ **សាលក្រម `null` = «server មិនបានអនុវត្ត» មិនមែន «មិនដឹង»** —
-  `ledgerServerVerdict(serverPromise)` ជាមូលដ្ឋានតែមួយ ៖ បដិសេធ ឬ
-  `committed: false` ➜ `{cod:0,dod:0,count:0}` ➜ **គ្មានអ្វីត្រូវដកវិញ**។
-  ⛔ ការធ្លាក់ចុះទៅ delta របស់សតិ ដកលេខដែលមិនដែលត្រូវបូក (វាស់បាន ៖ បណ្តាញ
-  ដាច់មួយភ្លែតពេលអនុវត្ត ➜ ដកវិញជោគជ័យ ➜ ថ្ងៃឡើងពី **$10.00 ទៅ $14.00**)។
-  ⛔ ការដកវិញ **ក្នុងសតិ** ត្រូវ idempotent (`ledgerMemoryCompensationClaimed`)
-  ព្រោះ `catch` របស់ commit ដក memory រួចហើយ — **ទាំង ២ លំដាប់**។
-- ⛔ **ការដកវិញខាង server ត្រូវរង់ចាំ *សាលក្រម server*** — `commitDailyRevenueDelta`
-  និង `commitMonthlyRevenueDelta` ចាប់ `serverBefore`/`serverAfter` **ខាងក្នុង
-  transaction** រួចត្រឡប់ `ledgerAppliedDelta(...)` ។ សតិ និង server អាចឃ្លាតគ្នា
-  (ទិដ្ឋភាពមូលដ្ឋានចាស់) ➜ ការដកតាម delta របស់សតិ **នៅតែខុស**។
-- **រាល់ការសរសេរទៅ node ស្ថិតិត្រូវ clamp មុនត្រឡប់** — ថ្ងៃ · ខែ · ស្ថិតិយក
-  ដូចគ្នាបេះបិទ (rules ពិតបដិសេធលេខអវិជ្ជមាន)។ ⛔ សារ
-  `ZoeErrors.capture('… clamped to 0')` **មិនមែនជាការ clamp ទេ**។
-- **`pickedUpPhones/$phoneKey` ទាមទារ `> 0`** ➜ កូនសោដែលធ្លាក់ដល់ 0 ត្រូវ
-  **លុប** មិនមែនសរសេរ `0`។
-- 🔴 **កំណែ 2.27.0 ៖ ស្ថិតិយក *ចាកចេញពីម៉ូដែល delta ទាំងស្រុង*** ➜ ច្បាប់
-  រស់នៅផ្នែក «⛔ ស្ថិតិ «យក» — សំណុំ barcode» ខាងលើ។ ⛔ **កុំនាំនព្វន្ធ delta
-  ត្រឡប់មកស្ថិតិយកវិញ។** function ចាស់របស់ផ្លូវនោះ (`addPickupToDailyRecord` ·
-  `commitDailyPickupDelta` · `applyPickupMemoryDelta` · `pickupAppliedDelta` ·
-  `revertPickupOnServer` · `revertPickupLedgerDelta` · `correctPickupServerToActual` ·
-  `correctPickupLedgerToActual` · `closedBarcodeCount`) **លែងមានក្នុងកូដទៀតហើយ** —
-  បើឃើញឈ្មោះទាំងនោះក្នុងឯកសារណា នោះជាកំណត់ត្រាប្រវត្តិ មិនមែនច្បាប់។
-  *ហេតុអ្វីវាចាំបាច់* ៖ ថ្នាក់ «កញ្ចប់កើតពីអាកាសធាតុ» ត្រូវកែ **៣ ជុំ**
-  (2.26.0 revert · 2.26.1 សាលក្រម server · 2.26.2 reconcile) ដោយការកែនីមួយៗ
-  ត្រឹមត្រូវ និងមានឧបករណ៍ចាក់សោ — តែវាវិលមកតាមទ្វារបន្ទាប់រៀងរាល់ដង ព្រោះ
-  counter មួយ **គ្មានអត្តសញ្ញាណ**។ លម្អិតពេញលេញក្នុង `docs/HISTORY-ARCHIVE.md` ផ្នែក ២។
-- ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ ការដកធម្មតា (`50 - 12.5`) ត្រូវសរសេរ `37.5`
-  **ពិតប្រាកដ** គ្មានការ clamp មុនពេល។
+Tools: `ledger-clamp-symmetry-test` (browser) · **`ledger-failed-apply-revert-test`** · **`emu/ledger-revert-emu-test`**
+(real RTDB + real rules via ETag/`if-match` — ground truth) · `money-guardian-test` (10 mutations ➜ guards must go
+truly red) · `price-edit-abort-test` · `revenue-rules-clamp-test` · `revenue-fuzz-test`.
 
-Tools ៖ `ledger-clamp-symmetry-test` (browser) · **`ledger-failed-apply-revert-test`**
-(ការអនុវត្តក្នុងរបៀបបរាជ័យ) · **`emu/ledger-revert-emu-test`**
-(RTDB ពិត + rules ពិត តាម ETag/`if-match` — ជា ground truth) ·
-`money-guardian-test` (mutation ១០ ➜ អ្នកយាមត្រូវក្រហមពិត) ·
-`price-edit-abort-test` · `revenue-rules-clamp-test` · `revenue-fuzz-test`។
+## ⛔ Duplicate barcode ➜ duplicated money
 
-## ⛔ barcode ស្ទួន ➜ លុយបូកស្ទួន
+Five layers, but **4 of 5 read this phone's in-memory copy**: debounce 2.5s · `isBarcodeAlreadyUsed()` (2 layers) ·
+**`claimBarcodeInRegistry()` (server — the only one)** · `addOrUpdateEntry()` merge (**covers only the merge path**).
 
-ជាន់ការពារមាន ៥ តែ **៤ ក្នុង ៥ អានច្បាប់ចម្លងក្នុងសតិរបស់ទូរស័ព្ទនេះ** ៖
-debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`claimBarcodeInRegistry()`
-(server — តែមួយគត់)** · `addOrUpdateEntry()` merge (**គ្របតែផ្លូវ merge**)។
+⛔ **Saving requires a real `'claimed'` verdict from the server.** Same rule as `license-verify.js` ("unverified ➜ keep
+but grant nothing new") applied to the **money path**: "can't verify" ≠ "no duplicate". ⛔ It doesn't break offline
+scanning — offline RTDB **hangs, not rejects** ➜ `withTimeout` throws ➜ the save was refused anyway.
 
-⛔ **ការរក្សាទុកត្រូវទាមទារសាលក្រម `'claimed'` ពិតពី server។** នេះជាច្បាប់
-«`unverified` ➜ រក្សាទុក តែកុំផ្តល់សិទ្ធិថ្មី» ដដែលនឹង `license-verify.js`
-ដែលអនុវត្តលើ **ផ្លូវលុយ** ៖ «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «គ្មានស្ទួន»។
-⛔ វាមិនបំបែកការស្កេនក្រៅបណ្តាញទេ — ក្រៅបណ្តាញ RTDB **ព្យួរ មិនបដិសេធ** ➜
-`withTimeout` បោះ ➜ ការរក្សាទុកបដិសេធរួចតាំងពីមុន។
+## ⛔ Orphan keys in `zoew_barcode_registry` ➜ barcode trapped
 
-## ⛔ កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់
+An **ownerless** key is a permanent trap: the user sees "⚠️ ត្រូវបានបញ្ចូលរួចហើយ" while the parcel is **in neither
+history nor trash**.
 
-កូនសោ **គ្មានម្ចាស់** ជាអន្ទាក់ស្ថាពរ ៖ អ្នកប្រើឃើញ «⚠️ ត្រូវបានបញ្ចូលរួចហើយ»
-ខណៈកញ្ចប់នោះ **គ្មានក្នុងប្រវត្តិ និងធុងសំរាមសោះ**។
-
-- ការដោះឆ្លងកាត់ `dbOp()` + `retryAsync()` រួច **ចូល `pendingRegistryReleases`**។
-- ជួរត្រូវ **រត់ឡើងវិញពេល `.info/connected` ត្រឡប់ជា `true`** **និង** មាន
-  **ច្រកចេញទី ២** ៖ `noteDbListenerAlive()` (ទិដ្ឋភាពមកដល់វិញ) បូកជាន់
-  សុវត្ថិភាពក្នុង `runScheduledCleanup()`។ ⛔ ជួរដែលអាច *ពន្យារ* ដោយគ្មាន
-  អ្នកដោះទី ២ = **ការជាប់ស្ថាពរ**។
-  Callback ត្រូវអនុវត្ត និង normalize snapshot **មុន** `noteDbListenerAlive()`;
-  បើប្រកាសស្រស់មុន នោះជួរដោះអាចលុប registry របស់ Barcode ដែលទើបត្រឡប់មកវិញ។
-- **`registryReleaseVerdict(key)` មាន ៣ លទ្ធផល** ៖ `release` · `owned`
-  (barcode ត្រឡប់មកវិញ ➜ មិនដោះ) · `defer` (`dbListenerViewIsStale()`)។
-  ⛔ **ផ្លូវដោះ *ភ្លាមៗ* មិនត្រូវមានច្រកទ្វារនោះទេ**។
-- ⛔ **ការជួសជុលកូនសោ «ដែលមើលទៅដូចកំព្រា» ដោយស្វ័យប្រវត្តិ ត្រូវច្រានចេញ** —
-  **ការជាប់អន្ទាក់ថ្លៃតិចជាងលុយស្ទួន**។ កូនសោដែលលេចរួច លុបដោយដៃក្នុង Console។ បើមានច្រើនពេក ៖ `node audit-tools/registry-orphan-list.js <dump.json>`
-  បញ្ចេញឯកសារ `{"KEY":null,…}` ➜ អ្នក **មើលដោយភ្នែក** រួចផ្ញើ `curl -X PATCH`
-  ដោយខ្លួនឯង (⛔ `PATCH` merge · ⛔ **កុំប្រើ «Import JSON» ក្នុង Console** —
-  នោះជា **REPLACE** ➜ លុប registry ទាំងមូល)។ ⛔ ឧបករណ៍នោះ **មិនលុបអ្វីទេ**
-  ដោយចេតនា ៖ ការសម្រេចចុងក្រោយត្រូវជារបស់មនុស្ស។
+- Release goes through `dbOp()` + `retryAsync()` then **into `pendingRegistryReleases`**.
+- The queue reruns **when `.info/connected` returns `true`** **and** has a **second exit**: `noteDbListenerAlive()`
+  (view arrived again) plus a safety net in `runScheduledCleanup()`. ⛔ A queue that can *defer* with no second
+  releaser = **permanent trap**. Callbacks apply and normalize the snapshot **before** `noteDbListenerAlive()`;
+  announcing freshness first lets the release queue delete the registry key of a barcode that just came back.
+- **`registryReleaseVerdict(key)` has 3 outcomes**: `release` · `owned` (barcode came back ➜ don't release) · `defer`
+  (`dbListenerViewIsStale()`). ⛔ **The *immediate* release path must not have that gate.**
+- ⛔ **Automatically repairing keys that "look orphaned" is rejected** — **a trap is cheaper than duplicate money**.
+  Already-visible keys are deleted by hand in Console. Many of them: `node audit-tools/registry-orphan-list.js
+  <dump.json>` emits `{"KEY":null,…}` ➜ a human **reviews it** and sends `curl -X PATCH` themselves (⛔ `PATCH`
+  merges · ⛔ **never "Import JSON" in Console** — that is a **REPLACE** ➜ wipes the whole registry). ⛔ The tool
+  **deletes nothing** by design: the final decision belongs to a human.
 
 ---
 
-# 🏗️ ស្ថាបត្យកម្ម
+# 🏗️ Architecture
 
-- **ZoeW React ជា ES module ក្នុង `ZoeW/src/**`** (រចនាសម្ព័ន្ធស្រទាប់ ៖
-  [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md))។ ⛔ **function មិនមែន global
-  ទេ** — មានតែ **build វាស់** (`VITE_EXPOSE_GLOBALS=1` ➜ `src/expose-globals.ts`) ដែលបើកវាលើ
-  `window` សម្រាប់ checker; ការជំនួស `window.<fn>` ក្នុងតេស្តដើរតាម plugin `zoew-audit-rebind`
-  (`vite.config.mts`) ➜ ⛔ **build ផលិតកម្មមិនដែលមាន bridge ទាំងនេះ** (`version-bump-scope`
-  មិនរាប់ឯកសារ audit-only ជាកូដ ship)។ ⛔ state រស់ក្នុងឃ្លាំង (`src/core/state.ts`) មិនមែន
-  `let` កម្រិត module ➜ តេស្តអានតាម `window.<ឈ្មោះវាល>` ក្នុង build វាស់។
-- **`zoew_scan_history_cod_dod` ជាប្រភពទិន្នន័យសំខាន់ *តែមួយ*។** App អានវា
-  ដោយផ្ទាល់តាម `onValue(dbRefHistory)` ➜ `scanHistory`។ **គ្មាន projection
-  ជាន់ទីពីរទេ** ➜ លែងមានថ្នាក់កំហុស «lookup និងប្រវត្តិបែកគ្នា»។
-- **រាល់ការកែកញ្ចប់ធ្វើដោយ `runTransaction` លើ record របស់ *server*** មិនមែន
-  លើច្បាប់ចម្លងក្នុងសតិទេ។
+- **ZoeW React is ES modules in `ZoeW/src/**`** (layers: [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md)).
+  ⛔ **Functions are not globals** — only the **audit build** (`VITE_EXPOSE_GLOBALS=1` ➜ `src/expose-globals.ts`)
+  exposes them on `window` for checkers; replacing `window.<fn>` in tests works via plugin `zoew-audit-rebind`
+  (`vite.config.mts`) ➜ ⛔ **production builds never have these bridges** (`version-bump-scope` doesn't count audit-only
+  files as shipped code). ⛔ State lives in stores (`src/core/state.ts`), not module-level `let` ➜ tests read it as
+  `window.<field>` in the audit build.
+- **`zoew_scan_history_cod_dod` is the *single* primary data source.** The app reads it directly via
+  `onValue(dbRefHistory)` ➜ `scanHistory`. **No second projection layer.**
+- **Every parcel edit runs `runTransaction` on the *server* record**, not the in-memory copy.
 
-## រចនាសម្ព័ន្ធ UI (ZoeW)
+## UI structure (ZoeW)
 
-> ⛔ **បញ្ជីខាងក្រោមដេរីវេបានពី `index.html` និង `app.js` ពិត** ➜
-> `doc-scope-test` ផ្នែក ៦ ធ្លាក់ ពេលផ្ទៃថ្មីលេចក្នុងកូដ តែមិនលេចត្រង់នេះ។
-> នេះជាថ្នាក់ «ផ្ទៃដែលកើត *ក្រោយ* ច្បាប់» ៖ តារាងនេះធ្លាប់ចាស់ **៥ ធាតុ**។
+> ⛔ This table is derived from real `index.html` and `app.js` ➜ `doc-scope-test` part 6 fails when a new surface
+> appears in code but not here (labels below are the real Khmer UI text — keep them verbatim).
 
-| ផ្នែក | id | មាតិកា |
+| Part | id | Content |
 |---|---|---|
-| ទំព័រ ១ — ទិន្នន័យ | `pageData` | គ្រប់គ្រងប្រចាំថ្ងៃ, ស្វែងរកលេខ, តារាងប្រវត្តិ, ប៊ូតុងស្ថិតិ ២ (📅 កញ្ចប់ប្រចាំថ្ងៃ · 💵 ចំណូលប្រចាំថ្ងៃ) |
-| ទំព័រ ២ — ស្កេន | `pageEntry` | របៀបស្កេន ៣ (កញ្ចប់, Locker, ដក), កាមេរ៉ា, hardware scanner, រូបភាព, `parcelPanel`, `lockerPanel` |
-| របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
-| របា Slide (ម៉ឺនុយ) | `sideDrawer` | **Category ៤ បត់បាន** (`.drawer-group`, បត់ជាលំនាំដើម, ស្ថានភាពក្នុង `zoew_drawer_groups_v1`) ៖ **ការតភ្ជាប់ និងទិន្នន័យ** (Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · នាំចូល Excel ទៅ Sheet) · **ZTO** (បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO — ⛔ ២ នេះ និង**ក្បាល Category ខ្លួនវា** លេចតែពេល Fast Mode គូស) · **ចាក់សោ និងសុវត្ថិភាព** (ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ) · **ឧបករណ៍** (កំណត់ទូ Locker · ពិនិត្យសុខភាពប្រព័ន្ធ)។ ⛔ **ចូល/ចាកចេញ ឈរក្នុង `.drawer-foot`** ជាមួយលេខកំណែ មិនមែនក្នុង `.drawer-body` |
-| ប៊ូតុង (...) ខាងលើ | `globalMoreMenu` | Export Data · របាយការណ៍អាជីវកម្មប្រចាំខែ · កែទឹកប្រាក់/កញ្ចប់ (PIN) · អត្រាប្រាក់ · ធុងសំរាម · Reset ចំនួនយករួច (PIN) · លុបទាំងអស់ (PIN) |
-| ប៊ូតុង (...) តាមជួរ | `globalMoreMenu` | កែតម្លៃកញ្ចប់ · កែលេខទូរស័ព្ទ · លុប |
-| ផ្ទាំងជូនដំណឹង (🔔 ជ្រុងស្តាំ navbar) | `notifyDrawer` | បើកពីខាងស្តាំ ៖ 📦 កញ្ចប់ជិតផុតកំណត់ (២៤ ម៉ោង) · 📱 កំណែ App · 📲 ជូនដំណឹងលើទូរស័ព្ទ (បើក/បិទ Push) · 📢 សេចក្តីប្រកាស/ថែទាំ (`public/announcements.json` + ដំណឹងពីអ្នកលក់ តាម ZoeKeyGen · 🧹 សម្អាត) · ⛔ **«Powered By ZoeW» ឈរក្នុងជើងផ្ទាំងនេះ** មិនមែន navbar |
+| Page 1 — data | `pageData` | daily management, number search, history table, 2 stats buttons (📅 កញ្ចប់ប្រចាំថ្ងៃ · 💵 ចំណូលប្រចាំថ្ងៃ) |
+| Page 2 — scan | `pageEntry` | 3 scan modes (parcel, Locker, remove), camera, hardware scanner, image, `parcelPanel`, `lockerPanel` |
+| Bottom tab bar | `pageTabBar` | page switching (`switchAppPage`) |
+| Drawer (menu) | `sideDrawer` | **4 collapsible categories** (`.drawer-group`, collapsed by default, state in `zoew_drawer_groups_v1`): **ការតភ្ជាប់ និងទិន្នន័យ** (Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · នាំចូល Excel ទៅ Sheet) · **ZTO** (បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO — ⛔ these 2 and **the category header itself** appear only when Fast Mode is ticked) · **ចាក់សោ និងសុវត្ថិភាព** (ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ) · **ឧបករណ៍** (កំណត់ទូ Locker · ពិនិត្យសុខភាពប្រព័ន្ធ). ⛔ **ចូល/ចាកចេញ sits in `.drawer-foot`** with the version number, not in `.drawer-body` |
+| Top (...) button | `globalMoreMenu` | Export Data · របាយការណ៍អាជីវកម្មប្រចាំខែ · កែទឹកប្រាក់/កញ្ចប់ (PIN) · អត្រាប្រាក់ · ធុងសំរាម · Reset ចំនួនយករួច (PIN) · លុបទាំងអស់ (PIN) |
+| Per-row (...) button | `globalMoreMenu` | កែតម្លៃកញ្ចប់ · កែលេខទូរស័ព្ទ · លុប |
+| Notification panel (🔔 navbar right) | `notifyDrawer` | opens from the right: 📦 near-expiry parcels (24h) · 📱 កំណែ App · 📲 phone notifications (Push on/off) · 📢 announcements/maintenance (`public/announcements.json` + seller notices via ZoeKeyGen · 🧹 សម្អាត) · ⛔ **"Powered By ZoeW" sits in this panel's footer**, not the navbar |
 
-ម៉ឺនុយ (...) ខាងលើ និងតាមជួរ ត្រូវបិទពេលចាប់ផ្តើមអូសផ្ទាំងខាងក្រៅ ឬ
-រមូរប្រវត្តិ។ ការចុច/រមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។ ការអូសផ្ទាំងដោយ transform
-មិនធានាថាមាន `scroll` event ទេ។ ចលនាបើក scope ត្រឹម `#globalMoreMenu`
-ត្រូវគោរព Reduce Motion ហើយមិនពន្យារការបិទពេលអូសខាងក្រៅ
-(`history-menu-dismiss-test.js`)។
+Top and per-row (...) menus close when an outside panel drag or history scroll starts; taps/scrolls inside the menu
+still work. A transform-driven panel drag doesn't guarantee a `scroll` event. The open motion scoped to
+`#globalMoreMenu` honors Reduce Motion and never delays closing on outside drags (`history-menu-dismiss-test.js`).
 
-**🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (របា Slide) ៖ ជួរ **៩** ដែល **អានសុទ្ធសាធ** —
-បណ្តាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន ·
-កំណែ Apps Script · Lookup។ ⛔ លេខនេះដេរីវេពី `runHealthCheck()` ➜ `doc-scope-test`
-ផ្នែក ៦ ធ្លាក់ បើបន្ថែមជួរដោយភ្លេច update ត្រង់នេះ។ ⛔ **«ពិនិត្យមិនបាន» ត្រូវរាយ ⚠️ មិនមែន ❌** (ច្បាប់ដដែលនឹង
-`license-verify.js` ៖ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស»)។ ⛔ **ហើយ «មិនបានវាស់»
-ក៏មិនត្រូវរាយ ✅ ដែរ** — ជួរ Lookup (ZTO) មាន **៣ លទ្ធផល** តាមសាលក្រម upstream
-ចុងក្រោយក្នុង `?diag=1` ៖ បដិសេធ ➜ **❌** · ទទួលយក ➜ **✅** · មិនទាន់ដែលប្រើ
-➜ **⚠️**។ ⛔ **មិនបង្ខំ PIN** —
-សោមិនទាន់ដោះ ➜ ប្រាប់មូលហេតុ (ការសុំ PIN ខណៈ App មានបញ្ហារួច ជាការធ្វើទុក្ខ
-អ្នកប្រើ)។ ⛔ **តម្លៃ header សម្ងាត់មិនត្រូវឡើងដល់ DOM** — មានតែ fingerprint
-៨ តួពី `?diag=1`។ ⛔ **ផ្លូវ Apps Script មិនហៅបណ្តាញសោះ** (ច្បាប់ simple
-request — មើលផ្នែក ZTO Lookup)។
+**🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (drawer): **9** rows, read-only — network · Firebase · clock · License · storage · Service
+Worker · customer table · Apps Script version · Lookup. ⛔ The count is derived from `runHealthCheck()`
+(`doc-scope-test` part 6). ⛔ **"Can't check" is ⚠️, not ❌**, and **"not measured" is never ✅** — the ZTO Lookup row
+has **3 outcomes** from the last upstream verdict in `?diag=1`: rejected ➜ **❌** · accepted ➜ **✅** · never used ➜
+**⚠️**. ⛔ **Never forces PIN** (locked ➜ say why). ⛔ **Secret header values never reach the DOM** — only the 8-char
+fingerprint from `?diag=1`. ⛔ **The Apps Script path makes no network call** (simple-request rule — see ZTO Lookup).
 
-**`entryScanMode`** (`'parcel'` / `'locker'` / `'remove'`) ជាចំណុចបំបែក
-**តែមួយ** — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់
-`triggerScanAction()`។ របៀប `'remove'` មិន persist ទេ; reload ត្រឡប់ទៅ
-`'parcel'` ដើម្បីកុំឲ្យការស្កេនបន្ទាប់ដកដោយចៃដន្យ។
+**`entryScanMode`** (`'parcel'` / `'locker'` / `'remove'`) is the **single** branch point — every scan source
+(camera, hardware, image) goes through `triggerScanAction()`. `'remove'` is not persisted; reload returns to
+`'parcel'` so the next scan can't remove by accident.
 
-**`history-expanded` តាមទំព័រដែលកំពុងសកម្ម។** `syncHistoryExpandedLock()`
-ដាក់ class នោះលើ `#appPages` តែពេល `.page-side` **របស់ទំព័រសកម្ម** មាន
-`.collapsed` (`activePanelSections()` អានពី DOM មិនមែនពី `currentAppPage`)។
-⛔ បើសោនោះជាប់ឆ្លងទំព័រ នោះទំព័រម្ខាង **រមូរមិនកើតទាល់តែសោះ** (វាដាក់
-`overflow-y: hidden` លើ `#appPages`)។ Test ៖ `page-nav-test.js`។
+**`history-expanded` follows the active page.** `syncHistoryExpandedLock()` puts that class on `#appPages` only when
+the **active page's** `.page-side` has `.collapsed` (`activePanelSections()` reads the DOM, not `currentAppPage`).
+⛔ If the lock sticks across pages, one page **can't scroll at all** (`overflow-y: hidden` on `#appPages`).
+Test: `page-nav-test.js`.
 
-**Layout** ៖ ទំព័រនីមួយៗមាន `.page-side` និង `.page-main`។ ទូរស័ព្ទ = flex
-column; **≥992px** = grid ២ ជួរ (`380px` + សល់) ហើយរបា Tab ផ្លាស់ទៅក្រោម
-navbar តាម `order`។ **របា Slide បិទត្រូវមាន `visibility: hidden`**។
+**Layout**: each page has `.page-side` and `.page-main`. Phone = flex column; **≥992px** = 2-column grid (`380px` +
+rest) and the tab bar moves under the navbar via `order`. **A closed drawer has `visibility: hidden`.**
 
-## កាយវិការអូស (<992px) — `setupSwipeGestures()` ➜ `bindPanelSwipe()` ×២
+## Swipe gestures (<992px) — `setupSwipeGestures()` ➜ `bindPanelSwipe()` ×2
 
-**ទំព័រទាំង ២ មានឥរិយាបថដូចគ្នា — កុំកែតែទំព័រមួយ ៖**
+**Both pages behave the same — never fix only one:**
 
-| ទំព័រ | `.page-side` | `.page-main` | ដងអូស | កន្សោមរមូរ |
+| Page | `.page-side` | `.page-main` | Drag handle | Scroll container |
 |---|---|---|---|---|
-| ទិន្នន័យ | `#dataSideSection` | `#dataMainSection` | `#dragHandle` | `#tableResponsive` |
-| ស្កេន | `#entrySideSection` | `#entryMainSection` | `#entryDragHandle` | `#entryTableResponsive` ឬ `#lockerTableResponsive` |
+| data | `#dataSideSection` | `#dataMainSection` | `#dragHandle` | `#tableResponsive` |
+| scan | `#entrySideSection` | `#entryMainSection` | `#entryDragHandle` | `#entryTableResponsive` or `#lockerTableResponsive` |
 
-ទំព័រ ២ មានកន្សោមរមូរ **២** — `entryScrollerInView()` ជ្រើសតាមផ្ទាំងដែល
-បង្ហាញ។ កាតបញ្ជីត្រូវមាន class **`.panel-section`** បើមិនដូច្នេះ
-`.table-responsive` ខាងក្នុង **flex មិនកើត**។
+Page 2 has **two** scroll containers — `entryScrollerInView()` picks by the visible panel. List cards need class
+**`.panel-section`**, otherwise the inner `.table-responsive` **doesn't flex**.
 
-- **ការប្តូរ `.collapsed`/`.search-focus` និងសោ `history-expanded` អនុវត្តពេល
-  `touchend` មិនមែនចំពេលអូសទេ។** iOS រក្សា scroll owner រហូតដល់ម្រាមដៃលើក ➜
-  ការប្តូរ class កណ្តាលកាយវិការ **កាត់ផ្តាច់ការរមូរ**។ `touchcancel` ត្រូវ
-  បោះបង់ចេតនាទាំងមូល។
-- ⛔ **កុំដាក់ `transition` លើ `.collapsed`/`.search-focus`** — `max-height`
-  **ធ្វើចលនាមិនបាន** ពេលតម្លៃដើមជា `none` ➜ សល់តែការគូរឡើងវិញ ០.៣ វិ.
-  ដោយឥតប្រយោជន៍ ចំពេលអ្នកប្រើកំពុងរមូរ។ ផ្ទាំងបង្រួមត្រូវមាន
-  `visibility: hidden`។
-- **ការអូសឡើងមិនត្រូវបិទផ្ទាំង ពេលអ្នកប្រើកំពុងស្វែងរកលេខ** (`phoneSearchIsActive()`)។
-- **iOS nested-scroll handoff** ៖ `usesIOSPanelHandoff()` gate ដោយ
-  `navigator.standalone === true` បូក `CSS.supports('-webkit-touch-callout','none')`។
-  Android ត្រូវនៅ passive ដដែល។ លើផ្លូវ iOS ៖ `touchmove` របស់តារាងជា
-  non-passive ហើយ `preventDefault()` តែពេលផ្ទាំង `.collapsed` · ទិសចុះច្បាស់ ·
-  ឆ្លង slop 8px · `scrollTop <= 1`។ ចេតនាត្រូវ **latch** រហូតដល់ `touchend`
-  ចុងក្រោយ — កុំសរសេរជាន់ដោយការអាន `scrollTop` ថ្មី (WebKit ផ្ញើ 0.5px ឬ
-  stale 2px)។
+- **Toggling `.collapsed`/`.search-focus` and the `history-expanded` lock happens at `touchend`, not mid-drag.** iOS
+  keeps the scroll owner until the finger lifts ➜ class changes mid-gesture **cut scrolling**. `touchcancel` drops the
+  whole intent.
+- ⛔ **No `transition` on `.collapsed`/`.search-focus`** — `max-height` **can't animate** from `none` ➜ only a useless
+  0.3s repaint while scrolling. Collapsed panels have `visibility: hidden`.
+- **Swiping up never closes the panel while the user is searching** (`phoneSearchIsActive()`).
+- **iOS nested-scroll handoff**: `usesIOSPanelHandoff()` gated by `navigator.standalone === true` plus
+  `CSS.supports('-webkit-touch-callout','none')`. Android stays passive. On iOS the table's `touchmove` is non-passive
+  and calls `preventDefault()` only when the panel is `.collapsed` · clearly downward · past 8px slop ·
+  `scrollTop <= 1`. The intent **latches** until the last `touchend` — never overwrite it by re-reading `scrollTop`
+  (WebKit sends 0.5px or a stale 2px).
 
-### ⛔ ចលនាតាមម្រាមដៃ (2.9.0) — តារាងចំណុច ៥ ដែលត្រូវមានគ្រប់
+### ⛔ Finger-following motion (2.9.0) — the 5-point table, all required
 
-លក្ខខណ្ឌស្នូល ៖ **កាតបញ្ជី (`.page-main`) ត្រូវខ្ពស់ដូចគ្នាបេះបិទទាំងរបៀបធម្មតា
-និងរបៀបពេញអេក្រង់** ➜ ការរំកិលចុះចំកន្លែង ➜ មិនលោត។ បាត់ចំណុចណាមួយ =
-ការលោតត្រឡប់មកវិញ ៖
+Core condition: **the list card (`.page-main`) has exactly the same height in normal and full-screen modes** ➜ it moves
+down in place ➜ no jump. Missing any point = the jump returns:
 
-| # | អ្វី | នៅឯណា |
+| # | What | Where |
 |---|---|---|
-| ១ | `.page-main` មាន `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)` + `flex: none` | `src/styles/app.css` ក្នុង `@media (max-width: 991px)` |
-| ២ | ខ្សែសង្វាក់ flex ខាងក្នុង ៖ `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` ជា `flex: 1; min-height: 0` និង `.table-responsive` ជា `max-height: none; flex: 1; min-height: 0` (**scope ត្រឹម `.page-main`** ➜ modal រក្សា 62vh) | ដដែល |
-| ៣ | `.app-pages` មាន `scroll-snap-type: y proximity` **បូក** `scroll-padding-top` ស្មើ `padding-top`; កូន ២ មាន `scroll-snap-align: start` | ដដែល |
-| ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅ **គ្មានលក្ខខណ្ឌ** ក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` — ⛔ **កុំដាក់ការលើកលែង iOS មកវិញ** | `src/app/behaviors/panel-motion.ts` |
-| ៥ | `panelGlideFrom()` ត្រូវ **ផ្អាក snap** (`#appPages.panel-gliding` ➜ `scroll-snap-type: none`) អំឡុងចលនា ហើយ **ដកចេញវិញតាមផ្លូវ ២** (`anim.finished.then(release, release)` **បូក** `setTimeout(…, PANEL_GLIDE_MS + GRACE)`)។ ក្រោយ watchdog ឬ cleanup បញ្ចប់វគ្គចាស់ callback របស់វគ្គនោះ **មិនត្រូវដោះ pause របស់វគ្គថ្មី** (`panel-snap-ownership-test.js`) | `src/app/behaviors/panel-motion.ts` + `src/styles/app.css` |
+| 1 | `.page-main` has `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)` + `flex: none` | `src/styles/app.css` in `@media (max-width: 991px)` |
+| 2 | Inner flex chain: `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` are `flex: 1; min-height: 0` and `.table-responsive` is `max-height: none; flex: 1; min-height: 0` (**scoped to `.page-main`** ➜ modals keep 62vh) | same |
+| 3 | `.app-pages` has `scroll-snap-type: y proximity` **plus** `scroll-padding-top` equal to `padding-top`; its 2 children have `scroll-snap-align: start` | same |
+| 4 | `panelGlideFrom()` (FLIP via Web Animations) is called **unconditionally** in `applyPanelAction()` and the `#dragHandle` `click` handler — ⛔ **never re-add an iOS exception** | `src/app/behaviors/panel-motion.ts` |
+| 5 | `panelGlideFrom()` **pauses snap** (`#appPages.panel-gliding` ➜ `scroll-snap-type: none`) during motion and **removes it via 2 paths** (`anim.finished.then(release, release)` **plus** `setTimeout(…, PANEL_GLIDE_MS + GRACE)`). After a watchdog or cleanup ends an old glide, that glide's callbacks **must not release the newer glide's pause** (`panel-snap-ownership-test.js`) | `src/app/behaviors/panel-motion.ts` + `src/styles/app.css` |
 
-⛔ **បើ `scroll-padding-top` បាត់ ➜ ចំណុច snap «បើក» ធ្លាក់ត្រឹម `scrollTop 71`
-➜ PTR ស្លាប់ទាំងស្រុង** (វាទាមទារ `scrollTop <= 1`)។ ដូចគ្នាដែរបើ class
-`panel-gliding` ជាប់។ `clearSensitiveModalFields()` ហៅ `endPanelGlideSnapPause()`។
+⛔ **Missing `scroll-padding-top` ➜ the "open" snap point lands at `scrollTop 71` ➜ PTR dies completely** (it needs
+`scrollTop <= 1`). Same if `panel-gliding` sticks. `clearSensitiveModalFields()` calls `endPanelGlideSnapPause()`.
+Reference numbers (412×780, seed 120): glide distance **361px**; card **642px in both modes**; table **538px in both
+modes**. Verification: `panel-motion-test.js` — `cardHeightDelta`/`tableHeightDelta` fail ➜ point 1 or 2 missing;
+`snapRestNearTop` fails ➜ point 3 (**PTR dies too**); `residualTransform` fails ➜ point 4.
 
-លេខយោង (412×780, seed 120) ៖ ចម្ងាយរំកិល **361px**; កាតខ្ពស់ **642px ទាំង ២
-របៀប**; តារាងខ្ពស់ **538px ទាំង ២ របៀប**។ មុនកែ ៖ 588 ធៀប 642 (ខុស **56px**)។
-ការផ្ទៀងផ្ទាត់ ៖ `panel-motion-test.js` — `cardHeightDelta`/`tableHeightDelta`
-ធ្លាក់ ➜ ចំណុច ១ ឬ ២ បាត់; `snapRestNearTop` ធ្លាក់ ➜ ចំណុច ៣ បាត់
-(**PTR ក៏ស្លាប់ដែរ**); `residualTransform` ធ្លាក់ ➜ ចំណុច ៤។
+**Auto pull up (`setPhoneSearchPulledUp()`)**: focusing the search box ➜ `#dataSideSection` gets `.search-focus`.
+⛔ **The search card must stay the last child of `.page-side`** (CSS: `.page-side.search-focus > *:not(:last-child)`).
 
-**Auto pull up (`setPhoneSearchPulledUp()`)** ៖ focus ប្រអប់ស្វែងរក ➜
-`#dataSideSection` ទទួល `.search-focus`។ ⛔ **កាតស្វែងរកត្រូវនៅជា child
-ចុងក្រោយរបស់ `.page-side`** (CSS ៖ `.page-side.search-focus > *:not(:last-child)`)។
+## ⛔ `--chrome-bottom` and safe-area — READ BEFORE TOUCHING LAYOUT
 
-## ⛔ `--chrome-bottom` និង safe-area — READ BEFORE TOUCHING LAYOUT
-
-`--chrome-bottom` ត្រូវរួមកម្ពស់របា **និង** ផ្នែក safe-area ដែលធ្វើឲ្យ iOS
-standalone body វែងជាង viewport ៖
+`--chrome-bottom` includes the bar height **and** the safe-area part that makes the iOS standalone body taller than
+the viewport:
 
 ```js
 tabbar.offsetHeight + Math.max(0, document.body.getBoundingClientRect().height - window.innerHeight)
 ```
 
-⛔ **កុំវាស់ជា `tabbar.offsetHeight` តែឯង** (ខ្វះ bottom inset លើ iPhone) ហើយ
-កុំប្រើ `body.getBoundingClientRect().bottom` ឬ transformed tabbar rect
-(root scroll restoration និងការលាក់របាដោយ transform ធ្វើឲ្យលេខរួញ)។
+⛔ **Never measure `tabbar.offsetHeight` alone** (misses the iPhone bottom inset), never use
+`body.getBoundingClientRect().bottom` or a transformed tabbar rect (root scroll restoration and transform-hiding shrink
+the numbers). Only `html.ios-standalone` extends the body by the bottom inset and locks the root. ⛔ **Never remove that
+iOS rule** and **never re-add a generic `@media (display-mode: standalone)`** (it creates a root scroll range on
+Android). **The audit environment is Chromium — `env(safe-area-*)` is always 0** ➜ tests **simulate** it
+(`min-height: calc(100dvh + 34px)`) and call `measureAppChromeSize()` again. Changes here **must be tested on a deploy
+preview and a real iPhone before merge**.
 
-មានតែ `html.ios-standalone` ប៉ុណ្ណោះដែលពង្រីក body តាម bottom inset និងចាក់សោ
-root។ ⛔ **កុំដក iOS rule នេះចេញ** និង **កុំដាក់ generic
-`@media (display-mode: standalone)` មកវិញ** (វាបង្កើត root scroll range លើ
-Android)។ **បរិស្ថាន audit ជា Chromium — `env(safe-area-*)` ត្រឡប់ 0 ជានិច្ច**
-➜ តេស្តត្រូវ **ធ្វើត្រាប់តាម** (`min-height: calc(100dvh + 34px)`) រួចហៅ
-`measureAppChromeSize()` ឡើងវិញ។ ការកែផ្នែកនេះ **ត្រូវសាកលើ deploy preview
-និង iPhone ពិតមុន merge**។
+## Pull-to-refresh on iOS PWA — `setupIOSPullToRefresh()`
 
-## Pull-to-refresh លើ iOS PWA — `setupIOSPullToRefresh()`
+- `<head>` detects iOS standalone **before the stylesheet** (`boot-flags.js`) and sets `html.ios-standalone`, where
+  `html/body` are `overflow-y:hidden` + `overscroll-behavior-y:none`; **`#appPages` is the single outer scroll owner**.
+- PTR engages only when every scroll container is at the top (`scrollTop <= 1` incl. negative rubber-band), one touch,
+  clearly downward. Modals/drawer/inputs/navbar/tabbar are not targets.
+- ⛔ **3 owner-requested rules (app standard)**: (1) the finger must **start** in the **top 40%** of the screen
+  (`PTR_START_ZONE_RATIO`) · (2) **any open layer** (modal · (...) menu · drawer · app lock) ➜ no PTR —
+  `ptrBlockedByOverlay()` is the single decider and the state is **remembered at `pointerdown` on `window` (capture)**
+  because a tap outside a menu closes it at `pointerdown` **before** `touchstart` ➜ the tap that closes a layer doesn't
+  reload · (3) **one haptic tick** when crossing the "release to refresh" threshold (`hapticTick()`: Android ➜
+  `@capacitor/haptics` · web ➜ `navigator.vibrate`) — ⛔ **iPhone has no vibration API for web pages** ➜ nothing on
+  iOS PWA. Guard: `native-check` (3/3 mutations caught).
+- ⛔ **While a panel has `.collapsed`/`.search-focus` or `history-expanded` ➜ PTR is fully off**: no indicator,
+  `preventDefault`, or reload. Safari decides cancelability before `touchstart` ends ➜ the non-passive listener is
+  armed ahead in the normal state and removed via `MutationObserver`; **never install it after touchstart**.
+- ⛔ **≥992px** the tab bar sits under the navbar ➜ `.ptr-indicator` gets `top: calc(var(--chrome-top) +
+  var(--tabbar-height) - 41px)` (`react-root.css`, that media only) ➜ at `ready` the gap to the top bar's bottom edge
+  **equals the phone's ±2px** (`gesture-test`: 412 · 1280×800 · 1194×834 · 800×1280). ⛔ Phones <992px untouched.
+- `iosTouchArbiter` uses `Touch.identifier`: 0–30px no action; ~56–212px spring back; ~213px+ refresh. A second finger
+  cancels both. Panel swipes require vertical-axis ratio 1.6 like PTR.
+- Before reload: marker `zoew_ptr_reload_pending` · `history.scrollRestoration='manual'` · clear offsets. ⛔ **Never
+  replace with a bare `location.reload()`** — the history card slides under the navbar. A 5s watchdog releases the
+  spinner if reload doesn't happen; `beforeunload` ➜ cancel the watchdog **without clearing markers**.
 
-- `<head>` រក iOS standalone **តាំងពីមុន stylesheet** (`boot-flags.js`) រួចដាក់
-  `html.ios-standalone`។ ក្នុងនោះ `html/body` ជា `overflow-y:hidden` +
-  `overscroll-behavior-y:none`; **`#appPages` ជា outer scroll owner តែមួយ**។
-- PTR ចាប់តែពេលគ្រប់កន្សោមរមូរនៅកំពូល (`scrollTop <= 1` រួមទាំង negative
-  rubber-band), touch មួយ, ទិសចុះច្បាស់។ Modal/drawer/input/navbar/tabbar
-  មិនមែនគោលដៅ។
-- ⛔ **ច្បាប់ ៣ ដែលម្ចាស់គម្រោងស្នើ (ដូចស្តង់ដា App)** ៖ (១) ម្រាមដៃត្រូវ **ចាប់ផ្តើម** ក្នុង
-  **៤០% ខាងលើ** នៃអេក្រង់ (`PTR_START_ZONE_RATIO`) · (២) **ស្រទាប់ណាមួយបើក** (ប្រអប់ ·
-  ម៉ឺនុយ (...) · របា Slide · សោ App) ➜ គ្មាន PTR — `ptrBlockedByOverlay()` ជាអ្នកសម្រេចតែមួយ
-  ហើយស្ថានភាពត្រូវ **ចងចាំនៅ `pointerdown` លើ `window` (capture)** ព្រោះការប៉ះខាងក្រៅ
-  ម៉ឺនុយបិទវានៅ `pointerdown` **មុន** `touchstart` ➜ ការប៉ះដែលបិទស្រទាប់ មិនផ្ទុកទំព័រ ·
-  (៣) **ញ័រម្តង** ពេលឆ្លងព្រំដែន «លែងដៃដើម្បីផ្ទុក» (`hapticTick()` ៖ Android ➜
-  `@capacitor/haptics` · web ➜ `navigator.vibrate`) — ⛔ **iPhone គ្មាន API ញ័រសម្រាប់ទំព័រ
-  វែប** ➜ គ្មានអ្វីកើតលើ iOS PWA។ អ្នកយាម ៖ `native-check` (mutation ៣/៣ ចាប់)។
-- ⛔ **ពេលផ្ទាំងមាន `.collapsed`/`.search-focus` ឬ `history-expanded` ➜ PTR
-  បិទទាំងស្រុង** ៖ គ្មាន indicator, `preventDefault`, reload។ Safari កំណត់
-  cancelability មុន `touchstart` ចប់ ➜ non-passive listener ត្រូវត្រៀមជាមុន
-  នៅ state ធម្មតា ហើយដកចេញតាម `MutationObserver`; **កុំដំឡើងវាក្រោយ touchstart**។
-- ⛔ **≥992px (tablet/កុំព្យូទ័រផ្តេក) របា Tab ឈរក្រោម navbar** ➜ `.ptr-indicator` ទទួល `top: calc(var(--chrome-top) + var(--tabbar-height) - 41px)` (`react-root.css` តែក្នុង
-  media នោះ) ➜ ពេល `ready` គម្លាតពីគែមក្រោមរបាខាងលើ **ស្មើទូរស័ព្ទ ±2px** (`gesture-test` ៖ 412 · 1280×800 · 1194×834 · 800×1280)។ ⛔ ទូរស័ព្ទ <992px មិនប៉ះ។
-- `iosTouchArbiter` ប្រើ `Touch.identifier` ៖ 0–30px គ្មាន action; ~56–212px
-  spring back; ~213px+ refresh។ ម្រាមដៃទី ២ ➜ cancel ទាំងពីរ។ Panel swipe
-  ត្រូវទាមទារ vertical-axis ratio 1.6 ដូច PTR។
-- មុន reload ៖ marker `zoew_ptr_reload_pending` · `history.scrollRestoration='manual'`
-  · លុប offset។ ⛔ **កុំជំនួសដោយ `location.reload()` ទទេ** — កាតប្រវត្តិរអិល
-  ឡើងក្រោម navbar។ Watchdog 5s ដោះ spinner បើ reload មិនកើត;
-  `beforeunload` ➜ cancel watchdog **ដោយមិនលុប markers**។
+## Hiding bars by scroll direction — `setupChromeAutoHide()`
 
-## ការលាក់របាតាមទិសរមូរ — `setupChromeAutoHide()`
+**Only the *bottom tab bar* hides. The top navbar never hides (user request)** — never re-add
+`body.chrome-hidden .app-navbar`.
 
-**លាក់តែ *របា Tab ខាងក្រោម*។ របា navbar ខាងលើមិនលាក់ទេ (សំណើអ្នកប្រើ)** —
-កុំបន្ថែម `body.chrome-hidden .app-navbar` មកវិញ។
+⛔ **During momentum, hiding/showing the bar must never change the height or padding of any scroll container**
+(the list would jump). So:
 
-⛔ **អំឡុង momentum ការលាក់/បង្ហាញរបា មិនត្រូវប្តូរកម្ពស់ ឬ padding របស់
-កន្សោមរមូរណាមួយឡើយ** (បញ្ជីនឹងលោតរំលង)។ ដូច្នេះ ៖
+- The tab bar is `position: fixed`, moved **only by `translate3d`**.
+- **Android path**: `.table-responsive` has `padding-bottom: var(--tabbar-height)` and `.page-main` has
+  `clip-path: inset(0 0 calc(var(--tabbar-height) - 8px) 0 …)`. ⛔ **Use `--tabbar-height`, not `--chrome-bottom`**
+  (it includes safe-area *below* the viewport ➜ clips 53px too high on iPhone). ⛔ **The card's bottom frame must match
+  iOS pixel for pixel** (owner request): `react-root.css` in `@supports (not (-webkit-touch-callout: none)) and
+  selector(:has(*))` clips **`.app-card`** (not `.page-main`) at `--tabbar-height` ➜ the card stops **8px** above the bar
+  and **paints** the table edge (`::before` + `--card-bg` shadows over hidden rows) and card edge (`::after` · catches
+  taps ➜ never reaches hidden buttons). ⛔ All **paint**: scroll container height unchanged · `chrome-hidden` removes the
+  clip + `visibility: hidden` (⛔ never change `position`/`content` by bar state — that is layout). ⛔ A card whose last
+  child is `.empty-state`: `margin-bottom: var(--tabbar-height)` on the message · empty table has no padding · no
+  `::before`. ⛔ The iOS simulation in checkers **also removes the `not (-webkit-touch-callout…)` block**
+  (`dropAndroidOnlyCss`). Guard: `panel-motion-test` part 9 (Android/iOS screenshots · 5 scenarios × 3 viewports).
+- **iOS path**: `@supports (-webkit-touch-callout: none)` — the card has a real height and **grows down to fill**.
+  `clip-path` **doesn't work on Safari**. ⚠️ Chromium returns `false` for `-webkit-touch-callout` ➜ that block is
+  **never tested by Chromium** — `panel-motion-test.js` extracts and injects it by hand.
+- ⛔ **The 180ms delay and `chrome-space-released` were removed — never bring them back** (gap while the card falls).
+- The scroll handler coalesces via `requestAnimationFrame`. `SHOW_AFTER` (48px) > `HIDE_AFTER` (36px) **on purpose**
+  (iOS momentum emits small reverse motion ➜ a low threshold makes the bar flicker).
 
-- របា Tab ជា `position: fixed` រំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**។
-- **ផ្លូវ Android** ៖ `.table-responsive` មាន `padding-bottom: var(--tabbar-height)`
-  ហើយ `.page-main` មាន `clip-path: inset(0 0 calc(var(--tabbar-height) - 8px) 0 …)`។
-  ⛔ **ត្រូវប្រើ `--tabbar-height` មិនមែន `--chrome-bottom`** (វារួម safe-area
-  ដែលនៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ជាងគែមរបា ៥៣px លើ iPhone)។
-  ⛔ **ស៊ុមក្រោមកាតត្រូវដូច iOS pixel ទល់ pixel** (សំណើម្ចាស់គម្រោង · រូបថត iPhone ធៀប Android ៖ ការកាត់ចំគែមរបា បាំងគែមក្រោម
-  ជ្រុងមូល និងកម្លាតរបស់កាតជានិច្ច) ៖ `react-root.css` ក្នុង `@supports (not (-webkit-touch-callout: none)) and selector(:has(*))`
-  កាត់ **`.app-card`** (មិនមែន `.page-main`) ត្រឹម `--tabbar-height` ➜ កាតឈប់ខាងលើរបា **៨px** ហើយ **គូរក្លែង** គែមតារាង (`::before`
-  + ស្រមោលពណ៌ `--card-bg` គ្រប់ជួរដេកដែលលាក់) និងគែមកាត (`::after` · ចាប់ការចុច ➜ មិនទៅប៊ូតុងដែលលាក់)។ ⛔ ទាំងអស់ជា **paint** ៖
-  កម្ពស់កន្សោមរមូរមិនប្រែ · `chrome-hidden` ដក clip + `visibility: hidden` (⛔ កុំប្តូរ `position`/`content` តាមស្ថានភាពរបា —
-  នោះជា layout)។ ⛔ កាតដែល `.empty-state` ជាកូនចុងក្រោយ ៖ `margin-bottom: var(--tabbar-height)` លើសារ · តារាងទទេគ្មាន padding ·
-  គ្មាន `::before` (បើអត់ សារ «មិនទាន់មាន…» លិចក្រោមរបា)។ ⛔ ការក្លែង iOS ក្នុង checker ត្រូវ **ដកប្លុក `not (-webkit-touch-callout…)`**
-  ចេញផង (`dropAndroidOnlyCss`)។ អ្នកយាម ៖ `panel-motion-test` ផ្នែក ៩ (ប្រៀបរូបថត Android/iOS · ៥ សេណារីយ៉ូ × ៣ viewport)។
-- **ផ្លូវ iOS** ៖ `@supports (-webkit-touch-callout: none)` — កាតមានកម្ពស់ពិត
-  ហើយ **រីកចុះមកបំពេញ**។ `clip-path` **មិនដើរលើ Safari**។ ⚠️ Chromium ត្រឡប់
-  `false` សម្រាប់ `-webkit-touch-callout` ➜ ច្បាប់ក្នុងប្លុកនោះ **មិនដែលត្រូវ
-  សាកក្នុង Chromium** — `panel-motion-test.js` ស្រង់វាចេញរួចចាក់ចូលដោយដៃ។
-- ⛔ **យន្តការពន្យារ 180ms និង `chrome-space-released` ត្រូវដកចេញរួច — កុំនាំ
-  មកវិញ** (របារអិលចេញភ្លាម តែកាតធ្លាក់មកបំពេញ 180ms ក្រោយ ➜ ចន្លោះទទេ)។
-- Scroll handler ត្រូវ coalesce តាម `requestAnimationFrame`។ `SHOW_AFTER`
-  (៤៨px) ខ្ពស់ជាង `HIDE_AFTER` (៣៦px) **ដោយចេតនា** (momentum របស់ iOS
-  បញ្ចេញចលនាបញ្ច្រាសបន្តិច ➜ ពិដានទាបធ្វើឲ្យរបាភ្លឹបភ្លែត)។
+## Frame rate and lite mode
 
-## ចង្វាក់ស៊ុម និងទម្រង់ស្រាល
+- **Web pages can't raise the refresh rate** — `measureDisplayHz()` takes the **median** of 24 rAF intervals, clamped
+  `[10, 120]`.
+- `longFrameThresholdMs()` = `frame budget × 1.6` (min 12ms) — ⛔ **never bring back a fixed number**.
+- **`setupAdaptivePerformance()` measures frame drops twice** (1.5s and 10s) and sets `body.perf-lite` only when **both**
+  drop — one measurement confuses boot business with a slow device. `perf-lite` **never touches business features**.
 
-- **ទំព័រវែបមិនអាចដំឡើងល្បឿន refresh បានទេ** — `measureDisplayHz()` យក
-  **median** នៃចន្លោះ rAF ២៤ ស៊ុម រួច clamp `[10, 120]`។
-- `longFrameThresholdMs()` = `ថវិកាមួយស៊ុម × 1.6` (យ៉ាងតិច ១២ms) — ⛔ **កុំយក
-  លេខថេរមកវិញ** (២៦ms ខុសទាំង ២ ទិស)។
-- **`setupAdaptivePerformance()` វាស់ការធ្លាក់ស៊ុម ២ ដង** (វិនាទីទី ១.៥ និង
-  ១០) រួចដាក់ `body.perf-lite` តែពេលធ្លាក់ **ទាំង ២ ដង** — ការវាស់តែម្តងនឹង
-  ច្រឡំភាពរវល់ពេល boot ជាឧបករណ៍យឺត។ `perf-lite` **មិនប៉ះមុខងារអាជីវកម្មទេ**។
+## Barcode scanner
 
-## ម៉ាស៊ីនស្កេន Barcode
+- **Decoder is ZXing-WASM in the repo**: `vendor/zxing-wasm.js` + `vendor/zxing_reader.wasm` (both in `sw.js`
+  `CORE_SHELL`), decoding via `ZXingWASM.readBarcodes(imageData, options)` on `ImageData` from a canvas. ⛔ CSP needs
+  `'wasm-unsafe-eval'`.
+- **Code 128 only — never add formats back.** `SCAN_FORMAT_NAMES = ['Code128']` (ZXing-WASM) and
+  `NATIVE_SCAN_FORMAT_NAMES = ['code_128']` (`BarcodeDetector` on Android). ITF · CODABAR · CODE_39 **have no mandatory
+  check digit** ➜ one label can be read as a **completely different number** "successfully".
+- **`confirmLiveScan()` is the second layer** — the same number must read `SCAN_CONFIRM_REPEATS` (2) consecutive
+  frames. **Both** live paths go through it; image and hardware paths **don't** by design (single frame).
+- **Decode frame size bounds *reading range* on iPhone**: `LIVE_SCAN_WIDTH_STEPS = [640, 800, 1024, 1280]` starting at
+  the **highest step**, then `noteLiveScanCost()` steps down/up by real cost. ⛔ **Never pin the width.** Height capped at
+  `LIVE_SCAN_MAX_BAND_PX` (240px) on purpose (vertical bars ➜ **horizontal** quality matters).
+- **Real decode cost decides the width**: `noteLiveScanCost()` keeps an EMA, steps down above `LIVE_SCAN_SLOW_MS`
+  (22ms) and up below `LIVE_SCAN_FAST_MS` (9ms). Scan interval as fps (`LIVE_SCAN_MIN_FPS` 10 ➜ `LIVE_SCAN_MAX_FPS` 120).
+- **`takeFreshVideoFrame()` is part of the protection** — decoding one frame twice makes `confirmLiveScan()` a 1-frame
+  check.
+- **QR scanning in Config is a separate reader** (`configQrReader`) — unrelated to `SCAN_FORMAT_NAMES`.
 
-- **ម៉ាស៊ីនអានជា ZXing-WASM ក្នុង repo** ៖ `vendor/zxing-wasm.js` +
-  `vendor/zxing_reader.wasm` (ទាំង ២ ក្នុង `CORE_SHELL` របស់ `sw.js`) ហើយ
-  ការឌិកូដជា `ZXingWASM.readBarcodes(imageData, options)` លើ `ImageData`
-  ដែលយកចេញពី canvas។ ⛔ CSP ត្រូវមាន `'wasm-unsafe-eval'`។
-- **បញ្ជី format មានតែ Code 128 — កុំបន្ថែមវិញ។** `SCAN_FORMAT_NAMES =
-  ['Code128']` (ZXing-WASM) និង `NATIVE_SCAN_FORMAT_NAMES = ['code_128']`
-  (`BarcodeDetector` លើ Android) មានធាតុមួយគត់។ ITF · CODABAR · CODE_39
-  **គ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ចទេ** ➜ ស្លាកមួយអាចត្រូវអានចេញជា **លេខ
-  ផ្សេងទាំងស្រុង** ដោយ «ជោគជ័យ»។
-- **`confirmLiveScan()` ជាជាន់ការពារទី ២** — លេខត្រូវអានឃើញដដែល
-  `SCAN_CONFIRM_REPEATS` (២) ស៊ុមជាប់គ្នា។ ផ្លូវ live **ទាំង ២** ត្រូវឆ្លងកាត់វា។
-  ផ្លូវរូបភាព និង hardware **មិនឆ្លងកាត់ទេ** ដោយចេតនា (ស៊ុមតែមួយ)។
-- **ទំហំស៊ុមឌិកូដជាព្រំដែននៃ *ជួរអាន* លើ iPhone** ៖ `LIVE_SCAN_WIDTH_STEPS =
-  [640, 800, 1024, 1280]` ចាប់ពី **ជំហានខ្ពស់បំផុត** រួច `noteLiveScanCost()`
-  ទម្លាក់/លើកតាមថ្លៃពិត។ ⛔ **កុំចាក់ទទឹងឲ្យថេរ**។ កម្ពស់កាត់ត្រឹម
-  `LIVE_SCAN_MAX_BAND_PX` (២៤០px) ដោយចេតនា (barcode ជាបន្ទាត់បញ្ឈរ ➜ គុណភាព
-  **ផ្តេក** ទេដែលសំខាន់)។
-- **ថ្លៃឌិកូដពិតជាអ្នកសម្រេចទទឹង** ៖ `noteLiveScanCost()` ថែ EMA ហើយ
-  ទម្លាក់ជំហានពេលលើស `LIVE_SCAN_SLOW_MS` (២២ms) និងលើកពេលក្រោម
-  `LIVE_SCAN_FAST_MS` (៩ms)។ ចន្លោះស្កេនសរសេរជា fps
-  (`LIVE_SCAN_MIN_FPS` ១០ ➜ `LIVE_SCAN_MAX_FPS` ១២០)។
-- **`takeFreshVideoFrame()` ជាផ្នែកនៃជាន់ការពារ** — ស៊ុមតែមួយឌិកូដ ២ ដងធ្វើឲ្យ
-  `confirmLiveScan()` ក្លាយជា ១ ស៊ុមភ្លាម។
-- **ការស្កេន QR ពេល Config ជាម៉ាស៊ីនអានដាច់ដោយឡែក** (`configQrReader`) —
-  មិនពាក់ព័ន្ធនឹង `SCAN_FORMAT_NAMES` សោះ។
+## Clock
 
-## នាឡិកា
+Every timestamp taking part in retention/revenue decisions (`createdAt`, `closedAt`, `deletedAt`, `lockerUpdatedAt`,
+and the "now" they're compared with) uses **`getServerNow()`**, not raw `Date.now()`. Purely cosmetic/local timers (PIN
+lockout, salt id, scan debounce, script-load deadlines, cache TTL) **keep raw `Date.now()` on purpose** — don't "fix"
+them.
 
-Timestamp ទាំងអស់ដែលចូលរួមក្នុងការសម្រេច retention/revenue (`createdAt`,
-`closedAt`, `deletedAt`, `lockerUpdatedAt`, និង «ឥឡូវ» ដែលប្រៀបនឹងវា) គណនាតាម
-**`getServerNow()`** មិនមែន `Date.now()` ឆៅទេ។ Timer ដែលជា cosmetic/local
-សុទ្ធសាធ (PIN lockout, salt id, scan debounce, deadline load script, TTL cache)
-**នៅតែប្រើ `Date.now()` ឆៅដោយចេតនា** — កុំ «កែ» ពួកវា។
+- ⛔ **Searching only `Date.now()` misses real spots — also search argument-less `new Date()`.** `clock-hygiene.js`
+  scans the **AST**, asserts 4 directions, and **its allowlist must have no dead entries**.
+- **The business calendar is `Asia/Phnom_Penh`**, not the device zone: `appZoneParts()` is the single converter
+  (`Intl` + fixed UTC+7 fallback — Cambodia has no DST); `getZoneDateKey(ms, dayOffset)` does day arithmetic **in the
+  zone** (⛔ never `d.setDate(d.getDate() - 1)`); `getFormattedClockTime(ms)` is the source of `item.time`. ⛔ **Old
+  data is never recomputed.** ⛔ **The stored format is `HH:MM:SS (YYYY-MM-DD)` — never change it**; sorting happens on
+  **display** via `formatScanStamp(raw)`, which **fails open**.
+- **`elapsedSince(mark)` is the single basis for every elapsed-time measurement** — `!mark` ➜ `Infinity`;
+  `delta < 0` ➜ `Infinity` (**fail-open**). A **shared** byte-identical helper in both apps. ⛔ **Deadline comparisons
+  are outside this rule** — `Date.now() < lockoutUntil` (PIN lockout) stays, because going backward makes the lockout
+  **longer** = the safe direction.
+- **Destructive cleanup needs the clock *from the server* and a *live* connection**:
+  `cleanupClockIsTrustworthy()` = `serverClockTrusted && isDatabaseConnected`. ⛔ **Never drop
+  `isDatabaseConnected`** ("connect ➜ WiFi off ➜ change date" put 2 parcels in trash, one `abandon` ➜ **money deducted**
+  + full purge). ⛔ The gate sits in `runAutomaticCleanupRules()` and `runAutomaticDeletedCleanup()` **themselves**
+  (`debouncedRenderAfterHistorySync` calls them directly). ⛔ **No "clock jump detection" via `performance.now()`** —
+  iOS PWA suspension makes it lie.
+- **`serverClockOffsetIsFromServer(offsetMs)` is the single gate**: `offsetMs !== 0 || isDatabaseConnected ||
+  hasEverConnectedToDatabase`. ⛔ **Never simplify it to one check** (we never measured whether
+  `.info/serverTimeOffset` or `.info/connected` arrives first). ⛔ **A non-number value `return`s at once** — never call
+  with an old offset.
 
-- ⛔ **ការស្វែងរកតែ `Date.now()` ខកខានចំណុចពិត — ត្រូវរក `new Date()` (គ្មាន
-  argument) ផងដែរ។** `clock-hygiene.js` ស្កេនតាម **AST** អះអាង ៤ ទិស ហើយ
-  **បញ្ជីអនុញ្ញាតត្រូវគ្មានធាតុងាប់**។
-- **ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh`** មិនមែនតំបន់ម៉ោងឧបករណ៍ ៖
-  `appZoneParts()` ជាអ្នកបម្លែងតែមួយ (`Intl` + fallback UTC+7 ថេរ — កម្ពុជា
-  គ្មាន DST); `getZoneDateKey(ms, dayOffset)` ធ្វើនព្វន្ធថ្ងៃ **ក្នុងតំបន់
-  ម៉ោង** (⛔ កុំប្រើ `d.setDate(d.getDate() - 1)`); `getFormattedClockTime(ms)`
-  ជាប្រភពនៃ `item.time`។ ⛔ **ទិន្នន័យចាស់មិនគណនាឡើងវិញទេ**។
-  ⛔ **ទម្រង់ដែលរក្សាទុកជា `HH:MM:SS (YYYY-MM-DD)` — កុំប្តូរវា**; ការតម្រៀប
-  ធ្វើខាង **បង្ហាញ** តាម `formatScanStamp(raw)` ដែល **fail-open**។
-- **`elapsedSince(mark)` ជាមូលដ្ឋានតែមួយនៃរាល់ការវាស់រយៈពេលកន្លងផុត** —
-  `!mark` ➜ `Infinity`; `delta < 0` ➜ `Infinity` (**fail-open**)។ វាជា helper
-  **ចែករំលែក** byte-identical ក្នុង App ទាំង ២។ ⛔ **ការប្រៀបធៀប *ថ្ងៃឈប់*
-  មិនស្ថិតក្នុងច្បាប់នេះទេ** — `Date.now() < lockoutUntil` (PIN lockout)
-  ត្រូវនៅដដែល ព្រោះការថយក្រោយធ្វើឲ្យ lockout **យូរជាង** = ទិសសុវត្ថិភាព។
-- **ការសម្អាតដែលបំផ្លាញត្រូវការនាឡិកា *ពី server* និងការភ្ជាប់ *រស់*** ៖
-  `cleanupClockIsTrustworthy()` = `serverClockTrusted && isDatabaseConnected`។
-  ⛔ **កុំដក `isDatabaseConnected` ចេញ** (លំដាប់ «ភ្ជាប់ ➜ បិទ WiFi ➜ ប្តូរថ្ងៃ»
-  វាស់បាន ៖ កញ្ចប់ ២ ចូលធុងសំរាម មួយ `abandon` ➜ **ដកលុយ** + purge ទាំងមូល)។
-  ⛔ ច្រកទ្វារត្រូវឈរក្នុង `runAutomaticCleanupRules()` និង
-  `runAutomaticDeletedCleanup()` **ខ្លួនវា** (`debouncedRenderAfterHistorySync`
-  ហៅផ្ទាល់)។ ⛔ **កុំបន្ថែម «ការរាវរកនាឡិកាលោត» តាម `performance.now()`** —
-  លើ iOS ការផ្អាក PWA ធ្វើឲ្យវារាយការណ៍ខុស។
-- **`serverClockOffsetIsFromServer(offsetMs)` ជាច្រកទ្វារតែមួយ** ៖
-  `offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase`។
-  ⛔ **កុំសម្រួលវាទៅជាការពិនិត្យតែមួយ** (យើងមិនបានវាស់ថា
-  `.info/serverTimeOffset` ឬ `.info/connected` មកមុន)។ ⛔ **តម្លៃមិនមែនលេខ
-  ត្រូវ `return` ភ្លាម** — កុំហៅដោយ offset ចាស់។
+## ⛔ CSP and `data-act` — never bring `onclick=` back
 
-## ⛔ CSP និង `data-act` — កុំនាំ `onclick=` ត្រឡប់មកវិញ
+**2.13.0 removed `'unsafe-inline'` from `script-src` in both apps.** ⛔ Every `on*=` attribute and inline `<script>` is
+**silently refused in production** while tests without CSP all pass.
 
-**កំណែ 2.13.0 ដក `'unsafe-inline'` ចេញពី `script-src` ទាំង ២ App។** ⛔ រាល់
-attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **បដិសេធស្ងាត់ៗលើ
-ផលិតកម្ម** ខណៈតេស្តគ្មាន CSP ជោគជ័យទាំងអស់។
-
-| អ្វី | របៀបសរសេរ |
+| What | How |
 |---|---|
-| ហៅគ្មានអាគុយម៉ង់ | `data-act="openSideDrawer"` |
-| អាគុយម៉ង់ថេរ | `data-act="filterDataByDate" data-args='["today"]'` (JSON) |
-| អាគុយម៉ង់ពីទិន្នន័យ | `data-a1="${sanitizeInput(item.id)}"` |
-| ព្រឹត្តិការណ៍ | `data-evt="1"` ➜ `event` ដាក់ខាងមុខ |
-| ធាតុខ្លួនឯង | `data-self="1"` ➜ ធាតុដាក់ខាងមុខគេបំផុត |
-| ព្រឹត្តិការណ៍ក្រៅ `click` | `data-on="change"` (ឬ `input`/`submit`) |
+| no-arg call | `data-act="openSideDrawer"` |
+| constant args | `data-act="filterDataByDate" data-args='["today"]'` (JSON) |
+| data args | `data-a1="${sanitizeInput(item.id)}"` |
+| event | `data-evt="1"` ➜ `event` prepended |
+| the element itself | `data-self="1"` ➜ element first |
+| events other than `click` | `data-on="change"` (or `input`/`submit`) |
 
-១. **`ACTION_ALLOWLIST` ជាព្រំដែន** — កុំប្តូរទៅ `window[name]` ត្រង់ៗ។
-២. **បន្ថែមប៊ូតុងថ្មី ➜ ត្រូវបន្ថែមឈ្មោះក្នុងបញ្ជី** — `wiring.js` និង
-   `csp-enforced-test.js` អះអាង **២ ទិស** (សិទ្ធិតូចបំផុត)។
-៣. **`event.currentTarget` ជា `document`** — function ដែលត្រូវការធាតុត្រូវ
-   ទទួលវាតាម `data-self`។
-៤. ⛔ **កុំបន្ថែម listener ទី ២ លើធាតុដែលមាន `data-act` រួច** — សកម្មភាព
-   នឹង **រត់ពីរដង** (ធ្ងន់បំផុតលើ `executePermanentDelete`)។ ⛔ **ទម្រង់ដែល
-   រអិលកាត់ភ្នែក ៖ `el.onclick = …` ដែលកំណត់ពី JS** — វាមិនលេចក្នុង HTML ➜
-   `wiring.js` និង `csp-enforced-test` មើលមិនឃើញ។ វាស់បាន ៖ `#navAuthBtn`
-   មាន `data-act` **និង** `onclick` ➜ ការចុច «ចាកចេញ» រត់ **ពីរផ្លូវ**។
-   ⛔ ការកែជា **ច្រកទ្វារតែមួយ** ៖ `data-act` មួយដែលសម្រេចតាមទង់ស្ថានភាព។
-   `page-nav-test` រាប់ **ការហៅពិត** ក្រោយចុច ➜ ត្រូវជា **១**។
-   🔴 **ហើយវាវិលមកតាម App ទី ២** (2.19.24) ៖ ការកែខាងលើធ្វើតែក្នុង ZoeW
-   ➜ ZoeKeyGen `#navAuthBtn` នៅមាន `data-act` **និង** `onclick` ➜ ចូលរួច
-   ចុច «ចាកចេញ» = ចាកចេញ **ហើយ** ប្រអប់ចូលលេច។ ⛔ ការកែជាច្រកទ្វារ
-   តែមួយដដែល (`navAuthFlow()`) — ហើយថ្នាក់នេះឥឡូវចាក់សោ **តាម
-   រចនាសម្ព័ន្ធ ឆ្លង App ទាំង ២** ដោយ `action-binding-test`។
-៥. **`<script>` ក្នុង `<head>` ត្រូវនៅក្នុង `boot-flags.js`** ដែលផ្ទុកជា
-   `<script src>` **មុន stylesheet**។ វាត្រូវនៅក្នុងសំបកស្នូលរបស់ Service Worker (បញ្ជីក្នុង
-   `serviceWorkerPlugin` ក្នុង `ZoeW/vite.config.mts` ➜ `__CORE_SHELL__`)។
-៦. `style-src` **នៅរក្សា `'unsafe-inline'` ដដែល** — **កុំដកវាចេញដោយគ្មានការស្នើ និងការវាស់**
-   (React កំណត់ `style={{…}}` តាម CSSOM តែការដកវាមិនទាន់ត្រូវវាស់លើ browser ពិតទាំងអស់)។
-៧. ⛔ **កុំបន្ថែម CDN ចូល `script-src`** — engine ស្កេន និង SheetJS នៅ
-   **ក្នុង repo**; `sw.js` បោះបង់សំណើឆ្លង origin ➜ ធនធាន CDN មិនដែលចូល cache។
-   CSP ត្រូវមាន `'wasm-unsafe-eval'`។
+1. **`ACTION_ALLOWLIST` is the boundary** — never switch to plain `window[name]`.
+2. **New button ➜ add its name to the list** — `wiring.js` and `csp-enforced-test.js` assert **both directions**
+   (least privilege).
+3. **`event.currentTarget` is `document`** — functions needing the element take it via `data-self`.
+4. ⛔ **Never add a second listener to an element that has `data-act`** — the action **runs twice** (worst on
+   `executePermanentDelete`). ⛔ **The sneaky form: `el.onclick = …` set from JS** — invisible to `wiring.js` and
+   `csp-enforced-test`. ⛔ Fix = **one gate**: a single `data-act` that decides by a state flag (`navAuthFlow()` in
+   ZoeKeyGen). `page-nav-test` counts **real calls** after a click ➜ must be **1**; `action-binding-test` locks this
+   **structurally across both apps**.
+5. **`<head>` scripts live in `boot-flags.js`**, loaded as `<script src>` **before the stylesheet**, and it must be in
+   the Service Worker core shell (list in `serviceWorkerPlugin` in `ZoeW/vite.config.mts` ➜ `__CORE_SHELL__`).
+6. `style-src` **keeps `'unsafe-inline'`** — **don't remove it without a request and measurement** (React sets
+   `style={{…}}` via CSSOM, but removal is unmeasured on all real browsers).
+7. ⛔ **Never add a CDN to `script-src`** — the scan engine and SheetJS are **in the repo**; `sw.js` drops cross-origin
+   requests ➜ CDN resources never enter the cache. CSP needs `'wasm-unsafe-eval'`.
 
-## ⛔ ធនធានឆ្លង origin ក្នុង `<head>` — READ BEFORE TOUCHING index.html
+## ⛔ Cross-origin resources in `<head>` — READ BEFORE TOUCHING index.html
 
-ធនធានឆ្លង origin **មិនដែលចូល cache** ➜ បើវាទប់ការគូរ នោះលើបណ្តាញ «ភ្ជាប់តែ
-ស្លាប់» អ្នកប្រើមើល **អេក្រង់សទទេ** ខណៈគ្រប់ឯកសាររបស់ App នៅក្នុង cache រួច
-(វាស់បាន ៖ **២០,២៥១ ms** ➜ **២៤៩ ms**)។
+Cross-origin resources **never enter the cache** ➜ if they block rendering, on a "connected but dead" network the user
+sees a **white screen** while every app file is cached (measured: **20,251 ms** ➜ **249 ms**).
 
-- **script ឆ្លង origin ត្រូវជា `async`** (`js.sentry-cdn.com`) — `error-reporting.js`
-  មានផ្លូវផ្ទុកយឺតរួចហើយ; `sentry-load-race-test.js` ចាក់សោវា។
-- **stylesheet ឆ្លង origin ត្រូវជា `media="print"`** រួច `boot-flags.js` ប្តូរ
-  ទៅ `all` ពេល `DOMContentLoaded`។ ⛔ **កុំប្រើ `onload="this.media='all'"`**
-  (CSP បដិសេធស្ងាត់ៗ)។ `<noscript>` ជាផ្លូវបម្រុង។
+- **Cross-origin scripts must be `async`** (`js.sentry-cdn.com`) — `error-reporting.js` has a late-load path;
+  `sentry-load-race-test.js` locks it.
+- **Cross-origin stylesheets use `media="print"`** and `boot-flags.js` switches to `all` on `DOMContentLoaded`.
+  ⛔ **Never `onload="this.media='all'"`** (CSP refuses silently). `<noscript>` is the fallback.
 
-## CSS invariant ដែលចាក់សោ — ⛔ READ BEFORE EDITING `src/styles/*.css`
+## Locked CSS invariants — ⛔ READ BEFORE EDITING `src/styles/*.css`
 
-`ZoeW/src/styles/app.css` ត្រូវ **ដូច `style.css` របស់ ZoeW vanilla byte ទល់ byte** (`npm run parity`) ➜ វា **គ្មាន comment**
-ហើយ CSS ថ្មីដែលមានតែក្នុង React ទៅ `react-root.css` · `native.css` ➜ ហេតុផលរស់នៅត្រង់នេះ។ selector ខាងក្រោម (ឈ្មោះ
-`style.css`) សំដៅលើ CSS ទាំង ៣ នេះ។
+`ZoeW/src/styles/app.css` must equal vanilla ZoeW `style.css` **byte for byte** (`npm run parity`) ➜ it **has no
+comments**, and React-only CSS goes to `react-root.css` · `native.css` ➜ reasons live here. Selectors below refer to
+these 3 files.
 
-| Selector | ច្បាប់ | ហេតុអ្វី |
+| Selector | Rule | Why |
 |---|---|---|
-| `.status-dot::after` | ចលនាលើ `transform`/`opacity` មិនមែន `box-shadow` · ⛔ online ភ្លឹប **៣ ជុំ រួចឈប់** (`animation-iteration-count: 3` ក្នុង `react-root.css`) · «កំពុងភ្ជាប់» នៅ `infinite` | `box-shadow` composite មិនបាន ➜ គូរឡើងវិញរាល់ស៊ុមជារៀងរហូត · animation `infinite` ណាមួយពេល App **ស្ងៀម** ➜ compositor គូររាល់ vsync (វាស់បាន ៖ DrawFrame ១៤៦ / ៣ វិ.) ➜ អេក្រង់ LTPO ចុះ Hz ទាបមិនបាន · ស៊ីថ្ម (`perf-check` «ស៊ុមពេលស្ងៀម» ៖ trace ពិត + probe ទិសផ្ទុយ) |
-| `.call-btn-recall` (ប៊ូតុង «ខលម្តងទៀត») | ⛔ ភ្លឹប **៥.៥ ជុំ** ពេលលេច រួចឈប់ត្រង់ពណ៌ក្រហម ហើយនៅ **`--action-danger` ជាប់** (`react-root.css` ៖ `background-color` + `animation-iteration-count: 5.5`) · ⛔ កុំប្រគល់ `infinite` មកវិញ | ពណ៌ផ្ទៃ `infinite` ជា animation **main thread** (paint រាល់ស៊ុម) ➜ វាស់បាន ៖ BeginMainThreadFrame **១៨១** · Paint ~**៧០០** / ៣ វិ. ខណៈ DrawFrame **០** (ខ្វាក់) — ទោះជួរដេកនៅក្រៅអេក្រង់ក្នុងកន្សោមរមូរ · ក្រោយកែ **១** · reduced-motion ឃើញក្រហមជាប់ (មុន ៖ បៃតង គ្មានសញ្ញា) (`perf-check` «ស៊ុមពេលស្ងៀម») |
-| `.app-navbar` | គ្មាន `backdrop-filter` · `transform` · `transition` | iOS គណនា blur ឡើងវិញរាល់ស៊ុម; របាខាងលើ **មិនលាក់** |
-| `.modal` | ផ្ទៃខ្មៅធម្មតា គ្មាន `backdrop-filter` | ប្រអប់បើករាល់ការស្កេន |
-| `.scan-line` | ចលនាលើ `transform` មិនមែន `top` | `top` បង្កើត layout រាល់ស៊ុមចំពេលឌិកូដ |
-| `.page-main` | `height` ថេរ + `flex: none` (`max-width: 991px`) | កាតត្រូវខ្ពស់ដូចគ្នា ២ របៀប (តារាងចំណុច ៥) |
-| `.table-responsive` | `max-height: none; flex: 1` **scope ត្រឹម `.page-main`** | modal រក្សា 62vh |
-| `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **មិនមែន `width: 100%`** | `width:100%` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `nowrap` ធ្វើឲ្យអត្ថបទ **ហៀរជាន់គ្នា** ជំនួសការរមូរផ្តេក (`layout-check` ចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរក្នុងមួយក្រឡា) |
-| `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` — ⚠️ **តម្លៃ ២ នេះរស់នៅក្នុង `@media (max-width: 991px)` *២ ប្លុកដាច់ដោយឡែក*** (`scroll-padding-top` នៅប្លុកទី ១ · `padding-top` នៅប្លុកទី ២ ប្រហែល ៣០០ បន្ទាត់ក្រោម) ➜ **កែមួយ ត្រូវពិនិត្យមួយទៀត**។ ⛔ កុំរួមប្លុកទាំង ២ ដើម្បី «សម្អាត» — នោះប្តូរលំដាប់ cascade ក្នុងតំបន់ហាមចូល | បើភ្លេច ➜ **PTR ស្លាប់** (`panel-motion-test` ៖ `snapRestNearTop`) |
-| `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា |
-| `.app-pages.history-expanded` | ⛔ `display: block` + `> .app-page.active { height: 100% }` (`react-root.css` ឈ្នះ `display: flex` របស់ `app.css`) ⛔ **កុំប្តូរ `display` របស់ `.app-pages` តាមរបៀប** | ការប្តូរ `display` block ↔ flex លើ container ធំជាងគេ ➜ browser បង្កើត layout tree ឡើងវិញទាំងស្រុងរាល់ការហូត (វាស់បាន ៖ dirty ៩៧.៨% · Layout ៤៥៨–៥៥៩ms លើ ២៦០ ជួរ ➜ ក្រោយកែ ១ms) · ធរណីមាត្រដូចគ្នាក្នុង noise (Android + iOS · ៣ viewport) · `panel-motion-test` ផ្នែក ៨ វាស់ **សមាមាត្រ object ដែល dirty** ពី trace ពិត |
-| `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |
-| `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | safe-area នៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ ៥៣px លើ iPhone |
-| `.app-card` ក្នុង `.page-main` (Android · `react-root.css`) | `clip-path` ត្រឹម `--tabbar-height` + `::before`/`::after` គូរគែមតារាង/កាត ⛔ paint តែប៉ុណ្ណោះ | ស៊ុមក្រោមកាតដូច iOS ដោយមិនប្តូរកម្ពស់កន្សោមរមូរ (`panel-motion-test` ផ្នែក ៩ · មើល «ការលាក់របាតាមទិសរមូរ») |
-| `@supports (-webkit-touch-callout: none)` | ផ្លូវ iOS ដាច់ដោយឡែក | `clip-path` មិនដើរលើ Safari |
-| `.boot-splash` | `pointer-events: none` ជានិច្ច | ផ្ទាំងតុបតែងមិនលេបការចុច |
-| `.boot-splash-bar > span` | រំកិល **ខាងក្នុងរបា** (`width: 40%`, `translateX(0 → 150%)`) | `translateX(-100%)` លើ span ពេញទទឹង ➜ `left = -38` នៅ 320px |
-| គ្រប់ `font-size` | `calc(N * var(--fs-unit))` — **គ្មាន `px` ថេរ** (លើកលែង `#pdfExportPrintArea`) | បើមួយកន្លែងនៅ `px` វានៅតូចខណៈអក្សរជុំវិញរីក |
-| `:focus-visible` | រង្វង់ `outline` ២px លើប៊ូតុង/តំណ/checkbox/file/range | អ្នកប្រើ Tab និងម៉ាស៊ីនស្កេន hardware ត្រូវដឹងថាឈរនៅណា |
-| ប្រអប់វាយអត្ថបទ | `outline: none` ត្រូវមាន `:focus` ជំនួស | `outline: none` ស្អាតៗ = គ្មានសញ្ញាផ្តោតសោះ |
-| `.modal-content` · `.modal-btns button` | ខ្ពស់ **៤៦px** | គោលដៅប៉ះម្រាមដៃ |
-| control ដែលមិនមែនប្រអប់អត្ថបទ | ត្រូវបិទ `min-height`/`padding` ដែលធ្លាក់ពី `.modal-content input` (`min-height: 0; padding: 0; flex: none`) | `min-height: 46px` លាត checkbox ទៅ ១៦×៤៦px **គ្រប់ប្រអប់** |
-| ការសរសេរជាន់ `.modal-content` **និងកូនរបស់វា** | ត្រូវឈរ **ក្រោយ** ជួរទូទៅ (ឬបង្កើន specificity) | specificity ស្មើ ➜ **លំដាប់សម្រេច** ➜ ច្បាប់ស្លាប់ស្ងាត់ៗ។ ⛔ **វាគ្របសំបករបស់ប្រអប់ខ្លួនឯងដែរ** — វាស់បាន (2.31.10) ៖ `.zto-sync-modal-content` ឈរនៅបន្ទាត់ ៤៣៤ ខណៈ `.modal-content` នៅ ៩៨៤ ➜ `max-width` និង `text-align` របស់វា **មិនដែលអនុវត្តសោះ** (600px/center ជំនួស 520px/left)។ ការសរសេរជាន់ដទៃទាំងអស់ (`.trash-modal-content` · `.scan-remove-modal-content` · `#… .modal-content`) ឈរក្រោយ ➜ មានតែជួរនោះ ដែលខុស។ ⛔ `css-classes`/`css-media-override`/`css-var` **មើលមិនឃើញ** ➜ អ្នកយាមត្រូវប្រៀប `getComputedStyle()` នឹងតម្លៃដែល **ដេរីវេពី CSS ពិត** បូក probe ថាជួរទាំង ២ ផ្តល់តម្លៃខុសគ្នា |
-| `.btn-biometric` | **ផ្ទៃស គែមក្រហម** បូក `margin-bottom` | ផ្ទៃផ្កាឈូកមើលទៅដូច **ប្រអប់សារកំហុស** |
-| `.bio-ico` · `.bio-label` | ស្លាករុំក្នុង span ២ | `gap` របស់ flex **គ្មានប្រសិទ្ធភាព** លើ text node តែមួយ |
-| **ZoeKeyGen** `.app-container` | `display: grid` ២ ជួរ នៅ `≥900px` · `max-width: 1180px` | បើអត់ ➜ ចន្លោះទទេ ៦៦០px នៅ 1440px |
-| **ZoeKeyGen** `#appContainer` | បង្ហាញ/លាក់តាម class `hidden` — **មិនមែន** `style.display` | inline `display: flex` ឈ្នះ `display: grid` របស់ media query |
+| `.status-dot::after` | animates `transform`/`opacity`, not `box-shadow` · ⛔ online blinks **3 times then stops** (`animation-iteration-count: 3` in `react-root.css`) · "connecting" stays `infinite` | `box-shadow` can't composite ➜ repaint every frame forever · any `infinite` animation while **idle** ➜ the compositor draws every vsync ➜ LTPO screens can't drop Hz · battery (`perf-check` "idle frames": real trace + reverse probe) |
+| `.call-btn-recall` ("ខលម្តងទៀត") | ⛔ blinks **5.5 times** on appearance, then stays **`--action-danger`** (`react-root.css`: `background-color` + `animation-iteration-count: 5.5`) · ⛔ never restore `infinite` | infinite background color is a **main-thread** animation (paint every frame) even when the row is off-screen · reduced-motion sees steady red (`perf-check` "idle frames") |
+| `.app-navbar` | no `backdrop-filter` · `transform` · `transition` | iOS recomputes blur every frame; the top bar **never hides** |
+| `.modal` | plain dark backdrop, no `backdrop-filter` | modals open on every scan |
+| `.scan-line` | animates `transform`, not `top` | `top` causes layout every frame while decoding |
+| `.page-main` | fixed `height` + `flex: none` (`max-width: 991px`) | card height equal in both modes (5-point table) |
+| `.table-responsive` | `max-height: none; flex: 1` **scoped to `.page-main`** | modals keep 62vh |
+| `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **not `width: 100%`** | `width:100%` + `nowrap` makes text **overflow onto each other** instead of horizontal scroll (`layout-check` injects test rows and measures per-cell overflow) |
+| `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` equal to `padding-top` — ⚠️ **these live in *two separate* `@media (max-width: 991px)` blocks** (`scroll-padding-top` in the first · `padding-top` ~300 lines later) ➜ **edit one, check the other**. ⛔ Never merge the blocks to "clean up" — it reorders the cascade in the forbidden zone | forget ➜ **PTR dies** (`panel-motion-test`: `snapRestNearTop`) |
+| `#appPages.panel-gliding` | `scroll-snap-type: none` during motion | `.page-main` is a snap target ➜ WebKit snap fights the motion |
+| `.app-pages.history-expanded` | ⛔ `display: block` + `> .app-page.active { height: 100% }` (`react-root.css` beats `app.css` `display: flex`) ⛔ **never switch `.app-pages` `display` by mode** | block ↔ flex on the biggest container rebuilds the whole layout tree on every drag (measured: 97.8% dirty · Layout 458–559ms on 260 rows ➜ 1ms after fix) · `panel-motion-test` part 8 measures the **dirty object ratio** from a real trace |
+| `.table-responsive` | `padding-bottom: var(--tabbar-height)` | reserves bar space **inside the scroll container** ➜ only `scrollHeight` changes |
+| `.page-main` | `clip-path` uses `--tabbar-height`, **not** `--chrome-bottom` | safe-area is *below* the viewport ➜ clips 53px too high on iPhone |
+| `.app-card` in `.page-main` (Android · `react-root.css`) | `clip-path` at `--tabbar-height` + `::before`/`::after` paint table/card edges ⛔ paint only | iOS-like card bottom without changing scroll container height (`panel-motion-test` part 9) |
+| `@supports (-webkit-touch-callout: none)` | separate iOS path | `clip-path` doesn't work on Safari |
+| `.boot-splash` | always `pointer-events: none` | decoration never swallows taps |
+| `.boot-splash-bar > span` | moves **inside the bar** (`width: 40%`, `translateX(0 → 150%)`) | `translateX(-100%)` on a full-width span ➜ `left = -38` at 320px |
+| every `font-size` | `calc(N * var(--fs-unit))` — **no fixed `px`** (except `#pdfExportPrintArea`) | a fixed `px` stays small while surrounding text grows |
+| `:focus-visible` | 2px `outline` ring on buttons/links/checkboxes/file/range | Tab users and hardware scanners need to know where they are |
+| text inputs | `outline: none` needs a `:focus` replacement | clean `outline: none` = no focus signal at all |
+| `.modal-content` · `.modal-btns button` | **46px** tall | finger tap targets |
+| non-text controls | disable inherited `min-height`/`padding` from `.modal-content input` (`min-height: 0; padding: 0; flex: none`) | `min-height: 46px` stretched checkboxes to 16×46px **in every modal** |
+| overrides of `.modal-content` **and its children** | must sit **after** the general rule (or raise specificity) | equal specificity ➜ **order decides** ➜ the rule dies silently — including a modal's own shell (`.zto-sync-modal-content` before `.modal-content` never applied). ⛔ `css-classes`/`css-media-override`/`css-var` **can't see it** ➜ guards compare `getComputedStyle()` with values **derived from real CSS** plus a probe that both rules give different values |
+| `.btn-biometric` | **white background, red border** plus `margin-bottom` | a pink fill looks like an **error box** |
+| `.bio-ico` · `.bio-label` | label wrapped in 2 spans | flex `gap` **has no effect** on a single text node |
+| **ZoeKeyGen** `.app-container` | `display: grid` 2 columns at `≥900px` · `max-width: 1180px` | otherwise a 660px empty gap at 1440px |
+| **ZoeKeyGen** `#appContainer` | shown/hidden by class `hidden` — **not** `style.display` | inline `display: flex` beats the media query's `display: grid` |
 
-**មាត្រដ្ឋានអក្សរមាន ៣ ជំហាន** ៖ ទូរស័ព្ទ `< 700px` (clamp ដល់ 1.1px) ·
-ថេប្លេត `700–991px` (floor 1.2px) · desktop `>= 992px` (ដល់ 1.35px)។
-ការប្រកាសមានតែ **២** (`:root` និង `@media (min-width: 700px)`) ➜ ការឆ្លងកាត់
-992px **រលូនទាំងស្រុង**។ ⛔ **តំបន់ `< 700px` និង `>= 992px` មិនប្រែសោះ។**
-⛔ **ZoeKeyGen មិនប្រែទេ** (`tabletStep: null` អះអាងទិសផ្ទុយ)។
-
-⛔ **`style.display` ក្នុង JS សរសេរជាន់ layout របស់ CSS** — បង្ហាញ/លាក់តាម
-**class**; ទទឹងជួរឈរតារាងនៅ **CSS** មិនមែន inline។
+**Type scale has 3 steps**: phone `< 700px` (clamp to 1.1px) · tablet `700–991px` (floor 1.2px) · desktop `>= 992px`
+(up to 1.35px). Only **2** declarations (`:root` and `@media (min-width: 700px)`) ➜ crossing 992px is **fully smooth**.
+⛔ **`< 700px` and `>= 992px` never change.** ⛔ **ZoeKeyGen doesn't change** (`tabletStep: null` asserts the
+reverse). ⛔ **`style.display` in JS overrides CSS layout** — show/hide via **class**; table column widths live in
+**CSS**, not inline.
 
 ---
 
-# 🌐 បណ្តាញ · Service Worker · License
+# 🌐 Network · Service Worker · License
 
-## ⛔ ការព្យួរ ≠ ការធ្លាក់ — របៀបបរាជ័យ ៥ ដាច់ដោយឡែក
+## ⛔ Hang ≠ fail — 5 separate failure modes
 
-នេះជាថ្នាក់កំហុសដែលវិលមកម្តងហើយម្តងទៀតតាមទ្វារផ្សេងៗ (2.22.4 · 2.23.1 ·
-2.25.6 · 2.25.8 · 2.42.6 · 2.45.4)។ dependency អាចបរាជ័យក្នុងរបៀប **៥** ៖
+This class returned again and again through different doors (2.22.4 · 2.23.1 · 2.25.6 · 2.25.8 · 2.42.6 · 2.45.4):
 
-| របៀប | អ្វីកើតឡើង | អ្វីដែលត្រូវការ |
+| Mode | What happens | What's needed |
 |---|---|---|
-| **បដិសេធ** | promise reject | `.catch()` |
-| **អវត្តមាន** | `TypeError` **synchronous** | ការពិនិត្យវត្តមានជាមុន — `.catch()` **ចាប់មិនបាន** |
-| **ព្យួរ** | មិនឆ្លើយ មិនបដិសេធ | **ពិដានពេល** ដែល settle ដោយរចនាសម្ព័ន្ធ |
-| **យឺត តែជោគជ័យ** | ដោះ **ក្រោយ** ពិដាន | **ការងារក្រោយ commit ត្រូវរត់ពេលវាមកដល់** |
-| **បដិសេធ តែអនុវត្តរួច** | `runTransaction` reject `disconnect` ខណៈ server **commit រួច** (ack បាត់) | **អាន server ពិតសិន** មុនបញ្ច្រាស (`runTransactionResolved()`) |
+| **reject** | promise rejects | `.catch()` |
+| **absent** | **synchronous** `TypeError` | a presence check first — `.catch()` **can't catch it** |
+| **hang** | neither answers nor rejects | a **time ceiling** that settles structurally |
+| **slow success** | resolves **after** the ceiling | **post-commit work runs when it arrives** |
+| **rejected but applied** | `runTransaction` rejects `disconnect` while the server **already committed** (lost ack) | **read the real server first** before reversing (`runTransactionResolved()`) |
 
-ច្បាប់ ៖
+- ⛔ **`disconnect` ≠ "not applied"** — the SDK rejects an already-sent transaction with `disconnect` when the
+  connection drops before the ack (measured on the real SDK + emulator). ⛔ `fb.get()` is not evidence (an active
+  listener answers from cache). `withTransactionOutcomeResolution()` wraps `fb` **once in `initFirebase()`** ➜ every
+  `fb.runTransaction` (single choke point ⛔ not editing 40+ call sites) reads **REST with the ID token** and compares
+  with the sent/pre-send value: `applied` ➜ **success** (`txOutcome: 'applied'`) · `not-applied` ➜ reject as before ·
+  `unknown` ➜ reject + Sentry `zone: 'money'` (once per path). ⛔ A late-committing cleanup checks **another device
+  hasn't already written the trash** (`cleanupClaimAccountedElsewhere()`) before writing/deducting.
+- **`dbOp(promise, msg)` is the single path** for Firebase calls behind a lock (`withTimeout(…, DB_OP_TIMEOUT_MS)` =
+  15s). ⛔ No more direct `await fb.<dataOp>(…)`. The right question is "**can this lock get stuck?**", not "is there
+  `fb.` here?" — calls through **helpers** count too.
+- ⛔ **RTDB doesn't reject writes offline** — it queues them and sends on reconnect ➜ **transactions commit after the
+  timeout**. **`armLateCommit(promise, onCommitted, onFailed, label)`** keeps the original promise and finishes
+  post-commit work (trash · money · pickup stats). ⛔ **`committed: false` and rejection go to `onFailed`**. ⛔ **Messages
+  tell the truth**: while the transaction lives, the app **never claims data was rolled back**.
+- **`armLateWrite(promise, onDone)`** for writes that release keys (registry · in-memory) and **`notifyIfSlow(promise,
+  ms, message)`** to tell the user. ⛔ `notifyIfSlow` must **return the same promise** (`=== promise`) — wrapping it in a
+  new `.then()` swallows the caller's rejection ➜ money revert dies silently.
+- ⛔ **No `dbOp()` on trash writes** — its `catch` path **reverses** (adds money back · removes from trash) ➜ when the
+  queued write lands later, the item lives in **both** places.
+- ⛔ **The one exception: `claimBarcodeInRegistry`** — its call sites already have a ceiling plus late reporting. An
+  inner ceiling makes a late-successful claim **never released** ➜ **that barcode can never be scanned again**.
+- **Batch work aborts after the *first* hang** (`dbOpStalled(e)`) — otherwise 30 trash items = **7.5 minutes** with the
+  lock held.
+- **`sw.js`: `timedFetch()` is the single network path** — `NETWORK_TIMEOUT_MS` (20s) with `AbortController` **plus a
+  race fallback** ➜ settling is **guaranteed by structure**. `networkOnly()` uses it too. ⚠️ The ceiling covers the
+  header phase only.
+- **`loadScriptOnce()` has a ceiling and *forgets* on failure** — a `<script>` the browser never answers fires
+  **neither `onload` nor `onerror`**. Forgetting compares **identity** (`=== pending`). The failure message tells the
+  real cause ("too long" ⛔ not "load failed").
 
-- ⛔ **`disconnect` ≠ «មិនបានអនុវត្ត»** — SDK បដិសេធ transaction ដែលបានផ្ញើរួចដោយ `disconnect` ពេលការតភ្ជាប់ដាច់មុន ack
-  (វាស់លើ SDK ពិត + emulator ពិត ៖ server ប្រែរួច ខណៈ promise reject)។ ⛔ `fb.get()` មិនមែនភស្តុតាង (listener សកម្ម ➜ ឆ្លើយពី
-  cache)។ `withTransactionOutcomeResolution()` រុំ `fb` **ម្តងក្នុង `initFirebase()`** ➜ រាល់ `fb.runTransaction` (ចំណុចច្របាច់តែមួយ ⛔
-  មិនមែនកែ ៤០+ កន្លែងហៅ) អាន **REST ជាមួយ ID token** ប្រៀបនឹងតម្លៃដែលបានផ្ញើ/មុនផ្ញើ ៖ `applied` ➜ **ជោគជ័យ** (`txOutcome:
-  'applied'`) · `not-applied` ➜ បដិសេធដដែល · `unknown` ➜ បដិសេធ + Sentry `zone: 'money'` (១ ដង/path)។ ⛔ ការសម្អាតដែល commit
-  យឺតត្រូវពិនិត្យថា **ឧបករណ៍ផ្សេងមិនបានសរសេរធុងសំរាមរួច** (`cleanupClaimAccountedElsewhere()`) មុនសរសេរ/ដកលុយ។
-- **`dbOp(promise, msg)` ជាផ្លូវតែមួយ** សម្រាប់ការហៅ Firebase ដែលឈរខាងក្រោយ
-  សោ (`withTimeout(…, DB_OP_TIMEOUT_MS)` = ១៥ វិ.)។ ⛔ គ្មាន `await
-  fb.<dataOp>(…)` ដោយផ្ទាល់ទៀតទេ។ សំណួរត្រឹមត្រូវគឺ «**តើសោនេះអាចជាប់បានទេ?**»
-  មិនមែន «តើមាន `fb.` នៅត្រង់នេះទេ?» — ការហៅតាមរយៈ **helper** ក៏រាប់ដែរ។
-- ⛔ **RTDB មិនបដិសេធការសរសេរពេលក្រៅបណ្តាញទេ** — វាចាក់ជួរក្នុងឧបករណ៍ ហើយ
-  ផ្ញើទៅ server ពេលភ្ជាប់មកវិញ ➜ **transaction commit ក្រោយ timeout**។
-  ដូច្នេះ **`armLateCommit(promise, onCommitted, onFailed, label)`** ត្រូវ
-  រក្សា promise ដើម រួចបញ្ចប់ការងារក្រោយ commit (ធុងសំរាម · លុយ · ស្ថិតិយក)។
-  ⛔ **`committed: false` និងការបដិសេធ ត្រូវទៅ `onFailed`**។
-  ⛔ **សារត្រូវនិយាយការពិត** ៖ ខណៈ transaction នៅរស់ App **មិនត្រូវអះអាងថា
-  ទិន្នន័យត្រូវបានត្រឡប់មកវិញ**។
-- **`armLateWrite(promise, onDone)`** សម្រាប់ការសរសេរដែលដោះកូនសោ (registry ·
-  in-memory) និង **`notifyIfSlow(promise, ms, message)`** សម្រាប់ប្រាប់អ្នកប្រើ។
-  ⛔ `notifyIfSlow` ត្រូវ **ត្រឡប់ promise ដដែល** (`=== promise`) — ការរុំវា
-  ក្នុង `.then()` ថ្មីលេបការបដិសេធរបស់អ្នកហៅ ➜ ផ្លូវ revert លុយស្លាប់ស្ងាត់។
-- ⛔ **កុំដាក់ `dbOp()` លើការសរសេរធុងសំរាម** — ផ្លូវ `catch` របស់វា
-  **បញ្ច្រាស** (បូកលុយវិញ · ដកចេញពីធុងសំរាម) ➜ ពេលការសរសេរដែលចូជួរចុះពិត
-  ក្រោយមក ធាតុនោះនឹងនៅ **ទាំង ២ កន្លែង**។
-- ⛔ **ការលើកលែងតែមួយ ៖ `claimBarcodeInRegistry`** — កន្លែងហៅរបស់វាមានពិដាន
-  បូកការរាយការណ៍យឺតរួចហើយ។ ការដាក់ពិដានខាងក្នុងធ្វើឲ្យ claim ដែលជោគជ័យយឺត
-  **មិនដែលត្រូវដោះ** ➜ **ស្កេនចូលមិនបានជារៀងរហូត**។
-- **ការងារជាក្រុមត្រូវបោះបង់ក្រោយការព្យួរ *ដំបូង*** (`dbOpStalled(e)`) —
-  បើអត់ ធុងសំរាម ៣០ ធាតុ = **៧,៥ នាទី** ដែលសោជាប់ពេញរយៈពេលនោះ។
-- **`sw.js` ៖ `timedFetch()` ជាផ្លូវបណ្តាញតែមួយ** — `NETWORK_TIMEOUT_MS`
-  (២០ វិ.) ជាមួយ `AbortController` **បូកផ្លូវបម្រុង race** ➜ ការ settle
-  ត្រូវ **ធានាដោយរចនាសម្ព័ន្ធ** មិនមែនដោយ API ណាមួយ។ `networkOnly()` ត្រូវ
-  ប្រើវាដែរ។ ⚠️ ពិដាននេះគ្របតែដំណាក់កាល header។
-- **`loadScriptOnce()` ត្រូវមានពិដាន ហើយ *លុបការចងចាំ* ពេលធ្លាក់** —
-  `<script>` ដែល browser មិនដែលឆ្លើយ បាញ់ **ទាំង `onload` ទាំង `onerror`
-  មិនកើត**។ ការលុបត្រូវប្រៀបធៀប **អត្តសញ្ញាណ** (`=== pending`)។
-  សារបរាជ័យត្រូវប្រាប់មូលហេតុពិត («យូរពេក» ⛔ មិនមែន «ផ្ទុកបរាជ័យ»)។
+## Listener and connection recovery
 
-## ការស្តារ listener និងការតភ្ជាប់
+- **`dbListenerFailedPaths` records *which* path died** — `handleDbListenerError(err, pathKey)` always gets the **path
+  key**. ⛔ **Never pass bare `handleDbListenerError` as an error callback** — no key ➜ **dead guard** ➜ siblings
+  announce recovery while one listener never reattaches all session.
+- **`dbListenerViewIsStale(key)` is the single basis** of "untrustworthy view" — ⛔ nothing asks
+  `dbListenerPendingPaths.has()` directly.
+- **Keys live as one shared constant** (`DB_LISTENER_KEYS` · `DB_LISTENER_KEY_DELETED`) — the key asked is the key
+  registered (`initDatabaseListeners()` builds a `listenerRefs` map ➜ pending keys match real listeners).
+- **`.info/*` follows the same rule** — `infoListenerFailedPaths` · `noteInfoListenerAlive(pathKey)`. ⛔ **Only the death
+  of `.info/connected` may announce a network drop.** ⛔ **Fix both apps.**
+- **Progress is a *timestamp*** (`dbListenerProgressAt`) written in `noteDbListenerAlive()` ➜ polling is
+  **idempotent**. ⛔ **Never overwrite evidence inside a poll.**
+- **`canCycleDatabaseConnection()`**: `goOffline()` **cuts an in-progress handshake** ➜ cycling allowed only when
+  `hasEverConnectedToDatabase` or `networkJustReturned`. ⛔ Never drop this condition.
+- **`retryFirebaseSdkNow()` is called from `online` *and* `visibilitychange` in both apps** — on phones a returning
+  network often **never fires `online`**. ⛔ `shared-fns.js` **can't see it** (handlers aren't FunctionDeclarations) ➜
+  **assert the *events* directly**.
+- **`FIREBASE_SDK_RETRY_MIN_GAP_MS` (3s) must be *smaller* than the ladder's first step (5s)** or the ladder is
+  swallowed. ⛔ `clearFirebaseSdkRetry()` **never resets `lastFirebaseSdkAttemptAt`**.
+- **SDK recovery is a *page reload*** — **the browser module map caches failures per URL for the page's life**
+  (measured: re-import · entry query · new `<script type="module">` **all still fail**). `reloadForFirebaseSdk()` has
+  **4** ceilings: `firebaseSdkUnavailable` · `navigator.onLine !== false` · **`anyModalIsOpen()` ➜ no reload** ·
+  `FIREBASE_SDK_RELOAD_MAX` (3)/`MIN_GAP` (20s). ⛔ **`navigator.onLine` lies** ➜ **measure reachability of the SDK host
+  first** (`probeFirebaseSdkHost()`: `FIREBASE_SDK_PROBE_URL` · no-cors · ceiling) · unreachable ➜ **don't spend the
+  ceiling** but keep the ladder · one probe in flight (`firebaseSdkProbeInFlight`) · the gate is re-checked **after the
+  probe** (a modal just opened ➜ no reload) · ⛔ CSP `connect-src` must allow that origin (else fetch throws like a dead
+  network ➜ **never reloads**) · both apps (`connection-recovery-test` 10ខ5 · `netlify-config-scope-test` ឃ).
+  ⛔ `recoverFirebaseSdk()` exits at once when `!firebaseSdkUnavailable`.
+- **The listener recovery ladder never cuts a resync in progress** — `dbListenerResyncIsProgressing()` decides, with
+  `DB_LISTENER_PROGRESS_GRACE_MS` (20s) ➜ a **delay**, not a block.
+- **A network drop ≠ a failure** — `pendingHistoryPatches` rerun when `.info/connected` returns `true`. ⛔ **Only
+  `disconnect` or SDK `already deleted` may queue** (`permission_denied` and timeouts **revert**). ⛔ Queueing is
+  **opt-in per call site** — `saveEditedPhone()` **must not use it**. ⛔ **Never add `flushPendingHistoryPatches()` to
+  the 60s cycle** — it burns `HISTORY_PATCH_RETRY_MAX` while offline.
 
-- **`dbListenerFailedPaths` កត់ថា path *ណា* ដែលងាប់** —
-  `handleDbListenerError(err, pathKey)` ត្រូវទទួល **កូនសោ path** ជានិច្ច។
-  ⛔ **កុំបញ្ជូន `handleDbListenerError` ទទេជា error callback** — គ្មានកូនសោ
-  ➜ **ការការពារដែលងាប់** ➜ បងប្អូនប្រកាសជំនួសថាជាសះស្បើយ ខណៈ listener មួយ
-  មិនដែល attach ឡើងវិញពេញវគ្គ។
-- **`dbListenerViewIsStale(key)` ជាមូលដ្ឋានតែមួយ** នៃ «ទិដ្ឋភាពមិនគួរទុកចិត្ត» —
-  ⛔ គ្មានកន្លែងណាសួរ `dbListenerPendingPaths.has()` ដោយផ្ទាល់ទៀតទេ។
-- **កូនសោត្រូវរស់នៅជាថេរតែមួយដែលចែករំលែក** (`DB_LISTENER_KEYS` ·
-  `DB_LISTENER_KEY_DELETED`) — កូនសោដែលសួរត្រូវជាកូនសោដែលដាក់ចូល
-  (`initDatabaseListeners()` សាង `listenerRefs` map ➜ pending keys ស៊ីនឹង
-  listener ដែលភ្ជាប់ពិត)។
-- **`.info/*` អនុវត្តច្បាប់ដដែល** — `infoListenerFailedPaths` ·
-  `noteInfoListenerAlive(pathKey)`។ ⛔ **មានតែការងាប់របស់ `.info/connected`
-  ទេដែលអាចប្រកាសថាដាច់បណ្តាញ**។ ⛔ **ត្រូវកែ App ទាំង ២**។
-- **វឌ្ឍនភាពជា *ត្រាពេលវេលា*** (`dbListenerProgressAt`) សរសេរក្នុង
-  `noteDbListenerAlive()` ➜ ការសួរ **idempotent**។ ⛔ **កុំសរសេរជាន់ភស្តុតាង
-  ខាងក្នុងការសួរ** (សួរ ២ ដងក្នុង tick ដដែល ➜ លទ្ធផលខុសគ្នា)។
-- **`canCycleDatabaseConnection()`** ៖ `goOffline()` **កាត់ផ្តាច់ការតភ្ជាប់
-  ដែលកំពុងដំណើរការ** ➜ វដ្តត្រូវអនុញ្ញាតតែពេល `hasEverConnectedToDatabase`
-  ឬ `networkJustReturned`។ ⛔ កុំដកលក្ខខណ្ឌនេះចេញ។
-- **`retryFirebaseSdkNow()` ត្រូវហៅពី `online` *និង* `visibilitychange`
-  ទាំង ២ App** — លើទូរស័ព្ទ បណ្តាញដែលត្រឡប់មកវិញជាញឹកញាប់ **មិនបាញ់ `online`**
-  សោះ។ ⛔ `shared-fns.js` **មើលមិនឃើញ** ព្រោះ handler មិនមែនជា
-  FunctionDeclaration ➜ **ត្រូវអះអាង *ព្រឹត្តិការណ៍* ដោយផ្ទាល់**។
-- **`FIREBASE_SDK_RETRY_MIN_GAP_MS` (៣ វិ.) ត្រូវ *តូចជាង* ជំហានដំបូងនៃជណ្តើរ
-  (៥ វិ.)** បើមិនដូច្នេះជណ្តើរត្រូវលេបដោយពិដាន។ ⛔ `clearFirebaseSdkRetry()`
-  **មិនត្រូវ reset `lastFirebaseSdkAttemptAt`**។
-- **ការស្តារ SDK ត្រូវជា *ការផ្ទុកទំព័រឡើងវិញ*** — **module map របស់ browser
-  cache ការបរាជ័យតាម URL ពេញអាយុទំព័រ** (វាស់រួច ៖ import ឡើងវិញ · query លើ
-  entry point · `<script type="module">` ថ្មី **សុទ្ធតែនៅតែធ្លាក់**)។
-  `reloadForFirebaseSdk()` មានពិដាន **៤** ៖ `firebaseSdkUnavailable` ·
-  `navigator.onLine !== false` · **`anyModalIsOpen()` ➜ មិនផ្ទុកឡើងវិញ** ·
-  `FIREBASE_SDK_RELOAD_MAX` (៣)/`MIN_GAP` (២០ វិ.)។
-  ⛔ **`navigator.onLine` និយាយមិនពិត** (WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យអស់លុយ) ➜ ពិដាន ៣ អស់ក្នុង ~១ នាទី ខណៈបណ្តាញស្លាប់ ➜ ពេលមកវិញ
-  SDK **មិនដែលស្តារ** ➜ ការផ្ទុកឡើងវិញត្រូវ **វាស់ការឈានដល់ host របស់ SDK ជាមុន** (`probeFirebaseSdkHost()` ៖ `FIREBASE_SDK_PROBE_URL` ·
-  no-cors · ពិដានពេល) · ឈានមិនដល់ ➜ **មិនចំណាយពិដាន** តែជណ្តើរនៅរស់ · ការវាស់មួយហោះម្តង (`firebaseSdkProbeInFlight`) · ច្រកទ្វារពិនិត្យ
-  **ម្តងទៀតក្រោយការវាស់** (ប្រអប់ទើបបើក ➜ មិនផ្ទុក) · ⛔ CSP `connect-src` ត្រូវអនុញ្ញាត origin នោះ (បើអត់ fetch បោះដូចបណ្តាញដាច់ ➜
-  **មិនដែលផ្ទុកឡើងវិញ**) · App ទាំង ២ (`connection-recovery-test` ១០ខ៥ · `netlify-config-scope-test` ឃ)។
-  ⛔ `recoverFirebaseSdk()` ត្រូវចាកចេញភ្លាមពេល `!firebaseSdkUnavailable`។
-- **ជណ្តើរស្តារ listener មិនត្រូវកាត់ផ្តាច់ resync ដែលកំពុងដើរ** —
-  `dbListenerResyncIsProgressing()` ជាអ្នកសម្រេច ជាមួយ
-  `DB_LISTENER_PROGRESS_GRACE_MS` (២០ វិ.) ➜ វាជាការ **ពន្យារ** មិនមែនការទប់។
-- **ការដាច់បណ្តាញ ≠ ការបរាជ័យ** — `pendingHistoryPatches` រត់ឡើងវិញពេល
-  `.info/connected` ត្រឡប់ជា `true`។ ⛔ **`disconnect` ឬ SDK `already deleted` ទើបអាចចូលជួរ**
-  (`permission_denied` និង timeout ត្រូវ **revert ដដែល**)។ ⛔ ការចូលជួរជា
-  **opt-in តាមកន្លែងហៅ** — `saveEditedPhone()` **មិនត្រូវប្រើវា**។
-  ⛔ **កុំបន្ថែម `flushPendingHistoryPatches()` ចូលវដ្ត ៦០ វិនាទី** — វានឹង
-  ស៊ី `HISTORY_PATCH_RETRY_MAX` អស់ខណៈក្រៅបណ្តាញ។
+## Short rules — easy to break, heavy consequences
 
-## ច្បាប់ខ្លីបន្ថែម — ងាយបំពាន · ផលធ្ងន់
-
-- **Reconfig កណ្តាលការផ្ទុក SDK** ៖ `initFirebase()` អាន config **មុន**
-  `await waitForFirebaseSDK()` ហើយច្រានការហៅដដែលៗចេញ ➜ `finally` ត្រូវ
-  ប្រៀបធៀប config ក្នុង storage នឹង `savedConfig` **ហើយរត់ឡើងវិញតែពេលវាប្រែ**។
-  ⛔ **កុំបង្កើតការរត់ឡើងវិញគ្មានលក្ខខណ្ឌ** — វានឹងជាន់ជណ្តើរ
-  `scheduleFirebaseSdkRetry()` ក្លាយជា **រង្វិលជុំស៊ីបណ្តាញ**។
-  ⛔ **ច្បាប់នេះជារបស់ App ទាំង ២** ៖ `saveFirebaseConfig()` របស់ ZoeW និង
-  ZoeKeyGen សរសេរកូនសោ `zoew_firebase_config` ដដែល រួចហៅ `initFirebase()`
-  **បេះបិទ** ➜ លំដាប់នេះមានក្នុង App ទាំង ២។ វាស់បាន (2.19.25) ៖ ZoeKeyGen
-  ខ្វះការរត់ឡើងវិញនោះ ➜ config ថ្មីត្រូវបោះចោល **ស្ងាត់ៗ** ➜ ឧបករណ៍អ្នកលក់
-  នៅសរសេរ Activation Key ចូល **License Project ចាស់** ខណៈអ្នកប្រើឃើញ
-  «រក្សាទុករួចរាល់» — ខណៈ **checker ១៧៤ បៃតងទាំងអស់ · SKIP ០** ព្រោះផ្នែក ១៥
-  របស់អ្នកយាមស្រង់តែ `SRC` (ZoeW)។ ⛔ មេរៀនទូទៅ ៖ **អ្នកយាមដែលស្រង់ពី
-  ឯកសារ ១ ខណៈច្បាប់ជារបស់ App ទាំង ២ = កាលបរិច្ឆេទផុតកំណត់**
-- **ការស្វែងរកតាមបណ្តាញត្រូវចិញ្ចឹមតារាងវិញ** (`rememberCustomerTableRow()`) ➜
-  ការស្កេន barcode ដដែលលើកក្រោយឆ្លើយ ០ ms។ ⛔ **ការស្វែងរកដែល *រកមិនឃើញ*
-  មិនត្រូវចាក់ជួរដេកទទេចូលតារាង** (នោះជា cache អវិជ្ជមានដែលកុហក)។
-  **`customerTableIsPartial` ជាទង់ភាពស្មោះត្រង់** ៖ ការខកខានលើតារាងដែល
-  **មិនពេញលេញ** ត្រូវធ្លាក់ទៅបណ្តាញ; ការខកខានលើតារាង **ស្រស់ និងពេញលេញ**
-  មិនត្រូវតាំងម៉ោងទេ។ ការតាំងម៉ោងទាញត្រូវ **បោះបង់ក្រោយ
-  `CUSTOMER_TABLE_SOON_MAX_WAIT_MS`** — ការភ្ញាក់រាល់ ៣ វិនាទីខណៈក្រៅបណ្តាញ
-  ជាការស៊ីថ្មសុទ្ធសាធ។
-- **`armLookupFocus()`** ៖ focus ក្រោយ `LOOKUP_FOCUS_GRACE_MS` (២៥០ms) បើ
-  lookup មិនទាន់ចប់ — មិន focus ពេលអ្នកប្រើវាយរួច · ប្រអប់បិទ · ឬ
-  `pendingBarcode` ប្តូរ ហើយ focus **តែម្តងគត់**។
-- **`planPickupLedgerRepair()` មិនដកការ Reset ស្ថិតិយកវិញទេ** — វាជួសជុលតែពេល
-  `bucket.total === recordedPackages`។ ការកែ helper នោះត្រូវរក្សាលក្ខណៈនេះ។
-  សោ `pickupResetInFlight` ត្រូវដោះក្នុង `resetClearHistoryOperationState()`។
-- **`PIN_PROMPT_MESSAGES`** ៖ `requestPinBeforeConfig(targetAction, promptKey)` —
-  **រាល់ការបន្ថែមប៊ូតុងដែលការពារដោយ PIN ត្រូវបន្ថែមធាតុថ្មីក្នុងតារាងនោះ**
-  បើមិនដូច្នេះអ្នកប្រើឃើញសារ «Config ឬ Reconfig» លើគ្រប់ប៊ូតុង។
-  ⛔ **ការ *ប្រើឡើងវិញ* ឈ្មោះរបស់ប៊ូតុងដទៃ ធ្លាក់ក្នុងច្បាប់ដដែល** ៖ សារ
-  ពិពណ៌នា **អ្វីដែលនឹងកើតក្រោយវាយ PIN** ➜ ឈ្មោះតែមួយដែលបម្រើ **សកម្មភាព
-  គោលដៅ ២ ផ្សេងគ្នា** = យ៉ាងហោចណាស់ម្ខាងអានសារខុស។ វាស់បាន (2.31.10) ៖
-  `lookupApi` បម្រើគោលដៅ **៣** ➜ ការស្កេន និងការចុចរបា ZTO បង្ហាញ toast
-  «ដោះសោ…»/«ពិនិត្យស្ថានភាព…» រួចប្រអប់រាយ «ដើម្បី **កំណត់** API» ➜ សារ ២
-  ផ្ទុយគ្នាក្នុងលំហូរតែមួយ។ ⛔ `promptKey` ប៉ះ **អត្ថបទ** ប៉ុណ្ណោះ
-  (`applyPinPromptText()`) — ការបំបែកវាមិនប្តូរឥរិយាបថទេ
-  (`pin-prompt-test.js`)។
-- **ជីវមាត្រជាការ *ដោះសោ* PIN មិនមែនជំនួស PIN** — `deriveLookupSecretKey(pin)`
-  យក PIN ទៅបង្កើតកូនសោ AES ➜ ជីវមាត្រត្រឹមតែ **រុំ PIN ទុក**។ ការបើកត្រូវ
-  វាយ PIN ពិតជាមុនជានិច្ច; PIN ដែលស្រាយចេញ **ត្រូវផ្ទៀងផ្ទាត់នឹង
-  `zoew_security_pin_hash` មុនទុកចិត្ត**; ការប្តូរ PIN ➜ លុបការចងចាស់។
-  `completePinUnlock()` ជា **ផ្លូវជោគជ័យតែមួយ** សម្រាប់ទាំង PIN និងជីវមាត្រ។
-  ⛔ **ZoeKeyGen ទទួលតែ WebAuthn PRF** (មិនមានរបៀប «device» ដែលរក្សា PIN ក្នុង storage) ➜ ឧបករណ៍គ្មាន PRF ➜ «មិនគាំទ្រ» (`keygen-biometric-test`)។
-- **`linkIsFrugal()` ត្រូវ *fail open*** (Safari គ្មាន API នេះ) ហើយរំលងតែការងារ
-  **ស្រេចចិត្ត** — ⛔ កុំរំលងការងារចាំបាច់តាមវា។
-- ⛔ **JavaScript អនុញ្ញាត declaration ឈ្មោះស្ទួន ហើយ function ក្រោយសរសេរជាន់
-  មុនដោយស្ងាត់** — syntax · boot · UI test អាចបៃតងទាំងអស់ខណៈមាន drift។
-  `function-surface-test.js` ទប់វា។
+- **Reconfig during SDK load**: `initFirebase()` reads config **before** `await waitForFirebaseSDK()` and drops repeat
+  calls ➜ `finally` compares stored config with `savedConfig` **and reruns only when it changed**. ⛔ **Never an
+  unconditional rerun** — it stacks on `scheduleFirebaseSdkRetry()` into a **network-eating loop**. ⛔ **This rule
+  belongs to both apps**: `saveFirebaseConfig()` of ZoeW and ZoeKeyGen writes the same `zoew_firebase_config` key and
+  calls `initFirebase()` ➜ both have this order (ZoeKeyGen once lacked the rerun ➜ new config silently dropped ➜ keys
+  written to the **old License Project** while "saved" showed). ⛔ General lesson: **a guard extracting from 1 file
+  while the rule belongs to both apps = an expiry date.**
+- **Network lookups feed the table back** (`rememberCustomerTableRow()`) ➜ the next scan of the same barcode answers in
+  0 ms. ⛔ **A lookup that *finds nothing* never inserts an empty row** (a lying negative cache). **`customerTableIsPartial`
+  is the honesty flag**: a miss on a **partial** table falls back to the network; a miss on a **fresh, complete** table
+  schedules nothing. The scheduled pull **gives up after `CUSTOMER_TABLE_SOON_MAX_WAIT_MS`** (waking every 3s offline
+  only burns battery).
+- **`armLookupFocus()`**: focus after `LOOKUP_FOCUS_GRACE_MS` (250ms) if the lookup isn't done — never when the user
+  already typed · the modal closed · `pendingBarcode` changed, and focus **once**.
+- **`planPickupLedgerRepair()` never undoes a pickup Reset** — it repairs only when `bucket.total === recordedPackages`.
+  Lock `pickupResetInFlight` is released in `resetClearHistoryOperationState()`.
+- **`PIN_PROMPT_MESSAGES`**: `requestPinBeforeConfig(targetAction, promptKey)` — **every new PIN-protected button adds
+  an entry**, else users see the "Config or Reconfig" message everywhere. ⛔ **Reusing another button's key falls under
+  the same rule**: the message describes **what happens after the PIN** ➜ one key serving **2 target actions** = one
+  side reads the wrong message. ⛔ `promptKey` touches **text** only (`applyPinPromptText()`) (`pin-prompt-test.js`).
+- **Biometrics *unlock* the PIN, never replace it** — `deriveLookupSecretKey(pin)` derives the AES key from the PIN ➜
+  biometrics only **wrap the PIN**. Enabling requires typing the real PIN first; a decrypted PIN **is verified against
+  `zoew_security_pin_hash` before trust**; changing the PIN ➜ unbind. `completePinUnlock()` is the **single success
+  path** for PIN and biometrics. ⛔ **ZoeKeyGen accepts only WebAuthn PRF** (no "device" mode storing the PIN) ➜ no PRF
+  ➜ "unsupported" (`keygen-biometric-test`).
+- **`linkIsFrugal()` must *fail open*** (Safari lacks the API) and skips only **optional** work — ⛔ never required
+  work.
+- ⛔ **JavaScript allows duplicate declarations and a later function silently overwrites an earlier one** — syntax ·
+  boot · UI tests can all pass with drift. `function-surface-test.js` blocks it.
 
 ## Service Worker
 
-- **cache-first** ជាមួយ `CACHE_VERSION` តាមលំនាំ `<app>-vN`; filter សម្អាត
-  cache ស្កេនតែ prefix របស់ខ្លួន — ⛔ **កុំពង្រីក filter នោះ**។
-- **`CORE_SHELL` ប្រើ `cache.addAll()` (atomic)** — SW ដែល activate ដោយសំបក
-  មិនពេញ ធ្វើឲ្យការស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ។
-- ⛔ **Cache API មិនត្រូវក្លាយជាចំណុចដាច់តែមួយ** — `caches.open()` និង
-  `cache.match()` អាចបោះ (ITP · quota · «Clear site data» ខណៈ App បើក) ➜
-  `respondWith` បដិសេធ ➜ browser រាប់ជា NetworkError ➜ **រាល់សំណើធ្លាក់** ➜
-  អេក្រង់សទទេ។ `networkOnly(request)` ត្រូវភ្ជាប់ **៣ កន្លែង** ៖
-  `cache.match()` (អាគុយម៉ង់ទី ២ របស់ `.then`) · `caches.open()` (`.catch`
-  ខាងក្រៅ) · និងការធ្លាក់ចុះទៅ `./index.html` ក្នុងផ្លូវ navigate។ វាត្រូវ
-  **resolve** ជា `Response.error()` — មិនត្រូវបដិសេធ។
-  ផ្លូវ navigate ទាំង cache miss និង Cache API បដិសេធ ត្រូវ fetch **សំបក
-  `cacheKey` ដដែល** និងបញ្ជូន `request.signal` បន្ត; កុំ cache JavaScript ឬ
-  asset ដើមក្រោមកូនសោ `index.html`។
-- `/.netlify/functions/` ទៅ **`networkOnly()`** ដោយផ្ទាល់ ➜ Function
-  **មិនដែលចូល cache** ➜ វាមិនអាចធ្វើឲ្យសំបកចាស់បានឡើយ (មូលហេតុនៃការលើកលែង
-  ក្នុង `version-bump-scope.js` សម្រាប់ `netlify/` និង `tools/`)។
+- **Cache-first** with `CACHE_VERSION` pattern `<app>-vN`; the cache cleanup filter only scans its own prefix —
+  ⛔ **never widen it**.
+- **`CORE_SHELL` uses `cache.addAll()` (atomic)** — a SW activated with an incomplete shell kills scanning offline
+  silently.
+- ⛔ **The Cache API must not be a single point of failure** — `caches.open()` and `cache.match()` can throw (ITP ·
+  quota · "Clear site data" while open) ➜ `respondWith` rejects ➜ **every request fails** ➜ white screen.
+  `networkOnly(request)` attaches in **3 places**: `cache.match()` (second argument of `.then`) · `caches.open()` (outer
+  `.catch`) · the fallback to `./index.html` on navigate. It **resolves** to `Response.error()` — never rejects. On
+  navigate, both cache miss and Cache API rejection fetch **the same shell `cacheKey`** and pass `request.signal` on;
+  never cache JavaScript or original assets under the `index.html` key.
+- `/.netlify/functions/` goes straight to **`networkOnly()`** ➜ Functions **never enter the cache** ➜ they can't make
+  the shell stale (why `version-bump-scope.js` exempts `netlify/` and `tools/`).
+- Cached HTML stays with the SW version that installed it; never revalidate HTML into an old cache.
+  `shellDeployIsCurrent()` and `revalidateShell()` settle within 6s even when fetch/body ignore abort or there is no
+  AbortController. Guard: `ZoeW/tests/sw-revalidation-timeout.test.ts` measures the SW of both apps.
 
-- HTML ដែល cache រួចត្រូវនៅជាមួយកំណែ SW ដែលដំឡើងវា; មិន revalidate HTML ចូល cache ចាស់។
-  `shellDeployIsCurrent()` និង `revalidateShell()` ត្រូវ settle ក្នុង ៦ វិ. ទោះ fetch/body មិនស្តាប់ abort ឬគ្មាន AbortController។
-  អ្នកយាមពិត៖ `ZoeW/tests/sw-revalidation-timeout.test.ts` វាស់ SW របស់ App ទាំង ២។
+## `license-verify.js` is the **third** network path — READ BEFORE TOUCHING IT
 
-## `license-verify.js` ជាផ្លូវបណ្តាញ **ទី ៣** — READ BEFORE TOUCHING IT
+It is **REST-only** (no Firebase SDK by design) with **its own network helpers**, separate from `app.js` ➜ every network
+rule must be applied to it **separately** (it slipped twice: 2.11.6 · 2.17.4). `network-pressure-test.js` replaces it
+with a **full stub**.
 
-វាជា **REST-only** (គ្មាន Firebase SDK ដោយការរចនា) ហើយមាន **helper បណ្តាញ
-ផ្ទាល់ខ្លួន** ដាច់ពី `app.js` ➜ រាល់ច្បាប់បណ្តាញត្រូវអនុវត្តលើវា **ដោយឡែក**
-(វារអិលកាត់ ២ ដងហើយ ៖ 2.11.6 · 2.17.4)។ មូលហេតុដដែល ៖
-`network-pressure-test.js` ជំនួសវាដោយ **stub ទាំងស្រុង**។
+- **Every request goes through `sharedRequest(key, priority, run)`** — dedup by key plus ceiling `NET_MAX_IN_FLIGHT`
+  (2). Release via `started.then(release, release)` — **both paths**.
+- **`checkOnline()` and `syncServerTime()` need `networkLooksDown()`.**
+- ⛔ **A skip returns `{ ok: null }` — never `{ ok: false }`.** `getStatus()` deletes the record **only when
+  `ok === false`**. **Changing it to `false` deletes customers' Licenses on bad networks — don't.**
+- **`activate()` (user tap) goes through `{ priority: true }`**.
+- **`getStatus()` binds the verdict to the record snapshot** and re-checks after `await` on signature and REST; record
+  changed ➜ read fresh, never delete/overwrite it. Shared requests per App + snapshot and recheck have ceiling 2
+  (`license-record-race-test.js` uses real ECDSA and shared storage).
+- ⚠️ `license-grace-test.js` extracts functions by name into `vm` — **a new helper ➜ add its name to that extraction
+  list**.
 
-- **រាល់សំណើឆ្លងកាត់ `sharedRequest(key, priority, run)`** — dedup តាមកូនសោ
-  បូកពិដាន `NET_MAX_IN_FLIGHT` (២)។ ការដោះតាម `started.then(release, release)`
-  — **ទាំង ២ ផ្លូវ**។
-- **`checkOnline()` និង `syncServerTime()` ត្រូវមាន `networkLooksDown()`។**
-- ⛔ **ការរំលងត្រូវត្រឡប់ `{ ok: null }` — មិនមែន `{ ok: false }` ទេ។**
-  `getStatus()` លុប record **តែពេល `ok === false`**។ **ការប្តូរវាទៅ `false`
-  លុប License របស់អតិថិជនពេលបណ្តាញអន់ — កុំធ្វើ។**
-- **`activate()` (អ្នកប្រើចុចផ្ទាល់) ត្រូវឆ្លងកាត់ `{ priority: true }`**។
-- **`getStatus()` ចងសាលក្រមទៅ snapshot របស់ record** ហើយពិនិត្យឡើងវិញក្រោយ
-  `await` លើ signature និង REST; record ប្រែ ➜ អានថ្មី មិនលុប/សរសេរជាន់វា។
-  សំណើរួមតាម App + snapshot និង recheck មានពិដាន ២
-  (`license-record-race-test.js` ប្រើ ECDSA ពិត និង storage រួម)។
-- ⚠️ `license-grace-test.js` ស្រង់ function តាមឈ្មោះចូល `vm` — **បន្ថែម
-  helper ថ្មី ➜ ត្រូវបន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់នោះ**។
+### ⛔ "Can't verify" ≠ "wrong" — applies to **every axis**
 
-### ⛔ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស» — អនុវត្តលើ **គ្រប់អ័ក្ស**
+Every validity check has **3 outcomes**: `valid` · `invalid` · **`unverified`**. Only `invalid` may delete anything.
+`unverified` ➜ keep, but **grant nothing new**. Closed axes:
 
-រាល់ការពិនិត្យសុពលភាពត្រូវមាន **៣ លទ្ធផល** ៖ `valid` · `invalid` ·
-**`unverified`**។ មានតែ `invalid` ទេដែលអាចលុបអ្វីមួយបាន។ `unverified` ➜
-រក្សាទុក តែ **កុំផ្តល់សិទ្ធិថ្មី**។ អ័ក្សដែលបិទរួច ៖
-
-| អ័ក្ស | ច្បាប់ |
+| Axis | Rule |
 |---|---|
-| **បណ្តាញ** (2.17.4) | ការរំលង ➜ `{ ok: null }` |
-| **crypto** (2.20.1) | WebCrypto ដួល ≠ ហត្ថលេខាក្លែងក្លាយ |
-| **នាឡិកា** (2.20.1) | ការលុបត្រូវការ `serverTimeSynced` ឬសាលក្រម server |
-| **ការថយក្រោយ** (2.20.6) | `monotonicNow(record) = max(getServerNow(), record.seenMax)` |
+| **network** (2.17.4) | a skip ➜ `{ ok: null }` |
+| **crypto** (2.20.1) | WebCrypto down ≠ forged signature |
+| **clock** (2.20.1) | deletion needs `serverTimeSynced` or a server verdict |
+| **rollback** (2.20.6) | `monotonicNow(record) = max(getServerNow(), record.seenMax)` |
 
-- **`activate()` ត្រូវការ `checkOnline().ok === true`** បូក `serverTimeSynced`
-  (ព្យាយាម `syncServerTime({ priority: true })` មុនបោះបង់)។ ការ Activate
-  ត្រូវការអ៊ីនធឺណិត — **ការប្តូរឥរិយាបថដោយចេតនា**។
-- **ពិដានមកពី DB** ៖ `online.expiresAt` ឈ្នះលើ `exp` ដែល sign រួច ➜ «Extend»
-  ដើរលើឧបករណ៍ថ្មី។ ⛔ Revoke · មិនមានក្នុង DB · ហត្ថលេខាខុស **នៅតែបដិសេធ**។
-- ⛔ **ការលុប record ត្រូវការសាលក្រម `checkOnline()` ពិត** — លែងលុបដោយ
-  `serverTimeSynced` (ទង់នោះនៅ `true` បន្តក្រោយចាកចេញពីបណ្តាញ)។
-- ⛔ **សាលក្រម server ត្រូវ *ព្យាបាល* `seenMax`** (សរសេរជាន់ដោយម៉ោង server
-  ពិត) — បើអត់ ទូរស័ព្ទដែល boot ទៅថ្ងៃអនាគត **ពុល floor ជារៀងរហូត**។
-- **សារបរាជ័យត្រូវប្រាប់ការពិត** — `network` · `clock-unverified` ➜
-  «ភ្ជាប់ Server មិនបានទេ!» ⛔ មិនមែន «Key មិនត្រឹមត្រូវទេ!»។
+- **`activate()` needs `checkOnline().ok === true`** plus `serverTimeSynced` (tries `syncServerTime({ priority: true })`
+  before giving up). Activation needs internet — **an intentional behavior change**.
+- **Ceiling from DB**: `online.expiresAt` beats the signed `exp` ➜ "Extend" works on new devices. ⛔ Revoke · missing
+  from DB · bad signature **still refuse**.
+- ⛔ **Deleting a record needs a real `checkOnline()` verdict** — no longer by `serverTimeSynced` (that flag stays
+  `true` after going offline).
+- ⛔ **A server verdict *heals* `seenMax`** (overwritten with real server time) — otherwise a phone that booted into the
+  future **poisons the floor forever**.
+- **Failure messages tell the truth** — `network` · `clock-unverified` ➜ "ភ្ជាប់ Server មិនបានទេ!" ⛔ not
+  "Key មិនត្រឹមត្រូវទេ!".
 
-## Toast · ស្លាកស្ថានភាព · XSS · secret
+## Toasts · status labels · XSS · secrets
 
-- **ថ្នាក់ toast ៤ តាមសញ្ញាដើមសារ**; `renderConnectionStatus()` ជាកន្លែងផ្សាយ
-  **តែមួយ**; ការចុះឈ្មោះ toast រស់នៅ **ក្នុង DOM** មិនមែន module state។
-  ⛔ **«ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»។**
-- ⛔ **optimistic UI ≠ durable commit** — write success លេចតែក្រោយ Firebase
-  resolve/`committed:true`; offline/timeout ដែលអាច late-commit ត្រូវជា ⏳/⚠️
-  ហើយទើបប្រកាស ✅ ក្រោយ reconnect (`toast-action-truth-test.js`)។
-- **រាល់តម្លៃដែលចូល HTML ត្រូវ `sanitizeInput()`** — `html-sink-escaping.js`
-  ស្កេន **ទាំង ២ ទម្រង់** (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)។
-- **`redactDeep()` ដើរលើ event ទាំងមូល** មុនផ្ញើទៅ Sentry ៖
-  - Bearer/Basic ត្រូវលាក់មុនបំបែក colon; Cookie header លាក់ទាំងតម្លៃ។ គ្រប
-    JSON credential ដែលមានចន្លោះ/quote/array/object និងឈ្មោះ URL param ដែល encode។
-  - អ្នកបំបែកត្រូវរួម `, ; { |` បន្ថែមលើ `?&#` និងចន្លោះ (breadcrumb របស់
-    console ជាផ្លូវលេចធំបំផុត — Sentry ចាប់វា **ដោយស្វ័យប្រវត្តិ**)។
-  - ⛔ **តម្លៃត្រូវឈប់ត្រឹមអ្នកបំបែក** បើមិនដូច្នេះគូមួយលេបគូបន្ទាប់។
-  - ⛔ **ការឈានដល់ពិដានជម្រៅត្រូវ *កាត់* (`'[truncated]'`) មិនមែន *ប្រគល់ឆៅ***។
-  - **ការលាក់តាមឈ្មោះកូនសោវត្ថុដែរ** ហើយ **តម្លៃណាក៏ដោយ** មិនត្រឹមខ្សែអក្សរ។
-  - ⛔ **ការសរសេរត្រូវផ្ទៀងផ្ទាត់ថាជាប់ពិត** (`if (target[key] === next) return;`)
-    ហើយពេលកែនៅនឹងកន្លែងមិនបាន (frozen · `writable: false` · getter) ➜
-    **ចម្លងវត្ថុនោះម្តង** រួចត្រឡប់ច្បាប់ចម្លង។ `seen` ត្រូវជា **`Map`**។
-    Cycle ដែលកំពុងដើរត្រូវកាត់ជា `[circular]`; កុំត្រឡប់វត្ថុដើមដែលមិនទាន់លាក់។
-  - ច្បាប់ **«keep case»** ៖ `barcode` · `keyId` · `id` · `count` **ត្រូវនៅ
-    មើលឃើញ** — បញ្ជីឈ្មោះកូនសោតូចជាងបញ្ជី URL param។
-- **`appLocalStore` / `appSessionStore` ជាផ្លូវតែមួយទៅ storage** — ពួកវាអាន
-  `window.localStorage` **ក្នុង `try` តែម្តង** នៅដើមឯកសារ ហើយអាចជា `null`។
-  ⛔ **`safeStoreSet(localStorage, …)` មិនគ្រប់គ្រាន់ទេ** — argument វាយតម្លៃ
-  **មុន** ចូល function ➜ បើ **getter** ជាអ្នកបោះ នោះការហៅបោះ **នៅកន្លែងហៅ**។
-  ⛔ **កុំវិនិច្ឆ័យដោយ `typeof <fn> === 'function'`** (hoisting)។ សញ្ញាពិត ៖
-  **ផ្ទាំង boot ជាប់** និង **កំហុស runtime**។
-- **credential មិនត្រូវសល់ក្នុង DOM ឬ state ក្រោយចាកចេញ** —
-  `clearSensitiveModalFields()` ជាកន្លែងសម្អាតតែមួយ។ ⚠️ **បន្ថែម state ថ្មី ➜
-  ត្រូវបន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់របស់ `setup-link-logout-test.js`** ដែរ។
+- **4 toast classes by message prefix**; `renderConnectionStatus()` is the **single** broadcaster; toast registration
+  lives **in the DOM**, not module state. ⛔ **"connected" ≠ "data arrived" ≠ "still signed in".**
+- ⛔ **Optimistic UI ≠ durable commit** — write success appears only after Firebase resolves/`committed:true`;
+  offline/timeouts that may late-commit are ⏳/⚠️ and ✅ comes after reconnect (`toast-action-truth-test.js`).
+- **Every value into HTML goes through `sanitizeInput()`** — `html-sink-escaping.js` scans **both forms** (template
+  literals **and** string concatenation).
+- **`redactDeep()` walks the whole event** before sending to Sentry:
+  - Bearer/Basic are redacted before splitting on colons; Cookie headers redact the whole value. Covers JSON
+    credentials with spaces/quotes/arrays/objects and encoded URL param names.
+  - Separators include `, ; { |` besides `?&#` and spaces (console breadcrumbs are the biggest leak path — Sentry
+    captures them **automatically**).
+  - ⛔ **Values stop at separators**, otherwise one pair swallows the next.
+  - ⛔ **Hitting the depth ceiling *truncates* (`'[truncated]'`), never returns raw.**
+  - **Redaction by object key name too**, and **any value type**, not only strings.
+  - ⛔ **Writes are verified to stick** (`if (target[key] === next) return;`); when in-place edits fail (frozen ·
+    `writable: false` · getter) ➜ **copy that object once** and return the copy. `seen` is a **`Map`**. Live cycles are
+    cut as `[circular]`; never return the original unredacted object.
+  - **"Keep case"**: `barcode` · `keyId` · `id` · `count` **stay visible** — the key-name list is smaller than the URL
+    param list.
+- **`appLocalStore` / `appSessionStore` are the single path to storage** — they read `window.localStorage` **inside a
+  `try` once** at the top and may be `null`. ⛔ **`safeStoreSet(localStorage, …)` is not enough** — arguments are
+  evaluated **before** entering the function ➜ a throwing **getter** throws **at the call site**. ⛔ **Never judge by
+  `typeof <fn> === 'function'`** (hoisting). Real signals: **stuck boot screen** and **runtime errors**.
+- **Credentials never survive in DOM or state after logout** — `clearSensitiveModalFields()` is the single cleaner.
+  ⚠️ **New state ➜ add its name to the extraction list of `setup-link-logout-test.js`** too.
 
-## ⛔ ចាក់សោ App ពេលបើក និងពេលត្រឡប់មកវិញ
+## ⛔ App lock on open and on return
 
-អេក្រង់ `#appLockScreen` ជា **ស្រទាប់ចូលប្រើលើឧបករណ៍** មិនមែន authentication។
+`#appLockScreen` is a **device access layer**, not authentication.
 
-- ⛔ **ការចាក់សោមិនត្រូវប៉ះ session ៤ ម៉ោងសោះ** — គ្មាន `fb.signOut()` ·
-  គ្មានការលុប `zoew_login_time`/`remembered_email` ក្នុងផ្លូវចាក់សោ/ដោះសោ។
-- ⛔ **សោ `lookupSecretKey` ត្រូវរស់រាន reload ដូចទង់ដោះសោ** — `CryptoKey`
-  រក្សាក្នុង **IndexedDB** (`zoew_lookup_key_v1`) ដោយ `extractable: false`
-  នៅដដែល ➜ script អាន *តម្លៃ* សោមិនបាន។ ⛔ ការស្តារត្រូវបដិសេធពេល
-  `appLockShouldArm()` **និង** ពេលកំណត់ត្រាមិនមែន CryptoKey; ⛔ រាល់ផ្លូវ
-  IndexedDB ត្រូវ **fail-open** បូកពិដាន ៣ វិ. (getter បោះ · `onblocked` ·
-  transaction abort ➜ App ដើរដូចមុនបេះបិទ)។
-- ⛔ **ទង់ដោះសោរស់នៅ `sessionStorage` (`zoew_app_unlocked`)** មិនមែន
-  `localStorage` — PTR និង `reloadForFirebaseSdk()` ធ្វើ `location.reload()`
-  ពិត ➜ បើសោចាក់រាល់ការផ្ទុក នោះ **រាល់ការទាញចុះត្រូវវាយ PIN**។
-- **ការចាកចេញ/ត្រឡប់មកចាក់សោតាមរូបមន្ត ៣ ជំហាន** ៖ (១) `hidden` ➜ **គ្រប**
-  `showAppLockScreen(true)` ⛔ **មិនប៉ះទង់វគ្គ** (បើអត់ រូបភាពក្នុង **task
-  switcher** បង្ហាញលេខអតិថិជន); (២) `visible` ➜ **ចាក់សោពិត** (លុបទង់វគ្គ)
-  បូក `runAppLockBiometric(true)` ស្ងាត់ — ⛔ **ការលុបទង់ត្រូវនៅជំហាននេះ**;
-  (៣) **ការចាកចេញដោយចេតនាពីក្នុង App ត្រូវលើកលែង** តាម `noteAppLockExcuse()`
-  + `APP_LOCK_EXCUSE_WINDOW_MS` (៦០ វិ., ប្រើ **តែជុំនោះមួយ**)។
-  ⛔ **កុំប្រើ `blur`/`focus`** (បាញ់ពេលបើកប្រអប់ native ➜ សោក្លែងក្លាយ)។
-  ⛔ **កុំ«រឹង» ដោយដកការលើកលែងចេញ** — នោះជា PIN រាល់ការខល។
-- `body.app-locked` ត្រូវលាក់ **`.modal` · `.more-menu` · `.phone-suggest` ·
-  `.toast-container`** បន្ថែមលើ navbar/ទំព័រ/របា Tab/របា Slide។ ការលាក់ត្រូវ
-  **ពិត** (`visibility: hidden` + ផ្ទៃ `var(--body-bg)` **មិនថ្លា**)។
-- **ច្រកទ្វារ ២ ដែលត្រូវរក្សា** ៖ `safeFocusScanner()` ត្រូវ `return` ភ្លាមពេល
-  `appIsLocked` (បើអត់ ➜ barcode ធ្លាក់ចូលវាល PIN) និង `pullTargetBlocked()`
-  ត្រូវរាប់ `appIsLocked`។
-- **សោចាក់តែពេលមាន `zoew_security_pin_hash`** — ⛔ **កុំបង្ខំការកំណត់ PIN ពេល
-  boot**។ **ផ្លូវចេញ «ភ្លេច PIN?» ចាំបាច់** (សោដែលគ្មានផ្លូវចេញជាអន្ទាក់)។
-- ⚠️ `initAppLock()` ត្រូវរត់ក្នុង boot (`src/app/lifecycle/boot.ts` តាម `oncePerPage`) **មុន** ការគូរ
-  ទិន្នន័យ — ការហៅក្រោយនោះបើកចន្លោះដែល App គូរទិន្នន័យមុនសោចាក់។
+- ⛔ **Locking never touches the 4-hour session** — no `fb.signOut()` · no clearing `zoew_login_time`/`remembered_email`
+  in lock/unlock paths.
+- ⛔ **`lookupSecretKey` survives reload like the unlock flag** — the `CryptoKey` lives in **IndexedDB**
+  (`zoew_lookup_key_v1`) with `extractable: false` ➜ scripts can't read its *value*. ⛔ Restore refuses when
+  `appLockShouldArm()` **and** when the record isn't a CryptoKey; ⛔ every IndexedDB path is **fail-open** with a 3s
+  ceiling (throwing getter · `onblocked` · transaction abort ➜ the app behaves exactly as before).
+- ⛔ **The unlock flag lives in `sessionStorage` (`zoew_app_unlocked`)**, not `localStorage` — PTR and
+  `reloadForFirebaseSdk()` do a real `location.reload()` ➜ locking on every load = **a PIN on every pull-down**.
+- **Leaving/returning locks in 3 steps**: (1) `hidden` ➜ **cover** `showAppLockScreen(true)` ⛔ **without touching the
+  session flag** (otherwise the **task switcher** snapshot shows customer numbers); (2) `visible` ➜ **really lock**
+  (clear the session flag) plus a silent `runAppLockBiometric(true)` — ⛔ **clearing happens at this step**; (3)
+  **intentional exits from inside the app are excused** via `noteAppLockExcuse()` + `APP_LOCK_EXCUSE_WINDOW_MS` (60s,
+  **that one round only**). ⛔ **Never use `blur`/`focus`** (they fire on native dialogs ➜ fake locks). ⛔ **Never
+  "harden" by removing the excuse** — that means a PIN on every call.
+- `body.app-locked` hides **`.modal` · `.more-menu` · `.phone-suggest` · `.toast-container`** besides navbar/pages/tab
+  bar/drawer. Hiding is **real** (`visibility: hidden` + an **opaque** `var(--body-bg)` background).
+- **Two gates to keep**: `safeFocusScanner()` `return`s at once when `appIsLocked` (else a barcode lands in the PIN
+  field) and `pullTargetBlocked()` counts `appIsLocked`.
+- **Locks only when `zoew_security_pin_hash` exists** — ⛔ **never force PIN setup at boot**. **"ភ្លេច PIN?" exit is
+  required** (a lock without an exit is a trap).
+- ⚠️ `initAppLock()` runs in boot (`src/app/lifecycle/boot.ts` via `oncePerPage`) **before** data rendering — calling
+  it later opens a window where data renders before the lock.
 
 ## ZTO Lookup
 
-- **`ZoeW/netlify/functions/zto-order-detail.js` ជាឯកសារតែមួយ** ដែលមាន
-  dependency **តែមួយ** ៖ `@netlify/blobs`។ ⛔ `puppeteer-core` និង
-  `@sparticuz/chromium` **ហាមដាច់ខាត** — auto-login ត្រូវដកចេញក្នុង 2.25.0
-  ព្រោះ **ZTO IDaaS មិនបើកឲ្យ IP របស់ Netlify** (ភស្តុតាង ៖ បច្ច័យ host
-  `@argus.ztoglobal.com` ➜ browser មិនត្រូវបញ្ជូនទៅ IdP ផង)។
-  ⛔ **កុំនាំវាមកវិញដោយគ្មានភស្តុតាងថា IdP បើកឲ្យ server ក្រៅប្រទេស។**
-- **ថវិកាពេល ២ ជាន់** ៖ `ZTO_UPSTREAM_TIMEOUT_MS` (៦ វិ.) ក្នុងមួយសំណើ បូក
-  `ZTO_REQUEST_BUDGET_MS` (**៩ វិ.**) សរុប។ នេះជាថវិកាឆ្លើយតបរបស់ App។
-  [ឯកសារ Netlify](https://docs.netlify.com/build/functions/configuration/) រាយ synchronous function ៦០ វិ.; កុំច្រឡំនឹងពិដាន streaming ១០ វិ.។ ពិដានខាង
-  client ៖ `ZTO_AUTO_LOOKUP_TIMEOUT_MS` **១៣ វិ.** · `ZTO_TEST_TIMEOUT_MS`
-  **១១ វិ.** (ថវិកា server ៩ វិ. + margin ៤/២ វិ. រៀងគ្នា)។
-- ⛔ **ការវាស់ថវិកាត្រូវឆ្លងកាត់ `elapsedSince()`** (ថយក្រោយ ➜ `Infinity` ➜
-  fail-open) និង **ការ settle ត្រូវធានាដោយរចនាសម្ព័ន្ធ** (timer ពិតប្រណាំង
-  នឹង `attempt()` បន្ថែមលើ `AbortController`)។
-- ⛔ **«រកមិនឃើញ» មិនមែនកំហុសទេ** — HTTP 200 `{ found: false }` **គ្មានវាល
-  `error`**។ បើដាក់ `error` ចូល ➜ `attemptAutoLookup()` បោះ «Lookup rejected»
-  ➜ **cooldown ៣០ វិនាទី**។
-- **Cache ខាង server** ៖ កូនសោ = `config.fingerprint + '|' + barcode` —
-  ⛔ **មិនផ្ទុក fingerprint នៃ Cookie** (លទ្ធផលជាទិន្នន័យបញ្ជាទិញ, មិន
-  អាស្រ័យលើ session)។ កូនសោ **single-flight នៅតែផ្ទុក Cookie** និងលំដាប់
-  `config|barcode|cookie` ដូចគ្នាទាំង lookup ធម្មតា និង retry ក្រោយ auth បដិសេធ។ ការពិនិត្យ
-  cache ត្រូវឈរ **មុន** `resolveCookieCredential()`។
-  **សាលក្រម `notFound` ក៏ចូល cache ដែរ** (TTL ខ្លី **១៥ វិ.**) —
-  ⛔ **ការបរាជ័យ *បណ្តោះអាសន្ន* មិនត្រូវចូល cache ដាច់ខាត** (401 · 5xx · 429
-  · timeout)។
-  ⛔ **TTL អវិជ្ជមានត្រូវមានពិដានដោយ `cacheTtlMs`** ➜ `ZTO_CACHE_TTL_MS=0`
-  បិទ **ទាំង ២** ផ្លូវក្នុងកន្លែងតែមួយ; `ZTO_NOT_FOUND_CACHE_TTL_MS=0` បិទតែ
-  ផ្លូវអវិជ្ជមាន។ TTL អវិជ្ជមានត្រូវ **ខ្លីដោយចេតនា** — កញ្ចប់ដែល ZTO ទើប
-  បញ្ចូល ត្រូវរកឃើញវិញឆាប់ ➜ cache មិនត្រូវក្លាយជាការបដិសេធជាអចិន្ត្រៃយ៍។
-- **`resolveCookieCredential()` ជាអ្នកសម្រេចប្រភពតែមួយ** ៖ `ZTO_AUTHORIZATION`
-  / `ZTO_TOKEN` ➜ **មិនប៉ះ store សោះ**; បើអត់ ➜ blob ➜ `ZTO_COOKIE` env។
-  ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ** — `import` ធ្លាក់ · `connectLambda`
-  បោះ · `getStore` បោះ · ការអានធ្លាក់/ព្យួរ · តម្លៃខូច ➜ ធ្លាក់ចុះទៅ env។
-  ⛔ `connectLambda(event)` កំណត់តែ **`edgeURL`** ➜ `consistency: 'strong'`
-  បោះ `BlobsConsistencyError` — **កុំ «កែ» វាដោយបន្ថែម PAT**។
-- ⛔ **ឈ្មោះ store ២ ខាងត្រូវស៊ីគ្នា** ៖ `getStore('zto-auth')` ➜ store ពិត
-  ជា **`site:zto-auth`** ➜ helper ត្រូវសរសេរទៅ
-  `/api/v1/blobs/{siteID}/site:zto-auth/cookie`។ **checker ត្រូវអានឈ្មោះចេញពី
-  Function ពិត** មិនមែនចាក់ literal។
-- **401 ពី ZTO ត្រូវលុប cache នោះភ្លាម** (`invalidateCookieCache()`) ហើយ
-  `?diag=1` ត្រូវឆ្លើយមូលហេតុ **ដែលរស់រានពី cache ៦០ វិ.**។ ⛔ **តម្លៃសម្ងាត់
-  មិនដែលចេញ** — មានតែ `fingerprint` ៨ តួ។
-- **សាលក្រម auth ជារបស់ Cookie ដែល ZTO បានវាស់**៖ Cookie ថ្មីពី Sync ត្រូវ
-  ចាប់ផ្តើមជា «មិនទាន់ផ្ទៀងផ្ទាត់»; ចម្លើយយឺតរបស់ Cookie ចាស់មិនត្រូវបដិសេធ
-  ឬទទួលយកជំនួស Cookie ថ្មី (`zto-cookie-session-test.js`)។ សារ client ប្រាប់
-  **«បដិសេធ»**; HTTP 401 មិនបញ្ជាក់មូលហេតុផុតកំណត់តាមពេល ហើយ timeout
-  មិនមែនសាលក្រម auth (`health-check-test.js`)។
-- **Renewal ត្រូវរក្សាទុកដោយមិនជាន់ Sync ថ្មី**៖ ប្រើ `getWithMetadata()`
-  របស់ SDK ដែលចាក់សោកំណែ ហើយ `set()` ជាមួយ `onlyIfMatch` តាម ETag
-  ដែលបានអាន ឬ `onlyIfNew` ពេលអានឃើញថាមិនមាន។ `modified:false` គឺ conflict;
-  `modified:true` ដែលគ្មាន ETag ក៏មិនបញ្ជាក់ថាសរសេរជោគជ័យដែរ។
-  ការប្តូរ `BOS-MAN-SESSION` ត្រូវសាកសរសេរភ្លាមក្នុងថវិកាដដែល; ពិដាន
-  ៦០ វិនាទីនៅលើ Cookie ជំនួយ និងការសាកឡើងវិញតម្លៃដដែល។ Pending មិនត្រូវ
-  បាត់ពេល budget/timeout ឬការអាន cache ចាស់ ហើយ fresh read បរាជ័យមិនត្រូវ
-  លុប Cookie ដែលនៅប្រើបាន (`zto-cookie-session-test.js` · `zto-cookie-store-test.js`)។
-- **ការស្កេនជាបន្តបន្ទាប់** ៖ ការរវល់ជា **ការរង់ចាំ** មិនមែន **ការបញ្ចប់** ➜
-  កញ្ចប់ដែលជាប់ពិដានចូល `autoLookupQueueRetries` ហើយព្យាយាមឡើងវិញ។
-  ⛔ **រាល់ផ្លូវចេញមុនត្រូវហៅ `dropAutoLookupQueueEntry(lookupKey)`**
-  (លើកលែងផ្លូវ «ពិដានស្របគ្នាពេញ» ដែលកំពុងចូជួរឡើងវិញ) — ធាតុកំព្រាធ្វើឲ្យ
-  ការស្កេនក្រោយត្រូវបដិសេធដោយ «រវល់យូរពេក» **ខណៈគ្មានការរង់ចាំណាមួយកើតឡើង**។
-  ពិដានពេលត្រូវវាស់ការរង់ចាំ **ពិត** (`existing.timer` **ឬ** `existing.pending`)។
-  ⛔ **កុំបំប្លែង `waiting` ទៅជាលក្ខខណ្ឌ «កុំតាំងម៉ោង»** — ការតាំងម៉ោងត្រូវ
-  រំលងតែពេល **មាន timer រស់រួច** (`existing && existing.timer`); ការប្រើ
-  `waiting` (ដែលរួម `pending`) ធ្វើឲ្យ `return true` **ដោយមិនតាំងម៉ោង** ➜
-  **វដ្តព្យាយាមងាប់ស្ងាត់**។
-  ⛔ **ពិដានចំនួនស្របគ្នានៅ ២ ដដែល** — កុំបង្កើនដោយផ្អែកលើទ្រឹស្តី។
-- **`lookupResponseError(status, body, retryable)` ជាអ្នកសាងកំហុសតែមួយ** —
-  វាភ្ជាប់ `lookupCode` និង `lookupReason` ជានិច្ច។
-  ⛔ គ្មាន `new Error('HTTP ' + status)` ទទេ (វាបំបាត់ `lookupCode` ➜ សាខា ៣
-  ក្លាយជាកូដងាប់)។ `err.noRetry` ➜ `retryAsync()` គោរព។ cooldown ៖
-  បណ្តោះអាសន្ន **៦ វិ.**; សាលក្រមស្ថាពរ **៣០ វិ.**។
-- **`customerTablePrefetchAllowed()` ជាច្រកទ្វារតែមួយ** — ទប់ពេល `isModalOpen`
-  ឬ `autoLookupInFlight.size > 0`។ **ជំហានទី ១ នៃជណ្តើរត្រូវវែងជាង
-  `CUSTOMER_TABLE_FAIL_COOLDOWN_MS`**។ **រវល់ពេលដល់ម៉ោង ➜ តាំងម៉ោងឡើងវិញ
-  មិនបោះបង់**។
-- **ការនាំចូល ➜ តារាងត្រូវបំពេញភ្លាម** ៖ `seedCustomerTableFromImport()`
-  ត្រូវ **បំពេញ** មិនមែន **លុប** ហើយត្រូវគោរពរបៀបនាំចូល **ដូច server បេះបិទ**
-  (`replace`/`upsert`/`newOnly`; ស្ទួនក្នុងឯកសារ ➜ **ជួរដេកចុងក្រោយឈ្នះ**)។
-  ⛔ **`runSheetImportClear()` នៅតែ *លុប* ដដែល**។ `fresh=1` ជាកូនសោបើក cache
-  **តែសម្រាប់ការទាញបង្ខំ**។ កូនសោ cache ខាង server ផ្ទុកចំនួនជួរដេក
-  (`customer_rows_v2_<lastRow>`)។
-- ⛔ **សំណើទៅ Apps Script ត្រូវជា *simple request* ជានិច្ច** —
-  `Content-Type: text/plain;charset=utf-8` និង **គ្មាន header ផ្ទាល់ខ្លួន**។
-  Apps Script **មិនឆ្លើយ `OPTIONS`** ➜ preflight = **ការនាំចូលស្លាប់ទាំងស្រុង
-  លើផលិតកម្ម ខណៈតេស្តដែល stub `fetch` ជោគជ័យទាំងអស់**។
-  ⛔ **ច្បាប់នេះគ្របផ្លូវ *ទាំងអស់* ទៅ Apps Script មិនត្រឹមការនាំចូលទេ**
-  (កំណែ 2.27.3 ៖ ផ្លូវ **Lookup** ខ្វះវា ➜ វាល «ឈ្មោះ Header» ធ្វើឲ្យ
-  `?list=1` និង `?code=` ស្លាប់ដោយ `Failed to fetch` លើផលិតកម្មពិត)។
-  `lookupApiSendsHeader(cfg)` ជាច្រកទ្វារតែមួយ ៖ header **និង** ការសុំ PIN
-  ត្រូវរំលងសម្រាប់ Apps Script។ ⛔ **Apps Script អាន header មិនបានទាល់តែសោះ**
-  (`Code.gs` អានពី `e.parameter`) ➜ header នោះគ្មានប្រយោជន៍ **និង** បំផ្លាញ។
-  ⛔ ការសម្គាល់ត្រូវប្រៀបធៀប **hostname** មិនមែន substring (`script.google.com.evil…`
-  មិនរាប់)។ ⛔ ការមិនផ្ញើត្រូវប្រាប់អ្នកប្រើ — **គ្មានការទម្លាក់ស្ងាត់**។
-- ⛔ **`fetch()` មិន reject លើ HTTP error ទេ** — 408/425/429/5xx ត្រូវបម្លែងទៅ
-  rejection **ខាងក្នុង** callback របស់ `retryAsync()`; 401/403 នៅក្រៅ។
+- **`ZoeW/netlify/functions/zto-order-detail.js` is one file** with **one** dependency: `@netlify/blobs`.
+  ⛔ `puppeteer-core` and `@sparticuz/chromium` **are banned** — auto-login was removed in 2.25.0 because **ZTO IDaaS
+  doesn't open to Netlify IPs** (evidence: host suffix `@argus.ztoglobal.com` ➜ the browser isn't even redirected to the
+  IdP). ⛔ **Never bring it back without proof that the IdP opens to foreign servers.**
+- **Two budget layers**: `ZTO_UPSTREAM_TIMEOUT_MS` (6s) per request plus `ZTO_REQUEST_BUDGET_MS` (**9s**) total — the
+  app's response budget. [Netlify docs](https://docs.netlify.com/build/functions/configuration/) list 60s for
+  synchronous functions; don't confuse with the 10s streaming limit. Client ceilings: `ZTO_AUTO_LOOKUP_TIMEOUT_MS`
+  **13s** · `ZTO_TEST_TIMEOUT_MS` **11s** (server budget 9s + margin 4/2s).
+- ⛔ **Budget measured via `elapsedSince()`** (backwards ➜ `Infinity` ➜ fail-open) and **settling guaranteed by
+  structure** (a real timer races `attempt()` in addition to `AbortController`).
+- ⛔ **"Not found" is not an error** — HTTP 200 `{ found: false }` **with no `error` field**. Adding `error` ➜
+  `attemptAutoLookup()` throws "Lookup rejected" ➜ **30s cooldown**.
+- **Server cache**: key = `config.fingerprint + '|' + barcode` — ⛔ **no Cookie fingerprint** (results are order data,
+  not session-dependent). The **single-flight key still holds the Cookie**, ordered `config|barcode|cookie` for both
+  normal lookups and the post-auth-rejection retry. The cache check sits **before** `resolveCookieCredential()`.
+  **`notFound` is cached too** (short TTL **15s**) — ⛔ **transient failures never enter the cache** (401 · 5xx · 429 ·
+  timeout). ⛔ **The negative TTL is capped by `cacheTtlMs`** ➜ `ZTO_CACHE_TTL_MS=0` disables **both** paths in one
+  place; `ZTO_NOT_FOUND_CACHE_TTL_MS=0` disables only the negative path. The negative TTL is **short on purpose** (newly
+  entered parcels must be found soon).
+- **`resolveCookieCredential()` is the single source decider**: `ZTO_AUTHORIZATION` / `ZTO_TOKEN` ➜ **never touches the
+  store**; else blob ➜ `ZTO_COOKIE` env. ⛔ **Blobs must not be a single point of failure** — `import` fails ·
+  `connectLambda` throws · `getStore` throws · read fails/hangs · bad value ➜ fall back to env. ⛔ `connectLambda(event)`
+  sets only **`edgeURL`** ➜ `consistency: 'strong'` throws `BlobsConsistencyError` — **never "fix" it by adding a PAT**.
+- ⛔ **Store names agree on both sides**: `getStore('zto-auth')` ➜ the real store is **`site:zto-auth`** ➜ the helper
+  writes `/api/v1/blobs/{siteID}/site:zto-auth/cookie`. **Checkers read the name from the real Function**, not a literal.
+- **A 401 from ZTO clears that cache at once** (`invalidateCookieCache()`) and `?diag=1` answers the reason **surviving
+  the 60s cache**. ⛔ **Secret values never leave** — only the 8-char `fingerprint`.
+- **Auth verdicts belong to the Cookie ZTO measured**: a new Cookie from Sync starts "unverified"; late answers for an
+  old Cookie never reject/accept the new one (`zto-cookie-session-test.js`). Client messages say **"rejected"**; a 401
+  doesn't prove time expiry and a timeout is not an auth verdict (`health-check-test.js`).
+- **Renewals are stored without overwriting a newer Sync**: SDK `getWithMetadata()` locks the version and `set()` uses
+  `onlyIfMatch` with the read ETag, or `onlyIfNew` when it read nothing. `modified:false` is a conflict; `modified:true`
+  without an ETag doesn't prove success either. A changed `BOS-MAN-SESSION` tries to write at once within the same
+  budget; the 60s ceiling applies to auxiliary Cookies and same-value retries. Pending must survive budget/timeouts and
+  stale cache reads, and a failed fresh read never deletes a working Cookie (`zto-cookie-session-test.js` ·
+  `zto-cookie-store-test.js`).
+- **Consecutive scans**: busy is a **wait**, not an **end** ➜ capped parcels go to `autoLookupQueueRetries` and retry.
+  ⛔ **Every early exit calls `dropAutoLookupQueueEntry(lookupKey)`** (except the "concurrency full" path, which
+  requeues) — orphan entries make later scans refused as "busy too long" **while no wait happens**. The ceiling measures
+  **real** waits (`existing.timer` **or** `existing.pending`). ⛔ **Never turn `waiting` into a "don't schedule"
+  condition** — skip scheduling only when **a live timer exists** (`existing && existing.timer`); using `waiting`
+  (which includes `pending`) makes `return true` **without scheduling** ➜ **the retry cycle dies silently**.
+  ⛔ **Concurrency ceiling stays 2** — never raise it on theory.
+- **`lookupResponseError(status, body, retryable)` is the single error builder** — it always attaches `lookupCode` and
+  `lookupReason`. ⛔ No bare `new Error('HTTP ' + status)`. `err.noRetry` ➜ `retryAsync()` honors it. Cooldown:
+  transient **6s**; permanent verdicts **30s**.
+- **`customerTablePrefetchAllowed()` is the single gate** — blocks when `isModalOpen` or `autoLookupInFlight.size > 0`.
+  **The ladder's first step is longer than `CUSTOMER_TABLE_FAIL_COOLDOWN_MS`**. **Busy at the scheduled time ➜
+  reschedule, never give up.**
+- **Import ➜ the table fills at once**: `seedCustomerTableFromImport()` **fills**, never **clears**, and honors the
+  import mode **exactly like the server** (`replace`/`upsert`/`newOnly`; duplicates in the file ➜ **last row wins**).
+  ⛔ **`runSheetImportClear()` still *clears***. `fresh=1` is the cache-opening key **for forced pulls only**. The server
+  cache key carries the row count (`customer_rows_v2_<lastRow>`).
+- ⛔ **Requests to Apps Script are always *simple requests*** — `Content-Type: text/plain;charset=utf-8` and **no custom
+  headers**. Apps Script **doesn't answer `OPTIONS`** ➜ a preflight = **import dead in production while fetch-stubbing
+  tests pass**. ⛔ **This covers *every* path to Apps Script, not just import** (the **Lookup** path once lacked it ➜ the
+  "Header name" field killed `?list=1` and `?code=` with `Failed to fetch`). `lookupApiSendsHeader(cfg)` is the single
+  gate: header **and** PIN prompt are skipped for Apps Script. ⛔ **Apps Script can't read headers at all** (`Code.gs`
+  reads `e.parameter`). ⛔ Detection compares the **hostname**, not a substring (`script.google.com.evil…` doesn't
+  count). ⛔ Not sending must be told to the user — **no silent drops**.
+- ⛔ **`fetch()` doesn't reject on HTTP errors** — 408/425/429/5xx are turned into rejections **inside** the
+  `retryAsync()` callback; 401/403 stay outside.
 
-## ZTO Cookie Sync លើ Windows (`tools/zto-cookie-sync-windows/`)
+## ZTO Cookie Sync on Windows (`tools/zto-cookie-sync-windows/`)
 
-ខ្សែសង្វាក់ ៖ `sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify Blobs
-(store site:zto-auth, key cookie)` — **គ្មាន redeploy**។
-ក្រោយ Login និងបើក Argus helper អាចចាប់ពីចម្លើយ API ដែលទទួលយក session។
-បើនៅរង់ចាំ ផ្លូវបម្រុងគឺ **Scan Management ➜ Arrival Scan ➜ វាយ Waybill**
-ដើម្បីកេះ `POST https://aargus-api.ztoglobal.com/scan/get/order/detail`។
+Chain: `sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify Blobs (store site:zto-auth, key cookie)` — **no redeploy**.
+After Login and opening Argus the helper captures from an API response that accepts the session. If still waiting, the
+fallback is **Scan Management ➜ Arrival Scan ➜ type a Waybill** to trigger
+`POST https://aargus-api.ztoglobal.com/scan/get/order/detail`.
 
-⛔ **ចំណុចចាប់ផ្តើម ≠ គោលដៅចាប់** ៖ helper បើក **`gate.ztoglobal.com`**
-(រក្សា session ➜ ចុចកាតសាខា ➜ Argus បើកដោយមិនវាយ password) ចំណែក
-`argus.ztoglobal.com` សុំ Login **រាល់ដង** ➜ វានៅតែបោះពុម្ពជា **ផ្លូវបម្រុង**
-(⛔ កុំដកចេញ)។ ការចាប់ **មិនប្តូរតាមវាទេ** ៖ `BOS-MAN-SESSION` ជារបស់
-**`aargus-api.ztoglobal.com`** ➜ ការចូលត្រឹម gate មិនបង្កើត Cookie នោះទេ។
-⛔ **Cookie អាយុវែងលើ `argus` មិនជំនួសវាបានឡើយ** (`__zcat_uuid__` ផុត
-២០២៧ · `ZTO_INTL_BOS_MAN_TOKEN`) — ពួកវា **domain ផ្សេង** ➜ browser មិនផ្ញើ
-ទៅ API host សោះ ➜ `validateCookieHeader()` ត្រូវទាមទារ `BOS-MAN-SESSION` ដដែល។
-⛔ **ការបើក Argus ជំនួសអ្នកប្រើ** (`openArgusFromPortal()`) ៖ **វាស់បាន
-(2026-09-11 · ការថតអេក្រង់របស់ម្ចាស់គម្រោង)** ការចុចកាតសាខាបើក **tab ថ្មី**
-ត្រង់ `https://argus.ztoglobal.com/#/` ធម្មតា រួច Argus redirect ទៅ `#/index`
-ដោយ **ចូលរួចស្រាប់** ➜ ⛔ **គ្មាន token ក្នុង URL សោះ** ➜ អ្វីដែលផ្តល់សិទ្ធិគឺ
-**ការផ្ទុកទំព័រ gate មុន** (SSO handshake) មិនមែនតួកាតទេ។ ដូច្នេះ helper
-**បើក tab ថ្មីទៅ `ARGUS_URL` ដោយផ្ទាល់** ⛔ **មិនស្កេន DOM រកតំណទេ** (វាស់បាន
-៖ frame មេរាយ **០ តំណ** ➜ ការស្កេនជាម៉ាស៊ីនឥតប្រយោជន៍)។ ⛔ **ច្រកទ្វារ ៣ មុន
-បើក** ៖ ការចាប់មិនទាន់ចប់ · គ្មាន tab ណាឈរលើ Argus រួច (`isArgusHost()` —
-⛔ **មិនមែន `endsWith` ធូរ** ៖ `aargus-api` និង `notargus` មិនរាប់ ➜ បើរាប់
-នឹងមិនបើកសោះ) · ទំព័រ gate ស្ថិតស្ថេររួច (`waitForLoadState` ក្នុងពិដាន ➜
-handshake រត់មុន)។ ⛔ **fail-open ទាំងស្រុង** ៖ `newPage` ធ្លាក់ · `goto` យឺត ·
-`waitForLoadState` ធ្លាក់ ➜ មិនបោះចេញ ហើយ **tab ដែលបើករួចត្រូវទុកចោល**
-(`goto` យឺត ≠ បរាជ័យ — ទំព័រនៅតែផ្ទុកបន្ត)។
-⛔ ការសាកលើកមុន (`a59d139`, ដកចេញវិញ `8718909`) ធ្លាក់ព្រោះជុំនោះ
-`isTargetApiUrl()` នៅទាមទារ path — **មិនមែនព្រោះ gate**។ ⛔ ហើយមូលហេតុពិត
-មិនអាចវាស់បាន ព្រោះ helper ចេញត្រឹមពាក្យ «អស់ម៉ោង» ➜ `watchApiTraffic()`
-រាយចំនួនការហៅ API ដែលឃើញ (សរុប · 2xx · 401/403) ពេលធ្លាក់ ៖ វាឈរ **ក្រៅ
-ផ្លូវចាប់** · ចុះឈ្មោះក្រោយអ្នកចាប់ · រុំក្នុង `try` ➜ មិនអាចធ្វើឲ្យការចាប់
-ធ្លាក់បានទេ · ⛔ **លេខប៉ុណ្ណោះ គ្មាន URL គ្មាន Cookie**។
+⛔ **Start point ≠ capture target**: the helper opens **`gate.ztoglobal.com`** (keeps the session ➜ tap the branch card ➜
+Argus opens without a password) while `argus.ztoglobal.com` asks for Login **every time** ➜ it's still printed as a
+**fallback** (⛔ never remove). Capture **doesn't follow it**: `BOS-MAN-SESSION` belongs to **`aargus-api.ztoglobal.com`**
+➜ signing into the gate alone doesn't create that Cookie. ⛔ **Long-lived Cookies on `argus` can't replace it**
+(`__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN` — **another domain** ➜ never sent to the API host) ➜
+`validateCookieHeader()` still requires `BOS-MAN-SESSION`. ⛔ **Opening Argus for the user** (`openArgusFromPortal()`):
+tapping the branch card opens a **new tab** at plain `https://argus.ztoglobal.com/#/` which redirects to `#/index`
+**already signed in** ➜ ⛔ **no token in the URL** ➜ what grants access is **loading the gate page first** (SSO
+handshake). So the helper **opens a new tab to `ARGUS_URL` directly** ⛔ **without scanning the DOM for links** (the
+main frame lists **0 links**). ⛔ **3 gates before opening**: capture not done · no tab already on Argus (`isArgusHost()`
+— ⛔ **not a loose `endsWith`**: `aargus-api` and `notargus` don't count) · gate page settled (`waitForLoadState` within a
+ceiling). ⛔ **Fully fail-open**: `newPage` fails · `goto` slow · `waitForLoadState` fails ➜ never throws, and **an
+already-opened tab is left alone** (slow `goto` ≠ failure). `watchApiTraffic()` reports counts of API calls seen
+(total · 2xx · 401/403) on failure: **outside the capture path** · registered after the capturer · wrapped in `try` ➜
+can't make capture fail · ⛔ **numbers only, no URLs, no Cookies**.
 
-- Cookie រស់ក្នុងសតិ; **បង្ហាញលើអេក្រង់ cmd តាមសំណើអ្នកប្រើ**។ ⛔ **PAT និង
-  `ZTO_PROXY_KEY` ហាមបង្ហាញដាច់ខាត** (AST scan — សួរថា «តើ **តម្លៃ** អាចឡើង
-  ដល់ output ទេ?» មិនមែន regex លើ **ឈ្មោះ**)។
-- ⛔ **រាល់អត្ថបទដែលចេញទៅ cmd ត្រូវជា ASCII អង់គ្លេស** ហើយ **`.cmd` ត្រូវជា
-  ASCII សុទ្ធ + CRLF** — `cmd.exe` បំបែក UTF-8 Khmer/emoji កណ្តាលពាក្យ។
-- **គូ cookie ដែលផ្ទៀងផ្ទាត់មិនបាន ➜ រំលង** (រាយ **ឈ្មោះ** មិនរាយតម្លៃ)
-  ចំណែក **ការការពារពិតនៅដដែល** ៖ CR/LF/NUL ➜ បដិសេធ **ទាំង jar**; គ្មាន
-  `BOS-MAN-SESSION` ត្រឹមត្រូវ ➜ បដិសេធ។ ⛔ **ខាង server អនុវត្តច្បាប់ដដែល**។
-- PAT ត្រូវ prompt ដោយ `Read-Host -AsSecureString` រក្សាជា **DPAPI/CurrentUser**
-  ក្នុង `%LOCALAPPDATA%` ហើយឆ្លងតែ stdout pipe (`shell:false`)។ ⛔ គ្មាន PAT
-  ក្នុង command line ឬ Netlify env។ **PAT មិនហូរទៅ host របស់ signed URL**។
-  Child DPAPI ត្រូវបញ្ចប់ក្នុង ៣០ វិនាទី ហើយសម្អាត buffer/timer រាល់ផ្លូវចេញ។
-- **ផ្លូវ setup ត្រូវរត់ឡើងវិញបាន ដោយ Enter = រក្សាតម្លៃចាស់** (Netlify បង្ហាញ
-  PAT **តែម្តង**)។ ⛔ **គ្មានការទម្លាក់ស្ងាត់** — សោខ្លីពេកត្រូវប្រាប់ចំនួន
-  តួដែលវាយ និងចំនួនដែលត្រូវការ។ ⛔ **ច្រកទ្វារត្រូវវាស់ *តម្លៃដែលដោះសោបាន*
-  មិនមែន *វត្តមានឯកសារ***។
-- **`--auto` បើក browser តែពេលមានសាលក្រមច្បាស់** (`status === 'ok' &&
-  healthy === false`)។ `mismatch` **មិនមែន `error` ទេ**។
-- **Timeout របស់ Netlify គ្របដល់អាន body ចប់**; stream លើស 1 MB បដិសេធ
-  មុន EOF។ EOF ខូចជា network ដែល retry បាន; 401/403 មិន retry ទោះ
-  `body.cancel()` ព្យួរក៏ដោយ (`zto-network-boundaries-test.js`)។
-- **Capture ត្រូវរង់ចាំ *ចម្លើយ* ដែលបញ្ជាក់ថា ZTO ទទួលយក session**៖ HTTPS
-  `GET`/`POST` លើ **host ពិត** (⛔ **path ណាមួយ** — Cookie ជារបស់ **domain**
-  មិនមែន path)។ Request ទទេ, HTTP 401/403, redirect/IdP, OPTIONS/HEAD និង
-  JSON ខូច មិនអាចបញ្ជាក់ជោគជ័យ។ អាន response ចប់ និងបញ្ចូល `Set-Cookie`
-  ដែលត្រូវនឹង URL មុនបិទ browser; រក្សាពិដានពេល និងដក listener រាល់ផ្លូវចេញ។
-  ⛔ **ការចាក់សោ path `/scan/get/order/detail` ជាការថយក្រោយ** (2.31.2 ➜
-  អ្នកប្រើរាយការណ៍ 2026-09-09) ៖ វាបង្ខំឲ្យ **ស្កេនកញ្ចប់មួយរាល់ដង** ខណៈ
-  វាមិនបន្ថែមការការពារអ្វីទេ — ការការពារឋិតនៅ **ចម្លើយ** មិនមែននៅ path។
-  ⛔ ដូច្នេះ host ជាច្រកទ្វារ URL **តែមួយ** ➜ ការធូររបស់វា (`endsWith`) ត្រូវ
-  មានអ្នកយាម (`zto-cookie-capture-test.js` · `zto-cookie-sync-test.js`)។
-- **Fingerprint ដូចគ្នា បញ្ជាក់តែការផ្ទុក Cookie**៖ សាលក្រមមាន ៣ គឺ
-  ទទួលយក/បដិសេធ/មិនទាន់វាស់។ `--auto` មិនបើក browser ព្រោះស្ថានភាពមិនទាន់
-  វាស់ទេ (`zto-cookie-sync-test.js` · `zto-cookie-capture-test.js`)។
-- ⛔ **server env ដែល extension ចាស់ធ្លាប់ប្រើ ត្រូវនៅតែលុប** ៖
-  `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
-  `NETLIFY_SITE_ID`។
+- Cookies live in memory; **shown on the cmd screen by user request**. ⛔ **PAT and `ZTO_PROXY_KEY` must never be shown**
+  (AST scan — ask "can the **value** reach output?", not regex on **names**).
+- ⛔ **All text to cmd is ASCII English** and **`.cmd` is pure ASCII + CRLF** — `cmd.exe` splits UTF-8 Khmer/emoji mid-word.
+- **Unverifiable cookie pairs ➜ skipped** (list **names**, never values) while **real protection stays**: CR/LF/NUL ➜
+  reject **the whole jar**; no valid `BOS-MAN-SESSION` ➜ reject. ⛔ **The server applies the same rules.**
+- The PAT is prompted with `Read-Host -AsSecureString`, kept as **DPAPI/CurrentUser** in `%LOCALAPPDATA%`, and crosses
+  only a stdout pipe (`shell:false`). ⛔ No PAT on command lines or Netlify env. **The PAT never flows to the signed-URL
+  host.** The DPAPI child must finish within 30s and clear buffers/timers on every exit.
+- **Setup can rerun, with Enter = keep the old value** (Netlify shows the PAT **once**). ⛔ **No silent drops** — a short
+  key reports characters typed and required. ⛔ **Gates measure *the value that decrypts*, not *file presence*.**
+- **`--auto` opens a browser only on a clear verdict** (`status === 'ok' && healthy === false`). `mismatch` **is not
+  `error`**.
+- **Netlify timeouts cover reading the body to the end**; streams over 1 MB are refused before EOF. Broken EOF is a
+  retryable network error; 401/403 never retry even if `body.cancel()` hangs (`zto-network-boundaries-test.js`).
+- **Capture waits for a *response* proving ZTO accepted the session**: HTTPS `GET`/`POST` on the **real host** (⛔ **any
+  path** — Cookies belong to the **domain**, not the path). Empty requests, HTTP 401/403, redirects/IdP, OPTIONS/HEAD and
+  bad JSON can't prove success. Read the response fully and merge `Set-Cookie` matching the URL before closing the
+  browser; keep the time ceiling and remove listeners on every exit. ⛔ **Locking path `/scan/get/order/detail` is a
+  regression** (2.31.2 ➜ user report): it forces **scanning a parcel every time** with no protection gained — protection
+  lives in the **response**, not the path. ⛔ The host is the **only** URL gate ➜ its looseness (`endsWith`) has guards
+  (`zto-cookie-capture-test.js` · `zto-cookie-sync-test.js`).
+- **The same fingerprint proves only storage**: verdicts are accepted/rejected/not measured. `--auto` doesn't open a
+  browser for "not measured" (`zto-cookie-sync-test.js` · `zto-cookie-capture-test.js`).
+- ⛔ **Server env the old extension used stays deleted**: `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` ·
+  `NETLIFY_ACCOUNT_ID` · `NETLIFY_SITE_ID`.
 
-## នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW) និង `zto-import`
+## Excel import to Sheet (in ZoeW) and `zto-import`
 
-- **Replace ត្រូវពង្រីក grid និងសរសេរថ្មីជោគជ័យមុនសម្អាតជួរចាស់លើស**;
-  write/resize បដិសេធមិនត្រូវលុបទិន្នន័យចាស់ (`zto-import/test.js`)។
-- **ផ្លូវតែមួយទៅប្រអប់គឺ PIN** — `requestPinBeforeConfig(openSheetImportModal,
-  'sheetImport')`។ ⛔ **`openSheetImportModal` មិនត្រូវដាក់ក្នុង
-  `ACTION_ALLOWLIST`**។
-- **Salt ត្រូវរក្សាដដែល** ៖ `zoew_sheet_import_secret_v1` (AES ពី Security PIN),
-  `zoeadmin_pin_verify_v2`, `zoeadmin_lookup_api_secret_v1` និង
-  **`LICENSE_APP_CODE`** — ការប្តូរណាមួយធ្វើឲ្យទិន្នន័យលើឧបករណ៍
-  ទាំងអស់ខូច (ឬ Key ដែលចេញរួចខូច)។ ⛔ **តម្លៃឥឡូវជា `'ZOE'`** (ធ្លាប់ជា
-  `'ADM'` តាំងពី App ៣ ដាច់ដោយឡែក) — ⛔ វាមិនមែនស្លាកបង្ហាញទេ ៖ វារស់នៅ
-  **ខាងក្នុងហត្ថលេខា** (`payload.a`) · ជាផ្លូវ Firebase · និងជាកូនសោ
-  `zoe_license_activation_` បូកកូដនោះ ➜ ការប្តូរវាម្តងទៀត **បំបែក Key និង
-  ការ Activate ទាំងអស់** ហើយត្រូវការការចេញ Key ថ្មីជូនអតិថិជនគ្រប់រូប។
-  `license-app-code-test` ចាក់សោវា ៖ ZoeW និង ZoeKeyGen ត្រូវនិយាយកូដតែមួយ
-  ហើយ rules មិនត្រូវរាយ App ដែលលុបចោលរួច។
-- ⛔ **«ស្រាយមិនបាន» ≠ «ខុស»** ៖ PIN ខុស ➜ បង្ហាញទម្រង់កំណត់វិញ តែ **មិនលុប
-  record**។ **ចាកចេញ ➜ `clearSheetImportSession()`** តែ **ការតភ្ជាប់ដែល
-  អ៊ិនគ្រីបនៅដដែល**។
-- **`sheetImportReadOptions(bytes)` ជាអ្នកសម្រេចតែមួយ** ៖ `raw: true` **តែពេល
-  ឯកសារមិនមែនជា container** (ZIP `50 4b` · OLE `d0 cf 11 e0`) — សម្គាល់តាម
-  **byte** មិនមែនឈ្មោះឯកសារ។ ⛔ **`.xlsx` មិនត្រូវទទួល `raw`** (កោសិកា
-  កាលបរិច្ឆេទក្លាយជាលេខ serial)។ បើអត់ `raw` ➜ CSV បាត់ **លេខ 0 នាំមុខ** ➜
-  លេខទូរស័ព្ទខុសហូរត្រឡប់មក ZoeW។
-- **SheetJS 0.20.3 នៅក្នុង repo** (`ZoeW/public/vendor/xlsx.full.min.js`) — ⛔ កុំ
-  ប្រើ CDN។ ⛔ **កុំរក្សា `IMPORT_PASSWORD` plaintext ក្នុង Web Storage**។
-- `zto-import/` ជា Apps Script **standalone** (សរសេរចូល) ចំណែក
-  `zto-import/google-sheets-api/` ជា Apps Script **bound** (អានចេញ) — **គម្រោង
-  ២ ដាច់ដោយឡែក ហើយ `CacheService` របស់ពួកវាដាច់ពីគ្នា**។ `Code.gs`
-  **fail closed** (គ្មាន ScriptProperty `API_KEY` ➜ បដិសេធ)។
+- **Replace grows the grid and writes new data successfully before clearing extra old rows**; rejected writes/resizes
+  never delete old data (`zto-import/test.js`).
+- **The only path to the dialog is PIN** — `requestPinBeforeConfig(openSheetImportModal, 'sheetImport')`.
+  ⛔ **`openSheetImportModal` must not be in `ACTION_ALLOWLIST`**.
+- **Salts stay fixed**: `zoew_sheet_import_secret_v1` (AES from Security PIN), `zoeadmin_pin_verify_v2`,
+  `zoeadmin_lookup_api_secret_v1` and **`LICENSE_APP_CODE`** — changing any breaks data on every device (or every issued
+  Key). ⛔ **The value is now `'ZOE'`** (once `'ADM'`) — ⛔ not a display label: it lives **inside the signature**
+  (`payload.a`) · is a Firebase path · and a key `zoe_license_activation_` plus the code ➜ changing it again **breaks
+  every Key and Activation** and needs new Keys for every customer. `license-app-code-test` locks it.
+- ⛔ **"Can't decrypt" ≠ "wrong"**: wrong PIN ➜ show the setup form, **never delete the record**. **Logout ➜
+  `clearSheetImportSession()`** while **the encrypted connection stays**.
+- **`sheetImportReadOptions(bytes)` is the single decider**: `raw: true` **only when the file is not a container** (ZIP
+  `50 4b` · OLE `d0 cf 11 e0`) — detected by **bytes**, not the file name. ⛔ **`.xlsx` never gets `raw`** (date cells
+  become serials). Without `raw` ➜ CSV **loses leading zeros** ➜ wrong phone numbers flow back to ZoeW.
+- **SheetJS 0.20.3 is in the repo** (`ZoeW/public/vendor/xlsx.full.min.js`) — ⛔ no CDN. ⛔ **Never keep
+  `IMPORT_PASSWORD` plaintext in Web Storage**.
+- `zto-import/` is a **standalone** Apps Script (writes) while `zto-import/google-sheets-api/` is a **bound** Apps Script
+  (reads) — **2 separate projects with separate `CacheService`**. `Code.gs` **fails closed** (no ScriptProperty
+  `API_KEY` ➜ refuse).
 
 ## Export · Setup Link · Firebase Backup
 
-- **jsPDF មិនអាច shape អក្សរខ្មែរបានទេ** — PDF export ប្រើ browser
-  print-to-PDF។ ⛔ កុំនាំ jsPDF មកវិញសម្រាប់អក្សរខ្មែរ។
-- **លេខទូរស័ព្ទ និង barcode ត្រូវជា TEXT មិនមែនលេខ** —
-  `XLSX.writeFile(..., { bookSST: true })` បូក `forceExportTextCells()`
-  (`EXPORT_TEXT_COLUMN_INDEXES = [1, 2]`)។ ⛔ **កុំវិនិច្ឆ័យថ្នាក់នេះពី cell
-  object ក្នុងសតិ — ត្រូវពិនិត្យ XML ដែល emit ចេញ។**
-- **`csvSafeText()` ដាក់ `'` ពីមុខ** តម្លៃដែលចាប់ផ្តើមដោយ `=` `+` `-` `@`
-  (ឈ្មោះទូជាអត្ថបទសេរី ➜ រូបមន្តរស់ក្នុង Excel)។ ⛔ **កុំដាក់វាលើ `csvEscape`
-  ទាំងមូល** — លទ្ធផលរបស់ `sheetsText()` ចាប់ផ្តើមដោយ `=` **ដោយចេតនា**។
-- **Setup Link** ៖ `applySetupLinkFromUrl()` **ឆ្លងកាត់ PIN gate ដដែល** មុន
-  បំពេញចូល textarea — **គ្មានផ្លូវរក្សាទុកស្វ័យប្រវត្តិទេ**។ Query string
-  ត្រូវលុបភ្លាមតាម `history.replaceState`។ Setup Link ដែលបើកចោល **មិនត្រូវ
-  រស់រានក្រោយចាកចេញ** តែ Link ដែលអ្នកប្រើ **កំពុងវាយ PIN ពិតៗ** មិនត្រូវ
-  បោះចោល (`isPinFlowPending()` ជាអ្នកបែងចែក)។
-- **`firebase-backup/`** ជា Node.js 18+ CLI ដាច់ដោយឡែក (native HTTPS/OAuth,
-  គ្មាន dependency)។ `config.json` · `secrets/` · `backups/` ស្ថិតក្នុង
-  `.gitignore` — ⛔ **service-account key ជា credential ពិត កុំ commit វា។**
-  Backup សរសេរទៅ `.partial` រួច `renameSync()`។
-- **វារត់បាន ២ ផ្លូវ** ៖ ដោយដៃ/Task Scheduler លើម៉ាស៊ីនអ្នកប្រើ **និង**
-  `.github/workflows/backup.yml` (រាល់ថ្ងៃ ០២:០០ ម៉ោងកម្ពុជា = cron `0 19 * * *`)។
-  ផ្លូវ GitHub ប្រើ `ci-config.js` (សាង config + សោពី secret) ➜ `backup.js` ➜
-  `crypt.js seal` (AES-256-GCM តាម scrypt)។
-- ⛔ **artifact មិនត្រូវផ្ទុក plaintext ដាច់ខាត** — dump មានលេខទូរស័ព្ទ និង
-  ចំនួន COD/DOD ពិត។ `seal` អ៊ិនគ្រីប **និងលុប `.json.gz`** រួចមានជំហាន
-  ផ្ទៀងផ្ទាត់ដាច់ដោយឡែកដែល **ធ្លាក់មុន upload** បើនៅសល់ឯកសារណាមិនមែន `.enc`។
-  ⛔ ការអ៊ិនគ្រីបត្រូវ **ស្រាយត្រឡប់វិញផ្ទៀងផ្ទាត់** មុនសរសេរ — backup ដែល
-  បើកមិនរួច គឺគ្មានតម្លៃ ហើយវាមិនត្រូវកើតឡើងស្ងាត់ៗឡើយ។
-- ⛔ **សោមិនចុះលើ checkout** — `ci-config.js` **បដិសេធ** ផ្លូវណាមួយក្នុង repo
-  ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើត *តាមរចនាសម្ព័ន្ធ*; workflow លុបសោចោល
-  **ទោះជុំធ្លាក់** (`if: always()`) ហើយសិទ្ធិ token ត្រឹម `contents: read`។
-- **អាជីវកម្មច្រើន ➜ Project ច្រើន** ៖ `ZOE_BACKUP_TARGETS` ជា **Array** ➜ ជុំ
-  មួយគ្រប Project ប៉ុន្មានក៏បាន (ថតដាច់ដោយឡែកក្នុងមួយឈ្មោះ; ធ្លាក់មួយមិន
-  បញ្ឈប់មួយទៀត)។ តែព្រំដែន **មិនមែនបច្ចេកទេស** ៖ ទិន្នន័យអតិថិជនស្ថិតក្នុង
-  Project **របស់អតិថិជន** ➜ ត្រូវការសោពីគេ (សូមស្នើ Role
-  **`Firebase Realtime Database Viewer`** អានតែម្យ៉ាង) ហើយកូតា artifact របស់
-  GitHub Free (repo ឯកជន = **500 MB**) = ទំហំមួយជុំ × `ZOE_BACKUP_RETENTION_DAYS`។
-- ⛔ **អាជីវកម្មមួយធ្លាក់ មិនត្រូវបំផ្លាញ backup របស់អាជីវកម្មផ្សេង** —
-  ជំហានទាញដាក់ `continue-on-error: true` (ព្រោះ `backup.js` ចេញ exit មិនមែន 0
-  ពេលមួយក្នុងចំណោមធ្លាក់) រួច **ជំហានចុងក្រោយ ក្រោយ upload** ធ្វើឲ្យ job
-  ក្លាយជាក្រហម។ ⛔ **កុំផ្លាស់ជំហាននោះឡើងលើ** — នោះនឹងបាត់ backup ដែលបាន។
-- ⚠️ **GitHub ផ្អាក workflow តាមកាលកំណត់ ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ** — នេះជា
-  តំបន់ 📝 (គ្មានឧបករណ៍ក្នុង repo មើលឃើញ)។ បើ backup ឈប់មកដោយស្ងាត់ ត្រូវ
-  ពិនិត្យ Actions ជាមុនគេ មុននឹងសង្ស័យកូដ។
+- **jsPDF can't shape Khmer** — PDF export uses browser print-to-PDF. ⛔ Never bring jsPDF back for Khmer.
+- **Phone numbers and barcodes are TEXT, not numbers** — `XLSX.writeFile(..., { bookSST: true })` plus
+  `forceExportTextCells()` (`EXPORT_TEXT_COLUMN_INDEXES = [1, 2]`). ⛔ **Never judge this from in-memory cell objects —
+  check the emitted XML.**
+- **`csvSafeText()` prefixes `'`** to values starting with `=` `+` `-` `@` (free-text Locker names ➜ live formulas in
+  Excel). ⛔ **Never apply it to all of `csvEscape`** — `sheetsText()` output starts with `=` **on purpose**.
+- **Setup Link**: `applySetupLinkFromUrl()` **goes through the same PIN gate** before filling the textarea — **no auto
+  save path**. The query string is removed at once via `history.replaceState`. An abandoned Setup Link **doesn't survive
+  logout**, but a Link the user is **actively typing a PIN for** is never dropped (`isPinFlowPending()` decides).
+- **`firebase-backup/`** is a Node.js 18+ CLI (native HTTPS/OAuth, no dependencies). `config.json` · `secrets/` ·
+  `backups/` are in `.gitignore` — ⛔ **a service-account key is a real credential, never commit it.** Backups write to
+  `.partial` then `renameSync()`.
+- **It runs 2 ways**: by hand/Task Scheduler on the user's machine **and** `.github/workflows/backup.yml` (daily 02:00
+  Cambodia = cron `0 19 * * *`). The GitHub path uses `ci-config.js` (config + key from secrets) ➜ `backup.js` ➜
+  `crypt.js seal` (AES-256-GCM via scrypt).
+- ⛔ **Artifacts never hold plaintext** — dumps have real phone numbers and COD/DOD. `seal` encrypts **and deletes the
+  `.json.gz`**, and a separate verification step **fails before upload** if any non-`.enc` file remains. ⛔ Encryption is
+  **decrypted back and verified** before writing — an unopenable backup is worthless and must never happen silently.
+- ⛔ **Keys never land in the checkout** — `ci-config.js` **refuses** any path inside the repo ➜ accidental commits are
+  impossible *by structure*; the workflow deletes the key **even when the round fails** (`if: always()`) and token
+  permissions are `contents: read`.
+- **Many businesses ➜ many projects**: `ZOE_BACKUP_TARGETS` is an **array** ➜ one round covers any number of projects
+  (separate folder per name; one failing doesn't stop others). The limits are **not technical**: customer data lives in
+  the **customer's** project ➜ you need their key (ask for role **`Firebase Realtime Database Viewer`**, read-only), and
+  GitHub Free artifact quota (private repo = **500 MB**) = one round size × `ZOE_BACKUP_RETENTION_DAYS`.
+- ⛔ **One business failing must not destroy another's backup** — the pull step has `continue-on-error: true` (because
+  `backup.js` exits non-zero when one fails) and **the last step, after upload,** turns the job red. ⛔ **Never move that
+  step up** — successful backups would be lost.
+- ⚠️ **GitHub pauses scheduled workflows after 60 days of repo inactivity** — a 📝 area (no repo tool sees it). If
+  backups stop silently, check Actions first.
 
-## Firebase rules — រូបរាងបច្ចុប្បន្ន
+## Firebase rules — current shape
 
-`firebase-database.rules.json` (Business) ៖ root default-deny; គ្រប់ node ប្រើ
-`auth != null` ជាការអនុញ្ញាតតែមួយ។ អ្វីដែលនៅសល់ជាការការពារពិត ៖
+`firebase-database.rules.json` (Business): root default-deny; every node uses `auth != null` as the only permission.
+The real protection left:
 
-- **schema validation** — ប្រភេទវាល, ជួរតម្លៃ, និង `$other: { ".validate": false }`
-  ដែលបដិសេធវាលចម្លែក។ ⛔ **កុំដកវាចេញ។**
-- **claim/witness fence** លើ `zoew_restore_finalizations` និង
-  `zoew_clear_history_finalizations` ការពារ Restore/Clear All replay និង
-  revenue ស្ទួន។ ⛔ **កុំដកវាចេញ។**
-- ⛔ **witness មិនត្រូវទាមទារ `!data.exists()`** — វាបង្កើត **deadlock ៣ ខាង**
-  (ស្តារ 401 · លុប witness 401 · លុបធាតុធុងសំរាម 401) ➜ ធាតុនោះ **ស្តារមិនបាន
-  លុបមិនបាន ជារៀងរហូត**។ អ្វីដែលពិតជាទប់ replay គឺ «claim token ត្រូវនៅក្នុង
-  ធាតុធុងសំរាម **មុន** update ហើយធាតុនោះត្រូវលុប **ក្នុង** update ដដែល»។
-- **`license_keys/$appCode/$keyId` អានបានជាសាធារណៈ** (តែ `expiresAt` និង
-  `revoked`) ព្រោះ `checkOnline()` ជា REST គ្មាន auth។ Metadata រសើប ស្ថិតក្នុង
-  `license_keys_meta` ដែលអាន/សរសេរបានតែ admin។
-- **node ដែលរំពឹង object ទាមទារ object** — `.validate: "newData.hasChildren()"` (ឬ `hasChildren([...])`) លើរាល់ node ដែលមាន
-  schema កូន ហើយអាចសរសេរបាន (record ប្រវត្តិ/ធុងសំរាម · `barcodes` · ledger ថ្ងៃ/ខែ · ស្ថិតិយក · កញ្ចក់ចំណូល · License Key/seat/meta)។
-  ⛔ **កុំដកវាចេញ** — ជួរ «Rules ៖ node ដែលរំពឹង object» ក្នុងតារាងស្នូល។ ⛔ `.validate` មិនរត់លើការលុប (`null`) ➜ ការលុបធម្មតាមិនប៉ះ។
-- `ZoeKeyGen/firebase-database.rules.json` នៅរក្សា `user_roles` និងតួនាទី
-  `admin` **ដោយចេតនា** — វាជា Project ដាច់ដោយឡែក។
+- **Schema validation** — field types, value ranges, and `$other: { ".validate": false }` rejecting unknown fields.
+  ⛔ **Never remove it.**
+- **Claim/witness fences** on `zoew_restore_finalizations` and `zoew_clear_history_finalizations` prevent
+  Restore/Clear All replay and duplicate revenue. ⛔ **Never remove them.**
+- ⛔ **A witness must not require `!data.exists()`** — it creates a **3-way deadlock** (restore 401 · deleting the
+  witness 401 · deleting the trash item 401) ➜ the item can **never be restored or deleted**. What really blocks replay is
+  "the claim token is in the trash item **before** the update and that item is deleted **in** the same update".
+- **`license_keys/$appCode/$keyId` is publicly readable** (only `expiresAt` and `revoked`) because `checkOnline()` is
+  REST without auth. Sensitive metadata lives in `license_keys_meta`, readable/writable only by admins.
+- **Nodes expecting objects require objects** — `.validate: "newData.hasChildren()"` (or `hasChildren([...])`) on every
+  writable node with child schema (history/trash records · `barcodes` · daily/monthly ledger · pickup stats · revenue
+  mirror · License Key/seat/meta). ⛔ **Never remove it** — see the core-table row. `.validate` doesn't run on deletes
+  (`null`).
+- `ZoeKeyGen/firebase-database.rules.json` keeps `user_roles` and the `admin` role **on purpose** — separate project.
 
-## ⛔⛔ config របស់ Netlify ៖ site ២ ពីថតតែមួយ — កុំបន្ថែម root `netlify.toml`
+## ⛔⛔ Netlify config: 2 sites from one repo — never add a root `netlify.toml`
 
-> 🔴 **រកឃើញពិត (2026-09-03, PR #150)** ៖ agent របស់ Netlify បើក PR ដែល
-> **បន្ថែម `netlify.toml` នៅ root** ដោយអះអាងថា «`base` setting ក្នុង
-> netlify.toml របស់អ្នកខុស — វាចង្អុលទៅ `/opt/build`»។ **ការអះអាងនោះមិនពិត** ៖
-> គ្មានពាក្យ `base` ក្នុងឯកសារណាមួយ ហើយក៏គ្មាន root file ដែរ។
+> 🔴 Real finding (2026-09-03, PR #150): Netlify's agent opened a PR **adding a root `netlify.toml`**, claiming "your
+> `base` setting points to `/opt/build`". **That claim was false**: no `base` existed anywhere and there was no root file.
 
-Repo នេះ deploy ជា Netlify site **២** (`zoew` · `zoekeygen`) ពីថតតែមួយ។
-**Base directory ជារបស់ Netlify UI ក្នុងមួយ site** — មិនមែនក្នុង repo ទេ។
+The repo deploys **2** Netlify sites (`zoew` · `zoekeygen`). **Base directory belongs to the Netlify UI per site** — not
+the repo.
 
-### ⛔ 📝 Base directory ត្រូវប្រកាន់អក្សរតូចធំ (គ្មានឧបករណ៍ចាក់សោបាន)
+### ⛔ 📝 Base directory is case-sensitive (no tool can lock it)
 
-| Netlify site | Base directory ត្រឹមត្រូវ |
+| Netlify site | Correct Base directory |
 |---|---|
 | `zoew` | **`ZoeW`** |
 | `zoekeygen` | **`ZoeKeyGen`** |
 
-🔴 **មូលហេតុពិតនៃ deploy ដែលធ្លាក់ 2026-09-03** ៖ base ត្រូវបានដាក់ជា
-**`zoekeygen`** (អក្សរតូច) ជំនួស **`ZoeKeyGen`**។ Netlify build រត់លើ
-**Linux ដែលប្រកាន់អក្សរតូចធំ** ➜ ថតនោះពិតជាមិនមាន ➜ សារ «base directory
-does not exist» **ត្រឹមត្រូវ** — បញ្ហាមិនដែលនៅក្នុង repo ទេ។
+🔴 **Real cause of the 2026-09-03 failed deploy**: base was set to **`zoekeygen`** instead of **`ZoeKeyGen`**. Netlify
+builds on **case-sensitive Linux** ➜ "base directory does not exist" was **true** — the problem was never in the repo.
+When a deploy fails with that message: **check case in the UI first**, before believing any analysis pointing at the
+repo.
 
-⛔ **នេះជាតំបន់ 📝** ៖ វារស់ក្នុង Netlify UI ដែល checker ក្នុង repo មើលមិនឃើញ
-ហើយការដាក់ PAT ចូល Netlify env ត្រូវហាម ➜ **គ្មានឧបករណ៍ណាចាក់សោវាបានទេ**។
-ដូច្នេះពេល deploy ធ្លាក់ដោយ «base directory does not exist» ៖ **ពិនិត្យ
-អក្សរតូចធំក្នុង UI ជាមុនគេ** មុននឹងជឿការវិភាគណាមួយដែលចង្អុលទៅ repo។
+- ⛔ **No root `netlify.toml`, ever** — Netlify reads it for **both** sites and it beats UI settings ➜ a `base` there
+  redirects the other app's build.
+- ⛔ **No `base` key in any app config** either.
+- **Config matches what the app *really ships*** (derived, not literal): ships `.wasm` ➜ CSP has `'wasm-unsafe-eval'`
+  **and** header `Content-Type = "application/wasm"`; has `netlify/functions/*.js` ➜ toml has `functions = ` pointing at
+  a real dir; `index.html` requests `script.google.com` ➜ `connect-src` allows it. ⛔ **Keep the reverse**: apps without
+  wasm/Functions are not forced.
+- ⛔ **Every config production reads needs at least 1 checker reading it** — the gap PR #150 exposed.
 
-ច្បាប់ ៖
-
-- ⛔ **គ្មាន `netlify.toml` នៅ root ដាច់ខាត** — Netlify អានវាសម្រាប់ site
-  **ទាំង ២** ហើយ `netlify.toml` ឈ្នះលើការកំណត់ក្នុង UI ➜ `base` នៅទីនោះ
-  បង្វែរ build របស់ App មួយទៀតទៅថតខុស។
-- ⛔ **គ្មានពាក្យ `base` ក្នុង config របស់ App ណាមួយ** ដែរ។
-- **config ត្រូវស៊ីនឹងអ្វីដែល App *ពិតជា ship*** (ដេរីវេ មិនមែន literal) ៖
-  ship `.wasm` ➜ CSP ត្រូវមាន `'wasm-unsafe-eval'` **និង** header
-  `Content-Type = "application/wasm"`; មាន `netlify/functions/*.js` ➜ toml
-  ត្រូវមាន `functions = ` ដែលចង្អុលទៅថតដែលមានពិត; `index.html` សុំ URL
-  `script.google.com` ➜ `connect-src` ត្រូវអនុញ្ញាត host នោះ។
-  ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ App ដែលគ្មាន wasm/Function មិនត្រូវបង្ខំ។
-- ⛔ **រាល់ config ដែលផលិតកម្មអាន ត្រូវមាន checker យ៉ាងតិច ១ អានវា** —
-  នេះជាចន្លោះពិតដែល PR #150 បង្ហាញ ៖ checker ដែលអាន netlify.toml
-  (`csp-enforced` · `csp-lazy-resource` · `scan-engine` · `offline-shell` ·
-  `sheet-import` · `zto-proxy`) សុទ្ធតែបើក **ផ្លូវផ្ទាល់** របស់ App ➜ root
-  file អាចបម្រើ CSP ខុសលើផលិតកម្ម ខណៈសំណុំ audit **បៃតងទាំងអស់**។
-
-⚠️ **មេរៀន ៖ ការកែដែល bot ស្នើ ក៏ត្រូវឆ្លងកាត់វិន័យដដែល។** ជុំនេះ bot ស្មាន
-មូលហេតុមួយដែលមិនមាន រួច «កែ» វាដោយបន្ថែមឯកសារដែល **គ្មាន checker ណាមើល** —
-ចូលទៅក្នុងស្រទាប់សុវត្ថិភាពផ្ទាល់។ មុនទទួលយក PR ណាមួយ (ពីមនុស្ស ឬពី bot)
-ត្រូវសួរ ៖ «**តើការអះអាងអំពីមូលហេតុ ពិតទេ?**» រួច `grep` វា។
-
-Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់ **៤** លើ tree
-របស់ PR #150; mutation ៦ ➜ ចាប់បានទាំង ៦ រួម **ទិសផ្ទុយ ១**)។
-
+⚠️ **Lesson: bot-proposed fixes go through the same discipline.** Before accepting any PR (human or bot) ask "**is the
+claimed cause true?**" and `grep` it. Test: **`netlify-config-scope-test.js`**.
 
 ---
 
-# 🔬 វិន័យរបស់ឧបករណ៍ (checker discipline)
+# 🔬 Checker discipline
 
-## ⛔ សំណួរ ១៣ មុនជឿថា checker ថ្មីមួយដំណើរការ
+## ⛔ 13 questions before believing a new checker works
 
-១. វា **ស្កេន/រត់ឯកសារណា**ខ្លះ?
-២. វាស្កេន **ទម្រង់វេយ្យាករណ៍ណា**ខ្លះ? (template literal ធៀបនឹងការតភ្ជាប់ខ្សែអក្សរ)
-៣. វាពិនិត្យ **ទិសណា**? (marker ចូល **និង** ចេញ)
-៤. **តើវាអាចធ្លាក់បានទេ?** ➜ `node audit-tools/checker-coverage.js`
-   (វារត់ checker នីមួយៗពិត ដោយចង្អុល `*_APP_DIR` ទៅ **ថតទទេ**)
-៥. **តើវាអាចព្យួរបានទេ?** ➜ `node audit-tools/hang-guard.js`
-៦. **តើការធ្លាក់របស់វាឡើងដល់ exit code ទេ?** ➜ `node audit-tools/exit-code-integrity.js`
-   (`run-all.sh` សម្រេច PASS/FAIL តាម **exit code តែម្យ៉ាង** — «❌ ធ្លាក់ 2»
-   ដែលចេញ exit 0 ត្រូវរាយថា PASS)
-៧. **តើមានឧបករណ៍ណាឃើញ *ស្នាមភ្ជាប់* រវាងឯកសារ ២ ទេ?** ⛔ **ការ stub
-   ស្នាមភ្ជាប់ក្នុងគ្រប់តេស្ត = ស្នាមភ្ជាប់នោះគ្មានតេស្តសោះ។** ហើយ
-   **ការ stub ស្នាមភ្ជាប់ដែលអ្នកកំពុងវាស់ = ការវាស់អ្វីផ្សេង។**
-៨. **តើវាដាក់ប្រព័ន្ធក្នុង *ស្ថានភាព* ណា មុនអះអាង?** (ឧ.
-   `connection-recovery-test` មាន assertion ១២៧ ហើយ **បៃតងទាំងអស់** លើកូដ
-   ដែលមានកំហុសពិត ព្រោះសេណារីយ៉ូទាំងអស់បាញ់ `errCb` **ភ្លាមក្រោយ**
-   `initDatabaseListeners()` ➜ ល័ក្ខខ័ណ្ឌដែលមានកំហុសត្រូវការពារ **ដោយចៃដន្យ**)
-៩. **តើ checker ដាក់ dependency ក្នុង *របៀបបរាជ័យ* ណា?** (បដិសេធ · អវត្តមាន ·
-   **ព្យួរ** · **យឺតតែជោគជ័យ** — ៤ របៀបផ្សេងគ្នា)
-១០. **តើវាឃើញ *ការបដិសេធ promise* ទេ?** — `pageerror` ចាប់តែការបោះ
-   **synchronous**; កូដនេះស្ទើរតែទាំងអស់ជា `async`។ អ្នកបម្លែងតាម
-   `addInitScript` ត្រូវឈរ **មុន `.goto()`**។
-១១. **តើការធ្លាក់របស់វា ជាការធ្លាក់ពិត ឬសំណល់នៃការវាស់?** ➜ ត្រូវមាន
-   **probe ទិសផ្ទុយ** និង **ជាន់អប្បបរមា**។
-១២. **តើលទ្ធផលដែលអ្នកអានជា `PASS` ឬ `SKIP`?** ⛔ **`SKIP` មានន័យថា «វាស់
-   មិនបាន» មិនមែន «ត្រឹមត្រូវ»** ➜ ត្រូវ **បំបាត់ SKIP ចោល** មុនអះអាងថា
-   tree បៃតង។
-១៣. **តើ *អ្នកវាស់* ខ្លួនឯងចង្អុលទៅ tree ត្រឹមត្រូវទេ?** — ជុំ 2026-09-03
-   រត់ mutation ៥ ដោយ **ឈ្មោះ `*_APP_DIR` ខុស** ➜ checker ស្កេន tree ពិត
-   ➜ រាយថា «រស់រាន» ទាំង ៥ **ដោយខុស**។ មុនជឿលទ្ធផល mutation ត្រូវ
-   `grep -n 'process.env\.[A-Z_]*APP_DIR' audit-tools/<checker>.js` ហើយ
-   សាកឲ្យវា **ធ្លាក់ដោយចេតនា** ម្តងជាមុន។
+1. Which **files** does it scan/run?
+2. Which **syntax forms** does it scan? (template literals vs string concatenation)
+3. Which **directions**? (markers in **and** out)
+4. **Can it fail?** ➜ `node audit-tools/checker-coverage.js` (runs each checker with `*_APP_DIR` pointing to an **empty
+   dir**)
+5. **Can it hang?** ➜ `node audit-tools/hang-guard.js`
+6. **Does its failure reach the exit code?** ➜ `node audit-tools/exit-code-integrity.js` (`run-all.sh` decides by **exit
+   code only**)
+7. **Does any tool see the *seam* between 2 files?** ⛔ Stubbing a seam in every test = that seam has no test; stubbing
+   the seam you measure = measuring something else.
+8. **What *state* does it put the system in before asserting?** (`connection-recovery-test` had 127 assertions **all
+   green** on buggy code because every scenario fired `errCb` **right after** `initDatabaseListeners()` ➜ the buggy
+   condition was protected **by accident**)
+9. **Which *failure modes* does it put dependencies in?** (reject · absent · **hang** · **slow success**)
+10. **Does it see *promise rejections*?** — `pageerror` only catches **synchronous** throws; nearly all code here is
+    `async`. Converters via `addInitScript` sit **before `.goto()`**.
+11. **Is its failure real or a measurement artifact?** ➜ needs a **reverse probe** and a **minimum floor**.
+12. **Is the result `PASS` or `SKIP`?** ⛔ **`SKIP` means "couldn't measure", not "correct"** ➜ eliminate SKIPs before
+    claiming a green tree.
+13. **Does the *measurer* itself point at the right tree?** — a round ran 5 mutations with the **wrong `*_APP_DIR`
+    name** ➜ checkers scanned the real tree ➜ "survived" all 5 **wrongly**. Before believing mutation results:
+    `grep -n 'process.env\.[A-Z_]*APP_DIR' audit-tools/<checker>.js` and make it **fail on purpose** once.
 
-## ច្បាប់ស្នូលរបស់ឧបករណ៍
+## Core tool rules
 
-- **checker ស្តាទិចចាក់សោ *ឈ្មោះ*; checker ឥរិយាបថចាក់សោ *លទ្ធផល*។**
-  ការប្តូរឈ្មោះ · refactor · ផ្លាស់កូដទៅឯកសារថ្មី **បញ្ឆោតបានតែប្រភេទទី ១**។
-  ដូច្នេះរាល់ថ្នាក់កំហុសដែល **វាស់បានក្នុង browser** គួរមាន checker ឥរិយាបថ។
-- **ការអះអាង *អវត្តមាន* ត្រូវមាន *ជាន់អប្បបរមា*** — «គ្មានលំនាំអាក្រក់ទេ»
-  ពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ ជាន់ត្រូវរាប់ **ចំនួនឯកសារ** ដែរ មិនត្រឹម
-  «ចំនួនការហៅ» (refactor ដែលរក្សាផលបូកបញ្ឆោតជាន់ដែលរាប់តែផលបូក)។
-- **រាល់ checker ត្រូវអាចចង្អុលទៅ tree ផ្សេងបាន** (`*_APP_DIR`) **និងត្រូវ
-  ត្រូវបានហៅក្នុងផ្នែក baseline របស់ `run-all.sh`** — override ដែលមានតែឈ្មោះ
-  គឺគ្មានតម្លៃទេ។
-- ⛔ **កុំបញ្ឈប់ checker ពេលរកឈ្មោះ function មិនឃើញ — ត្រូវ *stub* ជំនួស។**
-  `process.exit(1)` ដោយ «រកមុខងារមិនឃើញ» **បិទបាំងការអះអាងទាំងអស់ខាងក្រោមវា**
-  ➜ tree មុនកែបង្ហាញ `0 ok, 1 FAIL` ជំនួស **១១ ការធ្លាក់ដែលមានឈ្មោះ**។
-- ⛔ **កុំរុំសេណារីយ៉ូទាំងអស់ក្នុង `try` តែមួយ** — ការធ្លាក់ដំបូងលេប
-  ការអះអាងក្រោយៗទាំងអស់។ ⛔ **`scenario()` ត្រូវ `await`** បើ `fn` ជា `async`
-  (បើអត់ ការអះអាងខាងក្នុងមិនដែលរត់ ហើយឯកសារចេញ exit 0)។
-- ⛔ **រាល់សេណារីយ៉ូត្រូវចាប់ផ្តើមពី stub ដើម** — **stub ដែលបន្សល់ឆ្លង
-  សេណារីយ៉ូ ជាប្រភពបៃតងក្លែងក្លាយដ៏ស្ងាត់បំផុត**។ ត្រូវមាន **ការអះអាង
-  លក្ខខណ្ឌចាំបាច់** («ប្រអប់បើកពិត») ដែលបញ្ជាក់ថាវាឈានដល់ផ្លូវដែលចង់វាស់។
-- ⛔ **checker ត្រូវ `listen(0, '127.0.0.1')` ជានិច្ច** — port ថេរ ➜ ការរត់ ២
-  ស្របគ្នា ➜ `EADDRINUSE` ➜ **សញ្ញាក្លែងក្លាយ**; `listen(port)` ទទេ bind
-  `0.0.0.0` ➜ **ការលាតត្រដាង**។ ⛔ **ច្បាប់ដដែលអនុវត្តលើ RTDB namespace**
-  របស់ `emu/*` ៖ checker `emu/*` **ទាំងអស់** ចែក emulator តែមួយ ➜ namespace ត្រូវយកពី
-  `emu/ns.js` (`emuNamespace()`) **តែមួយក្នុងមួយការរត់**។ វាស់បាន (2026-09-04) ៖
-  namespace ថេរ ➜ `ledger-revert` ×2 ស្របគ្នា **ធ្លាក់ ១ និង ៣** ·
-  `restore-deadlock` ×2 **ធ្លាក់ ៣ និង ២** លើ tree ដែលមិនប៉ះកូដ ledger សោះ។
-- ⛔ **`ok()` ដែលទទួល *តែស្លាក* មិនត្រូវហៅដោយលក្ខខណ្ឌ** — checker ខ្លះកំណត់
-  `ok = (label) => { pass++ }` ➜ `ok(label, condition)` **បោះលក្ខខណ្ឌចោល
-  ស្ងាត់ៗ** ➜ ការអះអាងនោះ **ធ្លាក់មិនបានទេ**។ វាកើតឡើងពិត ២ ដង ៖
-  `html-sink-escaping.js` (ជាន់អប្បបរមារបស់ scanner XSS ងាប់) និងផ្នែក ៦
-  ដែលទើបបន្ថែម (៤ កន្លែង ➜ ចាប់បានដោយ mutation មុន commit)។
-  ⛔ **ការរាប់អាគុយម៉ង់ត្រូវប្រើ parser ពិត** — ការស្កេនអក្សរច្រឡំ **regex
-  literal** ដែលផ្ទុក `'` និង `,` (វាស់បាន ៖ `zto-cookie-sync-test.js:182`
-  ត្រូវរាយខុស)។
-- ⛔ **`checker-coverage.js` ត្រូវរំលងផ្នែក ៥ ពេល `EXITCODE_CHILD` ត្រូវកំណត់** —
-  បើមិនដូច្នេះកើតជា **រង្វិលជុំទៅវិញទៅមក** (checker-coverage ➜
-  exit-code-integrity ➜ checker-coverage ➜ …)។ ការថត hash ក៏ត្រូវរំលង
-  `.tmp-poison-*` ដែរ (សំណល់ការរត់មុនមើលទៅដូច «SIGKILL កែឯកសារ»)។
-- ⛔ **ការពុលត្រូវធ្វើលើ *ឯកសារស្រមោល*** (`.tmp-poison-<pid>-<name>.js` ក្នុង
-  ថតដដែល) — ឯកសារដើម **មិនដែលត្រូវបើកសរសេរសោះ** ➜ SIGKILL មិនអាចធ្វើឲ្យ
-  repo ខូចបានទេ (វាស់រួច ៖ ពុលនៅនឹងកន្លែង ➜ ១ ឯកសារខូច; ស្រមោល ➜ ០)។
-- ⛔ **រាល់ checker ដែលមានប៉ារ៉ាម៉ែត្រជម្រៅ ត្រូវមានលំនាំដើម *យ៉ាងតិចស្មើ*
-  កម្រិតដែលវាស់រួចថាចាំបាច់** — លេខថេរដែលតូចជាងកម្រិតនោះ គឺជាការរត់ដែល
-  មិនរត់អ្វីសោះ។
-- ⛔ **ការអះអាងអំពី *ពិដាន* ត្រូវគណនាធៀបនឹងពិដានពិត** — អានពិដានចេញពី
-  sandbox រួចប្រើ `cap + N`; កុំសរសេរលេខថេរ។
-- ⛔ **ច្បាប់ដដែលអនុវត្តលើ *ជាន់អប្បបរមា* របស់ fuzz** ៖ ជាន់ដែលជាលេខថេរ
-  ចងនឹងចំនួនរត់លំនាំដើម **ជាការវាស់ដោយសំណាង** — វាឡើងចុះតាមជួរ seed។
-  វាស់បាន (2.36.6) ៖ `collected-value-fuzz` លើការរត់ **១៦០ ដដែល** ➜
-  `CFUZZ_RUN0=0` ផ្តល់ស្ថានភាពស្អាត **៤៣** (បៃតង) ចំណែក `CFUZZ_RUN0=500`
-  ផ្តល់ត្រឹម **១៧** ➜ ជាន់ `>= 30` **ធ្លាក់ដោយគ្មានកំហុសក្នុងកូដ ship**។
-  ⛔ វាខូច ២ ទិស ៖ ការរត់ក្រៅជួរ seed លំនាំដើម (ដែលឯកសារនេះណែនាំ) ចេញ
-  **ក្រហមក្លែងក្លាយ** ➜ ជុំក្រោយរៀនមិនជឿការធ្លាក់; ហើយការធ្លាក់នៃចំនួន
-  ដែលគ្របពិត អាចរអិតកាត់ស្ងាត់ៗលើ seed សំណាងល្អ។ ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖
-  បម្រុងចំណែកថេរនៃការរត់ឲ្យស្ថានភាពនីមួយៗ (ឧ. ២ ក្នុង ៨ ស្អាតច្បាស់)
-  រួច **ដេរីវេជាន់ទាំងអស់ពី `RUNS`** ➜ ការរត់ខ្លី ឬជ្រៅ មិនចេញក្រហម
-  ក្លែងក្លាយ ហើយការដកចំណែកបម្រុងចេញ **នៅតែធ្លាក់ដដែល**។
-- ⛔ **ការអះអាងលើឯកសារត្រូវវាស់ *ការពិត* មិនមែន *ការជ្រើសពាក្យ*** — ការសរសេរ
-  ឡើងវិញមិនត្រូវធ្វើឲ្យវាធ្លាក់ តែការដកការធានានោះចេញពិត ត្រូវធ្វើឲ្យវាធ្លាក់។
-  **លេខលំនាំដើមក្នុងឯកសារត្រូវអានចេញពីកូដពិត** មិនមែនចាក់ literal ក្នុង checker។
-  ⛔ **ច្បាប់ដដែលអនុវត្តលើ *អត្ថបទកូដ* ផង** ៖ ការអះអាង «បន្ទាត់ X ឈរមុនបន្ទាត់ Y
-  ក្នុង function Z» ដែលស្កេនរក **អក្សរពិតរបស់ X** ជា **កាលបរិច្ឆេទផុតកំណត់** —
-  ពេល X ត្រូវផ្លាស់ចូល helper ដោយ **ត្រឹមត្រូវ** (ចំណុចច្របាច់តែមួយ) អ្នកយាម
-  ធ្លាក់ខណៈការធានានៅដដែល។ វាស់បាន (2.33.2) ៖ `toast-truth-test` ស្កេនរក
-  `sessionExpiryCheck = 'pending'` ក្នុង `proceedAfterLogin` ➜ `armAt: -1`
-  ក្រោយការរៀបចំឡើងវិញ។ ⛔ ការកែ **មិនមែន** ការចាក់ឈ្មោះ helper ជា literal ទី ២
-  (នោះជាការឃ្លាំមើលឈ្មោះ ២ កន្លែងឯករាជ្យ) — ត្រូវ **ដេរីវេ** ៖ រកឈ្មោះ function
-  ណាដែល **តួរបស់វា** ផ្ទុកអក្សរនោះ ➜ ការហៅវាក៏ជាការធានាដដែល។ ⛔ ហើយវានៅតែធ្លាក់បាន ៖
-  គ្មានអ្នកណាធានា ➜ បញ្ជីសល់តែអក្សរដើម ➜ រកមិនឃើញ ➜ FAIL។
-- ⛔ **កុំសរសេរការអះអាងដែល *ចាក់សោកំហុស*។** ពេលការអះអាងមួយធ្លាក់ ត្រូវសួរ
-  «តើវាការពារអ្វី ឬចាក់សោអ្វី?»។ ឧទាហរណ៍ ៖ `ok(caught.length === 0)` លើ
-  equivalent mutant នឹងធ្លាក់ពេលនរណាម្នាក់ **ធ្វើឲ្យអ្នកយាមខ្លាំងជាងមុន** ➜
-  វាជាទោស មិនមែនការការពារ។
-- ⛔ **fuzz ត្រូវអះអាង *ក្រោយរាល់ប្រតិបត្តិការ* មិនមែនត្រឹមចុងលំដាប់** —
-  ការអះអាងតែនៅចុងធ្វើឲ្យប្រតិបត្តិការក្រោយៗ **លុបភស្តុតាង** នៃការធ្លាក់មុន។
-  វាស់បាន (2.36.1) ៖ ស្នាមភ្ជាប់កញ្ចក់ចំណូល ២ ត្រូវការលំដាប់ **ផ្ទុយគ្នា** ➜
-  mutation «ដក `markCollectedRevenue` ចេញពី `removeSingleBarcode`» ត្រូវការ
-  ស្តារ **កុំ** មកក្រោយ (បើមក វាព្យាបាលកញ្ចក់វិញ) ចំណែក mutation «ដក
-  `reconcileCollectedHistory` ចេញពី `executeRestoreItem`» ត្រូវការស្តារ
-  **ត្រូវតែ** មកក្រោយ ➜ ការវាស់នៅចុងចាប់បានតែម្តងមួយ ហើយ **ការកែទម្ងន់
-  ដើម្បីចាប់មួយ បាត់មួយទៀត**។ ⛔ ការដោះស្រាយមិនមែនការបង្កើន run ឬទម្ងន់
-  (នោះជា **ការសំណាង**) — វាគឺ **ការវាស់រាល់ជំហាន** ➜ ស្នាមភ្ជាប់គ្រប់ទិស
-  ត្រូវវាស់ដោយ **រចនាសម្ព័ន្ធ**។ វាស់បាន ៖ ការអះអាងឡើងពី ៣៦ ➜ **២៧៦**
-  ដោយ **ពេលរត់មិនប្រែ** (៤៧ វិ.) ព្រោះការអានស្ថានភាពក្នុងមួយជំហានថោក។
-- **Mutation testing ៖ សួរថា *អ្នកណាចាប់* មិនមែន *តើចាប់បានទេ*។** ចម្លើយ
-  បង្ហាញព្រំដែនពិតនៃការគ្របដណ្តប់ ហើយការពារ session ក្រោយពីការសន្មតថា
-  checker មួយគ្របអ្វីដែលវាមិនគ្រប។
-- ⛔ **សម្មតិកម្មអំពីចន្លោះ ត្រូវវាស់ មុននឹងសាងឧបករណ៍ដើម្បីបិទវា។** ជុំ
-  2026-09-01 សង្ស័យចន្លោះស្នាមភ្ជាប់ ZTO ➜ mutation ១៣ ➜ **ឧបករណ៍ដែលមាន
-  ស្រាប់ចាប់បានទាំងអស់** ➜ ឧបករណ៍ថ្មីត្រូវលុបចោល។ **checker ស្ទួនបន្ថែម
-  ពេលរត់ CI ដោយគ្មានតម្លៃ ហើយធ្វើឲ្យជុំក្រោយជឿថាមានការគ្របច្រើនជាងការពិត។**
-- ⚠️ **ការធ្លាក់ដែលកើតពីការបន្ថែម helper ថ្មី (sandbox បាក់) ជា *សញ្ញាល្អ*** —
-  វាបញ្ជាក់ថា checker ទាំងនោះរត់កូដ ship ពិត។ បើ refactor បែបនោះ **មិន**
-  ធ្វើឲ្យ checker ណាមួយធ្លាក់សោះ នោះជាសញ្ញាថាពួកវាមិនប៉ះកូដពិត។
+- **Static checkers lock *names*; behavioral checkers lock *outcomes*.** Renames · refactors · moving code **fool only
+  the first kind** ➜ every class **measurable in a browser** deserves a behavioral checker.
+- **Assertions of *absence* need a *minimum floor*** — "no bad pattern" is automatically true on empty input. Floors
+  count **files** too, not just "number of calls".
+- **Every checker can point at another tree** (`*_APP_DIR`) **and is called in the baseline part of `run-all.sh`**.
+- ⛔ **Never stop a checker when a function name isn't found — *stub* it instead.** `process.exit(1)` on "function not
+  found" **masks every assertion below it**.
+- ⛔ **Never wrap all scenarios in one `try`** — the first failure swallows the rest. ⛔ **`await scenario()`** when `fn`
+  is `async`.
+- ⛔ **Every scenario starts from the original stubs** — **stubs leaking across scenarios are the quietest fake green**.
+  Add **precondition assertions** ("the dialog really opened") proving it reached the path under test.
+- ⛔ **Always `listen(0, '127.0.0.1')`** — fixed ports ➜ parallel runs ➜ `EADDRINUSE` ➜ **false signals**; bare
+  `listen(port)` binds `0.0.0.0` ➜ **exposure**. ⛔ **Same for the RTDB namespace** of `emu/*`: all `emu/*` share one
+  emulator ➜ namespaces come from `emu/ns.js` (`emuNamespace()`), **unique per run** (fixed namespaces made
+  `ledger-revert` ×2 and `restore-deadlock` ×2 fail on trees that never touched ledger code).
+- ⛔ **An `ok()` taking *only a label* must never be called conditionally** — `ok = (label) => { pass++ }` with
+  `ok(label, condition)` **silently drops the condition** ➜ the assertion **can't fail**. ⛔ **Counting arguments needs a
+  real parser** — character scans confuse **regex literals** containing `'` and `,`.
+- ⛔ **`checker-coverage.js` skips part 5 when `EXITCODE_CHILD` is set** — else a **mutual loop** (checker-coverage ➜
+  exit-code-integrity ➜ checker-coverage ➜ …). Hash snapshots skip `.tmp-poison-*` too.
+- ⛔ **Poisoning happens on a *shadow file*** (`.tmp-poison-<pid>-<name>.js` in the same dir) — originals **are never
+  opened for writing** ➜ SIGKILL can't corrupt the repo.
+- ⛔ **Every checker with a depth parameter defaults to *at least* the depth measured as necessary** — a smaller fixed
+  number is a run that runs nothing.
+- ⛔ **Assertions about *ceilings* compute against the real ceiling** — read it from the sandbox and use `cap + N`;
+  never a fixed number.
+- ⛔ **Same for fuzz *minimum floors***: a fixed floor tied to the default run count is **luck** — it moves with the seed
+  range (same 160 runs gave 43 clean states at `CFUZZ_RUN0=0` and 17 at `CFUZZ_RUN0=500` ➜ `>= 30` failed with no bug).
+  ⛔ The fix is **structural**: reserve a fixed share of runs per state (e.g. 2 of 8 clearly clean) and **derive every
+  floor from `RUNS`** ➜ short or deep runs never go falsely red, and removing the reserved share **still fails**.
+- ⛔ **Doc assertions measure *facts*, not *word choice*** — rewording must not fail it, removing the guarantee must.
+  **Default numbers in docs are read from real code**, not literals in the checker. ⛔ **Same for *code text***:
+  "line X before line Y in function Z" scanning **X's literal text** expires when X moves into a helper **correctly** ➜
+  the fix is **derivation**: find which function's **body** contains that text ➜ calling it is the same guarantee
+  (⛔ not a second hard-coded helper name). It must still fail when nothing provides the guarantee.
+- ⛔ **Never write assertions that *lock a bug in*.** When an assertion fails ask "does it protect something or lock
+  something?" (e.g. `ok(caught.length === 0)` on an equivalent mutant fails when someone **strengthens** the guard).
+- ⛔ **Fuzz asserts *after every operation*, not only at the end** — later operations **erase evidence** of earlier
+  failures (two revenue-mirror seams needed **opposite** orders; end-only checks caught one at a time, and tuning weights
+  to catch one lost the other). The fix is **measuring every step** ➜ seams in every direction measured
+  **structurally** (assertions 36 ➜ **276**, run time unchanged).
+- **Mutation testing: ask *who catches it*, not *is it caught*.** The answer shows real coverage boundaries.
+- ⛔ **Hypotheses about gaps are measured before building tools to close them.** (A suspected ZTO seam gap ➜ 13
+  mutations ➜ **existing tools caught all** ➜ the new tool was deleted.)
+- ⚠️ **Failures caused by adding a new helper (sandbox breaks) are a *good sign*** — they prove those checkers run real
+  shipped code. A refactor that breaks **no** checker means they don't touch real code.
 
 ---
 
-# 📘 Runbook — session ថ្មីអានត្រង់នេះ
+# 📘 Runbook
 
-## ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
+## Step 0 — setup (once per session)
 
-⛔ **CI ត្រូវរត់ក្នុង session នេះផង** មុន push ៖ GitHub Actions ធ្លាប់អស់កូតា (2026-09-09) ➜ ការរង់ចាំ «CI បៃតងលើ GitHub»
-អាចជាការរង់ចាំដែលមិនចប់។ `.github/workflows/audit.yml` រត់ `run-all.sh` ពេញជា **៤ ផ្នែកស្របគ្នា** (`RUNALL_SHARD=k/4` ·
-emulator ក្នុងផ្នែកនីមួយៗ · ទង់ STRICT ដូចប្លុកខាងក្រោម) ➜ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
+⛔ **Run CI in this session too** before pushing: GitHub Actions quota ran out before (2026-09-09) ➜ waiting for "CI green
+on GitHub" may never end. `.github/workflows/audit.yml` runs full `run-all.sh` as **4 parallel shards**
+(`RUNALL_SHARD=k/4` · an emulator per shard · STRICT flags as below) ➜ CI green = all 4 shards green. (`backup.yml` is
+separate.)
 
 ```bash
-npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect · emu/app-network-e2e)
-npm ci --prefix supabase      # អ្នកយាម Supabase ៖ Postgres ពិត (@embedded-postgres) · pg · supabase-js · typescript
-npm ci --prefix tools/firebase-provision --ignore-scripts   # firebase-tools ពិតសម្រាប់ firebase-provision-test
+npm ci --prefix ZoeW          # ZoeW React: vite · acorn · playwright-core · firebase (real SDK for emu/tx-disconnect · emu/app-network-e2e)
+npm ci --prefix supabase      # Supabase guards: real Postgres (@embedded-postgres) · pg · supabase-js · typescript
+npm ci --prefix tools/firebase-provision --ignore-scripts   # real firebase-tools for firebase-provision-test
 bash audit-tools/run-all.sh
 ```
 
-⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
-រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
-ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
-`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite` · emulator ពិត) ចំណាយ **~១០ នាទី** លើម៉ាស៊ីន ៤ CPU (វាស់ ៦០២ វិ. រួម `zoew-parity` · ជាជួរជំនាន់មុន ១៦៩៤ វិ.) ➜ រត់វាជា background ហើយ **commit + push មុនពេលរង់ចាំ** (session ដែលអស់កូតាកណ្តាលការរង់ចាំ បាត់ការងារដែលមិនទាន់ push ទាំងស្រុង)។
+⛔ `run-all.sh` on the React repo **builds the measure tree itself** (`ZoeW/dist-audit/measure-root`) and runs every
+checker there ➜ ⛔ running one checker **directly on the repo** measures a `ZoeW/app.js` that no longer exists. One
+checker alone: `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` then
+`(cd "$M" && node audit-tools/<x>.js)`. ⛔ Full CI (incl. `zoew-suite` · real emulator) takes **~10 minutes** on 4 CPUs
+➜ run it in the background and **commit + push before waiting** (a session that runs out of quota mid-wait loses all
+unpushed work).
 
-⛔ **`run-all.sh` រត់ស្របគ្នា ហើយ *បន្តបាន*** (របៀបប្រើ ៖ [`audit-tools/README.md`](audit-tools/README.md) ផ្នែក ២) ៖
-lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំដែន 2–6) · output **តាមលំដាប់បញ្ជីជានិច្ច** · រាល់ checker ដែលចប់ត្រូវសរសេរ
-ចូល `RUNALL_STATE` (`<git-dir>/zoe-runall-state.tsv`) **ភ្លាម** ➜ session ដែលអស់កូតាកណ្តាលទី ៖ session បន្ទាប់រត់
-`RUNALL_RESUME=1` **ជាមួយទង់ `*_STRICT` ដដែល** (វាចូល hash) ➜ រត់តែ checker ដែលធ្លាក់ ឬគ្មានលទ្ធផល ⛔ **កុំផ្គុំ log ដោយដៃ**។
-⛔ tree ប្រែ (ឯកសារណាមួយ · ទង់ STRICT) ➜ RESUME **បដិសេធ** ៖ លទ្ធផលចាស់មិនមែនភស្តុតាងរបស់ tree ថ្មី ➜ រត់ពេញ។
-⛔ `RUNALL_ONLY=…` និង `RUNALL_SHARD=k/n` = **«មិនពេញលេញ»** — មិនមែនភស្តុតាងថា tree បៃតង (សេចក្តីសង្ខេបមិនរាយ «ជោគជ័យទាំងអស់» ទេ · tree បៃតងតែពេលផ្នែកទាំង n បៃតង)។
-⛔ **run-all មួយក្នុងមួយ repo** ៖ root វាស់ (`ZoeW/dist-audit`) ចែករំលែក ➜ ការរត់ទី ២ ឬ `ZOE_MEASURE_ONLY=1` ខណៈវាកំពុងរត់ ➜ **exit 2** (សោ
-`<git-dir>/zoe-runall-measure.lock`) — បើអត់ build ថ្មីលុប root វាស់ពីក្រោម checker ដែលកំពុងរត់ ➜ ការធ្លាក់ចៃដន្យ ➜ ចង់វាស់ស្របគ្នា ៖ ច្បាប់ចម្លង repo
-(`tar` ដោយដក `node_modules` · `dist-audit` រួច symlink `node_modules`) ហើយរត់ `ZOE_MEASURE_ONLY=1` ក្នុងច្បាប់ចម្លង។
-⛔ checker ថ្មីដែលប្រើ emulator ឬសរសេរ/បោស `.tmp-poison-*` ត្រូវចូល lane `emu`/`excl` ក្នុង `runall_lane()` —
-`runall-runner-test` ធ្លាក់បើភ្លេច។ ⛔ `RUNALL_JOBS=1` ផ្តល់លំដាប់ជាជួរដូចមុន (សម្រាប់ដេញតាមការធ្លាក់ដែលសង្ស័យថាមកពីការរត់ស្របគ្នា)។
+⛔ **`run-all.sh` is parallel and *resumable*** (usage: [`audit-tools/README.md`](audit-tools/README.md) section 2):
+lanes `RUNALL_JOBS` (default = CPUs within 2–6) · output **always in list order** · every finished checker is written to
+`RUNALL_STATE` (`<git-dir>/zoe-runall-state.tsv`) **at once** ➜ a session that ran out of quota midway: the next session
+runs `RUNALL_RESUME=1` **with the same `*_STRICT` flags** (they're in the hash) ➜ reruns only failed/unfinished checkers
+⛔ **never stitch logs by hand**. ⛔ Tree changed (any file · STRICT flags) ➜ RESUME **refuses**: old results aren't
+evidence for a new tree ➜ run fully. ⛔ `RUNALL_ONLY=…` and `RUNALL_SHARD=k/n` = **incomplete** — not proof the tree is
+green. ⛔ **One run-all per repo**: the measure root (`ZoeW/dist-audit`) is shared ➜ a second run or `ZOE_MEASURE_ONLY=1`
+while it runs ➜ **exit 2** (lock `<git-dir>/zoe-runall-measure.lock`); to measure in parallel, copy the repo (`tar`
+without `node_modules` · `dist-audit`, then symlink `node_modules`) and run `ZOE_MEASURE_ONLY=1` in the copy.
+⛔ A new checker using the emulator or writing/sweeping `.tmp-poison-*` must enter lane `emu`/`excl` in `runall_lane()` —
+`runall-runner-test` fails if forgotten. ⛔ `RUNALL_JOBS=1` gives the old serial order (for chasing failures suspected to
+come from parallelism).
 
-⛔ **គ្មាន RTDB emulator ➜ checker `emu/*` ទាំងអស់ធ្លាក់ចុះ — ហើយ `SKIP`
-មិនមែន `PASS` ទេ។** ⛔ **ចំនួនត្រូវរាប់ពីថតពិត** (`audit-tools/emu/*-test.js`
-បូក `crud-rules-flow.js`) មិនមែនចងចាំជាលេខ ៖ លេខរឹងចាស់ភ្លាម — វាស់បាន
-(2.37.3) ៖ ឯកសារនេះរាយ **៤** ខណៈ `run-all.sh` រត់ **៥** (ធាតុទី ៥
-`emu/license-seat-rules` មកជាមួយ 2.37.0) ➜ session ដែលរាប់តាមលេខរឹង
-សន្និដ្ឋានខុសថាមាន checker ១ ធ្លាក់ពិត។ `doc-scope-test` ចាក់សោវាឥឡូវនេះ។
-វាស់បាន (2026-09-11) ៖ ការធ្លាក់ចុះមាន **២ រូបរាង** ➜
+⛔ **No RTDB emulator ➜ every `emu/*` checker degrades — and `SKIP` is not `PASS`.** ⛔ **Count from the real directory**
+(`audit-tools/emu/*-test.js` plus `crud-rules-flow.js`), never remember a number. Degradation has **2 shapes**:
 `emu/restore-deadlock` · `emu/ledger-revert` · `emu/license-seat-rules` · `emu/tx-disconnect` · `emu/app-writes-rules` ·
-`emu/app-network-e2e` · `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` ចេញ **`SKIPPED`** ត្រង់ៗ ចំណែក `emu/crud-rules-flow` និង
-`emu/restore-mutation` ចេញ **`PARTIAL PASS (3; SKIP …)`** / **`(1; SKIP …)`**។ ⛔ រូបរាងទី ២ ជា
-គ្រោះថ្នាក់ជាង ព្រោះវា **ផ្ទុកពាក្យ `PASS`** ➜ ងាយអានរំលងជាបៃតង ខណៈ
-ការអះអាងស្នូលរបស់វា (rules ពិត) **មិនដែលរត់សោះ**។ ⛔ បន្ទាត់សង្ខេបរបស់
-`run-all.sh` រាយវាដាច់ដោយឡែក (`… ពេញលេញ, 2 មួយផ្នែក, រំលង 2`) ➜ **អាន
-លេខ «មួយផ្នែក» និង «រំលង» ជានិច្ច មិនត្រឹម ✅ ខាងដើម**។
-មុនអះអាងថា tree បៃតង ត្រូវរត់ដូច CI ៖
+`emu/app-network-e2e` · `emu/supabase-rules-parity` · `emu/supabase-adapter-parity` print **`SKIPPED`**, while
+`emu/crud-rules-flow` and `emu/restore-mutation` print **`PARTIAL PASS (3; SKIP …)`** / **`(1; SKIP …)`**. ⛔ The second
+shape is more dangerous because it **contains the word `PASS`** while its core assertions (real rules) **never ran**.
+The `run-all.sh` summary lists them separately (`… complete, 2 partial, 2 skipped`) ➜ **always read the "partial" and
+"skipped" numbers**. Before claiming a green tree, run like CI:
 
 ```bash
 npm i firebase-tools
@@ -2108,258 +1535,247 @@ npx --no-install firebase setup:emulators:database
 setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
     --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
-curl -s "http://127.0.0.1:9000/.json?ns=x"    # ត្រូវឆ្លើយ null — បើអត់ emulator ងាប់ហើយ
+curl -s "http://127.0.0.1:9000/.json?ns=x"    # must answer null — otherwise the emulator is dead
 CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh
 ```
 
-⛔ **emulator អាចងាប់ពេល shell call ដែលបើកវាចប់** (វាស់បាន 2026-09-26 ៖ `setsid nohup … &` រស់ក្នុង call នោះ តែ run-all
-ជាបន្តបន្ទាប់ឃើញ `ECONNREFUSED` ➜ `emu/*` ៥ ធ្លាក់/រំលង លើ tree ដែលមិនខុស) ➜ ក្នុង harness ដែលមាន «background task» រត់
-`java -jar …` ជា task រស់រហូត ហើយ `curl` ម្តងទៀត **មុន** run-all។ ⛔ `money-guardian-test.js` ត្រូវរត់ក្នុង root វាស់ (វាអាន
-`ZoeW/app.js`) ➜ `MONEYGUARD_STRICT=1` ត្រូវដាក់លើ `run-all.sh` (វាហៅអ្នកយាមនេះខាងក្នុង) ⛔ កុំរត់វាដោយផ្ទាល់លើ repo។
+⛔ **The emulator can die when the shell call that started it ends** (later run-alls saw `ECONNREFUSED` ➜ 5 `emu/*`
+failed/skipped on a fine tree) ➜ in harnesses with background tasks run `java -jar …` as a long-lived task and `curl`
+again **before** run-all. ⛔ `money-guardian-test.js` must run in the measure root (it reads `ZoeW/app.js`) ➜ set
+`MONEYGUARD_STRICT=1` on `run-all.sh` ⛔ never run it directly on the repo.
 
-⚠️ **កុំបញ្ឈប់អ្វីដោយ `pkill -f <លំនាំ>` ក្នុង session នេះ** — លំនាំនោះ
-ត្រូវនឹង **command line របស់ shell ខ្លួនឯង** ➜ **សម្លាប់ session**។
-⛔ វា **មិនកំណត់ត្រឹម** `pkill -f firebase-database-emulator` ទេ (វាស់បាន
-២ ដង) ៖ វាស់បានម្តងទៀត (2.36.1) ថា `pkill -f "node audit-tools"` និង
-`pkill -f run-all.sh` ក៏សម្លាប់ shell ដដែល (exit 144) ព្រោះពាក្យបញ្ជាដែល
-កំពុងរត់ **ផ្ទុកលំនាំនោះក្នុងខ្លួនវា**។ ⛔ ដូច្នេះច្បាប់គឺ **លំនាំណាក៏ដោយ**
-ដែលលេចក្នុងពាក្យបញ្ជារបស់អ្នក។ ជំនួសវិញ ៖ ទុកឲ្យវាចប់ខ្លួនឯង · ប្រើ
-`timeout` តាំងពីដើម · ឬសម្លាប់តាម **PID ជាក់លាក់** (`ps aux | grep …` រួច
-`kill <pid>`) បន្ទាប់ពីផ្ទៀងផ្ទាត់ថា PID នោះមិនមែន shell របស់អ្នក។
+⚠️ **Never stop anything with `pkill -f <pattern>` in this session** — the pattern matches **your own shell's command
+line** ➜ **kills the session**. ⛔ Not only `pkill -f firebase-database-emulator`: `pkill -f "node audit-tools"` and
+`pkill -f run-all.sh` also killed the shell (exit 144). The rule is **any pattern** appearing in your command. Instead:
+let it finish · use `timeout` from the start · or kill a **specific PID** (`ps aux | grep …` then `kill <pid>`) after
+verifying it isn't your shell.
 
-## ជំហានទី ១ — អានកូដពិត និងសាកសេណារីយ៉ូដែល checker មិនទាន់គ្រប
+## Step 1 — read real code and try scenarios checkers don't cover
 
-ប្រើលទ្ធផល checker ជាភស្តុតាងមួយផ្នែក។ អានផ្លូវកូដពិត ជាពិសេសចំណុច `await` ការប្ដូរ session និង callback យឺត ហើយសាកឥរិយាបថ៖
+Checker results are partial evidence. Read the real code paths, especially `await` points, session switches and late
+callbacks, and try behavior:
 
-- **ឧបករណ៍ថ្នាក់ថ្មី** — សាង checker សម្រាប់ថ្នាក់កំហុសមួយ ជាការវិនិយោគល្អជាងគេ
-- **កូដដែលទើប ship** — `git log --oneline <ចំណុចចុងក្រោយក្នុងឯកសារនេះ>..HEAD`
-- **របាយការណ៍ពិតពីអ្នកប្រើ** (Sentry, វីដេអូ) — មានតម្លៃជាងការស្មានច្រើន
+- **New tool classes** — building a checker for a bug class is the best investment
+- **Newly shipped code** — `git log --oneline <last point in this file>..HEAD`
+- **Real user reports** (Sentry, videos) — worth far more than guesses
 
-## ជំហានទី ២ — ច្បាប់សម្រាប់តេស្តគ្រប់ពេល
+## Step 2 — rules for every test
 
-**តេស្តត្រូវតែដកកូដ *ពិត* ចេញពី `app.js` មករត់ក្នុង `vm` ឬក្នុង browser ពិត —
-កុំសរសេរតេស្តលើកូដចម្លង។** ហើយ **ត្រូវបញ្ជាក់ថាតេស្តមិនទទេ** ៖
+**Tests extract *real* code from `app.js` into `vm` or run a real browser — never test a copy.** And **prove the test
+isn't empty**:
 
 ```bash
-BASE_REF=origin/main          # ឬ commit មុនការកែរបស់អ្នក (branch ដែលមាន commit មិនទាន់ merge ច្រើន)
+BASE_REF=origin/main          # or the commit before your change (branches with many unmerged commits)
 git fetch origin main
 rm -rf /tmp/baseline && mkdir /tmp/baseline
 git archive "$BASE_REF" | tar -x -C /tmp/baseline
-bash audit-tools/run-all.sh /tmp/baseline   # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
+bash audit-tools/run-all.sh /tmp/baseline   # what *should* fail will show
 ```
 
-បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវាមិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។
-*អន្ទាក់ ៖ ត្រូវ archive tree **មុនកែ** មិនមែន `HEAD` ដែលផ្ទុកការកែរួច។* tree React ក្នុង baseline ក៏ត្រូវ
-build វាស់ដោយស្វ័យប្រវត្តិដែរ (`run-all.sh` ធ្វើវា)។
-**Mutation ត្រូវតែពិត** — ការធ្វើ mutation ខ្សោយធ្វើឲ្យតេស្តជោគជ័យក្លែងក្លាយ
-ហើយ **ត្រូវ `grep` បញ្ជាក់ថា mutation នោះចុះលើឯកសារពិត** មុនជឿលទ្ធផល។
+A new test passing on the pre-fix tree catches nothing — rewrite it. *Trap: archive the **pre-fix** tree, not `HEAD`.*
+The React tree in the baseline is audit-built automatically by `run-all.sh`. **Mutations must be real** — weak mutations
+give fake passes, and **`grep` that the mutation landed in the real file** before believing results.
 
-## ជំហានទី ៣ — មុន commit
+## Step 3 — before commit
 
 ```bash
-node --check <ឯកសារ .js ដែលកែ>
+node --check <edited .js files>
 node audit-tools/strip-comments.js
-CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh   # emulator រស់ (ជំហានទី ០)
-git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 SUPABASE_STRICT=1 FBPROVISION_STRICT=1 bash audit-tools/run-all.sh   # emulator alive (step 0)
+git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # unexplained deletions = regressions
 ```
 
-រួច bump `CACHE_VERSION` និង `APP_VERSION` ក្នុង App ណាដែលកូដ ship ប្រែ ហើយបន្ថែម
-ផ្នែកថ្មីក្នុង `docs/HISTORY.md` ផ្នែក ១។ ⛔ `version-check` · `version-bump-scope` · `doc-scope-test` រត់ **ក្នុង** `run-all.sh` —
-⛔ ការរត់វា **ដោយផ្ទាល់លើ repo** (`node audit-tools/<x>.js`) ធ្លាក់ក្លែងក្លាយ (វាស់បាន ៖ `doc-scope-test` FAIL 19 · `version-bump-scope`
-«មិនបានឃើញកូដ») ➜ checker តែមួយ ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
+Then bump `CACHE_VERSION` and `APP_VERSION` in apps whose shipped code changed and add a section in `docs/HISTORY.md`
+part 1. ⛔ `version-check` · `version-bump-scope` · `doc-scope-test` run **inside** `run-all.sh` — ⛔ running them
+**directly on the repo** fails falsely ➜ one checker: `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` then
+`(cd "$M" && node audit-tools/<x>.js)`.
 
-### ⛔ ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់ — ចាំបាច់ចុងរាល់ការងារ (សំណើអ្នកប្រើ)
+### ⛔ Impact verification — required at the end of every task (user request)
 
-> **អ្នកប្រើស្នើដោយផ្ទាល់** ៖ *«ពេលការងារចប់មួយៗ សូមធ្វើការផ្ទៀងផ្ទាត់អ្វី
-> ដែលកែ ឬលុប ផង ក្រែងប៉ះពាល់ដល់គេឯង»*។ ⛔ **`run-all.sh` បៃតង មិនមែនជា
-> ចម្លើយទេ** — វាវាស់តែថ្នាក់ដែល *មានអ្នកវាស់*។ ជំហានទាំងនេះរកឃើញកំហុសពិត
-> **៣** ដែល suite បៃតងទាំងស្រុងមិនបានចាប់ (កំណែ 2.28.1)។
+> The user asked: verify what was changed or deleted, in case it affects something else. ⛔ **Green `run-all.sh` is not
+> the answer** — it measures only classes *with a measurer*. These steps found **3** real bugs a fully green suite missed
+> (2.28.1).
 
-| # | សំណួរ | របៀបវាស់ |
+| # | Question | How |
 |---|---|---|
-| ១ | **អ្វីត្រូវលុប?** | `git diff "$BASE_REF" -- <ថត ship> \| grep '^-'` — ⛔ រាល់បន្ទាត់ត្រូវពន្យល់បាន (`BASE_REF` ៖ Runbook ជំហានទី ២) |
-| ២ | **កូដ *ដែលមានស្រាប់* ត្រូវប៉ះប៉ុន្មាន?** | `git diff "$BASE_REF" -U3` ➜ បំបែក «កូដថ្មី» ចេញពី «ការកែលើកូដចាស់»។ ផ្ទៃហានិភ័យពិតគឺក្រុមទី ២ ប៉ុណ្ណោះ |
-| ៣ | **អ្នកណាប្រើអ្វីដែលខ្ញុំកែ?** | រូបរាងចម្លើយ · តម្លៃត្រឡប់ · ឈ្មោះវាល ➜ `grep` អ្នកប្រើ **ទាំងអស់** ហើយពិនិត្យថាគេអានតែវាលដែលមានឈ្មោះ (មិនរាប់ key) |
-| ៤ | **ឥរិយាបថប្រែទេ?** | ស្រង់ function **មុន** (`git show "$BASE_REF":<file>`) និង **ក្រោយ** ចូល `vm` រួចរត់ **ករណីដដែល** ➜ លទ្ធផលត្រូវដូចគ្នា |
-| ៥ | **helper ថ្មីលើផ្លូវក្តៅ អាចបោះទេ?** | រត់វាលើ input អាក្រក់ (`undefined` · `null` · `NaN` · object · array) — ⛔ ការបោះនៅដើមផ្លូវ lookup សម្លាប់មុខងារទាំងមូល |
-| ៦ | **helper ចែករំលែកឬ?** | `error-reporting.js` · `license-verify.js` ship ក្នុង **App ទាំង ២** ➜ ការកែវាទាមទារឡើងកំណែ **ទាំង ២** (`version-bump-scope` ចាប់វា) |
+| 1 | **What was deleted?** | `git diff "$BASE_REF" -- <shipped dirs> \| grep '^-'` — ⛔ every line explained (`BASE_REF`: Runbook step 2) |
+| 2 | **How much *existing* code was touched?** | `git diff "$BASE_REF" -U3` ➜ separate "new code" from "edits to old code"; real risk is the second group |
+| 3 | **Who uses what I changed?** | response shapes · return values · field names ➜ `grep` **every** user and check they read only named fields |
+| 4 | **Did behavior change?** | extract the function **before** (`git show "$BASE_REF":<file>`) and **after** into `vm`, run **the same cases** ➜ same results |
+| 5 | **Can a new hot-path helper throw?** | run it on bad input (`undefined` · `null` · `NaN` · object · array) — ⛔ a throw at the start of the lookup path kills the feature |
+| 6 | **Is it a shared helper?** | `error-reporting.js` · `license-verify.js` ship in **both apps** ➜ editing them bumps **both** (`version-bump-scope` catches it) |
 
-⛔ **ជំហានទី ៤ ជាអ្នកបញ្ជាក់ដ៏ខ្លាំងបំផុត** ៖ ការប្រៀបធៀបឥរិយាបថ **មុន/ក្រោយ**
-លើករណីដដែល បង្ហាញការថយក្រោយដែលការអានកូដមើលមិនឃើញ។ ឧទាហរណ៍ដែលវាស់បាន ៖
-`retryTransientLookupResponse` — **១៦ ករណី ➜ ដូចគ្នា ១៦** បញ្ជាក់ថាការបន្ថែម
-បន្ទាត់ ១ នៅដើមវា មិនប៉ះផ្លូវបោះកំហុសណាមួយ។
+⛔ **Step 4 is the strongest proof**: before/after behavior comparison on the same cases reveals regressions code reading
+can't see.
 
-## អន្ទាក់ក្នុង harness (ចំណាយពេលច្រើនម្តងហើយម្តងទៀត)
+## Harness traps (cost a lot of time repeatedly)
 
-- **`snapshot.val()` ត្រូវត្រឡប់ច្បាប់ចម្លងជ្រៅ។** ការត្រឡប់ reference ធ្វើឲ្យ
-  ទិន្នន័យក្នុងសតិក្លាយជា alias នៃ store ➜ ការកែត្រូវរាប់ពីរដង។
-- **state រស់ក្នុងឃ្លាំង (`src/core/state.ts`) មិនមែនលើ `window`** ➜ checker អានវាតាម `window.<ឈ្មោះវាល>` **តែក្នុង
-  build វាស់** (`expose-globals`) · bridge នោះផ្ទុកតាម dynamic import (អសមកាល) ➜ រង់ចាំវាដោយ `waitAuditBridge()` មុនអាន។
-- ⛔ **ទិដ្ឋភាពអត្ថបទ `ZoeW/app.js` ប្តូរ `<ឃ្លាំង>.<វាល>` ➜ `<វាល>`** ➜ ក្នុងប្រភព TS កុំប្រកាស local ដែលមានឈ្មោះដូចវាលឃ្លាំង
-  (`const fb = firebaseState.fb;` ➜ `const fb = fb;` ➜ TDZ ក្នុង `vm` · `catch` លេប ➜ checker វាស់ឥរិយាបថខុស) ➜ `build-audit.mjs` បដិសេធ
-  ការប្រកាសយោងខ្លួនឯង។ ទិដ្ឋភាពចាប់ផ្តើមដោយ `\n` ព្រោះ checker រក declaration តាម `\n<ចន្លោះ>function X(` (module ដំបូងនៅតួអក្សរទី ០ ➜ stub ចាស់ស្ងាត់ៗ)។
-- **Fake SDK ត្រូវគាំទ្រ `fb.increment()`** — ផ្លូវ fanout របស់ ledger ប្រើវា។
-  ⛔ ហើយ **វាគួរអនុវត្ត `.validate` ពិត** — «server បដិសេធការសរសេរ» ជារបៀប
-  បរាជ័យដែល checker ១២៣ **មិនដែលសាកសោះ** រហូតដល់ 2.25.5។
-- **ការធ្វើតេស្តការប្រណាំងត្រូវដាក់ការសរសេររបស់ឧបករណ៍ផ្សេង *ក្នុងចន្លោះ*
-  នៃការអាន និងការសរសេរ** មិនមែនក្រោយវាទេ។
-- ⛔ **`.wasm`/asset ថ្មីនៅក្នុង cache ≠ SW ថ្មីគ្រប់គ្រងទំព័រ** — `install` ដាក់ `OPTIONAL_SHELL` ក្រោយ `CORE_SHELL` រួចទើប `skipWaiting()` ➜
-  `clients.claim()` ➜ ការវាស់ដែលត្រូវការ SW ថ្មី ត្រូវរង់ចាំ `installing`/`waiting` ទទេ **និង** cache ចាស់លុប (`sw-install-integrity-test` ជុំទី ៤ ៖ ធ្លាក់
-  ម្តងម្កាលពេលម៉ាស៊ីនរវល់ ➜ ឥឡូវពន្យារ `OPTIONAL_SHELL` ដោយចេតនា ➜ ចន្លោះប្រណាំងកើតជានិច្ច)។
-- **`renderHistory` មាន cache តាមជួរ** (`tr.dataset.sig`) — ការវាស់ដំណើរការ
-  ត្រូវលុប `sig` ចោលមុន។
-- **Fuzz ដែលកេះការសម្អាតត្រូវចាស់ត្រា *តាម barcode* មិនមែនតាមកញ្ចប់** —
-  ការគ្របតេស្តត្រូវតាមដាន **កម្រិតដែលកូដសម្រេច**។
-- **`vm` context ទទេ គ្មាន `setTimeout` host** ➜ `withTimeout` បោះ
-  ReferenceError។ sandbox ដែលមាន `setTimeout: (fn) => { fn(); return 0; }`
-  ធ្វើឲ្យពិដាន **ផុតកំណត់ភ្លាមៗ** ➜ ត្រូវប្រើ
-  `(fn, ms) => ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)`។
-- **`Date` ក្នុង sandbox ត្រូវជា constructor ពិត** មិនមែន `{ now }` —
-  `sheetImportCellToText()` ប្រើ `value instanceof Date`។
-- **`extractConst()` ដែល *បោះ* ពេលរកមិនឃើញ ធ្វើឲ្យ `|| fallback` គ្មាន
-  ប្រយោជន៍** ➜ checker គាំងលើ tree មុនកែជំនួសការធ្លាក់ដែលមានឈ្មោះ។
-- ⛔ **ការគ្របដែលអាស្រ័យលើ *បរិស្ថាន* គឺជាការគ្របដោយចៃដន្យ** — ឧ. តេស្តដែល
-  សាង `.xlsx` **ពេល package `xlsx` ដំឡើងរួច** ហើយធ្លាក់ទៅ CSV តែពេលវាមិនបាន
-  ដំឡើង ➜ ចម្លើយប្រែតាមម៉ាស៊ីន។ ត្រូវសរសេរផ្លូវទាំង ២ **ដោយចេតនាជានិច្ច**។
+- **`snapshot.val()` must return a deep copy.** Returning a reference aliases memory to the store ➜ edits count twice.
+- **State lives in stores (`src/core/state.ts`), not on `window`** ➜ checkers read `window.<field>` **only in the audit
+  build** (`expose-globals`) · that bridge loads by dynamic import (async) ➜ wait with `waitAuditBridge()` before reading.
+- ⛔ **The `ZoeW/app.js` text view rewrites `<store>.<field>` ➜ `<field>`** ➜ in TS sources never declare a local named
+  like a store field (`const fb = firebaseState.fb;` ➜ `const fb = fb;` ➜ TDZ in `vm` · `catch` swallows ➜ checkers
+  measure wrong behavior) ➜ `build-audit.mjs` refuses self-referencing declarations. The view starts with `\n` because
+  checkers find declarations by `\n<spaces>function X(`.
+- **The fake SDK must support `fb.increment()`** (ledger fanout). ⛔ It **should enforce real `.validate`** — "server
+  rejects a write" was **never tested** by 123 checkers until 2.25.5.
+- **Race tests put the other device's write *between* the read and the write**, not after.
+- ⛔ **`.wasm`/new asset in cache ≠ the new SW controls the page** — `install` adds `OPTIONAL_SHELL` after `CORE_SHELL` then
+  `skipWaiting()` ➜ `clients.claim()` ➜ measurements needing the new SW wait for empty `installing`/`waiting` **and**
+  old caches deleted.
+- **`renderHistory` caches per row** (`tr.dataset.sig`) — clear `sig` before performance measurements.
+- **Fuzz that triggers cleanup must age stamps *per barcode*, not per parcel** — coverage follows **the level code
+  decides at**.
+- **An empty `vm` context has no host `setTimeout`** ➜ `withTimeout` throws ReferenceError. A sandbox with
+  `setTimeout: (fn) => { fn(); return 0; }` makes ceilings **expire at once** ➜ use
+  `(fn, ms) => ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)`.
+- **`Date` in the sandbox must be a real constructor**, not `{ now }` — `sheetImportCellToText()` uses
+  `value instanceof Date`.
+- **An `extractConst()` that *throws* when not found makes `|| fallback` useless** ➜ the checker crashes on the pre-fix
+  tree instead of a named failure.
+- ⛔ **Coverage depending on the *environment* is accidental** — e.g. building `.xlsx` **when package `xlsx` is installed**
+  and falling back to CSV otherwise ➜ answers change per machine. Write both paths **on purpose**.
+- ⚠️ JS `String.replace(from, to)` interprets `$$`/`$&` in `to` ➜ SQL mutations with `$$` silently fail to apply ➜ use
+  `replace(from, () => to)`.
 
-## Firebase RTDB emulator (សម្រាប់ការកែ rules)
+## Firebase RTDB emulator (for rules changes)
 
-⛔ **ការដំឡើង និងការបើក emulator រស់នៅ Runbook ជំហានទី ០ តែមួយកន្លែង** —
-កុំចម្លងពាក្យបញ្ជាទាំងនោះមកទីនេះ (ច្បាប់ ១២ ៖ ច្បាប់ស្ទួន ➜ ជុំក្រោយកែមួយ
-ភ្លេចមួយ)។ 🔴 វាកើតឡើងពិត ៖ ប្លុកនេះធ្លាប់ផ្ទុកច្បាប់ចម្លងដែល **ផ្ទុយ**
-នឹងជំហានទី ០ ៖ វារាយ `java -jar …` ជា **foreground** (➜ **បិទ shell របស់
-session ជារៀងរហូត**) ខណៈជំហានទី ០ រាយ `setsid nohup … &`; ហើយវាខ្វះការ
-ព្រមានអំពី `pkill` ដែរ។ **អ្នកប្រើចាប់បាន មិនមែនឧបករណ៍ទេ។**
-
-ដូច្នេះ ៖ បើក emulator តាម **ជំហានទី ០** សិន រួចសម្រាប់ការកែ rules ធ្វើតែ ៖
+⛔ **Installing and starting the emulator lives in Runbook step 0 only** — never copy those commands here (rule 12: an
+old copy here once ran `java -jar …` in the **foreground**, which **closes the session's shell forever**, and lacked the
+`pkill` warning — **the user caught it, not a tool**). Start the emulator per **step 0**, then for rules changes:
 
 ```bash
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
 bash audit-tools/emu/rules.sh
 ```
 
-- `emulators:start` របស់ CLI **upload rules មិនបាន** តាម proxy — រត់ jar ដោយផ្ទាល់
-  (ពាក្យបញ្ជានៅជំហានទី ០)។
-- ទាំង `.settings/rules.json` និង `auth_variable_override` ត្រូវការ
-  `-H "Authorization: Bearer owner"` បើអត់ **rules នៅបើកចំហ ហើយតេស្តជោគជ័យ
-  ក្លែងក្លាយ**។
-- សំណើដែលមាន `Bearer owner` **តែគ្មាន** `auth_variable_override` = ម្ចាស់
-  project ➜ **រំលង rules**។ សម្រាប់តេស្ត «unauthenticated ត្រូវបានបដិសេធ»
-  **កុំផ្ញើ Authorization header សោះ**។
-- **ត្រូវ assert ថាការសរសេរដែលដឹងថាខុស ពិតជាត្រូវបានបដិសេធ** មុននឹងទុកចិត្ត
-  លទ្ធផលណាមួយ។
+- CLI `emulators:start` **can't upload rules** through the proxy — run the jar directly (step 0).
+- Both `.settings/rules.json` and `auth_variable_override` need `-H "Authorization: Bearer owner"`, else **rules stay
+  open and tests pass falsely**.
+- A request with `Bearer owner` **but without** `auth_variable_override` = project owner ➜ **bypasses rules**. For
+  "unauthenticated is refused" tests, **send no Authorization header**.
+- **Assert that a write known to be wrong is really refused** before trusting any result.
 
 ---
 
-# ⚠️ Error patterns ដែលរំពឹងទុក — កុំ «កែ» ពួកវា
+# ⚠️ Expected error patterns — don't "fix" them
 
-- `"<X> timed out"` — `withTimeout()` guard ដោយចេតនា។ Error ត្រូវសាងឡើង
-  **synchronously នៅកន្លែងហៅ** ដើម្បីឲ្យ stack trace បង្ហាញអ្នកហៅពិត។
-- `permission_denied` ពេល `repoRerunTransactionQueue` / ពេលភ្ជាប់ឡើងវិញ —
-  transaction ក្រៅបណ្តាញដែល replay ក្រោយស្ថានភាព auth/rules ប្រែ។
-- `"Daily/Monthly revenue underflow clamped to 0"` — សំណាញ់សុវត្ថិភាព។ បើវា
-  បាញ់ **ញឹកញាប់សម្រាប់ថ្ងៃ/ខែដដែល** នោះជាសញ្ញានៃការដកស្ទួន — តែ capture
-  ខ្លួនវាមិនមែនកំហុសទេ។
-- **«⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ!»** — transaction រកឃើញថា item លែងមាន
-  លើ server។ **មិនមែនកំហុសទេ។** បើវាលោតញឹកញាប់ ➜ ពិនិត្យនាឡិកាឧបករណ៍។
-- **False positive ដែលកត់ត្រារួច — កុំ «កែ»** ៖ `ResizeObserver` (`if
-  (window.ResizeObserver)` មានរួច) · `navigator.credentials`
-  (`biometricPlatformAvailable()` បូក `try`) · `crypto.subtle` (អវត្តមានតែលើ
-  non-secure context ដែល App **មិនអាចដំណើរការបានសោះ**)។
-- **`waitForZXingThenInitScanEngine()` ប្រើនាឡិកាឆៅ** — ទុកចោលដោយចេតនា
-  (មិនប៉ះទិន្នន័យ ឬលុយ)។
-- **`setInterval` ទាំង ៧ របស់ ZoeW រត់ខណៈទំព័រ `hidden`** — ⛔ **កុំបន្ថែម
-  ច្រកទ្វារ `document.hidden`** ៖ browser throttle រួចហើយ ហើយច្រកទ្វារបង្កើត
-  ហានិភ័យថា cache តារាងអតិថិជន **ចាស់ពេលអ្នកប្រើត្រឡប់មក**។ ⚠️ ការលើកលែងតែមួយ **ខាងក្នុង** វដ្ត ៖
-  `probeDatabaseLivenessIfIdle()` មិនវាស់ពេល `hidden` (វាជា round trip បណ្តាញសុទ្ធ ហើយទ្វារ «ភ្ញាក់ពី background»
-  វាស់ភ្លាមពេលត្រឡប់មក) — វដ្តខ្លួនវានៅរត់ដដែល។
-- **`revenue-fuzz` មិនកេះផ្លូវ «៧ ថ្ងៃ + កញ្ចប់លាយ»** — សំណាញ់ការពារនៃផ្លូវនោះ
-  គឺ `partial-pickup-cleanup-test` ⛔ **កុំសន្មតថា `revenue-fuzz` គ្របវា**។
-- **ZTO ៖ ⛔ កុំបន្ថែម circuit breaker សកល** — វាស់រួច ៖ ១២ កញ្ចប់ ➜ ១២ ការហៅ
-  upstream (គ្មានស្ទួន) ហើយ `ZTO_AUTH_EXPIRED` ជា `noRetry` រួចស្រាប់។
-  Breaker នឹងធ្វើឲ្យ Cookie ថ្មីមិនត្រូវប្រើរហូតដល់វាផុត។
+- `"<X> timed out"` — the intentional `withTimeout()` guard. The Error is built **synchronously at the call site** so
+  the stack shows the real caller.
+- `permission_denied` at `repoRerunTransactionQueue` / on reconnect — offline transactions replayed after auth/rules
+  changed.
+- `"Daily/Monthly revenue underflow clamped to 0"` — a safety net. Firing **often for the same day/month** signals
+  duplicate deduction — the capture itself is not a bug.
+- **"⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ!"** — the transaction found the item gone on the server. **Not a bug.** Frequent ➜
+  check the device clock.
+- **Recorded false positives — don't "fix"**: `ResizeObserver` (`if (window.ResizeObserver)` exists) ·
+  `navigator.credentials` (`biometricPlatformAvailable()` plus `try`) · `crypto.subtle` (absent only on non-secure
+  contexts where the app **can't run at all**).
+- **`waitForZXingThenInitScanEngine()` uses the raw clock** — left on purpose (touches no data or money).
+- **All 7 ZoeW `setInterval` timers run while the page is `hidden`** — ⛔ **never add a `document.hidden` gate**: browsers
+  already throttle, and a gate risks a **stale customer-table cache when the user returns**. ⚠️ The one exception
+  **inside** a cycle: `probeDatabaseLivenessIfIdle()` doesn't probe while `hidden` (pure network round trip; the
+  "wake from background" door probes at once on return) — the cycle itself still runs.
+- **`revenue-fuzz` doesn't trigger the "7 days + mixed parcel" path** — its safety net is
+  `partial-pickup-cleanup-test` ⛔ **never assume `revenue-fuzz` covers it**.
+- **ZTO: ⛔ never add a global circuit breaker** — measured: 12 parcels ➜ 12 upstream calls (no duplicates) and
+  `ZTO_AUTH_EXPIRED` is already `noRetry`. A breaker would keep a fresh Cookie unused until it expires.
 
 ---
 
-# 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
+# 📌 Pending work — user verification
 
-> ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
-> លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
+> ⛔ Keep only what the user **hasn't confirmed yet** or **live decisions**. Confirmed working on real devices ➜ delete
+> the item here (the permanent record lives in `docs/HISTORY*.md`).
 
-- ⏳ **Supabase (ZoeW 2.46.0 · ZoeKeyGen 2.23.0) — merge រួច (PR #276) · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»** ៖ សកម្មភាពដោយដៃ
-  (Project · migration ៣ · Admin · Edge Function + secrets · Netlify env · ហាងដំបូង) នៅ `docs/HISTORY.md` ផ្នែក ១ [2.46.0] ·
-  ការដំឡើង ៖ [`supabase/README.md`](supabase/README.md)។ ⏳ សាកលើ iPhone + Android ពិត ៖ ចុះឈ្មោះ · ចូល · ស្កេន · ក្រៅបណ្តាញ ➜ ភ្ជាប់វិញ ·
-  ឧបករណ៍ ២ ក្នុងហាងដដែល · ភ្លេចពាក្យសម្ងាត់ · ហាងបិទ ➜ ចាកចេញ។ **ចំណុចបើក** (សម្រេចជាមួយម្ចាស់គម្រោង) ៖ (១) **Push** ៖ ចងនឹងគណនីហាងរួច
-  (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
-  (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
-  (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
-  (៤) `firebase-loader.js` នៅទាញ SDK Firebase ទោះ Config ជា Supabase (~150 KB) · chunk `supabase-backend` ចូលសំបក SW សម្រាប់អ្នកប្រើទាំងអស់។
-- ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merge រួច (PR #277)** — សាកលើឧបករណ៍ពិត ៖
-  ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
-  ZoeKeyGen ៖ Tab ទូរស័ព្ទ · Signing Key ផុត ១៥ នាទី (លម្អិត ៖ `docs/HISTORY.md` [2.47.0])។
-- ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merge រួច (PR #278)** — សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 បើកការជូនដំណឹង
-  (គ្មាន Activation Key · ទូរស័ព្ទ ២ ក្នុងហាងដដែលទទួលការរំលឹកម៉ោង ៨) · រក្សាទុក Config Supabase ➜ គ្មានប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែត ·
-  ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android (Chrome · Google Password Manager) · QR ចំកណ្តាល + 💾 រក្សាទុក QR (លម្អិត ៖ `docs/HISTORY.md` [2.47.1])។
-- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 (branch `claude/focused-brown-3xf7am` ៖ មិនទាន់ merge)** — Supabase ៖ ✅ history ត្រូវ repair រួច (Project `xrobehzmmwjfxwkjysgg` ៖
-  migration ៣ ដំបូងផ្ទៀងលើ server ៖ តារាង · function · md5 `private.zoe_rules()` ស្មើ repo ➜ កត់ក្នុង `schema_migrations`) ➜ merge ➜
-  integration អនុវត្ត migration `20261002000100` (SECURITY DEFINER ➜ schema `private`) + deploy `register`/`reset-password` ➜ Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
-  សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
-  (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។
-- ⏳ **សំណើម្ចាស់គម្រោង ៖ «ពេល Supabase រួចសព្វគ្រប់ លុបឯកសារ Firebase ដែលលែងប្រើ»** — ⛔ **កុំលុបមុនលក្ខខណ្ឌទាំងអស់ពិត** ៖ Supabase
-  deploy · សាកលើឧបករណ៍ពិត · CLI ផ្ទេរទិន្នន័យ (ចំណុចបើក ៣) · **អតិថិជន Firebase ចុងក្រោយផ្ទេររួច** (លុយពិត) · ម្ចាស់គម្រោងបញ្ជាក់។ ពេលនោះ
-  ⛔ **ត្រូវរក្សា** ៖ `firebase-database.rules.json` (ប្រភព rules របស់ Supabase) · License Project/`license-verify.js`/`ZoeKeyGen/firebase-*`
-  (Activation Key · Push · ដំណឹងពីអ្នកលក់ · Login Admin របស់ ZoeKeyGen) · emulator ក្នុង `audit-tools/emu/*` (oracle របស់ parity)។ **បេក្ខជនលុប** ៖
-  ផ្លូវ Config/Login Firebase ក្នុង ZoeW (`firebase-loader.js` · SDK wrapper · ផ្លូវ `databaseURL`) · `firebase-backup/` + `backup.yml` (ជំនួសដោយ
-  backup Supabase) · ឯកសារ Firebase-only ក្នុង README/guide — ការលុបនីមួយៗត្រូវវាស់ផលប៉ះពាល់ (Runbook ជំហានទី ៣) ហើយមិនមែនក្នុងជុំតែមួយ។
-
-- ⏳ **`tools/firebase-provision/` ៖ ការរត់លើកដំបូងលើគណនី Google ពិត** — checker រត់ `firebase-tools` ពិតទល់ Google **ក្លែង** តែប៉ុណ្ណោះ
-  (session នេះហៅ Google ពិតមិនបាន) ➜ ម្ចាស់គម្រោង ៖ `setup.cmd` ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ ត្រូវ exit 0 (គ្មាន `FAIL` · `WARN`)
-  ➜ Login ក្នុង ZoeW ដោយគណនីនោះ។ បន្ទាប់មក `new --project-id <id> --branch <សាខា> --adopt` សម្រាប់អតិថិជនចាស់ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។
-  ⛔ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (លើស ➜ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា)។
-- ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
-  បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
-  ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
-  ⛔ វាស់បាន (2026-09-29) ៖ **០ Release** · run `Android APK` ទាំងអស់ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា) ➜ មិនមែនភស្តុតាងថា secret ខុស។
-- ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
-  ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
-  (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
-- ⏳ **2.45.7 (ZoeW) ៖ Deploy + build APK ថ្មី ហើយសាកការតភ្ជាប់ «ងាប់ស្ងាត់» លើឧបករណ៍ពិត** — ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ) ➜ ក្នុង ~១ នាទី
-  ចំណុចស្ថានភាពឈប់បៃតង (ឬ ~២៥ វិ. ក្រោយស្កេនដែលព្យួរ) ➜ ដោតវិញ ➜ បៃតងវិញខ្លួនឯង + ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · 🩺 ជួរ Firebase ❌ ពេល Server មិនឆ្លើយ។
-  ⛔ ZoeKeyGen **មិនទាន់មាន** ការវាស់ភាពរស់នេះ (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយដូចគ្នា)។
-- ⏳ **2.45.5 (ZoeW) · 2.22.1 (ZoeKeyGen) ៖ Deploy ទាំង ២ site + build APK ថ្មី** — CSP ថ្មី (`connect-src` + `https://www.gstatic.com`) មកជាមួយ
-  `netlify.toml` ក្នុង deploy ដដែល · សិទ្ធិ `ACCESS_NETWORK_STATE` ចូលតែតាម **APK ថ្មី**។ សាកលើឧបករណ៍ពិត ៖ APK បើក Airplane mode ➜ ចំណុចស្ថានភាព
-  ប្តូរជា «ក្រៅបណ្ដាញ» ក្នុងប៉ុន្មានវិនាទី (មុននេះ «កំពុងភ្ជាប់…» ~៣៥ វិ.) · បិទ Airplane ➜ «ភ្ជាប់ Server រួចរាល់» វិញភ្លាម · 🩺 ជួរ «អ៊ីនធឺណិត»
-  និយាយត្រូវ · បិទ Push លើ APK ខណៈអ៊ីនធឺណិតអន់ ➜ ដំណឹងពីអ្នកលក់លើកក្រោយ **មិនលោត**។ ⛔ ការវាស់ WebView ពិតធ្វើមិនបាននៅទីនេះ (គ្មាន Android SDK)។
-- ⏳ **2.45.4 ៖ ប៊ូតុង «ខលម្តងទៀត» ភ្លឹប ៥.៥ ជុំ រួចនៅក្រហមជាប់** (ជំនួសការភ្លឹបជារៀងរហូត ➜ អេក្រង់ចុះ Hz បាន · សន្សំថ្ម) — ម្ចាស់គម្រោងត្រូវមើលលើទូរស័ព្ទពិតថាសញ្ញានៅច្បាស់គ្រប់គ្រាន់។
-  ⛔ បើចង់បានការភ្លឹបជាប់វិញ ➜ ជាការសម្រេចរបស់ម្ចាស់គម្រោង (ថ្លៃ ៖ main thread គូរ ~៦០ ស៊ុម/វិ. ពេលមានជួរដេកនោះ) · `perf-check` ចាក់សោវាឥឡូវ។
-- ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
-  secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
-  ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·
-  backup ឈប់ស្ងាត់ ➜ ពិនិត្យ **Actions** មុន (GitHub ផ្អាក schedule ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ)។
-  ⛔ វាស់បាន (2026-09-29) ៖ run តាមកាលវិភាគ #21–#25 ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា Actions) ➜ **គ្មាន backup ណាមួយត្រូវបានបង្កើតទេ**។
-- ✅ **Sentry event ពី barcode តេស្ត (`ZTO_UPSTREAM_REJECTED`) — អ្នកប្រើសម្រេចថាមិនកែ** (កញ្ចប់តេស្តដែលគ្មានក្នុង ZTO)។
-  ⛔ កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់ (បាំងការដាច់ ZTO ពិត) — មើលជួរ `ZTO_UPSTREAM_REJECTED` ក្នុងតារាងស្នូល · `lookupReason: ""`
-  ក្នុង breadcrumb **មិនមែនកំហុស** (client អាន `reason` តែលើផ្លូវ `ZTO_CONFIG_INVALID`)។
-- ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000` ក្នុង Netlify env ជាការកំណត់ដោយចេតនា** (កូដលំនាំដើម `6000` · ZTO ឆ្លើយ ២,១–៥,៣ វិ.
-  លើផលិតកម្ម · បង្អួចអាន Cookie លើ container ត្រជាក់) ➜ តម្លៃមិនមែន `6000` ក្នុង `?diag=1` មិនមែនកំហុស។ ⛔ កុំបង្កើន
-  `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ (ថវិកា App មិនមែនពិដាន platform)។
-- ✅ **Firebase rules របស់ Business និង License Project ត្រូវ Publish រួច** (`pickedUpBarcodes` · កូដ App `ZOE` ·
-  `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច · វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `license_announcements`)។ ✅ Push (VAPID · FCM · `google-services.json`)
-  កំណត់រួច។ ⛔ ការសរសេរស្ថិតិយកត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ (`$other` បដិសេធវាល
-  ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
+- ⏳ **Supabase (ZoeW 2.46.0 · ZoeKeyGen 2.23.0) — merged (PR #276) · ✅ owner: "Supabase works"**: manual actions
+  (Project · 3 migrations · Admin · Edge Functions + secrets · Netlify env · first shop) in `docs/HISTORY.md` part 1
+  [2.46.0] · setup: [`supabase/README.md`](supabase/README.md). ⏳ Test on real iPhone + Android: sign-up · login · scan ·
+  offline ➜ reconnect · 2 devices in one shop · forgot password · shop disabled ➜ logout. **Open points** (decide with
+  the owner): (1) **Push** bound to the shop account (ZoeW 2.47.1) ➜ ⏳ test on real devices · (2) **Egress Free 5
+  GB/month**: the adapter pulls from `cursor=0` on every page load ➜ cache `zoe_docs` in IndexedDB (delta by `seq`) ·
+  (3) **Migrate old customer data** Firebase ➜ Supabase: CLI via `public.zoe_admin_write(p_tenant, p_op_id, p_ops,
+  p_replace)` (not built yet) · (4) `firebase-loader.js` still loads the Firebase SDK under a Supabase Config (~150 KB) ·
+  chunk `supabase-backend` enters the SW shell for everyone.
+- ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merged (PR #277)** — test on real devices: ⚙️ connect (QR image · paste Link ·
+  choose Supabase) · "Supabase" toast · live network toast (WiFi off ➜ on ➜ ✅) · new icon (reinstall) · ZoeKeyGen:
+  phone tabs · Signing Key expires after 15 minutes (`docs/HISTORY.md` [2.47.0]).
+- ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merged (PR #278)** — test on real devices: Supabase shop ➜ 🔔 enable
+  notifications (no Activation Key · 2 phones in one shop get the 8am reminder) · saving a Supabase Config ➜ no login
+  dialog flash · ZoeKeyGen: fingerprint/face on Android (Chrome · Google Password Manager) · centered QR + 💾 save QR
+  (`docs/HISTORY.md` [2.47.1]).
+- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 (branch `claude/focused-brown-3xf7am`: not merged)** — Supabase: ✅ history repaired
+  (project `xrobehzmmwjfxwkjysgg`: the first 3 migrations verified on the server — tables · functions · md5 of
+  `private.zoe_rules()` equals the repo ➜ recorded in `schema_migrations`) ➜ merge ➜ the integration applies migration
+  `20261002000100` (SECURITY DEFINER ➜ schema `private`) + deploys `register`/`reset-password` ➜ Security Advisor keeps
+  only "Leaked Password Protection" (Pro). Test on real devices: Reconfig with the same Setup Link ➜ login dialog · switch
+  Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen Key edits on slow internet (`docs/HISTORY.md` [2.48.0]).
+- ⏳ **Owner request: "once Supabase is complete, delete unused Firebase files"** — ⛔ **don't delete before every
+  condition holds**: Supabase deployed · tested on real devices · data migration CLI (open point 3) · **the last Firebase
+  customer migrated** (real money) · owner confirms. Then ⛔ **keep**: `firebase-database.rules.json` (Supabase rules
+  source) · License Project/`license-verify.js`/`ZoeKeyGen/firebase-*` (Activation Key · Push · seller notices · ZoeKeyGen
+  admin login) · emulators in `audit-tools/emu/*` (parity oracle). **Deletion candidates**: Firebase Config/Login paths in
+  ZoeW (`firebase-loader.js` · SDK wrapper · `databaseURL` path) · `firebase-backup/` + `backup.yml` (replaced by
+  Supabase backups) · Firebase-only docs in README/guide — each deletion needs impact verification (Runbook step 3), not
+  in one round.
+- ⏳ **`tools/firebase-provision/`: first run on a real Google account** — the checker runs real `firebase-tools` only
+  against a **fake** Google (this session can't call real Google) ➜ owner: `setup.cmd` ➜
+  `new-customer.cmd --branch <test branch> --user test` ➜ exit 0 (no `FAIL` · `WARN`) ➜ log into ZoeW with that account.
+  Then `new --project-id <id> --branch <branch> --adopt` per existing customer ➜ `deploy-rules.cmd` covers them.
+  ⛔ The ZTO Function reads `FIREBASE_PROJECT_IDS` up to `PROJECT_ID_MAX` (beyond ➜ the list feature turns off for all).
+- ⏳ **Automatic Release APK** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK`
+  creates no Release until the 4 secrets (`ZoeW/docs/ANDROID.md`) are set **and** GitHub Actions quota returns ➜ **Run
+  workflow** by hand. ⛔ Another keystore ➜ the pin step fails ➜ no Release (correct) · ⛔ never create a new keystore.
+  Measured (2026-09-29): **0 Releases** · every `Android APK` run failed in ~2s **with no runner** (quota) ➜ not proof the
+  secrets are wrong.
+- ⏳ **Publish both rules files (ZoeW 2.45.4: nodes expecting objects)** — `firebase-database.rules.json` ➜ Business
+  Project · `ZoeKeyGen/firebase-database.rules.json` ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜
+  paste ➜ Publish). Deploy/Publish order doesn't matter (old/new apps never write primitives; 955 real app writes
+  replayed on old and new rules ➜ **0 / 0** rejections · `emu/app-writes-rules` locks it every run). After Publish: try
+  "កំណត់ទូ Locker" · close/open · remove · restore · ZoeKeyGen create/Extend a Key once.
+- ⏳ **2.45.7 (ZoeW): deploy + build a new APK and test the "zombie connection" on a real device** — unplug the router's
+  internet cable (WiFi stays) ➜ within ~1 minute the status dot stops being green (or ~25s after a hung scan) ➜ plug back
+  ➜ green again by itself + data from other devices arrives · 🩺 Firebase row ❌ when the server doesn't answer.
+  ⛔ ZoeKeyGen **doesn't yet have** this liveness probe (admin tool: operations have a 15s ceiling, but the status dot can
+  be falsely green the same way).
+- ⏳ **2.45.5 (ZoeW) · 2.22.1 (ZoeKeyGen): deploy both sites + build a new APK** — new CSP (`connect-src` +
+  `https://www.gstatic.com`) ships with `netlify.toml` in the same deploy · permission `ACCESS_NETWORK_STATE` arrives only
+  with the **new APK**. Test on real devices: APK Airplane mode ➜ status becomes "offline" within seconds · Airplane off ➜
+  "connected" again at once · 🩺 "internet" row tells the truth · turning Push off on the APK on a bad network ➜ the next
+  seller notice **doesn't arrive**. ⛔ Real WebView can't be measured here (no Android SDK).
+- ⏳ **2.45.4: the "ខលម្តងទៀត" button blinks 5.5 times then stays red** (instead of blinking forever ➜ the screen can drop
+  Hz · saves battery) — the owner should check on a real phone that the signal is clear enough. ⛔ Wanting a permanent
+  blink again is the owner's decision (cost: the main thread paints ~60 frames/s while such a row exists) · `perf-check`
+  locks it now.
+- ⏳ **Automatic backup — postponed by the user on purpose** (⛔ don't nag every round): `backup.yml` backs up nothing until
+  secrets `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` are set ([`firebase-backup/README.md`](firebase-backup/README.md)
+  step 6) ➜ Run workflow once ➜ **download the artifact and try a restore** (an untested backup isn't a backup yet) ·
+  backups stop silently ➜ check **Actions** first (GitHub pauses schedules after 60 quiet days). ⛔ Measured (2026-09-29):
+  scheduled runs #21–#25 failed in ~2s **with no runner** (Actions quota) ➜ **no backup has been created yet**.
+- ✅ **Sentry events from test barcodes (`ZTO_UPSTREAM_REJECTED`) — the user decided not to fix** (test parcels not in
+  ZTO). ⛔ Never silence it all (hides real ZTO outages) — see the `ZTO_UPSTREAM_REJECTED` core-table row ·
+  `lookupReason: ""` in breadcrumbs **is not a bug** (the client reads `reason` only on the `ZTO_CONFIG_INVALID` path).
+- ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000` in Netlify env is intentional** (code default `6000` · ZTO answers in 2.1–5.3s in
+  production · Cookie read window on cold containers) ➜ a non-`6000` value in `?diag=1` is not a bug. ⛔ Never raise
+  `ZTO_REQUEST_BUDGET_MS` to `10000` without re-measuring the client path (an app budget, not a platform ceiling).
+- ✅ **Firebase rules of the Business and License projects are Published** (`pickedUpBarcodes` · app code `ZOE` ·
+  `maxDevices` · seat slots · new Keys issued · `op` field in daily/monthly ledger · `license_announcements`). ✅ Push
+  (VAPID · FCM · `google-services.json`) configured. ⛔ Pickup-stats writes refused ➜ check rules before code (`$other`
+  rejects unknown fields) · Activate fails with `seat-unavailable`/"Key នេះមិនមែនសម្រាប់ ZoeW" ➜ check whether it's an old
+  Key (`a: 'ADM'`) first.
 
 ---
 
-# 📖 ឯកសារយោង
+# 📖 References
 
-| ត្រូវការអ្វី | មើលឯកសារណា |
+| Need | File |
 |---|---|
-| **ច្បាប់ដែលត្រូវអនុវត្ត** | **ឯកសារនេះ** (`CLAUDE.md`) |
-| **Prompt សម្រាប់ជុំ audit បន្ទាប់** (បច្ចេកទេស · អន្ទាក់ harness · អ្វីដែលការវាស់បដិសេធ) | [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) |
-| ហេតុអ្វីច្បាប់មួយមាន · លេខដែលវាស់បាន · លទ្ធផល mutation | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ២** (សម័យ React) · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) **ផ្នែក ២** (សម័យ vanilla) |
-| **រកឈ្មោះ checker តែមិនដឹងវារស់នៅឯណា** | [`docs/HISTORY.md`](docs/HISTORY.md) **🔎 លិបិក្រម** នៅចុងឯកសារ (គ្របឯកសារប្រវត្តិទាំង ២) |
-| ZoeW ≤ 2.37.3 · កំណែមុន 2.20.0 · អត្ថបទដែលដកចេញ ឬបង្រួមពី `CLAUDE.md` | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) **ផ្នែក ១ · ៣ · ៤ · ៥** |
-| «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» របស់កំណែណាមួយ · អ្នកប្រើឃើញអ្វីខុសពីមុន | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ១** |
-| របៀបប្រើ App និងឧបករណ៍នីមួយៗ | `README.md` នៃថតនោះ |
-| បញ្ជី checker និងអ្វីដែលនីមួយៗវាស់ | [`audit-tools/README.md`](audit-tools/README.md) |
-| ការរៀបចំ ZTO Lookup | [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) |
+| **Rules to follow** | **this file** (`CLAUDE.md`) |
+| **Prompt for the next audit round** (techniques · harness traps · what measurement rejected) | [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) |
+| Why a rule exists · measured numbers · mutation results | [`docs/HISTORY.md`](docs/HISTORY.md) **part 2** (React era) · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) **part 2** (vanilla era) |
+| **Find a checker's explanation** | [`docs/HISTORY.md`](docs/HISTORY.md) **🔎 index** at the end (covers both history files) |
+| ZoeW ≤ 2.37.3 · versions before 2.20.0 · text removed or condensed from `CLAUDE.md` | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) **parts 1 · 3 · 4 · 5** · the previous Khmer `CLAUDE.md` in git history |
+| "Actions to do by hand" of any version · what users see differently | [`docs/HISTORY.md`](docs/HISTORY.md) **part 1** |
+| How to use each app and tool | that directory's `README.md` |
+| Checker list and what each measures | [`audit-tools/README.md`](audit-tools/README.md) |
+| ZTO Lookup setup | [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) |

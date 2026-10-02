@@ -180,13 +180,13 @@ check(scanned === alreadyScanned.size,
 // ចោល នោះ checker នេះក្លាយជាការចាក់សោដោយគ្មានមូលដ្ឋាន។
 const claude = fs.existsSync(path.join(ROOT, 'CLAUDE.md'))
     ? fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8') : '';
-check(/README សរសេរតែ \*{1,2}របៀបប្រើ\*{1,2}/.test(claude) && /កុំចម្លងចំនួន assertion ចូល README/.test(claude),
+check(/README files describe \*{0,2}usage only/.test(claude) && /Never copy assertion counts into a README/.test(claude),
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ ៩ នៅរស់ក្នុង CLAUDE.md (មូលដ្ឋាននៃ checker នេះ)');
 // ⛔ ទិសផ្ទុយ ៖ ច្បាប់ដែលពង្រីកវិសាលភាពទៅ **គ្រប់ `.md`** ក៏ត្រូវរស់ក្នុង
 // `CLAUDE.md` ដែរ — បើអត់ ការស្កេនទូលាយក្លាយជាការចាក់សោគ្មានមូលដ្ឋាន។
-check(/ប្រវត្តិកំហុស.{0,40}`docs\/HISTORY\.md`.{0,60}`docs\/HISTORY-ARCHIVE\.md`.{0,40}តែមួយកន្លែងគត់/s.test(claude)
-    && /គ្មានឯកសារប្រវត្តិទី ៣/.test(claude)
-    && /គ្រប់ឯកសារ `\*\.md`|រាល់ឯកសារ `\*\.md`/.test(claude),
+check(/history lives only in `docs\/HISTORY\.md`\s+and\s+`docs\/HISTORY-ARCHIVE\.md`/.test(claude)
+    && /no third history file/.test(claude)
+    && /every `\*\.md` file/.test(claude),
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ «ប្រវត្តិកំហុស ➜ HISTORY.md តែមួយកន្លែង» គ្របគ្រប់ `.md` នៅរស់ក្នុង CLAUDE.md');
 
 // ⛔ ទិសផ្ទុយ ២ ៖ docs/HISTORY.md ត្រូវ **ពិតជាកាន់** ប្រវត្តិនោះ — បើវាទទេ
@@ -562,14 +562,12 @@ const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length - everyImpl
     + (uiApp.match(/\bscope\.every\(/g) || []).length;
 check(intervalCount >= 3, 'ជាន់អប្បបរមា ៖ រាប់ `setInterval` ក្នុង `app.js` បានយ៉ាងតិច ៣',
     'រាប់បាន ' + intervalCount);
-const KH_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
-const khNum = (n) => String(n).split('').map((d) => KH_DIGITS[Number(d)] || d).join('');
-const intervalClaim = /`setInterval` ទាំង ([០-៩]+) របស់ ZoeW/.exec(claudeText);
+const intervalClaim = /All ([0-9]+) ZoeW `setInterval` timers/.exec(claudeText);
 check(!!intervalClaim, '⛔ `CLAUDE.md` នៅរក្សាច្បាប់ `setInterval` ↔ `document.hidden`',
     'រកប្រយោគនោះមិនឃើញ');
-check(!intervalClaim || intervalClaim[1] === khNum(intervalCount),
+check(!intervalClaim || intervalClaim[1] === String(intervalCount),
     '⛔ ចំនួន `setInterval` ក្នុង `CLAUDE.md` ត្រូវស្មើចំនួនក្នុង `app.js` ពិត',
-    intervalClaim ? 'ឯកសាររាយ ' + intervalClaim[1] + ' · កូដមាន ' + khNum(intervalCount) : '');
+    intervalClaim ? 'ឯកសាររាយ ' + intervalClaim[1] + ' · កូដមាន ' + intervalCount : '');
 
 
 // ⛔ ទិសផ្ទុយ ៖ តារាង UI ត្រូវនៅរស់ក្នុង CLAUDE.md — បើនរណាលុបវាចោល នោះ
@@ -597,7 +595,7 @@ check(missingMenu.length === 0,
 // ដែរ ➜ វាអាចចាស់ដោយស្ងាត់។ វាស់បាន (mutation ពិត) ៖ ការប្តូរ root README
 // ទៅ «៨ ជួរ» **រស់រាន** `PASS (64)`។ ដូច្នេះបញ្ជីត្រូវ **ដេរីវេពីថតពិត** ៖
 // ឯកសារ `.md` ណាដែល *អះអាងលេខនោះ* ត្រូវស្ថិតក្នុងការវាស់ដោយស្វ័យប្រវត្តិ។
-const HEALTH_CLAIM_RE = /ពិនិត្យសុខភាពប្រព័ន្ធ\*{0,2}[^\n]*?(?:ជួរ \*{0,2}([០-៩0-9]+)|\*{0,2}([០-៩0-9]+) ជួរ)/;
+const HEALTH_CLAIM_RE = /ពិនិត្យសុខភាពប្រព័ន្ធ\*{0,2}[^\n]*?(?:ជួរ \*{0,2}([០-៩0-9]+)|\*{0,2}([០-៩0-9]+) ជួរ|\*{0,2}([0-9]+)\*{0,2} rows)/;
 function listMarkdownFiles(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
@@ -614,7 +612,7 @@ const healthClaims = listMarkdownFiles(ROOT, '', [])
         let text = '';
         try { text = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return null; }
         const hit = text.match(HEALTH_CLAIM_RE);
-        return hit ? { rel: rel, claimed: khmerToInt(hit[1] || hit[2]) } : null;
+        return hit ? { rel: rel, claimed: khmerToInt(hit[1] || hit[2] || hit[3]) } : null;
     })
     .filter(Boolean);
 const HEALTH_CLAIM_DOCS = healthClaims.map((c) => c.rel);
@@ -627,7 +625,7 @@ check(healthStale.length === 0,
     healthStale.map((c) => c.rel + ' រាយ ' + c.claimed).join(' · ')
     + ' ខណៈកូដផលិត ' + healthRowCount);
 
-const screensClaim = khmerToInt((claudeText.match(/អេក្រង់ស្ថិតិទាំង \*{0,2}([០-៩0-9]+)\*{0,2} ប្រើ helper ដដែល/) || [])[1]);
+const screensClaim = khmerToInt((claudeText.match(/\*{0,2}([0-9]+)\*{0,2} stats screens use the same helper/) || [])[1]);
 check(screensClaim !== null && screensClaim === collectedCallers,
     '⛔ CLAUDE.md ៖ ចំនួនអេក្រង់ដែលប្រើ `collectedValueOf()` ត្រូវស្មើចំនួនកន្លែងហៅពិត',
     'ឯកសាររាយ ' + screensClaim + ' ខណៈកូដហៅ ' + collectedCallers);
@@ -641,7 +639,7 @@ check(lineClaim === null || Math.abs(lineClaim - appLineCount) / appLineCount <=
 
 // ⛔ ចំនួនតំបន់ 📝 ៖ ការអះអាងក្នុងក្បាលតារាងស្នូល ត្រូវស្មើចំនួនជួរ 📝 ពិត
 const penRows = (claudeText.match(/^\|[^\n]*\|\s*📝[^\n]*\|$/gm) || []).length;
-const penClaim = khmerToInt((claudeText.match(/ឥឡូវនៅសល់ \*{0,2}([០-៩0-9]+)/) || [])[1]);
+const penClaim = khmerToInt((claudeText.match(/\*{0,2}([0-9]+)\*{0,2} 📝 rows remain/) || [])[1]);
 check(penRows >= 2, 'ជាន់អប្បបរមា ៖ តារាងស្នូលមានជួរ 📝 យ៉ាងតិច ២', 'រាប់បាន ' + penRows);
 check(penClaim !== null && penClaim === penRows,
     '⛔ CLAUDE.md ៖ ចំនួនតំបន់ 📝 ដែលអះអាង ត្រូវស្មើចំនួនជួរ 📝 ក្នុងតារាងស្នូល',
@@ -949,8 +947,8 @@ check(siteOffenders.length === 0,
     // ⛔ វិសាលភាពត្រូវជា **កថាខណ្ឌនៃការធ្លាក់ចុះ** មិនមែនឯកសារទាំងមូល ៖
     // ឈ្មោះដដែលលេចក្នុងតារាងស្នូល (`emu/license-seat-rules-test.js`) ធ្វើឲ្យ
     // ការស្វែងរកទូទាំងឯកសារ **ពិតដោយចៃដន្យ** ➜ អ្នកយាមងងឹតទាំងស្រុង។
-    const degradeAt = claudeText.indexOf('គ្មាន RTDB emulator');
-    check(degradeAt !== -1, 'ជាន់អប្បបរមា ៖ រកកថាខណ្ឌ «គ្មាន RTDB emulator» ក្នុង CLAUDE.md បាន',
+    const degradeAt = claudeText.indexOf('No RTDB emulator');
+    check(degradeAt !== -1, 'ជាន់អប្បបរមា ៖ រកកថាខណ្ឌ «No RTDB emulator» ក្នុង CLAUDE.md បាន',
         'រកមិនឃើញ');
     const degradeBlock = degradeAt === -1 ? '' : claudeText.slice(degradeAt, degradeAt + 1400);
     const missing = labels.filter((label) => degradeBlock.indexOf(label) === -1);

@@ -3,7 +3,7 @@
 > Written for **Claude**. English by owner request; **everything else stays Khmer** (rule 7).
 > ⛔ **This file holds only rules and prohibitions.** Bug history, measured numbers, versions and dates live in
 > [`docs/HISTORY.md`](docs/HISTORY.md) (React era · pending user verification at the top) and
-> [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) (vanilla era). Want the *why* of a rule? `grep` its tool name
+> [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) (vanilla era · React migration). Want the *why* of a rule? `grep` its tool name
 > there (index at the end of `docs/HISTORY.md`). `doc-scope-test` fails on any version number or date outside the header
 > table below.
 
@@ -52,7 +52,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.48.0` (`zoew-v253`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.48.1` (`zoew-v254`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.2` (`zoekeygen-v113`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -89,7 +89,8 @@ only this text protects them.
 - 🏪 **Two backends per device Config**: Firebase (`databaseURL`) ➜ one Firebase project per customer · Supabase
   (`supabaseUrl` · `supabaseKey` · `loginDomain?`) ➜ **one project, many shops** (`tenant_id` + RLS · sign-up by **invite
   code** bound to a ZTO branch). `initFirebase()` loads chunk `supabase-backend` by dynamic import only when Config has
-  `supabaseUrl`; the adapter (`src/services/supabase-*.ts`) exposes the Firebase `fb` surface ➜ ⛔ money/listener code
+  `supabaseUrl`; `firebase-loader.js` is the single decider for the Firebase SDK ⛔ no static `modulepreload` of it in
+  `index.html` (`npm run smoke`: Supabase Config ➜ 0 SDK requests · Firebase ➜ 3); the adapter (`src/services/supabase-*.ts`) exposes the Firebase `fb` surface ➜ ⛔ money/listener code
   **never branches on backend**. ⛔ **RTDB rules are the single source**: `firebase-database.rules.json` ➜
   `node supabase/scripts/generate-rules-sql.mjs` writes a **new** `<timestamp>_zoe_rules.sql` ➜ Publish on Firebase **and**
   merge to `main` (Supabase GitHub integration applies new migrations) or paste the new file in the SQL Editor.
@@ -133,8 +134,9 @@ only this text protects them.
    `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` · `firebase-backup/` · `zto-import/` (and
    `google-sheets-api/`) · `supabase/` · [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md). A stale README is a wrong
    document. ⛔⛔ **Scope is every `*.md` file in the repo**: bug history lives only in `docs/HISTORY.md` and
-   `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era (read,
-   never append) · no third history file. Exceptions: root `docs/` (history files · `AUDIT-PROMPT.md`) and `CLAUDE.md`
+   `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era + React
+   migration + history moved out of `HISTORY.md` (read; new entries never go there) · no third history file. Exceptions:
+   root `docs/` (history files · `AUDIT-PROMPT.md`) and `CLAUDE.md`
    (rules only — rule 12). ⛔ `ZoeW/docs/` is not an exception. ⛔ Banned elsewhere: version numbers · date-bound requests ·
    version/date-bound measurements ➜ present tense. ⛔ File lists are derived from real dirs. Guard: `doc-scope-test.js`.
 10. **Firebase rules don't deploy automatically.** Every new path gets its rule in the same commit, and **tell the user to
@@ -216,7 +218,7 @@ only this text protects them.
 | Connection · recovery | Failed listeners come back; the SDK recovers. Reloading to recover the SDK first measures reachability of the SDK host (`navigator.onLine` lies) · CSP `connect-src` allows it | `connection-recovery-test` · `netlify-config-scope-test` |
 | **Zombie socket** | `.info/connected` = `true` is no proof. `probeDatabaseLiveness()` decides: real round trip (`get()` on `DB_LIVENESS_PROBE_PATH`; any reply incl. `permission_denied` = alive); only a 10s timeout disconnects (`forceDatabaseReconnect()`). Doors: hung `dbOp`/scan claim · wake from background ≥ 30s · 60s cycle (visible, no round trip in 55s). Never probe while a listener is pending · ≤ 1 disconnect per 30s · slow but alive ➜ no disconnect | `emu/app-network-e2e-test` |
 | **Listeners dying alone** | Siblings never announce recovery for a dead listener — `.info/connected` and `.info/serverTimeOffset` too | `connection-recovery-test` |
-| **Stale callbacks** | Every `onValue` callback has a generation gate (`listenerGeneration !== dbListenerGeneration`) — old callbacks after a database/auth switch never write old data or call `noteDbListenerAlive()`. Measured over real `DB_LISTENER_KEYS` | `connection-recovery-test` |
+| **Stale callbacks** | Every `onValue` callback has a generation gate (`listenerGeneration !== dbListenerGeneration`) — old callbacks after a database/auth switch never write old data or call `noteDbListenerAlive()`. Measured over real `DB_LISTENER_KEYS`. A backend switch (`initFirebase()` teardown) unsubscribes the old auth listener **before** `deleteApp()` — Firebase delivers a pending `onAuthStateChanged` after `deleteApp()` | `connection-recovery-test` · `ZoeW/tests/registry-session-race.test.ts` |
 | **Each listener reports its own key** | A callback passing a sibling key hides its death from `dbListenerFailedPaths` (`dbListenerViewIsStale()` dies silently) | `listener-pending-key-test` |
 | **Secret redaction** | Frozen objects redacted by copy · private/signing keys and private JWK (incl. JSON strings) redacted · public JWK and money field `d` kept. `SECRET_KEY_PATTERN` (object keys) and `SECRET_PARAM_PATTERN` (`x=…` strings, e.g. console breadcrumbs) are separate lists ➜ both cover every secret the system holds (`headerValue` · `headerValueEnc` · `X-Zoe-Proxy-Key` · `ZTO_PROXY_KEY` · `BOS-MAN-SESSION` · `activationKey` · `keyString` · …) · credential fields derived from `fieldsToBlank` of `clearSensitiveModalFields()`. Reverse: non-secrets (`path` · `patch` · `dispatch` · `headerName`) stay | `secret-hygiene` |
 | **Tools** | Poisoning happens on shadow files · no fixed shared resources: `listen(0, '127.0.0.1')` · `emu/*` namespace unique per run | `checker-coverage` |
@@ -226,7 +228,7 @@ only this text protects them.
 | **Cleanup labels ↔ constants** | User-facing text is read from the constants | `trash-modal-test` |
 | **Progress trackers** | Polling never consumes evidence (idempotent) | `connection-recovery-test` |
 | Reconnect ladder | The cycle never cuts a handshake | `reconnect-ladder-test` |
-| Timeout · retry | Every `fetch` truly aborts | `network-timeout-test` |
+| Timeout · retry | Every `fetch` truly aborts — supabase-js too (`sbFetchWithCeiling()` is its `global.fetch`) · the Supabase `rpc()` token step has the same ceiling as its POST (`sbWithin()`) | `network-timeout-test` · `ZoeW/tests/supabase-transport-hang.test.ts` |
 | Network pressure | Concurrency ceilings | `network-pressure` · `license-network-pressure` |
 | Service worker | Cache-first. Every fetch filling the SW cache uses `cache: 'no-cache'` · `immutable` only on hashed names (`/assets/*`) · Cache API failure ≠ app down · navigation and direct assets like `/app.js` ➜ `index.html`; `guide.html` and `/guide` ➜ guide cache · sensitive queries never in cache keys · ⛔ background refresh never puts a **new deploy** into an **old** cache (`shellDeployIsCurrent()` gate; new versions arrive only as one install group) · both apps | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` · `netlify-config-scope-test` part 5 |
 | **SW ↔ page wiring** | Measured with real app · SW · browser, posting from the SW context: `zoew-open-notify` ➜ 🔔 panel · `zoew-push` ➜ fetch notices · message types derived from `sw.js` · `visibilitychange`/`focus`/`online` ➜ `reg.update()` after a 15-minute ceiling · `controllerchange` ➜ "new version" only when a controller existed since load | `sw-client-wiring-test` |
@@ -292,7 +294,7 @@ only this text protects them.
 | **`ZTO_UPSTREAM_REJECTED`** | Mixes permanent and transient verdicts ⛔ never silence it all · never guess codes ➜ `noteUpstreamReject()` records `count · status · code` in `?diag=1` without changing verdict/cache/retry · codes read via `upstreamCodeText()` (shared with `upstreamSucceeded()`) through `SAFE_REASON_RE` | `zto-proxy-test` |
 | **React single DOM owner** | Feature code never touches DOM (`uiState.modalDisplay` · `viewState` · `src/app/refs.ts` · exceptions in `platform/document-io.ts`) · the React layer writes DOM only via JSX or `APP_ALLOWED` exits · PTR indicator from `ptrState` · `boot-flags.js` never touches React elements · every ref has a real `ref={…}` · `commitNow()` before measuring/focus · inputs uncontrolled · class-writing checkers translated only in `src/audit-compat.ts` | `npm run purity:check` |
 | **Big lists ↔ re-render** | List bodies subscribe only to their own fields (`useStoreFields`) · drag-heavy parents use `Memo…` versions · `HistoryRow` compares by value (`sameHistoryRowModel()`) · in-place edits + `renderHistory()` must render (`historyRenderSeq`) · producers assign new objects · big dialogs page by 20 with totals/search over all · history table pages by 50 (`HISTORY_PAGE_ROWS`, sentinel on `.table-responsive`); `renderHistory(data, viewKey)` keeps position on same-key syncs · APK status-bar measurement only when `statusBarLayerSignature()` changes | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` · `npm run native:check` 4ឃ |
-| **🔔 panel** | Near-expiry uses `barcodeAbandonIsRipe()` · read-only · stale view ➜ "unmeasurable" · logout clears · 🔔 and drawer are one layer (`isSideDrawerOpen()`) · `public/announcements.json` network-only · **every ZoeW bump adds a newest `update` entry = `APP_VERSION`** · `maintenance`-only messages don't bump · in-app logos derive from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
+| **🔔 panel** | Near-expiry uses `barcodeAbandonIsRipe()` · read-only · stale view ➜ "unmeasurable" · logout clears · 🔔 and drawer are one layer (`isSideDrawerOpen()`) · `public/announcements.json` network-only · **exactly one `update` entry, = `APP_VERSION` (every ZoeW bump replaces it)** · `maintenance`-only messages don't bump · in-app logos derive from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
 | **Toolchain ↔ shipped output** | CSS minifier is esbuild (`cssMinify`; Lightning CSS reorders declarations covering PTR/motion) · built JS parses in `build.target` · chunks split by `codeSplitting` + `priority` (`__vitePreload` must stay out of the native chunk) · Android config stays on the installed Capacitor's template line | `npm run smoke` · `npm run android:check` · `npm run native:check` |
 | **New Firebase project tool** | One project per customer · sign-up disabled **and measured** by a real sign-up attempt · Auth settings and rules read back · ⛔ never silently adopt (`--adopt`) or reset passwords (`--reset`) · `pendingProject` recorded before creation · step ceilings · passwords never in files · email ↔ `siteCodeFromEmail()` · Setup Link ↔ `decodeSetupPayload()` · `firebase-tools` pinned · measured with real `firebase-tools` over HTTPS | `firebase-provision-test` |
 | **Netlify config** | ⛔ No root `netlify.toml` (read by both sites) · CSP · `functions` · headers match what the app ships | `netlify-config-scope-test` |
@@ -1141,7 +1143,7 @@ bash audit-tools/emu/rules.sh
 | Pending user verification · manual actions per version | [`docs/HISTORY.md`](docs/HISTORY.md) top section · part 1 |
 | Why a rule exists · measured numbers · mutation results | [`docs/HISTORY.md`](docs/HISTORY.md) part 2 · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) part 2 |
 | Find a checker's explanation | [`docs/HISTORY.md`](docs/HISTORY.md) 🔎 index |
-| Vanilla era · older removed `CLAUDE.md` text | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · git history of `CLAUDE.md` |
+| Vanilla era · React migration · older removed `CLAUDE.md` text | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · git history of `CLAUDE.md` |
 | Usage of each app/tool | that directory's `README.md` |
 | Checker catalog | [`audit-tools/README.md`](audit-tools/README.md) |
 | ZTO Lookup setup | [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) |

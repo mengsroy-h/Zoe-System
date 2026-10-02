@@ -9,6 +9,8 @@ export const SB_AUTH_OWNER_KEY = 'zoew-sb-auth-owner';
 
 export const SB_AUTH_KEY_SUFFIXES = ['', '-code-verifier', '-user'];
 
+export const SB_FETCH_TIMEOUT_MS = 15000;
+
 export function claimSessionStorageFor(storage, url) {
     const owner = storage.getItem(SB_AUTH_OWNER_KEY);
     if (owner !== null && owner !== url) {
@@ -88,6 +90,47 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
     return Promise.race([run, guard]).finally(() => clearTimeout(timer));
 }
 
+export function sbFetchWithCeiling(fetchImpl, input, init, timeoutMs) {
+    let controller = null;
+    try { controller = new AbortController(); } catch (e) { controller = null; }
+    const source = init && init.signal;
+    const abort = () => { try { if (controller) controller.abort(); } catch (e) {} };
+    if (source && typeof source.addEventListener === 'function') {
+        if (source.aborted) abort();
+        else source.addEventListener('abort', abort, { once: true });
+    }
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            abort();
+            reject(new SbNetworkError('timeout'));
+        }, timeoutMs);
+    });
+    let started;
+    try {
+        started = Promise.resolve(fetchImpl(input, controller ? Object.assign({}, init, { signal: controller.signal }) : init));
+    } catch (e) {
+        started = Promise.reject(e);
+    }
+    const run = started.then(async (res) => {
+        const body = await res.text();
+        const empty = res.status === 204 || res.status === 205 || res.status === 304;
+        return new Response(empty ? null : body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    });
+    return Promise.race([run, guard]).finally(() => {
+        clearTimeout(timer);
+        if (source && typeof source.removeEventListener === 'function') source.removeEventListener('abort', abort);
+    });
+}
+
+export function sbWithin(promise, timeoutMs) {
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new SbNetworkError('timeout')), timeoutMs);
+    });
+    return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
 export function rpcErrorFrom(status, text) {
     let body = null;
     try { body = JSON.parse(text); } catch (e) { body = null; }
@@ -101,6 +144,7 @@ export function createSupabaseTransport(config, deps?) {
     const url = String(config.supabaseUrl || '').replace(/\/+$/, '');
     const key = String(config.supabaseKey || '');
     const fetchImpl = (deps && deps.fetch) || ((...args) => (globalThis.fetch as any)(...args));
+    const fetchTimeoutMs = (deps && deps.fetchTimeoutMs) || SB_FETCH_TIMEOUT_MS;
     const storage = createModeStorage((deps && deps.localStorage) || storeOf('localStorage'), (deps && deps.sessionStorage) || storeOf('sessionStorage'));
     claimSessionStorageFor(storage, url);
     const client = createClient(url, key, {
@@ -112,7 +156,7 @@ export function createSupabaseTransport(config, deps?) {
             detectSessionInUrl: false
         },
         global: {
-            fetch: (input, init) => fetchImpl(input, init)
+            fetch: (input, init) => sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs)
         }
     });
     const toSession = (s) => (s && s.access_token && s.user ? { accessToken: s.access_token, user: { id: s.user.id, email: s.user.email || '' } } : null);
@@ -126,10 +170,10 @@ export function createSupabaseTransport(config, deps?) {
         return sbFetchWithTimeout(fetchImpl, url + path, { method: 'POST', headers, body: JSON.stringify(body || {}), cache: 'no-store', credentials: 'omit' }, timeoutMs);
     };
     const rpc = async (fn, args, timeoutMs) => {
-        let token = await accessToken().catch(() => null);
+        let token = await sbWithin(accessToken().catch(() => null), timeoutMs);
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
-            const refreshed = await client.auth.refreshSession().catch(() => null);
+            const refreshed = await sbWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
             const next = refreshed && refreshed.data && refreshed.data.session ? refreshed.data.session.access_token : null;
             if (next && next !== token) {
                 token = next;

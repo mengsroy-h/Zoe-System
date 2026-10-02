@@ -140,6 +140,30 @@ const scrollRateOk = !!rateText && /ស៊ុម App \d+fps · ពេលរម�
 if (scrollRateOk) console.log(`✅ ស៊ុមពេលរមូរត្រូវវាស់ពី scroll ពិត ៖ «${rateText}»`);
 else console.log('⛔ បន្ទាត់ស៊ុមមិនមាន «ពេលរមូរ» (boot មិនភ្ជាប់អ្នកស្តាប់ scroll?) ៖ ' + JSON.stringify(rateText));
 
+/* ⛔ ហាង Supabase មិនទាញ SDK Firebase ៖ `firebase-loader.js` សម្រេចតាម Config តែ `<link rel="modulepreload">` ក្នុង
+ *    `index.html` ទាញ module ទាំង ៣ ដោយឥតលក្ខខណ្ឌ (ការវាស់ក្នុង Chromium ៖ Config Supabase ➜ ៣ សំណើ) ➜ វាស់សំណើពិតពី
+ *    build ផលិតកម្ម ៖ Config Supabase ➜ ០ · ទិសផ្ទុយ ៖ Config Firebase ➜ module ទាំង ៣ នៅតែទាញ។ */
+const FIREBASE_SDK_RE = /^https:\/\/www\.gstatic\.com\/firebasejs\//;
+async function firebaseSdkRequestsFor(config) {
+    const ctx = await browser.newContext();
+    const probe = await ctx.newPage();
+    const hits = [];
+    await probe.route((u) => !/^http:\/\/127\.0\.0\.1:/.test(u.href), (route) => {
+        if (FIREBASE_SDK_RE.test(route.request().url())) hits.push(route.request().url());
+        return route.abort('internetdisconnected');
+    });
+    await probe.addInitScript((cfg) => { try { localStorage.setItem('zoew_firebase_config', JSON.stringify(cfg)); } catch (e) {} }, config);
+    await probe.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'load' });
+    await probe.waitForTimeout(1500);
+    await ctx.close();
+    return hits.length;
+}
+const sdkOnSupabase = await firebaseSdkRequestsFor({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_smoke' });
+const sdkOnFirebase = await firebaseSdkRequestsFor({ apiKey: 'smoke', databaseURL: 'https://smoke-default-rtdb.firebaseio.com', projectId: 'smoke' });
+const sdkGateOk = sdkOnSupabase === 0 && sdkOnFirebase >= 3;
+if (sdkGateOk) console.log(`✅ Config Supabase ➜ គ្មានសំណើ SDK Firebase · Config Firebase ➜ ${sdkOnFirebase} សំណើ`);
+else console.log('⛔ SDK Firebase ៖ ' + JSON.stringify({ sdkOnSupabase, sdkOnFirebase }) + ' (ត្រូវ ០ សម្រាប់ Supabase · ≥ ៣ សម្រាប់ Firebase)');
+
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk || !scrollRateOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk || !scrollRateOk || !sdkGateOk ? 1 : 0);

@@ -1119,8 +1119,8 @@ check(siteOffenders.length === 0,
     const probeGood = ['ចុចកន្លែងណាក៏បាន', 'រក្សាទុកនៅកន្លែងមានសុវត្ថិភាព', 'ទាញគ្រប់ ➜ លែងដៃដើម្បីផ្ទុក', 'Key នេះ លែងអាច Activate លើគ្រឿងថ្មី'];
     check(probeBad.every((t) => STATIC_RE.test(t)) && probeGood.every((t) => !STATIC_RE.test(t)),
         'អត្ថបទក្នុង App ៖ probe ទិសទាំង ២ (ពាក្យអតីតកាលត្រូវចាប់ · «កន្លែង» · «លែងដៃ» · ច្បាប់បច្ចុប្បន្ន មិនចាប់)');
-    check(!!guide && !!kgHtml && !!notes && noteItems >= 5 && codeFiles.length >= 2,
-        'អត្ថបទក្នុង App ៖ ជាន់អប្បបរមា — សៀវភៅ · ZoeKeyGen · កំណត់ចំណាំកំណែ (≥ ៥) · កូដ App ទាំង ២',
+    check(!!guide && !!kgHtml && !!notes && noteItems >= 1 && codeFiles.length >= 2,
+        'អត្ថបទក្នុង App ៖ ជាន់អប្បបរមា — សៀវភៅ · ZoeKeyGen · កំណត់ចំណាំកំណែ (≥ ១ ៖ ម្ចាស់គម្រោងទុកតែធាតុ update ចុងក្រោយ) · កូដ App ទាំង ២',
         JSON.stringify({ guide: !!guide, kgHtml: !!kgHtml, notes: noteItems, code: codeFiles.length }));
     check(hits.length === 0, '⛔ អត្ថបទក្នុង App មិននិយាយពីអ្វីដែលលែងមាន/ធ្លាប់ដក ឬប្រៀបនឹងកំណែមុន (សរសេរ «វាដើរបែបនេះ»)',
         'រកឃើញ ' + hits.length + ' ៖\n        ' + hits.slice(0, 12).join('\n        '));

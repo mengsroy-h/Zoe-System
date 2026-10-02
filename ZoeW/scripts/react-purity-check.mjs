@@ -64,6 +64,7 @@ const ALLOWED = {
     'features/daily-stats.ts:.srcObject =': [1, 'media playback ៖ ផ្តាច់ stream ពេលបិទកាមេរ៉ា (React គ្មាន prop `srcObject`)'],
     'services/camera.ts:element.addEventListener()': [2, 'media playback ៖ `pause` · `loadedmetadata` របស់ stream កាមេរ៉ា (`{ once }` · ដកវិញដោយកូដកាមេរ៉ា)'],
     'services/network.ts:element.addEventListener()': [1, '`AbortSignal` (មិនមែនធាតុ DOM) ៖ បញ្ជូនការបោះបង់បន្ត'],
+    'services/supabase-transport.ts:element.addEventListener()': [1, '`AbortSignal` ដែល supabase-js ប្រគល់ (មិនមែនធាតុ DOM) ៖ បញ្ជូនការបោះបង់បន្តទៅ fetch ដែលមានពិដាន (`sbFetchWithCeiling`)'],
 };
 
 /**

@@ -3,8 +3,9 @@
  * ⛔ «ជិតផុតកំណត់» ត្រូវសួរ **អ្នកសម្រេចដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (`barcodeAbandonIsRipe`) ➜ គ្មានរូបមន្តព្រំដែនទី ២
  *    ដែលនិយាយផ្ទុយនឹងអ្វីដែលប្រព័ន្ធដកចេញពិត ៖ ការវាស់ចុះលើ **ព្រំដែនពិត** (៧ ថ្ងៃ ± ១ ms) មិនមែនលេខងាយ។
  * ⛔ «គ្មាន» ជាការអះអាងអំពីអាជីវកម្ម ➜ ទិដ្ឋភាពប្រវត្តិមិនស្រស់ = «វាស់មិនបាន» មិនមែន «គ្មានកញ្ចប់» (ច្បាប់ «បញ្ជីទទេ ↔ សិទ្ធិវាស់»)។
- * ⛔ សារថែទាំទៅដល់ App តាម `public/announcements.json` ដែល deploy ជាមួយ App ➜ **រាល់ PR ដែលឡើងកំណែត្រូវបន្ថែមធាតុ
- *    សម្រាប់កំណែនោះ** (ធាតុ `update` ថ្មីបំផុត = `APP_VERSION`) ➜ PR ដែលកែ App ដោយគ្មានសារ ➜ ធ្លាក់។ សារ `maintenance`
+ * ⛔ សារថែទាំទៅដល់ App តាម `public/announcements.json` ដែល deploy ជាមួយ App ➜ **រាល់ PR ដែលឡើងកំណែត្រូវជំនួសធាតុ
+ *    `update` តែមួយគត់ដោយសារនៃកំណែនោះ** (= `APP_VERSION`) ➜ PR ដែលកែ App ដោយគ្មានសារ ➜ ធ្លាក់។ សំណើម្ចាស់គម្រោង ៖
+ *    «កុំរក្សាទុកច្រើនពេក ប្រាប់តែមួយចុងក្រោយ» ➜ ធាតុ `update` ច្រើនជាង ១ ➜ ធ្លាក់។ សារ `maintenance`
  *    ឈរលើគេបានដោយមិនឡើងកំណែ (`version-bump-scope` មិនរាប់ `announcements.json` ជាកូដ ship)។
  */
 import { readFileSync } from 'node:fs';
@@ -122,6 +123,11 @@ describe('សារថែទាំ/កំណែ ៖ announcements.json', () => {
     it('⛔ ធាតុ update ថ្មីបំផុតជាកំណែបច្ចុប្បន្ន (APP_VERSION) ➜ រាល់ការឡើងកំណែត្រូវមានសារ', () => {
         const firstUpdate = raw.items.find((it: any) => it && it.kind === 'update');
         expect(firstUpdate && firstUpdate.version).toBe(APP_VERSION);
+    });
+
+    it('⛔ ទុកតែធាតុ update ចុងក្រោយមួយ (សំណើម្ចាស់គម្រោង ៖ កុំរក្សាទុកច្រើនពេក)', () => {
+        const updates = raw.items.filter((it: any) => it && it.kind === 'update');
+        expect(updates.map((it: any) => it.version)).toEqual([APP_VERSION]);
     });
 
     it('គ្រប់ធាតុឆ្លងការត្រង (គ្មានធាតុបាត់ស្ងាត់) · id មិនស្ទួន · អត្ថបទខ្មែរ · គ្មានកំណែលើស App', () => {

@@ -3,7 +3,7 @@
 > Written for **Claude**. English by owner request; **everything else stays Khmer** (rule 7).
 > ⛔ **This file holds only rules and prohibitions.** Bug history, measured numbers, versions and dates live in
 > [`docs/HISTORY.md`](docs/HISTORY.md) (React era · pending user verification at the top) and
-> [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) (vanilla era). Want the *why* of a rule? `grep` its tool name
+> [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) (vanilla era · React migration). Want the *why* of a rule? `grep` its tool name
 > there (index at the end of `docs/HISTORY.md`). `doc-scope-test` fails on any version number or date outside the header
 > table below.
 
@@ -133,8 +133,9 @@ only this text protects them.
    `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` · `firebase-backup/` · `zto-import/` (and
    `google-sheets-api/`) · `supabase/` · [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md). A stale README is a wrong
    document. ⛔⛔ **Scope is every `*.md` file in the repo**: bug history lives only in `docs/HISTORY.md` and
-   `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era (read,
-   never append) · no third history file. Exceptions: root `docs/` (history files · `AUDIT-PROMPT.md`) and `CLAUDE.md`
+   `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era + React
+   migration + history moved out of `HISTORY.md` (read; new entries never go there) · no third history file. Exceptions:
+   root `docs/` (history files · `AUDIT-PROMPT.md`) and `CLAUDE.md`
    (rules only — rule 12). ⛔ `ZoeW/docs/` is not an exception. ⛔ Banned elsewhere: version numbers · date-bound requests ·
    version/date-bound measurements ➜ present tense. ⛔ File lists are derived from real dirs. Guard: `doc-scope-test.js`.
 10. **Firebase rules don't deploy automatically.** Every new path gets its rule in the same commit, and **tell the user to
@@ -292,7 +293,7 @@ only this text protects them.
 | **`ZTO_UPSTREAM_REJECTED`** | Mixes permanent and transient verdicts ⛔ never silence it all · never guess codes ➜ `noteUpstreamReject()` records `count · status · code` in `?diag=1` without changing verdict/cache/retry · codes read via `upstreamCodeText()` (shared with `upstreamSucceeded()`) through `SAFE_REASON_RE` | `zto-proxy-test` |
 | **React single DOM owner** | Feature code never touches DOM (`uiState.modalDisplay` · `viewState` · `src/app/refs.ts` · exceptions in `platform/document-io.ts`) · the React layer writes DOM only via JSX or `APP_ALLOWED` exits · PTR indicator from `ptrState` · `boot-flags.js` never touches React elements · every ref has a real `ref={…}` · `commitNow()` before measuring/focus · inputs uncontrolled · class-writing checkers translated only in `src/audit-compat.ts` | `npm run purity:check` |
 | **Big lists ↔ re-render** | List bodies subscribe only to their own fields (`useStoreFields`) · drag-heavy parents use `Memo…` versions · `HistoryRow` compares by value (`sameHistoryRowModel()`) · in-place edits + `renderHistory()` must render (`historyRenderSeq`) · producers assign new objects · big dialogs page by 20 with totals/search over all · history table pages by 50 (`HISTORY_PAGE_ROWS`, sentinel on `.table-responsive`); `renderHistory(data, viewKey)` keeps position on same-key syncs · APK status-bar measurement only when `statusBarLayerSignature()` changes | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` · `npm run native:check` 4ឃ |
-| **🔔 panel** | Near-expiry uses `barcodeAbandonIsRipe()` · read-only · stale view ➜ "unmeasurable" · logout clears · 🔔 and drawer are one layer (`isSideDrawerOpen()`) · `public/announcements.json` network-only · **every ZoeW bump adds a newest `update` entry = `APP_VERSION`** · `maintenance`-only messages don't bump · in-app logos derive from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
+| **🔔 panel** | Near-expiry uses `barcodeAbandonIsRipe()` · read-only · stale view ➜ "unmeasurable" · logout clears · 🔔 and drawer are one layer (`isSideDrawerOpen()`) · `public/announcements.json` network-only · **exactly one `update` entry, = `APP_VERSION` (every ZoeW bump replaces it)** · `maintenance`-only messages don't bump · in-app logos derive from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
 | **Toolchain ↔ shipped output** | CSS minifier is esbuild (`cssMinify`; Lightning CSS reorders declarations covering PTR/motion) · built JS parses in `build.target` · chunks split by `codeSplitting` + `priority` (`__vitePreload` must stay out of the native chunk) · Android config stays on the installed Capacitor's template line | `npm run smoke` · `npm run android:check` · `npm run native:check` |
 | **New Firebase project tool** | One project per customer · sign-up disabled **and measured** by a real sign-up attempt · Auth settings and rules read back · ⛔ never silently adopt (`--adopt`) or reset passwords (`--reset`) · `pendingProject` recorded before creation · step ceilings · passwords never in files · email ↔ `siteCodeFromEmail()` · Setup Link ↔ `decodeSetupPayload()` · `firebase-tools` pinned · measured with real `firebase-tools` over HTTPS | `firebase-provision-test` |
 | **Netlify config** | ⛔ No root `netlify.toml` (read by both sites) · CSP · `functions` · headers match what the app ships | `netlify-config-scope-test` |
@@ -1141,7 +1142,7 @@ bash audit-tools/emu/rules.sh
 | Pending user verification · manual actions per version | [`docs/HISTORY.md`](docs/HISTORY.md) top section · part 1 |
 | Why a rule exists · measured numbers · mutation results | [`docs/HISTORY.md`](docs/HISTORY.md) part 2 · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) part 2 |
 | Find a checker's explanation | [`docs/HISTORY.md`](docs/HISTORY.md) 🔎 index |
-| Vanilla era · older removed `CLAUDE.md` text | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · git history of `CLAUDE.md` |
+| Vanilla era · React migration · older removed `CLAUDE.md` text | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · git history of `CLAUDE.md` |
 | Usage of each app/tool | that directory's `README.md` |
 | Checker catalog | [`audit-tools/README.md`](audit-tools/README.md) |
 | ZTO Lookup setup | [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) |

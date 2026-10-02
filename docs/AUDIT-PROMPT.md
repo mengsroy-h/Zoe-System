@@ -136,8 +136,8 @@ transaction ដែលបានផ្ញើរួចដោយ `disconnect` ទោ
 ហើយ diff **output** (CSS · import graph · syntax ធៀប `build.target`)។ ⛔ ការឡើង Gradle/AGP/SDK លើសខ្សែ template របស់ Capacitor
 វាស់មិនបាននៅទីនេះ (គ្មាន Android SDK · `dl.google.com` បិទ) ➜ `android:check` ផ្នែក ៧ ចាក់សោ។ ⛔ កំណែ SDK ដែល **ផលិតកម្មរត់ពិត**
 វាស់បានពី event របស់ Sentry (`sdk.version`) មិនមែនពីកូដ (Loader ជ្រើសកំណែតាម Sentry settings)។
-⛔ **ប្រវត្តិរស់នៅ ២ ឯកសារ** ៖ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) · `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · អានបានតែ
-មិនបន្ថែម) — `grep` ទាំង ២។ ⛔ ក្នុងតារាងស្នូលរបស់ `CLAUDE.md` សរសេរតែ **ច្បាប់ខ្លី** (narrative «វាស់បាន» ទៅ HISTORY)។
+⛔ **ប្រវត្តិរស់នៅ ២ ឯកសារ** ៖ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) · `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · ផ្នែក ៦ ៖ សម័យផ្ទេរទៅ React · អានបានតែ
+មិនបន្ថែមធាតុថ្មី) — `grep` ទាំង ២។ ⛔ ក្នុងតារាងស្នូលរបស់ `CLAUDE.md` សរសេរតែ **ច្បាប់ខ្លី** (narrative «វាស់បាន» ទៅ HISTORY)។
 ⛔ App React ដំឡើង bridge វាស់តាម dynamic import ➜ checker ត្រូវ `waitAuditBridge()` មុនអាន `window.<fn>`។
 
 
@@ -148,7 +148,7 @@ transaction ដែលបានផ្ញើរួចដោយ `disconnect` ទោ
 `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
 ⛔ React ៖ កំហុសដែល error boundary **ចាប់** ទៅត្រឹម `console.error` ➜ Sentry មិនឃើញ លុះត្រាតែ `onCaughtError`
 បញ្ជូនវា (`src/app/root-errors.ts`)។ ⛔ bridge វាស់ (`expose-globals` · `__auditRebind`) មិនត្រូវចូល build ផលិតកម្ម ➜
-`npm run smoke` វាស់ ២ ជាន់ (window · bundle)។ ⛔ ប្រវត្តិរស់នៅ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) និង `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · អានបានតែមិនបន្ថែម) ប៉ុណ្ណោះ។
+`npm run smoke` វាស់ ២ ជាន់ (window · bundle)។ ⛔ ប្រវត្តិរស់នៅ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) និង `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · សម័យផ្ទេរទៅ React · អានបានតែមិនបន្ថែមធាតុថ្មី) ប៉ុណ្ណោះ។
 
 ⛔ **មេរៀនជុំ 2.42.2 ៖ checker ដើមលើ App React ធ្លាក់ ឬ *វាស់អ្វីផ្សេង*** — វាស្រង់អត្ថបទពី `app.js` · អាន markup ថេរ ·
 ជំនួស `window.<fn>` (App React ហៅតាម module/`ACTION_REGISTRY` មិនឆ្លង `window`)។ ⛔ ការកែត្រូវវាស់ **ផល** ឬ **JSX ពិត**
@@ -213,7 +213,7 @@ React web · React Android (`rules:check` ១១៥/១១៥ · mutation ២/�
 (tree សម្រួល `ZoeW/scripts/build-audit.mjs`) ឆ្លើយ ✅ **៥៨** · ❌ **១២០** · ⏭️ ៣
 ហើយការធ្លាក់ភាគច្រើនមានន័យថា **checker មិនបានវាស់** (ស្រង់អត្ថបទពី `app.js` ·
 markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>`)។ លេខ និងការចាត់ថ្នាក់ ៖
-`docs/HISTORY.md` ផ្នែក ២ (ការផ្ទេរ ZoeW ទៅ React) · ផ្លូវផ្ទេរ ៖ `ZoeW/docs/MIGRATION.md` ដំណាក់ ២។
+`docs/HISTORY-ARCHIVE.md` ផ្នែក ៦ (ការផ្ទេរ ZoeW ទៅ React) · ផ្លូវផ្ទេរ ៖ `ZoeW/docs/MIGRATION.md` ដំណាក់ ២។
 
 ⛔ **ការងារដំបូងរបស់ជុំក្រោយ** ៖ ផ្ទេរ checker ដែលយាម **លុយ** មុនគេ (តារាង
 «ច្បាប់ ➜ ឧបករណ៍» ជួរលុយ) ឲ្យវាស់ App React ពិត — ⛔ ហើយបញ្ជាក់ថាវា **ធ្លាក់**

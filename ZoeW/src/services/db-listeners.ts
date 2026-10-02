@@ -10,7 +10,7 @@ import { RECENT_PHONES_MAX, collectPhoneSuggestions } from '../features/phone-su
 import { DB_LISTENER_PROGRESS_GRACE_MS, DB_LISTENER_RETRY_MIN_GAP_MS, LISTENER_RECOVERY_STEPS_MS, clearInfoListenerRecovery, clearReconnectWatchdog, renderConnectionStatus } from './connection';
 import { debouncedRenderAfterHistorySync } from './network';
 import { rawSnapshotToItemList } from '../ui/modal-stack';
-import { refreshLiveToasts, showToast } from '../ui/toast';
+import { liveSuccessCount, refreshLiveToasts, showToast } from '../ui/toast';
 
 export const dbListenerReportedFailures = new Set();
 
@@ -59,8 +59,9 @@ export function noteDbListenerAlive(pathKey) {
     firebaseState.dbListenersFailed = false;
     firebaseState.dbListenerOutageNoticeShown = false;
     clearDbListenerRecovery();
+    const announced = liveSuccessCount();
     renderConnectionStatus();
-    showToast('✅ ទិន្នន័យភ្ជាប់មកវិញហើយ — តារាងទាន់សម័យវិញហើយ');
+    if (liveSuccessCount() === announced) showToast('✅ ទិន្នន័យភ្ជាប់មកវិញហើយ — តារាងទាន់សម័យវិញហើយ');
 }
 
 export function dbListenerResyncIsProgressing() {

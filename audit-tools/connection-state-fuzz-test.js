@@ -91,6 +91,7 @@ function makeWorld() {
         function elapsedSince(mark) { return mark ? Date.now() - mark : Infinity; }
         function flushPendingRegistryReleases() {}
         function refreshLiveToasts() {}
+        function liveSuccessCount() { return 0; }
         function renderConnectionStatus() {}
         function clearDbListenerRecovery() {}
         function scheduleDbListenerRecovery() {}

@@ -39,6 +39,9 @@ function sliceFn(name) {
     return sliceFnFrom(SRC, name);
 }
 
+// ⛔ `refreshLiveToasts()` · `liveSuccessCount()` អានអថេរ module `liveSuccessAnnounced` ➜ ការប្រកាស **ពិត** ពី SRC (tree ចាស់គ្មាន ➜ 0)
+const LIVE_SUCCESS_DECL = ((typeof SRC === 'string' ? SRC : '').match(/^\s*let liveSuccessAnnounced = [^;]+;/m) || ['let liveSuccessAnnounced = 0;'])[0].trim();
+
 function sliceConst(name) {
     const re = new RegExp('^\\s*const ' + name + ' = [^;]+;', 'm');
     const m = SRC.match(re);
@@ -96,13 +99,13 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         if (core.appLocalStore === undefined) core.appLocalStore = core.localStorage || null;
         if (core.appSessionStore === undefined) core.appSessionStore = core.sessionStorage || null;
         const extras = [
-            'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
+            'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
             'rawSnapshotToItemList'
         ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
         const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
-        const src = expiredDecl + '\n' + 'let dbListenersFailed = false;\n' +
+        const src = expiredDecl + '\n' + LIVE_SUCCESS_DECL + '\n' + 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
@@ -142,7 +145,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
 }
 
 const REQUIRED_FNS = [
-    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts',
+    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount',
     'nudgeDatabaseConnection',
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
@@ -301,7 +304,7 @@ function buildContext() {
     if (ctx.appLocalStore === undefined) ctx.appLocalStore = ctx.localStorage || null;
     if (ctx.appSessionStore === undefined) ctx.appSessionStore = ctx.sessionStorage || null;
 
-    const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
+    const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + LIVE_SUCCESS_DECL + '\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
         REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' + ELAPSED_HELPER + '\n' +
         'const DB_LISTENER_KEYS = ' + JSON.stringify(REAL_LISTENER_KEYS) + ';\n' +

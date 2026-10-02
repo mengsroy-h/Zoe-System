@@ -43,8 +43,9 @@
 
 **ZoeW `2.48.0`** (`zoew-v252` ➜ `zoew-v253`) · **ZoeKeyGen `2.24.2`** (`zoekeygen-v112` ➜ `zoekeygen-v113`)។ សំណើម្ចាស់គម្រោង (Deep Audit) ៖ «Reconfig លើកក្រោយ ហាងដែលចុះឈ្មោះរួច
 ត្រូវលោត modal login មិនមែន signup · ការចងចាំ login កុំច្រឡំ Firebase/Supabase» · «ក្នុង check health firebase activate key ដាក់ឲ្យមើលដឹងសុពលភាព» ·
-«បង្ហាញអាយុ cookie zto ពី blob ពិត» · «update version blob ទៅជំនាន់ចុងក្រោយ» · «toast realtime · កុំនិយាយមិនពិត»។ ⛔ Firebase rules **មិនប្រែ** ·
-Supabase migration **មិនប្រែ**។
+«បង្ហាញអាយុ cookie zto ពី blob ពិត» · «update version blob ទៅជំនាន់ចុងក្រោយ» · «toast realtime · កុំនិយាយមិនពិត» · «8 warnings ក្នុង supabase» (Security Advisor) ·
+«ភ្ជាប់ GitHub ជាមួយ Supabase រួច ➜ deploy .sql auto បានទេ» · «ដាក់ឲ្យហើយ ក្រែងថ្ងៃក្រោយប្រើ Pro»។ ⛔ Firebase rules **មិនប្រែ** · Supabase ៖ migration ថ្មី
+`20261002000100_zoe_definer_private.sql` (Supabase មិនទាន់មានអតិថិជន ៖ ម្ចាស់គម្រោងតែម្នាក់កំពុងសាក)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -73,6 +74,23 @@ Supabase migration **មិនប្រែ**។
   Rules ខុសផ្លូវ។ ឥឡូវ «⏳ ការកែមិនទាន់បញ្ជាក់ទេ … សូមចុច 🔄 Refresh មើលបញ្ជី Key មុនធ្វើម្តងទៀត» ហើយចុះយឺត ➜ «✅ … (ចុះយឺត)» + Refresh (`armAdminLateWrite()` ·
   ⛔ session ប្តូរ ➜ ស្ងាត់ · ការបដិសេធពិត ➜ «មិនបាន» ដដែល) · ការបង្កើត Key អស់ពេល ➜ «⏳ មិនទាន់បញ្ជាក់ … កុំបង្កើត Key ត្រួតគ្នា» (មុន «សាកល្បងម្តងទៀត»)។
   អ្នកយាម ៖ `keygen-session-security-test` (កូដមុនកែ ➜ ធ្លាក់ ៨ ដោយមានឈ្មោះ)។
+- 🛡️ **Supabase Security Advisor ៖ «Signed-In Users Can Execute SECURITY DEFINER Function» ×៧ ➜ ០** — `my_account` · `admin_create_tenant` ·
+  `admin_update_tenant` · `admin_issue_invite` · `admin_revoke_invite` · `admin_issue_reset_code` · `zoe_write` ជា `security definer` ក្នុង `public` (schema ដែល
+  PostgREST បើក)។ ពួកវាពិនិត្យ admin/ហាងខាងក្នុងត្រឹមត្រូវ (មិនមែនរន្ធ) តែ Supabase ណែនាំ «definer មិននៅក្នុង schema ដែល API បើក»។ migration ថ្មីផ្លាស់ function
+  ទាំង ៧ ទៅ `private` (`alter … set schema` ៖ សិទ្ធិ · តួ · `search_path` ដដែល) រួចសាង `public.*` ជា `security invoker` ដែលហៅវា (ឈ្មោះ · argument · default ·
+  លទ្ធផល · កូដកំហុសដដែល ➜ ZoeW · ZoeKeyGen · Netlify មិនប្រែ) · រត់ម្តងទៀតបាន (ផ្លាស់តែពេល `public.*` នៅជា definer) · `notify pgrst`។ ការព្រមានទី ៨
+  «Leaked Password Protection Disabled» ជាមុខងារ **Pro** (Supabase docs ៖ «available on the Pro Plan and above») ➜ នៅលើ Free។
+- 🔑 **សារ `password-weak` និយាយត្រូវពេលបើក Leaked password protection (Pro)** — Supabase Auth (admin `createUser`/`updateUser` ហៅ
+  `checkPasswordStrength` ➜ reason `pwned`) បដិសេធពាក្យសម្ងាត់លេចធ្លាយជា `weak_password` ➜ មុនសារ «សូមលាយអក្សរ និងលេខ» (ពាក្យសម្ងាត់ដែលលាយរួចក៏ត្រូវ
+  បដិសេធ) ➜ ឥឡូវ «ពាក្យសម្ងាត់នេះខ្សោយពេក ឬធ្លាប់លេចធ្លាយលើអ៊ីនធឺណិត — សូមជ្រើសពាក្យសម្ងាត់ផ្សេង (លាយអក្សរ និងលេខ)»។
+- 🚀 **Deploy ពី GitHub (Supabase integration) ដើរដោយសុវត្ថិភាព** — integration អនុវត្តតែ migration ដែល version មិនទាន់មានក្នុង
+  `supabase_migrations.schema_migrations` ➜ ការកែឯកសារដែលអនុវត្តរួច **មិនទៅដល់ Database (ស្ងាត់)**។ មុន `generate-rules-sql.mjs` សរសេរជាន់
+  `20261001000100_zoe_rules.sql` ដដែល ➜ ការកែ rules ថ្ងៃក្រោយនឹងរំលងស្ងាត់ (rules = ស្រទាប់សិទ្ធិ)។ ឥឡូវ generator បង្កើត `<ម៉ោង UTC>_zoe_rules.sql` ថ្មី
+  (មិនប្រែ ➜ «unchanged») · អ្នកយាមអាន rules ចុងក្រោយ · migration ក្នុង `origin/main` កែ/លុបមិនបាន · version ថ្មីក្រោយគេ · គ្មាន version ស្ទួន។
+- 📶 **ការជាសះស្បើយតែមួយ ➜ ✅ តែមួយ** — listener ដែលងាប់ (ឧ. `permission_denied`) រស់វិញខណៈ toast បណ្តាញរស់កំពុងបង្ហាញ ➜ toast រស់ប្តូរជា
+  «✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ» **ហើយ** `noteDbListenerAlive()` បន្ថែម «✅ ទិន្នន័យភ្ជាប់មកវិញហើយ» ក្នុងពេលដដែល (✅ ២ និយាយរឿងដដែល · វាស់បាន
+  ក្នុង vitest ៖ `expected 2 to be 1`)។ ឥឡូវ `liveSuccessCount()` រាប់រាល់ពេល toast រស់ប្រកាសជោគជ័យ ➜ សារទី ២ លេចតែពេលគ្មាន toast រស់ប្រកាសវា
+  (ទិសផ្ទុយ ៖ គ្មាន toast រស់ ➜ «ទិន្នន័យភ្ជាប់មកវិញហើយ» លេចដដែល)។
 - 🔁 **License យឺតក្រោយចូលប្រព័ន្ធ មិនធ្វើឲ្យ App ជាប់** — `checkOnline()` (Key + កៅអី · សំណើនីមួយៗរហូតដល់ ១០ វិ.) អាចលើសពិដាន ២០ វិ. លើបណ្តាញយឺត ➜
   មុនចេញ toast «សូមសាកល្បងចូលម្តងទៀត» ហើយឈប់ ៖ ការស្តារវគ្គក្រោយ reload គ្មានប្រអប់ចូល · គ្មាន listener ➜ App ទទេ។ ឥឡូវសាកម្តងទៀតតាម
   `ACTIVATION_RETRY_STEPS_MS` (៥ · ១៥ · ៣០ · ៦០ វិ.) · toast តែម្តង · ការប្តូរវគ្គបោះបង់ · ជណ្តើរអស់ ➜ «សូមពិនិត្យអ៊ីនធឺណិត រួចបិទបើក App»។
@@ -80,14 +98,21 @@ Supabase migration **មិនប្រែ**។
 #### អ្នកយាម
 
 `ZoeW/tests/login-routing.test.tsx` (mutation ៦/៦ ចាប់) · `ZoeW/tests/toast-live-expiry.test.tsx` (mutation ២/២) ·
-`ZoeW/tests/activation-retry.test.ts` (mutation ១/១) · `health-check-test` (សុពលភាព Key · អាយុ Blob · ទិសផ្ទុយ) · `zto-cookie-store-test` (mutation ២/២) ·
-`zto-cookie-sync-test` (រួម decoder **ពិត** របស់ `@netlify/blobs`) · `supabase-functions-test` (mutation ថ្មី ២ ចាប់)។
+`ZoeW/tests/activation-retry.test.ts` (mutation ១/១) · `ZoeW/tests/recovery-toast-dedup.test.tsx` (កូដមុនកែ ➜ ធ្លាក់ ១ · ទិសផ្ទុយ ២) · `health-check-test` (សុពលភាព Key · អាយុ Blob · ទិសផ្ទុយ) · `zto-cookie-store-test` (mutation ២/២) ·
+`zto-cookie-sync-test` (រួម decoder **ពិត** របស់ `@netlify/blobs`) · `supabase-functions-test` (mutation ថ្មី ២ ចាប់) · `supabase-rls-test` (ច្បាប់ linter
+0028/0029 **ពិត** របស់ Supabase លើ Postgres ពិត ៖ tree មុនកែ ➜ ធ្លាក់ដោយរាយ function ៧ ដូចរបាយការណ៍ Security Advisor បេះបិទ · mutation ថ្មី ៤ ចាប់) ·
+`supabase-datastore-test` (migration append-only ៖ ការកែ rules តាមលំនាំចាស់ ➜ «កែ 20261001000100_zoe_rules.sql» · probe ទិសផ្ទុយ ៥)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. **Netlify (ZoeW · ZoeKeyGen)** ៖ Deploy ទាំង ២ site (merge ➜ auto) — Function ZTO អាន metadata ថ្មី · `@netlify/blobs` 11.1.3។
-2. **Supabase** ៖ deploy Edge Function `register` ឡើងវិញ ៖ `npx supabase@latest functions deploy register --no-verify-jwt` — មុននោះ ZoeW ដើរដូចដើម
-   (ឧបករណ៍ថ្មី ➜ ប្រអប់ចុះឈ្មោះ) តែការចងចាំក្នុងឧបករណ៍ដើររួច។ migration **មិនប្រែ**។
+2. **Supabase** (GitHub integration ៖ Working directory `.` · Deploy to production បើក · branch `main` — កំណត់រួច) ៖
+   (ក) **មុន merge** ៖ SQL Editor ➜ `select version, name from supabase_migrations.schema_migrations order by version;` ➜ version `20260930120000` ·
+   `20261001000100` · `20261001000200` ដែលអនុវត្តរួចតាម SQL Editor តែមិនលេច ➜ `npx supabase@latest migration repair --status applied <version> …`
+   (`supabase/README.md` ជំហានទី ២) · (ខ) merge ចូល `main` ➜ integration អនុវត្ត `20261002000100_zoe_definer_private.sql` + deploy `register` ·
+   `reset-password` (ឬដោយដៃ ៖ paste migration នោះក្នុង SQL Editor + `npx supabase@latest functions deploy register --no-verify-jwt`) — មុននោះ ZoeW ដើរដូចដើម
+   (ឧបករណ៍ថ្មី ➜ ប្រអប់ចុះឈ្មោះ) · (គ) Security Advisor ➜ Refresh ➜ សល់តែ «Leaked Password Protection Disabled» (Pro) · ⛔ កុំបន្ថែម `private` ចូល Exposed
+   schemas · ពេល Upgrade ទៅ Pro ៖ `supabase/README.md` «ពេល Upgrade ទៅ Pro»។
 3. **ឧបករណ៍ Sync Cookie ZTO** (Windows `sync-zto-cookie.cmd` · Android/Termux) ៖ ទាញ `tools/zto-cookie-sync-windows/` ថ្មី រួច Sync ម្តង ➜ 🩺 ចាប់ផ្តើម
    បង្ហាញ «Sync ចូល Blob … មុន» (Blob ចាស់ ➜ «មិនទាន់ស្គាល់»)។
 4. **App Android** ៖ build APK ថ្មី (workflow `Android APK`) ដើម្បីទទួលការប្រែទាំងនេះ។
@@ -1847,6 +1872,20 @@ baseline ក្នុង session (emulator រស់ · ទង់ STRICT ទា�
 7. **checker ធ្លាក់ក្លែងក្លាយពេលការរត់ឆ្លងម៉ោង ០០:០០** — `ledger-clamp-symmetry-test` ៖ ««ដក» ដែលធុងសំរាមធ្លាក់ ➜ ចំណូលថ្ងៃ `null`» ក្នុង CI ពេញ ខណៈ
    រត់ម្នាក់ឯង **១៣/១៣** ×២។ មូលហេតុ ៖ `today()` គណនាកូនសោថ្ងៃ **រាល់ការហៅ** ➜ seed ចុះថ្ងៃ X តែ `rev()` អានថ្ងៃ X+1 (ម៉ាស៊ីន UTC ០០:០២)។ ⛔ ការកែ ៖ កកកូនសោ
    **ម្តង** ក្នុងមួយការរត់ (`TODAY_KEY`) · checker ផ្សេងគ្មានទម្រង់ `function today()` នេះទេ (`grep`)។
+
+8. **Supabase Security Advisor ៧ ការព្រមាន ➜ អ្នកយាមគ្មានច្បាប់នោះ** — `supabase-rls-test` វាស់ «រាល់ SECURITY DEFINER មាន `search_path`» និង EXECUTE តាម
+   function តែមិនវាស់ច្បាប់ linter 0028/0029 (definer + anon/authenticated + schema ក្នុង `pgrst.db_schemas`) ➜ ចម្លង SQL ពិតពី `supabase/splinter`
+   (`0029_authenticated_security_definer_function_executable.sql` ៖ predicate · បញ្ជី schema លើកលែង) ➜ tree មុនកែ ៖ FAIL រាយ function ៧ **ដូចរបាយការណ៍ម្ចាស់
+   គម្រោងបេះបិទ** (ភស្តុតាងថាវាវាស់ច្បាប់ពិត មិនមែនការស្មាន)។
+9. **អន្ទាក់ harness ៖ `String.replace(from, to)` បកប្រែ `$$` ក្នុង `to` ជា `$`** — mutation ដែល replacement ផ្ទុក `as $$` (តួ function SQL) ក្លាយជា SQL ខូច ➜
+   «SQL អនុវត្តមិនបាន (មិនរាប់)» ➜ mutation មើលទៅដូចមិនអាចវាស់បាន។ ⛔ ការកែជារចនាសម្ព័ន្ធ ៖ `replace(from, () => to)` ក្នុង `supabase-rls-test` ·
+   `supabase-datastore-test` · `supabase-functions-test` (mutation ចាស់គ្មាន `$` ពិសេស ➜ ឥរិយាបថមិនប្រែ)។
+10. **Deploy ពី GitHub (ឯកសារ Supabase ពី repo `supabase/supabase` ព្រោះ supabase.com ត្រូវ proxy ទប់)** ៖ «You can deploy directly from GitHub on any plan» ·
+   Working directory = ថតដែល *ផ្ទុក* `supabase/` (`.`) · «New migrations are applied · Edge Functions declared in `config.toml` are deployed … All other
+   configurations, including API, Auth, and seed files, are ignored» · migration នីមួយៗក្នុង transaction · Branching (preview) ទាមទារ Pro។ ⛔ ផលវិបាក ៖
+   migration ដែលអនុវត្តរួចកែមិនបាន ➜ generator rules ត្រូវបង្កើតឯកសារថ្មី (ផ្នែក ១) · migration ដែល paste ក្នុង SQL Editor ត្រូវ `migration repair` មុន។
+   ⛔ មិនដាក់ `ZOE_LOGIN_DOMAIN`/`ZOE_ALLOWED_ORIGINS` ក្នុង `[edge_runtime.secrets]` របស់ `config.toml` ៖ ឯកសារមិនបញ្ជាក់ថាការ deploy ផលិតកម្មរំលងវា ➜
+   អាចសរសេរជាន់ origin ផលិតកម្ម។
 
 ⛔ **វាស់ តែមិនរកឃើញ** ៖ sink HTML ក្នុង ZoeW (`dangerouslySetInnerHTML` · `innerHTML` ០ ក្នុង `src/**`) · ZoeKeyGen `innerHTML` ២២ កន្លែង (តម្លៃពីទិន្នន័យទាំងអស់ឆ្លង
 `escapeHtml`) · header សុវត្ថិភាព Netlify ទាំង ២ App (CSP · `frame-ancestors 'none'` · HSTS · nosniff) · adapter Supabase (`waitForLink` · ការសរសេរព្យួរ ➜ `dbOp`

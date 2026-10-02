@@ -167,11 +167,18 @@ export function reannounceOrShowToast(msg) {
     return showToast(msg);
 }
 
+let liveSuccessAnnounced = 0;
+
+export function liveSuccessCount() {
+    return liveSuccessAnnounced;
+}
+
 export function showLiveToast(key) {
     expiredLiveKeys.delete(key);
     const state = liveToastState(key);
     if (!state) return null;
     const id = showToast(state.msg, state.kind);
+    if (id !== null && state.settled && state.kind === 'success') liveSuccessAnnounced++;
     if (id === null || state.settled) return id;
     const item = toastItem(id);
     if (item) { item.live = key; uiState.touch(); }
@@ -188,6 +195,7 @@ export function refreshLiveToasts() {
         paintToast(el.id, state.msg, state.kind);
         if (state.settled) {
             if (el.live === 'network') networkToastEpisode = false;
+            if (state.kind === 'success') liveSuccessAnnounced++;
             settleLiveToast(el.id);
         }
     }
@@ -195,7 +203,7 @@ export function refreshLiveToasts() {
         const state = liveToastState(key);
         if (state && !state.settled) return;
         expiredLiveKeys.delete(key);
-        if (state && state.kind === 'success') showToast(state.msg, 'success');
+        if (state && state.kind === 'success' && showToast(state.msg, 'success') !== null) liveSuccessAnnounced++;
     });
 }
 

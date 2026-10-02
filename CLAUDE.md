@@ -89,7 +89,8 @@ only this text protects them.
 - 🏪 **Two backends per device Config**: Firebase (`databaseURL`) ➜ one Firebase project per customer · Supabase
   (`supabaseUrl` · `supabaseKey` · `loginDomain?`) ➜ **one project, many shops** (`tenant_id` + RLS · sign-up by **invite
   code** bound to a ZTO branch). `initFirebase()` loads chunk `supabase-backend` by dynamic import only when Config has
-  `supabaseUrl`; the adapter (`src/services/supabase-*.ts`) exposes the Firebase `fb` surface ➜ ⛔ money/listener code
+  `supabaseUrl`; `firebase-loader.js` is the single decider for the Firebase SDK ⛔ no static `modulepreload` of it in
+  `index.html` (`npm run smoke`: Supabase Config ➜ 0 SDK requests · Firebase ➜ 3); the adapter (`src/services/supabase-*.ts`) exposes the Firebase `fb` surface ➜ ⛔ money/listener code
   **never branches on backend**. ⛔ **RTDB rules are the single source**: `firebase-database.rules.json` ➜
   `node supabase/scripts/generate-rules-sql.mjs` writes a **new** `<timestamp>_zoe_rules.sql` ➜ Publish on Firebase **and**
   merge to `main` (Supabase GitHub integration applies new migrations) or paste the new file in the SQL Editor.

@@ -53,8 +53,8 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
    ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
 2. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
    `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)`។ ⛔ ទាំង ២ ប៉ះ adapter/Postgres ➜ ត្រូវរត់ `emu/supabase-adapter-parity` · `supabase-*` ពេលកែ។
-3. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** (ធាតុ 2.48.0 ខាងក្រោម) បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase
-   ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
+3. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** ៖ សេណារីយ៉ូដែល browser វាស់បានធ្វើរួចក្នុង Chromium (ផ្នែក ២ «សាកសេណារីយ៉ូ ឧបករណ៍ពិត») ➜ នៅសល់តែអ្វីដែលត្រូវការ
+   iPhone/Android ពិត ឬ Supabase ពិត (ធាតុ ⏳ ខាងក្រោម)។
 
 ⛔ **សន្សំកូតា** ៖ រត់តែ checker ពាក់ព័ន្ធក្នុង session (`RUNALL_ONLY=…`) ហើយទុកឲ្យ CI លើ GitHub (៤ ផ្នែកស្របគ្នា ~១០ នាទី) វាស់ពេញ · ឆ្លើយម្ចាស់គម្រោងជាខ្មែរ។
 
@@ -139,12 +139,16 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
 - **ប្តូរ Config Firebase ⇄ Supabase ក្នុងវគ្គដដែល** ៖ `initFirebase()` ផ្តាច់ listener auth របស់ backend ចាស់ (និង timer សង្គ្រោះ auth) **មុន** `deleteApp()`
   ➜ callback `onAuthStateChanged` របស់ Firebase ដែលមកក្រោយ មិនរត់លើ backend ថ្មី (មិនបើកប្រអប់ចូល · មិនសម្អាតទិន្នន័យ · មិនចាប់ផ្តើម login លើ Supabase)។
 - **🔔 កំណែ App** ៖ `announcements.json` ទុកតែធាតុ `update` ចុងក្រោយមួយ (= `APP_VERSION`)។
+- **ហាង Supabase មិនទាញ SDK Firebase ពិតប្រាកដ** ៖ ដក `<link rel="modulepreload">` ៣ របស់ SDK Firebase ចេញពី `index.html` (វាទាញ module ទាំង ៣
+  សម្រាប់អ្នកប្រើទាំងអស់ ទោះ `firebase-loader.js` រំលងសម្រាប់ Config Supabase) ➜ Config Firebase នៅទាញតាម `import()` របស់ loader ដដែល។
 
 #### អ្នកយាម
 
 - `ZoeW/tests/supabase-transport-hang.test.ts` (supabase-js ពិត · fetch ក្លែងដែលព្យួរ និងគោរព `signal`) ៖ មុនកែ **១/៤** (តែទិសផ្ទុយជាប់ · ៣ នៅ pending
   ក្រោយ ៣ វិ.) ➜ ក្រោយកែ **៤/៤**។
 - `ZoeW/tests/notifications.test.tsx` «ទុកតែធាតុ update ចុងក្រោយមួយ»។
+- `npm run smoke` (build ផលិតកម្ម · Chromium) ៖ Config Supabase ➜ ០ សំណើ `gstatic.com/firebasejs` · ទិសផ្ទុយ Config Firebase ➜ ៣ ៖ មុនកែ
+  `{"sdkOnSupabase":3,"sdkOnFirebase":3}` ធ្លាក់ ➜ ក្រោយកែជាប់។
 - `ZoeW/tests/registry-session-race.test.ts` «ប្ដូរ Firebase ➜ Supabase ៖ callback auth ចាស់» ៖ មុនកែធ្លាក់ (callback ចាស់ត្រូវបញ្ជូន) ➜ ក្រោយកែជាប់ ·
   ទិសផ្ទុយ ៖ listener របស់ backend ថ្មីនៅដំណើរការ។
 
@@ -938,6 +942,19 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### សាកសេណារីយ៉ូ «ឧបករណ៍ពិត» ក្នុង Chromium ៖ SDK Firebase នៅទាញសម្រាប់ហាង Supabase (2026-10-02 · ZoeW 2.48.1)
+
+- **ហេតុ** ៖ ម្ចាស់គម្រោងស្នើឲ្យធ្វើ handoff «សាកលើឧបករណ៍ពិត» ជំនួស ➜ ម៉ាស៊ីននេះគ្មាន iPhone/Android ➜ សាកក្នុង Chromium ពិត (ម៉ាស៊ីនដូច WebView Android)
+  លើ audit build ពិត · SDK Firebase 12.19.0 ពិត (បម្រើពី `node_modules` ជំនួស gstatic) · Server Supabase ក្លែង (route)។ script មិនចូល repo (ការវាស់មួយដង)។
+- **កំហុសពិត** ៖ Config Supabase ➜ **៣ សំណើ** `gstatic.com/firebasejs/12.19.0/*` ពេលបើក App ៖ `index.html` មាន `<link rel="modulepreload">` ៣ ដែល browser
+  ទាញដោយឥតលក្ខខណ្ឌ ➜ ការបិទក្នុង `firebase-loader.js` (PR #279) មិនមានឥទ្ធិពល ហើយ `firebase-loader-gate.test.ts` (vitest លើ loader តែម្នាក់ឯង) មើលមិនឃើញ HTML ➜
+  សារ 2.48.0 «មិនទាញ SDK Firebase ដែលមិនប្រើ» មិនពិតលើផលិតកម្ម។ ការកែ ៖ ដក link ទាំង ៣ · អ្នកយាម ៖ `npm run smoke` (មុនកែ ៣/៣ ➜ ក្រោយកែ ០/៣)។
+- **លទ្ធផលក្រោយកែ** (៥ សេណារីយ៉ូ · គ្មាន `pageerror`) ៖ (១) បើក App ជាហាង Supabase ➜ ០ សំណើ SDK · ប្រអប់ចូល «ឈ្មោះគណនី» · (២) 🔔 «កំណែបច្ចុប្បន្ន ៖ 2.48.1 ✅» +
+  ធាតុ update តែ ១ · (៣) ប្តូរ Supabase ➜ Firebase ក្នុងវគ្គដដែល ➜ SDK ទាញតាមតម្រូវការ (៣ module) · ប្រអប់ចូល «អ៊ីមែល» ក្នុង ~១,៥ វិ. · (៤) ប្តូរ Firebase ➜ Supabase
+  ភ្លាមក្រោយ Auth ចាប់ផ្តើម ➜ ប្រអប់ចូល Supabase · `authGeneration` មិនប្រែក្រោយការប្តូរ ៣ វិ. (គ្មាន callback ចាស់) · (៥) ចូលប្រព័ន្ធលើបណ្តាញព្យួរ (endpoint token មិនឆ្លើយ)
+  ➜ «ភ្ជាប់ Server មិនបានទេ» ក្នុង **១៥,៣ វិ.** · ប៊ូតុងប្រើបានវិញ។
+- **នៅតែជាការងារម្ចាស់គម្រោង** ៖ iPhone (WebKit) · Android ពិត · Supabase ពិត (ចុះឈ្មោះ · ស្កេន · ឧបករណ៍ ២) · router ដក cable លើស ១ ម៉ោង។
 
 ### Firebase ⇄ Supabase ៖ callback auth ចាស់ប្រណាំងនឹង backend ថ្មី · realtime WebSocket ព្យួរ (2026-10-02 · ZoeW 2.48.1)
 

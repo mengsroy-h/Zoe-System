@@ -53,9 +53,7 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
    ⛔ Supabase គ្មានអតិថិជនទេ (ម្ចាស់គម្រោងសាកតែម្នាក់) ➜ ការកែដែលប៉ះ schema អនុញ្ញាត តែត្រូវជា migration **ថ្មី**។
 2. **ចំណុចបើក Supabase** ៖ (ក) cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ដើម្បីកាត់ egress Free 5 GB/ខែ · (ខ) CLI ផ្ទេរទិន្នន័យ Firebase ➜ Supabase តាម
    `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)`។ ⛔ ទាំង ២ ប៉ះ adapter/Postgres ➜ ត្រូវរត់ `emu/supabase-adapter-parity` · `supabase-*` ពេលកែ។
-3. **Audit បណ្តាញ** ៖ ពិដាន fetch គ្រប់កន្លែងធ្វើរួច (ZoeW 2.48.1 · ផ្នែក ២ «Audit បណ្តាញ») · ⏳ នៅសល់ ៖ realtime WebSocket របស់ Supabase
-   ពេលព្យួរ (adapter មាន poll ជំនួស · មិនទាន់វាស់ក្នុងជុំនេះ)។
-4. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** (ធាតុ 2.48.0 ខាងក្រោម) បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase
+3. **ម្ចាស់គម្រោងសាកលើឧបករណ៍ពិត** (ធាតុ 2.48.0 ខាងក្រោម) បូក ៖ ហាង Supabase បើក App ➜ គ្មានសំណើ `gstatic.com/firebasejs` · ប្តូរ Config Supabase ➜ Firebase
    ក្នុងវគ្គដដែល ➜ ចូលប្រព័ន្ធបានភ្លាម។
 
 ⛔ **សន្សំកូតា** ៖ រត់តែ checker ពាក់ព័ន្ធក្នុង session (`RUNALL_ONLY=…`) ហើយទុកឲ្យ CI លើ GitHub (៤ ផ្នែកស្របគ្នា ~១០ នាទី) វាស់ពេញ · ឆ្លើយម្ចាស់គម្រោងជាខ្មែរ។
@@ -138,6 +136,8 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
   (`SB_FETCH_TIMEOUT_MS` ១៥ វិ. · abort ពិត · គ្របទាំង body) ហើយជំហានយក token ក្នុង `rpc()` មានពិដានដូច POST របស់វា (`sbWithin()`) ➜ ការបន្តសម័យដែលព្យួរ
   លែងរាំង RPC ទាំងអស់ជារៀងរហូត ៖ RPC ធ្លាក់ជា `SbNetworkError` (adapter សាកម្តងទៀតតាមជណ្តើររបស់វា) · បណ្តាញល្អវិញ ➜ ការបន្តសម័យបន្ទាប់ជោគជ័យខ្លួនឯង។
 - **ប្រអប់ចូលប្រព័ន្ធ (Supabase)** លើបណ្តាញព្យួរ ➜ «ភ្ជាប់ Server មិនបានទេ» ក្នុងពិដាន fetch ជំនួសការរង់ចាំគ្មានទីបញ្ចប់។
+- **ប្តូរ Config Firebase ⇄ Supabase ក្នុងវគ្គដដែល** ៖ `initFirebase()` ផ្តាច់ listener auth របស់ backend ចាស់ (និង timer សង្គ្រោះ auth) **មុន** `deleteApp()`
+  ➜ callback `onAuthStateChanged` របស់ Firebase ដែលមកក្រោយ មិនរត់លើ backend ថ្មី (មិនបើកប្រអប់ចូល · មិនសម្អាតទិន្នន័យ · មិនចាប់ផ្តើម login លើ Supabase)។
 - **🔔 កំណែ App** ៖ `announcements.json` ទុកតែធាតុ `update` ចុងក្រោយមួយ (= `APP_VERSION`)។
 
 #### អ្នកយាម
@@ -145,6 +145,8 @@ Security Advisor សល់ WARN ១ «Leaked Password Protection» (Pro) + INFO 
 - `ZoeW/tests/supabase-transport-hang.test.ts` (supabase-js ពិត · fetch ក្លែងដែលព្យួរ និងគោរព `signal`) ៖ មុនកែ **១/៤** (តែទិសផ្ទុយជាប់ · ៣ នៅ pending
   ក្រោយ ៣ វិ.) ➜ ក្រោយកែ **៤/៤**។
 - `ZoeW/tests/notifications.test.tsx` «ទុកតែធាតុ update ចុងក្រោយមួយ»។
+- `ZoeW/tests/registry-session-race.test.ts` «ប្ដូរ Firebase ➜ Supabase ៖ callback auth ចាស់» ៖ មុនកែធ្លាក់ (callback ចាស់ត្រូវបញ្ជូន) ➜ ក្រោយកែជាប់ ·
+  ទិសផ្ទុយ ៖ listener របស់ backend ថ្មីនៅដំណើរការ។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -936,6 +938,21 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### Firebase ⇄ Supabase ៖ callback auth ចាស់ប្រណាំងនឹង backend ថ្មី · realtime WebSocket ព្យួរ (2026-10-02 · ZoeW 2.48.1)
+
+- **realtime ព្យួរ (handoff · គ្មានចន្លោះ)** ៖ supabase-js/realtime-js 2.117.2 ពិត តាម `transport.subscribe()` ពិត + WebSocket ក្លែងដែលឈប់ឆ្លើយនៅ ១០ វិ.
+  (មិនបិទ) ➜ `CHANNEL_ERROR` នៅ **៥០,១ វិ.** (heartbeat ២៥ វិ. × ២ ➜ `close(1000,'heartbeat timeout')`) ➜ adapter poll រៀងរាល់ ៣០ វិ. ➜ socket ថ្មីឆ្លើយ ➜ `SUBSCRIBED`
+  + pull តាមទាន់ភ្លាម ➜ ភាពចាស់អតិបរមា ~៧០ វិ. · គ្មានការព្យួរ ➜ មិនសាងអ្នកយាម (វាស់ហើយ គ្មានចន្លោះ)។
+- **ការប្រណាំង (សំណើម្ចាស់គម្រោង ៖ «កុំឲ្យ Firebase និង Supabase ប្រណាំងគ្នា»)** ៖ `initFirebase()` ដាក់ `firebaseState.fb = nextFb` ហើយ `await deleteApp()`
+  backend ចាស់ ខណៈ listener auth ចាស់ផ្តាច់តែក្នុង `setupAuthListener()` ចុងក្រោយ។ **វាស់** (firebase 12.19.0 ពិត · node) ៖ `deleteApp()` មុន Auth បញ្ចប់ការចាប់ផ្តើម ➜
+  callback `onAuthStateChanged` **រត់ក្រោយ** `deleteApp()` · ផ្តាច់មុន `deleteApp()` ➜ មិនរត់ ➜ ក្នុង ZoeW callback Firebase ចាស់អាចរត់ `proceedAfterLogin` ឬផ្លូវចាកចេញ
+  លើ `fb` Supabase។ Supabase `_close()` សម្អាត listener ដោយមិនហៅ (ទិសផ្ទុយមានសុវត្ថិភាព)។ ការកែ ៖ teardown ផ្តាច់ `authUnsubscribe` + `authRecoveryTimeout`
+  ដោយ synchronous មុន `await deleteApp()`។ ពិនិត្យបន្ថែម ៖ `window.firebaseSDK` ប្រើតែក្នុង loader (`network.ts` · `firebase-sdk.ts`) ➜ គ្មានផ្លូវទិន្នន័យរំលង `firebaseState.fb`។
+- **អ្នកយាម** ៖ `ZoeW/tests/registry-session-race.test.ts` (`initFirebase()` ពិត · SDK ក្លែងតាមការវាស់ ៖ បញ្ជូន callback ក្រោយ `deleteApp()` តែពេលមិនទាន់ផ្តាច់)
+  ៖ មុនកែ `expected true to be false` ➜ ក្រោយកែ ៦/៦ · រួម `config-modal` · `login-routing` · `supabase-account` ៤៦/៤៦ · `connection-recovery-test`
+  (sandbox រត់ `initFirebase()` ពិត ៖ ប្រកាស `authUnsubscribe`/`authRecoveryTimeout` · ការអះអាងថ្មី «listener auth ចាស់ផ្តាច់មុន deleteApp») ៖
+  លើកូដមុនកែ ២១៩ ok · ១ FAIL (តែការអះអាងថ្មី) ➜ ក្រោយកែ ២២០/២២០។
 
 ### Audit បណ្តាញ ៖ token Supabase ព្យួរ ➜ RPC ព្យួរគ្មានទីបញ្ចប់ (2026-10-02 · ZoeW 2.48.1)
 

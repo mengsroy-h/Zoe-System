@@ -5,6 +5,10 @@ import { pendingRegistryReleases } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { claimBarcodeInRegistry, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../src/domain/registry';
 import { initFirebase } from '../src/services/firebase-init';
+import { setupAuthListener } from '../src/features/auth';
+
+const sb = vi.hoisted(() => ({ sdk: null as any }));
+vi.mock('../src/services/supabase-backend', () => ({ createZoeSupabaseSdk: () => sb.sdk }));
 import { ztoPickupStatus } from '../src/features/zto-status';
 import { confirmPhone } from '../src/features/scan-action';
 import { clearSensitiveModalFields } from '../src/features/session';
@@ -63,6 +67,49 @@ describe('Registry ៖ ការងារចាស់មិនសរសេរគ
         expect(pendingRegistryReleases.size).toBe(0);
         expect(dataState.registryReleaseFlushInFlight).toBe(false);
         expect(ztoPickupStatus.size).toBe(0);
+    });
+
+    it('⛔ ប្ដូរ Firebase ➜ Supabase ៖ callback auth Firebase ចាស់ដែលមកក្រោយ deleteApp មិនប៉ះ backend ថ្មី', async () => {
+        let pendingOld: any = null;
+        let oldUnsubscribed = false;
+        let oldDelivered = false;
+        let oldApps: any[] = [{ name: 'old' }];
+        const oldFb: any = {
+            getApps: () => oldApps,
+            deleteApp: async () => {
+                oldApps = [];
+                await Promise.resolve();
+                if (pendingOld && !oldUnsubscribed) { oldDelivered = true; try { pendingOld(null); } catch { void 0; } }
+            },
+            onAuthStateChanged: (_auth: any, cb: any) => { pendingOld = cb; return () => { oldUnsubscribed = true; }; }
+        };
+        firebaseState.fb = oldFb;
+        firebaseState.auth = { currentUser: null, owner: 'firebase' } as any;
+        setupAuthListener();
+        expect(pendingOld).toBeTypeOf('function');
+
+        let newCb: any = null;
+        let sbApps: any[] = [];
+        sb.sdk = {
+            __supabase: true,
+            getApps: () => sbApps, deleteApp: async () => { sbApps = []; },
+            initializeApp: () => { const a = { name: 'sb' }; sbApps.push(a); return a; },
+            getAuth: () => ({ currentUser: null, owner: 'supabase' }), getDatabase: () => ({ name: 'sb' }),
+            goOnline() {}, off() {}, ref: (db: any, path: string) => ({ db, path }),
+            onValue: () => () => {},
+            onAuthStateChanged: (_auth: any, cb: any) => { newCb = cb; return () => {}; }
+        };
+        appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }));
+        firebaseState.isInitializingFirebase = false;
+        const before = firebaseState.authGeneration;
+        expect(await initFirebase()).toBe(true);
+        expect(firebaseState.fb).toBe(sb.sdk);
+        expect(oldDelivered).toBe(false);
+        expect(firebaseState.authGeneration).toBe(before + 1);
+
+        expect(newCb).toBeTypeOf('function');
+        try { newCb(null); } catch { void 0; }
+        expect(firebaseState.authGeneration).toBe(before + 2);
     });
 
     it('claim ត្រឡប់ក្រោយប្ដូរគម្រោង ➜ មិនអនុញ្ញាតឲ្យរក្សាទុកក្នុងគម្រោងថ្មី', async () => {

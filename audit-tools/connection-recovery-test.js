@@ -1673,6 +1673,7 @@ function buildContext() {
             'let isDatabaseInitialized = false, isDatabaseConnected = false, isInitializingFirebase = false;',
             'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
             'let authGeneration = 0, historyPatchFlushInFlight = true;',
+            'let authUnsubscribe = () => { __log.oldAuthOff = true; }, authRecoveryTimeout = null;',
             'const pendingHistoryPatches = new Map([["OLD_BUSINESS_BARCODE", { fields: { isCalled: true } }]]);',
             'const pendingRegistryReleases = new Map(); let registryReleaseFlushInFlight = false;',
             'const viewState = { phoneModalBusy: false };',
@@ -1682,7 +1683,7 @@ function buildContext() {
             'let scanHistory = [], deletedItems = [], dailyRevenueData = {}, monthlyRevenueData = {};',
             'let dailyPickupData = {}, lockerBarcodeIndex = {};',
             'let dailyCollectedData = { "2026-09-12": { OLD_BUSINESS_BARCODE: { c: 9, d: 2 } } };',
-            'const FAKE_SDK = { getApps: () => __existingApp ? [{}] : [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => { __log.retryAtDelete = __retryState(); __existingApp = false; return Promise.resolve(); },',
+            'const FAKE_SDK = { getApps: () => __existingApp ? [{}] : [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => { __log.retryAtDelete = __retryState(); __log.authOffAtDelete = !!__log.oldAuthOff; __existingApp = false; return Promise.resolve(); },',
             '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
             '  onAuthStateChanged: (a, callback) => { __log.authCallback = callback; return () => {}; } };',
             'let __sdkGate = null;',
@@ -1825,11 +1826,14 @@ function buildContext() {
             reconfigured.log.retryAtDelete);
         ok('Reconfig ៖ callback ដែលចេញដំណើរមុន teardown ត្រូវផុតសុពលភាពមុនរង់ចាំ deleteApp',
             reconfigured.log.retryAtDelete && reconfigured.log.retryAtDelete.generation > 0, reconfigured.log.retryAtDelete);
+        // ⛔ Firebase ពិតបញ្ជូន `onAuthStateChanged` ដែលកំពុងរង់ចាំ **ក្រោយ** `deleteApp()` ➜ listener auth ចាស់ត្រូវផ្តាច់មុន
+        ok('Reconfig ៖ listener auth របស់ backend ចាស់ត្រូវផ្តាច់មុន deleteApp',
+            reconfigured.log.authOffAtDelete === true, reconfigured.log);
 
         const signedOut = runInit(false);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); signedOut.release(); }
         vm.runInContext([
-            'let authUnsubscribe = null, authRecoveryTimeout = null, autoLoginAttempted = false;',
+            'authUnsubscribe = null; authRecoveryTimeout = null; let autoLoginAttempted = false;',
             'function attemptAuthStorageRecovery() {}',
             'function resetClearHistoryOperationState() {}',
             'function clearCustomerDataTableCache() {}',

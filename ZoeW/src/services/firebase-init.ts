@@ -81,6 +81,14 @@ export async function initFirebase() {
         firebaseState.fb.getApps().forEach((a) => staleApps.push([firebaseState.fb, a]));
         const existingApps = staleApps;
         if (existingApps.length) {
+            if (firebaseState.authUnsubscribe) {
+                try { firebaseState.authUnsubscribe(); } catch (e) {}
+                firebaseState.authUnsubscribe = null;
+            }
+            if (firebaseState.authRecoveryTimeout) {
+                clearTimeout(firebaseState.authRecoveryTimeout);
+                firebaseState.authRecoveryTimeout = null;
+            }
             firebaseState.authGeneration++;
             viewState.phoneModalBusy = false;
             pendingRegistryReleases.clear();

@@ -954,6 +954,11 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **អ្នកយាម** ៖ `ZoeW/tests/supabase-transport-hang.test.ts` (មុនកែ ១/៤ ➜ ក្រោយកែ ៤/៤) · `supabase-account.test.tsx` ១២/១២ នៅជាប់។
   ⛔ មិនបានរត់ `emu/supabase-adapter-parity` (Postgres ពិត) តាមសំណើសន្សំកូតា ➜ CI (`SUPABASE_STRICT=1`) វាស់។
 - **មិនទាន់វាស់** ៖ WebSocket realtime ដែលព្យួរ (adapter មាន poll ជំនួស `SB_POLL_FALLBACK_MS`)។
+- **ការផ្ទៀងផ្ទាត់ឡើងវិញ (សំណើម្ចាស់គម្រោង)** ៖ `run-all.sh` ពេញ (`VERSIONSCOPE_STRICT=1` · គ្មាន emulator · គ្មាន `npm ci --prefix supabase`/`tools/firebase-provision`)
+  ➜ ធ្លាក់ ២ ៖ (១) `doc-scope-test` ៖ `README.md` · `ZoeW/README.md` · ក្បាលតារាង `docs/AUDIT-PROMPT.md` នៅអះអាង 2.48.0 ក្រោយការឡើងកំណែ ➜ កែ ·
+  (២) `zoew-suite` ➜ `purity:check` ៖ `source.addEventListener` លើ `AbortSignal` ក្នុង `sbFetchWithCeiling` ➜ ធាតុលើកលែងដែលមានហេតុផល (ដូច `services/network.ts`)។
+  រត់ឡើងវិញ ➜ ២/២ PASS។ មួយផ្នែក ៩ · រំលង ៦ = `emu/*` · checker Postgres/firebase-tools ដែលមិនបានដំឡើងដោយចេតនា ➜ CI វាស់។ ការផ្លាស់ HISTORY ផ្ទៀងដោយ script ៖
+  block ទាំង ២ ស្មើ byte ទល់ byte ក្នុង archive · ខ្លឹមសារ archive ចាស់នៅដដែល · គ្មានបន្ទាត់បាត់។
 
 ### សម្អាត HISTORY · announcements តែមួយ · audit `.md` (2026-10-02 · ឯកសារ · អ្នកយាម · ទិន្នន័យ feed តែប៉ុណ្ណោះ)
 

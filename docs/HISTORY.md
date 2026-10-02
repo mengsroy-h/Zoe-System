@@ -3013,6 +3013,7 @@ Function ដែល export ៖ 978
 | `strip-comments` | ផ្នែក ១ | ផ្នែក ១ |
 | `supabase-datastore-test` | ផ្នែក ១ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
+| `supabase-rls-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-functions-test` | ផ្នែក ១ | — |
 | `supabase-pg` | ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |

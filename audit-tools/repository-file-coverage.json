@@ -2672,6 +2672,9 @@
     "supabase/migrations/20261001000200_zoe_datastore.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261002000100_zoe_definer_private.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },

@@ -53,12 +53,14 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 **បន្តតាមលំដាប់** ៖
 1. PR #282 (draft · រួម PR #281) ៖ ពិនិត្យ CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ Edge Functions រួច Netlify/APK · សាក reset លើឧបករណ៍ពិត។
-   ⚠️ migration `20261002154730_zoe_reset_claim.sql` **អនុវត្តលើ live រួច (2026-10-03)** — ផ្ទៀង ៖ `claim_id` · `claim_reset_code`/`settle_reset_code`
-   (`service_role` តែប៉ុណ្ណោះ) មាន **តែ version មិនកត់** ក្នុង `supabase_migrations.schema_migrations` (live មាន ៤) ➜ **មុន merge** ត្រូវ
-   `supabase migration repair --status applied 20261002154730` បើមិនដូច្នេះ GitHub integration អនុវត្តម្តងទៀត ➜ `add column claim_id` ធ្លាក់។
+   ✅ migration `20261002154730_zoe_reset_claim.sql` អនុវត្តលើ live ដោយម្ចាស់គម្រោង (SQL Editor) ➜ version មិនបានកត់ ➜ Claude កត់វា (សមមូល
+   `migration repair --status applied` តាមសំណើម្ចាស់គម្រោង · `statements` ទទេដូច repair មុនៗ) ➜ live មាន migration **៥** ស្មើ repo។
+   Edge Functions live នៅកំណែចាស់ (v8) ➜ deploy `register` + `reset-password` ក្រោយ merge។
 2. ✅ register createUser ឆ្លើយបាត់ ➜ retry ដោយឈ្មោះ + ពាក្យសម្ងាត់ដដែលបន្តគណនីដដែល (2.49.0 · ផ្នែក ២)។ **នៅសល់** ៖ កូដប្រើ ១ ដង + App ផុតពិដាន ២០ វិ.
    ខណៈ Server បញ្ចប់ ➜ retry ➜ `invite-invalid` (គណនីដើរ) — បើចង់កែ ត្រូវសាងអ្នកយាមមុន (ឧ. App បកប្រែ `network` លើ register ជា «មិនដឹងលទ្ធផល»)។
-3. បន្ត Supabase audit ជុំក្រោយ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops។ ជុំនេះផ្តោតលើ reset និង deployment metadata; មិនអះអាងថាបានគ្រប finder ៦ ទាំងអស់។
+3. ✅ Supabase audit ជុំ 2026-10-03 (ផ្នែក ២) ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops ពិនិត្យរួច។ **សំណើដែលនៅចាំការសម្រេច** ៖
+   (ក) **backup ទិន្នន័យហាង Supabase** (មិនទាន់មាន — `firebase-backup/` គ្របតែ Firebase) · (ខ) ពិដានស្ងៀម ១៥ នាទីសម្រាប់ session Admin Supabase ក្នុង ZoeKeyGen
+   (ដូច Signing Key) · (គ) index លើ `created_by` (Advisor INFO · ទំហំតូច)។
 4. IndexedDB cache zoe_docs (delta seq) និង CLI ផ្ទេរ Firebase ➜ Supabase តាម zoe_admin_write នៅមិនទាន់សាង។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
 5. សាកលើឧបករណ៍ iPhone/Android ពិតសម្រាប់ backend ទាំង២។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**; CLI ផ្ទេរប្រើតែសម្រាប់អតិថិជនដែលជ្រើសប្តូរ។
 
@@ -1020,6 +1022,24 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — Supabase audit (Handoff ជំហាន ៣) ៖ live · SQL · adapter · Edge · ZoeKeyGen · ops
+
+វាស់លើ live (read-only · Project `ZoeW` · Postgres 17.11) និងកូដ ៖
+- **deploy/ops ៖ migration `20261002154730` អនុវត្តតាម SQL Editor តែ version មិនកត់** (live ៤ ធៀប repo ៥) ➜ merge នឹងធ្វើឲ្យ GitHub integration អនុវត្តម្តងទៀត
+  ➜ `add column claim_id` ធ្លាក់។ Claude កត់ version តាមសំណើម្ចាស់គម្រោង ➜ ៥/៥។ ⛔ ការបិទភ្ជាប់ SQL ត្រូវតាមដោយ repair ជានិច្ច (ច្បាប់មានក្នុង `CLAUDE.md` ·
+  អ្នកយាមស្តាទិច `supabase-datastore-test` មើលមិនឃើញ live)។
+- **deploy/ops ៖ ទិន្នន័យហាង Supabase គ្មាន backup** — `firebase-backup/` · `backup.yml` គ្របតែ Firebase RTDB ➜ សំណើ (ត្រូវការ secret DB/secret key ពីម្ចាស់គម្រោង)។
+- **SQL/realtime** ៖ policy broadcast `zoe_tenant_broadcast_read` មាន · broadcast ឯកជន ១១៩ ក្នុង ២៤ ម៉ោង (ហាង ១ · `seq` ២៤៣៣ · `zoe_docs` ៧៣៦ kB ·
+  `zoe_ops` ២៦៦៣ ជួរ/២ ថ្ងៃ)។ Advisors ៖ WARN Leaked Password Protection (Pro) · INFO `zoe_ops` គ្មាន policy (ចេតនា) · INFO FK `created_by` គ្មាន index (២ តារាងតូច)។
+- **adapter ៖ ការសរសេរធម្មតា (`set`/`inc`) សាកម្តងទៀតគ្មានពិដានពេលដោយ `op_id` ដដែល · `zoe_ops` លុបក្រោយ ២ ថ្ងៃ** ➜ ឧបករណ៍ក្រៅបណ្តាញ >២ ថ្ងៃ
+  (ទំព័រនៅរស់) ក្រោយចម្លើយបាត់អនុវត្តម្តងទៀត ៖ `set` = អ្នកសរសេរចុងក្រោយឈ្នះ (ដូចជួរ offline របស់ SDK Firebase) · `inc` លុយមានតែក្នុង
+  `finalizeClaimedRestore()` ដែល rules ទាមទារធាតុធុងសំរាម + លុបវាក្នុងការសរសេរដដែល ➜ replay ត្រូវបដិសេធ · transaction (CAS) មានពិដាន ៦០ វិ. ➜ `unknown`។
+  ➜ មិនមែនកំហុសលុយ · មិនកែ (ការអានកូដ + អ្នកយាម rules មានស្រាប់ `emu/restore-mutation-emu-test` · `emu/supabase-rules-parity`)។
+- **Edge ៖** register/reset (2.48.2 · 2.49.0) · CORS តាម origin · secret មិនលេច — អ្នកយាម `supabase-functions-test`។
+- **ZoeKeyGen/Netlify ៖** CSP `connect-src` ទាំង ២ App អនុញ្ញាត `https://*.supabase.co` (+ `wss` លើ ZoeW) · session Admin Supabase នៅក្នុងសតិតែប៉ុណ្ណោះ
+  (មិនរក្សាក្នុង storage) · ផុតតាម JWT (~១ ម៉ោង) · ចាកចេញ revoke ➜ ខ្សោយជាង Signing Key (ស្ងៀម ១៥ នាទី) បន្តិច ➜ សំណើ។
+- **Egress ៖** adapter ទាញ `zoe_docs` ទាំងអស់រាល់ការផ្ទុកទំព័រ (៧៣៦ kB មុន gzip សម្រាប់ហាង ១) ➜ Handoff ជំហាន ៤ (IndexedDB)។
 
 ### 2026-10-03 — chunk `supabase-backend` ចេញពីហាង Firebase (ZoeW 2.49.0 · សេចក្តីសម្រេចម្ចាស់គម្រោង)
 

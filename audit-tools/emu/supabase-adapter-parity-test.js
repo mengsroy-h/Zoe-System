@@ -396,6 +396,9 @@ async function scenario(api) {
         fake.setMode('ok');
         check(!!lost && lost.message === 'disconnect' && lost.txOutcome === 'unknown' && events.unknown.includes('sbp_fail/tx'),
             'transaction ផុតពិដានលទ្ធផល ➜ បដិសេធ disconnect · txOutcome unknown · រាយការណ៍ (zone money)', lost && { m: lost.message, o: lost.txOutcome, u: events.unknown });
+        // ⛔ ថ្នេរ adapter ↔ ledger ៖ `ledgerRejectionVerdict()` (domain/ledger.ts) មិនប៉ះលុយតែពេល `txServerUnread === true` ➜ បើ adapter
+        //    ភ្លេចទង់នេះ reconcile ដកម្តងទៀតលើ transaction ដែលប្រហែលចុះរួច (ដក ២ ដង · tx-outcome-test ផ្នែក ៤គ)
+        check(!!lost && lost.txServerUnread === true, 'transaction ផុតពិដាន ➜ txServerUnread (server មិនបានអាន ➜ ledger មិនដកម្តងទៀត)', lost && { unread: lost.txServerUnread });
         F.sdk.goOnline(F.db);
         await until(() => connected === true, 3000);
         fake.expireTokens();

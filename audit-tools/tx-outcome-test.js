@@ -67,7 +67,7 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
-    'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
+    'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory', 'runLedgerTransaction',
@@ -434,6 +434,53 @@ function runTx(run, p, updaterSrc) {
         const d = run.server.zoew_daily_revenue_cod_dod[DAY] || {};
         const m = run.server.zoew_monthly_revenue_cod_dod[MONTH] || {};
         ok('⛔ ការសរសេរ ledger ផ្ទុក token `op` (ថ្ងៃ និងខែ)', typeof d.op === 'string' && d.op.length >= 8 && typeof m.op === 'string', { d, m });
+    }
+
+    console.log('\n── ៤គ. ⛔⛔ ledger ៖ outcome `unknown` (អាន server មិនបាន) ➜ សាលក្រម reconcile មិនរាយ ok ──');
+    //    `disconnect` + អាន server មិនបាន ៦០ វិ. (REST ងាប់ · Supabase ៖ បណ្តាញខូចលើសពិដាន) ➜ wrapper/adapter បដិសេធ
+    //    `txOutcome: 'unknown'` + `txServerUnread`។ reconcile ទាយ «មិនបានអនុវត្ត» ហើយដកម្តងទៀត ➜ ត្រូវតែពេលសំណើមិនដល់ server ·
+    //    ដក ២ ដងពេលវាដល់រួច (វាស់ ៖ ថ្ងៃ 100 ➜ 90)។ ⛔ ការទាយទិសណាក៏ខុសពាក់កណ្តាល (វាស់ ១៥០ ករណីមុន/ក្រោយ ៖ «កុំប៉ះ» អាក្រក់ជាង ៣៦) ➜
+    //    ការកែឫសគល់ = ដោះស្រាយ outcome រហូតបណ្តាញត្រឡប់ (មិនទាន់សម្រេច · docs/HISTORY.md ផ្នែក ២)។ ផ្នែកនេះចាក់សោតែ **ការពិត** ៖
+    //    App មិនអះអាង ✅ ពេល outcome មិនដឹង (មុនកែ ៖ `ok: true` ខណៈលុយខុស ២៧/១៥០) ➜ សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» + Sentry។
+    //    ⛔ កុំអះអាងតម្លៃលុយក្នុងករណី unknown (ទាំងទិសទាំងពីរមិនអាចបញ្ជាក់ ➜ ការអះអាងនឹងចាក់សោកំហុសមួយ)។
+    for (const mode of ['applied-disconnect', 'lost-disconnect']) {
+        for (const plan of [[mode, 'ok', 'ok', 'ok', 'ok', 'ok'], ['ok', mode, 'ok', 'ok', 'ok', 'ok']]) {
+            const where = plan[0] === mode ? 'ថ្ងៃ' : 'ខែ';
+            const run = makeRun({ plan: plan.slice(), restDown: true });
+            vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+                + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+            await settle(1500);
+            ok('លក្ខខណ្ឌចាំបាច់ (' + where + ' ' + mode + ') ៖ outcome unknown (REST អានមិនបាន · Sentry money)',
+                run.log.rest.length >= 1 && run.log.captures.some((c) => c.zone === 'money' && /outcome unknown/i.test(c.message)), { rest: run.log.rest.length, captures: run.log.captures });
+            ok('⛔⛔ ' + where + ' unknown (' + mode + ') ➜ សាលក្រម reconcile មិន ok (មិនអះអាងថាស្ថិតិប្រាក់ត្រូវ)',
+                !!run.box.__status && run.box.__status.ok === false, run.box.__status);
+        }
+    }
+    {
+        const run = makeRun({ plan: ['applied-disconnect', 'ok', 'ok', 'ok', 'ok'], restDown: true });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, 0, 0, 0).then((s) => { __status = s; });", run.ctx);
+        await settle(1500);
+        ok('⛔⛔ ចំនួនពិត 0 (ឧ. កែតម្លៃដែលមិនប្រែ) + ថ្ងៃ unknown ➜ សាលក្រមមិន ok (0 ស្មើ 0 មិនមែនភស្តុតាង)',
+            !!run.box.__status && run.box.__status.ok === false, run.box.__status);
+    }
+    {
+        const run = makeRun({ plan: ['ok', 'ok', 'ok', 'ok'], restDown: true });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+        await settle(300);
+        ok('⛔ ទិសផ្ទុយ ៖ គ្មាន disconnect ➜ ដកតែម្តង (95 · 95) · សាលក្រម ok',
+            r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95 && r2(run.server.zoew_monthly_revenue_cod_dod[MONTH].codDollar) === 95
+                && !!run.box.__status && run.box.__status.ok === true,
+            { day: run.server.zoew_daily_revenue_cod_dod[DAY], month: run.server.zoew_monthly_revenue_cod_dod[MONTH], status: run.box.__status });
+    }
+    {
+        const run = makeRun({ plan: ['foreign-equal-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'] });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+        await settle(400);
+        ok('⛔ ទិសផ្ទុយ ៖ unknown ដែល server **អានបាន** (ឧបករណ៍ផ្សេងសរសេរ) មិនមែន `txServerUnread` ➜ reconcile បញ្ចប់ ok (ផ្នែក ៤ខ)',
+            !!run.box.__status && run.box.__status.ok === true, run.box.__status);
     }
 
     console.log('\n── ៥. ⛔⛔ registry barcode ៖ តម្លៃ `true` ថេរ ➜ «ស្មើតម្លៃដែលផ្ញើ» មិនមែនភស្តុតាងថាជារបស់យើង ──');

@@ -216,7 +216,7 @@ for (const app of ['ZoeW']) {
     // ---------- ⛔ ប៊ូតុងលុបដោយដៃ ៖ មិនត្រូវប៉ះលុយសោះ (រចនាសម្ព័ន្ធ) ----------
     console.log('\n-- ⛔ លុបដោយដៃ / លុបទាំងអស់ ៖ គ្មានការសរសេរលុយក្នុង function ទាំងមូល --');
     const REVENUE_SINKS = [
-        'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
+        'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements',
         'zoew_daily_revenue_cod_dod',
         'zoew_monthly_revenue_cod_dod'

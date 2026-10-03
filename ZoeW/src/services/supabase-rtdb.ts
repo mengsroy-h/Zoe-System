@@ -931,6 +931,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             }
                             if (closed || elapsedSince(startedAt) >= txOutcomeMaxWaitMs) {
                                 lost.txOutcome = 'unknown';
+                                lost.txServerUnread = true;
                                 hooks.onTxOutcomeUnknown(path);
                                 throw lost;
                             }

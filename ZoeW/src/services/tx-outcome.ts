@@ -175,6 +175,9 @@ export function runTransactionResolved(sdk, ref, updater, options) {
                 return { committed: true, snapshot: txSnapshotOf(ref, resolved.server), txOutcome: 'applied' };
             }
             try { error.txOutcome = resolved.outcome; } catch (e) {}
+            if (resolved.outcome === 'unknown' && resolved.server === undefined) {
+                try { error.txServerUnread = true; } catch (e) {}
+            }
             if (resolved.outcome === 'unknown') reportTxOutcomeUnknown(restUrl);
             throw error;
         }, (resolveErr) => {

@@ -52,7 +52,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.49.1` (`zoew-v257`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.49.2` (`zoew-v258`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.3` (`zoekeygen-v114`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -204,7 +204,7 @@ only this text protects them.
 | **Values rules reject** | Clamp negatives **before writing** (memory = server) | `revenue-rules-clamp-test` |
 | **Clamp ↔ revert** | "apply ➜ revert" is a true inverse: revert the delta the **server applied**, never the requested one | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` · `revenue-rules-clamp-test` |
 | **Revert after a failed apply** | Verdict `null` = not applied ➜ nothing to revert (never fall back to the memory delta); in-memory revert is idempotent | `ledger-failed-apply-revert-test` |
-| **Transactions: `disconnect`** | `disconnect` = unknown ➜ `runTransactionResolved()` (wrapper on `fb`) reads the server via REST before reversing: `applied` ➜ success · `unknown` ➜ don't touch money + Sentry money · late cleanup never duplicates trash. "Equals the sent value" is valid only for values unique to one writer ➜ ledger writes carry an `op` token (`runLedgerTransaction()` choke point ⛔ never `fb.runTransaction` on the ledger directly; `permission_denied` ➜ resend without `op`). The wrapper delays `disconnect` ➜ paths queuing on it (`patchHistoryItemFields` · call marking) check `transactionDisconnectPending()` when `dbOp` times out | `tx-outcome-test` · `emu/tx-disconnect-emu-test` · `money-guardian-test` · `history-patch-retry-test` |
+| **Transactions: `disconnect`** | `disconnect` = unknown ➜ `runTransactionResolved()` (wrapper on `fb`) reads the server via REST before reversing: `applied` ➜ success · `unknown` ➜ Sentry money · late cleanup never duplicates trash. Server unread (`txServerUnread`: wrapper after its read budget · Supabase adapter after its retry ceiling) ➜ ledger reconcile never reports `ok` (`ledgerRejectionVerdict()`); a server that *was* read but holds another writer's value keeps the normal reconcile ⛔ never flip the reconcile's guess on `unknown` without resolving the outcome (either guess is wrong whenever the other case happened). "Equals the sent value" is valid only for values unique to one writer ➜ ledger writes carry an `op` token (`runLedgerTransaction()` choke point ⛔ never `fb.runTransaction` on the ledger directly; `permission_denied` ➜ resend without `op`). The wrapper delays `disconnect` ➜ paths queuing on it (`patchHistoryItemFields` · call marking) check `transactionDisconnectPending()` when `dbOp` times out | `tx-outcome-test` · `emu/tx-disconnect-emu-test` · `emu/supabase-adapter-parity` · `money-guardian-test` · `history-patch-retry-test` |
 | **Pickup stats** | Count by **barcode set** (`pickedUpBarcodes`) — both numbers are derived mirrors · key = `barcodeRegistryKey()` · writes are idempotent state (no arithmetic on `packagesPickedUp`) · customers and parcels counted on one basis (closed barcodes) | `pickup-barcode-identity-test` · `pickup-ledger-test` · `revenue-rules-clamp-test` · `money-guardian-test` |
 | **Aborted transactions** | `committed: false` ➜ the money reversal still runs (a throw in the success handler doesn't reach the failure handler) | `price-edit-abort-test` |
 | **Orphan registry keys** | A failed release is queued and retried; deferral has a second exit (view arrival) | `registry-release-test` |
@@ -444,7 +444,8 @@ pickedUpPhones   = count per value        ← derived mirror
 
 - `ledgerAppliedDelta(before, after)` is the single revert basis — revert the applied delta.
 - Verdict `null` = not applied: `ledgerServerVerdict(serverPromise)` (rejection or `committed: false`) ➜
-  `{cod:0,dod:0,count:0}`. In-memory revert is idempotent (`ledgerMemoryCompensationClaimed`) in both orders.
+  `{cod:0,dod:0,count:0}` (an unread `unknown` rejection adds `unknown: true` ➜ same arithmetic, never `ok`). In-memory revert is idempotent
+  (`ledgerMemoryCompensationClaimed`) in both orders.
 - Server-side revert waits for the server verdict: `commitDailyRevenueDelta` / `commitMonthlyRevenueDelta` capture
   `serverBefore`/`serverAfter` inside the transaction.
 - Every stats-node write clamps before returning (day · month · pickup). `ZoeErrors.capture('… clamped to 0')` is not a

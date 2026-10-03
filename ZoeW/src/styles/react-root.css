@@ -318,6 +318,10 @@
     transition-duration: 0.12s;
 }
 
+.scroll-thumb.cut {
+    transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .scroll-thumb { transition: none; }
 }

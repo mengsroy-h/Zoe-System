@@ -433,6 +433,7 @@ export interface ScrollThumbView {
     y: number;
     h: number;
     shown: boolean;
+    cut?: boolean;
 }
 
 export interface ScrollThumbState {

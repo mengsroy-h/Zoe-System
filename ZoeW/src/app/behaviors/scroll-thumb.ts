@@ -7,6 +7,7 @@ export const SCROLL_THUMB_WIDTH_PX = 3;
 export const SCROLL_THUMB_INSET_PX = 2;
 export const SCROLL_THUMB_MIN_PX = 24;
 export const SCROLL_THUMB_IDLE_MS = 900;
+export const SCROLL_THUMB_MOVE_PX = 1;
 
 function pxOf(value) {
     const n = parseFloat(String(value || ''));
@@ -39,6 +40,13 @@ export function scrollThumbGeometry(rect, band, scrollTop, scrollHeight, clientH
     };
 }
 
+export function scrollerMoved(rect, now) {
+    if (!rect) return false;
+    if (!now) return true;
+    return Math.abs(now.top - rect.top) > SCROLL_THUMB_MOVE_PX || Math.abs(now.bottom - rect.bottom) > SCROLL_THUMB_MOVE_PX
+        || Math.abs(now.right - rect.right) > SCROLL_THUMB_MOVE_PX;
+}
+
 function verticalScroller(el) {
     if (!el || el.nodeType !== 1) return false;
     const overflowY = window.getComputedStyle(el).overflowY;
@@ -52,6 +60,9 @@ export function setupScrollThumb() {
     let frame = null;
     let idleTimer = null;
     let view = null;
+    let tracked = null;
+    let trackedRect = null;
+    let watchFrame = null;
 
     const publish = (next) => {
         view = next;
@@ -59,9 +70,25 @@ export function setupScrollThumb() {
         renderNow(scrollThumbState);
     };
 
-    const hide = () => {
+    const hide = (cut?) => {
+        if (idleTimer !== null) clearTimeout(idleTimer);
         idleTimer = null;
-        if (view && view.shown) publish({ ...view, shown: false });
+        if (watchFrame !== null) cancelAnimationFrame(watchFrame);
+        watchFrame = null;
+        tracked = null;
+        trackedRect = null;
+        if (view && view.shown) publish({ ...view, shown: false, cut: cut === true });
+    };
+
+    const watch = () => {
+        watchFrame = null;
+        if (!tracked || !view || !view.shown) return;
+        const now = tracked.isConnected ? tracked.getBoundingClientRect() : null;
+        if (scrollerMoved(trackedRect, now)) {
+            hide(true);
+            return;
+        }
+        watchFrame = requestAnimationFrame(watch);
     };
 
     const process = () => {
@@ -78,9 +105,12 @@ export function setupScrollThumb() {
         const band = scrollThumbBand(rect, window.innerHeight, overlayOpen, pxOf(uiState.chromeTopVar), chromeBottom);
         const geo = scrollThumbGeometry(rect, band, top, el.scrollHeight, el.clientHeight);
         if (!geo) return;
-        publish({ ...geo, shown: true });
+        publish({ ...geo, shown: true, cut: false });
+        tracked = el;
+        trackedRect = { top: rect.top, bottom: rect.bottom, right: rect.right };
+        if (watchFrame === null) watchFrame = requestAnimationFrame(watch);
         if (idleTimer !== null) clearTimeout(idleTimer);
-        idleTimer = setTimeout(hide, SCROLL_THUMB_IDLE_MS);
+        idleTimer = setTimeout(() => hide(false), SCROLL_THUMB_IDLE_MS);
     };
 
     document.addEventListener('scroll', (event) => {

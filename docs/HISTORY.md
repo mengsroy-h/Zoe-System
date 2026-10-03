@@ -47,8 +47,8 @@
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
 1. **ម្ចាស់គម្រោង** ៖ PR #282 (draft · រួម PR #281 · ZoeW 2.49.0 · ZoeKeyGen 2.24.3) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ»
-   (migration ថ្មី ៤ ➜ Edge Functions `register` + `reset-password` ម្តងទៀត ➜ Netlify ZoeKeyGen + ZoeW ➜ APK · secret backup ហាង + សាកស្តារ)។
-   live (វាស់ 2026-10-03) ៖ migration ៥ (៤ ពី `main` + `20261002154730`) · Edge Functions **v9** (`73db73a` · v8 = `main` សម្រាប់ត្រឡប់វិញ)។
+   (កត់ version migration ៥ ដែល paste រួច ➜ Edge Functions `register` + `reset-password` ម្តងទៀត ➜ Netlify ZoeKeyGen + ZoeW ➜ APK · secret backup ហាង + សាកស្តារ)។
+   live (វាស់ 2026-10-03) ៖ migration ១០ ក្នុង DB (ម្ចាស់គម្រោង paste ៥ ថ្មី) តែ `schema_migrations` កត់ ៥ · Edge Functions **v9** (`73db73a` · v8 = `main` សម្រាប់ត្រឡប់វិញ)។
 2. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 3. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
@@ -142,6 +142,8 @@
 - **ខ្សែរមូរ (APK · iPhone PWA តែប៉ុណ្ណោះ)** ៖ iOS WebKit មិនគូរ `::-webkit-scrollbar` ➜ App គូរខ្សែ ៣px ពណ៌ប្រផេះខ្លួនឯង (`ScrollThumb` · ធាតុ `position: fixed`
   `pointer-events: none`) ៖ លេចពេលរមូរបញ្ឈរ · បាត់ក្រោយស្ងៀម ៩០០ms · មិនជាន់ navbar/របា Tab (លើកលែងក្នុង modal/drawer) · listener scroll តែមួយ (passive · capture ·
   rAF)។ ⛔ មិនប្តូរ layout · មិនប៉ះ PTR/ចលនាផ្ទាំង · web/PWA Android/desktop គ្មាន listener គ្មានធាតុ (`drawsOwnScrollThumb()`)។
+  ផ្ទាំងរមូរផ្លាស់ទីដោយគ្មានការរមូរ (ប្រអប់ប្រវត្តិធ្លាក់ចុះ/ឡើងវិញ) ➜ ខ្សែបាត់ភ្លាម (គ្មាន fade · class `cut`) មិននៅទីតាំងចាស់ក្រៅប្រអប់ (រាយការណ៍ ៖ វីដេអូ APK
+  ពីម្ចាស់គម្រោង ៖ ខ្សែនៅលើប្រអប់ស្ថិតិ ~០.៧ វិ.) ៖ ពេលខ្សែកំពុងលេច វាពិនិត្យទីតាំងផ្ទាំងរៀងរាល់ frame (`scrollerMoved()` · ឈប់ពេលលាក់)។
 - **ZoeKeyGen ៖ modal តាមទំហំអេក្រង់** ៖ ទទឹងជា «ឯកតាអក្សរ» (`calc(var(--modal-w) * var(--fs-unit))`) ជំនួស px ថេរ ➜ ទូរស័ព្ទស្ទើរដូចដើម · tablet/desktop
   រីកតាមអក្សរ (ប្រអប់ PIN 300 ➜ 405px លើ 1920px)។ ZoeW ៖ វាស់រួច មិនប្តូរ (រីកតាមអេក្រង់ស្រាប់)។
 - **ហាង Supabase ៖ ចុះឈ្មោះម្តងទៀតក្រោយ App អស់ពេលរង់ចាំ** ៖ កូដអញ្ជើញប្រើបាន ១ ដង + បណ្តាញយឺត (App ឈប់រង់ចាំ ២០ វិ. ខណៈ Edge Function ចុះឈ្មោះរួច) ➜
@@ -193,7 +195,8 @@
   ធ្វើបច្ចុប្បន្នភាពភ្លាម · UI + badge + បានមើល · ចាកចេញ) ៖ មុនកែ **FAIL ៥** ➜ **២០/២០** · mutation ៩ ➜ ក្រហម ៩។ sandbox listener ៣ (`connection-recovery` ·
   `registry-release` · `raw-read-shape`) ស្គាល់ `refreshNotifyRemovedView`។
 - `ZoeW/tests/scroll-thumb.test.tsx` (៨) ៖ ធរណីមាត្រ · មិនជាន់ chrome · web មិនដំឡើង · លាក់ពេលស្ងៀម · រមូរផ្តេកមិនលេច · modal ពេញកម្ពស់ · CSS `pointer-events: none` ·
-  mutation ៨ ➜ ក្រហម ៦ · ២ ដែលរួចគឺលក្ខខណ្ឌស្ទួន ➜ លុបចេញពីកូដ។
+  mutation ៨ ➜ ក្រហម ៦ · ២ ដែលរួចគឺលក្ខខណ្ឌស្ទួន ➜ លុបចេញពីកូដ។ ផ្ទាំងផ្លាស់ទីគ្មានការរមូរ ៖ មុនកែ **FAIL** (ខ្សែនៅ `shown`) ➜ **១០/១០** ·
+  mutation ៤ (គ្មានអ្នកពិនិត្យ · មិនដែលឃើញការផ្លាស់ទី · ឃើញជានិច្ច ➜ លាក់មុនពេល · fade ជំនួស `cut`) ➜ ក្រហម ៤។
 - `layout-check` ៖ ទិសទី ២ របស់ modal (ទទឹងជាឯកតាអក្សរលើ tablet/desktop ≥ ៩៧% នៃទូរស័ព្ទ ឬពេញអេក្រង់) · ZoeKeyGen មុនកែ **FAIL** (`pinModal @768px 273u < 281u` …) ➜ **101/101**។
 - `sw-backend-chunk-test` (ថ្មី · Chromium ពិត + `sw.js` ពិត) ៖ មុនកែ **FAIL ៣** (ហាង Firebase ទាញ chunk) ➜ **២០/២០** · mutation ៧ ➜ ក្រហម ៧
   (install ជានិច្ច/មិនដែល · គ្មានសញ្ញាគ្រោង · គ្មានសញ្ញាប្រើ · គ្មានការផ្ទេរសញ្ញា · មិនមែនផ្លូវសំបក · មិនអើពើសញ្ញាគ្រោង)។
@@ -206,12 +209,12 @@
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - ✅ ធ្វើរួច ៖ migration `20261002154730_zoe_reset_claim.sql` លើ live (កត់ version) ➜ Edge Function **`register`** និង `reset-password` **v9**។
-- ⛔ **migration ថ្មី ៤** ៖ `20261003091742_zoe_register_spent_invite.sql` (`tenant_members.invite_code_hash` · `spent_invite_member` · `finish_registration` ចាក់សោកូដ)
-  · `20261003160000_zoe_admin_races.sql` (`admin_extend_tenant` · `admin_issue_reset_code` ចាក់សោជួរសមាជិក) · `20261003170000_zoe_fk_indexes.sql`
-  · `20261003180000_zoe_pull_full_head.sql` (`zoe_pull` + `p_full_head` · ចម្លើយមាន `head` + `tenant` ➜ App 2.49.0 ប្រើ cache បានតែក្រោយ migration នេះ ·
-  App ចាស់/ថ្មីដើរទាំងមុន និងក្រោយ) ➜ merge ចូល `main` (GitHub integration)
-  ឬ paste ក្នុង SQL Editor + `migration repair --status applied <version>`។ ⛔ ធ្វើ **មុន** ៖ (ក) deploy Edge Function `register` + `reset-password` ម្តងទៀត
-  (កូដ register ថ្មីគ្មាន RPC ➜ កូដប្រើមិនបានទាំងអស់ឆ្លើយ 502 ជំនួស 403 · Function v9 + DB ថ្មីដើរធម្មតា) · (ខ) Netlify ZoeKeyGen (គ្មាន `admin_extend_tenant` ➜ «ពន្យារ» បរាជ័យ)។
+- ✅ **migration ថ្មី ៥** ម្ចាស់គម្រោង paste ក្នុង SQL Editor ៖ `20261003091742_zoe_register_spent_invite.sql` (`tenant_members.invite_code_hash` · `spent_invite_member` ·
+  `finish_registration` ចាក់សោកូដ) · `20261003120000_zoe_admin_export.sql` · `20261003160000_zoe_admin_races.sql` (`admin_extend_tenant` · `admin_issue_reset_code`
+  ចាក់សោជួរសមាជិក) · `20261003170000_zoe_fk_indexes.sql` · `20261003180000_zoe_pull_full_head.sql` (`zoe_pull` + `p_full_head` · ចម្លើយមាន `head` + `tenant`)។
+  វាស់ live (អានតែប៉ុណ្ណោះ) ៖ function · index ៣ · column មានគ្រប់ · `zoe_pull` ៣ argument តែមួយ (App 2.48.1 ផលិតកម្មដើរដោយ default)។
+  ⛔ **version មិនទាន់កត់** (`schema_migrations` នៅ ៥) ➜ `migration repair --status applied` version ទាំង ៥ **មុន merge** (បើមិនដូច្នោះ GitHub integration អនុវត្តម្តងទៀត ➜ ធ្លាក់)។
+  ⛔ បន្ទាប់ ៖ deploy Edge Function `register` + `reset-password` ម្តងទៀត (v9 ខ្វះផ្លូវ «កូដប្រើរួច» ក្នុង `account-core.ts` · `admin-deps.ts` ដែលត្រូវការ `spent_invite_member`)។
 - បន្ទាប់មក ៖ Netlify ZoeW + ZoeKeyGen + APK ថ្មី។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
 - iPhone PWA + APK ៖ រមូរតារាងប្រវត្តិ · បញ្ជីក្នុង modal ➜ ខ្សែស្តើងលេច/បាត់ · ⛔ ពិនិត្យថា PTR · ចលនាផ្ទាំង · ភាពរលូនពេលរមូរ នៅដដែល (តំបន់ហាម ៖ វាស់លើឧបករណ៍ពិត ២ ប្រភេទមុន merge)។
 - ហាង Supabase (ក្រោយ migration `20261003180000`) ៖ បើក App ➜ បិទ ➜ បើកម្តងទៀត ➜ ទិន្នន័យដដែល (Supabase Dashboard ➜ Reports ➜ egress ធ្លាក់) · ចាកចេញ ➜
@@ -1059,6 +1062,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — CI ៖ `supabase-docs-cache` រកប្រភពក្នុង root វាស់ · `remember-password` ផុយក្រោមបន្ទុក (audit-tools · តេស្តតែប៉ុណ្ណោះ)
+
+- **CI ផ្នែក ៣/៤ FAIL** ៖ `supabase-docs-cache-test` រក `ZoeW/src/services` ក្នុង root វាស់ (មានតែ text view) ➜ «ប្រភព TS មាន» FAIL ក្នុង 0.0 វិ.។ ការរត់ផ្ទាល់លើ repo
+  ជាប់ ➜ អ្នកនិពន្ធមិនបានវាស់តាម run-all។ កែ ៖ `run-all.sh` នាំចេញ `DOCSCACHE_APP_DIR=$REPO` ដូច checker កម្រិត repo ផ្សេង (`ZOEWSUITE_APP_DIR`) ·
+  ថតទទេ (`checker-coverage`) នៅធ្លាក់។
+- **`remember-password.test.tsx` ធ្លាក់ ១ ក្នុង run-all ពេញក្នុងម៉ាស៊ីន** (agent ៩ រត់ស្របគ្នា) តែជាប់ ៣/៣ ម្នាក់ឯង និង ៤ ស្រប ៖ `settle()` រង់ចាំ ៦ ជុំ `setTimeout` ថេរ ខណៈ
+  ការបំពេញពាក្យសម្ងាត់ពឹង WebCrypto ពិត។ វាស់ ៖ crypto យឺត ៤០ms ដោយចេតនា ➜ `settle()` ចាស់ **FAIL ៦/១៣** ➜ ថ្មី (រាប់ការងារ async ពិត ៖ IndexedDB ក្លែង + `crypto.subtle`
+  តាម Proxy · រង់ចាំរហូតស្ងប់ · អះអាង `asyncPending === 0`) **១៣/១៣**។ `sw-backend-chunk` FAIL ១ ក្នុងការរត់នោះដែរ ➜ វាស់ឡើងវិញម្នាក់ឯង (ផ្នែក ១ [2.49.0] អ្នកយាម)។
 
 ### 2026-10-03 — Supabase ៖ ការទាញពេញវិលចាប់ផ្តើមម្តងទៀត · ការទាញបាត់ពេលចូល · doc ខ្មោច · cache IndexedDB (ZoeW 2.49.0 · Handoff ៤)
 

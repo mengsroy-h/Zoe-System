@@ -94,7 +94,7 @@ describe('ខ្សែ scrollbar ស្តើង (APK · iPhone PWA)', () => {
         it('រមូរបញ្ឈរ ➜ ខ្សែលេចត្រង់គែមស្តាំ · ស្តើង · មិនចាប់ការចុច', async () => {
             const el = fakeScroller({ scrollHeight: 1000, clientHeight: 200, top: 0, rect: { top: 100, bottom: 300, right: 380 } });
             await scrollTo(el, 400);
-            expect(scrollThumbState.view).toEqual({ x: 375, y: 181, h: 39, shown: true });
+            expect(scrollThumbState.view).toEqual({ x: 375, y: 181, h: 39, shown: true, cut: false });
             const thumb = document.querySelector('.scroll-thumb') as HTMLElement;
             expect(thumb).toBeTruthy();
             expect(thumb.className).toBe('scroll-thumb shown');
@@ -115,6 +115,39 @@ describe('ខ្សែ scrollbar ស្តើង (APK · iPhone PWA)', () => {
             el.dispatchEvent(new Event('scroll'));
             await wait(40);
             expect(scrollThumbState.view!.shown).toBe(false);
+            el.remove();
+        });
+
+        it('⛔ ផ្ទាំងរមូរផ្លាស់ទីដោយគ្មានការរមូរ (ប្រអប់ប្រវត្តិធ្លាក់ចុះ) ➜ ខ្សែលាក់ភ្លាម មិននៅទីតាំងចាស់ក្រៅប្រអប់', async () => {
+            await wait(SCROLL_THUMB_IDLE_MS + 60);
+            const rect = { top: 100, bottom: 500, right: 380 };
+            const el = fakeScroller({ scrollHeight: 4000, clientHeight: 400, top: 600, rect });
+            await scrollTo(el, 0);
+            const before = scrollThumbState.view!;
+            expect(before.shown).toBe(true);
+            expect(before.y).toBe(102);
+            expect(window.innerHeight).toBeGreaterThan(760);
+            rect.top = 400;
+            rect.bottom = 700;
+            await wait(60);
+            step(() => {});
+            expect(scrollThumbState.view!.shown).toBe(false);
+            expect((document.querySelector('.scroll-thumb') as HTMLElement).className).toBe('scroll-thumb cut');
+            const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles', 'react-root.css'), 'utf8');
+            expect((css.match(/\n\.scroll-thumb\.cut \{([^}]*)\}/) || [])[1] || '').toMatch(/transition: none;/);
+            await scrollTo(el, 400);
+            expect(scrollThumbState.view!.shown).toBe(true);
+            expect((document.querySelector('.scroll-thumb') as HTMLElement).className).toBe('scroll-thumb shown');
+            el.remove();
+        });
+
+        it('ផ្ទាំងរមូរនៅនឹងកន្លែង ➜ ខ្សែនៅលេចរហូតដល់ស្ងៀម (មិនលាក់មុនពេល)', async () => {
+            await wait(SCROLL_THUMB_IDLE_MS + 60);
+            const el = fakeScroller({ scrollHeight: 4000, clientHeight: 800, top: 600, rect: { top: 300, bottom: 1100, right: 380 } });
+            await scrollTo(el, 900);
+            await wait(SCROLL_THUMB_IDLE_MS / 2);
+            step(() => {});
+            expect(scrollThumbState.view!.shown).toBe(true);
             el.remove();
         });
 

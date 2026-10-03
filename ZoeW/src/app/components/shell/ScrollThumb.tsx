@@ -6,7 +6,7 @@ export function ScrollThumb() {
     if (!view) return null;
     return (
         <div
-            className={view.shown ? 'scroll-thumb shown' : 'scroll-thumb'}
+            className={view.shown ? 'scroll-thumb shown' : (view.cut ? 'scroll-thumb cut' : 'scroll-thumb')}
             aria-hidden="true"
             style={{ transform: 'translate3d(' + view.x + 'px, ' + view.y + 'px, 0)', height: view.h + 'px' }}
         />

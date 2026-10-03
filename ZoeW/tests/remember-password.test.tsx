@@ -29,9 +29,27 @@ const SECRET = 'Kh-secret-9271';
 type Rec = Record<string, unknown>;
 let idbRows: Map<string, unknown>;
 let idbOff = false;
+let asyncPending = 0;
+
+function tracked<T>(work: Promise<T>): Promise<T> {
+    asyncPending++;
+    return work.finally(() => { asyncPending--; });
+}
+
+const realSubtle = crypto.subtle;
+const countedSubtle = new Proxy(realSubtle, {
+    get(target, prop) {
+        const value = (target as any)[prop];
+        return typeof value === 'function' ? (...args: unknown[]) => tracked(value.apply(target, args)) : value;
+    }
+});
+Object.defineProperty(crypto, 'subtle', { configurable: true, get: () => countedSubtle });
 
 function fakeIndexedDb() {
-    const later = (fn: () => void) => setTimeout(fn, 0);
+    const later = (fn: () => void) => {
+        asyncPending++;
+        setTimeout(() => { asyncPending--; fn(); }, 0);
+    };
     const request = (run: () => unknown) => {
         const req: any = {};
         later(() => {
@@ -89,10 +107,13 @@ function fakeFb(outcome: 'ok' | 'reject' = 'ok') {
 }
 
 async function settle() {
-    for (let i = 0; i < 6; i++) {
+    let quiet = 0;
+    for (let i = 0; i < 2000 && (i < 6 || quiet < 3); i++) {
         for (let j = 0; j < 8; j++) await Promise.resolve();
         await new Promise((r) => setTimeout(r, 0));
+        quiet = asyncPending === 0 ? quiet + 1 : 0;
     }
+    expect(asyncPending).toBe(0);
     step(() => {});
 }
 

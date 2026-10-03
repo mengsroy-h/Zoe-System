@@ -20,6 +20,7 @@ import {
 } from '../src/features/password-memory';
 import { clearRememberedSession, showLoginModalWithPrefill } from '../src/features/session';
 import { byId, mount, step, unmount } from './native/react-harness';
+import { beginAsync, settleAsync, trackCryptoSubtle } from './async-settle';
 
 const FB = { apiKey: 'A', databaseURL: 'https://shop-a.firebaseio.com', projectId: 'p' };
 const FB_OTHER = { apiKey: 'A', databaseURL: 'https://shop-b.firebaseio.com', projectId: 'q' };
@@ -30,8 +31,13 @@ type Rec = Record<string, unknown>;
 let idbRows: Map<string, unknown>;
 let idbOff = false;
 
+trackCryptoSubtle();
+
 function fakeIndexedDb() {
-    const later = (fn: () => void) => setTimeout(fn, 0);
+    const later = (fn: () => void) => {
+        const end = beginAsync();
+        setTimeout(() => { end(); fn(); }, 0);
+    };
     const request = (run: () => unknown) => {
         const req: any = {};
         later(() => {
@@ -89,11 +95,7 @@ function fakeFb(outcome: 'ok' | 'reject' = 'ok') {
 }
 
 async function settle() {
-    for (let i = 0; i < 6; i++) {
-        for (let j = 0; j < 8; j++) await Promise.resolve();
-        await new Promise((r) => setTimeout(r, 0));
-    }
-    step(() => {});
+    await settleAsync(6);
 }
 
 function useBackend(cfg: Rec, fb: any, kind: 'firebase' | 'supabase' = 'firebase') {

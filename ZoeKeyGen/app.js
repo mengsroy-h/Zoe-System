@@ -3136,6 +3136,7 @@ async function sbAdminLogin() {
 function sbAdminReset(expired) {
     sbAdminGeneration++;
     sbAdminSession = null;
+    sbAdminLastUseAt = 0;
     sbAdminBusy = false;
     sbTenantCache = [];
     sbMemberCache = [];

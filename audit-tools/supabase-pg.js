@@ -129,6 +129,7 @@ function createPgHarness(opts) {
 
     async function connect(user, database) {
         const c = new PG.Client({ host: '127.0.0.1', port, user, database });
+        c.on('error', () => {});
         await c.connect();
         return c;
     }

@@ -271,6 +271,7 @@ async function scenario(api) {
             [u1, tA, u2, u3, tB]);
         const PG = H.PG;
         pool = new PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 12 });
+        pool.on('error', () => {});
         fake = await startFakeSupabase({ pool });
         fake.addUser('sokha@users.zoew.invalid', 'pass-sokha-1', u1);
         fake.addUser('dara@users.zoew.invalid', 'pass-dara-12', u2);

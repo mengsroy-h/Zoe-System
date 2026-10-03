@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.2';
+const APP_VERSION = '2.24.3';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3213,7 +3213,7 @@ function renderSbTenantList() {
     body.innerHTML = sbTenantCache.map((row) => {
         const sbStatusHtml = badges[sbTenantState(row)];
         const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => '<span class="sb-member">' + (m.role === 'owner' ? '👑 ' : '') + escapeHtml(m.username) + '</span>').join('') || '-';
+            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-';
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
         return `<tr>

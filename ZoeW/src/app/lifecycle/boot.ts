@@ -33,6 +33,7 @@ import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
 import { noteScrollFrameRate, setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
+import { setupScrollThumb } from '../behaviors/scroll-thumb';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
 import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget } from './layers';
@@ -183,6 +184,7 @@ function startInteractions(): void {
         setupAdaptivePerformance();
         startJankMonitor();
         setupIOSPullToRefresh();
+        setupScrollThumb();
         setupVisibilityHandling();
         updateRecentPhonesList();
         setupPhoneSuggestions();

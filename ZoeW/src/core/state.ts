@@ -424,6 +424,20 @@ export interface PtrState {
 export const ptrState = createStore<PtrState>('ptrState', { view: null });
 registerStore(ptrState);
 
+export interface ScrollThumbView {
+    x: number;
+    y: number;
+    h: number;
+    shown: boolean;
+}
+
+export interface ScrollThumbState {
+    view: ScrollThumbView | null;
+}
+
+export const scrollThumbState = createStore<ScrollThumbState>('scrollThumbState', { view: null });
+registerStore(scrollThumbState);
+
 export interface SecurityState {
     lookupSecretKey: any;
     pinTargetAction: any;

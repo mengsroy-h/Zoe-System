@@ -28,6 +28,10 @@ export function pullToRefreshSupported(): boolean {
     return (window.navigator as any).standalone === true || isNativeAndroid();
 }
 
+export function drawsOwnScrollThumb(): boolean {
+    return pullToRefreshSupported();
+}
+
 export function resolveNativeApiUrl(url: string): string {
     if (!isNativeApp() || typeof url !== 'string') return url;
     const origin = nativeWebOrigin();

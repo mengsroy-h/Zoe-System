@@ -2722,6 +2722,15 @@
     },
     "ZoeW/tests/remember-password.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/app/behaviors/scroll-thumb.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/ScrollThumb.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/tests/scroll-thumb.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

@@ -471,7 +471,9 @@ async function behavior() {
         const reg = await H.as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [ownerUid, ownerHash, 'sokha']);
         ok('កូដពីអេក្រង់ ➜ finish_registration ➜ ម្ចាស់ហាងរបស់ហាងដដែល', !!reg.rows && reg.rows[0].tenant_id === tRow.id && reg.rows[0].role === 'owner', reg);
         await C.sbAdminRefresh();
-        ok('បញ្ជីបង្ហាញ 👑 sokha', /👑 sokha/.test(el('sbTenantListBody').innerHTML));
+        const ownerListHtml = el('sbTenantListBody').innerHTML;
+        ok('បញ្ជីបង្ហាញម្ចាស់ sokha ជាអក្សរដិត (sb-owner) · គ្មាន emoji នៅមុខឈ្មោះ',
+            /<span class="sb-member sb-owner" title="ម្ចាស់ហាង">sokha<\/span>/.test(ownerListHtml) && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*sokha/u.test(ownerListHtml), ownerListHtml.slice(0, 300));
         K.answers.confirm.push(true);
         await C.sbTenantAction(tRow.id, 'sb-invite');
         await drain();

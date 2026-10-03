@@ -87,6 +87,9 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   អនុវត្តរួច · `register`/`reset-password` deploy រួច · Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
   សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
   (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។
+- ⏳ **ZoeW 2.49.0 · ZoeKeyGen 2.24.3 — branch `claude/gracious-feynman-t7vu3k` (រួម PR #281) មិនទាន់ merge** — សាកលើឧបករណ៍ពិត ៖
+  ចងចាំពាក្យសម្ងាត់ (ធីក/ដកធីក · ផុត ៤ ម៉ោង · ចាកចេញ) · ខ្សែរមូរលើ iPhone PWA + APK (⛔ PTR/ចលនាផ្ទាំងនៅដដែល) · modal ZoeKeyGen លើ tablet/desktop ·
+  ចុះឈ្មោះ Supabase ដែលដាច់កណ្តាលទី (លម្អិត ៖ [2.49.0])។
 - ✅ **សេចក្តីសម្រេច៖ ZoeW គាំទ្រ backend ទាំង២តាមជម្រើសអតិថិជន — Firebase និង Supabase**។ ការសាង Supabase មិនមែនជាការបិទ Firebase ទេ។
   ត្រូវរក្សាផ្លូវ Config/Login, SDK, rules, provisioning, backup និងឯកសារដែលអតិថិជន Firebase ត្រូវការ។ CLI ផ្ទេរទិន្នន័យជាជម្រើសសម្រាប់អ្នកចង់ប្តូរ backend។
   ការសម្អាតអាចលុបតែកូដដែលបញ្ជាក់ថាមិនប្រើដោយ backend ទាំង២ និងមុខងាររួម។
@@ -125,11 +128,12 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.0] — 2026-10-03 · ZoeW ៖ **ចងចាំពាក្យសម្ងាត់ (checkbox) · ហាង Supabase ៖ ការចុះឈ្មោះដែលដាច់កណ្តាលទីបន្តបាន**
+### [2.49.0] — 2026-10-03 · ZoeW · ZoeKeyGen `2.24.3` ៖ **ចងចាំពាក្យសម្ងាត់ (checkbox) · ខ្សែរមូរលើ APK/iPhone · ហាង Supabase ៖ ការចុះឈ្មោះដែលដាច់កណ្តាលទីបន្តបាន · ZoeKeyGen ៖ modal តាមទំហំអេក្រង់ · គ្មាន emoji មុខឈ្មោះគណនី**
 
-**ZoeW `2.49.0`** (`zoew-v255` ➜ `zoew-v256`) — ឈរលើ [2.48.2] (PR #281 មិនទាន់ merge ➜ branch នេះរួម 2.48.2 ទាំងមូល)។
-⛔ **ZoeKeyGen មិនប្រែ** · Firebase rules · Supabase migration **មិនប្រែ** (Edge Function `register` ប្រែ)។ សំណើម្ចាស់គម្រោង ៖
-«ZoeW អោយមាន Checkbox ចងចាំ Password login … អ្នកប្រើអាចដកធីកបានដោយខ្លួនឯង» · Handoff ជំហាន ២ (ចន្លោះ register)។
+**ZoeW `2.49.0`** (`zoew-v255` ➜ `zoew-v256`) — ឈរលើ [2.48.2] (PR #281 មិនទាន់ merge ➜ branch នេះរួម 2.48.2 ទាំងមូល) ·
+**ZoeKeyGen `2.24.3`** (`zoekeygen-v113` ➜ `zoekeygen-v114`)។ ⛔ Firebase rules · Supabase migration **មិនប្រែ** (Edge Function `register` ប្រែ)។
+សំណើម្ចាស់គម្រោង ៖ «Checkbox ចងចាំ Password login … ដកធីកបានដោយខ្លួនឯង» · «ដាក់ scrollbar សម្រាប់ APK និង PWA iOS … ដាក់តូចកុំបាំងអីផ្សេង» ·
+«ពិនិត្យ modal ទាំងអស់អោយឆ្លាស់ទំហំតាមប្រភេទអេក្រង់ (ZoeKeyGen និង ZoeW)» · «ដក emoji ពីមុខ username ក្នុង ZoeKeyGen» · Handoff ជំហាន ២ (register)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -142,6 +146,12 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   **ឈ្មោះ + ពាក្យសម្ងាត់ដដែល** ➜ Server បញ្ជាក់ពាក្យសម្ងាត់ជាមួយ Auth (client ថ្មីរាល់ការហៅ · ផ្តាច់ session ផ្ទៀងផ្ទាត់ `scope=local`) រួចហៅ
   `finish_registration` (idempotent) លើ user id នោះ ➜ `200 registered`។ ពាក្យសម្ងាត់ផ្សេង ➜ `409 username-taken` (ដូចមុន) · Auth មិនឆ្លើយ ➜ `502 auth-unavailable` ·
   ⛔ ផ្លូវបន្តមិនលុបគណនីដែលសំណើនោះមិនបានបង្កើត។
+- **ខ្សែរមូរ (APK · iPhone PWA តែប៉ុណ្ណោះ)** ៖ iOS WebKit មិនគូរ `::-webkit-scrollbar` ➜ App គូរខ្សែ ៣px ពណ៌ប្រផេះខ្លួនឯង (`ScrollThumb` · ធាតុ `position: fixed`
+  `pointer-events: none`) ៖ លេចពេលរមូរបញ្ឈរ · បាត់ក្រោយស្ងៀម ៩០០ms · មិនជាន់ navbar/របា Tab (លើកលែងក្នុង modal/drawer) · listener scroll តែមួយ (passive · capture ·
+  rAF)។ ⛔ មិនប្តូរ layout · មិនប៉ះ PTR/ចលនាផ្ទាំង · web/PWA Android/desktop គ្មាន listener គ្មានធាតុ (`drawsOwnScrollThumb()`)។
+- **ZoeKeyGen ៖ modal តាមទំហំអេក្រង់** ៖ ទទឹងជា «ឯកតាអក្សរ» (`calc(var(--modal-w) * var(--fs-unit))`) ជំនួស px ថេរ ➜ ទូរស័ព្ទស្ទើរដូចដើម · tablet/desktop
+  រីកតាមអក្សរ (ប្រអប់ PIN 300 ➜ 405px លើ 1920px)។ ZoeW ៖ វាស់រួច មិនប្តូរ (រីកតាមអេក្រង់ស្រាប់)។
+- **ZoeKeyGen ៖ បញ្ជីហាង** ៖ ម្ចាស់ហាងបង្ហាញជាអក្សរដិត (tooltip «ម្ចាស់ហាង») ជំនួស «👑» នៅមុខឈ្មោះគណនី។
 
 #### អ្នកយាម
 
@@ -149,11 +159,17 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   mutation ១១ លើកូដពិត ➜ ក្រហម ១១ (ដកធីកមិនលុប · key នាំចេញបាន · អក្សរធម្មតាក្នុង record · បំពេញជាន់ការវាយ · បកដោយគ្មាន binding · race · ចាកចេញ/ប្តូរពាក្យសម្ងាត់មិនលុប …)។
 - `supabase-functions-test` ៖ ក្រុម `register-resume` (ពិភពក្លែងមានស្ថានភាព) + adapter ទល់ GoTrue ក្លែងដោយ supabase-js ពិត · tree មុនកែ ➜ **FAIL ១១** ➜ **២០២/២០២** ·
   mutation ថ្មី ១០ ➜ ក្រហមទាំង ១០។
+- `ZoeW/tests/scroll-thumb.test.tsx` (៨) ៖ ធរណីមាត្រ · មិនជាន់ chrome · web មិនដំឡើង · លាក់ពេលស្ងៀម · រមូរផ្តេកមិនលេច · modal ពេញកម្ពស់ · CSS `pointer-events: none` ·
+  mutation ៨ ➜ ក្រហម ៦ · ២ ដែលរួចគឺលក្ខខណ្ឌស្ទួន ➜ លុបចេញពីកូដ។
+- `layout-check` ៖ ទិសទី ២ របស់ modal (ទទឹងជាឯកតាអក្សរលើ tablet/desktop ≥ ៩៧% នៃទូរស័ព្ទ ឬពេញអេក្រង់) · ZoeKeyGen មុនកែ **FAIL** (`pinModal @768px 273u < 281u` …) ➜ **101/101**។
+- `keygen-supabase-admin-test` ៖ ម្ចាស់ `sb-owner` · គ្មាន emoji មុខឈ្មោះ។ `setup-link-logout-test` ៖ ចាក់កូដពិតនៃការបំពេញពាក្យសម្ងាត់ ➜ ចាកចេញមិនបន្សល់ (mutation ➜ ក្រហម)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - ក្រោយអនុម័ត merge ៖ ជំហាន [2.48.2] (migration `20261002154730_zoe_reset_claim.sql` **មុន** Functions) ➜ deploy Edge Function **`register`** និង `reset-password`
-  ➜ Netlify ZoeW + APK ថ្មី។ គ្មាន migration ថ្មីសម្រាប់ 2.49.0។
+  ➜ Netlify ZoeW + ZoeKeyGen + APK ថ្មី។ គ្មាន migration ថ្មីសម្រាប់ 2.49.0។
+- iPhone PWA + APK ៖ រមូរតារាងប្រវត្តិ · បញ្ជីក្នុង modal ➜ ខ្សែស្តើងលេច/បាត់ · ⛔ ពិនិត្យថា PTR · ចលនាផ្ទាំង · ភាពរលូនពេលរមូរ នៅដដែល (តំបន់ហាម ៖ វាស់លើឧបករណ៍ពិត ២ ប្រភេទមុន merge)។
+- ZoeKeyGen ៖ បើក modal (PIN · Config · Key ថ្មី · Extend) លើទូរស័ព្ទ · tablet · កុំព្យូទ័រ · បញ្ជីហាង ៖ ម្ចាស់ជាអក្សរដិត។
 - សាកលើឧបករណ៍ពិត ៖ ចូល (ធីក) ➜ បិទ App ➜ រង់ចាំផុត ៤ ម៉ោង (ឬចាកចេញ ➜ ត្រូវតែទទេ) ➜ ពាក្យសម្ងាត់បំពេញ · ដកធីក ➜ វាលទទេ · iPhone PWA · APK · Firebase និង Supabase។
 
 ### [2.48.2] — 2026-10-03 · ZoeW ៖ កូដប្តូរពាក្យសម្ងាត់ Supabase ទទួលសំណើតែមួយ
@@ -995,6 +1011,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — modal ZoeKeyGen ចង្អៀតលើ desktop · ខ្សែរមូរ iOS (ZoeW 2.49.0 · ZoeKeyGen 2.24.3)
+
+`layout-check` វាស់តែ «modal មិនលើសអេក្រង់» ➜ ជាប់ទោះ modal ZoeKeyGen ទទឹង px ថេរ ខណៈ `--fs-unit` ឡើង 1.0 ➜ 1.35 ៖ ប្រអប់ PIN **២៨៨ ឯកតាអក្សរ** លើ 320px ➜
+**២២២** លើ 1920px (modal ទាំង ៦ ចង្អៀតទៅៗពេលអេក្រង់ធំ)។ ZoeW (`clamp(…vw…)`) ៖ ១៥៥ សំណាក tablet/desktop ≥ ទូរស័ព្ទទាំងអស់។ ការកែ ៖ ទទឹង = `--modal-w × --fs-unit`
+➜ ឯកតាអក្សរថេរគ្រប់អេក្រង់ (PIN ៣០០u)។ អ្នកយាមថ្មីក្នុង `layout-check` ៖ tree មុនកែ FAIL ១ (ZoeKeyGen) ➜ ១០១/១០១។
+ខ្សែរមូរ ៖ iOS WebKit មិនគាំទ្រការកំណត់រចនា scrollbar ➜ indicator គូរដោយ App (state ➜ React) · purity:check ៖ ការសរសេរ DOM ក្រៅច្រក ០។
+Android WebView ៖ ជ្រើស indicator ដដែល (មិនប្រើ `::-webkit-scrollbar` ដែលស៊ីទទឹង layout ៣px ជាប់ជានិច្ច) ➜ រូបរាងដូច PWA Android (លេចពេលរមូរ)។
 
 ### 2026-10-03 — Supabase register ៖ createUser ឆ្លើយបាត់ ➜ user កំព្រា · retry ➜ username-taken (ZoeW 2.49.0)
 

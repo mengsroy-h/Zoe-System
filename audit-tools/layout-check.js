@@ -94,6 +94,7 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
         const server = await serve(dir);
         const port = server.address().port;
         const shape = {};
+        const modalUnits = {};
         for (const size of SIZES) {
             const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h } });
             const page = await ctx.newPage();
@@ -175,17 +176,28 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                     });
                     // ប្រអប់ត្រូវនៅក្នុងអេក្រង់ ហើយអាចរមូរបាន បើវាខ្ពស់ជាង
                     let boxIssue = null;
+                    let units = null, fills = false;
                     if (box) {
                         const bb = box.getBoundingClientRect();
                         if (bb.top < -1) boxIssue = 'ផ្នែកខាងលើចេញក្រៅអេក្រង់ top=' + Math.round(bb.top);
                         else if (bb.height > vh + 1 && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) boxIssue = 'ខ្ពស់ជាងអេក្រង់ តែរមូរមិនបាន h=' + Math.round(bb.height) + '/' + vh;
+                        const probe = document.createElement('div');
+                        probe.style.cssText = 'position:absolute;visibility:hidden;width:calc(100 * var(--fs-unit))';
+                        document.body.appendChild(probe);
+                        const unit = probe.getBoundingClientRect().width / 100;
+                        probe.remove();
+                        const ms = getComputedStyle(m);
+                        const room = vw - parseFloat(ms.paddingLeft) - parseFloat(ms.paddingRight);
+                        if (unit > 0 && bb.width > 0) units = bb.width / unit;
+                        fills = bb.width >= room - 1;
                     }
                     prevAll.forEach(([x, d, h]) => { x.style.display = d; if (h) x.classList.add('hidden'); });
                     if (wasHidden) m.classList.add('hidden');
-                    return { over, boxIssue };
+                    return { over, boxIssue, units, fills };
                 }, mid);
                 if (r && r.over) modalBad.push(mid + ' ➜ លើសទទឹង: ' + r.over);
                 if (r && r.boxIssue) modalBad.push(mid + ' ➜ ' + r.boxIssue);
+                if (r && r.units !== null) (modalUnits[mid] = modalUnits[mid] || []).push({ w: size.w, units: r.units, fills: r.fills });
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
@@ -361,6 +373,23 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
 
             await ctx.close();
         }
+
+        // ⛔ ទិសទី ២ របស់ modal ៖ «មិនលើសអេក្រង់» ជាប់ទោះ modal ទទឹង px ថេរ (ZoeKeyGen ៣០០–៤៦០px) នៅតូចលើ desktop ខណៈអក្សរធំ ៣៥% ➜
+        //    ប្រអប់ PIN ២៨៨ ឯកតាអក្សរលើទូរស័ព្ទ ➜ ២២២ លើ 1920px (ចង្អៀតជាងទូរស័ព្ទ)។ វាស់ទទឹងជា `--fs-unit` ៖ លើ tablet/desktop
+        //    ត្រូវ ≥ ៩៧% នៃអតិបរមាលើទូរស័ព្ទ (ឬពេញអេក្រង់)។ modal ដែលមិនដែលបង្ហាញលើទូរស័ព្ទ ➜ គ្មានមូលដ្ឋាន ➜ មិនរាប់។
+        const squeezed = [];
+        let squeezeSamples = 0;
+        for (const [mid, list] of Object.entries(modalUnits)) {
+            const phone = list.filter((x) => x.w <= 430).map((x) => x.units);
+            if (!phone.length) continue;
+            const floor = Math.max(...phone) * 0.97;
+            for (const x of list.filter((y) => y.w >= 700)) {
+                squeezeSamples++;
+                if (x.units < floor && !x.fills) squeezed.push(mid + ' @' + x.w + 'px ' + Math.round(x.units) + 'u < ' + Math.round(floor) + 'u');
+            }
+        }
+        check(squeezeSamples >= 5 && squeezed.length === 0,
+            app + ': modal លើ tablet/desktop មិនចង្អៀតជាងទូរស័ព្ទ (ទទឹងជាឯកតាអក្សរ · វាស់ ' + squeezeSamples + ')', squeezed.slice(0, 6).join('\n        '));
 
         if (DESKTOP[app] && shape[412]) {
             for (const w of [1280, 1440]) {

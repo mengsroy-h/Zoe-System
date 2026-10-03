@@ -292,6 +292,8 @@ export interface UiState {
     drawerOpen: boolean;
     notifyDrawerOpen: boolean;
     notifyView: import('../features/notifications').NotifyView | null;
+    notifyRemovedView: import('../features/notifications').NotifyRemovedView | null;
+    notifyRemovedSeenIds: string[];
     notifyFeed: import('../features/notifications').NotifyFeedItem[];
     notifySellerFeed: import('../features/notifications').NotifyFeedItem[];
     pushStatus: import('../features/push').PushStatus;
@@ -383,6 +385,8 @@ export const uiState = createStore<UiState>('uiState', {
     drawerOpen: false,
     notifyDrawerOpen: false,
     notifyView: null,
+    notifyRemovedView: null,
+    notifyRemovedSeenIds: [],
     notifyFeed: [],
     notifySellerFeed: [],
     pushStatus: 'unknown',

@@ -182,6 +182,7 @@ export function clearSensitiveModalFields() {
     uiState.monthlyReportMonth = '';
     uiState.notifyDrawerOpen = false;
     uiState.notifyView = null;
+    uiState.notifyRemovedView = null;
 }
 
 export function showLoginModalWithPrefill() {

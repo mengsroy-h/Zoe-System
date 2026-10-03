@@ -278,6 +278,7 @@ function buildContext() {
         normalizeBarcodesOf: () => {},
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
+        refreshNotifyRemovedView: () => {},
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },

@@ -12,16 +12,18 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
-import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../src/core/text';
+import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../src/core/text';
 import { APP_VERSION } from '../src/core/version';
 import { barcodeAbandonIsRipe } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
-    NOTIFY_EMPTY_EXPIRY_TEXT, NOTIFY_FEED_CACHE_KEY, NOTIFY_HOUR_MS, NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_SEEN_KEY,
-    compareVersions, fetchNotifyFeed, hoursUntilAbandon, nearExpiryView, newerAppVersion, notifyBadgeCount,
-    openNotifyDrawer, refreshNotifyView, sanitizeFeed
+    NOTIFY_EMPTY_EXPIRY_TEXT, NOTIFY_EMPTY_REMOVED_TEXT, NOTIFY_FEED_CACHE_KEY, NOTIFY_HOUR_MS, NOTIFY_EXPIRY_HOURS_MAX,
+    NOTIFY_REMOVED_SEEN_KEY, NOTIFY_SEEN_KEY, compareVersions, fetchNotifyFeed, hoursUntilAbandon, nearExpiryView,
+    newerAppVersion, notifyBadgeCount, openNotifyDrawer, refreshNotifyRemovedView, refreshNotifyView, removedParcelsView,
+    sanitizeFeed
 } from '../src/features/notifications';
+import { initDatabaseListeners } from '../src/services/db-listeners';
 import { closeSideDrawer, isSideDrawerOpen, openSideDrawer } from '../src/ui/page-nav';
 import { showUpdateAvailableBanner } from '../src/ui/boot-splash';
 import { AppNavbar } from '../src/app/components/AppNavbar';
@@ -45,10 +47,13 @@ beforeEach(() => {
     uiState.notifyFeed = [];
     uiState.notifySeenIds = [];
     uiState.notifyView = null;
+    (uiState as any).notifyRemovedView = null;
+    (uiState as any).notifyRemovedSeenIds = [];
     uiState.updateReady = false;
     uiState.notifyFeedFetchedAt = 0;
     uiState.notifyFeedInFlight = false;
     dataState.scanHistory = [];
+    dataState.deletedItems = [];
     firebaseState.isDatabaseInitialized = true;
 });
 
@@ -240,5 +245,109 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         step(() => { dataState.scanHistory = []; clearSensitiveModalFields(); });
         expect(document.getElementById('notifyDrawer')!.textContent).not.toContain(phone);
         expect(uiState.notifyDrawerOpen).toBe(false);
+    });
+});
+
+function trashItem(id: string, deletedAt: number, barcodes: any[], extra: any = {}) {
+    return { id, phone: '0' + id.replace(/\D/g, '').padStart(8, '2'), deletedAt, barcodes, trashReason: 'expired', isFromDeletion: false, ...extra };
+}
+
+describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរាម «ផុតកំណត់» (សំណើម្ចាស់គម្រោង)', () => {
+    it('រាប់តែ trashReasonOf() = expired · ដក/យករួច/លុប/កំពុងស្តារ/ចាស់គ្មាន trashReason មិនរាប់ · ថ្មីបំផុតមុន', () => {
+        const deleted = [
+            trashItem('T1', NOW - 5 * NOTIFY_HOUR_MS, [{ code: 'A', locker: 'L-1' }, { code: 'B' }]),
+            trashItem('T2', NOW - 30 * 60 * 1000, [{ code: 'C' }]),
+            trashItem('T3', NOW - NOTIFY_HOUR_MS, [{ code: 'D' }], { trashReason: 'remove' }),
+            trashItem('T4', NOW - NOTIFY_HOUR_MS, [{ code: 'E' }], { trashReason: 'pickup', isFromDeletion: true }),
+            trashItem('T5', NOW - NOTIFY_HOUR_MS, [{ code: 'F' }], { trashReason: 'delete', isFromDeletion: true }),
+            trashItem('T6', NOW - NOTIFY_HOUR_MS, [{ code: 'G' }], { restoreClaim: { token: 't', at: NOW } }),
+            { id: 'T7', phone: '0999', deletedAt: NOW - NOTIFY_HOUR_MS, barcodes: [{ code: 'H' }], isFromDeletion: false },
+            trashItem('T8', NOW - 2 * NOTIFY_HOUR_MS, [{ code: 'I' }], { phone: trashItem('T1', 0, []).phone }),
+            null,
+            5
+        ];
+        const view = removedParcelsView(deleted, NOW, false, []);
+        expect(view.measurable).toBe(true);
+        expect(view.packages).toBe(4);
+        expect(view.customers).toBe(2);
+        expect(view.unseen).toBe(4);
+        expect(view.rows.map((r) => r.key)).toEqual(['T2', 'T8', 'T1']);
+        expect(view.rows[2]).toMatchObject({ count: 2, locker: 'L-1', hoursAgo: 5, isNew: true });
+        expect(view.rows[0]).toMatchObject({ count: 1, hoursAgo: 0 });
+        const seen = removedParcelsView(deleted, NOW, false, ['T1']);
+        expect(seen.unseen).toBe(2);
+        expect(seen.rows.find((r) => r.key === 'T1')!.isNew).toBe(false);
+    });
+
+    it('ទិដ្ឋភាពធុងសំរាមមិនស្រស់ ឬ Database មិនទាន់ភ្ជាប់ ➜ «វាស់មិនបាន» មិនមែន «គ្មាន» ហើយមិនរាប់ចូល badge', () => {
+        const deleted = [trashItem('S1', NOW - NOTIFY_HOUR_MS, [{ code: 'S' }])];
+        const stale = removedParcelsView(deleted, NOW, true, []);
+        expect(stale).toMatchObject({ measurable: false, packages: 0, customers: 0, unseen: 0, rows: [], emptyText: VIEW_NOT_MEASURABLE_NOTICE });
+        expect(notifyBadgeCount(nearExpiryView([], NOW, false), [], [], stale)).toBe(0);
+        dataState.deletedItems = deleted;
+        firebaseState.isDatabaseInitialized = false;
+        refreshNotifyRemovedView();
+        expect((uiState as any).notifyRemovedView.measurable).toBe(false);
+        firebaseState.isDatabaseInitialized = true;
+        dbListenerPendingPaths.add(DB_LISTENER_KEY_DELETED);
+        refreshNotifyRemovedView();
+        expect((uiState as any).notifyRemovedView).toMatchObject({ measurable: false, packages: 0, unseen: 0, emptyText: VIEW_NOT_MEASURABLE_NOTICE });
+        dbListenerPendingPaths.clear();
+        refreshNotifyRemovedView();
+        expect((uiState as any).notifyRemovedView.packages).toBe(1);
+        dataState.deletedItems = [];
+        refreshNotifyRemovedView();
+        expect((uiState as any).notifyRemovedView.emptyText).toBe(NOTIFY_EMPTY_REMOVED_TEXT);
+        expect(notifyBadgeCount(nearExpiryView([], NOW, false), [], [], removedParcelsView(deleted, NOW, false, []))).toBe(1);
+    });
+
+    it('listener ធុងសំរាមពិត (initDatabaseListeners) ➜ ផ្ទាំងធ្វើបច្ចុប្បន្នភាពភ្លាម មិនរង់ចាំប្រវត្តិ', () => {
+        const callbacks: Record<string, (snap: any) => void> = {};
+        const saved = { db: firebaseState.db, fb: firebaseState.fb, del: firebaseState.dbRefDeleted };
+        try {
+            firebaseState.db = {} as any;
+            firebaseState.fb = { onValue: (ref: any, cb: any) => { callbacks[ref] = cb; return () => {}; }, off: () => {} } as any;
+            firebaseState.dbRefDeleted = 'DEL' as any;
+            expect(initDatabaseListeners()).toBe(true);
+            const at = Date.now() - NOTIFY_HOUR_MS;
+            callbacks.DEL({ val: () => ({ X1: trashItem('X1', at, [{ code: 'X' }, { code: 'Y' }]) }) });
+            expect((uiState as any).notifyRemovedView.measurable).toBe(true);
+            expect((uiState as any).notifyRemovedView.packages).toBe(2);
+        } finally {
+            firebaseState.db = saved.db;
+            firebaseState.fb = saved.fb;
+            firebaseState.dbRefDeleted = saved.del;
+        }
+    });
+
+    it('UI ពិត ៖ បញ្ជី + ស្លាក «ថ្មី» · badge រាប់កញ្ចប់ដកដែលមិនទាន់មើល · បិទផ្ទាំង ➜ បានមើល', () => {
+        vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }))));
+        dataState.deletedItems = [trashItem('R1', Date.now() - 3 * NOTIFY_HOUR_MS, [{ code: 'R', locker: 'L-9' }, { code: 'S' }])];
+        mount(<><AppNavbar /><DrawerBackdrop /><SideDrawer /><NotifyDrawer /></>);
+        step(() => { openNotifyDrawer(); });
+        const list = document.getElementById('notifyRemovedList')!;
+        expect(list.children).toHaveLength(1);
+        expect(list.textContent).toContain(dataState.deletedItems[0].phone);
+        expect(list.textContent).toContain('L-9');
+        expect(list.querySelector('.notify-new-tag')).toBeTruthy();
+        expect(document.getElementById('notifyRemovedSummary')!.textContent).toContain('2');
+        expect(document.getElementById('navNotifyBadge')!.textContent).toBe('2');
+        step(() => { closeSideDrawer(); });
+        expect(JSON.parse(localStorage.getItem(NOTIFY_REMOVED_SEEN_KEY)!)).toEqual(['R1']);
+        expect(document.getElementById('navNotifyBadge')).toBeNull();
+        step(() => { openNotifyDrawer(); });
+        expect(document.getElementById('notifyRemovedList')!.querySelector('.notify-new-tag')).toBeNull();
+    });
+
+    it('⛔ ចាកចេញ ➜ លេខទូរស័ព្ទក្នុងបញ្ជីកញ្ចប់ដករួចមិនសល់ក្នុង DOM', () => {
+        vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }))));
+        dataState.deletedItems = [trashItem('Q1', Date.now() - NOTIFY_HOUR_MS, [{ code: 'Q' }])];
+        mount(<><DrawerBackdrop /><NotifyDrawer /></>);
+        step(() => { openNotifyDrawer(); });
+        const phone = dataState.deletedItems[0].phone;
+        expect(document.getElementById('notifyDrawer')!.textContent).toContain(phone);
+        step(() => { dataState.deletedItems = []; clearSensitiveModalFields(); });
+        expect(document.getElementById('notifyDrawer')!.textContent).not.toContain(phone);
+        expect((uiState as any).notifyRemovedView).toBeNull();
     });
 });

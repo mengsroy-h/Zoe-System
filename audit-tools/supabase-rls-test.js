@@ -60,6 +60,7 @@ const EXPECT_PUBLIC_EXEC = {
     admin_revoke_invite: ['authenticated'],
     finish_registration: ['service_role'],
     invite_is_usable: ['service_role'],
+    spent_invite_member: ['service_role'],
     revoke_user_sessions: ['service_role'],
     admin_issue_reset_code: ['authenticated'],
     reset_code_user: ['service_role'],
@@ -382,6 +383,79 @@ async function body(c, rec, extra, mode) {
     const regB = await finishReg(SERVICE, uB1, await hashOf(invB.rows[0].code), 'dara');
     rec('ចុះឈ្មោះ tenant B', !!regB.rows && regB.rows[0].tenant_id === B, regB);
 
+    const hB = await hashOf(invB.rows[0].code);
+    const rowsOr = async (q, p) => { try { return (await c.query(q, p)).rows; } catch (e) { return { error: e.message }; } };
+    const usedOf = async (hash) => { const r = await rowsOr('select used_count from public.tenant_invites where code_hash = $1', [hash]); return Array.isArray(r) && r[0] ? r[0].used_count : r; };
+    const spentMember = async (hash, username) => {
+        const r = await as(c, SERVICE, 'select * from public.spent_invite_member($1, $2)', [hash, username]);
+        return r.rows ? r.rows : r;
+    };
+    const isRow = (rows, uid, tenant, role) => Array.isArray(rows) && rows.length === 1 && rows[0].user_id === uid && rows[0].tenant_id === tenant
+        && rows[0].role === role && Object.keys(rows[0]).sort().join() === 'role,tenant_id,user_id';
+    const noRow = (rows) => Array.isArray(rows) && rows.length === 0;
+    const recorded = await rowsOr('select username, invite_code_hash from public.tenant_members where user_id = any($1) order by username', [[uA1, uA2, uA3, uB1]]);
+    rec('finish_registration កត់ hash កូដដែលចុះឈ្មោះសមាជិកម្នាក់ៗ (invite_code_hash ៖ chan/vanna ➜ កូដ max_uses=2 · dara ➜ កូដ B · sokha ➜ កូដ owner)',
+        Array.isArray(recorded) && JSON.stringify(recorded.map((x) => [x.username, x.invite_code_hash])) === JSON.stringify([['chan', h2], ['dara', hB], ['sokha', h1], ['vanna', h2]]), recorded);
+    rec('anon ៖ spent_invite_member ➜ permission denied', denied(await as(c, ANON, 'select * from public.spent_invite_member($1, $2)', [h1, 'sokha'])));
+    rec('authenticated (សូម្បីសមាជិកដែលប្រើកូដនោះ) ៖ spent_invite_member ➜ permission denied (ការទាយកូដដោយផ្ទាល់)',
+        denied(await as(c, { role: 'authenticated', sub: uA1 }, 'select * from public.spent_invite_member($1, $2)', [h1, 'sokha'])));
+    const usedSpentBefore = [await usedOf(h1), await usedOf(h2), await usedOf(hB)];
+    rec('spent_invite_member ៖ កូដប្រើអស់ (max_uses=1) + username ដែលចុះឈ្មោះដោយកូដនោះ ➜ user id · tenant · role របស់សមាជិក (App អស់ពេលរង់ចាំ ➜ សាកម្តងទៀតបាន)',
+        isRow(await spentMember(h1, 'sokha'), uA1, A, 'owner'));
+    rec('spent_invite_member ៖ កូដប្រើអស់ (max_uses=2) ➜ អ្នកប្រើម្នាក់ៗ ➜ ជួររបស់ខ្លួន', isRow(await spentMember(h2, 'vanna'), uA2, A, 'member')
+        && isRow(await spentMember(h2, 'chan'), uA3, A, 'member') && isRow(await spentMember(hB, 'dara'), uB1, B, 'member'));
+    rec('spent_invite_member ៖ សមាជិកហាងដដែល តែចុះឈ្មោះដោយកូដផ្សេង ➜ គ្មាន (ត្រូវតែកូដនេះ)', noRow(await spentMember(h1, 'vanna')) && noRow(await spentMember(h2, 'sokha')));
+    rec('spent_invite_member ៖ សមាជិកហាងផ្សេង + កូដរបស់ A · សមាជិក A + កូដរបស់ B ➜ គ្មាន', noRow(await spentMember(h1, 'dara')) && noRow(await spentMember(h2, 'dara'))
+        && noRow(await spentMember(hB, 'sokha')));
+    rec('spent_invite_member ៖ username គ្មានសមាជិកភាព/មិនមាន · hash មិនស្គាល់ ➜ គ្មាន', noRow(await spentMember(h1, 'dara4')) && noRow(await spentMember(h1, 'nobody'))
+        && noRow(await spentMember('0'.repeat(64), 'sokha')));
+    rec('spent_invite_member ៖ កូដផុតកំណត់ដែលមិនធ្លាប់ប្រើ · កូដ revoke ដែលមិនធ្លាប់ប្រើ ➜ គ្មាន', noRow(await spentMember(h3, 'sokha')) && noRow(await spentMember(h4, 'sokha')));
+    await c.query('update public.tenant_members set tenant_id = $2 where user_id = $1', [uA3, B]);
+    const movedShop = await spentMember(h2, 'chan');
+    await c.query('update public.tenant_members set tenant_id = $2 where user_id = $1', [uA3, A]);
+    await c.query("update public.tenant_members set role = 'owner' where user_id = $1", [uA2]);
+    const changedRole = await spentMember(h2, 'vanna');
+    await c.query("update public.tenant_members set role = 'member' where user_id = $1", [uA2]);
+    rec('spent_invite_member ៖ សមាជិកដែលហាង ឬ role លែងស្មើកូដ (កែដោយផ្ទាល់ក្នុង DB) ➜ គ្មាន (⛔ មិនឆ្លើយហាងផ្សេង · មិនប្តូរ role)',
+        noRow(movedShop) && noRow(changedRole) && isRow(await spentMember(h2, 'chan'), uA3, A, 'member'), { movedShop, changedRole });
+    const invPart = await issue(ADMIN, A, 'member', 2, 24);
+    const hPart = await hashOf(invPart.rows[0].code);
+    const uPart = await makeAuthUser(c, 'part1@u.zoe.test');
+    const regPart = await finishReg(SERVICE, uPart, hPart, 'part1');
+    rec('spent_invite_member ៖ កូដនៅប្រើបាន (ប្រើ ១/២) ➜ គ្មាន (ផ្លូវកូដប្រើបានធម្មតាដោះស្រាយ)', !!regPart.rows && noRow(await spentMember(hPart, 'part1')), regPart);
+    rec('spent_invite_member ៖ សមាជិកហាងដដែល role ដដែល តែចុះឈ្មោះដោយកូដផ្សេង + កូដប្រើអស់ ➜ គ្មាន (ត្រូវតែកូដនេះ)', noRow(await spentMember(h2, 'part1')));
+    await c.query("update public.tenant_invites set expires_at = now() - interval '1 second' where code_hash = $1", [hPart]);
+    rec('spent_invite_member ៖ កូដផុតកំណត់ក្រោយប្រើ ➜ អ្នកប្រើ ➜ ជួររបស់ខ្លួន', isRow(await spentMember(hPart, 'part1'), uPart, A, 'member'));
+    await as(c, ADMIN, 'select public.admin_revoke_invite($1)', [hPart]);
+    rec('spent_invite_member ៖ កូដប្រើរួច តែ admin revoke ➜ គ្មាន', noRow(await spentMember(hPart, 'part1')));
+    await c.query('update public.tenants set revoked = true where id = $1', [A]);
+    const whileRevoked = await spentMember(h1, 'sokha');
+    await c.query("update public.tenants set revoked = false, expires_at = now() - interval '1 second' where id = $1", [A]);
+    const whileExpired = await spentMember(h1, 'sokha');
+    await c.query('update public.tenants set expires_at = $2 where id = $1', [A, future]);
+    rec('spent_invite_member ៖ ហាងបិទ ឬផុតកំណត់ ➜ គ្មាន · សកម្មវិញ ➜ មានវិញ', noRow(whileRevoked) && noRow(whileExpired) && isRow(await spentMember(h1, 'sokha'), uA1, A, 'owner'),
+        { whileRevoked, whileExpired });
+    rec('spent_invite_member អានតែប៉ុណ្ណោះ ៖ used_count មិនប្រែ', JSON.stringify([await usedOf(h1), await usedOf(h2), await usedOf(hB)]) === JSON.stringify(usedSpentBefore)
+        && JSON.stringify(usedSpentBefore) === JSON.stringify([1, 2, 1]), usedSpentBefore);
+
+    const invA2 = await issue(ADMIN, A, 'owner', 1, 24);
+    const hA2 = await hashOf(invA2.rows[0].code);
+    const sameShop = await finishReg(SERVICE, uA1, hA2, 'sokha');
+    rec('finish_registration ៖ សមាជិកមានរួច + កូដផ្សេងរបស់ហាងដដែល role ដដែល ➜ ជួរដដែល · កូដនោះមិនស៊ី',
+        !!sameShop.rows && sameShop.rows[0].tenant_id === A && sameShop.rows[0].role === 'owner' && (await usedOf(hA2)) === 0, sameShop);
+    const invBOpen = await issue(ADMIN, B, 'owner', 1, 24);
+    const hBOpen = await hashOf(invBOpen.rows[0].code);
+    const crossShop = await finishReg(SERVICE, uA1, hBOpen, 'sokha');
+    const sokhaAfter = await rowsOr('select tenant_id, role, invite_code_hash from public.tenant_members where user_id = $1', [uA1]);
+    rec('finish_registration ៖ owner ហាង A + កូដ owner ប្រើបានរបស់ហាង B ➜ username-taken (⛔ មិនឆ្លើយ «ចុះឈ្មោះរួច» · មិនផ្លាស់ហាង) · កូដ B មិនស៊ី',
+        raised(crossShop, 'username-taken') && (await usedOf(hBOpen)) === 0 && Array.isArray(sokhaAfter) && sokhaAfter[0].tenant_id === A
+        && sokhaAfter[0].role === 'owner' && sokhaAfter[0].invite_code_hash === h1, { crossShop, sokhaAfter });
+    const invAMember = await issue(ADMIN, A, 'member', 1, 24);
+    const hAMember = await hashOf(invAMember.rows[0].code);
+    const crossRole = await finishReg(SERVICE, uA1, hAMember, 'sokha');
+    rec('finish_registration ៖ owner + កូដ member របស់ហាងដដែល ➜ username-taken (⛔ មិនប្តូរ role) · កូដមិនស៊ី',
+        raised(crossRole, 'username-taken') && (await usedOf(hAMember)) === 0, crossRole);
+
     const WA = { role: 'authenticated', sub: uA1 };
     const WB = { role: 'authenticated', sub: uB1 };
     const seeTenants = async (who) => ((await as(c, who, 'select id from public.tenants order by id')).rows || []).map((r) => r.id);
@@ -645,16 +719,34 @@ const MUTATIONS = [
     ['invite_row_usable មិនពិនិត្យ max_uses', 'and i.used_count < i.max_uses and', 'and'],
     ['invite_row_usable មិនពិនិត្យថ្ងៃផុតរបស់កូដ', 'and i.expires_at > now() and private.tenant_row_active(t)', 'and private.tenant_row_active(t)'],
     ['invite_row_usable មិនពិនិត្យ tenant', 'i.expires_at > now() and private.tenant_row_active(t)', 'i.expires_at > now()'],
-    ['finish_registration មិនហៅ invite_row_usable', '        and t.id = i.tenant_id\n        and private.invite_row_usable(i, t)\n    returning',
-        '        and t.id = i.tenant_id\n    returning'],
-    ['finish_registration លែង idempotent', "    if found then\n        tenant_id := invite_tenant;", "    if false then\n        tenant_id := invite_tenant;"],
+    ['finish_registration មិនហៅ invite_row_usable',
+        "        and private.invite_row_usable(i, t)\n    returning i.tenant_id, i.role into invite_tenant, invite_role;\n    if invite_tenant is null then\n        raise exception 'invite-invalid' using errcode = 'P0001';\n    end if;\n    insert into public.tenant_members (user_id, tenant_id, username, role, invite_code_hash)",
+        "    returning i.tenant_id, i.role into invite_tenant, invite_role;\n    if invite_tenant is null then\n        raise exception 'invite-invalid' using errcode = 'P0001';\n    end if;\n    insert into public.tenant_members (user_id, tenant_id, username, role, invite_code_hash)"],
+    ['finish_registration លែង idempotent', '    if found then\n        if not exists (\n            select 1 from public.tenant_invites i', '    if false then\n        if not exists (\n            select 1 from public.tenant_invites i'],
+    ['finish_registration (សមាជិកមានរួច) មិនពិនិត្យហាងរបស់កូដ', 'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant and i.role = invite_role',
+        'where i.code_hash = p_code_hash and i.role = invite_role'],
+    ['finish_registration (សមាជិកមានរួច) មិនពិនិត្យ role របស់កូដ', 'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant and i.role = invite_role',
+        'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant'],
+    ['finish_registration មិនកត់ invite_code_hash', 'values (p_user_id, invite_tenant, p_username, invite_role, p_code_hash);',
+        'values (p_user_id, invite_tenant, p_username, invite_role, null);'],
+    ['spent_invite_member មិនពិនិត្យ hash កូដលើសមាជិក', '    join public.tenant_members m on m.invite_code_hash = i.code_hash\n',
+        '    join public.tenant_members m on m.tenant_id = i.tenant_id\n'],
+    ['spent_invite_member មិនពិនិត្យ username', '        and m.username = p_username\n        and m.tenant_id = i.tenant_id\n', '        and m.tenant_id = i.tenant_id\n'],
+    ['spent_invite_member មិនពិនិត្យហាងរបស់សមាជិក', '        and m.tenant_id = i.tenant_id\n        and m.role = i.role\n', '        and m.role = i.role\n'],
+    ['spent_invite_member មិនពិនិត្យ role', '        and m.role = i.role\n        and not i.revoked\n', '        and not i.revoked\n'],
+    ['spent_invite_member ទទួលកូដ revoke', '        and not i.revoked\n        and (i.used_count >= i.max_uses', '        and (i.used_count >= i.max_uses'],
+    ['spent_invite_member ទទួលកូដនៅប្រើបាន', '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n', ''],
+    ['spent_invite_member មិនពិនិត្យហាងសកម្ម', '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n        and private.tenant_row_active(t)\n$$;',
+        '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n$$;'],
+    ['spent_invite_member ឲ្យ authenticated ហៅបាន', 'grant execute on function public.spent_invite_member(text, text) to service_role;',
+        'grant execute on function public.spent_invite_member(text, text) to service_role, authenticated;'],
     ['revoke_user_sessions លុប session ទាំងអស់', 'delete from auth.sessions s where s.user_id = p_user_id;', 'delete from auth.sessions s;'],
     ['invite_is_usable មិនហៅ invite_row_usable', 'where i.code_hash = p_code_hash and private.invite_row_usable(i, t)\n    )',
         'where i.code_hash = p_code_hash\n    )'],
-    ['finish_registration ឲ្យ authenticated ហៅបាន', '    public.consume_reset_code(text, text)\n    to service_role;',
-        '    public.consume_reset_code(text, text)\n    to service_role, authenticated;'],
+    ['finish_registration ឲ្យ authenticated ហៅបាន', 'grant execute on function public.finish_registration(uuid, text, text) to service_role;',
+        'grant execute on function public.finish_registration(uuid, text, text) to service_role, authenticated;'],
     ['finish_registration មិនពិនិត្យ email ↔ username',
-        "        where u.id = p_user_id and lower(split_part(u.email, '@', 1)) = p_username", '        where u.id = p_user_id'],
+        "        where u.id = p_user_id\n            and lower(split_part(u.email, '@', 1)) = p_username", '        where u.id = p_user_id'],
     ['admin_issue_invite គ្មានច្រកទ្វារ admin',
         "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_role is null",
         '    if p_role is null'],

@@ -97,6 +97,10 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 transaction និង Edge Function ដែលប្រកាសក្នុង [`config.toml`](config.toml) ត្រូវ deploy ⛔ ការកំណត់ Auth/API ក្នុង `config.toml` **មិន** ត្រូវអនុវត្តលើ Project
 ផលិតកម្មទេ (កំណត់ក្នុង Dashboard ៖ ជំហានទី ១)។ លទ្ធផល ៖ សញ្ញា ✓/✗ លើ commit ក្នុង GitHub។
 
+⛔ **ការភ្ជាប់ integration មិន deploy ភ្លាមទេ** ៖ deploy រត់តែពេលមាន push/merge ចូល `main` **ក្រោយ** ការភ្ជាប់ ➜ Project ថ្មីនៅទទេរហូតដល់ merge
+បន្ទាប់។ ចង់បាន Database ភ្លាម ➜ `db push` (ផ្លូវដោយដៃខាងក្រោម) ម្តង ៖ វាកត់ version គ្រប់ ➜ merge បន្ទាប់អនុវត្តតែ migration ថ្មី។ ប្តូរ ឬលុប Project ➜
+ភ្ជាប់ integration លើ Project ថ្មីម្តងទៀត ៖ តំណ Details នៃសញ្ញា «Supabase Preview» លើ PR មាន `<project-ref>` របស់ Project ដែល repo កំពុងភ្ជាប់។
+
 ⛔ **មុនការ deploy លើកដំបូង** ៖ migration ដែលធ្លាប់ paste ក្នុង SQL Editor **មិនត្រូវកត់** ក្នុង `schema_migrations` ➜ ការ deploy រត់វាម្តងទៀត ➜ ធ្លាក់
 (`already exists`) ➜ migration ថ្មីមិនត្រូវអនុវត្ត។ ពិនិត្យក្នុង SQL Editor ៖
 

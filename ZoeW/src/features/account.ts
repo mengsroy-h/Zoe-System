@@ -6,6 +6,7 @@ import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { performLogin } from './auth';
 import { rememberedLoginFor } from './login-memory';
+import { forgetLoginPassword, syncRememberPasswordBox } from './password-memory';
 import { showToast } from '../ui/toast';
 
 export const ACCOUNT_USERNAME_RE = /^[a-z0-9_.]{3,32}$/;
@@ -218,6 +219,7 @@ export function openResetPasswordForm() {
 export function backToLoginForm() {
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
 }
 
 export async function submitRegisterForm(event?) {
@@ -256,6 +258,7 @@ export async function submitRegisterForm(event?) {
     setFieldValue('registerInviteInput', '');
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
     showToast('✅ ចុះឈ្មោះជោគជ័យ! កំពុងចូលប្រព័ន្ធ...');
     performLogin(username, password, true);
 }
@@ -282,11 +285,13 @@ export async function submitResetPasswordForm(event?) {
         alert((reply.code === 'password-reset-unknown' ? '' : 'ប្តូរពាក្យសម្ងាត់មិនបាន៖ ') + accountReplyText(reply.code));
         return;
     }
+    forgetLoginPassword();
     setFieldValue('resetCodeInput', '');
     setFieldValue('resetPasswordInput', '');
     setFieldValue('resetPasswordConfirmInput', '');
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
     setFieldValue('loginEmailInput', username);
     showToast(reply.code === 'password-reset-incomplete'
         ? '✅ បានប្តូរពាក្យសម្ងាត់ — ឧបករណ៍ចាស់ខ្លះអាចនៅចូលបានរហូតដល់វាចាកចេញ'

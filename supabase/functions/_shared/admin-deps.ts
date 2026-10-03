@@ -6,6 +6,7 @@ import { withTimeout } from './timeout.ts';
 export const ADMIN_CALL_TIMEOUT_MS = 8000;
 const EXISTS_CODES = new Set(['email_exists', 'user_already_exists', 'phone_exists']);
 const WEAK_CODES = new Set(['weak_password']);
+const SIGN_IN_REFUSED_CODES = new Set(['invalid_credentials', 'email_not_confirmed', 'user_banned']);
 
 function errorCode(error: unknown): string {
     const code = error !== null && typeof error === 'object' ? (error as Record<string, unknown>).code : undefined;
@@ -17,7 +18,7 @@ function errorMessage(error: unknown): string {
     return typeof message === 'string' ? message : '';
 }
 
-export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT_MS) {
+export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT_MS, openProbe?: () => SupabaseClient) {
     return {
         async inviteIsUsable(codeHash: string): Promise<boolean | null> {
             try {
@@ -68,6 +69,20 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return !error;
             } catch {
                 return false;
+            }
+        },
+        async passwordUserId(email: string, password: string): Promise<string | null | undefined> {
+            if (!openProbe) return undefined;
+            try {
+                const probe = openProbe();
+                if (probe === client) return undefined;
+                const { data, error } = await withTimeout(probe.auth.signInWithPassword({ email, password }), timeoutMs, 'timeout');
+                if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;
+                const id = data && data.user ? data.user.id : '';
+                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);
+                return id || undefined;
+            } catch {
+                return undefined;
             }
         },
         async claimResetCode(username: string, codeHash: string, claimId: string): Promise<string | null | undefined> {

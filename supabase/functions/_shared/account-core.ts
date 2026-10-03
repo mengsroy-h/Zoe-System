@@ -22,6 +22,7 @@ export interface RegisterDeps {
     createUser(email: string, password: string): Promise<CreateUserResult>;
     finishRegistration(input: { userId: string; codeHash: string; username: string }): Promise<FinishResult>;
     deleteUser(userId: string): Promise<boolean>;
+    passwordUserId(email: string, password: string): Promise<string | null | undefined>;
     loginDomain: string;
 }
 
@@ -65,6 +66,21 @@ function fields(input: unknown): Record<string, unknown> | null {
     return input !== null && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null;
 }
 
+async function finishWithRetry(deps: RegisterDeps, request: { userId: string; codeHash: string; username: string }): Promise<FinishResult> {
+    const first = await deps.finishRegistration(request);
+    if (!first.ok && first.reason === 'unavailable') return deps.finishRegistration(request);
+    return first;
+}
+
+async function resumeRegistration(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string): Promise<HandlerResult> {
+    const userId = await deps.passwordUserId(email, password);
+    if (userId === undefined) return reply(502, 'auth-unavailable');
+    if (userId === null) return reply(409, 'username-taken');
+    const finished = await finishWithRetry(deps, { userId, codeHash, username });
+    if (finished.ok) return reply(200, 'registered', { tenantId: finished.tenantId, role: finished.role });
+    return reply(...FINISH_REPLY[finished.reason]);
+}
+
 export async function handleRegister(input: unknown, deps: RegisterDeps): Promise<HandlerResult> {
     const body = fields(input);
     if (!body) return reply(400, 'bad-request');
@@ -84,15 +100,14 @@ export async function handleRegister(input: unknown, deps: RegisterDeps): Promis
     const usable = await deps.inviteIsUsable(codeHash);
     if (usable === null) return reply(502, 'db-unavailable');
     if (!usable) return reply(403, 'invite-invalid');
-    const created = await deps.createUser(loginEmail(username, deps.loginDomain), password);
+    const email = loginEmail(username, deps.loginDomain);
+    const created = await deps.createUser(email, password);
     if (!created.ok) {
-        if (created.reason === 'exists') return reply(409, 'username-taken');
+        if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);
         if (created.reason === 'weak') return reply(400, 'password-weak');
         return reply(502, 'auth-unavailable');
     }
-    const request = { userId: created.userId, codeHash, username };
-    let finished = await deps.finishRegistration(request);
-    if (!finished.ok && finished.reason === 'unavailable') finished = await deps.finishRegistration(request);
+    const finished = await finishWithRetry(deps, { userId: created.userId, codeHash, username });
     if (finished.ok) return reply(200, 'registered', { tenantId: finished.tenantId, role: finished.role });
     if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);
     const removed = (await deps.deleteUser(created.userId)) || (await deps.deleteUser(created.userId));

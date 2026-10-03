@@ -149,6 +149,16 @@ export function LoginModal() {
                                 <input type="checkbox" id="rememberMeCheckbox" ref={refTo('rememberMeCheckbox')} defaultChecked />
                                 <span>ចងចាំគណនី និងចូលប្រព័ន្ធស្វ័យប្រវត្តិរយៈពេល ៤ ម៉ោង</span>
                             </label>
+                            <label className="remember-container remember-password">
+                                <input
+                                    type="checkbox"
+                                    id="rememberPasswordCheckbox"
+                                    ref={refTo('rememberPasswordCheckbox')}
+                                    defaultChecked
+                                    onChange={onAct("toggleRememberPassword", { self: true })}
+                                />
+                                <span>ចងចាំពាក្យសម្ងាត់លើឧបករណ៍នេះ (ដកធីក ➜ លុបពាក្យសម្ងាត់ដែលចងចាំ)</span>
+                            </label>
                             <div className="modal-btns">
                                 <button type="submit" className="btn-confirm" id="loginBtn" disabled={v.loginBusy}>{v.loginBusy ? 'កំពុងចូល...' : 'ចូលប្រព័ន្ធ'}</button>
                             </div>

@@ -154,6 +154,22 @@ for (const app of ['ZoeW']) {
             ok(!!fn, n + '() មានក្នុង app.js');
             if (fn) vm.runInContext(fn, ctx);
         });
+        // ⛔ «ចងចាំពាក្យសម្ងាត់» (`password-memory.ts`) ៖ ការបំពេញពាក្យសម្ងាត់រត់ពី `showLoginModalWithPrefill()` ➜ ចាក់កូដ **ពិត**
+        //    (IndexedDB គ្មានក្នុង sandbox ➜ `rememberedPasswordFor()` ឆ្លងផ្លូវ fail-open ពិតរបស់វា)
+        const rememberPrefDecl = (src.match(/^ *const REMEMBER_PASSWORD_PREF_KEY = .*$/m) || [])[0];
+        ok(!!rememberPrefDecl, 'រកឃើញ REMEMBER_PASSWORD_PREF_KEY ក្នុង app.js');
+        if (rememberPrefDecl) vm.runInContext(rememberPrefDecl, ctx);
+        ['prefillSeq', 'prefilledPassword'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            ok(!!decl, 'រកឃើញ let ' + n + ' ក្នុង app.js');
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        ['loginKey', 'bindingOf', 'rememberPasswordPrefIsOff', 'rememberedPasswordFor', 'syncRememberPasswordBox', 'prefillRememberedPassword'].forEach((n) => {
+            const fn = sliceFn(src, n);
+            ok(!!fn, n + '() មានក្នុង app.js');
+            if (fn) vm.runInContext((src.includes('async function ' + n + '(') ? 'async ' : '') + fn, ctx);
+        });
+        vm.runInContext("prefilledPassword = 'stale-remembered-secret';", ctx);
         vm.runInContext(sliceFn(src, 'showLoginModalWithPrefill'), ctx);
 
         let threw = null;
@@ -172,6 +188,8 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        ok(vm.runInContext('prefilledPassword', ctx) === '',
+            'ចាកចេញ ➜ ពាក្យសម្ងាត់ដែលបានបំពេញពីការចងចាំមិនរស់រានក្នុងសតិ', vm.runInContext('prefilledPassword', ctx));
         ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
             'the barcode held for scan confirmation does not survive logout',
             vm.runInContext('scanConfirmCode', ctx));

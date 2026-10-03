@@ -2716,6 +2716,12 @@
     },
     "ZoeW/tests/activation-retry.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/password-memory.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/remember-password.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

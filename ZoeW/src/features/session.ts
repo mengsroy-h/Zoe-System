@@ -10,6 +10,7 @@ import { hasPendingInvite, routePendingInvite } from './account';
 import { cancelPendingLookupUnlock, clearLookupStatus } from './auto-lookup';
 import { isPinFlowPending } from './config';
 import { forgetRememberedLogin, loginBackendScope, rememberedLoginFor } from './login-memory';
+import { forgetLoginPassword, prefillRememberedPassword } from './password-memory';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { expandedTrashGroups } from './locker';
@@ -39,7 +40,10 @@ export const TRASH_WRITE_SLOW_NOTICE_MS = 15000;
 
 export function clearRememberedSession(keepEmail) {
     safeStoreRemove(appLocalStore, 'zoew_login_time');
-    if (!keepEmail) forgetRememberedLogin();
+    if (!keepEmail) {
+        forgetRememberedLogin();
+        forgetLoginPassword();
+    }
     clearZtoPickupStatusStore();
 }
 
@@ -198,5 +202,6 @@ export function showLoginModalWithPrefill() {
         setFieldValue('loginEmailInput', '');
     }
     loginPrefillScope = scope;
+    prefillRememberedPassword(savedEmail, scope);
     if (viewState.backendKind === 'supabase' && hasPendingInvite()) routePendingInvite();
 }

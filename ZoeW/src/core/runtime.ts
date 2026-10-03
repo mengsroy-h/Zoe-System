@@ -127,6 +127,7 @@ export const ACTION_ALLOWLIST = [
     "toggleHeaderMoreDropdown",
     "toggleIndividualBarcodeClose",
     "toggleMoreDropdown",
+    "toggleRememberPassword",
     "toggleTorch",
     "toggleTrashGroup",
     "verifySecurityPin"

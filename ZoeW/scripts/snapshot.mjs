@@ -22,7 +22,7 @@
  *      ឡើងលើ ១៤px និងកម្ពស់បន្ថែម ១៤px របស់ផ្ទាំងដែលបំពេញអេក្រង់ — x · ទទឹង · តម្លៃ CSS ផ្សេងទៀត ត្រូវដូចដើមបេះបិទ
  */
 export const INTENTIONAL_UI = {
-    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content > h3, #configModal .modal-content > p:not([style]), #configModal .cfg-extra, #configModal .cfg-supabase',
+    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content > h3, #configModal .modal-content > p:not([style]), #configModal .cfg-extra, #configModal .cfg-supabase, #loginModal .remember-password',
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',
     navbarShrinkPx: 14,

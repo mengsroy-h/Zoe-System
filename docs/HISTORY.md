@@ -43,6 +43,9 @@
 
 ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
+**ជុំ 2026-10-03 (Claude)** ៖ branch `claude/gracious-feynman-t7vu3k` ឈរលើ `codex/supabase-audit-handoff` (PR #281) ➜ ZoeW **2.49.0** ៖ Handoff ជំហាន ២
+(register បន្តបាន) **កែរួច** + checkbox «ចងចាំពាក្យសម្ងាត់» (សំណើម្ចាស់គម្រោង) ➜ merge branch នេះ = រួម 2.48.2 ផង។ មិនទាន់ merge/deploy។
+
 **ជុំសន្សំកូតា 2026-10-03** ៖ branch `codex/supabase-audit-handoff` កែការប្រណាំងកូដប្តូរពាក្យសម្ងាត់ (ZoeW 2.48.2)។
 migration ថ្មី `20261002154730_zoe_reset_claim.sql` + Edge Functions + សារ App; មិនទាន់ merge/deploy។
 ផ្ទៀង live មុនកែ៖ main CI Audit/APK ជាប់ · migration ៤ · register/reset-password ACTIVE · Postgres 17.11 · តារាង public គ្មាន RLS = ០ ·
@@ -50,8 +53,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 **បន្តតាមលំដាប់** ៖
 1. ពិនិត្យ PR របស់ branch ខាងលើ និង CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ migration មុន Edge Functions រួច Netlify/APK។ ផ្ទៀង live migration មាន ៥ និងសាក reset លើឧបករណ៍ពិត។
-2. **ចន្លោះដែលរកឃើញ មិនទាន់កែ**៖ register Auth createUser ឆ្លើយយឺតលើស ceiling អាចបង្កើត user ប៉ុន្តែគ្មាន tenant membership; retry username ដដែល ➜ username-taken។
-   ត្រូវសាងអ្នកយាមសម្រាប់ការបន្តចុះឈ្មោះដែលលទ្ធផលមិនដឹង មុនកែ; កុំលុប user លើលទ្ធផលមិនដឹង។
+2. ✅ register createUser ឆ្លើយបាត់ ➜ retry ដោយឈ្មោះ + ពាក្យសម្ងាត់ដដែលបន្តគណនីដដែល (2.49.0 · ផ្នែក ២)។ **នៅសល់** ៖ កូដប្រើ ១ ដង + App ផុតពិដាន ២០ វិ.
+   ខណៈ Server បញ្ចប់ ➜ retry ➜ `invite-invalid` (គណនីដើរ) — បើចង់កែ ត្រូវសាងអ្នកយាមមុន (ឧ. App បកប្រែ `network` លើ register ជា «មិនដឹងលទ្ធផល»)។
 3. បន្ត Supabase audit ជុំក្រោយ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops។ ជុំនេះផ្តោតលើ reset និង deployment metadata; មិនអះអាងថាបានគ្រប finder ៦ ទាំងអស់។
 4. IndexedDB cache zoe_docs (delta seq) និង CLI ផ្ទេរ Firebase ➜ Supabase តាម zoe_admin_write នៅមិនទាន់សាង។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
 5. សាកលើឧបករណ៍ iPhone/Android ពិតសម្រាប់ backend ទាំង២។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**; CLI ផ្ទេរប្រើតែសម្រាប់អតិថិជនដែលជ្រើសប្តូរ។
@@ -121,6 +124,37 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.0] — 2026-10-03 · ZoeW ៖ **ចងចាំពាក្យសម្ងាត់ (checkbox) · ហាង Supabase ៖ ការចុះឈ្មោះដែលដាច់កណ្តាលទីបន្តបាន**
+
+**ZoeW `2.49.0`** (`zoew-v255` ➜ `zoew-v256`) — ឈរលើ [2.48.2] (PR #281 មិនទាន់ merge ➜ branch នេះរួម 2.48.2 ទាំងមូល)។
+⛔ **ZoeKeyGen មិនប្រែ** · Firebase rules · Supabase migration **មិនប្រែ** (Edge Function `register` ប្រែ)។ សំណើម្ចាស់គម្រោង ៖
+«ZoeW អោយមាន Checkbox ចងចាំ Password login … អ្នកប្រើអាចដកធីកបានដោយខ្លួនឯង» · Handoff ជំហាន ២ (ចន្លោះ register)។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ប្រអប់ចូល ៖ «ចងចាំពាក្យសម្ងាត់លើឧបករណ៍នេះ»** (លំនាំដើមធីក · backend ទាំង ២)។ ចូលជោគជ័យ + «ចងចាំគណនី» ធីក ➜ ពាក្យសម្ងាត់រក្សាជា
+  **អក្សរកូដ AES-GCM** ដោយ key **មិនអាចនាំចេញ** ក្នុង IndexedDB (`zoew_lookup_key_v1` · ធាតុ `rememberedLoginPassword`) ចងនឹង backend + Project +
+  ឈ្មោះគណនី (additional data) ➜ អក្សរធម្មតាមិនចូល storage ណាមួយ។ ផុត ៤ ម៉ោង ➜ ប្រអប់ចូលបំពេញពាក្យសម្ងាត់ ⛔ **មិនចូលដោយខ្លួនឯង** (ច្បាប់ ៤ ម៉ោងនៅដដែល)។
+  ដកធីក ➜ លុបភ្លាម + ចងចាំជម្រើស (`zoew_remember_password_v1` = `'0'`) · ចាកចេញ · ប្តូរពាក្យសម្ងាត់ដោយកូដ · ដក «ចងចាំគណនី» ➜ លុប។
+  ការបំពេញមិនសរសេរជាន់អ្វីដែលអ្នកប្រើវាយ · គ្មាន IndexedDB ➜ ចូលបានធម្មតា (មិនចងចាំ)។
+- **Edge Function `register`** ៖ `createUser` ឆ្លើយបាត់ (Auth បង្កើតរួច តែគ្មានសមាជិកភាព) ឬ App ផុតពិដានខណៈ Server បញ្ចប់ ➜ ចុះឈ្មោះម្តងទៀតដោយ
+  **ឈ្មោះ + ពាក្យសម្ងាត់ដដែល** ➜ Server បញ្ជាក់ពាក្យសម្ងាត់ជាមួយ Auth (client ថ្មីរាល់ការហៅ · ផ្តាច់ session ផ្ទៀងផ្ទាត់ `scope=local`) រួចហៅ
+  `finish_registration` (idempotent) លើ user id នោះ ➜ `200 registered`។ ពាក្យសម្ងាត់ផ្សេង ➜ `409 username-taken` (ដូចមុន) · Auth មិនឆ្លើយ ➜ `502 auth-unavailable` ·
+  ⛔ ផ្លូវបន្តមិនលុបគណនីដែលសំណើនោះមិនបានបង្កើត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/remember-password.test.tsx` (LoginModal ពិត · IndexedDB ក្លែង · WebCrypto ពិត) ១៣ ករណី · tree មុនកែ ➜ ធ្លាក់ (module មិនមាន) ·
+  mutation ១១ លើកូដពិត ➜ ក្រហម ១១ (ដកធីកមិនលុប · key នាំចេញបាន · អក្សរធម្មតាក្នុង record · បំពេញជាន់ការវាយ · បកដោយគ្មាន binding · race · ចាកចេញ/ប្តូរពាក្យសម្ងាត់មិនលុប …)។
+- `supabase-functions-test` ៖ ក្រុម `register-resume` (ពិភពក្លែងមានស្ថានភាព) + adapter ទល់ GoTrue ក្លែងដោយ supabase-js ពិត · tree មុនកែ ➜ **FAIL ១១** ➜ **២០២/២០២** ·
+  mutation ថ្មី ១០ ➜ ក្រហមទាំង ១០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ក្រោយអនុម័ត merge ៖ ជំហាន [2.48.2] (migration `20261002154730_zoe_reset_claim.sql` **មុន** Functions) ➜ deploy Edge Function **`register`** និង `reset-password`
+  ➜ Netlify ZoeW + APK ថ្មី។ គ្មាន migration ថ្មីសម្រាប់ 2.49.0។
+- សាកលើឧបករណ៍ពិត ៖ ចូល (ធីក) ➜ បិទ App ➜ រង់ចាំផុត ៤ ម៉ោង (ឬចាកចេញ ➜ ត្រូវតែទទេ) ➜ ពាក្យសម្ងាត់បំពេញ · ដកធីក ➜ វាលទទេ · iPhone PWA · APK · Firebase និង Supabase។
 
 ### [2.48.2] — 2026-10-03 · ZoeW ៖ កូដប្តូរពាក្យសម្ងាត់ Supabase ទទួលសំណើតែមួយ
 
@@ -961,6 +995,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — Supabase register ៖ createUser ឆ្លើយបាត់ ➜ user កំព្រា · retry ➜ username-taken (ZoeW 2.49.0)
+
+មូលហេតុ ៖ `createUser` លើសពិដាន ៨ វិ. តែ GoTrue បង្កើត user រួច ➜ `502 auth-unavailable` · retry ➜ `email_exists` ➜ `409 username-taken` ជារៀងរហូត
+(user មាន · គ្មាន `tenant_members` · កូដអញ្ជើញមិនស៊ី)។ ករណីដដែល ៖ App ផុតពិដាន ២០ វិ. ខណៈ Server បញ្ចប់ (កូដប្រើច្រើនដង) ➜ retry ➜ `username-taken`។
+ការកែ ៖ `exists` ➜ `passwordUserId()` (GoTrue password grant លើ client ថ្មី មិនមែន admin client រួម ➜ session អ្នកប្រើមិនចូល RPC service) ➜
+`finish_registration` (ពិនិត្យ email ↔ username · idempotent) លើ user id ដែល Auth បញ្ជាក់។ មិនបន្ថែម oracle ថ្មី ៖ GoTrue `/token` បើកសាធារណៈរួចដោយ publishable key
+ហើយផ្លូវនេះត្រូវការកូដអញ្ជើញដែលប្រើបានរាល់ការសាក។ ⛔ មិនលុបគណនីលើផ្លូវបន្ត (សំណើនោះមិនបានបង្កើតវា)។
+លេខ ៖ tree មុនកែ **FAIL ១១** ➜ **២០២/២០២** (supabase-js ពិត · tsc strict) · mutation `account-core` ៥ + `admin-deps` ៥ ➜ ក្រហមទាំងអស់។
+តេស្ត logout ព្យួរដំបូងចំណាយ ៣០០ វិ. ក្រោម mutation «logout គ្មានពិដាន» (socket timeout របស់ Node) ➜ ដាក់ពិដាន ៣ វិ. ក្នុងតេស្ត ➜ ក្រុមទាំងមូល ~១១ វិ.។
+ចន្លោះនៅសល់ ៖ កូដអញ្ជើញប្រើ ១ ដង + App ផុតពិដានខណៈ Server បញ្ចប់ ➜ retry ➜ `403 invite-invalid` (គណនីដើរ · សារ App ណែនាំសុំកូដថ្មី) — មិនកែក្នុងជុំនេះ។
 
 ### 2026-10-03 — បញ្ជាក់ជម្រើស backend ទាំង២
 

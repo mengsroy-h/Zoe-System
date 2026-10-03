@@ -84,6 +84,7 @@ function fakeDeps(over) {
             return queue || { ok: true, tenantId: 't-1', role: 'member' };
         },
         deleteUser: async (id) => { log.push(['delete', id]); return over && 'deleted' in over ? over.deleted : true; },
+        passwordUserId: async (email, pw) => { log.push(['signin', email, pw]); return over && 'owner' in over ? over.owner : null; },
         claimResetCode: async (u, h, id) => { log.push(['check', u, h, id]); return over && Array.isArray(over.members) ? over.members.shift() : over && 'member' in over ? over.member : 'user-9'; },
         updatePassword: async (id, pw) => { log.push(['update', id, pw]); return over && over.update ? over.update : 'ok'; },
         settleResetCode: async (u, h, id, consumed) => { log.push([consumed ? 'consume' : 'release', u, h, id]); return over && 'consumed' in over ? over.consumed : true; },
@@ -151,12 +152,38 @@ async function groupAccount(m, rec) {
     f = fakeDeps({ usable: null });
     r = await A.handleRegister(REG, f.deps);
     rec('ចុះឈ្មោះ ៖ DB មិនឆ្លើយពេលពិនិត្យកូដ ➜ 502 · មិនបង្កើតគណនី', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'usable', { r, log: f.kinds() });
-    const createCases = [['exists', 409, 'username-taken'], ['weak', 400, 'password-weak'], ['unavailable', 502, 'auth-unavailable']];
-    for (const [reason, status, code] of createCases) {
+    const createCases = [['exists', 409, 'username-taken', 'usable,create,signin'], ['weak', 400, 'password-weak', 'usable,create'],
+        ['unavailable', 502, 'auth-unavailable', 'usable,create']];
+    for (const [reason, status, code, kinds] of createCases) {
         f = fakeDeps({ created: { ok: false, reason } });
         r = await A.handleRegister(REG, f.deps);
-        rec('ចុះឈ្មោះ ៖ createUser ' + reason + ' ➜ ' + status + ' ' + code, r.status === status && r.body.code === code && f.kinds() === 'usable,create', { r, log: f.kinds() });
+        rec('ចុះឈ្មោះ ៖ createUser ' + reason + ' ➜ ' + status + ' ' + code + ' (' + kinds + ')', r.status === status && r.body.code === code && f.kinds() === kinds, { r, log: f.kinds() });
     }
+    const EXISTS = { ok: false, reason: 'exists' };
+    f = fakeDeps({ created: EXISTS, owner: 'user-old' });
+    r = await A.handleRegister(REG, f.deps);
+    const signin = f.log.find((x) => x[0] === 'signin');
+    const resumed = f.log.find((x) => x[0] === 'finish');
+    rec('បន្តចុះឈ្មោះ ៖ គណនីមានរួច + ពាក្យសម្ងាត់ត្រូវ ➜ finish លើ user id ដែល Auth បញ្ជាក់ ➜ 200 registered',
+        r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-1' && f.kinds() === 'usable,create,signin,finish'
+        && !!signin && signin[1] === 'sokha@u.zoew.invalid' && signin[2] === 'secret-pass' && !!resumed && resumed[1].userId === 'user-old', { r, log: f.log });
+    f = fakeDeps({ created: EXISTS, owner: undefined });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ Auth មិនឆ្លើយពេលផ្ទៀងពាក្យសម្ងាត់ ➜ 502 auth-unavailable · មិន finish · មិនលុប',
+        r.status === 502 && r.body.code === 'auth-unavailable' && f.kinds() === 'usable,create,signin', { r, log: f.kinds() });
+    for (const [reason, status, code] of [['invite-invalid', 403, 'invite-invalid'], ['username-taken', 409, 'username-taken'], ['account-invalid', 400, 'account-invalid']]) {
+        f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: { ok: false, reason } });
+        r = await A.handleRegister(REG, f.deps);
+        rec('បន្តចុះឈ្មោះ ៖ finish ' + reason + ' ➜ ' + status + ' · ⛔ មិនលុបគណនីដែលសំណើនេះមិនបានបង្កើត',
+            r.status === status && r.body.code === code && f.kinds() === 'usable,create,signin,finish', { r, log: f.kinds() });
+    }
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: [{ ok: false, reason: 'unavailable' }, { ok: true, tenantId: 't-3', role: 'member' }] });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ finish មិនដឹងលទ្ធផល ➜ សាកម្តងទៀត ➜ 200', r.status === 200 && r.body.tenantId === 't-3' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: [{ ok: false, reason: 'unavailable' }, { ok: false, reason: 'unavailable' }] });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ finish មិនដឹង ២ ដង ➜ 502 registration-unknown · មិនលុប',
+        r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
     const finishCases = [
         ['invite-invalid', 403, 'invite-invalid', true],
         ['username-taken', 409, 'username-taken', true],
@@ -285,6 +312,74 @@ async function groupResetConcurrency(m, rec) {
         { firstResult, second, updates });
 }
 
+async function groupRegisterResume(m, rec) {
+    const world = (maxUses) => {
+        const users = new Map();
+        const members = new Map();
+        const w = { users, members, uses: 0, deletes: [], creates: 0, replyLost: 0 };
+        w.deps = {
+            inviteIsUsable: async () => w.uses < maxUses,
+            createUser: async (email, password) => {
+                w.creates++;
+                if (users.has(email)) return { ok: false, reason: 'exists' };
+                const id = 'auth-' + (users.size + 1);
+                users.set(email, { id, password });
+                if (w.replyLost > 0) { w.replyLost--; return { ok: false, reason: 'unavailable' }; }
+                return { ok: true, userId: id };
+            },
+            passwordUserId: async (email, password) => {
+                const u = users.get(email);
+                return u && u.password === password ? u.id : null;
+            },
+            finishRegistration: async ({ userId, username }) => {
+                const mine = members.get(userId);
+                if (mine) return { ok: true, tenantId: mine.tenantId, role: 'member' };
+                if ([...members.values()].some((x) => x.username === username)) return { ok: false, reason: 'username-taken' };
+                if (w.uses >= maxUses) return { ok: false, reason: 'invite-invalid' };
+                w.uses++;
+                members.set(userId, { tenantId: 't-shop', username });
+                return { ok: true, tenantId: 't-shop', role: 'member' };
+            },
+            deleteUser: async (id) => {
+                w.deletes.push(id);
+                for (const [email, u] of users) if (u.id === id) users.delete(email);
+                return true;
+            },
+            loginDomain: 'u.zoew.invalid'
+        };
+        return w;
+    };
+    const body = { invite: INVITE, username: 'sokha', password: 'secret-pass' };
+    let w = world(1);
+    w.replyLost = 1;
+    const lost = await m.account.handleRegister(body, w.deps);
+    const orphanBefore = w.users.size === 1 && w.members.size === 0 && w.uses === 0;
+    const retry = await m.account.handleRegister(body, w.deps);
+    rec('createUser ឆ្លើយបាត់ (Auth បង្កើតរួច · គ្មានសមាជិកភាព) ➜ សាកម្តងទៀតដោយព័ត៌មានដដែល ➜ 200 registered · គណនីតែ ១ · កូដប្រើ ១ · មិនលុប',
+        lost.status === 502 && lost.body.code === 'auth-unavailable' && orphanBefore
+        && retry.status === 200 && retry.body.code === 'registered' && retry.body.tenantId === 't-shop'
+        && w.users.size === 1 && w.members.size === 1 && w.members.has('auth-1') && w.uses === 1 && w.deletes.length === 0,
+        { lost, retry, users: w.users.size, members: w.members.size, uses: w.uses, deletes: w.deletes });
+    w = world(1);
+    w.replyLost = 1;
+    await m.account.handleRegister(body, w.deps);
+    const stranger = await m.account.handleRegister({ ...body, password: 'other-pass-9' }, w.deps);
+    rec('គណនីពាក់កណ្តាល + ពាក្យសម្ងាត់ផ្សេង ➜ 409 username-taken · មិនចងសមាជិកភាព · មិនលុបគណនីអ្នកដទៃ',
+        stranger.status === 409 && stranger.body.code === 'username-taken' && w.members.size === 0 && w.uses === 0 && w.deletes.length === 0 && w.users.size === 1,
+        { stranger, members: w.members.size, uses: w.uses, deletes: w.deletes });
+    const owner = await m.account.handleRegister(body, w.deps);
+    rec('ម្ចាស់ពិតសាកម្តងទៀតក្រោយអ្នកដទៃ ➜ 200 · សមាជិកភាពចងលើ user id ដើម', owner.status === 200 && w.members.has('auth-1') && w.uses === 1, { owner, uses: w.uses });
+    w = world(3);
+    const done = await m.account.handleRegister(body, w.deps);
+    const again = await m.account.handleRegister(body, w.deps);
+    rec('ចុះឈ្មោះរួច (ចម្លើយបាត់ផ្នែក App) + កូដប្រើបានច្រើនដង ➜ សាកម្តងទៀត ➜ 200 tenant ដដែល · កូដមិនស៊ីលើកទី ២',
+        done.status === 200 && again.status === 200 && again.body.tenantId === 't-shop' && w.uses === 1 && w.members.size === 1 && w.deletes.length === 0,
+        { done, again, uses: w.uses });
+    const taken = await m.account.handleRegister({ ...body, password: 'guess-pass-1' }, w.deps);
+    rec('ឈ្មោះរបស់សមាជិក + ពាក្យសម្ងាត់ខុស ➜ 409 username-taken · tenant មិនលេច', taken.status === 409 && taken.body.code === 'username-taken'
+        && taken.body.tenantId === undefined && w.uses === 1, taken);
+}
+
 const ENV = {
     SUPABASE_URL: 'https://abcdefgh.supabase.co',
     ZOE_SECRET_KEY: KEY,
@@ -386,6 +481,24 @@ async function startMock() {
                 if (body && body.password === 'weakpass1') return send(422, { code: 'weak_password', message: 'weak', weak_password: { reasons: ['length'] } }, v2024);
                 if (email === 'boom@u.zoe.test') return send(500, { message: 'db down' });
                 return send(200, { id: USER_ID, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' });
+            }
+            if (req.method === 'POST' && u === '/auth/v1/token') {
+                const email = body && body.email;
+                if (email === 'hang@u.zoe.test') return;
+                if (email === 'boom@u.zoe.test') return send(500, { message: 'db down' });
+                if (email === 'limit@u.zoe.test') return send(429, { code: 'over_request_rate_limit', message: 'rate' }, v2024);
+                if (email === 'unconfirmed@u.zoe.test') return send(400, { code: 'email_not_confirmed', message: 'x' }, v2024);
+                if (email === 'legacy@u.zoe.test') return send(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+                if (!body || body.password !== 'secret-pass') return send(400, { code: 'invalid_credentials', message: 'Invalid login credentials' }, v2024);
+                const exp = Math.floor(Date.now() / 1000) + 3600;
+                const claims = Buffer.from(JSON.stringify({ sub: USER_ID, email, exp, role: 'authenticated', aud: 'authenticated' })).toString('base64url');
+                return send(200, { access_token: 'eyJhbGciOiJIUzI1NiJ9.' + claims + '.sig-' + String(email).split('@')[0], token_type: 'bearer', expires_in: 3600,
+                    expires_at: exp, refresh_token: 'refresh-' + String(email).split('@')[0],
+                    user: { id: USER_ID, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' } });
+            }
+            if (req.method === 'POST' && u === '/auth/v1/logout') {
+                if (String(req.headers.authorization || '').endsWith('.sig-stuck')) return;
+                return send(204);
             }
             if (req.method === 'DELETE' && u.startsWith('/auth/v1/admin/users/')) {
                 return u.endsWith('/' + FAIL_ID) ? send(500, { message: 'x' }) : send(200, {});
@@ -497,6 +610,41 @@ async function groupAdapter(m, rec, env) {
     rec('ស្នាមភ្ជាប់ ៖ argument RPC revoke_user_sessions ស្មើ SQL ពិត', !!rr && !!wantR && JSON.stringify(Object.keys(rr.body).sort()) === JSON.stringify(wantR),
         { sent: rr && Object.keys(rr.body), wantR });
     rec('adapter ៖ revokeSessions កំហុស ➜ false', (await D.revokeSessions(FAIL_ID)) === false);
+
+    const opts = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+    let probes = 0;
+    const P = m.admin.adminDeps(client, 400, () => { probes++; return env.createClient(mock.url, KEY, opts); });
+    mock.requests.length = 0;
+    const owner = await P.passwordUserId('sokha@u.zoe.test', 'secret-pass');
+    const tok = last((x) => x.url.split('?')[0] === '/auth/v1/token');
+    const out = last((x) => x.url.split('?')[0] === '/auth/v1/logout');
+    rec('adapter ៖ passwordUserId ➜ POST /auth/v1/token?grant_type=password {email, password} ➜ user id',
+        owner === USER_ID && !!tok && /[?&]grant_type=password(&|$)/.test(tok.url) && tok.body.email === 'sokha@u.zoe.test' && tok.body.password === 'secret-pass', { owner, tok: tok && tok.url });
+    rec('adapter ៖ passwordUserId ផ្តាច់ session ផ្ទៀងផ្ទាត់ (logout scope=local ដោយ token របស់វា) · client ថ្មីរាល់ការហៅ',
+        !!out && /[?&]scope=local(&|$)/.test(out.url) && String(out.headers.authorization || '').endsWith('.sig-sokha') && probes === 1, { out: out && out.url, probes });
+    await D.inviteIsUsable('good');
+    const after = last((x) => x.url === '/rest/v1/rpc/invite_is_usable');
+    rec('adapter ៖ ក្រោយផ្ទៀងពាក្យសម្ងាត់ RPC របស់ admin client នៅប្រើ secret key (មិនមែន token អ្នកប្រើ)',
+        !!after && after.headers.apikey === KEY && !String(after.headers.authorization || '').includes('.sig-'), after && after.headers.authorization);
+    rec('adapter ៖ ពាក្យសម្ងាត់ខុស (invalid_credentials) ➜ null', (await P.passwordUserId('sokha@u.zoe.test', 'wrong-pass')) === null);
+    rec('adapter ៖ invalid_credentials (API ចាស់ error_code) ➜ null', (await P.passwordUserId('legacy@u.zoe.test', 'secret-pass')) === null);
+    rec('adapter ៖ email_not_confirmed ➜ null', (await P.passwordUserId('unconfirmed@u.zoe.test', 'secret-pass')) === null);
+    rec('adapter ៖ GoTrue 500 ➜ undefined (មិនដឹង ≠ ពាក្យសម្ងាត់ខុស)', (await P.passwordUserId('boom@u.zoe.test', 'secret-pass')) === undefined);
+    rec('adapter ៖ rate limit 429 ➜ undefined', (await P.passwordUserId('limit@u.zoe.test', 'secret-pass')) === undefined);
+    const t1 = Date.now();
+    const hungSignIn = await P.passwordUserId('hang@u.zoe.test', 'secret-pass');
+    rec('adapter ៖ /token ព្យួរ ➜ undefined ក្នុងពិដាន (' + (Date.now() - t1) + 'ms)', hungSignIn === undefined && Date.now() - t1 < 2000, hungSignIn);
+    const t2 = Date.now();
+    const stuck = await m.timeout.withTimeout(P.passwordUserId('stuck@u.zoe.test', 'secret-pass'), 3000, 'stuck-hung').catch(() => 'hung');
+    const afterStuck = await D.inviteIsUsable('good');
+    const stuckRpc = last((x) => x.url === '/rest/v1/rpc/invite_is_usable');
+    rec('adapter ៖ logout ព្យួរ ➜ នៅឆ្លើយ user id ក្នុងពិដាន · RPC admin បន្ទាប់មិនជាប់ session នោះ (' + (Date.now() - t2) + 'ms)',
+        stuck === USER_ID && Date.now() - t2 < 2000 && afterStuck === true && !!stuckRpc && !String(stuckRpc.headers.authorization || '').includes('.sig-'),
+        { stuck, afterStuck, auth: stuckRpc && stuckRpc.headers.authorization });
+    rec('adapter ៖ គ្មានរោងចក្រ client ផ្ទៀងផ្ទាត់ ➜ undefined (fail closed)', (await D.passwordUserId('sokha@u.zoe.test', 'secret-pass')) === undefined);
+    const same = m.admin.adminDeps(client, 400, () => client);
+    rec('adapter ៖ រោងចក្រផ្តល់ admin client ខ្លួនឯង ➜ undefined (session អ្នកប្រើមិនចូល client រួម)',
+        (await same.passwordUserId('sokha@u.zoe.test', 'secret-pass')) === undefined);
 }
 
 async function runGroups(m, env, stopOnFail) {
@@ -506,7 +654,7 @@ async function runGroups(m, env, stopOnFail) {
         results.push({ label, pass: !!cond, detail });
         if (!cond && stopOnFail) throw STOP;
     };
-    const groups = [['invite', groupInvite], ['account', groupAccount], ['reset-concurrency', groupResetConcurrency], ['http', groupHttp]];
+    const groups = [['invite', groupInvite], ['account', groupAccount], ['register-resume', groupRegisterResume], ['reset-concurrency', groupResetConcurrency], ['http', groupHttp]];
     if (env.createClient) groups.push(['adapter', groupAdapter]);
     for (const [name, fn] of groups) {
         try {
@@ -536,7 +684,18 @@ const MUTATIONS = [
     ['account-core.ts', 'check DB មិនឆ្លើយ ➜ «ប្រើរួច»', "        if (usableNow === null) return reply(502, 'db-unavailable');\n", ''],
     ['account-core.ts', 'check ធ្លាក់ចូលការចុះឈ្មោះ', '    if (body.check === true) {', '    if (body.check === false) {'],
     ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);\n', ''],
-    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!finished.ok && finished.reason === 'unavailable') finished = await deps.finishRegistration(request);\n", ''],
+    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!first.ok && first.reason === 'unavailable') return deps.finishRegistration(request);\n", ''],
+    ['account-core.ts', 'គណនីមានរួច ➜ username-taken ភ្លាម (មិនបន្ត)', "        if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);",
+        "        if (created.reason === 'exists') return reply(409, 'username-taken');"],
+    ['account-core.ts', 'បន្តដោយមិនផ្ទៀងពាក្យសម្ងាត់', "    if (userId === null) return reply(409, 'username-taken');\n", ''],
+    ['account-core.ts', 'Auth មិនដឹង ➜ username-taken', "    if (userId === undefined) return reply(502, 'auth-unavailable');", "    if (userId === undefined) return reply(409, 'username-taken');"],
+    ['account-core.ts', 'បន្តរួចលុបគណនីពេល finish បដិសេធ', "    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister",
+        "    await deps.deleteUser(userId);\n    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister"],
+    ['admin-deps.ts', 'ផ្ទៀងពាក្យសម្ងាត់លើ admin client រួម', 'await withTimeout(probe.auth.signInWithPassword({ email, password })', 'await withTimeout(client.auth.signInWithPassword({ email, password })'],
+    ['admin-deps.ts', 'មិនរាំង probe ជា admin client', '                if (probe === client) return undefined;\n', ''],
+    ['admin-deps.ts', 'កំហុស sign-in ទាំងអស់ ➜ null', 'if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;', 'if (error) return null;'],
+    ['admin-deps.ts', 'មិនផ្តាច់ session ផ្ទៀងផ្ទាត់', "                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);\n", ''],
+    ['admin-deps.ts', 'logout គ្មានពិដាន', "await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);", "await probe.auth.signOut({ scope: 'local' });"],
     ['account-core.ts', 'reset មិនពិនិត្យកូដ', "    if (userId === null) return reply(403, 'reset-code-invalid');\n", "    if (userId === null) return reply(200, 'password-reset');\n"],
     ['account-core.ts', 'reset មិនសាក claim ដដែល', "    if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);\n", ''],
     ['account-core.ts', 'reset claim សាកដោយ id ថ្មី', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, crypto.randomUUID());'],
@@ -608,7 +767,11 @@ async function main() {
         ok('functions/' + d + '/index.ts ៖ Deno.serve + handleHttp + readConfig + handler ១',
             /Deno\.serve\(/.test(src) && /handleHttp\(/.test(src) && /readConfig\(/.test(src) && handlers.length === 1, handlers);
         ok('functions/' + d + '/index.ts ៖ គ្មាន OTP/Firebase (ចុះឈ្មោះដោយកូដអញ្ជើញតែម្យ៉ាង)', !/firebase|otp|phone/i.test(src));
-        ok('functions/' + d + '/index.ts ៖ ឆ្លង adminDeps(admin) ដែលបង្កើតតែពេល config.ok', /adminDeps\(admin\)/.test(src) && /const admin = config\.ok/.test(src));
+        ok('functions/' + d + '/index.ts ៖ ឆ្លង adminDeps(admin…) ដែលបង្កើតតែពេល config.ok', /adminDeps\(admin\b/.test(src) && /const admin = config\.ok/.test(src));
+        if (handlers[0] === 'handleRegister') {
+            ok('functions/' + d + '/index.ts ៖ ផ្ទៀងពាក្យសម្ងាត់លើ client ថ្មីរាល់ការហៅ (មិនមែន admin រួម)',
+                /const openProbe = \(\) => createClient\(/.test(src) && /adminDeps\(admin, ADMIN_CALL_TIMEOUT_MS, openProbe\)/.test(src));
+        }
         const suffix = (src.match(/corsHeaders\['Access-Control-Allow-Headers'\] \+ '([^']*)'/) || [])[1];
         ok('functions/' + d + '/index.ts ៖ Allow-Headers ដេរីវេពី corsHeaders របស់ SDK', typeof suffix === 'string');
         if (typeof suffix === 'string') allowSuffix = suffix;

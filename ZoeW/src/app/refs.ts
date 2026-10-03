@@ -59,6 +59,7 @@ export const REF_NAMES = [
     'registerPasswordInput',
     'registerUsernameInput',
     'rememberMeCheckbox',
+    'rememberPasswordCheckbox',
     'resetCodeInput',
     'resetPasswordConfirmInput',
     'resetPasswordInput',

@@ -12,6 +12,7 @@ import { handleCallAction, openCallMarkModal, openEditModal, saveEditedPhone, se
 import { saveExchangeRate } from '../features/exchange-rate';
 import { exportDataAsCsvForSheets, exportDataAsExcel, exportDataAsPDF } from '../features/export';
 import { openHealthCheck, runHealthCheck } from '../features/health-check';
+import { toggleRememberPassword } from '../features/password-memory';
 import { submitActivationKey } from '../features/license';
 import { openLockerPicker, saveLockerSettings, selectCustomLocker } from '../features/locker';
 import { cancelLocationChange, confirmLocationChange } from '../features/locker-assign';
@@ -166,6 +167,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     toggleHeaderMoreDropdown,
     toggleIndividualBarcodeClose,
     toggleMoreDropdown,
+    toggleRememberPassword,
     toggleTorch,
     toggleTrashGroup,
     verifySecurityPin,

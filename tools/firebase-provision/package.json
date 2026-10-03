@@ -13,6 +13,6 @@
     "test": "node ../../audit-tools/firebase-provision-test.js"
   },
   "dependencies": {
-    "firebase-tools": "15.32.0"
+    "firebase-tools": "15.32.1"
   }
 }

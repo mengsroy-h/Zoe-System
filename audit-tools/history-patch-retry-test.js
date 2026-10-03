@@ -72,7 +72,8 @@ const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHi
     // ➜ វាប្តូរ `disconnect` ដែល SDK បោះភ្លាម ទៅជាការអាន REST ដែលអាចយូរជាងពិដាន `dbOp` ➜ ស្នាមភ្ជាប់នេះ
     // ត្រូវវាស់ជាមួយ wrapper ពិត (មិនមែន stub `runTransaction` ដែលបដិសេធត្រង់ៗ)។
     'elapsedSince', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue',
-    'txRestUrl', 'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown',
+    'txRestUrl', 'txReadServerValue', 'txDelay', 'txReadWasRefused', 'txResolveOutcome', 'txPathKey', 'txResolvingBlockers', 'txTrackResolving',
+    'txSnapshotOf', 'reportTxOutcomeUnknown',
     'transactionDisconnectPending', 'runTransactionResolved', 'withTransactionOutcomeResolution'];
 const src = {};
 FNS.forEach((n) => {
@@ -81,8 +82,8 @@ FNS.forEach((n) => {
 });
 
 const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
-    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS',
-    'TX_OUTCOME_MAX_WAIT_MS', 'txOutcomeUnknownReported', 'txDisconnectResolving'];
+    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS',
+    'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txOutcomeUnknownReported', 'txDisconnectResolving'];
 const decls = [];
 DECLS.forEach((n) => {
     const m = SRC.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm'));
@@ -247,9 +248,17 @@ async function scenario(label, fn) {
             ok('⛔ wrapper + ' + where + ' ➜ ចូលជួររង់ចាំ', saved === 'queued' && vm.runInContext('pendingHistoryPatches.size', ctx) === 1,
                 { saved, queued: vm.runInContext('pendingHistoryPatches.size', ctx) });
             ok('⛔ wrapper + ' + where + ' ➜ គ្មាន toast «បរាជ័យ»', !ctx.__toasts.some((t) => /^⚠️/.test(t)), ctx.__toasts);
+            // ភ្ជាប់មកវិញពិត ៖ browser · SDK · REST ត្រឡប់មកជាមួយគ្នា ➜ wrapper អាន server (មិនទាន់ប្រែ ➜ not-applied) ➜ ការសម្គាល់ក្នុងជួរទៅដល់
+            //    (ទ្វារតាម path របស់ wrapper ឲ្យ T2 រង់ចាំលទ្ធផល T1 ➜ ត្រូវរង់ចាំរហូតបញ្ចប់ មិនមែន ៣ tick)
+            ctx.navigator.onLine = true;
+            ctx.fetch = (url) => {
+                const id = decodeURIComponent(new URL(url).pathname).replace(/\.json$/, '').split('/').pop();
+                const body = ctx.__server[id] === undefined ? null : JSON.parse(JSON.stringify(ctx.__server[id]));
+                return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+            };
             vm.runInContext('__mode.value = "ok";', ctx);
             vm.runInContext('flushPendingHistoryPatches();', ctx);
-            await tick(); await tick(); await tick();
+            for (let i = 0; i < 200 && ctx.__server.id1.callMark !== 'no-connect'; i++) await new Promise((r) => setTimeout(r, 10));
             ok('⛔ wrapper + ' + where + ' ➜ ភ្ជាប់មកវិញ ការសម្គាល់ទៅដល់ server', ctx.__server.id1.callMark === 'no-connect', ctx.__server.id1.callMark);
         });
     }

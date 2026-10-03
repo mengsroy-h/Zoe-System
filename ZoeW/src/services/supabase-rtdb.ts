@@ -10,7 +10,6 @@ const MAX_KEY_BYTES = 768;
 const MAX_DEPTH = 32;
 
 export const SB_RPC_TIMEOUT_MS = 20000;
-export const SB_TX_OUTCOME_MAX_WAIT_MS = 60000;
 export const SB_TX_MAX_RETRIES = 25;
 export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
@@ -328,7 +327,6 @@ function applyOpsToDocs(getDoc, ops) {
 export function createSupabaseDatabase(transport, hooks, options?) {
     const opt = options || {};
     const rpcTimeoutMs = opt.rpcTimeoutMs || SB_RPC_TIMEOUT_MS;
-    const txOutcomeMaxWaitMs = opt.txOutcomeMaxWaitMs || SB_TX_OUTCOME_MAX_WAIT_MS;
     const retrySteps = opt.retryStepsMs || SB_RETRY_STEPS_MS;
     const pollFallbackMs = opt.pollFallbackMs || SB_POLL_FALLBACK_MS;
     const pullPage = opt.pullPage || SB_PULL_PAGE;
@@ -916,26 +914,33 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     await waitForLink();
                     let res;
                     let lost = null;
-                    const startedAt = Date.now();
+                    let lostAttempts = 0;
+                    const giveUp = () => {
+                        lost.txOutcome = 'unknown';
+                        lost.txServerUnread = true;
+                        hooks.onTxOutcomeUnknown(path);
+                        return lost;
+                    };
                     for (;;) {
                         try {
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] });
                             break;
                         } catch (e) {
-                            if (!(e instanceof SbNetworkError)) throw rpcFailureToError(e, path);
+                            if (!(e instanceof SbNetworkError)) {
+                                if (lost) throw giveUp();
+                                throw rpcFailureToError(e, path);
+                            }
                             setConnected(false);
                             scheduleRetry();
                             if (!lost) {
                                 lost = disconnectError();
                                 txDisconnectResolving.set(outer, lost);
                             }
-                            if (closed || elapsedSince(startedAt) >= txOutcomeMaxWaitMs) {
-                                lost.txOutcome = 'unknown';
-                                lost.txServerUnread = true;
-                                hooks.onTxOutcomeUnknown(path);
-                                throw lost;
+                            if (!closed) {
+                                await delay(retrySteps[Math.min(lostAttempts++, retrySteps.length - 1)]);
+                                await waitForLink();
                             }
-                            await delay(Math.max(1, Math.min(2000, txOutcomeMaxWaitMs - elapsedSince(startedAt))));
+                            if (closed) throw giveUp();
                         }
                     }
                     setConnected(true);

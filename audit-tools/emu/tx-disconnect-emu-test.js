@@ -241,11 +241,14 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
     };
     box.window = box;
     box.authGeneration = 0;
+    // wrapper ឈប់ដោះស្រាយពេលប្តូរ auth **ឬ database** (`firebaseState.db` ➜ `db` ក្នុង text view)
+    box.db = {};
     const ctx = vm.createContext(box);
     const parts = ['const txOutcomeUnknownReported = new Set();'];
-    ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS', 'TX_OUTCOME_MAX_WAIT_MS', 'txDisconnectResolving'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
+    ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txDisconnectResolving'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     const FNS = ['elapsedSince', 'withTimeout', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
-        'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown', 'runTransactionResolved',
+        'txReadServerValue', 'txDelay', 'txReadWasRefused', 'txResolveOutcome', 'txPathKey', 'txResolvingBlockers', 'txTrackResolving',
+        'txSnapshotOf', 'reportTxOutcomeUnknown', 'runTransactionResolved',
         'barcodeRegistryKey', 'claimBarcodeInRegistry', 'runLedgerTransaction'];
     const missing = FNS.filter((n) => !sliceFrom(SRC, n));
     check(missing.length === 0, 'wrapper ពិតរបស់ App មានក្នុងកូដ ship', missing);

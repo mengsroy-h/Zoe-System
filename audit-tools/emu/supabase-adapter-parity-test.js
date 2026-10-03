@@ -356,7 +356,7 @@ async function scenario(api) {
         D.sdk.goOnline(D.db);
 
         console.log('\n── ៤. ផ្លូវបរាជ័យ HTTP (Firebase គ្មានសមមូល) ──');
-        const F = await openClient('sokha', 'pass-sokha-1', { txOutcomeMaxWaitMs: 1500, rpcTimeoutMs: 1500 });
+        const F = await openClient('sokha', 'pass-sokha-1', { rpcTimeoutMs: 1500 });
         let connected = null;
         F.sdk.onValue(F.sdk.ref(F.db, '.info/connected'), (s) => { connected = s.val(); });
         let fView = 'unset';
@@ -391,14 +391,39 @@ async function scenario(api) {
         const txRow = (await rows('tx'))[0];
         check(!!pendingMark && pendingMark.message === 'disconnect', 'transaction ចម្លើយបាត់ ➜ ចុះក្នុង txDisconnectResolving (history-write ប្រើ)', pendingMark && pendingMark.message);
         check(txRes.committed === true && txRes.txOutcome === 'applied' && txRow && txRow.value === 5, 'transaction ចម្លើយបាត់ ➜ committed · txOutcome applied · អនុវត្តម្តង', { txRes: txRes.committed, outcome: txRes.txOutcome, row: txRow });
+        // ⛔ outcome ដែល *មិនទាន់ដឹង* មិនមែន *មិនអាចដឹង* ៖ `zoe_ops` រក្សាលទ្ធផល op_id ២ ថ្ងៃ ➜ adapter ផ្ញើ op_id ដដែលរហូតបានចម្លើយច្បាស់។
+        //    មុនកែ ៖ បោះបង់ក្រោយ ៦០ វិ. ➜ `unknown` ➜ «ដក» ធ្វើឲ្យកញ្ចប់បាត់ · reconcile ដក ២ ដង (tx-outcome-test ផ្នែក ៤ឃ · ៦)
+        fake.setMode('drop-response');
+        let longState = 'pending';
+        const longP = F.sdk.runTransaction(F.sdk.ref(F.db, 'sbp_fail/tx'), (v) => (v || 0) + 1);
+        longP.then((r) => { longState = r; }, (e) => { longState = e; });
+        await sleep(400);
         fake.setMode('down');
-        const lost = await F.sdk.runTransaction(F.sdk.ref(F.db, 'sbp_fail/tx'), (v) => (v || 0) + 1).then(() => null, (e) => e);
+        await sleep(3500);
+        check(longState === 'pending' && !!mod.txDisconnectResolving.get(longP) && !events.unknown.includes('sbp_fail/tx'),
+            '⛔⛔ ចម្លើយបាត់ + server ធ្លាក់យូរ (លើសពិដាន RPC ២ ដង) ➜ transaction នៅរង់ចាំ មិនបោះបង់ មិនទាយ unknown',
+            { state: longState === 'pending' ? 'pending' : (longState && (longState.message || longState.committed)), unknown: events.unknown });
+        fake.setMode('ok');
+        F.sdk.goOnline(F.db);
+        await until(() => longState !== 'pending', 15000);
+        const txRow2 = (await rows('tx'))[0];
+        check(!!longState && longState.committed === true && longState.txOutcome === 'applied' && txRow2 && txRow2.value === 6,
+            '⛔⛔ server មកវិញ ➜ op_id ដដែល ➜ committed · applied · អនុវត្តតែម្តង (5 ➜ 6)',
+            { committed: longState && longState.committed, outcome: longState && longState.txOutcome, row: txRow2 && txRow2.value });
+        const G = await openClient('sokha', 'pass-sokha-1', { rpcTimeoutMs: 1500 });
+        let gView = 'unset';
+        G.sdk.onValue(G.sdk.ref(G.db, 'sbp_fail'), (s) => { gView = s.val(); });
+        await until(() => gView !== 'unset', 5000);
+        fake.setMode('down');
+        const lostP = G.sdk.runTransaction(G.sdk.ref(G.db, 'sbp_fail/tx'), (v) => (v || 0) + 1).then(() => null, (e) => e);
+        await sleep(600);
+        await G.sdk.deleteApp(G.app);
+        const lost = await lostP;
         fake.setMode('ok');
         check(!!lost && lost.message === 'disconnect' && lost.txOutcome === 'unknown' && events.unknown.includes('sbp_fail/tx'),
-            'transaction ផុតពិដានលទ្ធផល ➜ បដិសេធ disconnect · txOutcome unknown · រាយការណ៍ (zone money)', lost && { m: lost.message, o: lost.txOutcome, u: events.unknown });
-        // ⛔ ថ្នេរ adapter ↔ ledger ៖ `ledgerRejectionVerdict()` (domain/ledger.ts) មិនប៉ះលុយតែពេល `txServerUnread === true` ➜ បើ adapter
-        //    ភ្លេចទង់នេះ reconcile ដកម្តងទៀតលើ transaction ដែលប្រហែលចុះរួច (ដក ២ ដង · tx-outcome-test ផ្នែក ៤គ)
-        check(!!lost && lost.txServerUnread === true, 'transaction ផុតពិដាន ➜ txServerUnread (server មិនបានអាន ➜ ledger មិនដកម្តងទៀត)', lost && { unread: lost.txServerUnread });
+            'adapter ត្រូវបិទ (deleteApp) ខណៈលទ្ធផលមិនទាន់ដឹង ➜ បដិសេធ disconnect · txOutcome unknown · រាយការណ៍ (zone money)', lost && { m: lost.message, o: lost.txOutcome, u: events.unknown });
+        // ⛔ ថ្នេរ adapter ↔ ledger ៖ `ledgerRejectionVerdict()` (domain/ledger.ts) រាយ «មិន ok» តែពេល `txServerUnread === true`
+        check(!!lost && lost.txServerUnread === true, 'unknown ពេលបិទ ➜ txServerUnread (ledger reconcile មិនរាយ ok)', lost && { unread: lost.txServerUnread });
         F.sdk.goOnline(F.db);
         await until(() => connected === true, 3000);
         fake.expireTokens();

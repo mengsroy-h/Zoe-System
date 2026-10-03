@@ -46,13 +46,13 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.2**
-   (Deep audit ជុំ ១) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
+1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.2 · ZoeKeyGen 2.24.4**
+   (Deep audit ជុំ ១ · PR #284) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
    secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី** (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` ·
    version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** · Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration
    មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ) ៖ **ជុំ ១ លុយ ចប់** ([2.49.2] ·
-   ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ») · 🔀 **រង់ចាំការសម្រេច** ៖ ការកែឫសគល់ outcome `unknown` (បន្តដោះស្រាយរហូតបណ្តាញត្រឡប់ · ប្តូរអ្នកយាម ៣) ·
+   ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · ការកែឫសគល់ outcome `unknown` ធ្វើរួចតាមការយល់ព្រម · Sentry Loader ថ្មី) ·
    ជុំ ២–៧ នៅសល់ ៖ បណ្តាញ · Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
@@ -127,30 +127,38 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.2] — 2026-10-03 · ZoeW ៖ **ស្ថិតិប្រាក់មិនអះអាង ✅ ពេលលទ្ធផលការរក្សាទុកមិនដឹង** (Deep audit ជុំ ១ ៖ លុយ)
+### [2.49.2] — 2026-10-03 · ZoeW · ZoeKeyGen `2.24.4` ៖ **បណ្តាញដាច់ចំពេលរក្សាទុក ➜ App រង់ចាំលទ្ធផលពិត (មិនទាយ) · Sentry Loader ថ្មី** (Deep audit ជុំ ១ ៖ លុយ)
 
-**ZoeW `2.49.2`** (`zoew-v257` ➜ `zoew-v258`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ backend ទាំង ២ (Firebase · Supabase)។
+**ZoeW `2.49.2`** (`zoew-v257` ➜ `zoew-v258`) · **ZoeKeyGen `2.24.4`** (`zoekeygen-v114` ➜ `zoekeygen-v115` ៖ Sentry Loader តែប៉ុណ្ណោះ)។ ⛔ Firebase rules ·
+migration · Edge Function **មិនប្រែ**។ backend ទាំង ២ (Firebase · Supabase)។
 
 #### អ្វីដែលខុសពីមុន
 
-- **ការរក្សាទុកចំណូលដែលបណ្តាញដាច់ចំពេល ហើយ App អានលទ្ធផលពី server មិនបានរយៈ ៦០ វិ.** (Firebase ៖ REST ងាប់ · Supabase ៖ `zoe_write` ខូចលើសពិដាន) ៖ App
-  លែងរាយ ✅ «បានដក… និងកាត់ប្រាក់រួចរាល់» ទៀតទេ ➜ «⚠️ … ស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin» + Sentry `zone: 'money'` (សារដែលមានស្រាប់)។
-  មុនកែ ៖ ការផ្ទៀងចំណូល (`correctRevenueLedgerToActual()`) ទាយថា «មិនបានអនុវត្ត» ដកម្តងទៀត ហើយរាយ `ok` ទោះ server បានដករួច (វាស់ ៖ ថ្ងៃ 100 ➜ **90** ·
-  ខែ 95 · `ok: true`)។ ⛔ **ចំនួនប្រាក់ដែលសរសេរ មិនប្រែទេ** (មុន/ក្រោយ ១៥០ ករណី ៖ លុយដូចគ្នា ១៥០/១៥០) — ការកែឫសគល់ (រង់ចាំលទ្ធផលពិតរហូតបណ្តាញត្រឡប់)
-  រង់ចាំការសម្រេចម្ចាស់គម្រោង (ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ»)។
-- 🔔 សារកំណែ 2.49.2 ជំនួស 2.49.1 (ចំណុចថ្មី ៖ ស្ថិតិប្រាក់ពេលបណ្តាញដាច់)។
+- **transaction ដែលបណ្តាញដាច់ចំពេល server ឆ្លើយ** (ចម្លើយបាត់) ៖ App រង់ចាំលទ្ធផលពិតរហូតបណ្តាញត្រឡប់ — Firebase អាន server តាម REST (ចន្លោះ ២ ➜ ៣០ វិ. ·
+  ក្រៅបណ្តាញ ➜ ត្រឡប់ ២ វិ.) · Supabase ផ្ញើ `op_id` ដដែល (`zoe_ops` ២ ថ្ងៃ) — **មិនបោះបង់ក្រោយ ៦០ វិ. ទៀតទេ**។ មុនកែ ៖ App ទាយ «មិនបានអនុវត្ត» ➜
+  (ក) «ដក» barcode ៖ «⚠️ ដកមិនបានជោគជ័យ» ខណៈ server បានដក ➜ **កញ្ចប់បាត់** ពីប្រវត្តិ និងធុងសំរាម · ledger មិនដក · (ខ) ការផ្ទៀងចំណូល ដកម្តងទៀត ➜ ថ្ងៃ
+  100 ➜ **90** + `ok: true`។ ឥឡូវ ៖ សារ «⏳ … នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ» ជាការពិត ៖ ដល់ server ➜ ចូលធុងសំរាម + ដកម្តង · មិនដល់ ➜ នៅប្រវត្តិ
+  + «ដកមិនបានជោគជ័យ»។ transaction ថ្មីលើ path ដដែល (ឧ. ស្កេនបន្តពេលបណ្តាញដាច់) រង់ចាំលទ្ធផលមុន (Firebase · ដោះក្រោយការអានបរាជ័យ ៣ ដងពេលលើបណ្តាញ)។
+- **outcome ដែលនៅតែមិនដឹង** (server បដិសេធការអាន · ប្តូរ auth/database · adapter បិទ ៖ `txServerUnread`) ➜ ការផ្ទៀងចំណូលមិនរាយ ✅ ➜ «⚠️ … ស្ថិតិប្រាក់មិនទាន់
+  Sync ពេញលេញទេ! សូមប្រាប់ Admin» + Sentry `zone: 'money'` (ចំនួនប្រាក់ដែលសរសេរដូចមុន)។
+- **Sentry** ៖ Loader ថ្មី `js.sentry-cdn.com/08e04427…` (Project `javascript-react` · SDK v11) ក្នុង App ទាំង ២ (`async` ដដែល) — Project ចាស់ត្រូវលុប ➜ គ្មាន
+  event ចាប់តាំងពីនោះ (event `zone: money` ចុងក្រោយ 2026-09-25)។
+- 🔔 សារកំណែ 2.49.2 ជំនួស 2.49.1។
 
 #### អ្នកយាម
 
-- `tx-outcome-test` ផ្នែក ៤គ ៖ មុនកែ **FAIL ៦** (សាលក្រម `ok` ខណៈ outcome មិនដឹង ៤ · ចំនួនពិត 0 ១ · helper ថ្មីមិនមាន ១) ➜ **៦៣/៦៣** · ទិសផ្ទុយ ៖ គ្មាន disconnect ➜
-  ដកម្តង + `ok` · server **អានបាន** (ឧបករណ៍ផ្សេងសរសេរ ៖ ផ្នែក ៤ខ) ➜ `ok` ដដែល។ `emu/supabase-adapter-parity` ៖ adapter ដាក់ `txServerUnread` (ថ្នេរ adapter ↔ ledger) **៨៨**។
-- Mutation ៦ ➜ ក្រហម ៦ (ផ្នែក ២)។
+- `tx-outcome-test` ៖ tree មុនកែឫស **FAIL ២២** ➜ **៩២/៩២** (ផ្នែក ២ រង់ចាំ ➜ applied · បដិសេធ HTTP មានព្រំដែន · ប្តូរ auth ឈប់ · ៤គ សាលក្រមពិត · ៤ឃ reconcile ត្រូវម្តង
+  ទិស applied/lost × ថ្ងៃ/ខែ · ៦ «ដក» មិនបាត់ · ៧ ទ្វារតាម path + ដោះពេលជាប់ + ចន្លោះ ២ វិ. ពេលក្រៅបណ្តាញ)។ `ZoeW/tests/supabase-tx-outcome.test.ts` (ថ្មី) ៖ adapter ចាស់
+  **ធ្លាក់ ២/៥** ➜ **៥/៥** · `ZoeW/tests/tx-outcome-timeout.test.ts` **៦/៦** · `emu/supabase-adapter-parity` **៩០** · `history-patch-retry-test` **១២៨** · `emu/tx-disconnect` **២៥**។
+- Mutation ៖ ledger ៦ ➜ ក្រហម ៦ · ការកែឫស ៨ ➜ ក្រហម ៨ (ផ្នែក ២)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
-- ⛔ សាកលើឧបករណ៍ពិត «អ្នកនឹងមិនឃើញអ្វីទេ» ក្នុងការប្រើធម្មតា ៖ ករណីនេះត្រូវការបណ្តាញដាច់ **ចំពេល** server ឆ្លើយ ហើយនៅដាច់លើស ៦០ វិ.។
-- 🔀 **សម្រេច** ៖ ការកែឫសគល់ (ផ្នែក ២) ជាការប្តូរគោលការណ៍ transaction លើ backend ទាំង ២ — រង់ចាំម្ចាស់គម្រោង។
+- Merge ➜ Netlify deploy `zoew` **និង** `zoekeygen` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- **Sentry** ៖ ក្រោយ deploy បើក App ➜ Sentry Project `javascript-react` ➜ Issues ត្រូវឃើញ event (ឧ. ពី 🩺 ឬកំហុសណាមួយ) · **បង្កើត Alert rule ឡើងវិញ** លើ tag
+  `zone:money` (rule ចាស់នៅក្នុង Project ដែលលុប)។
+- ⛔ សាកលើឧបករណ៍ពិត ៖ ការដាច់ **ចំពេល** server ឆ្លើយ ពិបាកបង្កើតដោយដៃ ➜ ក្នុងការប្រើធម្មតា «អ្នកនឹងមិនឃើញអ្វីទេ»។ ការសាកដែលធ្វើបាន ៖ បើកពេលហោះ (Airplane) ភ្លាមក្រោយ
+  ចុច «ដក» ➜ សារ «⏳ … នឹងបញ្ចប់…» ➜ បិទពេលហោះ ➜ កញ្ចប់ចូលធុងសំរាម (ឬនៅប្រវត្តិ ប្រសិនបើសំណើមិនទាន់ចេញ) — **មិនបាត់ពីទាំង ២ កន្លែង**។
 
 ### [2.49.1] — 2026-10-03 · ZoeW ៖ **ខ្សែរមូរបាត់ភ្លាមពេលប្រអប់ប្រវត្តិធ្លាក់ចុះ**
 
@@ -1131,14 +1139,23 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   សរសេរ ៖ ផ្នែក ៤ខ) មិនមែន `txServerUnread` ➜ ឥរិយាបថដើម។ Mutation ៦ ➜ ក្រហម ៦ ៖ verdict `null` · មិនអើពើ `txServerUnread` · ដកឃ្លា `ok` · align មិនបញ្ជូនទង់ ·
   wrapper មិនដាក់ទង់ (`tx-outcome-test`) · adapter មិនដាក់ទង់ (`emu/supabase-adapter-parity`)។ បន្ទាត់ «ការកែរបស់ reconcile ខ្លួនឯង unknown ➜ មិន ok» ជា mutant ស្មើ
   (`unknownOutcome` គ្របរួច) ➜ ដកចេញ មិនទុកកូដដែលគ្មានអ្នកវាស់។
-- **កំហុស ២ (វាស់ · មិនទាន់កែ ៖ រង់ចាំការសម្រេច)** ៖ `removeSingleBarcode()` ពេល transaction ប្រវត្តិ `applied-disconnect` + អាន server មិនបាន ➜ late `onFailed` ➜ «⚠️ ដកកញ្ចប់
-  មិនបានជោគជ័យ!… សាកល្បងម្តងទៀត» ខណៈ server បានដក ➜ **barcode មិននៅប្រវត្តិ · មិននៅធុងសំរាម · ledger មិនដក (100)** (probe ៖ ប្រវត្តិ `["BCB"]` · ធុងសំរាម ០) ·
-  registry នៅ `true` ➜ ស្កេនវិញមិនបាន · «ចំណូល (យករួច)» ប៉ោងដោយតម្លៃវា។ ទិសផ្ទុយ (`lost-disconnect`) ➜ BCA នៅប្រវត្តិ (ត្រឹមត្រូវ)។ ការសម្អាត (`claimAndCleanupItem`)
-  មិនរងព្រោះមាន journal (`resumeInterruptedCleanups()`) ➜ «ដក» ដោយអ្នកប្រើជាផ្ទៃបងប្អូនដែលគ្មាន journal។
-- **ការកែឫសគល់ដែលស្នើ (កំហុស ១ + ២)** ៖ លទ្ធផល **អាចដឹងបាន** ពេលបណ្តាញត្រឡប់ (Firebase ៖ អាន REST · Supabase ៖ replay `op_id` ក្នុង `zoe_ops` ២ ថ្ងៃ) ➜ កុំបោះបង់ពេល
-  អាន server មិនបាន ៖ បន្តរហូតអានបាន (ឈប់តែពេលប្តូរ auth/database ឬ adapter `close`) · `onFailed`/`ok` សម្រេចលើលទ្ធផលពិត។ សារ UI «⏳ … នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ
-  ពេលបណ្តាញត្រឡប់មកវិញ» ក្លាយជាការពិត។ ⛔ វាបញ្ច្រាសការសម្រេចដែលចាក់សោដោយចេតនា ៣ ៖ `tx-outcome-test` ផ្នែក ២ («ការព្យាយាមមានព្រំដែន រួចចេញ unknown») ·
-  `ZoeW/tests/tx-outcome-timeout.test.ts` · `emu/supabase-adapter-parity` («ផុតពិដាន ➜ unknown») ➜ រង់ចាំម្ចាស់គម្រោង។
+- **កំហុស ២ (វាស់ · កែរួច)** ៖ `removeSingleBarcode()` ពេល transaction ប្រវត្តិ `applied-disconnect` + អាន server មិនបាន ➜ late `onFailed` ➜ «⚠️ ដកកញ្ចប់
+  មិនបានជោគជ័យ!…» ខណៈ server បានដក ➜ **barcode មិននៅប្រវត្តិ · មិននៅធុងសំរាម · ledger មិនដក (100)** · registry នៅ `true` ➜ ស្កេនវិញមិនបាន។ ការសម្អាត
+  (`claimAndCleanupItem`) មិនរងព្រោះមាន journal (`resumeInterruptedCleanups()`) ➜ «ដក» ដោយអ្នកប្រើជាផ្ទៃបងប្អូនដែលគ្មាន។
+- **ការកែឫសគល់ (ម្ចាស់គម្រោងយល់ព្រម)** ៖ លទ្ធផល *មិនទាន់ដឹង* ≠ *មិនអាចដឹង* ➜ wrapper Firebase (`txResolveOutcome`) អាន REST រហូតអានបាន (ចន្លោះ ២ ➜ ៣០ វិ. ·
+  ក្រៅបណ្តាញ ➜ ត្រឡប់ ២ វិ. · ឈប់ពេលប្តូរ auth/database · បដិសេធ HTTP 4xx មានព្រំដែន `TX_OUTCOME_MAX_REFUSALS`) · adapter Supabase ផ្ញើ `op_id` ដដែលរហូតបាន
+  ចម្លើយច្បាស់ (ឈប់តែ `close` · កំហុសមិនមែនបណ្តាញក្រោយចម្លើយបាត់ ➜ `unknown` មិនមែន permission ធម្មតា)។ **ទ្វារតាម path** (`txResolvingPaths`) ៖ transaction ថ្មី
+  លើ path ដែលកំពុងដោះស្រាយ រង់ចាំ ➜ ការសរសេររបស់ App ខ្លួនឯង (ស្កេនបន្តពេលបណ្តាញដាច់) មិនប្តូរតម្លៃ server មុនការអាន (បើមិនដូច្នេះ T1 ក្លាយជា `unknown` វិញ) ·
+  ដោះក្រោយការអានបរាជ័យ `TX_OUTCOME_GATE_RELEASE_FAILS` (៣) ដងពេលលើបណ្តាញ (SDK ដើរ តែ REST មិនដើរ ➜ មិនជាប់ជារៀងរហូត)។ UI មិនព្យួរ ៖ អ្នកហៅមាន `dbOp` +
+  `armLateCommit` រួច ហើយសារ «⏳ … នឹងបញ្ចប់ពេលបណ្តាញត្រឡប់មកវិញ» ក្លាយជាការពិត។ អ្នកយាមចាស់ ៣ ដែលចាក់សោ «បោះបង់ក្រោយ ៦០ វិ.» ត្រូវប្តូរជាអត្ថន័យថ្មី ៖
+  `tx-outcome-test` ផ្នែក ២ · `ZoeW/tests/tx-outcome-timeout.test.ts` · `emu/supabase-adapter-parity` · harness `history-patch-retry-test` ៖ «ភ្ជាប់មកវិញ» = browser + SDK +
+  REST ត្រឡប់មកជាមួយគ្នា (មុននេះ fetch ធ្លាក់ជារៀងរហូត ➜ ទ្វាររារាំងការ flush)។ លេខ ៖ `tx-outcome-test` tree មុនកែឫស **FAIL ២២ ➜ ៩២/៩២** · vitest adapter ថ្មី
+  **ធ្លាក់ ២/៥ ➜ ៥/៥**។ Mutation ៨ ➜ ក្រហម ៨ ៖ បោះបង់ក្រោយ ៣០ ដងវិញ · គ្មានទ្វារ · ទ្វារមិនដោះពេលជាប់ (មុនកែអ្នកយាម ៖ **រស់** ព្រោះ T2 ចាប់ផ្តើមមុន T1 បដិសេធ) · បដិសេធ
+  គ្មានព្រំដែន · មិនអើពើការប្តូរ auth · adapter បោះបង់ក្រោយ ៣ ដង · គ្មានការ reset ចន្លោះពេលក្រៅបណ្តាញ (មុនកែអ្នកយាម ៖ **រស់** ព្រោះ harness បង្រួម timer ➜ កត់ចន្លោះ
+  ដែលស្នើ) · កំហុស 403 ក្រោយចម្លើយបាត់ (vitest)។
+- **ចន្លោះដែលនៅសល់ (ចេតនា)** ៖ Firebase ៖ **ឧបករណ៍ផ្សេង** សរសេរ path ដដែលខណៈបណ្តាញយើងដាច់ ➜ server អានបានតែជាតម្លៃគេ ➜ `unknown` (reconcile ធម្មតា ៖ ផ្នែក ៤ខ) —
+  ដោះស្រាយពិតត្រូវការប្រវត្តិ `op` ក្នុង node ledger (ប្តូរ rules) · ការសរសេរ `update()` (មិនមែន transaction) មិនឆ្លងទ្វារ · ទំព័របិទខណៈរង់ចាំ ➜ លទ្ធផលបាត់ (ដូច SDK)។
+  Supabase ៖ `op_id` ចាស់ជាង ២ ថ្ងៃ (`zoe_ops` លុប) ➜ replay អនុវត្តម្តងទៀត (CAS ➜ conflict ➜ not-applied ព្រោះតម្លៃប្រែ)។
 - **សម្មតិកម្មដែលការវាស់/កូដបដិសេធ** ៖ (ក) Supabase `inc` បូកជា `numeric` ➜ CAS conflict ជានិច្ច ➜ **មិនពិត** (`zoe_apply` បូកជា `float8` ដូច JS) · (ខ) `update()` >៥០០ op
   បំបែកជាការសរសេរមិន atomic ➜ ផ្លូវតែមួយដែលលើស គឺ purge ធុងសំរាម (លុបតែប៉ុណ្ណោះ · idempotent · fallback ម្តងមួយ) ➜ គ្មានផលលុយ។
 

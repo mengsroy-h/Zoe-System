@@ -63,8 +63,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 3. ✅ Supabase audit ជុំ 2026-10-03 (ផ្នែក ២) ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops ពិនិត្យរួច។ **សំណើដែលនៅចាំការសម្រេច** ៖
    (ក) ✅ **backup ទិន្នន័យហាង Supabase** (`firebase-backup` គោលដៅ `"type": "supabase"` · ផ្នែក ២) ⏳ ម្ចាស់គម្រោង ៖ migration + secret + Run workflow + សាកស្តារ · (ខ) ✅ ពិដានស្ងៀម ១៥ នាទី Admin Supabase ក្នុង ZoeKeyGen · (គ) ✅ index FK ៣ (`created_by` ២ + `invite_code_hash`) ៖ migration `20261003170000_zoe_fk_indexes.sql`។ ✅ ការរកឃើញ audit SQL គណនីទាំង ៣ កែរួច (ផ្នែក ២)។
    ⏸️ **Supabase deep audit ជុំ ២ ផ្អាក** (សំណើម្ចាស់គម្រោង ៖ បន្តកូដសិន) ៖ ចប់តែផ្នែក SQL គណនី (រកឃើញ ៣ ក្នុងផ្នែក ២) · ផ្នែក ៨ ទៀតនៅសល់។
-4. IndexedDB cache zoe_docs (delta seq) ⌛ មិនទាន់ចាប់ផ្តើម (រចនា «egress-only» ៖ delta ពី cursor · ផ្តល់ callback តែក្រោយ server ឆ្លើយ · scope = URL + tenant + user ·
-   សម្អាតពេលចាកចេញ) · ✅ CLI ផ្ទេរ Firebase ➜ Supabase (`tools/supabase-migrate/`) · ✅ ឡើងកំណែ dependency + CI + Netlify Node 24 (ផ្នែក ២)។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
+4. ✅ cache IndexedDB `zoe_docs` (delta ពី cursor · callback តែក្រោយ server ឆ្លើយ · scope URL + user · tenant បញ្ជាក់ដោយ server · សម្អាតពេលចាកចេញ) + ការទាញពេញ
+   វិល/ការទាញបាត់ពេលចូល/doc ខ្មោច (ផ្នែក ២) ⏳ ម្ចាស់គម្រោង ៖ migration `20261003180000` · ✅ CLI ផ្ទេរ Firebase ➜ Supabase (`tools/supabase-migrate/`) · ✅ ឡើងកំណែ dependency + CI + Netlify Node 24 (ផ្នែក ២)។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
 5. សាកលើឧបករណ៍ iPhone/Android ពិតសម្រាប់ backend ទាំង២។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**; CLI ផ្ទេរប្រើតែសម្រាប់អតិថិជនដែលជ្រើសប្តូរ។
 
 ⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
@@ -136,12 +136,12 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.0] — 2026-10-03 · ZoeW · ZoeKeyGen `2.24.3` ៖ **ចងចាំពាក្យសម្ងាត់ (checkbox) · ខ្សែរមូរលើ APK/iPhone · ហាង Supabase ៖ ការចុះឈ្មោះដែលដាច់កណ្តាលទីបន្តបាន · ZoeKeyGen ៖ modal តាមទំហំអេក្រង់ · គ្មាន emoji មុខឈ្មោះគណនី · 🔔 កញ្ចប់ដែលដករួច**
+### [2.49.0] — 2026-10-03 · ZoeW · ZoeKeyGen `2.24.3` ៖ **ចងចាំពាក្យសម្ងាត់ (checkbox) · ខ្សែរមូរលើ APK/iPhone · ហាង Supabase ៖ ការចុះឈ្មោះដែលដាច់កណ្តាលទីបន្តបាន · ZoeKeyGen ៖ modal តាមទំហំអេក្រង់ · គ្មាន emoji មុខឈ្មោះគណនី · 🔔 កញ្ចប់ដែលដករួច · ហាង Supabase ទាញតែទិន្នន័យថ្មី (cache)**
 
 **ZoeW `2.49.0`** (`zoew-v255` ➜ `zoew-v256`) — ឈរលើ [2.48.2] (PR #281 មិនទាន់ merge ➜ branch នេះរួម 2.48.2 ទាំងមូល) ·
-**ZoeKeyGen `2.24.3`** (`zoekeygen-v113` ➜ `zoekeygen-v114`)។ ⛔ Firebase rules · Supabase migration **មិនប្រែ** (Edge Function `register` ប្រែ)។
+**ZoeKeyGen `2.24.3`** (`zoekeygen-v113` ➜ `zoekeygen-v114`)។ ⛔ Firebase rules **មិនប្រែ** · Supabase ៖ migration ថ្មី **៤** + Edge Function `register` ប្រែ។
 សំណើម្ចាស់គម្រោង ៖ «Checkbox ចងចាំ Password login … ដកធីកបានដោយខ្លួនឯង» · «ដាក់ scrollbar សម្រាប់ APK និង PWA iOS … ដាក់តូចកុំបាំងអីផ្សេង» ·
-«ពិនិត្យ modal ទាំងអស់អោយឆ្លាស់ទំហំតាមប្រភេទអេក្រង់ (ZoeKeyGen និង ZoeW)» · «ដក emoji ពីមុខ username ក្នុង ZoeKeyGen» · «ក្នុងជូនដំណឹងបន្ថែមប្រាប់ពីកញ្ចប់ដែលដករួចផង» · Handoff ជំហាន ២ (register)។
+«ពិនិត្យ modal ទាំងអស់អោយឆ្លាស់ទំហំតាមប្រភេទអេក្រង់ (ZoeKeyGen និង ZoeW)» · «ដក emoji ពីមុខ username ក្នុង ZoeKeyGen» · «ក្នុងជូនដំណឹងបន្ថែមប្រាប់ពីកញ្ចប់ដែលដករួចផង» · Handoff ជំហាន ២ (register) · ៤ (cache IndexedDB)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -175,6 +175,17 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   ដកលុយរួច) ➜ ទូរស័ព្ទ · ចំនួនកញ្ចប់ · ទូ Locker · «ដកមុន N ម៉ោង» · ស្លាក «ថ្មី» · ថ្មីបំផុតខាងលើ ➜ ហាងដឹងថាត្រូវយកកញ្ចប់ណាចេញពីទូ។ badge 🔔 រាប់កញ្ចប់ដកដែលមិនទាន់មើល
   (បិទផ្ទាំង ➜ បានមើល · `zoew_notify_removed_seen_v1`)។ ⛔ ដក/យករួច/លុប ដោយដៃ មិនបង្ហាញ · ធាតុកំពុងស្តារ (`restoreClaim`) មិនបង្ហាញ · ទិដ្ឋភាពធុងសំរាមមិនស្រស់ ➜
   «វាស់មិនបាន» (គ្មាន badge) · listener ធុងសំរាមធ្វើបច្ចុប្បន្នភាពភ្លាម · ចាកចេញ ➜ សម្អាត។
+- **ហាង Supabase ៖ បើក App ម្តងទៀត (ឬទាញចុះ Refresh) ទាញតែទិន្នន័យដែលប្រែ** ៖ ក្រោយ sync App រក្សាទុកទិន្នន័យហាងក្នុង IndexedDB (`zoew_sb_docs_v1` ·
+  កំណត់ត្រាតែមួយ ចងនឹង URL Project + គណនី) ➜ ការបើកលើកក្រោយទាញតែពី cursor (មុននេះ ទាញទាំងអស់រាល់ការផ្ទុកទំព័រ ≈ ៧៣៦ kB សម្រាប់ហាងតូច ➜ ស៊ី egress Free 5 GB/ខែ)។
+  ⛔ cache សម្រាប់ egress **តែប៉ុណ្ណោះ** ៖ listener បាញ់តែក្រោយ Server ឆ្លើយ (ក្រៅបណ្តាញ ➜ មិនបង្ហាញទិន្នន័យចាស់ជាការពិត) · Server ប្រាប់ហាង (`tenant`) ក្នុងចម្លើយ
+  ➜ cache ហាងផ្សេង (សមាជិកផ្លាស់ហាង) ឬ Server ចាស់ ➜ បោះចោល ទាញពេញ · cache ចាស់ជាង ៧ ថ្ងៃ ➜ Server reset · ចាកចេញ ➜ លុប database ទាំងមូល (ទោះ Config ប្តូរទៅ Firebase)
+  · storage រាំង/ព្យួរ ➜ ទាញពេញធម្មតា (ពិដាន ៣ វិ.)។ រក្សាទុក ១.៥ វិ. ក្រោយ sync ដំបូង រួចយ៉ាងយូរ ១ ដង/៣០ វិ.។
+- **ហាង Supabase ៖ ការទាញពេញលើហាងធំលែងវិលចាប់ផ្តើមម្តងទៀត** ៖ ហាងមាន doc លើស ២០០០ ហើយ tombstone ចាស់ជាង ៧ ថ្ងៃត្រូវ purge ➜ `zoe_pull` ទំព័រទី ២ ឃើញ cursor
+  ចាស់ជាង `purged_seq` ➜ reset ➜ ទទួលទំព័រទី ១ ម្តងទៀត ... រហូតដល់ ១០០០ ទំព័រ (egress រាប់ GB · ទិន្នន័យកន្លះ)។ ឥឡូវទំព័រ reset ប្រាប់ `head` ➜ ទំព័របន្តផ្ញើ `p_full_head`
+  ➜ Server បន្តដោយសុវត្ថិភាព (tombstone ក្រោយការទាញចាប់ផ្តើមនៅមក) · App ចាស់ (2 argument) ដើរដូចមុន · Server ចាស់ (គ្មាន `head`) ➜ App មិនផ្ញើ argument ថ្មី ហើយឈប់ក្រោយ
+  reset ៣ ដង (មិនខាត egress)។ ការទាញដែលដាច់កណ្តាលទី ➜ បន្តពី cursor (មិនចាប់ផ្តើមពីទំព័រ ១)។
+- **ហាង Supabase ៖ ចូលប្រព័ន្ធខណៈ App កំពុងពិនិត្យបណ្តាញ ➜ ទិន្នន័យមកភ្លាម** ៖ មុននេះ ការចូលដែលធ្លាក់ចំពេល ping (ឧ. បណ្តាញយឺត) បាត់សំណើទាញ ➜ តារាងទទេរហូតដល់
+  realtime ឬព្រឹត្តិការណ៍ផ្សេងមកជួយ។ **ក្រៅបណ្តាញយូរ (cursor ចាស់ជាង purge) ➜ reset ច្រើនទំព័រ** មិនទុក doc ដែលលុបរួច (doc ខ្មោច) ទៀតទេ។
 - **ZoeKeyGen ៖ បញ្ជីហាង** ៖ ម្ចាស់ហាងបង្ហាញជាអក្សរដិត (tooltip «ម្ចាស់ហាង») ជំនួស «👑» នៅមុខឈ្មោះគណនី។
 - **Service Worker ៖ chunk `supabase-backend` (~២៤១ KB) ចេញពី `CORE_SHELL`** (សេចក្តីសម្រេចម្ចាស់គម្រោង) ➜ ក្រុម install ដាច់ (`__BACKEND_SHELL__`) ៖
   ហាង Firebase **មិនទាញ** · ហាង Supabase ៖ ប្រើលើកដំបូង ➜ chunk ចូល cache + សញ្ញាប្រើ (`./__zoew-backend-used`) ➜ កំណែក្រោយ install វាក្នុងក្រុមតែមួយ
@@ -202,16 +213,24 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 - `sw-backend-chunk-test` (ថ្មី · Chromium ពិត + `sw.js` ពិត) ៖ មុនកែ **FAIL ៣** (ហាង Firebase ទាញ chunk) ➜ **២០/២០** · mutation ៧ ➜ ក្រហម ៧
   (install ជានិច្ច/មិនដែល · គ្មានសញ្ញាគ្រោង · គ្មានសញ្ញាប្រើ · គ្មានការផ្ទេរសញ្ញា · មិនមែនផ្លូវសំបក · មិនអើពើសញ្ញាគ្រោង)។
 - `keygen-supabase-admin-test` ៖ ម្ចាស់ `sb-owner` · គ្មាន emoji មុខឈ្មោះ។ `setup-link-logout-test` ៖ ចាក់កូដពិតនៃការបំពេញពាក្យសម្ងាត់ ➜ ចាកចេញមិនបន្សល់ (mutation ➜ ក្រហម)។
+- `zoe_pull` · cache (លម្អិត ៖ ផ្នែក ២ «ការទាញពេញវិលចាប់ផ្តើមម្តងទៀត») ៖ `supabase-datastore-test` មុនកែ **FAIL ៥** ➜ **១២៦** (mutation SQL ថ្មី ៥ + ចាស់ ៣ ផ្លាស់ទៅ body ថ្មី) ·
+  vitest `supabase-pull-paging` **១៦** (មុនកែ ៖ ការចូលចំពេល ping ➜ **០** សំណើទាញ · doc ខ្មោច `i8`) · mutation ១៣ លើ `supabase-rtdb.ts` ➜ ក្រហម ១៣ ·
+  `emu/supabase-adapter-parity` ផ្នែក ៥–៦ (client ពិត + SQL ពិត ៖ ទំព័រ ២ ក្រោយ purge · cache + delta · សមាជិកផ្លាស់ហាង ➜ គ្មានទិន្នន័យហាងចាស់) **៨៧** ·
+  `supabase-docs-cache-test` (ថ្មី · IndexedDB ពិតក្នុង Chromium) **១៨** · `setup-link-logout-test` ៖ ចាកចេញលុប database cache។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - ✅ ធ្វើរួច ៖ migration `20261002154730_zoe_reset_claim.sql` លើ live (កត់ version) ➜ Edge Function **`register`** និង `reset-password` **v9**។
-- ⛔ **migration ថ្មី ៣** ៖ `20261003091742_zoe_register_spent_invite.sql` (`tenant_members.invite_code_hash` · `spent_invite_member` · `finish_registration` ចាក់សោកូដ)
-  · `20261003160000_zoe_admin_races.sql` (`admin_extend_tenant` · `admin_issue_reset_code` ចាក់សោជួរសមាជិក) · `20261003170000_zoe_fk_indexes.sql` ➜ merge ចូល `main` (GitHub integration)
+- ⛔ **migration ថ្មី ៤** ៖ `20261003091742_zoe_register_spent_invite.sql` (`tenant_members.invite_code_hash` · `spent_invite_member` · `finish_registration` ចាក់សោកូដ)
+  · `20261003160000_zoe_admin_races.sql` (`admin_extend_tenant` · `admin_issue_reset_code` ចាក់សោជួរសមាជិក) · `20261003170000_zoe_fk_indexes.sql`
+  · `20261003180000_zoe_pull_full_head.sql` (`zoe_pull` + `p_full_head` · ចម្លើយមាន `head` + `tenant` ➜ App 2.49.0 ប្រើ cache បានតែក្រោយ migration នេះ ·
+  App ចាស់/ថ្មីដើរទាំងមុន និងក្រោយ) ➜ merge ចូល `main` (GitHub integration)
   ឬ paste ក្នុង SQL Editor + `migration repair --status applied <version>`។ ⛔ ធ្វើ **មុន** ៖ (ក) deploy Edge Function `register` + `reset-password` ម្តងទៀត
   (កូដ register ថ្មីគ្មាន RPC ➜ កូដប្រើមិនបានទាំងអស់ឆ្លើយ 502 ជំនួស 403 · Function v9 + DB ថ្មីដើរធម្មតា) · (ខ) Netlify ZoeKeyGen (គ្មាន `admin_extend_tenant` ➜ «ពន្យារ» បរាជ័យ)។
 - បន្ទាប់មក ៖ Netlify ZoeW + ZoeKeyGen + APK ថ្មី។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
 - iPhone PWA + APK ៖ រមូរតារាងប្រវត្តិ · បញ្ជីក្នុង modal ➜ ខ្សែស្តើងលេច/បាត់ · ⛔ ពិនិត្យថា PTR · ចលនាផ្ទាំង · ភាពរលូនពេលរមូរ នៅដដែល (តំបន់ហាម ៖ វាស់លើឧបករណ៍ពិត ២ ប្រភេទមុន merge)។
+- ហាង Supabase (ក្រោយ migration `20261003180000`) ៖ បើក App ➜ បិទ ➜ បើកម្តងទៀត ➜ ទិន្នន័យដដែល (Supabase Dashboard ➜ Reports ➜ egress ធ្លាក់) · ចាកចេញ ➜
+  DevTools ➜ Application ➜ IndexedDB គ្មាន `zoew_sb_docs_v1` · ក្រៅបណ្តាញ ➜ បើក App ➜ គ្មានទិន្នន័យចាស់លេចមុនភ្ជាប់។
 - ZoeKeyGen ៖ បើក modal (PIN · Config · Key ថ្មី · Extend) លើទូរស័ព្ទ · tablet · កុំព្យូទ័រ · បញ្ជីហាង ៖ ម្ចាស់ជាអក្សរដិត · ពន្យារហាងពីឧបករណ៍ ២ (បញ្ជីចាស់) ➜ សារ + Refresh។
 - ហាង Supabase ៖ កូដ max_uses=1 + បណ្តាញយឺត (ចុចចុះឈ្មោះ រួចបិទអ៊ីនធឺណិតបន្តិច) ➜ សារ «មិនដឹង…» ➜ ចុះឈ្មោះម្តងទៀតដោយព័ត៌មានដដែល ➜ ចូលប្រព័ន្ធ · ZoeKeyGen used_count នៅ 1។
 - សាកលើឧបករណ៍ពិត ៖ ចូល (ធីក) ➜ បិទ App ➜ រង់ចាំផុត ៤ ម៉ោង (ឬចាកចេញ ➜ ត្រូវតែទទេ) ➜ ពាក្យសម្ងាត់បំពេញ · ដកធីក ➜ វាលទទេ · iPhone PWA · APK · Firebase និង Supabase។
@@ -1055,6 +1074,22 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — Supabase ៖ ការទាញពេញវិលចាប់ផ្តើមម្តងទៀត · ការទាញបាត់ពេលចូល · doc ខ្មោច · cache IndexedDB (ZoeW 2.49.0 · Handoff ៤)
+
+- **ការទាញពេញវិល** ៖ `zoe_pull` ចាត់ `0 < since < purged_seq` ជា cursor ចាស់ ➜ reset ➜ ទំព័រទី ២ នៃការទាញពេញ (since = ព្រំទំព័រទី ១) ត្រូវ reset ម្តងទៀតពេល
+  `purged_seq` លើសព្រំនោះ ➜ ទទួលទំព័រទី ១ រហូតដល់ ១០០០ ទំព័រ ➜ `ready` លើទិន្នន័យកន្លះ។ លក្ខខណ្ឌ ៖ doc រស់ > `SB_PULL_PAGE` (២០០០) **និង** housekeeping purge
+  (tombstone ចាស់ជាង ៧ ថ្ងៃ)។ live (អានតែចំនួន) ៖ doc រស់ ៦០៦ · tombstone ១៩៦ · `purged_seq` ០ ➜ មិនទាន់កើត។ ការកែ ៖ `p_full_head` (head ពីទំព័រ reset) ➜ ការបន្តមានសុពលភាព
+  បើ `purged ≤ full_head ≤ head` (tombstone ក្រោយ full_head មិនទាន់ purge ទេ ព្រោះ purge យកតែចាស់ជាង ៧ ថ្ងៃ) · ទំព័របន្តបញ្ជូន tombstone `> full_head` ·
+  ចម្លើយមាន `head` + `tenant` · `drop function` + `create` ក្នុង migration តែមួយ (PostgREST មិនច្រឡំ overload)។
+- **ការទាញបាត់ពេលចូល** (រកឃើញពេលសរសេរ vitest) ៖ `runSync()` ផ្លូវមិនទាន់ចូល `break` ក្រោយ `ping` ➜ `requestSync()` ពី `setAuthed(true)` កំឡុង ping បាត់ ➜ **០** សំណើ
+  `zoe_pull` (រង់ចាំ realtime `SUBSCRIBED` ឬ `visibilitychange`)។ កែ ៖ `continue` ក្រោយ ping ជោគជ័យ (បរាជ័យ ➜ `break` + retry ដូចមុន)។
+- **doc ខ្មោចក្រោយ reset ច្រើនទំព័រ** ៖ `applyPull()` ទុកធាតុ `s > res.seq` ពេល reset ➜ ទំព័រទី ១ មាន `res.seq` = ព្រំទំព័រ ➜ doc ក្នុងសតិដែលលុបមុនការទាញ (tombstone ≤ head
+  ឬ purge រួច) នៅជាប់។ កែ ៖ ទុកតែ `s > max(res.seq, res.head)` (ការសរសេរក្រោយ snapshot)។
+- **cache** ៖ `supabase-docs-cache.ts` (IndexedDB · `openIdbStore()` រួមជាមួយ `crypto.ts` ➜ `core/idb-store.ts` · `code-duplication-test` ចាប់ការស្ទួន ៣១៥ តួ)
+  · seed មុនការទាញ · ផ្ទៀង `tenant` មុនអនុវត្ត delta · reset លើ cache ➜ សម្អាតទាំងអស់ (cursor លើស head ពេល DB ស្តារ) · `cacheGeneration` ➜ ការរក្សាទុកដែលចប់ក្រោយចាកចេញ ➜ លុបម្តងទៀត
+  · `forgetSupabaseDocsCache()` ក្នុង `clearSensitiveModalFields()`។ ការវាស់ ៖ IndexedDB ពិត ៧០០ doc រក្សាទុក+ផ្ទុក ១០ ms · open ព្យួរ ➜ null ៣ ០០២ ms ·
+  adapter-parity ៖ ទាញពេញ ≥ ១២ ជួរ ➜ បើកម្តងទៀតតែ ≤ ២ ជួរ · សមាជិកផ្លាស់ហាង ➜ ចម្លើយ tenant ថ្មី ➜ ទាញពី 0។
 
 ### 2026-10-03 — CI ៖ `exit-code-integrity` លើសពិដាន 300s លើ runner CPU ២ (audit-tools តែប៉ុណ្ណោះ)
 
@@ -1992,6 +2027,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-data-tools-test` | ផ្នែក ២ | — |
+| `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
 | `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | — |

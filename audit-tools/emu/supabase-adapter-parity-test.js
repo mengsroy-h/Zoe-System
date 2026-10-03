@@ -279,15 +279,16 @@ async function scenario(api) {
         fake.addUser('lonely@users.zoew.invalid', 'pass-lonely1', u4);
 
         const events = { blocked: [], unknown: [], listenerErrors: [] };
-        const makeSdk = (dbOptions) => mod.createSupabaseSdk((cfg) => mod.createSupabaseTransport(cfg, { localStorage: memStorage(), sessionStorage: memStorage() }), {
+        const makeSdk = (dbOptions, docsCache) => mod.createSupabaseSdk((cfg) => mod.createSupabaseTransport(cfg, { localStorage: memStorage(), sessionStorage: memStorage() }), {
             onListenerError: (e) => events.listenerErrors.push(String(e && e.message)),
             onAccountBlocked: (m) => events.blocked.push(m),
             onTxOutcomeUnknown: (p) => events.unknown.push(p.join('/')),
+            docsCache,
             dbOptions: Object.assign({ pollFallbackMs: 400, retryStepsMs: [100, 200, 400] }, dbOptions || {})
         });
         const config = { supabaseUrl: fake.url, supabaseKey: 'sb_publishable_' + 'x'.repeat(30), loginDomain: 'users.zoew.invalid' };
-        const openClient = async (username, password, dbOptions) => {
-            const sdk = makeSdk(dbOptions);
+        const openClient = async (username, password, dbOptions, docsCache) => {
+            const sdk = makeSdk(dbOptions, docsCache);
             const app = sdk.initializeApp(config);
             apps.push({ sdk, app });
             const auth = sdk.getAuth(app);
@@ -409,6 +410,84 @@ async function scenario(api) {
         check(await until(() => events.blocked.includes(mod.SB_ACCOUNT_BLOCKED_TEXT.revoked) && !F.auth.currentUser, 5000),
             'ហាងត្រូវ Revoke ➜ ប្រាប់មូលហេតុ + ចាកចេញ (currentUser null)', { blocked: events.blocked, user: !!F.auth.currentUser });
         await c.query('update public.tenants set revoked = false where id = $1', [tA]);
+
+        console.log('\n── ៥. ទាញពេញជាទំព័រ ក្រោយ purge tombstone (client ពិត + SQL ពិត) ──');
+        const S = await openClient('dara', 'pass-dara-12');
+        for (let i = 0; i < 12; i++) await S.sdk.set(S.sdk.ref(S.db, 'sbp_page/k' + i), i);
+        await S.sdk.set(S.sdk.ref(S.db, 'sbp_page/gone'), 1);
+        await S.sdk.set(S.sdk.ref(S.db, 'sbp_page/gone'), null);
+        await c.query("update public.zoe_docs set updated_at = now() - interval '8 days' where tenant_id = $1 and value is null", [tA]);
+        await c.query('select private.zoe_housekeeping($1)', [tA]);
+        const PAGE = 2;
+        const st5 = (await c.query('select seq, purged_seq from public.zoe_tenant_state where tenant_id = $1', [tA])).rows[0];
+        const live5 = (await c.query('select seq from public.zoe_docs where tenant_id = $1 and value is not null order by seq', [tA])).rows.map((r) => Number(r.seq));
+        check(Number(st5.purged_seq) > live5[PAGE - 1] && live5.length > PAGE * 4,
+            'មុនលក្ខខណ្ឌ ៖ purged_seq លើសព្រំទំព័រទី ១ · doc រស់ច្រើនទំព័រ', { purged: st5.purged_seq, boundary: live5[PAGE - 1], live: live5.length });
+        const pulls = [];
+        fake.setRpcHook(({ fn, body, phase }) => {
+            if (fn === 'zoe_pull' && phase === 'before' && body && body.p_limit === PAGE) pulls.push(body);
+            return null;
+        });
+        const P = await openClient('sokha', 'pass-sokha-1', { pullPage: PAGE });
+        let pView = null;
+        P.sdk.onValue(P.sdk.ref(P.db, 'sbp_page'), (s) => { pView = s.val(); });
+        const want5 = Array.from({ length: 12 }, (_, i) => 'k' + i).join();
+        const converged = await until(() => !!pView && Object.keys(pView).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).join() === want5, 8000);
+        const pullsAtReady = pulls.length;
+        fake.setRpcHook(null);
+        check(converged && !('gone' in (pView || {})), 'client ទំព័រ ' + PAGE + ' ៖ ទាញពេញបញ្ចប់ · ឃើញ doc រស់គ្រប់ · មិនឃើញ doc ដែលលុប', pView);
+        check(pullsAtReady > 1 && pullsAtReady <= Math.ceil(live5.length / PAGE) + 3,
+            'ចំនួន zoe_pull ≤ ចំនួនទំព័រ + ៣ (មិនវិលចាប់ផ្តើមម្តងទៀត ➜ មិនខាត egress)', { pulls: pullsAtReady, pages: Math.ceil(live5.length / PAGE) });
+        const continuing = pulls.filter((b) => b.p_since > 0 && b.p_since < Number(st5.purged_seq));
+        check(continuing.length >= 1 && continuing.every((b) => typeof b.p_full_head === 'number'),
+            'ទំព័របន្ត (0 < since < purged_seq) ផ្ញើ p_full_head (head ពីទំព័រ reset) ➜ server មិន reset', pulls.slice(0, 6));
+
+        console.log('\n── ៦. cache zoe_docs (egress តែប៉ុណ្ណោះ) ៖ client ពិត + SQL ពិត ──');
+        for (const { sdk, app } of apps.splice(0)) { try { await sdk.deleteApp(app); } catch (e) {} }
+        const cacheStore = new Map();
+        const cacheLog = [];
+        const docsCache = {
+            load: async (scope) => { cacheLog.push('load'); return cacheStore.has(scope) ? JSON.parse(JSON.stringify(cacheStore.get(scope))) : null; },
+            save: async (scope, rec) => { cacheLog.push('save'); cacheStore.clear(); cacheStore.set(scope, JSON.parse(JSON.stringify(rec))); return true; },
+            clear: async () => { cacheLog.push('clear'); cacheStore.clear(); return true; }
+        };
+        const pullLog = [];
+        fake.setRpcHook(({ fn, body, phase, result }) => {
+            if (fn === 'zoe_pull' && phase === 'after' && result && result[0]) pullLog.push({ since: body.p_since, rows: result[0].r.rows.length, tenant: result[0].r.tenant });
+            return null;
+        });
+        const C1 = await openClient('dara', 'pass-dara-12', { docsCacheFirstSaveMs: 50 }, docsCache);
+        let c1View = null;
+        C1.sdk.onValue(C1.sdk.ref(C1.db, 'sbp_page'), (s) => { c1View = s.val(); });
+        const scope6 = fake.url.replace(/\/+$/, '') + '|' + u2;
+        const saved6 = await until(() => !!c1View && cacheStore.has(scope6), 5000);
+        const rec6 = cacheStore.get(scope6) || {};
+        const coldRows = pullLog.filter((p) => p.since === 0).reduce((n, p) => n + p.rows, 0);
+        check(saved6 && rec6.tenant === tA && rec6.cursor > 0 && rec6.docs.length === coldRows && coldRows >= 12,
+            'ក្រោយ sync ៖ cache មាន tenant ពី server · cursor · doc រស់ស្មើការទាញពេញ', { tenant: rec6.tenant, cursor: rec6.cursor, docs: (rec6.docs || []).length, coldRows });
+        await C1.sdk.deleteApp(C1.app);
+        await c.query("select public.zoe_admin_write($1, $2, $3::jsonb, false)", [tA, ('op6x' + process.pid + 'x000000000000').slice(0, 24), JSON.stringify([{ k: 'set', p: ['sbp_page', 'k0'], v: 100 }])]);
+        pullLog.length = 0;
+        const C2 = await openClient('dara', 'pass-dara-12', {}, docsCache);
+        let c2View = null;
+        C2.sdk.onValue(C2.sdk.ref(C2.db, 'sbp_page'), (s) => { c2View = s.val(); });
+        const delta6 = await until(() => !!c2View && c2View.k0 === 100, 5000);
+        const warmRows = pullLog.reduce((n, p) => n + p.rows, 0);
+        check(delta6 && pullLog.length >= 1 && pullLog[0].since === rec6.cursor && warmRows <= 2 && Object.keys(c2View).length === 12,
+            'បើក App ម្តងទៀត ៖ ទាញតែ delta ពី cursor ក្នុង cache (' + warmRows + ' ជួរ ជំនួស ' + coldRows + ') · ទិដ្ឋភាពពេញ', { pullLog: pullLog.slice(0, 3), keys: c2View && Object.keys(c2View).length });
+        await C2.sdk.deleteApp(C2.app);
+        await c.query('update public.tenant_members set tenant_id = $1 where user_id = $2', [tB, u2]);
+        pullLog.length = 0;
+        const C3 = await openClient('dara', 'pass-dara-12', {}, docsCache);
+        let c3View = 'unset';
+        C3.sdk.onValue(C3.sdk.ref(C3.db, 'sbp_page'), (s) => { c3View = s.val(); });
+        const moved = await until(() => c3View !== 'unset', 5000);
+        check(moved && c3View === null && pullLog.length >= 2 && pullLog[0].tenant === tB && pullLog[1].since === 0,
+            '⛔ សមាជិកផ្លាស់ទៅហាងផ្សេង ➜ server ប្រាប់ tenant ថ្មី ➜ បោះ cache ចោល · ទាញពេញ · គ្មានទិន្នន័យហាងចាស់លេច', { c3View, pullLog: pullLog.slice(0, 3) });
+        await C3.sdk.signOut(C3.auth);
+        check(cacheStore.size === 0 && cacheLog[cacheLog.length - 1] === 'clear', 'ចាកចេញ ➜ cache ទទេ', { size: cacheStore.size, log: cacheLog.slice(-3) });
+        await c.query('update public.tenant_members set tenant_id = $1 where user_id = $2', [tA, u2]);
+        fake.setRpcHook(null);
         check(events.listenerErrors.length === 0, 'callback របស់ listener មិនបោះកំហុស', events.listenerErrors.slice(0, 3));
     } catch (e) {
         check(false, 'ការវាស់មិនគាំង', String(e && e.stack || e));

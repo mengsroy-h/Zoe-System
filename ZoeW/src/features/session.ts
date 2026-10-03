@@ -21,6 +21,7 @@ import { ztoListSignedProbe } from './zto-list-sync';
 import { clearZtoPickupStatusStore } from './zto-status';
 import { DB_OP_TIMEOUT_MS, withTimeout } from '../services/network';
 import { resetScanConfirm } from '../services/scan-engine';
+import { forgetSupabaseDocsCache } from '../services/supabase-docs-cache';
 import { showAppChrome } from '../ui/chrome-autohide';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { endPanelGlideSnapPause } from '../app/behaviors/panel-motion';
@@ -138,6 +139,7 @@ export function clearSensitiveModalFields() {
     cancelPendingLookupUnlock();
     clearLookupStatus();
     clearSheetImportSession();
+    void forgetSupabaseDocsCache();
     uiState.pendingLockerCode = null;
     uiState.lockerBarcodeIndex = {};
     dataState.recentPhonesSignature = null;

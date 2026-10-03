@@ -1,5 +1,6 @@
 import { txDisconnectResolving } from './tx-disconnect';
 import { elapsedSince } from '../core/elapsed';
+import { SB_DOCS_CACHE_VERSION, docsCacheRecordIsValid } from './supabase-docs-cache';
 
 export const INVALID_KEY_RE = /[[\].#$/\u0000-\u001F\u007F]/;
 export const INVALID_PATH_RE = /[[\].#$\u0000-\u001F\u007F]/;
@@ -15,6 +16,10 @@ export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
 export const SB_POLL_FALLBACK_MS = 30000;
 export const SB_PULL_PAGE = 2000;
+export const SB_PULL_MAX_RESTARTS = 2;
+export const SB_DOCS_CACHE_LOAD_MAX_MS = 3000;
+export const SB_DOCS_CACHE_FIRST_SAVE_MS = 1500;
+export const SB_DOCS_CACHE_MIN_INTERVAL_MS = 30000;
 export const SB_OPS_PER_WRITE = 500;
 
 export class SbNetworkError extends Error {
@@ -326,11 +331,24 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const txOutcomeMaxWaitMs = opt.txOutcomeMaxWaitMs || SB_TX_OUTCOME_MAX_WAIT_MS;
     const retrySteps = opt.retryStepsMs || SB_RETRY_STEPS_MS;
     const pollFallbackMs = opt.pollFallbackMs || SB_POLL_FALLBACK_MS;
+    const pullPage = opt.pullPage || SB_PULL_PAGE;
+    const docsCache = opt.docsCache || null;
+    const cacheFirstSaveMs = opt.docsCacheFirstSaveMs || SB_DOCS_CACHE_FIRST_SAVE_MS;
+    const cacheMinIntervalMs = opt.docsCacheMinIntervalMs || SB_DOCS_CACHE_MIN_INTERVAL_MS;
+    const cacheLoadMaxMs = opt.docsCacheLoadMaxMs || SB_DOCS_CACHE_LOAD_MAX_MS;
     const server = new Map();
     const listeners = new Set();
     const infoListeners = new Set();
     const pending = [];
     let cursor = 0;
+    let pullFullHead = null;
+    let cacheScope = null;
+    let cacheTried = false;
+    let cacheTenant = null;
+    let serverTenant = null;
+    let cacheSaveTimer = null;
+    let lastCacheSaveAt = 0;
+    let cacheGeneration = 0;
     let ready = false;
     let syncing = false;
     let wantSync = false;
@@ -418,6 +436,58 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         return true;
     };
 
+    const loadCacheWithin = (scope) => new Promise<any>((resolve) => {
+        let finished = false;
+        let timer = null;
+        const finish = (value) => {
+            if (finished) return;
+            finished = true;
+            if (timer !== null) clearTimeout(timer);
+            resolve(value);
+        };
+        timer = setTimeout(() => finish(null), cacheLoadMaxMs);
+        try {
+            Promise.resolve(docsCache.load(scope)).then(finish, () => finish(null));
+        } catch (e) {
+            finish(null);
+        }
+    });
+
+    const seedFromCache = (rec) => {
+        for (const d of rec.docs) putDoc(d[0], d[1], d[2], d[3]);
+        cursor = rec.cursor;
+        cacheTenant = rec.tenant;
+    };
+
+    const clearDocsCache = () => {
+        if (!docsCache) return;
+        try { Promise.resolve(docsCache.clear()).catch(() => {}); } catch (e) {}
+    };
+
+    const saveDocsCacheNow = () => {
+        if (closed || !authed || !cacheScope || !serverTenant || cursor <= 0) return;
+        if (syncing) { scheduleCacheSave(); return; }
+        const docs = [];
+        server.forEach((entries, root) => entries.forEach((entry, key) => { if (entry.v !== null) docs.push([root, key, entry.v, entry.s]); }));
+        const scope = cacheScope;
+        const generation = cacheGeneration;
+        lastCacheSaveAt = Date.now();
+        try {
+            Promise.resolve(docsCache.save(scope, { v: SB_DOCS_CACHE_VERSION, scope, tenant: serverTenant, cursor, docs })).then(() => {
+                if (generation !== cacheGeneration) clearDocsCache();
+            }, () => {});
+        } catch (e) {}
+    };
+
+    function scheduleCacheSave() {
+        if (!docsCache || !cacheScope || !serverTenant || cacheSaveTimer || closed) return;
+        const wait = lastCacheSaveAt ? Math.max(cacheFirstSaveMs, cacheMinIntervalMs - elapsedSince(lastCacheSaveAt)) : cacheFirstSaveMs;
+        cacheSaveTimer = setTimeout(() => {
+            cacheSaveTimer = null;
+            saveDocsCacheNow();
+        }, wait);
+    }
+
     const fireListener = (l, getDoc?) => {
         if (closed || !ready || l.cancelled || !listeners.has(l)) return;
         const node = valueAt(l.path, getDoc);
@@ -491,8 +561,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const applyPull = (res) => {
         if (!res || !Array.isArray(res.rows)) throw new SbRpcError('bad pull response', 'bad_response', 0, '');
         if (res.reset) {
+            const keepAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
             const keepNewer = [];
-            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > res.seq) keepNewer.push([root, key, entry]); }));
+            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > keepAbove) keepNewer.push([root, key, entry]); }));
             server.clear();
             keepNewer.forEach(([root, key, entry]) => {
                 if (!server.has(root)) server.set(root, new Map());
@@ -537,16 +608,48 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (closed) return;
                         setConnected(false);
                         scheduleRetry();
+                        break;
                     }
-                    break;
+                    continue;
+                }
+                if (docsCache && cacheScope && !cacheTried) {
+                    cacheTried = true;
+                    if (cursor === 0 && server.size === 0) {
+                        const scope = cacheScope;
+                        const rec = await loadCacheWithin(scope);
+                        if (closed) return;
+                        if (scope === cacheScope && authed && cursor === 0 && server.size === 0 && docsCacheRecordIsValid(rec, scope)) seedFromCache(rec);
+                    }
                 }
                 try {
+                    let restarts = 0;
                     for (let page = 0; page < 1000; page++) {
-                        const res = await rpc('zoe_pull', { p_since: cursor, p_limit: SB_PULL_PAGE });
+                        const args: any = { p_since: cursor, p_limit: pullPage };
+                        if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
+                        const res = await rpc('zoe_pull', args);
                         if (closed) return;
+                        if (cacheTenant !== null) {
+                            const sameShop = !!res && typeof res.tenant === 'string' && res.tenant === cacheTenant;
+                            cacheTenant = null;
+                            if (!sameShop || res.reset) server.clear();
+                            if (!sameShop) {
+                                cursor = 0;
+                                pullFullHead = null;
+                                page = -1;
+                                continue;
+                            }
+                        }
+                        if (res && res.reset && page > 0 && ++restarts > SB_PULL_MAX_RESTARTS) {
+                            throw new SbRpcError('pull keeps restarting', 'pull_restart', 0, '');
+                        }
                         applyPull(res);
                         cursor = res.seq;
-                        if (!res.more) break;
+                        if (typeof res.tenant === 'string' && res.tenant) serverTenant = res.tenant;
+                        if (res.reset) pullFullHead = res.more && typeof res.head === 'number' && Number.isFinite(res.head) ? res.head : null;
+                        if (!res.more) {
+                            pullFullHead = null;
+                            break;
+                        }
                     }
                     forbidden = null;
                     retryAttempt = 0;
@@ -556,6 +659,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     notify();
                     hooks.onSynced();
                     schedulePoll();
+                    scheduleCacheSave();
                 } catch (e) {
                     if (closed) return;
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
@@ -892,8 +996,13 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         startRealtime();
     };
 
-    db.setAuthed = (value) => {
+    db.setAuthed = (value, scope?) => {
         const next = !!value;
+        const nextScope = next && typeof scope === 'string' && scope ? scope : null;
+        if (nextScope !== cacheScope) {
+            cacheScope = nextScope;
+            cacheTried = false;
+        }
         if (authed === next) return;
         authed = next;
         if (authed) {
@@ -909,6 +1018,15 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         authed = false;
         server.clear();
         cursor = 0;
+        pullFullHead = null;
+        if (cacheSaveTimer) { clearTimeout(cacheSaveTimer); cacheSaveTimer = null; }
+        cacheGeneration++;
+        cacheScope = null;
+        cacheTried = false;
+        cacheTenant = null;
+        serverTenant = null;
+        lastCacheSaveAt = 0;
+        clearDocsCache();
         ready = false;
         forbidden = null;
         tenantTopic = null;
@@ -934,8 +1052,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         stopRealtime();
         if (retryTimer) clearTimeout(retryTimer);
         if (pollTimer) clearTimeout(pollTimer);
+        if (cacheSaveTimer) clearTimeout(cacheSaveTimer);
         retryTimer = null;
         pollTimer = null;
+        cacheSaveTimer = null;
         wakeWaiters();
         listeners.clear();
         infoListeners.clear();

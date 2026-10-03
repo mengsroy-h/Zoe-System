@@ -570,9 +570,10 @@
         "audit-tools/zoew-suite-test.js",
         "audit-tools/firebase-config-paste-test.js",
         "audit-tools/sdk-surface.js",
-        "audit-tools/keygen-supabase-admin-test.js"
+        "audit-tools/keygen-supabase-admin-test.js",
+        "audit-tools/supabase-docs-cache-test.js"
       ],
-      "evidence": "emu/supabase-adapter-parity bundle ប្រភព TS ពិត ហើយប្រៀបលទ្ធផលនឹង SDK Firebase ពិត + RTDB emulator (val · update · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP) · zoew-suite (vitest supabase-account · tsc · purity) · firebase-config-paste/keygen-supabase-admin វាស់ helper Config ពិតពី build វាស់ · sdk-surface ទាមទារផ្ទៃ adapter ⊇ ផ្ទៃ SDK ដែល App ប្រើ។",
+      "evidence": "emu/supabase-adapter-parity bundle ប្រភព TS ពិត ហើយប្រៀបលទ្ធផលនឹង SDK Firebase ពិត + RTDB emulator (val · update · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP) · zoew-suite (vitest supabase-account · tsc · purity) · firebase-config-paste/keygen-supabase-admin វាស់ helper Config ពិតពី build វាស់ · sdk-surface ទាមទារផ្ទៃ adapter ⊇ ផ្ទៃ SDK ដែល App ប្រើ · supabase-docs-cache វាស់ cache zoe_docs លើ IndexedDB ពិតក្នុង Chromium (ផ្ទុក · scope · storage រាំង · open ព្យួរ · ថ្នេរ adapter ↔ cache ពិត)។",
       "limitation": "Realtime websocket ពិតរបស់ Supabase មិនបានរត់នៅទីនេះ (adapter ធ្លាក់ចុះទៅការទាញតាមវដ្តក្នុងតេស្ត) ➜ ការសាកលើ Project ពិត និងឧបករណ៍ពិតនៅតែចាំបាច់។"
     },
     "guard-firebase-provision": {
@@ -1448,6 +1449,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/src/core/elapsed.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/idb-store.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/core/modals.ts": {
@@ -2588,6 +2592,9 @@
     "ZoeW/src/services/supabase-config.ts": {
       "policy": "zoew-supabase-adapter"
     },
+    "ZoeW/src/services/supabase-docs-cache.ts": {
+      "policy": "zoew-supabase-adapter"
+    },
     "ZoeW/src/services/supabase-rtdb.ts": {
       "policy": "zoew-supabase-adapter"
     },
@@ -2601,6 +2608,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/tests/supabase-account.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pull-paging.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-transport-hang.test.ts": {
@@ -2705,6 +2715,9 @@
     "supabase/migrations/20261003170000_zoe_fk_indexes.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261003180000_zoe_pull_full_head.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -2757,6 +2770,9 @@
       "policy": "zoew-self-verification"
     },
     "audit-tools/supabase-data-tools-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-docs-cache-test.js": {
       "policy": "guard-1"
     },
     "firebase-backup/supabase.js": {

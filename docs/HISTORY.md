@@ -54,7 +54,7 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
    ត្រូវសាងអ្នកយាមសម្រាប់ការបន្តចុះឈ្មោះដែលលទ្ធផលមិនដឹង មុនកែ; កុំលុប user លើលទ្ធផលមិនដឹង។
 3. បន្ត Supabase audit ជុំក្រោយ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops។ ជុំនេះផ្តោតលើ reset និង deployment metadata; មិនអះអាងថាបានគ្រប finder ៦ ទាំងអស់។
 4. IndexedDB cache zoe_docs (delta seq) និង CLI ផ្ទេរ Firebase ➜ Supabase តាម zoe_admin_write នៅមិនទាន់សាង។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
-5. ឧបករណ៍ iPhone/Android ពិត និងលក្ខខណ្ឌមុនលុប Firebase នៅខាងក្រោម។
+5. សាកលើឧបករណ៍ iPhone/Android ពិតសម្រាប់ backend ទាំង២។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**; CLI ផ្ទេរប្រើតែសម្រាប់អតិថិជនដែលជ្រើសប្តូរ។
 
 ⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
 
@@ -84,12 +84,9 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   អនុវត្តរួច · `register`/`reset-password` deploy រួច · Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
   សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
   (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។
-- ⏳ **សំណើម្ចាស់គម្រោង ៖ «ពេល Supabase រួចសព្វគ្រប់ លុបឯកសារ Firebase ដែលលែងប្រើ»** — ⛔ **កុំលុបមុនលក្ខខណ្ឌទាំងអស់ពិត** ៖ Supabase
-  deploy · សាកលើឧបករណ៍ពិត · CLI ផ្ទេរទិន្នន័យ (ចំណុចបើក ៣) · **អតិថិជន Firebase ចុងក្រោយផ្ទេររួច** (លុយពិត) · ម្ចាស់គម្រោងបញ្ជាក់។ ពេលនោះ
-  ⛔ **ត្រូវរក្សា** ៖ `firebase-database.rules.json` (ប្រភព rules របស់ Supabase) · License Project/`license-verify.js`/`ZoeKeyGen/firebase-*`
-  (Activation Key · Push · ដំណឹងពីអ្នកលក់ · Login Admin របស់ ZoeKeyGen) · emulator ក្នុង `audit-tools/emu/*` (oracle របស់ parity)។ **បេក្ខជនលុប** ៖
-  ផ្លូវ Config/Login Firebase ក្នុង ZoeW (`firebase-loader.js` · SDK wrapper · ផ្លូវ `databaseURL`) · `firebase-backup/` + `backup.yml` (ជំនួសដោយ
-  backup Supabase) · ឯកសារ Firebase-only ក្នុង README/guide — ការលុបនីមួយៗត្រូវវាស់ផលប៉ះពាល់ (Runbook ជំហានទី ៣) ហើយមិនមែនក្នុងជុំតែមួយ។
+- ✅ **សេចក្តីសម្រេច៖ ZoeW គាំទ្រ backend ទាំង២តាមជម្រើសអតិថិជន — Firebase និង Supabase**។ ការសាង Supabase មិនមែនជាការបិទ Firebase ទេ។
+  ត្រូវរក្សាផ្លូវ Config/Login, SDK, rules, provisioning, backup និងឯកសារដែលអតិថិជន Firebase ត្រូវការ។ CLI ផ្ទេរទិន្នន័យជាជម្រើសសម្រាប់អ្នកចង់ប្តូរ backend។
+  ការសម្អាតអាចលុបតែកូដដែលបញ្ជាក់ថាមិនប្រើដោយ backend ទាំង២ និងមុខងាររួម។
 
 - ⏳ **`tools/firebase-provision/` ៖ ការរត់លើកដំបូងលើគណនី Google ពិត** — checker រត់ `firebase-tools` ពិតទល់ Google **ក្លែង** តែប៉ុណ្ណោះ
   (session នេះហៅ Google ពិតមិនបាន) ➜ ម្ចាស់គម្រោង ៖ `setup.cmd` ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ ត្រូវ exit 0 (គ្មាន `FAIL` · `WARN`)
@@ -964,6 +961,11 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-03 — បញ្ជាក់ជម្រើស backend ទាំង២
+
+ម្ចាស់គម្រោងបញ្ជាក់ថា ZoeW ត្រូវឱ្យអតិថិជនជ្រើស Firebase ឬ Supabase តាមចិត្ត។ ដកផែនការបិទ Firebase ចាស់ចេញពី Handoff;
+រក្សាការគាំទ្រ backend ទាំង២ ហើយ CLI ផ្ទេរទិន្នន័យគឺជាជម្រើស។ កែតែឯកសារ និងច្បាប់; គ្មានកូដ App ឬកំណែប្រែ។
 
 ### 2026-10-03 — Supabase reset៖ កូដតែមួយសរសេរពាក្យសម្ងាត់២ដង
 

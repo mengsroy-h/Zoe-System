@@ -96,6 +96,7 @@ only this text protects them.
   merge to `main` (Supabase GitHub integration applies new migrations) or paste the new file in the SQL Editor.
   ⛔ Migrations in `main` are append-only. Supabase has no Activation Key (shop status · `ensureAppActivated()`);
   `owner`/`member` are labels only. Setup: [`supabase/README.md`](supabase/README.md).
+  Both backends are supported customer choices. Keep Firebase support when developing Supabase; migration is optional per customer.
 - Other dirs: `audit-tools/` (catalog: [`audit-tools/README.md`](audit-tools/README.md) section 6 ⛔ don't copy counts) ·
   `zto-import/` (Apps Script) · `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` (new customer project ·
   rules to all customers · [`README-KH.md`](tools/firebase-provision/README-KH.md)) · `firebase-backup/` · `supabase/`

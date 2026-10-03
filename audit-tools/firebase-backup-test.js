@@ -80,20 +80,26 @@ async function bodyDeadlineScenario(recover) {
     let requests = 0;
     let bodyStarted = 0;
     let escaped = false;
+    // ⛔ fetch ដំបូងក្នុង process (undici ផ្ទុកខ្ជិល ~200 ms) + CPU រវល់លើ CI ➜ ពិដាន 100 ms ផុតមុនសំណើដល់ server
+    //    (`requests: 0`) ➜ សេណារីយ៉ូមិនចូលស្ថានភាព «headers មក · body ព្យួរ» ដែលវាវាស់ ➜ កំដៅ fetch លើផ្លូវដាច់ដោយឡែក
+    //    (មិនរាប់) និងពិដានដែលមានចន្លោះ
     const server = http.createServer((req, res) => {
+        if (req.url === '/warm') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
         requests++;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         if (recover && requests > 1) res.end('{"recovered":true}');
         else { bodyStarted++; res.write('{"held":'); }
     });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const watchdog = setTimeout(() => { escaped = true; server.closeAllConnections(); }, 1200);
+    const base = `http://127.0.0.1:${server.address().port}/`;
+    await fetch(base + 'warm').then((r) => r.json()).catch(() => null);
+    const BODY_DEADLINE_MS = 1000;
+    const watchdog = setTimeout(() => { escaped = true; server.closeAllConnections(); }, BODY_DEADLINE_MS * 3);
     let value;
     let error;
     try {
-        value = await backup.requestJsonWithRetry('body deadline',
-            `http://127.0.0.1:${server.address().port}/`, {},
-            { timeoutMs: 100, retryCount: recover ? 1 : 0, retryDelayMs: 1 });
+        value = await backup.requestJsonWithRetry('body deadline', base, {},
+            { timeoutMs: BODY_DEADLINE_MS, retryCount: recover ? 1 : 0, retryDelayMs: 1 });
     } catch (e) { error = e; }
     finally {
         clearTimeout(watchdog);

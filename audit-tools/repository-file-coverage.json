@@ -2781,6 +2781,9 @@
     "audit-tools/supabase-docs-cache-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/supabase-app-network-e2e-test.js": {
+      "policy": "guard-1"
+    },
     "firebase-backup/supabase.js": {
       "policy": "supabase-data-tools"
     },

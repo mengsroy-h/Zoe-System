@@ -769,6 +769,7 @@ run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
+run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node audit-tools/supabase-data-tools-test.js
 
 section "== ឧបករណ៍បង្កើតអតិថិជនថ្មី (tools/firebase-provision) =="
 # ⛔ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ➜ `npm ci --prefix tools/firebase-provision` + openssl
@@ -953,6 +954,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
+    SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

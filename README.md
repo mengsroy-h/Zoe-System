@@ -290,7 +290,8 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
 | [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
 | [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
-| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase |
+| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
+| [tools/supabase-migrate/](tools/supabase-migrate/README.md) | CLI ផ្ទេរទិន្នន័យហាងពី Firebase ចូល Supabase · ស្តារហាង Supabase ពី backup |
 
 ---
 

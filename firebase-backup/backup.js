@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const supabase = require('./supabase.js');
 
 const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const FIREBASE_SCOPES = [
@@ -289,6 +290,16 @@ function validateBusinesses(config, backupRoot) {
         const key = path.basename(dir).toLowerCase();
         if (names.has(key)) throw new Error(`Duplicate business name "${business.name}" in config.`);
         names.add(key);
+        if (business.type === 'supabase') {
+            if (typeof business.secretKeyPath !== 'string' || !business.secretKeyPath.trim()) {
+                throw new Error(`Business "${business.name}" is missing secretKeyPath.`);
+            }
+            supabase.normalizeSupabaseUrl(business.url);
+            continue;
+        }
+        if (business.type !== undefined && business.type !== 'firebase') {
+            throw new Error(`Business "${business.name}" has an unknown type (use "firebase" or "supabase").`);
+        }
         if (typeof business.serviceAccountPath !== 'string' || !business.serviceAccountPath.trim()) {
             throw new Error(`Business "${business.name}" is missing serviceAccountPath.`);
         }
@@ -296,7 +307,38 @@ function validateBusinesses(config, backupRoot) {
     }
 }
 
+async function backupSupabase(business, context, dependencies) {
+    const deps = dependencies || {};
+    const outDir = resolveBusinessDir(context.backupRoot, business.name);
+    const keyPath = path.resolve(context.configDir, business.secretKeyPath);
+    if (!fs.existsSync(keyPath)) {
+        throw new Error(`Secret key file not found: ${keyPath}`);
+    }
+    const client = supabase.createClient({
+        url: business.url,
+        key: fs.readFileSync(keyPath, 'utf8'),
+        timeoutMs: context.network.timeoutMs,
+        retryCount: context.network.retryCount,
+        retryDelayMs: context.network.retryDelayMs,
+        fetchImpl: deps.fetchImpl,
+        sleepImpl: deps.sleepImpl
+    });
+    const tenants = await supabase.listTenants(client);
+    const files = [];
+    const failed = [];
+    for (const tenant of tenants) {
+        try {
+            const exported = await supabase.exportTenant(client, tenant.id);
+            files.push(writeBackup(path.join(outDir, tenant.id), supabase.buildArchive(tenant, exported, client.host), context.keepCount));
+        } catch (e) {
+            failed.push(`${tenant.id}: ${e && e.message ? e.message : 'Unknown error'}`);
+        }
+    }
+    return { files, tenants: tenants.length, failed };
+}
+
 async function backupOne(business, context, dependencies) {
+    if (business.type === 'supabase') return backupSupabase(business, context, dependencies);
     const outDir = resolveBusinessDir(context.backupRoot, business.name);
     const serviceAccountPath = path.resolve(context.configDir, business.serviceAccountPath);
     if (!fs.existsSync(serviceAccountPath)) {
@@ -347,14 +389,23 @@ async function main(argv) {
     try {
         for (const business of config.businesses) {
             try {
-                const outFile = await backupOne(business, {
+                const outcome = await backupOne(business, {
                     backupRoot,
                     configDir,
                     keepCount,
                     network
                 });
-                const sizeKb = (fs.statSync(outFile).size / 1024).toFixed(1);
-                console.log(`[OK]   ${business.name} -> ${outFile} (${sizeKb} KB)`);
+                const outFiles = typeof outcome === 'string' ? [outcome] : outcome.files;
+                for (const outFile of outFiles) {
+                    const sizeKb = (fs.statSync(outFile).size / 1024).toFixed(1);
+                    console.log(`[OK]   ${business.name} -> ${outFile} (${sizeKb} KB)`);
+                }
+                if (typeof outcome !== 'string') {
+                    if (outcome.failed.length) {
+                        throw new Error(`${outcome.failed.length} of ${outcome.tenants} tenant(s) failed: ${outcome.failed.join(' | ')}`);
+                    }
+                    if (!outcome.tenants) console.log(`[OK]   ${business.name}: no tenants yet`);
+                }
             } catch (e) {
                 failures += 1;
                 console.error(`[FAIL] ${business.name}: ${e && e.message ? e.message : 'Unknown error'}`);
@@ -380,6 +431,7 @@ if (require.main === module) {
 module.exports = {
     acquireRunLock,
     backupOne,
+    backupSupabase,
     createServiceAccountJwt,
     getAccessToken,
     main,

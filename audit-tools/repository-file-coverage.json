@@ -325,9 +325,10 @@
     "guard-38": {
       "category": "behavior",
       "guards": [
-        "audit-tools/firebase-backup-test.js"
+        "audit-tools/firebase-backup-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
-      "evidence": "audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network",
+      "evidence": "audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network · target Supabase (ci-config · backup · crypt) វាស់ដោយ supabase-data-tools-test ទល់ Postgres ពិត",
       "limitation": "តេស្តកូដ និង fixture។ មិនបញ្ជាក់ service account, secret, schedule ឬ restore លើ production ពិត។"
     },
     "guard-39": {
@@ -508,9 +509,10 @@
       "guards": [
         "audit-tools/supabase-rls-test.js",
         "audit-tools/supabase-datastore-test.js",
-        "audit-tools/emu/supabase-rules-parity-test.js"
+        "audit-tools/emu/supabase-rules-parity-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
-      "evidence": "អ្នកយាមអនុវត្ត migration ពិតទាំងអស់លើ Postgres ពិត (major ពី config.toml) ក្រោយ shim role/grant ចម្លងពី supabase/postgres · supabase/auth ➜ ធ្វើត្រាប់ PostgREST (anon · authenticated · service_role + request.jwt.claims) ➜ RLS · EXECUTE · ឆ្លង tenant · claim ក្លែង · កូដអញ្ជើញ · ឃ្លាំងទិន្នន័យដូច RTDB (CAS · op_id · delta) · rules ក្នុង Postgres ធៀប RTDB emulator ពិត · mutation លើ migration ត្រូវក្រហម។",
+      "evidence": "អ្នកយាមអនុវត្ត migration ពិតទាំងអស់លើ Postgres ពិត (major ពី config.toml) ក្រោយ shim role/grant ចម្លងពី supabase/postgres · supabase/auth ➜ ធ្វើត្រាប់ PostgREST (anon · authenticated · service_role + request.jwt.claims) ➜ RLS · EXECUTE · ឆ្លង tenant · claim ក្លែង · កូដអញ្ជើញ · ឃ្លាំងទិន្នន័យដូច RTDB (CAS · op_id · delta) · rules ក្នុង Postgres ធៀប RTDB emulator ពិត · mutation លើ migration ត្រូវក្រហម · supabase-data-tools-test វាស់ RPC export ក្នុង migration ថ្មី និង mutation របស់វា។",
       "limitation": "shim មិនមែន Supabase ពេញ (គ្មាន GoTrue · PostgREST · Realtime ពិត) ➜ ការដំឡើងលើ Project ពិតនៅតែត្រូវសាកដោយដៃ។"
     },
     "supabase-functions": {
@@ -546,10 +548,20 @@
         "audit-tools/supabase-rls-test.js",
         "audit-tools/supabase-datastore-test.js",
         "audit-tools/keygen-supabase-admin-test.js",
-        "audit-tools/emu/supabase-adapter-parity-test.js"
+        "audit-tools/emu/supabase-adapter-parity-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
       "evidence": "harness (Postgres ពិត · ម៉ាស៊ីនមេ Supabase ក្លែង) ត្រូវប្រើដោយ checker ដែលមាន *_APP_DIR និង mutation ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (SUPABASE_STRICT=1 ➜ FAIL)។",
       "limitation": "ម៉ាស៊ីនមេក្លែងធ្វើត្រាប់តែផ្នែកដែល ZoeW/ZoeKeyGen ប្រើ (គ្មាន Realtime websocket)។"
+    },
+    "supabase-data-tools": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/supabase-data-tools-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "supabase-data-tools-test រត់ ci-config.js · backup.js · crypt.js · migrate.js ពិតជា child process ទល់ម៉ាស៊ីនមេ PostgREST ក្លែងលើ Postgres ពិត + migration ពិត ៖ RPC export (service_role · ព្រំដែនជួរ/byte · keyset ពេលហាងកំពុងសរសេរ · tombstone · មិនឆ្លង tenant) · ខ្សែ CI ពេញ (seal + ជំហានស្កេន plaintext ពិតរបស់ backup.yml) · នាំចូលហាងទី ២ ➜ export ម្តងទៀតដូចគ្នាបេះបិទ · ចម្លើយបាត់/ព្យួរ/503/401 · REFUSED · --replace · ឧបករណ៍ផ្សេងសរសេរ · record ខូច · secret មិនលេច · mutation លើ migration និង tool ត្រូវក្រហម · supabase-rls-test ផ្ទៀង EXECUTE (service_role តែប៉ុណ្ណោះ)។",
+      "limitation": "PostgREST · gateway API key និង GitHub Actions ពិតមិនបានរត់នៅទីនេះ ➜ backup/ការផ្ទេរលើ Project ពិតត្រូវសាកដោយដៃ (dry-run មុន · ស្តារ archive មួយមកហាងសាកល្បង)។"
     },
     "zoew-supabase-adapter": {
       "category": "behavior",
@@ -2743,6 +2755,21 @@
     },
     "ZoeW/tests/scroll-thumb.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "audit-tools/supabase-data-tools-test.js": {
+      "policy": "guard-1"
+    },
+    "firebase-backup/supabase.js": {
+      "policy": "supabase-data-tools"
+    },
+    "tools/supabase-migrate/migrate.js": {
+      "policy": "supabase-data-tools"
+    },
+    "tools/supabase-migrate/README.md": {
+      "policy": "guard-13"
+    },
+    "supabase/migrations/20261003120000_zoe_admin_export.sql": {
+      "policy": "supabase-db"
     }
   }
 }

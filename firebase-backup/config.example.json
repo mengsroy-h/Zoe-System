@@ -15,6 +15,12 @@
       "name": "zoekeygen-license-project",
       "serviceAccountPath": "./secrets/zoekeygen-service-account.json",
       "databaseURL": "https://zoe-license-default-rtdb.firebaseio.com"
+    },
+    {
+      "name": "supabase-shops",
+      "type": "supabase",
+      "url": "https://example-project-ref.supabase.co",
+      "secretKeyPath": "./secrets/supabase-secret.key"
     }
   ]
 }

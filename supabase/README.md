@@ -45,6 +45,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `admin_revoke_invite(code_hash)` | admin | បិទកូដអញ្ជើញ |
 | `admin_issue_reset_code(username, valid_hours)` | admin | ចេញកូដប្តូរពាក្យសម្ងាត់ (កូដចាស់របស់គណនីនោះលែងប្រើបាន) |
 | `invite_is_usable` · `spent_invite_member` · `finish_registration` · `reset_code_user` · `consume_reset_code` · `revoke_user_sessions` · `zoe_admin_write` | service_role (Edge Function · ការផ្ទេរទិន្នន័យ) | ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · សរសេរទិន្នន័យជំនួសហាង |
+| `zoe_admin_tenants(after?, limit)` · `zoe_admin_export(tenant, after_seq, after_root, after_key, tombstones_after?, limit, max_bytes)` | service_role (backup · ការផ្ទេរទិន្នន័យ) | បញ្ជីហាង (id · ឈ្មោះ · សាខា · `seq` · ចំនួន record — គ្មានគណនី/hash) · ទាញ record របស់ហាងមួយតាមទំព័រ keyset `(seq, root, key)` ដែលមានព្រំដែន (≤ ២០០០ ជួរ · ≤ 4 MiB) ត្រឹមត្រូវទោះហាងកំពុងសរសេរ |
 
 ### Edge Function
 
@@ -80,7 +81,9 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 ### ជំហានទី ១ — Supabase Project
 
 1. បង្កើត Project (តំបន់ **Singapore** ជិតកម្ពុជា)។ ⚠️ គម្រោង **Free** ៖ 500 MB · 5 GB egress/ខែ · **ផ្អាក Project ក្រោយគ្មានសកម្មភាព ១ សប្តាហ៍** ·
-   **គ្មាន backup ស្វ័យប្រវត្តិ** ➜ ពេលអតិថិជនច្រើន Upgrade ទៅ **Pro លើ Project ដដែល** (គ្មាន migration)។
+   **គ្មាន backup ស្វ័យប្រវត្តិរបស់ Supabase** ➜ backup ហាងនីមួយៗតាម [`firebase-backup/`](../firebase-backup/README.md) (target `"type": "supabase"` ·
+   GitHub Actions អ៊ិនគ្រីប) · ស្តារ/ផ្ទេរតាម [`tools/supabase-migrate/`](../tools/supabase-migrate/README.md) · ពេលអតិថិជនច្រើន Upgrade ទៅ **Pro លើ Project ដដែល**
+   (គ្មាន migration)។
 2. **Authentication ➜ Sign In / Providers** ៖ Email = បើក · **Allow new users to sign up = បិទ** · **Confirm email = បើក** · Anonymous sign-ins = បិទ ·
    Phone = បិទ។
 3. **Authentication ➜ Email** ៖ **Secure email change = បើក** · **Secure password change = បើក** ⛔ កុំកំណត់ SMTP ផ្ទាល់ខ្លួន (គណនីប្រើ domain `.invalid`)។
@@ -194,7 +197,7 @@ npm ci --prefix ZoeW && npm ci --prefix supabase
 SUPABASE_STRICT=1 bash audit-tools/run-all.sh
 ```
 
-`supabase-rls` · `supabase-datastore` · `supabase-functions` · `keygen-supabase-admin` (Postgres ពិត) និង `emu/supabase-rules-parity` ·
+`supabase-rls` · `supabase-datastore` · `supabase-functions` · `keygen-supabase-admin` · `supabase-data-tools` (Postgres ពិត) និង `emu/supabase-rules-parity` ·
 `emu/supabase-adapter-parity` (RTDB emulator ពិតជា oracle) ត្រូវបៃតង **ពេញលេញ** (មិនមែន PARTIAL)។
 
 ### គណនីកំព្រា
@@ -234,8 +237,11 @@ where m.user_id is null and a.user_id is null;
   កូដអញ្ជើញ (⛔ គ្មាន token ឬពាក្យសម្ងាត់ Admin) · ចាកចេញ ➜ កូដ · Link · ឈ្មោះហាង លុបចេញពីអេក្រង់។
 - **HTTP** ៖ CORS តែ origin ក្នុង `ZOE_ALLOWED_ORIGINS` · body ≤ 8 KB · កំហុសខាងក្នុងមិនលេចក្នុងចម្លើយ · function មិនសរសេរ log (ពាក្យសម្ងាត់ · កូដ · secret)។
 - ⚠️ **ព្រំដែនដែលនៅសល់** ៖ access token ដែលចេញរួច នៅប្រើបានរហូតដល់ផុតអាយុ (JWT expiry) សូម្បីក្រោយកំណត់ពាក្យសម្ងាត់ថ្មី · គណនី admin មានអំណាចលើ
-  គ្រប់ហាង ➜ ពាក្យសម្ងាត់ខ្លាំង និងកុំចែករំលែក · Free tier គ្មាន backup ➜ ការសម្រេចរបស់ម្ចាស់គម្រោង។
-- អ្នកយាម ៖ `audit-tools/supabase-rls-test.js` · `supabase-datastore-test.js` · `supabase-functions-test.js` · `keygen-supabase-admin-test.js` ·
+  គ្រប់ហាង ➜ ពាក្យសម្ងាត់ខ្លាំង និងកុំចែករំលែក · Free tier គ្មាន backup ពី Supabase ➜ backup ហាងតាម `firebase-backup/` ត្រូវការ secret key ដែល
+  មានសិទ្ធិពេញ ➜ បង្កើតសោដាច់សម្រាប់ backup ហើយទុកតែក្នុង GitHub secret។
+- **backup · ការផ្ទេរទិន្នន័យ** ៖ `zoe_admin_tenants` · `zoe_admin_export` · `zoe_admin_write` ហៅបានតែ service_role (anon/authenticated ➜ permission denied) ·
+  ការ export មិនចេញ hash កូដ · គណនី · ពាក្យសម្ងាត់។
+- អ្នកយាម ៖ `audit-tools/supabase-rls-test.js` · `supabase-datastore-test.js` · `supabase-functions-test.js` · `keygen-supabase-admin-test.js` · `supabase-data-tools-test.js` ·
   `emu/supabase-rules-parity-test.js` · `emu/supabase-adapter-parity-test.js` (រួម mutation ដែលត្រូវធ្វើឲ្យវាក្រហម)។
 
 ## អាជ្ញាប័ណ្ណ

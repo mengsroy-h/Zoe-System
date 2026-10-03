@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const backup = require('./backup.js');
+const supabase = require('./supabase.js');
 
 const TARGETS_ENV = 'ZOE_BACKUP_TARGETS';
 
@@ -48,6 +49,23 @@ function buildRunDirectory(outRoot, targets) {
         }
         const dir = backup.resolveBusinessDir(outRoot, entry.name);
         const name = path.basename(dir);
+        if (entry.type === 'supabase') {
+            const url = supabase.normalizeSupabaseUrl(entry.url);
+            const key = supabase.validateSecretKey(entry.secretKey);
+            const keyPath = path.join(secretsDir, `${name}.key`);
+            fs.writeFileSync(keyPath, key + '\n', { mode: 0o600 });
+            businesses.push({
+                name,
+                type: 'supabase',
+                url,
+                secretKeyPath: path.join('secrets', `${name}.key`)
+            });
+            summary.push(`${name} -> ${new URL(url).host} (supabase)`);
+            continue;
+        }
+        if (entry.type !== undefined && entry.type !== 'firebase') {
+            throw new Error(`Entry "${entry.name}" has an unknown type (use "firebase" or "supabase").`);
+        }
         const databaseURL = backup.normalizeDatabaseUrl(entry.databaseURL);
         const serviceAccount = backup.validateServiceAccount(serviceAccountObject(entry));
         const keyPath = path.join(secretsDir, `${name}.json`);

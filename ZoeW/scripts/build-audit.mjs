@@ -226,16 +226,19 @@ writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
         }
     };
     walk(acornMod.parse(shipped, { ecmaVersion: 'latest' }));
+    const isBackend = (a) => a.every((u) => /^\.\/assets\/supabase-backend-[^/]+\.js$/.test(u));
     const core = arrays.filter((a) => a.includes('./index.html'));
-    const optional = arrays.filter((a) => !a.includes('./index.html'));
-    if (core.length !== 1 || optional.length !== 1 || versions.length !== 1) {
-        throw new Error('build-audit ៖ ស្រង់ថេររបស់ sw.js មិនបាន (core ' + core.length + ' · optional ' + optional.length + ' · version ' + versions.length + ')');
+    const backend = arrays.filter((a) => !a.includes('./index.html') && isBackend(a));
+    const optional = arrays.filter((a) => !a.includes('./index.html') && !isBackend(a));
+    if (core.length !== 1 || optional.length !== 1 || backend.length !== 1 || versions.length !== 1) {
+        throw new Error('build-audit ៖ ស្រង់ថេររបស់ sw.js មិនបាន (core ' + core.length + ' · optional ' + optional.length + ' · backend ' + backend.length + ' · version ' + versions.length + ')');
     }
     const swSource = readFileSync(path.join(ROOT, 'src/sw/sw.ts'), 'utf8');
     const defines = {
         __CACHE_VERSION__: JSON.stringify(cacheVersion),
         __CORE_SHELL__: JSON.stringify(core[0]),
-        __OPTIONAL_SHELL__: JSON.stringify(optional[0])
+        __OPTIONAL_SHELL__: JSON.stringify(optional[0]),
+        __BACKEND_SHELL__: JSON.stringify(backend[0])
     };
     const rebuilt = await build({
         entryPoints: [path.join(ROOT, 'src/sw/sw.ts')], bundle: true, format: 'iife', target: 'es2020', minify: true, write: false, define: defines
@@ -245,10 +248,11 @@ writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
     const view = scriptView(swSource, 'sw.ts', {
         __CACHE_VERSION__: "'" + cacheVersion + "'",
         __CORE_SHELL__: lit(core[0]),
-        __OPTIONAL_SHELL__: lit(optional[0])
+        __OPTIONAL_SHELL__: lit(optional[0]),
+        __BACKEND_SHELL__: lit(backend[0])
     });
     writeFileSync(swPath, view);
-    console.log('sw.js ៖ ទិដ្ឋភាពអានបាន ' + view.split('\n').length + ' បន្ទាត់ (សំបកស្នូល ' + core[0].length + ' · ស្រេចចិត្ត ' + optional[0].length + ')');
+    console.log('sw.js ៖ ទិដ្ឋភាពអានបាន ' + view.split('\n').length + ' បន្ទាត់ (សំបកស្នូល ' + core[0].length + ' · ស្រេចចិត្ត ' + optional[0].length + ' · backend ' + backend[0].length + ')');
 }
 
 /*

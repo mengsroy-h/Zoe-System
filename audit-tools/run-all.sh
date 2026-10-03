@@ -730,6 +730,7 @@ run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
 run "sw-client-wiring (browser ពិត)" node audit-tools/sw-client-wiring-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
 run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
+run "sw-backend-chunk (browser ពិត)" node audit-tools/sw-backend-chunk-test.js
 run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
 run "license-net-pressure (browser ពិត)" node audit-tools/license-network-pressure-test.js
 run "sw-revalidate-pressure (browser ពិត)" node audit-tools/sw-revalidate-pressure-test.js
@@ -862,6 +863,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KHMERTZ_APP_DIR="$BASE" node audit-tools/khmer-timezone-test.js 2>&1 | tail -1 | sed 's/^/   khmer-tz:        /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
     SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
+    SWBACKEND_APP_DIR="$BASE" node audit-tools/sw-backend-chunk-test.js 2>&1 | tail -1 | sed 's/^/   sw-backend-chunk:/'
     NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'
     LICPRESSURE_APP_DIR="$BASE" node audit-tools/license-network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   license-pressure:/'
     ADAPTIVE_APP_DIR="$BASE" node audit-tools/adaptive-link-test.js 2>&1 | tail -1 | sed 's/^/   adaptive-link:   /'

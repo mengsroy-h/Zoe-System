@@ -2347,6 +2347,9 @@
     "audit-tools/sw-shell-latency-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/sw-backend-chunk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/toast-action-truth-test.js": {
       "policy": "guard-1"
     },

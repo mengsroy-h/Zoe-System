@@ -9,6 +9,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 const NATIVE_CHUNK = 'native-plugins';
 const NATIVE_CHUNK_RE = new RegExp('^\\./assets/' + NATIVE_CHUNK + '-[^/]+\\.js$');
+const BACKEND_CHUNK_RE = /^\.\/assets\/supabase-backend-[^/]+\.js$/;
 
 function readAppVersion(): string {
     const src = readFileSync(path.join(ROOT, 'src/core/version.ts'), 'utf8');
@@ -38,18 +39,26 @@ const NETWORK_ONLY = new Set(['./announcements.json']);
 
 function serviceWorkerPlugin(): Plugin {
     let outDir = 'dist';
+    const staticallyImported = new Set<string>();
     return {
         name: 'zoew-service-worker',
         apply: 'build',
         configResolved(cfg) {
             outDir = cfg.build.outDir;
         },
+        generateBundle(_options, bundle) {
+            staticallyImported.clear();
+            for (const item of Object.values(bundle)) {
+                if (item.type === 'chunk') for (const name of item.imports) staticallyImported.add('./' + name);
+            }
+        },
         async closeBundle() {
             const dist = path.resolve(ROOT, outDir);
             if (!existsSync(dist)) return;
             const emitted = walk(dist).filter((p) => p !== './sw.js' && !NETWORK_ONLY.has(p) && !p.endsWith('.map') && !NATIVE_CHUNK_RE.test(p));
 
-            const core = emitted.filter((p) =>
+            const backend = emitted.filter((p) => BACKEND_CHUNK_RE.test(p) && !staticallyImported.has(p));
+            const core = emitted.filter((p) => !backend.includes(p)).filter((p) =>
                 p === './index.html' ||
                 p === './guide.html' ||
                 p === './boot-flags.js' ||
@@ -60,7 +69,7 @@ function serviceWorkerPlugin(): Plugin {
                 p === './vendor/zxing_reader.wasm' ||
                 /^\.\/assets\/.*\.(js|css)$/.test(p)
             );
-            const optional = emitted.filter((p) => !core.includes(p));
+            const optional = emitted.filter((p) => !core.includes(p) && !backend.includes(p));
 
             const result = await esbuildBuild({
                 entryPoints: [path.join(ROOT, 'src/sw/sw.ts')],
@@ -72,7 +81,8 @@ function serviceWorkerPlugin(): Plugin {
                 define: {
                     __CACHE_VERSION__: JSON.stringify(readCacheVersion()),
                     __CORE_SHELL__: JSON.stringify(['./', ...core]),
-                    __OPTIONAL_SHELL__: JSON.stringify(optional)
+                    __OPTIONAL_SHELL__: JSON.stringify(optional),
+                    __BACKEND_SHELL__: JSON.stringify(backend)
                 }
             });
             mkdirSync(dist, { recursive: true });

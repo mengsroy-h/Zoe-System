@@ -52,7 +52,10 @@ migration ថ្មី `20261002154730_zoe_reset_claim.sql` + Edge Functions + �
 definer ក្នុង public ដែល anon/authenticated ហៅបាន = ០ · zoe_ops អានដោយ role ទាំង២ = false។ Advisor សល់ WARN Leaked Password Protection + INFO zoe_ops ដូចជុំមុន។
 
 **បន្តតាមលំដាប់** ៖
-1. ពិនិត្យ PR របស់ branch ខាងលើ និង CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ migration មុន Edge Functions រួច Netlify/APK។ ផ្ទៀង live migration មាន ៥ និងសាក reset លើឧបករណ៍ពិត។
+1. PR #282 (draft · រួម PR #281) ៖ ពិនិត្យ CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ Edge Functions រួច Netlify/APK · សាក reset លើឧបករណ៍ពិត។
+   ⚠️ migration `20261002154730_zoe_reset_claim.sql` **អនុវត្តលើ live រួច (2026-10-03)** — ផ្ទៀង ៖ `claim_id` · `claim_reset_code`/`settle_reset_code`
+   (`service_role` តែប៉ុណ្ណោះ) មាន **តែ version មិនកត់** ក្នុង `supabase_migrations.schema_migrations` (live មាន ៤) ➜ **មុន merge** ត្រូវ
+   `supabase migration repair --status applied 20261002154730` បើមិនដូច្នេះ GitHub integration អនុវត្តម្តងទៀត ➜ `add column claim_id` ធ្លាក់។
 2. ✅ register createUser ឆ្លើយបាត់ ➜ retry ដោយឈ្មោះ + ពាក្យសម្ងាត់ដដែលបន្តគណនីដដែល (2.49.0 · ផ្នែក ២)។ **នៅសល់** ៖ កូដប្រើ ១ ដង + App ផុតពិដាន ២០ វិ.
    ខណៈ Server បញ្ចប់ ➜ retry ➜ `invite-invalid` (គណនីដើរ) — បើចង់កែ ត្រូវសាងអ្នកយាមមុន (ឧ. App បកប្រែ `network` លើ register ជា «មិនដឹងលទ្ធផល»)។
 3. បន្ត Supabase audit ជុំក្រោយ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops។ ជុំនេះផ្តោតលើ reset និង deployment metadata; មិនអះអាងថាបានគ្រប finder ៦ ទាំងអស់។
@@ -71,8 +74,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
   (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
   (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
-  (៤) chunk `supabase-backend` ស្ថិតក្នុង `CORE_SHELL` រួចសម្រាប់អ្នកប្រើទាំងអស់ (វាស់ ៖ ~២៤១ KB · gzip ~៦៤ KB · ទាញម្តងក្នុងមួយ `CACHE_VERSION`)
-  ➜ ហាង Supabase បើកក្រៅបណ្តាញបាន · ការដកវាចេញពីអ្នកប្រើ Firebase ត្រូវឲ្យ SW ដឹង Config ➜ ⛔ មិនប្តូរដោយគ្មានការសម្រេចពីម្ចាស់គម្រោង។
+  (៤) ✅ ម្ចាស់គម្រោងសម្រេច (2026-10-03) ៖ ដក chunk `supabase-backend` (~២៤១ KB) ចេញពីហាង Firebase ➜ ធ្វើរួចក្នុង 2.49.0 (ក្រុម install ដាច់ ·
+  ហាង Supabase នៅបើកក្រៅបណ្តាញបាន · ឧបករណ៍ទាំងអស់ទាញវា **១ ដងចុងក្រោយ** ពេលផ្លាស់ពី SW ចាស់)។
   ការទាញ SDK Firebase ពេល Config ជា Supabase ៖ merge រួច (PR #279) ➜ ⏳ សាកលើឧបករណ៍ពិត។
 - ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merge រួច (PR #277)** — សាកលើឧបករណ៍ពិត ៖
   ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
@@ -152,6 +155,10 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 - **ZoeKeyGen ៖ modal តាមទំហំអេក្រង់** ៖ ទទឹងជា «ឯកតាអក្សរ» (`calc(var(--modal-w) * var(--fs-unit))`) ជំនួស px ថេរ ➜ ទូរស័ព្ទស្ទើរដូចដើម · tablet/desktop
   រីកតាមអក្សរ (ប្រអប់ PIN 300 ➜ 405px លើ 1920px)។ ZoeW ៖ វាស់រួច មិនប្តូរ (រីកតាមអេក្រង់ស្រាប់)។
 - **ZoeKeyGen ៖ បញ្ជីហាង** ៖ ម្ចាស់ហាងបង្ហាញជាអក្សរដិត (tooltip «ម្ចាស់ហាង») ជំនួស «👑» នៅមុខឈ្មោះគណនី។
+- **Service Worker ៖ chunk `supabase-backend` (~២៤១ KB) ចេញពី `CORE_SHELL`** (សេចក្តីសម្រេចម្ចាស់គម្រោង) ➜ ក្រុម install ដាច់ (`__BACKEND_SHELL__`) ៖
+  ហាង Firebase **មិនទាញ** · ហាង Supabase ៖ ប្រើលើកដំបូង ➜ chunk ចូល cache + សញ្ញាប្រើ (`./__zoew-backend-used`) ➜ កំណែក្រោយ install វាក្នុងក្រុមតែមួយ
+  (ក្រៅបណ្តាញភ្លាមក្រោយ update នៅដើរ · សញ្ញាផ្ទេរបន្តទោះទំព័របើកជាប់ ២ កំណែ) · cache មុនកែ (គ្មាន `./__zoew-shell-scheme`) ដែលមាន chunk ➜ រក្សាវា
+  **១ ដងចុងក្រោយ** (ការផ្លាស់មិនធ្វើឲ្យហាង Supabase បាត់ក្រៅបណ្តាញ) ➜ ហាង Firebase ឈប់ទាញចាប់ពី update បន្ទាប់។
 
 #### អ្នកយាម
 
@@ -162,6 +169,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 - `ZoeW/tests/scroll-thumb.test.tsx` (៨) ៖ ធរណីមាត្រ · មិនជាន់ chrome · web មិនដំឡើង · លាក់ពេលស្ងៀម · រមូរផ្តេកមិនលេច · modal ពេញកម្ពស់ · CSS `pointer-events: none` ·
   mutation ៨ ➜ ក្រហម ៦ · ២ ដែលរួចគឺលក្ខខណ្ឌស្ទួន ➜ លុបចេញពីកូដ។
 - `layout-check` ៖ ទិសទី ២ របស់ modal (ទទឹងជាឯកតាអក្សរលើ tablet/desktop ≥ ៩៧% នៃទូរស័ព្ទ ឬពេញអេក្រង់) · ZoeKeyGen មុនកែ **FAIL** (`pinModal @768px 273u < 281u` …) ➜ **101/101**។
+- `sw-backend-chunk-test` (ថ្មី · Chromium ពិត + `sw.js` ពិត) ៖ មុនកែ **FAIL ៣** (ហាង Firebase ទាញ chunk) ➜ **២០/២០** · mutation ៧ ➜ ក្រហម ៧
+  (install ជានិច្ច/មិនដែល · គ្មានសញ្ញាគ្រោង · គ្មានសញ្ញាប្រើ · គ្មានការផ្ទេរសញ្ញា · មិនមែនផ្លូវសំបក · មិនអើពើសញ្ញាគ្រោង)។
 - `keygen-supabase-admin-test` ៖ ម្ចាស់ `sb-owner` · គ្មាន emoji មុខឈ្មោះ។ `setup-link-logout-test` ៖ ចាក់កូដពិតនៃការបំពេញពាក្យសម្ងាត់ ➜ ចាកចេញមិនបន្សល់ (mutation ➜ ក្រហម)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
@@ -1012,6 +1021,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-03 — chunk `supabase-backend` ចេញពីហាង Firebase (ZoeW 2.49.0 · សេចក្តីសម្រេចម្ចាស់គម្រោង)
+
+គ្មានអ្នកយាមណាវាស់ថា «ឧបករណ៍ណាទាញ chunk Supabase» ➜ សាង `sw-backend-chunk-test` មុន ៖ tree មុនកែ **FAIL ៣** (ហាង Firebase ទាញ chunk ពេល install
+និងរាល់ update) · ទិស Supabase (ក្រៅបណ្តាញ) ជាប់រួច។ SW មិនអាន `localStorage` (Config) ➜ ការសម្រេចពីប្រវត្តិ cache ខ្លួនឯង ៖ fetch handler កត់សញ្ញាប្រើ ·
+install អាន cache ចាស់មុន `activate` លុបវា។ អន្ទាក់ ៖ សញ្ញាដែលកត់តែពេល fetch មិនគ្រប់ ➜ ទំព័របើកជាប់ពី A ➜ B ➜ C (chunk ផ្ទុកក្នុងសតិក្រោម A) ➜ C ខ្វះ chunk ➜
+បើកក្រៅបណ្តាញធ្លាក់ ➜ install ផ្ទេរសញ្ញាដែលមានពិត (មិនមែនពីការសន្និដ្ឋាន cache មុនកែ បើមិនដូច្នេះហាង Firebase ទាញជារៀងរហូត)។ តេស្តដំបូងរបស់ខ្ញុំ
+រំលង mutation «គ្មានការផ្ទេរ» ព្រោះការផ្ទុកក្រោម B សរសេរសញ្ញាឡើងវិញ ➜ តម្រៀបតេស្តឲ្យ update ២ ដងជាប់គ្នា ➜ mutation ៧/៧។ `build-audit.mjs` ស្គាល់បញ្ជីទី ៣។
+
 ### 2026-10-03 — modal ZoeKeyGen ចង្អៀតលើ desktop · ខ្សែរមូរ iOS (ZoeW 2.49.0 · ZoeKeyGen 2.24.3)
 
 `layout-check` វាស់តែ «modal មិនលើសអេក្រង់» ➜ ជាប់ទោះ modal ZoeKeyGen ទទឹង px ថេរ ខណៈ `--fs-unit` ឡើង 1.0 ➜ 1.35 ៖ ប្រអប់ PIN **២៨៨ ឯកតាអក្សរ** លើ 320px ➜
@@ -1858,6 +1875,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `supabase-pg` | ផ្នែក ២ | — |
 | `supabase-rls-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `sw-backend-chunk-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-client-wiring-test` | ផ្នែក ១ · ផ្នែក ២ | — |

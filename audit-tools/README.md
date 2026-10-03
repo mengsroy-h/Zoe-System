@@ -296,6 +296,7 @@ bash audit-tools/emu/rules.sh
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ · ជាមួយ wrapper `disconnect` ពិត (ក្រៅបណ្តាញ · `fetch` ធ្លាក់) ការសម្គាល់ខលនៅតែចូលជួរ · ការព្យួរសុទ្ធនៅតែ revert | `HISTPATCH_APP_DIR` |
 | `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ · HTTP cache ចាស់មិនពុល cache SW · deploy ថ្មីដែល install ធ្លាក់ ➜ SW ចាស់មិនចាក់ឯកសារកំណែថ្មីចូល cache ចាស់ (asset ដែលសំបកយោងមានក្រៅបណ្តាញ) | `SWINTEG_APP_DIR` |
 | `sw-shell-latency-test.js` | សំបកដែល cache រួច មិនរង់ចាំបណ្តាញ | `SWLATENCY_APP_DIR` |
+| `sw-backend-chunk-test.js` | chunk `supabase-backend` ទាញតែលើឧបករណ៍ដែលប្រើ Supabase (ហាង Firebase មិនដែលទាញ) · ហាង Supabase ៖ ប្រើលើកដំបូង ➜ cache · ក្រៅបណ្តាញ · កំណែក្រោយ install វាក្នុងក្រុមតែមួយ (ទំព័របើកជាប់ ២ កំណែក៏ដោយ) · cache មុនកែ ➜ រក្សា ១ ដង · Chromium ពិត + `sw.js` ពិត | `SWBACKEND_APP_DIR` |
 | `sw-cache-key-test.js` | URL រសើប (Setup Link) មិនជាប់ក្នុង Cache Storage · `guide.html` និង Netlify `/guide` មាន route ផ្ទាល់ · direct navigation ទៅ `/app.js` នៅតែត្រឡប់ `index.html` | `SWKEY_APP_DIR` |
 | `sw-cache-failure-test.js` | Cache API បរាជ័យ ≠ App ដាច់ | `SWFAIL_APP_DIR` |
 | `sw-revalidate-pressure-test.js` | ការធ្វើឲ្យសំបកស្រស់ មិនស៊ីកូតាការតភ្ជាប់ | `SWREVAL_APP_DIR` |

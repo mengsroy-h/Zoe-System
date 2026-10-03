@@ -17,6 +17,7 @@ begin
     ) then
         raise exception 'user-mismatch' using errcode = 'P0001';
     end if;
+    perform 1 from public.tenant_invites i where i.code_hash = p_code_hash for update;
     select m.tenant_id, m.role into invite_tenant, invite_role
     from public.tenant_members m
     where m.user_id = p_user_id and m.username = p_username;

@@ -724,6 +724,23 @@ async function body(c, rec, extra, mode) {
     const usedRace = (await one('select used_count from public.tenant_invites where code_hash = $1', [hRace]))[0].used_count;
     rec('ការប្រណាំង ➜ used_count = 1', usedRace === 1, usedRace);
 
+    const invSame = await issue(ADMIN, B, 'member', 1, 24);
+    const hSame = await hashOf(invSame.rows[0].code);
+    const rSame = await makeAuthUser(c, 'samerace@u.zoe.test');
+    await c1.query('begin');
+    await c1.query("select set_config('request.jwt.claims', '{\"role\":\"service_role\"}', true)");
+    await c1.query('set local role service_role');
+    const sameFirst = await c1.query('select * from public.finish_registration($1, $2, $3)', [rSame, hSame, 'samerace']).then((r) => r.rows[0], () => null);
+    let sameSecondDone = false;
+    const sameSecondP = as(c2, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [rSame, hSame, 'samerace']).then((r) => { sameSecondDone = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const sameSecondBlocked = !sameSecondDone;
+    await c1.query('commit');
+    const sameSecond = await sameSecondP;
+    rec('ការប្រណាំងអ្នកដដែល (retry ក្រោយពិដាន ខណៈការហៅទី ១ នៅរត់) លើកូដ max_uses=1 ➜ ទី ២ ចូលជាជួរ ហើយបានហាង/role ដដែល (មិនមែន invite-invalid ដែលនាំឲ្យលុបគណនី)',
+        !!sameFirst && sameSecondBlocked && !!sameSecond.rows && sameSecond.rows[0].tenant_id === sameFirst.tenant_id && sameSecond.rows[0].role === sameFirst.role,
+        { sameFirst, sameSecondBlocked, sameSecond });
+
     const resetRaceHash = await newResetHash();
     await c1.query('begin');
     await c1.query('set local role service_role');
@@ -833,6 +850,8 @@ const MUTATIONS = [
         '    if p_valid_hours is null'],
     ['admin_issue_reset_code មិនចាក់សោជួរសមាជិក (ចេញកូដដំណាលគ្នា ➜ កូដ ២)', '    where m.username = lower(btrim(p_username))\n    for update;\n',
         '    where m.username = lower(btrim(p_username));\n'],
+    ['finish_registration មិនចាក់សោកូដមុនពិនិត្យសមាជិកភាព (retry ដំណាលគ្នា ➜ invite-invalid ➜ លុបគណនី)',
+        '    perform 1 from public.tenant_invites i where i.code_hash = p_code_hash for update;\n', ''],
     ['admin_extend_tenant គ្មាន CAS (ជួរចាស់សរសេរជាន់)', ' and t.expires_at = p_expected_expires_at\n', '\n'],
     ['admin_extend_tenant គ្មានច្រកទ្វារ admin',
         "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_days is null",

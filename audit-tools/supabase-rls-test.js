@@ -70,7 +70,9 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
-    zoe_admin_write: ['service_role']
+    zoe_admin_write: ['service_role'],
+    zoe_admin_tenants: ['service_role'],
+    zoe_admin_export: ['service_role']
 };
 const EXPECT_PRIVATE_EXEC = {
     is_platform_admin: ['authenticated'],
@@ -433,6 +435,20 @@ async function body(c, rec, extra, mode) {
         raised(await as(c, WA, 'select * from public.admin_issue_reset_code($1, 24)', ['dara']), 'forbidden'));
     const adminSees = (await as(c, ADMIN, 'select count(*)::int as n from public.tenants')).rows;
     rec('admin ឃើញ tenant ទាំងអស់', !!adminSees && adminSees[0].n >= 2, adminSees);
+    for (const who of [ANON, PLAIN, WA, ADMIN]) {
+        const tag = who === ANON ? 'anon' : who === ADMIN ? 'admin (authenticated)' : who === WA ? 'authenticated (សមាជិក A)' : 'authenticated (គ្មានហាង)';
+        rec(tag + ' ៖ zoe_admin_tenants (បញ្ជីហាងទាំងអស់) ➜ permission denied', denied(await as(c, who, 'select public.zoe_admin_tenants(null, 10)')));
+        rec(tag + ' ៖ zoe_admin_export (ទិន្នន័យហាងផ្សេង) ➜ permission denied',
+            denied(await as(c, who, 'select public.zoe_admin_export($1, 0, \'\', \'\', null, 10, 65536)', [B])));
+    }
+    const svcTenants = await as(c, SERVICE, 'select public.zoe_admin_tenants(null, 10) as r');
+    const svcExport = await as(c, SERVICE, 'select public.zoe_admin_export($1, 0, \'\', \'\', null, 10, 65536) as r', [A]);
+    rec('service_role ៖ zoe_admin_tenants · zoe_admin_export ហៅបាន (ផ្លូវ backup/ផ្ទេរទិន្នន័យ)',
+        !!svcTenants.rows && Array.isArray(svcTenants.rows[0].r.tenants) && !!svcExport.rows && Array.isArray(svcExport.rows[0].r.rows),
+        [svcTenants.error, svcExport.error]);
+    rec('zoe_admin_tenants មិនបញ្ចេញវាលសម្ងាត់ (hash កូដ · username · ពាក្យសម្ងាត់)', !!svcTenants.rows
+        && svcTenants.rows[0].r.tenants.every((t) => JSON.stringify(Object.keys(t).sort()) === JSON.stringify(['branch_code', 'docs', 'expires_at', 'id', 'name', 'revoked', 'seq'])),
+        svcTenants.rows && svcTenants.rows[0].r.tenants[0]);
 
     await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, null, null, true)', [A]);
     rec('Revoke A ➜ សមាជិក A ឃើញ tenant ០ ភ្លាម (មិនរង់ចាំ JWT ផុត)', (await seeTenants(WA)).length === 0);
@@ -698,7 +714,14 @@ const MUTATIONS = [
     ['public.zoe_write ជា SECURITY DEFINER (Supabase linter 0029)', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write",
         "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write"],
     ['private.zoe_write អាចហៅដោយ anon', '    private.zoe_write(text, jsonb)\n    to authenticated;', '    private.zoe_write(text, jsonb)\n    to authenticated, anon;'],
-    ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;']
+    ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;'],
+    ['zoe_admin_export ឲ្យ authenticated ហៅបាន', 'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role;',
+        'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role, authenticated;'],
+    ['zoe_admin_tenants ឲ្យ anon ហៅបាន', 'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role;',
+        'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role, anon;'],
+    ['zoe_admin_export · zoe_admin_tenants គ្មាន revoke (grant លំនាំដើម ➜ PUBLIC)',
+        'revoke all on function public.zoe_admin_tenants(uuid, integer), public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer)\n    from public, anon, authenticated, service_role;\n',
+        '']
 ];
 
 async function main() {

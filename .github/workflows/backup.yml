@@ -1,5 +1,5 @@
-# Backup ស្វ័យប្រវត្តិរបស់ Firebase Realtime Database ទៅជា artifact ដែល
-# **អ៊ិនគ្រីបរួច**។
+# Backup ស្វ័យប្រវត្តិរបស់ Firebase Realtime Database និងហាងនីមួយៗក្នុង Supabase Project
+# (target `"type": "supabase"` · RPC `zoe_admin_export`) ទៅជា artifact ដែល **អ៊ិនគ្រីបរួច**។
 #
 # ⛔ ហេតុអ្វី artifact ត្រូវអ៊ិនគ្រីប ៖ dump មានទិន្នន័យអតិថិជនពិត (លេខទូរស័ព្ទ
 #    · ចំនួន COD/DOD)។ អ្នកណាដែលអានឯកសារ repo បាន ក៏ទាញ artifact បានដែរ ➜
@@ -7,8 +7,8 @@
 #    (AES-256-GCM) **និងលុប plaintext** មុនជំហាន upload ហើយមានជំហានផ្ទៀងផ្ទាត់
 #    ដាច់ដោយឡែកដែលធ្លាក់បើនៅសល់ `.json.gz` ណាមួយ។
 #
-# ⛔ សោ service account មិនដែលចុះលើ checkout ទេ — `ci-config.js` បដិសេធផ្លូវ
-#    ណាមួយក្នុង repo ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើតតាមរចនាសម្ព័ន្ធ។
+# ⛔ សោ service account និង secret key របស់ Supabase មិនដែលចុះលើ checkout ទេ —
+#    `ci-config.js` បដិសេធផ្លូវណាមួយក្នុង repo ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើតតាមរចនាសម្ព័ន្ធ។
 #
 # Secret ២ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions ៖
 #   · ZOE_BACKUP_TARGETS    — JSON array (មើល firebase-backup/README.md)
@@ -75,7 +75,7 @@ jobs:
       #    **ដែលជោគជ័យ** ក៏បាត់ backup ដែរ រៀងរាល់ថ្ងៃ រហូតដល់សោនោះត្រូវជួស។
       #    ដូច្នេះយើងរក្សា backup ដែលបាន រួច **បញ្ចប់ job ជាក្រហម** នៅជំហាន
       #    ចុងក្រោយ ➜ អ្នកប្រើនៅតែទទួល Email ប្រាប់។
-      - name: ទាញទិន្នន័យពី Firebase
+      - name: ទាញទិន្នន័យពី Firebase · Supabase
         id: pull
         if: steps.guard.outputs.ready == 'yes'
         continue-on-error: true
@@ -117,9 +117,9 @@ jobs:
           echo "✅ ឯកសារអ៊ិនគ្រីប ${count} · ទំហំជុំនេះ ${kb} KB"
           echo "### Backup ${count} ឯកសារ · ${kb} KB · រក្សាទុក ${RETENTION_DAYS} ថ្ងៃ" >> "$GITHUB_STEP_SUMMARY"
 
-      # ⛔ ត្រូវរត់ជានិច្ច (រួមទាំងពេលជំហានខាងលើធ្លាក់) — សោ service account
-      #    មិនត្រូវសល់ក្នុង runner បន្តទៅជំហានក្រោយឡើយ។
-      - name: លុបសោ service account
+      # ⛔ ត្រូវរត់ជានិច្ច (រួមទាំងពេលជំហានខាងលើធ្លាក់) — សោ service account និង secret key
+      #    របស់ Supabase មិនត្រូវសល់ក្នុង runner បន្តទៅជំហានក្រោយឡើយ។
+      - name: លុបសោ service account · secret key
         if: always()
         run: rm -rf "$RUNNER_TEMP/zoe-backup/secrets" "$RUNNER_TEMP/zoe-backup/config.json"
 
@@ -137,5 +137,5 @@ jobs:
       - name: បញ្ចប់ជាក្រហមបើអាជីវកម្មណាមួយធ្លាក់
         if: steps.guard.outputs.ready == 'yes' && steps.pull.outcome == 'failure'
         run: |
-          echo "❌ អាជីវកម្មយ៉ាងតិច ១ ទាញមិនបាន — មើល log ជំហាន «ទាញទិន្នន័យពី Firebase»" >&2
+          echo "❌ អាជីវកម្ម ឬហាងយ៉ាងតិច ១ ទាញមិនបាន — មើល log ជំហាន «ទាញទិន្នន័យពី Firebase · Supabase»" >&2
           exit 1

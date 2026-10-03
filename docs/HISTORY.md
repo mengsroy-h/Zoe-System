@@ -39,33 +39,18 @@
 
 ## 📌 ការងារដែលនៅសល់ — ការផ្ទៀងផ្ទាត់ដោយអ្នកប្រើ
 
-### 🤝 Handoff សម្រាប់ session បន្ទាប់ (ផ្ទៀង main PR #280 merge រួច ➜ `074903a`)
+### 🤝 Handoff សម្រាប់ session បន្ទាប់
 
-⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
-**ជុំ 2026-10-03 (Claude)** ៖ branch `claude/gracious-feynman-t7vu3k` ឈរលើ `codex/supabase-audit-handoff` (PR #281) ➜ ZoeW **2.49.0** ៖ Handoff ជំហាន ២
-(register បន្តបាន) **កែរួច** + checkbox «ចងចាំពាក្យសម្ងាត់» (សំណើម្ចាស់គម្រោង) ➜ merge branch នេះ = រួម 2.48.2 ផង។ មិនទាន់ merge/deploy។
+ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
+ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-**ជុំសន្សំកូតា 2026-10-03** ៖ branch `codex/supabase-audit-handoff` កែការប្រណាំងកូដប្តូរពាក្យសម្ងាត់ (ZoeW 2.48.2)។
-migration ថ្មី `20261002154730_zoe_reset_claim.sql` + Edge Functions + សារ App; មិនទាន់ merge/deploy។
-ផ្ទៀង live មុនកែ៖ main CI Audit/APK ជាប់ · migration ៤ · register/reset-password ACTIVE · Postgres 17.11 · តារាង public គ្មាន RLS = ០ ·
-definer ក្នុង public ដែល anon/authenticated ហៅបាន = ០ · zoe_ops អានដោយ role ទាំង២ = false។ Advisor សល់ WARN Leaked Password Protection + INFO zoe_ops ដូចជុំមុន។
-
-**បន្តតាមលំដាប់** ៖
-1. PR #282 (draft · រួម PR #281) ៖ ពិនិត្យ CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ Edge Functions រួច Netlify/APK · សាក reset លើឧបករណ៍ពិត។
-   ✅ migration `20261002154730_zoe_reset_claim.sql` អនុវត្តលើ live ដោយម្ចាស់គម្រោង (SQL Editor) ➜ version មិនបានកត់ ➜ Claude កត់វា (សមមូល
-   `migration repair --status applied` តាមសំណើម្ចាស់គម្រោង · `statements` ទទេដូច repair មុនៗ) ➜ live មាន migration **៥** ស្មើ repo។
-   ✅ Edge Functions `register` + `reset-password` deploy លើ live តាមសំណើម្ចាស់គម្រោង (មុន merge) ➜ **v9** = កូដ branch នេះ (`73db73a`) ·
-   ប្រភព ១២ ឯកសារលើ live ស្មើ repo (`diff` + sha256) · v8 = កូដ `main` ➜ ត្រឡប់វិញ = deploy ពី `origin/main`។ App ផលិតកម្ម (2.48.1) មិនស្គាល់
-   `password-reset-unknown` (ករណីកម្រ ៖ Auth មិនឆ្លើយ) ➜ បង្ហាញកូដឆៅ រហូតដល់ Netlify deploy 2.49.0។ នៅសល់ក្រោយ merge ៖ Netlify ZoeW + ZoeKeyGen + APK។
-2. ✅ register createUser ឆ្លើយបាត់ ➜ retry ដោយឈ្មោះ + ពាក្យសម្ងាត់ដដែលបន្តគណនីដដែល · ✅ កូដប្រើ ១ ដង + App ផុតពិដាន ➜ retry ➜ `200 registered` ·
-   ✅ retry ដំណាលគ្នាលែងលុបគណនី (2.49.0 · ផ្នែក ២)។ ⛔ Edge Functions live (v9) **មិនទាន់**មានកូដនេះ ➜ migration ២ ថ្មីមុន ➜ deploy ម្តងទៀត ([2.49.0] សកម្មភាពដោយដៃ)។
-3. ✅ Supabase audit ជុំ 2026-10-03 (ផ្នែក ២) ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops ពិនិត្យរួច។ **សំណើដែលនៅចាំការសម្រេច** ៖
-   (ក) ✅ **backup ទិន្នន័យហាង Supabase** (`firebase-backup` គោលដៅ `"type": "supabase"` · ផ្នែក ២) ⏳ ម្ចាស់គម្រោង ៖ migration + secret + Run workflow + សាកស្តារ · (ខ) ✅ ពិដានស្ងៀម ១៥ នាទី Admin Supabase ក្នុង ZoeKeyGen · (គ) ✅ index FK ៣ (`created_by` ២ + `invite_code_hash`) ៖ migration `20261003170000_zoe_fk_indexes.sql`។ ✅ ការរកឃើញ audit SQL គណនីទាំង ៣ កែរួច (ផ្នែក ២)។
-   ⏸️ **Supabase deep audit ជុំ ២ ផ្អាក** (សំណើម្ចាស់គម្រោង ៖ បន្តកូដសិន) ៖ ចប់តែផ្នែក SQL គណនី (រកឃើញ ៣ ក្នុងផ្នែក ២) · ផ្នែក ៨ ទៀតនៅសល់។
-4. ✅ cache IndexedDB `zoe_docs` (delta ពី cursor · callback តែក្រោយ server ឆ្លើយ · scope URL + user · tenant បញ្ជាក់ដោយ server · សម្អាតពេលចាកចេញ) + ការទាញពេញ
-   វិល/ការទាញបាត់ពេលចូល/doc ខ្មោច (ផ្នែក ២) ⏳ ម្ចាស់គម្រោង ៖ migration `20261003180000` · ✅ CLI ផ្ទេរ Firebase ➜ Supabase (`tools/supabase-migrate/`) · ✅ ឡើងកំណែ dependency + CI + Netlify Node 24 (ផ្នែក ២)។ ការកែ adapter/Postgres ត្រូវវាស់ emu/supabase-adapter-parity និង supabase-*។
-5. សាកលើឧបករណ៍ iPhone/Android ពិតសម្រាប់ backend ទាំង២។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**; CLI ផ្ទេរប្រើតែសម្រាប់អតិថិជនដែលជ្រើសប្តូរ។
+1. **ម្ចាស់គម្រោង** ៖ PR #282 (draft · រួម PR #281 · ZoeW 2.49.0 · ZoeKeyGen 2.24.3) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ»
+   (migration ថ្មី ៤ ➜ Edge Functions `register` + `reset-password` ម្តងទៀត ➜ Netlify ZoeKeyGen + ZoeW ➜ APK · secret backup ហាង + សាកស្តារ)។
+   live (វាស់ 2026-10-03) ៖ migration ៥ (៤ ពី `main` + `20261002154730`) · Edge Functions **v9** (`73db73a` · v8 = `main` សម្រាប់ត្រឡប់វិញ)។
+2. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
+3. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
 ⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
 
@@ -77,8 +62,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   ការដំឡើង ៖ [`supabase/README.md`](../supabase/README.md)។ ⏳ សាកលើ iPhone + Android ពិត ៖ ចុះឈ្មោះ · ចូល · ស្កេន · ក្រៅបណ្តាញ ➜ ភ្ជាប់វិញ ·
   ឧបករណ៍ ២ ក្នុងហាងដដែល · ភ្លេចពាក្យសម្ងាត់ · ហាងបិទ ➜ ចាកចេញ។ **ចំណុចបើក** (សម្រេចជាមួយម្ចាស់គម្រោង) ៖ (១) **Push** ៖ ចងនឹងគណនីហាងរួច
   (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
-  (២) **Egress Free 5 GB/ខែ** ៖ adapter ទាញពី `cursor=0` រាល់ការផ្ទុកទំព័រ ➜ គួរ cache `zoe_docs` ក្នុង IndexedDB (delta តាម `seq`) ·
-  (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ CLI តាម `public.zoe_admin_write(p_tenant, p_op_id, p_ops, p_replace)` (មិនទាន់សាង) ·
+  (២) **Egress Free 5 GB/ខែ** ៖ ✅ cache `zoe_docs` ក្នុង IndexedDB (2.49.0 · ទាញតែ delta) ➜ ⏳ migration `20261003180000` · Dashboard ➜ Reports ➜ egress ·
+  (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ ✅ CLI `tools/supabase-migrate/` (dry-run លំនាំដើម) ➜ ⏳ សាកលើហាងសាកល្បងមុន ·
   (៤) ✅ ម្ចាស់គម្រោងសម្រេច (2026-10-03) ៖ ដក chunk `supabase-backend` (~២៤១ KB) ចេញពីហាង Firebase ➜ ធ្វើរួចក្នុង 2.49.0 (ក្រុម install ដាច់ ·
   ហាង Supabase នៅបើកក្រៅបណ្តាញបាន · ឧបករណ៍ទាំងអស់ទាញវា **១ ដងចុងក្រោយ** ពេលផ្លាស់ពី SW ចាស់)។
   ការទាញ SDK Firebase ពេល Config ជា Supabase ៖ merge រួច (PR #279) ➜ ⏳ សាកលើឧបករណ៍ពិត។

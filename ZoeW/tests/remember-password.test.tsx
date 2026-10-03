@@ -20,6 +20,7 @@ import {
 } from '../src/features/password-memory';
 import { clearRememberedSession, showLoginModalWithPrefill } from '../src/features/session';
 import { byId, mount, step, unmount } from './native/react-harness';
+import { beginAsync, settleAsync, trackCryptoSubtle } from './async-settle';
 
 const FB = { apiKey: 'A', databaseURL: 'https://shop-a.firebaseio.com', projectId: 'p' };
 const FB_OTHER = { apiKey: 'A', databaseURL: 'https://shop-b.firebaseio.com', projectId: 'q' };
@@ -29,26 +30,13 @@ const SECRET = 'Kh-secret-9271';
 type Rec = Record<string, unknown>;
 let idbRows: Map<string, unknown>;
 let idbOff = false;
-let asyncPending = 0;
 
-function tracked<T>(work: Promise<T>): Promise<T> {
-    asyncPending++;
-    return work.finally(() => { asyncPending--; });
-}
-
-const realSubtle = crypto.subtle;
-const countedSubtle = new Proxy(realSubtle, {
-    get(target, prop) {
-        const value = (target as any)[prop];
-        return typeof value === 'function' ? (...args: unknown[]) => tracked(value.apply(target, args)) : value;
-    }
-});
-Object.defineProperty(crypto, 'subtle', { configurable: true, get: () => countedSubtle });
+trackCryptoSubtle();
 
 function fakeIndexedDb() {
     const later = (fn: () => void) => {
-        asyncPending++;
-        setTimeout(() => { asyncPending--; fn(); }, 0);
+        const end = beginAsync();
+        setTimeout(() => { end(); fn(); }, 0);
     };
     const request = (run: () => unknown) => {
         const req: any = {};
@@ -107,14 +95,7 @@ function fakeFb(outcome: 'ok' | 'reject' = 'ok') {
 }
 
 async function settle() {
-    let quiet = 0;
-    for (let i = 0; i < 2000 && (i < 6 || quiet < 3); i++) {
-        for (let j = 0; j < 8; j++) await Promise.resolve();
-        await new Promise((r) => setTimeout(r, 0));
-        quiet = asyncPending === 0 ? quiet + 1 : 0;
-    }
-    expect(asyncPending).toBe(0);
-    step(() => {});
+    await settleAsync(6);
 }
 
 function useBackend(cfg: Rec, fb: any, kind: 'firebase' | 'supabase' = 'firebase') {

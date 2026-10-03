@@ -22,6 +22,7 @@ import { clearRememberedSession, showLoginModalWithPrefill } from '../src/featur
 import { performLogin } from '../src/features/auth';
 import { SB_ACCOUNT_STORAGE_KEY, SB_AUTH_OWNER_KEY, SB_AUTH_STORAGE_KEY, claimSessionStorageFor, createModeStorage } from '../src/services/supabase-transport';
 import { mount, step, unmount } from './native/react-harness';
+import { settleAsync, trackCryptoSubtle } from './async-settle';
 
 const SB_URL = 'https://abcd1234.supabase.co';
 const SB = { supabaseUrl: SB_URL, supabaseKey: 'sb_publishable_' + 'k'.repeat(24) };
@@ -49,12 +50,10 @@ function fakeSupabaseFb(checkCode: string | (() => Promise<any>)) {
     return { fb, calls };
 }
 
+trackCryptoSubtle();
+
 async function settle() {
-    for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 8; j++) await Promise.resolve();
-        await new Promise((r) => setTimeout(r, 0));
-    }
-    step(() => {});
+    await settleAsync(4);
 }
 
 function useBackend(kind: 'supabase' | 'firebase', fb?: any) {

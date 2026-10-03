@@ -1706,6 +1706,9 @@
     "ZoeW/src/ui/toast.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/tests/async-settle.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/app-icon-logo.test.tsx": {
       "policy": "zoew-self-verification"
     },

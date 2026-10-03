@@ -2153,6 +2153,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-data-tools-test` | ផ្នែក ២ | — |
 | `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `supabase-app-network-e2e-test` | ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
 | `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | — |

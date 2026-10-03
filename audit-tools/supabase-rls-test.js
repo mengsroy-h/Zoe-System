@@ -227,6 +227,22 @@ async function body(c, rec, extra, mode) {
     const badViews = views.filter((v) => !v.opts.some((o) => /^security_invoker=(true|on|1)$/.test(o)));
     rec('រាល់ view ក្នុង public មាន security_invoker (view រំលង RLS តាមលំនាំដើម) ៖ ' + views.length, badViews.length === 0, badViews);
 
+    const unindexedFks = async () => {
+        const fks = await one(`select n.nspname || '.' || cl.relname || '.' || c.conname as name, c.conrelid::int as relid, c.conkey::int[] as cols
+            from pg_constraint c join pg_class cl on cl.oid = c.conrelid join pg_namespace n on n.oid = cl.relnamespace
+            where c.contype = 'f' and n.nspname in ('public', 'private')`);
+        const idx = await one(`select i.indrelid::int as relid, string_to_array(i.indkey::text, ' ')::int[] as cols from pg_index i`);
+        const covered = (fk) => idx.some((x) => x.relid === fk.relid && fk.cols.every((col) => x.cols.slice(0, fk.cols.length).indexOf(col) !== -1));
+        return { count: fks.length, missing: fks.filter((fk) => !covered(fk)).map((fk) => fk.name) };
+    };
+    const fkScan = await unindexedFks();
+    rec('FK ទាំង ' + fkScan.count + ' ក្នុង public/private មាន index ដែលជួរឈរនាំមុខស្មើ FK (Advisor «unindexed foreign keys») · ជាន់អប្បបរមា ៨',
+        fkScan.count >= 8 && fkScan.missing.length === 0, fkScan.missing);
+    await c.query('create table public.zz_fk_probe (id integer primary key, tenant uuid references public.tenants (id))');
+    const fkProbe = await unindexedFks();
+    await c.query('drop table public.zz_fk_probe');
+    rec('probe ៖ FK ថ្មីគ្មាន index ➜ ការស្កេនចាប់បាន (ទិសផ្ទុយ)', fkProbe.missing.some((n) => /zz_fk_probe/.test(n)), fkProbe.missing);
+
     const fns = await one(`select n.nspname, p.proname, p.prosecdef, coalesce(p.proconfig, '{}') as cfg,
             array(select r.rolname from pg_roles r where r.rolname = any($1) and has_function_privilege(r.rolname, p.oid, 'EXECUTE') order by 1)::text[] as exec
         from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private') order by 1, 2`, [API_ROLES]);
@@ -852,6 +868,8 @@ const MUTATIONS = [
         '    where m.username = lower(btrim(p_username));\n'],
     ['finish_registration មិនចាក់សោកូដមុនពិនិត្យសមាជិកភាព (retry ដំណាលគ្នា ➜ invite-invalid ➜ លុបគណនី)',
         '    perform 1 from public.tenant_invites i where i.code_hash = p_code_hash for update;\n', ''],
+    ['index FK created_by របស់ tenant_invites បាត់', 'create index if not exists tenant_invites_created_by_idx on public.tenant_invites (created_by);\n', ''],
+    ['index FK invite_code_hash របស់ tenant_members បាត់', 'create index if not exists tenant_members_invite_code_hash_idx on public.tenant_members (invite_code_hash);\n', ''],
     ['admin_extend_tenant គ្មាន CAS (ជួរចាស់សរសេរជាន់)', ' and t.expires_at = p_expected_expires_at\n', '\n'],
     ['admin_extend_tenant គ្មានច្រកទ្វារ admin',
         "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_days is null",

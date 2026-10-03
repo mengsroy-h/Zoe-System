@@ -2690,6 +2690,9 @@
     "supabase/migrations/20261003160000_zoe_admin_races.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261003170000_zoe_fk_indexes.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },

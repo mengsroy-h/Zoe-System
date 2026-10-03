@@ -95,7 +95,9 @@ const LOCAL_CLOCK_OK = {
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល (ការប្រៀបធៀបថ្ងៃឈប់ ៖ ថយក្រោយ ➜ lockout យូរជាង = ទិសសុវត្ថិភាព)',
         noteSigningKeyActivity: 'ត្រាសកម្មភាពនៃ Signing Key (ពិដានទុកចោល) — local សុទ្ធសាធ · អ្នកអាន `expireIdleSigningKey()` ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ ដក Key (fail-closed)',
         loadSigningKey: 'ត្រាសកម្មភាពពេល Load Signing Key — ដូច `noteSigningKeyActivity`',
-        tryRestoreSigningKeyFromSession: 'ត្រាសកម្មភាពពេលស្តារ Signing Key — ដូច `noteSigningKeyActivity`'
+        tryRestoreSigningKeyFromSession: 'ត្រាសកម្មភាពពេលស្តារ Signing Key — ដូច `noteSigningKeyActivity`',
+        sbAdminActivity: 'ត្រាសកម្មភាពនៃ session Admin Supabase (ពិដានស្ងៀម) — local សុទ្ធសាធ · អ្នកអាន `expireIdleSbAdmin()` ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ ចាកចេញ (fail-closed)',
+        sbAdminLogin: 'ត្រាសកម្មភាពពេលចូល Admin Supabase — ដូច `sbAdminActivity`'
     },
     'ZoeW/license-verify.js': {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',

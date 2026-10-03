@@ -2991,7 +2991,9 @@ const SB_ADMIN_ERROR_TEXT = {
     'reset-invalid': 'ការកំណត់កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ!',
     'forbidden': 'គណនីនេះមិនមែន Admin របស់ Supabase ទេ (តារាង platform_admins)!'
 };
+const SB_ADMIN_IDLE_MS = 15 * 60 * 1000;
 let sbAdminSession = null;
+let sbAdminLastUseAt = 0;
 let sbAdminGeneration = 0;
 let sbAdminBusy = false;
 let sbTenantCache = [];
@@ -3109,6 +3111,7 @@ async function sbAdminLogin() {
             return;
         }
         sbAdminSession = session;
+        sbAdminLastUseAt = Date.now();
         const panel = document.getElementById('sbAdminPanel');
         if (panel) panel.classList.remove('hidden');
         const logoutBtn = document.getElementById('sbAdminLogoutBtn');
@@ -3159,6 +3162,21 @@ function sbAdminReset(expired) {
         if (el) el.value = '';
     });
     if (expired === true) alert('Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!');
+}
+
+function expireIdleSbAdmin() {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy) return false;
+    if (elapsedSince(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
+    sbAdminReset(false);
+    sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    showToast('🔒 ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត');
+    return true;
+}
+
+function sbAdminActivity() {
+    if (!sbAdminSession || expireIdleSbAdmin()) return;
+    sbAdminLastUseAt = Date.now();
 }
 
 function sbAdminLogout() {
@@ -3514,11 +3532,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('pointerdown', noteSigningKeyActivity, { capture: true, passive: true });
     document.addEventListener('keydown', noteSigningKeyActivity, { capture: true, passive: true });
+    document.addEventListener('pointerdown', sbAdminActivity, { capture: true, passive: true });
+    document.addEventListener('keydown', sbAdminActivity, { capture: true, passive: true });
     setInterval(expireIdleSigningKey, 30000);
+    setInterval(expireIdleSbAdmin, 30000);
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         expireIdleSigningKey();
+        expireIdleSbAdmin();
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();

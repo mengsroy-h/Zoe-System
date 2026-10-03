@@ -86,7 +86,7 @@ function sliceNested(source, name) {
 const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
-const HELPER_FNS = ['fetchWithTimeout', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'safeStoreGet',
+const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'setupLinkDsnIsValid', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'QR_MAX_MODULES'];
@@ -696,6 +696,47 @@ async function behavior() {
         await drain();
         ok('JWT ផុត (RPC 401) ➜ reset + សារ «ផុតកំណត់» តែមួយ (មិនមែន «ចេញកូដមិនបាន» ទៀត)', alertsSince(a).length === 1 && /ផុតកំណត់/.test(alertsSince(a)[0])
             && !panelOpen() && C.sbAdminSession === null && el('sbResetResultBox').hidden(), alertsSince(a));
+        console.log('   · ពិដានស្ងៀម ១៥ នាទី (ដូច Signing Key)');
+        const run = (code) => { try { return vm.runInContext(code, C); } catch (e) { return 'ERR ' + e.message; } };
+        const signingIdle = Function('return (' + ((src.match(/const SIGNING_KEY_IDLE_MS = ([0-9 *]+);/) || [])[1] || '0') + ')')();
+        ok('SB_ADMIN_IDLE_MS = SIGNING_KEY_IDLE_MS (' + signingIdle + 'ms)', signingIdle > 0 && run('typeof SB_ADMIN_IDLE_MS === "number" ? SB_ADMIN_IDLE_MS : 0') === signingIdle);
+        K.relogin();
+        await sleep(1200);
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលវិញសម្រាប់ការសាកពិដានស្ងៀម', panelOpen() && !!C.sbAdminSession);
+        const idleBy = (ms) => run('sbAdminLastUseAt = Date.now() - SB_ADMIN_IDLE_MS + (' + ms + ')');
+        const expire = () => run('typeof expireIdleSbAdmin === "function" ? expireIdleSbAdmin() : null');
+        const activity = () => run('typeof sbAdminActivity === "function" ? sbAdminActivity() : null');
+        ok('ចូលរួច ➜ ត្រាពេលប្រើ = ឥឡូវ (Date.now)', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000);
+        idleBy(60000);
+        ok('ស្ងៀមតិចជាង ១៥ នាទី ➜ session នៅ', expire() === false && !!C.sbAdminSession && panelOpen());
+        idleBy(1000);
+        activity();
+        ok('សកម្មភាព (pointer/key) មុនដល់ពិដាន ➜ ត្រាពេលថ្មី · session នៅ', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000 && !!C.sbAdminSession);
+        idleBy(-1000);
+        const fIdle = K.log.fetches.length;
+        const tIdle = K.log.toasts.length;
+        const aIdle = K.log.alerts.length;
+        const expired = expire();
+        await drain();
+        ok('ស្ងៀម ១៥ នាទី ➜ sbAdminReset (ផ្ទាំងលាក់ · session null · បញ្ជី/កូដទទេ) · POST /auth/v1/logout · toast ១ «ចូលម្តងទៀត» · គ្មាន alert',
+            expired === true && !panelOpen() && C.sbAdminSession === null && el('sbTenantListBody').innerHTML === ''
+            && K.log.fetches.slice(fIdle).some((f) => /\/auth\/v1\/logout$/.test(f.url)) && K.log.toasts.length === tIdle + 1
+            && /ចូល/.test(K.log.toasts[tIdle] || '') && K.log.alerts.length === aIdle, { expired, toasts: K.log.toasts.slice(tIdle), fetches: K.log.fetches.slice(fIdle).map((f) => f.url) });
+        ok('ក្រោយផុត ➜ ហៅម្តងទៀតមិនធ្វើអ្វី (គ្មាន toast ស្ទួន)', expire() === false && K.log.toasts.length === tIdle + 1);
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        idleBy(-1000);
+        activity();
+        ok('សកម្មភាពដំបូងក្រោយស្ងៀមលើស ១៥ នាទី (ភ្ញាក់ពីការដេក) ➜ ផុតមុន មិនពន្យារ session ចាស់', C.sbAdminSession === null && !panelOpen());
+        const visBlock = (src.match(/document\.addEventListener\('visibilitychange', \(\) => \{[\s\S]*?\n {4}\}\);/g) || []).join('\n');
+        ok('init ៖ setInterval(expireIdleSbAdmin) · visibilitychange ➜ expireIdleSbAdmin() · pointerdown/keydown ➜ sbAdminActivity',
+            /setInterval\(expireIdleSbAdmin, \d+\)/.test(src) && /expireIdleSbAdmin\(\);/.test(visBlock)
+            && /addEventListener\('pointerdown', sbAdminActivity, /.test(src) && /addEventListener\('keydown', sbAdminActivity, /.test(src));
         ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
     } catch (e) {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));

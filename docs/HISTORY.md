@@ -62,8 +62,7 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
    ✅ retry ដំណាលគ្នាលែងលុបគណនី (2.49.0 · ផ្នែក ២)។ ⛔ Edge Functions live (v9) **មិនទាន់**មានកូដនេះ ➜ migration ២ ថ្មីមុន ➜ deploy ម្តងទៀត ([2.49.0] សកម្មភាពដោយដៃ)។
 3. ✅ Supabase audit ជុំ 2026-10-03 (ផ្នែក ២) ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops ពិនិត្យរួច។ **សំណើដែលនៅចាំការសម្រេច** ៖
    (ក) **backup ទិន្នន័យហាង Supabase** ⏳ WIP branch `wt/supabase-data-tools-wip` (`b005a0b` · RPC export · `firebase-backup` គោលដៅ Supabase · CLI ផ្ទេរ ·
-   checker ថ្មី · agent ឈប់ដោយ session limit ➜ **មិនទាន់ផ្ទៀង**) · (ខ) ពិដានស្ងៀម ១៥ នាទី Admin Supabase ក្នុង ZoeKeyGen ⏳ WIP `wt/keygen-admin-idle`
-   (`488c1c6` · guard តែប៉ុណ្ណោះ) · (គ) ✅ index FK ៣ (`created_by` ២ + `invite_code_hash`) ៖ migration `20261003170000_zoe_fk_indexes.sql`។ ✅ ការរកឃើញ audit SQL គណនីទាំង ៣ កែរួច (ផ្នែក ២)។
+   checker ថ្មី · agent ឈប់ដោយ session limit ➜ **មិនទាន់ផ្ទៀង**) · (ខ) ✅ ពិដានស្ងៀម ១៥ នាទី Admin Supabase ក្នុង ZoeKeyGen · (គ) ✅ index FK ៣ (`created_by` ២ + `invite_code_hash`) ៖ migration `20261003170000_zoe_fk_indexes.sql`។ ✅ ការរកឃើញ audit SQL គណនីទាំង ៣ កែរួច (ផ្នែក ២)។
    ⏸️ **Supabase deep audit ជុំ ២ ផ្អាក** (សំណើម្ចាស់គម្រោង ៖ បន្តកូដសិន) ៖ ចប់តែផ្នែក SQL គណនី (រកឃើញ ៣ ក្នុងផ្នែក ២) · ផ្នែក ៨ ទៀតនៅសល់។
 4. IndexedDB cache zoe_docs (delta seq) ⌛ មិនទាន់ចាប់ផ្តើម (រចនា «egress-only» ៖ delta ពី cursor · ផ្តល់ callback តែក្រោយ server ឆ្លើយ · scope = URL + tenant + user ·
    សម្អាតពេលចាកចេញ) · CLI ផ្ទេរ Firebase ➜ Supabase ⏳ ក្នុង WIP (ក) ខាងលើ · ⏳ ឡើងកំណែ dependency ទាំងអស់ (សំណើម្ចាស់គម្រោង ៖ npm patch/minor · Actions v7/v6 ·
@@ -168,6 +167,9 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
   · ប្តូរពាក្យសម្ងាត់អស់ពេល ➜ «មិនទាន់ដឹងលទ្ធផល…»។ គណនីមានរួច + កូដហាង/role ផ្សេង ➜ «ឈ្មោះគណនីនេះមានគេប្រើរួច» (មិនឆ្លើយ «ចុះឈ្មោះរួច» ជាមួយហាងចាស់ទៀត)។
 - **ហាង Supabase ៖ retry ដំណាលគ្នាលែងលុបគណនី** ៖ `finish_registration` ចាក់សោកូដមុនពិនិត្យសមាជិកភាព ➜ ការហៅទី ២ (retry ក្រោយពិដាន ៨ វិ. ឬសំណើបោះបង់)
   ចូលជាជួរ ហើយបានហាង/role ដដែល (មុននេះ `invite-invalid` ➜ Edge rollback លុបគណនីដែលទើបចុះឈ្មោះ)។
+- **ZoeKeyGen ៖ session Admin Supabase ផុតក្រោយមិនប្រើ ១៥ នាទី** (ដូច Signing Key) ៖ គ្មានការចុច/វាយ ១៥ នាទី ➜ `sbAdminReset()` (ផ្ទាំង · បញ្ជី · កូដ · Link លុប) +
+  revoke session (`/auth/v1/logout` មានពិដាន) + toast «ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត»។ ពិនិត្យរៀងរាល់ ៣០ វិ. · ពេលត្រឡប់មក App ·
+  និងនៅ**មុន**សកម្មភាពដំបូងក្រោយស្ងៀម (ភ្ញាក់ពីការដេក ➜ ផុតមុន មិនពន្យារ session ចាស់)។ ពេលកំពុងហៅ Supabase មិនកាត់។
 - **ZoeKeyGen ៖ «ពន្យារ» ហាង Supabase តាម CAS** ៖ RPC ថ្មី `admin_extend_tenant(ថ្ងៃ, ថ្ងៃផុតដែលឃើញ)` ៖ `greatest(ថ្ងៃផុត, ឥឡូវ) + ថ្ងៃ` (នាឡិកា DB) តែពេលថ្ងៃផុតក្នុង DB
   ស្មើអ្វីដែល ZoeKeyGen ឃើញ ➜ ឧបករណ៍ ២ ដែលបញ្ជីចាស់ ➜ សារ «ហាងនេះត្រូវបានកែពីឧបករណ៍ផ្សេង…» + Refresh បញ្ជីខ្លួនឯង (មុននេះ ៖ សរសេរថ្ងៃផុតដាច់ខាតពីបញ្ជីចាស់
   ➜ ពន្យារ +365 ពីកុំព្យូទ័រ រួច +7 ពីទូរស័ព្ទ ➜ បាត់ ៣៦៥ ថ្ងៃដោយស្ងាត់)។ **ចេញកូដប្តូរពាក្យសម្ងាត់ដំណាលគ្នា ➜ កូដនៅប្រើបានតែ ១** (ចាក់សោជួរសមាជិក)។
@@ -190,6 +192,7 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 - `supabase-functions-test` (register កូដប្រើរួច) ៖ មុនកែ **FAIL ២៦** ➜ **២៣៣** · mutation TS ថ្មី ១៣ · `supabase-rls-test` ៖ register កូដប្រើរួច មុនកែ **FAIL ៣២** ·
   ពន្យារ CAS + កូដ reset ដំណាលគ្នា មុនកែ **FAIL ១៨** (កូដ reset **២** នៅប្រើបាន) · ការប្រណាំងអ្នកដដែល មុនកែ **FAIL ២** ➜ **៤២១/៤២១** · mutation SQL ថ្មី ២២ ·
   FK ទាំងអស់មាន index (ស្កេន `pg_constraint` ↔ `pg_index` · probe ទិសផ្ទុយ · ជាន់ ៨) ៖ មុនកែ **FAIL** (FK ៣) ➜ **៤២៧/៤២៧** ·
+  ពិដានស្ងៀម Admin ៖ មុនកែ **FAIL ៨** ➜ **១០០/១០០** · mutation ៣ (គ្មានការផុតមុនសកម្មភាព · គ្មាន revoke · គ្មានត្រាពេលចូល) ចាប់ទាំងអស់ ·
   `keygen-supabase-admin-test` ៖ ពន្យារពីបញ្ជីចាស់តាម ZoeKeyGen ពិត មុនកែ **FAIL ៤** (ថ្ងៃផុត 2027-10-08 ➜ 2026-10-15) ➜ **៩១/៩១** · fake PostgREST បញ្ជូន `timestamptz`
   ជា microsecond ដូច PostgREST ពិត · vitest `supabase-account` មុនកែ FAIL ៣ ➜ ១៦/១៦។
 - `ZoeW/tests/notifications.test.tsx` ៖ ក្រុម «📤 កញ្ចប់ដែលដករួច» (ការត្រងតាមមូលហេតុ · រំលងការស្តារ · តម្រៀប · មិនស្រស់ ➜ វាស់មិនបាន · `initDatabaseListeners()` ពិត ➜

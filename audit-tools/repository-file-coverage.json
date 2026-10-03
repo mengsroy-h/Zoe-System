@@ -2684,6 +2684,9 @@
     "supabase/migrations/20261002154730_zoe_reset_claim.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261003160000_zoe_admin_races.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },

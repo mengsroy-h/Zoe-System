@@ -56,6 +56,7 @@ const EXPECT_PUBLIC_EXEC = {
     my_account: ['authenticated'],
     admin_create_tenant: ['authenticated'],
     admin_update_tenant: ['authenticated'],
+    admin_extend_tenant: ['authenticated'],
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     finish_registration: ['service_role'],
@@ -101,6 +102,7 @@ const EXPECT_PRIVATE_EXEC = {
     my_account: ['authenticated'],
     admin_create_tenant: ['authenticated'],
     admin_update_tenant: ['authenticated'],
+    admin_extend_tenant: ['authenticated'],
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     admin_issue_reset_code: ['authenticated'],
@@ -451,6 +453,43 @@ async function body(c, rec, extra, mode) {
     rec('admin_update_tenant ប្តូរ branch ទៅស្ទួន ➜ branch-taken',
         raised(await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, $2, null, null)', [A, '770001']), 'branch-taken'));
 
+    const expText = async (id) => (await one('select expires_at::text as e from public.tenants where id = $1', [id]))[0].e;
+    const extendRpc = (who, id, days, expected, conn) => as(conn || c, who, 'select * from public.admin_extend_tenant($1, $2, $3)', [id, days, expected]);
+    const sameExp = async (id, sql, params) => (await one('select (t.expires_at = ' + sql + ') as ok from public.tenants t where t.id = $1', [id].concat(params || [])))[0].ok;
+    const eStart = await expText(A);
+    rec('anon ៖ admin_extend_tenant ➜ permission denied', denied(await extendRpc(ANON, A, 1, eStart)));
+    rec('សមាជិក A ៖ admin_extend_tenant (ពន្យារខ្លួនឯង) ➜ forbidden', raised(await extendRpc(WA, A, 30, eStart), 'forbidden'));
+    rec('admin_extend_tenant ៖ ថ្ងៃ 0 · 3651 · null · expected null ➜ extend-invalid (ថ្ងៃផុតមិនប្រែ)',
+        raised(await extendRpc(ADMIN, A, 0, eStart), 'extend-invalid') && raised(await extendRpc(ADMIN, A, 3651, eStart), 'extend-invalid')
+        && raised(await extendRpc(ADMIN, A, null, eStart), 'extend-invalid') && raised(await extendRpc(ADMIN, A, 5, null), 'extend-invalid')
+        && (await expText(A)) === eStart);
+    rec('admin_extend_tenant ៖ tenant មិនមាន ➜ tenant-not-found', raised(await extendRpc(ADMIN, '00000000-0000-4000-8000-000000000000', 1, eStart), 'tenant-not-found'));
+    const ext10 = await extendRpc(ADMIN, A, 10, eStart);
+    rec('admin_extend_tenant លើហាងសកម្ម ➜ ចាស់ + ១០ ថ្ងៃពិតប្រាកដ (នាឡិកា DB)', !!ext10.rows && await sameExp(A, "$2::timestamptz + interval '10 days'", [eStart]), ext10);
+    const eAfter10 = await expText(A);
+    const staleExt = await extendRpc(ADMIN, A, 7, eStart);
+    rec('ឧបករណ៍ ២ ពន្យារដោយជួរចាស់ (expected ខុស) ➜ tenant-changed · ថ្ងៃផុតមិនខ្លីវិញ', raised(staleExt, 'tenant-changed') && (await expText(A)) === eAfter10, staleExt);
+    const cx1 = await connect('postgres', c.database);
+    const cx2 = await connect('postgres', c.database);
+    extra.push(cx1, cx2);
+    await cx1.query('begin');
+    await cx1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: adminId, aud: 'authenticated' })]);
+    await cx1.query('set local role authenticated');
+    const ext365 = await cx1.query('select * from public.admin_extend_tenant($1, 365, $2)', [A, eAfter10]).then((r) => r.rows.length === 1, () => false);
+    let ext7Done = false;
+    const ext7P = extendRpc(ADMIN, A, 7, eAfter10, cx2).then((r) => { ext7Done = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const ext7Blocked = !ext7Done;
+    await cx1.query('commit');
+    const ext7 = await ext7P;
+    rec('ពន្យារដំណាលគ្នា +365 / +7 ពីជួរដដែល ➜ ទី ២ ចូលជាជួរ ហើយ tenant-changed · ចុងក្រោយ = ចាស់ + 365 ថ្ងៃ (មិនបាត់)',
+        ext365 && ext7Blocked && raised(ext7, 'tenant-changed') && await sameExp(A, "$2::timestamptz + interval '365 days'", [eAfter10]), { ext365, ext7Blocked, ext7 });
+    await c.query("update public.tenants set expires_at = now() - interval '3 days' where id = $1", [A]);
+    const ext5 = await extendRpc(ADMIN, A, 5, await expText(A));
+    rec('admin_extend_tenant លើហាងផុតកំណត់ ➜ ឥឡូវ + ៥ ថ្ងៃ (មិនមែនថ្ងៃផុតចាស់ + ៥)', !!ext5.rows
+        && (await one("select abs(extract(epoch from (t.expires_at - (now() + interval '5 days')))) < 60 as ok from public.tenants t where t.id = $1", [A]))[0].ok, ext5);
+    await c.query('update public.tenants set expires_at = $2 where id = $1', [A, future]);
+
     const invPending = await issue(ADMIN, A, 'member', 1, 24);
     const hPending = await hashOf(invPending.rows[0].code);
     await c.query("update public.tenants set expires_at = now() - interval '1 second' where id = $1", [A]);
@@ -627,6 +666,20 @@ async function body(c, rec, extra, mode) {
     rec('ការកក់ reset ដំណាលគ្នាចូលជាជួរ; សំណើតែមួយបាន user id',
         resetSecondBlocked && resetFirst.rows[0].id === uA1 && resetSecond === null, { resetSecondBlocked, resetSecond });
     rec('ចម្លើយ claim បាត់៖ retry ដោយ id ឈ្នះបាន user ដដែល', (await claim('sokha', resetRaceHash, claimId, c2)) === uA1);
+
+    await c1.query('begin');
+    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: ADMIN.sub, aud: 'authenticated' })]);
+    await c1.query('set local role authenticated');
+    const issueFirst = await c1.query('select * from public.admin_issue_reset_code($1, 24)', ['sokha']).then((r) => r.rows.length === 1, () => false);
+    let issueSecondDone = false;
+    const issueSecondP = as(c2, ADMIN, 'select * from public.admin_issue_reset_code($1, 24)', ['sokha']).then((r) => { issueSecondDone = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const issueSecondBlocked = !issueSecondDone;
+    await c1.query('commit');
+    const issueSecond = await issueSecondP;
+    const unusedReset = (await one('select count(*)::int as n from public.member_reset_codes where user_id = $1 and not used', [uA1]))[0].n;
+    rec('admin_issue_reset_code ដំណាលគ្នា ២ ការតភ្ជាប់ ➜ ចូលជាជួរ · កូដនៅប្រើបានតែ ១ (កូដថ្មីបិទកូដចាស់)',
+        issueFirst && !!issueSecond.rows && issueSecondBlocked && unusedReset === 1, { issueFirst, issueSecondBlocked, unusedReset, issueSecond });
 }
 
 const MUTATIONS = [
@@ -682,10 +735,23 @@ const MUTATIONS = [
     ['release ទទួលកូដប្រើរួច/បិទដោយ admin', '            and m.username = p_username and not r.used\n', '            and m.username = p_username\n'],
     ['claim/settle ផ្តល់សិទ្ធិដល់ authenticated', 'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role;',
         'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role, authenticated;'],
-    ['admin_issue_reset_code មិនបិទកូដចាស់', '    update public.member_reset_codes r set used = true where r.user_id = member_id and not r.used;\n', ''],
+    ['admin_issue_reset_code មិនបិទកូដចាស់', '    update public.member_reset_codes r set used = true where r.user_id = member_id and r.used = false;\n', ''],
     ['admin_issue_reset_code គ្មានច្រកទ្វារ admin',
-        "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_valid_hours is null or p_valid_hours not between 1 and 168",
-        '    if p_valid_hours is null or p_valid_hours not between 1 and 168'],
+        "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_valid_hours is null",
+        '    if p_valid_hours is null'],
+    ['admin_issue_reset_code មិនចាក់សោជួរសមាជិក (ចេញកូដដំណាលគ្នា ➜ កូដ ២)', '    where m.username = lower(btrim(p_username))\n    for update;\n',
+        '    where m.username = lower(btrim(p_username));\n'],
+    ['admin_extend_tenant គ្មាន CAS (ជួរចាស់សរសេរជាន់)', ' and t.expires_at = p_expected_expires_at\n', '\n'],
+    ['admin_extend_tenant គ្មានច្រកទ្វារ admin',
+        "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_days is null",
+        '    if p_days is null'],
+    ['admin_extend_tenant ពន្យារពីឥឡូវជានិច្ច', 'greatest(t.expires_at, now()) + make_interval(days => p_days)', 'now() + make_interval(days => p_days)'],
+    ['admin_extend_tenant ពន្យារពីថ្ងៃផុតចាស់ជានិច្ច', 'greatest(t.expires_at, now()) + make_interval(days => p_days)', 't.expires_at + make_interval(days => p_days)'],
+    ['admin_extend_tenant ទទួលថ្ងៃលើស ៣៦៥០', 'p_days not between 1 and 3650', 'p_days not between 1 and 100000'],
+    ['admin_extend_tenant ជួរចាស់ ➜ tenant-not-found (លាក់ការប្រណាំង)',
+        "        if exists (select 1 from public.tenants t where t.id = p_tenant_id) then\n            raise exception 'tenant-changed' using errcode = 'P0001';\n        end if;\n", ''],
+    ['admin_extend_tenant ឲ្យ anon ហៅបាន', 'public.admin_extend_tenant(uuid, integer, timestamptz)\n    to authenticated;',
+        'public.admin_extend_tenant(uuid, integer, timestamptz)\n    to authenticated, anon;'],
     ['reset hash ប្រើ prefix ដូចកូដអញ្ជើញ', "convert_to('zoe-reset:' ||", "convert_to('zoe-invite:' ||"],
     ['policy member_reset_codes ➜ using (true)', 'create policy member_reset_codes_select on public.member_reset_codes for select to authenticated\n    using ((select private.is_platform_admin()));',
         'create policy member_reset_codes_select on public.member_reset_codes for select to authenticated\n    using (true);'],

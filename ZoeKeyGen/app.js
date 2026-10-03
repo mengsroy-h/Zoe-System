@@ -2984,6 +2984,8 @@ const SB_ADMIN_ERROR_TEXT = {
     'expires-invalid': 'ថ្ងៃផុតកំណត់ត្រូវនៅអនាគត!',
     'tenant-inactive': 'ហាងនេះផុតកំណត់ ឬត្រូវបានបិទ — សូមពន្យារ ឬបើកវាសិន!',
     'tenant-not-found': 'រកហាងនេះមិនឃើញ!',
+    'tenant-changed': 'ហាងនេះត្រូវបានកែពីឧបករណ៍ផ្សេង ឬសំណើមុនបានសម្រេចរួច — បញ្ជីត្រូវបានធ្វើបច្ចុប្បន្នភាព សូមពិនិត្យថ្ងៃផុតកំណត់មុនពន្យារម្តងទៀត!',
+    'extend-invalid': 'ចំនួនថ្ងៃពន្យារមិនត្រឹមត្រូវ!',
     'member-not-found': 'រកឈ្មោះគណនីនេះមិនឃើញ!',
     'invite-invalid': 'ការកំណត់កូដអញ្ជើញមិនត្រឹមត្រូវ!',
     'reset-invalid': 'ការកំណត់កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ!',
@@ -3330,6 +3332,7 @@ async function sbTenantAction(tenantId, action) {
     const tenant = sbTenantCache.find((t) => t.id === tenantId);
     if (!tenant) return;
     let args = null;
+    let rpc = 'admin_update_tenant';
     if (action === 'sb-invite') {
         const hasOwner = sbMemberCache.some((m) => m.tenant_id === tenant.id && m.role === 'owner');
         const role = hasOwner ? 'member' : 'owner';
@@ -3347,9 +3350,8 @@ async function sbTenantAction(tenantId, action) {
         if (raw === null) return;
         const days = Number(String(raw).trim());
         if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('ចំនួនថ្ងៃមិនត្រឹមត្រូវ!'); return; }
-        const current = Date.parse(String(tenant.expires_at || ''));
-        const base = isFinite(current) && current > getServerNow() ? current : getServerNow();
-        args = { p_tenant_id: tenant.id, p_expires_at: new Date(base + days * 86400000).toISOString() };
+        rpc = 'admin_extend_tenant';
+        args = { p_tenant_id: tenant.id, p_days: days, p_expected_expires_at: tenant.expires_at };
     } else if (action === 'sb-revoke') {
         if (!confirm((tenant.revoked ? 'បើកហាង «' : 'បិទហាង «') + tenant.name + '» វិញ?' + (tenant.revoked ? '' : '\n\nគណនីទាំងអស់របស់ហាងនេះនឹងចាកចេញ ហើយចូលមិនបានទៀត។'))) return;
         args = { p_tenant_id: tenant.id, p_revoked: !tenant.revoked };
@@ -3358,9 +3360,13 @@ async function sbTenantAction(tenantId, action) {
     }
     if (!sbAdminIsCurrent(session)) return;
     try {
-        const out = await sbAdminRpc(session, 'admin_update_tenant', args);
+        const out = await sbAdminRpc(session, rpc, args);
         if (!sbAdminIsCurrent(session)) return;
-        if (!out.ok) { alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+        if (!out.ok) {
+            alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out));
+            if (out.body && out.body.message === 'tenant-changed') await sbAdminRefresh();
+            return;
+        }
         showToast('✅ បានកែហាង «' + tenant.name + '»');
         await sbAdminRefresh();
     } catch (e) {

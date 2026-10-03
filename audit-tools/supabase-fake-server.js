@@ -32,9 +32,19 @@ function verifyJwt(token, secret, nowSec) {
     return { ok: true, claims };
 }
 
+// PostgREST បញ្ជូន timestamptz តាម JSON របស់ Postgres (microsecond · `T` · `+00:00`) ➜ client ដែលបញ្ជូនតម្លៃនោះត្រឡប់ (CAS) ស្មើពិតប្រាកដ។
+// node-pg លំនាំដើមបំប្លែងជា Date (millisecond) ➜ fake ក្លាយជាបាត់ microsecond ➜ ផ្តល់ `pgTypes` ដើម្បីធ្វើត្រាប់ PostgREST។
+function postgrestTimestamptz(text) {
+    const iso = String(text).replace(' ', 'T');
+    return /[+-]\d\d$/.test(iso) ? iso + ':00' : iso;
+}
+
 async function startFakeSupabase(opts) {
     const secret = opts.jwtSecret || crypto.randomBytes(32).toString('hex');
     const pool = opts.pool;
+    const rowTypes = opts.pgTypes
+        ? { getTypeParser: (oid, format) => (oid === 1184 ? postgrestTimestamptz : opts.pgTypes.getTypeParser(oid, format)) }
+        : undefined;
     const users = new Map();
     const refreshTokens = new Map();
     const requests = [];
@@ -114,7 +124,7 @@ async function startFakeSupabase(opts) {
             await c.query('begin');
             await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
             await c.query('set local role ' + role);
-            const r = await c.query(sql, params);
+            const r = await c.query({ text: sql, values: params, types: rowTypes });
             await c.query('commit');
             if (mode === 'drop-response') { req.socket.destroy(); return; }
             if (sig.setof) return send(res, 200, r.rows);
@@ -155,7 +165,7 @@ async function startFakeSupabase(opts) {
             await c.query('begin');
             await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
             await c.query('set local role ' + role);
-            const r = await c.query('select ' + cols.join(', ') + ' from public.' + table + order);
+            const r = await c.query({ text: 'select ' + cols.join(', ') + ' from public.' + table + order, types: rowTypes });
             await c.query('commit');
             return send(res, 200, r.rows);
         } catch (e) {

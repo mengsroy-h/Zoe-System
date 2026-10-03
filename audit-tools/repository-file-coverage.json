@@ -306,14 +306,6 @@
       "evidence": "audit-tools/hang-guard.js និង audit-tools/runall-runner-test.js រត់ម៉ាស៊ីនរត់ពិត (#@runner-begin…#@runner-end) លើ checker ក្លែង ៖ ព្យួរ · lane ស្របគ្នា · លំដាប់ output · state/resume/only · TERM · lane នៃបញ្ជីពិតធៀបភស្តុតាងប្រភព; checker-coverage.js ផ្ទៀងផ្ទាត់ wiring និង baseline",
       "limitation": "ការចេញ exit 0 អាចមាន SKIP/PARTIAL PASS; ត្រូវអានរបាយការណ៍ suite ជាមួយលទ្ធផលនីមួយៗ។ ការរត់ស្របគ្នាពិតលើ checker browser ត្រូវវាស់ដោយការរត់ពេញ (ពេលវេលាប្រែតាមម៉ាស៊ីន)។"
     },
-    "guard-36": {
-      "category": "static",
-      "guards": [
-        "audit-tools/doc-scope-test.js"
-      ],
-      "evidence": "audit-tools/doc-scope-test.js ផ្ទៀងផ្ទាត់កំណែ App និងឈ្មោះ checker ដែលយោង",
-      "limitation": "ពិនិត្យ freshness/wiring ជាក់លាក់។ មិនធានាភាពត្រឹមត្រូវនៃរបាយការណ៍ ឬពាក្យបញ្ជាគ្រប់ជួរ។"
-    },
     "guard-37": {
       "category": "static",
       "guards": [
@@ -2440,9 +2432,6 @@
     },
     "audit-tools/zto-sync-banner-test.js": {
       "policy": "guard-1"
-    },
-    "docs/AUDIT-PROMPT.md": {
-      "policy": "guard-36"
     },
     "docs/HISTORY-ARCHIVE.md": {
       "policy": "guard-37"

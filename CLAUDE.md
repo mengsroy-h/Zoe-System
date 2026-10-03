@@ -39,7 +39,10 @@ only this text protects them.
 3. **Ask "what is *not yet* measured?"**, not "which checker is red?". Methods: fake SDK in **real-rules reject mode** ·
    dependencies in new failure modes (hang · slow success · absent) · fuzz outside the default seed range:
    `FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50 node audit-tools/revenue-fuzz-test.js` (deeper runs find **new** classes;
-   they don't protect old ones).
+   they don't protect old ones) · compare sibling paths (two apps · two backends) on their **failure modes**, not their
+   shape · `grep` every caller of a shared resource · surfaces added *after* a rule (re-derive its scope from code) · a
+   queue walked in the same order every round starves its tail · a test ceiling must be tighter than the backup door's
+   ceiling, or a mutation of the main door survives.
 4. **Review deleted lines in every fix**: `git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'` — **an
    unexplained deletion is a regression** (step 1 of 6 of the impact verification, Runbook step 3).
 5. **Don't change verified areas on suspicion** (Forbidden zone). **Measurement is evidence, reading code is not.**
@@ -137,7 +140,7 @@ only this text protects them.
    document. ⛔⛔ **Scope is every `*.md` file in the repo**: bug history lives only in `docs/HISTORY.md` and
    `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era + React
    migration + history moved out of `HISTORY.md` (read; new entries never go there) · no third history file. Exceptions:
-   root `docs/` (history files · `AUDIT-PROMPT.md`) and `CLAUDE.md`
+   root `docs/` (history files) and `CLAUDE.md`
    (rules only — rule 12). ⛔ `ZoeW/docs/` is not an exception. ⛔ Banned elsewhere: version numbers · date-bound requests ·
    version/date-bound measurements ➜ present tense. ⛔ File lists are derived from real dirs. Guard: `doc-scope-test.js`.
 10. **Firebase rules don't deploy automatically.** Every new path gets its rule in the same commit, and **tell the user to
@@ -299,7 +302,7 @@ only this text protects them.
 | **Toolchain ↔ shipped output** | CSS minifier is esbuild (`cssMinify`; Lightning CSS reorders declarations covering PTR/motion) · built JS parses in `build.target` · chunks split by `codeSplitting` + `priority` (`__vitePreload` must stay out of the native chunk) · Android config stays on the installed Capacitor's template line | `npm run smoke` · `npm run android:check` · `npm run native:check` |
 | **New Firebase project tool** | One project per customer · sign-up disabled **and measured** by a real sign-up attempt · Auth settings and rules read back · ⛔ never silently adopt (`--adopt`) or reset passwords (`--reset`) · `pendingProject` recorded before creation · step ceilings · passwords never in files · email ↔ `siteCodeFromEmail()` · Setup Link ↔ `decodeSetupPayload()` · `firebase-tools` pinned · measured with real `firebase-tools` over HTTPS | `firebase-provision-test` |
 | **Netlify config** | ⛔ No root `netlify.toml` (read by both sites) · CSP · `functions` · headers match what the app ships | `netlify-config-scope-test` |
-| **Document scope** | READMEs and `ZTO-SETUP-KH.md` usage only · history only in `docs/HISTORY*.md` · `CLAUDE.md` rules only (no versions/dates outside the header table) · current-version claims derived from code (incl. `CACHE_VERSION` and the [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) header) · checker lists derived (guide words · `listReadmeFiles()` · UI surfaces · 🩺 rows · `collectedValueOf()` screens · 📝 count · every `audit-tools/*.js` in its README · `money-reality-check.js` section counts) · removed surfaces never live in docs (storage keys exist in shipped code) · new surfaces appear in `guide.html` (`licenseFailureMessage()` · `LICENSE_SEAT_SLOTS`) · every `run "emu/…"` named in the Runbook degradation paragraph | `doc-scope-test` · `user-guide-test` |
+| **Document scope** | READMEs and `ZTO-SETUP-KH.md` usage only · history only in `docs/HISTORY*.md` · `CLAUDE.md` rules only (no versions/dates outside the header table) · current-version claims derived from code (incl. `CACHE_VERSION`) · checker lists derived (guide words · `listReadmeFiles()` · UI surfaces · 🩺 rows · `collectedValueOf()` screens · 📝 count · every `audit-tools/*.js` in its README · `money-reality-check.js` section counts) · removed surfaces never live in docs (storage keys exist in shipped code) · new surfaces appear in `guide.html` (`licenseFailureMessage()` · `LICENSE_SEAT_SLOTS`) · every `run "emu/…"` named in the Runbook degradation paragraph | `doc-scope-test` · `user-guide-test` |
 | **Netlify Base directory** | Case-sensitive `ZoeW` · `ZoeKeyGen` (UI only) | 📝 |
 | **`zto-import` · Apps Script** | `SCRIPT_VERSION` rises on every response from one exit point | `google-sheets-cache-test` · `health-check-test` |
 
@@ -1141,7 +1144,6 @@ bash audit-tools/emu/rules.sh
 | Need | File |
 |---|---|
 | Rules | this file |
-| Prompt for the next audit round | [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) |
 | Pending user verification · manual actions per version | [`docs/HISTORY.md`](docs/HISTORY.md) top section · part 1 |
 | Why a rule exists · measured numbers · mutation results | [`docs/HISTORY.md`](docs/HISTORY.md) part 2 · [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) part 2 |
 | Find a checker's explanation | [`docs/HISTORY.md`](docs/HISTORY.md) 🔎 index |

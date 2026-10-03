@@ -55,7 +55,9 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 1. PR #282 (draft · រួម PR #281) ៖ ពិនិត្យ CI; ក្រោយម្ចាស់គម្រោងស្នើ merge ➜ Edge Functions រួច Netlify/APK · សាក reset លើឧបករណ៍ពិត។
    ✅ migration `20261002154730_zoe_reset_claim.sql` អនុវត្តលើ live ដោយម្ចាស់គម្រោង (SQL Editor) ➜ version មិនបានកត់ ➜ Claude កត់វា (សមមូល
    `migration repair --status applied` តាមសំណើម្ចាស់គម្រោង · `statements` ទទេដូច repair មុនៗ) ➜ live មាន migration **៥** ស្មើ repo។
-   Edge Functions live នៅកំណែចាស់ (v8) ➜ deploy `register` + `reset-password` ក្រោយ merge។
+   ✅ Edge Functions `register` + `reset-password` deploy លើ live តាមសំណើម្ចាស់គម្រោង (មុន merge) ➜ **v9** = កូដ branch នេះ (`73db73a`) ·
+   ប្រភព ១២ ឯកសារលើ live ស្មើ repo (`diff` + sha256) · v8 = កូដ `main` ➜ ត្រឡប់វិញ = deploy ពី `origin/main`។ App ផលិតកម្ម (2.48.1) មិនស្គាល់
+   `password-reset-unknown` (ករណីកម្រ ៖ Auth មិនឆ្លើយ) ➜ បង្ហាញកូដឆៅ រហូតដល់ Netlify deploy 2.49.0។ នៅសល់ក្រោយ merge ៖ Netlify ZoeW + ZoeKeyGen + APK។
 2. ✅ register createUser ឆ្លើយបាត់ ➜ retry ដោយឈ្មោះ + ពាក្យសម្ងាត់ដដែលបន្តគណនីដដែល (2.49.0 · ផ្នែក ២)។ **នៅសល់** ៖ កូដប្រើ ១ ដង + App ផុតពិដាន ២០ វិ.
    ខណៈ Server បញ្ចប់ ➜ retry ➜ `invite-invalid` (គណនីដើរ) — បើចង់កែ ត្រូវសាងអ្នកយាមមុន (ឧ. App បកប្រែ `network` លើ register ជា «មិនដឹងលទ្ធផល»)។
 3. ✅ Supabase audit ជុំ 2026-10-03 (ផ្នែក ២) ៖ SQL/rules · adapter · Edge · ZoeKeyGen/Netlify · deploy/ops ពិនិត្យរួច។ **សំណើដែលនៅចាំការសម្រេច** ៖
@@ -177,8 +179,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- ក្រោយអនុម័ត merge ៖ ជំហាន [2.48.2] (migration `20261002154730_zoe_reset_claim.sql` **មុន** Functions) ➜ deploy Edge Function **`register`** និង `reset-password`
-  ➜ Netlify ZoeW + ZoeKeyGen + APK ថ្មី។ គ្មាន migration ថ្មីសម្រាប់ 2.49.0។
+- ✅ ធ្វើរួច ៖ migration `20261002154730_zoe_reset_claim.sql` លើ live (កត់ version) ➜ Edge Function **`register`** និង `reset-password` **v9** (កូដ 2.49.0)។
+  នៅសល់ក្រោយអនុម័ត merge ៖ Netlify ZoeW + ZoeKeyGen + APK ថ្មី។ គ្មាន migration ថ្មីសម្រាប់ 2.49.0។
 - iPhone PWA + APK ៖ រមូរតារាងប្រវត្តិ · បញ្ជីក្នុង modal ➜ ខ្សែស្តើងលេច/បាត់ · ⛔ ពិនិត្យថា PTR · ចលនាផ្ទាំង · ភាពរលូនពេលរមូរ នៅដដែល (តំបន់ហាម ៖ វាស់លើឧបករណ៍ពិត ២ ប្រភេទមុន merge)។
 - ZoeKeyGen ៖ បើក modal (PIN · Config · Key ថ្មី · Extend) លើទូរស័ព្ទ · tablet · កុំព្យូទ័រ · បញ្ជីហាង ៖ ម្ចាស់ជាអក្សរដិត។
 - សាកលើឧបករណ៍ពិត ៖ ចូល (ធីក) ➜ បិទ App ➜ រង់ចាំផុត ៤ ម៉ោង (ឬចាកចេញ ➜ ត្រូវតែទទេ) ➜ ពាក្យសម្ងាត់បំពេញ · ដកធីក ➜ វាលទទេ · iPhone PWA · APK · Firebase និង Supabase។
@@ -201,8 +203,8 @@ definer ក្នុង public ដែល anon/authenticated ហៅបាន = �
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- ក្រោយអនុម័ត merge៖ អនុវត្ត migration `20261002154730_zoe_reset_claim.sql` **មុន** deploy reset-password (GitHub integration deploy migration រួច Functions)។
-  ផ្ទៀងទាំងពីរជោគជ័យ; Functions ថ្មីជាមួយ schema ចាស់នឹងបដិសេធ reset ដោយសុវត្ថិភាព។ Netlify deploy ZoeW និង APK ថ្មី។
+- ✅ ធ្វើរួច ៖ migration `20261002154730_zoe_reset_claim.sql` (SQL Editor + កត់ version) **មុន** reset-password v9 (រួម [2.49.0])។
+  នៅសល់ក្រោយអនុម័ត merge ៖ Netlify deploy ZoeW និង APK ថ្មី។
 - សាក reset លើឧបករណ៍ពិត។ កុំចាត់ចន្លោះពេល deploy ដែល Functions ចាស់នៅទទួលសំណើថាការពាររួច។
 
 ### [2.48.1] — 2026-10-02 · ZoeW ៖ **ហាង Supabase ៖ ការបន្តសម័យចូលប្រព័ន្ធដែលព្យួរមានពិដាន · 🔔 សារកំណែតែមួយ**

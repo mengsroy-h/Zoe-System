@@ -1,6 +1,6 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
@@ -67,6 +67,46 @@ function ExpirySection({ view }: { view: NotifyView | null }) {
                 </>
             ) : (
                 <div className="notify-summary" id="notifyExpirySummary">{view ? view.emptyText : '⏳ កំពុងរៀបចំ…'}</div>
+            )}
+        </section>
+    );
+}
+
+function removedAgoText(h: number): string {
+    if (h < 0) return '';
+    return h < 1 ? 'ទើបដក' : 'ដកមុន ' + h + ' ម៉ោង';
+}
+
+function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
+    const measurable = !!(view && view.measurable);
+    const rows = measurable && view ? view.rows : [];
+    return (
+        <section className="notify-section" id="notifyRemovedSection">
+            <div className="notify-section-title">📤 កញ្ចប់ដែលដករួច</div>
+            {measurable && view && view.packages > 0 ? (
+                <>
+                    <div className="notify-summary is-warn" id="notifyRemovedSummary">
+                        <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
+                        {' '}ផុតកំណត់ ➜ ប្រព័ន្ធដកចេញ និងដកលុយ ➜ យកចេញពីទូ ហើយប្រគល់ត្រឡប់ · ស្តារវិញបានពី 🗑️ ធុងសំរាម
+                    </div>
+                    <ul className="notify-expiry-list" id="notifyRemovedList">
+                        {rows.map((row) => (
+                            <li key={row.key} className="notify-expiry-row">
+                                <span className="notify-expiry-phone">{row.phone || '—'}</span>
+                                <span className="notify-expiry-meta">
+                                    {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+                                </span>
+                                <span className="notify-expiry-left">
+                                    {removedAgoText(row.hoursAgo)}
+                                    {row.isNew ? <span className="notify-new-tag">ថ្មី</span> : null}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    {view.more > 0 ? <div className="notify-more">… និង {view.more} ជួរទៀត</div> : null}
+                </>
+            ) : (
+                <div className="notify-summary" id="notifyRemovedSummary">{view ? view.emptyText : '⏳ កំពុងរៀបចំ…'}</div>
             )}
         </section>
     );
@@ -140,7 +180,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -159,6 +199,7 @@ export function NotifyDrawer() {
             <div className="drawer-body">
                 <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
+                <RemovedSection view={s.notifyRemovedView} />
                 <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
                 <FeedSection feed={visibleNotifyFeed(s.notifyFeed, s.notifySellerFeed, s.notifyDismissedIds)} seen={s.notifySeenIds} />
             </div>

@@ -8,8 +8,8 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.48.1` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.2` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.49.0` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.3` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -290,7 +290,8 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
 | [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
 | [tools/firebase-provision/](tools/firebase-provision/README-KH.md) | Windows ៖ បង្កើតអតិថិជនថ្មីលើ Firebase ដោយពាក្យបញ្ជាតែមួយ · ដំឡើង Rules ទៅអតិថិជនទាំងអស់ |
-| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase |
+| [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase និងហាងនីមួយៗក្នុង Supabase |
+| [tools/supabase-migrate/](tools/supabase-migrate/README.md) | CLI ផ្ទេរទិន្នន័យហាងពី Firebase ចូល Supabase · ស្តារហាង Supabase ពី backup |
 
 ---
 

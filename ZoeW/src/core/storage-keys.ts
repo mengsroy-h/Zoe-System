@@ -10,6 +10,8 @@ export const APP_LOCK_SESSION_KEY = 'zoew_app_unlocked';
 
 export const APP_LOCK_PREF_KEY = 'zoew_app_lock_v1';
 
+export const REMEMBER_PASSWORD_PREF_KEY = 'zoew_remember_password_v1';
+
 export const SHEET_IMPORT_STORE_KEY = 'zoew_sheet_import_config';
 
 export const SHEET_IMPORT_SECRET_SALT = 'zoew_sheet_import_secret_v1';

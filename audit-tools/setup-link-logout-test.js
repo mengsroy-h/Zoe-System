@@ -131,6 +131,19 @@ for (const app of ['ZoeW']) {
         if (helper) vm.runInContext(helper, ctx);
         const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
         if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
+        // ⛔ cache `zoe_docs` របស់ហាង Supabase (IndexedDB) ផ្ទុកទិន្នន័យអតិថិជន ➜ ការចាកចេញលុប database ទាំងមូល ឯករាជ្យពី backend
+        //    (ឧបករណ៍ដែលប្តូរ Config ទៅ Firebase ក៏មិនទុកវា) ➜ ចាក់កូដ **ពិត** + indexedDB ក្លែងដែលកត់ឈ្មោះ database ដែលត្រូវលុប
+        const docsCacheDecls = ['SB_DOCS_CACHE_DB', 'SB_DOCS_CACHE_TIMEOUT_MS'].map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [])[0]);
+        ok(docsCacheDecls.every(Boolean), 'រកឃើញ SB_DOCS_CACHE_DB · SB_DOCS_CACHE_TIMEOUT_MS ក្នុង app.js');
+        docsCacheDecls.filter(Boolean).forEach((d) => vm.runInContext(d, ctx));
+        ['docsCacheFactory', 'docsCacheSettle', 'forgetSupabaseDocsCache'].forEach((n) => {
+            const fn = sliceFn(src, n);
+            ok(!!fn, n + '() មានក្នុង app.js');
+            if (fn) vm.runInContext(fn, ctx);
+        });
+        const deletedIdb = [];
+        if (typeof ctx.setTimeout !== 'function') ctx.setTimeout = () => 0;
+        ctx.indexedDB = { deleteDatabase: (name) => { deletedIdb.push(name); const req = {}; queueMicrotask(() => { if (req.onsuccess) req.onsuccess(); }); return req; } };
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
         // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜
@@ -154,6 +167,22 @@ for (const app of ['ZoeW']) {
             ok(!!fn, n + '() មានក្នុង app.js');
             if (fn) vm.runInContext(fn, ctx);
         });
+        // ⛔ «ចងចាំពាក្យសម្ងាត់» (`password-memory.ts`) ៖ ការបំពេញពាក្យសម្ងាត់រត់ពី `showLoginModalWithPrefill()` ➜ ចាក់កូដ **ពិត**
+        //    (IndexedDB គ្មានក្នុង sandbox ➜ `rememberedPasswordFor()` ឆ្លងផ្លូវ fail-open ពិតរបស់វា)
+        const rememberPrefDecl = (src.match(/^ *const REMEMBER_PASSWORD_PREF_KEY = .*$/m) || [])[0];
+        ok(!!rememberPrefDecl, 'រកឃើញ REMEMBER_PASSWORD_PREF_KEY ក្នុង app.js');
+        if (rememberPrefDecl) vm.runInContext(rememberPrefDecl, ctx);
+        ['prefillSeq', 'prefilledPassword'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            ok(!!decl, 'រកឃើញ let ' + n + ' ក្នុង app.js');
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        ['loginKey', 'bindingOf', 'rememberPasswordPrefIsOff', 'rememberedPasswordFor', 'syncRememberPasswordBox', 'prefillRememberedPassword'].forEach((n) => {
+            const fn = sliceFn(src, n);
+            ok(!!fn, n + '() មានក្នុង app.js');
+            if (fn) vm.runInContext((src.includes('async function ' + n + '(') ? 'async ' : '') + fn, ctx);
+        });
+        vm.runInContext("prefilledPassword = 'stale-remembered-secret';", ctx);
         vm.runInContext(sliceFn(src, 'showLoginModalWithPrefill'), ctx);
 
         let threw = null;
@@ -172,6 +201,11 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        const docsCacheDbName = docsCacheDecls[0] ? vm.runInContext('SB_DOCS_CACHE_DB', ctx) : '(none)';
+        ok(deletedIdb.length >= 1 && deletedIdb.every((n) => n === docsCacheDbName),
+            'ចាកចេញ ➜ លុប cache zoe_docs របស់ Supabase (IndexedDB ' + docsCacheDbName + ')', deletedIdb);
+        ok(vm.runInContext('prefilledPassword', ctx) === '',
+            'ចាកចេញ ➜ ពាក្យសម្ងាត់ដែលបានបំពេញពីការចងចាំមិនរស់រានក្នុងសតិ', vm.runInContext('prefilledPassword', ctx));
         ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
             'the barcode held for scan confirmation does not survive logout',
             vm.runInContext('scanConfirmCode', ctx));

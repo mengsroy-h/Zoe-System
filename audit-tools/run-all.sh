@@ -730,6 +730,7 @@ run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
 run "sw-client-wiring (browser ពិត)" node audit-tools/sw-client-wiring-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
 run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
+run "sw-backend-chunk (browser ពិត)" node audit-tools/sw-backend-chunk-test.js
 run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
 run "license-net-pressure (browser ពិត)" node audit-tools/license-network-pressure-test.js
 run "sw-revalidate-pressure (browser ពិត)" node audit-tools/sw-revalidate-pressure-test.js
@@ -768,6 +769,8 @@ run "supabase-rls (Postgres ពិត)" node audit-tools/supabase-rls-test.js
 run "supabase-datastore (Postgres ពិត)" node audit-tools/supabase-datastore-test.js
 run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
+run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node audit-tools/supabase-data-tools-test.js
+run "supabase-docs-cache (IndexedDB ពិត · ថ្នេរ adapter)" node audit-tools/supabase-docs-cache-test.js
 
 section "== ឧបករណ៍បង្កើតអតិថិជនថ្មី (tools/firebase-provision) =="
 # ⛔ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ➜ `npm ci --prefix tools/firebase-provision` + openssl
@@ -862,6 +865,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KHMERTZ_APP_DIR="$BASE" node audit-tools/khmer-timezone-test.js 2>&1 | tail -1 | sed 's/^/   khmer-tz:        /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
     SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
+    SWBACKEND_APP_DIR="$BASE" node audit-tools/sw-backend-chunk-test.js 2>&1 | tail -1 | sed 's/^/   sw-backend-chunk:/'
     NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'
     LICPRESSURE_APP_DIR="$BASE" node audit-tools/license-network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   license-pressure:/'
     ADAPTIVE_APP_DIR="$BASE" node audit-tools/adaptive-link-test.js 2>&1 | tail -1 | sed 's/^/   adaptive-link:   /'
@@ -951,6 +955,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SUPABASE_DS_APP_DIR="$BASE" node audit-tools/supabase-datastore-test.js 2>&1 | tail -1 | sed 's/^/   supabase-ds:     /'
     SUPABASE_FN_APP_DIR="$BASE" node audit-tools/supabase-functions-test.js 2>&1 | tail -1 | sed 's/^/   supabase-fn:     /'
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
+    SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
+    DOCSCACHE_APP_DIR="$BASE" node audit-tools/supabase-docs-cache-test.js 2>&1 | tail -1 | sed 's/^/   sb-docs-cache:   /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

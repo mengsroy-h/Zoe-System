@@ -16,8 +16,8 @@ function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
 export function AppNavbar() {
     const v = useStoreFields(viewState, ['connectionStatus', 'connectionText']);
     const cls = statusClasses(v.connectionStatus);
-    const n = useStoreFields(uiState, ['notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady']);
-    const badge = notifyBadgeCount(n.notifyView, visibleNotifyFeed(n.notifyFeed, n.notifySellerFeed, n.notifyDismissedIds), n.notifySeenIds) + (n.updateReady ? 1 : 0);
+    const n = useStoreFields(uiState, ['notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady']);
+    const badge = notifyBadgeCount(n.notifyView, visibleNotifyFeed(n.notifyFeed, n.notifySellerFeed, n.notifyDismissedIds), n.notifySeenIds, n.notifyRemovedView) + (n.updateReady ? 1 : 0);
     const bellLabel = badge ? 'ជូនដំណឹង (' + badge + ' ថ្មី)' : 'ជូនដំណឹង';
     return (
         <header className="app-navbar" ref={refTo('navbar')}>

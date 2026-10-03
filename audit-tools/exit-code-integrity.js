@@ -166,14 +166,17 @@ const BUDGET_MS = parseInt(process.env.EXITCODE_TIMEOUT_MS || '60000', 10);
 // ⛔ ការពុលរត់ **ស្របគ្នាតាមចំនួនកំណត់** មិនមែនម្តងមួយៗ។
 // 🔴 វាស់បាន (2.42.8) ៖ checker កូន ១០៨ រត់ជាជួរ ➜ ២៨០ វិ. លើម៉ាស៊ីន ៤ CPU និង **៣៦៧ វិ.** លើម៉ាស៊ីនមួយទៀត ➜ លើសពិដាន
 // ៣០០ វិ. របស់ `run-all.sh` ➜ «*** FAIL *** (ព្យួរ)» ខណៈគ្មាន checker ណាខូចសោះ។ ការរត់ស្របគ្នាក្នុងពិដាន
-// (`EXITCODE_CONCURRENCY` · លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ២–៨) ជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ ដូច probe ថតទទេរបស់
+// (`EXITCODE_CONCURRENCY` · លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ៤–៨) ជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ ដូច probe ថតទទេរបស់
 // `checker-coverage` ⛔ មិនមែនការបង្កើន `CHECKER_TIMEOUT` (នោះលាក់ checker ដែលព្យួរពិត)។
+// 🔴 វាស់បាន (2.49.0) ៖ runner CI មាន CPU ២ ➜ lane ២ ដែល ១ ទុកឲ្យ `emu/*` ➜ lane ស្របគ្នាតែ ១ ➜ ២៥៧ វិ. (ម៉ាស៊ីន ៤ CPU) និង
+// **លើស ៣០០ វិ.** លើ CI ។ កូនភាគច្រើនរង់ចាំ timer (CPU ពិត ៧៩ វិ. ក្នុង ២៥៧ វិ.) ➜ lane ៤ លើ CPU ២ (`taskset`) ៖ **៩១ វិ.** ហើយពេលកូននីមួយៗ
+// ដដែល (គ្មានការប្រជែង) ➜ អប្បបរមា ៤។
 const CONCURRENCY = (() => {
     const asked = parseInt(process.env.EXITCODE_CONCURRENCY || '', 10);
     if (Number.isFinite(asked) && asked >= 1) return Math.min(asked, 16);
     let cpus = 2;
     try { cpus = require('os').cpus().length || 2; } catch (e) {}
-    return Math.min(8, Math.max(2, cpus));
+    return Math.min(8, Math.max(4, cpus));
 })();
 // ⛔ `emu/*` ចែក RTDB emulator តែមួយ ➜ រត់ក្នុងផ្លូវតែមួយ (ម្តងមួយ) ស្របនឹងក្រុមផ្សេង។
 const SERIAL_LANE = (rel) => rel.startsWith('emu/');

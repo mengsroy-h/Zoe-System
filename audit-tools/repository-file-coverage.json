@@ -325,9 +325,10 @@
     "guard-38": {
       "category": "behavior",
       "guards": [
-        "audit-tools/firebase-backup-test.js"
+        "audit-tools/firebase-backup-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
-      "evidence": "audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network",
+      "evidence": "audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network · target Supabase (ci-config · backup · crypt) វាស់ដោយ supabase-data-tools-test ទល់ Postgres ពិត",
       "limitation": "តេស្តកូដ និង fixture។ មិនបញ្ជាក់ service account, secret, schedule ឬ restore លើ production ពិត។"
     },
     "guard-39": {
@@ -508,9 +509,10 @@
       "guards": [
         "audit-tools/supabase-rls-test.js",
         "audit-tools/supabase-datastore-test.js",
-        "audit-tools/emu/supabase-rules-parity-test.js"
+        "audit-tools/emu/supabase-rules-parity-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
-      "evidence": "អ្នកយាមអនុវត្ត migration ពិតទាំងអស់លើ Postgres ពិត (major ពី config.toml) ក្រោយ shim role/grant ចម្លងពី supabase/postgres · supabase/auth ➜ ធ្វើត្រាប់ PostgREST (anon · authenticated · service_role + request.jwt.claims) ➜ RLS · EXECUTE · ឆ្លង tenant · claim ក្លែង · កូដអញ្ជើញ · ឃ្លាំងទិន្នន័យដូច RTDB (CAS · op_id · delta) · rules ក្នុង Postgres ធៀប RTDB emulator ពិត · mutation លើ migration ត្រូវក្រហម។",
+      "evidence": "អ្នកយាមអនុវត្ត migration ពិតទាំងអស់លើ Postgres ពិត (major ពី config.toml) ក្រោយ shim role/grant ចម្លងពី supabase/postgres · supabase/auth ➜ ធ្វើត្រាប់ PostgREST (anon · authenticated · service_role + request.jwt.claims) ➜ RLS · EXECUTE · ឆ្លង tenant · claim ក្លែង · កូដអញ្ជើញ · ឃ្លាំងទិន្នន័យដូច RTDB (CAS · op_id · delta) · rules ក្នុង Postgres ធៀប RTDB emulator ពិត · mutation លើ migration ត្រូវក្រហម · supabase-data-tools-test វាស់ RPC export ក្នុង migration ថ្មី និង mutation របស់វា។",
       "limitation": "shim មិនមែន Supabase ពេញ (គ្មាន GoTrue · PostgREST · Realtime ពិត) ➜ ការដំឡើងលើ Project ពិតនៅតែត្រូវសាកដោយដៃ។"
     },
     "supabase-functions": {
@@ -546,10 +548,20 @@
         "audit-tools/supabase-rls-test.js",
         "audit-tools/supabase-datastore-test.js",
         "audit-tools/keygen-supabase-admin-test.js",
-        "audit-tools/emu/supabase-adapter-parity-test.js"
+        "audit-tools/emu/supabase-adapter-parity-test.js",
+        "audit-tools/supabase-data-tools-test.js"
       ],
       "evidence": "harness (Postgres ពិត · ម៉ាស៊ីនមេ Supabase ក្លែង) ត្រូវប្រើដោយ checker ដែលមាន *_APP_DIR និង mutation ➜ harness ខូច = checker ទាំងនោះធ្លាក់ ឬ SKIP (SUPABASE_STRICT=1 ➜ FAIL)។",
       "limitation": "ម៉ាស៊ីនមេក្លែងធ្វើត្រាប់តែផ្នែកដែល ZoeW/ZoeKeyGen ប្រើ (គ្មាន Realtime websocket)។"
+    },
+    "supabase-data-tools": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/supabase-data-tools-test.js",
+        "audit-tools/supabase-rls-test.js"
+      ],
+      "evidence": "supabase-data-tools-test រត់ ci-config.js · backup.js · crypt.js · migrate.js ពិតជា child process ទល់ម៉ាស៊ីនមេ PostgREST ក្លែងលើ Postgres ពិត + migration ពិត ៖ RPC export (service_role · ព្រំដែនជួរ/byte · keyset ពេលហាងកំពុងសរសេរ · tombstone · មិនឆ្លង tenant) · ខ្សែ CI ពេញ (seal + ជំហានស្កេន plaintext ពិតរបស់ backup.yml) · នាំចូលហាងទី ២ ➜ export ម្តងទៀតដូចគ្នាបេះបិទ · ចម្លើយបាត់/ព្យួរ/503/401 · REFUSED · --replace · ឧបករណ៍ផ្សេងសរសេរ · record ខូច · secret មិនលេច · mutation លើ migration និង tool ត្រូវក្រហម · supabase-rls-test ផ្ទៀង EXECUTE (service_role តែប៉ុណ្ណោះ)។",
+      "limitation": "PostgREST · gateway API key និង GitHub Actions ពិតមិនបានរត់នៅទីនេះ ➜ backup/ការផ្ទេរលើ Project ពិតត្រូវសាកដោយដៃ (dry-run មុន · ស្តារ archive មួយមកហាងសាកល្បង)។"
     },
     "zoew-supabase-adapter": {
       "category": "behavior",
@@ -558,9 +570,10 @@
         "audit-tools/zoew-suite-test.js",
         "audit-tools/firebase-config-paste-test.js",
         "audit-tools/sdk-surface.js",
-        "audit-tools/keygen-supabase-admin-test.js"
+        "audit-tools/keygen-supabase-admin-test.js",
+        "audit-tools/supabase-docs-cache-test.js"
       ],
-      "evidence": "emu/supabase-adapter-parity bundle ប្រភព TS ពិត ហើយប្រៀបលទ្ធផលនឹង SDK Firebase ពិត + RTDB emulator (val · update · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP) · zoew-suite (vitest supabase-account · tsc · purity) · firebase-config-paste/keygen-supabase-admin វាស់ helper Config ពិតពី build វាស់ · sdk-surface ទាមទារផ្ទៃ adapter ⊇ ផ្ទៃ SDK ដែល App ប្រើ។",
+      "evidence": "emu/supabase-adapter-parity bundle ប្រភព TS ពិត ហើយប្រៀបលទ្ធផលនឹង SDK Firebase ពិត + RTDB emulator (val · update · increment · transaction · listener · ផ្លូវបរាជ័យ HTTP) · zoew-suite (vitest supabase-account · tsc · purity) · firebase-config-paste/keygen-supabase-admin វាស់ helper Config ពិតពី build វាស់ · sdk-surface ទាមទារផ្ទៃ adapter ⊇ ផ្ទៃ SDK ដែល App ប្រើ · supabase-docs-cache វាស់ cache zoe_docs លើ IndexedDB ពិតក្នុង Chromium (ផ្ទុក · scope · storage រាំង · open ព្យួរ · ថ្នេរ adapter ↔ cache ពិត)។",
       "limitation": "Realtime websocket ពិតរបស់ Supabase មិនបានរត់នៅទីនេះ (adapter ធ្លាក់ចុះទៅការទាញតាមវដ្តក្នុងតេស្ត) ➜ ការសាកលើ Project ពិត និងឧបករណ៍ពិតនៅតែចាំបាច់។"
     },
     "guard-firebase-provision": {
@@ -1436,6 +1449,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/src/core/elapsed.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/idb-store.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/core/modals.ts": {
@@ -2347,6 +2363,9 @@
     "audit-tools/sw-shell-latency-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/sw-backend-chunk-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/toast-action-truth-test.js": {
       "policy": "guard-1"
     },
@@ -2573,6 +2592,9 @@
     "ZoeW/src/services/supabase-config.ts": {
       "policy": "zoew-supabase-adapter"
     },
+    "ZoeW/src/services/supabase-docs-cache.ts": {
+      "policy": "zoew-supabase-adapter"
+    },
     "ZoeW/src/services/supabase-rtdb.ts": {
       "policy": "zoew-supabase-adapter"
     },
@@ -2586,6 +2608,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/tests/supabase-account.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-pull-paging.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-transport-hang.test.ts": {
@@ -2678,6 +2703,21 @@
     "supabase/migrations/20261002000100_zoe_definer_private.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261002154730_zoe_reset_claim.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261003091742_zoe_register_spent_invite.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261003160000_zoe_admin_races.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261003170000_zoe_fk_indexes.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261003180000_zoe_pull_full_head.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -2713,6 +2753,39 @@
     },
     "ZoeW/tests/activation-retry.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/password-memory.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/remember-password.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/app/behaviors/scroll-thumb.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/ScrollThumb.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/tests/scroll-thumb.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/supabase-data-tools-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/supabase-docs-cache-test.js": {
+      "policy": "guard-1"
+    },
+    "firebase-backup/supabase.js": {
+      "policy": "supabase-data-tools"
+    },
+    "tools/supabase-migrate/migrate.js": {
+      "policy": "supabase-data-tools"
+    },
+    "tools/supabase-migrate/README.md": {
+      "policy": "guard-13"
+    },
+    "supabase/migrations/20261003120000_zoe_admin_export.sql": {
+      "policy": "supabase-db"
     }
   }
 }

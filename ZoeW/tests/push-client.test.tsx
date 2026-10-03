@@ -660,7 +660,7 @@ describe('Service Worker ៖ push · notificationclick', () => {
             addEventListener: (name: string, fn: (e: any) => void) => { handlers[name] = fn; }
         };
         const context = vm.createContext({
-            __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html'], __OPTIONAL_SHELL__: [],
+            __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html'], __OPTIONAL_SHELL__: [], __BACKEND_SHELL__: [],
             self: worker, navigator: { onLine: true }, URL, Request, Response, AbortController, fetch: () => Promise.reject(new Error('x')), setTimeout, clearTimeout, Date, Promise
         });
         vm.runInContext(js, context);

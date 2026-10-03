@@ -56,19 +56,25 @@ const EXPECT_PUBLIC_EXEC = {
     my_account: ['authenticated'],
     admin_create_tenant: ['authenticated'],
     admin_update_tenant: ['authenticated'],
+    admin_extend_tenant: ['authenticated'],
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     finish_registration: ['service_role'],
     invite_is_usable: ['service_role'],
+    spent_invite_member: ['service_role'],
     revoke_user_sessions: ['service_role'],
     admin_issue_reset_code: ['authenticated'],
     reset_code_user: ['service_role'],
     consume_reset_code: ['service_role'],
+    claim_reset_code: ['service_role'],
+    settle_reset_code: ['service_role'],
     zoe_write: ['authenticated'],
     zoe_read: ['authenticated'],
     zoe_pull: ['authenticated'],
     zoe_now: ['authenticated'],
-    zoe_admin_write: ['service_role']
+    zoe_admin_write: ['service_role'],
+    zoe_admin_tenants: ['service_role'],
+    zoe_admin_export: ['service_role']
 };
 const EXPECT_PRIVATE_EXEC = {
     is_platform_admin: ['authenticated'],
@@ -99,6 +105,7 @@ const EXPECT_PRIVATE_EXEC = {
     my_account: ['authenticated'],
     admin_create_tenant: ['authenticated'],
     admin_update_tenant: ['authenticated'],
+    admin_extend_tenant: ['authenticated'],
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     admin_issue_reset_code: ['authenticated'],
@@ -221,6 +228,22 @@ async function body(c, rec, extra, mode) {
         where n.nspname = 'public' and c.relkind = 'v'`);
     const badViews = views.filter((v) => !v.opts.some((o) => /^security_invoker=(true|on|1)$/.test(o)));
     rec('រាល់ view ក្នុង public មាន security_invoker (view រំលង RLS តាមលំនាំដើម) ៖ ' + views.length, badViews.length === 0, badViews);
+
+    const unindexedFks = async () => {
+        const fks = await one(`select n.nspname || '.' || cl.relname || '.' || c.conname as name, c.conrelid::int as relid, c.conkey::int[] as cols
+            from pg_constraint c join pg_class cl on cl.oid = c.conrelid join pg_namespace n on n.oid = cl.relnamespace
+            where c.contype = 'f' and n.nspname in ('public', 'private')`);
+        const idx = await one(`select i.indrelid::int as relid, string_to_array(i.indkey::text, ' ')::int[] as cols from pg_index i`);
+        const covered = (fk) => idx.some((x) => x.relid === fk.relid && fk.cols.every((col) => x.cols.slice(0, fk.cols.length).indexOf(col) !== -1));
+        return { count: fks.length, missing: fks.filter((fk) => !covered(fk)).map((fk) => fk.name) };
+    };
+    const fkScan = await unindexedFks();
+    rec('FK ទាំង ' + fkScan.count + ' ក្នុង public/private មាន index ដែលជួរឈរនាំមុខស្មើ FK (Advisor «unindexed foreign keys») · ជាន់អប្បបរមា ៨',
+        fkScan.count >= 8 && fkScan.missing.length === 0, fkScan.missing);
+    await c.query('create table public.zz_fk_probe (id integer primary key, tenant uuid references public.tenants (id))');
+    const fkProbe = await unindexedFks();
+    await c.query('drop table public.zz_fk_probe');
+    rec('probe ៖ FK ថ្មីគ្មាន index ➜ ការស្កេនចាប់បាន (ទិសផ្ទុយ)', fkProbe.missing.some((n) => /zz_fk_probe/.test(n)), fkProbe.missing);
 
     const fns = await one(`select n.nspname, p.proname, p.prosecdef, coalesce(p.proconfig, '{}') as cfg,
             array(select r.rolname from pg_roles r where r.rolname = any($1) and has_function_privilege(r.rolname, p.oid, 'EXECUTE') order by 1)::text[] as exec
@@ -380,6 +403,79 @@ async function body(c, rec, extra, mode) {
     const regB = await finishReg(SERVICE, uB1, await hashOf(invB.rows[0].code), 'dara');
     rec('ចុះឈ្មោះ tenant B', !!regB.rows && regB.rows[0].tenant_id === B, regB);
 
+    const hB = await hashOf(invB.rows[0].code);
+    const rowsOr = async (q, p) => { try { return (await c.query(q, p)).rows; } catch (e) { return { error: e.message }; } };
+    const usedOf = async (hash) => { const r = await rowsOr('select used_count from public.tenant_invites where code_hash = $1', [hash]); return Array.isArray(r) && r[0] ? r[0].used_count : r; };
+    const spentMember = async (hash, username) => {
+        const r = await as(c, SERVICE, 'select * from public.spent_invite_member($1, $2)', [hash, username]);
+        return r.rows ? r.rows : r;
+    };
+    const isRow = (rows, uid, tenant, role) => Array.isArray(rows) && rows.length === 1 && rows[0].user_id === uid && rows[0].tenant_id === tenant
+        && rows[0].role === role && Object.keys(rows[0]).sort().join() === 'role,tenant_id,user_id';
+    const noRow = (rows) => Array.isArray(rows) && rows.length === 0;
+    const recorded = await rowsOr('select username, invite_code_hash from public.tenant_members where user_id = any($1) order by username', [[uA1, uA2, uA3, uB1]]);
+    rec('finish_registration កត់ hash កូដដែលចុះឈ្មោះសមាជិកម្នាក់ៗ (invite_code_hash ៖ chan/vanna ➜ កូដ max_uses=2 · dara ➜ កូដ B · sokha ➜ កូដ owner)',
+        Array.isArray(recorded) && JSON.stringify(recorded.map((x) => [x.username, x.invite_code_hash])) === JSON.stringify([['chan', h2], ['dara', hB], ['sokha', h1], ['vanna', h2]]), recorded);
+    rec('anon ៖ spent_invite_member ➜ permission denied', denied(await as(c, ANON, 'select * from public.spent_invite_member($1, $2)', [h1, 'sokha'])));
+    rec('authenticated (សូម្បីសមាជិកដែលប្រើកូដនោះ) ៖ spent_invite_member ➜ permission denied (ការទាយកូដដោយផ្ទាល់)',
+        denied(await as(c, { role: 'authenticated', sub: uA1 }, 'select * from public.spent_invite_member($1, $2)', [h1, 'sokha'])));
+    const usedSpentBefore = [await usedOf(h1), await usedOf(h2), await usedOf(hB)];
+    rec('spent_invite_member ៖ កូដប្រើអស់ (max_uses=1) + username ដែលចុះឈ្មោះដោយកូដនោះ ➜ user id · tenant · role របស់សមាជិក (App អស់ពេលរង់ចាំ ➜ សាកម្តងទៀតបាន)',
+        isRow(await spentMember(h1, 'sokha'), uA1, A, 'owner'));
+    rec('spent_invite_member ៖ កូដប្រើអស់ (max_uses=2) ➜ អ្នកប្រើម្នាក់ៗ ➜ ជួររបស់ខ្លួន', isRow(await spentMember(h2, 'vanna'), uA2, A, 'member')
+        && isRow(await spentMember(h2, 'chan'), uA3, A, 'member') && isRow(await spentMember(hB, 'dara'), uB1, B, 'member'));
+    rec('spent_invite_member ៖ សមាជិកហាងដដែល តែចុះឈ្មោះដោយកូដផ្សេង ➜ គ្មាន (ត្រូវតែកូដនេះ)', noRow(await spentMember(h1, 'vanna')) && noRow(await spentMember(h2, 'sokha')));
+    rec('spent_invite_member ៖ សមាជិកហាងផ្សេង + កូដរបស់ A · សមាជិក A + កូដរបស់ B ➜ គ្មាន', noRow(await spentMember(h1, 'dara')) && noRow(await spentMember(h2, 'dara'))
+        && noRow(await spentMember(hB, 'sokha')));
+    rec('spent_invite_member ៖ username គ្មានសមាជិកភាព/មិនមាន · hash មិនស្គាល់ ➜ គ្មាន', noRow(await spentMember(h1, 'dara4')) && noRow(await spentMember(h1, 'nobody'))
+        && noRow(await spentMember('0'.repeat(64), 'sokha')));
+    rec('spent_invite_member ៖ កូដផុតកំណត់ដែលមិនធ្លាប់ប្រើ · កូដ revoke ដែលមិនធ្លាប់ប្រើ ➜ គ្មាន', noRow(await spentMember(h3, 'sokha')) && noRow(await spentMember(h4, 'sokha')));
+    await c.query('update public.tenant_members set tenant_id = $2 where user_id = $1', [uA3, B]);
+    const movedShop = await spentMember(h2, 'chan');
+    await c.query('update public.tenant_members set tenant_id = $2 where user_id = $1', [uA3, A]);
+    await c.query("update public.tenant_members set role = 'owner' where user_id = $1", [uA2]);
+    const changedRole = await spentMember(h2, 'vanna');
+    await c.query("update public.tenant_members set role = 'member' where user_id = $1", [uA2]);
+    rec('spent_invite_member ៖ សមាជិកដែលហាង ឬ role លែងស្មើកូដ (កែដោយផ្ទាល់ក្នុង DB) ➜ គ្មាន (⛔ មិនឆ្លើយហាងផ្សេង · មិនប្តូរ role)',
+        noRow(movedShop) && noRow(changedRole) && isRow(await spentMember(h2, 'chan'), uA3, A, 'member'), { movedShop, changedRole });
+    const invPart = await issue(ADMIN, A, 'member', 2, 24);
+    const hPart = await hashOf(invPart.rows[0].code);
+    const uPart = await makeAuthUser(c, 'part1@u.zoe.test');
+    const regPart = await finishReg(SERVICE, uPart, hPart, 'part1');
+    rec('spent_invite_member ៖ កូដនៅប្រើបាន (ប្រើ ១/២) ➜ គ្មាន (ផ្លូវកូដប្រើបានធម្មតាដោះស្រាយ)', !!regPart.rows && noRow(await spentMember(hPart, 'part1')), regPart);
+    rec('spent_invite_member ៖ សមាជិកហាងដដែល role ដដែល តែចុះឈ្មោះដោយកូដផ្សេង + កូដប្រើអស់ ➜ គ្មាន (ត្រូវតែកូដនេះ)', noRow(await spentMember(h2, 'part1')));
+    await c.query("update public.tenant_invites set expires_at = now() - interval '1 second' where code_hash = $1", [hPart]);
+    rec('spent_invite_member ៖ កូដផុតកំណត់ក្រោយប្រើ ➜ អ្នកប្រើ ➜ ជួររបស់ខ្លួន', isRow(await spentMember(hPart, 'part1'), uPart, A, 'member'));
+    await as(c, ADMIN, 'select public.admin_revoke_invite($1)', [hPart]);
+    rec('spent_invite_member ៖ កូដប្រើរួច តែ admin revoke ➜ គ្មាន', noRow(await spentMember(hPart, 'part1')));
+    await c.query('update public.tenants set revoked = true where id = $1', [A]);
+    const whileRevoked = await spentMember(h1, 'sokha');
+    await c.query("update public.tenants set revoked = false, expires_at = now() - interval '1 second' where id = $1", [A]);
+    const whileExpired = await spentMember(h1, 'sokha');
+    await c.query('update public.tenants set expires_at = $2 where id = $1', [A, future]);
+    rec('spent_invite_member ៖ ហាងបិទ ឬផុតកំណត់ ➜ គ្មាន · សកម្មវិញ ➜ មានវិញ', noRow(whileRevoked) && noRow(whileExpired) && isRow(await spentMember(h1, 'sokha'), uA1, A, 'owner'),
+        { whileRevoked, whileExpired });
+    rec('spent_invite_member អានតែប៉ុណ្ណោះ ៖ used_count មិនប្រែ', JSON.stringify([await usedOf(h1), await usedOf(h2), await usedOf(hB)]) === JSON.stringify(usedSpentBefore)
+        && JSON.stringify(usedSpentBefore) === JSON.stringify([1, 2, 1]), usedSpentBefore);
+
+    const invA2 = await issue(ADMIN, A, 'owner', 1, 24);
+    const hA2 = await hashOf(invA2.rows[0].code);
+    const sameShop = await finishReg(SERVICE, uA1, hA2, 'sokha');
+    rec('finish_registration ៖ សមាជិកមានរួច + កូដផ្សេងរបស់ហាងដដែល role ដដែល ➜ ជួរដដែល · កូដនោះមិនស៊ី',
+        !!sameShop.rows && sameShop.rows[0].tenant_id === A && sameShop.rows[0].role === 'owner' && (await usedOf(hA2)) === 0, sameShop);
+    const invBOpen = await issue(ADMIN, B, 'owner', 1, 24);
+    const hBOpen = await hashOf(invBOpen.rows[0].code);
+    const crossShop = await finishReg(SERVICE, uA1, hBOpen, 'sokha');
+    const sokhaAfter = await rowsOr('select tenant_id, role, invite_code_hash from public.tenant_members where user_id = $1', [uA1]);
+    rec('finish_registration ៖ owner ហាង A + កូដ owner ប្រើបានរបស់ហាង B ➜ username-taken (⛔ មិនឆ្លើយ «ចុះឈ្មោះរួច» · មិនផ្លាស់ហាង) · កូដ B មិនស៊ី',
+        raised(crossShop, 'username-taken') && (await usedOf(hBOpen)) === 0 && Array.isArray(sokhaAfter) && sokhaAfter[0].tenant_id === A
+        && sokhaAfter[0].role === 'owner' && sokhaAfter[0].invite_code_hash === h1, { crossShop, sokhaAfter });
+    const invAMember = await issue(ADMIN, A, 'member', 1, 24);
+    const hAMember = await hashOf(invAMember.rows[0].code);
+    const crossRole = await finishReg(SERVICE, uA1, hAMember, 'sokha');
+    rec('finish_registration ៖ owner + កូដ member របស់ហាងដដែល ➜ username-taken (⛔ មិនប្តូរ role) · កូដមិនស៊ី',
+        raised(crossRole, 'username-taken') && (await usedOf(hAMember)) === 0, crossRole);
+
     const WA = { role: 'authenticated', sub: uA1 };
     const WB = { role: 'authenticated', sub: uB1 };
     const seeTenants = async (who) => ((await as(c, who, 'select id from public.tenants order by id')).rows || []).map((r) => r.id);
@@ -431,6 +527,20 @@ async function body(c, rec, extra, mode) {
         raised(await as(c, WA, 'select * from public.admin_issue_reset_code($1, 24)', ['dara']), 'forbidden'));
     const adminSees = (await as(c, ADMIN, 'select count(*)::int as n from public.tenants')).rows;
     rec('admin ឃើញ tenant ទាំងអស់', !!adminSees && adminSees[0].n >= 2, adminSees);
+    for (const who of [ANON, PLAIN, WA, ADMIN]) {
+        const tag = who === ANON ? 'anon' : who === ADMIN ? 'admin (authenticated)' : who === WA ? 'authenticated (សមាជិក A)' : 'authenticated (គ្មានហាង)';
+        rec(tag + ' ៖ zoe_admin_tenants (បញ្ជីហាងទាំងអស់) ➜ permission denied', denied(await as(c, who, 'select public.zoe_admin_tenants(null, 10)')));
+        rec(tag + ' ៖ zoe_admin_export (ទិន្នន័យហាងផ្សេង) ➜ permission denied',
+            denied(await as(c, who, 'select public.zoe_admin_export($1, 0, \'\', \'\', null, 10, 65536)', [B])));
+    }
+    const svcTenants = await as(c, SERVICE, 'select public.zoe_admin_tenants(null, 10) as r');
+    const svcExport = await as(c, SERVICE, 'select public.zoe_admin_export($1, 0, \'\', \'\', null, 10, 65536) as r', [A]);
+    rec('service_role ៖ zoe_admin_tenants · zoe_admin_export ហៅបាន (ផ្លូវ backup/ផ្ទេរទិន្នន័យ)',
+        !!svcTenants.rows && Array.isArray(svcTenants.rows[0].r.tenants) && !!svcExport.rows && Array.isArray(svcExport.rows[0].r.rows),
+        [svcTenants.error, svcExport.error]);
+    rec('zoe_admin_tenants មិនបញ្ចេញវាលសម្ងាត់ (hash កូដ · username · ពាក្យសម្ងាត់)', !!svcTenants.rows
+        && svcTenants.rows[0].r.tenants.every((t) => JSON.stringify(Object.keys(t).sort()) === JSON.stringify(['branch_code', 'docs', 'expires_at', 'id', 'name', 'revoked', 'seq'])),
+        svcTenants.rows && svcTenants.rows[0].r.tenants[0]);
 
     await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, null, null, true)', [A]);
     rec('Revoke A ➜ សមាជិក A ឃើញ tenant ០ ភ្លាម (មិនរង់ចាំ JWT ផុត)', (await seeTenants(WA)).length === 0);
@@ -448,6 +558,43 @@ async function body(c, rec, extra, mode) {
     rec('admin ពន្យារ ➜ សមាជិក A ឃើញ A វិញ', !!extend.rows && JSON.stringify(await seeTenants(WA)) === JSON.stringify([A]));
     rec('admin_update_tenant ប្តូរ branch ទៅស្ទួន ➜ branch-taken',
         raised(await as(c, ADMIN, 'select * from public.admin_update_tenant($1, null, $2, null, null)', [A, '770001']), 'branch-taken'));
+
+    const expText = async (id) => (await one('select expires_at::text as e from public.tenants where id = $1', [id]))[0].e;
+    const extendRpc = (who, id, days, expected, conn) => as(conn || c, who, 'select * from public.admin_extend_tenant($1, $2, $3)', [id, days, expected]);
+    const sameExp = async (id, sql, params) => (await one('select (t.expires_at = ' + sql + ') as ok from public.tenants t where t.id = $1', [id].concat(params || [])))[0].ok;
+    const eStart = await expText(A);
+    rec('anon ៖ admin_extend_tenant ➜ permission denied', denied(await extendRpc(ANON, A, 1, eStart)));
+    rec('សមាជិក A ៖ admin_extend_tenant (ពន្យារខ្លួនឯង) ➜ forbidden', raised(await extendRpc(WA, A, 30, eStart), 'forbidden'));
+    rec('admin_extend_tenant ៖ ថ្ងៃ 0 · 3651 · null · expected null ➜ extend-invalid (ថ្ងៃផុតមិនប្រែ)',
+        raised(await extendRpc(ADMIN, A, 0, eStart), 'extend-invalid') && raised(await extendRpc(ADMIN, A, 3651, eStart), 'extend-invalid')
+        && raised(await extendRpc(ADMIN, A, null, eStart), 'extend-invalid') && raised(await extendRpc(ADMIN, A, 5, null), 'extend-invalid')
+        && (await expText(A)) === eStart);
+    rec('admin_extend_tenant ៖ tenant មិនមាន ➜ tenant-not-found', raised(await extendRpc(ADMIN, '00000000-0000-4000-8000-000000000000', 1, eStart), 'tenant-not-found'));
+    const ext10 = await extendRpc(ADMIN, A, 10, eStart);
+    rec('admin_extend_tenant លើហាងសកម្ម ➜ ចាស់ + ១០ ថ្ងៃពិតប្រាកដ (នាឡិកា DB)', !!ext10.rows && await sameExp(A, "$2::timestamptz + interval '10 days'", [eStart]), ext10);
+    const eAfter10 = await expText(A);
+    const staleExt = await extendRpc(ADMIN, A, 7, eStart);
+    rec('ឧបករណ៍ ២ ពន្យារដោយជួរចាស់ (expected ខុស) ➜ tenant-changed · ថ្ងៃផុតមិនខ្លីវិញ', raised(staleExt, 'tenant-changed') && (await expText(A)) === eAfter10, staleExt);
+    const cx1 = await connect('postgres', c.database);
+    const cx2 = await connect('postgres', c.database);
+    extra.push(cx1, cx2);
+    await cx1.query('begin');
+    await cx1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: adminId, aud: 'authenticated' })]);
+    await cx1.query('set local role authenticated');
+    const ext365 = await cx1.query('select * from public.admin_extend_tenant($1, 365, $2)', [A, eAfter10]).then((r) => r.rows.length === 1, () => false);
+    let ext7Done = false;
+    const ext7P = extendRpc(ADMIN, A, 7, eAfter10, cx2).then((r) => { ext7Done = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const ext7Blocked = !ext7Done;
+    await cx1.query('commit');
+    const ext7 = await ext7P;
+    rec('ពន្យារដំណាលគ្នា +365 / +7 ពីជួរដដែល ➜ ទី ២ ចូលជាជួរ ហើយ tenant-changed · ចុងក្រោយ = ចាស់ + 365 ថ្ងៃ (មិនបាត់)',
+        ext365 && ext7Blocked && raised(ext7, 'tenant-changed') && await sameExp(A, "$2::timestamptz + interval '365 days'", [eAfter10]), { ext365, ext7Blocked, ext7 });
+    await c.query("update public.tenants set expires_at = now() - interval '3 days' where id = $1", [A]);
+    const ext5 = await extendRpc(ADMIN, A, 5, await expText(A));
+    rec('admin_extend_tenant លើហាងផុតកំណត់ ➜ ឥឡូវ + ៥ ថ្ងៃ (មិនមែនថ្ងៃផុតចាស់ + ៥)', !!ext5.rows
+        && (await one("select abs(extract(epoch from (t.expires_at - (now() + interval '5 days')))) < 60 as ok from public.tenants t where t.id = $1", [A]))[0].ok, ext5);
+    await c.query('update public.tenants set expires_at = $2 where id = $1', [A, future]);
 
     const invPending = await issue(ADMIN, A, 'member', 1, 24);
     const hPending = await hashOf(invPending.rows[0].code);
@@ -503,6 +650,71 @@ async function body(c, rec, extra, mode) {
     await c.query("update public.member_reset_codes set expires_at = now() - interval '1 second' where code_hash = $1", [rsHash3]);
     rec('កូដកំណត់ថ្មីផុតកំណត់ ➜ null', (await resetUser('sokha', rsHash3)) === null);
 
+    const claimId = '11111111-1111-4111-8111-111111111111';
+    const otherClaimId = '22222222-2222-4222-8222-222222222222';
+    const claim = async (username, hash, token, client = c) => {
+        const r = await as(client, SERVICE, 'select public.claim_reset_code($1, $2, $3) as id', [username, hash, token]);
+        return r.rows ? r.rows[0].id : r;
+    };
+    const settle = async (username, hash, token, consumed) => {
+        const r = await as(c, SERVICE, 'select public.settle_reset_code($1, $2, $3, $4) as ok', [username, hash, token, consumed]);
+        return r.rows ? r.rows[0].ok : r;
+    };
+    const newResetHash = async () => resetHashOf((await issueReset(ADMIN, 'sokha', 24)).rows[0].code);
+    for (const who of [ANON, WA, ADMIN]) {
+        rec(who.role + ' claim_reset_code ➜ permission denied', denied(await as(c, who,
+            'select public.claim_reset_code($1, $2, $3)', ['sokha', rsHash3, claimId])));
+        rec(who.role + ' settle_reset_code ➜ permission denied', denied(await as(c, who,
+            'select public.settle_reset_code($1, $2, $3, true)', ['sokha', rsHash3, claimId])));
+    }
+    rec('claim ៖ កូដប្រើរួច/ផុតកំណត់ត្រូវបដិសេធ', (await claim('sokha', rsHash2, claimId)) === null
+        && (await claim('sokha', rsHash3, claimId)) === null);
+    const claimHash = await newResetHash();
+    rec('claim ៖ username/hash ខុស ឬ claim ទទេត្រូវបដិសេធ', (await claim('dara', claimHash, claimId)) === null
+        && (await claim('sokha', '0'.repeat(64), claimId)) === null && (await claim('sokha', claimHash, null)) === null);
+    rec('claim ៖ កូដត្រូវបាន user id', (await claim('sokha', claimHash, claimId)) === uA1);
+    rec('claim ៖ retry សំណើដដែលបាន user ដដែល; សំណើផ្សេងចាញ់', (await claim('sokha', claimHash, claimId)) === uA1
+        && (await claim('sokha', claimHash, otherClaimId)) === null);
+    rec('lookup/consume ចាស់មិនរំលងការកក់ដែលកំពុងរង់ចាំ', (await resetUser('sokha', claimHash)) === null
+        && (await consume('sokha', claimHash)) === false);
+    rec('settle ៖ username/hash/claim ខុស ឬទទេមិនអាចដោះការកក់',
+        (await settle('dara', claimHash, claimId, false)) === false
+        && (await settle('sokha', '0'.repeat(64), claimId, false)) === false
+        && (await settle('sokha', claimHash, otherClaimId, false)) === false
+        && (await settle('sokha', claimHash, null, false)) === false
+        && (await settle('sokha', claimHash, claimId, null)) === false);
+    rec('settle ៖ username/hash/claim ខុសមិនអាចស៊ីកូដ',
+        (await settle('dara', claimHash, claimId, true)) === false
+        && (await settle('sokha', '0'.repeat(64), claimId, true)) === false
+        && (await settle('sokha', claimHash, otherClaimId, true)) === false);
+    rec('release ៖ ដោះការកក់ខ្លួន; retry ក្រោយចម្លើយបាត់មិនស្ទួន',
+        (await settle('sokha', claimHash, claimId, false)) === true
+        && (await settle('sokha', claimHash, claimId, false)) === true
+        && (await resetUser('sokha', claimHash)) === uA1);
+    rec('កូដដែលដោះរួចទទួលសំណើថ្មី; release ចាស់មិនដោះការកក់ថ្មី',
+        (await claim('sokha', claimHash, otherClaimId)) === uA1
+        && (await settle('sokha', claimHash, claimId, false)) === false
+        && (await claim('sokha', claimHash, claimId)) === null);
+    rec('ការស៊ីកូដដោយម្ចាស់ claim មិនស្ទួន', (await settle('sokha', claimHash, otherClaimId, true)) === true
+        && (await settle('sokha', claimHash, otherClaimId, true)) === true);
+    rec('កូដស៊ីរួចមិនអាចដោះឬកក់វិញ (សូម្បី claim ដដែល)',
+        (await settle('sokha', claimHash, otherClaimId, false)) === false
+        && (await settle('sokha', claimHash, claimId, true)) === false
+        && (await claim('sokha', claimHash, otherClaimId)) === null
+        && (await resetUser('sokha', claimHash)) === null);
+    const invalidatedHash = await newResetHash();
+    await claim('sokha', invalidatedHash, claimId);
+    const newerHash = await newResetHash();
+    rec('admin ចេញកូដថ្មីបិទ claim ចាស់; release មិនធ្វើឱ្យកូដចាស់រស់វិញ',
+        (await settle('sokha', invalidatedHash, claimId, false)) === false
+        && (await claim('sokha', invalidatedHash, claimId)) === null
+        && (await resetUser('sokha', invalidatedHash)) === null
+        && (await claim('sokha', newerHash, otherClaimId)) === uA1);
+    await c.query("update public.member_reset_codes set expires_at = now() - interval '1 second' where code_hash = $1", [newerHash]);
+    rec('ផុតកំណត់បិទ retry claim; ម្ចាស់អាចបញ្ចប់ Auth ដែលឆ្លើយយឺត',
+        (await claim('sokha', newerHash, otherClaimId)) === null
+        && (await settle('sokha', newerHash, otherClaimId, true)) === true);
+
     const addSession = async (uid, n) => {
         for (let i = 0; i < n; i++) {
             const sid = (await one('insert into auth.sessions (id, user_id, created_at) values (gen_random_uuid(), $1, now()) returning id', [uid]))[0].id;
@@ -543,6 +755,54 @@ async function body(c, rec, extra, mode) {
     rec('ការប្រណាំង ២ ការតភ្ជាប់លើកូដ max_uses=1 ➜ ជោគជ័យតែ ១', first === true && raised(second, 'invite-invalid'), { first, second });
     const usedRace = (await one('select used_count from public.tenant_invites where code_hash = $1', [hRace]))[0].used_count;
     rec('ការប្រណាំង ➜ used_count = 1', usedRace === 1, usedRace);
+
+    const invSame = await issue(ADMIN, B, 'member', 1, 24);
+    const hSame = await hashOf(invSame.rows[0].code);
+    const rSame = await makeAuthUser(c, 'samerace@u.zoe.test');
+    await c1.query('begin');
+    await c1.query("select set_config('request.jwt.claims', '{\"role\":\"service_role\"}', true)");
+    await c1.query('set local role service_role');
+    const sameFirst = await c1.query('select * from public.finish_registration($1, $2, $3)', [rSame, hSame, 'samerace']).then((r) => r.rows[0], () => null);
+    let sameSecondDone = false;
+    const sameSecondP = as(c2, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [rSame, hSame, 'samerace']).then((r) => { sameSecondDone = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const sameSecondBlocked = !sameSecondDone;
+    await c1.query('commit');
+    const sameSecond = await sameSecondP;
+    rec('ការប្រណាំងអ្នកដដែល (retry ក្រោយពិដាន ខណៈការហៅទី ១ នៅរត់) លើកូដ max_uses=1 ➜ ទី ២ ចូលជាជួរ ហើយបានហាង/role ដដែល (មិនមែន invite-invalid ដែលនាំឲ្យលុបគណនី)',
+        !!sameFirst && sameSecondBlocked && !!sameSecond.rows && sameSecond.rows[0].tenant_id === sameFirst.tenant_id && sameSecond.rows[0].role === sameFirst.role,
+        { sameFirst, sameSecondBlocked, sameSecond });
+
+    const resetRaceHash = await newResetHash();
+    await c1.query('begin');
+    await c1.query('set local role service_role');
+    const resetFirst = await c1.query('select public.claim_reset_code($1, $2, $3) as id', ['sokha', resetRaceHash, claimId]);
+    let resetSecondFinished = false;
+    const resetSecondP = claim('sokha', resetRaceHash, otherClaimId, c2).then((value) => {
+        resetSecondFinished = true;
+        return value;
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    const resetSecondBlocked = !resetSecondFinished;
+    await c1.query('commit');
+    const resetSecond = await resetSecondP;
+    rec('ការកក់ reset ដំណាលគ្នាចូលជាជួរ; សំណើតែមួយបាន user id',
+        resetSecondBlocked && resetFirst.rows[0].id === uA1 && resetSecond === null, { resetSecondBlocked, resetSecond });
+    rec('ចម្លើយ claim បាត់៖ retry ដោយ id ឈ្នះបាន user ដដែល', (await claim('sokha', resetRaceHash, claimId, c2)) === uA1);
+
+    await c1.query('begin');
+    await c1.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: 'authenticated', sub: ADMIN.sub, aud: 'authenticated' })]);
+    await c1.query('set local role authenticated');
+    const issueFirst = await c1.query('select * from public.admin_issue_reset_code($1, 24)', ['sokha']).then((r) => r.rows.length === 1, () => false);
+    let issueSecondDone = false;
+    const issueSecondP = as(c2, ADMIN, 'select * from public.admin_issue_reset_code($1, 24)', ['sokha']).then((r) => { issueSecondDone = true; return r; });
+    await new Promise((r) => setTimeout(r, 300));
+    const issueSecondBlocked = !issueSecondDone;
+    await c1.query('commit');
+    const issueSecond = await issueSecondP;
+    const unusedReset = (await one('select count(*)::int as n from public.member_reset_codes where user_id = $1 and not used', [uA1]))[0].n;
+    rec('admin_issue_reset_code ដំណាលគ្នា ២ ការតភ្ជាប់ ➜ ចូលជាជួរ · កូដនៅប្រើបានតែ ១ (កូដថ្មីបិទកូដចាស់)',
+        issueFirst && !!issueSecond.rows && issueSecondBlocked && unusedReset === 1, { issueFirst, issueSecondBlocked, unusedReset, issueSecond });
 }
 
 const MUTATIONS = [
@@ -561,16 +821,34 @@ const MUTATIONS = [
     ['invite_row_usable មិនពិនិត្យ max_uses', 'and i.used_count < i.max_uses and', 'and'],
     ['invite_row_usable មិនពិនិត្យថ្ងៃផុតរបស់កូដ', 'and i.expires_at > now() and private.tenant_row_active(t)', 'and private.tenant_row_active(t)'],
     ['invite_row_usable មិនពិនិត្យ tenant', 'i.expires_at > now() and private.tenant_row_active(t)', 'i.expires_at > now()'],
-    ['finish_registration មិនហៅ invite_row_usable', '        and t.id = i.tenant_id\n        and private.invite_row_usable(i, t)\n    returning',
-        '        and t.id = i.tenant_id\n    returning'],
-    ['finish_registration លែង idempotent', "    if found then\n        tenant_id := invite_tenant;", "    if false then\n        tenant_id := invite_tenant;"],
+    ['finish_registration មិនហៅ invite_row_usable',
+        "        and private.invite_row_usable(i, t)\n    returning i.tenant_id, i.role into invite_tenant, invite_role;\n    if invite_tenant is null then\n        raise exception 'invite-invalid' using errcode = 'P0001';\n    end if;\n    insert into public.tenant_members (user_id, tenant_id, username, role, invite_code_hash)",
+        "    returning i.tenant_id, i.role into invite_tenant, invite_role;\n    if invite_tenant is null then\n        raise exception 'invite-invalid' using errcode = 'P0001';\n    end if;\n    insert into public.tenant_members (user_id, tenant_id, username, role, invite_code_hash)"],
+    ['finish_registration លែង idempotent', '    if found then\n        if not exists (\n            select 1 from public.tenant_invites i', '    if false then\n        if not exists (\n            select 1 from public.tenant_invites i'],
+    ['finish_registration (សមាជិកមានរួច) មិនពិនិត្យហាងរបស់កូដ', 'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant and i.role = invite_role',
+        'where i.code_hash = p_code_hash and i.role = invite_role'],
+    ['finish_registration (សមាជិកមានរួច) មិនពិនិត្យ role របស់កូដ', 'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant and i.role = invite_role',
+        'where i.code_hash = p_code_hash and i.tenant_id = invite_tenant'],
+    ['finish_registration មិនកត់ invite_code_hash', 'values (p_user_id, invite_tenant, p_username, invite_role, p_code_hash);',
+        'values (p_user_id, invite_tenant, p_username, invite_role, null);'],
+    ['spent_invite_member មិនពិនិត្យ hash កូដលើសមាជិក', '    join public.tenant_members m on m.invite_code_hash = i.code_hash\n',
+        '    join public.tenant_members m on m.tenant_id = i.tenant_id\n'],
+    ['spent_invite_member មិនពិនិត្យ username', '        and m.username = p_username\n        and m.tenant_id = i.tenant_id\n', '        and m.tenant_id = i.tenant_id\n'],
+    ['spent_invite_member មិនពិនិត្យហាងរបស់សមាជិក', '        and m.tenant_id = i.tenant_id\n        and m.role = i.role\n', '        and m.role = i.role\n'],
+    ['spent_invite_member មិនពិនិត្យ role', '        and m.role = i.role\n        and not i.revoked\n', '        and not i.revoked\n'],
+    ['spent_invite_member ទទួលកូដ revoke', '        and not i.revoked\n        and (i.used_count >= i.max_uses', '        and (i.used_count >= i.max_uses'],
+    ['spent_invite_member ទទួលកូដនៅប្រើបាន', '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n', ''],
+    ['spent_invite_member មិនពិនិត្យហាងសកម្ម', '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n        and private.tenant_row_active(t)\n$$;',
+        '        and (i.used_count >= i.max_uses or i.expires_at <= now())\n$$;'],
+    ['spent_invite_member ឲ្យ authenticated ហៅបាន', 'grant execute on function public.spent_invite_member(text, text) to service_role;',
+        'grant execute on function public.spent_invite_member(text, text) to service_role, authenticated;'],
     ['revoke_user_sessions លុប session ទាំងអស់', 'delete from auth.sessions s where s.user_id = p_user_id;', 'delete from auth.sessions s;'],
     ['invite_is_usable មិនហៅ invite_row_usable', 'where i.code_hash = p_code_hash and private.invite_row_usable(i, t)\n    )',
         'where i.code_hash = p_code_hash\n    )'],
-    ['finish_registration ឲ្យ authenticated ហៅបាន', '    public.consume_reset_code(text, text)\n    to service_role;',
-        '    public.consume_reset_code(text, text)\n    to service_role, authenticated;'],
+    ['finish_registration ឲ្យ authenticated ហៅបាន', 'grant execute on function public.finish_registration(uuid, text, text) to service_role;',
+        'grant execute on function public.finish_registration(uuid, text, text) to service_role, authenticated;'],
     ['finish_registration មិនពិនិត្យ email ↔ username',
-        "        where u.id = p_user_id and lower(split_part(u.email, '@', 1)) = p_username", '        where u.id = p_user_id'],
+        "        where u.id = p_user_id\n            and lower(split_part(u.email, '@', 1)) = p_username", '        where u.id = p_user_id'],
     ['admin_issue_invite គ្មានច្រកទ្វារ admin',
         "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_role is null",
         '    if p_role is null'],
@@ -579,13 +857,46 @@ const MUTATIONS = [
     ['new_invite_code ប្រើ byte ថេរ (version របស់ uuid)', 'array[0, 1, 2, 3, 4, 5, 7, 8,', 'array[0, 1, 2, 3, 4, 5, 6, 8,'],
     ['new_invite_code ប្រើតែ ៤ bit', '(get_byte(raw, positions[i]) & 31)', '(get_byte(raw, positions[i]) & 15)'],
     ['username លែង unique', "    username text not null unique check (username ~", "    username text not null check (username ~"],
-    ['reset_code_user មិនពិនិត្យ username', 'where r.code_hash = p_code_hash and m.username = p_username and not r.used', 'where r.code_hash = p_code_hash and not r.used'],
-    ['reset_code_user ទទួលកូដដែលប្រើរួច', 'and m.username = p_username and not r.used and r.expires_at > now()', 'and m.username = p_username and r.expires_at > now()'],
-    ['reset_code_user ទទួលកូដផុតកំណត់', 'and not r.used and r.expires_at > now()', 'and not r.used'],
-    ['admin_issue_reset_code មិនបិទកូដចាស់', '    update public.member_reset_codes r set used = true where r.user_id = member_id and not r.used;\n', ''],
+    ['reset_code_user មិនពិនិត្យ username', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and not r.used'],
+    ['reset_code_user ទទួលកូដដែលប្រើរួច', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and r.expires_at > now()'],
+    ['reset_code_user ទទួលកូដផុតកំណត់', 'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used and r.expires_at > now()',
+        'where r.code_hash = p_code_hash and r.claim_id is null\n        and m.username = p_username and not r.used'],
+    ['lookup ចាស់រំលងការកក់', 'where r.code_hash = p_code_hash and r.claim_id is null', 'where r.code_hash = p_code_hash'],
+    ['consume ចាស់រំលងការកក់', 'and m.username = p_username\n        and r.claim_id is null;', 'and m.username = p_username;'],
+    ['claim ទទួល request id ទទេ', '    if p_claim_id is null then return null; end if;\n', ''],
+    ['claim រំលងម្ចាស់ការកក់', '        and (r.claim_id is null or r.claim_id = p_claim_id)\n', ''],
+    ['claim ទទួលកូដប្រើរួច', '        and not r.used and r.expires_at > now()\n        and (r.claim_id is null',
+        '        and r.expires_at > now()\n        and (r.claim_id is null'],
+    ['claim ទទួលកូដផុតកំណត់', '        and not r.used and r.expires_at > now()\n        and (r.claim_id is null',
+        '        and not r.used\n        and (r.claim_id is null'],
+    ['settle ស៊ីកូដនៃ claim ផ្សេង', 'and m.username = p_username and r.claim_id = p_claim_id;', 'and m.username = p_username;'],
+    ['release ដោះ claim ផ្សេង', '            and (r.claim_id = p_claim_id or r.claim_id is null);', ';'],
+    ['release ទទួលកូដប្រើរួច/បិទដោយ admin', '            and m.username = p_username and not r.used\n', '            and m.username = p_username\n'],
+    ['claim/settle ផ្តល់សិទ្ធិដល់ authenticated', 'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role;',
+        'public.reset_code_user(text, text), public.consume_reset_code(text, text)\n    to service_role, authenticated;'],
+    ['admin_issue_reset_code មិនបិទកូដចាស់', '    update public.member_reset_codes r set used = true where r.user_id = member_id and r.used = false;\n', ''],
     ['admin_issue_reset_code គ្មានច្រកទ្វារ admin',
-        "    if not private.is_platform_admin() then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_valid_hours is null or p_valid_hours not between 1 and 168",
-        '    if p_valid_hours is null or p_valid_hours not between 1 and 168'],
+        "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_valid_hours is null",
+        '    if p_valid_hours is null'],
+    ['admin_issue_reset_code មិនចាក់សោជួរសមាជិក (ចេញកូដដំណាលគ្នា ➜ កូដ ២)', '    where m.username = lower(btrim(p_username))\n    for update;\n',
+        '    where m.username = lower(btrim(p_username));\n'],
+    ['finish_registration មិនចាក់សោកូដមុនពិនិត្យសមាជិកភាព (retry ដំណាលគ្នា ➜ invite-invalid ➜ លុបគណនី)',
+        '    perform 1 from public.tenant_invites i where i.code_hash = p_code_hash for update;\n', ''],
+    ['index FK created_by របស់ tenant_invites បាត់', 'create index if not exists tenant_invites_created_by_idx on public.tenant_invites (created_by);\n', ''],
+    ['index FK invite_code_hash របស់ tenant_members បាត់', 'create index if not exists tenant_members_invite_code_hash_idx on public.tenant_members (invite_code_hash);\n', ''],
+    ['admin_extend_tenant គ្មាន CAS (ជួរចាស់សរសេរជាន់)', ' and t.expires_at = p_expected_expires_at\n', '\n'],
+    ['admin_extend_tenant គ្មានច្រកទ្វារ admin',
+        "    if not (select private.is_platform_admin()) then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_days is null",
+        '    if p_days is null'],
+    ['admin_extend_tenant ពន្យារពីឥឡូវជានិច្ច', 'greatest(t.expires_at, now()) + make_interval(days => p_days)', 'now() + make_interval(days => p_days)'],
+    ['admin_extend_tenant ពន្យារពីថ្ងៃផុតចាស់ជានិច្ច', 'greatest(t.expires_at, now()) + make_interval(days => p_days)', 't.expires_at + make_interval(days => p_days)'],
+    ['admin_extend_tenant ទទួលថ្ងៃលើស ៣៦៥០', 'p_days not between 1 and 3650', 'p_days not between 1 and 100000'],
+    ['admin_extend_tenant ជួរចាស់ ➜ tenant-not-found (លាក់ការប្រណាំង)',
+        "        if exists (select 1 from public.tenants t where t.id = p_tenant_id) then\n            raise exception 'tenant-changed' using errcode = 'P0001';\n        end if;\n", ''],
+    ['admin_extend_tenant ឲ្យ anon ហៅបាន', 'public.admin_extend_tenant(uuid, integer, timestamptz)\n    to authenticated;',
+        'public.admin_extend_tenant(uuid, integer, timestamptz)\n    to authenticated, anon;'],
     ['reset hash ប្រើ prefix ដូចកូដអញ្ជើញ', "convert_to('zoe-reset:' ||", "convert_to('zoe-invite:' ||"],
     ['policy member_reset_codes ➜ using (true)', 'create policy member_reset_codes_select on public.member_reset_codes for select to authenticated\n    using ((select private.is_platform_admin()));',
         'create policy member_reset_codes_select on public.member_reset_codes for select to authenticated\n    using (true);'],
@@ -598,7 +909,14 @@ const MUTATIONS = [
     ['public.zoe_write ជា SECURITY DEFINER (Supabase linter 0029)', "language sql volatile security invoker set search_path = ''\nas $$\n    select private.zoe_write",
         "language sql volatile security definer set search_path = ''\nas $$\n    select private.zoe_write"],
     ['private.zoe_write អាចហៅដោយ anon', '    private.zoe_write(text, jsonb)\n    to authenticated;', '    private.zoe_write(text, jsonb)\n    to authenticated, anon;'],
-    ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;']
+    ['public.zoe_write អាចហៅដោយ anon (linter 0028)', '    public.zoe_write(text, jsonb)\n    to authenticated;', '    public.zoe_write(text, jsonb)\n    to authenticated, anon;'],
+    ['zoe_admin_export ឲ្យ authenticated ហៅបាន', 'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role;',
+        'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role, authenticated;'],
+    ['zoe_admin_tenants ឲ្យ anon ហៅបាន', 'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role;',
+        'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role, anon;'],
+    ['zoe_admin_export · zoe_admin_tenants គ្មាន revoke (grant លំនាំដើម ➜ PUBLIC)',
+        'revoke all on function public.zoe_admin_tenants(uuid, integer), public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer)\n    from public, anon, authenticated, service_role;\n',
+        '']
 ];
 
 async function main() {

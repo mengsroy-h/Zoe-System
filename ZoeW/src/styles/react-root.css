@@ -298,3 +298,30 @@
 #configModal .cfg-supabase input {
     text-align: left;
 }
+
+.scroll-thumb {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 3px;
+    border-radius: 3px;
+    background: rgba(100, 116, 139, 0.55);
+    pointer-events: none;
+    z-index: 1300;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    will-change: transform, opacity;
+}
+
+.scroll-thumb.shown {
+    opacity: 1;
+    transition-duration: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-thumb { transition: none; }
+}
+
+.remember-container.remember-password {
+    margin-top: -4px;
+}

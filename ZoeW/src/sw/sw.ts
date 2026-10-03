@@ -4,23 +4,56 @@ declare const self: ServiceWorkerGlobalScope;
 declare const __CACHE_VERSION__: string;
 declare const __CORE_SHELL__: string[];
 declare const __OPTIONAL_SHELL__: string[];
+declare const __BACKEND_SHELL__: string[];
 
 const CACHE_VERSION = __CACHE_VERSION__;
 const CORE_SHELL = __CORE_SHELL__;
 const OPTIONAL_SHELL = __OPTIONAL_SHELL__;
+const BACKEND_SHELL = __BACKEND_SHELL__;
 
 const FRESH: RequestCache = 'no-cache';
 
+const pathOf = (url: string): string => new URL(url, self.location.href).pathname;
+
 const SHELL_PATHS = new Set(
-    CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
+    CORE_SHELL.concat(OPTIONAL_SHELL, BACKEND_SHELL).map(pathOf)
 );
+
+const BACKEND_PATHS = new Set(BACKEND_SHELL.map(pathOf));
+const BACKEND_PREFIXES = BACKEND_SHELL.map((url) => pathOf(url).replace(/-[^-/]+\.js$/, '-'));
+const SHELL_SCHEME_KEY = './__zoew-shell-scheme';
+const BACKEND_USED_KEY = './__zoew-backend-used';
+
+function cacheUsedBackend(cache: Cache): Promise<{ used: boolean; marked: boolean }> {
+    return cache.match(SHELL_SCHEME_KEY).then((scheme) => {
+        if (scheme) return cache.match(BACKEND_USED_KEY).then((used) => ({ used: !!used, marked: !!used }));
+        return cache.keys().then((requests) => ({
+            used: requests.some((r) => BACKEND_PREFIXES.some((prefix) => new URL(r.url).pathname.startsWith(prefix))),
+            marked: false
+        }));
+    });
+}
+
+function previousBackendUse(): Promise<{ used: boolean; marked: boolean }> {
+    if (!BACKEND_SHELL.length) return Promise.resolve({ used: false, marked: false });
+    return caches.keys()
+        .then((keys) => Promise.all(keys.filter((key) => key.startsWith('zoew-') && key !== CACHE_VERSION).map((key) => caches.open(key).then(cacheUsedBackend))))
+        .then((results) => ({ used: results.some((r) => r.used), marked: results.some((r) => r.marked) }), () => ({ used: false, marked: false }));
+}
+
+function noteBackendUse(cache: Cache): Promise<void> {
+    return cache.match(BACKEND_USED_KEY).then((seen) => (seen ? undefined : cache.put(BACKEND_USED_KEY, new Response('1')))).catch(() => {});
+}
 
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
-        caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(CORE_SHELL.map((url) => new Request(url, { cache: FRESH }))).then(() => Promise.all(
-                OPTIONAL_SHELL.map((url) => cache.add(new Request(url, { cache: FRESH })).catch(() => {}))
-            )))
+        Promise.all([caches.open(CACHE_VERSION), previousBackendUse()])
+            .then(([cache, backend]) => cache.addAll(CORE_SHELL.concat(backend.used ? BACKEND_SHELL : []).map((url) => new Request(url, { cache: FRESH })))
+                .then(() => cache.put(SHELL_SCHEME_KEY, new Response('1')))
+                .then(() => (backend.marked ? cache.put(BACKEND_USED_KEY, new Response('1')) : undefined))
+                .then(() => Promise.all(
+                    OPTIONAL_SHELL.map((url) => cache.add(new Request(url, { cache: FRESH })).catch(() => {}))
+                )))
             .then(() => self.skipWaiting())
     );
 });
@@ -204,6 +237,10 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>
             cache.match(cacheKey).then((cached) => {
+                if (BACKEND_PATHS.has(url.pathname)) {
+                    try { event.waitUntil(noteBackendUse(cache)); }
+                    catch (e) { noteBackendUse(cache); }
+                }
                 if (cached && isShell) {
                     try { event.waitUntil(revalidateShell(cache, request, cacheKey)); }
                     catch (e) { revalidateShell(cache, request, cacheKey); }

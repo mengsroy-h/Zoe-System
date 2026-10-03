@@ -37,23 +37,23 @@ jobs:
       # ➜ ការការពារ «កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ» និង «ការឡើងកំណែទទេ»
       # មិនដែលអនុវត្តលើ PR ណាមួយសោះ។ `VERSIONSCOPE_STRICT=1` ខាងក្រោម
       # ធ្វើឲ្យការបាត់នោះក្លាយជា **ការធ្លាក់** មិនមែនការស្ងាត់ទេ។
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: |
             ZoeW/package-lock.json
             supabase/package-lock.json
             tools/firebase-provision/package-lock.json
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: ដំឡើង dependency
         run: npm install --no-save --no-audit --no-fund acorn playwright-core playwright
@@ -93,7 +93,7 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: Cache RTDB emulator jar
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
           key: rtdb-emulator-${{ runner.os }}-v1

@@ -14,6 +14,7 @@ import { ACCOUNT_REPLY_TEXT, backToLoginForm, clearPendingInvite, openRegisterFo
 import { ensureAppActivated } from '../src/features/license';
 import { cleanupJournalScope } from '../src/domain/cleanup';
 import { supabaseKeyIsSecret } from '../src/services/supabase-config';
+import { sbFetchWithTimeout } from '../src/services/supabase-transport';
 import { databaseHealthLabel, healthLicenseRow } from '../src/features/health-check';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
 import { fieldValue, setFieldValue } from '../src/app/refs';
@@ -158,6 +159,91 @@ describe('Modal ចូល/ចុះឈ្មោះ/ប្តូរពាក្�
         await submitRegisterForm();
         expect(alerts[2]).toContain(ACCOUNT_REPLY_TEXT.network);
         expect(calls.some((c) => c[0] === 'signIn')).toBe(false);
+    });
+
+    it('Supabase ៖ App អស់ពេលរង់ចាំ Edge Function (ពិដាន transport ពិត) ➜ «មិនដឹងលទ្ធផល» ណែនាំសាកចូលមុន · មិនមែន «ភ្ជាប់មិនបាន» · ទម្រង់នៅដដែលសម្រាប់សាកម្តងទៀត', async () => {
+        const { fb, calls } = fakeSupabaseFb();
+        const hung = () => sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/register', { method: 'POST' }, 5);
+        fb.registerAccount.mockImplementationOnce(async () => { await hung(); });
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
+        rememberSetupInvite('abcd-efgh-jkmn-pqrs-tvwx');
+        setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
+        setFieldValue('registerUsernameInput', 'dara');
+        setFieldValue('registerPasswordInput', 'pass1234');
+        setFieldValue('registerPasswordConfirmInput', 'pass1234');
+        await submitRegisterForm();
+        await settle();
+        expect(fb.registerAccount).toHaveBeenCalledTimes(1);
+        expect(alerts).toEqual([ACCOUNT_REPLY_TEXT['registration-unknown']]);
+        expect(alerts[0]).not.toContain(ACCOUNT_REPLY_TEXT.network);
+        expect(alerts[0]).not.toMatch(/មិនជោគជ័យ/);
+        expect(calls.some((c) => c[0] === 'signIn')).toBe(false);
+        expect(viewState.loginMode).toBe('register');
+        expect(fieldValue('registerInviteInput')).toBe('abcd-efgh-jkmn-pqrs-tvwx');
+        expect(fieldValue('registerPasswordInput')).toBe('pass1234');
+        fb.registerReply = { status: 200, body: { ok: true, code: 'registered', tenantId: 't-1', role: 'owner' } };
+        await submitRegisterForm();
+        await settle();
+        expect(calls.filter((c) => c[0] === 'register').length).toBe(1);
+        expect(calls.find((c) => c[0] === 'signIn')).toEqual(['signIn', 'dara', 'pass1234']);
+        expect(alerts.length).toBe(1);
+    });
+
+    it('Supabase ៖ Server ឆ្លើយ registration-unknown ➜ សារណែនាំដោយគ្មានពាក្យ «មិនជោគជ័យ» នៅមុខ', async () => {
+        const { fb } = fakeSupabaseFb();
+        fb.registerReply = { status: 502, body: { ok: false, code: 'registration-unknown' } };
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openRegisterForm(); });
+        setFieldValue('registerInviteInput', 'abcd-efgh-jkmn-pqrs-tvwx');
+        setFieldValue('registerUsernameInput', 'dara');
+        setFieldValue('registerPasswordInput', 'pass1234');
+        setFieldValue('registerPasswordConfirmInput', 'pass1234');
+        await submitRegisterForm();
+        await settle();
+        expect(alerts).toEqual([ACCOUNT_REPLY_TEXT['registration-unknown']]);
+    });
+
+    it('Supabase ៖ App អស់ពេលរង់ចាំការប្តូរពាក្យសម្ងាត់ (ពិដាន transport ពិត) ➜ password-reset-unknown (សាកចូលដោយពាក្យសម្ងាត់ថ្មីមុន) · មិនមែន «ភ្ជាប់មិនបាន»', async () => {
+        const { fb } = fakeSupabaseFb();
+        fb.resetPassword.mockImplementationOnce(async () => {
+            await sbFetchWithTimeout(() => new Promise(() => {}), 'https://abcd1234.supabase.co/functions/v1/reset-password', { method: 'POST' }, 5);
+        });
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
+        setFieldValue('resetUsernameInput', 'dara');
+        setFieldValue('resetCodeInput', 'CODE-1');
+        setFieldValue('resetPasswordInput', 'newpass99');
+        setFieldValue('resetPasswordConfirmInput', 'newpass99');
+        await submitResetPasswordForm();
+        await settle();
+        expect(alerts).toEqual([ACCOUNT_REPLY_TEXT['password-reset-unknown']]);
+        expect(viewState.loginMode).toBe('reset');
+    });
+
+    it('Supabase ៖ លទ្ធផលប្តូរពាក្យសម្ងាត់មិនដឹង ➜ សារណែនាំសាកចូលមុនសុំកូដថ្មី', async () => {
+        const { fb, calls } = fakeSupabaseFb();
+        fb.resetReply = { status: 502, body: { ok: false, code: 'password-reset-unknown' } };
+        firebaseState.fb = fb;
+        firebaseState.auth = { app: {}, currentUser: null };
+        mount(<LoginModal />);
+        step(() => { viewState.backendKind = 'supabase'; openResetPasswordForm(); });
+        setFieldValue('resetUsernameInput', 'dara');
+        setFieldValue('resetCodeInput', 'CODE-1');
+        setFieldValue('resetPasswordInput', 'newpass99');
+        setFieldValue('resetPasswordConfirmInput', 'newpass99');
+        await submitResetPasswordForm();
+        await settle();
+        expect(alerts.join(' ')).toMatch(/សាកចូល/);
+        expect(alerts.join(' ')).toMatch(/កូដថ្មី/);
+        expect(viewState.loginMode).toBe('reset');
+        expect(calls.map((c) => c[0])).toEqual(['reset']);
     });
 
     it('Supabase ៖ ប្តូរពាក្យសម្ងាត់ ➜ ផ្ញើ username + resetCode ➜ ត្រឡប់ទៅ Modal ចូល ជាមួយ username', async () => {

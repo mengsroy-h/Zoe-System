@@ -1,11 +1,12 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
 import { FINISH_REASONS } from './account-core.ts';
-import type { CreateUserResult, FinishReason, FinishResult, UpdatePasswordResult } from './account-core.ts';
+import type { CreateUserResult, FinishReason, FinishResult, SpentInviteMember, UpdatePasswordResult } from './account-core.ts';
 import { withTimeout } from './timeout.ts';
 
 export const ADMIN_CALL_TIMEOUT_MS = 8000;
 const EXISTS_CODES = new Set(['email_exists', 'user_already_exists', 'phone_exists']);
 const WEAK_CODES = new Set(['weak_password']);
+const SIGN_IN_REFUSED_CODES = new Set(['invalid_credentials', 'email_not_confirmed', 'user_banned']);
 
 function errorCode(error: unknown): string {
     const code = error !== null && typeof error === 'object' ? (error as Record<string, unknown>).code : undefined;
@@ -17,7 +18,7 @@ function errorMessage(error: unknown): string {
     return typeof message === 'string' ? message : '';
 }
 
-export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT_MS) {
+export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT_MS, openProbe?: () => SupabaseClient) {
     return {
         async inviteIsUsable(codeHash: string): Promise<boolean | null> {
             try {
@@ -26,6 +27,18 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return data;
             } catch {
                 return null;
+            }
+        },
+        async spentInviteMember(codeHash: string, username: string): Promise<SpentInviteMember | null | undefined> {
+            try {
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('spent_invite_member', { p_code_hash: codeHash, p_username: username })), timeoutMs, 'timeout');
+                if (error || !Array.isArray(data)) return undefined;
+                if (data.length === 0) return null;
+                const row = data[0];
+                if (!row || typeof row.user_id !== 'string' || typeof row.tenant_id !== 'string' || typeof row.role !== 'string') return undefined;
+                return { userId: row.user_id, tenantId: row.tenant_id, role: row.role };
+            } catch {
+                return undefined;
             }
         },
         async createUser(email: string, password: string): Promise<CreateUserResult> {
@@ -70,9 +83,23 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return false;
             }
         },
-        async resetCodeUser(username: string, codeHash: string): Promise<string | null | undefined> {
+        async passwordUserId(email: string, password: string): Promise<string | null | undefined> {
+            if (!openProbe) return undefined;
             try {
-                const { data, error } = await withTimeout(Promise.resolve(client.rpc('reset_code_user', { p_username: username, p_code_hash: codeHash })), timeoutMs, 'timeout');
+                const probe = openProbe();
+                if (probe === client) return undefined;
+                const { data, error } = await withTimeout(probe.auth.signInWithPassword({ email, password }), timeoutMs, 'timeout');
+                if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;
+                const id = data && data.user ? data.user.id : '';
+                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);
+                return id || undefined;
+            } catch {
+                return undefined;
+            }
+        },
+        async claimResetCode(username: string, codeHash: string, claimId: string): Promise<string | null | undefined> {
+            try {
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('claim_reset_code', { p_username: username, p_code_hash: codeHash, p_claim_id: claimId })), timeoutMs, 'timeout');
                 if (error) return undefined;
                 if (data === null) return null;
                 return typeof data === 'string' ? data : undefined;
@@ -80,9 +107,9 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return undefined;
             }
         },
-        async consumeResetCode(username: string, codeHash: string): Promise<boolean> {
+        async settleResetCode(username: string, codeHash: string, claimId: string, consumed: boolean): Promise<boolean> {
             try {
-                const { data, error } = await withTimeout(Promise.resolve(client.rpc('consume_reset_code', { p_username: username, p_code_hash: codeHash })), timeoutMs, 'timeout');
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('settle_reset_code', { p_username: username, p_code_hash: codeHash, p_claim_id: claimId, p_consumed: consumed })), timeoutMs, 'timeout');
                 return !error && data === true;
             } catch {
                 return false;

@@ -86,7 +86,7 @@ function sliceNested(source, name) {
 const decls = topLevel(src);
 const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'function' && /^sb[A-Z]|Sb[A-Z]/.test(n));
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
-const HELPER_FNS = ['fetchWithTimeout', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'safeStoreGet',
+const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'setupLinkDsnIsValid', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
     'downloadQrPng', 'saveQrImage'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'QR_MAX_MODULES'];
@@ -130,12 +130,16 @@ ok('⛔ migration Supabase មាន (tenants · admin_create_tenant · admin_is
 const SB_IDS = [...HTML_EL.keys()].filter((id) => /^sb[A-Z]/.test(id));
 ok('⛔ index.html មានកាត «ហាង Supabase» (ធាតុ id sb* ≥ 15)', SB_IDS.length >= 15, SB_IDS.length);
 
+// រាល់និយមន័យ (public · private · `create or replace` ក្នុង migration ក្រោយ) ➜ body ពិតរបស់ definer ក្នុង private មិនរលាយក្រោយ wrapper invoker
 function sqlFunctionBody(name) {
-    const start = migrationSql.indexOf('create function public.' + name + '(');
-    if (start === -1) return '';
-    const open = migrationSql.indexOf('$$', start);
-    const close = migrationSql.indexOf('$$', open + 2);
-    return open === -1 || close === -1 ? '' : migrationSql.slice(start, close + 2);
+    const re = new RegExp('create (?:or replace )?function (?:public|private)\\.' + name + '\\(', 'g');
+    const parts = [];
+    for (const m of migrationSql.matchAll(re)) {
+        const open = migrationSql.indexOf('$$', m.index);
+        const close = open === -1 ? -1 : migrationSql.indexOf('$$', open + 2);
+        if (close !== -1) parts.push(migrationSql.slice(m.index, close + 2));
+    }
+    return parts.join('\n');
 }
 
 function staticSeams() {
@@ -171,7 +175,11 @@ function staticSeams() {
     const resetInput = HTML_EL.get('sbResetUsernameInput');
     ok('#sbResetUsernameInput maxlength = ព្រំដែនឈ្មោះគណនី', !!resetInput && Number(resetInput.attr('maxlength')) === Number(((sqlUser || '').match(/\{\d+,(\d+)\}/) || [])[1]));
 
-    const called = ['admin_create_tenant', 'admin_update_tenant', 'admin_issue_invite', 'admin_issue_reset_code'];
+    const extendDays = sqlFunctionBody('admin_extend_tenant').match(/p_days not between (\d+) and (\d+)/);
+    ok('SB_TENANT_DAYS_MAX = ព្រំដែនថ្ងៃរបស់ admin_extend_tenant (1–' + (extendDays ? extendDays[2] : '?') + ')', !!extendDays
+        && Number(extendDays[1]) === 1 && Number(extendDays[2]) === C.SB_TENANT_DAYS_MAX, { app: C.SB_TENANT_DAYS_MAX, sql: extendDays && extendDays.slice(1) });
+
+    const called = ['admin_create_tenant', 'admin_update_tenant', 'admin_extend_tenant', 'admin_issue_invite', 'admin_issue_reset_code'];
     const usedInApp = called.filter((fn) => src.indexOf("'" + fn + "'") !== -1);
     ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ZoeKeyGen ហៅ RPC admin_* ទាំង ' + called.length, usedInApp.length === called.length, usedInApp);
     // ⛔ លើកលែងតែមួយ ៖ `*-collision` បោះតែក្រោយកូដ ~១០០ bit ប៉ះគ្នា ៥ ដងជាប់ (មិនកើតក្នុងការអនុវត្ត) ➜ សារទូទៅ «Supabase បដិសេធ (…)» គ្រប់គ្រាន់
@@ -342,7 +350,7 @@ async function behavior() {
         const clerkId = await H.makeAuthUser(c, 'clerk@admin.zoe.test');
         pool = new H.PG.Pool({ host: '127.0.0.1', port: c.connectionParameters.port, user: 'postgres', database: name, max: 8 });
         pool.on('error', () => {});
-        fake = await startFakeSupabase({ pool });
+        fake = await startFakeSupabase({ pool, pgTypes: H.PG.types });
         fake.addUser('boss@admin.zoe.test', 'boss-pass-123', adminId);
         fake.addUser('clerk@admin.zoe.test', 'clerk-pass-123', clerkId);
         const PUB = 'sb_publishable_' + 'k'.repeat(32);
@@ -471,7 +479,9 @@ async function behavior() {
         const reg = await H.as(c, SERVICE, 'select * from public.finish_registration($1, $2, $3)', [ownerUid, ownerHash, 'sokha']);
         ok('កូដពីអេក្រង់ ➜ finish_registration ➜ ម្ចាស់ហាងរបស់ហាងដដែល', !!reg.rows && reg.rows[0].tenant_id === tRow.id && reg.rows[0].role === 'owner', reg);
         await C.sbAdminRefresh();
-        ok('បញ្ជីបង្ហាញ 👑 sokha', /👑 sokha/.test(el('sbTenantListBody').innerHTML));
+        const ownerListHtml = el('sbTenantListBody').innerHTML;
+        ok('បញ្ជីបង្ហាញម្ចាស់ sokha ជាអក្សរដិត (sb-owner) · គ្មាន emoji នៅមុខឈ្មោះ',
+            /<span class="sb-member sb-owner" title="ម្ចាស់ហាង">sokha<\/span>/.test(ownerListHtml) && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*sokha/u.test(ownerListHtml), ownerListHtml.slice(0, 300));
         K.answers.confirm.push(true);
         await C.sbTenantAction(tRow.id, 'sb-invite');
         await drain();
@@ -526,7 +536,7 @@ async function behavior() {
         await C.sbTenantAction(tid770, 'sb-extend');
         const exp2 = (await c.query('select expires_at from public.tenants where id = $1', [tid770])).rows[0].expires_at.getTime();
         ok('ពន្យារ ៥ ថ្ងៃលើហាងផុតកំណត់ ➜ ឥឡូវ + ៥ ថ្ងៃ', Math.abs(exp2 - (t5 + 5 * 86400000)) < 60000, { exp2, want: t5 + 5 * 86400000 });
-        const updCalls = () => K.rpcCalls('admin_update_tenant');
+        const updCalls = () => K.rpcCalls('admin_update_tenant') + K.rpcCalls('admin_extend_tenant');
         let u0 = updCalls();
         K.answers.prompt.push(null);
         await C.sbTenantAction(tid770, 'sb-extend');
@@ -536,6 +546,21 @@ async function behavior() {
             await C.sbTenantAction(tid770, 'sb-extend');
         }
         ok('prompt បោះបង់ · មិនមែនចំនួនគត់ពេញ («abc» · «5abc» · «2.5» · «0») ➜ alert · គ្មាន RPC', updCalls() === u0 && alertsSince(a).length === 4, alertsSince(a));
+        console.log('   · ពន្យារពីឧបករណ៍ ២ (ជួរ cache ចាស់)');
+        await C.sbAdminRefresh();
+        const expTxt = async () => (await c.query('select expires_at::text as e from public.tenants where id = $1', [tid770])).rows[0].e;
+        await c.query("update public.tenants set expires_at = expires_at + interval '365 days' where id = $1", [tid770]);
+        const expOther = await expTxt();
+        a = K.log.alerts.length;
+        K.answers.prompt.push('7');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const expStale = await expTxt();
+        ok('ឧបករណ៍ផ្សេងពន្យាររួច (cache ចាស់) ➜ +7 ត្រូវបដិសេធ (tenant-changed) · ថ្ងៃផុតកំណត់មិនខ្លីវិញ (៣៦៥ ថ្ងៃមិនបាត់)',
+            expStale === expOther && alertsSince(a).join().indexOf(C.SB_ADMIN_ERROR_TEXT['tenant-changed'] || '\u0000') !== -1, { alerts: alertsSince(a), expOther, expStale });
+        K.answers.prompt.push('7');
+        await C.sbTenantAction(tid770, 'sb-extend');
+        const exp7 = (await c.query("select expires_at = $2::timestamptz + interval '7 days' as ok from public.tenants where id = $1", [tid770, expOther])).rows[0].ok;
+        ok('ក្រោយបដិសេធ បញ្ជីធ្វើបច្ចុប្បន្នភាពខ្លួនឯង ➜ ពន្យារ +7 ពីថ្ងៃថ្មី (មិនមែនពីជួរចាស់)', exp7 === true);
         K.answers.confirm.push(true);
         await C.sbTenantAction(tid770, 'sb-revoke');
         const rev1 = (await c.query('select revoked from public.tenants where id = $1', [tid770])).rows[0].revoked;
@@ -671,6 +696,47 @@ async function behavior() {
         await drain();
         ok('JWT ផុត (RPC 401) ➜ reset + សារ «ផុតកំណត់» តែមួយ (មិនមែន «ចេញកូដមិនបាន» ទៀត)', alertsSince(a).length === 1 && /ផុតកំណត់/.test(alertsSince(a)[0])
             && !panelOpen() && C.sbAdminSession === null && el('sbResetResultBox').hidden(), alertsSince(a));
+        console.log('   · ពិដានស្ងៀម ១៥ នាទី (ដូច Signing Key)');
+        const run = (code) => { try { return vm.runInContext(code, C); } catch (e) { return 'ERR ' + e.message; } };
+        const signingIdle = Function('return (' + ((src.match(/const SIGNING_KEY_IDLE_MS = ([0-9 *]+);/) || [])[1] || '0') + ')')();
+        ok('SB_ADMIN_IDLE_MS = SIGNING_KEY_IDLE_MS (' + signingIdle + 'ms)', signingIdle > 0 && run('typeof SB_ADMIN_IDLE_MS === "number" ? SB_ADMIN_IDLE_MS : 0') === signingIdle);
+        K.relogin();
+        await sleep(1200);
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ចូលវិញសម្រាប់ការសាកពិដានស្ងៀម', panelOpen() && !!C.sbAdminSession);
+        const idleBy = (ms) => run('sbAdminLastUseAt = Date.now() - SB_ADMIN_IDLE_MS + (' + ms + ')');
+        const expire = () => run('typeof expireIdleSbAdmin === "function" ? expireIdleSbAdmin() : null');
+        const activity = () => run('typeof sbAdminActivity === "function" ? sbAdminActivity() : null');
+        ok('ចូលរួច ➜ ត្រាពេលប្រើ = ឥឡូវ (Date.now)', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000);
+        idleBy(60000);
+        ok('ស្ងៀមតិចជាង ១៥ នាទី ➜ session នៅ', expire() === false && !!C.sbAdminSession && panelOpen());
+        idleBy(1000);
+        activity();
+        ok('សកម្មភាព (pointer/key) មុនដល់ពិដាន ➜ ត្រាពេលថ្មី · session នៅ', Math.abs(Date.now() - Number(run('sbAdminLastUseAt'))) < 5000 && !!C.sbAdminSession);
+        idleBy(-1000);
+        const fIdle = K.log.fetches.length;
+        const tIdle = K.log.toasts.length;
+        const aIdle = K.log.alerts.length;
+        const expired = expire();
+        await drain();
+        ok('ស្ងៀម ១៥ នាទី ➜ sbAdminReset (ផ្ទាំងលាក់ · session null · បញ្ជី/កូដទទេ) · POST /auth/v1/logout · toast ១ «ចូលម្តងទៀត» · គ្មាន alert',
+            expired === true && !panelOpen() && C.sbAdminSession === null && el('sbTenantListBody').innerHTML === ''
+            && K.log.fetches.slice(fIdle).some((f) => /\/auth\/v1\/logout$/.test(f.url)) && K.log.toasts.length === tIdle + 1
+            && /ចូល/.test(K.log.toasts[tIdle] || '') && K.log.alerts.length === aIdle, { expired, toasts: K.log.toasts.slice(tIdle), fetches: K.log.fetches.slice(fIdle).map((f) => f.url) });
+        ok('ក្រោយផុត ➜ ហៅម្តងទៀតមិនធ្វើអ្វី (គ្មាន toast ស្ទួន)', expire() === false && K.log.toasts.length === tIdle + 1);
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        idleBy(-1000);
+        activity();
+        ok('សកម្មភាពដំបូងក្រោយស្ងៀមលើស ១៥ នាទី (ភ្ញាក់ពីការដេក) ➜ ផុតមុន មិនពន្យារ session ចាស់', C.sbAdminSession === null && !panelOpen());
+        const visBlock = (src.match(/document\.addEventListener\('visibilitychange', \(\) => \{[\s\S]*?\n {4}\}\);/g) || []).join('\n');
+        ok('init ៖ setInterval(expireIdleSbAdmin) · visibilitychange ➜ expireIdleSbAdmin() · pointerdown/keydown ➜ sbAdminActivity',
+            /setInterval\(expireIdleSbAdmin, \d+\)/.test(src) && /expireIdleSbAdmin\(\);/.test(visBlock)
+            && /addEventListener\('pointerdown', sbAdminActivity, /.test(src) && /addEventListener\('keydown', sbAdminActivity, /.test(src));
         ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
     } catch (e) {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));

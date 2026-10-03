@@ -130,10 +130,15 @@ scenario('Firebase example config អានដោយ validator ពិត', () =>
             check('Backup example ៖ ' + key + ' ត្រូវនឹង default ពិត', actual === fallback);
         }
     }
-    check('Backup example ៖ សោទុកក្នុង secrets/ និងគ្មាន private key ក្នុង config',
+    const firebaseTargets = config.businesses.filter((b) => b.type !== 'supabase');
+    const supabaseTargets = config.businesses.filter((b) => b.type === 'supabase');
+    check('Backup example ៖ សោទុកក្នុង secrets/ និងគ្មាន private key/secret key ក្នុង config',
         config.backupDir === './backups'
-        && config.businesses.every((b) => /^\.\/secrets\/[^/\\]+\.json$/.test(b.serviceAccountPath))
-        && !/PRIVATE KEY|private_key|client_secret|access_token/.test(JSON.stringify(config)));
+        && firebaseTargets.length >= 2 && firebaseTargets.every((b) => /^\.\/secrets\/[^/\\]+\.json$/.test(b.serviceAccountPath))
+        && supabaseTargets.every((b) => /^\.\/secrets\/[^/\\]+\.key$/.test(b.secretKeyPath) && !('secretKey' in b))
+        && !/PRIVATE KEY|private_key|client_secret|access_token|sb_secret_|service_role/.test(JSON.stringify(config)));
+    check('Backup example ៖ មាន target Supabase (url ឆ្លង normalizeSupabaseUrl ពិត)', supabaseTargets.length >= 1
+        && supabaseTargets.every((b) => { try { return !!require(path.join(ROOT, 'firebase-backup/supabase.js')).normalizeSupabaseUrl(b.url); } catch (e) { return false; } }));
 });
 
 scenario('npm lock ត្រូវនឹង package និង dependency graph', () => {

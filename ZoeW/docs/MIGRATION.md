@@ -26,7 +26,7 @@
 
 App នេះ **ជំនួសថត `ZoeW/` ដោយផ្ទាល់** ➜ Netlify site `zoew` ដដែល (base directory
 **`ZoeW`** — ⛔ ប្រកាន់អក្សរតូចធំ) តែឥឡូវ build តាម `ZoeW/netlify.toml` ៖
-`npm run build` ➜ publish `dist` · Functions `netlify/functions` · Node 22។
+`npm run build` ➜ publish `dist` · Functions `netlify/functions` · Node 24។
 env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល — គ្មានការចម្លង។
 
 ### ដំណាក់ ១ — Deploy preview របស់ branch (មុន merge)

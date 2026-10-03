@@ -6,6 +6,9 @@
 //     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
 //   · Edge Function ៖ POST /functions/v1/<name> ➜ handler ដែលអ្នកហៅផ្តល់ (ឬ 404)
 //   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()`
+//   · Secret key (`opts.secretKey` · `sb_secret_…` ក្នុង header `apikey` តែប៉ុណ្ណោះ) ឬ JWT role service_role ➜ role `service_role` ·
+//     `sb_secret_…` ខុស ➜ 401 ដូច gateway · `setRpcHook(fn)` ៖ `fn({ fn, body, phase: 'before' | 'after' })` ➜ `'drop'` (បិទ socket ·
+//     phase after = commit រួចតែចម្លើយបាត់) · `'hang'` (មិនឆ្លើយ) · `{ status, body }` (ចម្លើយក្លែង មុន SQL) · ផ្សេង ➜ ធម្មតា
 // ⛔ Realtime (websocket) មិនធ្វើត្រាប់ ➜ adapter ត្រូវធ្លាក់ចុះទៅការទាញតាមវដ្ត/`goOnline()` (ការវាស់នោះជាផ្នែកនៃតេស្ត)។
 'use strict';
 
@@ -32,9 +35,19 @@ function verifyJwt(token, secret, nowSec) {
     return { ok: true, claims };
 }
 
+// PostgREST បញ្ជូន timestamptz តាម JSON របស់ Postgres (microsecond · `T` · `+00:00`) ➜ client ដែលបញ្ជូនតម្លៃនោះត្រឡប់ (CAS) ស្មើពិតប្រាកដ។
+// node-pg លំនាំដើមបំប្លែងជា Date (millisecond) ➜ fake ក្លាយជាបាត់ microsecond ➜ ផ្តល់ `pgTypes` ដើម្បីធ្វើត្រាប់ PostgREST។
+function postgrestTimestamptz(text) {
+    const iso = String(text).replace(' ', 'T');
+    return /[+-]\d\d$/.test(iso) ? iso + ':00' : iso;
+}
+
 async function startFakeSupabase(opts) {
     const secret = opts.jwtSecret || crypto.randomBytes(32).toString('hex');
     const pool = opts.pool;
+    const rowTypes = opts.pgTypes
+        ? { getTypeParser: (oid, format) => (oid === 1184 ? postgrestTimestamptz : opts.pgTypes.getTypeParser(oid, format)) }
+        : undefined;
     const users = new Map();
     const refreshTokens = new Map();
     const requests = [];
@@ -42,6 +55,7 @@ async function startFakeSupabase(opts) {
     let mode = 'ok';
     let tokenTtlSec = opts.tokenTtlSec || 3600;
     let expireBefore = 0;
+    let rpcHook = null;
     const signatures = new Map();
     const sockets = new Set();
 
@@ -85,15 +99,27 @@ async function startFakeSupabase(opts) {
     async function rpc(req, res, fn, body) {
         const auth = String(req.headers.authorization || '');
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        const apikey = String(req.headers.apikey || '');
         let role = 'anon';
         let claims = { role: 'anon' };
-        if (token && token.split('.').length === 3) {
+        if (/^sb_secret_/.test(apikey)) {
+            if (!opts.secretKey || apikey !== opts.secretKey) return send(res, 401, { message: 'Invalid API key', hint: 'Double check your Supabase API key.' });
+            if (!token || token === apikey) {
+                role = 'service_role';
+                claims = { role: 'service_role' };
+            }
+        }
+        if (role !== 'service_role' && token && token.split('.').length === 3) {
             const v = verifyJwt(token, secret, Math.floor(Date.now() / 1000));
             if (!v.ok) return send(res, 401, { code: v.code, message: v.code === 'PGRST303' ? 'JWT expired' : 'JWSError', details: null, hint: null });
             if (v.claims.iat < expireBefore) return send(res, 401, { code: 'PGRST303', message: 'JWT expired', details: null, hint: null });
             claims = v.claims;
-            role = v.claims.role === 'authenticated' ? 'authenticated' : 'anon';
+            role = v.claims.role === 'authenticated' ? 'authenticated' : v.claims.role === 'service_role' ? 'service_role' : 'anon';
         }
+        const before = rpcHook ? await rpcHook({ fn, body, phase: 'before' }) : null;
+        if (before === 'drop') { req.socket.destroy(); return; }
+        if (before === 'hang') return;
+        if (before && typeof before === 'object') return send(res, before.status, before.body);
         const sig = await signatureOf(fn);
         if (!sig) return send(res, 404, { code: 'PGRST202', message: 'Could not find the function public.' + fn, details: null, hint: null });
         const args = body && typeof body === 'object' ? body : {};
@@ -114,15 +140,18 @@ async function startFakeSupabase(opts) {
             await c.query('begin');
             await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
             await c.query('set local role ' + role);
-            const r = await c.query(sql, params);
+            const r = await c.query({ text: sql, values: params, types: rowTypes });
             await c.query('commit');
             if (mode === 'drop-response') { req.socket.destroy(); return; }
+            const after = rpcHook ? await rpcHook({ fn, body, phase: 'after', result: r.rows }) : null;
+            if (after === 'drop') { req.socket.destroy(); return; }
+            if (after === 'hang') return;
             if (sig.setof) return send(res, 200, r.rows);
             if (sig.composite) return send(res, 200, r.rows[0] && Object.values(r.rows[0]).some((v) => v !== null) ? r.rows[0] : null);
             return send(res, 200, r.rows[0] ? r.rows[0].r : null);
         } catch (e) {
             try { await c.query('rollback'); } catch (x) {}
-            const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : e.code === '23505' ? 409 : 400);
+            const status = e.code === '42501' ? (role === 'anon' ? 401 : 403) : (e.code === 'P0002' ? 404 : e.code === '23505' ? 409 : e.code === '57014' ? 500 : 400);
             return send(res, status, { code: e.code || '', message: e.message, details: e.detail || null, hint: null });
         } finally {
             c.release();
@@ -155,7 +184,7 @@ async function startFakeSupabase(opts) {
             await c.query('begin');
             await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
             await c.query('set local role ' + role);
-            const r = await c.query('select ' + cols.join(', ') + ' from public.' + table + order);
+            const r = await c.query({ text: 'select ' + cols.join(', ') + ' from public.' + table + order, types: rowTypes });
             await c.query('commit');
             return send(res, 200, r.rows);
         } catch (e) {
@@ -173,7 +202,8 @@ async function startFakeSupabase(opts) {
             let body = null;
             try { body = data ? JSON.parse(data) : null; } catch (e) { body = null; }
             const u = new URL(req.url, 'http://x');
-            requests.push({ method: req.method, path: u.pathname, search: u.search, body });
+            requests.push({ method: req.method, path: u.pathname, search: u.search, body,
+                keyHash: req.headers.apikey ? crypto.createHash('sha256').update(String(req.headers.apikey)).digest('hex').slice(0, 16) : '' });
             if (req.method === 'OPTIONS') return send(res, 204);
             if (mode === 'down') { req.socket.destroy(); return; }
             if (mode === 'hang') return;
@@ -228,6 +258,7 @@ async function startFakeSupabase(opts) {
         requests,
         addUser,
         setMode(next) { mode = next; },
+        setRpcHook(fn) { rpcHook = typeof fn === 'function' ? fn : null; },
         setTokenTtl(sec) { tokenTtlSec = sec; },
         expireTokens() { expireBefore = Math.floor(Date.now() / 1000) + 1; },
         close() {

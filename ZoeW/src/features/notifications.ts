@@ -2,11 +2,12 @@ import { getServerNow } from '../core/clock';
 import { getZoneDateKey } from '../core/timezone';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
-import { DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../core/text';
+import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../core/text';
 import { APP_VERSION } from '../core/version';
 import { elapsedSince } from '../core/elapsed';
-import { barcodeAbandonIsRipe, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { barcodeAbandonIsRipe, barcodeEntriesOf, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { LICENSE_APP_CODE } from './license';
+import { trashReasonOf } from './trash';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
@@ -25,6 +26,25 @@ export interface NotifyView {
     packages: number;
     customers: number;
     rows: NotifyExpiryRow[];
+    more: number;
+}
+
+export interface NotifyRemovedRow {
+    key: string;
+    phone: string;
+    locker: string;
+    count: number;
+    hoursAgo: number;
+    isNew: boolean;
+}
+
+export interface NotifyRemovedView {
+    measurable: boolean;
+    emptyText: string;
+    packages: number;
+    customers: number;
+    unseen: number;
+    rows: NotifyRemovedRow[];
     more: number;
 }
 
@@ -59,6 +79,11 @@ export const NOTIFY_SELLER_CACHE_KEY = 'zoew_notify_seller_v1';
 export const NOTIFY_SELLER_ID_PREFIX = 'kg:';
 export const NOTIFY_SELLER_TITLE_MAX = 120;
 export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
+export const NOTIFY_REMOVED_REASON = 'expired';
+export const NOTIFY_REMOVED_LIST_MAX = 60;
+export const NOTIFY_REMOVED_SEEN_KEY = 'zoew_notify_removed_seen_v1';
+export const NOTIFY_REMOVED_SEEN_MAX = 300;
+export const NOTIFY_EMPTY_REMOVED_TEXT = 'គ្មានកញ្ចប់ដែលប្រព័ន្ធដកចេញព្រោះផុតកំណត់ក្នុងធុងសំរាមទេ';
 
 export function hoursUntilAbandon(barcode, parentAt, now) {
     if (!barcode || barcode.isClosed) return -1;
@@ -160,6 +185,52 @@ export function nearExpiryView(history, now, stale): NotifyView {
 export function refreshNotifyView() {
     const stale = !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY);
     uiState.notifyView = nearExpiryView(dataState.scanHistory, getServerNow(), stale);
+    refreshNotifyRemovedView();
+}
+
+export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView {
+    const list = Array.isArray(deleted) ? deleted : [];
+    const seenSet = new Set(Array.isArray(seen) ? seen : []);
+    const rows: (NotifyRemovedRow & { at: number })[] = [];
+    const phones = new Set();
+    let packages = 0;
+    let unseen = 0;
+    for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        if (!item || typeof item !== 'object' || !item.id) continue;
+        if (trashReasonOf(item) !== NOTIFY_REMOVED_REASON || item.restoreClaim) continue;
+        const entries = barcodeEntriesOf(item.barcodes);
+        const count = entries.length || 1;
+        let locker = '';
+        for (let j = 0; j < entries.length && !locker; j++) {
+            const b = entries[j].barcode;
+            if (b && b.locker && b.locker !== 'N/A') locker = String(b.locker);
+        }
+        if (!locker && item.locker && item.locker !== 'N/A') locker = String(item.locker);
+        const at = parseFloat(item.deletedAt) || 0;
+        const key = String(item.id);
+        const isNew = !seenSet.has(key);
+        const phone = String(item.phone || '');
+        packages += count;
+        if (isNew) unseen += count;
+        phones.add(phone);
+        rows.push({ key, phone, locker, count, at, isNew, hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
+    }
+    rows.sort((a, b) => b.at - a.at || b.count - a.count);
+    return {
+        measurable: !stale,
+        emptyText: stale ? VIEW_NOT_MEASURABLE_NOTICE : emptyViewMessage([DB_LISTENER_KEY_DELETED], NOTIFY_EMPTY_REMOVED_TEXT),
+        packages: stale ? 0 : packages,
+        customers: stale ? 0 : phones.size,
+        unseen: stale ? 0 : unseen,
+        rows: stale ? [] : rows.slice(0, NOTIFY_REMOVED_LIST_MAX).map(({ at, ...row }) => row),
+        more: stale ? 0 : Math.max(0, rows.length - NOTIFY_REMOVED_LIST_MAX)
+    };
+}
+
+export function refreshNotifyRemovedView() {
+    const stale = !firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED);
+    uiState.notifyRemovedView = removedParcelsView(dataState.deletedItems, getServerNow(), stale, uiState.notifyRemovedSeenIds);
 }
 
 export function parseVersion(v) {
@@ -291,6 +362,22 @@ export function dismissNotifyFeed(): number {
     return ids.length;
 }
 
+export function loadNotifyRemovedSeen() {
+    const raw = readJson(NOTIFY_REMOVED_SEEN_KEY);
+    uiState.notifyRemovedSeenIds = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(-NOTIFY_REMOVED_SEEN_MAX) : [];
+}
+
+export function markNotifyRemovedSeen() {
+    const view = uiState.notifyRemovedView;
+    if (!view || !view.measurable) return;
+    const fresh = view.rows.filter((row) => row.isNew).map((row) => row.key);
+    if (!fresh.length) return;
+    const merged = uiState.notifyRemovedSeenIds.filter((id) => fresh.indexOf(id) === -1).concat(fresh).slice(-NOTIFY_REMOVED_SEEN_MAX);
+    uiState.notifyRemovedSeenIds = merged;
+    safeStoreSet(appLocalStore, NOTIFY_REMOVED_SEEN_KEY, JSON.stringify(merged));
+    refreshNotifyRemovedView();
+}
+
 export function loadNotifySeen() {
     const list = readJson(NOTIFY_SEEN_KEY);
     uiState.notifySeenIds = Array.isArray(list) ? list.filter((x) => typeof x === 'string').slice(-NOTIFY_SEEN_MAX) : [];
@@ -315,9 +402,10 @@ export function unseenFeedCount(items, seen) {
     return (Array.isArray(items) ? items : []).filter((it) => it && !seenSet.has(it.id)).length;
 }
 
-export function notifyBadgeCount(view, items, seen) {
+export function notifyBadgeCount(view, items, seen, removed?) {
     const expiring = view && view.measurable ? Number(view.packages) || 0 : 0;
-    return expiring + unseenFeedCount(items, seen);
+    const removedNew = removed && removed.measurable ? Number(removed.unseen) || 0 : 0;
+    return expiring + removedNew + unseenFeedCount(items, seen);
 }
 
 export function markNotifyFeedSeen() {
@@ -398,6 +486,7 @@ export function openNotifyDrawer() {
 
 export function initNotifications() {
     loadNotifySeen();
+    loadNotifyRemovedSeen();
     loadNotifyDismissed();
     loadCachedNotifyFeed();
     loadCachedSellerNotices();

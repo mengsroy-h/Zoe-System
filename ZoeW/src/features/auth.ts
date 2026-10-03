@@ -11,6 +11,7 @@ import { clearCustomerDataTableCache } from './customer-table';
 import { proceedAfterLogin } from './license';
 import { applyCurrentFilter } from './monthly-report';
 import { forgetRememberedLogin, loginBackendScope, rememberLogin } from './login-memory';
+import { forgetLoginPassword, rememberLoginPassword, rememberPasswordPrefIsOff, setRememberPasswordPref } from './password-memory';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
 import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
@@ -95,16 +96,18 @@ export function loginWithFirebase() {
     const email = fieldValue('loginEmailInput').trim();
     const password = fieldValue('loginPasswordInput');
     const rememberMe = fieldChecked('rememberMeCheckbox');
+    const rememberPassword = fieldChecked('rememberPasswordCheckbox');
 
     if (!email || !password) {
         alert(viewState.backendKind === 'supabase' ? "សូមបញ្ចូល ឈ្មោះគណនី និង ពាក្យសម្ងាត់!" : "សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
         return;
     }
 
-    performLogin(email, password, rememberMe);
+    setRememberPasswordPref(rememberPassword);
+    performLogin(email, password, rememberMe, rememberPassword);
 }
 
-export function performLogin(email, password, rememberMe) {
+export function performLogin(email, password, rememberMe, rememberPassword = !rememberPasswordPrefIsOff()) {
     if (!firebaseState.auth || viewState.loginBusy) return;
     viewState.loginBusy = true;
 
@@ -123,6 +126,8 @@ export function performLogin(email, password, rememberMe) {
             } else {
                 forgetRememberedLogin();
             }
+            if (rememberMe && rememberPassword) rememberLoginPassword(email, password, scopeAtLogin);
+            else forgetLoginPassword();
             clearPendingInvite();
 
             if (firebaseState.authGeneration === generationAtLogin && userCredential && userCredential.user) {

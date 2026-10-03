@@ -10,6 +10,7 @@ import { hasPendingInvite, routePendingInvite } from './account';
 import { cancelPendingLookupUnlock, clearLookupStatus } from './auto-lookup';
 import { isPinFlowPending } from './config';
 import { forgetRememberedLogin, loginBackendScope, rememberedLoginFor } from './login-memory';
+import { forgetLoginPassword, prefillRememberedPassword } from './password-memory';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { expandedTrashGroups } from './locker';
@@ -20,6 +21,7 @@ import { ztoListSignedProbe } from './zto-list-sync';
 import { clearZtoPickupStatusStore } from './zto-status';
 import { DB_OP_TIMEOUT_MS, withTimeout } from '../services/network';
 import { resetScanConfirm } from '../services/scan-engine';
+import { forgetSupabaseDocsCache } from '../services/supabase-docs-cache';
 import { showAppChrome } from '../ui/chrome-autohide';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { endPanelGlideSnapPause } from '../app/behaviors/panel-motion';
@@ -39,7 +41,10 @@ export const TRASH_WRITE_SLOW_NOTICE_MS = 15000;
 
 export function clearRememberedSession(keepEmail) {
     safeStoreRemove(appLocalStore, 'zoew_login_time');
-    if (!keepEmail) forgetRememberedLogin();
+    if (!keepEmail) {
+        forgetRememberedLogin();
+        forgetLoginPassword();
+    }
     clearZtoPickupStatusStore();
 }
 
@@ -134,6 +139,7 @@ export function clearSensitiveModalFields() {
     cancelPendingLookupUnlock();
     clearLookupStatus();
     clearSheetImportSession();
+    void forgetSupabaseDocsCache();
     uiState.pendingLockerCode = null;
     uiState.lockerBarcodeIndex = {};
     dataState.recentPhonesSignature = null;
@@ -178,6 +184,7 @@ export function clearSensitiveModalFields() {
     uiState.monthlyReportMonth = '';
     uiState.notifyDrawerOpen = false;
     uiState.notifyView = null;
+    uiState.notifyRemovedView = null;
 }
 
 export function showLoginModalWithPrefill() {
@@ -198,5 +205,6 @@ export function showLoginModalWithPrefill() {
         setFieldValue('loginEmailInput', '');
     }
     loginPrefillScope = scope;
+    prefillRememberedPassword(savedEmail, scope);
     if (viewState.backendKind === 'supabase' && hasPendingInvite()) routePendingInvite();
 }

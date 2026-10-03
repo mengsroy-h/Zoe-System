@@ -6,6 +6,7 @@ import { DB_LISTENER_KEYS, DB_LISTENER_KEY_DAILY_COLLECTED, DB_LISTENER_KEY_DAIL
 import { generateUniqueId, normalizeBarcodesOf, parseTimestampFromId } from '../domain/barcode';
 import { runAutomaticDeletedCleanup } from '../domain/cleanup';
 import { flushPendingRegistryReleases } from '../domain/registry';
+import { refreshNotifyRemovedView } from '../features/notifications';
 import { RECENT_PHONES_MAX, collectPhoneSuggestions } from '../features/phone-suggest';
 import { DB_LISTENER_PROGRESS_GRACE_MS, DB_LISTENER_RETRY_MIN_GAP_MS, LISTENER_RECOVERY_STEPS_MS, clearInfoListenerRecovery, clearReconnectWatchdog, renderConnectionStatus } from './connection';
 import { debouncedRenderAfterHistorySync } from './network';
@@ -280,6 +281,7 @@ export function initDatabaseListeners() {
         });
         noteDbListenerAlive('deleted');
         runAutomaticDeletedCleanup();
+        refreshNotifyRemovedView();
     }, (err) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
         handleDbListenerError(err, DB_LISTENER_KEY_DELETED);

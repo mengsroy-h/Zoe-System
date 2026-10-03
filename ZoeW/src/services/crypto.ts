@@ -1,6 +1,7 @@
 import { securityState } from '../core/state';
 import { LOOKUP_KEY_DB_NAME } from '../core/storage-keys';
 import { appLockShouldArm } from '../features/app-lock';
+import { openIdbStore } from '../core/idb-store';
 
 export async function hashPinLegacy(pin) {
     const enc = new TextEncoder().encode(pin);
@@ -65,33 +66,7 @@ export function lookupKeyDbDeadline(done) {
 }
 
 export function openLookupKeyDb() {
-    return new Promise((resolve) => {
-        let settled = false;
-        const done = (value) => { if (!settled) { settled = true; resolve(value); } };
-        if (!lookupKeyDbDeadline(done)) { done(null); return; }
-        try {
-            const factory = lookupKeyDbFactory();
-            if (!factory) { done(null); return; }
-            const req = factory.open(LOOKUP_KEY_DB_NAME, 1);
-            req.onupgradeneeded = () => {
-                try {
-                    const db = req.result;
-                    if (db && !db.objectStoreNames.contains(LOOKUP_KEY_STORE)) db.createObjectStore(LOOKUP_KEY_STORE);
-                } catch (e) { done(null); }
-            };
-            req.onsuccess = () => {
-                if (settled) {
-                    try { req.result.close(); } catch (e) { }
-                    return;
-                }
-                done(req.result || null);
-            };
-            req.onerror = () => done(null);
-            req.onblocked = () => done(null);
-        } catch (e) {
-            done(null);
-        }
-    });
+    return openIdbStore(LOOKUP_KEY_DB_NAME, LOOKUP_KEY_STORE, lookupKeyDbFactory, lookupKeyDbDeadline);
 }
 
 export function lookupKeyDbRun(mode, action) {

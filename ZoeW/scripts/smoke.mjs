@@ -84,6 +84,30 @@ const syntaxOk = targetYears.length >= 2 && ecmaVersion >= 2015 && syntaxFiles.l
 if (syntaxOk) console.log(`✅ syntax ក្នុង build ស្ថិតក្នុង ES${ecmaVersion} (${syntaxFiles.length} ឯកសារ)`);
 else console.log('⛔ syntax ក្នុង build លើស target ឬវាស់មិនបាន ៖ ' + JSON.stringify({ targetYears, syntaxFiles: syntaxFiles.length, syntaxBad }));
 
+/* ⛔ chunk `supabase-backend` (~២៤០ KB) ទាញតែលើឧបករណ៍ដែលប្រើ Supabase (សេចក្តីសម្រេចម្ចាស់គម្រោង) ៖ build ផលិតកម្មពិតត្រូវដាក់វាក្នុងក្រុម
+ *    `__BACKEND_SHELL__` (មិនមែន `CORE_SHELL`) ហើយគ្មាន chunk ណា import វាដោយផ្ទាល់ (ហាង Firebase ក្រៅបណ្តាញមិនត្រូវការវា)។
+ *    build វាស់ (expose-globals import វាដោយផ្ទាល់) ដាក់វាក្នុង core ដោយត្រឹមត្រូវ ➜ ការចាក់សោនេះរស់តែលើ build ផលិតកម្ម។ */
+const backendFiles = fs.readdirSync(ASSETS).filter((f) => /^supabase-backend-[^/]+\.js$/.test(f));
+const swArrays = [];
+(function walkSw(n) {
+    if (!n || typeof n.type !== 'string') return;
+    if (n.type === 'ArrayExpression' && n.elements.length && n.elements.every((e) => e && e.type === 'Literal' && typeof e.value === 'string')) swArrays.push(n.elements.map((e) => e.value));
+    for (const v of Object.values(n)) {
+        if (Array.isArray(v)) v.forEach(walkSw);
+        else if (v && typeof v === 'object' && typeof v.type === 'string') walkSw(v);
+    }
+})(fs.existsSync(path.join(DIST, 'sw.js')) ? parse(fs.readFileSync(path.join(DIST, 'sw.js'), 'utf8'), { ecmaVersion: 'latest' }) : null);
+const swCore = swArrays.find((a) => a.includes('./index.html')) || [];
+const swBackend = swArrays.find((a) => a.length === backendFiles.length && a.every((u) => backendFiles.includes(u.replace(/^\.\/assets\//, '')))) || [];
+const staticBackendImporters = fs.readdirSync(ASSETS).filter((f) => f.endsWith('.js')).filter((f) => {
+    const text = fs.readFileSync(path.join(ASSETS, f), 'utf8');
+    return backendFiles.some((b) => new RegExp('(?:from|import)\\s*["\'`]\\./' + b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\'`]').test(text));
+});
+const swSplitOk = backendFiles.length === 1 && swCore.length >= 5 && swBackend.length === 1
+    && !swCore.some((u) => /supabase-backend-/.test(u)) && staticBackendImporters.length === 0;
+if (swSplitOk) console.log('✅ chunk Supabase នៅក្រុម install ដាច់ (ហាង Firebase មិនទាញ) · គ្មាន import ផ្ទាល់ ៖ ' + backendFiles[0]);
+else console.log('⛔ chunk Supabase ចូល CORE_SHELL ឬមាន import ផ្ទាល់ ៖ ' + JSON.stringify({ backendFiles, core: swCore.filter((u) => /supabase/.test(u)), swBackend, staticBackendImporters }));
+
 /* ⛔ design token CSS (`--x: value`) ត្រូវទៅដល់ browser ដូចដែលសរសេរ ៖ minifier ខ្លះ (Lightning CSS ដែលជា
  *    លំនាំដើមរបស់ Vite) សរសេរតម្លៃឡើងវិញ (`#0066FF` ➜ `#06f` · `rgba(…)` ➜ `#0000000d`) និងរៀបលំដាប់
  *    declaration — ក្នុង CSS ដែលគ្រប PTR · ចលនាផ្ទាំង ខណៈ checker CSS វាស់ CSS **ប្រភព** មិនមែន CSS ដែល ship។
@@ -166,4 +190,4 @@ else console.log('⛔ SDK Firebase ៖ ' + JSON.stringify({ sdkOnSupabase, sdkOn
 
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk || !scrollRateOk || !sdkGateOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !swSplitOk || !tokenOk || !jankOk || !scrollRateOk || !sdkGateOk ? 1 : 0);

@@ -264,6 +264,61 @@ async function body(c, rec, extra) {
     const stale = await pull(A.who, 1);
     rec('cursor ចាស់ជាង purged_seq ➜ reset (client មិនបាត់ការលុប)', stale.reset === true, { reset: stale.reset, seq: stale.seq });
 
+    const pullFull = async (who, since, limit, fullHead) => {
+        const r = await as(c, who, 'select public.zoe_pull($1, $2, $3) as r', [since, limit, fullHead]);
+        return r.rows ? r.rows[0].r : r;
+    };
+    for (let i = 0; i < 6; i++) await write(A.who, [{ k: 'set', p: [REG, 'FS' + i], v: true }]);
+    const purgedNow = Number((await c.query('select purged_seq from public.zoe_tenant_state where tenant_id = $1', [A.id])).rows[0].purged_seq);
+    const oneShot = await pull(A.who, 0, 5000);
+    const wantKeys = oneShot.rows.map((r) => r.r + '/' + r.k).sort();
+    const FS_PAGE = 2;
+    const firstPage = await pull(A.who, 0, FS_PAGE);
+    rec('មុនលក្ខខណ្ឌ ៖ ទាញពេញច្រើនទំព័រ · purged_seq លើសព្រំទំព័រទី ១ (ករណីដែលធ្លាប់វិលចាប់ផ្តើមម្តងទៀត)',
+        wantKeys.length > FS_PAGE * 3 && firstPage.more === true && firstPage.seq < purgedNow, { n: wantKeys.length, first: firstPage.seq, purgedNow });
+    const keyOf = (r) => r.r + '/' + r.k;
+    const fullSync = async (deleteAfterFirst) => {
+        const have = new Map();
+        let since = 0;
+        let fullHead = null;
+        const trail = [];
+        for (let page = 0; page < wantKeys.length + 4; page++) {
+            const res = await pullFull(A.who, since, FS_PAGE, fullHead);
+            if (!res || !Array.isArray(res.rows)) return { error: res, trail };
+            trail.push({ since, seq: res.seq, reset: res.reset, head: res.head, n: res.rows.length });
+            if (res.reset) { have.clear(); fullHead = typeof res.head === 'number' ? res.head : null; }
+            for (const row of res.rows) {
+                if (row.v === null) have.delete(keyOf(row));
+                else have.set(keyOf(row), row.v);
+            }
+            since = res.seq;
+            if (page === 0 && deleteAfterFirst) await write(A.who, [{ k: 'set', p: [res.rows[0].r, res.rows[0].k], v: null }]);
+            if (!res.more) return { keys: [...have.keys()].sort(), trail, pages: page + 1 };
+        }
+        return { stuck: true, trail };
+    };
+    const fs1 = await fullSync(false);
+    rec('ទាញពេញជាទំព័រ ពេល purged_seq លើសព្រំទំព័រ ➜ បញ្ចប់ (មិនវិលចាប់ផ្តើមម្តងទៀតរហូត) · ទទួល doc រស់គ្រប់ ស្មើការទាញម្តង',
+        !!fs1.keys && JSON.stringify(fs1.keys) === JSON.stringify(wantKeys) && fs1.pages <= Math.ceil(wantKeys.length / FS_PAGE) + 1, fs1);
+    rec('ទាញពេញជាទំព័រ ➜ reset តែទំព័រទី ១ (ទំព័របន្តមិនលុបអ្វីដែលបានទទួល)',
+        !!fs1.trail && fs1.trail.length > 1 && fs1.trail[0].reset === true && fs1.trail.slice(1).every((t) => t.reset === false), fs1.trail);
+    const victim = firstPage.rows[0].r + '/' + firstPage.rows[0].k;
+    const fs2 = await fullSync(true);
+    rec('doc នៅទំព័រទី ១ ត្រូវលុបកណ្តាលការទាញពេញ ➜ tombstone មកក្នុងទំព័របន្ត (client មិនរក្សា doc ដែលលុបហើយ)',
+        !!fs2.keys && !fs2.keys.includes(victim) && JSON.stringify(fs2.keys) === JSON.stringify(wantKeys.filter((k) => k !== victim)), { victim, fs2 });
+    const headNow = (await pull(A.who, 0, 1)).head;
+    const badHead = await pullFull(A.who, firstPage.seq, FS_PAGE, purgedNow - 1);
+    rec('p_full_head ចាស់ជាង purged_seq ➜ reset (មិនជឿការបន្តដែលអាចខកខានការលុប)', !!badHead && badHead.reset === true, badHead);
+    const futureHead = await pullFull(A.who, firstPage.seq, FS_PAGE, Number(headNow) + 1000);
+    rec('p_full_head ធំជាង head ➜ reset', !!futureHead && futureHead.reset === true, futureHead);
+    const tenantA = await pull(A.who, 0, 2);
+    const tenantB = await pull(B.who, 0, 2);
+    const tenantEmpty = await pull(A.who, Number(headNow), 2);
+    rec('pull ប្រាប់ tenant របស់អ្នកហៅ (cache ផ្ទៀងហាងមុនប្រើ delta) · ទំព័រទទេក៏ប្រាប់',
+        tenantA.tenant === A.id && tenantB.tenant === B.id && tenantEmpty.tenant === A.id, { a: tenantA.tenant, b: tenantB.tenant, e: tenantEmpty.tenant });
+    const legacy = await pull(A.who, 0, 5000);
+    rec('client ចាស់ (zoe_pull ២ argument) នៅដំណើរការ', !!legacy && Array.isArray(legacy.rows) && legacy.rows.length > 0 && legacy.reset === true, legacy && legacy.seq);
+
     const topicA = 'zoe:' + A.id;
     const msgs = (await c.query("select topic, payload from realtime.messages where topic = $1 order by inserted_at", [topicA])).rows;
     rec('broadcast ៖ រាល់ការសរសេរដែលប្រែ ➜ សារ topic zoe:<tenant> មាន seq', msgs.length >= 5 && msgs.every((m) => typeof m.payload.seq === 'number'), msgs.length);
@@ -407,12 +462,16 @@ const MUTATIONS = [
     ['មិន enforce rules', "    if p_enforce then\n        rules := private.zoe_rules();", "    if false then\n        rules := private.zoe_rules();"],
     ['tombstone មិនបាន seq ថ្មី (delta ខកខានការលុប)', "            set value = excluded.value, seq = excluded.seq, updated_at = excluded.updated_at;",
         "            set value = excluded.value, seq = case when excluded.value is null then z.seq else excluded.seq end, updated_at = excluded.updated_at;"],
-    ['pull ពី 0 រួម tombstone', "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq and (not full_sync or d.value is not null);",
-        "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq;"],
-    ['pull មិន reset លើ cursor ចាស់ជាង purge', "    if since < 0 or since > head or (since > 0 and since < purged) then", "    if since < 0 or since > head then"],
-    ['paging កាត់ក្រុម seq', "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq and (not full_sync or d.value is not null);",
-        "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq and (not full_sync or d.value is not null)\n"
+    ['pull ពី 0 រួម tombstone', "    if full_sync then\n        full_head := head;\n    end if;\n", ''],
+    ['pull មិន reset លើ cursor ចាស់ជាង purge', "(since > 0 and since < purged and full_head is null)", "(false)"],
+    ['paging កាត់ក្រុម seq', "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq\n        and (d.value is not null or d.seq > tomb_after);",
+        "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq\n        and (d.value is not null or d.seq > tomb_after)\n"
         + "        and (d.root, d.key) in (select d2.root, d2.key from public.zoe_docs d2 where d2.tenant_id = tenant and d2.seq > since order by d2.seq, d2.key limit lim);"],
+    ['ទាញពេញជាទំព័រមិនស្គាល់ p_full_head (វិលចាប់ផ្តើមម្តងទៀតពេល purge)', "since < purged and full_head is null)", "since < purged)"],
+    ['ជឿ p_full_head ចាស់ជាង purged_seq', "(since <= 0 or full_head < purged or full_head > head)", "(since <= 0 or full_head > head)"],
+    ['ទំព័របន្តមិនបញ្ជូន tombstone ក្រោយការទាញចាប់ផ្តើម', "tomb_after := case when full_head is null then since else full_head end;", "tomb_after := case when full_head is null then since else head end;"],
+    ['ទំព័រ reset មិនបញ្ជូន head', "'head', head, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);", "'head', null, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);"],
+    ['pull បញ្ជូន tenant ខុស (cache ហាងផ្សេងអាចចូល)', "'head', head, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);", "'head', head, 'tenant', null, 'now', private.zoe_now_ms(), 'rows', rows_out);"],
     ['housekeeping មិនកត់ purged_seq', "        update public.zoe_tenant_state s set purged_seq = greatest(s.purged_seq, purged) where s.tenant_id = p_tenant;\n", ''],
     ['គ្មាន tenant lock (for update)', "    select s.seq into head from public.zoe_tenant_state s where s.tenant_id = tenant for update;",
         "    select s.seq into head from public.zoe_tenant_state s where s.tenant_id = tenant;"],

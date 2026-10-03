@@ -1,8 +1,8 @@
 # Firebase Backup Tool
 
 Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime Database របស់ជំនួញនីមួយៗ (ZoeW)
-ព្រមទាំង Project License របស់ ZoeKeyGen ទៅជា File JSON (Compress ជា `.gz`) ដាក់ក្នុងម៉ាស៊ីន
-ក្នុងស្រុក ជាទៀងទាត់ដោយស្វ័យប្រវត្តិ (តាម Task Scheduler/Cron)។ នេះជា **Script ដាច់ដោយឡែក** ដំណើរការ
+ព្រមទាំង Project License របស់ ZoeKeyGen **និងហាងទាំងអស់ក្នុង Supabase Project** ទៅជា File JSON (Compress ជា `.gz`)
+ដាក់ក្នុងម៉ាស៊ីនក្នុងស្រុក ជាទៀងទាត់ដោយស្វ័យប្រវត្តិ (តាម Task Scheduler/Cron)។ នេះជា **Script ដាច់ដោយឡែក** ដំណើរការ
 ដោយអ្នកគ្រប់គ្រង (Vendor) ខ្លួនឯង — មិនមែនផ្នែកមួយនៃ App ទាំង ២ ទេ។
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
@@ -27,6 +27,21 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 ទាំង ២ ប្រើ `backup.js` ដដែល។ របៀប GitHub Actions បន្ថែម **ការអ៊ិនគ្រីប**
 (`crypt.js`) ព្រោះ artifact ដេកនៅលើ server របស់អ្នកដទៃ។
 
+### Target ២ ប្រភេទ
+
+| ប្រភេទ | អ្វីដែលត្រូវ backup | ឯកសារលទ្ធផល |
+|---|---|---|
+| Firebase (លំនាំដើម) | Realtime Database ទាំងមូលនៃ Project មួយ (ជំនួញមួយ ឬ Project License) | `<name>/<ពេល>-<ចៃដន្យ>.json.gz` |
+| Supabase (`"type": "supabase"`) | **ហាងនីមួយៗ** ក្នុង Project ដាច់ពីគ្នា (តាម RPC `zoe_admin_tenants` · `zoe_admin_export` របស់ migration) | `<name>/<tenant-id>/<ពេល>-<ចៃដន្យ>.json.gz` |
+
+ឯកសារហាង Supabase មួយ = JSON ៖ `{"format": "zoe-supabase-tenant", "version": 1, "manifest": {…}, "data": {…}}` ៖
+
+- `data` ៖ មែកធាងរូបរាងដូច **Firebase RTDB export របស់ហាងមួយ** (`{"<root>": {"<key>": <តម្លៃ>}}`) — record ដែលលុបរួចមិនរួម។
+- `manifest` ៖ `tenant` (id · ឈ្មោះ · លេខសាខា · ថ្ងៃផុត · បិទ/បើក) · `seq` (ចំណុច snapshot) · `docs` · `roots` (ចំនួនតាម root) · `exported_at` · `source`។
+- ⛔ គ្មានគណនី · ពាក្យសម្ងាត់ · hash កូដអញ្ជើញ/កូដប្តូរពាក្យសម្ងាត់ · secret key។
+- ការ export តាមទំព័រមានព្រំដែន (ជួរ · byte) ហើយត្រឹមត្រូវទោះហាងកំពុងប្រើ ៖ ទិន្នន័យស្មើស្ថានភាពហាងនៅទំព័រចុងក្រោយ។
+- ស្តារ/ផ្ទេរ ៖ CLI [`tools/supabase-migrate/`](../tools/supabase-migrate/README.md) (ទទួលឯកសារ `.json.gz` និង `.enc` ផ្ទាល់)។
+
 ### ហេតុអ្វីត្រូវការ
 
 ទិន្នន័យអាជីវកម្ម (Parcel/Revenue/COD/DOD) ទាំងអស់ស្ថិតនៅតែក្នុង Firebase តែមួយកន្លែងក្នុងមួយជំនួញ។
@@ -43,6 +58,9 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 (`fetch`, `AbortController`, `crypto`) និង **គ្មាន third-party runtime dependency** ទេ —
 មិនចាំបាច់ `npm install`។
 
+**Supabase** ៖ Project ត្រូវមាន migration ទាំងអស់ក្នុង [`supabase/migrations/`](../supabase/migrations) (RPC `zoe_admin_tenants` ·
+`zoe_admin_export`) ➜ [`supabase/README.md`](../supabase/README.md) ជំហានទី ២។
+
 ### ជំហានទី ២ — យក Service Account Key (សម្រាប់ជំនួញនីមួយៗ)
 
 សម្រាប់ Firebase Project នីមួយៗដែលចង់ Backup (ជំនួញនីមួយៗ + Project License របស់ ZoeKeyGen)៖
@@ -53,6 +71,10 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 3. ដាក់ File នេះទុកក្នុង folder `firebase-backup/secrets/` (Folder នេះមិនត្រូវបាន Commit ចូល Git ទេ
    ដោយសារ `.gitignore` — សូមកុំផ្លាស់ប្តូរ `.gitignore` ដើម្បីអនុញ្ញាតវា Key ទាំងនេះជា Credential ពិត
    មិនមែន Firebase Config ធម្មតាទេ — បើលេចធ្លាយ អាចអានសរសេរទិន្នន័យទាំងអស់បាន)
+
+**Supabase (secret key)** ៖ Supabase Dashboard ➜ **Project Settings ➜ API Keys ➜ Secret keys** ➜ បង្កើតសោថ្មី **សម្រាប់ backup តែប៉ុណ្ណោះ**
+(ឧ. `zoe-backup`) ➜ ដាក់វាក្នុង File មួយក្នុង `secrets/` (ឧ. `secrets/supabase-secret.key` · បន្ទាត់តែមួយ)។ ⛔ Publishable key ប្រើមិនបាន
+(script បដិសេធ)។
 
 ### ជំហានទី ៣ — កំណត់រចនាសម្ព័ន្ធ
 
@@ -84,6 +106,9 @@ cp config.example.json config.json
   ដើម្បីកុំឲ្យ Disk ពេញ។ បើ Run ជារៀងរាល់ថ្ងៃ 30 មានន័យថារក្សាទុកបាន ១ខែ។ ត្រូវជាចំនួនគត់ចាប់ពី 1 ឡើងទៅ —
   បើដាក់តម្លៃមិនត្រឹមត្រូវ (0, អវិជ្ជមាន, ឬមិនមែនលេខ) Script បញ្ឈប់ភ្លាមដោយបង្ហាញកំហុស ជាជាងលុបទិន្នន័យខុស។
 - `name` — ប្រើជាឈ្មោះថតលទ្ធផលផងដែរ ដូច្នេះអនុញ្ញាតតែ អក្សរឡាតាំង/លេខ/`.`/`-`/`_` ប៉ុណ្ណោះ។
+- **Supabase Project** ៖ Object `{"name": "…", "type": "supabase", "url": "https://<ref>.supabase.co", "secretKeyPath": "./secrets/…key"}`
+  (មើល `config.example.json`) ➜ ហាងទាំងអស់ក្នុង Project ត្រូវ backup ម្តងមួយ ហើយ `keepCount` រាប់ក្នុងមួយហាង។ `url` ត្រូវជា HTTPS
+  (HTTP តែ `127.0.0.1`/`localhost` សម្រាប់ Supabase CLI ក្នុងស្រុក)។
 - `requestTimeoutMs` — ពិដានពេលក្នុង request នីមួយៗ រហូតអាន JSON body ពេញ (លំនាំដើម 120 វិនាទី)។ HTTP បដិសេធក៏បិទ body ដែលនៅសល់ ដើម្បីឲ្យ process ចេញបាន។
 - `retryCount` និង `retryDelayMs` — retry សម្រាប់ timeout, 408/429/5xx ដោយ exponential backoff;
   កំហុស 401/403 មិន retry ទេ។
@@ -110,7 +135,8 @@ All 2 backup(s) completed.
 ```
 
 បើជំនួញណាមួយបរាជ័យ Script នៅតែបន្តទៅជំនួញបន្ទាប់ (មិនឈប់ទាំងស្រុង) ហើយចប់ដោយ Exit code មិនមែន 0
-ដើម្បីឲ្យ Task Scheduler/Cron ដឹងថាមានបញ្ហា។
+ដើម្បីឲ្យ Task Scheduler/Cron ដឹងថាមានបញ្ហា។ Target Supabase ៖ បន្ទាត់ `[OK]` មួយក្នុងមួយហាង · ហាងមួយធ្លាក់ (ឧ. បណ្តាញព្យួរ)
+មិនបញ្ឈប់ហាងផ្សេង ➜ `[FAIL]` រាយ id ហាងដែលធ្លាក់។
 
 ### ជំហានទី ៥ — កំណត់ឲ្យ Run ស្វ័យប្រវត្តិជាប្រចាំ
 
@@ -146,7 +172,7 @@ Actions ➜ New repository secret** ៖
 | `ZOE_BACKUP_TARGETS` | JSON array (ទម្រង់ខាងក្រោម) |
 | `ZOE_BACKUP_PASSPHRASE` | ពាក្យសម្ងាត់ **យ៉ាងតិច ១៦ តួ** — រក្សាទុកក្រៅ GitHub |
 
-ទម្រង់ `ZOE_BACKUP_TARGETS` — **មួយ Object ក្នុងមួយ Firebase Project** ៖
+ទម្រង់ `ZOE_BACKUP_TARGETS` — **មួយ Object ក្នុងមួយ Firebase Project · មួយ Object ក្នុងមួយ Supabase Project** ៖
 
 ```json
 [
@@ -159,12 +185,19 @@ Actions ➜ New repository secret** ៖
     "name": "zoekeygen-license",
     "databaseURL": "https://yyy-default-rtdb.firebaseio.com",
     "serviceAccount": { "client_email": "...", "private_key": "...", "token_uri": "..." }
+  },
+  {
+    "type": "supabase",
+    "name": "supabase-shops",
+    "url": "https://<ref>.supabase.co",
+    "secretKey": "sb_secret_..."
   }
 ]
 ```
 
 `serviceAccount` ជាខ្លឹមសារ File JSON ដែលទាញពី Firebase Console (ជំហានទី ២)
-ដាក់ចូលទាំងស្រុង — ឬជា String មួយក៏បាន។ `name` អនុញ្ញាតតែអក្សរឡាតាំង/លេខ/`.`/`-`/`_`។
+ដាក់ចូលទាំងស្រុង — ឬជា String មួយក៏បាន។ `secretKey` ជា Secret key របស់ Supabase (ជំហានទី ២) ៖ `ci-config.js` សរសេរវាចូល
+`secrets/<name>.key` (mode 0600) ក្រៅ checkout ហើយ workflow លុបវាចោលដូចសោ Firebase។ `name` អនុញ្ញាតតែអក្សរឡាតាំង/លេខ/`.`/`-`/`_`។
 
 ⛔ **ពាក្យសម្ងាត់នេះជាកូនសោតែមួយ** — បើភ្លេច នោះ backup ទាំងអស់លែងបើកបាន។
 GitHub មិនអាចប្រាប់វាមកវិញទេ។ សូមរក្សាទុកក្នុងកន្លែងផ្សេង (Password Manager)។
@@ -182,12 +215,14 @@ zoe-backup-<run_id>/
   biz-a/2026-09-04T19-00-00-000Z-a1b2c3.json.gz.enc
   biz-b/2026-09-04T19-00-05-000Z-d4e5f6.json.gz.enc
   zoekeygen-license/2026-09-04T19-00-08-000Z-778899.json.gz.enc
+  supabase-shops/<tenant-id-ហាង-1>/2026-09-04T19-00-10-000Z-aabbcc.json.gz.enc
+  supabase-shops/<tenant-id-ហាង-2>/2026-09-04T19-00-11-000Z-ddeeff.json.gz.enc
 ```
 
 អាជីវកម្មមួយធ្លាក់ (សោខូច · Project ត្រូវលុប) **មិនបញ្ឈប់អាជីវកម្មផ្សេងទេ** —
 `backup.js` បន្តទៅ Project បន្ទាប់ ហើយ backup **ដែលជោគជ័យនៅតែត្រូវរក្សាទុក
 ជា artifact ដដែល**។ បន្ទាប់មក job ទើបក្លាយជា **ក្រហម** ➜ GitHub ផ្ញើ Email
-ប្រាប់អ្នក។ សូមមើល log ជំហាន «ទាញទិន្នន័យពី Firebase» ដើម្បីដឹងថាមួយណាធ្លាក់។
+ប្រាប់អ្នក។ សូមមើល log ជំហាន «ទាញទិន្នន័យពី Firebase · Supabase» ដើម្បីដឹងថាមួយណាធ្លាក់។
 
 តែមានព្រំដែន **ពិត ២** ដែលត្រូវសម្រេចជាមុន ៖
 
@@ -242,12 +277,18 @@ Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោ�
 **សូមប្រុងប្រយ័ត្នខ្លាំង** — Import នៅ root អាចសរសេរជាន់/លុបទិន្នន័យបច្ចុប្បន្ន។ សាកល្បងលើ
 Firebase project បណ្ដោះអាសន្នសិន ហើយបិទការសរសេររបស់ App មុន restore production។
 
+**ហាង Supabase** ៖ ប្រើ CLI [`tools/supabase-migrate/`](../tools/supabase-migrate/README.md) — dry-run មុន រួច
+`--apply --replace` ទៅហាងដដែល (ឬ `--apply` ទៅហាងថ្មីទទេ)។ CLI ទទួល `.json.gz.enc` ផ្ទាល់ (`ZOE_BACKUP_PASSPHRASE`) ហើយផ្ទៀងផ្ទាត់ហាងទាំងមូលក្រោយសរសេរ។
+
 ---
 
 ## ប្រព័ន្ធសុវត្ថិភាព
 
 - **Service-account key ជា credential ពិត** — `config.json` · `secrets/` និង
   `backups/` ស្ថិតក្នុង `.gitignore`។ ⛔ កុំ commit វា។
+- **Secret key របស់ Supabase មានសិទ្ធិពេញលើគ្រប់ហាង** (Supabase គ្មានសោអានតែម្យ៉ាង) ➜ បង្កើតសោដាច់សម្រាប់ backup ដើម្បីលុបវាបានដោយមិនប៉ះ
+  Edge Function · វាផ្ញើតែក្នុង header `apikey` លើ HTTPS · មិនដែលបោះពុម្ព · មិនសរសេរចូល backup ឬ config (ផ្ទុកតែផ្លូវ `secretKeyPath`)។
+- **RPC export ជា service_role តែប៉ុណ្ណោះ** ៖ anon/authenticated ហៅ `zoe_admin_tenants` · `zoe_admin_export` មិនបាន ➜ ហាងមួយមិនអាចទាញទិន្នន័យហាងផ្សេង។
 - **ការសរសេរជា atomic** — សរសេរទៅ `.partial` រួច `renameSync()` ចូលកន្លែង ➜
   ការរត់ដែលដាច់ពាក់កណ្តាល **មិនបន្សល់ `.json.gz` កាត់ខ្លី** ដែលមើលទៅដូច
   backup ល្អទេ។

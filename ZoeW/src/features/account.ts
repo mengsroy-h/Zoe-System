@@ -6,6 +6,7 @@ import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { performLogin } from './auth';
 import { rememberedLoginFor } from './login-memory';
+import { forgetLoginPassword, syncRememberPasswordBox } from './password-memory';
 import { showToast } from '../ui/toast';
 
 export const ACCOUNT_USERNAME_RE = /^[a-z0-9_.]{3,32}$/;
@@ -20,6 +21,7 @@ export const ACCOUNT_REPLY_TEXT = {
     'password-weak': 'ពាក្យសម្ងាត់នេះខ្សោយពេក ឬធ្លាប់លេចធ្លាយលើអ៊ីនធឺណិត — សូមជ្រើសពាក្យសម្ងាត់ផ្សេង (លាយអក្សរ និងលេខ)',
     'username-taken': 'ឈ្មោះគណនីនេះមានគេប្រើរួច — សូមជ្រើសឈ្មោះផ្សេង',
     'reset-code-invalid': 'កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ ប្រើរួច ឬផុតកំណត់ — សូមសុំកូដថ្មីពីអ្នកលក់',
+    'password-reset-unknown': 'មិនទាន់ដឹងលទ្ធផលនៃការប្តូរពាក្យសម្ងាត់ — សូមសាកចូលដោយពាក្យសម្ងាត់ថ្មីជាមុន។ បើចូលមិនបាន សូមទាក់ទងអ្នកលក់ដើម្បីសុំកូដថ្មី',
     'registration-unknown': 'មិនដឹងថាការចុះឈ្មោះបានសម្រេចឬអត់ — សូមសាកចូលប្រព័ន្ធដោយឈ្មោះ និងពាក្យសម្ងាត់ដដែល មុនចុះឈ្មោះម្តងទៀត',
     'registration-incomplete': 'ការចុះឈ្មោះមិនពេញលេញ — សូមទាក់ទងអ្នកលក់',
     'account-invalid': 'គណនីនេះមិនត្រឹមត្រូវ — សូមទាក់ទងអ្នកលក់',
@@ -192,8 +194,13 @@ async function callAccountFunction(kind, body) {
         const out = res && res.body && typeof res.body === 'object' ? res.body : {};
         return { ok: out.ok === true, code: typeof out.code === 'string' ? out.code : (res && res.status === 429 ? 'rate-limited' : 'bad-response') };
     } catch (e) {
-        return { ok: false, code: 'network' };
+        if (!accountCallTimedOut(e)) return { ok: false, code: 'network' };
+        return { ok: false, code: kind === 'register' ? 'registration-unknown' : 'password-reset-unknown' };
     }
+}
+
+function accountCallTimedOut(e) {
+    return !!e && e.message === 'timeout';
 }
 
 export function openRegisterForm() {
@@ -217,6 +224,7 @@ export function openResetPasswordForm() {
 export function backToLoginForm() {
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
 }
 
 export async function submitRegisterForm(event?) {
@@ -244,7 +252,7 @@ export async function submitRegisterForm(event?) {
             await noteInviteUsed(invite, currentSupabaseScope());
             if (normalizeInviteText(pendingInvite) === normalizeInviteText(invite)) clearPendingInvite();
         }
-        alert('ការចុះឈ្មោះមិនជោគជ័យ៖ ' + accountReplyText(reply.code));
+        alert((reply.code === 'registration-unknown' ? '' : 'ការចុះឈ្មោះមិនជោគជ័យ៖ ') + accountReplyText(reply.code));
         return;
     }
     await noteInviteUsed(invite, currentSupabaseScope());
@@ -255,6 +263,7 @@ export async function submitRegisterForm(event?) {
     setFieldValue('registerInviteInput', '');
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
     showToast('✅ ចុះឈ្មោះជោគជ័យ! កំពុងចូលប្រព័ន្ធ...');
     performLogin(username, password, true);
 }
@@ -278,14 +287,16 @@ export async function submitResetPasswordForm(event?) {
         viewState.loginBusy = false;
     }
     if (!reply.ok) {
-        alert('ប្តូរពាក្យសម្ងាត់មិនបាន៖ ' + accountReplyText(reply.code));
+        alert((reply.code === 'password-reset-unknown' ? '' : 'ប្តូរពាក្យសម្ងាត់មិនបាន៖ ') + accountReplyText(reply.code));
         return;
     }
+    forgetLoginPassword();
     setFieldValue('resetCodeInput', '');
     setFieldValue('resetPasswordInput', '');
     setFieldValue('resetPasswordConfirmInput', '');
     viewState.loginMode = 'login';
     commitNow();
+    syncRememberPasswordBox();
     setFieldValue('loginEmailInput', username);
     showToast(reply.code === 'password-reset-incomplete'
         ? '✅ បានប្តូរពាក្យសម្ងាត់ — ឧបករណ៍ចាស់ខ្លះអាចនៅចូលបានរហូតដល់វាចាកចេញ'

@@ -1,4 +1,5 @@
 import { SbIncrement, SbNetworkError, SbRpcError, createSupabaseDatabase } from './supabase-rtdb';
+import { createIdbDocsCache } from './supabase-docs-cache';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
@@ -48,6 +49,11 @@ export function authErrorMessage(error) {
     return 'ចូលប្រព័ន្ធមិនបានទេ (' + (code || status || 'unknown') + ')';
 }
 
+export function docsCacheScope(app, uid) {
+    const url = app && app.options && typeof app.options.supabaseUrl === 'string' ? app.options.supabaseUrl.replace(/\/+$/, '') : '';
+    return url && uid ? url + '|' + uid : null;
+}
+
 function makeUser(auth, session) {
     const user: any = {
         uid: session.user.id,
@@ -85,7 +91,7 @@ function createAuth(app, env) {
         } else {
             auth.currentUser = makeUser(auth, session);
         }
-        if (app._db) app._db.setAuthed(true);
+        if (app._db) app._db.setAuthed(true, docsCacheScope(app, auth.currentUser.uid));
     };
     const accountOf = async () => {
         const rows = await transport.rpc('my_account', {}, 20000);
@@ -261,8 +267,9 @@ export function createSupabaseSdk(makeTransport, env) {
                     onSynced: () => { if (app._auth && app._auth.currentUser && !app._tenantTopic) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
                     onTxOutcomeUnknown: env.onTxOutcomeUnknown
-                }, env.dbOptions);
-                app._db.setAuthed(!!(app._auth && app._auth.currentUser));
+                }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache }, env.dbOptions));
+                const user = app._auth && app._auth.currentUser;
+                app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);
                 if (typeof window !== 'undefined' && window && typeof window.addEventListener === 'function') {
                     const onOnline = () => { if (app._db) app._db.onBrowserOnline(); };

@@ -6,7 +6,9 @@
 // ⛔ អ្វីដែលវាស់ ៖
 //   ១. កូដអញ្ជើញ/កូដកំណត់ពាក្យសម្ងាត់ថ្មី ៖ normalize · hash (prefix ដាច់ពីគ្នា)
 //   ២. លំហូរចុះឈ្មោះ/កំណត់ពាក្យសម្ងាត់ ៖ លំដាប់ការហៅ (គ្មានការបង្កើតគណនីមុនកូដអញ្ជើញឆ្លង) · rollback តែលើ
-//      ការបដិសេធច្បាស់ · **លទ្ធផលមិនដឹង ➜ មិនលុបគណនី** · ការព្យាយាមម្តងទៀតលើ RPC idempotent
+//      ការបដិសេធច្បាស់ · **លទ្ធផលមិនដឹង ➜ មិនលុបគណនី** · ការព្យាយាមម្តងទៀតលើ RPC idempotent ·
+//      **កូដប្រើរួចដោយការចុះឈ្មោះនេះ** (App អស់ពេលរង់ចាំ ខណៈ Server ចុះឈ្មោះរួច) ➜ 200 ដោយពាក្យសម្ងាត់ដដែល · មិនស៊ីកូដម្តងទៀត ·
+//      sign-in តែលើកូដដែល DB ថាប្រើរួចដោយ username នោះ (កូដមិនធ្លាប់មាន ➜ 403 គ្មាន sign-in) · ពាក្យសម្ងាត់ខុស/គណនីផ្សេង ➜ 403
 //   ៣. HTTP ៖ CORS តាម origin · 405/413/400/503 · កំហុសខាងក្នុងមិនលេចក្នុងចម្លើយ
 //   ៤. **ស្នាមភ្ជាប់ពិត** ៖ supabase-js ពិត (កំណែ pin) ទល់នឹងម៉ាស៊ីនមេក្លែង GoTrue/PostgREST ➜ ឈ្មោះ argument RPC ស្មើ SQL
 //      ពិត (PostgREST ផ្គូផ្គងតាមឈ្មោះ) · header ដែល SDK ផ្ញើ ⊂ Access-Control-Allow-Headers (preflight)
@@ -48,7 +50,7 @@ function finish() {
     console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
     process.exitCode = fail === 0 ? 0 : 1;
 }
-const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '');
+const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n') : '');
 const depPath = (rel) => DEPS_DIRS.map((d) => path.join(d, rel)).find((p) => fs.existsSync(p)) || null;
 
 const KEY = 'sb_secret_' + 'k'.repeat(40);
@@ -84,9 +86,11 @@ function fakeDeps(over) {
             return queue || { ok: true, tenantId: 't-1', role: 'member' };
         },
         deleteUser: async (id) => { log.push(['delete', id]); return over && 'deleted' in over ? over.deleted : true; },
-        resetCodeUser: async (u, h) => { log.push(['check', u, h]); return over && 'member' in over ? over.member : 'user-9'; },
+        passwordUserId: async (email, pw) => { log.push(['signin', email, pw]); return over && 'owner' in over ? over.owner : null; },
+        spentInviteMember: async (h, u) => { log.push(['spent', h, u]); return over && 'spent' in over ? over.spent : null; },
+        claimResetCode: async (u, h, id) => { log.push(['check', u, h, id]); return over && Array.isArray(over.members) ? over.members.shift() : over && 'member' in over ? over.member : 'user-9'; },
         updatePassword: async (id, pw) => { log.push(['update', id, pw]); return over && over.update ? over.update : 'ok'; },
-        consumeResetCode: async (u, h) => { log.push(['consume', u, h]); return over && 'consumed' in over ? over.consumed : true; },
+        settleResetCode: async (u, h, id, consumed) => { log.push([consumed ? 'consume' : 'release', u, h, id]); return over && 'consumed' in over ? over.consumed : true; },
         revokeSessions: async (id) => { log.push(['revoke', id]); return over && 'revoked' in over ? over.revoked : true; },
         loginDomain: 'u.zoew.invalid'
     };
@@ -147,16 +151,71 @@ async function groupAccount(m, rec) {
     rec('ពិនិត្យកូដ ៖ ខុសទម្រង់ ➜ 400 invite-invalid · មិនប៉ះ DB', r.status === 400 && r.body.code === 'invite-invalid' && f.log.length === 0, { r, log: f.kinds() });
     f = fakeDeps({ usable: false });
     r = await A.handleRegister(REG, f.deps);
-    rec('ចុះឈ្មោះ ៖ កូដអញ្ជើញប្រើមិនបាន ➜ 403 · មិនបង្កើតគណនី', r.status === 403 && r.body.code === 'invite-invalid' && f.kinds() === 'usable', { r, log: f.kinds() });
+    const spentAsk = f.log.find((x) => x[0] === 'spent');
+    rec('ចុះឈ្មោះ ៖ កូដអញ្ជើញប្រើមិនបាន ➜ សួរ DB ថាកូដប្រើរួចដោយ username នេះឬអត់ (hash · username តូច) ➜ មិនមែន ➜ 403 · ⛔ មិនផ្ទៀងពាក្យសម្ងាត់ (កូដមិនធ្លាប់មាន ➜ គ្មាន sign-in) · មិនបង្កើតគណនី',
+        r.status === 403 && r.body.code === 'invite-invalid' && f.kinds() === 'usable,spent' && !!spentAsk && spentAsk[1] === wantHash && spentAsk[2] === 'sokha', { r, log: f.log });
+    const SPENT = { userId: 'user-old', tenantId: 't-old', role: 'owner' };
+    f = fakeDeps({ usable: false, spent: SPENT, owner: 'user-old' });
+    r = await A.handleRegister(REG, f.deps);
+    const spentSignin = f.log.find((x) => x[0] === 'signin');
+    rec('ចុះឈ្មោះ ៖ កូដប្រើរួចដោយការចុះឈ្មោះនេះ (App អស់ពេលរង់ចាំ) + ពាក្យសម្ងាត់ត្រូវ ➜ 200 registered · tenant/role របស់សមាជិក · ⛔ មិន create មិន finish (កូដមិនស៊ីម្តងទៀត)',
+        r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-old' && r.body.role === 'owner' && f.kinds() === 'usable,spent,signin'
+        && !!spentSignin && spentSignin[1] === 'sokha@u.zoew.invalid' && spentSignin[2] === 'secret-pass', { r, log: f.log });
+    for (const [label, owner, status, code] of [['ពាក្យសម្ងាត់ខុស', null, 403, 'invite-invalid'], ['ពាក្យសម្ងាត់ជារបស់គណនីផ្សេង', 'user-other', 403, 'invite-invalid'],
+        ['Auth មិនឆ្លើយ', undefined, 502, 'auth-unavailable']]) {
+        f = fakeDeps({ usable: false, spent: SPENT, owner });
+        r = await A.handleRegister(REG, f.deps);
+        rec('ចុះឈ្មោះ ៖ កូដប្រើរួច + ' + label + ' ➜ ' + status + ' ' + code + ' · tenant មិនលេច · មិន create/finish/delete',
+            r.status === status && r.body.code === code && r.body.tenantId === undefined && r.body.role === undefined && f.kinds() === 'usable,spent,signin', { r, log: f.kinds() });
+    }
+    f = fakeDeps({ usable: false, spent: undefined, owner: 'user-old' });
+    r = await A.handleRegister(REG, f.deps);
+    rec('ចុះឈ្មោះ ៖ កូដប្រើមិនបាន + DB មិនឆ្លើយពេលសួរអ្នកប្រើកូដ ➜ 502 db-unavailable (⛔ មិនមែន «កូដខុស») · មិនផ្ទៀងពាក្យសម្ងាត់',
+        r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'usable,spent', { r, log: f.kinds() });
     f = fakeDeps({ usable: null });
     r = await A.handleRegister(REG, f.deps);
     rec('ចុះឈ្មោះ ៖ DB មិនឆ្លើយពេលពិនិត្យកូដ ➜ 502 · មិនបង្កើតគណនី', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'usable', { r, log: f.kinds() });
-    const createCases = [['exists', 409, 'username-taken'], ['weak', 400, 'password-weak'], ['unavailable', 502, 'auth-unavailable']];
-    for (const [reason, status, code] of createCases) {
+    const createCases = [['exists', 409, 'username-taken', 'usable,create,signin'], ['weak', 400, 'password-weak', 'usable,create'],
+        ['unavailable', 502, 'auth-unavailable', 'usable,create']];
+    for (const [reason, status, code, kinds] of createCases) {
         f = fakeDeps({ created: { ok: false, reason } });
         r = await A.handleRegister(REG, f.deps);
-        rec('ចុះឈ្មោះ ៖ createUser ' + reason + ' ➜ ' + status + ' ' + code, r.status === status && r.body.code === code && f.kinds() === 'usable,create', { r, log: f.kinds() });
+        rec('ចុះឈ្មោះ ៖ createUser ' + reason + ' ➜ ' + status + ' ' + code + ' (' + kinds + ')', r.status === status && r.body.code === code && f.kinds() === kinds, { r, log: f.kinds() });
     }
+    const EXISTS = { ok: false, reason: 'exists' };
+    f = fakeDeps({ created: EXISTS, owner: 'user-old' });
+    r = await A.handleRegister(REG, f.deps);
+    const signin = f.log.find((x) => x[0] === 'signin');
+    const resumed = f.log.find((x) => x[0] === 'finish');
+    rec('បន្តចុះឈ្មោះ ៖ គណនីមានរួច + ពាក្យសម្ងាត់ត្រូវ ➜ finish លើ user id ដែល Auth បញ្ជាក់ ➜ 200 registered',
+        r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-1' && f.kinds() === 'usable,create,signin,finish'
+        && !!signin && signin[1] === 'sokha@u.zoew.invalid' && signin[2] === 'secret-pass' && !!resumed && resumed[1].userId === 'user-old', { r, log: f.log });
+    f = fakeDeps({ created: EXISTS, owner: undefined });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ Auth មិនឆ្លើយពេលផ្ទៀងពាក្យសម្ងាត់ ➜ 502 auth-unavailable · មិន finish · មិនលុប',
+        r.status === 502 && r.body.code === 'auth-unavailable' && f.kinds() === 'usable,create,signin', { r, log: f.kinds() });
+    for (const [reason, status, code] of [['invite-invalid', 403, 'invite-invalid'], ['username-taken', 409, 'username-taken'], ['account-invalid', 400, 'account-invalid']]) {
+        f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: { ok: false, reason } });
+        r = await A.handleRegister(REG, f.deps);
+        const kinds = 'usable,create,signin,finish' + (reason === 'invite-invalid' ? ',spent' : '');
+        rec('បន្តចុះឈ្មោះ ៖ finish ' + reason + ' ➜ ' + status + ' · ⛔ មិនលុបគណនីដែលសំណើនេះមិនបានបង្កើត (' + kinds + ')',
+            r.status === status && r.body.code === code && f.kinds() === kinds, { r, log: f.kinds() });
+    }
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: { ok: false, reason: 'invite-invalid' }, spent: { userId: 'user-old', tenantId: 't-old', role: 'member' } });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ សំណើមុនស៊ីកូដចុងក្រោយចំពេល (finish invite-invalid) តែកូដនោះចុះឈ្មោះ user id ដែល Auth បញ្ជាក់ ➜ 200 · ⛔ មិន sign-in ម្តងទៀត',
+        r.status === 200 && r.body.code === 'registered' && r.body.tenantId === 't-old' && r.body.role === 'member' && f.kinds() === 'usable,create,signin,finish,spent', { r, log: f.kinds() });
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: { ok: false, reason: 'invite-invalid' }, spent: { userId: 'user-x', tenantId: 't-x', role: 'member' } });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ finish invite-invalid + កូដចុះឈ្មោះ user id ផ្សេង ➜ 403 · tenant មិនលេច',
+        r.status === 403 && r.body.code === 'invite-invalid' && r.body.tenantId === undefined && f.kinds() === 'usable,create,signin,finish,spent', { r, log: f.kinds() });
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: [{ ok: false, reason: 'unavailable' }, { ok: true, tenantId: 't-3', role: 'member' }] });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ finish មិនដឹងលទ្ធផល ➜ សាកម្តងទៀត ➜ 200', r.status === 200 && r.body.tenantId === 't-3' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
+    f = fakeDeps({ created: EXISTS, owner: 'user-old', finish: [{ ok: false, reason: 'unavailable' }, { ok: false, reason: 'unavailable' }] });
+    r = await A.handleRegister(REG, f.deps);
+    rec('បន្តចុះឈ្មោះ ៖ finish មិនដឹង ២ ដង ➜ 502 registration-unknown · មិនលុប',
+        r.status === 502 && r.body.code === 'registration-unknown' && f.kinds() === 'usable,create,signin,finish,finish', { r, log: f.kinds() });
     const finishCases = [
         ['invite-invalid', 403, 'invite-invalid', true],
         ['username-taken', 409, 'username-taken', true],
@@ -193,7 +252,7 @@ async function groupAccount(m, rec) {
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពិនិត្យដោយ username តូច + hash «zoe-reset:» (មិនមែន hash អញ្ជើញ)', !!chk && chk[1] === 'sokha' && chk[2] === wantReset, chk);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ប្តូរពាក្យសម្ងាត់របស់ user id ដែលកូដចង', !!upd && upd[1] === 'user-9' && upd[2] === 'new-secret', upd);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ លំដាប់ check ➜ update ➜ consume ➜ revoke (កូដមិនស៊ីមុនប្តូរជោគជ័យ)',
-        f.kinds() === 'check,update,consume,revoke' && !!cons && cons[2] === wantReset && JSON.stringify(f.log[3]) === JSON.stringify(['revoke', 'user-9']), f.kinds());
+        f.kinds() === 'check,update,consume,revoke' && !!cons && cons[2] === wantReset && cons[3] === chk[3] && /^[a-f0-9-]{36}$/.test(chk[3]) && JSON.stringify(f.log[3]) === JSON.stringify(['revoke', 'user-9']), f.kinds());
     f = fakeDeps({ revoked: false });
     r = await A.handleResetPassword(RESET, f.deps);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ផ្តាច់ session មិនបាន ➜ សាក ២ ដង ➜ 200 password-reset-incomplete (និយាយការពិត)',
@@ -207,14 +266,22 @@ async function groupAccount(m, rec) {
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ កូដមិនត្រូវនឹង username ➜ 403 reset-code-invalid · មិនប្តូរ', r.status === 403 && r.body.code === 'reset-code-invalid' && f.kinds() === 'check', { r, log: f.kinds() });
     f = fakeDeps({ member: undefined });
     r = await A.handleResetPassword(RESET, f.deps);
-    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ DB មិនឆ្លើយ ➜ 502 · មិនប្តូរ', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'check', { r, log: f.kinds() });
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ DB មិនឆ្លើយ ➜ សាក ២ ដង · 502 · មិនប្តូរ', r.status === 502 && r.body.code === 'db-unavailable' && f.kinds() === 'check,check' && f.log[0][3] === f.log[1][3], { r, log: f.kinds() });
+    f = fakeDeps({ members: [undefined, 'user-9'] });
+    r = await A.handleResetPassword(RESET, f.deps);
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ចម្លើយចាប់កូដបាត់ ➜ សាកដោយ claim ដដែល · ប្តូរម្តង',
+        r.status === 200 && f.kinds() === 'check,check,update,consume,revoke' && f.log[0][3] === f.log[1][3] && f.log[0][3] === f.log[3][3], { r, log: f.kinds() });
     f = fakeDeps({ update: 'weak' });
     r = await A.handleResetPassword(RESET, f.deps);
     rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពាក្យសម្ងាត់ខ្សោយ ➜ 400 password-weak · កូដមិនស៊ី · មិនផ្តាច់ session', r.status === 400 && r.body.code === 'password-weak'
-        && f.kinds() === 'check,update', { r, log: f.kinds() });
+        && f.kinds() === 'check,update,release', { r, log: f.kinds() });
+    f = fakeDeps({ update: 'weak', consumed: false });
+    r = await A.handleResetPassword(RESET, f.deps);
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ពាក្យសម្ងាត់ខ្សោយ តែដោះ claim មិនបាន ➜ 502 password-reset-unknown',
+        r.status === 502 && r.body.code === 'password-reset-unknown' && f.kinds() === 'check,update,release,release', { r, log: f.kinds() });
     f = fakeDeps({ update: 'unavailable' });
     r = await A.handleResetPassword(RESET, f.deps);
-    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ GoTrue មិនឆ្លើយ ➜ 502 · កូដមិនស៊ី (សាកម្តងទៀតបាន)', r.status === 502 && r.body.code === 'auth-unavailable'
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ GoTrue មិនឆ្លើយ ➜ 502 password-reset-unknown · មិនដោះ claim', r.status === 502 && r.body.code === 'password-reset-unknown'
         && f.kinds() === 'check,update', { r, log: f.kinds() });
     const resetEarly = [
         ['body ជា array', [RESET], 'bad-request'],
@@ -228,6 +295,152 @@ async function groupAccount(m, rec) {
         r = await A.handleResetPassword(body, f.deps);
         rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ ' + label + ' ➜ 400 ' + code + ' · មិនប៉ះ DB', r.status === 400 && r.body.code === code && f.log.length === 0, { r, log: f.kinds() });
     }
+}
+
+async function groupResetConcurrency(m, rec) {
+    let used = false;
+    let claim = null;
+    let releaseUpdate;
+    let signalUpdate;
+    const updateGate = new Promise((resolve) => { releaseUpdate = resolve; });
+    const updateStarted = new Promise((resolve) => { signalUpdate = resolve; });
+    const updates = [];
+    const deps = {
+        resetCodeUser: async () => used ? null : 'user-race',
+        claimResetCode: async (username, hash, claimId) => {
+            if (used || (claim !== null && claim !== claimId)) return null;
+            claim = claimId;
+            return 'user-race';
+        },
+        updatePassword: async (userId, password) => {
+            if (password === 'first-password') {
+                signalUpdate();
+                await updateGate;
+            }
+            updates.push(password);
+            return 'ok';
+        },
+        consumeResetCode: async () => { used = true; return true; },
+        settleResetCode: async (username, hash, claimId, consumed) => {
+            if (claim !== claimId) return false;
+            used = consumed;
+            if (!consumed) claim = null;
+            return true;
+        },
+        revokeSessions: async () => true
+    };
+    const body = { username: 'sokha', resetCode: INVITE, password: 'first-password' };
+    const first = m.account.handleResetPassword(body, deps);
+    let second;
+    try {
+        await m.timeout.withTimeout(updateStarted, 1000, 'first-update-not-started');
+        second = await m.timeout.withTimeout(m.account.handleResetPassword({ ...body, password: 'second-password' }, deps), 1000, 'second-reset-hung');
+    } finally {
+        releaseUpdate();
+    }
+    const firstResult = await first;
+    rec('កំណត់ពាក្យសម្ងាត់ថ្មី ៖ កូដតែមួយស្របពេលគ្នា ➜ ប្តូរតែម្តង · សំណើទីពីរបដិសេធមុនប៉ះ Auth',
+        firstResult.status === 200 && second.status === 403 && updates.length === 1 && updates[0] === 'first-password',
+        { firstResult, second, updates });
+}
+
+async function groupRegisterResume(m, rec) {
+    const world = (maxUses) => {
+        const users = new Map();
+        const members = new Map();
+        const w = { users, members, uses: 0, deletes: [], creates: 0, replyLost: 0, signins: 0 };
+        w.deps = {
+            inviteIsUsable: async () => w.uses < maxUses,
+            createUser: async (email, password) => {
+                w.creates++;
+                if (users.has(email)) return { ok: false, reason: 'exists' };
+                const id = 'auth-' + (users.size + 1);
+                users.set(email, { id, password });
+                if (w.replyLost > 0) { w.replyLost--; return { ok: false, reason: 'unavailable' }; }
+                return { ok: true, userId: id };
+            },
+            passwordUserId: async (email, password) => {
+                w.signins++;
+                const u = users.get(email);
+                return u && u.password === password ? u.id : null;
+            },
+            spentInviteMember: async (codeHash, username) => {
+                if (w.uses < maxUses) return null;
+                for (const [userId, m] of members) {
+                    if (m.username === username && m.inviteHash === codeHash && m.tenantId === 't-shop') return { userId, tenantId: m.tenantId, role: m.role };
+                }
+                return null;
+            },
+            finishRegistration: async ({ userId, username, codeHash }) => {
+                const mine = members.get(userId);
+                if (mine) return mine.tenantId === 't-shop' ? { ok: true, tenantId: mine.tenantId, role: mine.role } : { ok: false, reason: 'username-taken' };
+                if ([...members.values()].some((x) => x.username === username)) return { ok: false, reason: 'username-taken' };
+                if (w.uses >= maxUses) return { ok: false, reason: 'invite-invalid' };
+                w.uses++;
+                members.set(userId, { tenantId: 't-shop', username, role: 'member', inviteHash: codeHash });
+                return { ok: true, tenantId: 't-shop', role: 'member' };
+            },
+            deleteUser: async (id) => {
+                w.deletes.push(id);
+                for (const [email, u] of users) if (u.id === id) users.delete(email);
+                return true;
+            },
+            loginDomain: 'u.zoew.invalid'
+        };
+        return w;
+    };
+    const body = { invite: INVITE, username: 'sokha', password: 'secret-pass' };
+    let w = world(1);
+    w.replyLost = 1;
+    const lost = await m.account.handleRegister(body, w.deps);
+    const orphanBefore = w.users.size === 1 && w.members.size === 0 && w.uses === 0;
+    const retry = await m.account.handleRegister(body, w.deps);
+    rec('createUser ឆ្លើយបាត់ (Auth បង្កើតរួច · គ្មានសមាជិកភាព) ➜ សាកម្តងទៀតដោយព័ត៌មានដដែល ➜ 200 registered · គណនីតែ ១ · កូដប្រើ ១ · មិនលុប',
+        lost.status === 502 && lost.body.code === 'auth-unavailable' && orphanBefore
+        && retry.status === 200 && retry.body.code === 'registered' && retry.body.tenantId === 't-shop'
+        && w.users.size === 1 && w.members.size === 1 && w.members.has('auth-1') && w.uses === 1 && w.deletes.length === 0,
+        { lost, retry, users: w.users.size, members: w.members.size, uses: w.uses, deletes: w.deletes });
+    w = world(1);
+    w.replyLost = 1;
+    await m.account.handleRegister(body, w.deps);
+    const stranger = await m.account.handleRegister({ ...body, password: 'other-pass-9' }, w.deps);
+    rec('គណនីពាក់កណ្តាល + ពាក្យសម្ងាត់ផ្សេង ➜ 409 username-taken · មិនចងសមាជិកភាព · មិនលុបគណនីអ្នកដទៃ',
+        stranger.status === 409 && stranger.body.code === 'username-taken' && w.members.size === 0 && w.uses === 0 && w.deletes.length === 0 && w.users.size === 1,
+        { stranger, members: w.members.size, uses: w.uses, deletes: w.deletes });
+    const owner = await m.account.handleRegister(body, w.deps);
+    rec('ម្ចាស់ពិតសាកម្តងទៀតក្រោយអ្នកដទៃ ➜ 200 · សមាជិកភាពចងលើ user id ដើម', owner.status === 200 && w.members.has('auth-1') && w.uses === 1, { owner, uses: w.uses });
+    w = world(3);
+    const done = await m.account.handleRegister(body, w.deps);
+    const again = await m.account.handleRegister(body, w.deps);
+    rec('ចុះឈ្មោះរួច (ចម្លើយបាត់ផ្នែក App) + កូដប្រើបានច្រើនដង ➜ សាកម្តងទៀត ➜ 200 tenant ដដែល · កូដមិនស៊ីលើកទី ២',
+        done.status === 200 && again.status === 200 && again.body.tenantId === 't-shop' && w.uses === 1 && w.members.size === 1 && w.deletes.length === 0,
+        { done, again, uses: w.uses });
+    const taken = await m.account.handleRegister({ ...body, password: 'guess-pass-1' }, w.deps);
+    rec('ឈ្មោះរបស់សមាជិក + ពាក្យសម្ងាត់ខុស ➜ 409 username-taken · tenant មិនលេច', taken.status === 409 && taken.body.code === 'username-taken'
+        && taken.body.tenantId === undefined && w.uses === 1, taken);
+    w = world(1);
+    const sent = await m.account.handleRegister(body, w.deps);
+    const retried = await m.account.handleRegister(body, w.deps);
+    rec('កូដប្រើបានម្តង (max_uses = 1) · Server ចុះឈ្មោះរួច តែ App អស់ពេលរង់ចាំ ➜ សាកម្តងទៀតដោយព័ត៌មានដដែល ➜ 200 registered · tenant/role ដដែល · កូដប្រើ ១ · គណនី ១ · មិនបង្កើតម្តងទៀត · មិនលុប',
+        sent.status === 200 && retried.status === 200 && retried.body.code === 'registered' && retried.body.tenantId === sent.body.tenantId
+        && retried.body.role === sent.body.role && w.uses === 1 && w.users.size === 1 && w.members.size === 1 && w.creates === 1 && w.deletes.length === 0,
+        { sent, retried, uses: w.uses, users: w.users.size, members: w.members.size, creates: w.creates, deletes: w.deletes });
+    const third = await m.account.handleRegister(body, w.deps);
+    rec('កូដប្រើរួច ៖ សាកលើកទី ៣ ➜ 200 ដដែល · កូដនៅប្រើ ១', third.status === 200 && third.body.tenantId === sent.body.tenantId && w.uses === 1 && w.members.size === 1, third);
+    const guessSpent = await m.account.handleRegister({ ...body, password: 'guess-pass-1' }, w.deps);
+    rec('កូដប្រើរួច + username អ្នកប្រើកូដ + ពាក្យសម្ងាត់ខុស ➜ 403 invite-invalid (ដូចកូដប្រើរួចធម្មតា · មិនមែន 409/200) · tenant មិនលេច',
+        guessSpent.status === 403 && guessSpent.body.code === 'invite-invalid' && guessSpent.body.tenantId === undefined && w.uses === 1, guessSpent);
+    const signinsBefore = w.signins;
+    const otherName = await m.account.handleRegister({ ...body, username: 'vanna' }, w.deps);
+    rec('កូដប្រើរួច + username ផ្សេង ➜ 403 · ⛔ មិនបង្កើតគណនី · មិនផ្ទៀងពាក្យសម្ងាត់',
+        otherName.status === 403 && otherName.body.code === 'invite-invalid' && w.creates === 1 && w.users.size === 1 && w.signins === signinsBefore,
+        { otherName, creates: w.creates, signins: w.signins });
+    w.users.set('dara@u.zoew.invalid', { id: 'auth-b', password: 'dara-pass-1' });
+    w.members.set('auth-b', { tenantId: 't-other', username: 'dara', role: 'owner', inviteHash: 'hash-of-other-shop' });
+    const otherShop = await m.account.handleRegister({ ...body, username: 'dara', password: 'dara-pass-1' }, w.deps);
+    rec('កូដប្រើរួច + សមាជិកហាងផ្សេង (ពាក្យសម្ងាត់ត្រឹមត្រូវរបស់គេ) ➜ 403 · ⛔ មិនចងហាងនេះ · role មិនប្តូរ',
+        otherShop.status === 403 && otherShop.body.code === 'invite-invalid' && w.members.get('auth-b').tenantId === 't-other'
+        && w.members.get('auth-b').role === 'owner' && w.uses === 1 && w.members.size === 2, otherShop);
 }
 
 const ENV = {
@@ -332,6 +545,24 @@ async function startMock() {
                 if (email === 'boom@u.zoe.test') return send(500, { message: 'db down' });
                 return send(200, { id: USER_ID, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' });
             }
+            if (req.method === 'POST' && u === '/auth/v1/token') {
+                const email = body && body.email;
+                if (email === 'hang@u.zoe.test') return;
+                if (email === 'boom@u.zoe.test') return send(500, { message: 'db down' });
+                if (email === 'limit@u.zoe.test') return send(429, { code: 'over_request_rate_limit', message: 'rate' }, v2024);
+                if (email === 'unconfirmed@u.zoe.test') return send(400, { code: 'email_not_confirmed', message: 'x' }, v2024);
+                if (email === 'legacy@u.zoe.test') return send(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+                if (!body || body.password !== 'secret-pass') return send(400, { code: 'invalid_credentials', message: 'Invalid login credentials' }, v2024);
+                const exp = Math.floor(Date.now() / 1000) + 3600;
+                const claims = Buffer.from(JSON.stringify({ sub: USER_ID, email, exp, role: 'authenticated', aud: 'authenticated' })).toString('base64url');
+                return send(200, { access_token: 'eyJhbGciOiJIUzI1NiJ9.' + claims + '.sig-' + String(email).split('@')[0], token_type: 'bearer', expires_in: 3600,
+                    expires_at: exp, refresh_token: 'refresh-' + String(email).split('@')[0],
+                    user: { id: USER_ID, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' } });
+            }
+            if (req.method === 'POST' && u === '/auth/v1/logout') {
+                if (String(req.headers.authorization || '').endsWith('.sig-stuck')) return;
+                return send(204);
+            }
             if (req.method === 'DELETE' && u.startsWith('/auth/v1/admin/users/')) {
                 return u.endsWith('/' + FAIL_ID) ? send(500, { message: 'x' }) : send(200, {});
             }
@@ -351,16 +582,24 @@ async function startMock() {
                 if (h === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
                 return send(200, h === 'good');
             }
+            if (req.method === 'POST' && u === '/rest/v1/rpc/spent_invite_member') {
+                const h = body && body.p_code_hash;
+                if (h === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
+                if (h === 'hang') return;
+                if (h === 'odd') return send(200, [{ user_id: 7, tenant_id: 't-1', role: 'member' }]);
+                if (h === 'notarray') return send(200, { user_id: USER_ID, tenant_id: 't-1', role: 'member' });
+                return send(200, h === 'good' && body.p_username === 'sokha' ? [{ user_id: USER_ID, tenant_id: 't-spent', role: 'member' }] : []);
+            }
             if (req.method === 'POST' && u === '/rest/v1/rpc/revoke_user_sessions') {
                 return body && body.p_user_id === FAIL_ID ? send(500, { code: 'XX000', message: 'x', details: null, hint: null }) : send(200, 2);
             }
-            if (req.method === 'POST' && u === '/rest/v1/rpc/reset_code_user') {
+            if (req.method === 'POST' && u === '/rest/v1/rpc/claim_reset_code') {
                 if (body && body.p_username === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
-                return send(200, body && body.p_username === 'sokha' && body.p_code_hash === 'good' ? USER_ID : null);
+                return send(200, body && body.p_username === 'sokha' && body.p_code_hash === 'good' && body.p_claim_id === USER_ID ? USER_ID : null);
             }
-            if (req.method === 'POST' && u === '/rest/v1/rpc/consume_reset_code') {
+            if (req.method === 'POST' && u === '/rest/v1/rpc/settle_reset_code') {
                 if (body && body.p_username === 'err') return send(500, { code: 'XX000', message: 'x', details: null, hint: null });
-                return send(200, !!body && body.p_username === 'sokha');
+                return send(200, !!body && body.p_username === 'sokha' && body.p_claim_id === USER_ID && typeof body.p_consumed === 'boolean');
             }
             if (req.method === 'POST' && u.startsWith('/functions/v1/')) return send(200, { ok: true });
             return send(404, { message: 'no route' });
@@ -412,18 +651,36 @@ async function groupAdapter(m, rec, env) {
     rec('ស្នាមភ្ជាប់ ៖ argument RPC invite_is_usable ស្មើ SQL ពិត', !!ur && !!wantU && JSON.stringify(Object.keys(ur.body).sort()) === JSON.stringify(wantU),
         { sent: ur && Object.keys(ur.body), wantU });
     rec('adapter ៖ invite_is_usable កំហុស ➜ null (មិនមែន false)', (await D.inviteIsUsable('err')) === null);
-    rec('adapter ៖ reset_code_user ➜ id / null', (await D.resetCodeUser('sokha', 'good')) === USER_ID && (await D.resetCodeUser('none', 'good')) === null);
-    const mr = last((x) => x.url === '/rest/v1/rpc/reset_code_user');
-    const wantM = sqlArgs(env.migrationSql, 'reset_code_user');
-    rec('ស្នាមភ្ជាប់ ៖ argument RPC reset_code_user ស្មើ SQL ពិត', !!mr && !!wantM && JSON.stringify(Object.keys(mr.body).sort()) === JSON.stringify(wantM),
+    const spentRow = await D.spentInviteMember('good', 'sokha');
+    rec('adapter ៖ spent_invite_member ➜ {userId, tenantId, role} របស់សមាជិកដែលប្រើកូដ',
+        !!spentRow && spentRow.userId === USER_ID && spentRow.tenantId === 't-spent' && spentRow.role === 'member' && Object.keys(spentRow).length === 3, spentRow);
+    const sr = last((x) => x.url === '/rest/v1/rpc/spent_invite_member');
+    const wantS = sqlArgs(env.migrationSql, 'spent_invite_member');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC spent_invite_member ស្មើ SQL ពិត (' + (wantS || []).join(',') + ') · ផ្ញើ hash + username ដដែល',
+        !!sr && !!wantS && JSON.stringify(Object.keys(sr.body).sort()) === JSON.stringify(wantS) && sr.body.p_code_hash === 'good' && sr.body.p_username === 'sokha'
+        && sr.headers.apikey === KEY, { sent: sr && sr.body, wantS });
+    rec('adapter ៖ spent_invite_member គ្មានជួរ ➜ null', (await D.spentInviteMember('good', 'dara')) === null && (await D.spentInviteMember('bad', 'sokha')) === null);
+    rec('adapter ៖ spent_invite_member កំហុស ➜ undefined (មិនដឹង ≠ «មិនមែនអ្នកប្រើកូដ»)', (await D.spentInviteMember('err', 'sokha')) === undefined);
+    rec('adapter ៖ spent_invite_member ជួរខុសទម្រង់ ឬមិនមែន array ➜ undefined',
+        (await D.spentInviteMember('odd', 'sokha')) === undefined && (await D.spentInviteMember('notarray', 'sokha')) === undefined);
+    const t3 = Date.now();
+    const hungSpent = await m.timeout.withTimeout(D.spentInviteMember('hang', 'sokha'), 3000, 'spent-hung').catch(() => 'hung');
+    rec('adapter ៖ spent_invite_member ព្យួរ ➜ undefined ក្នុងពិដាន (' + (Date.now() - t3) + 'ms)', hungSpent === undefined && Date.now() - t3 < 2000, hungSpent);
+    rec('adapter ៖ claim_reset_code ➜ id / null', (await D.claimResetCode('sokha', 'good', USER_ID)) === USER_ID && (await D.claimResetCode('none', 'good', USER_ID)) === null);
+    const mr = last((x) => x.url === '/rest/v1/rpc/claim_reset_code');
+    const wantM = sqlArgs(env.migrationSql, 'claim_reset_code');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC claim_reset_code ស្មើ SQL ពិត', !!mr && !!wantM && JSON.stringify(Object.keys(mr.body).sort()) === JSON.stringify(wantM),
         { sent: mr && Object.keys(mr.body), wantM });
-    rec('adapter ៖ reset_code_user កំហុស ➜ undefined (មិនមែន null «កូដខុស»)', (await D.resetCodeUser('err', 'good')) === undefined);
-    rec('adapter ៖ consume_reset_code ➜ true / false', (await D.consumeResetCode('sokha', 'h')) === true && (await D.consumeResetCode('none', 'h')) === false);
-    const cr2 = last((x) => x.url === '/rest/v1/rpc/consume_reset_code');
-    const wantC = sqlArgs(env.migrationSql, 'consume_reset_code');
-    rec('ស្នាមភ្ជាប់ ៖ argument RPC consume_reset_code ស្មើ SQL ពិត', !!cr2 && !!wantC && JSON.stringify(Object.keys(cr2.body).sort()) === JSON.stringify(wantC),
+    rec('adapter ៖ claim_reset_code កំហុស ➜ undefined (មិនមែន null «កូដខុស»)', (await D.claimResetCode('err', 'good', USER_ID)) === undefined);
+    rec('adapter ៖ settle_reset_code ➜ true / false', (await D.settleResetCode('sokha', 'h', USER_ID, true)) === true && (await D.settleResetCode('none', 'h', USER_ID, true)) === false);
+    const cr2 = last((x) => x.url === '/rest/v1/rpc/settle_reset_code');
+    const wantC = sqlArgs(env.migrationSql, 'settle_reset_code');
+    rec('ស្នាមភ្ជាប់ ៖ argument RPC settle_reset_code ស្មើ SQL ពិត', !!cr2 && !!wantC && JSON.stringify(Object.keys(cr2.body).sort()) === JSON.stringify(wantC),
         { sent: cr2 && Object.keys(cr2.body), wantC });
-    rec('adapter ៖ consume_reset_code កំហុស ➜ false', (await D.consumeResetCode('err', 'h')) === false);
+    rec('adapter ៖ settle_reset_code កំហុស ➜ false', (await D.settleResetCode('err', 'h', USER_ID, true)) === false);
+    rec('adapter ៖ settle_reset_code ដោះ claim ➜ consumed=false និង claim id ដដែល', (await D.settleResetCode('sokha', 'h', USER_ID, false)) === true
+        && last((x) => x.url === '/rest/v1/rpc/settle_reset_code').body.p_consumed === false
+        && last((x) => x.url === '/rest/v1/rpc/settle_reset_code').body.p_claim_id === USER_ID);
     rec('adapter ៖ deleteUser ➜ DELETE /auth/v1/admin/users/<id>', (await D.deleteUser(USER_ID)) === true
         && !!last((x) => x.method === 'DELETE' && x.url.split('?')[0] === '/auth/v1/admin/users/' + USER_ID));
     rec('adapter ៖ deleteUser ធ្លាក់ ➜ false', (await D.deleteUser(FAIL_ID)) === false);
@@ -439,6 +696,41 @@ async function groupAdapter(m, rec, env) {
     rec('ស្នាមភ្ជាប់ ៖ argument RPC revoke_user_sessions ស្មើ SQL ពិត', !!rr && !!wantR && JSON.stringify(Object.keys(rr.body).sort()) === JSON.stringify(wantR),
         { sent: rr && Object.keys(rr.body), wantR });
     rec('adapter ៖ revokeSessions កំហុស ➜ false', (await D.revokeSessions(FAIL_ID)) === false);
+
+    const opts = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+    let probes = 0;
+    const P = m.admin.adminDeps(client, 400, () => { probes++; return env.createClient(mock.url, KEY, opts); });
+    mock.requests.length = 0;
+    const owner = await P.passwordUserId('sokha@u.zoe.test', 'secret-pass');
+    const tok = last((x) => x.url.split('?')[0] === '/auth/v1/token');
+    const out = last((x) => x.url.split('?')[0] === '/auth/v1/logout');
+    rec('adapter ៖ passwordUserId ➜ POST /auth/v1/token?grant_type=password {email, password} ➜ user id',
+        owner === USER_ID && !!tok && /[?&]grant_type=password(&|$)/.test(tok.url) && tok.body.email === 'sokha@u.zoe.test' && tok.body.password === 'secret-pass', { owner, tok: tok && tok.url });
+    rec('adapter ៖ passwordUserId ផ្តាច់ session ផ្ទៀងផ្ទាត់ (logout scope=local ដោយ token របស់វា) · client ថ្មីរាល់ការហៅ',
+        !!out && /[?&]scope=local(&|$)/.test(out.url) && String(out.headers.authorization || '').endsWith('.sig-sokha') && probes === 1, { out: out && out.url, probes });
+    await D.inviteIsUsable('good');
+    const after = last((x) => x.url === '/rest/v1/rpc/invite_is_usable');
+    rec('adapter ៖ ក្រោយផ្ទៀងពាក្យសម្ងាត់ RPC របស់ admin client នៅប្រើ secret key (មិនមែន token អ្នកប្រើ)',
+        !!after && after.headers.apikey === KEY && !String(after.headers.authorization || '').includes('.sig-'), after && after.headers.authorization);
+    rec('adapter ៖ ពាក្យសម្ងាត់ខុស (invalid_credentials) ➜ null', (await P.passwordUserId('sokha@u.zoe.test', 'wrong-pass')) === null);
+    rec('adapter ៖ invalid_credentials (API ចាស់ error_code) ➜ null', (await P.passwordUserId('legacy@u.zoe.test', 'secret-pass')) === null);
+    rec('adapter ៖ email_not_confirmed ➜ null', (await P.passwordUserId('unconfirmed@u.zoe.test', 'secret-pass')) === null);
+    rec('adapter ៖ GoTrue 500 ➜ undefined (មិនដឹង ≠ ពាក្យសម្ងាត់ខុស)', (await P.passwordUserId('boom@u.zoe.test', 'secret-pass')) === undefined);
+    rec('adapter ៖ rate limit 429 ➜ undefined', (await P.passwordUserId('limit@u.zoe.test', 'secret-pass')) === undefined);
+    const t1 = Date.now();
+    const hungSignIn = await P.passwordUserId('hang@u.zoe.test', 'secret-pass');
+    rec('adapter ៖ /token ព្យួរ ➜ undefined ក្នុងពិដាន (' + (Date.now() - t1) + 'ms)', hungSignIn === undefined && Date.now() - t1 < 2000, hungSignIn);
+    const t2 = Date.now();
+    const stuck = await m.timeout.withTimeout(P.passwordUserId('stuck@u.zoe.test', 'secret-pass'), 3000, 'stuck-hung').catch(() => 'hung');
+    const afterStuck = await D.inviteIsUsable('good');
+    const stuckRpc = last((x) => x.url === '/rest/v1/rpc/invite_is_usable');
+    rec('adapter ៖ logout ព្យួរ ➜ នៅឆ្លើយ user id ក្នុងពិដាន · RPC admin បន្ទាប់មិនជាប់ session នោះ (' + (Date.now() - t2) + 'ms)',
+        stuck === USER_ID && Date.now() - t2 < 2000 && afterStuck === true && !!stuckRpc && !String(stuckRpc.headers.authorization || '').includes('.sig-'),
+        { stuck, afterStuck, auth: stuckRpc && stuckRpc.headers.authorization });
+    rec('adapter ៖ គ្មានរោងចក្រ client ផ្ទៀងផ្ទាត់ ➜ undefined (fail closed)', (await D.passwordUserId('sokha@u.zoe.test', 'secret-pass')) === undefined);
+    const same = m.admin.adminDeps(client, 400, () => client);
+    rec('adapter ៖ រោងចក្រផ្តល់ admin client ខ្លួនឯង ➜ undefined (session អ្នកប្រើមិនចូល client រួម)',
+        (await same.passwordUserId('sokha@u.zoe.test', 'secret-pass')) === undefined);
 }
 
 async function runGroups(m, env, stopOnFail) {
@@ -448,7 +740,7 @@ async function runGroups(m, env, stopOnFail) {
         results.push({ label, pass: !!cond, detail });
         if (!cond && stopOnFail) throw STOP;
     };
-    const groups = [['invite', groupInvite], ['account', groupAccount], ['http', groupHttp]];
+    const groups = [['invite', groupInvite], ['account', groupAccount], ['register-resume', groupRegisterResume], ['reset-concurrency', groupResetConcurrency], ['http', groupHttp]];
     if (env.createClient) groups.push(['adapter', groupAdapter]);
     for (const [name, fn] of groups) {
         try {
@@ -473,23 +765,53 @@ const MUTATIONS = [
     ['invite-code.ts', 'មិនពិនិត្យ alphabet', '        if (!INVITE_CODE_ALPHABET.includes(ch)) return null;\n', ''],
     ['invite-code.ts', 'មិនប្តូរ O ➜ 0', ".replace(/O/g, '0')", ''],
     ['invite-code.ts', 'កូដកំណត់ថ្មីប្រើ prefix អញ្ជើញ', 'return prefixedHash(RESET_HASH_PREFIX, normalized);', 'return prefixedHash(INVITE_HASH_PREFIX, normalized);'],
-    ['account-core.ts', 'មិនពិនិត្យកូដមុនបង្កើតគណនី', "    if (!usable) return reply(403, 'invite-invalid');\n", ''],
+    ['account-core.ts', 'មិនពិនិត្យកូដមុនបង្កើតគណនី', "    if (!usable) return registeredBySpentInvite(deps, email, password, codeHash, username);\n", ''],
+    ['account-core.ts', 'កូដប្រើមិនបាន ➜ 403 ភ្លាម (សាកម្តងទៀតក្រោយ App អស់ពេលរង់ចាំមិនបាន)', "    if (!usable) return registeredBySpentInvite(deps, email, password, codeHash, username);",
+        "    if (!usable) return reply(403, 'invite-invalid');"],
+    ['account-core.ts', 'កូដប្រើរួច ៖ មិនផ្ទៀង user id ដែល Auth បញ្ជាក់', "    if (proven !== member.userId) return reply(403, 'invite-invalid');\n", ''],
+    ['account-core.ts', 'កូដប្រើរួច ៖ ទទួលពាក្យសម្ងាត់របស់គណនីណាក៏បាន', "    if (proven !== member.userId) return reply(403, 'invite-invalid');", "    if (proven === null) return reply(403, 'invite-invalid');"],
+    ['account-core.ts', 'កូដប្រើរួច ៖ ពាក្យសម្ងាត់ខុស ➜ 409 (oracle username)', "    if (proven !== member.userId) return reply(403, 'invite-invalid');", "    if (proven !== member.userId) return reply(409, 'username-taken');"],
+    ['account-core.ts', 'កូដប្រើរួច ៖ sign-in មុនសួរ DB (sign-in លើកូដមិនធ្លាប់មាន)', "    if (member === null) return reply(403, 'invite-invalid');",
+        "    if (member === null) { await deps.passwordUserId(email, password); return reply(403, 'invite-invalid'); }"],
+    ['account-core.ts', 'កូដប្រើរួច ៖ DB មិនដឹង ➜ 403', "    if (member === undefined) return reply(502, 'db-unavailable');", "    if (member === undefined) return reply(403, 'invite-invalid');"],
+    ['account-core.ts', 'កូដប្រើរួច ៖ Auth មិនដឹង ➜ 403', "    if (proven === undefined) return reply(502, 'auth-unavailable');", "    if (proven === undefined) return reply(403, 'invite-invalid');"],
+    ['account-core.ts', 'បន្ត ៖ finish invite-invalid មិនពិនិត្យកូដប្រើរួច', "    if (finished.reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);\n", ''],
+    ['account-core.ts', 'បន្ត ៖ ពិនិត្យកូដប្រើរួចដោយ sign-in ម្តងទៀត', 'return registeredBySpentInvite(deps, email, password, codeHash, username, userId);',
+        'return registeredBySpentInvite(deps, email, password, codeHash, username);'],
+    ['admin-deps.ts', 'spent_invite_member កំហុស ➜ null', "                if (error || !Array.isArray(data)) return undefined;", "                if (error || !Array.isArray(data)) return null;"],
+    ['admin-deps.ts', 'spent_invite_member មិនពិនិត្យប្រភេទជួរ', " || typeof row.user_id !== 'string'", ''],
+    ['admin-deps.ts', 'spent_invite_member ឈ្មោះ argument ខុស', 'p_username: username })', 'p_user: username })'],
+    ['admin-deps.ts', 'spent_invite_member គ្មានពិដាន', "withTimeout(Promise.resolve(client.rpc('spent_invite_member', { p_code_hash: codeHash, p_username: username })), timeoutMs, 'timeout')",
+        "Promise.resolve(client.rpc('spent_invite_member', { p_code_hash: codeHash, p_username: username }))"],
     ['account-core.ts', 'DB មិនឆ្លើយ ➜ ចាត់ទុកកូដត្រឹមត្រូវ', "    if (usable === null) return reply(502, 'db-unavailable');\n", ''],
     ['account-core.ts', 'check DB មិនឆ្លើយ ➜ «ប្រើរួច»', "        if (usableNow === null) return reply(502, 'db-unavailable');\n", ''],
     ['account-core.ts', 'check ធ្លាក់ចូលការចុះឈ្មោះ', '    if (body.check === true) {', '    if (body.check === false) {'],
     ['account-core.ts', 'លុបគណនីលើលទ្ធផលមិនដឹង', '    if (!ROLLBACK_REASONS.has(finished.reason)) return reply(...FINISH_REPLY[finished.reason]);\n', ''],
-    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!finished.ok && finished.reason === 'unavailable') finished = await deps.finishRegistration(request);\n", ''],
+    ['account-core.ts', 'មិនសាក finish ម្តងទៀត', "    if (!first.ok && first.reason === 'unavailable') return deps.finishRegistration(request);\n", ''],
+    ['account-core.ts', 'គណនីមានរួច ➜ username-taken ភ្លាម (មិនបន្ត)', "        if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);",
+        "        if (created.reason === 'exists') return reply(409, 'username-taken');"],
+    ['account-core.ts', 'បន្តដោយមិនផ្ទៀងពាក្យសម្ងាត់', "    if (userId === null) return reply(409, 'username-taken');\n", ''],
+    ['account-core.ts', 'Auth មិនដឹង ➜ username-taken', "    if (userId === undefined) return reply(502, 'auth-unavailable');", "    if (userId === undefined) return reply(409, 'username-taken');"],
+    ['account-core.ts', 'បន្តរួចលុបគណនីពេល finish បដិសេធ', "    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister",
+        "    await deps.deleteUser(userId);\n    return reply(...FINISH_REPLY[finished.reason]);\n}\n\nexport async function handleRegister"],
+    ['admin-deps.ts', 'ផ្ទៀងពាក្យសម្ងាត់លើ admin client រួម', 'await withTimeout(probe.auth.signInWithPassword({ email, password })', 'await withTimeout(client.auth.signInWithPassword({ email, password })'],
+    ['admin-deps.ts', 'មិនរាំង probe ជា admin client', '                if (probe === client) return undefined;\n', ''],
+    ['admin-deps.ts', 'កំហុស sign-in ទាំងអស់ ➜ null', 'if (error) return SIGN_IN_REFUSED_CODES.has(errorCode(error)) ? null : undefined;', 'if (error) return null;'],
+    ['admin-deps.ts', 'មិនផ្តាច់ session ផ្ទៀងផ្ទាត់', "                if (data && data.session) await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);\n", ''],
+    ['admin-deps.ts', 'logout គ្មានពិដាន', "await withTimeout(probe.auth.signOut({ scope: 'local' }), timeoutMs, 'timeout').catch(() => null);", "await probe.auth.signOut({ scope: 'local' });"],
     ['account-core.ts', 'reset មិនពិនិត្យកូដ', "    if (userId === null) return reply(403, 'reset-code-invalid');\n", "    if (userId === null) return reply(200, 'password-reset');\n"],
-    ['account-core.ts', 'reset ស៊ីកូដមុនប្តូរពាក្យសម្ងាត់', "    const updated = await deps.updatePassword(userId, body.password as string);\n    if (updated === 'weak') return reply(400, 'password-weak');\n    if (updated !== 'ok') return reply(502, 'auth-unavailable');\n    const consumed = (await deps.consumeResetCode(username, codeHash)) || (await deps.consumeResetCode(username, codeHash));\n",
-        "    const consumed = (await deps.consumeResetCode(username, codeHash)) || (await deps.consumeResetCode(username, codeHash));\n    const updated = await deps.updatePassword(userId, body.password as string);\n    if (updated === 'weak') return reply(400, 'password-weak');\n    if (updated !== 'ok') return reply(502, 'auth-unavailable');\n"],
+    ['account-core.ts', 'reset មិនសាក claim ដដែល', "    if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);\n", ''],
+    ['account-core.ts', 'reset claim សាកដោយ id ថ្មី', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, claimId);', 'if (userId === undefined) userId = await deps.claimResetCode(username, codeHash, crypto.randomUUID());'],
+    ['account-core.ts', 'reset ពាក្យសម្ងាត់ខ្សោយមិនដោះ claim', 'const released = (await deps.settleResetCode(username, codeHash, claimId, false)) || (await deps.settleResetCode(username, codeHash, claimId, false));', 'const released = true;'],
+    ['account-core.ts', 'reset ប្តូរពាក្យសម្ងាត់មុន claim', '    const claimId = crypto.randomUUID();', "    await deps.updatePassword('user-race', body.password as string);\n    const claimId = crypto.randomUUID();"],
     ['account-core.ts', 'reset ប្រើ hash អញ្ជើញ', '    const codeHash = await resetCodeHash(code);', '    const codeHash = await inviteCodeHash(code);'],
     ['account-core.ts', 'មិនផ្តាច់ session ក្រោយកំណត់ថ្មី', "    const revoked = (await deps.revokeSessions(userId)) || (await deps.revokeSessions(userId));", '    const revoked = true;'],
     ['account-core.ts', 'reset រាយជោគជ័យពេញលេញទោះស៊ីកូដមិនបាន', "consumed && revoked ? 'password-reset'", "revoked ? 'password-reset'"],
     ['http.ts', 'loginDomain មិនបង្ខំ .invalid', " || !loginDomain.endsWith('.invalid')", ''],
     ['admin-deps.ts', 'revokeSessions ជឿកំហុស', "                return !error && typeof data === 'number';", '                return true;'],
-    ['admin-deps.ts', 'consumeResetCode ជឿកំហុស', "                return !error && data === true;", '                return !error;'],
-    ['admin-deps.ts', 'resetCodeUser កំហុស ➜ null', "                if (error) return undefined;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async consumeResetCode",
-        "                if (error) return null;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async consumeResetCode"],
+    ['admin-deps.ts', 'settleResetCode ជឿកំហុស', "                return !error && data === true;", '                return !error;'],
+    ['admin-deps.ts', 'claimResetCode កំហុស ➜ null', "                if (error) return undefined;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async settleResetCode",
+        "                if (error) return null;\n                if (data === null) return null;\n                return typeof data === 'string' ? data : undefined;\n            } catch {\n                return undefined;\n            }\n        },\n        async settleResetCode"],
     ['account-core.ts', 'មិនកំណត់ ៧២ byte', "    if (new TextEncoder().encode(raw).length > PASSWORD_MAX_BYTES) return 'password-long';\n", ''],
     ['http.ts', 'មិនបដិសេធ origin មិនស្គាល់', "    if (origin !== null && !allowed) return json(403, { ok: false, code: 'origin-denied' }, cors);\n", ''],
     ['http.ts', 'មិនកំណត់ទំហំ body', '            if (total > maxBytes) {', '            if (false) {'],
@@ -548,7 +870,11 @@ async function main() {
         ok('functions/' + d + '/index.ts ៖ Deno.serve + handleHttp + readConfig + handler ១',
             /Deno\.serve\(/.test(src) && /handleHttp\(/.test(src) && /readConfig\(/.test(src) && handlers.length === 1, handlers);
         ok('functions/' + d + '/index.ts ៖ គ្មាន OTP/Firebase (ចុះឈ្មោះដោយកូដអញ្ជើញតែម្យ៉ាង)', !/firebase|otp|phone/i.test(src));
-        ok('functions/' + d + '/index.ts ៖ ឆ្លង adminDeps(admin) ដែលបង្កើតតែពេល config.ok', /adminDeps\(admin\)/.test(src) && /const admin = config\.ok/.test(src));
+        ok('functions/' + d + '/index.ts ៖ ឆ្លង adminDeps(admin…) ដែលបង្កើតតែពេល config.ok', /adminDeps\(admin\b/.test(src) && /const admin = config\.ok/.test(src));
+        if (handlers[0] === 'handleRegister') {
+            ok('functions/' + d + '/index.ts ៖ ផ្ទៀងពាក្យសម្ងាត់លើ client ថ្មីរាល់ការហៅ (មិនមែន admin រួម)',
+                /const openProbe = \(\) => createClient\(/.test(src) && /adminDeps\(admin, ADMIN_CALL_TIMEOUT_MS, openProbe\)/.test(src));
+        }
         const suffix = (src.match(/corsHeaders\['Access-Control-Allow-Headers'\] \+ '([^']*)'/) || [])[1];
         ok('functions/' + d + '/index.ts ៖ Allow-Headers ដេរីវេពី corsHeaders របស់ SDK', typeof suffix === 'string');
         if (typeof suffix === 'string') allowSuffix = suffix;
@@ -593,18 +919,18 @@ async function main() {
     if (tscBin && sdkTypes && corsTypes && sdkVersion) {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-sbtsc-'));
         const conf = {
-            extends: path.join(SB, 'tsconfig.json'),
-            compilerOptions: { paths: { ['npm:@supabase/supabase-js@' + sdkVersion]: [sdkTypes], ['npm:@supabase/supabase-js@' + sdkVersion + '/cors']: [corsTypes] } },
-            include: [path.join(FN_DIR, '**', '*.ts'), path.join(SB, 'types', '*.d.ts')]
+            extends: path.join(SB, 'tsconfig.json').replace(/\\/g, '/'),
+            compilerOptions: { paths: { ['npm:@supabase/supabase-js@' + sdkVersion]: [sdkTypes.replace(/\\/g, '/')], ['npm:@supabase/supabase-js@' + sdkVersion + '/cors']: [corsTypes.replace(/\\/g, '/')] } },
+            include: [path.join(FN_DIR, '**', '*.ts'), path.join(SB, 'types', '*.d.ts')].map((p) => p.replace(/\\/g, '/'))
         };
         fs.writeFileSync(path.join(tmp, 'tsconfig.json'), JSON.stringify(conf));
         const r = cp.spawnSync(process.execPath, [tscBin, '-p', path.join(tmp, 'tsconfig.json'), '--listFiles'], { encoding: 'utf8', timeout: 120000 });
         fs.rmSync(tmp, { recursive: true, force: true });
         const out = String(r.stdout || '') + String(r.stderr || '');
-        const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR)).length;
+        const checked = out.split('\n').filter((l) => l.startsWith(FN_DIR.replace(/\\/g, '/'))).length;
         ok('tsc strict ៖ ០ កំហុស (ឯកសារ function ដែលពិនិត្យ ' + checked + ')', r.status === 0 && checked >= tsFiles.length && tsFiles.length >= 7,
             out.split('\n').filter((l) => /error TS/.test(l)).slice(0, 8));
-        ok('tsc ៖ type មកពី supabase-js ពិត (មិនមែន any)', out.includes(sdkTypes));
+        ok('tsc ៖ type មកពី supabase-js ពិត (មិនមែន any)', out.includes(sdkTypes.replace(/\\/g, '/')));
     } else {
         skipPart('គ្មាន typescript/supabase-js ➜ tsc មិនបានរត់');
     }

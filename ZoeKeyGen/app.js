@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.2';
+const APP_VERSION = '2.24.3';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2984,12 +2984,16 @@ const SB_ADMIN_ERROR_TEXT = {
     'expires-invalid': 'ថ្ងៃផុតកំណត់ត្រូវនៅអនាគត!',
     'tenant-inactive': 'ហាងនេះផុតកំណត់ ឬត្រូវបានបិទ — សូមពន្យារ ឬបើកវាសិន!',
     'tenant-not-found': 'រកហាងនេះមិនឃើញ!',
+    'tenant-changed': 'ហាងនេះត្រូវបានកែពីឧបករណ៍ផ្សេង ឬសំណើមុនបានសម្រេចរួច — បញ្ជីត្រូវបានធ្វើបច្ចុប្បន្នភាព សូមពិនិត្យថ្ងៃផុតកំណត់មុនពន្យារម្តងទៀត!',
+    'extend-invalid': 'ចំនួនថ្ងៃពន្យារមិនត្រឹមត្រូវ!',
     'member-not-found': 'រកឈ្មោះគណនីនេះមិនឃើញ!',
     'invite-invalid': 'ការកំណត់កូដអញ្ជើញមិនត្រឹមត្រូវ!',
     'reset-invalid': 'ការកំណត់កូដប្តូរពាក្យសម្ងាត់មិនត្រឹមត្រូវ!',
     'forbidden': 'គណនីនេះមិនមែន Admin របស់ Supabase ទេ (តារាង platform_admins)!'
 };
+const SB_ADMIN_IDLE_MS = 15 * 60 * 1000;
 let sbAdminSession = null;
+let sbAdminLastUseAt = 0;
 let sbAdminGeneration = 0;
 let sbAdminBusy = false;
 let sbTenantCache = [];
@@ -3107,6 +3111,7 @@ async function sbAdminLogin() {
             return;
         }
         sbAdminSession = session;
+        sbAdminLastUseAt = Date.now();
         const panel = document.getElementById('sbAdminPanel');
         if (panel) panel.classList.remove('hidden');
         const logoutBtn = document.getElementById('sbAdminLogoutBtn');
@@ -3131,6 +3136,7 @@ async function sbAdminLogin() {
 function sbAdminReset(expired) {
     sbAdminGeneration++;
     sbAdminSession = null;
+    sbAdminLastUseAt = 0;
     sbAdminBusy = false;
     sbTenantCache = [];
     sbMemberCache = [];
@@ -3157,6 +3163,21 @@ function sbAdminReset(expired) {
         if (el) el.value = '';
     });
     if (expired === true) alert('Session Supabase ផុតកំណត់ — សូមចូល Supabase ម្តងទៀត!');
+}
+
+function expireIdleSbAdmin() {
+    const session = sbAdminSession;
+    if (!session || sbAdminBusy) return false;
+    if (elapsedSince(sbAdminLastUseAt) < SB_ADMIN_IDLE_MS) return false;
+    sbAdminReset(false);
+    sbAdminRequest(session, '/auth/v1/logout', 'POST', {}).catch(() => {});
+    showToast('🔒 ចាកចេញពី Supabase Admin ក្រោយមិនប្រើ ១៥ នាទី — សូមចូលម្តងទៀត');
+    return true;
+}
+
+function sbAdminActivity() {
+    if (!sbAdminSession || expireIdleSbAdmin()) return;
+    sbAdminLastUseAt = Date.now();
 }
 
 function sbAdminLogout() {
@@ -3213,7 +3234,7 @@ function renderSbTenantList() {
     body.innerHTML = sbTenantCache.map((row) => {
         const sbStatusHtml = badges[sbTenantState(row)];
         const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => '<span class="sb-member">' + (m.role === 'owner' ? '👑 ' : '') + escapeHtml(m.username) + '</span>').join('') || '-';
+            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-';
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
         return `<tr>
@@ -3330,6 +3351,7 @@ async function sbTenantAction(tenantId, action) {
     const tenant = sbTenantCache.find((t) => t.id === tenantId);
     if (!tenant) return;
     let args = null;
+    let rpc = 'admin_update_tenant';
     if (action === 'sb-invite') {
         const hasOwner = sbMemberCache.some((m) => m.tenant_id === tenant.id && m.role === 'owner');
         const role = hasOwner ? 'member' : 'owner';
@@ -3347,9 +3369,8 @@ async function sbTenantAction(tenantId, action) {
         if (raw === null) return;
         const days = Number(String(raw).trim());
         if (!Number.isInteger(days) || days < 1 || days > SB_TENANT_DAYS_MAX) { alert('ចំនួនថ្ងៃមិនត្រឹមត្រូវ!'); return; }
-        const current = Date.parse(String(tenant.expires_at || ''));
-        const base = isFinite(current) && current > getServerNow() ? current : getServerNow();
-        args = { p_tenant_id: tenant.id, p_expires_at: new Date(base + days * 86400000).toISOString() };
+        rpc = 'admin_extend_tenant';
+        args = { p_tenant_id: tenant.id, p_days: days, p_expected_expires_at: tenant.expires_at };
     } else if (action === 'sb-revoke') {
         if (!confirm((tenant.revoked ? 'បើកហាង «' : 'បិទហាង «') + tenant.name + '» វិញ?' + (tenant.revoked ? '' : '\n\nគណនីទាំងអស់របស់ហាងនេះនឹងចាកចេញ ហើយចូលមិនបានទៀត។'))) return;
         args = { p_tenant_id: tenant.id, p_revoked: !tenant.revoked };
@@ -3358,9 +3379,13 @@ async function sbTenantAction(tenantId, action) {
     }
     if (!sbAdminIsCurrent(session)) return;
     try {
-        const out = await sbAdminRpc(session, 'admin_update_tenant', args);
+        const out = await sbAdminRpc(session, rpc, args);
         if (!sbAdminIsCurrent(session)) return;
-        if (!out.ok) { alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out)); return; }
+        if (!out.ok) {
+            alert('កែហាងមិនបាន ៖ ' + sbAdminErrorText(out));
+            if (out.body && out.body.message === 'tenant-changed') await sbAdminRefresh();
+            return;
+        }
         showToast('✅ បានកែហាង «' + tenant.name + '»');
         await sbAdminRefresh();
     } catch (e) {
@@ -3508,11 +3533,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('pointerdown', noteSigningKeyActivity, { capture: true, passive: true });
     document.addEventListener('keydown', noteSigningKeyActivity, { capture: true, passive: true });
+    document.addEventListener('pointerdown', sbAdminActivity, { capture: true, passive: true });
+    document.addEventListener('keydown', sbAdminActivity, { capture: true, passive: true });
     setInterval(expireIdleSigningKey, 30000);
+    setInterval(expireIdleSbAdmin, 30000);
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         expireIdleSigningKey();
+        expireIdleSbAdmin();
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();

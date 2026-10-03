@@ -8,7 +8,7 @@ function worker(app: string, fetch: ReturnType<typeof vi.fn>, abort: typeof Abor
     const source = fs.readFileSync(new URL(app === 'ZoeW' ? '../src/sw/sw.ts' : '../../ZoeKeyGen/sw.js', import.meta.url), 'utf8');
     const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
     const context = vm.createContext({
-        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js'], __OPTIONAL_SHELL__: [],
+        __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: ['./index.html', './app.js'], __OPTIONAL_SHELL__: [], __BACKEND_SHELL__: [],
         self: { location: new URL('https://audit.invalid/sw.js'), addEventListener() {} },
         navigator: { onLine: true }, URL, Request, Response, AbortController: abort,
         fetch, setTimeout, clearTimeout, Date

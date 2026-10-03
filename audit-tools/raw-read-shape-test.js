@@ -69,7 +69,7 @@ function makeCtx(src) {
         vm.runInContext('function normalizeBarcodesOf(i) { return i; }', ctx);
     }
     vm.runInContext('function normalizeTrashItem(item) ' + extractTrashNormalizer(src)
-        .replace('runAutomaticDeletedCleanup();', ''), ctx);
+        .replace('runAutomaticDeletedCleanup();', '').replace('refreshNotifyRemovedView();', ''), ctx);
     // ⛔ យុថ្កាដែលរកមិនឃើញ ➜ `indexOf` ត្រឡប់ -1 ➜ `sliceBalanced` កាត់កូដ
     // **ខុសកន្លែងទាំងស្រុង** ➜ ការធ្លាក់គ្មានឈ្មោះដែលចំណាយពេលដេញតាមយូរ
     // (មេរៀន «ការធ្លាក់ក្លែងក្លាយ» — សំណួរទី ១១)។ ត្រូវធ្លាក់ដោយមានឈ្មោះជំនួស។

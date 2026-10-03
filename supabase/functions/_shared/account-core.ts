@@ -11,6 +11,7 @@ export type FinishReason = typeof FINISH_REASONS[number] | 'unavailable';
 export type CreateUserResult = { ok: true; userId: string } | { ok: false; reason: 'exists' | 'weak' | 'unavailable' };
 export type FinishResult = { ok: true; tenantId: string; role: string } | { ok: false; reason: FinishReason };
 export type UpdatePasswordResult = 'ok' | 'weak' | 'unavailable';
+export type SpentInviteMember = { userId: string; tenantId: string; role: string };
 
 export interface HandlerResult {
     status: number;
@@ -19,6 +20,7 @@ export interface HandlerResult {
 
 export interface RegisterDeps {
     inviteIsUsable(codeHash: string): Promise<boolean | null>;
+    spentInviteMember(codeHash: string, username: string): Promise<SpentInviteMember | null | undefined>;
     createUser(email: string, password: string): Promise<CreateUserResult>;
     finishRegistration(input: { userId: string; codeHash: string; username: string }): Promise<FinishResult>;
     deleteUser(userId: string): Promise<boolean>;
@@ -72,12 +74,23 @@ async function finishWithRetry(deps: RegisterDeps, request: { userId: string; co
     return first;
 }
 
+async function registeredBySpentInvite(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string, provenUserId?: string): Promise<HandlerResult> {
+    const member = await deps.spentInviteMember(codeHash, username);
+    if (member === undefined) return reply(502, 'db-unavailable');
+    if (member === null) return reply(403, 'invite-invalid');
+    const proven = provenUserId ?? await deps.passwordUserId(email, password);
+    if (proven === undefined) return reply(502, 'auth-unavailable');
+    if (proven !== member.userId) return reply(403, 'invite-invalid');
+    return reply(200, 'registered', { tenantId: member.tenantId, role: member.role });
+}
+
 async function resumeRegistration(deps: RegisterDeps, email: string, password: string, codeHash: string, username: string): Promise<HandlerResult> {
     const userId = await deps.passwordUserId(email, password);
     if (userId === undefined) return reply(502, 'auth-unavailable');
     if (userId === null) return reply(409, 'username-taken');
     const finished = await finishWithRetry(deps, { userId, codeHash, username });
     if (finished.ok) return reply(200, 'registered', { tenantId: finished.tenantId, role: finished.role });
+    if (finished.reason === 'invite-invalid') return registeredBySpentInvite(deps, email, password, codeHash, username, userId);
     return reply(...FINISH_REPLY[finished.reason]);
 }
 
@@ -99,8 +112,8 @@ export async function handleRegister(input: unknown, deps: RegisterDeps): Promis
     const codeHash = await inviteCodeHash(invite);
     const usable = await deps.inviteIsUsable(codeHash);
     if (usable === null) return reply(502, 'db-unavailable');
-    if (!usable) return reply(403, 'invite-invalid');
     const email = loginEmail(username, deps.loginDomain);
+    if (!usable) return registeredBySpentInvite(deps, email, password, codeHash, username);
     const created = await deps.createUser(email, password);
     if (!created.ok) {
         if (created.reason === 'exists') return resumeRegistration(deps, email, password, codeHash, username);

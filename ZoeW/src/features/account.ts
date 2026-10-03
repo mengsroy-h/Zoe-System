@@ -194,8 +194,13 @@ async function callAccountFunction(kind, body) {
         const out = res && res.body && typeof res.body === 'object' ? res.body : {};
         return { ok: out.ok === true, code: typeof out.code === 'string' ? out.code : (res && res.status === 429 ? 'rate-limited' : 'bad-response') };
     } catch (e) {
-        return { ok: false, code: 'network' };
+        if (!accountCallTimedOut(e)) return { ok: false, code: 'network' };
+        return { ok: false, code: kind === 'register' ? 'registration-unknown' : 'password-reset-unknown' };
     }
+}
+
+function accountCallTimedOut(e) {
+    return !!e && e.message === 'timeout';
 }
 
 export function openRegisterForm() {
@@ -247,7 +252,7 @@ export async function submitRegisterForm(event?) {
             await noteInviteUsed(invite, currentSupabaseScope());
             if (normalizeInviteText(pendingInvite) === normalizeInviteText(invite)) clearPendingInvite();
         }
-        alert('ការចុះឈ្មោះមិនជោគជ័យ៖ ' + accountReplyText(reply.code));
+        alert((reply.code === 'registration-unknown' ? '' : 'ការចុះឈ្មោះមិនជោគជ័យ៖ ') + accountReplyText(reply.code));
         return;
     }
     await noteInviteUsed(invite, currentSupabaseScope());

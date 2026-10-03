@@ -1,6 +1,6 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
 import { FINISH_REASONS } from './account-core.ts';
-import type { CreateUserResult, FinishReason, FinishResult, UpdatePasswordResult } from './account-core.ts';
+import type { CreateUserResult, FinishReason, FinishResult, SpentInviteMember, UpdatePasswordResult } from './account-core.ts';
 import { withTimeout } from './timeout.ts';
 
 export const ADMIN_CALL_TIMEOUT_MS = 8000;
@@ -27,6 +27,18 @@ export function adminDeps(client: SupabaseClient, timeoutMs = ADMIN_CALL_TIMEOUT
                 return data;
             } catch {
                 return null;
+            }
+        },
+        async spentInviteMember(codeHash: string, username: string): Promise<SpentInviteMember | null | undefined> {
+            try {
+                const { data, error } = await withTimeout(Promise.resolve(client.rpc('spent_invite_member', { p_code_hash: codeHash, p_username: username })), timeoutMs, 'timeout');
+                if (error || !Array.isArray(data)) return undefined;
+                if (data.length === 0) return null;
+                const row = data[0];
+                if (!row || typeof row.user_id !== 'string' || typeof row.tenant_id !== 'string' || typeof row.role !== 'string') return undefined;
+                return { userId: row.user_id, tenantId: row.tenant_id, role: row.role };
+            } catch {
+                return undefined;
             }
         },
         async createUser(email: string, password: string): Promise<CreateUserResult> {

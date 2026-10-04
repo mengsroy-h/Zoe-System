@@ -15,6 +15,7 @@ export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
 export const SB_POLL_FALLBACK_MS = 30000;
 export const SB_REALTIME_RETRY_STEPS_MS = [5000, 15000, 30000, 60000];
+export const SB_CLOCK_SKEW_WARN_MS = 5 * 60 * 1000;
 export const SB_PULL_PAGE = 2000;
 export const SB_PULL_MAX_RESTARTS = 2;
 export const SB_DOCS_CACHE_LOAD_MAX_MS = 3000;
@@ -369,6 +370,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let realtimeGeneration = 0;
     let realtimeRetryTimer = null;
     let realtimeRetryAttempt = 0;
+    let clockSkewWarned = false;
     let tenantTopic = null;
     let forbidden = null;
     let closed = false;
@@ -535,6 +537,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (typeof now !== 'number' || !Number.isFinite(now)) return;
         serverOffset = Math.round(now - (t0 + t1) / 2);
         offsetKnown = true;
+        if (!clockSkewWarned && Math.abs(serverOffset) > SB_CLOCK_SKEW_WARN_MS && hooks.onClockSkew) {
+            clockSkewWarned = true;
+            hooks.onClockSkew(serverOffset);
+        }
         fireInfo();
     };
 

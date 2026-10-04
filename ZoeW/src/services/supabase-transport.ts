@@ -127,6 +127,12 @@ export function sbFetchWithCeiling(fetchImpl, input, init, timeoutMs) {
     });
 }
 
+export function sbSoftenRefreshRateLimit(input, res) {
+    const url = String(input && input.url ? input.url : input);
+    if (!res || res.status !== 429 || url.indexOf('/auth/v1/token') === -1 || url.indexOf('grant_type=refresh_token') === -1) return res;
+    return res.text().then((body) => new Response(body, { status: 503, statusText: 'Service Unavailable', headers: res.headers }));
+}
+
 export function sbWithin(promise, timeoutMs) {
     let timer = null;
     const guard = new Promise((_, reject) => {
@@ -164,7 +170,7 @@ export function createSupabaseTransport(config, deps?) {
             detectSessionInUrl: false
         },
         global: {
-            fetch: (input, init) => sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs)
+            fetch: (input, init) => sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs).then((res) => sbSoftenRefreshRateLimit(input, res))
         }
     });
     const toSession = (s) => (s && s.access_token && s.user ? { accessToken: s.access_token, user: { id: s.user.id, email: s.user.email || '' } } : null);

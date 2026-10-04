@@ -11,6 +11,12 @@ export const SB_ACCOUNT_BLOCKED_TEXT = {
     revoked: 'ហាងនេះត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់'
 };
 
+export function sbClockSkewText(offsetMs) {
+    const minutes = Math.max(1, Math.round(Math.abs(Number(offsetMs) || 0) / 60000));
+    return 'ម៉ោងលើឧបករណ៍នេះ' + (offsetMs < 0 ? 'លឿន' : 'យឺត') + 'ជាងម៉ោង Server ប្រហែល ' + minutes
+        + ' នាទី — សូមបើក «កំណត់ម៉ោងស្វ័យប្រវត្តិ» ក្នុង Settings (ម៉ោងខុសធ្វើឲ្យការចូលប្រព័ន្ធ និងការភ្ជាប់ Server ដាច់ញឹក)';
+}
+
 export const SB_SESSION_ENDED_TEXT = 'សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់ (ចាកចេញពីផ្ទាំងផ្សេង ឬ Server លែងទទួលស្គាល់) — សូមចូលប្រព័ន្ធម្តងទៀត';
 
 export function loginEmailFor(input, domain) {
@@ -297,7 +303,8 @@ export function createSupabaseSdk(makeTransport, env) {
                     onListenerError: env.onListenerError,
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
-                    onTxOutcomeUnknown: env.onTxOutcomeUnknown
+                    onTxOutcomeUnknown: env.onTxOutcomeUnknown,
+                    onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);

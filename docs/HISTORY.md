@@ -57,7 +57,7 @@
    វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
    សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
-   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
+   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
    នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
    (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
@@ -186,9 +186,17 @@ Function `netlify/functions/zto-order-detail.js`។
   «មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify (reason)» · `site:*` ➜ «គ្មានលេខសាខា» ដដែល។
 - **Function ZTO ៖ សំណើដែលចូលរួម run របស់អ្នកផ្សេង លើសថវិកា** (ZTO-G6) ៖ B ចាប់ផ្តើមមុន តែអាន Cookie store យឺត ➜ ចូលរួម run របស់ A (ចាប់ផ្តើមក្រោយ) ➜ រង់ចាំរហូត run
   ចប់តាមថវិការបស់ A ➜ មុនកែ B ឆ្លើយក្រោយ **7004 ms** (ថវិកា 6000)។ ឥឡូវ ៖ `joinWithinBudget()` ➜ ការរង់ចាំមានពិដានតាមថវិការបស់អ្នកចូលរួម ➜ `ZTO_TIMEOUT` (JSON) ទាន់ពេល។
+- **នាឡិកាទូរស័ព្ទលឿន ~១ ម៉ោង** (G6 · ហាង Supabase) ៖ GoTrue ឲ្យ `expires_at` តាមម៉ោង Server ➜ supabase-js ប្រៀបជាមួយម៉ោងទូរស័ព្ទ ➜ token មើលទៅ «ផុត» រាល់ពេល ➜
+  refresh ស្ទើររាល់ RPC (វាស់ ៖ ៥ RPC ➜ refresh ≥ ៤) ➜ GoTrue កំណត់ល្បឿន (429) ➜ supabase-js ចាត់ 429 ជាចុងក្រោយ ➜ **ចាកចេញ**។ ឥឡូវ ៖ 429 លើ refresh = បណ្តោះអាសន្ន
+  (`sbSoftenRefreshRateLimit()` ➜ session នៅ ➜ RPC សាកឡើងវិញ) · App ព្រមានម្តង «⚠️ ម៉ោងលើឧបករណ៍នេះលឿនជាងម៉ោង Server ប្រហែល N នាទី — សូមបើក «កំណត់ម៉ោងស្វ័យប្រវត្តិ»…»
+  (គម្លាត > `SB_CLOCK_SKEW_WARN_MS` ៥ នាទី · វាស់ពី `now` របស់ server)។ ការចូលប្រព័ន្ធដែលទទួល 429 នៅជាសារ «ព្យាយាមញឹកពេក»។ ⏳ ការកែគម្លាតម៉ោងក្នុង supabase-js
+  ខ្លួនឯង (refresh ញឹក) មិនធ្វើ ៖ ត្រូវកែ `expires_at` ក្នុង storage (ហានិភ័យកែពីរដង) ➜ ការព្រមានឲ្យអ្នកប្រើកែម៉ោងជាដំណោះស្រាយ។
 - 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
 
 #### អ្នកយាម
+
+- `ZoeW/tests/supabase-clock-skew.test.ts` (ថ្មី · supabase-js ពិត · adapter ពិត · SDK) ៖ tree មុនកែ **ធ្លាក់ ២/៥** (429 ➜ session ត្រូវលុប · គ្មានការព្រមាន) ➜ **៧/៧**
+  (ទិសផ្ទុយ ៖ 400 នៅចាកចេញ · ចូលប្រព័ន្ធ 429 នៅ 429 · គម្លាតតិចជាងព្រំ ➜ គ្មានការព្រមាន)។ Mutation ៥ ➜ ក្រហម ៥។
 
 - `ZoeW/tests/zto-list-identity.test.ts` (ថ្មី · `runZtoListSyncPreview()` ពិត) ៖ tree មុនកែ **ធ្លាក់ ៨/១២** ➜ **១២/១២** · Mutation (config Server ជាបណ្តោះអាសន្ន) ➜ ក្រហម ៣។
   `zto-budget-test` ផ្នែក ៩ (ថ្មី · ២ សំណើស្របគ្នា · store អានតាមលំដាប់ 2000/0 ms) ៖ Function មុនកែ **ធ្លាក់** (B 7004 ms > 6900) ➜ **៦៣ ok**។
@@ -1316,6 +1324,16 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G6 — នាឡិកាទូរស័ព្ទលឿន ➜ refresh ញឹក · 429 ➜ ចាកចេញ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (supabase-js ពិត · `vi.setSystemTime` លឿន ៦៥ នាទី · GoTrue ក្លែងឲ្យ `expires_at` តាមម៉ោង server · PostgREST ក្លែងទាមទារ token) ៖ ៥ RPC ➜ refresh **≥ ៤** ·
+  GoTrue 429 ➜ `AuthApiError` (auth-js `NETWORK_ERROR_CODES` = 500–530 តែប៉ុណ្ណោះ) ➜ access token «ផុត» តាមម៉ោងទូរស័ព្ទ ➜ `_removeSession` ➜ storage **ទទេ** (ចាកចេញ)។
+- **ការកែ** ៖ transport `global.fetch` ➜ `sbSoftenRefreshRateLimit(input, res)` ៖ 429 លើ `/auth/v1/token?grant_type=refresh_token` ➜ 503 (retryable សម្រាប់ auth-js ➜ session នៅ ·
+  backoff ក្នុង ៣០ វិ. ➜ cooldown ៦០ វិ.) · adapter `noteServerTime()` ➜ `onClockSkew(offset)` ម្តង ➜ SDK ➜ `sbClockSkewText()` ➜ env ➜ toast។ ⛔ មិនប៉ះ `attachInfoListeners()`
+  (ស្ថិតក្នុង `shared-fns` ទាំង ២ App)។
+- **លទ្ធផល** ៖ **៧/៧** · vitest ពេញ ៥៥ ឯកសារ / ៤៩១ · Mutation ៥ ៖ គ្មានការប្តូរ 429 · ប្តូរទាំងការចូល · ព្រមានរាល់ការទាញ · គ្មានព្រំ · SDK មិនភ្ជាប់ ➜ ក្រហម ៥។ G7 (fake server
+  គ្មាន reuse interval) ៖ មិនត្រូវការ (G2 ✅ reuse interval ៦០ វិ. ម្ចាស់គម្រោងកំណត់រួច)។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G2 + ZTO-G6 — អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន · ថវិកា single-flight (ការកែ ➜ ផ្នែក ១ [2.49.4])
 

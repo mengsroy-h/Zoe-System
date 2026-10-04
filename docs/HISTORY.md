@@ -52,10 +52,13 @@
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
    **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
-   **ជុំ ៣ Config ➜ Login ➜ Signup កំពុងធ្វើ** (ចាប់ផ្តើមពីការរកឃើញ login ពីជុំ ២ ដែលមិនទាន់ផ្ទៀង ៖ G2 ចម្លើយ refresh បាត់ ➜ ចាកចេញ · G3 alert លុយក្លែង
-   សម្រាប់ការសរសេរដែលមិនទាន់ផ្ញើ · G4 ចាកចេញពេលក្រៅបណ្តាញ (token ផុត) មិនចាកចេញពិត · G5 បើក App ក្រៅបណ្តាញ ➜ ប្រអប់ចូលជាប់ · G6 នាឡិកាលឿន ➜ refresh ញឹក/429
-   ចាកចេញ) · នៅសល់ពីជុំ ២ ៖ realtime websocket ពិត · SW/License ក្រោមបណ្តាញខូច · Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ស្នើព្រមាន) ·
-   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · workflow ≤ ១០ agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
+   **ជុំ ២ នៅសល់ ៣ (ម្ចាស់គម្រោងសម្រេច ៖ ម្តងមួយចំណុចក្នុងមួយ session · គ្មាន workflow/agent ព្រោះកូតា)** ៖ 🔒 G4 ចាកចេញពេល Supabase មិនឆ្លើយ +
+   token ផុត ➜ session នៅក្នុង storage ➜ អ្នកបើក App បន្ទាប់ចូលជាគណនីមុន (`supabase-transport.ts` `signOut()`) ➜ G5 បើក App ក្រៅបណ្តាញ + token ផុត ➜
+   ប្រអប់ចូលជាប់ទោះ refresh ជោគជ័យក្រោយ (`supabase-sdk.ts` `onSession`/`restoreSession` · `attemptAuthStorageRecovery`) ➜ ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់
+   ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី)។ **ម្ចាស់គម្រោងធ្វើដោយដៃ** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval»
+   ១០ ➜ ៦០ វិ.។ **ទទួលយក/ពេលក្រោយ** (គ្មានលុយខុស · គ្មានទិន្នន័យបាត់) ៖ G3 · G6 · G7 · SBD-5 · SBD-6 · ZTO-G2/G3/G5/G6 · realtime websocket ពិត ·
+   SW/License ក្រោមបណ្តាញខូច · Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ស្នើព្រមាន)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ៣ ចំណុចនេះ ·
+   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ⛔ គ្មាន workflow/agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
    `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។

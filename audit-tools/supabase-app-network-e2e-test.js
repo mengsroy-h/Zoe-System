@@ -304,11 +304,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const reloadMark = fake.requests.length;
         // ⛔ race ផុតកំណត់ ↔ ការទាញ delta ជាពេលវេលារបស់ App (ការពិនិត្យ ៤ ម៉ោងនៅមុន `initDatabaseListeners()` · token របស់ runSync រង់ចាំ lock auth របស់ supabase-js) ➜ បង្ខំដោយមិនពឹងពេល ៖
         //    (១) ទំព័រថ្មី (តែការផ្ទុកនេះ) ៖ `getIdTokenResult()` រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ ➜ ការសម្រេចផុតកំណត់ធ្លាក់ចំពេលការទាញកំពុងរត់ (២) server ៖ ចម្លើយការទាញនោះរង់ចាំរហូតការចាកចេញ
-        const race = { pullHeld: false, pullReleasedAfterLogout: false };
+        // ⛔ «ចេញមុនការចាកចេញ» សម្រេចពេលការទាញ **មកដល់** (`before`) មិនមែនពេល `after` ទេ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (G4) ➜ logout អាចមកដល់
+        //    ចន្លោះ `before` និង `after` ➜ ចម្លើយមកក្រោយ logout ពិត តែ hook ចាស់មើលមិនឃើញ (CI ៖ `pullHeld:false`)
+        const race = { pullBeforeLogout: false, pullHeld: false, pullReleasedAfterLogout: false };
         const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
         const newPageRefreshed = () => fake.requests.slice(reloadMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
         fake.setRpcHook(async ({ fn, phase }) => {
-            if (fn === 'zoe_pull' && phase === 'after' && !race.pullHeld && newPageRefreshed() && !loggedOut()) {
+            if (fn === 'zoe_pull' && phase === 'before' && !race.pullBeforeLogout && newPageRefreshed() && !loggedOut()) race.pullBeforeLogout = true;
+            if (fn === 'zoe_pull' && phase === 'after' && race.pullBeforeLogout && !race.pullHeld) {
                 race.pullHeld = true;
                 const t0 = Date.now();
                 while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);

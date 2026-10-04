@@ -52,12 +52,16 @@
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
    **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
-   **ជុំ ២ នៅសល់ ៣ (ម្ចាស់គម្រោងសម្រេច ៖ ម្តងមួយចំណុចក្នុងមួយ session · គ្មាន workflow/agent ព្រោះកូតា)** ៖ 🔒 G4 ចាកចេញពេល Supabase មិនឆ្លើយ +
-   token ផុត ➜ session នៅក្នុង storage ➜ អ្នកបើក App បន្ទាប់ចូលជាគណនីមុន (`supabase-transport.ts` `signOut()`) ➜ G5 បើក App ក្រៅបណ្តាញ + token ផុត ➜
-   ប្រអប់ចូលជាប់ទោះ refresh ជោគជ័យក្រោយ (`supabase-sdk.ts` `onSession`/`restoreSession` · `attemptAuthStorageRecovery`) ➜ ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់
-   ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី)។ ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval»
-   ១០ ➜ ៦០ វិ. (ការរកឃើញការលួច refresh token នៅបើក)។ **ទទួលយក/ពេលក្រោយ** (គ្មានលុយខុស · គ្មានទិន្នន័យបាត់) ៖ G3 · G6 · G7 · SBD-5 · SBD-6 · ZTO-G2/G3/G5/G6 · realtime websocket ពិត ·
-   SW/License ក្រោមបណ្តាញខូច · Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ស្នើព្រមាន)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ៣ ចំណុចនេះ ·
+   **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
+   វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)** ៖ (១) 🔒 G4 ចាកចេញពេល Supabase មិនឆ្លើយ + token ផុត ➜ session នៅក្នុង storage ➜ អ្នកបើក App បន្ទាប់ចូលជាគណនីមុន
+   (`supabase-transport.ts` `signOut()`) (២) G5 បើក App ក្រៅបណ្តាញ + token ផុត ➜ ប្រអប់ចូលជាប់ទោះ refresh ជោគជ័យក្រោយ (`supabase-sdk.ts` `onSession`/
+   `restoreSession` · `attemptAuthStorageRecovery`) (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
+   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ (៦) ZTO-G3 HTTP 200 body ខូច ➜
+   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
+   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
+   ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
+   (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
+   ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
    ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ⛔ គ្មាន workflow/agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
    `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។

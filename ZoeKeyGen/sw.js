@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v115';
+const CACHE_VERSION = 'zoekeygen-v116';
 
 const CORE_SHELL = [
     './',
@@ -22,11 +22,28 @@ const SHELL_PATHS = new Set(
     CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
 );
 
+const OPTIONAL_INSTALL_TIMEOUT_MS = 20000;
+
+function addOptionalShell(cache, url) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const request = controller ? new Request(url, { signal: controller.signal }) : url;
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            resolve();
+        }, OPTIONAL_INSTALL_TIMEOUT_MS);
+        cache.add(request).catch(() => {}).then(() => {
+            clearTimeout(timer);
+            resolve();
+        });
+    });
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
             .then((cache) => cache.addAll(CORE_SHELL).then(() => Promise.all(
-                OPTIONAL_SHELL.map((url) => cache.add(url).catch(() => {}))
+                OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
             )))
             .then(() => self.skipWaiting())
     );

@@ -46,7 +46,7 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4**
+1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5**
    (PR #285 · ជុំ ២ ដែលនៅសល់ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
@@ -58,7 +58,7 @@
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
    សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
    «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
-   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
+   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) ✅ **➜ [2.49.4]** SW install ព្យួរដោយឯកសារ OPTIONAL + License ៖ អ្នកយាម ២ ចន្លោះ (ផ្នែក ២ «ចំណុច ១០») ➜ **ជុំ ២ ចប់គ្រប់ចំណុច**។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
    (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
    ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
@@ -137,12 +137,12 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.4] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
+### [2.49.4] — 2026-10-04 · ZoeW · ZoeKeyGen `2.24.5` ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ · SW ៖ ឯកសារបន្ថែមព្យួរមិនរារាំងការដំឡើង** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
 
-**ZoeW `2.49.4`** (`zoew-v259` ➜ `zoew-v260`) · ZoeKeyGen មិនប្រែ។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ adapter Supabase
+**ZoeW `2.49.4`** (`zoew-v259` ➜ `zoew-v260`) · **ZoeKeyGen `2.24.5`** (`zoekeygen-v115` ➜ `zoekeygen-v116` ៖ `sw.js` តែប៉ុណ្ណោះ)។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ adapter Supabase
 (`src/services/supabase-sdk.ts` · `supabase-transport.ts`) និង env របស់វា (`src/services/firebase-init.ts` ៖ `onSessionEnded`) · សារចាកចេញបរាជ័យ (`src/features/auth.ts` ·
 `app-lock.ts` ៖ និយាយពី «ឧបករណ៍នេះ» ព្រោះការបរាជ័យតែមួយគត់ដែលនៅសល់ = storage លុបមិនចេញ) · `src/features/zto-list-sync.ts` · `auto-lookup.ts` ·
-Function `netlify/functions/zto-order-detail.js`។
+Function `netlify/functions/zto-order-detail.js` · `src/sw/sw.ts` + `ZoeKeyGen/sw.js` (install)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -191,9 +191,19 @@ Function `netlify/functions/zto-order-detail.js`។
   (`sbSoftenRefreshRateLimit()` ➜ session នៅ ➜ RPC សាកឡើងវិញ) · App ព្រមានម្តង «⚠️ ម៉ោងលើឧបករណ៍នេះលឿនជាងម៉ោង Server ប្រហែល N នាទី — សូមបើក «កំណត់ម៉ោងស្វ័យប្រវត្តិ»…»
   (គម្លាត > `SB_CLOCK_SKEW_WARN_MS` ៥ នាទី · វាស់ពី `now` របស់ server)។ ការចូលប្រព័ន្ធដែលទទួល 429 នៅជាសារ «ព្យាយាមញឹកពេក»។ ⏳ ការកែគម្លាតម៉ោងក្នុង supabase-js
   ខ្លួនឯង (refresh ញឹក) មិនធ្វើ ៖ ត្រូវកែ `expires_at` ក្នុង storage (ហានិភ័យកែពីរដង) ➜ ការព្រមានឲ្យអ្នកប្រើកែម៉ោងជាដំណោះស្រាយ។
+- **ដំឡើង SW ពេលបណ្តាញ «ភ្ជាប់តែស្លាប់»** (App ទាំង ២) ៖ ឯកសារ `OPTIONAL_SHELL` (រូបតំណាង · `manifest.json` · SheetJS) មួយដែល server មិនឆ្លើយ ➜ មុនកែ
+  `.catch(() => {})` មិនជួយ (ព្យួរ ≠ បរាជ័យ) ➜ SW **ជាប់ `installing`** (វាស់ ៖ ៤៥ វិ. ហើយនៅតែ installing · បណ្តាញធម្មតា activate ក្នុង 176 ms) ➜ គ្មាន offline ·
+  កំណែថ្មីមិនដល់ ទោះ CORE ចូល cache រួច។ ឥឡូវ ៖ ឯកសារ OPTIONAL នីមួយៗមានពិដាន `OPTIONAL_INSTALL_TIMEOUT_MS` (២០ វិ. · abort + resolve ដោយរចនាសម្ព័ន្ធ) ➜ SW activate ·
+  ឯកសារដែលខ្វះចូល cache ពេលប្រើលើកដំបូងតាមផ្លូវ fetch ធម្មតា។ CORE នៅជាក្រុម atomic ដដែល (CORE ព្យួរ ➜ មិន activate)។
 - 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
 
 #### អ្នកយាម
+
+- `sw-install-integrity-test` ជុំទី ៦ (ថ្មី · browser ពិត · App ទាំង ២ · ធនធានដេរីវេពី `OPTIONAL_SHELL`/`CORE_SHELL` ពិត · ៤ សេណារីយ៉ូស្របគ្នា) ៖ tree មុនកែ **ធ្លាក់ ៤**
+  (App ទាំង ២ ជាប់ installing · គ្មានពិដានក្នុងកូដ) ➜ **៣៧ ok** · ទិសផ្ទុយ ៖ CORE ព្យួរ ➜ មិន activate · ពិដានដេរីវេ ≤ ៦០ វិ.។
+- `license-grace-test` (បន្ថែម ១១ · គ្មានការកែកូដ License ៖ កូដត្រឹមត្រូវ តែគ្មានអ្នកយាម) ៖ mutation «GET `license_keys` 5xx ➜ `ok:false`» និង «PUT seat បាត់ដោយបណ្តាញ ➜
+  `seat-taken`» **រស់** គ្រប់ checker License ទាំង ៦ ➜ ឥឡូវ ក្រហម ៣ និង ២ (Server 500/503/429 ➜ មិនលុប · Activate «network» · PUT មិន commit ➜ មិនលុប · commit រួចតែបាត់ចម្លើយ ➜
+  Activate ម្តងទៀតជោគជ័យ)។
 
 - `ZoeW/tests/supabase-realtime-ws.test.ts` (ថ្មី · realtime-js ពិត + transport + adapter ទល់នឹង server Phoenix ក្លែងលើ `ws` ពិត) ៖ ៥ សេណារីយ៉ូ ➜ adapter `main` **ធ្លាក់ ២/៥**
   (server បិទ channel · បដិសេធ join ➜ មិន subscribe វិញ = SBD-6 ជាមួយ websocket ពិត) ➜ **៥/៥**។
@@ -227,7 +237,7 @@ Function `netlify/functions/zto-order-detail.js`។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- Merge ➜ Netlify deploy `zoew` **និង `zoekeygen`** (`sw.js`) · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
 - ⏳ សាកលើឧបករណ៍ពិត (ហាង Supabase) ៖ ចូល ➜ បិទ App ទុក ១-២ ម៉ោង (តិចជាង ៤ ម៉ោង) ➜ បិទ Wi-Fi/Data ➜ បើក App ➜ ត្រូវនៅក្នុងប្រព័ន្ធ (មិន reload · គ្មានប្រអប់ចូល · ស្ថានភាព
   «ក្រៅបណ្ដាញ») ➜ បើកបណ្តាញ ➜ ទិន្នន័យទាញខ្លួនឯង (មិនវាយពាក្យសម្ងាត់)។
 - ⏳ ចាកចេញ ៖ បិទបណ្តាញ ➜ ចុចចាកចេញ ➜ ត្រូវចេញក្នុង ~៣ វិ. («✅ បានចាកចេញ») ➜ បិទ/បើក App (មានបណ្តាញ) ➜ ត្រូវឃើញប្រអប់ចូល (មិនចូលគណនីមុនខ្លួនឯង)។
@@ -1326,6 +1336,23 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ចំណុច ១០ — SW + License ក្រោមបណ្តាញខូច (SW ➜ ផ្នែក ១ [2.49.4] · License ៖ អ្នកយាមតែប៉ុណ្ណោះ)
+
+- **SW (browser ពិត · server ក្លែងដែលទទួល socket តែមិនឆ្លើយ)** ៖ revalidate · fetch · ការពិនិត្យ deploy មានពិដានរួច (`sw-revalidation-timeout` · `sw-abort-propagation`)។
+  ចន្លោះ = **install** ៖ `cache.addAll(CORE)` និង `cache.add(OPTIONAL)` គ្មានពិដាន។ វាស់លើ build `zoew-v260` មុនកែ ៖ `icon-192.png` ព្យួរ ➜ SW **នៅ `installing` ក្រោយ ៤៥ វិ.**
+  (គ្មាន `statechange`) · បណ្តាញធម្មតា ➜ activated ក្នុង 176 ms។ ZoeKeyGen ដូចគ្នា (`manifest.json`)។ ការកែ ៖ OPTIONAL នីមួយៗ `addOptionalShell()` (abort + resolve ក្នុង
+  `OPTIONAL_INSTALL_TIMEOUT_MS` ២០ វិ.) ➜ activate ក្នុង ~២០ វិ.។ ⛔ **CORE មិនដាក់ពិដានទាំងមូល** ៖ សំបក ~២.៣ MB (+ OPTIONAL ~១.២ MB) លើបណ្តាញយឺតអាចលើស
+  ពិដានណាមួយ ➜ install មិនដែលចប់ ➜ អាក្រក់ជាងបច្ចុប្បន្ន · CORE ព្យួរទុកឲ្យ browser សម្លាប់ event ខ្លួនឯង (Chromium ~៥ នាទី) ហើយ `reg.update()` សាកម្តងទៀត។ ⏳ ជុំ ៣ ៖
+  ពិដាន «គ្មានវឌ្ឍនភាព» (idle) លើ CORE តាម stream ត្រូវការវាស់លើ WebKit ពិតមុន។ សង្កេតក្រៅវិសាលភាព ៖ ZoeKeyGen install មិនប្រើ `cache: 'no-cache'` (ZoeW ប្រើ) ➜ ជុំ ៣។
+- **License (`license-verify.js` ពិតក្នុង vm)** ៖ ព្យួរ ➜ `ok:null` ក្នុង `NET_TIMEOUT_MS` · body ព្យួរ ➜ abort · `fetch`/`AbortController` អវត្តមាន ➜ `ok:null` (គ្មានការបោះ) ·
+  PUT seat commit រួចតែចម្លើយបាត់ ➜ Activate លើកទី ១ «network» · លើកទី ២ អាន seat វិញ ➜ `mine` · `getStatus` ព្យួរ ➜ record នៅ ➜ **កូដត្រឹមត្រូវ (វាស់ ៖ គ្មានកំហុស)**។
+  Mutation ៤ លើ checker License ទាំង ៦ (`license-grace` · `license-seat` · `license-network-pressure` · `network-timeout` · `license-record-race` · `license-clock-trust` ·
+  baseline បៃតងទាំង ៦) ៖ catch ➜ `ok:false` ក្រហម ២ · គ្មានពិដាន ➜ `network-timeout` ព្យួរ (ក្រហម) · **GET 5xx ➜ `ok:false` រស់** · **PUT seat បាត់ ➜ `seat-taken` រស់**
+  (ផល ៖ Firebase 503 ម្តង ឬបណ្តាញដាច់កណ្តាលការកក់ seat របស់ record ចាស់ ➜ `checkLocalStatus` **លុប License ពិត**) ➜ `license-grace-test` +១១ ➜ ក្រហម ៣ · ២។
+- **CI** ៖ កូតា GitHub Actions អស់ ➜ CI ចម្លង `audit.yml` ក្នុង session (Node 24 · emulator ពិត · `RUNALL_SHARD=k/4` · ទង់ STRICT ទាំង ៥) ➜ `0e2e766` ៖ ២០២/២០៣ ·
+  ការធ្លាក់តែមួយ = `npm run parity` (សារចាកចេញ G4 មិនចុះ `REMOVED_STRINGS`) ➜ `1193fff` ៖ shard 2 បៃតង។ ម្ចាស់គម្រោងប្តូរ `runs-on: self-hosted` (`f2e5d50`) ៖ runner
+  ជា Windows ➜ `audit.yml` (bash · `sudo` · `/opt/pw-browsers/.../chrome-linux` · `playwright install --with-deps`) រត់មិនបាន · runner ត្រូវបិទកណ្តាលការទាញ Java។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ realtime websocket ពិត (ឧបករណ៍វាស់ថ្មី · ការកែ = SBD-6)
 

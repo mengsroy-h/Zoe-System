@@ -367,7 +367,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 #    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
 RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
     ui-flow-test:96 supabase-app-network-e2e-test:95 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 collected-mirror-fuzz-test:50
-    layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:36
+    layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:63
     emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
     ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
     slow-write-test:18 stale-clear-claim-test:17 ios-panel-glide-test:16 listener-leak-test:14 scan-remove-mode-test:14

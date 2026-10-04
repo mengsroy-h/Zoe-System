@@ -456,13 +456,14 @@ export async function importZtoListRows() {
     let failed = 0;
     let pending = 0;
     let takenOver = 0;
+    let notTried = 0;
     const savedDates = new Set();
     try {
         for (let i = 0; i < queue.length; i++) {
             if (!session.current()) return;
             const row = queue[i];
             setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + (i + 1) + '/' + queue.length + '...');
-            if ((navigator.onLine as boolean) === false) break;
+            if ((navigator.onLine as boolean) === false) { notTried = queue.length - i; break; }
             if (isBarcodeAlreadyUsed(row.barcode)) continue;
             const claimPromise = claimBarcodeInRegistry(row.barcode);
             let claim = 'unknown';
@@ -471,10 +472,11 @@ export async function importZtoListRows() {
                     'Barcode claim timed out');
             } catch (e) {
                 if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode);
-                claim = 'unknown';
+                claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
             if (!session.current()) return;
             if (claim === 'taken') { taken++; continue; }
+            if (claim === 'stalled') { failed++; notTried = queue.length - i - 1; break; }
             if (claim !== 'claimed') { failed++; continue; }
             const rollbackImportedRow = () => {
                 if (!session.current()) return;
@@ -506,6 +508,8 @@ export async function importZtoListRows() {
                         refreshCurrentHistoryView();
                         return closedStampMs ? markZtoListRowPickedUp(row.barcode) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
+                    notTried = queue.length - i - 1;
+                    break;
                 } else {
                     failed++;
                     rollbackImportedRow();
@@ -516,21 +520,26 @@ export async function importZtoListRows() {
         if (session.ownsLock()) ztoState.ztoListSyncInFlight = false;
     }
     if (!session.current()) return;
-    ztoState.ztoListSyncResult = null;
-    ztoListSignedProbe.clear();
+    if (!notTried) {
+        ztoState.ztoListSyncResult = null;
+        ztoListSignedProbe.clear();
+    }
     renderZtoListSyncPreview();
     const parts = ['✅ បញ្ចូល ' + saved + ' កញ្ចប់'];
     if (takenOver) parts.push('🔒 យករួច ' + takenOver);
     if (taken) parts.push('♻️ ស្ទួន ' + taken);
     if (pending) parts.push('⏳ កំពុងរក្សាទុក ' + pending);
     if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
+    if (notTried) parts.push('⏸️ មិនទាន់បញ្ចូល ' + notTried + ' (បណ្តាញមិនឆ្លើយ ➜ ឈប់)');
     const dateKeys = Array.from(savedDates).sort();
     const dateNote = dateKeys.length
         ? ' — 📅 កញ្ចប់ចុះលើថ្ងៃស្កេន ZTO ៖ ' + dateKeys.join(' · ')
             + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
         : '';
     showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
-    setZtoListSyncNote(parts.join(' · ') + dateNote + ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');
+    setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried
+        ? ' — បញ្ជីនៅដដែល ➜ ចុច «បញ្ចូល» ម្តងទៀតពេលបណ្តាញល្អ (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន)។'
+        : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។'));
 }
 
 export function openZtoListSyncModal() {

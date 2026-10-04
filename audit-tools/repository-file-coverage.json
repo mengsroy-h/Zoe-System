@@ -2599,7 +2599,13 @@
     "ZoeW/src/services/tx-disconnect.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/tests/ledger-not-applied-retry.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-account.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-auth-unavailable.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-pull-paging.test.ts": {

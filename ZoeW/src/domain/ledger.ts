@@ -83,6 +83,8 @@ export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAd
     };
 }
 
+export const LEDGER_NOT_APPLIED_RETRIES = 3;
+
 export function runLedgerTransaction(ref, update) {
     const sdk = firebaseState.fb;
     let op = 'op_';
@@ -94,11 +96,12 @@ export function runLedgerTransaction(ref, update) {
         op = 'op_';
         for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
     }
-    const send = (tagged) => sdk.runTransaction(ref, (current) => update(current, tagged ? op : null));
-    return send(true).catch((error) => {
-        if (!/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
-        return send(false);
+    const send = (tagged, retries) => sdk.runTransaction(ref, (current) => update(current, tagged ? op : null)).catch((error) => {
+        if (error && error.txOutcome === 'not-applied' && retries > 0) return send(tagged, retries - 1);
+        if (!tagged || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
+        return send(false, retries);
     });
+    return send(true, LEDGER_NOT_APPLIED_RETRIES);
 }
 
 export function ledgerZeroDelta() {

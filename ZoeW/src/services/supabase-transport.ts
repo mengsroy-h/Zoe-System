@@ -169,8 +169,12 @@ export function createSupabaseTransport(config, deps?) {
         if (token) headers.Authorization = 'Bearer ' + token;
         return sbFetchWithTimeout(fetchImpl, url + path, { method: 'POST', headers, body: JSON.stringify(body || {}), cache: 'no-store', credentials: 'omit' }, timeoutMs);
     };
+    const sessionStored = () => {
+        try { return !!storage.getItem(SB_AUTH_STORAGE_KEY); } catch (e) { return false; }
+    };
     const rpc = async (fn, args, timeoutMs) => {
         let token = await sbWithin(accessToken().catch(() => null), timeoutMs);
+        if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable');
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
             const refreshed = await sbWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
@@ -178,6 +182,8 @@ export function createSupabaseTransport(config, deps?) {
             if (next && next !== token) {
                 token = next;
                 res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
+            } else if (!next && sessionStored()) {
+                throw new SbNetworkError('auth-unavailable');
             }
         }
         if (!res.ok) throw rpcErrorFrom(res.status, res.text);

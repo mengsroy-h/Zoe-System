@@ -76,9 +76,13 @@ function build(serverRecord, opts) {
                 try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
                 const held = seat.value[slotMatch[1]];
                 if (held && held.device !== body.device) return res(401, { error: 'Permission denied' });
+                if (opts.onPut) opts.onPut();
+                if (opts.seatPutFail === 'before-commit') return Promise.reject(new TypeError('Failed to fetch'));
                 seat.value[slotMatch[1]] = body;
+                if (opts.seatPutFail === 'after-commit') return Promise.reject(new TypeError('Failed to fetch'));
                 return res(200, body);
             }
+            if (opts.keyStatus) return res(opts.keyStatus, { error: 'unavailable' });
             return res(200, serverRecord);
         },
         __store: store, __clock: clock
@@ -310,6 +314,50 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         const servedSt = await vm.runInContext("getStatus('" + APP + "')", served.ctx);
         ok('សាលក្រម server (expired-server) ➜ ត្រូវលុបដដែល',
             !served.store[STORE_KEY], JSON.stringify(servedSt));
+    }
+
+    // ── «ផ្ទៀងមិនបាន ≠ ខុស» លើផ្លូវ HTTP និងការកក់ seat (Deep audit ជុំ ២ ចំណុច ១០) ──────────────────────────────────
+    //    វាស់ ៖ mutation «GET `license_keys` 5xx ➜ `ok:false`» និង «PUT seat បាត់ចម្លើយ ➜ `seat-taken`» **រស់** គ្រប់ checker License ➜
+    //    Firebase ឆ្លើយ 503 ម្តង ឬបណ្តាញដាច់កណ្តាលការកក់ seat (record ចាស់ + seat ទទេ ➜ `checkLocalStatus` កក់) នឹង **លុប License ពិត**។
+    {
+        const liveRec = () => ({ [STORE_KEY]: JSON.stringify({
+            keyString: 'KEY1', id: 'KEY1', a: APP, iat: 1,
+            exp: Math.floor((1000000 + 30 * 86400000) / 1000),
+            lastOnlineCheck: 1000000, onlineExp: 1000000 + 30 * 86400000, seenMax: 1000000
+        }) });
+        for (const status of [500, 503, 429]) {
+            const hs = build(LIVE, { store: liveRec(), keyStatus: status });
+            const st5 = await vm.runInContext("getStatus('" + APP + "')", hs.ctx);
+            ok('⛔ Server ឆ្លើយ ' + status + ' ➜ License **មិនត្រូវលុប** (នៅ active ក្នុងអនុគ្រោះ)',
+                !!hs.store[STORE_KEY] && st5.state === 'active', JSON.stringify(st5));
+            const ha = build(LIVE, { keyStatus: status });
+            const ra = await vm.runInContext("activate('KEY1', '" + APP + "')", ha.ctx);
+            ok('⛔ Server ឆ្លើយ ' + status + ' ពេល Activate ➜ បដិសេធជា «network» (មិនមែន Key ខុស) · មិនរក្សាទុក',
+                ra.valid === false && ra.reason === 'network' && !ha.store[STORE_KEY], ra);
+        }
+
+        const emptySeat = {};
+        let puts = 0;
+        const hc = build(LIVE, { store: liveRec(), seat: emptySeat, seatPutFail: 'before-commit', onPut: () => { puts++; } });
+        const stc = await vm.runInContext("getStatus('" + APP + "')", hc.ctx);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ getStatus ពិតជាសាកកក់ seat (PUT ≥ 1) ហើយ seat នៅទទេ (មិន commit)',
+            puts >= 1 && Object.keys(emptySeat).length === 0, { puts, emptySeat });
+        ok('⛔ record ចាស់ + seat ទទេ ➜ PUT កក់ seat បរាជ័យបណ្តាញ ➜ License **មិនត្រូវលុប**',
+            !!hc.store[STORE_KEY] && stc.state === 'active', JSON.stringify(stc));
+
+        const hd = build(LIVE, { seat: {}, seatPutFail: 'before-commit' });
+        const rd = await vm.runInContext("activate('KEY1', '" + APP + "')", hd.ctx);
+        ok('⛔ Activate ៖ PUT កក់ seat បរាជ័យបណ្តាញ ➜ បដិសេធជា «network» (មិនមែន «seat-taken») · មិនរក្សាទុក',
+            rd.valid === false && rd.reason === 'network' && !hd.store[STORE_KEY], rd);
+
+        const seatLost = {};
+        const he = build(LIVE, { seat: seatLost, seatPutFail: 'after-commit' });
+        const re1 = await vm.runInContext("activate('KEY1', '" + APP + "')", he.ctx);
+        ok('PUT commit រួចតែចម្លើយបាត់ ➜ Activate លើកទី ១ មិនមែន «seat-taken»', re1.reason !== 'seat-taken', re1);
+        const hf = build(LIVE, { seat: seatLost, store: Object.assign({}, he.store) });
+        const re2 = await vm.runInContext("activate('KEY1', '" + APP + "')", hf.ctx);
+        ok('⛔ បណ្តាញត្រឡប់ ➜ Activate ម្តងទៀតលើឧបករណ៍ដដែល ➜ **ជោគជ័យ** (អាន seat វិញ ➜ ជារបស់ខ្លួន)',
+            re2.valid === true && !!hf.store[STORE_KEY], { re1, re2, seat: seatLost });
     }
 
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));

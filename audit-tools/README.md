@@ -297,7 +297,7 @@ bash audit-tools/emu/rules.sh
 | `periodic-network-guard-test.js` | callback Activate ចាស់មិនប្ដូរ UI/listener របស់ auth/database ថ្មី · ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ · ជាមួយ wrapper `disconnect` ពិត (ក្រៅបណ្តាញ · `fetch` ធ្លាក់) ការសម្គាល់ខលនៅតែចូលជួរ · ការព្យួរសុទ្ធនៅតែ revert | `HISTPATCH_APP_DIR` |
-| `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ · HTTP cache ចាស់មិនពុល cache SW · deploy ថ្មីដែល install ធ្លាក់ ➜ SW ចាស់មិនចាក់ឯកសារកំណែថ្មីចូល cache ចាស់ (asset ដែលសំបកយោងមានក្រៅបណ្តាញ) | `SWINTEG_APP_DIR` |
+| `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ · HTTP cache ចាស់មិនពុល cache SW · deploy ថ្មីដែល install ធ្លាក់ ➜ SW ចាស់មិនចាក់ឯកសារកំណែថ្មីចូល cache ចាស់ (asset ដែលសំបកយោងមានក្រៅបណ្តាញ) · ធនធាន OPTIONAL ព្យួរ ➜ SW activate ក្នុងពិដាន `OPTIONAL_INSTALL_TIMEOUT_MS` ខណៈ CORE ព្យួរ ➜ មិន activate (App ទាំង ២) | `SWINTEG_APP_DIR` |
 | `sw-shell-latency-test.js` | សំបកដែល cache រួច មិនរង់ចាំបណ្តាញ | `SWLATENCY_APP_DIR` |
 | `sw-backend-chunk-test.js` | chunk `supabase-backend` ទាញតែលើឧបករណ៍ដែលប្រើ Supabase (ហាង Firebase មិនដែលទាញ) · ហាង Supabase ៖ ប្រើលើកដំបូង ➜ cache · ក្រៅបណ្តាញ · កំណែក្រោយ install វាក្នុងក្រុមតែមួយ (ទំព័របើកជាប់ ២ កំណែក៏ដោយ) · cache មុនកែ ➜ រក្សា ១ ដង · Chromium ពិត + `sw.js` ពិត | `SWBACKEND_APP_DIR` |
 | `sw-cache-key-test.js` | URL រសើប (Setup Link) មិនជាប់ក្នុង Cache Storage · `guide.html` និង Netlify `/guide` មាន route ផ្ទាល់ · direct navigation ទៅ `/app.js` នៅតែត្រឡប់ `index.html` | `SWKEY_APP_DIR` |
@@ -353,7 +353,7 @@ bash audit-tools/emu/rules.sh
 | `biometric-unlock-test.js` | ជីវមាត្រជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN | `BIOMETRIC_APP_DIR` |
 | `app-lock-test.js` | ចាក់សោ App ៖ មិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ · កុងតាក់ប្តូរបានទាំង ២ ទិស (បើក និងបិទ) | `APPLOCK_APP_DIR` · `APPLOCK_CHROME` |
 | `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
-| `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record | — |
+| `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record · Server ឆ្លើយ 5xx/429 · ការកក់ seat បាត់ដោយបណ្តាញ ➜ `ok: null` (មិនលុប · មិនមែន `seat-taken`) | — |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |

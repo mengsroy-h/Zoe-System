@@ -45,6 +45,23 @@ function noteBackendUse(cache: Cache): Promise<void> {
     return cache.match(BACKEND_USED_KEY).then((seen) => (seen ? undefined : cache.put(BACKEND_USED_KEY, new Response('1')))).catch(() => {});
 }
 
+const OPTIONAL_INSTALL_TIMEOUT_MS = 20000;
+
+function addOptionalShell(cache: Cache, url: string): Promise<void> {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const request = new Request(url, controller ? { cache: FRESH, signal: controller.signal } : { cache: FRESH });
+    return new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            resolve();
+        }, OPTIONAL_INSTALL_TIMEOUT_MS);
+        cache.add(request).catch(() => {}).then(() => {
+            clearTimeout(timer);
+            resolve();
+        });
+    });
+}
+
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         Promise.all([caches.open(CACHE_VERSION), previousBackendUse()])
@@ -52,7 +69,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
                 .then(() => cache.put(SHELL_SCHEME_KEY, new Response('1')))
                 .then(() => (backend.marked ? cache.put(BACKEND_USED_KEY, new Response('1')) : undefined))
                 .then(() => Promise.all(
-                    OPTIONAL_SHELL.map((url) => cache.add(new Request(url, { cache: FRESH })).catch(() => {}))
+                    OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
                 )))
             .then(() => self.skipWaiting())
     );

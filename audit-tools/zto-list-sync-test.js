@@ -1283,6 +1283,7 @@ function firstBody(requests) {
             isBarcodeAlreadyUsed: () => false,
             claimBarcodeInRegistry: (code) => {
                 calls.claim.push(code);
+                if (box.__claimRejects) return Promise.reject(new Error('permission_denied'));
                 if (box.__claimHangs) { const d = deferred(); box.__claimDeferreds.push(d); return d.promise; }
                 return Promise.resolve(box.__claim || 'claimed');
             },
@@ -1363,6 +1364,7 @@ function firstBody(requests) {
                 box.__stale = false; box.__claim = 'claimed';
                 box.__saveThrows = false; box.__saveResult = true; box.__confirm = true;
                 box.__claimHangs = false; box.__saveHangs = false; box.__timeoutLabel = '';
+                box.__claimRejects = false;
                 box.__claimDeferreds = []; box.__saveDeferreds = [];
                 box.navigator.onLine = true;
                 box.__now = Date.UTC(2026, 8, 11, 9, 0, 0) - box.__offsetMin * 60000;
@@ -1448,13 +1450,20 @@ function firstBody(requests) {
             box.__timeoutLabel = 'Barcode claim timed out';
             await runImport();
             ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «claim ព្យួរ» ត្រូវបានឈានដល់ពិត',
-                box.__claimDeferreds.length === 2, box.__claimDeferreds.length);
+                box.__claimDeferreds.length >= 1, box.__claimDeferreds.length);
+            ok('⛔ **ការព្យួរដំបូង ➜ ឈប់** (ZTO-G4 ៖ បន្ត ➜ ជួរនីមួយៗរង់ចាំពិដាន ១៥ វិ. ➜ ១០០ ជួរ = សោជាប់ ~២៥ នាទី)',
+                box.__claimDeferreds.length === 1 && calls.claim.length === 1, calls.claim);
             ok('⛔ claim ព្យួរ ➜ មិនរក្សាទុក', calls.save.length === 0, calls.save);
             ok('⛔ claim ព្យួរ ➜ មិនដោះមុនដឹងសាលក្រម', releasedCodes().length === 0, calls.release);
+            ok('⛔ ឈប់ពេលព្យួរ ➜ សារប្រាប់ចំនួនជួរដែល **មិនទាន់បញ្ចូល** (ZTO-G5)',
+                calls.toast.some((m) => m.indexOf('មិនទាន់បញ្ចូល 1') !== -1), calls.toast);
+            ok('⛔ ឈប់ពេលព្យួរ ➜ **រក្សាបញ្ជី** ដើម្បីចុចបញ្ចូលម្តងទៀត (មិនសម្អាត preview)',
+                !!box.ztoListSyncResult && box.ztoListSyncResult.rows.length === 2, box.ztoListSyncResult);
+            ok('⛔ ឈប់ពេលព្យួរ ➜ សោដោះ', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
             box.__claimDeferreds.forEach((d) => d.resolve('claimed'));
             await flush();
             ok('⛔ claim ដែលចុះ **យឺត** ជា `claimed` ➜ ត្រូវដោះវិញ (បើអត់ ➜ កូនសោ registry កំព្រា ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត)',
-                releasedCodes().length === 2, calls.release);
+                releasedCodes().length === 1, calls.release);
 
             reset();
             box.__claimHangs = true;
@@ -1470,7 +1479,12 @@ function firstBody(requests) {
             box.__timeoutLabel = 'Save timed out';
             await runImport();
             ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «ការសរសេរព្យួរ» ត្រូវបានឈានដល់ពិត',
-                box.__saveDeferreds.length === 2, box.__saveDeferreds.length);
+                box.__saveDeferreds.length >= 1, box.__saveDeferreds.length);
+            ok('⛔ ការសរសេរព្យួរដំបូង ➜ ឈប់ (មិនរង់ចាំពិដានលើជួរបន្ទាប់)',
+                box.__saveDeferreds.length === 1 && calls.claim.length === 1, calls.claim);
+            ok('⛔ ការសរសេរព្យួរ ➜ សារប្រាប់ «កំពុងរក្សាទុក» និង «មិនទាន់បញ្ចូល» · បញ្ជីនៅ',
+                calls.toast.some((m) => m.indexOf('⏳') !== -1 && m.indexOf('មិនទាន់បញ្ចូល 1') !== -1)
+                && !!box.ztoListSyncResult, calls.toast);
             ok('⛔ ការសរសេរព្យួរ ➜ **មិនដោះកូនសោ registry ភ្លាម** (RTDB ចាក់ជួរ ➜ commit យឺត ➜ ការដោះ = barcode ស្កេនចូលបាន ២ ដង ➜ **លុយបូកស្ទួន**)',
                 releasedCodes().length === 0, calls.release);
             ok('⛔ សារមិនត្រូវអះអាងថា «បរាជ័យ» ខណៈការសរសេរនៅរស់',
@@ -1487,7 +1501,27 @@ function firstBody(requests) {
             box.__saveDeferreds.forEach((d) => d.reject(new Error('write rejected')));
             await flush();
             ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ',
-                releasedCodes().length === 2, calls.release);
+                releasedCodes().length === 1, calls.release);
+
+            reset();
+            box.__claimRejects = true;
+            await runImport();
+            ok('ទិសផ្ទុយ ៖ claim **បដិសេធ** (មិនមែនព្យួរ) ➜ បន្តជួរបន្ទាប់ (មិនមែនការព្យួរ)',
+                calls.claim.length === 2 && calls.save.length === 0, calls.claim);
+
+            reset();
+            const saveImpl = box.addOrUpdateEntry;
+            box.addOrUpdateEntry = (...args) => { box.navigator.onLine = false; return saveImpl(...args); };
+            await runImport();
+            box.addOrUpdateEntry = saveImpl;
+            ok('⛔ បណ្តាញដាច់កណ្តាលការបញ្ចូល ➜ ឈប់ · សារប្រាប់ «មិនទាន់បញ្ចូល 1» · បញ្ជីនៅ (ZTO-G5)',
+                calls.save.length === 1 && calls.toast.some((m) => m.indexOf('មិនទាន់បញ្ចូល 1') !== -1)
+                && !!box.ztoListSyncResult, { save: calls.save.length, toast: calls.toast });
+
+            reset();
+            await runImport();
+            ok('ទិសផ្ទុយ ៖ បញ្ចូលគ្រប់ជួរ ➜ សម្អាតបញ្ជី · គ្មាន «មិនទាន់បញ្ចូល»',
+                box.ztoListSyncResult === null && !calls.toast.some((m) => m.indexOf('មិនទាន់បញ្ចូល') !== -1), calls.toast);
             reset();
 
             // ═════════════════════════════════════════════════════════════

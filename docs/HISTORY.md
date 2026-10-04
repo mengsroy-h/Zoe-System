@@ -46,19 +46,24 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4**
-   (Deep audit ជុំ ១–២ · PR #284) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
-   secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី** (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` ·
-   version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** · Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration
-   មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ) ៖ **ជុំ ១ លុយ ចប់** ([2.49.2] ·
-   ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · ការកែឫសគល់ outcome `unknown` ធ្វើរួចតាមការយល់ព្រម · Sentry Loader ថ្មី) ·
-   **ជុំ ២ បណ្តាញ កំពុងធ្វើ** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» · កំហុសដែលម្ចាស់គម្រោងរាយការណ៍ «ចូលវិញក្រោយ ៤ ម៉ោង គ្មានទិន្នន័យ» · G1 (RPC គ្មាន token ពេល
-   GoTrue មិនឆ្លើយ) · ledger `not-applied` (ឧបករណ៍ ៣) · gateway 5xx ក្រោយ commit ➜ ចំណូលរាប់ ២ ដង (SBD-3/4) · ZTO បញ្ជី «យករួច» commit យឺត ➜ គ្មានស្ថិតិយក (ZTO-G1) កែរួច ➜ [2.49.3] · Firebase វាស់លំហូរដដែល ៖ គ្មានកំហុស ក្រៅពីការសរសេរពេលក្រៅបណ្តាញបាត់ពេល Reconfig (ស្នើ · មិនទាន់កែ)) ·
-   **នៅសល់មិនទាន់ផ្ទៀង** (ការរកឃើញរបស់ finder ក្នុង workflow ដែលមិនទាន់មានអ្នកផ្ទៀងទី ២ · លុយមុន) ៖
-   G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ?) · realtime websocket ពិត · SW/License ក្រោមបណ្តាញខូច ➜ ផ្ទៀងម្តងមួយៗដោយគ្មាន workflow
-   (ម្ចាស់គម្រោង ៖ «កុំអោយworkflow ស៊ីកូតាពេក») · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
-   ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
+1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5**
+   (PR #285 · ជុំ ២ ដែលនៅសល់ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+   «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
+   (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
+   Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
+2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
+   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
+   **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
+   វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
+   (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
+   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
+   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
+   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) ✅ **➜ [2.49.4]** SW install ព្យួរដោយឯកសារ OPTIONAL + License ៖ អ្នកយាម ២ ចន្លោះ (ផ្នែក ២ «ចំណុច ១០») ➜ **ជុំ ២ ចប់គ្រប់ចំណុច**។
+   ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
+   (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
+   ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
+   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ⛔ គ្មាន workflow/agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
+   `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
@@ -131,6 +136,111 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.4] — 2026-10-04 · ZoeW · ZoeKeyGen `2.24.5` ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ · SW ៖ ឯកសារបន្ថែមព្យួរមិនរារាំងការដំឡើង** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
+
+**ZoeW `2.49.4`** (`zoew-v259` ➜ `zoew-v260`) · **ZoeKeyGen `2.24.5`** (`zoekeygen-v115` ➜ `zoekeygen-v116` ៖ `sw.js` តែប៉ុណ្ណោះ)។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ adapter Supabase
+(`src/services/supabase-sdk.ts` · `supabase-transport.ts`) និង env របស់វា (`src/services/firebase-init.ts` ៖ `onSessionEnded`) · សារចាកចេញបរាជ័យ (`src/features/auth.ts` ·
+`app-lock.ts` ៖ និយាយពី «ឧបករណ៍នេះ» ព្រោះការបរាជ័យតែមួយគត់ដែលនៅសល់ = storage លុបមិនចេញ) · `src/features/zto-list-sync.ts` · `auto-lookup.ts` ·
+Function `netlify/functions/zto-order-detail.js` · `src/sw/sw.ts` + `ZoeKeyGen/sw.js` (install)។
+
+#### អ្វីដែលខុសពីមុន
+
+- **បើក App ពេលក្រៅបណ្តាញ + token ផុត** (ទូរស័ព្ទទុកលើស ១ ម៉ោង) ៖ supabase-js សាក refresh ឡើងវិញ ~២៥-៣០ វិ. មុន `getSession()` ឆ្លើយ ➜ មុនកែ adapter មិនឆ្លើយ
+  `onAuthStateChanged` ក្នុង ៨ វិ. ➜ App **reload ខ្លួនឯង** (`attemptAuthStorageRecovery` ៖ លុបតែ IndexedDB Firebase · គ្មានប្រយោជន៍លើ Supabase) ➜ ៨ វិ. ទៀត ➜ **ប្រអប់ចូល** ➜
+  បណ្តាញត្រឡប់ ហើយ refresh ជោគជ័យ (`TOKEN_REFRESHED`) តែ adapter មិនអើពើព្រោះ `currentUser` ទទេ ➜ **ជាប់ប្រអប់ចូល** (ក្រៅបណ្តាញ ការវាយពាក្យសម្ងាត់ក៏បរាជ័យ)។
+- ឥឡូវ ៖ ការស្តារមានពិដាន `SB_RESTORE_CEILING_MS` (៣ វិ.) ៖ refresh យឺត ឬបរាជ័យបណ្តោះអាសន្ន (session នៅក្នុង storage) ➜ ស្តារគណនីពី session ក្នុង storage (ដូច
+  Firebase ស្តារអ្នកប្រើពី persistence ពេលក្រៅបណ្តាញ) ➜ App ដំណើរការក្រៅបណ្តាញ (RPC = `auth-unavailable` ➜ សាកឡើងវិញ) ➜ បណ្តាញត្រឡប់ ➜ token ថ្មី។ បណ្តាញល្អ ➜
+  ឆ្លើយដោយ session ថ្មីពី Server ដូចមុន · refresh token មិនត្រឹមត្រូវ ➜ មិនស្តារ។ ការកំណត់ ៤ ម៉ោងនៅដដែល (វដ្ត ៦០ វិ. អាន `authTime` ពី token ចាស់ ៖ វាស់)។
+- **ការពិនិត្យស្ថានភាពហាង (`my_account`) ដែលរំលងពេលក្រៅបណ្តាញ** ➜ រត់ម្តងទៀតពេល `TOKEN_REFRESHED` ឬការទាញជោគជ័យបន្ទាប់ (`_accountUnverified`) ➜ ហាងបិទ/ផុតកំណត់ខណៈ
+  ក្រៅបណ្តាញ ➜ សារហាង + ចាកចេញ (ការពារពិតនៅ RLS ដដែល)។ ការពិនិត្យស្របគ្នាសួរ Server ម្តង (សារតែម្តង)។
+- **supabase-js ចាកចេញដោយខ្លួនឯង** (refresh token ត្រូវ Server បដិសេធ ៖ reuse · session ត្រូវលុប · ចាកចេញពីផ្ទាំងផ្សេង) ➜ មុនកែ ប្រអប់ចូលលេចដោយគ្មានមូលហេតុ ➜ ឥឡូវ
+  «⚠️ សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់ (…) — សូមចូលប្រព័ន្ធម្តងទៀត» (`SB_SESSION_ENDED_TEXT`) · ការចាកចេញរបស់ adapter ខ្លួនឯង (ប៊ូតុង · ៤ ម៉ោង · ហាងបិទ) គ្មានសារនេះ។
+- **ចាកចេញពេល Supabase មិនឆ្លើយ** (G4 · 🔒 ទូរស័ព្ទរួម) ៖ supabase-js `signOut()` អាន session ជាមុន ➜ token ផុត ➜ refresh បរាជ័យបណ្តោះអាសន្ន ➜ ត្រឡប់ error **មុនលុប
+  session** ➜ មុនកែ ៖ ប៊ូតុងចាកចេញជាប់ **13.4 វិ.** ➜ «⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពី Supabase…» (សារបណ្តាញ ខណៈបញ្ហាពិតគឺ session នៅក្នុងឧបករណ៍) ➜ session **នៅក្នុង storage** ➜ អ្នកបើក App បន្ទាប់
+  **ចូលជាគណនីមុន**។ ឥឡូវ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (ដូច Firebase) ៖ ការលុបចោលនៅ Server (`/auth/v1/logout?scope=local` ដោយ token បច្ចុប្បន្ន · refresh មុនបើផុត)
+  ជា best-effort ក្រោមពិដាន `SB_SIGN_OUT_CEILING_MS` (៣ វិ.) ➜ លុប `zoew-sb-auth*` ក្នុង storage ដោយខ្លួនឯង ➜ refresh ដែលកំពុងរត់មកដល់ក្រោយ ត្រូវ commit guard របស់
+  supabase-js បោះចោល (storage ប្រែ) ➜ មិនស្តារ session ឡើងវិញ។ បដិសេធតែពេល storage លុបមិនចេញ (សារ «មិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះ»)។
+- **សំណើដែលមិនទាន់ផ្ញើ ≠ ចម្លើយបាត់** (G3 · លុយ/សារ) ៖ token មិនទាន់បាន (`auth-unavailable` · ពិដានជំហាន token · refresh ក្រោយ 401) ➜ `rpc()` បោះ **មុន POST** ➜
+  មុនកែ adapter ចាត់ជា «ចម្លើយបាត់» ➜ App បិទ/Reconfig ➜ `unknown` + `txServerUnread` + **Sentry `zone: money` ក្លែង** · ledger reconcile មិនរាយ ✅ · ឧបករណ៍ផ្សេងសរសេរ
+  ចន្លោះនោះ ➜ conflict ➜ `not-applied` (ការសរសេរដែលមិនដែលចេញ ក្លាយជាការបដិសេធ)។ ឥឡូវ ៖ `SbNetworkError.unsent` ➜ សាកឡើងវិញដោយមិនដាក់ «ចម្លើយបាត់» ➜ បិទ ➜ `disconnect`
+  ធម្មតា · conflict ➜ CAS សាកលើតម្លៃថ្មី។ សំណើដែលអាចបានផ្ញើ (timeout ក្រោយ POST · បណ្តាញ · gateway 5xx) នៅជា «ចម្លើយបាត់» ដដែល។
+- **channel realtime ងាប់ ➜ ទាញរៀងរាល់ ៣០ វិ. ជារៀងរហូត** (SBD-6) ៖ `CLOSED` (ឧ. token ផុត ➜ Server បិទ channel) ឬ `subscribe()` បរាជ័យ ➜ មុនកែ `startRealtime()` មិនដែល
+  បង្កើតម្តងទៀត (`unsubscribeRealtime` នៅ) ➜ ការផ្លាស់ប្តូរពីឧបករណ៍ផ្សេងមកដល់យឺតរហូតដល់ ៣០ វិ. និងទាញ ១០ ដងច្រើនជាង realtime។ ឥឡូវ ៖ channel មិនរស់ ➜ បង្កើតម្តងទៀតតាម
+  `SB_REALTIME_RETRY_STEPS_MS` (៥ · ១៥ · ៣០ · ៦០ វិ. · timer តែមួយ · ត្រឡប់ទៅដើមពេល `SUBSCRIBED` · channel ដែល realtime-js ភ្ជាប់វិញខ្លួនឯងមិនត្រូវរុះ · status ពី channel
+  ចាស់ត្រូវមិនអើពើ)។
+- **ទាញបញ្ជីពី ZTO ៖ បណ្តាញមិនឆ្លើយកណ្តាលការបញ្ចូល** (ZTO-G4 · App ជាប់ + ZTO-G5 ផ្នែកនាំចូល) ៖ claim/ការរក្សាទុកព្យួរលើសពិដាន ១៥ វិ. ➜ មុនកែ loop បន្តជួរបន្ទាប់ ➜
+  ជួរនីមួយៗរង់ចាំ ១៥ វិ. ម្តងទៀត ➜ `ZTO_LIST_IMPORT_MAX` (១០០) ជួរ = **សោ «⏳ កំពុងដំណើរការ» ជាប់ ~២៥ នាទី** · ចប់ ➜ «⚠️ បរាជ័យ 100» ហើយ **បញ្ជីត្រូវសម្អាត** · បណ្តាញដាច់
+  (`navigator.onLine`) ➜ ឈប់ស្ងាត់ «✅ បញ្ចូល N» (មិនប្រាប់ជួរដែលនៅសល់)។ ឥឡូវ ៖ ការព្យួរដំបូង ឬក្រៅបណ្តាញ ➜ ឈប់ភ្លាម ➜ «⏸️ មិនទាន់បញ្ចូល N (បណ្តាញមិនឆ្លើយ ➜ ឈប់)» ➜
+  បញ្ជីនៅ ➜ ចុច «បញ្ចូល» ម្តងទៀត (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន ៖ `classifyZtoListRows()` + registry)។ claim ដែល **បដិសេធ** (មិនមែនព្យួរ) នៅបន្តជួរបន្ទាប់។
+- **ការទាញពេញច្រើនទំព័រដាច់កណ្តាល ➜ ទិដ្ឋភាពខ្លីជាទិន្នន័យស្រស់** (SBD-5 · ហាង Supabase) ៖ cursor ចាស់ជាង purge (tombstone ចាស់ជាង ២ ថ្ងៃ) ➜ server reset ➜ ទំព័រទី ១
+  សម្អាតទិដ្ឋភាព ➜ ទំព័របន្តធ្លាក់ (បណ្តាញ) ➜ មុនកែ ទិដ្ឋភាពនៅជាទំព័រទី ១ តែ `ready` ➜ listener/ផ្ទាំងដែលបើកក្រោយឃើញ **២ ក្នុងចំណោម ៩ កញ្ចប់** ជាទិន្នន័យស្រស់ (ស្ថិតិ ·
+  Export · «គ្មានទិន្នន័យ»)។ ឥឡូវ ៖ ទំព័រ reset ចូល stage ដាច់ដោយឡែក ➜ ប្តូរតែពេលទំព័រចុងក្រោយ ➜ ចន្លោះនោះនៅជាទិដ្ឋភាពពេញចាស់ (ស្របគ្នា) · ការសរសេររបស់ឧបករណ៍នេះដែល
+  commit ក្រោយ snapshot មិនបាត់ពេលប្តូរ · cache `zoe_docs` មិនរក្សាទុកពេល stage (cursor កណ្តាល + ទិដ្ឋភាពចាស់ = doc ខ្មោចពេលបើក App លើកក្រោយ)។
+- **Lookup ស្កេន ៖ HTTP 200 តែ body ខូច** (ZTO-G3 · proxy/ប្រព័ន្ធ Wi-Fi កាត់ចម្លើយ · ទំព័រ HTML) ➜ មុនកែ `r.json().catch(() => null)` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode
+  នេះ» (អះអាងខុស) · មិនព្យាយាមឡើងវិញ · គ្មាន cooldown។ ឥឡូវ ៖ `LOOKUP_BAD_BODY` = ការបរាជ័យបណ្តោះអាសន្ន ➜ ព្យាយាមឡើងវិញម្តង ➜ «⚠️ ZTO ឆ្លើយមកខូច (មិនពេញលេញ) — សូមស្កេនម្ដងទៀត» ·
+  cooldown បណ្តោះអាសន្ន។ (ZTO-G5 ផ្នែកនាំចូល ➜ ZTO-G4 ខាងលើ · sweep ស្ថានភាព ZTO ចាត់ body ខូចជា «បរាជ័យ» ត្រឹមត្រូវរួច ៖ វាស់ ៖ គ្មាន)
+- **ទាញបញ្ជីពី ZTO ៖ ការផ្ទៀងអត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ≠ «គ្មានសាខា»** (ZTO-G2) ៖ Function ទាញ certs Google មិនបាន (`idtoken:certs`) · token ផុត/នាឡិកា
+  (`idtoken:expired` · `future`) · `kid-unknown` · App យក ID token មិនបានក្នុង ៨ វិ. (`idtoken:missing`) ➜ មុនកែ «🏢 គណនីនេះគ្មានលេខសាខា ZTO — សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ»។
+  ឥឡូវ ៖ «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន (reason) — សូមសាកម្ដងទៀត» · Server កំណត់ខុស (`idtoken:aud` · `iss` · `project-unset` ៖ `ZTO_LIST_SERVER_CONFIG_REASONS`) ➜
+  «មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify (reason)» · `site:*` ➜ «គ្មានលេខសាខា» ដដែល។
+- **Function ZTO ៖ សំណើដែលចូលរួម run របស់អ្នកផ្សេង លើសថវិកា** (ZTO-G6) ៖ B ចាប់ផ្តើមមុន តែអាន Cookie store យឺត ➜ ចូលរួម run របស់ A (ចាប់ផ្តើមក្រោយ) ➜ រង់ចាំរហូត run
+  ចប់តាមថវិការបស់ A ➜ មុនកែ B ឆ្លើយក្រោយ **7004 ms** (ថវិកា 6000)។ ឥឡូវ ៖ `joinWithinBudget()` ➜ ការរង់ចាំមានពិដានតាមថវិការបស់អ្នកចូលរួម ➜ `ZTO_TIMEOUT` (JSON) ទាន់ពេល។
+- **នាឡិកាទូរស័ព្ទលឿន ~១ ម៉ោង** (G6 · ហាង Supabase) ៖ GoTrue ឲ្យ `expires_at` តាមម៉ោង Server ➜ supabase-js ប្រៀបជាមួយម៉ោងទូរស័ព្ទ ➜ token មើលទៅ «ផុត» រាល់ពេល ➜
+  refresh ស្ទើររាល់ RPC (វាស់ ៖ ៥ RPC ➜ refresh ≥ ៤) ➜ GoTrue កំណត់ល្បឿន (429) ➜ supabase-js ចាត់ 429 ជាចុងក្រោយ ➜ **ចាកចេញ**។ ឥឡូវ ៖ 429 លើ refresh = បណ្តោះអាសន្ន
+  (`sbSoftenRefreshRateLimit()` ➜ session នៅ ➜ RPC សាកឡើងវិញ) · App ព្រមានម្តង «⚠️ ម៉ោងលើឧបករណ៍នេះលឿនជាងម៉ោង Server ប្រហែល N នាទី — សូមបើក «កំណត់ម៉ោងស្វ័យប្រវត្តិ»…»
+  (គម្លាត > `SB_CLOCK_SKEW_WARN_MS` ៥ នាទី · វាស់ពី `now` របស់ server)។ ការចូលប្រព័ន្ធដែលទទួល 429 នៅជាសារ «ព្យាយាមញឹកពេក»។ ⏳ ការកែគម្លាតម៉ោងក្នុង supabase-js
+  ខ្លួនឯង (refresh ញឹក) មិនធ្វើ ៖ ត្រូវកែ `expires_at` ក្នុង storage (ហានិភ័យកែពីរដង) ➜ ការព្រមានឲ្យអ្នកប្រើកែម៉ោងជាដំណោះស្រាយ។
+- **ដំឡើង SW ពេលបណ្តាញ «ភ្ជាប់តែស្លាប់»** (App ទាំង ២) ៖ ឯកសារ `OPTIONAL_SHELL` (រូបតំណាង · `manifest.json` · SheetJS) មួយដែល server មិនឆ្លើយ ➜ មុនកែ
+  `.catch(() => {})` មិនជួយ (ព្យួរ ≠ បរាជ័យ) ➜ SW **ជាប់ `installing`** (វាស់ ៖ ៤៥ វិ. ហើយនៅតែ installing · បណ្តាញធម្មតា activate ក្នុង 176 ms) ➜ គ្មាន offline ·
+  កំណែថ្មីមិនដល់ ទោះ CORE ចូល cache រួច។ ឥឡូវ ៖ ឯកសារ OPTIONAL នីមួយៗមានពិដាន `OPTIONAL_INSTALL_TIMEOUT_MS` (២០ វិ. · abort + resolve ដោយរចនាសម្ព័ន្ធ) ➜ SW activate ·
+  ឯកសារដែលខ្វះចូល cache ពេលប្រើលើកដំបូងតាមផ្លូវ fetch ធម្មតា។ CORE នៅជាក្រុម atomic ដដែល (CORE ព្យួរ ➜ មិន activate)។
+- 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
+
+#### អ្នកយាម
+
+- `sw-install-integrity-test` ជុំទី ៦ (ថ្មី · browser ពិត · App ទាំង ២ · ធនធានដេរីវេពី `OPTIONAL_SHELL`/`CORE_SHELL` ពិត · ៤ សេណារីយ៉ូស្របគ្នា) ៖ tree មុនកែ **ធ្លាក់ ៤**
+  (App ទាំង ២ ជាប់ installing · គ្មានពិដានក្នុងកូដ) ➜ **៣៧ ok** · ទិសផ្ទុយ ៖ CORE ព្យួរ ➜ មិន activate · ពិដានដេរីវេ ≤ ៦០ វិ.។
+- `license-grace-test` (បន្ថែម ១១ · គ្មានការកែកូដ License ៖ កូដត្រឹមត្រូវ តែគ្មានអ្នកយាម) ៖ mutation «GET `license_keys` 5xx ➜ `ok:false`» និង «PUT seat បាត់ដោយបណ្តាញ ➜
+  `seat-taken`» **រស់** គ្រប់ checker License ទាំង ៦ ➜ ឥឡូវ ក្រហម ៣ និង ២ (Server 500/503/429 ➜ មិនលុប · Activate «network» · PUT មិន commit ➜ មិនលុប · commit រួចតែបាត់ចម្លើយ ➜
+  Activate ម្តងទៀតជោគជ័យ)។
+
+- `ZoeW/tests/supabase-realtime-ws.test.ts` (ថ្មី · realtime-js ពិត + transport + adapter ទល់នឹង server Phoenix ក្លែងលើ `ws` ពិត) ៖ ៥ សេណារីយ៉ូ ➜ adapter `main` **ធ្លាក់ ២/៥**
+  (server បិទ channel · បដិសេធ join ➜ មិន subscribe វិញ = SBD-6 ជាមួយ websocket ពិត) ➜ **៥/៥**។
+- `ZoeW/tests/supabase-clock-skew.test.ts` (ថ្មី · supabase-js ពិត · adapter ពិត · SDK) ៖ tree មុនកែ **ធ្លាក់ ២/៥** (429 ➜ session ត្រូវលុប · គ្មានការព្រមាន) ➜ **៧/៧**
+  (ទិសផ្ទុយ ៖ 400 នៅចាកចេញ · ចូលប្រព័ន្ធ 429 នៅ 429 · គម្លាតតិចជាងព្រំ ➜ គ្មានការព្រមាន)។ Mutation ៥ ➜ ក្រហម ៥។
+
+- `ZoeW/tests/zto-list-identity.test.ts` (ថ្មី · `runZtoListSyncPreview()` ពិត) ៖ tree មុនកែ **ធ្លាក់ ៨/១២** ➜ **១២/១២** · Mutation (config Server ជាបណ្តោះអាសន្ន) ➜ ក្រហម ៣។
+  `zto-budget-test` ផ្នែក ៩ (ថ្មី · ២ សំណើស្របគ្នា · store អានតាមលំដាប់ 2000/0 ms) ៖ Function មុនកែ **ធ្លាក់** (B 7004 ms > 6900) ➜ **៦៣ ok**។
+
+- `lookup-failure-identity-test` ផ្នែក ២ខ (ថ្មី) ៖ fetch ក្លែងមុនមិនដែលហៅ body reader ➜ body ខូច **មិនអាចវាស់បាន** ➜ ជំហាន `badBody` ហៅ reader ពិតដោយ `json()` បដិសេធ ➜ tree មុនកែ
+  **ធ្លាក់ ៣** ➜ **៥៣ ok**។ Mutation ៣ (គ្មាន retry · គ្មានសារ · គ្មានការចាប់) ➜ ក្រហម ៣។
+
+- `ZoeW/tests/supabase-pull-paging.test.ts` (បន្ថែម ៣ · adapter ពិត) ៖ tree មុនកែ **ធ្លាក់ ១/៣** (listener ថ្មីឃើញ ២ ជំនួស ៩) ➜ **១៩/១៩**។ តេស្ត ២ ទៀតការពារហានិភ័យថ្មីរបស់
+  stage (ការសរសេរ commit ក្រោយទំព័រចុងក្រោយ · cache កណ្តាល stage) ➜ ឆ្លងលើ tree មុនកែ ហើយចាប់ mutation។ Mutation ៦ ➜ ក្រហម ៤ · រស់ ២ (`pullStage = null` ពេលចាកចេញ ·
+  ពេលហាងខុស ៖ cursor 0 តែងតែ reset ➜ stage ថ្មី) ➜ ដកចេញ។
+
+- `zto-list-sync-test` ផ្នែក ៩ ៖ ការអះអាង ៣ ដែល **ចាក់សោកំហុសនេះ** (claim/ការរក្សាទុកព្យួរ ➜ `=== 2` ការព្យាយាម · ការដោះ ២) ➜ ១ · បន្ថែម ៖ ឈប់ក្រោយការព្យួរដំបូង · សារ
+  «មិនទាន់បញ្ចូល» · បញ្ជីនៅ · សោដោះ · បណ្តាញដាច់កណ្តាល · claim បដិសេធ ➜ បន្ត · ចប់គ្រប់ជួរ ➜ សម្អាតបញ្ជី។ tree មុនកែ **ធ្លាក់ ៨** ➜ **៣៨៤ ok**។ Mutation ៦ ➜ ក្រហម ៦។
+
+- `ZoeW/tests/supabase-unsent-tx.test.ts` (ថ្មី · adapter ពិត + transport ពិត + supabase-js ពិត) ៖ tree មុនកែ **ធ្លាក់ ៥/៩** (`unknown` ក្លែង · មិន commit ក្រោយ conflict ·
+  transport មិនដាក់ `unsent` · subscribe តែម្តងទោះ `CLOSED`/`CHANNEL_ERROR`) ➜ **១៧/១៧**។ Mutation ១៣ ➜ ក្រហម ១៣ (ក្រោយបន្ថែមតេស្ត ៨ ដែល mutation ដំបូងរកឃើញថាខ្វះ ៖ ពិដាន
+  ជំហាន token · 401 ➜ refresh បរាជ័យ · reset ជំហាន · channel ភ្ជាប់វិញខ្លួនឯង · CLOSED យឺតពី channel ចាស់ · timer ក្រោយ goOffline · `subscribe()` បោះ · CLOSED ២ ដង)។
+
+- `ZoeW/tests/supabase-signout-offline.test.ts` (ថ្មី · supabase-js ពិត · fake timers) ៖ `main` មុនកែ **ធ្លាក់ ៤/៧** (13.4 វិ. · `Failed to fetch` · session នៅ storage · អ្នកបន្ទាប់ =
+  `u1`) ➜ **៩/៩** (ទិសផ្ទុយ ៖ បណ្តាញល្អ ➜ Server លុបចោលដោយ token នោះ/token ថ្មី · storage លុបមិនចេញ ➜ បដិសេធ)។ Mutation ៦ ➜ ក្រហម ៥ · រស់ ១ (លុប account key ក្នុង
+  transport ៖ adapter `setUser(null)` លុបរួច ➜ ដកចេញ)។
+- `ZoeW/tests/supabase-offline-restore.test.ts` (ថ្មី · supabase-js ពិត + transport ពិត + adapter ពិត · fake timers · ផ្នែកថ្នេរ ៖ transport ក្លែង) ៖ កូដ `main` មុនកែ
+  **ធ្លាក់ ៦/៩** (គ្មានចម្លើយក្នុង 7.5 វិ. · បណ្តាញត្រឡប់ ១២០ វិ. ➜ `currentUser` នៅ `null` · GoTrue 503 ➜ គ្មានចម្លើយ · គ្មានសារមូលហេតុ ២) ➜ **១៤/១៤** (រួម ៖ ក្រៅបណ្តាញ
+  ៤០ វិ. ➜ `getIdTokenResult()` ឲ្យ `authTime` ពី token ចាស់ក្នុងពិដាន ១៥ វិ. ➜ ច្បាប់ ៤ ម៉ោងនៅរស់)។ Mutation ១០ ➜ ក្រហម ៩ ·
+  រស់ ១ (ការពិនិត្យ `refresh_token` ក្នុង session ពី storage ៖ supabase-js លុប session មិនត្រឹមត្រូវដោយខ្លួនឯងរួច ➜ ដកចេញ មិនទុកកូដគ្មានអ្នកវាស់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` **និង `zoekeygen`** (`sw.js`) · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- ⏳ សាកលើឧបករណ៍ពិត (ហាង Supabase) ៖ ចូល ➜ បិទ App ទុក ១-២ ម៉ោង (តិចជាង ៤ ម៉ោង) ➜ បិទ Wi-Fi/Data ➜ បើក App ➜ ត្រូវនៅក្នុងប្រព័ន្ធ (មិន reload · គ្មានប្រអប់ចូល · ស្ថានភាព
+  «ក្រៅបណ្ដាញ») ➜ បើកបណ្តាញ ➜ ទិន្នន័យទាញខ្លួនឯង (មិនវាយពាក្យសម្ងាត់)។
+- ⏳ ចាកចេញ ៖ បិទបណ្តាញ ➜ ចុចចាកចេញ ➜ ត្រូវចេញក្នុង ~៣ វិ. («✅ បានចាកចេញ») ➜ បិទ/បើក App (មានបណ្តាញ) ➜ ត្រូវឃើញប្រអប់ចូល (មិនចូលគណនីមុនខ្លួនឯង)។
 
 ### [2.49.3] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ ចូលប្រព័ន្ធវិញក្រោយផុតកំណត់ ៤ ម៉ោង ឃើញទិន្នន័យគ្រប់ · ទិន្នន័យ/ការសរសេររបស់គណនីមួយមិនឆ្លងទៅគណនីផ្សេង · gateway 5xx មិនរាប់ចំណូល ២ ដង** (រាយការណ៍ដោយម្ចាស់គម្រោង + Deep audit ជុំ ២)
 
@@ -1226,6 +1336,128 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ចំណុច ១០ — SW + License ក្រោមបណ្តាញខូច (SW ➜ ផ្នែក ១ [2.49.4] · License ៖ អ្នកយាមតែប៉ុណ្ណោះ)
+
+- **SW (browser ពិត · server ក្លែងដែលទទួល socket តែមិនឆ្លើយ)** ៖ revalidate · fetch · ការពិនិត្យ deploy មានពិដានរួច (`sw-revalidation-timeout` · `sw-abort-propagation`)។
+  ចន្លោះ = **install** ៖ `cache.addAll(CORE)` និង `cache.add(OPTIONAL)` គ្មានពិដាន។ វាស់លើ build `zoew-v260` មុនកែ ៖ `icon-192.png` ព្យួរ ➜ SW **នៅ `installing` ក្រោយ ៤៥ វិ.**
+  (គ្មាន `statechange`) · បណ្តាញធម្មតា ➜ activated ក្នុង 176 ms។ ZoeKeyGen ដូចគ្នា (`manifest.json`)។ ការកែ ៖ OPTIONAL នីមួយៗ `addOptionalShell()` (abort + resolve ក្នុង
+  `OPTIONAL_INSTALL_TIMEOUT_MS` ២០ វិ.) ➜ activate ក្នុង ~២០ វិ.។ ⛔ **CORE មិនដាក់ពិដានទាំងមូល** ៖ សំបក ~២.៣ MB (+ OPTIONAL ~១.២ MB) លើបណ្តាញយឺតអាចលើស
+  ពិដានណាមួយ ➜ install មិនដែលចប់ ➜ អាក្រក់ជាងបច្ចុប្បន្ន · CORE ព្យួរទុកឲ្យ browser សម្លាប់ event ខ្លួនឯង (Chromium ~៥ នាទី) ហើយ `reg.update()` សាកម្តងទៀត។ ⏳ ជុំ ៣ ៖
+  ពិដាន «គ្មានវឌ្ឍនភាព» (idle) លើ CORE តាម stream ត្រូវការវាស់លើ WebKit ពិតមុន។ សង្កេតក្រៅវិសាលភាព ៖ ZoeKeyGen install មិនប្រើ `cache: 'no-cache'` (ZoeW ប្រើ) ➜ ជុំ ៣។
+- **License (`license-verify.js` ពិតក្នុង vm)** ៖ ព្យួរ ➜ `ok:null` ក្នុង `NET_TIMEOUT_MS` · body ព្យួរ ➜ abort · `fetch`/`AbortController` អវត្តមាន ➜ `ok:null` (គ្មានការបោះ) ·
+  PUT seat commit រួចតែចម្លើយបាត់ ➜ Activate លើកទី ១ «network» · លើកទី ២ អាន seat វិញ ➜ `mine` · `getStatus` ព្យួរ ➜ record នៅ ➜ **កូដត្រឹមត្រូវ (វាស់ ៖ គ្មានកំហុស)**។
+  Mutation ៤ លើ checker License ទាំង ៦ (`license-grace` · `license-seat` · `license-network-pressure` · `network-timeout` · `license-record-race` · `license-clock-trust` ·
+  baseline បៃតងទាំង ៦) ៖ catch ➜ `ok:false` ក្រហម ២ · គ្មានពិដាន ➜ `network-timeout` ព្យួរ (ក្រហម) · **GET 5xx ➜ `ok:false` រស់** · **PUT seat បាត់ ➜ `seat-taken` រស់**
+  (ផល ៖ Firebase 503 ម្តង ឬបណ្តាញដាច់កណ្តាលការកក់ seat របស់ record ចាស់ ➜ `checkLocalStatus` **លុប License ពិត**) ➜ `license-grace-test` +១១ ➜ ក្រហម ៣ · ២។
+- **CI** ៖ កូតា GitHub Actions អស់ ➜ CI ចម្លង `audit.yml` ក្នុង session (Node 24 · emulator ពិត · `RUNALL_SHARD=k/4` · ទង់ STRICT ទាំង ៥) ➜ `0e2e766` ៖ ២០២/២០៣ ·
+  ការធ្លាក់តែមួយ = `npm run parity` (សារចាកចេញ G4 មិនចុះ `REMOVED_STRINGS`) ➜ `1193fff` ៖ shard 2 បៃតង។ ម្ចាស់គម្រោងប្តូរ `runs-on: self-hosted` (`f2e5d50`) ៖ runner
+  ជា Windows ➜ `audit.yml` (bash · `sudo` · `/opt/pw-browsers/.../chrome-linux` · `playwright install --with-deps`) រត់មិនបាន · runner ត្រូវបិទកណ្តាលការទាញ Java។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ realtime websocket ពិត (ឧបករណ៍វាស់ថ្មី · ការកែ = SBD-6)
+
+- **ចន្លោះ** ៖ fake Supabase របស់ audit-tools បិទ upgrade ➜ realtime មិនដែលត្រូវវាស់ពីចុងដល់ចុង។ **ឧបករណ៍ថ្មី** ៖ server Phoenix ក្លែង (`ws` · vsn 2.0.0 ៖ `phx_join` · `phx_reply` ·
+  heartbeat · `broadcast` · `phx_close` + `system` «Token has expired» · `access_token`) + REST `zoe_pull` + GoTrue refresh លើ HTTP ពិត ➜ realtime-js ពិត (តាម supabase-js) + transport + adapter។
+- **លទ្ធផលលើ adapter `main`** ៖ (ក) broadcast `seq` ➜ ការទាញ ✅ · (ខ) server ផ្តាច់ socket ➜ realtime-js ភ្ជាប់វិញ ➜ join ម្តងទៀត ➜ broadcast មក · គ្មាន join បន្ថែមក្នុង ១២ វិ. ✅ ·
+  (គ) server បិទ channel (token ផុត) ➜ **មិន subscribe វិញ** ❌ · (ឃ) server បដិសេធ join ➜ **join តែ ១ ក្នុង ២០ វិ.** ❌ ➜ ទាំង ២ = SBD-6 (កែរួច ៖ ៥/៥ · join ក្នុង ២០ វិ. ≤ ១២) ·
+  (ង) token refresh ពេល channel រស់ ➜ supabase-js `realtime.setAuth()` ➜ `access_token` ទៅ channel · មិន join ម្តងទៀត ✅។
+- **វាស់ ៖ គ្មានកំហុសថ្មី** ក្រៅពី SBD-6។ តេស្តប្រើពេលពិត (~៦០ វិ. ក្នុង vitest ពេញ ៤១ វិ. ព្រោះឯកសាររត់ស្របគ្នា · ពិដាន `zoew-suite` ២៤០ វិ.)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G6 — នាឡិកាទូរស័ព្ទលឿន ➜ refresh ញឹក · 429 ➜ ចាកចេញ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (supabase-js ពិត · `vi.setSystemTime` លឿន ៦៥ នាទី · GoTrue ក្លែងឲ្យ `expires_at` តាមម៉ោង server · PostgREST ក្លែងទាមទារ token) ៖ ៥ RPC ➜ refresh **≥ ៤** ·
+  GoTrue 429 ➜ `AuthApiError` (auth-js `NETWORK_ERROR_CODES` = 500–530 តែប៉ុណ្ណោះ) ➜ access token «ផុត» តាមម៉ោងទូរស័ព្ទ ➜ `_removeSession` ➜ storage **ទទេ** (ចាកចេញ)។
+- **ការកែ** ៖ transport `global.fetch` ➜ `sbSoftenRefreshRateLimit(input, res)` ៖ 429 លើ `/auth/v1/token?grant_type=refresh_token` ➜ 503 (retryable សម្រាប់ auth-js ➜ session នៅ ·
+  backoff ក្នុង ៣០ វិ. ➜ cooldown ៦០ វិ.) · adapter `noteServerTime()` ➜ `onClockSkew(offset)` ម្តង ➜ SDK ➜ `sbClockSkewText()` ➜ env ➜ toast។ ⛔ មិនប៉ះ `attachInfoListeners()`
+  (ស្ថិតក្នុង `shared-fns` ទាំង ២ App)។
+- **លទ្ធផល** ៖ **៧/៧** · vitest ពេញ ៥៥ ឯកសារ / ៤៩១ · Mutation ៥ ៖ គ្មានការប្តូរ 429 · ប្តូរទាំងការចូល · ព្រមានរាល់ការទាញ · គ្មានព្រំ · SDK មិនភ្ជាប់ ➜ ក្រហម ៥។ G7 (fake server
+  គ្មាន reuse interval) ៖ មិនត្រូវការ (G2 ✅ reuse interval ៦០ វិ. ម្ចាស់គម្រោងកំណត់រួច)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G2 + ZTO-G6 — អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន · ថវិកា single-flight (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **ZTO-G2 វាស់លើ tree មុនកែ** (vitest · `runZtoListSyncPreview()` ពិត · fetch ក្លែងឆ្លើយ `enabled:false` + reason) ៖ `idtoken:certs` · `expired` · `future` · `kid-unknown` ·
+  `aud` · `iss` · `project-unset` និង token ព្យួរ ៨ វិ. ➜ **«គ្មានលេខសាខា» ទាំង ៨**។ មូលហេតុ ៖ `reason.indexOf('site:') === 0 || reason.indexOf('idtoken:') === 0` ➜ សាខាតែមួយ។
+  `idtoken:supabase-unreachable` មានសាខាផ្ទាល់រួច (ឆ្លង)។ certs Google ៖ TTL ១ ម៉ោង · ការទាញបរាជ័យ ➜ ប្រើ certs ចាស់ (fail-open) · `kid-unknown` ក្នុង TTL ➜ មិនទាញម្តងទៀត ៖ Google
+  ផ្សព្វផ្សាយ key ថ្មីមុនប្រើ (Cache-Control ច្រើនម៉ោង) ➜ **វាស់មិនបាន** ➜ មិនកែ Function · App ចាត់ជាបណ្តោះអាសន្ន។
+- **ZTO-G6 វាស់** (`zto-budget-test` ផ្នែក ៩ ៖ Function ពិត · upstream ព្យួរ · ថវិកា 6000 · upstream 5500) ៖ B ចាប់ផ្តើម t=0 អាន store 2000 ms · A ចាប់ផ្តើម t=1500 អាន 0 ms ➜
+  A ម្ចាស់ run ➜ B ចូលរួមនៅ t=2000 ➜ B **7004 ms** · A 5503 ms · upstream ១ ដង។ ការកែ ៖ `runSharedLookup()` ➜ `joinWithinBudget(existing, config, startedAt)` (ការប្រណាំងជាមួយ
+  `budgetLeftMs() - 200` ➜ `budgetTimeoutOutcome()` ដែល `fetchOrder()` ប្រើដែរ ➜ គ្មាន JSON 504 ពីរកន្លែង)។ ⛔ ការវិភាគតាមកូដដំបូង («អ្នកចូលរួមតែងមកក្រោយ ➜ មិនអាចលើស») **ខុស** ៖
+  អ្នកចូលរួមអាន *ចាប់ផ្តើម* មុនម្ចាស់ run (ជំហាន Cookie យឺត)។
+- **លទ្ធផល** ៖ ZTO-G2 **១២/១២** · ZTO-G6 **៦៣ ok** · `zto-proxy` · `zto-negative-cache` · `zto-cookie-store` · `zto-cookie-session` · `zto-list-sync` · `netlify-config-scope` ✅។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G3 + ZTO-G5 — body ខូច ≠ «គ្មានទិន្នន័យ» (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (`attemptAutoLookup()` ពិតក្នុង vm) ៖ HTTP 200 + `json()` បដិសេធ ➜ `data = null` ➜ `found = false` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ» · ការហៅ ១ ·
+  `autoLookupFailureAt` ទទេ។ ⛔ មេរៀន ៖ fetch ក្លែងរបស់ checker ត្រឡប់ body ផ្ទាល់ ហើយ **មិនអើពើ reader** (អាគុយម៉ង់ទី ៥) ➜ ផ្លូវ parse body គ្មានអ្នកវាស់។
+- **ការកែ** ៖ reader ត្រឡប់ sentinel `unreadable` (ក្នុង `attemptAutoLookup()`) ➜ ក្រោយ `retryTransientLookupResponse` ៖ `res.ok` + sentinel ➜ `lookupResponseError(status,
+  { code: 'LOOKUP_BAD_BODY' }, true)` ➜ `retryAsync` ព្យាយាមម្តងទៀត ➜ សារផ្ទាល់ខ្លួន។ `zto-status.ts` (`checkZtoStatusForBarcode`) ៖ body ខូច ➜ `null` ➜ `continue` (មិនកត់សាលក្រម ·
+  fail streak) ➜ ត្រឹមត្រូវរួច (វាស់ ៖ គ្មាន)។ ZTO-G5 (សារនាំចូល + បញ្ជីត្រូវសម្អាត) ➜ កែរួចជាមួយ ZTO-G4។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៣** ➜ **៥៣ ok** · `lookup-prefetch` · `lookup-burst` · `zto-proxy` · `network-pressure` · `html-sink-escaping` ✅ · Mutation ៣ ➜ ក្រហម ៣។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ SBD-5 — ការទាញពេញច្រើនទំព័រដាច់កណ្តាល ➜ ទិដ្ឋភាពខ្លី (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (adapter ពិត · fake server មាន purge) ៖ ៩ កញ្ចប់ ready ➜ លុប ១ + purge + កែ ៨ ➜ cursor < purged ➜ reset (ទំព័រ ២) ➜ ទំព័រទី ២ `SbNetworkError` ➜
+  listener ថ្មី **២ keys**។ មូលហេតុ ៖ `applyPull()` reset `server.clear()` លើទំព័រទី ១ ខណៈ `ready` នៅ `true` ➜ `notify()`/`fireListener()` ណាមួយ (listener ថ្មី · ការសរសេរ) បង្ហាញវា។
+- **ការកែ** ៖ `pullStage` (reset ➜ Map ថ្មី · `pullStageAbove` = `max(seq, head)`) · ទំព័របន្តចូល stage · `!res.more` ➜ បញ្ចូល entry ក្នុង `server` ដែល `s > pullStageAbove`
+  (ការសរសេររបស់យើង) ➜ ប្តូរ · `putDocIn(target, …)` ជំនួស `putDoc` ផ្ទាល់ (reset ទំព័រតែមួយ ក៏ឆ្លងផ្លូវដដែល ➜ គ្មានរូបមន្តពីរ) · `saveDocsCacheNow()` ឈប់ពេល stage ៖ ទិដ្ឋភាពចាស់ +
+  cursor កណ្តាល ➜ ឧបករណ៍ដែលផ្ទុកពី cache ទាញ delta ពី cursor នោះ ➜ doc ដែលលុប/កែចន្លោះ cursor ចាស់ និង cursor កណ្តាល **មិនមកវិញ** (វាស់ ៖ mutation ➜ doc ខ្មោច)។
+- **លទ្ធផល** ៖ **១៩/១៩** · vitest ពេញ ៥៣ ឯកសារ / ៤៧២ · Mutation ៦ ៖ គ្មាន stage · cache កណ្តាល stage · គ្មាន keep-newer · មិនប្តូរ ➜ ក្រហម ៤ · `pullStage = null` ២ កន្លែង ➜ រស់ ➜ ដក។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G4 — ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (`zto-list-sync-test` sandbox ៖ `importZtoListRows()` ពិត) ៖ claim ព្យួរ ➜ claim ទាំង ២ ជួរ (= ១០០ ជួរ × ពិដាន ១៥ វិ. ≈ ២៥ នាទី លើ App ពិត) ·
+  ការរក្សាទុកព្យួរ ➜ ការរក្សាទុក ២ · toast «✅ បញ្ចូល 0 កញ្ចប់ · ⚠️ បរាជ័យ 2» · `ztoListSyncResult = null` · បណ្តាញដាច់កណ្តាល ➜ «✅ បញ្ចូល 1 កញ្ចប់» តែប៉ុណ្ណោះ។
+- ⛔ **មេរៀន** ៖ ផ្នែក ៩ មានការអះអាង `claimDeferreds.length === 2` / `saveDeferreds.length === 2` ជា «ជាន់អប្បបរមា» ➜ **ចាក់សោកំហុស** (loop បន្តក្រោយការព្យួរ)
+  ផ្ទុយនឹងច្បាប់ «Batch work aborts after the first hang»។ ជាន់អប្បបរមាត្រូវវាស់ថា *ផ្លូវត្រូវបានឈានដល់* (`>= 1`) មិនមែនចំនួនដែលឥរិយាបថខុសផលិត។
+- **ការកែ** ៖ `notTried` ៖ claim timeout (`'Barcode claim timed out'` តែប៉ុណ្ណោះ ➜ `'stalled'`) · save timeout · `navigator.onLine === false` ➜ `break` · `notTried` ➜ មិនសម្អាត
+  `ztoListSyncResult` · សារ «⏸️ មិនទាន់បញ្ចូល N» + កំណត់ចំណាំ «ចុច «បញ្ចូល» ម្តងទៀត»។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៨** ➜ **៣៨៤ ok** · Mutation ៦ ៖ claim ព្យួរបន្ត · save ព្យួរបន្ត · សម្អាតបញ្ជី · គ្មានសារ · offline មិនរាប់ · claim បដិសេធ = ព្យួរ ➜ ក្រហម ៦។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G3 + SBD-6 — សំណើមិនទាន់ផ្ញើ ≠ ចម្លើយបាត់ · realtime `CLOSED` មិន subscribe វិញ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (adapter ពិត · transport ពិត + supabase-js ពិត) ៖ (ក) token ផុត + GoTrue 503 ➜ `rpc()` បោះ `SbNetworkError('auth-unavailable')` **គ្មាន POST** តែ
+  adapter ដាក់ `lost` ➜ `close` ➜ `txOutcome: 'unknown'` + `onTxOutcomeUnknown` (Sentry លុយ) · (ខ) ចន្លោះនោះឧបករណ៍ផ្សេងសរសេរ ➜ token មកវិញ ➜ conflict ➜ `not-applied`
+  (មិន commit) · (គ) `CLOSED` ក្រោយ `SUBSCRIBED` ➜ `subscribe` **១ ដងក្នុង ១២០ វិ.** · `CHANNEL_ERROR` ជាប់ ➜ **១ ដងក្នុង ៣០០ វិ.**។
+- **ការកែ** ៖ transport ដាក់ `unsent` លើ `SbNetworkError` ដែលបោះមុន POST (`unsentWithin()` លើជំហាន token និង refresh ក្រោយ 401 · `auth-unavailable`) · adapter ៖
+  `if (!lost && !e.unsent)` · ផ្លូវ `close` ក្រោយ delay ➜ `lost ? giveUp() : disconnect` (មុនកែ `giveUp()` លើ `lost = null` ➜ `TypeError`)។ realtime ៖ `scheduleRealtimeRetry()`
+  + `realtimeGeneration` (status ពី channel ដែលរុះរួចត្រូវមិនអើពើ ៖ realtime-js `removeChannel()` ផ្ញើ `CLOSED` យឺត ➜ បើគ្មាន gate ➜ វដ្តរុះ/បង្កើតឥតឈប់ · វាស់)។
+- **លទ្ធផល** ៖ **១៧/១៧** · vitest ពេញ ៥៣ ឯកសារ / ៤៦៩ · Mutation ១៣ ➜ ក្រហម ១៣។ ⛔ មេរៀន ៖ mutation ដំបូង ១៣ ➜ រស់ ៦ (ផ្នែកដែលតេស្តដំបូងមិនបានចូល) ➜ តេស្តថ្មី ៨។
+  gate លើ event broadcast របស់ channel ចាស់ ➜ គ្មានផល (requestSync បន្ថែម) ➜ មិនដាក់។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G4 — ចាកចេញពេល Supabase មិនឆ្លើយ ➜ session នៅក្នុង storage (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ `main`** (supabase-js ពិត · fake timers) ៖ ចូលពេលមានបណ្តាញ ➜ បណ្តាញងាប់ ២ ម៉ោង (token ផុត) ➜ `signOut()` ➜ **បដិសេធ `Failed to fetch` ក្រោយ 13.4 វិ.** ·
+  session **នៅ** ក្នុង storage ➜ SDK ថ្មីលើ storage ដដែល (មានបណ្តាញ) ➜ `onAuthStateChanged(u1)`។ មូលហេតុ ៖ auth-js `_signOut` ➜ `_useSession` ➜ `__loadSession` ➜ refresh
+  បរាជ័យ (retryable) ➜ `return { error: sessionError }` **មុន** `_removeSession` · token នៅមាន ➜ `admin.signOut` network error ➜ លុប session តែត្រឡប់ error ➜ adapter បោះ ➜
+  សារ «មិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase» (`toastBackendText()` ប្តូរជា «Supabase» លើហាង Supabase)។
+- **ការកែ** ៖ transport `signOut()` = (ក) best-effort revoke ក្រោមពិដាន ៣ វិ. (`accessToken()` ➜ `POST /auth/v1/logout?scope=local`) (ខ) លុប `SB_AUTH_KEY_SUFFIXES` ក្នុង storage
+  ដោយខ្លួនឯង (គ) storage នៅមាន session ➜ បដិសេធ។ ⛔ មិនហៅ `client.auth.signOut()` ៖ វារង់ចាំ lock ដែល refresh កំពុងកាន់ (~៣០ វិ.) ហើយ `signInWithPassword` មិនយក lock ➜
+  ការចាកចេញដែលចូលជួរយឺតអាចរត់ **ក្រោយ** ការចូលថ្មី ➜ revoke ហើយចាកចេញគណនីថ្មី។ ⛔ មិន `stopAutoRefresh()` ៖ transport ដដែលប្រើសម្រាប់ការចូលបន្ទាប់ ហើយ ticker អាន
+  storage ទទេ ➜ គ្មានអ្វីត្រូវ refresh។ refresh ដែលកំពុងរត់ ➜ commit guard (`storedAtStart` ≠ `storedAfter`) បោះចោល (វាស់ ៖ បណ្តាញត្រឡប់ ១២០ វិ. ➜ storage ទទេ · ចូលគណនីថ្មីបាន)។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៤/៧** ➜ **៩/៩** · vitest ពេញ ៥២ ឯកសារ / ៤៥២ · Mutation ៦ ៖ គ្មានការលុបក្នុងឧបករណ៍ (ធ្លាក់ ៨) · គ្មានពិដាន (១) · គ្មាន revoke (២) · គ្មានការពិនិត្យ
+  storage (១) · គ្មានការការពារ `ownSignOut` (៣ ៖ refresh 400 កំឡុងចាកចេញ ➜ សារ «សម័យបញ្ចប់» ខុស) · លុប account key ក្នុង transport **រស់** ➜ ដកចេញ។
+- **សម្មតិកម្មដែលកូដបដិសេធ** ៖ «សារជាច្រើននិយាយ Firebase លើហាង Supabase» ➜ មិនពិត ៖ `showToast()` ឆ្លង `toastBackendText()` ដែលប្តូរពាក្យជា «Supabase» រួចហើយ។
+- **សារបរាជ័យ** (`logoutApp()` · `forgetAppLockPin()`) ៖ ការចាកចេញលែងពឹងបណ្តាញ ➜ «សូមពិនិត្យបណ្ដាញ» ក្លាយជាការណែនាំខុស ➜ «…មិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម
+  Refresh ហើយសាកចាកចេញម្តងទៀត»។ ⚠️ ការប្តូរនេះត្រូវចុះក្នុង `REMOVED_STRINGS` (`ZoeW/scripts/intentional-removals.mjs`) ៖ `npm run parity` (ក្នុង `zoew-suite`) ធ្លាក់ 773/775
+  លើ CI ក្នុង session (shard 2/4) ព្រោះការផ្ទៀងក្នុងជុំនោះរត់តែ vitest + checker ពាក់ព័ន្ធ មិនបានរត់ `zoew-suite` ពេញ ➜ បន្ថែម ២ ធាតុមានហេតុផល ➜ 773/773។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G5 — បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ ប្រអប់ចូលជាប់ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ `main` (49adb4d) មុនកែ** ៖ supabase-js ពិត (`@supabase/auth-js` 2.117.2) + storage ក្នុងសតិ + fetch ក្លែង (ក្រៅបណ្តាញ = `TypeError` · GoTrue 503 · 400) · fake timers ៖
+  `restoreSession()` = `getSession()` រង់ចាំ `_initialize` ➜ `_callRefreshToken` សាកឡើងវិញ (backoff 200 ms × 2ⁿ ក្នុង `AUTO_REFRESH_TICK_DURATION_MS` ៣០ វិ.) ➜ **គ្មាន
+  `onAuthStateChanged` ក្នុង 7.5 វិ.** ➜ App ពិត ៖ `attemptAuthStorageRecovery` reload ➜ ប្រអប់ចូល · `getSession()` ឆ្លើយ `null` + `AuthRetryableFetchError` (session **នៅ** ក្នុង storage) ·
+  បណ្តាញត្រឡប់ ➜ ticker ស្វ័យប្រវត្តិ refresh ជោគជ័យ ➜ `TOKEN_REFRESHED` ➜ handler ត្រូវការ `auth.currentUser` ➜ **`currentUser` នៅ `null` ក្រោយ ១២០ វិ.**។
+- **ការកែ** ៖ (ក) `restoreSession(ceilingMs)` ៖ ការប្រណាំងជាមួយពិដាន ៣ វិ. · session ពី Server ➜ ប្រើ · គ្មាន session + គ្មាន error ➜ `null` · error ឬពិដាន ➜ session ក្នុង storage
+  (supabase-js ទុកវាតែពេលបរាជ័យបណ្តោះអាសន្ន · លុបពេល 400) (ខ) `SIGNED_OUT` មកកំឡុងការស្តារ ➜ មិនស្តារ session ចាស់ (`lostWhileRestoring` ៖ ចន្លោះ microtask រវាងការអាន
+  storage និង `setUser`) (គ) `SIGNED_OUT` ដែល adapter មិនបានហៅ (`ownSignOut()` រាប់) ➜ `env.onSessionEnded` (ឃ) `_accountUnverified` ➜ ពិនិត្យហាងម្តងទៀតលើ
+  `TOKEN_REFRESHED` និង `onSynced` · `_verifyAccount()` រួមការហៅស្របគ្នា។ ⛔ មិនអើពើ `TOKEN_REFRESHED` ពេល `currentUser` ទទេដដែល ៖ ការចាកចេញដែលបរាជ័យ (G4) ទុក session ក្នុង
+  supabase-js ➜ ការទទួលយកវានឹងបើកចូលគណនីដែលអ្នកប្រើទើបចាកចេញ។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៦/៩** ➜ **១៤/១៤** (បន្ថែម ៥ ៖ error លឿន ➜ storage · race `SIGNED_OUT` · `onSynced` ពិនិត្យម្តងទៀត · ការពិនិត្យស្របគ្នា · ច្បាប់ ៤ ម៉ោងពេលក្រៅបណ្តាញ ៖
+  `authTime` ពី token ចាស់ ក្រោយ ៤០ វិ.) · vitest ពេញ ៥១ ឯកសារ / ៤៤៣ · run-all subset (STRICT · emulator រស់) ៖ `emu/supabase-adapter-parity` ៩២ · `supabase-app-network-e2e` ២៣ ·
+  `supabase-docs-cache` · `sdk-surface` · `toast-truth` · ឯកសារ/កំណែ ✅ ·
+  `tsc` · eslint · purity ✅។ Mutation ១០ ៖ គ្មាន fallback storage (ធ្លាក់ ៥) · error ➜ `null` (១) · គ្មានការពិនិត្យលើ `TOKEN_REFRESHED` (២) · គ្មានការការពារ `ownSignOut` (២) ·
+  គ្មានសារ (២) · គ្មានការរួមការពិនិត្យ (១) · មិនដាក់ `_accountUnverified` (៣) · គ្មាន `lostWhileRestoring` (១) · លក្ខខណ្ឌ `onSynced` ចាស់ (១) · ការពិនិត្យ `refresh_token` **រស់** ➜ ដកចេញ។
+- **ផលលើ G4** ៖ storage ដែល `signOut()` បរាជ័យទុកចោល ស្តារពេលក្រៅបណ្តាញដែរ ➜ G4 កែក្នុង PR ដដែល (ធាតុខាងលើ)។
 
 ### 2026-10-03 — Deep audit ជុំ ២ ៖ បណ្តាញ — ហាង Supabase ពេលបណ្តាញខូចលើ App ពិត · Firebase លើលំហូរដដែល (ការកែ ➜ ផ្នែក ១ [2.49.3])
 

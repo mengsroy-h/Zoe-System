@@ -160,7 +160,7 @@ export function logoutApp() {
             resetClearHistoryOperationState();
             clearRememberedSession(false);
             showLoginModalWithPrefill();
-            showToast("⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase ទេ — បានសម្អាតការចងចាំក្នុង App ប៉ុណ្ណោះ។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្តងទៀត។");
+            showToast("⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — បានសម្អាតការចងចាំក្នុង App ប៉ុណ្ណោះ។ សូម Refresh ហើយសាកចាកចេញម្តងទៀត។");
         });
     }
 }

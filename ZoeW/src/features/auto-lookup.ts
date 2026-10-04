@@ -345,11 +345,16 @@ export async function attemptAutoLookup(barcode) {
             }
         }
 
+        const unreadable = {};
         const out = await retryAsync(
             () => fetchWithTimeout(targetUrl, { headers }, isZtoLookup ? ZTO_AUTO_LOOKUP_TIMEOUT_MS : AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
-                (r) => r.json().catch(() => null))
+                (r) => r.json().catch(() => unreadable))
                 .catch(markLookupTimeoutNoRetry)
-                .then(retryTransientLookupResponse),
+                .then(retryTransientLookupResponse)
+                .then((o) => {
+                    if (o.res.ok && o.body === unreadable) throw lookupResponseError(o.res.status, { code: 'LOOKUP_BAD_BODY' }, true);
+                    return o;
+                }),
             2, isZtoLookup ? 350 : 1500
         );
         const data = out.body;
@@ -399,6 +404,8 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'error', '🚦 ZTO កំណត់ល្បឿន — សូមរង់ចាំបន្តិច ហើយស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_TIMEOUT') {
             setLookupStatus(barcode, 'error', '⏱️ ZTO ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
+        } else if (e && e.lookupCode === 'LOOKUP_BAD_BODY') {
+            setLookupStatus(barcode, 'error', '⚠️ ' + lookupSource + ' ឆ្លើយមកខូច (មិនពេញលេញ) — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
             setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
         } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {

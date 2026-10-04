@@ -14,6 +14,8 @@ export const SB_TX_MAX_RETRIES = 25;
 export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
 export const SB_POLL_FALLBACK_MS = 30000;
+export const SB_REALTIME_RETRY_STEPS_MS = [5000, 15000, 30000, 60000];
+export const SB_CLOCK_SKEW_WARN_MS = 5 * 60 * 1000;
 export const SB_PULL_PAGE = 2000;
 export const SB_PULL_MAX_RESTARTS = 2;
 export const SB_DOCS_CACHE_LOAD_MAX_MS = 3000;
@@ -22,9 +24,11 @@ export const SB_DOCS_CACHE_MIN_INTERVAL_MS = 30000;
 export const SB_OPS_PER_WRITE = 500;
 
 export class SbNetworkError extends Error {
-    constructor(message) {
+    unsent: boolean;
+    constructor(message, unsent = false) {
         super(message);
         this.name = 'SbNetworkError';
+        if (unsent) this.unsent = true;
     }
 }
 
@@ -350,6 +354,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let sessionEpoch = 0;
     let authScope = null;
     let ready = false;
+    let pullStage = null;
+    let pullStageAbove = 0;
     let syncing = false;
     let wantSync = false;
     let online = true;
@@ -361,6 +367,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let pollTimer = null;
     let realtimeHealthy = false;
     let unsubscribeRealtime = null;
+    let realtimeGeneration = 0;
+    let realtimeRetryTimer = null;
+    let realtimeRetryAttempt = 0;
+    let clockSkewWarned = false;
     let tenantTopic = null;
     let forbidden = null;
     let closed = false;
@@ -426,15 +436,17 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         return getAt(serverDoc(path[0], path[1]), path.slice(2));
     };
 
-    const putDoc = (root, key, value, seq) => {
-        let docs = server.get(root);
+    const putDocIn = (target, root, key, value, seq) => {
+        let docs = target.get(root);
         const entry = docs && docs.get(key);
         if (entry && seq < entry.s) return false;
-        if (!docs) { docs = new Map(); server.set(root, docs); }
+        if (!docs) { docs = new Map(); target.set(root, docs); }
         if (value === null) docs.set(key, { v: null, s: seq });
         else docs.set(key, { v: value, s: seq });
         return true;
     };
+
+    const putDoc = (root, key, value, seq) => putDocIn(server, root, key, value, seq);
 
     const loadCacheWithin = (scope) => new Promise<any>((resolve) => {
         let finished = false;
@@ -465,7 +477,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const saveDocsCacheNow = () => {
-        if (closed || !authed || !cacheScope || !serverTenant || cursor <= 0) return;
+        if (closed || !authed || !cacheScope || !serverTenant || cursor <= 0 || pullStage) return;
         if (syncing) { scheduleCacheSave(); return; }
         const docs = [];
         server.forEach((entries, root) => entries.forEach((entry, key) => { if (entry.v !== null) docs.push([root, key, entry.v, entry.s]); }));
@@ -525,6 +537,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (typeof now !== 'number' || !Number.isFinite(now)) return;
         serverOffset = Math.round(now - (t0 + t1) / 2);
         offsetKnown = true;
+        if (!clockSkewWarned && Math.abs(serverOffset) > SB_CLOCK_SKEW_WARN_MS && hooks.onClockSkew) {
+            clockSkewWarned = true;
+            hooks.onClockSkew(serverOffset);
+        }
         fireInfo();
     };
 
@@ -561,16 +577,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const applyPull = (res) => {
         if (!res || !Array.isArray(res.rows)) throw new SbRpcError('bad pull response', 'bad_response', 0, '');
         if (res.reset) {
-            const keepAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
-            const keepNewer = [];
-            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > keepAbove) keepNewer.push([root, key, entry]); }));
-            server.clear();
-            keepNewer.forEach(([root, key, entry]) => {
-                if (!server.has(root)) server.set(root, new Map());
-                server.get(root).set(key, entry);
-            });
+            pullStage = new Map();
+            pullStageAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
         }
-        for (const row of res.rows) putDoc(row.r, row.k, row.v === undefined ? null : row.v, row.s);
+        const target = pullStage || server;
+        for (const row of res.rows) putDocIn(target, row.r, row.k, row.v === undefined ? null : row.v, row.s);
+        if (pullStage && !res.more) {
+            const stage = pullStage;
+            pullStage = null;
+            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > pullStageAbove) putDocIn(stage, root, key, entry.v, entry.s); }));
+            server.clear();
+            stage.forEach((docs, root) => server.set(root, docs));
+        }
     };
 
     const scheduleRetry = () => {
@@ -691,26 +709,44 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!syncing) runSync();
     }
 
+    const scheduleRealtimeRetry = () => {
+        if (realtimeRetryTimer || closed) return;
+        const step = SB_REALTIME_RETRY_STEPS_MS[Math.min(realtimeRetryAttempt++, SB_REALTIME_RETRY_STEPS_MS.length - 1)];
+        realtimeRetryTimer = setTimeout(() => {
+            realtimeRetryTimer = null;
+            if (realtimeHealthy || closed) return;
+            stopRealtime();
+            startRealtime();
+        }, step);
+    };
+
     const startRealtime = () => {
         if (unsubscribeRealtime || !tenantTopic || !online || closed || !authed) return;
+        const generation = ++realtimeGeneration;
         try {
             unsubscribeRealtime = transport.subscribe(tenantTopic, (payload) => {
                 const seq = payload && typeof payload.seq === 'number' ? payload.seq : Infinity;
                 if (seq > cursor) requestSync();
             }, (status) => {
+                if (generation !== realtimeGeneration) return;
                 const healthy = status === 'SUBSCRIBED';
                 if (healthy && !realtimeHealthy) requestSync();
                 realtimeHealthy = healthy;
+                if (healthy) realtimeRetryAttempt = 0;
+                else scheduleRealtimeRetry();
                 schedulePoll();
             });
         } catch (e) {
             unsubscribeRealtime = null;
             realtimeHealthy = false;
+            scheduleRealtimeRetry();
         }
     };
 
     const stopRealtime = () => {
+        realtimeGeneration++;
         realtimeHealthy = false;
+        if (realtimeRetryTimer) { clearTimeout(realtimeRetryTimer); realtimeRetryTimer = null; }
         if (unsubscribeRealtime) { try { unsubscribeRealtime(); } catch (e) {} }
         unsubscribeRealtime = null;
     };
@@ -956,7 +992,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             }
                             setConnected(false);
                             scheduleRetry();
-                            if (!lost) {
+                            if (!lost && !e.unsent) {
                                 lost = disconnectError();
                                 txDisconnectResolving.set(outer, lost);
                             }
@@ -964,7 +1000,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 await delay(retrySteps[Math.min(lostAttempts++, retrySteps.length - 1)]);
                                 await waitForLink();
                             }
-                            if (closed) throw giveUp();
+                            if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         }
                     }
                     setConnected(true);

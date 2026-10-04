@@ -388,6 +388,91 @@ function serve(dir, blocked) {
         await new Promise((r) => { srv.close(r); sockets.forEach((c) => c.destroy()); });
     }
 
+    // ជុំទី ៦ — ⛔ ធនធាន OPTIONAL **ព្យួរ** (បណ្តាញ «ភ្ជាប់តែស្លាប់» កណ្តាល install ៖ server ទទួល socket តែមិនឆ្លើយ) ➜ `.catch(() => {})` មិនជួយទេ
+    //    (ការព្យួរ ≠ ការបរាជ័យ) ➜ SW ជាប់ `installing` ➜ គ្មាន offline · deploy ថ្មីមិនដល់ ខណៈ CORE ចូល cache រួចហើយ។ OPTIONAL ត្រូវមានពិដាន
+    //    (`OPTIONAL_INSTALL_TIMEOUT_MS` ដេរីវេពី sw.js ពិត) ➜ SW activate ក្នុងពិដាន + ៨ វិ.។ ទិសផ្ទុយ ៖ CORE ព្យួរ ➜ **មិន** activate (CORE នៅជាក្រុម
+    //    atomic · ការកែមិនត្រូវប្រែ CORE ជា optional)។ App ទាំង ២ · ធនធានដេរីវេពី `OPTIONAL_SHELL`/`CORE_SHELL` ពិត · ៤ សេណារីយ៉ូរត់ស្របគ្នា (origin ដាច់)។
+    {
+        const MARGIN_MS = 8000;
+        const CEILING_MAX_MS = 60000;
+        const shellList = (sw, name) => {
+            const m = new RegExp(name + '\\s*=\\s*\\[([\\s\\S]*?)\\]').exec(sw);
+            return m ? (m[1].match(/['"]\.\/[^'"]*['"]/g) || []).map((x) => x.slice(1, -1)) : [];
+        };
+        const scenario = async (app, kind) => {
+            const appDir = path.join(ROOT, app);
+            const sw = fs.readFileSync(path.join(appDir, 'sw.js'), 'utf8');
+            const ceilingMatch = /OPTIONAL_INSTALL_TIMEOUT_MS\s*=\s*(\d+)/.exec(sw);
+            const ceiling = ceilingMatch ? Number(ceilingMatch[1]) : 20000;
+            const optional = shellList(sw, 'OPTIONAL_SHELL');
+            const core = shellList(sw, 'CORE_SHELL').filter((u) => u !== './' && u !== './index.html');
+            const target = kind === 'optional' ? optional[0] : core[core.length - 1];
+            const hangPath = target ? target.slice(1) : null;
+            const state = { hangHits: 0, armed: false };
+            const held = new Set();
+            const srv = await new Promise((res) => {
+                const s = http.createServer((req, rsp) => {
+                    let p = decodeURIComponent(req.url.split('?')[0]);
+                    if (p === '/') p = '/index.html';
+                    if (state.armed && p === hangPath) { state.hangHits++; held.add(rsp); return; }
+                    const f = path.join(appDir, p);
+                    if (!f.startsWith(appDir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                    rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                    rsp.end(fs.readFileSync(f));
+                });
+                const sockets = new Set();
+                s.on('connection', (c) => { sockets.add(c); c.on('close', () => sockets.delete(c)); });
+                s.stopAll = () => new Promise((r) => { held.clear(); sockets.forEach((c) => c.destroy()); s.close(r); });
+                s.listen(0, '127.0.0.1', () => res(s));
+            });
+            const o = 'http://127.0.0.1:' + srv.address().port;
+            const b = await chromium.launch({ executablePath: CHROME });
+            const ctx6 = await b.newContext({ viewport: { width: 412, height: 780 } });
+            const page6 = await ctx6.newPage();
+            await ctx6.route('**', (r) => (r.request().url().startsWith(o) ? r.continue() : r.abort()));
+            let out = { err: 'មិនបានរត់' };
+            try {
+                await page6.goto(o + '/', { waitUntil: 'load', timeout: 30000 });
+                state.armed = true;
+                out = await page6.evaluate(async (waitMs) => {
+                    const t0 = Date.now();
+                    const reg = await navigator.serviceWorker.register('./sw.js');
+                    const w = reg.installing || reg.waiting || reg.active;
+                    if (!w) return { err: 'គ្មាន worker' };
+                    await new Promise((res) => {
+                        const done = () => w.state === 'activated' || w.state === 'redundant';
+                        if (done()) return res();
+                        w.addEventListener('statechange', () => { if (done()) res(); });
+                        setTimeout(res, waitMs);
+                    });
+                    let cachedIndex = false;
+                    for (const k of await caches.keys()) {
+                        if (await (await caches.open(k)).match('./index.html')) cachedIndex = true;
+                    }
+                    return { state: w.state, ms: Date.now() - t0, cachedIndex };
+                }, Math.min(ceiling, CEILING_MAX_MS) + MARGIN_MS);
+            } catch (e) {
+                out = { err: String(e && e.message || e) };
+            }
+            await b.close().catch(() => {});
+            await srv.stopAll();
+            return { app, kind, target, ceiling, fromCode: !!ceilingMatch, hangHits: state.hangHits, out };
+        };
+        const runs = await Promise.all(['ZoeW', 'ZoeKeyGen'].flatMap((app) => [scenario(app, 'optional'), scenario(app, 'core')]));
+        for (const r of runs) {
+            const label = 'ជុំទី ៦ ៖ ' + r.app + ' ៖ ';
+            ok(label + 'លក្ខខណ្ឌចាំបាច់ ៖ ធនធាន ' + r.kind.toUpperCase() + ' «' + r.target + '» ត្រូវបានស្នើ ហើយព្យួរពិត', !!r.target && r.hangHits >= 1, r);
+            if (r.kind === 'optional') {
+                ok(label + 'OPTIONAL ព្យួរ ➜ SW activate ក្នុងពិដាន `OPTIONAL_INSTALL_TIMEOUT_MS` + ' + MARGIN_MS / 1000 + ' វិ. (មិនជាប់ installing)',
+                    r.out.state === 'activated' && r.out.ms <= r.ceiling + MARGIN_MS && r.out.cachedIndex === true, r);
+                ok(label + 'ពិដាន OPTIONAL ដេរីវេពី sw.js ពិត (`OPTIONAL_INSTALL_TIMEOUT_MS`) ហើយ ≤ ' + CEILING_MAX_MS / 1000 + ' វិ. (តឹងជាងការសម្លាប់ event ~៥ នាទីរបស់ browser)',
+                    r.fromCode && r.ceiling > 0 && r.ceiling <= CEILING_MAX_MS, r);
+            } else {
+                ok(label + 'ទិសផ្ទុយ ៖ CORE ព្យួរ ➜ SW **មិន** activate (CORE នៅជាក្រុម atomic)', r.out.state !== 'activated' && !r.out.err, r);
+            }
+        }
+    }
+
     await browser.close();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);

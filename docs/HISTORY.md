@@ -56,7 +56,7 @@
    **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
    វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
-   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ZTO-G3 HTTP 200 body ខូច ➜
+   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
    «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
    នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
@@ -176,9 +176,15 @@
   សម្អាតទិដ្ឋភាព ➜ ទំព័របន្តធ្លាក់ (បណ្តាញ) ➜ មុនកែ ទិដ្ឋភាពនៅជាទំព័រទី ១ តែ `ready` ➜ listener/ផ្ទាំងដែលបើកក្រោយឃើញ **២ ក្នុងចំណោម ៩ កញ្ចប់** ជាទិន្នន័យស្រស់ (ស្ថិតិ ·
   Export · «គ្មានទិន្នន័យ»)។ ឥឡូវ ៖ ទំព័រ reset ចូល stage ដាច់ដោយឡែក ➜ ប្តូរតែពេលទំព័រចុងក្រោយ ➜ ចន្លោះនោះនៅជាទិដ្ឋភាពពេញចាស់ (ស្របគ្នា) · ការសរសេររបស់ឧបករណ៍នេះដែល
   commit ក្រោយ snapshot មិនបាត់ពេលប្តូរ · cache `zoe_docs` មិនរក្សាទុកពេល stage (cursor កណ្តាល + ទិដ្ឋភាពចាស់ = doc ខ្មោចពេលបើក App លើកក្រោយ)។
+- **Lookup ស្កេន ៖ HTTP 200 តែ body ខូច** (ZTO-G3 · proxy/ប្រព័ន្ធ Wi-Fi កាត់ចម្លើយ · ទំព័រ HTML) ➜ មុនកែ `r.json().catch(() => null)` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode
+  នេះ» (អះអាងខុស) · មិនព្យាយាមឡើងវិញ · គ្មាន cooldown។ ឥឡូវ ៖ `LOOKUP_BAD_BODY` = ការបរាជ័យបណ្តោះអាសន្ន ➜ ព្យាយាមឡើងវិញម្តង ➜ «⚠️ ZTO ឆ្លើយមកខូច (មិនពេញលេញ) — សូមស្កេនម្ដងទៀត» ·
+  cooldown បណ្តោះអាសន្ន។ (ZTO-G5 ផ្នែកនាំចូល ➜ ZTO-G4 ខាងលើ · sweep ស្ថានភាព ZTO ចាត់ body ខូចជា «បរាជ័យ» ត្រឹមត្រូវរួច ៖ វាស់ ៖ គ្មាន)
 - 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
 
 #### អ្នកយាម
+
+- `lookup-failure-identity-test` ផ្នែក ២ខ (ថ្មី) ៖ fetch ក្លែងមុនមិនដែលហៅ body reader ➜ body ខូច **មិនអាចវាស់បាន** ➜ ជំហាន `badBody` ហៅ reader ពិតដោយ `json()` បដិសេធ ➜ tree មុនកែ
+  **ធ្លាក់ ៣** ➜ **៥៣ ok**។ Mutation ៣ (គ្មាន retry · គ្មានសារ · គ្មានការចាប់) ➜ ក្រហម ៣។
 
 - `ZoeW/tests/supabase-pull-paging.test.ts` (បន្ថែម ៣ · adapter ពិត) ៖ tree មុនកែ **ធ្លាក់ ១/៣** (listener ថ្មីឃើញ ២ ជំនួស ៩) ➜ **១៩/១៩**។ តេស្ត ២ ទៀតការពារហានិភ័យថ្មីរបស់
   stage (ការសរសេរ commit ក្រោយទំព័រចុងក្រោយ · cache កណ្តាល stage) ➜ ឆ្លងលើ tree មុនកែ ហើយចាប់ mutation។ Mutation ៦ ➜ ក្រហម ៤ · រស់ ២ (`pullStage = null` ពេលចាកចេញ ·
@@ -1300,6 +1306,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G3 + ZTO-G5 — body ខូច ≠ «គ្មានទិន្នន័យ» (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (`attemptAutoLookup()` ពិតក្នុង vm) ៖ HTTP 200 + `json()` បដិសេធ ➜ `data = null` ➜ `found = false` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ» · ការហៅ ១ ·
+  `autoLookupFailureAt` ទទេ។ ⛔ មេរៀន ៖ fetch ក្លែងរបស់ checker ត្រឡប់ body ផ្ទាល់ ហើយ **មិនអើពើ reader** (អាគុយម៉ង់ទី ៥) ➜ ផ្លូវ parse body គ្មានអ្នកវាស់។
+- **ការកែ** ៖ reader ត្រឡប់ sentinel `unreadable` (ក្នុង `attemptAutoLookup()`) ➜ ក្រោយ `retryTransientLookupResponse` ៖ `res.ok` + sentinel ➜ `lookupResponseError(status,
+  { code: 'LOOKUP_BAD_BODY' }, true)` ➜ `retryAsync` ព្យាយាមម្តងទៀត ➜ សារផ្ទាល់ខ្លួន។ `zto-status.ts` (`checkZtoStatusForBarcode`) ៖ body ខូច ➜ `null` ➜ `continue` (មិនកត់សាលក្រម ·
+  fail streak) ➜ ត្រឹមត្រូវរួច (វាស់ ៖ គ្មាន)។ ZTO-G5 (សារនាំចូល + បញ្ជីត្រូវសម្អាត) ➜ កែរួចជាមួយ ZTO-G4។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៣** ➜ **៥៣ ok** · `lookup-prefetch` · `lookup-burst` · `zto-proxy` · `network-pressure` · `html-sink-escaping` ✅ · Mutation ៣ ➜ ក្រហម ៣។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ SBD-5 — ការទាញពេញច្រើនទំព័រដាច់កណ្តាល ➜ ទិដ្ឋភាពខ្លី (ការកែ ➜ ផ្នែក ១ [2.49.4])
 

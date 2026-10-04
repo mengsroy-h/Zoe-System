@@ -120,11 +120,15 @@ function buildRuntime(plan) {
         decryptLookupSecret: () => Promise.resolve(''),
         isPinFlowPending: () => false,
         requestPinBeforeConfig: () => {},
-        fetchWithTimeout: (url, opts, ms, timeoutMsg) => {
+        fetchWithTimeout: (url, opts, ms, timeoutMsg, readBody) => {
             const step = plan[Math.min(calls.length, plan.length - 1)];
             calls.push({ url, ms });
             if (step && step.reject === 'timeout') return Promise.reject(new Error(timeoutMsg || TIMEOUT_MESSAGE));
             if (step && step.reject === 'network') return Promise.reject(new TypeError('Failed to fetch'));
+            if (step && step.badBody) {
+                const res = { ok: true, status: 200, json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')) };
+                return Promise.resolve(typeof readBody === 'function' ? readBody(res) : null).then((body) => ({ res, body }));
+            }
             const status = Number(step && step.status) || 200;
             const body = status >= 200 && status < 300
                 ? { success: true, found: true, phone: '012345678', cod: 1, dod: 2 }
@@ -222,6 +226,18 @@ scenario('⛔ ទិសផ្ទុយ ៖ បណ្តាញញ័រពិត 
     const upstream = await run([{ status: 502, code: 'ZTO_UPSTREAM_UNAVAILABLE' }, { status: 200 }]);
     ok('⛔ 502 បណ្តោះអាសន្ន ➜ ព្យាយាមឡើងវិញ ហើយជោគជ័យជុំទី ២',
         upstream.calls.length === 2 && upstream.text.indexOf('✅') !== -1, { calls: upstream.calls.length, text: upstream.text });
+});
+
+// ── ២ខ. ⛔ HTTP 200 តែ body ខូច (proxy កាត់ · ទំព័រ HTML) ≠ «គ្មានទិន្នន័យ» (ZTO-G3) ─────────
+scenario('⛔ HTTP 200 + body ខូច ➜ ការបរាជ័យបណ្តោះអាសន្ន (មិនមែន «មិនឃើញទិន្នន័យ»)', async () => {
+    const once = await run([{ badBody: true }, { status: 200 }]);
+    ok('⛔ body ខូចម្តង ➜ ព្យាយាមឡើងវិញ ហើយជោគជ័យជុំទី ២',
+        once.calls.length === 2 && once.text.indexOf('✅') !== -1, { calls: once.calls.length, text: once.text });
+    const twice = await run([{ badBody: true }]);
+    ok('⛔ body ខូចជាប់ ➜ សារមិនអះអាង «មិនឃើញទិន្នន័យ»',
+        twice.text.indexOf('មិនឃើញទិន្នន័យ') === -1 && twice.text.indexOf('ខូច') !== -1, twice.text);
+    ok('⛔ body ខូចជាប់ ➜ កត់ cooldown បណ្តោះអាសន្ន (មិនមែនលុបចោល)',
+        twice.ctx.autoLookupFailureAt.size === 1, twice.ctx.autoLookupFailureAt.size);
 });
 
 // ── ៣. ការបរាជ័យដែលចំណាយពេលរួចហើយ មិនត្រូវចំណាយម្តងទៀត ────────────────

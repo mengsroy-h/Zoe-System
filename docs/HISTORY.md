@@ -53,10 +53,11 @@
    មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ) ៖ **ជុំ ១ លុយ ចប់** ([2.49.2] ·
    ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · ការកែឫសគល់ outcome `unknown` ធ្វើរួចតាមការយល់ព្រម · Sentry Loader ថ្មី) ·
-   **ជុំ ២ បណ្តាញ កំពុងធ្វើ** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» · កំហុសដែលម្ចាស់គម្រោងរាយការណ៍ «ចូលវិញក្រោយ ៤ ម៉ោង គ្មានទិន្នន័យ» កែរួច ➜ [2.49.3] ·
-   workflow រកចន្លោះ ៖ `sb-auth` រកឃើញ G1 (refresh token បរាជ័យយូរ ➜ RPC គ្មាន token ➜ ការសរសេរ/listener ក្លាយជា permission_denied) · G2 (ចម្លើយ refresh បាត់ ➜
-   ចាកចេញ) **មិនទាន់ផ្ទៀងដោយអ្នកផ្ទៀងទី ២** ព្រោះ agent ៤ ធ្លាក់ដោយកំណត់ session · `sb-data` · `zto` ៖ មិនមានចន្លោះដែលបញ្ជាក់ · `sw-license-keygen` មិនទាន់រត់ ➜
-   ចាប់ផ្តើមពី G1/G2 (លទ្ធផល ៖ `tasks/wg5d3zqss.output` មិននៅក្នុង repo — រត់ workflow ឡើងវិញ)) · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
+   **ជុំ ២ បណ្តាញ កំពុងធ្វើ** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» · កំហុសដែលម្ចាស់គម្រោងរាយការណ៍ «ចូលវិញក្រោយ ៤ ម៉ោង គ្មានទិន្នន័យ» · G1 (RPC គ្មាន token ពេល
+   GoTrue មិនឆ្លើយ) · ledger `not-applied` (ឧបករណ៍ ៣) · gateway 5xx ក្រោយ commit ➜ ចំណូលរាប់ ២ ដង (SBD-3/4) · ZTO បញ្ជី «យករួច» commit យឺត ➜ គ្មានស្ថិតិយក (ZTO-G1) កែរួច ➜ [2.49.3] · Firebase វាស់លំហូរដដែល ៖ គ្មានកំហុស ក្រៅពីការសរសេរពេលក្រៅបណ្តាញបាត់ពេល Reconfig (ស្នើ · មិនទាន់កែ)) ·
+   **នៅសល់មិនទាន់ផ្ទៀង** (ការរកឃើញរបស់ finder ក្នុង workflow ដែលមិនទាន់មានអ្នកផ្ទៀងទី ២ · លុយមុន) ៖
+   G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ?) · realtime websocket ពិត · SW/License ក្រោមបណ្តាញខូច ➜ ផ្ទៀងម្តងមួយៗដោយគ្មាន workflow
+   (ម្ចាស់គម្រោង ៖ «កុំអោយworkflow ស៊ីកូតាពេក») · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
    ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
@@ -131,10 +132,10 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.3] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ ចូលប្រព័ន្ធវិញក្រោយផុតកំណត់ ៤ ម៉ោង ឃើញទិន្នន័យគ្រប់ · ទិន្នន័យ/ការសរសេររបស់គណនីមួយមិនឆ្លងទៅគណនីផ្សេង** (រាយការណ៍ដោយម្ចាស់គម្រោង)
+### [2.49.3] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ ចូលប្រព័ន្ធវិញក្រោយផុតកំណត់ ៤ ម៉ោង ឃើញទិន្នន័យគ្រប់ · ទិន្នន័យ/ការសរសេររបស់គណនីមួយមិនឆ្លងទៅគណនីផ្សេង · gateway 5xx មិនរាប់ចំណូល ២ ដង** (រាយការណ៍ដោយម្ចាស់គម្រោង + Deep audit ជុំ ២)
 
 **ZoeW `2.49.3`** (`zoew-v258` ➜ `zoew-v259`) · ZoeKeyGen មិនប្រែ។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះតែ adapter Supabase
-(`src/services/supabase-rtdb.ts`) ➜ ហាង Firebase មិនប៉ះ។
+(`src/services/supabase-rtdb.ts` · `supabase-transport.ts`) និង `src/domain/ledger.ts` (`runLedgerTransaction()` ប៉ះ backend ទាំង ២)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -156,6 +157,16 @@
   ធ្លាក់ ២/៣ ដូចគ្នា)។ ឥឡូវ ៖ `not-applied` ច្បាស់ ➜ ផ្ញើម្តងទៀត (≤ ៣ · ប៉ារ៉ាម៉ែត្រ `notAppliedRetries` · `op` ដដែល) · `unknown` មិនផ្ញើម្តងទៀត (ប្រហែលចូលរួច)។
   Firebase ៖ wrapper ឲ្យ `not-applied` តែពេល server ស្មើតម្លៃមុន ➜ ករណីឧបករណ៍ផ្សេងសរសេរ path ដដែលនៅតែ `unknown` (ចន្លោះចាស់ ផ្នែក ២ ជុំ ១)។
 - 🔔 សារកំណែ 2.49.3 ជំនួស 2.49.2 (រួមចំណុច 2.49.2 ព្រោះ 2.49.2 មិនទាន់ដល់អ្នកប្រើ)។
+- **gateway 5xx ក្រោយ commit ➜ ចំណូលរាប់ ២ ដង** (Deep audit ជុំ ២ SBD-3 · លុយ) ៖ API gateway របស់ Supabase (Kong/Envoy/Cloudflare) ឆ្លើយ 502/503/504/52x ពេលបាត់ចម្លើយ
+  PostgREST (instance restart · upstream timeout) ខណៈ Postgres **commit រួច** ➜ មុនកែ `rpc()` បោះ `SbRpcError` ➜ adapter ចាត់ជាការបដិសេធចុងក្រោយ (គ្មាន `txOutcome`) ➜
+  `ledgerRejectionVerdict()` = null ➜ reconcile សរសេរ delta ម្តងទៀត ➜ **ថ្ងៃ $20 · ខែ $10 សម្រាប់កញ្ចប់ $10** (វាស់ដោយ finder លើកូដ ledger ពិត) · ការសរសេរធម្មតា (បិទកញ្ចប់ ·
+  ស្កេន) ត្រូវបោះចោលភ្លាម · `.info/connected` នៅ `true` រហូត ៥ នាទី ខណៈការសរសេរគ្រប់ធ្លាក់ (SBD-4)។ ឥឡូវ ៖ `sbStatusIsGateway()` ➜ `SbNetworkError` ➜ op_id ដដែល
+  ផ្ញើម្តងទៀត (server dedupe) ➜ `applied` តែម្តង · ស្ថានភាពក្លាយ «មិនទាន់ភ្ជាប់»។ កំហុស PostgREST ពិត (4xx · 500 JSON) នៅតែចុងក្រោយ។ ចូលប្រព័ន្ធពេល `my_account` ទទួល 5xx ➜
+  «ភ្ជាប់ Server មិនបានទេ» (មិនមែន «ចូលប្រព័ន្ធមិនបានទេ (503)»)។
+- **ទាញបញ្ជីពី ZTO ៖ ជួរដែល ZTO បិទរួច មិនចូលស្ថិតិយក** (Deep audit ជុំ ២ ZTO-G1) ៖ ការរក្សាទុក commit យឺតលើសពិដាន ១៥ វិ. ➜ callback ពេលក្រោយគ្រាន់តែ refresh ទិដ្ឋភាព ·
+  ការរក្សាទុកឆ្លើយ `false` (កញ្ចប់ចុះរួច · ការផ្ទៀងចំណូលមិនទាន់បញ្ជាក់) ➜ រាប់ជា «⚠️ បរាជ័យ» ➜ ករណីទាំងពីរ `markZtoListRowPickedUp()` មិនរត់ ➜ កញ្ចប់បិទក្នុងប្រវត្តិ តែ
+  `pickedUpBarcodes` និង mirror ចំណូលប្រចាំថ្ងៃ (`zoew_daily_collected_cod_dod`) គ្មាន ➜ ស្ថិតិ «យករួច» និងចំណូលប្រចាំថ្ងៃតាមថ្ងៃយកទាបជាងការពិត (ledger ចំណូលមិនប៉ះ)។ ឥឡូវ ៖
+  commit យឺត ➜ សរសេរស្ថិតិយកពេល commit មកដល់ · `false` ➜ រាប់ជា «បញ្ចូល» ហើយសរសេរស្ថិតិយក។
 
 #### អ្នកយាម
 
@@ -173,8 +184,14 @@
   n2 ការសរសេររក្សាទុក (server `2`) · listener ធ្លាក់ ០ · សំណើគ្មាន token ០ · n2tx `applied` · n9 (GoTrue 503) listener ធ្លាក់ ០។ ⏳ ចំណុចនៅសល់ ៖ ការសរសេររង់ចាំ
   រហូត cooldown ៦០ វិ. របស់ supabase-js ចប់ (មិនបាត់ · ស្ថានភាពមិនបៃតង)។
 - `supabase-app-network-e2e-test` ផ្នែក **ជ** (App ពិត · supabase-js ពិត · Postgres ពិត) ៖ ចូលដោយចងចាំពាក្យសម្ងាត់ ➜ បើក App ក្រោយ ៦.៥ ម៉ោង (token ផុត ➜ refresh ·
-  `setAuthAge`) ➜ ផុតកំណត់ ➜ ចូលវិញ ➜ build មុនកែ **ធ្លាក់ ២** (`history 1` ក្នុងចំណោម ៧ · ការទាញដំបូង `p_since = 6`) ➜ ក្រោយកែ ៖ ៧/៧ + `p_since = 0`។ ⛔ មេរៀន ៖ ក្រោយការកែ G1 លំហូរធម្មតាគេចពី race (ការទាញរង់ចាំ token) ➜ លក្ខខណ្ឌចាំបាច់ធ្លាក់ (suite ពេញ) ➜ ផ្នែក ជ បង្ខំ race ដោយមិនពឹងពេល
-  (`my_account` យឺត ២ វិ. · ចម្លើយទាញរង់ចាំរហូតការចាកចេញ) ➜ កែ ២៣/២៣ · មុនកែ ធ្លាក់ ២។
+  `setAuthAge`) ➜ ផុតកំណត់ ➜ ចូលវិញ ➜ build មុនកែ **ធ្លាក់ ២** (`history 1` ក្នុងចំណោម ៧ · ការទាញដំបូង `p_since = 6`) ➜ ក្រោយកែ ៖ ៧/៧ + `p_since = 0`។ ⛔ មេរៀន ៖ race
+  នេះជាពេលវេលារបស់ App ពិត ➜ ការពន្យារ `my_account` ឬការសាកច្រើនដងមិនគ្រប់គ្រងវាទេ ➜ init script ពន្យារការពិនិត្យ ៤ ម៉ោងរហូត `zoe_pull` ចេញ (ផ្នែក ២ «run-all ៖ … ពឹងពេល»)។
+
+- `ZoeW/tests/supabase-gateway-5xx.test.ts` (ថ្មី · transport ពិត + supabase-js ពិត + adapter ពិត · fetch ក្លែងមាន op_id dedupe) ៖ កូដមុនកែ **ធ្លាក់ ៨/១០** (502/503/504/520/524 ➜
+  `SbRpcError` · transaction ledger commit ➜ 504 ➜ `HTTP 504` បដិសេធ · ការសរសេរ commit ➜ 502 ➜ បដិសេធ · 503 មុន commit ➜ បោះចោល) ➜ **១០/១០** (ទិសផ្ទុយ ៖ 400/403/500 JSON
+  នៅ `SbRpcError` · 400 JSON ➜ បដិសេធភ្លាម មិនផ្ញើម្តងទៀត)។
+- `zto-list-sync-test` ផ្នែក ១៦ (បន្ថែម) ៖ ជួរ «យករួច» commit យឺត · ឆ្លើយ `false` · ទិសផ្ទុយ commit យឺតបដិសេធ ➜ កូដមុនកែ **ធ្លាក់ ៣** (`applyBarcodeCloseChange()` ០ ដង ·
+  សារ «✅ បញ្ចូល 0 កញ្ចប់ · ⚠️ បរាជ័យ 1») ➜ ក្រោយកែ ឆ្លង។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -1181,6 +1198,19 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-04 — run-all ៖ `emu/supabase-adapter-parity` · `supabase-app-network-e2e` ផ្នែក ជ ពឹងពេល (audit-tools តែប៉ុណ្ណោះ)
+
+- `emu/supabase-adapter-parity` ធ្លាក់ ១ ក្នុង run-all STRICT ក្នុង session (CI PR #284 បៃតង) ➜ បង្កើតឡើងវិញ ៖ ៦ instance + CPU busy ៦ ដុំ ➜ **ធ្លាក់ ៤/៦** · commit មុន
+  (មុនការកែថ្ងៃនេះ) **ធ្លាក់ ៥/៦** ➜ មិនមែនមកពីការកែ។ ឫស ៣ (សំណួរ ៨ ៖ សេណារីយ៉ូមិនចូលស្ថានភាព) ៖ (ក) `sleep(400/500)` ក្នុង `drop-response` ➜ ប្តូរ mode មុនសំណើដល់
+  server ➜ មិនមែន «ចម្លើយបាត់ក្រោយ commit» · (ខ) transaction ក្រោយ transaction ដែល **replay** ៖ ចម្លើយ replay (`zoe_ops`) គ្មានតម្លៃ doc ➜ adapter ទាញតម្លៃពិត
+  (`requestSync()`) ➜ ក្រោមបន្ទុក transaction បន្ទាប់ចាប់ផ្តើមលើ base ហួសសម័យ ➜ conflict ក្នុង `drop-response` ➜ `not-applied` (ពិត ៖ op មិនបានអនុវត្ត · ledger ផ្ញើម្តងទៀត ≤ ៣
+  · ការបរាជ័យពីរជាន់ មិនមែនកំហុស adapter) · (គ) «សមាជិកផ្លាស់ហាង» ៖ ការទាញយឺតរបស់ client មុន (បិទរួច) មកដល់ក្រោយ `pullLog.length = 0` ➜ លំដាប់ខុស។
+  កែ ៖ រង់ចាំ commit ពិតលើ Postgres + `txDisconnectResolving` · ទិដ្ឋភាពស្រស់ (`tx = 5`) · វាស់ការទាញរបស់ C3 តាម cursor ពិតក្នុង cache ➜ **៦/៦ ក្រោមបន្ទុកដដែល**។
+  Mutation (op_id ថ្មីពេលផ្ញើម្តងទៀត) ➜ **ធ្លាក់ ២**។
+- `supabase-app-network-e2e` ផ្នែក ជ ៖ ក្រោយការកែ G1 token របស់ runSync រង់ចាំ lock auth របស់ supabase-js រហូតការចាកចេញ ➜ ការទាញចេញ **ក្រោយ** logout (ការវាស់ ៖
+  `refresh · my_account · logout · zoe_pull`) ➜ ការសាក ៤ ដងក៏មិនចូលស្ថានភាព (៤/៤ ដងគ្មាន race) ➜ init script (តែការផ្ទុកនោះ) ពន្យារ `fb.getIdTokenResult()` រហូត
+  `zoe_pull` ចេញពីទំព័រ ➜ build កែ **២៣/២៣ ៧ ដងជាប់គ្នា** · build មុនកែ (2.49.2) **ធ្លាក់ ២** (history មិនគ្រប់ · `p_since ≠ 0`)។
+
 ### 2026-10-03 — CI ៖ `firebase-backup-test` ធ្លាក់លើ runner រវល់ (audit-tools · តេស្តតែប៉ុណ្ណោះ)
 
 - CI PR #284 ផ្នែក ៣/៤ ៖ «ផ្លូវ body ព្យួរត្រូវបានឈានដល់ពិត» `{"bodyStarted":0,"requests":0}` — ពិដាន 100 ms ផុតមុនសំណើដល់ server។ ឫស ៖ `fetch` ដំបូងក្នុង
@@ -1197,7 +1227,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
 
-### 2026-10-03 — Deep audit ជុំ ២ ៖ បណ្តាញ — ហាង Supabase ពេលបណ្តាញខូចលើ App ពិត (audit-tools តែប៉ុណ្ណោះ · ⏸️ ផ្អាកដោយកូតា)
+### 2026-10-03 — Deep audit ជុំ ២ ៖ បណ្តាញ — ហាង Supabase ពេលបណ្តាញខូចលើ App ពិត · Firebase លើលំហូរដដែល (ការកែ ➜ ផ្នែក ១ [2.49.3])
 
 - **ចន្លោះដែលវាស់ឃើញ** ៖ `emu/app-network-e2e-test` វាស់ App ពិតលើ **Firebase** តែប៉ុណ្ណោះ · Supabase វាស់តែកម្រិត adapter ក្នុង node ➜ ថ្នេរ adapter ↔ App
   (`.info/connected` · ការវាស់ភាពរស់ · `forceDatabaseReconnect()` ➜ `goOffline/goOnline` · ចំណុចស្ថានភាព) គ្មាននរណារត់ពីចុងដល់ចុង។
@@ -1212,6 +1242,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **នៅសល់ក្នុងជុំ ២ (មិនទាន់វាស់)** ៖ (ក) session Supabase ផុតពេលទូរស័ព្ទដេក (`expireTokens()` + offline + background ➜ App ត្រូវ refresh ដោយខ្លួនឯង មិនបង្ខំចូលម្តងទៀត) —
   សេណារីយ៉ូព្រាងរួច មិនទាន់ដាក់ · (ខ) ចម្លើយ refresh token បាត់ (GoTrue rotation ➜ ចាកចេញ?) — fake server មិនទាន់គាំទ្រ drop លើ `/auth/v1/token` · (គ) realtime
   websocket ពិត (fake បិទ upgrade) · (ឃ) ZTO · SW ក្រោមបណ្តាញខូច មានអ្នកយាមច្រើនរួច ➜ មិនទាន់ស្វែងរកចន្លោះថ្មី។
+- **2026-10-04 · Firebase (SDK ពិត + RTDB emulator ពិត + rules ពិត · App ពិតក្នុង Chromium)** ៖
+  - **ប្តូរ Config ពីហាង A ទៅហាង B ក្នុងឧបករណ៍តែមួយ** ៖ ហាង B ឃើញតែ ៣ កញ្ចប់របស់ខ្លួន (620 ms) · កូដហាង A ក្នុងទិដ្ឋភាព B **០** · server ហាង B គ្មានការសរសេររបស់ A ➜
+    **គ្មានការលេចឆ្លងហាង** (Firebase មួយ Project មួយហាង ➜ `deleteApp()` ផ្តាច់គ្រប់ listener/queue)។
+  - **រកឃើញតូច (មិនមែនលុយ · មិនទាន់កែ · ស្នើ)** ៖ បិទកញ្ចប់ពេលក្រៅបណ្តាញក្នុងហាង A ➜ Reconfig ទៅហាង B មុនបណ្តាញត្រឡប់ ➜ SDK បោះចោលការសរសេរដែលរង់ចាំពេល `deleteApp()`
+    ➜ ត្រឡប់មកហាង A ៖ កញ្ចប់នៅ «មិនទាន់បិទ» · promise របស់ការសរសេរមិនដែលបញ្ចប់ ➜ គ្មានសារប្រាប់។ Reconfig ត្រូវការ PIN ហើយកម្រធ្វើពេលក្រៅបណ្តាញ ➜ ស្នើ ៖ Reconfig
+    ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (មិនទាន់ធ្វើ · រង់ចាំការសម្រេចម្ចាស់គម្រោង)។
+  - **G1 លើ Firebase** (token ផុត + securetoken 503 ~៤១ វិ. · ៤១ សំណើ) ៖ ការបិទកញ្ចប់ពេលក្រៅបណ្តាញ **រក្សាទុកលើ server** (1476 ms ក្រោយ auth មកវិញ) · history ៥ ·
+    ស្ថានភាពត្រឡប់បៃតង · គ្មាន `permission_denied` ➜ Firebase SDK មិនផ្ញើសំណើគ្មាន token ដូច adapter Supabase មុនកែ។
+  - កំហុស `Cannot read properties of undefined (reading 'update')` ក្នុងការវាស់ ៖ ប្រភព `registerServiceWorker()` (`reg.update()`) ក្រោម `serviceWorkers: 'block'` របស់
+    Playwright ដែលជំនួស `register()` ដោយ `async () => {}` (resolve `undefined`) ➜ **វត្ថុបុរាណនៃការវាស់** ៖ `register()` ពិតតាម spec resolve ជា
+    `ServiceWorkerRegistration` ឬ reject ➜ មិនកែ។
 
 ### 2026-10-03 — Deep audit ជុំ ១ ៖ លុយ — outcome `unknown` ➜ ការផ្ទៀងចំណូលដក ២ ដងដោយស្ងាត់ · «ដក» ធ្វើឲ្យកញ្ចប់បាត់ (ZoeW 2.49.2)
 

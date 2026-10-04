@@ -131,6 +131,10 @@ export function sbWithin(promise, timeoutMs) {
     return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
 }
 
+export function sbStatusIsGateway(status) {
+    return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530);
+}
+
 export function rpcErrorFrom(status, text) {
     let body = null;
     try { body = JSON.parse(text); } catch (e) { body = null; }
@@ -186,7 +190,10 @@ export function createSupabaseTransport(config, deps?) {
                 throw new SbNetworkError('auth-unavailable');
             }
         }
-        if (!res.ok) throw rpcErrorFrom(res.status, res.text);
+        if (!res.ok) {
+            if (sbStatusIsGateway(res.status)) throw new SbNetworkError('HTTP ' + res.status);
+            throw rpcErrorFrom(res.status, res.text);
+        }
         if (!res.text) return null;
         try {
             return JSON.parse(res.text);

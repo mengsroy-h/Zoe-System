@@ -488,7 +488,7 @@ export async function importZtoListRows() {
             try {
                 const status = await withTimeout(savePromise, 15000, 'Save timed out');
                 if (!session.current()) return;
-                if (status === true) {
+                if (status === true || status === false) {
                     saved++;
                     savedDates.add(rowDateKey);
                     if (closedStampMs) {
@@ -501,8 +501,11 @@ export async function importZtoListRows() {
                 if (e && e.message === 'Save timed out') {
                     pending++;
                     savedDates.add(rowDateKey);
-                    armLateWrite(savePromise, () => { if (session.current()) refreshCurrentHistoryView(); }, rollbackImportedRow,
-                        'ZTO list import save');
+                    armLateWrite(savePromise, () => {
+                        if (!session.current()) return undefined;
+                        refreshCurrentHistoryView();
+                        return closedStampMs ? markZtoListRowPickedUp(row.barcode) : undefined;
+                    }, rollbackImportedRow, 'ZTO list import save');
                 } else {
                     failed++;
                     rollbackImportedRow();

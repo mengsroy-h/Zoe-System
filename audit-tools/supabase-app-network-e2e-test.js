@@ -157,6 +157,34 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             Date.now = () => realNow() + skew;
             window.__zoeSkew = (ms) => { skew += ms; };
         }, JSON.stringify(config));
+        // ⛔ ផ្នែក ជ តែប៉ុណ្ណោះ (sessionStorage `__zoeExpiryRace` ➜ ការផ្ទុកមួយដង) ៖ ការពិនិត្យ ៤ ម៉ោង (`fb.getIdTokenResult`) រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ (ពិដាន ១០ វិ.)
+        await ctx.addInitScript(() => {
+            let armed = false;
+            try { armed = sessionStorage.getItem('__zoeExpiryRace') === '1'; if (armed) sessionStorage.removeItem('__zoeExpiryRace'); } catch (e) {}
+            if (!armed) return;
+            const st = { pullSent: false, waitedMs: -1, wrapped: 0 };
+            window.__zoeExpiryRace = st;
+            const realFetch = window.fetch;
+            window.fetch = function (input) {
+                try { if (String(input && input.url ? input.url : input).indexOf('/rest/v1/rpc/zoe_pull') >= 0) st.pullSent = true; } catch (e) {}
+                return realFetch.apply(this, arguments);
+            };
+            const t0 = Date.now();
+            const timer = setInterval(() => {
+                const fb = window.firebaseState && window.firebaseState.fb;
+                if (Date.now() - t0 > 30000) { clearInterval(timer); return; }
+                if (!fb || typeof fb.getIdTokenResult !== 'function' || fb.__zoeExpiryRace) return;
+                const orig = fb.getIdTokenResult;
+                fb.getIdTokenResult = async function () {
+                    const w0 = Date.now();
+                    while (!st.pullSent && Date.now() - w0 < 10000) await new Promise((r) => setTimeout(r, 20));
+                    st.waitedMs = Date.now() - w0;
+                    return orig.apply(this, arguments);
+                };
+                fb.__zoeExpiryRace = true;
+                st.wrapped++;
+            }, 1);
+        });
         await ctx.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
                 var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
                 setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
@@ -271,15 +299,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         check(!!authStore && wholeHistory === 7, 'លក្ខខណ្ឌចាំបាច់ ៖ session supabase-js នៅក្នុង storage + history ៧ ជួរ', { store: authStore && authStore.kind, history: wholeHistory });
         const oldSession = JSON.parse((authStore && authStore.raw) || '{}');
         oldSession.expires_at = Math.floor(Date.now() / 1000) - 60;
-        await page.evaluate(([kind, v]) => window[kind].setItem('zoew-sb-auth', v), [(authStore && authStore.kind) || 'localStorage', JSON.stringify(oldSession)]);
+        await page.evaluate(([kind, v]) => { window[kind].setItem('zoew-sb-auth', v); sessionStorage.setItem('__zoeExpiryRace', '1'); }, [(authStore && authStore.kind) || 'localStorage', JSON.stringify(oldSession)]);
         fake.setAuthAge(Math.round(6.5 * 3600));
         const reloadMark = fake.requests.length;
-        // ⛔ បង្ខំ race ដោយមិនពឹងពេល ៖ my_account (មុនការពិនិត្យ ៤ ម៉ោង) យឺត ២ វិ. ➜ ការទាញ delta ចេញមុន · ចម្លើយរបស់វាត្រូវរង់ចាំរហូតការចាកចេញ
-        const race = { accountHeld: false, pullHeld: false, pullReleasedAfterLogout: false };
+        // ⛔ race ផុតកំណត់ ↔ ការទាញ delta ជាពេលវេលារបស់ App (ការពិនិត្យ ៤ ម៉ោងនៅមុន `initDatabaseListeners()` · token របស់ runSync រង់ចាំ lock auth របស់ supabase-js) ➜ បង្ខំដោយមិនពឹងពេល ៖
+        //    (១) ទំព័រថ្មី (តែការផ្ទុកនេះ) ៖ `getIdTokenResult()` រង់ចាំរហូត `zoe_pull` ចេញពីទំព័រ ➜ ការសម្រេចផុតកំណត់ធ្លាក់ចំពេលការទាញកំពុងរត់ (២) server ៖ ចម្លើយការទាញនោះរង់ចាំរហូតការចាកចេញ
+        const race = { pullHeld: false, pullReleasedAfterLogout: false };
         const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
+        const newPageRefreshed = () => fake.requests.slice(reloadMark).some((r) => /grant_type=refresh_token/.test(r.search || ''));
         fake.setRpcHook(async ({ fn, phase }) => {
-            if (fn === 'my_account' && phase === 'before' && !race.accountHeld) { race.accountHeld = true; await sleep(2000); }
-            if (fn === 'zoe_pull' && phase === 'after' && !race.pullHeld) {
+            if (fn === 'zoe_pull' && phase === 'after' && !race.pullHeld && newPageRefreshed() && !loggedOut()) {
                 race.pullHeld = true;
                 const t0 = Date.now();
                 while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);
@@ -292,11 +321,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
         await sleep(1500);
         fake.setRpcHook(null);
+        race.page = await page.evaluate(() => window.__zoeExpiryRace || null).catch(() => null);
         const logoutAt = fake.requests.slice(reloadMark).findIndex((r) => /\/auth\/v1\/logout/.test(r.path));
         const pullsAroundExpiry = pullsOf(reloadMark);
         const refreshed = fake.requests.slice(reloadMark).filter((r) => /grant_type=refresh_token/.test(r.search || '')).length;
         check(expiredAt >= 0 && refreshed >= 1 && logoutAt >= 0, 'លក្ខខណ្ឌចាំបាច់ ៖ token ផុត ➜ refresh ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញ ➜ ប្រអប់ចូលលេច', { expiredAt, refreshed, logoutAt });
-        check(pullsAroundExpiry.some((since) => since > 0) && race.pullReleasedAfterLogout, 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ចេញមុនការចាកចេញ ហើយចម្លើយមកដល់ក្រោយការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', { pulls: pullsAroundExpiry, race });
+        check(pullsAroundExpiry.some((since) => since > 0) && race.pullReleasedAfterLogout, 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ចេញមុនការចាកចេញ ហើយចម្លើយមកដល់ក្រោយការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', { pulls: pullsAroundExpiry, race, requests: fake.requests.slice(reloadMark).map((r) => r.path.replace('/rest/v1/rpc/', '') + (r.search || '')) });
         fake.setAuthAge(0);
         const prefilled = await page.evaluate(() => ({ email: document.getElementById('loginEmailInput').value, pw: (document.getElementById('loginPasswordInput').value || '').length }));
         check(prefilled.email === 'sokha' && prefilled.pw > 0, 'ប្រអប់ចូលបំពេញឈ្មោះ និងពាក្យសម្ងាត់ដែលចងចាំ', prefilled);

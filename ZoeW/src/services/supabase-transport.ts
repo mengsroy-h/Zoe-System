@@ -11,6 +11,8 @@ export const SB_AUTH_KEY_SUFFIXES = ['', '-code-verifier', '-user'];
 
 export const SB_FETCH_TIMEOUT_MS = 15000;
 
+export const SB_RESTORE_CEILING_MS = 3000;
+
 export function claimSessionStorageFor(storage, url) {
     const owner = storage.getItem(SB_AUTH_OWNER_KEY);
     if (owner !== null && owner !== url) {
@@ -176,6 +178,11 @@ export function createSupabaseTransport(config, deps?) {
     const sessionStored = () => {
         try { return !!storage.getItem(SB_AUTH_STORAGE_KEY); } catch (e) { return false; }
     };
+    const storedSession = () => {
+        let parsed = null;
+        try { parsed = JSON.parse(storage.getItem(SB_AUTH_STORAGE_KEY) || 'null'); } catch (e) { parsed = null; }
+        return toSession(parsed);
+    };
     const rpc = async (fn, args, timeoutMs) => {
         let token = await sbWithin(accessToken().catch(() => null), timeoutMs);
         if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable');
@@ -204,9 +211,15 @@ export function createSupabaseTransport(config, deps?) {
     return {
         url,
         loginDomain: config.loginDomain,
-        async restoreSession() {
-            const { data } = await client.auth.getSession();
-            return toSession(data && data.session);
+        async restoreSession(ceilingMs = SB_RESTORE_CEILING_MS) {
+            let timer = null;
+            const ceiling = new Promise((resolve) => { timer = setTimeout(() => resolve(null), ceilingMs); });
+            const loaded = client.auth.getSession().then((out) => ({ out }), () => null);
+            const settled: any = await Promise.race([loaded, ceiling]).finally(() => clearTimeout(timer));
+            const out = settled && settled.out;
+            if (out && out.data && out.data.session) return toSession(out.data.session);
+            if (out && !out.error) return null;
+            return storedSession();
         },
         async signIn(email, password) {
             let out;

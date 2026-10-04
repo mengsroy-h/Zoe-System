@@ -46,7 +46,8 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) ➜ ធ្វើតាម [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4**
+   (G5 · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
@@ -54,8 +55,8 @@
    **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
    **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
    វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)** ៖ (១) 🔒 G4 ចាកចេញពេល Supabase មិនឆ្លើយ + token ផុត ➜ session នៅក្នុង storage ➜ អ្នកបើក App បន្ទាប់ចូលជាគណនីមុន
-   (`supabase-transport.ts` `signOut()`) (២) G5 បើក App ក្រៅបណ្តាញ + token ផុត ➜ ប្រអប់ចូលជាប់ទោះ refresh ជោគជ័យក្រោយ (`supabase-sdk.ts` `onSession`/
-   `restoreSession` · `attemptAuthStorageRecovery`) (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
+   (`supabase-transport.ts` `signOut()`) ⚠️ **ធ្វើមុន merge 2.49.4** ៖ 2.49.4 ស្តារ session ពី storage ពេលក្រៅបណ្តាញ ➜ storage ដែល G4 ទុកចោលបើកចូលគណនីមុនទាំងពេល
+   ក្រៅបណ្តាញ (មុននេះតែពេលមានបណ្តាញ) (២) ✅ **G5 ➜ [2.49.4]** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
    សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ (៦) ZTO-G3 HTTP 200 body ខូច ➜
    «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
    នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
@@ -136,6 +137,38 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.4] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ (មិន reload · មិនជាប់ប្រអប់ចូល) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ** (Deep audit ជុំ ២ G5)
+
+**ZoeW `2.49.4`** (`zoew-v259` ➜ `zoew-v260`) · ZoeKeyGen មិនប្រែ។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះតែ adapter Supabase
+(`src/services/supabase-sdk.ts` · `supabase-transport.ts`) និង env របស់វា (`src/services/firebase-init.ts` ៖ `onSessionEnded`) ➜ ហាង Firebase មិនរង។
+
+#### អ្វីដែលខុសពីមុន
+
+- **បើក App ពេលក្រៅបណ្តាញ + token ផុត** (ទូរស័ព្ទទុកលើស ១ ម៉ោង) ៖ supabase-js សាក refresh ឡើងវិញ ~២៥-៣០ វិ. មុន `getSession()` ឆ្លើយ ➜ មុនកែ adapter មិនឆ្លើយ
+  `onAuthStateChanged` ក្នុង ៨ វិ. ➜ App **reload ខ្លួនឯង** (`attemptAuthStorageRecovery` ៖ លុបតែ IndexedDB Firebase · គ្មានប្រយោជន៍លើ Supabase) ➜ ៨ វិ. ទៀត ➜ **ប្រអប់ចូល** ➜
+  បណ្តាញត្រឡប់ ហើយ refresh ជោគជ័យ (`TOKEN_REFRESHED`) តែ adapter មិនអើពើព្រោះ `currentUser` ទទេ ➜ **ជាប់ប្រអប់ចូល** (ក្រៅបណ្តាញ ការវាយពាក្យសម្ងាត់ក៏បរាជ័យ)។
+- ឥឡូវ ៖ ការស្តារមានពិដាន `SB_RESTORE_CEILING_MS` (៣ វិ.) ៖ refresh យឺត ឬបរាជ័យបណ្តោះអាសន្ន (session នៅក្នុង storage) ➜ ស្តារគណនីពី session ក្នុង storage (ដូច
+  Firebase ស្តារអ្នកប្រើពី persistence ពេលក្រៅបណ្តាញ) ➜ App ដំណើរការក្រៅបណ្តាញ (RPC = `auth-unavailable` ➜ សាកឡើងវិញ) ➜ បណ្តាញត្រឡប់ ➜ token ថ្មី។ បណ្តាញល្អ ➜
+  ឆ្លើយដោយ session ថ្មីពី Server ដូចមុន · refresh token មិនត្រឹមត្រូវ ➜ មិនស្តារ។ ការកំណត់ ៤ ម៉ោងនៅដដែល (វដ្ត ៦០ វិ. អាន `authTime` ពី token ចាស់ ៖ វាស់)។
+- **ការពិនិត្យស្ថានភាពហាង (`my_account`) ដែលរំលងពេលក្រៅបណ្តាញ** ➜ រត់ម្តងទៀតពេល `TOKEN_REFRESHED` ឬការទាញជោគជ័យបន្ទាប់ (`_accountUnverified`) ➜ ហាងបិទ/ផុតកំណត់ខណៈ
+  ក្រៅបណ្តាញ ➜ សារហាង + ចាកចេញ (ការពារពិតនៅ RLS ដដែល)។ ការពិនិត្យស្របគ្នាសួរ Server ម្តង (សារតែម្តង)។
+- **supabase-js ចាកចេញដោយខ្លួនឯង** (refresh token ត្រូវ Server បដិសេធ ៖ reuse · session ត្រូវលុប · ចាកចេញពីផ្ទាំងផ្សេង) ➜ មុនកែ ប្រអប់ចូលលេចដោយគ្មានមូលហេតុ ➜ ឥឡូវ
+  «⚠️ សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់ (…) — សូមចូលប្រព័ន្ធម្តងទៀត» (`SB_SESSION_ENDED_TEXT`) · ការចាកចេញរបស់ adapter ខ្លួនឯង (ប៊ូតុង · ៤ ម៉ោង · ហាងបិទ) គ្មានសារនេះ។
+- 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-offline-restore.test.ts` (ថ្មី · supabase-js ពិត + transport ពិត + adapter ពិត · fake timers · ផ្នែកថ្នេរ ៖ transport ក្លែង) ៖ កូដ `main` មុនកែ
+  **ធ្លាក់ ៦/៩** (គ្មានចម្លើយក្នុង 7.5 វិ. · បណ្តាញត្រឡប់ ១២០ វិ. ➜ `currentUser` នៅ `null` · GoTrue 503 ➜ គ្មានចម្លើយ · គ្មានសារមូលហេតុ ២) ➜ **១៤/១៤** (រួម ៖ ក្រៅបណ្តាញ
+  ៤០ វិ. ➜ `getIdTokenResult()` ឲ្យ `authTime` ពី token ចាស់ក្នុងពិដាន ១៥ វិ. ➜ ច្បាប់ ៤ ម៉ោងនៅរស់)។ Mutation ១០ ➜ ក្រហម ៩ ·
+  រស់ ១ (ការពិនិត្យ `refresh_token` ក្នុង session ពី storage ៖ supabase-js លុប session មិនត្រឹមត្រូវដោយខ្លួនឯងរួច ➜ ដកចេញ មិនទុកកូដគ្មានអ្នកវាស់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។ ⚠️ ធ្វើ G4 (Handoff) មុន merge។
+- ⏳ សាកលើឧបករណ៍ពិត (ហាង Supabase) ៖ ចូល ➜ បិទ App ទុក ១-២ ម៉ោង (តិចជាង ៤ ម៉ោង) ➜ បិទ Wi-Fi/Data ➜ បើក App ➜ ត្រូវនៅក្នុងប្រព័ន្ធ (មិន reload · គ្មានប្រអប់ចូល · ស្ថានភាព
+  «ក្រៅបណ្ដាញ») ➜ បើកបណ្តាញ ➜ ទិន្នន័យទាញខ្លួនឯង (មិនវាយពាក្យសម្ងាត់)។
 
 ### [2.49.3] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ ចូលប្រព័ន្ធវិញក្រោយផុតកំណត់ ៤ ម៉ោង ឃើញទិន្នន័យគ្រប់ · ទិន្នន័យ/ការសរសេររបស់គណនីមួយមិនឆ្លងទៅគណនីផ្សេង · gateway 5xx មិនរាប់ចំណូល ២ ដង** (រាយការណ៍ដោយម្ចាស់គម្រោង + Deep audit ជុំ ២)
 
@@ -1231,6 +1264,24 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G5 — បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ ប្រអប់ចូលជាប់ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ `main` (49adb4d) មុនកែ** ៖ supabase-js ពិត (`@supabase/auth-js` 2.117.2) + storage ក្នុងសតិ + fetch ក្លែង (ក្រៅបណ្តាញ = `TypeError` · GoTrue 503 · 400) · fake timers ៖
+  `restoreSession()` = `getSession()` រង់ចាំ `_initialize` ➜ `_callRefreshToken` សាកឡើងវិញ (backoff 200 ms × 2ⁿ ក្នុង `AUTO_REFRESH_TICK_DURATION_MS` ៣០ វិ.) ➜ **គ្មាន
+  `onAuthStateChanged` ក្នុង 7.5 វិ.** ➜ App ពិត ៖ `attemptAuthStorageRecovery` reload ➜ ប្រអប់ចូល · `getSession()` ឆ្លើយ `null` + `AuthRetryableFetchError` (session **នៅ** ក្នុង storage) ·
+  បណ្តាញត្រឡប់ ➜ ticker ស្វ័យប្រវត្តិ refresh ជោគជ័យ ➜ `TOKEN_REFRESHED` ➜ handler ត្រូវការ `auth.currentUser` ➜ **`currentUser` នៅ `null` ក្រោយ ១២០ វិ.**។
+- **ការកែ** ៖ (ក) `restoreSession(ceilingMs)` ៖ ការប្រណាំងជាមួយពិដាន ៣ វិ. · session ពី Server ➜ ប្រើ · គ្មាន session + គ្មាន error ➜ `null` · error ឬពិដាន ➜ session ក្នុង storage
+  (supabase-js ទុកវាតែពេលបរាជ័យបណ្តោះអាសន្ន · លុបពេល 400) (ខ) `SIGNED_OUT` មកកំឡុងការស្តារ ➜ មិនស្តារ session ចាស់ (`lostWhileRestoring` ៖ ចន្លោះ microtask រវាងការអាន
+  storage និង `setUser`) (គ) `SIGNED_OUT` ដែល adapter មិនបានហៅ (`ownSignOut()` រាប់) ➜ `env.onSessionEnded` (ឃ) `_accountUnverified` ➜ ពិនិត្យហាងម្តងទៀតលើ
+  `TOKEN_REFRESHED` និង `onSynced` · `_verifyAccount()` រួមការហៅស្របគ្នា។ ⛔ មិនអើពើ `TOKEN_REFRESHED` ពេល `currentUser` ទទេដដែល ៖ ការចាកចេញដែលបរាជ័យ (G4) ទុក session ក្នុង
+  supabase-js ➜ ការទទួលយកវានឹងបើកចូលគណនីដែលអ្នកប្រើទើបចាកចេញ។
+- **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៦/៩** ➜ **១៤/១៤** (បន្ថែម ៥ ៖ error លឿន ➜ storage · race `SIGNED_OUT` · `onSynced` ពិនិត្យម្តងទៀត · ការពិនិត្យស្របគ្នា · ច្បាប់ ៤ ម៉ោងពេលក្រៅបណ្តាញ ៖
+  `authTime` ពី token ចាស់ ក្រោយ ៤០ វិ.) · vitest ពេញ ៥១ ឯកសារ / ៤៤៣ · run-all subset (STRICT · emulator រស់) ៖ `emu/supabase-adapter-parity` ៩២ · `supabase-app-network-e2e` ២៣ ·
+  `supabase-docs-cache` · `sdk-surface` · `toast-truth` · ឯកសារ/កំណែ ✅ ·
+  `tsc` · eslint · purity ✅។ Mutation ១០ ៖ គ្មាន fallback storage (ធ្លាក់ ៥) · error ➜ `null` (១) · គ្មានការពិនិត្យលើ `TOKEN_REFRESHED` (២) · គ្មានការការពារ `ownSignOut` (២) ·
+  គ្មានសារ (២) · គ្មានការរួមការពិនិត្យ (១) · មិនដាក់ `_accountUnverified` (៣) · គ្មាន `lostWhileRestoring` (១) · លក្ខខណ្ឌ `onSynced` ចាស់ (១) · ការពិនិត្យ `refresh_token` **រស់** ➜ ដកចេញ។
+- **ផលលើ G4 (វាស់ពីកូដ)** ៖ storage ដែល `signOut()` បរាជ័យទុកចោល ឥឡូវស្តារពេលក្រៅបណ្តាញដែរ ➜ G4 ត្រូវធ្វើមុន merge (Handoff)។
 
 ### 2026-10-03 — Deep audit ជុំ ២ ៖ បណ្តាញ — ហាង Supabase ពេលបណ្តាញខូចលើ App ពិត · Firebase លើលំហូរដដែល (ការកែ ➜ ផ្នែក ១ [2.49.3])
 

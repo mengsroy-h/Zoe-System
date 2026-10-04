@@ -11,6 +11,8 @@ export const SB_ACCOUNT_BLOCKED_TEXT = {
     revoked: 'ហាងនេះត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់'
 };
 
+export const SB_SESSION_ENDED_TEXT = 'សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់ (ចាកចេញពីផ្ទាំងផ្សេង ឬ Server លែងទទួលស្គាល់) — សូមចូលប្រព័ន្ធម្តងទៀត';
+
 export function loginEmailFor(input, domain) {
     const text = String(input === null || input === undefined ? '' : input).trim().toLowerCase();
     if (!text) return '';
@@ -73,7 +75,19 @@ function makeUser(auth, session) {
 
 function createAuth(app, env) {
     const transport = app._transport;
-    const auth: any = { app, currentUser: null, _transport: transport, _listeners: new Set(), _ready: false, _account: null };
+    const auth: any = { app, currentUser: null, _transport: transport, _listeners: new Set(), _ready: false, _account: null, _accountUnverified: false };
+    let restoring = true;
+    let lostWhileRestoring = false;
+    let ownSignOuts = 0;
+    let verifying = null;
+    const ownSignOut = async () => {
+        ownSignOuts++;
+        try {
+            await transport.signOut();
+        } finally {
+            ownSignOuts--;
+        }
+    };
     const fire = () => {
         const current = auth.currentUser;
         auth._listeners.forEach((cb) => { try { cb(current); } catch (e) { env.onListenerError(e); } });
@@ -82,6 +96,7 @@ function createAuth(app, env) {
         if (!session) {
             auth.currentUser = null;
             auth._account = null;
+            auth._accountUnverified = false;
             try { transport.writeAccount(null); } catch (e) {}
             if (app._db) app._db.setAuthed(false);
             return;
@@ -90,6 +105,7 @@ function createAuth(app, env) {
             auth.currentUser._session = session;
         } else {
             auth.currentUser = makeUser(auth, session);
+            auth._accountUnverified = false;
         }
         if (app._db) app._db.setAuthed(true, docsCacheScope(app, auth.currentUser.uid));
     };
@@ -107,16 +123,18 @@ function createAuth(app, env) {
         }
         if (app._db) app._db.setTenantTopic(app._tenantTopic);
     };
-    auth._verifyAccount = async () => {
+    const verifyAccountNow = async () => {
         if (!auth.currentUser) return null;
         const uid = auth.currentUser.uid;
         let row;
         try {
             row = await accountOf();
         } catch (e) {
+            if (auth.currentUser && auth.currentUser.uid === uid) auth._accountUnverified = true;
             return null;
         }
         if (!auth.currentUser || auth.currentUser.uid !== uid) return null;
+        auth._accountUnverified = false;
         const reason = blockedReason(row);
         if (reason) {
             env.onAccountBlocked(SB_ACCOUNT_BLOCKED_TEXT[reason]);
@@ -125,6 +143,10 @@ function createAuth(app, env) {
         }
         applyAccount(row);
         return null;
+    };
+    auth._verifyAccount = () => {
+        if (!verifying) verifying = verifyAccountNow().finally(() => { verifying = null; });
+        return verifying;
     };
     auth._onChange = (cb) => {
         auth._listeners.add(cb);
@@ -142,12 +164,12 @@ function createAuth(app, env) {
         try {
             row = await accountOf();
         } catch (e) {
-            await transport.signOut().catch(() => {});
+            await ownSignOut().catch(() => {});
             throw new Error(authErrorMessage(e));
         }
         const reason = blockedReason(row);
         if (reason) {
-            await transport.signOut().catch(() => {});
+            await ownSignOut().catch(() => {});
             throw new Error(SB_ACCOUNT_BLOCKED_TEXT[reason]);
         }
         setUser(session);
@@ -160,7 +182,7 @@ function createAuth(app, env) {
         const had = !!auth.currentUser;
         let failed = null;
         try {
-            await transport.signOut();
+            await ownSignOut();
         } catch (e) {
             failed = e;
         }
@@ -173,17 +195,25 @@ function createAuth(app, env) {
         transport.setPersistence(persistence && persistence.type === 'SESSION' ? 'session' : 'local');
     };
     transport.onSession((event, session) => {
-        if (event === 'SIGNED_OUT' && auth.currentUser) {
-            if (app._db) app._db.resetForSignOut();
-            setUser(null);
-            fire();
+        if (event === 'SIGNED_OUT') {
+            const ended = !ownSignOuts && (!!auth.currentUser || restoring);
+            if (restoring) lostWhileRestoring = true;
+            if (auth.currentUser) {
+                if (app._db) app._db.resetForSignOut();
+                setUser(null);
+                fire();
+            }
+            if (ended && env.onSessionEnded) env.onSessionEnded(SB_SESSION_ENDED_TEXT);
             return;
         }
         if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session && auth.currentUser && auth.currentUser.uid === session.user.id) {
             auth.currentUser._session = session;
+            if (event === 'TOKEN_REFRESHED' && auth._accountUnverified) auth._verifyAccount();
         }
     });
-    transport.restoreSession().then((session) => {
+    transport.restoreSession().then((restored) => {
+        restoring = false;
+        const session = lostWhileRestoring ? null : restored;
         setUser(session);
         if (session) {
             let cached = null;
@@ -191,6 +221,7 @@ function createAuth(app, env) {
             if (cached && cached.uid === session.user.id && cached.row && cached.row.tenant_id) applyAccount(cached.row, false);
         }
     }, () => {
+        restoring = false;
         setUser(null);
     }).then(() => {
         auth._ready = true;
@@ -264,7 +295,7 @@ export function createSupabaseSdk(makeTransport, env) {
             if (!app._db) {
                 app._db = createSupabaseDatabase(app._transport, {
                     onListenerError: env.onListenerError,
-                    onSynced: () => { if (app._auth && app._auth.currentUser && !app._tenantTopic) app._auth._verifyAccount(); },
+                    onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
                     onTxOutcomeUnknown: env.onTxOutcomeUnknown
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache }, env.dbOptions));

@@ -25,6 +25,9 @@ function supabaseEnv() {
         onAccountBlocked: (message) => {
             showToast('⚠️ ' + message);
         },
+        onSessionEnded: (message) => {
+            showToast('⚠️ ' + message);
+        },
         onTxOutcomeUnknown: (segs) => {
             const path = '/' + (Array.isArray(segs) ? segs.join('/') : '');
             if (txOutcomeUnknownReported.has(path)) return;

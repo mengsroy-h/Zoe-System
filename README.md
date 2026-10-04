@@ -8,7 +8,7 @@ step; App ទាំង ២ deploy ជា Netlify site។ ទិន្នន័�
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.49.3` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.49.4` |
 | **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key · បង្កើតហាង Supabase និងកូដអញ្ជើញ | `2.24.4` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·

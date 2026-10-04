@@ -87,7 +87,8 @@ function fakeBlobs(opts) {
             return {
                 get() {
                     state.reads++;
-                    return new Promise((resolve) => setTimeout(() => resolve(state.value), opts.readMs));
+                    const readMs = Array.isArray(opts.readMs) ? opts.readMs[Math.min(state.reads - 1, opts.readMs.length - 1)] : opts.readMs;
+                    return new Promise((resolve) => setTimeout(() => resolve(state.value), readMs));
                 },
                 async getWithMetadata() {
                     const value = await this.get();
@@ -605,6 +606,32 @@ async function runHandler(opts) {
         ok('⛔ នាឡិកាថយក្រោយ ➜ នៅតែឆ្លើយជា JSON ដែលមានឈ្មោះ (មិនព្យួរ)',
             !!backClock.res && backClock.res.statusCode > 0 && /"(code|success|found)"/.test(String(backClock.res.body)),
             backClock.res && { status: backClock.res.statusCode, body: String(backClock.res.body).slice(0, 120) });
+    }
+
+    // ═══ ៩. ⛔ single-flight ៖ សំណើដែលចូលរួម run របស់អ្នកផ្សេង នៅតែគោរពថវិការបស់ខ្លួន (ZTO-G6) ═══
+    // B ចាប់ផ្តើមមុន តែអាន Cookie store យឺត (២ វិ.) · A ចាប់ផ្តើមក្រោយ ១.៥ វិ. អានលឿន ➜ A ជាម្ចាស់ run (ថវិការបស់ A)
+    // ➜ B ចូលរួម run នោះ ➜ មុនកែ B រង់ចាំរហូតដល់ run របស់ A ចប់ = ក្រោយថវិការបស់ B ខ្លួនឯង។
+    console.log('\n=== ៩. single-flight ៖ សំណើចូលរួមគោរពថវិការបស់ខ្លួន ===');
+    {
+        const JOIN_BUDGET = 6000;
+        mod.resetCachesForTests();
+        const state = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: GOOD_COOKIE, writeStartedAt: 0 };
+        mod.setBlobsModuleForTests(fakeBlobs({ readMs: [2000, 0], writeMs: 0, state }));
+        applyEnv({ budgetMs: JOIN_BUDGET, upstreamTimeoutMs: 5500, retries: 0 });
+        global.fetch = upstream({ state, hang: true });
+        const barcode = nextBarcode();
+        const t0 = Date.now();
+        const pB = mod.handler(makeEvent({ barcode })).then((res) => ({ ms: Date.now() - t0, res }));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const t1 = Date.now();
+        const pA = mod.handler(makeEvent({ barcode })).then((res) => ({ ms: Date.now() - t1, res }));
+        const [b, a] = await Promise.all([pB, pA]);
+        ok('ជាន់អប្បបរមា ៖ B ចូលរួម run របស់ A (upstream ហៅតែម្តង)', state.upstreamCalls === 1, state.upstreamCalls);
+        ok('⛔ B (ចូលរួម) ឆ្លើយក្នុងថវិការបស់ខ្លួន (' + b.ms + ' ms ≤ ' + (JOIN_BUDGET + SLACK) + ' ms)',
+            b.ms <= JOIN_BUDGET + SLACK, { measuredMs: b.ms, budgetMs: JOIN_BUDGET });
+        ok('⛔ B ឆ្លើយជា JSON ដែលមានឈ្មោះ (ZTO_TIMEOUT)',
+            b.res.statusCode >= 400 && /"code":"ZTO_TIMEOUT"/.test(b.res.body), { status: b.res.statusCode, body: String(b.res.body).slice(0, 120) });
+        ok('ទិសផ្ទុយ ៖ A (ម្ចាស់ run) ក៏ក្នុងថវិកា (' + a.ms + ' ms)', a.ms <= JOIN_BUDGET + SLACK, a.ms);
     }
 
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);

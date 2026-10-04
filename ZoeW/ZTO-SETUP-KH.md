@@ -545,7 +545,7 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 | --- | --- | --- |
 | `idtoken:project-unset` | `FIREBASE_PROJECT_IDS` មិនទាន់ដាក់ | Netlify env ➜ ជំហានទី ២ |
 | `idtoken:aud` | token មកពី Project ដែលមិនក្នុងបញ្ជី | Netlify env ➜ ជំហានទី ២ |
-| `idtoken:expired` · `idtoken:missing` | មិនទាន់ចូលប្រព័ន្ធ ឬ token ផុត | ចូលប្រព័ន្ធឡើងវិញ |
+| `idtoken:certs` · `idtoken:expired` · `idtoken:future` · `idtoken:kid-unknown` · `idtoken:missing` | ផ្ទៀងផ្ទាត់មិនបានបណ្តោះអាសន្ន (certs Google · token ផុត · នាឡិកា · App យក token មិនបាន) — App ប្រាប់ «សាកម្ដងទៀត» | សាកម្តងទៀត · នៅតែមិនបាន ➜ ចាកចេញ ហើយចូលប្រព័ន្ធវិញ |
 | `idtoken:signature` · `idtoken:malformed` | token មិនមែនរបស់ Firebase ពិត | ⛔ សញ្ញានៃការក្លែង |
 | `site:no-account` | គណនីនោះគ្មានលេខសាខាក្នុង email | Console ➜ ជំហានទី ៣ |
 | `url:invalid` · `scan-type:invalid` | env របស់បញ្ជីខូច | Netlify env ➜ `?diag=1` |

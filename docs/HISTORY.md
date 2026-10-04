@@ -57,7 +57,7 @@
    វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
    សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
-   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
+   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
    នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
    (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
@@ -141,7 +141,8 @@
 
 **ZoeW `2.49.4`** (`zoew-v259` ➜ `zoew-v260`) · ZoeKeyGen មិនប្រែ។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ adapter Supabase
 (`src/services/supabase-sdk.ts` · `supabase-transport.ts`) និង env របស់វា (`src/services/firebase-init.ts` ៖ `onSessionEnded`) · សារចាកចេញបរាជ័យ (`src/features/auth.ts` ·
-`app-lock.ts` ៖ លែងនិយាយ «Firebase» ព្រោះប្រើទាំង ២ backend)។
+`app-lock.ts` ៖ និយាយពី «ឧបករណ៍នេះ» ព្រោះការបរាជ័យតែមួយគត់ដែលនៅសល់ = storage លុបមិនចេញ) · `src/features/zto-list-sync.ts` · `auto-lookup.ts` ·
+Function `netlify/functions/zto-order-detail.js`។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -156,7 +157,7 @@
 - **supabase-js ចាកចេញដោយខ្លួនឯង** (refresh token ត្រូវ Server បដិសេធ ៖ reuse · session ត្រូវលុប · ចាកចេញពីផ្ទាំងផ្សេង) ➜ មុនកែ ប្រអប់ចូលលេចដោយគ្មានមូលហេតុ ➜ ឥឡូវ
   «⚠️ សម័យចូលប្រព័ន្ធលើឧបករណ៍នេះបានបញ្ចប់ (…) — សូមចូលប្រព័ន្ធម្តងទៀត» (`SB_SESSION_ENDED_TEXT`) · ការចាកចេញរបស់ adapter ខ្លួនឯង (ប៊ូតុង · ៤ ម៉ោង · ហាងបិទ) គ្មានសារនេះ។
 - **ចាកចេញពេល Supabase មិនឆ្លើយ** (G4 · 🔒 ទូរស័ព្ទរួម) ៖ supabase-js `signOut()` អាន session ជាមុន ➜ token ផុត ➜ refresh បរាជ័យបណ្តោះអាសន្ន ➜ ត្រឡប់ error **មុនលុប
-  session** ➜ មុនកែ ៖ ប៊ូតុងចាកចេញជាប់ **13.4 វិ.** ➜ «⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase…» លើហាង Supabase ➜ session **នៅក្នុង storage** ➜ អ្នកបើក App បន្ទាប់
+  session** ➜ មុនកែ ៖ ប៊ូតុងចាកចេញជាប់ **13.4 វិ.** ➜ «⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពី Supabase…» (សារបណ្តាញ ខណៈបញ្ហាពិតគឺ session នៅក្នុងឧបករណ៍) ➜ session **នៅក្នុង storage** ➜ អ្នកបើក App បន្ទាប់
   **ចូលជាគណនីមុន**។ ឥឡូវ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (ដូច Firebase) ៖ ការលុបចោលនៅ Server (`/auth/v1/logout?scope=local` ដោយ token បច្ចុប្បន្ន · refresh មុនបើផុត)
   ជា best-effort ក្រោមពិដាន `SB_SIGN_OUT_CEILING_MS` (៣ វិ.) ➜ លុប `zoew-sb-auth*` ក្នុង storage ដោយខ្លួនឯង ➜ refresh ដែលកំពុងរត់មកដល់ក្រោយ ត្រូវ commit guard របស់
   supabase-js បោះចោល (storage ប្រែ) ➜ មិនស្តារ session ឡើងវិញ។ បដិសេធតែពេល storage លុបមិនចេញ (សារ «មិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះ»)។
@@ -179,9 +180,18 @@
 - **Lookup ស្កេន ៖ HTTP 200 តែ body ខូច** (ZTO-G3 · proxy/ប្រព័ន្ធ Wi-Fi កាត់ចម្លើយ · ទំព័រ HTML) ➜ មុនកែ `r.json().catch(() => null)` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode
   នេះ» (អះអាងខុស) · មិនព្យាយាមឡើងវិញ · គ្មាន cooldown។ ឥឡូវ ៖ `LOOKUP_BAD_BODY` = ការបរាជ័យបណ្តោះអាសន្ន ➜ ព្យាយាមឡើងវិញម្តង ➜ «⚠️ ZTO ឆ្លើយមកខូច (មិនពេញលេញ) — សូមស្កេនម្ដងទៀត» ·
   cooldown បណ្តោះអាសន្ន។ (ZTO-G5 ផ្នែកនាំចូល ➜ ZTO-G4 ខាងលើ · sweep ស្ថានភាព ZTO ចាត់ body ខូចជា «បរាជ័យ» ត្រឹមត្រូវរួច ៖ វាស់ ៖ គ្មាន)
+- **ទាញបញ្ជីពី ZTO ៖ ការផ្ទៀងអត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ≠ «គ្មានសាខា»** (ZTO-G2) ៖ Function ទាញ certs Google មិនបាន (`idtoken:certs`) · token ផុត/នាឡិកា
+  (`idtoken:expired` · `future`) · `kid-unknown` · App យក ID token មិនបានក្នុង ៨ វិ. (`idtoken:missing`) ➜ មុនកែ «🏢 គណនីនេះគ្មានលេខសាខា ZTO — សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ»។
+  ឥឡូវ ៖ «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន (reason) — សូមសាកម្ដងទៀត» · Server កំណត់ខុស (`idtoken:aud` · `iss` · `project-unset` ៖ `ZTO_LIST_SERVER_CONFIG_REASONS`) ➜
+  «មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify (reason)» · `site:*` ➜ «គ្មានលេខសាខា» ដដែល។
+- **Function ZTO ៖ សំណើដែលចូលរួម run របស់អ្នកផ្សេង លើសថវិកា** (ZTO-G6) ៖ B ចាប់ផ្តើមមុន តែអាន Cookie store យឺត ➜ ចូលរួម run របស់ A (ចាប់ផ្តើមក្រោយ) ➜ រង់ចាំរហូត run
+  ចប់តាមថវិការបស់ A ➜ មុនកែ B ឆ្លើយក្រោយ **7004 ms** (ថវិកា 6000)។ ឥឡូវ ៖ `joinWithinBudget()` ➜ ការរង់ចាំមានពិដានតាមថវិការបស់អ្នកចូលរួម ➜ `ZTO_TIMEOUT` (JSON) ទាន់ពេល។
 - 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
 
 #### អ្នកយាម
+
+- `ZoeW/tests/zto-list-identity.test.ts` (ថ្មី · `runZtoListSyncPreview()` ពិត) ៖ tree មុនកែ **ធ្លាក់ ៨/១២** ➜ **១២/១២** · Mutation (config Server ជាបណ្តោះអាសន្ន) ➜ ក្រហម ៣។
+  `zto-budget-test` ផ្នែក ៩ (ថ្មី · ២ សំណើស្របគ្នា · store អានតាមលំដាប់ 2000/0 ms) ៖ Function មុនកែ **ធ្លាក់** (B 7004 ms > 6900) ➜ **៦៣ ok**។
 
 - `lookup-failure-identity-test` ផ្នែក ២ខ (ថ្មី) ៖ fetch ក្លែងមុនមិនដែលហៅ body reader ➜ body ខូច **មិនអាចវាស់បាន** ➜ ជំហាន `badBody` ហៅ reader ពិតដោយ `json()` បដិសេធ ➜ tree មុនកែ
   **ធ្លាក់ ៣** ➜ **៥៣ ok**។ Mutation ៣ (គ្មាន retry · គ្មានសារ · គ្មានការចាប់) ➜ ក្រហម ៣។
@@ -1307,6 +1317,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
 
+### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G2 + ZTO-G6 — អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន · ថវិកា single-flight (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **ZTO-G2 វាស់លើ tree មុនកែ** (vitest · `runZtoListSyncPreview()` ពិត · fetch ក្លែងឆ្លើយ `enabled:false` + reason) ៖ `idtoken:certs` · `expired` · `future` · `kid-unknown` ·
+  `aud` · `iss` · `project-unset` និង token ព្យួរ ៨ វិ. ➜ **«គ្មានលេខសាខា» ទាំង ៨**។ មូលហេតុ ៖ `reason.indexOf('site:') === 0 || reason.indexOf('idtoken:') === 0` ➜ សាខាតែមួយ។
+  `idtoken:supabase-unreachable` មានសាខាផ្ទាល់រួច (ឆ្លង)។ certs Google ៖ TTL ១ ម៉ោង · ការទាញបរាជ័យ ➜ ប្រើ certs ចាស់ (fail-open) · `kid-unknown` ក្នុង TTL ➜ មិនទាញម្តងទៀត ៖ Google
+  ផ្សព្វផ្សាយ key ថ្មីមុនប្រើ (Cache-Control ច្រើនម៉ោង) ➜ **វាស់មិនបាន** ➜ មិនកែ Function · App ចាត់ជាបណ្តោះអាសន្ន។
+- **ZTO-G6 វាស់** (`zto-budget-test` ផ្នែក ៩ ៖ Function ពិត · upstream ព្យួរ · ថវិកា 6000 · upstream 5500) ៖ B ចាប់ផ្តើម t=0 អាន store 2000 ms · A ចាប់ផ្តើម t=1500 អាន 0 ms ➜
+  A ម្ចាស់ run ➜ B ចូលរួមនៅ t=2000 ➜ B **7004 ms** · A 5503 ms · upstream ១ ដង។ ការកែ ៖ `runSharedLookup()` ➜ `joinWithinBudget(existing, config, startedAt)` (ការប្រណាំងជាមួយ
+  `budgetLeftMs() - 200` ➜ `budgetTimeoutOutcome()` ដែល `fetchOrder()` ប្រើដែរ ➜ គ្មាន JSON 504 ពីរកន្លែង)។ ⛔ ការវិភាគតាមកូដដំបូង («អ្នកចូលរួមតែងមកក្រោយ ➜ មិនអាចលើស») **ខុស** ៖
+  អ្នកចូលរួមអាន *ចាប់ផ្តើម* មុនម្ចាស់ run (ជំហាន Cookie យឺត)។
+- **លទ្ធផល** ៖ ZTO-G2 **១២/១២** · ZTO-G6 **៦៣ ok** · `zto-proxy` · `zto-negative-cache` · `zto-cookie-store` · `zto-cookie-session` · `zto-list-sync` · `netlify-config-scope` ✅។
+
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ ZTO-G3 + ZTO-G5 — body ខូច ≠ «គ្មានទិន្នន័យ» (ការកែ ➜ ផ្នែក ១ [2.49.4])
 
 - **វាស់លើ tree មុនកែ** (`attemptAutoLookup()` ពិតក្នុង vm) ៖ HTTP 200 + `json()` បដិសេធ ➜ `data = null` ➜ `found = false` ➜ «⚠️ ZTO មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ» · ការហៅ ១ ·
@@ -1351,14 +1373,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **វាស់លើ `main`** (supabase-js ពិត · fake timers) ៖ ចូលពេលមានបណ្តាញ ➜ បណ្តាញងាប់ ២ ម៉ោង (token ផុត) ➜ `signOut()` ➜ **បដិសេធ `Failed to fetch` ក្រោយ 13.4 វិ.** ·
   session **នៅ** ក្នុង storage ➜ SDK ថ្មីលើ storage ដដែល (មានបណ្តាញ) ➜ `onAuthStateChanged(u1)`។ មូលហេតុ ៖ auth-js `_signOut` ➜ `_useSession` ➜ `__loadSession` ➜ refresh
   បរាជ័យ (retryable) ➜ `return { error: sessionError }` **មុន** `_removeSession` · token នៅមាន ➜ `admin.signOut` network error ➜ លុប session តែត្រឡប់ error ➜ adapter បោះ ➜
-  សារ «Firebase»។
+  សារ «មិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase» (`toastBackendText()` ប្តូរជា «Supabase» លើហាង Supabase)។
 - **ការកែ** ៖ transport `signOut()` = (ក) best-effort revoke ក្រោមពិដាន ៣ វិ. (`accessToken()` ➜ `POST /auth/v1/logout?scope=local`) (ខ) លុប `SB_AUTH_KEY_SUFFIXES` ក្នុង storage
   ដោយខ្លួនឯង (គ) storage នៅមាន session ➜ បដិសេធ។ ⛔ មិនហៅ `client.auth.signOut()` ៖ វារង់ចាំ lock ដែល refresh កំពុងកាន់ (~៣០ វិ.) ហើយ `signInWithPassword` មិនយក lock ➜
   ការចាកចេញដែលចូលជួរយឺតអាចរត់ **ក្រោយ** ការចូលថ្មី ➜ revoke ហើយចាកចេញគណនីថ្មី។ ⛔ មិន `stopAutoRefresh()` ៖ transport ដដែលប្រើសម្រាប់ការចូលបន្ទាប់ ហើយ ticker អាន
   storage ទទេ ➜ គ្មានអ្វីត្រូវ refresh។ refresh ដែលកំពុងរត់ ➜ commit guard (`storedAtStart` ≠ `storedAfter`) បោះចោល (វាស់ ៖ បណ្តាញត្រឡប់ ១២០ វិ. ➜ storage ទទេ · ចូលគណនីថ្មីបាន)។
 - **លទ្ធផល** ៖ មុនកែ **ធ្លាក់ ៤/៧** ➜ **៩/៩** · vitest ពេញ ៥២ ឯកសារ / ៤៥២ · Mutation ៦ ៖ គ្មានការលុបក្នុងឧបករណ៍ (ធ្លាក់ ៨) · គ្មានពិដាន (១) · គ្មាន revoke (២) · គ្មានការពិនិត្យ
   storage (១) · គ្មានការការពារ `ownSignOut` (៣ ៖ refresh 400 កំឡុងចាកចេញ ➜ សារ «សម័យបញ្ចប់» ខុស) · លុប account key ក្នុង transport **រស់** ➜ ដកចេញ។
-- **រកឃើញក្រៅជុំ ២ (ជុំ ៥ Toast)** ៖ សារជាច្រើននៅនិយាយ «Firebase» លើហាង Supabase (`barcode-ops.ts` · `entry-ops.ts` · `clear-history.ts` …) ➜ មិនកែនៅទីនេះ។
+- **សម្មតិកម្មដែលកូដបដិសេធ** ៖ «សារជាច្រើននិយាយ Firebase លើហាង Supabase» ➜ មិនពិត ៖ `showToast()` ឆ្លង `toastBackendText()` ដែលប្តូរពាក្យជា «Supabase» រួចហើយ។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ G5 — បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ ប្រអប់ចូលជាប់ (ការកែ ➜ ផ្នែក ១ [2.49.4])
 

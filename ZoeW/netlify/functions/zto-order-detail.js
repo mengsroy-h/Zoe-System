@@ -1372,12 +1372,7 @@ async function fetchOrder(config, headers, barcode, startedAt, session, plan) {
     let lastTransient = null;
     for (;;) {
         const remaining = config.budgetMs - elapsedSince(startedAt);
-        if (remaining <= 1200) {
-            return lastTransient || {
-                kind: 'fatal',
-                response: json(504, { error: 'ZTO request timed out', code: 'ZTO_TIMEOUT' })
-            };
-        }
+        if (remaining <= 1200) return lastTransient || budgetTimeoutOutcome();
         const timeoutMs = Math.max(1000, Math.min(config.upstreamTimeoutMs, remaining - 200));
         const outcome = await requestOnce(config, headers, barcode, timeoutMs, session, plan);
         if (outcome.kind !== 'transient') return outcome;
@@ -1388,6 +1383,18 @@ async function fetchOrder(config, headers, barcode, startedAt, session, plan) {
         if (config.budgetMs - elapsedSince(startedAt) <= backoffMs + 1500) return lastTransient;
         await delay(backoffMs);
     }
+}
+
+function budgetTimeoutOutcome() {
+    return { kind: 'fatal', response: json(504, { error: 'ZTO request timed out', code: 'ZTO_TIMEOUT' }) };
+}
+
+function joinWithinBudget(run, config, startedAt) {
+    const left = budgetLeftMs(config, startedAt) - 200;
+    if (!(left > 0)) return Promise.resolve(budgetTimeoutOutcome());
+    let timer = null;
+    const guard = new Promise((resolve) => { timer = setTimeout(() => resolve(budgetTimeoutOutcome()), left); });
+    return Promise.race([run, guard]).finally(() => clearTimeout(timer));
 }
 
 function budgetLeftMs(config, startedAt) {
@@ -1478,7 +1485,7 @@ function readCachedBody(key, ttlMs, negativeTtlMs) {
 
 function runSharedLookup(key, config, headers, barcode, session, startedAt, plan) {
     const existing = inFlight.get(key);
-    if (existing) return existing;
+    if (existing) return joinWithinBudget(existing, config, startedAt);
     const run = fetchOrder(config, headers, barcode, startedAt, session, plan);
     inFlight.set(key, run);
     run.then(() => {}, () => {}).then(() => {

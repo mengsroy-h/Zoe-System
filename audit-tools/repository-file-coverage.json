@@ -1815,6 +1815,9 @@
     "ZoeW/tests/tx-outcome-timeout.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-list-identity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },

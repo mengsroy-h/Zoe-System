@@ -58,7 +58,7 @@
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
    សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
    «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
-   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
+   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
    (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
    ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
@@ -195,6 +195,8 @@ Function `netlify/functions/zto-order-detail.js`។
 
 #### អ្នកយាម
 
+- `ZoeW/tests/supabase-realtime-ws.test.ts` (ថ្មី · realtime-js ពិត + transport + adapter ទល់នឹង server Phoenix ក្លែងលើ `ws` ពិត) ៖ ៥ សេណារីយ៉ូ ➜ adapter `main` **ធ្លាក់ ២/៥**
+  (server បិទ channel · បដិសេធ join ➜ មិន subscribe វិញ = SBD-6 ជាមួយ websocket ពិត) ➜ **៥/៥**។
 - `ZoeW/tests/supabase-clock-skew.test.ts` (ថ្មី · supabase-js ពិត · adapter ពិត · SDK) ៖ tree មុនកែ **ធ្លាក់ ២/៥** (429 ➜ session ត្រូវលុប · គ្មានការព្រមាន) ➜ **៧/៧**
   (ទិសផ្ទុយ ៖ 400 នៅចាកចេញ · ចូលប្រព័ន្ធ 429 នៅ 429 · គម្លាតតិចជាងព្រំ ➜ គ្មានការព្រមាន)។ Mutation ៥ ➜ ក្រហម ៥។
 
@@ -1324,6 +1326,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ realtime websocket ពិត (ឧបករណ៍វាស់ថ្មី · ការកែ = SBD-6)
+
+- **ចន្លោះ** ៖ fake Supabase របស់ audit-tools បិទ upgrade ➜ realtime មិនដែលត្រូវវាស់ពីចុងដល់ចុង។ **ឧបករណ៍ថ្មី** ៖ server Phoenix ក្លែង (`ws` · vsn 2.0.0 ៖ `phx_join` · `phx_reply` ·
+  heartbeat · `broadcast` · `phx_close` + `system` «Token has expired» · `access_token`) + REST `zoe_pull` + GoTrue refresh លើ HTTP ពិត ➜ realtime-js ពិត (តាម supabase-js) + transport + adapter។
+- **លទ្ធផលលើ adapter `main`** ៖ (ក) broadcast `seq` ➜ ការទាញ ✅ · (ខ) server ផ្តាច់ socket ➜ realtime-js ភ្ជាប់វិញ ➜ join ម្តងទៀត ➜ broadcast មក · គ្មាន join បន្ថែមក្នុង ១២ វិ. ✅ ·
+  (គ) server បិទ channel (token ផុត) ➜ **មិន subscribe វិញ** ❌ · (ឃ) server បដិសេធ join ➜ **join តែ ១ ក្នុង ២០ វិ.** ❌ ➜ ទាំង ២ = SBD-6 (កែរួច ៖ ៥/៥ · join ក្នុង ២០ វិ. ≤ ១២) ·
+  (ង) token refresh ពេល channel រស់ ➜ supabase-js `realtime.setAuth()` ➜ `access_token` ទៅ channel · មិន join ម្តងទៀត ✅។
+- **វាស់ ៖ គ្មានកំហុសថ្មី** ក្រៅពី SBD-6។ តេស្តប្រើពេលពិត (~៦០ វិ. ក្នុង vitest ពេញ ៤១ វិ. ព្រោះឯកសាររត់ស្របគ្នា · ពិដាន `zoew-suite` ២៤០ វិ.)។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ G6 — នាឡិកាទូរស័ព្ទលឿន ➜ refresh ញឹក · 429 ➜ ចាកចេញ (ការកែ ➜ ផ្នែក ១ [2.49.4])
 

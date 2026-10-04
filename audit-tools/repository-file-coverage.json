@@ -2629,6 +2629,9 @@
     "ZoeW/tests/supabase-tx-outcome.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-unsent-tx.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/toast-backend.test.tsx": {
       "policy": "zoew-self-verification"
     },

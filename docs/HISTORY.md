@@ -56,7 +56,7 @@
    **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
    វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
    (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
-   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ (៦) ZTO-G3 HTTP 200 body ខូច ➜
+   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ (៦) ZTO-G3 HTTP 200 body ខូច ➜
    «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) G6
    នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) realtime websocket ពិត (មិនទាន់វាស់) (១០) SW + License ក្រោមបណ្តាញខូច (មិនទាន់វាស់)។
    ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
@@ -160,9 +160,21 @@
   **ចូលជាគណនីមុន**។ ឥឡូវ ៖ ការចាកចេញក្នុងឧបករណ៍មិនពឹងបណ្តាញ (ដូច Firebase) ៖ ការលុបចោលនៅ Server (`/auth/v1/logout?scope=local` ដោយ token បច្ចុប្បន្ន · refresh មុនបើផុត)
   ជា best-effort ក្រោមពិដាន `SB_SIGN_OUT_CEILING_MS` (៣ វិ.) ➜ លុប `zoew-sb-auth*` ក្នុង storage ដោយខ្លួនឯង ➜ refresh ដែលកំពុងរត់មកដល់ក្រោយ ត្រូវ commit guard របស់
   supabase-js បោះចោល (storage ប្រែ) ➜ មិនស្តារ session ឡើងវិញ។ បដិសេធតែពេល storage លុបមិនចេញ (សារ «មិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះ»)។
+- **សំណើដែលមិនទាន់ផ្ញើ ≠ ចម្លើយបាត់** (G3 · លុយ/សារ) ៖ token មិនទាន់បាន (`auth-unavailable` · ពិដានជំហាន token · refresh ក្រោយ 401) ➜ `rpc()` បោះ **មុន POST** ➜
+  មុនកែ adapter ចាត់ជា «ចម្លើយបាត់» ➜ App បិទ/Reconfig ➜ `unknown` + `txServerUnread` + **Sentry `zone: money` ក្លែង** · ledger reconcile មិនរាយ ✅ · ឧបករណ៍ផ្សេងសរសេរ
+  ចន្លោះនោះ ➜ conflict ➜ `not-applied` (ការសរសេរដែលមិនដែលចេញ ក្លាយជាការបដិសេធ)។ ឥឡូវ ៖ `SbNetworkError.unsent` ➜ សាកឡើងវិញដោយមិនដាក់ «ចម្លើយបាត់» ➜ បិទ ➜ `disconnect`
+  ធម្មតា · conflict ➜ CAS សាកលើតម្លៃថ្មី។ សំណើដែលអាចបានផ្ញើ (timeout ក្រោយ POST · បណ្តាញ · gateway 5xx) នៅជា «ចម្លើយបាត់» ដដែល។
+- **channel realtime ងាប់ ➜ ទាញរៀងរាល់ ៣០ វិ. ជារៀងរហូត** (SBD-6) ៖ `CLOSED` (ឧ. token ផុត ➜ Server បិទ channel) ឬ `subscribe()` បរាជ័យ ➜ មុនកែ `startRealtime()` មិនដែល
+  បង្កើតម្តងទៀត (`unsubscribeRealtime` នៅ) ➜ ការផ្លាស់ប្តូរពីឧបករណ៍ផ្សេងមកដល់យឺតរហូតដល់ ៣០ វិ. និងទាញ ១០ ដងច្រើនជាង realtime។ ឥឡូវ ៖ channel មិនរស់ ➜ បង្កើតម្តងទៀតតាម
+  `SB_REALTIME_RETRY_STEPS_MS` (៥ · ១៥ · ៣០ · ៦០ វិ. · timer តែមួយ · ត្រឡប់ទៅដើមពេល `SUBSCRIBED` · channel ដែល realtime-js ភ្ជាប់វិញខ្លួនឯងមិនត្រូវរុះ · status ពី channel
+  ចាស់ត្រូវមិនអើពើ)។
 - 🔔 សារកំណែ 2.49.4 ជំនួស 2.49.3 (រួមចំណុច 2.49.3)។
 
 #### អ្នកយាម
+
+- `ZoeW/tests/supabase-unsent-tx.test.ts` (ថ្មី · adapter ពិត + transport ពិត + supabase-js ពិត) ៖ tree មុនកែ **ធ្លាក់ ៥/៩** (`unknown` ក្លែង · មិន commit ក្រោយ conflict ·
+  transport មិនដាក់ `unsent` · subscribe តែម្តងទោះ `CLOSED`/`CHANNEL_ERROR`) ➜ **១៧/១៧**។ Mutation ១៣ ➜ ក្រហម ១៣ (ក្រោយបន្ថែមតេស្ត ៨ ដែល mutation ដំបូងរកឃើញថាខ្វះ ៖ ពិដាន
+  ជំហាន token · 401 ➜ refresh បរាជ័យ · reset ជំហាន · channel ភ្ជាប់វិញខ្លួនឯង · CLOSED យឺតពី channel ចាស់ · timer ក្រោយ goOffline · `subscribe()` បោះ · CLOSED ២ ដង)។
 
 - `ZoeW/tests/supabase-signout-offline.test.ts` (ថ្មី · supabase-js ពិត · fake timers) ៖ `main` មុនកែ **ធ្លាក់ ៤/៧** (13.4 វិ. · `Failed to fetch` · session នៅ storage · អ្នកបន្ទាប់ =
   `u1`) ➜ **៩/៩** (ទិសផ្ទុយ ៖ បណ្តាញល្អ ➜ Server លុបចោលដោយ token នោះ/token ថ្មី · storage លុបមិនចេញ ➜ បដិសេធ)។ Mutation ៦ ➜ ក្រហម ៥ · រស់ ១ (លុប account key ក្នុង
@@ -1273,6 +1285,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ខ្លឹមសារពេញនៅក្នុង git history (`git show 1ffb6f0:docs/AUDIT-PROMPT.md`)។
 - `doc-scope-test` ផ្នែក ៤ (ភាពស្រស់ក្បាលតារាងរបស់ឯកសារនោះ) ដកចេញ · `repository-file-coverage.json` ដកធាតុ + policy `guard-36` · `CLAUDE.md` ៣ កន្លែង ·
   `audit-tools/README.md`។ គ្មានការឡើងកំណែ (ឯកសារ + audit-tools តែប៉ុណ្ណោះ)។
+
+### 2026-10-04 — Deep audit ជុំ ២ ៖ G3 + SBD-6 — សំណើមិនទាន់ផ្ញើ ≠ ចម្លើយបាត់ · realtime `CLOSED` មិន subscribe វិញ (ការកែ ➜ ផ្នែក ១ [2.49.4])
+
+- **វាស់លើ tree មុនកែ** (adapter ពិត · transport ពិត + supabase-js ពិត) ៖ (ក) token ផុត + GoTrue 503 ➜ `rpc()` បោះ `SbNetworkError('auth-unavailable')` **គ្មាន POST** តែ
+  adapter ដាក់ `lost` ➜ `close` ➜ `txOutcome: 'unknown'` + `onTxOutcomeUnknown` (Sentry លុយ) · (ខ) ចន្លោះនោះឧបករណ៍ផ្សេងសរសេរ ➜ token មកវិញ ➜ conflict ➜ `not-applied`
+  (មិន commit) · (គ) `CLOSED` ក្រោយ `SUBSCRIBED` ➜ `subscribe` **១ ដងក្នុង ១២០ វិ.** · `CHANNEL_ERROR` ជាប់ ➜ **១ ដងក្នុង ៣០០ វិ.**។
+- **ការកែ** ៖ transport ដាក់ `unsent` លើ `SbNetworkError` ដែលបោះមុន POST (`unsentWithin()` លើជំហាន token និង refresh ក្រោយ 401 · `auth-unavailable`) · adapter ៖
+  `if (!lost && !e.unsent)` · ផ្លូវ `close` ក្រោយ delay ➜ `lost ? giveUp() : disconnect` (មុនកែ `giveUp()` លើ `lost = null` ➜ `TypeError`)។ realtime ៖ `scheduleRealtimeRetry()`
+  + `realtimeGeneration` (status ពី channel ដែលរុះរួចត្រូវមិនអើពើ ៖ realtime-js `removeChannel()` ផ្ញើ `CLOSED` យឺត ➜ បើគ្មាន gate ➜ វដ្តរុះ/បង្កើតឥតឈប់ · វាស់)។
+- **លទ្ធផល** ៖ **១៧/១៧** · vitest ពេញ ៥៣ ឯកសារ / ៤៦៩ · Mutation ១៣ ➜ ក្រហម ១៣។ ⛔ មេរៀន ៖ mutation ដំបូង ១៣ ➜ រស់ ៦ (ផ្នែកដែលតេស្តដំបូងមិនបានចូល) ➜ តេស្តថ្មី ៨។
+  gate លើ event broadcast របស់ channel ចាស់ ➜ គ្មានផល (requestSync បន្ថែម) ➜ មិនដាក់។
 
 ### 2026-10-04 — Deep audit ជុំ ២ ៖ G4 — ចាកចេញពេល Supabase មិនឆ្លើយ ➜ session នៅក្នុង storage (ការកែ ➜ ផ្នែក ១ [2.49.4])
 

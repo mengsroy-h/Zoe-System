@@ -188,18 +188,19 @@ export function createSupabaseTransport(config, deps?) {
         try { parsed = JSON.parse(storage.getItem(SB_AUTH_STORAGE_KEY) || 'null'); } catch (e) { parsed = null; }
         return toSession(parsed);
     };
+    const unsentWithin = (promise, timeoutMs) => sbWithin(promise, timeoutMs).catch((e) => { throw new SbNetworkError(String((e && e.message) || 'timeout'), true); });
     const rpc = async (fn, args, timeoutMs) => {
-        let token = await sbWithin(accessToken().catch(() => null), timeoutMs);
-        if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable');
+        let token = await unsentWithin(accessToken().catch(() => null), timeoutMs);
+        if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
-            const refreshed = await sbWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
+            const refreshed = await unsentWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
             const next = refreshed && refreshed.data && refreshed.data.session ? refreshed.data.session.access_token : null;
             if (next && next !== token) {
                 token = next;
                 res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
             } else if (!next && sessionStored()) {
-                throw new SbNetworkError('auth-unavailable');
+                throw new SbNetworkError('auth-unavailable', true);
             }
         }
         if (!res.ok) {

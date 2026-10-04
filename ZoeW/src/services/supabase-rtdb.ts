@@ -14,6 +14,7 @@ export const SB_TX_MAX_RETRIES = 25;
 export const SB_RETRY_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
 export const SB_POLL_REALTIME_MS = 300000;
 export const SB_POLL_FALLBACK_MS = 30000;
+export const SB_REALTIME_RETRY_STEPS_MS = [5000, 15000, 30000, 60000];
 export const SB_PULL_PAGE = 2000;
 export const SB_PULL_MAX_RESTARTS = 2;
 export const SB_DOCS_CACHE_LOAD_MAX_MS = 3000;
@@ -22,9 +23,11 @@ export const SB_DOCS_CACHE_MIN_INTERVAL_MS = 30000;
 export const SB_OPS_PER_WRITE = 500;
 
 export class SbNetworkError extends Error {
-    constructor(message) {
+    unsent: boolean;
+    constructor(message, unsent = false) {
         super(message);
         this.name = 'SbNetworkError';
+        if (unsent) this.unsent = true;
     }
 }
 
@@ -361,6 +364,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let pollTimer = null;
     let realtimeHealthy = false;
     let unsubscribeRealtime = null;
+    let realtimeGeneration = 0;
+    let realtimeRetryTimer = null;
+    let realtimeRetryAttempt = 0;
     let tenantTopic = null;
     let forbidden = null;
     let closed = false;
@@ -691,26 +697,44 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!syncing) runSync();
     }
 
+    const scheduleRealtimeRetry = () => {
+        if (realtimeRetryTimer || closed) return;
+        const step = SB_REALTIME_RETRY_STEPS_MS[Math.min(realtimeRetryAttempt++, SB_REALTIME_RETRY_STEPS_MS.length - 1)];
+        realtimeRetryTimer = setTimeout(() => {
+            realtimeRetryTimer = null;
+            if (realtimeHealthy || closed) return;
+            stopRealtime();
+            startRealtime();
+        }, step);
+    };
+
     const startRealtime = () => {
         if (unsubscribeRealtime || !tenantTopic || !online || closed || !authed) return;
+        const generation = ++realtimeGeneration;
         try {
             unsubscribeRealtime = transport.subscribe(tenantTopic, (payload) => {
                 const seq = payload && typeof payload.seq === 'number' ? payload.seq : Infinity;
                 if (seq > cursor) requestSync();
             }, (status) => {
+                if (generation !== realtimeGeneration) return;
                 const healthy = status === 'SUBSCRIBED';
                 if (healthy && !realtimeHealthy) requestSync();
                 realtimeHealthy = healthy;
+                if (healthy) realtimeRetryAttempt = 0;
+                else scheduleRealtimeRetry();
                 schedulePoll();
             });
         } catch (e) {
             unsubscribeRealtime = null;
             realtimeHealthy = false;
+            scheduleRealtimeRetry();
         }
     };
 
     const stopRealtime = () => {
+        realtimeGeneration++;
         realtimeHealthy = false;
+        if (realtimeRetryTimer) { clearTimeout(realtimeRetryTimer); realtimeRetryTimer = null; }
         if (unsubscribeRealtime) { try { unsubscribeRealtime(); } catch (e) {} }
         unsubscribeRealtime = null;
     };
@@ -956,7 +980,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             }
                             setConnected(false);
                             scheduleRetry();
-                            if (!lost) {
+                            if (!lost && !e.unsent) {
                                 lost = disconnectError();
                                 txDisconnectResolving.set(outer, lost);
                             }
@@ -964,7 +988,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 await delay(retrySteps[Math.min(lostAttempts++, retrySteps.length - 1)]);
                                 await waitForLink();
                             }
-                            if (closed) throw giveUp();
+                            if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         }
                     }
                     setConnected(true);

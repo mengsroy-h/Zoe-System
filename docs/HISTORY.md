@@ -153,7 +153,7 @@
 - **ការកាត់ ledger ដែល backend ដឹងច្បាស់ថា «មិនបានអនុវត្ត» បាត់** (ឧបករណ៍ ៣ ក្នុងហាងតែមួយ · Supabase) ៖ «ដក» barcode ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញចំពេល transaction
   ledger ថ្ងៃ ឬប្រវត្តិកំពុងរត់ ➜ ចូលវិញ ➜ replay `op_id` ប៉ះ conflict ព្រោះឧបករណ៍ផ្សេងស្កេនបន្ត ➜ `not-applied` ➜ `runLedgerTransaction()` បោះបង់ ➜ **ខែត្រូវកាត់ ថ្ងៃមិនកាត់**
   (ledger ថ្ងៃ `38.5/0.75/29` ធៀបកញ្ចប់ `35/0.5/28` · `money-reality-check` «ខែឃ្លាតពីផលបូកថ្ងៃ») · ករណីប្រវត្តិ **គ្មានសារព្រមាន**។ មានតាំងពី 2.49.2 (snapshot មុនកែ ៖
-  ធ្លាក់ ២/៣ ដូចគ្នា)។ ឥឡូវ ៖ `not-applied` ច្បាស់ ➜ ផ្ញើម្តងទៀត (≤ `LEDGER_NOT_APPLIED_RETRIES` = ៣ · `op` ដដែល) · `unknown` មិនផ្ញើម្តងទៀត (ប្រហែលចូលរួច)។
+  ធ្លាក់ ២/៣ ដូចគ្នា)។ ឥឡូវ ៖ `not-applied` ច្បាស់ ➜ ផ្ញើម្តងទៀត (≤ ៣ · ប៉ារ៉ាម៉ែត្រ `notAppliedRetries` · `op` ដដែល) · `unknown` មិនផ្ញើម្តងទៀត (ប្រហែលចូលរួច)។
   Firebase ៖ wrapper ឲ្យ `not-applied` តែពេល server ស្មើតម្លៃមុន ➜ ករណីឧបករណ៍ផ្សេងសរសេរ path ដដែលនៅតែ `unknown` (ចន្លោះចាស់ ផ្នែក ២ ជុំ ១)។
 - 🔔 សារកំណែ 2.49.3 ជំនួស 2.49.2 (រួមចំណុច 2.49.2 ព្រោះ 2.49.2 មិនទាន់ដល់អ្នកប្រើ)។
 
@@ -166,7 +166,7 @@
   (៣០/៣០ · mutation លុប `isDatabaseInitialized = false` ពេល auth ទទេ ➜ **ធ្លាក់** `history 0` ខណៈស្ថានភាពបៃតង)។
 - ឧបករណ៍ ៣ ក្នុងហាងតែមួយ (harness workflow ៖ App ពិត ៣ context · supabase-js ពិត · Postgres ពិត) ៖ ស្កេនព្រមគ្នា · បិទ/បើកព្រមគ្នា · ដកជួរដដែល · កែតម្លៃ vs បិទ ·
   កែតម្លៃ vs ដក ➜ **ឧបករណ៍ទាំង ៣ ឃើញដូច server** (convergence ≤ ~០.៦ វិ.) · គ្មាន barcode ស្ទួន · `money-reality-check` ✅។ s6b (ផុតកំណត់ចំពេលដក) ៖ build មុនកែ **ធ្លាក់
-  ២/៣** ➜ build កែ **៣/៣** + `money-reality-check` ✅។ `ZoeW/tests/ledger-not-applied-retry.test.ts` (ថ្មី) ៖ មុនកែ **ធ្លាក់ ២/៤** ➜ **៤/៤**។ ⏳ សារ «⚠️ … ស្ថិតិប្រាក់មិនទាន់
+  ២/៣** ➜ build កែ **៣/៣** + `money-reality-check` ✅។ `ZoeW/tests/ledger-not-applied-retry.test.ts` (ថ្មី) ៖ មុនកែ **ធ្លាក់ ២/៤** ➜ **៤/៤**។ ⛔ មេរៀន ៖ ថេរថ្មីនៅខាងក្រៅអនុគមន៍ ➜ checker ១២ ដែលដកតែអនុគមន៍តាមឈ្មោះធ្លាក់ (CI PR #284) ➜ ប៉ារ៉ាម៉ែត្រលំនាំដើម។ ⏳ សារ «⚠️ … ស្ថិតិប្រាក់មិនទាន់
   Sync ពេញលេញទេ» នៅលេចក្នុង s6b ទោះលុយត្រូវចុងក្រោយ (ប្រុងប្រយ័ត្នលើស មិនមែនលុយខុស)។
 - `ZoeW/tests/supabase-auth-unavailable.test.ts` (ថ្មី · supabase-js ពិត · fake timers) ៖ transport មុនកែ **ធ្លាក់ ២/៤** (`SbRpcError: JWT required` ពីសំណើគ្មាន token)
   ➜ **៤/៤** (ទិសផ្ទុយ ៖ refresh token មិនត្រឹមត្រូវ ➜ 401 ពិត · មិនទាន់ចូល ➜ សំណើធម្មតា)។ សេណារីយ៉ូ node របស់ finder (GoTrue ក្លែងមាន reuse interval) លើកូដកែ ៖

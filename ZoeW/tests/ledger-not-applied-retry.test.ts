@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { firebaseState } from '../src/core/state';
-import { LEDGER_NOT_APPLIED_RETRIES, runLedgerTransaction } from '../src/domain/ledger';
+import { runLedgerTransaction } from '../src/domain/ledger';
 
 const saved = firebaseState.fb;
 afterEach(() => { firebaseState.fb = saved; });
@@ -39,11 +39,14 @@ describe('runLedgerTransaction ៖ «មិនបានអនុវត្ត» �
         expect(s.seen[1].proposed.op).toBe(s.seen[0].proposed.op);
     });
 
-    it('not-applied ជាប់គ្នា ➜ ព្រំដែន LEDGER_NOT_APPLIED_RETRIES ➜ បដិសេធ (មិនវិលជារៀងរហូត)', async () => {
-        const s = sdkWith(Array(LEDGER_NOT_APPLIED_RETRIES + 5).fill('not-applied'));
+    it('not-applied ជាប់គ្នា ➜ ព្រំដែន (លំនាំដើម ៣ · ឬប៉ារ៉ាម៉ែត្រ) ➜ បដិសេធ (មិនវិលជារៀងរហូត)', async () => {
+        const s = sdkWith(Array(20).fill('not-applied'));
         const err: any = await runLedgerTransaction({}, deduct).then(() => null, (e: any) => e);
         expect(err && err.txOutcome).toBe('not-applied');
-        expect(s.seen.length).toBe(LEDGER_NOT_APPLIED_RETRIES + 1);
+        expect(s.seen.length).toBe(4);
+        const t = sdkWith(Array(20).fill('not-applied'));
+        await runLedgerTransaction({}, deduct, 1).then(() => null, (e: any) => e);
+        expect(t.seen.length).toBe(2);
     });
 
     it('ទិសផ្ទុយ ៖ unknown ➜ មិនសាកឡើងវិញ (ប្រហែលបានអនុវត្តរួច)', async () => {

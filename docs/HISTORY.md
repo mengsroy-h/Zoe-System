@@ -46,19 +46,17 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4**
-   (Deep audit ជុំ ១–២ · PR #284) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
-   secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី** (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` ·
-   version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** · Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration
-   មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ) ៖ **ជុំ ១ លុយ ចប់** ([2.49.2] ·
-   ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · ការកែឫសគល់ outcome `unknown` ធ្វើរួចតាមការយល់ព្រម · Sentry Loader ថ្មី) ·
-   **ជុំ ២ បណ្តាញ កំពុងធ្វើ** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» · កំហុសដែលម្ចាស់គម្រោងរាយការណ៍ «ចូលវិញក្រោយ ៤ ម៉ោង គ្មានទិន្នន័យ» · G1 (RPC គ្មាន token ពេល
-   GoTrue មិនឆ្លើយ) · ledger `not-applied` (ឧបករណ៍ ៣) · gateway 5xx ក្រោយ commit ➜ ចំណូលរាប់ ២ ដង (SBD-3/4) · ZTO បញ្ជី «យករួច» commit យឺត ➜ គ្មានស្ថិតិយក (ZTO-G1) កែរួច ➜ [2.49.3] · Firebase វាស់លំហូរដដែល ៖ គ្មានកំហុស ក្រៅពីការសរសេរពេលក្រៅបណ្តាញបាត់ពេល Reconfig (ស្នើ · មិនទាន់កែ)) ·
-   **នៅសល់មិនទាន់ផ្ទៀង** (ការរកឃើញរបស់ finder ក្នុង workflow ដែលមិនទាន់មានអ្នកផ្ទៀងទី ២ · លុយមុន) ៖
-   G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ?) · realtime websocket ពិត · SW/License ក្រោមបណ្តាញខូច ➜ ផ្ទៀងម្តងមួយៗដោយគ្មាន workflow
-   (ម្ចាស់គម្រោង ៖ «កុំអោយworkflow ស៊ីកូតាពេក») · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
-   ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
+1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) ➜ ធ្វើតាម [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+   «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
+   (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
+   Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
+2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
+   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
+   **ជុំ ៣ Config ➜ Login ➜ Signup កំពុងធ្វើ** (ចាប់ផ្តើមពីការរកឃើញ login ពីជុំ ២ ដែលមិនទាន់ផ្ទៀង ៖ G2 ចម្លើយ refresh បាត់ ➜ ចាកចេញ · G3 alert លុយក្លែង
+   សម្រាប់ការសរសេរដែលមិនទាន់ផ្ញើ · G4 ចាកចេញពេលក្រៅបណ្តាញ (token ផុត) មិនចាកចេញពិត · G5 បើក App ក្រៅបណ្តាញ ➜ ប្រអប់ចូលជាប់ · G6 នាឡិកាលឿន ➜ refresh ញឹក/429
+   ចាកចេញ) · នៅសល់ពីជុំ ២ ៖ realtime websocket ពិត · SW/License ក្រោមបណ្តាញខូច · Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ស្នើព្រមាន) ·
+   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · workflow ≤ ១០ agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
+   `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 

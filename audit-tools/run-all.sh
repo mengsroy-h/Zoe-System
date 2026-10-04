@@ -366,7 +366,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 #    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
 #    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
 RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
-    ui-flow-test:96 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:68 collected-mirror-fuzz-test:50
+    ui-flow-test:96 supabase-app-network-e2e-test:95 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 collected-mirror-fuzz-test:50
     layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:36
     emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
     ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
@@ -771,6 +771,7 @@ run "supabase-functions" node audit-tools/supabase-functions-test.js
 run "keygen-supabase-admin (Postgres ពិត)" node audit-tools/keygen-supabase-admin-test.js
 run "supabase-data-tools (backup ហាង · CLI ផ្ទេរ · Postgres ពិត)" node audit-tools/supabase-data-tools-test.js
 run "supabase-docs-cache (IndexedDB ពិត · ថ្នេរ adapter)" node audit-tools/supabase-docs-cache-test.js
+run "supabase-app-network-e2e (App ពិត · adapter · Postgres ពិត · បណ្តាញខូច)" node audit-tools/supabase-app-network-e2e-test.js
 
 section "== ឧបករណ៍បង្កើតអតិថិជនថ្មី (tools/firebase-provision) =="
 # ⛔ CLI ពិត + firebase-tools ពិត (កំណែ pin) ទល់ Google ក្លែងលើ HTTPS ➜ `npm ci --prefix tools/firebase-provision` + openssl
@@ -957,6 +958,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KEYGEN_SBADMIN_APP_DIR="$BASE" node audit-tools/keygen-supabase-admin-test.js 2>&1 | tail -1 | sed 's/^/   keygen-sbadmin:  /'
     SBDATA_APP_DIR="$BASE" node audit-tools/supabase-data-tools-test.js 2>&1 | tail -1 | sed 's/^/   supabase-data:   /'
     DOCSCACHE_APP_DIR="$BASE" node audit-tools/supabase-docs-cache-test.js 2>&1 | tail -1 | sed 's/^/   sb-docs-cache:   /'
+    SBNETE2E_APP_DIR="$BASE" node audit-tools/supabase-app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   sb-app-network:  /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

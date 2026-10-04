@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
-import { TX_OUTCOME_MAX_WAIT_MS, TX_OUTCOME_READ_TIMEOUT_MS, txReadServerValue, txResolveOutcome } from '../src/services/tx-outcome';
+import { TX_OUTCOME_MAX_REFUSALS, TX_OUTCOME_READ_TIMEOUT_MS, txReadServerValue, txResolveOutcome } from '../src/services/tx-outcome';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -17,12 +17,40 @@ describe('សាលក្រម transaction ៖ ពិដានត្រូវ�
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('getIdToken ព្យួរ ➜ សាលក្រមសរុបមិនរង់ចាំលើសពិដាន', async () => {
+    it('getIdToken ព្យួរ ➜ ការអាននីមួយៗបញ្ចប់ក្នុងពិដាន ហើយការដោះស្រាយបន្ត (មិនបោះបង់ មិនទាយ unknown)', async () => {
+        let calls = 0;
+        const user = { getIdToken: (): Promise<string> => { calls++; return new Promise(() => {}); } };
+        firebaseState.auth = { currentUser: user } as any;
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('7')));
+        let outcome = '';
+        void txResolveOutcome('https://example.firebaseio.com/a.json', 7, 10).then((result) => { outcome = result.outcome; });
+        await vi.advanceTimersByTimeAsync(5 * 60000);
+        expect(outcome).toBe('');
+        expect(calls).toBeGreaterThan(5);
+        user.getIdToken = async () => 'audit-token';
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(outcome).toBe('applied');
+    });
+
+    it('ប្តូរ auth ខណៈរង់ចាំ ➜ ឈប់ (unknown) មិនអានដោយគណនីផ្សេង', async () => {
         firebaseState.auth = { currentUser: { getIdToken: () => new Promise(() => {}) } } as any;
         let outcome = '';
         void txResolveOutcome('https://example.firebaseio.com/a.json', 7, 10).then((result) => { outcome = result.outcome; });
-        await vi.advanceTimersByTimeAsync(TX_OUTCOME_MAX_WAIT_MS + 1);
+        await vi.advanceTimersByTimeAsync(TX_OUTCOME_READ_TIMEOUT_MS + 1);
+        firebaseState.authGeneration = (firebaseState.authGeneration || 0) + 1;
+        await vi.advanceTimersByTimeAsync(60000);
         expect(outcome).toBe('unknown');
+    });
+
+    it('server បដិសេធការអាន (HTTP 403) ➜ មានព្រំដែន រួច unknown', async () => {
+        firebaseState.auth = { currentUser: { getIdToken: async () => 'audit-token' } } as any;
+        const fetch = vi.fn(async () => new Response('{"error":"Permission denied"}', { status: 403 }));
+        vi.stubGlobal('fetch', fetch);
+        let outcome = '';
+        void txResolveOutcome('https://example.firebaseio.com/a.json', 7, 10).then((result) => { outcome = result.outcome; });
+        await vi.advanceTimersByTimeAsync(TX_OUTCOME_MAX_REFUSALS * 60000);
+        expect(outcome).toBe('unknown');
+        expect(fetch.mock.calls.length).toBeLessThanOrEqual(TX_OUTCOME_MAX_REFUSALS);
     });
 
     it('token មកក្រោយពិដាន ➜ មិនបង្កើតសំណើដែលគ្មានអ្នករង់ចាំ', async () => {

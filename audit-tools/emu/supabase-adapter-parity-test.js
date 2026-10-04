@@ -356,7 +356,7 @@ async function scenario(api) {
         D.sdk.goOnline(D.db);
 
         console.log('\n── ៤. ផ្លូវបរាជ័យ HTTP (Firebase គ្មានសមមូល) ──');
-        const F = await openClient('sokha', 'pass-sokha-1', { txOutcomeMaxWaitMs: 1500, rpcTimeoutMs: 1500 });
+        const F = await openClient('sokha', 'pass-sokha-1', { rpcTimeoutMs: 1500 });
         let connected = null;
         F.sdk.onValue(F.sdk.ref(F.db, '.info/connected'), (s) => { connected = s.val(); });
         let fView = 'unset';
@@ -377,25 +377,59 @@ async function scenario(api) {
         fake.setMode('drop-response');
         let incSettled = 'pending';
         const inc = F.sdk.update(F.sdk.ref(F.db, 'sbp_fail/money'), { cod: F.sdk.increment(10) }).then(() => { incSettled = 'ok'; }, (e) => { incSettled = 'err ' + e.message; });
-        await sleep(500);
+        // ⛔ រង់ចាំ commit ពិតលើ Postgres (ចម្លើយត្រូវបោះចោល) មុនប្តូរ mode — `sleep` ក្រោមបន្ទុកអាចប្តូរមុនសំណើដល់ ➜ មិនចូលស្ថានភាព «ចម្លើយបាត់ក្រោយ commit»
+        const incDropped = await until(async () => { const m = (await rows('money'))[0]; return !!m && !!m.value && m.value.cod === 10 && incSettled === 'pending'; }, 10000);
         fake.setMode('ok');
         await inc;
         const money = (await rows('money'))[0];
-        check(incSettled === 'ok' && money && money.value.cod === 10, '⛔ ចម្លើយបាត់ក្រោយ commit ➜ ផ្ញើម្តងទៀតដោយ op_id ដដែល ➜ increment ១០ មិនមែន ២០', { incSettled, money });
+        check(incDropped && incSettled === 'ok' && money && money.value.cod === 10, '⛔ ចម្លើយបាត់ក្រោយ commit ➜ ផ្ញើម្តងទៀតដោយ op_id ដដែល ➜ increment ១០ មិនមែន ២០', { incDropped, incSettled, money });
         fake.setMode('drop-response');
         const txP = F.sdk.runTransaction(F.sdk.ref(F.db, 'sbp_fail/tx'), (v) => (v || 0) + 5);
-        await sleep(400);
+        await until(async () => { const r = (await rows('tx'))[0]; return !!r && r.value === 5 && !!mod.txDisconnectResolving.get(txP); }, 10000);
         const pendingMark = mod.txDisconnectResolving.get(txP);
         fake.setMode('ok');
         const txRes = await txP.then((r) => r, (e) => ({ error: e }));
         const txRow = (await rows('tx'))[0];
         check(!!pendingMark && pendingMark.message === 'disconnect', 'transaction ចម្លើយបាត់ ➜ ចុះក្នុង txDisconnectResolving (history-write ប្រើ)', pendingMark && pendingMark.message);
         check(txRes.committed === true && txRes.txOutcome === 'applied' && txRow && txRow.value === 5, 'transaction ចម្លើយបាត់ ➜ committed · txOutcome applied · អនុវត្តម្តង', { txRes: txRes.committed, outcome: txRes.txOutcome, row: txRow });
+        // ⛔ outcome ដែល *មិនទាន់ដឹង* មិនមែន *មិនអាចដឹង* ៖ `zoe_ops` រក្សាលទ្ធផល op_id ២ ថ្ងៃ ➜ adapter ផ្ញើ op_id ដដែលរហូតបានចម្លើយច្បាស់។
+        //    មុនកែ ៖ បោះបង់ក្រោយ ៦០ វិ. ➜ `unknown` ➜ «ដក» ធ្វើឲ្យកញ្ចប់បាត់ · reconcile ដក ២ ដង (tx-outcome-test ផ្នែក ៤ឃ · ៦)
+        // ⛔ ចម្លើយ replay គ្មានតម្លៃ doc ➜ adapter ទាញតម្លៃពិតក្រោយ replay (`requestSync()`) ➜ រង់ចាំទិដ្ឋភាពស្រស់ (`tx = 5`) ៖ សេណារីយ៉ូនេះវាស់ «ចម្លើយបាត់ + server ធ្លាក់យូរ»
+        //    មិនមែន base ហួសសម័យ + ចម្លើយ conflict បាត់ (ការបរាជ័យពីរជាន់ ➜ `not-applied` ពិត · ledger ផ្ញើម្តងទៀត)
+        const freshBase = await until(() => !!fView && fView.tx === 5, 10000);
+        check(freshBase, 'លក្ខខណ្ឌចាំបាច់ ៖ ទិដ្ឋភាពក្នុងគ្រឿងស្រស់ (tx = 5) ក្រោយ transaction ដែល replay', fView);
+        fake.setMode('drop-response');
+        let longState = 'pending';
+        const longP = F.sdk.runTransaction(F.sdk.ref(F.db, 'sbp_fail/tx'), (v) => (v || 0) + 1);
+        longP.then((r) => { longState = r; }, (e) => { longState = e; });
+        const longDropped = await until(async () => { const r = (await rows('tx'))[0]; return !!r && r.value === 6 && !!mod.txDisconnectResolving.get(longP); }, 10000);
+        check(longDropped, 'លក្ខខណ្ឌចាំបាច់ ៖ transaction commit លើ Postgres (5 ➜ 6) ហើយចម្លើយបាត់ មុន server ធ្លាក់');
         fake.setMode('down');
-        const lost = await F.sdk.runTransaction(F.sdk.ref(F.db, 'sbp_fail/tx'), (v) => (v || 0) + 1).then(() => null, (e) => e);
+        await sleep(3500);
+        check(longState === 'pending' && !!mod.txDisconnectResolving.get(longP) && !events.unknown.includes('sbp_fail/tx'),
+            '⛔⛔ ចម្លើយបាត់ + server ធ្លាក់យូរ (លើសពិដាន RPC ២ ដង) ➜ transaction នៅរង់ចាំ មិនបោះបង់ មិនទាយ unknown',
+            { state: longState === 'pending' ? 'pending' : (longState && (longState.message || longState.committed)), unknown: events.unknown });
+        fake.setMode('ok');
+        F.sdk.goOnline(F.db);
+        await until(() => longState !== 'pending', 15000);
+        const txRow2 = (await rows('tx'))[0];
+        check(!!longState && longState.committed === true && longState.txOutcome === 'applied' && txRow2 && txRow2.value === 6,
+            '⛔⛔ server មកវិញ ➜ op_id ដដែល ➜ committed · applied · អនុវត្តតែម្តង (5 ➜ 6)',
+            { committed: longState && longState.committed, outcome: longState && longState.txOutcome, row: txRow2 && txRow2.value });
+        const G = await openClient('sokha', 'pass-sokha-1', { rpcTimeoutMs: 1500 });
+        let gView = 'unset';
+        G.sdk.onValue(G.sdk.ref(G.db, 'sbp_fail'), (s) => { gView = s.val(); });
+        await until(() => gView !== 'unset', 5000);
+        fake.setMode('down');
+        const lostP = G.sdk.runTransaction(G.sdk.ref(G.db, 'sbp_fail/tx'), (v) => (v || 0) + 1).then(() => null, (e) => e);
+        await sleep(600);
+        await G.sdk.deleteApp(G.app);
+        const lost = await lostP;
         fake.setMode('ok');
         check(!!lost && lost.message === 'disconnect' && lost.txOutcome === 'unknown' && events.unknown.includes('sbp_fail/tx'),
-            'transaction ផុតពិដានលទ្ធផល ➜ បដិសេធ disconnect · txOutcome unknown · រាយការណ៍ (zone money)', lost && { m: lost.message, o: lost.txOutcome, u: events.unknown });
+            'adapter ត្រូវបិទ (deleteApp) ខណៈលទ្ធផលមិនទាន់ដឹង ➜ បដិសេធ disconnect · txOutcome unknown · រាយការណ៍ (zone money)', lost && { m: lost.message, o: lost.txOutcome, u: events.unknown });
+        // ⛔ ថ្នេរ adapter ↔ ledger ៖ `ledgerRejectionVerdict()` (domain/ledger.ts) រាយ «មិន ok» តែពេល `txServerUnread === true`
+        check(!!lost && lost.txServerUnread === true, 'unknown ពេលបិទ ➜ txServerUnread (ledger reconcile មិនរាយ ok)', lost && { unread: lost.txServerUnread });
         F.sdk.goOnline(F.db);
         await until(() => connected === true, 3000);
         fake.expireTokens();
@@ -477,13 +511,17 @@ async function scenario(api) {
             'បើក App ម្តងទៀត ៖ ទាញតែ delta ពី cursor ក្នុង cache (' + warmRows + ' ជួរ ជំនួស ' + coldRows + ') · ទិដ្ឋភាពពេញ', { pullLog: pullLog.slice(0, 3), keys: c2View && Object.keys(c2View).length });
         await C2.sdk.deleteApp(C2.app);
         await c.query('update public.tenant_members set tenant_id = $1 where user_id = $2', [tB, u2]);
+        // ⛔ ការទាញយឺតរបស់ C2 (បិទរួច) អាចមកដល់ server ក្រោយការកំណត់ log ឡើងវិញ (ក្រោមបន្ទុក) ➜ វាស់ការទាញរបស់ C3 តាម cursor ពិតក្នុង cache មិនមែនតាមលំដាប់
+        const cursorBeforeC3 = (cacheStore.get(scope6) || {}).cursor;
         pullLog.length = 0;
         const C3 = await openClient('dara', 'pass-dara-12', {}, docsCache);
         let c3View = 'unset';
         C3.sdk.onValue(C3.sdk.ref(C3.db, 'sbp_page'), (s) => { c3View = s.val(); });
-        const moved = await until(() => c3View !== 'unset', 5000);
-        check(moved && c3View === null && pullLog.length >= 2 && pullLog[0].tenant === tB && pullLog[1].since === 0,
-            '⛔ សមាជិកផ្លាស់ទៅហាងផ្សេង ➜ server ប្រាប់ tenant ថ្មី ➜ បោះ cache ចោល · ទាញពេញ · គ្មានទិន្នន័យហាងចាស់លេច', { c3View, pullLog: pullLog.slice(0, 3) });
+        const c3Delta = () => pullLog.findIndex((p) => p.since === cursorBeforeC3 && p.tenant === tB);
+        const c3Full = () => pullLog.findIndex((p, i) => i > c3Delta() && c3Delta() >= 0 && p.since === 0 && p.tenant === tB);
+        const moved = await until(() => c3View !== 'unset' && c3Full() > 0, 5000);
+        check(moved && c3View === null && typeof cursorBeforeC3 === 'number' && cursorBeforeC3 > 0 && c3Delta() >= 0 && c3Full() > c3Delta(),
+            '⛔ សមាជិកផ្លាស់ទៅហាងផ្សេង ➜ server ប្រាប់ tenant ថ្មី ➜ បោះ cache ចោល · ទាញពេញ · គ្មានទិន្នន័យហាងចាស់លេច', { c3View, cursorBeforeC3, pullLog: pullLog.slice(0, 4) });
         await C3.sdk.signOut(C3.auth);
         check(cacheStore.size === 0 && cacheLog[cacheLog.length - 1] === 'clear', 'ចាកចេញ ➜ cache ទទេ', { size: cacheStore.size, log: cacheLog.slice(-3) });
         await c.query('update public.tenant_members set tenant_id = $1 where user_id = $2', [tA, u2]);

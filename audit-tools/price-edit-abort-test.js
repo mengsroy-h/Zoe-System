@@ -83,7 +83,7 @@ const NEEDED = [
     'getFormattedDate', 'appZoneParts', 'getZoneDateKey', 'getServerNow',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
-    'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
+    'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',

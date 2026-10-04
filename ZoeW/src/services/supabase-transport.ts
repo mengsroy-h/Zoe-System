@@ -131,6 +131,10 @@ export function sbWithin(promise, timeoutMs) {
     return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
 }
 
+export function sbStatusIsGateway(status) {
+    return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530);
+}
+
 export function rpcErrorFrom(status, text) {
     let body = null;
     try { body = JSON.parse(text); } catch (e) { body = null; }
@@ -169,8 +173,12 @@ export function createSupabaseTransport(config, deps?) {
         if (token) headers.Authorization = 'Bearer ' + token;
         return sbFetchWithTimeout(fetchImpl, url + path, { method: 'POST', headers, body: JSON.stringify(body || {}), cache: 'no-store', credentials: 'omit' }, timeoutMs);
     };
+    const sessionStored = () => {
+        try { return !!storage.getItem(SB_AUTH_STORAGE_KEY); } catch (e) { return false; }
+    };
     const rpc = async (fn, args, timeoutMs) => {
         let token = await sbWithin(accessToken().catch(() => null), timeoutMs);
+        if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable');
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
             const refreshed = await sbWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
@@ -178,9 +186,14 @@ export function createSupabaseTransport(config, deps?) {
             if (next && next !== token) {
                 token = next;
                 res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
+            } else if (!next && sessionStored()) {
+                throw new SbNetworkError('auth-unavailable');
             }
         }
-        if (!res.ok) throw rpcErrorFrom(res.status, res.text);
+        if (!res.ok) {
+            if (sbStatusIsGateway(res.status)) throw new SbNetworkError('HTTP ' + res.status);
+            throw rpcErrorFrom(res.status, res.text);
+        }
         if (!res.text) return null;
         try {
             return JSON.parse(res.text);

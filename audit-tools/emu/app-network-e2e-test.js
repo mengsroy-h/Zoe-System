@@ -22,6 +22,8 @@
 //      ដោយខ្លួនឯង + ទិន្នន័យថ្មីមកដល់
 //   ច. ⛔ zombie ក្រោយ **ភ្ញាក់ពី background** (គ្មានការសរសេរ) ➜ ដូចគ្នា
 //   ឆ. listener មិនកកកុញ ៖ ក្រោយការឆ្លងទាំងអស់ ការតភ្ជាប់ថ្មីនីមួយៗ listen path នីមួយៗ **ម្តងគត់** (វាស់លើ frame WebSocket)
+//   ឈ. បើក App ក្រោយ ៦.៥ ម៉ោង (token ផុត ➜ refresh · `auth_time` លើស ៤ ម៉ោង) ➜ ផុតកំណត់ ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ➜ ទិន្នន័យគ្រប់
+//      រួមការប្រែដែលឧបករណ៍ផ្សេងធ្វើពេលទូរស័ព្ទដេក (បងប្អូននៃ `supabase-app-network-e2e-test` ផ្នែក ជ)
 //
 //   java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1
 //   NODE_PATH=ZoeW/node_modules node audit-tools/emu/app-network-e2e-test.js   (ក្នុង root វាស់ ៖ run-all.sh)
@@ -263,11 +265,11 @@ function startProxy() {
     });
 }
 
-function unsignedToken(uid, email, projectId) {
+function unsignedToken(uid, email, projectId, authTime) {
     const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
     const now = Math.floor(Date.now() / 1000);
     return b({ alg: 'none', typ: 'JWT' }) + '.' + b({
-        iss: 'https://securetoken.google.com/' + projectId, aud: projectId, auth_time: now, user_id: uid, sub: uid,
+        iss: 'https://securetoken.google.com/' + projectId, aud: projectId, auth_time: authTime || now, user_id: uid, sub: uid,
         iat: now, exp: now + 3600, email, email_verified: false, firebase: { identities: { email: [email] }, sign_in_provider: 'password' }
     }) + '.';
 }
@@ -357,13 +359,14 @@ function unsignedToken(uid, email, projectId) {
         if (!/^firebase-[a-z-]+\.js$/.test(file) || !fs.existsSync(src)) return route.abort();
         return route.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(src) });
     });
-    const idp = { signIns: 0 };
+    const idp = { signIns: 0, refreshes: 0, authAge: 0 };
     const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS' };
     await ctx.route(/^https:\/\/(identitytoolkit|securetoken)\.googleapis\.com\//, (route) => {
         const req = route.request();
         if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
         const url = req.url();
-        const token = unsignedToken(UID, EMAIL, PROJECT);
+        const refresh = /securetoken\.googleapis\.com/.test(url);
+        const token = unsignedToken(UID, EMAIL, PROJECT, refresh && idp.authAge ? Math.floor(Date.now() / 1000) - idp.authAge : 0);
         let body;
         if (/accounts:signInWithPassword/.test(url)) {
             idp.signIns++;
@@ -371,7 +374,8 @@ function unsignedToken(uid, email, projectId) {
         } else if (/accounts:lookup/.test(url)) {
             const t = String(Date.now());
             body = { kind: 'identitytoolkit#GetAccountInfoResponse', users: [{ localId: UID, email: EMAIL, emailVerified: false, passwordHash: 'x', passwordUpdatedAt: Number(t), providerUserInfo: [{ providerId: 'password', federatedId: EMAIL, email: EMAIL, rawId: EMAIL }], validSince: String(Math.floor(Number(t) / 1000)), lastLoginAt: t, createdAt: t, lastRefreshAt: new Date().toISOString() }] };
-        } else if (/securetoken\.googleapis\.com/.test(url)) {
+        } else if (refresh) {
+            idp.refreshes++;
             body = { access_token: token, expires_in: '3600', token_type: 'Bearer', refresh_token: 'refresh-' + UID, id_token: token, user_id: UID, project_id: PROJECT };
         } else {
             body = {};
@@ -439,6 +443,7 @@ function unsignedToken(uid, email, projectId) {
         window.__fireIntervals = (ms) => { let n = 0; captured.forEach((c) => { if (c.ms === ms) { n++; try { c.fn(); } catch (e) {} } }); return n; };
         const realNow = Date.now.bind(Date);
         let skew = 0;
+        try { skew = Number(sessionStorage.getItem('__bootSkew') || 0); } catch (e) {}
         Date.now = () => realNow() + skew;
         window.__zoeSkew = (ms) => { skew += ms; };
     }, JSON.stringify(config));
@@ -579,6 +584,30 @@ function unsignedToken(uid, email, projectId) {
         check(dup.length === 0, 'path នីមួយៗមាន onValue សកម្មតែ ១ (គ្មាន listener ស្ទួនក្រោយការឆ្លង ៦ ដង)', dup);
         const liveWs = proxy.live().filter((c) => c.kind === 'ws');
         check(liveWs.length === 1, 'WebSocket រស់តែ ១ ក្រោយការឆ្លងទាំងអស់ (គ្មានការតភ្ជាប់ស្របគ្នា)', liveWs.map((c) => c.id));
+        // ── ឈ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ៤ ម៉ោង ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──
+        console.log('\n── ឈ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──');
+        const loginVisible = () => page.evaluate(() => { const m = document.getElementById('loginModal'); return !!m && getComputedStyle(m).display !== 'none'; }).catch(() => null);
+        const beforeSleep = await historyCount();
+        idp.authAge = Math.round(6.5 * 3600);
+        await page.evaluate(() => sessionStorage.setItem('__bootSkew', String(2 * 3600 * 1000)));
+        await addServerItem('n7', '012000007', 'NET7');
+        await addServerItem('n8', '012000008', 'NET8');
+        const refreshesBefore = idp.refreshes;
+        await page.reload({ waitUntil: 'load' });
+        const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
+        check(beforeSleep === 6 && expiredAt >= 0 && idp.refreshes > refreshesBefore,
+            'លក្ខខណ្ឌចាំបាច់ ៖ token ផុត ➜ refresh (`auth_time` ៦.៥ ម៉ោងមុន) ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញ ➜ ប្រអប់ចូលលេច',
+            { beforeSleep, expiredAt, refreshes: idp.refreshes - refreshesBefore });
+        await sleep(1500);
+        idp.authAge = 0;
+        const prefilled = await page.evaluate(() => ({ email: document.getElementById('loginEmailInput').value, pw: (document.getElementById('loginPasswordInput').value || '').length }));
+        check(prefilled.email === EMAIL && prefilled.pw > 0, 'ប្រអប់ចូលបំពេញអ៊ីមែល និងពាក្យសម្ងាត់ដែលចងចាំ', prefilled);
+        if (!prefilled.pw) await page.fill('#loginPasswordInput', 'password-123');
+        await page.click('#loginBtn');
+        const reloginAt = await waitUntil(async () => (await statusText()) === ONLINE_TEXT && (await historyCount()) === 8, 30000);
+        timings.expiry = { ms: reloginAt };
+        check(reloginAt >= 0, '⛔ ចូលវិញក្រោយផុតកំណត់ ➜ history ៨ ជួរគ្រប់ (រួម ២ ជួរដែលឧបករណ៍ផ្សេងបន្ថែមពេលដេក) ក្នុង ៣០ វិ.',
+            { ms: reloginAt, history: await historyCount(), status: await statusText(), login: await loginVisible() });
         const noisy = errors.filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError/i.test(e));
         check(noisy.length === 0, 'គ្មានកំហុស runtime / unhandledrejection', noisy.slice(0, 5));
         console.log('      ⏱  ' + JSON.stringify(timings));

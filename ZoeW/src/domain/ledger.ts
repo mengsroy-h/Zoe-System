@@ -83,7 +83,7 @@ export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAd
     };
 }
 
-export function runLedgerTransaction(ref, update) {
+export function runLedgerTransaction(ref, update, notAppliedRetries = 3) {
     const sdk = firebaseState.fb;
     let op = 'op_';
     try {
@@ -94,15 +94,24 @@ export function runLedgerTransaction(ref, update) {
         op = 'op_';
         for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
     }
-    const send = (tagged) => sdk.runTransaction(ref, (current) => update(current, tagged ? op : null));
-    return send(true).catch((error) => {
-        if (!/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
-        return send(false);
+    const send = (tagged, retries) => sdk.runTransaction(ref, (current) => update(current, tagged ? op : null)).catch((error) => {
+        if (error && error.txOutcome === 'not-applied' && retries > 0) return send(tagged, retries - 1);
+        if (!tagged || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
+        return send(false, retries);
     });
+    return send(true, notAppliedRetries);
 }
 
 export function ledgerZeroDelta() {
     return { cod: 0, dod: 0, count: 0 };
+}
+
+export function ledgerRejectionVerdict(error) {
+    return error && error.txOutcome === 'unknown' && error.txServerUnread === true ? { cod: 0, dod: 0, count: 0, unknown: true } : null;
+}
+
+export function ledgerMarkUnknown(total, unknown) {
+    return unknown ? { ...total, unknown: true } : total;
 }
 
 export function ledgerServerVerdict(serverPromise) {
@@ -190,6 +199,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
         );
         return Promise.all([dailyStatus, monthlyStatus]).then((fixed) => {
             if (!current()) return { ok: false, daily: daily, monthly: monthly };
+            const unknownOutcome = !!(daily.unknown || monthly.unknown || fixed[0].delta.unknown || fixed[1].delta.unknown);
             const dailyTotal = {
                 cod: r2(daily.cod + fixed[0].delta.cod),
                 dod: r2(daily.dod + fixed[0].delta.dod),
@@ -206,6 +216,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
                 Promise.resolve(monthlyTotal)
             )).then((alignedMonthly) => ({
                 ok: fixed[0].ok
+                    && !unknownOutcome && !alignedMonthly.unknown
                     && dailyTotal.cod === desired.cod
                     && dailyTotal.dod === desired.dod
                     && dailyTotal.count === desired.count
@@ -231,11 +242,11 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
         const dod = Math.round((dailyApplied.dod - monthlyApplied.dod) * 100) / 100;
         const count = dailyApplied.count - monthlyApplied.count;
         if (!cod && !dod && !count) return monthlyApplied;
-        return ledgerServerVerdict(commitMonthlyRevenueDelta(ymKey, cod, dod, count, null, true)).then((fix) => ({
+        return ledgerServerVerdict(commitMonthlyRevenueDelta(ymKey, cod, dod, count, null, true)).then((fix) => ledgerMarkUnknown({
             cod: Math.round((monthlyApplied.cod + fix.cod) * 100) / 100,
             dod: Math.round((monthlyApplied.dod + fix.dod) * 100) / 100,
             count: monthlyApplied.count + fix.count
-        }), () => monthlyApplied);
+        }, monthlyApplied.unknown || fix.unknown), () => monthlyApplied);
     }).catch(() => monthlyVerdict);
 }
 
@@ -270,10 +281,10 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
             return null;
         }
         return ledgerAppliedDelta(serverBefore, serverAfter);
-    }, () => {
+    }, (error) => {
         rollbackMemory();
         showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
-        return null;
+        return ledgerRejectionVerdict(error);
     });
 }
 
@@ -317,9 +328,9 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
         const storedMonth = (storedMonths && typeof storedMonths === 'object') ? storedMonths[ymKey] : null;
         if (!storedMonth || typeof storedMonth !== 'object') return ledgerZeroDelta();
         return ledgerAppliedDelta(serverBefore, storedMonth);
-    }, () => {
+    }, (error) => {
         rollbackMemory();
         showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
-        return null;
+        return ledgerRejectionVerdict(error);
     });
 }

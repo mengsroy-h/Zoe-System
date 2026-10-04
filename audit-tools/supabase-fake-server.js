@@ -5,7 +5,7 @@
 //     argument (type ពី pg_proc) ➜ scalar ➜ តម្លៃ JSON · table ➜ array · កំហុស ➜ {code, message, details, hint} + status ដូច PostgREST
 //     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
 //   · Edge Function ៖ POST /functions/v1/<name> ➜ handler ដែលអ្នកហៅផ្តល់ (ឬ 404)
-//   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()`
+//   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()` · `setAuthAge(វិ.)` (token ថ្មីរាយម៉ោងចូលប្រព័ន្ធថយក្រោយ ➜ ការផុតកំណត់ ៤ ម៉ោង)
 //   · Secret key (`opts.secretKey` · `sb_secret_…` ក្នុង header `apikey` តែប៉ុណ្ណោះ) ឬ JWT role service_role ➜ role `service_role` ·
 //     `sb_secret_…` ខុស ➜ 401 ដូច gateway · `setRpcHook(fn)` ៖ `fn({ fn, body, phase: 'before' | 'after' })` ➜ `'drop'` (បិទ socket ·
 //     phase after = commit រួចតែចម្លើយបាត់) · `'hang'` (មិនឆ្លើយ) · `{ status, body }` (ចម្លើយក្លែង មុន SQL) · ផ្សេង ➜ ធម្មតា
@@ -56,6 +56,7 @@ async function startFakeSupabase(opts) {
     let tokenTtlSec = opts.tokenTtlSec || 3600;
     let expireBefore = 0;
     let rpcHook = null;
+    let authAge = 0;
     const signatures = new Map();
     const sockets = new Set();
 
@@ -64,7 +65,7 @@ async function startFakeSupabase(opts) {
         const now = Math.floor(Date.now() / 1000);
         const sessionId = crypto.randomUUID();
         const access = signJwt({ aud: 'authenticated', role: 'authenticated', sub: user.id, email: user.email, iat: now, exp: now + tokenTtlSec,
-            session_id: sessionId, amr: [{ method: 'password', timestamp: authTime || now }], app_metadata: {}, user_metadata: {} }, secret);
+            session_id: sessionId, amr: [{ method: 'password', timestamp: (authTime || now) - authAge }], app_metadata: {}, user_metadata: {} }, secret);
         const refresh = crypto.randomBytes(16).toString('hex');
         refreshTokens.set(refresh, { user, authTime: authTime || now });
         return {
@@ -260,6 +261,7 @@ async function startFakeSupabase(opts) {
         setMode(next) { mode = next; },
         setRpcHook(fn) { rpcHook = typeof fn === 'function' ? fn : null; },
         setTokenTtl(sec) { tokenTtlSec = sec; },
+        setAuthAge(sec) { authAge = sec; },
         expireTokens() { expireBefore = Math.floor(Date.now() / 1000) + 1; },
         close() {
             for (const s of sockets) s.destroy();

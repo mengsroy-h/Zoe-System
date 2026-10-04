@@ -397,7 +397,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
     'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
-    'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
+    'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'correctRevenueLedgerToActual', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {

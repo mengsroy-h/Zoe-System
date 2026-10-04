@@ -56,9 +56,10 @@ function sliceConst(src, name) {
 }
 
 const TX_FNS = ['transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
-    'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown',
+    'txReadServerValue', 'txDelay', 'txReadWasRefused', 'txResolveOutcome', 'txPathKey', 'txResolvingBlockers', 'txTrackResolving',
+    'txSnapshotOf', 'reportTxOutcomeUnknown',
     'runTransactionResolved', 'withTransactionOutcomeResolution'];
-const TX_CONSTS = ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS', 'TX_OUTCOME_MAX_WAIT_MS',
+const TX_CONSTS = ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths',
     'txDisconnectResolving'];
 const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
     'fetchWithTimeout',
@@ -67,13 +68,13 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
-    'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
+    'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory', 'runLedgerTransaction',
     'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
-    'cleanupClaimAccountedElsewhere', 'claimAndCleanupItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry'];
+    'cleanupClaimAccountedElsewhere', 'claimAndCleanupItem', 'removeSingleBarcode', 'ensureBarcodeArrayForItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry'];
 const APP_CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER'];
@@ -98,7 +99,7 @@ function makeRun(opts) {
         ledger: { day: { codDollar: 10 } }
     };
     const plan = opts.plan || [];
-    const log = { tx: [], rest: [], captures: [], restDown: !!opts.restDown };
+    const log = { tx: [], rest: [], captures: [], delays: [], restDown: !!opts.restDown, restRefuse: !!opts.restRefuse };
     const storage = {};
     const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
     function getPath(p) {
@@ -129,7 +130,7 @@ function makeRun(opts) {
         increment: (n) => ({ __inc: n }),
         runTransaction: (ref, fn) => {
             const mode = plan.length ? plan.shift() : 'ok';
-            log.tx.push({ path: ref.path, mode });
+            log.tx.push({ path: ref.path, mode, restSeen: log.rest.length });
             const cur = getPath(ref.path);
             // SDK ពិត ៖ path ដែលគ្មាន listener ➜ ការរត់ updater លើកទី ១ ឃើញ cache ទទេ (`null`) រួចផ្ញើ ➜ server
             // ឆ្លើយ `datastale` តែការតភ្ជាប់ដាច់មុន ➜ `disconnect` (updater មិនដែលរត់លើតម្លៃ server)
@@ -172,6 +173,7 @@ function makeRun(opts) {
         const u = new URL(url);
         log.rest.push({ path: u.pathname, auth: u.searchParams.get('auth') });
         if (log.restDown) return Promise.reject(new TypeError('Failed to fetch'));
+        if (log.restRefuse) return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({ error: 'Permission denied' }) });
         const p = decodeURIComponent(u.pathname.replace(/\.json$/, '')).replace(/^\/+/, '');
         const body = clone(getPath(p));
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body === undefined ? null : body) });
@@ -186,7 +188,7 @@ function makeRun(opts) {
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean, Proxy, Reflect, URL, TypeError,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error, encodeURIComponent, decodeURIComponent,
-        setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 5)),
+        setTimeout: (fn, ms) => { if ((ms || 0) >= 1000) log.delays.push(ms); return setTimeout(fn, Math.min(ms || 0, 5)); },
         clearTimeout: (id) => clearTimeout(id),
         AbortController,
         navigator: { onLine: true },
@@ -209,7 +211,8 @@ function makeRun(opts) {
         releaseBarcodesInRegistry: () => Promise.resolve(),
         dbListenerViewIsStale: () => false,
         isDatabaseConnected: true,
-        scanHistory: [], deletedItems: [],
+        scanHistory: [], deletedItems: [], confirm: () => true, probeDatabaseLiveness: () => {}, closeModal: () => {}, viewListModalShowing: () => false,
+        openViewListModal: () => {}, markCollectedRevenue: () => Promise.resolve(true), collectedMarksFor: () => [], clearScannedRemovalInFlight: () => {}, scanRemoveInFlight: null,
         dailyRevenueData: clone(server.zoew_daily_revenue_cod_dod),
         monthlyRevenueData: clone(server.zoew_monthly_revenue_cod_dod)
     };
@@ -243,7 +246,7 @@ function runTx(run, p, updaterSrc) {
     run.box.__error = null;
     vm.runInContext('fb.runTransaction(fb.ref(db, ' + JSON.stringify(p) + '), ' + updaterSrc + ')'
         + '.then((r) => { __result = { committed: r && r.committed, value: r && r.snapshot ? r.snapshot.val() : undefined, txOutcome: r && r.txOutcome }; },'
-        + ' (e) => { __error = { message: String(e && e.message), txOutcome: e && e.txOutcome }; });', run.ctx);
+        + ' (e) => { __error = { message: String(e && e.message), txOutcome: e && e.txOutcome, txServerUnread: e && e.txServerUnread }; });', run.ctx);
 }
 
 (async () => {
@@ -329,13 +332,35 @@ function runTx(run, p, updaterSrc) {
         ok('⛔ ref ដែលគ្មាន URL (fake ចាស់) ➜ ឥរិយាបថដើម (បដិសេធ disconnect) គ្មាន fetch', !!(run.box.__error && run.box.__error.message === 'disconnect') && run.log.rest.length === 0, { error: run.box.__error, rest: run.log.rest });
     }
     {
+        // ⛔ «អាន server មិនបាន» = លទ្ធផល *មិនទាន់ដឹង* មិនមែន *មិនអាចដឹង* ➜ រង់ចាំរហូតអានបាន (មុនកែ ៖ បោះបង់ក្រោយ ៣០ ដង/៦០ វិ. ➜ `unknown`
+        //    ➜ reconcile ដក ២ ដង · «ដក» ធ្វើឲ្យកញ្ចប់បាត់ ៖ ផ្នែក ៤ឃ · ៦)។ UI មិនព្យួរ ៖ អ្នកហៅមាន `dbOp` + `armLateCommit` រួចហើយ។
         const run = makeRun({ plan: ['applied-disconnect'], restDown: true });
         runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
         await settle(600);
-        ok('⛔ អាន server មិនបាន ➜ ការព្យាយាមមានព្រំដែន រួចចេញ unknown (មិនព្យួរជារៀងរហូត)',
-            !!(run.box.__error && run.box.__error.txOutcome === 'unknown'), { error: run.box.__error, attempts: run.log.rest.length });
-        const cap = Number((sliceConst(SRC, 'TX_OUTCOME_MAX_ATTEMPTS').match(/=\s*(\d+)/) || [])[1] || 0);
-        ok('ចំនួនការអាន <= TX_OUTCOME_MAX_ATTEMPTS', cap > 0 && run.log.rest.length <= cap, { attempts: run.log.rest.length, cap });
+        ok('⛔⛔ អាន server មិនបាន ➜ នៅរង់ចាំ (មិនបោះបង់ មិនទាយ unknown) ទោះលើសចំនួនព្យាយាមចាស់ (៣០)',
+            !run.box.__result && !run.box.__error && run.log.rest.length > 30, { result: run.box.__result, error: run.box.__error, attempts: run.log.rest.length });
+        run.log.restDown = false;
+        await settle(600);
+        ok('⛔⛔ ... server អានបានវិញ ➜ committed · txOutcome applied', !!(run.box.__result && run.box.__result.committed && run.box.__result.txOutcome === 'applied'),
+            { result: run.box.__result, error: run.box.__error });
+    }
+    {
+        const run = makeRun({ plan: ['applied-disconnect'], restRefuse: true });
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
+        await settle(1000);
+        const cap = Number((sliceConst(SRC, 'TX_OUTCOME_MAX_REFUSALS').match(/=\s*(\d+)/) || [])[1] || 0);
+        ok('⛔ server **បដិសេធ** ការអាន (HTTP 403) ➜ ការព្យាយាមមានព្រំដែន រួចចេញ unknown + txServerUnread (មិនព្យួរជារៀងរហូត)',
+            !!(run.box.__error && run.box.__error.txOutcome === 'unknown' && run.box.__error.txServerUnread === true), { error: run.box.__error, attempts: run.log.rest.length });
+        ok('ចំនួនការអាន <= TX_OUTCOME_MAX_REFUSALS', cap > 0 && run.log.rest.length <= cap, { attempts: run.log.rest.length, cap });
+    }
+    {
+        const run = makeRun({ plan: ['applied-disconnect'], restDown: true });
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
+        await settle(200);
+        vm.runInContext('authGeneration++;', run.ctx);
+        await settle(300);
+        ok('⛔ ប្តូរ auth ខណៈរង់ចាំ ➜ ឈប់អាន ➜ unknown + txServerUnread (មិនអានដោយ token របស់គណនីផ្សេង)',
+            !!(run.box.__error && run.box.__error.txOutcome === 'unknown' && run.box.__error.txServerUnread === true), { error: run.box.__error });
     }
     {
         const run = makeRun({ plan: ['applied-disconnect'] });
@@ -434,6 +459,174 @@ function runTx(run, p, updaterSrc) {
         const d = run.server.zoew_daily_revenue_cod_dod[DAY] || {};
         const m = run.server.zoew_monthly_revenue_cod_dod[MONTH] || {};
         ok('⛔ ការសរសេរ ledger ផ្ទុក token `op` (ថ្ងៃ និងខែ)', typeof d.op === 'string' && d.op.length >= 8 && typeof m.op === 'string', { d, m });
+    }
+
+    console.log('\n── ៤គ. ⛔⛔ ledger ៖ outcome `unknown` (server អានមិនបាន ៖ បដិសេធ · ប្តូរ auth · adapter បិទ) ➜ សាលក្រម reconcile មិនរាយ ok ──');
+    //    បណ្តាញដាច់តែម្យ៉ាង ➜ wrapper/adapter រង់ចាំលទ្ធផលពិត (ផ្នែក ២ · ៤ឃ)។ `unknown` + `txServerUnread` នៅសល់តែពេល server **បដិសេធ**
+    //    ការអាន · ប្តូរ auth/database · adapter បិទ ➜ reconcile ទាយ «មិនបានអនុវត្ត» ហើយដកម្តងទៀត (ត្រូវតែពេលសំណើមិនដល់ server · ដក ២ ដង
+    //    ពេលវាដល់រួច ៖ ថ្ងៃ 100 ➜ 90)។ ⛔ ការទាយទិសណាក៏ខុសពាក់កណ្តាល (វាស់ ១៥០ ករណីមុន/ក្រោយ ៖ «កុំប៉ះ» អាក្រក់ជាង ៣៦) ➜ ផ្នែកនេះចាក់សោតែ
+    //    **ការពិត** ៖ App មិនអះអាង ✅ (មុនកែ ៖ `ok: true` ខណៈលុយខុស ២៧/១៥០) ➜ សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» + Sentry។
+    //    ⛔ កុំអះអាងតម្លៃលុយក្នុងករណី unknown (ទាំងទិសទាំងពីរមិនអាចបញ្ជាក់ ➜ ការអះអាងនឹងចាក់សោកំហុសមួយ)។
+    for (const mode of ['applied-disconnect', 'lost-disconnect']) {
+        for (const plan of [[mode, 'ok', 'ok', 'ok', 'ok', 'ok'], ['ok', mode, 'ok', 'ok', 'ok', 'ok']]) {
+            const where = plan[0] === mode ? 'ថ្ងៃ' : 'ខែ';
+            const run = makeRun({ plan: plan.slice(), restRefuse: true });
+            vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+                + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+            await settle(1500);
+            ok('លក្ខខណ្ឌចាំបាច់ (' + where + ' ' + mode + ') ៖ outcome unknown (server បដិសេធការអាន · Sentry money)',
+                run.log.rest.length >= 1 && run.log.captures.some((c) => c.zone === 'money' && /outcome unknown/i.test(c.message)), { rest: run.log.rest.length, captures: run.log.captures });
+            ok('⛔⛔ ' + where + ' unknown (' + mode + ') ➜ សាលក្រម reconcile មិន ok (មិនអះអាងថាស្ថិតិប្រាក់ត្រូវ)',
+                !!run.box.__status && run.box.__status.ok === false, run.box.__status);
+        }
+    }
+    {
+        const run = makeRun({ plan: ['applied-disconnect', 'ok', 'ok', 'ok', 'ok'], restRefuse: true });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, 0, 0, 0).then((s) => { __status = s; });", run.ctx);
+        await settle(1500);
+        ok('⛔⛔ ចំនួនពិត 0 (ឧ. កែតម្លៃដែលមិនប្រែ) + ថ្ងៃ unknown ➜ សាលក្រមមិន ok (0 ស្មើ 0 មិនមែនភស្តុតាង)',
+            !!run.box.__status && run.box.__status.ok === false, run.box.__status);
+    }
+    {
+        const run = makeRun({ plan: ['ok', 'ok', 'ok', 'ok'], restDown: true });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+        await settle(300);
+        ok('⛔ ទិសផ្ទុយ ៖ គ្មាន disconnect ➜ ដកតែម្តង (95 · 95) · សាលក្រម ok',
+            r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95 && r2(run.server.zoew_monthly_revenue_cod_dod[MONTH].codDollar) === 95
+                && !!run.box.__status && run.box.__status.ok === true,
+            { day: run.server.zoew_daily_revenue_cod_dod[DAY], month: run.server.zoew_monthly_revenue_cod_dod[MONTH], status: run.box.__status });
+    }
+    {
+        const run = makeRun({ plan: ['foreign-equal-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'] });
+        vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+            + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+        await settle(400);
+        ok('⛔ ទិសផ្ទុយ ៖ unknown ដែល server **អានបាន** (ឧបករណ៍ផ្សេងសរសេរ) មិនមែន `txServerUnread` ➜ reconcile បញ្ចប់ ok (ផ្នែក ៤ខ)',
+            !!run.box.__status && run.box.__status.ok === true, run.box.__status);
+    }
+
+    console.log('\n── ៤ឃ. ⛔⛔ ledger ៖ server អានមិនបានយូរ រួចអានបានវិញ ➜ reconcile ដកតែម្តង (មិនទាយ) ──');
+    //    មុនកែ ៖ wrapper បោះបង់ក្រោយ ៣០ ដង/៦០ វិ. ➜ unknown ➜ reconcile ដក ២ ដង (100 ➜ 90) ពេលសំណើបានដល់ ឬ «កុំប៉ះ» ➜ ការដកបាត់ពេលមិនដល់។
+    //    ឥឡូវ ៖ រង់ចាំលទ្ធផលពិត ➜ ទិសទាំងពីរត្រូវ (ថ្ងៃ 95 · ខែ 95 · ok)។
+    for (const mode of ['applied-disconnect', 'lost-disconnect']) {
+        for (const plan of [[mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], ['ok', mode, 'ok', 'ok', 'ok', 'ok', 'ok']]) {
+            const where = plan[0] === mode ? 'ថ្ងៃ' : 'ខែ';
+            const run = makeRun({ plan: plan.slice(), restDown: true });
+            vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
+                + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
+            await settle(500);
+            ok('លក្ខខណ្ឌចាំបាច់ (' + where + ' ' + mode + ') ៖ ខណៈ server អានមិនបាន reconcile មិនទាន់សម្រេច (រង់ចាំ មិនទាយ)',
+                run.box.__status === null && run.log.rest.length > 30, { status: run.box.__status, rest: run.log.rest.length });
+            run.log.restDown = false;
+            await settle(800);
+            ok('⛔⛔ ' + where + ' ' + mode + ' ➜ បណ្តាញត្រឡប់ ➜ ថ្ងៃ 95 · ខែ 95 · ok (ដកតែម្តង)',
+                r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95 && run.server.zoew_daily_revenue_cod_dod[DAY].totalCount === 19
+                    && r2(run.server.zoew_monthly_revenue_cod_dod[MONTH].codDollar) === 95 && run.server.zoew_monthly_revenue_cod_dod[MONTH].totalCount === 19
+                    && !!run.box.__status && run.box.__status.ok === true,
+                { day: run.server.zoew_daily_revenue_cod_dod[DAY], month: run.server.zoew_monthly_revenue_cod_dod[MONTH], status: run.box.__status });
+            ok('⛔ ... គ្មាន Sentry «outcome unknown»', !run.log.captures.some((c) => /outcome unknown/i.test(c.message)), run.log.captures);
+        }
+    }
+
+    console.log('\n── ៦. ⛔⛔ «ដក» barcode ៖ server អានមិនបានយូរ ➜ មិនបាត់កញ្ចប់ ──');
+    //    មុនកែ ៖ transaction ប្រវត្តិចុះលើ server តែ wrapper បោះបង់ ➜ late onFailed «ដកមិនបានជោគជ័យ» ➜ barcode មិននៅប្រវត្តិ · មិននៅធុងសំរាម ·
+    //    ledger មិនដក (វាស់ ៖ ប្រវត្តិ ["BCB"] · ធុងសំរាម ០ · ថ្ងៃ 100)។ ការសម្អាតមាន journal ➜ «ដក» ដោយអ្នកប្រើជាផ្ទៃបងប្អូនដែលគ្មាន។
+    for (const mode of ['applied-disconnect', 'lost-disconnect']) {
+        const run = makeRun({ plan: [mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], restDown: true });
+        const item = { id: ITEM_ID, phone: '012345678', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: NOW - 3600000, count: 2, cod: 12, dod: 0, price: 12,
+            isClosed: false, barcode: 'BCA', barcodes: [{ code: 'BCA', cod: 5, dod: 0 }, { code: 'BCB', cod: 7, dod: 0 }] };
+        run.server.zoew_scan_history_cod_dod[ITEM_ID] = JSON.parse(JSON.stringify(item));
+        run.box.scanHistory.push(JSON.parse(JSON.stringify(item)));
+        vm.runInContext("__rm = null; removeSingleBarcode('" + ITEM_ID + "', 'BCA').then((r) => { __rm = r; }, (e) => { __rm = 'threw ' + e; });", run.ctx);
+        await settle(500);
+        ok('លក្ខខណ្ឌចាំបាច់ (' + mode + ') ៖ ការដករង់ចាំ (pending · «នឹងបញ្ចប់ពេលបណ្តាញត្រឡប់»)', run.box.__rm === 'pending'
+            && run.toasts.some((t) => /នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ/.test(t)) && !run.toasts.some((t) => /មិនបានជោគជ័យ/.test(t)), { rm: run.box.__rm, toasts: run.toasts });
+        run.log.restDown = false;
+        await settle(1500);
+        const h = run.server.zoew_scan_history_cod_dod[ITEM_ID];
+        const inHistory = !!(h && h.barcodes && h.barcodes.some((b) => b.code === 'BCA'));
+        const trash = Object.values(run.server.zoew_recently_deleted_cod_dod || {}).filter((t) => (t.barcodes || []).some((b) => b.code === 'BCA'));
+        const day = run.server.zoew_daily_revenue_cod_dod[DAY];
+        const month = run.server.zoew_monthly_revenue_cod_dod[MONTH];
+        if (mode === 'applied-disconnect') {
+            ok('⛔⛔ server ដករួច ➜ បណ្តាញត្រឡប់ ➜ BCA ចូលធុងសំរាម ១ (មិនបាត់) · មិននៅប្រវត្តិ', !inHistory && trash.length === 1 && trash[0].barcodes[0].isDeducted === true,
+                { inHistory, trash: trash.length });
+            ok('⛔⛔ ... ការដកកាត់ប្រាក់តែម្តង (ថ្ងៃ 95 · ខែ 95)', r2(day.codDollar) === 95 && r2(month.codDollar) === 95, { day, month });
+        } else {
+            ok('⛔ ទិសផ្ទុយ ៖ server មិនបានដក ➜ BCA នៅប្រវត្តិ · ធុងសំរាម ០ · លុយ 100', inHistory && trash.length === 0 && r2(day.codDollar) === 100 && r2(month.codDollar) === 100,
+                { inHistory, trash: trash.length, day, month });
+            ok('⛔ ... ប្រាប់ការពិត «ដកមិនបានជោគជ័យ»', run.toasts.some((t) => /មិនបានជោគជ័យ/.test(t)), run.toasts.slice(-3));
+        }
+    }
+
+    console.log('\n── ៧. ⛔⛔ ទ្វារតាម path ៖ transaction ថ្មីរង់ចាំលទ្ធផលមុនលើ path ដដែល ──');
+    //    បើ T2 (ឧ. ស្កេនបន្ទាប់ពេលបណ្តាញដាច់) ចុះមុនការអាន ➜ server មិនស្មើតម្លៃដែល T1 ផ្ញើ ➜ T1 ក្លាយជា unknown វិញ (ការទាយ)។
+    {
+        const run = makeRun({ plan: ['applied-disconnect', 'ok', 'ok'], restDown: true });
+        run.box.navigator.onLine = false;
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: ((cur && cur.codDollar) || 0) + 1 })');
+        await settle(150);
+        run.box.__r2 = null;
+        vm.runInContext("fb.runTransaction(fb.ref(db, 'ledger/day'), (cur) => ({ codDollar: ((cur && cur.codDollar) || 0) + 2 }))"
+            + ".then((r) => { __r2 = !!(r && r.committed); }, (e) => { __r2 = 'err ' + e.message; });", run.ctx);
+        await settle(300);
+        ok('⛔⛔ ក្រៅបណ្តាញ ៖ T2 លើ path ដដែលមិនទាន់ទៅ SDK ខណៈ T1 រង់ចាំលទ្ធផល', run.log.tx.length === 1, run.log.tx);
+        run.box.navigator.onLine = true;
+        run.log.restDown = false;
+        await settle(800);
+        ok('⛔⛔ T1 ➜ applied (server 11 = តម្លៃដែលផ្ញើ · T2 មិនរំខាន)', !!(run.box.__result && run.box.__result.committed && run.box.__result.txOutcome === 'applied'),
+            { result: run.box.__result, error: run.box.__error });
+        ok('⛔⛔ T2 រត់បន្ទាប់ ➜ server 13 (10 + 1 + 2)', run.box.__r2 === true && run.server.ledger.day.codDollar === 13, { r2: run.box.__r2, day: run.server.ledger.day });
+    }
+    {
+        const run = makeRun({ plan: ['applied-disconnect', 'ok'], restDown: true });
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
+        await settle(150);
+        run.box.__r3 = null;
+        vm.runInContext("fb.runTransaction(fb.ref(db, 'zoew_daily_revenue_cod_dod/" + DAY + "'), (cur) => cur).then((r) => { __r3 = !!(r && r.committed); }, () => { __r3 = false; });", run.ctx);
+        await settle(200);
+        ok('⛔ ទិសផ្ទុយ ៖ path ផ្សេងមិនរង់ចាំ', run.box.__r3 === true && run.log.tx.length === 2, { r3: run.box.__r3, tx: run.log.tx });
+        run.log.restDown = false;
+        await settle(400);
+    }
+    {
+        // ⛔ ទ្វារមិនត្រូវរារាំងជារៀងរហូត ៖ លើបណ្តាញ (SDK ដើរ) តែ REST អានមិនបាន ➜ ដោះក្រោយការអានបរាជ័យ TX_OUTCOME_GATE_RELEASE_FAILS ដង
+        const run = makeRun({ plan: ['applied-disconnect', 'ok'], restDown: true });
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: ((cur && cur.codDollar) || 0) + 1 })');
+        await settle(0);
+        run.box.__r4 = null;
+        vm.runInContext("fb.runTransaction(fb.ref(db, 'ledger/day'), (cur) => ({ codDollar: ((cur && cur.codDollar) || 0) + 2 }))"
+            + ".then((r) => { __r4 = !!(r && r.committed); }, (e) => { __r4 = 'err ' + e.message; });", run.ctx);
+        await settle(400);
+        const fails = Number((sliceConst(SRC, 'TX_OUTCOME_GATE_RELEASE_FAILS').match(/=\s*(\d+)/) || [])[1] || 0);
+        ok('⛔ លើបណ្តាញ តែ REST អានមិនបាន ➜ ទ្វារដោះ ➜ T2 ទៅមុខ (មិនជាប់ជារៀងរហូត) · T1 នៅរង់ចាំ',
+            fails > 0 && run.box.__r4 === true && !run.box.__result && !run.box.__error, { fails, rest: run.log.rest.length, r4: run.box.__r4 });
+        ok('⛔ ... តែទ្វារបានរារាំងមុន ៖ T2 ទៅ SDK តែក្រោយការអាន REST បរាជ័យ >= TX_OUTCOME_GATE_RELEASE_FAILS',
+            run.log.tx.length === 2 && run.log.tx[1].restSeen >= fails, run.log.tx);
+        run.log.restDown = false;
+        await settle(400);
+    }
+    {
+        // ⛔ ពេលត្រឡប់លើបណ្តាញ ការអានត្រូវមកឆាប់ ៖ ក្រៅបណ្តាញ ➜ ចន្លោះត្រឡប់ទៅ TX_OUTCOME_RETRY_GAP_MS (មិនរង់ចាំ backoff ចាស់ ៣០ វិ.)
+        const run = makeRun({ plan: ['applied-disconnect'], restDown: true });
+        runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
+        await settle(150);
+        const grown = run.log.delays.some((d) => d >= 16000);
+        run.box.navigator.onLine = false;
+        await settle(30);
+        const mark = run.log.delays.length;
+        await settle(100);
+        const gapBase = Number((sliceConst(SRC, 'TX_OUTCOME_RETRY_GAP_MS').match(/=\s*(\d+)/) || [])[1] || 0);
+        const readTimeout = Number((sliceConst(SRC, 'TX_OUTCOME_READ_TIMEOUT_MS').match(/=\s*(\d+)/) || [])[1] || 0);
+        const offlineGaps = run.log.delays.slice(mark).filter((d) => d !== readTimeout);
+        ok('⛔ backoff ពេលលើបណ្តាញតែ REST ធ្លាក់កើនឡើង (លក្ខខណ្ឌចាំបាច់)', grown, run.log.delays.slice(0, 12));
+        ok('⛔ ក្រៅបណ្តាញ ➜ ចន្លោះត្រឡប់ទៅ ' + gapBase + 'ms ➜ ពេលបណ្តាញមកវិញ អានឆាប់',
+            gapBase > 0 && offlineGaps.length >= 2 && offlineGaps.every((d) => d === gapBase), offlineGaps.slice(0, 8));
+        run.box.navigator.onLine = true;
+        run.log.restDown = false;
+        await settle(200);
     }
 
     console.log('\n── ៥. ⛔⛔ registry barcode ៖ តម្លៃ `true` ថេរ ➜ «ស្មើតម្លៃដែលផ្ញើ» មិនមែនភស្តុតាងថាជារបស់យើង ──');

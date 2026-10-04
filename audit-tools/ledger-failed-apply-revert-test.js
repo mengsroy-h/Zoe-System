@@ -96,7 +96,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 
 const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
-    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
+    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
     'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'claimAndCleanupItem', 'submitManualAdjustment'
@@ -197,6 +197,8 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.applyLedgerBucketDelta + '\n'
         + fnSrc.commitRevenueBucketDelta + '\n'
         + fnSrc.ledgerZeroDelta + '\n'
+        + fnSrc.ledgerRejectionVerdict + '\n'
+        + fnSrc.ledgerMarkUnknown + '\n'
         + fnSrc.ledgerServerVerdict + '\n'
         + fnSrc.ledgerMemoryCompensationClaimed + '\n'
         + fnSrc.revertLedgerBucketOnServer + '\n'

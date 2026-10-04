@@ -97,7 +97,7 @@ const REAL_FNS = [
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers',
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
-    'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
+    'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'getPickupPhoneKey',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',

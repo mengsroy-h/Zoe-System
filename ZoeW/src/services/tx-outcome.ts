@@ -9,9 +9,13 @@ export const TX_OUTCOME_READ_TIMEOUT_MS = 8000;
 
 export const TX_OUTCOME_RETRY_GAP_MS = 2000;
 
-export const TX_OUTCOME_MAX_ATTEMPTS = 30;
+export const TX_OUTCOME_MAX_GAP_MS = 30000;
 
-export const TX_OUTCOME_MAX_WAIT_MS = 60000;
+export const TX_OUTCOME_MAX_REFUSALS = 30;
+
+export const TX_OUTCOME_GATE_RELEASE_FAILS = 3;
+
+export const txResolvingPaths = new Map();
 
 export const txOutcomeUnknownReported = new Set();
 
@@ -100,23 +104,36 @@ export function txDelay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function txResolveOutcome(restUrl, sentValue, priorValue) {
-    const startedAt = Date.now();
+export function txReadWasRefused(error) {
+    const text = String((error && error.message) || error || '');
+    if (/^Transaction outcome read unavailable$/.test(text)) return true;
+    const m = /^HTTP (\d{3})$/.exec(text);
+    return !!m && Number(m[1]) < 500;
+}
+
+export async function txResolveOutcome(restUrl, sentValue, priorValue, onStuck?) {
     const capturedAuthGeneration = firebaseState.authGeneration;
-    for (let attempt = 0; attempt < TX_OUTCOME_MAX_ATTEMPTS; attempt++) {
-        if (firebaseState.authGeneration !== capturedAuthGeneration) break;
-        let remaining = TX_OUTCOME_MAX_WAIT_MS - elapsedSince(startedAt);
-        if (remaining <= 0) break;
+    const capturedDb = firebaseState.db;
+    const current = () => firebaseState.authGeneration === capturedAuthGeneration && firebaseState.db === capturedDb;
+    let refusals = 0;
+    let onlineFailures = 0;
+    let gap = TX_OUTCOME_RETRY_GAP_MS;
+    for (let attempt = 0; current(); attempt++) {
         if (attempt) {
-            await txDelay(Math.min(TX_OUTCOME_RETRY_GAP_MS, remaining));
+            await txDelay(gap);
+            if (!current()) break;
         }
-        remaining = TX_OUTCOME_MAX_WAIT_MS - elapsedSince(startedAt);
-        if (remaining <= 0 || firebaseState.authGeneration !== capturedAuthGeneration) break;
-        if ((navigator.onLine as boolean) === false) continue;
+        if ((navigator.onLine as boolean) === false) {
+            gap = TX_OUTCOME_RETRY_GAP_MS;
+            continue;
+        }
         let server;
         try {
-            server = await txReadServerValue(restUrl, Math.min(TX_OUTCOME_READ_TIMEOUT_MS, remaining));
+            server = await txReadServerValue(restUrl, TX_OUTCOME_READ_TIMEOUT_MS);
         } catch (e) {
+            gap = Math.min(gap * 2, TX_OUTCOME_MAX_GAP_MS);
+            if (++onlineFailures === TX_OUTCOME_GATE_RELEASE_FAILS && typeof onStuck === 'function') onStuck();
+            if (txReadWasRefused(e) && ++refusals >= TX_OUTCOME_MAX_REFUSALS) break;
             continue;
         }
         if (txSameValue(server, sentValue)) return { outcome: 'applied', server };
@@ -124,6 +141,28 @@ export async function txResolveOutcome(restUrl, sentValue, priorValue) {
         return { outcome: 'unknown', server };
     }
     return { outcome: 'unknown', server: undefined };
+}
+
+export function txPathKey(restUrl) {
+    if (!restUrl) return '';
+    try {
+        const url = new URL(restUrl);
+        return url.origin + url.pathname.replace(/\.json$/, '') + '|' + (url.searchParams.get('ns') || '');
+    } catch (e) {
+        return '';
+    }
+}
+
+export function txResolvingBlockers(key) {
+    if (!key) return [];
+    const [path, ns] = key.split('|');
+    const out = [];
+    txResolvingPaths.forEach((entry, other) => {
+        const [otherPath, otherNs] = other.split('|');
+        if (ns !== otherNs) return;
+        if (otherPath === path || otherPath.startsWith(path + '/') || path.startsWith(otherPath + '/')) entry.forEach((e) => out.push(e));
+    });
+    return out;
 }
 
 export function txSnapshotOf(ref, value) {
@@ -144,7 +183,34 @@ export function reportTxOutcomeUnknown(restUrl) {
     if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'runTransactionResolved', path });
 }
 
+export function txTrackResolving(key, error) {
+    if (!key) return () => {};
+    let open;
+    const entry = { error, released: new Promise<void>((resolve) => { open = resolve; }) };
+    let entries = txResolvingPaths.get(key);
+    if (!entries) {
+        entries = new Set();
+        txResolvingPaths.set(key, entries);
+    }
+    entries.add(entry);
+    return () => {
+        open();
+        const live = txResolvingPaths.get(key);
+        if (!live) return;
+        live.delete(entry);
+        if (!live.size) txResolvingPaths.delete(key);
+    };
+}
+
 export function runTransactionResolved(sdk, ref, updater, options) {
+    const pathKey = txPathKey(txRestUrl(ref));
+    const blockers = txResolvingBlockers(pathKey);
+    if (blockers.length) {
+        const waited = Promise.all(blockers.map((b) => b.released)).then(() => runTransactionResolved(sdk, ref, updater, options));
+        txDisconnectResolving.set(waited, blockers[0].error);
+        waited.then(() => txDisconnectResolving.delete(waited), () => txDisconnectResolving.delete(waited));
+        return waited;
+    }
     let ran = false;
     let sent;
     let prior;
@@ -169,12 +235,18 @@ export function runTransactionResolved(sdk, ref, updater, options) {
         const sentValue = sent;
         const priorValue = prior;
         txDisconnectResolving.set(outcome, error);
-        return txResolveOutcome(restUrl, sentValue, priorValue).then((resolved) => {
+        const releaseGate = txTrackResolving(pathKey, error);
+        const resolving = txResolveOutcome(restUrl, sentValue, priorValue, releaseGate);
+        resolving.then(releaseGate, releaseGate);
+        return resolving.then((resolved) => {
             txDisconnectResolving.delete(outcome);
             if (resolved.outcome === 'applied') {
                 return { committed: true, snapshot: txSnapshotOf(ref, resolved.server), txOutcome: 'applied' };
             }
             try { error.txOutcome = resolved.outcome; } catch (e) {}
+            if (resolved.outcome === 'unknown' && resolved.server === undefined) {
+                try { error.txServerUnread = true; } catch (e) {}
+            }
             if (resolved.outcome === 'unknown') reportTxOutcomeUnknown(restUrl);
             throw error;
         }, (resolveErr) => {

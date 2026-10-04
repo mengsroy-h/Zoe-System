@@ -1295,7 +1295,7 @@ function firstBody(requests) {
                 });
                 if (box.__saveHangs) { const d = deferred(); box.__saveDeferreds.push(d); return d.promise; }
                 if (box.__saveThrows) return Promise.reject(new Error('save failed'));
-                return Promise.resolve(true);
+                return Promise.resolve(box.__saveResult === undefined ? true : box.__saveResult);
             },
             releaseBarcodesInRegistry: (codes) => { calls.release.push(codes); },
             checkZtoStatusForBarcode: (cfg, code) => {
@@ -1361,7 +1361,7 @@ function firstBody(requests) {
                 if (box.__signedProbe) box.__signedProbe.clear();
                 box.ztoListSyncInFlight = false;
                 box.__stale = false; box.__claim = 'claimed';
-                box.__saveThrows = false; box.__confirm = true;
+                box.__saveThrows = false; box.__saveResult = true; box.__confirm = true;
                 box.__claimHangs = false; box.__saveHangs = false; box.__timeoutLabel = '';
                 box.__claimDeferreds = []; box.__saveDeferreds = [];
                 box.navigator.onLine = true;
@@ -1728,6 +1728,47 @@ function firstBody(requests) {
                 await runImport();
                 ok('⛔ ទិសផ្ទុយ ៖ ស្ថិតិយកធ្លាក់ ➜ **មិនត្រូវដោះកូនសោ registry** (កញ្ចប់ចុះរួច ➜ ការដោះ = ស្កេនចូលបាន ២ ដង ➜ លុយបូកស្ទួន)',
                     calls.release.length === 0, calls.release);
+
+                // ⛔ ជួរ «យករួច» ដែលការសរសេរ **commit យឺត** (លើសពិដាន ១៥ វិ.) ឬឆ្លើយ `false` (កញ្ចប់ចុះរួច · ស្ថិតិប្រាក់មិនទាន់បញ្ជាក់) ៖
+                // ស្ថិតិយក (`pickedUpBarcodes`) និង mirror ចំណូលប្រចាំថ្ងៃ ត្រូវសរសេរតាម `applyBarcodeCloseChange()` ដដែល ពេល commit មកដល់ —
+                // បើមិនដូច្នេះ កញ្ចប់បិទក្នុងប្រវត្តិ តែមិនដែលចូលស្ថិតិយក/ចំណូលប្រចាំថ្ងៃ (Late commit ៖ ការងារក្រោយ commit រត់ពេលវាមកដល់)
+                const flushLate = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+                const lateRow = (code) => ({ rows: [{ barcode: code, phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                    from: '2026-09-01', to: '2026-09-11', total: 1 });
+                reset();
+                box.__now = NOW;
+                box.__saveHangs = true;
+                box.__timeoutLabel = 'Save timed out';
+                box.ztoListSyncResult = lateRow('77130500000833');
+                await runImport();
+                ok('⛔ ជាន់អប្បបរមា ៖ ការសរសេរជួរ «យករួច» ព្យួរពិត ហើយមិនទាន់សរសេរស្ថិតិយក',
+                    box.__saveDeferreds.length === 1 && calls.close.length === 0, { saves: box.__saveDeferreds.length, close: calls.close });
+                box.__saveDeferreds.forEach((d) => d.resolve(true));
+                await flushLate();
+                ok('⛔ commit **យឺត** នៃជួរ «យករួច» ➜ ស្ថិតិយកត្រូវសរសេរពេល commit មកដល់ (`applyBarcodeCloseChange()` តែម្តង)',
+                    calls.close.length === 1 && calls.close[0].code === '77130500000833' && calls.close[0].closed === true, calls.close);
+
+                reset();
+                box.__now = NOW;
+                box.__saveResult = false;
+                box.ztoListSyncResult = lateRow('77130500000834');
+                await runImport();
+                ok('⛔ រក្សាទុករួច តែស្ថិតិប្រាក់មិនទាន់បញ្ជាក់ (`false`) ➜ ស្ថិតិយកនៅតែត្រូវសរសេរ',
+                    calls.close.length === 1 && calls.close[0].code === '77130500000834', calls.close);
+                const falseToast = calls.toast[calls.toast.length - 1] || '';
+                ok('⛔ ហើយសារបញ្ចប់មិនអះអាងថា «បរាជ័យ» (កញ្ចប់ចុះរួច · កូនសោ registry នៅ)',
+                    falseToast.indexOf('បរាជ័យ') === -1 && calls.release.length === 0, { toast: calls.toast, release: calls.release });
+
+                reset();
+                box.__now = NOW;
+                box.__saveHangs = true;
+                box.__timeoutLabel = 'Save timed out';
+                box.ztoListSyncResult = lateRow('77130500000835');
+                await runImport();
+                box.__saveDeferreds.forEach((d) => d.reject(new Error('write rejected')));
+                await flushLate();
+                ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ មិនសរសេរស្ថិតិយក (កញ្ចប់មិនមាន)',
+                    calls.close.length === 0, calls.close);
 
                 // ⛔ **ការធ្លាក់ចុះទៅ `/detail`** ៖ ជួរដេកបញ្ជីអាចគ្មានវាល
                 // ស្ថានភាព (យើងផ្ទៀងផ្ទាត់ `billStatus` **តែលើ `/detail`**)

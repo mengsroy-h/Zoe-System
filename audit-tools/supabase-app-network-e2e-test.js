@@ -274,14 +274,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         await page.evaluate(([kind, v]) => window[kind].setItem('zoew-sb-auth', v), [(authStore && authStore.kind) || 'localStorage', JSON.stringify(oldSession)]);
         fake.setAuthAge(Math.round(6.5 * 3600));
         const reloadMark = fake.requests.length;
+        // ⛔ បង្ខំ race ដោយមិនពឹងពេល ៖ my_account (មុនការពិនិត្យ ៤ ម៉ោង) យឺត ២ វិ. ➜ ការទាញ delta ចេញមុន · ចម្លើយរបស់វាត្រូវរង់ចាំរហូតការចាកចេញ
+        const race = { accountHeld: false, pullHeld: false, pullReleasedAfterLogout: false };
+        const loggedOut = () => fake.requests.slice(reloadMark).some((r) => /\/auth\/v1\/logout/.test(r.path));
+        fake.setRpcHook(async ({ fn, phase }) => {
+            if (fn === 'my_account' && phase === 'before' && !race.accountHeld) { race.accountHeld = true; await sleep(2000); }
+            if (fn === 'zoe_pull' && phase === 'after' && !race.pullHeld) {
+                race.pullHeld = true;
+                const t0 = Date.now();
+                while (!loggedOut() && Date.now() - t0 < 15000) await sleep(100);
+                await sleep(300);
+                race.pullReleasedAfterLogout = loggedOut();
+            }
+            return null;
+        });
         await page.reload({ waitUntil: 'load' });
         const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
         await sleep(1500);
+        fake.setRpcHook(null);
         const logoutAt = fake.requests.slice(reloadMark).findIndex((r) => /\/auth\/v1\/logout/.test(r.path));
         const pullsAroundExpiry = pullsOf(reloadMark);
         const refreshed = fake.requests.slice(reloadMark).filter((r) => /grant_type=refresh_token/.test(r.search || '')).length;
         check(expiredAt >= 0 && refreshed >= 1 && logoutAt >= 0, 'លក្ខខណ្ឌចាំបាច់ ៖ token ផុត ➜ refresh ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញ ➜ ប្រអប់ចូលលេច', { expiredAt, refreshed, logoutAt });
-        check(pullsAroundExpiry.some((since) => since > 0), 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ឆ្លងកាត់ការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', pullsAroundExpiry);
+        check(pullsAroundExpiry.some((since) => since > 0) && race.pullReleasedAfterLogout, 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ចេញមុនការចាកចេញ ហើយចម្លើយមកដល់ក្រោយការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', { pulls: pullsAroundExpiry, race });
         fake.setAuthAge(0);
         const prefilled = await page.evaluate(() => ({ email: document.getElementById('loginEmailInput').value, pw: (document.getElementById('loginPasswordInput').value || '').length }));
         check(prefilled.email === 'sokha' && prefilled.pw > 0, 'ប្រអប់ចូលបំពេញឈ្មោះ និងពាក្យសម្ងាត់ដែលចងចាំ', prefilled);

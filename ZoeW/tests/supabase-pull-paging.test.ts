@@ -331,3 +331,97 @@ describe('cache zoe_docs (IndexedDB) ៖ egress តែប៉ុណ្ណោះ',
         c.db.close();
     });
 });
+
+describe('SBD-5 ៖ ការទាញពេញច្រើនទំព័រដាច់កណ្តាលពេល ready ➜ មិនបង្ហាញទិដ្ឋភាពខ្លីជាទិន្នន័យស្រស់', () => {
+    const SCOPE = 'https://abcdefghijklmnopqrst.supabase.co|u1';
+
+    function stalePurgedServer() {
+        const srv = fakeServer({ fullHead: true, live: 9, purge: false, tenant: 'T1' });
+        return {
+            srv,
+            forceReset: () => {
+                srv.set('i8', null);
+                srv.purgeTombstones();
+                for (const k of ['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i9']) srv.set(k, { n: k, v: 2 });
+                srv.set('i10', { n: 10, v: 2 });
+            }
+        };
+    }
+
+    const TRUTH = ['i1', 'i10', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i9'];
+
+    it('⛔ ទំព័រទី ២ នៃ reset ធ្លាក់ ➜ listener ថ្មីឃើញទិដ្ឋភាពពេញចាស់ (មិនមែនទំព័រ ១) ➜ ការបន្តបញ្ចប់ ➜ ទិដ្ឋភាពពេញថ្មី', async () => {
+        const { srv, forceReset } = stalePurgedServer();
+        const c = open(srv, 2, [100000]);
+        c.db.setAuthed(true);
+        await wait(50);
+        expect(Object.keys(c.view() || {}).length).toBe(9);
+        forceReset();
+        expect(c.db.cursor()).toBeLessThan(srv.purged());
+        srv.dropNext(srv.calls.length + 1);
+        const fires = c.events.fired;
+        const before = srv.calls.length;
+        c.db.onBrowserOnline();
+        await wait(50);
+        expect(srv.calls.length - before).toBe(2);
+        let late: any = 'unset';
+        c.db.onValue(c.db.ref(HIST), (s: any) => { late = s.val(); });
+        await wait(10);
+        expect(Object.keys(late || {}).length).toBe(9);
+        expect(c.events.fired).toBe(fires);
+        c.db.onBrowserOnline();
+        await wait(80);
+        expect(Object.keys(c.view() || {}).sort()).toEqual(TRUTH);
+        expect(Object.keys(late || {}).sort()).toEqual(TRUTH);
+        expect((c.view() || {}).i1).toEqual({ n: 'i1', v: 2 });
+        c.db.close();
+    });
+
+    it('⛔ ការសរសេររបស់ឧបករណ៍នេះ commit ក្រោយ server គណនាទំព័រចុងក្រោយ ➜ មិនបាត់ពេលប្តូរទិដ្ឋភាពពេញ', async () => {
+        const { srv, forceReset } = stalePurgedServer();
+        const c = open(srv, 2, [100000]);
+        const realRpc = srv.transport.rpc;
+        let hook: null | (() => Promise<void>) = null;
+        (srv.transport as any).rpc = async (fn: string, args: any) => {
+            if (fn === 'zoe_write') {
+                const op = args.p_ops[0];
+                srv.set(op.p[1], op.v);
+                const row = srv.rows.get(op.p[1])!;
+                return { ok: true, seq: row.s, docs: [{ r: row.r, k: row.k, v: row.v, s: row.s }] };
+            }
+            const out = await realRpc(fn, args);
+            if (hook && out && !out.more) { const h = hook; hook = null; await h(); }
+            return out;
+        };
+        c.db.setAuthed(true);
+        await wait(50);
+        forceReset();
+        hook = () => c.db.set(c.db.ref(HIST + '/mine'), { n: 'mine' });
+        c.db.onBrowserOnline();
+        await wait(80);
+        expect(Object.keys(c.view() || {}).sort()).toEqual(TRUTH.concat(['mine']).sort());
+        c.db.close();
+    });
+
+    it('⛔ cache ដែលរក្សាទុកពេលការទាញពេញកំពុងរង់ចាំទំព័របន្ត ➜ ឧបករណ៍ចាប់ផ្តើមពី cache នោះ នៅតែឃើញការពិត (គ្មាន doc ខ្មោច · គ្មានតម្លៃចាស់)', async () => {
+        const { srv, forceReset } = stalePurgedServer();
+        const cache = memCache();
+        const c = open(srv, 2, [100000], { docsCache: cache, docsCacheFirstSaveMs: 5, docsCacheMinIntervalMs: 60 });
+        c.db.setAuthed(true, SCOPE);
+        await wait(50);
+        expect(cache.store.size).toBe(1);
+        c.db.onBrowserOnline();
+        await wait(10);
+        forceReset();
+        srv.dropNext(srv.calls.length + 1);
+        c.db.onBrowserOnline();
+        await wait(150);
+        c.db.close();
+        const d = open(srv, 2, [20, 40], { docsCache: cache });
+        d.db.setAuthed(true, SCOPE);
+        await wait(80);
+        expect(Object.keys(d.view() || {}).sort()).toEqual(TRUTH);
+        expect((d.view() || {}).i1).toEqual({ n: 'i1', v: 2 });
+        d.db.close();
+    });
+});

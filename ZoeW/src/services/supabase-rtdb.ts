@@ -353,6 +353,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let sessionEpoch = 0;
     let authScope = null;
     let ready = false;
+    let pullStage = null;
+    let pullStageAbove = 0;
     let syncing = false;
     let wantSync = false;
     let online = true;
@@ -432,15 +434,17 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         return getAt(serverDoc(path[0], path[1]), path.slice(2));
     };
 
-    const putDoc = (root, key, value, seq) => {
-        let docs = server.get(root);
+    const putDocIn = (target, root, key, value, seq) => {
+        let docs = target.get(root);
         const entry = docs && docs.get(key);
         if (entry && seq < entry.s) return false;
-        if (!docs) { docs = new Map(); server.set(root, docs); }
+        if (!docs) { docs = new Map(); target.set(root, docs); }
         if (value === null) docs.set(key, { v: null, s: seq });
         else docs.set(key, { v: value, s: seq });
         return true;
     };
+
+    const putDoc = (root, key, value, seq) => putDocIn(server, root, key, value, seq);
 
     const loadCacheWithin = (scope) => new Promise<any>((resolve) => {
         let finished = false;
@@ -471,7 +475,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const saveDocsCacheNow = () => {
-        if (closed || !authed || !cacheScope || !serverTenant || cursor <= 0) return;
+        if (closed || !authed || !cacheScope || !serverTenant || cursor <= 0 || pullStage) return;
         if (syncing) { scheduleCacheSave(); return; }
         const docs = [];
         server.forEach((entries, root) => entries.forEach((entry, key) => { if (entry.v !== null) docs.push([root, key, entry.v, entry.s]); }));
@@ -567,16 +571,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const applyPull = (res) => {
         if (!res || !Array.isArray(res.rows)) throw new SbRpcError('bad pull response', 'bad_response', 0, '');
         if (res.reset) {
-            const keepAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
-            const keepNewer = [];
-            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > keepAbove) keepNewer.push([root, key, entry]); }));
-            server.clear();
-            keepNewer.forEach(([root, key, entry]) => {
-                if (!server.has(root)) server.set(root, new Map());
-                server.get(root).set(key, entry);
-            });
+            pullStage = new Map();
+            pullStageAbove = typeof res.head === 'number' && Number.isFinite(res.head) ? Math.max(res.seq, res.head) : res.seq;
         }
-        for (const row of res.rows) putDoc(row.r, row.k, row.v === undefined ? null : row.v, row.s);
+        const target = pullStage || server;
+        for (const row of res.rows) putDocIn(target, row.r, row.k, row.v === undefined ? null : row.v, row.s);
+        if (pullStage && !res.more) {
+            const stage = pullStage;
+            pullStage = null;
+            server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > pullStageAbove) putDocIn(stage, root, key, entry.v, entry.s); }));
+            server.clear();
+            stage.forEach((docs, root) => server.set(root, docs));
+        }
     };
 
     const scheduleRetry = () => {

@@ -13,6 +13,8 @@ export const SB_FETCH_TIMEOUT_MS = 15000;
 
 export const SB_RESTORE_CEILING_MS = 3000;
 
+export const SB_SIGN_OUT_CEILING_MS = 3000;
+
 export function claimSessionStorageFor(storage, url) {
     const owner = storage.getItem(SB_AUTH_OWNER_KEY);
     if (owner !== null && owner !== url) {
@@ -178,6 +180,9 @@ export function createSupabaseTransport(config, deps?) {
     const sessionStored = () => {
         try { return !!storage.getItem(SB_AUTH_STORAGE_KEY); } catch (e) { return false; }
     };
+    const clearStoredSession = () => {
+        SB_AUTH_KEY_SUFFIXES.forEach((suffix) => storage.removeItem(SB_AUTH_STORAGE_KEY + suffix));
+    };
     const storedSession = () => {
         let parsed = null;
         try { parsed = JSON.parse(storage.getItem(SB_AUTH_STORAGE_KEY) || 'null'); } catch (e) { parsed = null; }
@@ -238,8 +243,13 @@ export function createSupabaseTransport(config, deps?) {
             return toSession(out.data.session);
         },
         async signOut() {
-            const out = await client.auth.signOut({ scope: 'local' });
-            if (out && out.error && !/session/i.test(String(out.error.message))) throw out.error;
+            const revoke = async () => {
+                const token = await accessToken().catch(() => null);
+                if (token) await post('/auth/v1/logout?scope=local', {}, token, SB_SIGN_OUT_CEILING_MS);
+            };
+            await sbWithin(revoke(), SB_SIGN_OUT_CEILING_MS).catch(() => {});
+            clearStoredSession();
+            if (sessionStored()) throw new SbNetworkError('sign-out-storage');
         },
         onSession(cb) {
             const { data } = client.auth.onAuthStateChange((event, session) => cb(event, toSession(session)));

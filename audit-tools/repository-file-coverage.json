@@ -2620,6 +2620,9 @@
     "ZoeW/tests/supabase-transport-hang.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-signout-offline.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-signout-race.test.ts": {
       "policy": "zoew-self-verification"
     },

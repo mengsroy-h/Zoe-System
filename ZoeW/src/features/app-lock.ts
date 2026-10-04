@@ -248,7 +248,7 @@ export function forgetAppLockPin() {
         showLoginModalWithPrefill();
         reannounceOrShowToast(signedOut
             ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
-            : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase ទេ — សូមពិនិត្យបណ្ដាញ ហើយ Refresh');
+            : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពីឧបករណ៍នេះទេ — សូម Refresh ហើយសាកចាកចេញម្តងទៀត');
     };
     if (firebaseState.auth) firebaseState.fb.signOut(firebaseState.auth).then(() => finish(true), () => finish(false));
     else finish(false);

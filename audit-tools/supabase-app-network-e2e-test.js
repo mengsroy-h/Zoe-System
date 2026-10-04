@@ -13,6 +13,8 @@
 //   ឃ. server **ព្យួរ** (មិនឆ្លើយ) ➜ វដ្ត ៦០ វិ. ឈប់រាយបៃតងក្នុងពិដាន (ការវាស់ ១០ វិ.) ➜ មកវិញ ➜ ភ្ជាប់វិញ
 //   ង. ភ្ញាក់ពី background លើ server ព្យួរ ➜ ឈប់រាយបៃតង ➜ មកវិញ ➜ ភ្ជាប់វិញ
 //   ច. realtime មិនដើរ + App ស្ងៀម ➜ ការប្រែលើ server មកដល់តាមការទាញតាមវដ្ត (មិនត្រូវចុចអ្វី)
+//   ជ. បើក App ក្រោយ ៦.៥ ម៉ោង (token ផុត ➜ refresh · ម៉ោងចូលលើស ៤ ម៉ោង) ➜ cache ➜ ទាញ delta ➜ ផុតកំណត់ចាកចេញកណ្តាលការទាញ ➜ ចូលវិញដោយ
+//      ពាក្យសម្ងាត់ដែលចងចាំ ➜ ទិន្នន័យគ្រប់ (ចម្លើយចាស់មិនដាក់ cursor លើសម័យថ្មី)
 //   ឆ. គ្មានកំហុស runtime / unhandledrejection
 //
 //   npm ci --prefix supabase · npm ci --prefix ZoeW
@@ -252,6 +254,46 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         timings.poll = { ms: pollAt };
         check(pollAt >= 0, 'ការប្រែលើ server (ឧបករណ៍ផ្សេង) មកដល់ដោយមិនចុចអ្វី ក្នុង ៤៥ វិ. (realtime ងាប់ ➜ ការទាញតាមវដ្ត)', { ms: pollAt, history: await historyCount() });
         check((await statusText()) === ONLINE_TEXT, 'ទិសផ្ទុយ ៖ realtime មិនដើរ តែ server ល្អ ➜ ស្ថានភាពនៅបៃតង', await statusText());
+
+        // ── ជ ──
+        console.log('\n── ជ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ៤ ម៉ោង ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──');
+        const loginVisible = () => page.evaluate(() => { const m = document.getElementById('loginModal'); return !!m && getComputedStyle(m).display !== 'none'; }).catch(() => null);
+        const pullsOf = (from) => fake.requests.slice(from).filter((r) => r.path === '/rest/v1/rpc/zoe_pull').map((r) => (r.body && r.body.p_since !== undefined ? Number(r.body.p_since) : -1));
+        const wholeHistory = await historyCount();
+        await sleep(2500);
+        const authStore = await page.evaluate(() => {
+            for (const kind of ['localStorage', 'sessionStorage']) {
+                const raw = window[kind].getItem('zoew-sb-auth');
+                if (raw) return { kind, raw };
+            }
+            return null;
+        });
+        check(!!authStore && wholeHistory === 7, 'លក្ខខណ្ឌចាំបាច់ ៖ session supabase-js នៅក្នុង storage + history ៧ ជួរ', { store: authStore && authStore.kind, history: wholeHistory });
+        const oldSession = JSON.parse((authStore && authStore.raw) || '{}');
+        oldSession.expires_at = Math.floor(Date.now() / 1000) - 60;
+        await page.evaluate(([kind, v]) => window[kind].setItem('zoew-sb-auth', v), [(authStore && authStore.kind) || 'localStorage', JSON.stringify(oldSession)]);
+        fake.setAuthAge(Math.round(6.5 * 3600));
+        const reloadMark = fake.requests.length;
+        await page.reload({ waitUntil: 'load' });
+        const expiredAt = await waitUntil(async () => (await loginVisible()) === true, 30000);
+        await sleep(1500);
+        const logoutAt = fake.requests.slice(reloadMark).findIndex((r) => /\/auth\/v1\/logout/.test(r.path));
+        const pullsAroundExpiry = pullsOf(reloadMark);
+        const refreshed = fake.requests.slice(reloadMark).filter((r) => /grant_type=refresh_token/.test(r.search || '')).length;
+        check(expiredAt >= 0 && refreshed >= 1 && logoutAt >= 0, 'លក្ខខណ្ឌចាំបាច់ ៖ token ផុត ➜ refresh ➜ ការផុតកំណត់ ៤ ម៉ោងចាកចេញ ➜ ប្រអប់ចូលលេច', { expiredAt, refreshed, logoutAt });
+        check(pullsAroundExpiry.some((since) => since > 0), 'លក្ខខណ្ឌចាំបាច់ ៖ ការទាញ delta ពី cache (`p_since > 0`) ឆ្លងកាត់ការចាកចេញ (ស្ថានភាពដែលផ្នែកនេះវាស់)', pullsAroundExpiry);
+        fake.setAuthAge(0);
+        const prefilled = await page.evaluate(() => ({ email: document.getElementById('loginEmailInput').value, pw: (document.getElementById('loginPasswordInput').value || '').length }));
+        check(prefilled.email === 'sokha' && prefilled.pw > 0, 'ប្រអប់ចូលបំពេញឈ្មោះ និងពាក្យសម្ងាត់ដែលចងចាំ', prefilled);
+        if (!prefilled.pw) await page.fill('#loginPasswordInput', 'pass-sokha-1');
+        const reloginMark = fake.requests.length;
+        await page.click('#loginBtn');
+        const reloginAt = await waitUntil(async () => (await statusText()) === ONLINE_TEXT && (await historyCount()) === wholeHistory, 30000);
+        const reloginPulls = pullsOf(reloginMark);
+        timings.expiry = { ms: reloginAt, pulls: reloginPulls };
+        check(reloginAt >= 0, '⛔ ចូលវិញក្រោយផុតកំណត់ ➜ history ' + wholeHistory + ' ជួរគ្រប់ (មិនមែន «គ្មាន» ឬ «តែ ២-៣») ក្នុង ៣០ វិ.',
+            { ms: reloginAt, history: await historyCount(), status: await statusText(), pulls: reloginPulls });
+        check(reloginPulls.length > 0 && reloginPulls[0] === 0, '⛔ ការទាញដំបូងក្រោយចូលវិញចាប់ពីដើម (`p_since = 0`) — cursor សម័យចាស់មិនរស់', reloginPulls);
 
         // ── ឆ ──
         console.log('\n── ឆ. កំហុស runtime ──');

@@ -347,6 +347,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let cacheSaveTimer = null;
     let lastCacheSaveAt = 0;
     let cacheGeneration = 0;
+    let sessionEpoch = 0;
+    let authScope = null;
     let ready = false;
     let syncing = false;
     let wantSync = false;
@@ -397,7 +399,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             return overlay.has(k) ? overlay.get(k) : serverDoc(root, key);
         };
         for (const w of pending) {
-            if (!w.overlay) continue;
+            if (!w.overlay || w.scope !== authScope) continue;
             applyOpsToDocs(getDoc, w.ops).forEach((v, k) => overlay.set(k, v));
         }
         return getDoc;
@@ -408,7 +410,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!path.length) {
             const out = {};
             const roots = new Set(server.keys());
-            for (const w of pending) if (w.overlay) for (const op of w.ops) roots.add(op.p[0]);
+            for (const w of pending) if (w.overlay && w.scope === authScope) for (const op of w.ops) roots.add(op.p[0]);
             roots.forEach((root) => {
                 const v = getDoc(root, null);
                 if (v !== null) out[root] = v;
@@ -595,6 +597,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         try {
             while (wantSync && !closed) {
                 wantSync = false;
+                const epoch = sessionEpoch;
                 if (!online || (navigator.onLine as boolean) === false) { setConnected(false); break; }
                 if (!authed) {
                     try {
@@ -616,16 +619,19 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const scope = cacheScope;
                         const rec = await loadCacheWithin(scope);
                         if (closed) return;
+                        if (epoch !== sessionEpoch) { wantSync = true; continue; }
                         if (scope === cacheScope && authed && cursor === 0 && server.size === 0 && docsCacheRecordIsValid(rec, scope)) seedFromCache(rec);
                     }
                 }
                 try {
                     let restarts = 0;
+                    let staleSession = false;
                     for (let page = 0; page < 1000; page++) {
                         const args: any = { p_since: cursor, p_limit: pullPage };
                         if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
                         const res = await rpc('zoe_pull', args);
                         if (closed) return;
+                        if (epoch !== sessionEpoch) { staleSession = true; break; }
                         if (cacheTenant !== null) {
                             const sameShop = !!res && typeof res.tenant === 'string' && res.tenant === cacheTenant;
                             cacheTenant = null;
@@ -649,6 +655,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             break;
                         }
                     }
+                    if (staleSession) { wantSync = true; continue; }
                     forbidden = null;
                     retryAttempt = 0;
                     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
@@ -660,6 +667,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     scheduleCacheSave();
                 } catch (e) {
                     if (closed) return;
+                    if (epoch !== sessionEpoch) { wantSync = true; continue; }
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
                         forbidden = e;
                         setConnected(true);
@@ -737,7 +745,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     let writeSeq = 0;
     const enqueueWrite = (ops, path, overlay) => {
-        const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId() };
+        const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope };
         let resolveDone;
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
@@ -748,11 +756,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             for (;;) {
                 if (closed) { settleWrite(w); rejectDone(firebaseLikeError('disconnect', path)); return; }
                 await waitForLink();
+                if (closed) continue;
+                if (authScope !== w.scope) {
+                    if (authed) { settleWrite(w); notify(); rejectDone(firebaseLikeError('permission_denied', path)); return; }
+                    await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
+                    continue;
+                }
+                const sendEpoch = sessionEpoch;
                 try {
                     const res = await rpc('zoe_write', { p_op_id: w.opId, p_ops: ops.map((o) => Object.assign({}, o)) });
                     retryAttempt = 0;
                     setConnected(true);
-                    applyWriteResult(res);
+                    if (sendEpoch === sessionEpoch) applyWriteResult(res);
                     settleWrite(w);
                     notify();
                     resolveDone(res);
@@ -891,7 +906,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         assertWritable('runTransaction', path);
         let outer;
         const run = async () => {
-            const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false };
+            const txScope = authScope;
+            const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope: txScope };
             let release;
             gate.done = new Promise<void>((res) => { release = res; });
             pending.push(gate);
@@ -921,7 +937,15 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         hooks.onTxOutcomeUnknown(path);
                         return lost;
                     };
+                    let sendEpoch = sessionEpoch;
                     for (;;) {
+                        if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
+                        if (authScope !== txScope) {
+                            if (authed) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
+                            await delay(retrySteps[Math.min(lostAttempts, retrySteps.length - 1)]);
+                            continue;
+                        }
+                        sendEpoch = sessionEpoch;
                         try {
                             res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] });
                             break;
@@ -945,9 +969,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     }
                     setConnected(true);
                     if (res && res.ok) {
-                        applyWriteResult(res);
+                        const current = sendEpoch === sessionEpoch;
+                        if (current) applyWriteResult(res);
                         notify();
-                        const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed ? next : cloneCanonical(serverValueAt(path))) };
+                        const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed || !current ? next : cloneCanonical(serverValueAt(path))) };
                         if (lost) (committed as any).txOutcome = 'applied';
                         return committed;
                     }
@@ -1005,6 +1030,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     db.setAuthed = (value, scope?) => {
         const next = !!value;
         const nextScope = next && typeof scope === 'string' && scope ? scope : null;
+        authScope = nextScope;
         if (nextScope !== cacheScope) {
             cacheScope = nextScope;
             cacheTried = false;
@@ -1020,6 +1046,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.resetForSignOut = () => {
+        sessionEpoch++;
+        authScope = null;
         stopRealtime();
         authed = false;
         server.clear();

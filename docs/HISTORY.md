@@ -46,15 +46,17 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.2 · ZoeKeyGen 2.24.4**
-   (Deep audit ជុំ ១ · PR #284) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
+1. **ម្ចាស់គម្រោង** ៖ PR #283 merge រួច (`main` = ZoeW 2.49.1 · ZoeKeyGen 2.24.3) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4**
+   (Deep audit ជុំ ១–២ · PR #284) ➜ ពេលស្នើ merge ➜ ធ្វើតាម [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK ·
    secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី** (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` ·
    version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** · Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration
    មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ) ៖ **ជុំ ១ លុយ ចប់** ([2.49.2] ·
    ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · ការកែឫសគល់ outcome `unknown` ធ្វើរួចតាមការយល់ព្រម · Sentry Loader ថ្មី) ·
-   **ជុំ ២ បណ្តាញ ⏸️ ផ្អាកដោយកូតា** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» ៖ អ្នកយាម `supabase-app-network-e2e-test` ចូលរួច · ចំណុច (ក)–(ឃ) នៅសល់ ➜
-   ចាប់ផ្តើមពី (ក)) · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
+   **ជុំ ២ បណ្តាញ កំពុងធ្វើ** (ផ្នែក ២ «Deep audit ជុំ ២ ៖ បណ្តាញ» · កំហុសដែលម្ចាស់គម្រោងរាយការណ៍ «ចូលវិញក្រោយ ៤ ម៉ោង គ្មានទិន្នន័យ» កែរួច ➜ [2.49.3] ·
+   workflow រកចន្លោះ ៖ `sb-auth` រកឃើញ G1 (refresh token បរាជ័យយូរ ➜ RPC គ្មាន token ➜ ការសរសេរ/listener ក្លាយជា permission_denied) · G2 (ចម្លើយ refresh បាត់ ➜
+   ចាកចេញ) **មិនទាន់ផ្ទៀងដោយអ្នកផ្ទៀងទី ២** ព្រោះ agent ៤ ធ្លាក់ដោយកំណត់ session · `sb-data` · `zto` ៖ មិនមានចន្លោះដែលបញ្ជាក់ · `sw-license-keygen` មិនទាន់រត់ ➜
+   ចាប់ផ្តើមពី G1/G2 (លទ្ធផល ៖ `tasks/wg5d3zqss.output` មិននៅក្នុង repo — រត់ workflow ឡើងវិញ)) · ជុំ ៣–៧ នៅសល់ ៖ Config ➜ Login ➜ Signup · សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ `docs/AUDIT-PROMPT.md` លុបចោលរួច (សំណើម្ចាស់គម្រោង) ➜
    ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
@@ -128,6 +130,36 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.3] — 2026-10-04 · ZoeW ៖ **ហាង Supabase ៖ ចូលប្រព័ន្ធវិញក្រោយផុតកំណត់ ៤ ម៉ោង ឃើញទិន្នន័យគ្រប់ · ទិន្នន័យ/ការសរសេររបស់គណនីមួយមិនឆ្លងទៅគណនីផ្សេង** (រាយការណ៍ដោយម្ចាស់គម្រោង)
+
+**ZoeW `2.49.3`** (`zoew-v258` ➜ `zoew-v259`) · ZoeKeyGen មិនប្រែ។ ⛔ Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះតែ adapter Supabase
+(`src/services/supabase-rtdb.ts`) ➜ ហាង Firebase មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- **រាយការណ៍** ៖ ក្រោយផុត ៤ ម៉ោង ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ➜ ឧបករណ៍មួយ «គ្មានទិន្នន័យសោះ» · ឧបករណ៍មួយទៀត «តែ ២-៣ កញ្ចប់» · ចាកចេញ ➜ វាយពាក្យសម្ងាត់ចូល ➜
+  ត្រឹមត្រូវ។ **មិនមែនមកពីការចងចាំពាក្យសម្ងាត់ទេ** ៖ បើក App ក្រោយ ៤ ម៉ោង ➜ token ផុត ➜ refresh ➜ adapter យកទិន្នន័យពី cache ហើយទាញ delta (`p_since > 0`) ➜
+  ការផុតកំណត់ ៤ ម៉ោងចាកចេញ **កណ្តាលការទាញ** ➜ ចម្លើយ delta ចាស់មកដល់ក្រោយការសម្អាត ➜ ដាក់ cursor = head លើទិន្នន័យទទេ ➜ ចូលវិញទាញតែអ្វីដែលប្រែក្រោយ head ➜
+  «គ្មាន» (cache ថ្មី) ឬ «តែកញ្ចប់ដែលប្រែថ្មីៗ» (cache ចាស់) ខណៈស្ថានភាព «ភ្ជាប់ Server រួចរាល់» បៃតង។ ចាកចេញដោយដៃកើតពេលស្ងៀម ➜ គ្មានចម្លើយចាស់ ➜ ត្រឹមត្រូវ។
+- ឥឡូវ ៖ សម័យចូលប្រព័ន្ធមួយជា epoch (`sessionEpoch`) ៖ ចម្លើយទាញ ឬលទ្ធផលសរសេរដែលមកក្រោយ `resetForSignOut()` ត្រូវបោះចោល ➜ ចូលវិញទាញពីដើម (`p_since = 0`)។
+- **ផលបន្ទាប់ដែលវាស់ឃើញក្នុងថ្នាក់ដដែល** (ឧបករណ៍ដែលប្រើគណនីច្រើន) ៖ (ក) ចម្លើយចាស់របស់ហាង A លេចក្នុងហាង B ដែលចូលបន្ទាប់ · (ខ) ការសរសេរ/transaction ដែលរង់ចាំពេល
+  ក្រៅបណ្តាញក្នុងហាង A ត្រូវផ្ញើក្រោម token ហាង B ➜ សរសេរចូលហាង B។ ឥឡូវ ការសរសេរ/transaction ជាប់គណនីដែលបង្កើតវា (`authScope`) ៖ គណនីដដែលចូលវិញ ➜ ផ្ញើ
+  (ការងារពេលក្រៅបណ្តាញមិនបាត់) · គណនីផ្សេង ➜ បដិសេធ មិនផ្ញើ មិនបង្ហាញ។
+- 🔔 សារកំណែ 2.49.3 ជំនួស 2.49.2 (រួមចំណុច 2.49.2 ព្រោះ 2.49.2 មិនទាន់ដល់អ្នកប្រើ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-signout-race.test.ts` (ថ្មី · adapter ពិត) ៖ adapter មុនកែ **ធ្លាក់ ៣/៤** (cursor ១២ ជំនួស ០ · តែ ២ កញ្ចប់ · `secretA` របស់ហាង A លេចក្នុងហាង B)
+  ➜ ការកែ epoch ៖ **៤/៤** · ផ្នែកការសរសេរ/transaction ៖ មុនកែ **ធ្លាក់ ២/៣** (ការសរសេរ និង CAS ផ្ញើទៅហាង B) ➜ **៧/៧** (ទិសផ្ទុយ ៖ គណនីដដែលចូលវិញ ➜ ការសរសេរដល់ server ម្តង)។
+- `supabase-app-network-e2e-test` ផ្នែក **ជ** (App ពិត · supabase-js ពិត · Postgres ពិត) ៖ ចូលដោយចងចាំពាក្យសម្ងាត់ ➜ បើក App ក្រោយ ៦.៥ ម៉ោង (token ផុត ➜ refresh ·
+  `setAuthAge`) ➜ ផុតកំណត់ ➜ ចូលវិញ ➜ build មុនកែ **ធ្លាក់ ២** (`history 1` ក្នុងចំណោម ៧ · ការទាញដំបូង `p_since = 6`) ➜ ក្រោយកែ ៖ ៧/៧ + `p_since = 0`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- ⏳ សាកលើឧបករណ៍ពិត (ហាង Supabase) ៖ ចូលដោយធីក «ចងចាំពាក្យសម្ងាត់» ➜ ទុក App ៥-៧ ម៉ោង (ឬយប់ទាំងមូល) ➜ បើកវិញ ➜ សារ «⏱️ ផុតកំណត់ ៤ ម៉ោង» ➜ ចុច «ចូលប្រព័ន្ធ» ➜
+  ចំនួនកញ្ចប់ត្រូវដូចឧបករណ៍ផ្សេង (ឬដូចពេលចាកចេញ ➜ ចូលវិញ)។
 
 ### [2.49.2] — 2026-10-03 · ZoeW · ZoeKeyGen `2.24.4` ៖ **បណ្តាញដាច់ចំពេលរក្សាទុក ➜ App រង់ចាំលទ្ធផលពិត (មិនទាយ) · Sentry Loader ថ្មី** (Deep audit ជុំ ១ ៖ លុយ)
 
@@ -2169,7 +2201,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-data-tools-test` | ផ្នែក ២ | — |
 | `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `supabase-app-network-e2e-test` | ផ្នែក ២ | — |
+| `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
 | `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | — |

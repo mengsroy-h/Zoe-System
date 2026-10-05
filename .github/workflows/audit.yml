@@ -78,14 +78,18 @@ jobs:
           JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
+      - name: ត្រៀម browser និង emulator cache រួមសម្រាប់ Linux runners
+        if: vars.ZOE_RUNNER_MODE != 'github'
+        run: bash tools/actions-runners/prepare-audit-cache.sh init
+
       - name: ដំឡើង dependency
         run: |
           PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
-          npm install --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
+          npm install --prefer-offline --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
 
       - name: ទាញ Chromium លើម៉ាស៊ីនអ្នក
         if: vars.ZOE_RUNNER_MODE != 'github'
-        run: npx --no-install playwright install chromium
+        run: bash tools/actions-runners/prepare-audit-cache.sh chromium
 
       - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub
         if: vars.ZOE_RUNNER_MODE == 'github'
@@ -126,13 +130,13 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: ទាញ RTDB emulator
-        run: tools/firebase-provision/node_modules/.bin/firebase setup:emulators:database
+        run: bash tools/actions-runners/prepare-audit-cache.sh database
 
       # ⛔ emulator ត្រូវរស់ **មុន** run-all ➜ emu/* · money-guardian រត់ពេញ (STRICT ៖ ការតភ្ជាប់មិនបាន = FAIL មិនមែន SKIP)
       - name: បើក emulator
         run: |
           set -euo pipefail
-          JAR=$(ls "$HOME"/.cache/firebase/emulators/firebase-database-emulator-*.jar | head -1)
+          JAR=${ZOE_RTDB_JAR:?RTDB cache មិនទាន់ត្រៀមរួច}
           echo "jar: $JAR"
           JAVA_TOOL_OPTIONS="-Xmx512m" nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
           echo "$!" > "$RUNNER_TEMP/zoe-emulator.pid"

@@ -25,6 +25,7 @@ services:
       RUNNER_LABELS: wsl-zoe-audit
     volumes:
       - audit-1-home:/home/runner
+      - audit-binaries:/opt/zoe-cache
   audit-2:
     <<: *runner
     environment:
@@ -32,6 +33,7 @@ services:
       RUNNER_LABELS: wsl-zoe-audit
     volumes:
       - audit-2-home:/home/runner
+      - audit-binaries:/opt/zoe-cache
   audit-3:
     <<: *runner
     environment:
@@ -39,6 +41,7 @@ services:
       RUNNER_LABELS: wsl-zoe-audit
     volumes:
       - audit-3-home:/home/runner
+      - audit-binaries:/opt/zoe-cache
   audit-4:
     <<: *runner
     environment:
@@ -46,9 +49,11 @@ services:
       RUNNER_LABELS: wsl-zoe-audit
     volumes:
       - audit-4-home:/home/runner
+      - audit-binaries:/opt/zoe-cache
 
 volumes:
   audit-1-home:
   audit-2-home:
   audit-3-home:
   audit-4-home:
+  audit-binaries:

@@ -1308,6 +1308,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — Audit ៤ runner៖ Chromium/RTDB cache រួម និង conditional download
+
+- **ភស្តុតាង**៖ Audit `37300701337` attempt ២លើ `120f14e` ផ្ទៀង Node/Java ឆ្លងក្នុង ០–១វិនាទី។ Chromium install ចំណាយ ២៥:០១, ៣០:៥៨, ៣១:១៩ និង ៤៦:២១នាទី; log ទាញ Chrome 186.8 MiB + FFmpeg 2.3 MiB + Headless Shell 114.3 MiB ដាច់ៗ runner ទាំង៤។ RTDB download លើ runner ២ចំណាយ ២៣:២៩នាទី; run-all ផ្នែក ២ចាប់ផ្ដើមក្រោយ setup ជាង ៥៤នាទី ហើយ run ត្រូវ cancelled ជិតពិដាន ៦០នាទី។ Source firebase-tools pin `15.32.1` បញ្ជាក់ `setup:emulators:database` ហៅ download ដោយគ្មាន cache-exists guard; ការអះអាងថាយឺតតែលើកដំបូងមិនត្រូវសម្រាប់ command នេះ។ មិនបានវាស់ bandwidth ឬបញ្ជាក់មូលហេតុ cancellation ពី API ទេ។
+- **ការកែ**៖ Docker image/Compose ផ្ដល់ `audit-binaries` volume រួមនៅ `/opt/zoe-cache`; home/workspace និង emulator network/port នៅដាច់ពីគ្នា។ Helper ចម្លង browser ដែលមាន INSTALLATION_COMPLETE និងយក JAR ចាស់ជាបេក្ខជន។ flock សៀរឡើងតែ install/download; run-all ទាំង៤នៅស្របគ្នា។ Playwright រក្សា browser revisions ដើម្បីមិនលុបឯកសារដែល run ផ្សេងត្រូវការ។ RTDB ផ្ទៀង filename/size និង SHA-256 (ឬ MD5 តាម metadata) ពិតក្នុង firebase-tools ដែល npm ci ដំឡើង ហើយហៅ setup តែពេល cache ខុស/បាត់។ JAR ដែលបើកយកតាម metadata ដដែល មិនមែន glob យកកំណែចាស់។ Firebase CLI versions ប្រើថតដាច់ដើម្បីការពារ cleanup លុប JAR របស់ run ផ្សេង។ GitHub mode មិនទាមទារ Docker cache ហើយ npm install របស់ audit ប្រើ prefer-offline ផង។ មិនឡើង APP_VERSION និងមិនកាត់ shards/STRICT flags។
+- **អ្នកយាម**៖ repository-contract-test រត់ helper ពិតទល់ download fixtures និង runner ៤ស្របគ្នា៖ lock, reuse browser/JAR ក្នុង home ឬពី runner ផ្សេង, checksum ខុសទោះទំហំដូចគ្នា, repair ម្ដង, warm cache គ្មាន download, install fail, image ចាស់គ្មាន config និង GitHub home fallback។ មុនកែ ១៨ឆ្លង/២ធ្លាក់; ក្រោយកែ runner/runtime/cache/registration focused ៣០ឆ្លង/០ធ្លាក់។ Full STRICT run-all ត្រូវបានសាក ប៉ុន្តែ build វាស់ឈប់ដោយគ្មាន `/opt/pw-browsers/chromium` ក្នុង session; Docker mount ownership និងពេលវេលាពិតនៅត្រូវផ្ទៀងលើ PC។
+- **សកម្មភាពដោយដៃ**៖ Update branch, rebuild image ដោយរក្សា Docker layers, recreate containers ដោយរក្សា home volumes, ផ្ទៀង volume ឈ្មោះដូចគ្នា ៤ដង និង cache writable តាម [ជំហានទី ១៧](SELF-HOSTED-RUNNERS.md)។ Run ថ្មីដែលចាប់មុន update image នឹងឈប់មុន download ហើយបង្ហាញវិធី update។ សាក commit ថ្មីនៃ PR បន្ទាប់ពី runners Online; ក្រោយ merge សាក Run workflow ថ្មីលើ main។ មិនធានាថា PC ដែលចែក CPU/RAM/network ដល់ runners ទាំង៤ចប់ក្រោម ១៥នាទីទេ; វាស់ setup និង run-all ដាច់គ្នាក្រោយ cache រួច។
+
 ### 2026-10-05 — npm cache សម្រាប់ GitHub-hosted និង prefer-offline សម្រាប់ Audit/APK
 
 - **សំណើ**៖ ម្ចាស់ចង់ឱ្យ GitHub workflow និង self-hosted runners លឿនជាងមុន ហើយសួរផលប៉ះពាល់របស់ការកែ runtime។

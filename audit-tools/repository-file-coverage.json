@@ -599,6 +599,14 @@
       ],
       "evidence": "រត់ register.sh ពិតទល់ Docker CLI fixture៖ លំដាប់ runner ៤, token តាម stdin មិនលេច argv/output និងបញ្ឈប់នៅកំហុសដំបូង។",
       "limitation": "Docker និង GitHub registration API ពិតមិនរត់; account permissions និង service connectivity ត្រូវសាកដោយម្ចាស់គម្រោង។"
+    },
+    "self-hosted-audit-cache": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "រត់ prepare-audit-cache.sh ពិតដោយ runner fixture ៤ស្របគ្នា៖ download មិនជាន់ · browser ទាញរួចត្រូវ reuse · RTDB size/checksum ខុសត្រូវទាញជួសជុល · cache ត្រូវមិនទាញ · download fail ត្រូវធ្លាក់។",
+      "limitation": "Network downloads និង Docker named volume ពិតមិនរត់ក្នុង fixture; ល្បឿន និង ownership លើ PC ត្រូវផ្ទៀងដោយម្ចាស់គម្រោង។"
     }
   },
   "files": {
@@ -2845,6 +2853,9 @@
     },
     "tools/actions-runners/register.sh": {
       "policy": "self-hosted-register"
+    },
+    "tools/actions-runners/prepare-audit-cache.sh": {
+      "policy": "self-hosted-audit-cache"
     },
     "docs/SELF-HOSTED-RUNNERS.md": {
       "policy": "guard-13"

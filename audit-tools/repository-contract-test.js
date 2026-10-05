@@ -391,7 +391,7 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         image.includes('install-deps chromium') && privileged.length === 1
         && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
         && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
-            && step.includes('playwright install chromium') && !/\bsudo\b|--with-deps/.test(step)));
+            && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step)));
 });
 
 scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java បាត់ ត្រូវបដិសេធមុន download', () => {
@@ -427,6 +427,122 @@ scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java �
         check('Node 22 ត្រូវបដិសេធ', run('22').status !== 0);
         check('Java 17 ត្រូវបដិសេធ', run('24', '17').status !== 0);
         check('Java រកមិនឃើញ ត្រូវបដិសេធ', run('24', 'missing').status !== 0);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('audit cache ៖ ទាញម្ដង · ផ្ទៀង checksum · មិនលាយ workspace', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const script = path.join(ROOT, 'tools/actions-runners/prepare-audit-cache.sh');
+    check('runner ទាំង ៤ mount binary cache រួម និង workflow ត្រៀមមុនទាញ',
+        (compose.match(/audit-binaries:\/opt\/zoe-cache/g) || []).length === 4
+        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh init')
+        && audit.indexOf('prepare-audit-cache.sh init') < audit.indexOf('PW_VERSION=')
+        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh chromium')
+        && audit.includes('bash tools/actions-runners/prepare-audit-cache.sh database')
+        && /JAR=\$\{ZOE_RTDB_JAR:\?/.test(audit));
+    check('មាន helper សម្រាប់វាស់ការទាញពិតជាមួយ fixture', fs.existsSync(script));
+    if (!fs.existsSync(script)) return;
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe shared cache '));
+    try {
+        const home = path.join(temp, 'home'), cache = path.join(temp, 'shared'), bin = path.join(temp, 'bin');
+        const moduleDir = path.join(temp, 'tools/firebase-provision/node_modules/firebase-tools');
+        const log = path.join(temp, 'downloads.jsonl'), envFile = path.join(temp, 'github-env');
+        for (const dir of [home, cache, bin, path.join(moduleDir, 'lib/emulator')]) fs.mkdirSync(dir, { recursive: true });
+        const payload = 'fixture emulator bytes', filename = 'firebase-database-emulator-v1.jar';
+        const checksum = require('crypto').createHash('sha256').update(payload).digest('hex');
+        fs.writeFileSync(path.join(moduleDir, 'lib/emulator/downloadableEmulatorInfo.json'), JSON.stringify({ database: {
+            version: '1', expectedSize: Buffer.byteLength(payload), expectedChecksumSHA256: checksum,
+            downloadPathRelativeToCacheDir: filename
+        } }));
+        fs.writeFileSync(path.join(temp, 'tools/firebase-provision/package-lock.json'), JSON.stringify({ packages: {
+            'node_modules/firebase-tools': { version: 'fixture' }
+        } }));
+        const executable = (file, source) => { fs.writeFileSync(file, '#!' + process.execPath + '\n' + source); fs.chmodSync(file, 0o755); };
+        executable(path.join(bin, 'npx'), 'const fs=require("fs"),path=require("path");'
+            + 'const log=process.env.CACHE_FIXTURE_LOG,p=path.join(process.env.PLAYWRIGHT_BROWSERS_PATH,"chromium-1");'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-start"})+"\\n");'
+            + 'setTimeout(()=>{if(process.env.CACHE_FIXTURE_FAIL)process.exit(17);'
+            + 'if(!fs.existsSync(path.join(p,"INSTALLATION_COMPLETE"))){fs.mkdirSync(p,{recursive:true});'
+            + 'fs.writeFileSync(path.join(p,"INSTALLATION_COMPLETE"),"");'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-download"})+"\\n");}'
+            + 'fs.appendFileSync(log,JSON.stringify({event:"browser-end"})+"\\n");},80);');
+        const cli = path.join(temp, 'tools/firebase-provision/node_modules/.bin/firebase');
+        fs.mkdirSync(path.dirname(cli), { recursive: true });
+        executable(cli, 'const fs=require("fs"),path=require("path");'
+            + 'fs.appendFileSync(process.env.CACHE_FIXTURE_LOG,JSON.stringify({event:"database-download"})+"\\n");'
+            + 'if(process.env.CACHE_FIXTURE_FAIL)process.exit(17);'
+            + 'fs.mkdirSync(process.env.FIREBASE_EMULATORS_PATH,{recursive:true});'
+            + 'fs.writeFileSync(path.join(process.env.FIREBASE_EMULATORS_PATH,' + JSON.stringify(filename) + '),'
+            + JSON.stringify(payload) + ');');
+        let env = { ...process.env, HOME: home, ZOE_AUDIT_CACHE: cache, GITHUB_ENV: envFile,
+            PATH: bin + path.delimiter + process.env.PATH, CACHE_FIXTURE_LOG: log };
+        delete env.PLAYWRIGHT_BROWSERS_PATH; delete env.FIREBASE_EMULATORS_PATH;
+        const run = (mode, extra = {}) => cp.spawnSync('bash', [script, mode], {
+            cwd: temp, encoding: 'utf8', timeout: 10000, env: { ...env, ...extra }
+        });
+        const unconfigured = run('init', { ZOE_AUDIT_CACHE: '' });
+        check('image ចាស់គ្មាន cache config ត្រូវឈប់មុន download និងប្រាប់វិធី update',
+            unconfigured.status === 1 && /audit-binaries/.test(unconfigured.stderr));
+        const complete = path.join(home, '.cache/ms-playwright/chromium-2');
+        fs.mkdirSync(complete, { recursive: true }); fs.writeFileSync(path.join(complete, 'INSTALLATION_COMPLETE'), '');
+        fs.mkdirSync(path.join(home, '.cache/ms-playwright/chromium-3'), { recursive: true });
+        let result = run('init');
+        check('init reuse browser ទាញរួច និងមិនយក browser ទាញមិនចប់', result.status === 0
+            && fs.existsSync(path.join(cache, 'ms-playwright/chromium-2/INSTALLATION_COMPLETE'))
+            && !fs.existsSync(path.join(cache, 'ms-playwright/chromium-3')), result.stdout + result.stderr);
+        if (result.status !== 0) return;
+        for (const line of fs.readFileSync(envFile, 'utf8').trim().split('\n')) {
+            const at = line.indexOf('='); env[line.slice(0, at)] = line.slice(at + 1);
+        }
+        const parallel = (mode) => cp.spawnSync(process.execPath, ['-e',
+            'const cp=require("child_process"),fs=require("fs"),s=JSON.parse(fs.readFileSync(0,"utf8"));'
+            + 'Promise.all(Array.from({length:4},()=>new Promise(resolve=>{'
+            + 'const p=cp.spawn("bash",[s.script,s.mode],{cwd:s.cwd,env:s.env,stdio:"ignore"});'
+            + 'p.on("error",()=>resolve(1));p.on("exit",code=>resolve(code));})))'
+            + '.then(codes=>process.exit(codes.every(c=>c===0)?0:1));'], {
+            input: JSON.stringify({ script, mode, cwd: temp, env }), encoding: 'utf8', timeout: 12000
+        });
+        const events = () => fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+        result = parallel('chromium');
+        let active = 0, peak = 0;
+        for (const e of events()) { if (e.event === 'browser-start') peak = Math.max(peak, ++active); if (e.event === 'browser-end') active--; }
+        check('Chromium ៖ runner ៤មិនទាញជាន់គ្នា ហើយ cache បាត់ទាញម្ដង', result.status === 0
+            && peak === 1 && active === 0 && events().filter(e => e.event === 'browser-download').length === 1);
+        const jar = path.join(env.FIREBASE_EMULATORS_PATH, filename);
+        fs.mkdirSync(path.dirname(jar), { recursive: true }); fs.writeFileSync(jar, 'ខូច');
+        result = parallel('database');
+        check('RTDB ៖ cache ខូចទាញជួសជុលម្ដងសម្រាប់ runner ៤', result.status === 0
+            && events().filter(e => e.event === 'database-download').length === 1
+            && fs.readFileSync(jar, 'utf8') === payload);
+        result = run('database');
+        check('RTDB ៖ cache ត្រូវ checksum មិនទាញម្ដងទៀត និងប្រើ JAR កំណែពិត', result.status === 0
+            && events().filter(e => e.event === 'database-download').length === 1
+            && fs.readFileSync(envFile, 'utf8').includes('ZOE_RTDB_JAR=' + jar));
+        fs.rmSync(jar);
+        const oldJar = path.join(home, '.cache/firebase/emulators', filename);
+        fs.mkdirSync(path.dirname(oldJar), { recursive: true }); fs.writeFileSync(oldJar, payload);
+        result = run('database');
+        check('RTDB ៖ reuse JAR ចាស់ដែល checksum ត្រូវ ដោយគ្មាន download', result.status === 0
+            && fs.readFileSync(jar, 'utf8') === payload
+            && events().filter(e => e.event === 'database-download').length === 1);
+        const otherJar = path.join(cache, 'firebase-legacy/other-runner', filename);
+        fs.mkdirSync(path.dirname(otherJar), { recursive: true }); fs.writeFileSync(otherJar, payload);
+        fs.rmSync(oldJar); fs.rmSync(jar);
+        result = run('database');
+        check('RTDB ៖ reuse JAR ដែល runner ផ្សេង seed ទុកក្នុង shared cache', result.status === 0
+            && fs.readFileSync(jar, 'utf8') === payload
+            && events().filter(e => e.event === 'database-download').length === 1);
+        fs.rmSync(otherJar); fs.writeFileSync(jar, payload.slice(0, -1) + 'x');
+        result = run('database', { CACHE_FIXTURE_FAIL: '1' });
+        check('RTDB ៖ checksum ខុសទោះទំហំដូចគ្នា និង download fail ត្រូវធ្លាក់', result.status === 17,
+            result.stdout + result.stderr);
+        check('Chromium ៖ install fail ត្រូវធ្លាក់', run('chromium', { CACHE_FIXTURE_FAIL: '1' }).status === 17);
+        fs.writeFileSync(oldJar, payload);
+        result = run('database', { ZOE_AUDIT_CACHE: '', FIREBASE_EMULATORS_PATH: '' });
+        check('GitHub mode ប្រើ home cache និង JAR ពិត ដោយមិនទាមទារ Docker volume', result.status === 0
+            && fs.readFileSync(envFile, 'utf8').includes('ZOE_RTDB_JAR=' + oldJar)
+            && events().filter(e => e.event === 'database-download').length === 2);
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 

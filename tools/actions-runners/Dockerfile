@@ -28,6 +28,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 ENV HOME=/home/runner
 ENV LANG=C.UTF-8
+RUN mkdir -p /opt/zoe-cache && chown runner:runner /opt/zoe-cache
+ENV ZOE_AUDIT_CACHE=/opt/zoe-cache
 USER runner
 WORKDIR /home/runner/actions-runner
 CMD ["./run.sh"]

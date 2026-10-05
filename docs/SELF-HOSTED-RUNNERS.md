@@ -701,8 +701,11 @@ Get-Service 'actions.runner.*'
 | Linux image មិនទាន់មាន Java 21 | Workflow ថ្មីប្រើ runtime ក្នុង image ប៉ុន្តែ containers នៅប្រើ image ចាស់ | ជំហានទី ១៧៖ rebuild image, recreate ដោយរក្សា volumes និងបង្កើត Run workflow ថ្មី |
 | Chromium/RTDB download យូរ មុន run-all | Cache បាត់/កំណែប្រែ ឬ runners មិនប្រើ volume រួម | ជំហានទី ១៧៖ update image + compose និងផ្ទៀង `audit-binaries`; មើល cache hit/download ក្នុង run ថ្មី |
 | Cache Permission denied | Image/volume ownership ឬ container ចាស់ | ជំហានទី ១៧៖ ផ្ទៀង `cache writable`; រក្សា home volumes និងមើល Compose mounts |
+| `tx-outcome` ធ្លាក់តែ `status: null, rest: 27` ក្នុងផ្នែក 3/4 | តេស្តចាស់ទាមទារអានលើស ៣០ ដងក្នុង 500ms; timer លើ PC យឺតអាចមិនទាន់ដល់ចំនួននោះ | ប្រើ commit ដែលកែ checker ឱ្យរង់ចាំ state ពិត ហើយសាក Audit ថ្មី; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
+
+ករណី `tx-outcome` ខាងលើ ត្រូវអាន assertion ពិតក្នុង logs មុនសន្និដ្ឋាន។ ការកែនេះរក្សា `rest > 30` និងការផ្ទៀងថា ledger ដកតែម្តងដដែល; វារង់ចាំការអានលើស ៣០ ដង ឬលទ្ធផលចប់ ដោយមានពិដាន ៥វិនាទី។ មិនចាំបាច់ rebuild image ឬ register runner ម្ដងទៀតសម្រាប់ការកែ checker នេះទេ។ GitHub `actions/checkout` ទាញ source តាម commit របស់ run ដោយស្វ័យប្រវត្តិ។ បើសាក PR ត្រូវមើល run របស់ commit ថ្មី; ក្រោយ merge ទើបបង្កើត run ថ្មីលើ main។ `Re-run` លើ run ចាស់នៅប្រើ checker ចាស់។ បើ assertion ផ្សេងធ្លាក់ ត្រូវពិនិត្យបញ្ហានោះបន្ត។
 
 បើត្រូវពិនិត្យ OOM របស់ Linux runner ឧទាហរណ៍ `audit-1` ពេលគ្មាន job ថ្មីប្ដូរស្ថានភាព៖
 

@@ -21,6 +21,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { performance } = require('perf_hooks');
 
 const ROOT = process.env.TXOUTCOME_APP_DIR ? path.resolve(process.env.TXOUTCOME_APP_DIR) : path.resolve(__dirname, '..');
 const FILE = path.join(ROOT, 'ZoeW/app.js');
@@ -188,7 +189,7 @@ function makeRun(opts) {
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean, Proxy, Reflect, URL, TypeError,
         parseFloat, parseInt, isNaN, isFinite, Promise, RegExp, Intl, Error, encodeURIComponent, decodeURIComponent,
-        setTimeout: (fn, ms) => { if ((ms || 0) >= 1000) log.delays.push(ms); return setTimeout(fn, Math.min(ms || 0, 5)); },
+        setTimeout: (fn, ms) => { if ((ms || 0) >= 1000) log.delays.push(ms); return setTimeout(fn, Math.max(Math.min(ms || 0, 5), opts.timerFloorMs || 0)); },
         clearTimeout: (id) => clearTimeout(id),
         AbortController,
         navigator: { onLine: true },
@@ -240,6 +241,12 @@ function makeRun(opts) {
 }
 
 function settle(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// ⛔ ម៉ាស៊ីនយឺតអាចមិនទាន់អាន ៣១ ដងក្នុង 500ms៖ រង់ចាំ state ពិត ហើយរក្សាពិដាន 5s ដើម្បីចាប់ការព្យួរ។
+async function waitForState(ready) {
+    const deadline = performance.now() + 5000;
+    while (!ready() && performance.now() < deadline) await settle(5);
+}
 
 function runTx(run, p, updaterSrc) {
     run.box.__result = null;
@@ -334,13 +341,13 @@ function runTx(run, p, updaterSrc) {
     {
         // ⛔ «អាន server មិនបាន» = លទ្ធផល *មិនទាន់ដឹង* មិនមែន *មិនអាចដឹង* ➜ រង់ចាំរហូតអានបាន (មុនកែ ៖ បោះបង់ក្រោយ ៣០ ដង/៦០ វិ. ➜ `unknown`
         //    ➜ reconcile ដក ២ ដង · «ដក» ធ្វើឲ្យកញ្ចប់បាត់ ៖ ផ្នែក ៤ឃ · ៦)។ UI មិនព្យួរ ៖ អ្នកហៅមាន `dbOp` + `armLateCommit` រួចហើយ។
-        const run = makeRun({ plan: ['applied-disconnect'], restDown: true });
+        const run = makeRun({ plan: ['applied-disconnect'], restDown: true, timerFloorMs: 20 });
         runTx(run, 'ledger/day', '(cur) => ({ codDollar: 1 })');
-        await settle(600);
+        await waitForState(() => run.log.rest.length > 30 || run.box.__result || run.box.__error);
         ok('⛔⛔ អាន server មិនបាន ➜ នៅរង់ចាំ (មិនបោះបង់ មិនទាយ unknown) ទោះលើសចំនួនព្យាយាមចាស់ (៣០)',
             !run.box.__result && !run.box.__error && run.log.rest.length > 30, { result: run.box.__result, error: run.box.__error, attempts: run.log.rest.length });
         run.log.restDown = false;
-        await settle(600);
+        await waitForState(() => run.box.__result || run.box.__error);
         ok('⛔⛔ ... server អានបានវិញ ➜ committed · txOutcome applied', !!(run.box.__result && run.box.__result.committed && run.box.__result.txOutcome === 'applied'),
             { result: run.box.__result, error: run.box.__error });
     }
@@ -510,17 +517,18 @@ function runTx(run, p, updaterSrc) {
     console.log('\n── ៤ឃ. ⛔⛔ ledger ៖ server អានមិនបានយូរ រួចអានបានវិញ ➜ reconcile ដកតែម្តង (មិនទាយ) ──');
     //    មុនកែ ៖ wrapper បោះបង់ក្រោយ ៣០ ដង/៦០ វិ. ➜ unknown ➜ reconcile ដក ២ ដង (100 ➜ 90) ពេលសំណើបានដល់ ឬ «កុំប៉ះ» ➜ ការដកបាត់ពេលមិនដល់។
     //    ឥឡូវ ៖ រង់ចាំលទ្ធផលពិត ➜ ទិសទាំងពីរត្រូវ (ថ្ងៃ 95 · ខែ 95 · ok)។
+    //    Timer អប្បបរមា 20ms ចាក់សោករណីម៉ាស៊ីនយឺត៖ អាន >30 ដងមិនអាចយក 500ms ជាលក្ខខណ្ឌចាំបាច់។
     for (const mode of ['applied-disconnect', 'lost-disconnect']) {
         for (const plan of [[mode, 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'], ['ok', mode, 'ok', 'ok', 'ok', 'ok', 'ok']]) {
             const where = plan[0] === mode ? 'ថ្ងៃ' : 'ខែ';
-            const run = makeRun({ plan: plan.slice(), restDown: true });
+            const run = makeRun({ plan: plan.slice(), restDown: true, timerFloorMs: 20 });
             vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
                 + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
-            await settle(500);
+            await waitForState(() => run.log.rest.length > 30 || run.box.__status !== null);
             ok('លក្ខខណ្ឌចាំបាច់ (' + where + ' ' + mode + ') ៖ ខណៈ server អានមិនបាន reconcile មិនទាន់សម្រេច (រង់ចាំ មិនទាយ)',
                 run.box.__status === null && run.log.rest.length > 30, { status: run.box.__status, rest: run.log.rest.length });
             run.log.restDown = false;
-            await settle(800);
+            await waitForState(() => run.box.__status !== null);
             ok('⛔⛔ ' + where + ' ' + mode + ' ➜ បណ្តាញត្រឡប់ ➜ ថ្ងៃ 95 · ខែ 95 · ok (ដកតែម្តង)',
                 r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 95 && run.server.zoew_daily_revenue_cod_dod[DAY].totalCount === 19
                     && r2(run.server.zoew_monthly_revenue_cod_dod[MONTH].codDollar) === 95 && run.server.zoew_monthly_revenue_cod_dod[MONTH].totalCount === 19

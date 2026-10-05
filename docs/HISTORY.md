@@ -1308,6 +1308,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — Self-hosted shard 3/4៖ `tx-outcome` វាស់មុនការអានដល់ចំនួនចាំបាច់
+
+- **ភស្តុតាងពិត**៖ Audit `37316299995` attempt 2 លើ `7eeb533`៖ shards 1/4, 2/4 និង 4/4 ឆ្លង; 3/4 ធ្លាក់តែ `tx-outcome`។ ករណី ledger ខែ applied-disconnect វាស់ `status: null, rest: 27` ក្រោយ 500ms ខណៈ assertion ទាមទារ `rest > 30`។ ក្រោយបណ្តាញត្រឡប់ ថ្ងៃ/ខែ 95 និង count 19 ត្រឹមត្រូវ; មិនដកស្ទួន ហើយគ្មាន Sentry outcome unknown។ App code មិនប្រែពី main `90aa66c`។
+- **បញ្ជាក់មូលហេតុ**៖ រត់ករណី ledger ទាំង៤ពី checker ពិត ដោយទាញ function ពី `ZoeW/dist-audit/ZoeW/app.js` ដែល build-audit បង្កើត។ App SHA-256 `2bbd4b8f9d83ba6e30264307b724a3d8ae51747e3e57eaa57724748f628632ef` ដដែល៖ timer ធម្មតា ១២ឆ្លង/០ធ្លាក់; ពន្យារ timer ខ្លីទៅ 18ms បាន ៨ឆ្លង/៤ធ្លាក់ (`rest` 19–28) តែលទ្ធផលលុយនៅត្រឹមត្រូវទាំង៤។ នេះបញ្ជាក់ថា fixed wait អាចធ្វើឱ្យតេស្តធ្លាក់ដោយមិនកែ App; មិនបានវាស់ CPU pressure ពិតរបស់ Windows នៅពេលធ្លាក់ទេ។
+- **ការកែ**៖ checker រង់ចាំ state ពិត៖ អានលើស៣០ដង ឬលទ្ធផលចប់ ដោយមានពិដាន ៥វិនាទី; ការងើបវិញរង់ចាំលទ្ធផលចប់។ រក្សា `rest > 30`, pending, ledger និង Sentry assertions ដដែល។ Timer អប្បបរមា 20ms ក្នុងករណីនេះចាក់សោការមិនពឹងលើ 500ms ទោះ host លឿន។ មិនកែ App, APP_VERSION, shards ទាំង៤, STRICT flags ឬ CHECKER_TIMEOUT។
+- **អ្នកយាម**៖ checker ចាស់ជាមួយ timer floor 20ms ធ្លាក់៥/ឆ្លង៨៧; ក្រោយកែឆ្លង៩២លក្ខខណ្ឌលើ generated code view។ Checker ថ្មីក៏ឆ្លងទាំង៩២ពេលពន្យារ timer ខ្លីទៅ18ms។ Mutation នៅស្រមោល generated App៖ បង្ខំ resolver បោះបង់ក្រោយ៣០ការអាន ធ្លាក់២២/ឆ្លង៧០ រួមការដកស្ទួនទៅ90 និងបាត់ barcode; test មិនលាក់ regression ពិត។ Full STRICT run-all ក្នុង session ឈប់នៅ Chromium executable បាត់; មិនអះអាងថា generated tree ទាំងមូល ឬ Windows/WSL ពេញឆ្លង។ PR នៅ Draft សម្រាប់ការផ្ទៀង Audit ពិតលើ runners ម្ចាស់។
+- **សកម្មភាពដោយដៃ**៖ ការកែ checker មិនត្រូវ rebuild image/register runner ឡើងវិញ។ សាក run លើ commit ថ្មី; rerun លើ run ចាស់នៅប្រើ checker ចាស់។ មើល assertions ពិតបើមានការធ្លាក់ផ្សេង។
+
 ### 2026-10-05 — Audit ៤ runner៖ Chromium/RTDB cache រួម និង conditional download
 
 - **ភស្តុតាង**៖ Audit `37300701337` attempt ២លើ `120f14e` ផ្ទៀង Node/Java ឆ្លងក្នុង ០–១វិនាទី។ Chromium install ចំណាយ ២៥:០១, ៣០:៥៨, ៣១:១៩ និង ៤៦:២១នាទី; log ទាញ Chrome 186.8 MiB + FFmpeg 2.3 MiB + Headless Shell 114.3 MiB ដាច់ៗ runner ទាំង៤។ RTDB download លើ runner ២ចំណាយ ២៣:២៩នាទី; run-all ផ្នែក ២ចាប់ផ្ដើមក្រោយ setup ជាង ៥៤នាទី ហើយ run ត្រូវ cancelled ជិតពិដាន ៦០នាទី។ Source firebase-tools pin `15.32.1` បញ្ជាក់ `setup:emulators:database` ហៅ download ដោយគ្មាន cache-exists guard; ការអះអាងថាយឺតតែលើកដំបូងមិនត្រូវសម្រាប់ command នេះ។ មិនបានវាស់ bandwidth ឬបញ្ជាក់មូលហេតុ cancellation ពី API ទេ។

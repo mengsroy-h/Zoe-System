@@ -1308,6 +1308,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — Windows APK៖ WSL bash បើក script ផ្លូវ Windows មិនបាន
+
+- **ភស្តុតាង**៖ Android APK run `37294008780` លើ main `90aa66c` និង runner `Zoe-Windows-APK` ធ្លាក់នៅ step ពិនិត្យ GitHub CLI។ Log ជ្រើស `C:\Users\hunme\AppData\Local\Microsoft\WindowsApps\bash.EXE`; `/bin/bash` រាយ script `C:actions-runner-apk...sh` រកមិនឃើញ។ មិនទាន់ឈានដល់ពិនិត្យ Release ឬ build APK; cleanup ក៏ធ្លាក់ដោយ shell ដូចគ្នា។
+- **ការកែ**៖ បន្ថែម step PowerShell មុន run step ផ្សេង ដើម្បីរក Git for Windows, ផ្ទៀង `bin/bash.exe` ហើយដាក់ folder នោះនៅដើម PATH តាម GITHUB_PATH។ Git Bash ប្រើសម្រាប់ Windows Gradle/apksigner និង cleanup; Linux audit មិនប្រែ។ ឯកសារដំឡើងបន្ថែម where.exe bash, កែ PATH/restart service និងបង្កើត run ថ្មីលើ main។ គ្មានការឡើងកំណែ App។
+- **អ្នកយាម**៖ repository-contract-test ផ្ទៀង first run step ប្រើ PowerShell, គោលដៅ Git Bash និង GITHUB_PATH UTF-8។ មុនកែ ៦ឆ្លង/១ធ្លាក់; ក្រោយកែ ៧ឆ្លង/០ធ្លាក់។ android:check ៨៩ឆ្លង, runall-runner-test ៥៦ឆ្លង និង repository-file-coverage ១០ឆ្លង; YAML/Bash syntax និង comments ឆ្លង។ Full STRICT run-all បានសាក ប៉ុន្តែ build វាស់ឈប់ព្រោះបរិស្ថាននេះគ្មាន `/opt/pw-browsers/chromium`។ Native Windows APK build និង Audit ពេញលើ main ត្រូវផ្ទៀងដោយ run ថ្មី; គ្មានការអះអាងថា build APK ឬ run-all ពេញរួច។
+- **សកម្មភាពដោយដៃ**៖ Merge ការកែ workflow ហើយ Actions → Android APK → Run workflow → main។ Release កំណែដដែលមានរួចនឹងរំលង build តាមចេតនា។ ចង់តេស្ត run-all លើ main ទោះធ្លាប់ pass រួច៖ Actions → Audit → Run workflow → main; មិនត្រូវឡើង APP_VERSION សម្រាប់ Audit។
+
 ### 2026-10-05 — ណែនាំដំឡើង runner សម្រាប់អ្នកចាប់ផ្ដើម
 
 - **ការវាស់ពីការដំឡើង**៖ PowerShell បង្ហាញ Command not found សម្រាប់ sudo apt-get; Ubuntu gh auth login បង្ហាញ browser launcher/xdg-open រកមិនឃើញ។ ម្ចាស់ស្នើឱ្យ .md មានជំហានលម្អិត និងលទ្ធផលដែលត្រូវឃើញមុនបន្ត។

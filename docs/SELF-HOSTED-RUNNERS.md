@@ -359,6 +359,24 @@ gh --version
 
 បើ Git ដំឡើងនៅផ្លូវផ្សេង ត្រូវកែផ្លូវ `bash.exe` ឱ្យត្រូវ។ Command ចុងក្រោយត្រូវបង្ហាញផ្លូវរបស់ឧបករណ៍ទាំង ៣។ Workflow ប្រើ Git Bash សម្រាប់ logic និង PowerShell ដើម្បីហៅ Windows Gradle/apksigner។
 
+ឆែក `bash.exe` ដែល Windows រកឃើញ៖
+
+```powershell
+where.exe bash
+```
+
+បើបន្ទាត់ដំបូងជា `WindowsApps\bash.exe` វាអាចជ្រើស launcher របស់ WSL ហើយបើក script ផ្លូវ Windows មិនបាន។ APK workflow មាន step «កំណត់ Git Bash របស់ Windows» ដែលរត់ PowerShell មុន ហើយដាក់ folder Git Bash នៅដើម PATH សម្រាប់ job នោះ។ ពេលមើល log របស់ step Bash បន្ទាប់ ត្រូវឃើញ shell ក្នុង folder `Git\bin\bash.exe`។
+
+បើកែ workflow មិនទាន់ចូល `main` អាចដោះស្រាយលើម៉ាស៊ីនសិន៖ Start → វាយ **Edit the system environment variables** → Environment Variables → ក្នុង **System variables** ជ្រើស **Path** → Edit → បន្ថែម `C:\Program Files\Git\bin` ហើយ Move Up ឱ្យនៅមុន entry `WindowsApps` ប្រសិនបើមាន។ កែផ្លូវតាមទីតាំង Git ពិតរបស់អ្នក។ កុំលុប entry WindowsApps; កុំប្រើ `setx PATH` ដែលអាចបាត់ PATH ចាស់។ បើ service ប្រើ user account ដែលមាន user PATH ផ្ទាល់ ត្រូវពិនិត្យ Path របស់ account នោះដែរ។
+
+ក្រោយដំឡើង tools ឬកែ PATH បើក PowerShell ជា Administrator ហើយ restart តែ APK service៖
+
+```powershell
+Restart-Service 'actions.runner.mengsroy-h-Zoe-System.Zoe-Windows-APK'
+```
+
+បន្ទាប់មក Actions → Android APK → Run workflow → main។ `Re-run jobs` រក្សា workflow/commit ដើម; ក្រោយ merge ការកែ workflow ត្រូវបង្កើត run ថ្មី។
+
 Node, Java និង Android command-line SDK ដំឡើងតាម workflow។ មិនចាំបាច់ដំឡើង Android Studio ដើម្បីប្រើ runner នេះ។ ក្នុង job ការបង្កើត GitHub Release ប្រើ token ដែល workflow ផ្ដល់; មិនត្រូវ login `gh` ដោយដៃសម្រាប់ runner នីមួយៗទេ។
 
 **ចំណុចត្រូវឆ្លង៖** Git, gh និង Git Bash tools ឆ្លើយតបក្នុង Windows។
@@ -594,6 +612,7 @@ Get-Service 'actions.runner.*'
 | Android workflow skipped | Branch មិនមែន main ឬ Public ក្នុង self-hosted mode | ជំហានទី ១៤ និង ១៦ |
 | Android build រំលងក្រោយ meta | Version មាន Release រួច | រង់ចាំ release កំណែថ្មីពិត; កុំឡើង version ទទេ |
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
+| `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ក្រោយ merge បង្កើត Run workflow ថ្មីលើ main |
 | sudo terminal error ក្នុង audit | Self-hosted កំពុងប្រើ workflow/step ចាស់ | Update branch; --with-deps/sudo ត្រូវរត់តែ GitHub mode |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |

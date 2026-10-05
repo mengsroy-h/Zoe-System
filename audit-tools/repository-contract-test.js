@@ -313,6 +313,16 @@ scenario('comment checker វាស់ root ដែលបានស្នើ ន�
 scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
     const audit = read('.github/workflows/audit.yml');
     const apk = read('.github/workflows/android-release.yml');
+    const apkSteps = apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const firstRun = apkSteps.find((step) => /^        run:/m.test(step));
+    check('APK កំណត់ Git Bash មុន run step ផ្សេង ដោយ PowerShell របស់ Windows',
+        !!firstRun && /^        shell: powershell$/m.test(firstRun)
+        && firstRun.includes("Get-Command git -ErrorAction Stop")
+        && firstRun.includes("Join-Path $gitRoot 'bin'")
+        && firstRun.includes("Join-Path $gitBin 'bash.exe'")
+        && firstRun.includes('Test-Path -LiteralPath $gitBash -PathType Leaf')
+        && firstRun.includes('& $gitBash --version')
+        && /\$gitBin \| Out-File -FilePath \$env:GITHUB_PATH -Encoding utf8 -Append/.test(firstRun));
     const compose = read('tools/actions-runners/compose.yml');
     const image = read('tools/actions-runners/Dockerfile');
     const labels = (source, mode) => {

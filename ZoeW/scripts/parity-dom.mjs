@@ -113,11 +113,33 @@ async function snapshot(port, viewport) {
         return u.includes('127.0.0.1') || u.includes('localhost') ? route.continue() : route.abort();
     });
     await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'load' }).catch(() => {});
-    await page.waitForTimeout(2200);
+    // វាស់សំបកដែល boot ចប់ និង fonts រួច៖ 2200ms មិនបញ្ជាក់ស្ថានភាពលើម៉ាស៊ីនដែលកំពុងប្រជែង CPU។
+    await page.waitForFunction(() => {
+        const splash = document.getElementById('bootSplash');
+        return !!document.querySelector('.app-card') && document.readyState === 'complete'
+            && (!splash || getComputedStyle(splash).display === 'none')
+            && !document.body.classList.contains('boot-reveal') && document.fonts.status !== 'loading';
+    }, null, { timeout: 15000 });
+    let geometry, previous = '', stable = 0;
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && stable < 2) {
+        geometry = await page.evaluate(GEOMETRY);
+        const signature = JSON.stringify(geometry);
+        stable = signature === previous ? stable + 1 : 0;
+        previous = signature;
+        if (stable < 2) await page.waitForTimeout(100);
+    }
+    if (stable < 2) throw new Error('parity DOM៖ layout មិនទាន់ស្ថិតស្ថេរក្នុង 5s');
     const fingerprint = await page.evaluate(FINGERPRINT, { ignored: [...IGNORED_ATTRS], ui: INTENTIONAL_UI });
-    const geometry = await page.evaluate(GEOMETRY);
+    const detail = await page.evaluate(() => {
+        const card = document.querySelector('.app-card');
+        return { fonts: document.fonts.status, children: Array.from(card ? card.querySelectorAll('.card-title, .stats-grid, .financial-row, .date-filter-grid, .custom-date-row') : []).map((el) => {
+            const r = el.getBoundingClientRect(), css = getComputedStyle(el);
+            return { class: el.className, rect: [r.x, r.y, r.width, r.height], font: css.fontFamily, size: css.fontSize, lineHeight: css.lineHeight };
+        }) };
+    });
     await ctx.close();
-    return { fingerprint, geometry };
+    return { fingerprint, geometry, detail };
 }
 
 let failures = 0;
@@ -179,6 +201,7 @@ for (const vp of VIEWPORTS) {
         console.log(`        ដើម : ${g.old.slice(0, 150)}`);
         console.log(`        ថ្មី : ${g.now.slice(0, 150)}`);
     }
+    if (geoDiffs.length) console.log('      បរិបទ layout៖ ' + JSON.stringify({ old: a.detail, now: b.detail }));
 }
 
 await browser.close();

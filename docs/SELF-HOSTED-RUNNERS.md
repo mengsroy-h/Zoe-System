@@ -663,6 +663,18 @@ Audit និង APK ប្រើ `npm ci --prefer-offline`៖ package ដែល�
 
 GitHub-hosted Audit អាចប្រើ cache ក្រោយ run បានដំឡើង dependencies និង save cache ជោគជ័យ។ បើ GitHub cache storage ពេញ ឬ restore/save បរាជ័យ ត្រូវមើល log របស់ setup-node; ការទាញ dependencies តាម network នៅតែចាំបាច់ពេល cache មិនមាន។
 
+### រត់ Audit ៤ព្រមគ្នាដោយមិនបើក workers លើស CPU
+
+១. ក្នុង GitHub → Settings → Actions → Runners ត្រូវឃើញ Linux runner ទាំង៤ Online។ Job មួយត្រូវការ runner មួយ; runner ៤មិនបែងចែក job តែមួយជាបួនទេ។ Audit matrix ផ្ដល់ shard 1/4 ដល់ 4/4 និងអនុញ្ញាតឱ្យរត់ព្រមគ្នាទាំង៤។
+
+២. Workflow កំណត់ lane ២ និង browser ១ក្នុង shard នីមួយៗ។ ក្នុង self-hosted mode, money-guardian និង Vitest ប្រើ workers ២សមនឹង CPU quota ២របស់ container; ក្នុង GitHub mode វាប្រើ auto ដូច defaults របស់ឧបករណ៍។ មិនចាំបាច់បន្ថែម repository variables សម្រាប់ workers ទាំងនេះទេ។ ការបន្ថែម workers មិនធ្វើឱ្យ CPU ពិតកើនទេ ហើយអាចធ្វើឱ្យ checkers ប្រជែង RAM/CPU។
+
+៣. សាក Audit ពី commit ថ្មី ហើយមើល start time របស់ jobs ទាំង៤។ បើ job មួយ Queued ត្រូវពិនិត្យ runner ទី៤ថា Online និងមិនកំពុង Busy ក្នុង run ផ្សេង។ បើ source នៅ PR មិនទាន់ merge ត្រូវមើល run របស់ PR នោះ; Re-run លើ main ចាស់មិនយកការកែថ្មីទេ។
+
+៤. មើលជំហាន «វាស់ CPU និង RAM របស់ runner» នៅចុង job។ `cpu.max` បង្ហាញ quota/period; `cpu.stat` មាន `nr_throttled` និង `throttled_usec`; `memory.events` មាន `oom`/`oom_kill`។ ទិន្នន័យទាំងនេះសរុបចាប់ពី container បើក ដូច្នេះគ្មាន baseline មិនអាចយកលេខសរុបថាជារបស់ run តែមួយបានទេ។ ពេល cache hit ហើយ គួរវាស់ run-all ជំនួសការសន្និដ្ឋានថា network យឺត។
+
+៥. នៅលើ PC RAM 16GB ទុក APK build សាកក្រោយ Audit ចប់។ ការកែ source/checker/workers មិនតម្រូវឱ្យ rebuild runner image ឬ register ឡើងវិញទេ។
+
 ### Windows៖ PowerShell
 
 ```powershell
@@ -702,6 +714,8 @@ Get-Service 'actions.runner.*'
 | Chromium/RTDB download យូរ មុន run-all | Cache បាត់/កំណែប្រែ ឬ runners មិនប្រើ volume រួម | ជំហានទី ១៧៖ update image + compose និងផ្ទៀង `audit-binaries`; មើល cache hit/download ក្នុង run ថ្មី |
 | Cache Permission denied | Image/volume ownership ឬ container ចាស់ | ជំហានទី ១៧៖ ផ្ទៀង `cache writable`; រក្សា home volumes និងមើល Compose mounts |
 | `tx-outcome` ធ្លាក់តែ `status: null, rest: 27` ក្នុងផ្នែក 3/4 | តេស្តចាស់ទាមទារអានលើស ៣០ ដងក្នុង 500ms; timer លើ PC យឺតអាចមិនទាន់ដល់ចំនួននោះ | ប្រើ commit ដែលកែ checker ឱ្យរង់ចាំ state ពិត ហើយសាក Audit ថ្មី; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
+| `money-guardian`៖ អ្នកយាមមិនបៃតងលើ tree ស្អាត | Child checker ធ្លាក់មុនតេស្ត mutation; មិនទាន់អាចសន្និដ្ឋានថាកូដលុយខូច ឬថា PC យឺតទេ | ក្នុង run-all log អានបន្ទាត់ FAIL របស់ child នោះ; ប្រើ source ថ្មីដែលបង្ហាញ failed assertions និងមើល CPU/RAM step |
+| `parity:dom`៖ layout `.app-card` ខុស | អាចជាភាពខុសគ្នាពិតនៃ layout/font ឬវាស់មុន boot ចប់ | ប្រើ checker ដែលរង់ចាំ boot/fonts/layout; បើនៅធ្លាក់ អានបរិបទ layout ដើម/ថ្មី; កុំបន្ថែម tolerance ដើម្បីលាក់ភាពខុសគ្នា |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
 

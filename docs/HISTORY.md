@@ -1308,6 +1308,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — Audit ពិត ៤ runner៖ workers ខាងក្នុង និង log របស់អ្នកយាមដែលធ្លាក់
+
+- **ភស្តុតាងពិត**៖ Audit `37321763097` លើ `f854152` ចាប់ផ្ដើម shard ទាំង៤ព្រមគ្នាលើ Zoe-WSL-Audit-1 ដល់ 4 ហើយចប់ក្នុង ១០នាទី៤៨វិនាទី។ Chromium/RTDB cache ប្រើ ០–១វិនាទី។ Shards 1/4 និង 4/4 ឆ្លងពេញ; 2/4 ធ្លាក់ `money-guardian` ព្រោះ `tx-outcome` កូនធ្លាក់៤លក្ខខណ្ឌលើ clean tree ហើយ mutation ពីរមិនអាចផ្ទៀងបាន។ Log ចាស់លាក់ឈ្មោះ៤លក្ខខណ្ឌនោះ។ Shard 3/4 ឆ្លង `tx-outcome` ទាំង៩២ ប៉ុន្តែ parity DOM desktop វាស់ `.app-card` កម្ពស់ 307 ទល់ 295px; live/deep ឆ្លង។ នេះមិនមែន all-pass ទេ។ GitHub-hosted reference `37271570634` ចប់ក្នុង ៩នាទី៦វិនាទី។
+- **ការកែ**៖ self-hosted កំណត់ `MONEYGUARD_JOBS=2` និងផ្ញើ Vitest `--maxWorkers=2` តាម zoew-suite ដើម្បីសមនឹង Compose CPU quota ២។ GitHub mode រក្សា auto; shards ទាំង៤, lanes ២, browser ១, STRICT ទាំង៥ និង CHECKER_TIMEOUT នៅដដែល។ Money guardian បង្ហាញ failed assertions របស់ clean child; workflow កត់ cgroup CPU/RAM ដើម្បីវាស់ quota, throttling និង OOM។ Parity DOM រង់ចាំ boot/fonts និង geometry ស្ថិតស្ថេរ មុនប្រៀបធៀបដដែល; បើនៅខុស បង្ហាញ rect/font នៃធាតុកូន។ មិនបន្ថែម tolerance ឬរំលង card ទេ។
+- **អ្នកយាម**៖ worker contract រត់ wrapper ពិតទល់ npm CLI capture៖ មុនកែឆ្លង១/ធ្លាក់៣ ➜ ក្រោយកែឆ្លង៤/ធ្លាក់០។ Vitest CLI ពិតលើតេស្ត tx-outcome-timeout និង ledger-not-applied-retry ជាមួយ workers ២ ឆ្លង១០តេស្ត។ Repository file coverage ឆ្លង១០; YAML និង Bash steps ឆ្លង។ Direct repository-contract លើ root ឆ្លង៧៣/ធ្លាក់១ ព្រោះ SheetJS vendor មាននៅ measure tree ប៉ុណ្ណោះ។ Full STRICT ក្នុង session ឈប់នៅ Chromium executable បាត់។ Probe checker/clean guardian ក្រោម CPU pressure មិនបានបង្កើត child failure៤ឡើងវិញទេ; មិនទាន់បញ្ជាក់ថាបញ្ហាទាំងពីរបណ្តាលពី timing ឬថាការកែនេះឆ្លង browser ពិតឡើយ។ ត្រូវផ្ទៀង Audit ថ្មីទាំង៤លើ PC មុនអះអាង all-pass។
+- **សកម្មភាពដោយដៃ**៖ source/workflow changes ទាំងនេះមិនត្រូវ rebuild image ឬ register ឡើងវិញ។ ទុក runners ទាំង៤ Online និងមើល Audit ដែលចាប់ផ្ដើមពី commit ថ្មី។ បើ child ឬ parity នៅធ្លាក់ សូមអាន failed assertions និងបរិបទ layout ថ្មី; កុំបិទ money guards ដើម្បីឱ្យបៃតង។ គ្មានការកែ App code, APP_VERSION ឬ Firebase rules។
+
 ### 2026-10-05 — Self-hosted shard 3/4៖ `tx-outcome` វាស់មុនការអានដល់ចំនួនចាំបាច់
 
 - **ភស្តុតាងពិត**៖ Audit `37316299995` attempt 2 លើ `7eeb533`៖ shards 1/4, 2/4 និង 4/4 ឆ្លង; 3/4 ធ្លាក់តែ `tx-outcome`។ ករណី ledger ខែ applied-disconnect វាស់ `status: null, rest: 27` ក្រោយ 500ms ខណៈ assertion ទាមទារ `rest > 30`។ ក្រោយបណ្តាញត្រឡប់ ថ្ងៃ/ខែ 95 និង count 19 ត្រឹមត្រូវ; មិនដកស្ទួន ហើយគ្មាន Sentry outcome unknown។ App code មិនប្រែពី main `90aa66c`។

@@ -157,6 +157,9 @@ jobs:
         env:
           RUNALL_JOBS: '2'
           RUNALL_BROWSER_JOBS: '1'
+          # កូនក្នុង container មាន CPU quota ២; GitHub រក្សា defaults តាម VM ដើម។
+          MONEYGUARD_JOBS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
+          ZOEWSUITE_TEST_WORKERS: ${{ vars.ZOE_RUNNER_MODE == 'github' && 'auto' || '2' }}
           RUNALL_SHARD: ${{ matrix.shard }}/4
           CRUD_FLOW_STRICT: '1'
           VERSIONSCOPE_STRICT: '1'
@@ -164,6 +167,18 @@ jobs:
           SUPABASE_STRICT: '1'
           FBPROVISION_STRICT: '1'
         run: bash audit-tools/run-all.sh
+
+      - name: វាស់ CPU និង RAM របស់ runner
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs'), os = require('os');
+          console.log('Node availableParallelism:', os.availableParallelism());
+          for (const file of ['cpu.max', 'cpu.stat', 'memory.max', 'memory.peak', 'memory.events', 'memory.swap.current']) {
+            const path = '/sys/fs/cgroup/' + file;
+            if (fs.existsSync(path)) console.log(file + ':\n' + fs.readFileSync(path, 'utf8').trim());
+          }
+          NODE
 
       - name: log របស់ emulator ពេលធ្លាក់
         if: failure()

@@ -248,7 +248,9 @@ GUARDS.forEach((g, i) => {
         else { console.log('  --    ' + g.file + ' — SKIP (ត្រូវការ ' + (g.needs || 'dependency') + ') ➜ មិនរាប់ជាអ្នកយាម'); }
         return;
     }
-    ok(r.code === 0, 'អ្នកយាម ' + g.file + ' បៃតងលើ tree ស្អាត', r.out.split('\n').slice(-3).join(' | '));
+    const detail = r.out.split('\n').filter((line) => /\bFAIL\b|❌|Error:/.test(line)).slice(0, 12)
+        .concat(r.out.split('\n').slice(-3)).join('\n');
+    ok(r.code === 0, 'អ្នកយាម ' + g.file + ' បៃតងលើ tree ស្អាត', detail);
     if (r.code === 0) alive.push(g);
 });
 ok(alive.length > 0, '⛔ ជាន់អប្បបរមា៖ មានអ្នកយាមយ៉ាងតិច ១ ដែលរត់បាន', 'alive=' + alive.length);

@@ -394,6 +394,52 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
             && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step)));
 });
 
+scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota ដោយរក្សា shards ទាំង៤', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const cpu = Number((compose.match(/cpus:\s*([\d.]+)/) || [])[1]);
+    const values = ['MONEYGUARD_JOBS', 'ZOEWSUITE_TEST_WORKERS'].map((name) => {
+        const match = audit.match(new RegExp('^\\s+' + name + ': \\$\\{\\{ (.*?) \\}\\}', 'm'));
+        return match ? ['self-hosted', '', 'invalid', 'github'].map((mode) =>
+            vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode } })) : [];
+    });
+    check('self-hosted កំណត់ workers តាម CPU quota; GitHub រក្សា auto',
+        cpu >= 1 && values.every((result) => result.length === 4
+            && result.slice(0, 3).every((value) => Number(value) === cpu) && result[3] === 'auto'));
+});
+
+scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និងមិនប្ដូរ steps ផ្សេង', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-suite-workers-'));
+    const app = path.join(temp, 'ZoeW');
+    try {
+        for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript', '.original/ZoeW']) fs.mkdirSync(path.join(app, dir), { recursive: true });
+        fs.writeFileSync(path.join(app, 'src/main.tsx'), '');
+        fs.writeFileSync(path.join(app, '.original/ZoeW/app.js'), '');
+        fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify(json('ZoeW/package.json')));
+        const invoke = (workers) => {
+            const calls = [], env = { ZOEWSUITE_APP_DIR: temp };
+            if (workers !== undefined) env.ZOEWSUITE_TEST_WORKERS = workers;
+            const processFake = { env, argv: ['node', 'zoew-suite-test.js'], exitCode: 1 };
+            const requireReal = createRequire(path.join(ROOT, 'audit-tools/zoew-suite-test.js'));
+            vm.runInNewContext(read('audit-tools/zoew-suite-test.js'), {
+                __dirname: path.join(ROOT, 'audit-tools'), process: processFake, console: { log() {} },
+                require: (name) => name === 'child_process' ? { spawnSync: (command, args) => {
+                    calls.push({ command, args: Array.from(args) }); return { status: 0, stdout: '', stderr: '' };
+                } } : requireReal(name)
+            });
+            return { calls, code: processFake.exitCode };
+        };
+        const capped = invoke('2'), automatic = invoke('auto'), missing = invoke(undefined);
+        const testArgs = (result) => (result.calls.find((call) => call.command === 'npm' && call.args[2] === 'test') || {}).args;
+        check('Vitest ទទួល --maxWorkers=2 តែ test step', capped.code === 0 && capped.calls.length >= 10
+            && same(testArgs(capped), ['run', '-s', 'test', '--', '--maxWorkers=2'])
+            && capped.calls.filter((call) => call.args[2] !== 'test').every((call) => call.args.length === 3));
+        check('auto/មិនកំណត់ នៅប្រើ Vitest defaults ដើម', automatic.code === 0 && missing.code === 0
+            && same(testArgs(automatic), ['run', '-s', 'test']) && same(testArgs(missing), ['run', '-s', 'test']));
+        check('worker value ខុស មិនបៃតងដោយស្ងាត់', invoke('0').code !== 0 && invoke('lots').code !== 0);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java បាត់ ត្រូវបដិសេធមុន download', () => {
     const steps = read('.github/workflows/audit.yml').match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
     const step = steps.find((item) => item.includes("if: vars.ZOE_RUNNER_MODE != 'github'") && item.includes('$GITHUB_ENV'));

@@ -369,11 +369,53 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
     const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
     const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
+    const setupRuntime = steps.filter((step) => /uses: actions\/setup-(node|java)@/.test(step));
+    check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ',
+        setupRuntime.length === 2 && setupRuntime.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+        && image.includes('FROM node:24-') && image.includes('openjdk-21-jdk-headless')
+        && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+            && step.includes('java -version') && step.includes('process.versions.node') && step.includes('$GITHUB_ENV')));
     check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ',
         image.includes('install-deps chromium') && privileged.length === 1
         && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
         && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
             && step.includes('playwright install chromium') && !/\bsudo\b|--with-deps/.test(step)));
+});
+
+scenario('runtime ក្នុង Linux image៖ កំណែខុសឬ Java បាត់ ត្រូវបដិសេធមុន download', () => {
+    const steps = read('.github/workflows/audit.yml').match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const step = steps.find((item) => item.includes("if: vars.ZOE_RUNNER_MODE != 'github'") && item.includes('$GITHUB_ENV'));
+    check('runtime preflight មាន Bash script ពិតក្នុង workflow', !!step && /        run: \|/.test(step || ''));
+    if (!step) return;
+    const script = step.slice(step.indexOf('        run: |') + '        run: |'.length).trimStart()
+        .split('\n').map((line) => line.replace(/^          /, '')).join('\n');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-image-runtime-'));
+    const bin = path.join(temp, 'bin'), envFile = path.join(temp, 'github-env');
+    fs.mkdirSync(bin);
+    try {
+        const write = (name, body) => {
+            const target = path.join(bin, name);
+            fs.writeFileSync(target, '#!' + process.execPath + '\n' + body + '\n');
+            fs.chmodSync(target, 0o755);
+        };
+        write('node', 'require("vm").runInNewContext(process.argv[3],{process:{versions:{node:process.env.ZOE_FIXTURE_NODE+".0.0"},exit:code=>process.exit(code)}});');
+        write('java', 'if(process.env.ZOE_FIXTURE_JAVA==="missing")process.exit(127);console.error("openjdk version \\\""+process.env.ZOE_FIXTURE_JAVA+".0.0\\\"");');
+        write('javac', 'console.log("javac "+process.env.ZOE_FIXTURE_JAVA+".0.0");');
+        const run = (node = '24', java = '21') => {
+            fs.writeFileSync(envFile, '');
+            return cp.spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+                cwd: ROOT, encoding: 'utf8', timeout: 10000,
+                env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH,
+                    GITHUB_ENV: envFile, ZOE_FIXTURE_NODE: node, ZOE_FIXTURE_JAVA: java }
+            });
+        };
+        const valid = run();
+        check('Node 24 + Java/Javac 21 ឆ្លង និង JAVA_HOME ផ្ដល់ឱ្យ step បន្ទាប់',
+            valid.status === 0 && fs.readFileSync(envFile, 'utf8').includes('JAVA_HOME=' + temp), valid.stdout + valid.stderr);
+        check('Node 22 ត្រូវបដិសេធ', run('22').status !== 0);
+        check('Java 17 ត្រូវបដិសេធ', run('24', '17').status !== 0);
+        check('Java រកមិនឃើញ ត្រូវបដិសេធ', run('24', 'missing').status !== 0);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
 scenario('registration script ៖ ៤ runner · token លាក់ពី argv · បញ្ឈប់ពេលខុស', () => {

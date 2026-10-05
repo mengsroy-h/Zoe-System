@@ -9,7 +9,10 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
  && apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl git gh jq unzip xz-utils sudo python3 util-linux libstdc++6 libreadline8t64 libzstd1 liblz4-1 libxml2 \
+ && apt-get install -y --no-install-recommends ca-certificates curl git gh jq unzip xz-utils sudo python3 util-linux openjdk-21-jdk-headless libstdc++6 libreadline8t64 libzstd1 liblz4-1 libxml2 \
+ && node --version \
+ && java -version \
+ && javac -version \
  && useradd --create-home --uid 1001 --shell /bin/bash runner \
  && mkdir -p /home/runner/actions-runner /opt/pw-browsers/chromium-1194 \
  && curl -fL --retry 3 "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" -o /tmp/runner.tar.gz \

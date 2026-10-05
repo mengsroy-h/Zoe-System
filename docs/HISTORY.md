@@ -1308,6 +1308,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — Wi-Fi យឺត៖ Linux runners ប្រើ Node/Java ក្នុង image
+
+- **ភស្តុតាង**៖ Audit `37295216643` លើ self-hosted shard ១ប្រើ Node setup ៩៥វិនាទី និង Java setup ៤១១វិនាទី មុន TLS connection fail; run-all មិនទាន់ចាប់ផ្ដើម។ GitHub run `37271570634` setup Node ០–៣វិនាទី និង Java ប្រហែល ០វិនាទី។ Java archive ក្នុង log មាន 207,473,347 bytes; runners ទាំង ៤អាចទាញប្រហែល 830 MB ដាច់ៗគ្នា។ ម្ចាស់បញ្ជាក់ថា Wi-Fi យឺត; មិនបានវាស់ bandwidth ពិតទេ។
+- **ការកែ**៖ Linux image ដំឡើង Ubuntu OpenJDK 21 JDK headless ពេល build ម្ដង និងប្រើ Node 24 ដែលមានរួច។ self-hosted Audit ផ្ទៀង Node/Java/javac និងផ្ដល់ JAVA_HOME ដល់ steps បន្ទាប់; setup-node/setup-java រត់តែ GitHub mode។ Chromium/npm/emulator cache និង runner home volumes ដាច់ៗនៅដដែល; shards ទាំង ៤ និង STRICT flags មិនប្រែ។ Windows APK ការផ្គត់ផ្គង់ runtime មិនប្រែ។
+- **អ្នកយាម**៖ repository-contract-test ផ្ទៀង mode conditions/image packages ហើយរត់ Bash preflight ពិតជាមួយ CLI fixtures៖ Node/Java ត្រឹមត្រូវផ្ដល់ JAVA_HOME; Node 22, Java 17 ឬ Java បាត់ ត្រូវបដិសេធ។ មុនកែ ៧ឆ្លង/២ធ្លាក់; ក្រោយកែ ១៣ឆ្លង/០ធ្លាក់។ runall-runner-test ៥៦ឆ្លង, android:check ៨៩ឆ្លង និង repository-file-coverage ១០ឆ្លង; YAML/Bash/Docker RUN syntax, comments និង whitespace ឆ្លង។ Full STRICT run-all សាកហើយឈប់នៅ build វាស់ព្រោះគ្មាន Chromium; បរិស្ថាននេះគ្មាន Docker CLI។ Native Docker build/WSL និង Audit ពេញនៅត្រូវផ្ទៀងលើ PC របស់ម្ចាស់; មិនអះអាងពេល run ថេរទេ។
+- **សកម្មភាពដោយដៃ**៖ Update source, rebuild image ម្ដង, recreate containers ដោយរក្សា named volumes; មិនត្រូវ register ម្ដងទៀត។ Merge workflow ថ្មីមុនតេស្ត main ហើយបង្កើត Run workflow ថ្មី។ Download ដំបូង/កំណែថ្មីអាចយឺត; download ជោគជ័យ និង cache នៅដដែលទើប run បន្ទាប់អាចលឿន។
+
 ### 2026-10-05 — Windows APK៖ WSL bash បើក script ផ្លូវ Windows មិនបាន
 
 - **ភស្តុតាង**៖ Android APK run `37294008780` លើ main `90aa66c` និង runner `Zoe-Windows-APK` ធ្លាក់នៅ step ពិនិត្យ GitHub CLI។ Log ជ្រើស `C:\Users\hunme\AppData\Local\Microsoft\WindowsApps\bash.EXE`; `/bin/bash` រាយ script `C:actions-runner-apk...sh` រកមិនឃើញ។ មិនទាន់ឈានដល់ពិនិត្យ Release ឬ build APK; cleanup ក៏ធ្លាក់ដោយ shell ដូចគ្នា។

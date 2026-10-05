@@ -45,14 +45,33 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-node@v7
+        if: vars.ZOE_RUNNER_MODE == 'github'
         with:
           node-version: '24'
           package-manager-cache: false
 
       - uses: actions/setup-java@v6
+        if: vars.ZOE_RUNNER_MODE == 'github'
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: ផ្ទៀង Node និង Java ដែលមានក្នុង Linux image
+        if: vars.ZOE_RUNNER_MODE != 'github'
+        run: |
+          set -euo pipefail
+          node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1)'
+          node --version
+          if ! command -v java >/dev/null || ! command -v javac >/dev/null; then
+            echo '::error::Linux image មិនទាន់មាន Java 21។ Rebuild image និង recreate containers ដោយរក្សា volumes។'
+            exit 1
+          fi
+          JAVA_VERSION=$(java -version 2>&1)
+          printf '%s\n' "$JAVA_VERSION"
+          grep -Eq 'version "21([."])' <<< "$JAVA_VERSION"
+          javac -version 2>&1 | grep -Eq '^javac 21([.]|$)'
+          JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: ដំឡើង dependency
         run: |

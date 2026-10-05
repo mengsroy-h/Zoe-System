@@ -275,7 +275,7 @@ docker build -t zoe-actions-runner:local .
 
 បើ repo នៅ folder ផ្សេង ប្រើទីតាំងពិត។ សញ្ញា `.` ចុង command មានន័យ build ដោយយក Dockerfile ក្នុង folder បច្ចុប្បន្ន; ត្រូវមានវា។
 
-ការបង្កើត image ដំបូងទាញ Node, Linux dependencies និង runner application។ Image រៀបចំ browser system dependencies ជាមុន; self-hosted workflow មិនស្នើ sudo password ពេលដំឡើង Chromium។ Runner tarball មាន SHA-256 check ហើយ runner auto-update នៅបើក។
+ការបង្កើត image ដំបូងទាញ Node 24, Java/OpenJDK 21, Linux dependencies និង runner application ម្ដង។ Linux runners ទាំង ៤ប្រើ image ដូចគ្នា; self-hosted Audit ផ្ទៀងកំណែ Node/Java ដែលមានរួច ហើយមិនទាញ runtime ទាំងនេះក្នុង job ទៀត។ GitHub mode ប្រើ setup actions របស់ GitHub។ Image រៀបចំ browser system dependencies ជាមុន; self-hosted workflow មិនស្នើ sudo password ពេលដំឡើង Chromium។ Runner tarball មាន SHA-256 check ហើយ runner auto-update នៅបើក។
 
 ពិនិត្យក្រោយ build៖
 
@@ -284,6 +284,14 @@ docker image inspect zoe-actions-runner:local
 ```
 
 ត្រូវឃើញព័ត៌មាន image ហើយគ្មាន error No such image។ បើ build ធ្លាក់ ពិនិត្យ error ចុងក្រោយ និង command ដែលធ្លាក់ មុនបន្ត។
+
+ឆែក runtime ក្នុង image ដោយមិន register runner ថ្មី៖
+
+```bash
+docker run --rm --entrypoint bash zoe-actions-runner:local -c 'node --version; java -version; javac -version'
+```
+
+ត្រូវឃើញ Node `v24...` និង Java/javac `21...`។ Command នេះមិនបើក runner application និងមិនភ្ជាប់ runner home volumes ទេ។
 
 **ចំណុចត្រូវឆ្លង៖** Image `zoe-actions-runner:local` មានក្នុង Docker។
 
@@ -579,6 +587,37 @@ docker build -t zoe-actions-runner:local .
 docker compose up -d --force-recreate
 ```
 
+### Update image ពេលមាន Java ក្នុង Dockerfile
+
+១. រង់ចាំឱ្យ jobs ចប់ ឬ Cancel run នៅ GitHub មុនបញ្ឈប់ containers។
+
+២. Update source ដែលមាន Dockerfile និង workflow ថ្មី។ ក្រោយ merge រួច រត់ក្នុង Ubuntu៖
+
+```bash
+cd ~/src/Zoe-System
+git switch main
+git pull --ff-only
+cd tools/actions-runners
+docker compose stop
+docker build -t zoe-actions-runner:local .
+```
+
+៣. បើ build ឆ្លង ទើបបង្កើត containers ថ្មីពី image នោះ ដោយរក្សា named volumes៖
+
+```bash
+docker compose up -d --force-recreate
+docker compose ps
+docker compose exec -T audit-1 bash -c 'node --version; java -version; javac -version'
+```
+
+ត្រូវឃើញ services ទាំង ៤ Running និង Node 24/Java 21។ Image ថ្មីផ្ទុក runtime នៅក្រៅ runner home volume ដូច្នេះ registration/cache ចាស់នៅដដែល; មិនត្រូវ register ម្ដងទៀត។ បើ source មាននៅ PR តែមិនទាន់ merge អាច build ពី branch របស់ PR មុនបាន; សម្រាប់តេស្ត main ត្រូវ merge workflow ថ្មីមុន ហើយបង្កើត Run workflow ថ្មី។
+
+### ហេតុអ្វីលើកដំបូងយឺត?
+
+ការទាញលើកដំបូង ឬពេលកំណែ dependencies ប្រែ អាចយូរតាមល្បឿន network។ npm, Chromium និង Firebase emulator មាន cache ក្នុង home volume ដាច់ៗរបស់ runner នីមួយៗ។ ពេល download បានជោគជ័យ ហើយ cache នៅដដែល run បន្ទាប់អាចប្រើវាវិញ។ Download ដែល fail មិនស្មើ cache ដែលបានត្រៀមរួចទេ។ Rebuild image ក៏អាចត្រូវទាញ package ថ្មី; មិនមានការធានាពេលវេលា run ទេ។
+
+កុំលុប named volumes ឬប្រើ Docker prune volumes បើចង់រក្សា registration/cache។ `npm ci` នៅតែដំឡើងតាម package-lock សម្រាប់ source នីមួយៗ; ការមាន npm cache មិនមានន័យថារំលងតេស្ត ឬប្រើ node_modules ចាស់ដោយមិនផ្ទៀងទេ។
+
 ### Windows៖ PowerShell
 
 ```powershell
@@ -614,6 +653,7 @@ Get-Service 'actions.runner.*'
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
 | `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ក្រោយ merge បង្កើត Run workflow ថ្មីលើ main |
 | sudo terminal error ក្នុង audit | Self-hosted កំពុងប្រើ workflow/step ចាស់ | Update branch; --with-deps/sudo ត្រូវរត់តែ GitHub mode |
+| Linux image មិនទាន់មាន Java 21 | Workflow ថ្មីប្រើ runtime ក្នុង image ប៉ុន្តែ containers នៅប្រើ image ចាស់ | ជំហានទី ១៧៖ rebuild image, recreate ដោយរក្សា volumes និងបង្កើត Run workflow ថ្មី |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
 

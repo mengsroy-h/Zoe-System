@@ -32,6 +32,7 @@ const STEPS = PARITY ? ['build:parity', 'parity:dom', 'parity:live', 'parity:dee
     : ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
         'logic:check', 'parity', 'build:only', 'sw:check', 'smoke', 'native:check', 'rules:check'];
 const STEP_ENV = {};
+const TEST_WORKERS = process.env.ZOEWSUITE_TEST_WORKERS || 'auto';
 
 let pass = 0, fail = 0;
 function ok(label) { pass++; console.log('  ok    ' + label); }
@@ -39,6 +40,8 @@ function bad(label, detail) {
     fail++;
     console.log('  FAIL  ' + label + (detail ? '\n' + String(detail).split('\n').map((l) => '        ' + l).join('\n') : ''));
 }
+
+if (!/^(?:auto|[1-8])$/.test(TEST_WORKERS)) bad('តម្លៃ ZOEWSUITE_TEST_WORKERS ត្រូវជា auto ឬ 1–8', TEST_WORKERS);
 
 function tail(text, n) {
     return String(text || '').split('\n').filter((l) => l.trim()).slice(-n).join('\n');
@@ -88,7 +91,9 @@ if (isReactSource && hasModules && PARITY) {
 if (isReactSource && hasModules && !missing.length) {
     for (const step of STEPS) {
         const started = Date.now();
-        const r = cp.spawnSync('npm', ['run', '-s', step], {
+        const args = ['run', '-s', step];
+        if (step === 'test' && /^[1-8]$/.test(TEST_WORKERS)) args.push('--', '--maxWorkers=' + TEST_WORKERS);
+        const r = cp.spawnSync('npm', args, {
             cwd: APP,
             encoding: 'utf8',
             timeout: STEP_TIMEOUT_MS,

@@ -275,7 +275,7 @@ docker build -t zoe-actions-runner:local .
 
 បើ repo នៅ folder ផ្សេង ប្រើទីតាំងពិត។ សញ្ញា `.` ចុង command មានន័យ build ដោយយក Dockerfile ក្នុង folder បច្ចុប្បន្ន; ត្រូវមានវា។
 
-ការបង្កើត image ដំបូងទាញ Node, Linux dependencies និង runner application។ Image រៀបចំ browser system dependencies ជាមុន; self-hosted workflow មិនស្នើ sudo password ពេលដំឡើង Chromium។ Runner tarball មាន SHA-256 check ហើយ runner auto-update នៅបើក។
+ការបង្កើត image ដំបូងទាញ Node 24, Java/OpenJDK 21, Linux dependencies និង runner application ម្ដង។ Linux runners ទាំង ៤ប្រើ image ដូចគ្នា; self-hosted Audit ផ្ទៀងកំណែ Node/Java ដែលមានរួច ហើយមិនទាញ runtime ទាំងនេះក្នុង job ទៀត។ GitHub mode ប្រើ setup actions របស់ GitHub។ Image រៀបចំ browser system dependencies ជាមុន; self-hosted workflow មិនស្នើ sudo password ពេលដំឡើង Chromium។ Runner tarball មាន SHA-256 check ហើយ runner auto-update នៅបើក។
 
 ពិនិត្យក្រោយ build៖
 
@@ -284,6 +284,14 @@ docker image inspect zoe-actions-runner:local
 ```
 
 ត្រូវឃើញព័ត៌មាន image ហើយគ្មាន error No such image។ បើ build ធ្លាក់ ពិនិត្យ error ចុងក្រោយ និង command ដែលធ្លាក់ មុនបន្ត។
+
+ឆែក runtime ក្នុង image ដោយមិន register runner ថ្មី៖
+
+```bash
+docker run --rm --entrypoint bash zoe-actions-runner:local -c 'node --version; java -version; javac -version'
+```
+
+ត្រូវឃើញ Node `v24...` និង Java/javac `21...`។ Command នេះមិនបើក runner application និងមិនភ្ជាប់ runner home volumes ទេ។
 
 **ចំណុចត្រូវឆ្លង៖** Image `zoe-actions-runner:local` មានក្នុង Docker។
 
@@ -358,6 +366,24 @@ gh --version
 ```
 
 បើ Git ដំឡើងនៅផ្លូវផ្សេង ត្រូវកែផ្លូវ `bash.exe` ឱ្យត្រូវ។ Command ចុងក្រោយត្រូវបង្ហាញផ្លូវរបស់ឧបករណ៍ទាំង ៣។ Workflow ប្រើ Git Bash សម្រាប់ logic និង PowerShell ដើម្បីហៅ Windows Gradle/apksigner។
+
+ឆែក `bash.exe` ដែល Windows រកឃើញ៖
+
+```powershell
+where.exe bash
+```
+
+បើបន្ទាត់ដំបូងជា `WindowsApps\bash.exe` វាអាចជ្រើស launcher របស់ WSL ហើយបើក script ផ្លូវ Windows មិនបាន។ APK workflow មាន step «កំណត់ Git Bash របស់ Windows» ដែលរត់ PowerShell មុន ហើយដាក់ folder Git Bash នៅដើម PATH សម្រាប់ job នោះ។ ពេលមើល log របស់ step Bash បន្ទាប់ ត្រូវឃើញ shell ក្នុង folder `Git\bin\bash.exe`។
+
+បើកែ workflow មិនទាន់ចូល `main` អាចដោះស្រាយលើម៉ាស៊ីនសិន៖ Start → វាយ **Edit the system environment variables** → Environment Variables → ក្នុង **System variables** ជ្រើស **Path** → Edit → បន្ថែម `C:\Program Files\Git\bin` ហើយ Move Up ឱ្យនៅមុន entry `WindowsApps` ប្រសិនបើមាន។ កែផ្លូវតាមទីតាំង Git ពិតរបស់អ្នក។ កុំលុប entry WindowsApps; កុំប្រើ `setx PATH` ដែលអាចបាត់ PATH ចាស់។ បើ service ប្រើ user account ដែលមាន user PATH ផ្ទាល់ ត្រូវពិនិត្យ Path របស់ account នោះដែរ។
+
+ក្រោយដំឡើង tools ឬកែ PATH បើក PowerShell ជា Administrator ហើយ restart តែ APK service៖
+
+```powershell
+Restart-Service 'actions.runner.mengsroy-h-Zoe-System.Zoe-Windows-APK'
+```
+
+បន្ទាប់មក Actions → Android APK → Run workflow → main។ `Re-run jobs` រក្សា workflow/commit ដើម; ក្រោយ merge ការកែ workflow ត្រូវបង្កើត run ថ្មី។
 
 Node, Java និង Android command-line SDK ដំឡើងតាម workflow។ មិនចាំបាច់ដំឡើង Android Studio ដើម្បីប្រើ runner នេះ។ ក្នុង job ការបង្កើត GitHub Release ប្រើ token ដែល workflow ផ្ដល់; មិនត្រូវ login `gh` ដោយដៃសម្រាប់ runner នីមួយៗទេ។
 
@@ -466,7 +492,7 @@ Self-hosted jobs នឹង skip បើ repo នៅ Public។ ផ្ដល់ស�
 
 Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ។ GitHub Release ក្នុង repo Private ក៏ទាមទារសិទ្ធិ; បើចែក App ទៅអតិថិជន ចែកតែ signed APK តាមកន្លែងផ្សេង ដោយមិនផ្ដល់សិទ្ធិចូល source repo។
 
-Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Workflow ទាំងពីរបិទ automatic npm cache upload និងរក្សា dependencies cache តាមម៉ាស៊ីនដែលរត់។
+Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Self-hosted Audit រក្សា npm cache ក្នុង home volumes ហើយប្រើ Chromium/RTDB binary cache រួមក្នុង `audit-binaries` volume។ GitHub-hosted Audit ប្រើ explicit npm cache ដែល key ដេរីវេពី lockfiles របស់ ZoeW, supabase និង firebase-provision។ APK workflow បិទ automatic npm cache upload ហើយប្រើ cache របស់ម៉ាស៊ីនដែលរត់។
 
 **ចំណុចត្រូវឆ្លង៖** សម្រាប់ self-hosted mode repo Private និង runner ទាំង ៥ Online។
 
@@ -561,6 +587,94 @@ docker build -t zoe-actions-runner:local .
 docker compose up -d --force-recreate
 ```
 
+### Update image និងបើក binary cache រួម
+
+១. រង់ចាំឱ្យ jobs ចប់ ឬ Cancel run នៅ GitHub មុនបញ្ឈប់ containers។
+
+២. Update source ដែលមាន Dockerfile និង workflow ថ្មី។ **បើ PR មិនទាន់ merge** រត់ក្នុង Ubuntu៖
+
+```bash
+cd ~/src/Zoe-System
+git fetch origin
+git switch codex/windows-apk-git-bash
+git pull --ff-only
+```
+
+**ក្រោយ merge រួច** ប្រើ main ជំនួស៖
+
+```bash
+cd ~/src/Zoe-System
+git switch main
+git pull --ff-only
+```
+
+៣. ពេល source update ឆ្លង បញ្ឈប់ containers ហើយ build image៖
+
+```bash
+cd tools/actions-runners
+docker compose stop
+docker build -t zoe-actions-runner:local .
+```
+
+៤. បើ build ឆ្លង ទើបបង្កើត containers ថ្មីពី image នោះ ដោយរក្សា named volumes៖
+
+```bash
+docker compose up -d --force-recreate
+docker compose ps
+docker compose exec -T audit-1 bash -c 'node --version; java -version; javac -version'
+```
+
+ត្រូវឃើញ services ទាំង ៤ Running និង Node 24/Java 21។ Image ផ្ទុក runtime នៅក្រៅ runner home volume ដូច្នេះ registration/cache ចាស់នៅដដែល; មិនត្រូវ register ម្ដងទៀត។ កុំបន្ថែម `--no-cache` ទៅ docker build ពេល update ធម្មតា ដើម្បីឱ្យ Docker ប្រើ layers ដែលមានរួច។
+
+Workflow ថ្មីលើ image ចាស់ដែលមិនទាន់កំណត់ `ZOE_AUDIT_CACHE` នឹងឈប់មុន download ហើយប្រាប់ឱ្យ update image/compose។ បើ PR update បង្កើត run ស្វ័យប្រវត្តិ មុនបាន update PC សូមចាំឱ្យ run នោះចប់ ឬ Cancel មុនជំហានទី ៣។ កុំបញ្ឈប់ containers ពេល jobs កំពុងរត់។
+
+៥. ផ្ទៀងថា containers ទាំង៤ប្រើ binary cache volume ដូចគ្នា៖
+
+```bash
+for service in audit-1 audit-2 audit-3 audit-4; do
+  container=$(docker compose ps -q "$service")
+  docker inspect --format '{{range .Mounts}}{{if eq .Destination "/opt/zoe-cache"}}{{.Name}}{{end}}{{end}}' "$container"
+done
+```
+
+ត្រូវឃើញ volume ឈ្មោះដូចគ្នា ៤ដង ដែលបញ្ចប់ដោយ `audit-binaries`។ ពិនិត្យថា runner user អាចសរសេរបាន៖
+
+```bash
+docker compose exec -T audit-1 bash -c 'test "$ZOE_AUDIT_CACHE" = /opt/zoe-cache && test -w "$ZOE_AUDIT_CACHE" && echo "cache writable"'
+```
+
+៦. សាក workflow **ពី commit ថ្មី**។ បើ PR មិនទាន់ merge ចូល GitHub → PR → Close pull request → Reopen pull request ដើម្បីបង្កើត Audit run ថ្មី។ PR នៅ branch ដដែល និង commits នៅដដែល។ កុំចុច Re-run លើ run ដែលមាន workflow code ចាស់។ ក្រោយ merge ចូល main ប្រើ Actions → Audit → Run workflow → main។
+
+៧. ក្នុង run ថ្មី ជំហានត្រៀម cache ចម្លង Chromium ដែលទាញចប់ពី home ចាស់ចូល cache រួម ហើយយក JAR ចាស់ជាបេក្ខជន។ RTDB step ផ្ទៀងទំហំ និង checksum តាម firebase-tools កំណែដែល npm ci ដំឡើង។ ត្រូវឃើញ `RTDB cache ready` ហើយគ្មាន `downloading` បើមាន JAR ត្រូវរួច។ Browser cache ដែលមានរួចក៏មិនត្រូវទាញ ZIP ឡើងវិញ។
+
+បើ source មាននៅ PR តែមិនទាន់ merge អាច build image ពី branch របស់ PR មុនបាន; សម្រាប់តេស្ត main ត្រូវ merge workflow ថ្មីមុន ហើយបង្កើត Run workflow ថ្មី។
+
+### ហេតុអ្វីលើកដំបូងយឺត?
+
+ការទាញលើកដំបូង ឬពេលកំណែ dependencies ប្រែ អាចយូរតាមល្បឿន network។ npm មាន cache ក្នុង home របស់ runner នីមួយៗ។ Chromium និង RTDB JAR ប្រើ binary cache volume រួម; ការដំឡើងប្រើ lock ដើម្បីឱ្យ runner មួយទាញ ហើយ runner ផ្សេងប្រើឯកសារនោះ។ Lock មិនទប់ run-all របស់ shard ទាំង៤ទេ។ Home, source workspace និង emulator process/port នៅដាច់ពីគ្នា។
+
+Playwright ប្រែ revision អាចត្រូវទាញ browser ថ្មី។ Workflow រក្សា revisions ក្នុង shared cache ដើម្បីឱ្យ runs ដែលប្រើកំណែផ្សេងគ្នាអាចដំណើរការ។ RTDB JAR ផ្ទៀង size/checksum មុនរាល់ការប្រើ; ខូច ឬបាត់ទើបទាញតាម Firebase CLI។ `firebase setup:emulators:database` ដោយខ្លួនឯងទាញឡើងវិញ ដូច្នេះ workflow ហៅវាតែពេល cache មិនត្រូវប៉ុណ្ណោះ។ Cache របស់ firebase-tools កំណែផ្សេងៗទុកនៅថតដាច់គ្នា។
+
+Download ដែល fail មិនស្មើ cache ដែលបានត្រៀមរួចទេ។ Rebuild image អាចត្រូវទាញ package ថ្មី។ GitHub ប្រើម៉ាស៊ីនដាច់សម្រាប់ shard នីមួយៗ ខណៈ self-hosted runners ទាំង៤ចែក CPU/RAM/network លើ PC តែមួយ; ពេល cache រួច ត្រូវវាស់ run-all time លើ PC ដើម្បីប្រៀបធៀប។
+
+កុំលុប named volumes ឬប្រើ Docker prune volumes បើចង់រក្សា registration/cache។ `npm ci` នៅតែដំឡើងតាម package-lock សម្រាប់ source នីមួយៗ; ការមាន npm cache មិនមានន័យថារំលងតេស្ត ឬប្រើ node_modules ចាស់ដោយមិនផ្ទៀងទេ។
+
+Audit និង APK ប្រើ `npm ci --prefer-offline`៖ package ដែលមាន cache ប្រើមុន; package ដែលបាត់នៅទាញតាម network។ វាមិនមែន offline mode ហើយមិនរំលងការផ្ទៀង package-lock ទេ។ ក្នុង GitHub-hosted Audit, setup-node រក្សា npm package cache រវាង runs; វាមិន cache node_modules ឬ source/signing secrets ទេ។ កំណែ dependencies ប្រែបង្កើត cache key ថ្មី។
+
+GitHub-hosted Audit អាចប្រើ cache ក្រោយ run បានដំឡើង dependencies និង save cache ជោគជ័យ។ បើ GitHub cache storage ពេញ ឬ restore/save បរាជ័យ ត្រូវមើល log របស់ setup-node; ការទាញ dependencies តាម network នៅតែចាំបាច់ពេល cache មិនមាន។
+
+### រត់ Audit ៤ព្រមគ្នាដោយមិនបើក workers លើស CPU
+
+១. ក្នុង GitHub → Settings → Actions → Runners ត្រូវឃើញ Linux runner ទាំង៤ Online។ Job មួយត្រូវការ runner មួយ; runner ៤មិនបែងចែក job តែមួយជាបួនទេ។ Audit matrix ផ្ដល់ shard 1/4 ដល់ 4/4 និងអនុញ្ញាតឱ្យរត់ព្រមគ្នាទាំង៤។
+
+២. Workflow កំណត់ lane ២ និង browser ១ក្នុង shard នីមួយៗ។ ក្នុង self-hosted mode, money-guardian និង Vitest ប្រើ workers ២សមនឹង CPU quota ២របស់ container; ក្នុង GitHub mode វាប្រើ auto ដូច defaults របស់ឧបករណ៍។ មិនចាំបាច់បន្ថែម repository variables សម្រាប់ workers ទាំងនេះទេ។ ការបន្ថែម workers មិនធ្វើឱ្យ CPU ពិតកើនទេ ហើយអាចធ្វើឱ្យ checkers ប្រជែង RAM/CPU។
+
+៣. សាក Audit ពី commit ថ្មី ហើយមើល start time របស់ jobs ទាំង៤។ បើ job មួយ Queued ត្រូវពិនិត្យ runner ទី៤ថា Online និងមិនកំពុង Busy ក្នុង run ផ្សេង។ បើ source នៅ PR មិនទាន់ merge ត្រូវមើល run របស់ PR នោះ; Re-run លើ main ចាស់មិនយកការកែថ្មីទេ។
+
+៤. មើលជំហាន «វាស់ CPU និង RAM របស់ runner» នៅចុង job។ `cpu.max` បង្ហាញ quota/period; `cpu.stat` មាន `nr_throttled` និង `throttled_usec`; `memory.events` មាន `oom`/`oom_kill`។ ទិន្នន័យទាំងនេះសរុបចាប់ពី container បើក ដូច្នេះគ្មាន baseline មិនអាចយកលេខសរុបថាជារបស់ run តែមួយបានទេ។ ពេល cache hit ហើយ គួរវាស់ run-all ជំនួសការសន្និដ្ឋានថា network យឺត។
+
+៥. នៅលើ PC RAM 16GB ទុក APK build សាកក្រោយ Audit ចប់។ ការកែ source/checker/workers មិនតម្រូវឱ្យ rebuild runner image ឬ register ឡើងវិញទេ។
+
 ### Windows៖ PowerShell
 
 ```powershell
@@ -594,9 +708,18 @@ Get-Service 'actions.runner.*'
 | Android workflow skipped | Branch មិនមែន main ឬ Public ក្នុង self-hosted mode | ជំហានទី ១៤ និង ១៦ |
 | Android build រំលងក្រោយ meta | Version មាន Release រួច | រង់ចាំ release កំណែថ្មីពិត; កុំឡើង version ទទេ |
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
+| `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ក្រោយ merge បង្កើត Run workflow ថ្មីលើ main |
 | sudo terminal error ក្នុង audit | Self-hosted កំពុងប្រើ workflow/step ចាស់ | Update branch; --with-deps/sudo ត្រូវរត់តែ GitHub mode |
+| Linux image មិនទាន់មាន Java 21 | Workflow ថ្មីប្រើ runtime ក្នុង image ប៉ុន្តែ containers នៅប្រើ image ចាស់ | ជំហានទី ១៧៖ rebuild image, recreate ដោយរក្សា volumes និងបង្កើត Run workflow ថ្មី |
+| Chromium/RTDB download យូរ មុន run-all | Cache បាត់/កំណែប្រែ ឬ runners មិនប្រើ volume រួម | ជំហានទី ១៧៖ update image + compose និងផ្ទៀង `audit-binaries`; មើល cache hit/download ក្នុង run ថ្មី |
+| Cache Permission denied | Image/volume ownership ឬ container ចាស់ | ជំហានទី ១៧៖ ផ្ទៀង `cache writable`; រក្សា home volumes និងមើល Compose mounts |
+| `tx-outcome` ធ្លាក់តែ `status: null, rest: 27` ក្នុងផ្នែក 3/4 | តេស្តចាស់ទាមទារអានលើស ៣០ ដងក្នុង 500ms; timer លើ PC យឺតអាចមិនទាន់ដល់ចំនួននោះ | ប្រើ commit ដែលកែ checker ឱ្យរង់ចាំ state ពិត ហើយសាក Audit ថ្មី; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
+| `money-guardian`៖ អ្នកយាមមិនបៃតងលើ tree ស្អាត | Child checker ធ្លាក់មុនតេស្ត mutation; មិនទាន់អាចសន្និដ្ឋានថាកូដលុយខូច ឬថា PC យឺតទេ | ក្នុង run-all log អានបន្ទាត់ FAIL របស់ child នោះ; ប្រើ source ថ្មីដែលបង្ហាញ failed assertions និងមើល CPU/RAM step |
+| `parity:dom`៖ layout `.app-card` ខុស | អាចជាភាពខុសគ្នាពិតនៃ layout/font ឬវាស់មុន boot ចប់ | ប្រើ checker ដែលរង់ចាំ boot/fonts/layout; បើនៅធ្លាក់ អានបរិបទ layout ដើម/ថ្មី; កុំបន្ថែម tolerance ដើម្បីលាក់ភាពខុសគ្នា |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
+
+ករណី `tx-outcome` ខាងលើ ត្រូវអាន assertion ពិតក្នុង logs មុនសន្និដ្ឋាន។ ការកែនេះរក្សា `rest > 30` និងការផ្ទៀងថា ledger ដកតែម្តងដដែល; វារង់ចាំការអានលើស ៣០ ដង ឬលទ្ធផលចប់ ដោយមានពិដាន ៥វិនាទី។ មិនចាំបាច់ rebuild image ឬ register runner ម្ដងទៀតសម្រាប់ការកែ checker នេះទេ។ GitHub `actions/checkout` ទាញ source តាម commit របស់ run ដោយស្វ័យប្រវត្តិ។ បើសាក PR ត្រូវមើល run របស់ commit ថ្មី; ក្រោយ merge ទើបបង្កើត run ថ្មីលើ main។ `Re-run` លើ run ចាស់នៅប្រើ checker ចាស់។ បើ assertion ផ្សេងធ្លាក់ ត្រូវពិនិត្យបញ្ហានោះបន្ត។
 
 បើត្រូវពិនិត្យ OOM របស់ Linux runner ឧទាហរណ៍ `audit-1` ពេលគ្មាន job ថ្មីប្ដូរស្ថានភាព៖
 
@@ -624,3 +747,5 @@ docker inspect --format '{{.State.OOMKilled}}' "$(docker compose ps -aq audit-1)
 - [GitHub៖ រត់ workflow ដោយដៃ](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
 - [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 - [Android SDK action](https://github.com/android-actions/setup-android)
+- [Playwright៖ browser cache](https://playwright.dev/docs/browsers#managing-browser-binaries)
+- [Firebase tools៖ emulator download](https://github.com/firebase/firebase-tools/blob/main/src/emulator/download.ts)

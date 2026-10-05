@@ -20,8 +20,16 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && chown -R runner:runner /home/runner /opt/pw-browsers \
  && rm -f /tmp/runner.tar.gz \
  && rm -rf /var/lib/apt/lists/* /root/.npm
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
+ && node --version \
+ && java -version \
+ && javac -version \
+ && rm -rf /var/lib/apt/lists/*
 ENV HOME=/home/runner
 ENV LANG=C.UTF-8
+RUN mkdir -p /opt/zoe-cache && chown runner:runner /opt/zoe-cache
+ENV ZOE_AUDIT_CACHE=/opt/zoe-cache
 USER runner
 WORKDIR /home/runner/actions-runner
 CMD ["./run.sh"]

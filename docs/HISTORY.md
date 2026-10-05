@@ -1308,6 +1308,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — ណែនាំដំឡើង runner សម្រាប់អ្នកចាប់ផ្ដើម
+
+- **ការវាស់ពីការដំឡើង**៖ PowerShell បង្ហាញ Command not found សម្រាប់ sudo apt-get; Ubuntu gh auth login បង្ហាញ browser launcher/xdg-open រកមិនឃើញ។ ម្ចាស់ស្នើឱ្យ .md មានជំហានលម្អិត និងលទ្ធផលដែលត្រូវឃើញមុនបន្ត។
+- **ការកែឯកសារ**៖ SELF-HOSTED-RUNNERS.md បែងជា ១៩ជំហាន, បញ្ជាក់ terminal, WSL/Docker, login តាម browser Windows, source ក្នុង Linux home, token តាមប្រភេទ, script ម្ដងសម្រាប់ Linux ៤ និង Windows service មួយ។ បន្ថែមការផ្ទៀង Repository variable និងតារាងដោះស្រាយកំហុស។ គ្មាន workflow ឬកូដ App ប្រែ។
+- **ការផ្ទៀង**៖ Code fences ៣៨ពេញលេញ, Bash syntax ក្នុងឯកសារឆ្លង, local links ៥មានគោលដៅពិត, repository-file-coverage ឆ្លង និង git diff --check ឆ្លង។ ការដំឡើងលើ PC ពិតនៅត្រូវធ្វើតាមជំហាន និងផ្ទៀង Online/job results។
+
 ### 2026-10-05 — GitHub mode៖ Draft PR មិនមែនមូលហេតុ skip
 
 - **វាស់មុនកែ**៖ Audit PR run `37266035700` នៅ commit `0db7de8` skipped; repo Public និង job មាន Private guard លើ mode ទាំងពីរ។ Draft flag មិនត្រូវបានប្រើក្នុង job condition។ អ្នកយាមរត់ condition ពិតមុនកែបាន ៧ឆ្លង និង ២ធ្លាក់។

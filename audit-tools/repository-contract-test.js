@@ -310,5 +310,64 @@ scenario('comment checker វាស់ root ដែលបានស្នើ ន�
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+scenario('self-hosted runner ៖ Linux audit និង Windows APK ដាច់ពីគ្នា', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const apk = read('.github/workflows/android-release.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const image = read('tools/actions-runners/Dockerfile');
+    check('audit ជ្រើស Linux pool ជាក់លាក់ និងរក្សា shard ទាំង ៤',
+        /runs-on:\s*\[self-hosted, Linux, X64, wsl-zoe-audit\]/.test(audit)
+        && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*2\b/.test(audit));
+    check('fork មិនរត់លើ PC និង workflow មិនចាប់ self-hosted ពេល Public',
+        audit.includes('github.event.repository.private == true')
+        && audit.includes('github.event.pull_request.head.repo.full_name == github.repository')
+        && apk.includes('github.event.repository.private == true'));
+    check('APK ជ្រើស Windows pool និងប្រើ Gradle/apksigner របស់ Windows',
+        /runs-on:\s*\[self-hosted, Windows, X64, windows-zoe-android\]/.test(apk)
+        && apk.includes('gradlew.bat') && apk.includes('apksigner.bat')
+        && apk.indexOf('actions/setup-node@') < apk.indexOf('VERSION=$(node')
+        && apk.indexOf('android-actions/setup-android@') < apk.indexOf('gradlew.bat'));
+    check('Linux container មាន home ដាច់ពីគ្នា និងគ្មាន host port/socket',
+        [1, 2, 3, 4].every((n) => compose.includes('audit-' + n + '-home:/home/runner'))
+        && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
+    check('Chromium dependency ដំឡើងក្នុង image; job មិនហៅ sudo',
+        image.includes('install-deps chromium') && !/\bsudo\b|--with-deps/.test(audit));
+});
+
+scenario('registration script ៖ ៤ runner · token លាក់ពី argv · បញ្ឈប់ពេលខុស', () => {
+    const script = path.join(ROOT, 'tools/actions-runners/register.sh');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-runner-register-'));
+    const log = path.join(temp, 'calls.jsonl');
+    try {
+        const docker = path.join(temp, 'docker');
+        fs.writeFileSync(docker, '#!' + process.execPath + '\n'
+            + 'const fs=require("fs"),args=process.argv.slice(2);'
+            + 'if(args.includes("run")){const input=fs.readFileSync(0,"utf8");'
+            + 'fs.appendFileSync(process.env.ZOE_RUNNER_FIXTURE_LOG,JSON.stringify({args,input})+"\\n");'
+            + 'if(process.env.ZOE_RUNNER_FIXTURE_FAIL && args.includes(process.env.ZOE_RUNNER_FIXTURE_FAIL)) process.exit(17);}\n');
+        fs.chmodSync(docker, 0o755);
+        const run = (stopAt = '') => cp.spawnSync('bash', [script], {
+            cwd: ROOT, input: 'fixture-registration-token\n', encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, PATH: temp + path.delimiter + process.env.PATH,
+                ZOE_RUNNER_FIXTURE_LOG: log, ZOE_RUNNER_FIXTURE_FAIL: stopAt }
+        });
+        const calls = () => fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+        let result = run();
+        let recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ លំដាប់ runner ៤ មិនស្ទួន ហើយ exit 0', result.status === 0
+            && same(recorded.map((c) => c.args.find((a) => /^audit-[1-4]$/.test(a))),
+                ['audit-1', 'audit-2', 'audit-3', 'audit-4']), result.stdout + result.stderr);
+        check('register ៖ token ឆ្លង stdin ប៉ុណ្ណោះ និងមិនលេចក្នុង output', recorded.length === 4
+            && recorded.every((c) => c.input === 'fixture-registration-token\n'
+                && !c.args.join(' ').includes('fixture-registration-token'))
+            && !(result.stdout + result.stderr).includes('fixture-registration-token'));
+        if (fs.existsSync(log)) fs.rmSync(log);
+        result = run('audit-2');
+        recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ Docker ខុស ➜ exit ដើម និងមិន register runner បន្ទាប់',
+            result.status === 17 && recorded.length === 2, result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);

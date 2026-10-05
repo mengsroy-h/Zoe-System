@@ -1,11 +1,12 @@
 # ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR និង main ៖ `run-all.sh` ពេញ (រួមតេស្ត browser · RTDB emulator ពិត · Postgres ពិត)
-# បែងចែកជា ៤ ផ្នែករត់ស្របគ្នា (`RUNALL_SHARD`)។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
+# បែងចែកជា ៤ ផ្នែក (`RUNALL_SHARD`) ហើយរត់ស្របគ្នាអតិបរមា ២។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
 #
 # ⛔ ទង់ *_STRICT ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator · Postgres · firebase-tools មិនឡើង
 #    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ (កំហុស 2.17.2/2.17.3 ship បាន ព្រោះគ្មានអ្វីសាកនឹង rules ពិត)។
 name: Audit
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -25,10 +26,12 @@ jobs:
   #    (emu/* · money-guardian រត់ពេញ មិនមែន SKIP) ➜ job «Firebase rules» ដាច់លែងត្រូវការ។
   audit-shard:
     name: run-all.sh ផ្នែក ${{ matrix.shard }}/4
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    if: github.event.repository.private == true && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, Linux, X64, wsl-zoe-audit]
+    timeout-minutes: 60
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         shard: [1, 2, 3, 4]
     steps:
@@ -44,11 +47,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: |
-            ZoeW/package-lock.json
-            supabase/package-lock.json
-            tools/firebase-provision/package-lock.json
+          package-manager-cache: false
 
       - uses: actions/setup-java@v6
         with:
@@ -56,24 +55,26 @@ jobs:
           java-version: '21'
 
       - name: ដំឡើង dependency
-        run: npm install --no-save --no-audit --no-fund acorn playwright-core playwright
+        run: |
+          PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
+          npm install --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
 
       - name: ទាញ Chromium
-        run: npx --yes playwright install --with-deps chromium
+        run: npx --no-install playwright install chromium
 
       # តេស្ត browser រកមើល Chromium នៅផ្លូវថេរមួយ (ដូចបរិស្ថាន audit ដើម)។
       # ដូច្នេះ symlink វាទៅផ្លូវនោះ ជំនួសការកែឯកសារ ២០។
       - name: ភ្ជាប់ Chromium ទៅផ្លូវដែលតេស្តរំពឹងទុក
         run: |
           set -euo pipefail
-          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
-          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
+          SRC=$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")
+          if [ ! -x "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
           echo "chromium: $SRC"
-          sudo mkdir -p /opt/pw-browsers/chromium-1194
-          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
+          mkdir -p /opt/pw-browsers/chromium-1194
+          ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
           # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
-          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
           test -x /opt/pw-browsers/chromium
 
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
@@ -92,12 +93,6 @@ jobs:
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
-      - name: Cache RTDB emulator jar
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/firebase/emulators
-          key: rtdb-emulator-${{ runner.os }}-v1
-
       - name: ទាញ RTDB emulator
         run: tools/firebase-provision/node_modules/.bin/firebase setup:emulators:database
 
@@ -107,7 +102,8 @@ jobs:
           set -euo pipefail
           JAR=$(ls "$HOME"/.cache/firebase/emulators/firebase-database-emulator-*.jar | head -1)
           echo "jar: $JAR"
-          nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 &
+          JAVA_TOOL_OPTIONS="-Xmx512m" nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/zoe-emulator.pid"
           for i in $(seq 1 60); do
             if curl -sf --noproxy "*" -o /dev/null "http://127.0.0.1:9000/.json?ns=demo-zoe"; then
               echo "emulator UP"
@@ -123,6 +119,8 @@ jobs:
       # ⛔ ទង់ STRICT ដូច Runbook ជំហានទី ០ (CLAUDE.md) ➜ runall-runner-test ផ្ទៀងថាគ្មានទង់ណាបាត់
       - name: run-all.sh (ផ្នែក ${{ matrix.shard }}/4)
         env:
+          RUNALL_JOBS: '2'
+          RUNALL_BROWSER_JOBS: '1'
           RUNALL_SHARD: ${{ matrix.shard }}/4
           CRUD_FLOW_STRICT: '1'
           VERSIONSCOPE_STRICT: '1'
@@ -134,3 +132,16 @@ jobs:
       - name: log របស់ emulator ពេលធ្លាក់
         if: failure()
         run: cat /tmp/emu.log || true
+
+      - name: បិទ emulator
+        if: always()
+        run: |
+          PID_FILE="$RUNNER_TEMP/zoe-emulator.pid"
+          if [ -f "$PID_FILE" ]; then
+            PID=$(cat "$PID_FILE")
+            if [[ "$PID" =~ ^[0-9]+$ ]] && [ -r "/proc/$PID/cmdline" ] && \
+              tr '\0' ' ' < "/proc/$PID/cmdline" | grep -q 'firebase-database-emulator-'; then
+              kill "$PID" 2>/dev/null || true
+            fi
+            rm -f "$PID_FILE"
+          fi

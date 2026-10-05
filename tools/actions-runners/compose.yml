@@ -1,0 +1,54 @@
+name: zoe-wsl
+
+x-runner: &runner
+  image: zoe-actions-runner:local
+  init: true
+  restart: unless-stopped
+  cpus: 2.0
+  mem_limit: 3g
+  memswap_limit: 4g
+  shm_size: 512m
+  stop_grace_period: 2m
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  audit-1:
+    <<: *runner
+    environment:
+      RUNNER_NAME: Zoe-WSL-Audit-1
+      RUNNER_LABELS: wsl-zoe-audit
+    volumes:
+      - audit-1-home:/home/runner
+  audit-2:
+    <<: *runner
+    environment:
+      RUNNER_NAME: Zoe-WSL-Audit-2
+      RUNNER_LABELS: wsl-zoe-audit
+    volumes:
+      - audit-2-home:/home/runner
+  audit-3:
+    <<: *runner
+    environment:
+      RUNNER_NAME: Zoe-WSL-Audit-3
+      RUNNER_LABELS: wsl-zoe-audit
+    volumes:
+      - audit-3-home:/home/runner
+  audit-4:
+    <<: *runner
+    environment:
+      RUNNER_NAME: Zoe-WSL-Audit-4
+      RUNNER_LABELS: wsl-zoe-audit
+    volumes:
+      - audit-4-home:/home/runner
+
+volumes:
+  audit-1-home:
+  audit-2-home:
+  audit-3-home:
+  audit-4-home:

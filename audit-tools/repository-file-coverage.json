@@ -583,6 +583,22 @@
       ],
       "evidence": "firebase-provision-test ពិនិត្យ pin កំណែ firebase-tools · lock ស្របនឹង package.json · engines · .cmd ASCII+CRLF · ពាក្យបញ្ជាដែល launcher ហៅ",
       "limitation": "មិនបញ្ជាក់ថា npm registry ឬ Windows cmd.exe ពិតដំណើរការលើម៉ាស៊ីនរបស់ម្ចាស់គម្រោង។"
+    },
+    "self-hosted-runners": {
+      "category": "static",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "repository-contract-test ផ្ទៀង Linux/Windows labels, Private/fork guard, shard ទាំង ៤, Chromium dependencies និង container home/port isolation។",
+      "limitation": "កិច្ចសន្យាប្រភពមិនបញ្ជាក់ Docker/WSL/Windows services ពិត ឬការប្រើ RAM លើម៉ាស៊ីនម្ចាស់គម្រោង។"
+    },
+    "self-hosted-register": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "រត់ register.sh ពិតទល់ Docker CLI fixture៖ លំដាប់ runner ៤, token តាម stdin មិនលេច argv/output និងបញ្ឈប់នៅកំហុសដំបូង។",
+      "limitation": "Docker និង GitHub registration API ពិតមិនរត់; account permissions និង service connectivity ត្រូវសាកដោយម្ចាស់គម្រោង។"
     }
   },
   "files": {
@@ -2814,6 +2830,24 @@
     },
     "supabase/migrations/20261003120000_zoe_admin_export.sql": {
       "policy": "supabase-db"
+    },
+    "tools/actions-runners/Dockerfile": {
+      "policy": "self-hosted-runners"
+    },
+    "tools/actions-runners/compose.yml": {
+      "policy": "self-hosted-runners"
+    },
+    "tools/actions-runners/.dockerignore": {
+      "policy": "self-hosted-runners"
+    },
+    "tools/actions-runners/.wslconfig.example": {
+      "policy": "self-hosted-runners"
+    },
+    "tools/actions-runners/register.sh": {
+      "policy": "self-hosted-register"
+    },
+    "docs/SELF-HOSTED-RUNNERS.md": {
+      "policy": "guard-13"
     }
   }
 }

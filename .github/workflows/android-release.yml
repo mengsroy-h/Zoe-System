@@ -32,19 +32,36 @@ concurrency:
   group: android-release
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   apk:
     name: Build APK ➜ GitHub Release
-    runs-on: ubuntu-latest
+    if: github.event.repository.private == true && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, windows-zoe-android]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: ពិនិត្យ GitHub CLI
+        run: |
+          git --version
+          gh --version
+          powershell.exe -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
 
       - name: កំណែ និងស្លាក Release
         id: meta
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          GITHUB_OUTPUT=$(cygpath -u "$GITHUB_OUTPUT")
           VERSION=$(node -e "const s=require('fs').readFileSync('ZoeW/src/core/version.ts','utf8');const m=s.match(/APP_VERSION\s*=\s*'([0-9]+\.[0-9]+\.[0-9]+)'/);if(!m)process.exit(1);console.log(m[1])")
           TAG="zoew-android-v${VERSION}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -65,6 +82,7 @@ jobs:
           KA: ${{ secrets.ZOEW_KEY_ALIAS }}
           KP: ${{ secrets.ZOEW_KEY_PASSWORD }}
         run: |
+          GITHUB_OUTPUT=$(cygpath -u "$GITHUB_OUTPUT")
           if [ -n "$KS" ] && [ -n "$KSP" ] && [ -n "$KA" ] && [ -n "$KP" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -83,12 +101,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: actions/setup-node@v7
+      - name: ដំឡើង Android SDK
         if: steps.keystore.outputs.ready == 'true'
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
         with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: ZoeW/package-lock.json
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
 
       - name: google-services.json (FCM ៖ ជូនដំណឹងលើទូរស័ព្ទ · ស្រេចចិត្ត)
         if: steps.keystore.outputs.ready == 'true'
@@ -120,19 +139,19 @@ jobs:
           ZOEW_KEY_ALIAS: ${{ secrets.ZOEW_KEY_ALIAS }}
           ZOEW_KEY_PASSWORD: ${{ secrets.ZOEW_KEY_PASSWORD }}
         run: |
-          export ZOEW_KEYSTORE_FILE="$RUNNER_TEMP/zoew-release.jks"
+          export ZOEW_KEYSTORE_FILE="$(cygpath -m "$RUNNER_TEMP")/zoew-release.jks"
+          umask 077
           printf '%s' "$KS" | base64 -d > "$ZOEW_KEYSTORE_FILE"
           cd ZoeW/android
-          chmod +x ./gradlew
-          ./gradlew --no-daemon assembleRelease
+          powershell.exe -NoProfile -Command '& .\gradlew.bat --no-daemon --max-workers=2 "-Dorg.gradle.parallel=false" assembleRelease; exit $LASTEXITCODE'
 
       - name: ផ្ទៀងផ្ទាត់ហត្ថលេខា ➜ ដាក់ឈ្មោះ
         if: steps.keystore.outputs.ready == 'true'
         run: |
           APK="ZoeW/android/app/build/outputs/apk/release/app-release.apk"
           test -f "$APK" || { echo "::error::រក APK ដែល sign រួចមិនឃើញ (${APK})"; exit 1; }
-          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify -v --print-certs "$APK" > apk-certs.txt || { cat apk-certs.txt; echo "::error::apksigner verify ធ្លាក់ ➜ មិនបង្កើត Release"; exit 1; }
+          GITHUB_STEP_SUMMARY=$(cygpath -u "$GITHUB_STEP_SUMMARY")
+          powershell.exe -NoProfile -Command '& "$env:ANDROID_HOME\build-tools\35.0.0\apksigner.bat" verify -v --print-certs "ZoeW\android\app\build\outputs\apk\release\app-release.apk"; exit $LASTEXITCODE'  > apk-certs.txt || { cat apk-certs.txt; echo "::error::apksigner verify ធ្លាក់ ➜ មិនបង្កើត Release"; exit 1; }
           cat apk-certs.txt
           if ! GOT=$(node ZoeW/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256 2> apk-cert-why.txt); then
             echo "::error::$(cat apk-cert-why.txt) ➜ secret ចង្អុលទៅ keystore ផ្សេង ឬ APK មិនត្រឹមត្រូវ ➜ មិនបង្កើត Release"
@@ -175,3 +194,11 @@ jobs:
       - name: លុប keystore ចេញពី runner
         if: always()
         run: rm -f "$RUNNER_TEMP/zoew-release.jks"
+
+      - name: លុប config FCM ចេញពី runner
+        if: always()
+        run: rm -f ZoeW/android/app/google-services.json
+
+      - name: លុប keystore តាមផ្លូវ Windows
+        if: always()
+        run: rm -f "$(cygpath -u "$RUNNER_TEMP")/zoew-release.jks"

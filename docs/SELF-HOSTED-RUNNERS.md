@@ -22,13 +22,15 @@ GitHub → repo → Settings → Secrets and variables → Actions → Variables
 | `self-hosted` | Linux runner ៤ ក្នុង WSL | Windows runner របស់អ្នក |
 | `github` | `ubuntu-latest` ចំនួន ៤ job | `windows-latest` |
 
+បង្កើតនៅ tab **Variables** ជា **Repository variable** មិនមែន Secret, `.env` ឬ Environment variable ទេ។ PR ជា Draft ក៏អាចរត់ Audit បាន; workflow មិនបិទតាម draft flag។
+
 បើមិនមាន variable ឬ value ផ្សេង Workflow ប្រើ self-hosted ជាលំនាំដើម។ ការប្ដូរ value មានប្រសិទ្ធភាពលើ workflow run ថ្មី; វាមិនផ្លាស់ទី job ដែលកំពុងរត់ទេ។ Mode `github` មិនត្រូវការ PC Online; repo Private ត្រូវមាន quota នាទី ឬ billing សម្រាប់ GitHub-hosted។ ការប្ដូរមិនធ្វើស្វ័យប្រវត្តិតាម quota ទេ។
 
-ពេល quota GitHub ត្រឡប់មក កែ value ទៅ `github` រួច Actions → Audit → Run workflow → main; Audit អាចចាប់ job ទាំង ៤ព្រមគ្នា។ Android APK ជ្រើស Windows របស់ GitHub តាម variable ដូចគ្នា។ Workflow នៅតែរក្សា Private និង main/signing guards។
+ពេល quota GitHub ត្រឡប់មក កែ value ទៅ `github` រួច Actions → Audit → Run workflow → main; Audit អាចចាប់ job ទាំង ៤ព្រមគ្នា។ Android APK ជ្រើស Windows របស់ GitHub តាម variable ដូចគ្នា។ GitHub mode រត់បានទាំង Public និង Private; self-hosted mode ត្រូវការ Private។ APK នៅតែរក្សា main/signing guards។
 
 ## ១. ដាក់ repo ជា Private
 
-GitHub → repo → Settings → General → Danger Zone → Change repository visibility → Make private។ Workflow ទាំងពីររត់តែពេល repo ជា Private; audit មិនចាប់ PR ពី fork។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow រត់កូដលើម៉ាស៊ីនអ្នក។ កុំរត់ PR មិនទុកចិត្តលើ PC ផ្ទាល់ខ្លួន។
+GitHub → repo → Settings → General → Danger Zone → Change repository visibility → Make private។ សម្រាប់ self-hosted mode Workflow ទាំងពីររត់តែពេល repo ជា Private; GitHub mode អាចរត់លើ Public ដែរ។ Audit មិនចាប់ PR ពី fork។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow រត់កូដលើម៉ាស៊ីនអ្នក។ កុំរត់ PR មិនទុកចិត្តលើ PC ផ្ទាល់ខ្លួន។
 
 Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted ទេ; អគ្គិសនី និងធនធានម៉ាស៊ីនជារបស់អ្នក។ Artifact និង cache នៅ GitHub មាន quota ផ្សេង។ Workflow ទាំងពីររក្សា dependency cache ក្នុងម៉ាស៊ីន ដោយបិទ automatic npm cache upload ទៅ GitHub។
 
@@ -184,7 +186,7 @@ Ctrl+C បិទការមើល stats។ បញ្ឈប់ runner ពេល�
 | រោគសញ្ញា | ពិនិត្យ |
 |---|---|
 | Waiting for a runner | ពិនិត្យ `ZOE_RUNNER_MODE`; ក្នុង self-hosted mode ពិនិត្យ Online, OS/X64 និង custom label |
-| Job ទាំងអស់ skipped | Repo នៅ Public, PR ពី fork ឬ Android branch មិនមែន main |
+| Job ទាំងអស់ skipped | ពិនិត្យ repository variable `ZOE_RUNNER_MODE` មិនមែន env/Secret; Public ត្រូវប្រើ `github`, audit មិនរត់ fork PR និង Android branch ត្រូវជា main |
 | sudo terminal error | self-hosted step មិនហៅ sudo; sudo និង --with-deps ត្រូវរត់តែ step GitHub mode |
 | Emulator port ជាន់ | Runner ត្រូវជា container ដាច់ៗ គ្មាន host network |
 | bash/gh/cygpath រកមិនឃើញ | Git for Windows/GitHub CLI និង restart service ដើម្បី refresh PATH |

@@ -326,10 +326,27 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && same(labels(audit, ''), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
         && same(labels(audit, 'invalid'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
         && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*4\b/.test(audit));
-    check('fork មិនរត់លើ PC និង workflow មិនចាប់ self-hosted ពេល Public',
-        audit.includes('github.event.repository.private == true')
-        && audit.includes('github.event.pull_request.head.repo.full_name == github.repository')
-        && apk.includes('github.event.repository.private == true'));
+    const allowed = (source, mode, isPrivate, event = 'pull_request', sameRepo = true, ref = 'refs/heads/main') => {
+        const match = source.match(/^    if: (.+)$/m);
+        if (!match) return false;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, github: {
+            event_name: event, repository: 'owner/repo', ref,
+            event: { repository: { private: isPrivate },
+                pull_request: { draft: true, head: { repo: { full_name: sameRepo ? 'owner/repo' : 'fork/repo' } } } }
+        } }) === true;
+    };
+    check('GitHub mode រត់ Public/Private និង Draft; self-hosted នៅតែទាមទារ Private',
+        allowed(audit, 'github', false) && allowed(audit, 'github', true)
+        && allowed(audit, 'self-hosted', true) && !allowed(audit, 'self-hosted', false)
+        && !allowed(audit, '', false) && !allowed(audit, 'invalid', false)
+        && allowed(apk, 'github', false, 'workflow_dispatch')
+        && allowed(apk, 'self-hosted', true, 'workflow_dispatch')
+        && !allowed(apk, 'self-hosted', false, 'workflow_dispatch'));
+    check('fork មិនរត់ audit និង APK នៅ main តែប៉ុណ្ណោះ',
+        !allowed(audit, 'self-hosted', true, 'pull_request', false)
+        && !allowed(audit, 'github', false, 'pull_request', false)
+        && allowed(audit, 'github', false, 'push')
+        && !allowed(apk, 'github', false, 'workflow_dispatch', true, 'refs/heads/feature'));
     check('APK ជ្រើស Windows pool ឬ GitHub និងប្រើ Gradle/apksigner របស់ Windows',
         same(labels(apk, 'self-hosted'), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
         && same(labels(apk, 'github'), ['windows-latest'])

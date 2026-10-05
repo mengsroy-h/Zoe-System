@@ -310,5 +310,96 @@ scenario('comment checker វាស់ root ដែលបានស្នើ ន�
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
+    const audit = read('.github/workflows/audit.yml');
+    const apk = read('.github/workflows/android-release.yml');
+    const compose = read('tools/actions-runners/compose.yml');
+    const image = read('tools/actions-runners/Dockerfile');
+    const labels = (source, mode) => {
+        const match = source.match(/runs-on:\s*\$\{\{\s*(.*?)\s*\}\}/);
+        if (!match) return null;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, fromJSON: JSON.parse });
+    };
+    check('audit ជ្រើស Linux pool ឬ GitHub និងអនុញ្ញាត shard ទាំង ៤ស្របគ្នា',
+        same(labels(audit, 'self-hosted'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'github'), ['ubuntu-latest'])
+        && same(labels(audit, ''), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'invalid'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*4\b/.test(audit));
+    const allowed = (source, mode, isPrivate, event = 'pull_request', sameRepo = true, ref = 'refs/heads/main') => {
+        const match = source.match(/^    if: (.+)$/m);
+        if (!match) return false;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, github: {
+            event_name: event, repository: 'owner/repo', ref,
+            event: { repository: { private: isPrivate },
+                pull_request: { draft: true, head: { repo: { full_name: sameRepo ? 'owner/repo' : 'fork/repo' } } } }
+        } }) === true;
+    };
+    check('GitHub mode រត់ Public/Private និង Draft; self-hosted នៅតែទាមទារ Private',
+        allowed(audit, 'github', false) && allowed(audit, 'github', true)
+        && allowed(audit, 'self-hosted', true) && !allowed(audit, 'self-hosted', false)
+        && !allowed(audit, '', false) && !allowed(audit, 'invalid', false)
+        && allowed(apk, 'github', false, 'workflow_dispatch')
+        && allowed(apk, 'self-hosted', true, 'workflow_dispatch')
+        && !allowed(apk, 'self-hosted', false, 'workflow_dispatch'));
+    check('fork មិនរត់ audit និង APK នៅ main តែប៉ុណ្ណោះ',
+        !allowed(audit, 'self-hosted', true, 'pull_request', false)
+        && !allowed(audit, 'github', false, 'pull_request', false)
+        && allowed(audit, 'github', false, 'push')
+        && !allowed(apk, 'github', false, 'workflow_dispatch', true, 'refs/heads/feature'));
+    check('APK ជ្រើស Windows pool ឬ GitHub និងប្រើ Gradle/apksigner របស់ Windows',
+        same(labels(apk, 'self-hosted'), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
+        && same(labels(apk, 'github'), ['windows-latest'])
+        && same(labels(apk, ''), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
+        && apk.includes('gradlew.bat') && apk.includes('apksigner.bat')
+        && apk.indexOf('actions/setup-node@') < apk.indexOf('VERSION=$(node')
+        && apk.indexOf('android-actions/setup-android@') < apk.indexOf('gradlew.bat'));
+    check('Linux container មាន home ដាច់ពីគ្នា និងគ្មាន host port/socket',
+        [1, 2, 3, 4].every((n) => compose.includes('audit-' + n + '-home:/home/runner'))
+        && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
+    const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
+    check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ',
+        image.includes('install-deps chromium') && privileged.length === 1
+        && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+        && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+            && step.includes('playwright install chromium') && !/\bsudo\b|--with-deps/.test(step)));
+});
+
+scenario('registration script ៖ ៤ runner · token លាក់ពី argv · បញ្ឈប់ពេលខុស', () => {
+    const script = path.join(ROOT, 'tools/actions-runners/register.sh');
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-runner-register-'));
+    const log = path.join(temp, 'calls.jsonl');
+    try {
+        const docker = path.join(temp, 'docker');
+        fs.writeFileSync(docker, '#!' + process.execPath + '\n'
+            + 'const fs=require("fs"),args=process.argv.slice(2);'
+            + 'if(args.includes("run")){const input=fs.readFileSync(0,"utf8");'
+            + 'fs.appendFileSync(process.env.ZOE_RUNNER_FIXTURE_LOG,JSON.stringify({args,input})+"\\n");'
+            + 'if(process.env.ZOE_RUNNER_FIXTURE_FAIL && args.includes(process.env.ZOE_RUNNER_FIXTURE_FAIL)) process.exit(17);}\n');
+        fs.chmodSync(docker, 0o755);
+        const run = (stopAt = '') => cp.spawnSync('bash', [script], {
+            cwd: ROOT, input: 'fixture-registration-token\n', encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, PATH: temp + path.delimiter + process.env.PATH,
+                ZOE_RUNNER_FIXTURE_LOG: log, ZOE_RUNNER_FIXTURE_FAIL: stopAt }
+        });
+        const calls = () => fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+        let result = run();
+        let recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ លំដាប់ runner ៤ មិនស្ទួន ហើយ exit 0', result.status === 0
+            && same(recorded.map((c) => c.args.find((a) => /^audit-[1-4]$/.test(a))),
+                ['audit-1', 'audit-2', 'audit-3', 'audit-4']), result.stdout + result.stderr);
+        check('register ៖ token ឆ្លង stdin ប៉ុណ្ណោះ និងមិនលេចក្នុង output', recorded.length === 4
+            && recorded.every((c) => c.input === 'fixture-registration-token\n'
+                && !c.args.join(' ').includes('fixture-registration-token'))
+            && !(result.stdout + result.stderr).includes('fixture-registration-token'));
+        if (fs.existsSync(log)) fs.rmSync(log);
+        result = run('audit-2');
+        recorded = fs.existsSync(log) ? calls() : [];
+        check('register ៖ Docker ខុស ➜ exit ដើម និងមិន register runner បន្ទាប់',
+            result.status === 17 && recorded.length === 2, result.stdout + result.stderr);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);

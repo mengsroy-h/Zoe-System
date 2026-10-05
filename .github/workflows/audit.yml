@@ -1,5 +1,5 @@
 # ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR និង main ៖ `run-all.sh` ពេញ (រួមតេស្ត browser · RTDB emulator ពិត · Postgres ពិត)
-# បែងចែកជា ៤ ផ្នែក (`RUNALL_SHARD`) ហើយរត់ស្របគ្នាអតិបរមា ២។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
+# បែងចែកជា ៤ ផ្នែក (`RUNALL_SHARD`) ហើយរត់ស្របគ្នាទាំង ៤។ CI បៃតង = ផ្នែកទាំង ៤ បៃតង។
 #
 # ⛔ ទង់ *_STRICT ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator · Postgres · firebase-tools មិនឡើង
 #    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ (កំហុស 2.17.2/2.17.3 ship បាន ព្រោះគ្មានអ្វីសាកនឹង rules ពិត)។
@@ -27,11 +27,11 @@ jobs:
   audit-shard:
     name: run-all.sh ផ្នែក ${{ matrix.shard }}/4
     if: github.event.repository.private == true && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, Linux, X64, wsl-zoe-audit]
+    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","wsl-zoe-audit"]') }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
         shard: [1, 2, 3, 4]
     steps:
@@ -59,8 +59,16 @@ jobs:
           PW_VERSION=$(node -p "require('./ZoeW/package-lock.json').packages['node_modules/playwright-core'].version")
           npm install --no-save --no-audit --no-fund acorn "playwright-core@$PW_VERSION" "playwright@$PW_VERSION"
 
-      - name: ទាញ Chromium
+      - name: ទាញ Chromium លើម៉ាស៊ីនអ្នក
+        if: vars.ZOE_RUNNER_MODE != 'github'
         run: npx --no-install playwright install chromium
+
+      - name: ត្រៀម Chromium លើម៉ាស៊ីន GitHub
+        if: vars.ZOE_RUNNER_MODE == 'github'
+        run: |
+          npx --no-install playwright install --with-deps chromium
+          sudo mkdir -p /opt/pw-browsers/chromium-1194
+          sudo chown -R "$(id -u):$(id -g)" /opt/pw-browsers
 
       # តេស្ត browser រកមើល Chromium នៅផ្លូវថេរមួយ (ដូចបរិស្ថាន audit ដើម)។
       # ដូច្នេះ symlink វាទៅផ្លូវនោះ ជំនួសការកែឯកសារ ២០។

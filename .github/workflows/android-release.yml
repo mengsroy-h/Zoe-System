@@ -40,7 +40,7 @@ jobs:
   apk:
     name: Build APK ➜ GitHub Release
     if: github.event.repository.private == true && github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Windows, X64, windows-zoe-android]
+    runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["windows-latest"]' || '["self-hosted","Windows","X64","windows-zoe-android"]') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7

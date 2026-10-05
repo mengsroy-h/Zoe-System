@@ -310,28 +310,43 @@ scenario('comment checker វាស់ root ដែលបានស្នើ ន�
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
-scenario('self-hosted runner ៖ Linux audit និង Windows APK ដាច់ពីគ្នា', () => {
+scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំងពីរ', () => {
     const audit = read('.github/workflows/audit.yml');
     const apk = read('.github/workflows/android-release.yml');
     const compose = read('tools/actions-runners/compose.yml');
     const image = read('tools/actions-runners/Dockerfile');
-    check('audit ជ្រើស Linux pool ជាក់លាក់ និងរក្សា shard ទាំង ៤',
-        /runs-on:\s*\[self-hosted, Linux, X64, wsl-zoe-audit\]/.test(audit)
-        && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*2\b/.test(audit));
+    const labels = (source, mode) => {
+        const match = source.match(/runs-on:\s*\$\{\{\s*(.*?)\s*\}\}/);
+        if (!match) return null;
+        return vm.runInNewContext(match[1], { vars: { ZOE_RUNNER_MODE: mode }, fromJSON: JSON.parse });
+    };
+    check('audit ជ្រើស Linux pool ឬ GitHub និងអនុញ្ញាត shard ទាំង ៤ស្របគ្នា',
+        same(labels(audit, 'self-hosted'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'github'), ['ubuntu-latest'])
+        && same(labels(audit, ''), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && same(labels(audit, 'invalid'), ['self-hosted', 'Linux', 'X64', 'wsl-zoe-audit'])
+        && /shard:\s*\[1, 2, 3, 4\]/.test(audit) && /max-parallel:\s*4\b/.test(audit));
     check('fork មិនរត់លើ PC និង workflow មិនចាប់ self-hosted ពេល Public',
         audit.includes('github.event.repository.private == true')
         && audit.includes('github.event.pull_request.head.repo.full_name == github.repository')
         && apk.includes('github.event.repository.private == true'));
-    check('APK ជ្រើស Windows pool និងប្រើ Gradle/apksigner របស់ Windows',
-        /runs-on:\s*\[self-hosted, Windows, X64, windows-zoe-android\]/.test(apk)
+    check('APK ជ្រើស Windows pool ឬ GitHub និងប្រើ Gradle/apksigner របស់ Windows',
+        same(labels(apk, 'self-hosted'), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
+        && same(labels(apk, 'github'), ['windows-latest'])
+        && same(labels(apk, ''), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
         && apk.includes('gradlew.bat') && apk.includes('apksigner.bat')
         && apk.indexOf('actions/setup-node@') < apk.indexOf('VERSION=$(node')
         && apk.indexOf('android-actions/setup-android@') < apk.indexOf('gradlew.bat'));
     check('Linux container មាន home ដាច់ពីគ្នា និងគ្មាន host port/socket',
         [1, 2, 3, 4].every((n) => compose.includes('audit-' + n + '-home:/home/runner'))
         && !/network_mode\s*:|\bports\s*:|docker\.sock|privileged\s*:\s*true/.test(compose));
-    check('Chromium dependency ដំឡើងក្នុង image; job មិនហៅ sudo',
-        image.includes('install-deps chromium') && !/\bsudo\b|--with-deps/.test(audit));
+    const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
+    const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
+    check('Chromium ៖ system dependencies ក្នុង image ឬ GitHub step តែប៉ុណ្ណោះ',
+        image.includes('install-deps chromium') && privileged.length === 1
+        && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
+        && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
+            && step.includes('playwright install chromium') && !/\bsudo\b|--with-deps/.test(step)));
 });
 
 scenario('registration script ៖ ៤ runner · token លាក់ពី argv · បញ្ឈប់ពេលខុស', () => {

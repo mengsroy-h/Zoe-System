@@ -1,5 +1,5 @@
 [wsl2]
-memory=8GB
+memory=12GB
 processors=8
 swap=4GB
 

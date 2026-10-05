@@ -7,15 +7,28 @@
 | `run-all.sh` | Ubuntu ក្នុង Docker/WSL2 | ៤ | `wsl-zoe-audit` |
 | Build APK | Windows ផ្ទាល់ | ១ | `windows-zoe-android` |
 
-Audit មាន shard ទាំង ៤ ហើយ `max-parallel: 2` ឱ្យពីររត់ស្របគ្នា ដើម្បីសមនឹង RAM 16GB។ Runner Online មិនមានន័យថាកំពុង build ទាំងអស់ទេ។ `max-parallel` ជាពិដានក្នុង workflow មួយ; កុំបើក audit ច្រើន branch ព្រមគ្នា។ សាក audit មុន ហើយរង់ចាំចប់មុនចុច build APK។
+Audit មាន shard ទាំង ៤ ហើយ `max-parallel: 4` ឱ្យទាំង ៤អាចរត់ស្របគ្នា ក្នុង mode ទាំងពីរ។ លើ PC ត្រូវមាន Linux runner ៤ Online/Idle ទើបចាប់ job ទាំង ៤បាន; លើ GitHub ក៏អាស្រ័យលើ runner capacity និង quota។ `max-parallel` ជាពិដានក្នុង workflow មួយ; កុំបើក audit ច្រើន branch ព្រមគ្នា។ សាក audit មុន ហើយរង់ចាំចប់មុនចុច build APK។
 
 Runner Linux នីមួយៗមាន Docker network និង home volume ដាច់ពីគ្នា។ Emulator ប្រើ `127.0.0.1:9000` ក្នុង container ផ្ទាល់; កុំបើក host network, កុំ publish port 9000 និងកុំ mount Docker socket ចូល runner។
 
 ឯកសាររបស់ម៉ាស៊ីននៅ [tools/actions-runners](../tools/actions-runners/)។ Workflow នៅ [audit.yml](../.github/workflows/audit.yml) និង [android-release.yml](../.github/workflows/android-release.yml)។ ឯកសារទាំងនេះមិនផ្លាស់ប្ដូរ License ឬ signing key របស់ App ទេ។
 
+## ជ្រើសម៉ាស៊ីនអ្នក ឬម៉ាស៊ីន GitHub
+
+GitHub → repo → Settings → Secrets and variables → Actions → Variables → New repository variable។ បង្កើត `ZOE_RUNNER_MODE`៖
+
+| Value | Audit | APK |
+|---|---|---|
+| `self-hosted` | Linux runner ៤ ក្នុង WSL | Windows runner របស់អ្នក |
+| `github` | `ubuntu-latest` ចំនួន ៤ job | `windows-latest` |
+
+បើមិនមាន variable ឬ value ផ្សេង Workflow ប្រើ self-hosted ជាលំនាំដើម។ ការប្ដូរ value មានប្រសិទ្ធភាពលើ workflow run ថ្មី; វាមិនផ្លាស់ទី job ដែលកំពុងរត់ទេ។ Mode `github` មិនត្រូវការ PC Online; repo Private ត្រូវមាន quota នាទី ឬ billing សម្រាប់ GitHub-hosted។ ការប្ដូរមិនធ្វើស្វ័យប្រវត្តិតាម quota ទេ។
+
+ពេល quota GitHub ត្រឡប់មក កែ value ទៅ `github` រួច Actions → Audit → Run workflow → main; Audit អាចចាប់ job ទាំង ៤ព្រមគ្នា។ Android APK ជ្រើស Windows របស់ GitHub តាម variable ដូចគ្នា។ Workflow នៅតែរក្សា Private និង main/signing guards។
+
 ## ១. ដាក់ repo ជា Private
 
-GitHub → repo → Settings → General → Danger Zone → Change repository visibility → Make private។ Workflow ទាំងពីរចាប់ self-hosted job តែពេល repo ជា Private; audit មិនចាប់ PR ពី fork។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow រត់កូដលើម៉ាស៊ីនអ្នក។ កុំរត់ PR មិនទុកចិត្តលើ PC ផ្ទាល់ខ្លួន។
+GitHub → repo → Settings → General → Danger Zone → Change repository visibility → Make private។ Workflow ទាំងពីររត់តែពេល repo ជា Private; audit មិនចាប់ PR ពី fork។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow រត់កូដលើម៉ាស៊ីនអ្នក។ កុំរត់ PR មិនទុកចិត្តលើ PC ផ្ទាល់ខ្លួន។
 
 Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted ទេ; អគ្គិសនី និងធនធានម៉ាស៊ីនជារបស់អ្នក។ Artifact និង cache នៅ GitHub មាន quota ផ្សេង។ Workflow ទាំងពីររក្សា dependency cache ក្នុងម៉ាស៊ីន ដោយបិទ automatic npm cache upload ទៅ GitHub។
 
@@ -48,12 +61,12 @@ notepad "$env:USERPROFILE\.wslconfig"
 
 ```ini
 [wsl2]
-memory=8GB
+memory=12GB
 processors=8
 swap=4GB
 ```
 
-`processors` គឺ CPU logical មិនមែនចំនួន runner; បើមានតិចជាង 8 ប្រើចំនួនដែលមាន។ RAM 8GB ជាពិដានរួមរបស់ WSL2 ទាំងអស់។ បិទការងារ WSL មុន `wsl --shutdown` ព្រោះវាបញ្ឈប់ distro និង Docker ដែលកំពុងធ្វើការ។ បន្ទាប់មកបើក Docker/Ubuntu ឡើងវិញ។
+`processors` គឺ CPU logical មិនមែនចំនួន runner; បើមានតិចជាង 8 ប្រើចំនួនដែលមាន។ RAM 12GB ជាពិដានរួមរបស់ WSL2 ទាំងអស់ សម្រាប់សាក audit ៤ស្របគ្នា; លើ PC RAM 16GB វានៅសល់ប្រហែល 4GB សម្រាប់ Windows។ បិទកម្មវិធីធ្ងន់ និងមើលការប្រើ RAM ពិត; ប្រសិនបើមាន OOM ត្រូវកាត់ parallel ឬប្រើ GitHub mode។ បិទការងារ WSL មុន `wsl --shutdown` ព្រោះវាបញ្ឈប់ distro និង Docker ដែលកំពុងធ្វើការ។ បន្ទាប់មកបើក Docker/Ubuntu ឡើងវិញ។
 
 ## ៣. Docker Desktop
 
@@ -156,7 +169,7 @@ Secret ដើមទាំង ៤ ត្រូវមាន៖ `ZOEW_KEYSTORE_BASE
 
 ## ៨. ថែទាំ និងដោះស្រាយកំហុស
 
-Linux ត្រូវការ Docker Desktop បើក។ Windows runner ត្រូវការ service ឬ `run.cmd` បើក។ PC ត្រូវភ្ញាក់ មានភ្លើង និងអ៊ីនធឺណិត។ កំណត់ Docker Desktop Start when you sign in និង Windows Sleep ពេលដោតភ្លើងឱ្យសមនឹង CI។ Docker `restart: unless-stopped` មិនដាស់ Windows ឬបើក Docker Desktop ដោយខ្លួនឯងទេ។
+ក្នុង self-hosted mode Linux ត្រូវការ Docker Desktop បើក។ Windows runner ត្រូវការ service ឬ `run.cmd` បើក។ PC ត្រូវភ្ញាក់ មានភ្លើង និងអ៊ីនធឺណិត។ កំណត់ Docker Desktop Start when you sign in និង Windows Sleep ពេលដោតភ្លើងឱ្យសមនឹង CI។ Docker `restart: unless-stopped` មិនដាស់ Windows ឬបើក Docker Desktop ដោយខ្លួនឯងទេ។
 
 ក្នុង Ubuntu ពី `tools/actions-runners`៖
 
@@ -170,9 +183,9 @@ Ctrl+C បិទការមើល stats។ បញ្ឈប់ runner ពេល�
 
 | រោគសញ្ញា | ពិនិត្យ |
 |---|---|
-| Waiting for a runner | Online, OS/X64 និង custom label ត្រឹមត្រូវ |
+| Waiting for a runner | ពិនិត្យ `ZOE_RUNNER_MODE`; ក្នុង self-hosted mode ពិនិត្យ Online, OS/X64 និង custom label |
 | Job ទាំងអស់ skipped | Repo នៅ Public, PR ពី fork ឬ Android branch មិនមែន main |
-| sudo terminal error | Workflow/runner ចាស់; Linux workflow ថ្មីមិនហៅ sudo |
+| sudo terminal error | self-hosted step មិនហៅ sudo; sudo និង --with-deps ត្រូវរត់តែ step GitHub mode |
 | Emulator port ជាន់ | Runner ត្រូវជា container ដាច់ៗ គ្មាន host network |
 | bash/gh/cygpath រកមិនឃើញ | Git for Windows/GitHub CLI និង restart service ដើម្បី refresh PATH |
 | SDK location not found | SDK setup ក្រោយ Java, ANDROID_HOME និង service account permissions |

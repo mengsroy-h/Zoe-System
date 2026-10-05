@@ -492,7 +492,7 @@ Self-hosted jobs នឹង skip បើ repo នៅ Public។ ផ្ដល់ស�
 
 Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ។ GitHub Release ក្នុង repo Private ក៏ទាមទារសិទ្ធិ; បើចែក App ទៅអតិថិជន ចែកតែ signed APK តាមកន្លែងផ្សេង ដោយមិនផ្ដល់សិទ្ធិចូល source repo។
 
-Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Workflow ទាំងពីរបិទ automatic npm cache upload និងរក្សា dependencies cache តាមម៉ាស៊ីនដែលរត់។
+Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Self-hosted Audit រក្សា npm cache ក្នុង home volumes; GitHub-hosted Audit ប្រើ explicit npm cache ដែល key ដេរីវេពី lockfiles របស់ ZoeW, supabase និង firebase-provision។ APK workflow បិទ automatic npm cache upload ហើយប្រើ cache របស់ម៉ាស៊ីនដែលរត់។
 
 **ចំណុចត្រូវឆ្លង៖** សម្រាប់ self-hosted mode repo Private និង runner ទាំង ៥ Online។
 
@@ -591,18 +591,32 @@ docker compose up -d --force-recreate
 
 ១. រង់ចាំឱ្យ jobs ចប់ ឬ Cancel run នៅ GitHub មុនបញ្ឈប់ containers។
 
-២. Update source ដែលមាន Dockerfile និង workflow ថ្មី។ ក្រោយ merge រួច រត់ក្នុង Ubuntu៖
+២. Update source ដែលមាន Dockerfile និង workflow ថ្មី។ **បើ PR មិនទាន់ merge** រត់ក្នុង Ubuntu៖
+
+```bash
+cd ~/src/Zoe-System
+git fetch origin
+git switch codex/windows-apk-git-bash
+git pull --ff-only
+```
+
+**ក្រោយ merge រួច** ប្រើ main ជំនួស៖
 
 ```bash
 cd ~/src/Zoe-System
 git switch main
 git pull --ff-only
+```
+
+៣. ពេល source update ឆ្លង បញ្ឈប់ containers ហើយ build image៖
+
+```bash
 cd tools/actions-runners
 docker compose stop
 docker build -t zoe-actions-runner:local .
 ```
 
-៣. បើ build ឆ្លង ទើបបង្កើត containers ថ្មីពី image នោះ ដោយរក្សា named volumes៖
+៤. បើ build ឆ្លង ទើបបង្កើត containers ថ្មីពី image នោះ ដោយរក្សា named volumes៖
 
 ```bash
 docker compose up -d --force-recreate
@@ -617,6 +631,10 @@ docker compose exec -T audit-1 bash -c 'node --version; java -version; javac -ve
 ការទាញលើកដំបូង ឬពេលកំណែ dependencies ប្រែ អាចយូរតាមល្បឿន network។ npm, Chromium និង Firebase emulator មាន cache ក្នុង home volume ដាច់ៗរបស់ runner នីមួយៗ។ ពេល download បានជោគជ័យ ហើយ cache នៅដដែល run បន្ទាប់អាចប្រើវាវិញ។ Download ដែល fail មិនស្មើ cache ដែលបានត្រៀមរួចទេ។ Rebuild image ក៏អាចត្រូវទាញ package ថ្មី; មិនមានការធានាពេលវេលា run ទេ។
 
 កុំលុប named volumes ឬប្រើ Docker prune volumes បើចង់រក្សា registration/cache។ `npm ci` នៅតែដំឡើងតាម package-lock សម្រាប់ source នីមួយៗ; ការមាន npm cache មិនមានន័យថារំលងតេស្ត ឬប្រើ node_modules ចាស់ដោយមិនផ្ទៀងទេ។
+
+Audit និង APK ប្រើ `npm ci --prefer-offline`៖ package ដែលមាន cache ប្រើមុន; package ដែលបាត់នៅទាញតាម network។ វាមិនមែន offline mode ហើយមិនរំលងការផ្ទៀង package-lock ទេ។ ក្នុង GitHub-hosted Audit, setup-node រក្សា npm package cache រវាង runs; វាមិន cache node_modules ឬ source/signing secrets ទេ។ កំណែ dependencies ប្រែបង្កើត cache key ថ្មី។
+
+GitHub-hosted Audit អាចប្រើ cache ក្រោយ run បានដំឡើង dependencies និង save cache ជោគជ័យ។ បើ GitHub cache storage ពេញ ឬ restore/save បរាជ័យ ត្រូវមើល log របស់ setup-node; ការទាញ dependencies តាម network នៅតែចាំបាច់ពេល cache មិនមាន។
 
 ### Windows៖ PowerShell
 

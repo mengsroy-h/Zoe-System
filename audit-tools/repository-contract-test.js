@@ -370,6 +370,18 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
     const steps = audit.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || [];
     const privileged = steps.filter((step) => /\bsudo\b|--with-deps/.test(step));
     const setupRuntime = steps.filter((step) => /uses: actions\/setup-(node|java)@/.test(step));
+    const nodeStep = setupRuntime.find((step) => step.includes('setup-node@')) || '';
+    const installSteps = steps.filter((step) => /npm ci --prefix/.test(step));
+    const installLocks = installSteps.map((step) => step.match(/npm ci --prefix (\S+)/)[1] + '/package-lock.json');
+    const cacheLocks = (nodeStep.match(/cache-dependency-path: \|\n((?:            [^\n]+\n?)+)/) || ['', ''])[1]
+        .trim().split(/\s+/).filter(Boolean);
+    check('GitHub npm cache យោង lockfiles ដែល audit ដំឡើងពិតទាំងអស់',
+        nodeStep.includes("if: vars.ZOE_RUNNER_MODE == 'github'") && /^          cache: npm$/m.test(nodeStep)
+        && installLocks.length >= 3 && same(installLocks.slice().sort(), cacheLocks.slice().sort())
+        && cacheLocks.every((file) => fs.existsSync(path.join(ROOT, file))));
+    check('Audit និង APK ប្រើ npm ci + prefer-offline ដោយរក្សា lockfile validation',
+        installSteps.length >= 3 && installSteps.every((step) => step.includes('--prefer-offline'))
+        && /npm ci --prefix ZoeW --prefer-offline/.test(apk));
     check('self-hosted ប្រើ Node/Java ក្នុង image; setup downloads សម្រាប់ GitHub តែប៉ុណ្ណោះ',
         setupRuntime.length === 2 && setupRuntime.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
         && image.includes('FROM node:24-') && image.includes('openjdk-21-jdk-headless')

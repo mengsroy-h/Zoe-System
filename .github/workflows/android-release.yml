@@ -141,7 +141,7 @@ jobs:
       - name: Build web (--mode android) ➜ cap sync
         if: steps.keystore.outputs.ready == 'true'
         run: |
-          npm ci --prefix ZoeW
+          npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
           npm run android:check --prefix ZoeW
           npm run android:sync --prefix ZoeW
 

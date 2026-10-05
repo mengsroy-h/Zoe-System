@@ -49,6 +49,11 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+          cache: npm
+          cache-dependency-path: |
+            ZoeW/package-lock.json
+            supabase/package-lock.json
+            tools/firebase-provision/package-lock.json
 
       - uses: actions/setup-java@v6
         if: vars.ZOE_RUNNER_MODE == 'github'
@@ -105,17 +110,17 @@ jobs:
           test -x /opt/pw-browsers/chromium
 
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
-        run: npm ci --prefix ZoeW --no-audit --no-fund
+        run: npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
 
       # ⛔ Postgres ពិត + supabase-js ពិតសម្រាប់ supabase-rls · supabase-datastore · supabase-functions · keygen-supabase-admin ·
       #    emu/supabase-* ➜ `SUPABASE_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL
       - name: ដំឡើង dependency របស់ supabase (Postgres · pg · supabase-js · typescript)
-        run: npm ci --prefix supabase --no-audit --no-fund
+        run: npm ci --prefix supabase --prefer-offline --no-audit --no-fund
 
       # ⛔ firebase-tools ពិត (កំណែ pin) សម្រាប់ firebase-provision-test ➜ `FBPROVISION_STRICT=1` ខាងក្រោមធ្វើឲ្យ SKIP ក្លាយជា FAIL ·
       #    CLI ដដែលទាញ RTDB emulator ខាងក្រោម (គ្មានការដំឡើង firebase-tools ទី ២)
       - name: ដំឡើង dependency របស់ tools/firebase-provision (firebase-tools)
-        run: npm ci --prefix tools/firebase-provision --ignore-scripts --no-audit --no-fund
+        run: npm ci --prefix tools/firebase-provision --prefer-offline --ignore-scripts --no-audit --no-fund
 
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main

@@ -1308,6 +1308,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-05 — npm cache សម្រាប់ GitHub-hosted និង prefer-offline សម្រាប់ Audit/APK
+
+- **សំណើ**៖ ម្ចាស់ចង់ឱ្យ GitHub workflow និង self-hosted runners លឿនជាងមុន ហើយសួរផលប៉ះពាល់របស់ការកែ runtime។
+- **ការកែ**៖ GitHub-hosted Audit setup-node ប្រើ explicit npm cache ជាមួយ lockfiles ពិតរបស់ ZoeW, supabase និង firebase-provision។ Self-hosted Audit នៅប្រើ Node/Java ក្នុង image និង local home cache។ npm ci ក្នុង Audit/APK បន្ថែម prefer-offline/no-audit/no-fund; lockfile validation និងតេស្តពេញនៅដដែល។ APK មិន upload npm cache និង signing secrets មិនចូល cache។ គ្មានការបង្កើន workers ឬកាត់ STRICT flags។
+- **អ្នកយាម**៖ repository-contract-test ដេរីវេ lockfiles ពី npm ci prefixes ក្នុង workflow ហើយប្រៀបនឹង cache-dependency-path; ផ្ទៀង prefer-offline នៅ Audit/APK។ មុនកែ ១៣ឆ្លង/២ធ្លាក់; ក្រោយកែ ១៥ឆ្លង/០ធ្លាក់។ android:check ៨៩ឆ្លង, runall-runner-test ៥៦ឆ្លង និង repository-file-coverage ១០ឆ្លង; YAML/Bash syntax, comments និង whitespace ឆ្លង។ Full STRICT run-all ឈប់នៅ build វាស់ព្រោះគ្មាន Chromium។ ការផ្ទៀង native image/ពេលវេលា CI ត្រូវវាស់ក្រោយ rebuild និង run ពិត។
+- **សកម្មភាពដោយដៃ**៖ Update source/rebuild image/recreate ដោយរក្សា volumes មុន rerun Audit របស់ PR។ ក្រោយ merge បង្កើត run ថ្មីលើ main។ GitHub npm cache ដំបូងត្រូវ download និង save ជោគជ័យ; cache storage quota នៅដាច់ពី compute quota។
+
 ### 2026-10-05 — Wi-Fi យឺត៖ Linux runners ប្រើ Node/Java ក្នុង image
 
 - **ភស្តុតាង**៖ Audit `37295216643` លើ self-hosted shard ១ប្រើ Node setup ៩៥វិនាទី និង Java setup ៤១១វិនាទី មុន TLS connection fail; run-all មិនទាន់ចាប់ផ្ដើម។ GitHub run `37271570634` setup Node ០–៣វិនាទី និង Java ប្រហែល ០វិនាទី។ Java archive ក្នុង log មាន 207,473,347 bytes; runners ទាំង ៤អាចទាញប្រហែល 830 MB ដាច់ៗគ្នា។ ម្ចាស់បញ្ជាក់ថា Wi-Fi យឺត; មិនបានវាស់ bandwidth ពិតទេ។

@@ -325,11 +325,7 @@ export function applySetupPayload(parsed) {
     const linkConfig = Object.assign({}, parsed);
     delete linkConfig.dsn;
     delete linkConfig.invite;
-    if (linkDsn && window.ZoeErrors) {
-        ZoeErrors.setDsn(linkDsn);
-        ZoeErrors.init('zoew');
-        setFieldValue('sentryDsnInput', linkDsn);
-    }
+    if (linkDsn) setFieldValue('sentryDsnInput', linkDsn);
     rememberSetupInvite(linkInvite, linkInvite ? String(parsed.supabaseUrl) : '');
     fillConfigFields(linkConfig);
     setFieldValue('setupLinkInput', '');
@@ -371,15 +367,36 @@ export function applySetupLinkText(text) {
     return connectSetupPayload(result.parsed, 'Setup Link');
 }
 
+export const OFFICIAL_SUPABASE_HOST = /\.supabase\.co$/i;
+export const OFFICIAL_FIREBASE_HOST = /\.(?:firebaseio\.com|firebasedatabase\.app)$/i;
+
 export function setupLinkSummary(parsed): ConfigLinkSummary {
     const supabase = !!(parsed && parsed.supabaseUrl);
     const raw = String((supabase ? parsed.supabaseUrl : parsed && (parsed.databaseURL || parsed.projectId)) || '');
     let host = raw;
-    try { host = new URL(raw).host || raw; } catch (e) {}
-    return { backend: supabase ? 'supabase' : 'firebase', host: host.slice(0, 80), invite: supabase && typeof parsed.invite === 'string' && !!parsed.invite };
+    let hostname = '';
+    try {
+        const url = new URL(raw);
+        host = url.host || raw;
+        hostname = url.hostname;
+    } catch (e) {}
+    return {
+        backend: supabase ? 'supabase' : 'firebase',
+        host: host,
+        invite: supabase && typeof parsed.invite === 'string' && !!parsed.invite,
+        official: (supabase ? OFFICIAL_SUPABASE_HOST : OFFICIAL_FIREBASE_HOST).test(hostname),
+        dsn: setupLinkDsnIsValid(parsed && parsed.dsn)
+    };
+}
+
+export function connectPendingSetupLink() {
+    const link = viewState.configPendingLink;
+    if (!link || !link.payload || !modalIsOpen('configModal')) return false;
+    return connectSetupPayload(link.payload, 'Setup Link');
 }
 
 export function connectSetupPayload(parsed, source) {
+    viewState.configPendingLink = null;
     applySetupPayload(parsed);
     if (!saveFirebaseConfig()) {
         viewState.configManual = true;
@@ -419,7 +436,7 @@ export function applySetupLinkFromUrl() {
     requestPinBeforeConfig(() => {
         openConfigModal();
         announceSetupApplied(applySetupPayload(parsed));
-        viewState.configPendingLink = setupLinkSummary(parsed);
+        viewState.configPendingLink = Object.assign(setupLinkSummary(parsed), { payload: parsed });
     }, 'setupLink');
 }
 

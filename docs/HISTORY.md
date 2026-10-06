@@ -178,6 +178,13 @@ migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.t
   `ACTION_ALLOWLIST` · `src/core/runtime.ts`) · `css-classes` (`.cfg-lead` · `.cfg-hint` គ្មានច្បាប់ CSS) · `toast-action-truth` (toast 🔗 គ្មានសញ្ញាន័យ ➜ ℹ️) ·
   `zoew-suite` ➜ `npm run parity` (អត្ថបទដើម ៣ ➜ `REMOVED_STRINGS` មានហេតុផល)។ toast ក្រោយស្កេន/បិទភ្ជាប់និយាយតែអ្វីដែលបានរក្សាទុក
   («✅ QR ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ host») ហើយ live toast `config` រាយការណ៍ការភ្ជាប់។
+- Review ប្រឆាំង (៥ វិមាត្រ · អ្នកផ្ទៀងបដិសេធ) ➜ ៦ ចំណុចពិត ៖ (១) 🔐 កាតកាត់ host ត្រឹម ៨០ តួ ➜ Link phishing លាក់ domain ចុង
+  (`x.supabase.co.<padding>.attacker.net`) ➜ ឥឡូវ host ពេញ + ⚠️ ពេលមិននៅលើ `*.supabase.co` · `*.firebaseio.com` · `*.firebasedatabase.app` ·
+  (២) «✅ ភ្ជាប់» រក្សាទុកវាលក្នុង form (មិនមែន Link របស់កាត) ➜ `connectPendingSetupLink()` ភ្ជាប់ payload របស់កាត · Link ផ្សេងចូល ➜ កាតបាត់ ·
+  (៣) DSN Sentry ពី Link URL អនុវត្តភ្លាមក្រោយ PIN (បោះបង់ក៏នៅ) ➜ ឥឡូវតែពេលចុច «✅ ភ្ជាប់» (`saveFirebaseConfig()` អានវាល) · កាតបង្ហាញ 🐞 ·
+  `setup-link-browser-test` វាស់ «ក្រោយ PIN ➜ គ្មាន DSN · ក្រោយចុច ➜ DSN + Config» · (៤) រង្វង់ផ្តោតក្តារចុចពឹង `:has()` តែមួយ ➜ ផ្លូវបម្រុង
+  `@supports not selector(:has(*))` · (៥) តេស្តរូបភាព QR លំដាប់បញ្ច្រាស (mutation ដក `seq === configQrImageSeq` ➜ ធ្លាក់) · (៦) guide «គណនីហាង»
+  និង README ៣ ប្រាប់ «✅ ភ្ជាប់» ជំនួស «រក្សាទុក»។ ការចាកចេញសម្អាតកាត + switch (`clearSensitiveModalFields()`)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

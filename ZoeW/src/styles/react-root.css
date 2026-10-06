@@ -276,6 +276,16 @@
     font-size: calc(11 * var(--fs-unit));
     color: var(--text-muted);
 }
+#configModal .cfg-link-card-warn {
+    margin: 6px 0 4px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #FEF2F2;
+    color: #B91C1C;
+    font-size: calc(11.5 * var(--fs-unit));
+    font-weight: 600;
+    line-height: 1.5;
+}
 #configModal .cfg-link-card-btn {
     width: 100%;
     min-height: 46px;
@@ -414,6 +424,13 @@
 #configModal .cfg-choice-item:has(input:focus-visible) {
     outline: 2px solid var(--accent-blue);
     outline-offset: 2px;
+}
+@supports not selector(:has(*)) {
+    #configModal .cfg-manual-toggle input:focus-visible + .cfg-switch,
+    #configModal .cfg-choice-item input:focus-visible + .cfg-mark {
+        outline: 2px solid var(--accent-blue);
+        outline-offset: 2px;
+    }
 }
 #configModal .cfg-manual {
     margin: 0 0 12px;

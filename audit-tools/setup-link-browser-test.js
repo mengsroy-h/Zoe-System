@@ -106,7 +106,7 @@ const SEL = {
             await p2.waitForTimeout(1200);
 
             const dsnAfterPin = await p2.evaluate(() => localStorage.getItem('zoe_sentry_dsn'));
-            ok(dsnAfterPin === tc.expect, tc.name + ' ៖ DSN ក្រោយ PIN ត្រូវជា ' + tc.expect, dsnAfterPin);
+            ok(!dsnAfterPin, tc.name + ' ៖ DSN **មិន**ទាន់កំណត់ក្រោយ PIN (កាត Setup Link រង់ចាំ «✅ ភ្ជាប់»)', dsnAfterPin);
 
             const filled2 = await p2.evaluate((q) => { const e = document.querySelector(q); return e ? e.value : null; }, sel.config);
             let clean = false, keptCfg = false;
@@ -117,6 +117,14 @@ const SEL = {
             } catch (e) {}
             ok(clean, tc.name + ' ៖ `dsn` មិនលេចក្នុងប្រអប់ Config', (filled2 || '').slice(0, 80));
             ok(keptCfg, tc.name + ' ៖ វាល Firebase នៅគ្រប់ដដែល', (filled2 || '').slice(0, 80));
+            const card = await p2.$('#configLinkConnectBtn');
+            ok(!!card, tc.name + ' ៖ កាត Setup Link មានប៊ូតុង «✅ ភ្ជាប់»');
+            if (card) await card.click();
+            await p2.waitForTimeout(800);
+            const dsnAfterTap = await p2.evaluate(() => localStorage.getItem('zoe_sentry_dsn'));
+            ok((dsnAfterTap || null) === tc.expect, tc.name + ' ៖ DSN ក្រោយចុច «✅ ភ្ជាប់» ត្រូវជា ' + tc.expect, dsnAfterTap);
+            const savedAfterTap = await p2.evaluate(() => localStorage.getItem('zoew_firebase_config'));
+            ok(!!savedAfterTap && JSON.parse(savedAfterTap).projectId === 'biz-a', tc.name + ' ៖ ចុច «✅ ភ្ជាប់» ➜ Config រក្សាទុក', (savedAfterTap || '').slice(0, 60));
             ok(errs2.length === 0, tc.name + ' ៖ គ្មានកំហុស runtime', errs2.slice(0, 2));
 
             await c2.close();

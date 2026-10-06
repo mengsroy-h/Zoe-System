@@ -25,8 +25,14 @@ export function ConfigModal() {
                             <span>Setup Link ៖ {linkSupabase ? 'Supabase' : 'Firebase'}</span>
                         </div>
                         <div className="cfg-link-card-host">{link.host}</div>
+                        {link.official ? null : (
+                            <div className="cfg-link-card-warn" id="configLinkWarn">
+                                ⚠️ Server នេះមិននៅលើ domain ផ្លូវការរបស់ {linkSupabase ? 'Supabase' : 'Firebase'} — ចុច «✅ ភ្ជាប់» តែពេលអ្នកប្រាកដថាអ្នកលក់ផ្ញើ Link នេះ
+                            </div>
+                        )}
                         {link.invite ? <div className="cfg-link-card-note">📝 មានកូដអញ្ជើញ (ហាងថ្មី ➜ ចុះឈ្មោះ)</div> : null}
-                        <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" onClick={onAct("saveFirebaseConfig")}>✅ ភ្ជាប់</button>
+                        {link.dsn ? <div className="cfg-link-card-note">🐞 រួមការរាយការណ៍កំហុស (Sentry)</div> : null}
+                        <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" onClick={onAct("connectPendingSetupLink")}>✅ ភ្ជាប់</button>
                     </div>
                 ) : null}
                 <div className="cfg-quick">

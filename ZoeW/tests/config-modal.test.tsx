@@ -38,6 +38,8 @@ import { decodeConfigQrDataUrl, handleConfigQrResult } from '../src/features/con
 import { clearPendingInvite, hasPendingInvite } from '../src/features/account';
 import { openModalHelper } from '../src/ui/modal';
 import { initFirebase } from '../src/services/firebase-init';
+import { clearSensitiveModalFields } from '../src/features/session';
+import { closeModal } from '../src/ui/modal';
 import { byId, mount, step, unmount } from './native/react-harness';
 
 const SB = { supabaseUrl: 'https://abcd1234.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24) };
@@ -338,7 +340,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
     });
 
     it('ប្រអប់បើកថ្មី ៖ មានតែ ស្កេន QR · QR ពីរូបភាព · Setup Link · switch «ដោយដៃ» ➜ ចុច switch ➜ ជម្រើស Server + វាល + ប៊ូតុងរក្សាទុក', () => {
-        step(() => { viewState.configManual = true; viewState.configPendingLink = { backend: 'firebase', host: 'x', invite: false }; });
+        step(() => { viewState.configManual = true; viewState.configPendingLink = { backend: 'firebase', host: 'x', invite: false, official: true, dsn: false }; });
         step(() => openConfigModal());
         expect(viewState.configManual).toBe(false);
         expect(document.getElementById('configLinkCard')).toBe(null);
@@ -408,5 +410,126 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         } finally {
             scan.decodeBarcodeFromCanvasManual.mockImplementation(async () => (globalThis as any).__qrText || '');
         }
+    });
+});
+
+describe('កាត Setup Link ពី URL ៖ ចងនឹង Link ខ្លួនឯង · host ពេញ · DSN តែពេលចុច (review 2.49.6)', () => {
+    const stored = () => JSON.parse(appLocalStore!.getItem('zoew_firebase_config') || 'null');
+    const openFromUrl = (payload: object) => {
+        const before = window.location.href;
+        (window as any).happyDOM.setURL(new URL('/?setup=' + encodeURIComponent(enc(payload)), before).href);
+        try {
+            step(() => applySetupLinkFromUrl());
+            step(() => (securityState.pinTargetAction as any)());
+        } finally {
+            (window as any).happyDOM.setURL(before);
+        }
+    };
+
+    it('⛔ «✅ ភ្ជាប់» ភ្ជាប់ Server ដែលកាតបង្ហាញ ទោះអ្នកប្រើប្តូរជម្រើស Server ក្នុងផ្នែកដោយដៃ', () => {
+        appLocalStore!.setItem('zoew_firebase_config', JSON.stringify(SB));
+        openFromUrl(FB);
+        expect(byId('configLinkCard').textContent).toContain('x.firebaseio.com');
+        step(() => { toggleConfigManual(); selectConfigBackend('supabase'); });
+        step(() => (byId('configLinkConnectBtn') as HTMLButtonElement).click());
+        expect(stored()).toEqual(FB);
+        expect(initFirebase).toHaveBeenCalledTimes(1);
+        expect(viewState.configPendingLink).toBe(null);
+    });
+
+    it('⛔ Link ផ្សេងចូលក្នុងប្រអប់ (ខូច) ➜ កាតចាស់បាត់ (មិនបង្ហាញ Server ដែលវាលលែងមាន)', () => {
+        openFromUrl(FB);
+        expect(document.getElementById('configLinkCard')).not.toBe(null);
+        step(() => { applySetupLinkText(link({ supabaseUrl: SB.supabaseUrl, supabaseKey: 'sb_secret_' + 'z'.repeat(30) })); });
+        expect(stored()).toBe(null);
+        expect(document.getElementById('configLinkCard')).toBe(null);
+        expect(viewState.configPendingLink).toBe(null);
+        expect(viewState.configManual).toBe(true);
+    });
+
+    it('⛔ host វែង ➜ កាតបង្ហាញ host ពេញ (domain ចុងក្រោយមិនបាត់) · host ក្រៅ domain ផ្លូវការ ➜ ព្រមាន', () => {
+        const longUrl = 'https://zoewshop12abcdefghijk.supabase.co.' + 'x'.repeat(50) + '.attacker-sb.net';
+        openFromUrl({ supabaseUrl: longUrl, supabaseKey: SB.supabaseKey });
+        const card = byId('configLinkCard');
+        expect(card.textContent).toContain(new URL(longUrl).host);
+        expect(card.textContent).toContain('attacker-sb.net');
+        expect(document.getElementById('configLinkWarn')).not.toBe(null);
+        step(() => closeModal('configModal'));
+        openFromUrl(SB);
+        expect(byId('configLinkCard').textContent).toContain('abcd1234.supabase.co');
+        expect(document.getElementById('configLinkWarn')).toBe(null);
+        step(() => closeModal('configModal'));
+        for (const db of ['https://x.firebaseio.com', 'https://x-default-rtdb.asia-southeast1.firebasedatabase.app']) {
+            openFromUrl(Object.assign({}, FB, { databaseURL: db }));
+            expect(document.getElementById('configLinkWarn'), db).toBe(null);
+            step(() => closeModal('configModal'));
+        }
+        openFromUrl(Object.assign({}, FB, { databaseURL: 'https://x.firebaseio.com.evil.example' }));
+        expect(document.getElementById('configLinkWarn')).not.toBe(null);
+    });
+
+    it('⛔ DSN Sentry ក្នុង Link URL ៖ មិនអនុវត្តមុនចុច «✅ ភ្ជាប់» · បោះបង់ ➜ មិនអនុវត្ត · កាតប្រាប់ថាមាន DSN', () => {
+        const dsn = 'https://k@o1.ingest.sentry.io/9';
+        const setDsn = (window as any).ZoeErrors.setDsn;
+        openFromUrl(Object.assign({ dsn }, SB));
+        expect(setDsn).not.toHaveBeenCalled();
+        expect(fieldValue('sentryDsnInput')).toBe(dsn);
+        expect(byId('configLinkCard').textContent).toContain('Sentry');
+        step(() => closeModal('configModal'));
+        expect(setDsn).not.toHaveBeenCalled();
+        expect(stored()).toBe(null);
+        openFromUrl(Object.assign({ dsn }, SB));
+        step(() => (byId('configLinkConnectBtn') as HTMLButtonElement).click());
+        expect(setDsn).toHaveBeenCalledWith(dsn);
+        expect(stored()).toEqual(SB);
+    });
+
+    it('⛔ ចាកចេញ (clearSensitiveModalFields) ➜ កាត Link ដែលមិនទាន់ចុច និង switch ដោយដៃត្រូវសម្អាត', () => {
+        openFromUrl(FB);
+        step(() => toggleConfigManual());
+        expect(viewState.configPendingLink).not.toBe(null);
+        step(() => clearSensitiveModalFields());
+        expect(viewState.configPendingLink).toBe(null);
+        expect(viewState.configManual).toBe(false);
+    });
+
+    it('⛔ QR ពីរូបភាព ២ ជាន់គ្នា (លំដាប់បញ្ច្រាស) ៖ រូបចាស់ឌិកូដចប់មុន ខណៈរូបថ្មីនៅរង់ចាំ ➜ មិនរក្សាទុក · រូបថ្មីទើបភ្ជាប់', async () => {
+        const scan: any = await import('../src/services/scan-engine');
+        const release: Array<() => void> = [];
+        const texts = [link(Object.assign({}, FB, { apiKey: 'OLD' })), link(Object.assign({}, FB, { apiKey: 'NEW' }))];
+        scan.decodeBarcodeFromCanvasManual.mockImplementation(() => {
+            const text = texts[release.length];
+            return new Promise((resolve) => { release.push(() => resolve(text)); });
+        });
+        try {
+            step(() => openConfigModal());
+            step(() => decodeConfigQrDataUrl('data:image/png;base64,AAAA'));
+            step(() => decodeConfigQrDataUrl('data:image/png;base64,BBBB'));
+            release[0]();
+            await new Promise((r) => setTimeout(r, 0));
+            step(() => {});
+            expect(stored()).toBe(null);
+            expect(initFirebase).not.toHaveBeenCalled();
+            expect(uiState.modalDisplay.configModal).toBe('flex');
+            release[1]();
+            await new Promise((r) => setTimeout(r, 0));
+            step(() => {});
+            expect(stored().apiKey).toBe('NEW');
+            expect(initFirebase).toHaveBeenCalledTimes(1);
+        } finally {
+            scan.decodeBarcodeFromCanvasManual.mockImplementation(async () => (globalThis as any).__qrText || '');
+        }
+    });
+
+    it('CSS ៖ រង្វង់ផ្តោតក្តារចុចលើ switch/ជម្រើស Server មានផ្លូវបម្រុងដោយគ្មាន :has() (WebView ចាស់)', () => {
+        const css = readFileSync(resolve(__dirname, '..', 'src', 'styles', 'react-root.css'), 'utf8');
+        const at = css.indexOf('@supports not selector(:has(*))');
+        expect(at).toBeGreaterThan(-1);
+        const block = css.slice(at, css.indexOf('}\n}', at) + 3);
+        const selector = block.slice(block.indexOf('{') + 1, block.indexOf('{', block.indexOf('{') + 1));
+        expect(selector).toContain('#configModal .cfg-manual-toggle input:focus-visible + .cfg-switch');
+        expect(selector).toContain('#configModal .cfg-choice-item input:focus-visible + .cfg-mark');
+        expect(selector).not.toContain(':has(');
+        expect(block).toMatch(/outline:\s*2px solid/);
     });
 });

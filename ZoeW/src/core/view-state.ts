@@ -12,6 +12,9 @@ export interface ConfigLinkSummary {
     backend: 'firebase' | 'supabase';
     host: string;
     invite: boolean;
+    official: boolean;
+    dsn: boolean;
+    payload?: any;
 }
 
 export interface ViewState {

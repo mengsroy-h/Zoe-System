@@ -20,6 +20,7 @@ export const ACTION_ALLOWLIST = [
     "confirmLogout",
     "confirmPhone",
     "confirmScannedRemoval",
+    "connectPendingSetupLink",
     "debouncedSearchByPhone",
     "decodeConfigQrImage",
     "decodeImageFile",

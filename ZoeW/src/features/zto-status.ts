@@ -352,12 +352,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         return out;
     }
     ztoState.ztoSignedOff = false;
-    if (signed.partial) {
-        ztoState.ztoSignedSweepWaitMs = ztoSignedSweepBackoffMs();
-    } else {
-        ztoState.ztoSignedSweepOkAt = Date.now();
-        ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_GAP_MS;
-    }
+    ztoState.ztoSignedSweepWaitMs = signed.partial ? ztoSignedSweepBackoffMs() : ZTO_SIGNED_SWEEP_GAP_MS;
     const signedKeys = new Set();
     for (let i = 0; i < signed.codes.length; i++) {
         const key = pickupBarcodeKey(signed.codes[i]);
@@ -384,6 +379,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
     }
     if (finished && !signed.partial && !signed.truncated) {
         ztoState.ztoSignedCompleteAt = Date.now();
+        ztoState.ztoSignedSweepOkAt = ztoState.ztoSignedCompleteAt;
     }
     return out;
 }

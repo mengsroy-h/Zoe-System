@@ -159,6 +159,28 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(codes.filter((_, i) => abandoned('b' + i))).toEqual([]);
     });
 
+    it('ជួរថ្ងៃមិនរួមតូចមុនជុំពេញលេញ ៖ កញ្ចប់ដែលចុះហត្ថលេខាចាស់ (ក្រៅ ១ ថ្ងៃ) នៅជុំបន្ទាប់ (more) មិនត្រូវដកលុយ', async () => {
+        const n = ZTO_STATUS_SWEEP_BATCH + 2;
+        const codes = Array.from({ length: n }, (_, i) => 'ZTE2R' + String(i).padStart(5, '0'));
+        const signedOn = getZoneDateKey(NOW - 9 * DAY, 0);
+        dataState.scanHistory = codes.map((code, i) => openItem('rb' + i, code, 10 * DAY));
+        const ranges: string[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            const from = String(url.searchParams.get('from'));
+            const to = String(url.searchParams.get('to'));
+            ranges.push(from + '..' + to);
+            return signedPage(from <= signedOn && signedOn <= to ? codes : []);
+        }));
+        await runZtoStatusSweep(false);
+        expect(h.calls.length).toBe(ZTO_STATUS_SWEEP_BATCH);
+        advance(ZTO_STATUS_SWEEP_GAP_MS + 1000);
+        await runZtoStatusSweep(false);
+        cleanupNow();
+        expect(codes.filter((_, i) => abandoned('rb' + i)), 'ជុំទី ២ ត្រូវអានជួរដដែល ➜ បិទ ២ ដែលនៅសល់ (មិនដកលុយ) · ជួរ ៖ ' + ranges.join(' | ')).toEqual([]);
+        expect(h.calls.length).toBe(n);
+    });
+
     it('ZTO ធ្លាក់ ៖ រង់ចាំមិនលើស ZTO_ABANDON_HOLD_MAX_MS ហើយដើរធម្មតា (មិនជាប់រហូត)', async () => {
         dataState.scanHistory = [openItem('f1', 'ZTE3000001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'down' }, 503)));

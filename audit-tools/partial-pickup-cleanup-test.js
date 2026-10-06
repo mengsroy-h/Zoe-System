@@ -123,7 +123,7 @@ const REAL_FNS = [
     'normalizeBarcodesOf',
     'applyBarcodeCloseState',
     'barcodeCloseIsRipe',
-    'barcodeAbandonIsRipe',
+    'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
     'normalizeBarcodeCloseStamps',
     'itemHasRestoreMarkers',
     'stripHistoryOnlyMarkers',
@@ -253,6 +253,10 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractFn(src, 'markCleanupJournalStage'), 'function markCleanupJournalStage() {}'),
         optionalPart(() => extractFn(src, 'clearCleanupJournalEntry'), 'function clearCleanupJournalEntry() {}'),
         extractFn(src, 'cleanupClockIsTrustworthy'),
+        // ⛔ ZTO-E1 ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` មុន `abandon` ➜ sandbox នេះគ្មាន ZTO
+        //    (Lookup មិនកំណត់) ➜ ច្រកទ្វារពិតឆ្លើយ `false` ➜ stub ដូចគ្នា។ ច្រកទ្វារខ្លួនវាវាស់ដោយ module ពិតក្នុង
+        //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (មិនមែននៅទីនេះ)។
+        'function ztoAbandonCleanupIsHeld() { return false; }',
         'const cleanupInFlight = new Set();',
         ...REAL_FNS.map((name) => extractFn(src, name)),
         'globalThis.runAutomaticCleanupRules = runAutomaticCleanupRules;',

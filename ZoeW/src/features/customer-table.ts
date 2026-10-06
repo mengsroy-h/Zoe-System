@@ -37,7 +37,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
 
     viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
 
-    const myGeneration = lookupState.customerDataTableSessionGeneration;
+    const myGeneration = lookupState.customerDataTableFetchGeneration;
     lookupState.customerDataTableFetchPromise = (async () => {
         try {
             const headers = {};
@@ -57,7 +57,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
             const data = out.body;
             if (data && data.error) throw new Error(data.error);
-            if (myGeneration !== lookupState.customerDataTableSessionGeneration) return;
+            if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             const rows = Array.isArray(data && data.rows) ? data.rows : [];
             lookupState.customerDataTableRows = rows;
             lookupState.customerDataTableFetchedAt = Date.now();
@@ -68,14 +68,14 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             renderCustomerDataTableStatus(rows);
             filterCustomerDataTable();
         } catch (e) {
-            if (myGeneration !== lookupState.customerDataTableSessionGeneration) return;
+            if (myGeneration !== lookupState.customerDataTableFetchGeneration) return;
             lookupState.customerDataTableLastFailedAt = Date.now();
             scheduleCustomerTableRetry();
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'fetchCustomerDataTableRows' });
             viewState.customerTableStatus = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
             if (lookupState.customerDataTableRows) filterCustomerDataTable();
         } finally {
-            if (myGeneration === lookupState.customerDataTableSessionGeneration) lookupState.customerDataTableFetchPromise = null;
+            if (myGeneration === lookupState.customerDataTableFetchGeneration) lookupState.customerDataTableFetchPromise = null;
         }
     })();
 
@@ -125,6 +125,7 @@ export function clearCustomerDataTableCache() {
     clearZtoWarmSoon();
     lookupState.customerTableIsPartial = false;
     lookupState.customerDataTableSessionGeneration++;
+    lookupState.customerDataTableFetchGeneration++;
     lookupState.customerDataTableRows = null;
     lookupState.customerDataTableFetchedAt = 0;
     lookupState.customerDataTableFetchPromise = null;
@@ -194,7 +195,7 @@ export function seedCustomerTableFromImport(rows, mode, rowsAfter) {
             merged.push(record);
         }
     }
-    lookupState.customerDataTableSessionGeneration++;
+    lookupState.customerDataTableFetchGeneration++;
     lookupState.customerDataTableFetchPromise = null;
     lookupState.customerDataTableRows = merged;
     lookupState.customerDataTableFetchedAt = Date.now();

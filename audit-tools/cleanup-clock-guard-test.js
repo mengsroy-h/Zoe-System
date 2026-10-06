@@ -181,7 +181,12 @@ function buildWorld(opts) {
         extractFn(src, 'detachInfoListeners'),
         extractFn(src, 'attachInfoListeners'),
         extractFn(src, 'runAutomaticCleanupRules'),
+        // ⛔ ZTO-E1 ៖ ច្រកទ្វាររង់ចាំបញ្ជី «ចុះហត្ថលេខា» ➜ sandbox គ្មាន ZTO ➜ ច្រកទ្វារពិតឆ្លើយ `false` (វាស់ក្នុង
+        //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។ checker នេះវាស់តែច្រកទ្វារនាឡិកា។
+        'function ztoAbandonCleanupIsHeld() { return false; }',
         extractFn(src, 'barcodeAbandonIsRipe'),
+        extractFn(src, 'barcodeAbandonBasis'),
+        extractFn(src, 'itemAbandonRipeAt'),
         extractFn(src, 'trashRetentionMs'),
         extractFn(src, 'runAutomaticDeletedCleanup'),
         'globalThis.__seed = (h, t) => { scanHistory = h; deletedItems = t; };',

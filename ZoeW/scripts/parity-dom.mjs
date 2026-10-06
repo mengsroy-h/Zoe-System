@@ -68,7 +68,8 @@ const FINGERPRINT = ({ ignored, ui }) => {
             .trim()
             // ⛔ ស្លាកកំណែខុសគ្នាដោយចេតនា (App ថ្មីមានកំណែថ្មី) ➜ ធ្វើឲ្យស្មើតែស្លាកនោះ
             .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>');
-        out.push(`${'  '.repeat(Math.min(depth, 12))}${el.tagName}[${attrs}]${ownText && !opaque ? '::' + ownText : ''}`);
+        const legacy = (ui.asLegacy || []).find(([sel]) => matches(el, sel));
+        out.push(`${'  '.repeat(Math.min(depth, 12))}${legacy ? legacy[1] : el.tagName}[${legacy ? legacy[2] : attrs}]${ownText && !opaque ? '::' + ownText : ''}`);
         if (opaque) return;
         for (const c of el.children) walk(c, depth + 1);
     };

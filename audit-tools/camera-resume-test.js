@@ -90,6 +90,9 @@ function buildContext(opts) {
     vm.runInContext('currentStream = ' + (opts.stream === false ? 'null' : '{}') + ';', ctx);
     vm.runInContext('isCameraScanning = ' + (opts.scanning === false ? 'false' : 'true') + ';', ctx);
     NEEDED.filter((n) => n !== 'requestCameraPermission').forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
+    // ⛔ `clearLookupStatus()` សម្អាតចម្លើយ Lookup ដែលទុកពេលកំពុងរក្សាទុក ➜ ប្រកាស Map **ពិត** ពី app.js
+    const heldDecl = (src.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
+    vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
     const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
     if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
     return ctx;

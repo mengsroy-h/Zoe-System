@@ -93,7 +93,7 @@ check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្�
 
 const REAL_FNS = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite', 'retryAsync',
-    'barcodeEntriesOf', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe',
+    'barcodeEntriesOf', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers',
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',

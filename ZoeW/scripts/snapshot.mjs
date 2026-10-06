@@ -22,7 +22,12 @@
  *      ឡើងលើ ១៤px និងកម្ពស់បន្ថែម ១៤px របស់ផ្ទាំងដែលបំពេញអេក្រង់ — x · ទទឹង · តម្លៃ CSS ផ្សេងទៀត ត្រូវដូចដើមបេះបិទ
  */
 export const INTENTIONAL_UI = {
-    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content, #loginModal .remember-password',
+    // ⛔ ជួរប្រវត្តិ (សំណើម្ចាស់គម្រោង) ៖ បញ្ជីកញ្ចប់បើកពី «កញ្ចប់សរុប» ➜ ប៊ូតុង «📦 បញ្ជី» និងស្រោមរបស់វាដកចេញ (រំលងលើ App ដើម) ·
+    //    «កញ្ចប់សរុប» ជា `<button>` ប្រៀបជា `<span class="count-badge">` ដើម (`asLegacy` ៖ [selector · tag ដើម · attribute ដើម]) ·
+    //    ជួរប្រអប់បញ្ជី ZTO (សំណើ «សម្រួលក្រែងបាំងគ្នា») ៖ សម្គាល់ · ប្រភព ជាបន្ទាត់ដាច់ ➜ ប្រៀបតែ barcode (`.zto-list-code`) និងចំនួនជួរ ·
+    //    ខ្លឹមសារជួរចាក់សោដោយ `zto-list-sync-test` · `tests/zto-list-origin.test.tsx`
+    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content, #loginModal .remember-password, .customer-info-stack > div:has(> .btn-view-list), #ztoListSyncBody .zto-list-row > :is(.zto-list-meta, .zto-list-origin, .zto-list-note)',
+    asLegacy: [['button.count-badge-btn', 'SPAN', 'class=count-badge']],
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',
     navbarShrinkPx: 14,
@@ -71,7 +76,8 @@ export const SNAPSHOT = (opts) => {
         const live = (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')
             ? '=' + JSON.stringify(el.type === 'checkbox' ? el.checked : el.value) : '';
         const opaqueLogo = matches(el, ui.opaque);
-        out.push(`${'  '.repeat(Math.min(depth, 10))}${el.tagName}[${attrs}]{${cs.display}}${live}${text && !opaqueLogo ? '::' + text : ''}`);
+        const legacy = (ui.asLegacy || []).find(([sel]) => matches(el, sel));
+        out.push(`${'  '.repeat(Math.min(depth, 10))}${legacy ? legacy[1] : el.tagName}[${legacy ? legacy[2] : attrs}]{${cs.display}}${live}${text && !opaqueLogo ? '::' + text : ''}`);
         if (opaqueLogo) return;
         for (const c of el.children) walk(c, depth + 1);
     };

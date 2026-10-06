@@ -20,7 +20,7 @@ import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { clearSensitiveModalFields } from '../src/features/session';
 import {
     ZTO_LIST_PROBE_CONCURRENCY, classifyZtoListRows, importZtoListRows, resolveZtoListSignedVerdicts,
-    runZtoListSyncPreview, ztoListSignedEvidence
+    runZtoListSyncPreview, ztoListSignedEvidence, ztoListSignedProbe, ztoListSignedVerdict
 } from '../src/features/zto-list-sync';
 import {
     ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_IDLE_MS, ZTO_STATUS_SWEEP_GAP_MS, clearZtoPickupStatusStore, runZtoStatusSweep, setZtoPickupVerdict,
@@ -29,7 +29,7 @@ import {
 import { ZtoListSyncModal } from '../src/app/components/modals/ZtoListSyncModal';
 import { mount, step, unmount } from './native/react-harness';
 
-const h = vi.hoisted(() => ({ calls: [] as any[], ok: true }));
+const h = vi.hoisted(() => ({ calls: [] as any[], ok: true, saves: [] as any[], confirms: [] as string[] }));
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {},
     removeSingleBarcode: async () => 'failed',
@@ -40,6 +40,19 @@ vi.mock('../src/features/barcode-ops', () => ({
     applyBarcodeCloseChange: async (itemId: string, code: string, closed: boolean, opts: any) => {
         h.calls.push({ itemId, code, closed, opts });
         return h.ok;
+    }
+}));
+
+vi.mock('../src/features/scan-action', () => ({
+    triggerScanAction: () => {},
+    confirmPhone: async () => {},
+    dropOptimisticBarcode: () => {},
+    addOrUpdateEntry: async (barcode: string, phone: string, cod: number, dod: number, locker: string, stampMs: number, closedAtMs: number) => {
+        h.saves.push({ barcode, phone, cod, dod, locker, stampMs, closedAtMs });
+        const at = Date.UTC(2026, 9, 6, 3, 0, 0) - 3600000;
+        dataState.scanHistory = dataState.scanHistory.concat([{ id: 'it-' + barcode, phone, scanDate: '2026-10-05', isClosed: !!closedAtMs,
+            createdAt: at, barcodes: [{ code: barcode, isClosed: !!closedAtMs, cod, dod, createdAt: at }] }]);
+        return true;
     }
 }));
 
@@ -91,13 +104,20 @@ beforeEach(() => {
     viewState.ztoListSyncNote = '';
     firebaseState.authGeneration++;
     firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
-    firebaseState.fb = { getIdTokenResult: async () => ({ token: 'audit-token' }) } as any;
+    firebaseState.db = { audit: true } as any;
+    firebaseState.fb = {
+        getIdTokenResult: async () => ({ token: 'audit-token' }),
+        ref: (_db: unknown, path: string) => ({ path }),
+        runTransaction: async () => ({ committed: true, txOutcome: 'committed' })
+    } as any;
+    h.saves.length = 0;
+    h.confirms.length = 0;
     for (const name of ['ztoListSyncFrom', 'ztoListSyncTo'] as const) {
         const input = document.createElement('input');
         input.value = name === 'ztoListSyncFrom' ? '2026-10-03' : '2026-10-06';
         refTo(name)(input);
     }
-    vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('confirm', (q: string) => { h.confirms.push(String(q)); return true; });
 });
 
 afterEach(() => {
@@ -171,11 +191,14 @@ describe('ភស្តុតាង «ចុះហត្ថលេខា» ➜ ប
         expect(viewState.ztoListSyncNote).toContain('🔒');
     });
 
-    it('`ztoClosed: false` ពីជួរដេក ឈ្នះភស្តុតាង (ស្ថានភាពបច្ចុប្បន្ន) · `null` + គ្មានភស្តុតាង ➜ មិនបិទ', () => {
+    it('⛔ ភស្តុតាងចុះហត្ថលេខា ឈ្នះ `ztoClosed: false` ពីជួរដេក (ចុះហត្ថលេខា = យករួច) · ទិសផ្ទុយ ៖ `false`/`null` + គ្មានភស្តុតាង ➜ មិនបិទ', () => {
         ztoListSignedEvidence.clear();
         ztoListSignedEvidence.add('ZT0000000201');
-        const groups = classifyZtoListRows([row('ZT0000000201', { ztoClosed: false }), row('ZT0000000202')], [], []);
-        expect(groups.fresh.every((r: any) => r.closedAtZto === false)).toBe(true);
+        const groups = classifyZtoListRows([row('ZT0000000201', { ztoClosed: false }), row('ZT0000000202'), row('ZT0000000203', { ztoClosed: false })], [], []);
+        const by = (code: string) => groups.fresh.find((r: any) => r.barcode === code);
+        expect(by('ZT0000000201').closedAtZto).toBe(true);
+        expect(by('ZT0000000202').closedAtZto).toBe(false);
+        expect(by('ZT0000000203').closedAtZto).toBe(false);
     });
 
     it('កញ្ចប់មានក្នុង ZoeW ហើយនៅបើក + ZTO ចុះហត្ថលេខា ➜ «បញ្ចូល» បិទវាតាម `applyBarcodeCloseChange()` (ដូចបិទដោយដៃ)', async () => {
@@ -463,5 +486,104 @@ describe('ឈ្មោះសាខាក្នុងប្រអប់បញ្�
         step(() => { clearSensitiveModalFields(); });
         expect(document.getElementById('ztoListSyncSite')).toBeNull();
         expect(ztoListSignedEvidence.size).toBe(0);
+    });
+});
+
+const E2_YOUNG = '2026-10-05 09:00:00';
+const E2_OLD = '2026-09-27 08:00:00';
+const E2_PURGED = '2026-08-20 08:00:00';
+function e2Server(code: string, rowClosed: boolean | null, detailClosed: boolean | null, signed: string[], at = E2_YOUNG) {
+    return vi.fn(async (u: string) => {
+        const url = new URL(String(u));
+        if (url.searchParams.get('signed') === '1') {
+            return json({ success: true, list: true, enabled: true, kind: 'signed', rows: [], pages: 1, total: signed.length, signed, signedOk: true });
+        }
+        if (url.searchParams.get('list') === '1') {
+            return json({ success: true, list: true, enabled: true, pages: 1, total: 1,
+                rows: [row(code, { ztoClosed: rowClosed, at })], signed, signedOk: true, signedPages: 1 });
+        }
+        return json({ found: true, ztoClosed: detailClosed });
+    });
+}
+
+describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្វ័យប្រវត្តិ ៖ ភស្តុតាង ➜ /detail ➜ ជួរដេក', () => {
+    it('1. លំដាប់ ៖ ភស្តុតាង ➜ /detail ➜ ជួរដេក ➜ null', () => {
+        ztoListSignedEvidence.clear();
+        ztoListSignedProbe.clear();
+        ztoListSignedEvidence.add('ZT0000003001');
+        expect(ztoListSignedVerdict({ ztoClosed: false }, 'ZT0000003001')).toBe(true);
+        ztoListSignedProbe.set('ZT0000003001', false);
+        expect(ztoListSignedVerdict({ ztoClosed: null }, 'ZT0000003001')).toBe(true);
+        ztoListSignedProbe.set('ZT0000003002', false);
+        expect(ztoListSignedVerdict({ ztoClosed: true }, 'ZT0000003002')).toBe(false);
+        ztoListSignedProbe.set('ZT0000003003', true);
+        expect(ztoListSignedVerdict({ ztoClosed: false }, 'ZT0000003003')).toBe(true);
+        expect(ztoListSignedVerdict({ ztoClosed: false }, 'ZT0000003004')).toBe(false);
+        expect(ztoListSignedVerdict({ ztoClosed: null }, 'ZT0000003004')).toBe(null);
+        expect(ztoListSignedVerdict(null, '')).toBe(null);
+    });
+
+    it('2. ជួរដេកក្មេង false + ភស្តុតាង ➜ កើតមកជា «យករួច» · ចំណាំមើលជាមុនរាប់ 🔒', async () => {
+        vi.stubGlobal('fetch', e2Server('ZT0000003101', false, false, ['ZT0000003101']));
+        await runZtoListSyncPreview();
+        expect(viewState.ztoListSyncNote).toContain('🔒 ថ្មីដែល ZTO បិទរួច 1');
+        await importZtoListRows();
+        expect(h.saves).toHaveLength(1);
+        expect(h.saves[0].closedAtMs).toBe(NOW);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZT0000003101']);
+    });
+
+    it('3. មានក្នុង ZoeW (បើក) + false + ភស្តុតាង ➜ «បញ្ចូល» បិទ (ដូចជុំស្វ័យប្រវត្តិ)', async () => {
+        dataState.scanHistory = [openItem('ex1', 'ZT0000003201')];
+        vi.stubGlobal('fetch', e2Server('ZT0000003201', false, false, ['ZT0000003201']));
+        await runZtoListSyncPreview();
+        expect(viewState.ztoListSyncNote).toContain('🔒 មានក្នុង ZoeW តែ ZTO បិទរួច 1');
+        await importZtoListRows();
+        expect(h.calls).toEqual([{ itemId: 'ex1', code: 'ZT0000003201', closed: true, opts: { silent: true, showModal: false } }]);
+        expect(h.saves).toHaveLength(0);
+        h.calls.length = 0;
+        ztoState.ztoListSyncResult = null;
+        dataState.scanHistory = [openItem('ex2', 'ZT0000003202')];
+        vi.stubGlobal('fetch', e2Server('ZT0000003202', false, false, []));
+        await runZtoListSyncPreview();
+        await importZtoListRows();
+        expect(h.calls).toEqual([]);
+    });
+
+    it('4. អាយុ ៖ ចាស់ + false + ភស្តុតាង ➜ ថ្មី «យករួច» · ទិសផ្ទុយ ៖ គ្មានភស្តុតាង ➜ too-old-open · ហួសធុងសំរាម ➜ too-old-purged ទោះមានភស្តុតាង', () => {
+        ztoListSignedEvidence.clear();
+        ztoListSignedProbe.clear();
+        ztoListSignedEvidence.add('ZT0000003301');
+        ztoListSignedEvidence.add('ZT0000003303');
+        const g = classifyZtoListRows([
+            row('ZT0000003301', { at: E2_OLD, ztoClosed: false }),
+            row('ZT0000003302', { at: E2_OLD, ztoClosed: false }),
+            row('ZT0000003303', { at: E2_PURGED, ztoClosed: false }),
+            row('ZT0000003304', { at: E2_OLD, ztoClosed: null })
+        ], [], []);
+        expect(g.fresh.map((r: any) => [r.barcode, r.closedAtZto])).toEqual([['ZT0000003301', true]]);
+        expect(g.skipped.map((r: any) => [r.barcode, r.skip])).toEqual([
+            ['ZT0000003302', 'too-old-open'], ['ZT0000003303', 'too-old-purged'], ['ZT0000003304', 'too-old-unknown']
+        ]);
+    });
+
+    it('5. ទ្វារទាំង ២ សម្រេចដូចគ្នាលើ server ដដែល (មានភស្តុតាង ➜ បិទ · គ្មាន ➜ បើក)', async () => {
+        const outcome = async (signed: string[]) => {
+            h.calls.length = 0;
+            h.saves.length = 0;
+            dataState.scanHistory = [];
+            ztoState.ztoListSyncResult = null;
+            vi.stubGlobal('fetch', e2Server('ZT0000003401', false, false, signed));
+            await runZtoListSyncPreview();
+            await importZtoListRows();
+            const importDoor = h.saves.length === 1 && h.saves[0].closedAtMs > 0;
+            h.calls.length = 0;
+            clearZtoPickupStatusStore();
+            await runZtoStatusSweep(true, [openItem('a1', 'ZT0000003401')], []);
+            const autoDoor = h.calls.some((c) => c.code === 'ZT0000003401');
+            return { importDoor, autoDoor };
+        };
+        expect(await outcome(['ZT0000003401'])).toEqual({ importDoor: true, autoDoor: true });
+        expect(await outcome([])).toEqual({ importDoor: false, autoDoor: false });
     });
 });

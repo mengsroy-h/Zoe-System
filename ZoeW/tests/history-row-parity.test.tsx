@@ -14,6 +14,7 @@ import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
 import { dataState } from '../src/core/state';
 import { mulberry32, makeItem } from './fixtures';
+import { INTENTIONAL_UI } from '../scripts/snapshot.mjs';
 
 /** ⛔ ចុះឈ្មោះសកម្មភាពត្រូវ stub ➜ តេស្តវាស់ *អ្វីដែលត្រូវហៅ* មិនមែនផលរំខាន។ */
 const recorder: string[] = [];
@@ -33,9 +34,11 @@ const ACTION_ATTRS = ['data-act', 'data-args', 'data-a1', 'data-a2', 'data-evt',
 function canonical(html: string): string {
     const host = document.createElement('tr');
     host.innerHTML = html;
+    host.querySelectorAll(INTENTIONAL_UI.skip).forEach((el) => el.remove());
     const visit = (el: Element): string => {
         for (const a of ACTION_ATTRS) el.removeAttribute(a);
-        const attrs = Array.from(el.attributes)
+        const legacy = INTENTIONAL_UI.asLegacy.find(([sel]) => el.matches(sel));
+        const attrs = legacy ? legacy[2] : Array.from(el.attributes)
             .map((a) => {
                 if (a.name !== 'style') return a.name + '=' + a.value;
                 const probe = document.createElement('div');
@@ -47,7 +50,7 @@ function canonical(html: string): string {
             .join('|');
         const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => (n as Text).data).join('').replace(/\s+/g, ' ').trim();
         const kids = Array.from(el.children).map(visit).join('');
-        return `<${el.tagName}[${attrs}]${text ? '::' + text : ''}>${kids}`;
+        return `<${legacy ? legacy[1] : el.tagName}[${attrs}]${text ? '::' + text : ''}>${kids}`;
     };
     return Array.from(host.children).map(visit).join('');
 }

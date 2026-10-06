@@ -17,6 +17,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { itemOriginOf, originLabel } from './barcode-origin';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -53,6 +54,7 @@ export function openViewListModal(id?) {
             index: idx + 1,
             locker: b.locker || 'N/A',
             time: b.time ? formatScanStamp(b.time) : null,
+            origin: originLabel(itemOriginOf(item, b.code)).full,
             moneyClass: bcMoneyClass,
             money: money,
             sum: sum,

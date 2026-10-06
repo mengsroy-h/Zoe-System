@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
-import { itemHasRestoreMarkers, sanitizeInput } from '../domain/barcode';
+import { itemHasRestoreMarkers, parseTimestampFromId, sanitizeInput } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
@@ -17,9 +17,11 @@ import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT, fetchZtoSignedCodes, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
+import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
+import { documentIsHidden } from '../platform/document-io';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
@@ -44,9 +46,30 @@ export const ZTO_SIGNED_SWEEP_GAP_MS = 2 * 60 * 1000;
 
 export const ZTO_SIGNED_SWEEP_IDLE_MS = 30 * 60 * 1000;
 
+export const ZTO_SIGNED_SWEEP_FAIL_MAX_MS = 10 * 60 * 1000;
+
+export const ZTO_SIGNED_SWEEP_ACTIVE_MS = 20 * 1000;
+
+export const ZTO_SIGNED_SWEEP_VISIBLE_MS = 60 * 1000;
+
+export const ZTO_USER_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
+
 export const ZTO_SIGNED_SWEEP_LOOKBACK_DAYS = 7;
 
 export const ZTO_SIGNED_SWEEP_RECENT_MS = 12 * 60 * 60 * 1000;
+
+export const ZTO_SIGNED_SWEEP_MAX_DAYS = 30;
+
+export const ZTO_SIGNED_FRESH_MS = 10 * 60 * 1000;
+
+export const ZTO_ABANDON_HOLD_MAX_MS = 30 * 60 * 1000;
+
+export const ZTO_SIGNED_CLOSE_RETRY_MS = 2 * 60 * 1000;
+
+const ztoSignedCloseFailedAt = new Map();
+const ztoPickupVerdictSeenAt = new Map();
+
+export const ZTO_ABANDON_RESUME_GAP_MS = 5 * 60 * 1000;
 
 export const ztoPickupStatus = new Map();
 
@@ -107,6 +130,17 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoSignedSweepAt = 0;
     ztoState.ztoSignedSweepOkAt = 0;
     ztoState.ztoSignedSweepWaitMs = 0;
+    ztoState.ztoSignedCompleteAt = 0;
+    ztoState.ztoSignedCompleteServerAt = 0;
+    ztoSignedCloseFailedAt.clear();
+    ztoPickupVerdictSeenAt.clear();
+    ztoState.ztoSignedSplitAt = 0;
+    ztoState.ztoSignedSplitFrom = '';
+    ztoState.ztoSignedMismatchFrom = '';
+    ztoState.ztoSignedMismatchWideAt = 0;
+    ztoState.ztoSignedOff = false;
+    ztoState.ztoSignedTruncatedNoted = false;
+    ztoState.ztoAbandonHoldSince = 0;
     ztoPickupStatus.clear();
     ztoState.ztoStatusBannerSig = '';
     ztoState.ztoStatusModalSig = '';
@@ -139,6 +173,7 @@ export function setZtoPickupVerdict(code, closed) {
     loadZtoPickupStatusOnce();
     ztoPickupStatus.delete(key);
     ztoPickupStatus.set(key, { closed: closed, at: Date.now() });
+    ztoPickupVerdictSeenAt.set(key, Date.now());
     while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
         if (!evictOneZtoPickupVerdict(key)) break;
     }
@@ -266,21 +301,105 @@ export async function autoCloseBarcodeFromZto(entry, dataToScan) {
     return done === undefined ? undefined : done === true;
 }
 
-export function ztoSignedSweepIsDue(force) {
-    if (force || !ztoState.ztoSignedSweepAt) return true;
-    return elapsedSince(ztoState.ztoSignedSweepAt) >= (ztoState.ztoSignedSweepWaitMs || ZTO_SIGNED_SWEEP_GAP_MS);
+function ztoUserIsActive() {
+    return !!ztoState.ztoUserActiveAt && elapsedSince(ztoState.ztoUserActiveAt) <= ZTO_USER_ACTIVE_WINDOW_MS;
 }
 
-export function ztoSignedSweepRange() {
+export function noteZtoUserActivity() {
+    const wasActive = ztoUserIsActive();
+    ztoState.ztoUserActiveAt = Date.now();
+    if (wasActive || !ztoState.ztoStatusSweepTimer || documentIsHidden() || !ztoSignedSweepWaitIsNormal()) return;
+    if (!ztoSignedLivePollWanted(dataState.scanHistory, dataState.deletedItems)) return;
+    const left = ztoState.ztoSignedSweepAt ? ZTO_SIGNED_SWEEP_ACTIVE_MS - elapsedSince(ztoState.ztoSignedSweepAt) : 0;
+    clearTimeout(ztoState.ztoStatusSweepTimer);
+    ztoState.ztoStatusSweepTimer = null;
+    scheduleZtoStatusSweep(Math.max(0, left) + 500);
+}
+
+export function ztoSignedSweepCadenceMs() {
+    if (documentIsHidden()) return ZTO_SIGNED_SWEEP_GAP_MS;
+    return ztoUserIsActive() ? ZTO_SIGNED_SWEEP_ACTIVE_MS : ZTO_SIGNED_SWEEP_VISIBLE_MS;
+}
+
+export function ztoSignedSweepWaitIsNormal() {
+    const wait = ztoState.ztoSignedSweepWaitMs || ZTO_SIGNED_SWEEP_GAP_MS;
+    return wait === ZTO_SIGNED_SWEEP_GAP_MS;
+}
+
+export function ztoSignedSweepIsDue(force) {
+    if (force || !ztoState.ztoSignedSweepAt) return true;
+    const wait = ztoSignedSweepWaitIsNormal() ? ztoSignedSweepCadenceMs() : ztoState.ztoSignedSweepWaitMs;
+    return elapsedSince(ztoState.ztoSignedSweepAt) >= wait;
+}
+
+export function ztoSignedLivePollWanted(dataToScan, trashToScan) {
+    if (documentIsHidden() || !ztoAutoCloseEnabled() || ztoState.ztoSignedOff || !ztoSignedSweepWaitIsNormal()) return false;
+    return collectOpenBarcodesForZtoStatus(dataToScan).length > 0 || ztoStatusPendingList(dataToScan, trashToScan).length > 0;
+}
+
+export function ztoOldestOpenStamp(dataToScan) {
+    let oldest = 0;
+    if (!Array.isArray(dataToScan)) return oldest;
+    for (let i = 0; i < dataToScan.length; i++) {
+        const item = dataToScan[i];
+        if (!item || !item.id || !Array.isArray(item.barcodes)) continue;
+        if (!item.barcodes.some((b) => b && !b.isClosed)) continue;
+        const at = parseFloat(item.createdAt) || parseTimestampFromId(item.id) || 0;
+        if (at > 0 && (!oldest || at < oldest)) oldest = at;
+    }
+    return oldest;
+}
+
+export function ztoSignedSweepRange(oldestOpenAt?, pendingOnly?) {
     const now = getServerNow();
-    const recent = ztoState.ztoSignedSweepOkAt
-        && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS;
-    return { from: getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS), to: getZoneDateKey(now, 0) };
+    const recent = !!pendingOnly || (ztoState.ztoSignedSweepOkAt
+        && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS);
+    let from = getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS);
+    if (!recent && oldestOpenAt > 0) {
+        const oldest = getZoneDateKey(oldestOpenAt, 0);
+        const floor = getZoneDateKey(now, -ZTO_SIGNED_SWEEP_MAX_DAYS);
+        if (oldest < from) from = oldest > floor ? oldest : floor;
+    }
+    const mismatchFrom = ztoState.ztoSignedMismatchFrom;
+    if (!pendingOnly && mismatchFrom && mismatchFrom < from && elapsedSince(ztoState.ztoSignedMismatchWideAt) >= ZTO_SIGNED_FRESH_MS) from = mismatchFrom;
+    return { from: from, to: getZoneDateKey(now, 0) };
+}
+
+function ztoLocalSweepGuards() {
+    return ztoAutoCloseEnabled() && !!ztoStatusFeatureConfig() && !ztoState.ztoSignedOff;
+}
+
+export function ztoAbandonCleanupIsHeld(ripeAt?) {
+    if (ztoState.ztoSignedOff) return false;
+    if (!ztoLocalSweepGuards()) {
+        if (!ztoShopSweepHolds(ripeAt)) return false;
+        if (ztoState.ztoShopSweep.advancedAt > ztoState.ztoAbandonHoldSince) ztoState.ztoAbandonHoldSince = 0;
+    } else {
+        const fresh = !!ztoState.ztoSignedCompleteAt && elapsedSince(ztoState.ztoSignedCompleteAt) <= ZTO_SIGNED_FRESH_MS;
+        const covers = typeof ripeAt !== 'number' || !isFinite(ripeAt) || ztoState.ztoSignedCompleteServerAt >= ripeAt;
+        if (fresh && covers) return false;
+    }
+    const resumed = !!ztoState.ztoAbandonCheckedAt && elapsedSince(ztoState.ztoAbandonCheckedAt) > ZTO_ABANDON_RESUME_GAP_MS;
+    ztoState.ztoAbandonCheckedAt = Date.now();
+    if (!ztoState.ztoAbandonHoldSince || resumed) ztoState.ztoAbandonHoldSince = Date.now();
+    return elapsedSince(ztoState.ztoAbandonHoldSince) <= ZTO_ABANDON_HOLD_MAX_MS;
 }
 
 export function ztoSignedSweepBackoffMs() {
     const base = Math.max(ZTO_SIGNED_SWEEP_GAP_MS, ztoState.ztoSignedSweepWaitMs || 0);
-    return Math.min(ZTO_SIGNED_SWEEP_IDLE_MS, base * 2);
+    return Math.min(ZTO_SIGNED_SWEEP_FAIL_MAX_MS, base * 2);
+}
+
+export function ztoSignedCloseRetryIsHeld(key) {
+    const at = ztoSignedCloseFailedAt.get(key);
+    return !!at && elapsedSince(at) < ZTO_SIGNED_CLOSE_RETRY_MS;
+}
+
+function ztoSignedBarcodeStillOpen(entry, dataToScan) {
+    const list = Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory;
+    const item = list.find((i) => i && i.id === entry.itemId);
+    const b = item && Array.isArray(item.barcodes) ? item.barcodes.find((x) => x && x.code === entry.code) : null;
+    return !!b && !b.isClosed;
 }
 
 export function ztoSignedCloseIsHeld(key, force) {
@@ -289,32 +408,36 @@ export function ztoSignedCloseIsHeld(key, force) {
     return !!(verdict && verdict.closed === true && !ztoOpenRecheckIsDue(verdict));
 }
 
-export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
+export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, pending?) {
     const session = captureZtoSession();
-    const out = { closed: 0, more: false, keys: new Set() };
-    if (!Array.isArray(entries) || !entries.length) return out;
+    const out = { closed: 0, flipped: 0, more: false, keys: new Set() };
+    const open = Array.isArray(entries) ? entries : [];
+    const stale = Array.isArray(pending) ? pending : [];
+    if (!open.length && !stale.length) return out;
     ztoState.ztoSignedSweepAt = Date.now();
-    const range = ztoSignedSweepRange();
+    const readServerAt = getServerNow();
+    const range = ztoSignedSweepRange(ztoOldestOpenStamp(Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory), !open.length);
     let signed = null;
     try {
         signed = await fetchZtoSignedCodes(cfg, range.from, range.to);
     } catch (e) {
         if (!session.current()) return out;
-        ztoState.ztoSignedSweepWaitMs = e && e.notConfigured
-            ? ZTO_SIGNED_SWEEP_IDLE_MS
-            : ztoSignedSweepBackoffMs();
+        const definitive = !!(e && e.notConfigured && ztoListReasonIsDefinitive(e.listReason));
+        ztoState.ztoSignedSweepWaitMs = definitive ? ZTO_SIGNED_SWEEP_IDLE_MS : ztoSignedSweepBackoffMs();
+        if (definitive) ztoState.ztoSignedOff = true;
         return out;
     }
     if (!session.current()) return out;
     if (!signed || !signed.measured) {
         ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_IDLE_MS;
+        if (signed) ztoState.ztoSignedOff = true;
         return out;
     }
-    if (signed.partial) {
-        ztoState.ztoSignedSweepWaitMs = ztoSignedSweepBackoffMs();
-    } else {
-        ztoState.ztoSignedSweepOkAt = Date.now();
-        ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_GAP_MS;
+    ztoState.ztoSignedOff = false;
+    ztoState.ztoSignedSweepWaitMs = signed.partial || signed.truncated ? ztoSignedSweepBackoffMs() : ZTO_SIGNED_SWEEP_GAP_MS;
+    if (signed.truncated && !ztoState.ztoSignedTruncatedNoted) {
+        ztoState.ztoSignedTruncatedNoted = true;
+        showToast('⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក (លើស ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រក្នុងមួយថ្ងៃ) ➜ កញ្ចប់ខ្លះនឹងពិនិត្យម្តងមួយ');
     }
     const signedKeys = new Set();
     for (let i = 0; i < signed.codes.length; i++) {
@@ -322,22 +445,59 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         if (key) signedKeys.add(key);
     }
     let tried = 0;
-    for (let i = 0; i < entries.length; i++) {
-        if (!signedKeys.has(entries[i].key) || ztoSignedCloseIsHeld(entries[i].key, force)) continue;
+    let finished = true;
+    for (let i = 0; i < open.length; i++) {
+        if (!signedKeys.has(entries[i].key)) continue;
+        if (ztoSignedCloseRetryIsHeld(entries[i].key)) {
+            finished = false;
+            out.keys.add(entries[i].key);
+            continue;
+        }
+        if (ztoSignedCloseIsHeld(entries[i].key, force)) continue;
         if (tried >= ZTO_STATUS_SWEEP_BATCH) {
             out.more = true;
             ztoState.ztoSignedSweepWaitMs = 1;
+            finished = false;
             break;
         }
-        if ((navigator.onLine as boolean) === false) break;
+        if ((navigator.onLine as boolean) === false) { finished = false; break; }
         tried++;
         const done = await autoCloseBarcodeFromZto(entries[i], dataToScan);
-        if (!session.current()) return { closed: 0, more: false, keys: new Set() };
-        if (done === undefined) break;
+        if (!session.current()) return { closed: 0, flipped: 0, more: false, keys: new Set() };
+        if (done === undefined) { finished = false; break; }
+        if (done === false && ztoSignedBarcodeStillOpen(entries[i], dataToScan)) {
+            ztoSignedCloseFailedAt.set(entries[i].key, Date.now());
+            out.keys.add(entries[i].key);
+            finished = false;
+            continue;
+        }
         setZtoPickupVerdict(entries[i].code, true);
         out.keys.add(entries[i].key);
         if (done) out.closed++;
     }
+    for (let i = 0; i < stale.length; i++) {
+        if (!signedKeys.has(stale[i].key)) continue;
+        setZtoPickupVerdict(stale[i].code, true);
+        out.keys.add(stale[i].key);
+        out.flipped++;
+    }
+    const rangeComplete = !!open.length && finished && !signed.partial && !signed.truncated;
+    const mismatched = ztoListPositiveCount(signed.signedMismatch) > 0;
+    const coversMismatch = !ztoState.ztoSignedMismatchFrom || range.from <= ztoState.ztoSignedMismatchFrom;
+    if (ztoState.ztoSignedMismatchFrom && coversMismatch) ztoState.ztoSignedMismatchWideAt = Date.now();
+    if (rangeComplete && mismatched && (!ztoState.ztoSignedMismatchFrom || range.from < ztoState.ztoSignedMismatchFrom)) {
+        ztoState.ztoSignedMismatchFrom = range.from;
+        ztoState.ztoSignedMismatchWideAt = Date.now();
+    }
+    if (rangeComplete && !mismatched && coversMismatch) ztoState.ztoSignedMismatchFrom = '';
+    const complete = rangeComplete && !mismatched && !ztoState.ztoSignedMismatchFrom;
+    if (rangeComplete) ztoState.ztoSignedSweepOkAt = Date.now();
+    if (complete) {
+        ztoState.ztoSignedCompleteAt = Date.now();
+        ztoState.ztoSignedCompleteServerAt = readServerAt;
+        ztoState.ztoAbandonHoldSince = 0;
+    }
+    markZtoShopSweep(complete ? readServerAt : 0);
     return out;
 }
 
@@ -361,7 +521,7 @@ export function ztoStatusPendingCodes(dataToScan = dataState.scanHistory, trashT
 export function ztoStatusUnmeasuredCount(dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
     let n = 0;
     collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
-        if (!ztoPickupStatus.get(entry.key)) n++;
+        if (!ztoPickupStatus.get(entry.key) && !ztoPickupVerdictSeenAt.has(entry.key)) n++;
     });
     return n;
 }
@@ -509,6 +669,12 @@ export function ztoStatusNetworkAllowed(userAsked) {
     return autoLookupInFlight.size === 0;
 }
 
+export function ztoSignedNetworkAllowed(userAsked) {
+    if ((navigator.onLine as boolean) === false) return false;
+    if (!userAsked && linkIsFrugal()) return false;
+    return autoLookupInFlight.size === 0;
+}
+
 export function ztoStatusSweepGapMs() {
     const idx = Math.min(ztoState.ztoStatusFailStreak, ZTO_STATUS_FAIL_BACKOFF_MS.length - 1);
     const step = ZTO_STATUS_FAIL_BACKOFF_MS[idx];
@@ -518,7 +684,6 @@ export function ztoStatusSweepGapMs() {
 export function ztoStatusBlockIsTransient() {
     if ((navigator.onLine as boolean) === false) return false;
     if (linkIsFrugal()) return false;
-    if (uiState.isModalOpen) return false;
     return true;
 }
 
@@ -532,7 +697,8 @@ export function resumeZtoStatusSweep() {
 export function scheduleZtoStatusSweep(delayMs?) {
     if (ztoState.ztoStatusSweepTimer || ztoState.ztoStatusInFlight) return;
     if (!delayMs && ztoState.ztoStatusLastSweepAt
-        && elapsedSince(ztoState.ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return;
+        && elapsedSince(ztoState.ztoStatusLastSweepAt) < ztoStatusSweepGapMs()
+        && !(ztoAutoCloseEnabled() && ztoSignedSweepIsDue(false))) return;
     if (!ztoStatusFeatureConfig()) return;
     ztoState.ztoStatusSweepTimer = setTimeout(() => {
         ztoState.ztoStatusSweepTimer = null;
@@ -553,35 +719,51 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     return { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
 }
 
+function pruneZtoPickupVerdictSeen(closedAll, openAll) {
+    if (!ztoPickupVerdictSeenAt.size) return;
+    const keep = new Set();
+    for (let i = 0; i < closedAll.length; i++) keep.add(closedAll[i].key);
+    for (let i = 0; i < openAll.length; i++) keep.add(openAll[i].key);
+    ztoPickupVerdictSeenAt.forEach((_at, key) => { if (!keep.has(key)) ztoPickupVerdictSeenAt.delete(key); });
+}
+
 export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
     const session = captureZtoSession();
     const cfg = ztoStatusFeatureConfig();
     if (!cfg) return 0;
     if (ztoStatusSecretIsLocked(cfg)) return 0;
     if (ztoState.ztoStatusInFlight) return 0;
-    if (!ztoStatusNetworkAllowed(force)) {
-        if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ztoStatusSweepGapMs());
+    const detailAllowed = ztoStatusNetworkAllowed(force);
+    if (!detailAllowed && !ztoSignedNetworkAllowed(force)) {
+        if (ztoStatusBlockIsTransient()) {
+            const gap = ztoStatusSweepGapMs();
+            scheduleZtoStatusSweep(ztoSignedLivePollWanted(dataToScan, trashToScan) ? Math.min(gap, ztoSignedSweepCadenceMs()) : gap);
+        }
         return 0;
     }
-    if (!force && elapsedSince(ztoState.ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return 0;
+    const detailDue = detailAllowed && (force || elapsedSince(ztoState.ztoStatusLastSweepAt) >= ztoStatusSweepGapMs());
+    const signedDue = ztoAutoCloseEnabled() && ztoSignedSweepIsDue(force);
+    if (!detailDue && !signedDue) return 0;
     loadZtoPickupStatusOnce();
-    ztoState.ztoStatusLastSweepAt = Date.now();
-    const closedWork = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
+    if (detailDue) ztoState.ztoStatusLastSweepAt = Date.now();
+    const closedAll = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan);
+    const openAll = ztoAutoCloseEnabled() ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
+    pruneZtoPickupVerdictSeen(closedAll, openAll);
+    const closedWork = closedAll
         .filter((entry) => {
             const verdict = ztoPickupStatus.get(entry.key);
-            if (!verdict) return true;
+            if (!verdict) return force || !ztoPickupVerdictSeenAt.has(entry.key);
             if (verdict.closed === true) return false;
             return force;
         });
-    const openWork = ztoAutoCloseEnabled()
-        ? collectOpenBarcodesForZtoStatus(dataToScan)
-            .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)))
-        : [];
-    const queue = closedWork.concat(openWork);
+    const openWork = openAll
+        .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)
+            || (ztoPickupVerdictSeenAt.has(entry.key) ? { at: ztoPickupVerdictSeenAt.get(entry.key) } : null)));
+    const queue = detailDue ? closedWork.concat(openWork) : [];
     const work = rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor).slice(0, ZTO_STATUS_SWEEP_BATCH);
-    const signedEntries = ztoAutoCloseEnabled() && ztoSignedSweepIsDue(force)
-        ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
-    if (!work.length && !signedEntries.length) return 0;
+    const signedEntries = signedDue ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
+    const signedPending = signedDue ? ztoStatusPendingList(dataToScan, trashToScan) : [];
+    if (!work.length && !signedEntries.length && !signedPending.length) return 0;
     ztoState.ztoStatusInFlight = true;
     let measured = 0;
     let autoClosed = 0;
@@ -590,14 +772,14 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let signedMore = false;
     let signedKeys = new Set();
     try {
-        if (signedEntries.length) {
-            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force);
+        if (signedEntries.length || signedPending.length) {
+            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force, signedPending);
             if (!session.current()) return 0;
             autoClosed += signed.closed;
-            measured += signed.closed;
+            measured += signed.closed + signed.flipped;
             signedMore = signed.more;
             signedKeys = signed.keys;
-            if (signed.closed) renderZtoSyncViews(dataToScan, trashToScan);
+            if (signed.closed || signed.flipped) renderZtoSyncViews(dataToScan, trashToScan);
         }
         for (let i = 0; i < work.length; i++) {
             if (signedKeys.has(work[i].key)) continue;
@@ -635,6 +817,8 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     renderZtoSyncViews(dataToScan, trashToScan);
     if ((recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) || signedMore) {
         scheduleZtoStatusSweep(ztoStatusSweepGapMs() + 500);
+    } else if (ztoSignedLivePollWanted(dataToScan, trashToScan)) {
+        scheduleZtoStatusSweep(ztoSignedSweepCadenceMs() + 500);
     }
     return measured;
 }

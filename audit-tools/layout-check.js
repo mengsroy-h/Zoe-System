@@ -86,6 +86,163 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
     return { width: host ? Math.round(host.getBoundingClientRect().width) : 0, cards: cards.length, rows: tops.size };
 }, cfg);
 
+// ⛔ ជួរប្រវត្តិមានទិន្នន័យ (របាយការណ៍ម្ចាស់គម្រោង ៖ «ប៊ូតុង ខល នៅពីលើ កញ្ចប់សរុប»)។ ការវាស់ខាងលើផ្ទុក App **ទទេ**
+// ➜ ជួរដេកមិនដែលត្រូវវាស់ ៖ ប៊ូតុងសកម្មភាព (`white-space: nowrap`) ហៀរចេញពីក្រឡារបស់វា ហើយជាន់ «កញ្ចប់សរុប»
+// (22×21px នៅ 320) · ស្លាកលេខរៀង (`min-width: 20px` ក្នុងជួរឈរ 6%) ជាន់លេខទូរស័ព្ទ ១–៤px ពេលលេខ ៣ ខ្ទង់។
+// វាស់ដូចម្រាមដៃ ៖ `elementFromPoint` លើគែម «កញ្ចប់សរុប» និងកណ្តាលប៊ូតុងនីមួយៗ ត្រូវឃើញធាតុនោះផ្ទាល់ · ការចុចពិត
+// (Playwright បដិសេធពេលធាតុផ្សេងបាំង) ➜ ប្រអប់បញ្ជីកញ្ចប់ · ប្រភពកញ្ចប់ (`origins`) ៖ នៅក្នុងក្រឡា · មិនជាន់ធាតុជិតខាង ·
+// មិនពង្រីកជួរឈរ · អត្ថបទវែងកាត់ (…)។ ⛔ ទទឹង ≥992 ៖ ប៊ូតុងហៀរចេញពីក្រឡាខ្លួនចូលកន្លែងទំនេរ (មានតាំងពីមុន ·
+// គ្មានការជាន់) ➜ អះអាង «មិនជាន់» គ្រប់ទទឹង តែ «នៅក្នុងក្រឡាខ្លួន» សម្រាប់ទូរស័ព្ទ (< 700)។
+const HISTORY_ROW_WIDTHS = [320, 340, 360, 375, 390, 412, 430, 480, 600, 699, 700, 768, 991, 992, 1024, 1100, 1280];
+const HISTORY_ROW_PROBE = async (big) => {
+    const day = '2026-10-06';
+    const LONG = 'សាខាផ្សេងទៀតដែលមិនមែនចិន ឬវៀតណាម ផ្លូវលេខ ២៧១ សង្កាត់ទួលទំពូង ខណ្ឌចំការមន ភ្នំពេញ';
+    const mk = (id, extra, origins) => Object.assign({ id, phone: '0963897345', scanDate: day, time: '09:00:00 (' + day + ')',
+        createdAt: Date.now(), cod: 3, dod: 0, count: 3, isClosed: false,
+        barcodes: [1, 2, 3].map((j) => ({ code: 'ZT' + id + '00' + j, cod: 1, dod: 0, isClosed: false })) }, extra, origins ? { origins } : {});
+    const kinds = [
+        ['A', {}, null],
+        ['B', {}, { ZTB001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ', ZTB002: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }],
+        ['C', { isCalled: true }, { ZTC001: 'Shopee SHPE' }],
+        ['D', { isCalled: true, isClosed: true }, { ZTD001: 'Shopee SHPE', ZTD002: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }],
+        ['E', { isCalled: true, callMark: 'wrong-number' }, { ZTE001: LONG }],
+        ['F', { isCalled: true, callMark: 'no-answer' }, { ZTF001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]
+    ];
+    const extra = big ? Array.from({ length: 114 }, (_, i) => mk('G' + i, i % 3 ? {} : { isCalled: true, callMark: i % 2 ? 'no-answer' : 'wrong-number' }, null)) : [];
+    const plain = kinds.map(([id, x]) => mk(id, x, null)).concat(extra);
+    const rich = kinds.map(([id, x, o]) => mk(id, x, o)).concat(extra);
+    const R = (el) => el.getBoundingClientRect();
+    const cut = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const paint = async (items) => {
+        window.scanHistory = items;
+        renderHistory(items, 'layout-' + Math.random());
+        await new Promise((r) => setTimeout(r, 150));
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        return Array.from(document.querySelectorAll('#historyTableBody tr[data-id]'));
+    };
+    const widthsOf = (rows) => rows.map((tr) => Array.from(tr.children).map((td) => Math.round(R(td).width)).join(','));
+    const plainRows = await paint(plain);
+    const plainWidths = widthsOf(plainRows);
+    const plainHeights = plainRows.map((tr) => R(tr).height);
+    const rows = await paint(rich);
+    const out = { rows: rows.length, oldButtons: document.querySelectorAll('#historyTableBody .btn-view-list').length,
+        widthsChanged: widthsOf(rows).filter((w, i) => w !== plainWidths[i]).length, rowList: [] };
+    const limit = big ? Math.min(rows.length, 12) : rows.length;
+    for (let i = 0; i < limit; i++) {
+        const tr = rows[i];
+        tr.scrollIntoView({ block: 'center' });
+        await frame();
+        const hitsSelf = (el, x, y) => { const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); };
+        const [numTd, custTd, priceTd, actTd] = Array.from(tr.children);
+        const badge = priceTd.querySelector('.count-badge');
+        const b = R(badge);
+        const btns = Array.from(actTd.querySelectorAll('.action-group > *'));
+        const priceEls = Array.from(priceTd.querySelectorAll('*')).filter((e) => !e.children.length || e.matches('.count-badge, .locker-badge'));
+        const custLeaves = Array.from(custTd.querySelectorAll('*')).filter((e) => !e.children.length);
+        const mark = numTd.querySelector('.row-num-mark');
+        const range = document.createRange();
+        range.selectNodeContents(numTd);
+        const numBox = mark ? R(mark) : range.getBoundingClientRect();
+        const chip = custTd.querySelector('.origin-chip');
+        const row = {
+            id: tr.dataset.id,
+            badgeTag: badge.tagName,
+            badgeClear: [b.left + 2, (b.left + b.right) / 2, b.right - 2].every((x) => hitsSelf(badge, x, (b.top + b.bottom) / 2)),
+            buttonsClear: btns.every((x) => { const q = R(x); return hitsSelf(x, (q.left + q.right) / 2, (q.top + q.bottom) / 2); }),
+            buttonsHitPrice: btns.some((x) => priceEls.some((e) => cut(R(x), R(e)))),
+            buttonsInCell: btns.every((x) => R(x).left >= R(actTd).left - 0.5 && R(x).right <= R(actTd).right + 0.5),
+            buttonsOneLine: new Set(btns.map((x) => Math.round(R(x).top))).size === 1,
+            fixPhone: !!actTd.querySelector('.fix-phone-btn'),
+            numberHitsCustomer: custLeaves.some((e) => cut(numBox, R(e))),
+            grew: Math.round(R(tr).height - plainHeights[i])
+        };
+        if (chip) {
+            const c = R(chip);
+            const text = chip.querySelector('.origin-chip-text');
+            const line = chip.closest('.origin-line');
+            const siblings = Array.from(line.parentElement.children).filter((e) => e !== line);
+            row.chip = {
+                text: chip.textContent,
+                inCell: c.left >= R(custTd).left - 0.5 && c.right <= R(custTd).right + 0.5,
+                hitsSibling: siblings.some((e) => cut(c, R(e))),
+                cut: text.scrollWidth > text.clientWidth + 1,
+                oneLine: Math.round(Math.max(...siblings.map((e) => R(e).height), R(line).height)
+                    + (parseFloat(getComputedStyle(line.parentElement).rowGap) || 0))
+            };
+        }
+        out.rowList.push(row);
+    }
+    return out;
+};
+
+async function historyRowLayout(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof renderHistory === 'function' && typeof openViewListModal === 'function');
+    check(ready, 'ZoeW ជួរប្រវត្តិ ៖ មាន renderHistory · openViewListModal (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    const seen = [];
+    for (const w of HISTORY_ROW_WIDTHS) {
+        await page.setViewportSize({ width: w, height: 900 });
+        seen.push(Object.assign({ w: w, big: false }, await page.evaluate(HISTORY_ROW_PROBE, false)));
+        seen.push(Object.assign({ w: w, big: true }, await page.evaluate(HISTORY_ROW_PROBE, true)));
+    }
+    const rowsOf = (pred) => seen.flatMap((s) => s.rowList.map((r) => Object.assign({ w: s.w, big: s.big }, r))).filter(pred);
+    const show = (list) => JSON.stringify(list.slice(0, 4));
+    const small = seen.filter((s) => !s.big);
+    check(small.length === HISTORY_ROW_WIDTHS.length && small.every((s) => s.rows === 6) && seen.filter((s) => s.big).every((s) => s.rows >= 50),
+        'ZoeW ជួរប្រវត្តិ ៖ ជាន់អប្បបរមា ៖ គូរជួរពិត ៦ ជួរ + ៥០ ជួរ (លេខរៀង ៣ ខ្ទង់) គ្រប់ទទឹង', JSON.stringify(seen.map((s) => [s.w, s.big, s.rows])));
+    check(seen.every((s) => s.oldButtons === 0) && rowsOf((r) => r.badgeTag !== 'BUTTON').length === 0,
+        'ZoeW ជួរប្រវត្តិ ៖ «កញ្ចប់សរុប» ជាប៊ូតុង · គ្មានប៊ូតុង «📦 បញ្ជី» ចាស់', show(rowsOf((r) => r.badgeTag !== 'BUTTON')));
+    check(rowsOf((r) => !r.badgeClear).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ គ្មានធាតុណាបាំង «កញ្ចប់សរុប» (elementFromPoint គែមឆ្វេង · កណ្តាល · គែមស្តាំ គ្រប់ទទឹង)', show(rowsOf((r) => !r.badgeClear)));
+    check(rowsOf((r) => !r.buttonsClear || r.buttonsHitPrice).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ មិនជាន់ធាតុណាក្នុងក្រឡាតម្លៃ ហើយគ្មានអ្វីបាំងវា', show(rowsOf((r) => !r.buttonsClear || r.buttonsHitPrice)));
+    check(rowsOf((r) => r.w < 700 && !r.buttonsInCell).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ទូរស័ព្ទ (< 700) ៖ ប៊ូតុងសកម្មភាពនៅក្នុងក្រឡារបស់វា', show(rowsOf((r) => r.w < 700 && !r.buttonsInCell)));
+    check(rowsOf((r) => r.fixPhone).length > 0 && rowsOf((r) => !r.buttonsOneLine && (!r.fixPhone || r.w >= 360)).length === 0,
+        'ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ នៅបន្ទាត់តែមួយ (មិនបន្ថែមកម្ពស់ជួរ) · «✏️ កែលេខ» ចាប់ពី 360px',
+        show(rowsOf((r) => !r.buttonsOneLine && (!r.fixPhone || r.w >= 360))));
+    check(rowsOf((r) => r.numberHitsCustomer).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ លេខរៀង (រួមទាំង ៣ ខ្ទង់ និងស្លាកពណ៌) មិនជាន់ក្រឡាអតិថិជន', show(rowsOf((r) => r.numberHitsCustomer)));
+    const chips = rowsOf((r) => !r.big && !!r.chip);
+    check(chips.length === HISTORY_ROW_WIDTHS.length * 5,
+        'ZoeW ជួរប្រវត្តិ ៖ ជាន់អប្បបរមា ៖ ប្រភពបង្ហាញលើ ៥ ជួរដែលមាន `origins` គ្រប់ទទឹង (ទិសផ្ទុយ ៖ ជួរ A គ្មាន)',
+        'ឃើញ ' + chips.length + ' · ' + show(rowsOf((r) => !r.big && r.id === 'A' && !!r.chip)));
+    check(chips.every((r) => r.chip.inCell && !r.chip.hitsSibling),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ប្រភពនៅក្នុងក្រឡាអតិថិជន មិនជាន់ស្លាក · លេខទូរស័ព្ទ · ម៉ោង', show(chips.filter((r) => !r.chip.inCell || r.chip.hitsSibling)));
+    check(chips.filter((r) => r.id === 'E').every((r) => r.chip.cut) && chips.filter((r) => r.id === 'B' || r.id === 'F').every((r) => !r.chip.cut),
+        'ZoeW ជួរប្រវត្តិ ៖ ប្រភពវែងកាត់ (…) · «🇨🇳 ចិន» បង្ហាញពេញ', show(chips.filter((r) => (r.id === 'E' && !r.chip.cut) || ((r.id === 'B' || r.id === 'F') && r.chip.cut))));
+    check(small.every((s) => s.widthsChanged === 0),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ប្រភពមិនប្តូរទទឹងជួរឈរ', JSON.stringify(small.filter((s) => s.widthsChanged).map((s) => [s.w, s.widthsChanged])));
+    check(chips.every((r) => r.grew <= r.chip.oneLine + 1),
+        'ZoeW ជួរប្រវត្តិ ៖ ប្រភពបន្ថែមកម្ពស់ជួរយ៉ាងច្រើនមួយបន្ទាត់ (កម្ពស់ធាតុខ្ពស់បំផុតក្នុងក្រឡា + គម្លាតពិត)',
+        show(chips.filter((r) => r.grew > r.chip.oneLine + 1)));
+
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.evaluate(HISTORY_ROW_PROBE, false);
+    let opened = null;
+    try {
+        await page.click('#historyTableBody tr[data-id="D"] .count-badge', { timeout: 4000 });
+        await page.waitForTimeout(250);
+        opened = await page.evaluate(() => {
+            const modal = document.getElementById('viewListModal');
+            const list = document.getElementById('barcodeListContainer');
+            return { shown: !!modal && getComputedStyle(modal).display !== 'none', text: list ? list.textContent : '' };
+        });
+    } catch (e) { opened = { error: String(e && e.message).split('\n')[0] }; }
+    check(!!opened && opened.shown && ['ZTD001', 'ZTD002', 'ZTD003'].every((c) => opened.text.indexOf(c) !== -1)
+        && /វៀតណាម/.test(opened.text) && /ចិន/.test(opened.text),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ចុច «កញ្ចប់សរុប» ពិត (320px) ➜ ប្រអប់បញ្ជី barcode ទាំង ៣ របស់ជួរនោះ ជាមួយប្រភពនីមួយៗ',
+        JSON.stringify(opened && { shown: opened.shown, error: opened.error, text: String(opened.text || '').slice(0, 160) }));
+    await ctx.close();
+}
+
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
@@ -518,6 +675,7 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                     'ZoeW: ស្រោមស្វែងរករក្សាគោលដៅប៉ះ >= 44px (ច្បាប់ 2.22.2)',
                     'min-height=' + ui.boxMinH);
             }
+            await historyRowLayout(browser, port);
         }
 
         server.close();

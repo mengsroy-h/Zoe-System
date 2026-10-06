@@ -1,3 +1,4 @@
+import { originLabel } from '../../../features/barcode-origin';
 import { ZTO_LIST_PREVIEW_ROWS, ztoListSkipText } from '../../../features/zto-list-sync';
 import type { ZtoListGroup } from './ZtoListSyncBody';
 
@@ -14,10 +15,12 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
             ].filter(Boolean).join(' · ');
             return {
                 barcode: row.barcode || '—',
-                meta: [row.phone || '—', money, row.at,
+                primary: [row.phone || '—', money, row.at].filter(Boolean).join(' · '),
+                origin: originLabel(row.from).full,
+                notes: [
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
-                    ztoListSkipText(row.skip)].filter(Boolean).join(' · ')
+                    ztoListSkipText(row.skip)].filter(Boolean)
             };
         })
     };

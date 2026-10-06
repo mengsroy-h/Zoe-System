@@ -17,6 +17,7 @@ export interface FirebaseState {
     dbRefDailyPickup: any;
     dbRefDailyCollected: any;
     dbRefExchangeRate: any;
+    dbRefZtoSignedSweep: any;
     dbRefConnected: any;
     dbRefServerTimeOffset: any;
     authUnsubscribe: any;
@@ -75,6 +76,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     dbRefDailyPickup: null,
     dbRefDailyCollected: null,
     dbRefExchangeRate: null,
+    dbRefZtoSignedSweep: null,
     dbRefConnected: null,
     dbRefServerTimeOffset: null,
     authUnsubscribe: null,
@@ -479,6 +481,7 @@ export interface LookupState {
     customerDataTableFetchedAt: number;
     customerDataTableFetchPromise: any;
     customerDataTableSessionGeneration: number;
+    customerDataTableFetchGeneration: number;
     customerDataTableLastFailedAt: number;
     ztoWarmSoonTimer: any;
     ztoWarmSoonArmedAt: number;
@@ -502,6 +505,7 @@ export const lookupState = createStore<LookupState>('lookupState', {
     customerDataTableFetchedAt: 0,
     customerDataTableFetchPromise: null,
     customerDataTableSessionGeneration: 0,
+    customerDataTableFetchGeneration: 0,
     customerDataTableLastFailedAt: 0,
     ztoWarmSoonTimer: null,
     ztoWarmSoonArmedAt: 0,
@@ -559,6 +563,20 @@ export interface ZtoState {
     ztoSignedSweepAt: number;
     ztoSignedSweepOkAt: number;
     ztoSignedSweepWaitMs: number;
+    ztoSignedCompleteAt: number;
+    ztoSignedCompleteServerAt: number;
+    ztoSignedOff: boolean;
+    ztoSignedTruncatedNoted: boolean;
+    ztoUserActiveAt: number;
+    ztoAbandonHoldSince: number;
+    ztoAbandonCheckedAt: number;
+    ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number; failedAt: number };
+    ztoShopSweepWrote: { activeAt: number; completeAt: number };
+    ztoSignedSplitAt: number;
+    ztoSignedSplitFrom: string;
+    ztoSignedMismatchFrom: string;
+    ztoSignedMismatchWideAt: number;
+    ztoOriginRefusedDb: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
     ztoListPreview: any | null;
@@ -579,6 +597,20 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoSignedSweepAt: 0,
     ztoSignedSweepOkAt: 0,
     ztoSignedSweepWaitMs: 0,
+    ztoSignedCompleteAt: 0,
+    ztoSignedCompleteServerAt: 0,
+    ztoSignedOff: false,
+    ztoSignedTruncatedNoted: false,
+    ztoUserActiveAt: 0,
+    ztoAbandonHoldSince: 0,
+    ztoAbandonCheckedAt: 0,
+    ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 },
+    ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
+    ztoSignedSplitAt: 0,
+    ztoSignedSplitFrom: '',
+    ztoSignedMismatchFrom: '',
+    ztoSignedMismatchWideAt: 0,
+    ztoOriginRefusedDb: null,
     ztoBannerView: null,
     ztoSyncListView: null,
     ztoListPreview: null,

@@ -163,6 +163,45 @@ async function replay(cap, rules, tag) {
         'probe ទិសផ្ទុយ ៖ rules ដែលបដិសេធ record ប្រវត្តិ ➜ ការ replay ឃើញការបដិសេធ (ការវាស់រសើប)',
         'denied=' + probe.denied.length + ' historyWrites=' + historyWrites);
 
+    // ⛔ ប្រភពកញ្ចប់ (`origins`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរប្រភពពិត និងការចម្លងកញ្ចប់ដែលមានប្រភពទៅធុងសំរាម
+    //    (លុប/ដក/សម្អាត) ឬត្រឡប់ (ស្តារ) — rules ពិតទទួលទាំងអស់ (ខាងលើ) · probe ៖ rules ដែលគ្មាន `origins` (ដូច rules ចាស់) ➜ បដិសេធ។
+    const carriesOrigins = (v) => !!v && typeof v === 'object' && JSON.stringify(v).indexOf('"origins"') !== -1;
+    const originPaths = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && rootOf(e.p) === 'zoew_scan_history_cod_dod'
+        && carriesOrigins(e.v)).length, 0);
+    const trashWithOrigins = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner
+        && (rootOf(e.p) === 'zoew_recently_deleted_cod_dod' || (e.m === 'PATCH' && e.v && Object.keys(e.v).some((k) => k.indexOf('zoew_recently_deleted_cod_dod') === 0 && carriesOrigins(e.v[k]))))
+        && carriesOrigins(e.v)).length, 0);
+    console.log('    ប្រភព ៖ ការសរសេរ origins ' + originPaths + ' · ការចម្លងទៅធុងសំរាមដែលមាន origins ' + trashWithOrigins);
+    check(originPaths >= 3, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរប្រវត្តិដែលមាន `origins` (transaction ប្រភព · កែកញ្ចប់ក្រោយ) ≥ ៣', 'originPaths=' + originPaths);
+    check(trashWithOrigins >= 1, 'ជាន់អប្បបរមា ៖ ការ replay ចម្លងកញ្ចប់ដែលមានប្រភពទៅធុងសំរាម ≥ ១ (rules ធុងសំរាមត្រូវទទួល)', 'trashWithOrigins=' + trashWithOrigins);
+    const oldRules = JSON.parse(JSON.stringify(rules));
+    delete oldRules.rules.zoew_scan_history_cod_dod.$itemId.origins;
+    delete oldRules.rules.zoew_recently_deleted_cod_dod.$itemId.origins;
+    const old = await replay(cap.data, oldRules, 'old-rules');
+    check(old.denied.length >= originPaths,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `origins`) បដិសេធការសរសេរប្រភព ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់ (`saveBarcodeOrigins`)',
+        'denied=' + old.denied.length + ' originPaths=' + originPaths);
+
+    // ⛔ សញ្ញាហាង ZTO (`zoew_settings/zto_signed_sweep`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរពិតរបស់ `markZtoShopSweep()` ·
+    //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules ដែលគ្មាន node នេះ (ដូច rules ចាស់) ➜ បដិសេធ។
+    const sweepMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && String(e.p || '') === 'zoew_settings/zto_signed_sweep').length, 0);
+    console.log('    សញ្ញាហាង ZTO ៖ ការសរសេរ ' + sweepMarks);
+    check(sweepMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរសញ្ញាហាង ZTO ≥ ១', 'sweepMarks=' + sweepMarks);
+    const noMarkRules = JSON.parse(JSON.stringify(rules));
+    delete noMarkRules.rules.zoew_settings.zto_signed_sweep;
+    const noMark = await replay(cap.data, noMarkRules, 'no-mark-rules');
+    check(noMark.denied.filter((d) => d.path === 'zoew_settings/zto_signed_sweep').length >= sweepMarks,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_signed_sweep`) បដិសេធសញ្ញាហាង (ការវាស់រសើប)',
+        'denied=' + noMark.denied.length + ' sweepMarks=' + sweepMarks);
+
+    // ⛔ ត្រាពេលអនាគត (ម៉ោង Server ខុស) មិនត្រូវកកសញ្ញាហាងទាំងហាង ➜ rules បដិសេធ > now + ១០ នាទី · ត្រាបច្ចុប្បន្ន ➜ ទទួល
+    const markProbe = (stamp) => [{ run: 'mark-probe', seed: {}, log: [{ p: 'zoew_settings/zto_signed_sweep', m: 'PATCH', v: { activeAt: stamp, completeAt: stamp } }] }];
+    const future = await replay(markProbe(Date.now() + 30 * 24 * 3600 * 1000), rules, 'mark-future');
+    const current = await replay(markProbe(Date.now()), rules, 'mark-now');
+    check(future.denied.length === 1 && current.denied.length === 0,
+        'rules ពិត ៖ សញ្ញាហាងត្រាអនាគត (+៣០ ថ្ងៃ) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន ➜ ទទួល',
+        'future=' + future.denied.length + ' current=' + current.denied.length);
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); process.exit(1); });

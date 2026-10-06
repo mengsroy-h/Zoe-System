@@ -143,6 +143,7 @@ function makeCtx(mode) {
         toasts: [], lateResolvers: [],
         showToast(m) { ctx.toasts.push(String(m)); },
         refreshCurrentHistoryView() {}, clearLookupStatus() {}, safeFocusScanner() {},
+        originLabel() { return { icon: '', name: '', short: '', full: '' }; }, itemOriginOf() { return ''; },
         resumeScanVideo() {}, hidePhoneSuggestions() {}, showAppChrome() {},
         __serverLedger: serverLedger, __serverHistory: serverHistory, __pending: pending
     };

@@ -59,7 +59,7 @@ const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
-    'lookupFailureIsDefinitive'];
+    'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -69,6 +69,18 @@ NEEDED.forEach((n) => {
 });
 
 const TIMEOUT_MESSAGE = 'Auto lookup timed out';
+// ⛔ barcode លំនាំដើមត្រូវស្របនឹងទម្រង់ ZTO (`BARCODE_RE` របស់ Function) ➜ សេណារីយ៉ូខាងក្រោមវាស់ផ្លូវបណ្ដាញពិត មិនមែនច្រកទម្រង់
+const BARCODE = 'BC100001';
+
+// ច្បាប់ទម្រង់ barcode ៖ ស្រង់ពី Function (`const BARCODE_RE = /…/;`) និងពី App (`const ZTO_BARCODE_RE = /…/;`)
+function regexConst(text, name) {
+    const m = new RegExp('const ' + name + ' = (\\/(?:\\\\.|[^\\/\\n])+\\/[a-z]*);').exec(text || '');
+    return m ? m[1] : null;
+}
+function stringConst(text, name) {
+    const m = new RegExp('const ' + name + " = ('(?:\\\\.|[^'\\\\\\n])*');").exec(text || '');
+    return m ? m[1] : null;
+}
 
 // បង្កើតបរិស្ថានរត់កូដពិត។ `plan` ជាបញ្ជីលទ្ធផលក្នុងមួយការហៅ៖
 //   { status, code, reason }  ឬ  { reject: 'timeout' | 'network' }
@@ -97,7 +109,7 @@ function buildRuntime(plan) {
         sheetScriptVersionSeen: null,
         pendingLookupUnlockBarcode: '',
         pendingLookupUnlockResolve: null,
-        pendingBarcode: 'BC1',
+        pendingBarcode: BARCODE,
         isModalOpen: true,
         customerDataTableSessionGeneration: 0,
         customerDataTableRows: null,
@@ -106,7 +118,7 @@ function buildRuntime(plan) {
         customerTableIsPartial: false,
         getFastLookupRow: () => null,
         setFastLookupRow: () => {},
-        getLookupApiConfig: () => ({
+        getLookupApiConfig: () => ctx.__cfg || ({
             url: '/.netlify/functions/zto-order-detail?barcode={barcode}',
             enabled: true, fastMode: false, headerName: '', headerValueEnc: null,
             phoneField: 'phone', codField: 'cod', dodField: 'dod'
@@ -136,7 +148,8 @@ function buildRuntime(plan) {
             return Promise.resolve({ res: { ok: status >= 200 && status < 300, status }, body });
         },
         document: { getElementById: (id) => (id === 'lookupStatus' ? statusEl : null) },
-        ZoeErrors: { capture: () => {} },
+        ZoeErrors: { capture: () => { ctx.__captures++; } },
+        __captures: 0,
         __calls: calls,
         __status: statusEl
     };
@@ -146,6 +159,14 @@ function buildRuntime(plan) {
     // ⛔ ZoeW ជា React ៖ ស្ថានភាព Lookup ជា `viewState.lookupStatus` ដែល `PhoneModal.tsx` គូរជា `#lookupStatus` ➜
     //    ស្រទាប់ React ពិតចូល sandbox ហើយ `__status` អានអត្ថបទពី **JSX ពិត**
     vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+    ['ZTO_BARCODE_RE'].forEach((n) => {
+        const literal = regexConst(SRC, n);
+        if (literal) vm.runInContext('var ' + n + ' = ' + literal + ';', ctx);
+    });
+    ['ZTO_BARCODE_SHAPE_TEXT'].forEach((n) => {
+        const literal = stringConst(SRC, n);
+        if (literal) vm.runInContext('var ' + n + ' = ' + literal + ';', ctx);
+    });
     Object.defineProperty(ctx, '__status', { configurable: true,
         value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
     ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
@@ -153,7 +174,7 @@ function buildRuntime(plan) {
      'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
      'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
-     'clearAutoLookupQueueRetries'].forEach((n) => {
+     'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });
     // ជាន់ការពារ ៖ បើ helper ថ្មីមិនទាន់មាន ត្រូវ stub ដើម្បីកុំឲ្យ
@@ -163,10 +184,13 @@ function buildRuntime(plan) {
     return ctx;
 }
 
-function run(plan) {
+function run(plan, barcode, cfg) {
     const ctx = buildRuntime(plan);
     if (!src.attemptAutoLookup) return Promise.resolve({ calls: [], text: '', ctx });
-    return vm.runInContext('attemptAutoLookup("BC1")', ctx)
+    ctx.__scan = barcode === undefined ? BARCODE : barcode;
+    ctx.pendingBarcode = ctx.__scan;
+    if (cfg) ctx.__cfg = cfg;
+    return vm.runInContext('attemptAutoLookup(__scan)', ctx)
         .then(() => ({ calls: ctx.__calls, text: ctx.__status.textContent, ctx }),
               () => ({ calls: ctx.__calls, text: ctx.__status.textContent, ctx }));
 }
@@ -297,13 +321,13 @@ scenario('Cooldown ត្រូវឆ្លើយតបនឹងប្រភេ�
         { definitive: definitiveCodes.map((c) => c + ':' + fnCodes.get(c)), transient: transientCodes.map((c) => c + ':' + fnCodes.get(c)) });
     for (const code of definitiveCodes) {
         const r = await run([{ status: fnCodes.get(code), code }]);
-        const entry = r.ctx.autoLookupFailureAt.get('BC1');
+        const entry = r.ctx.autoLookupFailureAt.get(BARCODE);
         const ms = entry && typeof entry === 'object' ? entry.ms : -1;
         ok('⛔ ' + code + ' (HTTP ' + fnCodes.get(code) + ') ➜ cooldown សាលក្រមស្ថាពរ', ms === r.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, ms);
     }
     for (const code of transientCodes) {
         const r = await run([{ status: fnCodes.get(code), code }]);
-        const entry = r.ctx.autoLookupFailureAt.get('BC1');
+        const entry = r.ctx.autoLookupFailureAt.get(BARCODE);
         const ms = entry && typeof entry === 'object' ? entry.ms : -1;
         ok('⛔ ទិសផ្ទុយ ៖ ' + code + ' (HTTP ' + fnCodes.get(code) + ') ➜ cooldown បណ្តោះអាសន្ន (ខ្លីជាងសាលក្រមស្ថាពរ)',
             ms > 0 && ms < r.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, ms);
@@ -311,13 +335,64 @@ scenario('Cooldown ត្រូវឆ្លើយតបនឹងប្រភេ�
 
     // អ្នកប្រើត្រូវដឹងថាត្រូវរង់ចាំប៉ុន្មាន — សារត្រូវផ្គូផ្គងនឹង cooldown ពិត
     const again = await run([{ reject: 'timeout' }]);
-    again.ctx.autoLookupFailureAt.set('BC1', Date.now());
+    again.ctx.autoLookupFailureAt.set(BARCODE, Date.now());
     const blocked = await new Promise((resolve) => {
-        vm.runInContext('attemptAutoLookup("BC1")', again.ctx).then(
+        vm.runInContext('attemptAutoLookup(__scan)', again.ctx).then(
             () => resolve(again.ctx.__status.textContent), () => resolve(again.ctx.__status.textContent));
     });
     ok('⛔ ការស្កេនម្តងទៀតក្នុង cooldown ➜ សារប្រាប់វិនាទីដែលនៅសល់',
         /\d+\s*វិ\./.test(blocked), blocked);
+});
+
+// ── ៦. ⛔ barcode ក្រៅទម្រង់ ZTO ➜ App ឈប់មុនបណ្ដាញ (ច្បាប់តែមួយជាមួយ `BARCODE_RE` របស់ Function) ──────────
+//    វាស់បាន (46377da) ៖ Function បដិសេធ 400 `ZTO_BARCODE_INVALID` ➜ App បង្ហាញ «មិនអាចភ្ជាប់ ZTO បាន» + cooldown ៦ វិ. + Sentry
+//    «HTTP 400» ➜ ការស្កេនរាល់ barcode ក្រៅទម្រង់ចំណាយការហៅ Function មួយ (APK ៖ ២) ដោយគ្មានផលអ្វី។
+scenario('⛔ barcode ក្រៅទម្រង់ ZTO ➜ គ្មានសំណើ · សារបញ្ចូលដោយដៃ · គ្មាន cooldown · គ្មាន Sentry', async () => {
+    let fnSrc = '';
+    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js'), 'utf8'); } catch (e) { fnSrc = ''; }
+    const fnLiteral = regexConst(fnSrc, 'BARCODE_RE');
+    const appLiteral = regexConst(SRC, 'ZTO_BARCODE_RE');
+    ok('ស្រង់ `BARCODE_RE` ពី zto-order-detail.js បាន', !!fnLiteral);
+    ok('⛔ App មាន `ZTO_BARCODE_RE` ស្មើ `BARCODE_RE` របស់ Function បេះបិទ', !!appLiteral && appLiteral === fnLiteral,
+        { app: appLiteral, fn: fnLiteral });
+    const fnRe = fnLiteral ? vm.runInNewContext(fnLiteral) : /^$/;
+    const corpus = ['771305', 'ZTO123456', 'ab_cd-12', 'A'.repeat(64), '77130527210012',
+        'AB12', '12345', 'ABC 12345', 'ABC.12345', 'ABC/12345', 'ក123456', 'A'.repeat(65), 'ABC#12345'];
+    const valid = corpus.filter((c) => fnRe.test(c));
+    const invalid = corpus.filter((c) => !fnRe.test(c));
+    ok('សំណាកចែកតាម Function (ជាន់អប្បបរមា ៖ ត្រឹមត្រូវ ≥ ៣ · ខុស ≥ ៣)', valid.length >= 3 && invalid.length >= 3,
+        { valid: valid.length, invalid: invalid.length });
+    for (const code of valid) {
+        const r = await run([{ status: 200 }], code);
+        ok('⛔ ទិសផ្ទុយ ៖ ' + JSON.stringify(code) + ' (Function ទទួល) ➜ ហៅ Function ១ ដង', r.calls.length === 1,
+            { calls: r.calls.length, text: r.text });
+    }
+    for (const code of invalid) {
+        const r = await run([{ status: 400, code: 'ZTO_BARCODE_INVALID' }], code);
+        ok('⛔ ' + JSON.stringify(code) + ' (Function បដិសេធ) ➜ 0 សំណើ · សារបញ្ចូលដោយដៃ · គ្មាន cooldown · គ្មាន Sentry',
+            r.calls.length === 0 && r.text.indexOf('ទម្រង់ ZTO') !== -1 && r.text.indexOf('មិនអាចភ្ជាប់') === -1
+            && r.ctx.autoLookupFailureAt.size === 0 && r.ctx.__captures === 0,
+            { calls: r.calls.length, text: r.text, failures: r.ctx.autoLookupFailureAt.size, captures: r.ctx.__captures });
+    }
+    for (const url of ['https://script.google.com/macros/s/x/exec?code={barcode}', 'https://api.example.invalid/lookup?code={barcode}']) {
+        const r = await run([{ status: 200 }], 'ABC.12345', {
+            url, enabled: true, fastMode: false, headerName: '', headerValueEnc: null,
+            phoneField: 'phone', codField: 'cod', dodField: 'dod'
+        });
+        ok('⛔ ទិសផ្ទុយ ៖ Lookup មិនមែន ZTO (' + url.split('/')[2] + ') មិនពិនិត្យទម្រង់ ZTO ➜ ហៅ ១ ដង',
+            r.calls.length === 1 && r.text.indexOf('ទម្រង់ ZTO') === -1, { calls: r.calls.length, text: r.text });
+    }
+
+    const refused = await run([{ status: 400, code: 'ZTO_BARCODE_INVALID' }]);
+    const entry = refused.ctx.autoLookupFailureAt.get(BARCODE);
+    ok('⛔ ច្រកបម្រុង ៖ Function ឆ្លើយ ZTO_BARCODE_INVALID ➜ សារបញ្ចូលដោយដៃ (មិនមែន «មិនអាចភ្ជាប់»)',
+        refused.text.indexOf('ទម្រង់ ZTO') !== -1 && refused.text.indexOf('មិនអាចភ្ជាប់') === -1, refused.text);
+    ok('⛔ ច្រកបម្រុង ៖ ZTO_BARCODE_INVALID ➜ cooldown សាលក្រមស្ថាពរ · គ្មាន Sentry',
+        !!entry && entry.ms === refused.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS && refused.ctx.__captures === 0,
+        { ms: entry && entry.ms, captures: refused.ctx.__captures });
+    const generic = await run([{ status: 400 }]);
+    ok('⛔ ទិសផ្ទុយ ៖ 400 គ្មានកូដ ➜ សារទូទៅ + Sentry ដដែល',
+        generic.text.indexOf('ទម្រង់ ZTO') === -1 && generic.ctx.__captures === 1, { text: generic.text, captures: generic.ctx.__captures });
 });
 
 (async () => {

@@ -39,11 +39,13 @@ const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
 const LIST_RANGE_MAX_DAYS = 31;
 const LIST_ROW_MAX = 200;
 const LIST_CACHE_TTL_MAX_MS = 60000;
+const LIST_SIGNED_CACHE_TTL_MAX_MS = 15000;
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
 const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា';
 const LIST_SITE_NAME_PATHS = ['scanSite', 'scanSiteName'];
+const LIST_ORIGIN_PATHS = ['recSite', 'customerCodeDesc'];
 const LIST_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 86400000;
 
@@ -73,6 +75,8 @@ const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
+const SIGNED_MISMATCH_KEYS_MAX = 1000;
+const signedMismatchSignal = { at: 0, keys: new Set() };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -943,7 +947,7 @@ function listPlan(config, siteCode, range, page, kind) {
         },
         cacheKey: config.fingerprint + '|L|' + config.list.fingerprint + '|' + kind
             + '|' + siteCode + '|' + range.from + '|' + range.to + '|' + page,
-        cacheTtlMs: config.listCacheTtlMs
+        cacheTtlMs: kind === 'signed' ? Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS) : config.listCacheTtlMs
     };
 }
 
@@ -965,7 +969,7 @@ function listContainerOf(upstream) {
     return null;
 }
 
-function listPhoneIsPlaceholder(text) {
+function phoneIsPlaceholder(text) {
     const digits = String(text || '').replace(/[^0-9]/g, '');
     return !digits || /^0+$/.test(digits);
 }
@@ -979,14 +983,20 @@ function listScanTypeSkip(listConfig, candidates) {
     return desc === listConfig.scanDesc ? '' : 'scan-type';
 }
 
-function listRowIsSigned(listConfig, candidates) {
-    if (!listConfig.signedType) return false;
+function listRowSignedVerdict(listConfig, candidates) {
+    if (!listConfig.signedType) return '';
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
     const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
-    if (code && code !== listConfig.signedType) return false;
-    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return false;
-    if (code) return true;
-    return !!(listConfig.signedDesc && desc);
+    if (code && code !== listConfig.signedType) return '';
+    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return code ? 'mismatch' : '';
+    if (code) return 'signed';
+    return listConfig.signedDesc && desc ? 'signed' : '';
+}
+
+function noteSignedMismatch(code) {
+    if (!BARCODE_RE.test(code)) return;
+    signedMismatchSignal.at = Date.now();
+    if (signedMismatchSignal.keys.size < SIGNED_MISMATCH_KEYS_MAX) signedMismatchSignal.keys.add(code);
 }
 
 function listSiteNameOf(candidates) {
@@ -1002,12 +1012,13 @@ function projectListRow(config, row) {
     const at = pickText(candidates, LIST_TIME_PATHS);
     return {
         barcode: pickText(candidates, LIST_BARCODE_PATHS),
-        phone: listPhoneIsPlaceholder(phone) ? '' : phone,
+        phone: phoneIsPlaceholder(phone) ? '' : phone,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : '',
         ztoClosed: pickSignedVerdict(candidates, config.signed),
-        skip: listScanTypeSkip(config.list, candidates)
+        skip: listScanTypeSkip(config.list, candidates),
+        from: pickText(candidates, LIST_ORIGIN_PATHS).replace(/\s+/g, ' ')
     };
 }
 
@@ -1017,6 +1028,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const seenSigned = new Set();
     let otherScans = 0;
     let signedScans = 0;
+    let signedMismatch = 0;
     let siteName = '';
     const raws = container.rows.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
@@ -1024,13 +1036,20 @@ function listResponseBody(config, container, page, siteCode, kind) {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
         const candidates = [raw];
         if (!siteName) siteName = listSiteNameOf(candidates);
-        if (listRowIsSigned(config.list, candidates)) {
+        const verdict = listRowSignedVerdict(config.list, candidates);
+        if (verdict === 'signed') {
             signedScans++;
             const code = pickText(candidates, LIST_BARCODE_PATHS);
             if (BARCODE_RE.test(code) && !seenSigned.has(code)) {
                 seenSigned.add(code);
                 signed.push(code);
             }
+            continue;
+        }
+        if (verdict === 'mismatch') {
+            signedMismatch++;
+            otherScans++;
+            noteSignedMismatch(pickText(candidates, LIST_BARCODE_PATHS));
             continue;
         }
         if (kind === 'signed') { otherScans++; continue; }
@@ -1055,6 +1074,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         rows: rows,
         otherScans: otherScans,
         signedScans: signedScans,
+        signedMismatch: signedMismatch,
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
@@ -1076,6 +1096,7 @@ function mergeSignedCompanion(body, outcome) {
     out.signedOk = true;
     out.signedPages = companion.pages;
     out.signedTotal = companion.total;
+    out.signedListMismatch = companion.signedMismatch;
     if (!out.siteName && companion.siteName) out.siteName = companion.siteName;
     return out;
 }
@@ -1338,10 +1359,11 @@ function extractOrder(config, upstream) {
     const phone = pickText(candidates, config.phonePaths);
     const cod = pickNumber(candidates, config.codPaths);
     const dod = pickNumber(candidates, config.dodPaths);
-    if (!phone && cod === null && dod === null) return null;
+    const shown = phoneIsPlaceholder(phone) ? '' : phone;
+    if (!shown && cod === null && dod === null) return null;
     return {
         barcode: pickText(candidates, config.barcodePaths),
-        phone,
+        phone: shown,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         signed: pickSignedVerdict(candidates, config.signed)
@@ -1542,7 +1564,7 @@ function cookieRenewTimeoutMs(config, startedAt) {
     return Math.min(COOKIE_RENEW_WRITE_TIMEOUT_MS, room);
 }
 
-async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan) {
+async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan, companion) {
     if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return null;
     if (budgetLeftMs(config, startedAt) < COOKIE_REFRESH_RETRY_RESERVE_MS) return null;
     const readMs = cookieReadTimeoutMs(config, startedAt);
@@ -1566,13 +1588,20 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     if (!built.authKind) return null;
     const flightKey = (plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase())
         + '|' + (cookieFingerprint(fresh.cookie) || '-');
+    const rerun = companion
+        ? companion.run.then((prior) => (prior && prior.kind === 'authRejected'
+            ? runSharedLookup(companion.plan.cacheKey + '|' + (cookieFingerprint(fresh.cookie) || '-'),
+                config, built.headers, barcode, fresh, startedAt, companion.plan).catch(() => null)
+            : prior))
+        : null;
     let outcome;
     try {
         outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt, plan);
     } catch (_) {
         return null;
     }
-    return { outcome: outcome, session: fresh };
+    const companionRun = companion ? (outcome.kind === 'ok' ? rerun : companion.run) : null;
+    return { outcome: outcome, session: fresh, companionRun: companionRun };
 }
 
 function storeCachedBody(key, body, negative) {
@@ -1675,7 +1704,13 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedReason: config.list.signedReason || null,
             signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
             signedDescIsDefault: config.list.signedDesc === DEFAULT_LIST_SIGNED_SCAN_DESC,
-            cacheTtlMs: config.listCacheTtlMs
+            signedMismatch: {
+                observed: signedMismatchSignal.keys.size > 0,
+                count: signedMismatchSignal.keys.size,
+                ageMs: signedMismatchSignal.at ? elapsedSince(signedMismatchSignal.at) : null
+            },
+            cacheTtlMs: config.listCacheTtlMs,
+            signedCacheTtlMs: Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS)
         },
         timing: {
             upstreamTimeoutMs: config.upstreamTimeoutMs,
@@ -1840,7 +1875,7 @@ async function handleRequest(event) {
             });
         }
         plan = signedOnly
-            ? listPlan(config, site.code, listSignedRange(range), page, 'signed')
+            ? listPlan(config, site.code, String(query.exact || '') === '1' ? range : listSignedRange(range), page, 'signed')
             : listPlan(config, site.code, range, page, 'arrival');
         if (!signedOnly && config.list.signedType && String(query.withSigned || '') === '1') {
             companion = listPlan(config, site.code, listSignedRange(range), page, 'signed');
@@ -1905,12 +1940,14 @@ async function handleRequest(event) {
         session.renewal = '';
         invalidateCookieCache(session);
         noteCookieRejected(session);
-        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan);
+        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan,
+            companionRun && { plan: companion, run: companionRun });
         if (!retried) {
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
         outcome = retried.outcome;
+        companionRun = retried.companionRun;
         if (outcome.kind === 'authRejected') {
             session.renewal = '';
             invalidateCookieCache(session);
@@ -1951,6 +1988,8 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.keys = null;
     certsState.inFlight = null;
     supabaseAccountCache.clear();
+    signedMismatchSignal.at = 0;
+    signedMismatchSignal.keys.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

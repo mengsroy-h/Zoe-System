@@ -1,7 +1,7 @@
 import { ztoState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
 
-export interface ZtoListRow { barcode: string; meta: string }
+export interface ZtoListRow { barcode: string; primary: string; origin: string; notes: string[] }
 export interface ZtoListGroup { title: string; tone: string; rows: ZtoListRow[]; more: number }
 export interface ZtoListPreview { empty: string | null; groups: ZtoListGroup[] }
 
@@ -19,7 +19,9 @@ export function ZtoListSyncBody() {
                         ? g.rows.map((r, i) => (
                             <div className="zto-list-row" key={r.barcode + '|' + i}>
                                 <span className="zto-list-code">{r.barcode}</span>
-                                <span className="zto-list-meta">{r.meta}</span>
+                                <span className="zto-list-meta">{r.primary}</span>
+                                {r.origin ? <span className="zto-list-origin">{r.origin}</span> : null}
+                                {r.notes.map((n) => <span className="zto-list-note" key={n}>{n}</span>)}
                             </div>
                         ))
                         : <div className="zto-list-row zto-list-row-none">— គ្មាន —</div>}

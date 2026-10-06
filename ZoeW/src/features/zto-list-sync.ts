@@ -3,6 +3,7 @@ import { ztoListGroupModel } from '../app/components/zto/model';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
+import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone } from '../core/text';
@@ -25,6 +26,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
+import { saveBarcodeOrigins } from './barcode-origin';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
 
@@ -39,6 +41,11 @@ export const ZTO_LIST_SERVER_CONFIG_REASONS = ['idtoken:aud', 'idtoken:iss', 'id
 
 export const ZTO_LIST_SIGNED_PROBE_MAX = 20;
 
+export const ZTO_LIST_RANGE_MAX_DAYS = 31;
+
+export const ZTO_SIGNED_DAY_CONCURRENCY = 3;
+export const ZTO_SIGNED_SPLIT_MEMO_MS = 30 * 60 * 1000;
+
 export const ZTO_LIST_PROBE_CONCURRENCY = 4;
 
 export const ZTO_LIST_SKIP_TEXT = {
@@ -51,6 +58,13 @@ export const ZTO_LIST_SKIP_TEXT = {
 export const ztoListSignedProbe = new Map();
 
 export const ztoListSignedEvidence = new Set();
+
+export function ztoListReasonIsDefinitive(reason) {
+    const text = String(reason === undefined || reason === null ? '' : reason);
+    if (!text) return false;
+    if (text.indexOf('idtoken:') !== 0) return true;
+    return text === 'idtoken:supabase-unset' || ZTO_LIST_SERVER_CONFIG_REASONS.indexOf(text) !== -1;
+}
 
 export function ztoListSkipText(reason) {
     const key = String(reason === undefined || reason === null ? '' : reason);
@@ -88,10 +102,17 @@ export function drawerZtoListSyncFlow() {
     });
 }
 
+export function ztoPickupVerdictOf(signed, detail, row) {
+    if (signed === true) return true;
+    if (typeof detail === 'boolean') return detail;
+    if (typeof row === 'boolean') return row;
+    return null;
+}
+
 export function ztoListSignedVerdict(raw, key) {
-    if (key && ztoListSignedProbe.has(key)) return ztoListSignedProbe.get(key);
-    if (raw && typeof raw.ztoClosed === 'boolean') return raw.ztoClosed;
-    return key && ztoListSignedEvidence.has(key) ? true : null;
+    return ztoPickupVerdictOf(!!key && ztoListSignedEvidence.has(key),
+        key && ztoListSignedProbe.has(key) ? ztoListSignedProbe.get(key) : null,
+        raw ? raw.ztoClosed : null);
 }
 
 export function noteZtoListSignedCodes(codes) {
@@ -207,6 +228,7 @@ export function classifyZtoListRows(rows, historyList, trashList) {
             ztoClosed: ztoListSignedVerdict(raw, key),
             closedAtZto: false,
             skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
+            from: typeof raw.from === 'string' ? raw.from.slice(0, 64) : '',
             key: key
         };
         if (!key || !phone || row.skip) {
@@ -252,7 +274,7 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?) {
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
-    const extra = mode === 'signed' ? '&signed=1' : (mode === 'withSigned' ? '&withSigned=1' : '');
+    const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1' : (mode === 'withSigned' ? '&withSigned=1' : ''));
     return base + '?list=1'
         + '&from=' + encodeURIComponent(from)
         + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra;
@@ -300,10 +322,16 @@ export function ztoListSiteText(siteName, site) {
     return name || code;
 }
 
+export function ztoListPositiveCount(value) {
+    const n = Number(value);
+    return isFinite(n) && n > 0 ? n : 0;
+}
+
 export async function fetchZtoListAllPages(cfg, from, to) {
-    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedState: 'none' };
+    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0, signedState: 'none' };
     const absorb = (body, arrival) => {
         if (!body) return;
+        out.signedMismatch += ztoListPositiveCount(body.signedMismatch) + ztoListPositiveCount(body.signedListMismatch);
         if (arrival) {
             for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
             const reportedTotal = Number(body.total);
@@ -417,6 +445,11 @@ export function ztoListSignedNote(result, bornClosed, closeCount) {
     const state = result && result.signedState;
     if (state === 'partial') parts.push('⚠️ បញ្ជីចុះហត្ថលេខា ZTO ទាញបានមិនគ្រប់ ➜ ខ្លះនៅបើក (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
     else if (state === 'failed') parts.push('⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន ➜ កញ្ចប់ថ្មីបញ្ចូលជា «មិនទាន់យក» (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
+    const mismatch = ztoListPositiveCount(result && result.signedMismatch);
+    if (mismatch > 0) {
+        parts.push('⚠️ ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» ' + mismatch + ' ជួរ ដែលអត្ថបទប្រភេទស្កេនខុសពីការកំណត់ Server ➜ មិនរាប់ជាភស្តុតាងបិទ'
+            + ' (សូមប្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធឲ្យពិនិត្យ ZTO_LIST_SIGNED_SCAN_DESC)');
+    }
     return parts.length ? ' · ' + parts.join(' · ') : '';
 }
 
@@ -477,6 +510,7 @@ export async function runZtoListSyncPreview() {
             site: pulled.site,
             siteName: pulled.siteName,
             otherScans: pulled.otherScans,
+            signedMismatch: pulled.signedMismatch,
             signedCount: ztoListSignedEvidence.size,
             signedState: pulled.signedState
         };
@@ -556,8 +590,11 @@ export async function importZtoListRows() {
     const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
     const closeTargets = ztoListCloseTargets(groups.existing);
+    const originOf = (row) => ({ code: row.barcode, from: row.from });
     if (!queue.length && !closeTargets.length) {
-        showToast('ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
+        const filled = await saveBarcodeOrigins(groups.existing.map(originOf));
+        if (!session.current()) return;
+        showToast(filled ? '📍 បំពេញប្រភព ' + filled + ' កញ្ចប់' : 'ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
         return;
     }
     const capped = groups.fresh.length > queue.length
@@ -593,6 +630,7 @@ export async function importZtoListRows() {
     let closeNotTried = 0;
     let stalled = false;
     const savedDates = new Set();
+    const origins = groups.existing.map(originOf);
     try {
         for (let i = 0; i < queue.length; i++) {
             if (!session.current()) return;
@@ -628,6 +666,7 @@ export async function importZtoListRows() {
                 if (status === true || status === false) {
                     saved++;
                     savedDates.add(rowDateKey);
+                    origins.push(originOf(row));
                     if (closedStampMs) {
                         takenOver += (await markZtoListRowPickedUp(row.barcode)) ? 1 : 0;
                     }
@@ -692,6 +731,7 @@ export async function importZtoListRows() {
             + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
         : '';
     showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
+    saveBarcodeOrigins(origins).catch(() => 0);
     setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried || closeNotTried
         ? ' — បញ្ជីនៅដដែល ➜ ចុច «បញ្ចូល» ម្តងទៀតពេលបណ្តាញល្អ (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន)។'
         : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។'));
@@ -734,24 +774,91 @@ export function closeZtoListSyncModal() {
     closeModal('ztoListSyncModal');
 }
 
+export function ztoListDayKeys(from, to) {
+    const out = [];
+    const shape = /^\d{4}-\d{2}-\d{2}$/;
+    const a = String(from === undefined || from === null ? '' : from);
+    const b = String(to === undefined || to === null ? '' : to);
+    if (!shape.test(a) || !shape.test(b) || b < a) return out;
+    const start = Date.parse(a + 'T00:00:00Z');
+    if (!isFinite(start)) return out;
+    for (let i = 0; i < ZTO_LIST_RANGE_MAX_DAYS; i++) {
+        const day = new Date(start + i * 86400000).toISOString().slice(0, 10);
+        if (day > b) break;
+        out.push(day);
+    }
+    return out;
+}
+
 export async function fetchZtoSignedCodes(cfg, from, to) {
-    const first = await fetchZtoListPage(cfg, from, to, 1, 'signed');
+    const session = captureZtoSession();
+    const days = ztoListDayKeys(from, to);
+    const split = days.length >= 2 && !!ztoState.ztoSignedSplitAt && elapsedSince(ztoState.ztoSignedSplitAt) < ZTO_SIGNED_SPLIT_MEMO_MS
+        && String(from) <= ztoState.ztoSignedSplitFrom;
+    let whole = null;
+    if (!split) {
+        whole = await fetchZtoSignedPages(cfg, from, to);
+        if (!whole || !whole.measured || !whole.truncated) return whole;
+        if (days.length < 2 || !session.current()) return whole;
+        ztoState.ztoSignedSplitAt = Date.now();
+        ztoState.ztoSignedSplitFrom = String(from);
+    }
+    const out = { measured: true, codes: whole ? whole.codes.slice() : [], truncated: false, partial: false, signedMismatch: 0 };
+    let daysMismatch = 0;
+    let measuredDays = 0;
+    let unmeasuredDays = 0;
+    let firstErr = null;
+    let next = 0;
+    const worker = async () => {
+        while (next < days.length) {
+            if (!session.current()) { out.partial = true; return; }
+            const day = days[next];
+            next++;
+            let got = null;
+            try {
+                got = await fetchZtoSignedPages(cfg, day, day);
+            } catch (e) {
+                got = null;
+                if (!whole && !firstErr) { firstErr = e; next = days.length; }
+            }
+            if (!got || !got.measured || got.partial) out.partial = true;
+            if (!got) continue;
+            if (got.measured) measuredDays++;
+            else unmeasuredDays++;
+            if (got.truncated) out.truncated = true;
+            daysMismatch += ztoListPositiveCount(got.signedMismatch);
+            for (let i = 0; i < got.codes.length; i++) out.codes.push(got.codes[i]);
+        }
+    };
+    const workers = [];
+    for (let w = 0; w < ZTO_SIGNED_DAY_CONCURRENCY && w < days.length; w++) workers.push(worker());
+    await Promise.all(workers);
+    if (!whole && firstErr && !measuredDays) throw firstErr;
+    if (!whole && unmeasuredDays && !measuredDays) return { measured: false, codes: [], truncated: false, partial: false };
+    out.signedMismatch = Math.max(whole ? ztoListPositiveCount(whole.signedMismatch) : 0, daysMismatch);
+    return out;
+}
+
+export async function fetchZtoSignedPages(cfg, from, to) {
+    const first = await fetchZtoListPage(cfg, from, to, 1, 'signedExact');
     if (!first) return null;
-    if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false };
+    if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false, partial: false };
     const codes = first.signed.slice();
+    let signedMismatch = ztoListPositiveCount(first.signedMismatch);
     const reported = Number(first.pages);
     const pages = isFinite(reported) && reported > 0 ? reported : 1;
     const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
     const work = [];
-    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
+    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signedExact').catch(() => null));
     const more = await Promise.all(work);
     let partial = false;
     for (let i = 0; i < more.length; i++) {
         if (more[i] && more[i].signedOk === true && Array.isArray(more[i].signed)) {
             for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
+            signedMismatch += ztoListPositiveCount(more[i].signedMismatch);
         } else {
             partial = true;
         }
     }
-    return { measured: true, codes: codes, truncated: pages > last, partial: partial };
+    return { measured: true, codes: codes, truncated: pages > last, partial: partial, signedMismatch: signedMismatch };
 }

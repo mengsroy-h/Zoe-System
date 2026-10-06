@@ -116,11 +116,13 @@ const DB_LISTENER_KEY_DELETED = 'deleted';
 function getServerNow() { return ${NOW}; }
 function elapsedSince(m) { if (!m) return Infinity; const d = getServerNow() - m; return d < 0 ? Infinity : d; }
 function claimAndCleanupItem(id, reason) { __log.cleanups.push(id + ':' + reason); }
+function ztoAbandonCleanupIsHeld() { return false; }
 function clearStaleRestoreMarkers() {}
 function dbListenerViewIsStale() { return false; }
 function showToast() {}
 function parseTimestampFromId() { return 0; }
 function barcodeAbandonIsRipe(b, p, n) { return !b.isClosed && (n - p) > ABANDON_AGE_MS; }
+function itemAbandonRipeAt(item, p) { return p + ABANDON_AGE_MS; }
 function barcodeCloseIsRipe(b, n) { return !!(b && b.isClosed && typeof b.closedAt === 'number' && (n - b.closedAt) > TWO_HOURS_MS); }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'isActiveClearHistoryClaim',

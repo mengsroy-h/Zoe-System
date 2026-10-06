@@ -634,6 +634,36 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('⛔ ប្រអប់បើក (កំពុងស្កេន) ➜ ជុំបោសមិនហៅបណ្ដាញ', modalGate.blocked === 0, modalGate);
     ok('ទិសផ្ទុយ ៖ ប្រអប់បិទវិញ ➜ ជុំបោសដើរ', modalGate.afterRelease > 0, modalGate);
 
+    // ⛔ ល្បឿន «បិទតាម ZTO» តាមសកម្មភាព ៖ ការប៉ះ/ចុចគ្រាប់ចុច (រួមទាំង scanner ដែលវាយជាគ្រាប់ចុច) លើ App ពិត ➜ ល្បឿនសកម្ម
+    //    (ស្នាមភ្ជាប់ boot ➜ `noteZtoUserActivity()` ➜ `ztoSignedSweepCadenceMs()`) · ទិសផ្ទុយ ៖ ការរមូរមិនរាប់ · សកម្មភាពចាស់ ➜ ល្បឿនធម្មតា។
+    const activity = await page.evaluate(() => {
+        const realNow = Date.now;
+        const base = realNow.call(Date) + 1e9;
+        const out = { fn: typeof ztoSignedSweepCadenceMs === 'function', hidden: document.hidden };
+        try {
+            Date.now = () => base;
+            out.idle = ztoSignedSweepCadenceMs();
+            document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+            out.tap = ztoSignedSweepCadenceMs();
+            Date.now = () => base + 10 * 60000;
+            out.stale = ztoSignedSweepCadenceMs();
+            document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '7', bubbles: true }));
+            out.key = ztoSignedSweepCadenceMs();
+            Date.now = () => base + 20 * 60000;
+            window.dispatchEvent(new Event('scroll'));
+            document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
+            out.scroll = ztoSignedSweepCadenceMs();
+        } finally {
+            Date.now = realNow;
+        }
+        return out;
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ទំព័រមើលឃើញ · `ztoSignedSweepCadenceMs` មានពិត · គ្មានសកម្មភាព ➜ ល្បឿនធម្មតា ៦០ វិ.',
+        activity.fn === true && activity.hidden === false && activity.idle === 60000, activity);
+    ok('⛔ ការប៉ះ (`pointerdown`) លើ App ពិត ➜ ល្បឿនសកម្ម ២០ វិ.', activity.tap === 20000, activity);
+    ok('⛔ គ្រាប់ចុច / scanner (`keydown`) ➜ ល្បឿនសកម្ម ២០ វិ.', activity.stale === 60000 && activity.key === 20000, activity);
+    ok('ទិសផ្ទុយ ៖ ការរមូរ មិនរាប់ជាសកម្មភាព', activity.scroll === 60000, activity);
+
     // ⛔ ទិសផ្ទុយ ៖ «upstream ធ្លាក់» ≠ «ZTO គ្មានវាលនេះ» — ការចងចាំការធ្លាក់
     // បណ្ដាញជា «វាស់មិនបាន» នឹងបិទការពិនិត្យពេញ TTL ខណៈ ZTO ដាច់ត្រឹមមួយភ្លែត។
     await setup(ZTO_URL);

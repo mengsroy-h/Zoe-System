@@ -133,6 +133,12 @@
             ".validate": false
           }
         },
+        "origins": {
+          ".validate": "newData.hasChildren() && (newData.parent().child('barcodes').exists() || newData.parent().child('barcode').isString())",
+          "$originKey": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+          }
+        },
         "$other": {
           ".validate": false
         }
@@ -275,6 +281,12 @@
             }
           }
         },
+        "origins": {
+          ".validate": "newData.hasChildren() && (newData.parent().child('barcodes').exists() || newData.parent().child('barcode').isString())",
+          "$originKey": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+          }
+        },
         "$other": {
           ".validate": false
         }
@@ -410,6 +422,20 @@
         ".read": "auth != null",
         ".write": "auth != null",
         ".validate": "newData.isNumber() && newData.val() > 0"
+      },
+      "zto_signed_sweep": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['activeAt'])",
+        "activeAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000"
+        },
+        "completeAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "zoew_barcode_registry": {

@@ -60,14 +60,16 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'databaseHealthLabel', 'healthTenantRow',
     // ⛔ ជួរ License (Firebase) ៖ សុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) · សារមូលហេតុពី `licenseFailureMessage()` ពិត
     'healthKeyValidityText', 'licenseFailureMessage',
-    // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob
-    'durationText', 'ztoBlobAgeText'];
+    // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob · ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ (`?diag=1` `list.signedMismatch`)
+    'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',
+    // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
+    'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused'];
 // ⛔ ថេរដេរីវេពីកូដពិត (មិនមែន literal ក្នុង checker)
 function sliceConst(name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : '';
 }
-const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS'];
+const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);

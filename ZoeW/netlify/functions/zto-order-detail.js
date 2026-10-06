@@ -75,7 +75,8 @@ const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
-const signedMismatchSignal = { at: 0, count: 0 };
+const SIGNED_MISMATCH_KEYS_MAX = 1000;
+const signedMismatchSignal = { at: 0, keys: new Set() };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -992,6 +993,12 @@ function listRowSignedVerdict(listConfig, candidates) {
     return listConfig.signedDesc && desc ? 'signed' : '';
 }
 
+function noteSignedMismatch(code) {
+    if (!BARCODE_RE.test(code)) return;
+    signedMismatchSignal.at = Date.now();
+    if (signedMismatchSignal.keys.size < SIGNED_MISMATCH_KEYS_MAX) signedMismatchSignal.keys.add(code);
+}
+
 function listSiteNameOf(candidates) {
     return pickText(candidates, LIST_SITE_NAME_PATHS).replace(/\s+/g, ' ');
 }
@@ -1039,15 +1046,16 @@ function listResponseBody(config, container, page, siteCode, kind) {
             }
             continue;
         }
-        if (verdict === 'mismatch') { signedMismatch++; otherScans++; continue; }
+        if (verdict === 'mismatch') {
+            signedMismatch++;
+            otherScans++;
+            noteSignedMismatch(pickText(candidates, LIST_BARCODE_PATHS));
+            continue;
+        }
         if (kind === 'signed') { otherScans++; continue; }
         const row = projectListRow(config, raw);
         if (row.skip === 'scan-type') { otherScans++; continue; }
         rows.push(row);
-    }
-    if (signedMismatch > 0) {
-        signedMismatchSignal.at = Date.now();
-        signedMismatchSignal.count += signedMismatch;
     }
     const meta = container.meta || {};
     const pages = Number(meta.pages);
@@ -1579,7 +1587,7 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     if (!built.authKind) return null;
     const flightKey = (plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase())
         + '|' + (cookieFingerprint(fresh.cookie) || '-');
-    const companionRun = companion
+    const rerun = companion
         ? companion.run.then((prior) => (prior && prior.kind === 'authRejected'
             ? runSharedLookup(companion.plan.cacheKey + '|' + (cookieFingerprint(fresh.cookie) || '-'),
                 config, built.headers, barcode, fresh, startedAt, companion.plan).catch(() => null)
@@ -1591,6 +1599,7 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     } catch (_) {
         return null;
     }
+    const companionRun = companion ? (outcome.kind === 'ok' ? rerun : companion.run) : null;
     return { outcome: outcome, session: fresh, companionRun: companionRun };
 }
 
@@ -1695,8 +1704,8 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
             signedDescIsDefault: config.list.signedDesc === DEFAULT_LIST_SIGNED_SCAN_DESC,
             signedMismatch: {
-                observed: signedMismatchSignal.count > 0,
-                count: signedMismatchSignal.count,
+                observed: signedMismatchSignal.keys.size > 0,
+                count: signedMismatchSignal.keys.size,
                 ageMs: signedMismatchSignal.at ? elapsedSince(signedMismatchSignal.at) : null
             },
             cacheTtlMs: config.listCacheTtlMs,
@@ -1979,7 +1988,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.inFlight = null;
     supabaseAccountCache.clear();
     signedMismatchSignal.at = 0;
-    signedMismatchSignal.count = 0;
+    signedMismatchSignal.keys.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

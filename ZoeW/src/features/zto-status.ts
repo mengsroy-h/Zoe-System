@@ -326,10 +326,10 @@ export function ztoOldestOpenStamp(dataToScan) {
     return oldest;
 }
 
-export function ztoSignedSweepRange(oldestOpenAt?) {
+export function ztoSignedSweepRange(oldestOpenAt?, pendingOnly?) {
     const now = getServerNow();
-    const recent = ztoState.ztoSignedSweepOkAt
-        && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS;
+    const recent = !!pendingOnly || (ztoState.ztoSignedSweepOkAt
+        && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS);
     let from = getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS);
     if (!recent && oldestOpenAt > 0) {
         const oldest = getZoneDateKey(oldestOpenAt, 0);
@@ -366,7 +366,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
     const stale = Array.isArray(pending) ? pending : [];
     if (!open.length && !stale.length) return out;
     ztoState.ztoSignedSweepAt = Date.now();
-    const range = ztoSignedSweepRange(ztoOldestOpenStamp(Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory));
+    const range = ztoSignedSweepRange(ztoOldestOpenStamp(Array.isArray(dataToScan) ? dataToScan : dataState.scanHistory), !open.length);
     let signed = null;
     try {
         signed = await fetchZtoSignedCodes(cfg, range.from, range.to);

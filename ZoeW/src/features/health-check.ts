@@ -230,7 +230,7 @@ export function ztoSignedMismatchText(body) {
     const count = signal && signal.observed === true && Number.isFinite(signal.count) && signal.count > 0 ? signal.count : 0;
     if (!count) return '';
     const age = durationText(signal.ageMs);
-    return ' · ⚠️ បញ្ជី «ចុះហត្ថលេខា» ៖ ZTO ផ្ញើ ' + count + ' ជួរ ដែលអត្ថបទប្រភេទស្កេនខុសពី ZTO_LIST_SIGNED_SCAN_DESC'
+    return ' · ⚠️ បញ្ជី «ចុះហត្ថលេខា» ៖ ZTO ផ្ញើ ' + count + ' កញ្ចប់ ដែលអត្ថបទប្រភេទស្កេនខុសពី ZTO_LIST_SIGNED_SCAN_DESC'
         + (age ? ' (ចុងក្រោយ ' + age + 'មុន)' : '')
         + ' ➜ មិនរាប់ជាភស្តុតាងបិទ — សូមកែអត្ថបទនោះនៅ Netlify';
 }

@@ -18,7 +18,7 @@ import { getZoneDateKey } from '../src/core/timezone';
 import { cleanupInFlight, runAutomaticCleanupRules } from '../src/domain/cleanup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import {
-    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_STATUS_SWEEP_GAP_MS, clearZtoPickupStatusStore, closeZtoSignedBarcodes, openZtoSyncModal,
+    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_STATUS_SWEEP_BATCH, ZTO_STATUS_SWEEP_GAP_MS, clearZtoPickupStatusStore, closeZtoSignedBarcodes, openZtoSyncModal,
     recheckZtoPickupStatus, renderZtoSyncViews, runZtoStatusSweep, setZtoPickupVerdict, ztoPickupStatus, ztoSyncModalIsOpen
 } from '../src/features/zto-status';
 
@@ -401,5 +401,62 @@ describe('⛔ E1 ៖ ជុំដែលគ្មានកញ្ចប់បើ�
         expect(verdictOf('ZTE6M00001')).toBe(true);
         expect(ztoState.ztoSignedCompleteAt).toBe(NOW);
         expect(ztoState.ztoSignedSweepOkAt).toBe(NOW);
+    });
+
+    it('⛔ k4 ៖ ជុំដែលមានតែសាលក្រម false អានតែម្សិលមិញ ➜ ថ្ងៃនេះ (មិនមែន ៧ ថ្ងៃ · ១ សំណើ) · ទិសផ្ទុយ ៖ មានកញ្ចប់បើក ➜ ជួរធំ', async () => {
+        dataState.scanHistory = [closedItem('c1', 'ZTE6K00001')];
+        setZtoPickupVerdict('ZTE6K00001', false);
+        const log = server([]);
+        await runZtoStatusSweep(false);
+        expect(log.signed).toEqual([getZoneDateKey(NOW, -1) + '..' + getZoneDateKey(NOW, 0)]);
+        dataState.scanHistory = [closedItem('c1', 'ZTE6K00001'), openItem('o1', 'ZTE6K00002', DAY)];
+        advance(ZTO_SIGNED_SWEEP_GAP_MS + 1000);
+        await runZtoStatusSweep(false);
+        expect(log.signed[1]).toBe(getZoneDateKey(NOW + ZTO_SIGNED_SWEEP_GAP_MS + 1000, -7) + '..' + getZoneDateKey(NOW + ZTO_SIGNED_SWEEP_GAP_MS + 1000, 0));
+    });
+
+    it('k4 ៖ ជុំដែលមានតែ false ហើយបញ្ជីវែងលើសពិដាន (truncated) ➜ ចន្លោះទ្វេ (មិនអានរៀងរាល់ជុំ)', async () => {
+        dataState.scanHistory = [closedItem('c1', 'ZTE6K00011')];
+        setZtoPickupVerdict('ZTE6K00011', false);
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            const page = Number(url.searchParams.get('page'));
+            return json({ success: true, list: true, enabled: true, kind: 'signed', page, pages: 9, total: 900,
+                rows: [], otherScans: 0, signedScans: 1, signed: ['ZTE6K0009' + page], signedOk: true });
+        }));
+        await runZtoStatusSweep(false);
+        expect(ztoState.ztoSignedSweepWaitMs).toBeGreaterThan(ZTO_SIGNED_SWEEP_GAP_MS);
+        expect(verdictOf('ZTE6K00011')).toBe(false);
+    });
+
+    it('⛔ k5 ៖ ជុំបិទត្រូវកាត់ (កញ្ចប់បើកត្រូវបិទលើស ZTO_STATUS_SWEEP_BATCH) ➜ របានៅតែប្តូរ true ក្នុងជុំដដែល', async () => {
+        const opens = [];
+        const codes = ['ZTE6L00000'];
+        for (let i = 1; i <= ZTO_STATUS_SWEEP_BATCH + 2; i++) {
+            const code = 'ZTE6L' + String(i).padStart(5, '0');
+            opens.push(openItem('o' + i, code, DAY));
+            codes.push(code);
+        }
+        dataState.scanHistory = [closedItem('c1', 'ZTE6L00000')].concat(opens);
+        setZtoPickupVerdict('ZTE6L00000', false);
+        server(codes);
+        await runZtoStatusSweep(false);
+        expect(h.calls.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំត្រូវកាត់ត្រឹម batch').toBe(ZTO_STATUS_SWEEP_BATCH);
+        expect(verdictOf('ZTE6L00000')).toBe(true);
+    });
+
+    it('⛔ k5 ៖ ការអានមិនគ្រប់ (ទំព័រ ២ ធ្លាក់) តែ barcode នៅទំព័រ ១ ➜ របាប្តូរ true (ភស្តុតាងវិជ្ជមាន)', async () => {
+        dataState.scanHistory = [closedItem('c1', 'ZTE6P00001')];
+        setZtoPickupVerdict('ZTE6P00001', false);
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            const page = Number(url.searchParams.get('page'));
+            if (page === 2) return json({ error: 'down' }, 503);
+            return json({ success: true, list: true, enabled: true, kind: 'signed', page, pages: 2, total: 2,
+                rows: [], otherScans: 0, signedScans: 1, signed: ['ZTE6P00001'], signedOk: true });
+        }));
+        await runZtoStatusSweep(false);
+        expect(verdictOf('ZTE6P00001')).toBe(true);
+        expect(ztoState.ztoSignedSweepWaitMs, 'មិនគ្រប់ ➜ ចន្លោះទ្វេ').toBeGreaterThan(ZTO_SIGNED_SWEEP_GAP_MS);
     });
 });

@@ -2970,6 +2970,11 @@ function firstBody(requests) {
             main.again && { cached: main.again.body.cached, signedOk: main.again.body.signedOk, sent: main.again.sent.length });
         ok('⛔ ការសាកឡើងវិញនៅក្នុងថវិកា (' + main.ms + ' ms ≤ 9000)', main.ms <= 9000, main.ms);
 
+        // ⛔ k2 ៖ «មកដល់» សាកឡើងវិញធ្លាក់ (429) ➜ ចម្លើយកំហុសមិនរង់ចាំសំណើ «ចុះហត្ថលេខា» ថ្មីដែលលទ្ធផលត្រូវបោះចោល។
+        const rateLimited = await retryRun({ env: TIGHT_ENV, accept: (type, fresh) => (fresh ? (type === '03' ? 429 : true) : false),
+            latency: (type, fresh) => (fresh && type === '05' ? 1500 : 5) });
+        ok('⛔ k2 ៖ «មកដល់» សាកឡើងវិញ 429 ➜ ឆ្លើយ 429 ភ្លាម (' + rateLimited.ms + ' ms < 1000 · មិនរង់ចាំ «ចុះហត្ថលេខា» ថ្មី ១៥០០ ms)',
+            rateLimited.status === 429 && rateLimited.ms < 1000, { status: rateLimited.status, ms: rateLimited.ms, sent: rateLimited.sent });
         const kept = await retryRun({ accept: (type, fresh) => type === '05' || fresh });
         ok('ជាន់អប្បបរមា ៖ «មកដល់» ត្រូវបដិសេធ ហើយសាកម្តងទៀតដោយ Cookie ថ្មី ➜ 200',
             kept.status === 200 && rowsOf(kept.body).length === 2 && countOf(kept.sent, '03', true) === 1,
@@ -3165,8 +3170,24 @@ function firstBody(requests) {
             && rowsOf(both.body).length + both.body.otherScans + (both.body.signedScans || 0) === MISMATCH_ARRIVAL.length,
             { mismatch: both.body.signedMismatch, other: both.body.otherScans, rows: rowsOf(both.body).length });
         const diagBoth = await diagNow();
-        ok('⛔ `?diag=1` បូកចំនួនពីគ្រប់ចម្លើយ upstream (មកដល់ ១ + ចុះហត្ថលេខា ២ = ៣ · មិនមែនតែចម្លើយចុងក្រោយ)',
+        ok('⛔ `?diag=1` រាប់ barcode ផ្សេងៗគ្នា (មកដល់ ១ ថ្មី + ចុះហត្ថលេខា ២ ដដែល = ៣ · មិនបូកស្ទួន)',
             mmOf(diagBoth.body).observed === true && mmOf(diagBoth.body).count === 3, mmOf(diagBoth.body));
+        // ⛔ k1 ៖ ជុំបិទតាម ZTO អានបញ្ជីដដែលរៀងរាល់ ២០ វិ. ➜ ចំនួនមិនត្រូវកើនរហូត (🩺 «ZTO ផ្ញើ N កញ្ចប់» ត្រូវតែពិត)។
+        const dayKey = (back) => new Date(Date.parse(todayKey + 'T00:00:00Z') - back * 86400000).toISOString().slice(0, 10);
+        let repeatUpstream = 0;
+        for (let i = 1; i <= 4; i++) {
+            const r = await mmCall(GOOD_LIST_ENV, { signed: '1', from: dayKey(i), to: dayKey(i) }, true);
+            repeatUpstream += r.requests.length;
+        }
+        const diagRepeat = await diagNow();
+        ok('⛔ k1 ៖ អានបញ្ជីដដែល ៤ ដងទៀត (ជួរថ្ងៃផ្សេង ➜ upstream ពិត ៤) ➜ `count` នៅ ៣ (មិនមែន ១១)',
+            repeatUpstream === 4 && mmOf(diagRepeat.body).count === 3, { upstream: repeatUpstream, diag: mmOf(diagRepeat.body) });
+        const prevSigned = signedRowsNow;
+        signedRowsNow = MISMATCH_SIGNED.concat([listRow({ scanBillCode: '77130500002210', scanTypeCode: '05', scanTypeDesc: 'Signed' })]);
+        await mmCall(GOOD_LIST_ENV, { signed: '1', from: dayKey(5), to: dayKey(5) }, true);
+        signedRowsNow = prevSigned;
+        const diagNew = await diagNow();
+        ok('ទិសផ្ទុយ ៖ barcode ថ្មីមួយ ➜ `count` ៤', mmOf(diagNew.body).count === 4, mmOf(diagNew.body));
         const bothCached = await mmCall(GOOD_LIST_ENV, { withSigned: '1' }, true);
         ok('⛔ cache ៖ ចម្លើយ `withSigned` ពី cache នៅផ្ទុកចំនួនដដែល',
             bothCached.body.cached === true && bothCached.body.signedListMismatch === 2 && bothCached.body.signedMismatch === 1,

@@ -149,13 +149,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន)** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
+### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន) · ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
 
 **ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
 («កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ➜ `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts` ធ្វើបច្ចុប្បន្នភាពរាល់ commit។ ប៉ះ `src/features/zto-status.ts`
 (`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()` · `ztoPickupVerdictOf()` · `ztoListSignedVerdict()`) ·
 `src/domain/cleanup.ts` (`runAutomaticCleanupRules()`) · `src/core/state.ts` · ល្បឿន ៖ `zto-status.ts` (`ztoSignedSweepCadenceMs()` · `noteZtoUserActivity()` ·
-`ztoSignedNetworkAllowed()` · `ztoSignedLivePollWanted()` · `runZtoStatusSweep()`) · `src/app/lifecycle/boot.ts` · Function `listPlan()`។
+`ztoSignedNetworkAllowed()` · `ztoSignedLivePollWanted()` · `runZtoStatusSweep()`) · `src/app/lifecycle/boot.ts` · Function `listPlan()` · ប្រភព ៖ Function `projectListRow()` ·
+`classifyZtoListRows()` · `src/app/components/zto/model.ts`។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -187,6 +188,9 @@
   | បើកទុកចោល | ៩២ វិ. | ៣២ វិ. |
   | App នៅខាងក្រោយ | ៩២ វិ. | ៩២ វិ. |
   | ZTO ធ្លាក់ ៣៥ នាទី រួចវិញ | ១៤៤២ វិ. | ៤៨២ វិ. |
+- 📍 **ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO** (សំណើម្ចាស់គម្រោង ៖ «ដឹងថាកញ្ចប់មកពីចិន វៀតណាម») ៖ ជួរដេកនីមួយៗបង្ហាញ «📍 ពី …» = កន្លែងដែល ZTO ទទួលកញ្ចប់
+  (`recSite` ➜ `customerCodeDesc`) ៖ ចិន «ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ» · «Shopee SHPE» · ក្នុងស្រុក ឈ្មោះសាខាដែលផ្ញើ។ ZTO **គ្មានវាលប្រទេស** (`countryCode: null` គ្រប់ payload ពិត ·
+  «វៀតណាម» មិនលេចក្នុងវាលណាមួយ) ➜ ZoeW មិនទាយប្រទេស · បង្ហាញតែក្នុងប្រអប់បញ្ជី (មិនរក្សាទុកក្នុងកញ្ចប់ ➜ គ្មាន rules/migration)។
 
 #### អ្នកយាម
 
@@ -203,6 +207,8 @@
 - ល្បឿន ៖ `ZoeW/tests/zto-signed-cadence.test.tsx` (១៤) ៖ tree មុនកែ (`8283545`) **ធ្លាក់ ១៣** (ទិសផ្ទុយ «ក្រៅបណ្តាញ · Data Saver» បៃតងទាំងពីរ) · `zto-list-sync-test` +៤
   (cache `signed=1` ផុត ១៦ វិ. · នៅ ៥ វិ. · បញ្ជីធម្មតានៅ ១៦ វិ. · `?diag=1` `signedCacheTtlMs`) · `zto-sync-banner-test` +៤ (App ពិត ៖ `pointerdown` · `keydown` ➜ ល្បឿនសកម្ម ·
   ការរមូរមិនរាប់ · សកម្មភាពចាស់ ➜ ល្បឿនធម្មតា) · `clock-hygiene` ៖ ហេតុផល `noteZtoUserActivity()` · mutation ២៦/២៦ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- ប្រភព ៖ `ZoeW/tests/zto-list-origin.test.tsx` (៤) ៖ tree មុនកែ (`a7521bb`) **ធ្លាក់ ៤** · `zto-list-sync-test` +៦ (payload ពិត ៣ ➜ `recSite` · `recSite` ទទេ ➜ `customerCodeDesc` ·
+  គ្មាន ➜ ទទេ · តួអក្សរបញ្ជា/ចន្លោះ/៦៤ តួ · ជួរដេក ៨ វាល ២ កន្លែង) · តារាង «📋 វាល» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេ `LIST_ORIGIN_PATHS` · mutation ៩/៩ ត្រូវសម្លាប់។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -1553,6 +1559,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-06 — ជុំ ZTO ស្អាត ៖ ប្រភពកញ្ចប់ (សំណើម្ចាស់គម្រោង ➜ [2.50.1])
+
+- **វាស់លើ payload ពិត ៥** (ក្នុងស្រុក · ចិន · Shopee ×២ · កញ្ចប់ត្រឡប់) ៖ `countryCode` = `null` គ្រប់ជួរដេក · គ្មានវាលណាសរសេរ «វៀតណាម» ឬ «ចិន» ជាប្រទេស ·
+  សញ្ញាដែលមាន ៖ `recSite` (ចិន «ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ» · Shopee «Shopee SHPE» · ក្នុងស្រុក ឈ្មោះសាខាដែលផ្ញើ) · `customerCodeDesc` (`ztda` · `Shopee SHPE` · `null`) ·
+  `customerCode` (`888880001` · `KH803480001` · `20000`) · barcode `7713…` (ចិន និង Shopee ដូចគ្នា) / `116…` (ក្នុងស្រុក)។ ➜ បង្ហាញ `recSite` ដូច ZTO សរសេរ (អានយល់ផ្ទាល់)
+  ជំនួសការផ្គូផ្គងកូដ ➜ ប្រទេស (គំរូ ១ ក្នុងមួយប្រភព ➜ ការផ្គូផ្គងនឹងជាការទាយ)។
+- ⛔ មិនរក្សាទុកក្នុងកញ្ចប់ ៖ វាលថ្មីលើ record ប្រវត្តិ = `$other` rules បដិសេធ ➜ ត្រូវការ rules Firebase + migration Supabase (ការសម្រេចរបស់ម្ចាស់គម្រោង) ·
+  ការបង្ហាញពេលស្កេនម្តងមួយកញ្ចប់ (`/detail` ៖ `scan/get/order/detail`) ត្រូវការ payload `/detail` ពិតមុន (វាលរបស់វាមិនទាន់វាស់)។
 
 ### 2026-10-06 — ជុំ ZTO ស្អាត ៖ «បិទតាម ZTO យឺត អត់ស្ថេរភាព» (របាយការណ៍ម្ចាស់គម្រោង ➜ [2.50.1])
 

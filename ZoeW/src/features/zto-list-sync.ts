@@ -225,6 +225,7 @@ export function classifyZtoListRows(rows, historyList, trashList) {
             ztoClosed: ztoListSignedVerdict(raw, key),
             closedAtZto: false,
             skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
+            from: typeof raw.from === 'string' ? raw.from.slice(0, 64) : '',
             key: key
         };
         if (!key || !phone || row.skip) {

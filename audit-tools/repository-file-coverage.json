@@ -1863,6 +1863,9 @@
     "ZoeW/tests/zto-signed-cadence.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-list-origin.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-abandon-signed-gate.test.tsx": {
       "policy": "zoew-self-verification"
     },

@@ -412,9 +412,9 @@ function firstBody(requests) {
     const rows = rowsOf(good.body);
     ok('ចម្លើយមាន `rows` ជា array', rows.length === 1, rows);
     const row = rows[0] || {};
-    ok('⛔ ជួរដេកមានតែវាលដែលត្រូវការ ៖ `barcode·phone·cod·dod·at·ztoClosed·skip`',
+    ok('⛔ ជួរដេកមានតែវាលដែលត្រូវការ ៖ `barcode·phone·cod·dod·at·ztoClosed·skip·from`',
         JSON.stringify(Object.keys(row).sort())
-        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip', 'ztoClosed']),
+        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'from', 'phone', 'skip', 'ztoClosed']),
         Object.keys(row).sort());
     // ⛔ **សាលក្រម «បិទរួច» លើផ្លូវបញ្ជី** — ច្រកទ្វារ «ចាស់ + បិទរួច ➜
     // បញ្ចូលជា យករួច» ខាង client ពឹងលើវា។ សាលក្រមមាន **៣** ដដែលនឹងផ្លូវស្កេន ៖
@@ -1148,9 +1148,9 @@ function firstBody(requests) {
     ok('⛔ វាលអវត្តមានទាំងស្រុង ➜ **មិនរំលង**',
         !!byCode('77130500000104') && byCode('77130500000104').skip === '',
         byCode('77130500000104'));
-    ok('⛔ ជួរដេកមាន ៧ វាល (`skip` + `ztoClosed`) — នៅតែគ្មានឈ្មោះ/អាសយដ្ឋាន',
+    ok('⛔ ជួរដេកមាន ៨ វាល (`skip` + `ztoClosed` + `from`) — នៅតែគ្មានឈ្មោះ/អាសយដ្ឋាន',
         JSON.stringify(Object.keys(descRows[0] || {}).sort())
-        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip', 'ztoClosed']),
+        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'from', 'phone', 'skip', 'ztoClosed']),
         Object.keys(descRows[0] || {}).sort());
     ok('⛔ តម្លៃ `scanTypeDesc` មិនឆ្លងកាត់ទៅ browser (ត្រឹមសាលក្រម)',
         JSON.stringify(descOut.body).indexOf('ចេញដំណើរ') === -1, true);
@@ -2721,18 +2721,21 @@ function firstBody(requests) {
     }, extra || {});
     const REAL = [
         { name: 'ក្នុងស្រុក', code: '11600100008801', mobile: '+855-090000001', phone: '090000001', cod: 185, dod: 0, at03: '2026-10-06 15:34:22',
+            from: 'ច្រមុះជ្រូកស្ទឹងមានជ័យ',
             rows: (c, m) => [
-                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 15:34:22', { agentAmount: 185.0, remark: '8.5', weight: '40.0' }),
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 15:34:22', { agentAmount: 185.0, remark: '8.5', weight: '40.0', recSite: 'ច្រមុះជ្រូកស្ទឹងមានជ័យ' }),
                 realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-06 15:34:27', { agentAmount: 185.0 }),
                 realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-06 15:37:15', { agentAmount: 185.0, signMan: 'S' })] },
         { name: 'ចិន (អន្តរជាតិ)', code: '77130500008802', mobile: '081000002', phone: '081000002', cod: 0, dod: 2.5, at03: '2026-10-06 14:07:16',
+            from: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ',
             rows: (c, m) => [
-                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 14:07:16', { fcAmount: 2.5, customerCodeDesc: 'ztda' }),
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 14:07:16', { fcAmount: 2.5, customerCode: '888880001', customerCodeDesc: 'ztda', recSite: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }),
                 realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-06 14:07:28', { fcAmount: 2.5 }),
                 realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-06 14:07:35', { fcAmount: 2.5, signMan: 'ស' })] },
         { name: 'Shopee វៀតណាម', code: '77130500008803', mobile: '855880000003', phone: '0880000003', cod: 3.16, dod: 0, at03: '2026-10-04 14:53:29',
+            from: 'Shopee SHPE',
             rows: (c, m) => [
-                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-04 14:53:29', { agentAmount: 3.16, customerCodeDesc: 'Shopee SHPE' }),
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-04 14:53:29', { agentAmount: 3.16, customerCode: 'KH803480001', customerCodeDesc: 'Shopee SHPE', recSite: 'Shopee SHPE' }),
                 realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-04 15:46:14', { agentAmount: 3.16 }),
                 realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-05 10:48:07', { agentAmount: 3.16, signMan: 'ថ' }),
                 realRow(c, m, '30', 'ការចុះឈ្មោះបញ្ហា', '2026-10-04 15:50:47', { agentAmount: 3.16, dataFrom: 'Z10-KH-PDA',
@@ -2769,6 +2772,7 @@ function firstBody(requests) {
             rows.length + Number(b.otherScans) + Number(b.signedScans) === upstreamRows && Number(b.signedScans) === 1,
             { rows: rows.length, otherScans: b.otherScans, signedScans: b.signedScans, upstreamRows: upstreamRows });
         ok('⛔ E8 ' + real.name + ' ៖ ឈ្មោះសាខា `Mer SorChrey`', b.siteName === 'Mer SorChrey', b.siteName);
+        ok('⛔ ប្រភពកញ្ចប់ ' + real.name + ' ៖ `from` = `recSite` («' + real.from + '»)', r0.from === real.from, r0.from);
         ok('⛔ E8 ' + real.name + ' ៖ លេខទូរស័ព្ទ (' + real.mobile + ') ➜ ទម្រង់ក្នុងស្រុក `' + real.phone + '` (កូនសោបញ្ចូលគ្នា)',
             phoneOf(r0.phone) === real.phone, { raw: r0.phone, normalized: phoneOf(r0.phone) });
         resetEnv(PROD_SIGNED_ENV);
@@ -2777,6 +2781,23 @@ function firstBody(requests) {
         ok('⛔ E8 ' + real.name + ' ៖ `signed=1` (ជុំបិទតាម ZTO) ➜ barcode ក្នុង `signed` · គ្មានជួរដេក',
             only.signedOk === true && rowsOf(only).length === 0 && Array.isArray(only.signed) && only.signed.indexOf(real.code) !== -1, only);
     }
+
+    // ⛔ ប្រភពកញ្ចប់ (សំណើម្ចាស់គម្រោង ៖ «ដឹងថាកញ្ចប់មកពីចិន វៀតណាម») ៖ ZTO គ្មានវាលប្រទេស (`countryCode: null` គ្រប់ payload ពិត) ➜ `from` = `recSite`
+    //    (កន្លែង ZTO ទទួលកញ្ចប់ ៖ ឃ្លាំងក្វាងចូវអន្តរជាតិ · Shopee SHPE · សាខាក្នុងស្រុក) ➜ `customerCodeDesc` · ⛔ មិនទាយប្រទេស។
+    const originOf = async (extra) => {
+        const p = listPayload([realRow('77130500008805', '081000005', '03', 'អីវ៉ាន់មកដល់', '2026-10-06 09:00:00', extra)], { pages: 1, total: 1 });
+        resetEnv(PROD_SIGNED_ENV);
+        global.fetch = withCerts(async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => p }));
+        const r = rowsOf(bodyOf(await call(listQuery({ from: '2026-10-06', to: '2026-10-06', page: '1' }))))[0] || {};
+        return r.from;
+    };
+    const fallbackFrom = await originOf({ recSite: '', customerCodeDesc: 'Shopee SHPE' });
+    ok('ប្រភព ៖ `recSite` ទទេ ➜ `customerCodeDesc`', fallbackFrom === 'Shopee SHPE', fallbackFrom);
+    const noneFrom = await originOf({ recSite: null, customerCodeDesc: null });
+    ok('ទិសផ្ទុយ ៖ គ្មានវាលទាំងពីរ ➜ `from: ""` (មិនទាយ)', noneFrom === '', noneFrom);
+    const dirtyFrom = await originOf({ recSite: '  ZTO\u0000  ឃ្លាំង\n\nក្វាងចូវ ' + 'x'.repeat(200) });
+    ok('⛔ ប្រភព ៖ តួអក្សរបញ្ជាដក · ចន្លោះបង្រួម · ≤ ៦៤ តួ', typeof dirtyFrom === 'string' && dirtyFrom.indexOf('\u0000') === -1
+        && dirtyFrom.indexOf('\n') === -1 && dirtyFrom.indexOf('  ') === -1 && dirtyFrom.length <= 64 && dirtyFrom.indexOf('ZTO ឃ្លាំង') === 0, dirtyFrom);
 
     // ⛔ E8ខ ៖ payload ពិត «ត្រឡប់ការស្កេន» (ម្ចាស់គម្រោង ៖ កញ្ចប់ត្រឡប់ទៅសាខាកណ្តាលវិញ លើស ៧ ថ្ងៃ) ៖ `scanTypeCode: "-710"` · `scanTypeDesc: "ត្រឡប់ការស្កេន"` ·
     //    `isRefund: 1`។ កញ្ចប់នេះ **មិនបានយក** ➜ ⛔ មិនត្រូវក្លាយជាភស្តុតាង «ចុះហត្ថលេខា» (បើក្លាយ ➜ ZoeW បិទ «យករួច» ➜ ការសម្អាត ៧ ថ្ងៃមិនដកលុយ) ·
@@ -2824,7 +2845,7 @@ function firstBody(requests) {
         try { return m ? JSON.parse(m[1].replace(/'/g, '"')) : []; } catch (_) { return []; }
     };
     const docFields = [].concat(pathList('BARCODE_PATHS'), ['scanBillCode'], pathList('PHONE_PATHS'), pathList('LIST_TIME_PATHS'),
-        pathList('LIST_SCAN_CODE_PATHS'), pathList('LIST_SCAN_DESC_PATHS'), pathList('LIST_SITE_NAME_PATHS'),
+        pathList('LIST_SCAN_CODE_PATHS'), pathList('LIST_SCAN_DESC_PATHS'), pathList('LIST_SITE_NAME_PATHS'), pathList('LIST_ORIGIN_PATHS'),
         pathList('COD_PATHS').slice(0, 1), pathList('DOD_PATHS').slice(0, 1));
     ok('ជាន់អប្បបរមា ៖ ស្រង់បញ្ជីវាលពី Function បាន (≥ ២០) · ផ្នែក «📋 វាល» មានក្នុង ZTO-SETUP-KH.md', docFields.length >= 20 && fieldsDoc.length > 200,
         { fields: docFields.length, doc: fieldsDoc.length });

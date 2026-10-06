@@ -45,6 +45,7 @@ const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
 const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា';
 const LIST_SITE_NAME_PATHS = ['scanSite', 'scanSiteName'];
+const LIST_ORIGIN_PATHS = ['recSite', 'customerCodeDesc'];
 const LIST_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 86400000;
 
@@ -1008,7 +1009,8 @@ function projectListRow(config, row) {
         dod: dod === null ? 0 : dod,
         at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : '',
         ztoClosed: pickSignedVerdict(candidates, config.signed),
-        skip: listScanTypeSkip(config.list, candidates)
+        skip: listScanTypeSkip(config.list, candidates),
+        from: pickText(candidates, LIST_ORIGIN_PATHS).replace(/\s+/g, ' ')
     };
 }
 

@@ -2873,6 +2873,9 @@
     },
     "docs/SELF-HOSTED-RUNNERS.md": {
       "policy": "guard-13"
+    },
+    ".github/workflows/android-shell-check.yml": {
+      "policy": "guard-2"
     }
   }
 }

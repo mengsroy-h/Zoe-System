@@ -47,13 +47,15 @@ jobs:
 
       - name: កំណត់ Git Bash របស់ Windows
         shell: powershell
+        env:
+          ZOE_GIT_BASH_MISSING_MESSAGE: 'រក Git Bash មិនឃើញ៖ {0}។ ដំឡើង Git for Windows និង restart runner service។'
         run: |
           $gitExecutable = (Get-Command git -ErrorAction Stop).Source
           $gitRoot = Split-Path (Split-Path $gitExecutable -Parent) -Parent
           $gitBin = Join-Path $gitRoot 'bin'
           $gitBash = Join-Path $gitBin 'bash.exe'
           if (-not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
-            throw "រក Git Bash មិនឃើញ៖ $gitBash។ ដំឡើង Git for Windows និង restart runner service។"
+            throw ($env:ZOE_GIT_BASH_MISSING_MESSAGE -f $gitBash)
           }
           & $gitBash --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1665,6 +1665,9 @@
     "ZoeW/src/services/db-listeners.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/zto-shop-sweep.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/services/firebase-init.ts": {
       "policy": "zoew-app"
     },
@@ -1879,6 +1882,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-abandon-signed-gate.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-shop-sweep-marker.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-sync.test.tsx": {
@@ -2796,7 +2802,7 @@
     "supabase/migrations/20261001000100_zoe_rules.sql": {
       "policy": "supabase-db"
     },
-    "supabase/migrations/20261006154711_zoe_rules.sql": {
+    "supabase/migrations/20261006181025_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "supabase/migrations/20261001000200_zoe_datastore.sql": {

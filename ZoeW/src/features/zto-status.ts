@@ -20,6 +20,7 @@ import { trashReasonOf } from './trash';
 import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
+import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
 import { documentIsHidden } from '../platform/document-io';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
@@ -345,11 +346,19 @@ export function ztoSignedSweepRange(oldestOpenAt?, pendingOnly?) {
     return { from: from, to: getZoneDateKey(now, 0) };
 }
 
+function ztoLocalSweepGuards() {
+    return ztoAutoCloseEnabled() && !!ztoStatusFeatureConfig() && !ztoState.ztoSignedOff;
+}
+
 export function ztoAbandonCleanupIsHeld(ripeAt?) {
-    if (!ztoAutoCloseEnabled() || !ztoStatusFeatureConfig() || ztoState.ztoSignedOff) return false;
-    const fresh = !!ztoState.ztoSignedCompleteAt && elapsedSince(ztoState.ztoSignedCompleteAt) <= ZTO_SIGNED_FRESH_MS;
-    const covers = typeof ripeAt !== 'number' || !isFinite(ripeAt) || ztoState.ztoSignedCompleteServerAt >= ripeAt;
-    if (fresh && covers) return false;
+    if (!ztoLocalSweepGuards()) {
+        if (!ztoShopSweepHolds(ripeAt)) return false;
+        if (ztoState.ztoShopSweep.advancedAt > ztoState.ztoAbandonHoldSince) ztoState.ztoAbandonHoldSince = 0;
+    } else {
+        const fresh = !!ztoState.ztoSignedCompleteAt && elapsedSince(ztoState.ztoSignedCompleteAt) <= ZTO_SIGNED_FRESH_MS;
+        const covers = typeof ripeAt !== 'number' || !isFinite(ripeAt) || ztoState.ztoSignedCompleteServerAt >= ripeAt;
+        if (fresh && covers) return false;
+    }
     const resumed = !!ztoState.ztoAbandonCheckedAt && elapsedSince(ztoState.ztoAbandonCheckedAt) > ZTO_ABANDON_RESUME_GAP_MS;
     ztoState.ztoAbandonCheckedAt = Date.now();
     if (!ztoState.ztoAbandonHoldSince || resumed) ztoState.ztoAbandonHoldSince = Date.now();
@@ -452,12 +461,14 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         out.keys.add(stale[i].key);
         out.flipped++;
     }
-    if (open.length && finished && !signed.partial && !signed.truncated && !ztoListPositiveCount(signed.signedMismatch)) {
+    const complete = !!open.length && finished && !signed.partial && !signed.truncated && !ztoListPositiveCount(signed.signedMismatch);
+    if (complete) {
         ztoState.ztoSignedCompleteAt = Date.now();
         ztoState.ztoSignedCompleteServerAt = readServerAt;
         ztoState.ztoAbandonHoldSince = 0;
         ztoState.ztoSignedSweepOkAt = ztoState.ztoSignedCompleteAt;
     }
+    markZtoShopSweep(complete ? readServerAt : 0);
     return out;
 }
 

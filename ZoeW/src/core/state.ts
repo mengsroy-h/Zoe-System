@@ -17,6 +17,7 @@ export interface FirebaseState {
     dbRefDailyPickup: any;
     dbRefDailyCollected: any;
     dbRefExchangeRate: any;
+    dbRefZtoSignedSweep: any;
     dbRefConnected: any;
     dbRefServerTimeOffset: any;
     authUnsubscribe: any;
@@ -75,6 +76,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     dbRefDailyPickup: null,
     dbRefDailyCollected: null,
     dbRefExchangeRate: null,
+    dbRefZtoSignedSweep: null,
     dbRefConnected: null,
     dbRefServerTimeOffset: null,
     authUnsubscribe: null,
@@ -566,6 +568,8 @@ export interface ZtoState {
     ztoUserActiveAt: number;
     ztoAbandonHoldSince: number;
     ztoAbandonCheckedAt: number;
+    ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number };
+    ztoShopSweepWrote: { activeAt: number; completeAt: number };
     ztoOriginRefusedDb: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
@@ -594,6 +598,8 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoUserActiveAt: 0,
     ztoAbandonHoldSince: 0,
     ztoAbandonCheckedAt: 0,
+    ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 },
+    ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
     ztoOriginRefusedDb: null,
     ztoBannerView: null,
     ztoSyncListView: null,

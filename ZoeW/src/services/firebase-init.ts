@@ -5,6 +5,7 @@ import { appLocalStore, safeStoreGet } from '../core/storage';
 import { setupAuthListener } from '../features/auth';
 import { clearCustomerDataTableCache } from '../features/customer-table';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
+import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
 import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
@@ -136,6 +137,7 @@ export async function initFirebase() {
         firebaseState.dbRefDailyPickup = firebaseState.fb.ref(firebaseState.db, 'zoew_daily_pickup_cod_dod');
         firebaseState.dbRefDailyCollected = firebaseState.fb.ref(firebaseState.db, 'zoew_daily_collected_cod_dod');
         firebaseState.dbRefExchangeRate = firebaseState.fb.ref(firebaseState.db, 'zoew_settings/exchange_rate');
+        firebaseState.dbRefZtoSignedSweep = firebaseState.fb.ref(firebaseState.db, ZTO_SHOP_SWEEP_PATH);
         firebaseState.dbRefConnected = firebaseState.fb.ref(firebaseState.db, '.info/connected');
         firebaseState.dbRefServerTimeOffset = firebaseState.fb.ref(firebaseState.db, '.info/serverTimeOffset');
         attachInfoListeners();

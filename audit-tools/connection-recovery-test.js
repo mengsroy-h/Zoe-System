@@ -279,6 +279,8 @@ function buildContext() {
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
         refreshNotifyRemovedView: () => {},
+        resetZtoShopSweep: () => {},
+        attachZtoShopSweepListener: () => false,
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },

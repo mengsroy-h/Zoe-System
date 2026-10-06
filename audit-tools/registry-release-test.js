@@ -375,7 +375,7 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
                 dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
                 dbListenerProgressAt: 0, dbListenerPendingSeen: 0, dbListenersFailed: false,
                 refreshLiveToasts() {}, liveSuccessCount: () => 0, clearDbListenerRecovery() {}, renderConnectionStatus() {}, showToast() {},
-                debouncedRenderAfterHistorySync() {}, runAutomaticDeletedCleanup() {}, refreshNotifyRemovedView() {},
+                debouncedRenderAfterHistorySync() {}, runAutomaticDeletedCleanup() {}, refreshNotifyRemovedView() {}, resetZtoShopSweep() {}, attachZtoShopSweepListener: () => false,
                 generateUniqueId: () => 'fixture', parseTimestampFromId: () => 1, getServerNow: () => 1000
             });
             ctx.fb.off = () => {};

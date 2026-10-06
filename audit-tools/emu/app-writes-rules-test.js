@@ -182,6 +182,18 @@ async function replay(cap, rules, tag) {
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `origins`) បដិសេធការសរសេរប្រភព ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់ (`saveBarcodeOrigins`)',
         'denied=' + old.denied.length + ' originPaths=' + originPaths);
 
+    // ⛔ សញ្ញាហាង ZTO (`zoew_settings/zto_signed_sweep`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរពិតរបស់ `markZtoShopSweep()` ·
+    //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules ដែលគ្មាន node នេះ (ដូច rules ចាស់) ➜ បដិសេធ។
+    const sweepMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && String(e.p || '') === 'zoew_settings/zto_signed_sweep').length, 0);
+    console.log('    សញ្ញាហាង ZTO ៖ ការសរសេរ ' + sweepMarks);
+    check(sweepMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរសញ្ញាហាង ZTO ≥ ១', 'sweepMarks=' + sweepMarks);
+    const noMarkRules = JSON.parse(JSON.stringify(rules));
+    delete noMarkRules.rules.zoew_settings.zto_signed_sweep;
+    const noMark = await replay(cap.data, noMarkRules, 'no-mark-rules');
+    check(noMark.denied.filter((d) => d.path === 'zoew_settings/zto_signed_sweep').length >= sweepMarks,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_signed_sweep`) បដិសេធសញ្ញាហាង (ការវាស់រសើប)',
+        'denied=' + noMark.denied.length + ' sweepMarks=' + sweepMarks);
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); process.exit(1); });

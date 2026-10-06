@@ -151,8 +151,8 @@
 
 ### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន) · ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO · ជួរ «ចុះហត្ថលេខា» អត្ថបទផ្ទុយលែងបាត់ស្ងាត់ · ភស្តុតាងចុះហត្ថលេខាលែងធ្លាក់ក្រោយ Cookie ផុត · របា «ZTO មិនទាន់បិទ» លែងចាស់ · ប្រភពកញ្ចប់ក្នុងប្រវត្តិ (🇨🇳 ចិន · 🇻🇳 វៀតណាម) · ចុច «កញ្ចប់សរុប» បើកបញ្ជី · ប៊ូតុងខល/បិទ និងលេខរៀងលែងជាន់** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
 
-**ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Edge Function **មិនប្រែ** · Firebase rules (Business) + migration Supabase `20261006154711_zoe_rules.sql`
-**ប្រែ** (វាល `origins` ក្នុងកញ្ចប់ ➜ សកម្មភាពដៃ ១)។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
+**ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Edge Function **មិនប្រែ** · Firebase rules (Business) + migration Supabase `20261006181025_zoe_rules.sql`
+**ប្រែ** (វាល `origins` ក្នុងកញ្ចប់ · សញ្ញាហាង `zoew_settings/zto_signed_sweep` ➜ សកម្មភាពដៃ ១)។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
 («កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ➜ `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts` ធ្វើបច្ចុប្បន្នភាពរាល់ commit។ ប៉ះ `src/features/zto-status.ts`
 (`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()` · `ztoPickupVerdictOf()` · `ztoListSignedVerdict()`) ·
 `src/domain/cleanup.ts` (`runAutomaticCleanupRules()`) · `src/core/state.ts` · ល្បឿន ៖ `zto-status.ts` (`ztoSignedSweepCadenceMs()` · `noteZtoUserActivity()` ·
@@ -217,7 +217,8 @@
   (បណ្តាញ · Server បដិសេធ) ➜ មុនកែ ៖ ជុំរាប់ថា «ពេញលេញ» ហើយការសម្អាតដកលុយកញ្ចប់នោះ ១ នាទីក្រោយ (មិនដែលសាកបិទម្តងទៀត ១ ម៉ោង) ➜ ឥឡូវ ៖ ជុំមិនពេញលេញ · សាកបិទម្តងទៀតក្រោយ
   ២ នាទី · (M3) ការអានបញ្ជី **មុន** កញ្ចប់គ្រប់ ៧×២៤ ម៉ោង លែងដោះលែងការសម្អាត (មុនកែ ៖ ត្រឡប់ពី background ក្នុង ១០ នាទី ឬវដ្ត ១ នាទី ➜ កញ្ចប់ដែលចុះហត្ថលេខាក្រោយការអាន
   ត្រូវដកលុយ) ➜ ត្រូវការការអានក្រោយពេលទុំ · (R1) ហេតុផលអត្តសញ្ញាណបណ្តោះអាសន្ន (token ផុត · Supabase មិនឆ្លើយ) ➜ សាកឡើងវិញតាមចន្លោះទ្វេ (មុនកែ ៖ រង់ចាំ ៣០ នាទី
-  ស្មើពិដាន ➜ ការរង់ចាំអស់មុនការអានម្តងទៀត ➜ ដកលុយ)។
+  ស្មើពិដាន ➜ ការរង់ចាំអស់មុនការអានម្តងទៀត ➜ ដកលុយ) · (M2) **ការរង់ចាំជាច្បាប់ទូទាំងហាង** ៖ មុនកែ ៖ ការកំណត់ ZTO នៅលើឧបករណ៍នីមួយៗ ➜ ទូរស័ព្ទផ្សេងក្នុងហាង
+  ដែលមិនបើក ZTO ដកលុយកញ្ចប់ដែលអតិថិជនយករួចភ្លាម ➜ ឥឡូវ ៖ ឧបករណ៍ ZTO ទុកសញ្ញាក្នុង database ហើយទូរស័ព្ទផ្សេងរង់ចាំដូចគ្នា (យូរបំផុត ៣០ នាទីក្នុងមួយលើក)។
 - 🧱 **ជួរប្រវត្តិលែងជាន់គ្នា** (របាយការណ៍ម្ចាស់គម្រោងពីរូបថត ៖ «ប៊ូតុង ខល នៅពីលើ កញ្ចប់សរុប») ៖ មុនកែ ៖ ប៊ូតុង «ខល/បិទ» (`white-space: nowrap` · padding 12px)
   ធំជាងក្រឡារបស់វា ➜ ហៀរទៅឆ្វេង ហើយជាន់ «កញ្ចប់សរុប» **22×21px នៅ 320 · 10×20 នៅ 360 · 5×20 នៅ 375** · ស្លាកលេខរៀងពណ៌ (`min-width: 20px` ក្នុងជួរឈរ 6%) ជាន់លេខទូរស័ព្ទ
   ១–៤px (លេខ ៣ ខ្ទង់ ៖ គ្រប់ទទឹង 320–1100 លើកលែង 768)។ ឥឡូវ (`react-root.css`) ៖ ទូរស័ព្ទ (< 700) ៖ padding ប៊ូតុង 4px ➜ 12px តាមទទឹងអេក្រង់ (កម្ពស់ 38px · អក្សរដដែល ·
@@ -268,13 +269,15 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-1. ⛔ **Publish Firebase rules ថ្មី (`firebase-database.rules.json` · វាល `origins`) ទៅគ្រប់ Project អតិថិជន** (Console ➜ Realtime Database ➜ Rules ➜ Publish ឬ
-   `tools/firebase-provision/deploy-rules.cmd`) · ហាង Supabase ៖ migration `20261006154711_zoe_rules.sql` អនុវត្តដោយ GitHub integration **ពេល merge ចូល `main`**
-   (ការសម្រេចរបស់ម្ចាស់គម្រោង)។ មុន Publish ៖ ការបញ្ចូលបញ្ជី ZTO ដើរធម្មតា តែប្រភពមិនរក្សាទុក។ ⛔ **កុំត្រឡប់ទៅ rules ចាស់** ក្រោយកញ្ចប់មាន `origins` ហើយ
+1. ⛔ **Publish Firebase rules ថ្មី (`firebase-database.rules.json` · វាល `origins` · សញ្ញាហាង `zoew_settings/zto_signed_sweep`) ទៅគ្រប់ Project អតិថិជន** (Console ➜ Realtime Database ➜ Rules ➜ Publish ឬ
+   `tools/firebase-provision/deploy-rules.cmd`) · ហាង Supabase ៖ migration `20261006181025_zoe_rules.sql` អនុវត្តដោយ GitHub integration **ពេល merge ចូល `main`**
+   (ការសម្រេចរបស់ម្ចាស់គម្រោង)។ មុន Publish ៖ ការបញ្ចូលបញ្ជី ZTO ដើរធម្មតា តែប្រភពមិនរក្សាទុក · ទូរស័ព្ទដែលមិនបើក ZTO មិនរង់ចាំ (ដូចមុន · គ្មាន toast ដាច់)។ ⛔ **កុំត្រឡប់ទៅ rules ចាស់** ក្រោយកញ្ចប់មាន `origins` ហើយ
    (ការសរសេរលើកញ្ចប់នោះ — បិទ · កែតម្លៃ · ដក — នឹងត្រូវបដិសេធ)។
 2. Deploy **ZoeW** (Netlify) ➜ build APK ឡើងវិញ។ គ្មាន env ថ្មី។
 3. សាក (ហាងដែលបើក «បិទតាម ZTO ស្វ័យប្រវត្តិ») ៖ កញ្ចប់អាយុ ៨ ថ្ងៃ ដែល ZTO Palm ចុះហត្ថលេខារួច ➜ បិទ App ➜ បើកវិញ ➜ វាត្រូវបិទ «យករួច» (ស្ថិតិយកឡើង) មិនមែនចូល
    «🗑️ ផុតកំណត់» ទេ · កញ្ចប់ ៨ ថ្ងៃដែលមិនទាន់យក ➜ ចូល «ផុតកំណត់» ក្នុងប៉ុន្មាននាទី (ZTO មិនឆ្លើយ ➜ ≤ ៣០ នាទី)។
+   ហាងមានទូរស័ព្ទ ២ ៖ ទូរស័ព្ទ A បើក ZTO + «បិទតាម ZTO ស្វ័យប្រវត្តិ» · ទូរស័ព្ទ B មិនបើក ZTO ➜ Firebase Console ➜ `zoew_settings/zto_signed_sweep` មាន `activeAt`/`completeAt`
+   ➜ កញ្ចប់ដែលហួស ៧ ថ្ងៃ ហើយ ZTO ចុះហត្ថលេខា មិនត្រូវ B ដកលុយ មុន A អានបញ្ជី។
 4. ✅ **ផ្ទៀងលើ Argus (E8 · ម្ចាស់គម្រោងចម្លង payload ពិត ៣ ៖ ក្នុងស្រុក · ចិន · Shopee វៀតណាម)** ៖ កញ្ចប់យករួចមានជួរដេក `scanTypeCode: "05"` +
    `scanTypeDesc: "ចុះហត្ថលេខា"` (= លំនាំដើម ➜ គ្មាន env ត្រូវប្តូរ) · ជួរដេកបញ្ជី **គ្មាន** `billStatus` · DOD = `fcAmount` · លំដាប់តាម `id` ឡើង។ ⏳ នៅសល់ ៖ សាកលើ App ពិត ៖
    ទាញបញ្ជីដែលមានកញ្ចប់ចុះហត្ថលេខារួច ➜ ប្រអប់ត្រូវរាប់វាក្នុង «🔒 ថ្មីដែល ZTO បិទរួច» · ZTO Palm ចុះហត្ថលេខា ➜ ZoeW បិទក្នុង ~២០ វិ. (កំពុងប្រើ) · `?diag=1` ➜ `list.signedEnabled: true`។
@@ -1642,6 +1645,20 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   mutation ១០/១០ ត្រូវសម្លាប់ (បរាជ័យរាប់ពេញលេញ · ការទប់សាកវិញរាប់ពេញលេញ · គ្មានការទប់សាកវិញ · `covers` ជានិច្ច · គ្មាន reset · R1 IDLE · cleanup គ្មាន `ripeAt` ·
   `ripeAt` ដំបូងបំផុត · មិនអើពើ `restoredAt` · មិនកត់ `readServerAt`) · ១ ស្មើ (លុប `ztoSignedCloseFailedAt` ពេលជោគជ័យ) ➜ ដកចេញ។ sandbox ៩ checker ៖ បន្ថែម
   `barcodeAbandonBasis` · `itemAbandonRipeAt`។
+- 💰 **M2** (មានតាំងពីមុន · ផ្ទៀងឯករាជ្យ ៖ ឧបករណ៍ ៥ ការកំណត់ លើទិន្នន័យរួមដដែល ➜ A (ZTO) មិនដក · B/C/D/E ដកភ្លាម) ៖ `ztoAbandonCleanupIsHeld()` សម្រេចតាម
+  localStorage (`zoew_lookup_api_config` · `zoew_zto_autoclose_v1`) ខណៈ `claimAndCleanupItem('abandon')` ដកពី ledger រួមរបស់ហាង ➜ សញ្ញាហាង
+  `zoew_settings/zto_signed_sweep` `{ activeAt, completeAt }` (ម៉ោង Server) ក្នុង `src/services/zto-shop-sweep.ts` ថ្មី (ម៉ូឌុលស្ថានភាព ZTO មិនប៉ះ Firebase ·
+  `zto-sync-banner-test` ឃើញ `dbRef` ពេលដាក់ក្នុង `zto-status.ts` ➜ ផ្លាស់ · ឯកសារថ្មីចូល `LOCK`) ៖ `markZtoShopSweep()` ក្រោយការអានដែលវាស់បាន (≤ ១ ដងក្នុង `ZTO_SHOP_SWEEP_MARK_GAP_MS`
+  ៥ នាទី · `completeAt` = `readServerAt` នៃការអានពេញលេញ) · listener ដាច់ពីទិន្នន័យ (មិនចូល `DB_LISTENER_KEYS` ➜ rules មិនទាន់ Publish មិនធ្វើឲ្យ «⚠️ ដាច់» ·
+  generation gate · `resetZtoShopSweep()` ពេល detach) · ឧបករណ៍គ្មាន ZTO រង់ចាំពេល `activeAt` ក្នុង `ZTO_SHOP_SWEEP_ACTIVE_MS` (៧ ថ្ងៃ) ហើយ `completeAt` < ពេលទុំ ·
+  listener រង់ចាំ/បរាជ័យ ➜ រង់ចាំ · `permission_denied` · គ្មានសញ្ញា · សញ្ញាចាស់ ➜ មិនរង់ចាំ · ពិដានវគ្គដដែល (`ZTO_ABANDON_HOLD_MAX_MS`) · `completeAt` ឡើង ➜ វគ្គថ្មី។
+  ជម្រើសដែលមិនយក ៖ ការរង់ចាំគ្មានពិដានវគ្គ (ការពារពេល A បិទច្រើនថ្ងៃ តែប្តូរពេលផុតកំណត់ដែលអ្នកប្រើឃើញ ≤ ១ ថ្ងៃ = ច្បាប់អាជីវកម្ម)។ rules ៖ `.validate`
+  ទាមទារ `activeAt` · លេខ ≥ 0 · `$other` false · migration Supabase តែមួយក្នុងជុំនេះ (`20261006181025_zoe_rules.sql` ជំនួស `…154711` ដែលមិនទាន់ merge)។
+  អ្នកយាម ៖ `tests/zto-shop-sweep-marker.test.tsx` (១២ · tree មុនកែ **ធ្លាក់ ៧** · ទិសផ្ទុយ ៣ បៃតង) · `revenue-fuzz` op `shopSweep` · `emu/app-writes-rules` (ការសរសេរ ≥ ១ ·
+  probe rules គ្មាន node ➜ បដិសេធ) · mutation ១៧/១៧ ត្រូវសម្លាប់ (listener មិន ok · pending មិនរង់ចាំ · មិនអើពើ ៧ ថ្ងៃ · មិនអើពើ `completeAt` · denied រង់ចាំ · គ្មាន throttle ·
+  `completeAt` ពេលសរសេរ · `completeAt` ពេលមិនពេញលេញ · គ្មាន gate · គ្មាន reset · គ្មានវគ្គថ្មី (តេស្តកែពីរបីដង ៖ ការប្តូរឧបករណ៍ក្នុង realm តែមួយ reset វគ្គ ➜ ក្លែងស្ថានភាព B ពិត) ·
+  គ្មានការសរសេរ · គ្មានពិដាន · មិនអើពើកំហុស listener · សរសេរមុនការអាន · វគ្គថ្មីមិនកត់ `advancedAt` · មិន `fb.off` ពេល detach ➜ តេស្តបន្ថែម) ·
+  sandbox `connection-recovery-test` · `registry-release-test` ៖ stub `resetZtoShopSweep` · `attachZtoShopSweepListener`។
 - 💰 **F1** (ជុំនេះបង្កើត · ផ្ទៀងឯករាជ្យ ២ ផ្លូវ) ៖ E3 ប្តូរ Function `signed=1` ពី `listSignedRange(range)` (ពង្រីកដល់ថ្ងៃនេះ) ទៅ `range` ផ្ទាល់ ដើម្បីការអានតាមថ្ងៃ ➜ តែប្រអប់បញ្ជី
   ក៏ប្រើ `signed=1` សម្រាប់ទំព័រ «ចុះហត្ថលេខា» បន្ថែម (`last+1..signedPages`) ខណៈ `signedPages` មកពី companion ដែលពង្រីកដល់ថ្ងៃនេះ ➜ ពេល «ដល់ថ្ងៃ» < ថ្ងៃនេះ ទំព័រ ២–៣
   អានបញ្ជីផ្សេង (`from..to`) ➜ វាស់ ៖ ភស្តុតាង ២៣០/២៩១ · X (ចុះហត្ថលេខាក្រោយ `to` · ទំព័រ ៣) មិនឃើញ ➜ ចូលជា «មិនទាន់យក» · `signedState: 'ok'` (គ្មានការព្រមាន) ·

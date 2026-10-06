@@ -422,6 +422,20 @@
         ".read": "auth != null",
         ".write": "auth != null",
         ".validate": "newData.isNumber() && newData.val() > 0"
+      },
+      "zto_signed_sweep": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['activeAt'])",
+        "activeAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "completeAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "zoew_barcode_registry": {

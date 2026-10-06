@@ -30,7 +30,7 @@ const STEP_TIMEOUT_MS = Number(process.env.ZOEWSUITE_STEP_TIMEOUT_MS || 240000);
 const PARITY = process.argv.includes('--parity');
 const STEPS = PARITY ? ['build:parity', 'parity:dom', 'parity:live', 'parity:deep']
     : ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
-        'logic:check', 'parity', 'build:only', 'sw:check', 'smoke', 'native:check', 'rules:check'];
+        'logic:check', 'parity', 'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
 const STEP_ENV = {};
 const TEST_WORKERS = process.env.ZOEWSUITE_TEST_WORKERS || 'auto';
 

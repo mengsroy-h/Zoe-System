@@ -1709,6 +1709,25 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-06 — Deep audit ជុំ ៤ ៖ សុវត្ថិភាព (សំណើម្ចាស់គម្រោង «ធ្វើ ៤ និង ៦»)
+
+CI ក្នុង session មុនចាប់ផ្តើម (STRICT · emulator · Node 24 · HEAD `a2dff43`) ៖ **ជោគជ័យ ២០២ · ធ្លាក់ ១ · មួយផ្នែក ០ · រំលង ០** ➜ FAIL តែមួយ =
+`repository-file-coverage` ៖ តេស្ត `zto-signed-only-import.test.tsx` ថ្មីរបស់ [2.50.3] គ្មាន mapping (កំហុសរបស់ Claude ក្នុង round 2.50.3 · CI GitHub ផ្នែក 3/4 ក្រហមដូចគ្នា) ➜ ដាក់ mapping។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| S4-a | NOTICE ↔ bundle ពិត | build ជាមួយ sourcemap (`vite build --sourcemap` ចូល scratch) ➜ រាយកញ្ចប់ npm ពី `sources` ➜ ធៀប NOTICE | ⚠️ **ខ្វះ ២** ៖ `iceberg-js@0.8.1` (MIT · chunk `supabase-backend` · storage-js ប្រើ) · `@capacitor/synapse@1.0.4` (LICENSE.md ៖ MIT «Copyright (c) 2025 Ionic» · chunk `native-plugins`) ➜ MIT តម្រូវឲ្យភ្ជាប់សេចក្តីជូនដំណឹង ➜ **កែ** · `tslib@2.8.1` (0BSD ៖ គ្មានលក្ខខណ្ឌ) ក៏រាយដែរ |
+| S4-b | កំណែក្នុង NOTICE | អានកំណែពីឯកសារ vendor ពិត (`make_xlsx_lib` ៖ `0.20.3` · zxing-wasm ៖ ថេរកំណែជាប់ commit hash) | ⚠️ NOTICE «zxing-wasm 3.1.3» ≠ ឯកសារ ship **3.1.4** (ឡើងកំណែក្នុង 2.42.4 តែ NOTICE មិនកែ) ➜ **កែ** |
+| S1 | Secret ក្នុង repo | `git ls-files` + regex (Google API key · JWT · private key · `sb_secret_` · GitHub/Slack/Stripe/Netlify token) · host Project ពិត | វាស់ ៖ គ្មាន — រកឃើញតែ RSA key សាកល្បងក្នុង `audit-tools/idtoken-fixture.js` (fixture ចុះហត្ថលេខា ID token ក្លែង) · host ទាំងអស់ជា fixture ក្លែង |
+| S5 | XSS ក្នុង ZoeW React | រក sink (`dangerouslySetInnerHTML` · `innerHTML` · `insertAdjacentHTML` · `document.write` · `javascript:`) ក្នុង `src/` | វាស់ ៖ គ្មាន sink · `href` មានតែ `tel:${phone}` (scheme ថេរ) និង Telegram ថេរ · វាលថ្មី `signedRows`/`from` ឆ្លងតែអត្ថបទ JSX |
+| S2 | សញ្ញាហាង `zto_signed_sweep` | អាន rules ពិត (`activeAt`/`completeAt` លេខ · ≤ `now + 600000` · `$other` បដិសេធ) + អ្នកយាមដែលមាន (`zto-shop-sweep-marker` · `emu/app-writes-rules`) | វាស់ ៖ ផលអតិបរមារបស់បុគ្គលិកក្នុងហាងដែលសរសេរខុស = ការរង់ចាំ ≤ ៣០ នាទី/វគ្គ · ការលុបសញ្ញា = ដូចគ្មានឧបករណ៍ ZTO (ឧបករណ៍ ZTO សរសេរឡើងវិញ) ➜ ទទួលយក (អ្នកសរសេរបានតែ `auth != null` ក្នុង Project ហាង) |
+| S3 | Firebase sign-up បិទ | រកផ្លូវវាស់ពីឧបករណ៍ដោយមិនបង្កើតគណនី | មិនបានវាស់ ៖ session គ្មាន Project សាកល្បង · `accounts:signUp` លើ Project ពិតអាចបង្កើតគណនី ➜ **ស្នើ** ៖ សាកលើ Project សាកល្បងមួយ (លំដាប់កំហុស `ADMIN_ONLY_OPERATION` ធៀប `INVALID_EMAIL`) មុនដាក់ក្នុង 🩺 · `tools/firebase-provision` វាស់ពេលបង្កើត Project រួចហើយ |
+
+- 🛡️ **អ្នកយាមថ្មី `npm run notice:check`** (`ZoeW/scripts/notice-check.mjs` · ក្នុង `zoew-suite` និង `verify`) ៖ build ចូលថតបណ្តោះអាសន្នជាមួយ sourcemap ➜ រាល់កញ្ចប់ npm
+  ដែលចូល `dist/assets` និងឯកសារ vendor ត្រូវមាន `` `ឈ្មោះ@កំណែ` `` ដែលដំឡើង/ship ពិតក្នុង NOTICE (ជាន់អប្បបរមា ៖ sourcemap ≥ ១ · កញ្ចប់ ≥ ១០ · កំណែ vendor រកឃើញ) ·
+  `NOTICE_FILE` ៖ NOTICE មុនកែ ➜ **FAIL** (២៥ ខ្វះ) · NOTICE ដែលមានគ្រប់តែ ២ ខាងលើ + zxing 3.1.3 ➜ **FAIL** ចំ ៣ ចំណុចនោះ · NOTICE ថ្មី ➜ PASS (២៣)។
+  hash integrity របស់ NOTICE ក្នុង `repository-file-coverage.json` ធ្វើបច្ចុប្បន្នភាព (កែដោយចេតនា)។
+
 ### 2026-10-06 — ជុំ ZTO ស្អាត ៖ ការផ្ទៀងផ្ទាត់ឡើងវិញ (សំណើម្ចាស់គម្រោង «ផ្ទៀងផ្ទាត់ ZTO ឡើងវិញសិន» ➜ [2.50.1])
 
 - ប្រភព ៖ ការពិនិត្យប្រឆាំងរបស់ workflow (E4 · E5 · E6 ម្នាក់ៗ ១ អ្នកពិនិត្យ · E7 ៥ ការរកឃើញ ផ្ទៀងដោយអ្នកផ្ទៀងឯករាជ្យ ៥ · គ្មានមួយត្រូវបដិសេធ) + workflow ផ្ទៀង ៦ ផ្លូវលើ `8d78c2c`។

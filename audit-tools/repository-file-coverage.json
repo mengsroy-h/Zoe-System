@@ -641,7 +641,7 @@
     "NOTICE": {
       "policy": "guard-7",
       "encoding": "lf-text",
-      "sha256": "7951fb870508b083f68c336e4293821f853b6c2d646a0e75827c3867d85a870f"
+      "sha256": "12600fb126606bd6930b87c7ba3e1bdf37852c56fea1f4daa0c3cf3165e5a1b7"
     },
     "README.md": {
       "policy": "guard-13"
@@ -1093,6 +1093,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/parity-deep.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/notice-check.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/parity-dom.mjs": {
@@ -1900,6 +1903,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-mismatch.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-signed-only-import.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-stale-bar.test.tsx": {

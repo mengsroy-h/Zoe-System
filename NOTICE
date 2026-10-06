@@ -29,6 +29,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 ១. SheetJS Community Edition (xlsx) — កំណែ 0.20.3
 -------------------------------------------------------------------------------
    ឯកសារដែល ship  : ZoeW/public/vendor/xlsx.full.min.js
+   កញ្ចប់ (កំណែ)    : `xlsx@0.20.3`
    តួនាទី          : អាន និងសរសេរឯកសារ Excel (នាំចូល និង Export)
    អាជ្ញាប័ណ្ណ      : Apache License 2.0
    កម្មសិទ្ធិ       : Copyright (C) 2013-present SheetJS LLC
@@ -36,9 +37,10 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
    អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/Apache-2.0.txt
 
 -------------------------------------------------------------------------------
-២. zxing-wasm — កំណែ 3.1.3 (កូដភ្ជាប់ JavaScript)
+២. zxing-wasm — កំណែ 3.1.4 (កូដភ្ជាប់ JavaScript)
 -------------------------------------------------------------------------------
    ឯកសារដែល ship  : ZoeW/public/vendor/zxing-wasm.js
+   កញ្ចប់ (កំណែ)    : `zxing-wasm@3.1.4`
    តួនាទី          : កូដភ្ជាប់ (glue) រវាង JavaScript និងម៉ូឌុល WebAssembly
    អាជ្ញាប័ណ្ណ      : MIT License
    កម្មសិទ្ធិ       : Copyright (c) Sec-ant
@@ -77,6 +79,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
    ឯកសារដែល ship  : bundle របស់ ZoeW ក្នុង dist/assets/ (build ភ្ជាប់ចូល
                      ពី npm ➜ វាមិនរស់ក្នុង repo ទេ តែវាត្រូវ ship)
    តួនាទី          : គូរ UI របស់ ZoeW
+   កញ្ចប់ npm      : `react@19.3.0` · `react-dom@19.3.0` · `scheduler@0.28.0`
    អាជ្ញាប័ណ្ណ      : MIT License
    កម្មសិទ្ធិ       : Copyright (c) Meta Platforms, Inc. and affiliates.
    គេហទំព័រ        : https://react.dev/
@@ -90,8 +93,13 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
                      auth-js · realtime-js · postgrest-js · functions-js ·
                      storage-js · @supabase/phoenix)
    តួនាទី          : ភ្ជាប់ហាង Supabase (ចូលប្រព័ន្ធ · realtime)
-   អាជ្ញាប័ណ្ណ      : MIT License
-   កម្មសិទ្ធិ       : Copyright (c) 2020 Supabase ·
+   កញ្ចប់ npm      : `@supabase/supabase-js@2.117.2` · `@supabase/auth-js@2.117.2` ·
+                     `@supabase/functions-js@2.117.2` · `@supabase/postgrest-js@2.117.2` ·
+                     `@supabase/realtime-js@2.117.2` · `@supabase/storage-js@2.117.2` ·
+                     `@supabase/phoenix@0.4.5` · `iceberg-js@0.8.1` (storage-js ប្រើ) ·
+                     `tslib@2.8.1` (0BSD — Copyright (c) Microsoft Corporation · គ្មានលក្ខខណ្ឌ attribution)
+   អាជ្ញាប័ណ្ណ      : MIT License (tslib ៖ 0BSD)
+   កម្មសិទ្ធិ       : Copyright (c) 2020 Supabase · Copyright (c) 2025 Supabase (iceberg-js) ·
                      Copyright (c) 2014 Chris McCord (Phoenix)
    គេហទំព័រ        : https://github.com/supabase/supabase-js ·
                      https://github.com/supabase/phoenix
@@ -106,8 +114,12 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
                      ឯកសារ template Android ក្នុង ZoeW/android/ ដែល Capacitor
                      បង្កើត
    តួនាទី          : App Android (WebView · Back · ចែករំលែក · ការជូនដំណឹង)
+   កញ្ចប់ npm      : `@capacitor/core@8.5.2` · `@capacitor/app@8.1.2` · `@capacitor/filesystem@8.1.4` ·
+                     `@capacitor/haptics@8.0.2` · `@capacitor/push-notifications@8.1.3` ·
+                     `@capacitor/share@8.0.3` · `@capacitor/synapse@1.0.4` (plugin ប្រើ) ·
+                     App Android តែប៉ុណ្ណោះ ៖ `@capacitor/android@8.5.2` · `@capacitor/splash-screen@8.0.2`
    អាជ្ញាប័ណ្ណ      : MIT License
-   កម្មសិទ្ធិ       : Copyright (c) 2017-present Drifty Co. ·
+   កម្មសិទ្ធិ       : Copyright (c) 2025 Ionic (synapse) · Copyright (c) 2017-present Drifty Co. ·
                      Copyright 2020-present Ionic
    គេហទំព័រ        : https://github.com/ionic-team/capacitor ·
                      https://github.com/ionic-team/capacitor-plugins
@@ -118,6 +130,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
    @capgo/capacitor-printer 8.1.4
 -------------------------------------------------------------------------------
    ឯកសារដែល ship  : chunk `native-plugins` ក្នុង dist/assets/ · App Android (APK)
+   កញ្ចប់ npm      : `@capgo/capacitor-native-biometric@8.7.0` · `@capgo/capacitor-printer@8.1.4`
    តួនាទី          : ចូលដោយក្រយៅដៃ/មុខ · បោះពុម្ព លើ App Android
    អាជ្ញាប័ណ្ណ      : Mozilla Public License 2.0 (MPL-2.0)
    កម្មសិទ្ធិ       : Capgo (Cap-go)

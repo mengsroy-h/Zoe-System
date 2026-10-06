@@ -1863,6 +1863,9 @@
     "ZoeW/tests/zto-signed-truncation.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-signed-past-range.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-signed-cadence.test.tsx": {
       "policy": "zoew-self-verification"
     },

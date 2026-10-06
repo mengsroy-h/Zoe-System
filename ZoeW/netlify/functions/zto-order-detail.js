@@ -1874,7 +1874,7 @@ async function handleRequest(event) {
             });
         }
         plan = signedOnly
-            ? listPlan(config, site.code, range, page, 'signed')
+            ? listPlan(config, site.code, String(query.exact || '') === '1' ? range : listSignedRange(range), page, 'signed')
             : listPlan(config, site.code, range, page, 'arrival');
         if (!signedOnly && config.list.signedType && String(query.withSigned || '') === '1') {
             companion = listPlan(config, site.code, listSignedRange(range), page, 'signed');

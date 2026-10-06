@@ -272,7 +272,7 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?) {
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
-    const extra = mode === 'signed' ? '&signed=1' : (mode === 'withSigned' ? '&withSigned=1' : '');
+    const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1' : (mode === 'withSigned' ? '&withSigned=1' : ''));
     return base + '?list=1'
         + '&from=' + encodeURIComponent(from)
         + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra;
@@ -821,7 +821,7 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
 }
 
 export async function fetchZtoSignedPages(cfg, from, to) {
-    const first = await fetchZtoListPage(cfg, from, to, 1, 'signed');
+    const first = await fetchZtoListPage(cfg, from, to, 1, 'signedExact');
     if (!first) return null;
     if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false, partial: false };
     const codes = first.signed.slice();
@@ -830,7 +830,7 @@ export async function fetchZtoSignedPages(cfg, from, to) {
     const pages = isFinite(reported) && reported > 0 ? reported : 1;
     const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
     const work = [];
-    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
+    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signedExact').catch(() => null));
     const more = await Promise.all(work);
     let partial = false;
     for (let i = 0; i < more.length; i++) {

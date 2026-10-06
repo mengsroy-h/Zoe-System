@@ -2577,14 +2577,20 @@ function firstBody(requests) {
     ok('⛔ `signed=1` ➜ `rows: []` · `signedOk:true` · barcode ចុះហត្ថលេខា',
         rowsOf(onlySigned.body).length === 0 && onlySigned.body.signedOk === true && Array.isArray(onlySigned.body.signed)
         && onlySigned.body.signed.indexOf('77130500002101') !== -1, onlySigned.body);
-    // ⛔ E3 ៖ ជុំបិទតាម ZTO បំបែកបញ្ជីវែង (លើសពិដានទំព័រ) ជាថ្ងៃៗ ➜ `signed=1` ត្រូវគោរពជួរដែលសុំ (មិនពង្រីកដល់ថ្ងៃនេះ) ·
-    //    companion (`withSigned=1`) នៅពង្រីកដដែល (ការបិទកើតក្រោយមកដល់)។
+    // ⛔ E3 ៖ ជុំបិទតាម ZTO បំបែកបញ្ជីវែង (លើសពិដានទំព័រ) ជាថ្ងៃៗ ➜ `signed=1&exact=1` គោរពជួរដែលសុំ (មិនពង្រីកដល់ថ្ងៃនេះ)។
+    // ⛔ F1 ៖ `signed=1` ធម្មតា (ទំព័រ «ចុះហត្ថលេខា» បន្ថែមរបស់ប្រអប់បញ្ជី) ពង្រីកដល់ថ្ងៃនេះ **ដូច companion** (`withSigned=1`) ➜ ទំព័រ ២–៣
+    //    អានបញ្ជីដដែលនឹងទំព័រ ១។ មុនកែ ៖ ទំព័របន្ថែមអាន `from..to` (បញ្ជីផ្សេង) ➜ ភស្តុតាងក្រោយ `to` បាត់ស្ងាត់ពេល «ដល់ថ្ងៃ» < ថ្ងៃនេះ។
     const dayBefore = new Date(Date.parse(todayKey + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
-    const oneDay = await typedCall(GOOD_LIST_ENV, { signed: '1', from: dayBefore, to: dayBefore });
+    const oneDay = await typedCall(GOOD_LIST_ENV, { signed: '1', exact: '1', from: dayBefore, to: dayBefore });
     const oneDayCond = (oneDay.requests[0] && bodyAt(oneDay.requests[0]) && bodyAt(oneDay.requests[0]).condition) || {};
-    ok('⛔ E3 ៖ `signed=1` គោរពជួរថ្ងៃដែលសុំ (ការបំបែកតាមថ្ងៃ) ➜ មិនពង្រីកដល់ថ្ងៃនេះ',
+    ok('⛔ E3 ៖ `signed=1&exact=1` គោរពជួរថ្ងៃដែលសុំ (ការបំបែកតាមថ្ងៃ) ➜ មិនពង្រីកដល់ថ្ងៃនេះ',
         oneDay.requests.length === 1 && oneDayCond.scanStartTime === dayBefore + ' 00:00:00' && oneDayCond.scanEndTime === dayBefore + ' 23:59:59',
         [oneDayCond.scanStartTime, oneDayCond.scanEndTime]);
+    const extended = await typedCall(GOOD_LIST_ENV, { signed: '1', from: dayBefore, to: dayBefore, page: '2' });
+    const extendedCond = (extended.requests[0] && bodyAt(extended.requests[0]) && bodyAt(extended.requests[0]).condition) || {};
+    ok('⛔ F1 ៖ `signed=1` (ទំព័របន្ថែមរបស់ប្រអប់បញ្ជី) ពង្រីកដល់ថ្ងៃនេះដូច companion ➜ ទំព័រទាំងអស់អានបញ្ជីដដែល',
+        extended.requests.length === 1 && extendedCond.scanStartTime === dayBefore + ' 00:00:00' && extendedCond.scanEndTime === todayKey + ' 23:59:59',
+        [extendedCond.scanStartTime, extendedCond.scanEndTime]);
     // ⛔ ល្បឿន «បិទតាម ZTO» (របាយការណ៍ម្ចាស់ ៖ «sync យឺត») ៖ cache `signed=1` ≤ LIST_SIGNED_CACHE_TTL_MAX_MS (១៥ វិ.) — ជុំរៀងរាល់ ២០ វិ.
     //    មិនត្រូវទទួលចម្លើយចាស់ ៦០ វិ. · ទិសផ្ទុយ ៖ ៥ វិ. ➜ នៅ cache (ឧបករណ៍ច្រើននៃសាខាតែមួយចែកគ្នា) · បញ្ជីធម្មតានៅ ៦០ វិ.។
     const twoBefore = new Date(Date.parse(todayKey + 'T00:00:00Z') - 2 * 86400000).toISOString().slice(0, 10);
@@ -3096,8 +3102,11 @@ function firstBody(requests) {
 
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
     const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
-    ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',
-        urlFn.indexOf("'&withSigned=1'") !== -1 && urlFn.indexOf("'&signed=1'") !== -1, urlFn.slice(0, 300));
+    ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` · `signed=1` · `signed=1&exact=1`',
+        urlFn.indexOf("'&withSigned=1'") !== -1 && urlFn.indexOf("'&signed=1'") !== -1 && urlFn.indexOf("'&signed=1&exact=1'") !== -1, urlFn.slice(0, 300));
+    const signedPagesFn = extractFn(APP_SRC, 'fetchZtoSignedPages') || '';
+    ok('⛔ E3/F1 ៖ ការអានរបស់ជុំបិទតាម ZTO (`fetchZtoSignedPages`) សុំជួរពិត (`signedExact`) គ្រប់ទំព័រ · ទំព័របន្ថែមរបស់ប្រអប់បញ្ជីប្រើ `signed`',
+        (signedPagesFn.match(/'signedExact'/g) || []).length === 2 && signedPagesFn.indexOf("'signed')") === -1, signedPagesFn.slice(0, 400));
     const allPagesFn = extractFn(APP_SRC, 'fetchZtoListAllPages') || '';
     ok('⛔ client ៖ ទំព័រ ១ ជាមួយ `withSigned` · ទំព័របន្ទាប់ស្របគ្នា (`Promise.all`)',
         /fetchZtoListPage\([^)]*1, 'withSigned'\)/.test(allPagesFn) && allPagesFn.indexOf('Promise.all(') !== -1, allPagesFn.slice(0, 200));

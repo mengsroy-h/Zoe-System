@@ -47,8 +47,8 @@
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
 1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 merge រួច (`main` = **ZoeW 2.50.0 · ZoeKeyGen 2.24.6** · Deep audit ជុំ ១–៣ · LICENSE · ZTO) · PR #292 =
-   **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] · [2.50.0] · [2.49.6] · [2.49.5] · [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
-   «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
+   **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
+   ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
 2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · មួយជុំក្នុងមួយ session (PR តែមួយ · commit ម្តងមួយចំណុច) · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
@@ -67,87 +67,41 @@
    ⏭️ **ជុំ ៤ សុវត្ថិភាព** ពី `main` ក្រោយ PR #292 merge។ ⛔ **គ្មាន workflow · គ្មាន agent** ដោយគ្មានការអនុញ្ញាតម្ចាស់គម្រោងក្នុង session (ទោះមានការរំលឹក
    ultracode ៖ ជុំនេះ workflow ពិនិត្យប្រឆាំង ១ រត់ដោយគ្មានការអនុញ្ញាតមុន ➜ ពិត ១៦ · លុយ ៣ · ម្ចាស់គម្រោងអនុញ្ញាតឲ្យបន្តរហូតចប់) · ⚠️ មុន CI ក្នុង session ៖
    `git fetch --unshallow origin` · ច្បាប់ចម្លង repo សម្រាប់វាស់ស្របគ្នា ត្រូវនៅក្រៅ `/tmp/claude-0` (Postgres ពិតរត់ជាអ្នកប្រើមិនមែន root)។
-   **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
+   **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥) ·
+   ZoeKeyGen គ្មានការវាស់ភាពរស់ «ងាប់ស្ងាត់» ដូច ZoeW (ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយ ➜ ជុំ ២ ឬ ៤)។
    ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏳ **ម្ចាស់គម្រោង ៖ មុនប្តូរ repo ជា Public** (LICENSE · NOTICE រួចក្នុង PR #288 · ផ្នែក ២ «LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ») ៖ merge PR #288 មុន
    (LICENSE ថ្មី) · GitHub Settings ➜ Code security ➜ បើក **Secret scanning** + **Push protection** · អ៊ីមែល commit ចាស់នឹងលេច (កំណត់ «Keep my email addresses
    private» សម្រាប់ commit ថ្មី) · `CLAUDE.md`/`docs/` ពិពណ៌នាការការពារលម្អិត (ការការពារពិតនៅ Server ➜ មិនមែនរន្ធ តែជាព័ត៌មានដល់អ្នកវាយប្រហារ) ·
-   ផ្ទៀង sign-up បិទក្នុង Supabase + Firebase គ្រប់ Project (ផ្នែក ១ [2.49.5] «ផ្ទៀងដោយដៃ») · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ (អ្នកណាក៏ clone បាន) ·
+   ✅ sign-up បិទក្នុង Supabase + Firebase (ម្ចាស់គម្រោង 2026-10-06) · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ (អ្នកណាក៏ clone បាន) ·
    ការអនុវត្តផ្លូវច្បាប់ ➜ ពិគ្រោះមេធាវី។
 4. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
-5. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
+5. សាកលើ iPhone/Android ពិត ៖ នៅសល់តែ [2.50.1] (បញ្ជី ⏳ ខាងក្រោម) · ✅ ធាតុ 2.45.x ➜ 2.50.0 ទាំងអស់ ម្ចាស់គម្រោងសាករួច (2026-10-06 ៖ Supabase លើឧបករណ៍ពិត ·
+   ⚙️ ភ្ជាប់ប្រព័ន្ធ · Push · បណ្តាញ «ងាប់ស្ងាត់» · Airplane · ខ្សែរមូរ · ប៊ូតុងខល · `tools/firebase-provision` · Sentry `zone:money` · rules 2.45.4)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
 ⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
 
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **Supabase (ZoeW 2.46.0 · ZoeKeyGen 2.23.0) — merge រួច (PR #276) · ✅ ម្ចាស់គម្រោង ៖ «Supabase ដំណើរការហើយ»** ៖ សកម្មភាពដោយដៃ
-  (Project · migration ៣ · Admin · Edge Function + secrets · Netlify env · ហាងដំបូង) នៅ `docs/HISTORY.md` ផ្នែក ១ [2.46.0] ·
-  ការដំឡើង ៖ [`supabase/README.md`](../supabase/README.md)។ ⏳ សាកលើ iPhone + Android ពិត ៖ ចុះឈ្មោះ · ចូល · ស្កេន · ក្រៅបណ្តាញ ➜ ភ្ជាប់វិញ ·
-  ឧបករណ៍ ២ ក្នុងហាងដដែល · ភ្លេចពាក្យសម្ងាត់ · ហាងបិទ ➜ ចាកចេញ។ **ចំណុចបើក** (សម្រេចជាមួយម្ចាស់គម្រោង) ៖ (១) **Push** ៖ ចងនឹងគណនីហាងរួច
-  (ZoeW 2.47.1) ➜ ⏳ សាកលើឧបករណ៍ពិត ·
-  (២) **Egress Free 5 GB/ខែ** ៖ ✅ cache `zoe_docs` ក្នុង IndexedDB (2.49.0 · ទាញតែ delta) ➜ ⏳ migration `20261003180000` · Dashboard ➜ Reports ➜ egress ·
-  (៣) **ផ្ទេរទិន្នន័យអតិថិជនចាស់** Firebase ➜ Supabase ៖ ✅ CLI `tools/supabase-migrate/` (dry-run លំនាំដើម) ➜ ⏳ សាកលើហាងសាកល្បងមុន ·
-  (៤) ✅ ម្ចាស់គម្រោងសម្រេច (2026-10-03) ៖ ដក chunk `supabase-backend` (~២៤១ KB) ចេញពីហាង Firebase ➜ ធ្វើរួចក្នុង 2.49.0 (ក្រុម install ដាច់ ·
-  ហាង Supabase នៅបើកក្រៅបណ្តាញបាន · ឧបករណ៍ទាំងអស់ទាញវា **១ ដងចុងក្រោយ** ពេលផ្លាស់ពី SW ចាស់)។
-  ការទាញ SDK Firebase ពេល Config ជា Supabase ៖ merge រួច (PR #279) ➜ ⏳ សាកលើឧបករណ៍ពិត។
-- ⏳ **ZoeW 2.47.0 · ZoeKeyGen 2.24.0 — merge រួច (PR #277)** — សាកលើឧបករណ៍ពិត ៖
-  ⚙️ ភ្ជាប់ប្រព័ន្ធ (QR រូបភាព · បិទភ្ជាប់ Link · ជ្រើស Supabase) · toast «Supabase» · toast បណ្តាញរស់ (បិទ WiFi ➜ បើកវិញ ➜ ✅) · icon ថ្មី (ដំឡើងម្តងទៀត) ·
-  ZoeKeyGen ៖ Tab ទូរស័ព្ទ · Signing Key ផុត ១៥ នាទី (លម្អិត ៖ `docs/HISTORY.md` [2.47.0])។
-- ⏳ **ZoeW 2.47.1 · ZoeKeyGen 2.24.1 — merge រួច (PR #278)** — សាកលើឧបករណ៍ពិត ៖ ហាង Supabase ➜ 🔔 បើកការជូនដំណឹង
-  (គ្មាន Activation Key · ទូរស័ព្ទ ២ ក្នុងហាងដដែលទទួលការរំលឹកម៉ោង ៨) · រក្សាទុក Config Supabase ➜ គ្មានប្រអប់ចូលប្រព័ន្ធលេចមួយភ្លែត ·
-  ZoeKeyGen ៖ ក្រយៅដៃ/មុខលើ Android (Chrome · Google Password Manager) · QR ចំកណ្តាល + 💾 រក្សាទុក QR (លម្អិត ៖ `docs/HISTORY.md` [2.47.1])។
-- ⏳ **ZoeW 2.48.1 — PR #280 merge រួច** — ហាង Supabase ៖ ទុក App បើកលើ WiFi ដែលដក cable អ៊ីនធឺណិតពី router
-  លើសពី ១ ម៉ោង (token ផុត) ➜ ដោតវិញ ➜ ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ខ្លួនឯង (មិនបិទបើក App) · ចូលប្រព័ន្ធពេលបណ្តាញព្យួរ ➜ សារ «ភ្ជាប់ Server មិនបានទេ»
-  ក្នុងប្រហែល ១៥–៣០ វិ.។ 🔔 បង្ហាញតែសារកំណែ 2.48.1 មួយ។
-- ⏳ **ZoeW 2.48.0 · ZoeKeyGen 2.24.2 — merge រួច (PR #279)** — Supabase ៖ ✅ migration `20261002000100` (SECURITY DEFINER ➜ schema `private`)
-  អនុវត្តរួច · `register`/`reset-password` deploy រួច · Security Advisor សល់តែ «Leaked Password Protection» (Pro)។
-  សាកលើឧបករណ៍ពិត ៖ Reconfig Setup Link ដដែល ➜ ប្រអប់ចូល · ប្តូរ Config Firebase ⇄ Supabase · 🩺 License/ZTO · ZoeKeyGen ការកែ Key ពេលអ៊ីនធឺណិតយឺត
-  (លម្អិត ៖ `docs/HISTORY.md` [2.48.0])។
-- ⏳ **ZoeW 2.49.0 · ZoeKeyGen 2.24.3 — merge រួច (PR #282 · រួម PR #281)** — សាកលើឧបករណ៍ពិត ៖
-  ចងចាំពាក្យសម្ងាត់ (ធីក/ដកធីក · ផុត ៤ ម៉ោង · ចាកចេញ) · ខ្សែរមូរលើ iPhone PWA + APK (⛔ PTR/ចលនាផ្ទាំងនៅដដែល) · modal ZoeKeyGen លើ tablet/desktop ·
-  ចុះឈ្មោះ Supabase ដែលដាច់កណ្តាលទី · 🔔 «📤 កញ្ចប់ដែលដករួច» ក្រោយការសម្អាតផុតកំណត់ (លម្អិត ៖ [2.49.0])។
-- ⏳ **ZoeW 2.50.1 — PR #292 (មិនទាន់ merge · ជុំ ZTO ស្អាត)** — តាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» ១–៧ ៖ ⛔ **Publish Firebase rules** (`origins` ·
-  `zoew_settings/zto_signed_sweep`) គ្រប់ Project · migration Supabase `20261006192639_zoe_rules.sql` ចូល live ពេល merge · Deploy ZoeW ➜ APK ➜ សាកលើទូរស័ព្ទពិត ៖
+- ⏳ **ZoeW 2.50.1 — PR #292 (មិនទាន់ merge · ជុំ ZTO ស្អាត)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ Publish Firebase rules (`origins` · `zoew_settings/zto_signed_sweep`) ·
+  Deploy ZoeW · build APK ថ្មី ➜ ⏳ នៅសល់ ៖ migration Supabase `20261006192639_zoe_rules.sql` ចូល live ពេល merge (GitHub integration ➜ ផ្ទៀង version ក្រោយ merge) ·
+  សាកលើទូរស័ព្ទពិត តាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» ៣–៧ ៖
   (១) កញ្ចប់ ៨ ថ្ងៃដែល ZTO Palm ចុះហត្ថលេខា ➜ បិទ/បើក App ➜ «យករួច» មិនមែន «ផុតកំណត់» · កញ្ចប់ ៨ ថ្ងៃមិនទាន់យក ➜ «ផុតកំណត់» ក្នុង ≤ ៣០ នាទី ·
   (២) ហាងមានទូរស័ព្ទ ២ (B មិនបើក ZTO) ➜ B មិនដកលុយមុន A អានបញ្ជី · (៣) ចុះហត្ថលេខាលើ ZTO Palm ពេលកំពុងស្កេន ➜ ZoeW បិទក្នុង ~២០–៦០ វិ. ·
   ១ សប្តាហ៍ក្រោយ ៖ Netlify ➜ Usage ➜ Functions · (៤) ប្រអប់បញ្ជី ZTO ៖ «🔒 ថ្មីដែល ZTO បិទរួច» · `?diag=1` ➜ `list.signedEnabled: true` ·
   (៥) ប្រភព 🇨🇳/🇻🇳 ក្នុងប្រវត្តិ · «កញ្ចប់សរុប» បើកបញ្ជី · ទូរស័ព្ទតូច ៖ ប៊ូតុងខល/បិទ មិនជាន់ · (៦) ស្កេន ៖ barcode ក្រៅទម្រង់ ➜ «⚠️ Barcode នេះមិនមែនទម្រង់ ZTO» ·
   កញ្ចប់គ្មានលេខ ➜ ជួរ «គ្មានលេខ» មួយក្នុងមួយកញ្ចប់ · (៧) ពិនិត្យជួរប្រវត្តិចាស់ phone `0`/`000` ដែល «ចំនួន» > ១ ➜ កែដោយដៃ។
-- ⏳ **ZoeW 2.50.0 — merge រួច (PR #291)** — ZTO ៖ ✅ ន័យ «ចុះហត្ថលេខា = បិទ» បញ្ជាក់រួច · ✅ payload ពិត Argus `05` (E8 · [2.50.1]) · ⏳ ប្រអប់បញ្ជីបង្ហាញ
-  «🏢 សាខា ៖ …» (តាម [2.50.0] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ»)។
-- ⏳ **ZoeW 2.49.2 ➜ 2.49.6 · ZoeKeyGen 2.24.4 ➜ 2.24.6 — merge រួច (PR #284 · #285 · #288 · #290)** — តាម [2.49.6] … [2.49.2] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» ៖
-  **Sentry** Alert rule `zone:money` ឡើងវិញ ([2.49.2]) · ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ QR/Setup Link ➜ ភ្ជាប់ភ្លាម · checkbox គ្មានការ៉េ · logo/ពណ៌ Firebase/Supabase · @mengsroyhun ➜ ត្រឡប់មក
-  ប្រអប់ដដែល ([2.49.6] · [2.49.5]) · APK Push ក្រោយ ៤ ម៉ោង ➜ «បើករួច» · ឧបករណ៍ថ្មី + Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ([2.49.5]) · ហាង Supabase ក្រៅបណ្តាញ ➜
-  នៅក្នុងប្រព័ន្ធ · ចាកចេញក្រៅបណ្តាញ ~៣ វិ. ([2.49.4]) · «ចងចាំពាក្យសម្ងាត់» ក្រោយ ៥–៧ ម៉ោង ➜ ចំនួនកញ្ចប់ត្រូវ ([2.49.3]) · Airplane ភ្លាមក្រោយ «ដក» ➜ កញ្ចប់មិនបាត់ ([2.49.2]) ·
-  ⚠️ **sign-up បិទ** ក្នុង Supabase + Firebase គ្រប់ Project ([2.49.5] «ផ្ទៀងដោយដៃ»)។
-- ⏳ **ZoeW 2.49.1 — merge រួច (មាននៅក្នុង `main`)** — APK + iPhone PWA ៖ ទាញប្រអប់ប្រវត្តិចុះក្រោយរមូរ ➜ ខ្សែរមូរបាត់ភ្លាម (លម្អិត ៖ [2.49.1])។
 - ✅ **សេចក្តីសម្រេច៖ ZoeW គាំទ្រ backend ទាំង២តាមជម្រើសអតិថិជន — Firebase និង Supabase**។ ការសាង Supabase មិនមែនជាការបិទ Firebase ទេ។
   ត្រូវរក្សាផ្លូវ Config/Login, SDK, rules, provisioning, backup និងឯកសារដែលអតិថិជន Firebase ត្រូវការ។ CLI ផ្ទេរទិន្នន័យជាជម្រើសសម្រាប់អ្នកចង់ប្តូរ backend។
   ការសម្អាតអាចលុបតែកូដដែលបញ្ជាក់ថាមិនប្រើដោយ backend ទាំង២ និងមុខងាររួម។
-
-- ⏳ **`tools/firebase-provision/` ៖ ការរត់លើកដំបូងលើគណនី Google ពិត** — checker រត់ `firebase-tools` ពិតទល់ Google **ក្លែង** តែប៉ុណ្ណោះ
-  (session នេះហៅ Google ពិតមិនបាន) ➜ ម្ចាស់គម្រោង ៖ `setup.cmd` ➜ `new-customer.cmd --branch <សាខាសាកល្បង> --user test` ➜ ត្រូវ exit 0 (គ្មាន `FAIL` · `WARN`)
-  ➜ Login ក្នុង ZoeW ដោយគណនីនោះ។ បន្ទាប់មក `new --project-id <id> --branch <សាខា> --adopt` សម្រាប់អតិថិជនចាស់ម្នាក់ៗ ➜ `deploy-rules.cmd` គ្របពួកគេ។
-  ⛔ Function ZTO អាន `FIREBASE_PROJECT_IDS` បានត្រឹម `PROJECT_ID_MAX` (លើស ➜ មុខងារបញ្ជីបិទសម្រាប់ទាំងអស់គ្នា)។
-- ⏳ **Publish rules ទាំង ២ (ZoeW 2.45.4 ៖ node ដែលរំពឹង object)** — `firebase-database.rules.json` ➜ Business Project · `ZoeKeyGen/firebase-database.rules.json`
-  ➜ License Project (Firebase Console ➜ Realtime Database ➜ Rules ➜ paste ➜ Publish)។ លំដាប់ Deploy/Publish មិនសំខាន់ ៖ App ចាស់/ថ្មីមិនសរសេរ primitive ទេ
-  (ការសរសេរពិតរបស់ App ៩៥៥ replay លើ rules ចាស់ និងថ្មី ➜ បដិសេធ **០ / ០** · `emu/app-writes-rules` ចាក់សោវារាល់ការរត់)។ ក្រោយ Publish ៖ សាក «កំណត់ទូ Locker» · បិទ/បើក · ដក · ស្តារ · ZoeKeyGen បង្កើត/Extend Key ម្តង។
-- ⏳ **2.45.7 (ZoeW) ៖ Deploy + build APK ថ្មី ហើយសាកការតភ្ជាប់ «ងាប់ស្ងាត់» លើឧបករណ៍ពិត** — ដក cable អ៊ីនធឺណិតពី router (WiFi នៅ) ➜ ក្នុង ~១ នាទី
-  ចំណុចស្ថានភាពឈប់បៃតង (ឬ ~២៥ វិ. ក្រោយស្កេនដែលព្យួរ) ➜ ដោតវិញ ➜ បៃតងវិញខ្លួនឯង + ទិន្នន័យពីឧបករណ៍ផ្សេងមកដល់ · 🩺 ជួរ Firebase ❌ ពេល Server មិនឆ្លើយ។
-  ⛔ ZoeKeyGen **មិនទាន់មាន** ការវាស់ភាពរស់នេះ (ឧបករណ៍ admin ៖ ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយដូចគ្នា)។
-- ⏳ **2.45.5 (ZoeW) · 2.22.1 (ZoeKeyGen) ៖ Deploy ទាំង ២ site + build APK ថ្មី** — CSP ថ្មី (`connect-src` + `https://www.gstatic.com`) មកជាមួយ
-  `netlify.toml` ក្នុង deploy ដដែល · សិទ្ធិ `ACCESS_NETWORK_STATE` ចូលតែតាម **APK ថ្មី**។ សាកលើឧបករណ៍ពិត ៖ APK បើក Airplane mode ➜ ចំណុចស្ថានភាព
-  ប្តូរជា «ក្រៅបណ្ដាញ» ក្នុងប៉ុន្មានវិនាទី (មុននេះ «កំពុងភ្ជាប់…» ~៣៥ វិ.) · បិទ Airplane ➜ «ភ្ជាប់ Server រួចរាល់» វិញភ្លាម · 🩺 ជួរ «អ៊ីនធឺណិត»
-  និយាយត្រូវ · បិទ Push លើ APK ខណៈអ៊ីនធឺណិតអន់ ➜ ដំណឹងពីអ្នកលក់លើកក្រោយ **មិនលោត**។ ⛔ ការវាស់ WebView ពិតធ្វើមិនបាននៅទីនេះ (គ្មាន Android SDK)។
-- ⏳ **2.45.4 ៖ ប៊ូតុង «ខលម្តងទៀត» ភ្លឹប ៥.៥ ជុំ រួចនៅក្រហមជាប់** (ជំនួសការភ្លឹបជារៀងរហូត ➜ អេក្រង់ចុះ Hz បាន · សន្សំថ្ម) — ម្ចាស់គម្រោងត្រូវមើលលើទូរស័ព្ទពិតថាសញ្ញានៅច្បាស់គ្រប់គ្រាន់។
-  ⛔ បើចង់បានការភ្លឹបជាប់វិញ ➜ ជាការសម្រេចរបស់ម្ចាស់គម្រោង (ថ្លៃ ៖ main thread គូរ ~៦០ ស៊ុម/វិ. ពេលមានជួរដេកនោះ) · `perf-check` ចាក់សោវាឥឡូវ។
-- ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
+- ⏳ **`tools/supabase-migrate/` (ជម្រើស · តែពេលអតិថិជន Firebase ចង់ប្តូរ)** ៖ dry-run (លំនាំដើម) លើហាងសាកល្បងមុនផ្ទេរទិន្នន័យពិត។
+- ⏳ **Backup ស្វ័យប្រវត្តិ — ម្ចាស់គម្រោងមិនទាន់ដាក់ (ពន្យារដោយចេតនា)** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](../firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·
   backup ឈប់ស្ងាត់ ➜ ពិនិត្យ **Actions** មុន (GitHub ផ្អាក schedule ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ)។
-  ⛔ វាស់បាន (2026-09-29) ៖ run តាមកាលវិភាគ #21–#25 ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា Actions) ➜ **គ្មាន backup ណាមួយត្រូវបានបង្កើតទេ**។
+  ⛔ វាស់បាន (2026-10-06) ៖ run #28–#30 «success» តែជំហាន «ពិនិត្យ secret» ➜ ទាញ/អ៊ិនគ្រីប/artifact **រំលង** (artifact ០) · #31 ធ្លាក់គ្មាន runner ➜
+  **«success» មិនមែន backup ទេ · គ្មាន backup ណាមួយត្រូវបានបង្កើតឡើយ**។
 - ✅ **Sentry event ពី barcode តេស្ត (`ZTO_UPSTREAM_REJECTED`) — អ្នកប្រើសម្រេចថាមិនកែ** (កញ្ចប់តេស្តដែលគ្មានក្នុង ZTO)។
   ⛔ កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់ (បាំងការដាច់ ZTO ពិត) — មើលជួរ `ZTO_UPSTREAM_REJECTED` ក្នុងតារាងស្នូល · `lookupReason: ""`
   ក្នុង breadcrumb **មិនមែនកំហុស** (client អាន `reason` តែលើផ្លូវ `ZTO_CONFIG_INVALID`)។

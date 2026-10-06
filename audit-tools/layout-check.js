@@ -101,12 +101,14 @@ const HISTORY_ROW_PROBE = async (big) => {
         createdAt: Date.now(), cod: 3, dod: 0, count: 3, isClosed: false,
         barcodes: [1, 2, 3].map((j) => ({ code: 'ZT' + id + '00' + j, cod: 1, dod: 0, isClosed: false })) }, extra, origins ? { origins } : {});
     const kinds = [
-        ['A', {}, null],
-        ['B', {}, { ZTB001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ', ZTB002: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }],
+        ['A', { dod: 2.5, barcodes: [1, 2, 3].map((j) => ({ code: 'ZTA00' + j, cod: 1, dod: j === 1 ? 2.5 : 0, isClosed: false })) }, null],
+        ['B', { cod: 1234.56, barcodes: [1, 2, 3].map((j) => ({ code: 'ZTB00' + j, cod: j === 1 ? 1232.56 : 1, dod: 0, isClosed: false })) },
+            { ZTB001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ', ZTB002: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }],
         ['C', { isCalled: true }, { ZTC001: 'Shopee SHPE' }],
         ['D', { isCalled: true, isClosed: true }, { ZTD001: 'Shopee SHPE', ZTD002: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }],
         ['E', { isCalled: true, callMark: 'wrong-number' }, { ZTE001: LONG }],
-        ['F', { isCalled: true, callMark: 'no-answer' }, { ZTF001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]
+        ['F', { isCalled: true, callMark: 'no-answer', cod: 987.65, dod: 245.5, barcodes: [1, 2, 3].map((j) => ({ code: 'ZTF00' + j, cod: j === 1 ? 985.65 : 1, dod: j === 2 ? 245.5 : 0, isClosed: false })) },
+            { ZTF001: 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]
     ];
     const extra = big ? Array.from({ length: 114 }, (_, i) => mk('G' + i, i % 3 ? {} : { isCalled: true, callMark: i % 2 ? 'no-answer' : 'wrong-number' }, null)) : [];
     const plain = kinds.map(([id, x]) => mk(id, x, null)).concat(extra);
@@ -122,12 +124,46 @@ const HISTORY_ROW_PROBE = async (big) => {
         return Array.from(document.querySelectorAll('#historyTableBody tr[data-id]'));
     };
     const widthsOf = (rows) => rows.map((tr) => Array.from(tr.children).map((td) => Math.round(R(td).width)).join(','));
+    const contentBox = (el) => {
+        const r = R(el), cs = getComputedStyle(el);
+        return { left: r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft), right: r.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight) };
+    };
+    const textBoxes = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return Array.from(rg.getClientRects()).filter((q) => q.width > 0.5); };
+    const lineSkew = (cell, boxes) => {
+        const box = contentBox(cell);
+        const lines = new Map();
+        boxes.forEach((q) => {
+            const key = Math.round((q.top + q.bottom) / 2);
+            const near = Array.from(lines.keys()).find((k) => Math.abs(k - key) <= 3);
+            const at = near === undefined ? key : near;
+            const line = lines.get(at) || { left: Infinity, right: -Infinity };
+            line.left = Math.min(line.left, q.left);
+            line.right = Math.max(line.right, q.right);
+            lines.set(at, line);
+        });
+        if (!lines.size) return Infinity;
+        return Math.max(...Array.from(lines.values()).map((l) => Math.abs((l.left - box.left) - (box.right - l.right))));
+    };
+    const rowSkew = (cell, boxes) => {
+        const box = contentBox(cell);
+        const groups = [];
+        boxes.slice().sort((a, b) => a.top - b.top).forEach((q) => {
+            const g = groups.find((x) => Math.min(x.bottom, q.bottom) - Math.max(x.top, q.top) > 0.5);
+            if (g) { g.left = Math.min(g.left, q.left); g.right = Math.max(g.right, q.right); g.top = Math.min(g.top, q.top); g.bottom = Math.max(g.bottom, q.bottom); }
+            else groups.push({ left: q.left, right: q.right, top: q.top, bottom: q.bottom });
+        });
+        if (!groups.length) return Infinity;
+        return Math.max(...groups.map((l) => Math.abs((l.left - box.left) - (box.right - l.right))));
+    };
     const plainRows = await paint(plain);
     const plainWidths = widthsOf(plainRows);
     const plainHeights = plainRows.map((tr) => R(tr).height);
     const rows = await paint(rich);
+    const head = document.querySelector('.history-table thead th:nth-child(3)');
     const out = { rows: rows.length, oldButtons: document.querySelectorAll('#historyTableBody .btn-view-list').length,
-        widthsChanged: widthsOf(rows).filter((w, i) => w !== plainWidths[i]).length, rowList: [] };
+        widthsChanged: widthsOf(rows).filter((w, i) => w !== plainWidths[i]).length, rowList: [],
+        headText: head ? head.textContent : null, headSkew: head ? Math.round(lineSkew(head, textBoxes(head)) * 10) / 10 : null,
+        colSkew: head ? Math.round(Math.abs((R(head).left + R(head).right) / 2 - (R(head.parentElement).left + R(head.parentElement).right) / 2) * 10) / 10 : null };
     const limit = big ? Math.min(rows.length, 12) : rows.length;
     for (let i = 0; i < limit; i++) {
         const tr = rows[i];
@@ -153,6 +189,15 @@ const HISTORY_ROW_PROBE = async (big) => {
             buttonsHitPrice: btns.some((x) => priceEls.some((e) => cut(R(x), R(e)))),
             buttonsInCell: btns.every((x) => R(x).left >= R(actTd).left - 0.5 && R(x).right <= R(actTd).right + 0.5),
             buttonsOneLine: new Set(btns.map((x) => Math.round(R(x).top))).size === 1,
+            buttonPad: btns.map((x) => { const cs = getComputedStyle(x); return cs.paddingLeft + '/' + cs.paddingRight + '/' + Math.round(R(x).height); }).join(' '),
+            buttonsFull: btns.length > 0 && btns.every((x) => { const cs = getComputedStyle(x); return cs.paddingLeft === '10px' && cs.paddingRight === '10px' && R(x).height >= 37.5; }),
+            priceInCell: Array.from(priceTd.querySelectorAll('.price-stack *')).every((e) => { const q = R(e); return q.width < 0.5 || (q.left >= R(priceTd).left - 0.5 && q.right <= R(priceTd).right + 0.5); })
+                && Array.from(priceTd.querySelectorAll('.price-figures > *')).flatMap(textBoxes).every((q) => q.left >= R(priceTd).left - 0.5 && q.right <= R(priceTd).right + 0.5),
+            moneyWhole: Array.from(priceTd.querySelectorAll('.price-figures strong')).every((e) => new Set(Array.from(e.getClientRects()).map((q) => Math.round((q.top + q.bottom) / 2))).size === 1),
+            bigMoney: /1234\.56|987\.65/.test(priceTd.textContent),
+            priceSkew: Math.round(Math.max(
+                rowSkew(priceTd, Array.from(priceTd.querySelectorAll('.price-stack > *')).map(R)),
+                ...Array.from(priceTd.querySelectorAll('.price-figures')).map((f) => lineSkew(f, Array.from(f.children).flatMap(textBoxes)))) * 10) / 10,
             fixPhone: !!actTd.querySelector('.fix-phone-btn'),
             numberHitsCustomer: custLeaves.some((e) => cut(numBox, R(e))),
             grew: Math.round(R(tr).height - plainHeights[i])
@@ -203,11 +248,30 @@ async function historyRowLayout(browser, port) {
         '⛔ ZoeW ជួរប្រវត្តិ ៖ គ្មានធាតុណាបាំង «កញ្ចប់សរុប» (elementFromPoint គែមឆ្វេង · កណ្តាល · គែមស្តាំ គ្រប់ទទឹង)', show(rowsOf((r) => !r.badgeClear)));
     check(rowsOf((r) => !r.buttonsClear || r.buttonsHitPrice).length === 0,
         '⛔ ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ មិនជាន់ធាតុណាក្នុងក្រឡាតម្លៃ ហើយគ្មានអ្វីបាំងវា', show(rowsOf((r) => !r.buttonsClear || r.buttonsHitPrice)));
-    check(rowsOf((r) => r.w < 700 && !r.buttonsInCell).length === 0,
-        '⛔ ZoeW ជួរប្រវត្តិ ៖ ទូរស័ព្ទ (< 700) ៖ ប៊ូតុងសកម្មភាពនៅក្នុងក្រឡារបស់វា', show(rowsOf((r) => r.w < 700 && !r.buttonsInCell)));
-    check(rowsOf((r) => r.fixPhone).length > 0 && rowsOf((r) => !r.buttonsOneLine && (!r.fixPhone || r.w >= 360)).length === 0,
-        'ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ នៅបន្ទាត់តែមួយ (មិនបន្ថែមកម្ពស់ជួរ) · «✏️ កែលេខ» ចាប់ពី 360px',
-        show(rowsOf((r) => !r.buttonsOneLine && (!r.fixPhone || r.w >= 360))));
+    check(rowsOf((r) => !r.buttonsInCell).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងសកម្មភាពនៅក្នុងក្រឡារបស់វា គ្រប់ទទឹង (ទូរស័ព្ទ · ថេប្លេត · desktop)', show(rowsOf((r) => !r.buttonsInCell)));
+    check(rowsOf(() => true).length > 0 && rowsOf((r) => !r.buttonsFull).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ ទំហំតែមួយគ្រប់ទទឹង (padding 10px ឆ្វេង/ស្តាំ · កម្ពស់ ≥ 38px) — មិនបង្រួមតាមអេក្រង់',
+        show(rowsOf((r) => !r.buttonsFull).map((r) => ({ w: r.w, id: r.id, pad: r.buttonPad }))));
+    check(rowsOf((r) => r.fixPhone).length > 0 && rowsOf((r) => !r.buttonsOneLine && (r.fixPhone ? r.w >= 430 : r.w >= 390)).length === 0,
+        'ZoeW ជួរប្រវត្តិ ៖ ប៊ូតុងខល/បិទ នៅបន្ទាត់តែមួយចាប់ពី 390px · «✏️ កែលេខ» ចាប់ពី 430px (Unifont · ក្រោមនោះ ៖ ប៊ូតុងទំហំដដែលបត់ចុះក្រោម មិនបង្រួម)',
+        show(rowsOf((r) => !r.buttonsOneLine && (r.fixPhone ? r.w >= 430 : r.w >= 390))));
+    check(seen.every((s) => s.colSkew !== null && s.colSkew <= 1),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ជួរឈរ «Locker/តម្លៃ/ចំនួន» នៅចំកណ្តាលតារាង គ្រប់ទទឹង (កណ្តាលជួរឈរ − កណ្តាលតារាង ≤ 1px)',
+        JSON.stringify(seen.filter((s) => !(s.colSkew <= 1)).map((s) => [s.w, s.colSkew]).filter((x, i, a) => a.findIndex((y) => y[0] === x[0]) === i)));
+    check(rowsOf((r) => !r.big && r.bigMoney).length === HISTORY_ROW_WIDTHS.length * 2 && rowsOf((r) => !r.priceInCell).length === 0,
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ លុយច្រើនខ្ទង់ ($1234.56 · COD $987.65 + DOD $245.50 · រៀល ៧ ខ្ទង់) នៅក្នុងក្រឡា «Locker/តម្លៃ/ចំនួន» គ្រប់ទទឹង (មិនហៀរទៅក្រោមប៊ូតុង)',
+        'ជួរលុយធំ ' + rowsOf((r) => !r.big && r.bigMoney).length + ' · ' + show(rowsOf((r) => !r.priceInCell).map((r) => [r.w, r.id])));
+    check(rowsOf((r) => !r.moneyWhole).length === 0,
+        'ZoeW ជួរប្រវត្តិ ៖ ចំនួនលុយ (ឧ. «$1234.56») នៅបន្ទាត់តែមួយ មិនបំបែកពាក់កណ្តាលលេខ គ្រប់ទទឹង',
+        show(rowsOf((r) => !r.moneyWhole).map((r) => [r.w, r.id])));
+    check(small.every((s) => s.headText === 'Locker/តម្លៃ/ចំនួន'),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ចំណងជើងជួរឈរទី ៣ = «Locker/តម្លៃ/ចំនួន» (លំដាប់ដូចធាតុក្នុងក្រឡា ៖ ស្លាក Locker · តម្លៃ · «កញ្ចប់សរុប»)',
+        JSON.stringify(small.map((s) => s.headText).filter((t, i, a) => a.indexOf(t) === i)));
+    check(rowsOf((r) => !(r.priceSkew <= 2)).length === 0 && seen.every((s) => s.headSkew !== null && s.headSkew <= 2),
+        '⛔ ZoeW ជួរប្រវត្តិ ៖ ជួរឈរ «Locker/តម្លៃ/ចំនួន» នៅចំកណ្តាលក្រឡា គ្រប់ទទឹង ៖ ចំណងជើង · ស្លាក Locker · បន្ទាត់តម្លៃនីមួយៗ · «កញ្ចប់សរុប» (គម្លាតឆ្វេង − ស្តាំ ≤ 2px)',
+        JSON.stringify({ head: seen.filter((s) => !(s.headSkew <= 2)).map((s) => [s.w, s.headSkew]).slice(0, 4),
+            rows: rowsOf((r) => !(r.priceSkew <= 2)).map((r) => [r.w, r.id, r.priceSkew]).slice(0, 6) }));
     check(rowsOf((r) => r.numberHitsCustomer).length === 0,
         '⛔ ZoeW ជួរប្រវត្តិ ៖ លេខរៀង (រួមទាំង ៣ ខ្ទង់ និងស្លាកពណ៌) មិនជាន់ក្រឡាអតិថិជន', show(rowsOf((r) => r.numberHitsCustomer)));
     const chips = rowsOf((r) => !r.big && !!r.chip);

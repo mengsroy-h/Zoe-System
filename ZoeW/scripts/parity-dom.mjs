@@ -67,7 +67,8 @@ const FINGERPRINT = ({ ignored, ui }) => {
             .replace(/\s+/g, ' ')
             .trim()
             // ⛔ ស្លាកកំណែខុសគ្នាដោយចេតនា (App ថ្មីមានកំណែថ្មី) ➜ ធ្វើឲ្យស្មើតែស្លាកនោះ
-            .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>');
+            .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>')
+            .replace(/^.*$/, (t) => (ui.texts || []).reduce((acc, [re, to]) => acc.replace(new RegExp(re), to), t));
         const legacy = (ui.asLegacy || []).find(([sel]) => matches(el, sel));
         out.push(`${'  '.repeat(Math.min(depth, 12))}${legacy ? legacy[1] : el.tagName}[${legacy ? legacy[2] : attrs}]${ownText && !opaque ? '::' + ownText : ''}`);
         if (opaque) return;

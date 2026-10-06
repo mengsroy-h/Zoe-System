@@ -31,6 +31,7 @@ const DEFAULT_LIST_URL = 'https://aargus-api.ztoglobal.com/scan/page/scan';
 const DEFAULT_LIST_SCAN_TYPE = '03';
 const DEFAULT_LIST_SCAN_DESC = 'អីវ៉ាន់មកដល់|到件|arrived';
 const LIST_DESC_MAX = 8;
+const LIST_DESC_INVISIBLE_RE = /\p{Cf}/gu;
 const LIST_SCAN_DESC_PATHS = ['scanTypeDesc', 'scanTypeName', 'scanDesc'];
 const LIST_SCAN_CODE_PATHS = ['scanTypeCode', 'scanType'];
 const LIST_SITE_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
@@ -670,11 +671,15 @@ function readListDescs(raw, fallback) {
     if (!text || /^off$/i.test(text)) return [];
     const out = [];
     for (const part of text.split('|')) {
-        const desc = part.trim();
+        const desc = scanDescKey(part);
         if (desc && out.indexOf(desc) < 0) out.push(desc);
         if (out.length >= LIST_DESC_MAX) break;
     }
     return out;
+}
+
+function scanDescKey(text) {
+    return String(text || '').replace(LIST_DESC_INVISIBLE_RE, '').trim();
 }
 
 function readListSignedConfig(env, out) {
@@ -990,7 +995,7 @@ function listScanTypeSkip(listConfig, candidates) {
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
     if (code && code !== listConfig.scanType) return 'scan-type';
     if (!listConfig.scanDescs.length) return '';
-    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    const desc = scanDescKey(pickText(candidates, LIST_SCAN_DESC_PATHS));
     if (!desc) return '';
     return listConfig.scanDescs.indexOf(desc) >= 0 ? '' : 'scan-type';
 }
@@ -998,7 +1003,7 @@ function listScanTypeSkip(listConfig, candidates) {
 function listRowSignedVerdict(listConfig, candidates) {
     if (!listConfig.signedType) return '';
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
-    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    const desc = scanDescKey(pickText(candidates, LIST_SCAN_DESC_PATHS));
     if (code && code !== listConfig.signedType) return '';
     const descs = listConfig.signedDescs;
     if (descs.length && desc && descs.indexOf(desc) < 0) return code ? 'mismatch' : '';

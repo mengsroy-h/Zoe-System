@@ -112,12 +112,12 @@ describe('ប្រអប់បញ្ជី ZTO ៖ ជួរ «ចុះហត�
                     signedDescExpected: ['ចុះហត្ថលេខា', '签收', 'Signed'] }));
             }
             return json(listBody({ page, pages: 1, total: 1, rows: [row('ZT0000000001')], signedPages: 2,
-                signedMismatch: 1, signedMismatchTexts: ['Delivered'], signedListMismatch: 1, signedListMismatchTexts: ['ចុះ\u200Bហត្ថលេខា'],
+                signedMismatch: 1, signedMismatchTexts: ['Delivered'], signedListMismatch: 1, signedListMismatchTexts: ['Deliv\u200Bery'],
                 signedDescExpected: ['ចុះហត្ថលេខា', '签收', 7, 'Signed'] }));
         });
         vi.stubGlobal('fetch', fetch);
         await runZtoListSyncPreview();
-        expect(ztoState.ztoListSyncResult.signedMismatchTexts).toEqual(['Delivered', 'ចុះ\u200Bហត្ថលេខា', 'x'.repeat(64)]);
+        expect(ztoState.ztoListSyncResult.signedMismatchTexts).toEqual(['Delivered', 'Deliv\u200Bery', 'x'.repeat(64)]);
         expect(ztoState.ztoListSyncResult.signedDescExpected).toEqual(['ចុះហត្ថលេខា', '签收', 'Signed']);
         const lines = mismatchNote();
         expect(lines).toHaveLength(1);
@@ -250,7 +250,7 @@ describe('🩺 ជួរ ZTO ៖ `?diag=1` រាយជួរ «ចុះហត�
 
     it('⛔ E9 ៖ 🩺 បង្ហាញអត្ថបទដែល Function ទទួលពី ZTO (`texts`) និងអត្ថបទដែល Server រំពឹង (`expected`) ជាមួយកូដតួអក្សរ · តម្លៃខូចមិនបោះ', () => {
         const text = ztoSignedMismatchText({ list: { signedMismatch: { observed: true, count: 66, ageMs: 60000,
-            texts: ['Delivered', 7, null, 'ចុះ\u200Bហត្ថលេខា'], expected: ['ចុះហត្ថលេខា', '签收', 'Signed'] } } });
+            texts: ['Delivered', 7, null, 'Deliv\u200Bery'], expected: ['ចុះហត្ថលេខា', '签收', 'Signed'] } } });
         expect(text).toContain('«Delivered» (U+0044 0065 006C 0069 0076 0065 0072 0065 0064)');
         expect(text).toContain('«Signed» (U+0053 0069 0067 006E 0065 0064)');
         expect(text).toContain('200B');

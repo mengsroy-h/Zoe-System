@@ -3284,7 +3284,7 @@ function firstBody(requests) {
             && JSON.stringify(mmOf(diagClean.body).texts) === '[]',
             mmOf(diagClean.body));
 
-        const ZW = 'ចុះ\u200Bហត្ថលេខា';
+        const ZW = 'Deliv\u200Bery';
         const LONG = 'ក'.repeat(80);
         signedRowsNow = ['Delivered', ZW, 'Sign', 'Received', 'Returned', 'Signed by agent', LONG].map((desc, i) =>
             listRow({ scanBillCode: '7713050000231' + i, scanTypeCode: '05', scanTypeDesc: desc }));
@@ -3368,6 +3368,40 @@ function firstBody(requests) {
             && docRow('ZTO_LIST_SIGNED_SCAN_DESC').indexOf('`' + docDefaults[1].split('|').join('\\|') + '`') !== -1
             && docRow('ZTO_LIST_SCAN_DESC').indexOf('`off`') !== -1 && docRow('ZTO_LIST_SIGNED_SCAN_DESC').indexOf('`off`') !== -1,
             { defaults: docDefaults, rows: [docRow('ZTO_LIST_SCAN_DESC'), docRow('ZTO_LIST_SIGNED_SCAN_DESC')] });
+
+        // ⛔ ZTO-E11 (ភស្តុតាងពិត ៖ សារ E9 លើ Deploy Preview របស់ម្ចាស់គម្រោង ៖ Function ទទួល «ចុះហត្ថលេខា» (U+1785 17BB 17C7 **200B** 17A0 …)
+        //    ≠ Server រំពឹង (U+1785 17BB 17C7 17A0 …) ➜ ជួរ 05 ទាំង 66 «ផ្ទុយ»)។ ZTO ដាក់ ZERO WIDTH SPACE ចន្លោះពាក្យខ្មែរ ➜ មើលមិនឃើញ ·
+        //    វាយក្នុង env មិនបាន ➜ ការប្រៀបធៀបអត្ថបទរំលងតួអក្សរទម្រង់មើលមិនឃើញ (Unicode Cf) ទាំងសងខាង · អក្សរមើលឃើញខុស ➜ នៅផ្ទុយ។
+        const ZTO_SIGNED_REAL = 'ចុះ\u200Bហត្ថលេខា';
+        signedRowsNow = [
+            listRow({ scanBillCode: '77130500002501', scanTypeCode: '05', scanTypeDesc: ZTO_SIGNED_REAL }),
+            listRow({ scanBillCode: '77130500002502', scanTypeDesc: ZTO_SIGNED_REAL }),
+            listRow({ scanBillCode: '77130500002503', scanTypeCode: '05', scanTypeDesc: '\uFEFFចុះ\u200Cហត្ថ\u200Dលេខា\u2060\u00AD' }),
+            listRow({ scanBillCode: '77130500002504', scanTypeCode: '05', scanTypeDesc: 'ចុះ\u200Bហត្ថលេខ' }),
+            listRow({ scanBillCode: '77130500002505', scanTypeCode: '05', scanTypeDesc: 'ចុះ ហត្ថលេខា' })
+        ];
+        const zwDefault = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        ok('⛔ E11 ៖ `05` + «ចុះ\u200Bហត្ថលេខា» (អត្ថបទពិតពី ZTO) ជាភស្តុតាង · គ្មានកូដ + អត្ថបទដដែល ជាភស្តុតាង · តួអក្សរ Cf ផ្សេង (FEFF · 200C · 200D · 2060 · 00AD) រំលង · '
+            + 'អក្សរបាត់ («ហត្ថលេខ») ឬដកឃ្លាមើលឃើញ ➜ នៅផ្ទុយ',
+            JSON.stringify(zwDefault.body.signed) === '["77130500002501","77130500002502","77130500002503"]' && zwDefault.body.signedMismatch === 2,
+            { signed: zwDefault.body.signed, mismatch: zwDefault.body.signedMismatch, texts: zwDefault.body.signedMismatchTexts });
+        const zwEnvPlain = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'ចុះហត្ថលេខា' }), { signed: '1' });
+        const zwEnvZw = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: ZTO_SIGNED_REAL }), { signed: '1' });
+        ok('⛔ E11 ៖ env «ចុះហត្ថលេខា» (ការកំណត់ពិតលើ Netlify ម្ចាស់គម្រោង) និង env ដែលមាន U+200B ទទួលជួរដូចគ្នា · `expected` គ្មាន U+200B',
+            JSON.stringify(zwEnvPlain.body.signed) === '["77130500002501","77130500002502","77130500002503"]'
+            && JSON.stringify(zwEnvZw.body.signed) === JSON.stringify(zwEnvPlain.body.signed)
+            && JSON.stringify(zwEnvZw.body.signedDescExpected) === '["ចុះហត្ថលេខា"]',
+            { plain: zwEnvPlain.body.signed, zw: zwEnvZw.body.signed, expected: zwEnvZw.body.signedDescExpected });
+        signedRowsNow = MISMATCH_SIGNED;
+        arrivalRowsNow = [
+            listRow({ scanBillCode: '77130500002511', scanTypeCode: '03', scanTypeDesc: 'អីវ៉ាន់\u200Bមកដល់' }),
+            listRow({ scanBillCode: '77130500002512', scanTypeCode: '03', scanTypeDesc: 'អីវ៉ាន់មក\u200Bដល' })
+        ];
+        const zwArrival = await mmCall(GOOD_LIST_ENV, {});
+        ok('⛔ E11 ៖ «មកដល់» ៖ «អីវ៉ាន់\u200Bមកដល់» ➜ ជួរដេក · អក្សរបាត់ ➜ `otherScans`',
+            rowsOf(zwArrival.body).length === 1 && rowsOf(zwArrival.body)[0].barcode === '77130500002511' && zwArrival.body.otherScans === 1,
+            { rows: rowsOf(zwArrival.body).map((r) => r.barcode), other: zwArrival.body.otherScans });
+        arrivalRowsNow = MISMATCH_ARRIVAL;
 
         signedRowsNow = MISMATCH_SIGNED;
         arrivalRowsNow = MISMATCH_ARRIVAL;

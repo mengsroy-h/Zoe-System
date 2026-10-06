@@ -628,7 +628,7 @@
     "LICENSE": {
       "policy": "guard-7",
       "encoding": "lf-text",
-      "sha256": "dc0c2028df327cbb31bd267eab825fc6cf7688fe88455dcf79e9e2647825dc76"
+      "sha256": "7276110daaedb934d0065983986b13efb20bb7b9915aed06b81a6b191a728744"
     },
     "LICENSES/Apache-2.0.txt": {
       "policy": "guard-7",
@@ -638,7 +638,7 @@
     "NOTICE": {
       "policy": "guard-7",
       "encoding": "lf-text",
-      "sha256": "ecfd6793e6e69831d290c9522f892359ecb32a514ceb9d698bc42a3ce37a44b6"
+      "sha256": "7951fb870508b083f68c336e4293821f853b6c2d646a0e75827c3867d85a870f"
     },
     "README.md": {
       "policy": "guard-13"
@@ -2602,6 +2602,11 @@
       "policy": "guard-7",
       "encoding": "lf-text",
       "sha256": "68c80ef00664ea62a2c6f38c0ef044497caacc6648a8bd92eec7fdb81e01f904"
+    },
+    "LICENSES/MPL-2.0.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "86cf9656479f1edb82245b985f4a2cc0d503b945766ebeda4269c60b307699ae"
     },
     "LICENSES/PostgreSQL-supabase-postgres.txt": {
       "policy": "guard-7",

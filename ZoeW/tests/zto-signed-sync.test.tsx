@@ -23,7 +23,7 @@ import {
     runZtoListSyncPreview, ztoListSignedEvidence
 } from '../src/features/zto-list-sync';
 import {
-    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_IDLE_MS, clearZtoPickupStatusStore, runZtoStatusSweep, setZtoPickupVerdict,
+    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_IDLE_MS, ZTO_STATUS_SWEEP_GAP_MS, clearZtoPickupStatusStore, runZtoStatusSweep, setZtoPickupVerdict,
     ztoPickupStatus
 } from '../src/features/zto-status';
 import { ZtoListSyncModal } from '../src/app/components/modals/ZtoListSyncModal';
@@ -268,6 +268,74 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         vi.stubGlobal('fetch', signedOnly(['ZT0000000901', 'ZT0000000902']));
         await runZtoStatusSweep(true, [openItem('a1', 'ZT0000000901'), openItem('a2', 'ZT0000000902')], []);
         expect(h.calls.map((c) => c.code)).toEqual(['ZT0000000901']);
+    });
+
+    it('ពិដាន ១០/ជុំ ៖ ១២ កញ្ចប់ ➜ ជុំ ១ បិទ ១០ · ជុំបន្ទាប់បិទ ២ ដែលនៅសល់', async () => {
+        const codes: string[] = [];
+        const items: any[] = [];
+        for (let i = 0; i < 12; i++) {
+            const code = 'ZT00000013' + String(i).padStart(2, '0');
+            codes.push(code);
+            items.push(openItem('c' + i, code));
+        }
+        vi.stubGlobal('fetch', signedOnly(codes));
+        await runZtoStatusSweep(true, items, []);
+        expect(h.calls).toHaveLength(10);
+        items.forEach((it) => { if (h.calls.some((c) => c.itemId === it.id)) it.barcodes[0].isClosed = true; });
+        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        expect(h.calls.map((c) => c.code).slice(10).sort()).toEqual(codes.slice(10));
+    });
+
+    it('⛔ ការបិទដែលបរាជ័យជានិច្ច មិនត្រូវទប់កញ្ចប់ផ្សេង (ជួរមិនអត់ឃ្លាន · មិនសាកឡើងវិញរាល់ ២០ វិ.)', async () => {
+        (h as any).ok = false;
+        const codes: string[] = [];
+        const items: any[] = [];
+        for (let i = 0; i < 12; i++) {
+            const code = 'ZT00000014' + String(i).padStart(2, '0');
+            codes.push(code);
+            items.push(openItem('s' + i, code));
+        }
+        vi.stubGlobal('fetch', signedOnly(codes));
+        await runZtoStatusSweep(true, items, []);
+        expect(h.calls).toHaveLength(10);
+        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        const second = h.calls.slice(10).map((c) => c.code).sort();
+        expect(second).toEqual(codes.slice(10));
+    });
+
+    it('ជួរថ្ងៃ ៖ លើកដំបូង ៧ ថ្ងៃ · ក្រោយជោគជ័យ ១ ថ្ងៃ (ចប់ថ្ងៃនេះជានិច្ច)', async () => {
+        const fetch = signedOnly([]);
+        vi.stubGlobal('fetch', fetch);
+        const items = [openItem('w1', 'ZT0000001501')];
+        await runZtoStatusSweep(true, items, []);
+        vi.setSystemTime(new Date(NOW + ZTO_SIGNED_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        const ranges = fetch.mock.calls.map((c) => urlOf(c)).filter((u) => u.searchParams.get('signed') === '1')
+            .map((u) => u.searchParams.get('from') + '>' + u.searchParams.get('to'));
+        expect(ranges).toEqual(['2026-09-29>2026-10-06', '2026-10-05>2026-10-06']);
+    });
+
+    it('បណ្តាញធ្លាក់ ➜ ចន្លោះទ្វេ (មិនសួររាល់ ២ នាទី) · ក្រោយចន្លោះទ្វេ ➜ សួរម្តងទៀត', async () => {
+        const fetch = vi.fn(async (url: string) => (new URL(url).searchParams.get('signed') === '1'
+            ? json({ error: 'down' }, 502)
+            : json({ found: true, ztoClosed: null })));
+        vi.stubGlobal('fetch', fetch);
+        const items = [openItem('b1', 'ZT0000001601')];
+        const count = () => fetch.mock.calls.filter((c) => urlOf(c).searchParams.get('signed') === '1').length;
+        await runZtoStatusSweep(true, items, []);
+        vi.setSystemTime(new Date(NOW + ZTO_SIGNED_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        expect(count()).toBe(1);
+        vi.setSystemTime(new Date(NOW + 2 * ZTO_SIGNED_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        expect(count()).toBe(2);
     });
 
     it('ទិសផ្ទុយ ៖ កុងតាក់បិទ ➜ មិនសួរបញ្ជីចុះហត្ថលេខា · មិនបិទ', async () => {

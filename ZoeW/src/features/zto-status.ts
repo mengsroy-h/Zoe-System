@@ -326,11 +326,9 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         const done = await autoCloseBarcodeFromZto(entries[i], dataToScan);
         if (!session.current()) return { closed: 0, more: false, keys: new Set() };
         if (done === undefined) break;
-        if (done) {
-            out.closed++;
-            out.keys.add(entries[i].key);
-            setZtoPickupVerdict(entries[i].code, true);
-        }
+        setZtoPickupVerdict(entries[i].code, true);
+        out.keys.add(entries[i].key);
+        if (done) out.closed++;
     }
     return out;
 }
@@ -594,7 +592,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (signed.closed) renderZtoSyncViews(dataToScan, trashToScan);
         }
         for (let i = 0; i < work.length; i++) {
-            if (work[i].open && signedKeys.has(work[i].key)) continue;
+            if (signedKeys.has(work[i].key)) continue;
             if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
             let answer = null;
             attempted++;

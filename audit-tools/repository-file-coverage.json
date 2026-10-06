@@ -1854,6 +1854,9 @@
     "ZoeW/tests/zto-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-signed-sync.test.tsx": {
       "policy": "zoew-self-verification"
     },

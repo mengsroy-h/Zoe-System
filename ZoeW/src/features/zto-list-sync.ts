@@ -591,6 +591,7 @@ export async function importZtoListRows() {
     let notTried = 0;
     let closedInZoew = 0;
     let closeNotTried = 0;
+    let stalled = false;
     const savedDates = new Set();
     try {
         for (let i = 0; i < queue.length; i++) {
@@ -610,7 +611,7 @@ export async function importZtoListRows() {
             }
             if (!session.current()) return;
             if (claim === 'taken') { taken++; continue; }
-            if (claim === 'stalled') { failed++; notTried = queue.length - i - 1; break; }
+            if (claim === 'stalled') { failed++; stalled = true; notTried = queue.length - i - 1; break; }
             if (claim !== 'claimed') { failed++; continue; }
             const rollbackImportedRow = () => {
                 if (!session.current()) return;
@@ -642,6 +643,7 @@ export async function importZtoListRows() {
                         refreshCurrentHistoryView();
                         return closedStampMs ? markZtoListRowPickedUp(row.barcode) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
+                    stalled = true;
                     notTried = queue.length - i - 1;
                     break;
                 } else {
@@ -652,7 +654,7 @@ export async function importZtoListRows() {
         }
         for (let i = 0; i < closeTargets.length; i++) {
             if (!session.current()) return;
-            if (notTried || (navigator.onLine as boolean) === false) { closeNotTried = closeTargets.length - i; break; }
+            if (stalled || notTried || (navigator.onLine as boolean) === false) { closeNotTried = closeTargets.length - i; break; }
             setZtoListSyncNote('⏳ កំពុងបិទតាម ZTO ' + (i + 1) + '/' + closeTargets.length + '...');
             const done = await autoCloseBarcodeFromZto(closeTargets[i], dataState.scanHistory);
             if (!session.current()) return;
@@ -741,12 +743,15 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
     const pages = isFinite(reported) && reported > 0 ? reported : 1;
     const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
     const work = [];
-    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signed'));
+    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
     const more = await Promise.all(work);
+    let partial = false;
     for (let i = 0; i < more.length; i++) {
-        if (more[i] && Array.isArray(more[i].signed)) {
+        if (more[i] && more[i].signedOk === true && Array.isArray(more[i].signed)) {
             for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
+        } else {
+            partial = true;
         }
     }
-    return { measured: true, codes: codes, truncated: pages > last };
+    return { measured: true, codes: codes, truncated: pages > last, partial: partial };
 }

@@ -1512,6 +1512,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   អ្នកយាមបន្ថែម (ចន្លោះគ្របដណ្តប់) ៖ ពិដាន ១០/ជុំ + ជុំបន្ទាប់ · ជួរថ្ងៃ (៧ ថ្ងៃ ➜ ១ ថ្ងៃ) · ចន្លោះទ្វេពេលបណ្តាញធ្លាក់។ vitest ២០ (មុនកែ ១ FAIL)។
   **សោ** ៖ `ZoeW/tests/zto-lock.test.ts` ចាក់សោ sha256 នៃឯកសារ ZTO ៦ (Function · `zto-list-sync.ts` · `zto-status.ts` · `zto/model.ts` · `ZtoListSyncBody.tsx` ·
   `ZtoListSyncModal.tsx`) + `CLAUDE.md` «Locked zone — ZTO» (កែតែពេលម្ចាស់គម្រោងស្នើផ្ទាល់) · mutation ថេរមួយ ➜ ធ្លាក់។
+- **ការផ្ទៀងផ្ទាត់ជុំទី ៣ (សំណើម្ចាស់គម្រោង ៖ «ផ្ទៀងផ្ទាត់ឡើងវិញ ស៊ីជម្រៅ»)** ៖ រកឃើញ **៣ ចំណុចពិត** វាស់ដោយអ្នកយាមដែលធ្លាក់មុនកែ (checker ៤ · vitest ២) ៖
+  (១) **ថង់ Cookie (Function)** ៖ ចម្លើយទី ២ ដែលមានតែ Cookie បន្ទាប់បន្សំ (`sidebarStatus`) បូកពី `session.cookie` ចាស់ ➜ **លុប BOS-MAN-SESSION** ដែល ZTO ទើបបង្វិល
+  ក្នុងចម្លើយទី ១ (មុនកែ ៖ store = session ចាស់) ➜ ឥឡូវ `noteCookieRenewal()` បូកពី `session.renewal || session.cookie` (តាមលំដាប់មកដល់ ដូច browser)។
+  (២) **ការបញ្ចូលបញ្ជី** ៖ claim/save ព្យួរលើជួរដេកថ្មី **ចុងក្រោយ** (`notTried = 0`) មិនឈប់រង្វិលបិទកញ្ចប់ដែលមានស្រាប់ ➜ ឥឡូវ `stalled` ឈប់វា («មិនទាន់បិទ N» · បញ្ជីនៅ)។
+  (៣) **ជុំបិទតាម ZTO** ៖ ទំព័របញ្ជីចុះហត្ថលេខាទី ២ ធ្លាក់ ➜ `Promise.all` បោះចោលភស្តុតាងទំព័រ ១ ទាំងអស់ (ទំព័រធ្លាក់ជានិច្ច ➜ មិនបិទអ្វីសោះ) ➜ ឥឡូវប្រើទំព័រដែលបាន
+  (`partial` ➜ មិនកត់ «វាស់គ្រប់» · ចន្លោះទ្វេ) · ចន្លោះទ្វេក្រោយជុំ «នៅសល់» (`wait = 1`) ក្លាយជា **2 ms** (វាស់) ➜ `ztoSignedSweepBackoffMs()` ចាប់ពី `ZTO_SIGNED_SWEEP_GAP_MS`។
+  សោ `LOCK` ធ្វើបច្ចុប្បន្នភាពតាមសំណើនេះ។ ⛔ នៅបើក (ការសម្រេចអាជីវកម្ម) ៖ កញ្ចប់ `expired` ក្នុងធុងសំរាមដែលមានក្នុងបញ្ជីចុះហត្ថលេខា (ឧ. App បិទច្រើនថ្ងៃ ➜ ការសម្អាត ៧ ថ្ងៃរត់មុនជុំបិទ)។
 - ⛔ អន្ទាក់ harness ៖ `vi.mock(..., importOriginal)` លើ `barcode-ops` ➜ ការនាំចូលរង្វង់ (`zto-status` ↔ `barcode-ops`) ផ្ទុកម៉ូឌុលពិតមុន mock ➜ mock មិនដល់
   `autoCloseBarcodeFromZto()` ➜ factory ដោយគ្មាន `importOriginal` · `restoreMocks: true` កំណត់ `vi.fn(impl)` ឡើងវិញ ➜ ប្រើ function ធម្មតា។
 

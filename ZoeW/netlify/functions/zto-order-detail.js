@@ -421,9 +421,9 @@ function noteCookieRenewal(session, response) {
     if (!session || !session.store || !session.cookie) return;
     const lines = setCookieLines(response);
     if (!lines.length) return;
-    const merged = mergeRenewedCookie(session.cookie, lines);
-    if (!merged || merged === session.cookie) return;
-    session.renewal = merged;
+    const merged = mergeRenewedCookie(session.renewal || session.cookie, lines);
+    if (!merged) return;
+    session.renewal = merged === session.cookie ? '' : merged;
 }
 
 function adoptRenewedCookie(session, merged) {

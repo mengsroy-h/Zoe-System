@@ -338,6 +338,58 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         expect(count()).toBe(2);
     });
 
+    it('⛔ ទំព័របញ្ជីចុះហត្ថលេខាបន្ទាប់ធ្លាក់ ➜ ភស្តុតាងទំព័រ ១ នៅតែបិទ (មិនបោះចោលទាំងអស់) · មិនរាប់ជាការវាស់គ្រប់ (ជួរ ៧ ថ្ងៃនៅ)', async () => {
+        const fetch = vi.fn(async (url: string) => {
+            const u = new URL(url);
+            if (u.searchParams.get('signed') === '1') {
+                if (u.searchParams.get('page') === '1') {
+                    return json({ success: true, list: true, enabled: true, kind: 'signed', rows: [], pages: 2, total: 150, signed: ['ZT0000001701'], signedOk: true });
+                }
+                return json({ error: 'ZTO rejected the request (HTTP 200)', code: 'ZTO_UPSTREAM_REJECTED' }, 502);
+            }
+            return json({ found: true, ztoClosed: null });
+        });
+        vi.stubGlobal('fetch', fetch);
+        await runZtoStatusSweep(true, [openItem('p1', 'ZT0000001701'), openItem('p2', 'ZT0000001702')], []);
+        const signedPages = fetch.mock.calls.map((c) => urlOf(c)).filter((u) => u.searchParams.get('signed') === '1')
+            .map((u) => u.searchParams.get('page')).sort();
+        expect(signedPages).toEqual(['1', '2']);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZT0000001701']);
+        expect(ztoState.ztoSignedSweepOkAt).toBe(0);
+        expect(ztoState.ztoSignedSweepWaitMs).toBeGreaterThanOrEqual(2 * ZTO_SIGNED_SWEEP_GAP_MS);
+    });
+
+    it('⛔ ចន្លោះទ្វេក្រោយជុំ «នៅសល់» ៖ ការធ្លាក់បន្ទាប់ពីជុំដែលនៅសល់កញ្ចប់ មិនត្រូវក្លាយជាចន្លោះប៉ុន្មាន ms (សួររាល់ជុំ)', async () => {
+        const codes: string[] = [];
+        const items: any[] = [];
+        for (let i = 0; i < 12; i++) {
+            const code = 'ZT00000018' + String(i).padStart(2, '0');
+            codes.push(code);
+            items.push(openItem('m' + i, code));
+        }
+        let signedCalls = 0;
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+            if (new URL(url).searchParams.get('signed') === '1') {
+                signedCalls++;
+                return signedCalls === 1
+                    ? json({ success: true, list: true, enabled: true, kind: 'signed', rows: [], pages: 1, total: 12, signed: codes, signedOk: true })
+                    : json({ error: 'down' }, 502);
+            }
+            return json({ found: true, ztoClosed: null });
+        }));
+        await runZtoStatusSweep(true, items, []);
+        expect(h.calls).toHaveLength(10);
+        vi.setSystemTime(new Date(NOW + ZTO_STATUS_SWEEP_GAP_MS + 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        expect(signedCalls).toBe(2);
+        expect(ztoState.ztoSignedSweepWaitMs).toBeGreaterThanOrEqual(2 * ZTO_SIGNED_SWEEP_GAP_MS);
+        vi.setSystemTime(new Date(NOW + 2 * (ZTO_STATUS_SWEEP_GAP_MS + 1000)));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(false, items, []);
+        expect(signedCalls).toBe(2);
+    });
+
     it('ទិសផ្ទុយ ៖ កុងតាក់បិទ ➜ មិនសួរបញ្ជីចុះហត្ថលេខា · មិនបិទ', async () => {
         appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
         const fetch = signedOnly(['ZT0000000701']);

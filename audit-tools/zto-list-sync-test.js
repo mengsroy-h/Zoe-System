@@ -2000,6 +2000,47 @@ function firstBody(requests) {
                     calls.toast.some((m) => m.indexOf('⏳') !== -1 && m.indexOf('មិនទាន់បិទ 1') !== -1) && !!box.ztoListSyncResult,
                     calls.toast);
                 ok('⛔ ការបិទព្យួរ ➜ សោដោះ', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
+
+                // ⛔ ថ្នាក់ដដែល ៖ ការរក្សាទុក/claim **ព្យួរលើជួរដេកថ្មីចុងក្រោយ** (គ្មាន «នៅសល់» ក្នុងរង្វិលបញ្ចូល) ក៏ជាសញ្ញាបណ្តាញព្យួរដែរ ➜
+                //    រង្វិលបិទកញ្ចប់ដែលមានស្រាប់ត្រូវឈប់ភ្លាម (មិនសាកបិទ ➜ រង់ចាំពិដានម្តងទៀត) · សារប្រាប់ «មិនទាន់បិទ» · បញ្ជីនៅ ➜ ចុចម្តងទៀតបាន។
+                const hangThenClose = async (label) => {
+                    reset();
+                    box.__now = NOW;
+                    if (label === 'Save timed out') box.__saveHangs = true; else box.__claimHangs = true;
+                    box.__timeoutLabel = label;
+                    evidence.add('77130500000892');
+                    box.scanHistory = [{ id: 'open-z', phone: '0963897345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
+                    box.ztoListSyncResult = {
+                        rows: [{ barcode: '77130500000891', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                            { barcode: '77130500000892', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                        from: '2026-09-08', to: '2026-09-11', total: 2
+                    };
+                    await runImport();
+                    return { close: calls.close.slice(), toast: calls.toast.slice(), kept: !!box.ztoListSyncResult,
+                        saved: calls.save.length, claimed: calls.claim.length, unlocked: box.ztoListSyncInFlight === false };
+                };
+                const saveHang = await hangThenClose('Save timed out');
+                ok('ជាន់អប្បបរមា ៖ ជួរដេកថ្មីត្រូវ claim + រក្សាទុក (ការព្យួរកើតលើជួរដេកចុងក្រោយពិត)',
+                    saveHang.claimed === 1 && saveHang.saved === 1, saveHang);
+                ok('⛔ ការរក្សាទុក **ព្យួរលើជួរដេកថ្មីចុងក្រោយ** ➜ មិនសាកបិទកញ្ចប់ដែលមានស្រាប់ · «មិនទាន់បិទ 1» · បញ្ជីនៅ · សោដោះ',
+                    saveHang.close.length === 0 && saveHang.toast.some((m) => m.indexOf('មិនទាន់បិទ 1') !== -1)
+                    && saveHang.kept && saveHang.unlocked, saveHang);
+                const claimHang = await hangThenClose('Barcode claim timed out');
+                ok('⛔ claim **ព្យួរលើជួរដេកថ្មីចុងក្រោយ** ➜ មិនសាកបិទកញ្ចប់ដែលមានស្រាប់ · «មិនទាន់បិទ 1» · បញ្ជីនៅ',
+                    claimHang.claimed === 1 && claimHang.close.length === 0
+                    && claimHang.toast.some((m) => m.indexOf('មិនទាន់បិទ 1') !== -1) && claimHang.kept, claimHang);
+                reset();
+                box.__now = NOW;
+                evidence.add('77130500000892');
+                box.scanHistory = [{ id: 'open-z', phone: '0963897345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000891', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000892', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    from: '2026-09-08', to: '2026-09-11', total: 2
+                };
+                await runImport();
+                ok('ទិសផ្ទុយ ៖ ជួរដេកថ្មីរក្សាទុកបានធម្មតា ➜ កញ្ចប់ដែលមានស្រាប់ត្រូវបិទ (ការឈប់កើតតែពេលព្យួរ)',
+                    calls.close.length === 1 && calls.close[0].code === '77130500000892', calls.close);
                 box.scanHistory = [];
                 reset();
             }
@@ -2517,7 +2558,9 @@ function firstBody(requests) {
     //    `flushCookieRenewal()` នោះ `Set-Cookie` របស់វា (BOS-MAN-SESSION ថ្មី) ចុះលើ `session.renewal` ហើយ **មិនដែលសរសេរ** ➜ Cookie
     //    ដែល ZTO បង្វិលរួចបាត់ ➜ ការហៅបន្ទាប់ផ្ញើ session ចាស់។ ការបង្វិលត្រូវសរសេរចូល store ទោះមកពីសំណើណាមួយ។
     {
-        const raceRun = async (rotateOn, rotated) => {
+        const raceRun = async (rotateOn, rotated, slowType) => {
+            const setCookies = rotateOn && typeof rotateOn === 'object' ? rotateOn : { [rotateOn]: [rotated] };
+            const slow = slowType || '05';
             const blobState = { value: 'BOS-MAN-SESSION=blob-cookie-value-9876; sidebarStatus=1', writes: [] };
             const etagOf = (v) => '"' + crypto.createHash('sha256').update(String(v || '')).digest('hex') + '"';
             const store = {
@@ -2538,12 +2581,12 @@ function firstBody(requests) {
             global.fetch = withCerts(async (href, init) => {
                 seenRequests.push({ href: href, init: init });
                 const type = typeOf(init);
-                if (type === '05') await new Promise((r) => setTimeout(r, 60));
+                if (type === slow) await new Promise((r) => setTimeout(r, 60));
                 return {
                     ok: true, status: 200,
                     headers: {
                         get: (name) => (String(name).toLowerCase() === 'content-type' ? 'application/json' : null),
-                        getSetCookie: () => (type === rotateOn ? [rotated + '; Path=/; HttpOnly'] : [])
+                        getSetCookie: () => (setCookies[type] || []).map((line) => line + '; Path=/; HttpOnly')
                     },
                     json: async () => byType(type)
                 };
@@ -2558,7 +2601,7 @@ function firstBody(requests) {
                 });
             } catch (e) { res = { statusCode: 500, body: String(e && e.message) }; }
             if (typeof proxy.setBlobsModuleForTests === 'function') proxy.setBlobsModuleForTests(null);
-            return { res: res, writes: blobState.writes };
+            return { res: res, writes: blobState.writes, stored: blobState.value };
         };
         const probe = await raceRun('03', 'BOS-MAN-SESSION=rotated-by-arrival-555000');
         ok('ជាន់អប្បបរមា (probe ទិសផ្ទុយ) ៖ Cookie បង្វិលក្នុងចម្លើយ «មកដល់» ➜ សរសេរចូល store (ការរៀបចំសរសេរបានពិត)',
@@ -2569,6 +2612,20 @@ function firstBody(requests) {
             !!raced.res && raced.res.statusCode === 200 && bodyOf(raced.res).signedOk === true, raced.res && raced.res.statusCode);
         ok('⛔ Cookie ដែល ZTO បង្វិលក្នុងចម្លើយ «ចុះហត្ថលេខា» (មកក្រោយ) ត្រូវសរសេរចូល store (មិនបាត់)',
             raced.writes.some((v) => String(v).indexOf('rotated-by-signed-777000') !== -1), raced.writes);
+
+        // ⛔ **ថង់ Cookie** ៖ ចម្លើយទាំង ២ (មកដល់ · ចុះហត្ថលេខា) ផ្ញើ Cookie ដដែល ហើយ `Set-Cookie` របស់វាត្រូវ **បូកតាមលំដាប់មកដល់**
+        //    (ដូចថង់ Cookie របស់ browser)។ ចម្លើយទី ២ ដែលមានតែ Cookie បន្ទាប់បន្សំ (ឧ. `sidebarStatus`) មិនត្រូវលុប BOS-MAN-SESSION
+        //    ដែល ZTO ទើបបង្វិលក្នុងចម្លើយទី ១ ឡើយ ➜ បើលុប ➜ store/អង្គចងចាំត្រឡប់ទៅ session ចាស់ ➜ ការហៅបន្ទាប់ផ្ញើ session ដែល ZTO បោះបង់។
+        const jarLater = await raceRun({ '03': ['BOS-MAN-SESSION=rotated-by-arrival-818000'], '05': ['sidebarStatus=7'] });
+        ok('ជាន់អប្បបរមា ៖ ការហៅ «ថង់ Cookie» (ការបង្វិលមុន · Cookie បន្ទាប់បន្សំក្រោយ) ឆ្លើយ 200',
+            !!jarLater.res && jarLater.res.statusCode === 200, jarLater.res && jarLater.res.statusCode);
+        ok('⛔ ចម្លើយក្រោយដែលមានតែ Cookie បន្ទាប់បន្សំ មិនលុប BOS-MAN-SESSION ដែលទើបបង្វិល (store ចុងក្រោយមាន session ថ្មី + `sidebarStatus=7`)',
+            String(jarLater.stored).indexOf('rotated-by-arrival-818000') !== -1 && String(jarLater.stored).indexOf('sidebarStatus=7') !== -1,
+            { stored: jarLater.stored, writes: jarLater.writes });
+        const jarEarlier = await raceRun({ '05': ['BOS-MAN-SESSION=rotated-by-signed-828000'], '03': ['sidebarStatus=8'] }, null, '03');
+        ok('⛔ ទិសផ្ទុយ ៖ ការបង្វិលក្នុងចម្លើយ «ចុះហត្ថលេខា» (មកមុន) នៅដដែល ពេល «មកដល់» (មកក្រោយ) មានតែ Cookie បន្ទាប់បន្សំ',
+            String(jarEarlier.stored).indexOf('rotated-by-signed-828000') !== -1 && String(jarEarlier.stored).indexOf('sidebarStatus=8') !== -1,
+            { stored: jarEarlier.stored, writes: jarEarlier.writes });
     }
 
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)

@@ -278,6 +278,11 @@ export function ztoSignedSweepRange() {
     return { from: getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS), to: getZoneDateKey(now, 0) };
 }
 
+export function ztoSignedSweepBackoffMs() {
+    const base = Math.max(ZTO_SIGNED_SWEEP_GAP_MS, ztoState.ztoSignedSweepWaitMs || 0);
+    return Math.min(ZTO_SIGNED_SWEEP_IDLE_MS, base * 2);
+}
+
 export function ztoSignedCloseIsHeld(key, force) {
     if (force) return false;
     const verdict = ztoPickupStatus.get(key);
@@ -295,10 +300,9 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         signed = await fetchZtoSignedCodes(cfg, range.from, range.to);
     } catch (e) {
         if (!session.current()) return out;
-        const grown = (ztoState.ztoSignedSweepWaitMs || ZTO_SIGNED_SWEEP_GAP_MS) * 2;
         ztoState.ztoSignedSweepWaitMs = e && e.notConfigured
             ? ZTO_SIGNED_SWEEP_IDLE_MS
-            : Math.min(ZTO_SIGNED_SWEEP_IDLE_MS, grown);
+            : ztoSignedSweepBackoffMs();
         return out;
     }
     if (!session.current()) return out;
@@ -306,8 +310,12 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_IDLE_MS;
         return out;
     }
-    ztoState.ztoSignedSweepOkAt = Date.now();
-    ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_GAP_MS;
+    if (signed.partial) {
+        ztoState.ztoSignedSweepWaitMs = ztoSignedSweepBackoffMs();
+    } else {
+        ztoState.ztoSignedSweepOkAt = Date.now();
+        ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_GAP_MS;
+    }
     const signedKeys = new Set();
     for (let i = 0; i < signed.codes.length; i++) {
         const key = pickupBarcodeKey(signed.codes[i]);

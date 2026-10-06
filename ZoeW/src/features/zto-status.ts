@@ -17,7 +17,7 @@ import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT, fetchZtoSignedCodes, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -117,6 +117,7 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoSignedSweepWaitMs = 0;
     ztoState.ztoSignedCompleteAt = 0;
     ztoState.ztoSignedOff = false;
+    ztoState.ztoSignedTruncatedNoted = false;
     ztoState.ztoAbandonHoldSince = 0;
     ztoPickupStatus.clear();
     ztoState.ztoStatusBannerSig = '';
@@ -352,7 +353,11 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         return out;
     }
     ztoState.ztoSignedOff = false;
-    ztoState.ztoSignedSweepWaitMs = signed.partial ? ztoSignedSweepBackoffMs() : ZTO_SIGNED_SWEEP_GAP_MS;
+    ztoState.ztoSignedSweepWaitMs = signed.partial || signed.truncated ? ztoSignedSweepBackoffMs() : ZTO_SIGNED_SWEEP_GAP_MS;
+    if (signed.truncated && !ztoState.ztoSignedTruncatedNoted) {
+        ztoState.ztoSignedTruncatedNoted = true;
+        showToast('⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក (លើស ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រក្នុងមួយថ្ងៃ) ➜ កញ្ចប់ខ្លះនឹងពិនិត្យម្តងមួយ');
+    }
     const signedKeys = new Set();
     for (let i = 0; i < signed.codes.length; i++) {
         const key = pickupBarcodeKey(signed.codes[i]);

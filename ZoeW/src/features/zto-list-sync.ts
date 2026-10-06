@@ -39,6 +39,10 @@ export const ZTO_LIST_SERVER_CONFIG_REASONS = ['idtoken:aud', 'idtoken:iss', 'id
 
 export const ZTO_LIST_SIGNED_PROBE_MAX = 20;
 
+export const ZTO_LIST_RANGE_MAX_DAYS = 31;
+
+export const ZTO_SIGNED_DAY_CONCURRENCY = 3;
+
 export const ZTO_LIST_PROBE_CONCURRENCY = 4;
 
 export const ZTO_LIST_SKIP_TEXT = {
@@ -748,10 +752,55 @@ export function closeZtoListSyncModal() {
     closeModal('ztoListSyncModal');
 }
 
+export function ztoListDayKeys(from, to) {
+    const out = [];
+    const shape = /^\d{4}-\d{2}-\d{2}$/;
+    const a = String(from === undefined || from === null ? '' : from);
+    const b = String(to === undefined || to === null ? '' : to);
+    if (!shape.test(a) || !shape.test(b) || b < a) return out;
+    const start = Date.parse(a + 'T00:00:00Z');
+    if (!isFinite(start)) return out;
+    for (let i = 0; i < ZTO_LIST_RANGE_MAX_DAYS; i++) {
+        const day = new Date(start + i * 86400000).toISOString().slice(0, 10);
+        if (day > b) break;
+        out.push(day);
+    }
+    return out;
+}
+
 export async function fetchZtoSignedCodes(cfg, from, to) {
+    const whole = await fetchZtoSignedPages(cfg, from, to);
+    if (!whole || !whole.measured || !whole.truncated) return whole;
+    const days = ztoListDayKeys(from, to);
+    if (days.length < 2) return whole;
+    const out = { measured: true, codes: whole.codes.slice(), truncated: false, partial: false };
+    let next = 0;
+    const worker = async () => {
+        while (next < days.length) {
+            const day = days[next];
+            next++;
+            let got = null;
+            try {
+                got = await fetchZtoSignedPages(cfg, day, day);
+            } catch (e) {
+                got = null;
+            }
+            if (!got || !got.measured || got.partial) out.partial = true;
+            if (!got) continue;
+            if (got.truncated) out.truncated = true;
+            for (let i = 0; i < got.codes.length; i++) out.codes.push(got.codes[i]);
+        }
+    };
+    const workers = [];
+    for (let w = 0; w < ZTO_SIGNED_DAY_CONCURRENCY && w < days.length; w++) workers.push(worker());
+    await Promise.all(workers);
+    return out;
+}
+
+export async function fetchZtoSignedPages(cfg, from, to) {
     const first = await fetchZtoListPage(cfg, from, to, 1, 'signed');
     if (!first) return null;
-    if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false };
+    if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false, partial: false };
     const codes = first.signed.slice();
     const reported = Number(first.pages);
     const pages = isFinite(reported) && reported > 0 ? reported : 1;

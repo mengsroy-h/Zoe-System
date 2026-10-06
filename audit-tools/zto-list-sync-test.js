@@ -2572,6 +2572,14 @@ function firstBody(requests) {
     ok('⛔ `signed=1` ➜ `rows: []` · `signedOk:true` · barcode ចុះហត្ថលេខា',
         rowsOf(onlySigned.body).length === 0 && onlySigned.body.signedOk === true && Array.isArray(onlySigned.body.signed)
         && onlySigned.body.signed.indexOf('77130500002101') !== -1, onlySigned.body);
+    // ⛔ E3 ៖ ជុំបិទតាម ZTO បំបែកបញ្ជីវែង (លើសពិដានទំព័រ) ជាថ្ងៃៗ ➜ `signed=1` ត្រូវគោរពជួរដែលសុំ (មិនពង្រីកដល់ថ្ងៃនេះ) ·
+    //    companion (`withSigned=1`) នៅពង្រីកដដែល (ការបិទកើតក្រោយមកដល់)។
+    const dayBefore = new Date(Date.parse(todayKey + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+    const oneDay = await typedCall(GOOD_LIST_ENV, { signed: '1', from: dayBefore, to: dayBefore });
+    const oneDayCond = (oneDay.requests[0] && bodyAt(oneDay.requests[0]) && bodyAt(oneDay.requests[0]).condition) || {};
+    ok('⛔ E3 ៖ `signed=1` គោរពជួរថ្ងៃដែលសុំ (ការបំបែកតាមថ្ងៃ) ➜ មិនពង្រីកដល់ថ្ងៃនេះ',
+        oneDay.requests.length === 1 && oneDayCond.scanStartTime === dayBefore + ' 00:00:00' && oneDayCond.scanEndTime === dayBefore + ' 23:59:59',
+        [oneDayCond.scanStartTime, oneDayCond.scanEndTime]);
 
     const off = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: 'off' }), { withSigned: '1' });
     ok('⛔ `ZTO_LIST_SIGNED_SCAN_TYPE=off` ➜ upstream ១ សំណើ (`03`) · `signed:null`',

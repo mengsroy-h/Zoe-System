@@ -6,6 +6,7 @@ import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ZTO_AUTOCLOSE_KEY, ZTO_STATUS_STORE_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS } from '../core/text';
+import { getZoneDateKey } from '../core/timezone';
 import { itemHasRestoreMarkers, sanitizeInput } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
@@ -16,7 +17,7 @@ import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT, ztoListSignedProbe } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, fetchZtoSignedCodes, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -38,6 +39,14 @@ export const ZTO_STATUS_SWEEP_BATCH = 10;
 export const ZTO_STATUS_BANNER_CODES = 3;
 
 export const ZTO_OPEN_RECHECK_MS = 60 * 60 * 1000;
+
+export const ZTO_SIGNED_SWEEP_GAP_MS = 2 * 60 * 1000;
+
+export const ZTO_SIGNED_SWEEP_IDLE_MS = 30 * 60 * 1000;
+
+export const ZTO_SIGNED_SWEEP_LOOKBACK_DAYS = 7;
+
+export const ZTO_SIGNED_SWEEP_RECENT_MS = 12 * 60 * 60 * 1000;
 
 export const ztoPickupStatus = new Map();
 
@@ -93,6 +102,11 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoListSyncResult = null;
     ztoState.ztoListPreview = null;
     ztoListSignedProbe.clear();
+    ztoListSignedEvidence.clear();
+    viewState.ztoListSyncSite = '';
+    ztoState.ztoSignedSweepAt = 0;
+    ztoState.ztoSignedSweepOkAt = 0;
+    ztoState.ztoSignedSweepWaitMs = 0;
     ztoPickupStatus.clear();
     ztoState.ztoStatusBannerSig = '';
     ztoState.ztoStatusModalSig = '';
@@ -250,6 +264,68 @@ export async function autoCloseBarcodeFromZto(entry, dataToScan) {
     const done = await applyBarcodeCloseChange(entry.itemId, entry.code, true,
         { silent: true, showModal: false });
     return done === true;
+}
+
+export function ztoSignedSweepIsDue(force) {
+    if (force || !ztoState.ztoSignedSweepAt) return true;
+    return elapsedSince(ztoState.ztoSignedSweepAt) >= (ztoState.ztoSignedSweepWaitMs || ZTO_SIGNED_SWEEP_GAP_MS);
+}
+
+export function ztoSignedSweepRange() {
+    const now = getServerNow();
+    const recent = ztoState.ztoSignedSweepOkAt
+        && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS;
+    return { from: getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS), to: getZoneDateKey(now, 0) };
+}
+
+export async function closeZtoSignedBarcodes(cfg, entries, dataToScan) {
+    const session = captureZtoSession();
+    const out = { closed: 0, more: false, keys: new Set() };
+    if (!Array.isArray(entries) || !entries.length) return out;
+    ztoState.ztoSignedSweepAt = Date.now();
+    const range = ztoSignedSweepRange();
+    let signed = null;
+    try {
+        signed = await fetchZtoSignedCodes(cfg, range.from, range.to);
+    } catch (e) {
+        if (!session.current()) return out;
+        const grown = (ztoState.ztoSignedSweepWaitMs || ZTO_SIGNED_SWEEP_GAP_MS) * 2;
+        ztoState.ztoSignedSweepWaitMs = e && e.notConfigured
+            ? ZTO_SIGNED_SWEEP_IDLE_MS
+            : Math.min(ZTO_SIGNED_SWEEP_IDLE_MS, grown);
+        return out;
+    }
+    if (!session.current()) return out;
+    if (!signed || !signed.measured) {
+        ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_IDLE_MS;
+        return out;
+    }
+    ztoState.ztoSignedSweepOkAt = Date.now();
+    ztoState.ztoSignedSweepWaitMs = ZTO_SIGNED_SWEEP_GAP_MS;
+    const signedKeys = new Set();
+    for (let i = 0; i < signed.codes.length; i++) {
+        const key = pickupBarcodeKey(signed.codes[i]);
+        if (key) signedKeys.add(key);
+    }
+    let tried = 0;
+    for (let i = 0; i < entries.length; i++) {
+        if (!signedKeys.has(entries[i].key)) continue;
+        if (tried >= ZTO_STATUS_SWEEP_BATCH) {
+            out.more = true;
+            ztoState.ztoSignedSweepWaitMs = 1;
+            break;
+        }
+        if ((navigator.onLine as boolean) === false) break;
+        tried++;
+        const done = await autoCloseBarcodeFromZto(entries[i], dataToScan);
+        if (!session.current()) return { closed: 0, more: false, keys: new Set() };
+        if (done) {
+            out.closed++;
+            out.keys.add(entries[i].key);
+            setZtoPickupVerdict(entries[i].code, true);
+        }
+    }
+    return out;
 }
 
 export function ztoStatusPendingList(dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
@@ -490,14 +566,28 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
         : [];
     const queue = closedWork.concat(openWork);
     const work = rotateZtoSweepQueue(queue, ztoState.ztoStatusSweepCursor).slice(0, ZTO_STATUS_SWEEP_BATCH);
-    if (!work.length) return 0;
+    const signedEntries = ztoAutoCloseEnabled() && ztoSignedSweepIsDue(force)
+        ? collectOpenBarcodesForZtoStatus(dataToScan) : [];
+    if (!work.length && !signedEntries.length) return 0;
     ztoState.ztoStatusInFlight = true;
     let measured = 0;
     let autoClosed = 0;
     let recorded = 0;
     let attempted = 0;
+    let signedMore = false;
+    let signedKeys = new Set();
     try {
+        if (signedEntries.length) {
+            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan);
+            if (!session.current()) return 0;
+            autoClosed += signed.closed;
+            measured += signed.closed;
+            signedMore = signed.more;
+            signedKeys = signed.keys;
+            if (signed.closed) renderZtoSyncViews(dataToScan, trashToScan);
+        }
         for (let i = 0; i < work.length; i++) {
+            if (work[i].open && signedKeys.has(work[i].key)) continue;
             if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
             let answer = null;
             attempted++;
@@ -530,7 +620,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     if (recorded > 0) ztoState.ztoStatusFailStreak = 0;
     else if (attempted > 0) ztoState.ztoStatusFailStreak++;
     renderZtoSyncViews(dataToScan, trashToScan);
-    if (recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) {
+    if ((recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) || signedMore) {
         scheduleZtoStatusSweep(ztoStatusSweepGapMs() + 500);
     }
     return measured;

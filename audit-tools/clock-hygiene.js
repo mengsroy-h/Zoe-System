@@ -63,6 +63,7 @@ const LOCAL_CLOCK_OK = {
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',
         setZtoPickupVerdict: 'ត្រាពេលនៃសាលក្រម ZTO ក្នុង cache localStorage — TTL local សុទ្ធសាធ (មិនចូល Firebase · មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យសាលក្រម *ថ្មី* ត្រូវបោះចោល រាល់ការផ្ទុកឡើងវិញ ➜ ការហៅឥតឈប់ (`clock-basis-test.js`)',
         txReadServerValue: 'ថវិកាអាន token + fetch + body ក្នុងសំណើតែមួយ; elapsedSince() មិនមែន timestamp ទិន្នន័យ ឬច្បាប់លុយ',
+        closeZtoSignedBarcodes: 'ត្រាពេលនៃការអានបញ្ជី «ចុះហត្ថលេខា» ZTO ចុងក្រោយ (ព្យាយាម · ជោគជ័យ) — ចន្លោះ `ZTO_SIGNED_SWEEP_GAP_MS`/`ZTO_SIGNED_SWEEP_IDLE_MS` និងការជ្រើសជួរថ្ងៃ local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ចន្លោះរលាយ ➜ សួរ ZTO រាល់ជុំ (`clock-basis-test.js`) · ថ្ងៃរបស់សំណួរយកពី getServerNow() ដដែល',
         runZtoStatusSweep: 'ត្រាពេលនៃជុំបោស ZTO ចុងក្រោយ — ពិដានល្បឿន local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ពិដានរលាយ (`clock-basis-test.js`)',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
         noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',

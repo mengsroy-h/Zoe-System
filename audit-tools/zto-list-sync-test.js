@@ -146,6 +146,7 @@ const ENV_NAMES = [
     'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN',
     'ZTO_LIST_SITE_CODE', 'ZTO_LIST_URL', 'ZTO_LIST_SCAN_TYPE',
     'ZTO_LIST_PAGE_SIZE', 'ZTO_LIST_MAX_PAGES', 'ZTO_LIST_SCAN_DESC',
+    'ZTO_LIST_SIGNED_SCAN_TYPE', 'ZTO_LIST_SIGNED_SCAN_DESC',
     'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'
 ];
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
@@ -471,14 +472,22 @@ function firstBody(requests) {
             customerCodeDesc: 'ztda', agentAmount: 0.0, fcAmount: 2.5,
             scanTime: '2026-09-11 15:15:22', scanTypeDesc: 'ចុះហត្ថលេខា' })
     ];
+    // ⛔ **សំណើម្ចាស់គម្រោង (ZoeW 2.50.0) ៖ «ទាញតែកញ្ចប់មកដល់»** — ជួរដេកដែលប្រភេទស្កេន **ខុសដោយវាស់បាន** មិនចេញជាជួរដេកទៀតទេ
+    // (មុន ៖ ចេញជាជួរ «រំលង») ➜ ប៉ុន្តែ **មិនបាត់ស្ងាត់** ៖ រាប់ក្នុង `otherScans` · ជួរ «ចុះហត្ថលេខា» ក្លាយជា **ភស្តុតាង «ZTO បិទរួច»**
+    // (`signed`) ➜ ការអភិរក្សខាង server ៖ `rows + otherScans + signedScans` = ជួរដេក upstream។
     const lifeOut = await listCall(listPayload(LIFECYCLE, { pages: 1, total: 3 }), GOOD_LIST_ENV);
     const lifeRows = rowsOf(lifeOut.body);
-    ok('ជាន់អប្បបរមា ៖ ជួរដេកវដ្តជីវិតទាំង ៣ ត្រឡប់មកវិញ', lifeRows.length === 3, lifeRows.length);
-    ok('⛔ `អីវ៉ាន់មកដល់` ➜ ប្រើបាន', lifeRows[0] && lifeRows[0].skip === '', lifeRows[0]);
-    ok('⛔ `ការចែកចាយអីវ៉ាន់` ➜ សម្គាល់ `scan-type` (កុំឲ្យក្លាយជាកញ្ចប់ទី ២)',
-        lifeRows[1] && lifeRows[1].skip === 'scan-type', lifeRows[1]);
-    ok('⛔ `ចុះហត្ថលេខា` ➜ សម្គាល់ `scan-type`',
-        lifeRows[2] && lifeRows[2].skip === 'scan-type', lifeRows[2]);
+    const lifeBody = lifeOut.body || {};
+    ok('⛔ ទាញតែ «អីវ៉ាន់មកដល់» ៖ វដ្តជីវិត ៣ ជួរ ➜ ជួរដេកបញ្ចូលបាន ១', lifeRows.length === 1, lifeRows.length);
+    ok('⛔ `អីវ៉ាន់មកដល់` ➜ ប្រើបាន', lifeRows[0] && lifeRows[0].skip === '' && lifeRows[0].barcode === '77130529557463', lifeRows[0]);
+    ok('⛔ `ការចែកចាយអីវ៉ាន់` ➜ មិនមែនជួរដេក (កុំឲ្យក្លាយជាកញ្ចប់ទី ២) តែរាប់ក្នុង `otherScans`',
+        lifeBody.otherScans === 1, lifeBody.otherScans);
+    ok('⛔ `ចុះហត្ថលេខា` ➜ មិនមែនជួរដេក ➜ ភស្តុតាង «ZTO បិទរួច» (`signed`)',
+        lifeBody.signedScans === 1 && Array.isArray(lifeBody.signed) && lifeBody.signed[0] === '77130529557463',
+        { signedScans: lifeBody.signedScans, signed: lifeBody.signed });
+    ok('⛔ ការអភិរក្សខាង server ៖ `rows + otherScans + signedScans` = ជួរដេក upstream',
+        lifeRows.length + (lifeBody.otherScans || 0) + (lifeBody.signedScans || 0) === LIFECYCLE.length,
+        [lifeRows.length, lifeBody.otherScans, lifeBody.signedScans]);
     ok('⛔ **`fcAmount` ជា DOD លើផ្លូវបញ្ជី** (កញ្ចប់ `ztda` ៖ COD 0 · DOD 2.5)',
         lifeRows[0] && lifeRows[0].cod === 0 && lifeRows[0].dod === 2.5, lifeRows[0]);
     ok('⛔ តម្លៃអត្ថបទប្រភេទស្កេនមិនឡើងដល់ browser',
@@ -894,7 +903,9 @@ function firstBody(requests) {
         'EXPIRED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'ZTO_LIST_SIGNED_PROBE_MAX'];
     const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
         .concat([extractConst(APP_SRC, 'ztoListSignedProbe')
-            || 'const ztoListSignedProbe = new Map();']);
+            || 'const ztoListSignedProbe = new Map();',
+        extractConst(APP_SRC, 'ztoListSignedEvidence')
+            || 'const ztoListSignedEvidence = new Set();']);
     ok('⛔ ស្រង់ថេរនាឡិកា/ច្បាប់សម្អាតចេញពី `app.js` បាន',
         CLOCK_CONST_NAMES.every((name) => !!extractConst(APP_SRC, name)), NEEDED_CONSTS);
     const parts = [];
@@ -1123,14 +1134,14 @@ function firstBody(requests) {
     const descOut = await listCall(listPayload(DESC_ROWS), GOOD_LIST_ENV);
     const descRows = rowsOf(descOut.body);
     const byCode = (code) => descRows.filter((r) => r.barcode === code)[0] || null;
-    ok('ជាន់អប្បបរមា ៖ ជួរដេកទាំង ៤ ត្រឡប់មកវិញ (មិនទម្លាក់ស្ងាត់)',
-        descRows.length === 4, descRows.length);
+    ok('ជាន់អប្បបរមា ៖ ជួរដេក ៣ ត្រឡប់មក + ១ រាប់ក្នុង `otherScans` (មិនទម្លាក់ស្ងាត់)',
+        descRows.length === 3 && !!descOut.body && descOut.body.otherScans === 1,
+        { rows: descRows.length, other: descOut.body && descOut.body.otherScans });
     ok('⛔ `scanTypeDesc` ត្រូវគ្នា ➜ ជួរដេកប្រើបាន',
         !!byCode('77130500000101') && byCode('77130500000101').skip === '',
         byCode('77130500000101'));
-    ok('⛔ `scanTypeDesc` **ខុស** ➜ សម្គាល់ `skip: \'scan-type\'`',
-        !!byCode('77130500000102') && byCode('77130500000102').skip === 'scan-type',
-        byCode('77130500000102'));
+    ok('⛔ `scanTypeDesc` **ខុស** ➜ មិនមែនជួរដេក (ទាញតែ «អីវ៉ាន់មកដល់»)',
+        byCode('77130500000102') === null, byCode('77130500000102'));
     ok('⛔ `scanTypeDesc` ទទេ ➜ **មិនរំលង** («មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»)',
         !!byCode('77130500000103') && byCode('77130500000103').skip === '',
         byCode('77130500000103'));
@@ -1160,15 +1171,18 @@ function firstBody(requests) {
     const codeOut = await listCall(listPayload(codeRows), GOOD_LIST_ENV);
     const codeRowsOut = rowsOf(codeOut.body);
     const byCode2 = (c) => codeRowsOut.filter((r) => r.barcode === c)[0] || null;
-    ok('ជាន់អប្បបរមា ៖ ជួរដេកទាំង ៥ ត្រឡប់មកវិញ', codeRowsOut.length === 5, codeRowsOut.length);
+    ok('ជាន់អប្បបរមា ៖ ជួរដេក ៣ ត្រឡប់មក + ២ រាប់ក្នុង `otherScans`',
+        codeRowsOut.length === 3 && !!codeOut.body && codeOut.body.otherScans === 2,
+        { rows: codeRowsOut.length, other: codeOut.body && codeOut.body.otherScans });
     ok('⛔ `scanTypeCode` = `03` និង desc ត្រូវគ្នា ➜ ប្រើបាន',
         !!byCode2('77130500000301') && byCode2('77130500000301').skip === '', byCode2('77130500000301'));
-    ok('⛔ `scanTypeCode` = `04` ➜ សម្គាល់ `scan-type`',
-        !!byCode2('77130500000302') && byCode2('77130500000302').skip === 'scan-type',
-        byCode2('77130500000302'));
-    ok('⛔ **កូដខុស ទោះអត្ថបទត្រូវ** ➜ សម្គាល់ (ជាន់ ២ ឯករាជ្យ)',
-        !!byCode2('77130500000303') && byCode2('77130500000303').skip === 'scan-type',
-        byCode2('77130500000303'));
+    ok('⛔ `scanTypeCode` = `04` ➜ មិនមែនជួរដេក',
+        byCode2('77130500000302') === null, byCode2('77130500000302'));
+    ok('⛔ **កូដខុស ទោះអត្ថបទត្រូវ** ➜ មិនមែនជួរដេក (ជាន់ ២ ឯករាជ្យ)',
+        byCode2('77130500000303') === null, byCode2('77130500000303'));
+    ok('⛔ **កូដ `05` តែអត្ថបទនិយាយ «មកដល់»** ➜ **មិនមែនភស្តុតាង «បិទរួច»** (ជាន់ ២ ផ្ទុយគ្នា ➜ មិនបិទ)',
+        !!codeOut.body && Array.isArray(codeOut.body.signed) && codeOut.body.signed.length === 0,
+        codeOut.body && codeOut.body.signed);
     ok('⛔ `scanTypeCode` ទទេ ➜ **មិនរំលង** («មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»)',
         !!byCode2('77130500000304') && byCode2('77130500000304').skip === '',
         byCode2('77130500000304'));
@@ -1257,11 +1271,14 @@ function firstBody(requests) {
         'barcodeAbandonIsRipe'];
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
-        'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp');
+        'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
+        'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'itemHasRestoreMarkers');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
         .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};',
-            extractConst(APP_SRC, 'ztoListSignedProbe') || 'const ztoListSignedProbe = new Map();']);
+            extractConst(APP_SRC, 'ztoListSignedProbe') || 'const ztoListSignedProbe = new Map();',
+            extractConst(APP_SRC, 'ztoListSignedEvidence') || 'const ztoListSignedEvidence = new Set();',
+            constOrStub(APP_SRC, 'ZTO_LIST_PROBE_CONCURRENCY')]);
     const importOptional = ['armLateWrite', 'releaseLateBarcodeClaim']
         .map((name) => extractFn(APP_SRC, name) || '').filter(Boolean);
     const importMissing = IMPORT_NAMES.filter((name) => !extractFn(APP_SRC, name)).length;
@@ -1269,7 +1286,7 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [] };
+        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [] };
         const box = {
             console: console,
             db: {}, authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
@@ -1309,6 +1326,8 @@ function firstBody(requests) {
                 calls.close.push({ itemId, code, closed, opts });
                 return Promise.resolve(box.__closeOk !== false);
             },
+            ztoAutoCloseEnabled: () => box.__autoClose !== false,
+            setZtoPickupVerdict: (code, closed) => { calls.verdict.push({ code, closed }); },
             dropOptimisticBarcode: () => {},
             refreshCurrentHistoryView: () => {},
             renderZtoListSyncPreview: () => {},
@@ -1340,6 +1359,7 @@ function firstBody(requests) {
                 + '\nglobalThis.__trashRetentionMs = trashRetentionMs;'
                 + '\nglobalThis.__resolveSigned = resolveZtoListSignedVerdicts;'
                 + '\nglobalThis.__signedProbe = ztoListSignedProbe;'
+                + '\nglobalThis.__signedEvidence = ztoListSignedEvidence;'
                 + '\nglobalThis.__probeMax = ZTO_LIST_SIGNED_PROBE_MAX;', box);
             runImport = box.__run;
         } catch (e) {
@@ -1355,8 +1375,10 @@ function firstBody(requests) {
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
                 calls.release.length = 0; calls.toast.length = 0;
-                calls.probe.length = 0; calls.close.length = 0;
+                calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0;
                 box.scanHistory.length = 0;
+                if (box.__signedEvidence) box.__signedEvidence.clear();
+                box.__autoClose = true;
                 box.__probeVerdict = undefined; box.__probeThrows = false;
                 box.__closeOk = true;
                 if (box.__signedProbe) box.__signedProbe.clear();
@@ -1695,9 +1717,16 @@ function firstBody(requests) {
                         callsDecider(classifySrc) && callsDecider(probeSrc),
                         { decider: decider, classify: callsDecider(classifySrc), probe: callsDecider(probeSrc) });
                 }
-                ok('⛔ ទិសផ្ទុយ ៖ ជួរដេក **ក្មេង** មិនត្រូវសម្គាល់ `closedAtZto` (ការស្កេនធម្មតាមិនប្រែ)',
-                    (gradeOne(true, zoneText(NOW - AGE + 60000)).fresh[0] || {}).closedAtZto === false,
+                // ⛔ **សំណើម្ចាស់គម្រោង (ZoeW 2.50.0)** ៖ «បើប៉ះកញ្ចប់ដែលបិទរួច សូមបូកវាចូលស្ថិតិដូចបិទដោយដៃ ១០០%» ➜
+                //    ជួរដេក **ក្មេង** ដែល ZTO បិទរួចក៏ត្រូវកើតមកជា «យករួច» (មុន ៖ តែជួរដេកចាស់ ➜ ក្មេងបញ្ចូលជា «មិនទាន់យក»
+                //    ហើយរង់ចាំការបិទស្វ័យប្រវត្តិ ឬដៃ)។ ⛔ ទិសផ្ទុយនៅដដែល ៖ `false`/`null` (មិនទាន់វាស់) ➜ **មិនបិទ**។
+                ok('⛔ ជួរដេក **ក្មេង** + ZTO **បិទរួច** ➜ សម្គាល់ `closedAtZto` (បញ្ចូលជា «យករួច» ដូចបិទដោយដៃ)',
+                    (gradeOne(true, zoneText(NOW - AGE + 60000)).fresh[0] || {}).closedAtZto === true,
                     gradeOne(true, zoneText(NOW - AGE + 60000)).fresh[0]);
+                ok('⛔ ទិសផ្ទុយ ៖ ជួរដេកក្មេង + ZTO **មិនទាន់បិទ** ឬ **វាស់មិនបាន** ➜ មិនសម្គាល់ `closedAtZto` («មិនអាចផ្ទៀងផ្ទាត់ ≠ បិទរួច»)',
+                    (gradeOne(false, zoneText(NOW - AGE + 60000)).fresh[0] || {}).closedAtZto === false
+                    && (gradeOne(null, zoneText(NOW - AGE + 60000)).fresh[0] || {}).closedAtZto === false,
+                    [gradeOne(false, zoneText(NOW - AGE + 60000)).fresh[0], gradeOne(null, zoneText(NOW - AGE + 60000)).fresh[0]]);
 
                 reset();
                 box.__now = NOW;
@@ -1877,6 +1906,76 @@ function firstBody(requests) {
                 ok('⛔ ថ្ងៃត្រូវតម្រៀប និងមិនស្ទួន (កញ្ចប់ច្រើនក្នុងថ្ងៃដដែល ➜ ថ្ងៃម្តង)',
                     (lastToast.match(/2026-09-09/g) || []).length === 1
                     && lastToast.indexOf('2026-09-09') < lastToast.indexOf('2026-09-10'), lastToast);
+                reset();
+
+                // ═════════════════════════════════════════════════════════
+                // ⛔ **ភស្តុតាង «ចុះហត្ថលេខា» (ZTO Palm) ➜ ស្ថិតិយកដូចបិទដោយដៃ ១០០%** (សំណើម្ចាស់គម្រោង ZoeW 2.50.0)
+                // ═════════════════════════════════════════════════════════
+                // ជួរដេក **ក្មេង** ដែល barcode ស្ថិតក្នុងបញ្ជី «ចុះហត្ថលេខា» ➜ កើតមកជាបិទ (អាគុយម៉ង់ទី ៧) ➜ ស្ថិតិយកតាម
+                // `applyBarcodeCloseChange()` (ទ្វារដដែលនឹងការចុចបិទដោយដៃ) · កញ្ចប់ **មានក្នុង ZoeW ហើយនៅបើក** ➜ បិទតាមទ្វារដដែល
+                // (គោរពកុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ») · ⛔ គ្មាន claim/ការរក្សាទុកទី ២ · ⛔ កញ្ចប់បិទស្រាប់មិនប៉ះ។
+                const evidence = box.__signedEvidence;
+                ok('ជាន់អប្បបរមា ៖ `ztoListSignedEvidence` មានក្នុង `app.js` ពិត',
+                    !!extractConst(APP_SRC, 'ztoListSignedEvidence'), !!extractConst(APP_SRC, 'ztoListSignedEvidence'));
+                const youngAt = zoneText(NOW - 86400000);
+                reset();
+                box.__now = NOW;
+                evidence.add('77130500000851');
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000851', phone: '0963897345', cod: 3, dod: 1, at: youngAt, skip: '', ztoClosed: null },
+                        { barcode: '77130500000852', phone: '0963897345', cod: 2, dod: 0, at: youngAt, skip: '', ztoClosed: null }],
+                    from: '2026-09-08', to: '2026-09-11', total: 2
+                };
+                await runImport();
+                const savedSigned = calls.save.find((c) => c.code === '77130500000851') || {};
+                const savedOpen = calls.save.find((c) => c.code === '77130500000852') || {};
+                ok('⛔ ជួរដេកក្មេងដែល ZTO ចុះហត្ថលេខា ➜ **កើតមកជាបិទ** (ត្រាបិទ = ម៉ោងឥឡូវ)',
+                    savedSigned.closedAtMs === NOW, savedSigned);
+                ok('⛔ ទិសផ្ទុយ ៖ ជួរដេកក្រៅបញ្ជីចុះហត្ថលេខា ➜ **នៅបើក** («គ្មានភស្តុតាង ≠ បិទរួច»)',
+                    savedOpen.closedAtMs === 0, savedOpen);
+                ok('⛔ ស្ថិតិយកតាម **ទ្វារតែមួយ** `applyBarcodeCloseChange()` (ស្ងាត់ · មិនបើកប្រអប់) ➜ ដូចបិទដោយដៃ',
+                    calls.close.length === 1 && calls.close[0].code === '77130500000851' && calls.close[0].closed === true
+                    && !!calls.close[0].opts && calls.close[0].opts.silent === true && calls.close[0].opts.showModal === false,
+                    calls.close);
+                ok('⛔ លុយចុះលើថ្ងៃស្កេន ZTO ដដែល (COD/DOD ឆ្លងកាត់បេះបិទ)',
+                    savedSigned.stampMs === stampOf(youngAt) && savedSigned.cod === 3 && savedSigned.dod === 1, savedSigned);
+
+                reset();
+                box.__now = NOW;
+                evidence.add('77130500000861');
+                evidence.add('77130500000862');
+                box.scanHistory = [
+                    { id: 'open-1', phone: '0963897345', barcodes: [{ code: '77130500000861', isClosed: false }] },
+                    { id: 'done-1', phone: '0963897345', barcodes: [{ code: '77130500000862', isClosed: true }] }
+                ];
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000861', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000862', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    from: '2026-09-08', to: '2026-09-11', total: 2
+                };
+                await runImport();
+                ok('⛔ កញ្ចប់ **មានក្នុង ZoeW ហើយនៅបើក** + ZTO ចុះហត្ថលេខា ➜ បិទតាម `applyBarcodeCloseChange()` (ដូចចុចបិទដោយដៃ)',
+                    calls.close.length === 1 && calls.close[0].itemId === 'open-1' && calls.close[0].code === '77130500000861'
+                    && calls.close[0].closed === true, calls.close);
+                ok('⛔ មិនមែនការបញ្ចូលទី ២ ៖ គ្មាន claim · គ្មានការរក្សាទុក (កញ្ចប់មានរួច)',
+                    calls.claim.length === 0 && calls.save.length === 0, { claim: calls.claim, save: calls.save });
+                ok('⛔ សាលក្រម «ZTO បិទរួច» ត្រូវកត់ (ជុំពិនិត្យមិនសួរម្តងទៀត)',
+                    calls.verdict.some((v) => v.code === '77130500000861' && v.closed === true), calls.verdict);
+                ok('⛔ សារបញ្ចប់រាប់ «បិទតាម ZTO»', calls.toast.some((m) => m.indexOf('បិទតាម ZTO 1') !== -1), calls.toast);
+
+                reset();
+                box.__now = NOW;
+                box.__autoClose = false;
+                evidence.add('77130500000861');
+                box.scanHistory = [{ id: 'open-1', phone: '0963897345', barcodes: [{ code: '77130500000861', isClosed: false }] }];
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000861', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    from: '2026-09-08', to: '2026-09-11', total: 1
+                };
+                await runImport();
+                ok('⛔ ទិសផ្ទុយ ៖ កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ ➜ មិនបិទកញ្ចប់ដែលមានស្រាប់',
+                    calls.close.length === 0, calls.close);
+                box.scanHistory = [];
                 reset();
             }
         }
@@ -2264,6 +2363,138 @@ function firstBody(requests) {
     const fbStill = await sbList(tokenFor('sok@zoew881859.com'), {});
     ok('⛔ ទិសផ្ទុយ ៖ ដាក់ Supabase env ហើយ ID token Firebase នៅដើរ (សាខាពី email)', siteSent() === '881859' && sbCalls.length === 0, { sent: siteSent(), body: fbStill.body });
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    console.log('\n== ២១. ⛔ បញ្ជី «ចុះហត្ថលេខា» (ZTO Palm) · ឈ្មោះសាខា · ទាញតែ «មកដល់» ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // ⛔ **សំណើម្ចាស់គម្រោង (ZoeW 2.50.0)** ៖ ទាញបញ្ជីលឿន · ទាញតែកញ្ចប់មកដល់ · Sync បិទពី ZTO ពិត · បង្ហាញឈ្មោះសាខា (`scanSite`)។
+    // ➜ `withSigned=1` ៖ Function សួរ `/scan/page/scan` **២ ស្របគ្នា** ក្នុងការហៅតែមួយ ៖ `03` (មកដល់) + `05` (ចុះហត្ថលេខា)
+    //    លើជួរ `from` ➜ `max(to, ថ្ងៃនេះ)` (ការចុះហត្ថលេខាកើត **ក្រោយ** មកដល់) ➜ `signed` = barcode ដែល ZTO បិទរួច។
+    // ⛔ ភស្តុតាងត្រូវ **វិជ្ជមាន** ៖ កូដ `05` ហើយអត្ថបទមិនផ្ទុយ · ឬគ្មានកូដ តែអត្ថបទ «ចុះហត្ថលេខា» ➜ ក្រៅពីនេះ ➜ មិនមែនភស្តុតាង
+    //    (ការបិទខុស = កញ្ចប់មិនទាន់យកចូលស្ថិតិយក ➜ មិនដែលផុតកំណត់/ដកលុយ)។
+    // ⛔ ការហៅចាស់ (គ្មាន `withSigned`) នៅ **១ សំណើ upstream** ដដែល ➜ App ចាស់មិនបង្កើនការហៅ ZTO។
+    const todayKey = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+    const signedStart = (() => {
+        const earliest = new Date(Date.parse(todayKey + 'T00:00:00Z') - 30 * 86400000).toISOString().slice(0, 10);
+        return RANGE.from > earliest ? RANGE.from : earliest;
+    })();
+    const SIGNED_ROWS = [
+        listRow({ scanBillCode: '77130500002101', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា', scanSite: 'Mer SorChrey' }),
+        listRow({ scanBillCode: '77130500002102', scanTypeCode: '05', scanTypeDesc: 'អីវ៉ាន់មកដល់' }),
+        (() => { const r = listRow({ scanBillCode: '77130500002103', scanTypeDesc: 'ចុះហត្ថលេខា' }); return r; })(),
+        listRow({ scanBillCode: '77130500002104', scanTypeCode: '04', scanTypeDesc: 'ការចែកចាយអីវ៉ាន់' }),
+        (() => { const r = listRow({ scanBillCode: '77130500002105' }); delete r.scanTypeDesc; return r; })(),
+        listRow({ scanBillCode: 'a b', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' }),
+        listRow({ scanBillCode: '77130500002101', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' })
+    ];
+    const ARRIVAL_ROWS = [
+        listRow({ scanBillCode: '77130500002101', scanTypeCode: '03', scanSite: 'Mer\u0007  SorChrey' }),
+        listRow({ scanBillCode: '77130500002106', scanTypeCode: '03', scanSite: 'Mer SorChrey' })
+    ];
+    let signedStatus = 200;
+    const byType = (code) => (code === '05' ? listPayload(SIGNED_ROWS, { pages: 1, total: SIGNED_ROWS.length })
+        : listPayload(ARRIVAL_ROWS, { pages: 1, total: ARRIVAL_ROWS.length }));
+    const typeOf = (init) => { try { return JSON.parse(String((init || {}).body || '')).condition.scanTypeCode; } catch (_) { return ''; } };
+    const typedFetch = withCerts(async (href, init) => {
+        seenRequests.push({ href: href, init: init });
+        const type = typeOf(init);
+        const status = type === '05' ? signedStatus : 200;
+        return { ok: status < 400, status: status, headers: { get: () => 'application/json' }, json: async () => byType(type) };
+    });
+    async function typedCall(env, query) {
+        resetEnv(env);
+        seenRequests.length = 0;
+        global.fetch = typedFetch;
+        const res = await call(listQuery(query));
+        return { status: res.statusCode, body: bodyOf(res), requests: seenRequests.slice() };
+    }
+    const bodyAt = (req) => { try { return JSON.parse(String((req.init || {}).body || '')); } catch (_) { return null; } };
+
+    const both = await typedCall(GOOD_LIST_ENV, { withSigned: '1' });
+    const bothTypes = both.requests.map((r) => typeOf(r.init)).sort();
+    ok('⛔ `withSigned=1` ➜ upstream **២ សំណើ** (`03` + `05`) ក្នុងការហៅតែមួយ', JSON.stringify(bothTypes) === '["03","05"]', bothTypes);
+    const signedReq = both.requests.find((r) => typeOf(r.init) === '05');
+    const signedCond = (signedReq && bodyAt(signedReq) && bodyAt(signedReq).condition) || {};
+    ok('⛔ សំណើ «ចុះហត្ថលេខា» ចងសាខាដដែល (មិនមែនសាខាផ្សេង)', signedCond.scanSiteCode === LIST_SITE, signedCond.scanSiteCode);
+    ok('⛔ ជួរ «ចុះហត្ថលេខា» ចប់ **ថ្ងៃនេះ** (ការបិទកើតក្រោយមកដល់) · ចាប់ពី `from` (ពិដាន ៣១ ថ្ងៃ)',
+        signedCond.scanEndTime === todayKey + ' 23:59:59' && signedCond.scanStartTime === signedStart + ' 00:00:00',
+        [signedCond.scanStartTime, signedCond.scanEndTime]);
+    ok('⛔ ចម្លើយ ៖ `signedOk:true` + barcode ដែលចុះហត្ថលេខា (មិនស្ទួន)',
+        both.body.signedOk === true && Array.isArray(both.body.signed)
+        && JSON.stringify(both.body.signed.slice().sort()) === '["77130500002101","77130500002103"]', both.body.signed);
+    ok('⛔ ភស្តុតាងត្រូវ **វិជ្ជមាន** ៖ កូដ `05` + អត្ថបទ «មកដល់» · កូដ `04` · គ្មានទាំង ២ · barcode ខូច ➜ មិនមែនភស្តុតាង',
+        Array.isArray(both.body.signed) && ['77130500002102', '77130500002104', '77130500002105', 'a b']
+            .every((c) => both.body.signed.indexOf(c) === -1), both.body.signed);
+    ok('⛔ `rows` មានតែ «អីវ៉ាន់មកដល់» (ជួរដេក `05` មិនក្លាយជាកញ្ចប់ថ្មី)',
+        rowsOf(both.body).length === 2 && rowsOf(both.body).every((r) => r.skip === ''), rowsOf(both.body).map((r) => r.barcode));
+    ok('⛔ ឈ្មោះសាខាពី `scanSite` (អក្សរបញ្ជាត្រូវដក · ចន្លោះត្រូវបង្រួម)', both.body.siteName === 'Mer SorChrey', both.body.siteName);
+    ok('⛔ លេខសាខាឡើងជាមួយ (`site`)', both.body.site === LIST_SITE, both.body.site);
+    ok('⛔ ឈ្មោះ/អាសយដ្ឋានអតិថិជននៅមិនឆ្លងកាត់', JSON.stringify(both.body).indexOf('ឈ្មោះអតិថិជន') === -1
+        && JSON.stringify(both.body).indexOf('磅湛直营店') === -1, true);
+
+    const plain = await typedCall(GOOD_LIST_ENV, {});
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មាន `withSigned` (App ចាស់) ➜ upstream **១ សំណើ** ដដែល', plain.requests.length === 1
+        && typeOf(plain.requests[0].init) === '03', plain.requests.map((r) => typeOf(r.init)));
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មាន `withSigned` ➜ `signedOk` មិនមែន `true`', plain.body.signedOk !== true, plain.body.signedOk);
+
+    resetEnv(GOOD_LIST_ENV);
+    seenRequests.length = 0;
+    global.fetch = typedFetch;
+    bodyOf(await call(listQuery({ withSigned: '1' })));
+    const cachedBoth = bodyOf(await call(listQuery({ withSigned: '1' })));
+    const plainAfter = bodyOf(await call(listQuery()));
+    ok('⛔ cache ៖ `withSigned` ដដែល ➜ `cached:true` · គ្មានការហៅ ZTO ថ្មី', cachedBoth.cached === true && cachedBoth.signedOk === true, cachedBoth.cached);
+    ok('⛔ cache ៖ ការហៅធម្មតាមិនទទួលចម្លើយ `withSigned` (កូនសោផ្សេង)', plainAfter.cached === false && plainAfter.signedOk !== true, plainAfter.cached);
+
+    signedStatus = 503;
+    const failedSigned = await typedCall(GOOD_LIST_ENV, { withSigned: '1' });
+    ok('⛔ សំណើ «ចុះហត្ថលេខា» ធ្លាក់ ➜ បញ្ជីមកដល់នៅ 200 · `signedOk:false` (មិនមែនកំហុសទាំងមូល)',
+        failedSigned.status === 200 && rowsOf(failedSigned.body).length === 2 && failedSigned.body.signedOk === false,
+        { status: failedSigned.status, signedOk: failedSigned.body.signedOk });
+    resetEnv(GOOD_LIST_ENV);
+    global.fetch = typedFetch;
+    bodyOf(await call(listQuery({ withSigned: '1' })));
+    const retrySigned = bodyOf(await call(listQuery({ withSigned: '1' })));
+    ok('⛔ ការធ្លាក់មិនត្រូវ cache (សាកម្តងទៀត ➜ សួរពិត)', retrySigned.cached === false, retrySigned.cached);
+    signedStatus = 200;
+
+    const onlySigned = await typedCall(GOOD_LIST_ENV, { signed: '1' });
+    ok('⛔ `signed=1` (ជុំបិទតាម ZTO ស្វ័យប្រវត្តិ) ➜ upstream ១ សំណើ `05`',
+        onlySigned.requests.length === 1 && typeOf(onlySigned.requests[0].init) === '05', onlySigned.requests.map((r) => typeOf(r.init)));
+    ok('⛔ `signed=1` ➜ `rows: []` · `signedOk:true` · barcode ចុះហត្ថលេខា',
+        rowsOf(onlySigned.body).length === 0 && onlySigned.body.signedOk === true && Array.isArray(onlySigned.body.signed)
+        && onlySigned.body.signed.indexOf('77130500002101') !== -1, onlySigned.body);
+
+    const off = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: 'off' }), { withSigned: '1' });
+    ok('⛔ `ZTO_LIST_SIGNED_SCAN_TYPE=off` ➜ upstream ១ សំណើ (`03`) · `signed:null`',
+        off.requests.length === 1 && off.body.signed === null && off.body.signedOk === false, { n: off.requests.length, signed: off.body.signed });
+    const offOnly = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: 'off' }), { signed: '1' });
+    ok('⛔ បិទ ➜ `signed=1` មិនហៅ ZTO សោះ · `signedOk:false`', offOnly.requests.length === 0 && offOnly.body.signedOk === false, offOnly.body);
+    const same = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: '03' }), { withSigned: '1' });
+    ok('⛔ ប្រភេទ «ចុះហត្ថលេខា» ស្មើ «មកដល់» ➜ បិទ (កញ្ចប់មកដល់មិនត្រូវចាត់ជា «បិទរួច»)',
+        same.requests.length === 1 && same.body.signed === null, { n: same.requests.length, signed: same.body.signed });
+    const customDesc = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: '' }), { withSigned: '1' });
+    ok('⛔ `ZTO_LIST_SIGNED_SCAN_DESC=` ➜ ជាន់អត្ថបទបិទ ➜ ពឹងលើកូដ `05` តែម្យ៉ាង (គ្មានកូដ ➜ មិនមែនភស្តុតាង)',
+        Array.isArray(customDesc.body.signed) && customDesc.body.signed.indexOf('77130500002102') !== -1
+        && customDesc.body.signed.indexOf('77130500002103') === -1, customDesc.body.signed);
+
+    const diagSigned = await diagCall(GOOD_LIST_ENV);
+    ok('`?diag=1` ៖ `signedEnabled` + លំនាំដើម (`05` · «ចុះហត្ថលេខា»)',
+        listOf(diagSigned.body).signedEnabled === true && listOf(diagSigned.body).signedTypeIsDefault === true
+        && listOf(diagSigned.body).signedDescIsDefault === true, listOf(diagSigned.body));
+    const diagSame = await diagCall({ ZTO_LIST_SIGNED_SCAN_TYPE: '03' });
+    ok('`?diag=1` ៖ ប្រភេទស្មើគ្នា ➜ មូលហេតុ `signed-type:same`', listOf(diagSame.body).signedReason === 'signed-type:same', listOf(diagSame.body));
+    const defaults = /const DEFAULT_LIST_SIGNED_SCAN_TYPE = '([^']*)'/.exec(FUNCTION_SRC);
+    ok('ជាន់អប្បបរមា ៖ លំនាំដើម «ចុះហត្ថលេខា» ជា `05` (វាស់លើ payload ពិត ៖ ០៣ មកដល់ · ០៤ ចែកចាយ · ០៥ ចុះហត្ថលេខា)',
+        !!defaults && defaults[1] === '05', defaults && defaults[1]);
+
+    // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
+    const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
+    ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',
+        urlFn.indexOf("'&withSigned=1'") !== -1 && urlFn.indexOf("'&signed=1'") !== -1, urlFn.slice(0, 300));
+    const allPagesFn = extractFn(APP_SRC, 'fetchZtoListAllPages') || '';
+    ok('⛔ client ៖ ទំព័រ ១ ជាមួយ `withSigned` · ទំព័របន្ទាប់ស្របគ្នា (`Promise.all`)',
+        /fetchZtoListPage\([^)]*1, 'withSigned'\)/.test(allPagesFn) && allPagesFn.indexOf('Promise.all(') !== -1, allPagesFn.slice(0, 200));
     console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     ENV_NAMES.forEach((name) => {
         if (SAVED_ENV[name] === undefined) delete process.env[name];

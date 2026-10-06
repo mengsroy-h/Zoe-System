@@ -392,7 +392,9 @@ const ZTO_BACKEND = {
         { barcode: 'ZL2', phone: '0972222222', cod: 3, dod: 0, at: '2026-09-22 10:00:00', ztoClosed: null, skip: '' },
         { barcode: 'ZL2', phone: '0972222222', cod: 3, dod: 0, at: '2026-09-22 10:05:00', ztoClosed: null, skip: '' },
         { barcode: 'ZL3', phone: '', cod: 5, dod: 0, at: '2026-09-22 10:10:00', ztoClosed: null, skip: '' },
-        { barcode: 'ZL9', phone: '0975555555', cod: 1, dod: 0, at: '2026-09-18 08:00:00', ztoClosed: true, skip: '' },
+        // ⛔ `ztoClosed: null` ៖ ជួរដេកក្មេងដែល ZTO បិទរួច កើតមកជា «យករួច» ក្នុង App ថ្មី (ZoeW 2.50.0 · សំណើម្ចាស់គម្រោង) ខណៈ App ដើមបញ្ចូលវាបើក
+        //    ➜ parity វាស់ផ្លូវរួម · ផ្លូវថ្មី ៖ `zto-list-sync-test` ផ្នែក ១៦/២១ · `ZoeW/tests/zto-signed-sync.test.tsx` (`detail.ZL9` នៅ `true` សម្រាប់ការស្កេនស្ទួន)
+        { barcode: 'ZL9', phone: '0975555555', cod: 1, dod: 0, at: '2026-09-18 08:00:00', ztoClosed: null, skip: '' },
         { barcode: 'ZL8', phone: '0978888888', cod: 2, dod: 0, at: '2026-09-18 08:00:00', ztoClosed: false, skip: '' },
         { barcode: 'ZL7', phone: '0977777770', cod: 6, dod: 0, at: '2026-09-22 11:00:00', ztoClosed: null, skip: 'scan-type' }
     ]
@@ -472,7 +474,11 @@ async function state(S) {
     const errs = S.errors.concat(rej).slice(S.errMark);
     const asReq = S.appsScript.slice(S.asMark);
     S.asMark = S.appsScript.length;
-    const ztoReq = S.ztoCalls.slice(S.ztoMark).sort().join(' ‖ ');
+    // ⛔ ZoeW 2.50.0 (សំណើម្ចាស់គម្រោង) ៖ App ថ្មីសុំបញ្ជី «ចុះហត្ថលេខា» របស់ ZTO (`withSigned=1` លើទំព័របញ្ជី · `signed=1` ក្នុងជុំបិទតាម ZTO
+    //    ស្វ័យប្រវត្តិ) ➜ App ដើមគ្មាន ➜ ប្រៀបដោយដកវាចេញ (Function ក្លែងមិនឆ្លើយ `signed` ➜ គ្មានការបិទ ➜ អេក្រង់ · ការសរសេរ · DB នៅប្រៀបពេញ ·
+    //    ឥរិយាបថរបស់វា ៖ `zto-list-sync-test` ផ្នែក ២១ · `ZoeW/tests/zto-signed-sync.test.tsx`)
+    const ztoReq = S.ztoCalls.slice(S.ztoMark).filter((q) => !/[?&]signed=1(?:&|$)/.test(q))
+        .map((q) => q.replace(/&withSigned=1(?=&|$)/, '')).sort().join(' ‖ ');
     S.ztoMark = S.ztoCalls.length;
     S.mark = total;
     S.dialogMark = S.dialogs.length;

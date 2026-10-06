@@ -18,7 +18,7 @@ import { safeLookupReason } from './customer-table-prefetch';
 import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { captureZtoSession, checkZtoStatusForBarcode, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
+import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
 import { armLateWrite, fetchWithTimeout, withTimeout } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -39,6 +39,8 @@ export const ZTO_LIST_SERVER_CONFIG_REASONS = ['idtoken:aud', 'idtoken:iss', 'id
 
 export const ZTO_LIST_SIGNED_PROBE_MAX = 20;
 
+export const ZTO_LIST_PROBE_CONCURRENCY = 4;
+
 export const ZTO_LIST_SKIP_TEXT = {
     'scan-type': 'មិនមែនស្កេន «មកដល់»',
     'too-old-open': 'ចាស់ជាងច្បាប់សម្អាត ហើយ ZTO មិនទាន់បិទបញ្ជី ➜ មិនបញ្ចូល (បញ្ចូល ➜ ចូលធុងសំរាមភ្លាម ➜ ដកលុយ)',
@@ -47,6 +49,8 @@ export const ZTO_LIST_SKIP_TEXT = {
 };
 
 export const ztoListSignedProbe = new Map();
+
+export const ztoListSignedEvidence = new Set();
 
 export function ztoListSkipText(reason) {
     const key = String(reason === undefined || reason === null ? '' : reason);
@@ -86,7 +90,20 @@ export function drawerZtoListSyncFlow() {
 
 export function ztoListSignedVerdict(raw, key) {
     if (key && ztoListSignedProbe.has(key)) return ztoListSignedProbe.get(key);
-    return raw && typeof raw.ztoClosed === 'boolean' ? raw.ztoClosed : null;
+    if (raw && typeof raw.ztoClosed === 'boolean') return raw.ztoClosed;
+    return key && ztoListSignedEvidence.has(key) ? true : null;
+}
+
+export function noteZtoListSignedCodes(codes) {
+    if (!Array.isArray(codes)) return 0;
+    let added = 0;
+    for (let i = 0; i < codes.length; i++) {
+        const key = pickupBarcodeKey(codes[i]);
+        if (!key || ztoListSignedEvidence.has(key)) continue;
+        ztoListSignedEvidence.add(key);
+        added++;
+    }
+    return added;
 }
 
 export function ztoListRowAgeState(stampMs, now) {
@@ -96,9 +113,8 @@ export function ztoListRowAgeState(stampMs, now) {
 
 export function ztoListRowNeedsSignedProbe(raw, now) {
     if (!raw || raw.skip) return false;
-    if (typeof raw.ztoClosed === 'boolean') return false;
     const key = pickupBarcodeKey(raw.barcode);
-    if (!key || ztoListSignedProbe.has(key)) return false;
+    if (!key || ztoListSignedVerdict(raw, key) !== null) return false;
     if (!normalizeStoredPhone(raw.phone)) return false;
     return ztoListRowAgeState(ztoScanStampMillis(raw.at), now) === 'old';
 }
@@ -118,23 +134,34 @@ export async function resolveZtoListSignedVerdicts(cfg, rows) {
         if (pending.length >= ZTO_LIST_SIGNED_PROBE_MAX) break;
     }
     let measured = 0;
-    for (let i = 0; i < pending.length; i++) {
-        if (!session.current() || (navigator.onLine as boolean) === false) break;
-        setZtoListSyncNote('⏳ កំពុងពិនិត្យស្ថានភាព ZTO ' + (i + 1) + '/' + pending.length + '...');
-        let verdict = null;
-        try {
-            const out = await checkZtoStatusForBarcode(cfg, pending[i].code);
-            verdict = out && typeof out.closed === 'boolean' ? out.closed : null;
-        } catch (e) {
-            verdict = null;
+    let next = 0;
+    let done = 0;
+    let lost = false;
+    const worker = async () => {
+        while (next < pending.length) {
+            if (!session.current() || (navigator.onLine as boolean) === false) return;
+            const job = pending[next];
+            next++;
+            let verdict = null;
+            try {
+                const out = await checkZtoStatusForBarcode(cfg, job.code);
+                verdict = out && typeof out.closed === 'boolean' ? out.closed : null;
+            } catch (e) {
+                verdict = null;
+            }
+            if (!session.current()) { lost = true; return; }
+            done++;
+            setZtoListSyncNote('⏳ កំពុងពិនិត្យស្ថានភាព ZTO ' + done + '/' + pending.length + '...');
+            if (typeof verdict === 'boolean') {
+                ztoListSignedProbe.set(job.key, verdict);
+                measured++;
+            }
         }
-        if (!session.current()) return 0;
-        if (typeof verdict === 'boolean') {
-            ztoListSignedProbe.set(pending[i].key, verdict);
-            measured++;
-        }
-    }
-    return measured;
+    };
+    const workers = [];
+    for (let w = 0; w < ZTO_LIST_PROBE_CONCURRENCY && w < pending.length; w++) workers.push(worker());
+    await Promise.all(workers);
+    return lost ? 0 : measured;
 }
 
 export function classifyZtoListRows(rows, historyList, trashList) {
@@ -192,14 +219,12 @@ export function classifyZtoListRows(rows, historyList, trashList) {
             out.skipped.push(row);
             continue;
         }
-        if (ageState === 'old') {
-            if (row.ztoClosed !== true) {
-                row.skip = row.ztoClosed === false ? 'too-old-open' : 'too-old-unknown';
-                out.skipped.push(row);
-                continue;
-            }
-            row.closedAtZto = true;
+        if (ageState === 'old' && row.ztoClosed !== true) {
+            row.skip = row.ztoClosed === false ? 'too-old-open' : 'too-old-unknown';
+            out.skipped.push(row);
+            continue;
         }
+        row.closedAtZto = row.ztoClosed === true;
         const prior = best.get(key);
         if (!prior) {
             best.set(key, row);
@@ -221,20 +246,21 @@ export function classifyZtoListRows(rows, historyList, trashList) {
     return out;
 }
 
-export function buildZtoListApiUrl(cfg, from, to, page) {
+export function buildZtoListApiUrl(cfg, from, to, page, mode?) {
     if (!cfg || !cfg.url) return '';
     const raw = String(cfg.url).trim();
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
+    const extra = mode === 'signed' ? '&signed=1' : (mode === 'withSigned' ? '&withSigned=1' : '');
     return base + '?list=1'
         + '&from=' + encodeURIComponent(from)
-        + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page));
+        + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra;
 }
 
-export async function fetchZtoListPage(cfg, from, to, page) {
+export async function fetchZtoListPage(cfg, from, to, page, mode?) {
     const session = captureZtoSession();
-    const url = buildZtoListApiUrl(cfg, from, to, page);
+    const url = buildZtoListApiUrl(cfg, from, to, page, mode);
     if (!url) return null;
     const headers = await buildLookupRequestHeaders(cfg);
     if (!session.current()) return null;
@@ -267,6 +293,68 @@ export async function fetchZtoListPage(cfg, from, to, page) {
     return body;
 }
 
+export function ztoListSiteText(siteName, site) {
+    const name = String(siteName === undefined || siteName === null ? '' : siteName).trim();
+    const code = String(site === undefined || site === null ? '' : site).trim();
+    if (name && code) return name + ' · ' + code;
+    return name || code;
+}
+
+export async function fetchZtoListAllPages(cfg, from, to) {
+    const out = { rows: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedState: 'none' };
+    const absorb = (body, arrival) => {
+        if (!body) return;
+        if (arrival) {
+            for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
+            const reportedTotal = Number(body.total);
+            if (isFinite(reportedTotal) && reportedTotal > out.total) out.total = reportedTotal;
+            const other = Number(body.otherScans);
+            if (isFinite(other) && other > 0) out.otherScans += other;
+        }
+        if (!out.site && body.site) out.site = String(body.site);
+        if (!out.siteName && body.siteName) out.siteName = String(body.siteName);
+        noteZtoListSignedCodes(body.signed);
+    };
+    const first = await fetchZtoListPage(cfg, from, to, 1, 'withSigned');
+    if (!first) return out;
+    absorb(first, true);
+    const reported = Number(first.pages);
+    out.pages = isFinite(reported) && reported > 0 ? reported : 1;
+    const last = Math.min(out.pages, ZTO_LIST_CLIENT_MAX_PAGES);
+    const signedPages = Number(first.signedPages);
+    const signedLast = first.signedOk === true && isFinite(signedPages)
+        ? Math.min(signedPages, ZTO_LIST_CLIENT_MAX_PAGES) : 0;
+    const arrivalWork = [];
+    for (let page = 2; page <= last; page++) {
+        arrivalWork.push(fetchZtoListPage(cfg, from, to, page, page <= signedLast ? 'withSigned' : undefined));
+    }
+    const signedWork = [];
+    for (let page = last + 1; page <= signedLast; page++) {
+        signedWork.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
+    }
+    const signedSettled = Promise.all(signedWork);
+    const more = await Promise.all(arrivalWork);
+    const extraSigned = await signedSettled;
+    for (let i = 0; i < more.length; i++) absorb(more[i], true);
+    let signedFailed = false;
+    for (let i = 0; i < more.length; i++) {
+        if (more[i] && i + 2 <= signedLast && more[i].signedOk !== true) signedFailed = true;
+    }
+    for (let i = 0; i < extraSigned.length; i++) {
+        if (!extraSigned[i] || extraSigned[i].signedOk !== true) signedFailed = true;
+        absorb(extraSigned[i], false);
+    }
+    if (first.signedOk === true) {
+        out.signedState = signedFailed ? 'partial'
+            : (isFinite(signedPages) && signedPages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok');
+    } else if (first.signed === null) {
+        out.signedState = 'off';
+    } else if (first.signedOk === false) {
+        out.signedState = 'failed';
+    }
+    return out;
+}
+
 export function ztoListSyncRangeFromInputs() {
     const fromValue = fieldValue('ztoListSyncFrom');
     const toValue = fieldValue('ztoListSyncTo');
@@ -289,6 +377,11 @@ export function renderZtoListSyncPreview() {
         return;
     }
     const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
+    const closeTargets = ztoListCloseTargets(groups.existing);
+    const closeKeys = new Set(closeTargets.map((entry) => entry.key));
+    for (let i = 0; i < groups.existing.length; i++) {
+        groups.existing[i].closeInZoew = closeKeys.has(groups.existing[i].key);
+    }
     const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     const freshTitle = stale ? '🆕 ថ្មី ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '🆕 ថ្មី (មិនទាន់មានក្នុង ZoeW)';
     const existingTitle = stale ? '✅ មានក្នុង ZoeW រួច ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '✅ មានក្នុង ZoeW រួច';
@@ -305,10 +398,35 @@ export function renderZtoListSyncPreview() {
     const truncated = result.truncated
         ? ' · ⚠️ បញ្ជីវែងជាង ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
         : '';
+    const bornClosed = groups.fresh.filter((row) => row.closedAtZto === true).length;
     setZtoListSyncNote('ZTO រាយ ' + result.total + ' ជួរដេក · ទាញបាន ' + result.rows.length
         + ' · ' + result.from + ' ➜ ' + result.to + truncated
+        + ztoListSignedNote(result, bornClosed, closeTargets.length)
         + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
         + ' — ⛔ ជុំនេះជាការមើលជាមុន ៖ គ្មានអ្វីត្រូវបញ្ចូលទេ។');
+}
+
+export function ztoListSignedNote(result, bornClosed, closeCount) {
+    const parts = [];
+    const other = Number(result && result.otherScans);
+    if (isFinite(other) && other > 0) parts.push('⏭️ ស្កេនប្រភេទផ្សេង ' + other + ' ជួរ មិនរាប់ (ទាញតែ «អីវ៉ាន់មកដល់»)');
+    if (bornClosed > 0) parts.push('🔒 ថ្មីដែល ZTO បិទរួច ' + bornClosed + ' ➜ បញ្ចូលជា «យករួច»');
+    if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW តែ ZTO បិទរួច ' + closeCount + ' ➜ បិទពេលចុច «បញ្ចូល»');
+    const state = result && result.signedState;
+    if (state === 'partial') parts.push('⚠️ បញ្ជីចុះហត្ថលេខា ZTO ទាញបានមិនគ្រប់ ➜ ខ្លះនៅបើក (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
+    else if (state === 'failed') parts.push('⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន ➜ កញ្ចប់ថ្មីបញ្ចូលជា «មិនទាន់យក» (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
+    return parts.length ? ' · ' + parts.join(' · ') : '';
+}
+
+export function ztoListCloseTargets(existingRows, dataToScan = dataState.scanHistory) {
+    if (!Array.isArray(existingRows) || !existingRows.length || !ztoAutoCloseEnabled()) return [];
+    const wanted = new Set();
+    for (let i = 0; i < existingRows.length; i++) {
+        const row = existingRows[i];
+        if (row && row.key && row.ztoClosed === true) wanted.add(row.key);
+    }
+    if (!wanted.size) return [];
+    return collectOpenBarcodesForZtoStatus(dataToScan).filter((entry) => wanted.has(entry.key));
 }
 
 export async function runZtoListSyncPreview() {
@@ -338,29 +456,26 @@ export async function runZtoListSyncPreview() {
     }
     ztoState.ztoListSyncInFlight = true;
     setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO...');
-    const rows = [];
-    let pages = 1;
-    let total = 0;
+    ztoListSignedProbe.clear();
+    ztoListSignedEvidence.clear();
     try {
-        for (let page = 1; page <= ZTO_LIST_CLIENT_MAX_PAGES; page++) {
-            const body = await fetchZtoListPage(cfg, range.from, range.to, page);
-            if (!session.current()) return;
-            if (!body) break;
-            for (let i = 0; i < body.rows.length; i++) rows.push(body.rows[i]);
-            const reported = Number(body.pages);
-            pages = isFinite(reported) && reported > 0 ? reported : page;
-            const reportedTotal = Number(body.total);
-            if (isFinite(reportedTotal)) total = reportedTotal;
-            if (page >= pages) break;
-        }
+        const pulled = await fetchZtoListAllPages(cfg, range.from, range.to);
+        if (!session.current()) return;
+        const rows = pulled.rows;
         await resolveZtoListSignedVerdicts(cfg, rows);
         if (!session.current()) return;
+        if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);
         ztoState.ztoListSyncResult = {
             rows: rows,
             from: range.from,
             to: range.to,
-            total: total || rows.length,
-            truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES
+            total: pulled.total || rows.length,
+            truncated: pulled.pages > ZTO_LIST_CLIENT_MAX_PAGES,
+            site: pulled.site,
+            siteName: pulled.siteName,
+            otherScans: pulled.otherScans,
+            signedCount: ztoListSignedEvidence.size,
+            signedState: pulled.signedState
         };
         renderZtoListSyncPreview();
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
@@ -368,6 +483,7 @@ export async function runZtoListSyncPreview() {
         if (!session.current()) return;
         ztoState.ztoListSyncResult = null;
         ztoListSignedProbe.clear();
+        ztoListSignedEvidence.clear();
         renderZtoListSyncPreview();
         if (e && e.notConfigured) {
             const reason = e.listReason || 'site:no-account';
@@ -405,8 +521,10 @@ export async function markZtoListRowPickedUp(code) {
         && i.barcodes.some((b) => b && b.code === code));
     if (!item || !item.id) return false;
     try {
-        return (await applyBarcodeCloseChange(item.id, code, true,
+        const done = (await applyBarcodeCloseChange(item.id, code, true,
             { silent: true, showModal: false })) === true;
+        if (done) setZtoPickupVerdict(code, true);
+        return done;
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'markZtoListRowPickedUp', barcode: code });
         return false;
@@ -434,7 +552,8 @@ export async function importZtoListRows() {
     }
     const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
-    if (!queue.length) {
+    const closeTargets = ztoListCloseTargets(groups.existing);
+    if (!queue.length && !closeTargets.length) {
         showToast('ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
         return;
     }
@@ -446,12 +565,18 @@ export async function importZtoListRows() {
         : '';
     const pickedUp = queue.filter((row) => row.closedAtZto === true).length;
     const pickedUpNote = pickedUp
-        ? '\n🔒 ' + pickedUp + ' កញ្ចប់ចាស់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» ➜ ចូលធុងសំរាមក្នុង ២ ម៉ោង (លុយមិនត្រូវដក)។'
+        ? '\n🔒 ' + pickedUp + ' កញ្ចប់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» (ចូលស្ថិតិយក ដូចបិទដោយដៃ) ➜ ចូលធុងសំរាមក្នុង ២ ម៉ោង (លុយមិនត្រូវដក)។'
         : '';
-    if (!confirm('បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
-        + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។'
-        + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
-        + noStampNote + pickedUpNote)) {
+    const closeNote = closeTargets.length
+        ? '\n🔒 ' + closeTargets.length + ' កញ្ចប់មានក្នុង ZoeW តែ ZTO បិទបញ្ជីរួច ➜ បិទជា «យករួច» (ដូចចុចបិទដោយដៃ)។'
+        : '';
+    const question = queue.length
+        ? 'បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
+            + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។'
+            + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
+            + noStampNote + pickedUpNote + closeNote
+        : 'បិទ ' + closeTargets.length + ' កញ្ចប់ក្នុង ZoeW ដែល ZTO បិទបញ្ជីរួច?' + closeNote;
+    if (!confirm(question)) {
         return;
     }
     ztoState.ztoListSyncInFlight = true;
@@ -461,6 +586,8 @@ export async function importZtoListRows() {
     let pending = 0;
     let takenOver = 0;
     let notTried = 0;
+    let closedInZoew = 0;
+    let closeNotTried = 0;
     const savedDates = new Set();
     try {
         for (let i = 0; i < queue.length; i++) {
@@ -520,17 +647,29 @@ export async function importZtoListRows() {
                 }
             }
         }
+        for (let i = 0; i < closeTargets.length; i++) {
+            if (!session.current()) return;
+            if (notTried || (navigator.onLine as boolean) === false) { closeNotTried = closeTargets.length - i; break; }
+            setZtoListSyncNote('⏳ កំពុងបិទតាម ZTO ' + (i + 1) + '/' + closeTargets.length + '...');
+            if (await autoCloseBarcodeFromZto(closeTargets[i], dataState.scanHistory)) {
+                closedInZoew++;
+                setZtoPickupVerdict(closeTargets[i].code, true);
+            }
+        }
     } finally {
         if (session.ownsLock()) ztoState.ztoListSyncInFlight = false;
     }
     if (!session.current()) return;
-    if (!notTried) {
+    if (!notTried && !closeNotTried) {
         ztoState.ztoListSyncResult = null;
         ztoListSignedProbe.clear();
+        ztoListSignedEvidence.clear();
     }
     renderZtoListSyncPreview();
     const parts = ['✅ បញ្ចូល ' + saved + ' កញ្ចប់'];
     if (takenOver) parts.push('🔒 យករួច ' + takenOver);
+    if (closedInZoew) parts.push('🔒 បិទតាម ZTO ' + closedInZoew);
+    if (closeNotTried) parts.push('⏸️ មិនទាន់បិទ ' + closeNotTried + ' (បណ្តាញមិនឆ្លើយ ➜ ឈប់)');
     if (taken) parts.push('♻️ ស្ទួន ' + taken);
     if (pending) parts.push('⏳ កំពុងរក្សាទុក ' + pending);
     if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
@@ -541,7 +680,7 @@ export async function importZtoListRows() {
             + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
         : '';
     showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
-    setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried
+    setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried || closeNotTried
         ? ' — បញ្ជីនៅដដែល ➜ ចុច «បញ្ចូល» ម្តងទៀតពេលបណ្តាញល្អ (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន)។'
         : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។'));
 }
@@ -570,6 +709,7 @@ export function openZtoListSyncModal() {
     if (!fieldValue('ztoListSyncTo')) setFieldValue('ztoListSyncTo', getZoneDateKey(now, 0));
     ztoState.ztoListSyncResult = null;
     ztoListSignedProbe.clear();
+    ztoListSignedEvidence.clear();
     renderZtoListSyncPreview();
     setZtoListSyncNote('🏢 សាខាមកពីគណនីដែលចូលប្រព័ន្ធ — ជ្រើសជួរកាលបរិច្ឆេទ រួចចុច «📥 ទាញបញ្ជី»');
     openModalHelper('ztoListSyncModal');
@@ -578,5 +718,25 @@ export function openZtoListSyncModal() {
 export function closeZtoListSyncModal() {
     ztoState.ztoListSyncResult = null;
     ztoListSignedProbe.clear();
+    ztoListSignedEvidence.clear();
     closeModal('ztoListSyncModal');
+}
+
+export async function fetchZtoSignedCodes(cfg, from, to) {
+    const first = await fetchZtoListPage(cfg, from, to, 1, 'signed');
+    if (!first) return null;
+    if (first.signedOk !== true || !Array.isArray(first.signed)) return { measured: false, codes: [], truncated: false };
+    const codes = first.signed.slice();
+    const reported = Number(first.pages);
+    const pages = isFinite(reported) && reported > 0 ? reported : 1;
+    const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
+    const work = [];
+    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signed'));
+    const more = await Promise.all(work);
+    for (let i = 0; i < more.length; i++) {
+        if (more[i] && Array.isArray(more[i].signed)) {
+            for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
+        }
+    }
+    return { measured: true, codes: codes, truncated: pages > last };
 }

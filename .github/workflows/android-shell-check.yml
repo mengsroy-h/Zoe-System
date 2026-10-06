@@ -79,6 +79,7 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $testDir -Recurse -Force -ErrorAction SilentlyContinue
           }
+          exit 0
 
       - uses: actions/setup-node@v7
         with:

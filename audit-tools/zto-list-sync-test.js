@@ -944,7 +944,7 @@ function firstBody(requests) {
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ១០. ខាង Client ៖ ការចាត់ថ្នាក់ ៤ ក្រុម ==');
     // ═════════════════════════════════════════════════════════════════════
-    const NEEDED = ['classifyZtoListRows', 'barcodeRegistryKey', 'pickupBarcodeKey',
+    const NEEDED = ['classifyZtoListRows', 'ztoListRowOf', 'ztoListSignedRowIndex', 'barcodeRegistryKey', 'pickupBarcodeKey',
         'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'trashRetentionMs', 'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState'];
@@ -966,6 +966,7 @@ function firstBody(requests) {
     ok('⛔ ស្រង់ function ចាំបាច់ចេញពី `app.js` បាន', missing.length === 0, missing);
 
     let classify = null;
+    let sandbox0Stamp = () => NaN;
     {
         const sandbox = { console: console, getServerNow: () => sandbox.__now };
         sandbox.globalThis = sandbox;
@@ -976,6 +977,7 @@ function firstBody(requests) {
                 + '\nglobalThis.__stamp0 = ztoScanStampMillis;', sandbox);
             sandbox.__now = sandbox.__stamp0('2026-09-11 09:00:00');
             classify = sandbox.__classify;
+            sandbox0Stamp = sandbox.__stamp0;
         } catch (e) {
             ok('sandbox រត់បាន', false, String(e && e.message));
         }
@@ -1029,6 +1031,40 @@ function firstBody(requests) {
         try { junkOut = classify(null, null, null); } catch (_) { junkOut = null; }
         ok('ទិសផ្ទុយ ៖ input អាក្រក់ ➜ មិនបោះ',
             !!junkOut && groups.every((g) => Array.isArray(junkOut[g])), junkOut);
+
+        // ⛔ ZTO-E12 (សំណើម្ចាស់គម្រោង ៖ កញ្ចប់ 05 ចូលជា «បិទរួច» លើថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា) ៖ ជួរ `signedRows` ដែល barcode មិននៅក្នុងបញ្ជីមកដល់
+        //    និងថ្ងៃចុះហត្ថលេខាក្នុងចន្លោះ ➜ ថ្មី «យករួច» (ម៉ោង = ម៉ោងចុះហត្ថលេខា) · មានក្នុង ZoeW ➜ `existing` · ចាស់ជាងអាយុធុងសំរាម ➜ `too-old-purged` ·
+        //    ក្រៅចន្លោះ ➜ មិនរាប់ · ជួរមកដល់ ➜ ផ្លូវដើម + `signedAt`។
+        const arrivalOnly = [{ barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 09:10:16' }];
+        const signedIn = [
+            { barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 15:00:00', from: '' },
+            { barcode: '77130500000444', phone: '855977000111', cod: 4.25, dod: 1, at: '2026-09-09 08:30:00', from: 'taobao' },
+            { barcode: '77130500000111', phone: '855963897345', cod: 1, dod: 0, at: '2026-09-10 11:00:00', from: '' },
+            { barcode: '77130500000555', phone: '855977000222', cod: 2, dod: 0, at: '2026-09-12 08:00:00', from: '' },
+            { barcode: '77130500000666', phone: '855977000333', cod: 2, dod: 0, at: '2026-08-01 08:00:00', from: '' }
+        ];
+        let sOut = null;
+        try { sOut = classify(arrivalOnly, history, trash, signedIn, { from: '2026-08-01', to: '2026-09-11' }); } catch (e) { sOut = null; }
+        const plainOut = classify(arrivalOnly, history, trash);
+        const inGroup = (g, code) => !!sOut && sOut[g].some((r) => r.barcode === code);
+        const one = sOut ? sOut.fresh.find((r) => r.barcode === '77130500000444') : null;
+        const arr = sOut ? sOut.fresh.find((r) => r.barcode === '77130500000999') : null;
+        ok('⛔ E12 ៖ ជួរ 05 គ្មានស្កេនមកដល់ ➜ ថ្មី «យករួច» · ម៉ោង = ម៉ោងចុះហត្ថលេខា · phone/លុយ/ប្រភពពីជួរ 05',
+            !!one && one.signedOnly === true && one.closedAtZto === true && one.at === '2026-09-09 08:30:00'
+            && one.stampMs === sandbox0Stamp('2026-09-09 08:30:00') && one.phone === '0977000111' && one.cod === 4.25 && one.dod === 1 && one.from === 'taobao',
+            one);
+        ok('⛔ E12 ៖ ជួរមកដល់ដែលមានស្កេនចុះហត្ថលេខា ➜ ផ្លូវដើម (ម៉ោងមកដល់) + `signedAt` · មិនស្ទួនជាជួរ 05',
+            !!arr && !arr.signedOnly && arr.at === '2026-09-10 09:10:16' && arr.signedAt === '2026-09-10 15:00:00'
+            && sOut.fresh.filter((r) => r.barcode === '77130500000999').length === 1,
+            arr);
+        ok('⛔ E12 ៖ មានក្នុង ZoeW ➜ `existing` (ZTO បិទរួច) · ចាស់ជាងអាយុធុងសំរាម ➜ `too-old-purged` · ក្រៅចន្លោះ ➜ មិនរាប់',
+            inGroup('existing', '77130500000111') && sOut.existing.find((r) => r.barcode === '77130500000111').ztoClosed === true
+            && inGroup('skipped', '77130500000666') && sOut.skipped.find((r) => r.barcode === '77130500000666').skip === 'too-old-purged'
+            && !['fresh', 'existing', 'duplicate', 'skipped'].some((g) => inGroup(g, '77130500000555')),
+            sOut && { existing: sOut.existing.map((r) => r.barcode), skipped: sOut.skipped.map((r) => [r.barcode, r.skip]) });
+        ok('ទិសផ្ទុយ ៖ គ្មាន `signedRows` ➜ ក្រុមដូចមុនបេះបិទ (មានតែជួរមកដល់)',
+            JSON.stringify(plainOut.fresh.map((r) => r.barcode)) === '["77130500000999"]' && plainOut.existing.length === 0,
+            plainOut.fresh.map((r) => r.barcode));
     }
 
     // ═════════════════════════════════════════════════════════════════════
@@ -1036,7 +1072,7 @@ function firstBody(requests) {
     // ═════════════════════════════════════════════════════════════════════
     const WRITERS = ['addOrUpdateEntry', 'claimBarcodeInRegistry', 'fb.set', 'fb.update',
         'fb.push', 'fb.remove', 'fb.runTransaction'];
-    const previewFns = ['runZtoListSyncPreview', 'classifyZtoListRows', 'renderZtoListSyncPreview',
+    const previewFns = ['runZtoListSyncPreview', 'classifyZtoListRows', 'ztoListRowOf', 'ztoListSignedRowIndex', 'renderZtoListSyncPreview',
         'fetchZtoListPage'];
     const previewSrc = previewFns.map((name) => extractFn(APP_SRC, name) || '').join('\n');
     ok('ជាន់អប្បបរមា ៖ ស្រង់តួ function មើលជាមុនបាន', previewSrc.length > 600, previewSrc.length);
@@ -1314,7 +1350,7 @@ function firstBody(requests) {
         /id="ztoListSyncImportBtn"[^>]*data-act="importZtoListRows"/.test(HTML_SRC), true);
 
     // ⛔ ការវាស់ **ឥរិយាបថ** ៖ ស្រង់តួចូល sandbox រួចរាប់ការហៅពិត
-    const IMPORT_NAMES = ['importZtoListRows', 'classifyZtoListRows', 'barcodeRegistryKey',
+    const IMPORT_NAMES = ['importZtoListRows', 'classifyZtoListRows', 'ztoListRowOf', 'ztoListSignedRowIndex', 'barcodeRegistryKey',
         'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt'];
@@ -3414,6 +3450,47 @@ function firstBody(requests) {
             english.body.signedMismatch === 1 && Array.isArray(english.body.signed)
             && english.body.signed.indexOf('77130500002201') !== -1 && english.body.signed.indexOf('77130500002203') === -1,
             { mismatch: english.body.signedMismatch, signed: english.body.signed });
+
+        // ⛔ ZTO-E12 (សំណើម្ចាស់គម្រោង ៖ «បញ្ចូលតែកញ្ចប់ 03 ហើយកញ្ចប់ 05 ក៏ទាញបានតែត្រូវចូលជាកញ្ចប់បិទរួច» · ថ្ងៃ = «ថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា») ៖
+        //    កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែស្កេនមកដល់នៅមុនចន្លោះ (ឬគ្មាន) មិនដែលចូលបញ្ជីទេ ព្រោះ Function ផ្ញើតែលេខ barcode របស់ជួរ 05
+        //    ➜ ឥឡូវ ៖ ជួរ 05 ដែលជាភស្តុតាង ត្រូវ project ជា `signedRows` (barcode · phone · cod · dod · at = ម៉ោងស្កេនចុះហត្ថលេខា · from) ដូចជួរមកដល់ ·
+        //    ជួរផ្ទុយ / កូដផ្សេង មិនចូល · barcode ស្ទួន ➜ យកម៉ោងចុងក្រោយ · ⛔ គ្មានឈ្មោះ/អាសយដ្ឋានអតិថិជន · ការអភិរក្សចំនួនមិនប្តូរ។
+        signedRowsNow = [
+            listRow({ scanBillCode: '77130500002601', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា', scanTime: '2026-09-09 10:00:00' }),
+            listRow({ scanBillCode: '77130500002601', scanTypeCode: '05', scanTypeDesc: 'ចុះ\u200Bហត្ថលេខា', scanTime: '2026-09-10 11:00:00' }),
+            listRow({ scanBillCode: '77130500002602', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា', consigneeMobile: '0', agentAmount: 0, fcAmount: 0,
+                scanTime: '2026-09-10 12:30:00' }),
+            listRow({ scanBillCode: '77130500002603', scanTypeCode: '05', scanTypeDesc: 'Delivered' }),
+            listRow({ scanBillCode: '77130500002604', scanTypeCode: '04', scanTypeDesc: 'Delivery' })
+        ];
+        const sRows = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        const sr = Array.isArray(sRows.body.signedRows) ? sRows.body.signedRows : null;
+        ok('⛔ E12 ៖ `signed=1` ផ្ទុក `signedRows` ៖ ជួរភស្តុតាងតែប៉ុណ្ណោះ (មិនមានជួរផ្ទុយ / `04`) · barcode ស្ទួន ➜ ១ ជួរ ម៉ោងចុងក្រោយ',
+            !!sr && JSON.stringify(sr.map((r) => r.barcode)) === '["77130500002601","77130500002602"]'
+            && sr[0].at === '2026-09-10 11:00:00' && JSON.stringify(sRows.body.signed) === '["77130500002601","77130500002602"]',
+            { signedRows: sr, signed: sRows.body.signed });
+        ok('⛔ E12 ៖ ជួរ `signedRows` = ទម្រង់ជួរមកដល់ (`barcode` · `phone` · `cod` · `dod` · `at` · `from`) · phone `0` ➜ \'\' · ⛔ គ្មានឈ្មោះ/អាសយដ្ឋាន',
+            !!sr && JSON.stringify(Object.keys(sr[0]).sort()) === '["at","barcode","cod","dod","from","phone"]'
+            && sr[0].phone === '855963897345' && sr[0].cod === 6.47 && sr[0].dod === 2.5 && sr[0].from === 'taobao'
+            && sr[1].phone === '' && sr[1].cod === 0 && JSON.stringify(sRows.body).indexOf('ឈ្មោះអតិថិជន') === -1
+            && JSON.stringify(sRows.body).indexOf('磅湛') === -1,
+            sr);
+        ok('⛔ E12 ៖ ការអភិរក្សចំនួននៅដដែល (`rows + otherScans + signedScans` = ជួរ upstream) · `rows` របស់ `signed=1` នៅទទេ',
+            rowsOf(sRows.body).length === 0 && sRows.body.signedScans + sRows.body.otherScans === 5,
+            { rows: rowsOf(sRows.body).length, signedScans: sRows.body.signedScans, other: sRows.body.otherScans });
+        arrivalRowsNow = [listRow({ scanBillCode: '77130500002601', scanTypeCode: '03' }), listRow({ scanBillCode: '77130500002611', scanTypeCode: '03' })];
+        const wRows = await mmCall(GOOD_LIST_ENV, { withSigned: '1' });
+        ok('⛔ E12 ៖ `withSigned=1` ៖ ចម្លើយបញ្ចូលគ្នាផ្ទុក `signedRows` របស់សំណើ «ចុះហត្ថលេខា» (barcode មកដល់ក្នុងបញ្ជីក៏នៅ ៖ client ជាអ្នកសម្រេច)',
+            Array.isArray(wRows.body.signedRows) && JSON.stringify(wRows.body.signedRows.map((r) => r.barcode)) === '["77130500002601","77130500002602"]'
+            && rowsOf(wRows.body).length === 2 && wRows.body.signedOk === true,
+            { signedRows: wRows.body.signedRows, rows: rowsOf(wRows.body).length });
+        resetEnv(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: 'off' }));
+        const offRows = await mmCall(null, { withSigned: '1' }, true);
+        ok('ទិសផ្ទុយ ៖ បញ្ជី «ចុះហត្ថលេខា» បិទ (`off`) ➜ គ្មាន `signedRows` (ដូច `signed: null`)',
+            offRows.body.signed === null && !Array.isArray(offRows.body.signedRows),
+            { signed: offRows.body.signed, signedRows: offRows.body.signedRows });
+        signedRowsNow = MISMATCH_SIGNED;
+        arrivalRowsNow = MISMATCH_ARRIVAL;
     }
     console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     ENV_NAMES.forEach((name) => {

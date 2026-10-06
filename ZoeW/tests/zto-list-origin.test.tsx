@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
-import { classifyZtoListRows } from '../src/features/zto-list-sync';
+import { classifyZtoListRows, ztoListSkipText } from '../src/features/zto-list-sync';
 import { getZoneDateKey } from '../src/core/timezone';
 
 const today = () => getZoneDateKey(Date.now(), 0) + ' 08:00:00';
@@ -42,6 +42,7 @@ describe('ប្រភពកញ្ចប់ ៖ Function `from` ➜ ជួរដ
         const out = classifyZtoListRows([old], [], []);
         const skipped = ztoListGroupModel('រំលង', out.skipped, 'zto-list-skip').rows[0];
         expect(skipped.origin).toBe('🇻🇳 វៀតណាម · Shopee SHPE');
-        expect(skipped.notes.length, 'មូលហេតុរំលងនៅបន្ទាត់ចំណាំដាច់').toBe(1);
+        expect(skipped.notes.filter((n) => n.indexOf('📥 មកដល់ ៖ ') !== 0), 'មូលហេតុរំលងនៅបន្ទាត់ចំណាំដាច់ (ក្រៅពីបន្ទាត់ថ្ងៃមកដល់)')
+            .toEqual([ztoListSkipText('scan-type')]);
     });
 });

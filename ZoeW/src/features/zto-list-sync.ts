@@ -95,10 +95,17 @@ export function drawerZtoListSyncFlow() {
     });
 }
 
+export function ztoPickupVerdictOf(signed, detail, row) {
+    if (signed === true) return true;
+    if (typeof detail === 'boolean') return detail;
+    if (typeof row === 'boolean') return row;
+    return null;
+}
+
 export function ztoListSignedVerdict(raw, key) {
-    if (key && ztoListSignedProbe.has(key)) return ztoListSignedProbe.get(key);
-    if (raw && typeof raw.ztoClosed === 'boolean') return raw.ztoClosed;
-    return key && ztoListSignedEvidence.has(key) ? true : null;
+    return ztoPickupVerdictOf(!!key && ztoListSignedEvidence.has(key),
+        key && ztoListSignedProbe.has(key) ? ztoListSignedProbe.get(key) : null,
+        raw ? raw.ztoClosed : null);
 }
 
 export function noteZtoListSignedCodes(codes) {

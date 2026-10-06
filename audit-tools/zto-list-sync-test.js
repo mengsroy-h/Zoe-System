@@ -898,7 +898,7 @@ function firstBody(requests) {
     const NEEDED = ['classifyZtoListRows', 'barcodeRegistryKey', 'pickupBarcodeKey',
         'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
-        'barcodeAbandonIsRipe', 'trashRetentionMs', 'ztoListSignedVerdict', 'ztoListRowAgeState'];
+        'barcodeAbandonIsRipe', 'trashRetentionMs', 'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState'];
     const CLOCK_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'ABANDON_AGE_MS',
         'EXPIRED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'ZTO_LIST_SIGNED_PROBE_MAX'];
     const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
@@ -1270,7 +1270,7 @@ function firstBody(requests) {
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe'];
     IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
-        'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
+        'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp',
         'ztoListCloseTargets', 'autoCloseBarcodeFromZto', 'collectOpenBarcodesForZtoStatus', 'itemHasRestoreMarkers');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
@@ -1941,6 +1941,48 @@ function firstBody(requests) {
                     calls.close);
                 ok('⛔ លុយចុះលើថ្ងៃស្កេន ZTO ដដែល (COD/DOD ឆ្លងកាត់បេះបិទ)',
                     savedSigned.stampMs === stampOf(youngAt) && savedSigned.cod === 3 && savedSigned.dod === 1, savedSigned);
+                // ⛔ E2 ៖ ភស្តុតាង «ចុះហត្ថលេខា» (ZTO Palm) = យករួច (ម្ចាស់គម្រោងបញ្ជាក់) ➜ ឈ្នះ `ztoClosed:false` របស់ជួរដេក និង `/detail` false
+                //    ដូចជុំ «បិទតាម ZTO ស្វ័យប្រវត្តិ» (`closeZtoSignedBarcodes()` រត់មុនរង្វិល `/detail` · សាលក្រម false មិនទប់)។
+                reset();
+                box.__now = NOW;
+                ['77130500000855', '77130500000856', '77130500000857', '77130500000859'].forEach((c) => evidence.add(c));
+                box.__signedProbe.set('77130500000856', false);
+                const e2Row = (code, at, ztoClosed) => ({ barcode: code, phone: '0963897345', cod: 1, dod: 0, at: at, skip: '', ztoClosed: ztoClosed });
+                const e2 = classifyReal([
+                    e2Row('77130500000855', youngAt, false),
+                    e2Row('77130500000856', youngAt, null),
+                    e2Row('77130500000857', oldAt, false),
+                    e2Row('77130500000858', oldAt, false),
+                    e2Row('77130500000859', zoneText(NOW - RET - 60000), false)
+                ], [], []);
+                const e2Fresh = (code) => e2.fresh.find((r) => r.barcode === code) || {};
+                const e2Skip = (code) => (e2.skipped.find((r) => r.barcode === code) || {}).skip;
+                ok('⛔ E2 ៖ ភស្តុតាងចុះហត្ថលេខា **ឈ្នះ** `ztoClosed:false` របស់ជួរដេក ➜ កើតមកជា «យករួច»',
+                    e2Fresh('77130500000855').closedAtZto === true, e2Fresh('77130500000855'));
+                ok('⛔ E2 ៖ ភស្តុតាងចុះហត្ថលេខា **ឈ្នះ** `/detail` false',
+                    e2Fresh('77130500000856').closedAtZto === true, e2Fresh('77130500000856'));
+                ok('⛔ E2 ៖ ជួរដេកចាស់ + false + ភស្តុតាង ➜ «ថ្មី» យករួច (មិនមែន `too-old-open`)',
+                    e2Fresh('77130500000857').closedAtZto === true, e2.skipped);
+                ok('⛔ E2 ទិសផ្ទុយ ៖ ចាស់ + false + **គ្មាន** ភស្តុតាង ➜ `too-old-open`',
+                    e2Skip('77130500000858') === 'too-old-open', e2.skipped);
+                ok('⛔ E2 ទិសផ្ទុយ ៖ ហួសអាយុធុងសំរាម ➜ `too-old-purged` **ទោះមានភស្តុតាង** (ពិនិត្យស្ទួនមិនបាន)',
+                    e2Skip('77130500000859') === 'too-old-purged', e2.skipped);
+                reset();
+                box.__now = NOW;
+                evidence.add('77130500000855');
+                box.ztoListSyncResult = { rows: [e2Row('77130500000855', youngAt, false)], from: '2026-09-08', to: '2026-09-11', total: 1 };
+                await runImport();
+                ok('⛔ E2 ៖ ការបញ្ចូល ៖ false + ភស្តុតាង ➜ រក្សាទុកជាបិទ (ត្រាបិទ = ឥឡូវ) + ស្ថិតិយកតាម `applyBarcodeCloseChange()`',
+                    calls.save.length === 1 && calls.save[0].closedAtMs === NOW
+                    && calls.close.length === 1 && calls.close[0].code === '77130500000855', { save: calls.save, close: calls.close });
+                reset();
+                box.__now = NOW;
+                evidence.add('77130500000865');
+                box.scanHistory = [{ id: 'open-e2', phone: '0963897345', barcodes: [{ code: '77130500000865', isClosed: false }] }];
+                box.ztoListSyncResult = { rows: [e2Row('77130500000865', youngAt, false)], from: '2026-09-08', to: '2026-09-11', total: 1 };
+                await runImport();
+                ok('⛔ E2 ៖ មានក្នុង ZoeW (បើក) + false + ភស្តុតាង ➜ «បញ្ចូល» បិទ (ទ្វារដូចជុំស្វ័យប្រវត្តិ)',
+                    calls.close.length === 1 && calls.close[0].itemId === 'open-e2' && calls.save.length === 0, calls.close);
 
                 reset();
                 box.__now = NOW;

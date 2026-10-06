@@ -63,8 +63,8 @@
    (៥) ✅ វាស់ ៖ គ្មាន — ផលរួម G4 · G5 · G6 ជាមួយ Reconfig (mutation ៣/៣) · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ✅ **➜ [2.49.5]** · ➕ 🔔 ចំណុចបាត់ស្ងាត់ ✅ ➜ **ជុំ ៣ ចប់** (ផ្នែក ២ «Deep audit ជុំ ៣»)។
    **ជុំ ZTO ស្អាត** (មុនជុំ ៤ · ម្ចាស់គម្រោងអនុញ្ញាត ៖ «កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ» · PR #291 merge រួច ➜ branch `claude/happy-clarke-nph09g` ពី `main` `b2868e1` ·
    CI មូលដ្ឋានលើ `b2868e1` បៃតង (shard ៤ · STRICT · emulator)) ៖ ✅ **E1 ➜ [2.50.1]** ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (លុយ · commit `8258ef9`) ·
-   ✅ **E2 វាស់ និងរចនារួច (កុំធ្វើឡើងវិញ)** ៖ ការកែ + អ្នកយាមពេញនៅក្នុងសេចក្តីពិពណ៌នា PR របស់ branch នេះ (ផ្នែក «E2 ៖ ការរចនាដែលវាស់រួច») ➜ session ក្រោយអនុវត្តផ្ទាល់ ·
-   ⏭️ E2 (អនុវត្ត) ➜ E3 ➜ E8 ➜ ចាក់សោឡើងវិញ (ពង្រីក `LOCK` + `auto-lookup.ts` · `lookup-api.ts`)។ ⛔ **គ្មាន workflow · គ្មាន agent** ទោះ session មានការរំលឹក ultracode ឬ
+   ✅ **E2 ➜ [2.50.1]** ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ (ភស្តុតាងចុះហត្ថលេខាឈ្នះ) ·
+   ⏭️ E3 ➜ E8 ➜ ចាក់សោឡើងវិញ (ពង្រីក `LOCK` + `auto-lookup.ts` · `lookup-api.ts`)។ ⛔ **គ្មាន workflow · គ្មាន agent** ទោះ session មានការរំលឹក ultracode ឬ
    `/workflow-authoring` ក៏ដោយ (ម្ចាស់គម្រោង ៖ ស៊ីកូតា) · ⚠️ មុន CI ក្នុង session ៖ `git fetch --unshallow origin` (clone រាក់ ➜ `zoew-suite`/`zoew-parity` ធ្លាក់) · ច្បាប់ចម្លង repo
    សម្រាប់វាស់ស្របគ្នា ត្រូវនៅក្រៅ `/tmp/claude-0` (Postgres ពិតរត់ជាអ្នកប្រើមិនមែន root)។
    **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
@@ -149,11 +149,11 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ)** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
+### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
 
 **ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
 («កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ➜ `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts` ធ្វើបច្ចុប្បន្នភាពរាល់ commit។ ប៉ះ `src/features/zto-status.ts`
-(`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()`) ·
+(`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()` · `ztoPickupVerdictOf()` · `ztoListSignedVerdict()`) ·
 `src/domain/cleanup.ts` (`runAutomaticCleanupRules()`) · `src/core/state.ts`។
 
 #### អ្វីដែលខុសពីមុន
@@ -164,11 +164,18 @@
   ZTO មិនឆ្លើយ/ព្យួរ/PIN ចាក់សោ ➜ រង់ចាំយូរបំផុត **៣០ នាទី** ក្នុងមួយវគ្គ រួចដើរធម្មតា · Server បិទបញ្ជីចុះហត្ថលេខា ឬគណនីគ្មានសាខា ➜ មិនរង់ចាំ ·
   ការអានដំបូងក្រោយបាត់យូរ គ្របថ្ងៃបង្កើតកញ្ចប់បើកចាស់បំផុត (≤ ៣០ ថ្ងៃ · មុន ៖ ៧ ថ្ងៃ ➜ កញ្ចប់ដែលចុះហត្ថលេខាមុនថ្ងៃទី ៧ មិនដែលឃើញ)។
   ⛔ ការសម្អាត ២ ម៉ោង (`pickup`) មិនរង់ចាំ · ⛔ ថេរ `ABANDON_AGE_MS` · `>` · ២ ថ្ងៃ · ៣០ ថ្ងៃ មិនប្រែ · កុងតាក់បិទ ➜ ដូចមុនទាំងស្រុង។
+- 🔒 **ZTO-E2 ៖ ការបញ្ចូលបញ្ជី ZTO សម្រេចដូចការបិទស្វ័យប្រវត្តិ** ៖ barcode ដែលមានក្នុងបញ្ជី «ចុះហត្ថលេខា» (05) = យករួច **ទោះជួរដេក ZTO ឬ `/detail` ថា «មិនទាន់បិទ»**
+  (លំដាប់ ៖ ភស្តុតាងចុះហត្ថលេខា ➜ `/detail` ➜ ជួរដេក · `ztoPickupVerdictOf()`)។ មុនកែ ៖ ជួរដេក `false` ឈ្នះភស្តុតាង ➜ «➕ បញ្ចូល» បញ្ចូលជា «មិនទាន់យក» (ក្មេង) ·
+  រំលង «ចាស់ ហើយ ZTO មិនទាន់បិទ» (ចាស់) · មិនបិទកញ្ចប់បើកក្នុង ZoeW ➜ ជុំបិទតាម ZTO បិទវា ~២ នាទីក្រោយ (ទ្វារពីរសម្រេចផ្ទុយគ្នា)។ ឥឡូវ ៖ ក្មេង ➜ កើតមកជា
+  «យករួច» · ចាស់ ៨–៣០ ថ្ងៃ ➜ «យករួច» (COD លើថ្ងៃមកដល់ ZTO · មិនដក) · មានក្នុង ZoeW ហើយបើក ➜ «បញ្ចូល» បិទ (គោរពកុងតាក់)។ ⛔ ហួសអាយុធុងសំរាម ➜ នៅរំលង
+  (ពិនិត្យស្ទួនមិនបាន) · គ្មានភស្តុតាង ➜ ដូចមុន។
 
 #### អ្នកយាម
 
 - `ZoeW/tests/zto-abandon-signed-gate.test.tsx` (២១) ៖ tree មុនកែ (`main` `b2868e1`) **ធ្លាក់ ១២** (១០ ដោយ «ដកលុយ» ពិត · ២ មិនមាន function) ·
   ទិសផ្ទុយ ៤ បៃតងទាំងពីរ (កុងតាក់បិទ · Fast Mode បិទ · Lookup មិនមែន ZTO · Server បិទបញ្ជី)។ mutation ២២/២២ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- E2 ៖ `ZoeW/tests/zto-signed-sync.test.tsx` (២៧ · តេស្ត «false ឈ្នះភស្តុតាង» ត្រឡប់ + ៥ ថ្មី) ៖ tree មុនកែ (`76a0fec`) **ធ្លាក់ ៦** · `zto-list-sync-test` ៤៤៣ ok
+  (មុនកែ **៧ FAIL** ៖ ៥ E2 + ២ ជាន់អប្បបរមា) · mutation ៦/៦ ត្រូវសម្លាប់ (ផ្នែក ២)។
 - sandbox `partial-pickup-cleanup-test` · `cleanup-clock-guard-test` ៖ stub `ztoAbandonCleanupIsHeld()` = `false` (គ្មាន ZTO = ឥរិយាបថពិត) · `clock-hygiene` ៖ ហេតុផល
   `Date.now()` សម្រាប់ពិដានរង់ចាំ។
 
@@ -177,6 +184,8 @@
 1. Deploy **ZoeW** (Netlify) ➜ build APK ឡើងវិញ។ គ្មាន env ថ្មី។
 2. សាក (ហាងដែលបើក «បិទតាម ZTO ស្វ័យប្រវត្តិ») ៖ កញ្ចប់អាយុ ៨ ថ្ងៃ ដែល ZTO Palm ចុះហត្ថលេខារួច ➜ បិទ App ➜ បើកវិញ ➜ វាត្រូវបិទ «យករួច» (ស្ថិតិយកឡើង) មិនមែនចូល
    «🗑️ ផុតកំណត់» ទេ · កញ្ចប់ ៨ ថ្ងៃដែលមិនទាន់យក ➜ ចូល «ផុតកំណត់» ក្នុងប៉ុន្មាននាទី (ZTO មិនឆ្លើយ ➜ ≤ ៣០ នាទី)។
+3. ⏳ **ផ្ទៀងលើ Argus (E2)** ៖ ជួរដេកស្កេន «អីវ៉ាន់មកដល់» (03) មានវាល `billStatus` ទេ ហើយជាស្ថានភាព *បច្ចុប្បន្ន* ឬ *ពេលស្កេន*? (បើពេលស្កេន ➜ មុន 2.50.1 ភស្តុតាងចុះហត្ថលេខា
+   មិនដែលដើរក្នុង «➕ បញ្ចូល» ទាល់តែសោះ)។ សាក ៖ ទាញបញ្ជីដែលមានកញ្ចប់ចុះហត្ថលេខារួច ➜ ប្រអប់ត្រូវរាប់វាក្នុង «🔒 ថ្មីដែល ZTO បិទរួច»។
 
 ### [2.50.0] — 2026-10-06 · ZoeW ៖ **ZTO ៖ ទាញបញ្ជីលឿន · ទាញតែកញ្ចប់មកដល់ · កញ្ចប់ដែល ZTO បិទរួចចូលស្ថិតិ «យករួច» ដូចបិទដោយដៃ · បិទតាម ZTO Palm ស្វ័យប្រវត្តិ · ឈ្មោះសាខាក្នុងប្រអប់បញ្ជី** (សំណើម្ចាស់គម្រោង)
 
@@ -1534,6 +1543,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   `ZTO_SIGNED_FRESH_MS` > `ZTO_ABANDON_RESUME_GAP_MS` ហើយផ្លូវ «ស្រស់» មិនត្រា) · ការកំណត់ `ztoAbandonCheckedAt` ឡើងវិញពេលចាកចេញ (`HoldSince = 0` គ្របរួច)។
 - ⛔ ច្រកទ្វារតែមួយគត់ ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` តែពេលកញ្ចប់ទុំ `abandon` (short-circuit) ➜ កញ្ចប់ចម្រុះ (A បិទ ២ ម៉ោង · B បើក ៨ ថ្ងៃ)
   នៅតែចូលផ្លូវ `close` សម្រាប់ A ពេលរង់ចាំ · `resumeInterruptedCleanups()` (journal) មិនរង់ចាំ (ការសម្អាតដែល claim រួច)។
+- **ZTO-E2 (ទ្វារពីរសម្រេចផ្ទុយគ្នា · ➜ [2.50.1])** ៖ `ztoListSignedVerdict()` (ទ្វារបញ្ចូល) ៖ `/detail` ➜ ជួរដេក ➜ ភស្តុតាង · `runZtoStatusSweep()` (ទ្វារស្វ័យប្រវត្តិ) ៖
+  ភស្តុតាង (`closeZtoSignedBarcodes()` រត់មុន) ➜ `/detail` (false មិនទប់)។ vitest លើ `b2868e1` ៖ ជួរដេកក្មេង `false` + ស្កេន 05 ➜ `addOrUpdateEntry(…, closedAtMs = 0)` ·
+  `applyBarcodeCloseChange` ០ ដង ➜ `runZtoStatusSweep(false)` ភ្លាមៗបន្ទាប់ ➜ បិទ ១ ដង · កញ្ចប់បើកក្នុង ZoeW ➜ «ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ» · ចាស់ + false + ភស្តុតាង ➜
+  `too-old-open`។ ឯកសារអ្នកប្រើ (`ZTO-SETUP-KH.md` · `guide.html`) សន្យា «ចុះហត្ថលេខា = បិទ» រួចហើយ ➜ កូដផ្ទុយឯកសារ។ ការកែ ៖ អ្នកសម្រេចតែមួយ `ztoPickupVerdictOf()`
+  (ភស្តុតាង ➜ `/detail` ➜ ជួរដេក · `/detail` នៅឈ្នះជួរដេក) · អ្នកប្រើ (`classifyZtoListRows` · `ztoListRowNeedsSignedProbe` · `ztoListCloseTargets` · ចំណាំ) មិនប្រែ ·
+  `zto-status.ts` មិនប្រែ (រចនាសម្ព័ន្ធលំដាប់ដដែល)។ mutation ៦/៦ ៖ លំដាប់ចាស់ · `/detail` មុនភស្តុតាង · ជួរដេកមុន `/detail` · មិនអានភស្តុតាង/`/detail`/ជួរដេក។
+  sandbox `zto-list-sync-test` ៖ ឈ្មោះថ្មីក្នុង `NEEDED` + `IMPORT_NAMES` (បើភ្លេច ➜ ReferenceError ១០ FAIL) · ⛔ harness ៖ `vi.mock` `scan-action`/registry **ដោយគ្មាន**
+  `importOriginal` (រង្វង់ import ➜ ម៉ូឌុលពិត ➜ claim `unknown`)។ ⛔ មិនទាន់វាស់ ៖ ជួរដេក 03 ពិតមាន `billStatus` ទេ (សកម្មភាពដោយដៃ [2.50.1] ទី ៣)។
 - ⚠️ បរិស្ថាន session ៖ ចម្លង repo សម្រាប់ CI មូលដ្ឋានក្នុង `/tmp/claude-0/…` (mode 700) ➜ Postgres ពិត (`initdb` រត់ជាអ្នកប្រើមិនមែន root) ផ្ទុក `libicuuc.so.60` មិនបាន ➜
   ត្រូវដាក់ច្បាប់ចម្លងក្រៅថតនោះ · clone រាក់ (`--is-shallow-repository = true`) ➜ `zoew-suite`/`zoew-parity` ធ្លាក់ «រកប្រវត្តិ ZoeW/app.js មិនឃើញ» ➜ `git fetch --unshallow` មុន CI។
 

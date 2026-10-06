@@ -651,7 +651,14 @@ export async function importZtoListRows() {
             if (!session.current()) return;
             if (notTried || (navigator.onLine as boolean) === false) { closeNotTried = closeTargets.length - i; break; }
             setZtoListSyncNote('⏳ កំពុងបិទតាម ZTO ' + (i + 1) + '/' + closeTargets.length + '...');
-            if (await autoCloseBarcodeFromZto(closeTargets[i], dataState.scanHistory)) {
+            const done = await autoCloseBarcodeFromZto(closeTargets[i], dataState.scanHistory);
+            if (!session.current()) return;
+            if (done === undefined) {
+                pending++;
+                closeNotTried = closeTargets.length - i - 1;
+                break;
+            }
+            if (done) {
                 closedInZoew++;
                 setZtoPickupVerdict(closeTargets[i].code, true);
             }

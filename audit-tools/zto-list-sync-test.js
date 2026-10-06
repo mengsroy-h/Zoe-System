@@ -1324,6 +1324,7 @@ function firstBody(requests) {
             },
             applyBarcodeCloseChange: (itemId, code, closed, opts) => {
                 calls.close.push({ itemId, code, closed, opts });
+                if (box.__closeHangs) return Promise.resolve(undefined);
                 return Promise.resolve(box.__closeOk !== false);
             },
             ztoAutoCloseEnabled: () => box.__autoClose !== false,
@@ -1379,6 +1380,7 @@ function firstBody(requests) {
                 box.scanHistory.length = 0;
                 if (box.__signedEvidence) box.__signedEvidence.clear();
                 box.__autoClose = true;
+                box.__closeHangs = false;
                 box.__probeVerdict = undefined; box.__probeThrows = false;
                 box.__closeOk = true;
                 if (box.__signedProbe) box.__signedProbe.clear();
@@ -1975,6 +1977,29 @@ function firstBody(requests) {
                 await runImport();
                 ok('⛔ ទិសផ្ទុយ ៖ កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ ➜ មិនបិទកញ្ចប់ដែលមានស្រាប់',
                     calls.close.length === 0, calls.close);
+
+                // ⛔ ថ្នាក់ដដែលនឹង ZTO-G4 ៖ ការបិទដែល **ព្យួរ** (`applyBarcodeCloseChange()` ➜ `undefined` = commit យឺតបានចាក់) ➜ ឈប់ភ្លាម
+                //    (បន្ត ➜ កញ្ចប់នីមួយៗរង់ចាំពិដាន ១៥ វិ. ➜ សោ «⏳ កំពុងដំណើរការ» ជាប់យូរ) · សារប្រាប់ «⏳» + «មិនទាន់បិទ» · បញ្ជីនៅ
+                reset();
+                box.__now = NOW;
+                box.__closeHangs = true;
+                evidence.add('77130500000871');
+                evidence.add('77130500000872');
+                box.scanHistory = [
+                    { id: 'open-a', phone: '0963897345', barcodes: [{ code: '77130500000871', isClosed: false }] },
+                    { id: 'open-b', phone: '0963897345', barcodes: [{ code: '77130500000872', isClosed: false }] }
+                ];
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000871', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000872', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    from: '2026-09-08', to: '2026-09-11', total: 2
+                };
+                await runImport();
+                ok('⛔ ការបិទព្យួរដំបូង ➜ **ឈប់** (មិនរង់ចាំពិដានលើកញ្ចប់បន្ទាប់)', calls.close.length === 1, calls.close);
+                ok('⛔ ការបិទព្យួរ ➜ សារប្រាប់ «⏳» និង «មិនទាន់បិទ 1» · បញ្ជីនៅ',
+                    calls.toast.some((m) => m.indexOf('⏳') !== -1 && m.indexOf('មិនទាន់បិទ 1') !== -1) && !!box.ztoListSyncResult,
+                    calls.toast);
+                ok('⛔ ការបិទព្យួរ ➜ សោដោះ', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
                 box.scanHistory = [];
                 reset();
             }

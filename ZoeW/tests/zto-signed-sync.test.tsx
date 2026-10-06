@@ -262,6 +262,13 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         expect(h.calls).toHaveLength(0);
     });
 
+    it('ការបិទព្យួរ (`undefined` = commit យឺត) ➜ ជុំឈប់ភ្លាម មិនរង់ចាំពិដានលើកញ្ចប់បន្ទាប់', async () => {
+        (h as any).ok = undefined;
+        vi.stubGlobal('fetch', signedOnly(['ZT0000000901', 'ZT0000000902']));
+        await runZtoStatusSweep(true, [openItem('a1', 'ZT0000000901'), openItem('a2', 'ZT0000000902')], []);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZT0000000901']);
+    });
+
     it('ទិសផ្ទុយ ៖ កុងតាក់បិទ ➜ មិនសួរបញ្ជីចុះហត្ថលេខា · មិនបិទ', async () => {
         appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
         const fetch = signedOnly(['ZT0000000701']);

@@ -263,7 +263,7 @@ export async function autoCloseBarcodeFromZto(entry, dataToScan) {
     if (!b || b.isClosed) return false;
     const done = await applyBarcodeCloseChange(entry.itemId, entry.code, true,
         { silent: true, showModal: false });
-    return done === true;
+    return done === undefined ? undefined : done === true;
 }
 
 export function ztoSignedSweepIsDue(force) {
@@ -319,6 +319,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan) {
         tried++;
         const done = await autoCloseBarcodeFromZto(entries[i], dataToScan);
         if (!session.current()) return { closed: 0, more: false, keys: new Set() };
+        if (done === undefined) break;
         if (done) {
             out.closed++;
             out.keys.add(entries[i].key);

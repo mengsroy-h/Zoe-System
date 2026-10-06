@@ -618,3 +618,14 @@ describe('ការពិនិត្យប្រឆាំង (លុយ) ៖ �
         ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 };
     });
 });
+
+describe('ការពិនិត្យប្រឆាំង (អ្នកយាម) ៖ ការអានយឺត', () => {
+    it('⛔ កញ្ចប់ទុំកណ្តាលការអានយឺត ៖ ការអានចាប់ផ្តើមមុនពេលទុំ ➜ មិនគ្រប ➜ មិនដកលុយ (ត្រាពេលចាប់ផ្តើម មិនមែនពេលចប់)', async () => {
+        dataState.scanHistory = [openItem('slow', 'ZTE1S10001', 7 * DAY - 10 * 1000)];
+        vi.stubGlobal('fetch', vi.fn(async () => { advance(20 * 1000); return signedPage([]); }));
+        await runZtoStatusSweep(false);
+        expect(ztoState.ztoSignedCompleteAt > 0, 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានពេញលេញ').toBe(true);
+        cleanupNow();
+        expect(abandoned('slow'), '⛔ ចុះហត្ថលេខាក្រោយការអានចាប់ផ្តើមអាចបាត់ ➜ រង់ចាំ').toBe(false);
+    });
+});

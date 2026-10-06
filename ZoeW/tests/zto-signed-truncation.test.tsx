@@ -296,3 +296,28 @@ describe('ការពិនិត្យប្រឆាំង ៖ ការច�
         expect(err && err.listReason).toBe('list-off');
     });
 });
+
+describe('ការពិនិត្យប្រឆាំង (អ្នកយាម) ៖ ការចងចាំមិនឆ្លងវគ្គ', () => {
+    it('ចាកចេញ/ចូលវិញ ខណៈការអានទាំងមូលដែលលើសពិដានកំពុងហោះ ➜ វគ្គថ្មីមិនទទួលការចងចាំ «តាមថ្ងៃ»', async () => {
+        const { clearZtoPickupStatusStore: clearStore } = await import('../src/features/zto-status');
+        let release: (v: any) => void = () => {};
+        const gate = new Promise((r) => { release = r; });
+        let long = true;
+        const srv = signedServer({ [d(0)]: ['ZTE3000401'] }, { wholePages: () => (long ? 9 : 1) });
+        let first = true;
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            if (first) { first = false; await gate; }
+            return srv.fetch(u);
+        }));
+        const pending = fetchZtoSignedCodes(CFG, d(7), d(0));
+        await new Promise((r) => setTimeout(r, 0));
+        clearStore();
+        firebaseState.authGeneration++;
+        release(null);
+        await pending;
+        long = false;
+        const before = srv.requests.length;
+        await fetchZtoSignedCodes(CFG, d(7), d(0));
+        expect(srv.requests.slice(before).map((r) => r.from + '..' + r.to), '⛔ វគ្គថ្មី ៖ បញ្ជីខ្លី ➜ ការអានទាំងមូលតែមួយ (មិនមែនការចងចាំពីវគ្គចាស់)').toEqual([d(7) + '..' + d(0)]);
+    });
+});

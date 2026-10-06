@@ -65,9 +65,9 @@ function openItem(id: string, code: string, ageMs: number) {
         cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
-function signedPage(codes: string[]) {
-    return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: codes.length,
-        rows: [], otherScans: 0, signedScans: codes.length, signed: codes, signedOk: true });
+function signedPage(codes: string[], extra: any = {}) {
+    return json(Object.assign({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: codes.length,
+        rows: [], otherScans: 0, signedScans: codes.length, signed: codes, signedOk: true }, extra));
 }
 
 const abandoned = (id: string) => tx.includes('zoew_scan_history_cod_dod/' + id);
@@ -95,9 +95,9 @@ function asDeviceB() {
     zto.clearZtoPickupStatusStore();
 }
 
-async function sweepA(codes: string[], readMs = 0) {
+async function sweepA(codes: string[], readMs = 0, extra: any = {}) {
     asDeviceA();
-    vi.stubGlobal('fetch', vi.fn(async () => { if (readMs) advance(readMs); return signedPage(codes); }));
+    vi.stubGlobal('fetch', vi.fn(async () => { if (readMs) advance(readMs); return signedPage(codes, extra); }));
     ztoState.ztoStatusInFlight = false;
     await zto.runZtoStatusSweep(false);
     await flush();
@@ -147,6 +147,7 @@ beforeEach(() => {
         off: (ref: { path: string }) => { delete listeners[ref.path]; },
         update: async (ref: { path: string }, patch: any) => {
             updates.push({ path: ref.path, patch: Object.assign({}, patch) });
+            if (ref.path === PATH && denyMarker) throw Object.assign(new Error('permission_denied at /' + PATH), { code: 'PERMISSION_DENIED' });
             if (ref.path === PATH) {
                 shared = Object.assign({}, shared || {}, patch);
                 if (!queueDelivery) deliver(PATH);
@@ -413,6 +414,60 @@ describe('ការពិនិត្យប្រឆាំង (backend) ៖ rule
         const node = rules.rules.zoew_settings.zto_signed_sweep;
         expect(node.activeAt['.validate']).toContain('newData.val() <= now + 600000');
         expect(node.completeAt['.validate']).toContain('newData.val() <= now + 600000');
+    });
+});
+
+describe('ការពិនិត្យប្រឆាំង (អ្នកយាម) ៖ mutant ដែលរស់', () => {
+    it('ជុំដែលមានជួរ «ចុះហត្ថលេខា» ផ្ទុយ មិនរុញ completeAt របស់ហាង ➜ B នៅរង់ចាំ', async () => {
+        dataState.scanHistory = [openItem('m1', 'ZTM2000040', 7 * DAY - 10 * MIN)];
+        attach();
+        deliver(PATH);
+        await sweepA([]);
+        expect(shared.completeAt).toBe(NOW);
+        advance(20 * MIN);
+        await sweepA([], 0, { signedMismatch: 1 });
+        expect(shared.completeAt, '⛔ ជួរផ្ទុយ ➜ មិនពេញលេញ ➜ completeAt មិនឡើង').toBe(NOW);
+        asDeviceB();
+        cleanupNow();
+        expect(abandoned('m1'), '⛔ B មិនដកលុយ').toBe(false);
+    });
+
+    it('rules មិនទាន់ Publish (update ត្រូវបដិសេធ) ➜ ការសរសេរនៅតែ ≤ ១ ដងក្នុង ZTO_SHOP_SWEEP_MARK_GAP_MS', async () => {
+        denyMarker = true;
+        dataState.scanHistory = [openItem('m2', 'ZTM2000041', 2 * DAY)];
+        attach();
+        for (let i = 0; i < 15; i++) {
+            await sweepA([]);
+            advance(zto.ZTO_SIGNED_SWEEP_GAP_MS);
+        }
+        const tries = updates.filter((u) => u.path === PATH).length;
+        expect(tries, 'លក្ខខណ្ឌចាំបាច់ ៖ សាកសរសេរ').toBeGreaterThanOrEqual(1);
+        expect(tries).toBeLessThanOrEqual(Math.floor(30 * MIN / M.ZTO_SHOP_SWEEP_MARK_GAP_MS) + 1);
+    });
+
+    it('A សរសេរតែ activeAt (ជុំមិនពេញលេញ) រៀងរាល់ ៥ នាទី ➜ វគ្គរបស់ B មិនចាប់ថ្មី ➜ ដកក្នុង ≤ ZTO_ABANDON_HOLD_MAX_MS + ២ នាទី', async () => {
+        dataState.scanHistory = [openItem('m3', 'ZTM2000042', 7 * DAY + MIN)];
+        attach();
+        shared = { activeAt: NOW, completeAt: NOW - DAY };
+        deliver(PATH);
+        asDeviceB();
+        let at = -1;
+        for (let m = 0; m <= 40 && at === -1; m++) {
+            if (m % 5 === 0) { shared = Object.assign({}, shared, { activeAt: Date.now() }); deliver(PATH); }
+            cleanupNow();
+            if (abandoned('m3')) at = m;
+            advance(MIN);
+        }
+        expect(at, '⛔ ដក').toBeGreaterThan(0);
+        expect(at).toBeLessThanOrEqual(HOLD_MAX / MIN + 2);
+    });
+
+    it('Server បិទបញ្ជី (`signedOk: false` ➜ measured: false) ➜ មិនសរសេរសញ្ញាហាង', async () => {
+        dataState.scanHistory = [openItem('m4', 'ZTM2000043', 2 * DAY)];
+        attach();
+        deliver(PATH);
+        await sweepA([], 0, { signedOk: false, signed: null });
+        expect(updates.filter((u) => u.path === PATH).length).toBe(0);
     });
 });
 

@@ -465,6 +465,20 @@ describe('ការពិនិត្យប្រឆាំង ៖ សារព�
         expect(ztoStatusUnmeasuredCount(), '⛔ គ្មានការសួរបន្ត ➜ មិនប្រាប់ថា «កំពុងពិនិត្យ»').toBe(0);
     });
 
+    it('ចាកចេញ/ចូលវិញ ➜ កញ្ចប់ដែលធ្លាប់សួររួច (verdict ត្រូវសម្អាត) ត្រូវសួរម្តងទៀត · របាត្រឡប់មកវិញ', async () => {
+        dataState.scanHistory = [closedItem('s1', 'ZTS0000001')];
+        const detail = detailServer(false);
+        await runZtoStatusSweep(false);
+        expect(detail.length).toBe(1);
+        expect(ztoStatusPendingCodes()).toEqual(['ZTS0000001']);
+        clearZtoPickupStatusStore();
+        firebaseState.authGeneration++;
+        ztoState.ztoStatusInFlight = false;
+        await runZtoStatusSweep(false);
+        expect(detail.length, '⛔ វគ្គថ្មីសួរម្តងទៀត').toBe(2);
+        expect(ztoStatusPendingCodes()).toEqual(['ZTS0000001']);
+    });
+
     it('T3 ៖ ប៉ះក្រោយទុកចោល មិនបោះ timer បន្តរបស់ /detail (កុងតាក់បិទតាម ZTO បិទ)', async () => {
         appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
         const items: any[] = [];

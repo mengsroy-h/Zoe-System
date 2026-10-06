@@ -2778,6 +2778,41 @@ function firstBody(requests) {
             only.signedOk === true && rowsOf(only).length === 0 && Array.isArray(only.signed) && only.signed.indexOf(real.code) !== -1, only);
     }
 
+    // ⛔ E8ខ ៖ payload ពិត «ត្រឡប់ការស្កេន» (ម្ចាស់គម្រោង ៖ កញ្ចប់ត្រឡប់ទៅសាខាកណ្តាលវិញ លើស ៧ ថ្ងៃ) ៖ `scanTypeCode: "-710"` · `scanTypeDesc: "ត្រឡប់ការស្កេន"` ·
+    //    `isRefund: 1`។ កញ្ចប់នេះ **មិនបានយក** ➜ ⛔ មិនត្រូវក្លាយជាភស្តុតាង «ចុះហត្ថលេខា» (បើក្លាយ ➜ ZoeW បិទ «យករួច» ➜ ការសម្អាត ៧ ថ្ងៃមិនដកលុយ) ·
+    //    មិនមែនជួរដេក «មកដល់» · ការសម្អាត ៧ ថ្ងៃ (`expired` · ដកលុយ) ជាផ្លូវត្រូវ (ច្បាប់អាជីវកម្ម ៖ កញ្ចប់មិនយកត្រឡប់ទៅសាខាកណ្តាល)។
+    const RET_CODE = '77130500008804';
+    const retRow = realRow(RET_CODE, '855960000004', '-710', 'ត្រឡប់ការស្កេន', '2026-10-06 11:49:23', { agentAmount: 8.76, customerCode: 'KH803480001',
+        customerCodeDesc: 'Shopee SHPE', recSite: 'Shopee SHPE', isRefund: 1, isRefundDesc: 'ត្រូវហើយ', barScannerId: '465' });
+    const retArrival = realRow(RET_CODE, '855960000004', '03', 'អីវ៉ាន់មកដល់', '2026-09-27 10:00:00', { agentAmount: 8.76, customerCodeDesc: 'Shopee SHPE' });
+    for (const ret of [{ name: 'តែជួរ -710 (ដូចម្ចាស់ចម្លង · total 1)', rows: [retRow], arrivals: 0 },
+        { name: 'មកដល់ 03 + ត្រឡប់ -710', rows: [retArrival, retRow], arrivals: 1 }]) {
+        const payload = listPayload(ret.rows, { pages: 1, total: ret.rows.length });
+        resetEnv(PROD_SIGNED_ENV);
+        global.fetch = withCerts(async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => payload }));
+        const res = await call(listQuery({ withSigned: '1', from: '2026-09-27', to: '2026-10-06' }));
+        const b = bodyOf(res);
+        const rows = rowsOf(b);
+        ok('⛔ E8ខ ' + ret.name + ' ៖ «ត្រឡប់ការស្កេន» **មិនមែន** ភស្តុតាងចុះហត្ថលេខា (មិនបិទ «យករួច» ➜ ការសម្អាត ៧ ថ្ងៃដកលុយ)',
+            res.statusCode === 200 && b.signedOk === true && Array.isArray(b.signed) && b.signed.indexOf(RET_CODE) === -1 && Number(b.signedScans) === 0,
+            { status: res.statusCode, signedOk: b.signedOk, signed: b.signed, signedScans: b.signedScans });
+        ok('⛔ E8ខ ' + ret.name + ' ៖ ជួរ -710 មិនមែនជួរដេក «មកដល់» (រាប់ក្នុង `otherScans`) · រាប់គ្រប់',
+            rows.length === ret.arrivals && Number(b.otherScans) === 1 && rows.length + Number(b.otherScans) + Number(b.signedScans) === ret.rows.length
+            && rows.every((r) => r.ztoClosed === null), { rows: rows, otherScans: b.otherScans });
+        resetEnv(PROD_SIGNED_ENV);
+        global.fetch = withCerts(async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => payload }));
+        const only = bodyOf(await call(listQuery({ signed: '1', from: '2026-09-27', to: '2026-10-06' })));
+        ok('⛔ E8ខ ' + ret.name + ' ៖ `signed=1` (ជុំបិទតាម ZTO) ➜ គ្មាន barcode ត្រឡប់', only.signedOk === true && Array.isArray(only.signed)
+            && only.signed.indexOf(RET_CODE) === -1, only.signed);
+    }
+    // ជាន់កូដតែម្យ៉ាង (`ZTO_LIST_SIGNED_SCAN_DESC=` ➜ ជាន់អត្ថបទបិទ) ៖ កូដ `-710` ≠ `05` ត្រូវបដិសេធដោយខ្លួនឯង (ជាន់ទាំង ២ ឯករាជ្យ)។
+    resetEnv(Object.assign({}, PROD_SIGNED_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: '' }));
+    global.fetch = withCerts(async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' },
+        json: async () => listPayload([retRow], { pages: 1, total: 1 }) }));
+    const retCodeOnly = bodyOf(await call(listQuery({ signed: '1', from: '2026-09-27', to: '2026-10-06' })));
+    ok('⛔ E8ខ ជាន់កូដតែម្យ៉ាង ៖ `-710` មិនមែន `05` ➜ មិនមែនភស្តុតាង', retCodeOnly.signedOk === true && Array.isArray(retCodeOnly.signed)
+        && retCodeOnly.signed.indexOf(RET_CODE) === -1, retCodeOnly.signed);
+
     // ⛔ E8 ៖ តារាង «📋 វាលដែល ZoeW អាន» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេពីកូដ ៖ រាល់ឈ្មោះវាលក្នុងបញ្ជីផ្លូវរបស់ Function ត្រូវមានក្នុងផ្នែកនោះ
     //    (វាលថ្មីក្នុងកូដ ➜ ឯកសារចាស់ ➜ ធ្លាក់)។
     const setupDoc = readOr(path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md'));

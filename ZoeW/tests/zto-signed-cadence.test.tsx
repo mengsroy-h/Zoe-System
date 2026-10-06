@@ -15,7 +15,7 @@ import { autoLookupInFlight } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import {
     ZTO_SIGNED_SWEEP_ACTIVE_MS, ZTO_SIGNED_SWEEP_FAIL_MAX_MS, ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_VISIBLE_MS,
-    clearZtoPickupStatusStore, noteZtoUserActivity, runZtoStatusSweep, scheduleZtoStatusSweep
+    clearZtoPickupStatusStore, noteZtoUserActivity, runZtoStatusSweep, scheduleZtoStatusSweep, setZtoPickupVerdict, ztoStatusPendingCodes
 } from '../src/features/zto-status';
 
 const h = vi.hoisted(() => ({ closes: [] as any[] }));
@@ -273,6 +273,22 @@ describe('ល្បឿន «បិទតាម ZTO» ៖ ពេលស្កេ�
         await runApp(2 * MIN, w);
         expect(signedCalls.length).toBeGreaterThan(0);
         expect(signedCalls[0] - T0).toBeLessThan(MIN - 5000);
+    });
+
+    it('E6 ៖ របា «ZTO មិនទាន់បិទ» (បិទក្នុង ZoeW មុន ZTO Palm) រលត់តាមល្បឿនសកម្ម (timer ខ្លួនឯង · មិនរង់ចាំជុំ ៦០ វិ.)', async () => {
+        dataState.scanHistory = [closedItem('c', 'ZTC0000031')];
+        setZtoPickupVerdict('ZTC0000031', false);
+        const w: World = { signedAt: { ZTC0000031: T0 + 70 * 1000 }, active: true };
+        install(w);
+        scheduleZtoStatusSweep(1500);
+        let flippedAt = 0;
+        const start = Date.now();
+        while (Date.now() - start < 4 * MIN && !flippedAt) {
+            await runApp(1000, w);
+            if (ztoStatusPendingCodes().length === 0) flippedAt = Date.now();
+        }
+        expect(flippedAt - (T0 + 70 * 1000)).toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 5000);
+        expect(detailCalls).toEqual([]);
     });
 
     it('⛔ ប្រអប់បើកយូរ មិនកត់ «បានសួរ /detail» ក្លែង ➜ បិទប្រអប់ ➜ /detail ដែលកំពុងចន្លោះទ្វេ ដើរវិញភ្លាម', async () => {

@@ -225,6 +225,16 @@ export function ztoRenewalText(body) {
         : ' · ZTO មិនផ្ញើ Cookie ថ្មី ➜ ត្រូវ Sync ដោយដៃពេលផុត';
 }
 
+export function ztoSignedMismatchText(body) {
+    const signal = body && body.list && body.list.signedMismatch;
+    const count = signal && signal.observed === true && Number.isFinite(signal.count) && signal.count > 0 ? signal.count : 0;
+    if (!count) return '';
+    const age = durationText(signal.ageMs);
+    return ' · ⚠️ បញ្ជី «ចុះហត្ថលេខា» ៖ ZTO ផ្ញើ ' + count + ' ជួរ ដែលអត្ថបទប្រភេទស្កេនខុសពី ZTO_LIST_SIGNED_SCAN_DESC'
+        + (age ? ' (ចុងក្រោយ ' + age + 'មុន)' : '')
+        + ' ➜ មិនរាប់ជាភស្តុតាងបិទ — សូមកែអត្ថបទនោះនៅ Netlify';
+}
+
 export async function healthLookupRow() {
     const cfg = getLookupApiConfig();
     if (!cfg || !cfg.enabled || !cfg.url) {
@@ -276,11 +286,13 @@ export async function healthLookupRow() {
         const reason = safeLookupReason(body && body.cookie && body.cookie.storeReason);
         const rejectedAgeMs = body && body.cookie && body.cookie.authRejectedAgeMs;
         const acceptedAgeMs = body && body.cookie && body.cookie.authAcceptedAgeMs;
+        const mismatchText = ztoSignedMismatchText(body);
         const cookieText = 'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
             + ztoBlobAgeText(body && body.cookie)
             + (typeof ageMs === 'number' ? ' · Server អានចុងក្រោយ ' + (durationText(ageMs) || '0 នាទី') + 'មុន' : '')
             + (reason ? ' · ' + reason : '')
-            + ztoRenewalText(body);
+            + ztoRenewalText(body)
+            + mismatchText;
         if (typeof rejectedAgeMs === 'number') {
             return healthRow('bad', 'Lookup អតិថិជន (ZTO)',
                 'ZTO បដិសេធ Cookie នេះ — សូមចូល Argus ហើយរត់ឧបករណ៍ sync-zto-cookie លើ Windows '
@@ -291,7 +303,7 @@ export async function healthLookupRow() {
                 'មាន Cookie តែ ZTO មិនទាន់ដែលប្រើវា ➜ ពិនិត្យមិនបានថាវានៅសុពលភាព។ '
                 + 'សូមស្កេនកញ្ចប់ ១ រួចពិនិត្យម្ដងទៀត · ' + cookieText);
         }
-        return healthRow('ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
+        return healthRow(mismatchText ? 'warn' : 'ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
     } catch (e) {
         return healthRow('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
     }

@@ -1872,6 +1872,9 @@
     "ZoeW/tests/zto-signed-sync.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-signed-mismatch.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tsconfig.app.json": {
       "policy": "zoew-self-verification"
     },

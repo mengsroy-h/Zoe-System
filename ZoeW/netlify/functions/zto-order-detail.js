@@ -75,6 +75,7 @@ const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
+const signedMismatchSignal = { at: 0, count: 0 };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -981,14 +982,14 @@ function listScanTypeSkip(listConfig, candidates) {
     return desc === listConfig.scanDesc ? '' : 'scan-type';
 }
 
-function listRowIsSigned(listConfig, candidates) {
-    if (!listConfig.signedType) return false;
+function listRowSignedVerdict(listConfig, candidates) {
+    if (!listConfig.signedType) return '';
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
     const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
-    if (code && code !== listConfig.signedType) return false;
-    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return false;
-    if (code) return true;
-    return !!(listConfig.signedDesc && desc);
+    if (code && code !== listConfig.signedType) return '';
+    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return code ? 'mismatch' : '';
+    if (code) return 'signed';
+    return listConfig.signedDesc && desc ? 'signed' : '';
 }
 
 function listSiteNameOf(candidates) {
@@ -1020,6 +1021,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const seenSigned = new Set();
     let otherScans = 0;
     let signedScans = 0;
+    let signedMismatch = 0;
     let siteName = '';
     const raws = container.rows.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
@@ -1027,7 +1029,8 @@ function listResponseBody(config, container, page, siteCode, kind) {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
         const candidates = [raw];
         if (!siteName) siteName = listSiteNameOf(candidates);
-        if (listRowIsSigned(config.list, candidates)) {
+        const verdict = listRowSignedVerdict(config.list, candidates);
+        if (verdict === 'signed') {
             signedScans++;
             const code = pickText(candidates, LIST_BARCODE_PATHS);
             if (BARCODE_RE.test(code) && !seenSigned.has(code)) {
@@ -1036,10 +1039,15 @@ function listResponseBody(config, container, page, siteCode, kind) {
             }
             continue;
         }
+        if (verdict === 'mismatch') { signedMismatch++; otherScans++; continue; }
         if (kind === 'signed') { otherScans++; continue; }
         const row = projectListRow(config, raw);
         if (row.skip === 'scan-type') { otherScans++; continue; }
         rows.push(row);
+    }
+    if (signedMismatch > 0) {
+        signedMismatchSignal.at = Date.now();
+        signedMismatchSignal.count += signedMismatch;
     }
     const meta = container.meta || {};
     const pages = Number(meta.pages);
@@ -1058,6 +1066,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         rows: rows,
         otherScans: otherScans,
         signedScans: signedScans,
+        signedMismatch: signedMismatch,
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
@@ -1079,6 +1088,7 @@ function mergeSignedCompanion(body, outcome) {
     out.signedOk = true;
     out.signedPages = companion.pages;
     out.signedTotal = companion.total;
+    out.signedListMismatch = companion.signedMismatch;
     if (!out.siteName && companion.siteName) out.siteName = companion.siteName;
     return out;
 }
@@ -1678,6 +1688,11 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedReason: config.list.signedReason || null,
             signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
             signedDescIsDefault: config.list.signedDesc === DEFAULT_LIST_SIGNED_SCAN_DESC,
+            signedMismatch: {
+                observed: signedMismatchSignal.count > 0,
+                count: signedMismatchSignal.count,
+                ageMs: signedMismatchSignal.at ? elapsedSince(signedMismatchSignal.at) : null
+            },
             cacheTtlMs: config.listCacheTtlMs,
             signedCacheTtlMs: Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS)
         },
@@ -1955,6 +1970,8 @@ exports.resetCachesForTests = function resetCachesForTests() {
     certsState.keys = null;
     certsState.inFlight = null;
     supabaseAccountCache.clear();
+    signedMismatchSignal.at = 0;
+    signedMismatchSignal.count = 0;
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

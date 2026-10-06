@@ -2860,6 +2860,110 @@ function firstBody(requests) {
     const allPagesFn = extractFn(APP_SRC, 'fetchZtoListAllPages') || '';
     ok('⛔ client ៖ ទំព័រ ១ ជាមួយ `withSigned` · ទំព័របន្ទាប់ស្របគ្នា (`Promise.all`)',
         /fetchZtoListPage\([^)]*1, 'withSigned'\)/.test(allPagesFn) && allPagesFn.indexOf('Promise.all(') !== -1, allPagesFn.slice(0, 200));
+
+    // ═════════════════════════════════════════════════════════════════════
+    console.log('\n== ២២. ⛔ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ ៖ រាប់ · ប្រាប់ក្នុង `?diag=1` (មិនបាត់ស្ងាត់) ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // ⛔ ZTO-E4 ៖ `listRowIsSigned()` (ឥឡូវ `listRowSignedVerdict()`) បដិសេធជួរដែលមានកូដ `05` តែ `scanTypeDesc` ខុសពី `ZTO_LIST_SIGNED_SCAN_DESC`
+    //    (ឧ. ZTO ប្តូរភាសាផ្ញើ «Signed») ➜ ជួរនោះចូល `otherScans` ស្ងាត់ៗ ➜ **គ្មានភស្តុតាងបិទ** ➜ កញ្ចប់ដែលអតិថិជនយករួច
+    //    នៅបើក ហើយ (ក្រោយ ៧ ថ្ងៃ) ត្រូវដកលុយជា «ផុតកំណត់» ➜ App មិននិយាយអ្វីសោះ។
+    // ⛔ ច្បាប់ «ភស្តុតាងវិជ្ជមាន» នៅដដែល (ជួរទាំងនោះ **មិន** ក្លាយជាភស្តុតាង) — ការកែគឺ **រាប់** វាដាច់ដោយឡែក ៖
+    //    `signedMismatch` = ជួរក្នុងទំព័រ upstream នេះដែលមានកូដ «ចុះហត្ថលេខា» តែអត្ថបទផ្ទុយ ⊆ `otherScans`
+    //    (ការអភិរក្ស `rows + otherScans + signedScans` = ជួរ upstream នៅដដែល) · `withSigned` ➜ ចម្លើយបញ្ចូលគ្នាផ្ទុកចំនួនរបស់
+    //    សំណើ «ចុះហត្ថលេខា» ក្នុង `signedListMismatch` (ដូច `signedPages` · `signedTotal`) · `?diag=1` ➜ `list.signedMismatch`
+    //    (`observed` · `count` · `ageMs`) ⛔ គ្មានអត្ថបទពី upstream។
+    {
+        const MISMATCH_SIGNED = [
+            listRow({ scanBillCode: '77130500002201', scanTypeCode: '05', scanTypeDesc: 'Signed' }),
+            listRow({ scanBillCode: '77130500002202', scanTypeCode: '05', scanTypeDesc: 'Signed' }),
+            listRow({ scanBillCode: '77130500002203', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' }),
+            listRow({ scanBillCode: '77130500002204', scanTypeCode: '04', scanTypeDesc: 'Delivery' }),
+            listRow({ scanBillCode: '77130500002205', scanTypeDesc: 'Signed' })
+        ];
+        const MISMATCH_ARRIVAL = [
+            listRow({ scanBillCode: '77130500002206', scanTypeCode: '03' }),
+            listRow({ scanBillCode: '77130500002207', scanTypeCode: '05', scanTypeDesc: 'Signed' })
+        ];
+        let signedRowsNow = MISMATCH_SIGNED;
+        let arrivalRowsNow = MISMATCH_ARRIVAL;
+        const mmFetch = withCerts(async (href, init) => {
+            seenRequests.push({ href: href, init: init });
+            const rows = typeOf(init) === '05' ? signedRowsNow : arrivalRowsNow;
+            return { ok: true, status: 200, headers: { get: () => 'application/json' },
+                json: async () => listPayload(rows, { pages: 1, total: rows.length }) };
+        });
+        const mmCall = async (env, query, keep) => {
+            if (!keep) resetEnv(env);
+            seenRequests.length = 0;
+            global.fetch = mmFetch;
+            const res = await call(listQuery(query));
+            return { status: res.statusCode, body: bodyOf(res), requests: seenRequests.slice() };
+        };
+        const diagNow = async () => {
+            global.fetch = mmFetch;
+            const res = await call({ diag: '1' });
+            return { body: bodyOf(res), raw: String(res.body || '') };
+        };
+        const mmOf = (body) => listOf(body).signedMismatch || {};
+
+        const cold = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        ok('ជាន់អប្បបរមា ៖ `signed=1` ឆ្លើយ 200 · `signedOk:true` · upstream ១ សំណើ `05`',
+            cold.status === 200 && cold.body.signedOk === true && cold.requests.length === 1 && typeOf(cold.requests[0].init) === '05',
+            { status: cold.status, signedOk: cold.body.signedOk, n: cold.requests.length });
+        ok('⛔ ភស្តុតាងវិជ្ជមាននៅដដែល ៖ មានតែ `05` + «ចុះហត្ថលេខា» ក្លាយជា `signed` («Signed» មិនមែនភស្តុតាង)',
+            JSON.stringify(cold.body.signed) === '["77130500002203"]', cold.body.signed);
+        ok('⛔ ជួរ `05` + អត្ថបទផ្ទុយ ➜ រាប់ក្នុង `signedMismatch` (= ២) · មិនរាប់កូដ `04` ឬជួរគ្មានកូដ',
+            cold.body.signedMismatch === 2, cold.body.signedMismatch);
+        ok('⛔ `signedMismatch` ⊆ `otherScans` · ការអភិរក្ស `rows + otherScans + signedScans` = ជួរ upstream នៅដដែល',
+            cold.body.otherScans === 4 && cold.body.signedScans === 1 && cold.body.signedMismatch <= cold.body.otherScans
+            && rowsOf(cold.body).length + cold.body.otherScans + cold.body.signedScans === MISMATCH_SIGNED.length,
+            { rows: rowsOf(cold.body).length, other: cold.body.otherScans, signedScans: cold.body.signedScans, mismatch: cold.body.signedMismatch });
+
+        const diagHot = await diagNow();
+        ok('⛔ `?diag=1` ៖ `list.signedMismatch` ឃើញ (`observed:true` · `count:2` · `ageMs` ជាលេខ)',
+            mmOf(diagHot.body).observed === true && mmOf(diagHot.body).count === 2
+            && typeof mmOf(diagHot.body).ageMs === 'number' && mmOf(diagHot.body).ageMs >= 0, mmOf(diagHot.body));
+        ok('⛔ `?diag=1` មិនបញ្ចេញអត្ថបទ upstream («Signed») · គ្មាន barcode',
+            diagHot.raw.indexOf('Signed') === -1 && diagHot.raw.indexOf('77130500002201') === -1, diagHot.raw.slice(0, 200));
+
+        const both = await mmCall(GOOD_LIST_ENV, { withSigned: '1' });
+        ok('⛔ `withSigned=1` ៖ ចម្លើយបញ្ចូលគ្នាផ្ទុកចំនួនរបស់សំណើ «ចុះហត្ថលេខា» (`signedListMismatch` = ២)',
+            both.status === 200 && both.body.signedOk === true && both.body.signedListMismatch === 2, both.body.signedListMismatch);
+        ok('⛔ `withSigned=1` ៖ `signedMismatch` របស់បញ្ជីមកដល់ = ជួររបស់វាផ្ទាល់ (= ១) ⊆ `otherScans` របស់វា',
+            both.body.signedMismatch === 1 && both.body.otherScans === 1 && rowsOf(both.body).length === 1
+            && rowsOf(both.body).length + both.body.otherScans + (both.body.signedScans || 0) === MISMATCH_ARRIVAL.length,
+            { mismatch: both.body.signedMismatch, other: both.body.otherScans, rows: rowsOf(both.body).length });
+        const diagBoth = await diagNow();
+        ok('⛔ `?diag=1` បូកចំនួនពីគ្រប់ចម្លើយ upstream (មកដល់ ១ + ចុះហត្ថលេខា ២ = ៣ · មិនមែនតែចម្លើយចុងក្រោយ)',
+            mmOf(diagBoth.body).observed === true && mmOf(diagBoth.body).count === 3, mmOf(diagBoth.body));
+        const bothCached = await mmCall(GOOD_LIST_ENV, { withSigned: '1' }, true);
+        ok('⛔ cache ៖ ចម្លើយ `withSigned` ពី cache នៅផ្ទុកចំនួនដដែល',
+            bothCached.body.cached === true && bothCached.body.signedListMismatch === 2 && bothCached.body.signedMismatch === 1,
+            { cached: bothCached.body.cached, list: bothCached.body.signedListMismatch, own: bothCached.body.signedMismatch });
+
+        signedRowsNow = [listRow({ scanBillCode: '77130500002208', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' })];
+        arrivalRowsNow = [listRow({ scanBillCode: '77130500002209', scanTypeCode: '03' })];
+        const clean = await mmCall(GOOD_LIST_ENV, { withSigned: '1' });
+        ok('ទិសផ្ទុយ ៖ គ្មានអត្ថបទផ្ទុយ ➜ `signedMismatch:0` · `signedListMismatch:0` (លេខ មិនមែនបាត់)',
+            clean.body.signedMismatch === 0 && clean.body.signedListMismatch === 0 && clean.body.signedOk === true,
+            { own: clean.body.signedMismatch, list: clean.body.signedListMismatch });
+        const diagClean = await diagNow();
+        ok('ទិសផ្ទុយ ៖ គ្មានអត្ថបទផ្ទុយ ➜ `?diag=1` `observed:false` · `count:0` · `ageMs:null`',
+            mmOf(diagClean.body).observed === false && mmOf(diagClean.body).count === 0 && mmOf(diagClean.body).ageMs === null,
+            mmOf(diagClean.body));
+
+        signedRowsNow = MISMATCH_SIGNED;
+        arrivalRowsNow = MISMATCH_ARRIVAL;
+        const textOff = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: '' }), { signed: '1' });
+        ok('ទិសផ្ទុយ ៖ `ZTO_LIST_SIGNED_SCAN_DESC=` (ជាន់អត្ថបទបិទ) ➜ គ្មានអត្ថបទអាចផ្ទុយ ➜ `signedMismatch:0` · «Signed» ក្លាយជាភស្តុតាង',
+            textOff.body.signedMismatch === 0 && Array.isArray(textOff.body.signed) && textOff.body.signed.indexOf('77130500002201') !== -1,
+            { mismatch: textOff.body.signedMismatch, signed: textOff.body.signed });
+        const english = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'Signed' }), { signed: '1' });
+        ok('⛔ `ZTO_LIST_SIGNED_SCAN_DESC=Signed` ➜ «Signed» ជាភស្តុតាង · ជួរ `05` + «ចុះហត្ថលេខា» ក្លាយជាអត្ថបទផ្ទុយ (= ១)',
+            english.body.signedMismatch === 1 && Array.isArray(english.body.signed)
+            && english.body.signed.indexOf('77130500002201') !== -1 && english.body.signed.indexOf('77130500002203') === -1,
+            { mismatch: english.body.signedMismatch, signed: english.body.signed });
+    }
     console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     ENV_NAMES.forEach((name) => {
         if (SAVED_ENV[name] === undefined) delete process.env[name];

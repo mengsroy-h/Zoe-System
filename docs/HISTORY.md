@@ -149,14 +149,14 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន) · ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
+### [2.50.1] — 2026-10-06 · ZoeW ៖ **ZTO ស្អាត ៖ ការសម្អាត ៧ ថ្ងៃរង់ចាំបញ្ជី «ចុះហត្ថលេខា» (កញ្ចប់ដែលអតិថិជនយករួចលែងត្រូវដកលុយ) · ការបញ្ចូលបញ្ជីសម្រេចដូចការបិទស្វ័យប្រវត្តិ · បញ្ជីចុះហត្ថលេខាវែងអានតាមថ្ងៃ · បិទតាម ZTO លឿនតាមសកម្មភាព (ទោះកំពុងស្កេន) · ប្រភពកញ្ចប់ក្នុងប្រអប់បញ្ជី ZTO · ជួរ «ចុះហត្ថលេខា» អត្ថបទផ្ទុយលែងបាត់ស្ងាត់** (ជុំ ZTO ស្អាត · សំណើម្ចាស់គម្រោង)
 
 **ZoeW `2.50.1`** (`zoew-v263` ➜ `zoew-v264`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ⛔ តំបន់ ZTO ចាក់សោ ៖ ម្ចាស់គម្រោងអនុញ្ញាតឲ្យកែក្នុងជុំនេះ
 («កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ➜ `LOCK` ក្នុង `ZoeW/tests/zto-lock.test.ts` ធ្វើបច្ចុប្បន្នភាពរាល់ commit។ ប៉ះ `src/features/zto-status.ts`
 (`ztoAbandonCleanupIsHeld()` · `ztoOldestOpenStamp()` · `ztoSignedSweepRange()` · `closeZtoSignedBarcodes()`) · `src/features/zto-list-sync.ts` (`ztoListReasonIsDefinitive()` · `ztoPickupVerdictOf()` · `ztoListSignedVerdict()`) ·
 `src/domain/cleanup.ts` (`runAutomaticCleanupRules()`) · `src/core/state.ts` · ល្បឿន ៖ `zto-status.ts` (`ztoSignedSweepCadenceMs()` · `noteZtoUserActivity()` ·
 `ztoSignedNetworkAllowed()` · `ztoSignedLivePollWanted()` · `runZtoStatusSweep()`) · `src/app/lifecycle/boot.ts` · Function `listPlan()` · ប្រភព ៖ Function `projectListRow()` ·
-`classifyZtoListRows()` · `src/app/components/zto/model.ts`។
+`classifyZtoListRows()` · `src/app/components/zto/model.ts` · E4 ៖ Function `listRowSignedVerdict()` · `src/features/health-check.ts` (`ztoSignedMismatchText()`)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -175,6 +175,10 @@
 - 📚 **ZTO-E3 ៖ បញ្ជី «ចុះហត្ថលេខា» វែងលើសពិដានទំព័រ (៣ × ១០០)** ៖ មុនកែ ៖ ជុំបិទតាម ZTO អានតែទំព័រ ១–៣ ហើយស្ងាត់ ➜ កញ្ចប់ដែលនៅក្រៅទំព័រ ៣ មិនដែលបិទតាមបញ្ជី
   (ZTO តម្រៀបពីចាស់ទៅថ្មី ➜ អ្វីដែលបាត់ = **ការចុះហត្ថលេខាថ្មីៗ**)។ ឥឡូវ ៖ បញ្ជីវែង ➜ អានម្តងទៀតតាមថ្ងៃ (៣ ថ្ងៃព្រមគ្នា · Function `signed=1` គោរពជួរដែលសុំ) ·
   ថ្ងៃមួយនៅតែលើសពិដាន ➜ toast «⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក …» ម្តងក្នុងមួយវគ្គ · ចន្លោះទ្វេ · ការសម្អាត ៧ ថ្ងៃរង់ចាំតាមពិដាន (E1)។ ការហៅធម្មតានៅ ១ សំណើ។
+- ⚠️ **ZTO-E4 ៖ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទប្រភេទស្កេនផ្ទុយ លែងបាត់ស្ងាត់** ៖ ជួរកូដ `05` តែ `scanTypeDesc` ខុសពី `ZTO_LIST_SIGNED_SCAN_DESC` (ឧ. ZTO ប្តូរភាសា)
+  នៅតែមិនមែនភស្តុតាង (ច្បាប់ជាន់ ២ ដដែល) តែឥឡូវ ៖ ប្រអប់បញ្ជីប្រាប់ «⚠️ ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» N ជួរ …» · 🩺 ជួរ ZTO ✅ ➜ ⚠️ (Cookie បដិសេធនៅ ❌) · `?diag=1` ➜
+  `list.signedMismatch` (`observed` · `count` · `ageMs` · គ្មានអត្ថបទ ZTO) · 💰 ការអានដែលមានជួរផ្ទុយ **មិនពេញលេញ** ➜ ការសម្អាត ៧ ថ្ងៃនៅរង់ចាំ (E1 · ពិដាន ៣០ នាទី)។
+  មុនកែ ៖ ZTO ប្តូរអត្ថបទ ➜ ជួរចុះហត្ថលេខាទាំងអស់បាត់ស្ងាត់ ➜ បិទតាម ZTO ឈប់ ហើយការសម្អាត ៧ ថ្ងៃដកលុយកញ្ចប់ដែលយករួច ដោយគ្មានសញ្ញាណាមួយ។
 - ⚡ **ល្បឿន «បិទតាម ZTO» (របាយការណ៍ម្ចាស់គម្រោង ៖ «យឺត អត់ស្ថេរភាព» · ជម្រើស «ឆ្លាតវៃ»)** ៖ ពេលមានកញ្ចប់បើក ZoeW អានបញ្ជី «ចុះហត្ថលេខា» រៀងរាល់ **២០ វិ.** ពេលកំពុងប្រើ
   (ប៉ះអេក្រង់ · គ្រាប់ចុច/scanner ក្នុង ៥ នាទីចុងក្រោយ) · **១ នាទី** ពេលបើកទុកចោល · **២ នាទី** ពេល App នៅខាងក្រោយ (កូតា Netlify ៖ ឧបករណ៍កំពុងប្រើ ~១៨០ ការហៅ/ម៉ោង ·
   ទុកចោល ~៦០ · ខាងក្រោយ ~៣០)។ ការអាននេះ **ដើរទោះប្រអប់ស្កេនបើក** (មុនកែ ៖ ជុំទាំងមូលរំលងពេលប្រអប់បើក ហើយគ្មានម៉ោងសាកឡើងវិញ ➜ ស្កេនជាប់ = **មិនដែលបិទ**) ·
@@ -207,6 +211,9 @@
 - ល្បឿន ៖ `ZoeW/tests/zto-signed-cadence.test.tsx` (១៤) ៖ tree មុនកែ (`8283545`) **ធ្លាក់ ១៣** (ទិសផ្ទុយ «ក្រៅបណ្តាញ · Data Saver» បៃតងទាំងពីរ) · `zto-list-sync-test` +៤
   (cache `signed=1` ផុត ១៦ វិ. · នៅ ៥ វិ. · បញ្ជីធម្មតានៅ ១៦ វិ. · `?diag=1` `signedCacheTtlMs`) · `zto-sync-banner-test` +៤ (App ពិត ៖ `pointerdown` · `keydown` ➜ ល្បឿនសកម្ម ·
   ការរមូរមិនរាប់ · សកម្មភាពចាស់ ➜ ល្បឿនធម្មតា) · `clock-hygiene` ៖ ហេតុផល `noteZtoUserActivity()` · mutation ២៦/២៦ ត្រូវសម្លាប់ (ផ្នែក ២)។
+- E4 (អនុវត្តដោយ workflow agent · ពិនិត្យ និងបញ្ចូលក្នុង session) ៖ `ZoeW/tests/zto-signed-mismatch.test.tsx` (១១ · tree មុនកែធ្លាក់ ១០) · `zto-list-sync-test` ផ្នែក ២២
+  (មុនកែ ១១ FAIL) · `health-check-test` · mutation ៣៦/៣៧ (១ សមមូល) · ការបញ្ចូល ៖ ផ្លូវអានតាមថ្ងៃ (E3) ផ្ទុក `signedMismatch` (មិនរាប់ស្ទួន) · `zto-abandon-signed-gate` +១
+  (ជួរផ្ទុយ ➜ មិនពេញលេញ · ទិសផ្ទុយ ➜ ពេញលេញ) · mutation ៣/៣ ត្រូវសម្លាប់។
 - ប្រភព ៖ `ZoeW/tests/zto-list-origin.test.tsx` (៤) ៖ tree មុនកែ (`a7521bb`) **ធ្លាក់ ៤** · `zto-list-sync-test` +៦ (payload ពិត ៣ ➜ `recSite` · `recSite` ទទេ ➜ `customerCodeDesc` ·
   គ្មាន ➜ ទទេ · តួអក្សរបញ្ជា/ចន្លោះ/៦៤ តួ · ជួរដេក ៨ វាល ២ កន្លែង) · តារាង «📋 វាល» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេ `LIST_ORIGIN_PATHS` · mutation ៩/៩ ត្រូវសម្លាប់។
 

@@ -38,7 +38,7 @@ function openItem(id: string, code: string, ageMs: number) {
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
-function signedServer(byDay: Record<string, string[]>, opts: { wholePages?: number, dayPages?: Record<string, number>, failDay?: string } = {}) {
+function signedServer(byDay: Record<string, string[]>, opts: { wholePages?: number, dayPages?: Record<string, number>, failDay?: string, mismatch?: Record<string, number> } = {}) {
     const requests: { from: string, to: string, page: number }[] = [];
     let live = 0;
     let peak = 0;
@@ -59,7 +59,8 @@ function signedServer(byDay: Record<string, string[]>, opts: { wholePages?: numb
         const pages = from === to ? ((opts.dayPages || {})[from] || 1) : (opts.wholePages || 1);
         const slice = pages > 1 ? (page === 1 ? codes.slice(0, 2) : []) : codes;
         return json({ success: true, list: true, enabled: true, kind: 'signed', page, pages, total: codes.length,
-            rows: [], otherScans: 0, signedScans: slice.length, signed: slice, signedOk: true });
+            rows: [], otherScans: 0, signedScans: slice.length, signed: slice, signedOk: true,
+            signedMismatch: from === to ? ((opts.mismatch || {})[from] || 0) : (opts.mismatch && page === 1 ? 1 : 0) });
     });
     return { fetch, requests, peak: () => peak };
 }
@@ -110,6 +111,14 @@ describe('ZTO-E3 ៖ បញ្ជី «ចុះហត្ថលេខា» ល�
         const dayRequests = srv.requests.filter((r) => r.from === r.to);
         expect(dayRequests.map((r) => r.from).sort()).toEqual(ztoListDayKeys(d(7), d(0)).sort());
         expect(srv.peak()).toBeLessThanOrEqual(ZTO_SIGNED_DAY_CONCURRENCY);
+    });
+
+    it('E4 ៖ ជួរ «ចុះហត្ថលេខា» ផ្ទុយ (`signedMismatch`) មិនបាត់លើផ្លូវអានតាមថ្ងៃ (មិនរាប់ស្ទួនជាមួយការអានទាំងមូល)', async () => {
+        const srv = signedServer({ [d(0)]: ['ZTE3000061'], [d(3)]: ['ZTE3000062'] }, { wholePages: 9, mismatch: { [d(1)]: 2, [d(3)]: 1 } });
+        vi.stubGlobal('fetch', srv.fetch);
+        const out = await fetchZtoSignedCodes(CFG, d(4), d(0));
+        expect(out.truncated).toBe(false);
+        expect(out.signedMismatch).toBe(3);
     });
 
     it('ទិសផ្ទុយ ៖ មិនលើសពិដាន ➜ ១ សំណើតែប៉ុណ្ណោះ (មិនបង្កើនការហៅ ZTO)', async () => {

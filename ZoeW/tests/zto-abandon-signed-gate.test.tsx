@@ -362,6 +362,22 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         expect(abandoned('o2')).toBe(false);
     });
 
+    it('⛔ E4 ៖ បញ្ជីមានជួរ «ចុះហត្ថលេខា» អត្ថបទផ្ទុយ (`signedMismatch`) ➜ ភស្តុតាងមិនច្បាស់ ➜ មិនដោះលែងការរង់ចាំ (មិនដកលុយកញ្ចប់ដែលប្រហែលយករួច)', async () => {
+        dataState.scanHistory = [openItem('m1', 'ZTE8500001', 8 * DAY)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999997'], { signedMismatch: 2 })));
+        await runZtoStatusSweep(false);
+        cleanupNow();
+        expect(ztoState.ztoSignedCompleteAt).toBe(0);
+        expect(abandoned('m1')).toBe(false);
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999997'], { signedMismatch: 0 })));
+        vi.setSystemTime(new Date(Date.now() + 10 * 60 * 1000));
+        ztoState.ztoStatusLastSweepAt = 0;
+        await runZtoStatusSweep(true);
+        cleanupNow();
+        expect(ztoState.ztoSignedCompleteAt, 'ទិសផ្ទុយ ៖ គ្មានជួរផ្ទុយ ➜ ពេញលេញ').toBeGreaterThan(0);
+        expect(abandoned('m1'), 'ទិសផ្ទុយ ៖ ពេញលេញ ➜ ផុតកំណត់ធម្មតា').toBe(true);
+    });
+
     it('បញ្ជីវែងលើសពិដានទំព័រ (truncated) មិនដោះលែងការរង់ចាំ', async () => {
         dataState.scanHistory = [openItem('t1', 'ZTE8400001', 8 * DAY)];
         vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTE9999998'], { pages: 9 })));

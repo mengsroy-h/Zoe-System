@@ -17,7 +17,7 @@ import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { documentIsHidden } from '../platform/document-io';
@@ -412,7 +412,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
         out.keys.add(entries[i].key);
         if (done) out.closed++;
     }
-    if (finished && !signed.partial && !signed.truncated) {
+    if (finished && !signed.partial && !signed.truncated && !ztoListPositiveCount(signed.signedMismatch)) {
         ztoState.ztoSignedCompleteAt = Date.now();
         ztoState.ztoSignedSweepOkAt = ztoState.ztoSignedCompleteAt;
     }

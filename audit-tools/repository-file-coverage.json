@@ -610,6 +610,9 @@
     }
   },
   "files": {
+    ".gitattributes": {
+      "policy": "guard-2"
+    },
     ".github/workflows/android-release.yml": {
       "policy": "android-release"
     },

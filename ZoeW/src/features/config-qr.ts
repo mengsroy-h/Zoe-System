@@ -1,7 +1,7 @@
 import { setFieldValue, videoElement } from '../app/refs';
 import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { scanState, securityState } from '../core/state';
-import { applySetupPayload, parseSetupLinkText } from './config';
+import { connectSetupPayload, parseSetupLinkText } from './config';
 import { modalIsOpen } from '../core/modals';
 import { CONFIG_QR_FORMAT_NAMES, CONFIG_QR_SCAN_WIDTH, buildReaderOptions, decodeBarcodeFromCanvasManual, scanEngineReady, scheduleScanFrame } from '../services/scan-engine';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -106,8 +106,7 @@ export function handleConfigQrResult(text) {
     }
 
     closeConfigQrScanner();
-    applySetupPayload(result.parsed);
-    showToast('✅ បានស្កេន QR ជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+    connectSetupPayload(result.parsed, 'QR');
 }
 
 export const CONFIG_QR_IMAGE_MAX_DIM = 1600;
@@ -156,7 +155,6 @@ export function decodeConfigQrDataUrl(dataUrl) {
             showToast(result.error === 'not-link' ? "❌ QR នេះមិនមែនជា Setup Link ត្រឹមត្រូវទេ!" : "❌ QR Setup Link មិនត្រឹមត្រូវទេ!");
             return;
         }
-        applySetupPayload(result.parsed);
-        showToast('✅ បានស្កេន QR ពីរូបភាពជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+        connectSetupPayload(result.parsed, 'QR ពីរូបភាព');
     }, notFound);
 }

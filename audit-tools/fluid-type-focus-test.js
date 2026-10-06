@@ -230,6 +230,61 @@ async function tabSweep(page, steps) {
                 app.name + '៖ #' + ring.id + ' បង្ហាញរង្វង់ផ្តោត', got.missing ? 'រកមិនឃើញធាតុ' : JSON.stringify(got));
         }
 
+        // ងខ. checkbox/radio ចុចដោយម្រាមដៃ/ម៉ៅស៍ ➜ គ្មានរង្វង់ការ៉េរបស់វាលអក្សរ (ZoeW `.modal-content input:focus` · ZoeKeyGen `input:focus` ៖
+        //     box-shadow 3px) — ម្ចាស់គម្រោងរាយការណ៍ (រូបថត) ៖ 🔘 Firebase/Supabase ទុកស្រមោលការ៉េខៀវក្រោយចុច។ បញ្ជីដេរីវេពី DOM ពិត (គ្រប់កន្លែង)
+        const toggles = await s.page.evaluate(() => Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))
+            .map((el, i) => { el.setAttribute('data-fluid-toggle', String(i)); return i; }));
+        const ringed2 = [];
+        const measured2 = [];
+        for (const idx of toggles) {
+            const target = await s.page.evaluate((i) => {
+                const el = document.querySelector('[data-fluid-toggle="' + i + '"]');
+                const host = el.closest('.modal');
+                document.querySelectorAll('.modal').forEach((m) => { if (m !== host) m.style.display = 'none'; });
+                if (host) host.style.display = 'flex';
+                for (let n = el; n && n !== document.body; n = n.parentElement) {
+                    if (n.classList.contains('hidden')) { n.classList.remove('hidden'); n.setAttribute('data-fluid-unhid', '1'); }
+                }
+                const label = el.closest('label') || (el.id && document.querySelector('label[for="' + el.id + '"]'));
+                const cs = getComputedStyle(el);
+                const own = el.getBoundingClientRect();
+                const pick = (own.width >= 4 && own.height >= 4 && parseFloat(cs.opacity) > 0) ? el : (label || el);
+                pick.scrollIntoView({ block: 'center' });
+                const r = pick.getBoundingClientRect();
+                return { x: r.left + Math.min(r.width / 2, 8), y: r.top + r.height / 2, key: (el.id || el.name || 'toggle') + '#' + i };
+            }, idx);
+            await s.page.mouse.click(target.x, target.y);
+            await s.page.waitForTimeout(80);
+            const got = await s.page.evaluate((i) => {
+                const el = document.querySelector('[data-fluid-toggle="' + i + '"]');
+                const cs = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                const visible = parseFloat(cs.opacity) > 0 && r.width > 2 && r.height > 2;
+                const shadow = cs.boxShadow && cs.boxShadow !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs.boxShadow);
+                // ⛔ input លាក់ (switch · segmented) ៖ អ្វីដែលអ្នកប្រើឃើញជាស្លាក/កុងតាក់ ➜ វាស់ outline/box-shadow របស់វាផង
+                const label = el.closest('label');
+                const stands = visible ? [] : [label, label && label.querySelector('.cfg-switch')].filter(Boolean);
+                const standRing = stands.map((n) => getComputedStyle(n)).filter((c) => c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0).map((c) => c.outlineStyle + ' ' + c.outlineWidth);
+                const out = { focused: document.activeElement === el, fv: el.matches(':focus-visible'), visible: visible, shadow: shadow ? cs.boxShadow : '', standRing: standRing.join(',') };
+                el.blur();
+                document.querySelectorAll('[data-fluid-unhid]').forEach((n) => { n.classList.add('hidden'); n.removeAttribute('data-fluid-unhid'); });
+                document.querySelectorAll('.modal').forEach((m) => { m.style.display = ''; });
+                return out;
+            }, idx);
+            if (got.focused) measured2.push(target.key);
+            if (got.focused && !got.fv && got.visible && got.shadow) ringed2.push(target.key + ' ➜ ' + got.shadow);
+            if (got.focused && !got.fv && got.standRing) ringed2.push(target.key + ' (ស្លាក) ➜ outline ' + got.standRing);
+        }
+        check(toggles.length >= (app.name === 'ZoeW' ? 5 : 2), app.name + '៖ checkbox/radio ' + toggles.length + ' (ដេរីវេពី DOM ពិត)');
+        // ⛔ ជាន់លើចំនួន **វាស់ពិត** (ចុចហើយ input ទទួល focus) — ការចុចដែលមិនដល់ ➜ មិនមែន «គ្មានស្រមោល»
+        check(measured2.length >= (app.name === 'ZoeW' ? 5 : 1), app.name + '៖ checkbox/radio ដែលចុចហើយទទួល focus ពិត ' + measured2.length + '/' + toggles.length, measured2.join(' · '));
+        if (app.name === 'ZoeW') {
+            const needed = ['configManualToggle', 'configBackend'];
+            const hit = needed.filter((k) => measured2.filter((m) => m.split('#')[0] === k).length >= (k === 'configBackend' ? 2 : 1));
+            check(hit.length === needed.length, 'ZoeW៖ switch «បំពេញ Config ដោយដៃ» និង radio Server ទាំង ២ (ផ្ទៃដែលម្ចាស់គម្រោងរាយការណ៍) ត្រូវបានវាស់', measured2.join(' · '));
+        }
+        check(ringed2.length === 0, app.name + '៖ checkbox/radio ចុចហើយ គ្មានរង្វង់ការ៉េរបស់វាលអក្សរ (box-shadow)', ringed2.join(' · '));
+
         // ង. ការចុចដោយម៉ៅស៍ មិនត្រូវទុករង្វង់ — នោះជាហេតុផលនៃ :focus-visible ធៀប :focus
         const box = await s.page.evaluate(() => {
             const b = document.createElement('button');

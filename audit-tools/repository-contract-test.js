@@ -204,6 +204,49 @@ scenario('.gitignore ការពារសោ/ទិន្នន័យ ហើយ
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
+scenario('.gitattributes ៖ checkout លើ Windows (core.autocrlf=true) បានបៃតដូច Linux · .cmd/.bat រក្សា CRLF', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eol-contract-'));
+    const git = (args, cwd) => cp.execFileSync('git', args, { cwd: cwd || temp, stdio: 'pipe', timeout: 15000, encoding: 'utf8' });
+    try {
+        const src = path.join(temp, 'src');
+        const win = path.join(temp, 'win');
+        fs.mkdirSync(src);
+        git(['init', '--quiet', src]);
+        git(['config', 'core.autocrlf', 'false'], src);
+        fs.writeFileSync(path.join(src, '.gitattributes'), read('.gitattributes'));
+        fs.mkdirSync(path.join(src, 'res'));
+        fs.writeFileSync(path.join(src, 'res', 'splash_icon.xml'), '<?xml version="1.0"?>\n<vector>\n</vector>\n');
+        fs.writeFileSync(path.join(src, 'icon.svg'), '<svg>\n<path d="M0 0"/>\n</svg>\n');
+        fs.writeFileSync(path.join(src, 'tool.cmd'), '@echo off\r\necho ok\r\n');
+        fs.writeFileSync(path.join(src, 'gradlew.bat'), '@rem x\r\nexit /b 0\r\n');
+        git(['add', '-A'], src);
+        git(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--quiet', '-m', 'x'], src);
+        git(['-c', 'core.autocrlf=true', 'clone', '--quiet', src, win]);
+        const bytes = (rel) => fs.readFileSync(path.join(win, rel), 'latin1');
+        check('.gitattributes ៖ Windows checkout ៖ XML/SVG នៅ LF (android-check ប្រៀបបៃតដូច Linux)',
+            !bytes('res/splash_icon.xml').includes('\r') && !bytes('icon.svg').includes('\r'));
+        check('.gitattributes ៖ Windows checkout ៖ .cmd/.bat នៅ CRLF ដដែល',
+            /\r\n/.test(bytes('tool.cmd')) && /\r\n/.test(bytes('gradlew.bat')));
+        const crlf = [];
+        const walk = (dir) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (['.git', 'node_modules', 'dist', 'dist-audit', '.original', 'build'].includes(entry.name)) continue;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walk(full);
+                else if (entry.isFile() && fs.statSync(full).size < 2000000) {
+                    const buf = fs.readFileSync(full);
+                    if (!buf.includes(0) && buf.includes('\r\n')) crlf.push(path.relative(ROOT, full).split(path.sep).join('/'));
+                }
+            }
+        };
+        walk(ROOT);
+        const attrs = crlf.length ? git(['check-attr', 'text', '--'].concat(crlf), src) : '';
+        const converted = crlf.filter((rel) => !new RegExp('^' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ': text: unset$', 'm').test(attrs));
+        check('.gitattributes ៖ ឯកសារ CRLF ពិតក្នុង repo (' + crlf.length + ') ទាំងអស់ជា -text (មិនប្តូរ EOL)', crlf.length >= 1 && converted.length === 0,
+            converted.join(' · '));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
 scenario('ឧបករណ៍សម្អាតរក្សាតម្លៃកូដពិត', () => {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-clean-contract-'));
     const options = { encoding: 'utf8', timeout: 10000, env: { ...process.env,

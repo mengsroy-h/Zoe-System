@@ -55,8 +55,8 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.49.5` (`zoew-v261`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.5` (`zoekeygen-v116`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.49.6` (`zoew-v262`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -917,7 +917,9 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 - Phones and barcodes are TEXT: `XLSX.writeFile(..., { bookSST: true })` + `forceExportTextCells()`
   (`EXPORT_TEXT_COLUMN_INDEXES = [1, 2]`); check the emitted XML.
 - `csvSafeText()` prefixes `'` to `=` `+` `-` `@` ⛔ never on all of `csvEscape` (`sheetsText()` starts with `=` on purpose).
-- Setup Link: `applySetupLinkFromUrl()` goes through the PIN gate, no auto-save; query removed via
+- Setup Link: `applySetupLinkFromUrl()` goes through the PIN gate, no auto-save (destination card `configPendingLink` +
+  one tap ⛔ never auto-save a URL link — it can come from anyone); in-modal QR/image/paste save at once via
+  `connectSetupPayload()` (a rejected config ➜ not saved, manual section opens); query removed via
   `history.replaceState`; abandoned links don't survive logout, active PIN flows keep them (`isPinFlowPending()`).
 - `firebase-backup/`: Node.js 18+ CLI, no dependencies; `config.json` · `secrets/` · `backups/` gitignored ⛔ never commit
   service-account keys; `.partial` ➜ `renameSync()`; runs by hand/Task Scheduler and via `backup.yml` (cron `0 19 * * *`):

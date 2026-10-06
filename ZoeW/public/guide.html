@@ -286,11 +286,12 @@
                 <ol>
                     <li>ទទួល Setup Link ឬ QR ពី ZoeKeyGen ដែលទុកចិត្តបាន។ មិនទាន់មានគណនី ឬ Setup Link ➜ ចុចតំណ <strong>@mengsroyhun</strong> ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ដើម្បីទាក់ទងបង្កើតគណនីតាម Telegram។</li>
                     <li>បើក link នោះ ឬនៅ ZoeW ចូលរបា Slide → <strong>Config / Reconfig</strong> → ប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ហើយជ្រើសមួយ ៖ <strong>📷 ស្កេន QR (Setup Link)</strong> ដោយកាមេរ៉ា · <strong>🖼️ QR ពីរូបភាព</strong> (រូបថតអេក្រង់ QR ដែលទទួលតាម chat) · ឬបិទភ្ជាប់ Link ក្នុងវាល <strong>Setup Link</strong> រួចចុច <strong>ប្រើ Link</strong>។</li>
-                    <li>ផ្ទៀងផ្ទាត់ Security PIN មុនរក្សាទុក។</li>
-                    <li>ចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ហើយរង់ចាំស្ថានភាពបង្ហាញថា «ភ្ជាប់ Server រួចរាល់»។</li>
+                    <li>វាយ Security PIN — មិនទាន់មាន PIN ➜ App ឲ្យបង្កើត PIN ថ្មីមុន។</li>
+                    <li>ស្កេន QR ឬបិទភ្ជាប់ Link ត្រឹមត្រូវ ➜ App រក្សាទុក ហើយភ្ជាប់ Server ភ្លាម។ បើក Link ពីសារ ➜ ប្រអប់បង្ហាញ Server ដែលនឹងភ្ជាប់ ➜ ពិនិត្យ ហើយចុច <strong>✅ ភ្ជាប់</strong>។</li>
+                    <li>រង់ចាំស្ថានភាពបង្ហាញថា «ភ្ជាប់ Server រួចរាល់»។</li>
                 </ol>
                 <h3>បញ្ចូល Config ដោយដៃ</h3>
-                <p>ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ជ្រើសប្រភេទ Server ៖</p>
+                <p>ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> បើក switch <strong>✍️ បំពេញ Config ដោយដៃ</strong> ជ្រើសប្រភេទ Server ហើយចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ៖</p>
                 <ul>
                     <li><strong>Firebase</strong> ៖ ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</li>
                     <li><strong>Supabase</strong> ៖ បំពេញ <strong>Project URL</strong> (<code>https://….supabase.co</code>) និង <strong>Publishable key</strong> (<code>sb_publishable_…</code>) ពី Supabase → Project Settings → API។ ⛔ App បដិសេធ Secret key (<code>sb_secret_…</code>)។</li>
@@ -304,7 +305,7 @@
                 <h3>ម្ចាស់ហាងចុះឈ្មោះលើកដំបូង</h3>
                 <ol class="steps">
                     <li><strong>បើក Setup Link ឬស្កេន QR</strong> ដែលអ្នកលក់ផ្ញើ (Link ផ្ទុកកូដអញ្ជើញ)។</li>
-                    <li><strong>វាយ Security PIN</strong> រួចចុច <strong>រក្សាទុក និងភ្ជាប់</strong>។</li>
+                    <li><strong>វាយ Security PIN</strong> (មិនទាន់មាន ➜ បង្កើតថ្មី) ពិនិត្យ Server លើកាត Setup Link រួចចុច <strong>✅ ភ្ជាប់</strong> (ស្កេន QR ក្នុងប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ភ្ជាប់ភ្លាម)។ កាតបង្ហាញ ⚠️ ពេល Server មិននៅលើ domain ផ្លូវការរបស់ Supabase ឬ Firebase។</li>
                     <li>App ពិនិត្យកូដអញ្ជើញជាមួយ Server ➜ កូដនៅប្រើបាន ➜ ប្រអប់ <strong>📝 ចុះឈ្មោះ</strong> លេចដោយស្វ័យប្រវត្តិ (កូដបំពេញរួច)។ កូដប្រើរួច ឬផុត ➜ App បង្ហាញប្រអប់ <strong>ចូលប្រព័ន្ធ</strong> ជំនួស (ហាងនោះមានគណនីរួច)។</li>
                     <li>ជ្រើស <strong>ឈ្មោះគណនី</strong> (៣–៣២ តួ ៖ a–z · 0–9 · <code>.</code> · <code>_</code>) និង <strong>ពាក្យសម្ងាត់</strong> យ៉ាងតិច ៨ តួ (វាយ ២ ដង) ➜ <strong>ចុះឈ្មោះ</strong> ➜ App ចូលប្រព័ន្ធភ្លាម។</li>
                 </ol>

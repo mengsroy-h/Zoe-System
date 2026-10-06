@@ -8,6 +8,15 @@ export type EntryMode = 'parcel' | 'locker' | 'remove';
 export type DataSummaryId = 'grandTotalCount' | 'todayTotalCount' | 'todayClosedCount' | 'todayPackagesPickedUpCount'
     | 'summaryCodDollar' | 'summaryCodRiel' | 'summaryDodDollar' | 'summaryDodRiel' | 'summaryTotalDollar' | 'summaryTotalRiel';
 
+export interface ConfigLinkSummary {
+    backend: 'firebase' | 'supabase';
+    host: string;
+    invite: boolean;
+    official: boolean;
+    dsn: boolean;
+    payload?: any;
+}
+
 export interface ViewState {
     appVersionLabel: string;
     displayRateText: string;
@@ -24,6 +33,8 @@ export interface ViewState {
     loginBusy: boolean;
     backendKind: 'firebase' | 'supabase';
     configBackend: 'firebase' | 'supabase';
+    configManual: boolean;
+    configPendingLink: ConfigLinkSummary | null;
     loginMode: 'login' | 'register' | 'reset';
 
     appLockOpen: boolean;
@@ -118,6 +129,8 @@ export const viewState = createStore<ViewState>('viewState', {
     loginBusy: false,
     backendKind: 'firebase',
     configBackend: 'firebase',
+    configManual: false,
+    configPendingLink: null,
     loginMode: 'login',
 
     appLockOpen: false,

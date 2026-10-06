@@ -257,7 +257,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         expect(hasPendingInvite()).toBe(true);
         expect(fieldValue('sentryDsnInput')).toBe('https://k@o1.ingest.sentry.io/2');
         expect(fieldValue('setupLinkInput')).toBe('');
-        expect(toastTexts()).toContain('✅ Setup Link ត្រឹមត្រូវ — កំពុងភ្ជាប់ Server ៖ abcd1234.supabase.co');
+        expect(toastTexts()).toContain('✅ Setup Link ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ abcd1234.supabase.co');
     });
 
     it('⛔ កាមេរ៉ា ៖ ភ្ជាប់ភ្លាម · invite មិនត្រូវបាត់ (មិនដាក់ក្នុង textarea)', () => {
@@ -268,7 +268,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         expect(viewState.configBackend).toBe('supabase');
         expect(stored()).toEqual(SB);
         expect(initFirebase).toHaveBeenCalledTimes(1);
-        expect(toastTexts()).toContain('✅ QR ត្រឹមត្រូវ — កំពុងភ្ជាប់ Server ៖ abcd1234.supabase.co');
+        expect(toastTexts()).toContain('✅ QR ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ abcd1234.supabase.co');
     });
 
     it('QR ពីរូបភាព ៖ Link Firebase ➜ ភ្ជាប់ភ្លាម · QR មិនមែន Link ➜ សារ · គ្មាន QR ➜ សារ (មិនរក្សាទុក)', async () => {
@@ -279,7 +279,7 @@ describe('Setup Link ៖ បិទភ្ជាប់ · កាមេរ៉ា ·
         step(() => {});
         expect(stored()).toEqual(FB);
         expect(viewState.configBackend).toBe('firebase');
-        expect(toastTexts()).toContain('✅ QR ពីរូបភាព ត្រឹមត្រូវ — កំពុងភ្ជាប់ Server ៖ x.firebaseio.com');
+        expect(toastTexts()).toContain('✅ QR ពីរូបភាព ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ x.firebaseio.com');
         appLocalStore!.clear();
         vi.mocked(initFirebase).mockClear();
         step(() => openConfigModal());

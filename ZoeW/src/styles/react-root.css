@@ -225,6 +225,16 @@
     .ptr-indicator { top: calc(var(--chrome-top, 65px) + var(--tabbar-height, 45px) - 41px); }
 }
 
+#configModal .cfg-lead {
+    margin: 0 0 14px;
+    font-size: calc(12 * var(--fs-unit));
+    text-align: center;
+}
+#configModal .cfg-hint {
+    margin: 0 0 8px;
+    line-height: 1.55;
+    text-align: left;
+}
 #configModal .cfg-contact {
     margin: 4px 0 12px;
     font-size: calc(11.5 * var(--fs-unit));

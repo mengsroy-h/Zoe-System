@@ -174,6 +174,10 @@ migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.t
 - `fluid-type-focus-test` ផ្នែក ងខ (browser ពិត · App ទាំងពីរ) ៖ ចុច checkbox/radio ពិតគ្រប់ធាតុ (ដេរីវេពី DOM) ➜ `box-shadow` = `none`។ មុនកែ FAIL ៖ ZoeW
   `lookupApi*Checkbox` ×3 · `rememberMeCheckbox` · `rememberPasswordCheckbox` (`rgb(224, 242, 254) 0 0 0 3px`) · ZoeKeyGen `rememberMeCheckbox`។
 - `repository-contract-test` ៖ clone ពិតដោយ `core.autocrlf=true` ➜ xml/svg នៅ LF · `.cmd`/`.bat` នៅ CRLF · ឯកសារ CRLF ពិតក្នុង repo ទាំងអស់មាន `-text`។
+- អ្នកយាមដែលមានស្រាប់ចាប់ ៥ ចំណុចលើ commit ដំបូង (CI ៤ shard ក្រហម) ៖ `wiring` · `csp-enforced` (`toggleConfigManual` ត្រូវនៅក្នុង
+  `ACTION_ALLOWLIST` · `src/core/runtime.ts`) · `css-classes` (`.cfg-lead` · `.cfg-hint` គ្មានច្បាប់ CSS) · `toast-action-truth` (toast 🔗 គ្មានសញ្ញាន័យ ➜ ℹ️) ·
+  `zoew-suite` ➜ `npm run parity` (អត្ថបទដើម ៣ ➜ `REMOVED_STRINGS` មានហេតុផល)។ toast ក្រោយស្កេន/បិទភ្ជាប់និយាយតែអ្វីដែលបានរក្សាទុក
+  («✅ QR ត្រឹមត្រូវ ➜ បានរក្សាទុក Config ៖ host») ហើយ live toast `config` រាយការណ៍ការភ្ជាប់។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

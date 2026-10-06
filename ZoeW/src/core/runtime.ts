@@ -123,6 +123,7 @@ export const ACTION_ALLOWLIST = [
     "switchAppPage",
     "testLookupApiConfig",
     "toggleCloseStatus",
+    "toggleConfigManual",
     "toggleDrawerGroup",
     "toggleHeaderMoreDropdown",
     "toggleIndividualBarcodeClose",

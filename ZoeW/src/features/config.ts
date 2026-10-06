@@ -386,14 +386,14 @@ export function connectSetupPayload(parsed, source) {
         return false;
     }
     const host = setupLinkSummary(parsed).host;
-    showToast('✅ ' + source + ' ត្រឹមត្រូវ — កំពុងភ្ជាប់ Server' + (host ? ' ៖ ' + host : ''));
+    showToast('✅ ' + source + ' ត្រឹមត្រូវ ➜ បានរក្សាទុក Config' + (host ? ' ៖ ' + host : ''));
     return true;
 }
 
 export function announceSetupApplied(linkDsn) {
     showToast(linkDsn
-        ? '🔗 Setup Link ត្រឹមត្រូវ (រួមការរាយការណ៍កំហុស) — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»'
-        : '🔗 Setup Link ត្រឹមត្រូវ — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»');
+        ? 'ℹ️ Setup Link ត្រឹមត្រូវ (រួមការរាយការណ៍កំហុស) — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»'
+        : 'ℹ️ Setup Link ត្រឹមត្រូវ — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»');
 }
 
 export function applySetupLinkFromInput() {

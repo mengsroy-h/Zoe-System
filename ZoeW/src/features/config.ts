@@ -1,7 +1,7 @@
 import { modalIsOpen } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { securityState } from '../core/state';
-import { viewState } from '../core/view-state';
+import { viewState, type ConfigLinkSummary } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { cancelPendingLookupUnlock } from './auto-lookup';
 import { applyPinPromptText, requestPinBeforeConfig } from './pin';
@@ -57,6 +57,8 @@ export function openConfigModal() {
             setFieldValue('firebaseConfigInput', savedConfig);
         }
     }
+    viewState.configManual = false;
+    viewState.configPendingLink = null;
     setFieldValue('setupLinkInput', '');
     if (window.ZoeErrors) setFieldValue('sentryDsnInput', ZoeErrors.getDsn());
     openModalHelper('configModal');
@@ -64,6 +66,10 @@ export function openConfigModal() {
 
 export function selectConfigBackend(kind) {
     viewState.configBackend = kind === 'supabase' ? 'supabase' : 'firebase';
+}
+
+export function toggleConfigManual() {
+    viewState.configManual = !viewState.configManual;
 }
 
 export function configInputText() {
@@ -265,29 +271,31 @@ export function saveFirebaseConfig() {
     }
     if (!raw) {
         alert("សូមបញ្ចូល Firebase Config!");
-        return;
+        return false;
     }
     let normalized;
     try {
         normalized = normalizeFirebaseConfig(raw);
     } catch (e) {
         alert(firebaseConfigErrorMessage(e));
-        return;
+        return false;
     }
     fillConfigFields(normalized.config);
     if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
-        return;
+        return false;
     }
     if (normalized.extras.length) {
         showToast(normalized.config.supabaseUrl
             ? "ℹ️ រំលងវាលដែលមិនមែនរបស់ Supabase៖ " + normalized.extras.join(', ')
             : "ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
     }
+    viewState.configPendingLink = null;
     closeModal('configModal');
     closeModal('loginModal');
     initFirebase();
     showLiveToast('config');
+    return true;
 }
 
 export function decodeSetupPayload(setupParam) {
@@ -360,14 +368,32 @@ export function applySetupLinkText(text) {
         showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
         return false;
     }
-    announceSetupApplied(applySetupPayload(result.parsed));
+    return connectSetupPayload(result.parsed, 'Setup Link');
+}
+
+export function setupLinkSummary(parsed): ConfigLinkSummary {
+    const supabase = !!(parsed && parsed.supabaseUrl);
+    const raw = String((supabase ? parsed.supabaseUrl : parsed && (parsed.databaseURL || parsed.projectId)) || '');
+    let host = raw;
+    try { host = new URL(raw).host || raw; } catch (e) {}
+    return { backend: supabase ? 'supabase' : 'firebase', host: host.slice(0, 80), invite: supabase && typeof parsed.invite === 'string' && !!parsed.invite };
+}
+
+export function connectSetupPayload(parsed, source) {
+    applySetupPayload(parsed);
+    if (!saveFirebaseConfig()) {
+        viewState.configManual = true;
+        return false;
+    }
+    const host = setupLinkSummary(parsed).host;
+    showToast('✅ ' + source + ' ត្រឹមត្រូវ — កំពុងភ្ជាប់ Server' + (host ? ' ៖ ' + host : ''));
     return true;
 }
 
 export function announceSetupApplied(linkDsn) {
     showToast(linkDsn
-        ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
-        : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+        ? '🔗 Setup Link ត្រឹមត្រូវ (រួមការរាយការណ៍កំហុស) — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»'
+        : '🔗 Setup Link ត្រឹមត្រូវ — ពិនិត្យ Server ខាងក្រោម ហើយចុច «✅ ភ្ជាប់»');
 }
 
 export function applySetupLinkFromInput() {
@@ -393,6 +419,7 @@ export function applySetupLinkFromUrl() {
     requestPinBeforeConfig(() => {
         openConfigModal();
         announceSetupApplied(applySetupPayload(parsed));
+        viewState.configPendingLink = setupLinkSummary(parsed);
     }, 'setupLink');
 }
 

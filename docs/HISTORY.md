@@ -46,8 +46,8 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #285 merge រួច (`main` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5** · Deep audit ជុំ ១–២) · branch `claude/wizardly-pascal-slr8gi` = **ZoeW 2.49.5**
-   (Deep audit ជុំ ៣ ចំណុច ១ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.5] · [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+1. **ម្ចាស់គម្រោង** ៖ PR #288 merge រួច (`main` = **ZoeW 2.49.5 · ZoeKeyGen 2.24.5** · Deep audit ជុំ ១–៣ · LICENSE) · branch `claude/wizardly-pascal-slr8gi` =
+   **ZoeW 2.49.6 · ZoeKeyGen 2.24.6** (ប្រអប់ Config · checkbox · CRLF APK · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.6] · [2.49.5] · [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
@@ -140,6 +140,46 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.6] — 2026-10-06 · ZoeW + ZoeKeyGen ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ស្កេន QR/បិទភ្ជាប់ Setup Link ➜ ភ្ជាប់ភ្លាម · Config ដោយដៃនៅក្រោយ switch · checkbox/radio គ្មានស្រមោលការ៉េ · APK workflow ៖ CRLF លើ Windows** (សំណើ/របាយការណ៍ម្ចាស់គម្រោង · រូបថត)
+
+**ZoeW `2.49.6`** (`zoew-v261` ➜ `zoew-v262`) · **ZoeKeyGen `2.24.6`** (`zoekeygen-v116` ➜ `zoekeygen-v117` ៖ `style.css` តែប៉ុណ្ណោះ)។ ⛔ Firebase rules ·
+migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.tsx` · `src/features/config.ts` (`toggleConfigManual` · `setupLinkSummary` · `connectSetupPayload` ·
+`saveFirebaseConfig()` ត្រឡប់ `true`/`false`) · `config-qr.ts` · `view-state.ts` (`configManual` · `configPendingLink`) · `action-registry.ts` · `react-root.css` ·
+`ZoeKeyGen/style.css` · `.gitattributes` (ថ្មី) · `ZoeW/scripts/android-check.mjs`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📷 **ស្កេន QR (កាមេរ៉ា ឬរូបភាព) និងបិទភ្ជាប់ Setup Link ក្នុងប្រអប់ ➜ រក្សាទុក ហើយភ្ជាប់ភ្លាម** (`connectSetupPayload()` ➜ `saveFirebaseConfig()`) ៖
+  អ្នកប្រើបានស្កេន/បិទភ្ជាប់ដោយខ្លួនឯង ➜ សកម្មភាពនោះជាការយល់ព្រម។ Link មិនត្រឹមត្រូវ (ឧ. Secret key · URL មិនអនុញ្ញាត) ➜ មិនរក្សាទុក
+  ហើយបើកផ្នែក «បំពេញ Config ដោយដៃ» ឲ្យឃើញតម្លៃ។
+- 🔗 **Setup Link ពី URL (`?setup=`)** នៅតែឆ្លងច្រក PIN ហើយ **មិនរក្សាទុកដោយស្វ័យប្រវត្តិ** ៖ ប្រអប់បង្ហាញកាត «Setup Link ៖ Firebase/Supabase · host ·
+  កូដអញ្ជើញ» + ប៊ូតុង «✅ ភ្ជាប់» (ចុចម្តង)។ មូលហេតុ ៖ តំណក្នុងសារអាចមកពីអ្នកដទៃ (phishing ➜ ភ្ជាប់ទៅ Server អ្នកវាយប្រហារ) ➜ អ្នកប្រើត្រូវឃើញ
+  Server មុនភ្ជាប់។
+- ✍️ **វាល Config ដោយដៃលាក់ក្រោយ switch «បំពេញ Config ដោយដៃ»** (`role="switch"` · បិទតាមលំនាំដើមរាល់ពេលបើកប្រអប់) ៖ បិទ ➜ ឃើញតែស្កេន QR ·
+  QR ពីរូបភាព · បិទភ្ជាប់ Link។ បើក ➜ ជម្រើស Server ជា segmented control (Firebase លឿង · Supabase បៃតង) · វាល Config · Sentry DSN ·
+  ប៊ូតុង «រក្សាទុក និងភ្ជាប់» (ភ្ជាប់តែពេលចុច)។
+- 🔘 **checkbox/radio ចុចហើយគ្មានស្រមោលការ៉េ** (រូបថតម្ចាស់គម្រោង) ៖ មូលហេតុ ៖ `.modal-content input:focus` (ZoeW) និង `input:focus` (ZoeKeyGen)
+  ដាក់ `box-shadow` 3px របស់វាលអក្សរលើ checkbox/radio ផងដែរ ➜ ចុចដោយម្រាមដៃនៅសល់ការ៉េពណ៌ (web និង APK ដូចគ្នា ព្រោះ CSS តែមួយ)។
+  ឥឡូវ checkbox/radio `:focus` គ្មាន `box-shadow` · ក្តារចុច (`:focus-visible`) នៅមានរង្វង់ outline 2px។ ZoeW ៖ `app.css` ស្មើ vanilla (parity) ➜
+  ការកែនៅ `react-root.css`។
+- 🤖 **APK workflow ធ្លាក់ពេលប្តូរទៅ runner `windows-latest` របស់ GitHub** ៖ មិនមែនដោយ repo ជាសាធារណៈទេ — Git for Windows `core.autocrlf=true`
+  ប្តូរ LF ➜ CRLF ពេល checkout ➜ `android-check` ប្រៀបអត្ថបទ xml/svg ជាមួយ LF ➜ FAIL។ ឥឡូវ `.gitattributes` (`* text=auto eol=lf` · `.cmd`/`.bat` `-text`)
+  + `android-check.mjs` អានដោយប្តូរ CRLF ➜ LF (tree CRLF ៖ មុនកែ 93 ok/1 FAIL · ក្រោយកែ 94 ok)។ runner self-hosted Windows ទទួលការកែដូចគ្នា។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/config-modal.test.tsx` ៖ លំនាំដើម (switch បិទ · វាលលាក់) · ស្កេនកាមេរ៉ា/រូបភាព/បិទភ្ជាប់ ➜ រក្សាទុកភ្លាម · Secret key ➜ មិនរក្សាទុក + បើកដោយដៃ ·
+  URL ➜ កាត + មិនរក្សាទុកមុនចុច «✅ ភ្ជាប់» · CSS គ្មានស្រមោលការ៉េ។
+- `fluid-type-focus-test` ផ្នែក ងខ (browser ពិត · App ទាំងពីរ) ៖ ចុច checkbox/radio ពិតគ្រប់ធាតុ (ដេរីវេពី DOM) ➜ `box-shadow` = `none`។ មុនកែ FAIL ៖ ZoeW
+  `lookupApi*Checkbox` ×3 · `rememberMeCheckbox` · `rememberPasswordCheckbox` (`rgb(224, 242, 254) 0 0 0 3px`) · ZoeKeyGen `rememberMeCheckbox`។
+- `repository-contract-test` ៖ clone ពិតដោយ `core.autocrlf=true` ➜ xml/svg នៅ LF · `.cmd`/`.bat` នៅ CRLF · ឯកសារ CRLF ពិតក្នុង repo ទាំងអស់មាន `-text`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeW និង ZoeKeyGen (Netlify) ➜ build APK ឡើងវិញ (workflow APK លើ `windows-latest` ឬ self-hosted)។
+2. ផ្ទៀងផ្ទាត់លើទូរស័ព្ទពិត (iPhone + Android/APK) ៖ ចុច 🔘 Firebase/Supabase និងប្រអប់ធីក «ចងចាំ…» ➜ គ្មានការ៉េ · ស្កេន QR ➜ ភ្ជាប់ភ្លាម ·
+   បើក Setup Link ពីសារ ➜ កាត + ចុច «✅ ភ្ជាប់»។
 
 ### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun) · ពណ៌ + logo Firebase/Supabase · Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Server ពិនិត្យកូដមិនបាន · APK ៖ Push មិនជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយផុត ៤ ម៉ោង** (Deep audit ជុំ ៣ · សំណើ/របាយការណ៍ម្ចាស់គម្រោង)
 
@@ -1378,6 +1418,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-06 — APK workflow លើ `windows-latest` ៖ CRLF មិនមែន repo ជាសាធារណៈ (➜ [2.49.6])
+
+- ម្ចាស់គម្រោងគិតថា APK workflow ធ្លាក់ព្រោះដាក់ repo ជាសាធារណៈ។ វាស់ ៖ checkout ដោយ `core.autocrlf=true` (លំនាំដើម Git for Windows) ➜
+  `android-check` 93 ok/1 FAIL (អត្ថបទ xml/svg មាន `\r\n`)។ គ្មាន `.gitattributes` ពីមុន ➜ tree លើ Windows ខុសពី Linux CI ➜ CI ក្នុង session
+  មិនអាចឃើញ។ ការកែពីរជាន់ ៖ `.gitattributes` (`eol=lf`) + អ្នកអានក្នុង `android-check.mjs` ធ្វើឲ្យ CRLF ➜ LF (ការពារ checkout ចាស់ដែលមាន CRLF រួច)។
+- អ្នកយាម ៖ `repository-contract-test` clone ពិតដោយ `core.autocrlf=true`។
 
 ### 2026-10-06 — LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ (សំណើម្ចាស់គម្រោង · ឯកសារតែប៉ុណ្ណោះ · គ្មានការឡើងកំណែ)
 

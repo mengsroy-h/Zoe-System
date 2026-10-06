@@ -14,17 +14,15 @@
  *    · `opaque` ៖ logo (ផ្ទាំង boot · navbar) ប្តូរពីអក្សរ «Zoe» ទៅ App icon SVG (2.43.0) ➜ ប្រៀបធាតុខ្លួនវា មិនមែនមាតិកាខាងក្នុង
  *    · `floating` ៖ ម៉ឺនុយ (...) និងប្រអប់ណែនាំលេខ ជាស្រទាប់ `position: fixed` ដែលតាំងតាមធាតុយុថ្កា ➜ `top`/`left` ជាលទ្ធផល layout
  *      (navbar ទាបជាងដើម ១៤px ក្រោយ «Powered By» ផ្លាស់ចេញ · 2.43.0) មិនមែនឥរិយាបថ ➜ ប្រៀបតែ display · ទទឹង
- *      · អត្ថបទណែនាំនៃប្រអប់ Config (`h3` + `p` គ្មាន style) ៖ Setup Link មុន · Config Firebase ក្រោម (2.46.0 ៖ backend Firebase ឬ Supabase)
- *        ➜ textarea · ប៊ូតុង · វាល Sentry នៅប្រៀបធៀបដដែល (ប្រអប់ mount ជានិច្ច ➜ គ្រប់អេក្រង់របស់ dom · live · deep) ·
- *        `.cfg-extra` (QR ពីរូបភាព · បិទភ្ជាប់ Setup Link · ជ្រើស Firebase/Supabase) និង `.cfg-supabase` (វាល Supabase) ជាផ្ទៃបន្ថែម
- *        (សំណើម្ចាស់គម្រោង) ➜ ពេល Config ជា Firebase (ដូច App ដើម) ធាតុដើមទាំងអស់នៅដដែល ·
- *        `p.cfg-contact` (2.49.5 ៖ ទាក់ទងបង្កើតគណនីតាម Telegram · សំណើម្ចាស់គម្រោង) ជា `p` គ្មាន style ដូចគ្នា ➜ ច្បាប់ដដែលរំលងវា
- *        (`ZoeW/tests/config-modal.test.tsx` ចាក់សោ ៖ វារំលង · textarea និងប៊ូតុងរក្សាទុកនៅប្រៀបធៀប)
+ *      · ខ្លឹមសារប្រអប់ Config ទាំងមូល (`#configModal .modal-content`) ៖ រចនាឡើងវិញតាមសំណើម្ចាស់គម្រោង — Setup Link មុន ·
+ *        backend Firebase ឬ Supabase (2.46.0) · ទាក់ទង Telegram (2.49.5) · ស្កេន QR/បិទភ្ជាប់ Link ➜ ភ្ជាប់ភ្លាម · វាល Config ដោយដៃ
+ *        លាក់ក្រោយ switch «បំពេញ Config ដោយដៃ» · ជម្រើស Server ជា segmented control (2.49.6) ➜ ប្រអប់ខ្លួនវា (`#configModal`) នៅប្រៀបធៀប
+ *        ហើយឥរិយាបថរបស់វាចាក់សោដោយ `ZoeW/tests/config-modal.test.tsx` · `setup-link-browser-test`
  *    · `navbarShrinkPx` ៖ navbar លើទូរស័ព្ទទាបជាងដើម **១៤px តែប៉ុណ្ណោះ** (65 ➜ 51 · 2.43.0) ➜ `parity:dom` ទទួលយក **តែ** ការរំកិល
  *      ឡើងលើ ១៤px និងកម្ពស់បន្ថែម ១៤px របស់ផ្ទាំងដែលបំពេញអេក្រង់ — x · ទទឹង · តម្លៃ CSS ផ្សេងទៀត ត្រូវដូចដើមបេះបិទ
  */
 export const INTENTIONAL_UI = {
-    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content > h3, #configModal .modal-content > p:not([style]), #configModal .cfg-extra, #configModal .cfg-supabase, #loginModal .remember-password',
+    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content, #loginModal .remember-password',
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',
     navbarShrinkPx: 14,

@@ -4,7 +4,7 @@ import { logoutApp } from '../features/auth';
 import { backToLoginForm, openRegisterForm, openResetPasswordForm, submitRegisterForm, submitResetPasswordForm } from '../features/account';
 import { closeEditBarcodeModal, openEditBarcodePriceModal, openViewListModal, saveEditedBarcodePrice, toggleIndividualBarcodeClose } from '../features/barcode-ops';
 import { runBiometricUnlock } from '../features/biometric';
-import { applySetupLinkFromInput, cancelPinEntryFlow, cancelPinSetupFlow, saveFirebaseConfig, selectConfigBackend } from '../features/config';
+import { applySetupLinkFromInput, cancelPinEntryFlow, cancelPinSetupFlow, saveFirebaseConfig, selectConfigBackend, toggleConfigManual } from '../features/config';
 import { closeConfigQrScanner, decodeConfigQrImage, openConfigQrScanner } from '../features/config-qr';
 import { fetchCustomerDataTableRows, filterCustomerDataTable } from '../features/customer-table';
 import { closeCameraManually, submitManualBarcode } from '../features/daily-stats';
@@ -163,6 +163,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     switchAppPage,
     testLookupApiConfig,
     toggleCloseStatus,
+    toggleConfigManual,
     toggleDrawerGroup,
     toggleHeaderMoreDropdown,
     toggleIndividualBarcodeClose,

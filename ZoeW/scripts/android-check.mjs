@@ -28,7 +28,7 @@ const ROOT = process.env.ANDROIDCHECK_ROOT || path.resolve(path.dirname(fileURLT
 const fails = [];
 const oks = [];
 const ok = (label, cond, got) => { (cond ? oks : fails).push(cond ? label : `${label}${got !== undefined ? '  ➜ ' + got : ''}`); };
-const read = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return ''; } };
+const read = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n'); } catch { return ''; } };
 const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
 
 function pngSize(rel) {

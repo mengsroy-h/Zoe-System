@@ -185,6 +185,10 @@ migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.t
   `setup-link-browser-test` វាស់ «ក្រោយ PIN ➜ គ្មាន DSN · ក្រោយចុច ➜ DSN + Config» · (៤) រង្វង់ផ្តោតក្តារចុចពឹង `:has()` តែមួយ ➜ ផ្លូវបម្រុង
   `@supports not selector(:has(*))` · (៥) តេស្តរូបភាព QR លំដាប់បញ្ច្រាស (mutation ដក `seq === configQrImageSeq` ➜ ធ្លាក់) · (៦) guide «គណនីហាង»
   និង README ៣ ប្រាប់ «✅ ភ្ជាប់» ជំនួស «រក្សាទុក»។ ការចាកចេញសម្អាតកាត + switch (`clearSensitiveModalFields()`)។
+- ចំណុច ៥ ដែលអ្នកផ្ទៀងបដិសេធ (មិនប៉ះអ្នកប្រើ) ក៏កែតាមសំណើម្ចាស់គម្រោង ៖ guide «វាយ Security PIN — មិនទាន់មាន ➜ App ឲ្យបង្កើត PIN
+  ថ្មីមុន» · id gradient SVG ឯកលក្ខណៈ (`useId` ក្នុង `BackendMark.tsx` · តេស្ត «គ្មាន id ស្ទួន · រាល់ `url(#…)` យោង gradient ពិត») · ងខ មានជាន់លើ
+  ចំនួន **វាស់ពិត** (ចុចហើយ input ទទួល focus) + ត្រូវវាស់ switch និង radio Server ទាំង ២ + វាស់ outline លើស្លាក/កុងតាក់ពេល input លាក់
+  (mutation `:has(input:focus-visible)` ➜ `:has(input:focus)` ➜ ធ្លាក់) · browser test ចុចកាត «✅ ភ្ជាប់» (`setup-link-browser-test`)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

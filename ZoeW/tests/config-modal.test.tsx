@@ -484,6 +484,16 @@ describe('កាត Setup Link ពី URL ៖ ចងនឹង Link ខ្លួ�
         expect(stored()).toEqual(SB);
     });
 
+    it('logo ក្នុងកាត + ផ្នែកដោយដៃ ៖ id gradient SVG មិនស្ទួន · រាល់ fill="url(#…)" យោង gradient ដែលមានពិត', () => {
+        openFromUrl(SB);
+        const ids = Array.from(document.querySelectorAll('#configModal linearGradient')).map((g) => g.id);
+        expect(ids.length).toBeGreaterThanOrEqual(3);
+        expect(new Set(ids).size).toBe(ids.length);
+        const refs = Array.from(document.querySelectorAll('#configModal path[fill^="url(#"]')).map((el) => el.getAttribute('fill')!.slice(5, -1));
+        expect(refs.length).toBe(ids.length);
+        for (const ref of refs) expect(ids).toContain(ref);
+    });
+
     it('⛔ ចាកចេញ (clearSensitiveModalFields) ➜ កាត Link ដែលមិនទាន់ចុច និង switch ដោយដៃត្រូវសម្អាត', () => {
         openFromUrl(FB);
         step(() => toggleConfigManual());

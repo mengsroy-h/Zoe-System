@@ -63,6 +63,7 @@ export interface ViewState {
     historyCountText: string;
     ztoSyncModalNote: string;
     ztoListSyncNote: string;
+    ztoListSyncSite: string;
     dataSummary: Record<DataSummaryId, string>;
 
     cameraView: 'initial' | 'live' | 'closed';
@@ -159,6 +160,7 @@ export const viewState = createStore<ViewState>('viewState', {
     historyCountText: '0',
     ztoSyncModalNote: '',
     ztoListSyncNote: '',
+    ztoListSyncSite: '',
     dataSummary: {
         grandTotalCount: '0',
         todayTotalCount: '0',

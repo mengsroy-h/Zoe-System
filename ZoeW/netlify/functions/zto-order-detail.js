@@ -41,6 +41,11 @@ const LIST_ROW_MAX = 200;
 const LIST_CACHE_TTL_MAX_MS = 60000;
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
+const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
+const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា';
+const LIST_SITE_NAME_PATHS = ['scanSite', 'scanSiteName'];
+const LIST_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 86400000;
 
 const FIELD_SEPARATOR = '|';
 const CACHE_MAX = 200;
@@ -416,9 +421,9 @@ function noteCookieRenewal(session, response) {
     if (!session || !session.store || !session.cookie) return;
     const lines = setCookieLines(response);
     if (!lines.length) return;
-    const merged = mergeRenewedCookie(session.cookie, lines);
-    if (!merged || merged === session.cookie) return;
-    session.renewal = merged;
+    const merged = mergeRenewedCookie(session.renewal || session.cookie, lines);
+    if (!merged) return;
+    session.renewal = merged === session.cookie ? '' : merged;
 }
 
 function adoptRenewedCookie(session, merged) {
@@ -621,7 +626,8 @@ function readSignedConfig(env) {
 function readListConfig(env) {
     const out = {
         enabled: false, url: null, scanType: DEFAULT_LIST_SCAN_TYPE,
-        pageSize: 100, maxPages: 3, reason: '', fingerprint: ''
+        pageSize: 100, maxPages: 3, reason: '', fingerprint: '',
+        signedType: '', signedDesc: '', signedReason: ''
     };
     let url;
     try {
@@ -641,14 +647,31 @@ function readListConfig(env) {
         : String(env.ZTO_LIST_SCAN_DESC).trim();
     out.pageSize = boundedInteger(env.ZTO_LIST_PAGE_SIZE, 100, 10, 100);
     out.maxPages = boundedInteger(env.ZTO_LIST_MAX_PAGES, 3, 1, 20);
+    readListSignedConfig(env, out);
     out.fingerprint = crypto.createHash('sha256')
         .update(url.href).update(FIELD_SEPARATOR)
         .update(scanType).update(FIELD_SEPARATOR)
         .update(out.scanDesc).update(FIELD_SEPARATOR)
-        .update(String(out.pageSize))
+        .update(String(out.pageSize)).update(FIELD_SEPARATOR)
+        .update(out.signedType).update(FIELD_SEPARATOR)
+        .update(out.signedDesc)
         .digest('base64url')
         .slice(0, 16);
     return out;
+}
+
+function readListSignedConfig(env, out) {
+    out.signedType = '';
+    out.signedReason = '';
+    out.signedDesc = env.ZTO_LIST_SIGNED_SCAN_DESC === undefined
+        ? DEFAULT_LIST_SIGNED_SCAN_DESC
+        : String(env.ZTO_LIST_SIGNED_SCAN_DESC).trim();
+    const raw = String(env.ZTO_LIST_SIGNED_SCAN_TYPE || '').trim();
+    if (/^off$/i.test(raw)) { out.signedReason = 'signed:off'; return; }
+    const type = raw || DEFAULT_LIST_SIGNED_SCAN_TYPE;
+    if (!LIST_SCAN_TYPE_RE.test(type)) { out.signedReason = 'signed-type:invalid'; return; }
+    if (type === out.scanType) { out.signedReason = 'signed-type:same'; return; }
+    out.signedType = type;
 }
 
 const ID_TOKEN_HEADER = 'x-zoe-id-token';
@@ -878,7 +901,20 @@ function listRange(fromText, toText) {
     return { from: from, to: to, start: from + ' 00:00:00', end: to + ' 23:59:59' };
 }
 
-function listRequestBody(listConfig, siteCode, range, page) {
+function listTodayKey() {
+    return new Date(Date.now() + LIST_ZONE_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function listSignedRange(range) {
+    const today = listTodayKey();
+    const to = range.to > today ? range.to : today;
+    const earliest = new Date(Date.parse(to + 'T00:00:00Z') - (LIST_RANGE_MAX_DAYS - 1) * DAY_MS)
+        .toISOString().slice(0, 10);
+    const from = range.from > earliest ? range.from : earliest;
+    return { from: from, to: to, start: from + ' 00:00:00', end: to + ' 23:59:59' };
+}
+
+function listRequestBody(listConfig, siteCode, range, page, scanType) {
     return {
         condition: {
             dispatchOrSendManCode: null,
@@ -888,11 +924,26 @@ function listRequestBody(listConfig, siteCode, range, page) {
             scanManCode: null,
             scanSiteCode: siteCode,
             scanStartTime: range.start,
-            scanTypeCode: listConfig.scanType,
+            scanTypeCode: scanType || listConfig.scanType,
             signMan: null
         },
         pageNum: page,
         pageSize: listConfig.pageSize
+    };
+}
+
+function listPlan(config, siteCode, range, page, kind) {
+    const scanType = kind === 'signed' ? config.list.signedType : config.list.scanType;
+    return {
+        href: config.list.url.href,
+        body: listRequestBody(config.list, siteCode, range, page, scanType),
+        extract: (upstream) => {
+            const container = listContainerOf(upstream);
+            return container ? listResponseBody(config, container, page, siteCode, kind) : null;
+        },
+        cacheKey: config.fingerprint + '|L|' + config.list.fingerprint + '|' + kind
+            + '|' + siteCode + '|' + range.from + '|' + range.to + '|' + page,
+        cacheTtlMs: config.listCacheTtlMs
     };
 }
 
@@ -928,6 +979,20 @@ function listScanTypeSkip(listConfig, candidates) {
     return desc === listConfig.scanDesc ? '' : 'scan-type';
 }
 
+function listRowIsSigned(listConfig, candidates) {
+    if (!listConfig.signedType) return false;
+    const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
+    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    if (code && code !== listConfig.signedType) return false;
+    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return false;
+    if (code) return true;
+    return !!(listConfig.signedDesc && desc);
+}
+
+function listSiteNameOf(candidates) {
+    return pickText(candidates, LIST_SITE_NAME_PATHS).replace(/\s+/g, ' ');
+}
+
 function projectListRow(config, row) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
     const candidates = [row];
@@ -946,23 +1011,73 @@ function projectListRow(config, row) {
     };
 }
 
-function listResponseBody(config, container, page, siteCode) {
-    const rows = container.rows.slice(0, LIST_ROW_MAX)
-        .map((row) => projectListRow(config, row))
-        .filter(Boolean);
+function listResponseBody(config, container, page, siteCode, kind) {
+    const rows = [];
+    const signed = [];
+    const seenSigned = new Set();
+    let otherScans = 0;
+    let signedScans = 0;
+    let siteName = '';
+    const raws = container.rows.slice(0, LIST_ROW_MAX);
+    for (let i = 0; i < raws.length; i++) {
+        const raw = raws[i];
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const candidates = [raw];
+        if (!siteName) siteName = listSiteNameOf(candidates);
+        if (listRowIsSigned(config.list, candidates)) {
+            signedScans++;
+            const code = pickText(candidates, LIST_BARCODE_PATHS);
+            if (BARCODE_RE.test(code) && !seenSigned.has(code)) {
+                seenSigned.add(code);
+                signed.push(code);
+            }
+            continue;
+        }
+        if (kind === 'signed') { otherScans++; continue; }
+        const row = projectListRow(config, raw);
+        if (row.skip === 'scan-type') { otherScans++; continue; }
+        rows.push(row);
+    }
     const meta = container.meta || {};
     const pages = Number(meta.pages);
     const total = Number(meta.total);
+    const counted = rows.length + otherScans + signedScans;
     return {
         success: true,
         list: true,
         enabled: true,
+        kind: kind,
         page: page,
         site: String(siteCode || ''),
-        pages: Number.isFinite(pages) ? pages : (rows.length ? 1 : 0),
-        total: Number.isFinite(total) ? total : rows.length,
-        rows: rows
+        siteName: siteName,
+        pages: Number.isFinite(pages) ? pages : (counted ? 1 : 0),
+        total: Number.isFinite(total) ? total : counted,
+        rows: rows,
+        otherScans: otherScans,
+        signedScans: signedScans,
+        signed: config.list.signedType ? signed : null,
+        signedOk: kind === 'signed' && !!config.list.signedType
     };
+}
+
+function mergeSignedCompanion(body, outcome) {
+    const out = Object.assign({}, body);
+    const companion = outcome && outcome.kind === 'ok' ? outcome.body : null;
+    if (!companion || !Array.isArray(companion.signed)) {
+        out.signedOk = false;
+        return out;
+    }
+    const merged = Array.isArray(out.signed) ? out.signed.slice() : [];
+    const seen = new Set(merged);
+    companion.signed.forEach((code) => {
+        if (!seen.has(code)) { seen.add(code); merged.push(code); }
+    });
+    out.signed = merged;
+    out.signedOk = true;
+    out.signedPages = companion.pages;
+    out.signedTotal = companion.total;
+    if (!out.siteName && companion.siteName) out.siteName = companion.siteName;
+    return out;
 }
 
 function readHttpsUrl(raw, label) {
@@ -1556,6 +1671,10 @@ function diagnosticsBody(config, headers, authKind, credential) {
             scanTypeIsDefault: config.list.scanType === DEFAULT_LIST_SCAN_TYPE,
             scanDescIsDefault: config.list.scanDesc === DEFAULT_LIST_SCAN_DESC,
             scanDescEnforced: !!config.list.scanDesc,
+            signedEnabled: !!config.list.signedType,
+            signedReason: config.list.signedReason || null,
+            signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
+            signedDescIsDefault: config.list.signedDesc === DEFAULT_LIST_SIGNED_SCAN_DESC,
             cacheTtlMs: config.listCacheTtlMs
         },
         timing: {
@@ -1673,6 +1792,7 @@ async function handleRequest(event) {
 
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
     let plan = null;
+    let companion = null;
     if (wantsList) {
         const idToken = (event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '';
         const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
@@ -1710,17 +1830,22 @@ async function handleRequest(event) {
         if (!Number.isInteger(page) || page < 1 || page > config.list.maxPages) {
             return json(400, { error: 'Invalid list page', code: 'ZTO_LIST_PAGE_INVALID' });
         }
-        plan = {
-            href: config.list.url.href,
-            body: listRequestBody(config.list, site.code, range, page),
-            extract: (upstream) => {
-                const container = listContainerOf(upstream);
-                return container ? listResponseBody(config, container, page, site.code) : null;
-            },
-            cacheKey: config.fingerprint + '|L|' + config.list.fingerprint
-                + '|' + site.code + '|' + range.from + '|' + range.to + '|' + page,
-            cacheTtlMs: config.listCacheTtlMs
-        };
+        const signedOnly = String(query.signed || '') === '1';
+        if (signedOnly && !config.list.signedType) {
+            return json(200, {
+                success: true, list: true, enabled: true, kind: 'signed', page: page,
+                site: site.code, siteName: '', pages: 0, total: 0, rows: [],
+                otherScans: 0, signedScans: 0, signed: null, signedOk: false,
+                reason: config.list.signedReason || 'signed:off'
+            });
+        }
+        plan = signedOnly
+            ? listPlan(config, site.code, listSignedRange(range), page, 'signed')
+            : listPlan(config, site.code, range, page, 'arrival');
+        if (!signedOnly && config.list.signedType && String(query.withSigned || '') === '1') {
+            companion = listPlan(config, site.code, listSignedRange(range), page, 'signed');
+            plan.cacheKey += '|S';
+        }
     }
 
     if (!wantsDiagnostics && !plan && !BARCODE_RE.test(barcode)) {
@@ -1764,8 +1889,14 @@ async function handleRequest(event) {
     const flightKey = cacheKey + '|' + (cookieFingerprint(session.cookie) || '-');
 
     let outcome;
+    let companionRun = null;
     try {
-        outcome = await runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
+        const primaryRun = runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
+        if (companion) {
+            companionRun = runSharedLookup(companion.cacheKey + '|' + (cookieFingerprint(session.cookie) || '-'),
+                config, headers, barcode, session, startedAt, companion).catch(() => null);
+        }
+        outcome = await primaryRun;
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     }
@@ -1790,12 +1921,16 @@ async function handleRequest(event) {
 
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
+    const companionOutcome = companionRun ? await companionRun : null;
+
     await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
 
     if (outcome.kind === 'ok') {
+        let body = outcome.body;
+        if (companion) body = mergeSignedCompanion(body, companionOutcome);
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
-        if (ttlMs > 0) storeCachedBody(cacheKey, outcome.body);
-        return json(200, Object.assign({}, outcome.body, { cached: false }));
+        if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
+        return json(200, Object.assign({}, body, { cached: false }));
     }
     if (outcome.kind === 'notFound') {
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };

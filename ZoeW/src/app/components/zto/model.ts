@@ -16,6 +16,7 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                 barcode: row.barcode || '—',
                 meta: [row.phone || '—', money, row.at,
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
+                    row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
                     ztoListSkipText(row.skip)].filter(Boolean).join(' · ')
             };
         })

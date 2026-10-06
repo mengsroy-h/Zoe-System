@@ -100,10 +100,23 @@ export function barcodeCloseIsRipe(barcode, now) {
     return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
 }
 
+export function barcodeAbandonBasis(barcode, parentCreatedAt) {
+    const restoredAt = barcode && typeof barcode.restoredAt === 'number' && isFinite(barcode.restoredAt) && barcode.restoredAt >= 0 ? barcode.restoredAt : 0;
+    return Math.max(parentCreatedAt, restoredAt);
+}
+
 export function barcodeAbandonIsRipe(barcode, parentCreatedAt, now) {
     if (!barcode || barcode.isClosed) return false;
-    const restoredAt = typeof barcode.restoredAt === 'number' && isFinite(barcode.restoredAt) && barcode.restoredAt >= 0 ? barcode.restoredAt : 0;
-    return now - Math.max(parentCreatedAt, restoredAt) > ABANDON_AGE_MS;
+    return now - barcodeAbandonBasis(barcode, parentCreatedAt) > ABANDON_AGE_MS;
+}
+
+export function itemAbandonRipeAt(item, parentCreatedAt, now) {
+    const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes : [];
+    let latest = 0;
+    for (let i = 0; i < barcodes.length; i++) {
+        if (barcodeAbandonIsRipe(barcodes[i], parentCreatedAt, now)) latest = Math.max(latest, barcodeAbandonBasis(barcodes[i], parentCreatedAt) + ABANDON_AGE_MS);
+    }
+    return latest || parentCreatedAt + ABANDON_AGE_MS;
 }
 
 export function normalizeBarcodeCloseStamps(item, now) {

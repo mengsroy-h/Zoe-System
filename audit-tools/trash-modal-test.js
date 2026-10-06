@@ -165,7 +165,7 @@ ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON
     const vm = require('vm');
     const ctx = { TWO_HOURS_MS: 2 * 60 * 60 * 1000, ABANDON_AGE_MS: 7 * 24 * 60 * 60 * 1000 };
     vm.createContext(ctx);
-    vm.runInContext(abandonRipeFn + '\n' + closeRipeFn, ctx);
+    vm.runInContext(sliceFn(src, 'barcodeAbandonBasis') + '\n' + abandonRipeFn + '\n' + closeRipeFn, ctx);
     const NOW = 1700000000000;
     ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS, NOW) === false,
         '⛔ ឥរិយាបថ ៖ នៅ ៧×២៤ ម៉ោង **គត់** barcode មិនទាន់ទុំ (លុយមិនត្រូវដក)');

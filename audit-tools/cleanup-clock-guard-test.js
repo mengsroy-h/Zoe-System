@@ -185,6 +185,8 @@ function buildWorld(opts) {
         //    `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។ checker នេះវាស់តែច្រកទ្វារនាឡិកា។
         'function ztoAbandonCleanupIsHeld() { return false; }',
         extractFn(src, 'barcodeAbandonIsRipe'),
+        extractFn(src, 'barcodeAbandonBasis'),
+        extractFn(src, 'itemAbandonRipeAt'),
         extractFn(src, 'trashRetentionMs'),
         extractFn(src, 'runAutomaticDeletedCleanup'),
         'globalThis.__seed = (h, t) => { scanHistory = h; deletedItems = t; };',

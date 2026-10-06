@@ -17,8 +17,9 @@ import { cleanupInFlight, runAutomaticCleanupRules } from '../src/domain/cleanup
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import {
     ZTO_ABANDON_HOLD_MAX_MS, ZTO_SIGNED_FRESH_MS, ZTO_SIGNED_SWEEP_MAX_DAYS, ZTO_STATUS_SWEEP_BATCH, ZTO_STATUS_SWEEP_GAP_MS,
-    clearZtoPickupStatusStore, runZtoStatusSweep, ztoAbandonCleanupIsHeld
+    clearZtoPickupStatusStore, runZtoStatusSweep, ztoAbandonCleanupIsHeld, ztoSignedSweepIsDue
 } from '../src/features/zto-status';
+import * as ztoStatusModule from '../src/features/zto-status';
 
 const h = vi.hoisted(() => ({ calls: [] as any[], ok: true as any }));
 vi.mock('../src/features/barcode-ops', () => ({
@@ -413,5 +414,147 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
         await runZtoStatusSweep(false);
         const capped = new URL(String((fetch.mock.calls[0] as any[])[0]));
         expect(capped.searchParams.get('from')).toBe(getZoneDateKey(NOW, -ZTO_SIGNED_SWEEP_MAX_DAYS));
+    });
+});
+
+describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ ការរង់ចាំមិនដោះលែងមុនភស្តុតាងពិត', () => {
+    const SWEEP_AFTER_CLEANUP_MS = 1500;
+    const cycle = async (minutes: number, stop: () => boolean = () => false) => {
+        for (let i = 0; i < minutes && !stop(); i++) {
+            advance(60000 - SWEEP_AFTER_CLEANUP_MS);
+            cleanupNow();
+            advance(SWEEP_AFTER_CLEANUP_MS);
+            if (ztoSignedSweepIsDue(false)) await runZtoStatusSweep(false);
+        }
+    };
+
+    it('M1 ៖ ការបិទតាមបញ្ជី «ចុះហត្ថលេខា» បរាជ័យម្តង ➜ ជុំមិនពេញលេញ · មិនដកលុយ · សាកបិទម្តងទៀតក្នុងការរង់ចាំ', async () => {
+        dataState.scanHistory = [openItem('m1', 'ZTM1000001', 8 * DAY)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM1000001'])));
+        h.ok = false;
+        cleanupNow();
+        await runZtoStatusSweep(false);
+        expect(h.calls.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ការបិទបានសាក ១ ដង (បរាជ័យ)').toBe(1);
+        cleanupNow();
+        expect(abandoned('m1'), '⛔ ការបិទបរាជ័យមិនមែនភស្តុតាងថាជុំពេញលេញ ➜ មិនដកលុយ').toBe(false);
+        h.ok = true;
+        await cycle(10, () => h.calls.length >= 2);
+        expect(h.calls.length, 'សាកបិទម្តងទៀតក្នុង ១០ នាទី (មិនមែនរង់ចាំ ១ ម៉ោង)').toBe(2);
+        cleanupNow();
+        expect(abandoned('m1')).toBe(false);
+        const item = dataState.scanHistory.find((i: any) => i.id === 'm1');
+        expect(item && item.barcodes[0].isClosed, 'បិទ «យករួច»').toBe(true);
+    });
+
+    it('M1 ៖ ការបិទដែលបរាជ័យជាប់ៗ មិនសាករាល់ជុំ (មិនអត់ឃ្លានជួរ) · ការរង់ចាំនៅមានពិដាន', async () => {
+        dataState.scanHistory = [openItem('m2', 'ZTM1000002', 8 * DAY)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM1000002'])));
+        h.ok = false;
+        cleanupNow();
+        await runZtoStatusSweep(false);
+        await cycle(10);
+        expect(h.calls.length, 'បរាជ័យជាប់ៗ ➜ សាកម្តងៗ មិនមែនរាល់ជុំ ២០–៦០ វិ.').toBeLessThanOrEqual(6);
+        expect(h.calls.length).toBeGreaterThanOrEqual(2);
+        await cycle(Math.ceil(ZTO_ABANDON_HOLD_MAX_MS / 60000) + 2);
+        expect(abandoned('m2'), 'ហួសពិដាន ➜ ការសម្អាតដើរ (មិនជាប់រហូត)').toBe(true);
+    });
+
+    it('M3 ៖ ការអានពេញលេញ **មុន** កញ្ចប់ «ទុំ» មិនដោះលែងការសម្អាត (ត្រឡប់ពី background ក្នុង ១០ នាទី)', async () => {
+        dataState.scanHistory = [openItem('r3', 'ZTM3000001', 7 * DAY - 5 * 60000)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
+        await runZtoStatusSweep(false);
+        expect(ztoState.ztoSignedCompleteAt, 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានពេញលេញ (បញ្ជីមិនទាន់មានកញ្ចប់)').toBeTruthy();
+        advance(8 * 60000);
+        cleanupNow();
+        expect(abandoned('r3'), '⛔ ការអាន ៨ នាទីមុន (មុនពេលទុំ) មិនមែនភស្តុតាង ➜ មិនដកលុយ').toBe(false);
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage(['ZTM3000001'])));
+        await runZtoStatusSweep(true);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZTM3000001']);
+        cleanupNow();
+        expect(abandoned('r3')).toBe(false);
+    });
+
+    it('M3 ៖ វគ្គដែលរត់យូរ (ការរង់ចាំមុនៗផុតយូរហើយ) ៖ កញ្ចប់ដែលទុំក្រោយការអានចុងក្រោយ នៅតែរង់ចាំការអានថ្មី', async () => {
+        dataState.scanHistory = [openItem('e0', 'ZTM3100000', 8 * DAY)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
+        cleanupNow();
+        await runZtoStatusSweep(false);
+        await cycle(120);
+        expect(abandoned('e0'), 'លក្ខខណ្ឌចាំបាច់ ៖ ការអានក្រោយពេលទុំ ➜ ផុតកំណត់').toBe(true);
+        tx = [];
+        const ripeIn = 10000;
+        dataState.scanHistory = [openItem('e1', 'ZTM3100001', NOW - (Date.now() + ripeIn - 7 * DAY))];
+        await runZtoStatusSweep(true);
+        advance(2 * ripeIn);
+        cleanupNow();
+        expect(abandoned('e1'), '⛔ ការអានមុនពេលទុំ ➜ រង់ចាំការអានថ្មី (មិនមែនដោះលែងព្រោះការរង់ចាំមុន ២ ម៉ោងហួសពិដាន)').toBe(false);
+    });
+
+    it('M3 ៖ ការរង់ចាំវែង (ZTO ធ្លាក់ ២៩ នាទី) ទើបចប់ ➜ កញ្ចប់ដែលទុំបន្ទាប់ទទួលការរង់ចាំថ្មី (មិនប្រើពិដានដែលស្ទើរអស់)', async () => {
+        dataState.scanHistory = [openItem('d0', 'ZTM3200000', 8 * DAY)];
+        let down = true;
+        vi.stubGlobal('fetch', vi.fn(async () => (down ? json({ error: 'down' }, 503) : signedPage(['ZTM3200000']))));
+        cleanupNow();
+        advance(1500);
+        await runZtoStatusSweep(false);
+        await cycle(28);
+        expect(abandoned('d0'), 'លក្ខខណ្ឌចាំបាច់ ៖ នៅក្នុងពិដាន').toBe(false);
+        down = false;
+        await runZtoStatusSweep(true);
+        cleanupNow();
+        expect(abandoned('d0')).toBe(false);
+        const ripeIn = 60000;
+        dataState.scanHistory = [openItem('d1', 'ZTM3200001', NOW - (Date.now() + ripeIn - 7 * DAY))];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
+        await runZtoStatusSweep(true);
+        advance(2 * ripeIn + 30000);
+        cleanupNow();
+        expect(abandoned('d1'), '⛔ ការអានមុនពេលទុំ ➜ រង់ចាំ (ការរង់ចាំថ្មី មិនមែនពិដានដែលចាប់ផ្តើម ៣០ នាទីមុន)').toBe(false);
+    });
+
+    it('M3 ៖ កញ្ចប់មាន barcode ទុំពេលផ្សេងគ្នា (barcode ស្តារ) ➜ ការអានត្រូវក្រោយ barcode ដែលទុំចុងក្រោយ', async () => {
+        const item: any = openItem('mx', 'ZTM3300001', 9 * DAY);
+        item.barcodes.push({ code: 'ZTM3300002', isClosed: false, cod: 1, dod: 0, restoredAt: Date.now() - 7 * DAY + 5 * 60000 });
+        dataState.scanHistory = [item];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
+        await runZtoStatusSweep(false);
+        advance(8 * 60000);
+        cleanupNow();
+        expect(abandoned('mx'), '⛔ ការអានមុនពេល barcode ស្តារទុំ ➜ រង់ចាំ').toBe(false);
+    });
+
+    it('M3 ទិសផ្ទុយ ៖ ការអានពេញលេញ **ក្រោយ** ពេលទុំ (មិនមានក្នុងបញ្ជី) ➜ ផុតកំណត់ធម្មតា', async () => {
+        dataState.scanHistory = [openItem('r4', 'ZTM3000002', 7 * DAY + 60000)];
+        vi.stubGlobal('fetch', vi.fn(async () => signedPage([])));
+        await runZtoStatusSweep(false);
+        cleanupNow();
+        expect(abandoned('r4')).toBe(true);
+    });
+
+    it('R1 ៖ ហេតុផលអត្តសញ្ញាណបណ្តោះអាសន្ន (idtoken:expired · idtoken:missing) ➜ សាកឡើងវិញក្នុងការរង់ចាំ ➜ បិទមុនពិដាន (មិនដកលុយ)', async () => {
+        for (const reason of ['idtoken:expired', 'idtoken:supabase-unreachable']) {
+            clearZtoPickupStatusStore();
+            h.calls.length = 0;
+            tx = [];
+            const id = 'i-' + reason.replace(/[^a-z]/g, '');
+            dataState.scanHistory = [openItem(id, 'ZTI100000' + (reason.length % 10), 8 * DAY)];
+            let first = true;
+            vi.stubGlobal('fetch', vi.fn(async () => {
+                if (first) { first = false; return json({ success: true, list: true, enabled: false, reason: reason }); }
+                return signedPage([dataState.scanHistory[0].barcodes[0].code]);
+            }));
+            cleanupNow();
+            advance(SWEEP_AFTER_CLEANUP_MS);
+            await runZtoStatusSweep(false);
+            expect(h.calls, reason + ' ៖ ការអានដំបូងបរាជ័យ').toEqual([]);
+            advance(500);
+            await cycle(Math.ceil(ZTO_ABANDON_HOLD_MAX_MS / 60000) + 2, () => h.calls.length > 0);
+            expect(abandoned(id), '⛔ ' + reason + ' ៖ មិនដកលុយ').toBe(false);
+            expect(h.calls.length, reason + ' ៖ បិទ «យករួច» ក្នុងពិដាន').toBe(1);
+        }
+    });
+
+    it('R1 អចលនៈ ៖ ការរង់ចាំវែងបំផុតតាមផ្លូវបរាជ័យដែលមិនបិទមុខងារ < ZTO_ABANDON_HOLD_MAX_MS', () => {
+        expect(ztoStatusModule.ZTO_SIGNED_SWEEP_FAIL_MAX_MS).toBeLessThan(ZTO_ABANDON_HOLD_MAX_MS);
     });
 });

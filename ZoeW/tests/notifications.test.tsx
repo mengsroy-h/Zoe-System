@@ -148,6 +148,14 @@ describe('សារថែទាំ/កំណែ ៖ announcements.json', () => {
         expect(versions).toEqual(sorted);
     });
 
+    it('⛔ គ្មានចំណុចបាត់ស្ងាត់ ៖ ចំណុចនីមួយៗក្នុងឯកសារឆ្លងការត្រងទាំងអស់ (ពិដានចំណុចរបស់ការត្រង)', () => {
+        const clean = sanitizeFeed(raw)!;
+        raw.items.forEach((it: any, i: number) => {
+            const want = Array.isArray(it.points) ? it.points.length : 0;
+            expect(clean[i].points.length, it.id).toBe(want);
+        });
+    });
+
     it('ការត្រងបដិសេធរូបរាងខុស ដោយមិនបោះ', () => {
         expect(sanitizeFeed(null)).toBeNull();
         expect(sanitizeFeed({ items: 'x' })).toBeNull();

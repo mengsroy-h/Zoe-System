@@ -22,7 +22,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 
 
 ===============================================================================
-បញ្ជីកូដភាគីទីបី (៥)
+បញ្ជីកូដភាគីទីបីដែល ship (៨)
 ===============================================================================
 
 -------------------------------------------------------------------------------
@@ -82,6 +82,94 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
    គេហទំព័រ        : https://react.dev/
    អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
 
+-------------------------------------------------------------------------------
+៦. Supabase JavaScript Client — កំណែ 2.117.2 · Phoenix (Supabase) — កំណែ 0.4.5
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : chunk `supabase-backend` ក្នុង dist/assets/ របស់ ZoeW
+                     (build ភ្ជាប់ចូលពី npm ៖ @supabase/supabase-js និងកញ្ចប់រង
+                     auth-js · realtime-js · postgrest-js · functions-js ·
+                     storage-js · @supabase/phoenix)
+   តួនាទី          : ភ្ជាប់ហាង Supabase (ចូលប្រព័ន្ធ · realtime)
+   អាជ្ញាប័ណ្ណ      : MIT License
+   កម្មសិទ្ធិ       : Copyright (c) 2020 Supabase ·
+                     Copyright (c) 2014 Chris McCord (Phoenix)
+   គេហទំព័រ        : https://github.com/supabase/supabase-js ·
+                     https://github.com/supabase/phoenix
+   អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
+
+-------------------------------------------------------------------------------
+៧. Capacitor — កំណែ 8.x (@capacitor/core · @capacitor/android និង plugin
+   ផ្លូវការ ៖ app · filesystem · haptics · push-notifications · share ·
+   splash-screen)
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : bundle របស់ ZoeW ក្នុង dist/assets/ · App Android (APK) ·
+                     ឯកសារ template Android ក្នុង ZoeW/android/ ដែល Capacitor
+                     បង្កើត
+   តួនាទី          : App Android (WebView · Back · ចែករំលែក · ការជូនដំណឹង)
+   អាជ្ញាប័ណ្ណ      : MIT License
+   កម្មសិទ្ធិ       : Copyright (c) 2017-present Drifty Co. ·
+                     Copyright 2020-present Ionic
+   គេហទំព័រ        : https://github.com/ionic-team/capacitor ·
+                     https://github.com/ionic-team/capacitor-plugins
+   អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
+
+-------------------------------------------------------------------------------
+៨. Capgo plugins — @capgo/capacitor-native-biometric 8.7.0 ·
+   @capgo/capacitor-printer 8.1.4
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : chunk `native-plugins` ក្នុង dist/assets/ · App Android (APK)
+   តួនាទី          : ចូលដោយក្រយៅដៃ/មុខ · បោះពុម្ព លើ App Android
+   អាជ្ញាប័ណ្ណ      : Mozilla Public License 2.0 (MPL-2.0)
+   កម្មសិទ្ធិ       : Capgo (Cap-go)
+   ប្រភពកូដ (Source Code Form) ៖ ZoeW ប្រើឯកសារទាំងនេះដោយ **មិនកែប្រែ** ➜
+                     កូដប្រភពមាននៅ https://github.com/Cap-go/capacitor-native-biometric
+                     និង https://github.com/Cap-go/capacitor-printer (និង npm)
+   អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/MPL-2.0.txt
+
+   ចំណាំ ៖ MPL-2.0 គ្របតែឯកសាររបស់ plugin ទាំងនេះ ➜ វាមិនធ្វើឲ្យកូដរបស់
+   Zoe-System ក្លាយជាកូដបើកចំហទេ (Zoe-System នៅក្រោម LICENSE)។
+
+
+===============================================================================
+កូដភាគីទីបីក្នុង repository ដែលមិន ship ទៅអតិថិជន (២)
+===============================================================================
+
+ឯកសារទាំងនេះមិនចូល App ទេ តែវារស់ក្នុង repository ➜ ពេល repository ចែកចាយ
+(ឧ. ដាក់ជាសាធារណៈ) attribution ខាងក្រោមត្រូវនៅជាមួយ ៖
+
+-------------------------------------------------------------------------------
+៩. SQL ពី Supabase — audit-tools/supabase-shim/ (00 · 01 · 02 · 03 · 04)
+-------------------------------------------------------------------------------
+   តួនាទី          : ធ្វើត្រាប់ schema/role របស់ Supabase ពិត ក្នុងអ្នកយាម
+                     (05-realtime.sql ជាកូដរបស់ Zoe-System មិនមែនច្បាប់ចម្លង)
+   អាជ្ញាប័ណ្ណ      : The PostgreSQL License (supabase/postgres) ·
+                     MIT License (supabase/auth)
+   កម្មសិទ្ធិ       : Copyright (c) 2020, Supabase ·
+                     Copyright (c) 2021-2025 Supabase
+   អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/PostgreSQL-supabase-postgres.txt ·
+                     LICENSES/MIT-supabase-auth.txt
+
+-------------------------------------------------------------------------------
+១០. Gradle Wrapper — ZoeW/android/gradlew · gradlew.bat ·
+    gradle/wrapper/gradle-wrapper.jar
+-------------------------------------------------------------------------------
+   តួនាទី          : build App Android
+   អាជ្ញាប័ណ្ណ      : Apache License 2.0
+   កម្មសិទ្ធិ       : Copyright © 2015-2021 the original authors (Gradle)
+   អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/Apache-2.0.txt
+
+
+===============================================================================
+ពាណិជ្ជសញ្ញា
+===============================================================================
+
+   «Firebase» និង logo Firebase ជាពាណិជ្ជសញ្ញារបស់ Google LLC ·
+   «Supabase» និង logo Supabase ជាពាណិជ្ជសញ្ញារបស់ Supabase, Inc.។
+   ZoeW បង្ហាញ logo ទាំងនេះក្នុងប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» ដើម្បីប្រាប់តែប្រភេទ
+   Server ដែលអ្នកប្រើជ្រើសប៉ុណ្ណោះ (មិនមែនការគាំទ្រ ឬភាពជាដៃគូ)។ ទិន្នន័យរូបរាង
+   logo (SVG path) មកពី Simple Icons — https://simpleicons.org/ (CC0 1.0)។
+   «ZTO» ជាពាណិជ្ជសញ្ញារបស់ម្ចាស់រៀងៗខ្លួន។
+
 
 ===============================================================================
 កូដភាគីទីបីដែល មិន ត្រូវបាន ship ក្នុង repository នេះ
@@ -91,17 +179,19 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 មិនត្រូវបានចែកចាយក្នុង repository នេះទេ ហើយមិនត្រូវការ attribution ត្រង់
 នេះឡើយ។ ពួកវារាយទុកជាព័ត៌មានតែប៉ុណ្ណោះ ៖
 
-   @netlify/blobs 11.0.2  — ZoeW/package.json (npm · Function ខាង server)
+   @netlify/blobs 11.1.3  — ZoeW/package.json (npm · Function ខាង server)
    Vite · TypeScript · ESLint · Vitest · esbuild — ZoeW/package.json
                             (devDependencies ៖ ឧបករណ៍ build/តេស្ត មិន ship)
-   playwright-core 1.62.1 — tools/zto-cookie-sync-windows/package.json (npm)
+   playwright-core 1.63.0 — tools/zto-cookie-sync-windows/package.json (npm)
+   firebase-tools         — tools/firebase-provision/package.json (npm)
    Firebase JavaScript SDK — ផ្ទុកពី CDN របស់ Google ពេលដំណើរការ
+                            (firebase-loader.js ៖ ហាង Firebase តែប៉ុណ្ណោះ)
    Sentry Browser SDK      — ផ្ទុកពី js.sentry-cdn.com ពេលដំណើរការ
    acorn · xlsx            — ប្រើតែក្នុង audit-tools (មិន deploy)
 
 
 ===============================================================================
-អត្ថបទ MIT License (អនុវត្តលើធាតុទី ២ · ទី ៤ និងទី ៥)
+អត្ថបទ MIT License (អនុវត្តលើធាតុទី ២ · ៤ · ៥ · ៦ និងទី ៧)
 ===============================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining a
@@ -124,7 +214,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ===============================================================================
-អត្ថបទ Apache License 2.0 (អនុវត្តលើធាតុទី ១ និងទី ៣)
+អត្ថបទ Apache License 2.0 (អនុវត្តលើធាតុទី ១ · ៣ និងទី ១០)
 ===============================================================================
 
 អត្ថបទពេញលេញ ស្ថិតក្នុង ៖ LICENSES/Apache-2.0.txt

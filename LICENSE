@@ -24,6 +24,14 @@ Copyright © 2026 MENGSROY HEN. All rights reserved.
    ឡាយណាដែលមិនបានផ្តល់ជាលាយលក្ខណ៍អក្សរច្បាស់លាស់ ត្រូវបានរក្សាទុកទាំងស្រុង
    ដោយម្ចាស់។
 
+   ករណីលើកលែងតែមួយ ៖ ពេល repository នេះត្រូវបានដាក់ជាសាធារណៈលើ GitHub
+   អ្នកប្រើ GitHub អាចមើល និង fork វានៅលើ GitHub បាន ត្រឹមកម្រិតដែល
+   លក្ខខណ្ឌសេវាកម្មរបស់ GitHub (GitHub Terms of Service) តម្រូវប៉ុណ្ណោះ។
+   ការលើកលែងនេះមិនផ្តល់សិទ្ធិប្រើប្រាស់ ដំណើរការ កែប្រែ ចម្លងក្រៅ GitHub
+   ឬចែកចាយខ្លឹមសារណាមួយឡើយ ហើយ fork នីមួយៗនៅតែស្ថិតក្រោមឯកសារនេះ
+   ទាំងស្រុង។ ការដាក់ repository ជាសាធារណៈ មិនមែនជាការបោះបង់សិទ្ធិណាមួយ
+   របស់ម្ចាស់ឡើយ។
+
 ៣. ការហាមឃាត់
 
    បើគ្មានការអនុញ្ញាតជាលាយលក្ខណ៍អក្សរជាមុនពីម្ចាស់ទេ ហាមមិនឲ្យបុគ្គល ឬ
@@ -38,6 +46,10 @@ Copyright © 2026 MENGSROY HEN. All rights reserved.
       ឯកសារ LICENSE និង NOTICE នេះ។
    ច. ប្រើប្រាស់ខ្លឹមសារនេះដើម្បីបណ្តុះបណ្តាល ធ្វើតេស្ត ឬអភិវឌ្ឍគំរូ
       បញ្ញាសិប្បនិម្មិត (AI/ML) ណាមួយ។
+   ឆ. build ដំណើរការ deploy ឬ host កម្មវិធីពី source code នេះ (សិទ្ធិប្រើ
+      កម្មវិធីរបស់អតិថិជនមានតែតាមផ្នែកទី ៥ ប៉ុណ្ណោះ)។
+   ជ. ជៀសវាង បិទ ដកចេញ ឬកែប្រែយន្តការ Activation Key អាជ្ញាប័ណ្ណ ឬការពារ
+      ណាមួយរបស់ប្រព័ន្ធ។
 
 ៤. ការចូលរួមរបស់អ្នកអភិវឌ្ឍ
 
@@ -108,6 +120,13 @@ PART 2 — ENGLISH TRANSLATION (for information only)
    repository grants no ownership interest and no licence of any kind.
    All rights not expressly granted in writing are reserved.
 
+   Sole exception: when this repository is made public on GitHub, GitHub
+   users may view and fork it on GitHub only to the extent required by
+   the GitHub Terms of Service. This exception grants no right to use,
+   run, modify, copy outside GitHub, or distribute any content, and every
+   fork remains fully subject to this document. Making the repository
+   public waives none of the Owner's rights.
+
 3. RESTRICTIONS
 
    Without the Owner's prior written permission, no person or entity may:
@@ -122,6 +141,11 @@ PART 2 — ENGLISH TRANSLATION (for information only)
       LICENSE and the NOTICE file.
    f. Use this content to train, evaluate or develop any artificial
       intelligence or machine learning model.
+   g. Build, run, deploy or host the application from this source code
+      (end-user rights to run the application exist only under
+      section 5).
+   h. Circumvent, disable, remove or alter the Activation Key, licensing
+      or any protection mechanism of the system.
 
 4. CONTRIBUTIONS
 

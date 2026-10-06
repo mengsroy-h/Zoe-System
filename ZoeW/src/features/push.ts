@@ -55,7 +55,8 @@ export const pushRuntime = {
     nativeWanted: false,
     nativeWatchdogSeq: 0,
     scheduleAttemptAt: 0,
-    scheduleInFlight: false
+    scheduleInFlight: false,
+    nativePendingToken: ''
 };
 
 function readSaved(): PushSaved {
@@ -259,7 +260,13 @@ async function onNativeToken(token: string) {
     pushRuntime.nativeWatchdogSeq++;
     if (!pushRuntime.nativeEnabling && !pushRuntime.nativeWanted && !readSaved().on) return;
     const credential = await pushCredential();
-    if (!credential) { setStatus(missingIdentityStatus()); pushRuntime.nativeEnabling = false; return; }
+    if (!credential) {
+        if (pushRuntime.nativeEnabling) setStatus(missingIdentityStatus());
+        else pushRuntime.nativePendingToken = token;
+        pushRuntime.nativeEnabling = false;
+        return;
+    }
+    if (pushRuntime.nativePendingToken === token) pushRuntime.nativePendingToken = '';
     const reply = await postPush('subscribe', Object.assign({}, credential, { platform: 'android', sub: { kind: 'fcm', token: token } }));
     const enabling = pushRuntime.nativeEnabling;
     pushRuntime.nativeEnabling = false;
@@ -407,6 +414,22 @@ export function clearNotifications(): Promise<number> {
 export function togglePush(): Promise<boolean> {
     if (uiState.pushStatus === 'busy') return Promise.resolve(false);
     return uiState.pushStatus === 'on' ? disablePush() : enablePush();
+}
+
+export function resumePushAfterSignIn(): Promise<boolean> {
+    refreshPushStatus();
+    const token = pushRuntime.nativePendingToken;
+    if (!token || pushIdentityMissing()) return Promise.resolve(false);
+    return onNativeToken(token).then(() => true, () => false);
+}
+
+export function watchPushIdentity(): () => void {
+    let signedIn = !!firebaseState.authButtonIsLoggedIn;
+    return firebaseState.subscribe(() => {
+        const now = !!firebaseState.authButtonIsLoggedIn;
+        if (now && !signedIn) resumePushAfterSignIn();
+        signedIn = now;
+    });
 }
 
 export function resyncPush(): Promise<boolean> {

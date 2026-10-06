@@ -53,7 +53,7 @@ import { abandonAtOf, expiryScheduleTimes, loadNotifyDismissed, NOTIFY_DISMISSED
 import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
-    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS
+    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -112,7 +112,7 @@ beforeEach(() => {
     posts.length = 0;
     try { localStorage.clear(); } catch {}
     uiState.pushStatus = 'unknown';
-    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false });
+    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '' });
     pushNativeBuild.fcm = true;
     setLicense(LICENSE);
     delete (window as any).Capacitor;
@@ -582,6 +582,67 @@ describe('⛔ ហាង Supabase ៖ អត្តសញ្ញាណ = គណន�
         const sub = posts.find((x) => x.op === 'subscribe')!;
         expect(sub.body).toMatchObject({ supabase: SB_TOKEN, platform: 'android', sub: { kind: 'fcm' } });
         expect('license' in sub.body).toBe(false);
+    });
+
+    it('⛔ APK ៖ ផុត ៤ ម៉ោង (ចាកចេញ) ពេល token FCM មកដល់ ➜ មិនប្រកាស «សូមចូលប្រព័ន្ធម្តងទៀត» · ចូលវិញ ➜ on + ចុះឈ្មោះ token ដោយគណនីថ្មី', async () => {
+        // ម្ចាស់គម្រោងរាយការណ៍ (រូបថត APK 2.49.4) ៖ ក្រោយសម័យចូល ៤ ម៉ោង ហើយចូលវិញ ផ្ទាំង 🔔 (ទិន្នន័យស្រស់) នៅតែបង្ហាញ
+        // «⚠️ សូមចូលប្រព័ន្ធម្តងទៀត រួចបើកការជូនដំណឹង» + ប៊ូតុង «បើក» ខណៈការជូនដំណឹងបើករួច
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: 'fcmToken:old', syncedAt: 1 }));
+        stubServer();
+        const stopWatch = typeof watchPushIdentity === 'function' ? watchPushIdentity() : () => {};
+        try {
+            firebaseState.authButtonIsLoggedIn = true;
+            refreshPushStatus();
+            expect(uiState.pushStatus).toBe('on');
+            await ensureNativePushListeners();
+            signIn(null);
+            firebaseState.authButtonIsLoggedIn = false;
+            await pn.listeners.registration({ value: 'fcmToken:' + 'z'.repeat(40) });
+            await new Promise((r) => setTimeout(r, 0));
+            expect(uiState.pushStatus).toBe('on');
+            expect(posts.filter((x) => x.op === 'subscribe')).toHaveLength(0);
+            signIn('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.new');
+            firebaseState.authButtonIsLoggedIn = true;
+            await vi.waitFor(() => expect(posts.filter((x) => x.op === 'subscribe')).toHaveLength(1));
+            const sub = posts.find((x) => x.op === 'subscribe')!;
+            expect(sub.body).toMatchObject({ supabase: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.new', sub: { kind: 'fcm', token: 'fcmToken:' + 'z'.repeat(40) } });
+            await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+            expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).token).toBe('fcmToken:' + 'z'.repeat(40));
+        } finally {
+            stopWatch();
+            firebaseState.authButtonIsLoggedIn = false;
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ APK កំពុងបើក (អ្នកប្រើចុច) ហើយសម័យចូលបាត់មុន token មក ➜ no-account (មិនរង់ចាំស្ងាត់ · មិនជាប់ busy)', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        expect(await enablePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('busy');
+        signIn(null);
+        await pn.listeners.registration({ value: 'fcmToken:' + 'w'.repeat(40) });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('no-account'));
+        expect(pushRuntime.nativePendingToken).toBe('');
+        expect(posts.filter((x) => x.op === 'subscribe')).toHaveLength(0);
+    });
+
+    it('⛔ ស្ថានភាពជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ពីមុន ➜ ចូលវិញ ➜ ផ្ទៀងឡើងវិញ (on) · ទិសផ្ទុយ ៖ ចុច «បើក» ពេលមិនទាន់ចូល ➜ no-account ដដែល', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        signIn(null);
+        expect(await enablePush()).toBe(false);
+        expect(uiState.pushStatus).toBe('no-account');
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: 'fcmToken:old', syncedAt: Date.now() }));
+        const stopWatch = typeof watchPushIdentity === 'function' ? watchPushIdentity() : () => {};
+        try {
+            signIn();
+            firebaseState.authButtonIsLoggedIn = true;
+            await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        } finally {
+            stopWatch();
+            firebaseState.authButtonIsLoggedIn = false;
+        }
     });
 
     it('កាលវិភាគផុតកំណត់ ៖ ផ្ញើ `supabase` + times · មិនទាន់ចូល ➜ មិនផ្ញើ', async () => {

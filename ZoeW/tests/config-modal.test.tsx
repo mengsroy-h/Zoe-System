@@ -4,6 +4,8 @@
  *    ហើយ `dsn` ចូលវាល Sentry — ⛔ មិនមែនដាក់ក្នុង textarea (ពេលរក្សាទុក `normalizeFirebaseConfig()` បោះវាលក្រៅបញ្ជីចោល ➜
  *    កូដអញ្ជើញបាត់ ៖ ផ្លូវកាមេរ៉ាធ្លាប់ធ្វើបែបនេះ)។
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/services/firebase-init', () => ({ initFirebase: vi.fn() }));
@@ -24,6 +26,9 @@ vi.mock('../src/platform/document-io', async (orig) => {
 
 import { ConfigModal } from '../src/app/components/modals/ConfigModal';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
+import { ActivationModal } from '../src/app/components/modals/ActivationModal';
+import { APP_LOCK_EXCUSE_SELECTOR } from '../src/features/app-lock';
+import { INTENTIONAL_UI } from '../scripts/snapshot.mjs';
 import { viewState } from '../src/core/view-state';
 import { securityState, uiState } from '../src/core/state';
 import { fieldValue } from '../src/app/refs';
@@ -102,6 +107,87 @@ describe('ប្រអប់ Config ៖ ជ្រើស Firebase / Supabase', ()
         step(() => { (byId('firebaseConfigInput') as HTMLTextAreaElement).value = 'const firebaseConfig = ' + JSON.stringify(FB) + ';'; });
         step(() => saveFirebaseConfig());
         expect(JSON.parse(appLocalStore!.getItem('zoew_firebase_config')!)).toEqual(FB);
+    });
+});
+
+describe('ទំនាក់ទំនងបង្កើតគណនី (Telegram @mengsroyhun) ក្នុងប្រអប់ Config', () => {
+    // សំណើម្ចាស់គម្រោង (Deep audit ជុំ ៣) ៖ អ្នកដែលមិនទាន់មានគណនី/Setup Link ត្រូវឃើញផ្លូវទាក់ទងក្នុងប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ»
+    const contactLinks = () => Array.from(document.querySelectorAll('#configModal a[href="https://t.me/mengsroyhun"]')) as HTMLAnchorElement[];
+    const visible = (el: Element) => !el.closest('.hidden');
+
+    for (const backend of ['firebase', 'supabase'] as const) {
+        it(`${backend} ៖ តំណ Telegram មួយ ឃើញ (មិននៅក្រោម .hidden) · អត្ថបទប្រាប់ «បង្កើតគណនី»`, () => {
+            step(() => { openConfigModal(); selectConfigBackend(backend); });
+            const links = contactLinks();
+            expect(links.length).toBe(1);
+            expect(visible(links[0])).toBe(true);
+            expect(links[0].textContent).toBe('@mengsroyhun');
+            const line = links[0].closest('p')!;
+            expect(line.textContent).toMatch(/បង្កើតគណនី/);
+            expect(line.textContent).toMatch(/Telegram/);
+        });
+    }
+
+    it('⛔ បើកក្នុងផ្ទាំងថ្មី (noopener) ➜ ការចាកចេញទៅ Telegram ជាការចាកចេញដោយចេតនា (App lock មិនសួរ PIN ពេលត្រឡប់)', () => {
+        step(() => openConfigModal());
+        const a = contactLinks()[0];
+        expect(a.target).toBe('_blank');
+        expect(a.rel.split(/\s+/)).toEqual(expect.arrayContaining(['noopener', 'noreferrer']));
+        expect(a.matches(APP_LOCK_EXCUSE_SELECTOR)).toBe(true);
+    });
+
+    it('⛔ ប្រភពតែមួយ ៖ តំណក្នុង Config ដូចតំណក្នុងប្រអប់ Activation បេះបិទ', () => {
+        unmount();
+        mount(<><ConfigModal /><ActivationModal /></>);
+        const act = document.querySelector('#activationModal a[href^="https://t.me/"]')!;
+        expect(act).not.toBe(null);
+        expect(contactLinks()[0].outerHTML).toBe(act.outerHTML);
+    });
+
+    it('parity ៖ បន្ទាត់ទំនាក់ទំនងជាផ្ទៃបន្ថែមដែល INTENTIONAL_UI រំលង (App ដើមគ្មាន) · ធាតុដើមនៅប្រៀបធៀប', () => {
+        const line = contactLinks()[0].closest('p')!;
+        expect(line.matches(INTENTIONAL_UI.skip)).toBe(true);
+        expect(byId('firebaseConfigInput').matches(INTENTIONAL_UI.skip)).toBe(false);
+        expect(byId('configSaveBtn').matches(INTENTIONAL_UI.skip)).toBe(false);
+    });
+});
+
+describe('ពណ៌ + logo តាម backend (សំណើម្ចាស់គម្រោង)', () => {
+    const css = readFileSync(resolve(__dirname, '..', 'src', 'styles', 'react-root.css'), 'utf8');
+    const rule = (sel: string) => {
+        const at = css.indexOf(sel + ' {');
+        return at === -1 ? '' : css.slice(at, css.indexOf('}', at));
+    };
+
+    it('ជម្រើសនីមួយៗមាន logo របស់ខ្លួន (SVG ក្នុងកូដ · aria-hidden · គ្មានធនធានខាងក្រៅ) · is-on ប្តូរតាមការជ្រើស', () => {
+        step(() => openConfigModal());
+        const fb = document.querySelector('#configModal .cfg-choice-item.cfg-fb')!;
+        const sb = document.querySelector('#configModal .cfg-choice-item.cfg-sb')!;
+        for (const [chip, name] of [[fb, 'Firebase'], [sb, 'Supabase']] as const) {
+            const mark = chip.querySelector('svg.cfg-mark')!;
+            expect(mark).not.toBeNull();
+            expect(mark.getAttribute('aria-hidden')).toBe('true');
+            expect(mark.querySelector('path')!.getAttribute('d')!.length).toBeGreaterThan(40);
+            expect(chip.innerHTML).not.toMatch(/https?:\/\//);
+            expect(chip.textContent!.trim()).toBe(name);
+        }
+        expect(fb.className).toContain('is-on');
+        expect(sb.className).not.toContain('is-on');
+        step(() => selectConfigBackend('supabase'));
+        expect(fb.className).not.toContain('is-on');
+        expect(sb.className).toContain('is-on');
+    });
+
+    it('CSS ៖ Firebase = ពណ៌លឿង/ទឹកក្រូច · Supabase = ពណ៌បៃតង លើជម្រើស · ប៊ូតុងរក្សាទុក · ខ្សែលើប្រអប់ (តាម :has ➜ DOM parity មិនប្រែ)', () => {
+        expect(rule('#configModal .cfg-choice-item.cfg-fb.is-on')).toMatch(/border-color:\s*#FFA000/i);
+        expect(rule('#configModal .cfg-choice-item.cfg-sb.is-on')).toMatch(/border-color:\s*#3ECF8E/i);
+        expect(rule('#configModal:has(.cfg-fb.is-on) #configSaveBtn')).toMatch(/background-color:\s*#FFCA28/i);
+        expect(rule('#configModal:has(.cfg-sb.is-on) #configSaveBtn')).toMatch(/background-color:\s*#3ECF8E/i);
+        expect(rule('#configModal:has(.cfg-fb.is-on) .modal-content')).toMatch(/inset 0 4px 0 #FFA000/i);
+        expect(rule('#configModal:has(.cfg-sb.is-on) .modal-content')).toMatch(/inset 0 4px 0 #3ECF8E/i);
+        const fbChip = document.querySelector('#configModal .cfg-fb')!;
+        expect(fbChip.closest('.cfg-extra')).not.toBeNull();
+        expect(byId('configSaveBtn').className).toBe('btn-confirm');
     });
 });
 

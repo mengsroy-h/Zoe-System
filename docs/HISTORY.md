@@ -46,26 +46,30 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5**
-   (PR #285 · ជុំ ២ ដែលនៅសល់ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+1. **ម្ចាស់គម្រោង** ៖ PR #285 merge រួច (`main` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5** · Deep audit ជុំ ១–២) · branch `claude/wizardly-pascal-slr8gi` = **ZoeW 2.49.5**
+   (Deep audit ជុំ ៣ ចំណុច ១ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.5] · [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
-   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
-   **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
-   វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
-   (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
-   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
-   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
-   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) ✅ **➜ [2.49.4]** SW install ព្យួរដោយឯកសារ OPTIONAL + License ៖ អ្នកយាម ២ ចន្លោះ (ផ្នែក ២ «ចំណុច ១០») ➜ **ជុំ ២ ចប់គ្រប់ចំណុច**។
-   ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
-   (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
-   ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
-   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ⛔ គ្មាន workflow/agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
-   `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
-3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
-4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
+2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · មួយជុំក្នុងមួយ session (PR តែមួយ · commit ម្តងមួយចំណុច) · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
+   ⛔ គ្មាន workflow/agent · វាស់ឡើងវិញលើ `main` មុនកែ · វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)៖
+   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · [2.49.4] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ …») ·
+   ✅ ម្ចាស់គម្រោងធ្វើរួច (2026-10-04) ៖ G2 ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.។
+   **ជុំ ៣ Config ➜ Login ➜ Signup** (ម្ចាស់គម្រោង ៖ «ធ្វើឲ្យរួចមួយជុំ» ➜ PR #288 តែមួយ) ៖ (១) ✅ **➜ [2.49.5]** ទាក់ទងបង្កើតគណនីតាម Telegram ·
+   (២) ✅ **➜ [2.49.5]** Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Function មិនឆ្លើយ (R3-G1 · ថ្នេរ App ↔ `handleRegister()` ពិត) ·
+   (៣) ✅ វាស់ ៖ គ្មាន — ការចងចាំគណនីចងនឹង scope · ពាក្យសម្ងាត់ចងនឹង scope + ឈ្មោះតាម AES-GCM AAD (`remember-password.test.tsx` · `login-routing.test.tsx`) ·
+   (៤) ✅ Server ៖ គណនីគ្មានហាង ➜ forbidden (អ្នកយាមបន្ថែម) · `register` + `check` មាន mutation រួច · sign-up live វាស់មិនបាន ➜ សកម្មភាពដោយដៃ [2.49.5] ·
+   ➕ របាយការណ៍ម្ចាស់គម្រោង ៖ APK Push ជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយ ៤ ម៉ោង ✅ **➜ [2.49.5]** ·
+   (៥) ✅ វាស់ ៖ គ្មាន — ផលរួម G4 · G5 · G6 ជាមួយ Reconfig (mutation ៣/៣) · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ✅ **➜ [2.49.5]** · ➕ 🔔 ចំណុចបាត់ស្ងាត់ ✅ ➜ **ជុំ ៣ ចប់** (ផ្នែក ២ «Deep audit ជុំ ៣»)។
+   **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
+   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
+3. ⏳ **ម្ចាស់គម្រោង ៖ មុនប្តូរ repo ជា Public** (LICENSE · NOTICE រួចក្នុង PR #288 · ផ្នែក ២ «LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ») ៖ merge PR #288 មុន
+   (LICENSE ថ្មី) · GitHub Settings ➜ Code security ➜ បើក **Secret scanning** + **Push protection** · អ៊ីមែល commit ចាស់នឹងលេច (កំណត់ «Keep my email addresses
+   private» សម្រាប់ commit ថ្មី) · `CLAUDE.md`/`docs/` ពិពណ៌នាការការពារលម្អិត (ការការពារពិតនៅ Server ➜ មិនមែនរន្ធ តែជាព័ត៌មានដល់អ្នកវាយប្រហារ) ·
+   ផ្ទៀង sign-up បិទក្នុង Supabase + Firebase គ្រប់ Project (ផ្នែក ១ [2.49.5] «ផ្ទៀងដោយដៃ») · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ (អ្នកណាក៏ clone បាន) ·
+   ការអនុវត្តផ្លូវច្បាប់ ➜ ពិគ្រោះមេធាវី។
+4. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
+5. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
 ⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
 
@@ -98,7 +102,7 @@
 - ⏳ **ZoeW 2.49.0 · ZoeKeyGen 2.24.3 — merge រួច (PR #282 · រួម PR #281)** — សាកលើឧបករណ៍ពិត ៖
   ចងចាំពាក្យសម្ងាត់ (ធីក/ដកធីក · ផុត ៤ ម៉ោង · ចាកចេញ) · ខ្សែរមូរលើ iPhone PWA + APK (⛔ PTR/ចលនាផ្ទាំងនៅដដែល) · modal ZoeKeyGen លើ tablet/desktop ·
   ចុះឈ្មោះ Supabase ដែលដាច់កណ្តាលទី · 🔔 «📤 កញ្ចប់ដែលដករួច» ក្រោយការសម្អាតផុតកំណត់ (លម្អិត ៖ [2.49.0])។
-- ⏳ **ZoeW 2.49.1 — branch `claude/gracious-feynman-t7vu3k` មិនទាន់ merge** — APK + iPhone PWA ៖ ទាញប្រអប់ប្រវត្តិចុះក្រោយរមូរ ➜ ខ្សែរមូរបាត់ភ្លាម (លម្អិត ៖ [2.49.1])។
+- ⏳ **ZoeW 2.49.1 — merge រួច (មាននៅក្នុង `main`)** — APK + iPhone PWA ៖ ទាញប្រអប់ប្រវត្តិចុះក្រោយរមូរ ➜ ខ្សែរមូរបាត់ភ្លាម (លម្អិត ៖ [2.49.1])។
 - ✅ **សេចក្តីសម្រេច៖ ZoeW គាំទ្រ backend ទាំង២តាមជម្រើសអតិថិជន — Firebase និង Supabase**។ ការសាង Supabase មិនមែនជាការបិទ Firebase ទេ។
   ត្រូវរក្សាផ្លូវ Config/Login, SDK, rules, provisioning, backup និងឯកសារដែលអតិថិជន Firebase ត្រូវការ។ CLI ផ្ទេរទិន្នន័យជាជម្រើសសម្រាប់អ្នកចង់ប្តូរ backend។
   ការសម្អាតអាចលុបតែកូដដែលបញ្ជាក់ថាមិនប្រើដោយ backend ទាំង២ និងមុខងាររួម។
@@ -136,6 +140,73 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun) · ពណ៌ + logo Firebase/Supabase · Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Server ពិនិត្យកូដមិនបាន · APK ៖ Push មិនជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយផុត ៤ ម៉ោង** (Deep audit ជុំ ៣ · សំណើ/របាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.49.5`** (`zoew-v260` ➜ `zoew-v261`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.tsx` · `ActivationModal.tsx`
+(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` · `shell/BackendMark.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact` · ពណ៌តាម backend) · `guide.html` · `src/features/account.ts`
+(`checkInviteWithServer` · `routePendingInvite`) · `src/features/push.ts` (`onNativeToken` · `resumePushAfterSignIn` · `watchPushIdentity`) · `src/app/lifecycle/boot.ts`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💬 **ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» មានបន្ទាត់ «មិនទាន់មានគណនី? ទាក់ទង @mengsroyhun តាម Telegram ដើម្បីបង្កើតគណនី»** ក្រោមសេចក្តីណែនាំ Setup Link — បង្ហាញទាំង
+  Firebase និង Supabase · បើកក្នុងផ្ទាំងថ្មី (`noopener`) · App lock ចាត់ទុកការចុចនេះជាការចាកចេញដោយចេតនា (`APP_LOCK_EXCUSE_SELECTOR` ដូចតំណក្នុងប្រអប់ Activation)។
+  មុននេះតំណទាក់ទងក្នុង App មានតែក្នុងប្រអប់ Activation (Firebase ក្រោយចូលប្រព័ន្ធ) ➜ អ្នកដែលមិនទាន់មានគណនី/Setup Link ជាពិសេសហាង Supabase (គ្មាន Activation Key)
+  គ្មានផ្លូវទាក់ទងក្នុង App ទាល់តែសោះ (មានតែក្នុងសៀវភៅណែនាំ)។
+- តំណ Telegram មានប្រភពតែមួយ (`SellerTelegramLink` · `SELLER_TELEGRAM_HANDLE`) ➜ ប្រអប់ Activation និង Config មិនអាចខុសគ្នា។ សៀវភៅណែនាំ (Setup Link/QR) និង
+  `ZoeW/README.md` ប្រាប់ផ្លូវនេះ។
+- parity ៖ បន្ទាត់ថ្មីជា `p` គ្មាន style ដោយផ្ទាល់ក្រោម `.modal-content` ➜ ច្បាប់ `INTENTIONAL_UI.skip` ដដែលរំលងវា (គ្មានការពង្រីកបញ្ជី)។
+- 🎨 **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ពណ៌ និង logo តាម backend** (សំណើម្ចាស់គម្រោង) ៖ ជម្រើស Firebase មាន logo អណ្តាតភ្លើង · Supabase មាន logo រន្ទះ (SVG ក្នុងកូដ ·
+  `aria-hidden` · គ្មានធនធានខាងក្រៅ ➜ CSP មិនប្រែ) · ការជ្រើស Firebase ➜ ពណ៌លឿង/ទឹកក្រូច · Supabase ➜ ពណ៌បៃតង លើជម្រើស · ខ្សែលើប្រអប់ · ប៊ូតុង «រក្សាទុក និងភ្ជាប់»
+  (ផ្ទៃពណ៌ម៉ាក + អក្សរងងឹត) · ខ្សែឆ្វេងនៃវាល Config។ ពណ៌ប៊ូតុង/ប្រអប់សម្រេចដោយ CSS `:has()` ➜ DOM ដែល parity ប្រៀប (class · style) មិនប្រែ · Chromium ពិត (build ផលិតកម្ម ·
+  390 និង 1280 px) ៖ ជ្រើស Supabase ➜ ប៊ូតុង `rgb(62, 207, 142)`។
+- 🔐 **Setup Link របស់ហាងដែលចុះឈ្មោះរួច ➜ ប្រអប់ចូលប្រព័ន្ធ ទោះ Server ពិនិត្យកូដអញ្ជើញមិនបាន** (ចំណុច ២ · R3-G1) ៖ ឧបករណ៍ថ្មី ឬ storage លុប (គ្មានការចងចាំ
+  កូដ/គណនី) + Function `register` មិនឆ្លើយ (បណ្តាញ · ព្យួរ ២០ វិ. · DB `502 db-unavailable` · gateway 504) ➜ មុនកែ App បើក **ប្រអប់ចុះឈ្មោះ** (ករណីព្យួរ ៖ ប្រអប់ចូល
+  ២០ វិ. រួចប្តូរជាចុះឈ្មោះពីក្រោមអ្នកប្រើ) ខណៈការចុះឈ្មោះក៏ធ្វើមិនបានដោយ Function ដដែល។ ឥឡូវ ៖ បើកប្រអប់ចុះឈ្មោះតែពេល Server ឆ្លើយ `invite-usable` ឬ Function ចាស់
+  (មិនស្គាល់ `check` ➜ `username-invalid` ➜ ការចុះឈ្មោះនៅធ្វើបាន ដូចដើម) · ក្រៅពីនោះ ➜ ប្រអប់ចូល + «មានកូដអញ្ជើញក្នុង Setup Link — បើហាងមិនទាន់មានគណនី សូមចុច
+  📝 ចុះឈ្មោះ» (កូដនៅចាំសម្រាប់ប៊ូតុងនោះ)។
+- 📲 **APK ៖ Push មិនជាប់ «⚠️ សូមចូលប្រព័ន្ធម្តងទៀត រួចបើកការជូនដំណឹង» ក្រោយផុត ៤ ម៉ោង** (របាយការណ៍ម្ចាស់គម្រោង ៖ រូបថត APK 2.49.4 ៖ ផ្ទាំង 🔔 ទិន្នន័យស្រស់
+  (ចូលរួច) តែផ្នែក Push និយាយ «សូមចូលប្រព័ន្ធម្តងទៀត» + ប៊ូតុង «បើក» ខណៈការជូនដំណឹងបើករួច) ៖ FCM ផ្ញើ token (`registration`) ពេលណាក៏បាន (ក្រោយ `register()` របស់ resync ·
+  token ថ្មី) ➜ token មកដល់ក្រោយការផុតសម័យ ៤ ម៉ោង (`forceExpireSession()` ➜ `signOut`) ➜ `onNativeToken()` គ្មានអត្តសញ្ញាណ ➜ កំណត់ `no-account` **ដោយគ្មានលក្ខខណ្ឌ**
+  ➜ ចូលប្រព័ន្ធវិញ គ្មានអ្វីផ្ទៀងស្ថានភាពឡើងវិញ (មានតែ boot · ត្រឡប់ពី background)។ ឥឡូវ ៖ token ពេលគ្មានអត្តសញ្ញាណ ហើយអ្នកប្រើមិនបានចុច «បើក» ➜ ទុក token រង់ចាំ
+  (ស្ថានភាពមិនប្រែ · ការចុះឈ្មោះលើ Server នៅដដែល) · ការចូលប្រព័ន្ធ (`authButtonIsLoggedIn` false ➜ true · `watchPushIdentity()`) ➜ `refreshPushStatus()` + ចុះឈ្មោះ
+  token ដែលរង់ចាំដោយគណនីដែលទើបចូល។ អ្នកប្រើចុច «បើក» ហើយសម័យបាត់មុន token មក ➜ `no-account` ដូចដើម។
+- 🔒 **Server ៖ គណនីគ្មានហាង** (ចំណុច ៤ក · ឧ. បង្កើតតាម GoTrue sign-up ផ្ទាល់ បើ Dashboard «Allow new users to sign up» បើកដោយច្រឡំ) ➜ វាស់លើ Postgres ពិត ៖
+  `zoe_write` · `zoe_read` · `zoe_pull` ➜ `forbidden` · `SELECT zoe_docs`/`zoe_tenant_state` ➜ ០ ➜ **គ្មានផ្លូវរំលង** (មិនកែកូដ)។ ចន្លោះអ្នកយាម ៖ guard tenant null របស់
+  `zoe_read` គ្មាននរណាវាស់ (ដកវាចេញ ➜ បញ្ជីទទេដែល App អានថា «គ្មានទិន្នន័យ») ➜ ឥឡូវចាប់។
+- 🔔 សារកំណែ 2.49.5 ជំនួស 2.49.4 ៖ ចំណុចថ្មី ៤ + ចំណុចមុន ៨ = **១២**។ វាស់បាន ៖ `sanitizeFeed()` យកតែ ១២ ចំណុចដំបូង (`points.slice(0, 12)`) ខណៈ `announcements.json`
+  លើ `main` មាន ២០ ➜ ចំណុច ៨ ចុងក្រោយ **មិនដែលបង្ហាញ** (បាត់ស្ងាត់ · គ្មានអ្នកយាមរាប់ចំណុច) ➜ ឯកសារឥឡូវ ≤ ១២ + អ្នកយាមថ្មី។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/config-modal.test.tsx` ផ្នែកថ្មី (៥ តេស្ត ៖ Firebase · Supabase ឃើញតំណមួយ មិននៅក្រោម `.hidden` · `target="_blank"` + `noopener` + ត្រូវ
+  `APP_LOCK_EXCUSE_SELECTOR` · `outerHTML` ស្មើតំណក្នុងប្រអប់ Activation · `INTENTIONAL_UI.skip` រំលងបន្ទាត់ ទិសផ្ទុយ ៖ textarea និងប៊ូតុងរក្សាទុកនៅប្រៀបធៀប) ៖
+  tree មុនកែ (`main` 425ac3a) **ធ្លាក់ ៥/៥** ➜ **១៧/១៧**។ Mutation ៦ ➜ ក្រហម ៦ (ដក `target` · ដក `noopener` · ដាក់ក្នុង `.cfg-supabase` ➜ លាក់ពេល Firebase ·
+  `p` មាន style ➜ parity ឃើញ · anchor ផ្ទាល់មិនប្រើប្រភពតែមួយ · អត្ថបទគ្មាន «បង្កើតគណនី»)។
+- `ZoeW/tests/reconfig-invite-seam.test.tsx` (ថ្មី · ថ្នេរ App ↔ `handleRegister()` **ពិត** របស់ Edge Function + hash កូដពិត លើ DB ក្នុង memory) ៖ ចុះឈ្មោះ ➜ ចូល ·
+  ឧបករណ៍ដដែល ➜ ចូល (មិនសួរ server) · storage លុប ➜ server `invite-invalid` ➜ ចូល (មិនបង្កើតគណនី) · Function មិនឆ្លើយ ៤ របៀប · ហាងថ្មី ➜ ចុះឈ្មោះ · Function ចាស់ ➜ ចុះឈ្មោះ ·
+  ចុះឈ្មោះម្តងទៀតដោយឈ្មោះ/ពាក្យសម្ងាត់ដដែល ➜ `registered` ➜ ចូល (គណនីតែ ១) · Firebase ⇄ Supabase ៖ tree មុនកែ **ធ្លាក់ ៤/១០** (Function មិនឆ្លើយ ➜ `register`) ➜ **១០/១០**។
+  Mutation ៣ ➜ ក្រហម ៣ (`unknown` ➜ ចុះឈ្មោះលើឧបករណ៍ថ្មី · `no-check` ➜ ចូលជានិច្ច · `username-invalid` ➜ `unknown`)។
+- `ZoeW/tests/push-client.test.tsx` (បន្ថែម ៣) ៖ tree មុនកែ **ធ្លាក់ ២** (`expected 'no-account' to be 'on'`) ➜ **៤០/៤០**។ Mutation ៥ ➜ ក្រហម ៥ (token គ្មានអត្តសញ្ញាណ ➜
+  `no-account` ជានិច្ច · កំពុងបើក ➜ មិនប្រាប់ · ចូលវិញមិន refresh · មិនផ្ញើ token រង់ចាំ · watch មិនហៅ)។
+- `ZoeW/tests/config-modal.test.tsx` (បន្ថែម ២) ៖ logo SVG ក្នុងជម្រើសនីមួយៗ (`aria-hidden` · គ្មាន URL) · `is-on` ប្តូរតាមការជ្រើស · ច្បាប់ពណ៌ម៉ាកក្នុង CSS ➜ **១៩/១៩**។
+- `ZoeW/tests/notifications.test.tsx` (បន្ថែម ១ ៖ ចំណុចនីមួយៗក្នុងឯកសារឆ្លងការត្រង) ៖ `announcements.json` របស់ `main` ➜ **ធ្លាក់** (`expected 12 to be 20`) ➜ **២១/២១**។
+- `supabase-datastore-test` (បន្ថែម ៥ ការអះអាង + mutation ៣) ៖ គណនីគ្មានហាង ➜ `forbidden`/០ · Revoke ➜ `zoe_read forbidden` · mutation ៖ ដក guard `zoe_read` ➜ ក្រហម ·
+  ដក guard `zoe_write` + `zoe_apply` ➜ ក្រហម · ដកតែ wrapper `zoe_write` ➜ បៃតង (probe ទិសផ្ទុយ ៖ `zoe_apply` នៅបដិសេធ) ➜ **១៣៤ ok**។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- ⏳ សាកលើឧបករណ៍ពិត ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ចុច **@mengsroyhun** ➜ iPhone PWA · APK · desktop បើក Telegram (ឬ `t.me` ក្នុង browser) ➜ ត្រឡប់មក App ➜ ប្រអប់នៅដដែល
+  (App lock មិនចាក់សោភ្លាម)។
+- ⏳ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ជ្រើស Firebase/Supabase ➜ logo + ពណ៌ប្តូរតាម (iPhone PWA · APK · desktop)។
+- ⏳ APK ហាង Supabase (Push បើករួច) ៖ ទុក App លើស ៤ ម៉ោង ➜ បើក ➜ ចូលប្រព័ន្ធវិញ ➜ 🔔 ផ្នែក «ជូនដំណឹងលើទូរស័ព្ទ» ត្រូវបង្ហាញ «បើករួច» (មិនមែន «សូមចូលប្រព័ន្ធម្តងទៀត»)។
+- ⏳ ឧបករណ៍ថ្មីបើក Setup Link របស់ហាងដែលចុះឈ្មោះរួច ពេលអ៊ីនធឺណិតខ្សោយ ➜ ប្រអប់ចូលប្រព័ន្ធ (មិនមែនចុះឈ្មោះ)។
+- ⚠️ **ផ្ទៀងដោយដៃ (session វាស់មិនបាន ៖ network policy បិទ `supabase.co` · គ្មានសិទ្ធិ Google)** ៖ Supabase Dashboard ➜ Authentication ➜ Sign In / Providers ➜
+  **Allow new users to sign up = បិទ** (បើបើក ៖ គ្មានទិន្នន័យលេចធ្លាយ (វាស់រួច) តែអ្នកណាក៏អាចចាប់យកឈ្មោះគណនីមុនម្ចាស់ហាង) · Firebase Console របស់អតិថិជន **នីមួយៗ** ➜
+  Authentication ➜ Settings ➜ User actions ➜ **Enable create (sign-up) = បិទ** (Firebase rules = `auth != null` ➜ បើបើក អ្នកមាន `apiKey` អានទិន្នន័យហាងបាន ·
+  `tools/firebase-provision` វាស់វាតែពេលបង្កើត/`--adopt`)។ Security Advisor (អាន ៖ 2026-10-06) ៖ `zoe_ops` RLS គ្មាន policy (INFO · ដោយចេតនា ៖ client គ្មានសិទ្ធិ) ·
+  Leaked Password Protection (Pro) ➜ គ្មានរឿងថ្មី។
 
 ### [2.49.4] — 2026-10-04 · ZoeW · ZoeKeyGen `2.24.5` ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ · SW ៖ ឯកសារបន្ថែមព្យួរមិនរារាំងការដំឡើង** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
 
@@ -1307,6 +1378,38 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-06 — LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ (សំណើម្ចាស់គម្រោង · ឯកសារតែប៉ុណ្ណោះ · គ្មានការឡើងកំណែ)
+
+- **LICENSE** (ម្ចាស់គម្រោងយល់ព្រម) ៖ ឃ្លាលើកលែង GitHub Terms of Service (មើល/fork លើ GitHub បាន · គ្មានសិទ្ធិប្រើ ដំណើរការ កែ ចម្លងក្រៅ GitHub ឬចែកចាយ ·
+  fork នៅក្រោម LICENSE · ការដាក់ជាសាធារណៈមិនបោះបង់សិទ្ធិ) · ការហាមថ្មី ឆ/g «build · ដំណើរការ · deploy · host ពី source» · ជ/h «ជៀសវាង/បិទ Activation Key ·
+  យន្តការការពារ»។ ឈ្មោះ «MENGSROY HEN» ម្ចាស់គម្រោងបញ្ជាក់ថាត្រឹមត្រូវ។
+- **NOTICE មិនពេញលេញ (វាស់ពី bundle ពិត)** ៖ LICENSE ផ្នែក ៦ ប្រកាសថា NOTICE ជា «បញ្ជីពេញលេញ» តែ build ផលិតកម្ម ship ៖ supabase-js 2.117.2 + `@supabase/phoenix`
+  (chunk `supabase-backend` ៖ `GoTrueClient` · `RealtimeClient` · `phx_join`) · Capacitor 8.x (bundle + APK) · `@capgo/capacitor-native-biometric` ·
+  `@capgo/capacitor-printer` (**MPL-2.0** ៖ chunk `native-plugins` + APK) ➜ គ្មានក្នុង NOTICE។ repo ក៏មាន SQL ពី Supabase (`audit-tools/supabase-shim/`) និង Gradle Wrapper
+  (Apache-2.0) ដែលនឹងចែកចាយពេលសាធារណៈ។ ឥឡូវ NOTICE រាយ ៨ ធាតុ ship + ២ ក្នុង repo + ពាណិជ្ជសញ្ញា (logo Firebase/Supabase ពី Simple Icons CC0) ·
+  `LICENSES/MPL-2.0.txt` (អត្ថបទពេញពី npm) · កំណែចាស់ក្នុង NOTICE (`@netlify/blobs` 11.0.2 ➜ 11.1.3 · `playwright-core` 1.62.1 ➜ 1.63.0) កែ។ Firebase SDK ផ្ទុកពី CDN (មិន ship)។
+- **ស្កេន git history ទាំងមូល (១០៨៣ commit · គ្រប់ branch)** មុនសាធារណៈ ៖ គ្មាន private key/service account/`sb_secret_`/token GitHub·Netlify/JWK ឯកជន ·
+  PEM មួយ = key សាកល្បងក្នុង `audit-tools/idtoken-fixture.js` (មិនមានអ្វីទុកចិត្តវា) · `BOS-MAN-SESSION=` ទាំង ៥៥ ជាតម្លៃក្លែង · URL Project ពិតតែមួយ = License Project
+  (`zoew-z1`) ដែល ship ក្នុង `license-verify.js` រួចហើយ។ ⚠️ អ៊ីមែលអ្នក commit (២) នឹងលេចជាសាធារណៈ · `CLAUDE.md`/`docs/` ពិពណ៌នាការការពារលម្អិត។
+
+### 2026-10-06 — Deep audit ជុំ ៣ ៖ Config ➜ Login ➜ Signup (ការកែ ➜ ផ្នែក ១ [2.49.5])
+
+- **R3-G1 (ចំណុច ២)** ៖ ថ្នេរ App ↔ Edge Function មិនដែលវាស់ជាមួយកូដ Function ពិត (តេស្តមុនប្រើកូដឆ្លើយដែលតេស្តសរសេរ) ➜ តេស្តថ្មីភ្ជាប់ `routePendingInvite()` ·
+  `submitRegisterForm()` ពិតទៅ `handleRegister()` ពិត (transpile ពី `supabase/functions/_shared/` ក្នុង vitest ព្រោះ tsconfig ZoeW (`strictNullChecks: false`)
+  ពិនិត្យប្រភេទកូដ Function មិនបាន) ➜ `main` **ធ្លាក់ ៤/១០** ៖ Function មិនឆ្លើយ ៤ របៀប + ឧបករណ៍គ្មានការចងចាំ ➜ ប្រអប់ចុះឈ្មោះ សម្រាប់ហាងដែលមានគណនីរួច។
+  ឫសគល់ ៖ verdict `unknown` លាយ «Function ចាស់មិនស្គាល់ `check`» (ចុះឈ្មោះបាន) ជាមួយ «Function មិនឆ្លើយ» (ចុះឈ្មោះមិនបាន) ➜ បំបែកជា `no-check` · `unknown`។
+- **Push APK ជាប់ `no-account` (របាយការណ៍ម្ចាស់គម្រោង · រូបថត)** ៖ ការវិភាគរូប ៖ «📤 កញ្ចប់ដែលដករួច» ជាសាលក្រមវាស់បាន (ទិដ្ឋភាព deleted ស្រស់) ➜ ចូលប្រព័ន្ធរួច ➜ ផ្នែក Push
+  ខុស។ ផ្លូវតែមួយដែលកំណត់ `no-account` ដោយអ្នកប្រើមិនបានចុច ៖ `onNativeToken()` (`registration` របស់ FCM មកពេលណាក៏បាន) · ការផ្ទៀងស្ថានភាពមានតែពេល boot/ត្រឡប់ពី
+  background ➜ តេស្ត `main` **ធ្លាក់ ២** ➜ ការកែ ៖ token ពេលគ្មានអត្តសញ្ញាណ = រង់ចាំ · ការចូល = ផ្ទៀង + ចុះឈ្មោះ។ Mutation ៥/៥។
+- **announcements ចំណុចបាត់ស្ងាត់** ៖ `sanitizeFeed()` កាត់ `points` ត្រឹម ១២ · ឯកសារ `main` មាន ២០ ➜ ៨ មិនដែលបង្ហាញ (តេស្ត «គ្មានធាតុបាត់ស្ងាត់» រាប់តែ item)។
+- **ចំណុច ៤ ៖ Server** — គណនីគ្មានហាង (GoTrue sign-up ផ្ទាល់) ➜ `forbidden`/០ គ្រប់ផ្លូវ (វាស់ ៖ គ្មានរន្ធ) · guard tenant null របស់ `zoe_read` គ្មានអ្នកវាស់ (mutation រស់ ➜ ឥឡូវចាប់) ·
+  guard `zoe_write` ជាន់ ២ (wrapper + `zoe_apply` ➜ ដកតែមួយ = probe ទិសផ្ទុយបៃតង) · `register` + `check` ៖ mutation ៥ មានរួច។ live ៖ `supabase.co` ត្រូវ network policy
+  បិទ (403) ➜ «Allow new users to sign up» វាស់មិនបាន · Security Advisor ៖ គ្មានរឿងថ្មី។
+- **ចំណុច ៣ (វាស់ ៖ គ្មាន)** ៖ ការចងចាំគណនីចងនឹង `fb:<databaseURL>`/`sb:<supabaseUrl>` · ពាក្យសម្ងាត់ចងនឹង scope + ឈ្មោះតាម AAD របស់ AES-GCM (scope ផ្សេង ➜ បកកូដមិនចេញ) ·
+  តេស្តមាន (`remember-password.test.tsx` · `login-routing.test.tsx`)។
+- **ចំណុច ៥ (វាស់ ៖ គ្មាន)** ៖ Reconfig ទៅ Project Supabase ផ្សេង + session ចាស់ក្នុង storage (G5) ➜ `claimSessionStorageFor()` លុប session + ព័ត៌មានហាង · mutation ៣/៣ ចាប់
+  (`login-routing` · `supabase-offline-restore` · `supabase-signout-offline`)។
 
 ### 2026-10-05 — Audit ពិត ៤ runner៖ workers ខាងក្នុង និង log របស់អ្នកយាមដែលធ្លាក់
 

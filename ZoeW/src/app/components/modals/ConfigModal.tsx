@@ -3,6 +3,8 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { viewState } from '../../../core/view-state';
 import { useStoreFields } from '../../hooks/useStore';
+import { SellerTelegramLink } from '../shell/SellerTelegramLink';
+import { FirebaseMark, SupabaseMark } from '../shell/BackendMark';
 
 export function ConfigModal() {
     const v = useStoreFields(viewState, ['configBackend']);
@@ -13,6 +15,11 @@ export function ConfigModal() {
                 <h3>⚙️ ភ្ជាប់ប្រព័ន្ធ</h3>
                 <p>
                     ស្កេន QR ឬបើក <b>Setup Link</b> ដែលអ្នកលក់ផ្ញើ ➜ ការកំណត់បំពេញឲ្យដោយខ្លួនឯង។
+                </p>
+                <p className="cfg-contact">
+                    មិនទាន់មានគណនី? ទាក់ទង{' '}
+                    <SellerTelegramLink />
+                    {' '}តាម Telegram ដើម្បីបង្កើតគណនី
                 </p>
                 <div className="modal-btns" style={{ marginBottom: "10px" }}>
                     <button type="button" className="btn-info" onClick={onAct("openConfigQrScanner")}>📷 ស្កេន QR (Setup Link)</button>
@@ -40,13 +47,15 @@ export function ConfigModal() {
                     </div>
                     <p className="cfg-choice-title">ឬកំណត់ដោយដៃ — ប្រភេទ Server ៖</p>
                     <div className="cfg-choice" role="radiogroup" aria-label="ប្រភេទ Server">
-                        <label className={supabase ? 'cfg-choice-item' : 'cfg-choice-item is-on'}>
+                        <label className={supabase ? 'cfg-choice-item cfg-fb' : 'cfg-choice-item cfg-fb is-on'}>
                             <input type="radio" name="configBackend" checked={!supabase} onChange={onAct("selectConfigBackend", { args: ['firebase'] })} />
-                            {' '}Firebase
+                            <FirebaseMark />
+                            Firebase
                         </label>
-                        <label className={supabase ? 'cfg-choice-item is-on' : 'cfg-choice-item'}>
+                        <label className={supabase ? 'cfg-choice-item cfg-sb is-on' : 'cfg-choice-item cfg-sb'}>
                             <input type="radio" name="configBackend" checked={supabase} onChange={onAct("selectConfigBackend", { args: ['supabase'] })} />
-                            {' '}Supabase
+                            <SupabaseMark />
+                            Supabase
                         </label>
                     </div>
                 </div>

@@ -39,6 +39,7 @@ const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
 const LIST_RANGE_MAX_DAYS = 31;
 const LIST_ROW_MAX = 200;
 const LIST_CACHE_TTL_MAX_MS = 60000;
+const LIST_SIGNED_CACHE_TTL_MAX_MS = 15000;
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
@@ -943,7 +944,7 @@ function listPlan(config, siteCode, range, page, kind) {
         },
         cacheKey: config.fingerprint + '|L|' + config.list.fingerprint + '|' + kind
             + '|' + siteCode + '|' + range.from + '|' + range.to + '|' + page,
-        cacheTtlMs: config.listCacheTtlMs
+        cacheTtlMs: kind === 'signed' ? Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS) : config.listCacheTtlMs
     };
 }
 
@@ -1675,7 +1676,8 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedReason: config.list.signedReason || null,
             signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
             signedDescIsDefault: config.list.signedDesc === DEFAULT_LIST_SIGNED_SCAN_DESC,
-            cacheTtlMs: config.listCacheTtlMs
+            cacheTtlMs: config.listCacheTtlMs,
+            signedCacheTtlMs: Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS)
         },
         timing: {
             upstreamTimeoutMs: config.upstreamTimeoutMs,

@@ -2580,6 +2580,32 @@ function firstBody(requests) {
     ok('⛔ E3 ៖ `signed=1` គោរពជួរថ្ងៃដែលសុំ (ការបំបែកតាមថ្ងៃ) ➜ មិនពង្រីកដល់ថ្ងៃនេះ',
         oneDay.requests.length === 1 && oneDayCond.scanStartTime === dayBefore + ' 00:00:00' && oneDayCond.scanEndTime === dayBefore + ' 23:59:59',
         [oneDayCond.scanStartTime, oneDayCond.scanEndTime]);
+    // ⛔ ល្បឿន «បិទតាម ZTO» (របាយការណ៍ម្ចាស់ ៖ «sync យឺត») ៖ cache `signed=1` ≤ LIST_SIGNED_CACHE_TTL_MAX_MS (១៥ វិ.) — ជុំរៀងរាល់ ២០ វិ.
+    //    មិនត្រូវទទួលចម្លើយចាស់ ៦០ វិ. · ទិសផ្ទុយ ៖ ៥ វិ. ➜ នៅ cache (ឧបករណ៍ច្រើននៃសាខាតែមួយចែកគ្នា) · បញ្ជីធម្មតានៅ ៦០ វិ.។
+    const twoBefore = new Date(Date.parse(todayKey + 'T00:00:00Z') - 2 * 86400000).toISOString().slice(0, 10);
+    const ttlNow = Date.now;
+    let ttlShift = 0;
+    Date.now = () => ttlNow.call(Date) + ttlShift;
+    let ttl = null;
+    try {
+        resetEnv(GOOD_LIST_ENV);
+        global.fetch = typedFetch;
+        const sq = listQuery({ signed: '1', from: twoBefore, to: twoBefore });
+        const lq = listQuery({ from: twoBefore, to: twoBefore });
+        const s1 = bodyOf(await call(sq));
+        const l1 = bodyOf(await call(lq));
+        ttlShift = 5000;
+        const s2 = bodyOf(await call(sq));
+        ttlShift = 16000;
+        const s3 = bodyOf(await call(sq));
+        const l2 = bodyOf(await call(lq));
+        ttl = { s1: s1.cached, s2: s2.cached, s3: s3.cached, l1: l1.cached, l2: l2.cached };
+    } finally {
+        Date.now = ttlNow;
+    }
+    ok('⛔ ល្បឿន ៖ `signed=1` ➜ cache ផុតក្នុង ១៥ វិ. (ជុំ ២០ វិ. ទទួលចម្លើយថ្មី)', ttl.s1 === false && ttl.s3 === false, ttl);
+    ok('ទិសផ្ទុយ ៖ `signed=1` ក្នុង ៥ វិ. ➜ cache នៅ (មិនបង្កើនការហៅ ZTO)', ttl.s2 === true, ttl);
+    ok('ទិសផ្ទុយ ៖ បញ្ជីធម្មតា (`list=1`) នៅ cache ដដែល (១៦ វិ. ➜ cached)', ttl.l1 === false && ttl.l2 === true, ttl);
 
     const off = await typedCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_TYPE: 'off' }), { withSigned: '1' });
     ok('⛔ `ZTO_LIST_SIGNED_SCAN_TYPE=off` ➜ upstream ១ សំណើ (`03`) · `signed:null`',
@@ -2598,6 +2624,8 @@ function firstBody(requests) {
     ok('`?diag=1` ៖ `signedEnabled` + លំនាំដើម (`05` · «ចុះហត្ថលេខា»)',
         listOf(diagSigned.body).signedEnabled === true && listOf(diagSigned.body).signedTypeIsDefault === true
         && listOf(diagSigned.body).signedDescIsDefault === true, listOf(diagSigned.body));
+    ok('`?diag=1` ៖ `signedCacheTtlMs` ≤ ១៥ វិ. និង ≤ `cacheTtlMs` (ល្បឿនបិទតាម ZTO)',
+        listOf(diagSigned.body).signedCacheTtlMs === Math.min(15000, listOf(diagSigned.body).cacheTtlMs), listOf(diagSigned.body));
     const diagSame = await diagCall({ ZTO_LIST_SIGNED_SCAN_TYPE: '03' });
     ok('`?diag=1` ៖ ប្រភេទស្មើគ្នា ➜ មូលហេតុ `signed-type:same`', listOf(diagSame.body).signedReason === 'signed-type:same', listOf(diagSame.body));
     const defaults = /const DEFAULT_LIST_SIGNED_SCAN_TYPE = '([^']*)'/.exec(FUNCTION_SRC);

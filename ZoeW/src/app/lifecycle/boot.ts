@@ -13,7 +13,7 @@ import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../feat
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
 import { runSessionExpiryCheck } from '../../features/session';
 import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
-import { refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
+import { noteZtoUserActivity, refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
 import { scrollWindowToTop } from '../../platform/document-io';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
@@ -199,6 +199,8 @@ function startGlobalDismissals(scope: LifecycleScope): void {
     });
 
     scope.listen(document, 'pointerdown', dismissGlobalMoreMenuOutside, { capture: true, passive: true });
+    scope.listen(document, 'pointerdown', noteZtoUserActivity, { capture: true, passive: true });
+    scope.listen(document, 'keydown', noteZtoUserActivity, { capture: true, passive: true });
     scope.listen(window, 'scroll', (e) => {
         const scrolled = e.target as any;
         const menu = elementOf('globalMoreMenu');

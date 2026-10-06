@@ -498,8 +498,8 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
     const other = Number(result && result.otherScans);
     if (isFinite(other) && other > 0) parts.push('⏭️ ស្កេនប្រភេទផ្សេង ' + other + ' ជួរ មិនរាប់ (ទាញតែ «អីវ៉ាន់មកដល់»)');
     if (bornClosed > 0) parts.push('🔒 ថ្មីដែល ZTO បិទរួច ' + bornClosed + ' ➜ បញ្ចូលជា «យករួច»');
-    if (signedOnly > 0) parts.push('✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ ' + (result && result.from) + ' ' + signedOnly
-        + ' ➜ បញ្ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា');
+    if (signedOnly > 0) parts.push('✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ ' + (result && result.from) + ' ៖ ' + signedOnly
+        + ' កញ្ចប់ ➜ បញ្ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា');
     if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW តែ ZTO បិទរួច ' + closeCount + ' ➜ បិទពេលចុច «បញ្ចូល»');
     const state = result && result.signedState;
     if (state === 'partial') parts.push('⚠️ បញ្ជីចុះហត្ថលេខា ZTO ទាញបានមិនគ្រប់ ➜ ខ្លះនៅបើក (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');

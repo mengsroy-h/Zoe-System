@@ -1908,6 +1908,9 @@
     "ZoeW/tests/zto-signed-only-import.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/locker-occupant.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-stale-bar.test.tsx": {
       "policy": "zoew-self-verification"
     },

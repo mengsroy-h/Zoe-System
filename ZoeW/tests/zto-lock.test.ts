@@ -19,7 +19,7 @@ const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
     'netlify/functions/zto-order-detail.js': 'c4622c7f77ad6508c8d47dc8af5af4f723307b34b646d28788358d9cf3a8a11c',
-    'src/features/zto-list-sync.ts': '60c7a418e125e6861a03f82883b9f50f6550e040b27390f7830e757943f6eb59',
+    'src/features/zto-list-sync.ts': '93e7be5b78db6641c6c892c0934809dd7b43fa4ef01cf01a82ae78331ac362f1',
     'src/features/zto-status.ts': '8ef77ed85e61bc38e6a7936e2394e7503c02331c823489dad35fd2bbc8a61d37',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
     'src/features/auto-lookup.ts': '5571f5778c00bc906c218c112ba342b1cd7cb17169d6d28b880841dafd261b9d',

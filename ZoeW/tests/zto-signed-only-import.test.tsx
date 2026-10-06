@@ -199,7 +199,7 @@ describe('មើលជាមុន និង «បញ្ចូល»', () => {
             signedRows: [signedRow('ZT0000000901', '2026-10-04 08:30:00')] }))));
         await runZtoListSyncPreview();
         expect(String(viewState.ztoListSyncNote)).toContain('✍️');
-        expect(String(viewState.ztoListSyncNote)).toContain('1');
+        expect(String(viewState.ztoListSyncNote)).toContain('មុនថ្ងៃ 2026-10-03 ៖ 1 កញ្ចប់ ➜');
         await importZtoListRows();
         expect(h.confirms.length).toBe(1);
         expect(h.confirms[0]).toContain('ចុះហត្ថលេខា');

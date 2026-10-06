@@ -278,7 +278,13 @@ export function ztoSignedSweepRange() {
     return { from: getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS), to: getZoneDateKey(now, 0) };
 }
 
-export async function closeZtoSignedBarcodes(cfg, entries, dataToScan) {
+export function ztoSignedCloseIsHeld(key, force) {
+    if (force) return false;
+    const verdict = ztoPickupStatus.get(key);
+    return !!(verdict && verdict.closed === true && !ztoOpenRecheckIsDue(verdict));
+}
+
+export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?) {
     const session = captureZtoSession();
     const out = { closed: 0, more: false, keys: new Set() };
     if (!Array.isArray(entries) || !entries.length) return out;
@@ -309,7 +315,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan) {
     }
     let tried = 0;
     for (let i = 0; i < entries.length; i++) {
-        if (!signedKeys.has(entries[i].key)) continue;
+        if (!signedKeys.has(entries[i].key) || ztoSignedCloseIsHeld(entries[i].key, force)) continue;
         if (tried >= ZTO_STATUS_SWEEP_BATCH) {
             out.more = true;
             ztoState.ztoSignedSweepWaitMs = 1;
@@ -579,7 +585,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let signedKeys = new Set();
     try {
         if (signedEntries.length) {
-            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan);
+            const signed = await closeZtoSignedBarcodes(cfg, signedEntries, dataToScan, force);
             if (!session.current()) return 0;
             autoClosed += signed.closed;
             measured += signed.closed;

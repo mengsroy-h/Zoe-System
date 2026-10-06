@@ -23,7 +23,8 @@ import {
     runZtoListSyncPreview, ztoListSignedEvidence
 } from '../src/features/zto-list-sync';
 import {
-    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_IDLE_MS, clearZtoPickupStatusStore, runZtoStatusSweep, ztoPickupStatus
+    ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_IDLE_MS, clearZtoPickupStatusStore, runZtoStatusSweep, setZtoPickupVerdict,
+    ztoPickupStatus
 } from '../src/features/zto-status';
 import { ZtoListSyncModal } from '../src/app/components/modals/ZtoListSyncModal';
 import { mount, step, unmount } from './native/react-harness';
@@ -276,6 +277,52 @@ describe('បិទតាម ZTO ស្វ័យប្រវត្តិ ៖ ប
         await runZtoStatusSweep(true, [openItem('a1', 'ZT0000000701')], []);
         expect(fetch.mock.calls.filter((c) => urlOf(c).searchParams.get('signed') === '1')).toHaveLength(0);
         expect(h.calls).toHaveLength(0);
+    });
+});
+
+describe('ការប្រណាំង ៖ វគ្គចាស់ · ការបើកវិញដោយដៃ', () => {
+    it('⛔ ចម្លើយយឺតរបស់វគ្គចាស់ (ក្រោយចាកចេញ) មិនត្រូវដាក់ភស្តុតាង «បិទរួច» ចូលការទាញរបស់វគ្គថ្មី', async () => {
+        const old = deferred<Response>();
+        const next = deferred<Response>();
+        const fetch = vi.fn().mockImplementationOnce(() => old.promise).mockImplementationOnce(() => next.promise);
+        vi.stubGlobal('fetch', fetch);
+        const oldRun = runZtoListSyncPreview();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        clearSensitiveModalFields();
+        setFieldValue('ztoListSyncFrom', '2026-10-03');
+        setFieldValue('ztoListSyncTo', '2026-10-06');
+        const nextRun = runZtoListSyncPreview();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        old.resolve(json({ success: true, list: true, enabled: true, pages: 1, total: 1,
+            rows: [row('ZT0000001001')], signed: ['ZT0000001001'], signedOk: true, signedPages: 1 }));
+        await oldRun;
+        next.resolve(json({ success: true, list: true, enabled: true, pages: 1, total: 1,
+            rows: [row('ZT0000001001')], signed: [], signedOk: true, signedPages: 1 }));
+        await nextRun;
+        expect(ztoListSignedEvidence.has('ZT0000001001')).toBe(false);
+        const groups = classifyZtoListRows(ztoState.ztoListSyncResult.rows, [], []);
+        expect(groups.fresh[0].closedAtZto).toBe(false);
+    });
+
+    it('⛔ កញ្ចប់ដែលអ្នកប្រើទើបបើកវិញ (សាលក្រម «បិទរួច» ថ្មី) ➜ ជុំធម្មតាមិនបិទវាវិញក្នុង ZTO_OPEN_RECHECK_MS · ការចុច «ពិនិត្យម្តងទៀត» ➜ បិទ', async () => {
+        setZtoPickupVerdict('ZT0000001101', true);
+        const items = [openItem('r1', 'ZT0000001101')];
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => (new URL(url).searchParams.get('signed') === '1'
+            ? json({ success: true, list: true, enabled: true, kind: 'signed', rows: [], pages: 1, total: 1, signed: ['ZT0000001101'], signedOk: true })
+            : json({ found: true, ztoClosed: true }))));
+        await runZtoStatusSweep(false, items, []);
+        expect(h.calls).toHaveLength(0);
+        await runZtoStatusSweep(true, items, []);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZT0000001101']);
+    });
+
+    it('ទិសផ្ទុយ ៖ សាលក្រម «មិនទាន់បិទ» ថ្មី + ស្កេនចុះហត្ថលេខាថ្មី (អតិថិជនទើបយក) ➜ ជុំធម្មតាបិទ (មិនរង់ចាំ ១ ម៉ោង)', async () => {
+        setZtoPickupVerdict('ZT0000001201', false);
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => (new URL(url).searchParams.get('signed') === '1'
+            ? json({ success: true, list: true, enabled: true, kind: 'signed', rows: [], pages: 1, total: 1, signed: ['ZT0000001201'], signedOk: true })
+            : json({ found: true, ztoClosed: null }))));
+        await runZtoStatusSweep(false, [openItem('f1', 'ZT0000001201')], []);
+        expect(h.calls.map((c) => c.code)).toEqual(['ZT0000001201']);
     });
 });
 

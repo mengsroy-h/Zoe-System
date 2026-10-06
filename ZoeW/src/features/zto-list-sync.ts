@@ -301,7 +301,7 @@ export function ztoListSiteText(siteName, site) {
 }
 
 export async function fetchZtoListAllPages(cfg, from, to) {
-    const out = { rows: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedState: 'none' };
+    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedState: 'none' };
     const absorb = (body, arrival) => {
         if (!body) return;
         if (arrival) {
@@ -313,7 +313,9 @@ export async function fetchZtoListAllPages(cfg, from, to) {
         }
         if (!out.site && body.site) out.site = String(body.site);
         if (!out.siteName && body.siteName) out.siteName = String(body.siteName);
-        noteZtoListSignedCodes(body.signed);
+        if (Array.isArray(body.signed)) {
+            for (let i = 0; i < body.signed.length; i++) out.signed.push(body.signed[i]);
+        }
     };
     const first = await fetchZtoListPage(cfg, from, to, 1, 'withSigned');
     if (!first) return out;
@@ -462,6 +464,7 @@ export async function runZtoListSyncPreview() {
         const pulled = await fetchZtoListAllPages(cfg, range.from, range.to);
         if (!session.current()) return;
         const rows = pulled.rows;
+        noteZtoListSignedCodes(pulled.signed);
         await resolveZtoListSignedVerdicts(cfg, rows);
         if (!session.current()) return;
         if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);

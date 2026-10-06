@@ -2513,6 +2513,64 @@ function firstBody(requests) {
     ok('ជាន់អប្បបរមា ៖ លំនាំដើម «ចុះហត្ថលេខា» ជា `05` (វាស់លើ payload ពិត ៖ ០៣ មកដល់ · ០៤ ចែកចាយ · ០៥ ចុះហត្ថលេខា)',
         !!defaults && defaults[1] === '05', defaults && defaults[1]);
 
+    // ⛔ **ការប្រណាំង Cookie** ៖ សំណើ «ចុះហត្ថលេខា» រត់ស្របគ្នាជាមួយបញ្ជីមកដល់ ហើយប្រើ `session` ដដែល ➜ បើវាឆ្លើយ **ក្រោយ**
+    //    `flushCookieRenewal()` នោះ `Set-Cookie` របស់វា (BOS-MAN-SESSION ថ្មី) ចុះលើ `session.renewal` ហើយ **មិនដែលសរសេរ** ➜ Cookie
+    //    ដែល ZTO បង្វិលរួចបាត់ ➜ ការហៅបន្ទាប់ផ្ញើ session ចាស់។ ការបង្វិលត្រូវសរសេរចូល store ទោះមកពីសំណើណាមួយ។
+    {
+        const raceRun = async (rotateOn, rotated) => {
+            const blobState = { value: 'BOS-MAN-SESSION=blob-cookie-value-9876; sidebarStatus=1', writes: [] };
+            const etagOf = (v) => '"' + crypto.createHash('sha256').update(String(v || '')).digest('hex') + '"';
+            const store = {
+                get: async () => blobState.value,
+                getWithMetadata: async () => ({ data: blobState.value, etag: etagOf(blobState.value), metadata: {} }),
+                set: async (key, value, options) => {
+                    blobState.writes.push(value);
+                    if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(blobState.value)) return { modified: false };
+                    blobState.value = value;
+                    return { modified: true, etag: etagOf(value) };
+                }
+            };
+            if (typeof proxy.setBlobsModuleForTests === 'function') {
+                proxy.setBlobsModuleForTests({ connectLambda() {}, getStore() { return store; } });
+            }
+            resetEnv(Object.assign({}, GOOD_LIST_ENV, { ZTO_AUTHORIZATION: undefined, ZTO_COOKIE: 'BOS-MAN-SESSION=env-cookie-value-1234; sidebarStatus=0' }));
+            seenRequests.length = 0;
+            global.fetch = withCerts(async (href, init) => {
+                seenRequests.push({ href: href, init: init });
+                const type = typeOf(init);
+                if (type === '05') await new Promise((r) => setTimeout(r, 60));
+                return {
+                    ok: true, status: 200,
+                    headers: {
+                        get: (name) => (String(name).toLowerCase() === 'content-type' ? 'application/json' : null),
+                        getSetCookie: () => (type === rotateOn ? [rotated + '; Path=/; HttpOnly'] : [])
+                    },
+                    json: async () => byType(type)
+                };
+            });
+            let res = null;
+            try {
+                res = await proxy.handler({
+                    httpMethod: 'GET',
+                    headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-id-token': tokenForSite(LIST_SITE), 'x-nf-site-id': 'site-for-tests', 'x-nf-deploy-id': 'deploy-for-tests' },
+                    blobs: Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 'blob-token-for-tests' })).toString('base64'),
+                    queryStringParameters: listQuery({ withSigned: '1' })
+                });
+            } catch (e) { res = { statusCode: 500, body: String(e && e.message) }; }
+            if (typeof proxy.setBlobsModuleForTests === 'function') proxy.setBlobsModuleForTests(null);
+            return { res: res, writes: blobState.writes };
+        };
+        const probe = await raceRun('03', 'BOS-MAN-SESSION=rotated-by-arrival-555000');
+        ok('ជាន់អប្បបរមា (probe ទិសផ្ទុយ) ៖ Cookie បង្វិលក្នុងចម្លើយ «មកដល់» ➜ សរសេរចូល store (ការរៀបចំសរសេរបានពិត)',
+            !!probe.res && probe.res.statusCode === 200
+            && probe.writes.some((v) => String(v).indexOf('rotated-by-arrival-555000') !== -1), probe.writes);
+        const raced = await raceRun('05', 'BOS-MAN-SESSION=rotated-by-signed-777000');
+        ok('ជាន់អប្បបរមា ៖ ការហៅជាមួយ Cookie store ឆ្លើយ 200 + `signedOk`',
+            !!raced.res && raced.res.statusCode === 200 && bodyOf(raced.res).signedOk === true, raced.res && raced.res.statusCode);
+        ok('⛔ Cookie ដែល ZTO បង្វិលក្នុងចម្លើយ «ចុះហត្ថលេខា» (មកក្រោយ) ត្រូវសរសេរចូល store (មិនបាត់)',
+            raced.writes.some((v) => String(v).indexOf('rotated-by-signed-777000') !== -1), raced.writes);
+    }
+
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
     const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
     ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',

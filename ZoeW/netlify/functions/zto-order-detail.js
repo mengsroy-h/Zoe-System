@@ -1921,11 +1921,13 @@ async function handleRequest(event) {
 
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
+    const companionOutcome = companionRun ? await companionRun : null;
+
     await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
 
     if (outcome.kind === 'ok') {
         let body = outcome.body;
-        if (companion) body = mergeSignedCompanion(body, await companionRun);
+        if (companion) body = mergeSignedCompanion(body, companionOutcome);
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
         if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
         return json(200, Object.assign({}, body, { cached: false }));

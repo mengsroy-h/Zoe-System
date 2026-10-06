@@ -116,6 +116,7 @@ const DB_LISTENER_KEY_DELETED = 'deleted';
 function getServerNow() { return ${NOW}; }
 function elapsedSince(m) { if (!m) return Infinity; const d = getServerNow() - m; return d < 0 ? Infinity : d; }
 function claimAndCleanupItem(id, reason) { __log.cleanups.push(id + ':' + reason); }
+function ztoAbandonCleanupIsHeld() { return false; }
 function clearStaleRestoreMarkers() {}
 function dbListenerViewIsStale() { return false; }
 function showToast() {}

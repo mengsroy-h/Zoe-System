@@ -559,6 +559,10 @@ export interface ZtoState {
     ztoSignedSweepAt: number;
     ztoSignedSweepOkAt: number;
     ztoSignedSweepWaitMs: number;
+    ztoSignedCompleteAt: number;
+    ztoSignedOff: boolean;
+    ztoAbandonHoldSince: number;
+    ztoAbandonCheckedAt: number;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
     ztoListPreview: any | null;
@@ -579,6 +583,10 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoSignedSweepAt: 0,
     ztoSignedSweepOkAt: 0,
     ztoSignedSweepWaitMs: 0,
+    ztoSignedCompleteAt: 0,
+    ztoSignedOff: false,
+    ztoAbandonHoldSince: 0,
+    ztoAbandonCheckedAt: 0,
     ztoBannerView: null,
     ztoSyncListView: null,
     ztoListPreview: null,

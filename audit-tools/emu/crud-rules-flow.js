@@ -264,6 +264,9 @@ function makeSandbox(store, now) {
         optionalFn(src, 'cleanupLockManager', 'function cleanupLockManager() { return null; }'),
         optionalFn(src, 'markCleanupJournalLive', 'function markCleanupJournalLive() {}'),
         optionalFn(src, 'releaseCleanupJournalLive', 'function releaseCleanupJournalLive() {}'),
+        // ⛔ ZTO-E1 ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` មុន `abandon` ➜ sandbox គ្មាន ZTO ➜ ច្រកទ្វារពិតឆ្លើយ
+        //    `false` (វាស់ដោយ module ពិតក្នុង `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។
+        'function ztoAbandonCleanupIsHeld() { return false; }',
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**

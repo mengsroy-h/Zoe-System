@@ -52,6 +52,13 @@ export const ztoListSignedProbe = new Map();
 
 export const ztoListSignedEvidence = new Set();
 
+export function ztoListReasonIsDefinitive(reason) {
+    const text = String(reason === undefined || reason === null ? '' : reason);
+    if (!text) return false;
+    if (text.indexOf('idtoken:') !== 0) return true;
+    return text === 'idtoken:supabase-unset' || ZTO_LIST_SERVER_CONFIG_REASONS.indexOf(text) !== -1;
+}
+
 export function ztoListSkipText(reason) {
     const key = String(reason === undefined || reason === null ? '' : reason);
     return Object.prototype.hasOwnProperty.call(ZTO_LIST_SKIP_TEXT, key) ? ZTO_LIST_SKIP_TEXT[key] : '';

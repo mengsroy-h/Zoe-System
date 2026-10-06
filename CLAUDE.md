@@ -55,7 +55,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.0` (`zoew-v263`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.1` (`zoew-v264`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -293,6 +293,7 @@ only this text protects them.
 | **Collected mirror ↔ ledger** | Remove (row 4) deletes the mirror entry · Restore (row 9) rebuilds it on the new `closedAt` day (`reconcileCollectedHistory()`, no second formula) · ⛔ Delete (row 5) never touches the mirror | `collected-mirror-lifecycle-test` · `collected-mirror-fuzz-test` |
 | **Interrupted cleanup** | `claimAndCleanupItem()` writes 4 times ➜ journal `zoew_cleanup_journal_v1` written **before** network writes · `resumeInterruptedCleanups()` finishes later · ⛔ no server marker · ledger step after trash (`moved` ➜ deductible · `ledger` = uncertain ➜ don't touch money, tell the user) · journal calls fail-open (`noteCleanupJournalEntry`) · key = trash id · `cleanupJournalScope()` (`databaseURL`) · a **live** cleanup is not an interruption: `withCleanupEntryOwnership()` (`cleanupJournalLive` + Web Locks `zoew-cleanup-live-<id>`, fail-open) then re-read fresh | `cleanup-interrupt-atomicity-test` · `money-guardian-test` |
 | **Destructive cleanup** | Needs the real server clock **and** a live connection | `cleanup-clock-guard-test` |
+| **7-day cleanup ↔ ZTO signed list** | ZTO auto-close on (`ztoAutoCloseEnabled()` + ZTO Lookup) ➜ `abandon` waits for a **fresh complete** signed read (`ztoAbandonCleanupIsHeld()` · `ztoSignedCompleteAt`: measured · not partial · not truncated · every match closed or held · fresh `ZTO_SIGNED_FRESH_MS`) so signed parcels close as pickup instead of expiring (deduct). A wait episode starts at session start or after `ZTO_ABANDON_RESUME_GAP_MS` without checks (resume from background) and ends after `ZTO_ABANDON_HOLD_MAX_MS` (never stuck) · signed list off on the server or a definitive not-configured reason (`ztoListReasonIsDefinitive()`) ➜ no wait · logout/Config change resets · the 2-hour rule never waits · ⛔ constants and `>` unchanged. The read after a gap covers back to the oldest open parcel (`ztoOldestOpenStamp()`, ≤ `ZTO_SIGNED_SWEEP_MAX_DAYS`) | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` |
 | **App lock** | Never touches the 4-hour session · refresh and calls don't lock · `CryptoKey` in IndexedDB (not sessionStorage) · cleared only via `clearAppUnlockedForSession()` · switch `zoew_app_lock_v1` (absent = on, only `'0'` off) · `appLockIsEnabled()` single decider · turning off goes through PIN (`appLockOff`) and never deletes the PIN | `app-lock-test` |
 | **Health check** | Read-only · never forces PIN · "can't check" = ⚠️ · ✅ only on something measured · secrets never in DOM · real `fetchWithTimeout` · an old round never overwrites a new one (`uiState.healthRunSeq`) · ZTO row: `cookieState` is per container ("never used" = ⚠️) · renewal info (`renewals` · `observed` · `setCookie`) never changes the verdict · Cookie age from the Blob (`blobSyncAgeMs` · `blobRenewAgeMs`) · License row shows Key validity (≤ `LICENSE_NEAR_EXPIRY_DAYS` ➜ ⚠️) | `health-check-test` · `zto-cookie-store-test` · `zto-cookie-sync-test` |
 | **Excel import to Sheet** | PIN is the gate · simple requests · secrets encrypted · leading zeros kept (`raw` only for text) | `sheet-import-test` |
@@ -395,6 +396,7 @@ Uncollected parcels ➜ `claimAndCleanupItem('abandon')` ➜ `isDeducted: true` 
 - The comparison is `now - createdAt > ABANDON_AGE_MS` (**`>`**) ➜ the label "ផុតកំណត់ ៨ថ្ងៃ" (day 8) is correct ⛔ never
   "fix" it to 7. `trash-modal-test.js` derives `ABANDON_LABEL_DAY = ABANDON_DAYS + 1` from `app.js` and asserts `>`;
   stale-day scans cover "៨ ថ្ងៃ" and "៨ថ្ងៃ".
+- ZTO auto-close on ➜ the 7-day rule waits for the ZTO signed list (core table row «7-day cleanup ↔ ZTO signed list»).
 - `barcode.restoredAt` is optional; never change the parent's or siblings' clocks; one age helper for selection and
   transaction; after partial removal `isClosed` comes from the remaining barcodes.
 - Mixed parcels (A closed · B open): 2h rule moves **A only** (`pickup`, money untouched); 7-day rule moves **B only**

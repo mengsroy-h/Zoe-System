@@ -2794,6 +2794,9 @@
     "ZoeW/tests/login-routing.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/reconfig-invite-seam.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/recovery-toast-dedup.test.tsx": {
       "policy": "zoew-self-verification"
     },

@@ -119,6 +119,15 @@ async function body(c, rec, extra) {
     rec('A ៖ SELECT zoe_docs ផ្ទាល់ (RLS) ➜ ១', !!selA.rows && selA.rows[0].n === 1, selA);
     const stB = await as(c, B.who, 'select count(*)::int as n from public.zoe_tenant_state');
     rec('B ៖ SELECT zoe_tenant_state ➜ មិនឃើញរបស់ A', !!stB.rows && stB.rows[0].n === 0, stB);
+    const NOMEM = { role: 'authenticated', sub: await makeAuthUser(c, 'squatter@u.zoe.test') };
+    const forbiddenErr = (r) => !!r.error && r.error.message === 'forbidden';
+    rec('គណនីគ្មានហាង (បង្កើតតាម GoTrue sign-up ផ្ទាល់ · គ្មាន tenant_members) ៖ zoe_write ➜ forbidden',
+        forbiddenErr(await as(c, NOMEM, 'select public.zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'SQ1'], v: true }])])));
+    rec('គណនីគ្មានហាង ៖ zoe_read · zoe_pull ➜ forbidden',
+        forbiddenErr(await as(c, NOMEM, 'select public.zoe_read($1, null)', [HIST])) && forbiddenErr(await as(c, NOMEM, 'select public.zoe_pull(0, 10)')));
+    const nomemSel = await as(c, NOMEM, 'select (select count(*) from public.zoe_docs)::int as d, (select count(*) from public.zoe_tenant_state)::int as s');
+    rec('គណនីគ្មានហាង ៖ SELECT zoe_docs · zoe_tenant_state ផ្ទាល់ (RLS) ➜ ០', !!nomemSel.rows && nomemSel.rows[0].d === 0 && nomemSel.rows[0].s === 0, nomemSel);
+    rec('គណនីគ្មានហាង ៖ មិនមាន doc ណាមួយត្រូវសរសេរ (SQ1)', (await c.query("select count(*)::int as n from public.zoe_docs where key = 'SQ1'")).rows[0].n === 0);
     rec('anon ៖ zoe_write ➜ permission denied', denied(await as(c, ANON, 'select public.zoe_write($1, $2::jsonb)', [newOp(), '[]'])));
     rec('anon ៖ zoe_pull ➜ permission denied', denied(await as(c, ANON, 'select public.zoe_pull(0, 10)')));
     rec('anon ៖ SELECT zoe_docs ➜ permission denied', denied(await as(c, ANON, 'select 1 from public.zoe_docs')));
@@ -349,6 +358,8 @@ async function body(c, rec, extra) {
     rec('tenant Revoke ➜ zoe_write forbidden ភ្លាម', !!revoked.error && revoked.error.message === 'forbidden', revoked);
     const revokedPull = await as(c, A.who, 'select public.zoe_pull(0, 10)');
     rec('tenant Revoke ➜ zoe_pull forbidden', !!revokedPull.error && revokedPull.error.message === 'forbidden', revokedPull);
+    const revokedRead = await as(c, A.who, 'select public.zoe_read($1, null)', [HIST]);
+    rec('tenant Revoke ➜ zoe_read forbidden (មិនមែនបញ្ជីទទេដែល App អានថា «គ្មានទិន្នន័យ»)', !!revokedRead.error && revokedRead.error.message === 'forbidden', revokedRead);
     await c.query('update public.tenants set revoked = false where id = $1', [A.id]);
 
     const c1 = await H.connect('postgres', c.database);
@@ -467,6 +478,16 @@ const MUTATIONS = [
     ['paging កាត់ក្រុម seq', "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq\n        and (d.value is not null or d.seq > tomb_after);",
         "    where d.tenant_id = tenant and d.seq > since and d.seq <= upper_seq\n        and (d.value is not null or d.seq > tomb_after)\n"
         + "        and (d.root, d.key) in (select d2.root, d2.key from public.zoe_docs d2 where d2.tenant_id = tenant and d2.seq > since order by d2.seq, d2.key limit lim);"],
+    ['zoe_write ៖ ដក guard tenant null តែក្នុង wrapper (probe ទិសផ្ទុយ ៖ zoe_apply នៅបដិសេធ)', [
+        ["    tenant uuid := private.current_tenant_id();\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);",
+            "    tenant uuid := private.current_tenant_id();\nbegin\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);"]], 'equivalent'],
+    ['zoe_write + zoe_apply មិនបដិសេធ tenant null (Revoke · គណនីគ្មានហាង)', [
+        ["    tenant uuid := private.current_tenant_id();\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);",
+            "    tenant uuid := private.current_tenant_id();\nbegin\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);"],
+        ["    b text[];\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_op_id is null",
+            "    b text[];\nbegin\n    if p_op_id is null"]]],
+    ['zoe_read មិនបដិសេធ tenant null ➜ បញ្ជីទទេ (App អាន «គ្មានទិន្នន័យ»)', "    docs jsonb;\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;",
+        "    docs jsonb;\nbegin"],
     ['ទាញពេញជាទំព័រមិនស្គាល់ p_full_head (វិលចាប់ផ្តើមម្តងទៀតពេល purge)', "since < purged and full_head is null)", "since < purged)"],
     ['ជឿ p_full_head ចាស់ជាង purged_seq', "(since <= 0 or full_head < purged or full_head > head)", "(since <= 0 or full_head > head)"],
     ['ទំព័របន្តមិនបញ្ជូន tombstone ក្រោយការទាញចាប់ផ្តើម', "tomb_after := case when full_head is null then since else full_head end;", "tomb_after := case when full_head is null then since else head end;"],

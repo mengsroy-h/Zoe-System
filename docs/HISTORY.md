@@ -51,16 +51,16 @@
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · ម្តងមួយចំណុចក្នុងមួយ session · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
+2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · មួយជុំក្នុងមួយ session (PR តែមួយ · commit ម្តងមួយចំណុច) · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
    ⛔ គ្មាន workflow/agent · វាស់ឡើងវិញលើ `main` មុនកែ · វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)៖
    **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · [2.49.4] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ …») ·
    ✅ ម្ចាស់គម្រោងធ្វើរួច (2026-10-04) ៖ G2 ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.។
-   **ជុំ ៣ Config ➜ Login ➜ Signup** ៖ (១) ✅ **➜ [2.49.5]** ទាក់ទងបង្កើតគណនីតាម Telegram @mengsroyhun ក្នុងប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ·
-   (២) ⏭️ **ចំណុចបន្ទាប់** ៖ ហាងដែលចុះឈ្មោះរួច ➜ Reconfig ➜ ប្រអប់ចូល (មិនមែនចុះឈ្មោះ) — មានរួចតាំងពី [2.48.0] (`routePendingInvite()` · `zoew_used_invites_v1` ·
-   `register` + `check: true`) ➜ **វាស់ឡើងវិញលើ App ពិត** ៖ storage លុប · ឧបករណ៍ថ្មី · Link អញ្ជើញប្រើរួច · Function `register` ចាស់/មិនឆ្លើយ · ប្តូរ Firebase ⇄ Supabase ·
-   (៣) ការចងចាំ login មិនច្រឡំ backend/Project ([2.48.0] `login-memory.ts` · `zoew-sb-auth-owner`) ➜ វាស់ឡើងវិញ ·
-   (៤) ការការពារពិតនៅ Server (RLS · Edge Function `register`/`reset-password` · Firebase rules) ➜ ផ្ទៀងថាគ្មានផ្លូវរំលង (ប្រអប់ក្នុង App ជាភាពងាយស្រួលប៉ុណ្ណោះ) ·
-   (៥) ផលរួម G4 · G5 · G6 ជាមួយ Config/Reconfig (វាស់តែប៉ុណ្ណោះ · កុំធ្វើស្ទួន)។
+   **ជុំ ៣ Config ➜ Login ➜ Signup** (ម្ចាស់គម្រោង ៖ «ធ្វើឲ្យរួចមួយជុំ» ➜ PR #288 តែមួយ) ៖ (១) ✅ **➜ [2.49.5]** ទាក់ទងបង្កើតគណនីតាម Telegram ·
+   (២) ✅ **➜ [2.49.5]** Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Function មិនឆ្លើយ (R3-G1 · ថ្នេរ App ↔ `handleRegister()` ពិត) ·
+   (៣) ✅ វាស់ ៖ គ្មាន — ការចងចាំគណនីចងនឹង scope · ពាក្យសម្ងាត់ចងនឹង scope + ឈ្មោះតាម AES-GCM AAD (`remember-password.test.tsx` · `login-routing.test.tsx`) ·
+   (៤) ✅ Server ៖ គណនីគ្មានហាង ➜ forbidden (អ្នកយាមបន្ថែម) · `register` + `check` មាន mutation រួច · sign-up live វាស់មិនបាន ➜ សកម្មភាពដោយដៃ [2.49.5] ·
+   ➕ របាយការណ៍ម្ចាស់គម្រោង ៖ APK Push ជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយ ៤ ម៉ោង ✅ **➜ [2.49.5]** ·
+   (៥) ⏳ ផលរួម G4 · G5 · G6 ជាមួយ Reconfig · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ក្នុងប្រអប់ Config ⏳។
    **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
    ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
@@ -136,10 +136,11 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun)** (Deep audit ជុំ ៣ ចំណុច ១ · សំណើម្ចាស់គម្រោង)
+### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun) · Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Server ពិនិត្យកូដមិនបាន · APK ៖ Push មិនជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយផុត ៤ ម៉ោង** (Deep audit ជុំ ៣ · សំណើ/របាយការណ៍ម្ចាស់គម្រោង)
 
 **ZoeW `2.49.5`** (`zoew-v260` ➜ `zoew-v261`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.tsx` · `ActivationModal.tsx`
-(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact`) · `guide.html`។
+(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact`) · `guide.html` · `src/features/account.ts`
+(`checkInviteWithServer` · `routePendingInvite`) · `src/features/push.ts` (`onNativeToken` · `resumePushAfterSignIn` · `watchPushIdentity`) · `src/app/lifecycle/boot.ts`។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -150,6 +151,20 @@
 - តំណ Telegram មានប្រភពតែមួយ (`SellerTelegramLink` · `SELLER_TELEGRAM_HANDLE`) ➜ ប្រអប់ Activation និង Config មិនអាចខុសគ្នា។ សៀវភៅណែនាំ (Setup Link/QR) និង
   `ZoeW/README.md` ប្រាប់ផ្លូវនេះ។
 - parity ៖ បន្ទាត់ថ្មីជា `p` គ្មាន style ដោយផ្ទាល់ក្រោម `.modal-content` ➜ ច្បាប់ `INTENTIONAL_UI.skip` ដដែលរំលងវា (គ្មានការពង្រីកបញ្ជី)។
+- 🔐 **Setup Link របស់ហាងដែលចុះឈ្មោះរួច ➜ ប្រអប់ចូលប្រព័ន្ធ ទោះ Server ពិនិត្យកូដអញ្ជើញមិនបាន** (ចំណុច ២ · R3-G1) ៖ ឧបករណ៍ថ្មី ឬ storage លុប (គ្មានការចងចាំ
+  កូដ/គណនី) + Function `register` មិនឆ្លើយ (បណ្តាញ · ព្យួរ ២០ វិ. · DB `502 db-unavailable` · gateway 504) ➜ មុនកែ App បើក **ប្រអប់ចុះឈ្មោះ** (ករណីព្យួរ ៖ ប្រអប់ចូល
+  ២០ វិ. រួចប្តូរជាចុះឈ្មោះពីក្រោមអ្នកប្រើ) ខណៈការចុះឈ្មោះក៏ធ្វើមិនបានដោយ Function ដដែល។ ឥឡូវ ៖ បើកប្រអប់ចុះឈ្មោះតែពេល Server ឆ្លើយ `invite-usable` ឬ Function ចាស់
+  (មិនស្គាល់ `check` ➜ `username-invalid` ➜ ការចុះឈ្មោះនៅធ្វើបាន ដូចដើម) · ក្រៅពីនោះ ➜ ប្រអប់ចូល + «មានកូដអញ្ជើញក្នុង Setup Link — បើហាងមិនទាន់មានគណនី សូមចុច
+  📝 ចុះឈ្មោះ» (កូដនៅចាំសម្រាប់ប៊ូតុងនោះ)។
+- 📲 **APK ៖ Push មិនជាប់ «⚠️ សូមចូលប្រព័ន្ធម្តងទៀត រួចបើកការជូនដំណឹង» ក្រោយផុត ៤ ម៉ោង** (របាយការណ៍ម្ចាស់គម្រោង ៖ រូបថត APK 2.49.4 ៖ ផ្ទាំង 🔔 ទិន្នន័យស្រស់
+  (ចូលរួច) តែផ្នែក Push និយាយ «សូមចូលប្រព័ន្ធម្តងទៀត» + ប៊ូតុង «បើក» ខណៈការជូនដំណឹងបើករួច) ៖ FCM ផ្ញើ token (`registration`) ពេលណាក៏បាន (ក្រោយ `register()` របស់ resync ·
+  token ថ្មី) ➜ token មកដល់ក្រោយការផុតសម័យ ៤ ម៉ោង (`forceExpireSession()` ➜ `signOut`) ➜ `onNativeToken()` គ្មានអត្តសញ្ញាណ ➜ កំណត់ `no-account` **ដោយគ្មានលក្ខខណ្ឌ**
+  ➜ ចូលប្រព័ន្ធវិញ គ្មានអ្វីផ្ទៀងស្ថានភាពឡើងវិញ (មានតែ boot · ត្រឡប់ពី background)។ ឥឡូវ ៖ token ពេលគ្មានអត្តសញ្ញាណ ហើយអ្នកប្រើមិនបានចុច «បើក» ➜ ទុក token រង់ចាំ
+  (ស្ថានភាពមិនប្រែ · ការចុះឈ្មោះលើ Server នៅដដែល) · ការចូលប្រព័ន្ធ (`authButtonIsLoggedIn` false ➜ true · `watchPushIdentity()`) ➜ `refreshPushStatus()` + ចុះឈ្មោះ
+  token ដែលរង់ចាំដោយគណនីដែលទើបចូល។ អ្នកប្រើចុច «បើក» ហើយសម័យបាត់មុន token មក ➜ `no-account` ដូចដើម។
+- 🔒 **Server ៖ គណនីគ្មានហាង** (ចំណុច ៤ក · ឧ. បង្កើតតាម GoTrue sign-up ផ្ទាល់ បើ Dashboard «Allow new users to sign up» បើកដោយច្រឡំ) ➜ វាស់លើ Postgres ពិត ៖
+  `zoe_write` · `zoe_read` · `zoe_pull` ➜ `forbidden` · `SELECT zoe_docs`/`zoe_tenant_state` ➜ ០ ➜ **គ្មានផ្លូវរំលង** (មិនកែកូដ)។ ចន្លោះអ្នកយាម ៖ guard tenant null របស់
+  `zoe_read` គ្មាននរណាវាស់ (ដកវាចេញ ➜ បញ្ជីទទេដែល App អានថា «គ្មានទិន្នន័យ») ➜ ឥឡូវចាប់។
 - 🔔 សារកំណែ 2.49.5 ជំនួស 2.49.4 (រួមចំណុចមុន)។
 
 #### អ្នកយាម
@@ -158,12 +173,27 @@
   `APP_LOCK_EXCUSE_SELECTOR` · `outerHTML` ស្មើតំណក្នុងប្រអប់ Activation · `INTENTIONAL_UI.skip` រំលងបន្ទាត់ ទិសផ្ទុយ ៖ textarea និងប៊ូតុងរក្សាទុកនៅប្រៀបធៀប) ៖
   tree មុនកែ (`main` 425ac3a) **ធ្លាក់ ៥/៥** ➜ **១៧/១៧**។ Mutation ៦ ➜ ក្រហម ៦ (ដក `target` · ដក `noopener` · ដាក់ក្នុង `.cfg-supabase` ➜ លាក់ពេល Firebase ·
   `p` មាន style ➜ parity ឃើញ · anchor ផ្ទាល់មិនប្រើប្រភពតែមួយ · អត្ថបទគ្មាន «បង្កើតគណនី»)។
+- `ZoeW/tests/reconfig-invite-seam.test.tsx` (ថ្មី · ថ្នេរ App ↔ `handleRegister()` **ពិត** របស់ Edge Function + hash កូដពិត លើ DB ក្នុង memory) ៖ ចុះឈ្មោះ ➜ ចូល ·
+  ឧបករណ៍ដដែល ➜ ចូល (មិនសួរ server) · storage លុប ➜ server `invite-invalid` ➜ ចូល (មិនបង្កើតគណនី) · Function មិនឆ្លើយ ៤ របៀប · ហាងថ្មី ➜ ចុះឈ្មោះ · Function ចាស់ ➜ ចុះឈ្មោះ ·
+  ចុះឈ្មោះម្តងទៀតដោយឈ្មោះ/ពាក្យសម្ងាត់ដដែល ➜ `registered` ➜ ចូល (គណនីតែ ១) · Firebase ⇄ Supabase ៖ tree មុនកែ **ធ្លាក់ ៤/១០** (Function មិនឆ្លើយ ➜ `register`) ➜ **១០/១០**។
+  Mutation ៣ ➜ ក្រហម ៣ (`unknown` ➜ ចុះឈ្មោះលើឧបករណ៍ថ្មី · `no-check` ➜ ចូលជានិច្ច · `username-invalid` ➜ `unknown`)។
+- `ZoeW/tests/push-client.test.tsx` (បន្ថែម ៣) ៖ tree មុនកែ **ធ្លាក់ ២** (`expected 'no-account' to be 'on'`) ➜ **៤០/៤០**។ Mutation ៥ ➜ ក្រហម ៥ (token គ្មានអត្តសញ្ញាណ ➜
+  `no-account` ជានិច្ច · កំពុងបើក ➜ មិនប្រាប់ · ចូលវិញមិន refresh · មិនផ្ញើ token រង់ចាំ · watch មិនហៅ)។
+- `supabase-datastore-test` (បន្ថែម ៥ ការអះអាង + mutation ៣) ៖ គណនីគ្មានហាង ➜ `forbidden`/០ · Revoke ➜ `zoe_read forbidden` · mutation ៖ ដក guard `zoe_read` ➜ ក្រហម ·
+  ដក guard `zoe_write` + `zoe_apply` ➜ ក្រហម · ដកតែ wrapper `zoe_write` ➜ បៃតង (probe ទិសផ្ទុយ ៖ `zoe_apply` នៅបដិសេធ) ➜ **១៣៤ ok**។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
 - ⏳ សាកលើឧបករណ៍ពិត ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ចុច **@mengsroyhun** ➜ iPhone PWA · APK · desktop បើក Telegram (ឬ `t.me` ក្នុង browser) ➜ ត្រឡប់មក App ➜ ប្រអប់នៅដដែល
   (App lock មិនចាក់សោភ្លាម)។
+- ⏳ APK ហាង Supabase (Push បើករួច) ៖ ទុក App លើស ៤ ម៉ោង ➜ បើក ➜ ចូលប្រព័ន្ធវិញ ➜ 🔔 ផ្នែក «ជូនដំណឹងលើទូរស័ព្ទ» ត្រូវបង្ហាញ «បើករួច» (មិនមែន «សូមចូលប្រព័ន្ធម្តងទៀត»)។
+- ⏳ ឧបករណ៍ថ្មីបើក Setup Link របស់ហាងដែលចុះឈ្មោះរួច ពេលអ៊ីនធឺណិតខ្សោយ ➜ ប្រអប់ចូលប្រព័ន្ធ (មិនមែនចុះឈ្មោះ)។
+- ⚠️ **ផ្ទៀងដោយដៃ (session វាស់មិនបាន ៖ network policy បិទ `supabase.co` · គ្មានសិទ្ធិ Google)** ៖ Supabase Dashboard ➜ Authentication ➜ Sign In / Providers ➜
+  **Allow new users to sign up = បិទ** (បើបើក ៖ គ្មានទិន្នន័យលេចធ្លាយ (វាស់រួច) តែអ្នកណាក៏អាចចាប់យកឈ្មោះគណនីមុនម្ចាស់ហាង) · Firebase Console របស់អតិថិជន **នីមួយៗ** ➜
+  Authentication ➜ Settings ➜ User actions ➜ **Enable create (sign-up) = បិទ** (Firebase rules = `auth != null` ➜ បើបើក អ្នកមាន `apiKey` អានទិន្នន័យហាងបាន ·
+  `tools/firebase-provision` វាស់វាតែពេលបង្កើត/`--adopt`)។ Security Advisor (អាន ៖ 2026-10-06) ៖ `zoe_ops` RLS គ្មាន policy (INFO · ដោយចេតនា ៖ client គ្មានសិទ្ធិ) ·
+  Leaked Password Protection (Pro) ➜ គ្មានរឿងថ្មី។
 
 ### [2.49.4] — 2026-10-04 · ZoeW · ZoeKeyGen `2.24.5` ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ · SW ៖ ឯកសារបន្ថែមព្យួរមិនរារាំងការដំឡើង** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
 

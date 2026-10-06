@@ -119,6 +119,7 @@ export async function checkInviteWithServer(invite) {
         const code = res && res.body && typeof res.body.code === 'string' ? res.body.code : '';
         if (code === 'invite-usable') return 'usable';
         if (code === 'invite-invalid') return 'used';
+        if (code === 'username-invalid') return 'no-check';
         return 'unknown';
     } catch (e) {
         return 'unknown';
@@ -155,7 +156,7 @@ export async function routePendingInvite() {
         return 'used';
     }
     if (!stillDeciding()) return 'stale';
-    if (verdict === 'unknown' && rememberedLoginFor()) {
+    if (verdict === 'unknown' || (verdict === 'no-check' && rememberedLoginFor())) {
         showToast(INVITE_UNVERIFIED_TOAST);
         return 'login';
     }

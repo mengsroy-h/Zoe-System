@@ -2678,6 +2678,78 @@ function firstBody(requests) {
             { stored: jarEarlier.stored, writes: jarEarlier.writes });
     }
 
+    console.log('\n== ២២. ⛔ E8 ៖ payload ពិតពី ZTO Argus (ម្ចាស់គម្រោង ៖ កញ្ចប់យករួច ៣ ៖ ក្នុងស្រុក · ចិន · Shopee វៀតណាម) ==');
+    // ⛔ ទម្រង់ពិតដែលម្ចាស់គម្រោងចម្លងពី Argus (2026-10-06) ៖ ឈ្មោះ · លេខទូរស័ព្ទ · អាសយដ្ឋាន · barcode · ឈ្មោះបុគ្គលិក ត្រូវប្តូរជាតម្លៃក្លែង
+    //    (repo នឹងជាសាធារណៈ) តែ **ទម្រង់** (`+855-0…` · `855…` · `0…`) · វាល · កូដ/អត្ថបទស្កេន · លំដាប់ (តាម `id` ឡើង ៖ ស្កេនបញ្ហា `30` ដែល `scanTime`
+    //    មុន `05` មកក្រោយ) · ចំនួនទឹកប្រាក់ ដូចពិត។ ការពិតដែលវាស់បាន ៖ ជួរដេកបញ្ជី **គ្មាន** `billStatus` ➜ សាលក្រមជួរដេក = `null` ➜ ភស្តុតាង 05 សម្រេច (E2)។
+    const realRow = (code, mobile, type, desc, at, extra) => Object.assign({
+        action: null, agentAmount: 0, barScannerId: '1', classCodeDesc: '', consigneeAddress: 'អាសយដ្ឋានក្លែង', consigneeMobile: mobile,
+        consigneeName: 'Customer', countryCode: null, customerCode: '20000', customerCodeDesc: null, dataFrom: 'Astra-VN-IOS', destinationNo: null,
+        destinationOutletName: 'Mer SorChrey', dispatchOrSendManName: 'បុគ្គលិក', fcAmount: 0, freeStatisticalResVO: null, goodsType: 'របស់របរទូទៅ',
+        id: 1808096000000000000, isRefund: 0, isRefundDesc: 'ទេ', netWeight: 0.5, packageQty: 1, preOrNextStationCode: null, problemReason: '',
+        recSite: 'ក្លែង', remark: '', scanBillCode: code, scanMan: 'បុគ្គលិក', scanSite: 'Mer SorChrey', scanSiteCode: LIST_SITE, scanSource: null,
+        scanSourceDesc: null, scanTime: at, scanTypeCode: type, scanTypeDesc: desc, signMan: '', signName: null, signedBillCode: '', updateTime: at,
+        volumeWeight: 0, weight: '0.0', zone: null
+    }, extra || {});
+    const REAL = [
+        { name: 'ក្នុងស្រុក', code: '11600100008801', mobile: '+855-090000001', phone: '090000001', cod: 185, dod: 0, at03: '2026-10-06 15:34:22',
+            rows: (c, m) => [
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 15:34:22', { agentAmount: 185.0, remark: '8.5', weight: '40.0' }),
+                realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-06 15:34:27', { agentAmount: 185.0 }),
+                realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-06 15:37:15', { agentAmount: 185.0, signMan: 'S' })] },
+        { name: 'ចិន (អន្តរជាតិ)', code: '77130500008802', mobile: '081000002', phone: '081000002', cod: 0, dod: 2.5, at03: '2026-10-06 14:07:16',
+            rows: (c, m) => [
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-06 14:07:16', { fcAmount: 2.5, customerCodeDesc: 'ztda' }),
+                realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-06 14:07:28', { fcAmount: 2.5 }),
+                realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-06 14:07:35', { fcAmount: 2.5, signMan: 'ស' })] },
+        { name: 'Shopee វៀតណាម', code: '77130500008803', mobile: '855880000003', phone: '0880000003', cod: 3.16, dod: 0, at03: '2026-10-04 14:53:29',
+            rows: (c, m) => [
+                realRow(c, m, '03', 'អីវ៉ាន់មកដល់', '2026-10-04 14:53:29', { agentAmount: 3.16, customerCodeDesc: 'Shopee SHPE' }),
+                realRow(c, m, '04', 'ការចែកចាយអីវ៉ាន់', '2026-10-04 15:46:14', { agentAmount: 3.16 }),
+                realRow(c, m, '05', 'ចុះហត្ថលេខា', '2026-10-05 10:48:07', { agentAmount: 3.16, signMan: 'ថ' }),
+                realRow(c, m, '30', 'ការចុះឈ្មោះបញ្ហា', '2026-10-04 15:50:47', { agentAmount: 3.16, dataFrom: 'Z10-KH-PDA',
+                    problemReason: 'បានធ្វើការចែកចាយ ប៉ុន្តែគ្មានអ្នកចាំទទួល/ ទាក់ទងអត់លើកឬអត់ចូល' })] }
+    ];
+    const phoneOf = (raw) => {
+        try {
+            return vm.runInNewContext(extractFn(APP_SRC, 'normalizeOneStoredPhone') + '\n' + extractFn(APP_SRC, 'normalizeStoredPhone')
+                + '\nnormalizeStoredPhone(__raw);', { __raw: raw });
+        } catch (e) { return 'ERR:' + (e && e.message); }
+    };
+    const PROD_SIGNED_ENV = { ZTO_FIELD_SIGNED: 'billStatus', ZTO_SIGNED_VALUES: '5' };
+    for (const real of REAL) {
+        const payload = listPayload(real.rows(real.code, real.mobile), { pages: 1, total: real.rows(real.code, real.mobile).length });
+        resetEnv(PROD_SIGNED_ENV);
+        seenRequests.length = 0;
+        global.fetch = withCerts(async (href, init) => {
+            seenRequests.push({ href: href, init: init });
+            return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => payload };
+        });
+        const res = await call(listQuery({ withSigned: '1' }));
+        const b = bodyOf(res);
+        const rows = rowsOf(b);
+        const r0 = rows[0] || {};
+        const upstreamRows = payload.data.result.length;
+        ok('⛔ E8 ' + real.name + ' ៖ ជួរដេក «មកដល់» តែមួយ (04 · 05 · 30 មិនក្លាយជាកញ្ចប់)',
+            res.statusCode === 200 && rows.length === 1 && r0.barcode === real.code && r0.skip === '', { status: res.statusCode, rows: rows });
+        ok('⛔ E8 ' + real.name + ' ៖ COD/DOD ពិត (`agentAmount` · `fcAmount` = DOD) · ម៉ោង = ស្កេន 03',
+            r0.cod === real.cod && r0.dod === real.dod && r0.at === real.at03, r0);
+        ok('⛔ E8 ' + real.name + ' ៖ ជួរដេកបញ្ជីគ្មាន `billStatus` ➜ `ztoClosed: null` (ទោះ `ZTO_FIELD_SIGNED=billStatus`)', r0.ztoClosed === null, r0.ztoClosed);
+        ok('⛔ E8 ' + real.name + ' ៖ ភស្តុតាង «ចុះហត្ថលេខា» ពិត (05 + អត្ថបទលំនាំដើម) ➜ `signed` មាន barcode',
+            b.signedOk === true && Array.isArray(b.signed) && b.signed.indexOf(real.code) !== -1, { signedOk: b.signedOk, signed: b.signed });
+        ok('⛔ E8 ' + real.name + ' ៖ រាប់គ្រប់ ៖ rows + otherScans + signedScans = ជួរដេក upstream',
+            rows.length + Number(b.otherScans) + Number(b.signedScans) === upstreamRows && Number(b.signedScans) === 1,
+            { rows: rows.length, otherScans: b.otherScans, signedScans: b.signedScans, upstreamRows: upstreamRows });
+        ok('⛔ E8 ' + real.name + ' ៖ ឈ្មោះសាខា `Mer SorChrey`', b.siteName === 'Mer SorChrey', b.siteName);
+        ok('⛔ E8 ' + real.name + ' ៖ លេខទូរស័ព្ទ (' + real.mobile + ') ➜ ទម្រង់ក្នុងស្រុក `' + real.phone + '` (កូនសោបញ្ចូលគ្នា)',
+            phoneOf(r0.phone) === real.phone, { raw: r0.phone, normalized: phoneOf(r0.phone) });
+        resetEnv(PROD_SIGNED_ENV);
+        global.fetch = withCerts(async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => payload }));
+        const only = bodyOf(await call(listQuery({ signed: '1' })));
+        ok('⛔ E8 ' + real.name + ' ៖ `signed=1` (ជុំបិទតាម ZTO) ➜ barcode ក្នុង `signed` · គ្មានជួរដេក',
+            only.signedOk === true && rowsOf(only).length === 0 && Array.isArray(only.signed) && only.signed.indexOf(real.code) !== -1, only);
+    }
+
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
     const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
     ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',

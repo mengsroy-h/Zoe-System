@@ -565,6 +565,7 @@ export interface ZtoState {
     ztoUserActiveAt: number;
     ztoAbandonHoldSince: number;
     ztoAbandonCheckedAt: number;
+    ztoOriginRefusedDb: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
     ztoListPreview: any | null;
@@ -591,6 +592,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoUserActiveAt: 0,
     ztoAbandonHoldSince: 0,
     ztoAbandonCheckedAt: 0,
+    ztoOriginRefusedDb: null,
     ztoBannerView: null,
     ztoSyncListView: null,
     ztoListPreview: null,

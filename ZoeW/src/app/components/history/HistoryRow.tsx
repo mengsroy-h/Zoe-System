@@ -80,9 +80,15 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
                             ? <span key="phone" className="phone-clickable" title="ចុចដើម្បីសម្គាល់ការខល" onClick={onAct('openCallMarkModal', { args: [row.id] })}>{row.phone}</span>
                             : <span key="nophone" style={{ color: '#ef4444', fontStyle: 'italic' }}>គ្មានលេខ</span>}
                     </div>
-                    <div>
-                        <button className="btn-view-list" onClick={onAct('openViewListModal', { args: [row.id] })}>📦 បញ្ជី ({row.totalPackageCount})</button>
-                    </div>
+                    {row.origin
+                        ? <div className="origin-line">
+                            <span className="origin-chip" title={row.originFull}>
+                                <span className="origin-chip-icon">{row.originIcon}</span>
+                                <span className="origin-chip-text">{row.origin}</span>
+                                {row.originMore ? <span className="origin-chip-more">+{row.originMore}</span> : null}
+                            </span>
+                        </div>
+                        : null}
                     {row.scanTime ? <span className="scan-time-tag">{row.scanTime}</span> : null}
                 </div>
             </td>
@@ -90,7 +96,7 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
                 <div className="price-stack">
                     <span className="locker-badge">ទីតាំង: {row.lockerLoc}</span>
                     <div className="price-figures"><PriceFigures money={row.money} /></div>
-                    <span className="count-badge">កញ្ចប់សរុប: {row.activeCount}</span>
+                    <button type="button" className="count-badge count-badge-btn" onClick={onAct('openViewListModal', { args: [row.id] })}>កញ្ចប់សរុប: {row.activeCount}</button>
                 </div>
             </td>
             <td className="action-cell">

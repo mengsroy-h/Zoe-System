@@ -22,7 +22,7 @@ const NEW_DIR = process.env.ZOEW_PARITY_DIST ? path.resolve(process.env.ZOEW_PAR
 const CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' });
 const seed = seedData();
 
-const READ = () => {
+const READ = (ui) => {
     const txt = (id) => { const el = document.getElementById(id); return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; };
     const probe = document.createElement('div');
     const normStyle = (v) => { probe.style.cssText = ''; probe.style.cssText = v; return Array.from(probe.style).map((p) => p + ':' + probe.style.getPropertyValue(p)).sort().join(';'); };
@@ -30,13 +30,15 @@ const READ = () => {
     const canon = (root) => {
         if (!root) return null;
         const visit = (el) => {
-            const attrs = Array.from(el.attributes)
+            if (ui && ui.skip && el.matches(ui.skip)) return '';
+            const legacy = ((ui && ui.asLegacy) || []).find(([sel]) => el.matches(sel));
+            const attrs = legacy ? legacy[2] : Array.from(el.attributes)
                 .filter((a) => !SKIP.includes(a.name))
                 .map((a) => a.name + '=' + (a.name === 'style' ? normStyle(a.value) : a.value))
                 .filter((s) => s !== 'class=')
                 .sort().join('|');
             const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.data).join('').replace(/\s+/g, ' ').trim();
-            return `<${el.tagName}[${attrs}]${text ? '::' + text : ''}>${Array.from(el.children).map(visit).join('')}`;
+            return `<${legacy ? legacy[1] : el.tagName}[${attrs}]${text ? '::' + text : ''}>${Array.from(el.children).map(visit).join('')}`;
         };
         return Array.from(root.children).map(visit).join('\n');
     };
@@ -75,7 +77,7 @@ const newSrv = await serveDir(NEW_DIR);
 const STEPS = [
     ['ផ្ទុកដំបូង (តម្រង «ថ្ងៃនេះ»)', null],
     ['តម្រង «ទាំងអស់»', (p) => p.click('#btnFilterAll')],
-    ['ប្រអប់បញ្ជីកញ្ចប់', (p) => p.click('#historyTableBody .btn-view-list')],
+    ['ប្រអប់បញ្ជីកញ្ចប់', (p) => p.click('#historyTableBody :is(.btn-view-list, .count-badge-btn) >> nth=0')],
     ['បិទប្រអប់បញ្ជី', (p) => p.click('#viewListModal .btn-cancel')],
     ['ទំព័រស្កេន', (p) => p.click('#pageTabEntry')],
     ['របៀប Locker', (p) => p.click('#modeLockerBtn')],
@@ -120,8 +122,8 @@ async function session(port) {
 const A = await session(oldSrv.port);
 const B = await session(newSrv.port);
 
-const a = { state: await A.page.evaluate(READ), errors: A.errors };
-const b = { state: await B.page.evaluate(READ), errors: B.errors };
+const a = { state: await A.page.evaluate(READ, INTENTIONAL_UI), errors: A.errors };
+const b = { state: await B.page.evaluate(READ, INTENTIONAL_UI), errors: B.errors };
 
 console.log('╔══════════════════════════════════════════════════════════════════════╗');
 console.log('║  parity ជាមួយទិន្នន័យ ៖ ZoeW ដើម ធៀបនឹង ZoeW React                   ║');
@@ -210,8 +212,8 @@ for (const [label, selector, field] of [
     await B.page.click(selector);
     await A.page.waitForTimeout(900);
     await B.page.waitForTimeout(900);
-    const ra = await A.page.evaluate(READ);
-    const rb = await B.page.evaluate(READ);
+    const ra = await A.page.evaluate(READ, INTENTIONAL_UI);
+    const rb = await B.page.evaluate(READ, INTENTIONAL_UI);
     const same = JSON.stringify(ra[field]) === JSON.stringify(rb[field]);
     const size = String(ra[field] || '').length;
     // ⛔ ជាន់អប្បបរមា ៖ តារាងទទេ មិនបានវាស់អ្វីទេ

@@ -308,7 +308,7 @@ const STEPS = [
     ['តម្រង «ទាំងអស់»', click('#btnFilterAll')],
     ['បិទកញ្ចប់ 012345678', click(`${row('012345678')} .close-btn`)],
     ['បើកវិញ 012345678', click(`${row('012345678')} .close-btn`)],
-    ['បញ្ជី ➜ បិទ barcode ទី ២', seq(click(`${row('012345678')} .btn-view-list`), click('#barcodeListContainer .btn-toggle-bc-close >> nth=1'))],
+    ['បញ្ជី ➜ បិទ barcode ទី ២', seq(click(`${row('012345678')} :is(.btn-view-list, .count-badge-btn)`), click('#barcodeListContainer .btn-toggle-bc-close >> nth=1'))],
     ['កែតម្លៃ barcode ទី ១', seq(click('#barcodeListContainer .btn-edit-item-price >> nth=0'), fill('#editBcCodInput', '11'), fill('#editBcDodInput', '2'), click('#editBarcodePriceModal .btn-confirm'))],
     ['បិទប្រអប់បញ្ជី', click('#viewListModal .btn-cancel')],
     ['សម្គាល់ការខល «អត់លើក»', seq(click(`${row('012345678')} .phone-clickable`), click('#callMarkModal .call-mark-no-answer'))],

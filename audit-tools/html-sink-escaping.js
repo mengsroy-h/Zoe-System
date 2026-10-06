@@ -80,7 +80,6 @@ const BUILDER_ALLOW = {
         codeHtml: 'HTML សាងខាងលើ; គ្រប់ code ឆ្លង sanitizeInput()',
         meta: 'ធាតុនៃ TRASH_REASON_META ដែលជា const ក្នុងកូដ — មិនមែនទិន្នន័យអ្នកប្រើ',
         actions: 'HTML សាងខាងលើ; id និង key ឆ្លង sanitizeInput()',
-        totalPackageCount: 'លេខ — item.barcodes.length ឬ parseFloat(item.count)',
         rowNum: 'លេខរៀងជួរដេក (i + 1)',
         rowNumClass: "ឈ្មោះ class ថេរ ៤ ('' / row-num-no-answer / -no-connect / -wrong-number)",
         rowNumLabel: 'អត្ថបទថេរ ៣ («ខល អត់លើក» / «ខល អត់ចូល» / «ខុសលេខ»)',

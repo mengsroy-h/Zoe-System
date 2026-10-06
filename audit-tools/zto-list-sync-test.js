@@ -1286,7 +1286,7 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [] };
+        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [], verdict: [], origin: [] };
         const box = {
             console: console,
             db: {}, authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
@@ -1316,6 +1316,7 @@ function firstBody(requests) {
                 return Promise.resolve(box.__saveResult === undefined ? true : box.__saveResult);
             },
             releaseBarcodesInRegistry: (codes) => { calls.release.push(codes); },
+            saveBarcodeOrigins: (entries) => { calls.origin.push(entries); return Promise.resolve(0); },
             checkZtoStatusForBarcode: (cfg, code) => {
                 calls.probe.push(code);
                 if (box.__probeThrows) return Promise.reject(new Error('probe failed'));
@@ -1370,13 +1371,13 @@ function firstBody(requests) {
 
         if (typeof runImport === 'function') {
             const FRESH = [
-                { barcode: '77130500000901', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 10:00:00', skip: '' },
+                { barcode: '77130500000901', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 10:00:00', skip: '', from: 'Shopee SHPE' },
                 { barcode: '77130500000902', phone: '85560633155', cod: 2.44, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
             ];
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
                 calls.release.length = 0; calls.toast.length = 0;
-                calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0;
+                calls.probe.length = 0; calls.close.length = 0; calls.verdict.length = 0; calls.origin.length = 0;
                 box.scanHistory.length = 0;
                 if (box.__signedEvidence) box.__signedEvidence.clear();
                 box.__autoClose = true;
@@ -1407,6 +1408,10 @@ function firstBody(requests) {
                 calls.save[0] && calls.save[0].cod === 6.47 && calls.save[0].dod === 0, calls.save[0]);
             ok('⛔ ផ្លូវជោគជ័យមិនដោះកូនសោ registry', calls.release.length === 0, calls.release);
             ok('⛔ សោដោះក្រោយចប់', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
+            ok('⛔ ប្រភពកញ្ចប់ ៖ ការសរសេរ `origins` ១ ដងក្រោយរក្សាទុក ជាមួយ barcode ដែលរក្សាទុក និង `from` របស់ជួរ (ជួរគ្មាន `from` ➜ ទទេ)',
+                calls.origin.length === 1 && JSON.stringify(calls.origin[0])
+                    === JSON.stringify([{ code: '77130500000901', from: 'Shopee SHPE' }, { code: '77130500000902', from: '' }]),
+                calls.origin);
 
             reset();
             box.__stale = true;

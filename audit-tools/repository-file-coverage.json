@@ -1542,6 +1542,9 @@
     "ZoeW/src/features/barcode-ops.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/barcode-origin.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/biometric.ts": {
       "policy": "zoew-app"
     },
@@ -1864,6 +1867,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-list-origin.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-list-origin-import.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/barcode-origin.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-abandon-signed-gate.test.tsx": {
@@ -2782,6 +2791,9 @@
       "policy": "supabase-db"
     },
     "supabase/migrations/20261001000100_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261006154711_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "supabase/migrations/20261001000200_zoe_datastore.sql": {

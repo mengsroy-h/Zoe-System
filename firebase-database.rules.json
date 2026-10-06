@@ -133,6 +133,12 @@
             ".validate": false
           }
         },
+        "origins": {
+          ".validate": "newData.hasChildren() && (newData.parent().child('barcodes').exists() || newData.parent().child('barcode').isString())",
+          "$originKey": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+          }
+        },
         "$other": {
           ".validate": false
         }
@@ -273,6 +279,12 @@
             "restoredAt": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
             }
+          }
+        },
+        "origins": {
+          ".validate": "newData.hasChildren() && (newData.parent().child('barcodes').exists() || newData.parent().child('barcode').isString())",
+          "$originKey": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
           }
         },
         "$other": {

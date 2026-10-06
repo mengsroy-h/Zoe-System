@@ -10,6 +10,7 @@ export interface BarcodeListRow {
     index: number;
     locker: string;
     time: string | null;
+    origin: string;
     moneyClass: string;
     money: BarcodeMoneyLine[];
     sum: { cls: string; dollars: string; riel: string } | null;
@@ -31,6 +32,7 @@ export function BarcodeListContainer() {
                             <span className="locker-badge">ទីតាំង: {b.locker}</span>
                         </div>
                         {b.time ? <div className="bc-time-line">{b.time}</div> : null}
+                        {b.origin ? <div className="bc-origin-line">{b.origin}</div> : null}
                         {b.money.map((m) => (
                             <div className={`bc-money-line ${m.cls}${m.kindDod ? ' kind-dod' : ''}`} key={m.label}>
                                 {m.label}: <strong>${m.dollars}</strong> ({m.riel} ៛)

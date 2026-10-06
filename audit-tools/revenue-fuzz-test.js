@@ -356,7 +356,7 @@ function seedData() {
 // deterministic PRNG so any failure reproduces from its seed
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
-const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup'];
+const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup', 'origin'];
 // `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ (seed + log តាមលំដាប់) សម្រាប់ `emu/app-writes-rules-test`
 const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
 
@@ -426,6 +426,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         if (wanted === 'removeBarcode' && isAdmin) { const it = at(live); const b = bcOf(it); if (!it || !b) return null; await window.removeSingleBarcode(it.id, b.code); return 'removeBarcode'; }
                         if (wanted === 'deleteItem' && isAdmin) { const it = at(live); if (!it) return null; await window.deleteSingleItem(it.id); return 'deleteItem'; }
                         if (wanted === 'restore') { const it = at(trash); if (!it) return null; window.promptRestoreDeletedItem(it.id); await window.executeRestoreItem(); return 'restore'; }
+                        if (wanted === 'origin') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.saveBarcodeOrigins !== 'function') return null; const n = await window.saveBarcodeOrigins([{ code: b.code, from: pick > 0.5 ? 'Shopee SHPE' : 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]); return n ? 'origin' : null; }
                         if (wanted === 'editPrice' && isAdmin) {
                             const it = at(live); const b = bcOf(it); if (!it || !b) return null;
                             window.openEditBarcodePriceModal(it.id, b.code);

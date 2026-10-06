@@ -1,5 +1,6 @@
 import { dataState } from '../../../core/state';
 import { formatScanStamp } from '../../../core/timezone';
+import { itemOriginSummary } from '../../../features/barcode-origin';
 
 export interface HistoryRowAction {
     action: string;
@@ -25,8 +26,11 @@ export interface HistoryRowModel {
     calledBadge: boolean;
     statusBadge: 'closed' | 'old' | 'new';
     scanTime: string | null;
+    originIcon: string;
+    origin: string;
+    originFull: string;
+    originMore: number;
     lockerLoc: string;
-    totalPackageCount: number;
     activeCount: number;
     money: { hasCod: boolean; hasDod: boolean; cod: number; dod: number; codRiel: number; dodRiel: number; sum: number; sumRiel: number };
     callKind: 'none' | 'fix-phone' | 'called' | 'call';
@@ -61,7 +65,6 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
         else callKind = 'call';
     }
 
-    const totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
 
     let activeCod: number;
     let activeDod: number;
@@ -78,6 +81,7 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
     activeCod = Math.round(activeCod * 100) / 100;
     activeDod = Math.round(activeDod * 100) / 100;
 
+    const origin = itemOriginSummary(item);
     const codRiel = Math.round(activeCod * dataState.exchangeRateRiel);
     const dodRiel = Math.round(activeDod * dataState.exchangeRateRiel);
     const sum = Math.round((activeCod + activeDod) * 100) / 100;
@@ -93,8 +97,11 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
         calledBadge: !!item.isCalled,
         statusBadge: item.isClosed ? 'closed' : (isOld ? 'old' : 'new'),
         scanTime: item.time ? formatScanStamp(item.time) : null,
+        originIcon: origin.icon,
+        origin: origin.text,
+        originFull: origin.full,
+        originMore: origin.more,
         lockerLoc: String(lockerLoc),
-        totalPackageCount,
         activeCount,
         money: { hasCod: activeCod > 0, hasDod: activeDod > 0, cod: activeCod, dod: activeDod, codRiel, dodRiel, sum, sumRiel: codRiel + dodRiel },
         callKind,

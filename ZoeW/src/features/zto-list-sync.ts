@@ -25,6 +25,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
+import { saveBarcodeOrigins } from './barcode-origin';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
 
@@ -587,8 +588,11 @@ export async function importZtoListRows() {
     const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
     const closeTargets = ztoListCloseTargets(groups.existing);
+    const originOf = (row) => ({ code: row.barcode, from: row.from });
     if (!queue.length && !closeTargets.length) {
-        showToast('ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
+        const filled = await saveBarcodeOrigins(groups.existing.map(originOf));
+        if (!session.current()) return;
+        showToast(filled ? '📍 បំពេញប្រភព ' + filled + ' កញ្ចប់' : 'ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
         return;
     }
     const capped = groups.fresh.length > queue.length
@@ -624,6 +628,7 @@ export async function importZtoListRows() {
     let closeNotTried = 0;
     let stalled = false;
     const savedDates = new Set();
+    const origins = groups.existing.map(originOf);
     try {
         for (let i = 0; i < queue.length; i++) {
             if (!session.current()) return;
@@ -659,6 +664,7 @@ export async function importZtoListRows() {
                 if (status === true || status === false) {
                     saved++;
                     savedDates.add(rowDateKey);
+                    origins.push(originOf(row));
                     if (closedStampMs) {
                         takenOver += (await markZtoListRowPickedUp(row.barcode)) ? 1 : 0;
                     }
@@ -723,6 +729,7 @@ export async function importZtoListRows() {
             + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
         : '';
     showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
+    saveBarcodeOrigins(origins).catch(() => 0);
     setZtoListSyncNote(parts.join(' · ') + dateNote + (notTried || closeNotTried
         ? ' — បញ្ជីនៅដដែល ➜ ចុច «បញ្ចូល» ម្តងទៀតពេលបណ្តាញល្អ (កញ្ចប់ដែលបញ្ចូលរួចមិនស្ទួន)។'
         : ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។'));

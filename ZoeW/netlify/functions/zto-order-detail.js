@@ -29,7 +29,9 @@ const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcod
 
 const DEFAULT_LIST_URL = 'https://aargus-api.ztoglobal.com/scan/page/scan';
 const DEFAULT_LIST_SCAN_TYPE = '03';
-const DEFAULT_LIST_SCAN_DESC = 'អីវ៉ាន់មកដល់';
+const DEFAULT_LIST_SCAN_DESC = 'អីវ៉ាន់មកដល់|到件|arrived';
+const LIST_DESC_MAX = 8;
+const LIST_DESC_INVISIBLE_RE = /\p{Cf}/gu;
 const LIST_SCAN_DESC_PATHS = ['scanTypeDesc', 'scanTypeName', 'scanDesc'];
 const LIST_SCAN_CODE_PATHS = ['scanTypeCode', 'scanType'];
 const LIST_SITE_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
@@ -43,7 +45,7 @@ const LIST_SIGNED_CACHE_TTL_MAX_MS = 15000;
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
-const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា';
+const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា|签收|Signed';
 const LIST_SITE_NAME_PATHS = ['scanSite', 'scanSiteName'];
 const LIST_ORIGIN_PATHS = ['recSite', 'customerCodeDesc'];
 const LIST_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -76,7 +78,8 @@ const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
 const SIGNED_MISMATCH_KEYS_MAX = 1000;
-const signedMismatchSignal = { at: 0, keys: new Set() };
+const SIGNED_MISMATCH_TEXTS_MAX = 5;
+const signedMismatchSignal = { at: 0, keys: new Set(), texts: new Set() };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -630,8 +633,8 @@ function readSignedConfig(env) {
 function readListConfig(env) {
     const out = {
         enabled: false, url: null, scanType: DEFAULT_LIST_SCAN_TYPE,
-        pageSize: 100, maxPages: 3, reason: '', fingerprint: '',
-        signedType: '', signedDesc: '', signedReason: ''
+        pageSize: 100, maxPages: 3, reason: '', fingerprint: '', scanDesc: '', scanDescs: [],
+        signedType: '', signedDesc: '', signedDescs: [], signedReason: ''
     };
     let url;
     try {
@@ -646,9 +649,8 @@ function readListConfig(env) {
     out.enabled = true;
     out.url = url;
     out.scanType = scanType;
-    out.scanDesc = env.ZTO_LIST_SCAN_DESC === undefined
-        ? DEFAULT_LIST_SCAN_DESC
-        : String(env.ZTO_LIST_SCAN_DESC).trim();
+    out.scanDescs = readListDescs(env.ZTO_LIST_SCAN_DESC, DEFAULT_LIST_SCAN_DESC);
+    out.scanDesc = out.scanDescs.join('|');
     out.pageSize = boundedInteger(env.ZTO_LIST_PAGE_SIZE, 100, 10, 100);
     out.maxPages = boundedInteger(env.ZTO_LIST_MAX_PAGES, 3, 1, 20);
     readListSignedConfig(env, out);
@@ -664,12 +666,27 @@ function readListConfig(env) {
     return out;
 }
 
+function readListDescs(raw, fallback) {
+    const text = raw === undefined ? fallback : String(raw).trim();
+    if (!text || /^off$/i.test(text)) return [];
+    const out = [];
+    for (const part of text.split('|')) {
+        const desc = scanDescKey(part);
+        if (desc && out.indexOf(desc) < 0) out.push(desc);
+        if (out.length >= LIST_DESC_MAX) break;
+    }
+    return out;
+}
+
+function scanDescKey(text) {
+    return String(text || '').replace(LIST_DESC_INVISIBLE_RE, '').trim();
+}
+
 function readListSignedConfig(env, out) {
     out.signedType = '';
     out.signedReason = '';
-    out.signedDesc = env.ZTO_LIST_SIGNED_SCAN_DESC === undefined
-        ? DEFAULT_LIST_SIGNED_SCAN_DESC
-        : String(env.ZTO_LIST_SIGNED_SCAN_DESC).trim();
+    out.signedDescs = readListDescs(env.ZTO_LIST_SIGNED_SCAN_DESC, DEFAULT_LIST_SIGNED_SCAN_DESC);
+    out.signedDesc = out.signedDescs.join('|');
     const raw = String(env.ZTO_LIST_SIGNED_SCAN_TYPE || '').trim();
     if (/^off$/i.test(raw)) { out.signedReason = 'signed:off'; return; }
     const type = raw || DEFAULT_LIST_SIGNED_SCAN_TYPE;
@@ -977,26 +994,33 @@ function phoneIsPlaceholder(text) {
 function listScanTypeSkip(listConfig, candidates) {
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
     if (code && code !== listConfig.scanType) return 'scan-type';
-    if (!listConfig.scanDesc) return '';
-    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    if (!listConfig.scanDescs.length) return '';
+    const desc = scanDescKey(pickText(candidates, LIST_SCAN_DESC_PATHS));
     if (!desc) return '';
-    return desc === listConfig.scanDesc ? '' : 'scan-type';
+    return listConfig.scanDescs.indexOf(desc) >= 0 ? '' : 'scan-type';
 }
 
 function listRowSignedVerdict(listConfig, candidates) {
     if (!listConfig.signedType) return '';
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
-    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    const desc = scanDescKey(pickText(candidates, LIST_SCAN_DESC_PATHS));
     if (code && code !== listConfig.signedType) return '';
-    if (listConfig.signedDesc && desc && desc !== listConfig.signedDesc) return code ? 'mismatch' : '';
+    const descs = listConfig.signedDescs;
+    if (descs.length && desc && descs.indexOf(desc) < 0) return code ? 'mismatch' : '';
     if (code) return 'signed';
-    return listConfig.signedDesc && desc ? 'signed' : '';
+    return descs.length && desc ? 'signed' : '';
 }
 
-function noteSignedMismatch(code) {
+function noteSignedMismatch(code, desc) {
     if (!BARCODE_RE.test(code)) return;
     signedMismatchSignal.at = Date.now();
     if (signedMismatchSignal.keys.size < SIGNED_MISMATCH_KEYS_MAX) signedMismatchSignal.keys.add(code);
+    if (!desc) return;
+    signedMismatchSignal.texts.delete(desc);
+    signedMismatchSignal.texts.add(desc);
+    if (signedMismatchSignal.texts.size > SIGNED_MISMATCH_TEXTS_MAX) {
+        signedMismatchSignal.texts.delete(signedMismatchSignal.texts.values().next().value);
+    }
 }
 
 function listSiteNameOf(candidates) {
@@ -1029,6 +1053,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
     let otherScans = 0;
     let signedScans = 0;
     let signedMismatch = 0;
+    const mismatchTexts = [];
     let siteName = '';
     const raws = container.rows.slice(0, LIST_ROW_MAX);
     for (let i = 0; i < raws.length; i++) {
@@ -1049,7 +1074,9 @@ function listResponseBody(config, container, page, siteCode, kind) {
         if (verdict === 'mismatch') {
             signedMismatch++;
             otherScans++;
-            noteSignedMismatch(pickText(candidates, LIST_BARCODE_PATHS));
+            const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+            if (desc && mismatchTexts.length < SIGNED_MISMATCH_TEXTS_MAX && mismatchTexts.indexOf(desc) === -1) mismatchTexts.push(desc);
+            noteSignedMismatch(pickText(candidates, LIST_BARCODE_PATHS), desc);
             continue;
         }
         if (kind === 'signed') { otherScans++; continue; }
@@ -1061,7 +1088,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const pages = Number(meta.pages);
     const total = Number(meta.total);
     const counted = rows.length + otherScans + signedScans;
-    return {
+    const body = {
         success: true,
         list: true,
         enabled: true,
@@ -1078,6 +1105,11 @@ function listResponseBody(config, container, page, siteCode, kind) {
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
+    if (mismatchTexts.length) {
+        body.signedMismatchTexts = mismatchTexts;
+        body.signedDescExpected = config.list.signedDescs.slice();
+    }
+    return body;
 }
 
 function mergeSignedCompanion(body, outcome) {
@@ -1097,6 +1129,10 @@ function mergeSignedCompanion(body, outcome) {
     out.signedPages = companion.pages;
     out.signedTotal = companion.total;
     out.signedListMismatch = companion.signedMismatch;
+    if (Array.isArray(companion.signedMismatchTexts)) {
+        out.signedListMismatchTexts = companion.signedMismatchTexts;
+        out.signedDescExpected = companion.signedDescExpected;
+    }
     if (!out.siteName && companion.siteName) out.siteName = companion.siteName;
     return out;
 }
@@ -1699,7 +1735,7 @@ function diagnosticsBody(config, headers, authKind, credential) {
             maxPages: config.list.maxPages,
             scanTypeIsDefault: config.list.scanType === DEFAULT_LIST_SCAN_TYPE,
             scanDescIsDefault: config.list.scanDesc === DEFAULT_LIST_SCAN_DESC,
-            scanDescEnforced: !!config.list.scanDesc,
+            scanDescEnforced: config.list.scanDescs.length > 0,
             signedEnabled: !!config.list.signedType,
             signedReason: config.list.signedReason || null,
             signedTypeIsDefault: config.list.signedType === DEFAULT_LIST_SIGNED_SCAN_TYPE,
@@ -1707,7 +1743,9 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedMismatch: {
                 observed: signedMismatchSignal.keys.size > 0,
                 count: signedMismatchSignal.keys.size,
-                ageMs: signedMismatchSignal.at ? elapsedSince(signedMismatchSignal.at) : null
+                ageMs: signedMismatchSignal.at ? elapsedSince(signedMismatchSignal.at) : null,
+                texts: Array.from(signedMismatchSignal.texts),
+                expected: config.list.signedDescs.length ? config.list.signedDescs.slice() : null
             },
             cacheTtlMs: config.listCacheTtlMs,
             signedCacheTtlMs: Math.min(config.listCacheTtlMs, LIST_SIGNED_CACHE_TTL_MAX_MS)
@@ -1990,6 +2028,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     supabaseAccountCache.clear();
     signedMismatchSignal.at = 0;
     signedMismatchSignal.keys.clear();
+    signedMismatchSignal.texts.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

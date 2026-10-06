@@ -6,7 +6,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY } from '../core/storage-keys';
-import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone } from '../core/text';
+import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
 import { barcodeAbandonIsRipe } from '../domain/barcode';
 import { trashRetentionMs } from '../domain/cleanup';
@@ -328,10 +328,14 @@ export function ztoListPositiveCount(value) {
 }
 
 export async function fetchZtoListAllPages(cfg, from, to) {
-    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0, signedState: 'none' };
+    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
+        signedMismatchTexts: [], signedDescExpected: [], signedState: 'none' };
     const absorb = (body, arrival) => {
         if (!body) return;
         out.signedMismatch += ztoListPositiveCount(body.signedMismatch) + ztoListPositiveCount(body.signedListMismatch);
+        ztoMismatchTexts(body.signedMismatchTexts, out.signedMismatchTexts);
+        ztoMismatchTexts(body.signedListMismatchTexts, out.signedMismatchTexts);
+        if (!out.signedDescExpected.length) out.signedDescExpected = ztoExpectedTexts(body.signedDescExpected);
         if (arrival) {
             for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
             const reportedTotal = Number(body.total);
@@ -447,8 +451,13 @@ export function ztoListSignedNote(result, bornClosed, closeCount) {
     else if (state === 'failed') parts.push('⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន ➜ កញ្ចប់ថ្មីបញ្ចូលជា «មិនទាន់យក» (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
     const mismatch = ztoListPositiveCount(result && result.signedMismatch);
     if (mismatch > 0) {
+        const seen = ztoMismatchTexts(result && result.signedMismatchTexts);
+        const expected = ztoExpectedTexts(result && result.signedDescExpected);
+        const detail = seen.length
+            ? ' — Function ទទួលពី ZTO ' + seen.map(ztoTextWithCodePoints).join(' / ') + (expected.length ? ' ≠ Server រំពឹង ' + expected.map(ztoTextWithCodePoints).join(' / ') : '')
+            : '';
         parts.push('⚠️ ZTO ផ្ញើជួរ «ចុះហត្ថលេខា» ' + mismatch + ' ជួរ ដែលអត្ថបទប្រភេទស្កេនខុសពីការកំណត់ Server ➜ មិនរាប់ជាភស្តុតាងបិទ'
-            + ' (សូមប្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធឲ្យពិនិត្យ ZTO_LIST_SIGNED_SCAN_DESC)');
+            + detail + ' (សូមប្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធឲ្យពិនិត្យ ZTO_LIST_SIGNED_SCAN_DESC)');
     }
     return parts.length ? ' · ' + parts.join(' · ') : '';
 }
@@ -511,6 +520,8 @@ export async function runZtoListSyncPreview() {
             siteName: pulled.siteName,
             otherScans: pulled.otherScans,
             signedMismatch: pulled.signedMismatch,
+            signedMismatchTexts: pulled.signedMismatchTexts,
+            signedDescExpected: pulled.signedDescExpected,
             signedCount: ztoListSignedEvidence.size,
             signedState: pulled.signedState
         };

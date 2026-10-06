@@ -189,7 +189,7 @@ export function PageData() {
                                 <tr>
                                     <th className="col-num">ល.រ</th>
                                     <th className="col-cust">អតិថិជន</th>
-                                    <th className="col-price">តម្លៃ/ទីតាំង</th>
+                                    <th className="col-price">Locker/តម្លៃ/ចំនួន</th>
                                     <th className="col-act">សកម្មភាព</th>
                                 </tr>
                             </thead>

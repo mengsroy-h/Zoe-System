@@ -1250,8 +1250,8 @@ function firstBody(requests) {
     const descDefault = /const DEFAULT_LIST_SCAN_DESC = '([^']*)'/.exec(FUNCTION_SRC);
     ok('ជាន់អប្បបរមា ៖ រកលំនាំដើម `DEFAULT_LIST_SCAN_DESC` ក្នុង Function',
         !!descDefault, descDefault && descDefault[1]);
-    ok('⛔ លំនាំដើមជា «អីវ៉ាន់មកដល់» (សំណើអ្នកប្រើ)',
-        !!descDefault && descDefault[1] === 'អីវ៉ាន់មកដល់', descDefault && descDefault[1]);
+    ok('⛔ លំនាំដើមជា «អីវ៉ាន់មកដល់» (សំណើអ្នកប្រើ) + អត្ថបទដែល ZTO បកប្រែតាមភាសាគណនី («到件» · «arrived»)',
+        !!descDefault && JSON.stringify(descDefault[1].split('|')) === '["អីវ៉ាន់មកដល់","到件","arrived"]', descDefault && descDefault[1]);
     const descCustom = await listCall(listPayload([listRow({ scanTypeDesc: 'Arrival Scan' })]),
         { ZTO_LIST_SCAN_DESC: 'Arrival Scan' });
     ok('`ZTO_LIST_SCAN_DESC` ជំនួសអត្ថបទគោលបាន',
@@ -3164,24 +3164,26 @@ function firstBody(requests) {
     console.log('\n== ២២. ⛔ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ ៖ រាប់ · ប្រាប់ក្នុង `?diag=1` (មិនបាត់ស្ងាត់) ==');
     // ═════════════════════════════════════════════════════════════════════
     // ⛔ ZTO-E4 ៖ `listRowIsSigned()` (ឥឡូវ `listRowSignedVerdict()`) បដិសេធជួរដែលមានកូដ `05` តែ `scanTypeDesc` ខុសពី `ZTO_LIST_SIGNED_SCAN_DESC`
-    //    (ឧ. ZTO ប្តូរភាសាផ្ញើ «Signed») ➜ ជួរនោះចូល `otherScans` ស្ងាត់ៗ ➜ **គ្មានភស្តុតាងបិទ** ➜ កញ្ចប់ដែលអតិថិជនយករួច
+    //    (ឧ. ZTO ប្តូរភាសាផ្ញើ «Delivered») ➜ ជួរនោះចូល `otherScans` ស្ងាត់ៗ ➜ **គ្មានភស្តុតាងបិទ** ➜ កញ្ចប់ដែលអតិថិជនយករួច
     //    នៅបើក ហើយ (ក្រោយ ៧ ថ្ងៃ) ត្រូវដកលុយជា «ផុតកំណត់» ➜ App មិននិយាយអ្វីសោះ។
     // ⛔ ច្បាប់ «ភស្តុតាងវិជ្ជមាន» នៅដដែល (ជួរទាំងនោះ **មិន** ក្លាយជាភស្តុតាង) — ការកែគឺ **រាប់** វាដាច់ដោយឡែក ៖
     //    `signedMismatch` = ជួរក្នុងទំព័រ upstream នេះដែលមានកូដ «ចុះហត្ថលេខា» តែអត្ថបទផ្ទុយ ⊆ `otherScans`
     //    (ការអភិរក្ស `rows + otherScans + signedScans` = ជួរ upstream នៅដដែល) · `withSigned` ➜ ចម្លើយបញ្ចូលគ្នាផ្ទុកចំនួនរបស់
     //    សំណើ «ចុះហត្ថលេខា» ក្នុង `signedListMismatch` (ដូច `signedPages` · `signedTotal`) · `?diag=1` ➜ `list.signedMismatch`
-    //    (`observed` · `count` · `ageMs`) ⛔ គ្មានអត្ថបទពី upstream។
+    //    (`observed` · `count` · `ageMs`)។ ⛔ ZTO-E9 (របាយការណ៍ម្ចាស់គម្រោង ៖ សារ ⚠️ «66 ជួរ» នៅដដែលទោះប្តូរ env · browser ឃើញ «ចុះហត្ថលេខា»
+    //    ត្រឹមត្រូវ) ៖ គ្មានអត្ថបទ ➜ អ្នកគ្រប់គ្រងកែមិនបាន ➜ ចម្លើយ និង `?diag=1` ផ្ទុកអត្ថបទ **ជួរផ្ទុយតែប៉ុណ្ណោះ** (≤ ៥ ផ្សេងគ្នា · ≤ ៦៤ តួ ·
+    //    តួអក្សរមើលមិនឃើញនៅដដែល) + អត្ថបទដែល Server រំពឹង · ⛔ មិនដែលមាន barcode ឬអត្ថបទជួរផ្សេង (04 · មកដល់)។
     {
         const MISMATCH_SIGNED = [
-            listRow({ scanBillCode: '77130500002201', scanTypeCode: '05', scanTypeDesc: 'Signed' }),
-            listRow({ scanBillCode: '77130500002202', scanTypeCode: '05', scanTypeDesc: 'Signed' }),
+            listRow({ scanBillCode: '77130500002201', scanTypeCode: '05', scanTypeDesc: 'Delivered' }),
+            listRow({ scanBillCode: '77130500002202', scanTypeCode: '05', scanTypeDesc: 'Delivered' }),
             listRow({ scanBillCode: '77130500002203', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' }),
             listRow({ scanBillCode: '77130500002204', scanTypeCode: '04', scanTypeDesc: 'Delivery' }),
-            listRow({ scanBillCode: '77130500002205', scanTypeDesc: 'Signed' })
+            listRow({ scanBillCode: '77130500002205', scanTypeDesc: 'Delivered' })
         ];
         const MISMATCH_ARRIVAL = [
             listRow({ scanBillCode: '77130500002206', scanTypeCode: '03' }),
-            listRow({ scanBillCode: '77130500002207', scanTypeCode: '05', scanTypeDesc: 'Signed' })
+            listRow({ scanBillCode: '77130500002207', scanTypeCode: '05', scanTypeDesc: 'Delivered' })
         ];
         let signedRowsNow = MISMATCH_SIGNED;
         let arrivalRowsNow = MISMATCH_ARRIVAL;
@@ -3209,10 +3211,15 @@ function firstBody(requests) {
         ok('ជាន់អប្បបរមា ៖ `signed=1` ឆ្លើយ 200 · `signedOk:true` · upstream ១ សំណើ `05`',
             cold.status === 200 && cold.body.signedOk === true && cold.requests.length === 1 && typeOf(cold.requests[0].init) === '05',
             { status: cold.status, signedOk: cold.body.signedOk, n: cold.requests.length });
-        ok('⛔ ភស្តុតាងវិជ្ជមាននៅដដែល ៖ មានតែ `05` + «ចុះហត្ថលេខា» ក្លាយជា `signed` («Signed» មិនមែនភស្តុតាង)',
+        ok('⛔ ភស្តុតាងវិជ្ជមាននៅដដែល ៖ មានតែ `05` + «ចុះហត្ថលេខា» ក្លាយជា `signed` («Delivered» មិនមែនភស្តុតាង)',
             JSON.stringify(cold.body.signed) === '["77130500002203"]', cold.body.signed);
         ok('⛔ ជួរ `05` + អត្ថបទផ្ទុយ ➜ រាប់ក្នុង `signedMismatch` (= ២) · មិនរាប់កូដ `04` ឬជួរគ្មានកូដ',
             cold.body.signedMismatch === 2, cold.body.signedMismatch);
+        ok('⛔ E9 ៖ ចម្លើយផ្ទុកអត្ថបទជួរផ្ទុយ (`signedMismatchTexts` = ["Delivered"]) + អត្ថបទដែល Server រំពឹង («ចុះហត្ថលេខា»)',
+            JSON.stringify(cold.body.signedMismatchTexts) === '["Delivered"]' && JSON.stringify(cold.body.signedDescExpected) === '["ចុះហត្ថលេខា","签收","Signed"]',
+            { texts: cold.body.signedMismatchTexts, expected: cold.body.signedDescExpected });
+        ok('⛔ E9 ៖ អត្ថបទជួរមិនផ្ទុយ (04 «Delivery») មិនឆ្លងកាត់ទៅ browser',
+            JSON.stringify(cold.body).indexOf('Delivery') === -1, true);
         ok('⛔ `signedMismatch` ⊆ `otherScans` · ការអភិរក្ស `rows + otherScans + signedScans` = ជួរ upstream នៅដដែល',
             cold.body.otherScans === 4 && cold.body.signedScans === 1 && cold.body.signedMismatch <= cold.body.otherScans
             && rowsOf(cold.body).length + cold.body.otherScans + cold.body.signedScans === MISMATCH_SIGNED.length,
@@ -3222,12 +3229,18 @@ function firstBody(requests) {
         ok('⛔ `?diag=1` ៖ `list.signedMismatch` ឃើញ (`observed:true` · `count:2` · `ageMs` ជាលេខ)',
             mmOf(diagHot.body).observed === true && mmOf(diagHot.body).count === 2
             && typeof mmOf(diagHot.body).ageMs === 'number' && mmOf(diagHot.body).ageMs >= 0, mmOf(diagHot.body));
-        ok('⛔ `?diag=1` មិនបញ្ចេញអត្ថបទ upstream («Signed») · គ្មាន barcode',
-            diagHot.raw.indexOf('Signed') === -1 && diagHot.raw.indexOf('77130500002201') === -1, diagHot.raw.slice(0, 200));
+        ok('⛔ E9 ៖ `?diag=1` `list.signedMismatch.texts` = ["Delivered"] · `expected` = ["ចុះហត្ថលេខា","签收","Signed"]',
+            JSON.stringify(mmOf(diagHot.body).texts) === '["Delivered"]' && JSON.stringify(mmOf(diagHot.body).expected) === '["ចុះហត្ថលេខា","签收","Signed"]', mmOf(diagHot.body));
+        ok('⛔ `?diag=1` គ្មាន barcode · គ្មានអត្ថបទជួរមិនផ្ទុយ («Delivery»)',
+            diagHot.raw.indexOf('77130500002201') === -1 && diagHot.raw.indexOf('Delivery') === -1, diagHot.raw.slice(0, 200));
 
         const both = await mmCall(GOOD_LIST_ENV, { withSigned: '1' });
         ok('⛔ `withSigned=1` ៖ ចម្លើយបញ្ចូលគ្នាផ្ទុកចំនួនរបស់សំណើ «ចុះហត្ថលេខា» (`signedListMismatch` = ២)',
             both.status === 200 && both.body.signedOk === true && both.body.signedListMismatch === 2, both.body.signedListMismatch);
+        ok('⛔ E9 ៖ `withSigned=1` ៖ អត្ថបទរបស់បញ្ជីមកដល់ (`signedMismatchTexts`) និងរបស់សំណើ «ចុះហត្ថលេខា» (`signedListMismatchTexts`) ដាច់ពីគ្នា',
+            JSON.stringify(both.body.signedMismatchTexts) === '["Delivered"]' && JSON.stringify(both.body.signedListMismatchTexts) === '["Delivered"]'
+            && JSON.stringify(both.body.signedDescExpected) === '["ចុះហត្ថលេខា","签收","Signed"]',
+            { own: both.body.signedMismatchTexts, list: both.body.signedListMismatchTexts, expected: both.body.signedDescExpected });
         ok('⛔ `withSigned=1` ៖ `signedMismatch` របស់បញ្ជីមកដល់ = ជួររបស់វាផ្ទាល់ (= ១) ⊆ `otherScans` របស់វា',
             both.body.signedMismatch === 1 && both.body.otherScans === 1 && rowsOf(both.body).length === 1
             && rowsOf(both.body).length + both.body.otherScans + (both.body.signedScans || 0) === MISMATCH_ARRIVAL.length,
@@ -3246,7 +3259,7 @@ function firstBody(requests) {
         ok('⛔ k1 ៖ អានបញ្ជីដដែល ៤ ដងទៀត (ជួរថ្ងៃផ្សេង ➜ upstream ពិត ៤) ➜ `count` នៅ ៣ (មិនមែន ១១)',
             repeatUpstream === 4 && mmOf(diagRepeat.body).count === 3, { upstream: repeatUpstream, diag: mmOf(diagRepeat.body) });
         const prevSigned = signedRowsNow;
-        signedRowsNow = MISMATCH_SIGNED.concat([listRow({ scanBillCode: '77130500002210', scanTypeCode: '05', scanTypeDesc: 'Signed' })]);
+        signedRowsNow = MISMATCH_SIGNED.concat([listRow({ scanBillCode: '77130500002210', scanTypeCode: '05', scanTypeDesc: 'Delivered' })]);
         await mmCall(GOOD_LIST_ENV, { signed: '1', from: dayKey(5), to: dayKey(5) }, true);
         signedRowsNow = prevSigned;
         const diagNew = await diagNow();
@@ -3259,22 +3272,145 @@ function firstBody(requests) {
         signedRowsNow = [listRow({ scanBillCode: '77130500002208', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' })];
         arrivalRowsNow = [listRow({ scanBillCode: '77130500002209', scanTypeCode: '03' })];
         const clean = await mmCall(GOOD_LIST_ENV, { withSigned: '1' });
+        ok('ទិសផ្ទុយ E9 ៖ គ្មានអត្ថបទផ្ទុយ ➜ គ្មានវាល `signedMismatchTexts` · `signedListMismatchTexts` · `signedDescExpected`',
+            !('signedMismatchTexts' in clean.body) && !('signedListMismatchTexts' in clean.body) && !('signedDescExpected' in clean.body),
+            Object.keys(clean.body));
         ok('ទិសផ្ទុយ ៖ គ្មានអត្ថបទផ្ទុយ ➜ `signedMismatch:0` · `signedListMismatch:0` (លេខ មិនមែនបាត់)',
             clean.body.signedMismatch === 0 && clean.body.signedListMismatch === 0 && clean.body.signedOk === true,
             { own: clean.body.signedMismatch, list: clean.body.signedListMismatch });
         const diagClean = await diagNow();
-        ok('ទិសផ្ទុយ ៖ គ្មានអត្ថបទផ្ទុយ ➜ `?diag=1` `observed:false` · `count:0` · `ageMs:null`',
-            mmOf(diagClean.body).observed === false && mmOf(diagClean.body).count === 0 && mmOf(diagClean.body).ageMs === null,
+        ok('ទិសផ្ទុយ ៖ គ្មានអត្ថបទផ្ទុយ ➜ `?diag=1` `observed:false` · `count:0` · `ageMs:null` · `texts:[]`',
+            mmOf(diagClean.body).observed === false && mmOf(diagClean.body).count === 0 && mmOf(diagClean.body).ageMs === null
+            && JSON.stringify(mmOf(diagClean.body).texts) === '[]',
             mmOf(diagClean.body));
+
+        const ZW = 'Deliv\u200Bery';
+        const LONG = 'ក'.repeat(80);
+        signedRowsNow = ['Delivered', ZW, 'Sign', 'Received', 'Returned', 'Signed by agent', LONG].map((desc, i) =>
+            listRow({ scanBillCode: '7713050000231' + i, scanTypeCode: '05', scanTypeDesc: desc }));
+        const many = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        const diagMany = await diagNow();
+        ok('⛔ E9 ៖ អត្ថបទផ្ទុយ ៧ ប្រភេទ ➜ ចម្លើយផ្ទុក ៥ ដំបូង (លំដាប់ដែលឃើញ) · តួអក្សរមើលមិនឃើញ (U+200B) នៅដដែល',
+            Array.isArray(many.body.signedMismatchTexts) && many.body.signedMismatchTexts.length === 5
+            && many.body.signedMismatchTexts[1] === ZW && many.body.signedMismatch === 7,
+            { texts: many.body.signedMismatchTexts });
+        ok('⛔ E9 ៖ `?diag=1` ផ្ទុក ៥ ចុងក្រោយ (ចាស់ ➜ ថ្មី · អត្ថបទដែល ZTO ប្តូរចុងក្រោយមិនត្រូវបាំងដោយអត្ថបទចាស់)',
+            JSON.stringify(mmOf(diagMany.body).texts) === JSON.stringify(['Sign', 'Received', 'Returned', 'Signed by agent', 'ក'.repeat(64)]),
+            mmOf(diagMany.body).texts);
+        signedRowsNow = [listRow({ scanBillCode: '77130500002320', scanTypeCode: '05', scanTypeDesc: LONG })];
+        const longOne = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        ok('⛔ E9 ៖ អត្ថបទវែង ➜ កាត់ត្រឹម ៦៤ តួ',
+            Array.isArray(longOne.body.signedMismatchTexts) && longOne.body.signedMismatchTexts[0] === 'ក'.repeat(64),
+            longOne.body.signedMismatchTexts && [...String(longOne.body.signedMismatchTexts[0])].length);
+
+        // ⛔ ZTO-E10 (payload ពិតរបស់ម្ចាស់គម្រោង ៖ Argus ប្តូរភាសា ➜ ZTO បកប្រែអត្ថបទ ៖ 05 = ខ្មែរ «ចុះហត្ថលេខា» · ចិន «签收» · អង់គ្លេស «Signed» ·
+        //    03 = «អីវ៉ាន់មកដល់» · «到件» · «arrived» (ជួរ 05 ទាំង ១៨/១៨ ក្នុងភាសានីមួយៗ) ➜ ជាន់អត្ថបទទទួលអត្ថបទច្រើន (`|`) ·
+        //    លំនាំដើម ៣ ភាសា · `off` = ពឹងលើកូដតែម្យ៉ាង (Netlify មិនទទួលតម្លៃ env ទទេ)។
+        signedRowsNow = [
+            listRow({ scanBillCode: '77130500002401', scanTypeCode: '05', scanTypeDesc: '签收' }),
+            listRow({ scanBillCode: '77130500002402', scanTypeCode: '05', scanTypeDesc: 'ចុះហត្ថលេខា' }),
+            listRow({ scanBillCode: '77130500002403', scanTypeCode: '05', scanTypeDesc: 'Signed' }),
+            listRow({ scanBillCode: '77130500002404', scanTypeDesc: '签收' }),
+            listRow({ scanBillCode: '77130500002405', scanTypeCode: '04', scanTypeDesc: '签收' }),
+            listRow({ scanBillCode: '77130500002406', scanTypeCode: '05', scanTypeDesc: 'Delivered' }),
+            listRow({ scanBillCode: '77130500002407', scanTypeCode: '-710', scanTypeDesc: '退货扫描' })
+        ];
+        const zh = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        ok('⛔ E10 ៖ លំនាំដើម ៖ `05` + «签收» · «ចុះហត្ថលេខា» · «Signed» ជាភស្តុតាង · គ្មានកូដ + «签收» ជាភស្តុតាង · «Delivered» ផ្ទុយ · `04` · `-710` «退货扫描» មិនមែន (ក៏មិនផ្ទុយ)',
+            JSON.stringify(zh.body.signed) === '["77130500002401","77130500002402","77130500002403","77130500002404"]' && zh.body.signedMismatch === 1
+            && JSON.stringify(zh.body.signedMismatchTexts) === '["Delivered"]'
+            && JSON.stringify(zh.body.signedDescExpected) === '["ចុះហត្ថលេខា","签收","Signed"]',
+            { signed: zh.body.signed, mismatch: zh.body.signedMismatch, texts: zh.body.signedMismatchTexts, expected: zh.body.signedDescExpected });
+        const diagZh = await diagNow();
+        ok('⛔ E10 ៖ `?diag=1` ៖ លំនាំដើម ➜ `signedDescIsDefault:true` · `scanDescIsDefault:true` · `expected` = ៣ ភាសា',
+            listOf(diagZh.body).signedDescIsDefault === true && listOf(diagZh.body).scanDescIsDefault === true
+            && JSON.stringify(mmOf(diagZh.body).expected) === '["ចុះហត្ថលេខា","签收","Signed"]',
+            listOf(diagZh.body));
+        const listEnv = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: ' Delivered | ចុះហត្ថលេខា |  | Delivered ' }), { signed: '1' });
+        ok('⛔ E10 ៖ env «Delivered | ចុះហត្ថលេខា» (ដកឃ្លា · ទទេ · ស្ទួន រំលង) ➜ ទាំង ២ ជាភស្តុតាង · «签收» «Signed» ផ្ទុយ · `expected` = ["Delivered","ចុះហត្ថលេខា"]',
+            JSON.stringify(listEnv.body.signed) === '["77130500002402","77130500002406"]' && listEnv.body.signedMismatch === 2
+            && JSON.stringify(listEnv.body.signedDescExpected) === '["Delivered","ចុះហត្ថលេខា"]',
+            { signed: listEnv.body.signed, mismatch: listEnv.body.signedMismatch, expected: listEnv.body.signedDescExpected });
+        const offEnv = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'OFF' }), { signed: '1' });
+        ok('⛔ E10 ៖ env `off` ➜ ពឹងលើកូដ `05` តែម្យ៉ាង (អត្ថបទណាក៏ភស្តុតាង · គ្មានកូដ ➜ មិនមែន · `04` មិនមែន)',
+            JSON.stringify(offEnv.body.signed) === '["77130500002401","77130500002402","77130500002403","77130500002406"]' && offEnv.body.signedMismatch === 0,
+            { signed: offEnv.body.signed, mismatch: offEnv.body.signedMismatch });
+        signedRowsNow = MISMATCH_SIGNED;
+        arrivalRowsNow = [
+            listRow({ scanBillCode: '77130500002411', scanTypeCode: '03' }),
+            listRow({ scanBillCode: '77130500002412', scanTypeCode: '03', scanTypeDesc: '到件' }),
+            listRow({ scanBillCode: '77130500002413', scanTypeCode: '03', scanTypeDesc: 'arrived' }),
+            listRow({ scanBillCode: '77130500002414', scanTypeDesc: '到件' }),
+            listRow({ scanBillCode: '77130500002415', scanTypeCode: '03', scanTypeDesc: 'Delivery' }),
+            listRow({ scanBillCode: '77130500002416', scanTypeCode: '-710', scanTypeDesc: '退货扫描' })
+        ];
+        const arrDefault = await mmCall(GOOD_LIST_ENV, {});
+        const arrList = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SCAN_DESC: 'អីវ៉ាន់មកដល់|Delivery' }), {});
+        const arrOff = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SCAN_DESC: 'off' }), {});
+        ok('⛔ E10 ៖ «មកដល់» លំនាំដើម ៣ ភាសា («អីវ៉ាន់មកដល់» · «到件» · «arrived») ➜ ជួរដេក ៤ · `03` + «Delivery» ផ្ទុយ · `-710` «退货扫描» ➜ `otherScans`',
+            rowsOf(arrDefault.body).length === 4 && arrDefault.body.otherScans === 2
+            && rowsOf(arrDefault.body).every((r) => r.barcode !== '77130500002415' && r.barcode !== '77130500002416'),
+            { rows: rowsOf(arrDefault.body).map((r) => r.barcode), other: arrDefault.body.otherScans });
+        ok('⛔ E10 ៖ env «មកដល់» ទទួលអត្ថបទច្រើនដូចគ្នា (`|`) · `off` = បិទជាន់អត្ថបទ',
+            rowsOf(arrList.body).length === 2 && arrList.body.otherScans === 4
+            && rowsOf(arrOff.body).length === 5 && arrOff.body.otherScans === 1,
+            { list: [rowsOf(arrList.body).length, arrList.body.otherScans], off: rowsOf(arrOff.body).length });
+        arrivalRowsNow = MISMATCH_ARRIVAL;
+        const envDoc = readOr(path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md'));
+        const docDefaults = ['DEFAULT_LIST_SCAN_DESC', 'DEFAULT_LIST_SIGNED_SCAN_DESC'].map((name) => {
+            const m = new RegExp('const ' + name + " = '([^']*)'").exec(FUNCTION_SRC);
+            return m ? m[1] : '';
+        });
+        const docRow = (key) => (envDoc.split('\n').find((line) => line.indexOf('| `' + key + '` |') === 0) || '');
+        ok('⛔ E10 ៖ តារាង env ក្នុង `ZTO-SETUP-KH.md` ៖ លំនាំដើមអត្ថបទ ២ = កូដពិត (`|` ក្នុងតារាងសរសេរ `\\|`) · ប្រាប់ `off` (Netlify មិនទទួលតម្លៃទទេ)',
+            docDefaults.every((d) => d.split('|').length === 3)
+            && docRow('ZTO_LIST_SCAN_DESC').indexOf('`' + docDefaults[0].split('|').join('\\|') + '`') !== -1
+            && docRow('ZTO_LIST_SIGNED_SCAN_DESC').indexOf('`' + docDefaults[1].split('|').join('\\|') + '`') !== -1
+            && docRow('ZTO_LIST_SCAN_DESC').indexOf('`off`') !== -1 && docRow('ZTO_LIST_SIGNED_SCAN_DESC').indexOf('`off`') !== -1,
+            { defaults: docDefaults, rows: [docRow('ZTO_LIST_SCAN_DESC'), docRow('ZTO_LIST_SIGNED_SCAN_DESC')] });
+
+        // ⛔ ZTO-E11 (ភស្តុតាងពិត ៖ សារ E9 លើ Deploy Preview របស់ម្ចាស់គម្រោង ៖ Function ទទួល «ចុះហត្ថលេខា» (U+1785 17BB 17C7 **200B** 17A0 …)
+        //    ≠ Server រំពឹង (U+1785 17BB 17C7 17A0 …) ➜ ជួរ 05 ទាំង 66 «ផ្ទុយ»)។ ZTO ដាក់ ZERO WIDTH SPACE ចន្លោះពាក្យខ្មែរ ➜ មើលមិនឃើញ ·
+        //    វាយក្នុង env មិនបាន ➜ ការប្រៀបធៀបអត្ថបទរំលងតួអក្សរទម្រង់មើលមិនឃើញ (Unicode Cf) ទាំងសងខាង · អក្សរមើលឃើញខុស ➜ នៅផ្ទុយ។
+        const ZTO_SIGNED_REAL = 'ចុះ\u200Bហត្ថលេខា';
+        signedRowsNow = [
+            listRow({ scanBillCode: '77130500002501', scanTypeCode: '05', scanTypeDesc: ZTO_SIGNED_REAL }),
+            listRow({ scanBillCode: '77130500002502', scanTypeDesc: ZTO_SIGNED_REAL }),
+            listRow({ scanBillCode: '77130500002503', scanTypeCode: '05', scanTypeDesc: '\uFEFFចុះ\u200Cហត្ថ\u200Dលេខា\u2060\u00AD' }),
+            listRow({ scanBillCode: '77130500002504', scanTypeCode: '05', scanTypeDesc: 'ចុះ\u200Bហត្ថលេខ' }),
+            listRow({ scanBillCode: '77130500002505', scanTypeCode: '05', scanTypeDesc: 'ចុះ ហត្ថលេខា' })
+        ];
+        const zwDefault = await mmCall(GOOD_LIST_ENV, { signed: '1' });
+        ok('⛔ E11 ៖ `05` + «ចុះ\u200Bហត្ថលេខា» (អត្ថបទពិតពី ZTO) ជាភស្តុតាង · គ្មានកូដ + អត្ថបទដដែល ជាភស្តុតាង · តួអក្សរ Cf ផ្សេង (FEFF · 200C · 200D · 2060 · 00AD) រំលង · '
+            + 'អក្សរបាត់ («ហត្ថលេខ») ឬដកឃ្លាមើលឃើញ ➜ នៅផ្ទុយ',
+            JSON.stringify(zwDefault.body.signed) === '["77130500002501","77130500002502","77130500002503"]' && zwDefault.body.signedMismatch === 2,
+            { signed: zwDefault.body.signed, mismatch: zwDefault.body.signedMismatch, texts: zwDefault.body.signedMismatchTexts });
+        const zwEnvPlain = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'ចុះហត្ថលេខា' }), { signed: '1' });
+        const zwEnvZw = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: ZTO_SIGNED_REAL }), { signed: '1' });
+        ok('⛔ E11 ៖ env «ចុះហត្ថលេខា» (ការកំណត់ពិតលើ Netlify ម្ចាស់គម្រោង) និង env ដែលមាន U+200B ទទួលជួរដូចគ្នា · `expected` គ្មាន U+200B',
+            JSON.stringify(zwEnvPlain.body.signed) === '["77130500002501","77130500002502","77130500002503"]'
+            && JSON.stringify(zwEnvZw.body.signed) === JSON.stringify(zwEnvPlain.body.signed)
+            && JSON.stringify(zwEnvZw.body.signedDescExpected) === '["ចុះហត្ថលេខា"]',
+            { plain: zwEnvPlain.body.signed, zw: zwEnvZw.body.signed, expected: zwEnvZw.body.signedDescExpected });
+        signedRowsNow = MISMATCH_SIGNED;
+        arrivalRowsNow = [
+            listRow({ scanBillCode: '77130500002511', scanTypeCode: '03', scanTypeDesc: 'អីវ៉ាន់\u200Bមកដល់' }),
+            listRow({ scanBillCode: '77130500002512', scanTypeCode: '03', scanTypeDesc: 'អីវ៉ាន់មក\u200Bដល' })
+        ];
+        const zwArrival = await mmCall(GOOD_LIST_ENV, {});
+        ok('⛔ E11 ៖ «មកដល់» ៖ «អីវ៉ាន់\u200Bមកដល់» ➜ ជួរដេក · អក្សរបាត់ ➜ `otherScans`',
+            rowsOf(zwArrival.body).length === 1 && rowsOf(zwArrival.body)[0].barcode === '77130500002511' && zwArrival.body.otherScans === 1,
+            { rows: rowsOf(zwArrival.body).map((r) => r.barcode), other: zwArrival.body.otherScans });
+        arrivalRowsNow = MISMATCH_ARRIVAL;
 
         signedRowsNow = MISMATCH_SIGNED;
         arrivalRowsNow = MISMATCH_ARRIVAL;
         const textOff = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: '' }), { signed: '1' });
-        ok('ទិសផ្ទុយ ៖ `ZTO_LIST_SIGNED_SCAN_DESC=` (ជាន់អត្ថបទបិទ) ➜ គ្មានអត្ថបទអាចផ្ទុយ ➜ `signedMismatch:0` · «Signed» ក្លាយជាភស្តុតាង',
+        ok('ទិសផ្ទុយ ៖ `ZTO_LIST_SIGNED_SCAN_DESC=` (ជាន់អត្ថបទបិទ) ➜ គ្មានអត្ថបទអាចផ្ទុយ ➜ `signedMismatch:0` · «Delivered» ក្លាយជាភស្តុតាង',
             textOff.body.signedMismatch === 0 && Array.isArray(textOff.body.signed) && textOff.body.signed.indexOf('77130500002201') !== -1,
             { mismatch: textOff.body.signedMismatch, signed: textOff.body.signed });
-        const english = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'Signed' }), { signed: '1' });
-        ok('⛔ `ZTO_LIST_SIGNED_SCAN_DESC=Signed` ➜ «Signed» ជាភស្តុតាង · ជួរ `05` + «ចុះហត្ថលេខា» ក្លាយជាអត្ថបទផ្ទុយ (= ១)',
+        const english = await mmCall(Object.assign({}, GOOD_LIST_ENV, { ZTO_LIST_SIGNED_SCAN_DESC: 'Delivered' }), { signed: '1' });
+        ok('⛔ `ZTO_LIST_SIGNED_SCAN_DESC=Delivered` ➜ «Delivered» ជាភស្តុតាង · ជួរ `05` + «ចុះហត្ថលេខា» ក្លាយជាអត្ថបទផ្ទុយ (= ១)',
             english.body.signedMismatch === 1 && Array.isArray(english.body.signed)
             && english.body.signed.indexOf('77130500002201') !== -1 && english.body.signed.indexOf('77130500002203') === -1,
             { mismatch: english.body.signedMismatch, signed: english.body.signed });

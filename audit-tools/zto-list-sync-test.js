@@ -2853,6 +2853,237 @@ function firstBody(requests) {
         docFields.filter((f) => fieldsDoc.indexOf('`' + f + '`') === -1).length === 0,
         docFields.filter((f) => fieldsDoc.indexOf('`' + f + '`') === -1));
 
+    // ═════════════════════════════════════════════════════════════════════
+    console.log('\n== ២៣. ⛔ សំណើ «ចុះហត្ថលេខា» ក្រោយ 401 ៖ Cookie ថ្មីពី store ត្រូវប្រើសម្រាប់ទាំង ២ (ZTO-E5) ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // `withSigned=1` ចាប់ផ្តើមសំណើ «មកដល់» និង «ចុះហត្ថលេខា» ស្របគ្នាដោយ Cookie ក្នុងសតិដដែល។ Cookie នោះផុត ➜ ZTO បដិសេធទាំង ២
+    // ➜ `retryAfterAuthRejected()` អាន store ឃើញ Cookie ថ្មី ហើយសាក «មកដល់» ម្តងទៀត។ 🔴 មុនកែ ៖ សំណើ «ចុះហត្ថលេខា» នៅជាប់
+    // សាលក្រម 401 របស់ Cookie ចាស់ ➜ `mergeSignedCompanion()` ➜ `signedOk:false` ➜ App ចាត់ភស្តុតាង «ចុះហត្ថលេខា» ថាធ្លាក់ ទោះ Cookie
+    // ថ្មីដើរ (ការបិទតាម ZTO រំលងជុំនោះ)។ ច្បាប់ ៖ ក្រោយការសាកឡើងវិញជោគជ័យ សំណើ «ចុះហត្ថលេខា» ដែលត្រូវបដិសេធ រត់ម្តងទៀតដោយ
+    // Cookie ថ្មី (single-flight តាម fingerprint ថ្មី · ក្នុងថវិកា · ស្របគ្នាជាមួយ «មកដល់») ហើយត្រូវរង់ចាំ **មុន** `flushCookieRenewal()` ·
+    // សំណើដែលជោគជ័យរួច មិនរត់ម្តងទៀតទេ · ចម្លើយ `signedOk:false` មិនដែលចូល cache។
+    // ⛔ ការសម្រេច ៖ «មកដល់» ជោគជ័យ តែ «ចុះហត្ថលេខា» ត្រូវបដិសេធ ➜ Cookie ដដែលត្រូវ ZTO ទទួលរួច ➜ មិនមែនបញ្ហា Cookie ចាស់ ➜ មិនអាន store
+    //    មិនសាកម្តងទៀត · `signedOk:false` (មិនចូល cache ➜ ជុំបន្ទាប់សួរពិត) — ដូចមុនកែ។
+    {
+        const OLD_COOKIE = 'BOS-MAN-SESSION=memory-cookie-old-110011; sidebarStatus=1';
+        const FRESH_COOKIE = 'BOS-MAN-SESSION=store-cookie-fresh-220022; sidebarStatus=1';
+        const SIGNED_EXPECTED = '["77130500002101","77130500002103"]';
+        const RETRY_SLACK = 300;
+        const TIGHT_ENV = { ZTO_REQUEST_BUDGET_MS: '4000', ZTO_UPSTREAM_TIMEOUT_MS: '2000' };
+        const etagOf = (v) => '"' + crypto.createHash('sha256').update(String(v || '')).digest('hex') + '"';
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const signedOf = (body) => JSON.stringify((Array.isArray(body.signed) ? body.signed : []).slice().sort());
+        const retryRun = async (opts) => {
+            const o = opts || {};
+            const blobState = { value: OLD_COOKIE, reads: 0, writes: [] };
+            const store = {
+                get: async () => blobState.value,
+                getWithMetadata: async () => {
+                    blobState.reads++;
+                    return { data: blobState.value, etag: etagOf(blobState.value), metadata: {} };
+                },
+                set: async (key, value, options) => {
+                    blobState.writes.push(value);
+                    if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(blobState.value)) return { modified: false };
+                    blobState.value = value;
+                    return { modified: true, etag: etagOf(value) };
+                }
+            };
+            if (typeof proxy.setBlobsModuleForTests === 'function') {
+                proxy.setBlobsModuleForTests({ connectLambda() {}, getStore() { return store; } });
+            }
+            resetEnv(Object.assign({}, GOOD_LIST_ENV, { ZTO_AUTHORIZATION: undefined, ZTO_COOKIE: undefined }, o.env || {}));
+            const eventOf = (method, query) => ({
+                httpMethod: method,
+                headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-id-token': tokenForSite(LIST_SITE), 'x-nf-site-id': 'site-for-tests', 'x-nf-deploy-id': 'deploy-for-tests' },
+                blobs: Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 'blob-token-for-tests' })).toString('base64'),
+                queryStringParameters: query
+            });
+            const callOnce = async () => {
+                try { return await proxy.handler(eventOf('GET', listQuery({ withSigned: '1' }))); }
+                catch (e) { return { statusCode: 500, body: JSON.stringify({ code: 'HANDLER_THREW', detail: String(e && e.message) }) }; }
+            };
+            const sent = [];
+            global.fetch = withCerts(async () => { throw new Error('ZTO must not be called during warm-up'); });
+            let warmed = null;
+            try { warmed = await proxy.handler(eventOf('OPTIONS')); } catch (_) { warmed = null; }
+            blobState.value = o.storeValue || FRESH_COOKIE;
+            const readsBefore = blobState.reads;
+            const t0 = Date.now();
+            global.fetch = withCerts(async (href, init) => {
+                const type = typeOf(init);
+                const cookie = String(((init || {}).headers || {}).Cookie || '');
+                const fresh = cookie.indexOf('store-cookie-fresh-220022') !== -1;
+                sent.push({ type: type, fresh: fresh, old: cookie.indexOf('memory-cookie-old-110011') !== -1, at: Date.now() - t0 });
+                if (o.onSend) o.onSend(type, fresh);
+                const wait = o.latency ? o.latency(type, fresh) : 5;
+                if (wait) await sleep(wait);
+                const verdict = o.accept ? o.accept(type, fresh) : fresh;
+                const status = verdict === true ? 200 : (verdict === false ? 401 : verdict);
+                const accepted = status === 200;
+                const lines = accepted && o.setCookie ? (o.setCookie(type, fresh) || []) : [];
+                return {
+                    ok: accepted, status: status,
+                    headers: {
+                        get: (name) => (String(name).toLowerCase() === 'content-type' ? 'application/json' : null),
+                        getSetCookie: () => lines.map((line) => line + '; Path=/; HttpOnly')
+                    },
+                    json: async () => (accepted ? byType(type) : { code: '401', message: 'unauthorized' })
+                };
+            });
+            const joinAfter = o.joinAfterMs === undefined ? null : sleep(o.joinAfterMs).then(callOnce);
+            const res = await callOnce();
+            const ms = Date.now() - t0;
+            const joined = joinAfter ? await joinAfter : null;
+            const firstSent = sent.slice();
+            let again = null;
+            if (o.again) {
+                const res2 = await callOnce();
+                again = { body: bodyOf(res2), status: res2.statusCode, sent: sent.slice(firstSent.length) };
+            }
+            if (typeof proxy.setBlobsModuleForTests === 'function') proxy.setBlobsModuleForTests(null);
+            return {
+                warmed: warmed, res: res, status: res.statusCode, body: bodyOf(res), ms: ms, sent: firstSent, again: again,
+                joined: joined && { status: joined.statusCode, body: bodyOf(joined) },
+                readsAfterWarm: blobState.reads - readsBefore, stored: blobState.value, writes: blobState.writes
+            };
+        };
+        const countOf = (sent, type, fresh) => sent.filter((s) => s.type === type && s.fresh === fresh).length;
+
+        const main = await retryRun({ again: true });
+        ok('ជាន់អប្បបរមា ៖ OPTIONS កំដៅ Cookie ចាស់ពី store ចូលសតិ (204 · គ្មានការហៅ ZTO)',
+            !!main.warmed && main.warmed.statusCode === 204, main.warmed && main.warmed.statusCode);
+        ok('ជាន់អប្បបរមា ៖ សំណើដំបូង «មកដល់» + «ចុះហត្ថលេខា» ផ្ញើ Cookie ចាស់ពីសតិ (ZTO បដិសេធ)',
+            main.sent.length >= 2 && JSON.stringify(main.sent.slice(0, 2).map((s) => s.type).sort()) === '["03","05"]'
+            && main.sent.slice(0, 2).every((s) => s.old && !s.fresh), main.sent);
+        ok('ជាន់អប្បបរមា ៖ 401 ➜ អាន store ឡើងវិញ ➜ «មកដល់» សាកម្តងទៀតដោយ Cookie ថ្មី ➜ 200 · ២ ជួរ',
+            main.status === 200 && rowsOf(main.body).length === 2 && countOf(main.sent, '03', true) === 1 && main.readsAfterWarm >= 1,
+            { status: main.status, rows: rowsOf(main.body).length, sent: main.sent, reads: main.readsAfterWarm });
+        ok('⛔ «ចុះហត្ថលេខា» ដែលត្រូវបដិសេធដោយ Cookie ចាស់ រត់ម្តងទៀតដោយ Cookie ថ្មី ➜ `signedOk:true` + barcode ដែលចុះហត្ថលេខា',
+            main.body.signedOk === true && signedOf(main.body) === SIGNED_EXPECTED,
+            { signedOk: main.body.signedOk, signed: main.body.signed, code: main.body.code });
+        ok('⛔ ការរត់ម្តងទៀតមានតែ ១ ដងក្នុងមួយប្រភេទ (ZTO ៤ សំណើ ៖ ចាស់ ០៣ · ចាស់ ០៥ · ថ្មី ០៣ · ថ្មី ០៥)',
+            main.sent.length === 4 && countOf(main.sent, '05', true) === 1 && countOf(main.sent, '05', false) === 1,
+            main.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')));
+        ok('⛔ ចម្លើយ `signedOk:true` ក្រោយការសាកឡើងវិញចូល cache ➜ ការហៅដដែលបន្ទាប់ `cached:true` · គ្មានការហៅ ZTO',
+            !!main.again && main.again.body.cached === true && main.again.body.signedOk === true && main.again.sent.length === 0,
+            main.again && { cached: main.again.body.cached, signedOk: main.again.body.signedOk, sent: main.again.sent.length });
+        ok('⛔ ការសាកឡើងវិញនៅក្នុងថវិកា (' + main.ms + ' ms ≤ 9000)', main.ms <= 9000, main.ms);
+
+        const kept = await retryRun({ accept: (type, fresh) => type === '05' || fresh });
+        ok('ជាន់អប្បបរមា ៖ «មកដល់» ត្រូវបដិសេធ ហើយសាកម្តងទៀតដោយ Cookie ថ្មី ➜ 200',
+            kept.status === 200 && rowsOf(kept.body).length === 2 && countOf(kept.sent, '03', true) === 1,
+            { status: kept.status, sent: kept.sent });
+        ok('⛔ ទិសផ្ទុយ ៖ «ចុះហត្ថលេខា» ដែលជោគជ័យរួច (ទោះ «មកដល់» ត្រូវបដិសេធ) មិនរត់ម្តងទៀតទេ ➜ ZTO ៣ សំណើ · `signedOk:true`',
+            kept.body.signedOk === true && signedOf(kept.body) === SIGNED_EXPECTED
+            && kept.sent.length === 3 && countOf(kept.sent, '05', true) === 0,
+            { signedOk: kept.body.signedOk, sent: kept.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')) });
+
+        const still = await retryRun({ again: true, accept: (type, fresh) => type === '03' && fresh });
+        ok('⛔ «ចុះហត្ថលេខា» ត្រូវបដិសេធទាំង Cookie ថ្មី ➜ បញ្ជីមកដល់នៅ 200 · `signedOk:false` (មិនមែនកំហុសទាំងមូល)',
+            still.status === 200 && rowsOf(still.body).length === 2 && still.body.signedOk === false,
+            { status: still.status, signedOk: still.body.signedOk });
+        ok('⛔ ការរត់ម្តងទៀតមានព្រំដែន ៖ «ចុះហត្ថលេខា» ដោយ Cookie ថ្មីយ៉ាងច្រើន ១ ដង (គ្មានរង្វិលជុំ)',
+            countOf(still.sent, '05', true) <= 1 && still.sent.length <= 4, still.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')));
+        ok('⛔ `signedOk:false` មិនចូល cache ➜ ការហៅបន្ទាប់សួរ ZTO ពិត',
+            !!still.again && still.again.body.cached === false && still.again.sent.length >= 1,
+            still.again && { cached: still.again.body.cached, sent: still.again.sent.length });
+
+        const onlySignedRejected = await retryRun({ again: true, accept: (type, fresh) => type === '03' || fresh });
+        ok('⛔ ការសម្រេច ៖ «មកដល់» ជោគជ័យ · «ចុះហត្ថលេខា» ត្រូវបដិសេធ ➜ 200 · ២ ជួរ · `signedOk:false`',
+            onlySignedRejected.status === 200 && rowsOf(onlySignedRejected.body).length === 2 && onlySignedRejected.body.signedOk === false,
+            { status: onlySignedRejected.status, signedOk: onlySignedRejected.body.signedOk });
+        ok('⛔ ការសម្រេច ៖ Cookie ដែល «មកដល់» ទទួលរួច ➜ មិនអាន store · មិនសាកម្តងទៀត (ZTO ២ សំណើ)',
+            onlySignedRejected.readsAfterWarm === 0 && onlySignedRejected.sent.length === 2,
+            { reads: onlySignedRejected.readsAfterWarm, sent: onlySignedRejected.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')) });
+        ok('⛔ ការសម្រេច ៖ `signedOk:false` មិនចូល cache ➜ ការហៅបន្ទាប់សួរ ZTO ពិត',
+            !!onlySignedRejected.again && onlySignedRejected.again.body.cached === false && onlySignedRejected.again.sent.length >= 1,
+            onlySignedRejected.again && { cached: onlySignedRejected.again.body.cached, sent: onlySignedRejected.again.sent.length });
+
+        const rotated = await retryRun({
+            latency: (type, fresh) => (type === '05' && fresh ? 80 : 5),
+            setCookie: (type, fresh) => (type === '05' && fresh ? ['BOS-MAN-SESSION=rotated-by-signed-retry-330033'] : [])
+        });
+        ok('ជាន់អប្បបរមា ៖ ការរត់ម្តងទៀតដែលបង្វិល Cookie ឆ្លើយ 200 + `signedOk:true`',
+            rotated.status === 200 && rotated.body.signedOk === true, { status: rotated.status, signedOk: rotated.body.signedOk });
+        ok('⛔ Cookie ដែល ZTO បង្វិលក្នុងការរត់ម្តងទៀត (មកក្រោយ «មកដល់») ត្រូវសរសេរចូល store (រង់ចាំមុន `flushCookieRenewal()`)',
+            String(rotated.stored).indexOf('rotated-by-signed-retry-330033') !== -1, { stored: rotated.stored, writes: rotated.writes });
+
+        const slowOld = await retryRun({ env: TIGHT_ENV, latency: (type, fresh) => (type === '05' && !fresh ? 1500 : 30) });
+        ok('⛔ «ចុះហត្ថលេខា» ចាស់យឺត (1500 ms) តែថវិកានៅសល់ ➜ រត់ម្តងទៀត ➜ `signedOk:true` ក្នុងថវិកា ('
+            + slowOld.ms + ' ms ≤ ' + (4000 + RETRY_SLACK) + ')',
+            slowOld.status === 200 && slowOld.body.signedOk === true && slowOld.ms <= 4000 + RETRY_SLACK,
+            { status: slowOld.status, signedOk: slowOld.body.signedOk, ms: slowOld.ms });
+
+        const parallel = await retryRun({ env: TIGHT_ENV, latency: (type, fresh) => (fresh ? 1200 : 20) });
+        ok('⛔ ការរត់ម្តងទៀតស្របគ្នាជាមួយ «មកដល់» (ZTO 1200 ms ម្នាក់ៗ ➜ ' + parallel.ms + ' ms < 2400 · `signedOk:true`)',
+            parallel.status === 200 && parallel.body.signedOk === true && parallel.ms < 2400,
+            { status: parallel.status, signedOk: parallel.body.signedOk, ms: parallel.ms });
+
+        const notAuth = await retryRun({ accept: (type, fresh) => (fresh ? true : (type === '05' ? 503 : false)) });
+        ok('⛔ «ចុះហត្ថលេខា» ធ្លាក់ដោយហេតុផលមិនមែន Cookie (ZTO 503) ➜ មិនរត់ម្តងទៀតដោយ Cookie ថ្មី (ZTO មិនត្រូវបង្ខំ) · `signedOk:false` · 200',
+            notAuth.status === 200 && rowsOf(notAuth.body).length === 2 && notAuth.body.signedOk === false
+            && countOf(notAuth.sent, '05', true) === 0 && countOf(notAuth.sent, '03', true) === 1,
+            { status: notAuth.status, signedOk: notAuth.body.signedOk, sent: notAuth.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')) });
+
+        const joinedRun = await retryRun({ joinAfterMs: 150, latency: (type, fresh) => (fresh ? 300 : 5) });
+        ok('ជាន់អប្បបរមា ៖ សំណើទី ២ (Cookie ថ្មីក្នុងសតិរួច) ចាប់ផ្តើមកំឡុងការរត់ម្តងទៀត ➜ ទាំង ២ ឆ្លើយ 200 + `signedOk:true`',
+            joinedRun.status === 200 && joinedRun.body.signedOk === true && !!joinedRun.joined
+            && joinedRun.joined.status === 200 && joinedRun.joined.body.signedOk === true,
+            { first: [joinedRun.status, joinedRun.body.signedOk], second: joinedRun.joined });
+        ok('⛔ single-flight តាម fingerprint Cookie ថ្មី ៖ សំណើទី ២ ចូលរួមការរត់ម្តងទៀត ➜ «ចុះហត្ថលេខា» ដោយ Cookie ថ្មីតែ ១ ដង',
+            countOf(joinedRun.sent, '05', true) === 1 && countOf(joinedRun.sent, '03', true) === 1,
+            joinedRun.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')));
+
+        // ⛔ **ការធ្លាក់ដែលបោះ** (dependency បោះ) ៖ `companionRun` ត្រូវតែឆ្លើយ (outcome ឬ `null`) មិនដែល reject ទេ — handler រង់ចាំវាដោយគ្មាន
+        //    `try` ហើយផ្លូវ 401 ទុកវាចោល (reject ដែលគ្មានអ្នកចាប់ = Function គាំង)។ ចាក់ការបោះនៅ `new AbortController()` របស់ `requestOnce()`
+        //    ៖ (ក) សំណើ «ចុះហត្ថលេខា» ដើម (ទទួល `null`) · (ខ) ការរត់ម្តងទៀតខ្លួនឯង។
+        const RealAbortController = global.AbortController;
+        let throwNextController = false;
+        global.AbortController = class extends RealAbortController {
+            constructor() {
+                if (throwNextController) { throwNextController = false; throw new Error('AbortController injected failure'); }
+                super();
+            }
+        };
+        const unhandled = [];
+        const onUnhandled = (reason) => { unhandled.push(String(reason && reason.message || reason)); };
+        process.on('unhandledRejection', onUnhandled);
+        let thrownPrior;
+        let thrownRerun;
+        try {
+            thrownPrior = await retryRun({ onSend: (type, fresh) => { if (type === '03' && !fresh) throwNextController = true; } });
+            thrownRerun = await retryRun({
+                latency: (type, fresh) => (type === '05' && !fresh ? 60 : 5),
+                onSend: (type, fresh) => { if (type === '03' && fresh) throwNextController = true; }
+            });
+            await sleep(50);
+        } finally {
+            global.AbortController = RealAbortController;
+            throwNextController = false;
+            process.removeListener('unhandledRejection', onUnhandled);
+        }
+        ok('⛔ ការចាក់ (ក) និង (ខ) ៖ គ្មាន promise reject ដែលគ្មានអ្នកចាប់ (Function មិនគាំង)', unhandled.length === 0, unhandled);
+        ok('ជាន់អប្បបរមា ៖ ការចាក់ (ក) ធ្វើឲ្យ «ចុះហត្ថលេខា» ដើមមិនបានផ្ញើ (ZTO មិនឃើញ ០៥ ចាស់)',
+            countOf(thrownPrior.sent, '05', false) === 0 && countOf(thrownPrior.sent, '03', true) === 1,
+            thrownPrior.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')));
+        ok('⛔ (ក) «ចុះហត្ថលេខា» ដើមបោះ ➜ handler មិនបោះ · បញ្ជីមកដល់ 200 · `signedOk:false`',
+            thrownPrior.status === 200 && rowsOf(thrownPrior.body).length === 2 && thrownPrior.body.signedOk === false,
+            { status: thrownPrior.status, body: thrownPrior.body.code || thrownPrior.body.signedOk });
+        ok('ជាន់អប្បបរមា ៖ ការចាក់ (ខ) ធ្វើឲ្យការរត់ម្តងទៀតមិនបានផ្ញើ (ZTO មិនឃើញ ០៥ ថ្មី)',
+            countOf(thrownRerun.sent, '05', false) === 1 && countOf(thrownRerun.sent, '05', true) === 0,
+            thrownRerun.sent.map((s) => s.type + (s.fresh ? ':fresh' : ':old')));
+        ok('⛔ (ខ) ការរត់ម្តងទៀតបោះ ➜ handler មិនបោះ · បញ្ជីមកដល់ 200 · `signedOk:false`',
+            thrownRerun.status === 200 && rowsOf(thrownRerun.body).length === 2 && thrownRerun.body.signedOk === false,
+            { status: thrownRerun.status, body: thrownRerun.body.code || thrownRerun.body.signedOk });
+
+        const exhausted = await retryRun({ env: TIGHT_ENV, latency: (type, fresh) => (type === '05' ? (fresh ? 2500 : 1800) : 30) });
+        ok('⛔ ថវិកាមិនគ្រប់ ➜ ឆ្លើយក្នុងថវិកា (' + exhausted.ms + ' ms ≤ ' + (4000 + RETRY_SLACK) + ') · បញ្ជីមកដល់ 200 · `signedOk:false`',
+            exhausted.status === 200 && rowsOf(exhausted.body).length === 2 && exhausted.body.signedOk === false
+            && exhausted.ms <= 4000 + RETRY_SLACK,
+            { status: exhausted.status, signedOk: exhausted.body.signedOk, ms: exhausted.ms });
+    }
+
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
     const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
     ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',

@@ -1555,7 +1555,7 @@ function cookieRenewTimeoutMs(config, startedAt) {
     return Math.min(COOKIE_RENEW_WRITE_TIMEOUT_MS, room);
 }
 
-async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan) {
+async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan, companion) {
     if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return null;
     if (budgetLeftMs(config, startedAt) < COOKIE_REFRESH_RETRY_RESERVE_MS) return null;
     const readMs = cookieReadTimeoutMs(config, startedAt);
@@ -1579,13 +1579,19 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     if (!built.authKind) return null;
     const flightKey = (plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase())
         + '|' + (cookieFingerprint(fresh.cookie) || '-');
+    const companionRun = companion
+        ? companion.run.then((prior) => (prior && prior.kind === 'authRejected'
+            ? runSharedLookup(companion.plan.cacheKey + '|' + (cookieFingerprint(fresh.cookie) || '-'),
+                config, built.headers, barcode, fresh, startedAt, companion.plan).catch(() => null)
+            : prior))
+        : null;
     let outcome;
     try {
         outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt, plan);
     } catch (_) {
         return null;
     }
-    return { outcome: outcome, session: fresh };
+    return { outcome: outcome, session: fresh, companionRun: companionRun };
 }
 
 function storeCachedBody(key, body, negative) {
@@ -1924,12 +1930,14 @@ async function handleRequest(event) {
         session.renewal = '';
         invalidateCookieCache(session);
         noteCookieRejected(session);
-        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan);
+        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan,
+            companionRun && { plan: companion, run: companionRun });
         if (!retried) {
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
         outcome = retried.outcome;
+        companionRun = retried.companionRun;
         if (outcome.kind === 'authRejected') {
             session.renewal = '';
             invalidateCookieCache(session);

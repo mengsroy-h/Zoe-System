@@ -4,6 +4,7 @@ import { onAct } from '../../actions';
 import { viewState } from '../../../core/view-state';
 import { useStoreFields } from '../../hooks/useStore';
 import { SellerTelegramLink } from '../shell/SellerTelegramLink';
+import { FirebaseMark, SupabaseMark } from '../shell/BackendMark';
 
 export function ConfigModal() {
     const v = useStoreFields(viewState, ['configBackend']);
@@ -46,13 +47,15 @@ export function ConfigModal() {
                     </div>
                     <p className="cfg-choice-title">ឬកំណត់ដោយដៃ — ប្រភេទ Server ៖</p>
                     <div className="cfg-choice" role="radiogroup" aria-label="ប្រភេទ Server">
-                        <label className={supabase ? 'cfg-choice-item' : 'cfg-choice-item is-on'}>
+                        <label className={supabase ? 'cfg-choice-item cfg-fb' : 'cfg-choice-item cfg-fb is-on'}>
                             <input type="radio" name="configBackend" checked={!supabase} onChange={onAct("selectConfigBackend", { args: ['firebase'] })} />
-                            {' '}Firebase
+                            <FirebaseMark />
+                            Firebase
                         </label>
-                        <label className={supabase ? 'cfg-choice-item is-on' : 'cfg-choice-item'}>
+                        <label className={supabase ? 'cfg-choice-item cfg-sb is-on' : 'cfg-choice-item cfg-sb'}>
                             <input type="radio" name="configBackend" checked={supabase} onChange={onAct("selectConfigBackend", { args: ['supabase'] })} />
-                            {' '}Supabase
+                            <SupabaseMark />
+                            Supabase
                         </label>
                     </div>
                 </div>

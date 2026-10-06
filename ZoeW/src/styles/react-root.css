@@ -293,6 +293,44 @@
     color: var(--action-primary);
     background: rgba(0, 102, 255, 0.06);
 }
+#configModal .cfg-mark {
+    width: 1.4em;
+    height: 1.4em;
+    flex: none;
+}
+#configModal .cfg-choice-item.cfg-fb.is-on {
+    border-color: #FFA000;
+    color: #B45309;
+    background: rgba(255, 202, 40, 0.16);
+}
+#configModal .cfg-choice-item.cfg-sb.is-on {
+    border-color: #3ECF8E;
+    color: #1F7A4D;
+    background: rgba(62, 207, 142, 0.12);
+}
+#configModal .cfg-supabase {
+    padding-left: 10px;
+    border-left: 3px solid #3ECF8E;
+}
+#configModal #firebaseConfigInput {
+    border-left: 3px solid #FFA000;
+}
+#configModal:has(.cfg-fb.is-on) .modal-content {
+    box-shadow: inset 0 4px 0 #FFA000, 0 18px 40px -12px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+#configModal:has(.cfg-sb.is-on) .modal-content {
+    box-shadow: inset 0 4px 0 #3ECF8E, 0 18px 40px -12px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+#configModal:has(.cfg-fb.is-on) #configSaveBtn {
+    background-color: #FFCA28;
+    color: #1F2937;
+    box-shadow: 0 4px 10px -4px rgba(245, 124, 0, 0.55);
+}
+#configModal:has(.cfg-sb.is-on) #configSaveBtn {
+    background-color: #3ECF8E;
+    color: #0B2E1F;
+    box-shadow: 0 4px 10px -4px rgba(36, 147, 97, 0.55);
+}
 #configModal .cfg-choice-item input[type="radio"] {
     width: auto;
     min-height: 0;

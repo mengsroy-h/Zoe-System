@@ -1365,6 +1365,9 @@
     "ZoeW/src/app/components/shell/AppIconMark.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/shell/BackendMark.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/shell/BiometricLabel.tsx": {
       "policy": "zoew-react-ui"
     },

@@ -60,7 +60,7 @@
    (៣) ✅ វាស់ ៖ គ្មាន — ការចងចាំគណនីចងនឹង scope · ពាក្យសម្ងាត់ចងនឹង scope + ឈ្មោះតាម AES-GCM AAD (`remember-password.test.tsx` · `login-routing.test.tsx`) ·
    (៤) ✅ Server ៖ គណនីគ្មានហាង ➜ forbidden (អ្នកយាមបន្ថែម) · `register` + `check` មាន mutation រួច · sign-up live វាស់មិនបាន ➜ សកម្មភាពដោយដៃ [2.49.5] ·
    ➕ របាយការណ៍ម្ចាស់គម្រោង ៖ APK Push ជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយ ៤ ម៉ោង ✅ **➜ [2.49.5]** ·
-   (៥) ⏳ ផលរួម G4 · G5 · G6 ជាមួយ Reconfig · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ក្នុងប្រអប់ Config ⏳។
+   (៥) ⏳ ផលរួម G4 · G5 · G6 ជាមួយ Reconfig · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ក្នុងប្រអប់ Config ✅ **➜ [2.49.5]**។
    **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
    ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
@@ -136,10 +136,10 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun) · Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Server ពិនិត្យកូដមិនបាន · APK ៖ Push មិនជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយផុត ៤ ម៉ោង** (Deep audit ជុំ ៣ · សំណើ/របាយការណ៍ម្ចាស់គម្រោង)
+### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun) · ពណ៌ + logo Firebase/Supabase · Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Server ពិនិត្យកូដមិនបាន · APK ៖ Push មិនជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយផុត ៤ ម៉ោង** (Deep audit ជុំ ៣ · សំណើ/របាយការណ៍ម្ចាស់គម្រោង)
 
 **ZoeW `2.49.5`** (`zoew-v260` ➜ `zoew-v261`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.tsx` · `ActivationModal.tsx`
-(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact`) · `guide.html` · `src/features/account.ts`
+(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` · `shell/BackendMark.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact` · ពណ៌តាម backend) · `guide.html` · `src/features/account.ts`
 (`checkInviteWithServer` · `routePendingInvite`) · `src/features/push.ts` (`onNativeToken` · `resumePushAfterSignIn` · `watchPushIdentity`) · `src/app/lifecycle/boot.ts`។
 
 #### អ្វីដែលខុសពីមុន
@@ -151,6 +151,10 @@
 - តំណ Telegram មានប្រភពតែមួយ (`SellerTelegramLink` · `SELLER_TELEGRAM_HANDLE`) ➜ ប្រអប់ Activation និង Config មិនអាចខុសគ្នា។ សៀវភៅណែនាំ (Setup Link/QR) និង
   `ZoeW/README.md` ប្រាប់ផ្លូវនេះ។
 - parity ៖ បន្ទាត់ថ្មីជា `p` គ្មាន style ដោយផ្ទាល់ក្រោម `.modal-content` ➜ ច្បាប់ `INTENTIONAL_UI.skip` ដដែលរំលងវា (គ្មានការពង្រីកបញ្ជី)។
+- 🎨 **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ពណ៌ និង logo តាម backend** (សំណើម្ចាស់គម្រោង) ៖ ជម្រើស Firebase មាន logo អណ្តាតភ្លើង · Supabase មាន logo រន្ទះ (SVG ក្នុងកូដ ·
+  `aria-hidden` · គ្មានធនធានខាងក្រៅ ➜ CSP មិនប្រែ) · ការជ្រើស Firebase ➜ ពណ៌លឿង/ទឹកក្រូច · Supabase ➜ ពណ៌បៃតង លើជម្រើស · ខ្សែលើប្រអប់ · ប៊ូតុង «រក្សាទុក និងភ្ជាប់»
+  (ផ្ទៃពណ៌ម៉ាក + អក្សរងងឹត) · ខ្សែឆ្វេងនៃវាល Config។ ពណ៌ប៊ូតុង/ប្រអប់សម្រេចដោយ CSS `:has()` ➜ DOM ដែល parity ប្រៀប (class · style) មិនប្រែ · Chromium ពិត (build ផលិតកម្ម ·
+  390 និង 1280 px) ៖ ជ្រើស Supabase ➜ ប៊ូតុង `rgb(62, 207, 142)`។
 - 🔐 **Setup Link របស់ហាងដែលចុះឈ្មោះរួច ➜ ប្រអប់ចូលប្រព័ន្ធ ទោះ Server ពិនិត្យកូដអញ្ជើញមិនបាន** (ចំណុច ២ · R3-G1) ៖ ឧបករណ៍ថ្មី ឬ storage លុប (គ្មានការចងចាំ
   កូដ/គណនី) + Function `register` មិនឆ្លើយ (បណ្តាញ · ព្យួរ ២០ វិ. · DB `502 db-unavailable` · gateway 504) ➜ មុនកែ App បើក **ប្រអប់ចុះឈ្មោះ** (ករណីព្យួរ ៖ ប្រអប់ចូល
   ២០ វិ. រួចប្តូរជាចុះឈ្មោះពីក្រោមអ្នកប្រើ) ខណៈការចុះឈ្មោះក៏ធ្វើមិនបានដោយ Function ដដែល។ ឥឡូវ ៖ បើកប្រអប់ចុះឈ្មោះតែពេល Server ឆ្លើយ `invite-usable` ឬ Function ចាស់
@@ -165,7 +169,8 @@
 - 🔒 **Server ៖ គណនីគ្មានហាង** (ចំណុច ៤ក · ឧ. បង្កើតតាម GoTrue sign-up ផ្ទាល់ បើ Dashboard «Allow new users to sign up» បើកដោយច្រឡំ) ➜ វាស់លើ Postgres ពិត ៖
   `zoe_write` · `zoe_read` · `zoe_pull` ➜ `forbidden` · `SELECT zoe_docs`/`zoe_tenant_state` ➜ ០ ➜ **គ្មានផ្លូវរំលង** (មិនកែកូដ)។ ចន្លោះអ្នកយាម ៖ guard tenant null របស់
   `zoe_read` គ្មាននរណាវាស់ (ដកវាចេញ ➜ បញ្ជីទទេដែល App អានថា «គ្មានទិន្នន័យ») ➜ ឥឡូវចាប់។
-- 🔔 សារកំណែ 2.49.5 ជំនួស 2.49.4 (រួមចំណុចមុន)។
+- 🔔 សារកំណែ 2.49.5 ជំនួស 2.49.4 ៖ ចំណុចថ្មី ៤ + ចំណុចមុន ៨ = **១២**។ វាស់បាន ៖ `sanitizeFeed()` យកតែ ១២ ចំណុចដំបូង (`points.slice(0, 12)`) ខណៈ `announcements.json`
+  លើ `main` មាន ២០ ➜ ចំណុច ៨ ចុងក្រោយ **មិនដែលបង្ហាញ** (បាត់ស្ងាត់ · គ្មានអ្នកយាមរាប់ចំណុច) ➜ ឯកសារឥឡូវ ≤ ១២ + អ្នកយាមថ្មី។
 
 #### អ្នកយាម
 
@@ -179,6 +184,8 @@
   Mutation ៣ ➜ ក្រហម ៣ (`unknown` ➜ ចុះឈ្មោះលើឧបករណ៍ថ្មី · `no-check` ➜ ចូលជានិច្ច · `username-invalid` ➜ `unknown`)។
 - `ZoeW/tests/push-client.test.tsx` (បន្ថែម ៣) ៖ tree មុនកែ **ធ្លាក់ ២** (`expected 'no-account' to be 'on'`) ➜ **៤០/៤០**។ Mutation ៥ ➜ ក្រហម ៥ (token គ្មានអត្តសញ្ញាណ ➜
   `no-account` ជានិច្ច · កំពុងបើក ➜ មិនប្រាប់ · ចូលវិញមិន refresh · មិនផ្ញើ token រង់ចាំ · watch មិនហៅ)។
+- `ZoeW/tests/config-modal.test.tsx` (បន្ថែម ២) ៖ logo SVG ក្នុងជម្រើសនីមួយៗ (`aria-hidden` · គ្មាន URL) · `is-on` ប្តូរតាមការជ្រើស · ច្បាប់ពណ៌ម៉ាកក្នុង CSS ➜ **១៩/១៩**។
+- `ZoeW/tests/notifications.test.tsx` (បន្ថែម ១ ៖ ចំណុចនីមួយៗក្នុងឯកសារឆ្លងការត្រង) ៖ `announcements.json` របស់ `main` ➜ **ធ្លាក់** (`expected 12 to be 20`) ➜ **២១/២១**។
 - `supabase-datastore-test` (បន្ថែម ៥ ការអះអាង + mutation ៣) ៖ គណនីគ្មានហាង ➜ `forbidden`/០ · Revoke ➜ `zoe_read forbidden` · mutation ៖ ដក guard `zoe_read` ➜ ក្រហម ·
   ដក guard `zoe_write` + `zoe_apply` ➜ ក្រហម · ដកតែ wrapper `zoe_write` ➜ បៃតង (probe ទិសផ្ទុយ ៖ `zoe_apply` នៅបដិសេធ) ➜ **១៣៤ ok**។
 
@@ -187,6 +194,7 @@
 - Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
 - ⏳ សាកលើឧបករណ៍ពិត ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ចុច **@mengsroyhun** ➜ iPhone PWA · APK · desktop បើក Telegram (ឬ `t.me` ក្នុង browser) ➜ ត្រឡប់មក App ➜ ប្រអប់នៅដដែល
   (App lock មិនចាក់សោភ្លាម)។
+- ⏳ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ជ្រើស Firebase/Supabase ➜ logo + ពណ៌ប្តូរតាម (iPhone PWA · APK · desktop)។
 - ⏳ APK ហាង Supabase (Push បើករួច) ៖ ទុក App លើស ៤ ម៉ោង ➜ បើក ➜ ចូលប្រព័ន្ធវិញ ➜ 🔔 ផ្នែក «ជូនដំណឹងលើទូរស័ព្ទ» ត្រូវបង្ហាញ «បើករួច» (មិនមែន «សូមចូលប្រព័ន្ធម្តងទៀត»)។
 - ⏳ ឧបករណ៍ថ្មីបើក Setup Link របស់ហាងដែលចុះឈ្មោះរួច ពេលអ៊ីនធឺណិតខ្សោយ ➜ ប្រអប់ចូលប្រព័ន្ធ (មិនមែនចុះឈ្មោះ)។
 - ⚠️ **ផ្ទៀងដោយដៃ (session វាស់មិនបាន ៖ network policy បិទ `supabase.co` · គ្មានសិទ្ធិ Google)** ៖ Supabase Dashboard ➜ Authentication ➜ Sign In / Providers ➜

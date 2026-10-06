@@ -428,10 +428,10 @@
         ".write": "auth != null",
         ".validate": "newData.hasChildren(['activeAt'])",
         "activeAt": {
-          ".validate": "newData.isNumber() && newData.val() >= 0"
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000"
         },
         "completeAt": {
-          ".validate": "newData.isNumber() && newData.val() >= 0"
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now + 600000"
         },
         "$other": {
           ".validate": false

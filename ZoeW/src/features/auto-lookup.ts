@@ -5,7 +5,7 @@ import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
-import { lookupApiIsZto, scheduleCustomerTableSoonRefresh } from './customer-table-prefetch';
+import { lookupApiIsZto, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
 import { lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
@@ -44,6 +44,8 @@ export const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export const LOOKUP_FAST_CACHE_MAX = 300;
 
+export const ZTO_BARCODE_SHAPE_TEXT = '⚠️ Barcode នេះមិនមែនទម្រង់ ZTO — សូមបញ្ចូលព័ត៌មានដោយដៃ';
+
 export const autoLookupInFlight = new Map();
 
 export const autoLookupFailureAt = new Map();
@@ -51,6 +53,15 @@ export const autoLookupFailureAt = new Map();
 export const autoLookupQueueRetries = new Map();
 
 export const lookupFastCache = new Map();
+
+export const lookupAnswersHeldWhileSaving = new Map();
+
+export function takeHeldLookupAnswer(barcode) {
+    const key = String(barcode || '').trim().toUpperCase();
+    const held = lookupAnswersHeldWhileSaving.get(key) || null;
+    lookupAnswersHeldWhileSaving.delete(key);
+    return held;
+}
 
 export function clearAutoLookupQueueRetries() {
     autoLookupQueueRetries.forEach((queued) => {
@@ -108,6 +119,7 @@ export function pumpAutoLookupQueue() {
 
 export function clearLookupStatus() {
     viewState.lookupStatus = { kind: '', text: '' };
+    lookupAnswersHeldWhileSaving.clear();
 }
 
 export function setLookupStatus(barcode, kind, text) {
@@ -152,9 +164,7 @@ export function setFastLookupRow(barcode, phone, cod, dod, cfg) {
     }
 }
 
-export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
-    if (scanState.pendingBarcode !== barcode || !uiState.isModalOpen) return false;
-
+export function fillEmptyLookupFields(phoneVal, codVal, dodVal) {
     let filledAny = false;
     let phoneWasAutoFilled = false;
 
@@ -173,6 +183,17 @@ export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
         setFieldValue('modalDodInput', String(parseFloat(dodVal)));
         filledAny = true;
     }
+    return { filledAny, phoneWasAutoFilled };
+}
+
+export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
+    if (scanState.pendingBarcode !== barcode || !uiState.isModalOpen) return false;
+    if (viewState.phoneModalBusy) {
+        lookupAnswersHeldWhileSaving.set(String(barcode || '').trim().toUpperCase(), { phone: phoneVal, cod: codVal, dod: dodVal });
+        return false;
+    }
+
+    const { filledAny, phoneWasAutoFilled } = fillEmptyLookupFields(phoneVal, codVal, dodVal);
 
     if (cfg.autoSubmit && phoneWasAutoFilled && scanState.pendingBarcode === barcode && uiState.isModalOpen) {
         showToast("⏳ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
@@ -278,6 +299,12 @@ export async function attemptAutoLookup(barcode) {
         return;
     }
 
+    if (isZtoLookup && !ztoBarcodeShapeIsValid(barcode)) {
+        dropAutoLookupQueueEntry(lookupKey);
+        setLookupStatus(barcode, 'warn', ZTO_BARCODE_SHAPE_TEXT);
+        return;
+    }
+
     scheduleCustomerTableSoonRefresh();
 
     if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc && !securityState.lookupSecretKey) {
@@ -331,6 +358,9 @@ export async function attemptAutoLookup(barcode) {
     dropAutoLookupQueueEntry(lookupKey);
 
     const myGeneration = lookupState.customerDataTableSessionGeneration;
+    const settleStaleLookup = () => {
+        if (!autoLookupInFlight.has(lookupKey)) setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' ត្រូវបានកំណត់ឡើងវិញ — សូមស្កេនម្ដងទៀត');
+    };
     const startedAt = Date.now();
     setLookupStatus(barcode, 'loading', isZtoLookup ? '🔎 កំពុងស្វែងរកពី ZTO...' : '🔎 កំពុងស្វែងរកព័ត៌មានអតិថិជន...');
     try {
@@ -359,7 +389,7 @@ export async function attemptAutoLookup(barcode) {
         );
         const data = out.body;
         if (!out.res.ok) throw lookupResponseError(out.res.status, data, false);
-        if (myGeneration !== lookupState.customerDataTableSessionGeneration) return;
+        if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
         if (data && data.error) throw new Error('Lookup rejected');
 
         const phoneVal = getNestedField(data, cfg.phoneField);
@@ -380,7 +410,7 @@ export async function attemptAutoLookup(barcode) {
         rememberCustomerTableRow(barcode, phoneVal, codVal, dodVal);
         applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
     } catch (e) {
-        if (myGeneration !== lookupState.customerDataTableSessionGeneration) return;
+        if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
         autoLookupFailureAt.delete(lookupKey);
         autoLookupFailureAt.set(lookupKey, {
             at: Date.now(),
@@ -406,6 +436,9 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'error', '⏱️ ZTO ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'LOOKUP_BAD_BODY') {
             setLookupStatus(barcode, 'error', '⚠️ ' + lookupSource + ' ឆ្លើយមកខូច (មិនពេញលេញ) — សូមស្កេនម្ដងទៀត');
+        } else if (e && e.lookupCode === 'ZTO_BARCODE_INVALID') {
+            setLookupStatus(barcode, 'warn', ZTO_BARCODE_SHAPE_TEXT);
+            return;
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
             setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
         } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {

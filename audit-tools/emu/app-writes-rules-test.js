@@ -194,6 +194,14 @@ async function replay(cap, rules, tag) {
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_signed_sweep`) បដិសេធសញ្ញាហាង (ការវាស់រសើប)',
         'denied=' + noMark.denied.length + ' sweepMarks=' + sweepMarks);
 
+    // ⛔ ត្រាពេលអនាគត (ម៉ោង Server ខុស) មិនត្រូវកកសញ្ញាហាងទាំងហាង ➜ rules បដិសេធ > now + ១០ នាទី · ត្រាបច្ចុប្បន្ន ➜ ទទួល
+    const markProbe = (stamp) => [{ run: 'mark-probe', seed: {}, log: [{ p: 'zoew_settings/zto_signed_sweep', m: 'PATCH', v: { activeAt: stamp, completeAt: stamp } }] }];
+    const future = await replay(markProbe(Date.now() + 30 * 24 * 3600 * 1000), rules, 'mark-future');
+    const current = await replay(markProbe(Date.now()), rules, 'mark-now');
+    check(future.denied.length === 1 && current.denied.length === 0,
+        'rules ពិត ៖ សញ្ញាហាងត្រាអនាគត (+៣០ ថ្ងៃ) ➜ បដិសេធ · ត្រាបច្ចុប្បន្ន ➜ ទទួល',
+        'future=' + future.denied.length + ' current=' + current.denied.length);
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('  FAIL  ' + (e && e.stack || e)); process.exit(1); });

@@ -3,7 +3,7 @@ import { addPreconnectHint } from '../platform/document-io';
 import { lookupState, uiState } from '../core/state';
 import { runAutomaticCleanupRules } from '../domain/cleanup';
 import { AUTO_LOOKUP_FAIL_COOLDOWN_MS, AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS } from '../features/auto-lookup';
-import { safeLookupReason } from '../features/customer-table-prefetch';
+import { lookupApiIsZto, safeLookupReason, ztoBarcodeShapeIsValid } from '../features/customer-table-prefetch';
 import { getLookupApiConfig } from '../features/lookup-config';
 import { updateRecentPhonesList } from './db-listeners';
 import { refreshEntryPagePanels } from '../ui/entry-list';
@@ -156,6 +156,17 @@ export function viewListModalShowing(itemId) {
     return modalIsOpen('viewListModal') && uiState.activeParentItemId === itemId;
 }
 
+export function ztoRequestBarcodeIsRefused(url) {
+    try {
+        if (!lookupApiIsZto({ url: url })) return false;
+        const params = new URL(url, 'https://zoew.invalid').searchParams;
+        if (params.get('diag') === '1' || params.get('list') === '1') return false;
+        return !ztoBarcodeShapeIsValid(params.get('barcode'));
+    } catch (e) {
+        return false;
+    }
+}
+
 export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promise<any> {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const opts = Object.assign({}, options || {});
@@ -201,6 +212,7 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
         const request = lookupState.nativeQueryHeaderUnsupported ? { url: legacyUrl, options: opts } : nativeFunctionRequest(url, opts);
         fetch(request.url, request.options).then((res) => {
             if (request.url === legacyUrl || settled || !res || res.status !== 400) return res;
+            if (ztoRequestBarcodeIsRefused(legacyUrl)) return res;
             return fetch(legacyUrl, opts).then((legacy) => {
                 if (legacy && legacy.status !== 400) lookupState.nativeQueryHeaderUnsupported = true;
                 return legacy;
@@ -256,7 +268,7 @@ export function lookupFailureCooldownMs(kind) {
 export function lookupFailureIsDefinitive(error) {
     const code = String(error && error.lookupCode || '');
     if (code === 'ZTO_AUTH_EXPIRED' || code === 'ZTO_AUTH_NOT_CONFIGURED'
-        || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') return true;
+        || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED' || code === 'ZTO_BARCODE_INVALID') return true;
     return /^HTTP (401|403)$/.test(error && error.message || '');
 }
 

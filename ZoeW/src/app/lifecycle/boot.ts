@@ -13,6 +13,7 @@ import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../feat
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
 import { runSessionExpiryCheck } from '../../features/session';
 import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
+import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
 import { noteZtoUserActivity, refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
 import { scrollWindowToTop } from '../../platform/document-io';
@@ -134,6 +135,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         syncExpirySchedule();
     });
     scope.every(60000, () => {
+        retryZtoShopSweepListener();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
@@ -142,6 +144,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.listen(document, 'visibilitychange', () => {
         if (document.hidden) return;
         sweepRecallHighlights();
+        retryZtoShopSweepListener();
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();

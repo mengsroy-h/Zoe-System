@@ -481,6 +481,7 @@ export interface LookupState {
     customerDataTableFetchedAt: number;
     customerDataTableFetchPromise: any;
     customerDataTableSessionGeneration: number;
+    customerDataTableFetchGeneration: number;
     customerDataTableLastFailedAt: number;
     ztoWarmSoonTimer: any;
     ztoWarmSoonArmedAt: number;
@@ -504,6 +505,7 @@ export const lookupState = createStore<LookupState>('lookupState', {
     customerDataTableFetchedAt: 0,
     customerDataTableFetchPromise: null,
     customerDataTableSessionGeneration: 0,
+    customerDataTableFetchGeneration: 0,
     customerDataTableLastFailedAt: 0,
     ztoWarmSoonTimer: null,
     ztoWarmSoonArmedAt: 0,
@@ -568,7 +570,7 @@ export interface ZtoState {
     ztoUserActiveAt: number;
     ztoAbandonHoldSince: number;
     ztoAbandonCheckedAt: number;
-    ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number };
+    ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number; failedAt: number };
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
     ztoSignedSplitAt: number;
     ztoSignedSplitFrom: string;
@@ -602,7 +604,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoUserActiveAt: 0,
     ztoAbandonHoldSince: 0,
     ztoAbandonCheckedAt: 0,
-    ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 },
+    ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 },
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
     ztoSignedSplitAt: 0,
     ztoSignedSplitFrom: '',

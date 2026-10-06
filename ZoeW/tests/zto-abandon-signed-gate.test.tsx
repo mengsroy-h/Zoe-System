@@ -613,8 +613,8 @@ describe('ការពិនិត្យប្រឆាំង (លុយ) ៖ �
 
     it('Server បិទបញ្ជីចុះហត្ថលេខា (`ztoSignedOff`) ➜ មិនរង់ចាំ ទោះសញ្ញាហាងសកម្ម', () => {
         ztoState.ztoSignedOff = true;
-        ztoState.ztoShopSweep = { state: 'ok', activeAt: NOW, completeAt: NOW - 8 * DAY, advancedAt: 0 };
+        ztoState.ztoShopSweep = { state: 'ok', activeAt: NOW, completeAt: NOW - 8 * DAY, advancedAt: 0, failedAt: 0 };
         expect(ztoAbandonCleanupIsHeld(NOW - 60000)).toBe(false);
-        ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 };
+        ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 };
     });
 });

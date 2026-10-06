@@ -109,6 +109,12 @@ export function safeLookupReason(raw) {
     return /^[A-Za-z0-9_.:@-]{1,80}$/.test(text) ? text : '';
 }
 
+export const ZTO_BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
+
+export function ztoBarcodeShapeIsValid(barcode) {
+    return ZTO_BARCODE_RE.test(String(barcode == null ? '' : barcode).trim());
+}
+
 export function lookupApiIsZto(cfg) {
     if (!cfg || !cfg.url) return false;
     return /(?:^|\/)\.netlify\/functions\/zto-order-detail\/?(?:[?#]|$)/i.test(String(cfg.url).trim());

@@ -1,5 +1,6 @@
 import { firebaseState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
+import { elapsedSince } from '../core/elapsed';
 
 export const ZTO_SHOP_SWEEP_PATH = 'zoew_settings/zto_signed_sweep';
 export const ZTO_SHOP_SWEEP_MARK_GAP_MS = 5 * 60 * 1000;
@@ -9,35 +10,41 @@ function ztoShopSweepStamp(v) {
     return typeof v === 'number' && isFinite(v) && v > 0 ? v : 0;
 }
 
+function ztoShopSweepSaneStamp(v) {
+    const at = ztoShopSweepStamp(v);
+    return at && at <= getServerNow() + ZTO_SHOP_SWEEP_MARK_GAP_MS ? at : 0;
+}
+
 export function resetZtoShopSweep() {
     const sdk = firebaseState.fb;
     const markRef = firebaseState.dbRefZtoSignedSweep;
     if (sdk && markRef && typeof sdk.off === 'function') { try { sdk.off(markRef); } catch (e) {} }
-    ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 };
+    ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 };
     ztoState.ztoShopSweepWrote = { activeAt: 0, completeAt: 0 };
 }
 
 export function noteZtoShopSweep(val) {
     const prev = ztoState.ztoShopSweep;
-    const completeAt = ztoShopSweepStamp(val && val.completeAt);
+    const completeAt = ztoShopSweepSaneStamp(val && val.completeAt);
     ztoState.ztoShopSweep = {
         state: 'ok',
-        activeAt: ztoShopSweepStamp(val && val.activeAt),
+        activeAt: ztoShopSweepSaneStamp(val && val.activeAt),
         completeAt: completeAt,
-        advancedAt: prev.state === 'ok' && completeAt > prev.completeAt ? Date.now() : prev.advancedAt
+        advancedAt: prev.state === 'ok' && completeAt > prev.completeAt ? Date.now() : prev.advancedAt,
+        failedAt: 0
     };
 }
 
 export function noteZtoShopSweepError(err) {
     const denied = /permission[_ ]denied/i.test(String((err && (err.code || err.message)) || err));
-    ztoState.ztoShopSweep = { state: denied ? 'denied' : 'failed', activeAt: 0, completeAt: 0, advancedAt: 0 };
+    ztoState.ztoShopSweep = { state: denied ? 'denied' : 'failed', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: Date.now() };
 }
 
-export function attachZtoShopSweepListener(listenerGeneration) {
+export function attachZtoShopSweepListener(listenerGeneration, keepState?) {
     const sdk = firebaseState.fb;
     const markRef = firebaseState.dbRefZtoSignedSweep;
     if (!sdk || !markRef || typeof sdk.onValue !== 'function') return false;
-    ztoState.ztoShopSweep = { state: 'pending', activeAt: 0, completeAt: 0, advancedAt: 0 };
+    if (!keepState) ztoState.ztoShopSweep = { state: 'pending', activeAt: 0, completeAt: 0, advancedAt: 0, failedAt: 0 };
     sdk.onValue(markRef, (snapshot) => {
         if (listenerGeneration !== firebaseState.dbListenerGeneration) return;
         noteZtoShopSweep(snapshot.val());
@@ -46,6 +53,18 @@ export function attachZtoShopSweepListener(listenerGeneration) {
         noteZtoShopSweepError(err);
     });
     return true;
+}
+
+export function retryZtoShopSweepListener() {
+    const shop = ztoState.ztoShopSweep;
+    if (shop.state !== 'denied' && shop.state !== 'failed') return false;
+    if (shop.failedAt && elapsedSince(shop.failedAt) < ZTO_SHOP_SWEEP_MARK_GAP_MS) return false;
+    const sdk = firebaseState.fb;
+    const markRef = firebaseState.dbRefZtoSignedSweep;
+    if (!sdk || !markRef) return false;
+    if (typeof sdk.off === 'function') { try { sdk.off(markRef); } catch (e) {} }
+    ztoState.ztoShopSweep = Object.assign({}, shop, { failedAt: Date.now() });
+    return attachZtoShopSweepListener(firebaseState.dbListenerGeneration, true);
 }
 
 export function ztoShopSweepHolds(ripeAt) {

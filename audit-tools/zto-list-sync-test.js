@@ -685,6 +685,55 @@ function firstBody(requests) {
         mixedRows[2] && mixedRows[2].phone === '081684403' && mixedRows[2].cod === 0, mixedRows[2]);
 
     // ═════════════════════════════════════════════════════════════════════
+    console.log('\n== ៥ក. លេខដាក់កន្លែង ៖ ផ្លូវស្កេន (`/detail`) និងផ្លូវបញ្ជីយល់ស្របគ្នា ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // ⛔ E7 k10 ៖ ផ្លូវបញ្ជីទម្លាក់ `"0"` · `"000"` ជា «មិនមែនអតិថិជន» តែផ្លូវស្កេនបញ្ជូនវាទៅ App ➜ App បំពេញ `0`
+    // ➜ រក្សាទុកស្វ័យប្រវត្តិ ➜ `addOrUpdateEntry()` បញ្ចូលកញ្ចប់អ្នកដទៃចូលជួរ `0` តែមួយ (phone + scanDate)។
+    // ច្បាប់ ៖ Function តែមួយ ➜ ការវិនិច្ឆ័យលេខដាក់កន្លែងតែមួយ ➜ phone ដូចគ្នាលើផ្លូវទាំង ២ ជានិច្ច។
+    const PLACEHOLDER_PHONES = ['0', '000', '', '0-0', ' 0 ', '00 000 000'];
+    const AGREEMENT_PHONES = PLACEHOLDER_PHONES.concat(['+855-0', '081684403', '855963897345']);
+    let agreementMeasured = 0;
+    for (const raw of AGREEMENT_PHONES) {
+        const listed = await listCall(listPayload([
+            listRow({ scanBillCode: '77130500000009', consigneeMobile: raw, agentAmount: 0 })
+        ]), GOOD_LIST_ENV);
+        const listPhone = (rowsOf(listed.body)[0] || {}).phone;
+        const scanned = await detailCall({}, '77130500000009', {
+            success: true,
+            data: { billCode: '77130500000009', consigneeMobile: raw, agentAmount: 0 }
+        });
+        const scanPhone = scanned.body && scanned.body.found === true ? scanned.body.phone : undefined;
+        if (typeof listPhone === 'string' && typeof scanPhone === 'string') agreementMeasured++;
+        ok('⛔ phone ' + JSON.stringify(raw) + ' (COD 0) ➜ `/detail` ឆ្លើយ phone ដូចផ្លូវបញ្ជី',
+            typeof listPhone === 'string' && scanPhone === listPhone, { list: listPhone, detail: scanned.body });
+    }
+    ok('ជាន់អប្បបរមា ៖ ការយល់ស្របវាស់លើផ្លូវទាំង ២ ពិតគ្រប់តម្លៃ',
+        agreementMeasured === AGREEMENT_PHONES.length, agreementMeasured);
+    for (const raw of PLACEHOLDER_PHONES) {
+        const withCod = await detailCall({}, '77130500000010', {
+            success: true,
+            data: { billCode: '77130500000010', consigneeMobile: raw, agentAmount: 3.25, fcAmount: 1.5 }
+        });
+        ok('⛔ `/detail` phone ' + JSON.stringify(raw) + ' + COD ➜ `found:true` · phone ទទេ · COD/DOD នៅ (App មិនរក្សាទុកស្វ័យប្រវត្តិ)',
+            !!withCod.body && withCod.body.found === true && withCod.body.phone === ''
+            && withCod.body.cod === 3.25 && withCod.body.dod === 1.5, withCod.body);
+        const bare = await detailCall({}, '77130500000011', {
+            success: true,
+            data: { billCode: '77130500000011', consigneeMobile: raw }
+        });
+        ok('⛔ `/detail` phone ' + JSON.stringify(raw) + ' គ្មាន COD/DOD ➜ «រកមិនឃើញ» (`found:false` · គ្មាន `error`)',
+            bare.status === 200 && !!bare.body && bare.body.found === false
+            && bare.body.code === 'ZTO_NOT_FOUND' && bare.body.error === undefined, { s: bare.status, b: bare.body });
+    }
+    const realBare = await detailCall({}, '77130500000012', {
+        success: true,
+        data: { billCode: '77130500000012', consigneeMobile: '081684403' }
+    });
+    ok('⛔ ទិសផ្ទុយ ៖ `/detail` លេខពិតគ្មាន COD/DOD ➜ `found:true` ហើយ phone ឆ្លងកាត់ដដែល',
+        !!realBare.body && realBare.body.found === true && realBare.body.phone === '081684403'
+        && realBare.body.cod === 0 && realBare.body.dod === 0, realBare.body);
+
+    // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ៦. ជួរកាលបរិច្ឆេទ និងទំព័រ ==');
     // ═════════════════════════════════════════════════════════════════════
     const badRange = [

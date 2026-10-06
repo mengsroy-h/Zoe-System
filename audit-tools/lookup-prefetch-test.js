@@ -133,7 +133,7 @@ function build(opts) {
         navigator: { onLine: o.onLine === undefined ? true : o.onLine, connection: o.connection || null },
         auth: o.noAuth ? null : { currentUser: { uid: 'u1' } },
         isModalOpen: !!o.isModalOpen,
-        pendingBarcode: o.pendingBarcode === undefined ? 'BC1' : o.pendingBarcode,
+        pendingBarcode: o.pendingBarcode === undefined ? 'BC100001' : o.pendingBarcode,
         getLookupApiConfig: () => (o.noCfg ? null : (o.cfg || { url: 'https://x/exec?code={barcode}&key=k', enabled: true })),
         URL: URL, Array: Array,
         // ⛔ React ៖ `armLookupFocus()` ទទួល **ឈ្មោះ ref** (`fieldValue()`/`focusField()` ➜ `getElementById`)
@@ -148,10 +148,10 @@ function build(opts) {
         withReact(ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
     FNS.forEach((n) => { if (src[n]) { try { vm.runInContext(src[n], ctx); } catch (e) {} } });
-    if (o.inFlight) vm.runInContext('if (typeof autoLookupInFlight.set === "function") autoLookupInFlight.set("BC9", {}); else autoLookupInFlight.add("BC9");', ctx);
-    if (o.lookupInFlight) vm.runInContext('if (typeof autoLookupInFlight.set === "function") autoLookupInFlight.set("BC1", {}); else autoLookupInFlight.add("BC1");', ctx);
-    if (o.lookupQueued) vm.runInContext('autoLookupQueueRetries.set("BC1", { timer: null, armedAt: 0 });', ctx);
-    if (o.lookupWaitingPin) vm.runInContext('pendingLookupUnlockBarcode = "BC1";', ctx);
+    if (o.inFlight) vm.runInContext('if (typeof autoLookupInFlight.set === "function") autoLookupInFlight.set("BC900009", {}); else autoLookupInFlight.add("BC900009");', ctx);
+    if (o.lookupInFlight) vm.runInContext('if (typeof autoLookupInFlight.set === "function") autoLookupInFlight.set("BC100001", {}); else autoLookupInFlight.add("BC100001");', ctx);
+    if (o.lookupQueued) vm.runInContext('autoLookupQueueRetries.set("BC100001", { timer: null, armedAt: 0 });', ctx);
+    if (o.lookupWaitingPin) vm.runInContext('pendingLookupUnlockBarcode = "BC100001";', ctx);
     return ctx;
 }
 
@@ -376,6 +376,12 @@ scenario('ការត្រៀមតំណទៅ Lookup API', () => {
 // ការស្កេនក្រៅបណ្តាញជាករណីធម្មតារបស់អាជីវកម្មនេះ ➜ សំឡេងរំខានក្នុង Sentry
 // បាំងកំហុសពិត ហើយការស្កេនក៏យឺតដោយឥតប្រយោជន៍ដែរ។
 let buildAutoRuntime = null;
+// ⛔ ច្រកទម្រង់ barcode ZTO (`ztoBarcodeShapeIsValid()` · `ZTO_BARCODE_RE`) ស្រង់ពីកូដពិត ➜ barcode សាកល្បងមានទម្រង់ ZTO
+//    (`BC100001`) ដើម្បីឲ្យសេណារីយ៉ូ ZTO វាស់ផ្លូវបណ្ដាញ មិនមែនច្រកទម្រង់ (`lookup-failure-identity-test` វាស់ច្រកនោះ)
+const ZTO_SHAPE_DECLS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT'].map((n) => {
+    const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
+    return m ? m[0] : '';
+}).filter(Boolean);
 scenario('ការស្វែងរកស្វ័យប្រវត្តិ ខណៈក្រៅបណ្តាញ', () => {
     const autoSrc = sliceFn('attemptAutoLookup');
     ok('រកឃើញ function attemptAutoLookup()', !!autoSrc);
@@ -424,7 +430,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             sheetScriptVersionSeen: null,
             pendingLookupUnlockBarcode: '',
             pendingLookupUnlockResolve: null,
-            pendingBarcode: 'BC1',
+            pendingBarcode: 'BC100001',
             isModalOpen: true,
             customerDataTableSessionGeneration: 0,
             customerDataTableRows: null,
@@ -509,6 +515,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         Object.defineProperty(ctx, '__status', { configurable: true,
             value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
         vm.runInContext(sliceFn('lookupApiIsZto'), ctx);
+        ZTO_SHAPE_DECLS.forEach((d) => vm.runInContext(d, ctx));
+        vm.runInContext(sliceFn('ztoBarcodeShapeIsValid') || 'function ztoBarcodeShapeIsValid() { return true; }', ctx);
         vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
         vm.runInContext(sliceFn('lookupApiSendsHeader') || 'function lookupApiSendsHeader(cfg) { return !!(cfg && cfg.headerName); }', ctx);
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
@@ -528,6 +536,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             // ⛔ `completePinUnlock()` បើកជុំបោស ZTO (2.32.0) ➜ stub ដែលរាប់
             //    ការហៅ (ច្បាប់ ៖ stub ជំនួសការបញ្ឈប់; stub ដែលវាស់បាន = ការគ្របបន្ថែម)
             vm.runInContext('var __ztoSweeps = 0; function scheduleZtoStatusSweep() { __ztoSweeps++; }', ctx);
+            const heldDecl = (SRC.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
+            vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
             ['clearLookupStatus', 'openModalHelper', 'closeModal', 'isPinFlowPending',
                 'requestPinBeforeConfig', 'completePinUnlock'].forEach((n) => {
                 const fnSrc = sliceFn(n);
@@ -549,13 +559,13 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
 
     // ខាងវិជ្ជមាន — មានបណ្តាញ ➜ សំណើត្រូវចេញធម្មតា
     const online = buildAuto({});
-    return vm.runInContext('attemptAutoLookup("BC1")', online).then(() => {
+    return vm.runInContext('attemptAutoLookup("BC100001")', online).then(() => {
         ok('⛔ ទិសផ្ទុយ ៖ មានបណ្តាញ ➜ សំណើស្វែងរកចេញធម្មតា',
             online.__fetches.length === 1, online.__fetches);
 
         // ខាងអវិជ្ជមាន — ក្រៅបណ្តាញ ➜ មិនបាញ់សំណើ និងមិនរាយការណ៍ទៅ Sentry
         const offline = buildAuto({ onLine: false });
-        return vm.runInContext('attemptAutoLookup("BC1")', offline).then(() => {
+        return vm.runInContext('attemptAutoLookup("BC100001")', offline).then(() => {
             ok('⛔ ក្រៅបណ្តាញ ➜ **មិនបាញ់សំណើស្វែងរកសោះ**',
                 offline.__fetches.length === 0, offline.__fetches);
             ok('⛔ ក្រៅបណ្តាញ ➜ មិនរាយការណ៍កំហុសទៅ Sentry (សំឡេងរំខានបាំងកំហុសពិត)',
@@ -566,7 +576,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             // ⛔ ទិសផ្ទុយទី ២ ៖ cache ក្នុងសតិត្រូវនៅតែបំពេញ **ទោះក្រៅបណ្តាញ**
             // (ការកែមិនត្រូវបិទផ្លូវដែលមិនត្រូវការបណ្តាញសោះ)
             const cachedOffline = buildAuto({ onLine: false, cached: true });
-            return vm.runInContext('attemptAutoLookup("BC1")', cachedOffline).then(() => {
+            return vm.runInContext('attemptAutoLookup("BC100001")', cachedOffline).then(() => {
                 ok('⛔ ទិសផ្ទុយ ៖ ក្រៅបណ្តាញ តែមានក្នុង cache ➜ **នៅតែបំពេញភ្លាម**',
                     cachedOffline.__filled.length === 1, cachedOffline.__filled);
             });
@@ -586,23 +596,23 @@ ok('ស្ថានភាពប្រើ textContent ការពារ XSS', lo
 
 scenario('ស្ថានភាព ZTO និង cooldown តាម Barcode មួយៗ', async () => {
     const ctx = buildAutoRuntime({ zto: true, fetchPlan: [false, true] });
-    const first = vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    const first = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
     ok('ចាប់ផ្ដើមភ្លាម ➜ បង្ហាញថាកំពុងស្វែងរក ZTO', ctx.__status.textContent.indexOf('កំពុងស្វែងរកពី ZTO') !== -1, ctx.__status.textContent);
     await first;
     ok('បរាជ័យ ➜ បង្ហាញស្ថានភាព មិនមែនស្ងាត់', ctx.__status.hidden === false && ctx.__status.className.indexOf('error') !== -1, ctx.__status);
-    vm.runInContext('pendingBarcode = "BC2";', ctx);
-    await vm.runInContext('attemptAutoLookup("BC2")', ctx);
-    ok('BC1 ខូច មិនរាំង BC2', ctx.__fetches.length === 2, ctx.__fetches);
-    ok('BC2 ជោគជ័យ ➜ បង្ហាញស្ថានភាពរកឃើញ', ctx.__status.className.indexOf('success') !== -1, ctx.__status);
-    vm.runInContext('pendingBarcode = "BC1";', ctx);
-    await vm.runInContext('attemptAutoLookup("BC1")', ctx);
-    ok('BC1 ដដែលក្នុង cooldown ➜ មិនបាញ់សំណើស្ទួន', ctx.__fetches.length === 2, ctx.__fetches);
+    vm.runInContext('pendingBarcode = "BC200002";', ctx);
+    await vm.runInContext('attemptAutoLookup("BC200002")', ctx);
+    ok('BC100001 ខូច មិនរាំង BC200002', ctx.__fetches.length === 2, ctx.__fetches);
+    ok('BC200002 ជោគជ័យ ➜ បង្ហាញស្ថានភាពរកឃើញ', ctx.__status.className.indexOf('success') !== -1, ctx.__status);
+    vm.runInContext('pendingBarcode = "BC100001";', ctx);
+    await vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    ok('BC100001 ដដែលក្នុង cooldown ➜ មិនបាញ់សំណើស្ទួន', ctx.__fetches.length === 2, ctx.__fetches);
     ok('cooldown ដដែលមានពេលរង់ចាំមើលឃើញ', ctx.__status.textContent.indexOf('ក្រោយ') !== -1, ctx.__status.textContent);
 });
 
 scenario('ស្ថានភាព API ធម្មតាមិនត្រូវហៅខុសថា ZTO', async () => {
     const ctx = buildAutoRuntime({ fetchSuccess: false });
-    await vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    await vm.runInContext('attemptAutoLookup("BC100001")', ctx);
     ok('API ធម្មតាបរាជ័យ ➜ សារប្រើ API មិនមែន ZTO',
         ctx.__status.textContent.indexOf('API') !== -1 && ctx.__status.textContent.indexOf('ZTO') === -1,
         ctx.__status.textContent);
@@ -610,19 +620,19 @@ scenario('ស្ថានភាព API ធម្មតាមិនត្រូ�
 
 scenario('HTTP បណ្ដោះអាសន្នត្រូវ retry តែ HTTP អចិន្ត្រៃយ៍មិនត្រូវបាញ់ស្ទួន', async () => {
     const transient = buildAutoRuntime({ zto: true, realRetry: true, httpPlan: [503, 200] });
-    await vm.runInContext('attemptAutoLookup("BC1")', transient);
+    await vm.runInContext('attemptAutoLookup("BC100001")', transient);
     ok('ZTO 503 ម្តង ➜ retry ហើយសំណើទី ២ ជោគជ័យ',
         transient.__fetches.length === 2 && transient.__status.className.indexOf('success') !== -1,
         [transient.__fetches.length, transient.__status.textContent]);
 
     const throttled = buildAutoRuntime({ zto: true, realRetry: true, httpPlan: [429, 200] });
-    await vm.runInContext('attemptAutoLookup("BC1")', throttled);
+    await vm.runInContext('attemptAutoLookup("BC100001")', throttled);
     ok('ZTO 429 ម្តង ➜ retry ដោយមិនបង្ខំអ្នកប្រើស្កេនឡើងវិញ',
         throttled.__fetches.length === 2 && throttled.__status.className.indexOf('success') !== -1,
         [throttled.__fetches.length, throttled.__status.textContent]);
 
     const unauthorized = buildAutoRuntime({ zto: true, realRetry: true, httpPlan: [401, 200] });
-    await vm.runInContext('attemptAutoLookup("BC1")', unauthorized);
+    await vm.runInContext('attemptAutoLookup("BC100001")', unauthorized);
     ok('⛔ HTTP 401 ➜ មិន retry ជាមួយ Secret ខុស',
         unauthorized.__fetches.length === 1 && unauthorized.__status.textContent.indexOf('Secret') !== -1,
         [unauthorized.__fetches.length, unauthorized.__status.textContent]);
@@ -635,7 +645,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
 
     function buildList(httpPlan) {
         const fetches = [];
-        const rows = [{ barcode: 'BC1', phone: '012', cod: 1, dod: 2 }];
+        const rows = [{ barcode: 'BC100001', phone: '012', cod: 1, dod: 2 }];
         const statusEl = { textContent: '' };
         const ctx = {
             console: { error: () => {} }, Promise, Array, Object, String, Number, Error, Math, Date,
@@ -688,27 +698,27 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
 
 scenario('លទ្ធផលចាស់មិនសរសេរជាន់ Barcode ថ្មី', () => {
     const ctx = buildAutoRuntime({ zto: true, fetchSuccess: true });
-    vm.runInContext('pendingBarcode = "BC2"; setLookupStatus("BC2", "loading", "ថ្មី");', ctx);
-    const changed = vm.runInContext('setLookupStatus("BC1", "error", "ចាស់")', ctx);
-    ok('status របស់ BC1 ចាស់ត្រូវបានបដិសេធ', changed === false, changed);
-    ok('status BC2 ថ្មីនៅដដែល', ctx.__status.textContent === 'ថ្មី', ctx.__status.textContent);
+    vm.runInContext('pendingBarcode = "BC200002"; setLookupStatus("BC200002", "loading", "ថ្មី");', ctx);
+    const changed = vm.runInContext('setLookupStatus("BC100001", "error", "ចាស់")', ctx);
+    ok('status របស់ BC100001 ចាស់ត្រូវបានបដិសេធ', changed === false, changed);
+    ok('status BC200002 ថ្មីនៅដដែល', ctx.__status.textContent === 'ថ្មី', ctx.__status.textContent);
 });
 
 scenario('Lookup ចាស់មិនត្រូវដោះសោរបស់ Lookup ថ្មីក្រោយប្តូរ Config', async () => {
     const ctx = buildAutoRuntime({ zto: true, deferred: true, loadClear: true });
-    const oldLookup = vm.runInContext('attemptAutoLookup("BC1")', ctx);
-    ok('សំណើចាស់កំពុងដំណើរការ', ctx.__fetches.length === 1 && ctx.autoLookupInFlight.has('BC1'));
+    const oldLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    ok('សំណើចាស់កំពុងដំណើរការ', ctx.__fetches.length === 1 && ctx.autoLookupInFlight.has('BC100001'));
 
     vm.runInContext('clearCustomerDataTableCache()', ctx);
-    const freshLookup = vm.runInContext('attemptAutoLookup("BC1")', ctx);
-    ok('ប្តូរ Config ➜ សំណើថ្មីអាចចាប់ផ្តើមភ្លាម', ctx.__fetches.length === 2 && ctx.autoLookupInFlight.has('BC1'));
+    const freshLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    ok('ប្តូរ Config ➜ សំណើថ្មីអាចចាប់ផ្តើមភ្លាម', ctx.__fetches.length === 2 && ctx.autoLookupInFlight.has('BC100001'));
 
     ctx.__deferreds[0].resolve({ res: { ok: true, status: 200 }, body: { phone: 'old', success: true } });
     await oldLookup;
     ok('⛔ សំណើចាស់ចប់ ➜ សោរបស់សំណើថ្មីនៅតែជាប់',
-        ctx.autoLookupInFlight.has('BC1'), ctx.autoLookupInFlight.size);
+        ctx.autoLookupInFlight.has('BC100001'), ctx.autoLookupInFlight.size);
 
-    const duplicateLookup = vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    const duplicateLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
     ok('⛔ ខណៈសំណើថ្មីនៅរង់ចាំ ➜ មិនបាញ់សំណើទី ៣ ស្ទួន', ctx.__fetches.length === 2, ctx.__fetches.length);
 
     ctx.__deferreds[1].resolve({ res: { ok: true, status: 200 }, body: { phone: 'new', success: true } });
@@ -719,7 +729,7 @@ scenario('Lookup ចាស់មិនត្រូវដោះសោរបស់
 scenario('PIN និង Lookup មិនប្រជែង Keyboard', () => {
     const locked = buildAutoRuntime({ locked: true, fetchSuccess: true });
     let settled = false;
-    const lookup = vm.runInContext('attemptAutoLookup("BC1")', locked).then(() => { settled = true; });
+    const lookup = vm.runInContext('attemptAutoLookup("BC100001")', locked).then(() => { settled = true; });
     return Promise.resolve().then(() => {
         ok('Secret នៅជាប់សោ ➜ Lookup Promise នៅរង់ចាំ PIN', settled === false, settled);
         ok('ស្នើ PIN តែម្តង', locked.__unlockActions.length === 1, locked.__unlockActions.length);
@@ -745,9 +755,9 @@ scenario('PIN និង Lookup មិនប្រជែង Keyboard', () => {
 //   សេណារីយ៉ូខាងក្រោមរត់ `completePinUnlock()` **ពិត** ដែលហៅ `closeModal()` ពិត។
 scenario('⛔ បិទប្រអប់ PIN ➜ Lookup បន្តភ្លាម (មិនចាំស្កេនម្ដងទៀត)', () => {
     const ctx = buildAutoRuntime({ locked: true, fetchSuccess: true, realModals: true });
-    vm.runInContext('openModalHelper("phoneModal"); pendingBarcode = "BC1";', ctx);
+    vm.runInContext('openModalHelper("phoneModal"); pendingBarcode = "BC100001";', ctx);
     let settled = false;
-    const lookup = vm.runInContext('attemptAutoLookup("BC1")', ctx).then(() => { settled = true; });
+    const lookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx).then(() => { settled = true; });
     return Promise.resolve().then(() => {
         ok('លក្ខខណ្ឌចាំបាច់ ៖ Lookup ជាប់សោ ➜ ប្រអប់ PIN បើកពិត',
             ctx.__modals.pinModal.style.display === 'flex', ctx.__modals.pinModal.style.display);
@@ -758,7 +768,7 @@ scenario('⛔ បិទប្រអប់ PIN ➜ Lookup បន្តភ្ល�
         return vm.runInContext('completePinUnlock("123456")', ctx);
     }).then(() => lookup).then(() => {
         ok('⛔ បិទប្រអប់ PIN ➜ Barcode របស់ប្រអប់ដែលនៅបើក **មិនត្រូវបាត់**',
-            ctx.pendingBarcode === 'BC1', ctx.pendingBarcode);
+            ctx.pendingBarcode === 'BC100001', ctx.pendingBarcode);
         ok('⛔ វាយ PIN ត្រូវ ➜ Lookup បន្តភ្លាម ដោយ**មិនចាំស្កេនម្ដងទៀត**',
             ctx.__fetches.length === 1, ctx.__fetches);
         ok('⛔ ស្ថានភាពលែងជាប់នៅ «សូមវាយ PIN»',
@@ -778,7 +788,7 @@ scenario('⛔ បិទប្រអប់ PIN ➜ Lookup បន្តភ្ល�
 scenario('⛔ ចាកចេញ ៖ បិទប្រអប់ទាំងអស់ជាវដ្ត ➜ សម្អាតគ្រប់ស្ថានភាព', () => {
     const ctx = buildAutoRuntime({ realModals: true });
     vm.runInContext('openModalHelper("phoneModal"); openModalHelper("editPhoneModal"); openModalHelper("callMarkModal");', ctx);
-    vm.runInContext('pendingBarcode = "BC1"; editingItemId = "E1"; markingItemId = "M1";', ctx);
+    vm.runInContext('pendingBarcode = "BC100001"; editingItemId = "E1"; markingItemId = "M1";', ctx);
     ok('លក្ខខណ្ឌចាំបាច់ ៖ ប្រអប់ ៣ បើកពិត',
         ctx.__modals.phoneModal.style.display === 'flex'
         && ctx.__modals.editPhoneModal.style.display === 'flex'
@@ -793,7 +803,7 @@ scenario('⛔ ចាកចេញ ៖ បិទប្រអប់ទាំងអ�
 
 scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ចាស់ ➜ ស្ថានភាពត្រូវសម្អាតពិត', () => {
     const ctx = buildAutoRuntime({ realModals: true });
-    vm.runInContext('openModalHelper("phoneModal"); pendingBarcode = "BC1"; editingItemId = "E1"; markingItemId = "M1";', ctx);
+    vm.runInContext('openModalHelper("phoneModal"); pendingBarcode = "BC100001"; editingItemId = "E1"; markingItemId = "M1";', ctx);
     vm.runInContext('closeModal("phoneModal");', ctx);
     ok('បិទប្រអប់កញ្ចប់ ➜ pendingBarcode ត្រូវសម្អាត', ctx.pendingBarcode === '', ctx.pendingBarcode);
     ok('ជង់ប្រអប់ទទេ ➜ សម្អាត editingItemId និង markingItemId',
@@ -825,7 +835,7 @@ scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ច�
 scenario('⛔ Apps Script ➜ មិនផ្ញើ header ផ្ទាល់ខ្លួន (preflight សម្លាប់សំណើ)', () => {
     const ctx = buildAutoRuntime({ appsScript: true, locked: true, fetchSuccess: true });
     ctx.lookupSecretKey = { unlocked: true };
-    return vm.runInContext('attemptAutoLookup("BC1")', ctx).then(() => {
+    return vm.runInContext('attemptAutoLookup("BC100001")', ctx).then(() => {
         ok('លក្ខខណ្ឌចាំបាច់ ៖ សំណើចេញពិត', ctx.__fetches.length === 1, ctx.__fetches);
         const sent = (ctx.__fetchOptions[0] || {}).headers || {};
         ok('⛔ Apps Script ➜ **គ្មាន header ផ្ទាល់ខ្លួន** (បើមាន ➜ preflight ➜ Failed to fetch)',
@@ -836,7 +846,7 @@ scenario('⛔ Apps Script ➜ មិនផ្ញើ header ផ្ទាល់ខ
 scenario('⛔ ទិសផ្ទុយ ៖ API ដែលមិនមែន Apps Script ➜ header ត្រូវផ្ញើដដែល', () => {
     const ctx = buildAutoRuntime({ locked: true, fetchSuccess: true });
     ctx.lookupSecretKey = { unlocked: true };
-    return vm.runInContext('attemptAutoLookup("BC1")', ctx).then(() => {
+    return vm.runInContext('attemptAutoLookup("BC100001")', ctx).then(() => {
         const sent = (ctx.__fetchOptions[0] || {}).headers || {};
         ok('⛔ ទិសផ្ទុយ ៖ API ធម្មតា ➜ header នៅតែផ្ញើ (ការកែមិនកាត់សុវត្ថិភាព)',
             sent['X-Zoe-Proxy-Key'] !== undefined, sent);
@@ -849,7 +859,7 @@ scenario('⛔ ទិសផ្ទុយ ៖ API ដែលមិនមែន Apps 
 scenario('⛔ Apps Script ➜ មិនត្រូវសុំ PIN សម្រាប់ header ដែលមិនដែលផ្ញើ', () => {
     const ctx = buildAutoRuntime({ appsScript: true, locked: true, fetchSuccess: true });
     ctx.lookupSecretKey = null;
-    vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    vm.runInContext('attemptAutoLookup("BC100001")', ctx);
     return new Promise((resolve) => setTimeout(resolve, 10)).then(() => {
         ok('⛔ Apps Script + សោជាប់ ➜ **មិនសុំ PIN** (header នោះគ្មានប្រយោជន៍)',
             ctx.__unlockActions.length === 0, ctx.__unlockActions.length);
@@ -861,7 +871,7 @@ scenario('⛔ Apps Script ➜ មិនត្រូវសុំ PIN សម្រ
 scenario('⛔ ទិសផ្ទុយ ៖ ZTO ដែលសោជាប់ ➜ នៅតែសុំ PIN', () => {
     const ctx = buildAutoRuntime({ zto: true, locked: true, fetchSuccess: true });
     ctx.lookupSecretKey = null;
-    vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    vm.runInContext('attemptAutoLookup("BC100001")', ctx);
     return Promise.resolve().then(() => {
         ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ ការសុំ PIN នៅដដែល', ctx.__unlockActions.length === 1, ctx.__unlockActions.length);
         ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ មិនបាញ់សំណើមុនដោះសោ', ctx.__fetches.length === 0, ctx.__fetches);
@@ -1023,10 +1033,10 @@ function focusCase(label, opts, expectFocused) {
         ctx.__input = input;
         if (opts.modalClosed) vm.runInContext('isModalOpen = false;', ctx);
         else vm.runInContext('isModalOpen = true;', ctx);
-        if (opts.otherBarcode) vm.runInContext('pendingBarcode = "BC2";', ctx);
+        if (opts.otherBarcode) vm.runInContext('pendingBarcode = "BC200002";', ctx);
         let settle;
         ctx.__promise = new Promise((r) => { settle = r; });
-        vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+        vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
         const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
         const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
         ctx.__clock.advance(fallback - 1);
@@ -1054,7 +1064,7 @@ scenario('បិទ PIN រួច ➜ manual fallback ចាប់ពេលព�
     let settle;
     ctx.__promise = new Promise((r) => { settle = r; });
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
     ctx.__clock.advance(fallback + grace + 1);
@@ -1077,7 +1087,7 @@ scenario('focus តែម្តង', () => {
     let settle;
     ctx.__promise = new Promise((r) => { settle = r; });
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
     settle();
     return Promise.resolve().then(() => {
         ctx.__clock.advance(vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx) + 1);
@@ -1112,8 +1122,8 @@ function workingCase(label, opts, clearJs) {
         ctx.__promise = new Promise((r) => { settle = r; });
         vm.runInContext('isModalOpen = true;', ctx);
         ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — កូដយល់ថា Lookup កំពុងធ្វើការ',
-            vm.runInContext('lookupIsWorkingOn("BC1")', ctx) === true);
-        vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+            vm.runInContext('lookupIsWorkingOn("BC100001")', ctx) === true);
+        vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
         const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
         const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
         ctx.__clock.advance(fallback + grace + 1);
@@ -1122,7 +1132,7 @@ function workingCase(label, opts, clearJs) {
         ok(label + ' ➜ រង់ចាំបន្ត មិនមែនគ្រាន់តែពន្យារ', focused === 0, focused);
         vm.runInContext(clearJs, ctx);
         ok(label + ' ៖ ការស្វែងរកចប់ ➜ កូដយល់ថាលែងធ្វើការ',
-            vm.runInContext('lookupIsWorkingOn("BC1")', ctx) === false);
+            vm.runInContext('lookupIsWorkingOn("BC100001")', ctx) === false);
         settle();
         return Promise.resolve().then(() => {
             ctx.__clock.advance(grace + 1);
@@ -1131,19 +1141,19 @@ function workingCase(label, opts, clearJs) {
     });
 }
 workingCase('សំណើ Lookup កំពុងដំណើរការ', { lookupInFlight: true },
-    'if (typeof autoLookupInFlight.delete === "function") autoLookupInFlight.delete("BC1");');
-workingCase('Lookup កំពុងរង់ចាំជួរ', { lookupQueued: true }, 'autoLookupQueueRetries.delete("BC1");');
+    'if (typeof autoLookupInFlight.delete === "function") autoLookupInFlight.delete("BC100001");');
+workingCase('Lookup កំពុងរង់ចាំជួរ', { lookupQueued: true }, 'autoLookupQueueRetries.delete("BC100001");');
 workingCase('Lookup កំពុងរង់ចាំការដោះសោ PIN', { lookupWaitingPin: true }, 'pendingLookupUnlockBarcode = "";');
 
 scenario('⛔ ទិសផ្ទុយ ៖ គ្មានការស្វែងរក ➜ Keyboard មិនត្រូវត្រូវទប់', () => {
     const ctx = build({});
     ok('គ្មានធាតុណាកំពុងធ្វើការ ➜ lookupIsWorkingOn() ត្រូវជា false',
-        vm.runInContext('lookupIsWorkingOn("BC1")', ctx) === false);
+        vm.runInContext('lookupIsWorkingOn("BC100001")', ctx) === false);
     ok('Barcode ទទេ ➜ មិនរាប់ជាការធ្វើការ (មិនទប់ជារៀងរហូត)',
         vm.runInContext('lookupIsWorkingOn("")', ctx) === false);
     const other = build({ lookupInFlight: true });
     ok('⛔ ការស្វែងរកកញ្ចប់ **ផ្សេង** មិនត្រូវទប់ Keyboard របស់កញ្ចប់នេះ',
-        vm.runInContext('lookupIsWorkingOn("BC2")', other) === false);
+        vm.runInContext('lookupIsWorkingOn("BC200002")', other) === false);
 });
 
 scenario('⛔ ការរង់ចាំ Lookup ត្រូវមានពិដាន (គ្មានការរង់ចាំគ្មានទីបញ្ចប់)', () => {
@@ -1154,7 +1164,7 @@ scenario('⛔ ការរង់ចាំ Lookup ត្រូវមានពិ�
     ctx.__input = { value: '', focus: () => { focused++; } };
     ctx.__promise = new Promise(() => {});
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const max = vm.runInContext('LOOKUP_FOCUS_MAX_WAIT_MS', ctx);
     const ztoTimeout = vm.runInContext('ZTO_AUTO_LOOKUP_TIMEOUT_MS', ctx);
@@ -1180,7 +1190,7 @@ scenario('⛔ នាឡិកាថយក្រោយ ➜ fail-open (Keyboard �
     ctx.__input = { value: '', focus: () => { focused++; } };
     ctx.__promise = new Promise(() => {});
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC100001", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
     now -= 3600000;

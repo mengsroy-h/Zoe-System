@@ -11,6 +11,8 @@
  * ក្នុងមួយវគ្គ (មិនជាប់រហូត)។ គ្មានសញ្ញា · សញ្ញាចាស់ · rules មិនទាន់ Publish (`permission_denied`) ➜ សម្អាតធម្មតា។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { getZoneDateKey } from '../src/core/timezone';
@@ -137,7 +139,10 @@ beforeEach(() => {
         ref: (_db: unknown, path: string) => ({ path }),
         onValue: (ref: { path: string }, ok: (s: any) => void, fail: (e: any) => void) => {
             (listeners[ref.path] = listeners[ref.path] || []).push({ ok, fail });
-            if (ref.path === PATH && denyMarker) fail(Object.assign(new Error('permission_denied at /' + PATH), { code: 'PERMISSION_DENIED' }));
+            if (ref.path === PATH && denyMarker) {
+                listeners[ref.path] = listeners[ref.path].filter((l) => l.ok !== ok);
+                fail(Object.assign(new Error('permission_denied at /' + PATH), { code: 'PERMISSION_DENIED' }));
+            }
         },
         off: (ref: { path: string }) => { delete listeners[ref.path]; },
         update: async (ref: { path: string }, patch: any) => {
@@ -358,6 +363,56 @@ describe('ការពិនិត្យប្រឆាំង ៖ សញ្ញ�
         deliver(PATH);
         for (let i = 0; i < 12; i++) { advance(MIN); cleanupNow(); }
         expect(abandoned('r'), '⛔ ការភ្ជាប់ឡើងវិញមិនបន្តពិដានវគ្គ').toBe(true);
+    });
+});
+
+describe('ការពិនិត្យប្រឆាំង (backend) ៖ rules បោះពុម្ពក្រោយ · ត្រាពេលអនាគត', () => {
+    it('listener ត្រូវ permission_denied (rules មិនទាន់ Publish) ➜ ក្រោយ Publish ការភ្ជាប់ឡើងវិញ (ជុំ ៦០ វិ.) ធ្វើឲ្យ B រង់ចាំវិញ ដោយមិនបាច់ reload · ≤ ១ ដងក្នុង ZTO_SHOP_SWEEP_MARK_GAP_MS', async () => {
+        const retry = (shop as any).retryZtoShopSweepListener;
+        expect(typeof retry, 'retryZtoShopSweepListener ត្រូវមាន').toBe('function');
+        dataState.scanHistory = [openItem('d2', 'ZTM2000030', 7 * DAY - 10 * MIN)];
+        denyMarker = true;
+        attach();
+        expect(ztoState.ztoShopSweep.state).toBe('denied');
+        expect((listeners[PATH] || []).length, 'លក្ខខណ្ឌចាំបាច់ ៖ SDK ពិតដក listener ដែលត្រូវបដិសេធ').toBe(0);
+        denyMarker = false;
+        shared = { activeAt: NOW, completeAt: NOW };
+        retry();
+        expect((listeners[PATH] || []).length, '⛔ មិនភ្ជាប់ភ្លាមៗរាល់ជុំ (≤ ១ ដងក្នុងចន្លោះ)').toBe(0);
+        advance(M.ZTO_SHOP_SWEEP_MARK_GAP_MS);
+        retry();
+        expect((listeners[PATH] || []).length, 'ភ្ជាប់ឡើងវិញក្រោយចន្លោះ').toBe(1);
+        expect(ztoState.ztoShopSweep.state, 'មុន snapshot មកដល់ ៖ នៅ denied (មិនរង់ចាំ)').toBe('denied');
+        deliver(PATH);
+        asDeviceB();
+        advance(10 * MIN);
+        cleanupNow();
+        expect(abandoned('d2'), '⛔ ក្រោយ Publish ៖ B រង់ចាំការអានរបស់ A').toBe(false);
+    });
+
+    it('ត្រាពេលអនាគត (ម៉ោង Server ខុស) មិនធ្វើឲ្យសញ្ញាហាងកក ៖ ឧបករណ៍ ZTO ម៉ោងត្រូវសរសេរជាន់ · B រង់ចាំត្រឹមត្រូវ', async () => {
+        dataState.scanHistory = [openItem('f2', 'ZTM2000031', 7 * DAY + 10 * MIN)];
+        attach();
+        shared = { activeAt: NOW + 30 * DAY, completeAt: NOW + 30 * DAY };
+        deliver(PATH);
+        const before = updates.filter((u) => u.path === PATH).length;
+        await sweepA([]);
+        const writes = updates.filter((u) => u.path === PATH).slice(before);
+        expect(writes.length, '⛔ ឧបករណ៍ ZTO សរសេរជាន់ត្រាអនាគត').toBeGreaterThanOrEqual(1);
+        expect(shared.completeAt, 'completeAt ត្រឹមត្រូវ (ម៉ោង Server ពិត)').toBe(NOW);
+        expect(shared.activeAt).toBe(NOW);
+        dataState.scanHistory = [openItem('f3', 'ZTM2000032', 7 * DAY - 10 * MIN)];
+        asDeviceB();
+        advance(20 * MIN);
+        cleanupNow();
+        expect(abandoned('f3'), 'B រង់ចាំ (ការអានចុងក្រោយមុនកញ្ចប់ទុំ)').toBe(false);
+    });
+
+    it('rules ៖ ត្រាពេល activeAt/completeAt មិនលើស now + ១០ នាទី', () => {
+        const rules = JSON.parse(readFileSync(path.resolve(__dirname, '../../firebase-database.rules.json'), 'utf8'));
+        const node = rules.rules.zoew_settings.zto_signed_sweep;
+        expect(node.activeAt['.validate']).toContain('newData.val() <= now + 600000');
+        expect(node.completeAt['.validate']).toContain('newData.val() <= now + 600000');
     });
 });
 

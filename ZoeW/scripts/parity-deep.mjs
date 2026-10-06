@@ -76,7 +76,7 @@ const CUSTOMER_MARKERS = ['012345678', '0977777777', '0888888', '011223344', '01
 /* ── បណ្តាញ ↔ នាឡិកាឈប់ ───────────────────────────────────────────────
  * ចម្លើយ ZTO/Apps Script (SW ➜ `ctx.route`/`page.route`) មកដល់តាម **ម៉ោងពិត** ខណៈនាឡិកា JS ឈប់ ➜
  * ការរង់ចាំម៉ោងពិតថេរ (~២១០ms ក្នុងមួយជំហាន) បាក់ពេល CI រវល់ ➜ App មួយឃើញ «✅ រកឃើញពី ZTO» ម្ខាងទៀត
- * «🔎 កំពុងស្វែងរក…» ➜ ជំហាន «ស្កេន ZL5» ធ្លាក់ «អេក្រង់» ដោយ App គ្មានកំហុស (វាស់បាន ៖ `DEEP_NET_DELAY_MS=800`
+ * «🔎 កំពុងស្វែងរក…» ➜ ជំហាន «ស្កេន ZL500005» ធ្លាក់ «អេក្រង់» ដោយ App គ្មានកំហុស (វាស់បាន ៖ `DEEP_NET_DELAY_MS=800`
  * ធ្លាក់ ៧/១៣ ជំហាន ZTO មុនការកែ)។ ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ៖ `advance()` រំកិលនាឡិកាជាដុំ `NET_STEP_MS`
  * ហើយរង់ចាំសំណើដែលកំពុងហោះ (`window.__netPending`) ស្ងប់ **មុន** ដុំនីមួយៗ ➜ ម៉ោងក្លែងសរុបដដែលទាំង ២ App
  * ហើយចម្លើយចុះលើម៉ោងក្លែងដដែល មិនអាស្រ័យលើល្បឿនម៉ាស៊ីន។ ⛔ កុំកែវាដោយបង្កើន `waitForTimeout` (ការសំណាង)។
@@ -384,7 +384,8 @@ const ZTO_BACKEND = {
         AA1: { phone: '012345678', cod: 10, dod: 2.5, ztoClosed: true },
         AA2: { phone: '012345678', cod: 2.5, dod: 0, ztoClosed: null },
         ZL9: { phone: '0975555555', cod: 1, dod: 0, ztoClosed: true },
-        ZL5: { phone: '0976666666', cod: 2.25, dod: 0.75, ztoClosed: null }
+        // ⛔ barcode ដែលស្កេនចូល Lookup ZTO ត្រូវមានទម្រង់ `BARCODE_RE` របស់ Function (App ឈប់មុនបណ្ដាញលើ barcode ក្រៅទម្រង់)
+        ZL500005: { phone: '0976666666', cod: 2.25, dod: 0.75, ztoClosed: null }
     },
     listRows: [
         { barcode: 'ZL1', phone: '0971111111', cod: 4.5, dod: 1, at: '2026-09-22 09:30:00', ztoClosed: null, skip: '' },
@@ -417,7 +418,7 @@ const ZTO_STEPS = [
     ['បិទប្រអប់ទាញបញ្ជី', click('#ztoListSyncCloseBtn')],
     ['តារាង «ថ្ងៃនេះ» ក្រោយបញ្ចូល', click('#btnFilterToday')],
     ['ទំព័រស្កេន ➜ ស្កេន ZL9 ស្ទួន', seq(click('#pageTabEntry'), scanCode('ZL9'))],
-    ['ស្កេន ZL5 ➜ ZTO បំពេញស្វ័យប្រវត្តិ', scanCode('ZL5')],
+    ['ស្កេន ZL500005 ➜ ZTO បំពេញស្វ័យប្រវត្តិ', scanCode('ZL500005')],
     ['យល់ព្រម (សរសេរលុយពី ZTO)', click('#phoneModalConfirmBtn')]
 ];
 /* ── សេណារីយ៉ូ Google Sheet ៖ តារាងអតិថិជន + Lookup តាម Sheet ─────────── */

@@ -8,7 +8,7 @@ import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../co
 import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta } from '../domain/ledger';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
-import { armLookupFocus, attemptAutoLookup, clearLookupStatus } from './auto-lookup';
+import { armLookupFocus, attemptAutoLookup, clearLookupStatus, fillEmptyLookupFields, lookupAnswersHeldWhileSaving, takeHeldLookupAnswer } from './auto-lookup';
 import { handleLockerScan } from './locker-assign';
 import { warmZtoLookupProxyNow } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
@@ -87,7 +87,25 @@ export function dropOptimisticBarcode(code) {
     }
 }
 
+function heldLookupMoneyOf(value) {
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return null;
+    return n > 0 ? Math.round(n * 100) / 100 : 0;
+}
+
+export function warnHeldLookupMoney(held, barcode, cod, dod) {
+    if (!held) return false;
+    const heldCod = heldLookupMoneyOf(held.cod);
+    const heldDod = heldLookupMoneyOf(held.dod);
+    if (!(heldCod > 0) && !(heldDod > 0)) return false;
+    if ((heldCod === null || heldCod === cod) && (heldDod === null || heldDod === dod)) return false;
+    const shown = (v) => (v === null ? '—' : String(v));
+    showToast(`⚠️ ZTO បង្ហាញ COD ${shown(heldCod)} · DOD ${shown(heldDod)} — កញ្ចប់ (${barcode}) បានរក្សាទុកតាមតម្លៃដែលបានបញ្ចូល (COD ${cod} · DOD ${dod})។ កែទឹកប្រាក់បានតាម «កែតម្លៃកញ្ចប់»។`);
+    return true;
+}
+
 export async function confirmPhone(isSkip = false) {
+    if (viewState.phoneModalBusy) return;
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
@@ -123,6 +141,7 @@ export async function confirmPhone(isSkip = false) {
     }
 
     viewState.phoneModalBusy = true;
+    lookupAnswersHeldWhileSaving.clear();
 
     try {
         const claimPromise = claimBarcodeInRegistry(barcodeToSave);
@@ -157,16 +176,20 @@ export async function confirmPhone(isSkip = false) {
             const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
             if (!current()) return;
             if (saveStatus !== true) {
+                const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
                 closeModal('phoneModal');
+                if (saveStatus === false) warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
                 return;
             }
         } catch (saveError) {
             if (!current()) return;
             if (saveError && saveError.message === 'Save timed out') {
                 probeDatabaseLiveness('save');
+                const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
                 savePromise.then((lateStatus) => {
                     if (!current()) return;
                     if (lateStatus === true) showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
+                    if (lateStatus === true || lateStatus === false) warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
                     refreshCurrentHistoryView();
                 }, (lateErr) => {
                     if (!current()) return;
@@ -183,8 +206,10 @@ export async function confirmPhone(isSkip = false) {
             throw saveError;
         }
 
+        const heldAnswer = takeHeldLookupAnswer(barcodeToSave);
         closeModal('phoneModal');
         showToast("✅ រក្សាទុកបានជោគជ័យ!");
+        warnHeldLookupMoney(heldAnswer, barcodeToSave, cod, dod);
     } catch (e) {
         if (!current()) return;
         showToast(`⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
@@ -192,6 +217,8 @@ export async function confirmPhone(isSkip = false) {
         if (current()) {
             viewState.phoneModalBusy = false;
             warmZtoLookupProxyNow();
+            const heldAnswer = takeHeldLookupAnswer(scanState.pendingBarcode);
+            if (heldAnswer) fillEmptyLookupFields(heldAnswer.phone, heldAnswer.cod, heldAnswer.dod);
         }
     }
 }

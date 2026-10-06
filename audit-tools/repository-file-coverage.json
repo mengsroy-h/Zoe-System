@@ -1776,6 +1776,9 @@
     "ZoeW/tests/list-render-scope.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/lookup-late-answer-busy.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1857,6 +1860,12 @@
     "ZoeW/tests/zto-list-identity.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/lookup-import-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-barcode-shape.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1894,6 +1903,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-stale-bar.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-placeholder-phone.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tsconfig.app.json": {
@@ -2802,7 +2814,7 @@
     "supabase/migrations/20261001000100_zoe_rules.sql": {
       "policy": "supabase-db"
     },
-    "supabase/migrations/20261006181025_zoe_rules.sql": {
+    "supabase/migrations/20261006192639_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "supabase/migrations/20261001000200_zoe_datastore.sql": {

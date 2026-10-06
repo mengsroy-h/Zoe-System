@@ -129,6 +129,12 @@ for (const app of ['ZoeW']) {
             + " sheetImportPassword = 'import-pw'; sheetImportSignature = 'sig'; sheetImportBusy = true;", ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
         if (helper) vm.runInContext(helper, ctx);
+        // ⛔ ចម្លើយ Lookup ដែលទុកពេលប្រអប់លេខទូរស័ព្ទកំពុងរក្សាទុក (លេខទូរស័ព្ទ · COD/DOD អតិថិជន)
+        //    ➜ ប្រកាស Map **ពិត** ពី app.js ហើយដាក់ធាតុមុនចាកចេញ (map ទទេ = ការការពារដែលងាប់)
+        const heldDecl = (src.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
+        ok(!!heldDecl, 'រកឃើញការប្រកាស lookupAnswersHeldWhileSaving ក្នុង app.js');
+        vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
+        vm.runInContext("lookupAnswersHeldWhileSaving.set('ZTO9999000222', { phone: '0963897345', cod: 5, dod: 1 });", ctx);
         const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
         if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
         // ⛔ cache `zoe_docs` របស់ហាង Supabase (IndexedDB) ផ្ទុកទិន្នន័យអតិថិជន ➜ ការចាកចេញលុប database ទាំងមូល ឯករាជ្យពី backend
@@ -209,6 +215,9 @@ for (const app of ['ZoeW']) {
         ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
             'the barcode held for scan confirmation does not survive logout',
             vm.runInContext('scanConfirmCode', ctx));
+        ok(vm.runInContext('lookupAnswersHeldWhileSaving.size', ctx) === 0,
+            'ចាកចេញ ➜ ចម្លើយ Lookup ដែលទុកពេលកំពុងរក្សាទុក (លេខទូរស័ព្ទ · COD/DOD) មិនរស់រាន',
+            vm.runInContext('lookupAnswersHeldWhileSaving.size', ctx));
         const scanRemoveState = vm.runInContext(
             '({ pending: pendingScannedRemoval, inFlight: scanRemoveInFlight, mode: entryScanMode })', ctx);
         ok(scanRemoveState.pending === null && scanRemoveState.inFlight === null && scanRemoveState.mode === 'parcel',

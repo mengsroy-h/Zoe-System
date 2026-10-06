@@ -65,8 +65,13 @@ function sliceFn(name) {
 const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookupTimeoutNoRetry',
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse', 'noteSheetScriptVersion',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
-    'getFastLookupRow', 'setFastLookupRow',
+    'getFastLookupRow', 'setFastLookupRow', 'ztoBarcodeShapeIsValid',
     'attemptAutoLookup'];
+// ⛔ ថេរដែល `attemptAutoLookup()` ពិតប្រើ (ច្រកទម្រង់ barcode ZTO) ➜ ស្រង់ពីកូដពិត
+const CONSTS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT'].map((n) => {
+    const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
+    return m ? m[0] : '';
+}).filter(Boolean);
 // ជាន់អប្បបរមាទី ២ ៖ ចំនួន function ដែលស្រង់បាន — refactor ដែលដក function
 // ចេញមិនត្រូវធ្វើឲ្យ checker បៃតងដោយស្ងាត់
 const OPTIONAL = ['scheduleAutoLookupQueueRetry', 'clearAutoLookupQueueRetries',
@@ -152,7 +157,7 @@ function buildRuntime(opts) {
         }), o.netDelayMs === undefined ? 300 : o.netDelayMs));
     };
     vm.createContext(ctx);
-    const body = NEEDED.concat(OPTIONAL).map((n) => src[n]).filter(Boolean).join('\n');
+    const body = CONSTS.concat(NEEDED.concat(OPTIONAL).map((n) => src[n]).filter(Boolean)).join('\n');
     vm.runInContext(body, ctx);
     return ctx;
 }

@@ -969,7 +969,7 @@ function listContainerOf(upstream) {
     return null;
 }
 
-function listPhoneIsPlaceholder(text) {
+function phoneIsPlaceholder(text) {
     const digits = String(text || '').replace(/[^0-9]/g, '');
     return !digits || /^0+$/.test(digits);
 }
@@ -1012,7 +1012,7 @@ function projectListRow(config, row) {
     const at = pickText(candidates, LIST_TIME_PATHS);
     return {
         barcode: pickText(candidates, LIST_BARCODE_PATHS),
-        phone: listPhoneIsPlaceholder(phone) ? '' : phone,
+        phone: phoneIsPlaceholder(phone) ? '' : phone,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : '',
@@ -1359,10 +1359,11 @@ function extractOrder(config, upstream) {
     const phone = pickText(candidates, config.phonePaths);
     const cod = pickNumber(candidates, config.codPaths);
     const dod = pickNumber(candidates, config.dodPaths);
-    if (!phone && cod === null && dod === null) return null;
+    const shown = phoneIsPlaceholder(phone) ? '' : phone;
+    if (!shown && cod === null && dod === null) return null;
     return {
         barcode: pickText(candidates, config.barcodePaths),
-        phone,
+        phone: shown,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         signed: pickSignedVerdict(candidates, config.signed)

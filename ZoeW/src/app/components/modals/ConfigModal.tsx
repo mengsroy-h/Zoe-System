@@ -3,6 +3,7 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { viewState } from '../../../core/view-state';
 import { useStoreFields } from '../../hooks/useStore';
+import { SellerTelegramLink } from '../shell/SellerTelegramLink';
 
 export function ConfigModal() {
     const v = useStoreFields(viewState, ['configBackend']);
@@ -13,6 +14,11 @@ export function ConfigModal() {
                 <h3>⚙️ ភ្ជាប់ប្រព័ន្ធ</h3>
                 <p>
                     ស្កេន QR ឬបើក <b>Setup Link</b> ដែលអ្នកលក់ផ្ញើ ➜ ការកំណត់បំពេញឲ្យដោយខ្លួនឯង។
+                </p>
+                <p className="cfg-contact">
+                    មិនទាន់មានគណនី? ទាក់ទង{' '}
+                    <SellerTelegramLink />
+                    {' '}តាម Telegram ដើម្បីបង្កើតគណនី
                 </p>
                 <div className="modal-btns" style={{ marginBottom: "10px" }}>
                     <button type="button" className="btn-info" onClick={onAct("openConfigQrScanner")}>📷 ស្កេន QR (Setup Link)</button>

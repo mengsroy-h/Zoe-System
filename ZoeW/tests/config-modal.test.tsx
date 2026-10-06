@@ -24,6 +24,9 @@ vi.mock('../src/platform/document-io', async (orig) => {
 
 import { ConfigModal } from '../src/app/components/modals/ConfigModal';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
+import { ActivationModal } from '../src/app/components/modals/ActivationModal';
+import { APP_LOCK_EXCUSE_SELECTOR } from '../src/features/app-lock';
+import { INTENTIONAL_UI } from '../scripts/snapshot.mjs';
 import { viewState } from '../src/core/view-state';
 import { securityState, uiState } from '../src/core/state';
 import { fieldValue } from '../src/app/refs';
@@ -102,6 +105,48 @@ describe('ប្រអប់ Config ៖ ជ្រើស Firebase / Supabase', ()
         step(() => { (byId('firebaseConfigInput') as HTMLTextAreaElement).value = 'const firebaseConfig = ' + JSON.stringify(FB) + ';'; });
         step(() => saveFirebaseConfig());
         expect(JSON.parse(appLocalStore!.getItem('zoew_firebase_config')!)).toEqual(FB);
+    });
+});
+
+describe('ទំនាក់ទំនងបង្កើតគណនី (Telegram @mengsroyhun) ក្នុងប្រអប់ Config', () => {
+    // សំណើម្ចាស់គម្រោង (Deep audit ជុំ ៣) ៖ អ្នកដែលមិនទាន់មានគណនី/Setup Link ត្រូវឃើញផ្លូវទាក់ទងក្នុងប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ»
+    const contactLinks = () => Array.from(document.querySelectorAll('#configModal a[href="https://t.me/mengsroyhun"]')) as HTMLAnchorElement[];
+    const visible = (el: Element) => !el.closest('.hidden');
+
+    for (const backend of ['firebase', 'supabase'] as const) {
+        it(`${backend} ៖ តំណ Telegram មួយ ឃើញ (មិននៅក្រោម .hidden) · អត្ថបទប្រាប់ «បង្កើតគណនី»`, () => {
+            step(() => { openConfigModal(); selectConfigBackend(backend); });
+            const links = contactLinks();
+            expect(links.length).toBe(1);
+            expect(visible(links[0])).toBe(true);
+            expect(links[0].textContent).toBe('@mengsroyhun');
+            const line = links[0].closest('p')!;
+            expect(line.textContent).toMatch(/បង្កើតគណនី/);
+            expect(line.textContent).toMatch(/Telegram/);
+        });
+    }
+
+    it('⛔ បើកក្នុងផ្ទាំងថ្មី (noopener) ➜ ការចាកចេញទៅ Telegram ជាការចាកចេញដោយចេតនា (App lock មិនសួរ PIN ពេលត្រឡប់)', () => {
+        step(() => openConfigModal());
+        const a = contactLinks()[0];
+        expect(a.target).toBe('_blank');
+        expect(a.rel.split(/\s+/)).toEqual(expect.arrayContaining(['noopener', 'noreferrer']));
+        expect(a.matches(APP_LOCK_EXCUSE_SELECTOR)).toBe(true);
+    });
+
+    it('⛔ ប្រភពតែមួយ ៖ តំណក្នុង Config ដូចតំណក្នុងប្រអប់ Activation បេះបិទ', () => {
+        unmount();
+        mount(<><ConfigModal /><ActivationModal /></>);
+        const act = document.querySelector('#activationModal a[href^="https://t.me/"]')!;
+        expect(act).not.toBe(null);
+        expect(contactLinks()[0].outerHTML).toBe(act.outerHTML);
+    });
+
+    it('parity ៖ បន្ទាត់ទំនាក់ទំនងជាផ្ទៃបន្ថែមដែល INTENTIONAL_UI រំលង (App ដើមគ្មាន) · ធាតុដើមនៅប្រៀបធៀប', () => {
+        const line = contactLinks()[0].closest('p')!;
+        expect(line.matches(INTENTIONAL_UI.skip)).toBe(true);
+        expect(byId('firebaseConfigInput').matches(INTENTIONAL_UI.skip)).toBe(false);
+        expect(byId('configSaveBtn').matches(INTENTIONAL_UI.skip)).toBe(false);
     });
 });
 

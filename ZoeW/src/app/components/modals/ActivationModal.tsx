@@ -3,6 +3,7 @@ import { viewState } from '../../../core/view-state';
 import { onAct } from '../../actions';
 import { useStoreFields } from '../../hooks/useStore';
 import { refTo } from '../../refs';
+import { SellerTelegramLink } from '../shell/SellerTelegramLink';
 
 export function ActivationModal() {
     const v = useStoreFields(viewState, ['activationMessage', 'activationBusy']);
@@ -25,14 +26,7 @@ export function ActivationModal() {
                     style={{ marginTop: "10px", fontSize: "calc(11.5 * var(--fs-unit))", color: "var(--text-muted)", textAlign: "center" }}
                 >
                     មិនទាន់មាន Key? ទាក់ទង{' '}
-                    <a
-                        href="https://t.me/mengsroyhun"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "var(--primary)", fontWeight: "600" }}
-                    >
-                        @mengsroyhun
-                    </a>
+                    <SellerTelegramLink />
                     {' '}តាម Telegram
                 </p>
             </div>

@@ -1377,6 +1377,9 @@
     "ZoeW/src/app/components/shell/SafeAreaProbe.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/shell/SellerTelegramLink.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/shell/UpdateBanner.tsx": {
       "policy": "zoew-react-ui"
     },

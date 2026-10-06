@@ -17,7 +17,9 @@
  *      · អត្ថបទណែនាំនៃប្រអប់ Config (`h3` + `p` គ្មាន style) ៖ Setup Link មុន · Config Firebase ក្រោម (2.46.0 ៖ backend Firebase ឬ Supabase)
  *        ➜ textarea · ប៊ូតុង · វាល Sentry នៅប្រៀបធៀបដដែល (ប្រអប់ mount ជានិច្ច ➜ គ្រប់អេក្រង់របស់ dom · live · deep) ·
  *        `.cfg-extra` (QR ពីរូបភាព · បិទភ្ជាប់ Setup Link · ជ្រើស Firebase/Supabase) និង `.cfg-supabase` (វាល Supabase) ជាផ្ទៃបន្ថែម
- *        (សំណើម្ចាស់គម្រោង) ➜ ពេល Config ជា Firebase (ដូច App ដើម) ធាតុដើមទាំងអស់នៅដដែល
+ *        (សំណើម្ចាស់គម្រោង) ➜ ពេល Config ជា Firebase (ដូច App ដើម) ធាតុដើមទាំងអស់នៅដដែល ·
+ *        `p.cfg-contact` (2.49.5 ៖ ទាក់ទងបង្កើតគណនីតាម Telegram · សំណើម្ចាស់គម្រោង) ជា `p` គ្មាន style ដូចគ្នា ➜ ច្បាប់ដដែលរំលងវា
+ *        (`ZoeW/tests/config-modal.test.tsx` ចាក់សោ ៖ វារំលង · textarea និងប៊ូតុងរក្សាទុកនៅប្រៀបធៀប)
  *    · `navbarShrinkPx` ៖ navbar លើទូរស័ព្ទទាបជាងដើម **១៤px តែប៉ុណ្ណោះ** (65 ➜ 51 · 2.43.0) ➜ `parity:dom` ទទួលយក **តែ** ការរំកិល
  *      ឡើងលើ ១៤px និងកម្ពស់បន្ថែម ១៤px របស់ផ្ទាំងដែលបំពេញអេក្រង់ — x · ទទឹង · តម្លៃ CSS ផ្សេងទៀត ត្រូវដូចដើមបេះបិទ
  */

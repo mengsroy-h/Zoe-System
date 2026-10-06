@@ -46,24 +46,23 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #284 merge រួច (`main` = **ZoeW 2.49.3 · ZoeKeyGen 2.24.4** · Deep audit ជុំ ១–២) · branch `claude/youthful-tesla-a7vr2w` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5**
-   (PR #285 · ជុំ ២ ដែលនៅសល់ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
+1. **ម្ចាស់គម្រោង** ៖ PR #285 merge រួច (`main` = **ZoeW 2.49.4 · ZoeKeyGen 2.24.5** · Deep audit ជុំ ១–២) · branch `claude/wizardly-pascal-slr8gi` = **ZoeW 2.49.5**
+   (Deep audit ជុំ ៣ ចំណុច ១ · មិនទាន់ merge) ➜ ធ្វើតាម [2.49.5] · [2.49.4] · [2.49.3] · [2.49.2] · [2.49.1] · [2.49.0]
    «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (Netlify ZoeKeyGen + ZoeW ➜ APK · Sentry Alert rule `zone:money` · secret backup ហាង + សាកស្តារ)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
    Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · រាយការណ៍ក្រោយជុំនីមួយៗ · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main`) ៖
-   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ បណ្តាញ») ·
-   **ជុំ ២ នៅសល់ ១០ session (ម្ចាស់គម្រោង ៖ ធ្វើគ្រប់ចំណុចឲ្យស្អាត · ម្តងមួយ session · គ្មាន workflow/agent ព្រោះកូតា · វាស់ឡើងវិញលើ `main` មុនកែ ·
-   វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន» · ម្ចាស់គម្រោងក្រោយមក ៖ «ធ្វើគ្រប់ចំណុចជុំ ២ ឲ្យចប់» ➜ PR #285)** ៖ (១) ✅ **G4 ➜ [2.49.4]** (២) ✅ **G5 ➜ [2.49.4]**
-   (ផ្នែក ២ «Deep audit ជុំ ២ ៖ G5» · «G4») (៣) ZTO-G4 ការនាំចូលបញ្ជី ZTO មិនឈប់ក្រោយការព្យួរដំបូង (សោ ~២៥ នាទី) ✅ **➜ [2.49.4]** (៤) G3 Sentry លុយ `unknown` ក្លែងសម្រាប់
-   សំណើដែលមិនទាន់ផ្ញើ + SBD-6 realtime `CLOSED` មិន subscribe វិញ ✅ **➜ [2.49.4]** (៥) SBD-5 ទិដ្ឋភាពខ្លីមួយភ្លែតពេលការទាញពេញច្រើនទំព័រដាច់ ✅ **➜ [2.49.4]** (៦) ✅ **➜ [2.49.4]** ZTO-G3 HTTP 200 body ខូច ➜
-   «គ្មានទិន្នន័យ» + ZTO-G5 សារនាំចូលមិនប្រាប់ជួរដែលមិនទាន់នាំចូល (៧) ✅ **➜ [2.49.4]** ZTO-G2 អត្តសញ្ញាណបរាជ័យបណ្តោះអាសន្ន ➜ «គ្មានសាខា» + ZTO-G6 ថវិកា single-flight (៨) ✅ **➜ [2.49.4]** G6
-   នាឡិកាលឿន ➜ refresh ញឹក/429 ចាកចេញ (G7 ពេលត្រូវការ) (៩) ✅ realtime websocket ពិត (វាស់រួច ៖ ផ្នែក ២) (១០) ✅ **➜ [2.49.4]** SW install ព្យួរដោយឯកសារ OPTIONAL + License ៖ អ្នកយាម ២ ចន្លោះ (ផ្នែក ២ «ចំណុច ១០») ➜ **ជុំ ២ ចប់គ្រប់ចំណុច**។
-   ✅ **ម្ចាស់គម្រោងធ្វើរួច (2026-10-04)** ៖ G2 (ចម្លើយ refresh បាត់ ➜ ចាកចេញ) ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.
-   (ការរកឃើញការលួច refresh token នៅបើក)។ **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ (ព្រមាន) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync»
-   ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។ ជុំ ៣ Config ➜ Login ➜ Signup ចាប់ផ្តើមក្រោយ ១០ session នេះ ·
-   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ម្ចាស់គម្រោងផ្តល់ prompt ផ្ទាល់រាល់ជុំ · ⛔ គ្មាន workflow/agent (សន្សំកូតា) · ច្បាប់រស់ក្នុង
-   `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
+2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · ម្តងមួយចំណុចក្នុងមួយ session · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
+   ⛔ គ្មាន workflow/agent · វាស់ឡើងវិញលើ `main` មុនកែ · វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)៖
+   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · [2.49.4] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ …») ·
+   ✅ ម្ចាស់គម្រោងធ្វើរួច (2026-10-04) ៖ G2 ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.។
+   **ជុំ ៣ Config ➜ Login ➜ Signup** ៖ (១) ✅ **➜ [2.49.5]** ទាក់ទងបង្កើតគណនីតាម Telegram @mengsroyhun ក្នុងប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ·
+   (២) ⏭️ **ចំណុចបន្ទាប់** ៖ ហាងដែលចុះឈ្មោះរួច ➜ Reconfig ➜ ប្រអប់ចូល (មិនមែនចុះឈ្មោះ) — មានរួចតាំងពី [2.48.0] (`routePendingInvite()` · `zoew_used_invites_v1` ·
+   `register` + `check: true`) ➜ **វាស់ឡើងវិញលើ App ពិត** ៖ storage លុប · ឧបករណ៍ថ្មី · Link អញ្ជើញប្រើរួច · Function `register` ចាស់/មិនឆ្លើយ · ប្តូរ Firebase ⇄ Supabase ·
+   (៣) ការចងចាំ login មិនច្រឡំ backend/Project ([2.48.0] `login-memory.ts` · `zoew-sb-auth-owner`) ➜ វាស់ឡើងវិញ ·
+   (៤) ការការពារពិតនៅ Server (RLS · Edge Function `register`/`reset-password` · Firebase rules) ➜ ផ្ទៀងថាគ្មានផ្លូវរំលង (ប្រអប់ក្នុង App ជាភាពងាយស្រួលប៉ុណ្ណោះ) ·
+   (៥) ផលរួម G4 · G5 · G6 ជាមួយ Config/Reconfig (វាស់តែប៉ុណ្ណោះ · កុំធ្វើស្ទួន)។
+   **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥)។
+   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
 3. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 4. សាកលើ iPhone/Android ពិតសម្រាប់ backend ទាំង ២ (បញ្ជី ⏳ ខាងក្រោម)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
 
@@ -98,7 +97,7 @@
 - ⏳ **ZoeW 2.49.0 · ZoeKeyGen 2.24.3 — merge រួច (PR #282 · រួម PR #281)** — សាកលើឧបករណ៍ពិត ៖
   ចងចាំពាក្យសម្ងាត់ (ធីក/ដកធីក · ផុត ៤ ម៉ោង · ចាកចេញ) · ខ្សែរមូរលើ iPhone PWA + APK (⛔ PTR/ចលនាផ្ទាំងនៅដដែល) · modal ZoeKeyGen លើ tablet/desktop ·
   ចុះឈ្មោះ Supabase ដែលដាច់កណ្តាលទី · 🔔 «📤 កញ្ចប់ដែលដករួច» ក្រោយការសម្អាតផុតកំណត់ (លម្អិត ៖ [2.49.0])។
-- ⏳ **ZoeW 2.49.1 — branch `claude/gracious-feynman-t7vu3k` មិនទាន់ merge** — APK + iPhone PWA ៖ ទាញប្រអប់ប្រវត្តិចុះក្រោយរមូរ ➜ ខ្សែរមូរបាត់ភ្លាម (លម្អិត ៖ [2.49.1])។
+- ⏳ **ZoeW 2.49.1 — merge រួច (មាននៅក្នុង `main`)** — APK + iPhone PWA ៖ ទាញប្រអប់ប្រវត្តិចុះក្រោយរមូរ ➜ ខ្សែរមូរបាត់ភ្លាម (លម្អិត ៖ [2.49.1])។
 - ✅ **សេចក្តីសម្រេច៖ ZoeW គាំទ្រ backend ទាំង២តាមជម្រើសអតិថិជន — Firebase និង Supabase**។ ការសាង Supabase មិនមែនជាការបិទ Firebase ទេ។
   ត្រូវរក្សាផ្លូវ Config/Login, SDK, rules, provisioning, backup និងឯកសារដែលអតិថិជន Firebase ត្រូវការ។ CLI ផ្ទេរទិន្នន័យជាជម្រើសសម្រាប់អ្នកចង់ប្តូរ backend។
   ការសម្អាតអាចលុបតែកូដដែលបញ្ជាក់ថាមិនប្រើដោយ backend ទាំង២ និងមុខងាររួម។
@@ -136,6 +135,35 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.49.5] — 2026-10-06 · ZoeW ៖ **ប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ៖ ទាក់ទងបង្កើតគណនីតាម Telegram (@mengsroyhun)** (Deep audit ជុំ ៣ ចំណុច ១ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.49.5`** (`zoew-v260` ➜ `zoew-v261`)។ ⛔ ZoeKeyGen · Firebase rules · migration · Edge Function **មិនប្រែ**។ ប៉ះ `ConfigModal.tsx` · `ActivationModal.tsx`
+(ប្រើតំណរួម ៖ DOM ដដែលបេះបិទ) · `shell/SellerTelegramLink.tsx` (ថ្មី) · `react-root.css` (`#configModal .cfg-contact`) · `guide.html`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💬 **ប្រអប់ «⚙️ ភ្ជាប់ប្រព័ន្ធ» មានបន្ទាត់ «មិនទាន់មានគណនី? ទាក់ទង @mengsroyhun តាម Telegram ដើម្បីបង្កើតគណនី»** ក្រោមសេចក្តីណែនាំ Setup Link — បង្ហាញទាំង
+  Firebase និង Supabase · បើកក្នុងផ្ទាំងថ្មី (`noopener`) · App lock ចាត់ទុកការចុចនេះជាការចាកចេញដោយចេតនា (`APP_LOCK_EXCUSE_SELECTOR` ដូចតំណក្នុងប្រអប់ Activation)។
+  មុននេះតំណទាក់ទងក្នុង App មានតែក្នុងប្រអប់ Activation (Firebase ក្រោយចូលប្រព័ន្ធ) ➜ អ្នកដែលមិនទាន់មានគណនី/Setup Link ជាពិសេសហាង Supabase (គ្មាន Activation Key)
+  គ្មានផ្លូវទាក់ទងក្នុង App ទាល់តែសោះ (មានតែក្នុងសៀវភៅណែនាំ)។
+- តំណ Telegram មានប្រភពតែមួយ (`SellerTelegramLink` · `SELLER_TELEGRAM_HANDLE`) ➜ ប្រអប់ Activation និង Config មិនអាចខុសគ្នា។ សៀវភៅណែនាំ (Setup Link/QR) និង
+  `ZoeW/README.md` ប្រាប់ផ្លូវនេះ។
+- parity ៖ បន្ទាត់ថ្មីជា `p` គ្មាន style ដោយផ្ទាល់ក្រោម `.modal-content` ➜ ច្បាប់ `INTENTIONAL_UI.skip` ដដែលរំលងវា (គ្មានការពង្រីកបញ្ជី)។
+- 🔔 សារកំណែ 2.49.5 ជំនួស 2.49.4 (រួមចំណុចមុន)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/config-modal.test.tsx` ផ្នែកថ្មី (៥ តេស្ត ៖ Firebase · Supabase ឃើញតំណមួយ មិននៅក្រោម `.hidden` · `target="_blank"` + `noopener` + ត្រូវ
+  `APP_LOCK_EXCUSE_SELECTOR` · `outerHTML` ស្មើតំណក្នុងប្រអប់ Activation · `INTENTIONAL_UI.skip` រំលងបន្ទាត់ ទិសផ្ទុយ ៖ textarea និងប៊ូតុងរក្សាទុកនៅប្រៀបធៀប) ៖
+  tree មុនកែ (`main` 425ac3a) **ធ្លាក់ ៥/៥** ➜ **១៧/១៧**។ Mutation ៦ ➜ ក្រហម ៦ (ដក `target` · ដក `noopener` · ដាក់ក្នុង `.cfg-supabase` ➜ លាក់ពេល Firebase ·
+  `p` មាន style ➜ parity ឃើញ · anchor ផ្ទាល់មិនប្រើប្រភពតែមួយ · អត្ថបទគ្មាន «បង្កើតគណនី»)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Merge ➜ Netlify deploy `zoew` · build APK ថ្មី (workflow `Android APK` លើ `main`)។ គ្មាន rules · migration · Edge Function។
+- ⏳ សាកលើឧបករណ៍ពិត ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ចុច **@mengsroyhun** ➜ iPhone PWA · APK · desktop បើក Telegram (ឬ `t.me` ក្នុង browser) ➜ ត្រឡប់មក App ➜ ប្រអប់នៅដដែល
+  (App lock មិនចាក់សោភ្លាម)។
 
 ### [2.49.4] — 2026-10-04 · ZoeW · ZoeKeyGen `2.24.5` ៖ **ហាង Supabase ៖ បើក App ពេលក្រៅបណ្តាញ + token ផុត ➜ នៅក្នុងប្រព័ន្ធ · ចាកចេញពេលបណ្តាញដាច់ ➜ ចេញពីឧបករណ៍ភ្លាម (អ្នកបន្ទាប់មិនចូលជាគណនីមុន) · Server បញ្ចប់សម័យចូល ➜ ប្រាប់មូលហេតុ · SW ៖ ឯកសារបន្ថែមព្យួរមិនរារាំងការដំឡើង** (Deep audit ជុំ ២ ៖ ចំណុចដែលនៅសល់)
 

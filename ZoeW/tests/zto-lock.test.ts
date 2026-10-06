@@ -19,9 +19,9 @@ const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
     'netlify/functions/zto-order-detail.js': '90f8612286e2cff2260925d9adf318521c5fb337439e53148a02008d6e98cca8',
-    'src/features/zto-list-sync.ts': '0fbca78ba4ce02a84e7a84a9ef830c3ea4b7c75b1311ff1a8a0e091542841b08',
-    'src/features/zto-status.ts': '52882c9c14e3d62be1f74e05945679cb8e6c473ed0564c68970d823eb5d8290a',
-    'src/services/zto-shop-sweep.ts': 'a28184205fa076cecb106224054a74afa4279348dd7125c0fe8472309c287bd5',
+    'src/features/zto-list-sync.ts': '1252dcb70a0fa3ce215d1a0ab8379923ca7b3ea485fef93251bb913a51295bb9',
+    'src/features/zto-status.ts': '8ef77ed85e61bc38e6a7936e2394e7503c02331c823489dad35fd2bbc8a61d37',
+    'src/services/zto-shop-sweep.ts': 'bbc372b1d0b51e42ee63b64ed3dea9b7ca126d0fa59612d67b230d8f27ea5b0b',
     'src/app/components/zto/model.ts': '10fdb40633669b20771154b2545e535caf4af4c796a7eae35ab10c618e347646',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',
     'src/app/components/modals/ZtoListSyncModal.tsx': 'c9d3c9bc49ac2d133ffefed161039040563994d4c0190a634e7bdb44cb2eb08e'

@@ -558,3 +558,63 @@ describe('ZTO-E1 ការផ្ទៀងផ្ទាត់ឡើងវិញ �
         expect(ztoStatusModule.ZTO_SIGNED_SWEEP_FAIL_MAX_MS).toBeLessThan(ZTO_ABANDON_HOLD_MAX_MS);
     });
 });
+
+describe('ការពិនិត្យប្រឆាំង (លុយ) ៖ ជួរផ្ទុយក្រៅជួរដែលបង្រួម · បញ្ជីបិទ', () => {
+    function rangeMismatchServer(state: { mismatchDay: string | null }) {
+        const reads: { from: string, to: string, mismatch: number }[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            const from = String(url.searchParams.get('from'));
+            const to = String(url.searchParams.get('to'));
+            const day = state.mismatchDay;
+            const mismatch = day && from <= day && day <= to ? 1 : 0;
+            reads.push({ from, to, mismatch });
+            return signedPage([], { signedMismatch: mismatch });
+        }));
+        return reads;
+    }
+    async function round() {
+        ztoState.ztoStatusInFlight = false;
+        await runZtoStatusSweep(false);
+    }
+
+    it('⛔ ជួរផ្ទុយ ៣ ថ្ងៃមុន ៖ ជួរបង្រួម (ម្សិលមិញ ➜ ថ្ងៃនេះ) មិនឃើញវា ➜ នៅតែមិន «ពេញលេញ» ➜ មិនដកលុយក្នុងវគ្គ', async () => {
+        const st = { mismatchDay: getZoneDateKey(NOW, -3) as string | null };
+        const reads = rangeMismatchServer(st);
+        dataState.scanHistory = [openItem('p', 'ZTE1Q10001', 7 * DAY - 10 * 60000)];
+        advance(9 * 60000);
+        await round();
+        expect(reads[0].mismatch, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំដំបូងឃើញជួរផ្ទុយ').toBe(1);
+        advance(3 * 60000);
+        cleanupNow();
+        expect(abandoned('p')).toBe(false);
+        await round();
+        expect(reads[reads.length - 1].from, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំទី ២ (ក្រោយកញ្ចប់ទុំ) អានជួរបង្រួម (quota)').toBe(getZoneDateKey(NOW + 12 * 60000, -1));
+        expect(reads[reads.length - 1].mismatch).toBe(0);
+        cleanupNow();
+        expect(abandoned('p'), '⛔ ជួរផ្ទុយមិនទាន់ដោះស្រាយ ➜ នៅរង់ចាំ').toBe(false);
+    });
+
+    it('ជួរផ្ទុយបាត់ (Server កែ) ➜ ការអានជួរវែងម្តងទៀតក្នុង ZTO_SIGNED_FRESH_MS ➜ ពេញលេញ ➜ ដកធម្មតា · ការអានជួរវែង ≤ ១ ក្នុងមួយ ZTO_SIGNED_FRESH_MS', async () => {
+        const st = { mismatchDay: getZoneDateKey(NOW, -3) as string | null };
+        const reads = rangeMismatchServer(st);
+        dataState.scanHistory = [openItem('q', 'ZTE1Q10002', 7 * DAY - 10 * 60000)];
+        await round();
+        for (let i = 0; i < 9; i++) { advance(2 * 60000); await round(); }
+        const wide = reads.filter((r) => r.from <= getZoneDateKey(NOW, -3)).length;
+        expect(wide, '⛔ quota ៖ ជួរវែងមិនរាល់ជុំ').toBeLessThanOrEqual(Math.ceil(18 * 60000 / ZTO_SIGNED_FRESH_MS) + 1);
+        expect(wide, 'ជួរវែងត្រូវអានម្តងទៀត (ដើម្បីដឹងពេលជួរផ្ទុយបាត់)').toBeGreaterThanOrEqual(2);
+        cleanupNow();
+        expect(abandoned('q'), 'នៅមានជួរផ្ទុយ ➜ រង់ចាំ').toBe(false);
+        st.mismatchDay = null;
+        for (let i = 0; i < 6 && !abandoned('q'); i++) { advance(2 * 60000); await round(); cleanupNow(); }
+        expect(abandoned('q'), 'ជួរផ្ទុយបាត់ ➜ ការអានជួរវែងស្អាត ➜ ដកធម្មតា').toBe(true);
+    });
+
+    it('Server បិទបញ្ជីចុះហត្ថលេខា (`ztoSignedOff`) ➜ មិនរង់ចាំ ទោះសញ្ញាហាងសកម្ម', () => {
+        ztoState.ztoSignedOff = true;
+        ztoState.ztoShopSweep = { state: 'ok', activeAt: NOW, completeAt: NOW - 8 * DAY, advancedAt: 0 };
+        expect(ztoAbandonCleanupIsHeld(NOW - 60000)).toBe(false);
+        ztoState.ztoShopSweep = { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 };
+    });
+});

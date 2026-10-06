@@ -3,7 +3,7 @@ import { getServerNow } from '../core/clock';
 
 export const ZTO_SHOP_SWEEP_PATH = 'zoew_settings/zto_signed_sweep';
 export const ZTO_SHOP_SWEEP_MARK_GAP_MS = 5 * 60 * 1000;
-export const ZTO_SHOP_SWEEP_ACTIVE_MS = 7 * 24 * 60 * 60 * 1000;
+export const ZTO_SHOP_SWEEP_ACTIVE_MS = 60 * 60 * 1000;
 
 function ztoShopSweepStamp(v) {
     return typeof v === 'number' && isFinite(v) && v > 0 ? v : 0;
@@ -24,7 +24,7 @@ export function noteZtoShopSweep(val) {
         state: 'ok',
         activeAt: ztoShopSweepStamp(val && val.activeAt),
         completeAt: completeAt,
-        advancedAt: completeAt > prev.completeAt ? Date.now() : prev.advancedAt
+        advancedAt: prev.state === 'ok' && completeAt > prev.completeAt ? Date.now() : prev.advancedAt
     };
 }
 

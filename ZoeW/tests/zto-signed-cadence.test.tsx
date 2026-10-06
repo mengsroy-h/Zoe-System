@@ -13,9 +13,11 @@ import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { autoLookupInFlight } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
+import { getZoneDateKey } from '../src/core/timezone';
 import {
-    ZTO_SIGNED_SWEEP_ACTIVE_MS, ZTO_SIGNED_SWEEP_FAIL_MAX_MS, ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_VISIBLE_MS,
-    clearZtoPickupStatusStore, noteZtoUserActivity, runZtoStatusSweep, scheduleZtoStatusSweep, setZtoPickupVerdict, ztoStatusPendingCodes
+    ZTO_SIGNED_SWEEP_ACTIVE_MS, ZTO_SIGNED_SWEEP_FAIL_MAX_MS, ZTO_SIGNED_SWEEP_GAP_MS, ZTO_SIGNED_SWEEP_LOOKBACK_DAYS, ZTO_SIGNED_SWEEP_VISIBLE_MS,
+    clearZtoPickupStatusStore, noteZtoUserActivity, runZtoStatusSweep, scheduleZtoStatusSweep, setZtoPickupVerdict, ztoAbandonCleanupIsHeld,
+    ztoStatusPendingCodes, ztoStatusUnmeasuredCount
 } from '../src/features/zto-status';
 
 const h = vi.hoisted(() => ({ closes: [] as any[] }));
@@ -287,6 +289,7 @@ describe('ល្បឿន «បិទតាម ZTO» ៖ ពេលស្កេ�
             await runApp(1000, w);
             if (ztoStatusPendingCodes().length === 0) flippedAt = Date.now();
         }
+        expect(flippedAt, 'G6 ៖ របាត្រូវរលត់ពិត (sentinel 0 មិនឆ្លង)').toBeGreaterThan(0);
         expect(flippedAt - (T0 + 70 * 1000)).toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 5000);
         expect(detailCalls).toEqual([]);
     });
@@ -301,5 +304,180 @@ describe('ល្បឿន «បិទតាម ZTO» ៖ ពេលស្កេ�
         expect(detailCalls.filter((c) => c.modal)).toEqual([]);
         const first = detailCalls.find((c) => c.at >= T0 + closeAt);
         expect(first && first.at - (T0 + closeAt)).toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 5000);
+    });
+});
+
+describe('ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ quota និងល្បឿនដែលឯកសារសន្យា', () => {
+    function rangeServer(opts: { mismatch?: number, detailClosed?: boolean | null, detailFails?: (now: number) => boolean } = {}) {
+        const signed: { at: number, from: string, to: string }[] = [];
+        const detail: number[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            const now = Date.now();
+            if (url.searchParams.get('signed') === '1') {
+                signed.push({ at: now, from: String(url.searchParams.get('from')), to: String(url.searchParams.get('to')) });
+                return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: 0, rows: [],
+                    signed: [], signedOk: true, signedMismatch: opts.mismatch || 0 });
+            }
+            detail.push(now);
+            if (opts.detailFails && opts.detailFails(now)) return json({ error: 'ZTO HTTP 502', code: 'ZTO_UPSTREAM_UNAVAILABLE' }, 502);
+            return json({ success: true, found: true, ztoClosed: opts.detailClosed === undefined ? null : opts.detailClosed });
+        }));
+        return { signed, detail };
+    }
+    const dayKey = (back: number) => getZoneDateKey(T0, -back);
+
+    it('Q1 ៖ ជួរ «ចុះហត្ថលេខា» ផ្ទុយមួយ មិនធ្វើឲ្យជួរអានជាប់ ៨ ថ្ងៃរៀងរាល់ ២០ វិ. ទៀតទេ (ជួរបង្រួម · តែការរង់ចាំលុយនៅ)', async () => {
+        dataState.scanHistory = [openItem('a', 'ZTC0000041')];
+        const srv = rangeServer({ mismatch: 1 });
+        scheduleZtoStatusSweep(1500);
+        await runApp(3 * MIN, { signedAt: {}, active: true });
+        expect(srv.signed.length, 'លក្ខខណ្ឌចាំបាច់ ៖ អានច្រើនជុំ').toBeGreaterThanOrEqual(4);
+        expect(srv.signed[0].from, 'ជុំដំបូងអានជួរវែង').toBe(dayKey(ZTO_SIGNED_SWEEP_LOOKBACK_DAYS));
+        expect(srv.signed.slice(1).every((c) => c.from === dayKey(1)), '⛔ ជុំបន្ទាប់អានតែម្សិលមិញ ➜ ថ្ងៃនេះ').toBe(true);
+        expect(ztoAbandonCleanupIsHeld(T0 - 60000), 'ទិសផ្ទុយ ៖ ជួរផ្ទុយនៅរក្សាការរង់ចាំលុយ (មិន «ពេញលេញ»)').toBe(true);
+    });
+
+    it('Q4 ៖ កញ្ចប់បិទច្រើនជាង ZTO_STATUS_MAX ➜ /detail សួរម្តងក្នុងមួយកញ្ចប់ (មិនវិលជុំគ្មានទីបញ្ចប់ពេល verdict ត្រូវបណ្តេញ)', async () => {
+        const items: any[] = [];
+        for (let i = 0; i < 400; i++) items.push(closedItem('c' + i, 'ZTQ' + String(4000000 + i)));
+        dataState.scanHistory = items;
+        const srv = rangeServer({ detailClosed: true });
+        scheduleZtoStatusSweep(1500);
+        await runApp(30 * MIN, { signedAt: {} });
+        expect(srv.detail.length, 'លក្ខខណ្ឌចាំបាច់ ៖ សួរគ្រប់កញ្ចប់').toBeGreaterThanOrEqual(400);
+        expect(srv.detail.length, '⛔ គ្មានការសួរម្តងទៀតព្រោះ verdict ត្រូវបណ្តេញ (មុនកែ ៖ ~៣០/នាទី ជារៀងរហូត)').toBeLessThanOrEqual(400 + 10);
+    });
+
+    it('T3 ៖ ទុកចោល ➜ ចាប់ផ្តើមប្រើ ➜ ការអានបន្ទាប់តាមល្បឿនសកម្ម (មិនរង់ចាំ timer ១ នាទីដែលតាំងរួច)', async () => {
+        dataState.scanHistory = [openItem('a', 'ZTC0000042')];
+        const srv = rangeServer();
+        scheduleZtoStatusSweep(1500);
+        await runApp(3 * MIN, { signedAt: {} });
+        await vi.advanceTimersByTimeAsync(25 * 1000);
+        const last = srv.signed[srv.signed.length - 1].at;
+        const tapAt = Date.now();
+        expect(tapAt - last, 'លក្ខខណ្ឌចាំបាច់ ៖ ប៉ះក្រោយការអានចុងក្រោយលើស ២០ វិ. (timer ១ នាទីនៅរង់ចាំ)').toBeGreaterThan(ZTO_SIGNED_SWEEP_ACTIVE_MS);
+        expect(tapAt - last).toBeLessThan(ZTO_SIGNED_SWEEP_VISIBLE_MS - 10 * 1000);
+        noteZtoUserActivity();
+        await runApp(70 * 1000, { signedAt: {}, active: true });
+        const next = srv.signed.find((c) => c.at > tapAt);
+        expect(next, 'មានការអានក្រោយប៉ះ').toBeTruthy();
+        expect(next!.at - Math.max(tapAt, last + ZTO_SIGNED_SWEEP_ACTIVE_MS), '⛔ តាមល្បឿនសកម្ម (មុនកែ ៖ រហូតដល់ ៦០ វិ.)').toBeLessThanOrEqual(2000);
+        expect(next!.at - last, 'មិនលឿនជាងល្បឿនសកម្ម').toBeGreaterThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS);
+    });
+
+    it('T3 ទិសផ្ទុយ ៖ ប៉ះភ្លាមក្រោយការអាន ➜ ការអានបន្ទាប់នៅតែរង់ចាំល្បឿនសកម្មពីការអានចុងក្រោយ (មិនលឿនជាង)', async () => {
+        dataState.scanHistory = [openItem('a', 'ZTC0000048')];
+        const srv = rangeServer();
+        scheduleZtoStatusSweep(1500);
+        await runApp(3 * MIN, { signedAt: {} });
+        await vi.advanceTimersByTimeAsync(10 * 1000);
+        const last = srv.signed[srv.signed.length - 1].at;
+        expect(Date.now() - last, 'លក្ខខណ្ឌចាំបាច់ ៖ ប៉ះក្នុង ២០ វិ. ក្រោយការអាន').toBeLessThan(ZTO_SIGNED_SWEEP_ACTIVE_MS);
+        noteZtoUserActivity();
+        await runApp(40 * 1000, { signedAt: {}, active: true });
+        const next = srv.signed.find((c) => c.at > last);
+        expect(next, 'មានការអានបន្ទាប់').toBeTruthy();
+        expect(next!.at - last, '⛔ មិនលឿនជាងល្បឿនសកម្ម').toBeGreaterThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS);
+        expect(next!.at - last, 'ហើយមិនរង់ចាំ timer ១ នាទី').toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 2000);
+    });
+
+    it('Q4 (កញ្ចប់បើក) ៖ កញ្ចប់បើកច្រើនជាង ZTO_STATUS_MAX ➜ /detail សួរម្តងក្នុងមួយម៉ោង (verdict ដែលត្រូវបណ្តេញ មិនធ្វើឲ្យសួរវិលជុំ)', async () => {
+        const items: any[] = [];
+        for (let i = 0; i < 400; i++) items.push(openItem('o' + i, 'ZTO' + String(5000000 + i)));
+        dataState.scanHistory = items;
+        const srv = rangeServer({ detailClosed: null });
+        scheduleZtoStatusSweep(1500);
+        await runApp(30 * MIN, { signedAt: {} });
+        expect(srv.detail.length, 'លក្ខខណ្ឌចាំបាច់ ៖ សួរគ្រប់កញ្ចប់').toBeGreaterThanOrEqual(400);
+        expect(srv.detail.length, '⛔ គ្មានការសួរម្តងទៀតក្នុងម៉ោងតែមួយ').toBeLessThanOrEqual(400 + 10);
+    });
+
+    it('T4 ៖ /detail ចន្លោះទ្វេ ១០ នាទី + Lookup កំពុងរត់ ➜ ការអានបញ្ជីចុះហត្ថលេខាដើរវិញតាមល្បឿនសកម្ម (មិនជាប់ ៦២០ វិ.)', async () => {
+        dataState.scanHistory = [openItem('a', 'ZTC0000043')];
+        const srv = rangeServer({ detailFails: () => true });
+        const w: World = { signedAt: {}, active: true, lookup: (now) => now >= T0 + 15 * MIN && now < T0 + 15 * MIN + 20 * 1000 };
+        scheduleZtoStatusSweep(1500);
+        await runApp(25 * MIN, w);
+        expect(ztoState.ztoStatusFailStreak, 'លក្ខខណ្ឌចាំបាច់ ៖ /detail ចន្លោះទ្វេធំ').toBeGreaterThanOrEqual(3);
+        const after = srv.signed.filter((c) => c.at >= T0 + 15 * MIN);
+        expect(after.length).toBeGreaterThan(0);
+        expect(after[0].at - (T0 + 15 * MIN + 20 * 1000), '⛔ ក្រោយ Lookup ចប់ ➜ ≤ ល្បឿនសកម្ម').toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 2000);
+        const gaps = after.slice(1).map((c, i) => c.at - after[i].at);
+        expect(Math.max(...gaps)).toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_ACTIVE_MS + 2000);
+    });
+
+    it('T4 ៖ App លាក់ + /detail ចន្លោះទ្វេ ១០ នាទី ➜ ការអានបញ្ជីចុះហត្ថលេខានៅ ~២ នាទី (មិនជាប់ ៦៦០ វិ.)', async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        dataState.scanHistory = [openItem('a', 'ZTC0000044')];
+        const srv = rangeServer({ detailFails: () => true });
+        scheduleZtoStatusSweep(1500);
+        await runApp(45 * MIN, { signedAt: {} });
+        expect(ztoState.ztoStatusFailStreak).toBeGreaterThanOrEqual(3);
+        const late = srv.signed.filter((c) => c.at >= T0 + 15 * MIN);
+        const gaps = late.slice(1).map((c, i) => c.at - late[i].at);
+        expect(gaps.length).toBeGreaterThan(5);
+        expect(Math.max(...gaps), '⛔ ≤ ZTO_SIGNED_SWEEP_GAP_MS + ជុំ ៦០ វិ.').toBeLessThanOrEqual(ZTO_SIGNED_SWEEP_GAP_MS + MIN + 2000);
+        expect(Math.min(...gaps), 'មិនលឿនជាង ZTO_SIGNED_SWEEP_GAP_MS').toBeGreaterThanOrEqual(ZTO_SIGNED_SWEEP_GAP_MS);
+    });
+
+    it('G2 ៖ /detail ធ្លាក់ ➜ ចន្លោះទ្វេពិត (ការអាន ២០ វិ. មិនបង្ខំ /detail រៀងរាល់ជុំ)', async () => {
+        dataState.scanHistory = [openItem('a', 'ZTC0000045')];
+        const srv = rangeServer({ detailFails: () => true });
+        scheduleZtoStatusSweep(1500);
+        await runApp(20 * MIN, { signedAt: {}, active: true });
+        expect(srv.signed.length).toBeGreaterThan(20);
+        expect(srv.detail.length, '⛔ ២០ វិ. ➜ ៦០ ➜ ១៨០ ➜ ៦០០ វិ. ➜ ≤ ៦ ក្នុង ២០ នាទី').toBeLessThanOrEqual(6);
+    });
+
+    it('G3 ៖ ជួរអានដំបូងរំលងកញ្ចប់ដែលបិទទាំងស្រុង (កញ្ចប់បិទចាស់ ២៥ ថ្ងៃ មិនពង្រីកជួរ)', async () => {
+        const old = closedItem('old', 'ZTC0000046');
+        old.createdAt = T0 - 25 * 24 * 3600000;
+        dataState.scanHistory = [old, openItem('a', 'ZTC0000047')];
+        setZtoPickupVerdict('ZTC0000046', true);
+        const srv = rangeServer();
+        await runZtoStatusSweep(false);
+        expect(srv.signed.length).toBe(1);
+        expect(srv.signed[0].from).toBe(dayKey(ZTO_SIGNED_SWEEP_LOOKBACK_DAYS));
+    });
+});
+
+describe('ការពិនិត្យប្រឆាំង ៖ សារពិត · timer /detail', () => {
+    function detailServer(closed: boolean | null) {
+        const detail: number[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+            const url = new URL(String(u));
+            if (url.searchParams.get('signed') === '1') return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, rows: [], signed: [], signedOk: true });
+            detail.push(Date.now());
+            return json({ success: true, found: true, ztoClosed: closed });
+        }));
+        return detail;
+    }
+
+    it('Q4 ៖ «កំពុងពិនិត្យបន្ត N» រាប់តែកញ្ចប់ដែលការបោសនឹងសួរពិត (verdict ដែលត្រូវបណ្តេញ ហើយមិនសួរម្តងទៀត មិនរាប់)', async () => {
+        const items: any[] = [];
+        for (let i = 0; i < 401; i++) items.push(closedItem('u' + i, 'ZTU' + String(6000000 + i)));
+        dataState.scanHistory = items;
+        detailServer(true);
+        scheduleZtoStatusSweep(1500);
+        await runApp(25 * MIN, { signedAt: {} });
+        expect(ztoStatusUnmeasuredCount(), '⛔ គ្មានការសួរបន្ត ➜ មិនប្រាប់ថា «កំពុងពិនិត្យ»').toBe(0);
+    });
+
+    it('T3 ៖ ប៉ះក្រោយទុកចោល មិនបោះ timer បន្តរបស់ /detail (កុងតាក់បិទតាម ZTO បិទ)', async () => {
+        appLocalStore.setItem('zoew_zto_autoclose_v1', '0');
+        const items: any[] = [];
+        for (let i = 0; i < 60; i++) items.push(closedItem('t' + i, 'ZTT' + String(7000000 + i)));
+        dataState.scanHistory = items;
+        const detail = detailServer(null);
+        scheduleZtoStatusSweep(1500);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(detail.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ជុំដំបូង ១០').toBe(10);
+        noteZtoUserActivity();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(!!ztoState.ztoStatusSweepTimer, '⛔ timer បន្តនៅ').toBe(true);
+        await vi.advanceTimersByTimeAsync(21 * 1000);
+        expect(detail.length, '⛔ ជុំទី ២ តាមពេល (មិនរង់ចាំជុំ ៦០ វិ.)').toBe(20);
     });
 });

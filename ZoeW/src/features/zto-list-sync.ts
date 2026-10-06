@@ -3,6 +3,7 @@ import { ztoListGroupModel } from '../app/components/zto/model';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
+import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone } from '../core/text';
@@ -43,6 +44,7 @@ export const ZTO_LIST_SIGNED_PROBE_MAX = 20;
 export const ZTO_LIST_RANGE_MAX_DAYS = 31;
 
 export const ZTO_SIGNED_DAY_CONCURRENCY = 3;
+export const ZTO_SIGNED_SPLIT_MEMO_MS = 30 * 60 * 1000;
 
 export const ZTO_LIST_PROBE_CONCURRENCY = 4;
 
@@ -789,15 +791,27 @@ export function ztoListDayKeys(from, to) {
 }
 
 export async function fetchZtoSignedCodes(cfg, from, to) {
-    const whole = await fetchZtoSignedPages(cfg, from, to);
-    if (!whole || !whole.measured || !whole.truncated) return whole;
+    const session = captureZtoSession();
     const days = ztoListDayKeys(from, to);
-    if (days.length < 2) return whole;
-    const out = { measured: true, codes: whole.codes.slice(), truncated: false, partial: false, signedMismatch: 0 };
+    const split = days.length >= 2 && !!ztoState.ztoSignedSplitAt && elapsedSince(ztoState.ztoSignedSplitAt) < ZTO_SIGNED_SPLIT_MEMO_MS
+        && String(from) <= ztoState.ztoSignedSplitFrom;
+    let whole = null;
+    if (!split) {
+        whole = await fetchZtoSignedPages(cfg, from, to);
+        if (!whole || !whole.measured || !whole.truncated) return whole;
+        if (days.length < 2 || !session.current()) return whole;
+        ztoState.ztoSignedSplitAt = Date.now();
+        ztoState.ztoSignedSplitFrom = String(from);
+    }
+    const out = { measured: true, codes: whole ? whole.codes.slice() : [], truncated: false, partial: false, signedMismatch: 0 };
     let daysMismatch = 0;
+    let measuredDays = 0;
+    let unmeasuredDays = 0;
+    let firstErr = null;
     let next = 0;
     const worker = async () => {
         while (next < days.length) {
+            if (!session.current()) { out.partial = true; return; }
             const day = days[next];
             next++;
             let got = null;
@@ -805,9 +819,12 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
                 got = await fetchZtoSignedPages(cfg, day, day);
             } catch (e) {
                 got = null;
+                if (!whole && !firstErr) { firstErr = e; next = days.length; }
             }
             if (!got || !got.measured || got.partial) out.partial = true;
             if (!got) continue;
+            if (got.measured) measuredDays++;
+            else unmeasuredDays++;
             if (got.truncated) out.truncated = true;
             daysMismatch += ztoListPositiveCount(got.signedMismatch);
             for (let i = 0; i < got.codes.length; i++) out.codes.push(got.codes[i]);
@@ -816,7 +833,9 @@ export async function fetchZtoSignedCodes(cfg, from, to) {
     const workers = [];
     for (let w = 0; w < ZTO_SIGNED_DAY_CONCURRENCY && w < days.length; w++) workers.push(worker());
     await Promise.all(workers);
-    out.signedMismatch = Math.max(ztoListPositiveCount(whole.signedMismatch), daysMismatch);
+    if (!whole && firstErr && !measuredDays) throw firstErr;
+    if (!whole && unmeasuredDays && !measuredDays) return { measured: false, codes: [], truncated: false, partial: false };
+    out.signedMismatch = Math.max(whole ? ztoListPositiveCount(whole.signedMismatch) : 0, daysMismatch);
     return out;
 }
 

@@ -324,6 +324,43 @@ describe('ZTO-M2 ៖ ឧបករណ៍គ្មាន ZTO រង់ចាំក
     });
 });
 
+describe('ការពិនិត្យប្រឆាំង ៖ សញ្ញាហាងមិនពន្យារការផុតកំណត់យូរ', () => {
+    it('ZTO_SHOP_SWEEP_ACTIVE_MS ៖ ការរង់ចាំតែពេលឧបករណ៍ ZTO អានថ្មីៗ (≥ ពិដានវគ្គ + ចន្លោះសរសេរ · ≤ ២ ម៉ោង ➜ ឧបករណ៍ ZTO បាត់ មិនពន្យាររាប់ថ្ងៃ)', () => {
+        expect(M.ZTO_SHOP_SWEEP_ACTIVE_MS).toBeGreaterThanOrEqual(HOLD_MAX + M.ZTO_SHOP_SWEEP_MARK_GAP_MS);
+        expect(M.ZTO_SHOP_SWEEP_ACTIVE_MS).toBeLessThanOrEqual(2 * 60 * MIN);
+    });
+
+    it('ឧបករណ៍ ZTO មិនអានជាង ២ ម៉ោង ហើយ B បើក App ខ្លីៗរៀងរាល់ម៉ោង ➜ ដក (មិនរង់ចាំរាប់ថ្ងៃ)', async () => {
+        dataState.scanHistory = [openItem('s', 'ZTM2000020', 7 * DAY - 10 * MIN)];
+        attach();
+        deliver(PATH);
+        await sweepA([]);
+        asDeviceB();
+        let hours = 0;
+        while (!abandoned('s') && hours < 4) {
+            advance(40 * MIN);
+            for (let i = 0; i < 20; i++) { advance(MIN); cleanupNow(); }
+            hours++;
+        }
+        expect(abandoned('s'), '⛔ ដកក្នុង ≤ ៤ ម៉ោង').toBe(true);
+    });
+
+    it('listener ភ្ជាប់ឡើងវិញ (initDatabaseListeners) មិនចាប់វគ្គរង់ចាំថ្មី', async () => {
+        dataState.scanHistory = [openItem('r', 'ZTM2000021', 7 * DAY - 10 * MIN)];
+        attach();
+        deliver(PATH);
+        await sweepA([]);
+        asDeviceB();
+        advance(11 * MIN);
+        for (let i = 0; i < 20; i++) { advance(MIN); cleanupNow(); }
+        expect(abandoned('r'), 'លក្ខខណ្ឌចាំបាច់ ៖ កំពុងរង់ចាំ').toBe(false);
+        initDatabaseListeners();
+        deliver(PATH);
+        for (let i = 0; i < 12; i++) { advance(MIN); cleanupNow(); }
+        expect(abandoned('r'), '⛔ ការភ្ជាប់ឡើងវិញមិនបន្តពិដានវគ្គ').toBe(true);
+    });
+});
+
 describe('ZTO-M2 ៖ ឧបករណ៍ ZTO សរសេរសញ្ញាហាង', () => {
     it('សរសេរ ≤ ១ ដងក្នុង ZTO_SHOP_SWEEP_MARK_GAP_MS ទោះជុំអានរៀងរាល់ ២ នាទី · completeAt ជាម៉ោង Server ពេលចាប់ផ្តើមអាន', async () => {
         const gap = M.ZTO_SHOP_SWEEP_MARK_GAP_MS;

@@ -570,6 +570,10 @@ export interface ZtoState {
     ztoAbandonCheckedAt: number;
     ztoShopSweep: { state: string; activeAt: number; completeAt: number; advancedAt: number };
     ztoShopSweepWrote: { activeAt: number; completeAt: number };
+    ztoSignedSplitAt: number;
+    ztoSignedSplitFrom: string;
+    ztoSignedMismatchFrom: string;
+    ztoSignedMismatchWideAt: number;
     ztoOriginRefusedDb: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
@@ -600,6 +604,10 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoAbandonCheckedAt: 0,
     ztoShopSweep: { state: 'off', activeAt: 0, completeAt: 0, advancedAt: 0 },
     ztoShopSweepWrote: { activeAt: 0, completeAt: 0 },
+    ztoSignedSplitAt: 0,
+    ztoSignedSplitFrom: '',
+    ztoSignedMismatchFrom: '',
+    ztoSignedMismatchWideAt: 0,
     ztoOriginRefusedDb: null,
     ztoBannerView: null,
     ztoSyncListView: null,

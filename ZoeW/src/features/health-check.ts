@@ -6,7 +6,7 @@ import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { getZoneDateKey } from '../core/timezone';
 import { appLocalStore, appSessionStore } from '../core/storage';
-import { DB_LISTENER_KEYS } from '../core/text';
+import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
 import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
@@ -230,8 +230,11 @@ export function ztoSignedMismatchText(body) {
     const count = signal && signal.observed === true && Number.isFinite(signal.count) && signal.count > 0 ? signal.count : 0;
     if (!count) return '';
     const age = durationText(signal.ageMs);
+    const seen = ztoMismatchTexts(signal.texts);
+    const expected = ztoExpectedTexts(signal.expected);
     return ' · ⚠️ បញ្ជី «ចុះហត្ថលេខា» ៖ ZTO ផ្ញើ ' + count + ' កញ្ចប់ ដែលអត្ថបទប្រភេទស្កេនខុសពី ZTO_LIST_SIGNED_SCAN_DESC'
         + (age ? ' (ចុងក្រោយ ' + age + 'មុន)' : '')
+        + (seen.length ? ' — Function ទទួល ' + seen.map(ztoTextWithCodePoints).join(' / ') + (expected.length ? ' ≠ Server រំពឹង ' + expected.map(ztoTextWithCodePoints).join(' / ') : '') : '')
         + ' ➜ មិនរាប់ជាភស្តុតាងបិទ — សូមកែអត្ថបទនោះនៅ Netlify';
 }
 

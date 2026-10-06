@@ -49,3 +49,27 @@ export function normalizeOneStoredPhone(part) {
     }
     return trimmed;
 }
+
+export const ZTO_MISMATCH_TEXTS_MAX = 5;
+
+export const ZTO_MISMATCH_TEXT_LEN = 64;
+
+export function ztoMismatchTexts(value: unknown, into: string[] = []): string[] {
+    if (!Array.isArray(value)) return into;
+    for (let i = 0; i < value.length && into.length < ZTO_MISMATCH_TEXTS_MAX; i++) {
+        const item = value[i];
+        if (typeof item !== 'string' || !item) continue;
+        const text = item.slice(0, ZTO_MISMATCH_TEXT_LEN);
+        if (into.indexOf(text) === -1) into.push(text);
+    }
+    return into;
+}
+
+export function ztoExpectedTexts(value: unknown): string[] {
+    return ztoMismatchTexts(typeof value === 'string' ? [value] : value);
+}
+
+export function ztoTextWithCodePoints(text: string): string {
+    const points = Array.from(String(text)).map((ch) => (ch.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4, '0'));
+    return '«' + text + '» (U+' + points.join(' ') + ')';
+}

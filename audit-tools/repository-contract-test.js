@@ -323,6 +323,21 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && firstRun.includes('Test-Path -LiteralPath $gitBash -PathType Leaf')
         && firstRun.includes('& $gitBash --version')
         && /\$gitBin \| Out-File -FilePath \$env:GITHUB_PATH -Encoding utf8 -Append/.test(firstRun));
+    const bootstrapScript = ((firstRun || '').match(/^        run: \|\r?\n([\s\S]*)$/m) || [])[1] || '';
+    const bootstrapMessage = ((firstRun || '').match(/^          ZOE_GIT_BASH_MISSING_MESSAGE: '([^'\r\n]*)'$/m) || [])[1] || '';
+    check('Windows PowerShell អាន inline script បានដោយគ្មាន BOM និងសារខ្មែរនៅក្នុង env',
+        bootstrapScript.trim().length > 0 && !/[^\x00-\x7f]/.test(bootstrapScript)
+        && bootstrapMessage.includes('{0}') && /[\u1780-\u17ff]/.test(bootstrapMessage)
+        && bootstrapScript.includes('throw ($env:ZOE_GIT_BASH_MISSING_MESSAGE -f $gitBash)'));
+    const shellCheck = read('.github/workflows/android-shell-check.yml');
+    check('Windows shell CI វាស់ bootstrap ពិត ដោយគ្មាន secrets ឬ Release',
+        /contents:\s*read/.test(shellCheck) && /shell:\s*powershell/.test(shellCheck)
+        && shellCheck.includes('github.event.pull_request.head.repo.full_name == github.repository')
+        && shellCheck.includes('.github\\workflows\\android-release.yml')
+        && shellCheck.includes('Management.Automation.Language.Parser]::ParseInput')
+        && shellCheck.includes('legacy-encoding-mutation-survived')
+        && shellCheck.includes('missing-Git-Bash-must-fail-with-path')
+        && !/secrets\.|gh\s+release\s+create|assembleRelease/.test(shellCheck));
     const compose = read('tools/actions-runners/compose.yml');
     const image = read('tools/actions-runners/Dockerfile');
     const labels = (source, mode) => {

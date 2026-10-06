@@ -522,6 +522,10 @@ Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; arti
 
 **កន្លែងធ្វើ៖ GitHub browser។** រង់ចាំ Audit ចប់មុនសាក APK ដំបូងលើ PC RAM 16GB។
 
+សាក Git Bash មុនសាងសង់ APK៖ ក្រោយ merge ការកែនេះទៅ main ចូល Actions → **Windows APK shell** → Run workflow → Branch **main**។ Job នេះផ្ទៀង Windows PowerShell 5.1, Git Bash និង Git/gh/Node ពិត ដោយមិនប្រើ keystore។ `ZOE_RUNNER_MODE=github` ប្រើ Windows របស់ GitHub; self-hosted mode ប្រើ Windows runner របស់អ្នក ហើយ repo ត្រូវ Private និង runner Online។
+
+ត្រូវឃើញ `legacy-encoding-negative`, `real-bootstrap-UTF8-without-BOM` និង `missing-Git-Bash-negative` ឆ្លង។ Shell check ឆ្លងបញ្ជាក់ bootstrap/CLI ប៉ុណ្ណោះ; វាមិនទាន់សាងសង់ ឬ sign APK ទេ។ បន្ទាប់មកទើបសាក **Android APK** ខាងក្រោម។
+
 ពិនិត្យ secrets ដើមក្នុង Settings → Secrets and variables → Actions → Secrets៖
 
 | Secret | ខ្លឹមសារ |
@@ -708,6 +712,7 @@ Get-Service 'actions.runner.*'
 | Android workflow skipped | Branch មិនមែន main ឬ Public ក្នុង self-hosted mode | ជំហានទី ១៤ និង ១៦ |
 | Android build រំលងក្រោយ meta | Version មាន Release រួច | រង់ចាំ release កំណែថ្មីពិត; កុំឡើង version ទទេ |
 | Git/gh/cygpath រកមិនឃើញក្នុង APK job | Windows PATH ឬ service PATH ចាស់ | ជំហានទី ១១; restart service ក្រោយដំឡើង tools |
+| `ParserError` / `UnexpectedToken` និងអក្សរខ្មែរខូចក្នុង PowerShell | Windows PowerShell 5.1 អាន inline UTF-8 script គ្មាន BOM ខុស | Merge ការកែដែលដាក់សារខ្មែរក្នុង env; សាក Windows APK shell ហើយបង្កើត Android APK run ថ្មីលើ main |
 | `/bin/bash: C:...sh: No such file or directory` ក្នុង APK job | Windows ជ្រើស WSL bash ជំនួស Git Bash | ជំហានទី ១១; log ត្រូវប្រើ `Git\bin\bash.exe`; ក្រោយ merge បង្កើត Run workflow ថ្មីលើ main |
 | sudo terminal error ក្នុង audit | Self-hosted កំពុងប្រើ workflow/step ចាស់ | Update branch; --with-deps/sudo ត្រូវរត់តែ GitHub mode |
 | Linux image មិនទាន់មាន Java 21 | Workflow ថ្មីប្រើ runtime ក្នុង image ប៉ុន្តែ containers នៅប្រើ image ចាស់ | ជំហានទី ១៧៖ rebuild image, recreate ដោយរក្សា volumes និងបង្កើត Run workflow ថ្មី |

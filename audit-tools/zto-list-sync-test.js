@@ -2750,6 +2750,25 @@ function firstBody(requests) {
             only.signedOk === true && rowsOf(only).length === 0 && Array.isArray(only.signed) && only.signed.indexOf(real.code) !== -1, only);
     }
 
+    // ⛔ E8 ៖ តារាង «📋 វាលដែល ZoeW អាន» ក្នុង `ZTO-SETUP-KH.md` ដេរីវេពីកូដ ៖ រាល់ឈ្មោះវាលក្នុងបញ្ជីផ្លូវរបស់ Function ត្រូវមានក្នុងផ្នែកនោះ
+    //    (វាលថ្មីក្នុងកូដ ➜ ឯកសារចាស់ ➜ ធ្លាក់)។
+    const setupDoc = readOr(path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md'));
+    const fieldsAt = setupDoc.indexOf('### 📋 វាលដែល ZoeW អានពីជួរដេកបញ្ជី ZTO');
+    const fieldsEnd = fieldsAt === -1 ? -1 : setupDoc.indexOf('\n### ', fieldsAt + 10);
+    const fieldsDoc = fieldsAt === -1 ? '' : setupDoc.slice(fieldsAt, fieldsEnd === -1 ? undefined : fieldsEnd);
+    const pathList = (name) => {
+        const m = new RegExp('const ' + name + ' = (\\[[^\\]]*\\])').exec(FUNCTION_SRC);
+        try { return m ? JSON.parse(m[1].replace(/'/g, '"')) : []; } catch (_) { return []; }
+    };
+    const docFields = [].concat(pathList('BARCODE_PATHS'), ['scanBillCode'], pathList('PHONE_PATHS'), pathList('LIST_TIME_PATHS'),
+        pathList('LIST_SCAN_CODE_PATHS'), pathList('LIST_SCAN_DESC_PATHS'), pathList('LIST_SITE_NAME_PATHS'),
+        pathList('COD_PATHS').slice(0, 1), pathList('DOD_PATHS').slice(0, 1));
+    ok('ជាន់អប្បបរមា ៖ ស្រង់បញ្ជីវាលពី Function បាន (≥ ២០) · ផ្នែក «📋 វាល» មានក្នុង ZTO-SETUP-KH.md', docFields.length >= 20 && fieldsDoc.length > 200,
+        { fields: docFields.length, doc: fieldsDoc.length });
+    ok('⛔ E8 ៖ រាល់វាលដែល Function អានពីជួរដេកបញ្ជី មានក្នុងតារាង «📋 វាល» របស់ ZTO-SETUP-KH.md',
+        docFields.filter((f) => fieldsDoc.indexOf('`' + f + '`') === -1).length === 0,
+        docFields.filter((f) => fieldsDoc.indexOf('`' + f + '`') === -1));
+
     // ⛔ client ៖ ទំព័រ ១ សុំ `withSigned=1` · ជុំបិទតាម ZTO សុំ `signed=1` (ស្នាមភ្ជាប់ទៅ Function)
     const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
     ok('⛔ client ៖ URL បញ្ជីគាំទ្រ `withSigned=1` និង `signed=1`',

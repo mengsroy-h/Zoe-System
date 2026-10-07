@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
-import { claimAndCleanupItem, readCleanupJournal } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
+import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -155,6 +156,10 @@ beforeEach(() => {
     try { localStorage.clear(); } catch {}
     (window as any).ZoeErrors = { capture: vi.fn() };
     fetchSpy.mockClear();
+    cleanupInFlight.clear();
+    cleanupJournalLive.clear();
+    dbListenerPendingPaths.clear();
+    dbListenerFailedPaths.clear();
     vi.stubGlobal('fetch', fetchSpy);
     vi.stubGlobal('confirm', () => true);
     firebaseState.authGeneration++;
@@ -256,6 +261,82 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(lab.tx.filter((t) => t.path === TRASH + '/' + ID && t.prior === null).length).toBe(0);
         expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+    it('7. applied · the app dies after the journal is written, before the slot claim lands ➜ the journal says «slot» (ownership unknown), never «moved»', async () => {
+        install('abandon', 'supabase');
+        lab.hook = (info) => {
+            if (info.path === TRASH + '/' + ID) return new Promise(() => {});
+            return appliedAfterLostReply(info);
+        };
+        claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        const journal = readCleanupJournal();
+        expect(journal.length).toBe(1);
+        expect(journal[0].stage).toBe('slot');
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+    }, 20000);
+
+    const slotEntry = (item: any) => {
+        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'expired',
+            barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
+        noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem,
+            revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
+        return trashItem;
+    };
+
+    it('8. resume «slot» · another device already holds trash/<id> (its own deletedAt) ➜ no deduction · its copy untouched · journal cleared', async () => {
+        const item = install('abandon', 'firebase');
+        setAt(HISTORY + '/' + ID, null);
+        dataState.scanHistory = [];
+        slotEntry(item);
+        const foreign = { ...clone(item), deletedAt: getServerNow() - 1000, trashReason: 'expired', isFromDeletion: false,
+            barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: true })) };
+        setAt(TRASH + '/' + ID, foreign);
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
+        await flush();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(TRASH + '/' + ID).deletedAt).toBe(foreign.deletedAt);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('9. resume «slot» · our own slot write landed before the app died (same deletedAt) ➜ deducted once · flipped', async () => {
+        const item = install('abandon', 'firebase');
+        setAt(HISTORY + '/' + ID, null);
+        dataState.scanHistory = [];
+        const trashItem = slotEntry(item);
+        setAt(TRASH + '/' + ID, trashItem);
+        await resumeCleanupJournalEntry(ID);
+        await flush();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
+        expect(getAt(DAILY + '/' + DAY).totalCount).toBe(9);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('10. resume «slot» · trash absent and the item is not back in history ➜ slot claimed · deducted once · flipped', async () => {
+        const item = install('abandon', 'firebase');
+        setAt(HISTORY + '/' + ID, null);
+        dataState.scanHistory = [];
+        slotEntry(item);
+        expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
+        await flush();
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('11. resume «slot» · the item is back in history under its id ➜ no trash write · no deduction · journal cleared · a stale view waits', async () => {
+        const item = install('abandon', 'firebase');
+        slotEntry(item);
+        dbListenerPendingPaths.add('history');
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
+        expect(readCleanupJournal().length).toBe(1);
+        dbListenerPendingPaths.clear();
+        expect(await resumeCleanupJournalEntry(ID)).toBe('');
+        await flush();
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);
 });

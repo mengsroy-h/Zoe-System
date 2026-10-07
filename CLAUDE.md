@@ -784,14 +784,18 @@ class, column widths in CSS.
   Sentry money). A whole-item cleanup claim resolved as `applied` (sent value `null` ➜ not proof that *we* deleted it) decides ownership
   by `claimCleanupTrashSlot()`: a create-if-absent transaction on `zoew_recently_deleted_cod_dod/<id>` — committed = ours (ledger follows) · aborted =
   another device's copy (journal cleared · no ledger) ⛔ never a REST read (none exists on Supabase · a failed read dropped the parcel); partial claims
-  use `cleanupClaimAccountedElsewhere()` (recent foreign trash). ⛔ `fb.get()` isn't evidence (cached).
+  use `cleanupClaimAccountedElsewhere()` (recent foreign trash). Until the slot answers, the journal says stage `slot` (ownership unknown) ⛔ never
+  `moved` (a resume would deduct a claim that was another device's): resume resolves it with `resolveCleanupSlot()` — trash with our `deletedAt` ➜ ours ·
+  another `deletedAt` ➜ elsewhere · absent ➜ the item back in history (id or restored barcodes, fresh views only) ➜ elsewhere, else claim the slot.
+  ⛔ `fb.get()` isn't evidence (cached).
 - `dbOp(promise, msg)` (`withTimeout(…, DB_OP_TIMEOUT_MS)`, 15s) for Firebase calls behind locks, incl. via helpers ⛔ no
   direct `await fb.<dataOp>(…)`.
 - RTDB queues offline writes ➜ `armLateCommit(promise, onCommitted, onFailed, label)` finishes post-commit work;
   `committed: false` and rejections go to `onFailed`; never claim a rollback while the transaction lives.
   `armLateWrite(promise, onDone)` for key releases; `notifyIfSlow(promise, ms, message)` returns the **same** promise.
 - ⛔ No `dbOp()` on trash writes (its catch reverses). ⛔ Exception: `claimBarcodeInRegistry` has no inner ceiling (call
-  sites have one).
+  sites have one). The `isDeducted` flip (`markCleanupTrashDeducted()`) may sit in `dbOp()`: it is idempotent and its catch only keeps the journal
+  at stage `flip` (a late landing is the wanted state; without the ceiling a hung flip would block every later resume).
 - Batch work aborts after the first hang (`dbOpStalled(e)`).
 - `sw.js` `timedFetch()` is the single network path (`NETWORK_TIMEOUT_MS` 20s, `AbortController` + race); `networkOnly()`
   uses it; the ceiling covers headers only.

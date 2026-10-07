@@ -102,6 +102,8 @@ export const CLEANUP_STAGE_LEDGER = 'ledger';
 
 export const CLEANUP_STAGE_FLIP = 'flip';
 
+export const CLEANUP_STAGE_SLOT = 'slot';
+
 export function readCleanupJournal() {
     try {
         const raw = safeStoreGet(appLocalStore, CLEANUP_JOURNAL_KEY);
@@ -245,6 +247,27 @@ export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone)
     return true;
 }
 
+export async function resolveCleanupSlot(trashItem) {
+    let existing = null;
+    try {
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        existing = snap.exists() ? snap.val() : null;
+    } catch (readErr) {
+        return 'wait';
+    }
+    if (existing) return existing.deletedAt === trashItem.deletedAt ? 'ours' : 'elsewhere';
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return 'wait';
+    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id)) return 'elsewhere';
+    const back = cleanupBarcodesBackInHistory(trashItem);
+    if (back === null) return 'wait';
+    if (back) return 'elsewhere';
+    try {
+        return (await retryAsync(() => claimCleanupTrashSlot(trashItem), 3, 1500)) ? 'claimed' : 'elsewhere';
+    } catch (claimErr) {
+        return 'wait';
+    }
+}
+
 export const cleanupJournalLive = new Map();
 
 export const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';
@@ -331,6 +354,18 @@ export async function resumeCleanupJournalEntry(trashId) {
         if (!rev || await settleCleanupDeduction(entry.id, trashItem, rev, true)) clearCleanupJournalEntry(trashItem.id);
         return '';
     }
+    let outcome = '';
+    if (entry.stage === CLEANUP_STAGE_SLOT) {
+        const slot = await resolveCleanupSlot(trashItem);
+        if (slot === 'wait') return '';
+        if (slot === 'elsewhere') {
+            clearCleanupJournalEntry(trashItem.id);
+            return '';
+        }
+        markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_MOVED);
+        entry.stage = CLEANUP_STAGE_MOVED;
+        if (slot === 'claimed') outcome = 'restored';
+    }
     let present = false;
     try {
         const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
@@ -338,7 +373,6 @@ export async function resumeCleanupJournalEntry(trashId) {
     } catch (readErr) {
         return '';
     }
-    let outcome = '';
     if (!present) {
         if (entry.stage !== CLEANUP_STAGE_MOVED) {
             clearCleanupJournalEntry(trashItem.id);
@@ -631,7 +665,7 @@ export async function claimAndCleanupItem(id, reason) {
                 id: id,
                 reason: reason,
                 journalAt: getServerNow(),
-                stage: CLEANUP_STAGE_MOVED,
+                stage: trashSlotDecides ? CLEANUP_STAGE_SLOT : CLEANUP_STAGE_MOVED,
                 trashItem: trashItem,
                 revenue: revenuePending ? { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount } : null
             });

@@ -62,7 +62,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
     'toggleCloseStatus', 'executePermanentDelete'];
 
@@ -248,6 +248,7 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_STAGE_MOVED', "const CLEANUP_STAGE_MOVED = 'moved';"),
         optionalConst(src, 'CLEANUP_STAGE_LEDGER', "const CLEANUP_STAGE_LEDGER = 'ledger';"),
         optionalConst(src, 'CLEANUP_STAGE_FLIP', "const CLEANUP_STAGE_FLIP = 'flip';"),
+        optionalConst(src, 'CLEANUP_STAGE_SLOT', "const CLEANUP_STAGE_SLOT = 'slot';"),
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         optionalFn(src, 'safeStoreGet', 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalFn(src, 'safeStoreSet', 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),

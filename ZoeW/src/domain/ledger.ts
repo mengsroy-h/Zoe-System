@@ -168,7 +168,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
         ledgerServerVerdict(applied && applied.dailyServer),
         ledgerServerVerdict(applied && applied.monthlyServer)
     ]).then((initial) => {
-        if (!current()) return { ok: false, daily: initial[0], monthly: initial[1] };
+        if (!current()) return { ok: false, stale: true, daily: initial[0], monthly: initial[1] };
         const daily = initial[0];
         const monthly = initial[1];
         const dailyNeed = {
@@ -198,7 +198,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
             () => ({ delta: ledgerZeroDelta() })
         );
         return Promise.all([dailyStatus, monthlyStatus]).then((fixed) => {
-            if (!current()) return { ok: false, daily: daily, monthly: monthly };
+            if (!current()) return { ok: false, stale: true, daily: daily, monthly: monthly };
             const unknownOutcome = !!(daily.unknown || monthly.unknown || fixed[0].delta.unknown || fixed[1].delta.unknown);
             const dailyTotal = {
                 cod: r2(daily.cod + fixed[0].delta.cod),
@@ -223,6 +223,7 @@ export function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, ac
                     && dailyTotal.cod === alignedMonthly.cod
                     && dailyTotal.dod === alignedMonthly.dod
                     && dailyTotal.count === alignedMonthly.count,
+                stale: false,
                 daily: dailyTotal,
                 monthly: alignedMonthly
             }));

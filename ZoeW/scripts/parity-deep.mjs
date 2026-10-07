@@ -446,6 +446,8 @@ const SHEET_STEPS = [
     ['យល់ព្រម (សរសេរលុយពី Sheet)', click('#phoneModalConfirmBtn')]
 ];
 
+const UNORDERED_WRITE_STEPS = new Set(['បញ្ចូល (សរសេរលុយ)']);
+
 /* ── សេណារីយ៉ូ ─────────────────────────────────────────────────────────── */
 let bad = 0;
 let vacuous = 0;
@@ -508,6 +510,11 @@ async function runScenario(title, steps, storage = {}, zto = null) {
 
     for (const [label, fn] of steps) {
         let okA = true; let okB = true; let errA = ''; let errB = '';
+        // ⛔ ZoeW 2.50.4 (សំណើម្ចាស់គម្រោង) ៖ ការបញ្ចូលបញ្ជី ZTO រត់ ៤ ខ្សែស្របគ្នាតាមអតិថិជន+ថ្ងៃ ➜ **លំដាប់** ការសរសេរ
+        //    ខុសពី App ដើម (តាមលំដាប់) តែ **សំណុំ** ការសរសេរ និង DB ចុងក្រោយដូចគ្នា ➜ ជំហាននេះប្រៀបការសរសេរដោយមិនគិតលំដាប់។
+        const unorderedWrites = UNORDERED_WRITE_STEPS.has(label);
+        const writesOf = (text) => (unorderedWrites
+            ? JSON.stringify(JSON.parse(text).map((w) => JSON.stringify(w)).sort(), null, 1) : text);
         try { await fn(A.page); } catch (e) { okA = false; errA = String(e.message).split('\n')[0]; }
         try { await fn(B.page); } catch (e) { okB = false; errB = String(e.message).split('\n')[0]; }
         let netA = ''; let netB = '';
@@ -518,7 +525,7 @@ async function runScenario(title, steps, storage = {}, zto = null) {
         const b = await state(B);
         const layers = {
             'អេក្រង់': [a.snap.tree, b.snap.tree],
-            'ការសរសេរ': [a.writes, b.writes],
+            'ការសរសេរ': [writesOf(a.writes), writesOf(b.writes)],
             'DB': [a.dump, b.dump],
             'ប្រអប់ native': [a.dialogs, b.dialogs],
             'Apps Script': [a.appsScript, b.appsScript],

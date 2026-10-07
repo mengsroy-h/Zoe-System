@@ -1911,6 +1911,24 @@
     "ZoeW/tests/locker-occupant.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/toast-visibility.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/collected-sync-pending.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-stale-session.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/locker-scan-direct.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-import-lanes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/remove-stale-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-stale-bar.test.tsx": {
       "policy": "zoew-self-verification"
     },

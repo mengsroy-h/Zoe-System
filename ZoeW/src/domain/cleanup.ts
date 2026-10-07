@@ -581,7 +581,7 @@ export async function claimAndCleanupItem(id, reason) {
             try {
                 const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
                     -revenueCod, -revenueDod, -revenueCount);
-                if (!status || !status.ok) {
+                if (!status || (!status.ok && !status.stale)) {
                     const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
                     if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
                     showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');

@@ -211,6 +211,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             if (deductionApplied) {
                 correctRevenueLedgerToActual(revenueScanDate, deductionApplied,
                     -itemToTrash.cod, -itemToTrash.dod, -1).then((status) => {
+                    if (status && status.stale) return;
                     if (status && status.ok) {
                         showToast(late
                             ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!`
@@ -377,7 +378,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         reconcilePickupDeltaWithServer();
         const collectedSaved = await reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
-        if (!silent && collectedSaved) showToast(late
+        if (!silent && collectedSaved === true) showToast(late
             ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
             : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);
         return true;
@@ -584,6 +585,7 @@ export function saveEditedBarcodePrice() {
                 const actualDodDiff = (Math.round(newDod * 100) - Math.round(serverOldDod * 100)) / 100;
                 Promise.all([correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0), collectedSync]).then(([status, collectedSaved]) => {
                     if (!editIsCurrent()) return;
+                    if (status && status.ok && collectedSaved === 'pending') return;
                     if (status && status.ok && collectedSaved !== null) {
                         showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
                         return;

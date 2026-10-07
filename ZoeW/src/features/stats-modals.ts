@@ -65,6 +65,7 @@ export function submitManualAdjustment() {
     viewState.manualAdjustBusy = true;
     const manualRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
     correctRevenueLedgerToActual(dateVal, manualRevenueApplied, codChange, dodChange, countChange).then((status) => {
+        if (status && status.stale) return;
         if (status && status.ok) {
             showToast("✅ កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
             return;

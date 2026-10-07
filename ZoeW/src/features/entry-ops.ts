@@ -266,7 +266,7 @@ export async function toggleCloseStatus(id?) {
         reconcilePickupDeltaWithServer();
         const collectedSaved = await reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
-        if (collectedSaved) showToast(late
+        if (collectedSaved === true) showToast(late
             ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`
             : `✅ បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`);
         return true;

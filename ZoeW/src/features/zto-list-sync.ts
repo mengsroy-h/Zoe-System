@@ -47,6 +47,7 @@ export const ZTO_SIGNED_DAY_CONCURRENCY = 3;
 export const ZTO_SIGNED_SPLIT_MEMO_MS = 30 * 60 * 1000;
 
 export const ZTO_LIST_PROBE_CONCURRENCY = 4;
+export const ZTO_LIST_IMPORT_CONCURRENCY = 4;
 
 export const ZTO_LIST_SKIP_TEXT = {
     'scan-type': 'មិនមែនស្កេន «មកដល់»',
@@ -705,12 +706,21 @@ export async function importZtoListRows() {
     const savedDates = new Set();
     const origins = groups.existing.map(originOf);
     try {
+        const laneOf = new Map();
         for (let i = 0; i < queue.length; i++) {
-            if (!session.current()) return;
             const row = queue[i];
-            setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + (i + 1) + '/' + queue.length + '...');
-            if ((navigator.onLine as boolean) === false) { notTried = queue.length - i; break; }
-            if (isBarcodeAlreadyUsed(row.barcode)) continue;
+            const laneKey = row.phone + '|' + getZoneDateKey(row.stampMs || getServerNow(), 0);
+            if (!laneOf.has(laneKey)) laneOf.set(laneKey, []);
+            laneOf.get(laneKey).push(row);
+        }
+        const lanes = Array.from(laneOf.values());
+        let laneNext = 0;
+        let started = 0;
+        let finished = 0;
+        let stop = false;
+        const runRow = async (row) => {
+            if (!session.current()) return 'lost';
+            if (isBarcodeAlreadyUsed(row.barcode)) return 'next';
             const claimPromise = claimBarcodeInRegistry(row.barcode);
             let claim = 'unknown';
             try {
@@ -720,10 +730,10 @@ export async function importZtoListRows() {
                 if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode);
                 claim = e && e.message === 'Barcode claim timed out' ? 'stalled' : 'unknown';
             }
-            if (!session.current()) return;
-            if (claim === 'taken') { taken++; continue; }
-            if (claim === 'stalled') { failed++; stalled = true; notTried = queue.length - i - 1; break; }
-            if (claim !== 'claimed') { failed++; continue; }
+            if (!session.current()) return 'lost';
+            if (claim === 'taken') { taken++; return 'next'; }
+            if (claim === 'stalled') { failed++; stalled = true; return 'stop'; }
+            if (claim !== 'claimed') { failed++; return 'next'; }
             const rollbackImportedRow = () => {
                 if (!session.current()) return;
                 releaseBarcodesInRegistry([row.barcode]);
@@ -735,7 +745,7 @@ export async function importZtoListRows() {
             const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs, closedStampMs);
             try {
                 const status = await withTimeout(savePromise, 15000, 'Save timed out');
-                if (!session.current()) return;
+                if (!session.current()) return 'lost';
                 if (status === true || status === false) {
                     saved++;
                     savedDates.add(rowDateKey);
@@ -746,7 +756,7 @@ export async function importZtoListRows() {
                 }
                 else failed++;
             } catch (e) {
-                if (!session.current()) return;
+                if (!session.current()) return 'lost';
                 if (e && e.message === 'Save timed out') {
                     pending++;
                     savedDates.add(rowDateKey);
@@ -756,14 +766,33 @@ export async function importZtoListRows() {
                         return closedStampMs ? markZtoListRowPickedUp(row.barcode) : undefined;
                     }, rollbackImportedRow, 'ZTO list import save');
                     stalled = true;
-                    notTried = queue.length - i - 1;
-                    break;
-                } else {
-                    failed++;
-                    rollbackImportedRow();
+                    return 'stop';
+                }
+                failed++;
+                rollbackImportedRow();
+            }
+            return 'next';
+        };
+        const worker = async () => {
+            while (!stop && laneNext < lanes.length) {
+                const lane = lanes[laneNext++];
+                for (let j = 0; j < lane.length; j++) {
+                    if (stop) return;
+                    if ((navigator.onLine as boolean) === false) { stop = true; return; }
+                    started++;
+                    const verdict = await runRow(lane[j]);
+                    finished++;
+                    setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + finished + '/' + queue.length + '...');
+                    if (verdict !== 'next') { stop = true; return; }
                 }
             }
-        }
+        };
+        if (queue.length) setZtoListSyncNote('⏳ កំពុងបញ្ចូល 0/' + queue.length + '...');
+        const workers = [];
+        for (let w = 0; w < ZTO_LIST_IMPORT_CONCURRENCY && w < lanes.length; w++) workers.push(worker());
+        await Promise.all(workers);
+        if (!session.current()) return;
+        if (stop) notTried = queue.length - started;
         for (let i = 0; i < closeTargets.length; i++) {
             if (!session.current()) return;
             if (stalled || notTried || (navigator.onLine as boolean) === false) { closeNotTried = closeTargets.length - i; break; }

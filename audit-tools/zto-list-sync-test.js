@@ -1340,8 +1340,15 @@ function firstBody(requests) {
         importFn.indexOf('ZTO_SYNC_VIEW_KEYS') !== -1
         && importFn.indexOf('anyDbListenerViewIsStale') !== -1, importFn.slice(0, 300));
     ok('⛔ ក្រៅបណ្ដាញ ➜ មិនបញ្ចូល', /navigator\.onLine === false/.test(importFn), true);
-    ok('⛔ ការបញ្ចូលជា **លំដាប់** មិនស្របគ្នា (គ្មាន `Promise.all`)',
-        importFn.indexOf('Promise.all') === -1, true);
+    // ⛔ ខ្សែស្របគ្នា **មានពិដាន** (សំណើម្ចាស់គម្រោង ៖ «ចុច បញ្ចូលក៏យឺត») ៖ `Promise.all` លើ worker ≤ `ZTO_LIST_IMPORT_CONCURRENCY`
+    //    ប៉ុណ្ណោះ (មិនមែនលើ `queue` ទាំងមូល ➜ ១០០ ការសរសេរក្នុងពេលតែមួយ) · ខ្សែចែកតាម «អតិថិជន + ថ្ងៃស្កេន» (`addOrUpdateEntry()`
+    //    បញ្ចូលគ្នាតាម phone + scanDate លើទិដ្ឋភាព local ➜ អតិថិជនដដែលមិនអាចរត់ស្របគ្នា)។
+    ok('⛔ ការបញ្ចូលស្របគ្នា **មានពិដាន** ៖ `Promise.all(workers)` · worker ≤ `ZTO_LIST_IMPORT_CONCURRENCY` · ខ្សែតាមអតិថិជន + ថ្ងៃ',
+        importFn.indexOf('Promise.all(workers)') !== -1
+        && /w < ZTO_LIST_IMPORT_CONCURRENCY && w < lanes\.length/.test(importFn)
+        && /row\.phone \+ '\|' \+ getZoneDateKey\(/.test(importFn), true);
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មាន fan-out លើ `queue` ទាំងមូល (`Promise.all(queue` · `queue.map(`)',
+        importFn.indexOf('Promise.all(queue') === -1 && importFn.indexOf('queue.map(') === -1, true);
     ok('`importZtoListRows` ស្ថិតក្នុង `ACTION_ALLOWLIST`',
         !!ALLOW && ALLOW[1].indexOf('"importZtoListRows"') !== -1, true);
     ok('`index.html` មានប៊ូតុងបញ្ចូល `#ztoListSyncImportBtn`',
@@ -1363,7 +1370,8 @@ function firstBody(requests) {
         .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};',
             extractConst(APP_SRC, 'ztoListSignedProbe') || 'const ztoListSignedProbe = new Map();',
             extractConst(APP_SRC, 'ztoListSignedEvidence') || 'const ztoListSignedEvidence = new Set();',
-            constOrStub(APP_SRC, 'ZTO_LIST_PROBE_CONCURRENCY')]);
+            constOrStub(APP_SRC, 'ZTO_LIST_PROBE_CONCURRENCY'),
+            constOrStub(APP_SRC, 'ZTO_LIST_IMPORT_CONCURRENCY')]);
     const importOptional = ['armLateWrite', 'releaseLateBarcodeClaim']
         .map((name) => extractFn(APP_SRC, name) || '').filter(Boolean);
     const importMissing = IMPORT_NAMES.filter((name) => !extractFn(APP_SRC, name)).length;
@@ -1447,7 +1455,8 @@ function firstBody(requests) {
                 + '\nglobalThis.__resolveSigned = resolveZtoListSignedVerdicts;'
                 + '\nglobalThis.__signedProbe = ztoListSignedProbe;'
                 + '\nglobalThis.__signedEvidence = ztoListSignedEvidence;'
-                + '\nglobalThis.__probeMax = ZTO_LIST_SIGNED_PROBE_MAX;', box);
+                + '\nglobalThis.__probeMax = ZTO_LIST_SIGNED_PROBE_MAX;'
+                + '\nglobalThis.__conc = ZTO_LIST_IMPORT_CONCURRENCY;', box);
             runImport = box.__run;
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
@@ -1559,27 +1568,62 @@ function firstBody(requests) {
             const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
             const releasedCodes = () => calls.release.reduce((all, codes) => all.concat(codes), []);
 
+            // ⛔ ខ្សែស្របគ្នា (សំណើម្ចាស់គម្រោង ៖ «ចុច បញ្ចូលក៏យឺត») ៖ ជួរដេកអតិថិជនផ្សេងគ្នា ≤ `ZTO_LIST_IMPORT_CONCURRENCY`
+            //    ក្នុងពេលតែមួយ · អតិថិជនដដែល ថ្ងៃដដែល = **ខ្សែតែមួយ តាមលំដាប់** (`addOrUpdateEntry()` បញ្ចូលគ្នាជាកញ្ចប់តែមួយ) ·
+            //    ការព្យួរដំបូង ➜ **គ្មានជួរថ្មីចាប់ផ្តើម** · ខ្សែដែលកំពុងរត់បញ្ចប់ជួររបស់វា ➜ «បរាជ័យ/កំពុងរក្សាទុក» ≤ ចំនួនខ្សែ ·
+            //    «មិនទាន់បញ្ចូល» = ជួរដែលមិនបានចាប់ផ្តើម។ ជួរ ៦ > ខ្សែ ➜ «ឈប់» វាស់បាន (ជួរ ២ ចាប់ផ្តើមទាំងអស់មុនការព្យួរ)។
+            const CONC = box.__conc;
+            ok('⛔ ជាន់អប្បបរមា ៖ `ZTO_LIST_IMPORT_CONCURRENCY` អានចេញពីកូដពិត (2–8)',
+                Number.isInteger(CONC) && CONC >= 2 && CONC <= 8, CONC);
+            const MANY = [];
+            for (let i = 0; i < 6; i++) {
+                MANY.push({ barcode: '7713050000091' + i, phone: '85596389734' + i, cod: 1 + i, dod: 0,
+                    at: '2026-09-10 10:0' + i + ':00', skip: '' });
+            }
+            const SAME = MANY.map((r) => Object.assign({}, r, { phone: '855963897345' }));
+            const loadMany = (rows) => {
+                box.ztoListSyncResult = { rows: rows.slice(), from: '2026-09-08', to: '2026-09-11', total: rows.length };
+            };
+            const notTriedOf = () => {
+                const m = calls.toast.map((t) => t.match(/មិនទាន់បញ្ចូល (\d+)/)).find(Boolean);
+                return m ? Number(m[1]) : 0;
+            };
+
             reset();
+            loadMany(MANY);
             box.__claimHangs = true;
             box.__timeoutLabel = 'Barcode claim timed out';
             await runImport();
             ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «claim ព្យួរ» ត្រូវបានឈានដល់ពិត',
                 box.__claimDeferreds.length >= 1, box.__claimDeferreds.length);
-            ok('⛔ **ការព្យួរដំបូង ➜ ឈប់** (ZTO-G4 ៖ បន្ត ➜ ជួរនីមួយៗរង់ចាំពិដាន ១៥ វិ. ➜ ១០០ ជួរ = សោជាប់ ~២៥ នាទី)',
-                box.__claimDeferreds.length === 1 && calls.claim.length === 1, calls.claim);
+            ok('⛔ **ការព្យួរដំបូង ➜ ឈប់** (ZTO-G4 ៖ បន្ត ➜ ជួរនីមួយៗរង់ចាំពិដាន ១៥ វិ. ➜ ១០០ ជួរ = ២៥ នាទី) ៖ claim = ចំនួនខ្សែ មិនមែនគ្រប់ជួរ',
+                box.__claimDeferreds.length === CONC && calls.claim.length === CONC, calls.claim);
+            ok('⛔ ខ្សែស្របគ្នា ៖ claim ' + CONC + ' ក្នុងពេលតែមួយ (មុនកែ ៖ ១)',
+                box.__claimDeferreds.length === CONC, box.__claimDeferreds.length);
             ok('⛔ claim ព្យួរ ➜ មិនរក្សាទុក', calls.save.length === 0, calls.save);
             ok('⛔ claim ព្យួរ ➜ មិនដោះមុនដឹងសាលក្រម', releasedCodes().length === 0, calls.release);
-            ok('⛔ ឈប់ពេលព្យួរ ➜ សារប្រាប់ចំនួនជួរដែល **មិនទាន់បញ្ចូល** (ZTO-G5)',
-                calls.toast.some((m) => m.indexOf('មិនទាន់បញ្ចូល 1') !== -1), calls.toast);
+            ok('⛔ ឈប់ពេលព្យួរ ➜ សារប្រាប់ចំនួនជួរដែល **មិនទាន់បញ្ចូល** = ជួរដែលមិនបានចាប់ផ្តើម (ZTO-G5)',
+                notTriedOf() === MANY.length - CONC, calls.toast);
             ok('⛔ ឈប់ពេលព្យួរ ➜ **រក្សាបញ្ជី** ដើម្បីចុចបញ្ចូលម្តងទៀត (មិនសម្អាត preview)',
-                !!box.ztoListSyncResult && box.ztoListSyncResult.rows.length === 2, box.ztoListSyncResult);
+                !!box.ztoListSyncResult && box.ztoListSyncResult.rows.length === MANY.length, box.ztoListSyncResult);
             ok('⛔ ឈប់ពេលព្យួរ ➜ សោដោះ', box.ztoListSyncInFlight === false, box.ztoListSyncInFlight);
             box.__claimDeferreds.forEach((d) => d.resolve('claimed'));
             await flush();
-            ok('⛔ claim ដែលចុះ **យឺត** ជា `claimed` ➜ ត្រូវដោះវិញ (បើអត់ ➜ កូនសោ registry កំព្រា ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត)',
-                releasedCodes().length === 1, calls.release);
+            ok('⛔ claim ដែលចុះ **យឺត** ជា `claimed` ➜ ត្រូវដោះវិញគ្រប់ខ្សែ (បើអត់ ➜ កូនសោ registry កំព្រា ➜ barcode ស្កេនមិនចូល)',
+                releasedCodes().length === CONC, calls.release);
 
             reset();
+            loadMany(SAME);
+            box.__claimHangs = true;
+            box.__timeoutLabel = 'Barcode claim timed out';
+            await runImport();
+            ok('⛔ ទិសផ្ទុយ ៖ អតិថិជនដដែល ថ្ងៃដដែល = **ខ្សែតែមួយ** ➜ claim ១ ក្នុងពេលតែមួយ · មិនទាន់បញ្ចូល = នៅសល់',
+                box.__claimDeferreds.length === 1 && calls.claim.length === 1 && notTriedOf() === SAME.length - 1, calls.claim);
+            box.__claimDeferreds.forEach((d) => d.resolve('claimed'));
+            await flush();
+
+            reset();
+            loadMany(MANY);
             box.__claimHangs = true;
             box.__timeoutLabel = 'Barcode claim timed out';
             await runImport();
@@ -1589,33 +1633,35 @@ function firstBody(requests) {
                 releasedCodes().length === 0, calls.release);
 
             reset();
+            loadMany(MANY);
             box.__saveHangs = true;
             box.__timeoutLabel = 'Save timed out';
             await runImport();
             ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «ការសរសេរព្យួរ» ត្រូវបានឈានដល់ពិត',
                 box.__saveDeferreds.length >= 1, box.__saveDeferreds.length);
-            ok('⛔ ការសរសេរព្យួរដំបូង ➜ ឈប់ (មិនរង់ចាំពិដានលើជួរបន្ទាប់)',
-                box.__saveDeferreds.length === 1 && calls.claim.length === 1, calls.claim);
-            ok('⛔ ការសរសេរព្យួរ ➜ សារប្រាប់ «កំពុងរក្សាទុក» និង «មិនទាន់បញ្ចូល» · បញ្ជីនៅ',
-                calls.toast.some((m) => m.indexOf('⏳') !== -1 && m.indexOf('មិនទាន់បញ្ចូល 1') !== -1)
+            ok('⛔ ការសរសេរព្យួរដំបូង ➜ ឈប់ (គ្មានជួរថ្មីក្រោយខ្សែដែលកំពុងរត់ព្យួរ · មិនរង់ចាំពិដានលើជួរបន្ទាប់)',
+                box.__saveDeferreds.length === CONC && calls.claim.length === CONC, calls.claim);
+            ok('⛔ ការសរសេរព្យួរ ➜ សារប្រាប់ «កំពុងរក្សាទុក» = ខ្សែ និង «មិនទាន់បញ្ចូល» = នៅសល់ · បញ្ជីនៅដដែល',
+                calls.toast.some((m) => m.indexOf('⏳ កំពុងរក្សាទុក ' + CONC) !== -1) && notTriedOf() === MANY.length - CONC
                 && !!box.ztoListSyncResult, calls.toast);
-            ok('⛔ ការសរសេរព្យួរ ➜ **មិនដោះកូនសោ registry ភ្លាម** (RTDB ចាក់ជួរ ➜ commit យឺត ➜ ការដោះ = barcode ស្កេនចូលបាន ២ ដង ➜ **លុយបូកស្ទួន**)',
+            ok('⛔ ការសរសេរព្យួរ ➜ **មិនដោះកូនសោ registry ភ្លាម** (RTDB ចាក់ជួរ ➜ commit យឺត ➜ ការដោះ = កូនសោបាត់ ➜ ស្ទួន)',
                 releasedCodes().length === 0, calls.release);
             ok('⛔ សារមិនត្រូវអះអាងថា «បរាជ័យ» ខណៈការសរសេរនៅរស់',
-                calls.toast.some((m) => m.indexOf('⏳') !== -1), calls.toast);
+                calls.toast.some((m) => m.indexOf('⏳') !== -1) && !calls.toast.some((m) => m.indexOf('⚠️ បរាជ័យ') !== -1), calls.toast);
             box.__saveDeferreds.forEach((d) => d.resolve(true));
             await flush();
             ok('⛔ commit យឺត **ជោគជ័យ** ➜ នៅតែមិនដោះកូនសោ',
                 releasedCodes().length === 0, calls.release);
 
             reset();
+            loadMany(MANY);
             box.__saveHangs = true;
             box.__timeoutLabel = 'Save timed out';
             await runImport();
             box.__saveDeferreds.forEach((d) => d.reject(new Error('write rejected')));
             await flush();
-            ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ',
-                releasedCodes().length === 1, calls.release);
+            ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ (គ្រប់ខ្សែ)',
+                releasedCodes().length === CONC, calls.release);
 
             reset();
             box.__claimRejects = true;
@@ -1624,13 +1670,14 @@ function firstBody(requests) {
                 calls.claim.length === 2 && calls.save.length === 0, calls.claim);
 
             reset();
+            loadMany(MANY);
             const saveImpl = box.addOrUpdateEntry;
             box.addOrUpdateEntry = (...args) => { box.navigator.onLine = false; return saveImpl(...args); };
             await runImport();
             box.addOrUpdateEntry = saveImpl;
-            ok('⛔ បណ្តាញដាច់កណ្តាលការបញ្ចូល ➜ ឈប់ · សារប្រាប់ «មិនទាន់បញ្ចូល 1» · បញ្ជីនៅ (ZTO-G5)',
-                calls.save.length === 1 && calls.toast.some((m) => m.indexOf('មិនទាន់បញ្ចូល 1') !== -1)
-                && !!box.ztoListSyncResult, { save: calls.save.length, toast: calls.toast });
+            ok('⛔ បណ្តាញដាច់កណ្តាលការបញ្ចូល ➜ ឈប់ (ខ្សែដែលកំពុងរត់ចប់ · គ្មានជួរថ្មី) · «មិនទាន់បញ្ចូល» = នៅសល់ · បញ្ជីនៅដដែល',
+                calls.save.length === CONC && notTriedOf() === MANY.length - CONC && !!box.ztoListSyncResult,
+                { save: calls.save.length, toast: calls.toast });
 
             reset();
             await runImport();
@@ -2609,6 +2656,10 @@ function firstBody(requests) {
     const bodyAt = (req) => { try { return JSON.parse(String((req.init || {}).body || '')); } catch (_) { return null; } };
 
     const both = await typedCall(GOOD_LIST_ENV, { withSigned: '1' });
+    const bothTiming = JSON.parse((await call({ diag: '1' })).body).upstreamTiming;
+    ok('⛔ `?diag=1` `upstreamTiming` កត់ការហៅបញ្ជី (`list`) និងចុះហត្ថលេខា (`signed`) ដាច់ពីគ្នា · `/detail` 0 (ពេល ZTO ឆ្លើយ ៖ count · lastMs · avgMs · maxMs · timeouts)',
+        !!bothTiming && bothTiming.list.count === 1 && bothTiming.signed.count === 1 && bothTiming.detail.count === 0
+        && bothTiming.list.lastMs >= 0 && bothTiming.signed.avgMs >= 0 && bothTiming.list.timeouts === 0, JSON.stringify(bothTiming));
     const bothTypes = both.requests.map((r) => typeOf(r.init)).sort();
     ok('⛔ `withSigned=1` ➜ upstream **២ សំណើ** (`03` + `05`) ក្នុងការហៅតែមួយ', JSON.stringify(bothTypes) === '["03","05"]', bothTypes);
     const signedReq = both.requests.find((r) => typeOf(r.init) === '05');

@@ -524,6 +524,10 @@ group('ស្ថេរភាព ៖ បណ្តាញព្យួរ', async ()
     ok('⛔ fetch ដែលព្យួរ ➜ Function **នៅតែឆ្លើយជា JSON**', stalled.statusCode === 504, stalled.body);
     ok('➜ ក្នុងថវិកាពេល (មិនរង់ចាំគ្មានទីបញ្ចប់)', elapsed < 6000, elapsed);
     ok('➜ code ZTO_TIMEOUT', JSON.parse(stalled.body).code === 'ZTO_TIMEOUT', stalled.body);
+    const hungTiming = JSON.parse((await call({ diag: '1' })).body).upstreamTiming;
+    ok('⛔ `?diag=1` រាប់ timeout ក្នុង `upstreamTiming.detail` (ពិដាន 2000 ms ➜ lastMs ≥ 1900 · timeouts ≥ 1)',
+        !!hungTiming && hungTiming.detail.timeouts >= 1 && hungTiming.detail.lastMs >= 1900,
+        JSON.stringify(hungTiming && hungTiming.detail));
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_CACHE_TTL_MS: '0' });
     global.fetch = jsonResponder('not json at all');
@@ -639,6 +643,26 @@ group('ការវិនិច្ឆ័យ ?diag=1', async () => {
     ok('ប្រាប់ថាមិនផ្ញើ header ក្លែងរបស់ browser', diagBody.browserHeaders === false, diagBody.browserHeaders);
     ok('ប្រាប់ថវិកាពេលពិត',
         diagBody.timing && diagBody.timing.budgetMs > 0 && diagBody.timing.upstreamTimeoutMs > 0, diagBody.timing);
+
+    // ⛔ «ទាញយឺត» វាស់មិនបាន បើ Function មិនកត់ពេល ZTO ឆ្លើយ (សំណើម្ចាស់គម្រោង) ➜ `upstreamTiming` ក្នុង `?diag=1` ៖
+    //    `/detail` · បញ្ជី · ចុះហត្ថលេខា ដាច់ពីគ្នា · count · lastMs · avgMs · maxMs · timeouts · ageMs (តែលេខ · តាម container)។
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_CACHE_TTL_MS: '0' });
+    const slowResponder = jsonResponder(ORDER);
+    global.fetch = async (url, options) => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return slowResponder(url, options);
+    };
+    await call({ barcode: '77130527210012' });
+    const timing = JSON.parse((await call({ diag: '1' })).body).upstreamTiming;
+    ok('⛔ `?diag=1` កត់ពេល ZTO ឆ្លើយ `/detail` (count · lastMs · avgMs · maxMs ≥ ពេលពិត · timeouts 0)',
+        !!timing && timing.detail.count === 1 && timing.detail.lastMs >= 35 && timing.detail.avgMs >= 35
+        && timing.detail.maxMs >= 35 && timing.detail.timeouts === 0 && timing.detail.ageMs >= 0, JSON.stringify(timing));
+    ok('⛔ ទិសផ្ទុយ ៖ បញ្ជី/ចុះហត្ថលេខាមិនបានហៅ ➜ count 0 · null',
+        !!timing && timing.list.count === 0 && timing.list.lastMs === null && timing.signed.count === 0
+        && timing.signed.avgMs === null, JSON.stringify(timing));
+    ok('⛔ `upstreamTiming` មានតែលេខ ឬ null (គ្មានអត្ថបទ · URL · Cookie)',
+        !!timing && ['detail', 'list', 'signed'].every((kind) => Object.values(timing[kind])
+            .every((v) => v === null || typeof v === 'number')), JSON.stringify(timing));
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=super-secret-cookie' });
     const diagCookie = await call({ diag: '1' });

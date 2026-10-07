@@ -9,7 +9,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { uiState } from '../src/core/state';
 import { refTo } from '../src/app/refs';
-import { setupChromeAutoHide } from '../src/app/behaviors/chrome-autohide';
+import { CHROME_FLIP_SETTLE_MS, setupChromeAutoHide } from '../src/app/behaviors/chrome-autohide';
 import { closeModal, openModalHelper } from '../src/ui/modal';
 import { openModalIds } from '../src/core/modals';
 import { closeSideDrawer, isSideDrawerOpen, openSideDrawer, switchAppPage } from '../src/ui/page-nav';
@@ -27,10 +27,24 @@ function fakeScroller(parent: HTMLElement) {
     return el;
 }
 
+let barSeen = false;
+let barFlippedAt = 0;
+
+function noteBar() {
+    if (uiState.chromeHidden === barSeen) return;
+    barSeen = uiState.chromeHidden;
+    barFlippedAt = Date.now();
+}
+
 async function scrollTo(el: HTMLElement, top: number) {
+    noteBar();
+    const since = Date.now() - barFlippedAt;
+    if (since < CHROME_FLIP_SETTLE_MS + 20) await wait(CHROME_FLIP_SETTLE_MS + 20 - since);
+    el.dispatchEvent(new Event('touchmove', { bubbles: true }));
     el.scrollTop = top;
     el.dispatchEvent(new Event('scroll'));
     await wait(40);
+    noteBar();
 }
 
 let pages: HTMLElement;

@@ -617,15 +617,56 @@ const GESTURE = function (steps) {
     await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
 
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
-    const scrollTo = (top) => page.evaluate(async (t) => {
+    // ⛔ របាប្តូរតែពេល **អ្នកប្រើ** រមូរ (touch/wheel/key ≤ CHROME_SCROLL_INTENT_MS) ➜ helper បញ្ជូន `wheel` មុនរមូរ (input ពិត · `touchmove` ក្លែងគ្មាន `touches` ធ្វើឲ្យ handler PTR បោះ) ហើយ
+    //    ពេលរបាទើបប្តូរ រង់ចាំ CHROME_FLIP_SETTLE_MS (ដេរីវេពី App) មុនការរមូរបន្ទាប់ (មនុស្សមិនបញ្ច្រាសទិសក្នុងពេលនោះ)
+    const scrollTo = async (top) => {
+        await page.evaluate(async () => {
+            if (window.__barFlipWatch === undefined) {
+                let seen = window.uiState.chromeHidden;
+                window.__barFlipAt = -Infinity;
+                window.__barFlipWatch = window.uiState.subscribe(() => {
+                    if (window.uiState.chromeHidden === seen) return;
+                    seen = window.uiState.chromeHidden;
+                    window.__barFlipAt = performance.now();
+                });
+            }
+            window.uiState.flush();
+            await Promise.resolve();
+            const left = (Number(window.CHROME_FLIP_SETTLE_MS) || 0) + 20 - (performance.now() - window.__barFlipAt);
+            if (left > 0) await new Promise((r) => setTimeout(r, left));
+        });
+        return page.evaluate(async (t) => {
+            const el = document.getElementById('tableResponsive') || document.getElementById('appPages');
+            el.style.scrollBehavior = 'auto';
+            el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: t - el.scrollTop }));
+            el.scrollTop = t;
+            if (el.scrollTop !== t) return -1;
+            el.dispatchEvent(new Event('scroll', { bubbles: false }));
+            await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+            return el.scrollTop;
+        }, top);
+    };
+    const intent = await page.evaluate(() => ({ settle: window.CHROME_FLIP_SETTLE_MS, intent: window.CHROME_SCROLL_INTENT_MS }));
+    ok('App ប្រកាសពេល settle/intent របស់របា (ដេរីវេ ១០០–១០០០ms · ១–៣ វិ.)',
+        intent.settle >= 100 && intent.settle <= 1000 && intent.intent >= 1000 && intent.intent <= 3000, intent);
+    const noInputHidden = await page.evaluate(async (wait) => {
+        window.showAppChrome();
+        await new Promise((r) => setTimeout(r, wait));
         const el = document.getElementById('tableResponsive') || document.getElementById('appPages');
-        el.style.scrollBehavior = 'auto';
-        el.scrollTop = t;
-        if (el.scrollTop !== t) return -1;
+        const before = document.body.classList.contains('chrome-hidden');
+        for (const t of [300, 400, 500]) {
+            el.scrollTop = t;
+            el.dispatchEvent(new Event('scroll', { bubbles: false }));
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }
+        const after = document.body.classList.contains('chrome-hidden');
+        el.scrollTop = 0;
         el.dispatchEvent(new Event('scroll', { bubbles: false }));
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        return el.scrollTop;
-    }, top);
+        return { before, after };
+    }, (intent.intent || 0) + 50);
+    ok('⛔ scroll ដោយកម្មវិធី (គ្មាន touch/wheel/key) ➜ របាមិនលាក់ (រង្វង់ «ញ៉ាក់» លើ APK)',
+        noInputHidden.before === false && noInputHidden.after === false, noInputHidden);
     const hidden = () => page.evaluate(() => document.body.classList.contains('chrome-hidden'));
 
     await resetState();
@@ -860,8 +901,8 @@ const GESTURE = function (steps) {
     // គឺ >8.3ms) ចំណែកលើឧបករណ៍ដែល browser ចាក់ត្រឹម ៣០Hz វាតឹងពេក។
     console.log('\n=== ចង្វាក់ស៊ុមសម្របតាមឧបករណ៍ (១០–១២០ fps) ===');
     const hz = await page.evaluate(async () => {
-        if (typeof window.measureDisplayHz !== 'function') return null;
-        const measured = await new Promise((r) => window.measureDisplayHz(r));
+        if (typeof window.sampleFramePace !== 'function') return null;
+        const measured = await new Promise((r) => window.sampleFramePace(() => r(window.uiState.displayHz)));
         const atMeasured = window.longFrameThresholdMs();
         const budget = window.displayFrameBudgetMs();
         return {
@@ -873,7 +914,7 @@ const GESTURE = function (steps) {
             clampNaN: window.clampDisplayHz(NaN)
         };
     });
-    ok('measureDisplayHz() មានក្នុង App ពិត', !!hz, hz);
+    ok('sampleFramePace() វាស់ Hz ក្នុង App ពិត', !!hz, hz);
     if (hz) {
         console.log('    វាស់បាន ' + hz.measured + ' Hz  ➜ ថវិកាមួយស៊ុម ' + hz.budget +
                     'ms  ➜ ពិដានស៊ុមវែង ' + hz.atMeasured + 'ms');

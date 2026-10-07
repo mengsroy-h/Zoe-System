@@ -8,8 +8,6 @@ export const DISPLAY_HZ_MIN = 10;
 
 export const DISPLAY_HZ_MAX = 120;
 
-export const DISPLAY_HZ_SAMPLES = 24;
-
 export const PERF_SAMPLE_FRAMES = 90;
 
 export const PERF_LONG_FRAME_FACTOR = 1.6;
@@ -44,20 +42,6 @@ export function clampDisplayHz(hz) {
 function medianGap(gaps) {
     const sorted = gaps.slice().sort((a, b) => a - b);
     return sorted[sorted.length >> 1];
-}
-
-export function measureDisplayHz(done) {
-    const gaps = [];
-    let last = 0;
-    function tick(timestamp) {
-        if (last && timestamp > last) gaps.push(timestamp - last);
-        last = timestamp;
-        if (gaps.length < DISPLAY_HZ_SAMPLES) { requestAnimationFrame(tick); return; }
-        uiState.displayHz = clampDisplayHz(1000 / medianGap(gaps));
-        uiState.displayHzMeasured = true;
-        done(uiState.displayHz);
-    }
-    requestAnimationFrame(tick);
 }
 
 export function sampleFramePace(done) {

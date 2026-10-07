@@ -69,7 +69,10 @@ const ZONE_ALLOWED = {
         ' ការរមូរបញ្ជីខណៈ modal បើក ធ្វើតាមច្បាប់ធម្មតា (លាក់ត្រូវ `hideAppChrome()` បដិសេធ · ត្រឡប់ដល់កំពូល ➜ បង្ហាញ) · `openModalHelper()` មិនបង្ហាញរបា ➜' +
         ' ការបើក modal មិនប្តូរ clip-path/padding របស់បញ្ជី ។ វាស់បាន ៖ ៦០០ ជួរ CPU ÷4 PrePaint+Paint ២១៦ ➜ ៧៦ms (ដូចពេលរបាបង្ហាញ) ·' +
         ' អ្នកយាម `tests/modal-chrome-state.test.tsx` · gesture-test · perf-check (tree មុនកែ ➜ ក្រហម)' +
-        ' ⊕ («កែម៉ឺនុយ ☰ ដែរ») ៖ ការរមូរក្នុង `.side-drawer` (☰ · 🔔) មិនបញ្ជារបាដូច `.modal` · ម៉ឺនុយបើកលែងបង្ហាញរបារាល់ការរមូរ',
+        ' ⊕ («កែម៉ឺនុយ ☰ ដែរ») ៖ ការរមូរក្នុង `.side-drawer` (☰ · 🔔) មិនបញ្ជារបាដូច `.modal` · ម៉ឺនុយបើកលែងបង្ហាញរបារាល់ការរមូរ' +
+        ' ⊕ (វីដេអូ APK «ញ៉ាក់» · «របា tap glitch» ៖ បញ្ជីស្ងៀម ០px តែរបាលោតរាល់ ១–២ ស៊ុម) ៖ រាប់តែ scroll ពេលប៉ះ/អូស ឬក្រោយ touch/wheel/key/pointer ≤ CHROME_SCROLL_INTENT_MS ·' +
+        ' ក្រោយ input ចុងក្រោយប្តូរបាន ១ ដង · មិនរាប់ CHROME_FLIP_SETTLE_MS ក្រោយរបាប្តូរ ➜ scroll ដោយកម្មវិធី (ការកែទីតាំងបញ្ជីបង្ហាញតាមរមូរ · clamp) មិនបង្កើតរង្វង់ ·' +
+        ' ដល់កំពូលនៅបង្ហាញ ។ អ្នកយាម `tests/chrome-autohide-intent.test.tsx` (មុនកែ ក្រហម ៤/៦) · gesture-test (មុនកែ ក្រហម ២)',
     positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref · `style.width/left/top` ជា state (`phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ · ទទឹងចុះ DOM មុនវាស់កម្ពស់ ដូចដើម',
     setPhoneSearchPulledUp: REACT_STATE + '`.search-focus` ជា `dataPanelSearchFocus` · `.collapsed` ជា `dataPanelCollapsed`',
     setupPhoneSuggestions: REACT_STATE + 'listener របស់ប្រអប់ស្វែងរក/ប្រអប់ណែនាំ ➜ prop របស់ JSX (`onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ) តួដដែល · សល់តែ `scroll`/`resize` របស់ `window`',

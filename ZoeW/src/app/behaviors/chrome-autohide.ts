@@ -39,6 +39,10 @@ export function scrollerOf(target) {
     return null;
 }
 
+export const CHROME_SCROLL_INTENT_MS = 1200;
+
+export const CHROME_FLIP_SETTLE_MS = 250;
+
 export function setupChromeAutoHide() {
     const pages = elementOf('appPages');
     const { navbar, tabbar } = appChromeElements();
@@ -55,6 +59,29 @@ export function setupChromeAutoHide() {
     let travel = 0;
     let pendingScroller = null;
     let scrollFrame = null;
+    let touching = false;
+    let inputAt = -Infinity;
+    let flipAt = -Infinity;
+    let flipsSinceInput = 0;
+    let hiddenSeen = uiState.chromeHidden;
+
+    const noteInput = () => {
+        inputAt = performance.now();
+        flipsSinceInput = 0;
+    };
+    const noteTouch = (event) => {
+        touching = !!(event.touches && event.touches.length);
+        noteInput();
+    };
+    const notePointerMove = (event) => { if (event.buttons) noteInput(); };
+    const userIsScrolling = (now) => (touching || now - inputAt <= CHROME_SCROLL_INTENT_MS)
+        && flipsSinceInput === 0 && now - flipAt >= CHROME_FLIP_SETTLE_MS;
+    uiState.subscribe(() => {
+        if (uiState.chromeHidden === hiddenSeen) return;
+        hiddenSeen = uiState.chromeHidden;
+        flipAt = performance.now();
+        flipsSinceInput++;
+    });
 
     const processScroll = () => {
         scrollFrame = null;
@@ -74,6 +101,7 @@ export function setupChromeAutoHide() {
         lastScrollTop = top;
         if (!delta) return;
         if (top <= TOP_ZONE) { travel = 0; showAppChrome(); return; }
+        if (!userIsScrolling(performance.now())) { travel = 0; return; }
         const step = Math.max(-MAX_STEP, Math.min(MAX_STEP, delta));
         if (step > 0 && el.scrollHeight - top - el.clientHeight <= BOTTOM_ZONE) { travel = 0; return; }
         if ((step > 0) !== (travel > 0)) travel = 0;
@@ -88,7 +116,16 @@ export function setupChromeAutoHide() {
         scrollFrame = requestAnimationFrame(processScroll);
     };
 
-    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    const listenOptions = { capture: true, passive: true };
+    document.addEventListener('scroll', onScroll, listenOptions);
+    document.addEventListener('touchstart', noteTouch, listenOptions);
+    document.addEventListener('touchmove', noteInput, listenOptions);
+    document.addEventListener('touchend', noteTouch, listenOptions);
+    document.addEventListener('touchcancel', noteTouch, listenOptions);
+    document.addEventListener('wheel', noteInput, listenOptions);
+    document.addEventListener('keydown', noteInput, listenOptions);
+    document.addEventListener('pointerdown', noteInput, listenOptions);
+    document.addEventListener('pointermove', notePointerMove, listenOptions);
     window.addEventListener('resize', () => {
         measureAppChromeSize();
         if (window.innerWidth >= 992) showAppChrome();

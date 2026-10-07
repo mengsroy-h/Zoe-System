@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.9` (`zoew-v272`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.10` (`zoew-v273`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -665,6 +665,11 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   Chromium never applies it ➜ `panel-motion-test.js` injects it.
 - ⛔ The 180ms delay and `chrome-space-released` stay removed.
 - rAF-coalesced scroll handler; `SHOW_AFTER` (48px) > `HIDE_AFTER` (36px) on purpose.
+- ⛔ The bar moves only on **user** scrolling: a delta counts only during a touch or ≤ `CHROME_SCROLL_INTENT_MS` after touch ·
+  wheel · key · pointer input; after the last input at most one flip; nothing counts for `CHROME_FLIP_SETTLE_MS` after any flip.
+  Programmatic scroll writes (virtualizer corrections · clamps · scroll anchoring) never drive it — on the APK they formed a
+  show/hide loop on a still list. Reaching the top zone still shows it. Guards: `ZoeW/tests/chrome-autohide-intent.test.tsx` ·
+  `gesture-test`.
 - ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
   never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
   flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list
@@ -674,7 +679,7 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
 
 ## Frame rate and lite mode
 
-- `measureDisplayHz()`: median of 24 rAF intervals, clamped `[10, 120]`. `longFrameThresholdMs()` = frame budget × 1.6
+- `sampleFramePace()`: median of 90 rAF intervals, clamped `[10, 120]`. `longFrameThresholdMs()` = frame budget × 1.6
   (min 12ms) ⛔ no fixed number.
 - `setupAdaptivePerformance()` measures twice (1.5s and 10s); `body.perf-lite` only when both drop; never touches
   business features. Each round measures the rate and the pace in **one** window (`sampleFramePace()`: budget = that

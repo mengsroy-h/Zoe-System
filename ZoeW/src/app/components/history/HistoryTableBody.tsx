@@ -90,7 +90,7 @@ export function HistoryTableBody() {
 
 function HistorySpacer({ height }: { height: number }) {
     if (!(height > 0)) return null;
-    return <tr aria-hidden="true" className="history-virtual-spacer"><td colSpan={4} style={{ height, padding: 0, border: 0 }} /></tr>;
+    return <tr aria-hidden="true"><td colSpan={4} style={{ height, padding: 0, border: 0 }} /></tr>;
 }
 
 function HistoryMoreRow({ more, shown }: { more: number; shown: number }) {

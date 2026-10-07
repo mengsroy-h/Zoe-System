@@ -1923,6 +1923,9 @@
     "ZoeW/tests/locker-scan-direct.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/merge-into-deleted-item.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-import-lanes.test.ts": {
       "policy": "zoew-self-verification"
     },

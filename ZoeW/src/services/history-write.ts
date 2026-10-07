@@ -6,6 +6,24 @@ import { transactionDisconnectPending } from './tx-outcome';
 import { refreshCurrentHistoryView, scheduleHistoryViewRefresh } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 
+export function freshHistoryItemShell(item) {
+    const shell: any = { barcodes: [] };
+    if (!item || typeof item !== 'object') return shell;
+    if (item.id !== undefined) shell.id = item.id;
+    if (item.phone !== undefined) shell.phone = item.phone;
+    if (item.createdAt !== undefined) shell.createdAt = item.createdAt;
+    return shell;
+}
+
+export function freshHistoryItemFrom(item, mergeFn) {
+    const fresh = mergeFn(freshHistoryItemShell(item));
+    if (!fresh || typeof fresh !== 'object') return fresh;
+    const only = Array.isArray(fresh.barcodes) && fresh.barcodes.length === 1 ? fresh.barcodes[0] : null;
+    const born = only && typeof only === 'object' ? Number(only.createdAt) : 0;
+    if (born > 0) fresh.createdAt = born;
+    return fresh;
+}
+
 export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
     if (!firebaseState.db || !firebaseState.fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
         const err = new Error('Refusing to merge barcode into history item with missing/unsafe id');
@@ -16,7 +34,7 @@ export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
     }
     return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         if (currentItem && currentItem.clearClaim) return;
-        if (!currentItem) return fallbackItem;
+        if (!currentItem) return fallbackItem ? freshHistoryItemFrom(fallbackItem, mergeFn) : fallbackItem;
         dropStaleRestoreMarkers(currentItem);
         return mergeFn(currentItem);
     }).then((result) => {

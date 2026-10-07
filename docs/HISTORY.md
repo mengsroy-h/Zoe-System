@@ -46,7 +46,7 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 merge រួច (`main` = **ZoeW 2.50.3 · ZoeKeyGen 2.24.6**) · PR #295 = ZoeW 2.50.4 (ជុំ ៥ · ៧ · Locker ដកវិញ (ចុះភ្លាម) · ZTO បញ្ចូលស្របគ្នា ៤ ខ្សែ + `?diag=1` `upstreamTiming` — សំណើ «ធ្វើទាំងពីរ» · `LOCK` ថ្មី ២ · branch `claude/wonderful-ride-ixmi63` · មិនទាន់ merge) · ប្រវត្តិ ៖ PR #292 =
+1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 merge រួច (`main` = **ZoeW 2.50.3 · ZoeKeyGen 2.24.6**) · PR #295 = ZoeW 2.50.4 (ជុំ ៥ · ៧ · Locker ដកវិញ (ចុះភ្លាម) · ZTO បញ្ចូលស្របគ្នា ៤ ខ្សែ + `?diag=1` `upstreamTiming` — សំណើ «ធ្វើទាំងពីរ» · `LOCK` ថ្មី ២) **merge រួច** (`main` = ZoeW 2.50.4) · **Deep audit ២** (workflow អ្នករក ១១ ➜ verify ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ➜ PR ថ្មី branch `claude/wonderful-ride-ixmi63` ពី `main` = ZoeW 2.50.5 ([2.50.5] · ផ្នែក ២ «Deep audit ២») · **មិនទាន់ merge** · របាយការណ៍ workflow (`scratchpad/deep-audit-2/report.md`) នៅរត់ · ប្រវត្តិ ៖ PR #292 =
    **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
    ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
@@ -120,6 +120,40 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.5] — 2026-10-07 · ZoeW ៖ **កញ្ចប់ដែលឧបករណ៍ផ្សេងដក ឬលុបរួច មិនត្រឡប់ចូលប្រវត្តិវិញ ពេលស្កេន ឬបញ្ចូលបញ្ជី ZTO របស់អតិថិជនដដែល (ដកលុយពីរដង)** (Deep audit ២ · ជុំ ១)
+
+**ZoeW `2.50.5`** (`zoew-v267` ➜ `zoew-v268`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ deep audit ទូទាំង project (workflow ៖ អ្នករក ១១ ➜ ផ្ទៀងផ្ទាត់ ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាតក្នុង session — agent អាន/វាស់ · Claude កែ/commit) ·
+  ម្ចាស់គម្រោង ៖ «ចាប់ផ្តើមកែឥឡូវ · workflow រត់បន្ត» ➜ PR ថ្មីពី `main` · កែ findings កម្រិត high ដែលអ្នករកវាស់ដោយរត់កូដពិត មុន verify ចប់ (Claude ផ្ទៀងផ្ទាត់ខ្លួនឯងមុនកែ ៖
+  រកអ្នកយាមដែលមានស្រាប់ · តេស្តក្រហមលើកូដមុនកែ) · កូដកែក្នុង worktree ដាច់ដោយឡែក ដើម្បីឲ្យ workflow នៅតែអាន repo ដើម។
+- 🧾 **RACES-1 = MONEY-2 ៖ merge ចូលកញ្ចប់ដែល server លែងមាន** ៖ `mergeBarcodeIntoHistoryItem()` ពេល transaction ឃើញ `null` សរសេរ `fallbackItem` = កញ្ចប់ local
+  ទាំងមូល (barcode ចាស់ + ថ្មី)។ `null` មិនមែនតែ cache ត្រជាក់ទេ ៖ SDK រត់ updater ឡើងវិញដោយតម្លៃ server ពេល hash មិនត្រូវ — ឧបករណ៍ B ដក barcode ចុងក្រោយ
+  (ធុងសំរាម `isDeducted: true` · ledger ដករួច) ឬលុបកញ្ចប់ ខណៈ A នៅឃើញវា (listener មិនទាន់មកដល់ · zombie socket) ➜ A ស្កេនកញ្ចប់ថ្មីរបស់អតិថិជនដដែល ➜ server បានកញ្ចប់ចាស់
+  ត្រឡប់ (barcode ចាស់បើក · `isDeducted: false`) + ថ្មី ➜ barcode ចាស់នៅទាំងប្រវត្តិ និងធុងសំរាម ➜ «ចំណូល (យករួច)» រាប់វាពីរ · ដក/ផុតកំណត់ ៧ ថ្ងៃម្តងទៀត ➜ **ដកលុយពីរដង** ·
+  ស្តារច្បាប់ចម្លងណាមួយ ➜ បូកវិញពីរ។ ទ្វារដដែលតាមខ្សែបញ្ចូលបញ្ជី ZTO (`importZtoListRows()` ➜ `addOrUpdateEntry()`)។ ឥឡូវ `freshHistoryItemFrom()` ៖ server `null` ➜
+  សរសេរ**កញ្ចប់ថ្មី** (`id` · `phone` + barcode ដែលទើប merge · `createdAt` = របស់ barcode នោះ — រូបរាងដូចផ្លូវកញ្ចប់ថ្មី) មិនដែលសរសេរកញ្ចប់ local ចាស់ · cache ត្រជាក់ (server មាន
+  កញ្ចប់) ➜ សំណើដំបូងជាកញ្ចប់ថ្មីដដែល ហើយ SDK រត់ឡើងវិញដោយតម្លៃ server ➜ merge ធម្មតា · Supabase adapter (`base = res.value ?? null`) ជាទ្វារដដែល។
+  ទិដ្ឋភាព local ជាសះស្បើយដោយ SDK ខ្លួនឯង (hash មិនត្រូវ ➜ cache ទទួលតម្លៃ server ➜ listener · commit ➜ listener)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក (ឧបករណ៍ ២ ហាងដដែល) ៖ B ដក barcode តែមួយរបស់កញ្ចប់អតិថិជន P (ថ្ងៃនេះ) ➜ ភ្លាមនោះ A (ដែលនៅឃើញកញ្ចប់នោះ · ឬបិទទិន្នន័យទូរស័ព្ទ A មួយភ្លែតមុនដក) ស្កេនកញ្ចប់ថ្មី C របស់ P ➜
+   ប្រវត្តិ A និង B ៖ P មានតែ C · ធុងសំរាម ៖ barcode ដែលដក (ដករួច ១ ច្បាប់) · 💵 ចំណូលប្រចាំថ្ងៃ = (ចំណូលមុនដក) − barcode ចាស់ + C។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/merge-into-deleted-item.test.ts` (ថ្មី · ៦ · module ពិត `addOrUpdateEntry` · `mergeBarcodeIntoHistoryItem` · `removeSingleBarcode` · `importZtoListRows` +
+  Firebase ក្លែងដែលរត់ updater លើតម្លៃ server និងរត់ឡើងវិញពេល hash មិនត្រូវ) ៖ (១) server គ្មាន ➜ សរសេរតែ barcode ថ្មី · `createdAt` · គ្មាន locker ចាស់ · ledger ·
+  ចំណូល(យករួច) · (២) ដកម្តងទៀត ➜ ធុងសំរាមដករួច ១ ច្បាប់ · ledger ត្រឹម · (៣) ទ្វារខ្សែបញ្ចូលបញ្ជី ZTO · (៤) ទិសផ្ទុយ server មាន ➜ merge ដូចដើម (locker · `createdAt` ចាស់នៅ) ·
+  (៥) cache ត្រជាក់ ➜ សំណើ `null` = barcode ថ្មីតែមួយ · រត់ឡើងវិញ merge · (៦) cache ត្រជាក់ + server មាន barcode រួច ➜ ស្ទួន · ledger ត្រឡប់ ៖ tree មុនកែ **FAIL ៤/៦** ➜ ៦/៦ ·
+  mutation ៖ shell ចម្លងកញ្ចប់ទាំងមូល ➜ FAIL ៤ · មិនធ្វើបច្ចុប្បន្នភាព `createdAt` ➜ FAIL ១ · ត្រឡប់ `return fallbackItem` ➜ FAIL ៤។
+- `revenue-fuzz-test` ៖ `other:remove` ដក barcode ចុងក្រោយបាន (កញ្ចប់បាត់ពី server ខណៈទិដ្ឋភាព local នៅមាន — ដូច `removeSingleBarcode()` ពិត) ➜ fuzz ២/២ លើ tree ទាំងពីរ (op នេះមិនឈានដល់ merge ចូលកញ្ចប់បាត់ក្នុង ១២ លំដាប់ — អ្នកយាមពិតជា vitest · op ជាក់លាក់ «ស្កេនចូលកញ្ចប់ដែលឧបករណ៍ផ្សេងដកអស់» ស្នើជុំក្រោយ)។
+- `concurrent-scan-test` ៖ ស្រង់ helper ថ្មី ២ · `repository-file-coverage.json` mapping · `money-core.js` បង្កើតឡើងវិញ។
 
 ### [2.50.4] — 2026-10-07 · ZoeW ៖ **សារជូនដំណឹង (toast) និយាយការពិត ៖ សារព្រមានមិនត្រូវរុញចេញដោយសារជោគជ័យ · សារពេល App ជាប់សោរង់ចាំដោះសោ · ចំណូលប្រចាំថ្ងៃដែលរង់ចាំបណ្តាញប្រាប់ ⏳ រួច ✅ · គ្មានសារ «សូមប្រាប់ Admin» ក្លែងក្រោយចាកចេញ · ZTO ៖ បញ្ចូលបញ្ជីស្របគ្នា ៤ ខ្សែ (លឿន ~៣–៤ ដង) · `?diag=1` ប្រាប់ពេល ZTO ឆ្លើយ** (Deep audit ជុំ ៥ · សំណើម្ចាស់គម្រោង)
 
@@ -1777,6 +1811,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-07 — Deep audit ២ (workflow ៖ អ្នករក ១១ ➜ ផ្ទៀងផ្ទាត់ ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ៖ ជុំ ១ ➜ [2.50.5]
+
+> Workflow រត់លើ repo ដើម (អាន · វាស់ក្នុងច្បាប់ចម្លង) · ការកែធ្វើក្នុង worktree ដាច់ដោយឡែក · findings ដែលអ្នករកវាស់ដោយរត់កូដពិត (`measured`) ហើយកម្រិត high
+> ត្រូវកែមុន verify ចប់ តាមសំណើម្ចាស់គម្រោង («ចាប់ផ្តើមកែឥឡូវ · workflow រត់បន្ត») ក្រោយ Claude ផ្ទៀងផ្ទាត់ខ្លួនឯង។ findings ផ្សេងរង់ចាំ verify (lens refute · measure · impact)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A1 | **RACES-1 = MONEY-2** merge ចូលកញ្ចប់ដែល server លែងមាន (`history-write.ts` `return fallbackItem` ពេល `null`) | អ្នករក ៖ vitest លើ module ពិត (`addOrUpdateEntry` ➜ transaction ឃើញ `null` ➜ server `itemI` = [A, C] · A `isDeducted: false` ខណៈធុងសំរាម A `isDeducted: true` · ចំណូល(យករួច) ៣៥ ជំនួស ២៥ · ដក A ម្តងទៀត ➜ ledger ២៥ ➜ ១៥ · ធុងសំរាមដករួច ២ ច្បាប់) · ទ្វារដដែលតាម `importZtoListRows()` · Claude ផ្ទៀងផ្ទាត់ ៖ Firebase SDK រត់ updater ឡើងវិញដោយតម្លៃ server ពេល hash មិនត្រូវ (`null` ពេលឧបករណ៍ផ្សេងលុប/ដកចុងក្រោយ) · Supabase adapter `base = res.value ?? null` · គ្មានអ្នកយាម (`concurrent-scan-test` merge ចូលកញ្ចប់ដែល server មានតែប៉ុណ្ណោះ · `grep fallbackItem` ក្នុង audit-tools/tests ៖ ០) | **ពិត · លុយ** ➜ `freshHistoryItemFrom()` (កញ្ចប់ថ្មី ៖ `id` · `phone` + barcode ដែល merge · `createdAt` = របស់ barcode) · មិនអាច abort លើ `null` (cache ត្រជាក់ ➜ abort មុនទាក់ទង server ➜ រក្សាទុកមិនបានរហូត listener មកដល់) ➜ សរសេរកញ្ចប់ថ្មីដដែលលើផ្លូវទាំងពីរ · `merge-into-deleted-item.test.ts` មុនកែ FAIL ៤/៦ ➜ ៦/៦ · mutation ៣ ➜ FAIL ៤ · ១ · ៤ · fuzz ៖ `other:remove` ដក barcode ចុងក្រោយបាន (២/២ tree ទាំងពីរ · មិនចាប់ទ្វារនេះ ➜ op ជាក់លាក់ជុំក្រោយ) |
 
 ### 2026-10-07 — ZTO ៖ ទាញ/បញ្ចូលបញ្ជីយឺត (របាយការណ៍ម្ចាស់គម្រោង «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច បញ្ចូលក៏យឺត · ស្កេន auto lookup លឿន 0.6–1.0 វិ.» ➜ [2.50.4])
 

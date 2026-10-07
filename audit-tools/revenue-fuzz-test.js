@@ -145,11 +145,11 @@ const BOOT = function (seed) {
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); logWrite({ owner: true, m: 'PUT', p: p, v: v }); fireAll(); };
     // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
-    window.__otherDevice = (kind, pick) => {
+    window.__otherDevice = (kind, pick, forcedId) => {
         const hist = store.zoew_scan_history_cod_dod || {};
         const ids = Object.keys(hist);
         if (!ids.length) return null;
-        const id = ids[Math.floor(pick * ids.length) % ids.length];
+        const id = forcedId && hist[forcedId] ? forcedId : ids[Math.floor(pick * ids.length) % ids.length];
         const it = hist[id];
         if (!it) return null;
         const bcs = Array.isArray(it.barcodes) ? it.barcodes.filter(Boolean) : [];
@@ -163,8 +163,9 @@ const BOOT = function (seed) {
             delete hist[id];
             return 'other:delete';
         }
-        if (kind === 'remove' && bcs.length > 1) {
-            // ដក៖ យក barcode ១ ចេញ ហើយកាត់ចំណូលចេញ (គោលការណ៍ ដក)
+        if (kind === 'remove' && bcs.length >= 1) {
+            // ដក៖ យក barcode ១ ចេញ ហើយកាត់ចំណូលចេញ (គោលការណ៍ ដក) ·
+            // barcode ចុងក្រោយ ➜ កញ្ចប់បាត់ពីប្រវត្តិទាំងស្រុង (ដូច `removeSingleBarcode()` ពិត) ខណៈទិដ្ឋភាព local នៅមានវា
             const idx = Math.floor(pick * bcs.length) % bcs.length;
             const gone = bcs[idx];
             const kept = bcs.filter((_, i) => i !== idx);
@@ -174,6 +175,7 @@ const BOOT = function (seed) {
             it.cod = r2(kept.reduce((a, b) => a + (parseFloat(b.cod) || 0), 0));
             it.dod = r2(kept.reduce((a, b) => a + (parseFloat(b.dod) || 0), 0));
             it.price = r2(it.cod + it.dod);
+            if (!kept.length) delete hist[id];
             const trashId = id + '_rm' + Math.floor(pick * 1e6);
             store.zoew_recently_deleted_cod_dod[trashId] = Object.assign({}, it, {
                 id: trashId, deletedAt: Date.now(), isFromDeletion: false, count: 1,
@@ -194,8 +196,8 @@ const BOOT = function (seed) {
     };
 
     const otherDeviceWrite = window.__otherDevice;
-    window.__otherDevice = (kind, pick) => {
-        const done = otherDeviceWrite(kind, pick);
+    window.__otherDevice = (kind, pick, forcedId) => {
+        const done = otherDeviceWrite(kind, pick, forcedId);
         if (done) logWrite({ owner: true, m: 'SNAP', v: store });
         return done;
     };

@@ -69,14 +69,27 @@ function buildRunner(appFile) {
     const pendingStyle = src.indexOf('            if (!revenuePending) {') !== -1;
     const ledgerCall = /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
     if (pendingStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
+    // ⛔ ចាប់ពីកំណែ 2.50.5 (MONEY-3) ធុងសំរាម `expired` សរសេរ `isDeducted: false` ហើយទង់ប្តូរជា `true` តែក្រោយ ledger
+    //    ដកចុះពិត (`markCleanupTrashDeducted()`) ➜ tail ក៏អនុវត្តបន្ទាត់ flip **ដែលស្រង់ពីកូដពិត** ក្រោយការដក ·
+    //    tree ចាស់ (គ្មាន `markCleanupTrashDeducted`) ➜ គ្មាន flip ដូចដើម។
+    const flipStyle = src.indexOf('function markCleanupTrashDeducted(') !== -1;
+    const flipLine = /current\.barcodes = current\.barcodes\.map\(\(b\) => \(b && codes\.has\(b\.code\) \? \{ \.\.\.b, isDeducted: true \} : b\)\);/.exec(src);
+    if (flipStyle && !flipLine) throw new Error('cleanup flip not found');
+    const flipHelpers = flipStyle
+        ? fnBody(src, 'function barcodeEntriesOf(', 'barcodeEntriesOf') + '\n' + fnBody(src, 'function cleanupTrashCodes(', 'cleanupTrashCodes') + '\n'
+        : '';
+    const flipTail = flipStyle
+        ? '            if (revenueApplied && Array.isArray(trashItem.barcodes)) { const codes = cleanupTrashCodes(trashItem); const current = trashItem; ' + flipLine[0] + ' }\n'
+        : '';
     const claimLedgerTail = pendingStyle
         ? '            let revenueApplied = null;\n'
           + '            if (revenuePending) revenueApplied = ' + ledgerCall[0] + ';\n'
+          + flipTail
           + '            return { trashItem, revenueDeducted: !!revenueApplied };'
         : '            return { trashItem, revenueDeducted: !!revenueApplied };';
 
 
-    const prelude = moneyHelper + `
+    const prelude = moneyHelper + flipHelpers + `
         var NOW = 1000000;
         function getServerNow() { return NOW; }
         function getFormattedDate() { return '2026-08-19'; }

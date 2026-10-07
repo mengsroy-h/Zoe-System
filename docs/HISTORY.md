@@ -46,7 +46,7 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.5** (modal · ម៉ឺនុយ ☰ លែងបង្ហាញរបា Tab ➜ បើករលូនពេលរមូរដល់ចុង · មិនទាន់ merge · មិនទាន់មាន PR) · ប្រវត្តិ ៖ PR #292 =
+1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.5** (modal · ម៉ឺនុយ ☰ លែងបង្ហាញរបា Tab ➜ បើករលូនពេលរមូរដល់ចុង · PR Draft · មិនទាន់ merge · APK សាក ៖ Run workflow លើ branch ➜ Pre-release) · ប្រវត្តិ ៖ PR #292 =
    **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
    ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.5 — branch `ccr-85f562ee-106o6w` (មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.5] សកម្មភាព ២ (តម្រង «ទាំងអស់» ➜ រមូរដល់ចុង (របា Tab លាក់) ➜ បើកធុងសំរាម · «📥 បញ្ជី ZTO» · ម៉ឺនុយ ☰ · 🔔 រលូន · បិទ ➜ របានៅលាក់ · រមូរឡើង ➜ របាលេច)។ ⛔ តំបន់ «Bar hiding» ➜ សាកលើ APK ពិតមុន merge។
+- ⏳ **ZoeW 2.50.5 — branch `ccr-85f562ee-106o6w` (PR Draft · មិនទាន់ merge)** ៖ APK សាក (Actions ➜ Android APK ➜ Run workflow ➜ branch នេះ ➜ Pre-release) ➜ សាកតាម [2.50.5] សកម្មភាព ២ (តម្រង «ទាំងអស់» ➜ រមូរដល់ចុង (របា Tab លាក់) ➜ បើកធុងសំរាម · «📥 បញ្ជី ZTO» · ម៉ឺនុយ ☰ · 🔔 រលូន · បិទ ➜ របានៅលាក់ · រមូរឡើង ➜ របាលេច)។ ⛔ តំបន់ «Bar hiding» ➜ សាកលើ APK ពិតមុន merge។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.2 — PR #293 (merge ចូល `main` រួច)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ លុប env អត្ថបទ · Deploy ➜ បញ្ជី ZTO ទាញបាន ៩៦/៩៦ · សារ ⚠️ «66 ជួរ» បាត់ · 🔒 «មានក្នុង ZoeW តែ ZTO បិទរួច 6» ➜ នៅសល់ ៖ APK · សាកតារាងប្រវត្តិលើទូរស័ព្ទ ([2.50.2] សកម្មភាព ២)។
@@ -159,7 +159,9 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+1. **APK សាកមុន merge** (សំណើម្ចាស់គម្រោង) ៖ GitHub ➜ **Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» = branch
+   `ccr-85f562ee-106o6w` ➜ **Releases** ➜ Pre-release `zoew-android-v2.50.5-test.<commit>` ➜ ដំឡើងជាន់ App (keystore ដដែល)។ ក្រោយ merge ៖
+   Deploy **ZoeW** · Release ផ្លូវការពី `main` ចេញស្វ័យប្រវត្តិ។ គ្មាន rules · env · migration ថ្មី។
 2. សាកលើ APK ពិត (⛔ មុន merge — តំបន់ «Bar hiding») ៖ តម្រង «ទាំងអស់» ➜ រមូរដល់ចុង (ជួរកើនរហូតអស់ · របា Tab លាក់) ➜ (ក) (...) ➜ ធុងសំរាម ➜
    លេចរលូនដូចពេលនៅកំពូល · (ខ) «📥 បញ្ជី ZTO» ➜ លេចរលូន · (គ) ម៉ឺនុយ ☰ និង 🔔 ➜ រអិលចូលរលូន · (ឃ) បិទប្រអប់/ម៉ឺនុយ ➜ របានៅលាក់ ·
    រមូរឡើងបន្តិច ➜ របាលេច · (ង) រមូរចុះ/ឡើងធម្មតា ➜ របាលាក់/លេចដូចដើម · ប្តូរ Tab ➜ របាលេច។
@@ -1834,6 +1836,12 @@ Chromium · audit build · ៤១២×៧៨០ · តម្រង «ទាំ�
 | B5 | ថ្លៃដែលនៅសល់ | `Layout` ១ ដង ២២២ms · dirty ៧៨៨ / ២៦០៨៦ object | តារាងធុងសំរាម (២០ ជួរ) ខ្លួនឯង · មិនអាស្រ័យប្រវត្តិ · ស្មើករណី «smooth» ➜ មិនកែ |
 | B7 | ម៉ឺនុយ ☰ ១២០០ ជួរ (សំណើបន្ថែម «កែម៉ឺនុយ ☰ ដែរ») | PrePaint+Paint របាលាក់ ២៧៣ ធៀបរបាបង្ហាញ ១១ms ➜ ក្រោយកែ ១០ ធៀប ១០ms | មូលហេតុដដែល (`openSideDrawer()` ➜ `showAppChrome()`) |
 | B6 | perf-check ៖ ដាក់ `chromeHidden` ដោយផ្ទាល់ពេលនៅចុងបាតបញ្ជី | padding ៦២ ➜ ០ ➜ `scrollTop` រួញ ➜ scroll event (−៦២ < −`SHOW_AFTER`) ➜ របាលេចវិញ | artifact របស់ការវាស់ (ផ្លូវពិត ៖ `BOTTOM_ZONE` ➜ ការរួញ ≤ ៣៨px) ➜ checker រមូរឡើង ៣០០px មុន + លក្ខខណ្ឌចាំបាច់ «របាលាក់ពិតមុនបើក» |
+
+**APK សាកពី branch** (សំណើម្ចាស់គម្រោង ៖ «apk build test លើ PR … មិនទាន់ចង់ merge») ៖ workflow `Android APK` ពីមុន build តែ `main`
+(`repository-contract-test` ចាក់សោ «APK នៅ main តែប៉ុណ្ណោះ») ➜ ឥឡូវ «Run workflow» លើ branch ផ្សេង ➜ **Pre-release**
+`zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (keystore · `apksigner verify` · pin ដដែល) · push នៅតែ `main` · Release ផ្លូវការមិនប្រែ។ អ្នកយាម ៖
+`repository-contract-test` រត់ script ពិតនៃ step «កំណែ» និង «បង្កើត GitHub Release» ក្នុង bash (`gh` · `cygpath` ក្លែង) ៖ branch ➜ `--prerelease`
++ ស្លាក test · `main` ➜ Release ដូចដើម · ឈ្មោះ branch ដូច `$(…)` មិនរត់ (env) · workflow ចាស់ ➜ **ក្រហម ៥**។
 
 អ្នកយាម ៖ `ZoeW/tests/modal-chrome-state.test.tsx` (មុនកែ ក្រហម · mutation ៣ ប្រភេទចាប់) · `gesture-test` (modal មុនកែ ក្រហម ៤ · ម៉ឺនុយមុនកែ ក្រហម ៣) · `perf-check` (ធុងសំរាមមុនកែ ២៥៨/៣៨ms · ម៉ឺនុយមុនកែ ២៧៣/១១ms ➜ ក្រហម)។
 

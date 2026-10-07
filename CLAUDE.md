@@ -82,7 +82,9 @@ only this text protects them.
   `BridgeActivity` theme · icon = vector `drawable/splash_icon.xml` from `icon.svg` ⛔ not `@mipmap` · ⛔ permission
   `ACCESS_NETWORK_STATE` (without it `navigator.onLine` is always `true` and `online`/`offline` never fire) · web never
   loads native code · Gradle/AGP/SDK ↔ Capacitor template · ⛔ APKs signed by **one keystore forever**, cert pinned in
-  `ZoeW/android/release-cert.sha256`, no debug-key path, ⛔ keystore **never in the repo**) · `npm run native:check`
+  `ZoeW/android/release-cert.sha256`, no debug-key path, ⛔ keystore **never in the repo**) · release workflow: push builds
+  `main` only (Release `zoew-android-v<APP_VERSION>`); another branch only by manual Run workflow ➜ **Pre-release**
+  `…-test.<7-char commit>`, never a plain Release (`repository-contract-test` runs the workflow's real scripts) · `npm run native:check`
   (fake bridge: Back · history · pause/resume · Share/Print · biometrics · PTR/latch) · `npm run rules:check`
   (delete/remove · 2h · 7d · 2d · 30d on original ZoeW · web · Android). ⛔ Back never returns into "remove" mode
   (`safeScreen()`).

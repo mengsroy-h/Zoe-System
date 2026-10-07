@@ -15,6 +15,9 @@
 #
 # ពេលរត់ ៖ ចុច «Run workflow» ដោយដៃ · ឬស្វ័យប្រវត្តិពេល `APP_VERSION` ប្រែលើ `main`។
 # Release មួយក្នុងមួយកំណែ (`zoew-android-v<APP_VERSION>`) ➜ កំណែដែលមាន Release រួច ➜ មិន build ម្តងទៀត។
+#
+# APK សាក (មុន merge) ៖ «Run workflow» ➜ ជ្រើស branch ផ្សេងពី `main` ➜ APK sign ដោយ keystore ដដែល (ដំឡើងជាន់ App ចាស់បាន) ចេញជា
+# **Pre-release** `zoew-android-v<APP_VERSION>-test.<commit ៧ តួ>` (មួយក្នុងមួយ commit) ➜ មិនប៉ះ Release ផ្លូវការ · push លើ branch មិន build។
 
 name: Android APK
 
@@ -39,7 +42,7 @@ defaults:
 jobs:
   apk:
     name: Build APK ➜ GitHub Release
-    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && github.ref == 'refs/heads/main'
+    if: (vars.ZOE_RUNNER_MODE == 'github' || github.event.repository.private == true) && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     runs-on: ${{ fromJSON(vars.ZOE_RUNNER_MODE == 'github' && '["windows-latest"]' || '["self-hosted","Windows","X64","windows-zoe-android"]') }}
     timeout-minutes: 45
     steps:
@@ -79,9 +82,20 @@ jobs:
         run: |
           GITHUB_OUTPUT=$(cygpath -u "$GITHUB_OUTPUT")
           VERSION=$(node -e "const s=require('fs').readFileSync('ZoeW/src/core/version.ts','utf8');const m=s.match(/APP_VERSION\s*=\s*'([0-9]+\.[0-9]+\.[0-9]+)'/);if(!m)process.exit(1);console.log(m[1])")
-          TAG="zoew-android-v${VERSION}"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            TEST=false
+            TAG="zoew-android-v${VERSION}"
+            FILE="ZoeW-${VERSION}.apk"
+          else
+            TEST=true
+            SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
+            TAG="zoew-android-v${VERSION}-test.${SHORT}"
+            FILE="ZoeW-${VERSION}-test.${SHORT}.apk"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "file=${FILE}" >> "$GITHUB_OUTPUT"
+          echo "test=${TEST}" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Release ${TAG} មានរួច — មិន build ម្តងទៀត (ឡើង APP_VERSION ដើម្បីបង្កើត Release ថ្មី)"
@@ -174,11 +188,11 @@ jobs:
             exit 1
           fi
           echo "$GOT" > apk-cert.txt
-          OUT="ZoeW-${{ steps.meta.outputs.version }}.apk"
+          OUT="${{ steps.meta.outputs.file }}"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           {
-            echo "### ZoeW ${{ steps.meta.outputs.version }} (Android)"
+            echo "### ZoeW ${{ steps.meta.outputs.version }} (Android) — ${{ steps.meta.outputs.tag }}"
             echo ""
             echo "- SHA-256 ៖ \`$(cut -d' ' -f1 "$OUT.sha256")\`"
             echo "- វិញ្ញាបនបត្រ ៖ \`$(cat apk-cert.txt)\`"
@@ -188,10 +202,26 @@ jobs:
         if: steps.keystore.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          OUT="ZoeW-${{ steps.meta.outputs.version }}.apk"
+          OUT="${{ steps.meta.outputs.file }}"
           CERT=$(cat apk-cert.txt)
-          cat > notes.md <<EOF
+          FLAGS=()
+          TITLE="ZoeW ${{ steps.meta.outputs.version }} (Android)"
+          : > notes.md
+          if [ "${{ steps.meta.outputs.test }}" = "true" ]; then
+            FLAGS+=(--prerelease)
+            TITLE="ZoeW ${{ steps.meta.outputs.version }} (Android · APK សាក · ${REF_NAME})"
+            cat > notes.md <<EOF
+          ## ⚠️ APK សាក (មិនទាន់ merge) — មិនមែនកំណែផ្លូវការ
+
+          - branch ៖ \`${REF_NAME}\` · commit \`${GITHUB_SHA}\`
+          - សម្រាប់សាកលើទូរស័ព្ទមុន merge តែប៉ុណ្ណោះ ⛔ កុំចែកឲ្យអតិថិជន
+          - Release ផ្លូវការនៃកំណែនេះ (ពី main) ដំឡើងជាន់ APK នេះបានផ្ទាល់
+
+          EOF
+          fi
+          cat >> notes.md <<EOF
           ## ZoeW ${{ steps.meta.outputs.version }} — App Android
 
           ១. ទាញ **${OUT}** ខាងក្រោម ➜ បើកលើទូរស័ព្ទ Android ➜ អនុញ្ញាត «ដំឡើងពីប្រភពនេះ» ➜ ដំឡើង។
@@ -204,8 +234,9 @@ jobs:
           EOF
           gh release create "${{ steps.meta.outputs.tag }}" "$OUT" "$OUT.sha256" \
             --target "${{ github.sha }}" \
-            --title "ZoeW ${{ steps.meta.outputs.version }} (Android)" \
-            --notes-file notes.md
+            --title "$TITLE" \
+            --notes-file notes.md \
+            "${FLAGS[@]}"
 
       - name: លុប keystore ចេញពី runner
         if: always()

@@ -48,6 +48,14 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 (`zoew-android-v<APP_VERSION>` · ឯកសារ `ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION` ប្រែលើ `main` ឬចុច
 **Actions ➜ Android APK ➜ Run workflow**។ ទាញយក ៖ ទំព័រ repo ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
 
+### APK សាកពី branch (មុន merge)
+
+**Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» ជ្រើស **branch** (មិនមែន `main`) ➜ **Run workflow** ➜ workflow build APK
+ដែល sign ដោយ keystore ដដែល ហើយបង្កើត **Pre-release** `zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (ឯកសារ `ZoeW-<កំណែ>-test.<commit>.apk`)
+➜ **Releases** ➜ ទាញ APK ➜ ដំឡើងជាន់ App ដែលមានស្រាប់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។ Pre-release មួយក្នុងមួយ commit ·
+push លើ branch មិន build ស្វ័យប្រវត្តិ · Release ផ្លូវការនៃកំណែដដែល (ពី `main`) ដំឡើងជាន់ APK សាកបាន។ ⛔ APK សាកសម្រាប់ម្ចាស់គម្រោងសាក
+តែប៉ុណ្ណោះ (កុំចែកឲ្យអតិថិជន) · លុប Pre-release និង tag របស់វាពេលលែងត្រូវការ (Releases ➜ Delete)។
+
 ⛔ **keystore តែមួយជារៀងរហូត** ៖ APK ដែល sign ដោយ keystore ផ្សេង **ដំឡើងជាន់ App ចាស់មិនបាន** ➜ ត្រូវលុប App ចាស់ ➜
 បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី ➜ Key ដែលមានពិដានឧបករណ៍ ១ ត្រូវឲ្យ admin ដោះឧបករណ៍ចាស់ក្នុង
 ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទាល់តែសោះ** ពេលគ្មាន keystore (គ្មានការធ្លាក់ចុះទៅ debug key)។

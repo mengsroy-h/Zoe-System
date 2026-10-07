@@ -17,10 +17,6 @@ function phoneNoteOf(item) {
     return phoneRaw ? ` (${phoneRaw})` : '';
 }
 
-function lockerOccupantNote(occupant) {
-    return `ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${phoneNoteOf(occupant.entry.item)} ស្ថិតនៅរួចហើយ`;
-}
-
 function askLocationChange(key, mode, text) {
     lockerErrorFeedback();
     uiState.pendingLockerCode = key;
@@ -65,12 +61,12 @@ export function handleLockerScan(code) {
     const occupant = findLockerOccupant(uiState.activeLocker, key, entry.itemId);
     if (hasLocker) {
         let msg = `កញ្ចប់ "${key}"${who} កំពុងស្ថិតនៅទីតាំង ${currentLocker} ។ តើអ្នកចង់ផ្លាស់ទីកញ្ចប់នេះទៅ ${uiState.activeLocker} មែនទេ?`;
-        if (occupant) msg += ` (ចំណាំ៖ ${lockerOccupantNote(occupant)})`;
+        if (occupant) msg += ` (ចំណាំ៖ ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${phoneNoteOf(occupant.entry.item)} ស្ថិតនៅរួចហើយ)`;
         askLocationChange(key, 'move', msg);
         return;
     }
     if (occupant) {
-        askLocationChange(key, 'occupied', `${lockerOccupantNote(occupant)}។ តើអ្នកចង់ដាក់កញ្ចប់ "${key}"${who} ចូលទីតាំង ${uiState.activeLocker} ជាមួយគ្នាមែនទេ?`);
+        askLocationChange(key, 'occupied', `ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${phoneNoteOf(occupant.entry.item)} ស្ថិតនៅរួចហើយ។ តើអ្នកចង់ដាក់កញ្ចប់ "${key}"${who} ចូលទីតាំង ${uiState.activeLocker} ជាមួយគ្នាមែនទេ?`);
         return;
     }
 

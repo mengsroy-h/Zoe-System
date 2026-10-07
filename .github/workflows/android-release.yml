@@ -18,6 +18,7 @@
 #
 # APK សាក (មុន merge) ៖ «Run workflow» ➜ ជ្រើស branch ផ្សេងពី `main` ➜ APK sign ដោយ keystore ដដែល (ដំឡើងជាន់ App ចាស់បាន) ចេញជា
 # **Pre-release** `zoew-android-v<APP_VERSION>-test.<commit ៧ តួ>` (មួយក្នុងមួយ commit) ➜ មិនប៉ះ Release ផ្លូវការ · push លើ branch មិន build។
+# APK សាកតែប៉ុណ្ណោះ build ជាមួយ VITE_PERF_TELEMETRY=1 (ពេលវាស់ស៊ុមពេលបើក/បិទប្រអប់ ➜ Sentry) ⛔ Release ពី main ជានិច្ច 0។
 
 name: Android APK
 
@@ -156,6 +157,8 @@ jobs:
 
       - name: Build web (--mode android) ➜ cap sync
         if: steps.keystore.outputs.ready == 'true'
+        env:
+          VITE_PERF_TELEMETRY: ${{ steps.meta.outputs.test == 'true' && '1' || '0' }}
         run: |
           npm ci --prefix ZoeW --prefer-offline --no-audit --no-fund
           npm run android:check --prefix ZoeW

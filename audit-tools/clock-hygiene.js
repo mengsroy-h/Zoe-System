@@ -48,7 +48,6 @@ const LOCAL_CLOCK_OK = {
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល',
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         fetchNotifyFeed: 'ពិដានល្បឿនការទាញសារជូនដំណឹង ៦០ វិ. — local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ទាញ)',
-        noteScrollFrameRate: 'ចន្លោះ ៥ វិ. រវាងការវាស់ស៊ុមពេលរមូរ (ឧបករណ៍វាស់ក្នុងរបា Slide) — local ហើយវាស់តាម `elapsedSince()` · មិនប៉ះទិន្នន័យ ឬលុយ',
         subscribeWeb: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
         onNativeToken: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',
         resyncPush: 'ត្រាពេលចុះឈ្មោះ Push/ផ្ញើកាលវិភាគចុងក្រោយ — ពិដានល្បឿន local (២៤ ម៉ោង · ១០ នាទី · ៦ ម៉ោង) វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ចុះឈ្មោះ/ផ្ញើម្តងទៀត) · មិនប៉ះ retention ឬលុយ · ម៉ោងផុតកំណត់ដែលផ្ញើទៅ server មកពី `getServerNow()`',

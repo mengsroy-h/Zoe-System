@@ -171,10 +171,9 @@ checker របស់ ZoeW ដើមត្រូវសរសេរសម្រា
 | `#root` | គ្មាន | `display: contents` | React ត្រូវការ host; `display:contents` រក្សា layout |
 | navbar | «Powered By ZoeW» ក្នុង navbar | ប៊ូតុង 🔔 + ផ្ទាំងជូនដំណឹង · «Powered By» ផ្លាស់ចូលជើងផ្ទាំង 🔔 ➜ navbar លើទូរស័ព្ទទាបជាង **១៤px** | មុខងារថ្មី (ផ្ទាំង 🔔) |
 | logo (ផ្ទាំង boot · navbar) | អក្សរ «Zoe» | App icon SVG | logo ដូចរូប App |
-| ជើងរបា Slide | គ្មាន | ល្បឿនស៊ុម · កំណែ WebView · «ស៊ុមកក» | ការវិនិច្ឆ័យល្បឿនអេក្រង់ (លេខវាស់ពី browser តាមពេល) |
 | ledger ថ្ងៃ/ខែ | គ្មាន token | វាល `op` | សម្គាល់ការសរសេររបស់ខ្លួនពេល `disconnect` (លុយមិនប៉ះ) |
 
-⛔ ការខុសគ្នា ៤ ជួរចុងក្រោយរស់ក្នុង **បញ្ជីតែមួយ** `INTENTIONAL_UI` (`scripts/snapshot.mjs`) ដែល `parity:dom` · `parity:live` ·
+⛔ ការខុសគ្នា ៣ ជួរចុងក្រោយរស់ក្នុង **បញ្ជីតែមួយ** `INTENTIONAL_UI` (`scripts/snapshot.mjs`) ដែល `parity:dom` · `parity:live` ·
 `parity:deep` ប្រើរួម ៖ ផ្ទៃបន្ថែមត្រូវរំលង · logo ប្រៀបតែធាតុខ្លួនវា · ស្រទាប់ `position: fixed` មិនប្រៀប `top`/`left` · `parity:dom` ទទួលយក
 **តែ** ការរំកិល ១៤px របស់ navbar (ការរំកិលផ្សេង ឬ x/ទទឹងប្រែ នៅតែធ្លាក់) · `op` ដកចេញពីការប្រៀប DB។ ⛔ ទាំង ៣ រត់ក្នុង
 `bash audit-tools/run-all.sh` (ការងារ `zoew-parity`) — បើអត់ វាក្រហមដោយស្ងាត់ពេលផ្ទៃថ្មីមកដល់ ហើយការខុសគ្នាពិតលិចក្នុងសំលេងរំខាន។

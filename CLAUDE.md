@@ -84,7 +84,7 @@ only this text protects them.
   loads native code · Gradle/AGP/SDK ↔ Capacitor template · ⛔ APKs signed by **one keystore forever**, cert pinned in
   `ZoeW/android/release-cert.sha256`, no debug-key path, ⛔ keystore **never in the repo**) · release workflow: push builds
   `main` only (Release `zoew-android-v<APP_VERSION>`); another branch only by manual Run workflow ➜ **Pre-release**
-  `…-test.<7-char commit>`, never a plain Release (`repository-contract-test` runs the workflow's real scripts) · `npm run native:check`
+  `…-test.<7-char commit>`, never a plain Release; only test APKs build with `VITE_PERF_TELEMETRY=1` (overlay frame timing ➜ Sentry `zone: 'perf'`, `src/ui/overlay-telemetry.ts`), Releases from `main` always `0` (`repository-contract-test` runs the workflow's real scripts) · `npm run native:check`
   (fake bridge: Back · history · pause/resume · Share/Print · biometrics · PTR/latch) · `npm run rules:check`
   (delete/remove · 2h · 7d · 2d · 30d on original ZoeW · web · Android). ⛔ Back never returns into "remove" mode
   (`safeScreen()`).

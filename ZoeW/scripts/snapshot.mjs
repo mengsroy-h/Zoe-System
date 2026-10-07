@@ -9,8 +9,7 @@
  *    ត្រូវមិនរាប់ — បញ្ជីតែមួយនេះ (ច្បាប់ ១២) ៖ បើអត់ គ្រប់ជំហានក្រហម ➜ ការខុសគ្នាពិតលិចក្នុងសំលេងរំខាន (វាស់បាន ៖ `parity:deep`
  *    ក្រហម ៧៩/៧៩ តាំងពី 2.43.0 ដោយមានតែ ២ ប្រភេទនៃការខុសគ្នា ហើយគ្មាននរណារត់វា)។ ⛔ បន្ថែមធាតុ **តែ** ពេលកំណែ App ពិតជាបន្ថែម/ផ្លាស់
  *    ផ្ទៃនោះ ហើយសរសេរកំណែជាប់ — កុំប្រើវាដើម្បីបិទការខុសគ្នាដែលមិនយល់។
- *    · `skip` ៖ ផ្ទៃបន្ថែម/ផ្លាស់ទី — ផ្ទាំង 🔔 និងប៊ូតុងរបស់វា (2.43.0) · «Powered By ZoeW» ផ្លាស់ពី navbar ចូលជើងផ្ទាំង 🔔 (2.43.0) ·
- *      ល្បឿនស៊ុម/កំណែ WebView និង «ស៊ុមកក» ក្នុងជើងរបា Slide (2.42.11 · 2.45.1 · 2.45.2 ៖ លេខវាស់ពី browser តាមពេល)
+ *    · `skip` ៖ ផ្ទៃបន្ថែម/ផ្លាស់ទី — ផ្ទាំង 🔔 និងប៊ូតុងរបស់វា (2.43.0) · «Powered By ZoeW» ផ្លាស់ពី navbar ចូលជើងផ្ទាំង 🔔 (2.43.0)
  *    · `opaque` ៖ logo (ផ្ទាំង boot · navbar) ប្តូរពីអក្សរ «Zoe» ទៅ App icon SVG (2.43.0) ➜ ប្រៀបធាតុខ្លួនវា មិនមែនមាតិកាខាងក្នុង
  *    · `floating` ៖ ម៉ឺនុយ (...) និងប្រអប់ណែនាំលេខ ជាស្រទាប់ `position: fixed` ដែលតាំងតាមធាតុយុថ្កា ➜ `top`/`left` ជាលទ្ធផល layout
  *      (navbar ទាបជាងដើម ១៤px ក្រោយ «Powered By» ផ្លាស់ចេញ · 2.43.0) មិនមែនឥរិយាបថ ➜ ប្រៀបតែ display · ទទឹង
@@ -26,7 +25,7 @@ export const INTENTIONAL_UI = {
     //    «កញ្ចប់សរុប» ជា `<button>` ប្រៀបជា `<span class="count-badge">` ដើម (`asLegacy` ៖ [selector · tag ដើម · attribute ដើម]) ·
     //    ជួរប្រអប់បញ្ជី ZTO (សំណើ «សម្រួលក្រែងបាំងគ្នា») ៖ សម្គាល់ · ប្រភព ជាបន្ទាត់ដាច់ ➜ ប្រៀបតែ barcode (`.zto-list-code`) និងចំនួនជួរ ·
     //    ខ្លឹមសារជួរចាក់សោដោយ `zto-list-sync-test` · `tests/zto-list-origin.test.tsx`
-    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #displayRateLine, #jankLine, #configModal .modal-content, #loginModal .remember-password, .customer-info-stack > div:has(> .btn-view-list), #ztoListSyncBody .zto-list-row > :is(.zto-list-meta, .zto-list-origin, .zto-list-note)',
+    skip: '#navNotifyBtn, #notifyDrawer, .notify-backdrop, .app-navbar .credit-tag, #configModal .modal-content, #loginModal .remember-password, .customer-info-stack > div:has(> .btn-view-list), #ztoListSyncBody .zto-list-row > :is(.zto-list-meta, .zto-list-origin, .zto-list-note)',
     asLegacy: [['button.count-badge-btn', 'SPAN', 'class=count-badge']],
     opaque: '.boot-splash-logo, .brand-logo',
     floating: '#globalMoreMenu, #phoneSuggestBox',

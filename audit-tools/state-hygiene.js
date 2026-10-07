@@ -82,7 +82,6 @@ const ACCEPTED = {
         staleFrameStreak: 'counter for the fresh-frame gate, reset by resetLiveScanQuality inside stopCurrentStream',
         freshFrameGateUsable: 'browser capability flag for video.currentTime, reset by resetLiveScanQuality inside stopCurrentStream',
         perfSamplePending: 'frame-pace sampler mutex, clears itself when the sample finishes',
-        displayRateSampling: 'drawer frame-rate sampler mutex (device property, no user data), clears itself after DISPLAY_RATE_SAMPLES frames or when requestAnimationFrame throws',
         displayHz: 'measured display refresh rate, a device property not user data',
         displayHzMeasured: 'flag saying the refresh rate has been measured; a device property',
         torchOn: 'reset by stopCurrentStream',

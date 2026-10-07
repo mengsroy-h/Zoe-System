@@ -123,47 +123,6 @@ const tokenOk = cssImports.length >= 1 && authoredTokens.length >= 20 && !tokenL
 if (tokenOk) console.log(`✅ design token CSS ទៅដល់ build ដូចដែលសរសេរ (${authoredTokens.length} token · ${cssImports.length} ឯកសារ)`);
 else console.log('⛔ minifier CSS សរសេរ design token ឡើងវិញ ឬវាស់មិនបាន ៖ ' + JSON.stringify({ files: cssImports.length, tokens: authoredTokens.length, lost: tokenLost.slice(0, 8), lostCount: tokenLost.length }));
 
-/* ⛔ «ស៊ុមកក» ក្នុងរបា Slide ត្រូវវាស់ពី build ផលិតកម្មពិត ៖ vitest វាស់ helper និង SideDrawer តែមិនឃើញថា boot ពិតជា
- *    ចាប់ផ្តើម observer ឬអត់ ➜ បង្កើតស៊ុមកក ១ ដែលដឹងថាយូរ ≥ 150ms រួចបើករបា Slide ➜ បន្ទាត់ `#jankLine` ត្រូវលេច ហើយ
- *    «យូរបំផុត» ត្រូវ ≥ រយៈពេលដែលបង្កើត។ Chromium គាំទ្រ `long-animation-frame` ➜ គ្មានបន្ទាត់ = boot មិនចាប់ផ្តើមការវាស់។ */
-const JANK_BUSY_MS = 150;
-await page.evaluate((busy) => new Promise((resolve) => requestAnimationFrame(() => {
-    const end = performance.now() + busy;
-    while (performance.now() < end) { /* ស៊ុមកកដោយចេតនា */ }
-    requestAnimationFrame(() => setTimeout(resolve, 100));
-})), JANK_BUSY_MS);
-await page.evaluate(() => document.getElementById('navMenuBtn').click());
-await page.waitForTimeout(300);
-const jank = await page.evaluate(() => {
-    const line = document.getElementById('jankLine');
-    return { text: line ? line.textContent : null, supported: (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes) || [] };
-});
-const jankMax = jank.text ? Number((jank.text.match(/(\d+)ms/) || [])[1]) : NaN;
-const jankCount = jank.text ? Number((jank.text.match(/៖ (\d+) ដង/) || [])[1]) : NaN;
-const jankOk = jank.supported.includes('long-animation-frame') && jankCount >= 1 && jankMax >= JANK_BUSY_MS;
-if (jankOk) console.log(`✅ ស៊ុមកកត្រូវវាស់ពី boot ពិត ៖ «${jank.text}»`);
-else console.log('⛔ បន្ទាត់ «ស៊ុមកក» មិនលេច ឬលេខខុស (boot មិនចាប់ផ្តើម observer?) ៖ ' + JSON.stringify(jank));
-
-/* ⛔ «ពេលរមូរ NNfps» ត្រូវវាស់ពីព្រឹត្តិការណ៍ scroll ពិត ៖ អេក្រង់ LTPO (10–120Hz) ឲ្យស៊ុម ៦០ ពេលស្ងៀម តែ ១២០ ពេលរមូរ ➜ ការវាស់តែពេលបើក
- *    របា Slide រាយ «60» ខុស។ ព្រឹត្តិការណ៍ scroll លើកន្សោមណាមួយ (capture លើ window) ➜ វាស់ ➜ បើករបា ➜ បន្ទាត់ត្រូវមាន «ពេលរមូរ»។
- *    ការដកអ្នកស្តាប់ចេញពី boot ➜ គ្មាន «ពេលរមូរ» ➜ smoke ធ្លាក់។ */
-await page.evaluate(() => {
-    const close = document.querySelector('#sideDrawer .drawer-close');
-    if (close) close.click();
-});
-await page.waitForTimeout(200);
-await page.evaluate(() => {
-    const target = document.getElementById('appPages') || document.body;
-    target.dispatchEvent(new Event('scroll'));
-});
-await page.waitForTimeout(800);
-await page.evaluate(() => document.getElementById('navMenuBtn').click());
-await page.waitForTimeout(900);
-const rateText = await page.evaluate(() => { const el = document.getElementById('displayRateLine'); return el ? el.textContent : null; });
-const scrollRateOk = !!rateText && /ស៊ុម App \d+fps · ពេលរមូរ \d+fps/.test(rateText);
-if (scrollRateOk) console.log(`✅ ស៊ុមពេលរមូរត្រូវវាស់ពី scroll ពិត ៖ «${rateText}»`);
-else console.log('⛔ បន្ទាត់ស៊ុមមិនមាន «ពេលរមូរ» (boot មិនភ្ជាប់អ្នកស្តាប់ scroll?) ៖ ' + JSON.stringify(rateText));
-
 /* ⛔ ហាង Supabase មិនទាញ SDK Firebase ៖ `firebase-loader.js` សម្រេចតាម Config តែ `<link rel="modulepreload">` ក្នុង
  *    `index.html` ទាញ module ទាំង ៣ ដោយឥតលក្ខខណ្ឌ (ការវាស់ក្នុង Chromium ៖ Config Supabase ➜ ៣ សំណើ) ➜ វាស់សំណើពិតពី
  *    build ផលិតកម្ម ៖ Config Supabase ➜ ០ · ទិសផ្ទុយ ៖ Config Firebase ➜ module ទាំង ៣ នៅតែទាញ។ */
@@ -190,4 +149,4 @@ else console.log('⛔ SDK Firebase ៖ ' + JSON.stringify({ sdkOnSupabase, sdkOn
 
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !swSplitOk || !tokenOk || !jankOk || !scrollRateOk || !sdkGateOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !swSplitOk || !tokenOk || !sdkGateOk ? 1 : 0);

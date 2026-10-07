@@ -16,7 +16,6 @@ import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
-import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 
@@ -365,17 +364,15 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
 
 export const CLEANUP_FOREIGN_TRASH_WINDOW_MS = 15 * 60 * 1000;
 
-export async function cleanupClaimAccountedElsewhere(id, claimedWhole, claimedPartial) {
-    if (claimedWhole) {
-        const url = txRestUrl(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`));
-        if (!url) return 'unknown';
-        try {
-            const existing = await txReadServerValue(url);
-            return existing === null || existing === undefined ? 'ours' : 'elsewhere';
-        } catch (e) {
-            return 'unknown';
-        }
+export function claimCleanupTrashSlot(trashItem) {
+    if (!firebaseState.db || !firebaseState.fb || !trashItem || !trashItem.id || !/^[a-zA-Z0-9_-]+$/.test(trashItem.id)) {
+        return Promise.reject(new Error('Trash Firebase reference unavailable'));
     }
+    return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => (current ? undefined : trashItem))
+        .then((result) => !!(result && result.committed));
+}
+
+export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     const codes = new Set(barcodeEntriesOf(claimedPartial && claimedPartial.barcodes).map(({ barcode }) => barcode.code));
     if (!codes.size) return 'unknown';
     const since = getServerNow() - CLEANUP_FOREIGN_TRASH_WINDOW_MS;
@@ -466,11 +463,16 @@ export async function claimAndCleanupItem(id, reason) {
     };
     const finishCleanup = async (result) => {
         if (!result.committed || (!claimedWhole && !claimedPartial)) return;
+        let trashSlotDecides = false;
         if (result.txOutcome === 'applied') {
-            const owner = await cleanupClaimAccountedElsewhere(id, claimedWhole, claimedPartial);
-            if (owner !== 'ours') {
-                if (owner === 'unknown' && window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
-                return;
+            if (claimedWhole) {
+                trashSlotDecides = true;
+            } else {
+                const owner = await cleanupClaimAccountedElsewhere(id, claimedPartial);
+                if (owner !== 'ours') {
+                    if (owner === 'unknown' && window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
+                    return;
+                }
             }
         }
 
@@ -552,7 +554,11 @@ export async function claimAndCleanupItem(id, reason) {
         try {
             dataState.deletedItems.unshift(trashItem);
             let trashSaved = false;
-            await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
+            let trashElsewhere = false;
+            const writeTrash = () => (trashSlotDecides
+                ? claimCleanupTrashSlot(trashItem).then((claimed) => { trashElsewhere = !claimed; })
+                : saveSingleDeletedItemToFirebase(trashItem));
+            await notifyIfSlow(retryAsync(writeTrash, 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
                 trashSaved = true;
@@ -572,6 +578,12 @@ export async function claimAndCleanupItem(id, reason) {
                 }
             });
             if (!trashSaved) return;
+            if (trashElsewhere) {
+                const dupIdx = dataState.deletedItems.findIndex(i => i.id === trashItem.id);
+                if (dupIdx !== -1) dataState.deletedItems.splice(dupIdx, 1);
+                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                return;
+            }
             if (!revenuePending) {
                 try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
                 return;

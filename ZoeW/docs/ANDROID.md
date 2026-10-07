@@ -19,7 +19,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | ស្ថានភាពបណ្តាញ (`navigator.onLine` · `online`/`offline`) | browser ផ្តល់ជានិច្ច | WebView ផ្តល់ **តែពេល** App មានសិទ្ធិ `ACCESS_NETWORK_STATE` (សិទ្ធិធម្មតា · គ្មានប្រអប់សុំ) — បើអត់ `onLine` = `true` ជានិច្ច ហើយ `online`/`offline` មិនដែលបាញ់ ➜ ការភ្ជាប់ឡើងវិញរង់ចាំជណ្តើរ (ដល់ ៦០ វិ.) · ស្ថានភាព «ក្រៅបណ្ដាញ» និង 🩺 «អ៊ីនធឺណិត» និយាយខុស (`npm run android:check` ចាក់សោសិទ្ធិនេះ) |
 | សោ App ពេលចាកចេញ | `visibilitychange` | `pause`/`resume` របស់ Activity **បូក** `visibilitychange` (ការហៅស្ទួនត្រូវច្រានចេញ) |
 | ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
-| ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · ល្បឿនស៊ុមពិត («ស៊ុម App NNfps · ពេលរមូរ NNfps») និងកំណែ WebView បង្ហាញក្រោមលេខកំណែក្នុងរបា Slide (ប្រៀបនឹង Chrome លើទូរស័ព្ទដដែលបាន · អេក្រង់ប្តូរល្បឿន 10–120Hz ➜ ប្រៀបលេខ «ពេលរមូរ» មិនមែនលេខពេលស្ងៀម) · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings ➜ ពិនិត្យលេខ «ពេលរមូរ» ជាមុន · បន្ទាត់ «ស៊ុមកក 5 នាទីចុងក្រោយ» (`long-animation-frame` · Android តែប៉ុណ្ណោះ) រាប់ស៊ុមដែលកក ➜ ប្រៀប APK និង Chrome ក្រោយប្រើដូចគ្នា ១–២ នាទី |
+| ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings របស់ទូរស័ព្ទ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 
 ---
@@ -47,6 +47,14 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 `.github/workflows/android-release.yml` build APK ដែល **sign រួច** ហើយបង្កើត **GitHub Release** មួយក្នុងមួយកំណែ
 (`zoew-android-v<APP_VERSION>` · ឯកសារ `ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION` ប្រែលើ `main` ឬចុច
 **Actions ➜ Android APK ➜ Run workflow**។ ទាញយក ៖ ទំព័រ repo ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
+
+### APK សាកពី branch (មុន merge)
+
+**Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» ជ្រើស **branch** (មិនមែន `main`) ➜ **Run workflow** ➜ workflow build APK
+ដែល sign ដោយ keystore ដដែល ហើយបង្កើត **Pre-release** `zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (ឯកសារ `ZoeW-<កំណែ>-test.<commit>.apk`)
+➜ **Releases** ➜ ទាញ APK ➜ ដំឡើងជាន់ App ដែលមានស្រាប់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។ Pre-release មួយក្នុងមួយ commit ·
+push លើ branch មិន build ស្វ័យប្រវត្តិ · Release ផ្លូវការនៃកំណែដដែល (ពី `main`) ដំឡើងជាន់ APK សាកបាន។ ⛔ APK សាកសម្រាប់ម្ចាស់គម្រោងសាក
+តែប៉ុណ្ណោះ (កុំចែកឲ្យអតិថិជន) · លុប Pre-release និង tag របស់វាពេលលែងត្រូវការ (Releases ➜ Delete)។
 
 ⛔ **keystore តែមួយជារៀងរហូត** ៖ APK ដែល sign ដោយ keystore ផ្សេង **ដំឡើងជាន់ App ចាស់មិនបាន** ➜ ត្រូវលុប App ចាស់ ➜
 បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី ➜ Key ដែលមានពិដានឧបករណ៍ ១ ត្រូវឲ្យ admin ដោះឧបករណ៍ចាស់ក្នុង
@@ -192,3 +200,4 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 | ១១ | ចាកចេញពី App ធម្មតា ➜ ត្រឡប់មក | សុំ PIN · task switcher មិនឃើញទិន្នន័យ |
 | ១២ | ZTO Lookup · 🩺 ពិនិត្យសុខភាព | ដូច PWA · ជួរ «របៀបក្រៅបណ្ដាញ» ✅ |
 | ១៣ | ទូរស័ព្ទ WebView ចាស់ ធៀបនឹងថ្មី · បើក/បិទប្រអប់ | របាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញជានិច្ច ៖ រូបតំណាង **ខ្មៅ** លើ navbar ស · **ស** ពេលប្រអប់ (ផ្ទៃងងឹត) បើក · ខ្មៅវិញពេលបិទ |
+| ១៤ | តម្រង «ទាំងអស់» ➜ រមូរដល់ចុងបញ្ជីច្រើន ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ➜ រមូរឡើងវិញ · កែជួរ · ប្តូរតម្រង | មើលបានគ្រប់កញ្ចប់ · ប្រអប់រលូន · ទីតាំងនៅដដែលពេលបិទ · លេខ/ប៊ូតុងត្រូវតាមជួរ · តម្រងថ្មីចាប់ផ្តើមនៅកំពូល |

@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.5` (`zoew-v268`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.14` (`zoew-v277`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -82,7 +82,9 @@ only this text protects them.
   `BridgeActivity` theme · icon = vector `drawable/splash_icon.xml` from `icon.svg` ⛔ not `@mipmap` · ⛔ permission
   `ACCESS_NETWORK_STATE` (without it `navigator.onLine` is always `true` and `online`/`offline` never fire) · web never
   loads native code · Gradle/AGP/SDK ↔ Capacitor template · ⛔ APKs signed by **one keystore forever**, cert pinned in
-  `ZoeW/android/release-cert.sha256`, no debug-key path, ⛔ keystore **never in the repo**) · `npm run native:check`
+  `ZoeW/android/release-cert.sha256`, no debug-key path, ⛔ keystore **never in the repo**) · release workflow: push builds
+  `main` only (Release `zoew-android-v<APP_VERSION>`); another branch only by manual Run workflow ➜ **Pre-release**
+  `…-test.<7-char commit>`, never a plain Release; a test APK builds the web bundle exactly like a Release (no test-only flags · `repository-contract-test` runs the workflow's real scripts) · `npm run native:check`
   (fake bridge: Back · history · pause/resume · Share/Print · biometrics · PTR/latch) · `npm run rules:check`
   (delete/remove · 2h · 7d · 2d · 30d on original ZoeW · web · Android). ⛔ Back never returns into "remove" mode
   (`safeScreen()`).
@@ -242,7 +244,7 @@ only this text protects them.
 | **Tools** | Poisoning happens on shadow files · no fixed shared resources: `listen(0, '127.0.0.1')` · `emu/*` namespace unique per run | `checker-coverage` |
 | **Writes ↔ leaving to call** | Retry keeps rollback of every field and newer choices; old callbacks can't write/deduct/message after an auth or database switch | `history-patch-retry-test` |
 | **Lookup & scanning** | Table prefetch retries fast but never during a scan · keyboard doesn't jump while a lookup works (ceiling 15s, fail-open) · `lookupCode` survives retries; the Cookie message points to the Windows sync tool ➜ Netlify Blobs · busy is a *wait*, not an *end* · early exits release their queue entry; the ceiling measures real waits only · HTTP 200 with an unreadable body = transient failure (`LOOKUP_BAD_BODY`: one retry · transient cooldown), never «not found» | `lookup-prefetch-test` · `lookup-failure-identity-test` · `lookup-burst-test` |
-| **Modals** | `closeModal()` clears only that modal's state (or when the stack is empty) · the last opened is on top (ZoeKeyGen `openModalHelper()` reorders z-index · ZoeW `uiState.modalStack` ➜ `Modal.tsx`) ⛔ never order by fixed z-index or DOM order | `lookup-prefetch-test` · `ui-flow-test` · `layout-check` |
+| **Modals** | `closeModal()` clears only that modal's state (or when the stack is empty) · the last opened is on top (ZoeKeyGen `openModalHelper()` reorders z-index · ZoeW `uiState.modalStack` ➜ `Modal.tsx`) ⛔ never order by fixed z-index or DOM order · a backdrop tap closes every modal except `noDismiss` ones and `BACKDROP_KEEP_MODALS` (Config · lookup API · Excel import — owner decision: long forms), which still close by their buttons · Back · Escape | `lookup-prefetch-test` · `ui-flow-test` · `layout-check` · `ZoeW/tests/modal-backdrop-keep.test.tsx` |
 | **Cleanup labels ↔ constants** | User-facing text is read from the constants | `trash-modal-test` |
 | **Progress trackers** | Polling never consumes evidence (idempotent) | `connection-recovery-test` |
 | Reconnect ladder | The cycle never cuts a handshake | `reconnect-ladder-test` |
@@ -314,7 +316,7 @@ only this text protects them.
 | **ZTO sync helper** | Writes the same `site:<store>` that `getStore()` reads · Android/Termux path imports the 4 deciders (`isTargetApiUrl` · `validateCookieHeader` · `captureResponseSucceeded` · `cookieAfterResponse`) · `--auto` needs ADB (connect is `|| true`) · `chmod +x ./*.sh` unconditionally, run via `bash` · project dir derived · intent URLs plain https · secrets mode 600/dir 700, no symlinks; Windows DPAPI · cmd text ASCII English, Cookie shown, keys never · transient failures retry within a ceiling; 401/403/404/422 never · `--auto` never opens a browser blind · setup rerun keeps the PAT · gates measure the decrypted value · bad jar pairs skipped, no session ➜ refuse | `zto-cookie-sync-test` · `zto-cookie-store-test` |
 | **`ZTO_UPSTREAM_REJECTED`** | Mixes permanent and transient verdicts ⛔ never silence it all · never guess codes ➜ `noteUpstreamReject()` records `count · status · code` in `?diag=1` without changing verdict/cache/retry · codes read via `upstreamCodeText()` (shared with `upstreamSucceeded()`) through `SAFE_REASON_RE` | `zto-proxy-test` |
 | **React single DOM owner** | Feature code never touches DOM (`uiState.modalDisplay` · `viewState` · `src/app/refs.ts` · exceptions in `platform/document-io.ts`) · the React layer writes DOM only via JSX or `APP_ALLOWED` exits · PTR indicator from `ptrState` · `boot-flags.js` never touches React elements · every ref has a real `ref={…}` · `commitNow()` before measuring/focus · inputs uncontrolled · class-writing checkers translated only in `src/audit-compat.ts` | `npm run purity:check` |
-| **Big lists ↔ re-render** | List bodies subscribe only to their own fields (`useStoreFields`) · drag-heavy parents use `Memo…` versions · `HistoryRow` compares by value (`sameHistoryRowModel()`) · in-place edits + `renderHistory()` must render (`historyRenderSeq`) · producers assign new objects · big dialogs page by 20 with totals/search over all · history table pages by 50 (`HISTORY_PAGE_ROWS`, sentinel on `.table-responsive`); `renderHistory(data, viewKey)` keeps position on same-key syncs · APK status-bar measurement only when `statusBarLayerSignature()` changes | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `perf-check` · `npm run native:check` 4ឃ |
+| **Big lists ↔ re-render** | List bodies subscribe only to their own fields (`useStoreFields`) · drag-heavy parents use `Memo…` versions · `HistoryRow` compares by value (`sameHistoryRowModel()`) · in-place edits + `renderHistory()` must render (`historyRenderSeq`) · producers assign new objects · big dialogs page by 20 with totals/search over all · history table pages by 50 (`HISTORY_PAGE_ROWS`, sentinel on `.table-responsive`); Android (APK and browser/PWA — `historyRowsWindowed()` is the single decider) mounts only the measured viewport rows plus overscan (`@tanstack/react-virtual`, spacers owned by JSX, scroll writes through `app/refs.ts`); iOS and desktop keep cumulative rows; a new view key (filter · search) returns the list to the top on every platform (no cascade of page loads); `renderHistory(data, viewKey)` keeps position on same-key syncs · APK status-bar measurement only when `statusBarLayerSignature()` changes and only **after** the frame (rAF ➜ task; ⛔ never inside rAF: it forces a whole-page layout mid-animation — APK only, grows with rows) | `ZoeW/tests/list-render-scope.test.tsx` · `ZoeW/tests/list-paging.test.tsx` · `ZoeW/tests/history-paging.test.tsx` · `ZoeW/scripts/history-window-check.mjs` · `perf-check` · `npm run native:check` 4ឃ |
 | **🔔 panel** | Near-expiry uses `barcodeAbandonIsRipe()` · removed list = trash items with `trashReasonOf() === 'expired'` (skips `restoreClaim`), refreshed by the deleted listener, stale deleted view ➜ unmeasurable and no badge · read-only · stale view ➜ "unmeasurable" · logout clears · 🔔 and drawer are one layer (`isSideDrawerOpen()`) · `public/announcements.json` network-only · **exactly one `update` entry, = `APP_VERSION` (every ZoeW bump replaces it)** · `maintenance`-only messages don't bump · in-app logos derive from `resources/icon.svg` / ZoeKeyGen `manifest.json` | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
 | **Toolchain ↔ shipped output** | CSS minifier is esbuild (`cssMinify`; Lightning CSS reorders declarations covering PTR/motion) · built JS parses in `build.target` · chunks split by `codeSplitting` + `priority` (`__vitePreload` must stay out of the native chunk) · Android config stays on the installed Capacitor's template line | `npm run smoke` · `npm run android:check` · `npm run native:check` |
 | **New Firebase project tool** | One project per customer · sign-up disabled **and measured** by a real sign-up attempt · Auth settings and rules read back · ⛔ never silently adopt (`--adopt`) or reset passwords (`--reset`) · `pendingProject` recorded before creation · step ceilings · passwords never in files · email ↔ `siteCodeFromEmail()` · Setup Link ↔ `decodeSetupPayload()` · `firebase-tools` pinned · measured with real `firebase-tools` over HTTPS | `firebase-provision-test` |
@@ -575,7 +577,11 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
 | 🔔 panel (navbar right) | `notifyDrawer` | 📦 near-expiry (24h) · 📤 removed (trash `expired`, unseen count in the badge) · 📱 កំណែ App · 📲 Push on/off · 📢 announcements/maintenance (`public/announcements.json` + seller notices · 🧹 សម្អាត) · ⛔ "Powered By ZoeW" in this panel's footer |
 
 - (...) menus close when an outside drag or history scroll starts; taps/scrolls inside still work; the open motion
-  (`#globalMoreMenu`) honors Reduce Motion and never delays closing (`history-menu-dismiss-test.js`).
+  (`#globalMoreMenu`) honors Reduce Motion and never delays closing (`history-menu-dismiss-test.js`). A scroll closes the menu
+  only when it moves the button (the scroller contains the anchor · the anchor left the DOM) or follows user input made
+  **after** opening (`moreMenuScrollDismisses()` · `noteMoreMenuInput()`: input inside the menu or on its button never counts ·
+  a `wheel` counts only when it starts a stream after a `MORE_MENU_WHEEL_GAP_MS` pause) ⛔ momentum or wheel inertia left over
+  from before the tap never closes it (`ZoeW/tests/more-menu-scroll.test.ts` · `history-menu-dismiss-test.js`).
 - **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (drawer): **9** rows, read-only — network · Firebase · clock · License · storage · Service
   Worker · customer table · Apps Script version · Lookup. Count derived from `runHealthCheck()`. ZTO row: rejected ➜ ❌ ·
   accepted ➜ ✅ · never used ➜ ⚠️. Never forces PIN · secrets never in DOM (8-char fingerprint only) · the Apps Script
@@ -664,13 +670,44 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   Chromium never applies it ➜ `panel-motion-test.js` injects it.
 - ⛔ The 180ms delay and `chrome-space-released` stay removed.
 - rAF-coalesced scroll handler; `SHOW_AFTER` (48px) > `HIDE_AFTER` (36px) on purpose.
+- ⛔ The bar moves only on **user** scrolling: a delta counts only during a touch or ≤ `CHROME_SCROLL_INTENT_MS` after touch ·
+  wheel · key · pointer input; after the last input at most one flip; nothing counts for `CHROME_FLIP_SETTLE_MS` after any flip.
+  Programmatic scroll writes (virtualizer corrections · clamps · scroll anchoring) never drive it — on the APK they formed a
+  show/hide loop on a still list. Reaching the top zone still shows it. Guards: `ZoeW/tests/chrome-autohide-intent.test.tsx` ·
+  `gesture-test`.
+- ⛔ APK soft keyboard: the WebView resizes in one step when the IME starts opening ➜ a fixed bar would jump above it. Inside the
+  same `resize` handler `noteKeyboardViewport()` (native Android only) sets `uiState.keyboardOpen` (immediate commit) when the
+  height drops ≥ `KEYBOARD_MIN_INSET_PX` below the **last height before the keyboard** (any other same-width resize re-bases
+  it: split-screen) while a text field is focused **and** a text field got `focusin`/`pointerdown` within `KEYBOARD_INTENT_MS`;
+  it clears only on a resize (back within the inset of that base, or ≥ the inset above the lowest open height) ⛔ never on blur
+  (the IME is still closing). Body gets `keyboard-open` + `chrome-hidden` (bar hidden with no transition, list uses the
+  hidden-bar layout); `uiState.chromeHidden` (scroll state) is never touched, so the bar returns to the state it had. Web/iOS
+  unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. Capacitor `SystemBars` pads the decor by the
+  full IME height when the show animation starts ➜ Android 11+ `MainActivity` (`KeyboardOpenHold`, platform
+  `WindowInsetsAnimation` on the decor) keeps the WebView at its height from `onPrepare` (parents unclipped) until `onEnd` or
+  `KEYBOARD_HOLD_MAX_MS`, so the keyboard slides over the page and the WebView shrinks once at the end ⛔ never `ViewCompat`
+  (below Android 11 it replaces Capacitor's insets listener). Any strip left shows the window background ➜ the bridge theme's
+  `android:windowBackground` = `--body-bg`. Guards: `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`
+  · `npm run android:check`.
+- ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
+  never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
+  flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list
+  repaints, cost grows with rows. A page scroller reaching the top while an overlay is open still shows it; page switches
+  still show it. Guards: `ZoeW/tests/modal-chrome-state.test.tsx` · `gesture-test` · `perf-check` (modal and drawer open
+  with the bar hidden ≤ 1.8× PrePaint+Paint of the bar shown, CPU ÷4).
 
 ## Frame rate and lite mode
 
-- `measureDisplayHz()`: median of 24 rAF intervals, clamped `[10, 120]`. `longFrameThresholdMs()` = frame budget × 1.6
+- `sampleFramePace()`: median of 90 rAF intervals, clamped `[10, 120]`. `longFrameThresholdMs()` = frame budget × 1.6
   (min 12ms) ⛔ no fixed number.
 - `setupAdaptivePerformance()` measures twice (1.5s and 10s); `body.perf-lite` only when both drop; never touches
-  business features.
+  business features. Each round measures the rate and the pace in **one** window (`sampleFramePace()`: budget = that
+  window's median) ⛔ never in separate windows — an LTPO display switching 120 ➜ 60 between them counts every normal
+  60Hz frame as long.
+- High-refresh devices are learned, not guessed: `sampleScrollHz()` (passive capture `scroll` · ≤ 1 per
+  `SCROLL_HZ_GAP_MS` · `DISPLAY_HZ_SAMPLES` frames · median) raises `uiState.displayHzPeak` (max only · `zoew_display_hz_peak_v1` per
+  device); ≥ `HIGH_REFRESH_HZ` ➜ never `perf-lite` and an existing one is cleared (`noteDisplayHzPeak()`). Guard:
+  `ZoeW/tests/adaptive-refresh.test.ts`.
 
 ## Barcode scanner
 

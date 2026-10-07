@@ -1,7 +1,7 @@
 {
   "name": "zoew",
   "private": true,
-  "version": "2.50.5",
+  "version": "2.50.14",
   "description": "ZoeW — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (React + Vite)",
   "engines": {
     "node": "^22.17.0 || >=24.0.0"
@@ -36,7 +36,7 @@
     "original:fetch": "bash scripts/fetch-original.sh",
     "logic:check": "node scripts/logic-identity.mjs",
     "android:check": "node scripts/android-check.mjs",
-    "native:check": "node scripts/native-check.mjs",
+    "native:check": "node scripts/native-check.mjs && node scripts/history-window-check.mjs",
     "rules:check": "node scripts/cleanup-rules-check.mjs",
     "money:core": "node scripts/build-audit.mjs && node ../audit-tools/money-reality-check.js --emit-core dist-audit/ZoeW/app.js ../audit-tools/money-core.js"
   },
@@ -57,6 +57,7 @@
     "@capgo/capacitor-printer": "^8.1.4",
     "@eslint/js": "^10.0.1",
     "@supabase/supabase-js": "2.117.2",
+    "@tanstack/react-virtual": "3.14.13",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

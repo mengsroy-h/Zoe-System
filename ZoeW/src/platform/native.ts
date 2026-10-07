@@ -24,6 +24,18 @@ export function isNativeAndroid(): boolean {
     }
 }
 
+export function isAndroidDevice(): boolean {
+    if (isNativeAndroid()) return true;
+    try {
+        const nav: any = window.navigator;
+        const platform = nav.userAgentData && typeof nav.userAgentData.platform === 'string' ? nav.userAgentData.platform : '';
+        if (platform) return platform === 'Android';
+        return /Android/i.test(String(nav.userAgent || ''));
+    } catch {
+        return false;
+    }
+}
+
 export function pullToRefreshSupported(): boolean {
     return (window.navigator as any).standalone === true || isNativeAndroid();
 }

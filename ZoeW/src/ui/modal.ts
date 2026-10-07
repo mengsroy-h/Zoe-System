@@ -5,11 +5,9 @@ import { safeFocusScanner } from '../core/timezone';
 import { clearLookupStatus } from '../features/auto-lookup';
 import { stopCurrentStream } from '../features/daily-stats';
 import { hidePhoneSuggestions } from '../features/phone-suggest';
-import { showAppChrome } from './chrome-autohide';
 
 export function openModalHelper(modalId) {
     uiState.isModalOpen = true;
-    showAppChrome();
     hidePhoneSuggestions();
     setModalDisplay(modalId, 'flex');
 }

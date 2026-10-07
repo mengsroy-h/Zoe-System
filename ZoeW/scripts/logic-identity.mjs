@@ -45,7 +45,10 @@ const ZONE_ALLOWED = {
         ' ⊕ សំណើម្ចាស់គម្រោង (ស្តង់ដា App) ៖ ចាប់ផ្តើមតែ **៤០% ខាងលើ** · **ស្រទាប់បើក ➜ គ្មាន PTR** (ចងចាំនៅ `pointerdown`) · **ញ័រម្តង** ពេលឆ្លងព្រំដែន ។ វាស់បាន ៖ native-check mutation ៣/៣ ចាប់ · gesture-test ត្រូវបៃតង' +
         ' ⊕ React ១០០% (សំណើម្ចាស់គម្រោង) ៖ transform · opacity · class ចលនារបស់សញ្ញា ជា **`ptrState`** ដែល `PtrIndicator` គូរ (`renderNow()` ➜ ស៊ុមដដែល) · `MutationObserver` លើ class ➜ `uiState.subscribe` (ប្រភពនៃ class ទាំងនោះ) · ការរមូរ document តាម `resetDocumentScroll()` (លំដាប់ដដែល)',
     switchAppPage: REACT_STATE + '`.active` របស់ទំព័រ/Tab ដេរីវេពី `currentAppPage` ក្នុង JSX · `scrollTop = 0` តាម `setScrollTop()` (commit មុន) — លំដាប់ hide ➜ pull-up ➜ chrome ➜ lock ➜ scroll ដដែល',
-    openSideDrawer: REACT_STATE + '`.open` · `aria-hidden` របស់របា Slide និង backdrop ដេរីវេពី `drawerOpen` ➜ ការហៅ refresh ទាំង ៥ ដដែល',
+    openSideDrawer: REACT_STATE + '`.open` · `aria-hidden` របស់របា Slide និង backdrop ដេរីវេពី `drawerOpen` ➜ `hidePhoneSuggestions()` និង refresh ទាំង ៣ ដដែល' +
+        ' (+ សម្គាល់ថាបានឃើញ 🔔 ពេលផ្ទាំង 🔔 បើក) · ⛔ ការវាស់ «ស៊ុម App/ពេលរមូរ» និង «ស៊ុមកក» ក្នុងជើងរបាដកចេញ (សំណើម្ចាស់គម្រោង)' +
+        ' ⊕ សំណើម្ចាស់គម្រោង («កែម៉ឺនុយ ☰ ដែរ») ៖ backdrop គ្របរបា (z-index 1200 > 900) ➜ មិនហៅ `showAppChrome()` (ការបង្ហាញរបាគូរបញ្ជីទាំងមូលឡើងវិញ) ។' +
+        ' អ្នកយាម `tests/modal-chrome-state.test.tsx` · gesture-test · perf-check',
     closeSideDrawer: REACT_STATE + '`drawerOpen = false` ជំនួស `.open`/`aria-hidden`',
     isSideDrawerOpen: REACT_STATE + 'អាន `drawerOpen` (ប្រភពរបស់ `.open`) ជំនួស classList',
     activePanelSections: REACT_STATE + 'ទំព័រសកម្មអានពី `currentAppPage` (ប្រភពរបស់ `.active`) · ធាតុតាម ref · បន្ថែម `panel` (កូនសោ state របស់ផ្ទាំង)',
@@ -61,7 +64,15 @@ const ZONE_ALLOWED = {
     appChromeElements: REACT_STATE + 'navbar · tabbar តាម ref',
     showAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
     hideAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
-    setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល',
+    setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល' +
+        ' ⊕ សំណើម្ចាស់គម្រោង (APK ៖ រមូរដល់ចុង ចុចបើកធុងសំរាម/បញ្ជី ZTO អាក់) ៖ modal គ្របរបា ➜ ការរមូរ **ក្នុង** `.modal` មិនបញ្ជារបា ·' +
+        ' ការរមូរបញ្ជីខណៈ modal បើក ធ្វើតាមច្បាប់ធម្មតា (លាក់ត្រូវ `hideAppChrome()` បដិសេធ · ត្រឡប់ដល់កំពូល ➜ បង្ហាញ) · `openModalHelper()` មិនបង្ហាញរបា ➜' +
+        ' ការបើក modal មិនប្តូរ clip-path/padding របស់បញ្ជី ។ វាស់បាន ៖ ៦០០ ជួរ CPU ÷4 PrePaint+Paint ២១៦ ➜ ៧៦ms (ដូចពេលរបាបង្ហាញ) ·' +
+        ' អ្នកយាម `tests/modal-chrome-state.test.tsx` · gesture-test · perf-check (tree មុនកែ ➜ ក្រហម)' +
+        ' ⊕ («កែម៉ឺនុយ ☰ ដែរ») ៖ ការរមូរក្នុង `.side-drawer` (☰ · 🔔) មិនបញ្ជារបាដូច `.modal` · ម៉ឺនុយបើកលែងបង្ហាញរបារាល់ការរមូរ' +
+        ' ⊕ (វីដេអូ APK «ញ៉ាក់» · «របា tap glitch» ៖ បញ្ជីស្ងៀម ០px តែរបាលោតរាល់ ១–២ ស៊ុម) ៖ រាប់តែ scroll ពេលប៉ះ/អូស ឬក្រោយ touch/wheel/key/pointer ≤ CHROME_SCROLL_INTENT_MS ·' +
+        ' ក្រោយ input ចុងក្រោយប្តូរបាន ១ ដង · មិនរាប់ CHROME_FLIP_SETTLE_MS ក្រោយរបាប្តូរ ➜ scroll ដោយកម្មវិធី (ការកែទីតាំងបញ្ជីបង្ហាញតាមរមូរ · clamp) មិនបង្កើតរង្វង់ ·' +
+        ' ដល់កំពូលនៅបង្ហាញ ។ អ្នកយាម `tests/chrome-autohide-intent.test.tsx` (មុនកែ ក្រហម ៤/៦) · gesture-test (មុនកែ ក្រហម ២)',
     positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref · `style.width/left/top` ជា state (`phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ · ទទឹងចុះ DOM មុនវាស់កម្ពស់ ដូចដើម',
     setPhoneSearchPulledUp: REACT_STATE + '`.search-focus` ជា `dataPanelSearchFocus` · `.collapsed` ជា `dataPanelCollapsed`',
     setupPhoneSuggestions: REACT_STATE + 'listener របស់ប្រអប់ស្វែងរក/ប្រអប់ណែនាំ ➜ prop របស់ JSX (`onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ) តួដដែល · សល់តែ `scroll`/`resize` របស់ `window`',

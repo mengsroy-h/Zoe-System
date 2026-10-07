@@ -12,7 +12,6 @@ import { markNotifyFeedSeen, markNotifyRemovedSeen } from '../features/notificat
 import { refreshZtoListSyncUi } from '../features/zto-list-sync';
 import { refreshZtoAutoCloseUi } from '../features/zto-status';
 import { showAppChrome } from './chrome-autohide';
-import { measureDisplayRateForDrawer, refreshJankText } from './perf';
 
 export function switchAppPage(page?) {
     const target = page === 'entry' ? 'entry' : 'data';
@@ -36,7 +35,6 @@ export function switchAppPage(page?) {
 }
 
 export function openSideDrawer() {
-    showAppChrome();
     hidePhoneSuggestions();
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -47,8 +45,6 @@ export function openSideDrawer() {
     }
     uiState.notifyDrawerOpen = false;
     uiState.drawerOpen = true;
-    measureDisplayRateForDrawer();
-    refreshJankText();
 }
 
 export function closeSideDrawer() {

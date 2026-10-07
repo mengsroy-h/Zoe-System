@@ -88,6 +88,22 @@ ok('MainActivity ៖ onResume ស្នើម្តងទៀត (ត្រឡប
 const refreshBody = javaMethodBody(mainActivity, 'void preferHighestRefreshRate(');
 ok('MainActivity ៖ កំណត់ preferredDisplayModeId តាម mode ដែលជ្រើស', /preferredDisplayModeId\s*=\s*best\.getModeId\(\)/.test(refreshBody) && /setAttributes\(/.test(refreshBody));
 ok('MainActivity ៖ ការបរាជ័យមិនគាំង App (catch RuntimeException)', /catch\s*\(\s*RuntimeException/.test(refreshBody));
+/* ⛔ keyboard បើក (វីដេអូម្ចាស់គម្រោង) ៖ `SystemBars` របស់ Capacitor ដាក់ padding = កម្ពស់ IME ពេញភ្លាមពេលចលនាចាប់ផ្តើម ➜ WebView រួញមុន keyboard
+ *    ឡើងមកដល់ ➜ ចន្លោះទទេ ~០,៣ វិ.។ Android 11+ ៖ `onPrepare` រក្សាកម្ពស់ WebView ដដែល (ដក clip) ➜ keyboard រំកិលពីលើទំព័រ ➜ `onEnd` (ឬ
+ *    KEYBOARD_HOLD_MAX_MS) ត្រឡប់ MATCH_PARENT · ⛔ មិនប្រើ `ViewCompat` (Android < 11 វាជំនួស listener insets របស់ Capacitor) */
+ok('MainActivity ៖ onCreate ចុះឈ្មោះការរក្សា WebView ពេល keyboard បើក', /holdWebViewWhileKeyboardOpens\(\)/.test(javaMethodBody(mainActivity, 'void onCreate(')));
+const holdBody = javaMethodBody(mainActivity, 'void holdWebViewWhileKeyboardOpens(');
+ok('MainActivity ៖ តែ Android 11+ (platform WindowInsetsAnimation · មិនមែន ViewCompat)', /SDK_INT\s*<\s*Build\.VERSION_CODES\.R\)\s*return/.test(holdBody)
+    && /decor\.setWindowInsetsAnimationCallback\(/.test(holdBody) && !/ViewCompat\s*\.\s*setWindowInsetsAnimationCallback/.test(mainActivity));
+const prepBody = javaMethodBody(mainActivity, 'void onPrepare(');
+ok('MainActivity ៖ onPrepare រក្សាតែពេល IME កំពុងបើក (មិនទាន់ visible) · កម្ពស់ WebView ពិត',
+    /WindowInsets\.Type\.ime\(\)/.test(prepBody) && /isVisible\(WindowInsets\.Type\.ime\(\)\)\)\s*return/.test(prepBody)
+    && /params\.height\s*=\s*webView\.getHeight\(\)/.test(prepBody) && /setClipChildren\(false\)/.test(prepBody)
+    && /postDelayed\(release,\s*KEYBOARD_HOLD_MAX_MS\)/.test(prepBody));
+const releaseBody = javaMethodBody(mainActivity, 'void release(');
+ok('MainActivity ៖ onEnd ឬ timeout ➜ ត្រឡប់ MATCH_PARENT និង clip ដើម',
+    /release\(\)/.test(javaMethodBody(mainActivity, 'void onEnd(')) && /MATCH_PARENT/.test(releaseBody)
+    && /setClipChildren\(clipChildren\.get\(i\)\)/.test(releaseBody) && /removeCallbacks\(release\)/.test(releaseBody));
 const pickBody = javaMethodBody(mainActivity, 'Display.Mode highestRefreshMode(');
 ok('MainActivity ៖ ជ្រើសតែ mode ទំហំដដែល ហើយ refresh ខ្ពស់ជាង',
     /boolean sameSize = mode\.getPhysicalWidth\(\) == current\.getPhysicalWidth\(\)\s*&& mode\.getPhysicalHeight\(\) == current\.getPhysicalHeight\(\);/.test(pickBody) &&
@@ -179,6 +195,13 @@ const colorsXml = fs.existsSync(path.join(ROOT, 'android/app/src/main/res/values
 const bgValue = bgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${bgName}"\\s*>\\s*([^<\\s]+)\\s*</color>`)) || [])[1]) || '').toLowerCase() : '';
 ok(`${launchTheme} ៖ windowSplashScreenBackground ស្មើ SplashScreen.backgroundColor (${capSplashBg || '?'})`,
     !!capSplashBg && bgValue === capSplashBg, bgRef + ' = ' + (bgValue || 'អវត្តមាន'));
+const bodyBg = ((read('src/styles/app.css').match(/--body-bg:\s*(#[0-9a-fA-F]{3,8})/) || [])[1] || '').toLowerCase();
+const bridgeItems = styleItems(stylesXml, bridgeTheme) || new Map();
+const windowBgRef = bridgeItems.get('android:windowBackground') || '';
+const windowBgName = (windowBgRef.match(/^@color\/(\w+)$/) || [])[1];
+const windowBgValue = windowBgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${windowBgName}"\\s*>\\s*([^<\\s]+)\\s*</color>`)) || [])[1]) || '').toLowerCase() : '';
+ok(`${bridgeTheme} ៖ android:windowBackground ស្មើ --body-bg របស់ App (${bodyBg || '?'}) ➜ ផ្ទៃក្រោម WebView ពេល keyboard កំពុងឡើង មិនមែនស/ខ្មៅ`,
+    !!bodyBg && windowBgValue === bodyBg, windowBgRef + ' = ' + (windowBgValue || 'អវត្តមាន'));
 const iconRef = launch.get('windowSplashScreenAnimatedIcon') || '';
 ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @drawable/splash_icon (vector · មិនមែន PNG/mipmap ដែលព្រិលពេលពង្រីក ឬ sym_def_app_icon លំនាំដើម)`,
     iconRef === '@drawable/splash_icon', iconRef || 'អវត្តមាន');

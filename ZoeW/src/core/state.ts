@@ -229,6 +229,7 @@ export interface UiState {
     perfSamplePending: boolean;
     displayHz: number;
     displayHzMeasured: boolean;
+    displayHzPeak: number;
     currentFilterMode: string;
     customFilterDate: string;
     editingItemId: any;
@@ -246,6 +247,7 @@ export interface UiState {
     panelGlideEpoch: number;
     panelGlideRelease: any;
     chromeHidden: boolean;
+    keyboardOpen: boolean;
     pdfExportOriginalTitle: any;
     monthlyReportMonth: string;
     lastRecallSignature: string;
@@ -322,6 +324,7 @@ export const uiState = createStore<UiState>('uiState', {
     perfSamplePending: false,
     displayHz: 60,
     displayHzMeasured: false,
+    displayHzPeak: 0,
     currentFilterMode: 'today',
     customFilterDate: '',
     editingItemId: null,
@@ -339,6 +342,7 @@ export const uiState = createStore<UiState>('uiState', {
     panelGlideEpoch: 0,
     panelGlideRelease: null,
     chromeHidden: false,
+    keyboardOpen: false,
     pdfExportOriginalTitle: null,
     monthlyReportMonth: '',
     lastRecallSignature: '',
@@ -413,7 +417,7 @@ export const uiState = createStore<UiState>('uiState', {
 registerStore(uiState);
 uiState.markImmediate(['modalDisplay', 'modalStack', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
-    'phoneSuggestOpen', 'chromeHidden']);
+    'phoneSuggestOpen', 'chromeHidden', 'keyboardOpen']);
 
 export interface PtrView {
     transform: string;

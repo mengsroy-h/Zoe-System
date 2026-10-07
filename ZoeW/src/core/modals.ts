@@ -38,6 +38,8 @@ export const MODAL_IDS = [
 
 export type ModalId = (typeof MODAL_IDS)[number];
 
+export const BACKDROP_KEEP_MODALS: readonly ModalId[] = ['configModal', 'lookupApiConfigModal', 'sheetImportModal'];
+
 export interface ModalMeta {
     close?: string;
     noDismiss?: boolean;

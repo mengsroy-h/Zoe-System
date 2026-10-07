@@ -410,11 +410,17 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && allowed(apk, 'github', false, 'workflow_dispatch')
         && allowed(apk, 'self-hosted', true, 'workflow_dispatch')
         && !allowed(apk, 'self-hosted', false, 'workflow_dispatch'));
-    check('fork មិនរត់ audit និង APK នៅ main តែប៉ុណ្ណោះ',
+    check('fork មិនរត់ audit · APK ស្វ័យប្រវត្តិ (push) នៅ main តែប៉ុណ្ណោះ · branch ផ្សេង ➜ តែ «Run workflow» ដោយដៃ (APK សាក)',
         !allowed(audit, 'self-hosted', true, 'pull_request', false)
         && !allowed(audit, 'github', false, 'pull_request', false)
         && allowed(audit, 'github', false, 'push')
-        && !allowed(apk, 'github', false, 'workflow_dispatch', true, 'refs/heads/feature'));
+        && allowed(apk, 'github', false, 'push')
+        && !allowed(apk, 'github', false, 'push', true, 'refs/heads/feature')
+        && !allowed(apk, 'github', false, 'pull_request', true, 'refs/heads/feature')
+        && allowed(apk, 'github', false, 'workflow_dispatch', true, 'refs/heads/feature')
+        && allowed(apk, 'self-hosted', true, 'workflow_dispatch', true, 'refs/heads/feature')
+        && !allowed(apk, 'self-hosted', false, 'workflow_dispatch', true, 'refs/heads/feature')
+        && /^  push:\n    branches: \[main\]$/m.test(apk) && !/^  pull_request/m.test(apk));
     check('APK ជ្រើស Windows pool ឬ GitHub និងប្រើ Gradle/apksigner របស់ Windows',
         same(labels(apk, 'self-hosted'), ['self-hosted', 'Windows', 'X64', 'windows-zoe-android'])
         && same(labels(apk, 'github'), ['windows-latest'])
@@ -450,6 +456,74 @@ scenario('runner ៖ Linux audit និង Windows APK មាន mode ទាំ�
         && privileged.every((step) => step.includes("if: vars.ZOE_RUNNER_MODE == 'github'"))
         && steps.some((step) => step.includes("if: vars.ZOE_RUNNER_MODE != 'github'")
             && step.includes('prepare-audit-cache.sh chromium') && !/\bsudo\b|--with-deps/.test(step)));
+});
+
+scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release តែមួយក្នុងមួយ commit · main ➜ Release ផ្លូវការ (script ពិតរបស់ workflow)', () => {
+    const apk = read('.github/workflows/android-release.yml');
+    const stepRun = (name) => {
+        const step = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ' + name)) || '';
+        const body = (step.match(/^        run: \|\n([\s\S]*)$/m) || [])[1] || '';
+        return body.split('\n').map((line) => line.replace(/^          /, '')).join('\n');
+    };
+    const meta = stepRun('កំណែ និងស្លាក Release');
+    const release = stepRun('បង្កើត GitHub Release');
+    check('ស្រង់ step «កំណែ» និង «បង្កើត GitHub Release» ពី workflow ពិតបាន',
+        meta.includes('GITHUB_OUTPUT') && release.includes('gh release create'), meta.slice(0, 80) + ' | ' + release.slice(0, 80));
+    const bash = cp.spawnSync('bash', ['--version'], { encoding: 'utf8' });
+    if (bash.status !== 0) { check('bash មានសម្រាប់រត់ script ពិត', false, String(bash.error || bash.stderr)); return; }
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'apk-test-mode-'));
+    try {
+        const bin = path.join(temp, 'bin');
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, 'cygpath'), '#!/bin/sh\nwhile [ "${1#-}" != "$1" ]; do shift; done\nprintf \'%s\\n\' "$1"\n', { mode: 0o755 });
+        fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nif [ "$1 $2" = "release view" ]; then exit 1; fi\nif [ "$1 $2" = "release create" ]; then shift 2; for a in "$@"; do printf \'%s\\n\' "$a"; done > "$GH_LOG"; exit 0; fi\nexit 3\n', { mode: 0o755 });
+        const run = (ref, refName) => {
+            const work = fs.mkdtempSync(path.join(temp, 'w-'));
+            fs.mkdirSync(path.join(work, 'ZoeW', 'src', 'core'), { recursive: true });
+            fs.writeFileSync(path.join(work, 'ZoeW', 'src', 'core', 'version.ts'), "export const APP_VERSION = '9.8.7';\n");
+            const out = path.join(work, 'out.txt');
+            fs.writeFileSync(out, '');
+            const env = { ...process.env, PATH: bin + path.delimiter + process.env.PATH, GITHUB_REF: ref, GITHUB_SHA: 'abcdef1234567890',
+                GITHUB_OUTPUT: out, REF_NAME: refName, GH_LOG: path.join(work, 'gh.log'), GH_TOKEN: 'x' };
+            const m = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', meta], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
+            const outputs = {};
+            fs.readFileSync(out, 'utf8').split('\n').filter(Boolean).forEach((line) => { const i = line.indexOf('='); outputs[line.slice(0, i)] = line.slice(i + 1); });
+            const filled = release.replace(/\$\{\{\s*steps\.meta\.outputs\.(\w+)\s*\}\}/g, (_, k) => outputs[k] || '')
+                .replace(/\$\{\{\s*github\.sha\s*\}\}/g, 'abcdef1234567890');
+            fs.writeFileSync(path.join(work, 'apk-cert.txt'), 'CERT\n');
+            if (outputs.file) {
+                fs.writeFileSync(path.join(work, outputs.file), 'apk');
+                fs.writeFileSync(path.join(work, outputs.file + '.sha256'), 'deadbeef  ' + outputs.file + '\n');
+            }
+            const r = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', filled], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
+            const args = fs.existsSync(env.GH_LOG) ? fs.readFileSync(env.GH_LOG, 'utf8').split('\n').filter(Boolean) : [];
+            const notes = fs.existsSync(path.join(work, 'notes.md')) ? fs.readFileSync(path.join(work, 'notes.md'), 'utf8') : '';
+            return { meta: m, rel: r, outputs, args, notes, pwned: fs.existsSync(path.join(work, 'pwned')) };
+        };
+        const test = run('refs/heads/feature', 'feature');
+        check('branch ផ្សេង ➜ test=true · ស្លាក/ឯកសារមាន «-test.<commit ៧ តួ>»',
+            test.meta.status === 0 && test.outputs.test === 'true' && test.outputs.tag === 'zoew-android-v9.8.7-test.abcdef1'
+            && test.outputs.file === 'ZoeW-9.8.7-test.abcdef1.apk' && test.outputs.exists === 'false',
+            JSON.stringify(test.outputs) + ' ' + test.meta.stderr);
+        check('branch ផ្សេង ➜ `gh release create` ជា --prerelease លើស្លាក test · កំណត់ចំណាំប្រាប់ «APK សាក» + branch',
+            test.rel.status === 0 && test.args[0] === 'zoew-android-v9.8.7-test.abcdef1' && test.args.includes('--prerelease')
+            && test.args.includes('ZoeW-9.8.7-test.abcdef1.apk') && /APK សាក/.test(test.notes) && test.notes.includes('`feature`')
+            && test.notes.includes('deadbeef'),
+            JSON.stringify(test.args) + ' ' + test.rel.stderr);
+        const main = run('refs/heads/main', 'main');
+        check('main ➜ Release ផ្លូវការ (គ្មាន --prerelease · ស្លាក/ឯកសារដូចដើម · គ្មានសារ «APK សាក»)',
+            main.meta.status === 0 && main.rel.status === 0 && main.outputs.test === 'false' && main.outputs.tag === 'zoew-android-v9.8.7'
+            && main.outputs.file === 'ZoeW-9.8.7.apk' && main.args[0] === 'zoew-android-v9.8.7' && !main.args.includes('--prerelease')
+            && !/APK សាក/.test(main.notes) && main.notes.includes('deadbeef'),
+            JSON.stringify(main.outputs) + ' ' + JSON.stringify(main.args) + ' ' + main.rel.stderr);
+        const evil = run('refs/heads/x', 'x$(touch pwned)`touch pwned`');
+        check('ឈ្មោះ branch ចូលតាម env (មិនរត់ជា shell)', evil.rel.status === 0 && !evil.pwned && evil.notes.includes('$(touch pwned)'),
+            evil.rel.stderr);
+        const webStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: Build web')) || '';
+        check('APK សាក និង Release ពី main build web ដូចគ្នា (android:sync · គ្មានការកំណត់ផ្សេងតាម test)',
+            webStep.includes('npm run android:sync --prefix ZoeW') && !/outputs\.test|VITE_[A-Z_]+:/.test(webStep), webStep);
+        check('ឈ្មោះ branch មិនដែលចូល script តាម `${{ github.ref_name }}` ផ្ទាល់', !/run: \|[\s\S]*?\$\{\{\s*github\.(ref_name|head_ref)/.test(apk.replace(/REF_NAME: \$\{\{ github\.ref_name \}\}/g, '')));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
 scenario('runner៖ workers ខាងក្នុងសមនឹង CPU quota ដោយរក្សា shards ទាំង៤', () => {

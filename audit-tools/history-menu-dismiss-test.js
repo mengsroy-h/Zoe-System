@@ -289,6 +289,53 @@ async function checkMenuAnimation(page) {
             }
 
             if (mobile) {
+                // ⛔ ចុច (…) ពេលបញ្ជីកំពុងរមូរ (របាយការណ៍ម្ចាស់គម្រោង ៖ PWA «ពេល list កំពុងរមូរ ចុច (…) អត់បាន») ៖ momentum ដែលបន្តពីការអូស
+                //    **មុន** បើកម៉ឺនុយ (គ្មាន input ថ្មី) ផ្ញើ `scroll` បន្ត ➜ ម៉ឺនុយ (…) ក្បាលប្រអប់ (ប៊ូតុងនៅក្រៅតារាង) ត្រូវនៅបើក ·
+                //    ម៉ឺនុយ ⋮ ជួរ (ប៊ូតុងរំកិលជាមួយតារាង) បិទ (ទីតាំងរបស់វាលែងត្រូវ) · ការរមូរដោយ input ថ្មី (wheel) បិទទាំងពីរ
+                const momentum = async () => page.evaluate(async () => {
+                    const table = document.getElementById('tableResponsive');
+                    const frame = () => new Promise((res) => requestAnimationFrame(() => res()));
+                    for (let i = 0; i < 6; i++) { table.scrollTop += 40; await frame(); }
+                    await frame();
+                    return document.getElementById('globalMoreMenu').classList.contains('show');
+                });
+                for (const [kind, selector, keep] of [['header', '.header-more-btn', true], ['row', '#historyTableBody .more-btn', false]]) {
+                    await page.evaluate(() => { closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                    await settle(page);
+                    await page.locator(selector).first().tap();
+                    check(await visible(), kind + ': ចុច (…) ➜ ម៉ឺនុយបើក (មុន momentum)');
+                    const stays = await momentum();
+                    check(stays === keep, kind + (keep ? ': momentum តារាងបន្តក្រោយបើក ➜ ម៉ឺនុយក្បាលប្រអប់នៅបើក' : ': momentum រំកិលប៊ូតុង ⋮ ➜ ម៉ឺនុយជួរបិទ'),
+                        'open=' + stays);
+                }
+                // ⛔ ចុចធាតុម៉ឺនុយខណៈ momentum នៅបន្ត ➜ pointerdown ក្នុងម៉ឺនុយមិនមែន «input ថ្មី» ➜ ម៉ឺនុយនៅ ហើយធាតុដំណើរការ
+                await page.evaluate(() => { closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                await settle(page);
+                await page.locator('.header-more-btn').first().tap();
+                await page.evaluate(() => {
+                    const table = document.getElementById('tableResponsive');
+                    const until = performance.now() + 900;
+                    const step = () => { if (performance.now() > until) return; table.scrollTop += 8; requestAnimationFrame(step); };
+                    requestAnimationFrame(step);
+                });
+                await page.waitForTimeout(120);
+                const item = await page.locator('#globalMoreMenu button', { hasText: '💱' }).first().boundingBox();
+                await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: item.x + item.width / 2, y: item.y + item.height / 2 }] });
+                await page.waitForTimeout(120);
+                await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+                await page.waitForTimeout(900);
+                const rateOpen = await page.evaluate(() => getComputedStyle(document.getElementById('exchangeRateModal')).display === 'flex');
+                check(rateOpen, 'header: ចុចធាតុម៉ឺនុយ (💱) ខណៈ momentum តារាងនៅបន្ត ➜ ធាតុដំណើរការ');
+                await page.evaluate(() => { closeModal('exchangeRateModal'); closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                await settle(page);
+                await page.locator('.header-more-btn').first().tap();
+                check(await visible(), 'header: បើកម្តងទៀតមុនរមូរដោយ input ថ្មី');
+                await page.evaluate(() => document.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 40 })));
+                await page.evaluate(() => { document.getElementById('tableResponsive').scrollTop += 120; });
+                await settle(page);
+                check(!await visible(), 'header: រមូរដោយ input ថ្មីក្រោយបើក ➜ ម៉ឺនុយបិទ');
+                await page.evaluate(() => { closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                await settle(page);
                 await page.locator('.header-more-btn').first().tap();
                 const moved = await page.evaluate(() => {
                     const target = document.getElementById('dataMainSection');

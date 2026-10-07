@@ -25,7 +25,11 @@ const REF_BINDINGS: Array<[RefName, Binding[]]> = [
     ['phoneSuggestBox', [field('phoneSuggestOpen', 'show')]],
     ['globalMoreMenu', [field('moreMenuOpen', 'show')]]
 ];
-const BODY_BINDINGS: Binding[] = [field('chromeHidden', 'chrome-hidden')];
+const BODY_BINDINGS: Binding[] = [{
+    cls: 'chrome-hidden',
+    get: () => !!(uiState.chromeHidden || uiState.keyboardOpen),
+    set: (on) => { uiState.chromeHidden = on; }
+}];
 
 const nativeClassList = Object.getOwnPropertyDescriptor(Element.prototype, 'classList')!.get!;
 const wrapped = new WeakSet<Element>();

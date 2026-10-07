@@ -46,7 +46,7 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 merge រួច (`main` = **ZoeW 2.50.3 · ZoeKeyGen 2.24.6**) · PR #295 = ZoeW 2.50.4 (ជុំ ៥ · ៧ · Locker ដកវិញ (ចុះភ្លាម) · ZTO បញ្ចូលស្របគ្នា ៤ ខ្សែ + `?diag=1` `upstreamTiming` — សំណើ «ធ្វើទាំងពីរ» · `LOCK` ថ្មី ២) **merge រួច** (`main` = ZoeW 2.50.4) · **Deep audit ២** (workflow អ្នករក ១១ ➜ verify ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ➜ PR ថ្មី branch `claude/wonderful-ride-ixmi63` ពី `main` = ZoeW 2.50.5 ([2.50.5] · ផ្នែក ២ «Deep audit ២») · **មិនទាន់ merge** · របាយការណ៍ workflow (`scratchpad/deep-audit-2/report.md`) នៅរត់ · ប្រវត្តិ ៖ PR #292 =
+1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.13** (keyboard រំកិលពីលើទំព័រ (APK Android 11+) · ផ្ទៃក្រោម WebView ពេល keyboard ឡើង = ពណ៌ App · របា Tab លាក់ពេល keyboard APK · ម៉ឺនុយ (…) ពេលរមូរ · modal ៣ មិនបិទពេលប៉ះផ្ទៃងងឹត · របា Tab ស្ងៀមពេលឈប់រមូរ · Android App និង PWA បង្ហាញជួរប្រវត្តិតាមទីតាំងរមូរ · ដក telemetry សាក · ស្គាល់អេក្រង់ Hz ខ្ពស់ · PR #296 Draft · មិនទាន់ merge · APK សាក ៖ Run workflow លើ branch ➜ Pre-release) · **Deep audit ២** (workflow អ្នករក ១១ ➜ verify ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ➜ PR #297 branch `claude/wonderful-ride-ixmi63` = **ZoeW 2.50.14** (លុយ ៖ RACES-1/MONEY-2 · MONEY-1 · MONEY-3 · រួមបញ្ចូល branch PR #296 ទាំងមូល ➜ merge PR #297 = merge ទាំងពីរ · [2.50.14] · ផ្នែក ២ «Deep audit ២») · របាយការណ៍ deep audit ៖ findings ៥៣ · បញ្ជាក់ ៤៩ · បដិសេធ ៤ · ប្រវត្តិ ៖ PR #292 =
    **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
    ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
@@ -87,7 +87,8 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.4 — PR #295 (មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
+- ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
+- ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.2 — PR #293 (merge ចូល `main` រួច)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ លុប env អត្ថបទ · Deploy ➜ បញ្ជី ZTO ទាញបាន ៩៦/៩៦ · សារ ⚠️ «66 ជួរ» បាត់ · 🔒 «មានក្នុង ZoeW តែ ZTO បិទរួច 6» ➜ នៅសល់ ៖ APK · សាកតារាងប្រវត្តិលើទូរស័ព្ទ ([2.50.2] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.1 — PR #292 (merge ចូល `main` រួច · ជុំ ZTO ស្អាត)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ Publish Firebase rules (`origins` · `zoew_settings/zto_signed_sweep`) ·
@@ -121,9 +122,9 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.5] — 2026-10-07 · ZoeW ៖ **កញ្ចប់ដែលឧបករណ៍ផ្សេងដក ឬលុបរួច មិនត្រឡប់ចូលប្រវត្តិវិញ ពេលស្កេន ឬបញ្ចូលបញ្ជី ZTO របស់អតិថិជនដដែល (ដកលុយពីរដង)** (Deep audit ២ · ជុំ ១)
+### [2.50.14] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ដែលឧបករណ៍ផ្សេងដក ឬលុបរួច មិនត្រឡប់ចូលប្រវត្តិវិញ ពេលស្កេន ឬបញ្ចូលបញ្ជី ZTO របស់អតិថិជនដដែល (ដកលុយពីរដង)** (Deep audit ២ · ជុំ ១)
 
-**ZoeW `2.50.5`** (`zoew-v267` ➜ `zoew-v268`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+**ZoeW `2.50.14`** (`zoew-v276` ➜ `zoew-v277`) · រួមបញ្ចូល branch `ccr-85f562ee-106o6w` (PR #296 · [2.50.5] ➜ [2.50.13] ខាងក្រោម) តាមសំណើម្ចាស់គម្រោង «ចាំ PR296 ចប់ ➜ ពិនិត្យ ➜ ទាញចូល branch ➜ កែអ្វីដែល agent រកឃើញ ដើម្បីកុំឲ្យ conflict»។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -185,6 +186,223 @@
   សរសេរ + ដក + flip · (៩) journal កំណែមុន ➜ ដកតែប៉ុណ្ណោះ · (១០) partial ៖ tree មុនកែ **FAIL ៨/១០** ➜ ១០/១០ · mutation ៥ ៖ ទង់មុនលុយ ➜ FAIL ៣ · គ្មានការបូកវិញ ➜ ១ · គ្មានទ្វារទិដ្ឋភាព ➜ ១ ·
   `moved` មិនស្គាល់ការស្តារ ➜ ២ · flip មិនអើពើ claim ➜ ៣ · `cleanup-applied-ownership.test.ts` រាប់តែ transaction claim slot (`prior === null`) + អះអាង `true` ចុងក្រោយ · checker ១២ ស្រង់ helper ថ្មី ៦ + `CLEANUP_STAGE_FLIP` (sandbox ស្រង់តាមឈ្មោះ ➜ ខ្វះ = ReferenceError) · `cleanup-interrupt-atomicity-test` ៖ fake `runTransaction` គំរូផ្លូវធុងសំរាម (មុន ៖ `cur = null` ➜ flip មើលឃើញ «បាត់») + ថេរ `DB_LISTENER_KEY_*` ➜ ៦១/៦១ (ចំណុចរំខានថ្មី ៖ ក្រោយ flip) · `emu/crud-rules-flow` ១២២ (STRICT) · `emu/restore-mutation` ១៨២ · `late-commit` ៦៧ · `partial-pickup-cleanup` ៥២ · `stall-lock-release` ៣០ · `db-stall-guard` ៣១ · `ledger-count-integrity` ១២ · `ledger-failed-apply-revert` ៥០ · `restore-marker-hygiene` ២៧ · `tx-outcome` ៩២ · `zto-sync-banner` ១៩៨ · `trash-modal` ៨៦ · `clock-hygiene` ២២ · `payload-schema` ✓ · `policy-test` ៖ tail ការសម្អាតអនុវត្តបន្ទាត់ flip ដែលស្រង់ពីកូដពិតក្រោយការដក (CI ក្នុង session ចាប់ ៖ `isDeducted` `[false,false]` · ស្តារមិនបូក)។
 - `concurrent-scan-test` ៖ ស្រង់ helper ថ្មី ២ · `tx-outcome-test` ស្រង់ `claimCleanupTrashSlot` · `repository-file-coverage.json` mapping ៣ · `money-core.js` បង្កើតឡើងវិញ។
+
+### [2.50.13] — 2026-10-08 · ZoeW ៖ keyboard រំកិលពីលើទំព័រ (APK Android 11+)
+
+**ZoeW `2.50.13`** (`zoew-v275` ➜ `zoew-v276`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- វីដេអូ + រូប (APK 2.50.12 · Xiaomi) ៖ ពណ៌ចន្លោះលែងស ប៉ុន្តែ **ចន្លោះទទេនៅតែមាន** ចន្លោះបាតកាតនិង keyboard ~០,៣ វិ. (ស៊ុម ៧២ ➜ ១០៣ ៖ WebView រួញទៅកម្ពស់ចុងក្រោយក្នុង ១ ស៊ុម · keyboard រំកិលពីជួរ ២១១ ទៅ ១៥២ (/២៤០) ក្នុង ~២៥ ស៊ុម)។ មូលហេតុ ៖ `SystemBars` (Capacitor) ដាក់ padding បាតរបស់ decor = កម្ពស់ IME **ចុងក្រោយ** ពេល listener insets ទទួល (ដើមចលនា)។
+- ឥឡូវ (Android 11+) ៖ `MainActivity.KeyboardOpenHold` (`WindowInsetsAnimation.Callback` platform លើ decor) ៖ `onPrepare` នៃចលនា IME ដែលកំពុងបើក ➜ កំណត់កម្ពស់ WebView = កម្ពស់បច្ចុប្បន្ន (px) · ដក `clipChildren` របស់ parent និង `clipToPadding` របស់ decor ➜ padding មិនរួញ WebView ➜ keyboard រំកិលពីលើទំព័រ (ដូច iPhone) · `onEnd` (ឬ `KEYBOARD_HOLD_MAX_MS` ១ វិ.) ➜ `MATCH_PARENT` + clip ដើម ➜ WebView រួញម្តងនៅចុងចលនា (ផ្នែកដែលបាត់នៅក្រោម keyboard រួចហើយ) ➜ JS `noteKeyboardViewport()` លាក់របាដូចមុន។ បិទ keyboard ៖ padding = 0 ដើមចលនា ➜ WebView ពង្រីកភ្លាម keyboard រំកិលចុះពីលើទំព័រ (មិនប្តូរ)។ ⛔ មិនប្រើ `ViewCompat.setWindowInsetsAnimationCallback` (Android < 11 compat ជំនួស `OnApplyWindowInsetsListener` របស់ Capacitor លើ decor ➜ safe area/IME ខូច) ➜ Android 7–10 ៖ មិនប្រែ (ចន្លោះពណ៌ផ្ទៃ App)។
+- compile ពិនិត្យ `MainActivity.java` ជាមួយ `android.jar` API 35 ពិត (stub តែ `BridgeActivity`/`Bridge`/annotation) ➜ គ្មាន error · ⚠️ ឥរិយាបថពិតវាស់បានតែលើទូរស័ព្ទ (គ្មាន emulator Android ក្នុងម៉ាស៊ីននេះ)។
+
+#### អ្នកយាម
+
+`android:check` (+៤ ៖ onCreate ចុះឈ្មោះ · តែ Android 11+ / platform API · `onPrepare` តែ IME កំពុងបើក + កម្ពស់ពិត + ដក clip + timeout · `onEnd`/timeout ត្រឡប់ `MATCH_PARENT` + clip ដើម) — ៩៩ ok។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.13-test.<commit>` ➜ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងគ្របបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះកាតនិង keyboard · បិទ keyboard ➜ បញ្ជីពេញវិញ · Config/PIN ៖ វាលវាយអក្សរនៅមើលឃើញពេល keyboard ឡើង · បង្វិលអេក្រង់ពេល keyboard បើក ➜ App មិនខូច។
+2. ដូច [2.50.11] (PWA ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.12] — 2026-10-08 · ZoeW ៖ ផ្ទៃក្រោម WebView ពេល keyboard ឡើង · ការរកឃើញពីការពិនិត្យ [2.50.11]
+
+**ZoeW `2.50.12`** (`zoew-v274` ➜ `zoew-v275`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **«ទុក space ស មួយភ្លែត» (វីដេអូម្ចាស់គម្រោង · APK 2.50.11)** ៖ របាលែងលោតហើយ តែពេល keyboard ចាប់ផ្តើមបើក ផ្ទៃខាងក្រោម WebView ពណ៌ `#fafafa` ឯកសណ្ឋាន ~៦ ស៊ុម (~៦០ms) រហូត keyboard (`#eff2f9`) រំកិលមកគ្រប។ វាស់ពណ៌ ៖ មិនមែន keyboard មិនមែន App — ជា **ផ្ទៃ window** ៖ `SystemBars` របស់ Capacitor ដាក់ padding បាតរបស់ decor view = កម្ពស់ IME ពេញភ្លាមពេលចលនាចាប់ផ្តើម ➜ ផ្ទៃ padding បង្ហាញ `windowBackground` របស់ theme `DayNight` (ភ្លឺ `#fafafa` · ងងឹត ខ្មៅ ដូចវីដេអូលើកទី ១)។ ឥឡូវ theme `AppTheme.NoActionBar` (theme របស់ `BridgeActivity`) ៖ `android:windowBackground` = `@color/splash_background` (`#f8fafc` = `--body-bg`) ➜ ផ្ទៃនោះមានពណ៌ផ្ទៃ App · `android:check` ផ្ទៀងតម្លៃពី `app.css`។ ការធ្វើឲ្យ WebView ប្តូរទំហំតាមចលនា keyboard (native `WindowInsetsAnimation`) ត្រូវជំនួស listener របស់ Capacitor ➜ មិនធ្វើ (ហានិភ័យខ្ពស់ គ្មានឧបករណ៍វាស់)។
+- **ពិនិត្យ adversarial [2.50.11] (agent ៣)** ៖ (១) keyboard ៖ កម្ពស់គោលកើនតែឡើង + `keyboardOpen ||` ➜ បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របា **ជាប់លាក់** (គ្មានផ្លូវទៅទំព័រស្កេន) · Back បិទ keyboard (focus នៅ) ➜ បំបែកអេក្រង់ ➜ ច្រឡំថា keyboard ➜ ឥឡូវ គោល = កម្ពស់ចុងក្រោយមុន keyboard (resize ផ្សេង re-base) · តម្រូវ `focusin`/`pointerdown` លើវាលវាយអក្សរក្នុង `KEYBOARD_INTENT_MS` (១,៥ វិ.) · បិទពេលត្រឡប់ជិតគោល ឬកើន ≥ inset ពីកម្ពស់ទាបបំផុត។ (២) ម៉ឺនុយ (…) ៖ pointerdown **ក្នុងម៉ឺនុយ** រាប់ជា input ថ្មី ➜ momentum បិទម៉ឺនុយកណ្តាលការចុច ➜ ធាតុមិនដំណើរការ (Chromium ៖ click ធ្លាក់លើជួរខាងក្រោម) ➜ ឥឡូវ input ក្នុងម៉ឺនុយ/លើប៊ូតុងមិនរាប់។ (៣) trackpad ៖ `wheel` inertia រាប់ជា input ថ្មី ➜ ឥឡូវរាប់តែ stream ដែលចាប់ផ្តើមក្រោយគម្លាត `MORE_MENU_WHEEL_GAP_MS` (១៥០ms)។ (៤) `state-hygiene` ៖ `keyboardOpen` មានហេតុផល (ស្ថានភាពឧបករណ៍)។ modal ៣ ៖ គ្មានការរកឃើញ។
+
+#### អ្នកយាម
+
+`tests/keyboard-tabbar.test.tsx` (+៣ ៖ បំបែកអេក្រង់ · ចូលបំបែកពេល keyboard បើក · Back រក្សា focus) · `tests/more-menu-scroll.test.ts` (+២ ៖ ចុចក្នុងម៉ឺនុយ · wheel inertia) · `history-menu-dismiss-test` ៖ ចុចធាតុ 💱 ខណៈ momentum នៅបន្ត ➜ ប្រអប់អត្រាប្រាក់បើក — លើ `layers.ts` [2.50.11] **ក្រហម** (៦៣/៦៤) · ក្រោយកែ ៦៤/៦៤ · `android:check` ៖ `windowBackground` = `--body-bg`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.12-test.<commit>` ➜ ប៉ះប្រអប់ស្វែងរកលេខ ➜ ផ្ទៃខាងក្រោមមុន keyboard ឡើងមកដល់ពណ៌ដូចផ្ទៃ App · ទូរស័ព្ទរបៀបងងឹត (Dark) ដូចគ្នា។
+2. ដូច [2.50.11] (PWA ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.11] — 2026-10-08 · ZoeW ៖ របា Tab ពេល keyboard (APK) · ម៉ឺនុយ (…) ពេលរមូរ · modal ៣ មិនបិទពេលប៉ះផ្ទៃងងឹត
+
+**ZoeW `2.50.11`** (`zoew-v273` ➜ `zoew-v274`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · `app.css` **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- **របា Tab ពេល keyboard (APK · វីដេអូ Xiaomi 14 Ultra)** ៖ វិភាគស៊ុមម្តងៗ (~៩០fps) ៖ ពេល keyboard ចាប់ផ្តើមបើក WebView រួញទៅកម្ពស់ចុងក្រោយក្នុង **១ ស៊ុម** (ផ្ទៃខ្មៅខាងក្រោម) ➜ របា (`position: fixed`) លោតឡើងភ្លាម (ប៊ូតុង «ទិន្នន័យ» ពីជួរ ~២២២០ ទៅ ~១៣៧០ px) ខណៈ keyboard ទើបរំកិលឡើងពីក្រោមក្នុង ~៦ ស៊ុម · ពេលបិទ WebView ពង្រីកវិញមុន ហើយ keyboard រលាយពីលើ។ មូលហេតុ ៖ Android/Capacitor ប្តូរទំហំ WebView តាម inset ចុងក្រោយរបស់ IME (មិនមែនតាមចលនា) — មិនមែនកំហុសរបស់ Xiaomi ទេ ហើយ web ធ្វើតាមចលនា keyboard មិនបាន។ ឥឡូវ ៖ `resize` ដែលកម្ពស់ថយ ≥ `KEYBOARD_MIN_INSET_PX` (១២០) ពេលវាលវាយអក្សរមាន focus ➜ `uiState.keyboardOpen` ➜ body `keyboard-open` + `chrome-hidden` **ក្នុង handler ដដែល** (មុនស៊ុមថ្មីត្រូវគូរ) ➜ របាលាក់ (គ្មាន transition) · resize ត្រឡប់ ➜ របារអិលឡើងវិញ · ស្ថានភាពលាក់តាមការរមូរមិនប៉ះ · PWA/iOS មិនប្រែ (keyboard គ្របពីលើ)។ `audit-compat` ៖ class `chrome-hidden` = `chromeHidden || keyboardOpen` (មុននេះ audit build បកប្រែ class ដែល keyboard ដាក់ទៅជា `chromeHidden = true` ➜ វាស់ឃើញរបានៅលាក់ក្រោយ keyboard បិទ — តែ audit build)។
+- **ម៉ឺនុយ (…) ពេលរមូរ (PWA `main`)** ៖ listener `scroll` (capture) បិទម៉ឺនុយលើ `scroll` **ណាមួយ** ➜ momentum ដែលបន្តពីការអូសមុនចុច (…) បិទម៉ឺនុយភ្លាមក្រោយវាបើក។ ឥឡូវ `moreMenuScrollDismisses()` ៖ បិទតែពេលការរមូររំកិលប៊ូតុង (ធាតុដែលរមូរផ្ទុកប៊ូតុង · ប៊ូតុងបាត់ពី DOM) ឬមាន input (pointerdown · wheel · keydown) ក្រោយបើក · `closeGlobalMoreMenu()` លែងចងប៊ូតុង។ APK 2.50.10 ម្ចាស់គម្រោងសាក «អត់អីផង» ➜ ការសាកល្បង «ចុចជំនួសពេល browser បំបាត់ click» ត្រូវដកចេញ (មិនចាំបាច់)។
+- **Modal ៣ (សំណើម្ចាស់គម្រោង ៖ «កុំអោយប៉ះកន្លែងទំនេរទៅវាបិទ»)** ៖ ⚙️ ភ្ជាប់ប្រព័ន្ធ · 🔌 API ស្វែងរកអតិថិជន · 📥 នាំចូល Excel ទៅ Sheet មិនបិទពេលប៉ះផ្ទៃងងឹត (`BACKDROP_KEEP_MODALS` ក្នុង `core/modals.ts` · `modalBackdropTarget()`) · ប៊ូតុងបិទ · Back (APK) · Escape នៅបិទ · modal ផ្សេងនៅបិទពេលប៉ះផ្ទៃងងឹតដដែល · DOM មិនប្រែ (parity)។
+
+#### អ្នកយាម
+
+`tests/keyboard-tabbar.test.tsx` (៥ ៖ class ក្នុង resize ដដែល · blur មុន resize · រួញតិច · គ្មាន focus · បង្វិល · ស្ថានភាពរមូរនៅដដែល · web) — មុនកែ **ក្រហម ៤/៥** · `history-window-check.mjs` ៖ ក្លែង keyboard ក្នុង browser ពិត (APK ៖ class + `visibility: hidden` + `transition: none` ក្នុង `resize` ដដែល · PWA Android/iPhone ៖ មិនប្រែ) · `tests/modal-backdrop-keep.test.tsx` (៥) — មុនកែ **ក្រហម ៣/៥** · `history-menu-dismiss-test` ៖ momentum ក្រោយបើក (header នៅបើក · ជួរ ⋮ បិទ · input ថ្មីបិទ) — មុនកែ **ក្រហម ១** (៦២/៦៣) · `tests/more-menu-scroll.test.ts` (៣ ៖ រួមប៊ូតុងបាត់ពី DOM · លែងចងក្រោយបិទ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.11-test.<commit>` ➜ ប៉ះប្រអប់ «ស្វែងរកលេខទូរស័ព្ទ» ➜ keyboard បើក ➜ របា Tab មិនលោតឡើងលើ keyboard · បិទ keyboard ➜ របាលេចវិញ · ប្រអប់ Config/API/Excel ៖ ប៉ះផ្ទៃងងឹតមិនបិទ · Back បិទ។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge) ➜ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.10] — 2026-10-07 · ZoeW ៖ របា Tab ស្ងៀមពេលឈប់រមូរ (វីដេអូ APK «ញ៉ាក់» · «របា tap glitch»)
+
+**ZoeW `2.50.10`** (`zoew-v272` ➜ `zoew-v273`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ · CSS **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- វីដេអូ ២ (Xiaomi · APK) វិភាគស៊ុមម្តងៗ (~៩០fps) ៖ ក្រោយលើកម្រាមដៃ បញ្ជីរំកិល **០px** តែរបា Tab លោតរវាងលេច/លាក់រៀងរាល់ ១–២ ស៊ុមរាប់វិនាទី (ទីតាំង 2216 ↔ 2396px) · បាតកាតលោតតាម (clip/padding) · scroll thumb លេច ➜ App ទទួល `scroll` ដោយគ្មានការរមូររបស់អ្នកប្រើ ហើយ `processScroll()` យល់ថាជាការរមូរ ➜ រង្វង់។ ប្រភព `scroll` ដោយកម្មវិធី ៖ ការកែទីតាំងរបស់បញ្ជីបង្ហាញតាមទីតាំងរមូរ (`applyScrollAdjustment` · `_retryClampedAdjustment` ពេល scroll range ប្តូរ) · padding បញ្ជីប្តូរ 62 ↔ 0px តាមរបា (`app.css` · ផ្លូវ Android) · clamp។ Chromium ក្លែងមិនបង្កើតរង្វង់ឡើងវិញ (WebView ពិតតែប៉ុណ្ណោះ)។
+- ឥឡូវ របាប្តូរតែពេលអ្នកប្រើរមូរ ៖ រាប់ scroll តែពេលប៉ះ/អូស ឬក្រោយ touch/wheel/key/pointer ≤ `CHROME_SCROLL_INTENT_MS` (១,២ វិ. · momentum) · ក្រោយ input ចុងក្រោយ ប្តូរបាន **១ ដង** · មិនរាប់ `CHROME_FLIP_SETTLE_MS` (២៥០ms) ក្រោយរបាប្តូរ · រមូរដល់កំពូលនៅបង្ហាញរបា ➜ រង្វង់ណាមួយ (ប្រភពណាក៏ដោយ) ឈប់។
+- `measureDisplayHz()` ដកចេញ (គ្មានអ្នកហៅក្រោយ [2.50.9] · `function-surface-test` ក្រហម) ➜ `sampleFramePace()` វាស់ Hz · `gesture-test` · `intentional-removals.mjs` · ថេរ `DISPLAY_HZ_SAMPLES` (២៤ ដូច ZoeW ដើម · `npm run parity`) ឥឡូវជាចំនួនស៊ុមរបស់ `sampleScrollHz()` (ជំនួស `SCROLL_HZ_SAMPLES` ២០)។
+
+#### អ្នកយាម
+
+`ZoeW/tests/chrome-autohide-intent.test.tsx` (៦) ៖ អូសចុះ/ឡើងនៅលាក់/លេច · scroll ដោយកម្មវិធីគ្មាន input ➜ មិនលាក់ · ក្លែងរង្វង់ឧបករណ៍ (ប្លង់ឆ្លើយតបការប្តូររបាដោយ scroll បញ្ច្រាស) ➜ ≤ ១ · momentum ១ ដង · ម្រាមដៃសង្កត់ស្ងៀម · ដល់កំពូល ➜ លេច — មុនកែ **ក្រហម ៤/៦**។ `gesture-test` ៖ helper រមូរដោយ `wheel` (input ពិត) និងរង់ចាំ settle ពិត (subscribe `uiState`) · ការអះអាងថ្មី «scroll ដោយកម្មវិធី ➜ មិនលាក់» — មុនកែ **ក្រហម ២** · ក្រោយកែ ១៣០/១៣០។ `modal-chrome-state.test.tsx` រមូរជាអ្នកប្រើ (`touchmove` + settle)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.10-test.<commit>` ➜ «ទាំងអស់» ➜ បង្រួមផ្ទាំង ➜ រមូរឡើង/ចុះ រួចលើកម្រាមដៃ ➜ របា Tab និងបាតកាតស្ងៀម · រមូរចុះ ➜ លាក់ · រមូរឡើង ➜ លេច។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.9] — 2026-10-07 · ZoeW ៖ ចង្វាក់ស៊ុមសម្រប ១០–១២០Hz ស្គាល់អេក្រង់ Hz ខ្ពស់ · អេក្រង់ LTPO មិនត្រូវចាត់ទុកថាយឺត (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.9`** (`zoew-v271` ➜ `zoew-v272`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់គម្រោង ៖ «ពិនិត្យមើល adaptive refresh rate 10-120hz មើលដំណើរការទេ និងអោយវា វៃឆ្លាតស្គាល់ device ណាដែល refresh rate ខ្ពស់»។ ពិនិត្យដោយ rAF ក្លែងលើ `setupAdaptivePerformance()` ពិត ៖ អេក្រង់ ១២០ ថេរ · ៦០ ថេរ ✅ · **LTPO ៖ វាស់ Hz ពេល ១២០ (ក្រោយប៉ះ) ហើយវាស់ស៊ុមកកក្នុងបង្អួចបន្ទាប់ពេលអេក្រង់ចុះ ៦០ ➜ ស៊ុម ៦០Hz ធម្មតារាប់ជា «កក» ➜ `perf-lite` ខុស** (ដកស្រមោលកាត · បន្ទាត់ស្កេន) · **ឧបករណ៍យឺតពិត (៤៥% ស៊ុម ៥០ms) ➜ «អេក្រង់ 20Hz» ➜ មិនដែល `perf-lite`**។
+- ឥឡូវ ៖ ជុំនីមួយៗវាស់ Hz និងស៊ុមកកក្នុងបង្អួចតែមួយ (`sampleFramePace()` ៖ ថវិកា = median របស់បង្អួចនោះ) · `sampleScrollHz()` វាស់ Hz ពេលអ្នកប្រើរមូរពិត (≤ ១ ដងក្នុង ៥ វិ. · ២០ ស៊ុម) ហើយរក្សា **អតិបរមា** ក្នុង `uiState.displayHzPeak` + `zoew_display_hz_peak_v1` (ស្គាល់តាំងពីបើក App លើកក្រោយ) · ឧបករណ៍ដែលរមូរបាន ≥ `HIGH_REFRESH_HZ` (៩០) ➜ មិន `perf-lite` ហើយ `perf-lite` ដែលដាក់រួចត្រូវដក។
+- APK ៖ `MainActivity` នៅស្នើ mode Hz ខ្ពស់បំផុតដដែល (Android ស្គាល់អេក្រង់ ១២០Hz ពីខាង native) · ទំព័រវែបមិនអាចដំឡើង Hz អេក្រង់បាន ➜ App **វាស់** ហើយសម្របតាមវា។
+
+#### អ្នកយាម
+
+`ZoeW/tests/adaptive-refresh.test.ts` (៨) ៖ ១២០/៦០ ថេរ · LTPO ១២០ ➜ ៦០ ➜ មិន `perf-lite` · ឧបករណ៍យឺត ២ ជុំ ➜ `perf-lite` + Hz ៦០ · រវល់តែពេល boot ➜ មិន · រមូរ ➜ peak ១២០ ចងចាំ · ម្តងក្នុង ៥ វិ. · មិនធ្លាក់ · peak ចងចាំ ≥ ៩០ ➜ មិន `perf-lite` + ដកវា · តម្លៃខូច/storage បោះ · rAF បោះ។ លើ `perf.ts` មុនកែ ➜ **ក្រហម ៥/៨**។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.9-test.<commit>` ➜ ដំឡើង។ ទូរស័ព្ទ ៩០/១២០Hz (Xiaomi) ៖ រមូរតារាងបន្តិច ➜ បិទ/បើក App ➜ ស្រមោលកាត និងបន្ទាត់ស្កេនមានចលនាដដែល (មិនចូលទម្រង់ស្រាល)។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge)។ គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
+### [2.50.8] — 2026-10-07 · ZoeW ៖ តារាងប្រវត្តិរលូនលើ Android ទាំង App និង PWA · ប្តូរតម្រងត្រឡប់កំពូល · ដក telemetry សាក (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.8`** (`zoew-v270` ➜ `zoew-v271`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់គម្រោង ៖ APK 2.50.7 «ដើរស្រួលហើយ» ➜ «ដក telemetry sentry ចេញផង» ➜ ដក `src/ui/overlay-telemetry.ts` · ការហៅក្នុង `boot.ts` · `VITE_PERF_TELEMETRY` ក្នុង workflow APK · តេស្ត និងការអះអាងពាក់ព័ន្ធ ➜ APK សាក build web ដូច Release ផ្លូវការ។ ការរាយការណ៍កំហុស Sentry ធម្មតានៅដដែល។
+- ម្ចាស់គម្រោង ៖ «optimize អោយ រត់បាន smooth គ្រប់ device ទាំងអស់អោយឆ្លាតវៃ» ➜ `historyRowsWindowed()` (អ្នកសម្រេចតែមួយ · `isAndroidDevice()` ៖ App Android ឬ `userAgentData.platform`/UA Android) ➜ **Android ទាំង App និង PWA/Chrome** បង្ហាញតែជួរជុំវិញទីតាំងរមូរ (ម៉ាស៊ីន Chromium ដូច APK ដែលម្ចាស់គម្រោងសាកថារលូន)។ iPhone និងកុំព្យូទ័របន្ថែមជួរដូចដើម ៖ iPhone មិនទាន់មានរបាយការណ៍អាក់ ហើយការរមូរ iOS ត្រូវសាកលើឧបករណ៍ពិត (តំបន់ហាមចូល) · កុំព្យូទ័រត្រូវការ Ctrl+F រកក្នុងតារាងទាំងមូល។
+- ប្តូរតម្រង ឬស្វែងរក ➜ តារាងត្រឡប់ទៅកំពូលលើគ្រប់ឧបករណ៍។ ពីមុនលើ PWA ទីតាំងរមូរនៅជ្រៅ ➜ ទំព័រ ៥០ ជួរខ្លី ➜ សញ្ញាផ្ទុកបន្តលេចភ្លាម ➜ ផ្ទុកបន្ត ១៥០–២០០ ជួរ ហើយអ្នកប្រើនៅកណ្តាលបញ្ជី (ផ្ទុយពី README «ត្រឡប់ទៅ ៥០ ជួរដំបូង»)។
+- `getItemKey` ៖ deps ច្បាស់ (`keySource`) ➜ lint គ្មាន warning exhaustive-deps (warning «incompatible-library» របស់ `useVirtualizer` ជាព័ត៌មាន · build មិនប្រើ React Compiler)។
+
+#### អ្នកយាម
+
+`history-window-check.mjs` (ក្នុង `npm run native:check`) ៖ ៣ ផ្លូវ (APK · PWA Android · PWA iPhone តាម UA ➜ `userAgentData.platform` ពិតរបស់ Chromium) · លោតទៅ ៣០/៦០/៩០% ➜ ជួរគ្របពេញផ្ទៃមើលឃើញ · ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ៥០ ជួរនៅកំពូល · រមូរដល់ចុងដូចអ្នកប្រើ (រង់ចាំ React គូរទំព័រចុងក្រោយ)។ build មុនកែ `84665b2` ➜ ក្រហម ៣ ចំ (PWA Android DOM ៦០០ ជួរ · ប្តូរតម្រង Android/iPhone ផ្ទុក ២០០/១៥០ ជួរ ហើយមិននៅកំពូល) · tree ថ្មី ➜ ០។ `repository-contract-test` ៖ APK សាក និង Release build web ដូចគ្នា (គ្មាន flag តាម test)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.8-test.<commit>` ➜ ដំឡើង ➜ សាកដូច [2.50.6] សកម្មភាព ២ (គួររលូនដូច 2.50.7)។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge) ➜ **Android (Chrome)** ៖ «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ➜ រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល · PTR និងចលនាផ្ទាំងដូចដើម។
+3. Sentry issue `JAVASCRIPT-REACT-9` («Perf overlay …») លែងមាន event ថ្មី ➜ Resolve បាន។
+
+### [2.50.7] — 2026-10-07 · ZoeW ៖ កែ class ជួរចន្លោះប្រវត្តិដែលធ្វើឲ្យ audit CI ធ្លាក់
+
+**ZoeW `2.50.7`** (`zoew-v269` ➜ `zoew-v270`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ដក `history-virtual-spacer` ពីជួរចន្លោះរបស់តារាង។ Class នេះគ្មាន CSS rule និងគ្មានអ្នកប្រើ; កម្ពស់ ចន្លោះខាងក្នុង និង border សម្រេចដោយ React inline style រួចហើយ។ `css-classes` អាចផ្ទៀងផ្ទាត់តារាងដែលបង្ហាញជួរតាមទីតាំងរមូរបាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Build APK ពី `ccr-85f562ee-106o6w` កំណែនេះ ហើយសាកតាម [2.50.6] សកម្មភាពដោយដៃ។ PR រក្សាជា draft រហូតសាកទូរស័ព្ទពិត និងដក telemetry សាករួច។
+2. បើ Gradle ទាញ dependency បាន `403 Forbidden` ដូច run `37623632463` ➜ ពិនិត្យការចូល Maven Central ពី runner។ កំហុសនេះកើតមុន compile Android និងជាបញ្ហាដាច់ដោយឡែកពី class ខាងលើ។
+
+### [2.50.6] — 2026-10-07 · ZoeW ៖ តារាងប្រវត្តិ APK បង្ហាញជួរតាមទីតាំងរមូរ (សំណើម្ចាស់គម្រោង · រង់ចាំសាកទូរស័ព្ទពិត)
+
+**ZoeW `2.50.6`** (`zoew-v268` ➜ `zoew-v269`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- តម្រង «ទាំងអស់» នៅផ្ទុក ៥០ជួរម្តងៗ និងរាប់ទិន្នន័យទាំងអស់។ លើ APK ជួរដែល React បង្កើតមានតែជុំវិញទីតាំងរមូរ និងជួរបម្រុង ដោយវាស់កម្ពស់ពិត។ ជួរដែលបានផ្ទុកនៅអាចរមូរឡើង/ចុះមើលបានគ្រប់ជួរ។ PWA Android/iOS នៅបន្ថែមជួរតាមរបៀបដើម។
+- រក្សាលេខជួរ ប៊ូតុងរបស់កញ្ចប់ និង React memo តាម ID; sync តម្រងដដែលរក្សាចំនួនដែលផ្ទុករួច; តម្រងថ្មីលើ APK ត្រឡប់ទៅកំពូល។ `@tanstack/react-virtual` វាស់កម្ពស់ ហើយ React គូរជួរ/ចន្លោះ; ការកំណត់ទីតាំងរមូរចេញតាម `app/refs.ts`។
+- កែ manifest គ្របដណ្តប់ឯកសារ `overlay-telemetry.ts` ដែលខ្វះលើ PR head ហើយបញ្ចូល guard ថ្មី និង attribution npm ក្នុង `NOTICE`។
+
+#### អ្នកយាម
+
+`history-window-check.mjs` រត់ក្នុង `npm run native:check` (Chromium · bridge ក្លែង): ៦០០ជួរ · កម្ពស់ខុសគ្នា · រមូរជិតចុងផ្ទុកទាំងអស់ · ចុចកញ្ចប់ចាស់បំផុត · ធុងសំរាម/ZTO · sync នៅចុងបញ្ជី · កែទិន្នន័យក្នុងជួរដដែល · តម្រងថ្មី · PWA។ លើកូដមុនកែ ការកំណត់ DOM APK ធ្លាក់ (៦០០ជួរ); កំណែថ្មីត្រូវឆ្លង។ លេខពេលវេលាវាស់ក្នុងផ្នែក ២ ជាការវាស់ Chromium មិនមែន WebView ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Android APK ➜ Run workflow លើ `ccr-85f562ee-106o6w` ➜ ដំឡើង Pre-release ដែល version/commit ត្រូវនឹងកំណែនេះ។
+2. Xiaomi ១២០Hz៖ «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ច្រើនដង · រមូរឡើង/ចុះ · សាកជួរដែលមានកម្ពស់ខុសគ្នា និងប៊ូតុងកញ្ចប់ចាស់ · sync · ប្តូរតម្រង/ស្វែងរក។ សាក PWA Android/iOS ផង។
+3. ម្ចាស់គម្រោងបញ្ជាក់ថារលូន និង Sentry ពី APK ថ្មីត្រូវបានពិនិត្យ ➜ ដក telemetry សាកថ្មី (`overlay-telemetry.ts` និងការចងរបស់វា · flag ក្នុង workflow · tests/docs ពាក់ព័ន្ធ) រួចតេស្តឡើងវិញមុន merge។ ការរាយការណ៍កំហុស Sentry ធម្មតាត្រូវរក្សា។
+
+### [2.50.5] — 2026-10-07 · ZoeW ៖ **បើកធុងសំរាម · បញ្ជី ZTO · ប្រអប់ផ្សេងៗ និងម៉ឺនុយ ☰ / 🔔 រលូន ទោះរមូរដល់ចុងតារាង «ទាំងអស់» (កញ្ចប់ច្រើន)** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.5`** (`zoew-v267` ➜ `zoew-v268`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ «APK ពេលឈរលើតម្រងថ្ងៃ «ទាំងអស់» … បើអត់ scroll បើក modal ធុងសំរាម smooth តែពេល scroll ដល់អស់ កញ្ចប់ច្រើន
+  ពេលចុចបើក modal ធុងសំរាមនៅតែរៀងអាក់អាក់ និង modal បញ្ជី ZTO» · «តែបើលែង auto hide មែន មិនបាច់ធ្វើទេ» · «កែម៉ឺនុយ ☰ ដែរ»។
+- 🔎 **មូលហេតុ (វាស់ ៖ Chromium · ៦០០ ជួរ · CPU ថយ ៤ ដង)** ៖ រមូរចុះ ➜ របា Tab លាក់ · ចុចបើក modal ➜ `openModalHelper()` ហៅ
+  `showAppChrome()` ➜ ផ្លូវ Android ប្តូរ `clip-path` របស់កាតប្រវត្តិ និង `padding-bottom` របស់បញ្ជី ➜ គូរជួរទាំងអស់ឡើងវិញ
+  ក្នុងស៊ុមដែល modal លេច ៖ ធុងសំរាម PrePaint+Paint **២១៦ms** (ធៀប ~៤០ms ពេលរបាបង្ហាញស្រាប់) · ស៊ុមបើក **៣៣១ms** ·
+  បញ្ជី ZTO ស៊ុមបើក **១៩៥ms**។ ថ្លៃកើនតាមចំនួនជួរ (៥០ ជួរ ➜ តិច) ➜ «មិនរមូរ ➜ រលូន · រមូរដល់ចុង ➜ អាក់»។
+- ✅ **ការកែ** ៖ modal គ្របរបា Tab (z-index ១០០០ > ៩០០) ➜ ការបើក modal **មិនប្តូររបា** · ការរមូរក្នុង modal មិនបញ្ជារបា
+  (`setupChromeAutoHide()` រំលងធាតុក្នុង `.modal`)។ របានៅលាក់ពីក្រោយ modal ហើយនៅដដែលក្រោយបិទ ➜ រមូរឡើងបន្តិច ឬដល់កំពូល ➜ លេចវិញ។
+  ⛔ **ការលាក់របាតាមទិសរមូរនៅដដែលទាំងស្រុង** (ចុះ ➜ លាក់ · ឡើង ➜ លេច · ពិដាន ៣៦/៤៨px · ប្តូរទំព័រ/បើកម៉ឺនុយ ➜ លេច)។
+  ផ្លូវចេញនៅរស់ ៖ បញ្ជីត្រឡប់ដល់កំពូល (ទិន្នន័យរួញ) ខណៈ modal បើក ➜ របាលេច។
+- ☰ **ម៉ឺនុយ និងផ្ទាំង 🔔 (សំណើបន្ថែម)** ៖ backdrop របស់វាគ្របរបាដែរ (z-index ១២០០) ➜ `openSideDrawer()` មិនបង្ហាញរបា · ការរមូរក្នុង
+  `.side-drawer` (☰ · 🔔) មិនបញ្ជារបា (មុនកែ ការរមូរណាមួយខណៈម៉ឺនុយបើក ➜ បង្ហាញរបា)។ ការប្តូរទំព័រ (Tab) នៅបង្ហាញរបាដូចដើម។
+- 📏 **ក្រោយកែ** (ការវាស់ដដែល · median ៧ ដង) ៖ ធុងសំរាម ស៊ុមបើក **៣៣១ ➜ ១៩៨ms** (PrePaint ១១៦ ➜ ១៦ · Paint ១០០ ➜ ៥៨) · បញ្ជី ZTO
+  **១៩៥ ➜ ៤១ms** · ការបើកពេលរបាលាក់ = ការបើកពេលរបាបង្ហាញ (ធុងសំរាម ២១៥ ធៀប ២៤៣ · ZTO ៥១ ធៀប ៥១)។ ថ្លៃដែលនៅសល់ (~១២០ms layout ក្រោម CPU ÷៤)
+  ជាតារាងធុងសំរាមខ្លួនឯង (២០ ជួរ) — មិនអាស្រ័យប្រវត្តិ ហើយស្មើពេលមិនរមូរដែលម្ចាស់គម្រោងថា «smooth»។
+- 🔁 **ជុំ ២ (របាយការណ៍ម្ចាស់គម្រោង ៖ វីដេអូ APK 2.50.5 «នៅអាក់ដដែល» · «តែ APK · PWA រលូន» · «តម្រង ទាំងអស់ មិនទាន់រមូរ ➜ រលូន · រមូរចុះអស់ ➜ អាក់»)** ៖
+  ការវិភាគវីដេអូស៊ុមម្តងៗ (~៩០fps) ៖ ចលនាប្រអប់/ម៉ឺនុយដើរ ៣–៧ ស៊ុម ➜ កក ៣៣–៦៦ms ➜ លោតទៅចុង · បន្ទាត់ «ស៊ុមកក» ១៤ ដង · យូរបំផុត ១០២ms។
+  មូលហេតុដែលមានតែក្នុង APK ៖ ពេលស្រទាប់ក្រោមរបាស្ថានភាពប្រែ (ប្រអប់ · ម៉ឺនុយ ☰/🔔 បើក-បិទ) `setupNativeShell()` វាស់ពណ៌ក្រោមរបាស្ថានភាព
+  (`measureStatusBarTone()` ៖ `elementsFromPoint` ×៥ + `getComputedStyle`) **ក្នុង rAF** ➜ layout របស់ប្រអប់ដែលទើបបើកមិនទាន់គណនា ➜ បង្ខំ
+  layout ពេញទំព័រកណ្តាលចលនា (ថ្លៃកើនតាមជួរ)។ ឥឡូវវាស់ **ក្រោយ** ស៊ុមគូររួច (rAF ➜ task · layout ស្អាត ➜ ~០.៥ms) · ការវាស់ ៣២០ms ដដែល ·
+  ពណ៌រូបតំណាងរបាស្ថានភាពដូចដើម។
+- 🔍 **ឧបករណ៍វាស់បណ្តោះអាសន្ន (ដកចេញវិញ)** ៖ APK សាក `fd46b45` មានបន្ទាត់ 🔍 ក្នុងជើងម៉ឺនុយ ☰ (ចន្លោះស៊ុម · long-animation-frame
+  JS/rAF/layout) ➜ ម្ចាស់គម្រោង ៖ «មិនរលូនទេ · ដក rAF ចេញ រញ៉េរញ៉ៃណាស់» ➜ ដកចេញទាំងស្រុង (កូដ · តេស្ត)។ ការវាស់ពណ៌របាស្ថានភាពក្រោយស៊ុមនៅដដែល
+  (ថ្លៃដែលវាស់បាន មានតែ APK) តែ **មិនទាន់ធ្វើឲ្យរលូនលើទូរស័ព្ទម្ចាស់គម្រោង** ➜ មូលហេតុនៅសល់មិនទាន់ដឹង (Chromium មិនបង្កើតឡើងវិញ)។
+- 🧹 **ជើងម៉ឺនុយ ☰ ស្អាត (សំណើម្ចាស់គម្រោង ៖ «ដកការបង្ហាញ ស៊ុមកក ចាស់ និង framerate ចេញផង»)** ៖ ដកបន្ទាត់
+  «ស៊ុម App NNfps · ពេលរមូរ NNfps · WebView» និង «ស៊ុមកក 5 នាទីចុងក្រោយ» ចេញទាំងស្រុង ៖ កូដ (`measureDisplayRateForDrawer` ·
+  `noteScrollFrameRate` · `startJankMonitor` · `refreshJankText` · `viewState.displayRateText`/`jankText`) · តេស្ត (`tests/native/display-rate` ·
+  `tests/native/jank-meter`) · smoke (ការវាស់បន្ទាត់ទាំង ២) · `INTENTIONAL_UI` (`#displayRateLine` · `#jankLine`) · allowlist (`clock-hygiene` ·
+  `state-hygiene`) · ឯកសារ (`ANDROID.md` · `PARITY.md` · `DEVELOPMENT.md` · `guide.html`)។ ជើងម៉ឺនុយនៅតែលេខកំណែ និងរក្សាសិទ្ធិ។
+  ⛔ `measureDisplayHz()` · perf-lite (`setupAdaptivePerformance()`) មិនប៉ះ។
+- 📡 **ការវាស់ស៊ុមលើទូរស័ព្ទ ➜ Sentry (សំណើម្ចាស់គម្រោង ៖ «ផ្ញើទៅ Sentry ទៅ»)** ៖ `src/ui/overlay-telemetry.ts` ៖ រាល់ការបើក/បិទប្រអប់ ·
+  ម៉ឺនុយ ☰/🔔 · (...) ➜ ចន្លោះ rAF យូរបំផុតក្នុង ៧០០ms + long-animation-frame (JS · rAF · layout/គូរ · script ធំបំផុត) + ស្ថានភាពតារាង (ជួរ ·
+  តម្រង · របា Tab · ផ្ទាំងហូត) ➜ `ZoeErrors.capture('Perf overlay <open|close> <ស្រទាប់>', { zone: 'perf' })` ⛔ មិនបង្ហាញលើអេក្រង់ · គ្មានទិន្នន័យ
+  អតិថិជន · តែ App Android · **តែ APK សាក** (`VITE_PERF_TELEMETRY=1` ពី workflow ពេល `test=true`) ➜ Release ពី `main` = `0` (មុខងារបិទក្នុង bundle)។
+- ⚖️ **ជម្រើសដែលមិនធ្វើ** ៖ ការស្នើពី session មុន (A padding ថេរ · B «បបូរមាត់» ជាប់របា · C ធុងសំរាម ១០ ជួរ) **រក្សាការលាក់របា**
+  ដែរ តែប្តូររូបរាងកាតក្នុងតំបន់ដែលផ្ទៀងលើឧបករណ៍ពិត (B ត្រូវផ្គូផ្គងគែម pixel) ➜ ការកែនេះតូចជាង ហើយមិនប៉ះ CSS។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-chrome-state.test.tsx` (ថ្មី · ១០ ករណី) ៖ បើក modal/ម៉ឺនុយ ➜ របានៅលាក់ · រមូរក្នុង modal/ម៉ឺនុយ/🔔 ➜ គ្មានការប្តូរ · បិទ ➜ ដដែល
+  រួចរមូរឡើង ➜ លេច · ផ្លូវចេញ (កំពូល) · ទិសផ្ទុយ (បើក ➜ មិនលាក់) · ប្តូរទំព័រនៅបង្ហាញ។ tree មុនកែ ➜ **ក្រហម** · mutation ៖ ដកការរំលង `.modal` ➜ ក្រហម ២ ·
+  `openSideDrawer()` ហៅ `showAppChrome()` វិញ ➜ ក្រហម ១ · ដកការរំលង `.side-drawer` ➜ ក្រហម ២។
+- `gesture-test` (Chromium ពិត) ៖ បើកធុងសំរាម/ម៉ឺនុយពេលរបាលាក់ ➜ របានៅលាក់ · `clip-path`/`padding` បញ្ជីមិនប្រែ · រមូរក្នុង modal/ម៉ឺនុយ · បិទ ·
+  រមូរឡើង ➜ លេច។ ⛔ ការអះអាងចាស់ «បើកម៉ឺនុយ ➜ បង្ហាញរបាវិញ» ប្តូរទៅ «របានៅលាក់» តាមសំណើ «កែម៉ឺនុយ ☰ ដែរ»។
+- `perf-check` (+៤) ៖ ១២០០ ជួរ · CPU ÷៤ · trace ពិត ៖ PrePaint+Paint ពេលបើកធុងសំរាម និងម៉ឺនុយ ☰ ដោយរបាលាក់ ≤ ១.៨× ពេលរបាបង្ហាញ
+  (សមាមាត្រ ➜ មិនអាស្រ័យល្បឿនម៉ាស៊ីន)។ វាស់ ៖ ផ្នែក ២ «modal ↔ របា Tab»។
+- `scripts/logic-identity.mjs` ៖ ហេតុផល `setupChromeAutoHide` · `openSideDrawer` (តំបន់ការលាក់របា) បន្ថែមការកែនេះ។
+- `ZoeW/tests/overlay-telemetry.test.ts` (ថ្មី · ៧) ៖ ហត្ថលេខា · ការចែក long-animation-frame · បង្អួច rAF (ឈប់ក្រោយ ៧០០ms) · ព្រឹត្តិការណ៍ Sentry
+  (`zone: perf` + ស្ថានភាពតារាង) · ⛔ web/PWA និង APK ផ្លូវការ (គ្មាន `VITE_PERF_TELEMETRY=1`) មិនដំឡើង · `repository-contract-test` ៖ step
+  «Build web» ឲ្យ `VITE_PERF_TELEMETRY` = 1 តែពេល `test=true` (វាយតម្លៃកន្សោមពិត)។
+- `npm run native:check` ៤ឃ ៖ បើក/បិទប្រអប់ និងម៉ឺនុយ ☰ (ចុចពិត · bridge ក្លែង · safe-area ២៤px) ➜ `elementsFromPoint` ទាំងអស់រត់ក្រៅ rAF
+  (កូដមុនកែ ➜ **ក្រហម** ៖ ២០/៤០ ក្នុង rAF) · ពណ៌ DARK/LIGHT ដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **APK សាកមុន merge** (សំណើម្ចាស់គម្រោង) ៖ GitHub ➜ **Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» = branch
+   `ccr-85f562ee-106o6w` ➜ **Releases** ➜ Pre-release `zoew-android-v2.50.5-test.<commit>` ➜ ដំឡើងជាន់ App (keystore ដដែល)។ ក្រោយ merge ៖
+   Deploy **ZoeW** · Release ផ្លូវការពី `main` ចេញស្វ័យប្រវត្តិ។ គ្មាន rules · env · migration ថ្មី។
+2. សាកលើ APK ពិត (⛔ មុន merge — តំបន់ «Bar hiding») ៖ តម្រង «ទាំងអស់» ➜ រមូរដល់ចុង (ជួរកើនរហូតអស់ · របា Tab លាក់) ➜ (ក) (...) ➜ ធុងសំរាម ➜
+   លេចរលូនដូចពេលនៅកំពូល · (ខ) «📥 បញ្ជី ZTO» ➜ លេចរលូន · (គ) ម៉ឺនុយ ☰ និង 🔔 ➜ រអិលចូលរលូន · (ឃ) បិទប្រអប់/ម៉ឺនុយ ➜ របានៅលាក់ ·
+   រមូរឡើងបន្តិច ➜ របាលេច · (ង) រមូរចុះ/ឡើងធម្មតា ➜ របាលាក់/លេចដូចដើម · ប្តូរ Tab ➜ របាលេច។
+3. ការវាស់ ➜ Sentry ៖ ក្នុង APK សាក ធ្វើដូចប្រើធម្មតា (មុនរមូរ និងក្រោយរមូរដល់ចុង ៖ បើក/បិទធុងសំរាម · «📥 បញ្ជី ZTO» · ម៉ឺនុយ ☰ ម្តងៗ ២–៣ ដង) ➜ Claude អាន Sentry (`Perf overlay …` · `zone:perf`)។ ⛔ មុន merge ៖ ដក `overlay-telemetry` ចេញ ឬទុក (Release ពី `main` បិទជានិច្ច)។
 
 ### [2.50.4] — 2026-10-07 · ZoeW ៖ **សារជូនដំណឹង (toast) និយាយការពិត ៖ សារព្រមានមិនត្រូវរុញចេញដោយសារជោគជ័យ · សារពេល App ជាប់សោរង់ចាំដោះសោ · ចំណូលប្រចាំថ្ងៃដែលរង់ចាំបណ្តាញប្រាប់ ⏳ រួច ✅ · គ្មានសារ «សូមប្រាប់ Admin» ក្លែងក្រោយចាកចេញ · ZTO ៖ បញ្ចូលបញ្ជីស្របគ្នា ៤ ខ្សែ (លឿន ~៣–៤ ដង) · `?diag=1` ប្រាប់ពេល ZTO ឆ្លើយ** (Deep audit ជុំ ៥ · សំណើម្ចាស់គម្រោង)
 
@@ -1843,7 +2061,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-07 — Deep audit ២ (workflow ៖ អ្នករក ១១ ➜ ផ្ទៀងផ្ទាត់ ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ៖ ជុំ ១ ➜ [2.50.5]
+### 2026-10-07 — Deep audit ២ (workflow ៖ អ្នករក ១១ ➜ ផ្ទៀងផ្ទាត់ ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ៖ ជុំ ១ ➜ [2.50.14]
 
 > Workflow រត់លើ repo ដើម (អាន · វាស់ក្នុងច្បាប់ចម្លង) · ការកែធ្វើក្នុង worktree ដាច់ដោយឡែក · findings ដែលអ្នករកវាស់ដោយរត់កូដពិត (`measured`) ហើយកម្រិត high
 > ត្រូវកែមុន verify ចប់ តាមសំណើម្ចាស់គម្រោង («ចាប់ផ្តើមកែឥឡូវ · workflow រត់បន្ត») ក្រោយ Claude ផ្ទៀងផ្ទាត់ខ្លួនឯង។ findings ផ្សេងរង់ចាំ verify (lens refute · measure · impact)។
@@ -1853,6 +2071,57 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A1 | **RACES-1 = MONEY-2** merge ចូលកញ្ចប់ដែល server លែងមាន (`history-write.ts` `return fallbackItem` ពេល `null`) | អ្នករក ៖ vitest លើ module ពិត (`addOrUpdateEntry` ➜ transaction ឃើញ `null` ➜ server `itemI` = [A, C] · A `isDeducted: false` ខណៈធុងសំរាម A `isDeducted: true` · ចំណូល(យករួច) ៣៥ ជំនួស ២៥ · ដក A ម្តងទៀត ➜ ledger ២៥ ➜ ១៥ · ធុងសំរាមដករួច ២ ច្បាប់) · ទ្វារដដែលតាម `importZtoListRows()` · Claude ផ្ទៀងផ្ទាត់ ៖ Firebase SDK រត់ updater ឡើងវិញដោយតម្លៃ server ពេល hash មិនត្រូវ (`null` ពេលឧបករណ៍ផ្សេងលុប/ដកចុងក្រោយ) · Supabase adapter `base = res.value ?? null` · គ្មានអ្នកយាម (`concurrent-scan-test` merge ចូលកញ្ចប់ដែល server មានតែប៉ុណ្ណោះ · `grep fallbackItem` ក្នុង audit-tools/tests ៖ ០) | **ពិត · លុយ** ➜ `freshHistoryItemFrom()` (កញ្ចប់ថ្មី ៖ `id` · `phone` + barcode ដែល merge · `createdAt` = របស់ barcode) · មិនអាច abort លើ `null` (cache ត្រជាក់ ➜ abort មុនទាក់ទង server ➜ រក្សាទុកមិនបានរហូត listener មកដល់) ➜ សរសេរកញ្ចប់ថ្មីដដែលលើផ្លូវទាំងពីរ · `merge-into-deleted-item.test.ts` មុនកែ FAIL ៤/៦ ➜ ៦/៦ · mutation ៣ ➜ FAIL ៤ · ១ · ៤ · fuzz ៖ `other:remove` ដក barcode ចុងក្រោយបាន (២/២ tree ទាំងពីរ · មិនចាប់ទ្វារនេះ ➜ op ជាក់លាក់ជុំក្រោយ) |
 | A2 | **MONEY-1** cleanup ទាំងមូល + `applied` ➜ `cleanupClaimAccountedElsewhere()` អាន REST (`cleanup.ts`) | អ្នករក ៖ vitest module ពិត · ref `supabase:…` ➜ `txRestUrl` = "" ➜ `'unknown'` ➜ abandon/close ៖ ប្រវត្តិ null · ធុងសំរាម null · ledger ១០០ ដដែល · journal ០ · Sentry «ownership unverified» · Claude ផ្ទៀងផ្ទាត់ ៖ adapter `if (lost) committed.txOutcome = 'applied'` (`supabase-rtdb.ts`) ➜ រាល់ចម្លើយបាត់ក្នុង cleanup លើហាង Supabase = កញ្ចប់បាត់ · Firebase ៖ REST តែមួយដងធ្លាក់ ➜ ដូចគ្នា · មូលហេតុដែលការពិនិត្យមាន ៖ តម្លៃផ្ញើ `null` មិនបញ្ជាក់ថាយើងជាអ្នកលុប (ឧបករណ៍ផ្សេងអាចសម្អាតមុន ➜ ដកលុយ ២ ដង · HISTORY-ARCHIVE «Transactions: disconnect») | **ពិត · លុយ** ➜ ម្ចាស់សម្រេចដោយ transaction «បង្កើតបើគ្មាន» លើ `zoew_recently_deleted_cod_dod/<id>` (`claimCleanupTrashSlot()` · backend ទាំងពីរ · abort = ឧបករណ៍ផ្សេង) · journal stage `slot` មុនបណ្តាញ (lens ៣ ៖ ⛔ `moved` មុនដឹងម្ចាស់ ➜ resume ដកលុយ claim ឧបករណ៍ផ្សេង) ➜ `resolveCleanupSlot()` · `cleanup-applied-ownership.test.ts` មុនកែ FAIL ៥/៦ ➜ ៦/៦ · mutation ៣ ➜ FAIL ២ · ១ · ១ · ដែនកំណត់ដែលនៅ ៖ ឧបករណ៍ ២ claim ដដែលក្នុងបង្អួចតូច (ទាំងពីរ `applied` · អ្នកចាញ់ slot មិនដក ✓ · តែ journal អ្នកចាញ់ក្រោយ App ងាប់ឃើញធុងសំរាមមាន ➜ ledger stage) = ថ្នាក់ចាស់មិនពង្រីក |
 | A3 | **MONEY-3** ធុងសំរាម `isDeducted: true` មុន ledger (`cleanup.ts` `finishCleanup`) | អ្នករក ៖ vitest ពិត · ledger ព្យួរ ➜ ធុងសំរាម `true` · journal `ledger` · ស្តារពីឧបករណ៍ B ➜ ១១០ · resume ➜ `''` · journal ០ · គ្មាន Sentry · Claude ផ្ទៀងផ្ទាត់ ៖ stage `moved` + ធុងសំរាមបាត់ ➜ កូដសរសេរធុងសំរាមឡើងវិញ + ដក (មិនមែនលុបស្ងាត់ដូចអ្នករកសរសេរ) ➜ បើកញ្ចប់ស្តាររួច ➜ ច្បាប់ចម្លងស្ទួន · rules ធុងសំរាម `isDeducted` boolean គ្មានលក្ខខណ្ឌឆ្លងវាល ➜ មិនត្រូវប្តូរ rules · `uncollectedValueByDate()` រាប់ធុងសំរាម `!isDeducted && !isClosed` ➜ ក្នុងបង្អួច ledger មិនទាន់ដក + ធុងសំរាម `false` = «ចំណូល (យករួច)» ត្រឹម (មុនកែ ៖ ប៉ោងក្នុងបង្អួច) | **ពិត · លុយ** ➜ ទង់ដើរតាមលុយ (`false` ➜ ledger ➜ `flip` ➜ `true`) · resume ស្គាល់ការស្តារ (barcode ត្រឡប់ក្នុងប្រវត្តិ · ទិដ្ឋភាពស្រស់) · ម្ចាស់គម្រោងជ្រើស «កែពេញ» · `cleanup-deduct-order.test.ts` មុនកែ FAIL ៨/១០ ➜ ១០/១០ · mutation ៥ ក្រហមគ្រប់ · checker ១២ ស្រង់ helper ថ្មី (មើល [2.50.5] អ្នកយាម) · ការពិនិត្យ «ត្រឡប់ក្នុងប្រវត្តិ» ទាមទារ `restoredAt` ≥ `deletedAt` − ២ ម៉ោង (ច្បាប់ចម្លង local ចាស់នៃកញ្ចប់ដែលទើបសម្អាតមិនមែនការស្តារ ៖ sandbox atomicity បង្ហាញ · `restoredAt` មុនការសម្អាតចាស់ ≥ ៧ ថ្ងៃ) · stage `flip` ៖ ធុងសំរាម local នៅមាន ➜ ទិដ្ឋភាពយឺត ➜ រង់ចាំ |
+
+### 2026-10-07 — ចង្វាក់ស៊ុមសម្រប ↔ LTPO ៖ perf-lite ខុសលើអេក្រង់ ១២០Hz · ខកខានលើឧបករណ៍យឺត ➜ [2.50.9]
+
+- rAF ក្លែង (vitest · `setupAdaptivePerformance()` ពិត) លើ `perf.ts` មុនកែ ៖ ១២០ ថេរ ➜ Hz ១២០ · មិន lite ✅ · ៦០ ថេរ ➜ ៦០ · មិន lite ✅ · **LTPO** (២៥ ស៊ុមដំបូងនៃជុំ ១២០ រួច ៦០) ➜ Hz ១២០ ➜ ពិដាន ១៣ms ➜ ស៊ុម ១៦,៧ms ទាំងអស់ «កក» ➜ **lite = true** ❌ · **យឺតពិត** (៩/២០ ស៊ុម ៥០ms) ➜ median ២៤ ស៊ុម = ៥០ms ➜ «20Hz» ➜ ពិដាន ៨០ms ➜ **lite = false** ❌។ មូលហេតុរួម ៖ Hz វាស់ក្នុងបង្អួចដាច់ពីបង្អួចស៊ុមកក (២៤ ស៊ុម ➜ ៩០ ស៊ុម) ➜ អេក្រង់ប្តូរ Hz នៅចន្លោះ ឬបង្អួចតូចដែលស៊ុមកកលើសពាក់កណ្តាល។
+- ការកែ ៖ បង្អួចតែមួយ ៩០ ស៊ុម (median ធន់នឹងស៊ុមកក < ៥០%) · Hz ខ្ពស់បំផុតរៀនពីការរមូរពិត (ការប៉ះធ្វើឲ្យ LTPO ឡើង Hz អតិបរមា) ហើយចងចាំ ➜ ឧបករណ៍ ≥ ៩០Hz មិន lite។ ក្រោយកែ ៨/៨ · មុនកែ ក្រហម ៥/៨។ ⛔ មិនទាន់វាស់លើទូរស័ព្ទ LTPO ពិត។
+
+### 2026-10-07 — accessibility × ទំហំ DOM ៖ ហេតុអ្វី «តែ APK អាក់» · PWA Android · iPhone ➜ [2.50.8]
+
+- Sentry `JAVASCRIPT-REACT-9` ២៦ event (APK `2.50.5-test.2adf39f` · Xiaomi `24030PN60G` · WebView 153 · ១២០Hz · ៨៦/៨៦ ជួរ) ៖ long frame ៥៨–១៣៦ms ដែល script ធំបំផុតតែ ១០–២៣ms · ផ្នែកគូរ ~០–១ms · gap ៤១–៥០ms ខ្លះគ្មាន long frame សោះ ➜ ភាគច្រើនជាការងារ browser ក្រៅ JS។ `_h` = `dispatchDiscreteEvent` ក្នុង chunk React (build `index-j3viNUV7.js` ឡើងវិញបេះបិទ ៖ `--mode android` + `google-services.json` ➜ `__FCM_CONFIGURED__`)។ ១១ ជួរ (ថ្ងៃនេះ) ➜ gap ១៧–២៥ms។
+- Chromium headless · CPU ÷៤ · `--force-renderer-accessibility` ៖ ៩០ ជួរ (DOM ពេញ) បើកធុងសំរាម gap ១៦៧–៣១៧ms ➜ **៦១៧–១០០០ms** · `RunAccessibilitySteps` ៦០០–១០០០ms (`SerializeLifecycleStage` ភាគច្រើន)។ ៦០០ ជួរ ៖ DOM ពេញ (PWA) gap រហូត **៨៣៧៩ms** · accessibility ១៤៤៧–៣៩១៣ms ក្នុង sample ធំ ➜ ជួរតាមទីតាំងរមូរ gap ១៥៩–៤២៤ms · accessibility ៥៣–២១១ms។ accessibility បិទ ៖ DOM ពេញ ៣៩–២២៥ms ធៀប ៣២–១៤៤ms។ ➜ ថ្លៃ accessibility កើនតាមចំនួន node ទាំងទំព័រ ហើយ WebView សាងមែកធាង accessibility ពេលមានសេវាជំនួយបើក ខណៈ Chrome ត្រងវា — សម្មតិកម្មដែលពន្យល់ «តែ APK» (មិនទាន់វាស់លើទូរស័ព្ទ)។ ថ្លៃនៅសល់ពេលបង្ហាញតាមទីតាំងរមូរ ៖ accessibility លើទំព័រ ~១៦០០ node (១២០–១៦០ms ក្រោម CPU ÷៤) មិនមែនតារាង។
+- ស្ថេរភាពរមូរ (APK · ៦០០ ជួរ) ៖ រមូរចុះ ៣០០ × ៤០px ➜ លោត ០ · ជួរខាងលើ viewport ធំ/តូចពេល sync ➜ ជួរដែលមើលឃើញរំកិល ០px · លោតដល់ចុងរួចរមូរឡើង ៣០០ ជំហាន ➜ លោត ២ ដង ≤ ៤px (ជួរដែលការលោតរំលងមិនទាន់វាស់ · estimate ១៦០ ធៀបពិត ~១២៧px)។
+- PWA iPhone/កុំព្យូទ័រមិនប្រែ ៖ build `2adf39f` ធៀប tree ក្រោយ `84665b2` (web · ៦០០ ជួរ · UA Android · iPhone (+ `navigator.standalone`/`-webkit-touch-callout` ក្លែង ➜ `html.ios-standalone`) · Desktop ១២៨០) ៖ HTML `#historyTableBody` · `scrollTop` · `scrollHeight` ដូចគ្នាបេះបិទ ៥/៧ ជំហាន។ ជំហានប្តូរតម្រងខុសគ្នា ក៏កើតពេលប្រៀប build ចាស់នឹងខ្លួនឯង (A/A) ➜ noise ពេលវេលារបស់ការផ្ទុកបន្ត (IntersectionObserver) — ការផ្ទុកបន្តនោះ [2.50.8] កែ (ត្រឡប់កំពូល)។
+
+### 2026-10-07 — CI ក្រោយ commit `daa120f` ៖ class ជួរចន្លោះគ្មាន CSS និង Maven Central 403 ➜ [2.50.7]
+
+- Audit run `37623340619`៖ ២០២ checker ឆ្លង · `css-classes` ធ្លាក់តែមួយដោយ `.history-virtual-spacer`។ Class នេះបន្ថែមក្នុងការកែបង្ហាញជួរតាមទីតាំងរមូរ ប៉ុន្តែគ្មាន rule ក្នុង CSS ដែល ship។ ដក class ដែលមិនប្រើ; រក្សា inline style របស់ជួរចន្លោះ។
+- ក្នុងម៉ាស៊ីនក្រោយកែ៖ `css-classes` ០ undefined · `history-window-check` ២៨ឆ្លង · typecheck · lint · doc-check · audit build ឆ្លង។ CI ពេញលើ commit ក្រោយកែ និង APK ពិតនៅរង់ចាំ។
+- APK run `37623632463`៖ `npm ci` · `android:check` · `android:sync` ឆ្លង; Gradle config root project ធ្លាក់ពេលទាញ dependency ជាច្រើនពី `https://repo.maven.apache.org/maven2/` បាន `403 Forbidden`។ Log គ្មាន response body ដើម្បីបញ្ជាក់មូលហេតុនៃការបដិសេធ។ Commit `daa120f` មិនបានកែ workflow ឬ Gradle repository; ការកែ class មិនបញ្ជាក់ថា APK អាច build បានទេ។ មិនទាន់មាន APK ថ្មីពី run នេះ។
+
+### 2026-10-07 — Sentry APK និង DOM ប្រវត្តិវែង ➜ [2.50.6]
+
+- Sentry org `zoew` · project `javascript-react` · issue `JAVASCRIPT-REACT-9` (`7778537404`) អានតែប៉ុណ្ណោះ។ JS `index-j3viNUV7.js` ត្រូវនឹង APK `2.50.5-test.2adf39f` ពិត។ Xiaomi `24030PN60G` · Android 16 · WebView 153 · display ១២០Hz · filter `all` · ៨៦/៨៦ជួរ។ ការបើក ៧ sample៖ ZTO gap ៥៨ms (២) · ធុងសំរាម ៤២–៦៧ms (៥); sample ធុងសំរាម `6550270d` មាន task ១៣៤ms ក្នុង long frames ២។
+- Stack របស់ issue នៅ `reportOverlaySample()` គឺកន្លែងរាយការណ៍។ `topScript: _h` គ្មាន source URL ហើយឈ្មោះ minify ស្ទួននៅ chunk React និង App; មិនអាចសន្និដ្ឋានថា function ណាជាមូលហេតុ។ Probe កត់ rows/chrome នៅចុងរយៈពេល sample ដូច្នេះការចុចជិតគ្នាអាចច្របូកច្របល់ស្ថានភាព។ មិនមាន sample ៥០ជួរមុនរមូរសម្រាប់ធៀបពី Sentry ក្នុងជុំនេះ។
+- វាស់ Chromium 153 headless · ៤១៤×៨៩៦ · CPU ថយ ៨ ដង · bridge Capacitor ក្លែង · ១២០០កញ្ចប់ · median ៨ដងក្នុងមួយ modal (កូដចុងក្រោយ · telemetry បិទពេលវាស់)៖ full DOM → ជួរតាមទីតាំងរមូរ (១៦ជួរ)៖ ធុងសំរាម gap **៨៣.៣ → ៣៣.៤ms**, Layout **៥២ → ២១.៥ms**; ZTO gap **៩១.៧ → ២៥.១ms**, Layout **៤១ → ៦ms**។ លទ្ធផល ៨៦កញ្ចប់មានភាពប្រែប្រួល; មិនអះអាងថាលែងអាក់លើទូរស័ព្ទពីការវាស់នេះ។
+- CSS `contain`/ស្រទាប់ compositor/body lock/រក្សា modal layout មិនផ្តល់លទ្ធផលថេរ; modal ជាប់ layout ធ្វើឲ្យ PrePaint កាន់តែថ្លៃ។ ដកការសាកទាំងនេះវិញ; កំណែ ship កែចំនួនជួរ DOM លើ native។
+- Guard វាស់ការរមូរពិតដោយ IntersectionObserver (មិនកំណត់ cap ផ្ទាល់)៖ មុនកែ DOM APK ៦០០ជួរ ➜ bounded-DOM check ធ្លាក់; ក្រោយកែ រមូរមើលបានគ្រប់ ៦០០ជួរ និង modal មិនប្តូរទីតាំង។ `repository-file-coverage` CI head ចាស់ធ្លាក់ដោយខ្វះ `overlay-telemetry.ts` ➜ បញ្ចូលធាតុនោះ និង guard ថ្មី។
+
+### 2026-10-07 — modal ↔ របា Tab ៖ បើកធុងសំរាម/បញ្ជី ZTO/ម៉ឺនុយ ☰ អាក់ពេលរមូរដល់ចុង (សំណើម្ចាស់គម្រោង ➜ [2.50.5])
+
+Chromium · audit build · ៤១២×៧៨០ · តម្រង «ទាំងអស់» រមូរដល់ចុង · CPU ថយ ៤ ដង · trace ពិត (`UpdateLayoutTree` · `Layout` · `PrePaint` · `Paint`) · median ៧ ដង។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| B1 | បើកធុងសំរាម ៦០០ ជួរ ៖ របាលាក់ ធៀបរបាបង្ហាញ | PrePaint ១១៦ ធៀប ១២–១៨ · Paint ១០០ ធៀប ២០ · ស៊ុម ៣៣១ms | **មូលហេតុ** ៖ `openModalHelper()` ➜ `showAppChrome()` ➜ `chrome-hidden` ប្តូរ clip-path + padding បញ្ជី |
+| B2 | ការបង្ហាញរបាតែម្យ៉ាង (គ្មាន modal) | PrePaint ៣២–៨៣ · Paint ៦២–៦៥ (៦០០ ជួរ) | ថ្លៃរបស់ការប្តូរ class ផ្ទាល់ |
+| B3 | ៥០ ជួរ (មិនរមូរ) | PrePaint ២៣–៤០ | ថ្លៃកើនតាមជួរ ➜ «មិនរមូរ ➜ រលូន» |
+| B4 | ក្រោយកែ ៦០០ ជួរ | ធុងសំរាម ស៊ុម ១៩៨ms (PrePaint ១៦ · Paint ៥៨) · ZTO ៤១ms (មុន ១៩៥) | របាលាក់ = របាបង្ហាញ (២១៥/២៤៣ · ៥១/៥១) |
+| B5 | ថ្លៃដែលនៅសល់ | `Layout` ១ ដង ២២២ms · dirty ៧៨៨ / ២៦០៨៦ object | តារាងធុងសំរាម (២០ ជួរ) ខ្លួនឯង · មិនអាស្រ័យប្រវត្តិ · ស្មើករណី «smooth» ➜ មិនកែ |
+| B7 | ម៉ឺនុយ ☰ ១២០០ ជួរ (សំណើបន្ថែម «កែម៉ឺនុយ ☰ ដែរ») | PrePaint+Paint របាលាក់ ២៧៣ ធៀបរបាបង្ហាញ ១១ms ➜ ក្រោយកែ ១០ ធៀប ១០ms | មូលហេតុដដែល (`openSideDrawer()` ➜ `showAppChrome()`) |
+| B8 | វីដេអូ APK 2.50.5 (ម្ចាស់គម្រោង · ការប្រៀបស៊ុមម្តងៗ) | បើក ZTO ៖ ចលនា ៤ ស៊ុម ➜ កក ៣ ស៊ុម (~៣៣ms) ➜ លោត · បើកធុងសំរាម ៖ កក ~៤៥ms · បិទម៉ឺនុយ ៖ កក ~៦៦ms · ពណ៌រូបតំណាងរបាស្ថានភាពប្តូរនៅ +៣២០ms | ការកកនៅសល់ក្រោយ [2.50.5] ជុំ ១ · មានតែ APK |
+| B9 | Chromium + bridge Capacitor ក្លែង (APK) ធៀប web · ៩២ ជួរ · CPU ÷៦ · long-animation-frame | APK ៖ rAF ២៣–៨៦ms (បង្ខំ layout ២៤–៥៥) រាល់ការបើក/បិទស្រទាប់ · web ៖ rAF ០–៣ | **មូលហេតុ** ៖ `measureStatusBarTone()` ក្នុង rAF ➜ ក្រោយកែ (ក្រោយស៊ុម) rAF ≤ ៣ms · បិទធុងសំរាម ស៊ុមកក ៦២ms ➜ គ្មាន |
+| B10 | សម្មតិកម្មដែលបដិសេធ (Chromium) | `body.style.overflow` ➜ គូរស្រទាប់ root ៣៧៧k px² ដូចគ្នាមុន/ក្រោយរមូរ · `elementsFromPoint` ពេល layout ស្អាត ០.២–០.៥ms · ខ្សែ scrollbar បិទ ៩០០ms ក្រោយរមូរ · PTR/ប្រវត្តិ Back ជា JS ថោក | មិនពន្យល់ «តែ APK · ក្រោយរមូរ» ➜ មិនកែ |
+| B6 | perf-check ៖ ដាក់ `chromeHidden` ដោយផ្ទាល់ពេលនៅចុងបាតបញ្ជី | padding ៦២ ➜ ០ ➜ `scrollTop` រួញ ➜ scroll event (−៦២ < −`SHOW_AFTER`) ➜ របាលេចវិញ | artifact របស់ការវាស់ (ផ្លូវពិត ៖ `BOTTOM_ZONE` ➜ ការរួញ ≤ ៣៨px) ➜ checker រមូរឡើង ៣០០px មុន + លក្ខខណ្ឌចាំបាច់ «របាលាក់ពិតមុនបើក» |
+
+**APK សាកពី branch** (សំណើម្ចាស់គម្រោង ៖ «apk build test លើ PR … មិនទាន់ចង់ merge») ៖ workflow `Android APK` ពីមុន build តែ `main`
+(`repository-contract-test` ចាក់សោ «APK នៅ main តែប៉ុណ្ណោះ») ➜ ឥឡូវ «Run workflow» លើ branch ផ្សេង ➜ **Pre-release**
+`zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (keystore · `apksigner verify` · pin ដដែល) · push នៅតែ `main` · Release ផ្លូវការមិនប្រែ។ អ្នកយាម ៖
+`repository-contract-test` រត់ script ពិតនៃ step «កំណែ» និង «បង្កើត GitHub Release» ក្នុង bash (`gh` · `cygpath` ក្លែង) ៖ branch ➜ `--prerelease`
++ ស្លាក test · `main` ➜ Release ដូចដើម · ឈ្មោះ branch ដូច `$(…)` មិនរត់ (env) · workflow ចាស់ ➜ **ក្រហម ៥**។
+
+អ្នកយាម ៖ `ZoeW/tests/modal-chrome-state.test.tsx` (មុនកែ ក្រហម · mutation ៣ ប្រភេទចាប់) · `gesture-test` (modal មុនកែ ក្រហម ៤ · ម៉ឺនុយមុនកែ ក្រហម ៣) · `perf-check` (ធុងសំរាមមុនកែ ២៥៨/៣៨ms · ម៉ឺនុយមុនកែ ២៧៣/១១ms ➜ ក្រហម)។
 
 ### 2026-10-07 — ZTO ៖ ទាញ/បញ្ចូលបញ្ជីយឺត (របាយការណ៍ម្ចាស់គម្រោង «ការទាញកញ្ចប់ពី ZTO យឺត ពេលចុច បញ្ចូលក៏យឺត · ស្កេន auto lookup លឿន 0.6–1.0 វិ.» ➜ [2.50.4])
 

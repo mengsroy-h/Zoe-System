@@ -77,6 +77,10 @@ const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
+function upstreamTimingBucket() {
+    return { count: 0, totalMs: 0, lastMs: 0, maxMs: 0, timeouts: 0, at: 0 };
+}
+const upstreamTimingSignal = { detail: upstreamTimingBucket(), arrival: upstreamTimingBucket(), signed: upstreamTimingBucket() };
 const SIGNED_MISMATCH_KEYS_MAX = 1000;
 const SIGNED_MISMATCH_TEXTS_MAX = 5;
 const signedMismatchSignal = { at: 0, keys: new Set(), texts: new Set() };
@@ -956,6 +960,7 @@ function listRequestBody(listConfig, siteCode, range, page, scanType) {
 function listPlan(config, siteCode, range, page, kind) {
     const scanType = kind === 'signed' ? config.list.signedType : config.list.scanType;
     return {
+        kind: kind,
         href: config.list.url.href,
         body: listRequestBody(config.list, siteCode, range, page, scanType),
         extract: (upstream) => {
@@ -1345,6 +1350,29 @@ function noteUpstreamReject(status, upstream) {
     upstreamRejectSignal.code = SAFE_REASON_RE.test(code) ? code : (code ? 'unsafe' : '');
 }
 
+function noteUpstreamTiming(kind, startedAt, timedOut) {
+    const bucket = upstreamTimingSignal[kind] || upstreamTimingSignal.detail;
+    const ms = elapsedSince(startedAt);
+    if (!Number.isFinite(ms)) return;
+    bucket.count += 1;
+    bucket.totalMs += ms;
+    bucket.lastMs = ms;
+    if (ms > bucket.maxMs) bucket.maxMs = ms;
+    if (timedOut) bucket.timeouts += 1;
+    bucket.at = Date.now();
+}
+
+function upstreamTimingReport(bucket) {
+    return {
+        count: bucket.count,
+        timeouts: bucket.timeouts,
+        lastMs: bucket.count ? bucket.lastMs : null,
+        avgMs: bucket.count ? Math.round(bucket.totalMs / bucket.count) : null,
+        maxMs: bucket.count ? bucket.maxMs : null,
+        ageMs: bucket.at ? elapsedSince(bucket.at) : null
+    };
+}
+
 function orderCandidates(upstream) {
     const found = [];
     function push(value) {
@@ -1546,6 +1574,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         };
     }
 
+    const upstreamStartedAt = Date.now();
     const work = attempt();
     work.catch(() => {});
     try {
@@ -1563,6 +1592,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         };
     } finally {
         if (timer) clearTimeout(timer);
+        noteUpstreamTiming(plan ? plan.kind : 'detail', upstreamStartedAt, controller.signal.aborted);
     }
 }
 
@@ -1790,6 +1820,11 @@ function diagnosticsBody(config, headers, authKind, credential) {
             status: upstreamRejectSignal.status || null,
             code: upstreamRejectSignal.code || null,
             ageMs: upstreamRejectSignal.at ? elapsedSince(upstreamRejectSignal.at) : null
+        },
+        upstreamTiming: {
+            detail: upstreamTimingReport(upstreamTimingSignal.detail),
+            list: upstreamTimingReport(upstreamTimingSignal.arrival),
+            signed: upstreamTimingReport(upstreamTimingSignal.signed)
         },
         sessionRenewal: {
             observed: upstreamCookieSignal.seenAt > 0,
@@ -2055,6 +2090,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     signedMismatchSignal.at = 0;
     signedMismatchSignal.keys.clear();
     signedMismatchSignal.texts.clear();
+    Object.keys(upstreamTimingSignal).forEach((kind) => { upstreamTimingSignal[kind] = upstreamTimingBucket(); });
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

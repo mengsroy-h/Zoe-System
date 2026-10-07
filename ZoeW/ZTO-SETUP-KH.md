@@ -252,9 +252,20 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
   "browserHeaders": true,
   "fields": { "phone": [...], "cod": [...], "dod": [...], "barcode": [...] },
   "timing": { "upstreamTimeoutMs": 6000, "budgetMs": 9000, "retries": 1, "cacheTtlMs": 60000 },
+  "upstreamTiming": {
+    "detail": { "count": 12, "timeouts": 0, "lastMs": 820, "avgMs": 910, "maxMs": 2400, "ageMs": 5000 },
+    "list": { "count": 3, "timeouts": 0, "lastMs": 4100, "avgMs": 3800, "maxMs": 4100, "ageMs": 60000 },
+    "signed": { "count": 1, "timeouts": 0, "lastMs": 2900, "avgMs": 2900, "maxMs": 2900, "ageMs": 60000 }
+  },
   "cacheEntries": 0
 }
 ```
+
+`upstreamTiming` ប្រាប់ **ពេលដែល ZTO ឆ្លើយ** (ms · ចាប់ពីផ្ញើសំណើរហូតដល់អានតួ JSON ចប់ · រាប់តាម container) ដាច់ពីគ្នាតាមប្រភេទ ៖
+`detail` (ស្កេន ➜ `/detail`) · `list` (បញ្ជីកញ្ចប់មកដល់) · `signed` (បញ្ជីចុះហត្ថលេខា) ៖ `count` ចំនួនហៅ · `lastMs` ចុងក្រោយ ·
+`avgMs` មធ្យម · `maxMs` យូរបំផុត · `timeouts` ចំនួនដែលលើសពិដាន `upstreamTimeoutMs` · `ageMs` អាយុនៃការហៅចុងក្រោយ។
+ទាញបញ្ជីយឺត ➜ បើក `?diag=1` **ភ្លាមក្រោយទាញ** ៖ `list.lastMs`/`signed.lastMs` ធំ = ZTO ឆ្លើយយឺត (មិនមែន App) · `timeouts` > 0 =
+ZTO មិនឆ្លើយក្នុងពិដាន ➜ Function ឆ្លើយ `ZTO_TIMEOUT`។ container ត្រជាក់ ➜ `count` 0 និង `null` ទាំងអស់ · មានតែលេខ (គ្មាន Cookie · URL · barcode)។
 
 ⛔ `auth` ត្រូវជា **`authorization`** ឬ **`token`** ពេលប្រើ API ផ្លូវការ។
 បើវាឡើង `none` នោះមានន័យថា Function រកមិនឃើញ Cookie ឬ Token សោះ។

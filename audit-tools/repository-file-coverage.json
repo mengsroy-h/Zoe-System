@@ -1920,7 +1920,10 @@
     "ZoeW/tests/ledger-stale-session.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/locker-occupied-warning.test.tsx": {
+    "ZoeW/tests/locker-scan-direct.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-import-lanes.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/remove-stale-session.test.ts": {

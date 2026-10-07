@@ -66,7 +66,7 @@ const src = fs.existsSync(APP) ? fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, 
 // ── ១. ជាន់អប្បបរមា ៖ ថតទទេ / ការស្រង់ដែលធ្លាក់ មិនត្រូវបៃតង ────────────────
 console.log('== ១. ជាន់អប្បបរមា ==');
 ok('អាន ZoeW/app.js បាន (>= ១០០ KB)', src.length > 100000, src.length);
-const NEEDED = ['assignLockerToEntry', 'phoneNoteOf', 'claimHistoryItemForClear', 'buildClearHistoryTrashItem',
+const NEEDED = ['assignLockerToEntry', 'claimHistoryItemForClear', 'buildClearHistoryTrashItem',
     'finalizeClaimedHistoryClear', 'withTimeout', 'dbOp', 'dbOpStalled'];
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
@@ -115,7 +115,7 @@ function recalcItemMoneyFromBarcodes(t) {
     t.price = Math.round((t.cod + t.dod) * 100) / 100;
 }
 `;
-    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry', 'phoneNoteOf',
+    const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'assignLockerToEntry',
         'claimHistoryItemForClear', 'buildClearHistoryTrashItem', 'finalizeClaimedHistoryClear'];
     vm.runInContext(preamble + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };

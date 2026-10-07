@@ -1,6 +1,5 @@
 import { uiState } from '../../core/state';
 import { hideAppChrome, showAppChrome } from '../../ui/chrome-autohide';
-import { isSideDrawerOpen } from '../../ui/page-nav';
 import { commitNow } from '../flush';
 import { elementOf } from '../refs';
 
@@ -62,9 +61,8 @@ export function setupChromeAutoHide() {
         const el = pendingScroller;
         pendingScroller = null;
         if (window.innerWidth >= 992) { showAppChrome(); return; }
-        if (isSideDrawerOpen()) { showAppChrome(); return; }
         if (!el || typeof el.scrollTop !== 'number') return;
-        if (el.closest('.modal')) return;
+        if (el.closest('.modal, .side-drawer')) return;
         if (el !== activeScroller) {
             activeScroller = el;
             lastScrollTop = el.scrollTop;

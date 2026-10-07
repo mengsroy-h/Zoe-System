@@ -655,10 +655,23 @@ const GESTURE = function (steps) {
     await scrollTo(10);
     ok('ត្រឡប់ដល់កំពូល ➜ បង្ហាញជានិច្ច', await hidden() === false);
 
+    // ⛔ ម៉ឺនុយ ☰ / ផ្ទាំង 🔔 គ្របរបាដូច modal (backdrop z-index 1200 > 900) ➜ បើកមិនប្តូររបា (សំណើម្ចាស់គម្រោង ៖ «កែម៉ឺនុយ ☰ ដែរ»)
     await scrollTo(200); await scrollTo(400);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលាក់មុនបើកម៉ឺនុយ', await hidden() === true);
     await page.evaluate(() => window.openSideDrawer());
-    ok('បើកម៉ឺនុយ ➜ បង្ហាញរបាវិញ', await hidden() === false);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const drawerOpen = await page.evaluate(() => document.getElementById('sideDrawer').classList.contains('open'));
+    ok('⛔ បើកម៉ឺនុយ ☰ ពេលរបាលាក់ ➜ របានៅលាក់', drawerOpen && await hidden() === true, { drawerOpen });
+    await page.evaluate(async () => {
+        const box = document.querySelector('#sideDrawer .drawer-body') || document.getElementById('sideDrawer');
+        [0, 120, 0].forEach((t) => { box.scrollTop = t; box.dispatchEvent(new Event('scroll', { bubbles: false })); });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    ok('រមូរក្នុងម៉ឺនុយមិនបង្ហាញរបា', await hidden() === true);
     await page.evaluate(() => window.closeSideDrawer());
+    ok('បិទម៉ឺនុយ ➜ របានៅដដែល', await hidden() === true);
+    await scrollTo(300);
+    ok('បិទម៉ឺនុយរួចរមូរឡើង ➜ បង្ហាញវិញ', await hidden() === false);
 
     await scrollTo(200); await scrollTo(400);
     await page.evaluate(() => window.switchAppPage('entry'));

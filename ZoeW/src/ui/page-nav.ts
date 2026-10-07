@@ -36,7 +36,6 @@ export function switchAppPage(page?) {
 }
 
 export function openSideDrawer() {
-    showAppChrome();
     hidePhoneSuggestions();
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();

@@ -663,11 +663,12 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   Chromium never applies it ➜ `panel-motion-test.js` injects it.
 - ⛔ The 180ms delay and `chrome-space-released` stay removed.
 - rAF-coalesced scroll handler; `SHOW_AFTER` (48px) > `HIDE_AFTER` (36px) on purpose.
-- ⛔ A modal covers the bar (z-index) ➜ it never moves the bar: `openModalHelper()` never calls `showAppChrome()` and scrolls
-  inside a `.modal` never drive it. On Android a bar toggle flips the list's `clip-path` and `.table-responsive`
-  `padding-bottom` (parity `app.css`) ➜ the whole rendered list repaints, cost grows with rows. A page scroller reaching
-  the top while a modal is open still shows it; the drawer still shows it. Guards: `ZoeW/tests/modal-chrome-state.test.tsx`
-  · `gesture-test` · `perf-check` (modal open with the bar hidden ≤ 1.8× PrePaint+Paint of the bar shown, CPU ÷4).
+- ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
+  never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
+  flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list
+  repaints, cost grows with rows. A page scroller reaching the top while an overlay is open still shows it; page switches
+  still show it. Guards: `ZoeW/tests/modal-chrome-state.test.tsx` · `gesture-test` · `perf-check` (modal and drawer open
+  with the bar hidden ≤ 1.8× PrePaint+Paint of the bar shown, CPU ÷4).
 
 ## Frame rate and lite mode
 

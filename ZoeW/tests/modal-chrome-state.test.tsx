@@ -1,7 +1,9 @@
 /**
- * ⛔ បើក modal មិនប្តូរស្ថានភាពរបា Tab (សំណើម្ចាស់គម្រោង ៖ «APK រមូរដល់ចុង កញ្ចប់ច្រើន ចុចបើកធុងសំរាម ឬបញ្ជី ZTO អាក់អាក់»)
+ * ⛔ បើក modal · ម៉ឺនុយ ☰ · ផ្ទាំង 🔔 មិនប្តូរស្ថានភាពរបា Tab (សំណើម្ចាស់គម្រោង ៖ «APK រមូរដល់ចុង កញ្ចប់ច្រើន ចុចបើកធុងសំរាម ឬបញ្ជី ZTO
+ *    អាក់អាក់» · «កែម៉ឺនុយ ☰ ដែរ»)
  *    ការបង្ហាញ/លាក់របាប្តូរ `clip-path` និង `padding-bottom` របស់បញ្ជីប្រវត្តិ (ផ្លូវ Android) ➜ គូរបញ្ជីទាំងមូលឡើងវិញ (៦០០ ជួរ ≈ ១០០ms+
- *    ក្រោម CPU ថយ ៤ ដង)។ modal គ្របរបា (z-index 1000 > 900) ➜ របានៅដដែលពេល modal បើក ហើយការរមូរ **ក្នុង** modal មិនបញ្ជារបា ·
+ *    ក្រោម CPU ថយ ៤ ដង)។ modal (z-index 1000) និង backdrop ម៉ឺនុយ (1200) គ្របរបា (900) ➜ របានៅដដែលពេលវាបើក ហើយការរមូរ **ក្នុង**
+ *    modal/ម៉ឺនុយមិនបញ្ជារបា ·
  *    ការលាក់តាមទិសរមូរ (ចុះ ➜ លាក់ · ឡើង ➜ បង្ហាញ) មិនប្រែ។
  */
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -10,6 +12,7 @@ import { refTo } from '../src/app/refs';
 import { setupChromeAutoHide } from '../src/app/behaviors/chrome-autohide';
 import { closeModal, openModalHelper } from '../src/ui/modal';
 import { openModalIds } from '../src/core/modals';
+import { closeSideDrawer, isSideDrawerOpen, openSideDrawer, switchAppPage } from '../src/ui/page-nav';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,6 +36,7 @@ async function scrollTo(el: HTMLElement, top: number) {
 let pages: HTMLElement;
 let list: HTMLElement;
 let modalList: HTMLElement;
+let drawerList: HTMLElement;
 
 async function hideByScrolling() {
     await scrollTo(list, 100);
@@ -57,14 +61,18 @@ describe('modal ↔ របា Tab', () => {
         modal.id = 'recentlyDeletedModal';
         document.body.appendChild(modal);
         modalList = fakeScroller(modal);
+        const drawer = document.createElement('aside');
+        drawer.className = 'side-drawer side-drawer-right';
+        document.body.appendChild(drawer);
+        drawerList = fakeScroller(drawer);
         setupChromeAutoHide();
     });
 
     afterEach(async () => {
         closeModal('recentlyDeletedModal');
         expect(openModalIds()).toEqual([]);
-        uiState.drawerOpen = false;
-        uiState.notifyDrawerOpen = false;
+        closeSideDrawer();
+        expect(isSideDrawerOpen()).toBe(false);
         await scrollTo(list, 0);
         uiState.chromeHidden = false;
     });
@@ -116,10 +124,43 @@ describe('modal ↔ របា Tab', () => {
         expect(uiState.chromeHidden).toBe(false);
     });
 
-    it('ម៉ឺនុយ (drawer) បើក ➜ ការរមូរនៅតែបង្ហាញរបា (មិនប្រែ)', async () => {
+    it('⛔ បើកម៉ឺនុយ ☰ ពេលរបាលាក់ ➜ របានៅលាក់ · រមូរក្នុងម៉ឺនុយមិនបញ្ជារបា · បិទ ➜ ដដែល', async () => {
         await hideByScrolling();
-        uiState.drawerOpen = true;
-        await scrollTo(list, 500);
+        openSideDrawer();
+        expect(isSideDrawerOpen()).toBe(true);
+        expect(uiState.chromeHidden).toBe(true);
+        await scrollTo(drawerList, 300);
+        await scrollTo(drawerList, 0);
+        expect(uiState.chromeHidden).toBe(true);
+        closeSideDrawer();
+        expect(uiState.chromeHidden).toBe(true);
+        await scrollTo(list, 300);
         expect(uiState.chromeHidden).toBe(false);
+    });
+
+    it('⛔ ផ្ទាំង 🔔 បើក ➜ រមូរក្នុងផ្ទាំងមិនបង្ហាញរបា', async () => {
+        await hideByScrolling();
+        uiState.notifyDrawerOpen = true;
+        await scrollTo(drawerList, 300);
+        await scrollTo(drawerList, 0);
+        expect(uiState.chromeHidden).toBe(true);
+    });
+
+    it('ម៉ឺនុយបើក ៖ បញ្ជីត្រឡប់ដល់កំពូល ➜ បង្ហាញ (ផ្លូវចេញ) · ទិសផ្ទុយ ៖ រមូរបញ្ជីចុះមិនលាក់', async () => {
+        await hideByScrolling();
+        openSideDrawer();
+        await scrollTo(list, 0);
+        expect(uiState.chromeHidden).toBe(false);
+        await scrollTo(list, 100);
+        await scrollTo(list, 200);
+        await scrollTo(list, 400);
+        expect(uiState.chromeHidden).toBe(false);
+    });
+
+    it('ការប្តូរទំព័រនៅបង្ហាញរបា (មិនប្រែ)', async () => {
+        await hideByScrolling();
+        switchAppPage('entry');
+        expect(uiState.chromeHidden).toBe(false);
+        switchAppPage('data');
     });
 });

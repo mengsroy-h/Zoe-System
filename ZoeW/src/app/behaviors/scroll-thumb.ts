@@ -101,7 +101,7 @@ export function setupScrollThumb() {
         lastTop.set(el, top);
         const rect = el.getBoundingClientRect();
         const overlayOpen = !!uiState.isModalOpen || isSideDrawerOpen() || el.closest('.modal, .side-drawer') !== null;
-        const chromeBottom = uiState.chromeHidden ? 0 : pxOf(uiState.tabbarHeightVar);
+        const chromeBottom = uiState.chromeHidden || uiState.keyboardOpen ? 0 : pxOf(uiState.tabbarHeightVar);
         const band = scrollThumbBand(rect, window.innerHeight, overlayOpen, pxOf(uiState.chromeTopVar), chromeBottom);
         const geo = scrollThumbGeometry(rect, band, top, el.scrollHeight, el.clientHeight);
         if (!geo) return;

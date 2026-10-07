@@ -1878,6 +1878,15 @@
     "ZoeW/tests/chrome-autohide-intent.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/keyboard-tabbar.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/modal-backdrop-keep.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/more-menu-scroll.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
       "policy": "zoew-self-verification"
     },

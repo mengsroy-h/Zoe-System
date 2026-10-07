@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.10` (`zoew-v273`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.11` (`zoew-v274`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -243,7 +243,7 @@ only this text protects them.
 | **Tools** | Poisoning happens on shadow files · no fixed shared resources: `listen(0, '127.0.0.1')` · `emu/*` namespace unique per run | `checker-coverage` |
 | **Writes ↔ leaving to call** | Retry keeps rollback of every field and newer choices; old callbacks can't write/deduct/message after an auth or database switch | `history-patch-retry-test` |
 | **Lookup & scanning** | Table prefetch retries fast but never during a scan · keyboard doesn't jump while a lookup works (ceiling 15s, fail-open) · `lookupCode` survives retries; the Cookie message points to the Windows sync tool ➜ Netlify Blobs · busy is a *wait*, not an *end* · early exits release their queue entry; the ceiling measures real waits only · HTTP 200 with an unreadable body = transient failure (`LOOKUP_BAD_BODY`: one retry · transient cooldown), never «not found» | `lookup-prefetch-test` · `lookup-failure-identity-test` · `lookup-burst-test` |
-| **Modals** | `closeModal()` clears only that modal's state (or when the stack is empty) · the last opened is on top (ZoeKeyGen `openModalHelper()` reorders z-index · ZoeW `uiState.modalStack` ➜ `Modal.tsx`) ⛔ never order by fixed z-index or DOM order | `lookup-prefetch-test` · `ui-flow-test` · `layout-check` |
+| **Modals** | `closeModal()` clears only that modal's state (or when the stack is empty) · the last opened is on top (ZoeKeyGen `openModalHelper()` reorders z-index · ZoeW `uiState.modalStack` ➜ `Modal.tsx`) ⛔ never order by fixed z-index or DOM order · a backdrop tap closes every modal except `noDismiss` ones and `BACKDROP_KEEP_MODALS` (Config · lookup API · Excel import — owner decision: long forms), which still close by their buttons · Back · Escape | `lookup-prefetch-test` · `ui-flow-test` · `layout-check` · `ZoeW/tests/modal-backdrop-keep.test.tsx` |
 | **Cleanup labels ↔ constants** | User-facing text is read from the constants | `trash-modal-test` |
 | **Progress trackers** | Polling never consumes evidence (idempotent) | `connection-recovery-test` |
 | Reconnect ladder | The cycle never cuts a handshake | `reconnect-ladder-test` |
@@ -576,7 +576,10 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
 | 🔔 panel (navbar right) | `notifyDrawer` | 📦 near-expiry (24h) · 📤 removed (trash `expired`, unseen count in the badge) · 📱 កំណែ App · 📲 Push on/off · 📢 announcements/maintenance (`public/announcements.json` + seller notices · 🧹 សម្អាត) · ⛔ "Powered By ZoeW" in this panel's footer |
 
 - (...) menus close when an outside drag or history scroll starts; taps/scrolls inside still work; the open motion
-  (`#globalMoreMenu`) honors Reduce Motion and never delays closing (`history-menu-dismiss-test.js`).
+  (`#globalMoreMenu`) honors Reduce Motion and never delays closing (`history-menu-dismiss-test.js`). A scroll closes the menu
+  only when it moves the button (the scroller contains the anchor · the anchor left the DOM) or follows user input made
+  **after** opening (`moreMenuScrollDismisses()` · `noteMoreMenuInput()`) ⛔ momentum left over from a swipe before the tap never
+  closes it (`ZoeW/tests/more-menu-scroll.test.ts`).
 - **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (drawer): **9** rows, read-only — network · Firebase · clock · License · storage · Service
   Worker · customer table · Apps Script version · Lookup. Count derived from `runHealthCheck()`. ZTO row: rejected ➜ ❌ ·
   accepted ➜ ✅ · never used ➜ ⚠️. Never forces PIN · secrets never in DOM (8-char fingerprint only) · the Apps Script
@@ -670,6 +673,13 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   Programmatic scroll writes (virtualizer corrections · clamps · scroll anchoring) never drive it — on the APK they formed a
   show/hide loop on a still list. Reaching the top zone still shows it. Guards: `ZoeW/tests/chrome-autohide-intent.test.tsx` ·
   `gesture-test`.
+- ⛔ APK soft keyboard: the WebView resizes in one step when the IME starts opening ➜ a fixed bar would jump above it. Inside the
+  same `resize` handler `noteKeyboardViewport()` (native Android only) sets `uiState.keyboardOpen` (immediate commit) when the
+  height drops ≥ `KEYBOARD_MIN_INSET_PX` below the full height of that width while a text field is focused; it clears only on a
+  resize back (never on blur — the IME is still closing). Body gets `keyboard-open` + `chrome-hidden` (bar hidden with no
+  transition, list uses the hidden-bar layout); `uiState.chromeHidden` (scroll state) is never touched, so the bar returns to
+  the state it had. Web/iOS unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. Guards:
+  `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`.
 - ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
   never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
   flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list

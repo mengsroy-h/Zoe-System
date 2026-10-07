@@ -154,6 +154,30 @@ try {
         await page.waitForTimeout(250);
         const reset = await state(page);
         check(mode.label + ' ៖ filter ថ្មីពេលរមូរជ្រៅ ➜ ត្រឡប់ទៅ ៥០ជួរ នៅកំពូល (មិនផ្ទុកបន្ត)', reset.loaded === 50 && reset.top < 2 && reset.first === 'window-599', reset);
+        await page.evaluate(() => {
+            window.__kb = [];
+            window.addEventListener('resize', () => {
+                const bar = document.getElementById('pageTabBar');
+                const cs = getComputedStyle(bar);
+                window.__kb.push({ h: window.innerHeight, hidden: document.body.classList.contains('chrome-hidden'), keyboard: document.body.classList.contains('keyboard-open'),
+                    visibility: cs.visibility, transition: cs.transitionProperty });
+            });
+        });
+        await page.evaluate(() => window.showAppChrome());
+        await frames(page);
+        await page.locator('#searchPhoneInput').focus();
+        await page.setViewportSize({ width: 414, height: 896 - 330 });
+        await frames(page);
+        await page.setViewportSize({ width: 414, height: 896 });
+        await frames(page);
+        await page.evaluate(() => document.activeElement && document.activeElement.blur());
+        const kb = await page.evaluate(() => window.__kb);
+        const opened = kb.find((k) => k.h < 896) || {};
+        const closed = kb.filter((k) => k.h === 896).pop() || {};
+        if (native) check(mode.label + ' ៖ keyboard បើក ➜ របាលាក់ក្នុង resize ដដែល (មុនស៊ុមថ្មី · គ្មាន transition) · បិទ ➜ របាត្រឡប់',
+            opened.keyboard && opened.hidden && opened.visibility === 'hidden' && opened.transition === 'none'
+                && !closed.keyboard && !closed.hidden && closed.visibility === 'visible', kb);
+        else check(mode.label + ' ៖ keyboard (គ្របពីលើ មិនប្តូរប្លង់) ➜ របាមិនប្រែ', kb.length >= 2 && kb.every((k) => !k.keyboard && !k.hidden && k.visibility === 'visible'), kb);
         check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
         await ctx.close();
     }

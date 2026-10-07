@@ -1,7 +1,8 @@
 import { uiState } from '../../core/state';
 import { hideAppChrome, showAppChrome } from '../../ui/chrome-autohide';
+import { isNativeAndroid } from '../../platform/native';
 import { commitNow } from '../flush';
-import { elementOf } from '../refs';
+import { activeElementIsTextField, elementOf } from '../refs';
 
 export function appChromeElements() {
     return {
@@ -42,6 +43,27 @@ export function scrollerOf(target) {
 export const CHROME_SCROLL_INTENT_MS = 1200;
 
 export const CHROME_FLIP_SETTLE_MS = 250;
+
+export const KEYBOARD_MIN_INSET_PX = 120;
+
+const keyboardViewport = { width: 0, height: 0 };
+
+export function noteKeyboardViewport() {
+    if (!isNativeAndroid()) {
+        if (uiState.keyboardOpen) uiState.keyboardOpen = false;
+        return;
+    }
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    if (width !== keyboardViewport.width) {
+        keyboardViewport.width = width;
+        keyboardViewport.height = height;
+    } else if (height > keyboardViewport.height) {
+        keyboardViewport.height = height;
+    }
+    const open = keyboardViewport.height - height >= KEYBOARD_MIN_INSET_PX && (uiState.keyboardOpen || activeElementIsTextField());
+    if (uiState.keyboardOpen !== open) uiState.keyboardOpen = open;
+}
 
 export function setupChromeAutoHide() {
     const pages = elementOf('appPages');
@@ -127,6 +149,7 @@ export function setupChromeAutoHide() {
     document.addEventListener('pointerdown', noteInput, listenOptions);
     document.addEventListener('pointermove', notePointerMove, listenOptions);
     window.addEventListener('resize', () => {
+        noteKeyboardViewport();
         measureAppChromeSize();
         if (window.innerWidth >= 992) showAppChrome();
     });
@@ -136,6 +159,7 @@ export function setupChromeAutoHide() {
         chromeSizeObserver.observe(navbar);
         chromeSizeObserver.observe(tabbar);
     }
+    noteKeyboardViewport();
     measureAppChromeSize();
     setTimeout(measureAppChromeSize, 300);
 }

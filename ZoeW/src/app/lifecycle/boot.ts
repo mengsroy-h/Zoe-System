@@ -37,10 +37,9 @@ import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { setupScrollThumb } from '../behaviors/scroll-thumb';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
-import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget } from './layers';
+import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, moreMenuScrollDismisses, noteMoreMenuInput } from './layers';
 import { setupNativeShell } from './native-shell';
 import { oncePerPage, type LifecycleScope } from './scope';
-import { elementOf } from '../refs';
 
 export function bootApplication(scope: LifecycleScope): void {
     bootShell(scope);
@@ -201,13 +200,13 @@ function startGlobalDismissals(scope: LifecycleScope): void {
     });
 
     scope.listen(document, 'pointerdown', dismissGlobalMoreMenuOutside, { capture: true, passive: true });
+    scope.listen(document, 'pointerdown', noteMoreMenuInput, { capture: true, passive: true });
+    scope.listen(document, 'wheel', noteMoreMenuInput, { capture: true, passive: true });
+    scope.listen(document, 'keydown', noteMoreMenuInput, { capture: true, passive: true });
     scope.listen(document, 'pointerdown', noteZtoUserActivity, { capture: true, passive: true });
     scope.listen(document, 'keydown', noteZtoUserActivity, { capture: true, passive: true });
     scope.listen(window, 'scroll', (e) => {
-        const scrolled = e.target as any;
-        const menu = elementOf('globalMoreMenu');
-        if (scrolled && scrolled.closest && menu && menu.contains(scrolled)) return;
-        closeGlobalMoreMenu();
+        if (moreMenuScrollDismisses(e.target)) closeGlobalMoreMenu();
     }, { capture: true, passive: true });
     scope.listen(window, 'resize', closeGlobalMoreMenu);
 

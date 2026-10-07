@@ -86,6 +86,8 @@ const ACCEPTED = {
         displayHzMeasured: 'flag saying the refresh rate has been measured; a device property',
         displayHzPeak: 'highest refresh rate seen while the user scrolls, remembered per device (zoew_display_hz_peak_v1); a device property not user data',
         keyboardOpen: 'soft keyboard currently shown (APK resize), a live device state that clears on the next resize back; not user data',
+        moreMenuInputAt: 'performance.now() stamp of the last user input outside the (...) menu; a timing guard, not user data',
+        moreMenuWheelAt: 'performance.now() stamp of the last wheel event (wheel-stream gap); a timing guard, not user data',
         torchOn: 'reset by stopCurrentStream',
         autoLoginAttempted: 'dead variable, never read',
         isDatabaseConnected: 'live connection state, not user data',

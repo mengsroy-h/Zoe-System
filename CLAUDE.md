@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.12` (`zoew-v275`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.13` (`zoew-v276`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -681,9 +681,13 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   it clears only on a resize (back within the inset of that base, or ≥ the inset above the lowest open height) ⛔ never on blur
   (the IME is still closing). Body gets `keyboard-open` + `chrome-hidden` (bar hidden with no transition, list uses the
   hidden-bar layout); `uiState.chromeHidden` (scroll state) is never touched, so the bar returns to the state it had. Web/iOS
-  unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. The strip below the shrunk WebView until
-  the IME slides in is the window background ➜ the bridge theme's `android:windowBackground` = `--body-bg` (`android:check`).
-  Guards: `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`.
+  unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. Capacitor `SystemBars` pads the decor by the
+  full IME height when the show animation starts ➜ Android 11+ `MainActivity` (`KeyboardOpenHold`, platform
+  `WindowInsetsAnimation` on the decor) keeps the WebView at its height from `onPrepare` (parents unclipped) until `onEnd` or
+  `KEYBOARD_HOLD_MAX_MS`, so the keyboard slides over the page and the WebView shrinks once at the end ⛔ never `ViewCompat`
+  (below Android 11 it replaces Capacitor's insets listener). Any strip left shows the window background ➜ the bridge theme's
+  `android:windowBackground` = `--body-bg`. Guards: `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`
+  · `npm run android:check`.
 - ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
   never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
   flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list

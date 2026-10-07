@@ -1788,9 +1788,6 @@
     "ZoeW/src/ui/more-menu.ts": {
       "policy": "zoew-app"
     },
-    "ZoeW/src/ui/overlay-telemetry.ts": {
-      "policy": "zoew-app"
-    },
     "ZoeW/src/ui/page-nav.ts": {
       "policy": "zoew-app"
     },
@@ -1921,9 +1918,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/oracles/history-row-html.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/overlay-telemetry.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/push-client.test.tsx": {

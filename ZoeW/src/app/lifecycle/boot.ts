@@ -33,7 +33,6 @@ import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
 import { setupAdaptivePerformance } from '../../ui/perf';
-import { setupOverlayTelemetry } from '../../ui/overlay-telemetry';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { setupScrollThumb } from '../behaviors/scroll-thumb';
 import { showToast } from '../../ui/toast';
@@ -186,7 +185,6 @@ function startInteractions(): void {
         setupSwipeGestures();
         setupChromeAutoHide();
         setupAdaptivePerformance();
-        setupOverlayTelemetry();
         setupIOSPullToRefresh();
         setupScrollThumb();
         setupVisibilityHandling();

@@ -520,11 +520,8 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
         check('ឈ្មោះ branch ចូលតាម env (មិនរត់ជា shell)', evil.rel.status === 0 && !evil.pwned && evil.notes.includes('$(touch pwned)'),
             evil.rel.stderr);
         const webStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: Build web')) || '';
-        const telemetryExpr = (webStep.match(/^          VITE_PERF_TELEMETRY: \$\{\{ (.*) \}\}$/m) || [])[1] || '';
-        const telemetryFor = (test) => telemetryExpr ? vm.runInNewContext(telemetryExpr, { steps: { meta: { outputs: { test } } } }) : null;
-        check('ការវាស់ស៊ុម ➜ Sentry (VITE_PERF_TELEMETRY) ៖ APK សាកតែប៉ុណ្ណោះ = 1 · Release ពី main = 0',
-            telemetryFor('true') === '1' && telemetryFor('false') === '0' && webStep.includes('npm run android:sync --prefix ZoeW'),
-            JSON.stringify({ telemetryExpr, test: telemetryFor('true'), main: telemetryFor('false') }));
+        check('APK សាក និង Release ពី main build web ដូចគ្នា (android:sync · គ្មានការកំណត់ផ្សេងតាម test)',
+            webStep.includes('npm run android:sync --prefix ZoeW') && !/outputs\.test|VITE_[A-Z_]+:/.test(webStep), webStep);
         check('ឈ្មោះ branch មិនដែលចូល script តាម `${{ github.ref_name }}` ផ្ទាល់', !/run: \|[\s\S]*?\$\{\{\s*github\.(ref_name|head_ref)/.test(apk.replace(/REF_NAME: \$\{\{ github\.ref_name \}\}/g, '')));
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });

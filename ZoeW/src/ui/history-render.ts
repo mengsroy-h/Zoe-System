@@ -6,12 +6,17 @@ import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { FOUR_HOURS_MS } from '../features/session';
 import { renderZtoSyncViews, scheduleZtoStatusSweep } from '../features/zto-status';
 import { emptyViewMessage } from '../services/db-listeners';
+import { isAndroidDevice } from '../platform/native';
 
 export const HISTORY_PAGE_ROWS = 50;
 
 export function historyRenderCap() {
     const limit = Number(uiState.historyRenderLimit);
     return Number.isFinite(limit) && limit > HISTORY_PAGE_ROWS ? Math.floor(limit) : HISTORY_PAGE_ROWS;
+}
+
+export function historyRowsWindowed(): boolean {
+    return isAndroidDevice();
 }
 
 export function showMoreHistoryRows() {

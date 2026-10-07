@@ -46,7 +46,7 @@
 ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
 ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.6** (APK បង្ហាញជួរប្រវត្តិតាមទីតាំងរមូរ · PR #296 Draft · មិនទាន់ merge · APK សាក ៖ Run workflow លើ branch ➜ Pre-release) · ប្រវត្តិ ៖ PR #292 =
+1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.8** (Android App និង PWA បង្ហាញជួរប្រវត្តិតាមទីតាំងរមូរ · ដក telemetry សាក · PR #296 Draft · មិនទាន់ merge · APK សាក ៖ Run workflow លើ branch ➜ Pre-release) · ប្រវត្តិ ៖ PR #292 =
    **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
    ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
    (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.7 — PR #296 Draft** ៖ Sentry ពី APK `2adf39f` បញ្ជាក់ការយឺតនៅសល់ (៨៦ជួរ · Xiaomi · ១២០Hz)។ កំណែនេះបង្ហាញជួរប្រវត្តិតាមទីតាំងរមូរលើ APK ប៉ុណ្ណោះ។ សាក APK ថ្មីតាម [2.50.7] និង [2.50.6] សកម្មភាពដោយដៃ · **រក្សា telemetry រហូតម្ចាស់គម្រោងបញ្ជាក់ថារលូន** ➜ ដក telemetry សាកបើក/បិទស្រទាប់ ➜ តេស្តឡើងវិញ ➜ ចាំ merge។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
+- ⏳ **ZoeW 2.50.8 — PR #296 Draft** ៖ ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ចាំ merge ([2.50.8] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.2 — PR #293 (merge ចូល `main` រួច)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ លុប env អត្ថបទ · Deploy ➜ បញ្ជី ZTO ទាញបាន ៩៦/៩៦ · សារ ⚠️ «66 ជួរ» បាត់ · 🔒 «មានក្នុង ZoeW តែ ZTO បិទរួច 6» ➜ នៅសល់ ៖ APK · សាកតារាងប្រវត្តិលើទូរស័ព្ទ ([2.50.2] សកម្មភាព ២)។
@@ -121,6 +121,27 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.8] — 2026-10-07 · ZoeW ៖ តារាងប្រវត្តិរលូនលើ Android ទាំង App និង PWA · ប្តូរតម្រងត្រឡប់កំពូល · ដក telemetry សាក (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.8`** (`zoew-v270` ➜ `zoew-v271`)។ ⛔ ZoeKeyGen · Firebase rules · migration Supabase · Function · តំបន់ ZTO ចាក់សោ **មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់គម្រោង ៖ APK 2.50.7 «ដើរស្រួលហើយ» ➜ «ដក telemetry sentry ចេញផង» ➜ ដក `src/ui/overlay-telemetry.ts` · ការហៅក្នុង `boot.ts` · `VITE_PERF_TELEMETRY` ក្នុង workflow APK · តេស្ត និងការអះអាងពាក់ព័ន្ធ ➜ APK សាក build web ដូច Release ផ្លូវការ។ ការរាយការណ៍កំហុស Sentry ធម្មតានៅដដែល។
+- ម្ចាស់គម្រោង ៖ «optimize អោយ រត់បាន smooth គ្រប់ device ទាំងអស់អោយឆ្លាតវៃ» ➜ `historyRowsWindowed()` (អ្នកសម្រេចតែមួយ · `isAndroidDevice()` ៖ App Android ឬ `userAgentData.platform`/UA Android) ➜ **Android ទាំង App និង PWA/Chrome** បង្ហាញតែជួរជុំវិញទីតាំងរមូរ (ម៉ាស៊ីន Chromium ដូច APK ដែលម្ចាស់គម្រោងសាកថារលូន)។ iPhone និងកុំព្យូទ័របន្ថែមជួរដូចដើម ៖ iPhone មិនទាន់មានរបាយការណ៍អាក់ ហើយការរមូរ iOS ត្រូវសាកលើឧបករណ៍ពិត (តំបន់ហាមចូល) · កុំព្យូទ័រត្រូវការ Ctrl+F រកក្នុងតារាងទាំងមូល។
+- ប្តូរតម្រង ឬស្វែងរក ➜ តារាងត្រឡប់ទៅកំពូលលើគ្រប់ឧបករណ៍។ ពីមុនលើ PWA ទីតាំងរមូរនៅជ្រៅ ➜ ទំព័រ ៥០ ជួរខ្លី ➜ សញ្ញាផ្ទុកបន្តលេចភ្លាម ➜ ផ្ទុកបន្ត ១៥០–២០០ ជួរ ហើយអ្នកប្រើនៅកណ្តាលបញ្ជី (ផ្ទុយពី README «ត្រឡប់ទៅ ៥០ ជួរដំបូង»)។
+- `getItemKey` ៖ deps ច្បាស់ (`keySource`) ➜ lint គ្មាន warning exhaustive-deps (warning «incompatible-library» របស់ `useVirtualizer` ជាព័ត៌មាន · build មិនប្រើ React Compiler)។
+
+#### អ្នកយាម
+
+`history-window-check.mjs` (ក្នុង `npm run native:check`) ៖ ៣ ផ្លូវ (APK · PWA Android · PWA iPhone តាម UA ➜ `userAgentData.platform` ពិតរបស់ Chromium) · លោតទៅ ៣០/៦០/៩០% ➜ ជួរគ្របពេញផ្ទៃមើលឃើញ · ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ៥០ ជួរនៅកំពូល · រមូរដល់ចុងដូចអ្នកប្រើ (រង់ចាំ React គូរទំព័រចុងក្រោយ)។ build មុនកែ `84665b2` ➜ ក្រហម ៣ ចំ (PWA Android DOM ៦០០ ជួរ · ប្តូរតម្រង Android/iPhone ផ្ទុក ២០០/១៥០ ជួរ ហើយមិននៅកំពូល) · tree ថ្មី ➜ ០។ `repository-contract-test` ៖ APK សាក និង Release build web ដូចគ្នា (គ្មាន flag តាម test)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. APK ៖ Run workflow លើ `ccr-85f562ee-106o6w` ➜ Pre-release `zoew-android-v2.50.8-test.<commit>` ➜ ដំឡើង ➜ សាកដូច [2.50.6] សកម្មភាព ២ (គួររលូនដូច 2.50.7)។
+2. PWA ចេញពេល Deploy ZoeW (ក្រោយ merge) ➜ **Android (Chrome)** ៖ «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ➜ រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល · PTR និងចលនាផ្ទាំងដូចដើម។
+3. Sentry issue `JAVASCRIPT-REACT-9` («Perf overlay …») លែងមាន event ថ្មី ➜ Resolve បាន។
 
 ### [2.50.7] — 2026-10-07 · ZoeW ៖ កែ class ជួរចន្លោះប្រវត្តិដែលធ្វើឲ្យ audit CI ធ្លាក់
 
@@ -1880,6 +1901,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-07 — accessibility × ទំហំ DOM ៖ ហេតុអ្វី «តែ APK អាក់» · PWA Android · iPhone ➜ [2.50.8]
+
+- Sentry `JAVASCRIPT-REACT-9` ២៦ event (APK `2.50.5-test.2adf39f` · Xiaomi `24030PN60G` · WebView 153 · ១២០Hz · ៨៦/៨៦ ជួរ) ៖ long frame ៥៨–១៣៦ms ដែល script ធំបំផុតតែ ១០–២៣ms · ផ្នែកគូរ ~០–១ms · gap ៤១–៥០ms ខ្លះគ្មាន long frame សោះ ➜ ភាគច្រើនជាការងារ browser ក្រៅ JS។ `_h` = `dispatchDiscreteEvent` ក្នុង chunk React (build `index-j3viNUV7.js` ឡើងវិញបេះបិទ ៖ `--mode android` + `google-services.json` ➜ `__FCM_CONFIGURED__`)។ ១១ ជួរ (ថ្ងៃនេះ) ➜ gap ១៧–២៥ms។
+- Chromium headless · CPU ÷៤ · `--force-renderer-accessibility` ៖ ៩០ ជួរ (DOM ពេញ) បើកធុងសំរាម gap ១៦៧–៣១៧ms ➜ **៦១៧–១០០០ms** · `RunAccessibilitySteps` ៦០០–១០០០ms (`SerializeLifecycleStage` ភាគច្រើន)។ ៦០០ ជួរ ៖ DOM ពេញ (PWA) gap រហូត **៨៣៧៩ms** · accessibility ១៤៤៧–៣៩១៣ms ក្នុង sample ធំ ➜ ជួរតាមទីតាំងរមូរ gap ១៥៩–៤២៤ms · accessibility ៥៣–២១១ms។ accessibility បិទ ៖ DOM ពេញ ៣៩–២២៥ms ធៀប ៣២–១៤៤ms។ ➜ ថ្លៃ accessibility កើនតាមចំនួន node ទាំងទំព័រ ហើយ WebView សាងមែកធាង accessibility ពេលមានសេវាជំនួយបើក ខណៈ Chrome ត្រងវា — សម្មតិកម្មដែលពន្យល់ «តែ APK» (មិនទាន់វាស់លើទូរស័ព្ទ)។ ថ្លៃនៅសល់ពេលបង្ហាញតាមទីតាំងរមូរ ៖ accessibility លើទំព័រ ~១៦០០ node (១២០–១៦០ms ក្រោម CPU ÷៤) មិនមែនតារាង។
+- ស្ថេរភាពរមូរ (APK · ៦០០ ជួរ) ៖ រមូរចុះ ៣០០ × ៤០px ➜ លោត ០ · ជួរខាងលើ viewport ធំ/តូចពេល sync ➜ ជួរដែលមើលឃើញរំកិល ០px · លោតដល់ចុងរួចរមូរឡើង ៣០០ ជំហាន ➜ លោត ២ ដង ≤ ៤px (ជួរដែលការលោតរំលងមិនទាន់វាស់ · estimate ១៦០ ធៀបពិត ~១២៧px)។
+- PWA iPhone/កុំព្យូទ័រមិនប្រែ ៖ build `2adf39f` ធៀប tree ក្រោយ `84665b2` (web · ៦០០ ជួរ · UA Android · iPhone (+ `navigator.standalone`/`-webkit-touch-callout` ក្លែង ➜ `html.ios-standalone`) · Desktop ១២៨០) ៖ HTML `#historyTableBody` · `scrollTop` · `scrollHeight` ដូចគ្នាបេះបិទ ៥/៧ ជំហាន។ ជំហានប្តូរតម្រងខុសគ្នា ក៏កើតពេលប្រៀប build ចាស់នឹងខ្លួនឯង (A/A) ➜ noise ពេលវេលារបស់ការផ្ទុកបន្ត (IntersectionObserver) — ការផ្ទុកបន្តនោះ [2.50.8] កែ (ត្រឡប់កំពូល)។
 
 ### 2026-10-07 — CI ក្រោយ commit `daa120f` ៖ class ជួរចន្លោះគ្មាន CSS និង Maven Central 403 ➜ [2.50.7]
 

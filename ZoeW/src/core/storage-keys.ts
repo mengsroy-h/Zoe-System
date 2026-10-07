@@ -1,5 +1,7 @@
 export const DRAWER_GROUP_KEY = 'zoew_drawer_groups_v1';
 
+export const DISPLAY_HZ_PEAK_KEY = 'zoew_display_hz_peak_v1';
+
 export const FIREBASE_SDK_RELOAD_KEY = 'zoe_firebase_sdk_reload_count';
 
 export const LOOKUP_KEY_DB_NAME = 'zoew_lookup_key_v1';

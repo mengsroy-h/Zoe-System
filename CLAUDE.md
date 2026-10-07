@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.8` (`zoew-v271`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.9` (`zoew-v272`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -677,7 +677,13 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
 - `measureDisplayHz()`: median of 24 rAF intervals, clamped `[10, 120]`. `longFrameThresholdMs()` = frame budget × 1.6
   (min 12ms) ⛔ no fixed number.
 - `setupAdaptivePerformance()` measures twice (1.5s and 10s); `body.perf-lite` only when both drop; never touches
-  business features.
+  business features. Each round measures the rate and the pace in **one** window (`sampleFramePace()`: budget = that
+  window's median) ⛔ never in separate windows — an LTPO display switching 120 ➜ 60 between them counts every normal
+  60Hz frame as long.
+- High-refresh devices are learned, not guessed: `sampleScrollHz()` (passive capture `scroll` · ≤ 1 per
+  `SCROLL_HZ_GAP_MS` · 20 frames · median) raises `uiState.displayHzPeak` (max only · `zoew_display_hz_peak_v1` per
+  device); ≥ `HIGH_REFRESH_HZ` ➜ never `perf-lite` and an existing one is cleared (`noteDisplayHzPeak()`). Guard:
+  `ZoeW/tests/adaptive-refresh.test.ts`.
 
 ## Barcode scanner
 

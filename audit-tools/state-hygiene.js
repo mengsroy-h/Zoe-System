@@ -84,6 +84,7 @@ const ACCEPTED = {
         perfSamplePending: 'frame-pace sampler mutex, clears itself when the sample finishes',
         displayHz: 'measured display refresh rate, a device property not user data',
         displayHzMeasured: 'flag saying the refresh rate has been measured; a device property',
+        displayHzPeak: 'highest refresh rate seen while the user scrolls, remembered per device (zoew_display_hz_peak_v1); a device property not user data',
         torchOn: 'reset by stopCurrentStream',
         autoLoginAttempted: 'dead variable, never read',
         isDatabaseConnected: 'live connection state, not user data',

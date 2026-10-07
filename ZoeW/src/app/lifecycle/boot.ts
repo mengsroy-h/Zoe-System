@@ -32,7 +32,7 @@ import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
-import { setupAdaptivePerformance } from '../../ui/perf';
+import { sampleScrollHz, setupAdaptivePerformance } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { setupScrollThumb } from '../behaviors/scroll-thumb';
 import { showToast } from '../../ui/toast';
@@ -50,6 +50,7 @@ export function bootApplication(scope: LifecycleScope): void {
         startScanEngine();
         startInteractions();
         startGlobalDismissals(scope);
+        scope.listen(window, 'scroll', sampleScrollHz, { capture: true, passive: true });
         revealAppAfterBoot();
     });
 }

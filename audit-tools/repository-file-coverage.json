@@ -1872,6 +1872,9 @@
     "ZoeW/tests/modal-chrome-state.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/adaptive-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
       "policy": "zoew-self-verification"
     },

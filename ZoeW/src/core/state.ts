@@ -229,6 +229,7 @@ export interface UiState {
     perfSamplePending: boolean;
     displayHz: number;
     displayHzMeasured: boolean;
+    displayHzPeak: number;
     currentFilterMode: string;
     customFilterDate: string;
     editingItemId: any;
@@ -322,6 +323,7 @@ export const uiState = createStore<UiState>('uiState', {
     perfSamplePending: false,
     displayHz: 60,
     displayHzMeasured: false,
+    displayHzPeak: 0,
     currentFilterMode: 'today',
     customFilterDate: '',
     editingItemId: null,

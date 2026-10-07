@@ -10,7 +10,7 @@ import { uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { DISPLAY_HZ_PEAK_KEY } from '../src/core/storage-keys';
 import {
-    HIGH_REFRESH_HZ, SCROLL_HZ_GAP_MS, SCROLL_HZ_SAMPLES, deviceIsHighRefresh, noteDisplayHzPeak, rememberedDisplayHzPeak,
+    HIGH_REFRESH_HZ, SCROLL_HZ_GAP_MS, DISPLAY_HZ_SAMPLES, deviceIsHighRefresh, noteDisplayHzPeak, rememberedDisplayHzPeak,
     sampleScrollHz, scrollHzSampler, setupAdaptivePerformance
 } from '../src/ui/perf';
 
@@ -96,7 +96,7 @@ describe('ចង្វាក់ស៊ុមសម្រប ↔ LTPO · ស្គ
         sampleScrollHz();
         run();
         expect(uiState.displayHzPeak).toBe(120);
-        expect(SCROLL_HZ_SAMPLES).toBeGreaterThan(10);
+        expect(DISPLAY_HZ_SAMPLES).toBeGreaterThan(10);
     });
 
     it('ឧបករណ៍ដែលធ្លាប់រមូរ ≥ HIGH_REFRESH_HZ (ចងចាំពីលើកមុន) ➜ មិន perf-lite ទោះស៊ុមពេល boot កក · perf-lite ដែលដាក់រួចត្រូវដក', () => {

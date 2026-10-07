@@ -22,7 +22,7 @@ export const PERF_SECOND_SAMPLE_DELAY_MS = 8000;
 
 export const HIGH_REFRESH_HZ = 90;
 
-export const SCROLL_HZ_SAMPLES = 20;
+export const DISPLAY_HZ_SAMPLES = 24;
 
 export const SCROLL_HZ_GAP_MS = 5000;
 
@@ -89,7 +89,7 @@ export function sampleScrollHz() {
     const tick = (timestamp) => {
         if (last && timestamp > last) gaps.push(timestamp - last);
         last = timestamp;
-        if (gaps.length < SCROLL_HZ_SAMPLES) {
+        if (gaps.length < DISPLAY_HZ_SAMPLES) {
             try { requestAnimationFrame(tick); } catch (e) { scrollHzSampler.sampling = false; }
             return;
         }

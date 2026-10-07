@@ -686,7 +686,7 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   window's median) ⛔ never in separate windows — an LTPO display switching 120 ➜ 60 between them counts every normal
   60Hz frame as long.
 - High-refresh devices are learned, not guessed: `sampleScrollHz()` (passive capture `scroll` · ≤ 1 per
-  `SCROLL_HZ_GAP_MS` · 20 frames · median) raises `uiState.displayHzPeak` (max only · `zoew_display_hz_peak_v1` per
+  `SCROLL_HZ_GAP_MS` · `DISPLAY_HZ_SAMPLES` frames · median) raises `uiState.displayHzPeak` (max only · `zoew_display_hz_peak_v1` per
   device); ≥ `HIGH_REFRESH_HZ` ➜ never `perf-lite` and an existing one is cleared (`noteDisplayHzPeak()`). Guard:
   `ZoeW/tests/adaptive-refresh.test.ts`.
 

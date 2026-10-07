@@ -1,0 +1,129 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { serveDir } from './serve.mjs';
+import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB, seedData } from './fake-firebase.mjs';
+import { FAKE_BRIDGE, RESPOND_DEFAULT } from './fake-capacitor.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const supplied = process.env.ZOEW_HISTORY_TEST_DIST;
+const OUT = supplied ? path.resolve(supplied) : path.join(ROOT, '.history-window-check-dist');
+if (!supplied) execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--mode', 'android', '--outDir', OUT, '--logLevel', 'error'], {
+    cwd: ROOT, stdio: 'inherit', env: { ...process.env, VITE_EXPOSE_GLOBALS: '1', VITE_PERF_TELEMETRY: '0' }
+});
+
+const browser = await chromium.launch({ executablePath: process.env.ZOEW_TEST_BROWSER || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const srv = await serveDir(OUT);
+const data = seedData();
+const history = {};
+for (let i = 0; i < 600; i++) history['window-' + i] = {
+    id: 'window-' + i, phone: '099' + String(i).padStart(7, '0'), cod: i % 5 ? 5 : 0, dod: i % 3 ? 1 : 0, count: 1, isClosed: false,
+    createdAt: HARNESS_CLOCK_START - 600000, scanDate: '2026-09-22', time: '10:00:00 (2026-09-22)',
+    barcodes: [{ code: 'WINDOW' + i, cod: i % 5 ? 5 : 0, dod: i % 3 ? 1 : 0, isClosed: false, isDeducted: false }]
+};
+data.zoew_scan_history_cod_dod = history;
+const failures = [];
+const check = (label, value, detail) => {
+    console.log((value ? '✅ ' : '❌ ') + label + (value ? '' : ' ' + JSON.stringify(detail)));
+    if (!value) failures.push(label);
+};
+const state = (page) => page.evaluate(() => {
+    const scroller = document.getElementById('tableResponsive');
+    const ids = Array.from(document.querySelectorAll('#historyTableBody tr[data-id]'), (r) => r.dataset.id);
+    return { count: ids.length, first: ids[0], last: ids[ids.length - 1], top: scroller.scrollTop,
+        loaded: Math.min(window.uiState.historyView.length, window.uiState.historyRenderLimit), total: window.uiState.historyView.length,
+        more: !!document.querySelector('.history-more-btn') };
+});
+
+try {
+    for (const native of [true, false]) {
+        const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, isMobile: true, hasTouch: true });
+        const page = await ctx.newPage();
+        const errors = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.route('**', (r) => {
+            if (r.request().url().includes('/license-verify.js')) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            return r.request().url().includes('127.0.0.1') ? r.continue() : r.abort();
+        });
+        if (native) {
+            await page.addInitScript('(' + FAKE_BRIDGE.toString() + ')();');
+            await page.addInitScript('(' + RESPOND_DEFAULT.toString() + ')();');
+        }
+        await page.addInitScript(() => {
+            localStorage.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }));
+            localStorage.setItem('zoe_active_locker', 'A5');
+        });
+        await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(data) + ');');
+        await page.clock.setFixedTime(HARNESS_CLOCK_START);
+        await page.goto('http://127.0.0.1:' + srv.port + '/index.html');
+        await page.waitForFunction(() => window.uiState?.historyView?.length === 600 && document.querySelector('#historyTableBody tr[data-id]'));
+        await page.waitForTimeout(700);
+        await page.getByRole('button', { name: 'ទាំងអស់', exact: true }).click();
+        await page.waitForTimeout(200);
+        const initial = await state(page);
+        check((native ? 'APK' : 'PWA') + ' ៖ ផ្ទុក ៥០ ដំបូង និងរាប់ទិន្នន័យទាំង ៦០០', initial.loaded === 50 && initial.total === 600, initial);
+        check('ជួរថ្មីបំផុតនៅកំពូល', initial.first === 'window-599', initial);
+        for (let i = 0; i < 40 && (await state(page)).loaded < 600; i++) {
+            await page.evaluate(() => { const e = document.getElementById('tableResponsive'); e.scrollTop = e.scrollHeight; });
+            await page.waitForTimeout(100);
+        }
+        await page.evaluate(() => { const e = document.getElementById('tableResponsive'); e.scrollTop = e.scrollHeight; });
+        await page.waitForTimeout(250);
+        const full = await state(page);
+        check('រមូរជិតចុង ➜ ផ្ទុកគ្រប់ ៦០០ · ជួរចាស់បំផុតអាចមើលបាន · គ្មានប៊ូតុងបន្ថែម', full.loaded === 600 && full.last === 'window-0' && !full.more, full);
+        check((native ? 'APK ៖ DOM នៅតូចក្រោយរមូរដល់ចុង' : 'PWA ៖ របៀបបន្ថែមជួរដើមនៅដដែល'), native ? full.count <= 50 : full.count === 600, full);
+        const heights = await page.locator('#historyTableBody tr[data-id]').evaluateAll((rows) => Array.from(new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))));
+        check('ជួរដែលកម្ពស់ខុសគ្នាអាចរមូរដល់ចុង', heights.length > 1, heights);
+        await page.evaluate(() => window.renderHistory([...window.uiState.historyView], window.uiState.historyViewKey));
+        await page.waitForTimeout(250);
+        const synced = await state(page);
+        check('sync នៅចុងបញ្ជី ➜ ចំនួន និងទីតាំងនៅដដែល', synced.loaded === 600 && Math.abs(synced.top - full.top) < 2 && synced.last === full.last, { full, synced });
+        await page.locator('#historyTableBody tr[data-id="window-0"] .count-badge-btn').click();
+        await page.waitForTimeout(300);
+        check('ចុចកញ្ចប់ចាស់បំផុត ➜ បញ្ជី barcode របស់ជួរត្រឹមត្រូវ', await page.evaluate(() => window.uiState.activeParentItemId === 'window-0' && document.getElementById('viewListModal').innerText.includes('WINDOW0')));
+        await page.evaluate(() => window.closeModal('viewListModal'));
+        await page.waitForTimeout(300);
+        const beforeModal = await state(page);
+        await page.evaluate(() => window.openRecentlyDeletedModal());
+        await page.waitForTimeout(400);
+        await page.evaluate(() => window.closeModal('recentlyDeletedModal'));
+        await page.waitForTimeout(400);
+        const afterModal = await state(page);
+        check('បើក/បិទធុងសំរាម ➜ ទីតាំង និងជួរដដែល', Math.abs(afterModal.top - beforeModal.top) < 2 && afterModal.first === beforeModal.first && afterModal.last === beforeModal.last, { beforeModal, afterModal });
+        await page.evaluate(() => window.openModalHelper('ztoListSyncModal'));
+        await page.waitForTimeout(400);
+        await page.evaluate(() => window.closeModal('ztoListSyncModal'));
+        await page.waitForTimeout(400);
+        const afterZto = await state(page);
+        check('បើក/បិទបញ្ជី ZTO ➜ ទីតាំង និងជួរដដែល', Math.abs(afterZto.top - beforeModal.top) < 2 && afterZto.first === beforeModal.first && afterZto.last === beforeModal.last, { beforeModal, afterZto });
+        await page.evaluate(() => { document.getElementById('tableResponsive').scrollTop = 0; });
+        await page.waitForTimeout(250);
+        const top = await state(page);
+        check('រមូរត្រឡប់ទៅកំពូល ➜ ជួរថ្មីបំផុតត្រឡប់មក · ទិន្នន័យនៅគ្រប់ ៦០០', top.first === 'window-599' && top.loaded === 600, top);
+        await page.evaluate(() => window.renderHistory(window.uiState.historyView, window.uiState.historyViewKey));
+        await page.waitForTimeout(200);
+        check('sync filter ដដែល ➜ មិនកាត់ចំនួនដែលផ្ទុករួច', (await state(page)).loaded === 600);
+        await page.evaluate(() => {
+            window.uiState.historyView[window.uiState.historyView.length - 1].phone = '0998888888';
+            window.renderHistory(window.uiState.historyView, window.uiState.historyViewKey);
+        });
+        await page.waitForTimeout(250);
+        check('កែទិន្នន័យក្នុងជួរដដែល ➜ React បង្ហាញលេខថ្មី', await page.locator('#historyTableBody tr[data-id="window-599"] .phone-title').innerText() === '0998888888');
+        await page.evaluate((native) => { const e = document.getElementById('tableResponsive'); e.scrollTop = native ? e.scrollHeight : 0; }, native);
+        await page.waitForTimeout(250);
+        await page.evaluate(() => window.renderHistory(window.uiState.historyView, 'window-new-filter'));
+        await page.waitForTimeout(250);
+        const reset = await state(page);
+        check('filter ថ្មី ➜ ត្រឡប់ទៅ ៥០ជួរ', reset.loaded === 50 && (!native || reset.top < 2 && reset.first === 'window-599'), reset);
+        check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
+        await ctx.close();
+    }
+} finally {
+    await browser.close();
+    srv.server.close();
+    if (!supplied) fs.rmSync(OUT, { recursive: true, force: true });
+}
+console.log('history-window-check ៖ ' + failures.length + ' FAIL');
+process.exitCode = failures.length ? 1 : 0;

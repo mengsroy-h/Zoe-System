@@ -155,9 +155,130 @@ export function noteJankEntries(list) {
         const ms = Number(entry && entry.duration);
         if (!isFinite(at) || !isFinite(ms) || ms <= 0) continue;
         jankMonitor.entries.push({ at: at, ms: ms });
+        const detail = loafDetailOf(entry);
+        if (detail) overlayProbe.frames.push(detail);
     }
     const extra = jankMonitor.entries.length - JANK_BUFFER_MAX;
     if (extra > 0) jankMonitor.entries.splice(0, extra);
+    const extraFrames = overlayProbe.frames.length - OVERLAY_PROBE_FRAMES_MAX;
+    if (extraFrames > 0) overlayProbe.frames.splice(0, extraFrames);
+}
+
+export const OVERLAY_PROBE_MS = 700;
+
+export const OVERLAY_PROBE_SETTLE_MS = 250;
+
+export const OVERLAY_PROBE_KEEP = 4;
+
+export const OVERLAY_PROBE_FRAMES_MAX = 60;
+
+export interface LoafDetail {
+    at: number;
+    ms: number;
+    task: number;
+    raf: number;
+    draw: number;
+    top: { name: string; ms: number; forced: number } | null;
+}
+
+export const overlayProbe: { sig: string; frames: LoafDetail[] } = { sig: '', frames: [] };
+
+function finiteOr(value, fallback) {
+    const n = Number(value);
+    return isFinite(n) ? n : fallback;
+}
+
+export function loafDetailOf(entry): LoafDetail | null {
+    if (!entry || typeof entry !== 'object') return null;
+    const at = finiteOr(entry.startTime, NaN);
+    const ms = finiteOr(entry.duration, NaN);
+    if (!isFinite(at) || !isFinite(ms) || ms <= 0) return null;
+    const end = at + ms;
+    const renderStart = finiteOr(entry.renderStart, 0);
+    const layoutStart = finiteOr(entry.styleAndLayoutStart, 0);
+    const renderAt = renderStart > at ? Math.min(end, renderStart) : end;
+    const layoutAt = layoutStart >= renderAt ? Math.min(end, layoutStart) : renderAt;
+    let top = null;
+    for (const script of Array.isArray(entry.scripts) ? entry.scripts : []) {
+        const d = finiteOr(script && script.duration, 0);
+        if (!(d > 0) || (top && d <= top.ms)) continue;
+        const name = String((script && (script.sourceFunctionName || script.invoker)) || '?').slice(0, 32);
+        top = { name: name, ms: d, forced: Math.max(0, finiteOr(script.forcedStyleAndLayoutDuration, 0)) };
+    }
+    return { at: at, ms: ms, task: renderAt - at, raf: layoutAt - renderAt, draw: end - layoutAt, top: top };
+}
+
+export function overlaySignature(state): string {
+    if (!state) return '';
+    const shown = state.modalDisplay || {};
+    const parts = Object.keys(shown).filter((id) => shown[id] === 'flex').sort();
+    if (state.drawerOpen) parts.push('drawer');
+    if (state.notifyDrawerOpen) parts.push('notify');
+    if (state.moreMenuOpen) parts.push('menu');
+    return parts.join(',');
+}
+
+export function overlayChangeLabel(prev, next): string {
+    const before = prev ? String(prev).split(',') : [];
+    const after = next ? String(next).split(',') : [];
+    const opened = after.filter((x) => before.indexOf(x) === -1);
+    if (opened.length) return 'បើក ' + opened.join('+');
+    const closed = before.filter((x) => after.indexOf(x) === -1);
+    return closed.length ? 'បិទ ' + closed.join('+') : '';
+}
+
+export function overlayProbeLine(label, maxGapMs, frames): string {
+    let text = '🔍 ' + label + ' ៖ ចន្លោះស៊ុម ' + Math.round(maxGapMs) + 'ms';
+    const list = Array.isArray(frames) ? frames : [];
+    if (!list.length) return text + ' · main thread គ្មានស៊ុមកក';
+    let total = 0, task = 0, raf = 0, draw = 0;
+    let top = null;
+    for (const f of list) {
+        total += f.ms; task += f.task; raf += f.raf; draw += f.draw;
+        if (f.top && (!top || f.top.ms > top.ms)) top = f.top;
+    }
+    text += ' · main ' + Math.round(total) + 'ms (JS ' + Math.round(task) + ' · rAF ' + Math.round(raf) + ' · layout/គូរ ' + Math.round(draw) + ')';
+    if (top) text += ' · ' + top.name + ' ' + Math.round(top.ms) + 'ms' + (top.forced > 0 ? ' (បង្ខំ layout ' + Math.round(top.forced) + ')' : '');
+    return text;
+}
+
+function recordOverlayProbe(line) {
+    const lines = (viewState.overlayProbeLines || []).concat([line]);
+    viewState.overlayProbeLines = lines.slice(-OVERLAY_PROBE_KEEP);
+}
+
+export function startOverlayProbe(label) {
+    if (!label || typeof requestAnimationFrame !== 'function') return;
+    let startAt = NaN;
+    try { startAt = performance.now(); } catch (e) { return; }
+    if (!isFinite(startAt)) return;
+    let last = startAt;
+    let maxGap = 0;
+    const finish = (endAt) => {
+        const frames = overlayProbe.frames.filter((f) => f.at + f.ms >= startAt - 1 && f.at <= endAt);
+        recordOverlayProbe(overlayProbeLine(label, maxGap, frames));
+    };
+    const tick = (timestamp) => {
+        if (timestamp > last) maxGap = Math.max(maxGap, timestamp - last);
+        last = Math.max(last, timestamp);
+        if (timestamp - startAt < OVERLAY_PROBE_MS) {
+            try { requestAnimationFrame(tick); } catch (e) {}
+            return;
+        }
+        setTimeout(() => finish(timestamp), OVERLAY_PROBE_SETTLE_MS);
+    };
+    try { requestAnimationFrame(tick); } catch (e) {}
+}
+
+export function setupOverlayProbe() {
+    overlayProbe.sig = overlaySignature(uiState);
+    uiState.subscribe(() => {
+        const next = overlaySignature(uiState);
+        if (next === overlayProbe.sig) return;
+        const label = overlayChangeLabel(overlayProbe.sig, next);
+        overlayProbe.sig = next;
+        startOverlayProbe(label);
+    });
 }
 
 export function startJankMonitor() {

@@ -32,7 +32,7 @@ import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
-import { noteScrollFrameRate, setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
+import { noteScrollFrameRate, setupAdaptivePerformance, setupOverlayProbe, startJankMonitor } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { setupScrollThumb } from '../behaviors/scroll-thumb';
 import { showToast } from '../../ui/toast';
@@ -187,6 +187,7 @@ function startInteractions(): void {
         setupChromeAutoHide();
         setupAdaptivePerformance();
         startJankMonitor();
+        setupOverlayProbe();
         setupIOSPullToRefresh();
         setupScrollThumb();
         setupVisibilityHandling();

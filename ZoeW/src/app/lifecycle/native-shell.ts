@@ -38,13 +38,19 @@ export function setupNativeShell(scope: LifecycleScope): void {
         applyBarStyles();
         scope.listen(window, 'resize', applyBarStyles);
         let frame = 0;
+        let afterFrame: ReturnType<typeof setTimeout> | null = null;
         let settle: ReturnType<typeof setTimeout> | null = null;
         let layers = statusBarLayerSignature();
         const scheduleBarStyles = () => {
             const next = statusBarLayerSignature();
             if (next === layers) return;
             layers = next;
-            if (!frame) frame = requestAnimationFrame(() => { frame = 0; applyBarStyles(); });
+            if (!frame && !afterFrame) {
+                frame = requestAnimationFrame(() => {
+                    frame = 0;
+                    afterFrame = setTimeout(() => { afterFrame = null; applyBarStyles(); }, 0);
+                });
+            }
             if (settle) clearTimeout(settle);
             settle = setTimeout(() => { settle = null; applyBarStyles(); }, STATUS_BAR_SETTLE_MS);
         };
@@ -53,6 +59,7 @@ export function setupNativeShell(scope: LifecycleScope): void {
         scope.onDispose(viewState.subscribe(scheduleBarStyles));
         scope.onDispose(() => {
             if (frame) cancelAnimationFrame(frame);
+            if (afterFrame) clearTimeout(afterFrame);
             if (settle) clearTimeout(settle);
         });
     }).catch((e) => {

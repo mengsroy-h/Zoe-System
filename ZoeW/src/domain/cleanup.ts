@@ -350,12 +350,13 @@ export async function resumeCleanupJournalEntry(trashId) {
         return '';
     }
     const rev = entry.revenue;
-    if (entry.stage === CLEANUP_STAGE_FLIP) {
+    let stage = entry.stage;
+    if (stage === CLEANUP_STAGE_FLIP) {
         if (!rev || await settleCleanupDeduction(entry.id, trashItem, rev, true)) clearCleanupJournalEntry(trashItem.id);
         return '';
     }
     let outcome = '';
-    if (entry.stage === CLEANUP_STAGE_SLOT) {
+    if (stage === CLEANUP_STAGE_SLOT) {
         const slot = await resolveCleanupSlot(trashItem);
         if (slot === 'wait') return '';
         if (slot === 'elsewhere') {
@@ -363,7 +364,7 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
         markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_MOVED);
-        entry.stage = CLEANUP_STAGE_MOVED;
+        stage = CLEANUP_STAGE_MOVED;
         if (slot === 'claimed') outcome = 'restored';
     }
     let present = false;
@@ -374,7 +375,7 @@ export async function resumeCleanupJournalEntry(trashId) {
         return '';
     }
     if (!present) {
-        if (entry.stage !== CLEANUP_STAGE_MOVED) {
+        if (stage !== CLEANUP_STAGE_MOVED) {
             clearCleanupJournalEntry(trashItem.id);
             return rev ? 'unverified' : '';
         }
@@ -395,14 +396,14 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
     }
-    if (entry.stage === CLEANUP_STAGE_MOVED && rev) {
+    if (stage === CLEANUP_STAGE_MOVED && rev) {
         markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
         const status = await applyCleanupRevenue(entry.id, rev, -1);
         if (cleanupLedgerDeducted(status, parseFloat(rev.cod) || 0, parseFloat(rev.dod) || 0, parseFloat(rev.count) || 0)) {
             markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
             if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return outcome;
         }
-    } else if (entry.stage === CLEANUP_STAGE_LEDGER && rev) {
+    } else if (stage === CLEANUP_STAGE_LEDGER && rev) {
         outcome = 'unverified';
     }
     clearCleanupJournalEntry(trashItem.id);

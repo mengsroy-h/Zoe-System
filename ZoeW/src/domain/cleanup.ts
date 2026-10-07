@@ -2,7 +2,7 @@ import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
-import { DB_LISTENER_KEY_DELETED } from '../core/text';
+import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
@@ -100,6 +100,8 @@ export const CLEANUP_STAGE_MOVED = 'moved';
 
 export const CLEANUP_STAGE_LEDGER = 'ledger';
 
+export const CLEANUP_STAGE_FLIP = 'flip';
+
 export function readCleanupJournal() {
     try {
         const raw = safeStoreGet(appLocalStore, CLEANUP_JOURNAL_KEY);
@@ -163,6 +165,84 @@ export function clearCleanupJournalEntry(trashId) {
     const list = readCleanupJournal();
     const next = list.filter(e => e.trashItem.id !== trashId);
     if (next.length !== list.length) writeCleanupJournal(next);
+}
+
+export function cleanupTrashCodes(trashItem) {
+    const codes = new Set();
+    barcodeEntriesOf(trashItem && trashItem.barcodes).forEach(({ barcode }) => {
+        if (barcode && barcode.code) codes.add(barcode.code);
+    });
+    return codes;
+}
+
+export function cleanupLedgerDeducted(status, cod, dod, count) {
+    if (!status || status.stale) return false;
+    if (status.ok) return true;
+    const daily = status.daily;
+    if (!daily || daily.unknown) return false;
+    const cents = (n) => Math.round((parseFloat(n) || 0) * 100);
+    return cents(daily.cod) === cents(-cod) && cents(daily.dod) === cents(-dod) && (parseFloat(daily.count) || 0) === -count;
+}
+
+export function markCleanupTrashDeducted(trashItem) {
+    const codes = cleanupTrashCodes(trashItem);
+    let claimed = false;
+    return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => {
+        claimed = false;
+        if (current === null || current === undefined) return null;
+        if (typeof current !== 'object') return;
+        if (current.restoreClaim && isActiveRestoreClaim(current.restoreClaim)) {
+            claimed = true;
+            return;
+        }
+        normalizeBarcodesOf(current);
+        if (Array.isArray(current.barcodes)) {
+            current.barcodes = current.barcodes.map((b) => (b && codes.has(b.code) ? { ...b, isDeducted: true } : b));
+        }
+        return current;
+    }).then((result) => {
+        if (claimed) return 'claimed';
+        const value = result && result.committed && result.snapshot ? result.snapshot.val() : null;
+        return value ? 'flipped' : 'gone';
+    });
+}
+
+export function cleanupBarcodesBackInHistory(trashItem) {
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return null;
+    const codes = cleanupTrashCodes(trashItem);
+    if (!codes.size) return false;
+    const since = (parseFloat(trashItem.deletedAt) || 0) - TWO_HOURS_MS;
+    return dataState.scanHistory.some((item) => item && barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode
+        && codes.has(barcode.code) && (parseFloat(barcode.restoredAt) || 0) >= since));
+}
+
+export async function applyCleanupRevenue(itemId, rev, sign) {
+    const cod = sign * (parseFloat(rev.cod) || 0);
+    const dod = sign * (parseFloat(rev.dod) || 0);
+    const count = sign * (parseFloat(rev.count) || 0);
+    const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, cod, dod, count);
+    try {
+        return await correctRevenueLedgerToActual(rev.scanDate, applied, cod, dod, count);
+    } catch (ledgerErr) {
+        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId });
+        return null;
+    }
+}
+
+export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone) {
+    let verdict;
+    try {
+        verdict = await retryAsync(() => dbOp(markCleanupTrashDeducted(trashItem)), 3, 1500);
+    } catch (flipErr) {
+        return false;
+    }
+    if (verdict === 'flipped') return true;
+    if (verdict === 'claimed' || !decideGone) return false;
+    if (dataState.deletedItems.some((t) => t && t.id === trashItem.id)) return false;
+    const back = cleanupBarcodesBackInHistory(trashItem);
+    if (back === null) return false;
+    if (back && rev) await applyCleanupRevenue(itemId, rev, 1);
+    return true;
 }
 
 export const cleanupJournalLive = new Map();
@@ -246,6 +326,11 @@ export async function resumeCleanupJournalEntry(trashId) {
         clearCleanupJournalEntry(trashItem.id);
         return '';
     }
+    const rev = entry.revenue;
+    if (entry.stage === CLEANUP_STAGE_FLIP) {
+        if (!rev || await settleCleanupDeduction(entry.id, trashItem, rev, true)) clearCleanupJournalEntry(trashItem.id);
+        return '';
+    }
     let present = false;
     try {
         const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
@@ -256,6 +341,14 @@ export async function resumeCleanupJournalEntry(trashId) {
     let outcome = '';
     if (!present) {
         if (entry.stage !== CLEANUP_STAGE_MOVED) {
+            clearCleanupJournalEntry(trashItem.id);
+            return rev ? 'unverified' : '';
+        }
+        const back = cleanupBarcodesBackInHistory(trashItem);
+        if (back === null) return '';
+        if (back) {
+            const flaggedBeforeLedger = barcodeEntriesOf(trashItem.barcodes).some(({ barcode }) => barcode && barcode.isDeducted === true);
+            if (rev && flaggedBeforeLedger) await applyCleanupRevenue(entry.id, rev, -1);
             clearCleanupJournalEntry(trashItem.id);
             return '';
         }
@@ -268,17 +361,12 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
     }
-    const rev = entry.revenue;
     if (entry.stage === CLEANUP_STAGE_MOVED && rev) {
         markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
-        const cod = parseFloat(rev.cod) || 0;
-        const dod = parseFloat(rev.dod) || 0;
-        const count = parseFloat(rev.count) || 0;
-        const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, -cod, -dod, -count);
-        try {
-            await correctRevenueLedgerToActual(rev.scanDate, applied, -cod, -dod, -count);
-        } catch (ledgerErr) {
-            if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId: entry.id });
+        const status = await applyCleanupRevenue(entry.id, rev, -1);
+        if (cleanupLedgerDeducted(status, parseFloat(rev.cod) || 0, parseFloat(rev.dod) || 0, parseFloat(rev.count) || 0)) {
+            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
+            if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return outcome;
         }
     } else if (entry.stage === CLEANUP_STAGE_LEDGER && rev) {
         outcome = 'unverified';
@@ -486,7 +574,7 @@ export async function claimAndCleanupItem(id, reason) {
             trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b,
                 cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
                 dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
-                isDeducted: true, isFromDeletion: false }));
+                isDeducted: false, isFromDeletion: false }));
             trashItem.count = trashItem.barcodes.length;
             recalcItemMoneyFromBarcodes(trashItem);
             trashItem.barcode = trashItem.barcodes[0].code;
@@ -518,7 +606,7 @@ export async function claimAndCleanupItem(id, reason) {
                     trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
                         cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
                         dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
-                        isDeducted: true, isFromDeletion: false }));
+                        isDeducted: false, isFromDeletion: false }));
                     recalcItemMoneyFromBarcodes(trashItem);
                 }
                 revenueScanDate = trashItem.scanDate || getFormattedDate();
@@ -590,9 +678,11 @@ export async function claimAndCleanupItem(id, reason) {
             }
             try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER); } catch (journalErr) {}
             const revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+            let ledgerStatus = null;
             try {
                 const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
                     -revenueCod, -revenueDod, -revenueCount);
+                ledgerStatus = status;
                 if (!status || (!status.ok && !status.stale)) {
                     const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
                     if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
@@ -600,6 +690,12 @@ export async function claimAndCleanupItem(id, reason) {
                 }
             } catch (ledgerErr) {
                 if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+            }
+            if (cleanupLedgerDeducted(ledgerStatus, revenueCod, revenueDod, revenueCount)) {
+                try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP); } catch (journalErr) {}
+                const settled = await settleCleanupDeduction(id, trashItem,
+                    { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount }, false);
+                if (!settled) return;
             }
             try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
         } finally {

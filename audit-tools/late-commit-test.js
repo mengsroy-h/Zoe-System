@@ -106,7 +106,7 @@ const REAL_FNS = [
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
     'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
-    'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
@@ -291,6 +291,7 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_JOURNAL_MAX') || 'const CLEANUP_JOURNAL_MAX = 200;',
         extractConst('CLEANUP_STAGE_MOVED') || "const CLEANUP_STAGE_MOVED = 'moved';",
         extractConst('CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
+        extractConst('CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc

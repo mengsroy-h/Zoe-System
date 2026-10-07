@@ -233,14 +233,15 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         install('abandon', 'supabase');
         let trashAttempts = 0;
         lab.hook = (info) => {
-            if (info.path === TRASH + '/' + ID && trashAttempts++ === 0) throw new Error('disconnect');
+            if (info.path === TRASH + '/' + ID && info.prior === null && trashAttempts++ === 0) throw new Error('disconnect');
             return appliedAfterLostReply(info);
         };
         await claimAndCleanupItem(ID, 'abandon');
         await flush(60);
         expect(trashAttempts).toBe(2);
         expect(getAt(TRASH + '/' + ID)).not.toBeNull();
-        expect(lab.tx.filter((t) => t.path === TRASH + '/' + ID && t.proposed !== undefined).length).toBe(2);
+        expect(lab.tx.filter((t) => t.path === TRASH + '/' + ID && t.prior === null && t.proposed !== undefined).length).toBe(2);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
         expect(getAt(DAILY + '/' + DAY).totalCount).toBe(9);
         expect(readCleanupJournal().length).toBe(0);
@@ -252,7 +253,8 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         await flush();
         expect(getAt(TRASH + '/' + ID)).not.toBeNull();
         expect(lab.updates.filter((p) => p === TRASH + '/' + ID).length).toBe(1);
-        expect(lab.tx.filter((t) => t.path === TRASH + '/' + ID).length).toBe(0);
+        expect(lab.tx.filter((t) => t.path === TRASH + '/' + ID && t.prior === null).length).toBe(0);
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
         expect(readCleanupJournal().length).toBe(0);
     }, 20000);

@@ -102,7 +102,7 @@ const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
-    'releaseStaleRestoreClaimForPurge', 'claimAndCleanupItem', 'runAutomaticCleanupRules',
+    'releaseStaleRestoreClaimForPurge', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'claimAndCleanupItem', 'runAutomaticCleanupRules',
     'collectItemBarcodes', 'trashRetentionMs', 'runAutomaticDeletedCleanup'];
 // មានតែក្នុងកំណែថ្មី (2.18.0) ឬកំណែចាស់ — ស្រង់អ្វីដែលមាន
 const OPTIONAL_FNS = ['purgeDeletedItemsQuietly', 'deleteMultipleDeletedItemsFromFirebase'];

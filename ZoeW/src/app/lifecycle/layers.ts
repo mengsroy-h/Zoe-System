@@ -54,10 +54,23 @@ export function dismissGlobalMoreMenuOutside(e) {
     closeGlobalMoreMenu();
 }
 
-let moreMenuInputAt = -Infinity;
+export const MORE_MENU_WHEEL_GAP_MS = 150;
 
-export function noteMoreMenuInput(): void {
-    moreMenuInputAt = performance.now();
+let moreMenuInputAt = -Infinity;
+let moreMenuWheelAt = -Infinity;
+
+export function noteMoreMenuInput(event?: Event): void {
+    const target = event ? event.target as Node | null : null;
+    const menu = elementOf('globalMoreMenu');
+    const anchor = moreMenuAnchor() as Node | null;
+    if (target && target.nodeType === 1 && ((menu && menu.contains(target)) || (anchor && anchor.contains(target)))) return;
+    const now = performance.now();
+    if (event && event.type === 'wheel') {
+        const continued = now - moreMenuWheelAt <= MORE_MENU_WHEEL_GAP_MS;
+        moreMenuWheelAt = now;
+        if (continued) return;
+    }
+    moreMenuInputAt = now;
 }
 
 export function moreMenuScrollDismisses(scrolled: EventTarget | null): boolean {

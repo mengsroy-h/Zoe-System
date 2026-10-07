@@ -9,7 +9,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { uiState } from '../src/core/state';
 import { refTo } from '../src/app/refs';
-import { KEYBOARD_MIN_INSET_PX, setupChromeAutoHide } from '../src/app/behaviors/chrome-autohide';
+import { KEYBOARD_INTENT_MS, KEYBOARD_MIN_INSET_PX, setupChromeAutoHide } from '../src/app/behaviors/chrome-autohide';
 import { DocumentEffects } from '../src/app/components/shell/DocumentEffects';
 import { mount, step, unmount } from './native/react-harness';
 
@@ -27,6 +27,7 @@ function resizeTo(width: number, height: number) {
 }
 
 const hasClass = (c: string) => document.body.classList.contains(c);
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('របា Tab ↔ keyboard (APK Android)', () => {
     beforeAll(() => {
@@ -96,6 +97,47 @@ describe('របា Tab ↔ keyboard (APK Android)', () => {
         resizeTo(412, FULL);
         expect(hasClass('keyboard-open')).toBe(false);
         expect(hasClass('chrome-hidden')).toBe(true);
+    });
+
+    it('បំបែកអេក្រង់ ➜ keyboard បើក/បិទក្នុងបង្អួចតូច ➜ របាត្រឡប់ (កម្ពស់គោល = កម្ពស់មុន keyboard)', () => {
+        resizeTo(412, 400);
+        input.focus();
+        resizeTo(412, 150);
+        expect(uiState.keyboardOpen).toBe(true);
+        resizeTo(412, 400);
+        expect(uiState.keyboardOpen).toBe(false);
+        expect(hasClass('chrome-hidden')).toBe(false);
+        input.blur();
+        resizeTo(412, FULL);
+    });
+
+    it('keyboard បើកពេញអេក្រង់ ➜ ចូលបំបែកអេក្រង់ទាំង keyboard បើក ➜ keyboard បិទ ➜ របាមិនជាប់លាក់', () => {
+        input.focus();
+        resizeTo(412, FULL - 320);
+        resizeTo(412, 250);
+        expect(uiState.keyboardOpen).toBe(true);
+        resizeTo(412, 400);
+        expect(uiState.keyboardOpen).toBe(false);
+        expect(hasClass('chrome-hidden')).toBe(false);
+        input.blur();
+        resizeTo(412, FULL);
+    });
+
+    it('Back បិទ keyboard (focus នៅ) ➜ យូរក្រោយមកបំបែកអេក្រង់ ➜ មិនមែន keyboard', async () => {
+        input.focus();
+        resizeTo(412, FULL - 320);
+        resizeTo(412, FULL);
+        await wait(KEYBOARD_INTENT_MS + 60);
+        resizeTo(412, 400);
+        expect(uiState.keyboardOpen).toBe(false);
+        expect(hasClass('chrome-hidden')).toBe(false);
+        input.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        resizeTo(412, 150);
+        expect(uiState.keyboardOpen).toBe(true);
+        resizeTo(412, 400);
+        expect(uiState.keyboardOpen).toBe(false);
+        input.blur();
+        resizeTo(412, FULL);
     });
 
     it('web/PWA (មិនមែន APK) ➜ មិនប្រែ', () => {

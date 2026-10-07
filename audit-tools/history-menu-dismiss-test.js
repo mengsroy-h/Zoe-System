@@ -308,7 +308,25 @@ async function checkMenuAnimation(page) {
                     check(stays === keep, kind + (keep ? ': momentum តារាងបន្តក្រោយបើក ➜ ម៉ឺនុយក្បាលប្រអប់នៅបើក' : ': momentum រំកិលប៊ូតុង ⋮ ➜ ម៉ឺនុយជួរបិទ'),
                         'open=' + stays);
                 }
+                // ⛔ ចុចធាតុម៉ឺនុយខណៈ momentum នៅបន្ត ➜ pointerdown ក្នុងម៉ឺនុយមិនមែន «input ថ្មី» ➜ ម៉ឺនុយនៅ ហើយធាតុដំណើរការ
                 await page.evaluate(() => { closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
+                await settle(page);
+                await page.locator('.header-more-btn').first().tap();
+                await page.evaluate(() => {
+                    const table = document.getElementById('tableResponsive');
+                    const until = performance.now() + 900;
+                    const step = () => { if (performance.now() > until) return; table.scrollTop += 8; requestAnimationFrame(step); };
+                    requestAnimationFrame(step);
+                });
+                await page.waitForTimeout(120);
+                const item = await page.locator('#globalMoreMenu button', { hasText: '💱' }).first().boundingBox();
+                await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: item.x + item.width / 2, y: item.y + item.height / 2 }] });
+                await page.waitForTimeout(120);
+                await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+                await page.waitForTimeout(900);
+                const rateOpen = await page.evaluate(() => getComputedStyle(document.getElementById('exchangeRateModal')).display === 'flex');
+                check(rateOpen, 'header: ចុចធាតុម៉ឺនុយ (💱) ខណៈ momentum តារាងនៅបន្ត ➜ ធាតុដំណើរការ');
+                await page.evaluate(() => { closeModal('exchangeRateModal'); closeGlobalMoreMenu(); document.getElementById('tableResponsive').scrollTop = 0; });
                 await settle(page);
                 await page.locator('.header-more-btn').first().tap();
                 check(await visible(), 'header: បើកម្តងទៀតមុនរមូរដោយ input ថ្មី');

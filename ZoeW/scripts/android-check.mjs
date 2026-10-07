@@ -179,6 +179,13 @@ const colorsXml = fs.existsSync(path.join(ROOT, 'android/app/src/main/res/values
 const bgValue = bgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${bgName}"\\s*>\\s*([^<\\s]+)\\s*</color>`)) || [])[1]) || '').toLowerCase() : '';
 ok(`${launchTheme} ៖ windowSplashScreenBackground ស្មើ SplashScreen.backgroundColor (${capSplashBg || '?'})`,
     !!capSplashBg && bgValue === capSplashBg, bgRef + ' = ' + (bgValue || 'អវត្តមាន'));
+const bodyBg = ((read('src/styles/app.css').match(/--body-bg:\s*(#[0-9a-fA-F]{3,8})/) || [])[1] || '').toLowerCase();
+const bridgeItems = styleItems(stylesXml, bridgeTheme) || new Map();
+const windowBgRef = bridgeItems.get('android:windowBackground') || '';
+const windowBgName = (windowBgRef.match(/^@color\/(\w+)$/) || [])[1];
+const windowBgValue = windowBgName ? (((colorsXml.match(new RegExp(`<color\\s+name="${windowBgName}"\\s*>\\s*([^<\\s]+)\\s*</color>`)) || [])[1]) || '').toLowerCase() : '';
+ok(`${bridgeTheme} ៖ android:windowBackground ស្មើ --body-bg របស់ App (${bodyBg || '?'}) ➜ ផ្ទៃក្រោម WebView ពេល keyboard កំពុងឡើង មិនមែនស/ខ្មៅ`,
+    !!bodyBg && windowBgValue === bodyBg, windowBgRef + ' = ' + (windowBgValue || 'អវត្តមាន'));
 const iconRef = launch.get('windowSplashScreenAnimatedIcon') || '';
 ok(`${launchTheme} ៖ windowSplashScreenAnimatedIcon = @drawable/splash_icon (vector · មិនមែន PNG/mipmap ដែលព្រិលពេលពង្រីក ឬ sym_def_app_icon លំនាំដើម)`,
     iconRef === '@drawable/splash_icon', iconRef || 'អវត្តមាន');

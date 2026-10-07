@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.11` (`zoew-v274`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.12` (`zoew-v275`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -578,8 +578,9 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
 - (...) menus close when an outside drag or history scroll starts; taps/scrolls inside still work; the open motion
   (`#globalMoreMenu`) honors Reduce Motion and never delays closing (`history-menu-dismiss-test.js`). A scroll closes the menu
   only when it moves the button (the scroller contains the anchor · the anchor left the DOM) or follows user input made
-  **after** opening (`moreMenuScrollDismisses()` · `noteMoreMenuInput()`) ⛔ momentum left over from a swipe before the tap never
-  closes it (`ZoeW/tests/more-menu-scroll.test.ts`).
+  **after** opening (`moreMenuScrollDismisses()` · `noteMoreMenuInput()`: input inside the menu or on its button never counts ·
+  a `wheel` counts only when it starts a stream after a `MORE_MENU_WHEEL_GAP_MS` pause) ⛔ momentum or wheel inertia left over
+  from before the tap never closes it (`ZoeW/tests/more-menu-scroll.test.ts` · `history-menu-dismiss-test.js`).
 - **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (drawer): **9** rows, read-only — network · Firebase · clock · License · storage · Service
   Worker · customer table · Apps Script version · Lookup. Count derived from `runHealthCheck()`. ZTO row: rejected ➜ ❌ ·
   accepted ➜ ✅ · never used ➜ ⚠️. Never forces PIN · secrets never in DOM (8-char fingerprint only) · the Apps Script
@@ -675,11 +676,14 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   `gesture-test`.
 - ⛔ APK soft keyboard: the WebView resizes in one step when the IME starts opening ➜ a fixed bar would jump above it. Inside the
   same `resize` handler `noteKeyboardViewport()` (native Android only) sets `uiState.keyboardOpen` (immediate commit) when the
-  height drops ≥ `KEYBOARD_MIN_INSET_PX` below the full height of that width while a text field is focused; it clears only on a
-  resize back (never on blur — the IME is still closing). Body gets `keyboard-open` + `chrome-hidden` (bar hidden with no
-  transition, list uses the hidden-bar layout); `uiState.chromeHidden` (scroll state) is never touched, so the bar returns to
-  the state it had. Web/iOS unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. Guards:
-  `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`.
+  height drops ≥ `KEYBOARD_MIN_INSET_PX` below the **last height before the keyboard** (any other same-width resize re-bases
+  it: split-screen) while a text field is focused **and** a text field got `focusin`/`pointerdown` within `KEYBOARD_INTENT_MS`;
+  it clears only on a resize (back within the inset of that base, or ≥ the inset above the lowest open height) ⛔ never on blur
+  (the IME is still closing). Body gets `keyboard-open` + `chrome-hidden` (bar hidden with no transition, list uses the
+  hidden-bar layout); `uiState.chromeHidden` (scroll state) is never touched, so the bar returns to the state it had. Web/iOS
+  unchanged (the keyboard overlays). Anything meaning "bar hidden" reads both fields. The strip below the shrunk WebView until
+  the IME slides in is the window background ➜ the bridge theme's `android:windowBackground` = `--body-bg` (`android:check`).
+  Guards: `ZoeW/tests/keyboard-tabbar.test.tsx` · `ZoeW/scripts/history-window-check.mjs`.
 - ⛔ Modals and drawers (☰ · 🔔) cover the bar (z-index) ➜ they never move it: `openModalHelper()` and `openSideDrawer()`
   never call `showAppChrome()`, and scrolls inside a `.modal` or `.side-drawer` never drive it. On Android a bar toggle
   flips the list's `clip-path` and `.table-responsive` `padding-bottom` (parity `app.css`) ➜ the whole rendered list

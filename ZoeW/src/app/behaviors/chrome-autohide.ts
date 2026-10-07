@@ -46,7 +46,28 @@ export const CHROME_FLIP_SETTLE_MS = 250;
 
 export const KEYBOARD_MIN_INSET_PX = 120;
 
-const keyboardViewport = { width: 0, height: 0 };
+export const KEYBOARD_INTENT_MS = 1500;
+
+const keyboardViewport = { width: 0, height: 0, low: 0, intentAt: -Infinity };
+
+function opensKeyboard(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el || el.nodeType !== 1) return false;
+    if (el.isContentEditable) return true;
+    if (el.tagName === 'TEXTAREA') return true;
+    if (el.tagName !== 'INPUT') return false;
+    return !/^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/i.test((el as HTMLInputElement).type || '');
+}
+
+export function noteKeyboardIntent(event: Event) {
+    if (opensKeyboard(event.target)) keyboardViewport.intentAt = performance.now();
+}
+
+function setKeyboardBase(width: number, height: number) {
+    keyboardViewport.width = width;
+    keyboardViewport.height = height;
+    keyboardViewport.low = height;
+}
 
 export function noteKeyboardViewport() {
     if (!isNativeAndroid()) {
@@ -56,13 +77,25 @@ export function noteKeyboardViewport() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     if (width !== keyboardViewport.width) {
-        keyboardViewport.width = width;
-        keyboardViewport.height = height;
-    } else if (height > keyboardViewport.height) {
-        keyboardViewport.height = height;
+        setKeyboardBase(width, height);
+        if (uiState.keyboardOpen) uiState.keyboardOpen = false;
+        return;
     }
-    const open = keyboardViewport.height - height >= KEYBOARD_MIN_INSET_PX && (uiState.keyboardOpen || activeElementIsTextField());
-    if (uiState.keyboardOpen !== open) uiState.keyboardOpen = open;
+    if (uiState.keyboardOpen) {
+        keyboardViewport.low = Math.min(keyboardViewport.low, height);
+        if (keyboardViewport.height - height < KEYBOARD_MIN_INSET_PX || height - keyboardViewport.low >= KEYBOARD_MIN_INSET_PX) {
+            setKeyboardBase(width, height);
+            uiState.keyboardOpen = false;
+        }
+        return;
+    }
+    const intent = activeElementIsTextField() && performance.now() - keyboardViewport.intentAt <= KEYBOARD_INTENT_MS;
+    if (intent && keyboardViewport.height - height >= KEYBOARD_MIN_INSET_PX) {
+        keyboardViewport.low = height;
+        uiState.keyboardOpen = true;
+        return;
+    }
+    setKeyboardBase(width, height);
 }
 
 export function setupChromeAutoHide() {
@@ -148,6 +181,8 @@ export function setupChromeAutoHide() {
     document.addEventListener('keydown', noteInput, listenOptions);
     document.addEventListener('pointerdown', noteInput, listenOptions);
     document.addEventListener('pointermove', notePointerMove, listenOptions);
+    document.addEventListener('focusin', noteKeyboardIntent, listenOptions);
+    document.addEventListener('pointerdown', noteKeyboardIntent, listenOptions);
     window.addEventListener('resize', () => {
         noteKeyboardViewport();
         measureAppChromeSize();

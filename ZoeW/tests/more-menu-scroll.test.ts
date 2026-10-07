@@ -5,7 +5,8 @@
  *    ធាតុផ្សេង ➜ បិទតែពេលមាន input (pointerdown · wheel · keydown) **ក្រោយ** ម៉ឺនុយបើក · បិទម៉ឺនុយ ➜ លែងចងប៊ូតុង (គ្មានសំណល់ DOM)។
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { moreMenuScrollDismisses, noteMoreMenuInput } from '../src/app/lifecycle/layers';
+import { MORE_MENU_WHEEL_GAP_MS, moreMenuScrollDismisses, noteMoreMenuInput } from '../src/app/lifecycle/layers';
+import { refTo } from '../src/app/refs';
 import { closeGlobalMoreMenu, moreMenuAnchor, showGlobalMoreMenu } from '../src/ui/more-menu';
 
 function setup() {
@@ -39,6 +40,35 @@ describe('ម៉ឺនុយ (…) ↔ scroll', () => {
         expect(moreMenuScrollDismisses(card)).toBe(true);
         expect(moreMenuScrollDismisses(document)).toBe(true);
         header.remove();
+        expect(moreMenuScrollDismisses(table)).toBe(true);
+    });
+
+    it('ចុចក្នុងម៉ឺនុយ ឬលើប៊ូតុង (…) ពេល momentum នៅបន្ត ➜ មិនរាប់ជា input ថ្មី (ធាតុម៉ឺនុយដំណើរការ)', () => {
+        const { header, table } = setup();
+        const menu = document.createElement('div');
+        const item = document.createElement('button');
+        menu.appendChild(item);
+        document.body.appendChild(menu);
+        refTo('globalMoreMenu')(menu);
+        showGlobalMoreMenu(header, null, []);
+        noteMoreMenuInput({ type: 'pointerdown', target: item } as unknown as Event);
+        noteMoreMenuInput({ type: 'pointerdown', target: header } as unknown as Event);
+        expect(moreMenuScrollDismisses(table)).toBe(false);
+        noteMoreMenuInput({ type: 'pointerdown', target: table } as unknown as Event);
+        expect(moreMenuScrollDismisses(table)).toBe(true);
+        refTo('globalMoreMenu')(null);
+    });
+
+    it('wheel inertia ដែលបន្តពីមុនបើក ➜ មិនរាប់ · wheel ថ្មី (ក្រោយគម្លាត) ➜ រាប់', async () => {
+        const { header, table } = setup();
+        const wheel = () => noteMoreMenuInput({ type: 'wheel', target: table } as unknown as Event);
+        wheel();
+        showGlobalMoreMenu(header, null, []);
+        wheel();
+        wheel();
+        expect(moreMenuScrollDismisses(table)).toBe(false);
+        await new Promise((r) => setTimeout(r, MORE_MENU_WHEEL_GAP_MS + 40));
+        wheel();
         expect(moreMenuScrollDismisses(table)).toBe(true);
     });
 

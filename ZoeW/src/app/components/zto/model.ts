@@ -13,11 +13,14 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                 row.cod ? 'COD $' + row.cod.toFixed(2) : '',
                 row.dod ? 'DOD $' + row.dod.toFixed(2) : ''
             ].filter(Boolean).join(' · ');
+            const arrived = row.signedOnly ? 'មុនថ្ងៃ ' + row.arrivedBefore + ' (ក្រៅចន្លោះ)' : row.at;
             return {
                 barcode: row.barcode || '—',
-                primary: [row.phone || '—', money, row.at].filter(Boolean).join(' · '),
+                primary: [row.phone || '—', money].filter(Boolean).join(' · '),
                 origin: originLabel(row.from).full,
                 notes: [
+                    arrived ? '📥 មកដល់ ៖ ' + arrived : '',
+                    row.signedAt ? '✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ ' + row.signedAt : '',
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
                     ztoListSkipText(row.skip)].filter(Boolean)

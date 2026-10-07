@@ -185,7 +185,43 @@ export async function resolveZtoListSignedVerdicts(cfg, rows) {
     return lost ? 0 : measured;
 }
 
-export function classifyZtoListRows(rows, historyList, trashList) {
+export function ztoListRowOf(raw, key) {
+    const cod = Number(raw.cod);
+    const dod = Number(raw.dod);
+    const at = String(raw.at === undefined || raw.at === null ? '' : raw.at);
+    return {
+        barcode: String(raw.barcode === undefined || raw.barcode === null ? '' : raw.barcode),
+        phone: normalizeStoredPhone(raw.phone),
+        cod: isFinite(cod) ? cod : 0,
+        dod: isFinite(dod) ? dod : 0,
+        at: at,
+        stampMs: ztoScanStampMillis(at),
+        ztoClosed: ztoListSignedVerdict(raw, key),
+        closedAtZto: false,
+        skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
+        from: typeof raw.from === 'string' ? raw.from.slice(0, 64) : '',
+        key: key,
+        signedAt: '',
+        signedOnly: false,
+        arrivedBefore: ''
+    };
+}
+
+export function ztoListSignedRowIndex(signedRows) {
+    const index = new Map();
+    if (!Array.isArray(signedRows)) return index;
+    for (let i = 0; i < signedRows.length; i++) {
+        const raw = signedRows[i];
+        if (!raw || typeof raw !== 'object' || typeof raw.at !== 'string') continue;
+        const key = pickupBarcodeKey(raw.barcode);
+        if (!key) continue;
+        const prior = index.get(key);
+        if (!prior || raw.at > prior.at) index.set(key, raw);
+    }
+    return index;
+}
+
+export function classifyZtoListRows(rows, historyList, trashList, signedRows?, range?) {
     const out = { fresh: [], existing: [], duplicate: [], skipped: [] };
     const list = Array.isArray(rows) ? rows : [];
     const known = new Set();
@@ -210,32 +246,19 @@ export function classifyZtoListRows(rows, historyList, trashList) {
 
     const best = new Map();
     const order = [];
+    const signedIndex = ztoListSignedRowIndex(signedRows);
+    const arrivalKeys = new Set();
     for (let i = 0; i < list.length; i++) {
         const raw = list[i] || {};
         const key = pickupBarcodeKey(raw.barcode);
-        const phone = normalizeStoredPhone(raw.phone);
-        const cod = Number(raw.cod);
-        const dod = Number(raw.dod);
-        const at = String(raw.at === undefined || raw.at === null ? '' : raw.at);
-        const stampMs = ztoScanStampMillis(at);
-        const row = {
-            barcode: String(raw.barcode === undefined || raw.barcode === null ? '' : raw.barcode),
-            phone: phone,
-            cod: isFinite(cod) ? cod : 0,
-            dod: isFinite(dod) ? dod : 0,
-            at: at,
-            stampMs: stampMs,
-            ztoClosed: ztoListSignedVerdict(raw, key),
-            closedAtZto: false,
-            skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
-            from: typeof raw.from === 'string' ? raw.from.slice(0, 64) : '',
-            key: key
-        };
-        if (!key || !phone || row.skip) {
+        if (key) arrivalKeys.add(key);
+        const row = ztoListRowOf(raw, key);
+        if (key && signedIndex.has(key)) row.signedAt = signedIndex.get(key).at;
+        if (!key || !row.phone || row.skip) {
             out.skipped.push(row);
             continue;
         }
-        const ageState = ztoListRowAgeState(stampMs, getServerNow());
+        const ageState = ztoListRowAgeState(row.stampMs, getServerNow());
         if (ageState === 'purged') {
             row.skip = 'too-old-purged';
             out.skipped.push(row);
@@ -265,6 +288,29 @@ export function classifyZtoListRows(rows, historyList, trashList) {
         if (known.has(row.key)) out.existing.push(row);
         else out.fresh.push(row);
     }
+    if (!range || typeof range.from !== 'string' || typeof range.to !== 'string') return out;
+    signedIndex.forEach((raw, key) => {
+        if (arrivalKeys.has(key)) return;
+        const row = ztoListRowOf(raw, key);
+        const day = row.at.slice(0, 10);
+        if (!row.stampMs || day < range.from || day > range.to) return;
+        row.ztoClosed = true;
+        row.signedOnly = true;
+        row.signedAt = row.at;
+        row.arrivedBefore = range.from;
+        if (!row.phone) {
+            out.skipped.push(row);
+            return;
+        }
+        if (ztoListRowAgeState(row.stampMs, getServerNow()) === 'purged') {
+            row.skip = 'too-old-purged';
+            out.skipped.push(row);
+            return;
+        }
+        row.closedAtZto = true;
+        if (known.has(key)) out.existing.push(row);
+        else out.fresh.push(row);
+    });
     return out;
 }
 
@@ -328,7 +374,7 @@ export function ztoListPositiveCount(value) {
 }
 
 export async function fetchZtoListAllPages(cfg, from, to) {
-    const out = { rows: [], signed: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
+    const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
         signedMismatchTexts: [], signedDescExpected: [], signedState: 'none' };
     const absorb = (body, arrival) => {
         if (!body) return;
@@ -347,6 +393,12 @@ export async function fetchZtoListAllPages(cfg, from, to) {
         if (!out.siteName && body.siteName) out.siteName = String(body.siteName);
         if (Array.isArray(body.signed)) {
             for (let i = 0; i < body.signed.length; i++) out.signed.push(body.signed[i]);
+        }
+        if (Array.isArray(body.signedRows)) {
+            for (let i = 0; i < body.signedRows.length; i++) {
+                const row = body.signedRows[i];
+                if (row && typeof row === 'object' && !Array.isArray(row)) out.signedRows.push(row);
+            }
         }
     };
     const first = await fetchZtoListPage(cfg, from, to, 1, 'withSigned');
@@ -410,7 +462,7 @@ export function renderZtoListSyncPreview() {
         ztoState.touch();
         return;
     }
-    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
+    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result);
     const closeTargets = ztoListCloseTargets(groups.existing);
     const closeKeys = new Set(closeTargets.map((entry) => entry.key));
     for (let i = 0; i < groups.existing.length; i++) {
@@ -432,19 +484,22 @@ export function renderZtoListSyncPreview() {
     const truncated = result.truncated
         ? ' · ⚠️ បញ្ជីវែងជាង ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
         : '';
-    const bornClosed = groups.fresh.filter((row) => row.closedAtZto === true).length;
+    const bornClosed = groups.fresh.filter((row) => row.closedAtZto === true && !row.signedOnly).length;
+    const signedOnly = groups.fresh.filter((row) => row.signedOnly).length;
     setZtoListSyncNote('ZTO រាយ ' + result.total + ' ជួរដេក · ទាញបាន ' + result.rows.length
         + ' · ' + result.from + ' ➜ ' + result.to + truncated
-        + ztoListSignedNote(result, bornClosed, closeTargets.length)
+        + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly)
         + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
         + ' — ⛔ ជុំនេះជាការមើលជាមុន ៖ គ្មានអ្វីត្រូវបញ្ចូលទេ។');
 }
 
-export function ztoListSignedNote(result, bornClosed, closeCount) {
+export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0) {
     const parts = [];
     const other = Number(result && result.otherScans);
     if (isFinite(other) && other > 0) parts.push('⏭️ ស្កេនប្រភេទផ្សេង ' + other + ' ជួរ មិនរាប់ (ទាញតែ «អីវ៉ាន់មកដល់»)');
     if (bornClosed > 0) parts.push('🔒 ថ្មីដែល ZTO បិទរួច ' + bornClosed + ' ➜ បញ្ចូលជា «យករួច»');
+    if (signedOnly > 0) parts.push('✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ ' + (result && result.from) + ' ៖ ' + signedOnly
+        + ' កញ្ចប់ ➜ បញ្ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា');
     if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW តែ ZTO បិទរួច ' + closeCount + ' ➜ បិទពេលចុច «បញ្ចូល»');
     const state = result && result.signedState;
     if (state === 'partial') parts.push('⚠️ បញ្ជីចុះហត្ថលេខា ZTO ទាញបានមិនគ្រប់ ➜ ខ្លះនៅបើក (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
@@ -512,6 +567,7 @@ export async function runZtoListSyncPreview() {
         if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);
         ztoState.ztoListSyncResult = {
             rows: rows,
+            signedRows: pulled.signedRows,
             from: range.from,
             to: range.to,
             total: pulled.total || rows.length,
@@ -586,7 +642,8 @@ export async function importZtoListRows() {
         return;
     }
     const result = ztoState.ztoListSyncResult;
-    if (!result || !Array.isArray(result.rows) || !result.rows.length) {
+    if (!result || !Array.isArray(result.rows)
+        || (!result.rows.length && !(Array.isArray(result.signedRows) && result.signedRows.length))) {
         showToast('⚠️ សូមទាញបញ្ជីជាមុនសិន');
         return;
     }
@@ -598,7 +655,7 @@ export async function importZtoListRows() {
         showToast('⏳ ' + VIEW_NOT_MEASURABLE_TEXT + ' — មិនអាចបញ្ចូលបានទេ');
         return;
     }
-    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems);
+    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
     const closeTargets = ztoListCloseTargets(groups.existing);
     const originOf = (row) => ({ code: row.barcode, from: row.from });
@@ -618,6 +675,11 @@ export async function importZtoListRows() {
     const pickedUpNote = pickedUp
         ? '\n🔒 ' + pickedUp + ' កញ្ចប់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» (ចូលស្ថិតិយក ដូចបិទដោយដៃ) ➜ ចូលធុងសំរាមក្នុង ២ ម៉ោង (លុយមិនត្រូវដក)។'
         : '';
+    const signedOnly = queue.filter((row) => row.signedOnly).length;
+    const signedOnlyNote = signedOnly
+        ? '\n✍️ ' + signedOnly + ' កញ្ចប់ក្នុងនោះ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ ' + result.from
+            + ' ➜ 📅 ថ្ងៃ និងម៉ោង = ពេល ZTO ស្កេនចុះហត្ថលេខា។'
+        : '';
     const closeNote = closeTargets.length
         ? '\n🔒 ' + closeTargets.length + ' កញ្ចប់មានក្នុង ZoeW តែ ZTO បិទបញ្ជីរួច ➜ បិទជា «យករួច» (ដូចចុចបិទដោយដៃ)។'
         : '';
@@ -625,7 +687,7 @@ export async function importZtoListRows() {
         ? 'បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
             + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។'
             + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
-            + noStampNote + pickedUpNote + closeNote
+            + noStampNote + pickedUpNote + signedOnlyNote + closeNote
         : 'បិទ ' + closeTargets.length + ' កញ្ចប់ក្នុង ZoeW ដែល ZTO បិទបញ្ជីរួច?' + closeNote;
     if (!confirm(question)) {
         return;

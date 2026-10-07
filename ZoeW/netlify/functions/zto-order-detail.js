@@ -1046,10 +1046,28 @@ function projectListRow(config, row) {
     };
 }
 
+function projectSignedRow(config, raw) {
+    const row = projectListRow(config, raw);
+    return { barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: row.at, from: row.from };
+}
+
+function keepLatestSignedRow(list, index, row) {
+    if (!row || !BARCODE_RE.test(row.barcode)) return;
+    const at = index.get(row.barcode);
+    if (at === undefined) {
+        index.set(row.barcode, list.length);
+        list.push(row);
+    } else if (row.at > list[at].at) {
+        list[at] = row;
+    }
+}
+
 function listResponseBody(config, container, page, siteCode, kind) {
     const rows = [];
     const signed = [];
     const seenSigned = new Set();
+    const signedRows = [];
+    const signedRowIndex = new Map();
     let otherScans = 0;
     let signedScans = 0;
     let signedMismatch = 0;
@@ -1069,6 +1087,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
                 seenSigned.add(code);
                 signed.push(code);
             }
+            keepLatestSignedRow(signedRows, signedRowIndex, projectSignedRow(config, raw));
             continue;
         }
         if (verdict === 'mismatch') {
@@ -1105,6 +1124,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
+    if (config.list.signedType) body.signedRows = signedRows;
     if (mismatchTexts.length) {
         body.signedMismatchTexts = mismatchTexts;
         body.signedDescExpected = config.list.signedDescs.slice();
@@ -1125,6 +1145,12 @@ function mergeSignedCompanion(body, outcome) {
         if (!seen.has(code)) { seen.add(code); merged.push(code); }
     });
     out.signed = merged;
+    const signedRows = [];
+    const signedRowIndex = new Map();
+    [out.signedRows, companion.signedRows].forEach((list) => {
+        if (Array.isArray(list)) list.forEach((row) => keepLatestSignedRow(signedRows, signedRowIndex, row));
+    });
+    out.signedRows = signedRows;
     out.signedOk = true;
     out.signedPages = companion.pages;
     out.signedTotal = companion.total;

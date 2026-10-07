@@ -128,6 +128,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
 | `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |
+| `npm run notice:check` | build ជាមួយ sourcemap ចូលថតបណ្តោះអាសន្ន ➜ រាល់កញ្ចប់ npm ដែលចូល `dist/assets` និងឯកសារ vendor (`xlsx` · `zxing-wasm`) ត្រូវមាន `ឈ្មោះ@កំណែ` ដែល ship ពិតក្នុង `NOTICE` (root) |
 | `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
 | `npm run test:watch` | Vitest ក្នុងរបៀបតាមដាន |
 | `npm run build:android` | build សម្រាប់ App Android (`--mode android` ➜ អាន `.env.android`) |

@@ -1,7 +1,7 @@
 {
   "name": "zoew",
   "private": true,
-  "version": "2.50.2",
+  "version": "2.50.3",
   "description": "ZoeW — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (React + Vite)",
   "engines": {
     "node": "^22.17.0 || >=24.0.0"
@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc -b --noEmit && vite build",
     "build:only": "vite build",
+    "notice:check": "node scripts/notice-check.mjs",
     "build:parity": "vite build --outDir dist-parity --emptyOutDir",
     "preview": "vite preview",
     "build:android": "tsc -b --noEmit && vite build --mode android",
@@ -21,7 +22,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "parity": "node scripts/parity-static.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run slot:check && npm run purity:check && npm run test && npm run build:only && npm run parity && npm run smoke && npm run sw:check && npm run doc:check && npm run android:check && npm run native:check",
+    "verify": "npm run typecheck && npm run lint && npm run slot:check && npm run purity:check && npm run test && npm run build:only && npm run notice:check && npm run parity && npm run smoke && npm run sw:check && npm run doc:check && npm run android:check && npm run native:check",
     "parity:dom": "node scripts/parity-dom.mjs",
     "parity:live": "node scripts/parity-live.mjs",
     "parity:all": "npm run parity && npm run parity:dom && npm run parity:live && npm run parity:deep && npm run rules:check",

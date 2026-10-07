@@ -90,6 +90,7 @@ export interface ViewState {
     callMarkPhoneText: string;
     editModalBarcodeText: string;
     locationWarningText: string;
+    locationWarningMode: 'move' | 'occupied';
 
     siParts: Record<string, boolean>;
     siStatusFoot: string;
@@ -205,6 +206,7 @@ export const viewState = createStore<ViewState>('viewState', {
     callMarkPhoneText: '',
     editModalBarcodeText: '',
     locationWarningText: '',
+    locationWarningMode: 'move',
 
     siParts: {
         siConfigSummary: false,

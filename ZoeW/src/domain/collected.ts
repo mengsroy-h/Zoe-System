@@ -125,6 +125,8 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
         if (history && history.val()) return readState(history);
         return readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
     };
+    const failedText = "⚠️ ស្ថានភាពបានរក្សាទុក ប៉ុន្តែចំណូលប្រចាំថ្ងៃមិនទាន់ Sync ពេញលេញទេ!";
+    let latePending = false;
     try {
         let state = await readCurrentState();
         for (let attempt = 0; attempt < attemptLimit; attempt++) {
@@ -160,8 +162,14 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
                     continue;
                 }
                 if (dbOpStalled(error) && attempt + 1 < attemptLimit) {
-                    armLateWrite(applied.server, () => isCurrent() ? reconcileCollectedHistory(itemId, targetKeys, attemptLimit - attempt - 1, preserveCollectedDay) : null,
-                        null, 'reconcileCollectedHistory');
+                    const retriesLeft = attemptLimit - attempt - 1;
+                    latePending = armLateWrite(applied.server, () => {
+                        if (!isCurrent()) return null;
+                        return Promise.resolve(reconcileCollectedHistory(itemId, targetKeys, retriesLeft, preserveCollectedDay)).then((saved) => {
+                            if (saved === true && isCurrent()) showToast("✅ បណ្តាញត្រឡប់មកវិញ — ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់!");
+                            return saved;
+                        });
+                    }, null, 'reconcileCollectedHistory');
                 }
                 throw error;
             }
@@ -175,7 +183,12 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
             state = next;
         }
     } catch (error) {}
-    if (isCurrent()) showToast("⚠️ ស្ថានភាពបានរក្សាទុក ប៉ុន្តែចំណូលប្រចាំថ្ងៃមិនទាន់ Sync ពេញលេញទេ!");
+    if (!isCurrent()) return null;
+    if (latePending) {
+        showToast("⏳ ស្ថានភាពបានរក្សាទុក — ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។");
+        return 'pending';
+    }
+    showToast(failedText);
     return null;
 }
 

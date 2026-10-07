@@ -12,7 +12,7 @@ import { requestPinBeforeConfig } from './pin';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
 import { deriveLookupSecretKey, forgetStoredLookupSecretKey, hashPin, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
 import { drawerAction } from '../ui/page-nav';
-import { reannounceOrShowToast, showToast } from '../ui/toast';
+import { reannounceOrShowToast, releaseHeldToasts, showToast } from '../ui/toast';
 
 export const APP_LOCK_MAX_FAILS = 5;
 
@@ -122,6 +122,7 @@ export function hideAppLockScreen() {
     setFieldValue('appLockPinInput', '');
     setAppLockMsg('');
     setAppLockBusy(false);
+    releaseHeldToasts();
 }
 
 export function appLockLockoutSecondsLeft() {

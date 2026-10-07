@@ -706,13 +706,19 @@ async function closeOperation(s, method, closed) {
         };
         const closing = closeOperation(s, 'single', true);
         const result = await Promise.race([closing, new Promise(resolve => setTimeout(() => resolve('still-waiting'), 100))]);
-        ok('history បានបិទ ប៉ុន្តែ UI មិនព្យួរលើការសរសេរចំណូល', result === true && !!release && s.messages.some(message => message.includes('⚠️')), { result, messages: s.messages });
+        // ⛔ ការសរសេរ mirror ព្យួរ ≠ បរាជ័យ ៖ សារត្រូវជា «⏳ … នឹង Sync ដោយស្វ័យប្រវត្តិ» (មិនមែន ⚠️ «មិនទាន់ Sync» ដែលក្លាយជាចាស់ពេលការសរសេរចុះ)
+        //    ហើយមិនអះអាង ✅ មុនពេល mirror ចុះ ➜ ពេលដោះយឺត ➜ «✅ … ចំណូលប្រចាំថ្ងៃបាន Sync រួចរាល់» (⏳ ➜ ✅ តាមការពិត)
+        ok('history បានបិទ ប៉ុន្តែ UI មិនព្យួរលើការសរសេរចំណូល ហើយប្រាប់ថា ⏳ រង់ចាំ (មិនមែន ⚠️ · មិនមែន ✅)', result === true && !!release
+            && s.messages.some(message => message.indexOf('⏳') === 0 && message.includes('ចំណូលប្រចាំថ្ងៃ') && message.includes('ស្វ័យប្រវត្តិ'))
+            && !s.messages.some(message => message.includes('⚠️') || message.includes('✅')), { result, messages: s.messages });
         if (!release) return;
         const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
         await closeOperation(second, 'single', false);
         await release(); await closing;
         await new Promise(resolve => setTimeout(resolve, 20));
         ok('ការសរសេរចាស់ដោះក្រោយពិដាន ត្រូវកែទៅស្ថានភាពបើកថ្មី', collectedTotal(s.server) === 0, s.read(COLLECTED));
+        ok('ដោះយឺត ➜ ✅ ប្រាប់ថាចំណូលប្រចាំថ្ងៃបាន Sync (⏳ ➜ ✅ តាមការពិត)',
+            s.messages.some(message => message.indexOf('✅') === 0 && message.includes('ចំណូលប្រចាំថ្ងៃ')), s.messages);
     });
     await operationScenario('២៤. បិទលើកដំបូង ហើយលុបមុនចម្លើយមកដល់', async () => {
         const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
@@ -837,9 +843,13 @@ async function closeOperation(s, method, closed) {
                     : original(ref, ...args);
             }
             editOperation(s, 24.5, 1.75); await operationTicks(30);
+            // reject ➜ ⚠️ (បរាជ័យពិត) · hang ➜ «⏳ … ចំណូលប្រចាំថ្ងៃនឹង Sync ដោយស្វ័យប្រវត្តិ» (ព្យួរ ≠ បរាជ័យ · ការសរសេរយឺតបញ្ចប់ដោយ ✅/⚠️) · ទាំងពីរ ៖ គ្មាន ✅ ក្លែង
+            const told = failure === 'reject'
+                ? s.messages.some(message => message.includes('⚠️'))
+                : s.messages.some(message => message.indexOf('⏳') === 0 && message.includes('ចំណូលប្រចាំថ្ងៃ') && message.includes('ស្វ័យប្រវត្តិ'));
             ok('history និង ledger រក្សាទុក តែសារមិនអះអាងជោគជ័យគ្រប់ — ' + failure,
                 s.read(HISTORY + '/fixture_item/price') === 26.25 && s.read(DAILY + '/2026-09-09/codDollar') === 24.5
-                && s.messages.some(message => message.includes('⚠️')) && !s.messages.some(message => message.includes('✅')), s.messages);
+                && told && !s.messages.some(message => message.includes('✅')), s.messages);
         });
     }
     await operationScenario('៣៤. ACK កែតម្លៃក្រោយប្ដូរអាជីវកម្ម មិនអាចសរសេរ mirror ឬបង្ហាញសារថ្មី', async () => {

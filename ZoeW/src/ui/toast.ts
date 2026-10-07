@@ -1,8 +1,9 @@
-import { uiState } from '../core/state';
+import { securityState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
 
 let toastSeq = 0;
 const toastTimers = new Map();
+const heldToastDelays = new Map();
 
 function toastItem(ref): any {
     if (ref === null || ref === undefined) return null;
@@ -19,6 +20,7 @@ function clearToastTimer(id) {
 
 function removeToastItem(id) {
     clearToastTimer(id);
+    heldToastDelays.delete(id);
     const next = uiState.toasts.filter((t) => t.id !== id);
     if (next.length === uiState.toasts.length) return;
     uiState.toasts = next;
@@ -93,6 +95,11 @@ export function armToastDismiss(el, delay) {
     const item = toastItem(el);
     if (!item) return;
     clearToastTimer(item.id);
+    if (securityState.appIsLocked) {
+        heldToastDelays.set(item.id, delay);
+        return;
+    }
+    heldToastDelays.delete(item.id);
     toastTimers.set(item.id, setTimeout(() => {
         toastTimers.delete(item.id);
         const live = toastItem(item.id);
@@ -104,13 +111,27 @@ export function armToastDismiss(el, delay) {
     }, delay));
 }
 
+export function releaseHeldToasts() {
+    if (!heldToastDelays.size) return;
+    const held = Array.from(heldToastDelays.entries());
+    heldToastDelays.clear();
+    refreshLiveToasts();
+    for (let i = 0; i < held.length; i++) {
+        if (toastTimers.has(held[i][0]) || !toastItem(held[i][0])) continue;
+        armToastDismiss(held[i][0], held[i][1]);
+    }
+}
+
 export function dropOldestToast(_container?) {
     const list = uiState.toasts;
+    const order = ['success', 'info', 'warn', 'error'];
     let victim = null;
-    for (let i = 0; i < list.length; i++) {
-        if (list[i].live !== null) continue;
-        victim = list[i];
-        break;
+    for (let k = 0; k < order.length && !victim; k++) {
+        for (let i = 0; i < list.length; i++) {
+            if (list[i].live !== null || list[i].kind !== order[k]) continue;
+            victim = list[i];
+            break;
+        }
     }
     if (!victim) victim = list[0];
     if (!victim) return;

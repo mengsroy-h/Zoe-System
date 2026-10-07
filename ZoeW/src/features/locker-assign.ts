@@ -12,6 +12,23 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
+function phoneNoteOf(item) {
+    const phoneRaw = item && item.phone ? sanitizePhoneNumber(item.phone) : '';
+    return phoneRaw ? ` (${phoneRaw})` : '';
+}
+
+function lockerOccupantNote(occupant) {
+    return `ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${phoneNoteOf(occupant.entry.item)} ស្ថិតនៅរួចហើយ`;
+}
+
+function askLocationChange(key, mode, text) {
+    lockerErrorFeedback();
+    uiState.pendingLockerCode = key;
+    viewState.locationWarningMode = mode;
+    viewState.locationWarningText = text;
+    openModalHelper('locationWarningModal');
+}
+
 export function handleLockerScan(code) {
     const key = lockerCodeKey(code);
     if (!key) return;
@@ -44,20 +61,16 @@ export function handleLockerScan(code) {
         return;
     }
 
+    const who = phoneNoteOf(entry.item);
+    const occupant = findLockerOccupant(uiState.activeLocker, key, entry.itemId);
     if (hasLocker) {
-        lockerErrorFeedback();
-        uiState.pendingLockerCode = key;
-        const phoneRaw = entry.item.phone ? sanitizePhoneNumber(entry.item.phone) : '';
-        const who = phoneRaw ? ` (${phoneRaw})` : '';
         let msg = `កញ្ចប់ "${key}"${who} កំពុងស្ថិតនៅទីតាំង ${currentLocker} ។ តើអ្នកចង់ផ្លាស់ទីកញ្ចប់នេះទៅ ${uiState.activeLocker} មែនទេ?`;
-        const occupant = findLockerOccupant(uiState.activeLocker, key, entry.itemId);
-        if (occupant) {
-            const occPhoneRaw = occupant.entry.item.phone ? sanitizePhoneNumber(occupant.entry.item.phone) : '';
-            const occWho = occPhoneRaw ? ` (${occPhoneRaw})` : '';
-            msg += ` (ចំណាំ៖ ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${occWho} ស្ថិតនៅរួចហើយ)`;
-        }
-        viewState.locationWarningText = msg;
-        openModalHelper('locationWarningModal');
+        if (occupant) msg += ` (ចំណាំ៖ ${lockerOccupantNote(occupant)})`;
+        askLocationChange(key, 'move', msg);
+        return;
+    }
+    if (occupant) {
+        askLocationChange(key, 'occupied', `${lockerOccupantNote(occupant)}។ តើអ្នកចង់ដាក់កញ្ចប់ "${key}"${who} ចូលទីតាំង ${uiState.activeLocker} ជាមួយគ្នាមែនទេ?`);
         return;
     }
 
@@ -107,8 +120,7 @@ export async function assignLockerToEntry(code) {
     const ts = getServerNow();
     const updatedBy = (firebaseState.auth && firebaseState.auth.currentUser && (firebaseState.auth.currentUser.email || firebaseState.auth.currentUser.uid)) || '';
     const previousLocker = getEntryCurrentLocker(entry);
-    const phoneRaw = entry.item.phone ? sanitizePhoneNumber(entry.item.phone) : '';
-    const who = phoneRaw ? ` (${phoneRaw})` : '';
+    const who = phoneNoteOf(entry.item);
     const successMsg = (previousLocker && previousLocker !== 'N/A' && previousLocker !== targetLocker)
         ? `✅ ផ្លាស់ទីកញ្ចប់${who} ពី ${previousLocker} ➜ ${targetLocker}`
         : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;

@@ -665,6 +665,33 @@ const GESTURE = function (steps) {
     ok('ប្តូរទំព័រ ➜ បង្ហាញរបាវិញ', await hidden() === false);
     await page.evaluate(() => window.switchAppPage('data'));
 
+    // ⛔ modal គ្របរបា (z-index) ➜ បើក modal មិនប្តូររបាទេ ៖ ការបង្ហាញរបាប្តូរ clip-path · padding របស់បញ្ជី ➜ គូរបញ្ជីទាំងមូលឡើងវិញ
+    //    (សំណើម្ចាស់គម្រោង ៖ «រមូរដល់ចុង កញ្ចប់ច្រើន ចុចបើកធុងសំរាម/បញ្ជី ZTO អាក់អាក់») · ការរមូរក្នុង modal មិនបញ្ជារបា
+    await scrollTo(200); await scrollTo(400);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលាក់មុនបើក modal', await hidden() === true);
+    const listPaint = () => page.evaluate(() => {
+        const t = document.getElementById('tableResponsive');
+        const main = t.closest('.page-main');
+        const card = t.closest('.app-card');
+        return [getComputedStyle(t).paddingBottom, getComputedStyle(main).clipPath, card ? getComputedStyle(card).clipPath : ''].join(' | ');
+    });
+    const paintBefore = await listPaint();
+    await page.evaluate(() => window.openRecentlyDeletedModal());
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const modalOpen = await page.evaluate(() => getComputedStyle(document.getElementById('recentlyDeletedModal')).display !== 'none');
+    ok('⛔ បើក modal ពេលរបាលាក់ ➜ របានៅលាក់', modalOpen && await hidden() === true, { modalOpen });
+    ok('⛔ បើក modal មិនប្តូរ clip-path/padding របស់បញ្ជី (គ្មានការគូរបញ្ជីឡើងវិញ)', await listPaint() === paintBefore, paintBefore);
+    await page.evaluate(async () => {
+        const box = document.querySelector('#recentlyDeletedModal .modal-content');
+        [0, 120, 0].forEach((t) => { box.scrollTop = t; box.dispatchEvent(new Event('scroll', { bubbles: false })); });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    ok('រមូរក្នុង modal មិនបង្ហាញរបា', await hidden() === true);
+    await page.evaluate(() => window.closeModal('recentlyDeletedModal'));
+    ok('បិទ modal ➜ របានៅដដែល', await hidden() === true);
+    await scrollTo(300);
+    ok('បិទ modal រួចរមូរឡើង ➜ បង្ហាញវិញ (ការលាក់តាមទិសរមូរនៅដដែល)', await hidden() === false);
+
     const navFixed = await page.evaluate(() => window.getComputedStyle(document.querySelector('.app-navbar')).position);
     ok('លើទូរស័ព្ទ navbar ជា fixed (ដូច្នេះការលាក់មិនបន្សល់ចន្លោះទទេ)', navFixed === 'fixed', navFixed);
     const padTop = await page.evaluate(() => parseFloat(window.getComputedStyle(document.getElementById('appPages')).paddingTop));

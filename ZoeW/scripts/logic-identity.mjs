@@ -61,7 +61,11 @@ const ZONE_ALLOWED = {
     appChromeElements: REACT_STATE + 'navbar · tabbar តាម ref',
     showAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
     hideAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
-    setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល',
+    setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល' +
+        ' ⊕ សំណើម្ចាស់គម្រោង (APK ៖ រមូរដល់ចុង ចុចបើកធុងសំរាម/បញ្ជី ZTO អាក់) ៖ modal គ្របរបា ➜ ការរមូរ **ក្នុង** `.modal` មិនបញ្ជារបា ·' +
+        ' ការរមូរបញ្ជីខណៈ modal បើក ធ្វើតាមច្បាប់ធម្មតា (លាក់ត្រូវ `hideAppChrome()` បដិសេធ · ត្រឡប់ដល់កំពូល ➜ បង្ហាញ) · `openModalHelper()` មិនបង្ហាញរបា ➜' +
+        ' ការបើក modal មិនប្តូរ clip-path/padding របស់បញ្ជី ។ វាស់បាន ៖ ៦០០ ជួរ CPU ÷4 PrePaint+Paint ២១៦ ➜ ៧៦ms (ដូចពេលរបាបង្ហាញ) ·' +
+        ' អ្នកយាម `tests/modal-chrome-state.test.tsx` · gesture-test · perf-check (tree មុនកែ ➜ ក្រហម) · drawer ដដែល',
     positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref · `style.width/left/top` ជា state (`phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ · ទទឹងចុះ DOM មុនវាស់កម្ពស់ ដូចដើម',
     setPhoneSearchPulledUp: REACT_STATE + '`.search-focus` ជា `dataPanelSearchFocus` · `.collapsed` ជា `dataPanelCollapsed`',
     setupPhoneSuggestions: REACT_STATE + 'listener របស់ប្រអប់ស្វែងរក/ប្រអប់ណែនាំ ➜ prop របស់ JSX (`onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ) តួដដែល · សល់តែ `scroll`/`resize` របស់ `window`',

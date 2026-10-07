@@ -273,6 +273,58 @@ function seedBig(n) {
             return Math.round((performance.now() - s) / 5);
         });
 
+        // ⛔ បើក modal ពេលរមូរដល់ចុង (កញ្ចប់ច្រើន ➜ ជួរច្រើន · របា Tab លាក់) ត្រូវថ្លៃស្មើពេលរបាបង្ហាញ (សំណើម្ចាស់គម្រោង ៖ «APK រមូរដល់ចុង
+        //    ចុចបើកធុងសំរាម ឬបញ្ជី ZTO អាក់អាក់»)។ មូលហេតុដែលវាស់បាន ៖ `openModalHelper()` បង្ហាញរបាវិញ ➜ `chrome-hidden` ប្តូរ clip-path ·
+        //    padding របស់បញ្ជី ➜ PrePaint + Paint លើជួរទាំងអស់ (៦០០ ជួរ ក្រោម CPU ថយ ៤ ដង ≈ ២១៦ms ធៀប ≈ ៤០ms)។ ⛔ ការវាស់ជា **សមាមាត្រ**
+        //    (របាលាក់ ÷ របាបង្ហាញ · median ៥ ដង · trace ពិត) ➜ មិនអាស្រ័យល្បឿនម៉ាស៊ីន · ផ្លូវណាមួយដែលធ្វើឲ្យការបើក modal ប៉ះបញ្ជី ➜ ក្រហម
+        const modalOpenRows = await page.evaluate(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const flush = typeof window.commitNow === 'function' ? () => window.commitNow() : () => {};
+            const el = document.getElementById('searchPhoneInput');
+            if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur(); }
+            window.filterDataByDate('all');
+            flush();
+            await wait(300);
+            const sc = document.getElementById('tableResponsive');
+            const count = () => document.querySelectorAll('#historyTableBody tr[data-id]').length;
+            let prev = -1;
+            for (let i = 0; i < 60 && count() !== prev; i++) {
+                prev = count();
+                sc.scrollTop = sc.scrollHeight;
+                for (let k = 0; k < 20 && count() === prev; k++) { await wait(50); flush(); }
+            }
+            sc.scrollTop = sc.scrollHeight - sc.clientHeight - 300;
+            await wait(200);
+            return count();
+        });
+        const cdpThrottle = await ctx.newCDPSession(page);
+        await cdpThrottle.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+        const modalOpenPaint = async (hiddenBar) => {
+            await page.evaluate((h) => { window.uiState.chromeHidden = h; if (typeof window.commitNow === 'function') window.commitNow(); }, hiddenBar);
+            await page.waitForTimeout(400);
+            const hiddenBefore = await page.evaluate(() => document.body.classList.contains('chrome-hidden'));
+            await browser.startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+            await page.evaluate(async () => {
+                window.openRecentlyDeletedModal();
+                if (typeof window.commitNow === 'function') window.commitNow();
+                await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+            });
+            await page.waitForTimeout(250);
+            const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
+            const hiddenAfter = await page.evaluate(() => document.body.classList.contains('chrome-hidden'));
+            await page.evaluate(() => { window.closeModal('recentlyDeletedModal'); if (typeof window.commitNow === 'function') window.commitNow(); });
+            await page.waitForTimeout(300);
+            const ms = ev.filter((e) => (e.name === 'PrePaint' || e.name === 'Paint') && e.ph === 'X').reduce((a, e) => a + (e.dur || 0), 0) / 1000;
+            return { ms, hiddenBefore, hiddenAfter };
+        };
+        const shownRuns = [], hiddenRuns = [];
+        for (let i = 0; i < 5; i++) { shownRuns.push(await modalOpenPaint(false)); hiddenRuns.push(await modalOpenPaint(true)); }
+        await cdpThrottle.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+        const median = (a) => { const v = a.map((r) => r.ms).sort((x, y) => x - y); return Math.round(v[Math.floor(v.length / 2)]); };
+        const modalOpen = { rows: modalOpenRows, shown: median(shownRuns), hidden: median(hiddenRuns),
+            stateSet: hiddenRuns.every((r) => r.hiddenBefore) && shownRuns.every((r) => !r.hiddenBefore), barStays: hiddenRuns.every((r) => r.hiddenAfter) };
+        console.log('    បើកធុងសំរាម (CPU ÷4 · PrePaint+Paint median) ៖ ' + JSON.stringify(modalOpen));
+
         console.log('    boot=' + bootMs + 'ms  renderCold=' + m.renderCold + 'ms  render=' + m.render + 'ms  listenerRepaint=' + m.listener +
                     'ms  suggest=' + m.suggest + 'ms  recentPhones=' + m.recent + 'ms  keystroke=' + typeMs + 'ms  rows=' + m.rows);
         console.log('    ធុងសំរាម (' + ORDERS + ' ធាតុ)៖ render=' + m.trashRender + 'ms  ស្វែងរក=' + m.trashSearch + 'ms  rows=' + m.trashRows);
@@ -301,6 +353,11 @@ function seedBig(n) {
                 app + ': តារាងប្រវត្តិ filter «ទាំងអស់» គូរតែទំព័រដំបូង (' + PAGE_ROWS + ' ជួរ) + ជួរ «បង្ហាញទៀត»', JSON.stringify(paging) + ' page=' + PAGE_ROWS);
             check(paging.scrollable && paging.afterScroll > paging.first && paging.afterScroll <= paging.total,
                 app + ': រមូរកន្សោមតារាងដល់ចុង ➜ IntersectionObserver ពិតទាញជួរបន្ថែម', JSON.stringify(paging));
+            check(modalOpen.rows >= Math.min(600, ORDERS) && modalOpen.stateSet,
+                app + ': បើក modal ៖ លក្ខខណ្ឌចាំបាច់ — រមូរដល់ចុងពិត (ជួរប្រវត្តិ ≥ ៦០០) · របាលាក់/បង្ហាញពិតមុនបើក', JSON.stringify(modalOpen));
+            check(modalOpen.hidden <= modalOpen.shown * 1.8 + 8,
+                app + ': ⛔ បើក modal ពេលរបាលាក់ (' + modalOpen.rows + ' ជួរ) មិនគូរបញ្ជីឡើងវិញ — PrePaint+Paint ≤ 1.8× ពេលរបាបង្ហាញ',
+                JSON.stringify(modalOpen));
         }
         await ctx.close();
 

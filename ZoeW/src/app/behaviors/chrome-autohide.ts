@@ -62,8 +62,9 @@ export function setupChromeAutoHide() {
         const el = pendingScroller;
         pendingScroller = null;
         if (window.innerWidth >= 992) { showAppChrome(); return; }
-        if (uiState.isModalOpen || isSideDrawerOpen()) { showAppChrome(); return; }
+        if (isSideDrawerOpen()) { showAppChrome(); return; }
         if (!el || typeof el.scrollTop !== 'number') return;
+        if (el.closest('.modal')) return;
         if (el !== activeScroller) {
             activeScroller = el;
             lastScrollTop = el.scrollTop;

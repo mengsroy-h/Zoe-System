@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.4` (`zoew-v267`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.5` (`zoew-v268`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -663,6 +663,11 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   Chromium never applies it ➜ `panel-motion-test.js` injects it.
 - ⛔ The 180ms delay and `chrome-space-released` stay removed.
 - rAF-coalesced scroll handler; `SHOW_AFTER` (48px) > `HIDE_AFTER` (36px) on purpose.
+- ⛔ A modal covers the bar (z-index) ➜ it never moves the bar: `openModalHelper()` never calls `showAppChrome()` and scrolls
+  inside a `.modal` never drive it. On Android a bar toggle flips the list's `clip-path` and `.table-responsive`
+  `padding-bottom` (parity `app.css`) ➜ the whole rendered list repaints, cost grows with rows. A page scroller reaching
+  the top while a modal is open still shows it; the drawer still shows it. Guards: `ZoeW/tests/modal-chrome-state.test.tsx`
+  · `gesture-test` · `perf-check` (modal open with the bar hidden ≤ 1.8× PrePaint+Paint of the bar shown, CPU ÷4).
 
 ## Frame rate and lite mode
 

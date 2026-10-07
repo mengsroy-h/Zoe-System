@@ -78,7 +78,6 @@ export function SideDrawer() {
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
     const displayRate = useStoreValue(viewState, (s) => s.displayRateText);
     const jank = useStoreValue(viewState, (s) => s.jankText);
-    const probeLines = useStoreValue(viewState, (s) => s.overlayProbeLines);
     const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
         'biometricUnsupported', 'biometricToggleText']);
@@ -189,7 +188,6 @@ export function SideDrawer() {
                 >{versionLabel}</a>
                 {displayRate ? <div className="app-copyright-line" id="displayRateLine">{displayRate}</div> : null}
                 {jank ? <div className="app-copyright-line" id="jankLine">{jank}</div> : null}
-                {probeLines.map((line, i) => <div className="app-copyright-line" key={i}>{line}</div>)}
                 <div className="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
                 <div className="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
             </div>

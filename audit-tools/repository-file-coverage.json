@@ -1782,9 +1782,6 @@
     "ZoeW/tests/modal-chrome-state.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/overlay-probe.test.ts": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/lookup-late-answer-busy.test.ts": {
       "policy": "zoew-self-verification"
     },

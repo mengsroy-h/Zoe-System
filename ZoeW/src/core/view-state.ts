@@ -21,7 +21,6 @@ export interface ViewState {
     appVersionLabel: string;
     displayRateText: string;
     jankText: string;
-    overlayProbeLines: string[];
 
     connectionStatus: 'online' | 'connecting' | 'offline' | null;
     connectionText: string;
@@ -121,7 +120,6 @@ export const viewState = createStore<ViewState>('viewState', {
     appVersionLabel: '',
     displayRateText: '',
     jankText: '',
-    overlayProbeLines: [],
     connectionStatus: null,
     connectionText: 'ក្រៅបណ្ដាញ',
     bootSplashPhase: 'shown',

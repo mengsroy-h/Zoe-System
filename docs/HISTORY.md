@@ -140,7 +140,7 @@
 
 - `ZoeW/tests/device-info.test.tsx` (ថ្មី · ១០) ៖ APK plugin ➜ model · Android ID · ផ្ញើ License · ឈ្មោះក្រុមហ៊ុនមិនស្ទួន · plugin បរាជ័យ ➜ UA · PWA UA កាត់ (K) ➜ userAgentData ·
   userAgentData ជាប់ ➜ UA ក្រោយពិដាន · ID App = SHA-256 ១៦ តួ មិនមែនលេខសម្គាល់ · iPhone · License មិនទាន់ផ្ទុក ➜ សាកម្តងទៀត · UI · ខ្សែភ្ជាប់ ☰ · 🩺 · boot។
-- `license-seat-test` ផ្នែក ១៨ (ថ្មី · ១០) ៖ meta សរសេរ ១ ដងទៅកៅអីខ្លួនឯង · ដដែល ➜ មិនសរសេរ · ⛔ `checkOnline()` គ្មាន `claimSeat` ➜ គ្មានការសរសេរ · 401 ➜ Key នៅ active ·
+- `license-seat-test` ផ្នែក ១៨ (ថ្មី · ១២) ៖ meta សរសេរ ១ ដងទៅកៅអីខ្លួនឯង · ⛔ សំណើ License ផ្សេងកំពុងរត់ ➜ meta មិនយកកន្លែងបណ្តាញ (ពិដាន ២) · ដដែល ➜ មិនសរសេរ · ⛔ `checkOnline()` គ្មាន `claimSeat` ➜ គ្មានការសរសេរ · 401 ➜ Key នៅ active ·
   មិនសាកម្តងទៀត · hang ➜ verdict មិនរង់ចាំ · Activate ថ្មី ➜ meta · គ្មាន meta ➜ មិនសរសេរ · ⛔ កៅអីអ្នកដទៃ · សម្អាតអត្ថបទ — មុនកែ ៖ FAIL ១៣។
 - `emu/license-seat-rules-test` ផ្នែក ១៤ (ថ្មី · rules ពិតលើ emulator) ៖ meta លើកៅអីមាន ➜ ទទួល · កៅអីទំនេរ · ប្តូរ device · វាលបន្ថែម · ប្រវែង · ខ្វះ · ប្រភេទ ➜ បដិសេធ ·
   ព្រំដែន ៨០ · ៤០ · ៦៤ ➜ ទទួល — មុនកែ rules ៖ FAIL ៣។
@@ -148,6 +148,9 @@
 - `npm run android:check` ៣គ (ថ្មី · ៦) ៖ ឈ្មោះ plugin ស្មើ JS · `registerPlugin` មុន `super.onCreate` · វាលដែល JS អាន · Android ID · ⛔ គ្មាន `READ_PHONE_STATE` / `getSerial()` · គ្មាន comment ·
   `npm run native:check` ៤ច (ថ្មី) ៖ `@capacitor/core` ពិត + header ពី Java ➜ boot ហៅ `info` ១ ដង ➜ ☰ «Samsung SM-A546E · Android 14» + Android ID។
 - Java compile ជាមួយ framework Android ពិត + class Capacitor ពិត ➜ 0 error។
+- ការផ្ទៀងផលប៉ះពាល់ (សំណើម្ចាស់គម្រោង) ៖ `checkOnline()` ចាស់ ↔ ថ្មី ១៦ ករណី ➜ verdict · កៅអីដូចគ្នាបេះបិទ (ការសរសេរបន្ថែមមានតែ `meta`) · ផ្លូវ Activation (`ensureAppActivated`) ដូច `main`
+  បេះបិទ · helper ថ្មីទាំងអស់ ៖ ទិន្នន័យខុស ១៥–១៦ ប្រភេទ ➜ មិនគាំង · layout ៣២០ · ៣៩០ · ១២៨០ ៖ ☰ · 🩺 · 🔔 APK · បញ្ជី Key ZoeKeyGen ➜ គ្មានលើស/ជាន់ ·
+  progress ទាញ APK ➜ re-render តែប្លុក APK (`notify-apk-link.test.tsx` ១៥ · មុនកែ ក្រុម 📦/📤 re-render រាល់ tick)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -2818,7 +2821,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A46 | **ស្គាល់ model · serial ទូរស័ព្ទ** (សំណើម្ចាស់គម្រោង · ការសម្រេច ៖ ☰ · 🩺 + ZoeKeyGen · Android ID / ID App) | Claude ៖ serial ពិតរបស់ hardware ៖ Android 10+ `Build.getSerial()` ត្រូវ `READ_PRIVILEGED_PHONE_STATE` (App ប្រព័ន្ធតែប៉ុណ្ណោះ) · browser គ្មាន API · Chrome Android UA ត្រូវកាត់ (`Android 10; K`) ➜ model តែតាម `getHighEntropyValues(['model'])` · License ៖ `checkLocalStatus()` ហៅ `checkOnline(…, { claimSeat: true })` រាល់ការពិនិត្យ ➜ meta ដើរតាមផ្លូវនោះបានដោយមិនបំពាន «`checkOnline()` គ្មាន `claimSeat` មិនសរសេរ» · rules `$slot/$other: false` បដិសេធ meta (emulator ៖ 401) · `keylist-consistency-test` មានអ្នកយាម «លេខសម្គាល់កៅអីពេញមិនដល់ DOM» ➜ serial PWA = SHA-256 មិនមែន ID · `native:check` ជុំ ១ ៖ `info` ២ ដង (License stub គ្មាន `setDeviceMeta` ➜ សួរម្តងទៀតរាល់ពេល) ➜ សាកម្តងទៀតតែពេល License មិនទាន់ផ្ទុក ឬគ្មាន serial | plugin `ZoeDevice` · `loadDeviceInfo()` · `setDeviceMeta()`/`noteSeatMeta()` · rules `meta` · ZoeKeyGen បន្ទាត់កៅអី · ⚠️ Publish rules License |
+| A46 | **ស្គាល់ model · serial ទូរស័ព្ទ** (សំណើម្ចាស់គម្រោង · ការសម្រេច ៖ ☰ · 🩺 + ZoeKeyGen · Android ID / ID App) | Claude ៖ serial ពិតរបស់ hardware ៖ Android 10+ `Build.getSerial()` ត្រូវ `READ_PRIVILEGED_PHONE_STATE` (App ប្រព័ន្ធតែប៉ុណ្ណោះ) · browser គ្មាន API · Chrome Android UA ត្រូវកាត់ (`Android 10; K`) ➜ model តែតាម `getHighEntropyValues(['model'])` · License ៖ `checkLocalStatus()` ហៅ `checkOnline(…, { claimSeat: true })` រាល់ការពិនិត្យ ➜ meta ដើរតាមផ្លូវនោះបានដោយមិនបំពាន «`checkOnline()` គ្មាន `claimSeat` មិនសរសេរ» · rules `$slot/$other: false` បដិសេធ meta (emulator ៖ 401) · `keylist-consistency-test` មានអ្នកយាម «លេខសម្គាល់កៅអីពេញមិនដល់ DOM» ➜ serial PWA = SHA-256 មិនមែន ID · `native:check` ជុំ ១ ៖ `info` ២ ដង (License stub គ្មាន `setDeviceMeta` ➜ សួរម្តងទៀតរាល់ពេល) ➜ សាកម្តងទៀតតែពេល License មិនទាន់ផ្ទុក ឬគ្មាន serial · **ការផ្ទៀងផលប៉ះពាល់** ៖ run-all STRICT លើ 2.50.44 ៖ FAIL ៤ ➜ `periodic-network-guard-test` (`ensureAppActivated` ពិតហៅ `loadDeviceInfo` ➜ ReferenceError ក្នុង sandbox ➜ ដកការហៅចេញពីផ្លូវ Activation ព្រោះ `license-verify.js` ជា script ធម្មតាមុន module ➜ boot ឃើញវាជានិច្ច) · `function-surface-test` (`cleanText` ស្ទួននឹង `notifications.ts` ➜ `cleanDeviceText`) · `doc-scope-test` (ប្រយោគ «៩ ជួរ» ក្នុង `ZoeW/README.md` ត្រូវបំបែក ➜ ជាន់អប្បបរមា ៣ ឯកសារ) · `css-classes` (`.device-info-name` · `.device-info-serial` គ្មាន rule) · ការអាន ៖ meta PUT អាចយកកន្លែងទី ២ នៃ `NET_MAX_IN_FLIGHT` ➜ សរសេរតែពេលគ្មានសំណើ License ផ្សេង · `NotifyDrawer` ទាំងមូលជាវ `apkUpdate` ➜ ផ្លាស់ទៅ `ApkUpdateBlock` | plugin `ZoeDevice` · `loadDeviceInfo()` · `setDeviceMeta()`/`noteSeatMeta()` · rules `meta` · ZoeKeyGen បន្ទាត់កៅអី · ⚠️ Publish rules License |
 
 ### 2026-10-08 — APK ៖ ទាញក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន ➜ [2.50.43]
 

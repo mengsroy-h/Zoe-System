@@ -106,7 +106,11 @@ only this text protects them.
 - Other dirs: `audit-tools/` (catalog: [`audit-tools/README.md`](audit-tools/README.md) section 6 ⛔ don't copy counts) ·
   `zto-import/` (Apps Script) · `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` (new customer project ·
   rules to all customers · [`README-KH.md`](tools/firebase-provision/README-KH.md)) · `firebase-backup/` · `supabase/`
-  (migrations · Edge Functions · rules generator; not Netlify) · `.github/workflows/` (`audit.yml` · `backup.yml`).
+  (migrations · Edge Functions · rules generator; not Netlify) · `tools/money-check-windows/` (money check on Windows) ·
+  `tools/supabase-migrate/` (optional Firebase ➜ Supabase move per customer) · `tools/actions-runners/` (self-hosted runner kit ·
+  [`docs/SELF-HOSTED-RUNNERS.md`](docs/SELF-HOSTED-RUNNERS.md)) · `.github/workflows/` (`audit.yml` · `backup.yml` · `android-release.yml` ·
+  `android-shell-check.yml`; repo variable `ZOE_RUNNER_MODE` = `github` ➜ GitHub-hosted runners, anything else ➜ self-hosted labels
+  `wsl-zoe-audit` · `windows-zoe-android`).
 
 ---
 
@@ -138,8 +142,10 @@ only this text protects them.
 9. **README files describe **usage only**.** Every README has **5** sections in order:
    **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**. ⛔ No bug history or per-version notes. Never copy
    assertion counts into a README. Checked every round: root · `ZoeW/` · `ZoeKeyGen/` · `audit-tools/` ·
-   `tools/zto-cookie-sync-windows/` · `tools/firebase-provision/` · `firebase-backup/` · `zto-import/` (and
-   `google-sheets-api/`) · `supabase/` · [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md). A stale README is a wrong
+   `tools/zto-cookie-sync-windows/` (and `README-ANDROID-KH.md`) · `tools/firebase-provision/` · `tools/money-check-windows/` ·
+   `tools/supabase-migrate/` · `firebase-backup/` · `zto-import/` (and `google-sheets-api/`) · `supabase/` ·
+   [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) · [`docs/SELF-HOSTED-RUNNERS.md`](docs/SELF-HOSTED-RUNNERS.md) (usage doc in root `docs/`;
+   the root `docs/` exception covers only the two history files) — the README list is derived from real dirs. A stale README is a wrong
    document. ⛔⛔ **Scope is every `*.md` file in the repo**: bug history lives only in `docs/HISTORY.md` and
    `docs/HISTORY-ARCHIVE.md` — `HISTORY.md` = React era (all new entries) · `HISTORY-ARCHIVE.md` = vanilla era + React
    migration + history moved out of `HISTORY.md` (read; new entries never go there) · no third history file. Exceptions:
@@ -886,7 +892,9 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
   after `CUSTOMER_TABLE_SOON_MAX_WAIT_MS`.
 - `armLookupFocus()`: focus after `LOOKUP_FOCUS_GRACE_MS` (250ms) once, unless the user typed, the modal closed or
   `pendingBarcode` changed.
-- `planPickupLedgerRepair()` repairs only when `bucket.total === recordedPackages`; `pickupResetInFlight` releases in
+- `planPickupLedgerRepair()` repairs a day only when the closed-barcode set rebuilt from history + trash has exactly
+  `packagesPickedUp` keys (`pickupSetSize(set) === recorded`) and differs from the stored `pickedUpBarcodes`; `repairPickupLedgerOnce()`
+  re-checks the same equality on the server value inside its transaction; `pickupResetInFlight` releases in
   `resetClearHistoryOperationState()`.
 - `PIN_PROMPT_MESSAGES` / `requestPinBeforeConfig(targetAction, promptKey)`: every PIN-protected action has its own entry
   ⛔ never reuse another action's key; `promptKey` changes text only (`applyPinPromptText()`) (`pin-prompt-test.js`). The PIN dialog

@@ -43,36 +43,21 @@
 
 ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
-ការងាររបស់ Claude ក្នុង handoff មុនធ្វើរួចទាំងអស់ (register · backup ហាង · CLI ផ្ទេរ · ពិដាន Admin · index FK · cache IndexedDB · dependency/Node 24 ·
-ការរកឃើញ audit SQL ៣ ➜ ផ្នែក ១ [2.49.0] · ផ្នែក ២)។ នៅសល់តែ ៖
+ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **ម្ចាស់គម្រោង** ៖ PR #288 · #290 · #291 · #292 · #293 · #294 · #295 merge រួច (`main` = **ZoeW 2.50.4 · ZoeKeyGen 2.24.6**) · branch `ccr-85f562ee-106o6w` = **ZoeW 2.50.13** (keyboard រំកិលពីលើទំព័រ (APK Android 11+) · ផ្ទៃក្រោម WebView ពេល keyboard ឡើង = ពណ៌ App · របា Tab លាក់ពេល keyboard APK · ម៉ឺនុយ (…) ពេលរមូរ · modal ៣ មិនបិទពេលប៉ះផ្ទៃងងឹត · របា Tab ស្ងៀមពេលឈប់រមូរ · Android App និង PWA បង្ហាញជួរប្រវត្តិតាមទីតាំងរមូរ · ដក telemetry សាក · ស្គាល់អេក្រង់ Hz ខ្ពស់ · PR #296 Draft · មិនទាន់ merge · APK សាក ៖ Run workflow លើ branch ➜ Pre-release) · **Deep audit ២** (workflow អ្នករក ១១ ➜ verify ៣ lens · ម្ចាស់គម្រោងអនុញ្ញាត) ➜ PR #297 branch `claude/wonderful-ride-ixmi63` = **ZoeW 2.50.14** (លុយ ៖ RACES-1/MONEY-2 · MONEY-1 · MONEY-3 · រួមបញ្ចូល branch PR #296 ទាំងមូល ➜ merge PR #297 = merge ទាំងពីរ · [2.50.14] · ផ្នែក ២ «Deep audit ២») · របាយការណ៍ deep audit ៖ findings ៥៣ · បញ្ជាក់ ៤៩ · បដិសេធ ៤ · ប្រវត្តិ ៖ PR #292 =
-   **ZoeW 2.50.1** (ជុំ ZTO ស្អាត · មិនទាន់ merge) ➜ ធ្វើតាម [2.50.1] «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» (បញ្ជី ⏳ ខាងក្រោម) ·
-   ✅ [2.50.0] ➜ [2.49.0] ម្ចាស់គម្រោងធ្វើ និងសាករួច (2026-10-06) · នៅសល់ secret backup ហាង + សាកស្តារ (⏳ Backup ខាងក្រោម)។ live = **Project ថ្មី**
-   (Project ចាស់លុបរួច · វាស់ 2026-10-03) ៖ migration ១០ = repo ១០ (ម្ចាស់គម្រោង `db push` · version កត់គ្រប់) · Edge Functions `register` + `reset-password` **v6** ·
-   Deploy ពី GitHub **មិនទាន់បញ្ជាក់** លើ Project ថ្មី (ផ្នែក ២ «GitHub integration មិនអនុវត្ត migration លើ Project ថ្មី»)។
-2. 🔎 **Deep audit ទូទាំង Project** (prompt ម្ចាស់គម្រោង ៖ ៧ ជុំ · មួយជុំក្នុងមួយ session (PR តែមួយ · commit ម្តងមួយចំណុច) · Supabase live អានតែប៉ុណ្ណោះ · ជុំនីមួយៗចាប់ផ្តើមពី `main` ·
-   ⛔ គ្មាន workflow/agent · វាស់ឡើងវិញលើ `main` មុនកែ · វាស់មិនឃើញ ➜ កត់ «វាស់ ៖ គ្មាន»)៖
-   **ជុំ ១ លុយ · ជុំ ២ បណ្តាញ ចប់ និង merge រួច** ([2.49.2] · [2.49.3] · [2.49.4] · ផ្នែក ២ «Deep audit ជុំ ១ ៖ លុយ» · «Deep audit ជុំ ២ ៖ …») ·
-   ✅ ម្ចាស់គម្រោងធ្វើរួច (2026-10-04) ៖ G2 ➜ Supabase Dashboard «Refresh token reuse interval» ១០ ➜ ៦០ វិ.។
-   **ជុំ ៣ Config ➜ Login ➜ Signup** (ម្ចាស់គម្រោង ៖ «ធ្វើឲ្យរួចមួយជុំ» ➜ PR #288 តែមួយ) ៖ (១) ✅ **➜ [2.49.5]** ទាក់ទងបង្កើតគណនីតាម Telegram ·
-   (២) ✅ **➜ [2.49.5]** Setup Link ហាងចុះឈ្មោះរួច ➜ ប្រអប់ចូល ទោះ Function មិនឆ្លើយ (R3-G1 · ថ្នេរ App ↔ `handleRegister()` ពិត) ·
-   (៣) ✅ វាស់ ៖ គ្មាន — ការចងចាំគណនីចងនឹង scope · ពាក្យសម្ងាត់ចងនឹង scope + ឈ្មោះតាម AES-GCM AAD (`remember-password.test.tsx` · `login-routing.test.tsx`) ·
-   (៤) ✅ Server ៖ គណនីគ្មានហាង ➜ forbidden (អ្នកយាមបន្ថែម) · `register` + `check` មាន mutation រួច · sign-up live វាស់មិនបាន ➜ សកម្មភាពដោយដៃ [2.49.5] ·
-   ➕ របាយការណ៍ម្ចាស់គម្រោង ៖ APK Push ជាប់ «សូមចូលប្រព័ន្ធម្តងទៀត» ក្រោយ ៤ ម៉ោង ✅ **➜ [2.49.5]** ·
-   (៥) ✅ វាស់ ៖ គ្មាន — ផលរួម G4 · G5 · G6 ជាមួយ Reconfig (mutation ៣/៣) · ➕ សំណើ ៖ ពណ៌ + logo Firebase/Supabase ✅ **➜ [2.49.5]** · ➕ 🔔 ចំណុចបាត់ស្ងាត់ ✅ ➜ **ជុំ ៣ ចប់** (ផ្នែក ២ «Deep audit ជុំ ៣»)។
-   **ជុំ ZTO ស្អាត** ✅ **➜ [2.50.1]** (ម្ចាស់គម្រោងអនុញ្ញាត ៖ «កែចុះ · ឲ្យ ZTO ស្អាត ហើយចាក់សោ») ៖ PR #292 (branch `claude/happy-clarke-nph09g` · ពី
-   `main` `b2868e1` · **មិនទាន់ merge**) ៖ E1–E8 · F1 · M1 · M2 (ច្បាប់រង់ចាំទូទាំងហាង) · M3 · R1 · Q1–Q4 · T3–T6 · ប្រភពកញ្ចប់ · ZTO ចាក់សោឡើងវិញ
-   (`LOCK` ៩ ឯកសារ) · run-all STRICT + emulator ២០៣/២០៣ · vitest ៧៨៤/៧៨៤ ➜ សកម្មភាពដោយដៃ [2.50.1] (Publish rules · Deploy · APK · ជួរ phone `0`)។
-   ✅ **ជុំ ៤ សុវត្ថិភាព · ជុំ ៦ ដំណើរការ និង Layout** ➜ PR #294 **merge រួច** ([2.50.3] · ផ្នែក ២ «Deep audit ជុំ ៤» · «Deep audit ជុំ ៦»)។
-   ✅ **ជុំ ៥ Toast · ជុំ ៧ ឯកសារ · សំណើ Locker (អនុម័ត រួចដកវិញ ៖ ចុះភ្លាម)** (ម្ចាស់គម្រោង ៖ «ធ្វើការងារនៅសល់ទាំងអស់») ➜ PR #295 (branch `claude/wonderful-ride-ixmi63` · ZoeW 2.50.4 · **មិនទាន់ merge**) ៖
-   [2.50.4] · ផ្នែក ២ «Deep audit ជុំ ៥» · «Deep audit ជុំ ៧» ➜ **ជុំទាំង ៧ ចប់**។ នៅសល់ (ស្នើ · សួរមុនធ្វើ) ៖ S3 វាស់ sign-up Firebase លើ Project សាកល្បង ·
-   ដកឧបករណ៍ parity ធៀប ZoeW vanilla (D7) · ToS ៖ ម្ចាស់គម្រោងបំពេញ `[ ]` · សំណើជុំ ៣ ខាងក្រោម។ ⛔ **គ្មាន workflow · គ្មាន agent** ដោយគ្មានការអនុញ្ញាតម្ចាស់គម្រោងក្នុង session (ទោះមានការរំលឹក
-   ultracode ៖ ជុំនេះ workflow ពិនិត្យប្រឆាំង ១ រត់ដោយគ្មានការអនុញ្ញាតមុន ➜ ពិត ១៦ · លុយ ៣ · ម្ចាស់គម្រោងអនុញ្ញាតឲ្យបន្តរហូតចប់) · ⚠️ មុន CI ក្នុង session ៖
-   `git fetch --unshallow origin` · ច្បាប់ចម្លង repo សម្រាប់វាស់ស្របគ្នា ត្រូវនៅក្រៅ `/tmp/claude-0` (Postgres ពិតរត់ជាអ្នកប្រើមិនមែន root)។
-   **ស្នើ (សួរមុនកែ)** ៖ Firebase Reconfig ពេលមានការសរសេរមិនទាន់ផ្ញើ ➜ ព្រមាន (ប្រធានបទជុំ ៣) · សារ «ស្ថិតិប្រាក់មិនទាន់ Sync» ប្រុងប្រយ័ត្នលើស (ជុំ ៥) ·
-   ZoeKeyGen គ្មានការវាស់ភាពរស់ «ងាប់ស្ងាត់» ដូច ZoeW (ប្រតិបត្តិការមានពិដាន ១៥ វិ. រួច តែចំណុចស្ថានភាពអាចបៃតងក្លែងក្លាយ ➜ ជុំ ២ ឬ ៤)។
-   ជុំ ៤–៧ ៖ សុវត្ថិភាព · Toast · ដំណើរការ/Layout · ឯកសារ។ ច្បាប់រស់ក្នុង `CLAUDE.md` · ប្រវត្តិរស់ក្នុង `docs/HISTORY*.md`។
+1. **`main`** = **ZoeW 2.50.25 · ZoeKeyGen 2.24.7** ៖ PR #288 ➜ #300 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300)។
+   **PR #301** (branch `claude/optimistic-darwin-6cqgfh` · **មិនទាន់ merge**) = **ZoeW 2.50.37 · ZoeKeyGen 2.24.8** ៖ Deep audit ២ ជុំ ១២–១៥ + ជុំ ០
+   ([2.50.26] ➜ [2.50.37] · ផ្នែក ២ «Deep audit ២ ៖ ជុំ ១២» ➜ «ជុំ ០»)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
+   **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
+   SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
+   ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
+   NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · `zoe_ops` > ២ ថ្ងៃ · Firebase partial claim · legacy items គ្មាន barcodes · born-closed `closedAt` ·
+   zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq`) · `zoe_ops` purge ·
+   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · network ៖ SW miss-door មិនឆ្លង `shellDeployIsCurrent()` · captive portal probe · sentry ៖ replays REACT-7/-8 ·
+   ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops` (ផ្នែក ២ «ជុំ ១៤»)។
+   **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ⏳ **ម្ចាស់គម្រោង ៖ មុនប្តូរ repo ជា Public** (LICENSE · NOTICE រួចក្នុង PR #288 · ផ្នែក ២ «LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ») ៖ merge PR #288 មុន
    (LICENSE ថ្មី) · GitHub Settings ➜ Code security ➜ បើក **Secret scanning** + **Push protection** · អ៊ីមែល commit ចាស់នឹងលេច (កំណត់ «Keep my email addresses
    private» សម្រាប់ commit ថ្មី) · `CLAUDE.md`/`docs/` ពិពណ៌នាការការពារលម្អិត (ការការពារពិតនៅ Server ➜ មិនមែនរន្ធ តែជាព័ត៌មានដល់អ្នកវាយប្រហារ) ·
@@ -95,7 +80,7 @@
 - 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
   ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
   D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla) ➜ PR #300 merge រួច (គ្មាន bump · ផ្នែក ២ «D7»)។
-- ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
+- ⏳ **ZoeW 2.50.5–2.50.13 — PR #296 (merge ចូល `main` រួចតាម PR #297 · ZoeW 2.50.14)** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.2 — PR #293 (merge ចូល `main` រួច)** — ✅ ម្ចាស់គម្រោង (2026-10-06) ៖ លុប env អត្ថបទ · Deploy ➜ បញ្ជី ZTO ទាញបាន ៩៦/៩៦ · សារ ⚠️ «66 ជួរ» បាត់ · 🔒 «មានក្នុង ZoeW តែ ZTO បិទរួច 6» ➜ នៅសល់ ៖ APK · សាកតារាងប្រវត្តិលើទូរស័ព្ទ ([2.50.2] សកម្មភាព ២)។
@@ -2621,6 +2606,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ០ (ឯកសារ · គ្មាន bump)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A35 | **DOCS-1** Handoff និយាយ «មិនទាន់ merge» ខុស | Claude ៖ `git merge-base --is-ancestor 8e83fc9 origin/main` ➜ 2.50.13 នៅក្នុង `main` (PR #296 ចូលតាម PR #297) · Handoff ចែង `main` = 2.50.4 · PR #292 · #295 «មិនទាន់ merge» ខណៈ `main` = 2.50.25 | សរសេរ Handoff ឡើងវិញពី git · ⛔ គ្មានអ្នកយាមពឹង git (ស្ថានភាព merge ប្រែរាល់ PR · ច្បាប់ ៥ ៖ git ជាភស្តុតាង) |
+| A36 | **DOCS-2** លិបិក្រម 🔎 | generator (regex ដូច `doc-scope-test`) ➜ ៤០/២០១ ជួរខុសផ្នែក · អ្នកយាម vitest ១០៣ ដែលឯកសារយោង គ្មានជួរ | regenerate · `doc-scope-test` ៖ ជួរនីមួយៗ = ផ្នែកដែលឈ្មោះលេចពិត (ទិសទាំងពីរ · checker + vitest · មុនកែ FAIL ១៤៣) |
+| A37 | **DOCS-4** បញ្ជី README (ច្បាប់ ៩) · «Other dirs» | `CLAUDE.md` ខ្វះ README ៤ · `tools/` ៣ · workflow ២ · `ZOE_RUNNER_MODE` · `docs/SELF-HOSTED-RUNNERS.md` គ្មានអ្នកស្កេន (root `docs/` លើកលែងទាំងមូល) | បញ្ជីពេញ · `doc-scope-test` ស្កេន root `docs/` លើកលែងតែឯកសារប្រវត្តិ ២ |
+| A38 | **DOCS-5** `ZoeW/docs/MIGRATION.md` | ជំហាន ២ «ដូចមុន» · ការថយក្រោយ «build `ZoeW/` static ចាស់» · «App ថ្មីមិនបន្ថែម path rules» (ខុស ៖ `origins` · `zoew_settings/zto_signed_sweep` · `ops`) | កែតាមការពិត (Publish deploy មុន · ច្បាប់ ១០) |
+| A39 | **DOCS-6** ច្បាប់ `planPickupLedgerRepair()` | `CLAUDE.md` ៖ `bucket.total === recordedPackages` ➜ គ្មានក្នុងកូដ · កូដ ៖ `pickupSetSize(set) === recorded` + ពិនិត្យម្តងទៀតលើតម្លៃ server ក្នុង transaction | កែច្បាប់ |
+
+- លិបិក្រមត្រូវ regenerate **ចុងក្រោយ** ក្នុងជុំណាដែលបន្ថែមអត្ថបទប្រវត្តិ (ឈ្មោះ checker/vitest ថ្មីក្នុងផ្នែកថ្មី ➜ `doc-scope-test` ក្រហមរហូតដល់ជួរត្រូវ)។
+
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៥ (UI · NATIVE) ➜ [2.50.34]–
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -2644,6 +2641,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ប្តូរទៅ Set នៃ id ដែលបានមើលក្នុងជុំ ៖ ជុំចប់ពេលគ្រប់ id ត្រូវមើល · ជុំក្រោយ (កេះថ្មី) ព្យាយាមកញ្ចប់បរាជ័យម្តងទៀត។
 - ការហៅដោយគ្មាន limit (checker ចាស់ ១០+) មិនប៉ះ state ថ្មី (`cleanupSweepVisited` អានតែពេលមាន limit) ➜ sandbox មិនត្រូវប្តូរ (លើកលែង `connection-recovery-test` ៖ ថេរ `CLEANUP_SWEEP_BATCH`)។
 - ⛔ ការស៊ើបអង្កេតមិនប៉ះ probe liveness (`probeDatabaseLiveness()`) ទេ។
+- run-all STRICT ជុំ ១៤ ៖ ២០១/២០២ ៖ `money-reality` ៖ `audit-tools/money-core.js` ចាស់ — `appZoneParts()` (SCALE-7) ជាផ្នែកនៃកូដលុយ ➜ `npm --prefix ZoeW run money:core` ·
+  មេរៀន ៖ កូដម៉ោង/ថ្ងៃក៏ជាកូដលុយ ➜ regenerate money-core រាល់ពេលប៉ះ `timezone.ts`។
+- ops (ពី MONEY-4) ៖ ring `ops` (≤ `LEDGER_OP_RING_MAX` token) បន្ថែម ~២៥០ byte ក្នុង record ថ្ងៃ/ខែ ➜ Firebase `onValue` លើ root ផ្ញើតែ child ដែលប្រែ (delta) ·
+  Supabase pull ផ្ញើតែ doc ដែលប្រែ ➜ egress បន្ថែមក្នុងមួយការសរសេរ ledger ≈ record មួយ · ⛔ មិនវាស់ live (គ្មានទិន្នន័យអតិថិជន) ➜ «មិនទាន់វាស់» ក្នុង Handoff។
 - SCALE-2 ក្រោយ push ៖ `emu/crud-rules-flow` (ការពិនិត្យ dependency ឋិតិវន្តរបស់ sandbox) ចាប់ `dataState` · `scheduleCleanupSweepContinuation` ➜ stub (ការហៅគ្មាន limit មិនអានវា) ·
   មេរៀន ៖ ផ្ទៀងផ្ទាត់ checker sandbox ទាំងអស់ដែលស្រង់ function ដែលប្រែ មុន push (មិនមែនតែ checker ដែលរត់វា)។
 - UI-7 ៖ ការវាស់ Enter ក្នុង `app-lock-test` ក្រុម ២១ មិនបាន ៖ អន្ទាក់ harness ដែលបានកត់ (Chromium headless ឈប់បញ្ជូន input ពិតក្រោយវដ្តចាកចេញ/ត្រឡប់ ៖ `page.press` ត្រឡប់ជោគជ័យ
@@ -4256,7 +4257,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 
 ## 🔎 លិបិក្រម — ឈ្មោះ checker ➜ ការពន្យល់រស់នៅឯណា
 
-> ⛔ **តារាងនេះដេរីវេពីការលេចពិត** នៃឈ្មោះ checker (`audit-tools/**/*.js`) ក្នុងឯកសារទាំង ២ — មិនមែនសរសេរដោយដៃ។
+> ⛔ **តារាងនេះដេរីវេពីការលេចពិត** នៃឈ្មោះ checker (`audit-tools/**/*.js`) និងអ្នកយាម vitest (`ZoeW/tests/**/*.test.ts(x)`) ក្នុងឯកសារទាំង ២ (`doc-scope-test` វាស់ទិសទាំងពីរ) — មិនមែនសរសេរដោយដៃ។
 > ផ្លូវធម្មតា ៖ checker ធ្លាក់ ➜ រកឈ្មោះវាត្រង់នេះ ➜ `grep -n "<ឈ្មោះ>" docs/HISTORY.md docs/HISTORY-ARCHIVE.md`។
 
 | Checker | `HISTORY.md` (សម័យ React) | `HISTORY-ARCHIVE.md` (vanilla · ផ្នែក ៦ ៖ ផ្ទេរទៅ React) |
@@ -4264,34 +4265,34 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `action-binding-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `app-lock-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
 | `barcode-shape-test` | — | ផ្នែក ២ |
-| `biometric-unlock-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `biometric-unlock-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `boot-animation-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `camera-resume-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `camera-resume-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `cleanup-clock-guard-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `cleanup-interrupt-atomicity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `cleanup-clock-guard-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `code-duplication-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `code-duplication-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
 | `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `comments` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `comments` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `concurrent-scan-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `concurrent-scan-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `connection-state-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `csp-enforced-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `csp-lazy-resource-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `css-classes` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `css-classes` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `css-media-override` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `css-var-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `daily-collected-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `daily-collected-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `dependency-security-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
@@ -4306,23 +4307,23 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `emu/license-seat-rules-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៥ |
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/restore-deadlock-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
-| `emu/restore-mutation-emu-test` | — | ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | — | ផ្នែក ១ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `firebase-backup-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | ផ្នែក ១ | ផ្នែក ៣ |
 | `firebase-provision-test` | ផ្នែក ២ | — |
-| `fluid-type-focus-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `function-surface-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `health-check-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `history-menu-dismiss-test` | — | ផ្នែក ២ · ផ្នែក ៦ |
-| `history-patch-retry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៦ |
+| `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `html-sink-escaping` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `idtoken-fixture` | ផ្នែក ២ | — |
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -4334,7 +4335,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | — | ផ្នែក ១ |
-| `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `layout-thrash` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4344,20 +4345,20 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `license-clock-rollback-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-clock-trust-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `license-grace-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-network-pressure-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-record-race-test` | — | ផ្នែក ២ |
 | `license-seat-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
 | `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `locker-claim-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `lookup-burst-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-config-secret-test` | — | ផ្នែក ១ |
 | `lookup-failure-identity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `lookup-prefetch-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `money-core` | ផ្នែក ១ | ផ្នែក ៦ |
+| `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `money-reality-test` | ផ្នែក ១ | ផ្នែក ២ |
@@ -4371,8 +4372,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `page-nav-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-snap-ownership-test` | — | ផ្នែក ២ · ផ្នែក ៦ |
-| `partial-pickup-cleanup-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `payload-schema` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4381,17 +4382,17 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `pin-prompt-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `policy-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `pin-prompt-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `policy-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | — | ផ្នែក ៦ |
 | `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
-| `registry-release-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `repository-contract-test` | — | ផ្នែក ២ · ផ្នែក ៦ |
+| `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
+| `registry-release-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4399,17 +4400,17 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ |
 | `runall-runner-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `scan-engine-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `scan-engine-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `scan-remove-mode-test` | — | ផ្នែក ១ |
-| `sdk-offline-boot-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sdk-offline-boot-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sdk-surface` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `sentry-load-race-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `setup-link-browser-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `setup-link-logout-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `setup-link-browser-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `setup-link-logout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `setup-link-roundtrip-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `shared-fns` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `shared-fns` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stale-clear-claim-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -4423,10 +4424,10 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
-| `supabase-data-tools-test` | ផ្នែក ២ | — |
-| `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `supabase-data-tools-test` | ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
 | `supabase-functions-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-pg` | ផ្នែក ២ | — |
@@ -4436,11 +4437,11 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-client-wiring-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `sw-install-integrity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-shell-latency-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `toast-action-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `toast-truth-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `toast-action-truth-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
+| `toast-truth-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `trash-modal-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `ts-comments` | — | ផ្នែក ៦ |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
@@ -4448,10 +4449,10 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `user-guide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `wiring` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zoew-suite-test` | ផ្នែក ២ | ផ្នែក ៦ |
-| `zto-budget-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `zto-cookie-session-test` | — | ផ្នែក ២ |
 | `zto-cookie-store-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -4459,6 +4460,109 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zto-network-boundaries-test` | — | ផ្នែក ២ |
-| `zto-proxy-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `zto-proxy-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
-| `zto-sync-banner-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `ZoeW/tests/activation-retry.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/adaptive-refresh.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/app-icon-logo.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/list-paging.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
+| `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/login-over-drawer.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/lookup-late-answer-busy.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/native-back.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
+| `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
+| `ZoeW/tests/network-toast.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/pwa-icons.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/reconfig-invite-seam.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/recovery-toast-dedup.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/registry-claim-proven.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/registry-flush-scale.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/registry-session-race.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-clock-skew.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-gateway-5xx.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-notify-dirty.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-offline-restore.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-pull-paging.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-realtime-ws.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-signout-offline.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-signout-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-signout-stage.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-tenant-switch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-transport-hang.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-tx-outcome.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-unsent-tx.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-update-contract.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/toast-backend.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/toast-live-expiry.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/toast-visibility.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-barcode-shape.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-born-closed-merge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-list-identity.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-list-origin.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-shop-sweep-marker.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-signed-cadence.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-signed-mismatch.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |

@@ -4568,7 +4568,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `firebase-config-paste-test` | ផ្នែក ១ | ផ្នែក ៣ |
 | `firebase-provision-test` | ផ្នែក ២ | — |
 | `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `function-surface-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -4626,7 +4626,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `periodic-network-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `phone-suggest-test` | — | ផ្នែក ១ |
 | `pickup-barcode-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ |

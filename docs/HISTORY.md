@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.28–2.50.32 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
@@ -128,6 +128,27 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.33] — 2026-10-08 · ZoeW ៖ **ថ្ងៃ និងម៉ោងកម្ពុជាគណនាដោយ formatter តែមួយ** (Deep audit ២ · ជុំ ១៤ · SCALE-7)
+
+**ZoeW `2.50.33`** (`zoew-v295` ➜ `zoew-v296`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🕒 **SCALE-7** ៖ `appZoneParts()` (ថ្ងៃ · ម៉ោង `Asia/Phnom_Penh`) បង្កើត `Intl.DateTimeFormat` ថ្មីរាល់ការហៅ ➜ រាល់ជួរប្រវត្តិ · ការស្កេន · ស្ថិតិ · Export បង់តម្លៃបង្កើត formatter។
+  ឥឡូវ formatter បង្កើតម្តង ហើយទុកលើ function ខ្លួនវា (`appZoneParts.zoneFormat` · checker ស្រង់តែ function ➜ គ្មានអថេរ module) · `Intl.DateTimeFormat` ប្តូរ ឬបោះ ➜ បង្កើតថ្មី ឬ fallback UTC+7 ដូចដើម ·
+  លទ្ធផលស្មើការបង្កើតថ្មីរាល់ដង។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ម៉ោងស្កេន · ថ្ងៃក្នុងតម្រង · របាយការណ៍ខែ ដូចដើម)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zone-format-cache.test.ts` (ថ្មី · ២ · `timezone.ts` ពិត · constructor រាប់) ៖ ហៅ ៥០០ ដង ➜ បង្កើត ≤ ១ · លទ្ធផលស្មើ formatter ថ្មីលើ ៦ ចំណុច ·
+  Intl បោះ ➜ fallback ត្រឹមត្រូវ · Intl ត្រឡប់មក ➜ បង្កើតម្តង (មុនកែ FAIL ២ ៖ បង្កើត ៥០០ · ៦) · mutation (ឈប់ពិនិត្យ constructor) ➜ FAIL ១ ·
+  `khmer-timezone-test` ២១ · `emu/crud-rules-flow` (Intl បរាជ័យកណ្តាល sandbox) ១២៦។
 
 ### [2.50.32] — 2026-10-08 · ZoeW ៖ **ការដោះ Barcode ពីបញ្ជីប្រឆាំងស្ទួនច្រើនរយក្នុងពេលតែមួយ លែងធ្វើឲ្យអេក្រង់កក** (Deep audit ២ · ជុំ ១៤ · SCALE-6)
 
@@ -2503,13 +2524,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.32]
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.33]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A26 | **SCALE-2** ការសម្អាតច្រើនរយកញ្ចប់រារាំង main thread | Claude ៖ `cleanup.ts` ពិត + SDK ក្លែង ៖ ៣០០ ripe ➜ `runScheduledCleanup()` ចាប់ផ្តើម ២០០ (ពិដាន journal) ក្នុងការហៅ synchronous តែមួយ · FAIL ២/៤ | batch ៨ + yield ៥០ms + ជុំដើរគ្រប់ (`cleanupSweepVisited`) |
 | A27 | **SCALE-3** `notify()` Supabase serialize គ្រប់ root រាល់ការហៅ | Claude ៖ adapter ពិត + transport ក្លែង (getter រាប់ការអាន) ៖ poll ទទេ ២ ដង ➜ អាន root ធំ ១២០ · pull ប្រែតែ root តូច ➜ ៦០ · ការសរសេរ root តូច ➜ ១២០ · FAIL ៣/៦ | dirty roots សម្គាល់នៅកន្លែងប្រែ · listener មិនទាន់ fire ➜ fire ជានិច្ច |
 | A28 | **SCALE-6** flush registry O(key × barcode) | Claude ៖ `registry.ts` ពិត ៖ key ២០០ (គ្មានម្ចាស់ ១៥០) លើប្រវត្តិ ៣០០ + ធុងសំរាម ១៥០០ ➜ អាន `barcodes` ១,១៧៤,៥០០ ដង (≈ ៣២៦ ដងនៃការដើរម្តង) | សំណុំ key មានម្ចាស់ម្តងក្នុងមួយ flush |
+| A29 | **SCALE-7** `Intl.DateTimeFormat` ថ្មីរាល់ការហៅ | Claude ៖ `appZoneParts()` ៥០០ ដង ➜ បង្កើត ៥០០ | formatter លើ function (key តាម constructor) |
+| A30 | **SCALE-4** ធុងសំរាម ៣០ ថ្ងៃ (fixture ៨៥០០) | Claude ៖ function ពិតដែលដើរធុងសំរាម ២០០០ ➜ ៨៥០០ ធាតុ (២ barcode/ធាតុ) ៖ `buildTrashGroups` ១៣ ➜ ៤១ms · `planPickupLedgerRepair` ៧ ➜ ២៥ms · `removedParcelsView` ២ ➜ ៤ms · `uncollectedValueByDate` ២ ➜ ៧ms · `rawSnapshotToItemList` ១ ➜ ៤ms · `isBarcodeAlreadyUsed` ២ ➜ ៣ms · `refreshNotifyView` · `runAutomaticCleanupRules` ≤ ៣ms ➜ លីនេអ៊ែរទាំងអស់ · ផ្លូវ O(N²) តែមួយគត់ = flush registry (A28) | ⛔ មិនកែកូដ (Set index ថ្មីនឹងត្រូវ invalidate តាម `unshift`/`splice` ៥ កន្លែង ➜ ហានិភ័យលើសតម្លៃ) |
 
 - ការរចនាដំបូង (cursor តាមលិបិក្រមរង្វិល) ➜ កញ្ចប់ ២០ ដែលបរាជ័យភ្លាមនៅសល់ ➜ ការហៅនីមួយៗចាប់ផ្តើម ៨ ក្នុងចំណោម ២០ ម្តងទៀត ➜ ជុំមិនដែលចប់ (timer បន្តរហូត · FAIL ១) ហើយលិបិក្រមរំកិលពេលបញ្ជីរួញ ➜
   ប្តូរទៅ Set នៃ id ដែលបានមើលក្នុងជុំ ៖ ជុំចប់ពេលគ្រប់ id ត្រូវមើល · ជុំក្រោយ (កេះថ្មី) ព្យាយាមកញ្ចប់បរាជ័យម្តងទៀត។

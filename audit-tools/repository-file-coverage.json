@@ -1878,6 +1878,9 @@
     "ZoeW/tests/registry-flush-scale.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zone-format-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-write-bad-body.test.ts": {
       "policy": "zoew-self-verification"
     },

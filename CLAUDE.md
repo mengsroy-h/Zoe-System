@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.32` (`zoew-v295`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.33` (`zoew-v296`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.8` (`zoekeygen-v119`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -292,7 +292,7 @@ only this text protects them.
 | Inspect-element protection | ⛔ Can't be hardened — don't try | 📝 (structural) |
 | **Users write revenue numbers directly** | Accepted by design (no backend) | 📝 |
 | **Phone number identity** | The stored number is the merge key and the basis of `getPickupPhoneKey()` ➜ `normalizeOneStoredPhone()` strips `= " '` at **both ends**; inner separators stay | `phone-suggest-test` |
-| **Dates and times** | Business calendar `Asia/Phnom_Penh` on every device | `khmer-timezone-test` |
+| **Dates and times** | Business calendar `Asia/Phnom_Penh` on every device · `appZoneParts()` builds its `Intl.DateTimeFormat` once and keeps it on the function itself (`appZoneParts.zoneFormat`, keyed by the `Intl.DateTimeFormat` constructor ➜ a swapped or throwing `Intl` rebuilds or falls back to UTC+7) ⛔ never a module-level cache (checkers extract the function alone) | `khmer-timezone-test` · `ZoeW/tests/zone-format-cache.test.ts` |
 | **Monthly report** | Derived from **days** · read-only · same basis as the original screen · every exported column carries the field its header promises (assertions derived from headers, values differ, cents) | `monthly-report-test` |
 | **Monthly ↔ daily ledger** | `monthly[M]` = sum of `daily[d ∈ M]` on the server; `alignMonthlyLedgerToDaily()` is the single aligner (normal path writes nothing extra) · restore adds back every field into both buckets (`appendRestoreRevenueIncrements`) · month verdicts read what the server really stores (trimmed month ➜ `0`) | `monthly-ledger-agreement-test` |
 | **Revenue ↔ uncollected parcels** | Revenue = ledger minus barcode values `!isDeducted && !isClosed` · clamp per currency · unmeasurable ➜ `—` · **2** stats screens use the same helper · month revenue = sum of daily revenues (`buildMonthlyReport()` sums `collectedValueOf()` per day; `buildStatCardItem()` takes computed revenue) · measurability covers the ledger side · random-order fuzz on the display path | `monthly-report-test` · `stats-collected-truth-test` · `stats-screen-agreement-test` · `stats-measurable-gate-test` · `collected-value-fuzz-test` |

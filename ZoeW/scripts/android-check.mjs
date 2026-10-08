@@ -365,7 +365,7 @@ const keystoreFiles = [];
     let entries;
     try { entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
-        if (['node_modules', 'build', '.gradle', 'dist', 'dist-audit', '.original'].includes(e.name)) continue;
+        if (['node_modules', 'build', '.gradle', 'dist', 'dist-audit'].includes(e.name)) continue;
         const rel = dir ? dir + '/' + e.name : e.name;
         if (e.isDirectory()) walkKs(rel);
         else if (/\.(jks|keystore)$/i.test(e.name)) keystoreFiles.push(rel);

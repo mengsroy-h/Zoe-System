@@ -28,7 +28,6 @@ import { ConfigModal } from '../src/app/components/modals/ConfigModal';
 import { LoginModal } from '../src/app/components/modals/LoginModal';
 import { ActivationModal } from '../src/app/components/modals/ActivationModal';
 import { APP_LOCK_EXCUSE_SELECTOR } from '../src/features/app-lock';
-import { INTENTIONAL_UI } from '../scripts/snapshot.mjs';
 import { viewState } from '../src/core/view-state';
 import { securityState, uiState } from '../src/core/state';
 import { fieldValue } from '../src/app/refs';
@@ -146,14 +145,6 @@ describe('ទំនាក់ទំនងបង្កើតគណនី (Telegram
         const act = document.querySelector('#activationModal a[href^="https://t.me/"]')!;
         expect(act).not.toBe(null);
         expect(contactLinks()[0].outerHTML).toBe(act.outerHTML);
-    });
-
-    it('parity ៖ ខ្លឹមសារប្រអប់ Config ទាំងមូលជាផ្ទៃរចនាឡើងវិញ (INTENTIONAL_UI រំលង) · ប្រអប់ខ្លួនវា និងប្រអប់ផ្សេងនៅប្រៀបធៀប', () => {
-        expect(document.querySelector('#configModal .modal-content')!.matches(INTENTIONAL_UI.skip)).toBe(true);
-        expect(byId('configModal').matches(INTENTIONAL_UI.skip)).toBe(false);
-        unmount();
-        mount(<><ConfigModal /><ActivationModal /></>);
-        expect(document.querySelector('#activationModal .modal-content')!.matches(INTENTIONAL_UI.skip)).toBe(false);
     });
 });
 

@@ -1,12 +1,12 @@
 /**
- * ម៉ឺនុយ (...) ↔ ការរមូរ — helper រួមសម្រាប់ harness ដែលចុចម៉ឺនុយ (...) (`parity-deep.mjs` · `cleanup-rules-check.mjs`)។
+ * ម៉ឺនុយ (...) ↔ ការរមូរ — helper សម្រាប់ harness ដែលចុចម៉ឺនុយ (...) (`cleanup-rules-check.mjs`)។
  *
- * App ទាំង ២ (ZoeW ដើម និង React) បិទម៉ឺនុយ (...) លើ **រាល់** ព្រឹត្តិការណ៍ `scroll` (capture លើ `window` ·
+ * App បិទម៉ឺនុយ (...) លើ **រាល់** ព្រឹត្តិការណ៍ `scroll` (capture លើ `window` ·
  * លើកលែងការរមូរខាងក្នុងម៉ឺនុយ) — ឥរិយាបថដោយចេតនា (`src/app/lifecycle/boot.ts` ៖ `startGlobalDismissals`)។
  * តែ `#appPages` មាន `scroll-snap-type: y proximity` ➜ ក្រោយការប្តូរទំព័រ browser អាច **snap ឡើងវិញ** តាមម៉ោង **ពិត**
  * (ឯករាជ្យពីនាឡិកា JS ដែល harness ផ្អាក) ➜ ការ snap នោះអាចបាញ់ **ក្រោយ** harness បើកម៉ឺនុយ ➜ ធាតុម៉ឺនុយ «មើលមិនឃើញ»
  * ➜ `page.click` ផុត ៥ វិ.។ វាស់បាន ៖ `#appPages` 0 ➜ 369 (ចំណុច snap របស់ `.page-main`) ខណៈម៉ឺនុយ `display:block` ·
- * ធ្លាក់ម្តងម្កាលលើ App **ណាមួយក្នុងចំណោម ៣** រួម ZoeW ដើម ដែលគ្មាននរណាកែ (CI ៖ Android · ក្នុង session ៖ ZoeW ដើម)។
+ * ធ្លាក់ម្តងម្កាលលើ build ណាមួយ (CI ៖ Android) ទាំងដែលគ្មាននរណាកែ។
  *
  * ⛔ ការកែជា **រចនាសម្ព័ន្ធ** ពីរជាន់ ៖
  *   ១. `scrollQuiet()` ៖ រង់ចាំការរមូរស្ងប់ **មុន** ចុចប៊ូតុងបើក (ដូចអ្នកប្រើដែលចុចពេលអេក្រង់ឈប់)។

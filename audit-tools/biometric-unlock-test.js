@@ -169,7 +169,7 @@ function makeEnv(opts) {
     return { ctx, sandbox, log, els, store, prfKey };
 }
 
-// ⛔ អ្វីដែលអេក្រង់បង្ហាញ = `viewState` (JSX គូរវាដោយផ្ទាល់ — `parity:dom` វាស់ការគូរ)
+// ⛔ អ្វីដែលអេក្រង់បង្ហាញ = `viewState` (JSX គូរវាដោយផ្ទាល់ — browser ពិតក្នុង `app-lock-test` វាស់ការគូរ)
 function view(e) { return vm.runInContext('viewState', e.ctx); }
 
 const PIN = '135790';

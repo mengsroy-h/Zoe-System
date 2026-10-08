@@ -96,7 +96,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 - function ដែលចាក់ listener **ខាងក្នុងខ្លួន** ហើយដកវិញមិនបាន ➜ `oncePerPage()`
   (បើអត់ StrictMode/HMR បង្កើតស្ទួន ➜ សកម្មភាពរត់ ២ ដង)
 - ⛔ **លំដាប់ជាផ្នែកនៃឥរិយាបថ** — បន្ថែមនៅចុងដំណាក់ដែលត្រឹមត្រូវ រួចរត់
-  `npm run parity:deep` មុនជឿ
+  `bash audit-tools/run-all.sh` (ពី root) មុនជឿ
 
 ---
 
@@ -148,7 +148,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 | unit (helper សុទ្ធ · component) | `tests/**/*.test.ts(x)` | `npm test` |
 | App ពិតក្នុង Chromium ជាមួយ bridge Android ក្លែង | `scripts/native-check.mjs` | `npm run native:check` |
 | ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `scripts/android-check.mjs` | `npm run android:check` |
-| parity ជាមួយ ZoeW ដើម | `scripts/parity-*.mjs` | `npm run parity:all` |
+| ច្បាប់លុប/ដក និងការសម្អាត លើ web និង Android | `scripts/cleanup-rules-check.mjs` | `npm run rules:check` |
 | React ១០០% (កូដមុខងារមិនប៉ះ DOM · ref ចងពិត) | `scripts/react-purity-check.mjs` | `npm run purity:check` |
 | ទាំងអស់ | — | `npm run verify` |
 

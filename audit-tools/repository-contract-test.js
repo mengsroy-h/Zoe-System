@@ -230,7 +230,7 @@ scenario('.gitattributes ៖ checkout លើ Windows (core.autocrlf=true) បា
         const crlf = [];
         const walk = (dir) => {
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                if (['.git', 'node_modules', 'dist', 'dist-audit', '.original', 'build'].includes(entry.name)) continue;
+                if (['.git', 'node_modules', 'dist', 'dist-audit', 'build'].includes(entry.name)) continue;
                 const full = path.join(dir, entry.name);
                 if (entry.isDirectory()) walk(full);
                 else if (entry.isFile() && fs.statSync(full).size < 2000000) {
@@ -544,9 +544,8 @@ scenario('workers Vitest៖ zoew-suite ផ្ញើ CLI flag ពិត និង
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-suite-workers-'));
     const app = path.join(temp, 'ZoeW');
     try {
-        for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript', '.original/ZoeW']) fs.mkdirSync(path.join(app, dir), { recursive: true });
+        for (const dir of ['src', 'node_modules/vite', 'node_modules/typescript']) fs.mkdirSync(path.join(app, dir), { recursive: true });
         fs.writeFileSync(path.join(app, 'src/main.tsx'), '');
-        fs.writeFileSync(path.join(app, '.original/ZoeW/app.js'), '');
         fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify(json('ZoeW/package.json')));
         const invoke = (workers) => {
             const calls = [], env = { ZOEWSUITE_APP_DIR: temp };

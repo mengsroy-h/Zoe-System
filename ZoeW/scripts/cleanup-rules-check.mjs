@@ -3,16 +3,15 @@
  * **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** (`CLAUDE.md` ៖ «តារាងសេណារីយ៉ូពេញលេញ» និង
  * «ការសម្អាតស្វ័យប្រវត្តិ»)។
  *
- * App ៣ ត្រូវរត់លើទិន្នន័យ និងនាឡិកាដូចគ្នាបេះបិទ ៖
- *   ក. ZoeW ដើម (vanilla — `.original/ZoeW`) — oracle
- *   ខ. ZoeW React (web)
- *   គ. ZoeW React (Android — build `--mode android` + bridge Capacitor ក្លែង)
+ * App ២ ត្រូវរត់លើទិន្នន័យ និងនាឡិកាដូចគ្នាបេះបិទ ៖
+ *   ក. ZoeW React (web)
+ *   ខ. ZoeW React (Android — build `--mode android` + bridge Capacitor ក្លែង)
  *
  * ការអះអាង ២ ជាន់ ៖
- *   ១. **ច្បាប់ដាច់ខាត** លើ App នីមួយៗ (រួម ZoeW ដើម) ៖ ទិន្នន័យឈរ **សងខាងព្រំដែន**
- *      (±១ នាទី) ➜ ខាងក្នុងនៅ · ខាងក្រៅចេញ · `trashReason` · `isDeducted` · ledger
- *   ២. **parity** ៖ DB ចុងក្រោយរបស់ React (web · Android) = ZoeW ដើម (ត្រាពេលវេលា
- *      ថ្មីត្រូវធ្វើឲ្យស្មើ — ការប្រៀបធៀបគឺ *អ្វីផ្លាស់ទីទៅណា* និង *លុយ*)
+ *   ១. **ច្បាប់ដាច់ខាត** លើ App នីមួយៗ ៖ ទិន្នន័យឈរ **សងខាងព្រំដែន** (±១ នាទី) ➜ ខាងក្នុងនៅ ·
+ *      ខាងក្រៅចេញ · `trashReason` · `isDeducted` · ledger (តារាងសេណារីយ៉ូ `CLAUDE.md`)
+ *   ២. **parity** ៖ DB ចុងក្រោយរបស់ Android = web (ត្រាពេលវេលាថ្មីត្រូវធ្វើឲ្យស្មើ — ការប្រៀបធៀបគឺ
+ *      *អ្វីផ្លាស់ទីទៅណា* និង *លុយ*) ➜ ផ្លូវ native មិនបង្កើតច្បាប់លុយទី ២
  *
  * ⛔ ព្រំដែន «> មិនមែន >=» (៧×២៤ ម៉ោងគត់ ➜ នៅក្នុងបញ្ជី) វាស់មិនបាននៅទីនេះ
  *    (នាឡិការំកិលពេល boot) ➜ `audit-tools/trash-modal-test.js` ចាក់សោវាតាមកូដ។
@@ -27,13 +26,11 @@ import { fileURLToPath } from 'node:url';
 import { serveDir } from './serve.mjs';
 import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB } from './fake-firebase.mjs';
 import { FAKE_BRIDGE, RESPOND_DEFAULT } from './fake-capacitor.mjs';
-import { resolveOldRoot } from './old-app.mjs';
 import { SCROLL_PROBE, openMenuItem } from './menu-scroll.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 const OUT = path.join(ROOT, '.rules-check-dist');
-const OLD_DIR = resolveOldRoot(HERE);
 const CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' });
 
 const MIN = 60 * 1000;
@@ -346,23 +343,22 @@ function diffPaths(a, b, p = '') {
 }
 
 const results = [];
-results.push(await run('ក. ZoeW ដើម (oracle)', OLD_DIR, false));
-results.push(await run('ខ. ZoeW React — web', path.join(OUT, 'web'), false));
-results.push(await run('គ. ZoeW React — Android (bridge Capacitor ក្លែង)', path.join(OUT, 'android'), true));
+results.push(await run('ក. ZoeW React — web', path.join(OUT, 'web'), false));
+results.push(await run('ខ. ZoeW React — Android (bridge Capacitor ក្លែង)', path.join(OUT, 'android'), true));
 await browser.close();
 fs.rmSync(OUT, { recursive: true, force: true });
 
 console.log(`ព្រំដែនដែលអានពីកូដ ៖ ២ម៉ោង=${TWO_HOURS / HOUR}h · ផុតកំណត់=${ABANDON / DAY}d · ធុងសំរាម expired=${EXPIRED_RETENTION / DAY}d · ផ្សេង=${TRASH_RETENTION / DAY}d`);
 for (const res of results) assertRules(res);
 
-console.log('\n── parity ៖ DB ចុងក្រោយ ធៀបនឹង ZoeW ដើម ──');
-const oracle = results[0];
+console.log('\n── parity ៖ DB ចុងក្រោយ Android ធៀបនឹង web ──');
+const web = results[0];
 for (const res of results.slice(1)) {
-    const phases = [['ក្រោយការសម្អាតពេលផ្ទុក', oracle.afterBoot, res.afterBoot],
-        ...oracle.steps.map((s, i) => ['ក្រោយ «' + s.name + '»', s.db, res.steps[i] && res.steps[i].db])];
+    const phases = [['ក្រោយការសម្អាតពេលផ្ទុក', web.afterBoot, res.afterBoot],
+        ...web.steps.map((s, i) => ['ក្រោយ «' + s.name + '»', s.db, res.steps[i] && res.steps[i].db])];
     for (const [name, a, b] of phases) {
         const d = a && b ? diffPaths(normalize(a), normalize(b)) : ['ខ្វះ DB'];
-        ok(`${res.label} ៖ ${name} = ZoeW ដើម`, d.length === 0, d.slice(0, 4));
+        ok(`${res.label} ៖ ${name} = web`, d.length === 0, d.slice(0, 4));
     }
 }
 

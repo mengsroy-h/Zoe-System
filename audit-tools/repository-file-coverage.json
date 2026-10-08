@@ -398,7 +398,7 @@
         "audit-tools/ui-flow-test.js",
         "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "run-all.sh build ZoeW/dist-audit ពី src ពិត ➜ checker ស្រង់ function ពិតពី app.js (ទិដ្ឋភាពអត្ថបទនៃ src) ចូល vm និងរត់ bundle Vite ពិតក្នុង browser; zoew-suite រត់ tsc · vitest · logic/parity ធៀបនឹង ZoeW ដើម។",
+      "evidence": "run-all.sh build ZoeW/dist-audit ពី src ពិត ➜ checker ស្រង់ function ពិតពី app.js (ទិដ្ឋភាពអត្ថបទនៃ src) ចូល vm និងរត់ bundle Vite ពិតក្នុង browser; zoew-suite រត់ tsc · vitest (រួមសោតំបន់ហាម) · rules:check (web ទល់ Android)។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
     },
     "guard-idtoken-fixture": {
@@ -458,7 +458,7 @@
       "guards": [
         "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "zoew-suite-test រត់ npm scripts ពិតរបស់ ZoeW (typecheck · lint · vitest · slot/purity · doc · android · logic · parity · build · sw · smoke · native · rules) ➜ tests/scripts/config ទាំងនេះត្រូវរត់ពិតរាល់ run-all។",
+      "evidence": "zoew-suite-test រត់ npm scripts ពិតរបស់ ZoeW (typecheck · lint · vitest · slot/purity · doc · android · build · sw · smoke · native · rules) ➜ tests/scripts/config ទាំងនេះត្រូវរត់ពិតរាល់ run-all។",
       "limitation": "ឧបករណ៍ផលិតកូដ (tools/) រត់តែពេលផលិត src ឡើងវិញ; config ត្រូវការ node_modules របស់ ZoeW។"
     },
     "zoew-android": {
@@ -970,9 +970,6 @@
     "ZoeW/docs/MIGRATION.md": {
       "policy": "zoew-docs"
     },
-    "ZoeW/docs/PARITY.md": {
-      "policy": "zoew-docs"
-    },
     "ZoeW/docs/TYPESCRIPT.md": {
       "policy": "zoew-docs"
     },
@@ -1089,19 +1086,10 @@
     "ZoeW/scripts/fake-firebase.mjs": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/scripts/fetch-original.sh": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/scripts/gen-vapid.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/history-window-check.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/intentional-removals.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/logic-identity.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/menu-scroll.mjs": {
@@ -1111,21 +1099,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/notice-check.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/old-app.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/parity-deep.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/parity-dom.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/parity-live.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/parity-static.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/pwa-icons.mjs": {
@@ -1144,9 +1117,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/smoke.mjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/scripts/snapshot.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/sw-check.mjs": {
@@ -1830,13 +1800,10 @@
     "ZoeW/tests/fixtures/code128-oracle.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/health-row-parity.test.tsx": {
+    "ZoeW/tests/forbidden-zone-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/history-paging.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/history-row-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ledger-not-applied-retry.test.ts": {
@@ -1978,12 +1945,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notifications.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/oracles/health-row-html.ts": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tests/oracles/history-row-html.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/push-client.test.tsx": {

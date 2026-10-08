@@ -23581,7 +23581,7 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 ### ការផ្ទេរ ZoeW ទៅ React ៖ ការរកឃើញ · ការពង្រឹង · លេខ parity ដែលវាស់បាន (ធ្លាប់ជា `ZoeW/docs/ADDED-VALUE.md` · `PARITY-RESULTS.md`)
 
 > ⛔ **បណ្ណសារ** ៖ លេខក្នុងនេះជារូបភាពនៃថ្ងៃដែលវាត្រូវវាស់ — ផលិតលេខថ្មីដោយ `npm --prefix ZoeW run parity:all` (វិធីសាស្ត្រ ៖
-> [`ZoeW/docs/PARITY.md`](../ZoeW/docs/PARITY.md))។ ច្បាប់ដែលនៅរស់រស់នៅ [`ZoeW/docs/ARCHITECTURE.md`](../ZoeW/docs/ARCHITECTURE.md) និង `CLAUDE.md`។
+> `ZoeW/docs/PARITY.md`)។ ច្បាប់ដែលនៅរស់រស់នៅ [`ZoeW/docs/ARCHITECTURE.md`](../ZoeW/docs/ARCHITECTURE.md) និង `CLAUDE.md`។
 
 #### ក. ការរកឃើញ និងការពង្រឹង (`ADDED-VALUE.md`)
 
@@ -23718,7 +23718,7 @@ ZoeW ដើមគ្មានការពិនិត្យសោះ។ កា�
 #### ខ. លទ្ធផល parity ឆៅ (`PARITY-RESULTS.md`)
 
 > ⚠️ ឯកសារនេះជា **លទ្ធផលឆៅ** នៃការរត់ឧបករណ៍វាស់។ វិធីសាស្ត្រ និងហេតុផល
-> ស្ថិតក្នុង [`PARITY.md`](../ZoeW/docs/PARITY.md) ។ ផលិតវាឡើងវិញដោយ `npm run parity:all`
+> ស្ថិតក្នុង `PARITY.md` ។ ផលិតវាឡើងវិញដោយ `npm run parity:all`
 > និង `npm test` ។
 
 ---

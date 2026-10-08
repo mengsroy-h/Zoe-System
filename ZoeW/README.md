@@ -2,7 +2,7 @@
 
 PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្ធ Zoe។ ដំឡើងលើទូរស័ព្ទបាន ដំណើរការក្រៅបណ្តាញបាន
 ហើយប្រើ Firebase Realtime Database ជាប្រភពទិន្នន័យ។ កូដសរសេរលើ **React +
-TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវាស់ parity ស្ថិតក្នុង
+TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវាស់ ស្ថិតក្នុង
 **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**។
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·

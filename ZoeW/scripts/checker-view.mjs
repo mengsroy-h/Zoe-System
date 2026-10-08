@@ -13,7 +13,7 @@
  *   ២. `import.meta.env.*` ➜ តម្លៃដែល Vite ជំនួសពេល build ផលិតកម្ម (`PROD` · `DEV` · `MODE` · `VITE_*`)។
  *   ៣. ដក comment (`app.js` ដើមគ្មាន comment — ច្បាប់ ៣) · ដក `import`/`export` (ពាក្យ `export ` តែប៉ុណ្ណោះ)។
  *   ៤. `<ឃ្លាំង>.<វាល>` ➜ `<វាល>` សម្រាប់តែ state ដើម (`src/_generated-state.json`) — ឃ្លាំងជា Proxy ដែល
- *      សរសេរ/អានវាលដដែល (`logic-identity.mjs` ធ្វើការធ្វើឲ្យស្មើដដែលនេះ)។
+ *      សរសេរ/អានវាលដដែល។
  *   ៥. indent +៤ (App ដើមជា script កម្រិតកំពូល indent ៤) — លើកលែងជួរក្នុង template literal។
  *   ៦. **ស្រទាប់ចូល DOM របស់ React ➜ សមមូលដើម** (`VIEW_OVERRIDES`) ៖ `elementOf(name)` ➜
  *      `document.getElementById(name)` (ឈ្មោះ ref = id របស់ធាតុ — `refSelectorsFromJsx()` ផ្ទៀងផ្ទាត់ពី JSX

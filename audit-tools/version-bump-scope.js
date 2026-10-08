@@ -133,6 +133,96 @@ function changedBeyond(file, versionLine) {
         .some((l) => !versionLine.test(l));
 }
 
+// ⛔ `package.json` របស់ App React ជា manifest នៃ build ៖ dependency · `type` · វាលផ្សេងៗចូល bundle ➜ ការកែពិត។ តែ `scripts`
+//    ប៉ះកូដ ship **តែតាមច្រកផ្សាយ** ៖ `command` របស់ Netlify (`<app>/netlify.toml`) · `npm run … --prefix <app>` ក្នុង workflow
+//    (APK) · lifecycle ពេលដំឡើង (`npm ci` រត់ `preinstall` · `install` · `postinstall` · `prepare`) · `pre<x>`/`post<x>` របស់ script
+//    នីមួយៗក្នុងការបិទ ➜ script ក្រៅការបិទនោះ (ឧបករណ៍វាស់ ៖ `rules:check` · `verify` …) មិនប៉ះកូដ ship ទេ។ ធ្លាប់វាស់ ៖ ការដក script
+//    ឧបករណ៍វាស់ចេញ (D7) ត្រូវអានថា «កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ» ➜ ការឡើងកំណែទទេបង្ខំអ្នកប្រើទាញសំបកទាំងមូលឡើងវិញ។
+//    ⛔ ច្រកផ្សាយរកមិនឃើញ ➜ រាប់ script ទាំងអស់ (fail-closed)។
+const INSTALL_LIFECYCLE = ['preinstall', 'install', 'postinstall', 'prepare'];
+function releaseEntryScripts(app) {
+    const entries = new Set();
+    const npmRuns = (text, re) => { for (const m of String(text).matchAll(re)) entries.add(m[1]); };
+    let toml = '';
+    try { toml = fs.readFileSync(path.join(GIT_DIR, app, 'netlify.toml'), 'utf8'); } catch (e) {}
+    for (const m of toml.matchAll(/^\s*command\s*=\s*"([^"]*)"/gm)) npmRuns(m[1], /npm\s+run\s+(?:-s\s+)?([\w:.-]+)/g);
+    let wfDir = [];
+    try { wfDir = fs.readdirSync(path.join(GIT_DIR, '.github', 'workflows')).filter((f) => /\.ya?ml$/.test(f)); } catch (e) {}
+    const prefix = app.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const f of wfDir) {
+        let wf = '';
+        try { wf = fs.readFileSync(path.join(GIT_DIR, '.github', 'workflows', f), 'utf8'); } catch (e) {}
+        for (const line of wf.split('\n')) {
+            if (!new RegExp('--prefix[ =]' + prefix + '(?![\\w/-])').test(line)) continue;
+            npmRuns(line, /npm\s+(?:--prefix[ =]\S+\s+)?run\s+(?:-s\s+)?([\w:.-]+)/g);
+        }
+    }
+    return entries;
+}
+function releaseScriptClosure(scripts, entries) {
+    const keep = new Set();
+    const queue = [...entries, ...INSTALL_LIFECYCLE];
+    while (queue.length) {
+        const name = queue.shift();
+        if (keep.has(name) || typeof scripts[name] !== 'string') continue;
+        keep.add(name);
+        queue.push('pre' + name, 'post' + name);
+        for (const m of scripts[name].matchAll(/npm\s+(?:--prefix[ =]\S+\s+)?run(?:-script)?\s+(?:-s\s+)?([\w:.-]+)/g)) queue.push(m[1]);
+    }
+    return keep;
+}
+function sortedJson(value) {
+    if (Array.isArray(value)) return '[' + value.map(sortedJson).join(',') + ']';
+    if (value && typeof value === 'object') {
+        return '{' + Object.keys(value).sort().map((k) => JSON.stringify(k) + ':' + sortedJson(value[k])).join(',') + '}';
+    }
+    return JSON.stringify(value);
+}
+function shippedManifestView(text, entries) {
+    let o;
+    try { o = JSON.parse(text); } catch (e) { return 'unparsed:' + text; }
+    if (!o || typeof o !== 'object') return 'unparsed:' + text;
+    const view = Object.assign({}, o);
+    delete view.version;
+    if (view.scripts && typeof view.scripts === 'object' && entries.size) {
+        const keep = releaseScriptClosure(view.scripts, entries);
+        view.scripts = Object.fromEntries(Object.entries(view.scripts).filter(([k]) => keep.has(k)));
+    }
+    return sortedJson(view);
+}
+function manifestChangedForShip(app) {
+    const rel = app + '/package.json';
+    let before, after;
+    try { before = git(['show', BASE + ':' + rel]); } catch (e) { return true; }
+    try { after = fs.readFileSync(path.join(GIT_DIR, rel), 'utf8'); } catch (e) { return true; }
+    const entries = releaseEntryScripts(app);
+    return shippedManifestView(before, entries) !== shippedManifestView(after, entries);
+}
+{
+    const entries = new Set(['build', 'android:sync']);
+    const base = JSON.stringify({ version: '1.0.0', scripts: { build: 'tsc && vite build', 'build:android': 'vite build --mode android',
+        'android:sync': 'npm run build:android && cap sync android', 'rules:check': 'node scripts/rules.mjs', verify: 'npm run rules:check' },
+    devDependencies: { vite: '^8.0.0' } });
+    const edit = (fn) => { const o = JSON.parse(base); fn(o); return JSON.stringify(o, null, 2); };
+    const same = (fn) => shippedManifestView(base, entries) === shippedManifestView(edit(fn), entries);
+    ok('package.json ៖ ការកែ script ឧបករណ៍វាស់ (`rules:check` · `verify`) ឬ `version` មិនមែនកូដ ship',
+        same((o) => { o.scripts['rules:check'] = 'node scripts/other.mjs'; delete o.scripts.verify; o.version = '1.0.1'; }));
+    ok('ទិសផ្ទុយ ៖ ការកែ `build` · script ដែល `android:sync` ហៅ · `postinstall` · `prebuild` · dependency · script ផ្លាស់ចូលការបិទ ជាកូដ ship',
+        !same((o) => { o.scripts.build = 'vite build --mode x'; })
+        && !same((o) => { o.scripts['build:android'] = 'vite build --mode other'; })
+        && !same((o) => { o.scripts.postinstall = 'node patch.js'; })
+        && !same((o) => { o.scripts.prebuild = 'node gen.js'; })
+        && !same((o) => { o.devDependencies.vite = '^9.0.0'; })
+        && !same((o) => { o.scripts.build = 'npm run rules:check && vite build'; }));
+    ok('ទិសផ្ទុយ ៖ ច្រកផ្សាយរកមិនឃើញ ➜ script ទាំងអស់រាប់ (fail-closed)',
+        shippedManifestView(base, new Set()) !== shippedManifestView(edit((o) => { o.scripts['rules:check'] = 'x'; }), new Set()));
+    for (const app of present.filter((a) => fs.existsSync(path.join(GIT_DIR, a, 'package.json')) && fs.existsSync(path.join(GIT_DIR, a, 'src', 'main.tsx')))) {
+        const real = releaseEntryScripts(app);
+        ok(app + ' ៖ ជាន់អប្បបរមា ៖ ច្រកផ្សាយដេរីវេពី netlify.toml + workflow មាន `build` និង `android:sync`',
+            real.has('build') && real.has('android:sync'), [...real].join(' · ') || '(ទទេ)');
+    }
+}
+
 // ⛔ ការបិទរន្ធនៃការលើកលែង `netlify/functions/` ខាងលើ។
 // ការ **បន្ធូរ checker** ដោយគ្មានការចាក់សោ គឺជាការបង្កើតបៃតងក្លែងក្លាយសម្រាប់
 // ជុំក្រោយ (មេរៀន «ការការពារដែលងាប់»)។ ការលើកលែងនោះឈរលើការពិត **តែមួយ** ៖
@@ -183,7 +273,8 @@ for (const app of present) {
         try { git(['cat-file', '-e', BASE + ':' + app + '/src/main.tsx']); } catch (e) { reactExists = false; }
         // base ជា App vanilla ➜ ឯកសារ ship ទាំងអស់ប្រែ (ការជំនួសទាំងស្រុង) ➜ ការកែពិតតាមនិយមន័យ
         const realFiles = reactExists
-            ? reactFiles.filter((f) => !versionOnly.has(f) || changedBeyond(prefix + f, versionOnly.get(f)))
+            ? reactFiles.filter((f) => (f === 'package.json' ? manifestChangedForShip(app)
+                : !versionOnly.has(f) || changedBeyond(prefix + f, versionOnly.get(f))))
             : reactFiles;
         const swBumpedR = cacheVersionOf(BASE, app) !== cacheVersionOf(null, app);
         if (!reactFiles.length && !swBumpedR) continue;

@@ -234,7 +234,7 @@ function isHashedName(rel) {
 }
 function servedFiles(app) {
     const out = [];
-    const skip = new Set(['node_modules', 'android', 'src', 'scripts', 'tests', 'netlify', 'docs', 'dist-audit', 'resources', '.original', '.netlify']);
+    const skip = new Set(['node_modules', 'android', 'src', 'scripts', 'tests', 'netlify', 'docs', 'dist-audit', 'resources', '.netlify']);
     (function scan(dir, url) {
         let entries = [];
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }

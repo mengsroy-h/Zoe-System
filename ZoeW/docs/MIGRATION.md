@@ -14,7 +14,7 @@
 | Netlify Function `zto-order-detail` | ចម្លងមកដោយមិនកែ |
 | env របស់ ZTO (`ZTO_*`) | មិនប្រែ |
 | Apps Script (Lookup និងនាំចូល) | មិនប្រែ |
-| កូនសោ `localStorage` ទាំងអស់របស់ ZoeW ដើម | ដូចគ្នាបេះបិទ ➜ ឧបករណ៍ដែលប្រើរួច មិនបាត់ការកំណត់ (`npm run parity` ផ្នែក ៤ វាស់វា — ⛔ កុំចម្លងចំនួនមកទីនេះ) |
+| កូនសោ `localStorage` ទាំងអស់របស់ ZoeW ដើម | ដូចគ្នាបេះបិទ ➜ ឧបករណ៍ដែលប្រើរួច មិនបាត់ការកំណត់ |
 
 ⛔ **កូនសោ storage ដូចគ្នា** មានន័យថាអ្នកប្រើដែលបើក App ថ្មីលើឧបករណ៍ដដែល
 រក្សា ៖ PIN · ការចងចាំជីវមាត្រ · Config · ការកំណត់ Locker · កុងតាក់ ZTO ·
@@ -52,8 +52,8 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
 
 ១. PR ដែលប៉ះ PTR · ចលនាផ្ទាំង · ការរមូរ · ផ្លូវ native ➜ សាកលើឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធ (ដំណាក់ ១)។
 ២. **សំណុំ `audit-tools/run-all.sh` វាស់ App នេះបានពិត** ✅ — `run-all.sh` build tree វាស់
-   (`scripts/build-audit.mjs` ➜ `dist-audit/ZoeW`) ហើយរត់ checker **ទាំងអស់** នៅទីនោះ (មើល
-   [`PARITY.md`](PARITY.md) ផ្នែក ៥) · `zoew-suite-test.js` រត់អ្នកយាមផ្ទាល់ខ្លួនរបស់ React ·
+   (`scripts/build-audit.mjs` ➜ `dist-audit/ZoeW`) ហើយរត់ checker **ទាំងអស់** នៅទីនោះ ·
+   `zoew-suite-test.js` រត់អ្នកយាមផ្ទាល់ខ្លួនរបស់ React ·
    `check-money.cmd` អានកូដលុយពី `audit-tools/money-core.js`។ ⛔ លក្ខខណ្ឌនេះ **ត្រូវរក្សា** ៖
    រត់ `bash audit-tools/run-all.sh` ពេញ (emulator រត់ · `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1`) ហើយ
    **០ ធ្លាក់ · ០ មួយផ្នែក · ០ រំលង** មុនរាល់ merge។
@@ -83,11 +83,9 @@ cache ដែលចាប់ផ្តើមដោយ `zoew-` ទាំងអស�
 ## ៤. ការកែកូដក្រោយការជំនួស
 
 ⛔ **`src/` ជាប្រភពការពិត** ៖ `app.js` ដើមលែងមានក្នុង `ZoeW/` ទៀតហើយ (វានៅក្នុង
-ប្រវត្តិ git ➜ `npm run original:fetch`)។ ការកែថ្មីធ្វើក្នុង `src/` ផ្ទាល់ ហើយត្រូវ ៖
+ប្រវត្តិ git)។ ការកែថ្មីធ្វើក្នុង `src/` ផ្ទាល់ ហើយត្រូវ ៖
 
 - `npm run verify` បៃតង
-- `npm run parity:deep` · `npm run logic:check` ៖ បើការកែប្រែឥរិយាបថ **ដោយចេតនា**
-  ភាពខុសគ្នាធៀបនឹងដើមនឹងលេច — នោះជាការរំពឹងទុក ➜ ពន្យល់វាក្នុង `docs/HISTORY.md`
 - `bash audit-tools/run-all.sh` (ពី root) បៃតង — CI ពេញក្នុង session
 
 ---

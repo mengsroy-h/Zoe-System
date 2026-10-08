@@ -910,7 +910,7 @@ check(siteOffenders.length === 0,
     check(THAI.test(probeThai) && !THAI.test(probeKhmer),
         'probe ៖ ការស្កេនចាប់អក្សរថៃ ហើយមិនចាប់អក្សរខ្មែរ (ទិសផ្ទុយ)', JSON.stringify({ thai: THAI.test(probeThai), khmer: THAI.test(probeKhmer) }));
     const TEXT_EXT = /\.(md|js|mjs|cjs|ts|tsx|mts|css|html|json|sh|cmd|bat|ps1|gs|ya?ml|txt|toml|xml|gradle|java|properties)$/i;
-    const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'dist', 'dist-audit', '.original', 'build', '.gradle', 'assets']);
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'dist', 'dist-audit', 'build', '.gradle', 'assets']);
     const hits = [];
     let scanned = 0;
     const walk = (dir, rel) => {

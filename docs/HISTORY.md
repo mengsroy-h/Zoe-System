@@ -47,10 +47,10 @@
 
 1. **`main`** = **ZoeW 2.50.45 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #304 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ = PR #301 ·
    [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch **`claude/exciting-gates-nvx9ar`** (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
-   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A66 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
+   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A67 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
    (fast-forward) ➜ ប្រើ `claude/exciting-gates-nvx9ar` តែមួយ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
-   វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · មួយផ្នែក ០ · រំលង ០ ·
-   លើ tree ចុងក្រោយ ➜ ផ្នែក ២ «Deep audit ៣» A60 · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
+   វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · លើ 95e91a0
+   ជោគជ័យ ២០១ · ធ្លាក់ ១ (`sw-backend-chunk-test` race ការវាស់ ➜ កែ · A67) · មួយផ្នែក ០ · រំលង ០ ទាំងបី · commit ចុងក្រោយ (តេស្ត + ឯកសារ) ➜ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
    confirmed ៩ ➜ កែទាំងអស់ · uncertain ១ (A66 ➜ សាកលើ iPhone)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
@@ -2940,6 +2940,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A64 | **ទំព័រស្កេន ៖ flag «focus ជាអ្នកបង្រួម» ចាស់ · ប្រអប់ Locker លាក់មានអក្សរ ➜ បើកវិញខុស/មិនបើក** (confirmed nit ×២) | Claude ៖ flag កំណត់តែពេល focus បង្រួម មិនដែលសម្អាតពេលផ្ទាំងបើកដោយដៃ ➜ បង្រួមដោយដៃ ➜ ចាកចេញ ➜ បើកវិញ · `ENTRY_SEARCH_FIELDS.some(value)` អានប្រអប់លាក់ · តេស្តទិសផ្ទុយចាស់ PASS ដោយចៃដន្យ (flag លេចពីតេស្តមុន) · vitest ថ្មី ៣ មុនកែ FAIL | `listenEntrySearchPanel()` (store subscription ៖ ផ្ទាំងបើក ➜ flag សម្អាត · boot សម្អាត) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ |
 | A65 | **SW ៖ ពាក់កណ្តាល revalidate នៃ `responseFitsKey()` គ្មានអ្នកយាម** (confirmed) | Claude ៖ `sw-backend-chunk-test` ផ្នែក ៤ ដើរតែទ្វារ miss · mutant ដក `responseFitsKey` ពី `revalidateShell()` រស់គ្រប់ checker | `sw-revalidation-timeout.test.ts` +២ (HTML ➜ put ០ · JS ➜ put ១) · mutant ➜ FAIL |
 | A66 | **iPhone PWA ៖ FLIP ចាប់ផ្តើមមុន `focus()` ➜ ប្រអប់គូរនៅទីតាំងចាស់ពេល focus** (uncertain · តំបន់ហាម) | អ្នកផ្ទៀង ៖ លំដាប់កូដពិត (Chromium ៖ កាតនៅទីតាំងចាស់ក្រោយ `focus()`) តែការរំកិលបង្ហាញ keyboard របស់ WebKit វាស់មិនបាន | ⛔ គ្មានកូដ (`phone-search.ts` ចាក់សោ · មិនកែតាមទ្រឹស្តី WebKit) ➜ [2.50.46] សកម្មភាព ២–៣ ៖ មើលការធ្លាក់/រអិលទំព័រទាំងមូល (រោគសញ្ញា A47) |
+| A67 | **`sw-backend-chunk-test` ធ្លាក់ម្តងក្នុង run-all STRICT (95e91a0 ៖ ជោគជ័យ ២០១ · ធ្លាក់ ១) ៖ «ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា»** (ផ្នែក ៤ ថ្មីរបស់ 2.50.46) | Claude ៖ ទ្វារ miss របស់ SW ឆ្លើយទំព័រមុន `cache.put()` ចប់ (មិន await ដោយចេតនា) តែតេស្តអាន cache ភ្លាមក្រោយ `fetch` · ១២ ដងព្រមគ្នា (៦ × ២) មិនកើតឡើងវិញ ➜ ធ្វើត្រាប់ disk យឺត (put ពន្យារ ៤០០ms ក្នុងច្បាប់ចម្លង sw.js) ➜ ធ្លាក់ ៣ កន្លែង (ផ្នែក ២ ក៏ដូចគ្នា) · ការអះអាងអវិជ្ជមាន «មិនដាក់ HTML» ភ្លាមៗ អាច PASS ទទេពេល put យឺត = ការវាស់ race មិនមែនកូដ App | `cacheHasEventually()` (≤ `CACHE_PUT_SETTLE_MS`) · `cacheStaysEmpty()` (ពេញ `CACHE_PUT_GRACE_MS`) · put យឺត ➜ PASS ២៦ · put យឺត + mutant HTML ទ្វារ miss ➜ FAIL ២ · tree ពិត ➜ PASS ២៦ |
 
 - **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
   `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase
@@ -2950,7 +2951,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **មិនបានរកឃើញ** (អានរួច) ៖ ច្បាប់ RLS · `current_tenant_id()` (user ១ = ហាង ១) · Edge Function register/reset (កូដ ១០០ bit · CORS ចង origin) · `ApkUpdatePlugin.java` (HTTPS ·
   packageName + versionName · Android ផ្ទៀង signature ពេលដំឡើង) · license meta (display តែប៉ុណ្ណោះ) · listener ស្ទួន (`addEventListener` គ្រប់កន្លែង ➜ scope ឬ function ដដែល) · គ្មាន
   `innerHTML` ក្នុង ZoeW React · គ្មាន secret ក្នុង repo (`git grep` private key · token · `sb_secret_`)។
-- **ជុំបន្ត (session ថ្មី · A60–A66)** ៖ run-all STRICT ពេញលើ tree ចុងក្រោយរបស់ session មុន (A60) ➜ workflow ពិនិត្យ diff `fe52290..HEAD` (ម្ចាស់គម្រោងបើក
+- **ជុំបន្ត (session ថ្មី · A60–A67)** ៖ run-all STRICT ពេញលើ tree ចុងក្រោយរបស់ session មុន (A60) ➜ workflow ពិនិត្យ diff `fe52290..HEAD` (ម្ចាស់គម្រោងបើក
   workflow ក្នុង session នេះ ៖ ៥ ផ្នែក — លុយ/Supabase · SW · UI ស្វែងរក · ពិនិត្យកំណែ · ឯកសារ/ឧបករណ៍ — រកឃើញ ១២ ➜ អ្នកផ្ទៀងប្រឆាំងម្នាក់ក្នុងមួយផ្នែក ៖ confirmed ៩ ·
   refuted ១ (កែរួចក្នុង A60) · uncertain ១ (A66) · ការរកឃើញឯកសារ ៣ ៖ guide.html ប្រយោគ 🔄 កាត់ «ចុច ➜» ចេញពីប៊ូតុង 📥 · ករណីកាមេរ៉ាមិនបានសរសេរ · announcements «APK លើ GitHub»
   បង្ហាញលើគ្រប់វេទិកា ➜ កែ) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ (៧ នាទី · `ledgerBlip` applied ១៥ · lost ១១)។

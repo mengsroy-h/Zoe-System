@@ -132,6 +132,28 @@ window.__sw = {
     }
 };`;
 
+// ⛔ ទ្វារ miss របស់ SW ឆ្លើយទំព័រមុន `cache.put()` ចប់ (មិន await ដោយចេតនា) ➜ ការអះអាងស្ថានភាព cache ក្រោយ `fetch` ត្រូវរង់ចាំ ៖
+//    វិជ្ជមាន ➜ រហូតឃើញ (ពិដាន) · អវិជ្ជមាន ➜ ពេញរយៈអត់ធ្មត់ ហើយមិនដែលឃើញ (put យឺតក្រោមបន្ទុក មិនត្រូវឲ្យ mutant រស់ ឬ PASS ពិតធ្លាក់)។
+//    វាស់បាន ៖ run-all STRICT ធ្លាក់ម្តង «chunk ពិតចូល cache ធម្មតា» · put ពន្យារ ៤០០ms ➜ ធ្លាក់ ៣ កន្លែងមុនរង់ចាំ។
+const CACHE_PUT_SETTLE_MS = 8000;
+const CACHE_PUT_GRACE_MS = 1500;
+async function cacheHasEventually(dev) {
+    const until = Date.now() + CACHE_PUT_SETTLE_MS;
+    while (!(await dev.has())) {
+        if (Date.now() >= until) return false;
+        await new Promise((r) => setTimeout(r, 50));
+    }
+    return true;
+}
+async function cacheStaysEmpty(dev) {
+    const until = Date.now() + CACHE_PUT_GRACE_MS;
+    for (;;) {
+        if (await dev.has()) return false;
+        if (Date.now() >= until) return true;
+        await new Promise((r) => setTimeout(r, 50));
+    }
+}
+
 async function main() {
     const chunkUrl = './assets/' + chunks[0];
     const chunkPath = '/assets/' + chunks[0];
@@ -183,7 +205,7 @@ async function main() {
         const sb = await device('Supabase');
         const firstLoad = await sb.load();
         ok('Supabase ៖ ការផ្ទុក chunk លើកដំបូងតាម SW ➜ 200', firstLoad.status === 200 && firstLoad.size === chunkSize, firstLoad);
-        ok('Supabase ៖ chunk ចូល cache ក្រោយការប្រើលើកដំបូង', await sb.has());
+        ok('Supabase ៖ chunk ចូល cache ក្រោយការប្រើលើកដំបូង', await cacheHasEventually(sb));
         sb.state.offline = true;
         const offlineLoad = await sb.load();
         ok('Supabase ៖ ក្រៅបណ្តាញ ➜ chunk ពី cache (App បើកបាន)', offlineLoad.status === 200 && offlineLoad.size === chunkSize, offlineLoad);
@@ -220,11 +242,11 @@ async function main() {
         const htmlLoad = await swap.load();
         const indexSize = fs.statSync(path.join(DIR, 'index.html')).size;
         ok('ការវាស់ពិត ៖ server ឆ្លើយ index.html ជំនួស chunk ដែលលែងមាន (200 · ទំហំ index.html)', htmlLoad.status === 200 && htmlLoad.size === indexSize, htmlLoad);
-        ok('⛔ SW មិនដាក់ HTML ចូល cache ក្រោម key របស់ chunk', !(await swap.has()));
+        ok('⛔ SW មិនដាក់ HTML ចូល cache ក្រោម key របស់ chunk', await cacheStaysEmpty(swap));
         swap.state.gone = null;
         const realLoad = await swap.load();
         ok('ក្រោយ chunk មានវិញ ➜ ទទួល chunk ពិត (មិនមែន HTML ពី cache)', realLoad.status === 200 && realLoad.size === chunkSize, realLoad);
-        ok('ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា', await swap.has());
+        ok('ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា', await cacheHasEventually(swap));
         await swap.close();
     } finally {
         await browser.close();

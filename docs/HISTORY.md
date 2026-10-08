@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.28–2.50.31 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.28–2.50.32 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
@@ -128,6 +128,28 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.32] — 2026-10-08 · ZoeW ៖ **ការដោះ Barcode ពីបញ្ជីប្រឆាំងស្ទួនច្រើនរយក្នុងពេលតែមួយ លែងធ្វើឲ្យអេក្រង់កក** (Deep audit ២ · ជុំ ១៤ · SCALE-6)
+
+**ZoeW `2.50.32`** (`zoew-v294` ➜ `zoew-v295`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔑 **SCALE-6** ៖ `flushPendingRegistryReleases()` សួរ `registryReleaseVerdict(key)` ម្តងមួយ key ➜ `registryKeyIsOwned()` ដើរប្រវត្តិ + ធុងសំរាមទាំងមូល ហើយគណនា
+  `barcodeRegistryKey()` (regex) លើគ្រប់ barcode ម្តងទៀតសម្រាប់ key នីមួយៗ ➜ O(key × barcode) ៖ ការលុបធុងសំរាមច្រើនរយ (ធុងសំរាម ៣០ ថ្ងៃធំ) ធ្វើឲ្យ listener callback បន្ទាប់កក។
+  ឥឡូវការ flush មួយបង្កើតសំណុំ key ដែលមានម្ចាស់ម្តង (`ownedRegistryKeys()`) ហើយសម្រេចគ្រប់ key លើសំណុំនោះ · លទ្ធផលដូចដើម (គ្មានម្ចាស់ ➜ ដោះ · មានម្ចាស់ ➜ ទុក · ទិដ្ឋភាពមិនស្រស់ ➜ ពន្យារ) ·
+  សំណុំបង្កើតថ្មីរាល់ flush · ⛔ មិនផ្លាស់ទៅវដ្ត ៦០ វិ.។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ការសម្អាតធុងសំរាមស្វ័យប្រវត្តិ ៣០ ថ្ងៃ · លុបជាអចិន្ត្រៃយ៍ ➜ ស្កេន Barcode ដដែលម្តងទៀតបានដូចដើម)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/registry-flush-scale.test.ts` (ថ្មី · ៤ · `registry.ts` ពិត · getter រាប់ការអាន `barcodes`) ៖ key ២០០ លើធាតុ ១៨០០ ➜ អាន ≤ ២ ដងនៃការដើរម្តង · ដោះតែ key គ្មានម្ចាស់ ១៥០ ·
+  ទិដ្ឋភាពមិនស្រស់ ➜ ពន្យារ · ធាតុថ្មីកាន់កាប់ key ➜ មានម្ចាស់ក្នុង flush បន្ទាប់ (មុនកែ FAIL ១ ៖ អាន ១,១៧៤,៥០០ ដង ធៀបនឹងពិដាន ១៤,៤០០) · mutation ៤ ➜ FAIL ទាំង ៤ ·
+  `registry-release-test` ស្រង់ `ownedRegistryKeys` (៥៧ ok)។
 
 ### [2.50.31] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ ការធ្វើសមកាលកម្មគណនាឡើងវិញតែទិន្នន័យដែលប្រែ** (Deep audit ២ · ជុំ ១៤ · SCALE-3)
 
@@ -2481,17 +2503,20 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.31]
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.32]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A26 | **SCALE-2** ការសម្អាតច្រើនរយកញ្ចប់រារាំង main thread | Claude ៖ `cleanup.ts` ពិត + SDK ក្លែង ៖ ៣០០ ripe ➜ `runScheduledCleanup()` ចាប់ផ្តើម ២០០ (ពិដាន journal) ក្នុងការហៅ synchronous តែមួយ · FAIL ២/៤ | batch ៨ + yield ៥០ms + ជុំដើរគ្រប់ (`cleanupSweepVisited`) |
 | A27 | **SCALE-3** `notify()` Supabase serialize គ្រប់ root រាល់ការហៅ | Claude ៖ adapter ពិត + transport ក្លែង (getter រាប់ការអាន) ៖ poll ទទេ ២ ដង ➜ អាន root ធំ ១២០ · pull ប្រែតែ root តូច ➜ ៦០ · ការសរសេរ root តូច ➜ ១២០ · FAIL ៣/៦ | dirty roots សម្គាល់នៅកន្លែងប្រែ · listener មិនទាន់ fire ➜ fire ជានិច្ច |
+| A28 | **SCALE-6** flush registry O(key × barcode) | Claude ៖ `registry.ts` ពិត ៖ key ២០០ (គ្មានម្ចាស់ ១៥០) លើប្រវត្តិ ៣០០ + ធុងសំរាម ១៥០០ ➜ អាន `barcodes` ១,១៧៤,៥០០ ដង (≈ ៣២៦ ដងនៃការដើរម្តង) | សំណុំ key មានម្ចាស់ម្តងក្នុងមួយ flush |
 
 - ការរចនាដំបូង (cursor តាមលិបិក្រមរង្វិល) ➜ កញ្ចប់ ២០ ដែលបរាជ័យភ្លាមនៅសល់ ➜ ការហៅនីមួយៗចាប់ផ្តើម ៨ ក្នុងចំណោម ២០ ម្តងទៀត ➜ ជុំមិនដែលចប់ (timer បន្តរហូត · FAIL ១) ហើយលិបិក្រមរំកិលពេលបញ្ជីរួញ ➜
   ប្តូរទៅ Set នៃ id ដែលបានមើលក្នុងជុំ ៖ ជុំចប់ពេលគ្រប់ id ត្រូវមើល · ជុំក្រោយ (កេះថ្មី) ព្យាយាមកញ្ចប់បរាជ័យម្តងទៀត។
 - ការហៅដោយគ្មាន limit (checker ចាស់ ១០+) មិនប៉ះ state ថ្មី (`cleanupSweepVisited` អានតែពេលមាន limit) ➜ sandbox មិនត្រូវប្តូរ (លើកលែង `connection-recovery-test` ៖ ថេរ `CLEANUP_SWEEP_BATCH`)។
 - ⛔ ការស៊ើបអង្កេតមិនប៉ះ probe liveness (`probeDatabaseLiveness()`) ទេ។
+- SCALE-2 ក្រោយ push ៖ `emu/crud-rules-flow` (ការពិនិត្យ dependency ឋិតិវន្តរបស់ sandbox) ចាប់ `dataState` · `scheduleCleanupSweepContinuation` ➜ stub (ការហៅគ្មាន limit មិនអានវា) ·
+  មេរៀន ៖ ផ្ទៀងផ្ទាត់ checker sandbox ទាំងអស់ដែលស្រង់ function ដែលប្រែ មុន push (មិនមែនតែ checker ដែលរត់វា)។
 - SCALE-3 ៖ mutation ដំបូង ៤ រស់ (scope · stage swap · reset · listener មិនទាន់ fire) ➜ test scope ដំបូងមិនចូលស្ថានភាពពិត (ការសរសេរត្រូវបដិសេធមុនផ្ញើ ព្រោះ scope ប្តូរមុន rpc) ➜ រង់ចាំឲ្យ
   ការសរសេរនៅក្នុង rpc សិន · បន្ថែម test reset កណ្តាលសម័យ · listener ក្រោយ permission_denied · tenant ប្តូរ (notify ខណៈ pull ពេញរង់ចាំ) · ការសម្គាល់ក្នុង `resetForSignOut()` ស្ទួន (listener ត្រូវ reset `fired`
   ហើយ pull `since = 0` តែងជា reset ➜ stage swap) ➜ រួមក្នុង `clearServerView()` តែមួយ។

@@ -138,14 +138,23 @@ export function releaseBarcodesInRegistry(codes) {
     });
 }
 
-export function registryKeyIsOwned(key) {
+export function registryKeyIsOwned(key, ownedKeys?) {
+    if (ownedKeys) return ownedKeys.has(key);
     const owns = (item) => collectItemBarcodes(item).some((code) => barcodeRegistryKey(code) === key);
     return dataState.scanHistory.some(owns) || dataState.deletedItems.some(owns);
 }
 
-export function registryReleaseVerdict(key) {
+export function ownedRegistryKeys() {
+    const owned = new Set();
+    const add = (item) => collectItemBarcodes(item).forEach((code) => owned.add(barcodeRegistryKey(code)));
+    dataState.scanHistory.forEach(add);
+    dataState.deletedItems.forEach(add);
+    return owned;
+}
+
+export function registryReleaseVerdict(key, ownedKeys?) {
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 'defer';
-    return registryKeyIsOwned(key) ? 'owned' : 'release';
+    return registryKeyIsOwned(key, ownedKeys) ? 'owned' : 'release';
 }
 
 export function flushPendingRegistryReleases() {
@@ -155,8 +164,9 @@ export function flushPendingRegistryReleases() {
     const entries = Array.from(pendingRegistryReleases.entries());
     pendingRegistryReleases.clear();
     const releasable = [];
+    const ownedKeys = ownedRegistryKeys();
     entries.forEach((pair) => {
-        const verdict = registryReleaseVerdict(pair[0]);
+        const verdict = registryReleaseVerdict(pair[0], ownedKeys);
         if (verdict === 'release') releasable.push(pair);
         else if (verdict === 'defer') pendingRegistryReleases.set(pair[0], { attempts: pair[1].attempts });
     });

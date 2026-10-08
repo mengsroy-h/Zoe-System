@@ -66,7 +66,7 @@ ok('ឃើញកន្លែងហៅ releaseBarcodesInRegistry >= 4', releaseCa
 
 const REQUIRED = ['barcodeRegistryKey', 'releaseBarcodesInRegistry', 'releaseRegistryKeys',
     'queueRegistryReleaseRetry', 'flushPendingRegistryReleases', 'retryAsync',
-    'registryKeyIsOwned', 'registryReleaseVerdict', 'collectItemBarcodes'];
+    'registryKeyIsOwned', 'ownedRegistryKeys', 'registryReleaseVerdict', 'collectItemBarcodes'];
 const fnSrc = {};
 const missing = [];
 for (const n of REQUIRED) {
@@ -119,7 +119,7 @@ function makeCtx(behaviour) {
     vm.runInContext('function dbListenerViewIsStale(k) { return staleKeys.has(k); }', ctx);
     vm.runInContext(fnSrc.retryAsync + '\n' + fnSrc.barcodeRegistryKey + '\n'
         + fnSrc.collectItemBarcodes + '\n' + fnSrc.registryKeyIsOwned + '\n'
-        + fnSrc.registryReleaseVerdict + '\n'
+        + fnSrc.ownedRegistryKeys + '\n' + fnSrc.registryReleaseVerdict + '\n'
         + fnSrc.releaseRegistryKeys + '\n' + fnSrc.queueRegistryReleaseRetry + '\n'
         + fnSrc.releaseBarcodesInRegistry + '\n' + fnSrc.flushPendingRegistryReleases + '\n', ctx);
     return ctx;

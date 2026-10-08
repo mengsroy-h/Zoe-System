@@ -18,6 +18,7 @@ function fakeServer() {
     let mode: Mode = 'ok';
     let seq = 0;
     let clockShift = 0;
+    let conflictNow = true;
     const now = () => Date.now() + clockShift;
     const docs = new Map<string, any>();
     const done = new Map<string, any>();
@@ -29,7 +30,7 @@ function fakeServer() {
         const op = args.p_ops[0];
         const k = op.p[0] + '/' + op.p[1];
         const current = docOf(k);
-        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return { ok: false, conflict: true, now: now(), value: current };
+        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return conflictNow ? { ok: false, conflict: true, now: now(), value: current } : { ok: false, conflict: true, value: current };
         seq++;
         docs.set(k, op.v === undefined ? null : op.v);
         applied.push(args.p_op_id);
@@ -59,7 +60,8 @@ function fakeServer() {
         set: (k: string, v: any) => { seq++; docs.set(k, v); },
         get: (k: string) => docOf(k),
         purgeOps: () => done.clear(),
-        deviceClockBack: (ms: number) => { vi.setSystemTime(Date.now() - ms); clockShift += ms; }
+        deviceClockBack: (ms: number) => { vi.setSystemTime(Date.now() - ms); clockShift += ms; },
+        dropConflictNow: () => { conflictNow = false; }
     };
 }
 
@@ -88,7 +90,7 @@ const deduct = (current: any, op: any, ring: any) => {
     return next;
 };
 
-async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs = 0) {
+async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs = 0, conflictWithoutNow = false) {
     vi.useFakeTimers();
     const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
     const server = fakeServer();
@@ -103,6 +105,7 @@ async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs 
     await wait(gapMs);
     expect(state).toBe('pending');
     if (deviceClockBackMs) server.deviceClockBack(deviceClockBackMs);
+    if (conflictWithoutNow) server.dropConflictNow();
     if (purge) server.purgeOps();
     server.setMode('ok');
     await wait(1200000);
@@ -135,6 +138,14 @@ describe('Supabase ៖ CAS ដែលចម្លើយបាត់ ហើយផ�
 
     it('⛔ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង + op ត្រូវ purge ➜ មិនមែន not-applied ➜ កាត់តែម្តង (អាយុវាស់តាមនាឡិកា server)', async () => {
         const { state, server } = await lostLedgerWrite(50 * HOUR, true, 30 * HOUR);
+        expect(server.applied.length).toBe(1);
+        expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
+        expect(state && state.committed).toBe(true);
+        expect(state.txOutcome).toBe('applied');
+    });
+
+    it('⛔ conflict គ្មាន `now` (អាយុវាស់មិនបាន) ➜ មិនទាយ not-applied ➜ witness ➜ កាត់តែម្តង (Claude ២ ៖ mutant `!(age > …)` រស់មុន)', async () => {
+        const { state, server } = await lostLedgerWrite(3 * HOUR, true, 0, true);
         expect(server.applied.length).toBe(1);
         expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
         expect(state && state.committed).toBe(true);

@@ -269,6 +269,8 @@ function makeSandbox(store, now) {
         // ⛔ ZTO-E1 ៖ `runAutomaticCleanupRules()` សួរ `ztoAbandonCleanupIsHeld()` មុន `abandon` ➜ sandbox គ្មាន ZTO ➜ ច្រកទ្វារពិតឆ្លើយ
         //    `false` (វាស់ដោយ module ពិតក្នុង `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។
         'function ztoAbandonCleanupIsHeld() { return false; }',
+        // ⛔ SCALE-2 ៖ ការហៅដោយគ្មាន limit (sandbox នេះ) មិនអាន state ជុំ batch ទេ ➜ stub តែដើម្បីឲ្យឈ្មោះមានក្នុង scope (ការវាស់ batch ៖ `ZoeW/tests/cleanup-sweep-batch.test.ts`)
+        "const dataState = { cleanupSweepVisited: new Set(), cleanupSweepTimer: null };", 'function scheduleCleanupSweepContinuation() {}',
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**

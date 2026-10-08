@@ -508,6 +508,12 @@ export async function claimAndCleanupItem(id, reason) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
     if (cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX) return;
     cleanupInFlight.add(id);
+    const cleanupDb = firebaseState.db;
+    const cleanupGeneration = firebaseState.authGeneration;
+    const cleanupIsCurrent = () => firebaseState.db === cleanupDb && firebaseState.authGeneration === cleanupGeneration;
+    const noteCleanupSessionSwitch = (step) => {
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup stopped after a database switch'), { zone: 'money', context: 'claimAndCleanupItem session switch ' + step, itemId: id, reason });
+    };
 
     let claimedWhole = null;
     let claimedPartial = null;
@@ -598,6 +604,10 @@ export async function claimAndCleanupItem(id, reason) {
                     return;
                 }
             }
+        }
+        if (!cleanupIsCurrent()) {
+            noteCleanupSessionSwitch('claim');
+            return;
         }
 
         let trashItem;
@@ -692,6 +702,10 @@ export async function claimAndCleanupItem(id, reason) {
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
+                if (!cleanupIsCurrent()) {
+                    noteCleanupSessionSwitch('trash');
+                    return;
+                }
                 try {
                     await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
                     try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
@@ -702,6 +716,10 @@ export async function claimAndCleanupItem(id, reason) {
                 }
             });
             if (!trashSaved) return;
+            if (!cleanupIsCurrent()) {
+                noteCleanupSessionSwitch('trash');
+                return;
+            }
             if (trashElsewhere) {
                 const dupIdx = dataState.deletedItems.findIndex(i => i.id === trashItem.id);
                 if (dupIdx !== -1) dataState.deletedItems.splice(dupIdx, 1);
@@ -726,6 +744,10 @@ export async function claimAndCleanupItem(id, reason) {
                 }
             } catch (ledgerErr) {
                 if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+            }
+            if (!cleanupIsCurrent()) {
+                noteCleanupSessionSwitch('ledger');
+                return;
             }
             if (cleanupLedgerDeducted(ledgerStatus, revenueCod, revenueDod, revenueCount)) {
                 try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP); } catch (journalErr) {}

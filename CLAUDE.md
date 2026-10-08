@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.17` (`zoew-v280`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.18` (`zoew-v281`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -257,7 +257,7 @@ only this text protects them.
 | **Loops that never end** | Bounds are structural: no arithmetic on `Infinity` · Firebase numbers aren't bounds · `Number.isFinite()` isn't enough · cover `while` · `do-while` · condition-less and counting `for` · start points from arguments (harden inside helpers like `matchingBraceIndex(src, -Infinity)`) · one-sided clamps aren't protection (`clampLockerCount()` for reads and writes). Measured by real runs in a separate process (time + heap) with a reverse direction · both apps | `loop-termination-test` |
 | **Locker assignment ↔ claim** | `assignLockerToEntry()` has the `clearClaim` gate like the other write paths (rules only protect deletes). ⛔ No gate for restore markers (restore paths keep the Locker) · a parcel without a prior position is assigned at once, even into a position holding another customer's open parcel (owner decision: a confirm there slows the work); only a parcel that already has a position asks before moving (`locationWarningModal`, occupant noted) · the same position ➜ «រួចហើយ» toast | `locker-claim-guard-test` · `ZoeW/tests/locker-scan-direct.test.tsx` |
 | **Dead `clearClaim`** | `releaseStaleClearHistoryClaim()` is the single releaser: decides on the server view inside a transaction · never touches live claims or this device's (`activeClearHistoryClaims`) | `stale-clear-claim-test` |
-| **Late commit** | Hang ≠ didn't happen — post-commit work runs when the commit arrives | `late-commit-test` |
+| **Late commit** | Hang ≠ didn't happen — post-commit work runs when the commit arrives, **in the session that started it**: `claimAndCleanupItem()` and `deleteSingleItem()` capture `db` + `authGeneration` and stop (Sentry) before every later write once either changed; `txResolveOutcome()` re-checks the session after its REST read (a switch ➜ unread `unknown`, never `applied`) | `late-commit-test` · `ZoeW/tests/late-commit-stale-session.test.ts` |
 | **Blocked storage** | The `window.localStorage` **getter** itself throws | `storage-guard` · `storage-blocked-boot-test` |
 | **Absent dependency** | A synchronous `TypeError` bypasses `.catch()` | `camera-resume-test` |
 | **`data-act` ↔ second listener** | `el.on<evt> =` on an element with `data-act` ➜ fail (derived from real `index.html`; reverse: elements without `data-act` are free) | `action-binding-test` |

@@ -122,6 +122,30 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.18] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ឬការលុបដែលចម្លើយមកយឺត មិនសរសេរចូលហាងថ្មីក្រោយប្តូរ Config** (Deep audit ២ · ជុំ ៥ · RACES-2)
+
+**ZoeW `2.50.18`** (`zoew-v280` ➜ `zoew-v281`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 **RACES-2 ៖ ការងារក្រោយ commit គ្មាន generation gate** ៖ `claimAndCleanupItem()` និង `deleteSingleItem()` អាន `firebaseState.db` · `dbRefDeleted` · ledger refs **ពេលហៅ** ក្រោយ await នីមួយៗ ➜
+  បណ្តាញដាច់ចំពេល commit ➜ `runTransactionResolved()` អាន REST (≤ ៨ វិ.) ឬការសរសេរធុងសំរាមព្យួរ ➜ អ្នកប្រើ Reconfig ទៅហាង B (មាន session) ➜ ចម្លើយ `applied` ឬការសរសេរដែលមកយឺត ➜
+  ធុងសំរាម និងការដកចំណូល **ចូលហាង B** (ទិន្នន័យលេចឆ្លងហាង · ledger B ១០០ ➜ ៩០)។ ឥឡូវ ៖ (១) `txResolveOutcome()` ពិនិត្យ session ម្តងទៀតក្រោយការអាន REST ➜ ប្តូរ ➜ `unknown` មិនបានអាន
+  (មិនដែល `applied`) · (២) ការសម្អាតចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម ហើយឈប់មុនការសរសេរបន្ទាប់នីមួយៗ (ក្រោយ claim · ក្រោយធុងសំរាម · ក្រោយ ledger) ជាមួយ Sentry `zone: 'money'` ·
+  (៣) ការលុបឈប់មុនសរសេរធុងសំរាម ឬស្តារចូលប្រវត្តិ (Sentry `zone: 'data'`)។ ការស្តារ (`executeRestoreItem()`) ត្រូវបានការពាររួចដោយរបង claim/witness ក្នុង rules (ការសរសេរក្នុង database ផ្សេងត្រូវបដិសេធ) ➜ មិនប្រែ។
+  ⚠️ ព្រំដែនដែលនៅសល់ ៖ កញ្ចប់ដែល claim រួចក្នុងហាង A ហើយឈប់ដោយសារការប្តូរ ➜ journal របស់ហាង A ត្រូវលុបពេល resume ក្នុងហាង B (`cleanupJournalScopeMismatch()` ដូចដើម) ➜ Sentry money ជាសញ្ញាឲ្យពិនិត្យដោយដៃ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស (ករណីត្រូវការបណ្តាញដាច់ចំពេល commit + Reconfig ក្នុងពេលតែមួយ)។ បើ Sentry បង្ហាញ «Cleanup stopped after a database switch» ➜ ពិនិត្យកញ្ចប់ `itemId` ក្នុងហាងចាស់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/late-commit-stale-session.test.ts` (ថ្មី · ៥ · `runTransactionResolved` · `claimAndCleanupItem` · `deleteSingleItem` ពិត · ហាង A/B ក្នុង store ក្លែងតែមួយ) ៖ (១) ប្តូរពេលអាន REST ➜ មិន `applied` ·
+  (២) claim commit ក្រោយប្តូរ ➜ ធុងសំរាម/ledger B មិនប៉ះ + Sentry money · (៣) ប្តូរពេលសរសេរធុងសំរាមព្យួរ ➜ ledger B មិនប៉ះ · (៤) ការលុប ➜ ធុងសំរាម B មិនប៉ះ · (៥) ទិសផ្ទុយ ៖ គ្មានការប្តូរ ➜ ហាង A ធម្មតា។
+  មុនកែ FAIL ៤/៥ · mutation ៖ ដកការពិនិត្យនីមួយៗក្នុង ៤ ➜ FAIL ១ ម្តងមួយ។
+
 ### [2.50.17] — 2026-10-08 · ZoeW ៖ **ZTO បិទម្តងទៀតលើទិដ្ឋភាពចាស់ មិនប្តូរម៉ោងបិទ · ប្តូរ backend ផ្តាច់ listener ចាស់តាម SDK ចាស់** (Deep audit ២ · ជុំ ៤ · ZTO-3 · NETWORK-2)
 
 **ZoeW `2.50.17`** (`zoew-v279` ➜ `zoew-v280`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ · តំបន់ ZTO ចាក់សោ មិនប៉ះ (ការកែនៅ `barcode-ops.ts` ក្រៅ `LOCK`)។
@@ -2146,6 +2170,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៥ (RACES-2 · late commit ក្រោយប្តូរហាង) ➜ [2.50.18]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A11 | **RACES-2** ការងារក្រោយ commit ក្នុងការសម្អាត/លុបអាន refs បច្ចុប្បន្ន · resolver មិនពិនិត្យ session ក្រោយការអាន | អ្នករក ៖ wrapper ពិត ➜ ledger B ១០០ ➜ ៩០ · A មិនប្តូរ · Claude ៖ vitest ហាង A/B ➜ FAIL ៤/៥ (resolver `applied` · ធុងសំរាម B · ledger B ៩០ · ធុងសំរាម B ពីការលុប) | gate session ក្នុង resolver · ការសម្អាត (៣ ចំណុច) · ការលុប (៣ ចំណុច) |
+
+- ការស្តារមិនប្រែ ៖ ជំហាននីមួយៗត្រូវការ claim token/witness ដែលមានតែក្នុង database ដើម ➜ rules បដិសេធក្នុង database ផ្សេង។
+- ជម្រើសដែលមិនយក ៖ រក្សា journal របស់ហាងចាស់រហូតត្រឡប់មកវិញ ➜ ប៉ះពិដាន SCALE-1 · ការលុប scope ដែលមិនត្រូវ · checker sandbox ១២ ➜ ធំពេកសម្រាប់ករណីកម្រ (Sentry money ជាសញ្ញាជំនួស)។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៤ (ZTO-3 · NETWORK-2) ➜ [2.50.17]
 

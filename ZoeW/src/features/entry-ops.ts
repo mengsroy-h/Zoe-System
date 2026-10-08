@@ -331,6 +331,9 @@ export async function deleteSingleItem(id) {
         return;
     }
 
+    const deleteDb = firebaseState.db;
+    const deleteGeneration = firebaseState.authGeneration;
+    const deleteIsCurrent = () => firebaseState.db === deleteDb && firebaseState.authGeneration === deleteGeneration;
     let claimedWhole = null;
     let clearClaimBlocked = false;
     let restoreClaimBlocked = false;
@@ -352,6 +355,10 @@ export async function deleteSingleItem(id) {
         return null;
     };
     const finishDelete = async (result, late) => {
+        if (!deleteIsCurrent()) {
+            if (claimedWhole && window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
+            return;
+        }
         if (!claimedWhole) {
             if (!clearClaimBlocked) {
                 const staleIdx = dataState.scanHistory.findIndex(i => i.id === id);
@@ -388,6 +395,7 @@ export async function deleteSingleItem(id) {
             if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
             console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'data', context: 'deleteSingleItem trash write failed after retries', itemId: id });
+            if (!deleteIsCurrent()) return;
             let restoredItem = null;
             let restoreOk = false;
             try {
@@ -405,7 +413,7 @@ export async function deleteSingleItem(id) {
                 showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
             }
         });
-        if (trashSaved) {
+        if (trashSaved && deleteIsCurrent()) {
             showToast(late ? "✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!" : "✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         }
     };

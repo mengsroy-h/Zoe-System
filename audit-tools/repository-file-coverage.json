@@ -1872,6 +1872,9 @@
     "ZoeW/tests/cleanup-journal-cap.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/late-commit-stale-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/backend-switch-detach.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -4772,8 +4772,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `phone-suggest-test` | — | ផ្នែក ១ |
+| `phone-search-swipe-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `phone-suggest-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `pickup-barcode-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
@@ -4830,7 +4830,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `supabase-rls-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-backend-chunk-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-cache-failure-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-client-wiring-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4945,7 +4945,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-unsent-tx.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-update-contract.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/toast-backend.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-live-expiry.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |

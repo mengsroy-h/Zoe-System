@@ -46,12 +46,12 @@
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 1. **`main`** = **ZoeW 2.50.45 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #304 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ = PR #301 ·
-   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch `claude/dazzling-fermi-hycqee` (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
-   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
-   ⏳ **session បន្ទាប់ធ្វើមុនគេ** ៖ run-all STRICT ពេញ **មិនទាន់រត់លើ tree ចុងក្រោយ** (session ឈប់ដោយ limit) ➜ រត់ Runbook ជំហាន ០ (emulator) ➜ កែអ្វីដែលធ្លាក់ ➜ push។
-   វាស់រួច ៖ run-all STRICT មុនកែ ២០០/២០២ (`repository-file-coverage` ឯកសារថ្មី ➜ map រួច · `history-window-check` keyboard ផុយក្រោមបន្ទុក ➜ កែ checker) ·
-   ក្រោយកែ ៖ vitest ពាក់ព័ន្ធ (supabase · ledger · ios-search · notify · forbidden-zone-lock) · `history-window-check` ០ FAIL · `sw-backend-chunk-test` · `doc-scope-test` ·
-   tsc · lint · purity · slot · strip-comments ✅ · fuzz លុយជ្រៅ `FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50` PASS (ជុំ ២ `RUN0=300 RUNS=20 OPS=80` មិនទាន់ចប់)។
+   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch **`claude/exciting-gates-nvx9ar`** (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
+   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A66 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
+   (fast-forward) ➜ ប្រើ `claude/exciting-gates-nvx9ar` តែមួយ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · មួយផ្នែក ០ · រំលង ០ ·
+   លើ tree ចុងក្រោយ ➜ ផ្នែក ២ «Deep audit ៣» A60 · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
+   confirmed ៩ ➜ កែទាំងអស់ · uncertain ១ (A66 ➜ សាកលើ iPhone)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -83,7 +83,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ ចលនាវាស់តែក្នុង Chromium)** ៖ Merge ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ · ស្វែងរកក្នុងទំព័រស្កេន ➜ រអិល មិនលោត · keyboard មិនគ្របលទ្ធផល · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
+- ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge · ⚠️ ចលនាវាស់តែក្នុង Chromium)** ៖ Merge ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ · ស្វែងរកក្នុងទំព័រស្កេន ➜ រអិល មិនលោត · keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · PR #304 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
 - ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។

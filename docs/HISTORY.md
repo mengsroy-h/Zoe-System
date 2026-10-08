@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.23 · ZoeKeyGen 2.24.7 — ជុំ ៩ (SECURITY-2 · SENTRY-3 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release `zoew@2.50.23` / `zoekeygen@2.24.7` ([2.50.23] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
 - 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
   ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
@@ -126,6 +126,29 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.24] — 2026-10-08 · ZoeW ៖ **ចូលដោយក្រយៅដៃ ឬមុខ (web) ការពារ PIN ដោយ WebAuthn PRF តែប៉ុណ្ណោះ** (Deep audit ២ · ជុំ ១០ · SECURITY-1 · ការសម្រេចម្ចាស់គម្រោង ៖ PRF-only)
+
+**ZoeW `2.50.24`** (`zoew-v286` ➜ `zoew-v287`) · ⛔ ZoeKeyGen មិនប្រែ (PRF-only រួចហើយ) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-1 ៖ របៀប `device` ទុកសោក្បែរ PIN ដែលរុំ** ៖ ឧបករណ៍គ្មាន PRF ធ្លាក់ចូលរបៀប `device` ដែលទុក `wrapKey` (សោ AES ឆៅ) ក្បែរ `wrapped` ក្នុង localStorage ➜ អ្នកដែលចម្លង storage បាន
+  (កុំព្យូទ័ររួម · extension · backup) ឌិគ្រីប PIN បានដោយគ្មានស្នាមម្រាមដៃ — `navigator.credentials.get()` ជាទ្វារ UI តែប៉ុណ្ណោះ។ ឥឡូវ ៖ web ចងតែពេល PRF ផ្តល់សោពីឧបករណ៍ · គ្មាន PRF ➜ មិនចង
+  («… មិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស») · record `device` ចាស់ ➜ `initBiometricUi()` លុបចេញពី storage ហើយប្រាប់ម្តង (វាយ PIN រួចបើកម្តងទៀត) ·
+  `readBiometricRecord()` មិនទទួល `device` · `biometricUnlockPin()` មិនមានផ្លូវ `wrapKey` ទៀត។ APK (native) មិនប្រែ។
+- ⚠️ ឧបករណ៍ web ដែលគ្មាន PRF (Safari មុន iOS 18 · កម្មវិធីរុករកចាស់) ➜ ប្រើ PIN។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ iPhone PWA (iOS 18+) · Android Chrome ➜ ☰ ➜ «ចូលដោយក្រយៅដៃ ឬមុខ» ➜ វាយ PIN ➜ ស្កេន ➜ «✅ បើករួច!» ➜ ចាក់សោ App ➜ ដោះដោយក្រយៅដៃ/មុខ ·
+   ឧបករណ៍ដែលធ្លាប់បើកក្នុងរបៀប device ➜ បើក App ➜ សារ «⚠️ ការចូលដោយក្រយៅដៃ ឬមុខត្រូវបិទ …» ម្តង ➜ បើកម្តងទៀត (ឬប្រើ PIN បើឧបករណ៍មិនគាំទ្រ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-no-device-mode.test.tsx` (ថ្មី · ៤) ៖ មុនកែ FAIL ៣/៤ (record `device` + `wrapKey` ក្នុង storage · record ចាស់នៅបើក · `wrapKey` ពិតដោះ PIN) ➜ ៤/៤ · ទិសផ្ទុយ PRF ឆ្លងទាំងពីរ tree។
+- `biometric-unlock-test` ៖ ផ្នែក «គ្មាន PRF» ចាក់សោឥរិយាបថថ្មី (គ្មាន record · គ្មាន `wrapKey` · សារ PRF/PIN) · record `device` ដែលមាន `wrapKey` ➜ បិទ · ៥៣/៥៣។
 
 ### [2.50.23] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **Sentry ៖ secret របស់ Push និងស្នាមម្រាមដៃមិនចេញ · event មានកំណែ App និងព័ត៌មានកំហុស** (Deep audit ២ · ជុំ ៩ · SECURITY-2 · SENTRY-3)
 
@@ -2305,6 +2328,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១០–១១ (SECURITY-1 · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង) ➜ [2.50.24]–[2.50.25]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A18 | **SECURITY-1** biometric `device` ទុក `wrapKey` ក្បែរ `wrapped` | Claude ៖ `enrollBiometricRecord()` ពិតលើ WebAuthn គ្មាន PRF ➜ `{ mode: 'device', wrapKey, wrapped }` ក្នុង localStorage · `wrapKey` + `wrapped` ពិតក្នុង storage ➜ `biometricUnlockPin()` ឲ្យ PIN · FAIL ៣/៤ | PRF-only · លុប record ចាស់ពេលបើក App |
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៩ (SECURITY-2 · SENTRY-3) ➜ [2.50.23]
 

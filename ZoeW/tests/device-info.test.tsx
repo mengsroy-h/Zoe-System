@@ -6,6 +6,9 @@
  * ⛔ APK ៖ plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) · plugin ជា Proxy thenable ➜ មិន resolve promise ទៅ plugin ·
  *    PWA Android ៖ UA ត្រូវកាត់ (`Android 10; K`) ➜ model ពី `userAgentData.getHighEntropyValues()` (ពិដាន `DEVICE_INFO_TIMEOUT_MS`) ·
  *    iPhone ៖ ត្រឹម «iPhone» + កំណែ iOS · បរាជ័យ ➜ ធ្លាក់ទៅ UA មិនគាំង។
+ * ⛔ រាយការណ៍ម្ចាស់គម្រោង ៖ iPhone iOS 26.5 ពិត តែ ZoeW បង្ហាញ «iOS 18.7» ➜ Safari លើ iOS 26 បង្កកលេខ OS ក្នុង UA (18_6 ➜ 18_7) ដោយចេតនា
+ *    ហើយ «Version/26.x» នៅតែពិត ➜ អាន Version ពេល ≥ 26 · UA គ្មាន Version (App លើ Home Screen) + OS បង្កក ➜ ពិនិត្យលក្ខណៈ engine Safari 26
+ *    (`CSS.supports`) ➜ «iOS 26+» (មិនដឹងលេខរង) · ទិសផ្ទុយ ៖ iOS 18 ពិត · Chrome iOS (OS ពិត) ➜ ដដែល។
  * ⛔ ព័ត៌មាននេះជាការមើលតែប៉ុណ្ណោះ ៖ មិនមែនជួរ ✅/⚠️ របស់ 🩺 (ចំនួនជួរដដែល) · ផ្ញើទៅ License តាម `setDeviceMeta()` តែមួយ។
  */
 import fs from 'node:fs';
@@ -49,6 +52,11 @@ function setUserAgent(ua: string, uad?: any) {
     Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, get: () => uad });
 }
 
+function withCssSupports(features: string[] | null) {
+    const value = features ? { supports: (q: string) => features.includes(q) } : { supports: () => { throw new Error('no CSS.supports'); } };
+    Object.defineProperty(window, 'CSS', { configurable: true, writable: true, value });
+}
+
 function asApk() {
     (window as any).androidBridge = { postMessage() {} };
     (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
@@ -82,6 +90,7 @@ afterEach(() => {
     delete (window as any).Capacitor;
     delete (window as any).androidBridge;
     delete (window as any).ZoeLicense;
+    delete (window as any).CSS;
 });
 
 describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK · PWA)', () => {
@@ -159,6 +168,44 @@ describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK
         expect(info.model).toBe('iPhone');
         expect(info.platform).toBe('iOS 17.5');
         expect(info.serial).toBe(APP_SERIAL);
+    });
+
+    it('⛔ iPhone iOS 26 ៖ Safari បង្កក «OS 18_7» ក្នុង UA (ចេតនា Apple) ➜ កំណែពិតពី «Version/26.5» មិនមែន 18.7', async () => {
+        setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1', undefined);
+        const { info } = await freshLoad();
+        expect(info.model).toBe('iPhone');
+        expect(info.platform).toBe('iOS 26.5');
+    });
+
+    it('⛔ iPhone iOS 26 App លើ Home Screen (UA គ្មាន «Version/») ៖ «OS 18_7» បង្កក + engine Safari 26 ➜ «iOS 26+» មិនមែន 18.7', async () => {
+        setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', undefined);
+        withCssSupports(['anchor-name: --zoe']);
+        const { info } = await freshLoad();
+        expect(info.platform).toBe('iOS 26+');
+        withCssSupports(['animation-timeline: scroll()']);
+        expect((await freshLoad()).info.platform).toBe('iOS 26+');
+    });
+
+    it('ទិសផ្ទុយ ៖ iOS 18.7 ពិត (Version/18.7 · ឬគ្មាន Version និង engine មិនទាន់ 26) ➜ «iOS 18.7» · iOS 18.5 មិនបង្កក ➜ ដដែល · Chrome iOS (OS 26_0 ពិត) ➜ «iOS 26.0»', async () => {
+        const { deviceFromUserAgent } = await import('../src/features/device-info');
+        const safari187 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1';
+        const home187 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+        const home185 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+        const chrome26 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.122 Mobile/15E148 Safari/604.1';
+        expect(deviceFromUserAgent(safari187, true).platform).toBe('iOS 18.7');
+        expect(deviceFromUserAgent(home187, false).platform).toBe('iOS 18.7');
+        expect(deviceFromUserAgent(home187).platform).toBe('iOS 18.7');
+        expect(deviceFromUserAgent(home185, true).platform).toBe('iOS 18.5');
+        expect(deviceFromUserAgent(chrome26, true).platform).toBe('iOS 26.0');
+        expect(deviceFromUserAgent(chrome26, false).model).toBe('iPhone');
+        expect(deviceFromUserAgent(home187.replace('Mobile/', 'Version/99999999999999999999.5 Mobile/'), true).platform).toBe('iOS 26+');
+        expect(deviceFromUserAgent(safari187.replace('Version/18.7', 'Version/26.5.1'), false).platform).toBe('iOS 26.5');
+        expect(deviceFromUserAgent(safari187.replace('Version/18.7', 'Version/18.7.2'), true).platform).toBe('iOS 18.7');
+        setUserAgent(home187, undefined);
+        withCssSupports([]);
+        expect((await freshLoad()).info.platform).toBe('iOS 18.7');
+        withCssSupports(null);
+        expect((await freshLoad()).info.platform).toBe('iOS 18.7');
     });
 
     it('⛔ License មិនទាន់ផ្ទុក ➜ គ្មាន serial ហើយការហៅលើកក្រោយសាកម្តងទៀត ➜ ផ្ញើ meta ពេល License មក', async () => {

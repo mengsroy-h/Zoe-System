@@ -17,6 +17,10 @@ const ANDROID_ID_RE = /^[0-9a-fA-F]{8,32}$/;
 const APP_SERIAL_SALT = 'zoew-device-serial:';
 const APP_SERIAL_BYTES = 8;
 const REDUCED_UA_MODEL = 'K';
+const IOS_FROZEN_MAJOR = 18;
+const IOS_FROZEN_MINOR = 6;
+const IOS_UNFROZEN_MAJOR = 26;
+const SAFARI_26_FEATURES = ['anchor-name: --zoe', 'animation-timeline: scroll()'];
 
 let devicePending: Promise<DeviceInfo> | null = null;
 
@@ -39,10 +43,28 @@ export function nativeModelName(manufacturer: unknown, model: unknown): string {
     return cleanDeviceText(titleCase(maker) + ' ' + name, 80);
 }
 
-export function deviceFromUserAgent(ua: unknown): { model: string; platform: string } {
+export function webKitAtLeast26(): boolean {
+    try {
+        const css: any = (window as any).CSS;
+        if (!css || typeof css.supports !== 'function') return false;
+        return SAFARI_26_FEATURES.some((q) => css.supports(q) === true);
+    } catch (e) {
+        return false;
+    }
+}
+
+function applePlatform(ua: string, major: string, minor: string, engine26: boolean): string {
+    const safari = /\bVersion\/(\d{1,3})(?:\.(\d{1,3}))?(?:\.\d{1,3})?(?![\d.])/.exec(ua);
+    if (safari && Number(safari[1]) >= IOS_UNFROZEN_MAJOR) return 'iOS ' + safari[1] + (safari[2] ? '.' + safari[2] : '');
+    const frozen = Number(major) === IOS_FROZEN_MAJOR && Number(minor) >= IOS_FROZEN_MINOR;
+    if (frozen && !safari && engine26) return 'iOS ' + IOS_UNFROZEN_MAJOR + '+';
+    return 'iOS ' + major + '.' + minor;
+}
+
+export function deviceFromUserAgent(ua: unknown, engine26 = false): { model: string; platform: string } {
     const s = typeof ua === 'string' ? ua : '';
     const apple = /\b(iPhone|iPad|iPod)\b[^)]*?OS (\d+)[_.](\d+)/.exec(s);
-    if (apple) return { model: apple[1], platform: 'iOS ' + apple[2] + '.' + apple[3] };
+    if (apple) return { model: apple[1], platform: applePlatform(s, apple[2], apple[3], engine26 === true) };
     const android = /Android (\d+(?:\.\d+)?)(?:;\s*([^;)]+))?/.exec(s);
     if (android) {
         const name = cleanDeviceText((android[2] || '').replace(/\s*Build\/.*$/, ''), 80);
@@ -57,7 +79,7 @@ export function deviceFromUserAgent(ua: unknown): { model: string; platform: str
 
 async function webDeviceInfo(): Promise<{ model: string; platform: string }> {
     const nav: any = window.navigator;
-    const fromUa = deviceFromUserAgent(nav && nav.userAgent);
+    const fromUa = deviceFromUserAgent(nav && nav.userAgent, webKitAtLeast26());
     let model = fromUa.model;
     let platform = fromUa.platform;
     const uad = nav && nav.userAgentData;

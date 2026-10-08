@@ -1905,6 +1905,9 @@
     "ZoeW/tests/zone-format-cache.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-search-tap-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ios-search-viewport.test.ts": {
       "policy": "zoew-self-verification"
     },

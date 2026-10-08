@@ -56,6 +56,8 @@ function serve(files) {
             const p = decodeURIComponent(req.url.split('?')[0]);
             const entry = files[p];
             if (!entry) { rsp.writeHead(404); return rsp.end(); }
+            entry.hits = (entry.hits || 0) + 1;
+            if (entry.failFirst && entry.hits <= entry.failFirst) { rsp.writeHead(404); return rsp.end(); }
             rsp.writeHead(200, { 'Content-Type': entry.type });
             rsp.end(entry.body);
         });
@@ -95,7 +97,9 @@ function serve(files) {
         'LIVE_SCAN_MAX_BAND_PX', 'LIVE_SCAN_MAX_FPS', 'LIVE_SCAN_MIN_FPS',
         'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS',
         'LIVE_SCAN_BACKOFF', 'LIVE_SCAN_SLOW_MS', 'LIVE_SCAN_FAST_MS', 'FRESH_FRAME_GIVE_UP',
-        'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS']
+        'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS',
+        // ⛔ WASM ផ្ទុកមិនបាន ➜ purge + prepare ឡើងវិញ (SENTRY-2 · `ZoeW/tests/scan-engine-recovery.test.ts`)
+        'SCAN_ENGINE_RETRY_STEPS_MS', 'SCAN_ENGINE_FAIL_TOAST_AFTER', 'SCAN_ENGINE_FAIL_TEXT']
         .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
 
     const page1 = `<!doctype html><meta charset="utf-8"><body>
@@ -107,6 +111,10 @@ let liveScanWidthIndex = -1, liveScanCostEma = 0, lastDecodedVideoTime = -1;
 let staleFrameStreak = 0, freshFrameGateUsable = true;
 ${constLines}
 ${buildFn || ''}
+${/\bscanState\.scanEngine/.test(initFn + decodeFn + (sliceFn(src, 'prepareScanEngineModule') || '')) ? 'const scanState = { scanEngineDown: false, scanEngineFailures: 0, scanEngineRetryTimer: null, scanEngineFailureReported: false };' : ''}
+function showToast(m) { (window.__toasts = window.__toasts || []).push(m); }
+${sliceFn(src, 'prepareScanEngineModule') || ''}
+${sliceFn(src, 'noteScanEngineLoadFailed') || ''}
 ${initFn}
 ${decodeFn}
 ${cropFn}
@@ -130,7 +138,8 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
                  setLive: (r) => { liveScanCodeReader = r; },
                  formats: () => SCAN_FORMAT_NAMES.slice(),
                  nativeFormats: () => NATIVE_SCAN_FORMAT_NAMES.slice(),
-                 readers: () => ({ codeReader, liveScanCodeReader }) };
+                 readers: () => ({ codeReader, liveScanCodeReader }),
+                 engineDown: () => (typeof scanState !== 'undefined' && scanState ? !!scanState.scanEngineDown : null) };
 </script></body>`;
 
     const server = await serve({
@@ -638,6 +647,42 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
             (src.match(/confirmLiveScan\(/g) || []).length >= 3, (src.match(/confirmLiveScan\(/g) || []).length);
         ok('សាខាស្លាប់ `nativeDetector && isIOSDevice()` ត្រូវបានដករួច (Safari គ្មាន BarcodeDetector)',
             !/nativeDetector && isIOSDevice\(\)/.test(src));
+    }
+
+    // ⛔ SENTRY-2 លើបណ្ណាល័យពិត ៖ zxing-wasm ចងចាំ promise របស់ module ដែល reject ➜ WASM 404 (Emscripten ទាញ ២ ដង ៖ streaming + ArrayBuffer) ➜ App ត្រូវ purge ហើយ prepare ឡើងវិញ
+    //    ពី `./vendor/` (មិនមែន CDN លំនាំដើមរបស់បណ្ណាល័យ) ➜ `readBarcodes()` ដើរវិញ។ មុនកែ ៖ ការហៅ prepare តែម្តង ➜ reject ជានិច្ច
+    {
+        const wasmEntry = { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')), failFirst: 2 };
+        const flaky = await serve({
+            '/': { type: 'text/html', body: page1 },
+            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
+            '/vendor/zxing_reader.wasm': wasmEntry
+        });
+        const fctx = await browser.newContext();
+        const fpage = await fctx.newPage();
+        const offHost = [];
+        const pageErrors = [];
+        fpage.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:')) offHost.push(r.url()); });
+        fpage.on('pageerror', (e) => pageErrors.push(String(e && e.message)));
+        await fpage.addInitScript(() => { window.addEventListener('unhandledrejection', (e) => { (window.__rejections = window.__rejections || []).push(String(e.reason && e.reason.message || e.reason)); }); });
+        await fpage.goto('http://127.0.0.1:' + flaky.address().port + '/', { waitUntil: 'load', timeout: 30000 });
+        await fpage.evaluate(() => window.__api.initScanEngine());
+        await fpage.waitForTimeout(800);
+        const downAfterFirst = await fpage.evaluate(() => window.__api.engineDown());
+        const hitsAfterFirst = wasmEntry.hits || 0;
+        const retryMs = Number((src.match(/const SCAN_ENGINE_RETRY_STEPS_MS = \[(\d+)/) || [])[1]) || 3000;
+        await fpage.waitForTimeout(retryMs + 2000);
+        const after = await fpage.evaluate(async () => {
+            const img = new ImageData(8, 8);
+            const read = await ZXingWASM.readBarcodes(img, { formats: ['Code128'], maxNumberOfSymbols: 1 }).then(() => 'ok', (e) => 'reject:' + String(e && e.message || e));
+            return { down: window.__api.engineDown(), read, rejections: window.__rejections || [] };
+        });
+        ok('ZXing ពិត ៖ WASM 404 (ការទាញ ២ របស់ Emscripten) ➜ ធ្លាក់ (scanEngineDown) ➜ prepare ឡើងវិញពី ./vendor/ ➜ readBarcodes ដើរវិញ',
+            hitsAfterFirst === 2 && downAfterFirst === true && wasmEntry.hits >= 3 && after.down === false && after.read === 'ok',
+            JSON.stringify({ hitsAfterFirst, downAfterFirst, hits: wasmEntry.hits, after }));
+        ok('ZXing ពិត ៖ គ្មានសំណើទៅ CDN · គ្មាន unhandled rejection · គ្មាន pageerror',
+            offHost.length === 0 && after.rejections.length === 0 && pageErrors.length === 0, JSON.stringify({ offHost, rejections: after.rejections, pageErrors }));
+        await fctx.close(); flaky.close();
     }
 
     await ctx.close(); server.close(); await browser.close();

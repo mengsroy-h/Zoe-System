@@ -193,6 +193,10 @@ export interface ScanState {
     nativeDetector: any;
     ownCaptureCanvas: any;
     ownCaptureCtx: any;
+    scanEngineDown: boolean;
+    scanEngineFailures: number;
+    scanEngineRetryTimer: any;
+    scanEngineFailureReported: boolean;
 }
 
 export const scanState = createStore<ScanState>('scanState', {
@@ -222,6 +226,10 @@ export const scanState = createStore<ScanState>('scanState', {
     nativeDetector: null,
     ownCaptureCanvas: null,
     ownCaptureCtx: null,
+    scanEngineDown: false,
+    scanEngineFailures: 0,
+    scanEngineRetryTimer: null,
+    scanEngineFailureReported: false,
 });
 registerStore(scanState);
 

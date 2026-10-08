@@ -5,6 +5,7 @@ import { elapsedSince } from '../core/elapsed';
 import { searchByPhone } from '../features/phone-suggest';
 import { triggerScanAction } from '../features/scan-action';
 import { getCoverCropRect } from './camera';
+import { showToast } from '../ui/toast';
 
 export const SCAN_FORMAT_NAMES = ['Code128'];
 
@@ -39,6 +40,12 @@ export const FRESH_FRAME_GIVE_UP = 20;
 export const SCAN_CONFIRM_REPEATS = 2;
 
 export const SCAN_CONFIRM_WINDOW_MS = 1500;
+
+export const SCAN_ENGINE_RETRY_STEPS_MS = [3000, 10000, 30000, 60000];
+
+export const SCAN_ENGINE_FAIL_TOAST_AFTER = 3;
+
+export const SCAN_ENGINE_FAIL_TEXT = '⚠️ ម៉ាស៊ីនស្កេន Barcode ផ្ទុកមិនបានទេ — App កំពុងព្យាយាមម្តងទៀត · សូម Refresh ទំព័រ ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូលដោយដៃ';
 
 export function liveScanTargetWidth() {
     if (scanState.liveScanWidthIndex < 0) scanState.liveScanWidthIndex = LIVE_SCAN_WIDTH_STEPS.length - 1;
@@ -117,19 +124,45 @@ export function buildReaderOptions(tryHarder, formats?) {
 
 export function initScanEngine() {
     if (!scanEngineReady()) return;
+    scanState.codeReader = buildReaderOptions(true);
+    scanState.liveScanCodeReader = buildReaderOptions(false);
+    prepareScanEngineModule();
+}
+
+export function prepareScanEngineModule() {
+    if (scanState.scanEngineRetryTimer) { clearTimeout(scanState.scanEngineRetryTimer); scanState.scanEngineRetryTimer = null; }
+    if (!scanEngineReady()) return;
+    let ready;
     try {
-        ZXingWASM.prepareZXingModule({
+        ready = ZXingWASM.prepareZXingModule({
             overrides: {
                 locateFile: (file, prefix) => (file.endsWith('.wasm') ? './vendor/' + file : prefix + file)
             },
             fireImmediately: true
         });
-        scanState.codeReader = buildReaderOptions(true);
-        scanState.liveScanCodeReader = buildReaderOptions(false);
     } catch (e) {
-        console.error("Scan engine initialization error: ", e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Scan engine initialization error: " });
+        noteScanEngineLoadFailed(e);
+        return;
     }
+    Promise.resolve(ready).then(() => {
+        scanState.scanEngineDown = false;
+        scanState.scanEngineFailures = 0;
+    }, noteScanEngineLoadFailed);
+}
+
+export function noteScanEngineLoadFailed(e) {
+    scanState.scanEngineDown = true;
+    try { if (typeof ZXingWASM.purgeZXingModule === 'function') ZXingWASM.purgeZXingModule(); } catch (err) {}
+    scanState.scanEngineFailures++;
+    if (!scanState.scanEngineFailureReported) {
+        scanState.scanEngineFailureReported = true;
+        console.error("Scan engine initialization error: ", e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Scan engine initialization error: ", failures: scanState.scanEngineFailures });
+    }
+    if (scanState.scanEngineFailures === SCAN_ENGINE_FAIL_TOAST_AFTER) showToast(SCAN_ENGINE_FAIL_TEXT);
+    if (scanState.scanEngineRetryTimer) return;
+    const step = SCAN_ENGINE_RETRY_STEPS_MS[Math.min(scanState.scanEngineFailures - 1, SCAN_ENGINE_RETRY_STEPS_MS.length - 1)];
+    scanState.scanEngineRetryTimer = setTimeout(prepareScanEngineModule, step);
 }
 
 export function resetScanConfirm() {
@@ -156,7 +189,7 @@ export function confirmLiveScan(code) {
 }
 
 export function decodeBarcodeFromCanvasManual(options, canvas) {
-    if (!scanEngineReady() || !options) return Promise.resolve('');
+    if (!scanEngineReady() || !options || scanState.scanEngineDown) return Promise.resolve('');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return Promise.resolve('');
     let imageData;

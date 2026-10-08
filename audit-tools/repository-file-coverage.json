@@ -1971,6 +1971,9 @@
     "ZoeW/tests/remove-stale-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-engine-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scroll-thumb.test.tsx": {
       "policy": "zoew-self-verification"
     },

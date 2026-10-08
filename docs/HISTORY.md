@@ -87,11 +87,12 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
 - 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
   ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
-  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla) ➜ branch `claude/optimistic-darwin-6cqgfh` (ផ្អែកលើ PR #299 · merge ក្រោយ #299 · គ្មាន bump · ផ្នែក ២ «D7»)។
+  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla) ➜ PR #300 merge រួច (គ្មាន bump · ផ្នែក ២ «D7»)។
 - ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
@@ -126,6 +127,28 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.27] — 2026-10-08 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Barcode (WASM) ផ្ទុកមិនបានម្តង មិនធ្វើឲ្យការស្កេនស្លាប់រហូតដល់ Refresh** (Deep audit ២ · ជុំ ១២ · SENTRY-2)
+
+**ZoeW `2.50.27`** (`zoew-v289` ➜ `zoew-v290`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📷 **SENTRY-2** ៖ `initScanEngine()` ហៅ `ZXingWASM.prepareZXingModule()` ម្តង ដោយគ្មាន `.catch` ➜ WASM ទាញមិនបាន (Emscripten ទាញ ២ ដង ៖ streaming + ArrayBuffer) ឬ compile មិនបាន (memory) ➜ zxing-wasm
+  ចងចាំ promise ដែល reject (`WeakMap`) ➜ រាល់ `readBarcodes()` បន្ទាប់ reject «Aborted(both async and sync fetching of the wasm failed)» ➜ `decodeBarcodeFromCanvasManual()` ត្រឡប់ `''` ➜ កាមេរ៉ា · រូបភាព · QR Config
+  «រកមិនឃើញ» រហូតដល់ Refresh · unhandled rejection + pageerror ទៅ Sentry រាល់បើក App។
+  ឥឡូវ ៖ `noteScanEngineLoadFailed()` ៖ `purgeZXingModule()` · decode ឈប់ខណៈធ្លាក់ (`scanEngineDown` ៖ ⛔ `readBarcodes()` ក្រោយ purge ប្រើ `locateFile` លំនាំដើម = CDN) · prepare ឡើងវិញពី `./vendor/`
+  តាម `SCAN_ENGINE_RETRY_STEPS_MS` (៣ · ១០ · ៣០ · ៦០ វិ. · ជំហានចុងក្រោយបន្ត) · Sentry ម្តងក្នុងមួយទំព័រ · toast ម្តងពេលធ្លាក់ `SCAN_ENGINE_FAIL_TOAST_AFTER` (៣) ដង។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ករណីនេះកើតតែពេល WASM ទាញ/compile មិនបាន)។ Sentry ៖ «Scan engine initialization error» គួរកម្រ ហើយមួយក្នុងមួយទំព័រ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/scan-engine-recovery.test.ts` (ថ្មី · ៤ · ZXing ក្លែង) ៖ មុនកែ FAIL ៣/៤ ➜ ៤/៤ · ទិសផ្ទុយ (ផ្ទុកបានលើកដំបូង) ឆ្លងទាំងពីរ tree · mutation ៖ gate decode ➜ FAIL ១ · purge ➜ ២ · retry ➜ ៣ · toast ➜ ១ · Sentry-once ➜ ២។
+- `scan-engine-test` (Chromium ពិត · zxing-wasm ពិត) ៖ WASM 404 ២ ដង ➜ `scanEngineDown` ➜ prepare ឡើងវិញពី `./vendor/` ➜ `readBarcodes()` ដើរ · គ្មានសំណើ CDN · គ្មាន unhandled rejection ➜ មុនកែ FAIL ២ ➜ ៥៤/៥៤។
 
 ### [2.50.26] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ភ្ជាប់ Server មិនបាន ក្រោយការផ្ទុកទំព័រឡើងវិញស្វ័យប្រវត្តិអស់ពិដាន ➜ App ប្រាប់ «សូម Refresh ទំព័រ» ហើយឈប់ព្យាយាមឥតប្រយោជន៍** (Deep audit ២ · ជុំ ១២ · NETWORK-1)
 
@@ -2372,15 +2395,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-08 — Deep audit ២ ៖ ជុំ ១២ (NETWORK-1 · SENTRY-2) ➜ [2.50.26]–
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១២ (NETWORK-1 · SENTRY-2) ➜ [2.50.26]–[2.50.27]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A22 | **NETWORK-1** ពិដានផ្ទុក SDK ឡើងវិញអស់ ➜ ការស្តារឥតប្រយោជន៍ · toast «កំពុងព្យាយាម» | Claude ៖ ជណ្តើរ + `online`/`visibility` ពិតក្នុង vm ៖ ក្រោយពិដានអស់ `initFirebase` ៩ ➜ ២៩ ក្នុង ១០ នាទី · Chromium ពិត ៖ ពិដានអស់ ➜ toast «កំពុងព្យាយាមម្តងទៀត» · `connection-recovery-test` FAIL ៨ · `sdk-offline-boot-test` FAIL ២ | `firebaseSdkNeedsRefresh()` ➜ ឈប់ + «សូម Refresh ទំព័រ» (App ទាំងពីរ) |
+| A23 | **SENTRY-2** WASM ផ្ទុកមិនបានម្តង ➜ ស្កេនស្លាប់រហូត | Claude ៖ zxing-wasm ពិតក្នុង Chromium ៖ WASM 404 (streaming + ArrayBuffer) ➜ `readBarcodes()` reject «Aborted(both async and sync fetching of the wasm failed)» ជានិច្ច + unhandled rejection · vitest ZXing ក្លែង FAIL ៣/៤ · `scan-engine-test` FAIL ២ | purge + gate + prepare ឡើងវិញពី `./vendor/` · Sentry ១ · toast ១ |
 
 - `connection-recovery-test` ១០ខ៣ មាន assertion ដែលចាក់សោកំហុសនេះ («ក្រោយអស់ពិដាន ការស្តារត្រឡប់ទៅជណ្តើរចាស់») ➜ ជំនួសដោយ «ជណ្តើរឈប់» · `b3` (ពិដាន ៣ វិ.) សងពិដានផ្ទុកឡើងវិញរាល់ជុំ ដើម្បីវាស់តែពិដាន ៣ វិ.។
 - sandbox ដែលស្រង់ `renderConnectionStatus` · `retryFirebaseSdkNow` ត្រូវការ `firebaseSdkNeedsRefresh` ៖ `connection-recovery-test` (`REQUIRED_FNS` · `extras`) · `monotonic-gate-test` (stub `false`)។
 - gate ក្នុង `recoverFirebaseSdk` ស្ទួន (mutation រស់ ៖ `scheduleFirebaseSdkRetry` · `retryFirebaseSdkNow` ទប់មុន) ➜ ដកចេញ។
+- SENTRY-2 ៖ WASM 404 **ម្តង** មិនបំបែក library (Emscripten ទាញម្តងទៀតជា ArrayBuffer) ➜ ការវាស់ពិតត្រូវ 404 ២ ដង · sandbox `scan-engine-test` ត្រូវការ `prepareScanEngineModule` · `noteScanEngineLoadFailed` · `scanState` (វាលថ្មីមិនមែន state ដើម)។
 - 🗳️ សំណើម្ចាស់គម្រោង ៖ `announcements.json` (ធាតុ `update`) សរសេរ **តែអ្វីដែលថ្មីក្នុងជុំនេះ** · អត្ថបទជុំចាស់លុបចោល (មិនបញ្ចូលចំណុចចាស់ទៀត) ➜ ច្បាប់ក្នុង `CLAUDE.md` ជួរ «🔔 panel»។
 
 ### 2026-10-08 — Deep audit ២ ៖ D7 (ដកឧបករណ៍ parity ធៀប ZoeW vanilla · ការសម្រេចម្ចាស់គម្រោង ៖ អនុញ្ញាត · PR ដាច់ · គ្មាន bump)

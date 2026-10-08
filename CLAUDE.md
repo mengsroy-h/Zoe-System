@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.26` (`zoew-v289`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.27` (`zoew-v290`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.8` (`zoekeygen-v119`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -725,6 +725,11 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   `LIVE_SCAN_SLOW_MS` (22ms), up below `LIVE_SCAN_FAST_MS` (9ms) ⛔ never pin the width. Band height
   `LIVE_SCAN_MAX_BAND_PX` (240px). Interval `LIVE_SCAN_MIN_FPS` 10 ➜ `LIVE_SCAN_MAX_FPS` 120.
 - Config QR scanning is a separate reader (`configQrReader`).
+- zxing-wasm caches the module promise ➜ a failed WASM load (fetch · compile) rejects every later `readBarcodes()`.
+  `noteScanEngineLoadFailed()` is the single failure path: `purgeZXingModule()` · decode gated by `scanEngineDown` ⛔ never
+  `readBarcodes()` between purge and re-prepare (the library's default `locateFile` is a CDN) · re-prepare from `./vendor/`
+  on `SCAN_ENGINE_RETRY_STEPS_MS` (last step repeats) · Sentry once per page · toast once at `SCAN_ENGINE_FAIL_TOAST_AFTER`.
+  Guards: `ZoeW/tests/scan-engine-recovery.test.ts` · `scan-engine-test` (real library, WASM 404).
 
 ## Clock
 

@@ -1992,6 +1992,9 @@
     "ZoeW/tests/supabase-clock-skew.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-cross-tab-signout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-gateway-5xx.test.ts": {
       "policy": "zoew-self-verification"
     },

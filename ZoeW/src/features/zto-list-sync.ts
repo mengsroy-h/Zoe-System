@@ -222,7 +222,7 @@ export function ztoListSignedRowIndex(signedRows) {
     return index;
 }
 
-export function classifyZtoListRows(rows, historyList, trashList, signedRows?, range?) {
+export function classifyZtoListRows(rows, historyList, trashList, signedRows?, range?, pickupData?) {
     const out = { fresh: [], existing: [], duplicate: [], skipped: [] };
     const list = Array.isArray(rows) ? rows : [];
     const known = new Set();
@@ -290,6 +290,13 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
         else out.fresh.push(row);
     }
     if (!range || typeof range.from !== 'string' || typeof range.to !== 'string') return out;
+    const pickedUpBefore = new Set();
+    if (pickupData && typeof pickupData === 'object') {
+        Object.keys(pickupData).forEach((day) => {
+            const marks = pickupData[day] && pickupData[day].pickedUpBarcodes;
+            if (marks && typeof marks === 'object') Object.keys(marks).forEach((mark) => pickedUpBefore.add(mark));
+        });
+    }
     signedIndex.forEach((raw, key) => {
         if (arrivalKeys.has(key)) return;
         const row = ztoListRowOf(raw, key);
@@ -303,7 +310,7 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
             out.skipped.push(row);
             return;
         }
-        if (ztoListRowAgeState(row.stampMs, getServerNow()) === 'purged') {
+        if (ztoListRowAgeState(row.stampMs, getServerNow()) === 'purged' || (!known.has(key) && pickedUpBefore.has(key))) {
             row.skip = 'too-old-purged';
             out.skipped.push(row);
             return;
@@ -463,7 +470,7 @@ export function renderZtoListSyncPreview() {
         ztoState.touch();
         return;
     }
-    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result);
+    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result, dataState.dailyPickupData);
     const closeTargets = ztoListCloseTargets(groups.existing);
     const closeKeys = new Set(closeTargets.map((entry) => entry.key));
     for (let i = 0; i < groups.existing.length; i++) {
@@ -656,7 +663,7 @@ export async function importZtoListRows() {
         showToast('⏳ ' + VIEW_NOT_MEASURABLE_TEXT + ' — មិនអាចបញ្ចូលបានទេ');
         return;
     }
-    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result);
+    const groups = classifyZtoListRows(result.rows, dataState.scanHistory, dataState.deletedItems, result.signedRows, result, dataState.dailyPickupData);
     const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
     const closeTargets = ztoListCloseTargets(groups.existing);
     const originOf = (row) => ({ code: row.barcode, from: row.from });

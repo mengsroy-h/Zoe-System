@@ -122,6 +122,31 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.21] — 2026-10-08 · ZoeW ៖ **ទាញបញ្ជី ZTO មិនបញ្ចូលកញ្ចប់ដែល ZoeW យករួចម្តងទៀត ក្រោយធុងសំរាមត្រូវលុប (COD មិនរាប់ពីរដង)** (Deep audit ២ · ជុំ ៨ · ZTO-2 · តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.21`** (`zoew-v283` ➜ `zoew-v284`) · ⛔ ZoeKeyGen · **Firebase rules · migration Supabase មិនប្រែ** · `src/features/zto-list-sync.ts` ប្រែ ➜ sha256 ថ្មីក្នុង `LOCK`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ (តំបន់ចាក់សោ)** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2»។ ហេតុផល ៖ ការនាំចូលបញ្ជី ZTO បញ្ចូលកញ្ចប់ដែល ZoeW បានរាប់ចំណូលរួចម្តងទៀត ➜ ledger ថ្ងៃ/ខែលើស COD។
+- 📦 **ZTO-2 ៖ ជួរ `signedOnly` ក្រោយធុងសំរាម «យករួច» ត្រូវលុប** ៖ `classifyZtoListRows()` ស្គាល់ «មានក្នុង ZoeW» តែពីប្រវត្តិ និងធុងសំរាម · ជួរ `signedOnly` (ការចុះហត្ថលេខាក្នុងចន្លោះ ·
+  ការមកដល់មុនចន្លោះ) មានតែការពិនិត្យអាយុលើ **ម៉ោងចុះហត្ថលេខា** (> ៣០ ថ្ងៃ ➜ `too-old-purged`) ➜ បើ ZTO Palm ចុះហត្ថលេខាយឺតជាងការបិទដោយដៃ > ២ ម៉ោង មានចន្លោះ (បិទ + ២ ម៉ោង + ៣០ ថ្ងៃ ·
+  ចុះហត្ថលេខា + ៣០ ថ្ងៃ] ដែលធុងសំរាមលុបរួច key registry ដោះរួច ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» បញ្ចូលវាជាកញ្ចប់ថ្មី ➜ ledger ថ្ងៃ D ១០ ➜ ២០ សម្រាប់កញ្ចប់តែមួយ។
+  ឥឡូវ ៖ ស្ថិតិយក `zoew_daily_pickup_cod_dod/<ថ្ងៃ>/pickedUpBarcodes/<key>` (listen ទាំងមូល · មិនលុបតាមអាយុ) ជាសញ្ញាដែលមានស្រាប់ថា ZoeW បានយកកញ្ចប់នោះ ➜ ជួរ `signedOnly` ដែល key មានក្នុងថ្ងៃណាមួយ
+  ខណៈគ្មានក្នុងប្រវត្តិ/ធុងសំរាម ➜ `too-old-purged` (preview និង import ដូចគ្នា)។ ⛔ មិនប្រើ registry ជា tombstone · គ្មាន path/rules ថ្មី (ផែនការ tombstone ក្នុងរបាយការណ៍មិនចាំបាច់)។
+  ⚠️ ព្រំដែន ៖ ថ្ងៃដែលត្រូវ «Reset ចំនួនយករួច» (`{ packagesPickedUp: 0 }`) បាត់ key ➜ ឥរិយាបថដូចមុនសម្រាប់ថ្ងៃនោះ · ទិន្នន័យចាស់ដែលមានតែ placeholder `_lg_*` ដូចគ្នា។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ **គ្មាន** Firebase rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស (ត្រូវការកញ្ចប់អាយុ ៣០ ថ្ងៃ)។ ការទាញបញ្ជីប្រចាំខែ ៖ កញ្ចប់ចាស់ដែលយករួចបង្ហាញក្នុង «រំលង» មិនមែន «បញ្ចូល»។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-signed-only-purge.test.ts` (ថ្មី · ៣ · lifecycle ពិត ៖ `claimBarcodeInRegistry` · `addOrUpdateEntry` · `applyBarcodeCloseChange` · `runAutomaticCleanupRules` · `runAutomaticDeletedCleanup` ·
+  `classifyZtoListRows` · `importZtoListRows`) ៖ ស្កេន ➜ បិទ ➜ ២ ម៉ោង ➜ លុប ៣០ ថ្ងៃ ➜ ទាញ ➜ `too-old-purged` · បញ្ចូល ០ · ledger ១០ · ទិសផ្ទុយ ៖ ២៩ ថ្ងៃ ➜ existing · កញ្ចប់ដែល ZoeW មិនដែលកត់ ➜ បញ្ចូល។
+  មុនកែ FAIL ១/៣ (ledger ២០) · mutation ៖ ដក `dailyPickupData` ពីអ្នកហៅ ➜ FAIL ១។ តេស្ត ZTO ផ្សេង ២៤៤ ឆ្លង · `zto-lock` ១២/១២។
+
 ### [2.50.20] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ៧ ថ្ងៃលើឧបករណ៍ Data Saver · 2G · secret ចាក់សោ មិនដកកញ្ចប់ដែល ZTO ចុះហត្ថលេខារួច** (Deep audit ២ · ជុំ ៧ · ZTO-1 · តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)
 
 **ZoeW `2.50.20`** (`zoew-v282` ➜ `zoew-v283`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ។
@@ -2220,6 +2245,16 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៦–៨ (SENTRY-1 · ZTO-1 · ZTO-2 · សំណើម្ចាស់គម្រោង) ➜ [2.50.19]–[2.50.21]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A12 | **SENTRY-1** patch ជាប់គាំង ➜ revert ខណៈ transaction នៅរស់ | អ្នករក ៖ stall ➜ `false` + «បរាជ័យ» + Sentry ➜ commit យឺត ➜ server `called` · App គ្មាន · កែលេខ ➜ ម្ចាស់ស្ថិតិយកខុស · Claude ៖ FAIL ៦/៨ | `pending` + `armLateCommit` · revert តែ field ដែលគ្មានការជ្រើសថ្មី |
+| A13 | **ZTO-1** ការអានបញ្ជីចុះហត្ថលេខារំលង (Data Saver · 2G · secret ចាក់សោ) | អ្នករក ៖ ០ fetch · abandon នាទី ៣១ · marker ០ · Claude ៖ FAIL ៣/៥ | អានពេល hold សកម្ម · secret ចាក់សោ ➜ hold មិនរាប់ម៉ោង |
+| A14 | **ZTO-2** `signedOnly` ក្រោយធុងសំរាមលុប ➜ COD ពីរដង | អ្នករក ៖ lifecycle ពិត ➜ ledger ១០ ➜ ២០ · Claude ៖ FAIL ១/៣ | `pickedUpBarcodes` ជាសញ្ញា (គ្មាន rules ថ្មី) |
+
+- ZTO-2 ៖ របាយការណ៍ស្នើ tombstone `zoew_purged_barcodes` + rules + SQL + Publish ➜ ការវាស់បង្ហាញថាស្ថិតិយក (`pickedUpBarcodes`) រក្សា key រួចហើយ (listen ទាំងមូល · គ្មានការលុបតាមអាយុ) ➜ ដំណោះស្រាយតូចជាង គ្មានសកម្មភាពដោយដៃ។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៥ (RACES-2 · late commit ក្រោយប្តូរហាង) ➜ [2.50.18]
 

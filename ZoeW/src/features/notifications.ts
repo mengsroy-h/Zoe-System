@@ -13,7 +13,7 @@ import { LICENSE_APP_CODE } from './license';
 import { trashReasonOf } from './trash';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
-import { fetchWithTimeout, linkIsFrugal } from '../services/network';
+import { fetchWithTimeout, linkIsFrugal, withTimeout } from '../services/network';
 
 export interface NotifyExpiryRow {
     key: string;
@@ -492,6 +492,36 @@ export function openNotifyDrawer() {
     clearAppBadge();
     checkApkRelease(newerAppVersion(uiState.notifyFeed));
     fetchNotifyFeed(true).then(() => checkApkRelease(newerAppVersion(uiState.notifyFeed)));
+}
+
+export const APP_UPDATE_CHECK_WAIT_MS = 100;
+
+export function requestServiceWorkerUpdate(): Promise<boolean> {
+    if (isNativeApp()) return Promise.resolve(false);
+    try {
+        const sw: any = typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+        if (!sw || typeof sw.getRegistration !== 'function') return Promise.resolve(false);
+        return Promise.resolve(sw.getRegistration('./'))
+            .then((reg: any) => (reg && typeof reg.update === 'function' ? Promise.resolve(reg.update()).then(() => true) : false))
+            .catch(() => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+export async function checkForAppUpdate(): Promise<void> {
+    if (uiState.appUpdateCheck.phase === 'checking') return;
+    uiState.appUpdateCheck = { phase: 'checking', at: Date.now() };
+    const sw = withTimeout(requestServiceWorkerUpdate(), NOTIFY_FEED_TIMEOUT_MS, 'Service worker update timed out').catch(() => false);
+    const startedAt = Date.now();
+    while (uiState.notifyFeedInFlight && elapsedSince(startedAt) < NOTIFY_FEED_TIMEOUT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, APP_UPDATE_CHECK_WAIT_MS));
+    }
+    const fetched = await fetchNotifyFeed(true);
+    const newer = newerAppVersion(uiState.notifyFeed);
+    if (newer) await checkApkRelease(newer, true);
+    await sw;
+    uiState.appUpdateCheck = { phase: fetched ? 'done' : 'failed', at: Date.now() };
 }
 
 export function initNotifications() {

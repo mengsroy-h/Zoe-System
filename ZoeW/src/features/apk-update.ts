@@ -55,14 +55,19 @@ function finiteBytes(n: any): number {
     return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 }
 
-export function checkApkRelease(version: string): Promise<void> {
+export function checkApkRelease(version: string, force?: boolean): Promise<void> {
     if (!isNativeAndroid() || typeof version !== 'string' || !APK_VERSION_RE.test(version)) return Promise.resolve();
     const cur = uiState.apkRelease;
     if (cur.version === version) {
         if (cur.state === 'checking' || cur.state === 'ready') return Promise.resolve();
+        if (force) return probeApkRelease(version);
         const gap = cur.state === 'absent' ? APK_RELEASE_RECHECK_MS : APK_RELEASE_RETRY_MS;
         if (elapsedSince(cur.checkedAt) < gap) return Promise.resolve();
     }
+    return probeApkRelease(version);
+}
+
+function probeApkRelease(version: string): Promise<void> {
     uiState.apkRelease = { version: version, state: 'checking', checkedAt: Date.now() };
     return withTimeout(loadApkPlugin().then(({ AU }) => AU.probe({ version: version })), APK_PROBE_TIMEOUT_MS, 'APK release probe timed out')
         .then((res: any) => (res && res.available === true ? 'ready' : res && res.available === false ? 'absent' : 'failed'), () => 'failed')

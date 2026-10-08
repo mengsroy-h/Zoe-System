@@ -7,6 +7,7 @@ import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { hardwareScannerKeyPress } from '../behaviors/scanner-input';
 import { togglePanelFromHandle } from '../behaviors/panel-motion';
+import { entrySearchBlurred, entrySearchFocused } from '../behaviors/entry-search';
 import { MemoEntryListTableBody } from './entry/EntryListTableBody';
 import { LockerListFilterSelect } from './entry/LockerListFilterSelect';
 import { MemoLockerListTableBody } from './entry/LockerListTableBody';
@@ -180,6 +181,8 @@ export function PageEntry() {
                                 placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..."
                                 autoComplete="off"
                                 onInput={onAct("renderEntryList")}
+                                onFocus={entrySearchFocused}
+                                onBlur={entrySearchBlurred}
                             />
                         </div>
                         <div className="table-responsive" id="entryTableResponsive" ref={refTo('entryTableResponsive')}>
@@ -223,6 +226,8 @@ export function PageEntry() {
                                 placeholder="ស្វែងរកលេខទូរស័ព្ទ..."
                                 autoComplete="off"
                                 onInput={onAct("renderLockerList")}
+                                onFocus={entrySearchFocused}
+                                onBlur={entrySearchBlurred}
                             />
                             <LockerListFilterSelect />
                         </div>

@@ -319,6 +319,7 @@ export interface UiState {
     notifyFeedInFlight: boolean;
     apkRelease: import('../features/apk-update').ApkReleaseState;
     apkUpdate: import('../features/apk-update').ApkUpdateState;
+    appUpdateCheck: { phase: 'idle' | 'checking' | 'done' | 'failed'; at: number };
     deviceInfo: import('../features/device-info').DeviceInfo;
     updateReady: boolean;
     dataPanelCollapsed: boolean;
@@ -417,6 +418,7 @@ export const uiState = createStore<UiState>('uiState', {
     notifyFeedInFlight: false,
     apkRelease: { version: '', state: 'idle', checkedAt: 0 },
     apkUpdate: { phase: 'idle', version: '', received: 0, total: 0, error: '' },
+    appUpdateCheck: { phase: 'idle', at: 0 },
     deviceInfo: { state: 'idle', model: '', platform: '', serial: '', serialKind: '' },
     updateReady: false,
     dataPanelCollapsed: false,

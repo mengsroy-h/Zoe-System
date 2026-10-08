@@ -89,6 +89,7 @@ function startServer(state) {
                 return;
             }
             if (p === '/') p = '/index.html';
+            if (state.gone && state.gone.has(p)) p = '/index.html';
             const f = path.join(DIR, p);
             if (!f.startsWith(DIR) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; }
             let body = fs.readFileSync(f);
@@ -210,6 +211,21 @@ async function main() {
         await legacy.update('zoew-v900002');
         ok('ការផ្លាស់ ៖ មិនប្រើ chunk ក្រោម SW ថ្មី (ហាង Firebase) ➜ កំណែបន្ទាប់ឈប់ទាញ', !(await legacy.has()));
         await legacy.close();
+
+        console.log('\n── ៤. Deploy ថ្មីខណៈ SW ចាស់គ្រប់គ្រង ៖ chunk ឈ្មោះចាស់លែងមាន ➜ Netlify ឆ្លើយ index.html (200 · text/html) ──');
+        // ⛔ ថ្នាក់ ៖ ទ្វារ miss របស់ SW ដាក់ចម្លើយបណ្តាញចូល cache ក្រោម key របស់ asset ➜ HTML (SPA fallback) ក្លាយជា «chunk»
+        //    ➜ import() បរាជ័យ (MIME) រហូតដល់ SW ថ្មី · ហាង Firebase ដែលប្តូរ Config ទៅ Supabase ចំពេល deploy ជាប់ «Supabase មិនទាន់រួចរាល់»
+        const swap = await device('Deploy ថ្មី');
+        swap.state.gone = new Set([chunkPath]);
+        const htmlLoad = await swap.load();
+        const indexSize = fs.statSync(path.join(DIR, 'index.html')).size;
+        ok('ការវាស់ពិត ៖ server ឆ្លើយ index.html ជំនួស chunk ដែលលែងមាន (200 · ទំហំ index.html)', htmlLoad.status === 200 && htmlLoad.size === indexSize, htmlLoad);
+        ok('⛔ SW មិនដាក់ HTML ចូល cache ក្រោម key របស់ chunk', !(await swap.has()));
+        swap.state.gone = null;
+        const realLoad = await swap.load();
+        ok('ក្រោយ chunk មានវិញ ➜ ទទួល chunk ពិត (មិនមែន HTML ពី cache)', realLoad.status === 200 && realLoad.size === chunkSize, realLoad);
+        ok('ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា', await swap.has());
+        await swap.close();
     } finally {
         await browser.close();
     }

@@ -3062,6 +3062,18 @@
     },
     "zto-import/test.js": {
       "policy": "guard-1"
+    },
+    "ZoeW/src/app/behaviors/entry-search.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/tests/supabase-op-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ios-entry-search-tap.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-update-check.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

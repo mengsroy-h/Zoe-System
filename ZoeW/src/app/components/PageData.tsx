@@ -123,7 +123,7 @@ export function PageData() {
                         <input type="date" id="customDateInput" ref={refTo('customDateInput')} onChange={onAct("filterDataByCustomDate")} />
                     </div>
                 </div>
-                <div className="app-card">
+                <div className="app-card" ref={refTo('dataSearchCard')}>
                     <div className="card-header">
                         <div className="card-title">🔍 ស្វែងរកលេខទូរស័ព្ទអតិថិជន</div>
                     </div>

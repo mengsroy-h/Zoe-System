@@ -22,6 +22,7 @@ export const SB_DOCS_CACHE_LOAD_MAX_MS = 3000;
 export const SB_DOCS_CACHE_FIRST_SAVE_MS = 1500;
 export const SB_DOCS_CACHE_MIN_INTERVAL_MS = 30000;
 export const SB_OPS_PER_WRITE = 500;
+export const SB_OP_REPLAY_SAFE_MS = 24 * 60 * 60 * 1000;
 
 export class SbNetworkError extends Error {
     unsent: boolean;
@@ -1008,6 +1009,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     await waitForLink();
                     let res;
                     let lost = null;
+                    let lostAt = 0;
                     let lostAttempts = 0;
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
@@ -1036,6 +1038,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             scheduleRetry();
                             if (!lost && !e.unsent) {
                                 lost = disconnectError();
+                                lostAt = Date.now();
                                 txDisconnectResolving.set(outer, lost);
                             }
                             if (!closed) {
@@ -1059,7 +1062,24 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     }
                     if (res && res.conflict) {
                         if (lost) {
-                            lost.txOutcome = 'not-applied';
+                            if (elapsedSince(lostAt) <= SB_OP_REPLAY_SAFE_MS) {
+                                lost.txOutcome = 'not-applied';
+                                throw lost;
+                            }
+                            let witnessed = null;
+                            try {
+                                witnessed = typeof updateFn.txOutcomeWitness === 'function'
+                                    ? updateFn.txOutcomeWitness(exportVal(cloneCanonical(res.value === undefined ? null : res.value)), exportVal(cloneCanonical(base)))
+                                    : null;
+                            } catch (e) {
+                                witnessed = null;
+                            }
+                            if (witnessed === 'applied') {
+                                notify();
+                                return { committed: true, snapshot: new SbSnapshot(ref, cloneCanonical(next)), txOutcome: 'applied' };
+                            }
+                            lost.txOutcome = witnessed === 'not-applied' ? 'not-applied' : 'unknown';
+                            if (lost.txOutcome === 'unknown') hooks.onTxOutcomeUnknown(path);
                             throw lost;
                         }
                         base = res.value === undefined ? null : res.value;

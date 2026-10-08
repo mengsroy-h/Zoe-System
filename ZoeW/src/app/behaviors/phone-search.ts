@@ -3,6 +3,7 @@ import { applyPhoneSuggestion, hidePhoneSuggestions, searchByPhone, setPhoneSugg
 import { showAppChrome } from '../../ui/chrome-autohide';
 import { commitNow } from '../flush';
 import { elementOf, fieldValue, scrollChildIntoView } from '../refs';
+import { panelGlideFrom } from './panel-motion';
 import { syncHistoryExpandedLock } from './panels';
 
 export function scrollPhoneSuggestRowIntoView(index) {
@@ -47,8 +48,21 @@ export function setPhoneSearchPulledUp(on) {
     setTimeout(positionPhoneSuggestBox, 340);
 }
 
+export function glidePhoneSearchPulledUp(on) {
+    if (uiState.dataPanelSearchFocus === !!on) return;
+    commitNow();
+    const card = elementOf('dataSearchCard');
+    const main = elementOf('dataMainSection');
+    const cardTop = card ? card.getBoundingClientRect().top : NaN;
+    const mainTop = main ? main.getBoundingClientRect().top : NaN;
+    setPhoneSearchPulledUp(on);
+    commitNow();
+    panelGlideFrom(card, cardTop);
+    panelGlideFrom(main, mainTop);
+}
+
 export function phoneSearchFocused() {
-    setPhoneSearchPulledUp(true);
+    glidePhoneSearchPulledUp(true);
     showPhoneSuggestions();
 }
 
@@ -56,7 +70,7 @@ export function phoneSearchBlurred() {
     if (uiState.phoneSuggestHideTimer) clearTimeout(uiState.phoneSuggestHideTimer);
     uiState.phoneSuggestHideTimer = setTimeout(() => {
         hidePhoneSuggestions();
-        if (!fieldValue('searchPhoneInput').trim()) setPhoneSearchPulledUp(false);
+        if (!fieldValue('searchPhoneInput').trim()) glidePhoneSearchPulledUp(false);
     }, 150);
 }
 

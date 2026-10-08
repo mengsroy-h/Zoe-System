@@ -10,6 +10,7 @@ export const REF_NAMES = [
     'customerDataTableSearchInput',
     'customLockerInput',
     'dataMainSection',
+    'dataSearchCard',
     'dataSideSection',
     'deletedSearchInput',
     'editBcCodInput',

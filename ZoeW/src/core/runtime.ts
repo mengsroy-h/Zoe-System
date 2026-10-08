@@ -10,6 +10,7 @@ export const ACTION_ALLOWLIST = [
     "cancelPinSetupFlow",
     "cancelRestoreItem",
     "cancelScannedRemoval",
+    "checkForAppUpdate",
     "closeCameraManually",
     "closeConfigQrScanner",
     "closeEditBarcodeModal",

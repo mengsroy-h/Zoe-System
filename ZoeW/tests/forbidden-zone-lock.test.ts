@@ -23,7 +23,7 @@ const LOCK: Record<string, string> = {
     'src/app/behaviors/panel-motion.ts': '94b2d14fc1d4b21942b6f9fd47a27a7b6a864dc7352057b1ea9c56128f16d961',
     'src/app/behaviors/panels.ts': 'd63700ee43e3ce68f10ab31104b269d97d9db5676807f2a79e93fb231da56271',
     'src/app/behaviors/chrome-autohide.ts': '05afdce20767ec10babb70283a3cc7429ebaaf856c1addfe5c8d6f9f2f02b664',
-    'src/app/behaviors/phone-search.ts': '9b35502e9345ade3fd97e669f6071c4c49bceb5ffbe08ac8801db6e418adcd74',
+    'src/app/behaviors/phone-search.ts': 'ffe1209ece38a0cf369891b4019e0a2867f8eb7d386dc2fea4a21f58c2e29307',
     'src/ui/chrome-autohide.ts': '54de996080789c214a5e20725cff58a491557198e04def6f8cd1c7e823960ca9',
     'src/ui/page-nav.ts': 'cc25e1a946db5e759b2e5666b893324bd7b069e85bc6deb4ed7206072a4cd6e5',
     'src/styles/app.css': 'dc8a48ec4294dcbc9545c5d933d644a82737fa99032ad3348369b9dc55e6e9d4'

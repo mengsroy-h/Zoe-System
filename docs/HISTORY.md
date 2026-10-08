@@ -122,6 +122,41 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.16] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ claim barcode ក្រោយចម្លើយបាត់ · ចម្លើយ zoe_write ខូច · ចាកចេញពាក់កណ្តាលការទាញ · ប្តូរហាងក្នុងសម័យ** (Deep audit ២ · ជុំ ៣ · SUPABASE-2 · 5 · 4 · 3)
+
+**ZoeW `2.50.16`** (`zoew-v278` ➜ `zoew-v279`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ · ផ្លូវ Firebase មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧾 **SUPABASE-2 ៖ claim barcode ក្រោយចម្លើយបាត់ ➜ key កំព្រា** ៖ `claimBarcodeInRegistry()` ត្រឡប់ `unknown` លើ `txOutcome: 'applied'` (registry សរសេរ `true` ថេរ ➜ លើ Firebase ការអាន REST
+  មិនអាចបញ្ជាក់ថាជារបស់យើង)។ លើ Supabase adapter ផ្ញើ `op_id` ដដែលរហូតបានចម្លើយច្បាស់ ➜ `ok` = CAS **របស់យើង** អនុវត្តតែម្តង (replay ឬអនុវត្តលើកនេះ) — តែលទ្ធផលនៅតែ `unknown` ➜
+  ស្កេនត្រូវបដិសេធ ហើយ key `true` នៅ server គ្មានម្ចាស់ ➜ barcode នោះ «ស្ទួន» រហូត (ការដោះ key កំព្រាជាការងារដោយដៃ)។ ឥឡូវ adapter ភ្ជាប់ `txProven: true` លើ commit ក្រោយចម្លើយបាត់ ➜
+  registry ៖ `applied` + `txProven` ➜ `claimed` · `applied` គ្មានភស្តុតាង (Firebase) ➜ `unknown` ដដែល។
+- 📡 **SUPABASE-5 ៖ `zoe_write` ឆ្លើយ 2xx តែ body ទទេ · កាត់ · ឬអានមិនចប់** ៖ transport ត្រឡប់ `null` (body ទទេ) ឬ `bad_response` (JSON កាត់) ឬ `TypeError` (stream ដាច់) ➜ adapter
+  ចាត់ជាការបដិសេធចុងក្រោយ (`res.replayed` លើ `null` ➜ TypeError · «bad transaction response») ខណៈ server commit រួច ➜ ការសរសេរ «បរាជ័យ» (rollback · toast · ledger verdict `null`)។
+  ឥឡូវ ៖ body អានមិនបាន = `SbNetworkError` (transport · គ្រប់ការហៅ) · `zoe_write` 2xx ទទេ/មិនមែន JSON = `SbNetworkError` (adapter `rpc()`) ➜ `op_id` ដដែលផ្ញើម្តងទៀត ➜ server dedupe ➜ អនុវត្តតែម្តង។
+  ការហៅផ្សេង (`zoe_pull` · គណនី) រក្សា `bad_response` · ការបដិសេធ PostgREST ពិត (4xx · 500) នៅតែចុងក្រោយ។
+- 🚪 **SUPABASE-4 ៖ ចាកចេញពាក់កណ្តាលការទាញច្រើនទំព័រ** ៖ `resetForSignOut()` មិនបានលុប `pullStage` ➜ ចូលវិញជាមួយ docs cache ត្រឹមត្រូវ (cursor = head) ➜ ការទាញ delta ដំបូងសរសេរចូល stage ចាស់ ➜
+  swap ➜ ទិដ្ឋភាព = ទំព័រដែលបានអានមុនចាកចេញ (២/៩ កញ្ចប់) · ពណ៌បៃតង · cache រក្សាទុក ២។ ឥឡូវ `resetForSignOut()` លុប stage។
+- 🏪 **SUPABASE-3 ៖ គណនីប្តូរហាងក្នុងសម័យ** ៖ adapter ពិនិត្យ `tenant` តែទំព័រដំបូងក្រោយ cache ➜ ពេល `tenant_members` ត្រូវប្តូរទៅហាងផ្សេង (ដោយដៃ) ការទាញបន្ទាប់ជា delta លើ cursor ចាស់ ➜
+  ទិដ្ឋភាពលាយហាង A + B · cache ហាង B មានទិន្នន័យហាង A។ ឥឡូវ ការទាញដែលឆ្លើយ `tenant` ផ្សេងពី session ➜ លុបទិដ្ឋភាព · stage · cursor ហើយទាញពី ០ (ព្រំដែន `SB_PULL_MAX_RESTARTS`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី (មុខងារ SQL មិនប្រែ)។
+2. ហាង Supabase ៖ ស្កេន barcode ហើយបិទទិន្នន័យទូរស័ព្ទមួយភ្លែតចំពេល ⏳ ➜ បើកវិញ ➜ barcode ត្រូវរក្សាទុក (មិនមែន «ស្ទួន» ឬ «មិនអាចផ្ទៀងផ្ទាត់»)។
+3. ហាង Supabase ៖ ចាកចេញ ➜ ចូលវិញ ➜ ចំនួនកញ្ចប់ស្មើឧបករណ៍ផ្សេង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/registry-claim-proven.test.ts` (ថ្មី · ៤ · adapter ពិត + wrapper `withTransactionOutcomeResolution` ពិត + `claimBarcodeInRegistry` ពិត) ៖ ចម្លើយបាត់ក្រោយ commit ➜ `claimed` · ទិសផ្ទុយ ៖
+  សំណើបាត់ + ឧបករណ៍ផ្សេង claim ➜ មិន `claimed` · ធម្មតា/`taken` · `applied` គ្មានភស្តុតាង ➜ `unknown`។ មុនកែ FAIL ១/៤ · mutation ៖ adapter គ្មាន `txProven` ➜ FAIL ១ · registry ទទួល `applied` ទាំងអស់ ➜ FAIL ១។
+  `emu/supabase-adapter-parity` (Postgres ពិត) ៖ transaction ចម្លើយបាត់ ➜ `txProven === true`។
+- `ZoeW/tests/supabase-write-bad-body.test.ts` (ថ្មី · ៩ · transport ពិត + adapter ពិត) ៖ body ទទេ · JSON កាត់ · stream ដាច់ ក្រោយ commit ➜ `set` resolve · transaction `applied` · server សរសេរ ១ ·
+  transport stream ➜ `SbNetworkError` · ទិសផ្ទុយ ៖ JSON កាត់លើការហៅផ្សេង = `bad_response` · PostgREST 400 ➜ ចុងក្រោយ ១ ដង។ មុនកែ FAIL ៧/៩ · mutation (៣ ផ្នែក) ➜ FAIL ២ · ២ · ៣។
+- `ZoeW/tests/supabase-signout-stage.test.ts` (ថ្មី · ២) ៖ ចាកចេញពាក់កណ្តាលទំព័រ ២ ➜ ចូលវិញ ➜ ៩/៩ · cache ៩ · ទិសផ្ទុយ ៖ គ្មានចាកចេញ ➜ បន្ត stage ➜ ៩។ មុនកែ FAIL ១ (២/៩)។
+- `ZoeW/tests/supabase-tenant-switch.test.ts` (ថ្មី · ២) ៖ ហាង A ➜ B ➜ ទិដ្ឋភាព B តែប៉ុណ្ណោះ (៨) · cache B មានតែ B · ទិសផ្ទុយ ៖ ហាងដដែល ➜ delta (`p_since` = cursor)។ មុនកែ FAIL ១ (A + B)។
+
 ### [2.50.15] — 2026-10-08 · ZoeW ៖ **ការសម្អាតស្វ័យប្រវត្តិច្រើនជាង ២០០ កញ្ចប់ក្នុងពេលតែមួយ មិនបាត់កញ្ចប់ពេល App ត្រូវបិទពាក់កណ្តាល** (Deep audit ២ · ជុំ ២ · SCALE-1)
 
 **ZoeW `2.50.15`** (`zoew-v277` ➜ `zoew-v278`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
@@ -2085,6 +2120,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៣ (Supabase adapter ៖ SUPABASE-2 · 5 · 4 · 3) ➜ [2.50.16]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A5 | **SUPABASE-2** `claimBarcodeInRegistry()` `applied` ➜ `unknown` លើ Supabase ទោះ `op_id` បញ្ជាក់ | អ្នករក ៖ adapter ពិត ទម្លាក់ចម្លើយដំបូង ➜ `unknown` · key `true` គ្មានម្ចាស់ · Claude ៖ vitest adapter + wrapper + registry ពិត ➜ `unknown` | `txProven` ពី adapter ➜ `claimed` · Firebase ដដែល |
+| A6 | **SUPABASE-5** 2xx body ទទេ/កាត់/stream ➜ ការបដិសេធចុងក្រោយ | អ្នករក ៖ `applyWriteResult(null)` ➜ TypeError · Claude ៖ transport ពិត ៣ រូបរាង × set/transaction ➜ ៦ FAIL + transport ១ | body អានមិនបាន = `SbNetworkError` · `zoe_write` 2xx ទទេ/មិនមែន JSON = `SbNetworkError` |
+| A7 | **SUPABASE-4** `resetForSignOut()` មិនលុប `pullStage` | អ្នករក ៖ ចូលវិញជាមួយ cache ➜ ២/៩ · ready · cache ២ · Claude ៖ ដដែល | លុប stage ពេលចាកចេញ |
+| A8 | **SUPABASE-3** `tenant` ពិនិត្យតែក្រោយ cache | អ្នករក ៖ A ➜ B ➜ ទិដ្ឋភាព A១–៥ + B៦–៨ · cache B មាន A · Claude ៖ ដដែល | `tenant` ផ្សេង ➜ ទាញពី ០ |
+
+- ឫសរួម ៖ adapter ធ្លាប់ចាត់ «ចម្លើយមិនច្បាស់» ជា «ចម្លើយច្បាស់» (A5 ៖ ភស្តុតាងមានតែមិនបញ្ជូន · A6 ៖ ចម្លើយខូច = ការបដិសេធ) ហើយស្ថានភាព session មិនចងនឹងអ្វីដែលវាជា (A7 stage · A8 tenant)។
+- SUPABASE-1 (ចាកចេញមិនដល់ tab ផ្សេង) · SUPABASE-6 (`update()` > ៥០០ ផ្លូវ) នៅជុំក្រោយ។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ២ (SCALE-1 · journal សម្អាតទម្លាក់ entry ដែលកំពុងរស់) ➜ [2.50.15]
 

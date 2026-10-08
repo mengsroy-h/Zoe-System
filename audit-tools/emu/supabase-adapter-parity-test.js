@@ -391,7 +391,7 @@ async function scenario(api) {
         const txRes = await txP.then((r) => r, (e) => ({ error: e }));
         const txRow = (await rows('tx'))[0];
         check(!!pendingMark && pendingMark.message === 'disconnect', 'transaction ចម្លើយបាត់ ➜ ចុះក្នុង txDisconnectResolving (history-write ប្រើ)', pendingMark && pendingMark.message);
-        check(txRes.committed === true && txRes.txOutcome === 'applied' && txRow && txRow.value === 5, 'transaction ចម្លើយបាត់ ➜ committed · txOutcome applied · អនុវត្តម្តង', { txRes: txRes.committed, outcome: txRes.txOutcome, row: txRow });
+        check(txRes.committed === true && txRes.txOutcome === 'applied' && txRes.txProven === true && txRow && txRow.value === 5, 'transaction ចម្លើយបាត់ ➜ committed · txOutcome applied · txProven (op_id ដដែលបញ្ជាក់ថាជារបស់យើង) · អនុវត្តម្តង', { txRes: txRes.committed, outcome: txRes.txOutcome, proven: txRes.txProven, row: txRow });
         // ⛔ outcome ដែល *មិនទាន់ដឹង* មិនមែន *មិនអាចដឹង* ៖ `zoe_ops` រក្សាលទ្ធផល op_id ២ ថ្ងៃ ➜ adapter ផ្ញើ op_id ដដែលរហូតបានចម្លើយច្បាស់។
         //    មុនកែ ៖ បោះបង់ក្រោយ ៦០ វិ. ➜ `unknown` ➜ «ដក» ធ្វើឲ្យកញ្ចប់បាត់ · reconcile ដក ២ ដង (tx-outcome-test ផ្នែក ៤ឃ · ៦)
         // ⛔ ចម្លើយ replay គ្មានតម្លៃ doc ➜ adapter ទាញតម្លៃពិតក្រោយ replay (`requestSync()`) ➜ រង់ចាំទិដ្ឋភាពស្រស់ (`tx = 5`) ៖ សេណារីយ៉ូនេះវាស់ «ចម្លើយបាត់ + server ធ្លាក់យូរ»

@@ -1872,6 +1872,18 @@
     "ZoeW/tests/cleanup-journal-cap.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-write-bad-body.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-tenant-switch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-signout-stage.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-claim-proven.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/login-routing.test.tsx": {
       "policy": "zoew-self-verification"
     },

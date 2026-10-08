@@ -220,6 +220,7 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         expect(document.getElementById('notifyDrawer')!.className).toContain('open');
         expect(document.getElementById('drawerBackdrop')!.className).toContain('open');
         expect(isSideDrawerOpen()).toBe(true);
+        step(() => { document.getElementById('notifyExpiryHead')!.click(); });
         expect(document.getElementById('notifyExpiryList')!.children).toHaveLength(1);
         expect(document.getElementById('navNotifyBadge')!.textContent).toBe('3');
         expect(document.querySelector('.notify-new-tag')).toBeTruthy();
@@ -248,6 +249,7 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         dataState.scanHistory = [item('P1', Date.now() - ABANDON_AGE_MS + NOTIFY_HOUR_MS, [{ code: 'P', isClosed: false }])];
         mount(<><DrawerBackdrop /><NotifyDrawer /></>);
         step(() => { openNotifyDrawer(); });
+        step(() => { document.getElementById('notifyExpiryHead')!.click(); });
         const phone = dataState.scanHistory[0].phone;
         expect(document.getElementById('notifyDrawer')!.textContent).toContain(phone);
         step(() => { dataState.scanHistory = []; clearSensitiveModalFields(); });
@@ -333,6 +335,7 @@ describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរ
         dataState.deletedItems = [trashItem('R1', Date.now() - 3 * NOTIFY_HOUR_MS, [{ code: 'R', locker: 'L-9' }, { code: 'S' }])];
         mount(<><AppNavbar /><DrawerBackdrop /><SideDrawer /><NotifyDrawer /></>);
         step(() => { openNotifyDrawer(); });
+        step(() => { document.getElementById('notifyRemovedHead')!.click(); });
         const list = document.getElementById('notifyRemovedList')!;
         expect(list.children).toHaveLength(1);
         expect(list.textContent).toContain(dataState.deletedItems[0].phone);
@@ -352,6 +355,7 @@ describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរ
         dataState.deletedItems = [trashItem('Q1', Date.now() - NOTIFY_HOUR_MS, [{ code: 'Q' }])];
         mount(<><DrawerBackdrop /><NotifyDrawer /></>);
         step(() => { openNotifyDrawer(); });
+        step(() => { document.getElementById('notifyRemovedHead')!.click(); });
         const phone = dataState.deletedItems[0].phone;
         expect(document.getElementById('notifyDrawer')!.textContent).toContain(phone);
         step(() => { dataState.deletedItems = []; clearSensitiveModalFields(); });

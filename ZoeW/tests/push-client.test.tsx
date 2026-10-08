@@ -803,7 +803,7 @@ describe('🧹 សម្អាតការជូនដំណឹង', () => {
         vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ items: [] })));
         uiState.notifyFeed = [FILE_ITEM];
         uiState.notifySellerFeed = seller('ដំណឹងចាស់', 1790000000000);
-        uiState.notifyView = { measurable: true, emptyText: '', packages: 2, customers: 1, more: 0, rows: [{ key: 'r', phone: '012', locker: '', count: 2, hoursLeft: 3 }] };
+        uiState.notifyView = { measurable: true, emptyText: '', packages: 2, customers: 1, rows: [{ key: 'r', phone: '012', locker: '', count: 2, hoursLeft: 3 }] };
         mount(<><AppNavbar /><DrawerBackdrop /><NotifyDrawer /></>);
         expect(document.getElementById('navNotifyBadge')!.textContent).toBe('4');
         expect(document.getElementById('notifyFeedList')!.children).toHaveLength(2);
@@ -815,7 +815,8 @@ describe('🧹 សម្អាតការជូនដំណឹង', () => {
         expect(document.getElementById('notifyClearBtn')).toBeNull();
         expect(shown.every((n) => n.close.mock.calls.length === 1)).toBe(true);
         expect(document.getElementById('navNotifyBadge')!.textContent).toBe('2');
-        expect(document.getElementById('notifyExpiryList')!.children).toHaveLength(1);
+        expect(document.querySelector('#notifyExpiryHead .notify-group-count')!.textContent).toBe('2');
+        expect(uiState.notifyView!.rows).toHaveLength(1);
         expect(document.getElementById('notifyVersionSection')!.textContent).toContain('✅');
         uiState.notifyDismissedIds = [];
         loadNotifyDismissed();

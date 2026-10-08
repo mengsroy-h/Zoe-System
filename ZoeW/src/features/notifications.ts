@@ -1,6 +1,8 @@
+import { refreshDrawerGroups, toggleDrawerGroup } from '../core/actions';
 import { getServerNow } from '../core/clock';
 import { getZoneDateKey } from '../core/timezone';
 import { dataState, firebaseState, uiState } from '../core/state';
+import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE } from '../core/text';
 import { APP_VERSION } from '../core/version';
@@ -26,7 +28,6 @@ export interface NotifyView {
     packages: number;
     customers: number;
     rows: NotifyExpiryRow[];
-    more: number;
 }
 
 export interface NotifyRemovedRow {
@@ -45,7 +46,6 @@ export interface NotifyRemovedView {
     customers: number;
     unseen: number;
     rows: NotifyRemovedRow[];
-    more: number;
 }
 
 export interface NotifyFeedItem {
@@ -60,7 +60,6 @@ export interface NotifyFeedItem {
 
 export const NOTIFY_EXPIRY_HOURS_MAX = 24;
 export const NOTIFY_HOUR_MS = 60 * 60 * 1000;
-export const NOTIFY_EXPIRY_LIST_MAX = 60;
 export const NOTIFY_FEED_PATH = '/announcements.json';
 export const NOTIFY_FEED_TIMEOUT_MS = 8000;
 export const NOTIFY_FEED_MIN_GAP_MS = 60 * 1000;
@@ -80,10 +79,11 @@ export const NOTIFY_SELLER_ID_PREFIX = 'kg:';
 export const NOTIFY_SELLER_TITLE_MAX = 120;
 export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
 export const NOTIFY_REMOVED_REASON = 'expired';
-export const NOTIFY_REMOVED_LIST_MAX = 60;
 export const NOTIFY_REMOVED_SEEN_KEY = 'zoew_notify_removed_seen_v1';
 export const NOTIFY_REMOVED_SEEN_MAX = 300;
 export const NOTIFY_EMPTY_REMOVED_TEXT = 'គ្មានកញ្ចប់ដែលប្រព័ន្ធដកចេញព្រោះផុតកំណត់ក្នុងធុងសំរាមទេ';
+export const NOTIFY_GROUP_EXPIRY = 'notifyGroupExpiry';
+export const NOTIFY_GROUP_REMOVED = 'notifyGroupRemoved';
 
 export function hoursUntilAbandon(barcode, parentAt, now) {
     if (!barcode || barcode.isClosed) return -1;
@@ -177,8 +177,7 @@ export function nearExpiryView(history, now, stale): NotifyView {
         emptyText: stale ? VIEW_NOT_MEASURABLE_NOTICE : emptyViewMessage([DB_LISTENER_KEY_HISTORY], NOTIFY_EMPTY_EXPIRY_TEXT),
         packages: stale ? 0 : packages,
         customers: stale ? 0 : phones.size,
-        rows: stale ? [] : rows.slice(0, NOTIFY_EXPIRY_LIST_MAX),
-        more: stale ? 0 : Math.max(0, rows.length - NOTIFY_EXPIRY_LIST_MAX)
+        rows: stale ? [] : rows
     };
 }
 
@@ -223,8 +222,7 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
         packages: stale ? 0 : packages,
         customers: stale ? 0 : phones.size,
         unseen: stale ? 0 : unseen,
-        rows: stale ? [] : rows.slice(0, NOTIFY_REMOVED_LIST_MAX).map(({ at, ...row }) => row),
-        more: stale ? 0 : Math.max(0, rows.length - NOTIFY_REMOVED_LIST_MAX)
+        rows: stale ? [] : rows.map(({ at, ...row }) => row)
     };
 }
 
@@ -374,9 +372,18 @@ export function loadNotifyRemovedSeen() {
     uiState.notifyRemovedSeenIds = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(-NOTIFY_REMOVED_SEEN_MAX) : [];
 }
 
+export function notifyGroupIsOpen(group) {
+    return viewState.drawerGroupsOpen.indexOf(group) !== -1;
+}
+
+export function toggleNotifyGroup(group?) {
+    if (group === NOTIFY_GROUP_REMOVED && uiState.notifyDrawerOpen && notifyGroupIsOpen(group)) markNotifyRemovedSeen();
+    toggleDrawerGroup(group);
+}
+
 export function markNotifyRemovedSeen() {
     const view = uiState.notifyRemovedView;
-    if (!view || !view.measurable) return;
+    if (!view || !view.measurable || !notifyGroupIsOpen(NOTIFY_GROUP_REMOVED)) return;
     const fresh = view.rows.filter((row) => row.isNew).map((row) => row.key);
     if (!fresh.length) return;
     const merged = uiState.notifyRemovedSeenIds.filter((id) => fresh.indexOf(id) === -1).concat(fresh).slice(-NOTIFY_REMOVED_SEEN_MAX);
@@ -485,6 +492,7 @@ export function clearAppBadge() {
 
 export function openNotifyDrawer() {
     uiState.drawerOpen = false;
+    refreshDrawerGroups();
     refreshNotifyView();
     uiState.notifyDrawerOpen = true;
     clearAppBadge();

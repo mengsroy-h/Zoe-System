@@ -277,11 +277,41 @@ async function notifyRowLayout(browser, port) {
     check(ready, 'ZoeW ជួរ 🔔 ៖ មាន uiState (audit build)');
     if (!ready) { await ctx.close(); return; }
     const LOCKER = 'ទូ A-12 · ជាន់ទី ៣ · ច្រកខាងឆ្វេង';
-    await page.evaluate((locker) => {
+    const ROWS = 50;
+    await page.evaluate(({ locker, n }) => {
         const rows = [{ key: 'r1', phone: '0961234567', locker, count: 12, isNew: true, hoursAgo: 3 }];
-        window.uiState.notifyRemovedView = { measurable: true, emptyText: '', packages: 12, customers: 1, unseen: 12, rows, more: 0 };
+        for (let i = 1; i < n; i++) rows.push({ key: 'r' + (i + 1), phone: '09700' + String(10000 + i), locker: 'B-' + i, count: 1, isNew: false, hoursAgo: 4 + i });
+        window.uiState.notifyRemovedView = { measurable: true, emptyText: '', packages: 11 + n, customers: n, unseen: 12, rows };
         window.uiState.notifyDrawerOpen = true;
-    }, LOCKER);
+    }, { locker: LOCKER, n: ROWS });
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ «📤 កញ្ចប់ដែលដករួច» ជាក្រុមពន្លាដូច category ក្នុង ☰ ៖ បិទជាលំនាំដើម · ក្បាល (រូប · ឈ្មោះ · ចំនួន · «ថ្មី» · ព្រួញ)
+    //    មិនលើស ហើយមិនគាបឈ្មោះលើទូរស័ព្ទ ៣២០ · ៤១២ · ចុចពន្លា ➜ បញ្ជីទំព័រ ២០ · រមូរ `.drawer-body` (ធាតុដែលរមូរពិត) ដល់ចុង ➜ ទាញទំព័របន្ទាប់។
+    const heads = [];
+    for (const w of [320, 412]) {
+        await page.setViewportSize({ width: w, height: 900 });
+        await page.waitForTimeout(300);
+        heads.push(await page.evaluate(() => {
+            const h = document.getElementById('notifyRemovedHead');
+            const d = document.getElementById('notifyDrawer');
+            if (!h || !d) return null;
+            const label = h.querySelector('.drawer-group-label');
+            const count = h.querySelector('.notify-group-count');
+            const tag = h.querySelector('.notify-new-tag');
+            const hr = h.getBoundingClientRect(), dr = d.getBoundingClientRect();
+            return { w: window.innerWidth, expanded: h.getAttribute('aria-expanded'), list: !!document.getElementById('notifyRemovedList'),
+                count: count ? count.textContent : null, tag: tag ? tag.textContent : null, countW: count ? count.getBoundingClientRect().width : 0,
+                labelW: label ? label.getBoundingClientRect().width : 0, labelCut: label ? label.scrollWidth > label.clientWidth + 1 : true,
+                headCut: h.scrollWidth > h.clientWidth + 1, inside: hr.left >= dr.left - 1 && hr.right <= dr.right + 1, headW: hr.width };
+        }));
+    }
+    check(heads.every((x) => x && x.expanded === 'false' && !x.list),
+        '⛔ ZoeW ក្រុម 🔔 ៖ «កញ្ចប់ដែលដករួច» បិទជាលំនាំដើម (aria-expanded=false · គ្មានបញ្ជី)', JSON.stringify(heads));
+    check(heads.every((x) => x && x.count === String(11 + ROWS) && x.tag && x.countW >= 16),
+        'ZoeW ក្រុម 🔔 ៖ ក្បាលបង្ហាញចំនួនកញ្ចប់ និង «ថ្មី»', JSON.stringify(heads));
+    check(heads.every((x) => x && !x.headCut && x.inside && !x.labelCut && x.labelW >= x.headW * 0.3),
+        '⛔ ZoeW ក្រុម 🔔 ៖ ក្បាលមិនលើសផ្ទាំង · ឈ្មោះក្រុមមិនកាត់ ឬគាបតូច (៣២០ · ៤១២)', JSON.stringify(heads));
+    if (await page.$('#notifyRemovedHead')) await page.click('#notifyRemovedHead');
+    await page.waitForTimeout(300);
     const seen = [];
     for (const w of [320, 412]) {
         await page.setViewportSize({ width: w, height: 900 });
@@ -302,6 +332,16 @@ async function notifyRowLayout(browser, port) {
     check(seen.every((s) => s && s.metaW >= s.rowW * 0.4),
         '⛔ ZoeW ជួរ 🔔 ៖ ព័ត៌មាន (ចំនួន · Locker) មិនត្រូវគាបតូច (≥ ៤០% នៃជួរ ៖ បត់ចុះបន្ទាត់ថ្មីពេលមិនគ្រប់)', JSON.stringify(seen));
     check(seen.every((s) => s && s.rowInside), 'ZoeW ជួរ 🔔 ៖ ជួរនៅក្នុងផ្ទាំង (មិនលើស)', JSON.stringify(seen));
+    await page.setViewportSize({ width: 412, height: 700 });
+    await page.waitForTimeout(500);
+    const rowsNow = () => page.evaluate(() => document.querySelectorAll('#notifyRemovedList .notify-expiry-row').length);
+    const first = await rowsNow();
+    await page.evaluate(() => { const m = document.querySelector('#notifyDrawer .notify-page-more'); if (m) m.scrollIntoView({ block: 'end' }); });
+    await page.waitForTimeout(600);
+    const second = await rowsNow();
+    check(first === 20 && second === 40,
+        '⛔ ZoeW ក្រុម 🔔 ៖ ពន្លា ➜ ២០ ជួរ · រមូរ `.drawer-body` ដល់ចុងបញ្ជី ➜ ៤០ (sentinel សង្កេតធាតុដែលរមូរពិត · មិនទាញគ្រប់ទំព័រភ្លាម)',
+        JSON.stringify({ first, second, total: ROWS }));
     // ⛔ សំណើម្ចាស់គម្រោង ៖ ផ្ទាំង 🔔 លើកុំព្យូទ័រ (≥ 992px) ធំជាងទូរស័ព្ទបន្តិច · ទូរស័ព្ទ និង ☰ មិនប្រែ
     const widths = [];
     for (const w of [412, 1280]) {

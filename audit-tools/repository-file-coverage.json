@@ -1176,6 +1176,9 @@
     "ZoeW/src/app/components/DrawerBackdrop.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/DrawerGroup.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/GlobalMoreMenu.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1879,6 +1882,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zone-format-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-groups.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notify-apk-link.test.tsx": {

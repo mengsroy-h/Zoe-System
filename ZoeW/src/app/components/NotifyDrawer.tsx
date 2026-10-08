@@ -1,10 +1,12 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, apkDownloadUrl, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_GROUP_EXPIRY, NOTIFY_GROUP_REMOVED, apkDownloadUrl, newerAppVersion, visibleNotifyFeed, type NotifyExpiryRow, type NotifyFeedItem, type NotifyRemovedRow, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
+import { DrawerGroup } from './DrawerGroup';
 
 const KIND_ICON: Record<string, string> = { update: '🆕', maintenance: '🛠️', notice: '📢' };
 
@@ -40,35 +42,88 @@ function PushSection({ status }: { status: PushStatus }) {
     );
 }
 
+export const NOTIFY_PAGE_ROWS = 20;
+
+function NotifyPageMore({ remaining, onMore }: { remaining: number; onMore: () => void }) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof IntersectionObserver !== 'function') return;
+        let fired = false;
+        const io = new IntersectionObserver((entries) => {
+            if (fired || !entries.some((e) => e.isIntersecting)) return;
+            fired = true;
+            onMore();
+        }, { root: el.closest('.drawer-body'), rootMargin: '0px 0px 240px 0px' });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [remaining, onMore]);
+    return (
+        <div className="notify-page-more" ref={ref}>
+            <button type="button" className="btn-sm notify-page-more-btn" onClick={onMore}>⬇️ បង្ហាញ {remaining} ទៀត</button>
+        </div>
+    );
+}
+
+function NotifyPagedList<T extends { key: string }>({ id, rows, renderRow }: { id: string; rows: T[]; renderRow: (row: T) => ReactNode }) {
+    const [limit, setLimit] = useState(NOTIFY_PAGE_ROWS);
+    const more = useCallback(() => setLimit((n) => n + NOTIFY_PAGE_ROWS), []);
+    const shown = rows.slice(0, limit);
+    const remaining = rows.length - shown.length;
+    return (
+        <>
+            <ul className="notify-expiry-list" id={id}>
+                {shown.map((row) => <li key={row.key} className="notify-expiry-row">{renderRow(row)}</li>)}
+            </ul>
+            {remaining > 0 ? <NotifyPageMore remaining={remaining} onMore={more} /> : null}
+        </>
+    );
+}
+
+function NotifyGroupCount({ view }: { view: { measurable: boolean; packages: number } | null }) {
+    const measurable = !!(view && view.measurable);
+    const packages = measurable && view ? view.packages : 0;
+    return <span className={packages > 0 ? 'notify-group-count is-warn' : 'notify-group-count'}>{measurable ? String(packages) : '—'}</span>;
+}
+
+function expiryRow(row: NotifyExpiryRow) {
+    return (
+        <>
+            <span className="notify-expiry-phone">{row.phone || '—'}</span>
+            <span className="notify-expiry-meta">
+                {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+            </span>
+            <span className={row.hoursLeft <= 0 ? 'notify-expiry-left is-due' : 'notify-expiry-left'}>{hoursText(row.hoursLeft)}</span>
+        </>
+    );
+}
+
 function ExpirySection({ view }: { view: NotifyView | null }) {
     const measurable = !!(view && view.measurable);
-    const rows = measurable && view ? view.rows : [];
     return (
-        <section className="notify-section" id="notifyExpirySection">
-            <div className="notify-section-title">📦 កញ្ចប់ជិតផុតកំណត់</div>
+        <DrawerGroup
+            id={NOTIFY_GROUP_EXPIRY}
+            headId="notifyExpiryHead"
+            bodyId="notifyExpirySection"
+            icon="📦"
+            label="កញ្ចប់ជិតផុតកំណត់"
+            className="notify-group"
+            action="toggleNotifyGroup"
+            lazy
+            extra={<NotifyGroupCount view={view} />}
+        >
             {measurable && view && view.packages > 0 ? (
                 <>
                     <div className="notify-summary is-warn" id="notifyExpirySummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
                         {' '}នឹងផុតកំណត់ក្នុង {NOTIFY_EXPIRY_HOURS_MAX} ម៉ោងខាងមុខ ➜ ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ (ដកលុយ) បើមិនទាន់យក
                     </div>
-                    <ul className="notify-expiry-list" id="notifyExpiryList">
-                        {rows.map((row) => (
-                            <li key={row.key} className="notify-expiry-row">
-                                <span className="notify-expiry-phone">{row.phone || '—'}</span>
-                                <span className="notify-expiry-meta">
-                                    {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
-                                </span>
-                                <span className={row.hoursLeft <= 0 ? 'notify-expiry-left is-due' : 'notify-expiry-left'}>{hoursText(row.hoursLeft)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    {view.more > 0 ? <div className="notify-more">… និង {view.more} ជួរទៀត</div> : null}
+                    <NotifyPagedList id="notifyExpiryList" rows={view.rows} renderRow={expiryRow} />
                 </>
             ) : (
                 <div className="notify-summary" id="notifyExpirySummary">{view ? view.emptyText : '⏳ កំពុងរៀបចំ…'}</div>
             )}
-        </section>
+        </DrawerGroup>
     );
 }
 
@@ -77,38 +132,48 @@ function removedAgoText(h: number): string {
     return h < 1 ? 'ទើបដក' : 'ដកមុន ' + h + ' ម៉ោង';
 }
 
+function removedRow(row: NotifyRemovedRow) {
+    return (
+        <>
+            <span className="notify-expiry-phone">{row.phone || '—'}</span>
+            <span className="notify-expiry-meta">
+                {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+            </span>
+            <span className="notify-expiry-left">
+                {removedAgoText(row.hoursAgo)}
+                {row.isNew ? <span className="notify-new-tag">ថ្មី</span> : null}
+            </span>
+        </>
+    );
+}
+
 function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
     const measurable = !!(view && view.measurable);
-    const rows = measurable && view ? view.rows : [];
+    const unseen = measurable && view ? view.unseen : 0;
     return (
-        <section className="notify-section" id="notifyRemovedSection">
-            <div className="notify-section-title">📤 កញ្ចប់ដែលដករួច</div>
+        <DrawerGroup
+            id={NOTIFY_GROUP_REMOVED}
+            headId="notifyRemovedHead"
+            bodyId="notifyRemovedSection"
+            icon="📤"
+            label="កញ្ចប់ដែលដករួច"
+            className="notify-group"
+            action="toggleNotifyGroup"
+            lazy
+            extra={<><NotifyGroupCount view={view} />{unseen > 0 ? <span className="notify-new-tag">ថ្មី {unseen}</span> : null}</>}
+        >
             {measurable && view && view.packages > 0 ? (
                 <>
                     <div className="notify-summary is-warn" id="notifyRemovedSummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
                         {' '}ផុតកំណត់ ➜ ប្រព័ន្ធដកចេញ និងដកលុយ ➜ យកចេញពីទូ ហើយប្រគល់ត្រឡប់ · ស្តារវិញបានពី 🗑️ ធុងសំរាម
                     </div>
-                    <ul className="notify-expiry-list" id="notifyRemovedList">
-                        {rows.map((row) => (
-                            <li key={row.key} className="notify-expiry-row">
-                                <span className="notify-expiry-phone">{row.phone || '—'}</span>
-                                <span className="notify-expiry-meta">
-                                    {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
-                                </span>
-                                <span className="notify-expiry-left">
-                                    {removedAgoText(row.hoursAgo)}
-                                    {row.isNew ? <span className="notify-new-tag">ថ្មី</span> : null}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                    {view.more > 0 ? <div className="notify-more">… និង {view.more} ជួរទៀត</div> : null}
+                    <NotifyPagedList id="notifyRemovedList" rows={view.rows} renderRow={removedRow} />
                 </>
             ) : (
                 <div className="notify-summary" id="notifyRemovedSummary">{view ? view.emptyText : '⏳ កំពុងរៀបចំ…'}</div>
             )}
-        </section>
+        </DrawerGroup>
     );
 }
 

@@ -1,50 +1,8 @@
-import type { ReactNode } from 'react';
 import { firebaseState, uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
 import { onAct } from '../actions';
 import { useStoreFields, useStoreValue } from '../hooks/useStore';
-
-interface DrawerGroupProps {
-    id: string;
-    headId: string;
-    bodyId: string;
-    icon: string;
-    label: string;
-    children: ReactNode;
-}
-
-function DrawerGroup({ id, headId, bodyId, icon, label, children }: DrawerGroupProps) {
-    const v = useStoreFields(viewState, ['drawerGroupsOpen', 'drawerGroupsHidden']);
-    const hidden = v.drawerGroupsHidden.indexOf(id) !== -1;
-    const open = v.drawerGroupsOpen.indexOf(id) !== -1;
-    let className = 'drawer-group';
-    if (hidden) className += ' hidden';
-    if (open) className += ' is-open';
-    return (
-        <section className={className} id={id}>
-            <button
-                type="button"
-                className="drawer-group-head"
-                id={headId}
-                aria-expanded={open ? 'true' : 'false'}
-                aria-controls={bodyId}
-                onClick={onAct("toggleDrawerGroup", { args: [id] })}
-            >
-                <span className="ico">{icon}</span>
-                <span className="drawer-group-label">{label}</span>
-                <span className="drawer-group-arrow" aria-hidden="true">↓</span>
-            </button>
-            <div
-                className="drawer-group-body"
-                id={bodyId}
-                role="group"
-                aria-labelledby={headId}
-            >
-                {children}
-            </div>
-        </section>
-    );
-}
+import { DrawerGroup } from './DrawerGroup';
 
 interface DrawerToggleProps {
     id: string;

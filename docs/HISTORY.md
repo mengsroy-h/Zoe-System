@@ -87,7 +87,11 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច (2026-10-08) · ⏳ migration Supabase `20261008023215_zoe_rules.sql` ចូលតាម merge ➜ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
+- ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
+- 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
+  ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
+  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla)។
 - ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
@@ -122,6 +126,72 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.25] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ «យករួច» ពីបញ្ជី ZTO របស់អតិថិជនដដែល ថ្ងៃដដែល នៅក្នុងជួរតែមួយ** (Deep audit ២ · ជុំ ១១ · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង ៖ បញ្ចូលគ្នា)
+
+**ZoeW `2.50.25`** (`zoew-v287` ➜ `zoew-v288`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ឯកសារ `LOCK` (តំបន់ ZTO) មិនប្រែ (ការកែនៅ `src/features/scan-action.ts`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📦 **ZTO-4** ៖ `addOrUpdateEntry()` រំលងការរកជួរពេល `closedAtMs > 0` (`!bornClosed`) ➜ ការនាំចូលបញ្ជី ZTO បង្កើតមួយជួរក្នុងមួយកញ្ចប់ «យករួច» សូម្បីអតិថិជនដដែល ថ្ងៃដដែល (ផ្ទុយច្បាប់ «មួយជួរ = អតិថិជនម្នាក់ក្នុងមួយថ្ងៃ»)។
+  ឥឡូវ ៖ ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល (barcode នីមួយៗរក្សា `closedAt` ខ្លួន ➜ ច្បាប់ ២ ម៉ោងដើរតាម barcode ដដែល) · `isClosed` ជួរដេរីវេពី barcode ទាំងអស់
+  (server បើកជួរវិញ ➜ មិនបិទក្លែង) · `closedAt` ជួរ = ថ្មីបំផុត · ជួរបើកនៅបញ្ចូលចូលជួរបើកដូចដើម · «គ្មានលេខ» មិនបញ្ចូល។ ចំណូល/ចំនួនមិនប្រែ (ledger ១ ក្នុងមួយកញ្ចប់ដដែល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ «📥 ទាញបញ្ជីកញ្ចប់ពី ZTO» ដែលមានកញ្ចប់ «យករួច» ច្រើនរបស់អតិថិជនដដែលក្នុងថ្ងៃដដែល ➜ «➕ បញ្ចូល» ➜ ប្រវត្តិមានជួរតែមួយ (ចំនួន = កញ្ចប់) · ក្រោយ ២ ម៉ោង ➜ ចូលធុងសំរាម «យករួច» · ចំណូលថ្ងៃកើនតែម្តងក្នុងមួយកញ្ចប់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-born-closed-merge.test.ts` (ថ្មី · ៤ · store ក្លែង + `addOrUpdateEntry` ពិត) ៖ មុនកែ FAIL ២/៤ (២ ជួរ · server បើកវិញ ➜ ជួរថ្មី) ➜ ៤/៤ · ទិសផ្ទុយ (ជួរបើក · អតិថិជនផ្សេង · «គ្មានលេខ» · ថ្ងៃផ្សេង) ឆ្លងទាំងពីរ tree ·
+  តេស្ត ZTO ផ្សេង (`zto-signed-sync` · `zto-import-lanes` · `zto-signed-only-purge` · `merge-into-deleted-item` · `lookup-late-answer-busy`) ៦២/៦២។
+
+### [2.50.24] — 2026-10-08 · ZoeW ៖ **ចូលដោយក្រយៅដៃ ឬមុខ (web) ការពារ PIN ដោយ WebAuthn PRF តែប៉ុណ្ណោះ** (Deep audit ២ · ជុំ ១០ · SECURITY-1 · ការសម្រេចម្ចាស់គម្រោង ៖ PRF-only)
+
+**ZoeW `2.50.24`** (`zoew-v286` ➜ `zoew-v287`) · ⛔ ZoeKeyGen មិនប្រែ (PRF-only រួចហើយ) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-1 ៖ របៀប `device` ទុកសោក្បែរ PIN ដែលរុំ** ៖ ឧបករណ៍គ្មាន PRF ធ្លាក់ចូលរបៀប `device` ដែលទុក `wrapKey` (សោ AES ឆៅ) ក្បែរ `wrapped` ក្នុង localStorage ➜ អ្នកដែលចម្លង storage បាន
+  (កុំព្យូទ័ររួម · extension · backup) ឌិគ្រីប PIN បានដោយគ្មានស្នាមម្រាមដៃ — `navigator.credentials.get()` ជាទ្វារ UI តែប៉ុណ្ណោះ។ ឥឡូវ ៖ web ចងតែពេល PRF ផ្តល់សោពីឧបករណ៍ · គ្មាន PRF ➜ មិនចង
+  («… មិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស») · record `device` ចាស់ ➜ `initBiometricUi()` លុបចេញពី storage ហើយប្រាប់ម្តង (វាយ PIN រួចបើកម្តងទៀត) ·
+  `readBiometricRecord()` មិនទទួល `device` · `biometricUnlockPin()` មិនមានផ្លូវ `wrapKey` ទៀត។ APK (native) មិនប្រែ។
+- ⚠️ ឧបករណ៍ web ដែលគ្មាន PRF (Safari មុន iOS 18 · កម្មវិធីរុករកចាស់) ➜ ប្រើ PIN។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ iPhone PWA (iOS 18+) · Android Chrome ➜ ☰ ➜ «ចូលដោយក្រយៅដៃ ឬមុខ» ➜ វាយ PIN ➜ ស្កេន ➜ «✅ បើករួច!» ➜ ចាក់សោ App ➜ ដោះដោយក្រយៅដៃ/មុខ ·
+   ឧបករណ៍ដែលធ្លាប់បើកក្នុងរបៀប device ➜ បើក App ➜ សារ «⚠️ ការចូលដោយក្រយៅដៃ ឬមុខត្រូវបិទ …» ម្តង ➜ បើកម្តងទៀត (ឬប្រើ PIN បើឧបករណ៍មិនគាំទ្រ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-no-device-mode.test.tsx` (ថ្មី · ៤) ៖ មុនកែ FAIL ៣/៤ (record `device` + `wrapKey` ក្នុង storage · record ចាស់នៅបើក · `wrapKey` ពិតដោះ PIN) ➜ ៤/៤ · ទិសផ្ទុយ PRF ឆ្លងទាំងពីរ tree។
+- `biometric-unlock-test` ៖ ផ្នែក «គ្មាន PRF» ចាក់សោឥរិយាបថថ្មី (គ្មាន record · គ្មាន `wrapKey` · សារ PRF/PIN) · record `device` ដែលមាន `wrapKey` ➜ បិទ · ៥៣/៥៣។
+
+### [2.50.23] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **Sentry ៖ secret របស់ Push និងស្នាមម្រាមដៃមិនចេញ · event មានកំណែ App និងព័ត៌មានកំហុស** (Deep audit ២ · ជុំ ៩ · SECURITY-2 · SENTRY-3)
+
+**ZoeW `2.50.23`** (`zoew-v285` ➜ `zoew-v286`) · **ZoeKeyGen `2.24.7`** (`zoekeygen-v117` ➜ `zoekeygen-v118`) · `error-reporting.js` ដូចគ្នា byte-for-byte ទាំងពីរ App · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-2 ៖ secret ក្នុងវត្ថុរអិលទៅ Sentry** ៖ `SECRET_KEY_PATTERN` (កូនសោវត្ថុ) ខ្វះ `auth` · `wrap_key` · `wrapped` · `p256dh` ➜ subscription Web Push (`keys.p256dh` · `keys.auth`) និង record biometric
+  (`wrapKey` ក្បែរ `wrapped` ៖ PIN ទទួលបានវិញ) ចេញទៅ Sentry ពេលភ្ជាប់ជាវត្ថុ (breadcrumb `console` · extra)។ ឥឡូវ ៖ ពាក្យទាំង ៤ ក្នុងបញ្ជីកូនសោ · `p256dh` · `wrapped` ក្នុងបញ្ជីខ្សែអក្សរ (`auth` មានរួច)។
+  ⚠️ ពាក្យ `auth` ជា token ➜ កូនសោដូច `authGeneration` · `authDomain` ក៏ត្រូវលាក់ (គ្មាន `ZoeErrors.capture` ណាផ្ញើវា) · `author` · `mode` · `keyId` នៅមើលឃើញ។
+- 🏷️ **SENTRY-3 ៖ event គ្មាន release · វាលរបស់ Error បាត់** ៖ `ZoeErrors.init('zoew')` / `init('zoekeygen')` គ្មាន release ➜ Sentry មិនបែងចែកកំណែ។ ឥឡូវ `zoew@<APP_VERSION>` · `zoekeygen@<APP_VERSION>`
+  (ការហៅទាំង ៤)។ វាល primitive របស់ Error ក្នុង allowlist (`lookupCode` · `lookupReason` · `listReason` · `txOutcome` · `txServerUnread` · `txProven` · `code` · `status` · `httpStatus` · `noRetry` · `notConfigured` · `unsent` · `stage` ·
+  ខ្សែអក្សរ ≤ ២០០) ទៅ `extra.errorFields` (ឆ្លង redaction ដដែល) · វាលផ្សេង និងវត្ថុមិនផ្ញើ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** និង **ZoeKeyGen** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. Sentry ៖ event ក្រោយ Deploy មាន release `zoew@2.50.23` / `zoekeygen@2.24.7` · event «Transaction outcome unknown» មាន `errorFields.txOutcome` · (ជម្រើស) Sentry ➜ Settings ➜ Releases ៖ issue ចាស់ «Resolve in next release»។
+
+#### អ្នកយាម
+
+- `secret-hygiene` ចន្លោះ ១ឃ (ថ្មី · ឈ្មោះដេរីវេពីកូដពិត ៖ `keys: { … }` របស់ push · `rec.*` ចូល `unwrapPinWithRawKey()`) ៖ មុនកែ FAIL ១៣ ➜ ២៤២/២៤២។
+- `sentry-load-race-test` (ការហៅ `ZoeErrors.init(` ដេរីវេពីកូដ ship ទាំងពីរ App + វាយតម្លៃ argument ក្នុង vm · `errorFields` លើ `error-reporting.js` ពិតក្នុង browser) ៖ មុនកែ FAIL ៧ ➜ ៣៥/៣៥។
 
 ### [2.50.22] — 2026-10-08 · ZoeW ៖ **ចំណូលថ្ងៃ/ខែមិនរាប់ពីរដង ពេលបណ្តាញដាច់ចំពេលរក្សាទុក ខណៈឧបករណ៍ផ្សេងសរសេរចំណូលដដែល** (Deep audit ២ · MONEY-4 · PR ដាច់ · សំណើម្ចាស់គម្រោង)
 
@@ -2278,6 +2348,26 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១០–១១ (SECURITY-1 · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង) ➜ [2.50.24]–[2.50.25]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A18 | **SECURITY-1** biometric `device` ទុក `wrapKey` ក្បែរ `wrapped` | Claude ៖ `enrollBiometricRecord()` ពិតលើ WebAuthn គ្មាន PRF ➜ `{ mode: 'device', wrapKey, wrapped }` ក្នុង localStorage · `wrapKey` + `wrapped` ពិតក្នុង storage ➜ `biometricUnlockPin()` ឲ្យ PIN · FAIL ៣/៤ | PRF-only · លុប record ចាស់ពេលបើក App |
+| A19 | **ZTO-4** ជួរ born-closed មិនបញ្ចូលគ្នា (`!bornClosed`) | Claude ៖ `addOrUpdateEntry()` ពិត ២ ដង (អតិថិជនដដែល ថ្ងៃដដែល · `closedAtMs > 0`) ➜ ២ ជួរ · FAIL ២/៤ | បញ្ចូលចូលជួរបិទ · `isClosed` ដេរីវេពី barcode |
+
+- run-all STRICT ក្នុង session លើ `72081c8` ៖ ១៩៩/២០៣ ➜ checker ៤ នៅជាប់ឥរិយាបថចាស់ (មិនមែនកំហុស App) ៖ `concurrent-scan-test` sandbox ខ្វះ `applyBarcodeCloseState` (ZTO-4 ប្រើវាក្នុង merge) ·
+  `secret-hygiene` ចន្លោះ ១ឃ ដេរីវេ `wrapKey` ពីកូដ device ដែល SECURITY-1 ដក ➜ ជាន់ ៣ (p256dh · auth · wrapped) · វត្ថុ record ចាស់នៅវាស់ `wrapKey` · `app-lock-test` ផ្នែក ១១ ដាក់ record `device` ជា «ចងរួច» ➜ record `prf` ·
+  `zoew-suite` `npm run parity` ៖ អត្ថបទ ២ ដែល SECURITY-1 ដក ➜ `REMOVED_STRINGS` (`intentional-removals.mjs`) ➜ ទាំង ៤ ឆ្លង (២៣/២៣ · ២៣៨ · ១៦២ · parity ៧៦៦/៧៦៦)។
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៩ (SECURITY-2 · SENTRY-3) ➜ [2.50.23]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A16 | **SECURITY-2** `SECRET_KEY_PATTERN` ខ្វះ `auth` · `wrap_key` · `wrapped` · `p256dh` | Claude ៖ `redactEvent()` ពិត លើ `{ sub: { keys: { p256dh, auth } } }` · `{ rec: { wrapKey, wrapped: { iv, data } } }` ➜ តម្លៃទាំងអស់ចេញ · ខ្សែអក្សរ `p256dh=` · `wrapped=` ចេញ ➜ FAIL ១៣ | ពាក្យ ៤ ក្នុងបញ្ជីកូនសោ · ២ ក្នុងបញ្ជីខ្សែអក្សរ |
+| A17 | **SENTRY-3** `ZoeErrors.init()` គ្មាន release · វាល Error (`txOutcome` …) មិនទៅ Sentry | Claude ៖ ការហៅ ៤ (ZoeW ២ · ZoeKeyGen ២) គ្មាន argument ទី ២ · SDK ក្លែង ៖ `extra` គ្មានវាល Error ➜ FAIL ៧ | release `<app>@<APP_VERSION>` · `extra.errorFields` (allowlist) |
+
+- run-all STRICT លើ `7b7dedd` (tree ដែល merge ជា PR #298) ៖ **២០៣/២០៣** (លើកទី ១ ៖ ២០០/២០៣ ➜ `emu/restore-mutation` sandbox ខ្វះ `LEDGER_OP_RING_MAX` · `zoew-suite`/`zoew-parity` ៖ clone shallow ➜ `original:fetch` ធ្លាក់ ➜ `git fetch --unshallow`)។
 
 ### 2026-10-08 — Deep audit ២ ៖ MONEY-4 (ring `ops` ក្នុង ledger · PR ដាច់) ➜ [2.50.22]
 

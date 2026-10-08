@@ -1,5 +1,6 @@
 import { scanState, uiState } from '../../core/state';
 import { renderAppVersionLabels } from '../../core/actions';
+import { APP_VERSION } from '../../core/version';
 import { elapsedSince } from '../../core/elapsed';
 import { safeFocusScanner } from '../../core/timezone';
 import { resumeInterruptedCleanups, runScheduledCleanup } from '../../domain/cleanup';
@@ -106,7 +107,7 @@ function registerServiceWorker(scope: LifecycleScope): void {
 
 function startCoreServices(): void {
     oncePerPage('core-services', () => {
-        if (window.ZoeErrors) ZoeErrors.init('zoew');
+        if (window.ZoeErrors) ZoeErrors.init('zoew', 'zoew@' + APP_VERSION);
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();

@@ -235,8 +235,8 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
     const timeString = `${timeFormatted} (${dateString})`;
 
     let existingIndex = -1;
-    if (phone !== "គ្មានលេខ" && !bornClosed) {
-        existingIndex = dataState.scanHistory.findIndex(item => item.phone === phone && item.scanDate === dateString && !item.isClosed);
+    if (phone !== "គ្មានលេខ") {
+        existingIndex = dataState.scanHistory.findIndex(item => item.phone === phone && item.scanDate === dateString && (bornClosed ? item.isClosed === true : !item.isClosed));
     }
 
     const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
@@ -282,7 +282,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
 
             if (!target.barcodes.some(b => b && b.code === barcode)) {
                 mergeAddedBarcode = true;
-                target.barcodes.push({
+                target.barcodes.push(applyBarcodeCloseState({
                     code: barcode,
                     time: timeString,
                     cod: cod,
@@ -292,7 +292,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
                     isDeducted: false,
                     isFromDeletion: false,
                     createdAt: currentTimeMillis
-                });
+                }, bornClosed, closeStamp));
             }
 
             target.count = target.barcodes.length;
@@ -300,8 +300,11 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
             target.barcode = barcode;
             target.time = timeString;
             target.scanDate = dateString;
-            target.isClosed = false;
-            delete target.closedAt;
+            const allClosed = target.barcodes.length > 0 && target.barcodes.every(b => b && b.isClosed === true);
+            const latestClose = allClosed ? target.barcodes.reduce((max, b) => Math.max(max, Number(b.closedAt) || 0), 0) : 0;
+            target.isClosed = allClosed;
+            if (latestClose > 0) target.closedAt = latestClose;
+            else if (!allClosed) delete target.closedAt;
             target.isCalled = false;
             return target;
         };

@@ -237,6 +237,49 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
                 overRedacted.length === 0, 'ត្រូវលាក់ខុស ៖ ' + overRedacted.join(', '));
         })();
 
+        // ⛔ **ចន្លោះទី ១ឃ ៖ secret ក្នុងវត្ថុ Push និង biometric (SECURITY-2)** — Web Push subscription (`keys.p256dh` ·
+        // `keys.auth` ៖ អ្នកណាមានវា + endpoint ផ្ញើ push ទៅឧបករណ៍បាន) និង record biometric (`wrapKey` ក្បែរ `wrapped` ៖
+        // PIN ទទួលបានវិញដោយគ្មាន WebAuthn) ធ្លាប់រអិលទៅ Sentry ពេលភ្ជាប់ជាវត្ថុ (breadcrumb `console` · extra)។
+        // ⛔ ឈ្មោះដេរីវេពីកូដពិត ៖ វាលក្នុង `keys: { … }` ដែល App ផ្ញើទៅ Function push · វាល `rec.*` ដែលចូល `unwrapPinWithRawKey()`។
+        (function () {
+            const appSrc = readApp('ZoeW');
+            const derived = new Set();
+            let m;
+            const keysRe = /keys:\s*\{([^{}]*)\}/g;
+            while ((m = keysRe.exec(appSrc)) !== null) {
+                (m[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach((k) => derived.add(k.replace(/\s*:$/, '')));
+            }
+            const unwrapRe = /unwrapPinWithRawKey\(([^;]*)\);/g;
+            while ((m = unwrapRe.exec(appSrc)) !== null) {
+                (m[1].match(/\brec\.([A-Za-z_$][\w$]*)/g) || []).forEach((k) => derived.add(k.slice(4)));
+            }
+            const names = Array.from(derived);
+            // ⛔ `wrapKey` លែងមានក្នុងកូដ (SECURITY-1 ៖ PRF-only) តែ record `device` ចាស់នៅក្នុង storage រហូត `purgeLegacyBiometricRecord()` ➜ ការវាស់វត្ថុខាងក្រោមនៅវាស់វា
+            ok('ជាន់អប្បបរមា ៖ ដេរីវេវាល secret របស់ Push និង biometric បានយ៉ាងតិច ៣ (p256dh · auth · wrapped)',
+                names.length >= 3 && ['p256dh', 'auth', 'wrapped'].every((n) => names.indexOf(n) !== -1), 'ដេរីវេបាន ៖ ' + names.join(', '));
+            derivedSecretNames = derivedSecretNames.concat(names.filter((n) => derivedSecretNames.indexOf(n) === -1));
+            names.forEach((name) => {
+                const probe = { extra: {} };
+                probe.extra[name] = 'PUSH_BIO_SECRET_PROBE';
+                api.redactEvent(probe);
+                ok('⛔ តម្លៃក្រោមកូនសោ `' + name + '` (ដេរីវេពីកូដពិត) ត្រូវលាក់', probe.extra[name] === '[redacted]', String(probe.extra[name]));
+            });
+            const ev = { extra: {
+                sub: { kind: 'web', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'BPUSHKEY_PROBE', auth: 'AUTHSECRET_PROBE' } },
+                rec: { mode: 'device', wrapKey: 'WRAPKEY_PROBE', wrapped: { iv: 'IV_PROBE', data: 'DATA_PROBE' } },
+                author: 'Zoe', mode: 'device', keyId: 'K7'
+            } };
+            api.redactEvent(ev);
+            const flat = JSON.stringify(ev);
+            ok('⛔ subscription Push ជាវត្ថុ ➜ `keys.p256dh` · `keys.auth` លាក់',
+                ev.extra.sub.keys.p256dh === '[redacted]' && ev.extra.sub.keys.auth === '[redacted]', JSON.stringify(ev.extra.sub));
+            ok('⛔ record biometric ជាវត្ថុ ➜ `wrapKey` · `wrapped` លាក់', ev.extra.rec.wrapKey === '[redacted]' && ev.extra.rec.wrapped === '[redacted]', JSON.stringify(ev.extra.rec));
+            ok('⛔ គ្មានតម្លៃ probe ណាលេចក្នុង event', !/(BPUSHKEY|AUTHSECRET|WRAPKEY|IV|DATA)_PROBE/.test(flat), flat);
+            ok('⛔ ទិសផ្ទុយ ៖ `author` · `mode` · `keyId` · `kind` នៅមើលឃើញ (debug)',
+                ev.extra.author === 'Zoe' && ev.extra.mode === 'device' && ev.extra.keyId === 'K7' && ev.extra.sub.kind === 'web' && ev.extra.rec.mode === 'device',
+                JSON.stringify({ author: ev.extra.author, mode: ev.extra.mode, keyId: ev.extra.keyId, kind: ev.extra.sub.kind }));
+        })();
+
         // ⛔ **ចន្លោះទី ១គ ៖ បញ្ជីពាក្យ ២ មិនស៊ីគ្នា — secret ដដែល លាក់
         // ម្ខាង លេចម្ខាង។** redactor មានបញ្ជីពាក្យ **ពីរ** ដែលដាច់ពីគ្នា ៖
         //   · `SECRET_KEY_PATTERN`   ➜ ប្រើពេលឈ្មោះជា **កូនសោវត្ថុ** (`{headerValue: …}`)

@@ -34,11 +34,11 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>t</title><body></body>
 // នៅ bound។ នេះជាឥរិយាបថពិតរបស់ Sentry៖ `captureException` លើ SDK ដែល
 // មិនទាន់ init ដើរដោយគ្មាន error តែ event មិនទៅណាទេ។
 const FAKE_SDK = `
-window.__log = { init: [], sent: [], scopes: [], closed: 0, unbound: 0 };
+window.__log = { init: [], releases: [], sent: [], scopes: [], closed: 0, unbound: 0 };
 (function () {
     var bound = false;
     window.Sentry = {
-        init: function (o) { window.__log.init.push(o && o.dsn); bound = true; },
+        init: function (o) { window.__log.init.push(o && o.dsn); window.__log.releases.push(o && o.release); bound = true; },
         captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra), extra: (s && s.extra) || null }); },
         setTag: function () {},
         close: function () { window.__log.closed++; bound = false; return Promise.resolve(true); },
@@ -119,7 +119,43 @@ async function readSentryLog(page) {
     return page.evaluate(() => window.__log || { init: [], sent: [], scopes: [], closed: 0, unbound: 0 });
 }
 
+// ⛔ SENTRY-3 ៖ event គ្មាន release ➜ Sentry មិនបែងចែកកំណែ (regression · «Resolve ក្នុងកំណែបន្ទាប់» មិនដំណើរការ)។ ច្បាប់ ៖
+//    រាល់ការហៅ `ZoeErrors.init(` ក្នុង App ទាំងពីរផ្តល់ release `<app>@<APP_VERSION>` (ដេរីវេពីកូដ ship ពិត · វាយតម្លៃ argument ក្នុង vm)។
+function releaseCallSites(file, appName) {
+    const vm = require('vm');
+    const full = path.join(ROOT, file);
+    if (!fs.existsSync(full)) return { calls: [], version: '', file };
+    const src = fs.readFileSync(full, 'utf8');
+    const version = (/(?:^|\n)\s*const APP_VERSION\s*=\s*'([^']+)'/.exec(src) || [])[1] || '';
+    const calls = [];
+    const re = /ZoeErrors\.init\(/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+        let depth = 1, i = m.index + m[0].length;
+        for (; i < src.length && depth; i++) {
+            if (src[i] === '(') depth++;
+            else if (src[i] === ')') depth--;
+        }
+        const args = src.slice(m.index + m[0].length, i - 1);
+        let value;
+        try { value = vm.runInNewContext('[' + args + ']', { APP_VERSION: version }); } catch (e) { value = ['throw:' + e.message]; }
+        calls.push({ args, value, want: appName + '@' + version });
+    }
+    return { calls, version, file };
+}
+
 (async () => {
+    {
+        [['ZoeW/app.js', 'zoew'], ['ZoeKeyGen/app.js', 'zoekeygen']].forEach(([file, appName]) => {
+            const r = releaseCallSites(file, appName);
+            ok('ជាន់អប្បបរមា ៖ ' + file + ' មាន APP_VERSION និងការហៅ `ZoeErrors.init(` យ៉ាងតិច ២', !!r.version && r.calls.length >= 2, r);
+            r.calls.forEach((c, i) => {
+                ok('⛔ ' + file + ' ការហៅ `ZoeErrors.init(` ទី ' + (i + 1) + ' ផ្តល់ release `' + c.want + '`',
+                    Array.isArray(c.value) && c.value[0] === appName && c.value[1] === c.want, { args: c.args, value: c.value });
+            });
+        });
+    }
+
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const origin = 'http://127.0.0.1:' + server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });
@@ -186,6 +222,46 @@ async function readSentryLog(page) {
             find('bad-zone') && find('bad-zone').tags === null, find('bad-zone'));
         ok('⛔ capture() គ្មាន extra សោះ នៅតែដំណើរការ',
             out.sent.indexOf('no-extra') !== -1, out.sent);
+        await ctx.close();
+    }
+
+    // ៥ខ — ⛔ SENTRY-3 ៖ release ទៅដល់ `Sentry.init` · វាល primitive ដែលកំណត់ក្នុង allowlist របស់ Error (`lookupCode` · `txOutcome` …)
+    //    ទៅដល់ `extra.errorFields` (មុនកែ ៖ បាត់ ➜ event «Transaction outcome unknown» មិនប្រាប់ outcome) · វាលផ្សេង/វត្ថុ មិនផ្ញើ
+    {
+        const { ctx, page } = await makePage(browser, origin, 0);
+        await page.evaluate(async () => {
+            await window.ZoeErrors.init('zoew', 'zoew@9.8.7');
+            const e1 = new Error('fields-err');
+            e1.lookupCode = 'ZTO_UPSTREAM_REJECTED';
+            e1.txOutcome = 'unknown';
+            e1.txServerUnread = true;
+            e1.status = 503;
+            e1.privateNote = 'SHOULD_NOT_SEND';
+            e1.lookupReason = { nested: 'x' };
+            e1.code = 'X'.repeat(500);
+            window.ZoeErrors.capture(e1, { zone: 'money', context: 'probe' });
+            const e2 = new Error('fields-no-extra');
+            e2.txOutcome = 'not-applied';
+            window.ZoeErrors.capture(e2);
+            window.ZoeErrors.capture(new Error('no-fields-no-extra'));
+        });
+        await waitForSdkLoad(page);
+        const out = await readSentryLog(page);
+        const scopes = Array.isArray(out.scopes) ? out.scopes : [];
+        const find = (m) => scopes.filter((x) => x.msg === m)[0];
+        const f1 = find('fields-err');
+        const fields = f1 && f1.extra && f1.extra.errorFields;
+        ok('⛔ release ទៅដល់ Sentry.init', Array.isArray(out.releases) && out.releases.indexOf('zoew@9.8.7') !== -1, out.releases);
+        ok('⛔ វាល Error ក្នុង allowlist ទៅដល់ extra.errorFields (lookupCode · txOutcome · txServerUnread · status)',
+            !!fields && fields.lookupCode === 'ZTO_UPSTREAM_REJECTED' && fields.txOutcome === 'unknown' && fields.txServerUnread === true && fields.status === 503, f1);
+        ok('⛔ វាលក្រៅ allowlist និងតម្លៃវត្ថុ មិនផ្ញើ · ខ្សែអក្សរវែងកាត់ (≤ 200)',
+            !!fields && !('privateNote' in fields) && !('lookupReason' in fields) && typeof fields.code === 'string' && fields.code.length <= 200
+                && JSON.stringify(f1).indexOf('SHOULD_NOT_SEND') === -1, f1);
+        ok('⛔ extra របស់អ្នកហៅនៅដដែល (zone ➜ tag · context)', !!f1 && f1.tags && f1.tags.zone === 'money' && f1.extra.context === 'probe', f1);
+        const f2 = find('fields-no-extra');
+        ok('⛔ Error មានវាល តែគ្មាន extra ➜ extra.errorFields នៅតែទៅ', !!f2 && f2.extra && f2.extra.errorFields && f2.extra.errorFields.txOutcome === 'not-applied', f2);
+        const f3 = find('no-fields-no-extra');
+        ok('⛔ ទិសផ្ទុយ ៖ Error គ្មានវាល គ្មាន extra ➜ គ្មាន extra (មិនប្តូរ scope)', !!f3 && f3.hasExtra === false, f3);
         await ctx.close();
     }
 

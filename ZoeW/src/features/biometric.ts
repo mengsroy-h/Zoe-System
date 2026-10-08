@@ -30,9 +30,8 @@ export function readBiometricRecord() {
         if (!raw) return null;
         const rec = JSON.parse(raw);
         if (!rec || typeof rec.credentialId !== 'string' || !rec.credentialId) return null;
-        if (rec.mode !== 'prf' && rec.mode !== 'device' && rec.mode !== 'native') return null;
+        if (rec.mode !== 'prf' && rec.mode !== 'native') return null;
         if (!rec.wrapped || typeof rec.wrapped.iv !== 'string' || typeof rec.wrapped.data !== 'string') return null;
-        if (rec.mode === 'device' && typeof rec.wrapKey !== 'string') return null;
         return rec;
     } catch (e) {
         return null;
@@ -42,6 +41,20 @@ export function readBiometricRecord() {
 export function writeBiometricRecord(rec) {
     try {
         appLocalStore.setItem(BIOMETRIC_STORAGE_KEY, JSON.stringify(rec));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+export function purgeLegacyBiometricRecord() {
+    try {
+        const raw = appLocalStore.getItem(BIOMETRIC_STORAGE_KEY);
+        if (!raw) return false;
+        let rec = null;
+        try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+        if (!rec || rec.mode !== 'device') return false;
+        appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
         return true;
     } catch (e) {
         return false;
@@ -150,17 +163,10 @@ export async function enrollBiometricRecord(pin) {
     } catch (e) {
         ext = {};
     }
-    if (ext.prf && ext.prf.enabled) {
-        const rawKey = await biometricPrfBytes(credentialId);
-        if (rawKey) return { mode: 'prf', credentialId, wrapped: await wrapPinWithRawKey(pin, rawKey) };
-    }
-    const deviceKey = crypto.getRandomValues(new Uint8Array(32));
-    return {
-        mode: 'device',
-        credentialId,
-        wrapKey: bytesToB64(deviceKey),
-        wrapped: await wrapPinWithRawKey(pin, deviceKey)
-    };
+    if (!ext.prf || !ext.prf.enabled) return null;
+    const rawKey = await biometricPrfBytes(credentialId);
+    if (!rawKey) return null;
+    return { mode: 'prf', credentialId, wrapped: await wrapPinWithRawKey(pin, rawKey) };
 }
 
 export async function biometricUnlockPin() {
@@ -177,22 +183,9 @@ export async function biometricUnlockPin() {
         }
         return '';
     }
-    if (rec.mode === 'prf') {
-        const rawKey = await biometricPrfBytes(rec.credentialId);
-        if (!rawKey) return '';
-        return await unwrapPinWithRawKey(rec.wrapped, rawKey);
-    }
-    const assertion = await navigator.credentials.get({
-        publicKey: {
-            challenge: crypto.getRandomValues(new Uint8Array(32)),
-            rpId: window.location.hostname,
-            allowCredentials: [{ type: 'public-key', id: b64ToBytes(rec.credentialId), transports: ['internal'] }],
-            userVerification: 'required',
-            timeout: 60000
-        }
-    });
-    if (!assertion) return '';
-    return await unwrapPinWithRawKey(rec.wrapped, b64ToBytes(rec.wrapKey));
+    const rawKey = await biometricPrfBytes(rec.credentialId);
+    if (!rawKey) return '';
+    return await unwrapPinWithRawKey(rec.wrapped, rawKey);
 }
 
 export function setBiometricLabel(target, busy) {
@@ -258,7 +251,7 @@ export async function startBiometricEnrollment(verifiedPin) {
     try {
         const rec = await enrollBiometricRecord(verifiedPin);
         if (!rec) {
-            showToast('❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ!');
+            showToast('❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — ឧបករណ៍ ឬកម្មវិធីរុករកនេះមិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស។');
             return;
         }
         if (!writeBiometricRecord(rec)) {
@@ -266,9 +259,7 @@ export async function startBiometricEnrollment(verifiedPin) {
             return;
         }
         refreshBiometricUi();
-        showToast(rec.mode === 'prf' || rec.mode === 'native'
-            ? '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។'
-            : '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។ (ឧបករណ៍នេះមិនគាំទ្រការចាក់សោដោយជីវមាត្រពេញលេញទេ — PIN ត្រូវរក្សាទុកក្នុងឧបករណ៍)');
+        showToast('✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។');
     } catch (e) {
         showToast('❌ បានបោះបង់ ឬមិនអាចចងក្រយៅដៃ ឬមុខបានទេ!');
     } finally {
@@ -291,6 +282,9 @@ export function toggleBiometricUnlock() {
 }
 
 export async function initBiometricUi() {
+    if (purgeLegacyBiometricRecord()) {
+        showToast('⚠️ ការចូលដោយក្រយៅដៃ ឬមុខត្រូវបិទ ដើម្បីការពារ PIN ➜ សូមវាយ PIN រួចបើកវាម្តងទៀតក្នុងម៉ឺនុយ «ចូលដោយក្រយៅដៃ ឬមុខ» (ឧបករណ៍ដែលមិនគាំទ្រ ត្រូវប្រើ PIN)។');
+    }
     refreshBiometricUi();
     const supported = await biometricPlatformAvailable();
     viewState.biometricUnsupported = !supported;

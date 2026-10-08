@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.6';
+const APP_VERSION = '2.24.7';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1540,7 +1540,7 @@ function saveFirebaseConfig() {
     const dsnInput = document.getElementById('sentryDsnInput');
     if (dsnInput && window.ZoeErrors) {
         ZoeErrors.setDsn(dsnInput.value);
-        ZoeErrors.init('zoekeygen');
+        ZoeErrors.init('zoekeygen', 'zoekeygen@' + APP_VERSION);
     }
     const cfgInput = document.getElementById('firebaseConfigInput');
     if (!cfgInput) return;
@@ -3518,7 +3518,7 @@ function switchKgTab(name) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
+    if (window.ZoeErrors) ZoeErrors.init('zoekeygen', 'zoekeygen@' + APP_VERSION);
     if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
     initFirebase();
     updateSigningKeyBadge();

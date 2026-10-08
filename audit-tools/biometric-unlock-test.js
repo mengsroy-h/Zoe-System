@@ -159,7 +159,7 @@ function makeEnv(opts) {
     vm.runInContext('function scheduleZtoStatusSweep() { __ztoSweeps.push(1); }', ctx);
     [
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
-        'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',
+        'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'purgeLegacyBiometricRecord', 'clearBiometricRecord',
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',
@@ -215,16 +215,14 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         ok('ការស្កេនតម្រូវឲ្យផ្ទៀងផ្ទាត់អ្នកប្រើ', get && get.uv === 'required');
     }
 
-    console.log('\n=== ឧបករណ៍គ្មាន PRF ➜ ធ្លាក់ចូលរបៀបឧបករណ៍ តែនៅតែដំណើរការ ===');
+    console.log('\n=== ⛔ ឧបករណ៍គ្មាន PRF ➜ មិនចង (PRF-only · SECURITY-1 ៖ របៀប device ទុកសោក្បែរ PIN ដែលរុំ) ===');
     {
         const e = makeEnv({ prf: false, storage: { zoew_security_pin_hash: PIN_HASH } });
         await e.sandbox.startBiometricEnrollment(PIN);
-        const rec = JSON.parse(e.store['zoew_biometric_unlock_v1'] || 'null');
-        ok('ប្រើរបៀប device', rec && rec.mode === 'device', rec && rec.mode);
-        ok('នៅតែមិនរក្សា PIN ជាអក្សរធម្មតា', JSON.stringify(rec).indexOf(PIN) === -1);
-        ok('ប្រាប់អ្នកប្រើថាឧបករណ៍មិនគាំទ្រពេញលេញ',
-            e.log.toasts.some((t) => t.indexOf('មិនគាំទ្រការចាក់សោដោយជីវមាត្រពេញលេញ') !== -1), e.log.toasts);
-        ok('ដោះសោបាន', (await e.sandbox.runBiometricUnlock()) === true);
+        ok('⛔ គ្មាន record ក្នុង storage', !('zoew_biometric_unlock_v1' in e.store), e.store['zoew_biometric_unlock_v1']);
+        ok('⛔ គ្មាន wrapKey ណាមួយក្នុង storage', JSON.stringify(e.store).indexOf('wrapKey') === -1);
+        ok('ប្រាប់អ្នកប្រើឲ្យប្រើ PIN', e.log.toasts.some((t) => /PRF/.test(t) && /PIN/.test(t)), e.log.toasts);
+        ok('ដោះសោដោយជីវមាត្រមិនបាន (គ្មានការចង)', (await e.sandbox.runBiometricUnlock()) === false);
     }
 
     console.log('\n=== ផ្លូវបរាជ័យ ===');
@@ -249,7 +247,7 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
     {
         const e = makeEnv({ prf: true, getFails: true, storage: { zoew_security_pin_hash: PIN_HASH } });
         e.store['zoew_biometric_unlock_v1'] = JSON.stringify({
-            mode: 'device', credentialId: 'AQID', wrapKey: 'AAAA', wrapped: { iv: 'AAAA', data: 'AAAA' }
+            mode: 'prf', credentialId: 'AQID', wrapped: { iv: 'AAAA', data: 'AAAA' }
         });
         const res = await e.sandbox.runBiometricUnlock();
         ok('អ្នកប្រើបោះបង់ការស្កេន ➜ ត្រឡប់ false មិន throw', res === false);
@@ -276,7 +274,8 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         const e = makeEnv({ prf: true, storage: { zoew_security_pin_hash: PIN_HASH } });
         ['not json', '{}', JSON.stringify({ mode: 'prf' }),
          JSON.stringify({ mode: 'evil', credentialId: 'AQID', wrapped: { iv: 'a', data: 'b' } }),
-         JSON.stringify({ mode: 'device', credentialId: 'AQID', wrapped: { iv: 'a', data: 'b' } })].forEach((bad) => {
+         JSON.stringify({ mode: 'device', credentialId: 'AQID', wrapped: { iv: 'a', data: 'b' } }),
+         JSON.stringify({ mode: 'device', credentialId: 'AQID', wrapKey: 'AAAA', wrapped: { iv: 'a', data: 'b' } })].forEach((bad) => {
             e.store['zoew_biometric_unlock_v1'] = bad;
             ok('កំណត់ត្រាមិនត្រឹមត្រូវ ➜ ចាត់ទុកជាបិទ: ' + bad.slice(0, 34), e.sandbox.isBiometricEnabled() === false);
         });

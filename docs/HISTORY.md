@@ -72,7 +72,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
@@ -114,6 +114,28 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.38] — 2026-10-08 · ZoeW ៖ **🔔 ៖ link ទាញយក APK កំណែថ្មី · ផ្ទាំង 🔔 ធំជាងលើកុំព្យូទ័រ** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.38`** (`zoew-v300` ➜ `zoew-v301`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📥 App Android (APK) ៖ ពេល feed (`announcements.json`) មានកំណែថ្មីជាង `APP_VERSION` ➜ ផ្ទាំង 🔔 «📱 កំណែ App» បង្ហាញប៊ូតុង **📥 ទាញយក APK កំណែ X**
+  ➜ ឯកសារ `ZoeW-X.apk` ក្នុង GitHub Release `zoew-android-vX` (repo public · workflow `android-release.yml` បង្កើតពី `main`) · បើកក្រៅ App (browser ទាញយក) ·
+  web/PWA គ្មាន link (ទាញកំណែថ្មីដោយខ្លួនឯង) · កំណែពី feed ដែលមិនមែន X.Y.Z ➜ គ្មាន link។
+- 🖥️ ផ្ទាំង 🔔 លើកុំព្យូទ័រ (≥ 992px) ៖ ទទឹង ៣២០ ➜ ៤០០px · ទូរស័ព្ទ និង ☰ ដូចដើម។
+- `guide.html` ៖ «📱 កំណែ App» ពន្យល់ប៊ូតុងទាញយក APK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ (merge ចូល `main` ➜ workflow បង្កើត Release `zoew-android-v2.50.38`)។
+2. សាក ៖ APK កំណែចាស់ (ឧ. 2.50.25) ➜ 🔔 ➜ «📥 ទាញយក APK កំណែ …» ➜ browser ទាញយក ➜ ដំឡើងជាន់ ➜ ទិន្នន័យនៅដដែល · កុំព្យូទ័រ ៖ 🔔 ធំជាងមុន · ទូរស័ព្ទដូចដើម។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-apk-link.test.tsx` (ថ្មី · ៤) ៖ URL = ស្លាក + ឈ្មោះឯកសារដែល `android-release.yml` ពិតបង្កើត (ថ្នេរ ២ ឯកសារ) · APK + កំណែថ្មី ➜ link `target=_blank` ·
+  web ➜ គ្មាន · កំណែចុងក្រោយ ➜ គ្មាន · កំណែមិនមែន X.Y.Z ➜ គ្មាន URL (មុនកែ FAIL ២) · `layout-check` ៖ 🔔 ៤១២ ➜ ៣២០ · ១២៨០ ➜ ៣៨០–៤៤០ · ☰ ៣២០ (មុនកែ FAIL ១)។
 
 ### [2.50.37] — 2026-10-08 · ZoeW (APK) ៖ **ប្រអប់សុំសិទ្ធិលែងចាក់សោ App · Back លើប្រអប់ចូលបង្រួម App · keyboard លែងគណនា style គ្រប់ធាតុ · រូបតំណាងរបា navigation តាមផ្ទៃពិត** (Deep audit ២ · ជុំ ១៥ · NATIVE-1 · NATIVE-3 · NATIVE-7 · NATIVE-8)
 
@@ -2626,6 +2648,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A32 | **UI-2** ប្រអប់ចូលនៅក្រោម ☰ | Claude ៖ React ពិត ៖ ☰ បើក ➜ `showLoginModalWithPrefill()` ➜ `#sideDrawer.open` នៅ | `drawerOpen = false` ក្នុង `clearSensitiveModalFields()` |
 | A33 | **UI-3 · UI-4 · UI-5/6 · UI-7** | Claude ៖ browser ពិត (`layout-check`) ៖ banner បាត ៩០០ គ្របរបា Tab · បញ្ជី ZTO គូរ ២០០/២០០ ពេលបើក · ព័ត៌មានជួរ 🔔 ទទឹង ០px (៣២០) / ៤៥px (៤១២) + «…» · Enter ក្នុងវាល PIN ➜ `__pinOk = 0` · cursor មិននៅវាល PIN | CSS `react-root.css` · root `.modal-content` · `<form onSubmit>` + focus កុំព្យូទ័រ |
 | A34 | **NATIVE-1 · 3 · 7 · 8** (+ NATIVE-4 វាស់) | Claude ៖ React/jsdom ៖ pause/resume ក្នុង getUserMedia/requestPermissions ➜ `appIsLocked` · Back លើប្រអប់ចូល ➜ `minimize` ០ ដង · Chromium ៖ ប្តូរកម្ពស់ 880 ➜ 560 ➜ `UpdateLayoutTree` ៧៥៩/២៦០៨ ធាតុ (`@property` ➜ ៨) · fake bridge safe-area ខាងក្រោម ៤៨px ➜ NavigationBar LIGHT ពេលប្រអប់បើក | excuse មុនប្រអប់ · `ROOT_SCREEN_MODALS` · `@property --fs-unit` · `appliedNav` |
+| A40 | **សំណើម្ចាស់គម្រោង** ៖ link APK · 🔔 ធំលើកុំព្យូទ័រ | Claude ៖ GitHub ៖ repo public · Release `zoew-android-v2.50.25` · `ZoeW-<កំណែ>.apk` (workflow) · `layout-check` ៖ 🔔 ១២៨០px = ៣២០ | `apkDownloadUrl()` + link តែ APK · `max-width: 400px` ≥ 992px |
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.33]
 
@@ -4507,6 +4530,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/network-toast.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pwa-icons.test.ts` | ផ្នែក ១ | — |

@@ -302,6 +302,21 @@ async function notifyRowLayout(browser, port) {
     check(seen.every((s) => s && s.metaW >= s.rowW * 0.4),
         '⛔ ZoeW ជួរ 🔔 ៖ ព័ត៌មាន (ចំនួន · Locker) មិនត្រូវគាបតូច (≥ ៤០% នៃជួរ ៖ បត់ចុះបន្ទាត់ថ្មីពេលមិនគ្រប់)', JSON.stringify(seen));
     check(seen.every((s) => s && s.rowInside), 'ZoeW ជួរ 🔔 ៖ ជួរនៅក្នុងផ្ទាំង (មិនលើស)', JSON.stringify(seen));
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ ផ្ទាំង 🔔 លើកុំព្យូទ័រ (≥ 992px) ធំជាងទូរស័ព្ទបន្តិច · ទូរស័ព្ទ និង ☰ មិនប្រែ
+    const widths = [];
+    for (const w of [412, 1280]) {
+        await page.setViewportSize({ width: w, height: 900 });
+        await page.waitForTimeout(300);
+        widths.push(await page.evaluate(() => {
+            const n = document.getElementById('notifyDrawer');
+            const d = document.getElementById('sideDrawer');
+            return { vw: window.innerWidth, notify: n ? Math.round(n.getBoundingClientRect().width) : 0, side: d ? Math.round(d.getBoundingClientRect().width) : 0 };
+        }));
+    }
+    const [phoneW, deskW] = widths;
+    check(phoneW.notify === 320 && phoneW.side === 320, 'ZoeW ផ្ទាំង 🔔 ៖ ទូរស័ព្ទ ៤១២ ➜ ទទឹងដូចដើម (៣២០ · ☰ ៣២០)', JSON.stringify(widths));
+    check(deskW.notify >= 380 && deskW.notify <= 440 && deskW.side === 320,
+        '⛔ ZoeW ផ្ទាំង 🔔 ៖ កុំព្យូទ័រ ១២៨០ ➜ ធំជាងទូរស័ព្ទ (៣៨០–៤៤០px) · ☰ មិនប្រែ', JSON.stringify(widths));
     await ctx.close();
 }
 

@@ -327,6 +327,13 @@ export function latestFeedVersion(items) {
     return best;
 }
 
+export const APK_RELEASE_DOWNLOAD_BASE = 'https://github.com/mengsroy-h/Zoe-System/releases/download/';
+
+export function apkDownloadUrl(version) {
+    if (typeof version !== 'string' || !/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version)) return null;
+    return APK_RELEASE_DOWNLOAD_BASE + 'zoew-android-v' + version + '/ZoeW-' + version + '.apk';
+}
+
 export function newerAppVersion(items) {
     const latest = latestFeedVersion(items);
     return latest && compareVersions(latest, APP_VERSION) > 0 ? latest : '';

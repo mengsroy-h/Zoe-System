@@ -141,6 +141,7 @@ async function openWithRelease(available: boolean | 'fail') {
     feedWith(NEWER);
     mount(<NotifyDrawer />);
     step(() => { openNotifyDrawer(); });
+    await vi.waitFor(() => { expect(calls('probe').length).toBeGreaterThan(0); }, { timeout: 5000 });
     await flush();
 }
 
@@ -210,6 +211,7 @@ describe('🔔 កំណែ App ៖ ទាញយក APK ក្នុង App · �
         feedWith(NEWER);
         mount(<NotifyDrawer />);
         step(() => { openNotifyDrawer(); });
+        await vi.waitFor(() => { expect(calls('probe').length).toBeGreaterThan(0); }, { timeout: 5000 });
         await flush();
         expect(btn()).toBe(null);
         expect(oldLink()).toBe(null);
@@ -283,6 +285,26 @@ describe('🔔 កំណែ App ៖ ទាញយក APK ក្នុង App · �
         expect(calls('install')).toEqual([]);
         expect(btn()).toBe(null);
         expect(versionText()).toContain('មិនទាន់មានលើ GitHub Release');
+    });
+
+    it('⛔ App នៅខាងក្រោយ (ប្តូរទៅ App ផ្សេង) ពេលកំពុងទាញ ➜ មិនរាប់ថាឈប់រីក (native ទាញបន្ត)', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+        await startDownload();
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        try {
+            await vi.advanceTimersByTimeAsync(STALL_MS * 3);
+            await flush();
+            expect(calls('cancel')).toEqual([]);
+        } finally {
+            delete (document as any).visibilityState;
+            delete (document as any).hidden;
+        }
+        step(() => { h.state.listeners.progress({ version: NEWER, received: 500, total: 1000 }); });
+        expect(versionText()).toContain('50%');
+        h.state.download!.resolve({ size: 1000 });
+        await flush();
+        expect(calls('install').length).toBe(1);
     });
 
     it('⛔ ការទាញយកឈប់រីក ➜ បោះបង់ក្រោយ APK_DOWNLOAD_STALL_MS · សារ · ចុចម្តងទៀតបាន', async () => {

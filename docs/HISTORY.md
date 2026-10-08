@@ -128,7 +128,7 @@
 
 - 🆕 **🔔 «📱 កំណែ App» លើ APK ៖ ទាញ APK ក្នុង App** ៖ link ចាស់បើក browser ក្រៅ ➜ ទាញចប់ តែគ្មានអ្វីលោតឲ្យដំឡើង (រាយការណ៍ម្ចាស់គម្រោង)។ ឥឡូវប៊ូតុង
   «📥 ទាញយក និងដំឡើង APK កំណែ X» ទាញក្នុង App (របារីកចម្រើន % · MB · ✖️ បោះបង់) ➜ ផ្ទាំងដំឡើងរបស់ Android លោតឡើង។ លើកដំបូង Android សួរ «អនុញ្ញាតពីប្រភពនេះ»
-  (Install unknown apps) ➜ បើក ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត។ បរាជ័យ (បណ្តាញ · ឯកសារមិនពេញ · ទំហំផ្ទុក · ឈប់រីក ៤៥ វិ.) ➜ សារច្បាស់ ➜ ចុចម្តងទៀតបាន ·
+  (Install unknown apps) ➜ បើក ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត។ បរាជ័យ (បណ្តាញ · ឯកសារមិនពេញ · ទំហំផ្ទុក · ឈប់រីក ៤៥ វិ. ខណៈ App នៅលើអេក្រង់ — ចេញទៅ App ផ្សេង ➜ ទាញបន្ត) ➜ សារច្បាស់ ➜ ចុចម្តងទៀតបាន ·
   ចេញពី App ទៅ Settings/ផ្ទាំងដំឡើង ➜ ត្រឡប់មកមិនសុំ PIN។
 - 🐛 **ប៊ូតុងបង្ហាញមុន APK ចេញ ➜ 404** (រាយការណ៍ម្ចាស់គម្រោង) ៖ Netlify ចេញ feed កំណែថ្មីភ្លាម ខណៈ workflow នៅ build APK · Release ដែលលុបចោល (2.50.41) ក៏ 404។
   ឥឡូវ App សួរ GitHub មុន ➜ ប៊ូតុងតែពេលឯកសារ APK ពិតមាន · មិនទាន់មាន ➜ «⏳ APK កំណែ X មិនទាន់មានលើ GitHub Release — App ពិនិត្យម្តងទៀតពេលបើក 🔔»
@@ -137,8 +137,8 @@
 
 #### អ្នកយាម
 
-- `ZoeW/tests/notify-apk-link.test.tsx` (សរសេរឡើងវិញ · ១៣) ៖ URL ដែល Java សាង = workflow ពិត · method JS ⊆ `@PluginMethod` · Release គ្មាន / កំពុងពិនិត្យ / ពិនិត្យមិនបាន ➜ គ្មានប៊ូតុង ·
-  មាន ➜ ទាញក្នុង App ➜ progress ➜ excuse ➜ install · Settings ➜ អនុញ្ញាត ➜ excuse ថ្មី ➜ installer · បដិសេធ ➜ ណែនាំ · បរាជ័យ / 404 · ឈប់រីក ➜ បោះបង់ · ប៊ូតុងបោះបង់ ·
+- `ZoeW/tests/notify-apk-link.test.tsx` (សរសេរឡើងវិញ · ១៤) ៖ URL ដែល Java សាង = workflow ពិត · method JS ⊆ `@PluginMethod` · Release គ្មាន / កំពុងពិនិត្យ / ពិនិត្យមិនបាន ➜ គ្មានប៊ូតុង ·
+  មាន ➜ ទាញក្នុង App ➜ progress ➜ excuse ➜ install · Settings ➜ អនុញ្ញាត ➜ excuse ថ្មី ➜ installer · បដិសេធ ➜ ណែនាំ · បរាជ័យ / 404 · ឈប់រីក ➜ បោះបង់ · App នៅខាងក្រោយ ➜ មិនរាប់ថាឈប់រីក (mutation ដកការពារនោះ ➜ ក្រហម) · ប៊ូតុងបោះបង់ ·
   ពិនិត្យម្តងទៀតតាមពេល · ទិសផ្ទុយ web/PWA · កំណែចុងក្រោយ — plugin mock ជា Proxy thenable ដូច Capacitor ពិត — មុនកែ ៖ FAIL ១១/១៣។
 - `npm run native:check` ៤ង (ថ្មី · ២ សេណារីយ៉ូ) ៖ `@capacitor/core` ពិត + header ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត ➜ Release គ្មាន ➜ គ្មានប៊ូតុង · មាន ➜ probe ➜
   addListener ➜ download ➜ install ➜ removeListener · គ្មាន «not implemented»។
@@ -2780,7 +2780,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A45 | **APK ៖ link ក្រៅ App គ្មានផ្ទាំងដំឡើង · ប៊ូតុងមុន Release ➜ 404** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង · Release 2.50.41 លុបដោយម្ចាស់គម្រោង) | Claude ៖ `curl -I` ពិត ៖ `zoew-android-v2.50.42/ZoeW-2.50.42.apk` ➜ 302 ទៅ `objects.githubusercontent.com` · `2.50.41` · `9.9.9` ➜ 404 · HEAD តាម redirect ➜ 401 (URL ចុះហត្ថលេខាសម្រាប់ GET) ➜ probe មិនតាម redirect · GET ➜ 200 `application/vnd.android.package-archive` ៨៥៨៩៧៤៧ bytes · គ្មាន Android SDK (dl.google.com បិទក្នុងបរិស្ថាននេះ) ➜ `javac` + Robolectric `android-all` 14 (Maven Central) + `JSObject` · `PluginCall` · annotation ពិតរបស់ Capacitor + stub `Plugin` · androidx តាម signature ពិត ➜ 0 error · harness JVM ហៅ `probe()` ពិត ➜ 302 / 404 / 404 · `bad-version` ➜ គ្មាន request | plugin `ZoeApkUpdate` · ពិនិត្យ Release មុនប៊ូតុង · ⚠️ download/install វាស់បានតែលើទូរស័ព្ទពិត |
+| A45 | **APK ៖ link ក្រៅ App គ្មានផ្ទាំងដំឡើង · ប៊ូតុងមុន Release ➜ 404** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង · Release 2.50.41 លុបដោយម្ចាស់គម្រោង) | Claude ៖ `curl -I` ពិត ៖ `zoew-android-v2.50.42/ZoeW-2.50.42.apk` ➜ 302 ទៅ `objects.githubusercontent.com` · `2.50.41` · `9.9.9` ➜ 404 · HEAD តាម redirect ➜ 401 (URL ចុះហត្ថលេខាសម្រាប់ GET) ➜ probe មិនតាម redirect · GET ➜ 200 `application/vnd.android.package-archive` ៨៥៨៩៧៤៧ bytes · គ្មាន Android SDK (dl.google.com បិទក្នុងបរិស្ថាននេះ) ➜ `javac` + Robolectric `android-all` 14 (Maven Central) + `JSObject` · `PluginCall` · annotation ពិតរបស់ Capacitor + stub `Plugin` · androidx តាម signature ពិត ➜ 0 error · harness JVM ហៅ `probe()` ពិត ➜ 302 / 404 / 404 · `bad-version` ➜ គ្មាន request · run-all STRICT ជុំ ១ ៖ FAIL ៤ ➜ `state-hygiene` (`pluginLoad` · `updateSeq` គ្មានហេតុផល) · `clock-hygiene` (`Date.now()` គ្មានហេតុផល) · `doc-scope-test` (`setInterval` ទី ៨ ➜ ការពារឈប់រីកដែលរាប់ពេល App នៅខាងក្រោយ ➜ បោះបង់ខុសពេលអ្នកប្រើចេញទៅ App ផ្សេង) · តេស្តរង់ចាំ dynamic import ខ្លីពេកពេល suite រត់ព្រមគ្នា (ការវាស់) | plugin `ZoeApkUpdate` · ពិនិត្យ Release មុនប៊ូតុង · ឈប់រីករាប់តែពេល App នៅលើអេក្រង់ (`setTimeout` · `documentIsHidden()`) · ⚠️ download/install វាស់បានតែលើទូរស័ព្ទពិត |
 
 ### 2026-10-08 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ ➜ [2.50.42]
 

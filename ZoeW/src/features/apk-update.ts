@@ -1,5 +1,6 @@
 import { elapsedSince } from '../core/elapsed';
 import { uiState } from '../core/state';
+import { documentIsHidden } from '../platform/document-io';
 import { isNativeAndroid } from '../platform/native';
 import { withTimeout } from '../services/network';
 import { noteAppLockExcuse } from './app-lock';
@@ -9,6 +10,7 @@ export const APK_PROBE_TIMEOUT_MS = 20000;
 export const APK_RELEASE_RECHECK_MS = 2 * 60 * 1000;
 export const APK_RELEASE_RETRY_MS = 30 * 1000;
 export const APK_DOWNLOAD_STALL_MS = 45000;
+export const APK_STALL_TICK_MS = 1000;
 export const APK_INSTALL_TIMEOUT_MS = 3 * 60 * 1000;
 
 const APK_VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
@@ -88,17 +90,25 @@ async function downloadWithStallGuard(AU: any, version: string, seq: number): Pr
         handle = null;
     }
     let timer: any = 0;
+    let settled = false;
     const stalled = new Promise((_, reject) => {
-        timer = setInterval(() => {
-            if (elapsedSince(lastProgressAt) < APK_DOWNLOAD_STALL_MS) return;
+        const tick = () => {
+            if (settled) return;
+            if (documentIsHidden()) lastProgressAt = Date.now();
+            if (elapsedSince(lastProgressAt) < APK_DOWNLOAD_STALL_MS) {
+                timer = setTimeout(tick, APK_STALL_TICK_MS);
+                return;
+            }
             Promise.resolve().then(() => AU.cancel()).catch(() => {});
             reject(Object.assign(new Error('APK download stalled'), { code: 'stalled' }));
-        }, 1000);
+        };
+        timer = setTimeout(tick, APK_STALL_TICK_MS);
     });
     try {
         return await Promise.race([Promise.resolve().then(() => AU.download({ version: version })), stalled]);
     } finally {
-        clearInterval(timer);
+        settled = true;
+        clearTimeout(timer);
         if (handle && typeof handle.remove === 'function') Promise.resolve().then(() => handle.remove()).catch(() => {});
     }
 }

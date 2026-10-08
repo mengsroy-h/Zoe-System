@@ -35,8 +35,8 @@ const EXPECTED_DIVERGENT = new Set([
     // ក្រយៅដៃ/មុខ ៖ ZoeKeyGen ទទួល **តែ** WebAuthn PRF (គ្មានរបៀបរក្សា PIN ធម្មតា ➜ `enrollBiometricRecord` ត្រឡប់ `unsupported`) ·
     // UI ជា DOM ផ្ទាល់ (`#pinBiometricBtn` · `#biometricToggleBtn`) ខណៈ ZoeW ជា state React + ផ្លូវ native (APK) · `completePinUnlock`
     // របស់ ZoeKeyGen ដេរីវេសោ Session របស់ Signing Key ➜ ឥរិយាបថរបស់ ZoeKeyGen វាស់ដោយ `keygen-biometric-test` · ZoeW ដោយ `biometric-unlock-test`
-    // · `biometricPrfBytes` ៖ ZoeKeyGen រុំ `biometricPrfEval()` (ការចុះឈ្មោះត្រូវឃើញការបោះ ➜ «បោះបង់» ≠ «មិនគាំទ្រ PRF») · ZoeW ធ្លាក់ចុះទៅរបៀប device
-    'biometricPlatformAvailable', 'biometricPrfBytes', 'biometricUnlockPin', 'clearBiometricRecord', 'completePinUnlock', 'enrollBiometricRecord',
+    // · `biometricPrfFirst` · `biometricPrfEval` · `biometricPrfBytes` ដូចគ្នាទាំង ២ App (មិនស្ថិតក្នុងបញ្ជីនេះ ៖ ការចុះឈ្មោះឃើញការបោះ ➜ «បោះបង់» ≠ «មិនគាំទ្រ PRF»)
+    'biometricPlatformAvailable', 'biometricUnlockPin', 'clearBiometricRecord', 'completePinUnlock', 'enrollBiometricRecord',
     'readBiometricRecord', 'refreshBiometricUi', 'runBiometricUnlock', 'setBiometricBusy', 'startBiometricEnrollment',
     'toggleBiometricUnlock',
 

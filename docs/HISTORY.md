@@ -46,7 +46,7 @@
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 1. **`main`** = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ PR #288 ➜ #301 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301)។
-   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -71,6 +71,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.34–2.50.38 — ជុំ ១៥ (UI · NATIVE · សំណើម្ចាស់គម្រោង · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
@@ -114,6 +115,32 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.40] — 2026-10-08 · ZoeW ៖ **PWA លើ Android ចងក្រយៅដៃ/មុខបាន (passkey · WebAuthn PRF)** (រាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.40`** (`zoew-v302` ➜ `zoew-v303`) · ⛔ ZoeKeyGen មិនប្រែ (កែរួចពីមុន) · គ្មាន rules · env · migration ថ្មី · ⛔ PRF-only ដដែល។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **Android PWA ៖ «❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — … (WebAuthn PRF)» ទោះទូរស័ព្ទគាំទ្រ** (រូបពីម្ចាស់គម្រោង · APK មិនអី ព្រោះប្រើក្រយៅដៃ native) —
+  ZoeW បង្កើត credential `residentKey: 'discouraged'` ➜ Android (Google Password Manager) ផ្តល់ PRF តែលើ **passkey** (discoverable) ➜ `prf.enabled: false` ➜
+  «មិនគាំទ្រ» ក្លែងក្លាយ។ ZoeKeyGen កែកំហុសដដែលរួច (ផ្នែក ១ «ZoeKeyGen ៖ ក្រយៅដៃ/មុខ «មិនគាំទ្រ» លើ Android») តែ ZoeW មិនទាន់ ➜ ថ្នេររវាង ២ App។
+- ឥឡូវ ZoeW ដូច ZoeKeyGen ៖ `residentKey: 'required'` · PRF ដែល `create()` ផ្តល់ផ្ទាល់ ➜ ប្រើភ្លាម (ស្កេនតែម្តង · `biometricPrfFirst()`) · `prf: {}` គ្មាន `enabled` ➜ សួរ `get()` ·
+  បោះបង់ការស្កេនទី ២ ➜ «❌ បានបោះបង់ …» (`biometricPrfEval()` បោះ) មិនមែន «មិនគាំទ្រ» · សារមិនគាំទ្រណែនាំ «លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager ឬប្រើ App ZoeW សម្រាប់ Android» ·
+  `biometricPrfFirst` · `biometricPrfEval` · `biometricPrfBytes` ដូចគ្នាបេះបិទទាំង ២ App (`shared-fns` ដកចេញពីបញ្ជី «បែកគ្នាដោយចេតនា»)។
+- កំណត់ត្រាដែលចងរួច (iPhone) ដើរដដែល (`get()` តាម credential id)។ ការចងម្តងៗបង្កើត passkey «ZoeW» ថ្មីក្នុងកម្មវិធីគ្រប់គ្រងពាក្យសម្ងាត់ (លុបចាស់បានក្នុងកម្មវិធីនោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-android-prf.test.ts` (៦) ៖ WebAuthn ក្លែងតាម Android (PRF តែ passkey) ៖ ស្នើ `residentKey: 'required'` ➜ ចង + ស្រាយ PIN · PRF ក្នុង `create()` ➜ `get()` ០ ដង ·
+  `prf: {}` ➜ `get()` ១ ដង · បោះបង់ស្កេនទី ២ ➜ «បោះបង់» · `enabled: false` ➜ មិនចង + Google Password Manager — មុនកែ FAIL ៥/៦ · mutation ៥/៥ ចាប់បាន។
+- `biometric-unlock-test` (sandbox ត្រូវការ `biometricPrfFirst` · `biometricPrfEval`) · `keygen-biometric-test` ២៧ · `shared-fns` (គ្មានការបែកគ្នាមិនរំពឹង)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. Android Chrome (PWA) ៖ ⚙️ ➜ 🔐 ចូលដោយក្រយៅដៃ ឬមុខ ➜ PIN ➜ ស្កេនក្រយៅដៃ (បើសួរ ➜ រក្សាក្នុង Google Password Manager) ➜ ✅ · បិទ/បើក App ➜ ដោះសោដោយក្រយៅដៃ។
+3. iPhone PWA ៖ បិទ ➜ បើក 🔐 ម្តងទៀត ➜ ✅ (passkey iCloud Keychain)។
 
 ### [2.50.39] — 2026-10-08 · ZoeW ៖ **🔔 «កញ្ចប់ជិតផុតកំណត់» និង «កញ្ចប់ដែលដករួច» ជាក្រុមពន្លាដូចម៉ឺនុយ ☰ · មើលបានគ្រប់កញ្ចប់** (សំណើម្ចាស់គម្រោង)
 
@@ -2656,6 +2683,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — ក្រយៅដៃ web លើ Android ➜ [2.50.40]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A42 | **Android PWA ៖ ក្រយៅដៃ «មិនគាំទ្រ PRF» ក្លែងក្លាយ** (រូបពីម្ចាស់គម្រោង) | Claude ៖ ប្រៀបធៀប ZoeW ↔ ZoeKeyGen ៖ ZoeKeyGen `residentKey: 'required'` + PRF ពី `create()` + `prf: {}` ➜ `get()` (កែរួច) · ZoeW `residentKey: 'discouraged'` + ទាមទារ `prf.enabled` + ចាប់ការបោះបង់ជា «មិនគាំទ្រ» · WebAuthn ក្លែងតាម Android ➜ មុនកែ FAIL ៥/៦ | ផ្ទេរការកែរបស់ ZoeKeyGen · function PRF ៣ ដូចគ្នាបេះបិទ |
+
 ### 2026-10-08 — សំណើម្ចាស់គម្រោង ៖ 🔔 ក្រុមពន្លា ➜ [2.50.39]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4528,6 +4561,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/app-icon-logo.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

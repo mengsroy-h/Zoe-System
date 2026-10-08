@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.39` (`zoew-v302`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.40` (`zoew-v303`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.8` (`zoekeygen-v119`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -904,7 +904,11 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
   are verified against `zoew_security_pin_hash` · PIN change unbinds · `completePinUnlock()` is the single success path ·
   web biometrics in both apps accept WebAuthn PRF only ⛔ never a `device` mode (a raw key stored beside the wrapped PIN = the PIN
   in plain sight): no PRF ➜ no enrollment (use the PIN) · legacy `device` records are purged at boot (`purgeLegacyBiometricRecord()`,
-  one toast) · the APK uses native biometrics (`biometric-no-device-mode.test.tsx` · `biometric-unlock-test`).
+  one toast) · the APK uses native biometrics · enrollment creates a discoverable passkey in both apps (`residentKey: 'required'`: Android
+  Google Password Manager gives PRF only to passkeys) · PRF results from `create()` are used at once, `prf: {}` (no `enabled`) asks `get()`, only
+  `enabled: false` means unsupported · a cancelled second scan is a cancel, never «unsupported» (`biometricPrfEval()` throws; `biometricPrfFirst` ·
+  `biometricPrfEval` · `biometricPrfBytes` byte-identical in both apps) (`biometric-no-device-mode.test.tsx` · `biometric-android-prf.test.ts` ·
+  `biometric-unlock-test` · `keygen-biometric-test`).
 - `linkIsFrugal()` fails open and skips only optional work.
 - `function-surface-test.js` blocks duplicate declarations.
 

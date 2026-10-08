@@ -182,7 +182,10 @@ function megabytes(bytes: number) {
     return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-function ApkUpdateBlock({ version, release, update }: { version: string; release: ApkReleaseState; update: ApkUpdateState }) {
+function ApkUpdateBlock({ version }: { version: string }) {
+    const s = useStoreFields(uiState, ['apkRelease', 'apkUpdate']);
+    const release: ApkReleaseState = s.apkRelease;
+    const update: ApkUpdateState = s.apkUpdate;
     if (release.version !== version || release.state === 'idle' || release.state === 'checking') {
         return <div className="notify-apk-status" id="notifyApkStatus">⏳ កំពុងពិនិត្យ APK កំណែ {version} លើ GitHub Release…</div>;
     }
@@ -227,7 +230,7 @@ function ApkUpdateBlock({ version, release, update }: { version: string; release
     );
 }
 
-function VersionSection({ feed, updateReady, apkRelease, apkUpdate }: { feed: NotifyFeedItem[]; updateReady: boolean; apkRelease: ApkReleaseState; apkUpdate: ApkUpdateState }) {
+function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateReady: boolean }) {
     const newer = newerAppVersion(feed);
     let status;
     if (updateReady) {
@@ -243,7 +246,7 @@ function VersionSection({ feed, updateReady, apkRelease, apkUpdate }: { feed: No
                 <div className="notify-summary is-info">
                     🆕 កំណែ {newer} មានហើយ — {isNativeApp() ? 'សូមដំឡើង APK ថ្មី' : 'App នឹងទាញវាដោយស្វ័យប្រវត្តិ (ឬ Refresh)'}
                 </div>
-                {isNativeApp() ? <ApkUpdateBlock version={newer} release={apkRelease} update={apkUpdate} /> : null}
+                {isNativeApp() ? <ApkUpdateBlock version={newer} /> : null}
             </>
         );
     } else if (feed.length) {
@@ -298,7 +301,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus', 'apkRelease', 'apkUpdate']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -318,7 +321,7 @@ export function NotifyDrawer() {
                 <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
                 <RemovedSection view={s.notifyRemovedView} />
-                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} apkRelease={s.apkRelease} apkUpdate={s.apkUpdate} />
+                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
                 <FeedSection feed={visibleNotifyFeed(s.notifyFeed, s.notifySellerFeed, s.notifyDismissedIds)} seen={s.notifySeenIds} />
             </div>
             <div className="drawer-foot notify-foot">

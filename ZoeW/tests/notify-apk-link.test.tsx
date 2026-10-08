@@ -66,6 +66,11 @@ vi.mock('@capacitor/core', async (orig) => ({
 }));
 
 vi.mock('../src/features/app-lock', async (orig) => ({ ...(await orig<any>()), noteAppLockExcuse: () => { h.state.order.push('excuse'); } }));
+const renders = vi.hoisted(() => ({ group: 0 }));
+vi.mock('../src/app/components/DrawerGroup', async (orig) => {
+    const real = await orig<any>();
+    return { ...real, DrawerGroup: (props: any) => { renders.group++; return real.DrawerGroup(props); } };
+});
 
 import { uiState } from '../src/core/state';
 import { APP_VERSION } from '../src/core/version';
@@ -246,6 +251,14 @@ describe('🔔 កំណែ App ៖ ទាញយក APK ក្នុង App · �
         expect(calls('install')).toEqual([['install', { version: NEWER }]]);
         expect(versionText()).toContain('ដំឡើង');
         expect(h.state.listeners.progress).toBe(undefined);
+    });
+
+    it('⛔ progress ទាញ APK (រាល់ ០,២៥ វិ.) ➜ re-render តែប្លុក APK មិនមែនក្រុម 📦/📤 របស់ផ្ទាំង 🔔', async () => {
+        await startDownload();
+        const before = renders.group;
+        for (let i = 1; i <= 5; i++) step(() => { h.state.listeners.progress({ version: NEWER, received: i * 1000, total: 10000 }); });
+        expect(versionText()).toContain('50%');
+        expect(renders.group).toBe(before);
     });
 
     it('⛔ មិនទាន់អនុញ្ញាត «ដំឡើង App មិនស្គាល់» ៖ Settings ➜ អនុញ្ញាត ➜ excuse ថ្មី ➜ ផ្ទាំងដំឡើង · បដិសេធ ➜ ណែនាំ + ចុចម្តងទៀតបាន', async () => {

@@ -501,6 +501,18 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
         await flushNet();
         ok('Activate ថ្មី (កក់កៅអី) ➜ meta សរសេរតាមក្រោយ', rE && rE.valid === true && metaPuts(sE).length === 1 && !!(sE.seats[SLOTS[0]] && sE.seats[SLOTS[0]].meta), [rE, sE.log]);
 
+        let sBusy = makeServer({ seats: mineSeat() });
+        let hBusy = build(sBusy, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        setMeta(hBusy, META);
+        vm.runInContext("netInFlight.set('foreign', new Promise(() => {}))", hBusy.ctx);
+        let stBusy = await status(hBusy);
+        await flushNet();
+        ok('⛔ សំណើ License ផ្សេងកំពុងរត់ ➜ meta មិនយកកន្លែងបណ្តាញ (ពិដាន ២ ទុកឲ្យការពិនិត្យ Key)', stBusy.state === 'active' && metaPuts(sBusy).length === 0, sBusy.log);
+        vm.runInContext("netInFlight.delete('foreign')", hBusy.ctx);
+        await status(hBusy);
+        await flushNet();
+        ok('ហើយពេលទំនេរ ➜ សរសេរនៅការពិនិត្យបន្ទាប់', metaPuts(sBusy).length === 1, sBusy.log);
+
         let sF = makeServer({ seats: mineSeat() });
         let hF = build(sF, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
         await status(hF);

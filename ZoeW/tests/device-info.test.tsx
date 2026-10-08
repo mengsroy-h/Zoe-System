@@ -189,12 +189,12 @@ describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK
         expect(document.getElementById('testDeviceInfo')!.textContent).toContain('ID App');
     });
 
-    it('⛔ ខ្សែភ្ជាប់ ៖ ☰ footer និង 🩺 គូរបន្ទាត់ឧបករណ៍ · boot · ensureAppActivated · បើក 🩺 ហៅ loadDeviceInfo · មិនមែនជួរ 🩺', () => {
+    it('⛔ ខ្សែភ្ជាប់ ៖ ☰ footer និង 🩺 គូរបន្ទាត់ឧបករណ៍ · boot · បើក 🩺 ហៅ loadDeviceInfo · ⛔ ផ្លូវ Activation មិនប៉ះ · មិនមែនជួរ 🩺', () => {
         const read = (rel: string) => fs.readFileSync(path.join(SRC, rel), 'utf8');
         expect(read('app/components/SideDrawer.tsx')).toMatch(/<DeviceInfoLine id="drawerDeviceInfo" \/>/);
         expect(read('app/components/modals/HealthCheckModal.tsx')).toMatch(/<DeviceInfoLine id="healthDeviceInfo" \/>/);
         expect(read('app/lifecycle/boot.ts')).toMatch(/loadDeviceInfo\(\);/);
-        expect(read('features/license.ts')).toMatch(/export async function ensureAppActivated\(\) \{\s*loadDeviceInfo\(\);/);
+        expect(read('features/license.ts')).not.toMatch(/loadDeviceInfo/);
         expect(read('features/health-check.ts')).toMatch(/export function openHealthCheck\(\) \{[^}]*loadDeviceInfo\(\);/);
         expect(read('app/components/device/DeviceInfoLine.tsx')).not.toMatch(/health-row/);
     });

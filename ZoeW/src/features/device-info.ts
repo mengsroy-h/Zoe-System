@@ -20,7 +20,7 @@ const REDUCED_UA_MODEL = 'K';
 
 let devicePending: Promise<DeviceInfo> | null = null;
 
-function cleanText(value: unknown, max: number): string {
+function cleanDeviceText(value: unknown, max: number): string {
     if (typeof value !== 'string') return '';
     const text = value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
     return text.length > max ? text.slice(0, max).trim() : text;
@@ -31,12 +31,12 @@ function titleCase(word: string): string {
 }
 
 export function nativeModelName(manufacturer: unknown, model: unknown): string {
-    const maker = cleanText(manufacturer, 40);
-    const name = cleanText(model, 80);
+    const maker = cleanDeviceText(manufacturer, 40);
+    const name = cleanDeviceText(model, 80);
     if (!maker) return name;
     if (!name) return titleCase(maker);
     if (name.toLowerCase().indexOf(maker.toLowerCase()) === 0) return name;
-    return cleanText(titleCase(maker) + ' ' + name, 80);
+    return cleanDeviceText(titleCase(maker) + ' ' + name, 80);
 }
 
 export function deviceFromUserAgent(ua: unknown): { model: string; platform: string } {
@@ -45,7 +45,7 @@ export function deviceFromUserAgent(ua: unknown): { model: string; platform: str
     if (apple) return { model: apple[1], platform: 'iOS ' + apple[2] + '.' + apple[3] };
     const android = /Android (\d+(?:\.\d+)?)(?:;\s*([^;)]+))?/.exec(s);
     if (android) {
-        const name = cleanText((android[2] || '').replace(/\s*Build\/.*$/, ''), 80);
+        const name = cleanDeviceText((android[2] || '').replace(/\s*Build\/.*$/, ''), 80);
         return { model: name && name !== REDUCED_UA_MODEL ? name : '', platform: 'Android ' + android[1] };
     }
     if (/Windows NT/.test(s)) return { model: '', platform: 'Windows' };
@@ -65,9 +65,9 @@ async function webDeviceInfo(): Promise<{ model: string; platform: string }> {
         try {
             const hints: any = await withTimeout(Promise.resolve().then(() => uad.getHighEntropyValues(['model', 'platformVersion'])),
                 DEVICE_INFO_TIMEOUT_MS, 'Device hints timed out');
-            const hintModel = cleanText(hints && hints.model, 80);
-            const hintPlatform = cleanText((hints && hints.platform) || uad.platform, 40);
-            const major = cleanText(hints && hints.platformVersion, 20).split('.')[0];
+            const hintModel = cleanDeviceText(hints && hints.model, 80);
+            const hintPlatform = cleanDeviceText((hints && hints.platform) || uad.platform, 40);
+            const major = cleanDeviceText(hints && hints.platformVersion, 20).split('.')[0];
             if (hintModel) model = hintModel;
             if (hintPlatform === 'Android' && /^\d+$/.test(major)) platform = 'Android ' + major;
             else if (hintPlatform && !platform) platform = hintPlatform;
@@ -80,8 +80,8 @@ async function nativeDeviceInfo(): Promise<{ model: string; platform: string; se
     const core = await import('@capacitor/core');
     const ZD: any = core.registerPlugin(DEVICE_PLUGIN_NAME);
     const info: any = await ZD.info();
-    const release = cleanText(info && info.release, 20);
-    const androidId = cleanText(info && info.androidId, 32);
+    const release = cleanDeviceText(info && info.release, 20);
+    const androidId = cleanDeviceText(info && info.androidId, 32);
     return {
         model: nativeModelName(info && info.manufacturer, info && info.model),
         platform: release ? 'Android ' + release : 'Android',
@@ -93,7 +93,7 @@ function licenseDeviceId(): string {
     try {
         const lic: any = window.ZoeLicense;
         if (!lic || typeof lic.getDeviceId !== 'function') return '';
-        return cleanText(lic.getDeviceId(), 64);
+        return cleanDeviceText(lic.getDeviceId(), 64);
     } catch (e) {
         return '';
     }

@@ -372,6 +372,7 @@
     function noteSeatMeta(appCode, keyId, slot, record) {
         const meta = seatMetaState.meta;
         if (!meta || seatMetaState.refused || LICENSE_SEAT_SLOTS.indexOf(slot) === -1 || seatMetaSame(record, meta)) return null;
+        if (netInFlight.size > 0) return null;
         const stamp = Math.round(getServerNow());
         const body = JSON.stringify({ model: meta.model || '-', platform: meta.platform || '-', serial: meta.serial || '-', at: stamp > 0 ? stamp : 1 });
         const pending = sharedRequest('seat-meta:' + appCode + '/' + keyId + '/' + slot, false,

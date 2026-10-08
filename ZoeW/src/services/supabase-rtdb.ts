@@ -950,6 +950,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         }
         if (!ops.length) return Promise.resolve();
+        if (ops.length > SB_OPS_PER_WRITE && ops.some((op) => op.k === 'inc')) {
+            throw new Error('update() failed: ' + ops.length + ' paths with increment() exceed the atomic write limit of ' + SB_OPS_PER_WRITE);
+        }
         const writes = [];
         for (let i = 0; i < ops.length; i += SB_OPS_PER_WRITE) writes.push(enqueueWrite(ops.slice(i, i + SB_OPS_PER_WRITE), base, true));
         return Promise.all(writes).then(() => undefined);

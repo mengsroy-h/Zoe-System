@@ -128,6 +128,26 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.29] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ `update()` ច្រើនជាង ៥០០ ផ្លូវមានកិច្ចសន្យាច្បាស់ ៖ បំបែកបានតែ payload idempotent · `increment()` ត្រូវបដិសេធមុនសរសេរ** (Deep audit ២ · ជុំ ១៣ · SUPABASE-6)
+
+**ZoeW `2.50.29`** (`zoew-v291` ➜ `zoew-v292`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី (⛔ ពិដាន ៥០០ op របស់ `zoe_write` មិនប្រែ)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧮 **SUPABASE-6** ៖ `update()` ពហុផ្លូវរបស់ RTDB ជា atomic · `zoe_write` ទទួល ≤ `SB_OPS_PER_WRITE` (៥០០) op ➜ adapter បំបែក update ធំជាការសរសេរច្រើនដែល atomic ដាច់ៗពីគ្នា ➜ ការអនុវត្តពាក់កណ្តាល
+  ដែលគ្មានអ្វីទប់ ៖ `increment()` + ការព្យាយាមម្តងទៀត = បូកពីរដង។ ឥឡូវ ៖ update > ៥០០ ផ្លូវដែលមាន `increment()` ➜ បោះមុនសរសេរ (គ្មាន `zoe_write`) · ≤ ៥០០ នៅ atomic ដូចដើម · អ្នកហៅ `fb.update(` ទាំង ៩
+  ចាត់ថ្នាក់ BOUNDED (ផ្លូវថេរតូច ៖ ការលុប/ស្តារជាមួយរបង · increment មានតែក្នុង `finalizeClaimedRestore`) ឬ IDEMPOTENT (`null`/តម្លៃដាច់ខាត ៖ ដោះ registry · purge · mirror ចំណូល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (គ្មានអ្នកហៅបច្ចុប្បន្នណាផ្ញើ increment លើស ៥០០ ផ្លូវ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-update-contract.test.ts` (ថ្មី · ៦ · adapter ពិត + backend ក្លែង) ៖ ៥០០ ➜ ការសរសេរ ១ · ៥០១ ➜ ២ · ១២០១ idempotent ➜ ៥០០/៥០០/២០១ · > ៥០០ + increment ➜ បដិសេធ គ្មាន `zoe_write`
+  (មុនកែ FAIL ១ ៖ «resolved») · បញ្ជីអ្នកហៅ `fb.update(` និង `fb.increment(` ដេរីវេពី `src/` ទាំងពីរទិស · ពិដាន ៥០០ = migration · mutation gate ➜ FAIL ១។
+
 ### [2.50.28] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ ចាកចេញ ឬចូលគណនីផ្សេងក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងបញ្ចប់សម័យ ហើយមិនប្រើ token គណនីផ្សេង** (Deep audit ២ · ជុំ ១៣ · SUPABASE-1)
 
 **ZoeW `2.50.28`** (`zoew-v290` ➜ `zoew-v291`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី។
@@ -2416,11 +2436,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៣ (SUPABASE-1 · SUPABASE-6) ➜ [2.50.28]–
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៣ (SUPABASE-1 · SUPABASE-6) ➜ [2.50.28]–[2.50.29]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A24 | **SUPABASE-1** ចាកចេញ/ចូលគណនីផ្សេងមិនទៅដល់ផ្ទាំងផ្សេង | Claude ៖ transport + sdk ពិត ២ ផ្ទាំង ៖ ផ្ទាំង A ចាកចេញ ➜ ផ្ទាំង B នៅ u1 ហើយ `rpc()` ផ្ញើគ្មាន Authorization · ផ្ទាំង A ចូល u2 ➜ ផ្ទាំង B ផ្ញើ `Bearer u2…` · FAIL ៤/៥ | session ចងនឹងផ្ទាំង · storage event + ការពិនិត្យក្នុង `rpc()`/`accessToken()` |
+| A25 | **SUPABASE-6** `update()` > ៥០០ ផ្លូវមិន atomic | Claude ៖ adapter ពិត ៖ update ៥០១ ផ្លូវ + increment ➜ បំបែក ២ ការសរសេរ (ផ្នែកទី ១ អាចចូល ខណៈផ្នែកទី ២ ធ្លាក់) · FAIL ១/៦ · អ្នកហៅបច្ចុប្បន្ន ៩ ៖ increment មានតែក្នុង `finalizeClaimedRestore` (BOUNDED) | បដិសេធ increment លើសពិដាន · ចាត់ថ្នាក់អ្នកហៅ |
 
 - ផ្ទាំងដែលបញ្ចប់សម័យដោយសារផ្ទាំងផ្សេង មិនហៅ `signOut()` (App គ្រាន់តែសម្អាតទិន្នន័យ + ប្រអប់ចូល) ➜ session របស់ផ្ទាំងផ្សេងនៅដដែល · ស្ថានភាព «បញ្ចប់» (`boundEnded`) រក្សារហូតដល់ចូល/ស្តារ/ចាកចេញក្នុងផ្ទាំងនោះ
   (មុនដំបូង ៖ `boundUid = null` ➜ `rpc()` យឺតពីសម័យចាស់ផ្ញើអនាមិក · FAIL ២)។ ការពិនិត្យក្រោយ refresh និងការបោះមុនក្នុង `rpc()` ស្ទួន ➜ ដកចេញ។

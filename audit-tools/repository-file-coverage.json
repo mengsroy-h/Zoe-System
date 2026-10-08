@@ -1866,6 +1866,9 @@
     "ZoeW/tests/close-restamp-idempotent.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/supabase-update-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-write-bad-body.test.ts": {
       "policy": "zoew-self-verification"
     },

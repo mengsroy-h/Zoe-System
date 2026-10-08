@@ -102,7 +102,8 @@ function makeContext(app) {
         requestAnimationFrame: (fn) => setTimeout(fn, 0)
     };
     const ctx = vm.createContext(sandbox);
-vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
+    // ⛔ ការហូតប្រអប់ឡើង (ផ្ទាល់ ឬរអិល FLIP) ជារបស់ `phone-search-swipe-test` · `history-window-check` ➜ ត្រង់នេះជា stub
+    vm.runInContext('function setPhoneSearchPulledUp() {}\nfunction glidePhoneSearchPulledUp() {}', ctx);
     const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper', 'showAppChrome'];
     // ⛔ `phoneSearchFocused`/`phoneSearchBlurred` ៖ handler `onFocus`/`onBlur` ពិតរបស់ប្រអប់ស្វែងរក (JSX)
     //    — App React មិនចាក់ listener តាម `addEventListener` ទៀតទេ

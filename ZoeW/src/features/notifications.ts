@@ -495,6 +495,7 @@ export function openNotifyDrawer() {
 }
 
 export const APP_UPDATE_CHECK_WAIT_MS = 100;
+export const APP_UPDATE_CHECK_WAIT_MAX = Math.ceil(NOTIFY_FEED_TIMEOUT_MS / APP_UPDATE_CHECK_WAIT_MS);
 
 export function requestServiceWorkerUpdate(): Promise<boolean> {
     if (isNativeApp()) return Promise.resolve(false);
@@ -513,8 +514,7 @@ export async function checkForAppUpdate(): Promise<void> {
     if (uiState.appUpdateCheck.phase === 'checking') return;
     uiState.appUpdateCheck = { phase: 'checking', at: Date.now() };
     const sw = withTimeout(requestServiceWorkerUpdate(), NOTIFY_FEED_TIMEOUT_MS, 'Service worker update timed out').catch(() => false);
-    const startedAt = Date.now();
-    while (uiState.notifyFeedInFlight && elapsedSince(startedAt) < NOTIFY_FEED_TIMEOUT_MS) {
+    for (let waited = 0; uiState.notifyFeedInFlight && waited < APP_UPDATE_CHECK_WAIT_MAX; waited++) {
         await new Promise((resolve) => setTimeout(resolve, APP_UPDATE_CHECK_WAIT_MS));
     }
     const fetched = await fetchNotifyFeed(true);

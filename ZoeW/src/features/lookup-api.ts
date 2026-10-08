@@ -92,12 +92,22 @@ export async function buildLookupRequestHeaders(cfg) {
     return headers;
 }
 
-export async function ztoIdToken() {
+export const ZTO_ID_TOKEN_TIMEOUT_MS = 8000;
+export const ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS = 3000;
+
+export async function ztoIdToken(timeoutMs?) {
     try {
         if (!firebaseState.fb || typeof firebaseState.fb.getIdTokenResult !== 'function' || !firebaseState.auth || !firebaseState.auth.currentUser) return '';
-        const out = await withTimeout(firebaseState.fb.getIdTokenResult(firebaseState.auth.currentUser), 8000, 'ID token timed out');
+        const out = await withTimeout(firebaseState.fb.getIdTokenResult(firebaseState.auth.currentUser), timeoutMs || ZTO_ID_TOKEN_TIMEOUT_MS, 'ID token timed out');
         return out && typeof out.token === 'string' ? out.token : '';
     } catch (e) { return ''; }
+}
+
+export async function addZtoIdentityHeader(cfg, headers) {
+    if (!lookupApiIsZto(cfg)) return headers;
+    const token = await ztoIdToken(ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS);
+    if (token) headers['X-Zoe-Id-Token'] = token;
+    return headers;
 }
 
 export function lookupApiSupportsList(cfg) {

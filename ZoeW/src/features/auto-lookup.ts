@@ -6,7 +6,7 @@ import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
 import { lookupApiIsZto, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
-import { lookupApiSendsHeader } from './lookup-api';
+import { addZtoIdentityHeader, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
@@ -374,6 +374,7 @@ export async function attemptAutoLookup(barcode) {
                 headers[cfg.headerName] = cfg.headerValue;
             }
         }
+        await addZtoIdentityHeader(cfg, headers);
 
         const unreadable = {};
         const out = await retryAsync(
@@ -401,6 +402,10 @@ export async function attemptAutoLookup(barcode) {
         const found = !!(data && (data.success === true || data.found === true)) || hasPhone || hasCod || hasDod;
         autoLookupFailureAt.delete(lookupKey);
         if (!found) {
+            if (isZtoLookup && data && data.code === 'ZTO_OTHER_BRANCH') {
+                setLookupStatus(barcode, 'warn', '⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ');
+                return;
+            }
             setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ');
             return;
         }
@@ -425,6 +430,10 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
             setLookupStatus(barcode, 'error', '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
+        } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED') {
+            setLookupStatus(barcode, 'error', '🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត');
+        } else if (e && e.lookupCode === 'ZTO_IDENTITY_UNAVAILABLE') {
+            setLookupStatus(barcode, 'error', '⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
             setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');
         } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED')) {

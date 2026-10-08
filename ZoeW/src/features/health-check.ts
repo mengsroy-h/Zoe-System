@@ -213,6 +213,14 @@ export function ztoBlobAgeText(cookie) {
     return (synced ? ' · Sync ចូល Blob ' + synced + 'មុន' : '') + (renewed ? ' · បន្តអាយុចុងក្រោយ ' + renewed + 'មុន' : '');
 }
 
+function ztoAccessText(body) {
+    const access = body && body.access;
+    if (!access || typeof access !== 'object') return '';
+    const label = safeLookupReason(access.keyLabel);
+    const mode = safeLookupReason(access.identity);
+    return (label ? ' · សោហាង ' + label : '') + (mode && mode !== 'off' ? ' · ផ្ទៀងគណនី ' + mode : '');
+}
+
 export function ztoRenewalText(body) {
     const cookie = body && typeof body.cookie === 'object' ? body.cookie : null;
     const signal = body && typeof body.sessionRenewal === 'object' && body.sessionRenewal
@@ -296,6 +304,7 @@ export async function healthLookupRow() {
             + (typeof ageMs === 'number' ? ' · Server អានចុងក្រោយ ' + (durationText(ageMs) || '0 នាទី') + 'មុន' : '')
             + (reason ? ' · ' + reason : '')
             + ztoRenewalText(body)
+            + ztoAccessText(body)
             + mismatchText;
         if (typeof rejectedAgeMs === 'number') {
             return healthRow('bad', 'Lookup អតិថិជន (ZTO)',

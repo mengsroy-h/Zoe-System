@@ -13,7 +13,7 @@ import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
 import { isPinFlowPending } from './config';
 import { lookupApiIsZto } from './customer-table-prefetch';
-import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
+import { addZtoIdentityHeader, buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
@@ -719,6 +719,7 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     const session = captureZtoSession();
     const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
     const headers = await buildLookupRequestHeaders(cfg);
+    await addZtoIdentityHeader(cfg, headers);
     if (!session.current()) return null;
     const out = await fetchWithTimeout(targetUrl, { headers }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
         'ZTO status timed out', (r) => r.json().catch(() => null));

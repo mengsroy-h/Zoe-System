@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { tokenForSite, withCerts } = require('./idtoken-fixture.js');
+const { tokenFor, tokenForSite, withCerts, TEST_PROJECT } = require('./idtoken-fixture.js');
 
 const ROOT = process.env.ZTOPROXY_APP_DIR ? path.resolve(process.env.ZTOPROXY_APP_DIR) : path.resolve(__dirname, '..');
 const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
@@ -106,7 +106,9 @@ const ENV_NAMES = [
     'ZTO_REQUEST_HEADERS_JSON', 'ZTO_FIELD_PHONE', 'ZTO_FIELD_COD', 'ZTO_FIELD_DOD',
     'ZTO_FIELD_BARCODE', 'ZTO_SEND_BROWSER_HEADERS', 'ZTO_UPSTREAM_TIMEOUT_MS',
     'ZTO_REQUEST_BUDGET_MS', 'ZTO_UPSTREAM_RETRIES', 'ZTO_CACHE_TTL_MS',
-    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN', 'ZTO_LIST_SITE_CODE'
+    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN', 'ZTO_LIST_SITE_CODE',
+    'ZTO_PROXY_KEYS', 'ZTO_DETAIL_IDENTITY', 'ZTO_DETAIL_BRANCH_PATHS', 'FIREBASE_PROJECT_IDS',
+    'ZTO_SITE_EMAIL_PREFIX', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'ZTO_NOT_FOUND_CACHE_TTL_MS'
 ];
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 const SAVED_FETCH = global.fetch;
@@ -676,6 +678,201 @@ group('ការវិនិច្ឆ័យ ?diag=1', async () => {
         diagNone.statusCode === 200 && JSON.parse(diagNone.body).auth === 'none', diagNone.body);
     const diagNoKey = await proxy.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { diag: '1' } });
     ok('⛔ ?diag=1 នៅតែត្រូវការសោ', diagNoKey.statusCode === 401, diagNoKey.statusCode);
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ១២. សោតាមហាង · អត្តសញ្ញាណលើ `/detail` · កំណត់សាខា (សំណើម្ចាស់គម្រោង ៖ ជម្រើស ២ · ៣ · ៤)
+// ────────────────────────────────────────────────────────────────────────────
+// ⛔ ថ្នាក់ ៖ `/detail` (លេខទូរស័ព្ទ · COD) ចងតែ `ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ➜ សោលេចពីទូរស័ព្ទហាងមួយ = អានកញ្ចប់ ZTO គ្រប់សាខា
+//    ដោយគ្មានគណនី ខណៈ `?list=1` ចងអត្តសញ្ញាណ និងសាខារួចហើយ។ ច្បាប់ ៖ (២) `ZTO_PROXY_KEYS` (`label=key` ក្នុងមួយហាង · បិទហាងមួយបាន ·
+//    `?diag=1` ប្រាប់ label) · (៣) `ZTO_DETAIL_IDENTITY` = `off` (លំនាំដើម) | `optional` | `require` ៖ `require` ➜ គ្មាន/មិនត្រឹមត្រូវ ID token ➜
+//    401 `ZTO_IDENTITY_REQUIRED` មុន cache និង ZTO · ផ្ទៀងមិនបាន (certs) ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` · (៤) `ZTO_DETAIL_BRANCH_PATHS` ៖
+//    ឆ្លើយតែកញ្ចប់ដែលសាខា (វាលក្នុងកំណត់ត្រា ZTO) = សាខារបស់គណនី ➜ ផ្សេង/គ្មាន ➜ 200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ·
+//    cache មិនរំលងការពិនិត្យណាមួយ។
+const KEY_A = 'shop-a-key-0123456789abcdef';
+const KEY_B = 'shop-b-key-0123456789abcdef';
+const KEY_PADDED = 'c2hvcC1jLWtleS0wMTIzNDU2Nzg5==';
+const ORDER_SITE = { success: true, data: Object.assign({}, ORDER.data, { dispSiteCode: '12345' }) };
+
+function bodyOf(res) {
+    try { return JSON.parse(res.body); } catch (_) { return null; }
+}
+
+function callAs(query, key, token) {
+    const headers = { 'x-zoe-proxy-key': key };
+    if (token) headers['x-zoe-id-token'] = token;
+    return proxy.handler({ httpMethod: 'GET', headers, queryStringParameters: query });
+}
+
+function ztoCalls() {
+    return jsonResponder.calls || 0;
+}
+
+function serveOrder(order) {
+    jsonResponder.calls = 0;
+    global.fetch = withCerts(jsonResponder(order));
+}
+
+group('សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា', async () => {
+    console.log('\n== ១២. សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា ==');
+    const B = { barcode: '77130527210012' };
+
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROXY_KEYS: 'shopa=' + KEY_A + ', shopb=' + KEY_B + '\nshopc=' + KEY_PADDED });
+    delete process.env.ZTO_PROXY_KEY;
+    serveOrder(ORDER);
+    const a = await callAs(B, KEY_A);
+    const b = await callAs(B, KEY_B);
+    const c = await callAs(B, KEY_PADDED);
+    ok('⛔ (២) `ZTO_PROXY_KEYS` ៖ សោហាង A · B · សោមាន `=` ខាងចុង ➜ 200',
+        a.statusCode === 200 && b.statusCode === 200 && c.statusCode === 200, [a.statusCode, b.statusCode, c.statusCode]);
+    const legacyGone = await callAs(B, KEY);
+    const stranger = await callAs(B, 'stranger-key-0123456789abcdef');
+    const prefix = await callAs(B, KEY_A.slice(0, -1));
+    ok('⛔ (២) សោដែលមិនមានក្នុងបញ្ជី · សោកាត់មួយតួ ➜ 401 (គ្មាន ZTO_PROXY_KEY ចាស់)',
+        legacyGone.statusCode === 401 && stranger.statusCode === 401 && prefix.statusCode === 401,
+        [legacyGone.statusCode, stranger.statusCode, prefix.statusCode]);
+    const diagA = await callAs({ diag: '1' }, KEY_A);
+    const diagABody = bodyOf(diagA) || {};
+    ok('⛔ (២) `?diag=1` ប្រាប់ label នៃសោដែលប្រើ (`shopa`) · ចំនួនសោ ៣',
+        !!diagABody.access && diagABody.access.keyLabel === 'shopa' && diagABody.access.keys === 3, diagABody.access);
+    ok('⛔ (២) តម្លៃសោមិនចេញក្នុង `?diag=1`',
+        diagA.body.indexOf(KEY_A) === -1 && diagA.body.indexOf(KEY_B) === -1 && diagA.body.indexOf(KEY_PADDED) === -1, diagA.body.slice(0, 200));
+
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROXY_KEYS: 'shopa=' + KEY_A });
+    serveOrder(ORDER);
+    const legacyKept = await callAs(B, KEY);
+    const legacyDiag = bodyOf(await callAs({ diag: '1' }, KEY)) || {};
+    ok('(២) `ZTO_PROXY_KEY` ចាស់នៅដំណើរការជាមួយ `ZTO_PROXY_KEYS` (ការផ្លាស់ម្តងមួយហាង) · label `default`',
+        legacyKept.statusCode === 200 && !!legacyDiag.access && legacyDiag.access.keyLabel === 'default', [legacyKept.statusCode, legacyDiag.access]);
+
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROXY_KEYS: 'nolabel,Bad!=' + KEY_B + ',short=abc,shopa=' + KEY_A + ',shopa=' + KEY_B });
+    delete process.env.ZTO_PROXY_KEY;
+    serveOrder(ORDER);
+    const goodLeft = await callAs(B, KEY_A);
+    const badKey = await callAs(B, KEY_B);
+    const badDiag = bodyOf(await callAs({ diag: '1' }, KEY_A)) || {};
+    ok('⛔ (២) ធាតុខុស (គ្មាន label · label ខុស · សោខ្លី · label ស្ទួន) ➜ មិនផ្តល់សិទ្ធិ · ធាតុត្រឹមត្រូវនៅដំណើរការ · `?diag=1` រាប់ធាតុខុស',
+        goodLeft.statusCode === 200 && badKey.statusCode === 401 && !!badDiag.access && badDiag.access.invalidKeys === 4,
+        [goodLeft.statusCode, badKey.statusCode, badDiag.access]);
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROXY_KEYS: 'short=abc' });
+    delete process.env.ZTO_PROXY_KEY;
+    const noneValid = await callAs(B, 'abc');
+    ok('(២) គ្មានសោត្រឹមត្រូវណាមួយ ➜ 503 `ZTO_PROXY_NOT_CONFIGURED`',
+        noneValid.statusCode === 503 && (bodyOf(noneValid) || {}).code === 'ZTO_PROXY_NOT_CONFIGURED', noneValid.body);
+
+    const site = tokenForSite('12345');
+    const otherSite = tokenForSite('99999');
+    const forged = tokenFor('u@zoew12345.com', { forge: true });
+    const idEnv = (extra) => resetEnv(Object.assign({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', FIREBASE_PROJECT_IDS: TEST_PROJECT }, extra || {}));
+
+    idEnv({});
+    serveOrder(ORDER);
+    const defaultNoToken = await callAs(B, KEY);
+    ok('(៣) លំនាំដើម (`ZTO_DETAIL_IDENTITY` មិនកំណត់) ➜ គ្មាន token នៅ 200 (ឧបករណ៍ចាស់មិនដាច់)',
+        defaultNoToken.statusCode === 200 && !!(bodyOf(defaultNoToken) || {}).phone, defaultNoToken.body);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    serveOrder(ORDER);
+    const missing = await callAs(B, KEY);
+    const missingBody = bodyOf(missing) || {};
+    ok('⛔ (៣) `require` + គ្មាន ID token ➜ 401 `ZTO_IDENTITY_REQUIRED` `idtoken:missing` · មិនហៅ ZTO',
+        missing.statusCode === 401 && missingBody.code === 'ZTO_IDENTITY_REQUIRED' && missingBody.reason === 'idtoken:missing'
+        && ztoCalls() === 0, [missing.statusCode, missing.body, ztoCalls()]);
+    const forgedRes = await callAs(B, KEY, forged);
+    ok('⛔ (៣) `require` + token ក្លែង ➜ 401 `idtoken:signature` · មិនហៅ ZTO',
+        forgedRes.statusCode === 401 && (bodyOf(forgedRes) || {}).reason === 'idtoken:signature' && ztoCalls() === 0, forgedRes.body);
+    const good = await callAs(B, KEY, site);
+    ok('(៣) `require` + token ត្រឹមត្រូវ ➜ 200 + លេខទូរស័ព្ទ',
+        good.statusCode === 200 && (bodyOf(good) || {}).phone === '0974158508' && ztoCalls() === 1, good.body);
+    const cachedNoToken = await callAs(B, KEY);
+    ok('⛔ (៣) cache មិនរំលងអត្តសញ្ញាណ ៖ ក្រោយលទ្ធផលចូល cache · គ្មាន token ➜ 401',
+        cachedNoToken.statusCode === 401 && cachedNoToken.body.indexOf('0974158508') === -1, cachedNoToken.body);
+    const cachedWithToken = await callAs(B, KEY, site);
+    ok('ទិសផ្ទុយ ៖ token ត្រឹមត្រូវ ➜ cache នៅឆ្លើយ (មិនហៅ ZTO ម្តងទៀត)',
+        cachedWithToken.statusCode === 200 && (bodyOf(cachedWithToken) || {}).cached === true && ztoCalls() === 1, cachedWithToken.body);
+    const diagRequire = await callAs({ diag: '1' }, KEY);
+    ok('(៣) `?diag=1` នៅត្រូវការតែសោ (🩺 · ឧបករណ៍ Sync) · ប្រាប់របៀប `require`',
+        diagRequire.statusCode === 200 && ((bodyOf(diagRequire) || {}).access || {}).identity === 'require', diagRequire.body.slice(0, 200));
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    jsonResponder.calls = 0;
+    const plain = jsonResponder(ORDER);
+    global.fetch = async (href, init) => {
+        if (String(href).indexOf('googleapis.com') !== -1) throw new TypeError('fetch failed');
+        return plain(href, init);
+    };
+    const certsDown = await callAs(B, KEY, site);
+    const certsBody = bodyOf(certsDown) || {};
+    ok('⛔ (៣) ផ្ទៀងមិនបាន (certs Google មិនឆ្លើយ) ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` (សាកម្តងទៀតបាន ≠ បដិសេធ) · មិនហៅ ZTO',
+        certsDown.statusCode === 503 && certsBody.code === 'ZTO_IDENTITY_UNAVAILABLE' && certsBody.reason === 'idtoken:certs'
+        && ztoCalls() === 0, [certsDown.statusCode, certsDown.body, ztoCalls()]);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'optional' });
+    serveOrder(ORDER);
+    const optNone = await callAs(B, KEY);
+    const optForged = await callAs(B, KEY, forged);
+    ok('(៣) `optional` ៖ គ្មាន token · token ក្លែង ➜ 200 (ដំណាក់កាលផ្លាស់ · មិនបដិសេធ)',
+        optNone.statusCode === 200 && optForged.statusCode === 200, [optNone.statusCode, optForged.statusCode]);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'requre' });
+    serveOrder(ORDER);
+    const typo = await callAs(B, KEY, site);
+    const typoBody = bodyOf(typo) || {};
+    ok('⛔ (៣) តម្លៃខុស (`requre`) ➜ 503 `ZTO_CONFIG_INVALID` `detail-identity:invalid` (មិនបើកចំហស្ងាត់ៗ)',
+        typo.statusCode === 503 && typoBody.code === 'ZTO_CONFIG_INVALID' && typoBody.reason === 'detail-identity:invalid' && ztoCalls() === 0, typo.body);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const same = await callAs(B, KEY, site);
+    const sameBody = bodyOf(same) || {};
+    ok('(៤) សាខាត្រូវគ្នា (`dispSiteCode` = 12345 = សាខាគណនី) ➜ 200 + លេខទូរស័ព្ទ',
+        same.statusCode === 200 && sameBody.phone === '0974158508', same.body);
+    ok('(៤) ចម្លើយមិនបញ្ចេញវាលសាខាខាងក្នុង (`branches`)', !('branches' in sameBody), Object.keys(sameBody));
+    const other = await callAs(B, KEY, otherSite);
+    const otherBody = bodyOf(other) || {};
+    ok('⛔ (៤) សាខាផ្សេង (99999) ➜ 200 `found:false` `ZTO_OTHER_BRANCH` · គ្មានលេខទូរស័ព្ទ · COD (cache មិនរំលង)',
+        other.statusCode === 200 && otherBody.found === false && otherBody.code === 'ZTO_OTHER_BRANCH'
+        && other.body.indexOf('0974158508') === -1 && !('cod' in otherBody) && ztoCalls() === 1, other.body);
+    const noSiteAccount = await callAs(B, KEY, tokenFor('u@zoew.com'));
+    ok('⛔ (៤) គណនីគ្មានលេខសាខា ➜ `ZTO_OTHER_BRANCH` (មិនបើកចំហ)',
+        (bodyOf(noSiteAccount) || {}).code === 'ZTO_OTHER_BRANCH' && noSiteAccount.body.indexOf('0974158508') === -1, noSiteAccount.body);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER);
+    const noField = await callAs(B, KEY, site);
+    const noFieldBody = bodyOf(noField) || {};
+    ok('⛔ (៤) កំណត់ត្រា ZTO គ្មានវាលសាខា ➜ `ZTO_OTHER_BRANCH` `branch:missing` (fail-closed)',
+        noFieldBody.code === 'ZTO_OTHER_BRANCH' && noFieldBody.reason === 'branch:missing' && noField.body.indexOf('0974158508') === -1, noField.body);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'optional', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const optAnon = await callAs(B, KEY);
+    const optOther = await callAs(B, KEY, otherSite);
+    ok('(៤) `optional` ៖ គ្មាន token ➜ 200 (មិនកំណត់) · token សាខាផ្សេង ➜ `ZTO_OTHER_BRANCH` (សាកលើផលិតកម្មមុន `require`)',
+        optAnon.statusCode === 200 && !!(bodyOf(optAnon) || {}).phone && (bodyOf(optOther) || {}).code === 'ZTO_OTHER_BRANCH',
+        [optAnon.body, optOther.body]);
+    const optDiag = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
+    ok('(៤) `?diag=1` រាប់ការពិនិត្យសាខា (ត្រូវ ១ · ផ្សេង ០ · ផ្សេង ១) និងសាខាដែលឃើញ (គ្មានលេខទូរស័ព្ទ)',
+        !!optDiag.branch && optDiag.branch.active === true && optDiag.branch.other === 1 && Array.isArray(optDiag.branch.seen)
+        && optDiag.branch.seen.indexOf('12345') !== -1 && JSON.stringify(optDiag).indexOf('0974158508') === -1, optDiag);
+
+    idEnv({ ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const offOther = await callAs(B, KEY, otherSite);
+    const offDiag = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
+    ok('ទិសផ្ទុយ ៖ អត្តសញ្ញាណ `off` ➜ មិនកំណត់សាខា (200) · `?diag=1` ប្រាប់ថាមិនសកម្ម',
+        offOther.statusCode === 200 && !!offDiag.branch && offDiag.branch.active === false, [offOther.statusCode, offDiag]);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'bad path!' });
+    serveOrder(ORDER_SITE);
+    const badPath = await callAs(B, KEY, site);
+    ok('(៤) ផ្លូវវាលខុស ➜ 503 `ZTO_CONFIG_INVALID` `field:branch`',
+        badPath.statusCode === 503 && (bodyOf(badPath) || {}).reason === 'field:branch', badPath.body);
+
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
+    serveOrder(ORDER);
+    const preflight = await proxy.handler({ httpMethod: 'OPTIONS', headers: { origin: 'https://localhost', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-zoe-proxy-key, x-zoe-id-token' }, queryStringParameters: {} });
+    ok('APK ៖ preflight អនុញ្ញាត `x-zoe-id-token`', /x-zoe-id-token/.test(String(preflight.headers['Access-Control-Allow-Headers'] || '')), preflight.headers);
 });
 
 // ────────────────────────────────────────────────────────────────────────────

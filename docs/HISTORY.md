@@ -77,13 +77,15 @@
    (គ) Netlify Functions ៖ ZTO Palm អានបញ្ជីចុះហត្ថលេខា ២០ វិ. (សកម្ម) · ៦០ វិ. (បើក) ➜ ~១,២០០ ការហៅ/ថ្ងៃ/ឧបករណ៍ ZTO ➜ ពិនិត្យកូតា Netlify មុនបន្ថែមហាង ·
    (ឃ) Supabase Project តែមួយ ៖ realtime ១ ការតភ្ជាប់/ឧបករណ៍ (Free ២០០ · Pro ៥០០ ព្រមគ្នា) · `zoe_ops` ~៤,៥០០ ជួរ/ហាងមមាញឹក/ថ្ងៃ (រក្សា ២ ថ្ងៃ) ·
    (ង) Push ៖ ពិដាន `PUSH_SUBS_TOTAL_MAX` ៥,០០០ · ថវិកា cron ២០ វិ. (១៦ ព្រមគ្នា × ~០.៣ វិ./subscription) ≈ ~១,០០០ subscription ក្នុងមួយដំណឹង (ledger ឡើងមុនផ្ញើ ➜ ដែលលើសមិនទទួល) ·
-   (ច) `ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` (លេខទូរស័ព្ទ · COD) មិនចងសាខា ➜ key លេចពីទូរស័ព្ទហាងមួយ = អានកញ្ចប់ ZTO គ្រប់សាខារបស់គណនី Argus (តំបន់ចាក់សោ ZTO ➜ ត្រូវសំណើ)។
+   (ច) `ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` (លេខទូរស័ព្ទ · COD) មិនចងសាខា ➜ ✅ **កូដរួចក្នុង [2.50.47]** (ម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ») ៖
+   សោតាមហាង · ចងគណនី · កំណត់សាខា ➜ ⏳ ម្ចាស់គម្រោងកំណត់ env តាម [2.50.47] សកម្មភាព ២–៤ (លំនាំដើមមិនប្រែ រហូតដល់កំណត់)។
 
 ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push)។ ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ក្នុង session មួយ ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ · ឆ្លើយជាខ្មែរ។
 
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
 - ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge · ⚠️ ចលនាវាស់តែក្នុង Chromium)** ៖ Merge ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ · ស្វែងរកក្នុងទំព័រស្កេន ➜ រអិល មិនលោត · keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · PR #304 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
@@ -133,6 +135,44 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.47] — 2026-10-09 · ZoeW + Function ZTO ៖ **`/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ» · Handoff ៦ច)
+
+**ZoeW `2.50.47`** (`zoew-v309` ➜ `zoew-v310`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · migration ថ្មី · env ថ្មី ៣ (ស្រេចចិត្ត · មិនកំណត់ ➜ ឥរិយាបថដដែល) ·
+⛔ តំបន់ចាក់សោ ZTO ៖ ប្រែតាមសំណើម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK` (`zto-lock.test.ts`) សម្រាប់ `zto-order-detail.js` · `zto-status.ts` · `auto-lookup.ts` · `lookup-api.ts` ·
+អ្នកយាមធ្លាក់មុនកែ ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់បៃតង។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **(២) សោមួយក្នុងមួយហាង** ៖ Netlify `ZTO_PROXY_KEYS` = `ឈ្មោះ=សោ` (comma · បន្ទាត់ថ្មី) · `ZTO_PROXY_KEY` ចាស់នៅដំណើរការ (ឈ្មោះ `default`) ➜ ប្តូរម្តងមួយហាង ·
+  សោហាងមួយលេច ➜ លុបតែធាតុនោះ · ធាតុខុស (គ្មានឈ្មោះ · ឈ្មោះខុស · សោ < ១៦ តួ · ស្ទួន) មិនផ្តល់សិទ្ធិ · `?diag=1` `access.keyLabel` · `keys` · `invalidKeys` ·
+  🩺 ជួរ Lookup ZTO បង្ហាញ «សោហាង ឈ្មោះ» និង «ផ្ទៀងគណនី require/optional»។
+- 👤 **(៣) ចងគណនី** ៖ App ផ្ញើ `X-Zoe-Id-Token` (គណនីដែលកំពុងចូល · ពិដាន ៣ វិ.) លើការស្កេន ZTO និងការពិនិត្យស្ថានភាព ZTO — តែទៅ Function ZTO (`lookupApiIsZto()`) ⛔ មិនដែលទៅ API ស្វែងរកផ្សេង ·
+  Function `ZTO_DETAIL_IDENTITY` = `off` (លំនាំដើម) · `optional` (ពិនិត្យ · មិនបដិសេធ · រាប់) · `require` (គ្មាន/មិនត្រឹមត្រូវ ➜ 401 `ZTO_IDENTITY_REQUIRED` មុន cache និង ZTO ·
+  certs/Supabase មិនឆ្លើយ ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` ➜ App សាកម្តងទៀត) · តម្លៃខុស ➜ `ZTO_CONFIG_INVALID` · App ៖ «🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត» ·
+  «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត»។
+- 🏢 **(៤) កំណត់សាខា** ៖ `ZTO_DETAIL_BRANCH_PATHS` (វាលក្នុងកំណត់ត្រា ZTO) ➜ ឆ្លើយតែពេលលេខសាខាក្នុងកំណត់ត្រា = សាខាគណនី · ផ្សេង · គ្មានវាល · គណនីគ្មានសាខា ➜
+  200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App ៖ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ» · cache មិនរំលង ·
+  `?diag=1` `access.branch` (`matched` · `other` · `missing` · `seen`) សម្រាប់ផ្ទៀងវាលមុន `require`។
+- 📖 `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ថ្មី (ជំហាន ១–៣) · `guide.html` ផ្នែក ១៤ (សោហាង និងគណនី)។
+
+#### អ្នកយាម
+
+- `audit-tools/zto-proxy-test.js` ផ្នែក ១២ (Function ពិត · token RS256 ពិតពី `idtoken-fixture.js`) ៖ សោហាង A · B · សោមាន `=` · សោក្រៅបញ្ជី · កាត់មួយតួ · `default` រួមជាមួយ ·
+  ធាតុខុស ៤ · គ្មានសោត្រឹមត្រូវ · `require` គ្មាន token · token ក្លែង · cache មិនរំលង · certs ធ្លាក់ ➜ 503 · `optional` · តម្លៃខុស · សាខាត្រូវ/ផ្សេង/គ្មានវាល/គណនីគ្មានសាខា ·
+  `optional` + សាខា · `off` មិនកំណត់ · ផ្លូវខុស · `?diag=1` (label · គ្មានតម្លៃសោ · ការរាប់ · `seen` គ្មានលេខទូរស័ព្ទ) · preflight APK — មុនកែ FAIL ១៨ (១៦៤ ok)។
+- `ZoeW/tests/zto-detail-identity.test.ts` (៨) ៖ ស្កេន · ពិនិត្យស្ថានភាព ➜ មាន token · API ផ្សេង ➜ គ្មាន token · គ្មានគណនី ➜ សំណើនៅចេញ · `ZTO_OTHER_BRANCH` ·
+  `ZTO_IDENTITY_REQUIRED` · `ZTO_IDENTITY_UNAVAILABLE` (សាកម្តងទៀត) · 🩺 «សោហាង» — មុនកែ FAIL ៥/៧ (+ 🩺)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។ មិនកំណត់ env ថ្មី ➜ ឥរិយាបថដូចមុនទាំងស្រុង។
+2. **សោតាមហាង** (`ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ជំហាន ១) ៖ បង្កើតសោមួយក្នុងមួយហាង ➜ Netlify `ZTO_PROXY_KEYS` ➜ Trigger deploy ➜ ទូរស័ព្ទនីមួយៗ ៖ API ស្វែងរកអតិថិជន ➜
+   តម្លៃ Header = សោហាងនោះ ➜ 🩺 «សោហាង ឈ្មោះ» ➜ គ្មានទូរស័ព្ទណា «default» ➜ លុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+3. **ចងគណនី** (ជំហាន ២) ៖ ទូរស័ព្ទទាំងអស់ update ដល់ 2.50.47 (កំណែចាស់មិនផ្ញើ token ➜ ការស្កេនធ្លាក់ពេល `require`) ➜ `ZTO_DETAIL_IDENTITY=optional` ➜ មួយថ្ងៃ ➜
+   `?diag=1` `access.missing` · `rejected` នៅ ០ ➜ `require`។
+4. **កំណត់សាខា** (ជំហាន ៣) ៖ Argus ➜ រកវាលលេខសាខាក្នុង `order/detail` ➜ `ZTO_DETAIL_BRANCH_PATHS` ខណៈ `optional` ➜ `?diag=1` `access.branch.other`/`missing` សម្រាប់
+   កញ្ចប់សាខាខ្លួនឯង = ០ ➜ ទើប `require`។ ⚠️ មិនទាន់វាស់លើទិន្នន័យ ZTO ពិត (ឈ្មោះវាលសាខាក្នុង `order/detail` មិនស្គាល់នៅទីនេះ)។
 
 ### [2.50.46] — 2026-10-08 · ZoeW ៖ **ស្វែងរករអិលរលូន (ទំព័រទិន្នន័យ · ទំព័រស្កេន) · 🔔 «🔄 ពិនិត្យកំណែថ្មី» · Supabase មិនកាត់ពីរដង · SW មិនផ្ទុក HTML ជា chunk** (Deep audit ៣ · សំណើម្ចាស់គម្រោង)
 
@@ -2942,6 +2982,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A65 | **SW ៖ ពាក់កណ្តាល revalidate នៃ `responseFitsKey()` គ្មានអ្នកយាម** (confirmed) | Claude ៖ `sw-backend-chunk-test` ផ្នែក ៤ ដើរតែទ្វារ miss · mutant ដក `responseFitsKey` ពី `revalidateShell()` រស់គ្រប់ checker | `sw-revalidation-timeout.test.ts` +២ (HTML ➜ put ០ · JS ➜ put ១) · mutant ➜ FAIL |
 | A66 | **iPhone PWA ៖ FLIP ចាប់ផ្តើមមុន `focus()` ➜ ប្រអប់គូរនៅទីតាំងចាស់ពេល focus** (uncertain · តំបន់ហាម) | អ្នកផ្ទៀង ៖ លំដាប់កូដពិត (Chromium ៖ កាតនៅទីតាំងចាស់ក្រោយ `focus()`) តែការរំកិលបង្ហាញ keyboard របស់ WebKit វាស់មិនបាន | ⛔ គ្មានកូដ (`phone-search.ts` ចាក់សោ · មិនកែតាមទ្រឹស្តី WebKit) ➜ [2.50.46] សកម្មភាព ២–៣ ៖ មើលការធ្លាក់/រអិលទំព័រទាំងមូល (រោគសញ្ញា A47) |
 | A67 | **`sw-backend-chunk-test` ធ្លាក់ម្តងក្នុង run-all STRICT (95e91a0 ៖ ជោគជ័យ ២០១ · ធ្លាក់ ១) ៖ «ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា»** (ផ្នែក ៤ ថ្មីរបស់ 2.50.46) | Claude ៖ ទ្វារ miss របស់ SW ឆ្លើយទំព័រមុន `cache.put()` ចប់ (មិន await ដោយចេតនា) តែតេស្តអាន cache ភ្លាមក្រោយ `fetch` · ១២ ដងព្រមគ្នា (៦ × ២) មិនកើតឡើងវិញ ➜ ធ្វើត្រាប់ disk យឺត (put ពន្យារ ៤០០ms ក្នុងច្បាប់ចម្លង sw.js) ➜ ធ្លាក់ ៣ កន្លែង (ផ្នែក ២ ក៏ដូចគ្នា) · ការអះអាងអវិជ្ជមាន «មិនដាក់ HTML» ភ្លាមៗ អាច PASS ទទេពេល put យឺត = ការវាស់ race មិនមែនកូដ App | `cacheHasEventually()` (≤ `CACHE_PUT_SETTLE_MS`) · `cacheStaysEmpty()` (ពេញ `CACHE_PUT_GRACE_MS`) · put យឺត ➜ PASS ២៦ · put យឺត + mutant HTML ទ្វារ miss ➜ FAIL ២ · tree ពិត ➜ PASS ២៦ |
+| A68 | **`ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` មិនចងគណនី/សាខា** (Handoff ៦ច · A59 ➜ ម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ») | Claude ៖ `handleRequest()` ផ្ទៀងតែ `timingSafeEqualText(ZTO_PROXY_KEY, …)` ➜ `/detail` ឆ្លើយលេខទូរស័ព្ទ · COD ដល់អ្នកមានសោ · `?list=1` ចង ID token + សាខារួច (`resolveListIdentity()`) · App ផ្ញើ token តែ `?list=1` · `zto-proxy-test` ផ្នែក ១២ មុនកែ FAIL ១៨ · vitest មុនកែ FAIL ៥ | [2.50.47] ៖ `ZTO_PROXY_KEYS` · `ZTO_DETAIL_IDENTITY` · `ZTO_DETAIL_BRANCH_PATHS` (លំនាំដើមដដែល · ម្ចាស់គម្រោងបើកតាមជំហាន) · `resolveListIdentity()` ប្រើឡើងវិញ (គ្មានការផ្ទៀងទី ២) · ⚠️ វាលសាខា ZTO ពិតត្រូវវាស់លើ Argus |
 
 - **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
   `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase

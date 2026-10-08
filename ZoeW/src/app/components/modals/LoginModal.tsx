@@ -32,6 +32,7 @@ function RegisterForm({ busy }: { busy: boolean }) {
                 <input
                     type="text"
                     id="registerUsernameInput"
+                    name="username"
                     ref={refTo('registerUsernameInput')}
                     placeholder="ឈ្មោះគណនី (a–z 0–9 . _ ៣–៣២ តួ)"
                     required
@@ -42,6 +43,7 @@ function RegisterForm({ busy }: { busy: boolean }) {
                 <input
                     type="password"
                     id="registerPasswordInput"
+                    name="new-password"
                     ref={refTo('registerPasswordInput')}
                     placeholder="ពាក្យសម្ងាត់ (យ៉ាងតិច ៨ តួ)"
                     required
@@ -50,6 +52,7 @@ function RegisterForm({ busy }: { busy: boolean }) {
                 <input
                     type="password"
                     id="registerPasswordConfirmInput"
+                    name="confirm-password"
                     ref={refTo('registerPasswordConfirmInput')}
                     placeholder="វាយពាក្យសម្ងាត់ម្តងទៀត"
                     required
@@ -73,6 +76,7 @@ function ResetForm({ busy }: { busy: boolean }) {
                 <input
                     type="text"
                     id="resetUsernameInput"
+                    name="username"
                     ref={refTo('resetUsernameInput')}
                     placeholder="ឈ្មោះគណនី"
                     required
@@ -83,6 +87,7 @@ function ResetForm({ busy }: { busy: boolean }) {
                 <input
                     type="text"
                     id="resetCodeInput"
+                    name="one-time-code"
                     ref={refTo('resetCodeInput')}
                     placeholder="កូដប្តូរពាក្យសម្ងាត់"
                     required
@@ -93,6 +98,7 @@ function ResetForm({ busy }: { busy: boolean }) {
                 <input
                     type="password"
                     id="resetPasswordInput"
+                    name="new-password"
                     ref={refTo('resetPasswordInput')}
                     placeholder="ពាក្យសម្ងាត់ថ្មី (យ៉ាងតិច ៨ តួ)"
                     required
@@ -101,6 +107,7 @@ function ResetForm({ busy }: { busy: boolean }) {
                 <input
                     type="password"
                     id="resetPasswordConfirmInput"
+                    name="confirm-password"
                     ref={refTo('resetPasswordConfirmInput')}
                     placeholder="វាយពាក្យសម្ងាត់ថ្មីម្តងទៀត"
                     required
@@ -130,6 +137,7 @@ export function LoginModal() {
                             <input
                                 type={supabase ? "text" : "email"}
                                 id="loginEmailInput"
+                                name="username"
                                 ref={refTo('loginEmailInput')}
                                 placeholder={supabase ? "ឈ្មោះគណនី" : "អ៊ីមែល ឬ User ID"}
                                 required
@@ -140,6 +148,7 @@ export function LoginModal() {
                             <input
                                 type="password"
                                 id="loginPasswordInput"
+                                name="password"
                                 ref={refTo('loginPasswordInput')}
                                 placeholder="ពាក្យសម្ងាត់"
                                 required

@@ -360,6 +360,65 @@ async function notifyRowLayout(browser, port) {
     await ctx.close();
 }
 
+// ⛔ សំណើម្ចាស់គម្រោង ៖ ZoeKeyGen ៖ ប្រអប់ចូលប្រព័ន្ធ · ចូល Supabase Admin · Private Key ត្រូវឲ្យ Google Password Manager និង iOS Passwords ស្គាល់ ៖
+//    ពាក្យសម្ងាត់នីមួយៗ (`current-password` · `new-password`) នៅក្នុង `<form>` មានប៊ូតុង submit · មុនវាមានប្រអប់ `autocomplete="username"` (Private Key ៖ username
+//    លាក់ «ZoeKeyGen Signing Key» ➜ entry ដាច់ពីគណនី Admin) · មាន `name` · Private Key ជា `<input type="password">` (password manager មិនបំពេញ `<textarea>`) ·
+//    submit (Enter) ដំណើរការសកម្មភាពពិត ហើយ ⛔ មិនបញ្ជូន form តាម URL (`?username=…&password=…`) · ទិសផ្ទុយ ៖ PIN មិនមែនពាក្យសម្ងាត់ (`autocomplete="off"`)។
+async function keygenPasswordForms(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    const dialogs = [];
+    page.on('dialog', (d) => { dialogs.push(d.message()); d.dismiss().catch(() => {}); });
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const audit = await page.evaluate(() => {
+        const out = { ids: [], problems: [], pk: null, pins: [] };
+        const pw = Array.from(document.querySelectorAll('input[type="password"]'));
+        for (const p of pw) {
+            const ac = p.getAttribute('autocomplete') || '';
+            if (ac !== 'current-password' && ac !== 'new-password') { out.pins.push(p.id + ':' + ac); continue; }
+            out.ids.push(p.id);
+            if (!p.getAttribute('name')) out.problems.push(p.id + ' គ្មាន name');
+            const form = p.closest('form');
+            if (!form) { out.problems.push(p.id + ' មិននៅក្នុង form'); continue; }
+            if (!form.querySelector('button[type="submit"]')) out.problems.push(p.id + ' form គ្មានប៊ូតុង submit');
+            const fields = Array.from(form.querySelectorAll('input'));
+            const user = fields.slice(0, fields.indexOf(p)).find((f) => f.getAttribute('autocomplete') === 'username');
+            if (!user) out.problems.push(p.id + ' គ្មាន username មុនវា');
+            else if (!user.getAttribute('name')) out.problems.push(user.id + ' គ្មាន name');
+        }
+        const pk = document.getElementById('privateKeyInput');
+        const pkForm = pk && pk.closest('form');
+        const pkUser = pkForm && pkForm.querySelector('input[autocomplete="username"]');
+        out.pk = pk ? { tag: pk.tagName, type: pk.getAttribute('type'), ac: pk.getAttribute('autocomplete'), user: pkUser ? pkUser.value : null } : null;
+        return out;
+    });
+    const want = ['loginPasswordInput', 'sbAdminPasswordInput', 'privateKeyInput'];
+    check(want.every((id) => audit.ids.indexOf(id) !== -1),
+        '⛔ ZoeKeyGen password manager ៖ ពាក្យសម្ងាត់ ៣ (ចូលប្រព័ន្ធ · Supabase Admin · Private Key) ជា current-password', JSON.stringify(audit));
+    check(audit.ids.length >= 3 && audit.problems.length === 0,
+        '⛔ ZoeKeyGen password manager ៖ ពាក្យសម្ងាត់នីមួយៗនៅក្នុង form + submit + username មុនវា + name', JSON.stringify(audit.problems));
+    check(!!audit.pk && audit.pk.tag === 'INPUT' && audit.pk.type === 'password' && audit.pk.user === 'ZoeKeyGen Signing Key',
+        '⛔ ZoeKeyGen Private Key ៖ <input type="password"> + username លាក់ «ZoeKeyGen Signing Key» (មិនមែន <textarea>)', JSON.stringify(audit.pk));
+    check(audit.pins.length >= 2 && audit.pins.every((x) => /:off$/.test(x)),
+        'ZoeKeyGen ៖ ទិសផ្ទុយ ៖ PIN មិនមែនពាក្យសម្ងាត់ (autocomplete="off")', JSON.stringify(audit.pins));
+    const url0 = page.url();
+    for (const [formId, label] of [['signingKeyForm', 'Private Key'], ['sbAdminForm', 'Supabase Admin']]) {
+        const before = dialogs.length;
+        const sent = await page.evaluate((id) => {
+            const f = document.getElementById(id);
+            if (!f || typeof f.requestSubmit !== 'function') return false;
+            f.requestSubmit();
+            return true;
+        }, formId);
+        await page.waitForTimeout(300);
+        check(sent && dialogs.length > before && page.url() === url0,
+            '⛔ ZoeKeyGen ' + label + ' ៖ submit (Enter) ➜ សកម្មភាពពិតរត់ · ⛔ មិនបញ្ជូនតាម URL', JSON.stringify({ sent, dialogs: dialogs.slice(before), url: page.url() }));
+    }
+    await ctx.close();
+}
+
 // ⛔ UI-4 ៖ បញ្ជី ZTO «មិនទាន់បិទ» គូរជាទំព័រ ២០ ហើយទាញបន្ថែមពេលរមូរជិតចុង ៖ root របស់ IntersectionObserver ត្រូវជាធាតុដែលរមូរពិត
 //    (`.modal-content`) — root ដែលមិនរមូរ (`.zto-sync-list`) ឃើញ sentinel «ប្រសព្វ» ជានិច្ច ➜ ទាញគ្រប់ទំព័រភ្លាម (គូរ ២០០ barcode SVG ពេលបើក)។
 async function ztoSyncListPaging(browser, port) {
@@ -960,6 +1019,7 @@ async function historyRowLayout(browser, port) {
             await notifyRowLayout(browser, port);
             await pinEnterSubmits(browser, port);
         }
+        if (app === 'ZoeKeyGen') await keygenPasswordForms(browser, port);
 
         server.close();
     }

@@ -12,7 +12,7 @@
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.8`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
+កំណែបច្ចុប្បន្ន **`2.24.9`** — ជាកំណែ **របស់ ZoeKeyGen ផ្ទាល់** (ដាច់ពី ZoeW
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` របស់វា។
 
 - បង្ហាញ **១ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ។
@@ -118,7 +118,11 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 3. បើក App ➜ បញ្ចូល **Firebase Config** របស់ License Project (ការពារដោយ PIN)។
 4. **ចូលប្រព័ន្ធ** ➜ កំណត់ **Security PIN**។
 5. **Signing Key** ៖ បង្កើតគូកូនសោថ្មី **ឬ** ផ្ទុកកូនសោឯកជនដែលមានស្រាប់។
-   ⛔ សោសាធារណៈត្រូវតែស្មើនឹងអ្វីដែល embed ក្នុង `license-verify.js` របស់ ZoeW។
+   ⛔ សោសាធារណៈត្រូវតែស្មើនឹងអ្វីដែល embed ក្នុង `license-verify.js` របស់ ZoeW ➜ Keypair ថ្មី Load បានតែក្រោយ Public Key ថ្មី
+   ត្រូវដាក់ក្នុង `license-verify.js` របស់ App ទាំងអស់ ហើយ Deploy។
+   ប្រអប់ Private Key ស្គាល់ **Google Password Manager** និង **iOS Passwords** (entry «ZoeKeyGen Signing Key») ៖ Load ជោគជ័យ ➜ browser
+   សួររក្សាទុក ➜ លើកក្រោយចុចប្រអប់ ➜ ជ្រើស entry នោះ។ ការចម្លងតាម chat ឬ Notes ក៏ Load បាន (App ដក « » “ ” · តួមើលមិនឃើញ · បន្ទាត់បាក់ ·
+   អត្ថបទជុំវិញ)។ ការចូលប្រព័ន្ធ និងការចូល Supabase Admin ក៏ស្គាល់ password manager ដែរ។
 
 ### ៣. ចេញ Key ថ្មីឲ្យអតិថិជន
 

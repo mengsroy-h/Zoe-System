@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.8';
+const APP_VERSION = '2.24.9';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1948,6 +1948,8 @@ function expireIdleSigningKey() {
 }
 
 function updateSigningKeyBadge() {
+    const form = document.getElementById('signingKeyForm');
+    if (form) form.classList.toggle('hidden', !!signingPrivateKeyJwk);
     const badge = document.getElementById('signingKeyStatusBadge');
     if (!badge) return;
     if (signingPrivateKeyJwk) {
@@ -1968,14 +1970,46 @@ async function validateSigningKeyAgainstShippedPublicKey(jwk) {
     if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
 }
 
-async function loadSigningKey() {
+const SIGNING_KEY_JWK_FIELDS = ['kty', 'crv', 'd', 'x', 'y'];
+const SIGNING_KEY_TEXT_ERRORS = {
+    'not-json': 'Private Key មិនត្រឹមត្រូវទេ! រកមិនឃើញ JSON JWK — សូមចម្លងម្តងទៀតពី Password Manager ឬប៊ូតុង «📋 ចម្លង Private Key»។',
+    'public-key': 'នេះជា Public Key (គ្មានវាល "d") — សូមបិទភ្ជាប់ Private Key វិញ។',
+    shape: 'Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។'
+};
+
+function normalizeSigningKeyText(raw) {
+    let text = String(raw || '')
+        .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, '')
+        .replace(/[\u00A0\u2007\u202F]/g, ' ')
+        .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+        .replace(/[\r\n\t]+/g, '')
+        .trim();
+    if (text.indexOf('"') === -1) text = text.replace(/'/g, '"');
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end <= start) return { error: 'not-json' };
+    let obj = null;
+    try { obj = JSON.parse(text.slice(start, end + 1)); } catch (e) { return { error: 'not-json' }; }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { error: 'not-json' };
+    if (!obj.d && obj.x && obj.y) return { error: 'public-key' };
+    const jwk = {};
+    SIGNING_KEY_JWK_FIELDS.forEach((k) => { if (typeof obj[k] === 'string') jwk[k] = obj[k].replace(/\s+/g, ''); });
+    if (jwk.kty !== 'EC' || jwk.crv !== 'P-256' || !jwk.d || !jwk.x || !jwk.y) return { error: 'shape' };
+    return { jwk: jwk };
+}
+
+async function loadSigningKey(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
     const input = document.getElementById('privateKeyInput');
     const raw = input ? input.value.trim() : '';
     if (!raw) { alert('សូមបិទភ្ជាប់ Private Key JWK សិន!'); return; }
     const operation = captureSensitiveSession(true);
     if (!operation) { alert('សូមចូលប្រព័ន្ធជាមុនសិន!'); return; }
     try {
-        const jwk = JSON.parse(raw);
+        const parsed = normalizeSigningKeyText(raw);
+        if (parsed.error) { alert(SIGNING_KEY_TEXT_ERRORS[parsed.error]); return; }
+        const jwk = parsed.jwk;
         await validateSigningKeyAgainstShippedPublicKey(jwk);
         if (!isSensitiveSessionCurrent(operation, true)) return;
         signingPrivateKeyJwk = jwk;
@@ -1996,7 +2030,7 @@ async function loadSigningKey() {
         if (!isSensitiveSessionCurrent(operation, true)) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loadSigningKey' });
         alert(e && e.message === 'private key does not pair with the shipped public key'
-            ? 'Private Key នេះមិនផ្គូផ្គងនឹង Public Key ដែលមានក្នុង license-verify.js ទេ! Key ដែលចេញដោយវានឹងផ្ទៀងផ្ទាត់មិនកើតនៅគ្រប់ App។ សូមប្រើ Private Key ដែលត្រូវគ្នា ឬដាក់ Public Key ថ្មីទៅក្នុង App ទាំងអស់សិន។'
+            ? 'Private Key នេះមិនផ្គូផ្គងនឹង Public Key ដែលមានក្នុង license-verify.js ទេ! Key ដែលចេញដោយវានឹងផ្ទៀងផ្ទាត់មិនកើតនៅគ្រប់ App។ បើជា Keypair ថ្មីដែលទើបបង្កើត ៖ ដាក់ Public Key ថ្មីក្នុង license-verify.js របស់ App ទាំងអស់ ហើយ Deploy សិន ទើប Load បាន។ បើមិនមែន ៖ សូមប្រើ Private Key ដែលត្រូវគ្នា។'
             : 'Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។');
     }
 }
@@ -3088,7 +3122,8 @@ async function sbAdminRpc(session, fn, args) {
     return result;
 }
 
-async function sbAdminLogin() {
+async function sbAdminLogin(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (sbAdminBusy) return;
     const operation = captureSensitiveSession(true);
     if (!operation) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
@@ -3127,6 +3162,8 @@ async function sbAdminLogin() {
         if (logoutBtn) logoutBtn.classList.remove('hidden');
         const loginBtn = document.getElementById('sbAdminLoginBtn');
         if (loginBtn) loginBtn.classList.add('hidden');
+        const adminForm = document.getElementById('sbAdminForm');
+        if (adminForm) adminForm.classList.add('hidden');
         showToast('✅ ចូល Supabase ជា Admin រួចរាល់');
         await sbAdminRefresh();
     } catch (e) {
@@ -3167,6 +3204,8 @@ function sbAdminReset(expired) {
     });
     const loginBtn = document.getElementById('sbAdminLoginBtn');
     if (loginBtn) loginBtn.classList.remove('hidden');
+    const adminForm = document.getElementById('sbAdminForm');
+    if (adminForm) adminForm.classList.remove('hidden');
     ['sbAdminPasswordInput', 'sbTenantNameInput', 'sbTenantBranchInput', 'sbResetUsernameInput'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = '';

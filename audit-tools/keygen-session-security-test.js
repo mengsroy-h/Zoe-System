@@ -165,6 +165,10 @@ function build(options) {
         var seatReadFailed = false;
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
+    // ⛔ normalizer Private Key (សំណើម្ចាស់គម្រោង) ៖ អវត្តមាន (កូដមុនកែ) ➜ loadSigningKey ប្រើ JSON.parse ផ្ទាល់ ➜ ការអះអាងខាងក្រោមធ្លាក់ដោយមានឈ្មោះ
+    const keyTextDecl = (src.match(/^const SIGNING_KEY_JWK_FIELDS = .*;$/m) || [])[0];
+    const keyErrDecl = (src.match(/^const SIGNING_KEY_TEXT_ERRORS = \{[\s\S]*?\n\};$/m) || [])[0];
+    if (keyTextDecl && keyErrDecl) vm.runInContext(keyTextDecl + '\n' + keyErrDecl, ctx);
     vm.runInContext(slice([
         'safeStoreSet', 'safeStoreGet', 'safeStoreRemove',
         'safeStoreRemove',
@@ -173,6 +177,7 @@ function build(options) {
         'isSensitiveSessionCurrent',
         'validateSigningKeyAgainstShippedPublicKey',
         'generateNewKeypair',
+        ...(src.indexOf('function normalizeSigningKeyText(') !== -1 ? ['normalizeSigningKeyText'] : []),
         'loadSigningKey',
         'clearSigningKey',
         'seatLimitOf',
@@ -542,6 +547,52 @@ async function run() {
         /addEventListener\('pointerdown', noteSigningKeyActivity/.test(bootBlock) && /addEventListener\('keydown', noteSigningKeyActivity/.test(bootBlock)
         && /setInterval\(expireIdleSigningKey, \d+\)/.test(bootBlock)
         && /'visibilitychange', \(\) => \{\s*if \(document\.hidden\) return;\s*expireIdleSigningKey\(\);/.test(bootBlock));
+
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ Private Key ដែល ZoeKeyGen បង្កើត (`JSON.stringify(exportKey)` ៖ មាន `key_ops` · `ext`) ហើយចម្លងតាម chat/Notes/Password Manager
+    //    ត្រូវ Load បាន ៖ « » “ ” · តួមើលមិនឃើញ · អត្ថបទជុំវិញ · បន្ទាត់បាក់កណ្តាលតម្លៃ · CRLF · ' ➜ JWK ស្អាតតែ kty·crv·d·x·y ទៅ signNewKey ·
+    //    Public Key ➜ សារ «នេះជា Public Key» · អត្ថបទមិនមែន JSON ➜ សារ JSON · Keypair ថ្មីដែល Public Key មិនទាន់ deploy ➜ សារប្រាប់ឲ្យ Deploy · ⛔ គ្មាន Sentry សម្រាប់កំហុសអ្នកប្រើ។
+    console.log('-- Private Key ៖ normalizer ការចម្លង --');
+    const genKey = { key_ops: ['sign'], ext: true, kty: 'EC', x: 'Xpub-Abc_123', y: 'Ypub-Def_456', crv: 'P-256', d: 'Dpriv-Ghi_789' };
+    const clean = { kty: 'EC', crv: 'P-256', d: 'Dpriv-Ghi_789', x: 'Xpub-Abc_123', y: 'Ypub-Def_456' };
+    const genText = JSON.stringify(genKey);
+    const variants = {
+        'output ពិតរបស់ Generate (key_ops · ext)': genText,
+        '“ ” smart quotes (Notes/iOS)': genText.replace(/"/g, (m, i) => (i % 2 ? '\u201C' : '\u201D')),
+        'តួមើលមិនឃើញ (ZWSP · BOM · NBSP)': '\u200B' + genText.replace(':', ':\u00A0') + '\uFEFF',
+        'អត្ថបទជុំវិញ (chat)': 'Private Key ៖ ' + genText + ' (កុំចែក)',
+        'បន្ទាត់បាក់កណ្តាលតម្លៃ': genText.replace('Dpriv-Ghi', 'Dpriv-\n Ghi'),
+        'JSON ស្អាតមានបន្ទាត់ CRLF': JSON.stringify(genKey, null, 2).replace(/\n/g, '\r\n'),
+        "សញ្ញា ' ជំនួស \"": genText.replace(/"/g, "'")
+    };
+    for (const [label, text] of Object.entries(variants)) {
+        const nh = build();
+        let signed = null;
+        nh.license.signNewKey = (jwk) => { signed = jwk; return Promise.resolve({ keyString: 'k', payload: { id: 'p' } }); };
+        nh.getElementById('privateKeyInput').value = text;
+        await nh.ctx.loadSigningKey();
+        const loaded = vm.runInContext('JSON.stringify(signingPrivateKeyJwk)', nh.ctx);
+        ok('⛔ ' + label + ' ➜ Load បាន · JWK ស្អាត (kty·crv·d·x·y) ទៅ signNewKey', loaded === JSON.stringify(clean) && JSON.stringify(signed) === JSON.stringify(clean)
+            && !nh.log.alerts.length, { loaded, signed, alerts: nh.log.alerts });
+    }
+    const badCases = [
+        ['Public Key (គ្មាន d)', JSON.stringify({ kty: 'EC', crv: 'P-256', x: 'a', y: 'b' }), /Public Key/],
+        ['អត្ថបទមិនមែន JSON', 'hello key', /JSON JWK/],
+        ['JSON ខុសរាង (RSA)', JSON.stringify({ kty: 'RSA', crv: 'P-256', d: '1', x: 'a', y: 'b' }), /ECDSA P-256/]
+    ];
+    for (const [label, text, re] of badCases) {
+        const bh = build();
+        bh.getElementById('privateKeyInput').value = text;
+        await bh.ctx.loadSigningKey();
+        ok('ទិសផ្ទុយ ៖ ' + label + ' ➜ មិន Load · សារត្រូវ · គ្មាន Sentry', vm.runInContext('signingPrivateKeyJwk === null', bh.ctx)
+            && bh.log.alerts.length === 1 && re.test(bh.log.alerts[0]) && !bh.log.captures, { alerts: bh.log.alerts, captures: bh.log.captures });
+    }
+    const mh = build();
+    mh.license.verifyKeyString = () => Promise.resolve({ valid: false, reason: 'signature' });
+    mh.getElementById('privateKeyInput').value = genText;
+    await mh.ctx.loadSigningKey();
+    ok('⛔ Keypair ថ្មី (Public Key មិនទាន់ deploy) ➜ មិន Load · សារប្រាប់ដាក់ Public Key ក្នុង license-verify.js ហើយ Deploy',
+        vm.runInContext('signingPrivateKeyJwk === null', mh.ctx) && mh.log.alerts.length === 1 && /Deploy/.test(mh.log.alerts[0]) && /license-verify\.js/.test(mh.log.alerts[0]),
+        mh.log.alerts);
 
     console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));
     process.exit(fail === 0 ? 0 : 1);

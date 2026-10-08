@@ -1884,6 +1884,9 @@
     "ZoeW/tests/zone-format-cache.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/login-autofill.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/biometric-android-prf.test.ts": {
       "policy": "zoew-self-verification"
     },

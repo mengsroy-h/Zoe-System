@@ -46,7 +46,8 @@
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 1. **`main`** = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ PR #288 ➜ #301 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301)។
-   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android ·
+   [2.50.41] · ZoeKeyGen 2.24.9 password manager + Private Key ចម្លង។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -71,6 +72,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.34–2.50.38 — ជុំ ១៥ (UI · NATIVE · សំណើម្ចាស់គម្រោង · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
@@ -115,6 +117,38 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.41] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ចូលប្រព័ន្ធ និង Private Key ស្គាល់ Google Password Manager · iOS Passwords · Private Key ដែលចម្លងមក Load បាន** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.41`** (`zoew-v303` ➜ `zoew-v304`) · **ZoeKeyGen `2.24.9`** (`zoekeygen-v119` ➜ `zoekeygen-v120`) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔑 **ZoeKeyGen Private Key ↔ password manager** ៖ `<textarea>` (password manager មិនបំពេញ textarea) ➜ `<input type="password" autocomplete="current-password">` ក្នុង
+  `#signingKeyForm` ជាមួយ username លាក់ «ZoeKeyGen Signing Key» (entry ដាច់ពីគណនី Admin) · Enter/«📥 Load Key» = submit (`data-on="submit"` · `preventDefault()`) ·
+  Load ជោគជ័យ ➜ form លាក់ (browser ដឹងថាការចូលជោគជ័យ ➜ សួររក្សាទុក) · «🗑️ សម្អាត» ➜ form លេចវិញ។
+- 🔐 **ZoeKeyGen ចូល Supabase Admin** ៖ អ៊ីមែល/ពាក្យសម្ងាត់មិននៅក្នុង `<form>` (browser មិនសួររក្សា) ➜ `#sbAdminForm` · submit ➜ `sbAdminLogin(event)` · ចូលរួច ➜ form លាក់ · ចាកចេញ ➜ លេចវិញ។
+- 🏷️ **`name`** លើប្រអប់ចូលប្រព័ន្ធគ្រប់កន្លែង (ZoeW ៖ ចូល · ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · ZoeKeyGen ៖ ចូល · Supabase Admin)។
+- 🧹 **Private Key ដែលចម្លងមក** (រាយការណ៍ម្ចាស់គម្រោង ៖ «generate ពី ZoeKeyGen ខ្លួនឯង copy ដាក់អត់ស្គាល់») ៖ `normalizeSigningKeyText()` ដក « » “ ” ·
+  តួមើលមិនឃើញ (ZWSP · BOM · NBSP) · បន្ទាត់បាក់កណ្តាលតម្លៃ · អត្ថបទជុំវិញ · `'` ➜ JWK ស្អាតតែ `kty·crv·d·x·y` (`key_ops` · `ext` របស់ `exportKey` ដកចេញ) · Public Key ➜ «នេះជា Public Key» ·
+  មិនមែន JSON ➜ សារ JSON · ⛔ កំហុសអ្នកប្រើលែងផ្ញើ Sentry។ ការវាស់ ៖ key ដែលទើបបង្កើតអាន JSON បាន ប៉ុន្តែផ្ទៀងផ្ទាត់នឹង Public Key ក្នុង `license-verify.js` ➜ `signature` ➜
+  **Keypair ថ្មី Load មិនបានដោយការរចនា** រហូតដល់ Public Key ថ្មីចូល App ទាំងអស់ ➜ សារ និងប្រអប់ Keypair ថ្មីប្រាប់ឲ្យដាក់ Public Key ក្នុង `license-verify.js` ហើយ Deploy។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/login-autofill.test.tsx` (៧) ៖ `LoginModal` ពិត (Firebase/Supabase · ចូល/ចុះឈ្មោះ/ប្តូរ) ៖ ពាក្យសម្ងាត់ក្នុង form + submit + username មុនវា + `name` ·
+  ទិសផ្ទុយ ៖ កូដអញ្ជើញ `off` · កូដប្តូរ `one-time-code` — មុនកែ FAIL ៥/៧។
+- `layout-check` (browser ពិត · ZoeKeyGen) ៖ ពាក្យសម្ងាត់ ៣ ជា `current-password` ក្នុង form ត្រឹមត្រូវ · Private Key = `<input type="password">` + username លាក់ · PIN `off` ·
+  `requestSubmit()` ➜ សកម្មភាពពិតរត់ · ⛔ URL មិនប្រែ — មុនកែ FAIL ៥។
+- `keygen-session-security-test` (+១១) ៖ ចម្លង ៧ ប្រភេទ ➜ Load + JWK ស្អាតទៅ `signNewKey` · Public Key/មិនមែន JSON/RSA ➜ សារត្រូវ គ្មាន Sentry · Keypair ថ្មី ➜ សារ Deploy — មុនកែ FAIL ១១។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** + **ZoeKeyGen** (merge ចូល `main`)។
+2. ZoeKeyGen (iPhone Safari/PWA · Android Chrome) ៖ បិទភ្ជាប់ Private Key ➜ Load ➜ browser សួររក្សា ➜ រក្សា · Refresh ➜ ចុចប្រអប់ Private Key ➜ ជ្រើស «ZoeKeyGen Signing Key» ➜
+   Load · ចូល Supabase Admin ➜ សួររក្សា · ចម្លង Private Key ពី Notes/chat ➜ Load បាន។
+3. ZoeW ៖ ចូលប្រព័ន្ធ ➜ សួររក្សាពាក្យសម្ងាត់ ➜ លើកក្រោយ ចុចប្រអប់ឈ្មោះគណនី ➜ ជ្រើសគណនី។
+4. ⛔ Keypair ថ្មី ៖ ផ្ញើ Public Key ថ្មីមក Claude (ឬដាក់ខ្លួនឯង) ក្នុង `ZoeW/public/license-verify.js` និង `ZoeKeyGen/license-verify.js` (byte-identical) ➜ Deploy ➜ ទើប Load Private Key ថ្មីបាន (Key ចាស់ទាំងអស់នឹងផ្ទៀងផ្ទាត់មិនកើត)។
 
 ### [2.50.40] — 2026-10-08 · ZoeW ៖ **PWA លើ Android ចងក្រយៅដៃ/មុខបាន (passkey · WebAuthn PRF)** (រាយការណ៍ម្ចាស់គម្រោង)
 
@@ -2683,6 +2717,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — Password manager · Private Key ចម្លង ➜ [2.50.41]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A43 | **Password manager · Private Key ចម្លង** (សំណើម្ចាស់គម្រោង) | Claude ៖ `layout-check` ZoeKeyGen មុនកែ ៖ Private Key = `TEXTAREA` · `sbAdminPasswordInput` មិននៅក្នុង form · គ្មាន `name` · `LoginModal` ZoeW មុនកែ ៖ autocomplete ត្រឹមត្រូវ តែគ្មាន `name` · `license-verify.js` ពិតក្នុង Node WebCrypto ៖ `generateKeyPair()` ➜ `JSON.stringify` ➜ `JSON.parse` ➜ `signNewKey` ➜ `verifyKeyString` = `{valid:false, reason:'signature'}` (មិនផ្គូផ្គង Public Key ដែល ship) · normalizer មុនកែ FAIL ១១ (smart quotes · ZWSP · អត្ថបទជុំវិញ ➜ «មិនត្រឹមត្រូវ» + Sentry) | form + username លាក់ + `name` · normalizer · សារ Deploy |
+
 ### 2026-10-08 — ក្រយៅដៃ web លើ Android ➜ [2.50.40]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4585,6 +4625,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
 | `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/login-autofill.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-over-drawer.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ២ | — |

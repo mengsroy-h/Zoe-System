@@ -217,6 +217,15 @@ function createAuth(app, env) {
             if (event === 'TOKEN_REFRESHED' && auth._accountUnverified) auth._verifyAccount();
         }
     });
+    if (typeof transport.onForeignSession === 'function') {
+        transport.onForeignSession(() => {
+            if (!auth.currentUser) return;
+            if (app._db) app._db.resetForSignOut();
+            setUser(null);
+            fire();
+            if (env.onSessionEnded) env.onSessionEnded(SB_SESSION_ENDED_TEXT);
+        });
+    }
     transport.restoreSession().then((restored) => {
         restoring = false;
         const session = lostWhileRestoring ? null : restored;

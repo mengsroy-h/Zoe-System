@@ -101,8 +101,8 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'liveSuccessCount', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
-            'rawSnapshotToItemList'
-        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
+            'rawSnapshotToItemList', 'firebaseSdkNeedsRefresh', 'firebaseSdkReloadCount'
+        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n' + ['FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX'].map(sliceConst).filter(Boolean).join('\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` ➜ ការប្រកាស **ពិត** ពី SRC
         const expiredDecl = sliceConst('expiredLiveKeys') || 'const expiredLiveKeys = new Set();';
         const src = expiredDecl + '\n' + LIVE_SUCCESS_DECL + '\n' + 'let dbListenersFailed = false;\n' +
@@ -154,7 +154,9 @@ const REQUIRED_FNS = [
     'rawSnapshotToItemList',
     'runScheduledCleanup',
     'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
-    'handleInfoListenerError', 'noteInfoListenerAlive'
+    'handleInfoListenerError', 'noteInfoListenerAlive',
+    // ⛔ `renderConnectionStatus()` ៖ ពិដានផ្ទុក SDK ឡើងវិញអស់ ➜ «សូម Refresh ទំព័រ» (`firebaseSdkNeedsRefresh()`)
+    'firebaseSdkNeedsRefresh', 'firebaseSdkReloadCount'
 ];
 
 // ⛔ **កុំបញ្ឈប់ខ្លួនត្រង់នេះ។** ការ `process.exit(1)` ដោយ «រកមុខងារមិនឃើញ»
@@ -191,6 +193,7 @@ const REAL_LISTENER_REF_NAMES = (function () {
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
     'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS',
+    'FIREBASE_SDK_RELOAD_KEY', 'FIREBASE_SDK_RELOAD_MAX',
     // ⛔ `refreshLiveToasts()` អានសំណុំ module `expiredLiveKeys` (toast រស់ដែលផុតពិដាន) ➜ ការប្រកាស **ពិត**
     'expiredLiveKeys'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
@@ -284,6 +287,7 @@ function buildContext() {
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
+        CLEANUP_SWEEP_BATCH: 8,
         ZoeErrors: { capture: (e) => log.captures.push(e) }
     };
     REAL_LISTENER_REF_NAMES.forEach((name) => {
@@ -1286,15 +1290,19 @@ function buildContext() {
             konst('FIREBASE_SDK_PROBE_URL') || '', konst('FIREBASE_SDK_PROBE_TIMEOUT_MS') || '',
             /firebaseSdkProbeInFlight/.test(appSrc) ? 'let firebaseSdkProbeInFlight = false;' : '',
             pick('probeFirebaseSdkHost') || '', pick('firebaseSdkReloadAllowed') || '',
-            pick('reloadForFirebaseSdk') || '', pick('recoverFirebaseSdk') || '',
+            pick('reloadForFirebaseSdk') || '', pick('firebaseSdkNeedsRefresh') || '', pick('recoverFirebaseSdk') || '',
             // ពិដានល្បឿនឥឡូវឆ្លងកាត់ `elapsedSince()` (2.20.7) — ត្រូវផ្ទុក helper ពិត
             pick('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }',
             pick('clearFirebaseSdkRetry'), pick('resetFirebaseSdkRetryHealth') || '',
             pick('scheduleFirebaseSdkRetry'), pick('retryFirebaseSdkNow'),
-            'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry, resetFirebaseSdkRetryHealth };'
+            'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry, resetFirebaseSdkRetryHealth,'
+                + ' firebaseSdkNeedsRefresh: typeof firebaseSdkNeedsRefresh === "function" ? firebaseSdkNeedsRefresh : null };'
         ].filter(Boolean).join('\n\n')).runInContext(ctx);
         return {
-            calls, ctx, reloads, probes, pendingProbes,
+            calls, ctx, reloads, probes, pendingProbes, store,
+            liveTimers: () => timers.filter((t) => !t.dead).length,
+            reloadKey: (/const FIREBASE_SDK_RELOAD_KEY = '([^']+)'/.exec(appSrc) || [])[1],
+            reloadMax: Number((/const FIREBASE_SDK_RELOAD_MAX = (\d+);/.exec(appSrc) || [])[1]),
             advance(ms) {
                 const end = clock + ms;
                 for (;;) {
@@ -1325,8 +1333,9 @@ function buildContext() {
         tries(b2) === 1, tries(b2));
 
     // ការប្តូរ App រាល់ ១០ វិនាទី **មិនត្រូវ** ត្រូវទប់ (១០ វិ. > ពិដាន ៣ វិ.)
+    // ⛔ វាស់ពិដាន ៣ វិ. មិនមែនពិដានផ្ទុកឡើងវិញ ៖ ការស្តារនីមួយៗសងពិដានមកវិញ (ពិដានអស់ ➜ ជណ្តើរឈប់ ៖ ផ្នែក ១០ខ៣ · ១០ខ៥)
     const b3 = buildSdkRetry(SRC);
-    for (let i = 0; i < 6; i++) { b3.advance(10000); b3.ctx.api.retryFirebaseSdkNow(); }
+    for (let i = 0; i < 6; i++) { b3.advance(10000); delete b3.store[b3.reloadKey]; b3.ctx.api.retryFirebaseSdkNow(); }
     ok('ការប្តូរ App រាល់ ១០ វិ. នៅតែព្យាយាមបានគ្រប់ដង (ពិដានមិនតឹងពេក)',
         tries(b3) === 6, tries(b3));
 
@@ -1362,8 +1371,12 @@ function buildContext() {
         for (let i = 0; i < 12; i++) { r2.advance(30000); r2.ctx.api.retryFirebaseSdkNow(); }
         ok('⛔ ការផ្ទុកទំព័រឡើងវិញមានពិដានក្នុងមួយវគ្គ (គ្មានរង្វិលជុំផ្ទុកមិនចេះចប់)',
             r2.reloads.length <= 3, r2.reloads.length);
-        ok('ក្រោយអស់ពិដាន ការស្តារត្រឡប់ទៅជណ្តើរចាស់ជំនួស ការឈប់ស្ងាត់',
-            r2.calls.length > 0, r2.calls.length);
+        // ⛔ ក្រោយអស់ពិដាន `initFirebase()` **មិនអាចជោគជ័យ** (module map cache ការបរាជ័យ · `started` របស់ loader) ➜ ជណ្តើរត្រូវឈប់
+        //    (អ្នកប្រើត្រូវ Refresh ដោយដៃ ៖ ស្ថានភាព + toast) · SDK ដែលមកយឺតនៅតែស្តារតាម `armLateFirebaseSdkListener()`
+        const capCalls = r2.calls.length;
+        for (let i = 0; i < 20; i++) { r2.advance(30000); r2.ctx.api.retryFirebaseSdkNow(); }
+        ok('⛔ ក្រោយអស់ពិដាន ជណ្តើរឈប់ ៖ ១០ នាទី + online/visibility ២០ ដង ➜ initFirebase() មិនកើនទៀត (រង្វិលជុំឥតប្រយោជន៍)',
+            r2.reloads.length === 3 && r2.calls.length === capCalls, 'reload=' + r2.reloads.length + ' initFirebase ' + capCalls + ' ➜ ' + r2.calls.length);
 
         // ⛔ កុំបំផ្លាញអ្វីដែលអ្នកប្រើកំពុងវាយ (PIN · Config)
         const r3 = buildSdkRetry(SRC);
@@ -1462,11 +1475,61 @@ function buildContext() {
         ok(name + ' ៖ ប្រអប់បិទវិញ ➜ ជណ្តើរនៅរស់ ហើយស្តារបាន',
             m.reloads.length === 1, 'reload=' + m.reloads.length);
 
+        // ⛔ ពិដានអស់ (`FIREBASE_SDK_RELOAD_MAX` ក្នុងវគ្គ) ➜ គ្មានផ្លូវស្តារក្នុងទំព័រនេះ ក្រៅពីការ Refresh ដោយដៃ ៖ ជណ្តើរ · online ·
+        //    visibility មិនហៅ initFirebase() · មិនរក្សា timer · ⛔ មិនផ្ទុកឡើងវិញពេលបណ្តាញ down ➜ up (ពិដានការពាររង្វិលជុំ)
+        const x = buildSdkRetry(src);
+        x.store[x.reloadKey] = String(x.reloadMax);
+        x.ctx.__sdkHost = 'down';
+        x.ctx.api.scheduleFirebaseSdkRetry();
+        for (let i = 0; i < 20; i++) { x.advance(30000); x.ctx.api.retryFirebaseSdkNow(); if (i === 10) x.ctx.__sdkHost = 'up'; }
+        ok(name + ' ៖ ⛔ ពិដានអស់ ➜ ជណ្តើរឈប់ ៖ ១០ នាទី (បណ្តាញ down ➜ up) ➜ initFirebase ០ · reload ០ · timer ០',
+            !!x.reloadKey && x.reloadMax > 0 && x.calls.length === 0 && x.reloads.length === 0 && x.liveTimers() === 0,
+            'key=' + x.reloadKey + ' initFirebase=' + x.calls.length + ' reload=' + x.reloads.length + ' timer=' + x.liveTimers());
+        ok(name + ' ៖ ពិដានអស់ ➜ `firebaseSdkNeedsRefresh()` ពិត (ស្ថានភាព/toast ប្រាប់ឲ្យ Refresh) · ពិដាននៅសល់ ➜ មិនពិត',
+            !!x.ctx.api.firebaseSdkNeedsRefresh && x.ctx.api.firebaseSdkNeedsRefresh() === true
+            && (() => { const y = buildSdkRetry(src); y.store[y.reloadKey] = String(y.reloadMax - 1); return y.ctx.api.firebaseSdkNeedsRefresh && y.ctx.api.firebaseSdkNeedsRefresh() === false; })(),
+            typeof x.ctx.api.firebaseSdkNeedsRefresh);
+        x.ctx.window.firebaseSDK = { ref: () => {} };
+        x.ctx.api.retryFirebaseSdkNow();
+        ok(name + ' ៖ ពិដានអស់ តែ SDK មកដល់យឺត ➜ លែងត្រូវ Refresh · initFirebase ១ ដង',
+            !!x.ctx.api.firebaseSdkNeedsRefresh && x.ctx.api.firebaseSdkNeedsRefresh() === false && x.calls.length === 1, 'initFirebase=' + x.calls.length);
+        const z = buildSdkRetry(src);
+        z.store[z.reloadKey] = String(z.reloadMax - 1);
+        z.ctx.api.retryFirebaseSdkNow();
+        ok(name + ' ៖ ទិសផ្ទុយ ៖ ពិដាននៅសល់ ១ ➜ ផ្ទុកឡើងវិញ ១ ដង (ការឈប់មិនលាតដល់មុនពិដាន)', z.reloads.length === 1, 'reload=' + z.reloads.length);
+
         const probe = d.probes[0] || {};
         const opts = probe.opts || {};
         ok(name + ' ៖ ការវាស់ ៖ https · no-cors (មិនអាន body) · no-store · មានពិដានពេល ≤ ១០ វិ.',
             /^https:\/\//.test(String(probe.url || '')) && opts.mode === 'no-cors' && opts.cache === 'no-store' &&
             Number.isFinite(probe.ms) && probe.ms > 0 && probe.ms <= 10000, probe);
+    }
+
+    // ── ១០ខ៥ខ. ពិដានអស់ ➜ ស្ថានភាព ZoeKeyGen ប្រាប់ឲ្យ Refresh (ZoeW វាស់ក្នុង Chromium ពិត ៖ `sdk-offline-boot-test`) ──
+    {
+        const kg = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+        const konstKg = (n) => { const m = new RegExp('\\n\\s*const ' + n + ' = ([^;]+);').exec(kg); return m ? 'const ' + n + ' = ' + m[1] + ';' : ''; };
+        const statusOf = (count) => {
+            const store = {};
+            if (count !== null) store.k = String(count);
+            const els = { firebaseStatusText: { textContent: '', classList: { toggle() {} } }, statusDot: { classList: { toggle() {} } } };
+            const c = vm.createContext({
+                navigator: { onLine: true }, window: {},
+                document: { getElementById: (id) => els[id] || null },
+                appSessionStore: { getItem: (k) => (k === (/const FIREBASE_SDK_RELOAD_KEY = '([^']+)'/.exec(kg) || [])[1] ? (store.k || null) : null) },
+                isDatabaseConnected: false, reconnectWatchdogAttempt: 9, firebaseSdkUnavailable: true, refreshLiveToasts() {}
+            });
+            vm.runInContext([konstKg('FIREBASE_SDK_RELOAD_KEY'), konstKg('FIREBASE_SDK_RELOAD_MAX'), konstKg('CONNECTING_GRACE_ATTEMPTS'),
+                sliceFnFrom(kg, 'firebaseSdkReloadCount') || '', sliceFnFrom(kg, 'firebaseSdkNeedsRefresh') || '',
+                sliceFnFrom(kg, 'connectionLooksOnline') || '', sliceFnFrom(kg, 'connectionIsSettlingIn') || '',
+                sliceFnFrom(kg, 'renderConnectionStatus') || '', 'renderConnectionStatus();'].join('\n'), c);
+            return els.firebaseStatusText.textContent;
+        };
+        const max = Number((/const FIREBASE_SDK_RELOAD_MAX = (\d+);/.exec(kg) || [])[1]);
+        const stuck = statusOf(max);
+        const fresh = statusOf(null);
+        ok('ZoeKeyGen ៖ ពិដានអស់ ➜ ស្ថានភាពប្រាប់ «Refresh» · ពិដាននៅសល់ ➜ «ក្រៅបណ្ដាញ» ដដែល',
+            max > 0 && /Refresh/.test(stuck) && fresh === 'ក្រៅបណ្ដាញ', JSON.stringify({ stuck, fresh }));
     }
 
     // ── ១០ខ៤. ព្រឹត្តិការណ៍ដែលដាស់ការស្តារ SDK ត្រូវដូចគ្នាទាំង ២ App ────
@@ -1745,6 +1808,34 @@ function buildContext() {
             const KGINIT = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
             const kgInitSrc = sliceFnFrom(KGINIT, 'initFirebase');
             ok('ស្រង់ initFirebase() របស់ ZoeKeyGen បាន', !!kgInitSrc);
+
+            // ⛔ SDK មកមិនដល់ ៖ toast ត្រូវនិយាយការពិត ➜ ពិដានផ្ទុកឡើងវិញនៅសល់ ➜ «កំពុងព្យាយាមម្តងទៀត» · អស់ ➜ «Refresh ទំព័រ»
+            //    (ZoeW ៖ Chromium ពិតក្នុង `sdk-offline-boot-test`)
+            const kgSdkDownToasts = async (stuck) => {
+                const toasts = [];
+                const c = vm.createContext({ console: { error() {}, log() {} }, Promise, JSON, Error, window: {}, __toasts: toasts, __stuck: stuck,
+                    localStorage: { getItem: () => JSON.stringify({ apiKey: 'A', databaseURL: 'https://x.example' }) } });
+                vm.runInContext([
+                    'const appLocalStore = localStorage;',
+                    'function safeStoreGet(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }',
+                    'let firebaseConfig = null, fb = null, isInitializingFirebase = false, firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
+                    konstKgSdk('FIREBASE_SDK_REFRESH_TEXT'),
+                    'function waitForFirebaseSDK() { const e = new Error("x"); e.code = "SDK_UNAVAILABLE"; return Promise.reject(e); }',
+                    'function invalidateSensitiveSession() {}', 'function armLateFirebaseSdkListener() {}', 'function scheduleFirebaseSdkRetry() {}',
+                    'function renderConnectionStatus() {}', 'function checkPinAndOpenConfig() {}',
+                    'function firebaseSdkNeedsRefresh() { return __stuck; }',
+                    'function showToast(m) { __toasts.push(m); }',
+                    kgInitSrc || 'async function initFirebase() { return false; }',
+                    'globalThis.__run = () => initFirebase();'
+                ].join('\n'), c);
+                await c.__run();
+                return toasts.join(' | ');
+            };
+            const konstKgSdk = (n) => { const m = new RegExp('\\n\\s*const ' + n + ' = ([^;]+);').exec(KGINIT); return m ? 'const ' + n + ' = ' + m[1] + ';' : ''; };
+            const kgFresh = await kgSdkDownToasts(false);
+            const kgStuck = await kgSdkDownToasts(true);
+            ok('ZoeKeyGen ៖ SDK មកមិនដល់ ➜ ពិដាននៅសល់ ៖ toast «កំពុងព្យាយាមម្តងទៀត» · ពិដានអស់ ៖ toast «Refresh ទំព័រ» (មិនមែន «កំពុងព្យាយាម»)',
+                /កំពុងព្យាយាមម្តងទៀត/.test(kgFresh) && /Refresh/.test(kgStuck) && !/កំពុងព្យាយាមម្តងទៀត/.test(kgStuck), JSON.stringify({ kgFresh, kgStuck }));
 
             function runKeygenInit(changeConfigMidFlight) {
                 const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };

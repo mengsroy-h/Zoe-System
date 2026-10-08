@@ -32,8 +32,7 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
 ### ដំណាក់ ១ — Deploy preview របស់ branch (មុន merge)
 
 ១. បើក PR ពី branch ➜ Netlify សាង **deploy preview** (URL ដាច់ពីផលិតកម្ម)
-២. ពិនិត្យ deploy log ៖ ត្រូវឃើញ `npm run build` និង `vite build` (មិនមែនការ
-   publish ថត `.` ដូចមុន)
+២. ពិនិត្យ deploy log ៖ ត្រូវឃើញ `npm run build` និង `vite build` ហើយ publish ថត `dist`
 ៣. ⛔ **សាកលើ iPhone ពិត (PWA ដំឡើងលើអេក្រង់ដើម) និង Android ពិត** — ច្បាប់ ១១
    របស់ `CLAUDE.md` ៖ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ ត្រូវសាកលើឧបករណ៍ពិត
    **ទាំង ២ ប្រព័ន្ធ** មុន merge។ checker តំបន់ហាមចូលទាំង ៣ របស់ `audit-tools/`
@@ -64,8 +63,8 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
 
 ### ដំណាក់ ៣ — ការថយក្រោយ
 
-`git revert` commit merge ➜ Netlify build `ZoeW/` ចាស់ (static) ឡើងវិញ។ Service
-Worker ចាស់ជំនួស SW ថ្មីនៅការបើកលើកក្រោយ ដូចការ deploy ធម្មតា។
+Netlify UI ➜ **Deploys** ➜ ជ្រើស deploy មុនដែលដើរល្អ ➜ **Publish deploy** (ភ្លាម · គ្មាន build) ឬ `git revert` commit
+ដែលមានបញ្ហា ➜ build ថ្មី។ Service Worker របស់ deploy នោះជំនួស SW បច្ចុប្បន្ននៅការបើកលើកក្រោយ ដូចការ deploy ធម្មតា។
 
 ---
 
@@ -99,4 +98,5 @@ cache ដែលចាប់ផ្តើមដោយ `zoew-` ទាំងអស�
 | ៣ | ⛔ **កុំដាក់ `netlify.toml` នៅ root របស់ repo** | repo |
 | ៤ | Activate លើ deploy preview ស៊ីកៅអីឧបករណ៍ ➜ ដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាក | ZoeKeyGen |
 
-⛔ **គ្មានការកែ Firebase rules ទេ** — App ថ្មីមិនបន្ថែម path ណាមួយឡើយ។
+⛔ **ការដាក់ឲ្យប្រើ App មិនកែ Firebase rules ដោយខ្លួនឯងទេ** — កំណែដែលបន្ថែម path ថ្មីប្រាប់ «Publish rules» ក្នុងសកម្មភាពដោយដៃរបស់វា
+(`CLAUDE.md` ច្បាប់ ១០ · `docs/HISTORY.md` ផ្នែក ១)។

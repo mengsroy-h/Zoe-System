@@ -40,6 +40,8 @@ export type ModalId = (typeof MODAL_IDS)[number];
 
 export const BACKDROP_KEEP_MODALS: readonly ModalId[] = ['configModal', 'lookupApiConfigModal', 'sheetImportModal'];
 
+export const ROOT_SCREEN_MODALS: readonly string[] = ['loginModal', 'activationModal'];
+
 export interface ModalMeta {
     close?: string;
     noDismiss?: boolean;

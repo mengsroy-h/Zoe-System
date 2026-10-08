@@ -140,6 +140,8 @@ export interface DataState {
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
+    cleanupSweepVisited: Set<string>;
+    cleanupSweepTimer: any;
     clearHistoryInFlight: boolean;
     recentPhonesOptions: string[];
 }
@@ -161,6 +163,8 @@ export const dataState = createStore<DataState>('dataState', {
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,
     cleanupResumeInFlight: false,
+    cleanupSweepVisited: new Set(),
+    cleanupSweepTimer: null,
     clearHistoryInFlight: false,
     recentPhonesOptions: [],
 });
@@ -193,6 +197,10 @@ export interface ScanState {
     nativeDetector: any;
     ownCaptureCanvas: any;
     ownCaptureCtx: any;
+    scanEngineDown: boolean;
+    scanEngineFailures: number;
+    scanEngineRetryTimer: any;
+    scanEngineFailureReported: boolean;
 }
 
 export const scanState = createStore<ScanState>('scanState', {
@@ -222,6 +230,10 @@ export const scanState = createStore<ScanState>('scanState', {
     nativeDetector: null,
     ownCaptureCanvas: null,
     ownCaptureCtx: null,
+    scanEngineDown: false,
+    scanEngineFailures: 0,
+    scanEngineRetryTimer: null,
+    scanEngineFailureReported: false,
 });
 registerStore(scanState);
 

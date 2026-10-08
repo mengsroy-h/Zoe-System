@@ -1,6 +1,7 @@
-import { fieldValue, setFieldValue } from '../app/refs';
+import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
+import { isMobileDevice } from '../core/timezone';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { markAppUnlockedForSession, refreshAppLockUi } from './app-lock';
 import { clearBiometricRecord, isBiometricEnabled, refreshBiometricUi, runBiometricUnlock } from './biometric';
@@ -85,6 +86,7 @@ export function requestPinBeforeConfig(targetAction, promptKey) {
     } else {
         setFieldValue('securityPinInput', '');
         openModalHelper('pinModal');
+        if (!isMobileDevice()) focusField('securityPinInput');
         refreshBiometricUi();
         if (isBiometricEnabled()) runBiometricUnlock();
     }
@@ -118,6 +120,11 @@ export async function saveNewSecurityPin() {
     refreshAppLockUi();
     showToast("✅ បានកំណត់ Security PIN រួចរាល់!");
     (securityState.pinTargetAction || openConfigModal)(pinVal);
+}
+
+export function submitSecurityPinForm(event?) {
+    if (event) event.preventDefault();
+    verifySecurityPin();
 }
 
 export async function verifySecurityPin() {

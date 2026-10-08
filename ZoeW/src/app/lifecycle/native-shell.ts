@@ -1,11 +1,12 @@
 import { securityState, uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
+import { ROOT_SCREEN_MODALS } from '../../core/modals';
 import { noteAppLockAway, relockAppAfterAway } from '../../features/app-lock';
 import { setEntryScanMode } from '../../features/scan-remove';
 import { isNativeAndroid } from '../../platform/native';
 import { switchAppPage } from '../../ui/page-nav';
 import { createBackHistory, screenOf, type BackHistory, type Screen } from './back-history';
-import { closeTopmostLayer } from './layers';
+import { closeTopmostLayer, topmostModal } from './layers';
 import type { LifecycleScope } from './scope';
 import { elementOf } from '../refs';
 import { statusBarToneFor, type StatusBarTone } from './status-bar-tone';
@@ -27,14 +28,20 @@ export function setupNativeShell(scope: LifecycleScope): void {
         const { SystemBars, SystemBarsStyle, SystemBarType } = core as any;
         if (!SystemBars) return;
         let applied = '';
+        let appliedNav = '';
         const applyBarStyles = () => {
             if (scope.disposed) return;
             const status = measureStatusBarTone();
-            if (status === applied) return;
-            applied = status;
-            SystemBars.setStyle({ style: status === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light, bar: SystemBarType.StatusBar }).catch(() => {});
+            if (status !== applied) {
+                applied = status;
+                SystemBars.setStyle({ style: status === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light, bar: SystemBarType.StatusBar }).catch(() => {});
+            }
+            const nav = measureNavigationBarTone();
+            if (nav !== appliedNav) {
+                appliedNav = nav;
+                SystemBars.setStyle({ style: nav === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light, bar: SystemBarType.NavigationBar }).catch(() => {});
+            }
         };
-        SystemBars.setStyle({ style: SystemBarsStyle.Light, bar: SystemBarType.NavigationBar }).catch(() => {});
         applyBarStyles();
         scope.listen(window, 'resize', applyBarStyles);
         let frame = 0;
@@ -69,6 +76,7 @@ export function setupNativeShell(scope: LifecycleScope): void {
 
 export function handleNativeBack(minimize: () => void, history?: BackHistory): void {
     if (securityState.appIsLocked) { minimize(); return; }
+    if (!uiState.moreMenuOpen && ROOT_SCREEN_MODALS.includes(topmostModal())) { minimize(); return; }
     if (closeTopmostLayer({ includeMoreMenu: true })) return;
     const target = history ? history.popTarget() : null;
     if (target) { restoreScreen(target); return; }
@@ -94,12 +102,27 @@ export function statusBarInsetPx(): number {
     return parseFloat(window.getComputedStyle(probe).paddingTop) || 0;
 }
 
+export function navigationBarInsetPx(): number {
+    const probe = elementOf('safeAreaProbe');
+    if (!probe) return 0;
+    return parseFloat(window.getComputedStyle(probe).paddingBottom) || 0;
+}
+
 export const STATUS_BAR_SETTLE_MS = 320;
 
 const STATUS_BAR_SAMPLE_XS = [0.08, 0.3, 0.5, 0.7, 0.92];
 
 export function measureStatusBarTone(): StatusBarTone {
     const inset = statusBarInsetPx();
+    return measureBarTone(inset, inset / 2, 'Status bar tone measure failed');
+}
+
+export function measureNavigationBarTone(): StatusBarTone {
+    const inset = navigationBarInsetPx();
+    return measureBarTone(inset, window.innerHeight - inset / 2, 'Navigation bar tone measure failed');
+}
+
+function measureBarTone(inset: number, y: number, failure: string): StatusBarTone {
     if (!(inset > 0)) return 'light';
     try {
         const opacityOf = new Map<Element, number>();
@@ -112,12 +135,11 @@ export function measureStatusBarTone(): StatusBarTone {
             opacityOf.set(el, value);
             return value;
         };
-        const y = inset / 2;
         const samples = STATUS_BAR_SAMPLE_XS.map((fx) => document.elementsFromPoint(window.innerWidth * fx, y)
             .map((el) => ({ color: window.getComputedStyle(el).backgroundColor, opacity: effectiveOpacity(el) })));
         return statusBarToneFor(inset, samples);
     } catch (e) {
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Status bar tone measure failed' });
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: failure });
         return 'light';
     }
 }

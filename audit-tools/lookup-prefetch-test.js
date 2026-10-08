@@ -536,6 +536,9 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             // ⛔ `completePinUnlock()` បើកជុំបោស ZTO (2.32.0) ➜ stub ដែលរាប់
             //    ការហៅ (ច្បាប់ ៖ stub ជំនួសការបញ្ឈប់; stub ដែលវាស់បាន = ការគ្របបន្ថែម)
             vm.runInContext('var __ztoSweeps = 0; function scheduleZtoStatusSweep() { __ztoSweeps++; }', ctx);
+            // ⛔ UI-7 ៖ `requestPinBeforeConfig()` focus វាល PIN តែលើកុំព្យូទ័រ (`isMobileDevice()`) ➜ sandbox នេះជាទូរស័ព្ទ (គ្មាន focus ·
+            //    ការវាស់ focus ៖ `layout-check` ប្រអប់ PIN ក្នុង browser ពិត)
+            vm.runInContext("if (typeof isMobileDevice !== 'function') globalThis.isMobileDevice = function () { return true; }; if (typeof focusField !== 'function') globalThis.focusField = function () {};", ctx);
             const heldDecl = (SRC.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
             vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
             ['clearLookupStatus', 'openModalHelper', 'closeModal', 'isPinFlowPending',

@@ -376,7 +376,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let closed = false;
     let authed = false;
     const waiters = new Set();
+    const dirtyRoots = new Set();
+    let dirtyAll = true;
     const db: any = { _sb: true };
+
+    const markDirty = (root) => { if (!dirtyAll) dirtyRoots.add(root); };
+    const markAllDirty = () => { dirtyAll = true; dirtyRoots.clear(); };
+    const markOpsDirty = (ops) => { for (const op of ops) markDirty(op.p[0]); };
+    const clearServerView = () => { server.clear(); markAllDirty(); };
 
     const serverDoc = (root, key) => {
         const docs = server.get(root);
@@ -443,6 +450,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!docs) { docs = new Map(); target.set(root, docs); }
         if (value === null) docs.set(key, { v: null, s: seq });
         else docs.set(key, { v: value, s: seq });
+        if (target === server) markDirty(root);
         return true;
     };
 
@@ -512,8 +520,16 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     const notify = () => {
         if (closed || !ready) return;
-        const getDoc = effectiveDocs();
-        listeners.forEach((l) => fireListener(l, getDoc));
+        const all = dirtyAll;
+        const roots = new Set(dirtyRoots);
+        dirtyAll = false;
+        dirtyRoots.clear();
+        let getDoc = null;
+        listeners.forEach((l: any) => {
+            if (!all && l.fired && !(l.path.length ? roots.has(l.path[0]) : roots.size > 0)) return;
+            if (!getDoc) getDoc = effectiveDocs();
+            fireListener(l, getDoc);
+        });
     };
 
     const fireInfo = () => {
@@ -593,7 +609,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             const stage = pullStage;
             pullStage = null;
             server.forEach((docs, root) => docs.forEach((entry, key) => { if (entry.s > pullStageAbove) putDocIn(stage, root, key, entry.v, entry.s); }));
-            server.clear();
+            clearServerView();
             stage.forEach((docs, root) => server.set(root, docs));
         }
     };
@@ -660,7 +676,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (cacheTenant !== null) {
                             const sameShop = !!res && typeof res.tenant === 'string' && res.tenant === cacheTenant;
                             cacheTenant = null;
-                            if (!sameShop || res.reset) server.clear();
+                            if (!sameShop || res.reset) clearServerView();
                             if (!sameShop) {
                                 cursor = 0;
                                 pullFullHead = null;
@@ -670,7 +686,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         }
                         if (serverTenant !== null && res && typeof res.tenant === 'string' && res.tenant && res.tenant !== serverTenant) {
                             if (++restarts > SB_PULL_MAX_RESTARTS) throw new SbRpcError('pull keeps restarting', 'pull_restart', 0, '');
-                            server.clear();
+                            clearServerView();
                             pullStage = null;
                             pullStageAbove = 0;
                             serverTenant = null;
@@ -771,7 +787,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     const settleWrite = (w) => {
         const i = pending.indexOf(w);
-        if (i !== -1) pending.splice(i, 1);
+        if (i === -1) return;
+        pending.splice(i, 1);
+        if (w.overlay) markOpsDirty(w.ops);
     };
 
     const applyWriteResult = (res) => {
@@ -804,7 +822,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
         pending.push(w);
-        if (overlay) notify();
+        if (overlay) {
+            markOpsDirty(ops);
+            notify();
+        }
         (async () => {
             await waitDeps(w);
             for (;;) {
@@ -950,6 +971,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
         }
         if (!ops.length) return Promise.resolve();
+        if (ops.length > SB_OPS_PER_WRITE && ops.some((op) => op.k === 'inc')) {
+            throw new Error('update() failed: ' + ops.length + ' paths with increment() exceed the atomic write limit of ' + SB_OPS_PER_WRITE);
+        }
         const writes = [];
         for (let i = 0; i < ops.length; i += SB_OPS_PER_WRITE) writes.push(enqueueWrite(ops.slice(i, i + SB_OPS_PER_WRITE), base, true));
         return Promise.all(writes).then(() => undefined);
@@ -1087,6 +1111,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     db.setAuthed = (value, scope?) => {
         const next = !!value;
         const nextScope = next && typeof scope === 'string' && scope ? scope : null;
+        if (nextScope !== authScope) markAllDirty();
         authScope = nextScope;
         if (nextScope !== cacheScope) {
             cacheScope = nextScope;
@@ -1107,7 +1132,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         authScope = null;
         stopRealtime();
         authed = false;
-        server.clear();
+        clearServerView();
         cursor = 0;
         pullFullHead = null;
         pullStage = null;

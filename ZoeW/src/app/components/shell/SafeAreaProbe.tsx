@@ -8,7 +8,8 @@ const PROBE_STYLE = {
     width: 0,
     visibility: 'hidden',
     pointerEvents: 'none',
-    paddingTop: 'env(safe-area-inset-top)'
+    paddingTop: 'env(safe-area-inset-top)',
+    paddingBottom: 'env(safe-area-inset-bottom)'
 } as const;
 
 export function SafeAreaProbe() {

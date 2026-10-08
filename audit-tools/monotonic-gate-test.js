@@ -246,6 +246,8 @@ function buildWorld(startNow) {
         'function canCycleDatabaseConnection() { return hasEverConnectedToDatabase || networkJustReturned; }',
         'function clearFirebaseSdkRetry() { firebaseSdkRetryTimer = null; }',
         'function recoverFirebaseSdk() { __log.recovered++; }',
+        // ពិដានផ្ទុក SDK ឡើងវិញនៅសល់ (ករណីពិដានអស់ ៖ connection-recovery-test ១០ខ៥) ➜ ច្រកទ្វារនាឡិកាដែលវាស់នៅទីនេះមិនប្រែ
+        'function firebaseSdkNeedsRefresh() { return false; }',
         HELPER,
         // ⛔ បាត់ function ➜ **stub** មិនមែនបញ្ឈប់ ៖ ការបញ្ឈប់បិទបាំងការអះអាង
         //    ឥរិយាបថទាំងអស់ខាងក្រោម (មេរៀន checker-coverage ចំណុច ៣)។

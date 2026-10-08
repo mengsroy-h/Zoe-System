@@ -1863,7 +1863,31 @@
     "ZoeW/tests/backend-switch-detach.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/cleanup-sweep-batch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/close-restamp-idempotent.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-update-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-notify-dirty.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/registry-flush-scale.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zone-format-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notify-apk-link.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/login-over-drawer.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scanner-focus-after-close.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-write-bad-body.test.ts": {
@@ -1971,6 +1995,9 @@
     "ZoeW/tests/remove-stale-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/scan-engine-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/scroll-thumb.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1987,6 +2014,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-clock-skew.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-cross-tab-signout.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-gateway-5xx.test.ts": {

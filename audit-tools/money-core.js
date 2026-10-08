@@ -138,11 +138,18 @@ function appZoneParts(ms) {
         const at = typeof ms === 'number' ? ms : Number(ms);
         try {
             const parts = {};
-            new Intl.DateTimeFormat('en-GB', {
-                timeZone: APP_TIME_ZONE, hour12: false,
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }).formatToParts(at).forEach((p) => { if (p.type !== 'literal') parts[p.type] = p.value; });
+            const memo = appZoneParts;
+            if (!memo.zoneFormat || memo.zoneFormat.ctor !== Intl.DateTimeFormat) {
+                memo.zoneFormat = {
+                    ctor: Intl.DateTimeFormat,
+                    fmt: new Intl.DateTimeFormat('en-GB', {
+                        timeZone: APP_TIME_ZONE, hour12: false,
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    })
+                };
+            }
+            memo.zoneFormat.fmt.formatToParts(at).forEach((p) => { if (p.type !== 'literal') parts[p.type] = p.value; });
             if (parts.year && parts.month && parts.day) {
                 if (parts.hour === '24') parts.hour = '00';
                 return parts;

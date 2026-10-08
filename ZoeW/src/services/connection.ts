@@ -6,7 +6,7 @@ import { elapsedSince } from '../core/elapsed';
 import { flushPendingRegistryReleases } from '../domain/registry';
 import { resumeZtoStatusSweep } from '../features/zto-status';
 import { retryFailedDbListenersNow } from './db-listeners';
-import { retryFirebaseSdkNow } from './firebase-sdk';
+import { firebaseSdkNeedsRefresh, retryFirebaseSdkNow } from './firebase-sdk';
 import { flushPendingHistoryPatches } from './history-write';
 import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
@@ -61,7 +61,7 @@ export function renderConnectionStatus() {
         ? "ភ្ជាប់ Server រួចរាល់"
         : (reconnecting
             ? "កំពុងភ្ជាប់ឡើងវិញ..."
-            : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
+            : (settling ? "កំពុងភ្ជាប់..." : (firebaseSdkNeedsRefresh() ? "សូម Refresh ទំព័រ" : "ក្រៅបណ្ដាញ")));
     refreshLiveToasts();
     noteConnectionTransition(prevStatus, viewState.connectionStatus);
 }

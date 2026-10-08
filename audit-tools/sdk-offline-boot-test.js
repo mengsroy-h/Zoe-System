@@ -81,6 +81,9 @@ const LICENSE_STUB = `window.ZoeLicense = {
     const browser = await chromium.launch({ executablePath: CHROME });
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const port = server.address().port;
+    const RELOAD_KEY = (/FIREBASE_SDK_RELOAD_KEY = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8')) || [])[1];
+    const RELOAD_MAX = Number((/FIREBASE_SDK_RELOAD_MAX = (\d+);/.exec(fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8')) || [])[1]);
+    async function bootOffline(reloadCount) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 850 } });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
@@ -100,6 +103,7 @@ const LICENSE_STUB = `window.ZoeLicense = {
     // «ដោះសោក្នុងវគ្គនេះរួច» ដូចការ Refresh ក្នុងវគ្គដដែល។ ការចាក់សោមាន
     // ឧបករណ៍ផ្ទាល់ខ្លួន ៖ `app-lock-test.js`។
     await page.addInitScript("window.sessionStorage.setItem('zoew_app_unlocked', '1');");
+    if (reloadCount) await page.addInitScript(`window.sessionStorage.setItem(${JSON.stringify(RELOAD_KEY)}, ${JSON.stringify(String(reloadCount))});`);
     // បង្រួមការរង់ចាំ SDK ពី ១៥ វិ. មក ១ វិ. ដើម្បីឲ្យតេស្តរត់លឿន —
     // តក្កវិជ្ជាដដែល ផ្លូវដដែល គ្រាន់តែ timeout ខ្លីជាង
     await page.addInitScript(`
@@ -126,9 +130,15 @@ const LICENSE_STUB = `window.ZoeLicense = {
             statusText: (document.getElementById('firebaseStatusText') || {}).innerText || '',
             dotOffline: !!dot && dot.classList.contains('offline'),
             dotConnecting: !!dot && dot.classList.contains('connecting'),
-            appVisible: vis('appPages')
+            appVisible: vis('appPages'),
+            toasts: (document.getElementById('toastContainer') || {}).innerText || ''
         };
     });
+    await ctx.close();
+    return state;
+    }
+
+    const state = await bootOffline(0);
 
     check(!state.pinModalOpen && !state.pinSetupOpen,
         'ការបើកខណៈ SDK មកមិនដល់ ➜ **មិនបើកប្រអប់ PIN**', state);
@@ -138,8 +148,18 @@ const LICENSE_STUB = `window.ZoeLicense = {
     check(state.dotOffline && !state.dotConnecting,
         'ចំណុចស្ថានភាពជា offline មិនមែនជាប់ «កំពុងភ្ជាប់...»', state);
     check(state.appVisible, 'App នៅមើលឃើញ — មិនជាប់ក្រោមប្រអប់', state);
+    check(/កំពុងព្យាយាមម្តងទៀត/.test(state.toasts) && !/Refresh/.test(state.statusText),
+        'ពិដានផ្ទុកឡើងវិញនៅសល់ ➜ toast «កំពុងព្យាយាមម្តងទៀត» (ជណ្តើរពិតជារត់) · ស្ថានភាពមិនសុំ Refresh', state);
 
-    await ctx.close();
+    // ⛔ ពិដានផ្ទុកឡើងវិញអស់ក្នុងវគ្គ ➜ ការស្តារក្នុងទំព័រនេះមិនអាចជោគជ័យ (module map cache ការបរាជ័យ) ➜ App ត្រូវប្រាប់ការពិត ៖
+    //    «សូម Refresh ទំព័រ» ជាប់នៅស្ថានភាព + toast · ⛔ មិនមែន «កំពុងព្យាយាមម្តងទៀត»
+    const stuck = await bootOffline(RELOAD_MAX);
+    check(RELOAD_KEY && RELOAD_MAX > 0 && /Refresh/.test(stuck.statusText) && stuck.dotOffline,
+        'ពិដានអស់ ➜ ស្ថានភាពជាប់ «សូម Refresh ទំព័រ» (offline)', stuck);
+    check(/Refresh/.test(stuck.toasts) && !/កំពុងព្យាយាមម្តងទៀត/.test(stuck.toasts),
+        'ពិដានអស់ ➜ toast សុំ Refresh · ⛔ មិនមែន «កំពុងព្យាយាមម្តងទៀត»', stuck.toasts);
+    check(!stuck.pinModalOpen && !stuck.configOpen && stuck.appVisible, 'ពិដានអស់ ➜ មិនបើកប្រអប់ PIN/Config · App នៅមើលឃើញ', stuck);
+
     await browser.close();
     server.close();
 

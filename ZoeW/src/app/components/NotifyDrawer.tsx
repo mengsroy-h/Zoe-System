@@ -1,6 +1,6 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, apkDownloadUrl, newerAppVersion, visibleNotifyFeed, type NotifyFeedItem, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
@@ -123,10 +123,14 @@ function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateR
             </>
         );
     } else if (newer) {
+        const apk = isNativeApp() ? apkDownloadUrl(newer) : null;
         status = (
-            <div className="notify-summary is-info">
-                🆕 កំណែ {newer} មានហើយ — {isNativeApp() ? 'សូមដំឡើង APK ថ្មី' : 'App នឹងទាញវាដោយស្វ័យប្រវត្តិ (ឬ Refresh)'}
-            </div>
+            <>
+                <div className="notify-summary is-info">
+                    🆕 កំណែ {newer} មានហើយ — {isNativeApp() ? 'សូមដំឡើង APK ថ្មី' : 'App នឹងទាញវាដោយស្វ័យប្រវត្តិ (ឬ Refresh)'}
+                </div>
+                {apk ? <a className="notify-refresh-btn notify-apk-link" href={apk} target="_blank" rel="noopener noreferrer">📥 ទាញយក APK កំណែ {newer}</a> : null}
+            </>
         );
     } else if (feed.length) {
         status = <div className="notify-summary">✅ អ្នកកំពុងប្រើកំណែចុងក្រោយ</div>;

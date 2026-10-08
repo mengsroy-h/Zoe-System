@@ -12,6 +12,9 @@ import { GlobalMoreMenu } from '../../src/app/components/GlobalMoreMenu';
 import { SideDrawer } from '../../src/app/components/SideDrawer';
 import { DrawerBackdrop } from '../../src/app/components/DrawerBackdrop';
 import { PhoneModal } from '../../src/app/components/modals/PhoneModal';
+import { LoginModal } from '../../src/app/components/modals/LoginModal';
+import { ActivationModal } from '../../src/app/components/modals/ActivationModal';
+import { ExchangeRateModal } from '../../src/app/components/modals/ExchangeRateModal';
 import { byId, mount, step, unmount } from './react-harness';
 
 /**
@@ -27,7 +30,7 @@ beforeEach(() => {
         uiState.drawerOpen = false;
         uiState.modalDisplay = {};
     });
-    mount(<><GlobalMoreMenu /><SideDrawer /><DrawerBackdrop /><PhoneModal /></>);
+    mount(<><GlobalMoreMenu /><SideDrawer /><DrawerBackdrop /><PhoneModal /><LoginModal /><ActivationModal /><ExchangeRateModal /></>);
 });
 
 afterEach(() => { unmount(); document.body.innerHTML = ''; });
@@ -51,6 +54,26 @@ describe('handleNativeBack', () => {
         expect(byId('phoneModal').style.display).toBe('flex');
         expect(minimize).not.toHaveBeenCalled();
         expect(uiState.currentAppPage).toBe('entry');
+    });
+
+    it('⛔ NATIVE-3 ៖ ប្រអប់ចូល / Activation (អេក្រង់ឫស · មិនបិទបាន) ➜ Back បង្រួម App (មិនជាប់)', () => {
+        for (const id of ['loginModal', 'activationModal']) {
+            step(() => { uiState.modalDisplay = {}; uiState.modalStack = []; openModalHelper(id); });
+            expect(byId(id).getAttribute('data-nodismiss')).toBe('true');
+            const minimize = vi.fn();
+            step(() => handleNativeBack(minimize));
+            expect(minimize).toHaveBeenCalledTimes(1);
+            expect(byId(id).style.display).toBe('flex');
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ ប្រអប់ផ្សេងបើកពីលើប្រអប់ចូល ➜ Back បិទប្រអប់នោះមុន (មិនបង្រួម)', () => {
+        step(() => { openModalHelper('loginModal'); openModalHelper('exchangeRateModal'); });
+        const minimize = vi.fn();
+        step(() => handleNativeBack(minimize));
+        expect(minimize).not.toHaveBeenCalled();
+        expect(byId('exchangeRateModal').style.display).toBe('none');
+        expect(byId('loginModal').style.display).toBe('flex');
     });
 
     it('របា Slide បើក ➜ បិទវា', () => {

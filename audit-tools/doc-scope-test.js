@@ -43,6 +43,7 @@ const SECTIONED = [
 // ឯកសារ «របៀបប្រើ» ដទៃ ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
 const CONTENT_ONLY = [
     'ZoeW/ZTO-SETUP-KH.md',
+    'docs/SELF-HOSTED-RUNNERS.md',
     'zto-import/google-sheets-api/README.md'
 ];
 
@@ -78,8 +79,9 @@ function listAllDocs(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
     entries.forEach((entry) => {
-        if (entry.name === 'node_modules' || entry.name === '.git' || (!rel && entry.name === 'docs')) return;
+        if (entry.name === 'node_modules' || entry.name === '.git') return;
         const next = rel ? rel + '/' + entry.name : entry.name;
+        if (next === 'docs/HISTORY.md' || next === 'docs/HISTORY-ARCHIVE.md') return;
         if (entry.isDirectory()) listAllDocs(path.join(dir, entry.name), next, out);
         else if (/\.md$/i.test(entry.name) && next !== 'CLAUDE.md') out.push(next);
     });
@@ -641,6 +643,61 @@ const unindexed = checkerFiles.map((rel) => rel.replace(/\.js$/, '')).filter((na
 check(histIndex.length > 2000 && unindexed.length === 0,
     '⛔ docs/HISTORY.md ៖ លិបិក្រមគ្រប checker ដែលលេចក្នុងឯកសារប្រវត្តិទាំង ២',
     histIndexAt === -1 ? 'រកលិបិក្រមមិនឃើញ' : 'ខ្វះក្នុងលិបិក្រម ៖ ' + unindexed.join(' · '));
+// ⛔ DOCS-2 ៖ ជួរនីមួយៗត្រូវប្រាប់ **ផ្នែកដែលឈ្មោះលេចពិត** (ទិសទាំងពីរ ៖ ផ្នែកដែលបាត់ពីជួរ · ផ្នែកក្នុងជួរដែលឈ្មោះលែងលេច) ·
+//    ជួរក៏គ្របអ្នកយាម vitest (`ZoeW/tests/**/*.test.ts(x)`) ដែលឯកសារប្រវត្តិយោង។ បញ្ជី tests អានពី repo ពិត (`ZOE_REPO_ROOT` ៖ root វាស់គ្មាន `ZoeW/tests`)។
+const KH_DIGITS = '០១២៣៤៥៦៧៨៩';
+function historyParts(text) {
+    const stop = text.indexOf('## 🔎 លិបិក្រម');
+    const heads = [];
+    const re = /^## [^\n]*?ផ្នែក ([០-៩])/gm;
+    let m;
+    while ((m = re.exec(text))) heads.push({ at: m.index, n: m[1] });
+    const out = {};
+    heads.forEach((h, i) => { out[h.n] = text.slice(h.at, i + 1 < heads.length ? heads[i + 1].at : (stop === -1 ? text.length : stop)); });
+    return out;
+}
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const testsRoot = [process.env.ZOE_REPO_ROOT, ROOT].filter(Boolean).find((d) => fs.existsSync(path.join(d, 'ZoeW/tests')));
+function listTestFiles(dir, rel, out) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    entries.forEach((e) => {
+        if (e.isDirectory()) listTestFiles(path.join(dir, e.name), rel + e.name + '/', out);
+        else if (/\.test\.tsx?$/.test(e.name)) out.push(rel + e.name);
+    });
+    return out;
+}
+const vitestFiles = testsRoot ? listTestFiles(path.join(testsRoot, 'ZoeW/tests'), '', []) : [];
+const histPartsMap = historyParts(hist);
+const archPartsMap = historyParts(histArchive);
+const indexKeys = [];
+checkerFiles.forEach((rel) => {
+    const name = rel.replace(/\.js$/, '');
+    indexKeys.push({ key: name, re: new RegExp('(?<![\\w/-])' + escRe(name) + '(?![\\w-])') });
+});
+vitestFiles.forEach((rel) => {
+    const base = rel.replace(/\.test\.tsx?$/, '');
+    indexKeys.push({ key: 'ZoeW/tests/' + rel, re: new RegExp('(?<![\\w-])' + escRe(base) + '\\.test\\.tsx?(?![\\w-])') });
+});
+const partList = (map, re) => Object.keys(map).sort((x, y) => KH_DIGITS.indexOf(x) - KH_DIGITS.indexOf(y)).filter((n) => re.test(map[n]));
+const fmtParts = (list) => list.length ? list.map((n) => 'ផ្នែក ' + n).join(' · ') : '—';
+const expectedIndex = new Map();
+indexKeys.forEach(({ key, re }) => {
+    const h = partList(histPartsMap, re);
+    const a = partList(archPartsMap, re);
+    if (h.length || a.length) expectedIndex.set(key, '| `' + key + '` | ' + fmtParts(h) + ' | ' + fmtParts(a) + ' |');
+});
+const actualIndexRows = histIndex.split('\n').filter((l) => l.startsWith('| `'));
+const actualIndex = new Map(actualIndexRows.map((l) => [l.split('`')[1], l.trim()]));
+const indexWrong = [];
+expectedIndex.forEach((row, key) => { if (actualIndex.get(key) !== row) indexWrong.push(key); });
+actualIndex.forEach((row, key) => {
+    if (expectedIndex.has(key)) return;
+    if (!key.startsWith('ZoeW/tests/') || testsRoot) indexWrong.push(key);
+});
+check(expectedIndex.size >= 150 && (!testsRoot || vitestFiles.length >= 50) && indexWrong.length === 0,
+    '⛔ docs/HISTORY.md ៖ លិបិក្រមស្មើការលេចពិត (ផ្នែកក្នុងជួរនីមួយៗ · ទិសទាំងពីរ · checker + អ្នកយាម vitest)',
+    'ជួរខុស/ខ្វះ/លើស ' + indexWrong.length + ' ៖ ' + indexWrong.slice(0, 12).join(' · ') + ' · រំពឹង ' + expectedIndex.size + ' ជួរ · vitest ' + vitestFiles.length);
 check(checkerFiles.length >= 100, 'ជាន់អប្បបរមា ៖ រកឃើញ checker យ៉ាងតិច ១០០ ក្នុងថតពិត',
     'រកបាន ' + checkerFiles.length);
 check(uncatalogued.length === 0,

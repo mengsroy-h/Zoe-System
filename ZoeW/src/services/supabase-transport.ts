@@ -164,7 +164,8 @@ export function createSupabaseTransport(config, deps?) {
     const key = String(config.supabaseKey || '');
     const fetchImpl = (deps && deps.fetch) || ((...args) => (globalThis.fetch as any)(...args));
     const fetchTimeoutMs = (deps && deps.fetchTimeoutMs) || SB_FETCH_TIMEOUT_MS;
-    const storage = createModeStorage((deps && deps.localStorage) || storeOf('localStorage'), (deps && deps.sessionStorage) || storeOf('sessionStorage'));
+    const localArea = (deps && deps.localStorage) || storeOf('localStorage');
+    const storage = createModeStorage(localArea, (deps && deps.sessionStorage) || storeOf('sessionStorage'));
     claimSessionStorageFor(storage, url);
     const client = createClient(url, key, {
         auth: {
@@ -179,9 +180,34 @@ export function createSupabaseTransport(config, deps?) {
         }
     });
     const toSession = (s) => (s && s.access_token && s.user ? { accessToken: s.access_token, user: { id: s.user.id, email: s.user.email || '' } } : null);
-    const accessToken = async () => {
+    let boundUid = null;
+    let boundEnded = false;
+    const bindTo = (uid) => { boundUid = uid; boundEnded = false; };
+    const foreignListeners = new Set<(next: any) => void>();
+    const noteForeignSession = (next) => {
+        if (boundEnded) return;
+        boundEnded = true;
+        foreignListeners.forEach((cb) => { try { cb(next); } catch (e) {} });
+    };
+    const isForeign = (s) => boundEnded || (!!boundUid && (!s || !s.user || s.user.id !== boundUid));
+    const eventTarget = (deps && deps.eventTarget) || (typeof window !== 'undefined' ? window : null);
+    const onStorage = (e) => {
+        if (!e || !boundUid || boundEnded || (e.key !== SB_AUTH_STORAGE_KEY && e.key !== null)) return;
+        if (e.storageArea && localArea && e.storageArea !== localArea) return;
+        let next = null;
+        try { next = e.key === null ? null : JSON.parse(e.newValue || 'null'); } catch (err) { next = null; }
+        if (!isForeign(next)) return;
+        noteForeignSession(toSession(next));
+    };
+    if (eventTarget && typeof eventTarget.addEventListener === 'function') eventTarget.addEventListener('storage', onStorage);
+    const currentSession = async () => {
         const { data } = await client.auth.getSession();
-        return data && data.session ? data.session.access_token : null;
+        return data && data.session ? data.session : null;
+    };
+    const accessToken = async () => {
+        const s = await currentSession();
+        if (s && isForeign(s)) { noteForeignSession(toSession(s)); return null; }
+        return s ? s.access_token : null;
     };
     const post = async (path, body, token, timeoutMs) => {
         const headers: any = { apikey: key, 'Content-Type': 'application/json', Accept: 'application/json' };
@@ -200,9 +226,15 @@ export function createSupabaseTransport(config, deps?) {
         return toSession(parsed);
     };
     const unsentWithin = (promise, timeoutMs) => sbWithin(promise, timeoutMs).catch((e) => { throw new SbNetworkError(String((e && e.message) || 'timeout'), true); });
+    const sessionEndedElsewhere = () => new SbRpcError('session ended in another tab', 'session-ended', 401, '');
     const rpc = async (fn, args, timeoutMs) => {
-        let token = await unsentWithin(accessToken().catch(() => null), timeoutMs);
-        if (!token && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
+        const current = await unsentWithin(currentSession().catch(() => null), timeoutMs);
+        if (!current && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
+        if (isForeign(current)) {
+            noteForeignSession(toSession(current));
+            throw sessionEndedElsewhere();
+        }
+        let token = current ? current.access_token : null;
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
             const refreshed = await unsentWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
@@ -234,9 +266,11 @@ export function createSupabaseTransport(config, deps?) {
             const loaded = client.auth.getSession().then((out) => ({ out }), () => null);
             const settled: any = await Promise.race([loaded, ceiling]).finally(() => clearTimeout(timer));
             const out = settled && settled.out;
-            if (out && out.data && out.data.session) return toSession(out.data.session);
-            if (out && !out.error) return null;
-            return storedSession();
+            let restored = null;
+            if (out && out.data && out.data.session) restored = toSession(out.data.session);
+            else if (!(out && !out.error)) restored = storedSession();
+            bindTo(restored ? restored.user.id : null);
+            return restored;
         },
         async signIn(email, password) {
             let out;
@@ -252,9 +286,12 @@ export function createSupabaseTransport(config, deps?) {
                 if (!err.status || /fetch|network/i.test(err.message)) throw new SbNetworkError(err.message);
                 throw err;
             }
-            return toSession(out.data.session);
+            const signedIn = toSession(out.data.session);
+            bindTo(signedIn ? signedIn.user.id : null);
+            return signedIn;
         },
         async signOut() {
+            bindTo(null);
             const revoke = async () => {
                 const token = await accessToken().catch(() => null);
                 if (token) await post('/auth/v1/logout?scope=local', {}, token, SB_SIGN_OUT_CEILING_MS);
@@ -266,6 +303,10 @@ export function createSupabaseTransport(config, deps?) {
         onSession(cb) {
             const { data } = client.auth.onAuthStateChange((event, session) => cb(event, toSession(session)));
             return () => { try { data.subscription.unsubscribe(); } catch (e) {} };
+        },
+        onForeignSession(cb) {
+            foreignListeners.add(cb);
+            return () => { foreignListeners.delete(cb); };
         },
         setPersistence(mode) {
             storage.setMode(mode);
@@ -326,6 +367,8 @@ export function createSupabaseTransport(config, deps?) {
             return { status: res.status, body: parsed && typeof parsed === 'object' ? parsed : { ok: false, code: 'bad-response' } };
         },
         close() {
+            foreignListeners.clear();
+            if (eventTarget && typeof eventTarget.removeEventListener === 'function') eventTarget.removeEventListener('storage', onStorage);
             try { client.removeAllChannels(); } catch (e) {}
             try { client.auth.stopAutoRefresh(); } catch (e) {}
         }

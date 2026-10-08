@@ -116,6 +116,7 @@ export const ACTION_ALLOWLIST = [
     "showMoreHistoryRows",
     "submitActivationKey",
     "submitAppLockForm",
+    "submitSecurityPinForm",
     "submitLoginForm",
     "submitRegisterForm",
     "submitResetPasswordForm",

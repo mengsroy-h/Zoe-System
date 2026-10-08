@@ -19,7 +19,7 @@ import { cancelLocationChange, confirmLocationChange } from '../features/locker-
 import { saveLookupApiConfig, testLookupApiConfig } from '../features/lookup-config';
 import { exportMonthlyReportAsExcel, exportMonthlyReportAsPDF, renderMonthlyReport } from '../features/monthly-report';
 import { decodeImageFile, searchByPhone } from '../features/phone-suggest';
-import { saveNewSecurityPin, verifySecurityPin } from '../features/pin';
+import { saveNewSecurityPin, submitSecurityPinForm, verifySecurityPin } from '../features/pin';
 import { cancelPermanentDelete, executePermanentDelete, executeRestoreItem, promptPermanentDelete } from '../features/restore';
 import { confirmPhone } from '../features/scan-action';
 import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '../features/scan-remove';
@@ -156,6 +156,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     showMoreHistoryRows,
     submitActivationKey,
     submitAppLockForm,
+    submitSecurityPinForm,
     submitLoginForm,
     submitRegisterForm,
     submitResetPasswordForm,

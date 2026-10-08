@@ -1,6 +1,7 @@
 import { setFieldValue, videoElement } from '../app/refs';
 import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { scanState, securityState } from '../core/state';
+import { noteAppLockExcuse } from './app-lock';
 import { connectSetupPayload, parseSetupLinkText } from './config';
 import { modalIsOpen } from '../core/modals';
 import { CONFIG_QR_FORMAT_NAMES, CONFIG_QR_SCAN_WIDTH, buildReaderOptions, decodeBarcodeFromCanvasManual, scanEngineReady, scheduleScanFrame } from '../services/scan-engine';
@@ -50,6 +51,7 @@ export async function openConfigQrScanner() {
     securityState.configQrScanActive = true;
     try {
         securityState.configQrReader = buildReaderOptions(false, CONFIG_QR_FORMAT_NAMES);
+        noteAppLockExcuse();
         securityState.configQrStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' }, audio: false
         });

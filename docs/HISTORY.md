@@ -127,6 +127,26 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.25] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ «យករួច» ពីបញ្ជី ZTO របស់អតិថិជនដដែល ថ្ងៃដដែល នៅក្នុងជួរតែមួយ** (Deep audit ២ · ជុំ ១១ · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង ៖ បញ្ចូលគ្នា)
+
+**ZoeW `2.50.25`** (`zoew-v287` ➜ `zoew-v288`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ឯកសារ `LOCK` (តំបន់ ZTO) មិនប្រែ (ការកែនៅ `src/features/scan-action.ts`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📦 **ZTO-4** ៖ `addOrUpdateEntry()` រំលងការរកជួរពេល `closedAtMs > 0` (`!bornClosed`) ➜ ការនាំចូលបញ្ជី ZTO បង្កើតមួយជួរក្នុងមួយកញ្ចប់ «យករួច» សូម្បីអតិថិជនដដែល ថ្ងៃដដែល (ផ្ទុយច្បាប់ «មួយជួរ = អតិថិជនម្នាក់ក្នុងមួយថ្ងៃ»)។
+  ឥឡូវ ៖ ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល (barcode នីមួយៗរក្សា `closedAt` ខ្លួន ➜ ច្បាប់ ២ ម៉ោងដើរតាម barcode ដដែល) · `isClosed` ជួរដេរីវេពី barcode ទាំងអស់
+  (server បើកជួរវិញ ➜ មិនបិទក្លែង) · `closedAt` ជួរ = ថ្មីបំផុត · ជួរបើកនៅបញ្ចូលចូលជួរបើកដូចដើម · «គ្មានលេខ» មិនបញ្ចូល។ ចំណូល/ចំនួនមិនប្រែ (ledger ១ ក្នុងមួយកញ្ចប់ដដែល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ «📥 ទាញបញ្ជីកញ្ចប់ពី ZTO» ដែលមានកញ្ចប់ «យករួច» ច្រើនរបស់អតិថិជនដដែលក្នុងថ្ងៃដដែល ➜ «➕ បញ្ចូល» ➜ ប្រវត្តិមានជួរតែមួយ (ចំនួន = កញ្ចប់) · ក្រោយ ២ ម៉ោង ➜ ចូលធុងសំរាម «យករួច» · ចំណូលថ្ងៃកើនតែម្តងក្នុងមួយកញ្ចប់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-born-closed-merge.test.ts` (ថ្មី · ៤ · store ក្លែង + `addOrUpdateEntry` ពិត) ៖ មុនកែ FAIL ២/៤ (២ ជួរ · server បើកវិញ ➜ ជួរថ្មី) ➜ ៤/៤ · ទិសផ្ទុយ (ជួរបើក · អតិថិជនផ្សេង · «គ្មានលេខ» · ថ្ងៃផ្សេង) ឆ្លងទាំងពីរ tree ·
+  តេស្ត ZTO ផ្សេង (`zto-signed-sync` · `zto-import-lanes` · `zto-signed-only-purge` · `merge-into-deleted-item` · `lookup-late-answer-busy`) ៦២/៦២។
+
 ### [2.50.24] — 2026-10-08 · ZoeW ៖ **ចូលដោយក្រយៅដៃ ឬមុខ (web) ការពារ PIN ដោយ WebAuthn PRF តែប៉ុណ្ណោះ** (Deep audit ២ · ជុំ ១០ · SECURITY-1 · ការសម្រេចម្ចាស់គម្រោង ៖ PRF-only)
 
 **ZoeW `2.50.24`** (`zoew-v286` ➜ `zoew-v287`) · ⛔ ZoeKeyGen មិនប្រែ (PRF-only រួចហើយ) · គ្មាន rules · env · migration ថ្មី។
@@ -2334,6 +2354,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A18 | **SECURITY-1** biometric `device` ទុក `wrapKey` ក្បែរ `wrapped` | Claude ៖ `enrollBiometricRecord()` ពិតលើ WebAuthn គ្មាន PRF ➜ `{ mode: 'device', wrapKey, wrapped }` ក្នុង localStorage · `wrapKey` + `wrapped` ពិតក្នុង storage ➜ `biometricUnlockPin()` ឲ្យ PIN · FAIL ៣/៤ | PRF-only · លុប record ចាស់ពេលបើក App |
+| A19 | **ZTO-4** ជួរ born-closed មិនបញ្ចូលគ្នា (`!bornClosed`) | Claude ៖ `addOrUpdateEntry()` ពិត ២ ដង (អតិថិជនដដែល ថ្ងៃដដែល · `closedAtMs > 0`) ➜ ២ ជួរ · FAIL ២/៤ | បញ្ចូលចូលជួរបិទ · `isClosed` ដេរីវេពី barcode |
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៩ (SECURITY-2 · SENTRY-3) ➜ [2.50.23]
 

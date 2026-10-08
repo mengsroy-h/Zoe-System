@@ -1848,6 +1848,9 @@
     "ZoeW/tests/biometric-no-device-mode.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-born-closed-merge.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ledger-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },

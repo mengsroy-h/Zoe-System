@@ -643,7 +643,7 @@ The list card (`.page-main`) has the same height in normal and full-screen modes
 ⛔ Missing `scroll-padding-top` or a stuck `panel-gliding` ➜ PTR dies (it needs `scrollTop <= 1`).
 `clearSensitiveModalFields()` calls `endPanelGlideSnapPause()`. `panel-motion-test.js`: `cardHeightDelta`/
 `tableHeightDelta` ➜ points 1–2 · `snapRestNearTop` ➜ point 3 · `residualTransform` ➜ point 4.
-Auto pull-up (`setPhoneSearchPulledUp()`): the search card must stay the last child of `.page-side`. Focus and blur glide (`glidePhoneSearchPulledUp()`: FLIP of the search card `dataSearchCard` and `.page-main` through `panelGlideFrom()`) ⛔ never an instant jump. Scan-tab search fields (`entryListSearchInput` · `lockerListSearchInput`) collapse the scan panel on focus with the same glide (`entrySearchFocused()`) and open it again when the empty field blurs, only when the focus collapsed it (`history-window-check` · `ZoeW/tests/ios-entry-search-tap.test.ts`).
+Auto pull-up (`setPhoneSearchPulledUp()`): the search card must stay the last child of `.page-side`. Focus and blur glide (`glidePhoneSearchPulledUp()`: FLIP of the search card `dataSearchCard` and `.page-main` through `panelGlideFrom()`) ⛔ never an instant jump. Scan-tab search fields (`entryListSearchInput` · `lockerListSearchInput`) collapse the scan panel on focus with the same glide (`entrySearchFocused()`) and open it again when the empty field blurs, only when the focus collapsed it ⛔ never while the camera scans (a hidden camera would keep adding parcels) (`history-window-check` · `ZoeW/tests/ios-entry-search-tap.test.ts`).
 
 ## ⛔ `--chrome-bottom` and safe-area
 
@@ -918,7 +918,6 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
   `biometricPrfEval` · `biometricPrfBytes` byte-identical in both apps) (`biometric-no-device-mode.test.tsx` · `biometric-android-prf.test.ts` ·
   `biometric-unlock-test` · `keygen-biometric-test`).
 - `linkIsFrugal()` fails open and skips only optional work.
-- `function-surface-test.js` blocks duplicate declarations.
 
 ## Service Worker
 
@@ -1104,13 +1103,8 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
 
 ## ⛔ Netlify: 2 sites, one repo
 
-| Site | Base directory |
-|---|---|
-| `zoew` | **`ZoeW`** |
-| `zoekeygen` | **`ZoeKeyGen`** |
-
-- Base directory lives in the Netlify UI and is case-sensitive (📝). "base directory does not exist" ➜ check case in the
-  UI first.
+- Base directory per site (`zoew` ➜ `ZoeW` · `zoekeygen` ➜ `ZoeKeyGen`) lives in the Netlify UI ➜ «Accepted by design» (📝 · case-sensitive).
+  "base directory does not exist" ➜ check case in the UI first.
 - ⛔ No root `netlify.toml` and no `base` key anywhere.
 - Config matches what each app ships (derived): `.wasm` ➜ `'wasm-unsafe-eval'` + `Content-Type = "application/wasm"` ·
   `netlify/functions/*.js` ➜ `functions = ` to a real dir · `script.google.com` in `connect-src` when used · reverse:

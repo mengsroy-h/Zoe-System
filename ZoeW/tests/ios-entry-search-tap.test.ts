@@ -4,10 +4,11 @@
  *    keyboard ~៣៣០px គ្របលទ្ធផលស្ទើរទាំងអស់ ហើយ iOS រំកិល document ដើម្បីបង្ហាញប្រអប់ (ដូចបញ្ហា 2.50.42 · 2.50.45 លើប្រអប់ស្វែងរកលេខ)។
  * ⛔ ច្បាប់ ៖ ទូរស័ព្ទ (< 992px) · focus ប្រអប់ស្វែងរកក្នុង tab ស្កេន ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល (ដូចអូសឡើង) · ចាកចេញពីប្រអប់ទទេ ➜ បើកវិញ
  *    (តែពេលការ focus ជាអ្នកបង្រួម) · iOS standalone ៖ ការចុច ➜ touchend preventDefault ➜ បង្រួមមុន ➜ `focus({ preventScroll: true })` ·
- *    document រំកិលខណៈប្រអប់ទាំងនេះ focus ➜ ត្រឡប់ ០។ ទិសផ្ទុយ ៖ អេក្រង់ធំ · tab ផ្សេង · ផ្ទាំងបង្រួមដោយដៃមុន ➜ មិនបើកវិញដោយខ្លួនឯង។
+ *    document រំកិលខណៈប្រអប់ទាំងនេះ focus ➜ ត្រឡប់ ០។ ទិសផ្ទុយ ៖ អេក្រង់ធំ · tab ផ្សេង · ផ្ទាំងបង្រួមដោយដៃមុន ➜ មិនបើកវិញដោយខ្លួនឯង ·
+ *    កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម (កាមេរ៉ាលាក់តែនៅស្កេន ➜ បញ្ចូលកញ្ចប់ដោយមិនដឹង)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { uiState } from '../src/core/state';
+import { scanState, uiState } from '../src/core/state';
 import { refTo } from '../src/app/refs';
 import * as iosViewport from '../src/app/behaviors/ios-viewport';
 import { entrySearchBlurred, entrySearchFocused } from '../src/app/behaviors/entry-search';
@@ -143,6 +144,23 @@ describe('tab ស្កេន ៖ ស្វែងរកបញ្ជីកញ្�
         uiState.currentAppPage = 'data';
         entrySearchFocused();
         expect(uiState.entryPanelCollapsed).toBe(false);
+    });
+
+    it('⛔ កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម (កាមេរ៉ាមិនត្រូវស្កេនបន្តដោយលាក់ ➜ បញ្ចូលកញ្ចប់ដោយមិនដឹង)', () => {
+        scanState.isCameraScanning = true;
+        try {
+            entrySearchFocused();
+            expect(uiState.entryPanelCollapsed).toBe(false);
+        } finally {
+            scanState.isCameraScanning = false;
+        }
+        scanState.isCameraStarting = true;
+        try {
+            entrySearchFocused();
+            expect(uiState.entryPanelCollapsed).toBe(false);
+        } finally {
+            scanState.isCameraStarting = false;
+        }
     });
 
     it('ទិសផ្ទុយ ៖ Android/web ➜ ការចុចទុកឲ្យ browser (focus ធម្មតា ➜ onFocus បង្រួម)', () => {

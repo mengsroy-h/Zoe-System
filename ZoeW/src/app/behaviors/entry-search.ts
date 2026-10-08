@@ -1,4 +1,4 @@
-import { uiState } from '../../core/state';
+import { scanState, uiState } from '../../core/state';
 import { commitNow } from '../flush';
 import { elementOf, fieldValue, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { panelGlideFrom } from './panel-motion';
@@ -29,6 +29,7 @@ export function glideEntryPanelCollapsed(collapsed: boolean): boolean {
 
 export function entrySearchFocused(): void {
     if (window.innerWidth >= ENTRY_SEARCH_WIDE_MIN_PX || uiState.currentAppPage !== 'entry') return;
+    if (scanState.isCameraScanning || scanState.isCameraStarting) return;
     if (glideEntryPanelCollapsed(true)) entrySearchCollapsed = true;
 }
 

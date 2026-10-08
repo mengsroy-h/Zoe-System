@@ -140,7 +140,7 @@
 - ✨ **ចុចស្វែងរកលេខ ➜ ផ្ទាំងរអិលឡើង** (មុននេះលោតភ្លាម ~៣០០px ក្នុងស៊ុមតែមួយ ខណៈ keyboard ចាប់ផ្តើម)។ ការទាញឡើង/ចុះពេល focus · blur ឥឡូវរអិល ២២០ms
   ដូចការអូសផ្ទាំង (`glidePhoneSearchPulledUp()` ៖ FLIP កាតស្វែងរក + បញ្ជី តាម `panelGlideFrom()` · ផ្អាក snap ដូចមុន)។ iPhone PWA ៖ ការចុច ➜ រអិលឡើងមុន ➜ `focus({ preventScroll })` ([2.50.45])។
 - ✨ **ទំព័រស្កេន ៖ ចុចស្វែងរកបញ្ជីកញ្ចប់ ឬបញ្ជី Locker ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល** (សំណើម្ចាស់គម្រោង «ពិនិត្យកន្លែងស្វែងរកក្នុង tab ស្កេនផង») ៖ មុននេះប្រអប់នៅ y ៤៣៦ · ៥០៣
-  (៤១៤×៨៩៦) ➜ keyboard គ្របលទ្ធផល ហើយ iOS រំកិលទំព័រ។ ឥឡូវប្រអប់ឡើង y ~១០៦ · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (តែពេល focus ជាអ្នកបង្រួម · មានអក្សរ ➜ នៅបង្រួម) ·
+  (៤១៤×៨៩៦) ➜ keyboard គ្របលទ្ធផល ហើយ iOS រំកិលទំព័រ។ ឥឡូវប្រអប់ឡើង y ~១០៦ · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (តែពេល focus ជាអ្នកបង្រួម · មានអក្សរ ➜ នៅបង្រួម · កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម ព្រោះកាមេរ៉ាលាក់នៅតែស្កេន) ·
   iPhone PWA ៖ ការចុច ➜ បង្រួមមុន ➜ `focus({ preventScroll })` · document រំកិល ➜ ត្រឡប់ ០ (ដូចប្រអប់ស្វែងរកលេខ)។
 - ✨ **🔔 «📱 កំណែ App» ៖ ប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី»** (សំណើម្ចាស់គម្រោង) ៖ ទាញព័ត៌មានកំណែភ្លាម · APK ៖ សួរ GitHub Release ម្តងទៀតភ្លាម (មុននេះរង់ចាំ ២ នាទីក្រោយ
   «មិនទាន់មាន») · PWA ៖ សួរ Service Worker ឲ្យទាញកំណែថ្មី ➜ «Refresh ឥឡូវនេះ» · ខណៈពិនិត្យ ➜ ប៊ូតុងបិទ · មិនបាន ➜ ⚠️។
@@ -160,7 +160,7 @@
   មុនកែ FAIL ២ (ការផ្ទុកលើកក្រោយទទួល HTML ៨៩,៥៩៣ bytes ពី cache)។
 - `ZoeW/scripts/history-window-check.mjs` (APK · PWA Android · PWA iPhone) ៖ ចុចស្វែងរកលេខ ➜ FLIP ចាប់ផ្តើមពីទីតាំងចាស់ (±២px) · ចប់គ្មាន transform សល់ · blur ➜ រអិលចុះ ·
   ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ➜ បង្រួមដោយរអិល · ប្រអប់ឡើង ≥ ១០០px · blur ទទេ ➜ បើកវិញ — មុនកែ FAIL ១២/១២ · ការវាស់ keyboard រង់ចាំ `resize` ពិត (មុននេះធ្លាក់ម្តងក្រោមបន្ទុក run-all)។
-- `ZoeW/tests/ios-entry-search-tap.test.ts` (៧) ៖ iPhone PWA ចុចប្រអប់ស្វែងរកទំព័រស្កេន ➜ preventDefault · បង្រួមមុន focus · `preventScroll` · blur ទទេ/មានអក្សរ · បង្រួមដោយដៃមុន ·
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (៨) ៖ iPhone PWA ចុចប្រអប់ស្វែងរកទំព័រស្កេន ➜ preventDefault · បង្រួមមុន focus · `preventScroll` · blur ទទេ/មានអក្សរ · បង្រួមដោយដៃមុន · កាមេរ៉ាកំពុងស្កេន ·
   អេក្រង់ធំ · tab ផ្សេង · Android ➜ មិនប៉ះ · document រំកិល ➜ ០។
 - `ZoeW/tests/notify-update-check.test.tsx` (៧) ៖ ខ្សែភ្ជាប់ (registry · allowlist) · APK «មិនទាន់មាន» ទើបពិនិត្យ ➜ ចុច ➜ probe ភ្លាម ➜ ប៊ូតុងទាញយក · PWA `registration.update()` ·
   កំពុងពិនិត្យ ➜ បិទ · មិនបាន ➜ ⚠️ · `updateReady` ➜ គ្មានប៊ូតុង។
@@ -2921,7 +2921,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 - **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
   `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase
-  conflict ក្រោយបង្អួច · HTML ក្រោម key · glide ស្វែងរក · ប៊ូតុងពិនិត្យកំណែ) ក្នុងជួរដែលមានស្រាប់ (គ្មានជួរថ្មី)។
+  conflict ក្រោយបង្អួច · HTML ក្រោម key · glide ស្វែងរក · ប៊ូតុងពិនិត្យកំណែ) ក្នុងជួរដែលមានស្រាប់ (គ្មានជួរថ្មី) · ដកស្ទួន ២ ៖ តារាង Base directory
+  ក្នុង «Netlify: 2 sites» (ដដែលនឹង «Accepted by design» និងជួរ 📝) ➜ យោង · «`function-surface-test.js` blocks duplicate declarations» ក្នុង Short rules (ដដែលនឹងតារាង «Rules carried by specific checkers»)។
 - **ឯកសារឈប់ប្រើ** ៖ ពិនិត្យ `git ls-files` ទាំងអស់ (ឈ្មោះឯកសារ ↔ ការយោង) ➜ គ្មានឯកសារងាប់ · `src/core/runtime.ts` (`ACTION_ALLOWLIST`) អានដោយ checker ➜ រក្សា ·
   `ZoeW/docs/MIGRATION.md` ធ្វើបច្ចុប្បន្នភាពក្នុង DOCS-5 ➜ រក្សា។
 - **មិនបានរកឃើញ** (អានរួច) ៖ ច្បាប់ RLS · `current_tenant_id()` (user ១ = ហាង ១) · Edge Function register/reset (កូដ ១០០ bit · CORS ចង origin) · `ApkUpdatePlugin.java` (HTTPS ·

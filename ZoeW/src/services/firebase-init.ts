@@ -9,7 +9,7 @@ import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
 import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
-import { armLateFirebaseSdkListener, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
+import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
 import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
@@ -151,7 +151,7 @@ export async function initFirebase() {
             renderConnectionStatus();
             if (!firebaseState.sdkUnavailableNoticeShown) {
                 firebaseState.sdkUnavailableNoticeShown = true;
-                showToast('⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ។ កំពុងព្យាយាមម្តងទៀត...');
+                showToast(firebaseSdkNeedsRefresh() ? FIREBASE_SDK_REFRESH_TEXT : '⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ។ កំពុងព្យាយាមម្តងទៀត...');
             }
             scheduleFirebaseSdkRetry();
             return false;

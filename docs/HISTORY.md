@@ -127,6 +127,29 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.26] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ភ្ជាប់ Server មិនបាន ក្រោយការផ្ទុកទំព័រឡើងវិញស្វ័យប្រវត្តិអស់ពិដាន ➜ App ប្រាប់ «សូម Refresh ទំព័រ» ហើយឈប់ព្យាយាមឥតប្រយោជន៍** (Deep audit ២ · ជុំ ១២ · NETWORK-1)
+
+**ZoeW `2.50.26`** (`zoew-v288` ➜ `zoew-v289`) · **ZoeKeyGen `2.24.8`** (`zoekeygen-v118` ➜ `zoekeygen-v119`) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **NETWORK-1** ៖ SDK Firebase ទាញមិនបាន ➜ App ផ្ទុកទំព័រឡើងវិញដោយខ្លួនឯង ≤ `FIREBASE_SDK_RELOAD_MAX` (៣) ដងក្នុងវគ្គ។ ក្រោយពិដានអស់ ជណ្តើរ ៥/១០/២០/៣០/៦០ វិ. · `online` · `visibilitychange`
+  នៅហៅ `initFirebase()` រៀងរហូត ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» — តែការព្យាយាមក្នុងទំព័រដដែលមិនអាចជោគជ័យ (browser ចងចាំ module ដែលទាញមិនបាន · `started` របស់ loader ZoeW)។
+  ឥឡូវ ៖ `firebaseSdkNeedsRefresh()` (ពិដានអស់ · SDK មិនមាន) ➜ ជណ្តើរ · `online` · `visibilitychange` ឈប់ · ស្ថានភាពជាប់ «សូម Refresh ទំព័រ» · toast «⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ រួច Refresh ទំព័រ» ·
+  SDK ដែលមកដល់យឺតនៅតែភ្ជាប់តាម `armLateFirebaseSdkListener()` · ⛔ មិនផ្ទុកឡើងវិញលើសពិដាន (ទោះ host របស់ SDK ត្រឡប់មកវិញ)។ App ទាំងពីរដូចគ្នា (`shared-fns`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** + **ZoeKeyGen** ➜ build APK ឡើងវិញ។
+2. គ្មានការសាកពិសេស (ករណីនេះកើតតែពេលបណ្តាញទប់ `gstatic.com` យូរ)។ បើចង់សាក ៖ DevTools ➜ Network ➜ Block `www.gstatic.com` ➜ Refresh ៤ ដង ➜ ស្ថានភាព «សូម Refresh ទំព័រ» · ដក Block ➜ Refresh ➜ «ភ្ជាប់ Server រួចរាល់»។
+
+#### អ្នកយាម
+
+- `connection-recovery-test` ១០ខ៥ (App ទាំងពីរ) ៖ ពិដានអស់ ➜ ជណ្តើរ ១០ នាទី (បណ្តាញ down ➜ up) ➜ `initFirebase` ០ · reload ០ · timer ០ · SDK មកយឺត ➜ ភ្ជាប់ · ពិដាននៅសល់ ១ ➜ reload ១ · ១០ខ៣ ៖ assertion ចាស់
+  «ក្រោយអស់ពិដាន ត្រឡប់ទៅជណ្តើរ» (ចាក់សោកំហុស) ➜ «ជណ្តើរឈប់» · ១០ខ៥ខ ៖ ស្ថានភាព ZoeKeyGen · toast ZoeKeyGen ក្នុង `initFirebase` ពិត ➜ មុនកែ FAIL ៨ ➜ ២៣០/២៣០ · mutation ដក gate ក្នុង
+  `scheduleFirebaseSdkRetry` ➜ FAIL ៤ · ក្នុង `retryFirebaseSdkNow` ➜ FAIL ៥ · ដកអត្ថបទ toast ZoeKeyGen ➜ FAIL ១។
+- `sdk-offline-boot-test` (Chromium ពិត · ZoeW) ៖ ពិដានអស់ ➜ ស្ថានភាព + toast «Refresh» · ពិដាននៅសល់ ➜ «កំពុងព្យាយាមម្តងទៀត» ➜ មុនកែ FAIL ២ ➜ ១៩/១៩។
+
 ### [2.50.25] — 2026-10-08 · ZoeW ៖ **កញ្ចប់ «យករួច» ពីបញ្ជី ZTO របស់អតិថិជនដដែល ថ្ងៃដដែល នៅក្នុងជួរតែមួយ** (Deep audit ២ · ជុំ ១១ · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង ៖ បញ្ចូលគ្នា)
 
 **ZoeW `2.50.25`** (`zoew-v287` ➜ `zoew-v288`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ឯកសារ `LOCK` (តំបន់ ZTO) មិនប្រែ (ការកែនៅ `src/features/scan-action.ts`)។
@@ -2348,6 +2371,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១២ (NETWORK-1 · SENTRY-2) ➜ [2.50.26]–
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A22 | **NETWORK-1** ពិដានផ្ទុក SDK ឡើងវិញអស់ ➜ ការស្តារឥតប្រយោជន៍ · toast «កំពុងព្យាយាម» | Claude ៖ ជណ្តើរ + `online`/`visibility` ពិតក្នុង vm ៖ ក្រោយពិដានអស់ `initFirebase` ៩ ➜ ២៩ ក្នុង ១០ នាទី · Chromium ពិត ៖ ពិដានអស់ ➜ toast «កំពុងព្យាយាមម្តងទៀត» · `connection-recovery-test` FAIL ៨ · `sdk-offline-boot-test` FAIL ២ | `firebaseSdkNeedsRefresh()` ➜ ឈប់ + «សូម Refresh ទំព័រ» (App ទាំងពីរ) |
+
+- `connection-recovery-test` ១០ខ៣ មាន assertion ដែលចាក់សោកំហុសនេះ («ក្រោយអស់ពិដាន ការស្តារត្រឡប់ទៅជណ្តើរចាស់») ➜ ជំនួសដោយ «ជណ្តើរឈប់» · `b3` (ពិដាន ៣ វិ.) សងពិដានផ្ទុកឡើងវិញរាល់ជុំ ដើម្បីវាស់តែពិដាន ៣ វិ.។
+- sandbox ដែលស្រង់ `renderConnectionStatus` · `retryFirebaseSdkNow` ត្រូវការ `firebaseSdkNeedsRefresh` ៖ `connection-recovery-test` (`REQUIRED_FNS` · `extras`) · `monotonic-gate-test` (stub `false`)។
+- gate ក្នុង `recoverFirebaseSdk` ស្ទួន (mutation រស់ ៖ `scheduleFirebaseSdkRetry` · `retryFirebaseSdkNow` ទប់មុន) ➜ ដកចេញ។
+- 🗳️ សំណើម្ចាស់គម្រោង ៖ `announcements.json` (ធាតុ `update`) សរសេរ **តែអ្វីដែលថ្មីក្នុងជុំនេះ** · អត្ថបទជុំចាស់លុបចោល (មិនបញ្ចូលចំណុចចាស់ទៀត) ➜ ច្បាប់ក្នុង `CLAUDE.md` ជួរ «🔔 panel»។
 
 ### 2026-10-08 — Deep audit ២ ៖ D7 (ដកឧបករណ៍ parity ធៀប ZoeW vanilla · ការសម្រេចម្ចាស់គម្រោង ៖ អនុញ្ញាត · PR ដាច់ · គ្មាន bump)
 

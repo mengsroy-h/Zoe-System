@@ -18,6 +18,8 @@ export const FIREBASE_SDK_PROBE_URL = 'https://www.gstatic.com/generate_204';
 
 export const FIREBASE_SDK_PROBE_TIMEOUT_MS = 8000;
 
+export const FIREBASE_SDK_REFRESH_TEXT = '⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ រួច Refresh ទំព័រ';
+
 export function clearFirebaseSdkRetry() {
     if (firebaseState.firebaseSdkRetryTimer) {
         clearTimeout(firebaseState.firebaseSdkRetryTimer);
@@ -64,6 +66,12 @@ export function firebaseSdkReloadAllowed() {
     return elapsedSince(firebaseState.lastFirebaseSdkReloadAt) >= FIREBASE_SDK_RELOAD_MIN_GAP_MS;
 }
 
+export function firebaseSdkNeedsRefresh() {
+    if (!firebaseState.firebaseSdkUnavailable) return false;
+    if (typeof window.firebaseSDK !== 'undefined' && window.firebaseSDK) return false;
+    return firebaseSdkReloadCount() >= FIREBASE_SDK_RELOAD_MAX;
+}
+
 export function reloadForFirebaseSdk() {
     if (!firebaseSdkReloadAllowed()) return false;
     if (firebaseState.firebaseSdkProbeInFlight) return true;
@@ -100,6 +108,7 @@ export function recoverFirebaseSdk() {
 
 export function scheduleFirebaseSdkRetry() {
     if (firebaseState.firebaseSdkRetryTimer || firebaseState.isDatabaseInitialized) return;
+    if (firebaseSdkNeedsRefresh()) return;
     const step = FIREBASE_SDK_RETRY_STEPS_MS[Math.min(firebaseState.firebaseSdkRetryAttempt, FIREBASE_SDK_RETRY_STEPS_MS.length - 1)];
     firebaseState.firebaseSdkRetryAttempt++;
     firebaseState.firebaseSdkRetryTimer = setTimeout(() => {
@@ -113,6 +122,7 @@ export function scheduleFirebaseSdkRetry() {
 export function retryFirebaseSdkNow() {
     if (!firebaseState.firebaseSdkUnavailable || firebaseState.isDatabaseInitialized || firebaseState.isInitializingFirebase) return;
     if ((navigator.onLine as boolean) === false) return;
+    if (firebaseSdkNeedsRefresh()) return;
     const sinceLastAttempt = elapsedSince(firebaseState.lastFirebaseSdkAttemptAt);
     if (sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
         if (!firebaseState.firebaseSdkRetryTimer) {

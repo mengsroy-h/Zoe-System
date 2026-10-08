@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.7';
+const APP_VERSION = '2.24.8';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -273,6 +273,7 @@ const FIREBASE_SDK_RELOAD_MAX = 3;
 const FIREBASE_SDK_RELOAD_MIN_GAP_MS = 20000;
 const FIREBASE_SDK_PROBE_URL = 'https://www.gstatic.com/generate_204';
 const FIREBASE_SDK_PROBE_TIMEOUT_MS = 8000;
+const FIREBASE_SDK_REFRESH_TEXT = '⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ រួច Refresh ទំព័រ';
 let firebaseSdkRetryTimer = null;
 let firebaseSdkRetryAttempt = 0;
 let lastFirebaseSdkAttemptAt = 0;
@@ -337,6 +338,12 @@ function firebaseSdkReloadAllowed() {
     return elapsedSince(lastFirebaseSdkReloadAt) >= FIREBASE_SDK_RELOAD_MIN_GAP_MS;
 }
 
+function firebaseSdkNeedsRefresh() {
+    if (!firebaseSdkUnavailable) return false;
+    if (typeof window.firebaseSDK !== 'undefined' && window.firebaseSDK) return false;
+    return firebaseSdkReloadCount() >= FIREBASE_SDK_RELOAD_MAX;
+}
+
 function reloadForFirebaseSdk() {
     if (!firebaseSdkReloadAllowed()) return false;
     if (firebaseSdkProbeInFlight) return true;
@@ -373,6 +380,7 @@ function recoverFirebaseSdk() {
 
 function scheduleFirebaseSdkRetry() {
     if (firebaseSdkRetryTimer || isDatabaseInitialized) return;
+    if (firebaseSdkNeedsRefresh()) return;
     const step = FIREBASE_SDK_RETRY_STEPS_MS[Math.min(firebaseSdkRetryAttempt, FIREBASE_SDK_RETRY_STEPS_MS.length - 1)];
     firebaseSdkRetryAttempt++;
     firebaseSdkRetryTimer = setTimeout(() => {
@@ -386,6 +394,7 @@ function scheduleFirebaseSdkRetry() {
 function retryFirebaseSdkNow() {
     if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
     if (navigator.onLine === false) return;
+    if (firebaseSdkNeedsRefresh()) return;
     const sinceLastAttempt = elapsedSince(lastFirebaseSdkAttemptAt);
     if (sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
         if (!firebaseSdkRetryTimer) {
@@ -414,7 +423,7 @@ function renderConnectionStatus() {
         txt.classList.toggle('is-online', online);
         txt.classList.toggle('is-connecting', !online && settling);
         txt.classList.toggle('is-offline', !online && !settling);
-        txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : (settling ? 'កំពុងភ្ជាប់...' : 'ក្រៅបណ្ដាញ');
+        txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : (settling ? 'កំពុងភ្ជាប់...' : (firebaseSdkNeedsRefresh() ? 'សូម Refresh ទំព័រ' : 'ក្រៅបណ្ដាញ'));
     }
     refreshLiveToasts();
 }
@@ -870,7 +879,7 @@ async function initFirebase() {
             renderConnectionStatus();
             if (!sdkUnavailableNoticeShown) {
                 sdkUnavailableNoticeShown = true;
-                showToast('⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ។ កំពុងព្យាយាមម្តងទៀត...');
+                showToast(firebaseSdkNeedsRefresh() ? FIREBASE_SDK_REFRESH_TEXT : '⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ។ កំពុងព្យាយាមម្តងទៀត...');
             }
             scheduleFirebaseSdkRetry();
             return false;

@@ -41,7 +41,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const srv = await serveDir(OUT);
 const seed = seedData();
 
-async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT, safeAreaTop = 0 } = {}) {
+async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT, safeAreaTop = 0, safeAreaBottom = 0 } = {}) {
     const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     const errors = [];
@@ -65,9 +65,9 @@ async function session({ native = true, storage = {}, session: sess = {}, respon
     await page.clock.install({ time: HARNESS_CLOCK_START });
     /* ⛔ WebView ពេញអេក្រង់ ៖ `env(safe-area-inset-top)` ពិតតាម CDP (មិនមែន CSS ក្លែង) ➜ navbar ·
        ធាតុវាស់ ទទួល padding ដូចលើទូរស័ព្ទ។ session CDP ត្រូវរស់ពេញសេណារីយ៉ូ (ការ override ជារបស់វា)។ */
-    if (safeAreaTop) {
+    if (safeAreaTop || safeAreaBottom) {
         const cdp = await ctx.newCDPSession(page);
-        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: safeAreaTop } });
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: safeAreaTop, bottom: safeAreaBottom } });
     }
     await page.goto(`http://127.0.0.1:${srv.port}/index.html`, { waitUntil: 'load' });
     await page.waitForTimeout(2500);
@@ -461,6 +461,31 @@ await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថា�
     const efp = await page.evaluate(() => ({ calls: window.__efpCalls, inRaf: window.__efpInRaf }));
     ok('⛔ ការវាស់ពណ៌ពេលប្រអប់/ម៉ឺនុយបើក-បិទ រត់ក្រោយស៊ុមគូរ ⛔ មិនដែលក្នុង rAF (layout កណ្តាលចលនា)', efp.calls >= 4 && efp.inRaf === 0, efp);
     await closeSession(s, 'របាស្ថានភាព');
+});
+
+/* ── ៤ឃ២. របា navigation (ខាងក្រោម) លើ WebView ពេញអេក្រង់ ───────────── */
+/*
+ * ⛔ NATIVE-8 ៖ របា navigation ក៏ជាស្រទាប់ថ្លាលើទំព័រដែរ (inset ខាងក្រោម) ➜ រូបតំណាងត្រូវផ្ទុយពន្លឺនឹងផ្ទៃពិតនៅក្រោមវា ៖ ប្រអប់បើក
+ *    (ផ្ទៃងងឹតថ្លាៗ) ➜ DARK (រូបតំណាងស) · បិទ ➜ LIGHT។ ការកំណត់ LIGHT ម្តងពេលចាប់ផ្តើម ➜ រូបតំណាងខ្មៅលើផ្ទៃងងឹត (មើលមិនឃើញ)។
+ */
+await scenario('៤ឃ២. ពណ៌រូបតំណាងរបា navigation (WebView ពេញអេក្រង់ · safe-area ខាងក្រោម 48px)', async () => {
+    const s = await session({ safeAreaBottom: 48 });
+    const { page } = s;
+    const lastNav = async () => {
+        const c = (await calls(page, 'SystemBars', 'setStyle')).filter((x) => x.options.bar === 'NavigationBar');
+        return c.length ? c[c.length - 1].options.style : null;
+    };
+    const pad = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('pageTabBar')).paddingBottom));
+    ok('(លក្ខខណ្ឌចាំបាច់) safe-area ខាងក្រោមពិត ៖ របា Tab ទទួល padding ពី env()', pad >= 48, pad);
+    ok('របា Tab ស ក្រោមរបា navigation ➜ រូបតំណាងខ្មៅ (LIGHT)', (await lastNav()) === 'LIGHT', await lastNav());
+    await page.click('.daily-stats-btn');
+    await page.waitForTimeout(700);
+    ok('(លក្ខខណ្ឌចាំបាច់) ប្រអប់បើក', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display !== 'none'));
+    ok('⛔ ប្រអប់បើក (ផ្ទៃងងឹតថ្លាៗ) ➜ រូបតំណាងរបា navigation ស (DARK)', (await lastNav()) === 'DARK', await lastNav());
+    await fire(page, 'App', 'backButton', { canGoBack: false });
+    await page.waitForTimeout(700);
+    ok('បិទប្រអប់ ➜ រូបតំណាងរបា navigation ខ្មៅវិញ (LIGHT)', (await lastNav()) === 'LIGHT', await lastNav());
+    await closeSession(s, 'របា navigation');
 });
 
 /* ── ៥. web (គ្មាន bridge) ───────────────────────────────────────────── */

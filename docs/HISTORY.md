@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
@@ -129,6 +129,36 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.37] — 2026-10-08 · ZoeW (APK) ៖ **ប្រអប់សុំសិទ្ធិលែងចាក់សោ App · Back លើប្រអប់ចូលបង្រួម App · keyboard លែងគណនា style គ្រប់ធាតុ · រូបតំណាងរបា navigation តាមផ្ទៃពិត** (Deep audit ២ · ជុំ ១៥ · NATIVE-1 · NATIVE-3 · NATIVE-7 · NATIVE-8)
+
+**ZoeW `2.50.37`** (`zoew-v299` ➜ `zoew-v300`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **NATIVE-1** ៖ ប្រអប់សុំសិទ្ធិរបស់ Android (កាមេរ៉ាសម្រាប់ QR Setup Link · ការជូនដំណឹង) ផ្អាក Activity ➜ `pause`/`resume` ➜ App ចាក់សោពេលត្រឡប់ពីប្រអប់។
+  ឥឡូវ `noteAppLockExcuse()` មុនប្រអប់ (Push ៖ តែពេលប្រអប់អាចលេច — សិទ្ធិមិនទាន់ granted/denied)។
+- ◀️ **NATIVE-3** ៖ Back លើប្រអប់ចូល / Activation (មិនបិទបាន) មិនធ្វើអ្វី ➜ អ្នកប្រើជាប់។ ឥឡូវ Back លើអេក្រង់ឫស (`ROOT_SCREEN_MODALS`) បង្រួម App · ប្រអប់ `noDismiss` ផ្សេង
+  (ប្រអប់លេខទូរស័ព្ទ) នៅស៊ី Back ដូចដើម · ប្រអប់ផ្សេងពីលើប្រអប់ចូល ➜ Back បិទវាមុន។
+- ⌨️ **NATIVE-7** ៖ keyboard APK ប្តូរកម្ពស់ WebView ➜ `--fs-unit` (clamp ជាមួយ `vw`) មិនចុះឈ្មោះ ➜ Chromium គណនា style ឡើងវិញគ្រប់ធាតុ (ទោះតម្លៃមិនប្រែ)។
+  ឥឡូវ `@property --fs-unit { syntax: '<length>' }` (`react-root.css`) ➜ គណនាជា px នៅ `:root` ➜ ការប្តូរកម្ពស់គណនាតែធាតុមួយចំនួន · ទំហំអក្សរដូចដើម។
+- 🧭 **NATIVE-8** ៖ រូបតំណាងរបា navigation កំណត់ LIGHT ម្តងពេលចាប់ផ្តើម ➜ ប្រអប់បើក (ផ្ទៃងងឹត) ➜ រូបតំណាងខ្មៅលើផ្ទៃងងឹត។ ឥឡូវវាស់ផ្ទៃនៅ inset ខាងក្រោម
+  ដូចរបាស្ថានភាព (`measureNavigationBarTone()` · `SafeAreaProbe` `padding-bottom`) ហើយប្តូរតែពេលប្រែ (`appliedNav`)។
+- 🌗 **NATIVE-4** (វាស់ឋិតិវន្ត · មិនកែ) ៖ Theme `DayNight` មិនប៉ះទំព័រ web (គ្មាន `color-scheme` · targetSdk 36 បិទ algorithmic darkening) · `windowBackground` = `--body-bg` រួច ➜
+  នៅសល់តែប្រអប់ JS (`alert`/`confirm`) ដែលតាមរបៀបងងឹតរបស់ប្រព័ន្ធ ➜ ត្រូវវាស់លើទូរស័ព្ទពិត (សកម្មភាព ៣)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក APK (សោ App បើក) ៖ Config ➜ ស្កេន QR ➜ ប្រអប់សិទ្ធិកាមេរ៉ា ➜ អនុញ្ញាត ➜ មិនសុំ PIN · 🔔 ➜ បើក Push ➜ ប្រអប់សិទ្ធិ ➜ មិនសុំ PIN · ចាកចេញ ➜ ប្រអប់ចូល ➜ Back ➜ App បង្រួម ·
+   ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard បើករលូន · បើកប្រអប់ ➜ រូបតំណាងរបា navigation ស · បិទ ➜ ខ្មៅ។
+3. ទូរស័ព្ទរបៀបងងឹត (Dark theme) ៖ ប្រអប់ «បញ្ជាក់» (ឧ. បោះបង់កញ្ចប់) មើលទៅអាន់អានឬទេ? (NATIVE-4 ៖ ប្រាប់មកវិញ បើចង់ឲ្យភ្លឺជានិច្ច)
+
+#### អ្នកយាម
+
+- `tests/native/app-lock-away.test.tsx` (+២) · `tests/push-client.test.tsx` (+១) ៖ ប្រអប់សិទ្ធិ (pause ➜ resume ក្នុងការសុំ) ➜ មិនចាក់សោ · សិទ្ធិមានរួច ➜ មិនបើកការលើកលែង (មុនកែ FAIL ២) ·
+  `tests/native/native-back.test.tsx` (+២) ៖ ប្រអប់ចូល/Activation ➜ បង្រួម · ប្រអប់ពីលើ ➜ បិទវាមុន (មុនកែ FAIL ១) · `perf-check` keyboard ៖ ប្តូរកម្ពស់ ៧៥៩ ➜ ៨ ធាតុ ·
+  probe ទទឹង ១៧១៥ (មុនកែ FAIL ១) · `npm run native:check` ៤ឃ២ ៖ safe-area ខាងក្រោម ៤៨px ➜ ប្រអប់បើក DARK · បិទ LIGHT (មុនកែ FAIL ១ ៖ LIGHT)។
 
 ### [2.50.36] — 2026-10-08 · ZoeW ៖ **banner កំណែថ្មីលែងគ្របរបា Tab · បញ្ជី ZTO ទាញជាទំព័រពិត · ជួរ 🔔 បង្ហាញ Locker ពេញ · ប្រអប់ PIN ចុច Enter បាន** (Deep audit ២ · ជុំ ១៥ · UI-3 · UI-4 · UI-5/6 · UI-7)
 
@@ -2598,6 +2628,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A31 | **UI-1** scanner ដៃបាត់ focus ក្រោយ Escape | Claude ៖ React ពិត (jsdom) ៖ focus ក្នុង `#exchangeRateInput` ➜ `closeModal()` ➜ `activeElement` នៅ `exchangeRateInput` (browser ពិត ៖ ធ្លាក់ទៅ `body` នៅការគូរបន្ទាប់) | មិនអើពើប្រអប់អក្សរក្នុង `.modal` ពេលគ្មានប្រអប់បើក |
 | A32 | **UI-2** ប្រអប់ចូលនៅក្រោម ☰ | Claude ៖ React ពិត ៖ ☰ បើក ➜ `showLoginModalWithPrefill()` ➜ `#sideDrawer.open` នៅ | `drawerOpen = false` ក្នុង `clearSensitiveModalFields()` |
 | A33 | **UI-3 · UI-4 · UI-5/6 · UI-7** | Claude ៖ browser ពិត (`layout-check`) ៖ banner បាត ៩០០ គ្របរបា Tab · បញ្ជី ZTO គូរ ២០០/២០០ ពេលបើក · ព័ត៌មានជួរ 🔔 ទទឹង ០px (៣២០) / ៤៥px (៤១២) + «…» · Enter ក្នុងវាល PIN ➜ `__pinOk = 0` · cursor មិននៅវាល PIN | CSS `react-root.css` · root `.modal-content` · `<form onSubmit>` + focus កុំព្យូទ័រ |
+| A34 | **NATIVE-1 · 3 · 7 · 8** (+ NATIVE-4 វាស់) | Claude ៖ React/jsdom ៖ pause/resume ក្នុង getUserMedia/requestPermissions ➜ `appIsLocked` · Back លើប្រអប់ចូល ➜ `minimize` ០ ដង · Chromium ៖ ប្តូរកម្ពស់ 880 ➜ 560 ➜ `UpdateLayoutTree` ៧៥៩/២៦០៨ ធាតុ (`@property` ➜ ៨) · fake bridge safe-area ខាងក្រោម ៤៨px ➜ NavigationBar LIGHT ពេលប្រអប់បើក | excuse មុនប្រអប់ · `ROOT_SCREEN_MODALS` · `@property --fs-unit` · `appliedNav` |
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.33]
 

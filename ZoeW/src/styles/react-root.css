@@ -1,3 +1,9 @@
+@property --fs-unit {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 1px;
+}
+
 #root {
     display: contents;
 }

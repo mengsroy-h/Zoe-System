@@ -9,6 +9,7 @@ import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { LICENSE_APP_CODE } from './license';
 import { dismissNotifyFeed, expiryScheduleTimes, fetchNotifyFeed, openNotifyDrawer } from './notifications';
+import { noteAppLockExcuse } from './app-lock';
 
 export type PushStatus = 'unknown' | 'unsupported' | 'needs-install' | 'native-unconfigured' | 'no-license'
     | 'no-account' | 'shop-inactive' | 'off' | 'busy' | 'on' | 'denied' | 'server-off' | 'error';
@@ -307,7 +308,10 @@ async function enableNative(): Promise<boolean> {
     try {
         const { PN } = await pushStep(loadNativePush(), 'Push plugin load timed out');
         let perm = await pushStep(PN.checkPermissions(), 'Push checkPermissions timed out');
-        if (perm.receive !== 'granted' && perm.receive !== 'denied') perm = await PN.requestPermissions();
+        if (perm.receive !== 'granted' && perm.receive !== 'denied') {
+            noteAppLockExcuse();
+            perm = await PN.requestPermissions();
+        }
         if (perm.receive !== 'granted') { setStatus('denied'); return false; }
         await pushStep(PN.createChannel({
             id: FCM_CHANNEL_ID,

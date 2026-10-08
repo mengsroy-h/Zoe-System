@@ -461,6 +461,49 @@ function seedBig(n) {
         server.close();
     }
 
+    // ⛔ NATIVE-7 ៖ keyboard APK ប្តូរតែ **កម្ពស់** WebView ➜ `--fs-unit` (clamp ជាមួយ `vw`) ជា custom property មិនចុះឈ្មោះ ➜ Chromium គណនា style
+    //    ឡើងវិញគ្រប់ធាតុដែលប្រើវា (viewport-unit dependency) ទោះតម្លៃមិនប្រែ។ `@property --fs-unit { syntax: '<length>' }` ➜ គណនាជា px នៅ :root ➜
+    //    ការប្តូរកម្ពស់គណនាតែធាតុមួយចំនួន · probe ទិសផ្ទុយ ៖ ការប្តូរ **ទទឹង** (តម្លៃ `--fs-unit` ប្រែពិត) ត្រូវគណនាធាតុច្រើន (ការវាស់មិនខូច)។
+    {
+        const app = 'ZoeW';
+        const server = await serve(path.join(ROOT, app));
+        const port = server.address().port;
+        const rctx = await browser.newContext({ viewport: { width: 412, height: 880 } });
+        const rpage = await rctx.newPage();
+        rpage.on('dialog', (d) => d.accept());
+        await rpage.route('**', (r) => {
+            const u = r.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
+            return r.abort();
+        });
+        await rpage.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await rpage.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(ORDERS)) + ');');
+        await rpage.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await rpage.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 30000 });
+        await rpage.waitForTimeout(800);
+        const recalcOn = async (w, h) => {
+            await browser.startTracing(rpage, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+            await rpage.setViewportSize({ width: w, height: h });
+            await rpage.waitForTimeout(400);
+            const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
+            return ev.filter((e) => e.name === 'UpdateLayoutTree' && e.ph === 'X')
+                .reduce((a, e) => a + ((e.args && (e.args.elementCount || (e.args.endData && e.args.endData.elementCount))) || 0), 0);
+        };
+        const total = await rpage.evaluate(() => document.querySelectorAll('*').length);
+        const keyboard = await recalcOn(412, 560);
+        await recalcOn(412, 880);
+        const widthProbe = await recalcOn(360, 880);
+        console.log('    keyboard (កម្ពស់ 880 ➜ 560) ៖ គណនា style ' + keyboard + ' / ' + total + ' ធាតុ · probe ទទឹង 412 ➜ 360 ៖ ' + widthProbe);
+        if (!REPORT) {
+            check(total >= 1000 && widthProbe >= 200, app + ': keyboard ៖ probe ទិសផ្ទុយ — ការប្តូរទទឹង (`--fs-unit` ប្រែ) គណនាធាតុច្រើន (ការវាស់ឃើញ)',
+                JSON.stringify({ total, widthProbe }));
+            check(keyboard <= 50, app + ': ⛔ keyboard បើក (ប្តូរតែកម្ពស់) ➜ មិនគណនា style គ្រប់ធាតុ (`@property --fs-unit`)', JSON.stringify({ keyboard, total }));
+        }
+        await rctx.close();
+        server.close();
+    }
+
     // ⛔ ZoeKeyGen ក៏ត្រូវស្ងៀម ០ ស៊ុម ដូច ZoeW (LTPO 10–120Hz) — ទាំងអេក្រង់ចូល និងផ្ទាំងការងារ (Tab លើទូរស័ព្ទ) ·
     //    probe ទិសផ្ទុយ ៖ animation infinite ដែលចាក់ចូល ➜ ត្រូវឃើញស៊ុម (បើមិនឃើញ ការវាស់ខូច)
     {

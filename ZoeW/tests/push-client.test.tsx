@@ -44,7 +44,9 @@ vi.mock('@capacitor/push-notifications', () => ({
     })
 }));
 
-import { dataState, firebaseState, uiState } from '../src/core/state';
+import { dataState, firebaseState, securityState, uiState } from '../src/core/state';
+import { appLocalStore } from '../src/core/storage';
+import { noteAppLockAway, relockAppAfterAway } from '../src/features/app-lock';
 import { viewState } from '../src/core/view-state';
 import { dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
 import { barcodeAbandonIsRipe } from '../src/domain/barcode';
@@ -349,6 +351,29 @@ describe('APK (FCM)', () => {
         const cleared = await Promise.race([clearNotifications().then(() => 'settled'), new Promise((r) => setTimeout(() => r('hang'), 1000))]);
         expect(cleared).toBe('settled');
         expect(pn.removeAllDeliveredNotifications).toHaveBeenCalled();
+    });
+
+    it('⛔ NATIVE-1 ៖ ប្រអប់សុំសិទ្ធិ Android (Activity pause ➜ resume) មិនចាក់សោ App · សិទ្ធិមានរួច (គ្មានប្រអប់) ➜ មិនបើកការលើកលែង', async () => {
+        stubServer();
+        appLocalStore.setItem('zoew_security_pin_hash', 'test-hash');
+        try {
+            Object.assign(securityState, { appIsLocked: false, appLockVeiled: false, appLockAwayNoted: false, appLockExcuseAt: 0 });
+            pn.requestPermissions.mockImplementationOnce(async () => {
+                noteAppLockAway();
+                relockAppAfterAway();
+                return { receive: 'granted' };
+            });
+            expect(await enablePush()).toBe(true);
+            expect(securityState.appIsLocked).toBe(false);
+            await disablePush();
+            Object.assign(securityState, { appIsLocked: false, appLockVeiled: false, appLockAwayNoted: false, appLockExcuseAt: 0 });
+            pn.checkPermissions.mockResolvedValueOnce({ receive: 'granted' });
+            expect(await enablePush()).toBe(true);
+            expect(securityState.appLockExcuseAt).toBe(0);
+        } finally {
+            appLocalStore.removeItem('zoew_security_pin_hash');
+            Object.assign(securityState, { appIsLocked: false, appLockVeiled: false, appLockAwayNoted: false, appLockExcuseAt: 0 });
+        }
     });
 
     it('បដិសេធសិទ្ធិ ➜ denied មិន register', async () => {

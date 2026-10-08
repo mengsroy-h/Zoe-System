@@ -192,7 +192,7 @@ describe('late work after a switch to another shop never writes into the new sho
             switchToShopB();
             return new Response(JSON.stringify({ ok: 1 }), { status: 200 });
         }));
-        const out: any = await runTransactionResolved(sdk, ref, () => ({ ok: 1 })).then((r: any) => ({ resolved: r }), (e: any) => ({ rejected: e }));
+        const out: any = await runTransactionResolved(sdk, ref, () => ({ ok: 1 }), undefined).then((r: any) => ({ resolved: r }), (e: any) => ({ rejected: e }));
         expect(out.resolved).toBeUndefined();
         expect(out.rejected && out.rejected.txOutcome).not.toBe('applied');
     });

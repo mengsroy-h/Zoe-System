@@ -137,7 +137,7 @@ const MUTATIONS = [
     },
     {
         name: 'claim registry ជឿ «ស្មើតម្លៃដែលផ្ញើ» ក្រោយ `disconnect` (barcode ស្ទួន ➜ COD បូក ២ ដង)',
-        from: "            return result.txOutcome === 'applied' ? 'unknown' : 'claimed';",
+        from: "            return result.txOutcome === 'applied' && result.txProven !== true ? 'unknown' : 'claimed';",
         to: "            return 'claimed';"
     },
     {

@@ -9,7 +9,7 @@ import { cleanupInFlight, runAutomaticCleanupRules, runAutomaticDeletedCleanup }
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { addOrUpdateEntry } from '../src/features/scan-action';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
-import { classifyZtoListRows, importZtoListRows, ztoListRowAgeState } from '../src/features/zto-list-sync';
+import { classifyZtoListRows, importZtoListRows } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
 
 const HISTORY = 'zoew_scan_history_cod_dod';

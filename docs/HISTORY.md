@@ -50,7 +50,8 @@
    [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A67 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
    (fast-forward) ➜ ប្រើ `claude/exciting-gates-nvx9ar` តែមួយ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · លើ 95e91a0
-   ជោគជ័យ ២០១ · ធ្លាក់ ១ (`sw-backend-chunk-test` race ការវាស់ ➜ កែ · A67) · មួយផ្នែក ០ · រំលង ០ ទាំងបី · commit ចុងក្រោយ (តេស្ត + ឯកសារ) ➜ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
+   ជោគជ័យ ២០១ · ធ្លាក់ ១ (`sw-backend-chunk-test` race ការវាស់ ➜ កែ · A67) · **លើ 5cc09d8 ✅ ជោគជ័យទាំងអស់ ២០២ · មួយផ្នែក ០ · រំលង ០** (commit ក្រោយនោះកែតែ Handoff ➜
+   `doc-scope-test` · `version-bump-scope` · `repository-file-coverage`) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
    confirmed ៩ ➜ កែទាំងអស់ · uncertain ១ (A66 ➜ សាកលើ iPhone)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·

@@ -1137,6 +1137,9 @@
     "ZoeW/src/app/behaviors/chrome-autohide.ts": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/behaviors/ios-viewport.ts": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/behaviors/panel-motion.ts": {
       "policy": "zoew-react-ui"
     },
@@ -1882,6 +1885,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zone-format-cache.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ios-search-viewport.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/login-autofill.test.tsx": {

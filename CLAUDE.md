@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.41` (`zoew-v304`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.42` (`zoew-v305`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.9` (`zoekeygen-v120`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -617,6 +617,9 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   `touchcancel` drops the intent. ⛔ No `transition` on them (`max-height` from `none` can't animate); collapsed panels
   are `visibility: hidden`.
 - Swiping up never closes the panel during a search (`phoneSearchIsActive()`).
+- iOS standalone: while the phone search is pulled up (`dataPanelSearchFocus`) a document scroll (window `scroll` · `visualViewport` `scroll`) is a
+  keyboard artifact (the root is locked, `#appPages` owns scrolling) ➜ `restoreIOSDocumentScroll()` returns it to 0 (`listenIOSDocumentScroll()` in
+  boot, besides the `visualViewport` `resize` reset); other fields keep iOS's scroll-into-view; Android/web untouched (`ZoeW/tests/ios-search-viewport.test.ts`).
 - iOS handoff: `usesIOSPanelHandoff()` (`navigator.standalone === true` + `CSS.supports('-webkit-touch-callout','none')`);
   Android stays passive. On iOS, non-passive `touchmove` calls `preventDefault()` only when `.collapsed` · clearly down ·
   past 8px · `scrollTop <= 1`; the intent latches until the last `touchend`.

@@ -47,7 +47,7 @@
 
 1. **`main`** = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ PR #288 ➜ #301 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301)។
    Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android ·
-   [2.50.41] · ZoeKeyGen 2.24.9 password manager + Private Key ចម្លង។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   [2.50.41] · ZoeKeyGen 2.24.9 password manager + Private Key ចម្លង · [2.50.42] iPhone ស្វែងរកលេខលោតទំព័រ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -72,6 +72,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
@@ -117,6 +118,30 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.42] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ស្វែងរកលេខ ➜ keyboard មិនរំកិលទំព័រឡើង/ចុះទៀត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
+
+**ZoeW `2.50.42`** (`zoew-v304` ➜ `zoew-v305`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts`) មិនប៉ះ · Android/web មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត ➜ ទំព័រលោតឡើង** (navbar បាត់ · បញ្ជីលេខទូរស័ព្ទជាន់ម៉ោង · នៅដដែលរហូតបិទ keyboard ·
+  ម្តងម្កាលលោតចុះ មានចន្លោះទទេខាងលើ) · Android PWA មិនអី (ម្ចាស់គម្រោងសាក)។ App ត្រឡប់ document ទៅ ០ តែពេល `visualViewport` `resize` ➜ ការរំកិលរបស់ keyboard ដែលមកក្រោយ
+  resize (តាមល្បឿន ➜ ម្តងម្កាល) នៅជាប់។ ឥឡូវ iOS standalone ខណៈប្រអប់ស្វែងរកលេខទាញឡើង ៖ `scroll` លើ window ឬ `visualViewport` ➜ `restoreIOSDocumentScroll()` ➜ ០
+  (root ចាក់សោ ➜ document រំកិល = artifact) · ប្រអប់ផ្សេងនៅឲ្យ iOS រំកិលបង្ហាញដដែល។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium មិនមាន keyboard iOS ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (ផ្នែក ២ A44) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-viewport.test.ts` (៦) ៖ iOS standalone + ស្វែងរកទាញឡើង ៖ document រំកិល (window · `visualViewport`) ➜ `scrollTo(0, 0)` · ខ្សែភ្ជាប់ boot ·
+  ទិសផ្ទុយ ៖ Android/web · ប្រអប់ផ្សេង · document មិនរំកិល · ការរមូរខាងក្នុង ➜ មិនប៉ះ — មុនកែ ៖ module/ខ្សែភ្ជាប់គ្មាន · mutation ៥/៥ ចាប់បាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត (សាក ៥ ដង) · ចុចស្វែងរកធម្មតា (៥ ដង) ➜ navbar និងប្រអប់ស្វែងរកនៅខាងលើ · បញ្ជីលេខនៅក្រោមប្រអប់ ·
+   គ្មានចន្លោះទទេ។ នៅលោត ➜ ថតវីដេអូម្តងទៀត។
+3. Android PWA ៖ ស្វែងរកដដែល (គួរតែមិនប្រែ)។
 
 ### [2.50.41] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ចូលប្រព័ន្ធ និង Private Key ស្គាល់ Google Password Manager · iOS Passwords · Private Key ដែលចម្លងមក Load បាន** (សំណើម្ចាស់គម្រោង)
 
@@ -2717,6 +2742,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ ➜ [2.50.42]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A44 | **iPhone PWA ៖ ស្វែងរកលេខ ➜ «⋯» ➜ ស្វែងរក ➜ ទំព័រលោត** (វីដេអូ IMG_1101) | Claude ៖ រូប ១០ fps ៖ ស្វែងរក (ទាញឡើង · keyboard) ➜ ចុច «⋯» ➜ keyboard បិទ · ផ្ទាំងចុះ ➜ ម៉ឺនុយបើក (ចុចលើកទី ២) ➜ ម៉ឺនុយបិទ ➜ ស្វែងរក focus ➜ ទំព័រលោតឡើង ~៣០០px ហើយនៅជាប់ · ករណីមួយទៀត ៖ ស្វែងរកធម្មតា ➜ លោតចុះ · Chromium (touch ៣៩០×៨៤៤) ៖ ស្ថានភាព App (`search-focus` · `scrollY` ០ · `#appPages` ០ · ទីតាំងប្រអប់ ៩២) ដូចគ្នាបេះបិទរវាងការចុចធម្មតា និងក្រោយ «⋯» ➜ មូលហេតុនៅ iOS · កូដ ៖ `scrollWindowToTop()` តែលើ `visualViewport` `resize` | ត្រឡប់ document ទៅ ០ លើ `scroll` ខណៈស្វែងរកទាញឡើង (iOS standalone) · ⚠️ ត្រូវសាកលើ iPhone |
+
 ### 2026-10-08 — Password manager · Private Key ចម្លង ➜ [2.50.41]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4616,6 +4647,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |

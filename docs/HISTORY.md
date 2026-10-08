@@ -48,6 +48,10 @@
 1. **`main`** = **ZoeW 2.50.45 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #304 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ = PR #301 ·
    [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch `claude/dazzling-fermi-hycqee` (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
    [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   ⏳ **session បន្ទាប់ធ្វើមុនគេ** ៖ run-all STRICT ពេញ **មិនទាន់រត់លើ tree ចុងក្រោយ** (session ឈប់ដោយ limit) ➜ រត់ Runbook ជំហាន ០ (emulator) ➜ កែអ្វីដែលធ្លាក់ ➜ push។
+   វាស់រួច ៖ run-all STRICT មុនកែ ២០០/២០២ (`repository-file-coverage` ឯកសារថ្មី ➜ map រួច · `history-window-check` keyboard ផុយក្រោមបន្ទុក ➜ កែ checker) ·
+   ក្រោយកែ ៖ vitest ពាក់ព័ន្ធ (supabase · ledger · ios-search · notify · forbidden-zone-lock) · `history-window-check` ០ FAIL · `sw-backend-chunk-test` · `doc-scope-test` ·
+   tsc · lint · purity · slot · strip-comments ✅ · fuzz លុយជ្រៅ `FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50` PASS (ជុំ ២ `RUN0=300 RUNS=20 OPS=80` មិនទាន់ចប់)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·

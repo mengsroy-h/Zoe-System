@@ -88,7 +88,7 @@ const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 
 function responseFitsKey(cacheKey: string | Request, response: Response): boolean {
     if (typeof cacheKey !== 'string' || /\.html$/i.test(cacheKey) || /\/$/.test(cacheKey)) return true;
-    let type = '';
+    let type: string;
     try {
         type = String(response.headers.get('content-type') || '');
     } catch (e) {

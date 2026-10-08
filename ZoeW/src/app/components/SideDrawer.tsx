@@ -2,6 +2,7 @@ import { firebaseState, uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
 import { onAct } from '../actions';
 import { useStoreFields, useStoreValue } from '../hooks/useStore';
+import { DeviceInfoLine } from './device/DeviceInfoLine';
 import { DrawerGroup } from './DrawerGroup';
 
 interface DrawerToggleProps {
@@ -142,6 +143,7 @@ export function SideDrawer() {
                     rel="noopener"
                     aria-label="បើកសៀវភៅណែនាំ ZoeW"
                 >{versionLabel}</a>
+                <DeviceInfoLine id="drawerDeviceInfo" />
                 <div className="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
                 <div className="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
             </div>

@@ -4,6 +4,7 @@ import { firebaseState, uiState } from '../core/state';
 import { safeFocusScanner } from '../core/timezone';
 import { resumeInterruptedCleanups } from '../domain/cleanup';
 import { updateAuthButton } from './auth';
+import { loadDeviceInfo } from './device-info';
 import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { captureAuthDatabaseGuard } from './exchange-rate';
 import { armSessionExpiryCheck } from './session';
@@ -36,6 +37,7 @@ export function licenseFailureMessage(reason) {
 }
 
 export async function ensureAppActivated() {
+    loadDeviceInfo();
     if (viewState.backendKind === 'supabase') {
         closeModal('activationModal');
         return true;

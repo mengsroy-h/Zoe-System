@@ -266,18 +266,24 @@
                 return { ok: false, reason: 'expired-server' };
             }
             const deviceId = getDeviceId();
+            const mine = (slot, record) => {
+                if (opts && opts.claimSeat) {
+                    try { noteSeatMeta(appCode, keyId, slot, record); } catch (e) {}
+                }
+                return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+            };
             let seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
             if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
-            if (seat.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+            if (seat.ok === true) return mine(seat.slot, seat.record);
             if (seat.unclaimed && opts && opts.claimSeat) {
                 let denied = false;
                 for (let attempt = 0; attempt < LICENSE_SEAT_CLAIM_TRIES; attempt++) {
                     const claimed = await claimSeat(appCode, keyId, deviceId, priority, seat.slot);
-                    if (claimed.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                    if (claimed.ok === true) return mine(seat.slot, null);
                     if (claimed.ok !== false) { denied = false; break; }
                     denied = true;
                     seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
-                    if (seat.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                    if (seat.ok === true) return mine(seat.slot, seat.record);
                     if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
                     if (!seat.unclaimed) break;
                 }
@@ -290,9 +296,9 @@
         }
     }
 
-    function licenseSeatUrl(appCode, keyId, slot) {
+    function licenseSeatUrl(appCode, keyId, slot, child) {
         return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId
-            + (slot ? '/' + slot : '') + '.json';
+            + (slot ? '/' + slot : '') + (slot && child ? '/' + child : '') + '.json';
     }
 
     function announcementsUrl(appCode, limit) {
@@ -328,7 +334,7 @@
             let free = '';
             for (let i = 0; i < slots.length; i++) {
                 const holder = seatHolderOf(data && data[slots[i]]);
-                if (holder === deviceId) return { ok: true, slot: slots[i] };
+                if (holder === deviceId) return { ok: true, slot: slots[i], record: data[slots[i]] };
                 if (!holder && !free) free = slots[i];
             }
             if (free) return { ok: null, reason: 'unclaimed', unclaimed: true, slot: free };
@@ -336,6 +342,49 @@
         } catch (e) {
             return { ok: null, reason: 'network' };
         }
+    }
+
+    const SEAT_META_LIMITS = { model: 80, platform: 40, serial: 64 };
+    const seatMetaState = { meta: null, refused: false };
+
+    function cleanMetaText(value, max) {
+        if (typeof value !== 'string') return '';
+        const text = value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+        return text.length > max ? text.slice(0, max).trim() : text;
+    }
+
+    function setDeviceMeta(meta) {
+        const src = (meta && typeof meta === 'object') ? meta : {};
+        const next = {
+            model: cleanMetaText(src.model, SEAT_META_LIMITS.model),
+            platform: cleanMetaText(src.platform, SEAT_META_LIMITS.platform),
+            serial: cleanMetaText(src.serial, SEAT_META_LIMITS.serial)
+        };
+        seatMetaState.meta = (next.model || next.platform || next.serial) ? next : null;
+        return seatMetaState.meta ? { model: next.model, platform: next.platform, serial: next.serial } : null;
+    }
+
+    function seatMetaSame(record, meta) {
+        const cur = (record && typeof record === 'object' && record.meta && typeof record.meta === 'object') ? record.meta : null;
+        return !!cur && cur.model === (meta.model || '-') && cur.platform === (meta.platform || '-') && cur.serial === (meta.serial || '-');
+    }
+
+    function noteSeatMeta(appCode, keyId, slot, record) {
+        const meta = seatMetaState.meta;
+        if (!meta || seatMetaState.refused || LICENSE_SEAT_SLOTS.indexOf(slot) === -1 || seatMetaSame(record, meta)) return null;
+        const stamp = Math.round(getServerNow());
+        const body = JSON.stringify({ model: meta.model || '-', platform: meta.platform || '-', serial: meta.serial || '-', at: stamp > 0 ? stamp : 1 });
+        const pending = sharedRequest('seat-meta:' + appCode + '/' + keyId + '/' + slot, false,
+            () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId, slot, 'meta'), null, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: body
+            }));
+        if (!pending) return null;
+        return pending.then((out) => {
+            if (out.res.status === 401 || out.res.status === 403) seatMetaState.refused = true;
+            return !!out.res.ok;
+        }, () => false);
     }
 
     async function claimSeat(appCode, keyId, deviceId, priority, slot) {
@@ -514,6 +563,7 @@
         activate: activate,
         getStatus: getStatus,
         getDeviceId: getDeviceId,
+        setDeviceMeta: setDeviceMeta,
         deactivate: deactivate,
         verifyKeyString: verifyKeyString,
         parseKeyString: parseKeyString,

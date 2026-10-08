@@ -47,7 +47,7 @@
 
 1. **`main`** = **ZoeW 2.50.42 · ZoeKeyGen 2.24.9** ៖ PR #288 ➜ #302 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301 ·
    [2.50.39]–[2.50.42] = PR #302)។ Branch `claude/optimistic-darwin-6cqgfh` (ចាប់ផ្តើមថ្មីពី `main` · **មិនទាន់ merge**) ៖ [2.50.43] ទាញ APK ក្នុង App ·
-   ប៊ូតុងតែពេល Release ពិតមាន។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   ប៊ូតុងតែពេល Release ពិតមាន · [2.50.44] · ZoeKeyGen 2.24.10 model · serial ទូរស័ព្ទ (⚠️ rules License ត្រូវ Publish)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -72,6 +72,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ Merge ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
 - ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Merge ➜ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (PR #302 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (PR #302 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
@@ -119,6 +120,43 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.44] — 2026-10-08 · ZoeW · ZoeKeyGen ៖ **ស្គាល់ model · serial ទូរស័ព្ទ (APK · PWA) ➜ ☰ · 🩺 · កៅអី Key ក្នុង ZoeKeyGen** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.44`** (`zoew-v306` ➜ `zoew-v307`) · **ZoeKeyGen `2.24.10`** (`zoekeygen-v120` ➜ `zoekeygen-v121`) · `license-verify.js` ថ្មី (ដូចគ្នាបេះបិទក្នុង ២ App) ·
+**rules License ថ្មី** (`license_seats/…/<slot>/meta`) · Android ៖ plugin ក្នុង App ថ្មី `ZoeDevice` (`DeviceInfoPlugin.java`) · គ្មានសិទ្ធិ Android ថ្មី · គ្មាន env · migration។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🆕 **☰ (ខាងក្រោម) និង 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ (ខាងលើ) បង្ហាញ «📱 model · កំណែប្រព័ន្ធ» និង «🔖 Serial»** ៖ App Android = `Samsung SM-A546E · Android 14` + **Android ID**
+  (ស្ថិតស្ថេរលើទូរស័ព្ទនោះ · នៅដដែលពេលដំឡើង App ឡើងវិញ · ប្តូរតែពេល Factory reset) · PWA Android = model ពី Chrome + **ID App ១៦ តួ** ·
+  iPhone = «iPhone · iOS 17.5» + ID App (Safari មិនប្រាប់ model) · កុំព្យូទ័រ = ប្រព័ន្ធ + ID App។ serial ពិតរបស់ hardware អានមិនបាន (Android 10+ ហាម App ធម្មតា ·
+  browser មិនផ្តល់) ➜ ការសម្រេចម្ចាស់គម្រោង ៖ Android ID / ID App។ ID App = ស្នាម SHA-256 នៃលេខសម្គាល់ License (⛔ មិនបង្ហាញលេខសម្គាល់កៅអីផ្ទាល់)។
+- 🆕 **ZoeKeyGen ៖ បញ្ជី Key ក្រោមស្លាក 📱 កៅអីនីមួយៗមួយបន្ទាត់** ៖ `d1 · Samsung SM-A546E · Android 14 · 🔖 <serial> · ចងនៅ <ថ្ងៃ>` ➜ ដឹងថាកៅអីណាជាទូរស័ព្ទណា មុនដោះ។
+  ZoeW ផ្ញើ model · serial ពេលពិនិត្យ Key (ផ្លូវ `claimSeat` ដដែល) តែពេលប្រែ · កៅអីដែលទូរស័ព្ទមិនទាន់បើក App កំណែនេះ ➜ `ID <៦ តួ>…` ដូចមុន។
+- ព័ត៌មាននេះសម្រាប់មើលតែប៉ុណ្ណោះ ៖ ការសរសេរ meta បរាជ័យ (rules មិនទាន់ Publish · បណ្តាញ) មិនប៉ះ Activate ឬស្ថានភាព Key ទេ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` (ថ្មី · ១០) ៖ APK plugin ➜ model · Android ID · ផ្ញើ License · ឈ្មោះក្រុមហ៊ុនមិនស្ទួន · plugin បរាជ័យ ➜ UA · PWA UA កាត់ (K) ➜ userAgentData ·
+  userAgentData ជាប់ ➜ UA ក្រោយពិដាន · ID App = SHA-256 ១៦ តួ មិនមែនលេខសម្គាល់ · iPhone · License មិនទាន់ផ្ទុក ➜ សាកម្តងទៀត · UI · ខ្សែភ្ជាប់ ☰ · 🩺 · boot។
+- `license-seat-test` ផ្នែក ១៨ (ថ្មី · ១០) ៖ meta សរសេរ ១ ដងទៅកៅអីខ្លួនឯង · ដដែល ➜ មិនសរសេរ · ⛔ `checkOnline()` គ្មាន `claimSeat` ➜ គ្មានការសរសេរ · 401 ➜ Key នៅ active ·
+  មិនសាកម្តងទៀត · hang ➜ verdict មិនរង់ចាំ · Activate ថ្មី ➜ meta · គ្មាន meta ➜ មិនសរសេរ · ⛔ កៅអីអ្នកដទៃ · សម្អាតអត្ថបទ — មុនកែ ៖ FAIL ១៣។
+- `emu/license-seat-rules-test` ផ្នែក ១៤ (ថ្មី · rules ពិតលើ emulator) ៖ meta លើកៅអីមាន ➜ ទទួល · កៅអីទំនេរ · ប្តូរ device · វាលបន្ថែម · ប្រវែង · ខ្វះ · ប្រភេទ ➜ បដិសេធ ·
+  ព្រំដែន ៨០ · ៤០ · ៦៤ ➜ ទទួល — មុនកែ rules ៖ FAIL ៣។
+- `keylist-consistency-test` (ថ្មី ៦) ៖ បន្ទាត់មួយក្នុងមួយកៅអី · model · platform · serial · HTML escape · «-» មិនបង្ហាញ · ⛔ លេខសម្គាល់កៅអីពេញមិនដល់ DOM — មុនកែ ៖ FAIL ៥។
+- `npm run android:check` ៣គ (ថ្មី · ៦) ៖ ឈ្មោះ plugin ស្មើ JS · `registerPlugin` មុន `super.onCreate` · វាលដែល JS អាន · Android ID · ⛔ គ្មាន `READ_PHONE_STATE` / `getSerial()` · គ្មាន comment ·
+  `npm run native:check` ៤ច (ថ្មី) ៖ `@capacitor/core` ពិត + header ពី Java ➜ boot ហៅ `info` ១ ដង ➜ ☰ «Samsung SM-A546E · Android 14» + Android ID។
+- Java compile ជាមួយ framework Android ពិត + class Capacitor ពិត ➜ 0 error។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⚠️ **Firebase Console (License Project · ZoeKeyGen) ➜ Realtime Database ➜ Rules ➜ paste `ZoeKeyGen/firebase-database.rules.json` ➜ Publish** (វាល `meta` ក្នុងកៅអី)។
+   មុន Publish ៖ ZoeW សរសេរ meta មិនបាន (ស្ងាត់ · Activate ធម្មតា) ➜ ZoeKeyGen បង្ហាញ `ID <៦ តួ>…` ដូចមុន។
+2. Merge ចូល `main` ➜ Deploy ZoeW + ZoeKeyGen + workflow build APK 2.50.44។
+3. ទូរស័ព្ទ ៖ ☰ ➜ ខាងក្រោមឃើញ «📱 <model> · Android <កំណែ>» និង «🔖 Serial (Android ID)» (APK) / «Serial (ID App)» (PWA · iPhone) · 🩺 ខាងលើដូចគ្នា ·
+   បិទ/បើក App ➜ serial ដដែល។
+4. ZoeKeyGen ➜ បញ្ជី Key ➜ ក្រោម 📱 ឃើញបន្ទាត់កៅអីនីមួយៗ (ក្រោយទូរស័ព្ទបើក App កំណែនេះ ហើយពិនិត្យ Key ម្តង ឬ Activate) ➜ serial ស្មើនឹងអ្វីដែលទូរស័ព្ទបង្ហាញ។
 
 ### [2.50.43] — 2026-10-08 · ZoeW (APK) ៖ **ទាញ APK ថ្មីក្នុង App ➜ ផ្ទាំងដំឡើង · ប៊ូតុងតែពេល Release ពិតមាន** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង)
 
@@ -2776,6 +2814,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — ស្គាល់ model · serial ទូរស័ព្ទ ➜ [2.50.44]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A46 | **ស្គាល់ model · serial ទូរស័ព្ទ** (សំណើម្ចាស់គម្រោង · ការសម្រេច ៖ ☰ · 🩺 + ZoeKeyGen · Android ID / ID App) | Claude ៖ serial ពិតរបស់ hardware ៖ Android 10+ `Build.getSerial()` ត្រូវ `READ_PRIVILEGED_PHONE_STATE` (App ប្រព័ន្ធតែប៉ុណ្ណោះ) · browser គ្មាន API · Chrome Android UA ត្រូវកាត់ (`Android 10; K`) ➜ model តែតាម `getHighEntropyValues(['model'])` · License ៖ `checkLocalStatus()` ហៅ `checkOnline(…, { claimSeat: true })` រាល់ការពិនិត្យ ➜ meta ដើរតាមផ្លូវនោះបានដោយមិនបំពាន «`checkOnline()` គ្មាន `claimSeat` មិនសរសេរ» · rules `$slot/$other: false` បដិសេធ meta (emulator ៖ 401) · `keylist-consistency-test` មានអ្នកយាម «លេខសម្គាល់កៅអីពេញមិនដល់ DOM» ➜ serial PWA = SHA-256 មិនមែន ID · `native:check` ជុំ ១ ៖ `info` ២ ដង (License stub គ្មាន `setDeviceMeta` ➜ សួរម្តងទៀតរាល់ពេល) ➜ សាកម្តងទៀតតែពេល License មិនទាន់ផ្ទុក ឬគ្មាន serial | plugin `ZoeDevice` · `loadDeviceInfo()` · `setDeviceMeta()`/`noteSeatMeta()` · rules `meta` · ZoeKeyGen បន្ទាត់កៅអី · ⚠️ Publish rules License |
+
 ### 2026-10-08 — APK ៖ ទាញក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន ➜ [2.50.43]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4538,7 +4582,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `keygen-pin-flow-test` | ផ្នែក ១ | — |
 | `keygen-session-security-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `keylist-consistency-test` | — | ផ្នែក ១ |
+| `keylist-consistency-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4552,7 +4596,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-network-pressure-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-record-race-test` | — | ផ្នែក ២ |
-| `license-seat-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
+| `license-seat-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
 | `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -4683,6 +4727,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |

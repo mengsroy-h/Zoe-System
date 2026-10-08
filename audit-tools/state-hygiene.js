@@ -110,6 +110,7 @@ const ACCEPTED = {
         lockerAssignGeneration: 'monotonic guard counter',
         pluginLoad: 'cached load of the in-app APK update plugin (a promise of a plugin handle, no user or customer data)',
         updateSeq: 'monotonic guard counter of APK update runs (a number, no customer data)',
+        devicePending: 'cached read of this device\'s model and serial (device identity like firebaseConfig, no customer data); the serial is Android ID or a hash of the License device ID, never the ID itself',
         appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
         appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
         // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន

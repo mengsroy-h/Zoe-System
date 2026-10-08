@@ -40,6 +40,14 @@
             ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40 && ($slot === 'd1' || ($slot === 'd2' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 2) || ($slot === 'd3' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 3) || ($slot === 'd4' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 4) || ($slot === 'd5' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 5))",
             "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
             "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "meta": {
+              ".validate": "newData.hasChildren(['model', 'platform', 'serial', 'at'])",
+              "model":    { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80" },
+              "platform": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+              "serial":   { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64" },
+              "at":       { ".validate": "newData.isNumber() && newData.val() > 0" },
+              "$other":   { ".validate": false }
+            },
             "$other": { ".validate": false }
           }
         }

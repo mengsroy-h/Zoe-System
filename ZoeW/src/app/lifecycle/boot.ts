@@ -23,6 +23,7 @@ import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
+import { loadDeviceInfo } from '../../features/device-info';
 import { consumePushOpenRequest, ensureNativePushListeners, handleServiceWorkerMessage, refreshPushStatus, resyncPush, syncExpirySchedule, watchPushIdentity } from '../../features/push';
 import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
@@ -114,6 +115,7 @@ function startCoreServices(): void {
         applySetupLinkFromUrl();
         initFirebase();
         initNotifications();
+        loadDeviceInfo();
         refreshPushStatus();
         watchPushIdentity();
         consumePushOpenRequest();

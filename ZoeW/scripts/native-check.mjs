@@ -584,6 +584,30 @@ for (const available of [false, true]) {
     });
 }
 
+/* ⛔ model · serial ឧបករណ៍ ៖ `@capacitor/core` ពិត + header `ZoeDevice` ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត (bridge ផ្ទុកមុន App) ➜
+ *    boot ហៅ `info` ➜ ☰ footer បង្ហាញ «Samsung SM-A546E · Android 14» និង Android ID · គ្មាន «not implemented»។ */
+const DEVICE_JAVA = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/com/zoesystem/zoew/DeviceInfoPlugin.java'), 'utf8');
+const DEVICE_JAVA_METHODS = [...DEVICE_JAVA.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]);
+const deviceRespond = new Function(`(${RESPOND_DEFAULT.toString()})();
+    window.Capacitor.PluginHeaders.push({ name: 'ZoeDevice', methods: ${JSON.stringify(DEVICE_JAVA_METHODS)}.map((m) => ({ name: m, rtype: 'promise' })).concat([{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }]) });
+    const base = window.__nativeRespond;
+    window.__nativeRespond = (plugin, method, options) => {
+        if (plugin === 'ZoeDevice' && method === 'info') return { manufacturer: 'samsung', brand: 'samsung', model: 'SM-A546E', release: '14', sdk: 34, androidId: '1A2B3C4D5E6F7890' };
+        return base ? base(plugin, method, options) : undefined;
+    };`);
+await scenario('៤ច. model · serial ឧបករណ៍ (APK ៖ ZoeDevice)', async () => {
+    const s = await session({ respond: deviceRespond });
+    const { page } = s;
+    ok('(លក្ខខណ្ឌចាំបាច់) Java មាន @PluginMethod info', DEVICE_JAVA_METHODS.includes('info'), DEVICE_JAVA_METHODS);
+    const infoCalls = await calls(page, 'ZoeDevice', 'info');
+    ok('boot ➜ ZoeDevice.info (មិនសួរម្តងហើយម្តងទៀត)', infoCalls.length === 1, infoCalls.length);
+    const line = await page.evaluate(() => { const el = document.getElementById('drawerDeviceInfo'); return el ? el.textContent : ''; });
+    ok('☰ footer ៖ «Samsung SM-A546E · Android 14»', line.includes('Samsung SM-A546E') && line.includes('Android 14'), line);
+    ok('☰ footer ៖ serial = Android ID (អក្សរតូច)', line.includes('Android ID') && line.includes('1a2b3c4d5e6f7890'), line);
+    ok('គ្មាន «not implemented» (JS ហៅតែ method ដែល Java មាន)', !(await page.evaluate(() => (window.__rejections || []).some((r) => /not implemented/.test(r)))));
+    await closeSession(s, 'device-info');
+});
+
 await scenario('៥. web ធម្មតា (គ្មាន bridge) ៖ មិនប៉ះ', async () => {
     const s = await session({ native: false });
     const { page } = s;

@@ -74,6 +74,8 @@ function constDecl(name, fallback) {
 
 const SLOT_DECL = constDecl('LICENSE_SEAT_SLOTS', "['d1']");
 const TRIES_DECL = constDecl('LICENSE_SEAT_CLAIM_TRIES', '1');
+const META_LIMITS_DECL = constDecl('SEAT_META_LIMITS', '{ model: 80, platform: 40, serial: 64 }');
+const META_STATE_DECL = constDecl('seatMetaState', '{ meta: null, refused: false }');
 const SLOTS = vm.runInNewContext(SLOT_DECL + '\nLICENSE_SEAT_SLOTS');
 
 const CODE = (APP_SRC.match(/const LICENSE_APP_CODE = '([A-Z]{2,8})';/) || [])[1];
@@ -86,7 +88,8 @@ const FNS = [
     'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord',
     'recordSeenMark', 'monotonicNow',
     'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat',
-    'checkOnline', 'syncServerTime', 'activate', 'checkLocalStatus', 'getStatus'
+    'checkOnline', 'syncServerTime', 'activate', 'checkLocalStatus', 'getStatus',
+    'cleanMetaText', 'setDeviceMeta', 'seatMetaSame', 'noteSeatMeta'
 ];
 
 const SLICED = FNS.map(sliceFn).join('\n\n');
@@ -137,6 +140,23 @@ function makeServer(opts) {
         if (pathOnly.indexOf('/license_seats/') !== -1) {
             if (opts.seatDown) return res(503, null);
             if (opts.rulesMissing) return res(401, { error: 'Permission denied' });
+            const metaMatch = /\/license_seats\/[^/]+\/[^/]+\/([^/.]+)\/meta\.json$/.exec(pathOnly);
+            if (metaMatch && method === 'PUT') {
+                // ⛔ rules ពិត ៖ meta តែលើកៅអីដែលមាន · keys ៤ ពិត · ប្រវែង 1..80 · 1..40 · 1..64 · at > 0
+                if (opts.metaHang) return new Promise(() => {});
+                if (opts.metaRefuse) return res(401, { error: 'Permission denied' });
+                const holder = st.seats[metaMatch[1]];
+                let body = null;
+                try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
+                const len = (v, max) => typeof v === 'string' && v.length >= 1 && v.length <= max;
+                if (!holder || !body || Object.keys(body).sort().join(',') !== 'at,model,platform,serial'
+                    || !len(body.model, 80) || !len(body.platform, 40) || !len(body.serial, 64) || !(typeof body.at === 'number' && body.at > 0)) {
+                    return res(401, { error: 'Permission denied' });
+                }
+                holder.meta = body;
+                st.metaPuts = (st.metaPuts || 0) + 1;
+                return res(200, body);
+            }
             const slotMatch = /\/license_seats\/[^/]+\/[^/]+\/([^/.]+)\.json$/.exec(pathOnly);
             const slot = slotMatch ? slotMatch[1] : null;
             if (method === 'GET') {
@@ -196,6 +216,8 @@ function build(server, opts) {
         const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
         ${SLOT_DECL}
         ${TRIES_DECL}
+        ${META_LIMITS_DECL}
+        ${META_STATE_DECL}
         const netInFlight = new Map();
         const statusInFlight = new Map();
         function getServerNow() { return ${NOW}; }
@@ -424,6 +446,80 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
     await vm.runInContext("checkOnline('" + APP + "', 'KEYID1')", h12.ctx);
     ok('`checkOnline()` ដោយគ្មាន `claimSeat` ➜ គ្មានការសរសេរ',
         srv12.devices().length === 0 && srv12.log.every((l) => l.indexOf('PUT') !== 0), srv12.log);
+
+    // ── ១៨. ⛔ model · serial ចូលកៅអី (`meta`) ៖ តែផ្លូវ `claimSeat` · តែកៅអីរបស់ខ្លួន · តែពេលប្រែ · មិនដែលប្តូរ verdict ─
+    //    (សំណើម្ចាស់គម្រោង ៖ ZoeKeyGen ឃើញថាកៅអីណាជាទូរស័ព្ទណា)
+    {
+        const META = { model: 'Samsung SM-A546E', platform: 'Android 14', serial: '1a2b3c4d5e6f7890' };
+        const setMeta = (h, m) => vm.runInContext('setDeviceMeta(' + JSON.stringify(m) + ')', h.ctx);
+        const flushNet = () => new Promise((r) => setTimeout(r, 20));
+        const metaPuts = (srvX) => srvX.log.filter((l) => /^PUT .*\/meta\.json$/.test(l));
+        const mineSeat = () => ({ [SLOTS[0]]: { device: DEV1, at: NOW } });
+
+        let sA = makeServer({ seats: mineSeat() });
+        let hA = build(sA, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        setMeta(hA, META);
+        let stA = await status(hA);
+        await flushNet();
+        ok('⛔ ឧបករណ៍ Activate រួច (កៅអី mine · គ្មាន meta) ➜ getStatus សរសេរ meta ១ ដងទៅកៅអីរបស់ខ្លួន',
+            stA.state === 'active' && metaPuts(sA).length === 1 && metaPuts(sA)[0].indexOf('/' + SLOTS[0] + '/meta.json') !== -1, [stA.state, sA.log]);
+        const wrote = sA.seats[SLOTS[0]] && sA.seats[SLOTS[0]].meta;
+        ok('ហើយ meta = model · platform · serial ពិត · device មិនប្រែ',
+            !!wrote && wrote.model === META.model && wrote.platform === META.platform && wrote.serial === META.serial && sA.seats[SLOTS[0]].device === DEV1, sA.seats);
+        await status(hA);
+        await flushNet();
+        ok('meta ដដែល ➜ ពិនិត្យម្តងទៀតមិនសរសេរទៀត (មួយដងក្នុងមួយការប្រែ)', metaPuts(sA).length === 1, sA.log);
+
+        let sB = makeServer({ seats: mineSeat() });
+        let hB = build(sB, { store: { zoe_license_device_id: DEV1 } });
+        setMeta(hB, META);
+        await vm.runInContext("checkOnline('" + APP + "', 'KEYID1')", hB.ctx);
+        await flushNet();
+        ok('⛔ `checkOnline()` ដោយគ្មាន `claimSeat` ➜ គ្មានការសរសេរ ទោះមាន meta', sB.log.every((l) => l.indexOf('PUT') !== 0), sB.log);
+
+        let sC = makeServer({ seats: mineSeat(), metaRefuse: true });
+        let hC = build(sC, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        setMeta(hC, META);
+        let stC = await status(hC);
+        await flushNet();
+        await status(hC);
+        await flushNet();
+        ok('rules មិនទាន់ Publish (meta 401) ➜ Key នៅ active · record មិនលុប · មិនសាកម្តងទៀតក្នុងទំព័រដដែល',
+            stC.state === 'active' && !!hC.store[RECORD_KEY] && metaPuts(sC).length === 1, [stC, sC.log]);
+
+        let sD = makeServer({ seats: mineSeat(), metaHang: true });
+        let hD = build(sD, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        setMeta(hD, META);
+        const tD = Date.now();
+        let stD = await Promise.race([status(hD), new Promise((r) => setTimeout(() => r({ state: 'hung' }), 3000))]);
+        ok('⛔ meta ជាប់ (hang) ➜ getStatus មិនរង់ចាំវា (verdict ចេញភ្លាម)', stD.state === 'active' && Date.now() - tD < 2000, stD);
+
+        let sE = makeServer({});
+        let hE = build(sE, { store: { zoe_license_device_id: DEV1 } });
+        setMeta(hE, META);
+        let rE = await activate(hE);
+        await flushNet();
+        ok('Activate ថ្មី (កក់កៅអី) ➜ meta សរសេរតាមក្រោយ', rE && rE.valid === true && metaPuts(sE).length === 1 && !!(sE.seats[SLOTS[0]] && sE.seats[SLOTS[0]].meta), [rE, sE.log]);
+
+        let sF = makeServer({ seats: mineSeat() });
+        let hF = build(sF, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        await status(hF);
+        await flushNet();
+        ok('ទិសផ្ទុយ ៖ App មិនផ្តល់ meta ➜ មិនសរសេរ', metaPuts(sF).length === 0, sF.log);
+
+        let sG = makeServer({ seats: { [SLOTS[0]]: { device: 'OTHERDEVICE0000000001', at: NOW } }, maxDevices: 2 });
+        let hG = build(sG, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+        setMeta(hG, META);
+        await status(hG);
+        await flushNet();
+        ok('⛔ មិនដែលសរសេរ meta ទៅកៅអីរបស់ឧបករណ៍ផ្សេង', !sG.seats[SLOTS[0]].meta && metaPuts(sG).every((l) => l.indexOf('/' + SLOTS[0] + '/') === -1), sG.log);
+
+        const clean = vm.runInContext('setDeviceMeta(' + JSON.stringify({ model: '  Sam\u0000sung​  SM-A546E\n', platform: 'x'.repeat(90), serial: 's'.repeat(70) }) + ')', hG.ctx);
+        ok('setDeviceMeta ៖ ដកតួអក្សរបញ្ជា/មើលមិនឃើញ · ចន្លោះច្រើន ➜ មួយ · កាត់ 80 · 40 · 64',
+            !!clean && clean.model === 'Samsung SM-A546E' && clean.platform.length === 40 && clean.serial.length === 64, clean);
+        const none = vm.runInContext('setDeviceMeta({ model: 5, platform: null })', hG.ctx);
+        ok('setDeviceMeta ៖ មិនមែនខ្សែអក្សរ ➜ គ្មាន meta (null)', none === null, none);
+    }
 
     // ── ជាន់អប្បបរមា ៖ ការអះអាងត្រូវប៉ះផ្លូវកៅអីពិត ────────────────────
     const seatCalls = srv.log.concat(srv4.log, srv7.log, srvM.log).filter((l) => l.indexOf('/license_seats/') !== -1);

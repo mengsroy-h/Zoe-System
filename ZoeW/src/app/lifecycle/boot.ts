@@ -41,7 +41,7 @@ import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
 import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, moreMenuScrollDismisses, noteMoreMenuInput } from './layers';
 import { setupNativeShell } from './native-shell';
-import { listenIOSDocumentScroll } from '../behaviors/ios-viewport';
+import { listenIOSDocumentScroll, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { oncePerPage, type LifecycleScope } from './scope';
 
 export function bootApplication(scope: LifecycleScope): void {
@@ -64,6 +64,7 @@ function bootShell(scope: LifecycleScope): void {
         scope.listen(window.visualViewport, 'resize', scrollWindowToTop);
     }
     listenIOSDocumentScroll(scope);
+    listenIOSSearchFocus(scope);
 
     if ('serviceWorker' in navigator && !isNativeApp()) {
         scope.onLoad(() => registerServiceWorker(scope));

@@ -45,9 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.42 · ZoeKeyGen 2.24.9** ៖ PR #288 ➜ #302 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301 ·
-   [2.50.39]–[2.50.42] = PR #302)។ Branch `claude/optimistic-darwin-6cqgfh` (ចាប់ផ្តើមថ្មីពី `main` · **មិនទាន់ merge**) ៖ [2.50.43] ទាញ APK ក្នុង App ·
-   ប៊ូតុងតែពេល Release ពិតមាន · [2.50.44] · ZoeKeyGen 2.24.10 model · serial ទូរស័ព្ទ (⚠️ rules License ត្រូវ Publish)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+1. **`main`** = **ZoeW 2.50.44 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #303 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301 ·
+   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] · ZoeKeyGen 2.24.10 = PR #303)។ Branch `claude/optimistic-darwin-6cqgfh` (ចាប់ផ្តើមថ្មីពី `main` · **មិនទាន់ merge**) ៖
+   [2.50.45] iPhone ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -72,9 +72,9 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ Merge ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
-- ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Merge ➜ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
-- ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (PR #302 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Merge ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
+- ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (PR #302 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (PR #302 merge រួច)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · PR #302 merge រួច)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
@@ -120,6 +120,34 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.45] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ចុចស្វែងរកលេខ ➜ navbar មិនរំកិល · ☰ · 🩺 បង្ហាញកំណែ iOS 26 ពិត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
+
+**ZoeW `2.50.45`** (`zoew-v307` ➜ `zoew-v308`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts` · `panels.ts` · `app.css`) មិនប៉ះ · Android/web មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ចុចស្វែងរកលេខ ➜ navbar ហាក់ «រមូរពីក្រោមឡើងលើ»** (វីដេអូ ៖ ទំព័រទាំងមូលធ្លាក់ចុះ ~១៩០px ហើយរអិលឡើងវិញ ~២០០ms ពេល keyboard បើក ·
+  ករណីពីរដូចគ្នា)។ iOS រំកិល document ដើម្បីដាក់ប្រអប់កណ្តាល តាមទីតាំង *មុន* ការទាញឡើង (y≈៣៧០) ហើយ [2.50.42] ត្រឡប់ ០ កណ្តាលចលនានោះ។ ឥឡូវ iOS standalone ៖
+  ការចុចលើប្រអប់ស្វែងរកលេខ (មិនទាន់ focus) ➜ App ទាញប្រអប់ឡើងមុន ហើយ `focus({ preventScroll: true })` ខ្លួនឯង ➜ iOS ឃើញប្រអប់នៅខាងលើរួច ➜ គ្មានហេតុរំកិល ·
+  អូសលើប្រអប់ · សង្កត់យូរ · ចុចពេល focus រួច ➜ iOS ធម្មតា · focus មិនជាប់ ➜ ទាញចុះវិញ ហើយទុកការចុចបន្ទាប់ឲ្យ iOS។ ការត្រឡប់ ០ របស់ [2.50.42] នៅជាខ្សែការពារទីពីរ។
+- 🐛 **☰ · 🩺 ៖ iPhone iOS 26.5 បង្ហាញ «iOS 18.7»** ៖ Safari លើ iOS 26 បង្កកលេខ OS ក្នុង user agent (18_6 ➜ 18_7) ដោយចេតនា ចំណែក «Version/26.x» នៅពិត ➜
+  អាន `Version/` ពេល ≥ 26 · UA គ្មាន `Version/` (App លើ Home Screen) + OS បង្កក + engine Safari 26 (`CSS.supports` anchor positioning · scroll-driven animation) ➜
+  «iOS 26+» · iOS 18 ពិត · Chrome iOS (OS ពិត) ➜ ដដែល · កៅអី Key ក្នុង ZoeKeyGen ទទួលកំណែថ្មីពេល App ពិនិត្យ License លើកក្រោយ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-tap-focus.test.ts` (៨) ៖ ចុច ➜ `touchend` preventDefault · ទាញឡើងមុន focus · `preventScroll` · focus ពិត · ខ្សែភ្ជាប់ boot (capture · `touchend` មិន passive) ·
+  ទិសផ្ទុយ ៖ អូស · សង្កត់យូរ · focus រួច · Android/web · អេក្រង់ធំ · ម្រាមដៃពីរ · `touchcancel` · ធាតុផ្សេង · fail-open — មុនកែ FAIL ៨/៨ · mutation ៩/៩ ចាប់បាន។
+- `ZoeW/tests/device-info.test.tsx` (+៣) ៖ `Version/26.5` ➜ «iOS 26.5» · គ្មាន Version + engine 26 ➜ «iOS 26+» · ទិសផ្ទុយ iOS 18.7/18.5 · Chrome iOS — មុនកែ FAIL ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ចុចធម្មតា · ក្រោយ «⋯» · ពេលបញ្ជីរមូរចុះ) ➜ ប្រអប់ឡើងទៅខាងលើ · keyboard បើក · navbar មិនធ្លាក់ ហើយរអិល ·
+   បញ្ជីលេខនៅក្រោមប្រអប់។ នៅរំកិល ➜ ថតវីដេអូម្តងទៀត។
+3. iPhone ៖ អូសចាប់ផ្តើមលើប្រអប់ស្វែងរក ➜ ទំព័ររមូរ (មិនបើក keyboard) · សង្កត់យូរ ➜ ម៉ឺនុយ «បិទភ្ជាប់» ធម្មតា · Android PWA/APK ៖ ស្វែងរកដដែល។
+4. iPhone ៖ ☰ ឬ 🩺 ➜ «iOS 26.x» (ឬ «iOS 26+») មិនមែន «iOS 18.7» · ZoeKeyGen ៖ បន្ទាត់កៅអីរបស់ iPhone ប្រែតាម (ក្រោយ App ពិនិត្យ License)។
 
 ### [2.50.44] — 2026-10-08 · ZoeW · ZoeKeyGen ៖ **ស្គាល់ model · serial ទូរស័ព្ទ (APK · PWA) ➜ ☰ · 🩺 · កៅអី Key ក្នុង ZoeKeyGen** (សំណើម្ចាស់គម្រោង)
 
@@ -2817,6 +2845,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar ធ្លាក់ ហើយរអិលឡើង · iOS 26 បង្ហាញ 18.7 ➜ [2.50.45]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A47 | **iPhone PWA ៖ ចុចស្វែងរកលេខ ➜ navbar «រមូរពីក្រោមឡើងលើ»** (វីដេអូ VID_20261008_210711 · iOS 26.5 · ក្រោយ [2.50.42]) | Claude ៖ រូប ៣០ fps ៖ ស៊ុមដំបូងប្រអប់ទាញឡើងរួច (navbar នៅលើ) ➜ keyboard ចាប់ផ្តើម ➜ ទំព័រទាំងមូលធ្លាក់ ~១៩០ ➜ ១៤៧ ➜ ១០៤ ➜ ៥៥ ➜ ០ px (~២០០ms · ករណី ២ ដូចគ្នា) = ចលនា UIKit បន្ថែម (additive) ដែល model ត្រូវ `scrollTo(0, 0)` កាត់កណ្តាល · Chromium (ក្លែង iOS standalone · ៣៩០×៨៤៤) ៖ ប្រអប់មុនទាញឡើង y=៣៧០ ក្រោយ y=៩២ ➜ ដាក់ y=៣៧០ កណ្តាលផ្ទៃពីលើ keyboard (~៤៧០px) ≈ រំកិល ~១៩០ = ចំនួនក្នុងវីដេអូ ➜ iOS ប្រើទីតាំងមុនទាញឡើង · ការត្រឡប់ ០ ពេលក្រោយ = ឃើញរំកិលឡើង ហើយលោតចុះ (អាក្រក់ជាង) ➜ ត្រូវកុំឲ្យ iOS រំកិលតាំងពីដំបូង · probe Chromium ក្រោយកែ ៖ ចុច ➜ `focus({preventScroll:true})` ពេលទាញឡើងរួច · អូស/សង្កត់យូរ ➜ ផ្លូវធម្មតា · Android មិនប្រែ · ០ error · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ | ទាញឡើងមុន focus ដោយ App (`focusIOSSearchWithoutScroll()`) · ⚠️ ត្រូវសាកលើ iPhone |
+| A48 | **iPhone iOS 26.5 បង្ហាញ «iOS 18.7»** (រាយការណ៍ម្ចាស់គម្រោង) | Claude ៖ WebKit បញ្ជាក់ ៖ Safari លើ iOS 26 រាយ OS ក្នុង UA ជា 18_6 ដោយចេតនា (ការពារគេហទំព័រដែលប្រៀប 26 < 18 · កាត់ fingerprint) ហើយ «Version/26.0» ពិត · លេខបង្កកប្តូរ 18_6 ➜ 18_6_2 ➜ 18_7 · Chrome iOS រាយ OS ពិត · `deviceFromUserAgent()` អានតែ `OS (\d+)_(\d+)` ➜ 18.7 · UA App លើ Home Screen អាចគ្មាន `Version/` ➜ ពិនិត្យលក្ខណៈ engine Safari 26 (anchor positioning · scroll-driven animation មិនមានក្នុង Safari 18) · iOS 18.7 ពិតមាន (ឧបករណ៍ដែល iOS 26 មិនគាំទ្រ) ➜ OS 18_7 តែឯងមិនអាចសន្និដ្ឋានថាបង្កក | `Version/` ≥ 26 ➜ លេខពិត · បង្កក + engine 26 ➜ «iOS 26+» |
+
 ### 2026-10-08 — ស្គាល់ model · serial ទូរស័ព្ទ ➜ [2.50.44]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4735,6 +4770,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |

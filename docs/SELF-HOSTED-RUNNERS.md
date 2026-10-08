@@ -720,7 +720,6 @@ Get-Service 'actions.runner.*'
 | Cache Permission denied | Image/volume ownership ឬ container ចាស់ | ជំហានទី ១៧៖ ផ្ទៀង `cache writable`; រក្សា home volumes និងមើល Compose mounts |
 | `tx-outcome` ធ្លាក់តែ `status: null, rest: 27` ក្នុងផ្នែក 3/4 | តេស្តចាស់ទាមទារអានលើស ៣០ ដងក្នុង 500ms; timer លើ PC យឺតអាចមិនទាន់ដល់ចំនួននោះ | ប្រើ commit ដែលកែ checker ឱ្យរង់ចាំ state ពិត ហើយសាក Audit ថ្មី; កុំកាត់លក្ខខណ្ឌពិនិត្យលុយ |
 | `money-guardian`៖ អ្នកយាមមិនបៃតងលើ tree ស្អាត | Child checker ធ្លាក់មុនតេស្ត mutation; មិនទាន់អាចសន្និដ្ឋានថាកូដលុយខូច ឬថា PC យឺតទេ | ក្នុង run-all log អានបន្ទាត់ FAIL របស់ child នោះ; ប្រើ source ថ្មីដែលបង្ហាញ failed assertions និងមើល CPU/RAM step |
-| `parity:dom`៖ layout `.app-card` ខុស | អាចជាភាពខុសគ្នាពិតនៃ layout/font ឬវាស់មុន boot ចប់ | ប្រើ checker ដែលរង់ចាំ boot/fonts/layout; បើនៅធ្លាក់ អានបរិបទ layout ដើម/ថ្មី; កុំបន្ថែម tolerance ដើម្បីលាក់ភាពខុសគ្នា |
 | Emulator port ជាន់ | Runner មិននៅ container ដាច់ៗ | ប្រើ compose ដែលផ្ដល់; គ្មាន host network/port publish/Docker socket |
 | Exit 137 / PC អស់ RAM | អាចមាន memory kill | ពិនិត្យ logs និង OOMKilled; កាត់ parallel ឬប្រើ GitHub mode |
 

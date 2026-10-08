@@ -91,7 +91,7 @@
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
 - 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
   ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
-  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla)។
+  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla) ➜ branch `claude/optimistic-darwin-6cqgfh` (ផ្អែកលើ PR #299 · merge ក្រោយ #299 · គ្មាន bump · ផ្នែក ២ «D7»)។
 - ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
@@ -2349,6 +2349,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — Deep audit ២ ៖ D7 (ដកឧបករណ៍ parity ធៀប ZoeW vanilla · ការសម្រេចម្ចាស់គម្រោង ៖ អនុញ្ញាត · PR ដាច់ · គ្មាន bump)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A20 | **D7** ឧបករណ៍ parity ទាញ ZoeW vanilla ពីប្រវត្តិ git (`fetch-original.sh`) ហើយប្រៀប ៖ កាតាឡុក (`parity-static` ៖ function · ថេរ · state · `data-act` · id · កូនសោ storage · អត្ថបទ · `style.css` byte) · DOM/layout (`parity-dom`) · ទិន្នន័យ RTDB ក្លែង (`parity-live`) · សេណារីយ៉ូលុយ (`parity-deep`) · token នៃ function + តំបន់ហាម (`logic-identity`) · oracle ការគូរ (`history-row-parity` · `health-row-parity`) · ការខុសគ្នាដោយចេតនា (`INTENTIONAL_UI`) ➜ clone shallow ធ្វើឲ្យ `zoew-suite` · `zoew-parity` ធ្លាក់ · ការកែដោយចេតនានីមួយៗត្រូវបន្ថែមបញ្ជីលើកលែង (`REMOVED_STRINGS` · `ZONE_ALLOWED`) | Claude ៖ មុនដក `parity` បៃតង (`style.css` byte ១/១) · `logic:check` បៃតង (តំបន់ហាមដូចដើម លើកលែងការកែដែលមានហេតុផល) | ដក ១៤ ឯកសារ · script npm ៨ · ការងារ `zoew-parity` ➜ ការការពារជំនួស ៖ `ZoeW/tests/forbidden-zone-lock.test.ts` (sha256 LF នៃឯកសារតំបន់ហាម ៧ + `src/styles/app.css` ➜ ជំនួស ZONE របស់ `logic-identity` និង `style.css` byte) · `rules:check` ៖ ច្បាប់ដាច់ខាតលើ build web + Android · parity Android = web (ជំនួស oracle vanilla) · ការគូរ ៖ `list-render-scope` · `history-paging` · `layout-check` · `app-lock-test` (`#pinModalDesc` ក្នុង browser ពិត) · ផ្លូវលុយ ៖ `revenue-fuzz-test` · `emu/app-writes-rules-test` · `money-guardian-test` · `collected-mirror-*` |
+| A21 | **`version-bump-scope`** រាប់ការកែ `scripts` ក្នុង `ZoeW/package.json` ជាកូដ ship | Claude ៖ D7 តែម្នាក់ឯង (base `9a2847a`) ➜ FAIL ២ («`package.json` ប្រែ ➜ ត្រូវឡើង `CACHE_VERSION` · `APP_VERSION`») ខណៈ script ដែលដកជាឧបករណ៍វាស់ មិនចូល bundle ➜ ការឡើងកំណែទទេ | ប្រៀប `package.json` តាមខ្លឹមសារ ៖ ដក `version` · រក្សាតែ script ក្នុងការបិទនៃច្រកផ្សាយ (`command` ក្នុង `ZoeW/netlify.toml` · `npm run … --prefix ZoeW` ក្នុង workflow · lifecycle ដំឡើង · `pre`/`post`) · រកច្រកមិនឃើញ ➜ script ទាំងអស់រាប់ ➜ ១៦/១៦ · កែ script `build` ➜ FAIL ២ វិញ · probe ទិសផ្ទុយ ៦ ក្នុង checker |
+
+- `forbidden-zone-lock` ៖ ១១/១១ · កែ `PTR_START_ZONE_RATIO` ១ តួ ➜ FAIL ២ · បន្ថែមបន្ទាត់ ១ ក្នុង `app.css` ➜ FAIL ១ · CRLF មិនបំបែកសោ។ `rules:check` ក្រោយកែ ៖ ៧៥ ok · ០ FAIL (web + Android)។
+- ផលបន្ថែម ៖ `zoew-suite` លែងត្រូវការប្រវត្តិ git (clone shallow រត់បាន) · `version-bump-scope` នៅត្រូវការ `origin/main` (`audit.yml` រក្សា `fetch-depth: 0`)។
+- ព្រំដែន ៖ គ្មានអ្វីប្រៀបនឹង ZoeW vanilla ទៀតទេ ➜ កាតាឡុក «function/អត្ថបទ/កូនសោ storage/id ដើមនៅមានគ្រប់» លែងមាន · កូនសោ storage ដែលឯកសារលើកឡើងនៅត្រូវមានក្នុងកូដ ship (`doc-scope-test`)។
+- សកម្មភាពដោយដៃ ៖ គ្មាន (គ្មាន rules · env · migration · deploy)។ ថត `ZoeW/.original` · `ZoeW/dist-parity` ចាស់លើម៉ាស៊ីនអ្នកអភិវឌ្ឍ លុបចោលបាន។
+
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១០–១១ (SECURITY-1 · ZTO-4 · ការសម្រេចម្ចាស់គម្រោង) ➜ [2.50.24]–[2.50.25]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -3926,7 +3938,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `action-binding-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `app-lock-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `app-lock-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `auth-recovery-test` | — | ផ្នែក ៣ · ផ្នែក ៦ |
 | `barcode-shape-test` | — | ផ្នែក ២ |
 | `biometric-unlock-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
@@ -3962,7 +3974,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `emu/app-writes-rules-test` | ផ្នែក ១ | — |
+| `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `emu/license-seat-rules-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៥ |
@@ -4057,7 +4069,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `revenue-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ |
 | `runall-runner-test` | ផ្នែក ១ · ផ្នែក ២ | — |

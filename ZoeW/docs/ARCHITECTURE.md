@@ -181,7 +181,7 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 |---|---|---|
 | `dist-audit/**` | `scripts/build-audit.mjs` | build វាស់សម្រាប់ `audit-tools/` (មិន commit) |
 | `audit-tools/money-core.js` | `npm run money:core` | កូដលុយពិតសម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់) |
-| `src/_generated-state.json` | ⛔ **ស្ថិរ** (រូបភាពនៃ state ដើមរបស់ vanilla) | `parity` · build វាស់ ប្រើវាដើម្បីផ្គូ state ដើម |
+| `src/_generated-state.json` | ⛔ **ស្ថិរ** (រូបភាពនៃ state ដើមរបស់ vanilla) | build វាស់ (`build-audit` · `checker-view` · `expose-globals`) ប្រើវាដើម្បីផ្គូ state ដើម |
 
 បញ្ជី slot (ផ្នែក ១០) រស់នៅ `scripts/slot-registry.cjs` ហើយ `slot:check` ផ្ទៀងផ្ទាត់វាទល់នឹង `REACT_OWNED_IDS`
 (`src/app/slot-resets.ts`) និង component ដែល export ពិត ➜ វាមិនមែនបញ្ជីរឹងឯករាជ្យទេ។
@@ -284,7 +284,7 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 
 `uiState.healthRows` មាន type `HealthRow[]` (មិនមែន `any`) ➜ អ្នកសាងជួរដែលត្រឡប់
 **ខ្សែអក្សរ HTML** ត្រូវ TypeScript បដិសេធពេល build។ វាស់បាន ៖ ជួរ 🩺 ទាំង ៩ ធ្លាប់
-ត្រឡប់ HTML ➜ ប្រអប់ទទេ ខណៈ parity ស្តាទិច ១០០%។
+ត្រឡប់ HTML ➜ ប្រអប់ទទេ ខណៈកាតាឡុក function ស្តាទិចឃើញគ្រប់ ១០០%។
 
 ### ⛔ សកម្មភាពនៃធាតុដែល React គូរ
 
@@ -297,9 +297,7 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 ⛔ `data-act` · `data-a1` លើប៊ូតុងម៉ឺនុយ (...) នៅជា attribute **ពណ៌នា** សុទ្ធ
 (DOM ដូចដើម ➜ ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
 ⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ **មិនរស់ក្នុង `src/` ទៀតទេ** — JSX គូរពី model (`buildHistoryRowModel()` ·
-`buildTrashRowModel()` · `healthRow()` · `ztoListGroupModel()`)។ builder ដើមដែលតេស្ត parity ត្រូវការ រស់ជា
-**oracle** ក្នុង `tests/oracles/` (`history-row-html.ts` · `health-row-html.ts`) ➜ `function-surface` មិនរាយវាថាងាប់ ហើយ
-ផលិតកម្មមិនដឹកវា។
+`buildTrashRowModel()` · `healthRow()` · `ztoListGroupModel()`)។
 
 ### ⛔ ច្រកចេញ (escape hatch) — អ្វីតែមួយគត់ដែលមិនមែន JSX
 

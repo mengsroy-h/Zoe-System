@@ -4,7 +4,7 @@
  * `el.textContent = ''` លើ container ដែល React គូរកូន ➜ node របស់ React
  * ត្រូវដកចេញពីក្រោមវា ➜ ការគូរបន្ទាប់ហៅ `removeChild` លើ node ដែលលែងនៅ
  * ➜ `NotFoundError` ➜ **React បោះបង់ root ទាំងមូល ➜ App ក្លាយជាអេក្រង់ស**។
- * វាស់បាន (`parity-deep`) ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ ការណែនាំលេច ➜ សម្អាត
+ * វាស់បាន ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ ការណែនាំលេច ➜ សម្អាត
  * ➜ `hidePhoneSuggestions()` ធ្វើ `box.textContent = ''` ➜ App ស។
  *
  * ឧបករណ៍នេះស្កេន AST នៃឯកសារ `.ts` ទាំងអស់ក្នុង `src/` (កូដមុខងារ **និង** `src/app/` — behavior ·

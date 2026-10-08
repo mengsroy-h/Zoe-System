@@ -20,7 +20,7 @@ export default tseslint.config(
     },
 
     {
-        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts', 'tests/oracles/**/*.ts'],
+        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', ZoeLicense: 'readonly', XLSX: 'readonly', ZXingWASM: 'readonly', Sentry: 'readonly', BarcodeDetector: 'readonly' } },
         rules: {

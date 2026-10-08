@@ -168,7 +168,7 @@ ok('គ្រប់ឈ្មោះក្នុង PIN_PROMPT_MESSAGES ត្រ�
 console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិតចូលអេក្រង់ ===');
 {
     // ⛔ ZoeW ជា React ៖ អត្ថបទប្រអប់ PIN ជា `viewState.pinPromptVerifyText` / `pinPromptSetupText` ដែល
-    //    JSX គូរ (`parity:dom` វាស់ការគូរ) ➜ `desc` · `setupDesc` ជាកញ្ចក់អានពីឃ្លាំងពិត
+    //    JSX គូរ (`app-lock-test` អាន `#pinModalDesc` ក្នុង browser ពិត) ➜ `desc` · `setupDesc` ជាកញ្ចក់អានពីឃ្លាំងពិត
     const readView = (k) => vm.runInContext('viewState.' + k, c2);
     const desc = { get textContent() { return readView('pinPromptVerifyText'); },
         set textContent(v) { vm.runInContext('viewState.pinPromptVerifyText = ' + JSON.stringify(v), c2); } };

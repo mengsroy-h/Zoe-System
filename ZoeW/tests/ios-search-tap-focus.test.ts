@@ -153,6 +153,29 @@ describe('iPhone PWA ៖ ចុចស្វែងរកលេខ ➜ ទាញ�
         expect(focusCalls).toEqual([]);
     });
 
+    it('ទិសផ្ទុយ ៖ event ចម្លែក (គ្មាន touches · changedTouches ខុស · timeStamp NaN · មិន cancelable) ➜ មិនបោះ error · មិនប៉ះ', () => {
+        const odd = (type: string, props: Record<string, any>, cancelable = true) => {
+            const ev = new Event(type, { bubbles: true, cancelable });
+            Object.entries(props).forEach(([k, v]) => Object.defineProperty(ev, k, { value: v }));
+            input.dispatchEvent(ev);
+            return ev;
+        };
+        expect(() => {
+            odd('touchstart', {});
+            odd('touchend', {});
+            odd('touchstart', { touches: null, changedTouches: null });
+            odd('touchend', { touches: null, changedTouches: null });
+            touch('touchstart', input, { x: 100, y: 450, t: 1000 }, 1);
+            odd('touchend', { touches: [], changedTouches: [null, { identifier: 7, clientX: 100, clientY: 450 }], timeStamp: 1100 });
+            touch('touchstart', input, { x: 100, y: 450, t: NaN }, 1);
+            odd('touchend', { touches: [], changedTouches: [{ identifier: 1, clientX: 100, clientY: 450 }], timeStamp: NaN });
+            touch('touchstart', input, { x: 100, y: 450, t: 3000 }, 1);
+            odd('touchend', { touches: [], changedTouches: [{ identifier: 1, clientX: 100, clientY: 450 }], timeStamp: 3100 }, false);
+        }).not.toThrow();
+        expect(focusCalls).toEqual([]);
+        expect(uiState.dataPanelSearchFocus).toBe(false);
+    });
+
     it('⛔ fail-open ៖ focus មិនជាប់ ➜ ទាញចុះវិញ · ការចុចបន្ទាប់ទុកឲ្យ iOS (មិនជាប់ប្រអប់គ្មាន keyboard)', () => {
         refuseFocus = true;
         const first = tap(input, { x: 100, y: 450, t: 1000 }, { x: 100, y: 450, t: 1100 });

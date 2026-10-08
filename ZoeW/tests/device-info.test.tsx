@@ -198,6 +198,9 @@ describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK
         expect(deviceFromUserAgent(home185, true).platform).toBe('iOS 18.5');
         expect(deviceFromUserAgent(chrome26, true).platform).toBe('iOS 26.0');
         expect(deviceFromUserAgent(chrome26, false).model).toBe('iPhone');
+        expect(deviceFromUserAgent(home187.replace('Mobile/', 'Version/99999999999999999999.5 Mobile/'), true).platform).toBe('iOS 26+');
+        expect(deviceFromUserAgent(safari187.replace('Version/18.7', 'Version/26.5.1'), false).platform).toBe('iOS 26.5');
+        expect(deviceFromUserAgent(safari187.replace('Version/18.7', 'Version/18.7.2'), true).platform).toBe('iOS 18.7');
         setUserAgent(home187, undefined);
         withCssSupports([]);
         expect((await freshLoad()).info.platform).toBe('iOS 18.7');

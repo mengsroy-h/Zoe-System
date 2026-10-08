@@ -137,9 +137,11 @@
 
 #### អ្នកយាម
 
-- `ZoeW/tests/ios-search-tap-focus.test.ts` (៨) ៖ ចុច ➜ `touchend` preventDefault · ទាញឡើងមុន focus · `preventScroll` · focus ពិត · ខ្សែភ្ជាប់ boot (capture · `touchend` មិន passive) ·
-  ទិសផ្ទុយ ៖ អូស · សង្កត់យូរ · focus រួច · Android/web · អេក្រង់ធំ · ម្រាមដៃពីរ · `touchcancel` · ធាតុផ្សេង · fail-open — មុនកែ FAIL ៨/៨ · mutation ៩/៩ ចាប់បាន។
-- `ZoeW/tests/device-info.test.tsx` (+៣) ៖ `Version/26.5` ➜ «iOS 26.5» · គ្មាន Version + engine 26 ➜ «iOS 26+» · ទិសផ្ទុយ iOS 18.7/18.5 · Chrome iOS — មុនកែ FAIL ២។
+- `ZoeW/tests/ios-search-tap-focus.test.ts` (៩) ៖ ចុច ➜ `touchend` preventDefault · ទាញឡើងមុន focus · `preventScroll` · focus ពិត · ខ្សែភ្ជាប់ boot (capture · `touchend` មិន passive) ·
+  ទិសផ្ទុយ ៖ អូស · សង្កត់យូរ · focus រួច · Android/web · អេក្រង់ធំ · ម្រាមដៃពីរ · `touchcancel` · ធាតុផ្សេង · event ចម្លែក (គ្មាន touches · `timeStamp` NaN) · fail-open —
+  មុនកែ FAIL ៨/៨ · mutation ៩/៩ ចាប់បាន។
+- `ZoeW/tests/device-info.test.tsx` (+៣) ៖ `Version/26.5` · `Version/26.5.1` ➜ «iOS 26.5» · គ្មាន Version + engine 26 ➜ «iOS 26+» · ទិសផ្ទុយ iOS 18.7/18.7.2/18.5 · Chrome iOS ·
+  `Version/` លេខវែងមិនធម្មតា ➜ មិនយក — មុនកែ FAIL ២ · old↔new លើ UA ២២ ករណី ៖ ខុសតែ iPhone/iPad ដែល OS បង្កក។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

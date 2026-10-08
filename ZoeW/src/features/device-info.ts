@@ -54,7 +54,7 @@ export function webKitAtLeast26(): boolean {
 }
 
 function applePlatform(ua: string, major: string, minor: string, engine26: boolean): string {
-    const safari = /\bVersion\/(\d+)(?:\.(\d+))?/.exec(ua);
+    const safari = /\bVersion\/(\d{1,3})(?:\.(\d{1,3}))?(?:\.\d{1,3})?(?![\d.])/.exec(ua);
     if (safari && Number(safari[1]) >= IOS_UNFROZEN_MAJOR) return 'iOS ' + safari[1] + (safari[2] ? '.' + safari[2] : '');
     const frozen = Number(major) === IOS_FROZEN_MAJOR && Number(minor) >= IOS_FROZEN_MINOR;
     if (frozen && !safari && engine26) return 'iOS ' + IOS_UNFROZEN_MAJOR + '+';

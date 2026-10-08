@@ -254,8 +254,9 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
                 (m[1].match(/\brec\.([A-Za-z_$][\w$]*)/g) || []).forEach((k) => derived.add(k.slice(4)));
             }
             const names = Array.from(derived);
-            ok('ជាន់អប្បបរមា ៖ ដេរីវេវាល secret របស់ Push និង biometric បានយ៉ាងតិច ៤ (p256dh · auth · wrapped · wrapKey)',
-                names.length >= 4, 'ដេរីវេបាន ៖ ' + names.join(', '));
+            // ⛔ `wrapKey` លែងមានក្នុងកូដ (SECURITY-1 ៖ PRF-only) តែ record `device` ចាស់នៅក្នុង storage រហូត `purgeLegacyBiometricRecord()` ➜ ការវាស់វត្ថុខាងក្រោមនៅវាស់វា
+            ok('ជាន់អប្បបរមា ៖ ដេរីវេវាល secret របស់ Push និង biometric បានយ៉ាងតិច ៣ (p256dh · auth · wrapped)',
+                names.length >= 3 && ['p256dh', 'auth', 'wrapped'].every((n) => names.indexOf(n) !== -1), 'ដេរីវេបាន ៖ ' + names.join(', '));
             derivedSecretNames = derivedSecretNames.concat(names.filter((n) => derivedSecretNames.indexOf(n) === -1));
             names.forEach((name) => {
                 const probe = { extra: {} };

@@ -777,7 +777,7 @@ async function withTimeout(promise, ms, label) {
             await page.evaluate(() => {
                 sessionStorage.clear();
                 localStorage.setItem('zoew_biometric_unlock_v1', JSON.stringify({
-                    credentialId: 'abc', mode: 'device', wrapKey: 'a2V5', wrapped: { iv: 'aXY=', data: 'ZGF0YQ==' }
+                    credentialId: 'abc', mode: 'prf', wrapped: { iv: 'aXY=', data: 'ZGF0YQ==' }
                 }));
             });
             await withTimeout(load(), 30000, 'reload-bio-on');

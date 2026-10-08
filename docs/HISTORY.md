@@ -2255,6 +2255,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A14 | **ZTO-2** `signedOnly` ក្រោយធុងសំរាមលុប ➜ COD ពីរដង | អ្នករក ៖ lifecycle ពិត ➜ ledger ១០ ➜ ២០ · Claude ៖ FAIL ១/៣ | `pickedUpBarcodes` ជាសញ្ញា (គ្មាន rules ថ្មី) |
 
 - ZTO-2 ៖ របាយការណ៍ស្នើ tombstone `zoew_purged_barcodes` + rules + SQL + Publish ➜ ការវាស់បង្ហាញថាស្ថិតិយក (`pickedUpBarcodes`) រក្សា key រួចហើយ (listen ទាំងមូល · គ្មានការលុបតាមអាយុ) ➜ ដំណោះស្រាយតូចជាង គ្មានសកម្មភាពដោយដៃ។
+- CI (GitHub shard ១/៤ · ២/៤ · ៤/៤ លើ `49d6c44` និង checker ក្នុង session) ៖ sandbox ដែលស្រង់ `claimAndCleanupItem` តាមឈ្មោះខ្វះ `readCleanupJournal` (`stall-lock-release` · `restore-marker-hygiene`) ➜
+  gate SCALE-1 ជាការហៅ journal ➜ fail-open ដូចការហៅ journal ផ្សេង (`try`) · sandbox ខ្វះ field ពិតរបស់ App ៖ `authGeneration` (`db-stall-guard` · `restore-marker-hygiene` · RACES-2) · `dailyPickupData`
+  (`zto-list-sync-test` · ZTO-2) ➜ បន្ថែម · `code-duplication-test` ៖ ធាតុ `ACCEPTED` `allClosedLocal` ងាប់ក្រោយ ZTO-3 (ប្លុក server លែងស្ទួន) ➜ ដក · `money-guardian` ៖ គោលដៅ mutation registry ក្រោយ `txProven` ·
+  `notifications.test.tsx` ៖ កំណត់ចំណាំ 🔔 ≤ ១២ ចំណុច · typecheck តេស្ត RACES-2។ មេរៀន ៖ ពេលប្តូរ function ដែល checker ស្រង់តាមឈ្មោះ ➜ រត់ checker ទាំងនោះលើ measure root មុន push។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៥ (RACES-2 · late commit ក្រោយប្តូរហាង) ➜ [2.50.18]
 

@@ -1383,7 +1383,7 @@ function firstBody(requests) {
         const box = {
             console: console,
             db: {}, authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
-            scanHistory: [], deletedItems: [],
+            scanHistory: [], deletedItems: [], dailyPickupData: {},
             ztoListSyncInFlight: false,
             ztoListSyncResult: null,
             ZTO_SYNC_VIEW_KEYS: ['history', 'deleted'],

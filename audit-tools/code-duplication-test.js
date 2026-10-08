@@ -87,17 +87,6 @@ const ACCEPTED = [
         // ការរមូរ) ដែលត្រូវការ ~១១ ជុំ និងការថយក្រោយ ២ ដងទំរាំត្រូវ ហើយ
         // `CLAUDE.md` ហាមកែវាដោយគ្មានការស្នើពីអ្នកប្រើ។
         reason: 'តំបន់ហាមចូល (PTR · កាយវិការ · ការរមូរ) — ក្បាលរួម ៦ បន្ទាត់ តែតួបែកគ្នាទាំងស្រុង'
-    },
-    {
-        file: 'ZoeW/app.js',
-        signature: 'const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);',
-        // ⛔ គូ **ដោយចេតនា** ៖ ច្បាប់ចម្លងទី ១ ធ្វើលើ **សតិ** (`freshItem` —
-        // ទិដ្ឋភាពរបស់ទូរស័ព្ទនេះ) ចំណែកទី ២ ធ្វើលើ **record របស់ server**
-        // ខាងក្នុង `runTransaction` (`currentItem`)។ `CLAUDE.md` ចែងថា «រាល់ការ
-        // កែកញ្ចប់ធ្វើដោយ `runTransaction` លើ record របស់ *server* មិនមែនលើ
-        // ច្បាប់ចម្លងក្នុងសតិទេ» ➜ ការរួបរួមបង្កើត **សោភ្ជាប់រវាងផ្លូវសតិ និង
-        // ផ្លូវ transaction** លើផ្លូវលុយ។ ហានិភ័យធំជាងអត្ថប្រយោជន៍។
-        reason: 'គូចេតនា ៖ ផ្លូវសតិ ធៀប ផ្លូវ transaction លើ server — ការរួបរួមភ្ជាប់ ២ ផ្លូវលុយចូលគ្នា'
     }
 ];
 const acceptedHits = ACCEPTED.map(() => 0);

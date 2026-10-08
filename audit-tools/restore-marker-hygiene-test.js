@@ -155,7 +155,7 @@ function buildWorld(store, now) {
     };
     const context = vm.createContext({
         console: auditConsole, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
-        db: {}, fb,
+        db: {}, fb, authGeneration: 0,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         getServerNow: () => world.now,

@@ -506,7 +506,9 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
 
 export async function claimAndCleanupItem(id, reason) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
-    if (cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX) return;
+    let journalFull = false;
+    try { journalFull = cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX; } catch (journalErr) {}
+    if (journalFull) return;
     cleanupInFlight.add(id);
     const cleanupDb = firebaseState.db;
     const cleanupGeneration = firebaseState.authGeneration;

@@ -449,6 +449,8 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
         sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
+        // RACES-2 ៖ `claimAndCleanupItem()` ចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម (store field ក្នុង text view)
+        'let authGeneration = 0;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();',
         // ⛔ journal នៃការសម្អាត (2.37.2) ៖ ការហៅរបស់វា fail-open ➜ បើ sandbox

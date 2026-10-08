@@ -45,9 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.25 · ZoeKeyGen 2.24.7** ៖ PR #288 ➜ #300 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300)។
-   **PR #301** (branch `claude/optimistic-darwin-6cqgfh` · **មិនទាន់ merge**) = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ + សំណើម្ចាស់គម្រោង
-   ([2.50.26] ➜ [2.50.38] · ផ្នែក ២ «Deep audit ២ ៖ ជុំ ១២» ➜ «ជុំ ០»)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+1. **`main`** = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ PR #288 ➜ #301 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301)។
+   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android ·
+   [2.50.41] · ZoeKeyGen 2.24.9 password manager + Private Key ចម្លង · [2.50.42] iPhone ស្វែងរកលេខលោតទំព័រ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -72,9 +72,13 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.34–2.50.38 — ជុំ ១៥ (UI · NATIVE · សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
-- ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
-- ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.34–2.50.38 — ជុំ ១៥ (UI · NATIVE · សំណើម្ចាស់គម្រោង · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · PR #301 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
 - 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
@@ -114,6 +118,116 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.42] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ស្វែងរកលេខ ➜ keyboard មិនរំកិលទំព័រឡើង/ចុះទៀត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
+
+**ZoeW `2.50.42`** (`zoew-v304` ➜ `zoew-v305`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts`) មិនប៉ះ · Android/web មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត ➜ ទំព័រលោតឡើង** (navbar បាត់ · បញ្ជីលេខទូរស័ព្ទជាន់ម៉ោង · នៅដដែលរហូតបិទ keyboard ·
+  ម្តងម្កាលលោតចុះ មានចន្លោះទទេខាងលើ) · Android PWA មិនអី (ម្ចាស់គម្រោងសាក)។ App ត្រឡប់ document ទៅ ០ តែពេល `visualViewport` `resize` ➜ ការរំកិលរបស់ keyboard ដែលមកក្រោយ
+  resize (តាមល្បឿន ➜ ម្តងម្កាល) នៅជាប់។ ឥឡូវ iOS standalone ខណៈប្រអប់ស្វែងរកលេខទាញឡើង ៖ `scroll` លើ window ឬ `visualViewport` ➜ `restoreIOSDocumentScroll()` ➜ ០
+  (root ចាក់សោ ➜ document រំកិល = artifact) · ប្រអប់ផ្សេងនៅឲ្យ iOS រំកិលបង្ហាញដដែល។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium មិនមាន keyboard iOS ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (ផ្នែក ២ A44) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-viewport.test.ts` (៦) ៖ iOS standalone + ស្វែងរកទាញឡើង ៖ document រំកិល (window · `visualViewport`) ➜ `scrollTo(0, 0)` · ខ្សែភ្ជាប់ boot ·
+  ទិសផ្ទុយ ៖ Android/web · ប្រអប់ផ្សេង · document មិនរំកិល · ការរមូរខាងក្នុង ➜ មិនប៉ះ — មុនកែ ៖ module/ខ្សែភ្ជាប់គ្មាន · mutation ៥/៥ ចាប់បាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ ចុច «⋯» ➜ ចុចស្វែងរកម្តងទៀត (សាក ៥ ដង) · ចុចស្វែងរកធម្មតា (៥ ដង) ➜ navbar និងប្រអប់ស្វែងរកនៅខាងលើ · បញ្ជីលេខនៅក្រោមប្រអប់ ·
+   គ្មានចន្លោះទទេ។ នៅលោត ➜ ថតវីដេអូម្តងទៀត។
+3. Android PWA ៖ ស្វែងរកដដែល (គួរតែមិនប្រែ)។
+
+### [2.50.41] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **ចូលប្រព័ន្ធ និង Private Key ស្គាល់ Google Password Manager · iOS Passwords · Private Key ដែលចម្លងមក Load បាន** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.41`** (`zoew-v303` ➜ `zoew-v304`) · **ZoeKeyGen `2.24.9`** (`zoekeygen-v119` ➜ `zoekeygen-v120`) · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔑 **ZoeKeyGen Private Key ↔ password manager** ៖ `<textarea>` (password manager មិនបំពេញ textarea) ➜ `<input type="password" autocomplete="current-password">` ក្នុង
+  `#signingKeyForm` ជាមួយ username លាក់ «ZoeKeyGen Signing Key» (entry ដាច់ពីគណនី Admin) · Enter/«📥 Load Key» = submit (`data-on="submit"` · `preventDefault()`) ·
+  Load ជោគជ័យ ➜ form លាក់ (browser ដឹងថាការចូលជោគជ័យ ➜ សួររក្សាទុក) · «🗑️ សម្អាត» ➜ form លេចវិញ។
+- 🔐 **ZoeKeyGen ចូល Supabase Admin** ៖ អ៊ីមែល/ពាក្យសម្ងាត់មិននៅក្នុង `<form>` (browser មិនសួររក្សា) ➜ `#sbAdminForm` · submit ➜ `sbAdminLogin(event)` · ចូលរួច ➜ form លាក់ · ចាកចេញ ➜ លេចវិញ។
+- 🏷️ **`name`** លើប្រអប់ចូលប្រព័ន្ធគ្រប់កន្លែង (ZoeW ៖ ចូល · ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់ · ZoeKeyGen ៖ ចូល · Supabase Admin)។
+- 🧹 **Private Key ដែលចម្លងមក** (រាយការណ៍ម្ចាស់គម្រោង ៖ «generate ពី ZoeKeyGen ខ្លួនឯង copy ដាក់អត់ស្គាល់») ៖ `normalizeSigningKeyText()` ដក « » “ ” ·
+  តួមើលមិនឃើញ (ZWSP · BOM · NBSP) · បន្ទាត់បាក់កណ្តាលតម្លៃ · អត្ថបទជុំវិញ · `'` ➜ JWK ស្អាតតែ `kty·crv·d·x·y` (`key_ops` · `ext` របស់ `exportKey` ដកចេញ) · Public Key ➜ «នេះជា Public Key» ·
+  មិនមែន JSON ➜ សារ JSON · ⛔ កំហុសអ្នកប្រើលែងផ្ញើ Sentry។ ការវាស់ ៖ key ដែលទើបបង្កើតអាន JSON បាន ប៉ុន្តែផ្ទៀងផ្ទាត់នឹង Public Key ក្នុង `license-verify.js` ➜ `signature` ➜
+  **Keypair ថ្មី Load មិនបានដោយការរចនា** រហូតដល់ Public Key ថ្មីចូល App ទាំងអស់ ➜ សារ និងប្រអប់ Keypair ថ្មីប្រាប់ឲ្យដាក់ Public Key ក្នុង `license-verify.js` ហើយ Deploy។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/login-autofill.test.tsx` (៧) ៖ `LoginModal` ពិត (Firebase/Supabase · ចូល/ចុះឈ្មោះ/ប្តូរ) ៖ ពាក្យសម្ងាត់ក្នុង form + submit + username មុនវា + `name` ·
+  ទិសផ្ទុយ ៖ កូដអញ្ជើញ `off` · កូដប្តូរ `one-time-code` — មុនកែ FAIL ៥/៧។
+- `layout-check` (browser ពិត · ZoeKeyGen) ៖ ពាក្យសម្ងាត់ ៣ ជា `current-password` ក្នុង form ត្រឹមត្រូវ · Private Key = `<input type="password">` + username លាក់ · PIN `off` ·
+  `requestSubmit()` ➜ សកម្មភាពពិតរត់ · ⛔ URL មិនប្រែ — មុនកែ FAIL ៥។
+- `keygen-session-security-test` (+១១) ៖ ចម្លង ៧ ប្រភេទ ➜ Load + JWK ស្អាតទៅ `signNewKey` · Public Key/មិនមែន JSON/RSA ➜ សារត្រូវ គ្មាន Sentry · Keypair ថ្មី ➜ សារ Deploy — មុនកែ FAIL ១១។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** + **ZoeKeyGen** (merge ចូល `main`)។
+2. ZoeKeyGen (iPhone Safari/PWA · Android Chrome) ៖ បិទភ្ជាប់ Private Key ➜ Load ➜ browser សួររក្សា ➜ រក្សា · Refresh ➜ ចុចប្រអប់ Private Key ➜ ជ្រើស «ZoeKeyGen Signing Key» ➜
+   Load · ចូល Supabase Admin ➜ សួររក្សា · ចម្លង Private Key ពី Notes/chat ➜ Load បាន។
+3. ZoeW ៖ ចូលប្រព័ន្ធ ➜ សួររក្សាពាក្យសម្ងាត់ ➜ លើកក្រោយ ចុចប្រអប់ឈ្មោះគណនី ➜ ជ្រើសគណនី។
+4. ⛔ Keypair ថ្មី ៖ ផ្ញើ Public Key ថ្មីមក Claude (ឬដាក់ខ្លួនឯង) ក្នុង `ZoeW/public/license-verify.js` និង `ZoeKeyGen/license-verify.js` (byte-identical) ➜ Deploy ➜ ទើប Load Private Key ថ្មីបាន (Key ចាស់ទាំងអស់នឹងផ្ទៀងផ្ទាត់មិនកើត)។
+
+### [2.50.40] — 2026-10-08 · ZoeW ៖ **PWA លើ Android ចងក្រយៅដៃ/មុខបាន (passkey · WebAuthn PRF)** (រាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.40`** (`zoew-v302` ➜ `zoew-v303`) · ⛔ ZoeKeyGen មិនប្រែ (កែរួចពីមុន) · គ្មាន rules · env · migration ថ្មី · ⛔ PRF-only ដដែល។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **Android PWA ៖ «❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — … (WebAuthn PRF)» ទោះទូរស័ព្ទគាំទ្រ** (រូបពីម្ចាស់គម្រោង · APK មិនអី ព្រោះប្រើក្រយៅដៃ native) —
+  ZoeW បង្កើត credential `residentKey: 'discouraged'` ➜ Android (Google Password Manager) ផ្តល់ PRF តែលើ **passkey** (discoverable) ➜ `prf.enabled: false` ➜
+  «មិនគាំទ្រ» ក្លែងក្លាយ។ ZoeKeyGen កែកំហុសដដែលរួច (ផ្នែក ១ «ZoeKeyGen ៖ ក្រយៅដៃ/មុខ «មិនគាំទ្រ» លើ Android») តែ ZoeW មិនទាន់ ➜ ថ្នេររវាង ២ App។
+- ឥឡូវ ZoeW ដូច ZoeKeyGen ៖ `residentKey: 'required'` · PRF ដែល `create()` ផ្តល់ផ្ទាល់ ➜ ប្រើភ្លាម (ស្កេនតែម្តង · `biometricPrfFirst()`) · `prf: {}` គ្មាន `enabled` ➜ សួរ `get()` ·
+  បោះបង់ការស្កេនទី ២ ➜ «❌ បានបោះបង់ …» (`biometricPrfEval()` បោះ) មិនមែន «មិនគាំទ្រ» · សារមិនគាំទ្រណែនាំ «លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager ឬប្រើ App ZoeW សម្រាប់ Android» ·
+  `biometricPrfFirst` · `biometricPrfEval` · `biometricPrfBytes` ដូចគ្នាបេះបិទទាំង ២ App (`shared-fns` ដកចេញពីបញ្ជី «បែកគ្នាដោយចេតនា»)។
+- កំណត់ត្រាដែលចងរួច (iPhone) ដើរដដែល (`get()` តាម credential id)។ ការចងម្តងៗបង្កើត passkey «ZoeW» ថ្មីក្នុងកម្មវិធីគ្រប់គ្រងពាក្យសម្ងាត់ (លុបចាស់បានក្នុងកម្មវិធីនោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/biometric-android-prf.test.ts` (៦) ៖ WebAuthn ក្លែងតាម Android (PRF តែ passkey) ៖ ស្នើ `residentKey: 'required'` ➜ ចង + ស្រាយ PIN · PRF ក្នុង `create()` ➜ `get()` ០ ដង ·
+  `prf: {}` ➜ `get()` ១ ដង · បោះបង់ស្កេនទី ២ ➜ «បោះបង់» · `enabled: false` ➜ មិនចង + Google Password Manager — មុនកែ FAIL ៥/៦ · mutation ៥/៥ ចាប់បាន។
+- `biometric-unlock-test` (sandbox ត្រូវការ `biometricPrfFirst` · `biometricPrfEval`) · `keygen-biometric-test` ២៧ · `shared-fns` (គ្មានការបែកគ្នាមិនរំពឹង)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។
+2. Android Chrome (PWA) ៖ ⚙️ ➜ 🔐 ចូលដោយក្រយៅដៃ ឬមុខ ➜ PIN ➜ ស្កេនក្រយៅដៃ (បើសួរ ➜ រក្សាក្នុង Google Password Manager) ➜ ✅ · បិទ/បើក App ➜ ដោះសោដោយក្រយៅដៃ។
+3. iPhone PWA ៖ បិទ ➜ បើក 🔐 ម្តងទៀត ➜ ✅ (passkey iCloud Keychain)។
+
+### [2.50.39] — 2026-10-08 · ZoeW ៖ **🔔 «កញ្ចប់ជិតផុតកំណត់» និង «កញ្ចប់ដែលដករួច» ជាក្រុមពន្លាដូចម៉ឺនុយ ☰ · មើលបានគ្រប់កញ្ចប់** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.39`** (`zoew-v301` ➜ `zoew-v302`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔔 **ក្រុមពន្លា** ៖ «📦 កញ្ចប់ជិតផុតកំណត់» និង «📤 កញ្ចប់ដែលដករួច» ប្រើ `DrawerGroup` ដដែលនឹង category ក្នុង ☰ (ដកចេញពី `SideDrawer.tsx` ជា component រួម) ៖
+  បិទជាលំនាំដើម · ក្បាលបង្ហាញចំនួនកញ្ចប់ (`—` = វាស់មិនបាន · ពណ៌លឿងពេលមាន) និង «ថ្មី N» (📤) · ចុចក្បាល ➜ ពន្លា/បិទ · ចងចាំក្នុង `zoew_drawer_groups_v1` ដូច ☰
+  (`notifyGroupExpiry` · `notifyGroupRemoved` · ក្រុមនីមួយៗឯករាជ្យ · ☰ មិនប្រែ) · `openNotifyDrawer()` អានស្ថានភាពនោះ (`refreshDrawerGroups()`)។
+- 📜 **មើលបានគ្រប់កញ្ចប់** ៖ បញ្ជីលែងកាត់ត្រឹម ៦០ ជួរ («… និង N ជួរទៀត») ➜ ទំព័រ ២០ (`NOTIFY_PAGE_ROWS`) · ទាញបន្ថែមពេលរមូរ `.drawer-body` ដល់ចុងបញ្ជី ឬចុច
+  «⬇️ បង្ហាញ … ទៀត» · ជួរគូរតែពេលក្រុមពន្លា (`lazy` ➜ ផ្ទាំងបិទមិនគូរជួររាប់រយរាល់ការ sync)។
+- 🆕 **«ថ្មី» ក្នុង 📤 = បានឃើញពិត** ៖ រាប់ថាបានមើលតែពេលក្រុម 📤 ពន្លា ខណៈបិទផ្ទាំង 🔔 · បើក ☰ ពីលើ · ឬបិទក្រុម (`toggleNotifyGroup`) ➜ ក្រុមបិទ ➜ លេខក្រហមនៅ។
+- 🐛 កញ្ចប់ដករួចលើស ៦០ ជួរ ➜ លេខក្រហមលើ 🔔 នៅជាប់រហូត (ផ្នែក ២ A41) ➜ ឥឡូវរាប់ថាបានមើលគ្រប់ជួរ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-groups.test.tsx` (៨) ៖ បិទជាលំនាំដើម · ក្បាលជាប៊ូតុង + ចំនួន · ពន្លា ➜ ២០ · «បង្ហាញ … ទៀត» ➜ គ្រប់ ៧៥/៧០ ជួរ · ចងចាំ + ឯករាជ្យ + ☰ មិនប្រែ ·
+  «ថ្មី» តាមក្រុម (បិទ ➜ មិនរាប់ · ពន្លា ➜ គ្រប់ ៧០) · បិទក្រុម/☰ ➜ បានមើល · `—` ពេលវាស់មិនបាន · `0` ពេលគ្មាន — មុនកែ FAIL ៧/៨ · mutation ១០/១០ ចាប់បាន។
+- `layout-check` (browser ពិត) ៖ ក្បាល 📤 បិទជាលំនាំដើម · ចំនួន + «ថ្មី» · ក្បាលមិនលើស ឈ្មោះមិនគាបតូច ៣២០ · ៤១២ · ពន្លា ➜ ២០ · រមូរ `.drawer-body` ដល់ចុងបញ្ជី ➜ ៤០ —
+  មុនកែ FAIL ៤ · mutation root `el.parentElement` (ធាតុមិនរមូរ) ➜ ៥០ ភ្លាម ➜ ចាប់បាន។
+- `tests/notifications.test.tsx` · `tests/push-client.test.tsx` ៖ ពន្លាក្រុមមុនពិនិត្យបញ្ជី (ច្បាប់ដដែល ៖ ចាកចេញ ➜ លេខទូរស័ព្ទមិនសល់ក្នុង DOM · 🧹 មិនប៉ះបញ្ជីកញ្ចប់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ (merge ចូល `main`)។
+2. សាក ៖ 🔔 ➜ ក្រុមទាំងពីរបិទ (ចំនួននៅក្បាល) ➜ ចុចពន្លា ➜ បញ្ជី · រមូរដល់ចុង ➜ ទាញបន្ថែម · បិទ/បើក App ➜ ក្រុមដែលពន្លានៅពន្លា · 📤 ៖ ក្រុមបិទ ➜ បិទ 🔔 ➜
+   លេខក្រហមនៅ · ពន្លា ➜ បិទ 🔔 ➜ លេខក្រហមរបស់ 📤 បាត់។
 
 ### [2.50.38] — 2026-10-08 · ZoeW ៖ **🔔 ៖ link ទាញយក APK កំណែថ្មី · ផ្ទាំង 🔔 ធំជាងលើកុំព្យូទ័រ** (សំណើម្ចាស់គម្រោង)
 
@@ -2628,6 +2742,33 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ ➜ [2.50.42]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A44 | **iPhone PWA ៖ ស្វែងរកលេខ ➜ «⋯» ➜ ស្វែងរក ➜ ទំព័រលោត** (វីដេអូ IMG_1101) | Claude ៖ រូប ១០ fps ៖ ស្វែងរក (ទាញឡើង · keyboard) ➜ ចុច «⋯» ➜ keyboard បិទ · ផ្ទាំងចុះ ➜ ម៉ឺនុយបើក (ចុចលើកទី ២) ➜ ម៉ឺនុយបិទ ➜ ស្វែងរក focus ➜ ទំព័រលោតឡើង ~៣០០px ហើយនៅជាប់ · ករណីមួយទៀត ៖ ស្វែងរកធម្មតា ➜ លោតចុះ · Chromium (touch ៣៩០×៨៤៤) ៖ ស្ថានភាព App (`search-focus` · `scrollY` ០ · `#appPages` ០ · ទីតាំងប្រអប់ ៩២) ដូចគ្នាបេះបិទរវាងការចុចធម្មតា និងក្រោយ «⋯» ➜ មូលហេតុនៅ iOS · កូដ ៖ `scrollWindowToTop()` តែលើ `visualViewport` `resize` | ត្រឡប់ document ទៅ ០ លើ `scroll` ខណៈស្វែងរកទាញឡើង (iOS standalone) · ⚠️ ត្រូវសាកលើ iPhone |
+
+### 2026-10-08 — Password manager · Private Key ចម្លង ➜ [2.50.41]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A43 | **Password manager · Private Key ចម្លង** (សំណើម្ចាស់គម្រោង) | Claude ៖ `layout-check` ZoeKeyGen មុនកែ ៖ Private Key = `TEXTAREA` · `sbAdminPasswordInput` មិននៅក្នុង form · គ្មាន `name` · `LoginModal` ZoeW មុនកែ ៖ autocomplete ត្រឹមត្រូវ តែគ្មាន `name` · `license-verify.js` ពិតក្នុង Node WebCrypto ៖ `generateKeyPair()` ➜ `JSON.stringify` ➜ `JSON.parse` ➜ `signNewKey` ➜ `verifyKeyString` = `{valid:false, reason:'signature'}` (មិនផ្គូផ្គង Public Key ដែល ship) · normalizer មុនកែ FAIL ១១ (smart quotes · ZWSP · អត្ថបទជុំវិញ ➜ «មិនត្រឹមត្រូវ» + Sentry) | form + username លាក់ + `name` · normalizer · សារ Deploy |
+
+### 2026-10-08 — ក្រយៅដៃ web លើ Android ➜ [2.50.40]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A42 | **Android PWA ៖ ក្រយៅដៃ «មិនគាំទ្រ PRF» ក្លែងក្លាយ** (រូបពីម្ចាស់គម្រោង) | Claude ៖ ប្រៀបធៀប ZoeW ↔ ZoeKeyGen ៖ ZoeKeyGen `residentKey: 'required'` + PRF ពី `create()` + `prf: {}` ➜ `get()` (កែរួច) · ZoeW `residentKey: 'discouraged'` + ទាមទារ `prf.enabled` + ចាប់ការបោះបង់ជា «មិនគាំទ្រ» · WebAuthn ក្លែងតាម Android ➜ មុនកែ FAIL ៥/៦ | ផ្ទេរការកែរបស់ ZoeKeyGen · function PRF ៣ ដូចគ្នាបេះបិទ |
+
+### 2026-10-08 — សំណើម្ចាស់គម្រោង ៖ 🔔 ក្រុមពន្លា ➜ [2.50.39]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A41 | **🔔 ក្រុមពន្លា** (សំណើម្ចាស់គម្រោង) · «ថ្មី» 📤 លើស ៦០ ជួរ | Claude ៖ `notifications.ts` ពិត ៖ ធាតុធុងសំរាម `expired` ៧០ ➜ `markNotifyRemovedSeen()` ៣ ដង ➜ `unseen` ១០ · ១០ · ១០ (រាប់តែ ៦០ ជួរដែលបង្ហាញ ➜ លេខក្រហមជាប់រហូត) · `layout-check` មុនកែ ៖ គ្មានក្បាលក្រុម · ៥០ ជួរគូរភ្លាមពេលបើក | `DrawerGroup` រួម + `lazy` · ទំព័រ ២០ លើគ្រប់ជួរ · «ថ្មី» រាប់តែពេលក្រុមពន្លា |
+
+- ការវាស់ «រមូរដល់ចុង» ដំបូង (`scrollTop = scrollHeight`) លោតហួស sentinel ក្នុងស៊ុមតែមួយ (sentinel ពី ១៤៤៩ ➜ −៣៣៨ px) ➜ IntersectionObserver មិនឃើញការប្រសព្វ ➜ artifact ការវាស់ (អ្នកប្រើរមូរជាបន្តបន្ទាប់ + ប៊ូតុង «បង្ហាញ … ទៀត») ➜ `scrollIntoView` sentinel។
+- ស្លាក «ថ្មី N» នៅក្បាល ៖ ៣២០px ➜ ឈ្មោះក្រុមនៅសល់ ២៦% នៃក្បាល (`gap` ១០px របស់ ☰) ➜ `gap: 6px` តែក្នុង 🔔 (`.notify-group > .drawer-group-head`) ➜ ≥ ៣០%។
+
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ០ (ឯកសារ · គ្មាន bump)
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4491,6 +4632,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/app-icon-logo.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -4505,6 +4647,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |
@@ -4514,6 +4657,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
 | `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/login-autofill.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-over-drawer.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-routing.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/lookup-import-race.test.ts` | ផ្នែក ២ | — |
@@ -4531,6 +4675,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/network-toast.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pwa-icons.test.ts` | ផ្នែក ១ | — |

@@ -77,15 +77,20 @@
             ចង់ចៀសវាង Paste ម្តងទៀតរាល់ពេល Reload/Multitasking? ជ្រើសរើសខាងក្រោម (ត្រូវការ PIN ដើម្បីការពារ)។
         </div>
 
-        <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON)</label>
-        <textarea id="privateKeyInput" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'></textarea>
-        <label style="display:flex; align-items:center; gap:6px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
-            <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
-            🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
-        </label>
+        <form id="signingKeyForm" data-act="loadSigningKey" data-evt="1" data-on="submit">
+            <input type="text" id="signingKeyUsername" class="hidden" name="username" autocomplete="username" value="ZoeKeyGen Signing Key" readonly tabindex="-1" aria-hidden="true">
+            <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON) ឬបំពេញពី Password Manager</label>
+            <input type="password" id="privateKeyInput" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'>
+            <label style="display:flex; align-items:center; gap:6px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
+                <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
+                🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
+            </label>
+            <div class="btn-row mb-8">
+                <button type="submit" class="btn-primary" id="loadSigningKeyBtn">📥 Load Key</button>
+            </div>
+        </form>
         <div class="btn-row mb-8">
-            <button class="btn-primary" data-act="loadSigningKey">📥 Load Key</button>
-            <button class="btn-secondary" data-act="clearSigningKey">🗑️ សម្អាត</button>
+            <button type="button" class="btn-secondary" data-act="clearSigningKey">🗑️ សម្អាត</button>
         </div>
 
         <details>
@@ -211,6 +216,7 @@ const firebaseConfig = {
             ➜ គណនីចងនឹងហាង និងសាខាដោយស្វ័យប្រវត្តិ។ ចូលដោយគណនី Admin របស់ Supabase
             (តារាង <code>platform_admins</code>)។ ⛔ ប្រើតែ <b>Publishable key</b> — ហាមដាក់ Secret key ទីនេះ។
         </div>
+        <form id="sbAdminForm" data-act="sbAdminLogin" data-evt="1" data-on="submit">
         <div class="form-grid">
             <div class="col-half">
                 <label for="sbAdminUrlInput">Supabase URL</label>
@@ -222,16 +228,19 @@ const firebaseConfig = {
             </div>
             <div class="col-half">
                 <label for="sbAdminEmailInput">អ៊ីមែល Admin (Supabase)</label>
-                <input type="email" id="sbAdminEmailInput" autocomplete="username">
+                <input type="email" id="sbAdminEmailInput" name="username" autocomplete="username">
             </div>
             <div class="col-half">
                 <label for="sbAdminPasswordInput">ពាក្យសម្ងាត់ Admin</label>
-                <input type="password" id="sbAdminPasswordInput" autocomplete="current-password">
+                <input type="password" id="sbAdminPasswordInput" name="password" autocomplete="current-password">
             </div>
         </div>
         <div class="btn-row">
-            <button class="btn-primary" id="sbAdminLoginBtn" data-act="sbAdminLogin">🔐 ចូល Supabase ជា Admin</button>
-            <button class="btn-secondary hidden" id="sbAdminLogoutBtn" data-act="sbAdminLogout">🚪 ចាកចេញ Supabase</button>
+            <button type="submit" class="btn-primary" id="sbAdminLoginBtn">🔐 ចូល Supabase ជា Admin</button>
+        </div>
+        </form>
+        <div class="btn-row">
+            <button type="button" class="btn-secondary hidden" id="sbAdminLogoutBtn" data-act="sbAdminLogout">🚪 ចាកចេញ Supabase</button>
         </div>
         <div id="sbAdminPanel" class="hidden">
             <label>➕ ហាងថ្មី</label>
@@ -379,8 +388,8 @@ const firebaseConfig = {
         <h3>🔐 ចូលប្រើប្រាស់ ZoeKeyGen</h3>
         <p>តម្រូវឲ្យប្រើគណនី Admin របស់ License Project</p>
         <form id="loginForm" data-act="blockFormSubmit" data-evt="1" data-on="submit">
-            <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល" required autocomplete="username">
-            <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
+            <input type="email" id="loginEmailInput" name="username" placeholder="អ៊ីមែល" required autocomplete="username">
+            <input type="password" id="loginPasswordInput" name="password" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
             <label class="remember-container">
                 <input type="checkbox" id="rememberMeCheckbox">
                 <span>ចងចាំអ៊ីមែលតែប៉ុណ្ណោះ (មិនចងចាំការចូល)</span>
@@ -398,7 +407,8 @@ const firebaseConfig = {
         <h3>🆕 Keypair ថ្មីត្រូវបានបង្កើត</h3>
         <div class="danger-box" style="text-align:left;">
             រក្សាទុក Private Key ខាងក្រោមឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។ វានឹងបាត់បង់ជារៀងរហូតបើអ្នកបិទប្រអប់នេះ
-            ដោយមិនបានចម្លងទុក! កុំដាក់វាចូល Git ឬបញ្ជូនតាម Chat/Email ធម្មតាឡើយ។
+            ដោយមិនបានចម្លងទុក! កុំដាក់វាចូល Git ឬបញ្ជូនតាម Chat/Email ធម្មតាឡើយ។ Private Key ថ្មីនេះ Load មិនបានរហូតដល់ Public Key ខាងក្រោម
+            ត្រូវដាក់ក្នុង license-verify.js របស់ App ទាំងអស់ ហើយ Deploy។
         </div>
         <label style="text-align:left;">Private Key (សម្ងាត់ — កុំចែក)</label>
         <textarea id="newPrivateKeyOutput" readonly style="min-height:90px;"></textarea>

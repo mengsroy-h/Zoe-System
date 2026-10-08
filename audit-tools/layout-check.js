@@ -277,11 +277,41 @@ async function notifyRowLayout(browser, port) {
     check(ready, 'ZoeW ជួរ 🔔 ៖ មាន uiState (audit build)');
     if (!ready) { await ctx.close(); return; }
     const LOCKER = 'ទូ A-12 · ជាន់ទី ៣ · ច្រកខាងឆ្វេង';
-    await page.evaluate((locker) => {
+    const ROWS = 50;
+    await page.evaluate(({ locker, n }) => {
         const rows = [{ key: 'r1', phone: '0961234567', locker, count: 12, isNew: true, hoursAgo: 3 }];
-        window.uiState.notifyRemovedView = { measurable: true, emptyText: '', packages: 12, customers: 1, unseen: 12, rows, more: 0 };
+        for (let i = 1; i < n; i++) rows.push({ key: 'r' + (i + 1), phone: '09700' + String(10000 + i), locker: 'B-' + i, count: 1, isNew: false, hoursAgo: 4 + i });
+        window.uiState.notifyRemovedView = { measurable: true, emptyText: '', packages: 11 + n, customers: n, unseen: 12, rows };
         window.uiState.notifyDrawerOpen = true;
-    }, LOCKER);
+    }, { locker: LOCKER, n: ROWS });
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ «📤 កញ្ចប់ដែលដករួច» ជាក្រុមពន្លាដូច category ក្នុង ☰ ៖ បិទជាលំនាំដើម · ក្បាល (រូប · ឈ្មោះ · ចំនួន · «ថ្មី» · ព្រួញ)
+    //    មិនលើស ហើយមិនគាបឈ្មោះលើទូរស័ព្ទ ៣២០ · ៤១២ · ចុចពន្លា ➜ បញ្ជីទំព័រ ២០ · រមូរ `.drawer-body` (ធាតុដែលរមូរពិត) ដល់ចុង ➜ ទាញទំព័របន្ទាប់។
+    const heads = [];
+    for (const w of [320, 412]) {
+        await page.setViewportSize({ width: w, height: 900 });
+        await page.waitForTimeout(300);
+        heads.push(await page.evaluate(() => {
+            const h = document.getElementById('notifyRemovedHead');
+            const d = document.getElementById('notifyDrawer');
+            if (!h || !d) return null;
+            const label = h.querySelector('.drawer-group-label');
+            const count = h.querySelector('.notify-group-count');
+            const tag = h.querySelector('.notify-new-tag');
+            const hr = h.getBoundingClientRect(), dr = d.getBoundingClientRect();
+            return { w: window.innerWidth, expanded: h.getAttribute('aria-expanded'), list: !!document.getElementById('notifyRemovedList'),
+                count: count ? count.textContent : null, tag: tag ? tag.textContent : null, countW: count ? count.getBoundingClientRect().width : 0,
+                labelW: label ? label.getBoundingClientRect().width : 0, labelCut: label ? label.scrollWidth > label.clientWidth + 1 : true,
+                headCut: h.scrollWidth > h.clientWidth + 1, inside: hr.left >= dr.left - 1 && hr.right <= dr.right + 1, headW: hr.width };
+        }));
+    }
+    check(heads.every((x) => x && x.expanded === 'false' && !x.list),
+        '⛔ ZoeW ក្រុម 🔔 ៖ «កញ្ចប់ដែលដករួច» បិទជាលំនាំដើម (aria-expanded=false · គ្មានបញ្ជី)', JSON.stringify(heads));
+    check(heads.every((x) => x && x.count === String(11 + ROWS) && x.tag && x.countW >= 16),
+        'ZoeW ក្រុម 🔔 ៖ ក្បាលបង្ហាញចំនួនកញ្ចប់ និង «ថ្មី»', JSON.stringify(heads));
+    check(heads.every((x) => x && !x.headCut && x.inside && !x.labelCut && x.labelW >= x.headW * 0.3),
+        '⛔ ZoeW ក្រុម 🔔 ៖ ក្បាលមិនលើសផ្ទាំង · ឈ្មោះក្រុមមិនកាត់ ឬគាបតូច (៣២០ · ៤១២)', JSON.stringify(heads));
+    if (await page.$('#notifyRemovedHead')) await page.click('#notifyRemovedHead');
+    await page.waitForTimeout(300);
     const seen = [];
     for (const w of [320, 412]) {
         await page.setViewportSize({ width: w, height: 900 });
@@ -302,6 +332,16 @@ async function notifyRowLayout(browser, port) {
     check(seen.every((s) => s && s.metaW >= s.rowW * 0.4),
         '⛔ ZoeW ជួរ 🔔 ៖ ព័ត៌មាន (ចំនួន · Locker) មិនត្រូវគាបតូច (≥ ៤០% នៃជួរ ៖ បត់ចុះបន្ទាត់ថ្មីពេលមិនគ្រប់)', JSON.stringify(seen));
     check(seen.every((s) => s && s.rowInside), 'ZoeW ជួរ 🔔 ៖ ជួរនៅក្នុងផ្ទាំង (មិនលើស)', JSON.stringify(seen));
+    await page.setViewportSize({ width: 412, height: 700 });
+    await page.waitForTimeout(500);
+    const rowsNow = () => page.evaluate(() => document.querySelectorAll('#notifyRemovedList .notify-expiry-row').length);
+    const first = await rowsNow();
+    await page.evaluate(() => { const m = document.querySelector('#notifyDrawer .notify-page-more'); if (m) m.scrollIntoView({ block: 'end' }); });
+    await page.waitForTimeout(600);
+    const second = await rowsNow();
+    check(first === 20 && second === 40,
+        '⛔ ZoeW ក្រុម 🔔 ៖ ពន្លា ➜ ២០ ជួរ · រមូរ `.drawer-body` ដល់ចុងបញ្ជី ➜ ៤០ (sentinel សង្កេតធាតុដែលរមូរពិត · មិនទាញគ្រប់ទំព័រភ្លាម)',
+        JSON.stringify({ first, second, total: ROWS }));
     // ⛔ សំណើម្ចាស់គម្រោង ៖ ផ្ទាំង 🔔 លើកុំព្យូទ័រ (≥ 992px) ធំជាងទូរស័ព្ទបន្តិច · ទូរស័ព្ទ និង ☰ មិនប្រែ
     const widths = [];
     for (const w of [412, 1280]) {
@@ -317,6 +357,65 @@ async function notifyRowLayout(browser, port) {
     check(phoneW.notify === 320 && phoneW.side === 320, 'ZoeW ផ្ទាំង 🔔 ៖ ទូរស័ព្ទ ៤១២ ➜ ទទឹងដូចដើម (៣២០ · ☰ ៣២០)', JSON.stringify(widths));
     check(deskW.notify >= 380 && deskW.notify <= 440 && deskW.side === 320,
         '⛔ ZoeW ផ្ទាំង 🔔 ៖ កុំព្យូទ័រ ១២៨០ ➜ ធំជាងទូរស័ព្ទ (៣៨០–៤៤០px) · ☰ មិនប្រែ', JSON.stringify(widths));
+    await ctx.close();
+}
+
+// ⛔ សំណើម្ចាស់គម្រោង ៖ ZoeKeyGen ៖ ប្រអប់ចូលប្រព័ន្ធ · ចូល Supabase Admin · Private Key ត្រូវឲ្យ Google Password Manager និង iOS Passwords ស្គាល់ ៖
+//    ពាក្យសម្ងាត់នីមួយៗ (`current-password` · `new-password`) នៅក្នុង `<form>` មានប៊ូតុង submit · មុនវាមានប្រអប់ `autocomplete="username"` (Private Key ៖ username
+//    លាក់ «ZoeKeyGen Signing Key» ➜ entry ដាច់ពីគណនី Admin) · មាន `name` · Private Key ជា `<input type="password">` (password manager មិនបំពេញ `<textarea>`) ·
+//    submit (Enter) ដំណើរការសកម្មភាពពិត ហើយ ⛔ មិនបញ្ជូន form តាម URL (`?username=…&password=…`) · ទិសផ្ទុយ ៖ PIN មិនមែនពាក្យសម្ងាត់ (`autocomplete="off"`)។
+async function keygenPasswordForms(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    const dialogs = [];
+    page.on('dialog', (d) => { dialogs.push(d.message()); d.dismiss().catch(() => {}); });
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const audit = await page.evaluate(() => {
+        const out = { ids: [], problems: [], pk: null, pins: [] };
+        const pw = Array.from(document.querySelectorAll('input[type="password"]'));
+        for (const p of pw) {
+            const ac = p.getAttribute('autocomplete') || '';
+            if (ac !== 'current-password' && ac !== 'new-password') { out.pins.push(p.id + ':' + ac); continue; }
+            out.ids.push(p.id);
+            if (!p.getAttribute('name')) out.problems.push(p.id + ' គ្មាន name');
+            const form = p.closest('form');
+            if (!form) { out.problems.push(p.id + ' មិននៅក្នុង form'); continue; }
+            if (!form.querySelector('button[type="submit"]')) out.problems.push(p.id + ' form គ្មានប៊ូតុង submit');
+            const fields = Array.from(form.querySelectorAll('input'));
+            const user = fields.slice(0, fields.indexOf(p)).find((f) => f.getAttribute('autocomplete') === 'username');
+            if (!user) out.problems.push(p.id + ' គ្មាន username មុនវា');
+            else if (!user.getAttribute('name')) out.problems.push(user.id + ' គ្មាន name');
+        }
+        const pk = document.getElementById('privateKeyInput');
+        const pkForm = pk && pk.closest('form');
+        const pkUser = pkForm && pkForm.querySelector('input[autocomplete="username"]');
+        out.pk = pk ? { tag: pk.tagName, type: pk.getAttribute('type'), ac: pk.getAttribute('autocomplete'), user: pkUser ? pkUser.value : null } : null;
+        return out;
+    });
+    const want = ['loginPasswordInput', 'sbAdminPasswordInput', 'privateKeyInput'];
+    check(want.every((id) => audit.ids.indexOf(id) !== -1),
+        '⛔ ZoeKeyGen password manager ៖ ពាក្យសម្ងាត់ ៣ (ចូលប្រព័ន្ធ · Supabase Admin · Private Key) ជា current-password', JSON.stringify(audit));
+    check(audit.ids.length >= 3 && audit.problems.length === 0,
+        '⛔ ZoeKeyGen password manager ៖ ពាក្យសម្ងាត់នីមួយៗនៅក្នុង form + submit + username មុនវា + name', JSON.stringify(audit.problems));
+    check(!!audit.pk && audit.pk.tag === 'INPUT' && audit.pk.type === 'password' && audit.pk.user === 'ZoeKeyGen Signing Key',
+        '⛔ ZoeKeyGen Private Key ៖ <input type="password"> + username លាក់ «ZoeKeyGen Signing Key» (មិនមែន <textarea>)', JSON.stringify(audit.pk));
+    check(audit.pins.length >= 2 && audit.pins.every((x) => /:off$/.test(x)),
+        'ZoeKeyGen ៖ ទិសផ្ទុយ ៖ PIN មិនមែនពាក្យសម្ងាត់ (autocomplete="off")', JSON.stringify(audit.pins));
+    const url0 = page.url();
+    for (const [formId, label] of [['signingKeyForm', 'Private Key'], ['sbAdminForm', 'Supabase Admin']]) {
+        const before = dialogs.length;
+        const sent = await page.evaluate((id) => {
+            const f = document.getElementById(id);
+            if (!f || typeof f.requestSubmit !== 'function') return false;
+            f.requestSubmit();
+            return true;
+        }, formId);
+        await page.waitForTimeout(300);
+        check(sent && dialogs.length > before && page.url() === url0,
+            '⛔ ZoeKeyGen ' + label + ' ៖ submit (Enter) ➜ សកម្មភាពពិតរត់ · ⛔ មិនបញ្ជូនតាម URL', JSON.stringify({ sent, dialogs: dialogs.slice(before), url: page.url() }));
+    }
     await ctx.close();
 }
 
@@ -920,6 +1019,7 @@ async function historyRowLayout(browser, port) {
             await notifyRowLayout(browser, port);
             await pinEnterSubmits(browser, port);
         }
+        if (app === 'ZoeKeyGen') await keygenPasswordForms(browser, port);
 
         server.close();
     }

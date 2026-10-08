@@ -161,7 +161,7 @@ function makeEnv(opts) {
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'purgeLegacyBiometricRecord', 'clearBiometricRecord',
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
-        'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
+        'biometricPrfFirst', 'biometricPrfEval', 'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',
         'initBiometricUi', 'completePinUnlock',
         'noteAppLockExcuse'

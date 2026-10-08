@@ -108,21 +108,28 @@ export async function unwrapPinWithRawKey(wrapped, rawKey) {
     }
 }
 
+export function biometricPrfFirst(results) {
+    const first = results && results.prf && results.prf.results && results.prf.results.first;
+    return first ? new Uint8Array(first) : null;
+}
+
+export async function biometricPrfEval(credentialId) {
+    const assertion = await navigator.credentials.get({
+        publicKey: {
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            rpId: window.location.hostname,
+            allowCredentials: [{ type: 'public-key', id: b64ToBytes(credentialId), transports: ['internal'] }],
+            userVerification: 'required',
+            timeout: 60000,
+            extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
+        }
+    });
+    return biometricPrfFirst(assertion && (assertion as any).getClientExtensionResults());
+}
+
 export async function biometricPrfBytes(credentialId) {
     try {
-        const assertion = await navigator.credentials.get({
-            publicKey: {
-                challenge: crypto.getRandomValues(new Uint8Array(32)),
-                rpId: window.location.hostname,
-                allowCredentials: [{ type: 'public-key', id: b64ToBytes(credentialId), transports: ['internal'] }],
-                userVerification: 'required',
-                timeout: 60000,
-                extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
-            }
-        });
-        const results: any = assertion && (assertion as any).getClientExtensionResults();
-        const first = results && results.prf && results.prf.results && results.prf.results.first;
-        return first ? new Uint8Array(first) : null;
+        return await biometricPrfEval(credentialId);
     } catch (e) {
         return null;
     }
@@ -147,8 +154,8 @@ export async function enrollBiometricRecord(pin) {
             authenticatorSelection: {
                 authenticatorAttachment: 'platform',
                 userVerification: 'required',
-                residentKey: 'discouraged',
-                requireResidentKey: false
+                residentKey: 'required',
+                requireResidentKey: true
             },
             timeout: 60000,
             attestation: 'none',
@@ -163,8 +170,8 @@ export async function enrollBiometricRecord(pin) {
     } catch (e) {
         ext = {};
     }
-    if (!ext.prf || !ext.prf.enabled) return null;
-    const rawKey = await biometricPrfBytes(credentialId);
+    if (!ext.prf || ext.prf.enabled === false) return null;
+    const rawKey = biometricPrfFirst(ext) || await biometricPrfEval(credentialId);
     if (!rawKey) return null;
     return { mode: 'prf', credentialId, wrapped: await wrapPinWithRawKey(pin, rawKey) };
 }
@@ -251,7 +258,7 @@ export async function startBiometricEnrollment(verifiedPin) {
     try {
         const rec = await enrollBiometricRecord(verifiedPin);
         if (!rec) {
-            showToast('❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — ឧបករណ៍ ឬកម្មវិធីរុករកនេះមិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស។');
+            showToast('❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ — ឧបករណ៍ ឬកម្មវិធីរុករកនេះមិនគាំទ្រការការពារ PIN ដោយជីវមាត្រ (WebAuthn PRF) ➜ សូមប្រើ PIN ជំនួស។ លើ Android ៖ រក្សា passkey ក្នុង Google Password Manager ឬប្រើ App ZoeW សម្រាប់ Android។');
             return;
         }
         if (!writeBiometricRecord(rec)) {

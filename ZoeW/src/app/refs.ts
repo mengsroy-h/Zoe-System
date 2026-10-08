@@ -184,6 +184,11 @@ export function activeElementIsTextField(): boolean {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
+export function activeElementIsInModal(): boolean {
+    const el = document.activeElement as HTMLElement | null;
+    return !!el && typeof el.closest === 'function' && !!el.closest('.modal');
+}
+
 export function blurActiveElement(): void {
     const el = document.activeElement as HTMLElement | null;
     if (el && typeof el.blur === 'function') el.blur();

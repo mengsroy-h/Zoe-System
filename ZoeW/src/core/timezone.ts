@@ -1,4 +1,4 @@
-import { activeElementIsTextField, focusFieldAsIs } from '../app/refs';
+import { activeElementIsInModal, activeElementIsTextField, focusFieldAsIs } from '../app/refs';
 import { securityState, uiState } from './state';
 import { getServerNow } from './clock';
 
@@ -97,7 +97,7 @@ export function isMobileDevice() {
 export function safeFocusScanner() {
     if (securityState.appIsLocked) return;
     if (!uiState.isModalOpen && !isMobileDevice()) {
-        if (activeElementIsTextField()) {
+        if (activeElementIsTextField() && !activeElementIsInModal()) {
             return;
         }
         focusFieldAsIs('hwScannerInput');

@@ -137,6 +137,46 @@ ok('⛔ សិទ្ធិ ACCESS_NETWORK_STATE ៖ WebView ផ្តល់ navi
     onlineUsers.length > 0 && manifestPermissions.has('android.permission.ACCESS_NETWORK_STATE'),
     'ឯកសារដែលពឹង onLine ' + onlineUsers.length + ' · សិទ្ធិ ' + [...manifestPermissions].join(','));
 
+/* ── ៣ខ. ធ្វើបច្ចុប្បន្នភាព APK ក្នុង App (`ZoeApkUpdate`) ──────────────────────
+ * ⛔ សំណើម្ចាស់គម្រោង ៖ link ក្រៅ App ទាញចប់ តែគ្មានអ្វីលោតឲ្យដំឡើង · ប៊ូតុងបង្ហាញមុន Release ពិតមាន (workflow កំពុង build ➜ 404)។
+ *    plugin ក្នុង App ៖ `probe` = HEAD មិនតាម redirect (GitHub ៖ មាន ➜ 302 ទៅ *.githubusercontent.com · គ្មាន ➜ 404 · HEAD លើ
+ *    URL ចុះហត្ថលេខា ➜ 401 ដូច្នេះមិនតាម) · `download` ក្នុង cache ➜ ផ្ទៀង package + versionName · `install` ៖ សិទ្ធិ
+ *    REQUEST_INSTALL_PACKAGES (Android 8+ ៖ គ្មានវា ➜ canRequestPackageInstalls() = false ជានិច្ច) ➜ FileProvider ➜ ផ្ទាំងដំឡើងរបស់ Android។ */
+const apkPluginSrc = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/ApkUpdatePlugin.java`);
+const apkJsSrc = read('src/features/apk-update.ts');
+const apkPluginName = (apkPluginSrc.match(/@CapacitorPlugin\(name = "(\w+)"\)/) || [])[1] || '';
+ok('ជាន់អប្បបរមា ៖ អាន ApkUpdatePlugin.java · src/features/apk-update.ts', apkPluginSrc.length > 2000 && apkJsSrc.length > 1000, apkPluginSrc.length + ' · ' + apkJsSrc.length);
+ok('ឈ្មោះ plugin Java ស្មើ APK_PLUGIN_NAME ក្នុង JS', !!apkPluginName && apkJsSrc.includes(`export const APK_PLUGIN_NAME = '${apkPluginName}';`), apkPluginName);
+const createBody = javaMethodBody(mainActivity, 'void onCreate(');
+ok('MainActivity ៖ registerPlugin(ApkUpdatePlugin.class) មុន super.onCreate (Bridge ផ្ទុក plugin ក្នុង onCreate)',
+    /registerPlugin\(ApkUpdatePlugin\.class\);\s*super\.onCreate\(/.test(createBody));
+ok('⛔ សិទ្ធិ REQUEST_INSTALL_PACKAGES (Android 8+ ៖ បើកផ្ទាំងដំឡើង APK ពី App)', manifestPermissions.has('android.permission.REQUEST_INSTALL_PACKAGES'));
+const probeBody = javaMethodBody(apkPluginSrc, 'void probe(');
+ok('probe ៖ HEAD · មិនតាម redirect · មាន = redirect ទៅ *.githubusercontent.com (https) · 404 = គ្មាន',
+    /setInstanceFollowRedirects\(false\)/.test(probeBody) && /setRequestMethod\("HEAD"\)/.test(probeBody) && /assetLocation\(/.test(probeBody) &&
+    /HTTP_NOT_FOUND/.test(probeBody) && /"\.githubusercontent\.com"/.test(apkPluginSrc) && /"https"\.equals\(url\.getProtocol\(\)\)/.test(javaMethodBody(apkPluginSrc, 'boolean assetLocation(')));
+ok('probe · download ៖ ពេលកំណត់ connect · read (បណ្តាញស្លាប់មិនជាប់)', (apkPluginSrc.match(/setConnectTimeout\(CONNECT_TIMEOUT_MS\)/g) || []).length === 2 &&
+    (apkPluginSrc.match(/setReadTimeout\(READ_TIMEOUT_MS\)/g) || []).length === 2);
+const fetchBody = javaMethodBody(apkPluginSrc, 'void fetch(');
+ok('download ៖ សរសេរ .part ក្នុង cache ➜ ពេញ (Content-Length) ➜ ប្តូរឈ្មោះ ➜ ផ្ទៀង package + versionName (ទំព័រ HTML/ឯកសារខូចមិនដល់ផ្ទាំងដំឡើង)',
+    /getCacheDir\(\)/.test(apkPluginSrc) && /PART_SUFFIX/.test(fetchBody) && /received != total/.test(fetchBody) && /renameTo\(target\)/.test(fetchBody) &&
+    /apkMatches\(target, version\)/.test(fetchBody) && /getPackageArchiveInfo\(/.test(apkPluginSrc) &&
+    /getPackageName\(\)\.equals\(info\.packageName\)/.test(apkPluginSrc) && /version\.equals\(info\.versionName\)/.test(apkPluginSrc));
+ok('FileProvider ៖ cache-path គ្របថត apk-update', /<cache-path[^>]*path="\."/.test(read('android/app/src/main/res/xml/file_paths.xml')));
+const installBody = javaMethodBody(apkPluginSrc, 'void install(') + javaMethodBody(apkPluginSrc, 'void openInstaller(');
+ok('install ៖ សិទ្ធិ «ដំឡើង App មិនស្គាល់» ➜ Settings តាម startActivityForResult · authority = manifest ${applicationId}.fileprovider · ACTION_VIEW + MIME APK + អនុញ្ញាតអាន',
+    /canRequestPackageInstalls\(\)/.test(installBody) && /ACTION_MANAGE_UNKNOWN_APP_SOURCES/.test(installBody) && /startActivityForResult\(call, settings, "installPermissionResult"\)/.test(installBody) &&
+    /@ActivityCallback\s+private void installPermissionResult\(PluginCall call, ActivityResult result\)/.test(apkPluginSrc) &&
+    /getPackageName\(\) \+ "\.fileprovider"/.test(installBody) && manifest.includes('android:authorities="${applicationId}.fileprovider"') &&
+    /Intent\.ACTION_VIEW/.test(installBody) && /setDataAndType\(uri, APK_MIME\)/.test(installBody) && /"application\/vnd\.android\.package-archive"/.test(apkPluginSrc) &&
+    /FLAG_GRANT_READ_URI_PERMISSION/.test(installBody));
+const jsMethods = new Set([...apkJsSrc.matchAll(/\bAU\.(\w+)\(/g)].map((m) => m[1]).filter((m) => m !== 'addListener'));
+const javaMethods = new Set([...apkPluginSrc.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]));
+const missingJava = [...jsMethods].filter((m) => !javaMethods.has(m));
+ok('JS ហៅតែ method ដែល Java មាន @PluginMethod', jsMethods.size >= 4 && !missingJava.length, [...jsMethods].join(',') + ' ➜ ខ្វះ ' + missingJava.join(','));
+ok('plugin Java ផ្ញើ progress ជា event «progress» ដែល JS ស្តាប់', /notifyListeners\("progress", data\)/.test(apkPluginSrc) && /AU\.addListener\('progress'/.test(apkJsSrc));
+ok('Java គ្មាន comment (កូដដែលដឹកជញ្ជូន)', !/\/\/|\/\*/.test(apkPluginSrc.replace(/"(?:[^"\\]|\\.)*"/g, '""')), 'ApkUpdatePlugin.java');
+
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 let iconCount = 0;

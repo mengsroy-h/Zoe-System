@@ -45,9 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.38 · ZoeKeyGen 2.24.8** ៖ PR #288 ➜ #301 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301)។
-   Branch `claude/optimistic-darwin-6cqgfh` (**មិនទាន់ merge**) ៖ [2.50.39] 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង) · [2.50.40] ក្រយៅដៃ PWA លើ Android ·
-   [2.50.41] · ZoeKeyGen 2.24.9 password manager + Private Key ចម្លង · [2.50.42] iPhone ស្វែងរកលេខលោតទំព័រ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+1. **`main`** = **ZoeW 2.50.42 · ZoeKeyGen 2.24.9** ៖ PR #288 ➜ #302 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301 ·
+   [2.50.39]–[2.50.42] = PR #302)។ Branch `claude/optimistic-darwin-6cqgfh` (ចាប់ផ្តើមថ្មីពី `main` · **មិនទាន់ merge**) ៖ [2.50.43] ទាញ APK ក្នុង App ·
+   ប៊ូតុងតែពេល Release ពិតមាន។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -72,10 +72,11 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
-- ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
-- ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
-- ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Merge ➜ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.42 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ (PR #302 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ZoeW ➜ iPhone ៖ ស្វែងរក ➜ «⋯» ➜ ស្វែងរក ៥ ដង · ស្វែងរកធម្មតា ៥ ដង ➜ មិនលោត ([2.50.42] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (PR #302 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.40 — ក្រយៅដៃ PWA លើ Android (PR #302 merge រួច)** ៖ Deploy ZoeW ➜ Android Chrome PWA ៖ 🔐 ចងក្រយៅដៃ ➜ ✅ · ដោះសោដោយក្រយៅដៃ · iPhone PWA ចងម្តងទៀត ([2.50.40] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.39 — 🔔 ក្រុមពន្លា (សំណើម្ចាស់គម្រោង · PR #302 merge រួច)** ៖ Deploy ZoeW + APK ➜ 🔔 ៖ ក្រុមបិទ · ពន្លា · ទាញបន្ថែម · ចងចាំ · «ថ្មី» 📤 ([2.50.39] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.34–2.50.38 — ជុំ ១៥ (UI · NATIVE · សំណើម្ចាស់គម្រោង · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២) · APK ៖ ប្រអប់សិទ្ធិ · Back លើប្រអប់ចូល · keyboard · របា navigation · Dark theme ([2.50.37] សកម្មភាព ២–៣) · 🔔 link APK · 🔔 កុំព្យូទ័រ ([2.50.38] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · PR #301 merge រួច)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · PR #301 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
@@ -118,6 +119,39 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.43] — 2026-10-08 · ZoeW (APK) ៖ **ទាញ APK ថ្មីក្នុង App ➜ ផ្ទាំងដំឡើង · ប៊ូតុងតែពេល Release ពិតមាន** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.43`** (`zoew-v305` ➜ `zoew-v306`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · Android ៖ plugin ក្នុង App ថ្មី `ZoeApkUpdate` (`ApkUpdatePlugin.java`) + សិទ្ធិ `REQUEST_INSTALL_PACKAGES` ➜ មានតែក្នុង APK ដែល build ពីកំណែនេះ · web/PWA មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🆕 **🔔 «📱 កំណែ App» លើ APK ៖ ទាញ APK ក្នុង App** ៖ link ចាស់បើក browser ក្រៅ ➜ ទាញចប់ តែគ្មានអ្វីលោតឲ្យដំឡើង (រាយការណ៍ម្ចាស់គម្រោង)។ ឥឡូវប៊ូតុង
+  «📥 ទាញយក និងដំឡើង APK កំណែ X» ទាញក្នុង App (របារីកចម្រើន % · MB · ✖️ បោះបង់) ➜ ផ្ទាំងដំឡើងរបស់ Android លោតឡើង។ លើកដំបូង Android សួរ «អនុញ្ញាតពីប្រភពនេះ»
+  (Install unknown apps) ➜ បើក ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត។ បរាជ័យ (បណ្តាញ · ឯកសារមិនពេញ · ទំហំផ្ទុក · ឈប់រីក ៤៥ វិ.) ➜ សារច្បាស់ ➜ ចុចម្តងទៀតបាន ·
+  ចេញពី App ទៅ Settings/ផ្ទាំងដំឡើង ➜ ត្រឡប់មកមិនសុំ PIN។
+- 🐛 **ប៊ូតុងបង្ហាញមុន APK ចេញ ➜ 404** (រាយការណ៍ម្ចាស់គម្រោង) ៖ Netlify ចេញ feed កំណែថ្មីភ្លាម ខណៈ workflow នៅ build APK · Release ដែលលុបចោល (2.50.41) ក៏ 404។
+  ឥឡូវ App សួរ GitHub មុន ➜ ប៊ូតុងតែពេលឯកសារ APK ពិតមាន · មិនទាន់មាន ➜ «⏳ APK កំណែ X មិនទាន់មានលើ GitHub Release — App ពិនិត្យម្តងទៀតពេលបើក 🔔»
+  (សួរម្តងទៀតក្រោយ ២ នាទី · ពិនិត្យមិនបាន ➜ ៣០ វិ.)។
+- APK ដែលទាញទុកក្នុង cache ➜ លុបដោយខ្លួនឯងពេលបើក App ក្រោយដំឡើងរួច។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/notify-apk-link.test.tsx` (សរសេរឡើងវិញ · ១៣) ៖ URL ដែល Java សាង = workflow ពិត · method JS ⊆ `@PluginMethod` · Release គ្មាន / កំពុងពិនិត្យ / ពិនិត្យមិនបាន ➜ គ្មានប៊ូតុង ·
+  មាន ➜ ទាញក្នុង App ➜ progress ➜ excuse ➜ install · Settings ➜ អនុញ្ញាត ➜ excuse ថ្មី ➜ installer · បដិសេធ ➜ ណែនាំ · បរាជ័យ / 404 · ឈប់រីក ➜ បោះបង់ · ប៊ូតុងបោះបង់ ·
+  ពិនិត្យម្តងទៀតតាមពេល · ទិសផ្ទុយ web/PWA · កំណែចុងក្រោយ — plugin mock ជា Proxy thenable ដូច Capacitor ពិត — មុនកែ ៖ FAIL ១១/១៣។
+- `npm run native:check` ៤ង (ថ្មី · ២ សេណារីយ៉ូ) ៖ `@capacitor/core` ពិត + header ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត ➜ Release គ្មាន ➜ គ្មានប៊ូតុង · មាន ➜ probe ➜
+  addListener ➜ download ➜ install ➜ removeListener · គ្មាន «not implemented»។
+- `npm run android:check` ៣ខ (ថ្មី · ១២) ៖ ឈ្មោះ plugin ស្មើ JS · `registerPlugin` មុន `super.onCreate` · `REQUEST_INSTALL_PACKAGES` · probe HEAD មិនតាម redirect · ពេលកំណត់ connect/read ·
+  `.part` ➜ ពេញ ➜ ផ្ទៀង package + versionName · FileProvider · Settings ➜ installer · method JS ⊆ Java · event progress · Java គ្មាន comment។
+- Java compile ជាមួយ framework Android ពិត + class Capacitor ពិត ➜ 0 error · `probe()` ពិតទៅ GitHub ៖ 2.50.42 ➜ 302 មាន · 2.50.41 ➜ 404 · កំណែមិនទាន់ build ➜ 404 (ផ្នែក ២ A45)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ចូល `main` ➜ Deploy ZoeW + workflow build APK (Release `zoew-android-v2.50.43`)។
+2. ⚠️ **APK 2.50.42 ដែលមានក្នុងទូរស័ព្ទនៅប្រើ link ចាស់** (plugin ថ្មីមានតែក្នុង APK 2.50.43) ➜ ដំឡើង APK 2.50.43 ដោយដៃម្តង (GitHub ➜ Releases ➜ ទាញ ➜ បើកពី Downloads)។
+3. ពី 2.50.43 ទៅ ៖ ពេលកំណែបន្ទាប់ចេញ ➜ 🔔 ៖ (ក) ខណៈ workflow កំពុង build ➜ «មិនទាន់មាន» គ្មានប៊ូតុង · (ខ) build ចប់ ➜ បិទ/បើក 🔔 ក្រោយ ២ នាទី ➜ ប៊ូតុង ➜ ចុច ➜ របារីក ➜
+   ផ្ទាំងដំឡើង ➜ «ដំឡើង» ➜ App ថ្មីបើក · ទិន្នន័យ · PIN · Activation នៅដដែល · លើកដំបូង ៖ «អនុញ្ញាតពីប្រភពនេះ» ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត · ✖️ បោះបង់ពេលកំពុងទាញ ➜ ប៊ូតុងវិញ។
 
 ### [2.50.42] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ស្វែងរកលេខ ➜ keyboard មិនរំកិលទំព័រឡើង/ចុះទៀត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
 
@@ -2741,6 +2775,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — APK ៖ ទាញក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន ➜ [2.50.43]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A45 | **APK ៖ link ក្រៅ App គ្មានផ្ទាំងដំឡើង · ប៊ូតុងមុន Release ➜ 404** (សំណើ · រាយការណ៍ម្ចាស់គម្រោង · Release 2.50.41 លុបដោយម្ចាស់គម្រោង) | Claude ៖ `curl -I` ពិត ៖ `zoew-android-v2.50.42/ZoeW-2.50.42.apk` ➜ 302 ទៅ `objects.githubusercontent.com` · `2.50.41` · `9.9.9` ➜ 404 · HEAD តាម redirect ➜ 401 (URL ចុះហត្ថលេខាសម្រាប់ GET) ➜ probe មិនតាម redirect · GET ➜ 200 `application/vnd.android.package-archive` ៨៥៨៩៧៤៧ bytes · គ្មាន Android SDK (dl.google.com បិទក្នុងបរិស្ថាននេះ) ➜ `javac` + Robolectric `android-all` 14 (Maven Central) + `JSObject` · `PluginCall` · annotation ពិតរបស់ Capacitor + stub `Plugin` · androidx តាម signature ពិត ➜ 0 error · harness JVM ហៅ `probe()` ពិត ➜ 302 / 404 / 404 · `bad-version` ➜ គ្មាន request | plugin `ZoeApkUpdate` · ពិនិត្យ Release មុនប៊ូតុង · ⚠️ download/install វាស់បានតែលើទូរស័ព្ទពិត |
 
 ### 2026-10-08 — iPhone PWA ៖ ស្វែងរកលេខលោតទំព័រ ➜ [2.50.42]
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_GROUP_EXPIRY, NOTIFY_GROUP_REMOVED, apkDownloadUrl, newerAppVersion, visibleNotifyFeed, type NotifyExpiryRow, type NotifyFeedItem, type NotifyRemovedRow, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_GROUP_EXPIRY, NOTIFY_GROUP_REMOVED, newerAppVersion, visibleNotifyFeed, type NotifyExpiryRow, type NotifyFeedItem, type NotifyRemovedRow, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
+import { APK_ERROR_TEXT, type ApkReleaseState, type ApkUpdateState } from '../../features/apk-update';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
@@ -177,7 +178,56 @@ function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
     );
 }
 
-function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateReady: boolean }) {
+function megabytes(bytes: number) {
+    return (bytes / (1024 * 1024)).toFixed(1);
+}
+
+function ApkUpdateBlock({ version, release, update }: { version: string; release: ApkReleaseState; update: ApkUpdateState }) {
+    if (release.version !== version || release.state === 'idle' || release.state === 'checking') {
+        return <div className="notify-apk-status" id="notifyApkStatus">⏳ កំពុងពិនិត្យ APK កំណែ {version} លើ GitHub Release…</div>;
+    }
+    if (release.state === 'absent') {
+        return <div className="notify-apk-status" id="notifyApkStatus">⏳ APK កំណែ {version} មិនទាន់មានលើ GitHub Release — App ពិនិត្យម្តងទៀតពេលបើក 🔔</div>;
+    }
+    if (release.state === 'failed') {
+        return <div className="notify-apk-status is-warn" id="notifyApkStatus">⚠️ ពិនិត្យ GitHub Release មិនបាន — App ពិនិត្យម្តងទៀតពេលបើក 🔔</div>;
+    }
+    const mine = update.version === version;
+    const phase = mine ? update.phase : 'idle';
+    if (phase === 'download') {
+        const pct = update.total > 0 ? Math.min(100, Math.floor((update.received * 100) / update.total)) : 0;
+        return (
+            <div className="notify-apk-progress-wrap">
+                <progress className="notify-apk-progress" id="notifyApkProgress" max={update.total > 0 ? update.total : undefined} value={update.total > 0 ? update.received : undefined} />
+                <div className="notify-apk-status" id="notifyApkStatus">
+                    ⬇️ កំពុងទាញយក {update.total > 0 ? pct + '% (' + megabytes(update.received) + ' / ' + megabytes(update.total) + ' MB)' : '…'}
+                </div>
+                <button type="button" className="notify-apk-cancel-btn" id="notifyApkCancelBtn" onClick={onAct('cancelApkUpdate')}>✖️ បោះបង់</button>
+            </div>
+        );
+    }
+    if (phase === 'install') {
+        return <div className="notify-apk-status" id="notifyApkStatus">📲 កំពុងបើកផ្ទាំងដំឡើង…</div>;
+    }
+    let note = null;
+    let label = '📥 ទាញយក និងដំឡើង APK កំណែ ' + version;
+    if (phase === 'opened') {
+        note = <div className="notify-apk-status" id="notifyApkStatus">📲 សូមចុច «ដំឡើង» (Install) នៅផ្ទាំងរបស់ Android</div>;
+        label = '📲 បើកផ្ទាំងដំឡើងម្តងទៀត';
+    } else if (phase === 'denied') {
+        note = <div className="notify-apk-status is-warn" id="notifyApkStatus">⚠️ សូមបើក «អនុញ្ញាតពីប្រភពនេះ» (Allow from this source) សម្រាប់ ZoeW ហើយចុចម្តងទៀត</div>;
+    } else if (phase === 'error') {
+        note = <div className="notify-apk-status is-warn" id="notifyApkStatus">{APK_ERROR_TEXT[update.error] || APK_ERROR_TEXT.failed}</div>;
+    }
+    return (
+        <>
+            {note}
+            <button type="button" className="notify-refresh-btn notify-apk-btn" id="notifyApkBtn" onClick={onAct('startApkUpdate', { args: [version] })}>{label}</button>
+        </>
+    );
+}
+
+function VersionSection({ feed, updateReady, apkRelease, apkUpdate }: { feed: NotifyFeedItem[]; updateReady: boolean; apkRelease: ApkReleaseState; apkUpdate: ApkUpdateState }) {
     const newer = newerAppVersion(feed);
     let status;
     if (updateReady) {
@@ -188,13 +238,12 @@ function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateR
             </>
         );
     } else if (newer) {
-        const apk = isNativeApp() ? apkDownloadUrl(newer) : null;
         status = (
             <>
                 <div className="notify-summary is-info">
                     🆕 កំណែ {newer} មានហើយ — {isNativeApp() ? 'សូមដំឡើង APK ថ្មី' : 'App នឹងទាញវាដោយស្វ័យប្រវត្តិ (ឬ Refresh)'}
                 </div>
-                {apk ? <a className="notify-refresh-btn notify-apk-link" href={apk} target="_blank" rel="noopener noreferrer">📥 ទាញយក APK កំណែ {newer}</a> : null}
+                {isNativeApp() ? <ApkUpdateBlock version={newer} release={apkRelease} update={apkUpdate} /> : null}
             </>
         );
     } else if (feed.length) {
@@ -249,7 +298,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus', 'apkRelease', 'apkUpdate']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -269,7 +318,7 @@ export function NotifyDrawer() {
                 <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
                 <RemovedSection view={s.notifyRemovedView} />
-                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
+                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} apkRelease={s.apkRelease} apkUpdate={s.apkUpdate} />
                 <FeedSection feed={visibleNotifyFeed(s.notifyFeed, s.notifySellerFeed, s.notifyDismissedIds)} seen={s.notifySeenIds} />
             </div>
             <div className="drawer-foot notify-foot">

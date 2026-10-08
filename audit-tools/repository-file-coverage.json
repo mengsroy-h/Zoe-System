@@ -758,6 +758,9 @@
     "ZoeW/android/app/src/main/AndroidManifest.xml": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ApkUpdatePlugin.java": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/java/com/zoesystem/zoew/MainActivity.java": {
       "policy": "zoew-android"
     },
@@ -1537,6 +1540,9 @@
       "policy": "zoew-audit-bridge"
     },
     "ZoeW/src/features/account.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/apk-update.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/app-lock.ts": {

@@ -317,6 +317,8 @@ export interface UiState {
     notifySeenIds: string[];
     notifyFeedFetchedAt: number;
     notifyFeedInFlight: boolean;
+    apkRelease: import('../features/apk-update').ApkReleaseState;
+    apkUpdate: import('../features/apk-update').ApkUpdateState;
     updateReady: boolean;
     dataPanelCollapsed: boolean;
     entryPanelCollapsed: boolean;
@@ -412,6 +414,8 @@ export const uiState = createStore<UiState>('uiState', {
     notifySeenIds: [],
     notifyFeedFetchedAt: 0,
     notifyFeedInFlight: false,
+    apkRelease: { version: '', state: 'idle', checkedAt: 0 },
+    apkUpdate: { phase: 'idle', version: '', received: 0, total: 0, error: '' },
     updateReady: false,
     dataPanelCollapsed: false,
     entryPanelCollapsed: false,

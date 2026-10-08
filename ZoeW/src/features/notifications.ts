@@ -8,6 +8,7 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_N
 import { APP_VERSION } from '../core/version';
 import { elapsedSince } from '../core/elapsed';
 import { barcodeAbandonIsRipe, barcodeEntriesOf, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
+import { checkApkRelease } from './apk-update';
 import { LICENSE_APP_CODE } from './license';
 import { trashReasonOf } from './trash';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
@@ -325,13 +326,6 @@ export function latestFeedVersion(items) {
     return best;
 }
 
-export const APK_RELEASE_DOWNLOAD_BASE = 'https://github.com/mengsroy-h/Zoe-System/releases/download/';
-
-export function apkDownloadUrl(version) {
-    if (typeof version !== 'string' || !/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version)) return null;
-    return APK_RELEASE_DOWNLOAD_BASE + 'zoew-android-v' + version + '/ZoeW-' + version + '.apk';
-}
-
 export function newerAppVersion(items) {
     const latest = latestFeedVersion(items);
     return latest && compareVersions(latest, APP_VERSION) > 0 ? latest : '';
@@ -496,7 +490,8 @@ export function openNotifyDrawer() {
     refreshNotifyView();
     uiState.notifyDrawerOpen = true;
     clearAppBadge();
-    fetchNotifyFeed(true);
+    checkApkRelease(newerAppVersion(uiState.notifyFeed));
+    fetchNotifyFeed(true).then(() => checkApkRelease(newerAppVersion(uiState.notifyFeed)));
 }
 
 export function initNotifications() {

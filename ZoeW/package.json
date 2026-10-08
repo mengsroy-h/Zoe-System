@@ -1,7 +1,7 @@
 {
   "name": "zoew",
   "private": true,
-  "version": "2.50.16",
+  "version": "2.50.17",
   "description": "ZoeW — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (React + Vite)",
   "engines": {
     "node": "^22.17.0 || >=24.0.0"

@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.16` (`zoew-v279`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.17` (`zoew-v280`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.6` (`zoekeygen-v117`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -238,7 +238,7 @@ only this text protects them.
 | Connection · recovery | Failed listeners come back; the SDK recovers. Reloading to recover the SDK first measures reachability of the SDK host (`navigator.onLine` lies) · CSP `connect-src` allows it · Supabase shops: the real app + real adapter leave green within the liveness ceiling when the server drops or hangs (idle cycle · background resume), reconnect alone and receive changes made meanwhile; realtime down ➜ the poll fallback still delivers · a channel that isn't `SUBSCRIBED` (`CLOSED` · `CHANNEL_ERROR` · `TIMED_OUT` · `subscribe()` throws) is re-created on `SB_REALTIME_RETRY_STEPS_MS` (one timer · reset on `SUBSCRIBED` · a channel that rejoins by itself is kept · statuses from torn-down channels are ignored) | `connection-recovery-test` · `netlify-config-scope-test` · `supabase-app-network-e2e-test` · `ZoeW/tests/supabase-unsent-tx.test.ts` · `ZoeW/tests/supabase-realtime-ws.test.ts` |
 | **Zombie socket** | `.info/connected` = `true` is no proof. `probeDatabaseLiveness()` decides: real round trip (`get()` on `DB_LIVENESS_PROBE_PATH`; any reply incl. `permission_denied` = alive); only a 10s timeout disconnects (`forceDatabaseReconnect()`). Doors: hung `dbOp`/scan claim · wake from background ≥ 30s · 60s cycle (visible, no round trip in 55s). Never probe while a listener is pending · ≤ 1 disconnect per 30s · slow but alive ➜ no disconnect | `emu/app-network-e2e-test` |
 | **Listeners dying alone** | Siblings never announce recovery for a dead listener — `.info/connected` and `.info/serverTimeOffset` too | `connection-recovery-test` |
-| **Stale callbacks** | Every `onValue` callback has a generation gate (`listenerGeneration !== dbListenerGeneration`) — old callbacks after a database/auth switch never write old data or call `noteDbListenerAlive()`. Measured over real `DB_LISTENER_KEYS`. A backend switch (`initFirebase()` teardown) unsubscribes the old auth listener **before** `deleteApp()` — Firebase delivers a pending `onAuthStateChanged` after `deleteApp()` | `connection-recovery-test` · `ZoeW/tests/registry-session-race.test.ts` |
+| **Stale callbacks** | Every `onValue` callback has a generation gate (`listenerGeneration !== dbListenerGeneration`) — old callbacks after a database/auth switch never write old data or call `noteDbListenerAlive()`. Measured over real `DB_LISTENER_KEYS`. A backend switch (`initFirebase()` teardown) unsubscribes the old auth listener **before** `deleteApp()` — Firebase delivers a pending `onAuthStateChanged` after `deleteApp()` — and detaches the old listeners through the old SDK (`firebaseState.fb` takes the new SDK only after teardown) | `connection-recovery-test` · `ZoeW/tests/registry-session-race.test.ts` · `ZoeW/tests/backend-switch-detach.test.ts` |
 | **Each listener reports its own key** | A callback passing a sibling key hides its death from `dbListenerFailedPaths` (`dbListenerViewIsStale()` dies silently) | `listener-pending-key-test` |
 | **Secret redaction** | Frozen objects redacted by copy · private/signing keys and private JWK (incl. JSON strings) redacted · public JWK and money field `d` kept. `SECRET_KEY_PATTERN` (object keys) and `SECRET_PARAM_PATTERN` (`x=…` strings, e.g. console breadcrumbs) are separate lists ➜ both cover every secret the system holds (`headerValue` · `headerValueEnc` · `X-Zoe-Proxy-Key` · `ZTO_PROXY_KEY` · `BOS-MAN-SESSION` · `activationKey` · `keyString` · …) · credential fields derived from `fieldsToBlank` of `clearSensitiveModalFields()`. Reverse: non-secrets (`path` · `patch` · `dispatch` · `headerName`) stay | `secret-hygiene` |
 | **Tools** | Poisoning happens on shadow files · no fixed shared resources: `listen(0, '127.0.0.1')` · `emu/*` namespace unique per run | `checker-coverage` |
@@ -463,7 +463,9 @@ Uncollected parcels ➜ `claimAndCleanupItem('abandon')` ➜ `isDeducted: true` 
   transaction; after partial removal `isClosed` comes from the remaining barcodes.
 - Mixed parcels (A closed · B open): 2h rule moves **A only** (`pickup`, money untouched); 7-day rule moves **B only**
   (`expired`, deduct B).
-- ⛔ Every close/open goes through `applyBarcodeCloseState(barcode, closed, at)` (never `b.isClosed = x`).
+- ⛔ Every close/open goes through `applyBarcodeCloseState(barcode, closed, at)` (never `b.isClosed = x`). `applyBarcodeCloseChange()` keeps the
+  server's `closedAt` (barcode and parcel) when the server barcode already holds the desired state — a stale view never re-stamps
+  (`ZoeW/tests/close-restamp-idempotent.test.ts`).
   `barcodeCloseIsRipe()` is the single decider; `normalizeBarcodeCloseStamps()` stamps old data. `executeRestoreItem()`
   resets `closedAt` to `getServerNow()`.
 

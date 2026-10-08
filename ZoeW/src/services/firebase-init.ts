@@ -75,7 +75,6 @@ export async function initFirebase() {
             preconnectToDatabaseHost(firebaseState.firebaseConfig);
             nextFb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
         }
-        firebaseState.fb = nextFb;
         viewState.backendKind = useSupabase ? 'supabase' : 'firebase';
         firebaseState.firebaseSdkUnavailable = false;
         firebaseState.sdkUnavailableNoticeShown = false;
@@ -85,7 +84,7 @@ export async function initFirebase() {
         if (previousFb && !!previousFb.__supabase !== useSupabase && typeof previousFb.getApps === 'function') {
             previousFb.getApps().forEach((a) => staleApps.push([previousFb, a]));
         }
-        firebaseState.fb.getApps().forEach((a) => staleApps.push([firebaseState.fb, a]));
+        nextFb.getApps().forEach((a) => staleApps.push([nextFb, a]));
         const existingApps = staleApps;
         if (existingApps.length) {
             if (firebaseState.authUnsubscribe) {
@@ -121,6 +120,7 @@ export async function initFirebase() {
             uiState.lockerBarcodeIndex = {};
             await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
         }
+        firebaseState.fb = nextFb;
 
         const firebaseApp = firebaseState.fb.getApps().length ? firebaseState.fb.getApps()[0] : firebaseState.fb.initializeApp(firebaseState.firebaseConfig);
         firebaseState.auth = firebaseState.fb.getAuth(firebaseApp);

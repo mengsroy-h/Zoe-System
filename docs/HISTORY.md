@@ -122,6 +122,32 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.17] — 2026-10-08 · ZoeW ៖ **ZTO បិទម្តងទៀតលើទិដ្ឋភាពចាស់ មិនប្តូរម៉ោងបិទ · ប្តូរ backend ផ្តាច់ listener ចាស់តាម SDK ចាស់** (Deep audit ២ · ជុំ ៤ · ZTO-3 · NETWORK-2)
+
+**ZoeW `2.50.17`** (`zoew-v279` ➜ `zoew-v280`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ · តំបន់ ZTO ចាក់សោ មិនប៉ះ (ការកែនៅ `barcode-ops.ts` ក្រៅ `LOCK`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✅ **ZTO-3 ៖ បិទម្តងទៀតលើទិដ្ឋភាពចាស់ ➜ `closedAt` ថ្មី** ៖ `applyBarcodeCloseChange()` ក្នុង transaction server ហៅ `applyBarcodeCloseState(b, true, now)` ទោះ barcode បិទរួចនៅ server ➜ ឧបករណ៍ដែល
+  listener ប្រវត្តិចាស់ (ឃើញបើក) ហើយ sign-list sweep ឬការបញ្ចូលបញ្ជី ZTO បិទវាម្តងទៀត ➜ `closedAt` (barcode និងកញ្ចប់) ផ្លាស់ពី ២៣:៣០ ទៅ ០០:៣០ ថ្ងៃបន្ទាប់ ➜ ការសម្អាត ២ ម៉ោងពន្យារ ·
+  «ចំណូលតាមថ្ងៃយក» ផ្លាស់ទៅថ្ងៃថ្មី (លុយ ledger មិនប៉ះ)។ ឥឡូវ ៖ barcode នៅ server មានស្ថានភាពដែលចង់បានរួច ➜ រក្សា `closedAt` ដើម · កញ្ចប់ដែលបិទទាំងមូលរួចរក្សា `closedAt` ដើម ·
+  barcode ដែលបើកពិតនៅ server ➜ stamp ពេលនេះដូចដើម។
+- 🔌 **NETWORK-2 ៖ ប្តូរ backend ➜ `off()` តាម SDK ថ្មី** ៖ `initFirebase()` កំណត់ `firebaseState.fb = nextFb` មុន teardown ➜ `detachDatabaseListeners()` · `detachInfoListeners()` ហៅ `off()` របស់ SDK ថ្មី
+  លើ ref របស់ SDK ចាស់ (Firebase ↔ Supabase) ➜ listener ចាស់មិនត្រូវផ្តាច់ (រស់រហូត `deleteApp()`)។ ឥឡូវ `firebaseState.fb` យក SDK ថ្មីតែក្រោយ teardown + `deleteApp()` ➜ SDK ចាស់ផ្តាច់ ref របស់វា ·
+  ចន្លោះ teardown SDK ចាស់នៅគូនឹង database ចាស់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. គ្មានការសាកពិសេស ៖ ឧបករណ៍ ២ ៖ A បិទកញ្ចប់ដោយដៃ ➜ B (ZTO បិទស្វ័យប្រវត្តិ) មិនប្តូរម៉ោងបិទ (🔎 មើលម៉ោងក្នុងបញ្ជី barcode)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/close-restamp-idempotent.test.ts` (ថ្មី · ៥ · `runZtoStatusSweep` · `applyBarcodeCloseChange` ពិត) ៖ sweep លើទិដ្ឋភាពចាស់ ➜ `closedAt` = T0 · គ្មានថ្ងៃថ្មីក្នុង collected · បិទផ្ទាល់ ➜ T0 ·
+  កញ្ចប់លាយ (A បិទ T0 · B បើក) · ទិសផ្ទុយ ៖ បើក ➜ stamp ពេលនេះ · បើកវិញ ➜ លុប stamp។ មុនកែ FAIL ៣/៥ · mutation ៖ stamp barcode ជានិច្ច ➜ FAIL ៣ · stamp កញ្ចប់ជានិច្ច ➜ FAIL ២។
+- `ZoeW/tests/backend-switch-detach.test.ts` (ថ្មី · ៣ · `initFirebase` ពិត) ៖ Firebase ➜ Supabase និង Supabase ➜ Firebase ៖ ref ចាស់ ៩ ផ្តាច់ដោយ SDK ចាស់ · SDK ថ្មីមិនទទួល ref ចាស់ ·
+  ទិសផ្ទុយ ៖ Firebase ➜ Firebase ។ មុនកែ FAIL ២/៣។
+
 ### [2.50.16] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ claim barcode ក្រោយចម្លើយបាត់ · ចម្លើយ zoe_write ខូច · ចាកចេញពាក់កណ្តាលការទាញ · ប្តូរហាងក្នុងសម័យ** (Deep audit ២ · ជុំ ៣ · SUPABASE-2 · 5 · 4 · 3)
 
 **ZoeW `2.50.16`** (`zoew-v278` ➜ `zoew-v279`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ · ផ្លូវ Firebase មិនប្រែ។
@@ -2120,6 +2146,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៤ (ZTO-3 · NETWORK-2) ➜ [2.50.17]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A9 | **ZTO-3** `applyBarcodeCloseChange()` stamp `closedAt` ទោះ server បិទរួច | អ្នករក ៖ `runZtoStatusSweep` លើទិដ្ឋភាពចាស់ ➜ `closedAt` T0 (២៣:៣០) ➜ ០០:៣០ ថ្ងៃបន្ទាប់ · Claude ៖ ដដែល + ផ្លូវផ្ទាល់ + កញ្ចប់លាយ | រក្សា stamp ពេលស្ថានភាពដដែល (ក្រៅ `LOCK`) |
+| A10 | **NETWORK-2** `firebaseState.fb = nextFb` មុន teardown | Claude ៖ fake SDK រាប់ `off()` ➜ SDK ចាស់ ០ · SDK ថ្មីទទួល ref ចាស់ ៩ (ទិសទាំងពីរ) | កំណត់ SDK ថ្មីក្រោយ teardown |
+
+- RACES-2 (late commit ក្រោយប្តូរហាង) ➜ ជុំក្រោយ (ប៉ះលុយ · ត្រូវការការរចនាដាច់)។ SENTRY-1 រង់ចាំការសម្រេចម្ចាស់គម្រោង។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ៣ (Supabase adapter ៖ SUPABASE-2 · 5 · 4 · 3) ➜ [2.50.16]
 

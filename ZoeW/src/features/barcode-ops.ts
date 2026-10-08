@@ -408,14 +408,17 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
-            applyBarcodeCloseState(b, desiredClosed, getServerNow());
+            const stateUnchanged = !!b.isClosed === !!desiredClosed && (!desiredClosed || typeof b.closedAt === 'number');
+            const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
+            if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());
             const serverPickupKey = pickupBarcodeKey(barcodeCode);
             serverPickupMarks = serverPickupKey ? [{ key: serverPickupKey, phoneKey: getPickupPhoneKey(currentItem), closed: desiredClosed }] : [];
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
             const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
             currentItem.isClosed = allClosed;
-            if (allClosed) currentItem.closedAt = getServerNow();
-            else delete currentItem.closedAt;
+            if (allClosed) {
+                if (!(stateUnchanged && itemWasClosed)) currentItem.closedAt = getServerNow();
+            } else delete currentItem.closedAt;
             if (desiredClosed) {
                 delete currentItem.callMark;
                 delete currentItem.callMarkTime;

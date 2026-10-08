@@ -1872,6 +1872,12 @@
     "ZoeW/tests/cleanup-journal-cap.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/backend-switch-detach.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/close-restamp-idempotent.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/supabase-write-bad-body.test.ts": {
       "policy": "zoew-self-verification"
     },

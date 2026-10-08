@@ -21,6 +21,8 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
 | ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings របស់ទូរស័ព្ទ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
+| model · serial ឧបករណ៍ | model ពី `userAgentData` (Chrome Android) · iPhone ត្រឹម «iPhone» · serial = ID App ១៦ តួ (SHA-256 នៃ ID License) | plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) ៖ `Build.MANUFACTURER` + `Build.MODEL` · កំណែ Android · serial = **Android ID** (`Settings.Secure.ANDROID_ID` ៖ ស្ថិតស្ថេរលើទូរស័ព្ទនោះ + keystore ដដែល · ប្តូរតែពេល Factory reset) · គ្មានសិទ្ធិថ្មី (serial ពិតរបស់ hardware Android 10+ ហាម App ធម្មតា) |
+| ធ្វើបច្ចុប្បន្នភាព App | Service Worker ទាញកំណែថ្មីដោយខ្លួនឯង | 🔔 «📱 កំណែ App» ៖ plugin ក្នុង App `ZoeApkUpdate` (`ApkUpdatePlugin.java`) សួរ GitHub ថា Release `zoew-android-v<កំណែ>` មាន `ZoeW-<កំណែ>.apk` ពិតឬនៅ (HEAD មិនតាម redirect ៖ 302 = មាន · 404 = គ្មាន) ➜ ប៊ូតុងតែពេលមាន ➜ ទាញចូល cache របស់ App (របារីកចម្រើន · ផ្ទៀង package និង versionName) ➜ ផ្ទាំងដំឡើងរបស់ Android (សិទ្ធិ `REQUEST_INSTALL_PACKAGES` · លើកដំបូង «អនុញ្ញាតពីប្រភពនេះ») · APK ចាស់ក្នុង cache លុបពេលបើក App ក្រោយដំឡើង |
 
 ---
 
@@ -47,6 +49,8 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 `.github/workflows/android-release.yml` build APK ដែល **sign រួច** ហើយបង្កើត **GitHub Release** មួយក្នុងមួយកំណែ
 (`zoew-android-v<APP_VERSION>` · ឯកសារ `ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION` ប្រែលើ `main` ឬចុច
 **Actions ➜ Android APK ➜ Run workflow**។ ទាញយក ៖ ទំព័រ repo ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
+ទូរស័ព្ទដែលមាន App រួច ៖ 🔔 ➜ «📥 ទាញយក និងដំឡើង APK» (បង្ហាញតែក្រោយ Release មានឯកសារ APK) ➜ ទាញ និងដំឡើងក្នុង App ·
+លុប Release ឬ build មិនទាន់ចប់ ➜ ប៊ូតុងមិនបង្ហាញ។
 
 ### APK សាកពី branch (មុន merge)
 
@@ -200,4 +204,5 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 | ១១ | ចាកចេញពី App ធម្មតា ➜ ត្រឡប់មក | សុំ PIN · task switcher មិនឃើញទិន្នន័យ |
 | ១២ | ZTO Lookup · 🩺 ពិនិត្យសុខភាព | ដូច PWA · ជួរ «របៀបក្រៅបណ្ដាញ» ✅ |
 | ១៣ | ទូរស័ព្ទ WebView ចាស់ ធៀបនឹងថ្មី · បើក/បិទប្រអប់ | របាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញជានិច្ច ៖ រូបតំណាង **ខ្មៅ** លើ navbar ស · **ស** ពេលប្រអប់ (ផ្ទៃងងឹត) បើក · ខ្មៅវិញពេលបិទ |
+| ១៥ | 🔔 ពេល Release កំណែថ្មីមិនទាន់ចេញ ➜ ចេញរួច ➜ «📥 ទាញយក និងដំឡើង APK» | មិនទាន់ចេញ ➜ «មិនទាន់មាន» គ្មានប៊ូតុង · ចេញរួច ➜ របារីក ➜ ផ្ទាំងដំឡើង ➜ App ថ្មីបើក · ទិន្នន័យ · PIN · Activation នៅដដែល |
 | ១៤ | តម្រង «ទាំងអស់» ➜ រមូរដល់ចុងបញ្ជីច្រើន ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 ➜ រមូរឡើងវិញ · កែជួរ · ប្តូរតម្រង | មើលបានគ្រប់កញ្ចប់ · ប្រអប់រលូន · ទីតាំងនៅដដែលពេលបិទ · លេខ/ប៊ូតុងត្រូវតាមជួរ · តម្រងថ្មីចាប់ផ្តើមនៅកំពូល |

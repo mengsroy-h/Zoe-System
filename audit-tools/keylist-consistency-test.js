@@ -44,6 +44,9 @@ function ok(label, cond, detail) {
     else { console.log('  FAIL   ' + label + (detail !== undefined ? '  got: ' + JSON.stringify(detail) : '')); fail++; }
 }
 
+// model · serial ក្នុងកៅអី (`meta`) ៖ function ថ្មី ➜ ស្រង់តែពេលមាន ហើយការអះអាងខាងក្រោមធ្លាក់ពេលអវត្តមាន (មិនគាំង checker)
+const SEAT_META_FNS = ['seatMetaText', 'seatMetaOf', 'seatDeviceLabel'];
+
 async function build(publicData, metaData, seatData) {
     const src = fs.readFileSync(APP_FILE, 'utf8');
     const log = { rendered: null, html: '' };
@@ -81,7 +84,8 @@ async function build(publicData, metaData, seatData) {
         function getServerNow() { return 0; }
         function renderKeyListStub() { __log.rendered = keyListCache; }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['seatLimitOf', 'seatDevicesOf', 'refreshKeyList', 'renderKeyList', 'escapeHtml']), ctx);
+    vm.runInContext(sliceFns(src, ['seatLimitOf', 'seatDevicesOf', 'refreshKeyList', 'renderKeyList', 'escapeHtml']
+        .concat(SEAT_META_FNS.filter((n) => src.includes('function ' + n + '(')))), ctx);
     vm.runInContext('const __origRender = renderKeyList;', ctx);
     await vm.runInContext('refreshKeyList()', ctx);
     log.rendered = ctx.keyListCache;
@@ -158,6 +162,27 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
         && r.rendered[0].seatDevices.length === 1
         && r.rendered[0].seatDevices[0].device === 'DEVICEAAAAAAAAAAAAAA'), r.rendered[0] && r.rendered[0].seatDevices);
     ok('⛔ លេខសម្គាល់ឧបករណ៍ពេញ មិនឡើងដល់ DOM', r.html.indexOf('DEVICEAAAAAAAAAAAAAA') === -1);
+
+    // ── ⛔ model · serial (`meta`) ៖ អ្នកលក់ឃើញថាកៅអីណាជាទូរស័ព្ទណា (សំណើម្ចាស់គម្រោង) ─────────────
+    //    meta មកពី client គ្មាន auth ➜ ជាអត្ថបទមិនទុកចិត្ត ➜ escape · «-» = គ្មាន · ⛔ លេខសម្គាល់កៅអីពេញនៅតែមិនដល់ DOM
+    {
+        const appSrc = fs.readFileSync(APP_FILE, 'utf8');
+        ok('មាន ' + SEAT_META_FNS.join(' · ') + ' ក្នុង ZoeKeyGen', SEAT_META_FNS.every((n) => appSrc.includes('function ' + n + '(')),
+            SEAT_META_FNS.filter((n) => !appSrc.includes('function ' + n + '(')));
+        const metaSeats = { [APP]: { K1: {
+            d1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000, meta: { model: 'Samsung SM-A546E', platform: 'Android 14', serial: '1a2b3c4d5e6f7890', at: 1 } },
+            d2: { device: 'DEVICEBBBBBBBBBBBBBB', at: 1700000000000, meta: { model: '<img src=x onerror=alert(1)>', platform: '-', serial: 'abcd', at: 1 } },
+            d3: { device: 'DEVICECCCCCCCCCCCCCC', at: 1700000000000 }
+        } } };
+        const rm = await build({ [APP]: { K1: { expiresAt: 2000, revoked: false, maxDevices: 3 } } }, meta, metaSeats);
+        const lines = rm.html.match(/class="seat-device-line"/g) || [];
+        ok('កៅអីនីមួយៗមានបន្ទាត់មើលឃើញ (មិនមែនតែ title ដែលទូរស័ព្ទមើលមិនឃើញ) ៖ ៣', lines.length === 3, lines.length);
+        ok('⛔ បន្ទាត់ d1 ៖ model · platform · serial', ['Samsung SM-A546E', 'Android 14', '1a2b3c4d5e6f7890'].every((t) => rm.html.includes(t)), rm.html.slice(0, 400));
+        ok('⛔ meta ជា HTML ➜ escape (គ្មាន <img ក្នុង DOM)', rm.html.includes('&lt;img') && !rm.html.includes('<img'), rm.html.slice(0, 400));
+        ok('platform «-» ➜ មិនបង្ហាញ', !/· - ·/.test(rm.html));
+        ok('កៅអីគ្មាន meta ➜ ID ៦ តួ + «…»', rm.html.includes('ID DEVICE…'));
+        ok('⛔ លេខសម្គាល់ឧបករណ៍ពេញ (៣ កៅអី) មិនឡើងដល់ DOM', ['DEVICEAAAAAAAAAAAAAA', 'DEVICEBBBBBBBBBBBBBB', 'DEVICECCCCCCCCCCCCCC'].every((d) => rm.html.indexOf(d) === -1));
+    }
 
     // ── ពិដានច្រើនឧបករណ៍ ៖ ស្លាកត្រូវរាយ n/max ពិត ────────────────────
     // ⛔ ការរាប់ត្រូវឈរក្នុងពិដាន ៖ slot ក្រៅពិដាន **មិនត្រូវរាប់** បើអត់

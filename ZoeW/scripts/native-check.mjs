@@ -531,6 +531,83 @@ await scenario('៤ខ. PTR លើ WebView របស់ Android (ច្បាប
     await closeSession(s, 'PTR latch');
 });
 
+/* ⛔ ទាញ APK ក្នុង App ៖ `@capacitor/core` ពិត + bridge ក្លែង ➜ header របស់ `ZoeApkUpdate` ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត
+ *    (Bridge របស់ Android នាំចេញ header ពី annotation) ➜ JS ហៅ method ដែល Java គ្មាន ➜ core បដិសេធ «not implemented» ដូចលើទូរស័ព្ទ។
+ *    Release គ្មាន ➜ គ្មានប៊ូតុង · Release មាន ➜ probe ➜ ស្តាប់ progress ➜ download ➜ install ➜ «ដំឡើង» · ឈប់ស្តាប់ក្រោយចប់។ */
+const APK_JAVA = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/com/zoesystem/zoew/ApkUpdatePlugin.java'), 'utf8');
+const APK_JAVA_METHODS = [...APK_JAVA.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]);
+const APK_FEED_VERSION = (() => { const v = (fs.readFileSync(path.join(ROOT, 'src/core/version.ts'), 'utf8').match(/APP_VERSION = '(\d+)\.(\d+)\.(\d+)'/) || []).slice(1).map(Number); return v[0] + '.' + v[1] + '.' + (v[2] + 1); })();
+function apkUpdateRespond(available) {
+    return `(() => {
+        window.Capacitor.PluginHeaders.push({ name: 'ZoeApkUpdate', methods: ${JSON.stringify(APK_JAVA_METHODS)}.map((m) => ({ name: m, rtype: 'promise' })).concat([{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }]) });
+        const base = window.__nativeRespond;
+        window.__nativeRespond = (plugin, method, options) => {
+            if (plugin !== 'ZoeApkUpdate') return base ? base(plugin, method, options) : undefined;
+            if (method === 'probe') return { status: ${available ? 302 : 404}, available: ${available} };
+            if (method === 'download') return { size: 8589747 };
+            if (method === 'install') return { status: 'opened' };
+            return {};
+        };
+    })();`;
+}
+for (const available of [false, true]) {
+    await scenario(`៤ង. ទាញ APK ក្នុង App ៖ Release ${available ? 'មាន' : 'គ្មាន (កំពុង build · លុបចោល)'}`, async () => {
+        const s = await session({ storage: { zoew_notify_feed_v1: JSON.stringify({ items: [{ id: APK_FEED_VERSION, kind: 'update', version: APK_FEED_VERSION, title: 'កំណែ ' + APK_FEED_VERSION, body: 'សាក', date: '2026-10-08', points: [] }] }) } });
+        const { page } = s;
+        await page.evaluate(apkUpdateRespond(available));
+        ok('(លក្ខខណ្ឌចាំបាច់) Java មាន @PluginMethod probe · download · install · cancel', ['probe', 'download', 'install', 'cancel'].every((m) => APK_JAVA_METHODS.includes(m)), APK_JAVA_METHODS);
+        await page.click('#navNotifyBtn');
+        await page.waitForTimeout(400);
+        const probes = await calls(page, 'ZoeApkUpdate', 'probe');
+        ok('បើក 🔔 ➜ probe កំណែពី feed (' + APK_FEED_VERSION + ')', probes.length >= 1 && probes.every((c) => c.options.version === APK_FEED_VERSION), probes);
+        const hasBtn = await page.evaluate(() => !!document.getElementById('notifyApkBtn'));
+        const hasLink = await page.evaluate(() => !!document.querySelector('#notifyVersionSection a[href*="github.com"]'));
+        ok('គ្មាន link បើក browser ក្រៅ App', !hasLink);
+        if (!available) {
+            ok('Release គ្មាន ➜ គ្មានប៊ូតុងទាញយក', !hasBtn);
+            ok('Release គ្មាន ➜ ប្រាប់ «មិនទាន់មានលើ GitHub Release»', (await page.textContent('#notifyVersionSection')).includes('មិនទាន់មានលើ GitHub Release'));
+            await closeSession(s, 'apk-absent');
+            return;
+        }
+        ok('Release មាន ➜ ប៊ូតុងទាញយក', hasBtn);
+        await page.click('#notifyApkBtn');
+        await page.waitForTimeout(600);
+        const seq = (await calls(page, 'ZoeApkUpdate')).map((c) => c.method + (c.method === 'addListener' || c.method === 'removeListener' ? ':' + (c.options.eventName || '') : ''));
+        const want = ['addListener:progress', 'download', 'install'];
+        ok('លំដាប់ ៖ ស្តាប់ progress ➜ download ➜ install', want.every((m, i) => seq.indexOf(m) !== -1 && (i === 0 || seq.indexOf(m) > seq.indexOf(want[i - 1]))), seq);
+        const dl = (await calls(page, 'ZoeApkUpdate', 'download'))[0];
+        ok('download ៖ កំណែពី feed (Java សាង URL ខ្លួនឯង)', !!dl && dl.options.version === APK_FEED_VERSION && Object.keys(dl.options).length === 1, dl);
+        ok('ឈប់ស្តាប់ progress ក្រោយចប់', seq.includes('removeListener:progress'), seq);
+        ok('បើកផ្ទាំងដំឡើង ➜ «សូមចុច ដំឡើង»', (await page.textContent('#notifyVersionSection')).includes('ដំឡើង'));
+        ok('គ្មាន «not implemented» (JS ហៅតែ method ដែល Java មាន)', !(await page.evaluate(() => (window.__rejections || []).some((r) => /not implemented/.test(r)))));
+        await closeSession(s, 'apk-present');
+    });
+}
+
+/* ⛔ model · serial ឧបករណ៍ ៖ `@capacitor/core` ពិត + header `ZoeDevice` ដេរីវេពី `@PluginMethod` ក្នុង Java ពិត (bridge ផ្ទុកមុន App) ➜
+ *    boot ហៅ `info` ➜ ☰ footer បង្ហាញ «Samsung SM-A546E · Android 14» និង Android ID · គ្មាន «not implemented»។ */
+const DEVICE_JAVA = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/com/zoesystem/zoew/DeviceInfoPlugin.java'), 'utf8');
+const DEVICE_JAVA_METHODS = [...DEVICE_JAVA.matchAll(/@PluginMethod\s+public void (\w+)\(PluginCall call\)/g)].map((m) => m[1]);
+const deviceRespond = new Function(`(${RESPOND_DEFAULT.toString()})();
+    window.Capacitor.PluginHeaders.push({ name: 'ZoeDevice', methods: ${JSON.stringify(DEVICE_JAVA_METHODS)}.map((m) => ({ name: m, rtype: 'promise' })).concat([{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }]) });
+    const base = window.__nativeRespond;
+    window.__nativeRespond = (plugin, method, options) => {
+        if (plugin === 'ZoeDevice' && method === 'info') return { manufacturer: 'samsung', brand: 'samsung', model: 'SM-A546E', release: '14', sdk: 34, androidId: '1A2B3C4D5E6F7890' };
+        return base ? base(plugin, method, options) : undefined;
+    };`);
+await scenario('៤ច. model · serial ឧបករណ៍ (APK ៖ ZoeDevice)', async () => {
+    const s = await session({ respond: deviceRespond });
+    const { page } = s;
+    ok('(លក្ខខណ្ឌចាំបាច់) Java មាន @PluginMethod info', DEVICE_JAVA_METHODS.includes('info'), DEVICE_JAVA_METHODS);
+    const infoCalls = await calls(page, 'ZoeDevice', 'info');
+    ok('boot ➜ ZoeDevice.info (មិនសួរម្តងហើយម្តងទៀត)', infoCalls.length === 1, infoCalls.length);
+    const line = await page.evaluate(() => { const el = document.getElementById('drawerDeviceInfo'); return el ? el.textContent : ''; });
+    ok('☰ footer ៖ «Samsung SM-A546E · Android 14»', line.includes('Samsung SM-A546E') && line.includes('Android 14'), line);
+    ok('☰ footer ៖ serial = Android ID (អក្សរតូច)', line.includes('Android ID') && line.includes('1a2b3c4d5e6f7890'), line);
+    ok('គ្មាន «not implemented» (JS ហៅតែ method ដែល Java មាន)', !(await page.evaluate(() => (window.__rejections || []).some((r) => /not implemented/.test(r)))));
+    await closeSession(s, 'device-info');
+});
+
 await scenario('៥. web ធម្មតា (គ្មាន bridge) ៖ មិនប៉ះ', async () => {
     const s = await session({ native: false });
     const { page } = s;

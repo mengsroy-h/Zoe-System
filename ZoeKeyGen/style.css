@@ -178,6 +178,8 @@ body.boot-reveal .app-container { animation: bootFadeIn 420ms ease-out 70ms both
 .badge-expired { background: var(--warning-light); color: #92610a; }
 .badge-revoked { background: var(--danger-light); color: #a3123a; }
 .badge-scope { background: var(--primary-light); color: var(--primary-hover); }
+.seat-device-list { margin-top: 4px; }
+.seat-device-line { font-size: calc(10.5 * var(--fs-unit)); color: var(--text-muted); line-height: 1.45; overflow-wrap: anywhere; }
 
 .warning-box {
     background: var(--warning-light); border: 1px solid #fcd34d; border-radius: var(--radius-md);

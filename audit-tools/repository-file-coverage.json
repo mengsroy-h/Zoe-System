@@ -758,6 +758,12 @@
     "ZoeW/android/app/src/main/AndroidManifest.xml": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ApkUpdatePlugin.java": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/DeviceInfoPlugin.java": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/java/com/zoesystem/zoew/MainActivity.java": {
       "policy": "zoew-android"
     },
@@ -1224,6 +1230,9 @@
     "ZoeW/src/app/components/customer/CustomerTableBody.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/device/DeviceInfoLine.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/entry/EntryListTableBody.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1539,6 +1548,9 @@
     "ZoeW/src/features/account.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/apk-update.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/app-lock.ts": {
       "policy": "zoew-app"
     },
@@ -1573,6 +1585,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/src/features/daily-stats.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/device-info.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/entry-ops.ts": {
@@ -1795,6 +1810,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/db-liveness.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/device-info.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/firebase-loader-gate.test.ts": {

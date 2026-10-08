@@ -380,6 +380,46 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
         check(allowed(keyOk) && allowed(metaOk), '⛔ ទិសផ្ទុយ ៖ admin សរសេរ Key និង meta ធម្មតា ➜ នៅតែទទួល', keyOk.status + ' · ' + metaOk.status + ' ' + metaOk.body.slice(0, 80));
     }
 
+    // ── ១៤. ⛔ model · serial របស់ឧបករណ៍ (`meta`) ៖ ឧបករណ៍ដែលកាន់កៅអីសរសេរ meta បាន · ⛔ មិនប្តូរ `device` · schema ចាក់សោ ─
+    //    (សំណើម្ចាស់គម្រោង ៖ ZoeKeyGen ឃើញថាកៅអីណាជាទូរស័ព្ទណា) · meta ជាព័ត៌មានសម្រាប់មើល ⛔ មិនដែលសម្រេចកៅអី
+    {
+        const KEY4 = 'MMMMMMMM44444444META';
+        await owner('PUT', keyPath(KEY4), { expiresAt: 4102444800000, revoked: false });
+        const metaPath = (slot) => '/license_seats/' + APP + '/' + KEY4 + '/' + slot + '/meta.json';
+        const META = { model: 'Samsung SM-A546E', platform: 'Android 14', serial: '1a2b3c4d5e6f7890', at: 1700000005000 };
+        const claim = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_A, at: 1700000005000 });
+        check(allowed(claim), '(លក្ខខណ្ឌចាំបាច់) ឧបករណ៍កក់កៅអី KEY4', claim.status);
+        const m1 = await anon('PUT', metaPath(SLOTS[0]), META);
+        check(allowed(m1), '⛔ សរសេរ meta (model · platform · serial · at) ទៅកៅអីដែលមាន ➜ អនុញ្ញាត', m1.status + ' ' + m1.body.slice(0, 120));
+        const back = JSON.parse((await anon('GET', seatPath(KEY4, SLOTS[0]))).body || 'null');
+        check(back && back.device === DEV_A && back.meta && back.meta.model === META.model && back.meta.serial === META.serial,
+            'ហើយ device នៅដដែល · meta អានវិញបាន (ZoeKeyGen ឃើញ)', back);
+        const ghostMeta = await anon('PUT', metaPath(SLOTS[1]), META);
+        check(denied(ghostMeta) || ghostMeta.status === 400, '⛔ meta ទៅកៅអីទំនេរ (គ្មាន device) ➜ បដិសេធ (មិនបង្កើតកៅអីក្លែង)', ghostMeta.status);
+        const swap = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_B, at: 1700000006000, meta: META });
+        check(denied(swap), '⛔ ប្តូរ device តាម payload មាន meta ➜ បដិសេធ (ច្បាប់កៅអីដដែល)', swap.status);
+        const bad = [
+            ['វាលបន្ថែម', Object.assign({}, META, { imei: '123456789012345' })],
+            ['model ទទេ', Object.assign({}, META, { model: '' })],
+            ['model វែងពេក (> 80)', Object.assign({}, META, { model: 'x'.repeat(81) })],
+            ['serial វែងពេក (> 64)', Object.assign({}, META, { serial: 'x'.repeat(65) })],
+            ['platform វែងពេក (> 40)', Object.assign({}, META, { platform: 'x'.repeat(41) })],
+            ['ខ្វះ serial', { model: META.model, platform: META.platform, at: META.at }],
+            ['at មិនមែនលេខ', Object.assign({}, META, { at: 'now' })],
+            ['meta ជាខ្សែអក្សរ', 'Samsung']
+        ];
+        for (const [label, body] of bad) {
+            const r = await anon('PUT', metaPath(SLOTS[0]), body);
+            check(denied(r) || r.status === 400, '⛔ meta ' + label + ' ➜ បដិសេធ', r.status);
+        }
+        const edge = await anon('PUT', metaPath(SLOTS[0]), { model: 'x'.repeat(80), platform: 'x'.repeat(40), serial: 'x'.repeat(64), at: 1 });
+        check(allowed(edge), 'ទិសផ្ទុយ ៖ ព្រំដែន (80 · 40 · 64) ➜ អនុញ្ញាត', edge.status);
+        const reclaim = await anon('PUT', seatPath(KEY4, SLOTS[0]), { device: DEV_A, at: 1700000007000 });
+        check(allowed(reclaim), 'ទិសផ្ទុយ ៖ ឧបករណ៍ដដែលសរសេរកៅអីឡើងវិញ (គ្មាន meta) ➜ អនុញ្ញាតដូចមុន', reclaim.status);
+        const adminDel = await asUser('DELETE', seatPath(KEY4), undefined, ADMIN);
+        check(allowed(adminDel), 'admin ដោះកៅអី ➜ meta ចេញជាមួយ', adminDel.status);
+    }
+
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;
 })();

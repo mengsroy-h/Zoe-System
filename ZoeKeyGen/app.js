@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.9';
+const APP_VERSION = '2.24.10';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2425,13 +2425,32 @@ function seatLimitOf(value) {
     if (!isFinite(n) || n < 1) return 1;
     return n > LICENSE_SEAT_MAX ? LICENSE_SEAT_MAX : n;
 }
+function seatMetaText(value, max) {
+    if (typeof value !== 'string') return '';
+    const text = value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    if (!text || text === '-') return '';
+    return text.length > max ? text.slice(0, max) : text;
+}
+function seatMetaOf(meta) {
+    if (!meta || typeof meta !== 'object') return null;
+    const out = { model: seatMetaText(meta.model, 80), platform: seatMetaText(meta.platform, 40), serial: seatMetaText(meta.serial, 64) };
+    return out.model || out.platform || out.serial ? out : null;
+}
+function seatDeviceLabel(d) {
+    const parts = [];
+    if (d.meta && d.meta.model) parts.push(d.meta.model);
+    if (d.meta && d.meta.platform) parts.push(d.meta.platform);
+    parts.push('🔖 ' + (d.meta && d.meta.serial ? d.meta.serial : 'ID ' + d.device.slice(0, 6) + '…'));
+    parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-'));
+    return '📱 ' + d.slot + ' · ' + parts.join(' · ');
+}
 function seatDevicesOf(node, limit) {
     const out = [];
     if (!node || typeof node !== 'object') return out;
     LICENSE_SEAT_SLOT_NAMES.slice(0, seatLimitOf(limit)).forEach((slot) => {
         const rec = node[slot];
         if (rec && typeof rec === 'object' && typeof rec.device === 'string' && rec.device) {
-            out.push({ slot: slot, device: rec.device, at: typeof rec.at === 'number' ? rec.at : 0 });
+            out.push({ slot: slot, device: rec.device, at: typeof rec.at === 'number' ? rec.at : 0, meta: seatMetaOf(rec.meta) });
         }
     });
     return out;
@@ -2543,9 +2562,9 @@ function renderKeyList() {
         if (seatReadFailed) {
             seatHtml = `<span class="badge badge-scope" title="${escapeHtml('អាន license_seats មិនបានទេ — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច')}">⚠️ ពិនិត្យមិនបាន</span>`;
         } else if (row.seatDevices.length > 0) {
-            const boundText = row.seatDevices.map((d) => d.device.slice(0, 6) + '… ចងនៅ '
-                + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-')).join(' · ');
-            seatHtml = `<span class="badge badge-active" title="${escapeHtml(boundText)}">📱 ${row.seatDevices.length}/${escapeHtml(String(row.maxDevices))}</span>`;
+            const boundText = row.seatDevices.map(seatDeviceLabel).join(' · ');
+            seatHtml = `<span class="badge badge-active" title="${escapeHtml(boundText)}">📱 ${row.seatDevices.length}/${escapeHtml(String(row.maxDevices))}</span>`
+                + `<div class="seat-device-list">${row.seatDevices.map((d) => `<div class="seat-device-line">${escapeHtml(seatDeviceLabel(d))}</div>`).join('')}</div>`;
         } else {
             seatHtml = `<span class="badge badge-scope">📱 ទំនេរ (0/${escapeHtml(String(row.maxDevices))})</span>`;
         }

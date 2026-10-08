@@ -24,6 +24,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ApkUpdatePlugin.class);
+        registerPlugin(DeviceInfoPlugin.class);
         super.onCreate(savedInstanceState);
         preferHighestRefreshRate();
         holdWebViewWhileKeyboardOpens();

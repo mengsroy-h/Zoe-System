@@ -1,3 +1,4 @@
+import { loadDeviceInfo } from './device-info';
 import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
 import { viewState } from '../core/view-state';
@@ -315,6 +316,7 @@ export async function healthLookupRow() {
 export function openHealthCheck() {
     closeSideDrawer();
     openModalHelper('healthCheckModal');
+    loadDeviceInfo();
     runHealthCheck();
 }
 

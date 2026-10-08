@@ -95,6 +95,7 @@ const REQUIRED_FNS = [
     'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta',
     'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'getFormattedDate'
 ];
 const fnSrc = {};
@@ -180,11 +181,11 @@ function makeSandbox(opts) {
     vm.createContext(ctx);
     const order = ['getFormattedDate', 'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp',
         'revertLedgerRecordInMemory', 'applyLedgerBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict',
-        'ledgerMemoryCompensationClaimed', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+        'ledgerMemoryCompensationClaimed', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
         'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer',
         'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements'];
-    vm.runInContext(order.filter((n) => fnSrc[n]).map((n) => fnSrc[n]).join('\n'), ctx);
+    vm.runInContext((SRC.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n' + order.filter((n) => fnSrc[n]).map((n) => fnSrc[n]).join('\n'), ctx);
     return ctx;
 }
 

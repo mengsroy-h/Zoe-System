@@ -311,7 +311,7 @@ function normalize(db) {
         rekey['<ថ្មី:' + t.trashReason + ':' + codes + '>'] = Object.assign({}, t, { id: '<id>' });
     }
     db = Object.assign({}, db, { zoew_recently_deleted_cod_dod: rekey });
-    // token `op` របស់ runLedgerTransaction() ជាអត្តសញ្ញាណការសរសេរ (ថ្មីរាល់ដង) មិនមែនលុយ ➜ ដកតែលើ record ledger ដែលមានរូបរាង token ពិត
+    // token `op` និង ring `ops` របស់ runLedgerTransaction() ជាអត្តសញ្ញាណការសរសេរ (ថ្មីរាល់ដង) មិនមែនលុយ ➜ ដកតែលើ record ledger ដែលមានរូបរាង token ពិត
     for (const node of ['zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod']) {
         const map = db[node];
         if (!map || typeof map !== 'object') continue;
@@ -320,6 +320,7 @@ function normalize(db) {
             if (rec && typeof rec === 'object' && typeof rec.op === 'string' && /^op_[a-z0-9]{8,}$/.test(rec.op)) {
                 const rest = Object.assign({}, rec);
                 delete rest.op;
+                if (rest.ops && typeof rest.ops === 'object' && Object.keys(rest.ops).every((key) => /^op_[a-z0-9]{8,}$/.test(key))) delete rest.ops;
                 clean[k] = rest;
             } else clean[k] = rec;
         }

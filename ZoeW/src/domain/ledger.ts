@@ -83,7 +83,51 @@ export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAd
     };
 }
 
-export function runLedgerTransaction(ref, update, notAppliedRetries = 3) {
+export const LEDGER_OP_RING_MAX = 12;
+
+export function ledgerOpRingOf(record) {
+    const ring = {};
+    const ops = record && typeof record === 'object' ? record.ops : null;
+    if (!ops || typeof ops !== 'object') return ring;
+    Object.keys(ops).forEach((key) => {
+        const seq = ops[key];
+        if (typeof seq === 'number' && isFinite(seq) && seq >= 1 && /^op_[0-9a-z_]{5,37}$/.test(key)) ring[key] = seq;
+    });
+    return ring;
+}
+
+export function ledgerOpRing(record, op) {
+    const ring = ledgerOpRingOf(record);
+    const keys = Object.keys(ring);
+    let top = keys.reduce((max, key) => Math.max(max, ring[key]), 0);
+    if (!keys.length && record && typeof record === 'object') {
+        const seed = typeof record.op === 'string' && record.op !== op && /^op_[0-9a-z_]{5,37}$/.test(record.op) ? record.op : null;
+        top = seed ? 2 : 1;
+        if (seed) ring[seed] = top;
+    }
+    ring[op] = top + 1;
+    Object.keys(ring).sort((a, b) => ring[b] - ring[a]).slice(LEDGER_OP_RING_MAX).forEach((key) => { delete ring[key]; });
+    return ring;
+}
+
+export function ledgerOpWitness(server, prior, op) {
+    if (!op || !server || typeof server !== 'object') return null;
+    const ring = ledgerOpRingOf(server);
+    const has = (key) => Object.prototype.hasOwnProperty.call(ring, key);
+    if (server.op === op || has(op)) return 'applied';
+    const before = ledgerOpRing(prior, op);
+    delete before[op];
+    if (Object.keys(before).some(has)) return 'not-applied';
+    if ((!prior || typeof prior !== 'object') && Object.keys(ring).some((key) => ring[key] === 1)) return 'not-applied';
+    return null;
+}
+
+export function ledgerTagged(record, op, ring) {
+    if (!op) return record;
+    return ring ? { ...record, op, ops: ring } : { ...record, op };
+}
+
+export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordOf = (value) => value) {
     const sdk = firebaseState.fb;
     let op = 'op_';
     try {
@@ -94,12 +138,16 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3) {
         op = 'op_';
         for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
     }
-    const send = (tagged, retries) => sdk.runTransaction(ref, (current) => update(current, tagged ? op : null)).catch((error) => {
-        if (error && error.txOutcome === 'not-applied' && retries > 0) return send(tagged, retries - 1);
-        if (!tagged || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
-        return send(false, retries);
-    });
-    return send(true, notAppliedRetries);
+    const send = (level, retries) => {
+        const updater: any = (current) => update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null);
+        if (level) updater.txOutcomeWitness = (server, prior) => ledgerOpWitness(recordOf(server), recordOf(prior), op);
+        return sdk.runTransaction(ref, updater).catch((error) => {
+            if (error && error.txOutcome === 'not-applied' && retries > 0) return send(level, retries - 1);
+            if (!level || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
+            return send(level - 1, retries);
+        });
+    };
+    return send(2, notAppliedRetries);
 }
 
 export function ledgerZeroDelta() {
@@ -107,7 +155,7 @@ export function ledgerZeroDelta() {
 }
 
 export function ledgerRejectionVerdict(error) {
-    return error && error.txOutcome === 'unknown' && error.txServerUnread === true ? { cod: 0, dod: 0, count: 0, unknown: true } : null;
+    return error && error.txOutcome === 'unknown' ? { cod: 0, dod: 0, count: 0, unknown: true } : null;
 }
 
 export function ledgerMarkUnknown(total, unknown) {
@@ -267,14 +315,14 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
     let serverBefore = null;
     let serverAfter = null;
-    return runLedgerTransaction(dateRef, (current, op) => {
+    return runLedgerTransaction(dateRef, (current, op, ring) => {
         serverBefore = {
             codDollar: parseFloat(current && current.codDollar) || 0,
             dodDollar: parseFloat(current && current.dodDollar) || 0,
             totalCount: parseFloat(current && current.totalCount) || 0
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr);
-        return op ? { ...serverAfter, op } : serverAfter;
+        return ledgerTagged(serverAfter, op, ring);
     }).then((result) => {
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
@@ -303,7 +351,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
     }
     let serverBefore = null;
     let serverAfter = null;
-    return runLedgerTransaction(firebaseState.dbRefMonthlyRevenue, (current, op) => {
+    return runLedgerTransaction(firebaseState.dbRefMonthlyRevenue, (current, op, ring) => {
         const months = (current && typeof current === 'object') ? current : {};
         const existing = months[ymKey] || {};
         serverBefore = {
@@ -312,14 +360,14 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
             totalCount: parseFloat(existing.totalCount) || 0
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Monthly', ymKey);
-        months[ymKey] = op ? { ...serverAfter, op } : serverAfter;
+        months[ymKey] = ledgerTagged(serverAfter, op, ring);
 
         const latestThreeMonths = {};
         Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {
             latestThreeMonths[key] = months[key];
         });
         return latestThreeMonths;
-    }).then((result) => {
+    }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null)).then((result) => {
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");

@@ -1842,6 +1842,9 @@
     "ZoeW/tests/ledger-not-applied-retry.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ledger-op-ring.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ledger-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2875,6 +2878,9 @@
       "policy": "supabase-db"
     },
     "supabase/migrations/20261006192639_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261008023215_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "supabase/package-lock.json": {

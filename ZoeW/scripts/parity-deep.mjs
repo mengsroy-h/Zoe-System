@@ -53,9 +53,11 @@ function idSignatures(dump) {
 }
 
 function normalize(value, sig = new Map()) {
-    // ⛔ ledger ថ្ងៃ/ខែ ផ្ទុក token `op` (ZoeW 2.42.7 ៖ សម្គាល់ការសរសេររបស់ខ្លួនពេល `disconnect`) ➜ App ដើមគ្មានវា ➜ ប្រៀបដោយដកវាចេញ
-    //    (តម្លៃលុយ/ចំនួនក្បែរវានៅប្រៀបដដែល · ការអះអាងរបស់ token ខ្លួនវា ៖ `tx-outcome-test` · `emu/tx-disconnect-emu-test`)
-    let text = JSON.stringify(value, (k, v) => (k === 'op' && typeof v === 'string' && /^op_[a-z0-9]+$/.test(v) ? undefined
+    // ⛔ ledger ថ្ងៃ/ខែ ផ្ទុក token `op` (ZoeW 2.42.7) និង ring `ops` (ZoeW 2.50.22 · MONEY-4) ៖ សម្គាល់ការសរសេររបស់ខ្លួនពេល `disconnect` ➜ App ដើមគ្មានវា
+    //    ➜ ប្រៀបដោយដកវាចេញ (តម្លៃលុយ/ចំនួនក្បែរវានៅប្រៀបដដែល · ការអះអាងរបស់ token ខ្លួនវា ៖ `tx-outcome-test` · `emu/tx-disconnect-emu-test`)
+    const opRing = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0
+        && Object.keys(v).every((key) => /^op_[a-z0-9]+$/.test(key) && typeof v[key] === 'number');
+    let text = JSON.stringify(value, (k, v) => ((k === 'op' && typeof v === 'string' && /^op_[a-z0-9]+$/.test(v)) || (k === 'ops' && opRing(v)) ? undefined
         : typeof v === 'number' && v >= T_CUT && v < T_CUT + 86400000 * 2 ? '<t>' : v));
     text = text.replace(/\b(1[3-9]|2[0-3]):\d\d:\d\d \(2026-09-22\)/g, '<time>');
     // ⛔ claim token (restore/clear) ជាតម្លៃចៃដន្យ **បណ្តោះអាសន្ន** ➜ ប្រៀបធៀបវត្តមាន មិនមែនតម្លៃ

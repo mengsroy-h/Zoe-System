@@ -99,6 +99,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
@@ -205,6 +206,11 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.revertRevenueLedgerDelta + '\n'
         + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
+        + (SRC.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n'
+        + fnSrc.ledgerOpRingOf + '\n'
+        + fnSrc.ledgerOpRing + '\n'
+        + fnSrc.ledgerOpWitness + '\n'
+        + fnSrc.ledgerTagged + '\n'
         + fnSrc.runLedgerTransaction + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
@@ -226,9 +232,9 @@ function seed(ctx, cod, dod, count) {
 }
 const dailyServer = (ctx) => ctx.__store.zoew_daily_revenue_cod_dod[DATE] || null;
 const monthlyServer = (ctx) => (ctx.__store.zoew_monthly_revenue_cod_dod || {})[MONTH] || null;
-// ⛔ token `op` ក្នុងការសរសេរ ledger ជាអត្តសញ្ញាណនៃការសរសេរ (wrapper `disconnect` ប្រៀបវា) មិនមែនលុយ ➜ ការប្រៀបលុយរំលងវា
+// ⛔ token `op` និង ring `ops` ក្នុងការសរសេរ ledger ជាអត្តសញ្ញាណនៃការសរសេរ (wrapper `disconnect` ប្រៀបវា) មិនមែនលុយ ➜ ការប្រៀបលុយរំលងវា
 const moneyOnly = (v) => (v && typeof v === 'object' && !Array.isArray(v)
-    ? Object.keys(v).filter((k) => k !== 'op').reduce((o, k) => { o[k] = moneyOnly(v[k]); return o; }, {})
+    ? Object.keys(v).filter((k) => k !== 'op' && k !== 'ops').reduce((o, k) => { o[k] = moneyOnly(v[k]); return o; }, {})
     : v);
 const same = (a, b) => JSON.stringify(moneyOnly(a)) === JSON.stringify(moneyOnly(b));
 

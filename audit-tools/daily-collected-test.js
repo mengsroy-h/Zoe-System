@@ -438,7 +438,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     vm.runInContext(fnCode, box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX', 'PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX',
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
-        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'EXPIRED_TRASH_RETENTION_MS']) {
+        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'EXPIRED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX']) {
         const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
         if (declaration) box[name] = vm.runInContext(SRC.slice(declaration.init.start, declaration.init.end), box);
     }

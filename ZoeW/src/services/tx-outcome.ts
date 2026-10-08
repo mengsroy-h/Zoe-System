@@ -111,7 +111,7 @@ export function txReadWasRefused(error) {
     return !!m && Number(m[1]) < 500;
 }
 
-export async function txResolveOutcome(restUrl, sentValue, priorValue, onStuck?) {
+export async function txResolveOutcome(restUrl, sentValue, priorValue, onStuck?, witness?) {
     const capturedAuthGeneration = firebaseState.authGeneration;
     const capturedDb = firebaseState.db;
     const current = () => firebaseState.authGeneration === capturedAuthGeneration && firebaseState.db === capturedDb;
@@ -139,6 +139,14 @@ export async function txResolveOutcome(restUrl, sentValue, priorValue, onStuck?)
         if (!current()) break;
         if (txSameValue(server, sentValue)) return { outcome: 'applied', server };
         if (txSameValue(server, priorValue)) return { outcome: 'not-applied', server };
+        let witnessed = null;
+        try {
+            witnessed = typeof witness === 'function' ? witness(server, priorValue) : null;
+        } catch (e) {
+            witnessed = null;
+        }
+        if (witnessed === 'applied') return { outcome: 'applied', server, committed: sentValue };
+        if (witnessed === 'not-applied') return { outcome: 'not-applied', server };
         return { outcome: 'unknown', server };
     }
     return { outcome: 'unknown', server: undefined };
@@ -215,6 +223,7 @@ export function runTransactionResolved(sdk, ref, updater, options) {
     let ran = false;
     let sent;
     let prior;
+    const witness = updater && typeof updater.txOutcomeWitness === 'function' ? updater.txOutcomeWitness : null;
     const tracked = (current) => {
         const before = txCloneJson(current);
         const result = updater(current);
@@ -237,12 +246,13 @@ export function runTransactionResolved(sdk, ref, updater, options) {
         const priorValue = prior;
         txDisconnectResolving.set(outcome, error);
         const releaseGate = txTrackResolving(pathKey, error);
-        const resolving = txResolveOutcome(restUrl, sentValue, priorValue, releaseGate);
+        const resolving = txResolveOutcome(restUrl, sentValue, priorValue, releaseGate, witness);
         resolving.then(releaseGate, releaseGate);
         return resolving.then((resolved) => {
             txDisconnectResolving.delete(outcome);
             if (resolved.outcome === 'applied') {
-                return { committed: true, snapshot: txSnapshotOf(ref, resolved.server), txOutcome: 'applied' };
+                const committed = 'committed' in resolved ? resolved.committed : resolved.server;
+                return { committed: true, snapshot: txSnapshotOf(ref, committed), txOutcome: 'applied' };
             }
             try { error.txOutcome = resolved.outcome; } catch (e) {}
             if (resolved.outcome === 'unknown' && resolved.server === undefined) {

@@ -16,7 +16,7 @@ function sdkWith(outcomes: Array<'ok' | 'not-applied' | 'unknown' | 'permission'
     let value: any = { codDollar: 10, dodDollar: 1, totalCount: 2 };
     firebaseState.fb = {
         runTransaction: async (_ref: any, fn: any) => {
-            const proposed = fn(value);
+            const proposed = fn(JSON.parse(JSON.stringify(value)));
             const outcome = outcomes.shift() || 'ok';
             seen.push({ outcome, proposed });
             if (outcome === 'ok') { value = proposed; return { committed: true, snapshot: { val: () => value } }; }
@@ -27,7 +27,7 @@ function sdkWith(outcomes: Array<'ok' | 'not-applied' | 'unknown' | 'permission'
     return { seen, value: () => value };
 }
 
-const deduct = (current: any, op: any) => ({ codDollar: current.codDollar - 3.5, dodDollar: current.dodDollar - 0.25, totalCount: current.totalCount - 1, op });
+const deduct = (current: any, op: any, ring: any) => ({ codDollar: current.codDollar - 3.5, dodDollar: current.dodDollar - 0.25, totalCount: current.totalCount - 1, op, ring });
 
 describe('runLedgerTransaction ៖ «មិនបានអនុវត្ត» ច្បាស់ ➜ សាកឡើងវិញ', () => {
     it('⛔ not-applied ម្តង ➜ សាកឡើងវិញ ➜ ការកាត់ចូលតែម្តង', async () => {
@@ -56,11 +56,22 @@ describe('runLedgerTransaction ៖ «មិនបានអនុវត្ត» �
         expect(s.seen.length).toBe(1);
     });
 
-    it('ទិសផ្ទុយ ៖ permission_denied ➜ ផ្ញើម្តងទៀតដោយគ្មាន op (ឥរិយាបថដើម)', async () => {
+    it('ទិសផ្ទុយ ៖ permission_denied ➜ ផ្ញើម្តងទៀតដោយគ្មាន ring `ops` (rules ដែលអនុញ្ញាតតែ `op`) · token `op` នៅដដែល', async () => {
         const s = sdkWith(['permission', 'ok']);
         const res: any = await runLedgerTransaction({}, deduct);
         expect(res.committed).toBe(true);
         expect(s.seen[0].proposed.op).toMatch(/^op_/);
-        expect(s.seen[1].proposed.op).toBeNull();
+        expect(Object.keys(s.seen[0].proposed.ring)).toEqual([s.seen[0].proposed.op]);
+        expect(s.seen[1].proposed.op).toBe(s.seen[0].proposed.op);
+        expect(s.seen[1].proposed.ring).toBeNull();
+    });
+
+    it('ទិសផ្ទុយ ៖ permission_denied ពីរដង ➜ ផ្ញើដោយគ្មាន op (rules ចាស់ ៖ ឥរិយាបថដើម)', async () => {
+        const s = sdkWith(['permission', 'permission', 'ok']);
+        const res: any = await runLedgerTransaction({}, deduct);
+        expect(res.committed).toBe(true);
+        expect(s.seen.map((x) => x.outcome)).toEqual(['permission', 'permission', 'ok']);
+        expect(s.seen[2].proposed.op).toBeNull();
+        expect(s.seen[2].proposed.ring).toBeNull();
     });
 });

@@ -609,7 +609,7 @@ runall_summary() {  # សេចក្តីសង្ខេប ៖ ពេល · F
 }
 #@runner-end
 
-section "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
+section "== តេស្តឥរិយាបថ (រត់កូដពិត ៖ ZoeW/src តាម audit build · ZoeKeyGen/app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
          license-grace-test license-clock-trust-test \
          license-clock-rollback-test license-record-race-test license-seat-test \

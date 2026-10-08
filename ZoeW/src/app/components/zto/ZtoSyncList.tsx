@@ -43,7 +43,7 @@ function ZtoSyncMore({ remaining, onMore }: { remaining: number; onMore: () => v
             if (fired || !entries.some((e) => e.isIntersecting)) return;
             fired = true;
             onMore();
-        }, { root: el.closest('.zto-sync-list'), rootMargin: '0px 0px 320px 0px' });
+        }, { root: el.closest('.modal-content'), rootMargin: '0px 0px 320px 0px' });
         io.observe(el);
         return () => io.disconnect();
     }, [remaining, onMore]);

@@ -221,6 +221,166 @@ const HISTORY_ROW_PROBE = async (big) => {
     return out;
 };
 
+// ⛔ UI-7 ៖ ប្រអប់ PIN លើកុំព្យូទ័រ ៖ បើក ➜ cursor នៅក្នុងវាល PIN · វាយ + Enter ➜ ផ្ទៀងផ្ទាត់ (ដូចប៊ូតុង) · ទូរស័ព្ទ (UA) ➜ មិន focus ស្វ័យប្រវត្តិ
+//    (keyboard មិនលោតឡើងគ្របប៊ូតុងក្រយៅដៃ)។ ទំព័រស្រស់ (app-lock-test ៖ Chromium ឈប់បញ្ជូន input ពិតក្រោយវដ្តចាកចេញ/ត្រឡប់)។
+async function pinEnterSubmits(browser, port) {
+    const open = async (ua) => {
+        const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 800 } }, ua ? { userAgent: ua } : {}));
+        const page = await ctx.newPage();
+        page.on('dialog', (d) => d.dismiss().catch(() => {}));
+        await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(800);
+        const ready = await page.evaluate(async () => {
+            if (typeof requestPinBeforeConfig !== 'function' || typeof hashPin !== 'function') return false;
+            localStorage.setItem('zoew_security_pin_hash', await hashPin('246802'));
+            window.__pinOk = 0;
+            requestPinBeforeConfig(() => { window.__pinOk = 1; }, 'config');
+            return true;
+        });
+        return { ctx, page, ready };
+    };
+    const desk = await open(null);
+    check(desk.ready, 'ZoeW ប្រអប់ PIN ៖ មាន requestPinBeforeConfig · hashPin (audit build)');
+    if (desk.ready) {
+        const focused = await desk.page.evaluate(() => (document.activeElement || {}).id || '');
+        check(focused === 'securityPinInput', '⛔ ZoeW ប្រអប់ PIN ៖ កុំព្យូទ័រ ➜ បើកហើយ cursor នៅក្នុងវាល PIN ភ្លាម', focused);
+        await desk.page.fill('#securityPinInput', '246802', { timeout: 6000 });
+        await desk.page.press('#securityPinInput', 'Enter', { timeout: 6000 });
+        let res = null;
+        for (let i = 0; i < 30; i++) {
+            await desk.page.waitForTimeout(200);
+            res = await desk.page.evaluate(() => ({ ok: window.__pinOk, open: getComputedStyle(document.getElementById('pinModal')).display !== 'none' }));
+            if (res.ok) break;
+        }
+        check(!!res && res.ok === 1 && res.open === false, '⛔ ZoeW ប្រអប់ PIN ៖ វាយ PIN + Enter ➜ ផ្ទៀងផ្ទាត់ ហើយបិទប្រអប់', JSON.stringify(res));
+    }
+    await desk.ctx.close();
+    const phone = await open('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36');
+    if (phone.ready) {
+        const focused = await phone.page.evaluate(() => (document.activeElement || {}).id || '');
+        check(focused !== 'securityPinInput', 'ZoeW ប្រអប់ PIN ៖ ទិសផ្ទុយ ៖ ទូរស័ព្ទ ➜ មិន focus ស្វ័យប្រវត្តិ (keyboard មិនលោត)', focused);
+    }
+    await phone.ctx.close();
+}
+
+// ⛔ UI-5/UI-6 ៖ ជួរ 🔔 «ជិតផុតកំណត់» · «ដករួច» ត្រូវបង្ហាញ Locker ពេញ (ទីតាំងសម្រាប់ទៅយកកញ្ចប់ចេញពីទូ) ៖ ព័ត៌មានបត់បន្ទាត់ មិនកាត់ «…» ·
+//    ជួរមិនលើសផ្ទាំង។ វាស់ `scrollWidth`/`clientWidth` ក្នុង browser ពិតលើទូរស័ព្ទ ៣២០ · ៤១២។
+async function notifyRowLayout(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => !!window.uiState);
+    check(ready, 'ZoeW ជួរ 🔔 ៖ មាន uiState (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    const LOCKER = 'ទូ A-12 · ជាន់ទី ៣ · ច្រកខាងឆ្វេង';
+    await page.evaluate((locker) => {
+        const rows = [{ key: 'r1', phone: '0961234567', locker, count: 12, isNew: true, hoursAgo: 3 }];
+        window.uiState.notifyRemovedView = { measurable: true, emptyText: '', packages: 12, customers: 1, unseen: 12, rows, more: 0 };
+        window.uiState.notifyDrawerOpen = true;
+    }, LOCKER);
+    const seen = [];
+    for (const w of [320, 412]) {
+        await page.setViewportSize({ width: w, height: 900 });
+        await page.waitForTimeout(400);
+        seen.push(await page.evaluate(() => {
+            const meta = document.querySelector('#notifyRemovedList .notify-expiry-meta');
+            const row = document.querySelector('#notifyRemovedList .notify-expiry-row');
+            const drawer = document.getElementById('notifyDrawer');
+            if (!meta || !row || !drawer) return null;
+            const rr = row.getBoundingClientRect(), dr = drawer.getBoundingClientRect();
+            return { w: window.innerWidth, text: meta.textContent, metaW: meta.clientWidth, rowW: row.clientWidth, cut: meta.scrollWidth > meta.clientWidth + 1, ellipsis: getComputedStyle(meta).textOverflow,
+                rowInside: rr.left >= dr.left - 1 && rr.right <= dr.right + 1, rowRight: rr.right, drawerRight: dr.right };
+        }));
+    }
+    check(seen.every(Boolean) && seen.every((s) => s.text.indexOf(LOCKER) !== -1), 'ZoeW ជួរ 🔔 ៖ ជាន់អប្បបរមា ៖ ជួរដករួចគូរជាមួយ Locker', JSON.stringify(seen));
+    check(seen.every((s) => s && !s.cut && s.ellipsis !== 'ellipsis'),
+        '⛔ ZoeW ជួរ 🔔 ៖ Locker មិនត្រូវកាត់ (បត់បន្ទាត់ គ្មាន «…») ៣២០ · ៤១២', JSON.stringify(seen));
+    check(seen.every((s) => s && s.metaW >= s.rowW * 0.4),
+        '⛔ ZoeW ជួរ 🔔 ៖ ព័ត៌មាន (ចំនួន · Locker) មិនត្រូវគាបតូច (≥ ៤០% នៃជួរ ៖ បត់ចុះបន្ទាត់ថ្មីពេលមិនគ្រប់)', JSON.stringify(seen));
+    check(seen.every((s) => s && s.rowInside), 'ZoeW ជួរ 🔔 ៖ ជួរនៅក្នុងផ្ទាំង (មិនលើស)', JSON.stringify(seen));
+    await ctx.close();
+}
+
+// ⛔ UI-4 ៖ បញ្ជី ZTO «មិនទាន់បិទ» គូរជាទំព័រ ២០ ហើយទាញបន្ថែមពេលរមូរជិតចុង ៖ root របស់ IntersectionObserver ត្រូវជាធាតុដែលរមូរពិត
+//    (`.modal-content`) — root ដែលមិនរមូរ (`.zto-sync-list`) ឃើញ sentinel «ប្រសព្វ» ជានិច្ច ➜ ទាញគ្រប់ទំព័រភ្លាម (គូរ ២០០ barcode SVG ពេលបើក)។
+async function ztoSyncListPaging(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof openModalHelper === 'function' && !!window.ztoState);
+    check(ready, 'ZoeW បញ្ជី ZTO ៖ មាន openModalHelper · ztoState (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.evaluate(() => {
+        const entries = [];
+        for (let i = 0; i < 200; i++) entries.push({ code: 'ZT' + String(700000000000 + i), phone: '0' + String(10000000 + i), locker: 'A' + (i % 9) });
+        window.ztoState.ztoSyncListView = { empty: null, entries };
+        openModalHelper('ztoSyncModal');
+    });
+    await page.waitForTimeout(700);
+    const count = () => document.querySelectorAll('#ztoSyncList .zto-sync-item').length;
+    const first = await page.evaluate(count);
+    check(first >= 20 && first <= 40, '⛔ ZoeW បញ្ជី ZTO ៖ បើកប្រអប់ ➜ គូរតែទំព័រដំបូង (មិនទាញគ្រប់ ២០០ ភ្លាម)', 'គូរ ' + first);
+    await page.evaluate(() => {
+        const box = document.querySelector('#ztoSyncModal .modal-content');
+        if (box) box.scrollTop = box.scrollHeight;
+    });
+    await page.waitForTimeout(700);
+    const after = await page.evaluate(count);
+    check(after > first && after < 200, 'ZoeW បញ្ជី ZTO ៖ រមូរដល់ចុង ➜ ទាញទំព័របន្ទាប់ (មិនមែនទាំងអស់)', first + ' ➜ ' + after);
+    await ctx.close();
+}
+
+// ⛔ UI-3 ៖ banner «កំណែថ្មី» (`position: fixed; bottom: 0`) មិនត្រូវគ្របរបា Tab ខាងក្រោម (ទូរស័ព្ទ/ថេប្លេត < 992px) ៖ នៅពីលើរបា ·
+//    របាលាក់ (`chrome-hidden`) ➜ ចុះដល់បាត · desktop (របា Tab នៅខាងលើ) ➜ នៅបាតដដែល។ វាស់ `getBoundingClientRect()` ក្នុង browser ពិត។
+async function updateBannerLayout(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof showUpdateAvailableBanner === 'function');
+    check(ready, 'ZoeW banner កំណែថ្មី ៖ មាន showUpdateAvailableBanner (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.evaluate(() => showUpdateAvailableBanner());
+    await page.waitForTimeout(150);
+    const probe = () => {
+        const b = document.getElementById('zoeUpdateBanner');
+        const t = document.getElementById('pageTabBar');
+        if (!b || !t) return null;
+        const br = b.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        return { bTop: br.top, bBottom: br.bottom, bH: br.height, tTop: tr.top, tBottom: tr.bottom, tH: tr.height, vh: window.innerHeight };
+    };
+    const phone = await page.evaluate(probe);
+    check(!!phone && phone.bH > 20 && phone.tH > 20, 'ZoeW banner កំណែថ្មី ៖ ជាន់អប្បបរមា ៖ banner និងរបា Tab ត្រូវគូរ (ទូរស័ព្ទ)', JSON.stringify(phone));
+    if (phone) {
+        check(phone.bBottom <= phone.tTop + 1,
+            '⛔ ZoeW banner កំណែថ្មី ៖ ទូរស័ព្ទ ➜ នៅពីលើរបា Tab (មិនគ្រប)', JSON.stringify(phone));
+        check(phone.tBottom >= phone.vh - 1, 'ZoeW banner កំណែថ្មី ៖ របា Tab នៅបាតអេក្រង់ដដែល', JSON.stringify(phone));
+    }
+    const hidden = await page.evaluate((fn) => {
+        document.body.classList.add('chrome-hidden');
+        const out = (0, eval)('(' + fn + ')')();
+        document.body.classList.remove('chrome-hidden');
+        return out;
+    }, probe.toString());
+    check(!!hidden && hidden.bBottom >= hidden.vh - 1,
+        'ZoeW banner កំណែថ្មី ៖ របា Tab លាក់ (`chrome-hidden`) ➜ banner ចុះដល់បាតអេក្រង់', JSON.stringify(hidden));
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.waitForTimeout(200);
+    const desk = await page.evaluate(probe);
+    check(!!desk && desk.bBottom >= desk.vh - 1 && desk.tTop < desk.vh / 2,
+        'ZoeW banner កំណែថ្មី ៖ desktop (របា Tab នៅខាងលើ) ➜ banner នៅបាតដដែល', JSON.stringify(desk));
+    await ctx.close();
+}
+
 async function historyRowLayout(browser, port) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
     const page = await ctx.newPage();
@@ -740,6 +900,10 @@ async function historyRowLayout(browser, port) {
                     'min-height=' + ui.boxMinH);
             }
             await historyRowLayout(browser, port);
+            await updateBannerLayout(browser, port);
+            await ztoSyncListPaging(browser, port);
+            await notifyRowLayout(browser, port);
+            await pinEnterSubmits(browser, port);
         }
 
         server.close();

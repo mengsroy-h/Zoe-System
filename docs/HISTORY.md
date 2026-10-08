@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.34– — ជុំ ១៥ (UI · NATIVE · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ កុំព្យូទ័រ ៖ Escape ➜ ស្កេនបន្តបាន ([2.50.34] សកម្មភាព ២) · ☰ បើក ➜ session ផុត ➜ ប្រអប់ចូលនៅខាងលើ ([2.50.35] សកម្មភាព ២) · banner កំណែថ្មី · 🔔 Locker · បញ្ជី ZTO · PIN Enter ([2.50.36] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.28–2.50.33 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · SCALE-3 · SCALE-6 · SCALE-7 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២) · ហាង Supabase ៖ ឧបករណ៍ពីរឃើញការប្រែភ្លាម ([2.50.31] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
@@ -129,6 +129,33 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.36] — 2026-10-08 · ZoeW ៖ **banner កំណែថ្មីលែងគ្របរបា Tab · បញ្ជី ZTO ទាញជាទំព័រពិត · ជួរ 🔔 បង្ហាញ Locker ពេញ · ប្រអប់ PIN ចុច Enter បាន** (Deep audit ២ · ជុំ ១៥ · UI-3 · UI-4 · UI-5/6 · UI-7)
+
+**ZoeW `2.50.36`** (`zoew-v298` ➜ `zoew-v299`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **UI-3** ៖ banner «មានកំណែថ្មី» (`position: fixed; bottom: 0; z-index: 990`) គ្របរបា Tab ខាងក្រោម (z-index 900) លើទូរស័ព្ទ/ថេប្លេត ➜ ចុចប្តូរទំព័រមិនបាន។
+  ឥឡូវ < 992px ៖ banner នៅពីលើរបា (`bottom: var(--tabbar-height)`) · របាលាក់ (`chrome-hidden`) ➜ ចុះដល់បាត · desktop (របាខាងលើ) ដូចដើម។
+- 📋 **UI-4** ៖ បញ្ជី ZTO «មិនទាន់បិទ» ៖ root របស់ IntersectionObserver ជា `.zto-sync-list` (មិនរមូរ) ➜ sentinel «ប្រសព្វ» ជានិច្ច ➜ ទាញគ្រប់ទំព័រភ្លាម (២០០ barcode SVG ពេលបើក)។
+  ឥឡូវ root = `.modal-content` (ធាតុដែលរមូរពិត) ➜ ទំព័រ ២០ ហើយទាញបន្ថែមពេលរមូរជិតចុង។
+- 📦 **UI-5/6** ៖ ជួរ 🔔 «ជិតផុតកំណត់» · «ដករួច» កាត់ព័ត៌មាន (ចំនួន · Locker) ដោយ «…» ហើយលើទូរស័ព្ទ ៣២០px ព័ត៌មានគាបដល់ ០px ➜ ឥឡូវបត់ចុះបន្ទាត់ថ្មី មិនកាត់។
+- 🔒 **UI-7** ៖ ប្រអប់ PIN ៖ ចុច Enter មិនធ្វើអ្វី · cursor មិននៅក្នុងវាល PIN ➜ ឥឡូវ Enter = ផ្ទៀងផ្ទាត់ (`<form onSubmit>` ➜ `submitSecurityPinForm`) · កុំព្យូទ័រ focus វាល PIN ភ្លាម ·
+  ទូរស័ព្ទមិន focus (keyboard មិនលោតគ្រប)។
+- run-all ៖ ចំណងជើងផ្នែក «តេស្តឥរិយាបថ» ប្រាប់ការពិត (កូដពិតពី `ZoeW/src` តាម audit build · `ZoeKeyGen/app.js`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក ៖ ទូរស័ព្ទ ៖ ពេល banner «មានកំណែថ្មី» លេច ➜ របា Tab នៅមើលឃើញ និងចុចបាន · 🔔 ➜ ជួរដែលមាន Locker វែងបង្ហាញពេញ ·
+   បញ្ជី ZTO «មិនទាន់បិទ» ច្រើន ➜ បើកលឿន ហើយរមូរចុះទាញបន្ថែម · កុំព្យូទ័រ ៖ Config ➜ វាយ PIN ➜ Enter។
+
+#### អ្នកយាម
+
+- `layout-check` (browser ពិត · ផ្នែកថ្មី ៤) ៖ banner នៅពីលើរបា Tab · `chrome-hidden` ➜ បាត · desktop បាត (មុនកែ FAIL ១) · បញ្ជី ZTO ២០០ ➜ បើកគូរ ២០ · រមូរ ➜ ទំព័របន្ទាប់
+  (មុនកែ FAIL ២ ៖ គូរ ២០០ ភ្លាម) · ជួរ 🔔 ៣២០/៤១២ ៖ មិនកាត់ · ព័ត៌មាន ≥ ៤០% នៃជួរ (មុនកែ FAIL ២ ៖ «…» · ទទឹង ០/៤៥px) · ប្រអប់ PIN ៖ focus · Enter ➜ ផ្ទៀងផ្ទាត់ ·
+  ទូរស័ព្ទមិន focus (មុនកែ FAIL ២) · `app-lock-test` ១៦២ · `pin-prompt-test` ៧៧ · `lookup-prefetch-test` ២៦៤ (sandbox ៖ `isMobileDevice` · `focusField`)។
 
 ### [2.50.35] — 2026-10-08 · ZoeW ៖ **session ផុត/ចាកចេញ ខណៈ ☰ បើក ➜ ប្រអប់ចូលលែងនៅក្រោមរបា Slide** (Deep audit ២ · ជុំ ១៥ · UI-2)
 
@@ -2570,6 +2597,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 |---|---|---|---|
 | A31 | **UI-1** scanner ដៃបាត់ focus ក្រោយ Escape | Claude ៖ React ពិត (jsdom) ៖ focus ក្នុង `#exchangeRateInput` ➜ `closeModal()` ➜ `activeElement` នៅ `exchangeRateInput` (browser ពិត ៖ ធ្លាក់ទៅ `body` នៅការគូរបន្ទាប់) | មិនអើពើប្រអប់អក្សរក្នុង `.modal` ពេលគ្មានប្រអប់បើក |
 | A32 | **UI-2** ប្រអប់ចូលនៅក្រោម ☰ | Claude ៖ React ពិត ៖ ☰ បើក ➜ `showLoginModalWithPrefill()` ➜ `#sideDrawer.open` នៅ | `drawerOpen = false` ក្នុង `clearSensitiveModalFields()` |
+| A33 | **UI-3 · UI-4 · UI-5/6 · UI-7** | Claude ៖ browser ពិត (`layout-check`) ៖ banner បាត ៩០០ គ្របរបា Tab · បញ្ជី ZTO គូរ ២០០/២០០ ពេលបើក · ព័ត៌មានជួរ 🔔 ទទឹង ០px (៣២០) / ៤៥px (៤១២) + «…» · Enter ក្នុងវាល PIN ➜ `__pinOk = 0` · cursor មិននៅវាល PIN | CSS `react-root.css` · root `.modal-content` · `<form onSubmit>` + focus កុំព្យូទ័រ |
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–[2.50.33]
 
@@ -2587,6 +2615,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ⛔ ការស៊ើបអង្កេតមិនប៉ះ probe liveness (`probeDatabaseLiveness()`) ទេ។
 - SCALE-2 ក្រោយ push ៖ `emu/crud-rules-flow` (ការពិនិត្យ dependency ឋិតិវន្តរបស់ sandbox) ចាប់ `dataState` · `scheduleCleanupSweepContinuation` ➜ stub (ការហៅគ្មាន limit មិនអានវា) ·
   មេរៀន ៖ ផ្ទៀងផ្ទាត់ checker sandbox ទាំងអស់ដែលស្រង់ function ដែលប្រែ មុន push (មិនមែនតែ checker ដែលរត់វា)។
+- UI-7 ៖ ការវាស់ Enter ក្នុង `app-lock-test` ក្រុម ២១ មិនបាន ៖ អន្ទាក់ harness ដែលបានកត់ (Chromium headless ឈប់បញ្ជូន input ពិតក្រោយវដ្តចាកចេញ/ត្រឡប់ ៖ `page.press` ត្រឡប់ជោគជ័យ
+  តែតម្លៃនៅក្នុងវាល · probe ទំព័រស្រស់ ➜ Enter ដើរ) ➜ ការវាស់ផ្លាស់ទៅ `layout-check` ទំព័រស្រស់។
 - SCALE-3 ៖ mutation ដំបូង ៤ រស់ (scope · stage swap · reset · listener មិនទាន់ fire) ➜ test scope ដំបូងមិនចូលស្ថានភាពពិត (ការសរសេរត្រូវបដិសេធមុនផ្ញើ ព្រោះ scope ប្តូរមុន rpc) ➜ រង់ចាំឲ្យ
   ការសរសេរនៅក្នុង rpc សិន · បន្ថែម test reset កណ្តាលសម័យ · listener ក្រោយ permission_denied · tenant ប្តូរ (notify ខណៈ pull ពេញរង់ចាំ) · ការសម្គាល់ក្នុង `resetForSignOut()` ស្ទួន (listener ត្រូវ reset `fired`
   ហើយ pull `since = 0` តែងជា reset ➜ stage swap) ➜ រួមក្នុង `clearServerView()` តែមួយ។

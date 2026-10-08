@@ -14,7 +14,9 @@ export function PinModal() {
             <div className="modal-content">
                 <h3>🔒 បញ្ចូល Security PIN</h3>
                 <p id="pinModalDesc">{desc}</p>
-                <input type="password" id="securityPinInput" ref={refTo('securityPinInput')} placeholder="លេខកូដ PIN (ឧ. 0000)" autoComplete="off" />
+                <form onSubmit={onAct("submitSecurityPinForm", { evt: true })}>
+                    <input type="password" id="securityPinInput" ref={refTo('securityPinInput')} placeholder="លេខកូដ PIN (ឧ. 0000)" autoComplete="off" />
+                </form>
                 <button
                     type="button"
                     className="btn-biometric"

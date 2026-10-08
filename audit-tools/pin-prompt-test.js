@@ -196,6 +196,8 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     vm.runInContext(reactRuntime(appJs, { context: sandbox }), c2);
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', c2);
     vm.runInContext('let pinTargetAction = null;', c2);
+    // ⛔ UI-7 ៖ focus វាល PIN តែលើកុំព្យូទ័រ ➜ sandbox នេះជាទូរស័ព្ទ (ការវាស់ focus ៖ `layout-check` ប្រអប់ PIN ក្នុង browser ពិត)
+    vm.runInContext("if (typeof isMobileDevice !== 'function') globalThis.isMobileDevice = function () { return true; }; if (typeof focusField !== 'function') globalThis.focusField = function () {};", c2);
     vm.runInContext(`
         let __biometricEnabled = false;
         function isBiometricEnabled() { return __biometricEnabled; }

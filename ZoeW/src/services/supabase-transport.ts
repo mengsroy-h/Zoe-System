@@ -86,7 +86,12 @@ export function sbFetchWithTimeout(fetchImpl, url, init, timeoutMs) {
         started = Promise.reject(e);
     }
     const run = started.then(async (res) => {
-        const text = await res.text();
+        let text;
+        try {
+            text = await res.text();
+        } catch (e) {
+            throw new SbNetworkError(String((e && e.message) || e || 'network'));
+        }
         return { status: res.status, ok: res.ok, text };
     }, (e) => {
         throw new SbNetworkError(String((e && e.message) || e || 'network'));

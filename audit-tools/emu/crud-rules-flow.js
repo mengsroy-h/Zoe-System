@@ -62,7 +62,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
-    'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
     'toggleCloseStatus', 'executePermanentDelete'];
 
@@ -247,6 +247,8 @@ function makeSandbox(store, now) {
         optionalConst(src, 'CLEANUP_JOURNAL_MAX', 'const CLEANUP_JOURNAL_MAX = 200;'),
         optionalConst(src, 'CLEANUP_STAGE_MOVED', "const CLEANUP_STAGE_MOVED = 'moved';"),
         optionalConst(src, 'CLEANUP_STAGE_LEDGER', "const CLEANUP_STAGE_LEDGER = 'ledger';"),
+        optionalConst(src, 'CLEANUP_STAGE_FLIP', "const CLEANUP_STAGE_FLIP = 'flip';"),
+        optionalConst(src, 'CLEANUP_STAGE_SLOT', "const CLEANUP_STAGE_SLOT = 'slot';"),
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         optionalFn(src, 'safeStoreGet', 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalFn(src, 'safeStoreSet', 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
@@ -268,7 +270,7 @@ function makeSandbox(store, now) {
         //    `false` (វាស់ដោយ module ពិតក្នុង `ZoeW/tests/zto-abandon-signed-gate.test.tsx`)។
         'function ztoAbandonCleanupIsHeld() { return false; }',
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';",
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", "const DB_LISTENER_KEY_HISTORY = 'history';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**
         // (ការវាស់របស់វាជារបស់ `tx-outcome-test` · `emu/tx-disconnect-emu-test`) ➜ ហៅ = បោះ ➜ ធ្លាក់ មិនមែនបៃតងស្ងាត់
         "async function cleanupClaimAccountedElsewhere() { throw new Error('crud-rules-flow: ផ្លូវ disconnect មិនត្រូវបានគំរូ'); }", 'const activeRestoreClaims = new Map();',

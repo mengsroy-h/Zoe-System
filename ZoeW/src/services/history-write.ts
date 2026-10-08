@@ -1,10 +1,28 @@
 import { dataState, firebaseState, uiState } from '../core/state';
 import { HISTORY_PATCH_QUEUE_MAX, HISTORY_PATCH_RETRY_MAX, pendingHistoryPatches } from '../core/clock';
 import { dropStaleRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
-import { dbOp, dbOpStalled } from './network';
+import { armLateCommit, dbOp, dbOpStalled } from './network';
 import { transactionDisconnectPending } from './tx-outcome';
 import { refreshCurrentHistoryView, scheduleHistoryViewRefresh } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
+
+export function freshHistoryItemShell(item) {
+    const shell: any = { barcodes: [] };
+    if (!item || typeof item !== 'object') return shell;
+    if (item.id !== undefined) shell.id = item.id;
+    if (item.phone !== undefined) shell.phone = item.phone;
+    if (item.createdAt !== undefined) shell.createdAt = item.createdAt;
+    return shell;
+}
+
+export function freshHistoryItemFrom(item, mergeFn) {
+    const fresh = mergeFn(freshHistoryItemShell(item));
+    if (!fresh || typeof fresh !== 'object') return fresh;
+    const only = Array.isArray(fresh.barcodes) && fresh.barcodes.length === 1 ? fresh.barcodes[0] : null;
+    const born = only && typeof only === 'object' ? Number(only.createdAt) : 0;
+    if (born > 0) fresh.createdAt = born;
+    return fresh;
+}
 
 export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
     if (!firebaseState.db || !firebaseState.fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
@@ -16,7 +34,7 @@ export function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
     }
     return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
         if (currentItem && currentItem.clearClaim) return;
-        if (!currentItem) return fallbackItem;
+        if (!currentItem) return fallbackItem ? freshHistoryItemFrom(fallbackItem, mergeFn) : fallbackItem;
         dropStaleRestoreMarkers(currentItem);
         return mergeFn(currentItem);
     }).then((result) => {
@@ -126,6 +144,10 @@ export function flushPendingHistoryPatches() {
         }
         Promise.resolve(started).then((saved) => {
             if (!flushIsCurrent()) return;
+            if (saved === 'pending') {
+                done();
+                return;
+            }
             if (!saved || saved === 'queued') noteAttempt(itemId, attempts);
             else if (entry.successToast) showToast(entry.successToast);
             done();
@@ -155,12 +177,54 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
         });
         refreshCurrentHistoryView();
     };
+    const revertUnchangedFields = () => {
+        if (!previousFields) return;
+        const revertItem = dataState.scanHistory.find(i => i.id === item.id);
+        if (!revertItem) return;
+        let changed = false;
+        Object.keys(previousFields).forEach((key) => {
+            const written = fields[key] === null ? undefined : fields[key];
+            if (revertItem[key] !== written) return;
+            if (previousFields[key] === undefined) delete revertItem[key];
+            else revertItem[key] = previousFields[key];
+            changed = true;
+        });
+        if (changed) refreshCurrentHistoryView();
+    };
+    const settleLatePatch = (saved) => {
+        if (opts && typeof opts.onLateSettled === 'function') opts.onLateSettled(saved);
+    };
     const handlePatchFailure = (error) => {
         if (!patchIsCurrent()) return false;
         const cause = (dbOpStalled(error) && transactionDisconnectPending(patchTransaction)) || error;
         if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(cause)
             && queueHistoryPatchRetry(item.id, fields, previousFields, opts.queuedSuccessToast, opts.preserveQueuedFields)) {
             return 'queued';
+        }
+        if (dbOpStalled(error) && armLateCommit(patchTransaction, (lateResult) => {
+            if (!patchIsCurrent()) return;
+            if (!serverItemExisted) {
+                revertUnchangedFields();
+                showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
+                settleLatePatch(false);
+                return;
+            }
+            const committedItem = lateResult.snapshot ? normalizeBarcodesOf(lateResult.snapshot.val()) : null;
+            if (committedItem && !committedItem.id) committedItem.id = item.id;
+            if (!(opts && typeof opts.onLateSettled === 'function')) showToast((opts && opts.queuedSuccessToast) || "✅ បណ្តាញត្រឡប់មកវិញ — ការកែប្រែត្រូវបានរក្សាទុកក្នុង Firebase រួចរាល់!");
+            settleLatePatch(committedItem || true);
+        }, (lateErr) => {
+            if (!patchIsCurrent()) return;
+            if (lateErr) {
+                console.error("Error patching history item (late): ", lateErr);
+                if (window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: "Error patching history item (late): " });
+            }
+            revertUnchangedFields();
+            showToast(lateErr ? "⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។" : "⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
+            settleLatePatch(false);
+        }, 'patchHistoryItemFields')) {
+            showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការកែប្រែនឹងរក្សាទុកពេលបណ្តាញត្រឡប់មកវិញ។");
+            return 'pending';
         }
         console.error("Error patching history item: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error patching history item: " });

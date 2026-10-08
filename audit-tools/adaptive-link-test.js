@@ -1,6 +1,6 @@
 // ថ្នាក់កំហុស៖ **ការងារបណ្តាញ «ស្រេចចិត្ត» មិនសម្របតាមគុណភាពតំណ។**
 //
-// App សម្របតាម **ឧបករណ៍** រួចហើយ (`measureDisplayHz()`, `setupAdaptivePerformance()`
+// App សម្របតាម **ឧបករណ៍** រួចហើយ (`sampleFramePace()`, `setupAdaptivePerformance()`
 // ➜ `perf-lite`, `LIVE_SCAN_WIDTH_STEPS`) ប៉ុន្តែវា **មិនសម្របតាមតំណបណ្តាញទេ** —
 // `navigator.connection` មិនត្រូវបានប្រើកន្លែងណាសោះ។ ផលៈ លើ 2G ឬពេលអ្នកប្រើ
 // បើក «Data Saver» ការងារ **ស្រេចចិត្ត** នៅតែរត់ពេញ៖

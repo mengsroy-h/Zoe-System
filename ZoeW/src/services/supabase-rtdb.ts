@@ -546,7 +546,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     const rpc = async (fn, args) => {
         const t0 = Date.now();
-        const data = await transport.rpc(fn, args, rpcTimeoutMs);
+        let data;
+        try {
+            data = await transport.rpc(fn, args, rpcTimeoutMs);
+        } catch (e) {
+            if (fn === 'zoe_write' && e instanceof SbRpcError && e.code === 'bad_response') throw new SbNetworkError('write reply unreadable');
+            throw e;
+        }
+        if (fn === 'zoe_write' && (!data || typeof data !== 'object')) throw new SbNetworkError('write reply empty');
         if (data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
         return data;
     };
@@ -660,6 +667,17 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 page = -1;
                                 continue;
                             }
+                        }
+                        if (serverTenant !== null && res && typeof res.tenant === 'string' && res.tenant && res.tenant !== serverTenant) {
+                            if (++restarts > SB_PULL_MAX_RESTARTS) throw new SbRpcError('pull keeps restarting', 'pull_restart', 0, '');
+                            server.clear();
+                            pullStage = null;
+                            pullStageAbove = 0;
+                            serverTenant = null;
+                            cursor = 0;
+                            pullFullHead = null;
+                            page = -1;
+                            continue;
                         }
                         if (res && res.reset && page > 0 && ++restarts > SB_PULL_MAX_RESTARTS) {
                             throw new SbRpcError('pull keeps restarting', 'pull_restart', 0, '');
@@ -1009,7 +1027,10 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (current) applyWriteResult(res);
                         notify();
                         const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed || !current ? next : cloneCanonical(serverValueAt(path))) };
-                        if (lost) (committed as any).txOutcome = 'applied';
+                        if (lost) {
+                            (committed as any).txOutcome = 'applied';
+                            (committed as any).txProven = true;
+                        }
                         return committed;
                     }
                     if (res && res.conflict) {
@@ -1089,6 +1110,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         server.clear();
         cursor = 0;
         pullFullHead = null;
+        pullStage = null;
+        pullStageAbove = 0;
         if (cacheSaveTimer) { clearTimeout(cacheSaveTimer); cacheSaveTimer = null; }
         cacheGeneration++;
         cacheScope = null;

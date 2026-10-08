@@ -136,6 +136,7 @@ export async function txResolveOutcome(restUrl, sentValue, priorValue, onStuck?)
             if (txReadWasRefused(e) && ++refusals >= TX_OUTCOME_MAX_REFUSALS) break;
             continue;
         }
+        if (!current()) break;
         if (txSameValue(server, sentValue)) return { outcome: 'applied', server };
         if (txSameValue(server, priorValue)) return { outcome: 'not-applied', server };
         return { outcome: 'unknown', server };

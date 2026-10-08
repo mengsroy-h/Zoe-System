@@ -365,7 +365,7 @@ function runPatch(mode) {
     vm.runInContext('const pendingHistoryPatches = new Map();', ctx);
     vm.runInContext('let scanHistory = [' + JSON.stringify(item) + '];', ctx);
     vm.runInContext(sliceConst(zoewSrc, 'txDisconnectResolving') || 'const txDisconnectResolving = new WeakMap();', ctx);
-    for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'transactionDisconnectPending', 'patchHistoryItemFields']) {
+    for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'transactionDisconnectPending', 'armLateCommit', 'patchHistoryItemFields']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return Promise.resolve({ missing: fn });
         vm.runInContext(s, ctx);
@@ -398,7 +398,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
-    'correctRevenueLedgerToActual', 'claimAndCleanupItem'];
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -449,6 +449,8 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
         sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
+        // RACES-2 ៖ `claimAndCleanupItem()` ចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម (store field ក្នុង text view)
+        'let authGeneration = 0;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();',
         // ⛔ journal នៃការសម្អាត (2.37.2) ៖ ការហៅរបស់វា fail-open ➜ បើ sandbox
@@ -458,6 +460,8 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'CLEANUP_JOURNAL_MAX') || 'const CLEANUP_JOURNAL_MAX = 200;',
         sliceConst(zoewSrc, 'CLEANUP_STAGE_MOVED') || "const CLEANUP_STAGE_MOVED = 'moved';",
         sliceConst(zoewSrc, 'CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
+        sliceConst(zoewSrc, 'CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
+        sliceConst(zoewSrc, 'CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         sliceFrom(zoewSrc, 'safeStoreGet') || 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
         sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',

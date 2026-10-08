@@ -114,7 +114,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ បូក `rules:check` |
 | `npm run build:parity` | build ផលិតកម្មចូល `dist-parity/` ឯកជន ៖ `run-all.sh` រត់ `parity:dom` · `parity:live` · `parity:deep` លើវា (ការងារ `zoew-parity`) ដោយមិនប្រណាំង `dist/` ជាមួយ `zoew-suite` (`ZOEW_PARITY_DIST`) |
 
-⛔ **ការខុសគ្នាពី ZoeW ដើមដោយចេតនា** (ផ្ទាំង 🔔 · logo SVG · navbar ទាបជាង ១៤px លើទូរស័ព្ទ · ល្បឿនស៊ុមក្នុងរបា Slide · token `op`
+⛔ **ការខុសគ្នាពី ZoeW ដើមដោយចេតនា** (ផ្ទាំង 🔔 · logo SVG · navbar ទាបជាង ១៤px លើទូរស័ព្ទ · token `op`
 ក្នុង ledger) រស់ក្នុង **បញ្ជីតែមួយ** `INTENTIONAL_UI` (`scripts/snapshot.mjs`) ដែល parity ទាំង ៣ ប្រើរួម — ⛔ បន្ថែមធាតុ **តែ** ពេល
 ផ្ទៃពិតជាប្តូរដោយចេតនា ហើយសរសេរកំណែជាប់ · កុំប្រើវាដើម្បីបិទការខុសគ្នាដែលមិនយល់។
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
@@ -136,7 +136,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run android:open` | បើក `android/` ក្នុង Android Studio |
 | `npm run android:icons` | បង្កើត logo និង splash របស់ Android ពី `resources/icon.svg` |
 | `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ស្ថិតក្នុងខ្សែ template របស់ Capacitor ដែលដំឡើង · workflow release APK ↔ keystore |
-| `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) |
+| `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) និងតារាងប្រវត្តិវែង (App និង PWA លើ Android បង្ហាញជួរជុំវិញទីតាំងរមូរ · iPhone បន្ថែមជួរ · ជួរកម្ពស់ខុសគ្នា · គ្មានចន្លោះទទេ · modal · sync · ប្តូរតម្រង ➜ កំពូល) |
 
 ### Deploy ទៅ Netlify
 

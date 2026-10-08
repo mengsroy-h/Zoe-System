@@ -73,16 +73,16 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
     'applyLedgerBucketDelta', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
-    'claimAndCleanupItem'];
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'resumeCleanupJournalEntry', 'resumeInterruptedCleanups'];
-const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS',
+const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
-    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER',
+    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT',
     'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);
@@ -130,6 +130,10 @@ function makeRun(opts) {
                 const k = p.split('/')[1];
                 cur = server.history[k] ? JSON.parse(JSON.stringify(server.history[k])) : null;
                 write = (out) => { if (out === null) delete server.history[k]; else server.history[k] = out; };
+            } else if (p.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
+                const k = p.split('/')[1];
+                cur = server.trash[k] ? JSON.parse(JSON.stringify(server.trash[k])) : null;
+                write = (out) => { if (out === null) delete server.trash[k]; else server.trash[k] = out; };
             } else {
                 cur = null;
                 write = () => {};

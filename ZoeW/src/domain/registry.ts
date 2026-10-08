@@ -70,7 +70,7 @@ export async function claimBarcodeInRegistry(code) {
         });
         if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return 'unknown';
         if (!result || !result.committed) return 'taken';
-        return result.txOutcome === 'applied' ? 'unknown' : 'claimed';
+        return result.txOutcome === 'applied' && result.txProven !== true ? 'unknown' : 'claimed';
     } catch (e) {
         return 'unknown';
     }

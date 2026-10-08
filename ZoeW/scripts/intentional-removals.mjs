@@ -6,6 +6,7 @@
 
 /** function ដើម */
 export const REMOVED = {
+    measureDisplayHz: 'សំណើម្ចាស់គម្រោង («adaptive refresh rate 10-120hz … វៃឆ្លាតស្គាល់ device ណាដែល refresh rate ខ្ពស់») ៖ Hz វាស់ក្នុងបង្អួចតែមួយជាមួយស៊ុមកក (`sampleFramePace()` · median ៩០ ស៊ុម) ➜ អេក្រង់ LTPO ដែលចុះ ១២០ ➜ ៦០ ចន្លោះបង្អួចពីរមិនរាប់ស៊ុមធម្មតាជា «កក» · Hz ខ្ពស់បំផុតរៀនពីការរមូរ (`sampleScrollHz()`) · អ្នកយាម `tests/adaptive-refresh.test.ts` (មុនកែ ក្រហម ៥/៨) · gesture-test',
     setupActionDelegation: 'React ១០០% ៖ ប៊ូតុងទាំងអស់ហៅសកម្មភាពតាម `onClick`/`onAct()` (ព្រំដែន `ACTION_REGISTRY` ពិនិត្យពេល build) ➜ listener ទី ២ នៅកម្រិត `document` នឹងធ្វើឲ្យសកម្មភាពរត់ **២ ដង** (ច្បាប់ ៤ នៃ «CSP និង `data-act`»)',
     readActionArgs: 'React ១០០% ៖ លំដាប់អាគុយម៉ង់ [ធាតុ? · ព្រឹត្តិការណ៍? · …args] រស់ក្នុង `onAct()` (`src/app/actions.ts`)',
     runElementAction: 'React ១០០% ៖ ច្រកទ្វារឈ្មោះសកម្មភាពរស់ក្នុង `act()` ➜ `lookupAction()` (`ACTION_REGISTRY` · `src/app/actions.ts`)',

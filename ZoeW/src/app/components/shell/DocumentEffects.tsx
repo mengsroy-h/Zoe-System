@@ -25,6 +25,7 @@ function useHtmlVar(name: string, value: string): void {
 export function DocumentEffects() {
     const scrollLocked = useStoreValue(uiState, (s) => s.isModalOpen);
     const chromeHidden = useStoreValue(uiState, (s) => s.chromeHidden);
+    const keyboardOpen = useStoreValue(uiState, (s) => s.keyboardOpen);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
@@ -37,7 +38,8 @@ export function DocumentEffects() {
     useBodyClass('app-locked', appLocked);
     useBodyClass('boot-reveal', bootRevealing);
     useBodyClass('perf-lite', perfLite);
-    useBodyClass('chrome-hidden', chromeHidden);
+    useBodyClass('chrome-hidden', chromeHidden || keyboardOpen);
+    useBodyClass('keyboard-open', keyboardOpen);
 
     useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
     useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));

@@ -133,7 +133,7 @@ const REAL_FNS = [
     'cloneRestoreItem',
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
-    'claimAndCleanupItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
@@ -241,6 +241,8 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractConst(src, 'CLEANUP_JOURNAL_MAX'), 'const CLEANUP_JOURNAL_MAX = 200;'),
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_MOVED'), "const CLEANUP_STAGE_MOVED = 'moved';"),
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_LEDGER'), "const CLEANUP_STAGE_LEDGER = 'ledger';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_STAGE_FLIP'), "const CLEANUP_STAGE_FLIP = 'flip';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_STAGE_SLOT'), "const CLEANUP_STAGE_SLOT = 'slot';"),
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),

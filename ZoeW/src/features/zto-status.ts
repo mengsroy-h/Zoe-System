@@ -378,6 +378,11 @@ export function ztoAbandonCleanupIsHeld(ripeAt?) {
         const fresh = !!ztoState.ztoSignedCompleteAt && elapsedSince(ztoState.ztoSignedCompleteAt) <= ZTO_SIGNED_FRESH_MS;
         const covers = typeof ripeAt !== 'number' || !isFinite(ripeAt) || ztoState.ztoSignedCompleteServerAt >= ripeAt;
         if (fresh && covers) return false;
+        if (ztoStatusSecretIsLocked(ztoStatusFeatureConfig())) {
+            ztoState.ztoAbandonCheckedAt = Date.now();
+            ztoState.ztoAbandonHoldSince = 0;
+            return true;
+        }
     }
     const resumed = !!ztoState.ztoAbandonCheckedAt && elapsedSince(ztoState.ztoAbandonCheckedAt) > ZTO_ABANDON_RESUME_GAP_MS;
     ztoState.ztoAbandonCheckedAt = Date.now();
@@ -669,9 +674,13 @@ export function ztoStatusNetworkAllowed(userAsked) {
     return autoLookupInFlight.size === 0;
 }
 
+export function ztoAbandonHoldIsActive() {
+    return !!ztoState.ztoAbandonHoldSince && elapsedSince(ztoState.ztoAbandonHoldSince) <= ZTO_ABANDON_HOLD_MAX_MS;
+}
+
 export function ztoSignedNetworkAllowed(userAsked) {
     if ((navigator.onLine as boolean) === false) return false;
-    if (!userAsked && linkIsFrugal()) return false;
+    if (!userAsked && linkIsFrugal() && !ztoAbandonHoldIsActive()) return false;
     return autoLookupInFlight.size === 0;
 }
 

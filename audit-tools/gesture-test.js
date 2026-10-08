@@ -617,15 +617,56 @@ const GESTURE = function (steps) {
     await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
 
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
-    const scrollTo = (top) => page.evaluate(async (t) => {
+    // ⛔ របាប្តូរតែពេល **អ្នកប្រើ** រមូរ (touch/wheel/key ≤ CHROME_SCROLL_INTENT_MS) ➜ helper បញ្ជូន `wheel` មុនរមូរ (input ពិត · `touchmove` ក្លែងគ្មាន `touches` ធ្វើឲ្យ handler PTR បោះ) ហើយ
+    //    ពេលរបាទើបប្តូរ រង់ចាំ CHROME_FLIP_SETTLE_MS (ដេរីវេពី App) មុនការរមូរបន្ទាប់ (មនុស្សមិនបញ្ច្រាសទិសក្នុងពេលនោះ)
+    const scrollTo = async (top) => {
+        await page.evaluate(async () => {
+            if (window.__barFlipWatch === undefined) {
+                let seen = window.uiState.chromeHidden;
+                window.__barFlipAt = -Infinity;
+                window.__barFlipWatch = window.uiState.subscribe(() => {
+                    if (window.uiState.chromeHidden === seen) return;
+                    seen = window.uiState.chromeHidden;
+                    window.__barFlipAt = performance.now();
+                });
+            }
+            window.uiState.flush();
+            await Promise.resolve();
+            const left = (Number(window.CHROME_FLIP_SETTLE_MS) || 0) + 20 - (performance.now() - window.__barFlipAt);
+            if (left > 0) await new Promise((r) => setTimeout(r, left));
+        });
+        return page.evaluate(async (t) => {
+            const el = document.getElementById('tableResponsive') || document.getElementById('appPages');
+            el.style.scrollBehavior = 'auto';
+            el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: t - el.scrollTop }));
+            el.scrollTop = t;
+            if (el.scrollTop !== t) return -1;
+            el.dispatchEvent(new Event('scroll', { bubbles: false }));
+            await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+            return el.scrollTop;
+        }, top);
+    };
+    const intent = await page.evaluate(() => ({ settle: window.CHROME_FLIP_SETTLE_MS, intent: window.CHROME_SCROLL_INTENT_MS }));
+    ok('App ប្រកាសពេល settle/intent របស់របា (ដេរីវេ ១០០–១០០០ms · ១–៣ វិ.)',
+        intent.settle >= 100 && intent.settle <= 1000 && intent.intent >= 1000 && intent.intent <= 3000, intent);
+    const noInputHidden = await page.evaluate(async (wait) => {
+        window.showAppChrome();
+        await new Promise((r) => setTimeout(r, wait));
         const el = document.getElementById('tableResponsive') || document.getElementById('appPages');
-        el.style.scrollBehavior = 'auto';
-        el.scrollTop = t;
-        if (el.scrollTop !== t) return -1;
+        const before = document.body.classList.contains('chrome-hidden');
+        for (const t of [300, 400, 500]) {
+            el.scrollTop = t;
+            el.dispatchEvent(new Event('scroll', { bubbles: false }));
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }
+        const after = document.body.classList.contains('chrome-hidden');
+        el.scrollTop = 0;
         el.dispatchEvent(new Event('scroll', { bubbles: false }));
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        return el.scrollTop;
-    }, top);
+        return { before, after };
+    }, (intent.intent || 0) + 50);
+    ok('⛔ scroll ដោយកម្មវិធី (គ្មាន touch/wheel/key) ➜ របាមិនលាក់ (រង្វង់ «ញ៉ាក់» លើ APK)',
+        noInputHidden.before === false && noInputHidden.after === false, noInputHidden);
     const hidden = () => page.evaluate(() => document.body.classList.contains('chrome-hidden'));
 
     await resetState();
@@ -655,15 +696,55 @@ const GESTURE = function (steps) {
     await scrollTo(10);
     ok('ត្រឡប់ដល់កំពូល ➜ បង្ហាញជានិច្ច', await hidden() === false);
 
+    // ⛔ ម៉ឺនុយ ☰ / ផ្ទាំង 🔔 គ្របរបាដូច modal (backdrop z-index 1200 > 900) ➜ បើកមិនប្តូររបា (សំណើម្ចាស់គម្រោង ៖ «កែម៉ឺនុយ ☰ ដែរ»)
     await scrollTo(200); await scrollTo(400);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលាក់មុនបើកម៉ឺនុយ', await hidden() === true);
     await page.evaluate(() => window.openSideDrawer());
-    ok('បើកម៉ឺនុយ ➜ បង្ហាញរបាវិញ', await hidden() === false);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const drawerOpen = await page.evaluate(() => document.getElementById('sideDrawer').classList.contains('open'));
+    ok('⛔ បើកម៉ឺនុយ ☰ ពេលរបាលាក់ ➜ របានៅលាក់', drawerOpen && await hidden() === true, { drawerOpen });
+    await page.evaluate(async () => {
+        const box = document.querySelector('#sideDrawer .drawer-body') || document.getElementById('sideDrawer');
+        [0, 120, 0].forEach((t) => { box.scrollTop = t; box.dispatchEvent(new Event('scroll', { bubbles: false })); });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    ok('រមូរក្នុងម៉ឺនុយមិនបង្ហាញរបា', await hidden() === true);
     await page.evaluate(() => window.closeSideDrawer());
+    ok('បិទម៉ឺនុយ ➜ របានៅដដែល', await hidden() === true);
+    await scrollTo(300);
+    ok('បិទម៉ឺនុយរួចរមូរឡើង ➜ បង្ហាញវិញ', await hidden() === false);
 
     await scrollTo(200); await scrollTo(400);
     await page.evaluate(() => window.switchAppPage('entry'));
     ok('ប្តូរទំព័រ ➜ បង្ហាញរបាវិញ', await hidden() === false);
     await page.evaluate(() => window.switchAppPage('data'));
+
+    // ⛔ modal គ្របរបា (z-index) ➜ បើក modal មិនប្តូររបាទេ ៖ ការបង្ហាញរបាប្តូរ clip-path · padding របស់បញ្ជី ➜ គូរបញ្ជីទាំងមូលឡើងវិញ
+    //    (សំណើម្ចាស់គម្រោង ៖ «រមូរដល់ចុង កញ្ចប់ច្រើន ចុចបើកធុងសំរាម/បញ្ជី ZTO អាក់អាក់») · ការរមូរក្នុង modal មិនបញ្ជារបា
+    await scrollTo(200); await scrollTo(400);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលាក់មុនបើក modal', await hidden() === true);
+    const listPaint = () => page.evaluate(() => {
+        const t = document.getElementById('tableResponsive');
+        const main = t.closest('.page-main');
+        const card = t.closest('.app-card');
+        return [getComputedStyle(t).paddingBottom, getComputedStyle(main).clipPath, card ? getComputedStyle(card).clipPath : ''].join(' | ');
+    });
+    const paintBefore = await listPaint();
+    await page.evaluate(() => window.openRecentlyDeletedModal());
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const modalOpen = await page.evaluate(() => getComputedStyle(document.getElementById('recentlyDeletedModal')).display !== 'none');
+    ok('⛔ បើក modal ពេលរបាលាក់ ➜ របានៅលាក់', modalOpen && await hidden() === true, { modalOpen });
+    ok('⛔ បើក modal មិនប្តូរ clip-path/padding របស់បញ្ជី (គ្មានការគូរបញ្ជីឡើងវិញ)', await listPaint() === paintBefore, paintBefore);
+    await page.evaluate(async () => {
+        const box = document.querySelector('#recentlyDeletedModal .modal-content');
+        [0, 120, 0].forEach((t) => { box.scrollTop = t; box.dispatchEvent(new Event('scroll', { bubbles: false })); });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    ok('រមូរក្នុង modal មិនបង្ហាញរបា', await hidden() === true);
+    await page.evaluate(() => window.closeModal('recentlyDeletedModal'));
+    ok('បិទ modal ➜ របានៅដដែល', await hidden() === true);
+    await scrollTo(300);
+    ok('បិទ modal រួចរមូរឡើង ➜ បង្ហាញវិញ (ការលាក់តាមទិសរមូរនៅដដែល)', await hidden() === false);
 
     const navFixed = await page.evaluate(() => window.getComputedStyle(document.querySelector('.app-navbar')).position);
     ok('លើទូរស័ព្ទ navbar ជា fixed (ដូច្នេះការលាក់មិនបន្សល់ចន្លោះទទេ)', navFixed === 'fixed', navFixed);
@@ -820,8 +901,8 @@ const GESTURE = function (steps) {
     // គឺ >8.3ms) ចំណែកលើឧបករណ៍ដែល browser ចាក់ត្រឹម ៣០Hz វាតឹងពេក។
     console.log('\n=== ចង្វាក់ស៊ុមសម្របតាមឧបករណ៍ (១០–១២០ fps) ===');
     const hz = await page.evaluate(async () => {
-        if (typeof window.measureDisplayHz !== 'function') return null;
-        const measured = await new Promise((r) => window.measureDisplayHz(r));
+        if (typeof window.sampleFramePace !== 'function') return null;
+        const measured = await new Promise((r) => window.sampleFramePace(() => r(window.uiState.displayHz)));
         const atMeasured = window.longFrameThresholdMs();
         const budget = window.displayFrameBudgetMs();
         return {
@@ -833,7 +914,7 @@ const GESTURE = function (steps) {
             clampNaN: window.clampDisplayHz(NaN)
         };
     });
-    ok('measureDisplayHz() មានក្នុង App ពិត', !!hz, hz);
+    ok('sampleFramePace() វាស់ Hz ក្នុង App ពិត', !!hz, hz);
     if (hz) {
         console.log('    វាស់បាន ' + hz.measured + ' Hz  ➜ ថវិកាមួយស៊ុម ' + hz.budget +
                     'ms  ➜ ពិដានស៊ុមវែង ' + hz.atMeasured + 'ms');

@@ -175,7 +175,7 @@ function confirm() { return true; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight',
-        'saveSingleDeletedItemToFirebase', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'

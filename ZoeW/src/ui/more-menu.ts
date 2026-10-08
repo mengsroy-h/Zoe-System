@@ -15,8 +15,19 @@ import { requestPinBeforeConfig } from '../features/pin';
 import { openManualAdjustModal } from '../features/stats-modals';
 import { openRecentlyDeletedModal } from '../features/trash';
 
+const moreMenuOpening: { anchor: unknown; at: number } = { anchor: null, at: 0 };
+
 export function closeGlobalMoreMenu() {
+    moreMenuOpening.anchor = null;
     uiState.moreMenuOpen = false;
+}
+
+export function moreMenuAnchor(): unknown {
+    return moreMenuOpening.anchor;
+}
+
+export function moreMenuOpenedAt(): number {
+    return moreMenuOpening.at;
 }
 
 export function moreMenuExport() { openExportDataModal(); closeGlobalMoreMenu(); }
@@ -43,6 +54,8 @@ export function showGlobalMoreMenu(btn, event, items) {
     if (event) event.stopPropagation();
     const rect = rectOfElement(btn);
     if (!rect) return;
+    moreMenuOpening.anchor = btn;
+    moreMenuOpening.at = performance.now();
     uiState.moreMenuItems = items;
     uiState.moreMenuOpen = true;
     uiState.touch();

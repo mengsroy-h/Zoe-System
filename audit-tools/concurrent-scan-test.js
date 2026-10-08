@@ -164,6 +164,7 @@ function makeCtx(server, fbSet) {
                       'recalcItemMoneyFromBarcodes',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
+                      'freshHistoryItemShell', 'freshHistoryItemFrom',
                       'mergeBarcodeIntoHistoryItem', 'addOrUpdateEntry']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);

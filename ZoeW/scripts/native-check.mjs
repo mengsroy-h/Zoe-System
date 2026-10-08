@@ -424,10 +424,17 @@ await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថា�
     /* ⛔ ការវាស់ពណ៌ = `elementsFromPoint` ×៥ + `getComputedStyle` ➜ បង្ខំ layout + hit-test ទំព័រទាំងមូល ➜ វាត្រូវរត់តែពេល
        **ស្រទាប់ក្រោមរបា** ប្រែ (ប្រអប់ · របា Slide · ផ្ទាំង 🔔 · សោ App) ⛔ មិនមែនរាល់ការប្រែ uiState (ហូតប្រអប់ · លាក់របា ·
        toast) ៖ វាស់បានលើ ៥០០ ជួរ ≈ ៦០ ms/ការហូត ក្រោម CPU ×4 កណ្តាលចលនា ហើយវាមានតែក្នុង APK (PWA គ្មាន)។ */
+    /* ⛔ ការវាស់ពេលស្រទាប់ប្រែ ត្រូវរត់ **ក្រោយ** ស៊ុមគូររួច (rAF ➜ task) ⛔ មិនមែនក្នុង rAF ៖ ក្នុង rAF layout របស់ប្រអប់/ម៉ឺនុយ
+       ដែលទើបបើកមិនទាន់គណនា ➜ elementsFromPoint បង្ខំ layout ពេញទំព័រកណ្តាលចលនា (សំណើម្ចាស់គម្រោង ៖ «APK បើកធុងសំរាម/បញ្ជី ZTO/ម៉ឺនុយ
+       អាក់ក្រោយរមូរដល់ចុង · PWA រលូន» ៖ Chromium CPU ÷6 ៩២ ជួរ rAF ៥៤ms (បង្ខំ layout ៤០) ➜ ១ms)។ */
     await page.evaluate(() => {
         const orig = Document.prototype.elementsFromPoint;
+        const raf = window.requestAnimationFrame.bind(window);
         window.__efpCalls = 0;
-        Document.prototype.elementsFromPoint = function (x, y) { window.__efpCalls++; return orig.call(this, x, y); };
+        window.__efpInRaf = 0;
+        let inRaf = 0;
+        window.requestAnimationFrame = (fn) => raf((t) => { inRaf++; try { fn(t); } finally { inRaf--; } });
+        Document.prototype.elementsFromPoint = function (x, y) { window.__efpCalls++; if (inRaf) window.__efpInRaf++; return orig.call(this, x, y); };
     });
     await page.click('#dragHandle');
     await page.waitForTimeout(900);
@@ -445,6 +452,14 @@ await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថា�
     await page.waitForTimeout(700);
     ok('(លក្ខខណ្ឌចាំបាច់) Back ➜ ប្រអប់បិទ', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display === 'none'));
     ok('បិទប្រអប់ ➜ រូបតំណាងខ្មៅវិញ (LIGHT)', (await lastStatus()) === 'LIGHT', await lastStatus());
+    await page.click('#navMenuBtn');
+    await page.waitForTimeout(700);
+    ok('(លក្ខខណ្ឌចាំបាច់) ម៉ឺនុយ ☰ បើកពិត', await page.evaluate(() => document.getElementById('sideDrawer').classList.contains('open')));
+    await fire(page, 'App', 'backButton', { canGoBack: false });
+    await page.waitForTimeout(700);
+    ok('(លក្ខខណ្ឌចាំបាច់) Back ➜ ម៉ឺនុយបិទ', await page.evaluate(() => !document.getElementById('sideDrawer').classList.contains('open')));
+    const efp = await page.evaluate(() => ({ calls: window.__efpCalls, inRaf: window.__efpInRaf }));
+    ok('⛔ ការវាស់ពណ៌ពេលប្រអប់/ម៉ឺនុយបើក-បិទ រត់ក្រោយស៊ុមគូរ ⛔ មិនដែលក្នុង rAF (layout កណ្តាលចលនា)', efp.calls >= 4 && efp.inRaf === 0, efp);
     await closeSession(s, 'របាស្ថានភាព');
 });
 

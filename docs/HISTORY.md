@@ -87,7 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.22 — MONEY-4 (branch `claude/cool-cori-bwlq91` · PR ដាច់ · មិនទាន់ merge)** ៖ ⛔ Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) ទៅគ្រប់អតិថិជន Firebase **មុន** Deploy · migration Supabase `20261008023215_zoe_rules.sql` ចូលតាម merge ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
+- ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច (2026-10-08) · ⏳ migration Supabase `20261008023215_zoe_rules.sql` ចូលតាម merge ➜ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
 - ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
@@ -117,7 +117,7 @@
   លើផលិតកម្ម · បង្អួចអាន Cookie លើ container ត្រជាក់) ➜ តម្លៃមិនមែន `6000` ក្នុង `?diag=1` មិនមែនកំហុស។ ⛔ កុំបង្កើន
   `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ (ថវិកា App មិនមែនពិដាន platform)។
 - ✅ **Firebase rules របស់ Business និង License Project ត្រូវ Publish រួច** (`pickedUpBarcodes` · កូដ App `ZOE` ·
-  `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច · វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `license_announcements`)។ ✅ Push (VAPID · FCM · `google-services.json`)
+  `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច · វាល `op` និង ring `ops` ក្នុង ledger ថ្ងៃ/ខែ · `license_announcements`)។ ✅ Push (VAPID · FCM · `google-services.json`)
   កំណត់រួច។ ⛔ ការសរសេរស្ថិតិយកត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ (`$other` បដិសេធវាល
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
@@ -2294,8 +2294,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ឧបករណ៍ផ្សេងសរសេរលើស ១២ ដងលើថ្ងៃដដែលខណៈរង់ចាំ ➜ សម្រេចមិនបាន (មិនខុស) · ទំហំ ~២៥០ byte ក្នុងមួយ record (listener ថ្ងៃទាញ root ទាំងមូល)។
 - **mutation** (tx-outcome-test លើ app.js ពិត) ៖ ដកការពិនិត្យ token យើង ➜ FAIL ៨ · wrapper មិនសួរ witness ➜ FAIL ១១ · ring រុញលំដាប់ថ្មីចេញ ➜ FAIL ២ · `return serverAfter` (គ្មាន `op`/ring) ➜ FAIL ១៣ · ដកភស្តុតាង token មុន ➜ FAIL ២ ·
   ដកច្បាប់លំដាប់ 1 ➜ FAIL ១ · មិនដាក់ `op` ចាស់ក្នុង ring ➜ FAIL ២។ `money-guardian` បន្ថែម ២ (ពិនិត្យ token យើង · wrapper witness) · គោលដៅ `op` ថ្ងៃប្តូរទៅ `ledgerTagged(serverAfter, op, ring)`។
-- **checker ដែលប្តូរ** (ឥរិយាបថដូចដើម) ៖ sandbox ដែលស្រង់ `runLedgerTransaction` តាមឈ្មោះ (១០ ៖ `cleanup-interrupt-atomicity` · `late-commit` · `ledger-count-integrity` · `ledger-failed-apply-revert` · `monthly-ledger-agreement` ·
-  `price-edit-abort` · `revenue-rules-clamp` · `daily-collected` · `emu/ledger-revert-emu` · `emu/tx-disconnect-emu`) ➜ បន្ថែម `ledgerOpRingOf` · `ledgerOpRing` · `ledgerOpWitness` · `ledgerTagged` · `LEDGER_OP_RING_MAX` ·
+- **checker ដែលប្តូរ** (ឥរិយាបថដូចដើម) ៖ sandbox ដែលស្រង់ `runLedgerTransaction` តាមឈ្មោះ (១១ ៖ `cleanup-interrupt-atomicity` · `late-commit` · `ledger-count-integrity` · `ledger-failed-apply-revert` · `monthly-ledger-agreement` ·
+  `price-edit-abort` · `revenue-rules-clamp` · `daily-collected` · `emu/ledger-revert-emu` · `emu/tx-disconnect-emu` · `emu/restore-mutation` (បញ្ជីថេរ · run-all ក្នុង session ៖ FAIL ១៦ ➜ ១៨២/១៨២)) ➜ បន្ថែម `ledgerOpRingOf` · `ledgerOpRing` · `ledgerOpWitness` · `ledgerTagged` · `LEDGER_OP_RING_MAX` ·
   `revenue-rules-clamp` ៖ validator ក្លែងអាន rules map (`ops/$op` ៖ ព្រំដែនលេខ + ប្រវែងកូនសោពី rules ពិត) · `ledger-failed-apply-revert` ៖ ការប្រៀបលុយរំលង `ops` ដូច `op` ·
   `tx-outcome-test` `foreign-equal-disconnect` ៖ ឧបករណ៍ផ្សេងប្តូរ token យើងទាំងក្នុង `op` និងកូនសោ ring (មុន ៖ តែ `op`) · ៤គ ទិសផ្ទុយ ៖ record មាន `op` (record ចាស់គ្មាន token ➜ ផ្នែក ៤ខ២ ៖ មិន ok)។
 

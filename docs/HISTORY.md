@@ -87,7 +87,11 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច (2026-10-08) · ⏳ migration Supabase `20261008023215_zoe_rules.sql` ចូលតាម merge ➜ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
+- ⏳ **ZoeW 2.50.23 · ZoeKeyGen 2.24.7 — ជុំ ៩ (SECURITY-2 · SENTRY-3 · branch `claude/cool-cori-bwlq91` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release `zoew@2.50.23` / `zoekeygen@2.24.7` ([2.50.23] សកម្មភាព ២)។
+- ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
+- 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោង (Deep audit ២ · 2026-10-08)** ៖ SECURITY-1 ➜ **PRF-only** (web ទុកតែ WebAuthn PRF · APK native · record `device` ចាស់ត្រូវបដិសេធ ➜ ចុះឈ្មោះស្នាមម្រាមដៃម្តងទៀត) ·
+  ZTO-4 ➜ **បញ្ចូលគ្នា** (ជួរ born-closed បញ្ចូលចូលជួរដែលបិទទាំងអស់របស់អតិថិជនដដែល ថ្ងៃដដែល) · NATIVE-6 ➜ **ទុកពេលក្រោយ** (តំបន់ហាម · រង់ចាំរបាយការណ៍ពិតពីទូរស័ព្ទ) ·
+  D7 ➜ **អនុញ្ញាត · PR ដាច់** (ផែនការដកឧបករណ៍ parity ធៀប ZoeW vanilla)។
 - ⏳ **ZoeW 2.50.13 — PR #296 Draft** ៖ APK ៖ ប៉ះប្រអប់ស្វែងរកលេខ ➜ keyboard រំកិលឡើងពីលើបញ្ជី · **គ្មានចន្លោះទទេ** ចន្លោះបាតកាត និង keyboard (វីដេអូ/រូប 2.50.12) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.11 ៖ របាលែងលោត (2026-10-08) · បំបែកអេក្រង់ ➜ keyboard បើក/បិទ ➜ របាលេចវិញ · បិទ keyboard ➜ របាលេចវិញ · PWA (ក្រោយ merge) ៖ រមូរបញ្ជីខ្លាំងៗ ហើយចុច (…) ក្បាលប្រអប់ប្រវត្តិភ្លាម ➜ ម៉ឺនុយបើក · Config · API ស្វែងរក · នាំចូល Excel ៖ ប៉ះផ្ទៃងងឹត ➜ មិនបិទ · Back/ប៊ូតុងបិទ ➜ បិទ · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.10 «ល្អ smooth» · (…) លើ APK «អត់អីផង» (2026-10-08) · ✅ ម្ចាស់គម្រោងបញ្ជាក់ APK 2.50.7 «ដើរស្រួលហើយ» (2026-10-07) ➜ ដក telemetry សាករួច។ នៅសល់ ៖ APK 2.50.8 · **PWA Android (Chrome)** «ទាំងអស់» ➜ រមូរដល់ចុង ➜ បើក/បិទធុងសំរាម · បញ្ជី ZTO · ☰ · 🔔 · រមូរឡើងវិញ · ប្តូរតម្រង/ស្វែងរក ➜ តារាងនៅកំពូល · **iPhone PWA** ៖ ប្តូរតម្រងពេលរមូរជ្រៅ ➜ ត្រឡប់កំពូល (PTR · ចលនាផ្ទាំងដូចដើម) ➜ ទូរស័ព្ទ ៩០/១២០Hz ៖ រមូរបន្តិច ➜ បិទ/បើក App ➜ ចលនា (ស្រមោលកាត · បន្ទាត់ស្កេន) នៅដដែល ➜ ចាំ merge ([2.50.8] · [2.50.9] សកម្មភាពដោយដៃ)។ កុំដក Sentry រាយការណ៍កំហុសធម្មតា។
 - ⏳ **ZoeW 2.50.4 — PR #295 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ សាកតាម [2.50.4] សកម្មភាព ២ (⚠️ នៅក្រោម ✅ ×៤ · សោ App · ⏳ ➜ ✅ ចំណូលប្រចាំថ្ងៃ · Locker ៖ ស្កេនដាក់ទីតាំងចុះភ្លាម គ្មានប្រអប់) · ZTO ៖ បញ្ចូលបញ្ជី ≥ ២០ ជួរ ➜ «⏳ កំពុងបញ្ចូល N/M» លឿន · កញ្ចប់អតិថិជនដដែលបញ្ចូលគ្នា · ចំណូលថ្ងៃ = COD សរុប · ទាញយឺត ➜ `?diag=1` `upstreamTiming` ផ្ញើមក។
 - ⏳ **ZoeW 2.50.3 — PR #294 (merge ចូល `main` រួច)** ៖ Deploy ZoeW + APK ➜ «📥 បញ្ជី ZTO» ៖ កញ្ចប់ដែល ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃចាប់ផ្តើម នៅក្នុងក្រុម «🆕 ថ្មី» ជាមួយ «📥 មកដល់ ៖ មុនថ្ងៃ …» · «✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ …» ➜ «➕ បញ្ចូល» ➜ ចូលជា «យករួច» លើថ្ងៃចុះហត្ថលេខា ([2.50.3] សកម្មភាព ២)។
@@ -122,6 +126,29 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.23] — 2026-10-08 · ZoeW + ZoeKeyGen ៖ **Sentry ៖ secret របស់ Push និងស្នាមម្រាមដៃមិនចេញ · event មានកំណែ App និងព័ត៌មានកំហុស** (Deep audit ២ · ជុំ ៩ · SECURITY-2 · SENTRY-3)
+
+**ZoeW `2.50.23`** (`zoew-v285` ➜ `zoew-v286`) · **ZoeKeyGen `2.24.7`** (`zoekeygen-v117` ➜ `zoekeygen-v118`) · `error-reporting.js` ដូចគ្នា byte-for-byte ទាំងពីរ App · គ្មាន rules · env · migration ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **SECURITY-2 ៖ secret ក្នុងវត្ថុរអិលទៅ Sentry** ៖ `SECRET_KEY_PATTERN` (កូនសោវត្ថុ) ខ្វះ `auth` · `wrap_key` · `wrapped` · `p256dh` ➜ subscription Web Push (`keys.p256dh` · `keys.auth`) និង record biometric
+  (`wrapKey` ក្បែរ `wrapped` ៖ PIN ទទួលបានវិញ) ចេញទៅ Sentry ពេលភ្ជាប់ជាវត្ថុ (breadcrumb `console` · extra)។ ឥឡូវ ៖ ពាក្យទាំង ៤ ក្នុងបញ្ជីកូនសោ · `p256dh` · `wrapped` ក្នុងបញ្ជីខ្សែអក្សរ (`auth` មានរួច)។
+  ⚠️ ពាក្យ `auth` ជា token ➜ កូនសោដូច `authGeneration` · `authDomain` ក៏ត្រូវលាក់ (គ្មាន `ZoeErrors.capture` ណាផ្ញើវា) · `author` · `mode` · `keyId` នៅមើលឃើញ។
+- 🏷️ **SENTRY-3 ៖ event គ្មាន release · វាលរបស់ Error បាត់** ៖ `ZoeErrors.init('zoew')` / `init('zoekeygen')` គ្មាន release ➜ Sentry មិនបែងចែកកំណែ។ ឥឡូវ `zoew@<APP_VERSION>` · `zoekeygen@<APP_VERSION>`
+  (ការហៅទាំង ៤)។ វាល primitive របស់ Error ក្នុង allowlist (`lookupCode` · `lookupReason` · `listReason` · `txOutcome` · `txServerUnread` · `txProven` · `code` · `status` · `httpStatus` · `noRetry` · `notConfigured` · `unsent` · `stage` ·
+  ខ្សែអក្សរ ≤ ២០០) ទៅ `extra.errorFields` (ឆ្លង redaction ដដែល) · វាលផ្សេង និងវត្ថុមិនផ្ញើ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** និង **ZoeKeyGen** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. Sentry ៖ event ក្រោយ Deploy មាន release `zoew@2.50.23` / `zoekeygen@2.24.7` · event «Transaction outcome unknown» មាន `errorFields.txOutcome` · (ជម្រើស) Sentry ➜ Settings ➜ Releases ៖ issue ចាស់ «Resolve in next release»។
+
+#### អ្នកយាម
+
+- `secret-hygiene` ចន្លោះ ១ឃ (ថ្មី · ឈ្មោះដេរីវេពីកូដពិត ៖ `keys: { … }` របស់ push · `rec.*` ចូល `unwrapPinWithRawKey()`) ៖ មុនកែ FAIL ១៣ ➜ ២៤២/២៤២។
+- `sentry-load-race-test` (ការហៅ `ZoeErrors.init(` ដេរីវេពីកូដ ship ទាំងពីរ App + វាយតម្លៃ argument ក្នុង vm · `errorFields` លើ `error-reporting.js` ពិតក្នុង browser) ៖ មុនកែ FAIL ៧ ➜ ៣៥/៣៥។
 
 ### [2.50.22] — 2026-10-08 · ZoeW ៖ **ចំណូលថ្ងៃ/ខែមិនរាប់ពីរដង ពេលបណ្តាញដាច់ចំពេលរក្សាទុក ខណៈឧបករណ៍ផ្សេងសរសេរចំណូលដដែល** (Deep audit ២ · MONEY-4 · PR ដាច់ · សំណើម្ចាស់គម្រោង)
 
@@ -2278,6 +2305,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ៩ (SECURITY-2 · SENTRY-3) ➜ [2.50.23]
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A16 | **SECURITY-2** `SECRET_KEY_PATTERN` ខ្វះ `auth` · `wrap_key` · `wrapped` · `p256dh` | Claude ៖ `redactEvent()` ពិត លើ `{ sub: { keys: { p256dh, auth } } }` · `{ rec: { wrapKey, wrapped: { iv, data } } }` ➜ តម្លៃទាំងអស់ចេញ · ខ្សែអក្សរ `p256dh=` · `wrapped=` ចេញ ➜ FAIL ១៣ | ពាក្យ ៤ ក្នុងបញ្ជីកូនសោ · ២ ក្នុងបញ្ជីខ្សែអក្សរ |
+| A17 | **SENTRY-3** `ZoeErrors.init()` គ្មាន release · វាល Error (`txOutcome` …) មិនទៅ Sentry | Claude ៖ ការហៅ ៤ (ZoeW ២ · ZoeKeyGen ២) គ្មាន argument ទី ២ · SDK ក្លែង ៖ `extra` គ្មានវាល Error ➜ FAIL ៧ | release `<app>@<APP_VERSION>` · `extra.errorFields` (allowlist) |
+
+- run-all STRICT លើ `7b7dedd` (tree ដែល merge ជា PR #298) ៖ **២០៣/២០៣** (លើកទី ១ ៖ ២០០/២០៣ ➜ `emu/restore-mutation` sandbox ខ្វះ `LEDGER_OP_RING_MAX` · `zoew-suite`/`zoew-parity` ៖ clone shallow ➜ `original:fetch` ធ្លាក់ ➜ `git fetch --unshallow`)។
 
 ### 2026-10-08 — Deep audit ២ ៖ MONEY-4 (ring `ops` ក្នុង ledger · PR ដាច់) ➜ [2.50.22]
 

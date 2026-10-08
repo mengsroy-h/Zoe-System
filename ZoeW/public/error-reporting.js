@@ -5,7 +5,7 @@
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/10.75.3/bundle.min.js';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
-    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|header_value|bos_man_session)';
+    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|invite|reset_code|cookie|header_value|bos_man_session|p256dh|wrapped)';
     const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
     const REDACT_MAX_JSON_CHARS = 64 * 1024;
@@ -159,7 +159,8 @@
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
         + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
         + 'credential|authorization|bearer|jwt|setup|cookie|private_key|signing_key|'
-        + 'header_value|proxy_key|bos_man_session|activation_key|license_key|key_string|invite|reset_code)';
+        + 'header_value|proxy_key|bos_man_session|activation_key|license_key|key_string|invite|reset_code|'
+        + 'auth|wrap_key|wrapped|p256dh)';
     const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
 
     function isSecretKeyName(name) {
@@ -272,9 +273,29 @@
         });
     }
 
+    const ERROR_FIELD_KEYS = ['code', 'status', 'httpStatus', 'lookupCode', 'lookupReason', 'listReason',
+        'txOutcome', 'txServerUnread', 'txProven', 'noRetry', 'notConfigured', 'unsent', 'stage'];
+    const ERROR_FIELD_MAX_CHARS = 200;
+
+    function errorFieldsOf(err) {
+        if (!err || typeof err !== 'object') return null;
+        let out = null;
+        for (let i = 0; i < ERROR_FIELD_KEYS.length; i++) {
+            let value;
+            try { value = err[ERROR_FIELD_KEYS[i]]; } catch (e) { continue; }
+            if (typeof value === 'string') value = value.slice(0, ERROR_FIELD_MAX_CHARS);
+            else if (typeof value !== 'boolean' && !(typeof value === 'number' && isFinite(value))) continue;
+            if (!out) out = {};
+            out[ERROR_FIELD_KEYS[i]] = value;
+        }
+        return out;
+    }
+
     function sendToSentry(err, extra) {
         try {
             let scope;
+            const fields = errorFieldsOf(err);
+            if (fields) extra = Object.assign({}, extra && typeof extra === 'object' ? extra : {}, { errorFields: fields });
             if (extra) {
                 scope = { extra: extra };
                 const zone = extra.zone;

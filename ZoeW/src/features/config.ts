@@ -1,6 +1,7 @@
 import { modalIsOpen } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { securityState } from '../core/state';
+import { APP_VERSION } from '../core/version';
 import { viewState, type ConfigLinkSummary } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { cancelPendingLookupUnlock } from './auto-lookup';
@@ -263,7 +264,7 @@ export function saveFirebaseConfig() {
     const dsnEntered = fieldValue('sentryDsnInput').trim();
     if (window.ZoeErrors) {
         ZoeErrors.setDsn(fieldValue('sentryDsnInput'));
-        const sentryInit = ZoeErrors.init('zoew');
+        const sentryInit = ZoeErrors.init('zoew', 'zoew@' + APP_VERSION);
         if (dsnEntered && sentryInit && typeof sentryInit.then === 'function') {
             const warnSentry = () => showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
             sentryInit.then((sentryOk) => { if (!sentryOk) warnSentry(); }, warnSentry);

@@ -122,6 +122,32 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.20] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ៧ ថ្ងៃលើឧបករណ៍ Data Saver · 2G · secret ចាក់សោ មិនដកកញ្ចប់ដែល ZTO ចុះហត្ថលេខារួច** (Deep audit ២ · ជុំ ៧ · ZTO-1 · តំបន់ចាក់សោ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.20`** (`zoew-v282` ➜ `zoew-v283`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ (តំបន់ចាក់សោ)** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2» ➜ `src/features/zto-status.ts` ប្រែ ➜ sha256 ថ្មីក្នុង `LOCK` (`ZoeW/tests/zto-lock.test.ts`)។
+  ហេតុផល ៖ ការអានបញ្ជីចុះហត្ថលេខាត្រូវរំលងដោយហេតុមិនមែនបណ្តោះអាសន្ន ➜ ការរង់ចាំ ៧ ថ្ងៃអស់ពេលដោយគ្មានការអានមួយ ➜ កញ្ចប់ដែល ZTO ចុះហត្ថលេខារួចត្រូវដកលុយជា «ផុតកំណត់»។
+- 📶 **ZTO-1 ៖ Data Saver · 2G** ៖ `ztoSignedNetworkAllowed()` បដិសេធការអានពេល `linkIsFrugal()` ➜ ០ fetch · ការរង់ចាំបញ្ចប់នាទីទី ៣១ ➜ `claimAndCleanupItem('abandon')` ➜ ធុងសំរាម `expired` ·
+  ដកលុយ · marker ហាងមិនដែលសរសេរ។ ឥឡូវ ការអានឆ្លងកាត់ frugal **តែខណៈការរង់ចាំ abandon សកម្ម** (`ztoAbandonHoldIsActive()` · កញ្ចប់ ៧ ថ្ងៃកំពុងរង់ចាំ) ➜ ទំព័រ JSON តូចមួយ ➜ បិទជា «យករួច»។
+  គ្មានកញ្ចប់រង់ចាំ ➜ Data Saver គោរពដដែល (០ fetch)។ `/detail` មិនប្រែ។
+- 🔒 **ZTO-1 ៖ secret ចាក់សោ** (`headerValueEnc` ដោយគ្មាន `lookupSecretKey` ក្រោយ reload រហូតវាយ PIN) ៖ `runZtoStatusSweep()` ត្រឡប់ ០ មុនអាន ➜ ការរង់ចាំ ៣០ នាទីអស់ ➜ abandon។ ឥឡូវ
+  `ztoAbandonCleanupIsHeld()` កាន់ដោយមិនរាប់ម៉ោងការរង់ចាំ ខណៈឧបករណ៍អានមិនបាន ➜ PIN ➜ ការអានចាប់ផ្តើម · ការរង់ចាំ ៣០ នាទីចាប់ផ្តើមពីពេលនោះ (មិនជាប់ ៖ ZTO មិនចុះហត្ថលេខា ➜ abandon ដូចធម្មតា)។
+  ការពន្យារ abandon មិនប៉ះលុយ (កញ្ចប់បើកមិនរាប់ក្នុង «ចំណូល (យករួច)») · ឧបករណ៍ផ្សេងដែលអានបាន សម្អាតតាមច្បាប់របស់វា។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក (ឧបករណ៍ ZTO · Fast Mode · បិទតាម ZTO ស្វ័យប្រវត្តិ) ៖ បើក Data Saver ➜ កញ្ចប់ ៨ ថ្ងៃដែល ZTO ចុះហត្ថលេខា ➜ ត្រូវបិទជា «យករួច» (មិនមែន «ផុតកំណត់») ក្នុង ៣០ នាទី។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` (ថ្មី · ៥ · `zto-status.ts` · `domain/cleanup.ts` · `network.ts` ពិត · gate abandon ពិត) ៖ Data Saver និង 2G ➜ អាន · បិទ · មិន abandon ក្នុង ៤៥ នាទី ·
+  ទិសផ្ទុយ ៖ គ្មានកញ្ចប់ ៧ ថ្ងៃ ➜ ០ fetch · secret ចាក់សោ ➜ មិន abandon ក្នុង ៤៥ នាទី ➜ PIN ➜ បិទ · ទិសផ្ទុយ (មិនជាប់) ៖ PIN + ZTO មិនចុះហត្ថលេខា ➜ abandon។ មុនកែ FAIL ៣/៥
+  (abandon នាទីទី ៣១ · ០ fetch)។ តេស្ត ZTO ផ្សេង ២៥២ ឆ្លង · `zto-lock` ១២/១២ ជាមួយ sha256 ថ្មី។
+
 ### [2.50.19] — 2026-10-08 · ZoeW ៖ **សម្គាល់ការខល · កែលេខទូរស័ព្ទ ពេលបណ្តាញយឺត ៖ រង់ចាំចម្លើយពិត មិនត្រឡប់ដើមខណៈ transaction នៅរស់** (Deep audit ២ · ជុំ ៦ · SENTRY-1 · សំណើម្ចាស់គម្រោង)
 
 **ZoeW `2.50.19`** (`zoew-v281` ➜ `zoew-v282`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។

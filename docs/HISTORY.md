@@ -122,6 +122,30 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.19] — 2026-10-08 · ZoeW ៖ **សម្គាល់ការខល · កែលេខទូរស័ព្ទ ពេលបណ្តាញយឺត ៖ រង់ចាំចម្លើយពិត មិនត្រឡប់ដើមខណៈ transaction នៅរស់** (Deep audit ២ · ជុំ ៦ · SENTRY-1 · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.19`** (`zoew-v281` ➜ `zoew-v282`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗣️ **សំណើ** ៖ ម្ចាស់គម្រោង «បន្តធ្វើ SENTRY-1 · ZTO-1 · ZTO-2» (SENTRY-1 ធ្លាប់ «គួរសួរ» ព្រោះប្តូរការសម្រេចចាស់ ៖ ព្យួរ ➜ revert)។
+- ⏳ **SENTRY-1 ៖ patch ជាប់គាំង ➜ «ត្រឡប់ដើមវិញ» ខណៈ transaction នៅរស់** (Sentry `JAVASCRIPT-REACT-7`) ៖ `patchHistoryItemFields()` ពេល `dbOp` ហួស ១៥ វិ. ដោយគ្មាន `disconnect`
+  ត្រឡប់ field ក្នុង App · toast «បរាជ័យ» · Sentry ➜ transaction ដដែល commit ក្រោយមក ➜ server មានតម្លៃថ្មី ខណៈ App បង្ហាញចាស់ · កែលេខ ➜ `revertPickupRefMove()` ធ្វើឲ្យម្ចាស់ស្ថិតិយកខុសរហូត session ក្រោយ។
+  ឥឡូវ ៖ `'pending'` + ⏳ (មិន revert · មិនចូលជួរ) ➜ `armLateCommit` ៖ commit ➜ ✅ · បរាជ័យ ឬកញ្ចប់បាត់ ➜ ត្រឡប់តែ field ដែលគ្មានការជ្រើសថ្មីជាងនេះ + toast/Sentry · ប្តូរ session ➜ មិនប៉ះ។
+  `setCallMark()` · `flushPendingHistoryPatches()` មិនប្រកាស ✅ លើ `pending` · `saveEditedPhone()` ផ្ទេរការសម្រេចទៅ `onLateSettled` (reconcile ស្ថិតិយក + ✅ ឬ ត្រឡប់ម្ចាស់ស្ថិតិយក)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។ គ្មាន rules · env · migration ថ្មី។
+2. សាក ៖ បើក DevTools ➜ Network «Slow 3G» (ឬទូរស័ព្ទសញ្ញាខ្សោយ) ➜ សម្គាល់ការខល ➜ ⏳ ➜ ស្លាកមិនលោតត្រឡប់ ➜ ពេលបណ្តាញមកវិញ ✅ តែម្តង។ Sentry `JAVASCRIPT-REACT-7` លែងមាន event ថ្មី ➜ Resolve។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/history-patch-late-commit.test.ts` (ថ្មី · ៨ · `patchHistoryItemFields` · `setCallMark` · `saveEditedPhone` ពិត) ៖ ព្យួរ ➜ `pending` · ⏳ · គ្មាន Sentry ➜ commit យឺត ➜ ✅ ១ · បរាជ័យយឺត ➜ revert + Sentry ·
+  កញ្ចប់បាត់ ➜ revert · ការជ្រើសថ្មីនៅរស់ · ប្តូរ session ➜ មិនប៉ះ · ការខល ✅ តែក្រោយ commit · កែលេខ ៖ ម្ចាស់ស្ថិតិយកនៅលេខថ្មីខណៈ pending ➜ ✅ / បរាជ័យ ➜ លេខចាស់។ មុនកែ FAIL ៦/៨។
+- `history-patch-retry-test` «ការព្យួរសុទ្ធ» ៖ ច្បាប់ចាស់ (revert) ➜ ច្បាប់ថ្មី (`pending` · មិន revert · មិនចូលជួរ · ⏳ គ្មាន ✅/បរាជ័យ) · `db-stall-guard` · `history-patch-retry-test` ផ្ទុក `armLateCommit` ពិត ·
+  `toast-action-truth-test` ទទួល success ក្នុង settle ដែល `.then` ហៅ។
+
 ### [2.50.18] — 2026-10-08 · ZoeW ៖ **ការសម្អាត ឬការលុបដែលចម្លើយមកយឺត មិនសរសេរចូលហាងថ្មីក្រោយប្តូរ Config** (Deep audit ២ · ជុំ ៥ · RACES-2)
 
 **ZoeW `2.50.18`** (`zoew-v280` ➜ `zoew-v281`) · ⛔ ZoeKeyGen · Firebase rules · migration Supabase · តំបន់ ZTO ចាក់សោ មិនប្រែ។

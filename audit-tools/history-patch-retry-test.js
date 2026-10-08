@@ -68,6 +68,8 @@ const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHi
     // បើគ្មានវា `historyPatchErrorIsDisconnect()` មិនដែលត្រូវហៅសោះ ➜
     // ការសម្គាល់ការខលបាត់ស្ងាត់ៗ (ថ្នាក់ដដែលនឹង 2.20.2 តាមទ្វារផ្សេង)។
     'withTimeout', 'dbOp', 'dbOpStalled',
+    // SENTRY-1 ៖ ការព្យួរដែល transaction នៅរស់ ➜ `armLateCommit` សម្រេចពេលវាដោះ (មិន revert មុន)។
+    'armLateCommit',
     // ⛔ wrapper `disconnect` (`src/services/tx-outcome.ts`) រុំ `fb.runTransaction` **ពិត** ក្នុង `initFirebase()`
     // ➜ វាប្តូរ `disconnect` ដែល SDK បោះភ្លាម ទៅជាការអាន REST ដែលអាចយូរជាងពិដាន `dbOp` ➜ ស្នាមភ្ជាប់នេះ
     // ត្រូវវាស់ជាមួយ wrapper ពិត (មិនមែន stub `runTransaction` ដែលបដិសេធត្រង់ៗ)។
@@ -263,15 +265,20 @@ async function scenario(label, fn) {
         });
     }
 
-    // ⛔ ទិសផ្ទុយ ៖ ការព្យួរ **ដែល SDK មិនបានបដិសេធ `disconnect`** នៅតែជា timeout ➜ revert ដដែល (ច្បាប់ 2.20.2)
+    // ⛔ ការព្យួរ **ដែល SDK មិនបានបដិសេធ `disconnect`** ៖ transaction នៅរស់ ➜ `pending` (SENTRY-1 ៖ មិន revert ខណៈ transaction
+    //    នៅរស់ · មិនចូលជួរ ព្រោះ transaction ដដែលនឹង commit) ➜ commit/បរាជ័យយឺតសម្រេចដោយ `armLateCommit`
+    //    (`ZoeW/tests/history-patch-late-commit.test.ts`)។
     await scenario('wrapper ៖ ការព្យួរសុទ្ធ', async () => {
         const item = { id: 'id1', phone: '012345678', callMark: 'wrong-number', callMarkTime: 111 };
         const ctx = build('hang', { server: { id1: { ...item } }, scanHistory: [{ ...item }], markingItemId: 'id1', timeScale: 100 });
         try { ctx.fb = vm.runInContext('withTransactionOutcomeResolution', ctx)(ctx.fb); } catch (e) {}
         const saved = await vm.runInContext('setCallMark("no-connect")', ctx);
-        ok('ទិសផ្ទុយ ៖ ព្យួរដោយគ្មាន `disconnect` ➜ revert ដដែល', ctx.scanHistory[0].callMark === 'wrong-number', ctx.scanHistory[0].callMark);
-        ok('ទិសផ្ទុយ ៖ ព្យួរដោយគ្មាន `disconnect` ➜ មិនចូលជួរ', saved !== 'queued' && vm.runInContext('pendingHistoryPatches.size', ctx) === 0,
+        ok('⛔ ព្យួរដោយគ្មាន `disconnect` ➜ `pending` · មិន revert ខណៈ transaction នៅរស់', saved === 'pending' && ctx.scanHistory[0].callMark === 'no-connect',
+            { saved, callMark: ctx.scanHistory[0].callMark });
+        ok('⛔ ព្យួរដោយគ្មាន `disconnect` ➜ មិនចូលជួរ', saved !== 'queued' && vm.runInContext('pendingHistoryPatches.size', ctx) === 0,
             { saved, queued: vm.runInContext('pendingHistoryPatches.size', ctx) });
+        ok('⛔ ព្យួរដោយគ្មាន `disconnect` ➜ ⏳ · គ្មាន ✅ · គ្មាន «បរាជ័យ»',
+            ctx.__toasts.some((t) => /^⏳/.test(t)) && !ctx.__toasts.some((t) => /^✅/.test(t) || /បរាជ័យ/.test(t)), ctx.__toasts);
     });
 
     // ⛔ ទិសផ្ទុយ ៖ កំហុសដែលមិនមែនការដាច់បណ្តាញ ត្រូវ revert ដដែល

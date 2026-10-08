@@ -72,6 +72,7 @@ export function setCallMark(mark?) {
     closeModal('callMarkModal');
     if (!savePromise) return Promise.resolve(false);
     return Promise.resolve(savePromise).then((saved) => {
+        if (saved === 'pending') return saved;
         if (saved === 'queued') {
             showToast('⏳ ការសម្គាល់បានចូលជួររង់ចាំ — នឹងរក្សាទុកទៅ Firebase ពេលបណ្តាញត្រឡប់មកវិញ។');
             return saved;
@@ -149,10 +150,8 @@ export function saveEditedPhone() {
             if (!serverPickupSource || prevPickupKey === nextPickupKey) return;
             pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed);
         };
-        const phoneSavePromise = patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
-            serverPickupSource = serverItem;
-        }).then((saved) => {
-            if (!phoneSaveIsCurrent()) return false;
+        const settlePhoneSave = (saved) => {
+            if (!phoneSaveIsCurrent()) return;
             if (saved) {
                 reconcilePickupRefWithServer();
                 showToast('✅ កែប្រែលេខទូរស័ព្ទ និងរក្សាទុកទៅ Firebase រួចរាល់!');
@@ -161,6 +160,12 @@ export function saveEditedPhone() {
                 updateRecentPhonesList();
                 applyCurrentFilter();
             }
+        };
+        const phoneSavePromise = patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
+            serverPickupSource = serverItem;
+        }, { onLateSettled: settlePhoneSave }).then((saved) => {
+            if (!phoneSaveIsCurrent()) return false;
+            if (saved !== 'pending') settlePhoneSave(saved);
             return saved;
         }, revertPickupRefMove).catch((postErr) => {
             console.error('saveEditedPhone post-patch handler failed: ', postErr);

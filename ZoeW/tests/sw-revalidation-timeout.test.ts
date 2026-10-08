@@ -66,3 +66,18 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' SW ៖ ការធ្
         expect(cache.put).not.toHaveBeenCalled();
     });
 });
+
+describe('ZoeW SW ៖ ទ្វារ revalidate មិនផ្ទុក HTML (Netlify `/* ➜ /index.html 200`) ក្រោម key របស់ asset', () => {
+    for (const [type, puts] of [['text/html; charset=UTF-8', 0], ['application/javascript', 1]] as const) {
+        it(`asset ចាស់ក្នុង cache ➜ server ឆ្លើយ ${type} ➜ cache.put ${puts} ដង`, async () => {
+            const fetch = vi.fn(async (url: string) => (String(url).endsWith('sw.js')
+                ? new Response('const CACHE_VERSION = "' + probe.version + '";')
+                : new Response(puts ? 'export {};' : '<!doctype html><title>ZoeW</title>', { headers: { 'content-type': type } })));
+            const probe = worker('ZoeW', fetch);
+            const cache = { put: vi.fn(async () => {}) };
+            await probe.revalidateShell(cache, new Request('https://audit.invalid/assets/supabase-backend-OLD.js'), '/assets/supabase-backend-OLD.js');
+            expect(fetch.mock.calls.some(([u]: any[]) => String(u).includes('supabase-backend-OLD'))).toBe(true);
+            expect(cache.put).toHaveBeenCalledTimes(puts);
+        });
+    }
+});

@@ -9,11 +9,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scanState, uiState } from '../src/core/state';
+import { viewState } from '../src/core/view-state';
 import { refTo } from '../src/app/refs';
 import * as iosViewport from '../src/app/behaviors/ios-viewport';
+import * as entrySearch from '../src/app/behaviors/entry-search';
 import { entrySearchBlurred, entrySearchFocused } from '../src/app/behaviors/entry-search';
 
 const listeners: Array<[EventTarget, string, any, any]> = [];
+const disposers: Array<() => void> = [];
 let side: HTMLElement;
 let main: HTMLElement;
 let pages: HTMLElement;
@@ -30,7 +33,7 @@ function scope() {
             target.addEventListener(type, handler, options);
             listeners.push([target, type, handler, options]);
         },
-        every() {}, onLoad() {}, onDispose() {}, dispose() {}
+        every() {}, onLoad() {}, onDispose(fn: () => void) { disposers.push(fn); }, dispose() {}
     } as any;
 }
 
@@ -85,10 +88,13 @@ beforeEach(() => {
     refTo('entryListSearchInput')(entryInput);
     refTo('lockerListSearchInput')(lockerInput);
     (iosViewport as any).listenIOSSearchFocus(scope());
+    (entrySearch as any).listenEntrySearchPanel?.(scope());
 });
 
 afterEach(() => {
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
+    disposers.splice(0).forEach((fn) => fn());
+    viewState.entryModeShown = 'parcel';
     ['appPages', 'entrySideSection', 'entryMainSection', 'entryListSearchInput', 'lockerListSearchInput'].forEach((n: any) => refTo(n)(null));
     (document.activeElement as HTMLElement | null)?.blur?.();
     pages.remove();
@@ -122,6 +128,47 @@ describe('tab ស្កេន ៖ ស្វែងរកបញ្ជីកញ្�
         vi.advanceTimersByTime(200);
         expect(uiState.entryPanelCollapsed).toBe(true);
         entryInput.value = '';
+        entrySearchBlurred();
+        vi.advanceTimersByTime(200);
+        expect(uiState.entryPanelCollapsed).toBe(false);
+    });
+
+    it('⛔ focus បង្រួម ➜ វាយ ➜ focus ម្តងទៀត ➜ លុបអក្សរ ➜ ចាកចេញ ➜ បើកវិញ (focus នៅតែជាអ្នកបង្រួម)', () => {
+        vi.useFakeTimers();
+        entrySearchFocused();
+        entryInput.value = '0961';
+        entrySearchBlurred();
+        vi.advanceTimersByTime(200);
+        entrySearchFocused();
+        entryInput.value = '';
+        entrySearchBlurred();
+        vi.advanceTimersByTime(200);
+        expect(uiState.entryPanelCollapsed).toBe(false);
+    });
+
+    it('⛔ ទិសផ្ទុយ ៖ focus បង្រួម ➜ វាយ ➜ ចាកចេញ ➜ បើកដោយដៃ ➜ បង្រួមដោយដៃ ➜ focus ➜ លុបអក្សរ ➜ ចាកចេញ ➜ នៅបង្រួម (អ្នកប្រើជាអ្នកបង្រួម)', async () => {
+        vi.useFakeTimers();
+        entrySearchFocused();
+        entryInput.value = '0961';
+        entrySearchBlurred();
+        vi.advanceTimersByTime(200);
+        uiState.entryPanelCollapsed = false;
+        await Promise.resolve();
+        uiState.entryPanelCollapsed = true;
+        await Promise.resolve();
+        entrySearchFocused();
+        entryInput.value = '';
+        entrySearchBlurred();
+        vi.advanceTimersByTime(200);
+        expect(uiState.entryPanelCollapsed).toBe(true);
+    });
+
+    it('⛔ ចាកចេញពីប្រអប់ទទេ ➜ បើកវិញ ទោះប្រអប់ Locker (លាក់) នៅមានអក្សរពីមុន', () => {
+        vi.useFakeTimers();
+        lockerInput.value = '012';
+        viewState.entryModeShown = 'parcel';
+        entrySearchFocused();
+        expect(uiState.entryPanelCollapsed).toBe(true);
         entrySearchBlurred();
         vi.advanceTimersByTime(200);
         expect(uiState.entryPanelCollapsed).toBe(false);
@@ -163,22 +210,56 @@ describe('tab ស្កេន ៖ ស្វែងរកបញ្ជីកញ្�
         }
     });
 
+    it('⛔ iPhone PWA ៖ កាមេរ៉ាកំពុងស្កេន ➜ ការចុចទុកឲ្យ iOS (ប្រអប់មិនរើ ➜ iOS ត្រូវរំកិលបង្ហាញវាលើ keyboard)', () => {
+        scanState.isCameraScanning = true;
+        try {
+            expect(tap(entryInput, 1000).defaultPrevented).toBe(false);
+            expect(tap(lockerInput, 2000).defaultPrevented).toBe(false);
+            expect(focusCalls).toEqual([]);
+            expect(uiState.entryPanelCollapsed).toBe(false);
+        } finally {
+            scanState.isCameraScanning = false;
+        }
+    });
+
+    it('iPhone PWA ៖ កាមេរ៉ាកំពុងស្កេន តែផ្ទាំងបង្រួមដោយដៃរួច (ប្រអប់នៅខាងលើ) ➜ ការចុចនៅ preventDefault + preventScroll', () => {
+        uiState.entryPanelCollapsed = true;
+        scanState.isCameraScanning = true;
+        try {
+            expect(tap(entryInput, 1000).defaultPrevented).toBe(true);
+            expect(focusCalls[0]).toMatchObject({ field: 'entryListSearchInput', options: { preventScroll: true }, collapsed: true });
+        } finally {
+            scanState.isCameraScanning = false;
+        }
+    });
+
     it('ទិសផ្ទុយ ៖ Android/web ➜ ការចុចទុកឲ្យ browser (focus ធម្មតា ➜ onFocus បង្រួម)', () => {
         setIOSStandalone(false);
         expect(tap(entryInput, 1000).defaultPrevented).toBe(false);
         expect(focusCalls).toEqual([]);
     });
 
-    it('⛔ iPhone PWA ៖ document រំកិលខណៈប្រអប់ស្វែងរក tab ស្កេន focus ➜ ត្រឡប់ ០ · មិន focus ➜ មិនប៉ះ', () => {
+    it('⛔ iPhone PWA ៖ document រំកិលខណៈប្រអប់ស្វែងរក tab ស្កេន focus ហើយផ្ទាំងបង្រួម ➜ ត្រឡប់ ០ · មិន focus ➜ មិនប៉ះ', () => {
         let y = 240;
         const calls: any[] = [];
         Object.defineProperty(window, 'scrollY', { configurable: true, get: () => y });
         window.scrollTo = ((a: any, b: any) => { calls.push([a, b]); y = 0; }) as any;
+        uiState.entryPanelCollapsed = true;
         iosViewport.restoreIOSDocumentScroll();
         expect(calls).toEqual([]);
         HTMLElement.prototype.focus.call(entryInput);
         y = 240;
         iosViewport.restoreIOSDocumentScroll();
         expect(calls).toEqual([[0, 0]]);
+    });
+
+    it('⛔ ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក tab ស្កេន focus ខណៈផ្ទាំងស្កេនបើក (កាមេរ៉ា) ➜ ការរំកិល document របស់ iOS នៅដដែល (បង្ហាញប្រអប់លើ keyboard)', () => {
+        let y = 240;
+        const calls: any[] = [];
+        Object.defineProperty(window, 'scrollY', { configurable: true, get: () => y });
+        window.scrollTo = ((a: any, b: any) => { calls.push([a, b]); y = 0; }) as any;
+        HTMLElement.prototype.focus.call(entryInput);
+        iosViewport.restoreIOSDocumentScroll();
+        expect(calls).toEqual([]);
     });
 });

@@ -17,21 +17,23 @@ type Mode = 'ok' | 'drop' | 'down';
 function fakeServer() {
     let mode: Mode = 'ok';
     let seq = 0;
+    let clockShift = 0;
+    const now = () => Date.now() + clockShift;
     const docs = new Map<string, any>();
     const done = new Map<string, any>();
     const applied: string[] = [];
     const docOf = (k: string) => (docs.has(k) ? docs.get(k) : null);
     const apply = (args: any) => {
         const prior = done.get(args.p_op_id);
-        if (prior) return Object.assign({}, prior, { replayed: true });
+        if (prior) return Object.assign({}, prior, { replayed: true, now: now() });
         const op = args.p_ops[0];
         const k = op.p[0] + '/' + op.p[1];
         const current = docOf(k);
-        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return { ok: false, conflict: true, value: current };
+        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return { ok: false, conflict: true, now: now(), value: current };
         seq++;
         docs.set(k, op.v === undefined ? null : op.v);
         applied.push(args.p_op_id);
-        const result = { ok: true, seq, docs: [{ r: op.p[0], k: op.p[1], v: docs.get(k), s: seq }] };
+        const result = { ok: true, seq, now: now(), docs: [{ r: op.p[0], k: op.p[1], v: docs.get(k), s: seq }] };
         done.set(args.p_op_id, result);
         return result;
     };
@@ -40,7 +42,7 @@ function fakeServer() {
         rpc: async (fn: string, args: any) => {
             if (fn === 'zoe_pull') {
                 if (mode !== 'ok') throw new SbNetworkError('network');
-                return { seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: rows() };
+                return { seq, more: false, reset: true, head: seq, tenant: 't1', now: now(), rows: rows() };
             }
             if (fn !== 'zoe_write') throw new Error('unexpected ' + fn);
             if (mode === 'down') throw new SbNetworkError('network');
@@ -56,7 +58,8 @@ function fakeServer() {
         setMode: (m: Mode) => { mode = m; },
         set: (k: string, v: any) => { seq++; docs.set(k, v); },
         get: (k: string) => docOf(k),
-        purgeOps: () => done.clear()
+        purgeOps: () => done.clear(),
+        deviceClockBack: (ms: number) => { vi.setSystemTime(Date.now() - ms); clockShift += ms; }
     };
 }
 
@@ -85,7 +88,7 @@ const deduct = (current: any, op: any, ring: any) => {
     return next;
 };
 
-async function lostLedgerWrite(gapMs: number, purge: boolean) {
+async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs = 0) {
     vi.useFakeTimers();
     const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
     const server = fakeServer();
@@ -99,6 +102,7 @@ async function lostLedgerWrite(gapMs: number, purge: boolean) {
     server.setMode('down');
     await wait(gapMs);
     expect(state).toBe('pending');
+    if (deviceClockBackMs) server.deviceClockBack(deviceClockBackMs);
     if (purge) server.purgeOps();
     server.setMode('ok');
     await wait(1200000);
@@ -127,6 +131,22 @@ describe('Supabase ៖ CAS ដែលចម្លើយបាត់ ហើយផ�
         expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
         expect(state && state.committed).toBe(true);
         expect(state.txOutcome).toBe('applied');
+    });
+
+    it('⛔ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង + op ត្រូវ purge ➜ មិនមែន not-applied ➜ កាត់តែម្តង (អាយុវាស់តាមនាឡិកា server)', async () => {
+        const { state, server } = await lostLedgerWrite(50 * HOUR, true, 30 * HOUR);
+        expect(server.applied.length).toBe(1);
+        expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
+        expect(state && state.committed).toBe(true);
+        expect(state.txOutcome).toBe('applied');
+    });
+
+    it('ទិសផ្ទុយ ៖ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៣ ម៉ោង (op នៅ) ➜ replay ➜ applied តែម្តង', async () => {
+        const { state, server, unknown } = await lostLedgerWrite(3 * HOUR, false, 30 * HOUR);
+        expect(server.applied.length).toBe(1);
+        expect(state && state.committed).toBe(true);
+        expect(state.txOutcome).toBe('applied');
+        expect(unknown).toEqual([]);
     });
 
     it('⛔ CAS គ្មាន witness ➜ ផ្ញើវិញក្រោយ purge ➜ unknown (មិនទាយ not-applied) + រាយការណ៍', async () => {

@@ -441,6 +441,7 @@ function fetchFileFeed(url) {
             if (!items) return false;
             uiState.notifyFeed = items;
             safeStoreSet(appLocalStore, NOTIFY_FEED_CACHE_KEY, JSON.stringify({ items: items }));
+            if (uiState.appUpdateCheck.phase === 'failed') uiState.appUpdateCheck = { phase: 'idle', at: 0 };
             return true;
         }, () => false);
 }
@@ -458,7 +459,7 @@ function fetchSellerNotices(url) {
         }, () => false);
 }
 
-export function fetchNotifyFeed(userAsked?) {
+export function fetchNotifyFeed(userAsked?, versionFeedOnly?) {
     if (uiState.notifyFeedInFlight) return Promise.resolve(false);
     if (!userAsked) {
         if ((navigator.onLine as boolean) === false || linkIsFrugal()) return Promise.resolve(false);
@@ -470,7 +471,7 @@ export function fetchNotifyFeed(userAsked?) {
     uiState.notifyFeedInFlight = true;
     uiState.notifyFeedFetchedAt = Date.now();
     return Promise.all([fetchFileFeed(url), fetchSellerNotices(sellerUrl)])
-        .then((results) => results[0] || results[1], () => false)
+        .then((results) => (versionFeedOnly ? results[0] : results[0] || results[1]), () => false)
         .then((ok) => {
             uiState.notifyFeedInFlight = false;
             return ok;
@@ -517,7 +518,7 @@ export async function checkForAppUpdate(): Promise<void> {
     for (let waited = 0; uiState.notifyFeedInFlight && waited < APP_UPDATE_CHECK_WAIT_MAX; waited++) {
         await new Promise((resolve) => setTimeout(resolve, APP_UPDATE_CHECK_WAIT_MS));
     }
-    const fetched = await fetchNotifyFeed(true);
+    const fetched = await fetchNotifyFeed(true, true);
     const newer = newerAppVersion(uiState.notifyFeed);
     if (newer) await checkApkRelease(newer, true);
     await sw;

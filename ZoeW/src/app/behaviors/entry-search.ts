@@ -1,5 +1,7 @@
 import { scanState, uiState } from '../../core/state';
+import { viewState } from '../../core/view-state';
 import { commitNow } from '../flush';
+import type { LifecycleScope } from '../lifecycle/scope';
 import { elementOf, fieldValue, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { panelGlideFrom } from './panel-motion';
 import { panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock } from './panels';
@@ -27,16 +29,27 @@ export function glideEntryPanelCollapsed(collapsed: boolean): boolean {
     return true;
 }
 
+export function entrySearchMovesField(): boolean {
+    if (window.innerWidth >= ENTRY_SEARCH_WIDE_MIN_PX || uiState.currentAppPage !== 'entry') return false;
+    return panelIsCollapsed('entry') || !(scanState.isCameraScanning || scanState.isCameraStarting);
+}
+
+export function listenEntrySearchPanel(scope: LifecycleScope): void {
+    entrySearchCollapsed = false;
+    scope.onDispose(uiState.subscribe(() => {
+        if (!uiState.entryPanelCollapsed) entrySearchCollapsed = false;
+    }));
+}
+
 export function entrySearchFocused(): void {
-    if (window.innerWidth >= ENTRY_SEARCH_WIDE_MIN_PX || uiState.currentAppPage !== 'entry') return;
-    if (scanState.isCameraScanning || scanState.isCameraStarting) return;
+    if (!entrySearchMovesField()) return;
     if (glideEntryPanelCollapsed(true)) entrySearchCollapsed = true;
 }
 
 export function entrySearchBlurred(): void {
     setTimeout(() => {
         if (!entrySearchCollapsed || entrySearchFieldFocused()) return;
-        if (ENTRY_SEARCH_FIELDS.some((f) => fieldValue(f).trim())) return;
+        if (fieldValue(viewState.entryModeShown === 'locker' ? 'lockerListSearchInput' : 'entryListSearchInput').trim()) return;
         entrySearchCollapsed = false;
         if (uiState.currentAppPage === 'entry') glideEntryPanelCollapsed(false);
         else setPanelCollapsed('entry', false);

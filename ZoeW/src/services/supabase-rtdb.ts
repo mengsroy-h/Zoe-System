@@ -362,6 +362,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let online = true;
     let connected = false;
     let serverOffset = 0;
+    let serverNowSeen = 0;
     let offsetKnown = false;
     let retryAttempt = 0;
     let retryTimer = null;
@@ -553,6 +554,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const noteServerTime = (now, t0, t1) => {
         if (typeof now !== 'number' || !Number.isFinite(now)) return;
         serverOffset = Math.round(now - (t0 + t1) / 2);
+        serverNowSeen = now;
         offsetKnown = true;
         if (!clockSkewWarned && Math.abs(serverOffset) > SB_CLOCK_SKEW_WARN_MS && hooks.onClockSkew) {
             clockSkewWarned = true;
@@ -1009,7 +1011,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     await waitForLink();
                     let res;
                     let lost = null;
-                    let lostAt = 0;
+                    const sentAfter = serverNowSeen;
                     let lostAttempts = 0;
                     const giveUp = () => {
                         lost.txOutcome = 'unknown';
@@ -1038,7 +1040,6 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             scheduleRetry();
                             if (!lost && !e.unsent) {
                                 lost = disconnectError();
-                                lostAt = Date.now();
                                 txDisconnectResolving.set(outer, lost);
                             }
                             if (!closed) {
@@ -1062,7 +1063,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     }
                     if (res && res.conflict) {
                         if (lost) {
-                            if (elapsedSince(lostAt) <= SB_OP_REPLAY_SAFE_MS) {
+                            const age = sentAfter > 0 && typeof res.now === 'number' && Number.isFinite(res.now) ? res.now - sentAfter : NaN;
+                            if (age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
                                 lost.txOutcome = 'not-applied';
                                 throw lost;
                             }

@@ -145,15 +145,18 @@
   ដូចការអូសផ្ទាំង (`glidePhoneSearchPulledUp()` ៖ FLIP កាតស្វែងរក + បញ្ជី តាម `panelGlideFrom()` · ផ្អាក snap ដូចមុន)។ iPhone PWA ៖ ការចុច ➜ រអិលឡើងមុន ➜ `focus({ preventScroll })` ([2.50.45])។
 - ✨ **ទំព័រស្កេន ៖ ចុចស្វែងរកបញ្ជីកញ្ចប់ ឬបញ្ជី Locker ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល** (សំណើម្ចាស់គម្រោង «ពិនិត្យកន្លែងស្វែងរកក្នុង tab ស្កេនផង») ៖ មុននេះប្រអប់នៅ y ៤៣៦ · ៥០៣
   (៤១៤×៨៩៦) ➜ keyboard គ្របលទ្ធផល ហើយ iOS រំកិលទំព័រ។ ឥឡូវប្រអប់ឡើង y ~១០៦ · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (តែពេល focus ជាអ្នកបង្រួម · មានអក្សរ ➜ នៅបង្រួម · កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម ព្រោះកាមេរ៉ាលាក់នៅតែស្កេន) ·
-  iPhone PWA ៖ ការចុច ➜ បង្រួមមុន ➜ `focus({ preventScroll })` · document រំកិល ➜ ត្រឡប់ ០ (ដូចប្រអប់ស្វែងរកលេខ)។
+  iPhone PWA ៖ ការចុច ➜ បង្រួមមុន ➜ `focus({ preventScroll })` · document រំកិល ➜ ត្រឡប់ ០ (ដូចប្រអប់ស្វែងរកលេខ) · កាមេរ៉ាកំពុងស្កេន ➜ ផ្ទាំងនៅបើក ហើយការចុចជារបស់ iOS
+  (iOS រំកិលបង្ហាញប្រអប់លើ keyboard · `entrySearchMovesField()`) · អ្នកប្រើបើកផ្ទាំងដោយដៃ ➜ ការចាកចេញពីប្រអប់មិនបើកវិញទៀត (អ្នកប្រើជាអ្នកបង្រួម) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ។
 - ✨ **🔔 «📱 កំណែ App» ៖ ប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី»** (សំណើម្ចាស់គម្រោង) ៖ ទាញព័ត៌មានកំណែភ្លាម · APK ៖ សួរ GitHub Release ម្តងទៀតភ្លាម (មុននេះរង់ចាំ ២ នាទីក្រោយ
-  «មិនទាន់មាន») · PWA ៖ សួរ Service Worker ឲ្យទាញកំណែថ្មី ➜ «Refresh ឥឡូវនេះ» · ខណៈពិនិត្យ ➜ ប៊ូតុងបិទ · មិនបាន ➜ ⚠️។
+  «មិនទាន់មាន») · PWA ៖ សួរ Service Worker ឲ្យទាញកំណែថ្មី ➜ «Refresh ឥឡូវនេះ» · ខណៈពិនិត្យ ➜ ប៊ូតុងបិទ · feed កំណែទាញមិនបាន ➜ ⚠️ (ដំណឹងអ្នកលក់ដែលឆ្លើយមិនរាប់ថាពិនិត្យបាន) ·
+  feed ទាញបានពេលក្រោយ (បើក 🔔) ➜ ⚠️ បាត់។
 - 🐛 **ហាង Supabase ៖ ការកាត់ប្រាក់ដែលចម្លើយបាត់ ហើយផ្ញើម្តងទៀតក្រោយ `zoe_ops` លុបលទ្ធផល (២ ថ្ងៃ) ➜ កាត់ពីរដង** ៖ op ដែលលុបរួចត្រូវវាយតម្លៃ CAS ថ្មី ➜ ប៉ះតម្លៃដែលខ្លួនឯងសរសេររួច
-  ➜ `conflict` ➜ adapter ឆ្លើយ `not-applied` ➜ `runLedgerTransaction()` ផ្ញើម្តងទៀត។ ឥឡូវ ៖ conflict ក្រោយ `SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង < ២ ថ្ងៃ) សម្រេចដោយ ring `ops`
+  ➜ `conflict` ➜ adapter ឆ្លើយ `not-applied` ➜ `runLedgerTransaction()` ផ្ញើម្តងទៀត។ ឥឡូវ ៖ conflict ក្រោយ `SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង < ២ ថ្ងៃ · វាស់តាមនាឡិកា server ៖ `now` របស់
+  conflict ដក `now` ចុងក្រោយដែលឃើញមុនផ្ញើ ➜ នាឡិកាឧបករណ៍ដែលថយក្រោយមិនប៉ះ) សម្រេចដោយ ring `ops`
   (`txOutcomeWitness`) ➜ `applied` តែម្តង · គ្មាន witness ➜ `unknown` (Sentry money · មិនទាយ)។
 - 🐛 **PWA ៖ deploy ថ្មីខណៈ SW ចាស់គ្រប់គ្រង ➜ chunk ឈ្មោះចាស់ (ឧ. `supabase-backend`) ត្រូវ Netlify ឆ្លើយ `index.html` 200 ➜ SW ផ្ទុក HTML ក្រោម key របស់ chunk**
   ➜ `import()` បរាជ័យរហូតដល់ SW ថ្មី (ហាង Firebase ប្តូរ Config ទៅ Supabase ចំពេល deploy ➜ «Supabase មិនទាន់រួចរាល់»)។ ឥឡូវ HTML មិនចូល cache ក្រោម key ដែលមិនមែន HTML
-  (`responseFitsKey()` ទាំងទ្វារ miss និង revalidate)។
+  (`responseFitsKey()` ទាំងទ្វារ miss និង revalidate · អាន header មិនបាន ➜ ផ្ទុកដូចមុន)។
 
 #### អ្នកយាម
 
@@ -166,15 +169,23 @@
   ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ➜ បង្រួមដោយរអិល · ប្រអប់ឡើង ≥ ១០០px · blur ទទេ ➜ បើកវិញ — មុនកែ FAIL ១២/១២ · ការវាស់ keyboard រង់ចាំ `resize` ពិត (មុននេះធ្លាក់ម្តងក្រោមបន្ទុក run-all)។
 - `ZoeW/tests/ios-entry-search-tap.test.ts` (៨) ៖ iPhone PWA ចុចប្រអប់ស្វែងរកទំព័រស្កេន ➜ preventDefault · បង្រួមមុន focus · `preventScroll` · blur ទទេ/មានអក្សរ · បង្រួមដោយដៃមុន · កាមេរ៉ាកំពុងស្កេន ·
   អេក្រង់ធំ · tab ផ្សេង · Android ➜ មិនប៉ះ · document រំកិល ➜ ០។
-- `ZoeW/tests/notify-update-check.test.tsx` (៧) ៖ ខ្សែភ្ជាប់ (registry · allowlist) · APK «មិនទាន់មាន» ទើបពិនិត្យ ➜ ចុច ➜ probe ភ្លាម ➜ ប៊ូតុងទាញយក · PWA `registration.update()` ·
-  កំពុងពិនិត្យ ➜ បិទ · មិនបាន ➜ ⚠️ · `updateReady` ➜ គ្មានប៊ូតុង។
+- `ZoeW/tests/notify-update-check.test.tsx` (៩) ៖ ខ្សែភ្ជាប់ (registry · allowlist) · APK «មិនទាន់មាន» ទើបពិនិត្យ ➜ ចុច ➜ probe ភ្លាម ➜ ប៊ូតុងទាញយក · PWA `registration.update()` ·
+  កំពុងពិនិត្យ ➜ បិទ · មិនបាន ➜ ⚠️ · feed កំណែធ្លាក់ + ដំណឹងអ្នកលក់ឆ្លើយ ➜ ⚠️ · feed ទាញបានវិញ ➜ ⚠️ បាត់ · `updateReady` ➜ គ្មានប៊ូតុង — ២ ថ្មីមុនកែ FAIL ២។
+- `ZoeW/tests/supabase-op-retention.test.ts` (+២) ៖ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង + purge ➜ កាត់តែម្តង (មុនកែ `applied` ២) · ទិសផ្ទុយ ៖ ការដាច់ ៣ ម៉ោង ➜ replay ·
+  fake server មាននាឡិកាផ្ទាល់ខ្លួន និង `now` ក្នុងចម្លើយ write ដូច migration ពិត។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (+៦) ៖ កាមេរ៉ា ➜ ការចុចជារបស់ iOS · កាមេរ៉ា + ផ្ទាំងបង្រួមរួច ➜ preventScroll · ការរំកិល document នៅដដែលពេលផ្ទាំងបើក · flag ចាស់ក្រោយបើក/បង្រួមដោយដៃ ·
+  ប្រអប់ Locker លាក់ · focus ម្តងទៀត ➜ នៅបើកវិញ — មុនកែ FAIL ៥។
+- `ZoeW/tests/sw-revalidation-timeout.test.ts` (+២) ៖ ទ្វារ revalidate ៖ HTML ➜ គ្មាន put · JS ➜ put — mutant ដក `responseFitsKey` ពី revalidate ➜ FAIL។
+- `phone-search-swipe-test` · `phone-suggest-test` ៖ onFocus ហូតឡើងតាមខ្សែហៅពិត + ទិសផ្ទុយ · `clock-hygiene` · `loop-termination` · `sw-cache-failure-test` ធ្លាក់លើ tree មុនកែ (A60)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. Deploy **ZoeW** (merge ចូល `main`) · build APK ថ្មី (workflow ពី `main`)។
 2. iPhone PWA · Android PWA · APK ៖ ទំព័រទិន្នន័យ ➜ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើង (មិនលោត) · keyboard បើកដោយទំព័រនៅនឹងកន្លែង · ចាកចេញពីប្រអប់ទទេ ➜ រអិលចុះវិញ។
+   iPhone PWA ៖ មើលជាពិសេសថាទំព័រទាំងមូល (navbar ផង) **មិនធ្លាក់ចុះ ហើយរអិលឡើងវិញ** ពេល keyboard បើក (រោគសញ្ញាវីដេអូ 2.50.45 · A66 ៖ ចលនាចាប់ផ្តើមមុន focus) ➜ ឃើញ ➜ ផ្ញើវីដេអូ។
    ⚠️ ចលនាវាស់តែក្នុង Chromium (តំបន់ហាម ➜ ត្រូវសាកលើទូរស័ព្ទពិតទាំង ២ មុនចាត់ថារួច) · ⛔ PTR · អូសផ្ទាំង ត្រូវដដែល។
 3. ទំព័រស្កេន ៖ ចុចប្រអប់ស្វែងរកបញ្ជីកញ្ចប់ (និងរបៀប Locker) ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល · លទ្ធផលនៅលើ keyboard · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ · ស្កេនបន្តបាន។
+   កាមេរ៉ាកំពុងស្កេន ➜ ចុចប្រអប់ស្វែងរក ➜ ផ្ទាំងនៅបើក ហើយប្រអប់មើលឃើញលើ keyboard (iPhone PWA ៖ iOS រំកិលបង្ហាញ)។
 4. 🔔 ➜ «🔄 ពិនិត្យកំណែថ្មី» ៖ APK ពេល Release កំពុង build ➜ ចុចក្រោយ Release ចេញ ➜ ប៊ូតុងទាញយកលេចភ្លាម · PWA ➜ «Refresh ឥឡូវនេះ» ពេលមានកំណែថ្មី។
 5. គ្មានការសាកពិសេសសម្រាប់ Supabase/SW (ការវាស់ក្នុងតេស្ត) · ⚠️ មុនដាក់ប្រើជាផ្លូវការ ៖ អាន Handoff ៦ (កូតា Firebase Spark · License Project · Netlify · Supabase · Push · `ZTO_PROXY_KEY`)។
 
@@ -2922,6 +2933,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A57 | **Netlify Functions ៖ ZTO Palm** (Handoff ៦គ) | Claude ៖ `ZTO_SIGNED_SWEEP_ACTIVE_MS` ២០ វិ. · `VISIBLE` ៦០ វិ. · `GAP` ២ នាទី ➜ ~១៨០/ម៉ោង (សកម្ម) · ~៦០/ម៉ោង (បើក) ➜ ~១,២០០/ថ្ងៃ/ឧបករណ៍ ZTO + `/detail` តាមការស្កេន · cache ក្នុង Function មិនកាត់ចំនួនការហៅ | ពិនិត្យកូតា Netlify មុនបន្ថែមហាង |
 | A58 | **Supabase Project តែមួយ** (Handoff ៦ឃ) | Claude ៖ `zoe_write` ចាក់សោ `zoe_tenant_state` ក្នុងមួយហាង (មិនប៉ះហាងផ្សេង) · `zoe_pull` ប្រើ index `(tenant_id, seq)` · `zoe_ops` ~១៥ ការសរសេរ/កញ្ចប់ ➜ ~៤,៥០០/ថ្ងៃ (៣០០ កញ្ចប់) × ២ ថ្ងៃ · realtime ១ websocket/ឧបករណ៍ | ពិដាន realtime ព្រមគ្នា (Free ២០០ · Pro ៥០០) ជាដែនកំណត់ចំនួនឧបករណ៍បើកព្រមគ្នា |
 | A59 | **Push cron · `ZTO_PROXY_KEY`** (Handoff ៦ង · ៦ច) | Claude ៖ `dispatchNotices()` ឡើង ledger មុនផ្ញើ · `PUSH_RUN_BUDGET_MS` ២០ វិ. · ១៦ ព្រមគ្នា ➜ ~១,០០០ subscription/ដំណឹង · `PUSH_SUBS_TOTAL_MAX` ៥,០០០ · `/detail` ចងតែ `ZTO_PROXY_KEY` (មិនចងអត្តសញ្ញាណ/សាខាដូច `?list=1`) | គ្មានកូដ (តំបន់ចាក់សោ ZTO ➜ ត្រូវសំណើ) |
+| A60 | **run-all STRICT ពេញលើ tree 1d619b4 (emulator RTDB · Postgres ពិត) ៖ ធ្លាក់ ៥ · ជោគជ័យ ១៩៧ · មួយផ្នែក ០ · រំលង ០** (ជុំបន្ត Deep audit ៣) | Claude ៖ (១) `phone-suggest-test` · `phone-search-swipe-test` រំពឹង `phoneSearchFocused()` ហៅ `setPhoneSearchPulledUp(true)` ផ្ទាល់ (ឥឡូវតាម `glidePhoneSearchPulledUp`) ➜ ReferenceError/regex · (២) `sw-cache-failure-test` ៖ `responseFitsKey()` អាន `response.headers` ដោយគ្មាន `try` ➜ TypeError ក្នុង `.then` ➜ `.catch(() => null)` ➜ ចម្លើយបណ្តាញល្អក្លាយ `Response.error()` (impact ជំហាន ៥ ៖ helper ថ្មីលើផ្លូវក្តៅបោះ) · (៣) `clock-hygiene` ៖ `Date.now()` ក្នុង `checkForAppUpdate()` · `probeApkRelease()` គ្មានហេតុផល + ធាតុងាប់ `checkApkRelease` · (៤) `loop-termination` ៖ `while (… elapsedSince(startedAt) < NOTIFY_FEED_TIMEOUT_MS)` គ្មានព្រំដែនរចនាសម្ព័ន្ធ · ក្រោយកែ `zoew-suite` lint ៖ `no-useless-assignment` | checker ស្វែងរកលេខដើរតាមខ្សែហៅពិត (helper ដែលបញ្ជូនប៉ារ៉ាម៉ែត្រទៅ `setPhoneSearchPulledUp`) + ទិសផ្ទុយ (ដកការហៅ ➜ ធ្លាក់) · `responseFitsKey()` អាន headers មិនបាន ➜ ផ្ទុកដូចមុន (fail-open) · `APP_UPDATE_CHECK_WAIT_MAX` ជុំ · allowlist នាឡិកាមានហេតុផលពិត |
+| A61 | **Supabase ៖ បង្អួច `SB_OP_REPLAY_SAFE_MS` វាស់តាមនាឡិកាឧបករណ៍** (workflow ពិនិត្យ diff 2.50.46 · អ្នកផ្ទៀងប្រឆាំង ៖ confirmed) | Claude ៖ `elapsedSince(lostAt)` ៖ នាឡិកាថយក្រោយ *មួយផ្នែក* (ឧ. NTP កែ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង) ➜ អាន ២០ ម៉ោង ≤ ២៤ ➜ `not-applied` ខណៈ op ត្រូវ purge (server ៖ `created_at < now() - 2 days`) ➜ ledger កាត់ ២ ដង · vitest ថ្មី ៖ មុនកែ `applied` ២ | អាយុ = `res.now` (conflict) − `now` ចុងក្រោយដែលឃើញមុនផ្ញើលើកដំបូង (`serverNowSeen` ➜ `sentAfter`) ៖ ចម្លើយដែលទទួលមុនផ្ញើ = ព្រំក្រោមនៃ `created_at` (causality) ➜ គ្មាននាឡិកាឧបករណ៍ · គ្មាន `now` ឬអវិជ្ជមាន ➜ witness/`unknown` · fake `supabase-tx-outcome` ឆ្លើយ conflict មាន `now` ដូច migration ពិត |
+| A62 | **🔔 «🔄 ពិនិត្យកំណែថ្មី» ✅ ពេល feed កំណែទាញមិនបាន តែដំណឹងអ្នកលក់ឆ្លើយ** (confirmed) · **⚠️ នៅជាប់ក្រោយ feed ទាញបានវិញ** (confirmed nit) | Claude ៖ `fetchNotifyFeed()` = `results[0] \|\| results[1]` ➜ License RTDB ឆ្លើយ `null` ក៏ជា «ជោគជ័យ» · ✅ «កំណែចុងក្រោយ» មកពី cache · `appUpdateCheck` `failed` គ្មានអ្នក reset · vitest ថ្មី ២ ៖ មុនកែ FAIL ២ | សេចក្តីសម្រេចពី feed កំណែតែប៉ុណ្ណោះ (`fetchNotifyFeed(true, true)`) · feed កំណែទាញបាន ➜ `failed` ➜ `idle` |
+| A63 | **iPhone PWA · ទំព័រស្កេន · កាមេរ៉ាកំពុងស្កេន ៖ ការចុចប្រអប់ស្វែងរកនៅ preventDefault + `preventScroll` + ការរំកិល document ត្រឡប់ ០ ខណៈផ្ទាំងមិនបង្រួម ➜ ប្រអប់នៅក្រោម keyboard** (confirmed) | Claude ៖ កាមេរ៉ា (`--scan-box-h` ~១៩០px) រុញប្រអប់ទៅ y ~៥៦០ · ~៦៣០ (៤១៤×៨៩៦) · `entrySearchFocused()` លែងបង្រួម (30a6eb4) តែ `searchTapField()` · `restoreIOSDocumentScroll()` មិនដឹង · vitest ថ្មី ២ មុនកែ FAIL | `entrySearchMovesField()` តែមួយ ៖ focus · ការចុច iOS · ការត្រឡប់ ០ (តែពេលផ្ទាំងបង្រួម) ➜ កាមេរ៉ា + ផ្ទាំងបើក ➜ iOS ធម្មតា |
+| A64 | **ទំព័រស្កេន ៖ flag «focus ជាអ្នកបង្រួម» ចាស់ · ប្រអប់ Locker លាក់មានអក្សរ ➜ បើកវិញខុស/មិនបើក** (confirmed nit ×២) | Claude ៖ flag កំណត់តែពេល focus បង្រួម មិនដែលសម្អាតពេលផ្ទាំងបើកដោយដៃ ➜ បង្រួមដោយដៃ ➜ ចាកចេញ ➜ បើកវិញ · `ENTRY_SEARCH_FIELDS.some(value)` អានប្រអប់លាក់ · តេស្តទិសផ្ទុយចាស់ PASS ដោយចៃដន្យ (flag លេចពីតេស្តមុន) · vitest ថ្មី ៣ មុនកែ FAIL | `listenEntrySearchPanel()` (store subscription ៖ ផ្ទាំងបើក ➜ flag សម្អាត · boot សម្អាត) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ |
+| A65 | **SW ៖ ពាក់កណ្តាល revalidate នៃ `responseFitsKey()` គ្មានអ្នកយាម** (confirmed) | Claude ៖ `sw-backend-chunk-test` ផ្នែក ៤ ដើរតែទ្វារ miss · mutant ដក `responseFitsKey` ពី `revalidateShell()` រស់គ្រប់ checker | `sw-revalidation-timeout.test.ts` +២ (HTML ➜ put ០ · JS ➜ put ១) · mutant ➜ FAIL |
+| A66 | **iPhone PWA ៖ FLIP ចាប់ផ្តើមមុន `focus()` ➜ ប្រអប់គូរនៅទីតាំងចាស់ពេល focus** (uncertain · តំបន់ហាម) | អ្នកផ្ទៀង ៖ លំដាប់កូដពិត (Chromium ៖ កាតនៅទីតាំងចាស់ក្រោយ `focus()`) តែការរំកិលបង្ហាញ keyboard របស់ WebKit វាស់មិនបាន | ⛔ គ្មានកូដ (`phone-search.ts` ចាក់សោ · មិនកែតាមទ្រឹស្តី WebKit) ➜ [2.50.46] សកម្មភាព ២–៣ ៖ មើលការធ្លាក់/រអិលទំព័រទាំងមូល (រោគសញ្ញា A47) |
 
 - **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
   `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase
@@ -2932,6 +2950,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **មិនបានរកឃើញ** (អានរួច) ៖ ច្បាប់ RLS · `current_tenant_id()` (user ១ = ហាង ១) · Edge Function register/reset (កូដ ១០០ bit · CORS ចង origin) · `ApkUpdatePlugin.java` (HTTPS ·
   packageName + versionName · Android ផ្ទៀង signature ពេលដំឡើង) · license meta (display តែប៉ុណ្ណោះ) · listener ស្ទួន (`addEventListener` គ្រប់កន្លែង ➜ scope ឬ function ដដែល) · គ្មាន
   `innerHTML` ក្នុង ZoeW React · គ្មាន secret ក្នុង repo (`git grep` private key · token · `sb_secret_`)។
+- **ជុំបន្ត (session ថ្មី · A60–A66)** ៖ run-all STRICT ពេញលើ tree ចុងក្រោយរបស់ session មុន (A60) ➜ workflow ពិនិត្យ diff `fe52290..HEAD` (ម្ចាស់គម្រោងបើក
+  workflow ក្នុង session នេះ ៖ ៥ ផ្នែក — លុយ/Supabase · SW · UI ស្វែងរក · ពិនិត្យកំណែ · ឯកសារ/ឧបករណ៍ — រកឃើញ ១២ ➜ អ្នកផ្ទៀងប្រឆាំងម្នាក់ក្នុងមួយផ្នែក ៖ confirmed ៩ ·
+  refuted ១ (កែរួចក្នុង A60) · uncertain ១ (A66) · ការរកឃើញឯកសារ ៣ ៖ guide.html ប្រយោគ 🔄 កាត់ «ចុច ➜» ចេញពីប៊ូតុង 📥 · ករណីកាមេរ៉ាមិនបានសរសេរ · announcements «APK លើ GitHub»
+  បង្ហាញលើគ្រប់វេទិកា ➜ កែ) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ (៧ នាទី · `ledgerBlip` applied ១៥ · lost ១១)។
 
 ### 2026-10-08 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar ធ្លាក់ ហើយរអិលឡើង · iOS 26 បង្ហាញ 18.7 ➜ [2.50.45]
 

@@ -2,8 +2,8 @@ import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
 import type { LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, type RefName } from '../refs';
-import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused } from './entry-search';
-import { usesIOSPanelHandoff } from './panels';
+import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
+import { panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 import { glidePhoneSearchPulledUp } from './phone-search';
 
 export const IOS_SEARCH_TAP_SLOP_PX = 10;
@@ -16,7 +16,7 @@ let searchTap: { id: number; x: number; y: number; at: number; field: RefName } 
 let searchFocusRefused = false;
 
 export function restoreIOSDocumentScroll(): void {
-    if (!(uiState.dataPanelSearchFocus || entrySearchFieldFocused()) || !usesIOSPanelHandoff()) return;
+    if (!(uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) || !usesIOSPanelHandoff()) return;
     if ((window.scrollY || 0) === 0) return;
     scrollWindowToTop();
 }
@@ -40,6 +40,7 @@ function searchTapField(target: EventTarget | null): RefName | null {
         const input = elementOf<HTMLInputElement>(field);
         if (!input || target !== input) continue;
         if (input.disabled || input.readOnly || isFieldFocused(field)) return null;
+        if (field !== 'searchPhoneInput' && !entrySearchMovesField()) return null;
         return field;
     }
     return null;

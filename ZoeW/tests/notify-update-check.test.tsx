@@ -157,6 +157,37 @@ describe('🔔 «🔄 ពិនិត្យកំណែថ្មី»', () => {
         expect(btn()!.disabled).toBe(false);
     });
 
+    it('⛔ feed កំណែទាញមិនបាន តែដំណឹងអ្នកលក់ឆ្លើយ ➜ ⚠️ (✅ ចាស់ពី cache មិនមែនការវាស់ក្នុងការពិនិត្យនេះ)', async () => {
+        feed = null;
+        (window as any).ZoeLicense = { announcementsUrl: () => 'https://license.invalid/license_announcements/ZOE.json' };
+        try {
+            mount(<NotifyDrawer />);
+            step(() => { btn()!.click(); });
+            await vi.waitFor(() => { expect((uiState as any).appUpdateCheck.phase).not.toBe('checking'); }, { timeout: 5000 });
+            await flush();
+            expect((fetch as any).mock.calls.some(([u]: any[]) => String(u).includes('license_announcements'))).toBe(true);
+            expect((uiState as any).appUpdateCheck.phase).toBe('failed');
+            expect(document.getElementById('notifyUpdateCheckStatus')).not.toBe(null);
+        } finally {
+            delete (window as any).ZoeLicense;
+        }
+    });
+
+    it('⚠️ ពិនិត្យមិនបាន ➜ feed កំណែទាញបានពេលក្រោយ (បើក 🔔) ➜ ⚠️ បាត់', async () => {
+        feed = null;
+        mount(<NotifyDrawer />);
+        step(() => { btn()!.click(); });
+        await vi.waitFor(() => { expect((uiState as any).appUpdateCheck.phase).toBe('failed'); }, { timeout: 5000 });
+        await flush();
+        expect(document.getElementById('notifyUpdateCheckStatus')).not.toBe(null);
+        feed = feedBody(APP_VERSION);
+        const { fetchNotifyFeed } = await import('../src/features/notifications');
+        await fetchNotifyFeed(true);
+        await flush();
+        expect(document.getElementById('notifyUpdateCheckStatus')).toBe(null);
+        expect(document.getElementById('notifyVersionSection')!.textContent).toContain('កំណែចុងក្រោយ');
+    });
+
     it('ទិសផ្ទុយ ៖ កំណែថ្មីទាញរួច (updateReady) ➜ គ្មានប៊ូតុង (Refresh ឥឡូវនេះជំនួស)', () => {
         step(() => { uiState.updateReady = true; });
         mount(<NotifyDrawer />);

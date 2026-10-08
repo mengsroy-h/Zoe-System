@@ -113,7 +113,7 @@ const ACCEPTED = {
         devicePending: 'cached read of this device\'s model and serial (device identity like firebaseConfig, no customer data); the serial is Android ID or a hash of the License device ID, never the ID itself',
         searchTap: 'start point and id of the current touch on the phone search input (coordinates and a timestamp, no customer data); cleared on every touchend/touchcancel',
         searchFocusRefused: 'per-page flag that iOS refused a programmatic focus (a boolean about the browser, no customer data); reset by listenIOSSearchFocus()',
-        entrySearchCollapsed: 'flag that a scan-tab search field collapsed the scan panel on focus (a boolean about the layout, no customer data); cleared when the empty field blurs and the panel opens again',
+        entrySearchCollapsed: 'flag that a scan-tab search field collapsed the scan panel on focus (a boolean about the layout, no customer data); cleared when the empty field blurs and the panel opens again, whenever the scan panel opens through any other door (listenEntrySearchPanel store subscription), and on every page load',
         appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
         appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
         // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន

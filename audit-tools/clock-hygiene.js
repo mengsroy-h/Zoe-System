@@ -49,7 +49,7 @@ const LOCAL_CLOCK_OK = {
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         fetchNotifyFeed: 'ពិដានល្បឿនការទាញសារជូនដំណឹង ៦០ វិ. — local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ទាញ)',
         probeApkRelease: 'ពិដានល្បឿនការសួរ GitHub Release (APK ថ្មី) ២ នាទី · ៣០ វិ. — ត្រាពេល local ដែល `checkApkRelease()` វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សួរម្តងទៀត) · មិនប៉ះទិន្នន័យ ឬលុយ',
-        checkForAppUpdate: 'ពិដានរង់ចាំការទាញសារជូនដំណឹងដែលកំពុងរត់ (`NOTIFY_FEED_TIMEOUT_MS`) និងត្រាពេលស្ថានភាពប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី» — local · វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ ឈប់រង់ចាំ) · មិនប៉ះទិន្នន័យ ឬលុយ',
+        checkForAppUpdate: 'ត្រាស្ថានភាពប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី» (`appUpdateCheck.at` · local · គ្មានការសម្រេចណាអានវា) — ការរង់ចាំការទាញសារដែលកំពុងរត់មានព្រំដែនរចនាសម្ព័ន្ធ (`APP_UPDATE_CHECK_WAIT_MAX` ជុំ) មិនពឹងនាឡិកា · មិនប៉ះទិន្នន័យ ឬលុយ',
         markReleaseAbsent: 'ត្រាពេលដដែលនឹង `probeApkRelease()` (Release ឆ្លើយ 404 ពេលទាញ) — local · វាស់តាម `elapsedSince()`',
         downloadWithStallGuard: 'ពិដាន «ការទាញ APK ឈប់រីក» ៤៥ វិ. — ត្រាពេល progress ចុងក្រោយ local · វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ បោះបង់ ➜ ចុចម្តងទៀតបាន) · មិនប៉ះទិន្នន័យ ឬលុយ',
         sampleScrollHz: 'ចន្លោះ ៥ វិ. រវាងការវាស់ Hz ពេលរមូរ (រៀន Hz ខ្ពស់បំផុតរបស់ឧបករណ៍) — local ហើយវាស់តាម `elapsedSince()` · មិនប៉ះទិន្នន័យ ឬលុយ',

@@ -118,7 +118,7 @@ export function readCleanupJournal() {
 }
 
 export function writeCleanupJournal(entries) {
-    const list = Array.isArray(entries) ? entries.slice(-CLEANUP_JOURNAL_MAX) : [];
+    const list = Array.isArray(entries) ? entries : [];
     if (!list.length) {
         safeStoreRemove(appLocalStore, CLEANUP_JOURNAL_KEY);
         return;
@@ -506,6 +506,7 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
 
 export async function claimAndCleanupItem(id, reason) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
+    if (cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX) return;
     cleanupInFlight.add(id);
 
     let claimedWhole = null;

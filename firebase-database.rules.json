@@ -344,6 +344,12 @@
         "op": {
           ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 40"
         },
+        "ops": {
+          ".validate": "newData.hasChildren()",
+          "$op": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && $op.length >= 8 && $op.length <= 40"
+          }
+        },
         "$other": {
           ".validate": false
         }
@@ -411,6 +417,12 @@
         },
         "op": {
           ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 40"
+        },
+        "ops": {
+          ".validate": "newData.hasChildren()",
+          "$op": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && $op.length >= 8 && $op.length <= 40"
+          }
         },
         "$other": {
           ".validate": false

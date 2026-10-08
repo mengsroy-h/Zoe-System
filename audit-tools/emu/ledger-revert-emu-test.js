@@ -94,6 +94,7 @@ function extractFn(src, name) {
 const FNS = ['ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta',
     'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord'];
 
@@ -137,7 +138,7 @@ function buildContext() {
         throw new Error('⛔ ផ្លូវដកវិញតាម delta ដែលអនុវត្តពិត មិនមានក្នុង tree នេះ: ' + missing.join(', ')
             + '\n        (ឥរិយាបថចាស់ ៖ ដកវិញតាម delta ដែល *ស្នើ* ➜ ការ clamp បង្កើតចំណូល)');
     }
-    vm.runInContext(FNS.map((n) => extractFn(src, n)).join('\n'), ctx);
+    vm.runInContext((src.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n' + FNS.map((n) => extractFn(src, n)).join('\n'), ctx);
     return ctx;
 }
 

@@ -73,13 +73,14 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory', 'runLedgerTransaction',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupClaimAccountedElsewhere', 'claimCleanupTrashSlot', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode', 'ensureBarcodeArrayForItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry'];
-const APP_CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS',
+const APP_CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT'];
-const OPTIONAL = new Set(['cleanupClaimAccountedElsewhere', 'runLedgerTransaction']);
+const OPTIONAL = new Set(['cleanupClaimAccountedElsewhere', 'runLedgerTransaction', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged']);
 
 const DB_URL = 'https://zoe-test-default-rtdb.firebaseio.com';
 const NOW = Date.UTC(2026, 8, 20, 6, 0, 0);
@@ -92,7 +93,7 @@ const missing = [];
 
 function makeRun(opts) {
     opts = opts || {};
-    const server = {
+    const server = opts.server || {
         zoew_scan_history_cod_dod: {},
         zoew_recently_deleted_cod_dod: {},
         zoew_daily_revenue_cod_dod: { [DAY]: { codDollar: 100, dodDollar: 10, totalCount: 20 } },
@@ -146,9 +147,20 @@ function makeRun(opts) {
             }
             if (mode === 'foreign-equal-disconnect') {
                 // ឧបករណ៍ផ្សេងដកចំនួនដូចគ្នាពីមូលដ្ឋានដដែល (ការសរសេររបស់វាចុះមុន) ➜ ការសរសេររបស់យើងបាន `datastale`
-                // តែការតភ្ជាប់ដាច់មុនចម្លើយ ➜ server មាន **តម្លៃដូចយើងបេះបិទ** តែជាការសរសេររបស់គេ (token `op` របស់គេ)
-                const foreign = JSON.parse(JSON.stringify(out === undefined ? null : out), (k, v) => (k === 'op' ? 'op_foreign_device1' : v));
-                setPath(ref.path, foreign);
+                // តែការតភ្ជាប់ដាច់មុនចម្លើយ ➜ server មាន **តម្លៃដូចយើងបេះបិទ** តែជាការសរសេររបស់គេ (token `op` របស់គេ ៖
+                // ទាំងវាល `op` ទាំងកូនសោក្នុង ring `ops` ដែលឧបករណ៍នោះគណនាពីមូលដ្ឋានដដែល)
+                const before = new Set();
+                JSON.stringify(cur === undefined ? null : cur, (k, v) => { if (k === 'op' && typeof v === 'string') before.add(v); return v; });
+                let text = JSON.stringify(out === undefined ? null : out);
+                const mine = new Set();
+                JSON.parse(text, (k, v) => { if (k === 'op' && typeof v === 'string' && !before.has(v)) mine.add(v); return v; });
+                mine.forEach((o) => { text = text.split(JSON.stringify(o)).join(JSON.stringify('op_foreign_device1')); });
+                setPath(ref.path, JSON.parse(text));
+                return Promise.reject(new Error('disconnect'));
+            }
+            if (mode === 'lost-foreign-disconnect') {
+                // សំណើរបស់យើងមិនដល់ server · ឧបករណ៍ផ្សេងសរសេរ ledger ដដែល (កូដ App ពិតលើឧបករណ៍ទី ២) · រួចការតភ្ជាប់ដាច់
+                if (opts.between) opts.between(ref.path);
                 return Promise.reject(new Error('disconnect'));
             }
             if (mode === 'foreign-disconnect') {
@@ -157,6 +169,11 @@ function makeRun(opts) {
             }
             setPath(ref.path, out);
             if (mode === 'applied-disconnect') return Promise.reject(new Error('disconnect'));
+            if (mode === 'applied-foreign-disconnect') {
+                // ⛔ MONEY-4 ៖ ការសរសេររបស់យើងចុះ ➜ ឧបករណ៍ផ្សេងសរសេរ ledger ដដែល **មុន** wrapper អាន REST ➜ server ≠ តម្លៃដែលផ្ញើ
+                if (opts.between) opts.between(ref.path);
+                return Promise.reject(new Error('disconnect'));
+            }
             return Promise.resolve({ committed: true, snapshot: { val: () => clone(getPath(ref.path)), exists: () => getPath(ref.path) !== null } });
         },
         update: (ref, obj) => {
@@ -468,6 +485,133 @@ function runTx(run, p, updaterSrc) {
         ok('⛔ ការសរសេរ ledger ផ្ទុក token `op` (ថ្ងៃ និងខែ)', typeof d.op === 'string' && d.op.length >= 8 && typeof m.op === 'string', { d, m });
     }
 
+    console.log('\n── ៤ខ២. ⛔⛔ ledger (MONEY-4) ៖ ការសរសេររបស់យើងចុះ ➜ ឧបករណ៍ផ្សេងសរសេរ ledger ដដែល ➜ `disconnect` ➜ ដកតែម្តង ──');
+    //    wrapper អាន REST ឃើញ server ≠ តម្លៃដែលផ្ញើ ≠ តម្លៃមុន (ឧបករណ៍ផ្សេងសរសេរចន្លោះ commit និងការអាន) ➜ មុនកែ ៖ `unknown` ដែលអានបាន ➜
+    //    `ledgerRejectionVerdict()` = null ➜ reconcile ចាត់ទុក «មិនបានអនុវត្ត» ➜ ដក delta ម្តងទៀត ➜ **ដកពីរដង** ហើយ `ok: true`។
+    //    ឧបករណ៍ទី ២ រត់កូដ App ពិតដដែល (sandbox ទី ២ · server ចែករំលែក) ➜ ring ដែលវាសរសេរគឺជារបស់ App ពិត មិនមែនរបស់ checker។
+    //    ⛔ ករណីដែលសម្រេចមិនបាន (ring ពេញ · App ចាស់លុប ring · record ចាស់គ្មាន token) ➜ App មិនអះអាង ✅ (ok:false + Sentry)។
+    const RING_MAX = Number((sliceConst(SRC, 'LEDGER_OP_RING_MAX').match(/=\s*(\d+)/) || [])[1] || 12);
+    const ledgerTwoDevices = async (o) => {
+        let deviceB = null;
+        const run = makeRun({ plan: o.plan.slice(), between: (p) => o.between(p, deviceB, run) });
+        deviceB = makeRun({ server: run.server });
+        if (o.seed) o.seed(run.server);
+        vm.runInContext('__status = null; const __applied = addRevenueToDailyAndMonthlyRecord(' + JSON.stringify(DAY) + ', ' + o.cod + ', 0, ' + o.count + ');'
+            + ' correctRevenueLedgerToActual(' + JSON.stringify(DAY) + ', __applied, ' + o.cod + ', 0, ' + o.count + ').then((s) => { __status = s; });', run.ctx);
+        await waitForState(() => run.box.__status !== null);
+        await settle(20);
+        return {
+            run,
+            day: run.server.zoew_daily_revenue_cod_dod[DAY] || {},
+            month: run.server.zoew_monthly_revenue_cod_dod[MONTH] || {},
+            status: run.box.__status,
+            unknownSentry: run.log.captures.some((c) => /outcome unknown/i.test(c.message))
+        };
+    };
+    const deviceBDaily = (cod, count) => (p, b) => {
+        if (p === 'zoew_daily_revenue_cod_dod/' + DAY) vm.runInContext('commitDailyRevenueDelta(' + JSON.stringify(DAY) + ', ' + cod + ', 0, ' + count + ', null, true);', b.ctx);
+    };
+    const deviceBMonthly = (cod, count) => (p, b) => {
+        if (p === 'zoew_monthly_revenue_cod_dod') vm.runInContext('commitMonthlyRevenueDelta(' + JSON.stringify(MONTH) + ', ' + cod + ', 0, ' + count + ', null, true);', b.ctx);
+    };
+    const seedOpEra = (server) => { server.zoew_daily_revenue_cod_dod[DAY].op = 'op_seedprior00001'; };
+    {
+        const r = await ledgerTwoDevices({ plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(-2, -1), cod: -5, count: -1 });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ wrapper អាន REST ក្រោយ disconnect · ឧបករណ៍ទី ២ សរសេរចន្លោះ commit និងការអាន', r.run.log.rest.length >= 1 && r.run.log.tx.length >= 1, { rest: r.run.log.rest.length, tx: r.run.log.tx });
+        ok('⛔⛔ ថ្ងៃ ៖ យើង −5 + ឧបករណ៍ផ្សេង −2 ➜ 93 · ចំនួន 18 (មិនដក −5 ម្តងទៀត ➜ 88)',
+            r2(r.day.codDollar) === 93 && r.day.totalCount === 18, r.day);
+        ok('⛔⛔ ខែ ៖ ដកតែម្តង (95)', r2(r.month.codDollar) === 95 && r.month.totalCount === 19, r.month);
+        ok('⛔⛔ សាលក្រម reconcile = ok (ការសរសេរត្រូវបានបញ្ជាក់ដោយ token ក្នុង ring)', !!r.status && r.status.ok === true, r.status);
+        ok('⛔ គ្មាន Sentry «outcome unknown» (សម្រេចបាន)', !r.unknownSentry, r.run.log.captures);
+        ok('⛔ record ថ្ងៃផ្ទុក ring `ops` ដែលមាន token របស់ឧបករណ៍ទាំងពីរ (≥ 2 · <= ' + RING_MAX + ')',
+            !!r.day.ops && typeof r.day.ops === 'object' && Object.keys(r.day.ops).length >= 2 && Object.keys(r.day.ops).length <= RING_MAX
+                && typeof r.day.op === 'string' && Object.prototype.hasOwnProperty.call(r.day.ops, r.day.op), r.day);
+    }
+    {
+        const r = await ledgerTwoDevices({ plan: ['ok', 'applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok'], between: deviceBMonthly(-2, -1), cod: -5, count: -1 });
+        ok('⛔⛔ ខែ ៖ យើង −5 + ឧបករណ៍ផ្សេង −2 ➜ 93 (មិនដកម្តងទៀត · delta ពី snapshot = តម្លៃដែលយើងផ្ញើ មិនមែនរបស់គេ)',
+            r2(r.month.codDollar) === 93 && r.month.totalCount === 18, r.month);
+        ok('⛔⛔ ... ថ្ងៃដកតែម្តង (95) · សាលក្រម ok', r2(r.day.codDollar) === 95 && !!r.status && r.status.ok === true, { day: r.day, status: r.status });
+    }
+    {
+        const r = await ledgerTwoDevices({
+            plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'],
+            between: (p, b, run) => { if (p === 'zoew_daily_revenue_cod_dod/' + DAY) run.server.zoew_daily_revenue_cod_dod[DAY].codDollar = r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar + 3); },
+            cod: -5, count: -1
+        });
+        ok('⛔⛔ ការស្តារ (`increment` លើ codDollar · `op` នៅដដែល) ចន្លោះ commit និងការអាន ➜ ថ្ងៃ 98 (មិនដកម្តងទៀត ➜ 93) · ok',
+            r2(r.day.codDollar) === 98 && !!r.status && r.status.ok === true, { day: r.day, status: r.status });
+    }
+    {
+        const times = Math.max(1, RING_MAX - 3);
+        const r = await ledgerTwoDevices({
+            plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'],
+            between: (p, b) => { for (let i = 0; i < times; i++) deviceBDaily(-0.5, 0)(p, b); },
+            cod: -5, count: -1, seed: seedOpEra
+        });
+        ok('⛔⛔ ឧបករណ៍ផ្សេងសរសេរ ' + times + ' ដង (ring ' + RING_MAX + ' មិនទាន់ពេញ) ➜ ថ្ងៃ ' + r2(100 - 5 - times * 0.5) + ' · ok',
+            r2(r.day.codDollar) === r2(100 - 5 - times * 0.5) && !!r.status && r.status.ok === true, { day: r.day, status: r.status });
+    }
+    {
+        const r = await ledgerTwoDevices({ plan: ['lost-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(-2, -1), cod: -5, count: -1, seed: seedOpEra });
+        ok('⛔ ទិសផ្ទុយ ៖ សំណើរបស់យើងមិនដល់ · ឧបករណ៍ផ្សេងសរសេរ (record មាន token) ➜ សាកឡើងវិញ ➜ ថ្ងៃ 93 · ok',
+            r2(r.day.codDollar) === 93 && r.day.totalCount === 18 && !!r.status && r.status.ok === true && !r.unknownSentry, { day: r.day, status: r.status });
+    }
+    {
+        const r = await ledgerTwoDevices({
+            plan: ['lost-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(2, 1), cod: 5, count: 1,
+            seed: (server) => { delete server.zoew_daily_revenue_cod_dod[DAY]; }
+        });
+        ok('⛔ ទិសផ្ទុយ ៖ ថ្ងៃថ្មី (record មិនទាន់មាន) · សំណើរបស់យើងមិនដល់ · ឧបករណ៍ផ្សេងបង្កើតមុន ➜ ថ្ងៃ 7 · ចំនួន 2 · ok',
+            r2(r.day.codDollar) === 7 && r.day.totalCount === 2 && !!r.status && r.status.ok === true, { day: r.day, status: r.status });
+    }
+    {
+        const r = await ledgerTwoDevices({
+            plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(2, 1), cod: 5, count: 1,
+            seed: (server) => { delete server.zoew_daily_revenue_cod_dod[DAY]; }
+        });
+        ok('⛔⛔ ថ្ងៃថ្មី ៖ យើងបង្កើតមុន ➜ ឧបករណ៍ផ្សេង ➜ disconnect ➜ ថ្ងៃ 7 (មិនមែន 12) · ok',
+            r2(r.day.codDollar) === 7 && r.day.totalCount === 2 && !!r.status && r.status.ok === true, { day: r.day, status: r.status });
+    }
+    {
+        const r = await ledgerTwoDevices({ plan: ['lost-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'], between: deviceBDaily(-2, -1), cod: -5, count: -1 });
+        ok('⛔⛔ record ចាស់គ្មាន token · សំណើមិនដល់ · ឧបករណ៍ផ្សេងសរសេរ ➜ សម្រេចមិនបាន ➜ App មិនអះអាង ✅ (ok:false)',
+            !!r.status && r.status.ok === false, r.status);
+        ok('⛔ ... Sentry money «outcome unknown» · លុយត្រូវ (93 · សំណើដើមមិនដល់)', r.unknownSentry && r2(r.day.codDollar) === 93, { captures: r.run.log.captures, day: r.day });
+    }
+    {
+        const r = await ledgerTwoDevices({
+            plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'],
+            between: (p, b, run) => {
+                if (p !== 'zoew_daily_revenue_cod_dod/' + DAY) return;
+                const cur = run.server.zoew_daily_revenue_cod_dod[DAY];
+                run.server.zoew_daily_revenue_cod_dod[DAY] = { codDollar: r2(cur.codDollar - 2), dodDollar: cur.dodDollar, totalCount: cur.totalCount - 1, op: 'op_oldversion0001' };
+            },
+            cod: -5, count: -1
+        });
+        ok('⛔⛔ App កំណែចាស់ (គ្មាន ring) សរសេរក្រោយយើង ➜ ring បាត់ ➜ សម្រេចមិនបាន ➜ មិនអះអាង ✅ (ok:false + Sentry)',
+            !!r.status && r.status.ok === false && r.unknownSentry, { status: r.status, captures: r.run.log.captures });
+    }
+    {
+        const times = RING_MAX + 1;
+        const r = await ledgerTwoDevices({
+            plan: ['applied-foreign-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'],
+            between: (p, b) => { for (let i = 0; i < times; i++) deviceBDaily(-0.5, 0)(p, b); },
+            cod: -5, count: -1, seed: seedOpEra
+        });
+        ok('⛔⛔ ឧបករណ៍ផ្សេងសរសេរ ' + times + ' ដង (> ring ' + RING_MAX + ') ➜ token យើងរុញចេញ ➜ សម្រេចមិនបាន ➜ មិនអះអាង ✅ (ok:false + Sentry)',
+            !!r.status && r.status.ok === false && r.unknownSentry, { status: r.status, ring: r.day.ops });
+    }
+    {
+        const run = makeRun({ plan: [] });
+        for (let i = 0; i < RING_MAX + 5; i++) vm.runInContext('commitDailyRevenueDelta(' + JSON.stringify(DAY) + ', -0.25, 0, 0, null, true);', run.ctx);
+        await settle(50);
+        const day = run.server.zoew_daily_revenue_cod_dod[DAY] || {};
+        const keys = Object.keys(day.ops || {});
+        ok('⛔ ring មានព្រំដែន ៖ ' + (RING_MAX + 5) + ' ការសរសេរ ➜ ring = ' + RING_MAX + ' token ថ្មីបំផុត (token ចុងក្រោយ = `op`)',
+            keys.length === RING_MAX && keys.indexOf(day.op) !== -1 && keys.every((k) => day.ops[k] <= day.ops[day.op]), day);
+    }
+
     console.log('\n── ៤គ. ⛔⛔ ledger ៖ outcome `unknown` (server អានមិនបាន ៖ បដិសេធ · ប្តូរ auth · adapter បិទ) ➜ សាលក្រម reconcile មិនរាយ ok ──');
     //    បណ្តាញដាច់តែម្យ៉ាង ➜ wrapper/adapter រង់ចាំលទ្ធផលពិត (ផ្នែក ២ · ៤ឃ)។ `unknown` + `txServerUnread` នៅសល់តែពេល server **បដិសេធ**
     //    ការអាន · ប្តូរ auth/database · adapter បិទ ➜ reconcile ទាយ «មិនបានអនុវត្ត» ហើយដកម្តងទៀត (ត្រូវតែពេលសំណើមិនដល់ server · ដក ២ ដង
@@ -506,12 +650,16 @@ function runTx(run, p, updaterSrc) {
             { day: run.server.zoew_daily_revenue_cod_dod[DAY], month: run.server.zoew_monthly_revenue_cod_dod[MONTH], status: run.box.__status });
     }
     {
+        //    record ដែល App មាន token សរសេរចុងក្រោយ (`op`) ➜ ring របស់ឧបករណ៍ផ្សេងមាន token នោះ ➜ សម្រេច «មិនបានអនុវត្ត» ➜ សាកឡើងវិញ ➜ ok។
+        //    record ចាស់គ្មាន token ➜ សម្រេចមិនបាន ➜ មិន ok (ផ្នែក ៤ខ២)។
         const run = makeRun({ plan: ['foreign-equal-disconnect', 'ok', 'ok', 'ok', 'ok', 'ok'] });
+        run.server.zoew_daily_revenue_cod_dod[DAY].op = 'op_seedprior00001';
         vm.runInContext("__status = null; const __applied = addRevenueToDailyAndMonthlyRecord('" + DAY + "', -5, 0, -1);"
             + " correctRevenueLedgerToActual('" + DAY + "', __applied, -5, 0, -1).then((s) => { __status = s; });", run.ctx);
         await settle(400);
-        ok('⛔ ទិសផ្ទុយ ៖ unknown ដែល server **អានបាន** (ឧបករណ៍ផ្សេងសរសេរ) មិនមែន `txServerUnread` ➜ reconcile បញ្ចប់ ok (ផ្នែក ៤ខ)',
-            !!run.box.__status && run.box.__status.ok === true, run.box.__status);
+        ok('⛔ ទិសផ្ទុយ ៖ server **អានបាន** ហើយ ring បញ្ជាក់ថាការសរសេររបស់យើងមិនបានចុះ (ឧបករណ៍ផ្សេងសរសេរ) ➜ សាកឡើងវិញ ➜ ថ្ងៃ 90 · reconcile ok (ផ្នែក ៤ខ)',
+            !!run.box.__status && run.box.__status.ok === true && r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 90,
+            { status: run.box.__status, day: run.server.zoew_daily_revenue_cod_dod[DAY] });
     }
 
     console.log('\n── ៤ឃ. ⛔⛔ ledger ៖ server អានមិនបានយូរ រួចអានបានវិញ ➜ reconcile ដកតែម្តង (មិនទាយ) ──');

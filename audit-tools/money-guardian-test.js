@@ -142,8 +142,18 @@ const MUTATIONS = [
     },
     {
         name: 'ledger ថ្ងៃលែងផ្ទុក token `op` (wrapper ច្រឡំការសរសេរតម្លៃដូចគ្នារបស់ឧបករណ៍ផ្សេង ➜ ការដកបាត់)',
-        from: '            return op ? { ...serverAfter, op } : serverAfter;',
+        from: '            return ledgerTagged(serverAfter, op, ring);',
         to: '            return serverAfter;'
+    },
+    {
+        name: 'ledger ៖ token របស់យើងក្នុង ring លែងជាភស្តុតាង «applied» (MONEY-4 ៖ ឧបករណ៍ផ្សេងសរសេរចន្លោះ commit និងការអាន ➜ ដកពីរដង)',
+        from: "    if (server.op === op || has(op)) return 'applied';",
+        to: ''
+    },
+    {
+        name: 'wrapper មិនសួរភស្តុតាង ring របស់ ledger (MONEY-4 ៖ unknown ដែលអានបាន ➜ ដកពីរដង)',
+        from: '            witnessed = typeof witness === \'function\' ? witness(server, priorValue) : null;',
+        to: '            witnessed = null;'
     },
     {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',

@@ -195,6 +195,46 @@ const BOOT = function (seed) {
         return null;
     };
 
+    // ⛔ MONEY-4 ៖ `ledgerBlip` ៖ transaction ledger ថ្ងៃបន្ទាប់របស់ App ចុះ (`applied`) ឬមិនដល់ (`lost`) ➜ ឧបករណ៍ផ្សេងស្កេនកញ្ចប់ថ្មី
+    //    (ប្រវត្តិ + registry + ledger ថ្ងៃ ដោយ ring របស់ App ពិត `ledgerOpRing`) **មុន** wrapper អាន REST ➜ SDK បដិសេធ `disconnect`
+    //    ➜ wrapper ពិតរបស់ App អាន server (fetch ក្លែងខាងក្រោម) ហើយសម្រេច ➜ អថេរចំណូលត្រូវនៅពិតក្រោយគ្រប់ op។
+    window.__ledgerBlip = null;
+    window.__ledgerBlipFired = [];
+    const FAKE_DB_URL = 'https://fake-default-rtdb.firebaseio.com';
+    const foreignLedgerScan = (dayPath) => {
+        const day = String(dayPath).split('/')[1];
+        const n = window.__ledgerBlipFired.length + 1;
+        const code = 'FX' + n + Math.floor(Math.random() * 1e6);
+        const cod = 3.25 * n;
+        const now = Date.now();
+        const id = 'fx_' + n + '_' + now;
+        if (!store.zoew_scan_history_cod_dod) store.zoew_scan_history_cod_dod = {};
+        store.zoew_scan_history_cod_dod[id] = {
+            id, phone: '0715' + String(100000 + n), scanDate: day, createdAt: now, cod, dod: 0, price: cod, count: 1, barcode: code, time: '10:00', isClosed: false,
+            barcodes: [{ code, time: '10:00', cod, dod: 0, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now }]
+        };
+        if (!store.zoew_barcode_registry) store.zoew_barcode_registry = {};
+        store.zoew_barcode_registry[String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
+        const cur = getPath(dayPath) || null;
+        const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+        const base = cur && typeof cur === 'object' ? cur : {};
+        const op = 'op_fx' + String(n).padStart(4, '0') + Math.floor(Math.random() * 1e6).toString(36);
+        const next = { codDollar: r2((parseFloat(base.codDollar) || 0) + cod), dodDollar: parseFloat(base.dodDollar) || 0, totalCount: (parseFloat(base.totalCount) || 0) + 1, op };
+        if (typeof window.ledgerOpRing === 'function') next.ops = window.ledgerOpRing(cur, op);
+        setPath(dayPath, next);
+        logWrite({ owner: true, m: 'SNAP', v: store });
+    };
+    const realFetch = window.fetch ? window.fetch.bind(window) : null;
+    window.fetch = function (input, init) {
+        const url = typeof input === 'string' ? input : String((input && input.url) || '');
+        if (url.indexOf(FAKE_DB_URL + '/') === 0) {
+            const p = decodeURIComponent(new URL(url).pathname.replace(/\.json$/, '')).replace(/^\/+/, '');
+            const v = getPath(p);
+            return Promise.resolve(new Response(JSON.stringify(v === undefined ? null : v), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        }
+        return realFetch ? realFetch(input, init) : Promise.reject(new TypeError('Failed to fetch'));
+    };
+
     const otherDeviceWrite = window.__otherDevice;
     window.__otherDevice = (kind, pick, forcedId) => {
         const done = otherDeviceWrite(kind, pick, forcedId);
@@ -211,7 +251,10 @@ const BOOT = function (seed) {
         setPersistence: () => Promise.resolve(), browserLocalPersistence: {}, browserSessionPersistence: {},
         getIdTokenResult: () => Promise.resolve({ authTime: new Date().toISOString(), claims: {} }),
         getDatabase: () => ({ fake: true }),
-        ref: (d, p) => ({ path: p === undefined ? '' : String(p) }),
+        ref: (d, p) => {
+            const at = p === undefined ? '' : String(p);
+            return { path: at, toString: () => FAKE_DB_URL + '/' + at.split('/').filter(Boolean).map(encodeURIComponent).join('/') };
+        },
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
             setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else cb(snapOf(r.path)); }, 0);
@@ -239,6 +282,15 @@ const BOOT = function (seed) {
             if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(r.path) });
             const why = ledgerRuleViolation(r.path, next);
             if (why) return ruleDenied(why);
+            const blip = window.__ledgerBlip;
+            if (blip && /^zoew_daily_revenue_cod_dod\/[^/]+$/.test(r.path)) {
+                window.__ledgerBlip = null;
+                window.__ledgerBlipFired.push(blip);
+                if (blip === 'applied') { setPath(r.path, next); logWrite({ m: 'PUT', p: r.path, v: next, tx: true }); }
+                foreignLedgerScan(r.path);
+                fireAll();
+                return Promise.reject(new Error('disconnect'));
+            }
             setPath(r.path, next); logWrite({ m: 'PUT', p: r.path, v: next, tx: true }); fireAll();
             return Promise.resolve({ committed: true, snapshot: snapOf(r.path) });
         }
@@ -371,6 +423,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         const server = await serve(dir);
         const port = server.address().port;
         let appFail = 0, appRuns = 0, lastDetail = '', staleViewRuns = 0;
+        const blipRuns = { applied: 0, lost: 0 };
         const RUN0 = parseInt(process.env.FUZZ_RUN0 || '0', 10);
         for (let run = RUN0; run < RUN0 + RUNS; run++) {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
@@ -403,6 +456,10 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     const injected = await page.evaluate((a) => window.__otherDevice(a.kind, a.pick), { kind, pick: r() });
                     if (injected) { trail.push(injected); if (process.env.FUZZ_DEBUG === '1') console.log('    ~ ' + injected); }
                 }
+                // ⛔ MONEY-4 ៖ ការចាក់ `ledgerBlip` លើ op ដែលសរសេរ ledger (ស្កេន · ដក · កែតម្លៃ) ➜ transaction ledger ថ្ងៃបន្ទាប់
+                //    ចុះ/មិនដល់ + ឧបករណ៍ផ្សេងសរសេរ + `disconnect` (BOOT `__ledgerBlip`)
+                const blip = (wanted === 'scan' || wanted === 'removeBarcode' || wanted === 'editPrice') && r() < 0.4 ? (r() < 0.5 ? 'applied' : 'lost') : null;
+                const blipsBefore = blip ? await page.evaluate((mode) => { window.__ledgerBlip = mode; return window.__ledgerBlipFired.length; }, blip) : 0;
                 const done = await page.evaluate(async (args) => {
                     const { wanted, pick, amt, isAdmin } = args;
                     const live = (typeof scanHistory !== 'undefined' ? scanHistory : []).filter(Boolean);
@@ -471,6 +528,14 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     } catch (e) { return 'threw:' + wanted + ':' + (e && e.message); }
                     return null;
                 }, { wanted, pick, amt, isAdmin: true });
+                if (blip) {
+                    const fired = await page.evaluate(async (before) => {
+                        for (let w = 0; w < 24 && window.__ledgerBlipFired.length === before; w++) await new Promise((res) => setTimeout(res, 25));
+                        window.__ledgerBlip = null;
+                        return window.__ledgerBlipFired.length > before ? window.__ledgerBlipFired[before] : null;
+                    }, blipsBefore);
+                    if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); }
+                }
                 await page.waitForTimeout(170);
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);
@@ -511,6 +576,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
             if (CAPTURE) CAPTURE.push({ run: run, seed: seed, log: await page.evaluate(() => window.__writeLog || []) });
             appRuns++;
             if (trail.indexOf('other:remove') !== -1) staleViewRuns++;
+            if (trail.indexOf('ledgerBlip:applied') !== -1) blipRuns.applied++;
+            if (trail.indexOf('ledgerBlip:lost') !== -1) blipRuns.lost++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
@@ -519,6 +586,9 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
         // ការរត់នេះមិនបានទៅដល់ស្ថានភាព **ទិដ្ឋភាពមូលដ្ឋានចាស់** ទេ ➜ បៃតងក្លែងក្លាយ។
         check(staleViewRuns > 0, app + ': ការចាក់ «ឧបករណ៍ផ្សេងដក» បានបាញ់ពិត (' + staleViewRuns + ' លំដាប់)',
             'គ្មានលំដាប់ណាឈានដល់ទិដ្ឋភាពមូលដ្ឋានចាស់ ➜ ការវាស់មិនបានគ្រប');
+        // ⛔ ជាន់អប្បបរមា ៖ `ledgerBlip` ទាំងពីររបៀប (ការសរសេរចុង + ឧបករណ៍ផ្សេង · មិនដល់ + ឧបករណ៍ផ្សេង) ត្រូវបាញ់ពិត
+        check(blipRuns.applied > 0 && blipRuns.lost > 0, app + ': ledgerBlip បានបាញ់ពិត (applied ' + blipRuns.applied + ' · lost ' + blipRuns.lost + ' លំដាប់)',
+            'ការចាក់ disconnect + ឧបករណ៍ផ្សេងលើ ledger មិនដែលបាញ់ ➜ MONEY-4 មិនបានវាស់');
         server.close();
     }
     await browser.close();

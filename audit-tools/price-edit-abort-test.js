@@ -85,6 +85,7 @@ const NEEDED = [
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
     'saveEditedBarcodePrice', 'itemHasRestoreMarkers',
@@ -199,7 +200,7 @@ function makeCtx(mode) {
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
         + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
         + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'
-        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'].map(name => {
+        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'LEDGER_OP_RING_MAX'].map(name => {
             const declaration = new RegExp('const ' + name + ' = [^;]+;').exec(SRC);
             return declaration ? declaration[0] : '';
         }).join('\n') + '\n'

@@ -77,6 +77,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
@@ -143,14 +144,30 @@ function stringFieldRule(node) {
     const max = /newData\.val\(\)\.length\s*<=\s*(\d+)/.exec(raw);
     return { min: min ? Number(min[1]) : 0, max: max ? Number(max[1]) : Infinity };
 }
+// វាល map (ឧ. ring `ops/$op` ក្នុង ledger) ៖ កូនសោ wildcard + តម្លៃលេខ · ព្រំដែនទាំងពីរអានចេញពី rules ពិត
+function mapFieldRule(node) {
+    const wild = node && Object.keys(node).find((k) => k.startsWith('$'));
+    if (!wild || typeof node['.validate'] !== 'string' || !/newData\.hasChildren\(\)/.test(node['.validate'])) return null;
+    const raw = node[wild] && node[wild]['.validate'];
+    const bound = numericBound(node[wild], wild);
+    if (!bound.ok) return null;
+    const esc = wild.replace(/\$/g, '\\$');
+    const min = new RegExp(esc + '\\.length\\s*>=\\s*(\\d+)').exec(raw);
+    const max = new RegExp(esc + '\\.length\\s*<=\\s*(\\d+)').exec(raw);
+    return { op: bound.op, limit: bound.limit, keyMin: min ? Number(min[1]) : 0, keyMax: max ? Number(max[1]) : Infinity };
+}
 const STRING_FIELDS = {};
+const MAP_FIELDS = {};
 ['zoew_daily_revenue_cod_dod/$date', 'zoew_monthly_revenue_cod_dod/$month'].forEach((p) => {
     const parts = p.split('/');
     const node = RULES[parts[0]] && RULES[parts[0]][parts[1]];
     STRING_FIELDS[parts[0]] = {};
+    MAP_FIELDS[parts[0]] = {};
     Object.keys(node || {}).forEach((k) => {
         const rule = stringFieldRule(node[k]);
         if (rule) STRING_FIELDS[parts[0]][k] = rule;
+        const map = mapFieldRule(node[k]);
+        if (map) MAP_FIELDS[parts[0]][k] = map;
     });
 });
 const ALLOWED = {
@@ -197,6 +214,16 @@ function makeSandbox(seed) {
                 for (const pk of Object.keys(v)) {
                     if (typeof v[pk] !== 'number' || !isFinite(v[pk])) return 'pickedUpPhones/' + pk + ' មិនមែនលេខ';
                     if (!(v[pk] > 0)) return 'pickedUpPhones/' + pk + ' = ' + v[pk] + ' (ត្រូវ > 0)';
+                }
+                continue;
+            }
+            const mapRule = MAP_FIELDS[rootKey] && MAP_FIELDS[rootKey][key];
+            if (mapRule) {
+                if (!v || typeof v !== 'object' || !Object.keys(v).length) return key + ' មិនមែនវត្ថុ';
+                for (const mk of Object.keys(v)) {
+                    if (mk.length < mapRule.keyMin || mk.length > mapRule.keyMax) return key + '/' + mk + ' ប្រវែងកូនសោក្រៅព្រំដែន';
+                    if (typeof v[mk] !== 'number' || !isFinite(v[mk])) return key + '/' + mk + ' មិនមែនលេខ';
+                    if (mapRule.op === '>=' ? !(v[mk] >= mapRule.limit) : !(v[mk] > mapRule.limit)) return key + '/' + mk + ' = ' + v[mk] + ' (ត្រូវ ' + mapRule.op + ' ' + mapRule.limit + ')';
                 }
                 continue;
             }
@@ -298,6 +325,11 @@ function makeSandbox(seed) {
         + fnSrc.revertRevenueLedgerDelta + '\n'
         + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
+        + (SRC.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n'
+        + fnSrc.ledgerOpRingOf + '\n'
+        + fnSrc.ledgerOpRing + '\n'
+        + fnSrc.ledgerOpWitness + '\n'
+        + fnSrc.ledgerTagged + '\n'
         + fnSrc.runLedgerTransaction + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'

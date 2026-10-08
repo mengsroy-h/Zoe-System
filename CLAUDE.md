@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.34` (`zoew-v297`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.35` (`zoew-v298`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.8` (`zoekeygen-v119`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -269,7 +269,7 @@ only this text protects them.
 | Secret leaks | Redaction walks the whole event | `secret-hygiene` |
 | **Sentry storms** | A repeatedly rejecting listener reports once per path per outage (`dbListenerReportedFailures`) · `ZoeErrors.capture()` drops identical events for 10 minutes (`suppressedRepeats`, fail-open) · different `itemId` · `item` · `barcode` · `keyId` · `date` · `path` still send (cap 5/signature/window) · both apps | `connection-recovery-test` · `sentry-load-race-test` |
 | **Error alerts** | Alert rules search tags only ➜ money paths send `zone: 'money'` · every `ZoeErrors.init(` passes release `<app>@<APP_VERSION>` (both apps; call sites derived) · allowlisted primitive Error fields (`ERROR_FIELD_KEYS`: `lookupCode` · `txOutcome` · …, strings ≤ 200) reach `extra.errorFields`; other fields and objects never | `money-guardian-test` · `sentry-load-race-test` |
-| DOM · state after logout | No customer data left | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
+| DOM · state after logout | No customer data left · `clearSensitiveModalFields()` closes ☰ and 🔔 by state (`drawerOpen` · `notifyDrawerOpen` = `false`) so the login dialog is never under the drawer ⛔ never `closeSideDrawer()` there (it marks 🔔 seen) | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` · `ZoeW/tests/login-over-drawer.test.tsx` |
 | PTR · panel motion · scrolling | ⛔ Don't touch without a request · the scroll thumb (APK · iOS standalone only, `drawsOwnScrollThumb()`) is a fixed `pointer-events: none` overlay driven by state from one passive capture listener — never a layout change, never inside a scroller · while shown it checks its scroller's rect each frame and hides at once (`cut`, no fade) when the scroller moves without scrolling (`scrollerMoved()`) | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` · `ZoeW/tests/scroll-thumb.test.tsx` · `ZoeW/tests/forbidden-zone-lock.test.ts` |
 | Layout | Assert both sides (no overflow and no squeeze) · modals: width in `--fs-unit` text units on tablet/desktop ≥ the phone width (or fills the screen) · type scale: phone `<700` · tablet `700–991` · desktop `>=992` · history rows are measured **with data** (6 and 120 rows, 320–1280): nothing covers «កញ្ចប់សរុប» or an action button (`elementFromPoint`) · phone action buttons stay inside their cell · 3-digit row numbers never overlap the customer cell | `layout-check` · `fluid-type-focus-test` |
 | **Undeclared CSS variables** | `var(--x)` without `--x` kills the whole declaration | `css-var-test` |

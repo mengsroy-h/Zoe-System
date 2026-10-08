@@ -287,6 +287,7 @@ function buildContext() {
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
+        CLEANUP_SWEEP_BATCH: 8,
         ZoeErrors: { capture: (e) => log.captures.push(e) }
     };
     REAL_LISTENER_REF_NAMES.forEach((name) => {

@@ -140,6 +140,8 @@ export interface DataState {
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
+    cleanupSweepVisited: Set<string>;
+    cleanupSweepTimer: any;
     clearHistoryInFlight: boolean;
     recentPhonesOptions: string[];
 }
@@ -161,6 +163,8 @@ export const dataState = createStore<DataState>('dataState', {
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,
     cleanupResumeInFlight: false,
+    cleanupSweepVisited: new Set(),
+    cleanupSweepTimer: null,
     clearHistoryInFlight: false,
     recentPhonesOptions: [],
 });

@@ -1863,6 +1863,9 @@
     "ZoeW/tests/backend-switch-detach.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/cleanup-sweep-batch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/close-restamp-idempotent.test.ts": {
       "policy": "zoew-self-verification"
     },

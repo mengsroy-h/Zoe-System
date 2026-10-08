@@ -87,6 +87,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.28–2.50.30 — ជុំ ១៣–១៤ (SUPABASE-1 · SUPABASE-6 · SCALE-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + APK ➜ ហាង Supabase ៖ ចាកចេញក្នុងផ្ទាំងមួយ ➜ ផ្ទាំងផ្សេងចេញដែរ ([2.50.28] សកម្មភាព ២) · ហាងមានកញ្ចប់ចាស់ច្រើន ៖ បើក App ➜ មិនកក ([2.50.30] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.26–2.50.27 · ZoeKeyGen 2.24.8 — ជុំ ១២ (NETWORK-1 · SENTRY-2 · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ គ្មានការសាកពិសេស ([2.50.26] · [2.50.27] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.23–2.50.25 · ZoeKeyGen 2.24.7 — ជុំ ៩–១១ (SECURITY-2 · SENTRY-3 · SECURITY-1 · ZTO-4 · PR #299 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen + APK ➜ Sentry ៖ event ថ្មីមាន release ([2.50.23] សកម្មភាព ២) · ក្រយៅដៃ/មុខលើ iPhone PWA · Android Chrome ([2.50.24] សកម្មភាព ២) · បញ្ជី ZTO ([2.50.25] សកម្មភាព ២)។
 - ⏳ **ZoeW 2.50.22 — MONEY-4 (PR #298 merge រួច)** ៖ ✅ ម្ចាស់គម្រោង Publish Firebase rules (`ops/$op` ក្នុង ledger ថ្ងៃ/ខែ) រួច · ✅ migration Supabase `20261008023215_zoe_rules.sql` ចូល live (វាស់ ៖ បញ្ជី migration ១២ · `private.zoe_rules()` មាន `ops` ក្នុងថ្ងៃ និងខែ · 2026-10-08) ➜ ⏳ Deploy ZoeW + APK ➜ សាកតាម [2.50.22] សកម្មភាព ៤–៥។
@@ -127,6 +128,28 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.30] — 2026-10-08 · ZoeW ៖ **ការសម្អាតស្វ័យប្រវត្តិច្រើនរយកញ្ចប់ក្នុងពេលតែមួយ លែងធ្វើឲ្យអេក្រង់កក** (Deep audit ២ · ជុំ ១៤ · SCALE-2)
+
+**ZoeW `2.50.30`** (`zoew-v292` ➜ `zoew-v293`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ថេរ ២ ម៉ោង · ៧ ថ្ងៃ · retention មិនប្រែ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🧹 **SCALE-2** ៖ `runAutomaticCleanupRules()` ចាប់ផ្តើម `claimAndCleanupItem()` សម្រាប់កញ្ចប់ ripe ទាំងអស់ក្នុង loop synchronous តែមួយ (រហូតដល់ពិដាន journal ២០០) ➜ ហាងដែលបើក App
+  ក្រោយឈប់យូរ (កញ្ចប់ ៣០០ ផុតកំណត់ក្នុងពេលតែមួយ) អេក្រង់កករាប់វិនាទី។ ឥឡូវច្រកចូលរបស់ App (`runScheduledCleanup()` រាល់ ៦០ វិ. · `debouncedRenderAfterHistorySync` ក្រោយ snapshot ប្រវត្តិ)
+  ចាប់ផ្តើម ≤ `CLEANUP_SWEEP_BATCH` (៨) ក្នុងមួយជុំ ហើយបន្តក្រោយ `CLEANUP_SWEEP_YIELD_MS` (៥០ms) រហូតដើរគ្រប់កញ្ចប់ម្តង (`cleanupSweepVisited`) ➜ គ្រប់កញ្ចប់នៅតែត្រូវសម្អាត · លុយដកដូចដើម ·
+  រាប់តែការសម្អាតដែលចាប់ផ្តើមពិត (កញ្ចប់កំពុងសម្អាត · កំពុងរង់ចាំ ZTO · journal ពេញ មិនស៊ីកូតា) ➜ កញ្ចប់ជាប់ ឬបរាជ័យភ្លាមនៅខាងមុខ មិនធ្វើឲ្យកញ្ចប់ខាងក្រោយស្រេកឃ្លាន · ការហៅដោយគ្មាន limit ដើរពេញដូចដើម។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** ➜ build APK ឡើងវិញ។
+2. សាក (បើមានហាងដែលមានកញ្ចប់ចាស់ច្រើន) ៖ បើក App ក្រោយឈប់យូរ ➜ អេក្រង់មិនកក · ធុងសំរាម «ផុតកំណត់» កើនបន្តិចម្តងៗ ហើយចប់ក្នុងរយៈពេលខ្លី · ចំណូលដកត្រូវនឹងតម្លៃកញ្ចប់។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-sweep-batch.test.ts` (ថ្មី · ៦ · `cleanup.ts` ពិត + SDK ក្លែង) ៖ batch ≤ ១០ · `runScheduledCleanup()` ៣០០ ripe ➜ ជុំដំបូង ≤ batch ➜ ទាំង ៣០០ ចូលធុងសំរាម · ledger ថ្ងៃ/ខែ −៣០០ ·
+  ២០ ជាប់ (transaction ព្យួរ) ➜ ២៨០ ផ្សេងសម្អាត · ២០ បរាជ័យភ្លាម ➜ ២៨០ សម្អាត · ការបន្តឈប់ · ជុំក្រោយព្យាយាមម្តងទៀត · `debouncedRenderAfterHistorySync` ≤ batch · ទិសផ្ទុយ ៖ គ្មាន limit ➜ ៥០ ក្នុងការហៅតែមួយ
+  (មុនកែ FAIL ២ ៖ ជុំដំបូងចាប់ផ្តើម ២០០ · ការរង់ចាំអស់ពេល) · mutation ៦ ➜ FAIL ទាំង ៦។
 
 ### [2.50.29] — 2026-10-08 · ZoeW ៖ **ហាង Supabase ៖ `update()` ច្រើនជាង ៥០០ ផ្លូវមានកិច្ចសន្យាច្បាស់ ៖ បំបែកបានតែ payload idempotent · `increment()` ត្រូវបដិសេធមុនសរសេរ** (Deep audit ២ · ជុំ ១៣ · SUPABASE-6)
 
@@ -2435,6 +2458,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៤ (SCALE-2..7) ➜ [2.50.30]–
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A26 | **SCALE-2** ការសម្អាតច្រើនរយកញ្ចប់រារាំង main thread | Claude ៖ `cleanup.ts` ពិត + SDK ក្លែង ៖ ៣០០ ripe ➜ `runScheduledCleanup()` ចាប់ផ្តើម ២០០ (ពិដាន journal) ក្នុងការហៅ synchronous តែមួយ · FAIL ២/៤ | batch ៨ + yield ៥០ms + ជុំដើរគ្រប់ (`cleanupSweepVisited`) |
+
+- ការរចនាដំបូង (cursor តាមលិបិក្រមរង្វិល) ➜ កញ្ចប់ ២០ ដែលបរាជ័យភ្លាមនៅសល់ ➜ ការហៅនីមួយៗចាប់ផ្តើម ៨ ក្នុងចំណោម ២០ ម្តងទៀត ➜ ជុំមិនដែលចប់ (timer បន្តរហូត · FAIL ១) ហើយលិបិក្រមរំកិលពេលបញ្ជីរួញ ➜
+  ប្តូរទៅ Set នៃ id ដែលបានមើលក្នុងជុំ ៖ ជុំចប់ពេលគ្រប់ id ត្រូវមើល · ជុំក្រោយ (កេះថ្មី) ព្យាយាមកញ្ចប់បរាជ័យម្តងទៀត។
+- ការហៅដោយគ្មាន limit (checker ចាស់ ១០+) មិនប៉ះ state ថ្មី (`cleanupSweepVisited` អានតែពេលមាន limit) ➜ sandbox មិនត្រូវប្តូរ (លើកលែង `connection-recovery-test` ៖ ថេរ `CLEANUP_SWEEP_BATCH`)។
+- ⛔ ការស៊ើបអង្កេតមិនប៉ះ probe liveness (`probeDatabaseLiveness()`) ទេ។
 
 ### 2026-10-08 — Deep audit ២ ៖ ជុំ ១៣ (SUPABASE-1 · SUPABASE-6) ➜ [2.50.28]–[2.50.29]
 

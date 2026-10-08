@@ -62,36 +62,60 @@ export function clearStaleRestoreMarkers(item) {
     });
 }
 
-export function runAutomaticCleanupRules() {
+export const CLEANUP_SWEEP_BATCH = 8;
+
+export const CLEANUP_SWEEP_YIELD_MS = 50;
+
+export function runAutomaticCleanupRules(sweepLimit?: number) {
     if (!cleanupClockIsTrustworthy()) return;
     const currentTime = getServerNow();
+    const visited = sweepLimit ? dataState.cleanupSweepVisited : null;
+    let started = 0;
 
-    dataState.scanHistory.forEach(item => {
-        if (!item.id) return;
+    for (const item of dataState.scanHistory) {
+        if (!item.id) continue;
+        if (visited) {
+            if (visited.has(item.id)) continue;
+            if (started >= sweepLimit) {
+                scheduleCleanupSweepContinuation();
+                return;
+            }
+            visited.add(item.id);
+        }
         if (item.clearClaim) {
             releaseStaleClearHistoryClaim(item);
-            return;
+            continue;
         }
         if (itemHasRestoreMarkers(item)) {
             clearStaleRestoreMarkers(item);
-            return;
+            continue;
         }
+        if (cleanupInFlight.has(item.id)) continue;
+        const inFlight = cleanupInFlight.size;
         let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
         if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && (!Array.isArray(item.barcodes) || !item.barcodes.length || item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime))) && !ztoAbandonCleanupIsHeld(itemAbandonRipeAt(item, itemTimestamp, currentTime))) {
             claimAndCleanupItem(item.id, 'abandon');
-            return;
-        }
-
-        if (item.isClosed && item.closedAt && (currentTime - item.closedAt > TWO_HOURS_MS)) {
+        } else if (item.isClosed && item.closedAt && (currentTime - item.closedAt > TWO_HOURS_MS)) {
             claimAndCleanupItem(item.id, 'close');
-            return;
-        }
-
-        if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime)))) {
+        } else if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime)))) {
             claimAndCleanupItem(item.id, 'close');
         }
-    });
+        if (cleanupInFlight.size > inFlight) started++;
+    }
+    if (visited) visited.clear();
+}
+
+export function scheduleCleanupSweepContinuation() {
+    if (dataState.cleanupSweepTimer) return;
+    dataState.cleanupSweepTimer = setTimeout(() => {
+        dataState.cleanupSweepTimer = null;
+        if (!firebaseState.db || !firebaseState.isDatabaseInitialized || firebaseState.dbListenersFailed) {
+            dataState.cleanupSweepVisited.clear();
+            return;
+        }
+        runAutomaticCleanupRules(CLEANUP_SWEEP_BATCH);
+    }, CLEANUP_SWEEP_YIELD_MS);
 }
 
 export const CLEANUP_JOURNAL_MAX = 200;
@@ -882,7 +906,7 @@ export async function runAutomaticDeletedCleanup() {
 export function runScheduledCleanup() {
     if (!firebaseState.db || !firebaseState.isDatabaseInitialized || firebaseState.dbListenersFailed) return;
     flushPendingRegistryReleases();
-    runAutomaticCleanupRules();
+    runAutomaticCleanupRules(CLEANUP_SWEEP_BATCH);
     runAutomaticDeletedCleanup();
     runAutomaticCollectedCleanup();
     repairPickupLedgerOnce();

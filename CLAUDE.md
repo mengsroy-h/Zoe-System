@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.29` (`zoew-v292`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.30` (`zoew-v293`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes) · **separate Firebase project** | `2.24.8` (`zoekeygen-v119`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -232,7 +232,7 @@ only this text protects them.
 | **Orphan registry keys** | A failed release is queued and retried; deferral has a second exit (view arrival) | `registry-release-test` |
 | Trash · `trashReason` | Label ≠ money decision. Group totals derive from `TRASH_REASON_META[r].deducted` and keep cents (`renderTrashSummary()` run, user-visible number read) | `trash-modal-test` · `restore-marker-hygiene-test` |
 | **Reset pickup stats** | Node remains with `0` · honors filter · never touches money | `pickup-reset-test` |
-| 2h/8d cleanup | Walks **barcodes**, not parcels | `partial-pickup-cleanup-test` |
+| 2h/8d cleanup | Walks **barcodes**, not parcels · the app's doors (`runScheduledCleanup()` · `debouncedRenderAfterHistorySync`) start ≤ `CLEANUP_SWEEP_BATCH` cleanups per call and continue after `CLEANUP_SWEEP_YIELD_MS` until one lap (`cleanupSweepVisited`) has visited every item; only a cleanup that really started counts (in-flight · held · journal-full items cost nothing) ➜ a stuck or failing head never starves the tail ⛔ never one synchronous pass over every ripe item from those doors · a call without a limit keeps the full pass | `partial-pickup-cleanup-test` · `ZoeW/tests/cleanup-sweep-batch.test.ts` |
 | Rules fence | A witness never locks the id | `emu/restore-deadlock-test` |
 | **Rules: object nodes** | Writable nodes with child schema need `.validate` requiring an object (`newData.hasChildren(…)`) — primitives skip child checks and break every listener. List derived from both rules files (`rules-shape.js`); emulator control ➜ accepts, real rules ➜ rejects. Console writes bypass rules ➜ `rawSnapshotToItemList()` skipping broken records stays | `rules-duplicate-keys` · `emu/crud-rules-flow` · `emu/license-seat-rules-test` |
 | **Rules ↔ real app writes** | Fake SDKs accept everything ➜ rules changes/new write paths are proven on real writes in real order: `revenue-fuzz-test` (`FUZZ_CAPTURE`) replays to the emulator with real rules ➜ 0 rejections · reverse probe · ≥ 150 writes · 9 roots. New write path not in fuzz ➜ add an op first | `emu/app-writes-rules-test` |

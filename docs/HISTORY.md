@@ -3252,7 +3252,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   (តម្លៃនៅសល់ដូចគ្នា) ➜ ពិនិត្យតែធុងសំរាមក្នុងសតិ ➜ ទិដ្ឋភាពចាស់ ឬការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងមិនទាន់មកដល់ ➜ `ours` ➜ ធុងសំរាម ២ + ដក ២ ដង។ ការប្តូរ `stale ➜ unknown`
   ដោះដូរការដក ២ ដងនឹងកញ្ចប់បាត់ (គ្មានធុងសំរាម) ➜ មិនកែដោយសង្ស័យ។ ដំណោះស្រាយរចនាសម្ព័ន្ធ ៖ id ធុងសំរាមកំណត់ពី item + សំណុំ barcode ➜ `claimCleanupTrashSlot()` សម្រេចដូចការ claim
   ទាំងមូល ➜ ⏳ ម្ចាស់គម្រោងសម្រេច (ផ្លូវលុយ)។
-- **បានពិនិត្យ មិនមែនកំហុស** ៖ Sentry ៩០ ថ្ងៃ ៖ events ទាំងអស់ `app: zoew` · `find_dropped_events` គ្មាន `filtered` (Allowed Domains មិនបោះ ZoeKeyGen) ➜ ZoeKeyGen ០ event = គ្មាន error
+- **បានពិនិត្យ មិនមែនកំហុស** ៖ fuzz លុយ seed ថ្មី `FUZZ_RUN0=700 FUZZ_RUNS=24 FUZZ_OPS=90` PASS ៣/៣ («ឧបករណ៍ផ្សេងដក» ២៤ លំដាប់ · `ledgerBlip` applied ១៨ · lost ១៨) ·
+  `tools/supabase-migrate` (op_id កំណត់ពីទិន្នន័យ ➜ rerun = replay · ផ្ទៀងហាងក្រោយសរសេរ · ចាប់ការសរសេរពីឧបករណ៍ផ្សេង) · ZoeW គ្មាន sink HTML ឆៅ (`tel:` មាន prefix) ·
+  Edge Functions ចុះឈ្មោះ/ប្តូរពាក្យសម្ងាត់ · ការដោះ registry ជា batch (rules អនុញ្ញាតលុបជានិច្ច) · rules `exchange_rate` ·
+  Sentry ៩០ ថ្ងៃ ៖ events ទាំងអស់ `app: zoew` · `find_dropped_events` គ្មាន `filtered` (Allowed Domains មិនបោះ ZoeKeyGen) ➜ ZoeKeyGen ០ event = គ្មាន error
   (ឬមិនទាន់មានអ្នកប្រើ) · adapter Supabase ផ្ញើ auth event តែពេលចូល/ចេញ/ស្តារ ➜ `phoneModalBusy` មិនជាប់ · CORS Edge Functions សម្រាប់ APK (`https://localhost` ក្នុង README) ·
   `dispatchNotices` at-most-once (`onlyIfMatch` ledger) · ការទាញ 🔔 feed · push config មានពិដាន។
 - **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ

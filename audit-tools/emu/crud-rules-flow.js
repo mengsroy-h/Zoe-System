@@ -66,6 +66,14 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
     'toggleCloseStatus', 'executePermanentDelete'];
 
+// ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ផុតកំណត់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
+//    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
+const KEYED_FNS = ['ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness',
+    'ledgerTagged', 'runLedgerTransaction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf',
+    'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
+    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
+    'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult'];
+
 // អានឈ្មោះដែលប្រើពិតតាម scope៖ ថេរ/state ក៏ជា dependency ដូច function call ដែរ។
 // អថេរមូលដ្ឋានរបស់ function មួយ មិនអាចលាក់ global ដែលបាត់ក្នុង function ផ្សេងបានទេ។
 function sandboxUnresolvedNames(ast, globals) {
@@ -176,6 +184,9 @@ function makeSandbox(store, now) {
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
         dbRefDailyCollected: fb.ref({}, 'zoew_daily_collected_cod_dod'),
+        dbRefDailyRevenue: fb.ref({}, 'zoew_daily_revenue_cod_dod'),
+        dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
+        dailyRevenueData: {}, monthlyRevenueData: {}, crypto: globalThis.crypto,
         getServerNow: () => w.now, getFormattedDate: () => '2026-08-26',
         // ⛔ តេស្តនេះវាស់ **payload ↔ rules** មិនមែនលេខ ledger — តែ stub ត្រូវ
         // រក្សា **រូបរាងពិត** (ត្រឡប់ delta ដែលអនុវត្ត) បើមិនដូច្នេះផ្លូវដកវិញ
@@ -277,6 +288,13 @@ function makeSandbox(store, now) {
         // (ការវាស់របស់វាជារបស់ `tx-outcome-test` · `emu/tx-disconnect-emu-test`) ➜ ហៅ = បោះ ➜ ធ្លាក់ មិនមែនបៃតងស្ងាត់
         "async function cleanupClaimAccountedElsewhere() { throw new Error('crud-rules-flow: ផ្លូវ disconnect មិនត្រូវបានគំរូ'); }", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
+        optionalConst(src, 'LEDGER_OP_RING_MAX', 'const LEDGER_OP_RING_MAX = 12;'),
+        optionalConst(src, 'CLEANUP_STAGE_UNDO', "const CLEANUP_STAGE_UNDO = 'undo';"),
+        optionalConst(src, 'CLEANUP_LEDGER_KEYED', "const CLEANUP_LEDGER_KEYED = 'keyed';"),
+        optionalConst(src, 'CLEANUP_LEDGER_LEGACY', "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
+        optionalConst(src, 'CLEANUP_LEDGER_RETRY_MAX', 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
+        optionalConst(src, 'CLEANUP_NO_PRIOR', 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
+        ...KEYED_FNS.map((n) => optionalFn(src, n, 'function ' + n + '() { return null; }')),
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
     ].join('\n\n');
@@ -619,6 +637,76 @@ async function clearOrphanBeforeRetry(w, label) {
         for (const wr of w.writes) { const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value); if (denied(r)) { bad = wr.path; break; } }
         const gone = (await asUser('GET', '/zoew_recently_deleted_cod_dod/id_t.json')).body.trim() === 'null';
         check(expectOk ? (!bad && gone) : !gone, '✖️ ' + label + (expectOk ? ' ➜ លុបបាន' : ' ➜ ត្រូវការពារ មិនលុប'), bad ? 'បដិសេធនៅ ' + bad : '');
+    }
+
+    // ---------- ផុតកំណត់ ៨ ថ្ងៃ ➜ ការដកមានសោ ----------
+    // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ផុតកំណត់សរសេរ `ded/<trashId>` ក្នុង record ថ្ងៃ (ផ្លូវសរសេរថ្មី ➜ fuzz គ្មាន op «abandon» ➜ មិនមានអ្នកវាស់
+    //    ជាមួយ rules ពិតទេ)។ ការវាស់ ៖ ការសម្អាតពិតក្នុង sandbox ➜ ចាក់ payload ពិតទៅ emulator ➜ rules ពិតទទួល ហើយលទ្ធផលលើ server = ការដកពិត
+    //    · ទិសផ្ទុយ ៖ rules ដែលដក `ded` ចេញ ➜ payload ថ្ងៃដដែលត្រូវបដិសេធ (បញ្ជាក់ថា node `ded` ជាអ្នកទទួល មិនមែនបៃតងទទេ)
+    //    · ទម្រង់ `ded` ខុស (អវិជ្ជមាន · វាលក្រៅ schema · គ្មាន `at`) ➜ បដិសេធ។
+    console.log('\n=== ៥. ផុតកំណត់ ៨ ថ្ងៃ ➜ ការដកមានសោ `ded/<trashId>` ➜ rules ពិតទទួល ===');
+    {
+        const day = '2026-08-26';
+        const month = day.substring(0, 7);
+        const base = {
+            zoew_scan_history_cod_dod: { id_e: parcel('id_e', [bc('E1', 4.57, false), bc('E2', 3.72, false)]) },
+            zoew_recently_deleted_cod_dod: {},
+            zoew_daily_revenue_cod_dod: { [day]: { codDollar: 20, dodDollar: 0, totalCount: 5 } },
+            zoew_monthly_revenue_cod_dod: { [month]: { codDollar: 120, dodDollar: 0, totalCount: 30 } }
+        };
+        const probe = makeSandbox({}, T0);
+        const ageMs = vm.runInContext('ABANDON_AGE_MS', probe.ctx);
+        const w = makeSandbox(clone(base), T0 + ageMs + 3600000);
+        w.sync();
+        await w.ctx.claimAndCleanupItem('id_e', 'abandon');
+        await w.drain();
+        const dailyWrites = w.writes.filter((wr) => wr.path.startsWith('zoew_daily_revenue_cod_dod'));
+        const keyedDaily = dailyWrites.filter((wr) => wr.value && wr.value.ded && wr.value.ded.id_e);
+        check(keyedDaily.length === 1 && w.writes.some((wr) => wr.path === 'zoew_monthly_revenue_cod_dod'),
+            'ផុតកំណត់ ➜ កូដពិតសរសេរខែ ហើយសរសេរថ្ងៃដែលមាន `ded/id_e` ម្តង', JSON.stringify(w.writes.map((wr) => wr.path)));
+        await seedServer(base);
+        await replay('ផុតកំណត់ ➜ rules ពិតទទួល payload ទាំងអស់ (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ+`ded` · flip)', w.writes);
+        const server = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
+        const dailyRec = server.zoew_daily_revenue_cod_dod && server.zoew_daily_revenue_cod_dod[day];
+        const monthlyRec = server.zoew_monthly_revenue_cod_dod && server.zoew_monthly_revenue_cod_dod[month];
+        const trash = server.zoew_recently_deleted_cod_dod && server.zoew_recently_deleted_cod_dod.id_e;
+        const ded = dailyRec && dailyRec.ded ? dailyRec.ded.id_e : null;
+        check(!!dailyRec && Math.abs(dailyRec.codDollar - 11.71) < 1e-9 && dailyRec.totalCount === 3 &&
+            !!monthlyRec && Math.abs(monthlyRec.codDollar - 111.71) < 1e-9 && monthlyRec.totalCount === 28,
+            'ផុតកំណត់ ➜ server ៖ ថ្ងៃ និងខែ ដក 8.29 · 2 កញ្ចប់ ពិតប្រាកដ', JSON.stringify({ dailyRec, monthlyRec }));
+        check(!!ded && ded.at === trash.deletedAt && Math.abs(ded.cod - 8.29) < 1e-9 && ded.dod === 0 && ded.count === 2,
+            'ផុតកំណត់ ➜ server ៖ `ded/id_e` = { at: deletedAt · cod 8.29 · dod 0 · count 2 }', JSON.stringify(ded));
+        check(!!trash && trash.trashReason === 'expired' && trash.barcodes.length === 2 && trash.barcodes.every((b) => b.isDeducted === true),
+            'ផុតកំណត់ ➜ server ៖ ធុងសំរាម `expired` flip `isDeducted:true` តែក្រោយការដក', JSON.stringify(trash && trash.barcodes));
+
+        const noDed = clone(realRules);
+        delete noDed.rules.zoew_daily_revenue_cod_dod.$date.ded;
+        const loadedNoDed = /"status"\s*:\s*"ok"/.test((await asOwner('PUT', '/.settings/rules.json', noDed)).body);
+        if (keyedDaily.length === 1) {
+            await seedServer(base);
+            const deniedNoDed = await asUser(keyedDaily[0].method || 'PUT', '/' + keyedDaily[0].path + '.json', keyedDaily[0].value);
+            const stripped = clone(keyedDaily[0].value);
+            delete stripped.ded;
+            const acceptedNoDed = await asUser('PUT', '/' + keyedDaily[0].path + '.json', stripped);
+            check(loadedNoDed && denied(deniedNoDed) && !denied(acceptedNoDed),
+                'ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ payload ថ្ងៃដែលមាន `ded` បដិសេធ · ដក `ded` ចេញ ➜ ទទួល',
+                [loadedNoDed, deniedNoDed.status, acceptedNoDed.status].join(' · '));
+        } else {
+            check(false, 'ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ payload ថ្ងៃដែលមាន `ded` បដិសេធ (គ្មាន payload `ded` ឲ្យវាស់)');
+        }
+        await asOwner('PUT', '/.settings/rules.json', realRules);
+        await seedServer(base);
+        const dedPath = '/zoew_daily_revenue_cod_dod/' + day + '/ded/probe_x.json';
+        const goodDed = await asUser('PUT', dedPath, { at: T0, cod: 1.25, dod: 0, count: 1 });
+        const badDed = await Promise.all([
+            asUser('PUT', dedPath, { at: T0, cod: -1, dod: 0, count: 1 }),
+            asUser('PUT', dedPath, { at: T0, cod: 1, dod: 0, count: 1, extra: 1 }),
+            asUser('PUT', dedPath, { cod: 1, dod: 0, count: 1 }),
+            asUser('PUT', dedPath, { at: T0, cod: 1, dod: 0, count: 1, back: false })
+        ]);
+        check(!denied(goodDed) && badDed.every(denied),
+            'rules ពិត ៖ `ded` ត្រឹមត្រូវទទួល · អវិជ្ជមាន · វាលក្រៅ schema · គ្មាន `at` · `back:false` ➜ បដិសេធ',
+            [goodDed.status].concat(badDed.map((r) => r.status)).join(' · '));
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');

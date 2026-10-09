@@ -302,12 +302,28 @@ function assertRules(res) {
 function normalize(db) {
     const trashIn = db.zoew_recently_deleted_cod_dod || {};
     const rekey = {};
+    const trashLabel = {};
     for (const [k, t] of Object.entries(trashIn)) {
         if (!/^id_/.test(k)) { rekey[k] = t; continue; }
         const codes = (t.barcodes || []).map((b) => b && b.code).join(',');
-        rekey['<ថ្មី:' + t.trashReason + ':' + codes + '>'] = Object.assign({}, t, { id: '<id>' });
+        trashLabel[k] = '<ថ្មី:' + t.trashReason + ':' + codes + '>';
+        rekey[trashLabel[k]] = Object.assign({}, t, { id: '<id>' });
     }
     db = Object.assign({}, db, { zoew_recently_deleted_cod_dod: rekey });
+    const seededDedStamps = new Set();
+    JSON.stringify(seed(), (k, v) => { if (typeof v === 'number' && /At$/.test(k)) seededDedStamps.add(v); return v; });
+    // សោដក `ded/<trashId>` (2.50.49) ៖ id ធុងសំរាមថ្មី និង `at` (= `deletedAt`) ថ្មីរាល់ដង ➜ ប្តូរឈ្មោះតាមធុងសំរាមដែលវាចង្អុល · ⛔ cod · dod · count · back · undo ប្រៀបធៀបដដែល
+    const normalizeDed = (ded) => {
+        if (!ded || typeof ded !== 'object') return ded;
+        const out = {};
+        for (const [trashId, entry] of Object.entries(ded)) {
+            const key = /^id_/.test(trashId) ? (trashLabel[trashId] || '<ded:គ្មានធុងសំរាម>') : trashId;
+            out[key] = entry && typeof entry === 'object' && typeof entry.at === 'number' && !seededDedStamps.has(entry.at)
+                ? Object.assign({}, entry, { at: '<ថ្មី>' })
+                : entry;
+        }
+        return out;
+    };
     // token `op` និង ring `ops` របស់ runLedgerTransaction() ជាអត្តសញ្ញាណការសរសេរ (ថ្មីរាល់ដង) មិនមែនលុយ ➜ ដកតែលើ record ledger ដែលមានរូបរាង token ពិត
     for (const node of ['zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod']) {
         const map = db[node];
@@ -318,8 +334,9 @@ function normalize(db) {
                 const rest = Object.assign({}, rec);
                 delete rest.op;
                 if (rest.ops && typeof rest.ops === 'object' && Object.keys(rest.ops).every((key) => /^op_[a-z0-9]{8,}$/.test(key))) delete rest.ops;
+                if (rest.ded) rest.ded = normalizeDed(rest.ded);
                 clean[k] = rest;
-            } else clean[k] = rec;
+            } else clean[k] = rec && typeof rec === 'object' && rec.ded ? Object.assign({}, rec, { ded: normalizeDed(rec.ded) }) : rec;
         }
         db = Object.assign({}, db, { [node]: clean });
     }

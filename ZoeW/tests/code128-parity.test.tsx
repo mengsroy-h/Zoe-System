@@ -14,7 +14,7 @@ import { code128SvgElement } from './fixtures/code128-oracle';
  *    នឹងក្រហមក្លែងក្លាយ។
  */
 const SAMPLES = [
-    '77130533910996',      // Waybill ១៤ ខ្ទង់ (ប្រវែងផលិតកម្មពិត)
+    '77130500000996',      // Waybill ១៤ ខ្ទង់ (ប្រវែងផលិតកម្មពិត)
     '1234567',             // ⛔ សេស ➜ Set C ត្រូវដោះជាគូ (អន្ទាក់ `12345607`)
     '12345678',            // គូ
     'ZTO-1234',            // លាយអក្សរ ➜ Set B
@@ -57,7 +57,7 @@ describe('Code128Svg ស្មើនឹងអ្នកសម្រេចដើ�
     }
 
     it('quiet zone ១០ module នៅសងខាង (ម៉ាស៊ីនស្កេនដៃត្រូវការ)', () => {
-        const svg = renderSvg('77130533910996')!;
+        const svg = renderSvg('77130500000996')!;
         const bars = Array.from(svg.querySelectorAll('rect'));
         const width = Number(svg.getAttribute('viewBox')!.split(' ')[2]);
         const first = Number(bars[0].getAttribute('x'));

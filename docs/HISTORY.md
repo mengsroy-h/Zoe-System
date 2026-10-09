@@ -45,12 +45,10 @@
 
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.47 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #305 merge រួចទាំងអស់ ([2.50.45] = PR #304 · [2.50.46]–[2.50.47] = PR #305 ពី branch
-   `claude/exciting-gates-nvx9ar` ដែលមាន commit របស់ `claude/dazzling-fermi-hycqee` ជាផ្នែក)។ Branch **`claude/kind-volta-02pazk`** (ពី `main` 250dcca ·
-   **មិនទាន់ merge** · មាន commit [2.50.48] របស់ `claude/dazzling-fermi-hycqee` ដដែល) ៖ [2.50.48] ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (APK · PWA Android · PWA iPhone) ·
-   checker ៣ តាមក្រោយ · [2.50.49] សោដកក្នុង ledger (KC-15 · Task #16 · rules + migration ថ្មី ➜ សកម្មភាពដោយដៃ ក្នុងផ្នែក ១)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
-   ម្ចាស់គម្រោងសាក [2.50.48] លើទូរស័ព្ទពិតទាំង ៣ មុនស្នើ merge។
-   វាស់រួចលើ [2.50.46]–[2.50.47] ៖ run-all STRICT ពេញ ✅ ២០២/២០២ លើ 5cc09d8 · ការផ្ទៀងឯករាជ្យ Claude ២ · fuzz លុយជ្រៅ PASS (ផ្នែក ២ A60–A71)។
+1. **`main`** = **ZoeW 2.50.49 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
+   migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
+   Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·
+   `security-guard-test`) ➜ PR ថ្មី។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -59,12 +57,16 @@
    **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · Firebase partial claim ពេល deleted view ចាស់ · legacy items គ្មាន barcodes · born-closed `closedAt` ·
    zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
    SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · auth listener របស់ client ចាស់ក្រោយ `deleteApp` · network ៖ captive portal probe · install `addAll` ពេល deploy ជាន់ ·
-   sentry ៖ replays REACT-7/-8 · ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops`។
+   sentry ៖ ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops`។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
    artifact backup (`backup.yml`) អ្នកមានគណនី GitHub ណាក៏ទាញបាន ➜ `ZOE_BACKUP_PASSPHRASE` ចៃដន្យ ≥ ៣២ តួ ([`firebase-backup/README.md`](../firebase-backup/README.md) «ប្រព័ន្ធសុវត្ថិភាព») ·
    ✅ sign-up បិទក្នុង Supabase + Firebase (ម្ចាស់គម្រោង 2026-10-06) · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ។
+3ក. 🗳️ **ប្រវត្តិ git របស់ repo public** ([2.50.50] · ផ្នែក ២ «Deep audit security») ៖ លេខទូរស័ព្ទ/waybill ពិតដែលធ្លាប់នៅក្នុង fixture ត្រូវប្តូរជាលេខសំយោគក្នុង tree
+   បច្ចុប្បន្ន តែ **នៅក្នុង commit ចាស់** (អ្នកណាក៏អានបាន) ➜ ម្ចាស់គម្រោងសម្រេច ៖ (ក) ប្តូរ repo ជា Private (ងាយបំផុត · CI/Netlify ដើរដដែល · runner self-hosted ត្រូវការ
+   លក្ខខណ្ឌ `private == true` រួចហើយ) ឬ (ខ) សរសេរប្រវត្តិឡើងវិញ (`git filter-repo` + force-push `main` · ⛔ បំបែក clone/fork · ត្រូវការការអនុញ្ញាតច្បាស់) ·
+   secret ពិត ៖ ស្កេនប្រវត្តិពេញ (blob ៧៦៦២) ➜ **គ្មាន** (តែ fixture តេស្ត ២ ដែលមានក្នុងបញ្ជីអនុញ្ញាត)។
 4. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 5. សាកលើ iPhone/Android ពិត ៖ បញ្ជី ⏳ ខាងក្រោម (ធាតុនីមួយៗប្រាប់ឧបករណ៍ និងសកម្មភាព) · ✅ ធាតុ 2.45.x ➜ 2.50.0 ម្ចាស់គម្រោងសាករួច (2026-10-06)។
    **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
@@ -134,6 +136,38 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.50] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **ឯកជនភាព ៖ Sentry ទទួលតែ error ដែលលាក់ secret រួច (Session Replay · tracing · logs របស់ Loader បិទ) · CSP `script-src` តឹង · អ្នកយាម security** (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «បង្កើតអ្នកយាមសម្រាប់ security គ្រប់ផ្នែក … ទាំងក្នុង repo និង app»)
+
+**ZoeW `2.50.50`** (`zoew-v312` ➜ `zoew-v313`) · **ZoeKeyGen `2.24.11`** (`zoekeygen-v121` ➜ `zoekeygen-v122`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 **Sentry** (`error-reporting.js` · byte-identical ×២) ៖ `guardedOptions()` កំណត់ `tracesSampleRate: 0` · `replaysSessionSampleRate: 0` · `replaysOnErrorSampleRate: 0` ·
+  `enableLogs: false`។ Loader (`js.sentry-cdn.com/<key>.min.js` ក្នុង `index.html`) ច្របាច់ option របស់ App ពីលើលំនាំដើមដែលកំណត់ក្នុង Sentry UI ➜ មុននេះ option ដែល App
+  មិនកំណត់ = លំនាំដើម UI ៖ **Session Replay `0.1/1.0`** (ថត ១០% នៃសម័យ · ១០០% ពេល error) និង **tracing** (span `http.client` មាន URL ពេញ) — ទាំងពីរ **មិនឆ្លង**
+  `beforeSend`/`beforeBreadcrumb` ➜ ការលាក់ secret មិនគ្រប។ ឥឡូវផ្លូវទាំង ២ (`tagApp()` តាម `Sentry.onLoad` · `applySentryInit()` តាម DSN) ផ្ញើតែ error event ដែលលាក់រួច។
+  ⛔ បន្ទាត់ `options.tracesSampleRate = 0;` ក្នុង `applySentryInit()` ដកចេញ ព្រោះផ្លាស់ទៅ `guardedOptions()` ដែលផ្លូវទាំង ២ ប្រើ (ការលុបដែលមានហេតុផល)។
+- 🛡️ **CSP** (App ទាំង ២) ៖ `script-src` `https://www.gstatic.com` ➜ `https://www.gstatic.com/firebasejs/` ➜ script ពីថតផ្សេងលើ www.gstatic.com (ឧបករណ៍រំលង CSP ប្រភេទ
+  JSONP/បណ្ណាល័យចាស់) ត្រូវបដិសេធ · Firebase SDK (`firebasejs/12.19.0/…` ក្នុង `firebase-loader.js` · `modulepreload` របស់ ZoeKeyGen) ដើរដដែល · `connect-src`
+  (probe `generate_204`) មិនប្រែ។
+
+#### អ្នកយាម
+
+- `sentry-load-race-test` ផ្នែក ៥ (ថ្មី) ៖ Loader ក្លែងច្របាច់ option ពីលើលំនាំដើម UI (Replay `0.1/1.0` · tracing ១ · logs · PII) ➜ មុនកែ **FAIL** ៖
+  `onLoad` ➜ `traces 1 · replay 0.1/1 · logs true` · DSN ➜ `traces 0 · replay 0.1/1 · logs true` (ដូច replay ពិតក្នុង Sentry ៖ `sessionSampleRate=0.1, errorSampleRate=1`) ➜
+  ក្រោយកែ ៣៨/៣៨ · ទិសផ្ទុយ ៖ App មិនកំណត់ ➜ Loader ក្លែងបើកវិញ (ការវាស់អាចក្រហមពិត)។
+- `security-guard-test` (ថ្មី) ៖ ៥៥ assertion · mutation ១៦/១៦ ក្រហម (ផ្នែក ២ «Deep audit security»)។
+- `csp-lazy-resource-test` ៖ `cspAllows()` គោរព path និង wildcard ដូច browser (មុននេះប្រៀបតែ host ➜ ប្រភពដែលមាន path មិនត្រូវវាស់) + ទិសផ្ទុយ ៦។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeW · ZoeKeyGen (Netlify ពី `main`) ➜ ធ្វើបច្ចុប្បន្នភាពឧបករណ៍ (App ចាស់នៅផ្ញើ Replay/tracing តាមលំដាប់ UI)។
+2. **Sentry** (ណែនាំ · ការពារ App ចាស់) ៖ Project `javascript-react` ➜ Settings ➜ Client Keys (DSN) ➜ Loader Script ➜ បិទ **Session Replay** · **Performance Monitoring** ·
+   (Logs/Feedback បើមាន) · Security & Privacy ➜ បើក **Prevent Storing of IP Addresses** · ពិចារណាលុប replay ដែលថតរួច (Explore ➜ Replays)។
+3. **GitHub** (ណែនាំ) ៖ Settings ➜ Code security ➜ **Secret scanning** + **Push protection** · **Dependabot alerts**។
+4. **Supabase** (ណែនាំ · advisor) ៖ Authentication ➜ Password security ➜ បើក **Leaked password protection**។
+5. ប្រវត្តិ git (លេខអតិថិជនក្នុង commit ចាស់) ➜ ការសម្រេចម្ចាស់គម្រោង (📌 ធាតុ ៣ក)។
 
 ### [2.50.49] — 2026-10-09 · ZoeW ៖ **ការដកប្រាក់កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចុះតែម្តង ទោះ App ស្លាប់ពាក់កណ្តាល — សោដកក្នុង ledger** (ហាង KC-15 · Task #16 · ម្ចាស់គម្រោងជ្រើស «សោដកក្នុង ledger»)
 
@@ -3060,6 +3094,32 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-09 — Deep audit security (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «អ្នកយាមសម្រាប់ security គ្រប់ផ្នែក») ➜ [2.50.50]
+
+- **Sentry Replay/tracing** (ការរកឃើញពិត) ៖ Sentry មាន replay ថតសម័យ production (ឧ. ២២ នាទី · `zoew@2.50.47` · options `sessionSampleRate=0.1, errorSampleRate=1`) និង span
+  `http.client` ១៣ ៨២១ ក្នុង ៧ ថ្ងៃ (Supabase · Netlify · Firebase · identitytoolkit) ➜ ប្រភព ៖ Loader settings ក្នុង Sentry UI (Replay · Performance បើកតាមលំនាំដើម)
+  ព្រោះ `guardedOptions()` មិនកំណត់ rate ទាំងនោះ។ Replay · span · log **មិនឆ្លង** `beforeSend` ➜ ការលាក់ `SECRET_PARAM_PATTERN` មិនគ្រប ➜ ផ្លូវលេចធ្លាយ ៖
+  `txReadServerValue()` (ZoeW) · `readUserRoleViaRest()` (ZoeKeyGen) ដាក់ ID token ក្នុង `?auth=`។ វាស់ ៣០ ថ្ងៃ ៖ span `http.client` ដែល URL/query មាន `auth` = **០** ➜
+  គ្មានភស្តុតាងថា token លេចពិត (អានតែកម្រ ៖ disconnect កណ្តាល transaction) តែផ្លូវបើក ➜ បិទក្នុង [2.50.50] (`sentry-load-race-test` ផ្នែក ៥ ក្រហមមុនកែ)។
+  ⏳ ការកំណត់ Loader ក្នុង UI ជាសកម្មភាពម្ចាស់គម្រោង ([2.50.50] សកម្មភាព ២)។
+- **`security-guard-test`** (ថ្មី · repo public + App ដែល ship) ៖ ក secret ក្នុងឯកសារ repo (git ls-files + ឯកសារថ្មី · ប្រភេទ ១៥ + ទិសផ្ទុយគ្រប់ប្រភេទ) · env ដែល commit
+  (`ZoeW/.env.android` តែ `VITE_NATIVE_WEB_ORIGIN`) · ខ env/ឈ្មោះ secret server ក្នុង client · `sourcemap: false` · `define` · គ លេខទូរស័ព្ទ/waybill ពិត · ឃ CSP/header
+  (ratchet ប្រភពមានហេតុផល) · CORS របស់ Function · ង GitHub Actions · ច Firebase rules សាធារណៈ · ឆ Supabase `verify_jwt`/RLS/grant · ជ **bundle ផលិតកម្មពិត**
+  (`vite build` ទៅថតបណ្តោះអាសន្នរាល់ដង ≈ ២ វិ. ➜ មិនពឹង `ZoeW/dist` ដែលនៅសល់ ៖ sourcemap · secret · bridge build វាស់ · លេខអតិថិជន) · ឈ APK (WebView debug ·
+  mixed content · cleartext · component exported)។ mutation លើច្បាប់ចម្លង ១៦/១៦ ក្រហម ៖ CSP host ទាំងមូល · `unsafe-inline` · `persist-credentials: true` ·
+  `pull_request_target` · លេខទូរស័ព្ទ/waybill ពិត · `import.meta.env.VITE_*TOKEN` · `sourcemap: true` (ផ្នែក ខ + ជ) · WebView debug · provider exported · `.write: true` ·
+  `verify_jwt = false` ថ្មី · CORS `*` លើ Function ZTO · env ថ្មីក្នុង `.env.android` · GitHub token ក្នុងឯកសារ · តារាងគ្មាន RLS · ថតទទេ ➜ ២៩ FAIL។
+  ការរកឃើញពេលសាងអ្នកយាម ៖ `service_role` ក្នុង bundle = អត្ថបទការពារ (`supabaseKeyIsSecret()` បដិសេធ key) មិនមែន secret ➜ មិនស្ថិតក្នុងបញ្ជីឈ្មោះ server។
+- **លេខអតិថិជនពិតក្នុង repo public** ៖ fixture/ឯកសារ ៤៨ (តេស្ត · `zto-import` · `docs`) មានលេខទូរស័ព្ទ ២១ និង waybill ២២ ដែលមិនមែនលំនាំសំយោគ (ខ្លះជាលេខហាង KC-15) ➜
+  ប្តូរជាប់គ្នាគ្រប់ឯកសារ (៣៣១ កន្លែង ៖ ៣ ខ្ទង់ក្រោយលេខក្រុមហ៊ុន ➜ `000` · waybill ខ្ទង់ ៧–១០ ➜ `0000` · ខ្ទង់ចុងក្រោយដដែល ➜ ការស្វែងរកតាមចុងលេខ · ប្រវែង · ក្រុមហ៊ុនដដែល) ·
+  ⛔ commit ចាស់នៅមានលេខទាំងនោះ (📌 ធាតុ ៣ក)។ ស្កេនប្រវត្តិពេញ (`git fetch --unshallow` · blob ៧៦៦២) ៖ secret ពិត **គ្មាន** · លេខអតិថិជនមិនសំយោគ ៥៥ តម្លៃ។
+- **ពង្រឹងផ្សេង** ៖ CSP `script-src` ថត `firebasejs/` · `android-release.yml` checkout `persist-credentials: false` (token `contents: write` មិននៅលើ disk runner) ·
+  `csp-lazy-resource-test` គោរព path។
+- **វាស់ ➜ ល្អរួច (កុំរាយការណ៍ម្តងទៀត)** ៖ Android ៖ `allowBackup="false"` · `dataExtractionRules` · `webContentsDebuggingEnabled: false` · `allowMixedContent: false` ·
+  FileProvider មិន exported · Function ZTO CORS តែ `https://localhost` (APK) · Function Push CORS `*` ដោយ auth ក្នុង body (គ្មាន Cookie) · Sentry `sendDefaultPii: false` ·
+  `SellerTelegramLink` `rel="noopener noreferrer"` · គ្មាន `dangerouslySetInnerHTML` · Supabase advisor ៖ `zoe_ops` RLS គ្មាន policy (ចេតនា ៖ ចូលតែតាម definer) ·
+  ⏳ Leaked password protection បិទ ([2.50.50] សកម្មភាព ៤)។
+
 ### 2026-10-09 — ហាង Supabase KC-15 ៖ ការដកផុតកំណត់ត្រូវកាត់ពាក់កណ្តាល ➜ Task #16 «សោដកក្នុង ledger» ➜ [2.50.49]
 
 **អាការៈ** ៖ «ស្កេនតាមថ្ងៃ» ៣៥៣ ≠ យករួច ២៥៧ + នៅសល់ ៩២ = ៣៤៩។ **មូលហេតុ** ៖ កញ្ចប់ផុតកំណត់ ៣ (barcode ៤ · $12.75 · ថ្ងៃ 2026-10-02) ត្រូវដកនៅ 10-09 ម៉ោង 08:33
@@ -3575,7 +3635,7 @@ CI ក្នុង session មុនចាប់ផ្តើម (STRICT · emula
 - 🔎 **E7 k10 ៖ ផ្លូវស្កេន `/detail` ទុកលេខដាក់កន្លែងដែលផ្លូវបញ្ជីទម្លាក់ ➜ `addOrUpdateEntry()` បញ្ចូលកញ្ចប់អ្នកដទៃក្រោម phone `0`**
   - **ការវាស់** ៖ `projectListRow()` (ផ្លូវ `?list=1`) ទម្លាក់ phone ដែលខ្ទង់ទាំងអស់ជា `0` ឬគ្មានខ្ទង់ (`listPhoneIsPlaceholder()`) តែ `extractOrder()` (ផ្លូវស្កេន `/detail`) បញ្ជូន phone ដដែល ➜ App បំពេញ `0` ក្នុងប្រអប់ ➜ `autoSubmit` ➜ `confirmPhone()` ➜ `addOrUpdateEntry()` បញ្ចូលគ្នាតាម phone + scanDate (មានតែ «គ្មានលេខ» ដែលរួច) ➜ កញ្ចប់ ២ របស់អតិថិជនផ្សេងគ្នា (COD $1.50 + $2.25) ក្លាយជាជួរតែមួយ phone `0` count ២។ សេណារីយ៉ូ Function ៖ phone `0` គ្មាន COD/DOD ➜ `found:true` (App រក្សាទុក `0` ស្វ័យប្រវត្តិ) ខណៈផ្លូវបញ្ជីចាត់ទុកជា «មិនមែនអតិថិជន»។
   - **កែ (ផ្នែក server តែប៉ុណ្ណោះ)** ៖ helper តែមួយ `phoneIsPlaceholder()` សម្រាប់ផ្លូវទាំង ២ · `extractOrder()` ៖ `shown = phoneIsPlaceholder(phone) ? '' : phone` · `!shown` ហើយគ្មាន COD/DOD ➜ `null` («រកមិនឃើញ» `found:false` គ្មាន `error`) · ផ្ទុយពីនោះ `phone: shown`។ App មិនប្តូរ ៖ `found:true` + phone ទទេ ➜ បំពេញ COD/DOD · `autoSubmit` មិនដើរ (`phoneWasAutoFilled` false)។
-  - **អ្នកយាម** ៖ `zto-list-sync-test` ផ្នែក ៥ក — តម្លៃដូចគ្នា (`'0'` · `'000'` · `''` · `'0-0'` · `' 0 '` · `'00 000 000'` · `'+855-0'` · `'081684403'` · `'855963897345'`) ឆ្លង handler ពិតតាម `?list=1` និង `/detail` ➜ phone ស្មើគ្នា (ជាន់អប្បបរមា ៖ វាស់ពិតគ្រប់តម្លៃ) · placeholder + COD ➜ `found:true` phone ទទេ · placeholder គ្មាន COD/DOD ➜ `found:false` · ទិសផ្ទុយ ៖ លេខពិតគ្មាន COD/DOD ➜ ឆ្លងកាត់។ `ZoeW/tests/zto-placeholder-phone.test.tsx` — handler ពិតនៅពីក្រោយ `fetch` របស់ App + `triggerScanAction`/`attemptAutoLookup`/`confirmPhone`/`addOrUpdateEntry` ពិត · Firebase SDK ក្លែងក្នុងអង្គចងចាំ ➜ ២ ជួរ «គ្មានលេខ» · ទិសផ្ទុយ ៖ លេខពិតដូចគ្នា ២ ដង ➜ ១ ជួរ count ២។
+  - **អ្នកយាម** ៖ `zto-list-sync-test` ផ្នែក ៥ក — តម្លៃដូចគ្នា (`'0'` · `'000'` · `''` · `'0-0'` · `' 0 '` · `'00 000 000'` · `'+855-0'` · `'081000403'` · `'855960007345'`) ឆ្លង handler ពិតតាម `?list=1` និង `/detail` ➜ phone ស្មើគ្នា (ជាន់អប្បបរមា ៖ វាស់ពិតគ្រប់តម្លៃ) · placeholder + COD ➜ `found:true` phone ទទេ · placeholder គ្មាន COD/DOD ➜ `found:false` · ទិសផ្ទុយ ៖ លេខពិតគ្មាន COD/DOD ➜ ឆ្លងកាត់។ `ZoeW/tests/zto-placeholder-phone.test.tsx` — handler ពិតនៅពីក្រោយ `fetch` របស់ App + `triggerScanAction`/`attemptAutoLookup`/`confirmPhone`/`addOrUpdateEntry` ពិត · Firebase SDK ក្លែងក្នុងអង្គចងចាំ ➜ ២ ជួរ «គ្មានលេខ» · ទិសផ្ទុយ ៖ លេខពិតដូចគ្នា ២ ដង ➜ ១ ជួរ count ២។
   - **លើ tree មុនកែ (46377da)** ៖ `zto-list-sync-test` 540 ok · 15 FAIL · vitest 4 ធ្លាក់ / 1 ឆ្លង («expected 1 to be 2»)។ ក្រោយកែ ៖ 555 ok · 0 FAIL · 5/5។
   - **Mutation** ៖ M1 `shown = phone` · M2 ច្រកមិនឃើញអាន `phone` ដើម · M3 ត្រឡប់ `phone` ដើម · M4 helper `/^0$/` · M5 ផ្លូវបញ្ជីឈប់ប្រើ helper · M6 ដកច្រកមិនឃើញ ➜ ៦/៦ KILLED។
   - **ព្រំដែនដែលទទួលយក** ៖ phone គ្មានខ្ទង់សោះ (ឧ. អក្សរ) ក៏ជា placeholder ដែរ (ច្បាប់ដដែលនឹងផ្លូវបញ្ជី)។ ជួរ `0` ដែលបានបញ្ចូលគ្នារួចមុនកែ មិនត្រូវកែស្វ័យប្រវត្តិ។ ផ្លូវ Lookup មិនមែន ZTO (Apps Script/API ផ្ទាល់ខ្លួន) មិនប្តូរ។
@@ -4885,7 +4945,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `connection-state-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `csp-enforced-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `csp-lazy-resource-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `csp-lazy-resource-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `css-classes` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `css-media-override` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `css-var-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -5002,6 +5062,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `sdk-offline-boot-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sdk-surface` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `secret-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `security-guard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `setup-link-browser-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |

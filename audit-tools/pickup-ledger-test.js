@@ -139,7 +139,7 @@ function toggleBarcode(item, idx, desiredClosed) {
     API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }], null);
 }
 
-const PHONE = '0974158508';
+const PHONE = '0970008508';
 const p1 = { id: 'A', phone: PHONE, scanDate: DAY, isClosed: false, barcodes: [{ code: 'BC1', isClosed: false }] };
 toggleBarcode(p1, 0, true);
 let st = ledger();

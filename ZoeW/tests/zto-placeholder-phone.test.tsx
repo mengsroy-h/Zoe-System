@@ -176,8 +176,8 @@ describe('E7 k10 ៖ លេខដាក់កន្លែងពី ZTO មិន
 
     it('ទិសផ្ទុយ ៖ លេខពិតដូចគ្នា ២ កញ្ចប់ក្នុងថ្ងៃតែមួយ ➜ រក្សាទុកស្វ័យប្រវត្តិ ហើយបញ្ចូលគ្នាជាជួរតែមួយ', async () => {
         upstream = {
-            '77130500000024': { billCode: '77130500000024', consigneeMobile: '081684403', agentAmount: 0 },
-            '77130500000025': { billCode: '77130500000025', consigneeMobile: '081684403', agentAmount: 3 }
+            '77130500000024': { billCode: '77130500000024', consigneeMobile: '081000403', agentAmount: 0 },
+            '77130500000025': { billCode: '77130500000025', consigneeMobile: '081000403', agentAmount: 3 }
         };
         const first = await scanThroughZto('77130500000024');
         const second = await scanThroughZto('77130500000025');
@@ -185,7 +185,7 @@ describe('E7 k10 ៖ លេខដាក់កន្លែងពី ZTO មិន
         expect(second.autoSaved).toBe(true);
         const rows = dataState.scanHistory;
         expect(rows.length).toBe(1);
-        expect(rows[0].phone).toBe('081684403');
+        expect(rows[0].phone).toBe('081000403');
         expect(rows[0].count).toBe(2);
         expect(rows[0].cod).toBe(3);
     });

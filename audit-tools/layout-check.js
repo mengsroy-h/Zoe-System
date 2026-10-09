@@ -97,7 +97,7 @@ const HISTORY_ROW_WIDTHS = [320, 340, 360, 375, 390, 412, 430, 480, 600, 699, 70
 const HISTORY_ROW_PROBE = async (big) => {
     const day = '2026-10-06';
     const LONG = 'សាខាផ្សេងទៀតដែលមិនមែនចិន ឬវៀតណាម ផ្លូវលេខ ២៧១ សង្កាត់ទួលទំពូង ខណ្ឌចំការមន ភ្នំពេញ';
-    const mk = (id, extra, origins) => Object.assign({ id, phone: '0963897345', scanDate: day, time: '09:00:00 (' + day + ')',
+    const mk = (id, extra, origins) => Object.assign({ id, phone: '0960007345', scanDate: day, time: '09:00:00 (' + day + ')',
         createdAt: Date.now(), cod: 3, dod: 0, count: 3, isClosed: false,
         barcodes: [1, 2, 3].map((j) => ({ code: 'ZT' + id + '00' + j, cod: 1, dod: 0, isClosed: false })) }, extra, origins ? { origins } : {});
     const kinds = [

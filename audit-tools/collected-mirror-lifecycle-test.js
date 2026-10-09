@@ -149,7 +149,7 @@ function seedData() {
     return {
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {
-            id_a: { id: 'id_a', phone: '0968490421', scanDate: d, createdAt: now - 1000, cod: 30, dod: 5, price: 35, count: 2, barcode: 'B2', time: '10:00', isClosed: false,
+            id_a: { id: 'id_a', phone: '0960000421', scanDate: d, createdAt: now - 1000, cod: 30, dod: 5, price: 35, count: 2, barcode: 'B2', time: '10:00', isClosed: false,
                 barcodes: [
                     { code: 'B1', time: '09:00', cod: 10, dod: 2, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 2000 },
                     { code: 'B2', time: '10:00', cod: 20, dod: 3, locker: 'A2', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 1000 }

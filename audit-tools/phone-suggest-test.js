@@ -188,8 +188,8 @@ function itemsFixture() {
     for (let i = 0; i < 40; i++) {
         items.push({ id: 'old' + i, phone: '011' + String(100000 + i), createdAt: 1000 + i, barcodes: [{ code: 'B' + i }] });
     }
-    items.push({ id: 'x1', phone: '0968490421', createdAt: 9000, barcodes: [{ code: 'C1' }, { code: 'C2' }] });
-    items.push({ id: 'x2', phone: '0968490421', createdAt: 9500, barcodes: [{ code: 'C3' }] });
+    items.push({ id: 'x1', phone: '0960000421', createdAt: 9000, barcodes: [{ code: 'C1' }, { code: 'C2' }] });
+    items.push({ id: 'x2', phone: '0960000421', createdAt: 9500, barcodes: [{ code: 'C3' }] });
     items.push({ id: 'x3', phone: '0421777888', createdAt: 9600, barcodes: [{ code: 'C4' }] });
     items.push({ id: 'x4', phone: '012-345 678', createdAt: 9700, barcodes: [{ code: 'C5' }] });
     items.push({ id: 'x5', phone: 'គ្មានលេខ', createdAt: 9800, barcodes: [{ code: 'C6' }] });
@@ -205,12 +205,12 @@ function itemsFixture() {
     ok('មាន collectPhoneSuggestions', h.has('collectPhoneSuggestions'));
     if (h.has('collectPhoneSuggestions')) {
         const tail = h.ctx.collectPhoneSuggestions('421');
-        ok('វាយ "421" ➜ រកឃើញ 0968490421', tail.some((e) => e.phone === '0968490421'), tail.map((e) => e.phone));
-        ok('លេខដែលបញ្ចប់ដោយ "421" ឡើងមុនគេ', tail.length && tail[0].phone === '0968490421', tail.map((e) => e.phone));
+        ok('វាយ "421" ➜ រកឃើញ 0960000421', tail.some((e) => e.phone === '0960000421'), tail.map((e) => e.phone));
+        ok('លេខដែលបញ្ចប់ដោយ "421" ឡើងមុនគេ', tail.length && tail[0].phone === '0960000421', tail.map((e) => e.phone));
         ok('លេខដែលមាន "421" នៅកណ្តាល/ដើម ក៏ចេញដែរ', tail.some((e) => e.phone === '0421777888'), tail.map((e) => e.phone));
         ok('រាប់កញ្ចប់បូកបញ្ចូលគ្នាតាមលេខតែមួយ',
-            (tail.find((e) => e.phone === '0968490421') || {}).packages === 3,
-            (tail.find((e) => e.phone === '0968490421') || {}).packages);
+            (tail.find((e) => e.phone === '0960000421') || {}).packages === 3,
+            (tail.find((e) => e.phone === '0960000421') || {}).packages);
         ok('លេខមិនស្ទួន', new Set(tail.map((e) => e.phone)).size === tail.length, tail.map((e) => e.phone));
         ok('"គ្មានលេខ" មិនចូលក្នុងបញ្ជី', !h.ctx.collectPhoneSuggestions('').some((e) => e.phone === 'គ្មានលេខ'));
         ok('សញ្ញា - និងចន្លោះមិនរារាំង៖ "345678" រក 012-345 678',
@@ -269,7 +269,7 @@ function itemsFixture() {
         }
         h.ctx.scanHistory = big;
         const last = h.ctx.collectPhoneSuggestions('200349');
-        ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011200349', last.map((e) => e.phone));
+        ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011000349', last.map((e) => e.phone));
         const first = h.ctx.collectPhoneSuggestions('200000');
         ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011200000', first.map((e) => e.phone));
         h.ctx.updateRecentPhonesList();

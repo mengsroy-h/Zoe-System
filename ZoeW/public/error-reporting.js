@@ -252,6 +252,10 @@
             environment: appName || 'unknown',
             release: release || undefined,
             sendDefaultPii: false,
+            tracesSampleRate: 0,
+            replaysSessionSampleRate: 0,
+            replaysOnErrorSampleRate: 0,
+            enableLogs: false,
             beforeBreadcrumb: redactBreadcrumb,
             beforeSend: redactEvent
         };
@@ -317,7 +321,6 @@
             const options = guardedOptions(appName, release);
             options.dsn = dsn;
             options.sampleRate = 1.0;
-            options.tracesSampleRate = 0;
             global.Sentry.init(options);
             if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
         } catch (e) {

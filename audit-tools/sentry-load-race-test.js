@@ -49,6 +49,29 @@ window.__log = { init: [], releases: [], sent: [], scopes: [], closed: 0, unboun
 })();
 `;
 
+// Loader ក្លែង (`js.sentry-cdn.com/<key>.min.js` ក្នុង index.html) ៖ ច្របាច់ option របស់ App ពីលើការកំណត់លំនាំដើមរបស់ Loader
+// ដែលម្ចាស់កំណត់ក្នុង Sentry UI (Session Replay 0.1/1.0 · tracing · logs · PII) ដូច Loader ពិត ➜ option ដែល App មិនកំណត់ = លំនាំដើមរបស់ UI។
+const LOADER_SDK = `
+window.__loader = { merged: [] };
+(function () {
+    var defaults = { dsn: 'https://k@o0.ingest.sentry.io/1', tracesSampleRate: 1, replaysSessionSampleRate: 0.1, replaysOnErrorSampleRate: 1, enableLogs: true, sendDefaultPii: true };
+    window.Sentry = {
+        onLoad: function (cb) { cb(); },
+        init: function (o) {
+            var merged = {};
+            Object.keys(defaults).forEach(function (k) { merged[k] = defaults[k]; });
+            Object.keys(o || {}).forEach(function (k) { merged[k] = o[k]; });
+            window.__loader.merged.push({ traces: merged.tracesSampleRate, replaySession: merged.replaysSessionSampleRate, replayError: merged.replaysOnErrorSampleRate,
+                logs: merged.enableLogs, pii: merged.sendDefaultPii, beforeSend: typeof merged.beforeSend, beforeBreadcrumb: typeof merged.beforeBreadcrumb });
+        },
+        setTag: function () {},
+        captureException: function () {},
+        close: function () { return Promise.resolve(true); },
+        getCurrentHub: function () { return { bindClient: function () {} }; }
+    };
+})();
+`;
+
 function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
@@ -362,6 +385,36 @@ function releaseCallSites(file, appName) {
             last.indexOf('new@') !== -1, out.log);
         ok('init ស្របគ្នា ➜ មិន init ស្ទួនដោយឥតប្រយោជន៍',
             out.log.init.length === 1, out.log);
+        await ctx.close();
+    }
+
+    // ៥ — Loader ពិត (index.html) ច្របាច់ option ពីលើលំនាំដើមរបស់ Sentry UI ➜ App ត្រូវបិទ Replay · tracing · logs · PII ដោយខ្លួនឯង
+    //     ⛔ Session Replay · span (`http.client` មាន URL ពេញ) · log មិនឆ្លង `beforeSend`/`beforeBreadcrumb` ➜ ការលាក់ secret មិនគ្រប ➜
+    //     មានតែ error event ដែលបានលាក់ secret ទើបចេញពីឧបករណ៍ (ផ្លូវទាំង ២ ៖ `tagApp()` តាម onLoad · `applySentryInit()` តាម DSN)
+    {
+        const ctx = await browser.newContext();
+        const page = await ctx.newPage();
+        await page.route('**', async (r) => {
+            const u = r.request().url();
+            if (u.indexOf('js.sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LOADER_SDK });
+            if (u.indexOf('sentry-cdn.com') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: FAKE_SDK });
+            if (u.startsWith(origin)) return r.continue();
+            return r.abort();
+        });
+        await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
+        await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+        await page.addScriptTag({ url: 'https://js.sentry-cdn.com/k.min.js' });
+        await page.addScriptTag({ url: '/error-reporting.js' });
+        await page.evaluate(() => window.ZoeErrors.init('zoew', 'zoew@9.8.7'));
+        const merged = await page.evaluate(() => (window.__loader && window.__loader.merged) || []);
+        ok('ជាន់អប្បបរមា ៖ App ហៅ `Sentry.init()` តាម Loader ២ ផ្លូវ (onLoad · DSN)', merged.length >= 2, merged);
+        const leaks = merged.filter((m) => m.traces !== 0 || m.replaySession !== 0 || m.replayError !== 0 || m.logs !== false || m.pii !== false
+            || m.beforeSend !== 'function' || m.beforeBreadcrumb !== 'function');
+        ok('⛔ Loader + option របស់ App ➜ Session Replay = 0 · tracing = 0 · logs បិទ · PII បិទ · beforeSend/beforeBreadcrumb លាក់ secret (គ្រប់ការហៅ init)',
+            merged.length >= 1 && leaks.length === 0, merged);
+        const probe = await page.evaluate(() => { window.Sentry.init({}); const m = window.__loader.merged; return m[m.length - 1]; });
+        ok('ទិសផ្ទុយ ៖ Loader ក្លែងបើក Replay · tracing · logs ពេល App មិនកំណត់ (ការវាស់អាចក្រហមពិត)',
+            !!probe && probe.traces === 1 && probe.replaySession === 0.1 && probe.replayError === 1 && probe.logs === true, probe);
         await ctx.close();
     }
 

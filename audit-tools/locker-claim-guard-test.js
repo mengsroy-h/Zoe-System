@@ -149,7 +149,7 @@ globalThis.__finalize = finalizeClaimedHistoryClear;
 
 function seedItem(w, extra) {
     const item = Object.assign({
-        id: 'itm1', phone: '0974158508', scanDate: '2026-09-01', time: '10:00:00 (2026-09-01)',
+        id: 'itm1', phone: '0970008508', scanDate: '2026-09-01', time: '10:00:00 (2026-09-01)',
         createdAt: 1749000000000, count: 1, cod: 5, dod: 0, price: 5, isClosed: false,
         barcodes: [{ code: 'BC1', cod: 5, dod: 0, locker: 'OLD', isClosed: false, isDeducted: false, isFromDeletion: false }]
     }, extra || {});

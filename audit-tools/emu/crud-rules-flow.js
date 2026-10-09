@@ -317,7 +317,7 @@ function makeSandbox(store, now) {
 
 const T0 = Date.now() - 3600000;
 const bc = (code, cod, closed, closedAt) => Object.assign({ code, cod, dod: 0, locker: 'N/A', time: 't', isClosed: !!closed, isDeducted: false, isFromDeletion: false, createdAt: T0 }, closed && closedAt !== undefined ? { closedAt } : {});
-const parcel = (id, barcodes, extra) => Object.assign({ id, phone: '098798880', scanDate: '2026-08-26', createdAt: T0, time: 't', barcodes, count: barcodes.length, cod: barcodes.reduce((s, b) => s + b.cod, 0), dod: 0, price: barcodes.reduce((s, b) => s + b.cod, 0), barcode: barcodes[0].code, isClosed: barcodes.every((b) => b.isClosed), isCalled: false }, extra || {});
+const parcel = (id, barcodes, extra) => Object.assign({ id, phone: '098000880', scanDate: '2026-08-26', createdAt: T0, time: 't', barcodes, count: barcodes.length, cod: barcodes.reduce((s, b) => s + b.cod, 0), dod: 0, price: barcodes.reduce((s, b) => s + b.cod, 0), barcode: barcodes[0].code, isClosed: barcodes.every((b) => b.isClosed), isCalled: false }, extra || {});
 
 async function replay(label, writes) {
     await asOwner('PUT', '/zoew_restore_finalizations.json', {});
@@ -567,7 +567,7 @@ async function clearOrphanBeforeRetry(w, label) {
         ['កញ្ចប់ដែលការស្តារ **កំពុងដំណើរការ** (marker នៅរស់)', { restoreClaimId: 'live_src', restoreClaimToken: 'live_tok' }, true]
     ]) {
         const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, true, T0), bc('B2', 3.72, false)], extra) },
-            zoew_recently_deleted_cod_dod: liveSource ? { live_src: { id: 'live_src', phone: '098798880', scanDate: '2026-08-26', deletedAt: T0, isFromDeletion: true, trashReason: 'delete', restoreClaim: { token: 'live_tok', targetId: 'id_x', claimedAt: T0 + 3600000 } } } : {} };
+            zoew_recently_deleted_cod_dod: liveSource ? { live_src: { id: 'live_src', phone: '098000880', scanDate: '2026-08-26', deletedAt: T0, isFromDeletion: true, trashReason: 'delete', restoreClaim: { token: 'live_tok', targetId: 'id_x', claimedAt: T0 + 3600000 } } } : {} };
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
         await w.ctx.removeSingleBarcode('id_x', 'B1'); await w.drain();

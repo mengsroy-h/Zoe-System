@@ -171,7 +171,7 @@ function seedData() {
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {
             id_1000_aaa: {
-                id: 'id_1000_aaa', phone: '0968490421', scanDate: d, createdAt: Date.now() - 1000,
+                id: 'id_1000_aaa', phone: '0960000421', scanDate: d, createdAt: Date.now() - 1000,
                 cod: 30, dod: 0, price: 30, count: 2, barcode: 'BB2', time: '10:00', isClosed: false,
                 barcodes: [
                     { code: 'BB1', time: '09:00', cod: 10, dod: 0, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 2000 },

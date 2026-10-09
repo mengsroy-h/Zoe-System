@@ -1175,7 +1175,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         // **រស់រាន** (វាស់បាន ៖ 113 ok · 0 FAIL) ខណៈខ្ទង់ចុងក្រោយចូល Set C
         // ជា `parseInt('7')` = 7 ➜ ចេញជាគូ `07` ➜ `1234567` អានចេញវិញជា
         // **`12345607`** ➜ ⛔ **កញ្ចប់ខុសត្រូវបិទក្នុង ZTO**។
-        const SAMPLES = ['77130534020575', '11600100131126', '0123456789', '1234567', '7713053402057', 'ZTO7788123456', 'AB-12'];
+        const SAMPLES = ['77130500000575', '11600100001126', '0123456789', '1234567', '7713050000057', 'ZTO7788123456', 'AB-12'];
             const out = [];
             for (let i = 0; i < SAMPLES.length; i++) {
                 const text = SAMPLES[i];
@@ -1209,12 +1209,12 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         ok('⛔ រូបដែលគូរ ត្រូវអានចេញវិញជា **លេខដដែលបេះបិទ** (Code Set B និង C)',
             mismatched.length === 0, mismatched);
         ok('លក្ខខណ្ឌចាំបាច់ ៖ គំរូគ្រប ១៤ ខ្ទង់ពិតរបស់ ZTO',
-            roundTrip.some((r) => r.text === '77130534020575' && r.decoded === r.text), roundTrip[0]);
+            roundTrip.some((r) => r.text === '77130500000575' && r.decoded === r.text), roundTrip[0]);
 
         // ⛔ probe ទិសផ្ទុយ ៖ បើអ្នកវាស់ «អានចេញវិញដដែល» ដោយចៃដន្យបៃតង
         // (ឧ. decoder ត្រឡប់ input) នោះការបំភ្លៃរូបមួយបន្ទាត់ត្រូវនៅតែធ្លាក់។
         const poisoned = await page.evaluate(async () => {
-            const drawing = code128Bars('77130534020575');
+            const drawing = code128Bars('77130500000575');
             const scale = 3;
             const c = document.createElement('canvas');
             c.width = drawing.width * scale; c.height = 90;
@@ -1237,20 +1237,20 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         // (ZTO Palm) ត្រូវការចន្លោះស ១០ module ក្នុងមួយចំហៀងតាមស្តង់ដារ ➜
         // ការវាស់ត្រូវជា **រចនាសម្ព័ន្ធ** មិនមែនតាមការអានវិញ។
         const quiet = await page.evaluate(() => {
-            const d = code128Bars("77130534020575");
+            const d = code128Bars("77130500000575");
             const last = d.bars[d.bars.length - 1];
             return { firstX: d.bars[0][0], lastEnd: last[0] + last[1], width: d.width };
         });
         ok("⛔ quiet zone ខាងឆ្វេង >= ១០ module", quiet.firstX >= 10, quiet);
         ok("⛔ quiet zone ខាងស្តាំ >= ១០ module", quiet.width - quiet.lastEnd >= 10, quiet);
         ok('⛔ probe ទិសផ្ទុយ ៖ រូបដែលបំភ្លៃ មិនត្រូវអានចេញជាលេខដដែល',
-            poisoned !== '77130534020575', poisoned);
+            poisoned !== '77130500000575', poisoned);
 
         // ⛔ រូបក្នុងប្រអប់ត្រូវដេរីវេពី `code128Bars()` ដដែល — មិនមែនផ្លូវទី ២
         // (ផ្លូវ ២ = ថ្ងៃណាមួយវាឃ្លាតគ្នា ហើយអ្នកយាមខាងលើមើលមិនឃើញ)។
         await setup(ZTO_URL);
         const inModal = await page.evaluate(async () => {
-            const code = '77130534020575';
+            const code = '77130500000575';
             const item = { id: 'bc1', phone: '011', barcodes: [{ code: code, isClosed: true }] };
             setZtoPickupVerdict(code, false);
             openZtoSyncModal([item]);
@@ -1430,8 +1430,8 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     for (let w = 0; w < WIDTHS.length; w++) {
         await page.setViewportSize({ width: WIDTHS[w], height: 760 });
         const fit = await page.evaluate(async () => {
-            const codes = ["77130534020575", "AB-1234567890XY", "0123456789012345678901234"];
-            const item = { id: "fit1", phone: "0964310697", barcodes: codes.map((c) => ({ code: c, isClosed: true, locker: "A-01" })) };
+            const codes = ["77130500000575", "AB-1234567890XY", "0123456789012345678901234"];
+            const item = { id: "fit1", phone: "0960000697", barcodes: codes.map((c) => ({ code: c, isClosed: true, locker: "A-01" })) };
             codes.forEach((c) => setZtoPickupVerdict(c, false));
             openZtoSyncModal([item]);
             await new Promise((r) => setTimeout(r, 80));
@@ -1493,7 +1493,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     // ពិដាន 1.5px ដេរីវេពីស្តង់ដារ X-dimension ~0.25mm (1 CSS px ≈ 0.15mm
     // លើទូរស័ព្ទ ➜ 0.25mm ≈ 1.7px) ដោយទុករង្វាន់សុវត្ថិភាពបន្តិច។
     // ⛔ ការអះអាងគ្របតែប្រវែងដែលប្រព័ន្ធនេះ **ពិតជាផលិត** ៖ Waybill ZTO
-    // ជា **១២–១៤ ខ្ទង់** (គំរូពិត `77130534020575`) ➜ ១៤ ជាពិដាន។ វាមិនមែន
+    // ជា **១២–១៤ ខ្ទង់** (គំរូពិត `77130500000575`) ➜ ១៤ ជាពិដាន។ វាមិនមែន
     // លេខដែលជ្រើសឲ្យតេស្តបៃតងទេ — វាជាប្រវែងដែលឯកសារ ZTO និងគំរូពិត
     // របស់ការវាស់នេះប្រើ។ វាស់បាន ៖ ១៤ ខ្ទង់ ➜ ១៣២ module ➜ **>= 1.5px
     // គ្រប់ទទឹង ៣២០–១២៨០**។
@@ -1539,8 +1539,8 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
                 Math.abs(want - generic) > 1, { want: want, generic: generic });
             await page.setViewportSize({ width: VW, height: 800 });
             const applied = await page.evaluate(async () => {
-                const item = { id: 'css1', phone: '011', barcodes: [{ code: '77130534020575', isClosed: true }] };
-                setZtoPickupVerdict('77130534020575', false);
+                const item = { id: 'css1', phone: '011', barcodes: [{ code: '77130500000575', isClosed: true }] };
+                setZtoPickupVerdict('77130500000575', false);
                 openZtoSyncModal([item]);
                 await new Promise((r) => setTimeout(r, 60));
                 const box = document.querySelector('#ztoSyncModal .modal-content');

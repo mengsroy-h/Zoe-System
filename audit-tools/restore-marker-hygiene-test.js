@@ -209,7 +209,7 @@ const bcode = (code, closed, closedAt) => Object.assign(
     { code, cod: 1, dod: 0, locker: 'N/A', time: 't', isClosed: !!closed, isDeducted: false, isFromDeletion: false, createdAt: T0 },
     closed && closedAt !== undefined ? { closedAt } : {});
 const parcel = (id, barcodes, extra) => Object.assign({
-    id, phone: '098798880', scanDate: '2026-08-26', createdAt: T0, time: 't',
+    id, phone: '098000880', scanDate: '2026-08-26', createdAt: T0, time: 't',
     barcodes, count: barcodes.length,
     cod: barcodes.reduce((s, b) => s + b.cod, 0), dod: 0,
     price: barcodes.reduce((s, b) => s + b.cod, 0),

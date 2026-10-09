@@ -317,12 +317,12 @@ function runResetPickup(mode, opts) {
         vm.runInContext(s, ctx);
     }
     const day = vm.runInContext('getFilterTargetDateKey()', ctx);
-    let ledger = { [day]: { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 } } };
+    let ledger = { [day]: { packagesPickedUp: 3, pickedUpPhones: { '0970008508': 3 } } };
     if (opts.days && opts.days > 1) {
         ledger = {};
         for (let i = 0; i < opts.days; i++) {
             const d = vm.runInContext('getZoneDateKey(' + Date.now() + ', ' + (-i) + ')', ctx);
-            ledger[d] = { packagesPickedUp: 2, pickedUpPhones: { '0974158508': 2 } };
+            ledger[d] = { packagesPickedUp: 2, pickedUpPhones: { '0970008508': 2 } };
         }
     }
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(ledger) + ';', ctx);
@@ -497,7 +497,7 @@ function runAbandonCleanup(mode) {
 
     // កញ្ចប់ហួស ៨ ថ្ងៃ ហើយ **មិនទាន់យក** ➜ ផ្លូវ `abandon` = ដកលុយ
     const item = {
-        id: 'id_abandon', phone: '0974158508', scanDate: '2026-08-21', isClosed: false,
+        id: 'id_abandon', phone: '0970008508', scanDate: '2026-08-21', isClosed: false,
         createdAt: NOW - 9 * 24 * 3600 * 1000,
         barcodes: [{ code: 'BC1', cod: 5, dod: 2, isClosed: false, isDeducted: false, isFromDeletion: false }]
     };

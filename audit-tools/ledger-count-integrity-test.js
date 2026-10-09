@@ -154,7 +154,7 @@ function runCleanup(reason, barcodes, opts) {
     vm.runInContext(parts.join('\n\n'), ctx);
 
     const item = {
-        id: 'id_probe', phone: '0762907142', scanDate: DAY,
+        id: 'id_probe', phone: '0760007142', scanDate: DAY,
         isClosed: barcodes.every((b) => b.isClosed),
         createdAt: NOW - (opts.ageDays || 9) * 24 * 3600 * 1000,
         barcodes: barcodes.map((b) => Object.assign({ isDeducted: false, isFromDeletion: false }, b))

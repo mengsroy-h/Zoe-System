@@ -210,7 +210,7 @@ function seedData() {
     ];
     return {
         zoew_scan_history_cod_dod: {
-            id_active: { id: 'id_active', phone: '096 849 0421', scanDate: date, createdAt: now, cod: 13, dod: 3, price: 16, count: 2, barcode: 'ABC123', time: '10:00', isClosed: false, barcodes }
+            id_active: { id: 'id_active', phone: '096 000 0421', scanDate: date, createdAt: now, cod: 13, dod: 3, price: 16, count: 2, barcode: 'ABC123', time: '10:00', isClosed: false, barcodes }
         },
         zoew_recently_deleted_cod_dod: {
             id_old: { id: 'id_old', phone: '010000000', scanDate: date, deletedAt: now, cod: 1, dod: 0, price: 1, count: 1, barcode: 'OLD999', trashReason: 'remove', isFromDeletion: false, barcodes: [{ code: 'OLD999', cod: 1, dod: 0, isDeducted: true, isFromDeletion: false }] }
@@ -313,7 +313,7 @@ async function runBrowserChecks() {
                 };
             });
             ok(tag + '៖ preview ផ្ទៀងផ្ទាត់ field ពិតទាំងអស់',
-                preview.barcode === 'ABC123' && preview.phone === '096 849 0421' && preview.locker === 'ទូ7' && preview.cod === '$10.00' && preview.dod === '$2.00', preview);
+                preview.barcode === 'ABC123' && preview.phone === '096 000 0421' && preview.locker === 'ទូ7' && preview.cod === '$10.00' && preview.dod === '$2.00', preview);
             ok(tag + '៖ modal និង action buttons សមនឹង viewport', preview.insideViewport && preview.actionHeight >= 44, preview);
             if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'scan-remove-' + viewport.width + 'x' + viewport.height + '.png') });
 

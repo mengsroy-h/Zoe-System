@@ -251,7 +251,7 @@ function makeRun(opts) {
 
 function seedItem(run, barcodes, ageDays) {
     const item = {
-        id: ITEM_ID, phone: '0762907142', scanDate: DAY,
+        id: ITEM_ID, phone: '0760007142', scanDate: DAY,
         isClosed: barcodes.every((b) => b.isClosed),
         createdAt: NOW - (ageDays || 9) * 24 * 3600 * 1000,
         barcodes: barcodes.map((b) => Object.assign({ isDeducted: false, isFromDeletion: false }, b))

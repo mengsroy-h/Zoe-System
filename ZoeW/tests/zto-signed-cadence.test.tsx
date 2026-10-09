@@ -47,7 +47,7 @@ let signedCalls: number[] = [];
 let detailCalls: { at: number, modal: boolean }[] = [];
 
 function openItem(id: string, code: string) {
-    return { id, phone: '0963897345', scanDate: '2026-10-06', isClosed: false, createdAt: T0 - 3600000,
+    return { id, phone: '0960007345', scanDate: '2026-10-06', isClosed: false, createdAt: T0 - 3600000,
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
@@ -127,7 +127,7 @@ afterEach(() => {
 });
 
 function closedItem(id: string, code: string) {
-    return { id, phone: '0963897346', scanDate: '2026-10-06', isClosed: true, closedAt: T0 - 60000, createdAt: T0 - 3600000,
+    return { id, phone: '0960007346', scanDate: '2026-10-06', isClosed: true, closedAt: T0 - 60000, createdAt: T0 - 3600000,
         barcodes: [{ code, isClosed: true, closedAt: T0 - 60000, cod: 1, dod: 0 }] };
 }
 

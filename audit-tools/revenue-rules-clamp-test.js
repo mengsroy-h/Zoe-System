@@ -437,10 +437,10 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     console.log('\n=== ៥. ស្ថិតិយក ៖ ការបើកលើសមិនត្រូវធ្វើឲ្យ server បដិសេធ ===');
     {
         const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { P1: '0974158508' } } }
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { P1: '0970008508' } } }
         });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { P1: '0974158508' } };
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("P1","0974158508",false), mark("P2","0974158508",false), mark("P3","0974158508",false)], null)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { P1: '0970008508' } };
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("P1","0970008508",false), mark("P2","0970008508",false), mark("P3","0970008508",false)], null)', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('គ្មានការបដិសេធលើស្ថិតិយក', ctx.__rejected.length === 0, ctx.__rejected);
@@ -505,9 +505,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         // ធានាគឺ ៖ server មិនទទួលអ្វីសោះ · អ្នកប្រើដឹងថាការសរសេរធ្លាក់ ·
         // ហើយ snapshot បន្ទាប់ជាអ្នកព្យាបាល។
         const ctx = makeSandbox({});
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { W1: '0974158508' } };
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { W1: '0970008508' } };
         ctx.__failWith.reason = 'disconnect';
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("W1","0974158508",false)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("W1","0970008508",false)], null)', ctx);
         await settle(); await settle();
         ok('ស្ថិតិយក ៖ ការសរសេរធ្លាក់ ➜ server មិនទទួលអ្វីសោះ',
             !(ctx.__store.zoew_daily_pickup_cod_dod || {})[DATE], ctx.__store.zoew_daily_pickup_cod_dod);
@@ -531,9 +531,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         const ctx = makeSandbox({
             zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0 } }
         });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 },
-            pickedUpBarcodes: { S1: '0974158508', S2: '0974158508', S3: '0974158508' } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("S1","0974158508",false)], null)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0970008508': 3 },
+            pickedUpBarcodes: { S1: '0970008508', S2: '0970008508', S3: '0970008508' } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("S1","0970008508",false)], null)', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ server នៅ 0 (barcode នោះមិនមានក្នុងសំណុំ ➜ គ្មានអ្វីត្រូវដក)',
@@ -544,12 +544,12 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     }
     {
         // ⛔ ទិសផ្ទុយ ១ ៖ សតិ និង server ស៊ីគ្នា ➜ ការបើក/revert ត្រូវពិតប្រាកដ
-        const seedSet = { T1: '0974158508', T2: '0974158508', T3: '0974158508', T4: '0974158508', T5: '0974158508' };
+        const seedSet = { T1: '0970008508', T2: '0970008508', T3: '0970008508', T4: '0970008508', T5: '0970008508' };
         const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 }, pickedUpBarcodes: { ...seedSet } } }
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 5, pickedUpPhones: { '0970008508': 5 }, pickedUpBarcodes: { ...seedSet } } }
         });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 }, pickedUpBarcodes: { ...seedSet } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("T1","0974158508",false), mark("T2","0974158508",false)], null)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 5, pickedUpPhones: { '0970008508': 5 }, pickedUpBarcodes: { ...seedSet } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("T1","0970008508",false), mark("T2","0970008508",false)], null)', ctx);
         await settle(); await settle();
         ok('ទិសផ្ទុយ ៖ ការបើក ២ ចុះដល់ 3 ពិត', ctx.__store.zoew_daily_pickup_cod_dod[DATE].packagesPickedUp === 3,
             ctx.__store.zoew_daily_pickup_cod_dod[DATE]);
@@ -557,7 +557,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ ទិសផ្ទុយ ៖ revert ស្តារ server ទៅ 5 បេះបិទ', srv && srv.packagesPickedUp === 5, srv);
-        ok('⛔ ទិសផ្ទុយ ៖ revert ស្តារ key លេខទូរស័ព្ទទៅ 5', srv && (srv.pickedUpPhones || {})['0974158508'] === 5, srv);
+        ok('⛔ ទិសផ្ទុយ ៖ revert ស្តារ key លេខទូរស័ព្ទទៅ 5', srv && (srv.pickedUpPhones || {})['0970008508'] === 5, srv);
         ok('⛔ ទិសផ្ទុយ ៖ សតិក៏ស្តារទៅ 5 ដែរ', ctx.dailyPickupData[DATE].packagesPickedUp === 5, ctx.dailyPickupData[DATE]);
     }
     {
@@ -566,11 +566,11 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         // ⛔ ការសរសេរជាស្ថានភាព ៖ ទោះ A សរសេរប៉ុន្មានដងក៏ដោយ លទ្ធផលនៅ 0 —
         // ព្រោះ barcode តែមួយកាន់កន្លែងតែមួយ។
         const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0 } } });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { U1: '0974158508' } };
-        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("U1","0974158508",false)], null)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { U1: '0970008508' } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)], null)', ctx);
         await settle(); await settle();
         // «reconcile» ៖ សរសេរសាលក្រម server ម្តងទៀត (idempotent)
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("U1","0974158508",false)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("U1","0970008508",false)], null)', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ reconcile ៖ server មិនត្រូវទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន (នៅ 0)',
@@ -584,13 +584,13 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         // ⛔ ការសរសេរដដែលៗពីឧបករណ៍ ២ ➜ barcode តែមួយ = កន្លែងតែមួយ
         const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: {} });
         ctx.dailyPickupData[DATE] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
-        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0970008508",true)], null)', ctx);
         await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ idempotent ៖ បិទ barcode ដដែល ៣ ដង ➜ server = 1', srv && srv.packagesPickedUp === 1, srv);
-        ok('⛔ idempotent ៖ អតិថិជន = 1', srv && (srv.pickedUpPhones || {})['0974158508'] === 1, srv);
+        ok('⛔ idempotent ៖ អតិថិជន = 1', srv && (srv.pickedUpPhones || {})['0970008508'] === 1, srv);
         ok('អថេរ ៖ sum(pickedUpPhones) === packagesPickedUp',
             srv && Object.keys(srv.pickedUpPhones || {}).reduce((a, k) => a + srv.pickedUpPhones[k], 0) === srv.packagesPickedUp, srv);
     }

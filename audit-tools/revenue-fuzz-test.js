@@ -387,7 +387,7 @@ function seedData() {
         barcodes: bcs.map((b) => ({ code: b.code, time: '10:00', cod: b.cod, dod: b.dod, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 100000 }))
     });
     const items = {
-        it_a: mk('it_a', '0968490421', [{ code: 'AA1', cod: 10, dod: 0 }, { code: 'AA2', cod: 20.5, dod: 1.25 }]),
+        it_a: mk('it_a', '0960000421', [{ code: 'AA1', cod: 10, dod: 0 }, { code: 'AA2', cod: 20.5, dod: 1.25 }]),
         it_b: mk('it_b', '0777123456', [{ code: 'BB1', cod: 5, dod: 2 }]),
         it_c: mk('it_c', '0611234567', [{ code: 'CC1', cod: 7.75, dod: 0 }, { code: 'CC2', cod: 3, dod: 4 }, { code: 'CC3', cod: 1.5, dod: 0 }])
     };
@@ -474,7 +474,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                             const modal = document.getElementById('phoneModal');
                             const open = modal && getComputedStyle(modal).display !== 'none';
                             if (!open || !bcText || bcText.innerText !== code) return null;
-                            const p = document.getElementById('modalPhoneInput'); if (p) p.value = pick > 0.5 ? '0968490421' : '09' + Math.floor(pick * 1e8);
+                            const p = document.getElementById('modalPhoneInput'); if (p) p.value = pick > 0.5 ? '0960000421' : '09' + Math.floor(pick * 1e8);
                             const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
                             const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = '0';
                             await Promise.resolve(window.confirmPhone()).catch(() => {});

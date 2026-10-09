@@ -76,16 +76,16 @@ function day(d, items, trash, ledger) {
 
 // ── ១. ថ្ងៃដែលទិន្នន័យនៅគ្រប់ ➜ ជួសជុលបាន ────────────────────────────
 {
-    const ledger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1, '0999000111': 1 } } };
-    const items = [{ id: 'a', phone: '0974158508', scanDate: '2026-08-27', barcodes: [bc('B1', true), bc('B2', false)] }];
+    const ledger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1, '0999000111': 1 } } };
+    const items = [{ id: 'a', phone: '0970008508', scanDate: '2026-08-27', barcodes: [bc('B1', true), bc('B2', false)] }];
     const out = day('2026-08-27', items, [], ledger);
     ok('ថ្ងៃដែលទិន្នន័យគ្រប់ ➜ មានផែនការជួសជុល', out.length === 1, JSON.stringify(out));
     const p = out[0] || {};
     const phones = tally(p.pickedUpBarcodes);
     ok('អតិថិជនខ្មោច `0999000111` ត្រូវដកចេញ',
-        !phones['0999000111'] && phones['0974158508'] === 1, JSON.stringify(phones));
+        !phones['0999000111'] && phones['0970008508'] === 1, JSON.stringify(phones));
     ok('ផែនការជាសំណុំ barcode (មិនមែនលេខសរុប)',
-        p.pickedUpBarcodes && Object.keys(p.pickedUpBarcodes).length === 1 && p.pickedUpBarcodes.B1 === '0974158508',
+        p.pickedUpBarcodes && Object.keys(p.pickedUpBarcodes).length === 1 && p.pickedUpBarcodes.B1 === '0970008508',
         JSON.stringify(p.pickedUpBarcodes));
     ok('⛔ `packagesPickedUp` **មិនត្រូវប៉ះ** ក្នុងផែនការ (វាដេរីវេពេលសរសេរ)',
         p.packagesPickedUp === undefined, JSON.stringify(p));
@@ -124,8 +124,8 @@ function day(d, items, trash, ledger) {
     const out1 = day('2026-08-25', items, [], ledger);
     ok('ថ្ងៃដែលត្រឹមត្រូវរួច ➜ គ្មានការសរសេរ', out1.length === 0, JSON.stringify(out1));
     // ដំណើរការម្តងទៀតលើលទ្ធផលដែលជួសជុលរួច ក៏ត្រូវស្ងាត់ដែរ
-    const fixedLedger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { B1: '0974158508' } } };
-    const fixedItems = [{ id: 'a', phone: '0974158508', scanDate: '2026-08-27', barcodes: [bc('B1', true), bc('B2', false)] }];
+    const fixedLedger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0970008508': 1 }, pickedUpBarcodes: { B1: '0970008508' } } };
+    const fixedItems = [{ id: 'a', phone: '0970008508', scanDate: '2026-08-27', barcodes: [bc('B1', true), bc('B2', false)] }];
     ok('⛔ idempotent ៖ រត់ម្តងទៀតក្រោយជួសជុល ➜ គ្មានការសរសេរ',
         day('2026-08-27', fixedItems, [], fixedLedger).length === 0);
     // ថ្ងៃចាស់ដែលមានតែលេខ (គ្មានសំណុំ) ➜ ត្រូវប្តូរទៅសំណុំ barcode ម្តង

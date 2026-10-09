@@ -137,33 +137,33 @@ equal('money on blank is zero', toMoney_(''), 0);
 equal('money on junk is zero', toMoney_('abc'), 0);
 equal('money keeps negative', toMoney_('-3.5'), -3.5);
 
-equal('long barcode number keeps all digits', cleanText_(77130526882395), '77130526882395');
-equal('text barcode is trimmed', cleanText_('  77130526882395 '), '77130526882395');
-equal('phone with dash is untouched', cleanText_('855-070210071'), '855-070210071');
+equal('long barcode number keeps all digits', cleanText_(77130500002395), '77130500002395');
+equal('text barcode is trimmed', cleanText_('  77130500002395 '), '77130500002395');
+equal('phone with dash is untouched', cleanText_('855-070000071'), '855-070000071');
 equal('not-a-number cell becomes blank', cleanText_(NaN), '');
 equal('date cell becomes blank', cleanText_(new Date(2026, 0, 1)), '');
 
 const normalized = normalizeRecords_([
-    ['77130526882395', 0, 2.59, '85510852996'],
+    ['77130500002395', 0, 2.59, '85510000996'],
     ['', 0, 5, '855111'],
-    ['77130526588457', 0, 2.26, '85590949280'],
-    ['77130526882395', 0, 9.99, '855999999999']
+    ['77130500008457', 0, 2.26, '85590000280'],
+    ['77130500002395', 0, 9.99, '855999999999']
 ]);
 equal('normalize keeps unique records', normalized.records.length, 2);
 equal('normalize counts blank barcode', normalized.skippedNoBarcode, 1);
 equal('normalize counts in-file duplicates', normalized.duplicatesInFile, 1);
 equal('in-file duplicate keeps last value', normalized.records[0].cod, 9.99);
-equal('in-file duplicate keeps original position', normalized.records[0].barcode, '77130526882395');
+equal('in-file duplicate keeps original position', normalized.records[0].barcode, '77130500002395');
 
 const existing = [
-    ['77130526882395', 0, 2.59, '85510852996'],
-    ['77130526588457', 0, 2.26, '85590949280'],
-    ['11600099026650', 0, 0, '855-070210071']
+    ['77130500002395', 0, 2.59, '85510000996'],
+    ['77130500008457', 0, 2.26, '85590000280'],
+    ['11600000006650', 0, 0, '855-070000071']
 ];
 
 const upsert = planImport_(existing, normalizeRecords_([
-    ['77130526882395', 0, 2.59, '85510852996'],
-    ['77130526588457', 1.5, 7.77, '855700111222'],
+    ['77130500002395', 0, 2.59, '85510000996'],
+    ['77130500008457', 1.5, 7.77, '855700111222'],
     ['77130526999999', 0, 1.25, '855123456789']
 ]).records, 'upsert');
 equal('upsert stats', upsert.stats, { added: 1, updated: 1, unchanged: 1 });
@@ -171,11 +171,11 @@ equal('upsert rewrites only the changed row', upsert.updatedRows, [1]);
 equal('upsert leaves untouched row identical', upsert.rows[0], existing[0]);
 equal('upsert leaves unmatched row identical', upsert.rows[2], existing[2]);
 equal('upsert rewrites every changed field of the row',
-    upsert.rows[1], ['77130526588457', 1.5, 7.77, '855700111222']);
+    upsert.rows[1], ['77130500008457', 1.5, 7.77, '855700111222']);
 equal('upsert appends the new barcode', upsert.appended, [['77130526999999', 0, 1.25, '855123456789']]);
 
 const newOnly = planImport_(existing, normalizeRecords_([
-    ['77130526588457', 0, 7.77, '85590949280'],
+    ['77130500008457', 0, 7.77, '85590000280'],
     ['77130526999999', 0, 1.25, '855123456789']
 ]).records, 'newOnly');
 equal('newOnly stats', newOnly.stats, { added: 1, updated: 0, unchanged: 1 });

@@ -227,7 +227,7 @@ const FAKE_URL = 'https://script.google.com/macros/s/AKfycbxSHEETIMPORTTEST00000
 const FAKE_PASSWORD = 'zoe-import-pw-secret';
 const SAMPLE = [
     ['Barcode', 'DOD', 'COD', 'Phone'],
-    ['ZTO0001', 1.5, 12, '0974158508'],
+    ['ZTO0001', 1.5, 12, '0970008508'],
     ['ZTO0002', 0, 7.25, '0965551234'],
     ['ZTO0003', 2, 30, '0888123456'],
     ['ZTO0003', 2, 30, '0888123456'],
@@ -422,7 +422,7 @@ async function withTimeout(promise, ms, label) {
             check(chips.some((c) => /Barcode 4$/.test(c)), 'ចំណាំ ៖ មាន Barcode ៤', chips);
             check(chips.some((c) => /ស្ទួន/.test(c)), 'ចំណាំ ៖ រកឃើញជួរស្ទួនក្នុងឯកសារ', chips);
             const preview = await page.evaluate(() => [...document.querySelectorAll('#siPreviewBody tr')].map((tr) => [...tr.children].map((td) => td.textContent).join('|')));
-            check(preview[0] === 'ZTO0001|1.50|12.00|0974158508', 'ជួរមើលជាមុនទី ១ ត្រឹមត្រូវ', preview[0]);
+            check(preview[0] === 'ZTO0001|1.50|12.00|0970008508', 'ជួរមើលជាមុនទី ១ ត្រឹមត្រូវ', preview[0]);
             check(preview.length === 4, 'មើលជាមុនបង្ហាញតែជួរដែលមាន Barcode', preview.length);
     });
 
@@ -515,7 +515,7 @@ async function withTimeout(promise, ms, label) {
             await page.waitForTimeout(2000);
             check(await shown('siMapCard'), 'CSV ➜ បើកជំហានផ្គូផ្គង');
             const csvPreview = await page.evaluate(() => [...document.querySelectorAll('#siPreviewBody tr')].map((tr) => [...tr.children].map((td) => td.textContent).join('|')));
-            check(csvPreview[0] === 'ZTO0001|1.50|12.00|0974158508',
+            check(csvPreview[0] === 'ZTO0001|1.50|12.00|0970008508',
                 '⛔ CSV ➜ លេខ 0 នាំមុខនៅដដែល (មើលជាមុន និង payload មកពី sheetImportMappedRows() តែមួយ)', csvPreview[0]);
             check(csvPreview[1] === 'ZTO0002|0.00|7.25|0965551234',
                 '⛔ ទិសផ្ទុយ ៖ តម្លៃលុយនៅតែជាលេខត្រឹមត្រូវ (មិនប្រែជាអក្សរឆៅ)', csvPreview[1]);

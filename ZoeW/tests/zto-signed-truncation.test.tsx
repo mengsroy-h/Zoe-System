@@ -35,7 +35,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const CFG = { enabled: true, fastMode: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' };
 
 function openItem(id: string, code: string, ageMs: number) {
-    return { id, phone: '0963897345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
+    return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 

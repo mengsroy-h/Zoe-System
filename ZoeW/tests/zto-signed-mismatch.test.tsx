@@ -36,7 +36,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const CFG = { enabled: true, fastMode: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' };
 
 function row(barcode: string) {
-    return { barcode, phone: '0963897345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: null, skip: '' };
+    return { barcode, phone: '0960007345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: null, skip: '' };
 }
 
 function listBody(extra: any) {

@@ -3,7 +3,7 @@ import { viewState } from '../../core/view-state';
 import { commitNow } from '../flush';
 import type { LifecycleScope } from '../lifecycle/scope';
 import { elementOf, fieldValue, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
-import { panelGlideFrom } from './panel-motion';
+import { PANEL_SEARCH_GLIDE, panelGlideFrom } from './panel-motion';
 import { panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock } from './panels';
 
 export const ENTRY_SEARCH_FIELDS: readonly RefName[] = ['entryListSearchInput', 'lockerListSearchInput'];
@@ -22,10 +22,11 @@ export function glideEntryPanelCollapsed(collapsed: boolean): boolean {
     commitNow();
     const before = main.getBoundingClientRect().top;
     setPanelCollapsed('entry', collapsed);
+    if (collapsed) uiState.entrySearchActive = true;
     syncHistoryExpandedLock();
     commitNow();
     if (!collapsed) setElementScrollTop(elementOf('appPages'), 0);
-    panelGlideFrom(main, before);
+    panelGlideFrom(main, before, PANEL_SEARCH_GLIDE);
     return true;
 }
 
@@ -36,14 +37,18 @@ export function entrySearchMovesField(): boolean {
 
 export function listenEntrySearchPanel(scope: LifecycleScope): void {
     entrySearchCollapsed = false;
+    uiState.entrySearchActive = false;
     scope.onDispose(uiState.subscribe(() => {
-        if (!uiState.entryPanelCollapsed) entrySearchCollapsed = false;
+        if (uiState.entryPanelCollapsed) return;
+        entrySearchCollapsed = false;
+        if (uiState.entrySearchActive) uiState.entrySearchActive = false;
     }));
 }
 
 export function entrySearchFocused(): void {
     if (!entrySearchMovesField()) return;
     if (glideEntryPanelCollapsed(true)) entrySearchCollapsed = true;
+    else if (panelIsCollapsed('entry')) uiState.entrySearchActive = true;
 }
 
 export function entrySearchBlurred(): void {

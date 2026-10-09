@@ -67,8 +67,17 @@ function buildRunner(appFile) {
     //    កូដពិត** មិនមែនចម្លងដោយដៃ — សញ្ញា និងលំដាប់អាគុយម៉ង់គឺជាអ្វីដែល
     //    តេស្តនេះការពារ។ លើ tree ចាស់ (`revenueApplied` ក្នុងប្លុក) ផ្លូវចាស់នៅដដែល។
     const pendingStyle = src.indexOf('            if (!revenuePending) {') !== -1;
-    const ledgerCall = /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
-    if (pendingStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
+    // ⛔ ចាប់ពី [2.50.49] ការដកជាព្រឹត្តិការណ៍មានសោ ៖ `revenue` (ចំនួនវិជ្ជមាន) ➜ `deductCleanupRevenue()` ➜ សញ្ញាពី
+    //    `ledgerEventDecision()` ➜ tail ស្រង់បន្ទាត់ `revenue` · `cleanupEventAmounts()` · សញ្ញា **ពីកូដពិត** (tree ចាស់ ➜ ការហៅចាស់)។
+    const keyedStyle = src.indexOf('const deduction = await deductCleanupRevenue(id, trashItem, revenue);') !== -1;
+    const revenueLine = /const revenue = \{ scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount \};/.exec(src);
+    if (keyedStyle && !revenueLine) throw new Error('cleanup revenue event not found');
+    const keyedHelpers = keyedStyle
+        ? ['ledgerNumber', 'ledgerOpRingOf', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerEventToken',
+            'ledgerEventDecision', 'cleanupEventAmounts', 'cleanupScanDateOf'].map((n) => fnBody(src, 'function ' + n + '(', n)).join('\n') + '\n'
+        : '';
+    const ledgerCall = keyedStyle ? null : /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
+    if (pendingStyle && !keyedStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
     // ⛔ ចាប់ពីកំណែ 2.50.14 (MONEY-3) ធុងសំរាម `expired` សរសេរ `isDeducted: false` ហើយទង់ប្តូរជា `true` តែក្រោយ ledger
     //    ដកចុះពិត (`markCleanupTrashDeducted()`) ➜ tail ក៏អនុវត្តបន្ទាត់ flip **ដែលស្រង់ពីកូដពិត** ក្រោយការដក ·
     //    tree ចាស់ (គ្មាន `markCleanupTrashDeducted`) ➜ គ្មាន flip ដូចដើម។
@@ -81,15 +90,20 @@ function buildRunner(appFile) {
     const flipTail = flipStyle
         ? '            if (revenueApplied && Array.isArray(trashItem.barcodes)) { const codes = cleanupTrashCodes(trashItem); const current = trashItem; ' + flipLine[0] + ' }\n'
         : '';
+    const keyedCall = keyedStyle
+        ? '{ ' + revenueLine[0] + ' const amounts = cleanupEventAmounts(revenue);'
+          + " const decision = ledgerEventDecision(true, 'deduct', null, trashItem.id, trashItem.deletedAt, null);"
+          + ' revenueApplied = addRevenueToDailyAndMonthlyRecord(revenue.scanDate, decision.sign * amounts.cod, decision.sign * amounts.dod, decision.sign * amounts.count); }'
+        : null;
     const claimLedgerTail = pendingStyle
         ? '            let revenueApplied = null;\n'
-          + '            if (revenuePending) revenueApplied = ' + ledgerCall[0] + ';\n'
+          + '            if (revenuePending) ' + (keyedStyle ? keyedCall : 'revenueApplied = ' + ledgerCall[0] + ';') + '\n'
           + flipTail
           + '            return { trashItem, revenueDeducted: !!revenueApplied };'
         : '            return { trashItem, revenueDeducted: !!revenueApplied };';
 
 
-    const prelude = moneyHelper + flipHelpers + `
+    const prelude = moneyHelper + flipHelpers + keyedHelpers + `
         var NOW = 1000000;
         function getServerNow() { return NOW; }
         function getFormattedDate() { return '2026-08-19'; }

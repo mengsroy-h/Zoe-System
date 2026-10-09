@@ -92,6 +92,7 @@ function CameraBox() {
 export function PageEntry() {
     const active = useStoreValue(uiState, (s) => s.currentAppPage === 'entry');
     const collapsed = useStoreValue(uiState, (s) => s.entryPanelCollapsed);
+    const searching = useStoreValue(uiState, (s) => s.entryPanelCollapsed && s.entrySearchActive);
     const v = useStoreFields(viewState, ['entryModeShown', 'removeScanDetail', 'entryListCountText', 'entryListEmpty',
         'lockerListEmpty', 'activeLockerLabel']);
     const mode = v.entryModeShown;
@@ -157,7 +158,7 @@ export function PageEntry() {
                     </div>
                 </div>
             </div>
-            <div className="page-main" id="entryMainSection" ref={refTo('entryMainSection')}>
+            <div className={searching ? 'page-main entry-search-open' : 'page-main'} id="entryMainSection" ref={refTo('entryMainSection')}>
                 <div
                     className="drag-handle-bar"
                     id="entryDragHandle"

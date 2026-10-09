@@ -1,14 +1,16 @@
 import { setModalDisplay } from '../core/modals';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
+import { DB_LISTENER_KEY_DAILY_REVENUE } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { pickupBarcodeKey } from '../domain/pickup';
+import { ledgerDedOf } from '../domain/ledger';
 import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { openRecentlyDeletedModal, renderRecentlyDeleted } from './trash';
-import { updateRecentPhonesList } from '../services/db-listeners';
+import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
 import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
 import { dbOp, notifyIfSlow } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -176,7 +178,31 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
     });
 }
 
-export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas) {
+export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
+    const at = item ? item.deletedAt : null;
+    if (!item || item.trashReason !== 'expired' || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
+    const scanDate = item.scanDate || getFormattedDate(new Date(at));
+    if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return null;
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return null;
+    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
+    const entry = ledgerDedOf(days[scanDate], trashId);
+    if (!entry || entry.at !== at || entry.back) return null;
+    if (!revenueDeltas.length) revenueDeltas.push({ scanDate, cod: entry.cod, dod: entry.dod, count: entry.count });
+    let cod = 0;
+    let dod = 0;
+    let count = 0;
+    revenueDeltas.forEach((delta) => {
+        cod += parseFloat(delta.cod) || 0;
+        dod += parseFloat(delta.dod) || 0;
+        count += parseFloat(delta.count) || 0;
+    });
+    return {
+        path: `zoew_daily_revenue_cod_dod/${scanDate}/ded/${trashId}`,
+        value: { at, cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count, back: true }
+    };
+}
+
+export async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas, ledgerKey?) {
     const updates = {
         [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
         [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
@@ -184,6 +210,7 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
         [`zoew_scan_history_cod_dod/${targetId}/restoreClaimToken`]: null
     };
     appendRestoreRevenueIncrements(updates, revenueDeltas);
+    if (ledgerKey) updates[ledgerKey.path] = ledgerKey.value;
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -236,6 +263,7 @@ export async function executeRestoreItem() {
         }
 
         let itemToRestore = claimed.item;
+        const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate };
         const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
@@ -307,7 +335,8 @@ export async function executeRestoreItem() {
             prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
         }
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
-        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas);
+        const restoredLedgerKey = restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
+        await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey);
         activeRestoreClaims.delete(restoredId);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
         const finalSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`)));

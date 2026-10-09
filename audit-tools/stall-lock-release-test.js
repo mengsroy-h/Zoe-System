@@ -174,11 +174,14 @@ function safeFocusScanner() {}
 function confirm() { return true; }
 `;
     const FNS = ['withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit', 'armLateWrite', 'notifyIfSlow',
+        'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
+        'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight',
-        'saveSingleDeletedItemToFirebase', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
+        + (extractConst(src, 'LEDGER_OP_RING_MAX') || 'const LEDGER_OP_RING_MAX = 12;') + '\n'
         + FNS.map(fnSource).join('\n')
         + `
 globalThis.__setFb = (i) => { fb = i; };
@@ -187,7 +190,7 @@ globalThis.__removeLock = () => !!scanRemoveInFlight;
 globalThis.__seedHistory = (h) => { scanHistory = h; };
 globalThis.__setPending = (p) => { pendingScannedRemoval = p; };
 globalThis.__trash = () => deletedItems.map((i) => i.id);
-globalThis.__ledger = () => ({ cod: __ledgerCod, count: __ledgerCount });
+globalThis.__ledger = () => { const k = __ledgerKeyed(); return { cod: Math.round((__ledgerCod + k.cod) * 100) / 100, count: __ledgerCount + k.count }; };
 globalThis.__claim = claimAndCleanupItem;
 globalThis.__confirmRemove = confirmScannedRemoval;
 `;
@@ -195,8 +198,20 @@ globalThis.__confirmRemove = confirmScannedRemoval;
 
     let CURRENT = null;
     const later = [];
+    // ⛔ [2.50.49] ការដកនៃការសម្អាត ៧ ថ្ងៃ = transaction មានសោលើ record ថ្ងៃ/ខែ ➜ ledger ពិតរស់ក្នុង LEDGER (ដាច់ពី item)
+    //    ហើយ `__ledger()` = ការដកតាមផ្លូវមានសោ + ផ្លូវ stub (ដកដោយដៃ)។
+    const LEDGER = {
+        'zoew_daily_revenue_cod_dod/2026-09-01': { codDollar: 100, dodDollar: 100, totalCount: 10 },
+        mrev: { '2026-09': { codDollar: 100, dodDollar: 100, totalCount: 10 } }
+    };
+    const ledgerKeyOf = (ref) => (ref && ref.p === 'mrev' ? 'mrev'
+        : (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_daily_revenue_cod_dod/') === 0 ? ref.path : null));
+    ctx.__ledgerKeyed = () => {
+        const day = LEDGER['zoew_daily_revenue_cod_dod/2026-09-01'] || {};
+        return { cod: Math.round(((day.codDollar || 0) - 100) * 100) / 100, count: (day.totalCount || 0) - 10 };
+    };
     ctx.__setFb({
-        ref: () => ({}),
+        ref: (_d, p) => ({ path: p || '' }),
         increment: (n) => n,
         // `hang` ➜ ការសរសេរធុងសំរាមមិនដោះ មិនបដិសេធ (RTDB ក្រៅបណ្តាញពិត)
         update: () => {
@@ -208,6 +223,15 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         // ដាច់ *ក្រោយ* transaction commit មិនមែនមុនទេ។
         runTransaction: (ref, updater) => {
             log.txs++;
+            const ledgerKey = ledgerKeyOf(ref);
+            if (ledgerKey) {
+                const cur = LEDGER[ledgerKey] ? JSON.parse(JSON.stringify(LEDGER[ledgerKey])) : null;
+                let next;
+                try { next = updater(cur); } catch (e) { next = undefined; }
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
+                LEDGER[ledgerKey] = JSON.parse(JSON.stringify(next));
+                return Promise.resolve({ committed: true, snapshot: { val: () => next } });
+            }
             let out;
             try { out = updater(CURRENT ? JSON.parse(JSON.stringify(CURRENT)) : null); } catch (e) { out = undefined; }
             if (out !== undefined) CURRENT = out;

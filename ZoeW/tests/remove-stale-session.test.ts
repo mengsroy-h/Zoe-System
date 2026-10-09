@@ -111,10 +111,15 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
 
     it('ការសម្អាតស្វ័យប្រវត្តិ ៖ ច្រក ledger ដដែលពិនិត្យ `stale` មុនសារ/Sentry', () => {
         const src = readFileSync(path.join(__dirname, '..', 'src', 'domain', 'cleanup.ts'), 'utf8');
-        const start = src.indexOf('correctRevenueLedgerToActual(revenueScanDate, revenueApplied');
+        const start = src.indexOf('const status = await applyCleanupRevenue(itemId, rev, -1);');
         expect(start).toBeGreaterThan(0);
         const verdict = src.slice(start, start + 400);
         expect(verdict.indexOf('status.stale')).toBeGreaterThan(0);
         expect(verdict.indexOf('status.stale')).toBeLessThan(verdict.indexOf('ZoeErrors.capture'));
+        const live = src.indexOf('const deduction = await deductCleanupRevenue(id, trashItem, revenue);');
+        expect(live).toBeGreaterThan(0);
+        const door = src.slice(live, live + 900);
+        expect(door.indexOf("deduction === 'stale'")).toBeGreaterThan(0);
+        expect(door.indexOf("deduction === 'stale'")).toBeLessThan(door.indexOf('ZoeErrors.capture'));
     });
 });

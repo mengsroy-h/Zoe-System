@@ -301,7 +301,7 @@ scenario('១០. ⛔ វា *មិនមែន* លុយ ៖ គ្មាន�
     const joined = FNS.map((n) => sliceFn(SRC, n) || '').join('\n');
     ok('⛔ ជាន់អប្បបរមា ៖ ស្រង់តួទាំង ' + FNS.length + ' បាន',
         FNS.every((n) => !!sliceFn(SRC, n)), FNS.filter((n) => !sliceFn(SRC, n)));
-    ['isDeducted', 'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta',
+    ['isDeducted', 'addRevenueToDailyAndMonthlyRecord', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta',
         'commitMonthlyRevenueDelta', 'revertRevenueLedgerDelta', 'packagesPickedUp',
         'zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod',
         'zoew_daily_pickup_cod_dod'].forEach((name) => {

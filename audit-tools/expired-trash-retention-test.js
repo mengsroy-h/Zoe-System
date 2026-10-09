@@ -51,8 +51,8 @@ function constant(name) {
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1800000000000;
 
-function build(items) {
-    const log = { batches: [], releasedClaims: [], releasedBarcodes: [], toasts: [] };
+function build(items, ledgerDays) {
+    const log = { batches: [], releasedClaims: [], releasedBarcodes: [], releasedKeys: [], toasts: [] };
     const context = vm.createContext({
         console,
         Promise,
@@ -71,6 +71,10 @@ function build(items) {
         releaseStaleRestoreClaimForPurge: async (id) => { log.releasedClaims.push(id); },
         purgeDeletedItemsQuietly: async (ids) => { log.batches.push(ids.slice()); },
         releaseBarcodesInRegistry: async (barcodes) => { log.releasedBarcodes.push(...barcodes); },
+        // ⛔ 2.50.49 ៖ purge លុបសោដក `ded/<trashId>` ជាមួយ ➜ `cleanupLedgerKeyOf()` ពិត (ផ្ទុកខាងក្រោម) · អ្នកដោះសោកត់ទុកតែប៉ុណ្ណោះ
+        releaseCleanupLedgerKeys: async (list) => { (list || []).forEach((c) => { if (c && c.ledgerKey) log.releasedKeys.push(c.id + '@' + c.ledgerKey.scanDate); }); },
+        dailyRevenueData: JSON.parse(JSON.stringify(ledgerDays || {})),
+        getFormattedDate: () => '2027-01-15',
         showToast: (message) => { log.toasts.push(message); }
     });
     const code = [
@@ -84,6 +88,11 @@ function build(items) {
         balancedFunction('dbOpStalled'),
         optionalFunction('armLateWrite', 'function armLateWrite() { return false; }'),
         balancedFunction('trashRetentionMs'),
+        optionalFunction('ledgerNumber', 'function ledgerNumber(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }'),
+        optionalFunction('ledgerDedOf', 'function ledgerDedOf() { return null; }'),
+        optionalFunction('cleanupEventAt', 'function cleanupEventAt() { return 0; }'),
+        optionalFunction('cleanupScanDateOf', 'function cleanupScanDateOf(item) { return item && item.scanDate; }'),
+        optionalFunction('cleanupLedgerKeyOf', 'function cleanupLedgerKeyOf() { return null; }'),
         balancedFunction('runAutomaticDeletedCleanup'),
         'globalThis.__run = runAutomaticDeletedCleanup;',
         'globalThis.__items = () => deletedItems;',
@@ -96,7 +105,8 @@ function build(items) {
 (async () => {
     const seed = [
         { id: 'expired_boundary', trashReason: 'expired', deletedAt: NOW - 2 * DAY, barcodes: [{ code: 'EB' }] },
-        { id: 'expired_old', trashReason: 'expired', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO' }] },
+        { id: 'expired_old', trashReason: 'expired', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO' }] },
+        { id: 'expired_otherkey', trashReason: 'expired', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK' }] },
         { id: 'expired_active', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA' }] },
         { id: 'expired_stale', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES' }] },
         { id: 'remove_young', trashReason: 'remove', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'RY' }] },
@@ -108,7 +118,12 @@ function build(items) {
         { id: 'legacy_remove', isFromDeletion: false, deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'LR' }] }
     ];
 
-    const world = build(seed);
+    const ledgerDays = { '2027-01-05': { codDollar: 9, dodDollar: 0, totalCount: 3, ded: {
+        expired_old: { at: NOW - 2 * DAY - 1, cod: 1.25, dod: 0, count: 1 },
+        expired_otherkey: { at: NOW - 9 * DAY, cod: 2, dod: 0, count: 1 },
+        pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 }
+    } } };
+    const world = build(seed, ledgerDays);
     check(vm.runInContext('__retention({ trashReason: "expired" })', world.context) === 2 * DAY,
         'expired ប្រើ retention ២ ថ្ងៃ');
     check(vm.runInContext('__retention({ trashReason: "remove" })', world.context) === 30 * DAY,
@@ -135,6 +150,11 @@ function build(items) {
         'registry ត្រូវដោះតែ barcode ដែល purge ជោគជ័យ', world.log.releasedBarcodes);
     check(!world.log.releasedBarcodes.includes('EA') && !world.log.releasedBarcodes.includes('EB'),
         'registry មិនត្រូវដោះ barcode ដែលនៅរក្សាទុក', world.log.releasedBarcodes);
+    // ⛔ សោដកដោះតែរបស់ព្រឹត្តិការណ៍ដដែល (`at` = `deletedAt`) របស់ធុងសំរាម `expired` ដែល purge ពិត · សោដែល `at` ផ្សេង (ព្រឹត្តិការណ៍មុន) និង `pickup` មិនប៉ះ
+    const hasKeyFn = /function cleanupLedgerKeyOf\(/.test(source);
+    check(!hasKeyFn || (world.log.releasedKeys.length === 1 && world.log.releasedKeys[0] === 'expired_old@2027-01-05'),
+        'purge ➜ ដោះសោដក `ded` តែរបស់ expired ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
+    check(!hasKeyFn || purged.includes('expired_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
     process.exit(fail ? 1 : 0);

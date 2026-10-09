@@ -1,4 +1,4 @@
-import { positionPhoneSuggestBox, scrollPhoneSuggestRowIntoView } from '../app/behaviors/phone-search';
+import { phoneSearchGlideRunning, positionPhoneSuggestBox, scrollPhoneSuggestRowIntoView } from '../app/behaviors/phone-search';
 import { fieldValue, isFieldFocused, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { sanitizePhoneNumber } from '../core/text';
@@ -57,7 +57,7 @@ export function renderPhoneSuggestions(matches) {
 
 export function showPhoneSuggestions() {
     if (uiState.phoneSuggestHideTimer) { clearTimeout(uiState.phoneSuggestHideTimer); uiState.phoneSuggestHideTimer = null; }
-    if (!isFieldFocused('searchPhoneInput')) return;
+    if (!isFieldFocused('searchPhoneInput') || phoneSearchGlideRunning()) return;
     const matches = collectPhoneSuggestions(fieldValue('searchPhoneInput'));
     if (!matches.length) {
         hidePhoneSuggestions();

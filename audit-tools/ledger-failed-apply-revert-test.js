@@ -98,9 +98,9 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
+    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
-    'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
+    'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
 const missing = [];
@@ -121,8 +121,14 @@ ok('ស្កេនមិនប្រកាស success មុន ledger reconcil
         && /saveStatus\s*!==\s*true/.test(fnSrc.confirmPhone));
 ok('ដក barcode ➜ កេះ correctRevenueLedgerToActual ក្រោយ trash ជោគជ័យ',
     /correctRevenueLedgerToActual\s*\(/.test(fnSrc.removeSingleBarcode));
-ok('auto-abandon > ៧ ថ្ងៃ ➜ កេះ correctRevenueLedgerToActual ក្រោយ trash ជោគជ័យ',
-    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.claimAndCleanupItem));
+// ⛔ [2.50.49] ការដកនៃការសម្អាត ៧ ថ្ងៃ = ព្រឹត្តិការណ៍មានសោ (idempotent · journal ព្យាយាមម្តងទៀត) ➜ reconcile ចាស់នៅសល់តែពេល
+//    rules បដិសេធ ring (`deductCleanupRevenue` ➜ `applyCleanupRevenue` ➜ `correctRevenueLedgerToActual`)។ ការវាស់ឥរិយាបថ ៖
+//    `cleanup-interrupt-atomicity-test` ៣ខ · `ZoeW/tests/cleanup-ledger-key.test.ts`។
+ok('auto-abandon > ៧ ថ្ងៃ ➜ ការដកមានសោក្រោយ trash ជោគជ័យ · rules មិនទទួល ring ➜ កេះ correctRevenueLedgerToActual',
+    /deductCleanupRevenue\s*\(/.test(fnSrc.claimAndCleanupItem)
+        && /deductCleanupLedgerKeyed\s*\(/.test(fnSrc.deductCleanupRevenue)
+        && /applyCleanupRevenue\s*\(/.test(fnSrc.deductCleanupRevenue)
+        && /correctRevenueLedgerToActual\s*\(/.test(fnSrc.applyCleanupRevenue));
 ok('manual adjustment ➜ កេះ correctRevenueLedgerToActual ដើម្បីជួសជុល partial failure',
     /correctRevenueLedgerToActual\s*\(/.test(fnSrc.submitManualAdjustment));
 ok('manual adjustment មិនអះអាង success មុន reconciliation បញ្ជាក់ `status.ok`',
@@ -212,6 +218,9 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.ledgerOpWitness + '\n'
         + fnSrc.ledgerTagged + '\n'
         + fnSrc.runLedgerTransaction + '\n'
+        + fnSrc.ledgerDedOf + '\n'
+        + fnSrc.ledgerDedValue + '\n'
+        + fnSrc.ledgerCarryDed + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n',

@@ -156,6 +156,21 @@ const MUTATIONS = [
         to: '            witnessed = null;'
     },
     {
+        name: 'ការដកមានសោ ៖ token ការដកក្នុង ring លែងជាភស្តុតាង «រួចហើយ» (KC-15 ៖ ការស្តារដកខែលើកទី ២)',
+        from: "            if (ledgerTokenSeen(record, tokenD)) return { state: 'already' };",
+        to: ''
+    },
+    {
+        name: 'ការដកមានសោ ៖ សោ `ded/<trashId>` ក្នុង ledger ថ្ងៃលែងជាភស្តុតាង (token ត្រូវរុញចេញ ➜ «unverified» មិន flip)',
+        from: "            if (same) return { state: entry.back ? 'restored' : 'already', entry };",
+        to: ''
+    },
+    {
+        name: 'ការដកមានសោ ៖ ការរត់ម្តងទៀតមិនទាមទារ token មុនការដក (គ្មានភស្តុតាង ➜ ដកលើកទី ២)',
+        from: "            if (prior && !ledgerPriorSeen(record, prior)) return { state: 'unknown' };",
+        to: ''
+    },
+    {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',
         from: '    function revertRevenueLedgerDelta(applied) {',
         to: '    function revertRevenueLedgerDelta(applied) { return applied; }\n    function revertRevenueLedgerDeltaDead(applied) {'

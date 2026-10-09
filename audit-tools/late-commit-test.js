@@ -98,7 +98,7 @@ const REAL_FNS = [
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'getPickupPhoneKey',
+    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'getPickupPhoneKey',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
@@ -107,7 +107,7 @@ const REAL_FNS = [
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
     'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
@@ -295,6 +295,11 @@ function buildWorld(seed, opts) {
         extractConst('CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
         extractConst('CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
         extractConst('CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
+        extractConst('CLEANUP_STAGE_UNDO') || "const CLEANUP_STAGE_UNDO = 'undo';",
+        extractConst('CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
+        extractConst('CLEANUP_LEDGER_LEGACY') || "const CLEANUP_LEDGER_LEGACY = 'legacy';",
+        extractConst('CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
+        extractConst('CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc

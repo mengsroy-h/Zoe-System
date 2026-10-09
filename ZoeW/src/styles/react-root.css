@@ -641,3 +641,12 @@
 .device-info-name, .device-info-serial { min-width: 0; overflow-wrap: anywhere; }
 .device-info-serial-value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
 #healthDeviceInfo { justify-content: flex-start; text-align: left; margin: 0 0 10px; font-size: calc(11.5 * var(--fs-unit)); }
+
+@media (max-width: 991px) {
+    .page-main.entry-search-open .app-card:has(> .empty-state:not(.hidden)) > .table-responsive {
+        flex: 0 0 auto;
+    }
+    .page-main.entry-search-open .app-card > .empty-state:not(.hidden) {
+        flex: 1 1 auto;
+    }
+}

@@ -43,18 +43,14 @@
 
 ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
-ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
+ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.45 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #304 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ = PR #301 ·
-   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch **`claude/exciting-gates-nvx9ar`** (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
-   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A67 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
-   (fast-forward) ➜ ប្រើ `claude/exciting-gates-nvx9ar` តែមួយ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
-   វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · លើ 95e91a0
-   ជោគជ័យ ២០១ · ធ្លាក់ ១ (`sw-backend-chunk-test` race ការវាស់ ➜ កែ · A67) · **លើ 5cc09d8 ✅ ជោគជ័យទាំងអស់ ២០២ · មួយផ្នែក ០ · រំលង ០** (commit ក្រោយនោះកែតែ Handoff ➜
-   `doc-scope-test` · `version-bump-scope` · `repository-file-coverage`) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
-   confirmed ៩ ➜ កែទាំងអស់ · uncertain ១ (A66 ➜ សាកលើ iPhone)។ **Claude ២** (session ផ្ទៀងឯករាជ្យ · read-only) លើ 651cb0d ៖ run-all STRICT ✅ ២០២ · A60–A67 បញ្ជាក់ដោយ
-   mutant · រកឃើញ ២ (ចន្លោះអ្នកយាម Supabase ➜ តេស្តថ្មី · A70) · A66 វាស់ក្នុង Chromium (A70)។ បន្ទាប់មក [2.50.47] (ZTO `/detail` · សំណើម្ចាស់គម្រោង) ៖ run-all STRICT ពេញលើ b3c420c
-   ធ្លាក់ ៦ (A69 ៖ sandbox checker មិនស្គាល់ helper ថ្មី · លិបិក្រម) ➜ កែ។
+1. **`main`** = **ZoeW 2.50.47 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #305 merge រួចទាំងអស់ ([2.50.45] = PR #304 · [2.50.46]–[2.50.47] = PR #305 ពី branch
+   `claude/exciting-gates-nvx9ar` ដែលមាន commit របស់ `claude/dazzling-fermi-hycqee` ជាផ្នែក)។ Branch **`claude/kind-volta-02pazk`** (ពី `main` 250dcca ·
+   **មិនទាន់ merge** · មាន commit [2.50.48] របស់ `claude/dazzling-fermi-hycqee` ដដែល) ៖ [2.50.48] ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (APK · PWA Android · PWA iPhone) ·
+   checker ៣ តាមក្រោយ · [2.50.49] សោដកក្នុង ledger (KC-15 · Task #16 · rules + migration ថ្មី ➜ សកម្មភាពដោយដៃ ក្នុងផ្នែក ១)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
+   ម្ចាស់គម្រោងសាក [2.50.48] លើទូរស័ព្ទពិតទាំង ៣ មុនស្នើ merge។
+   វាស់រួចលើ [2.50.46]–[2.50.47] ៖ run-all STRICT ពេញ ✅ ២០២/២០២ លើ 5cc09d8 · ការផ្ទៀងឯករាជ្យ Claude ២ · fuzz លុយជ្រៅ PASS (ផ្នែក ២ A60–A71)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
@@ -87,8 +83,9 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
-- ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge · ⚠️ ចលនាវាស់តែក្នុង Chromium)** ៖ Merge ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ · ស្វែងរកក្នុងទំព័រស្កេន ➜ រអិល មិនលោត · keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
+- ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
+- ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (PR #305 merge រួច · ម្ចាស់គម្រោងសាកលើ APK · PWA Android · PWA iPhone 2026-10-09 ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន មិនរលូន ➜ [2.50.48])** ៖ iPhone PWA · Android PWA · APK ៖ keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · PR #304 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
 - ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
@@ -137,6 +134,94 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.49] — 2026-10-09 · ZoeW ៖ **ការដកប្រាក់កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចុះតែម្តង ទោះ App ស្លាប់ពាក់កណ្តាល — សោដកក្នុង ledger** (ហាង KC-15 · Task #16 · ម្ចាស់គម្រោងជ្រើស «សោដកក្នុង ledger»)
+
+**ZoeW `2.50.49`** (`zoew-v311` ➜ `zoew-v312`) · ⛔ ZoeKeyGen មិនប្រែ · **Firebase rules ប្រែ** (`ded/$trashId` ក្នុង `zoew_daily_revenue_cod_dod/$date`) ·
+**migration Supabase ថ្មី** `supabase/migrations/20261009035130_zoe_rules.sql` (`generate-rules-sql.mjs`) · គ្មាន env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💵 **ការដកនៃការសម្អាត ៧ ថ្ងៃ (`expired`)** ៖ transaction ២ ជំហានតាមលំដាប់ **ខែ ➜ ថ្ងៃ** (`deductCleanupLedgerKeyed()` ➜ `commitLedgerEventStep()`) ដែលផ្ទុក token កំណត់ពី
+  (id ធុងសំរាម · `deletedAt`) (`ledgerEventToken()`) ជា `op` និងក្នុង ring `ops` · ថ្ងៃផ្ទុកសោ `ded/<trashId>` = `{ at, cod, dod, count }` (ចំនួនដែល server ដកពិត) ➜
+  **សោនៅថ្ងៃ = ការដកទាំង ២ ចុះហើយ**។ ជំហាននីមួយៗ idempotent ៖ ឃើញសោ ឬ token ➜ «រួចហើយ» (មិនសរសេរ)។ អ្នកសរសេរ ledger ថ្ងៃគ្រប់រូបរក្សា `ded` (`ledgerCarryDed()`)។
+- 🔁 **ការស្តារ (journal stage `ledger`)** ៖ journal កត់ `ledger: 'keyed'` + `prior` (token ក្នុង record ថ្ងៃ/ខែ មុនការដកលើកដំបូង) ➜ App បើកវិញ រត់ការដកម្តងទៀត ៖ សោ/token ➜ រួចហើយ ·
+  token មុនៗនៅតែមាន ➜ ការដកមិនទាន់ចុះ ➜ ដក · គ្មានភស្តុតាង (ring ពេញរុញចេញ · App ចាស់លុប ring) ➜ **មិនប៉ះលុយ** + «⚠️ … មិនអាចផ្ទៀងផ្ទាត់» ដូចមុន។ បរាជ័យបណ្តោះអាសន្ន ➜
+  ព្យាយាមរាល់វដ្ត ៦០ វិ. ≤ `CLEANUP_LEDGER_RETRY_MAX` ដង (សារ «⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។»)។
+- 🔄 **ការស្តារពីធុងសំរាម** ៖ គ្មាន barcode ណា flag `isDeducted` តែសោនៅថ្ងៃ (ការដកចុះ · flip មិនទាន់) ➜ បូកវិញតាមសោ (`restoreLedgerKeyFor()`) · ការបូកវិញដែលមានសោ ➜ សរសេរ
+  tombstone `back: true` ក្នុងការសរសេរ atomic ដដែល ➜ journal ដែលរត់ក្រោយមិនបូកវិញលើកទី ២។
+- ↩️ **ស្តារមុនសោចុះ** (journal ឃើញធុងសំរាមបាត់ ហើយ barcode ត្រឡប់ចូលប្រវត្តិ) ៖ stage `undo` ➜ ថ្ងៃ (បូកវិញតាមសោ + tombstone `back: true, undo: true`) ➜ ខែ (token `u`) ·
+  tombstone របស់ការស្តារ (គ្មាន `undo`) ➜ ការស្តារបូកវិញទាំង ២ រួចហើយ ➜ មិនបូកម្តងទៀត។
+- 🧹 **អ្នកបោស** `runCleanupLedgerKeySweep()` (វដ្ត ៦០ វិ.) ៖ ធុងសំរាម `expired` មិនទាន់ flip ចាស់ជាង `CLEANUP_KEY_SWEEP_GRACE_MS` គ្មាន journal លើឧបករណ៍នេះ ហើយសោនៅថ្ងៃ (`at` ដូចគ្នា) ➜
+  flip `isDeducted: true` (មិនប៉ះលុយ) · គ្មានសោ ➜ មិនធ្វើអ្វី ➜ ឧបករណ៍ដែលស្លាប់កណ្តាលការ flip មិនទុកកញ្ចប់ «មិនទាន់ដក» ក្នុងធុងសំរាមទៀត។
+- 🗑️ **purge (២ ថ្ងៃ)** លុបសោនៃធុងសំរាមដែល purge (`releaseCleanupLedgerKeys()`) ➜ record ថ្ងៃមិនរីកឥតឈប់ · ការលុបសោមានពិដាន `dbOp()` ៖ purge
+  រង់ចាំវាក្រោមសោ `deletedCleanupInFlight` ➜ បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) មិនធ្វើឲ្យសោជាប់ ហើយ purge ងាប់ទៀតទេ។
+- 🔐 **rules មិនទាន់ Publish** ➜ ការសរសេរ `ded` ត្រូវបដិសេធ ➜ App ថយទៅ token គ្មានសោ (ការស្តារនៅតែសម្រេចដោយ token · អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ) · rules ចាស់ជាង ring ➜
+  ផ្លូវចាស់ (journal `legacy`) ➜ ការស្តារ = «unverified» ដូចមុន។
+- ⚠️ **ព្រំដែន** ៖ App ≤ 2.50.48 ក្នុងហាងដដែលសរសេរ record ថ្ងៃដោយគ្មាន `ded` ➜ សោបាត់ តែ token ក្នុង ring នៅជាភស្តុតាង (App ≥ 2.50.22 រក្សា ring) · App < 2.50.22 លុប ring ➜
+  សម្រេចមិនបាន ➜ «unverified» (មិនដកពីរដង) ➜ ⛔ ធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍ក្នុងហាង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-ledger-key.test.ts` (ថ្មី · ១៨) ៖ មុនកែ **FAIL ១៣/១៨** ៖ KC-15 ពិត (`unverified` · ១០០ មិនមែន ៩០) · ការដកចុះតែចម្លើយបាត់ (មិន flip) · ខែ/ថ្ងៃចុះតែម្ខាង (១០០/៩០) ·
+  journal ចាស់រត់ម្តងទៀត · App ចាស់លុបសោ · flip ចុះ + journal មិនទាន់លុប + ស្តារ ➜ **១១០** (បូកវិញ ២ ដង) · ស្តារមិនបូកវិញតាមសោ (៩០) · undo ខែត្រូវកាត់ ➜ ថ្ងៃ **១១០** ·
+  អ្នកបោស · rules បដិសេធ `ded` + ចម្លើយបាត់ ➜ ក្រោយកែ ១៨/១៨ (ទិសផ្ទុយ ៥ ៖ គ្មានភស្តុតាង ➜ មិនប៉ះលុយ · id ដដែលផុតកំណត់ម្តងទៀត ➜ ដកម្តងទៀត · អ្នកបោសមិនដក · rules ចាស់ ➜ ការដកនៅចុះ)។
+- `audit-tools/cleanup-interrupt-atomicity-test.js` ផ្នែក ៣ខ (ថ្មី · ១៨ · record មាន ring) ៖ មុនកែ FAIL (unverified · មិន flip) ➜ ក្រោយ ៧៩/៧៩ · ផ្នែក ៣ (record គ្មាន ring ➜ មិនប៉ះលុយ) មិនប្រែ។
+- `money-guardian-test` mutation ថ្មី ៣ (token មិនរាប់ · សោមិនរាប់ · មិនទាមទារ token មុន) ➜ ចាប់ដោយ `cleanup-interrupt-atomicity-test` ៣ខ-ខ · ៣ខ-គ · ៣ (ដកលើកទី ២)។
+- emulator RTDB ៖ rules ថ្មីទទួលសោ · tombstone ហើយបដិសេធ ៦ រាងខុស (cod អវិជ្ជមាន · ខ្វះ `count` · វាលលើស · ធាតុ primitive · `back:false` · `ded` primitive) ·
+  rules ចាស់ (Publish បច្ចុប្បន្ន) បដិសេធ `ded` តែទទួល token ➜ ការថយក្រោយត្រូវ។
+- `ZoeW/tests/remove-stale-session.test.ts` ៖ យុថ្កាថ្មី (`deductCleanupRevenue` · ច្រកផ្ទាល់) ➜ `stale` មុនសារ/Sentry · `supabase-update-contract` ៖ `releaseCleanupLedgerKeys` = IDEMPOTENT ·
+  `finalizeClaimedRestore` + សោដក ១ = BOUNDED។
+- `write-stall-guard-test` ផ្នែក ២ខ (ថ្មី) ៖ purge ជោគជ័យ តែការលុបសោ `ded` ព្យួរ ➜ មុនកែ **FAIL** (សោ `deletedCleanupInFlight` ជាប់ក្រោយ ១៧,៥ វិ.) ➜ ក្រោយកែ ដោះក្នុងពិដាន។
+- `expired-trash-retention-test` ៖ purge ដោះសោ `ded` តែរបស់ធុងសំរាម `expired` ដែល purge ពិត និង `at` ដដែល (សោ `at` ផ្សេង · `pickup` មិនប៉ះ)។
+- `emu/crud-rules-flow` ផ្នែក ៥ (ថ្មី) ៖ ការសម្អាតផុតកំណត់ពិតក្នុង sandbox ➜ payload ពិត (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ + `ded` · flip) ➜ rules ពិតលើ emulator
+  ទទួល · server ៖ ថ្ងៃ/ខែដក ៨,២៩ · ២ · `ded/id_e` = `{ at · cod · dod · count }` · ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ បដិសេធ · `ded` ខុសទម្រង់ ➜ បដិសេធ
+  (mutation បិទការសរសេរ `ded` ➜ ធ្លាក់ ៣)។ មុននេះផ្លូវសរសេរ `ded` គ្មានអ្នកវាស់ជាមួយ rules ពិត (fuzz គ្មាន op ផុតកំណត់)។
+- `ZoeW/tests/cleanup-ledger-key.test.ts` ១២គ (ថ្មី ➜ ១៩) ៖ សោ `back:true` ឬ `at` ផ្សេង ➜ អ្នកបោសមិន flip · លុយមិនប្រែ (mutation ដកលក្ខខណ្ឌ `at`/`back` ➜ ធ្លាក់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **Publish Firebase rules** (`firebase-database.rules.json`) ទៅ **គ្រប់អតិថិជន Firebase មុន Deploy** ៖ Firebase Console ➜ Realtime Database ➜ Rules ➜ បិទភ្ជាប់ ➜ Publish ឬ
+   `tools/firebase-provision/deploy-rules.cmd` (មិន Publish ➜ App នៅដើរ តែគ្មានសោ ➜ អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ)។
+2. merge ➜ migration Supabase `20261009035130_zoe_rules.sql` ចូល live តាម GitHub integration (ឬបិទភ្ជាប់ក្នុង SQL Editor) ➜ ផ្ទៀង version ក្រោយ merge។
+3. Deploy **ZoeW** ➜ build APK ថ្មី ➜ ⛔ ធ្វើបច្ចុប្បន្នភាព **គ្រប់ឧបករណ៍** ក្នុងហាង (App ចាស់លុបសោពេលសរសេរ ledger ថ្ងៃដដែល)។
+4. សាក ៖ កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចូលធុងសំរាម ➜ Console/Supabase ៖ `zoew_daily_revenue_cod_dod/<ថ្ងៃស្កេន>/ded/<id ធុងសំរាម>` មាន `at · cod · dod · count` ·
+   ចំណូល/ចំនួនដក **តែម្តង** · ធាតុធុងសំរាម `isDeducted: true` · ស្តារវា ➜ ប្រាក់បូកវិញតែម្តង ហើយសោមាន `back: true`។
+5. Sentry ៖ «Automatic cleanup revenue awaits confirmation» (zone money) = ការដកមិនទាន់បញ្ជាក់ ➜ journal ព្យាយាមម្តងទៀត · «Interrupted cleanup resumed with unverified ledger» នៅមានពេលគ្មានភស្តុតាង។
+
+### [2.50.48] — 2026-10-09 · ZoeW ៖ **ស្វែងរក ៖ ប្រអប់ស្នើលេខធ្លាក់ចុះពេលប្រអប់ទៅដល់ · ចលនាមើលឃើញពេញលើ iPhone · សារទទេទំព័រស្កេនមិនលោតតាម keyboard** (វីដេអូម្ចាស់គម្រោង ៣ ៖ APK · PWA Android · PWA iPhone)
+
+**ZoeW `2.50.48`** (`zoew-v310` ➜ `zoew-v311`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ តំបន់ហាម ៖ `panel-motion.ts` · `phone-search.ts` ប្រែតាមរបាយការណ៍ម្ចាស់គម្រោង
+(វីដេអូ ៖ «phone suggestion glitch អត់រលូនតាមប្រអប់ស្វែងរកសោះ · keyboard ដូច glitch បន្តិច · tab scan ពេល keyboard ឡើងពេញរួច ទើបប្រអប់កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ ឡើងមកឈរពីលើ keyboard
+តាមក្រោយ» · ក្នុងជុំដដែល ៖ «អោយ suggestion ធ្លាក់មកពេលប្រអប់ស្វែងរកទៅដល់លើរួចរាល់វិញទៅ») ➜ sha256 ថ្មីក្នុង `LOCK` (`forbidden-zone-lock`) · ចលនាអូស/ចុចរបា (`panelGlideFrom` គ្មាន motion) ·
+`panels.ts` · `app.css` · PTR មិនប្រែ (`panel-motion-test` · `gesture-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` បៃតង)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔍 **ប្រអប់ស្នើលេខ** ៖ បិទពេលប្រអប់ស្វែងរកកំពុងរអិល (`showPhoneSuggestions()` រង់ចាំ `phoneSearchGlideRunning()`) ➜ glide ចប់ពិត (`PanelGlide.settled()`) ➜ បើក ហើយធ្លាក់ចុះពីលើ
+  (`dropPhoneSuggestBox()` ៖ opacity + `translate3d(0,-10px)` ➜ ០ · `PHONE_SUGGEST_DROP_MS` · Reduce Motion ➜ គ្មានចលនា) · glide ថ្មីជំនួស ឬប្រអប់លែង focus ➜ មិនបើក។
+- 📱 **ចលនាស្វែងរក** (`PANEL_SEARCH_GLIDE` ៖ ស្វែងរកលេខ · ទំព័រស្កេន) ៖ ខ្សែកោង `cubic-bezier(0.4, 0, 0.2, 1)` · `PANEL_SEARCH_GLIDE_MS` ៖ ស៊ុមនីមួយៗ ≤ ១៦% នៃចម្ងាយ ·
+  ចាប់ផ្តើមនៅទីតាំងចាស់ (pause) ហើយរត់តែពេលស៊ុមហូរ (២ ស៊ុមជាប់គ្នា ≤ `PANEL_GLIDE_FLOW_FRAME_MS` · ពិដាន `PANEL_GLIDE_HOLD_MAX_MS`) ➜ iPhone ដែលមិនបង្ហាញស៊ុម ~៨០ms ពេលរៀបចំ keyboard
+  មើលឃើញចលនាពេញ · glide ថ្មីលើធាតុដដែលបោះបង់ glide ចាស់ (`stopPanelGlide()`) · timer ដក snap pause តាមរយៈពេលពិត (`beginPanelGlideSnapPause(spanMs)` លំនាំដើម `PANEL_GLIDE_MS`)។
+- 📦 **ទំព័រស្កេន** ៖ ការស្វែងរកពេលផ្ទាំងស្កេនបង្រួម (`uiState.entrySearchActive` ➜ `.page-main.entry-search-open`) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង (មិននៅចុងកាត) ➜ WebView/Chrome
+  បង្រួមផ្ទៃក្រោយ keyboard ឡើងពេញ ➜ សារនៅដដែលពីលើ keyboard · ផ្ទាំងបើកវិញតាមផ្លូវណាក៏ដោយ ➜ ត្រឡប់ទៅចុងកាត (ស៊ុមក្រោមកាត Android = iOS មិនប្រែ)។
+
+#### អ្នកយាម
+
+- `ZoeW/scripts/history-window-check.mjs` (+១៥ ក្នុង ៣ របៀប) ៖ ប្រអប់ស្នើលេខមិនបង្ហាញពេលកាតកំពុងរអិល · បើក ≤ ១៥០ms ក្រោយកាតទៅដល់ · ធ្លាក់ពីលើមកនៅក្រោមប្រអប់ ៤px ·
+  ស៊ុមនីមួយៗ (≤ ២០ms) ≤ ២០% នៃចម្ងាយ · ស៊ុមកក ១២០ms ក្រោយ focus ➜ ស៊ុមដំបូងក្រោយកក ≤ ២០% · ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ៖ សារទទេមិនផ្លាស់ទីពេលផ្ទៃបង្រួម ៣៣០px ហើយនៅពីលើ —
+  មុនកែ FAIL ១៥ (ប្រអប់នៅទីតាំងចាស់ ៩៨ ➜ ៣០០px ពីប្រអប់ ១០ ស៊ុម · ស៊ុមដំបូង ៣១.៦% · ក្រោយកក ៩៨% · សារលោត ៧២៥ ➜ ៣៩៥)។
+- `ZoeW/tests/search-glide-hold.test.ts` (៧) ៖ pause ➜ ស៊ុមកកមិនរាប់ ➜ play · ពិដានពេលគ្មានស៊ុម · `settled()` true/false · glide ថ្មីបោះបង់ចាស់ · glide អូសមិនប្រែ · `entrySearchActive`
+  (focus បង្រួម · ផ្ទាំងបើក ➜ false · បង្រួមដោយដៃ ➜ មិនបើកវិញ)។
+- checker ដែលកាត់ function ពិតចូល sandbox ស្គាល់ helper ថ្មី ៖ `panel-snap-ownership-test` · `phone-search-swipe-test` (timer `spanMs`) · `phone-suggest-test` · `state-hygiene` (`phoneSearchGlide`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។
+2. iPhone PWA (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងដល់លើ (ឃើញចលនា មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះក្រោមប្រអប់ ➜ ចាកចេញ ➜ ចុះវិញ។
+3. Android PWA · APK ៖ ដូចជំហាន ២ · ប្រអប់ស្នើលេខមិនលេចនៅទីតាំងចាស់ពេលកំពុងរអិល។
+4. ទំព័រស្កេន (ទាំង ៣) ៖ ចុចស្វែងរក ➜ វាយ «zz» ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង ពីលើ keyboard ហើយមិនលោតពេល keyboard ឡើងពេញ · Locker ដូចគ្នា ·
+   ⚠️ Android PWA ៖ របារ «kc15 •••••» ពីលើ keyboard ជារបារ autofill របស់ Chrome (ផ្នែក ២ A73) ➜ រាយការណ៍បើនៅរំខាន។
 
 ### [2.50.47] — 2026-10-09 · ZoeW + Function ZTO ៖ **`/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ» · Handoff ៦ច)
 
@@ -2975,6 +3060,57 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-09 — ហាង Supabase KC-15 ៖ ការដកផុតកំណត់ត្រូវកាត់ពាក់កណ្តាល ➜ Task #16 «សោដកក្នុង ledger» ➜ [2.50.49]
+
+**អាការៈ** ៖ «ស្កេនតាមថ្ងៃ» ៣៥៣ ≠ យករួច ២៥៧ + នៅសល់ ៩២ = ៣៤៩។ **មូលហេតុ** ៖ កញ្ចប់ផុតកំណត់ ៣ (barcode ៤ · $12.75 · ថ្ងៃ 2026-10-02) ត្រូវដកនៅ 10-09 ម៉ោង 08:33
+(iPhone · 2.50.47) ចំពេលម្ចាស់គម្រោង redeploy Netlify ➜ ការដកត្រូវកាត់ ➜ journal នៅ stage `ledger` ➜ ការស្តាររាយការណ៍ «unverified» ហើយមិនដក (Sentry JAVASCRIPT-REACT-D · itemCount 1)។
+
+**ការជួសទិន្នន័យ (ម្ចាស់គម្រោងអនុញ្ញាតម្តងមួយៗ · session មុន)** ៖ (១) op `adminRepairKC15expired20261009` (02:37 UTC · DO block ផ្ទៀងតម្លៃមុន + `private.zoe_apply`) ៖
+ថ្ងៃ 10-02 ១៥៧,០៨/៤២ ➜ ១៤៤,៣៣/៣៨ · ខែ 2026-10 ១២៣២,៦៩/២៦២ ➜ ១២១៩,៩៤/២៥៨ · flip barcode ៤ ➜ `isDeducted: true` (count ៤២ មុនជួស = barcode ៤ មិនទាន់ដក ➜ មិនដកពីរដង) ·
+(២) op `adminRepairKC15drift362_20261009` (03:17 UTC) ៖ ថ្ងៃ 10-02 COD លើស +$3.62 ➜ ១៤០,៧១/២,៥/៣៨ · ខែ ១២១៦,៣២/១២,៥/២៥៨ ➜ គ្រប់ថ្ងៃស្មើ identity
+(Σ barcode `isDeducted != true` ក្នុងប្រវត្តិ + ធុងសំរាម)។ ⛔ កុំសរសេរលុយ KC-15 ម្តងទៀត។
+
+**+$3.62 ៖ អ្វីដែលវាស់បាន** ៖ ថ្ងៃ 09-29 ➜ 10-07 នាំចូលពីបញ្ជី ZTO ក្នុងពេលតែមួយ (10-07 00:14–00:23 UTC · 2.50.2/2.50.3) ត្រូវគ្នាទាំងអស់ · 10-02 ជាថ្ងៃតែមួយដែលឆ្លងការដក
+ផុតកំណត់ (10-09 01:33 UTC) · `zoe_ops` (រក្សា ២ ថ្ងៃ · `{ok,seq,docs}` គ្មានចំនួនទឹកប្រាក់) ៖ 10-07 02:19 ➜ 10-09 01:33 គ្មានការសរសេរថ្ងៃ 10-02 · ក្នុង 01:33:34–01:33:53 ថ្ងៃ 10-02
+ត្រូវសរសេរ ២២ ដង ៖ ២០ គូនឹងកញ្ចប់ ២០ ដែល flip · **២ លើស** (seq 3102 · 3125) នៅកន្លែងកញ្ចប់ «unverified» ៣ ➜ សរុប count ០ · COD +៣,៦២ (បើការនាំចូលត្រឹមត្រូវ) ·
+គ្មានការរួមផ្សំធម្មតាណាពន្យល់បាន (មិនមែនដកខ្វះ ១ + ដកពីរដង ១ ដែល count ស្មើ · មិនមែនផ្នែកនៃកញ្ចប់ដែលបូកបាន ៣,៦២) ➜ ចំនួនទឹកប្រាក់នៃការសរសេរនីមួយៗវាស់មិនបានទៀតទេ។
+កូដ cleanup 2.50.45 = 2.50.47 · ការដកផ្ទាល់គណនាពី barcode របស់ server ➜ ចំណុចសង្ស័យ ៖ reload កណ្តាលការដក + ការស្តារ/ការរស់ប៉ះគ្នា។
+
+**ថ្នាក់កំហុស (វាស់លើ tree មុនកែ · `cleanup-ledger-key.test.ts`)** ៖ (ក) ការដកដែលចម្លើយបាត់គ្មានភស្តុតាងនៅ server ➜ ការស្តារជ្រើស «មិនប៉ះលុយ» ជានិច្ច ➜ ledger ខុសដោយស្ងាត់
+(KC-15) · (ខ) flip ចុះ ហើយ App ស្លាប់មុនលុប journal ➜ អ្នកប្រើស្តារ (+១០ តាម flag) ➜ journal stage `flip` ឃើញធុងសំរាមបាត់ + barcode ត្រឡប់ ➜ បូកវិញម្តងទៀត ➜ **១១០** ·
+(គ) undo (`applyCleanupRevenue(+1)`) ដែលកាត់ពាក់កណ្តាល ➜ រត់ម្តងទៀត ➜ ថ្ងៃ **១១០** · (ឃ) ឧបករណ៍ស្លាប់កណ្តាល flip + journal បាត់ ➜ ការស្តារមិនបូកវិញ (flag false) ➜ ៩០។
+
+**ការរចនា (ហេតុអ្វី ខែ ➜ ថ្ងៃ · token កំណត់ · `prior`)** ៖ record ខែ (`zoew_monthly_revenue_cod_dod`) ត្រូវសរសេររាល់ការស្កេន (ring ១២ ប្តូររហ័ស) ➜ សោក្នុងខែនឹងធ្វើឲ្យរាល់ការស្កេនផ្ញើ
+record ខែធំជាងមុន (egress) ➜ សោតែក្នុងថ្ងៃ (record ថ្ងៃផុតកំណត់ ≥ ៨ ថ្ងៃ ស្ងាត់) · ខែដកមុន ➜ សោថ្ងៃ = ទាំង ២ ចុះ។ App ≤ 2.50.48 សរសេរ record ថ្ងៃឡើងវិញដោយគ្មាន `ded` ➜ token
+កំណត់ក្នុង ring ជាភស្តុតាងទី ២ (App ≥ 2.50.22 រក្សា ring ហើយរុញ seq ទាបចេញមុន ➜ token មុនការដកនៅ ⇒ token យើង (seq ខ្ពស់ជាង) ក៏នៅ បើបានចុះ)។ ⛔ token ផ្ទាល់គ្មាន `prior` មិនគ្រប់
+គ្រាន់ ៖ ring ពេញ ឬ App < 2.50.22 លុប ring ➜ «គ្មាន token» មិនមែនភស្តុតាង «មិនទាន់ចុះ» (ដកពីរដង) ➜ សម្រេចមិនបាន ➜ មិនប៉ះលុយ។ ទំហំ ៖ សោ ~៧០ byte/កញ្ចប់ផុតកំណត់
+ក្នុង record ថ្ងៃ ➜ purge ២ ថ្ងៃលុបវា។ ការសរសេរ `ded` លើ rules ចាស់ (emulator) ៖ ៤០១ ➜ ថយទៅ token គ្មានសោ ➜ ២០០។
+
+**ជុំបញ្ចប់ (session ទី ៣ · run-all STRICT ពេញលើ `d0940f9` ៖ ១៩៦ ជាប់ · ធ្លាក់ ៦)** ៖ handoff រាយការណ៍តែ checker ពាក់ព័ន្ធ ៣០ ➜ run-all ពេញរកឃើញ ៖
+(១) sandbox ៣ ខ្វះ function ថ្មី (`expired-trash-retention-test` · `write-stall-guard-test` ៖ `cleanupLedgerKeyOf` · `connection-recovery-test` ៖
+`runCleanupLedgerKeySweep` ➜ stub ដូចការងារសម្អាតផ្សេង) · (២) **bug ពិត** ៖ `releaseCleanupLedgerKeys()` គ្មានពិដាន ហើយ purge រង់ចាំវាក្រោមសោ ➜
+អ្នកយាម `write-stall-guard-test` ផ្នែក ២ខ មុនកែ FAIL ➜ `dbOp()` · (៣) លិបិក្រមខ្វះជួរ `ZoeW/tests/cleanup-ledger-key.test.ts` ·
+(៤) `zoew-suite-test` លើសពិដាន ៣០០ វិ. (ជំហាន ១៣ តាមលំដាប់ · `native:check` · `rules:check` មិនទាន់រត់) ➜ ⛔ មិនបង្កើន `CHECKER_TIMEOUT` ➜
+`--part=1/2` (ឋិតិវន្ត · vitest) · `--part=2/2` (build ហើយអ្វីៗដែលប្រើ `dist` តាមលំដាប់) ដូច `money-guardian-test` · (៥) `zto-network-boundaries-test`
+«HTTP body ព្យួរ» ៖ fetch ដំបូងក្នុង process + lane ស្របគ្នា ➜ ពិដាន ១០០ms ផុតមុនសំណើទៅដល់ server (វាស់ ៖ ម៉ាស៊ីនពេញ CPU ៖ កំណែចាស់ធ្លាក់ ១/៦ ·
+កំណែថ្មី (កំដៅ fetch · ពិដាន ៤០០ms) ជាប់ ៤/៤) · (៦) `money-guardian-test` ទាំង ២ ផ្នែកជាប់ (២៥ · ២២)។ checker ក្រហម ២ របស់ handoff ៖
+`emu/crud-rules-flow` (sandbox ខ្វះ ៤ ឈ្មោះ ➜ ផ្ទុក function ពិត + ផ្នែក ៥) · `rules:check` (parity Android = web ៖ id/`at` របស់សោ `ded` ថ្មីរាល់ដង ➜ ប្តូរឈ្មោះតាមធុងសំរាម ·
+cod/dod/count ប្រៀបធៀបដដែល ➜ ៧៥ ok)។
+
+### 2026-10-09 — វីដេអូម្ចាស់គម្រោង ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន ➜ [2.50.48]
+
+**វិធី** ៖ ញែកវីដេអូ ៣ (APK · PWA Android ៩០ ស៊ុម/វិ. · iPhone ៦០ ស៊ុម/វិ.) ជាស៊ុម (`ffmpeg` ២០–៦០ ស៊ុម/វិ.) ➜ វាស់ទីតាំងកាតស្វែងរក · ប្រអប់ស្នើលេខ · keyboard តាមស៊ុម ➜
+សង់អ្នកយាមក្នុង Chromium ដែលធ្លាក់លើកូដមុនកែ ➜ កែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A72 | **ប្រអប់ស្នើលេខនៅទីតាំងចាស់ ហើយលោតតាមក្រោយ** (ទាំង ៣) | វីដេអូ APK ៖ កាតរអិល ១៦០ ➜ ៥៥ ក្នុង ~១០០ms ខណៈប្រអប់ស្នើនៅ y ១៩៥ (ទីតាំងចាស់) ៦ ស៊ុម ➜ លោតទៅ ៩៧ ពេល timer `positionPhoneSuggestBox` 180ms · មូលហេតុ ៖ `positionPhoneSuggestBox()` អាន rect ដែលមាន transform FLIP (ស៊ុម ០ = ទីតាំងចាស់) · Chromium ៖ គម្លាតប្រអប់/ប្រអប់ស្វែងរក ៤ ➜ ៩៨ ➜ … ➜ ៣០០px ១០ ស៊ុម | ជុំដំបូង ៖ ប្រអប់តាម glide ក្នុងនាឡិកាដូចគ្នា ➜ ម្ចាស់គម្រោងស្នើក្នុងជុំដដែល ➜ ប្រអប់បិទពេលរអិល ធ្លាក់ចុះក្រោយ `settled()` |
+| A73 | **«keyboard ដូច glitch»** | APK ៖ keyboard រអិល ~២០០ms រលូន · របា Tab លាក់ពេល keyboard ចាប់ផ្តើម (ច្បាប់ keyboard-open) ចំពេលប្រអប់ស្នើលោត ➜ មើលទៅរញ៉េរញ៉ៃ · PWA Android ៖ Chrome បង្ហាញរបារ autofill «kc15 •••••» (ឈ្មោះចូល) + រូបតំណាងពាក្យសម្ងាត់/កាត/ទីតាំង ពីលើ keyboard មុន keyboard មកដល់ (ចន្លោះទទេ ~១០០ms) · ប្រអប់ស្វែងរក `type="tel"` `autocomplete="off"` · ប្រអប់ PIN `type="password"` ក្រៅ `<form>` (App Lock · PIN) ➜ Chrome អាចដាក់ fields ក្រៅ form ក្នុង «form» តែមួយ ➜ ទាយប្រអប់ស្វែងរកជា username (⚠️ ទ្រឹស្តី · វាស់លើ Chrome Android មិនបាន) · iPhone ៖ របារ ^ v ✓ របស់ iOS | ផ្នែកដែល App គ្រប់គ្រង (ប្រអប់ស្នើលោត) ➜ A72 · របារ autofill Chrome ➜ មិនកែ (រង់ចាំម្ចាស់គម្រោងរាយការណ៍បើនៅរំខាន) |
+| A74 | **iPhone ៖ ចលនាស្វែងរកមើលទៅលោត** | វីដេអូ iPhone (៦០ ស៊ុម/វិ.) ៖ ស៊ុមចុងក្រោយមុនការប្រែ ➜ ស៊ុមបន្ទាប់កាតនៅ ~៩០% នៃចម្ងាយ (២១២ ➜ ៧២ · ចុង ៦៤) · ខ្សែកោង `cubic-bezier(0.22, 1, 0.36, 1)` 220ms ៖ ៨០ms = ៨៩% ➜ iOS មិនបង្ហាញស៊ុម ~៨០ms ពេលរៀបចំ keyboard ខណៈនាឡិកា animation រត់ · ទំព័រស្កេនដូចគ្នា (ផ្ទាំងបង្រួមភ្លាម) · blur (glide ក្នុង timer ១៥០ms) រលូន ➜ មិនមែន Reduce Motion · Chromium ៖ ស៊ុមដំបូង ៣១.៦% · busy-loop ១២០ms ក្រោយស៊ុមដំបូង ➜ ៩៨% | `PANEL_SEARCH_GLIDE` ៖ `cubic-bezier(0.4, 0, 0.2, 1)` (៨០ms = ៣៣%) · pause រហូតស៊ុមហូរ ➜ ក្រោយកក ០% · ⚠️ ការកកលើ iOS អាចកើតក្រៅ web process (ទ្រឹស្តី) ➜ ខ្សែកោងថ្មីជាស្រទាប់ការពារទី ២ |
+| A75 | **ទំព័រស្កេន ៖ ប្រអប់កញ្ចប់ «ឡើងមកឈរពីលើ keyboard តាមក្រោយ»** | វីដេអូ APK ៖ keyboard ពេញ ១២.៦ វិ. ➜ ១២.៨ វិ. សារ «មិនទាន់មាន…» លោតពីក្រោម keyboard មកពីលើ (KeyboardOpenHold បង្រួម WebView តែម្តងពេលចប់) · PWA Android ៖ ដូចគ្នា (Chrome បង្រួមក្រោយ keyboard) · មូលហេតុ ៖ `.table-responsive` `flex: 1` ➜ សារទទេជាកូនចុងកាត ➜ ផ្លាស់ទីតាមបាតកាត (`100dvh`) · Chromium ៖ ផ្ទៃ -៣៣០ ➜ សារ ៧២៥ ➜ ៣៩៥ | `.entry-search-open` ៖ តារាង `flex: 0 0 auto` · សារ `flex: 1 1 auto` (តែពេលស្វែងរកក្នុងផ្ទាំងបង្រួម ➜ សេណារីយ៉ូ `panel-motion-test` ផ្នែក ៩ មិនប្រែ) |
+
+- **អ្នកយាមដែលត្រូវតាមក្រោយ** (run-all STRICT លើ `2705554` ៖ ធ្លាក់ ២ · ជាប់ ២០០) ៖ (១) `layout-thrash` រង់ចាំត្រឹម ៨០ms ក្រោយ focus + input ហើយតម្រូវ `#phoneSuggestBox.show` ➜ ឥឡូវប្រអប់ធ្លាក់ចុះតែក្រោយ glide ចប់ (រង់ចាំស៊ុមហូរ ≤ `PANEL_GLIDE_HOLD_MAX_MS` + `PANEL_SEARCH_GLIDE_MS`) ➜ poll រហូតបង្ហាញក្នុងពិដាន `SUGGEST_SHOW_CEILING_MS` (១៥០០ms · ផុតពិដាន = FAIL)។ មិនមែនបន្ធូរទេ ៖ អ្វីដែលវាស់ (ចំនួនការវាស់ទីតាំងពេលរមូរ ≤ ៤) មិនប្រែ · (២) `doc-scope-test` ៖ លិបិក្រម 🔎 ជួរ `panel-motion-test` (ផ្នែក ១ · ផ្នែក ២) · `panel-snap-ownership-test` (ផ្នែក ១) តាមការលេចថ្មីនៃ [2.50.48] · (៣) run-all STRICT លើ `fd7b03e` ៖ ២០១/២០២ ➜ `zoew-suite` ធ្លាក់ដោយ `history-window-check` «ចលនាស្វែងរកមិនលោត» PWA Android `steps [0, 0.21, 0.152 …]` (រត់ម្នាក់ឯង ៖ ជាប់)។ វាស់ស្ថានភាព animation តាមស៊ុម ៖ ធម្មតា `pending · currentTime 0` ➜ `running 17ms` (០,០០៨) · ពេលម៉ាស៊ីនរវល់ ៖ main thread នៅឃើញ `pending` (ទីតាំងដើម) ខណៈ compositor រត់រួច ➜ startTime ត្រូវដាក់ថយក្រោយ ➜ ស៊ុមបន្ទាប់លោតទៅ `currentTime ≈ 67ms` (០,២០៩ = ការរីកចម្រើនសរុប ៤ ស៊ុម) = ការវាស់ខុសរបស់ main thread មិនមែនចលនាដែលមើលឃើញ ➜ មិនរាប់ជំហានដែលស៊ុមមុនជា `pending` · ជាន់អប្បបរមា ៖ ឃើញ `pending` ≥ ១ · ជំហាន ≥ ៨។ Mutation `PANEL_SEARCH_GLIDE_MS` ២៨០ ➜ ៦០ ➜ FAIL ៣/៣ (APK · PWA Android · PWA iPhone) · ការលោតពេលចាប់ផ្តើម (A74) នៅតែវាស់ដោយ «ស៊ុមកក ១២០ms» ➜ run-all STRICT លើ `f30684c` ៖ **២០២/២០២** (មួយផ្នែក ០ · រំលង ០)។ គ្មាន bump (តែ `audit-tools/` · `ZoeW/scripts/` · ឯកសារ)។
+
 ### 2026-10-08 — Deep audit ៣ (សំណើម្ចាស់គម្រោង ៖ «deep audit គ្រប់ជ្រុងជ្រោយ មុនប្រកាសឲ្យប្រើជាផ្លូវការ») ➜ [2.50.46]
 
 **វិធី** ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) មុនកែ ➜ អានកូដដោយផ្ទាល់ (លុយ · Supabase adapter + SQL · SW · Push · ZTO Function · License ·
@@ -4771,7 +4907,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `expired-trash-retention-test` | — | ផ្នែក ១ |
+| `expired-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -4799,7 +4935,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `layout-thrash` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -4820,7 +4956,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
-| `money-guardian-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
+| `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `money-reality-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
@@ -4831,8 +4967,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `network-timeout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `offline-shell-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `page-nav-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `panel-snap-ownership-test` | — | ផ្នែក ២ · ផ្នែក ៦ |
+| `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -4911,7 +5047,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `write-stall-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zoew-suite-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -4920,7 +5056,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `zto-cookie-sync-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zto-network-boundaries-test` | — | ផ្នែក ២ |
+| `zto-network-boundaries-test` | ផ្នែក ២ | ផ្នែក ២ |
 | `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -4935,6 +5071,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
@@ -4990,6 +5127,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |

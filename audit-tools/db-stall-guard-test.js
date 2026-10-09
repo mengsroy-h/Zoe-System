@@ -398,7 +398,8 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
-    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
+    'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -406,7 +407,10 @@ function runAbandonCleanup(mode) {
     const ledger = makeLedgerStub((d, cod, dod, c) => revenueLog.push({ d, cod, dod, c }));
     ledger.buckets['2026-08-21'] = { codDollar: 5, dodDollar: 2, totalCount: 1 };
     const writes = [];
-    const store = {};
+    const store = {
+        'zoew_daily_revenue_cod_dod/2026-08-21': { codDollar: 5, dodDollar: 2, totalCount: 1 },
+        'zoew_monthly_revenue_cod_dod': { '2026-08': { codDollar: 5, dodDollar: 2, totalCount: 1 } }
+    };
     const hang = mode === 'hang';
     const NOW = Date.UTC(2026, 7, 29, 6, 0, 0);
     const fb = {
@@ -431,6 +435,9 @@ function runAbandonCleanup(mode) {
         db: {}, fb,
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
+        dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
+        dbRefMonthlyRevenue: { path: 'zoew_monthly_revenue_cod_dod' },
+        dailyRevenueData: {}, monthlyRevenueData: {},
         getServerNow: () => NOW,
         getFormattedDate: () => '2026-08-21',
         addRevenueToDailyAndMonthlyRecord: ledger.add,
@@ -448,6 +455,7 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'),
         sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
         sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
+        sliceConst(zoewSrc, 'LEDGER_OP_RING_MAX'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
         // RACES-2 ៖ `claimAndCleanupItem()` ចាប់ `db` + `authGeneration` ពេលចាប់ផ្តើម (store field ក្នុង text view)
         'let authGeneration = 0;',
@@ -462,6 +470,11 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
         sliceConst(zoewSrc, 'CLEANUP_STAGE_FLIP') || "const CLEANUP_STAGE_FLIP = 'flip';",
         sliceConst(zoewSrc, 'CLEANUP_STAGE_SLOT') || "const CLEANUP_STAGE_SLOT = 'slot';",
+        sliceConst(zoewSrc, 'CLEANUP_STAGE_UNDO') || "const CLEANUP_STAGE_UNDO = 'undo';",
+        sliceConst(zoewSrc, 'CLEANUP_LEDGER_KEYED') || "const CLEANUP_LEDGER_KEYED = 'keyed';",
+        sliceConst(zoewSrc, 'CLEANUP_LEDGER_LEGACY') || "const CLEANUP_LEDGER_LEGACY = 'legacy';",
+        sliceConst(zoewSrc, 'CLEANUP_LEDGER_RETRY_MAX') || 'const CLEANUP_LEDGER_RETRY_MAX = 10;',
+        sliceConst(zoewSrc, 'CLEANUP_NO_PRIOR') || 'const CLEANUP_NO_PRIOR = { d: [], m: [] };',
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         sliceFrom(zoewSrc, 'safeStoreGet') || 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
         sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
@@ -496,7 +509,10 @@ function runAbandonCleanup(mode) {
         setTimeout(() => {
             const inflight = vm.runInContext('__inflight()', ctx);
             box.__timers.dispose();
-            resolve({ revenueLog, writes, inflight, errors, ledger: ledger.buckets['2026-08-21'], trash: box.deletedItems });
+            const day = store['zoew_daily_revenue_cod_dod/2026-08-21'] || {};
+            const deductions = writes.filter((p) => p === 'zoew_daily_revenue_cod_dod/2026-08-21').map(() => 'keyed');
+            resolve({ revenueLog: revenueLog.concat(deductions), writes, inflight, errors, trash: box.deletedItems,
+                ledger: { codDollar: day.codDollar, dodDollar: day.dodDollar, totalCount: day.totalCount } });
         }, 1200);
     });
 }

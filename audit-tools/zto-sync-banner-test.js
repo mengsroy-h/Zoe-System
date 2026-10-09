@@ -98,7 +98,7 @@ const MONEY_TOKENS = ['fb.', 'runTransaction', 'isDeducted', 'dbRef', 'dbOp(',
     'zoew_daily_revenue', 'zoew_monthly_revenue', 'pickedUpBarcodes',
     'packagesPickedUp', 'zoew_scan_history', 'zoew_recently_deleted',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem', 'applyBarcodeCloseState', 'removeSingleBarcode',
-    'deleteSingleItem', 'ledgerAppliedDelta', 'commitDailyRevenueDelta',
+    'deleteSingleItem', 'ledgerAppliedDelta', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta',
     'commitMonthlyRevenueDelta', 'armLateCommit', 'trashReason ='];
 const MONEY_HITS = MONEY_TOKENS.filter((t) => ZTO_MODULE.indexOf(t) !== -1);
 ok('⛔ ការសរសេរតែមួយរបស់ម៉ូឌុល ៖ តួស្នូលចែករំលែក (មិនមែនផ្លូវថ្មី)',

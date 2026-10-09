@@ -11,13 +11,40 @@ export const PANEL_GLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 export const PANEL_GLIDE_SNAP_GRACE_MS = 260;
 
+export const PANEL_SEARCH_GLIDE_MS = 280;
+
+export const PANEL_SEARCH_GLIDE_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
+
+export const PANEL_GLIDE_HOLD_MAX_MS = 250;
+
+export const PANEL_GLIDE_FLOW_FRAME_MS = 34;
+
+export interface PanelGlideMotion {
+    duration: number;
+    easing: string;
+    holdUntilFramesFlow: boolean;
+}
+
+export const PANEL_SEARCH_GLIDE: PanelGlideMotion = {
+    duration: PANEL_SEARCH_GLIDE_MS,
+    easing: PANEL_SEARCH_GLIDE_EASING,
+    holdUntilFramesFlow: true
+};
+
+export interface PanelGlide {
+    running(): boolean;
+    settled(): Promise<boolean>;
+}
+
+const panelGlideAnimations = new WeakMap<Element, Animation>();
+
 export function panelMotionAllowed() {
     if (window.innerWidth >= 992) return false;
     if (typeof window.matchMedia !== 'function') return true;
     return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function beginPanelGlideSnapPause() {
+export function beginPanelGlideSnapPause(spanMs = PANEL_GLIDE_MS) {
     const pages = elementOf('appPages');
     if (!pages) return () => {};
     const epoch = uiState.panelGlideEpoch;
@@ -25,7 +52,7 @@ export function beginPanelGlideSnapPause() {
     uiState.panelGliding = true;
     commitNow();
     if (uiState.panelGlideRelease !== null) clearTimeout(uiState.panelGlideRelease);
-    uiState.panelGlideRelease = setTimeout(endPanelGlideSnapPause, PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS);
+    uiState.panelGlideRelease = setTimeout(endPanelGlideSnapPause, spanMs + PANEL_GLIDE_SNAP_GRACE_MS);
     let done = false;
     return () => {
         if (done) return;
@@ -46,22 +73,78 @@ export function endPanelGlideSnapPause() {
     uiState.panelGliding = false;
 }
 
-export function panelGlideFrom(el, beforeTop) {
-    if (!el || typeof el.animate !== 'function' || !isFinite(beforeTop)) return;
-    if (!panelMotionAllowed()) return;
-    const delta = beforeTop - el.getBoundingClientRect().top;
-    if (!isFinite(delta) || Math.abs(delta) < 2) return;
-    const release = beginPanelGlideSnapPause();
+export function stopPanelGlide(el) {
+    const previous = el ? panelGlideAnimations.get(el) : null;
+    if (!previous) return;
+    panelGlideAnimations.delete(el);
     try {
-        const anim = animateElement(el, [
-            { transform: 'translate3d(0,' + delta + 'px,0)' },
-            { transform: 'translate3d(0,0,0)' }
-        ], { duration: PANEL_GLIDE_MS, easing: PANEL_GLIDE_EASING });
+        if (typeof previous.cancel === 'function') previous.cancel();
+    } catch (e) {}
+}
+
+export function playPanelGlideWhenFramesFlow(play) {
+    if (typeof requestAnimationFrame !== 'function') {
+        play();
+        return;
+    }
+    let done = false;
+    let last = -1;
+    const fire = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(ceiling);
+        play();
+    };
+    const ceiling = setTimeout(fire, PANEL_GLIDE_HOLD_MAX_MS);
+    const tick = (now) => {
+        if (done) return;
+        if (last >= 0 && now - last <= PANEL_GLIDE_FLOW_FRAME_MS) {
+            fire();
+            return;
+        }
+        last = now;
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+
+export function panelGlideFrom(el, beforeTop, motion?: PanelGlideMotion): PanelGlide | null {
+    if (!el || typeof el.animate !== 'function' || !isFinite(beforeTop)) return null;
+    if (!panelMotionAllowed()) return null;
+    stopPanelGlide(el);
+    const delta = beforeTop - el.getBoundingClientRect().top;
+    if (!isFinite(delta) || Math.abs(delta) < 2) return null;
+    const timing = { duration: motion ? motion.duration : PANEL_GLIDE_MS, easing: motion ? motion.easing : PANEL_GLIDE_EASING };
+    const keyframes = [
+        { transform: 'translate3d(0,' + delta + 'px,0)' },
+        { transform: 'translate3d(0,0,0)' }
+    ];
+    const holding = !!(motion && motion.holdUntilFramesFlow);
+    const release = beginPanelGlideSnapPause(timing.duration + (holding ? PANEL_GLIDE_HOLD_MAX_MS : 0));
+    let anim: Animation | null;
+    try {
+        anim = animateElement(el, keyframes, timing);
+        if (anim) panelGlideAnimations.set(el, anim);
+        if (anim && holding && typeof anim.pause === 'function') anim.pause();
         if (anim && anim.finished && typeof anim.finished.then === 'function') anim.finished.then(release, release);
         else if (anim) anim.onfinish = release;
     } catch (e) {
         release();
+        return null;
     }
+    if (!anim) return null;
+    const lead = anim;
+    if (holding) {
+        playPanelGlideWhenFramesFlow(() => {
+            if (panelGlideAnimations.get(el) !== lead || lead.playState !== 'paused') return;
+            try { lead.play(); } catch (e) {}
+        });
+    }
+    const running = () => panelGlideAnimations.get(el) === lead && lead.playState !== 'finished' && lead.playState !== 'idle';
+    const settled = lead.finished && typeof lead.finished.then === 'function'
+        ? lead.finished.then(() => panelGlideAnimations.get(el) === lead, () => false)
+        : Promise.resolve(true);
+    return { running: running, settled: () => settled };
 }
 
 export function setupSwipeGestures() {

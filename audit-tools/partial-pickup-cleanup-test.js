@@ -133,16 +133,21 @@ const REAL_FNS = [
     'cloneRestoreItem',
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem',
+    'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
 function buildWorld(historySeed, startNow) {
     const store = {
         zoew_scan_history_cod_dod: clone(historySeed),
-        zoew_recently_deleted_cod_dod: {}
+        zoew_recently_deleted_cod_dod: {},
+        zoew_daily_revenue_cod_dod: { '2026-08-19': { codDollar: 100, dodDollar: 100, totalCount: 20 } },
+        zoew_monthly_revenue_cod_dod: { '2026-08': { codDollar: 100, dodDollar: 100, totalCount: 20 } }
     };
-    const world = { store, now: startNow, revenueLog: [], reconcileLog: [], transactionCalls: 0, commits: 0 };
+    const world = { store, now: startNow, revenueLog: [], reconcileLog: [], ledgerEvents: [], transactionCalls: 0, commits: 0 };
+    const DAILY_PREFIX = 'zoew_daily_revenue_cod_dod/';
+    const totalsOf = (r) => ({ cod: (r && r.codDollar) || 0, dod: (r && r.dodDollar) || 0, count: (r && r.totalCount) || 0 });
 
     function getPath(raw) {
         const parts = String(raw || '').split('/').filter(Boolean);
@@ -178,6 +183,13 @@ function buildWorld(historySeed, startNow) {
             const next = updater(clone(getPath(ref.path)));
             if (next === undefined) return { committed: false, snapshot: { val: () => clone(getPath(ref.path)) } };
             world.commits++;
+            if (ref.path.indexOf(DAILY_PREFIX) === 0) {
+                const a = totalsOf(getPath(ref.path));
+                const b = totalsOf(next);
+                const row = { scanDate: ref.path.slice(DAILY_PREFIX.length), cod: Math.round((b.cod - a.cod) * 100) / 100, dod: Math.round((b.dod - a.dod) * 100) / 100, count: b.count - a.count };
+                world.revenueLog.push(row);
+                world.ledgerEvents.push(Object.assign({ ded: Object.keys((next && next.ded) || {}) }, row));
+            }
             setPath(ref.path, next);
             return { committed: true, snapshot: { val: () => clone(getPath(ref.path)) } };
         }),
@@ -199,6 +211,10 @@ function buildWorld(historySeed, startNow) {
         fb,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
+        dbRefDailyRevenue: fb.ref({}, 'zoew_daily_revenue_cod_dod'),
+        dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
+        dailyRevenueData: {},
+        monthlyRevenueData: {},
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-19',
         ...ledgerStubEntries(
@@ -243,6 +259,12 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_LEDGER'), "const CLEANUP_STAGE_LEDGER = 'ledger';"),
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_FLIP'), "const CLEANUP_STAGE_FLIP = 'flip';"),
         optionalPart(() => extractConst(src, 'CLEANUP_STAGE_SLOT'), "const CLEANUP_STAGE_SLOT = 'slot';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_STAGE_UNDO'), "const CLEANUP_STAGE_UNDO = 'undo';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_KEYED'), "const CLEANUP_LEDGER_KEYED = 'keyed';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_LEGACY'), "const CLEANUP_LEDGER_LEGACY = 'legacy';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_LEDGER_RETRY_MAX'), 'const CLEANUP_LEDGER_RETRY_MAX = 10;'),
+        optionalPart(() => extractConst(src, 'CLEANUP_NO_PRIOR'), 'const CLEANUP_NO_PRIOR = { d: [], m: [] };'),
+        optionalPart(() => extractConst(src, 'LEDGER_OP_RING_MAX'), 'const LEDGER_OP_RING_MAX = 12;'),
         'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
@@ -366,8 +388,8 @@ async function scenarioMixedParcel() {
     const total = revenueTotal(world.revenueLog);
     check(total.cod === 0 && total.dod === -25 && total.count === -1,
         '⛔ ស្នូល៖ ដកតែ B ($25 dod, ១ កញ្ចប់) — លុយរបស់ A នៅគ្រប់', JSON.stringify(total));
-    check(world.reconcileLog.length === 1 && world.reconcileLog[0].dod === -25 && world.reconcileLog[0].count === -1,
-        'trash commit ជោគជ័យ ➜ reconcile តែ delta របស់ B ម្តងគត់', JSON.stringify(world.reconcileLog));
+    check(world.ledgerEvents.length === 1 && world.ledgerEvents[0].dod === -25 && world.ledgerEvents[0].count === -1 && world.ledgerEvents[0].ded.indexOf('id_mix') >= 0,
+        'trash commit ជោគជ័យ ➜ ដក ledger តែ delta របស់ B ម្តងគត់ (សោ ded/<trashId>)', JSON.stringify(world.ledgerEvents));
 }
 
 async function scenarioLegacyStamp() {
@@ -415,8 +437,8 @@ async function scenarioAllOpen() {
     const total = revenueTotal(world.revenueLog);
     check(total.cod === -10 && total.dod === -25 && total.count === -2,
         'ដកចំណូលពេញ (cod -10 · dod -25 · count -2)', JSON.stringify(total));
-    check(world.reconcileLog.length === 1 && world.reconcileLog[0].cod === -10 && world.reconcileLog[0].count === -2,
-        'auto-abandon ទាំងមូល reconcile ledger ម្តងគត់', JSON.stringify(world.reconcileLog));
+    check(world.ledgerEvents.length === 1 && world.ledgerEvents[0].cod === -10 && world.ledgerEvents[0].count === -2 && world.ledgerEvents[0].ded.indexOf('id_open') >= 0,
+        'auto-abandon ទាំងមូល ដក ledger ម្តងគត់ (សោ ded/<trashId>)', JSON.stringify(world.ledgerEvents));
 }
 
 async function scenarioAllClosed() {

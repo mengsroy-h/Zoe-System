@@ -27,6 +27,21 @@ const STEP_TIMEOUT_MS = Number(process.env.ZOEWSUITE_STEP_TIMEOUT_MS || 240000);
 const STEPS = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
     'build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check'];
 const TEST_WORKERS = process.env.ZOEWSUITE_TEST_WORKERS || 'auto';
+// ⛔ `--part=k/2` (ដូច `money-guardian-test`) ៖ ជំហាន ១៣ រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ. (2.50.49 ៖ «ព្យួរ — លើសពិដាន 300s»
+//    ខណៈ native:check · rules:check មិនទាន់រត់) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ។ ក្រុមទី ២ កាន់គ្រប់ជំហានដែលប្រើ `dist` តាមលំដាប់ដើម
+//    (build:only មុន smoke · sw · native · rules) ➜ ផ្នែកទាំង ២ រត់ស្របគ្នាបានដោយមិនប៉ះ `dist` គ្នា · គ្មាន `--part` ➜ ជំហានទាំងអស់ (baseline · contract)។
+const PART_GROUPS = [
+    ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check'],
+    ['build:only', 'notice:check', 'sw:check', 'smoke', 'native:check', 'rules:check']
+];
+const PART = (() => {
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
+    if (!arg) return { k: 1, n: 1 };
+    const m = /^--part=(\d+)\/(\d+)$/.exec(arg);
+    if (!m || +m[2] !== PART_GROUPS.length || +m[1] < 1 || +m[1] > +m[2]) return null;
+    return { k: +m[1], n: +m[2] };
+})();
+const MY_STEPS = !PART ? [] : PART.n === 1 ? STEPS : PART_GROUPS[PART.k - 1];
 
 let pass = 0, fail = 0;
 function ok(label) { pass++; console.log('  ok    ' + label); }
@@ -36,6 +51,25 @@ function bad(label, detail) {
 }
 
 if (!/^(?:auto|[1-8])$/.test(TEST_WORKERS)) bad('តម្លៃ ZOEWSUITE_TEST_WORKERS ត្រូវជា auto ឬ 1–8', TEST_WORKERS);
+if (!PART) bad('⛔ --part ត្រូវជា k/' + PART_GROUPS.length, process.argv.slice(2).join(' '));
+{
+    const flat = [].concat(...PART_GROUPS);
+    const sameSet = flat.length === STEPS.length && STEPS.every((s) => flat.indexOf(s) !== -1);
+    const inOrder = PART_GROUPS.every((g) => g.every((s, i) => i === 0 || STEPS.indexOf(g[i - 1]) < STEPS.indexOf(s)));
+    if (sameSet && inOrder) ok('⛔ ក្រុម --part គ្របជំហានទាំងអស់ម្តងគត់ ហើយរក្សាលំដាប់ដើម (' + PART_GROUPS.map((g) => g.length).join(' + ') + ' = ' + STEPS.length + ')');
+    else bad('⛔ ក្រុម --part គ្របជំហានទាំងអស់ម្តងគត់ ហើយរក្សាលំដាប់ដើម', JSON.stringify(PART_GROUPS));
+}
+if (PART && PART.n > 1) {
+    console.log('  ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ ' + MY_STEPS.join(' · '));
+    let runall = '';
+    try { runall = fs.readFileSync(path.join(__dirname, 'run-all.sh'), 'utf8').replace(/^\s*#.*$/gm, ''); } catch (e) {}
+    const listed = [];
+    for (let k = 1; k <= PART.n; k++) {
+        if (new RegExp('node\\s+audit-tools/zoew-suite-test\\.js\\s+--part=' + k + '/' + PART.n + '(?=\\s|$)', 'm').test(runall)) listed.push(k);
+    }
+    if (listed.length === PART.n) ok('⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = ជំហានដែលគ្មាននរណារត់)');
+    else bad('⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = ជំហានដែលគ្មាននរណារត់)', 'ឃើញ ' + listed.join(','));
+}
 
 function tail(text, n) {
     return String(text || '').split('\n').filter((l) => l.trim()).slice(-n).join('\n');
@@ -67,7 +101,7 @@ const hasModules = fs.existsSync(path.join(APP, 'node_modules', 'vite')) && fs.e
 if (isReactSource && !hasModules) bad('dependency របស់ ZoeW ត្រូវដំឡើង (npm ci --prefix ZoeW)', path.join(APP, 'node_modules'));
 
 if (isReactSource && hasModules && !missing.length) {
-    for (const step of STEPS) {
+    for (const step of MY_STEPS) {
         const started = Date.now();
         const args = ['run', '-s', step];
         if (step === 'test' && /^[1-8]$/.test(TEST_WORKERS)) args.push('--', '--maxWorkers=' + TEST_WORKERS);

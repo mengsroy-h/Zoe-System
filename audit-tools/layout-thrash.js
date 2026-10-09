@@ -384,6 +384,7 @@ function seedOrders(n) {
 
 const MOVES = 100;
 const SCROLLS = 60;
+const SUGGEST_SHOW_CEILING_MS = 1500;
 // ថវិកា៖ memo ត្រូវធ្វើឲ្យការដើរឡើងលើដើមឈើកើតតែម្តងក្នុងមួយកាយវិការ។
 // មុនកែ ការវាស់ពិតគឺ getComputedStyle=82 និង layout read=820 ក្នុង ១០០ ចលនា។
 const PTR_GCS_BUDGET = 8;
@@ -441,7 +442,7 @@ const SUGGEST_CALL_BUDGET = 4;
         return { gcs, reads, engaged };
     }, MOVES);
 
-    const suggest = await page.evaluate(async (scrolls) => {
+    const suggest = await page.evaluate(async ({ scrolls, suggestCeilingMs }) => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const input = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
@@ -449,8 +450,11 @@ const SUGGEST_CALL_BUDGET = 4;
         input.focus();
         input.value = '09';
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        await wait(80);
-        if (!box.classList.contains('show')) return { err: 'ប្រអប់ស្នើលេខមិនបង្ហាញ' };
+        // ប្រអប់ស្នើលេខធ្លាក់ចុះតែក្រោយចលនាប្រអប់ស្វែងរកចប់ (រង់ចាំស៊ុមហូរ + glide) —
+        // រង់ចាំរហូតវាបង្ហាញ ក្នុងពិដាន `SUGGEST_SHOW_CEILING_MS`; ពិដានផុត = បរាជ័យពិត។
+        const deadline = Date.now() + suggestCeilingMs;
+        while (!box.classList.contains('show') && Date.now() < deadline) await wait(20);
+        if (!box.classList.contains('show')) return { err: 'ប្រអប់ស្នើលេខមិនបង្ហាញក្នុង ' + suggestCeilingMs + 'ms' };
         // រាប់ការវាស់ពិតលើប្រអប់បញ្ចូល មិនមែនរាប់ការហៅតាម `window.` ទេ —
         // listener កាន់សេចក្តីយោងផ្ទាល់ ដូច្នេះការជំនួស `window.` មិនចាប់វាបានទេ។
         let calls = 0;
@@ -464,7 +468,7 @@ const SUGGEST_CALL_BUDGET = 4;
         await wait(160);
         Element.prototype.getBoundingClientRect = rectOrig;
         return { calls, placed: !!box.style.top, stillShown: box.classList.contains('show') };
-    }, SCROLLS);
+    }, { scrolls: SCROLLS, suggestCeilingMs: SUGGEST_SHOW_CEILING_MS });
 
     await ctx.close(); server.close(); await browser.close();
 

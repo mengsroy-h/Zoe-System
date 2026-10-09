@@ -127,27 +127,205 @@ export function ledgerTagged(record, op, ring) {
     return ring ? { ...record, op, ops: ring } : { ...record, op };
 }
 
-export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordOf = (value) => value) {
+export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordOf = (value) => value, event?) {
     const sdk = firebaseState.fb;
-    let op = 'op_';
-    try {
-        const bytes = new Uint8Array(12);
-        crypto.getRandomValues(bytes);
-        bytes.forEach((b) => { op += (b % 36).toString(36); });
-    } catch (e) {
-        op = 'op_';
-        for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
+    let op = event ? event.token : 'op_';
+    if (!event) {
+        try {
+            const bytes = new Uint8Array(12);
+            crypto.getRandomValues(bytes);
+            bytes.forEach((b) => { op += (b % 36).toString(36); });
+        } catch (e) {
+            op = 'op_';
+            for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
+        }
     }
     const send = (level, retries) => {
-        const updater: any = (current) => update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null);
-        if (level) updater.txOutcomeWitness = (server, prior) => ledgerOpWitness(recordOf(server), recordOf(prior), op);
+        const updater: any = (current) => update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null, level > 2);
+        if (level) updater.txOutcomeWitness = event
+            ? (server, prior) => event.witness(recordOf(server), recordOf(prior))
+            : (server, prior) => ledgerOpWitness(recordOf(server), recordOf(prior), op);
         return sdk.runTransaction(ref, updater).catch((error) => {
             if (error && error.txOutcome === 'not-applied' && retries > 0) return send(level, retries - 1);
             if (!level || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
+            if (event && level < 3) throw error;
             return send(level - 1, retries);
         });
     };
-    return send(2, notAppliedRetries);
+    return send(event ? 3 : 2, notAppliedRetries);
+}
+
+export function ledgerEventToken(trashId, at, mode) {
+    const text = String(trashId) + '|' + String(at) + '|' + String(mode);
+    let a = 0x811c9dc5;
+    let b = 0x9747b28c;
+    for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        a = Math.imul(a ^ c, 0x01000193) >>> 0;
+        b = Math.imul(b ^ c, 0x5bd1e995) >>> 0;
+        b = (b ^ (b >>> 13)) >>> 0;
+    }
+    return 'op_k' + String(mode) + a.toString(36).padStart(7, '0') + b.toString(36).padStart(7, '0');
+}
+
+export function ledgerRecordTokens(record) {
+    const tokens = Object.keys(ledgerOpRingOf(record));
+    const op = record && typeof record === 'object' ? record.op : null;
+    if (typeof op === 'string' && /^op_[0-9a-z_]{5,37}$/.test(op) && tokens.indexOf(op) === -1) tokens.push(op);
+    return tokens;
+}
+
+export function ledgerTokenSeen(record, token) {
+    return !!token && ledgerRecordTokens(record).indexOf(token) !== -1;
+}
+
+export function ledgerPriorSeen(record, prior) {
+    if (!Array.isArray(prior) || !prior.length) return false;
+    const seen = ledgerRecordTokens(record);
+    return prior.some((token) => seen.indexOf(token) !== -1);
+}
+
+export function ledgerDedOf(record, trashId) {
+    const ded = record && typeof record === 'object' && record.ded && typeof record.ded === 'object' ? record.ded : null;
+    const entry = ded && typeof trashId === 'string' ? ded[trashId] : null;
+    if (!entry || typeof entry !== 'object' || typeof entry.at !== 'number' || !isFinite(entry.at) || entry.at <= 0) return null;
+    return {
+        at: entry.at,
+        cod: Math.max(0, ledgerNumber(entry.cod)),
+        dod: Math.max(0, ledgerNumber(entry.dod)),
+        count: Math.max(0, ledgerNumber(entry.count)),
+        back: entry.back === true,
+        undo: entry.undo === true
+    };
+}
+
+export function ledgerDedValue(entry) {
+    const value: any = { at: entry.at, cod: entry.cod, dod: entry.dod, count: entry.count };
+    if (entry.back) value.back = true;
+    if (entry.undo) value.undo = true;
+    return value;
+}
+
+export function ledgerCarryDed(record, next) {
+    const ded = record && typeof record === 'object' && record.ded && typeof record.ded === 'object' ? record.ded : null;
+    if (!ded) return next;
+    const kept = {};
+    Object.keys(ded).forEach((trashId) => {
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return;
+        const entry = ledgerDedOf(record, trashId);
+        if (entry) kept[trashId] = ledgerDedValue(entry);
+    });
+    return Object.keys(kept).length ? { ...next, ded: kept } : next;
+}
+
+export function ledgerTotalsOf(record) {
+    return {
+        codDollar: parseFloat(record && record.codDollar) || 0,
+        dodDollar: parseFloat(record && record.dodDollar) || 0,
+        totalCount: parseFloat(record && record.totalCount) || 0
+    };
+}
+
+export function ledgerLatestMonths(months) {
+    const latest = {};
+    Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {
+        latest[key] = months[key];
+    });
+    return latest;
+}
+
+export function ledgerMirrorStep(map, key, token, before, after) {
+    if (!map || typeof map !== 'object') return;
+    if (map[key] && ledgerTokenSeen(map[key], token)) return;
+    const delta = ledgerAppliedDelta(before, after);
+    if (!delta.cod && !delta.dod && !delta.count) return;
+    applyLedgerBucketDelta(map, key, delta.cod, delta.dod, delta.count);
+}
+
+export function ledgerEventDecision(daily, mode, record, trashId, at, prior, deductionPrior) {
+    const tokenD = ledgerEventToken(trashId, at, 'd');
+    const tokenU = ledgerEventToken(trashId, at, 'u');
+    const entry = daily ? ledgerDedOf(record, trashId) : null;
+    const same = !!entry && entry.at === at;
+    if (mode !== 'undo') {
+        if (same) return { state: entry.back ? 'restored' : 'already', entry };
+        if (ledgerTokenSeen(record, tokenD)) return { state: 'already' };
+        if (prior && !ledgerPriorSeen(record, prior)) return { state: 'unknown' };
+        return { state: 'apply', sign: -1 };
+    }
+    if (daily) {
+        if (same && entry.back) return { state: 'already', undo: entry.undo, entry };
+        if (same) return { state: 'apply', sign: 1, entry };
+        if (ledgerTokenSeen(record, tokenU)) return { state: 'already', undo: true };
+        if (ledgerTokenSeen(record, tokenD)) return { state: 'unknown' };
+        return { state: ledgerPriorSeen(record, prior) ? 'absent' : 'unknown' };
+    }
+    if (ledgerTokenSeen(record, tokenU)) return { state: 'already' };
+    if (prior && !ledgerPriorSeen(record, prior)) return { state: 'unknown' };
+    if (deductionPrior && !ledgerTokenSeen(record, tokenD)) return { state: ledgerPriorSeen(record, deductionPrior) ? 'absent' : 'unknown' };
+    return { state: 'apply', sign: 1 };
+}
+
+export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, amounts, prior, deductionPrior?) {
+    const daily = bucket === 'daily';
+    const undo = mode === 'undo';
+    const ymKey = String(scanDateStr).substring(0, 7);
+    const token = ledgerEventToken(trashId, at, undo ? 'u' : 'd');
+    if (!firebaseState.fb || !firebaseState.db || !(daily ? firebaseState.dbRefDailyRevenue : firebaseState.dbRefMonthlyRevenue)) {
+        return Promise.resolve({ state: 'failed' });
+    }
+    const ref = daily ? firebaseState.fb.ref(firebaseState.db, `zoew_daily_revenue_cod_dod/${scanDateStr}`) : firebaseState.dbRefMonthlyRevenue;
+    const recordOf = daily ? (value) => value : (value) => (value && typeof value === 'object' ? value[ymKey] : null);
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
+    let verdict = null;
+    const update = (value, op, ring, keyed) => {
+        verdict = null;
+        const months = daily ? null : (value && typeof value === 'object' ? value : {});
+        const record = daily ? value : (months[ymKey] || null);
+        const decision: any = ledgerEventDecision(daily, mode, record, trashId, at, prior, deductionPrior);
+        if (decision.state !== 'apply') {
+            verdict = decision;
+            return undefined;
+        }
+        const size = undo && decision.entry ? decision.entry : amounts;
+        const sign = decision.sign;
+        const before = ledgerTotalsOf(record);
+        const after = ledgerDeltaWithClamp(before, sign * ledgerNumber(size.cod), sign * ledgerNumber(size.dod), sign * ledgerNumber(size.count),
+            daily ? 'Daily' : 'Monthly', daily ? scanDateStr : ymKey);
+        const applied = ledgerAppliedDelta(before, after);
+        let next = daily ? ledgerCarryDed(record, after) : after;
+        let entry = decision.entry || null;
+        if (daily && keyed) {
+            entry = undo
+                ? { at, cod: decision.entry.cod, dod: decision.entry.dod, count: decision.entry.count, back: true, undo: true }
+                : { at, cod: -applied.cod, dod: -applied.dod, count: -applied.count };
+            next = { ...next, ded: { ...(next.ded || {}), [trashId]: ledgerDedValue(entry) } };
+        }
+        verdict = { state: 'applied', before, after, entry };
+        const tagged = ledgerTagged(next, token, ring);
+        if (daily) return tagged;
+        months[ymKey] = tagged;
+        return ledgerLatestMonths(months);
+    };
+    const witness = (server, prior2) => {
+        const entry = daily ? ledgerDedOf(server, trashId) : null;
+        if (entry && entry.at === at && (!undo || (entry.back && entry.undo))) return 'applied';
+        return ledgerOpWitness(server, prior2, token);
+    };
+    return runLedgerTransaction(ref, update, 3, recordOf, { token, witness }).then((result) => {
+        if (!current()) return { state: 'stale' };
+        if (!verdict) return { state: 'failed' };
+        if (verdict.state !== 'applied') return verdict;
+        if (!result || !result.committed) return { state: 'failed' };
+        ledgerMirrorStep(daily ? dataState.dailyRevenueData : dataState.monthlyRevenueData, daily ? scanDateStr : ymKey, token, verdict.before, verdict.after);
+        return verdict;
+    }, (error) => {
+        if (!current()) return { state: 'stale' };
+        if (/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) return { state: 'refused' };
+        return { state: error && error.txOutcome === 'unknown' ? 'unknown' : 'failed' };
+    });
 }
 
 export function ledgerZeroDelta() {
@@ -321,7 +499,7 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
             dodDollar: parseFloat(current && current.dodDollar) || 0,
             totalCount: parseFloat(current && current.totalCount) || 0
         };
-        serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr);
+        serverAfter = ledgerCarryDed(current, ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr));
         return ledgerTagged(serverAfter, op, ring);
     }).then((result) => {
         if (!result || !result.committed || !serverBefore || !serverAfter) {

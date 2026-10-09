@@ -103,7 +103,7 @@ function constSource(name) { return extractConst(src, name) || CONST_STUBS[name]
 
 // ── ២. Sandbox ដែលរត់កូដ ship ពិត ─────────────────────────────────────────
 function buildWorld(mode) {
-    const log = { toasts: [], updates: 0, gets: 0, txs: 0, registryUpdates: 0, captures: [] };
+    const log = { toasts: [], updates: 0, gets: 0, txs: 0, registryUpdates: 0, dedUpdates: 0, captures: [] };
     const errorRecorder = { capture: (error, details) => log.captures.push({ message: String(error && error.message || error), details }) };
     const ctx = {
         console: { log: () => {}, error: () => {}, warn: () => {} },
@@ -124,6 +124,8 @@ let deletedCleanupInFlight = false;
 let db = {}, fb = null;
 let dbRefDeleted = { p: 'del' };
 let deletedItems = [], scanHistory = [];
+let dailyRevenueData = {};
+function getFormattedDate() { return '2027-01-15'; }
 let serverTimeOffsetMs = 0;
 const activeRestoreClaims = new Map();
 const pendingRegistryReleases = new Map();
@@ -147,11 +149,13 @@ function refreshCurrentHistoryView() {}
            'barcodeRegistryKey', 'collectItemBarcodes', 'queueRegistryReleaseRetry', 'releaseRegistryKeys',
            'releaseBarcodesInRegistry', 'trashRetentionMs', 'isActiveRestoreClaim',
            'releaseStaleRestoreClaimForPurge', 'itemHasRestoreMarkers', 'dbListenerViewIsStale',
-           'purgeDeletedItemsQuietly', 'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers']
+           'purgeDeletedItemsQuietly', 'runAutomaticDeletedCleanup', 'clearStaleRestoreMarkers',
+           'ledgerNumber', 'ledgerDedOf', 'cleanupEventAt', 'cleanupScanDateOf', 'cleanupLedgerKeyOf', 'releaseCleanupLedgerKeys']
             .map(fnSource).join('\n')
         + `
 globalThis.__setFb = (impl) => { fb = impl; };
 globalThis.__seed = (d) => { deletedItems = d; };
+globalThis.__seedLedger = (d) => { dailyRevenueData = d; };
 globalThis.__lockHeld = () => deletedCleanupInFlight;
 globalThis.__sweeps = () => Array.from(staleRestoreMarkerSweeps);
 globalThis.__trash = () => deletedItems.map((i) => i.id);
@@ -172,7 +176,10 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         update: (ref, updates) => {
             log.updates++;
             if (ref && ref.registry) log.registryUpdates++;
+            const dedRelease = Object.keys(updates || {}).some((k) => k.indexOf('/ded/') !== -1);
+            if (dedRelease) log.dedUpdates++;
             if (mode === 'hang') return new Promise((resolve) => { later.push(resolve); });
+            if (mode === 'ded-hang' && dedRelease) return hang();
             return Promise.resolve();
         },
         runTransaction: (ref, updater) => {
@@ -226,6 +233,24 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         await sleep(300);
         ok('⛔ ការសរសេរដែលចុះយឺត ➜ ធាតុត្រូវចេញពីធុងសំរាមក្នុងសតិ',
             w.ctx.__trash().length === 0, w.ctx.__trash());
+    }
+
+    // ── ២ខ. សោដក `ded` (2.50.49) ៖ purge ជោគជ័យ តែការដោះសោ `ded` ព្យួរ ➜ សោត្រូវដោះ ────────
+    // ⛔ purge ធុងសំរាម `expired` លុបសោ `ded/<trashId>` ជាមួយ (`releaseCleanupLedgerKeys()`) ក្នុង `applyPurged()` ដែលត្រូវ await ក្រោមសោ ➜
+    //    បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) ➜ ការសរសេរនោះព្យួរ ➜ សោ `deletedCleanupInFlight` ជាប់ ➜ purge ងាប់។
+    console.log('\n== ២ខ. សោដក `ded` ៖ ការដោះសោព្យួរ មិនត្រូវជាប់សោសម្អាតធុងសំរាម ==');
+    {
+        const w = buildWorld('ded-hang');
+        const at = Date.now() - 3 * 24 * 3600 * 1000;
+        w.ctx.__seedLedger({ '2027-01-10': { codDollar: 5, dodDollar: 0, totalCount: 1, ded: { id_3_a: { at, cod: 4.57, dod: 0, count: 1 } } } });
+        w.ctx.__seed([{ id: 'id_3_a', scanDate: '2027-01-10', deletedAt: at, trashReason: 'expired', barcodes: [{ code: 'DK1', isDeducted: true }] }]);
+        w.ctx.__runPurge();
+        await sleep(400);
+        const hasKeyRelease = /function releaseCleanupLedgerKeys\(/.test(src);
+        ok('ជាន់អប្បបរមា ៖ ការដោះសោ `ded` ចេញដំណើរពិត (tree ដែលមានសោ)', !hasKeyRelease || w.log.dedUpdates >= 1, w.log.dedUpdates);
+        ok('ធាតុ purge ចេញពីធុងសំរាមក្នុងសតិ', w.ctx.__trash().length === 0, w.ctx.__trash());
+        await sleep(WAIT_AFTER_TIMEOUT);
+        ok('⛔ ការដោះសោ `ded` ព្យួរ ➜ សោសម្អាតធុងសំរាមត្រូវដោះក្នុងពិដាន (មិនជាប់អស់កល្ប)', w.ctx.__lockHeld() === false);
     }
 
     // ── ៣. ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ─────────────────────────────────────────

@@ -158,6 +158,8 @@ function buildWorld(opts) {
         'function collectItemBarcodes() { return []; }',
         'function releaseStaleRestoreClaimForPurge() { return Promise.resolve(); }',
         'function releaseBarcodesInRegistry() { return Promise.resolve(); }',
+        'function cleanupLedgerKeyOf() { return null; }',
+        'function releaseCleanupLedgerKeys() { return Promise.resolve(); }',
         'function barcodeCloseIsRipe(b, now) { return !!(b && b.isClosed && typeof b.closedAt === "number" && (now - b.closedAt) > TWO_HOURS_MS); }',
         'function parseTimestampFromId() { return null; }',
         'function showToast() {}',

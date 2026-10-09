@@ -108,6 +108,7 @@ function makeContext(app) {
     // ⛔ `phoneSearchFocused`/`phoneSearchBlurred` ៖ handler `onFocus`/`onBlur` ពិតរបស់ប្រអប់ស្វែងរក (JSX)
     //    — App React មិនចាក់ listener តាម `addEventListener` ទៀតទេ
     const optional = ['cssPx', 'normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions',
+        'phoneSearchGlideRunning',
         'phoneSearchFocused', 'phoneSearchBlurred'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');
     // ⛔ ស្រទាប់ React (ឃ្លាំង · `fieldValue` · `isFieldFocused` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
@@ -117,7 +118,8 @@ function makeContext(app) {
     const consts2 = src.match(/const RECENT_PHONES_MAX = \d+;/);
     const stateDecls = (src.match(/^ *let phoneSuggest\w+ = .*$/gm) || []).join('\n');
     const recentSigDecl = (src.match(/^ *let recentPhonesSignature = .*$/m) || ['let recentPhonesSignature = null;'])[0];
-    const chromeDecl = (src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0];
+    const chromeDecl = (src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0]
+        + '\n' + (src.match(/^ *let phoneSearchGlide = .*$/m) || ['let phoneSearchGlide = null;'])[0];
     vm.runInContext((consts ? consts[0] : 'const PHONE_SUGGEST_MAX = 8;') + '\n' +
         (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') + '\n' +
         (stateDecls || 'let phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;') + '\n' +

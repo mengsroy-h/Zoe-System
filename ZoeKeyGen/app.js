@@ -1577,6 +1577,7 @@ function showLoginModalWithPrefill() {
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
     isGeneratingKey = false;
+    generateKeyOwner = null;
     const genBtn = document.getElementById('genGenerateBtn');
     if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     if (!isPinFlowPending()) pinTargetAction = null;
@@ -2054,6 +2055,7 @@ function clearSigningKey(silent) {
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
     if (rememberCb) rememberCb.checked = false;
     isGeneratingKey = false;
+    generateKeyOwner = null;
     const genBtn = document.getElementById('genGenerateBtn');
     if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     updateSigningKeyBadge();
@@ -2147,6 +2149,7 @@ function clearGeneratedKeyResult() {
 }
 
 let isGeneratingKey = false;
+let generateKeyOwner = null;
 
 async function generateLicenseKey() {
     if (isGeneratingKey) return;
@@ -2164,6 +2167,8 @@ async function generateLicenseKey() {
     if (days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
 
     const genBtn = document.getElementById('genGenerateBtn');
+    const owner = {};
+    generateKeyOwner = owner;
     isGeneratingKey = true;
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
 
@@ -2260,9 +2265,11 @@ async function generateLicenseKey() {
             ? '⏳ ការបង្កើត Key មិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ Key អាចនឹងចុះដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើល Key List មុនបង្កើតម្តងទៀត (កុំបង្កើត Key ត្រួតគ្នា)។'
             : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
-        if (!isSensitiveSessionCurrent(operation, true)) return;
-        isGeneratingKey = false;
-        if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+        if (generateKeyOwner === owner) {
+            generateKeyOwner = null;
+            isGeneratingKey = false;
+            if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+        }
     }
 }
 

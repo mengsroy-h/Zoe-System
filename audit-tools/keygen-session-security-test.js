@@ -282,6 +282,35 @@ async function run() {
     await newerGenerate;
     ok('សំណើថ្មីបញ្ចប់ដោយដោះសោ Generate ផ្ទាល់ខ្លួន', h.ctx.isGeneratingKey === false);
 
+    // ⛔ បិទប្រអប់ PIN (`closeModal('pinModal')` ពិត ➜ invalidateSensitiveSession) ខណៈ Generate កំពុងរង់ចាំ ៖ សំណើនោះបញ្ចប់ដោយមិនបង្ហាញ Key
+    //    ប៉ុន្តែ **ត្រូវដោះសោ Generate វិញ** ➜ ប៊ូតុងមិនស្លាប់ ហើយ `expireIdleSigningKey()` (ដែលបដិសេធពេល `isGeneratingKey`) ដក Signing Key បានវិញ។
+    //    កូដមុនកែ ៖ `finally` ពិនិត្យ session ➜ `isGeneratingKey` ជាប់ `true` រហូតដល់ចាកចេញ។
+    console.log('-- បិទប្រអប់ PIN ខណៈ Generate កំពុងរង់ចាំ --');
+    for (const stage of ['clock', 'write']) {
+        h = build({ privateKey: reloadKey });
+        vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', h.ctx);
+        h.getElementById('genDaysInput').value = '30';
+        const pending = deferred();
+        if (stage === 'clock') h.ctx.waitForServerTimeSync = () => pending.promise;
+        else h.ctx.fb.update = () => pending.promise;
+        const pinClosedGenerate = h.ctx.generateLicenseKey();
+        await drain();
+        ok(stage + ' ៖ Generate ចាក់សោមុនបិទប្រអប់ PIN', h.ctx.isGeneratingKey === true);
+        h.getElementById('pinModal').classList.add('active');
+        h.ctx.closeModal('pinModal');
+        pending.resolve(true);
+        await pinClosedGenerate;
+        await drain();
+        ok(stage + ' ៖ ⛔ បិទប្រអប់ PIN កណ្តាល Generate ➜ សោ Generate ដោះវិញ (ប៊ូតុងប្រើបាន · Signing Key ផុតពេលទំនេរបាន)',
+            h.ctx.isGeneratingKey === false && !h.getElementById('genGenerateBtn').disabled,
+            { isGeneratingKey: h.ctx.isGeneratingKey, disabled: h.getElementById('genGenerateBtn').disabled });
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
+        h.ctx.waitForServerTimeSync = () => Promise.resolve(true);
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'synthetic-after-pin-id' } });
+        await h.ctx.generateLicenseKey();
+        ok(stage + ' ៖ Generate បន្ទាប់បង្ហាញ Key បាន', h.ctx.lastGeneratedKey === 'synthetic-after-pin', h.ctx.lastGeneratedKey);
+    }
+
     console.log('-- Signing Key ចាស់ក្នុង session --');
     h = build({ sessionRecord: JSON.stringify({ iv: [1], data: [2] }) });
     h.license.verifyKeyString = () => Promise.resolve({ valid: false });

@@ -349,7 +349,7 @@ only this text protects them.
 | Ledger money and parcel count always move together | `ledger-count-integrity-test.js` |
 | Every path making the app usable arms `armSessionExpiryCheck()` (a `'pending'` gate nobody settles is a trap) | `periodic-network-guard-test.js` |
 | SW passes the abort signal via `networkOptions` (navigate targets are strings) — measure the real `fetch` handler | `sw-abort-propagation-test.js` |
-| ZoeKeyGen biometrics: WebAuthn PRF only · discoverable passkey (`residentKey: 'required'`) · decrypted PIN verified · PIN change unbinds · hung admin writes ➜ "⏳ not confirmed" + late ✅ (`armAdminLateWrite()`) · Signing Key idle expiry (`SIGNING_KEY_IDLE_MS`) | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` |
+| ZoeKeyGen biometrics: WebAuthn PRF only · discoverable passkey (`residentKey: 'required'`) · decrypted PIN verified · PIN change unbinds · hung admin writes ➜ "⏳ not confirmed" + late ✅ (`armAdminLateWrite()`) · Signing Key idle expiry (`SIGNING_KEY_IDLE_MS`) · the Generate lock has an owner (`generateKeyOwner`): a session invalidated mid-generate (PIN modal closed · Config) drops the result but releases the lock ⛔ never release by session check | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` |
 | Real data checks need a dump ➜ not in `run-all.sh` | `money-reality-check.js` · `money-reality-test.js` |
 | Duplicate declarations · dead functions | `function-surface-test.js` |
 

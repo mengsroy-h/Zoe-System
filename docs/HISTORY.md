@@ -164,6 +164,10 @@
 - 🔐 **ZoeKeyGen ៖ ប្តូរ Config ➜ auth ចាស់មិនរំខានសម័យថ្មី** (ផ្លូវបងប្អូនធៀប ZoeW) ៖ `initFirebase()` ផ្តាច់ listener auth ចាស់ · លុបពិដាន ៨ វិ. · ឡើង `authGeneration` **មុន**
   `deleteApp()` (Firebase បញ្ជូន callback `null` ក្រោយ `deleteApp` ➜ បើកប្រអប់ចូល · `sbAdminReset()` លើ admin ដែលចូលរួច) · `setupAuthListener()` រក្សាពិដានតែមួយ
   (`authRecoveryTimeout`) ➜ ការហៅលើកទី ២ មុន auth ឆ្លើយ មិនទុកពិដានចាស់ដែលលុប IndexedDB Firebase + reload លើ admin ដែលចូលរួចទេ។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN ខណៈ Generate Key ➜ ប៊ូតុង Generate មិនស្លាប់ · Signing Key ផុតពេលទំនេរបានវិញ** (deep audit) ៖ `closeModal('pinModal')` (បោះបង់ ឬ
+  PIN ត្រូវ សម្រាប់ ⚙️ Config …) និង `initFirebase()` ធ្វើឲ្យ session រសើបអស់សុពលភាព ➜ `generateLicenseKey()` បញ្ចប់ដោយមិនបង្ហាញ Key (ដូចមុន) តែ `finally` ក៏ពិនិត្យ session ដែរ ➜
+  `isGeneratingKey` ជាប់ `true` · ប៊ូតុង «កំពុងបង្កើត...» រហូតដល់ចាកចេញ ហើយ `expireIdleSigningKey()` (បដិសេធពេល `isGeneratingKey`) មិនដក Signing Key ចេញពីសតិទៀតទេ ➜
+  ឥឡូវសោ Generate មានម្ចាស់ (`generateKeyOwner` ដូច `noticeSendOwner`) ➜ សំណើដែលចាក់សោជាអ្នកដោះ · សំណើចាស់មិនដោះសោរបស់សំណើថ្មី។
 - 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
@@ -185,6 +189,8 @@
 - `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
   មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
   web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
+- `keygen-session-security-test` ៖ `closeModal('pinModal')` ពិតកណ្តាល Generate (ដំណាក់កាលម៉ោង Server · ការសរសេរ) ➜ សោដោះ · ប៊ូតុងប្រើបាន · Generate បន្ទាប់បង្ហាញ Key ➜
+  មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩។
 - `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
   ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
 

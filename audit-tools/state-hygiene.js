@@ -37,7 +37,7 @@ const ACCEPTED = {
         documentHiddenAt: 'page-visibility timestamp used only to measure time spent in the background before a database liveness probe; it describes the device tab, not the user, and holds no customer data',
         sessionExpiryCheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
         licenseRecheckInFlight: 'bounded request mutex that settles in finally; keeping it through logout prevents an old request from overlapping the next session and it holds no user data',
-        exchangeRateSaveInFlight: 'bounded Firebase write mutex that settles in finally or its late handlers; retaining it across logout prevents an older rate write from racing a newer session and it holds no customer data',
+        exchangeRateSaveInFlight: 'bounded Firebase write mutex that settles in finally or its late handlers; retaining it across logout prevents an older rate write from racing a newer session and it holds no customer data; a backend teardown (initFirebase ➜ deleteApp kills the queued write, so its late handlers never run) releases it (ZoeW/tests/exchange-rate-backend-switch.test.ts)',
         sessionExpiryCheck: 'the 4-hour session verdict for the CURRENT user; forceExpireSession sets it to "expired" and showLoginModalWithPrefill runs inside that path, so resetting it there would erase the very fact the login toast must report. proceedAfterLogin re-arms it to "pending" on the next sign-in',
         exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
         serverTimeOffsetMs: 'clock offset, not user data',

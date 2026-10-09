@@ -178,6 +178,9 @@
   SW activate ➜ cache-first ផ្តល់ HTML ជំនួស JS ➜ App ស រហូតដល់ SW បន្ទាប់ (ច្បាប់ `responseFitsKey()` មានតែលើ fetch/ការធ្វើឲ្យស្រស់ មិនលើ install) ➜ ឥឡូវ
   `shellEntriesFit()` ពិនិត្យ CORE ក្រោយ `addAll` ➜ HTML ក្រោម key មិនមែន HTML ➜ install ធ្លាក់ (browser សាក sw.js ថ្មីពេលក្រោយ) · OPTIONAL ដែលទទួល HTML ត្រូវលុបចេញពី
   cache (SW នៅ activate · fetch ពេលប្រើពីបណ្តាញ)។
+- 💱 **ZoeW ៖ រក្សាអត្រាប្រាក់ព្យួរ ➜ ប្តូរ Config/backend ➜ ប៊ូតុង «រក្សាទុកអត្រាប្រាក់» ដើរវិញ** (deep audit) ៖ `exchangeRateSaveInFlight` រស់រានឆ្លង logout ដោយចេតនា
+  («settle ក្នុង late handler») តែវាស់លើ Firebase SDK ពិត (emulator) ៖ `set()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ late handler មិនរត់ ➜
+  សោជាប់ ➜ ចុចរក្សាទុក return 'pending' ស្ងាត់ (គ្មាន toast · ប្រអប់មិនបិទ) រហូតដល់ reload ➜ ឥឡូវ teardown ក្នុង `initFirebase()` ដោះសោនេះ (ការសរសេរចាស់ស្លាប់ជាមួយ App ចាស់)។
 - 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
@@ -205,6 +208,8 @@
   កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
 - `sw-install-integrity-test` ជុំទី ៧ · ៧ខ (browser ពិត · build ពិត · deploy ជាន់មុនផ្ទុកទំព័រ ព្រោះ App ចុះឈ្មោះ sw.js ខ្លួនឯង) ៖ JS ចម្បងទទួល `index.html` ➜ install ធ្លាក់ ·
   ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate ជាមួយ JS ពិត · OPTIONAL ទទួល HTML ➜ activate តែគ្មាន HTML ក្នុង cache ➜ មុនកែ ៤ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · checker SW ផ្សេង ៨ បៃតង។
+- `ZoeW/tests/exchange-rate-backend-switch.test.ts` ៖ រក្សាអត្រាប្រាក់ព្យួរ (`dbOp` ផុត ➜ 'pending') ➜ `initFirebase()` ប្តូរ Config ➜ ការរក្សាទុកបន្ទាប់ 'done' តាម App ថ្មី · ទិសផ្ទុយ ៖
+  គ្មាន teardown ➜ ចុចលើកទី ២ នៅ 'pending' (គ្មានការសរសេរត្រួតគ្នា) ➜ មុនកែ ១ ធ្លាក់ (`'pending'`) · ក្រោយកែ ២/២។
 - `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
   ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
 

@@ -251,19 +251,23 @@ try {
         await page.locator('#searchPhoneInput').focus();
         await page.waitForTimeout(700);
         const suggestWasOpen = await page.evaluate(() => window.uiState.phoneSuggestOpen);
+        // ⛔ ប្រអប់ហូតឡើង ➜ កាតបញ្ជីយកតែកន្លែងនៅសល់ ➜ `#appPages` គ្មានអ្វីរមូរ ➜ ប្រអប់ស្វែងរកមិនអាចចូលក្រោមរបាខាងលើ ហើយ suggestion មិនអណ្តែតដាច់ពីប្រអប់
+        //    (រាយការណ៍ម្ចាស់គម្រោង ៖ «កំពុងស្វែងរក scroll list ទៅក្រោម បាត់ប្រអប់ស្វែងរក»)។ ច្រកសុវត្ថិភាព «ប្រអប់ចេញពីផ្ទៃដែលមើលឃើញ ➜ suggestion បិទ» វាស់ក្នុង `phone-suggest-test`។
         await page.evaluate(() => { document.getElementById('appPages').scrollTop = 500; });
         await page.waitForTimeout(400);
-        const hiddenSearch = await page.evaluate(() => ({
-            open: window.uiState.phoneSuggestOpen,
-            inputBottom: document.getElementById('searchPhoneInput').getBoundingClientRect().bottom,
-            navbarBottom: document.querySelector('.app-navbar').getBoundingClientRect().bottom
-        }));
-        check(mode.label + ' ៖ រមូរប្រអប់ស្វែងរកចូលក្រោមរបាខាងលើ ➜ suggestion បិទដោយមិនចាំបាច់ប៉ះកន្លែងផ្សេង',
-            suggestWasOpen && hiddenSearch.inputBottom <= hiddenSearch.navbarBottom && !hiddenSearch.open, hiddenSearch);
-        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
-        await page.waitForTimeout(400);
-        check(mode.label + ' ៖ រមូរត្រឡប់មកវិញមិនបើក suggestion ចាស់ឡើងវិញ',
-            !await page.evaluate(() => window.uiState.phoneSuggestOpen));
+        const pinnedSearch = await page.evaluate(() => {
+            const input = document.getElementById('searchPhoneInput').getBoundingClientRect();
+            const box = document.getElementById('phoneSuggestBox').getBoundingClientRect();
+            return {
+                open: window.uiState.phoneSuggestOpen,
+                pagesTop: Math.round(document.getElementById('appPages').scrollTop),
+                inputTop: Math.round(input.top), inputBottom: Math.round(input.bottom), boxTop: Math.round(box.top),
+                navbarBottom: Math.round(document.querySelector('.app-navbar').getBoundingClientRect().bottom)
+            };
+        });
+        check(mode.label + ' ៖ ⛔ ប្រអប់ហូតឡើង ➜ ការរមូរ `#appPages` មិនរុញប្រអប់ស្វែងរកចូលក្រោមរបាខាងលើ · suggestion នៅបើកជាប់ក្រោមប្រអប់ (មិនអណ្តែតដាច់)',
+            suggestWasOpen && pinnedSearch.pagesTop === 0 && pinnedSearch.inputTop >= pinnedSearch.navbarBottom && pinnedSearch.open
+                && Math.abs(pinnedSearch.boxTop - (pinnedSearch.inputBottom + 4)) <= 2, pinnedSearch);
         await page.evaluate(() => document.getElementById('searchPhoneInput').blur());
         await page.waitForTimeout(700);
         await page.locator('#searchPhoneInput').focus();

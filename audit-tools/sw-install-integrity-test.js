@@ -614,6 +614,96 @@ function serve(dir, blocked) {
             out.state === 'activated' && Array.isArray(out.types) && !out.types.some((t) => /text\/html/i.test(t)), out);
     }
 
+    // ជុំទី ៨ — ⛔⛔ deploy ថ្មីចូលផ្សាយ **កណ្តាល install** លើឯកសារ **គ្មាន hash** (`index.html` · `boot-flags.js` · vendor · ZoeKeyGen ទាំងមូល) ៖ Netlify ឆ្លើយ
+    //    ឯកសារឈ្មោះដដែលពី deploy ថ្មី (200 · ប្រភេទត្រឹមត្រូវ) ➜ `responseFitsKey()`/`shellEntriesFit()` មើលមិនឃើញ ➜ cache កំណែ N ផ្ទុកសំបក N+1 លាយ N
+    //    (ក្រៅបណ្តាញ ៖ `index.html` N+1 យោង asset ដែលគ្មានក្នុង cache) រហូតដល់ SW បន្ទាប់។ ភស្តុតាងតែមួយថា deploy មិនប្តូរ ៖ sw.js ដែលកំពុងផ្សាយ **ក្រោយ** cache ពេញ
+    //    នៅតែមាន `CACHE_VERSION` របស់ SW ដែលកំពុង install (Netlify deploy ជា atomic ➜ ដដែលនៅចុង = ដដែលពេញ install)។ ប្តូរ ➜ install ធ្លាក់ (browser
+    //    install sw.js ថ្មីពេលពិនិត្យបន្ទាប់)។ ⛔ «អានមិនបាន» ≠ «ប្តូរ» ៖ 503 · ព្យួរ (ពិដានដេរីវេពី sw.js ពិត) ➜ install នៅជោគជ័យ។ ទិសផ្ទុយ ៖ deploy មិនប្តូរ ➜ activate។
+    //    ការស្នើ script របស់ browser (header `Service-Worker: script`) ទទួល sw.js ពិតជានិច្ច ➜ មានតែការអានពីក្នុង SW ដែលឃើញ deploy ថ្មី។ App ទាំង ២ · ស្របគ្នា។
+    {
+        const MARGIN_MS = 8000;
+        const scenario = async (app, kind) => {
+            const appDir = path.join(ROOT, app);
+            const swReal = fs.readFileSync(path.join(appDir, 'sw.js'), 'utf8');
+            const cv = (/const CACHE_VERSION = '([a-z]+-v)(\d+)';/.exec(swReal) || []);
+            const nextSw = cv[0] ? swReal.replace(cv[0], "const CACHE_VERSION = '" + cv[1] + (Number(cv[2]) + 1000) + "';") : swReal;
+            const ceilingMatch = /INSTALL_DEPLOY_CHECK_TIMEOUT_MS\s*=\s*(\d+)/.exec(swReal);
+            const ceiling = ceilingMatch ? Number(ceilingMatch[1]) : 10000;
+            const state = { mode: kind, inSwReads: 0 };
+            const held = new Set();
+            const srv = await new Promise((res) => {
+                const s = http.createServer((req, rsp) => {
+                    let p = decodeURIComponent(req.url.split('?')[0]);
+                    if (p === '/') p = '/index.html';
+                    if (p === '/sw.js' && req.headers['service-worker'] !== 'script' && state.mode !== 'same') {
+                        state.inSwReads++;
+                        if (state.mode === 'down') { rsp.writeHead(503); return rsp.end('down'); }
+                        if (state.mode === 'hang') { held.add(rsp); return; }
+                        rsp.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
+                        return rsp.end(nextSw);
+                    }
+                    const f = path.join(appDir, p);
+                    if (!f.startsWith(appDir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                    rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                    rsp.end(fs.readFileSync(f));
+                });
+                const sockets = new Set();
+                s.on('connection', (c) => { sockets.add(c); c.on('close', () => sockets.delete(c)); });
+                s.stopAll = () => new Promise((r) => { held.clear(); sockets.forEach((c) => c.destroy()); s.close(r); });
+                s.listen(0, '127.0.0.1', () => res(s));
+            });
+            const o = 'http://127.0.0.1:' + srv.address().port;
+            const b = await chromium.launch({ executablePath: CHROME });
+            const c8 = await b.newContext({ viewport: { width: 412, height: 780 } });
+            const p8 = await c8.newPage();
+            await c8.route('**', (r) => (r.request().url().startsWith(o) ? r.continue() : r.abort()));
+            const installOnce = (waitMs) => p8.evaluate(async (ms) => {
+                const t0 = Date.now();
+                const reg = await navigator.serviceWorker.register('./sw.js');
+                const w = reg.installing || reg.waiting || reg.active;
+                if (!w) return { err: 'គ្មាន worker' };
+                await new Promise((res) => {
+                    const done = () => w.state === 'activated' || w.state === 'redundant';
+                    if (done()) return res();
+                    w.addEventListener('statechange', () => { if (done()) res(); });
+                    setTimeout(res, ms);
+                });
+                return { state: w.state, ms: Date.now() - t0, controlled: !!navigator.serviceWorker.controller };
+            }, waitMs).catch((e) => ({ err: String(e && e.message || e) }));
+            let out = { err: 'មិនបានរត់' };
+            let healed = null;
+            try {
+                await p8.goto(o + '/', { waitUntil: 'load', timeout: 30000 });
+                out = await installOnce(ceiling + MARGIN_MS + 20000);
+                if (kind === 'flip') {
+                    state.mode = 'same';
+                    healed = await installOnce(40000);
+                }
+            } catch (e) {
+                out = { err: String(e && e.message || e) };
+            }
+            await b.close().catch(() => {});
+            await srv.stopAll();
+            return { app, kind, versioned: !!cv[0], ceiling, fromCode: !!ceilingMatch, inSwReads: state.inSwReads, out, healed };
+        };
+        const runs = await Promise.all(['ZoeW', 'ZoeKeyGen'].flatMap((app) => [scenario(app, 'flip'), scenario(app, 'down'), scenario(app, 'hang')]));
+        for (const r of runs) {
+            const label = 'ជុំទី ៨ ៖ ' + r.app + ' ៖ ';
+            if (r.kind === 'flip') {
+                ok(label + 'លក្ខខណ្ឌចាំបាច់ ៖ រក `CACHE_VERSION` ក្នុង sw.js ពិតឃើញ (deploy ថ្មី = កំណែផ្សេង)', r.versioned, r);
+                ok(label + '⛔⛔ sw.js ដែលផ្សាយក្រោយ cache ពេញមាន `CACHE_VERSION` ផ្សេង (deploy ប្តូរកណ្តាល install) ➜ install ធ្លាក់ (មិន activate · មិនគ្រប់គ្រងទំព័រ)',
+                    r.inSwReads >= 1 && r.out.state === 'redundant' && !r.out.controlled, r);
+                ok(label + 'ទិសផ្ទុយ ៖ deploy មិនប្តូរ ➜ install ដដែល activate', !!r.healed && r.healed.state === 'activated', r);
+            } else if (r.kind === 'down') {
+                ok(label + 'ទិសផ្ទុយ ៖ អាន sw.js មិនបាន (503) ≠ deploy ប្តូរ ➜ install នៅ activate', r.out.state === 'activated', r);
+            } else {
+                ok(label + 'ពិដានពិនិត្យ deploy ដេរីវេពី sw.js ពិត (`INSTALL_DEPLOY_CHECK_TIMEOUT_MS`) ≤ 15 វិ.', r.fromCode && r.ceiling > 0 && r.ceiling <= 15000, r);
+                ok(label + 'ទិសផ្ទុយ ៖ ការអាន sw.js ព្យួរ ➜ install activate ក្នុងពិដាន + ' + MARGIN_MS / 1000 + ' វិ. (ព្យួរ ≠ ប្តូរ · មិនជាប់ installing)',
+                    r.inSwReads >= 1 && r.out.state === 'activated' && r.out.ms <= r.ceiling + MARGIN_MS, r);
+            }
+        }
+    }
+
     await browser.close();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);

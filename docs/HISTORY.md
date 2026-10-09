@@ -188,6 +188,11 @@
   SW activate ➜ cache-first ផ្តល់ HTML ជំនួស JS ➜ App ស រហូតដល់ SW បន្ទាប់ (ច្បាប់ `responseFitsKey()` មានតែលើ fetch/ការធ្វើឲ្យស្រស់ មិនលើ install) ➜ ឥឡូវ
   `shellEntriesFit()` ពិនិត្យ CORE ក្រោយ `addAll` ➜ HTML ក្រោម key មិនមែន HTML ➜ install ធ្លាក់ (browser សាក sw.js ថ្មីពេលក្រោយ) · OPTIONAL ដែលទទួល HTML ត្រូវលុបចេញពី
   cache (SW នៅ activate · fetch ពេលប្រើពីបណ្តាញ)។
+- 🧰 **ZoeW + ZoeKeyGen ៖ ឯកសារគ្មាន hash ពី deploy ២ មិនលាយក្នុង cache តែមួយ** (ម្ចាស់គម្រោង «កែទាំងអស់» · ព្រំដែនដែលនៅសល់ពីធាតុខាងលើ) ៖ `index.html` ·
+  `boot-flags.js` · vendor · ZoeKeyGen ទាំងមូល មានឈ្មោះដដែលគ្រប់ deploy ➜ deploy ថ្មីចូលផ្សាយកណ្តាល install ➜ cache កំណែ N ផ្ទុកឯកសារ N+1 លាយ N (ក្រៅបណ្តាញ
+  `index.html` ថ្មីយោង asset ដែលគ្មានក្នុង cache) រហូតដល់ SW បន្ទាប់ ➜ ឥឡូវ ក្រោយ cache ពេញ `deployUnchangedDuringInstall()` អាន sw.js ដែលកំពុងផ្សាយ ៖ `CACHE_VERSION` ផ្សេង ➜
+  install ធ្លាក់ (browser install sw.js ថ្មីពេលពិនិត្យបន្ទាប់) · អានមិនបាន ឬព្យួរលើស `INSTALL_DEPLOY_CHECK_TIMEOUT_MS` (១០ វិ.) ➜ ទទួល (មិនមែនភស្តុតាងថាប្តូរ)។ ចំណាយ ៖
+  ការស្នើ sw.js ១ ដង/install (conditional `no-cache`)។
 - 💱 **ZoeW ៖ រក្សាអត្រាប្រាក់ព្យួរ ➜ ប្តូរ Config/backend ➜ ប៊ូតុង «រក្សាទុកអត្រាប្រាក់» ដើរវិញ** (deep audit) ៖ `exchangeRateSaveInFlight` រស់រានឆ្លង logout ដោយចេតនា
   («settle ក្នុង late handler») តែវាស់លើ Firebase SDK ពិត (emulator) ៖ `set()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ late handler មិនរត់ ➜
   សោជាប់ ➜ ចុចរក្សាទុក return 'pending' ស្ងាត់ (គ្មាន toast · ប្រអប់មិនបិទ) រហូតដល់ reload ➜ ឥឡូវ teardown ក្នុង `initFirebase()` ដោះសោនេះ (ការសរសេរចាស់ស្លាប់ជាមួយ App ចាស់)។
@@ -220,7 +225,9 @@
 - `keygen-supabase-admin-test` ៖ `closeModal('pinModal')` ពិតក្រោយចូល Supabase ➜ 🔄 Refresh អានបញ្ជីហាងពិត · បង្កើតហាងបន្ទាប់ចុះ DB ➜ មុនកែ ១០ ធ្លាក់ (ការបង្កើតហាង ·
   កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
 - `sw-install-integrity-test` ជុំទី ៧ · ៧ខ (browser ពិត · build ពិត · deploy ជាន់មុនផ្ទុកទំព័រ ព្រោះ App ចុះឈ្មោះ sw.js ខ្លួនឯង) ៖ JS ចម្បងទទួល `index.html` ➜ install ធ្លាក់ ·
-  ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate ជាមួយ JS ពិត · OPTIONAL ទទួល HTML ➜ activate តែគ្មាន HTML ក្នុង cache ➜ មុនកែ ៤ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · checker SW ផ្សេង ៨ បៃតង។
+  ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate ជាមួយ JS ពិត · OPTIONAL ទទួល HTML ➜ activate តែគ្មាន HTML ក្នុង cache ➜ មុនកែ ៤ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · checker SW ផ្សេង ៨ បៃតង ·
+  ជុំទី ៨ (App ទាំង ២ · ស្របគ្នា) ៖ ការស្នើ script របស់ browser (`Service-Worker: script`) ទទួល sw.js ពិត · ការអានពីក្នុង SW ទទួល sw.js `CACHE_VERSION` ផ្សេង ➜ install ធ្លាក់ ·
+  ទិសផ្ទុយ ៖ deploy ដដែល ➜ activate · 503 ➜ activate · ព្យួរ ➜ activate ក្នុងពិដាន (ដេរីវេពី sw.js ពិត) + ៨ វិ. ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ៥៦/៥៦។
 - `ZoeW/tests/exchange-rate-backend-switch.test.ts` ៖ រក្សាអត្រាប្រាក់ព្យួរ (`dbOp` ផុត ➜ 'pending') ➜ `initFirebase()` ប្តូរ Config ➜ ការរក្សាទុកបន្ទាប់ 'done' តាម App ថ្មី · ទិសផ្ទុយ ៖
   គ្មាន teardown ➜ ចុចលើកទី ២ នៅ 'pending' (គ្មានការសរសេរត្រួតគ្នា) ➜ មុនកែ ១ ធ្លាក់ (`'pending'`) · ក្រោយកែ ២/២។
 - `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
@@ -3251,7 +3258,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - 🔴 **Service Worker ៖ deploy ជាន់កណ្តាល install** (ធាតុ «មិនទាន់វាស់» ក្នុង Handoff) ➜ វាស់ក្នុង browser ពិត ៖ `cache.addAll()` ទទួល `index.html` 200 ក្រោម key JS ចម្បង ➜
   SW activate ➜ App ស ➜ កែក្នុង [2.50.52] (`shellEntriesFit()`)។ ព្រំដែនដែលនៅសល់ ៖ ឯកសារគ្មាន hash (vendor · `boot-flags.js` · ZoeKeyGen ទាំងមូល) អាចជាលាយ deploy N/N+1
   បើ deploy ជាន់ចំកណ្តាល install (online ដើរ · ក្រៅបណ្តាញអាចខ្វះ asset ថ្មី រហូតដល់ SW បន្ទាប់) ➜ ដំណោះស្រាយដែលអាចធ្វើ ៖ ពិនិត្យ sw.js ពិតក្រោយ `addAll` (មាន `CACHE_VERSION` ដដែល ➜ ទទួល ·
-  ខុស ➜ install ធ្លាក់ · បណ្តាញធ្លាក់ ➜ ទទួល) ➜ ⏳ ម្ចាស់គម្រោងសម្រេច។
+  ខុស ➜ install ធ្លាក់ · បណ្តាញធ្លាក់ ➜ ទទួល) ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] (`deployUnchangedDuringInstall()` · App ទាំង ២)។
 - 🔬 **វាស់លើ Firebase SDK ពិត (emulator)** ៖ `set()` · `runTransaction()` · `get()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ សោដែលដោះតែក្នុង
   `then`/late handler ជាប់រហូតក្រោយប្តូរ Config/backend ➜ `exchangeRateSaveInFlight` (ប៊ូតុងរក្សាទុកអត្រាប្រាក់ស្ងាត់) កែក្នុង [2.50.52] (teardown ដោះ ដូច
   `historyPatchFlushInFlight` · `registryReleaseFlushInFlight`)។ សោផ្សេងបានពិនិត្យ ៖ `clearHistoryInFlight` · `pickupResetInFlight` · `deletedCleanupInFlight` · `phoneModalBusy` ·

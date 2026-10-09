@@ -70,6 +70,35 @@ function shellEntriesFit(cache: Cache, urls: string[]): Promise<void> {
     }))).then(() => undefined);
 }
 
+const INSTALL_DEPLOY_CHECK_TIMEOUT_MS = 10000;
+
+function deployUnchangedDuringInstall(): Promise<void> {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const versionPattern = new RegExp('["\']' + CACHE_VERSION.replace(/\d+$/, '') + '\\d+["\']', 'g');
+    return new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            resolve();
+        }, INSTALL_DEPLOY_CHECK_TIMEOUT_MS);
+        Promise.resolve().then(() => fetch(self.location.href, controller ? { cache: FRESH, signal: controller.signal } : { cache: FRESH }))
+            .then((response) => (response && response.ok && !response.redirected ? response.text() : ''))
+            .then((text) => {
+                const versions = (text.match(versionPattern) || []).map((literal) => literal.slice(1, -1));
+                return versions.length > 0 && versions.indexOf(CACHE_VERSION) === -1;
+            }, () => false)
+            .then((changed) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                if (changed) reject(new TypeError('Deploy changed during install: ' + CACHE_VERSION));
+                else resolve();
+            });
+    });
+}
+
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         Promise.all([caches.open(CACHE_VERSION), previousBackendUse()])
@@ -80,6 +109,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
                 .then(() => Promise.all(
                     OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
                 )))
+            .then(() => deployUnchangedDuringInstall())
             .then(() => self.skipWaiting())
     );
 });

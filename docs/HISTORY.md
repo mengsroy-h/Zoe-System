@@ -137,6 +137,35 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.52] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **model iPhone ពិតពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · បន្ទាត់ model/serial គ្មាន emoji** (សំណើម្ចាស់គម្រោង ៖ «កែកន្លែងបង្ហាញ model ឧបករណ៍ អោយស្គាល់ model ពិតសម្រាប់ iphone … និងដក emoji ចេញទាំង ២ កន្លែង model និង serial ទាំងក្នុង ZoeKeyGen និង ZoeW»)
+
+**ZoeW `2.50.52`** (`zoew-v314` ➜ `zoew-v315`) · **ZoeKeyGen `2.24.13`** (`zoekeygen-v123` ➜ `zoekeygen-v124`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📱 **ZoeW (PWA iPhone)** ៖ Safari មិនប្រាប់ model ក្នុង UA ➜ `iphoneModelFromScreen()` ស្គាល់ពី `screen.width × screen.height` (ចំណុច · បង្វិលក៏ដូចគ្នា) × `devicePixelRatio`
+  (បង្គត់ ➜ 12 mini ២,៨៨ = ៣) × កំណែ iOS (`IPHONE_MODELS` ៖ iPhone SE ១ ➜ 18 Pro Max · កំណែ iOS ដំបូង និងចុងក្រោយដែលគាំទ្រ) ៖
+  `402×874@3` + iOS 26.5 ➜ «iPhone 16 Pro / 17 / 17 Pro» · Home Screen «iOS 26+» ➜ បន្ថែម «18 Pro» · iOS 18.5 ➜ «iPhone 16 Pro» · `420×912@3` ➜ «iPhone Air»។
+  ⛔ model ដែលមានអេក្រង់ដូចគ្នាពិតប្រាកដ (ឧ. 14 Pro · 15 · 15 Pro · 16) web បំបែកមិនបាន ➜ បង្ហាញជាក្រុម មិនទាយមួយ · ទំហំមិនស្គាល់ (Display Zoom «Larger Text» ឧ. `320×693@3` ·
+  model ថ្មីមិនទាន់ក្នុងតារាង · iPhone Duo) ➜ «iPhone» ដូចមុន។ ⚠️ ព្រំដែនដែលទទួលស្គាល់ ៖ iPhone Pro Max ដែលបើក Display Zoom រាយការណ៍ `375×812@3` ដូច 11 Pro / 12 mini / 13 mini
+  ➜ ស្លាកក្រុមតូចនោះ (Serial នៅតែត្រឹមត្រូវ — វាជាអត្តសញ្ញាណពិតរបស់កៅអី)។ model ផ្ញើទៅកៅអី License តាម `setDeviceMeta()` ដដែល (ស្លាកវែងបំផុត ៤៩ តួ ≤ ៨០ របស់ rules)។
+- ✂️ **ZoeW ☰ · 🩺** (`DeviceInfoLine`) ៖ «<model> · <ប្រព័ន្ធ>» និង «Serial (…) ៖ <លេខ>» ជាអក្សរសុទ្ធ (គ្មាន 📱 · 🔖)។
+- ✂️ **ZoeKeyGen បញ្ជីកៅអី** (`seatDeviceLabel()`) ៖ `d1 · <model> · <ប្រព័ន្ធ> · Serial <លេខ> · ចងនៅ <ថ្ងៃ>` (គ្មាន 📱 · 🔖 · serial មានស្លាក «Serial»)។
+  ស្លាក/ប៊ូតុង «📱 n/max» · «📱 ចំនួនឧបករណ៍» មិនប្រែ (មិនមែនបន្ទាត់ model/serial)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` ៖ តារាង ៣០ ករណី (ក្រុម · តម្រង iOS · Home Screen 26+ · បង្វិល · DPR ២,៨៨ · ទំហំមិនស្គាល់ ➜ `''` · តម្លៃខូច) · ស្លាកគ្រប់ទំហំ ≤ ៨០ ·
+  គ្មានឈ្មោះស្ទួន · `loadDeviceInfo()` ពិតផ្ញើ model ក្រុមទៅ License · `DeviceInfoLine` គ្មាន emoji (`\p{Extended_Pictographic}`) ➜ មុនកែ ៤/១៦ ធ្លាក់ · ក្រោយកែ ១៦/១៦។
+- `keylist-consistency-test` ៖ បន្ទាត់កៅអីទាំង ៣ គ្មាន emoji · serial មានស្លាក «Serial» ➜ មុនកែ ២ ធ្លាក់ (`📱 d1 · … · 🔖 1a2b…`) · ក្រោយកែ ៥០/៥០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy ZoeW + ZoeKeyGen (គ្មាន rules · migration · env ថ្មី)។
+2. iPhone (App លើ Home Screen) ៖ បើក ☰ ➜ ខាងក្រោមឃើញ «iPhone <model ឬក្រុម> · iOS …» និង «Serial (ID App) ៖ …» គ្មាន emoji · ពិនិត្យ Key ម្តង (បើក App ធម្មតា) ➜ ZoeKeyGen
+   បញ្ជី Key ➜ បន្ទាត់កៅអី «d1 · iPhone … · iOS … · Serial … · ចងនៅ …»។ ⚠️ បើបង្ហាញត្រឹម «iPhone» ៖ Settings ➜ Display & Brightness ➜ Display Zoom ➜ Default (Larger Text ប្តូរទំហំអេក្រង់) ·
+   ឬ model ថ្មីមិនទាន់ក្នុងតារាង ➜ ផ្ញើ `screen.width × screen.height × devicePixelRatio` មក។
+
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
 **ZoeW `2.50.51`** (`zoew-v313` ➜ `zoew-v314`) · **ZoeKeyGen `2.24.12`** (`zoekeygen-v122` ➜ `zoekeygen-v123`)។ សំណើម្ចាស់គម្រោង៖ វីដេអូពីរ និងរូប emoji ⚡ លេចចូលតារាង; កែពី branch របស់ PR #307 និងដោះស្រាយ checker ដែលធ្លាក់។

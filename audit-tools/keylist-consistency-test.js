@@ -178,6 +178,9 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
         const lines = rm.html.match(/class="seat-device-line"/g) || [];
         ok('កៅអីនីមួយៗមានបន្ទាត់មើលឃើញ (មិនមែនតែ title ដែលទូរស័ព្ទមើលមិនឃើញ) ៖ ៣', lines.length === 3, lines.length);
         ok('⛔ បន្ទាត់ d1 ៖ model · platform · serial', ['Samsung SM-A546E', 'Android 14', '1a2b3c4d5e6f7890'].every((t) => rm.html.includes(t)), rm.html.slice(0, 400));
+        const seatLines = (rm.html.match(/<div class="seat-device-line">[^<]*<\/div>/g) || []);
+        ok('⛔ សំណើម្ចាស់គម្រោង ៖ បន្ទាត់កៅអី (model · serial) គ្មាន emoji', seatLines.length === 3 && seatLines.every((l) => !/\p{Extended_Pictographic}/u.test(l)), seatLines.join(' | '));
+        ok('serial មានស្លាក «Serial» (មិនមែនលេខទទេ)', seatLines.some((l) => l.includes('Serial 1a2b3c4d5e6f7890')), seatLines.join(' | '));
         ok('⛔ meta ជា HTML ➜ escape (គ្មាន <img ក្នុង DOM)', rm.html.includes('&lt;img') && !rm.html.includes('<img'), rm.html.slice(0, 400));
         ok('platform «-» ➜ មិនបង្ហាញ', !/· - ·/.test(rm.html));
         ok('កៅអីគ្មាន meta ➜ ID ៦ តួ + «…»', rm.html.includes('ID DEVICE…'));

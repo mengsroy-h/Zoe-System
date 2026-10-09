@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.12';
+const APP_VERSION = '2.24.13';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2440,9 +2440,9 @@ function seatDeviceLabel(d) {
     const parts = [];
     if (d.meta && d.meta.model) parts.push(d.meta.model);
     if (d.meta && d.meta.platform) parts.push(d.meta.platform);
-    parts.push('🔖 ' + (d.meta && d.meta.serial ? d.meta.serial : 'ID ' + d.device.slice(0, 6) + '…'));
+    parts.push(d.meta && d.meta.serial ? 'Serial ' + d.meta.serial : 'ID ' + d.device.slice(0, 6) + '…');
     parts.push('ចងនៅ ' + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-'));
-    return '📱 ' + d.slot + ' · ' + parts.join(' · ');
+    return d.slot + ' · ' + parts.join(' · ');
 }
 function seatDevicesOf(node, limit) {
     const out = [];

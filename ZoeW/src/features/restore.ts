@@ -181,7 +181,7 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
 export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
     if (!item || item.trashReason !== 'expired' || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
-    const scanDate = item.scanDate || getFormattedDate(at);
+    const scanDate = item.scanDate || getFormattedDate(new Date(at));
     if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return null;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return null;
     const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};

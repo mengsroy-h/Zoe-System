@@ -148,6 +148,12 @@ function makeRun(opts) {
             }
             const out = fn(cur);
             if (out === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
+            if (opts.refuseMarkers && (p === 'zoew_monthly_revenue_cod_dod' || p.indexOf('zoew_daily_revenue_cod_dod/') === 0)) {
+                const recs = p === 'zoew_monthly_revenue_cod_dod' ? Object.values(out || {}) : [out];
+                if (recs.some((r) => r && typeof r === 'object' && (r.op !== undefined || r.ops !== undefined || r.ded !== undefined))) {
+                    return Promise.reject(Object.assign(new Error('PERMISSION_DENIED: permission_denied'), { code: 'PERMISSION_DENIED' }));
+                }
+            }
             write(out === null ? null : JSON.parse(JSON.stringify(out)));
             if (landed) return hung();
             return Promise.resolve({ committed: true, snapshot: { val: () => out } });
@@ -722,9 +728,9 @@ function packagePlaces(server) {
     //    `resumeInterruptedCleanups()` ➜ វាឃើញធាតុ `moved` ដូចការរំខាន ➜ សរសេរធុងសំរាម
     //    ម្ដងទៀត ហើយ **ដកលុយ** ➜ ពេលការសរសេរដើមចុះ ការសម្អាតដើមក៏ដកលុយដែរ ➜ ដក ២ ដង។
     //    ⛔ អថេរ ៖ ការសម្អាត ១ ដង ➜ លុយដក **ម្តងគត់** ទោះអ្នកស្តាររត់ចំកណ្តាលក៏ដោយ។
-    async function liveCleanupWithResume(resumeCalls) {
+    async function liveCleanupWithResume(resumeCalls, extra) {
         const gate = { open: false, waiters: [] };
-        const run = makeRun({ trashGate: gate });
+        const run = makeRun(Object.assign({ trashGate: gate }, extra || {}));
         seedItem(run, BARCODES);
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(200);
@@ -763,6 +769,20 @@ function packagePlaces(server) {
         ok('⛔⛔ អ្នកស្តាររត់ ៣ ដង (វដ្ត + visibilitychange) ➜ លុយនៅតែដកម្តងគត់',
             r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
             && run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+    }
+    //    ⛔ សោ `ded` · token ក្នុង ring រារាំងការដក ២ ដងនៅលើ rules ថ្មី ➜ នៅលើ rules ចាស់ (បដិសេធ `op` · `ops` ·
+    //    `ded` ➜ ផ្លូវ legacy) ការការពារ «នៅរស់» ក្នុង tab ជាការការពារតែមួយ ➜ វាស់ផ្លូវនោះដោយឡែក។
+    {
+        const { run, journaled, waiting } = await liveCleanupWithResume(1, { refuseMarkers: true });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ rules ចាស់ ➜ journal ចុះ · ការសរសេរធុងសំរាមកំពុងហោះ · ledger គ្មាន op/ops/ded (ផ្លូវ legacy)',
+            journaled && waiting === 1 && !run.server.daily[DAY].op && !run.server.daily[DAY].ops && !run.server.daily[DAY].ded,
+            { journaled, waiting, daily: run.server.daily[DAY] });
+        ok('⛔⛔ rules ចាស់ ៖ អ្នកស្តាររត់ចំកណ្តាលការសម្អាតដែលនៅរស់ ➜ លុយដក **ម្តងគត់**',
+            r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
+            && run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+        ok('⛔ rules ចាស់ ៖ ... ហើយ ledger ខែស្របគ្នា',
+            r2(run.server.monthly[MONTH].codDollar) === r2(START_COD - TOTAL_COD)
+            && run.server.monthly[MONTH].totalCount === START_COUNT - 3, run.server.monthly[MONTH]);
     }
 
     // ── ៥ឈ. ⛔⛔ tab ២ លើឧបករណ៍ដដែល (`localStorage` រួម) ────────────────────

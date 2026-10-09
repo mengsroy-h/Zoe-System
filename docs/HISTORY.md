@@ -3228,6 +3228,28 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - 🟠 **ZoeKeyGen ៖ teardown auth ខុសពី ZoeW** (ផ្លូវបងប្អូន · `setupAuthListener` · `initFirebase` ក្នុង `EXPECTED_DIVERGENT` របស់ `shared-fns` ➜ គ្មានអ្នកយាមធៀប) ៖
   ZoeW ផ្តាច់ auth/ពិដាន/ឡើងជំនាន់មុន `deleteApp` (ច្បាប់ «Stale callbacks») តែ ZoeKeyGen មិនធ្វើ ហើយពិដាន ៨ វិ. ជាអថេរក្នុង function ➜ កែក្នុង [2.50.52]។ ផលប៉ះពាល់
   តិច (Config License ប្តូរកម្រ) តែជាថ្នាក់ដូច `isDatabaseInitialized` ៖ function ចម្លងពី ZoeW ដោយខ្វះស្ថានភាពរបស់វា។
+- 🔴 **ជុំបន្ត (session ដដែល) ៖ ថ្នាក់ «ជំនាន់ session រសើប ប្រើជាសញ្ញាសម្គាល់យូរ»** (ZoeKeyGen) ៖ `closeModal('pinModal')` · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ·
+  `initFirebase()` ឡើង `sensitiveSessionGeneration` ដើម្បីបោះបង់ប្រតិបត្តិការ PIN ដែលកំពុងហោះ តែ (១) `finally` របស់ `generateLicenseKey()` ដោះសោតែពេល session នៅ ➜
+  សោជាប់ (ប៊ូតុងស្លាប់ · `expireIdleSigningKey()` លែងដក Key) · (២) `sbAdminIsCurrent()` ពិនិត្យជំនាន់ដែលចាប់ពេលចូល Supabase ➜ ផ្ទាំងហាងទាំងមូល return ស្ងាត់ ➜ កែក្នុង
+  [2.50.52] (សោមានម្ចាស់ · `sbAdminOwnerIsCurrent()` = `uid` + UI ចូលរួច)។ ប្រតិបត្តិការខ្លីផ្សេង (Revoke · Extend · ផ្ញើដំណឹង) នៅបោះបង់សារ ✅/⏳ ពេលបិទប្រអប់ PIN កណ្តាល
+  ការសរសេរ (ការសរសេរនៅចុះ · 🔄 Refresh បង្ហាញ) · Generate ដែលត្រូវបិទប្រអប់ PIN កណ្តាល ➜ Key ចុះ DB តែមិនបង្ហាញ (Key ខ្មោចក្នុងបញ្ជី · គ្មានគ្រោះថ្នាក់) ➜ ព្រំដែនដែលទទួលស្គាល់។
+- 🔴 **Service Worker ៖ deploy ជាន់កណ្តាល install** (ធាតុ «មិនទាន់វាស់» ក្នុង Handoff) ➜ វាស់ក្នុង browser ពិត ៖ `cache.addAll()` ទទួល `index.html` 200 ក្រោម key JS ចម្បង ➜
+  SW activate ➜ App ស ➜ កែក្នុង [2.50.52] (`shellEntriesFit()`)។ ព្រំដែនដែលនៅសល់ ៖ ឯកសារគ្មាន hash (vendor · `boot-flags.js` · ZoeKeyGen ទាំងមូល) អាចជាលាយ deploy N/N+1
+  បើ deploy ជាន់ចំកណ្តាល install (online ដើរ · ក្រៅបណ្តាញអាចខ្វះ asset ថ្មី រហូតដល់ SW បន្ទាប់) ➜ ដំណោះស្រាយដែលអាចធ្វើ ៖ ពិនិត្យ sw.js ពិតក្រោយ `addAll` (មាន `CACHE_VERSION` ដដែល ➜ ទទួល ·
+  ខុស ➜ install ធ្លាក់ · បណ្តាញធ្លាក់ ➜ ទទួល) ➜ ⏳ ម្ចាស់គម្រោងសម្រេច។
+- 🔬 **វាស់លើ Firebase SDK ពិត (emulator)** ៖ `set()` · `runTransaction()` · `get()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ សោដែលដោះតែក្នុង
+  `then`/late handler ជាប់រហូតក្រោយប្តូរ Config/backend ➜ `exchangeRateSaveInFlight` (ប៊ូតុងរក្សាទុកអត្រាប្រាក់ស្ងាត់) កែក្នុង [2.50.52] (teardown ដោះ ដូច
+  `historyPatchFlushInFlight` · `registryReleaseFlushInFlight`)។ សោផ្សេងបានពិនិត្យ ៖ `clearHistoryInFlight` · `pickupResetInFlight` · `deletedCleanupInFlight` · `phoneModalBusy` ·
+  `sessionExpiryCheckInFlight` · `notifyFeedInFlight` · `ztoWarmupInFlight` · push (`scheduleInFlight` · `busy`) មានពិដានគ្រប់ await ✓ · `cleanupResumeInFlight` រង់ចាំប្រតិបត្តិការ
+  ledger ដោយគ្មានពិដាន (ច្បាប់ «⛔ never give up on a time ceiling») ➜ ក្រោយប្តូរ Config ខណៈ resume ព្យួរ ការ resume បន្ទាប់រង់ចាំ reload (journal នៅដដែល · Web Lock របស់ entry ក៏ជាប់
+  ដោយ promise ស្លាប់) ➜ ពន្យារ មិនបាត់ · ព្រំដែនដែលទទួលស្គាល់។
+- **ការដកពាក់កណ្តាល + `disconnect` ពេលទិដ្ឋភាពធុងសំរាមចាស់** (`cleanupClaimAccountedElsewhere()`) ៖ ឧបករណ៍ ២ claim barcode ដដែលដែលទុំ ហើយមួយទទួល `applied` តាមការអាន REST
+  (តម្លៃនៅសល់ដូចគ្នា) ➜ ពិនិត្យតែធុងសំរាមក្នុងសតិ ➜ ទិដ្ឋភាពចាស់ ឬការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងមិនទាន់មកដល់ ➜ `ours` ➜ ធុងសំរាម ២ + ដក ២ ដង។ ការប្តូរ `stale ➜ unknown`
+  ដោះដូរការដក ២ ដងនឹងកញ្ចប់បាត់ (គ្មានធុងសំរាម) ➜ មិនកែដោយសង្ស័យ។ ដំណោះស្រាយរចនាសម្ព័ន្ធ ៖ id ធុងសំរាមកំណត់ពី item + សំណុំ barcode ➜ `claimCleanupTrashSlot()` សម្រេចដូចការ claim
+  ទាំងមូល ➜ ⏳ ម្ចាស់គម្រោងសម្រេច (ផ្លូវលុយ)។
+- **បានពិនិត្យ មិនមែនកំហុស** ៖ Sentry ៩០ ថ្ងៃ ៖ events ទាំងអស់ `app: zoew` · `find_dropped_events` គ្មាន `filtered` (Allowed Domains មិនបោះ ZoeKeyGen) ➜ ZoeKeyGen ០ event = គ្មាន error
+  (ឬមិនទាន់មានអ្នកប្រើ) · adapter Supabase ផ្ញើ auth event តែពេលចូល/ចេញ/ស្តារ ➜ `phoneModalBusy` មិនជាប់ · CORS Edge Functions សម្រាប់ APK (`https://localhost` ក្នុង README) ·
+  `dispatchNotices` at-most-once (`onlyIfMatch` ledger) · ការទាញ 🔔 feed · push config មានពិដាន។
 - **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
   `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
 

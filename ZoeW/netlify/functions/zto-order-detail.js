@@ -887,10 +887,6 @@ function readProjectEntries(env) {
     return valid ? { ids: ids, branches: branches } : none;
 }
 
-function readProjectIds(env) {
-    return readProjectEntries(env).ids;
-}
-
 function siteEmailPrefix(env) {
     const raw = String((env && env.ZTO_SITE_EMAIL_PREFIX) || '').trim().toLowerCase();
     return SITE_EMAIL_PREFIX_RE.test(raw) ? raw : SITE_EMAIL_PREFIX_DEFAULT;

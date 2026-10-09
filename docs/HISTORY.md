@@ -49,8 +49,9 @@
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
    `52baeb9` ➜ ជាប់លើ HEAD) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
-   ⏳ **ម្ចាស់គម្រោងសម្រេច** (ផ្នែក ២ «Deep audit ៤ ជុំបន្ត») ៖ id ធុងសំរាមកំណត់សម្រាប់ការដកពាក់កណ្តាល (ការដក ២ ដងពេលឧបករណ៍ ២ + `disconnect`) ·
-   ពិនិត្យ sw.js ក្រោយ `addAll` (ឯកសារគ្មាន hash លាយ deploy) · Supabase Leaked Password Protection · poll realtime ៦០ វិ.។
+   ✅ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] ៖ id ធុងសំរាមកំណត់ + slot សម្រាប់ការសម្អាតទាំងអស់ · ពិនិត្យ sw.js ក្រោយ install (App ទាំង ២) · ZoeKeyGen ការកែ Key
+   ក្រោយបិទប្រអប់ PIN។ ⏳ **ម្ចាស់គម្រោងសម្រេច** ៖ Supabase Leaked Password Protection · poll realtime ៦០ វិ. · ប្រអប់ស្វែងរកលើ iPhone PWA (វាស់ក្នុង Chromium មិនឃើញ ➜
+   ត្រូវការវីដេអូពី iPhone ពិត · តំបន់ហាមឃាត់)។
    ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
    ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ✅ កែរួច ៖ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង
    (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52]) · ZoeKeyGen teardown auth ដូច ZoeW ([2.50.52])។
@@ -196,6 +197,13 @@
 - 💱 **ZoeW ៖ រក្សាអត្រាប្រាក់ព្យួរ ➜ ប្តូរ Config/backend ➜ ប៊ូតុង «រក្សាទុកអត្រាប្រាក់» ដើរវិញ** (deep audit) ៖ `exchangeRateSaveInFlight` រស់រានឆ្លង logout ដោយចេតនា
   («settle ក្នុង late handler») តែវាស់លើ Firebase SDK ពិត (emulator) ៖ `set()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ late handler មិនរត់ ➜
   សោជាប់ ➜ ចុចរក្សាទុក return 'pending' ស្ងាត់ (គ្មាន toast · ប្រអប់មិនបិទ) រហូតដល់ reload ➜ ឥឡូវ teardown ក្នុង `initFirebase()` ដោះសោនេះ (ការសរសេរចាស់ស្លាប់ជាមួយ App ចាស់)។
+- 💰 **ZoeW ៖ ឧបករណ៍ ២ សម្អាតកញ្ចប់ដដែលស្របគ្នា ➜ ធុងសំរាម ១ · ដកលុយ ១ ដង** (ម្ចាស់គម្រោង «កែទាំងអស់» · ផ្នែក ២ «ការដកពាក់កណ្តាល + `disconnect`») ៖
+  ឧបករណ៍ X claim barcode ដែលទុំ (commit ធម្មតា) · ឧបករណ៍ Y ផ្ញើពីទិដ្ឋភាពមុន X ហើយចម្លើយបាត់ ➜ ការអាន server ឃើញតម្លៃនៅសល់ដូចដែល Y ផ្ញើ ➜ `applied` ទោះ Y មិនមែនអ្នកដក ➜
+  (ក) ការដកពាក់កណ្តាល ៖ id ធុងសំរាមចៃដន្យ ➜ ធុងសំរាម ២ ច្បាប់ + ដក ២ ដង ពេលធុងសំរាមរបស់ X មិនទាន់មកដល់ទិដ្ឋភាព Y · (ខ) ទាំងមូល និងពាក់កណ្តាល ៖ X សរសេរធុងសំរាមដោយ
+  overwrite ➜ បើ Y កាន់ slot មុន X ការសរសេររបស់ X ជាន់ច្បាប់ Y ហើយដកម្តងទៀត ➜ ឥឡូវ ការ claim ពាក់កណ្តាលមាន id កំណត់ (`cleanupPartialTrashId()` ៖ ម៉ោង item + token នៃ
+  item · មូលហេតុ · barcode ដែល claim ជាមួយ `closedAt`/`restoredAt`) · ការសរសេរធុងសំរាមនៃការសម្អាត **ទាំងអស់** ឆ្លង slot create-if-absent (`claimCleanupTrashSlot()` ៖
+  commit ឬ slot មានច្បាប់របស់យើង (`deletedAt` ដដែល) = របស់យើង) · journal ចាប់ផ្តើមនៅ `slot` ➜ ដកតែម្តង មិនថាលំដាប់ណា។ ព្រំដែនដែលទទួលស្គាល់ ៖ ច្បាប់ចាស់ក្នុង slot ពីវដ្តមុន
+  (ការសរសេរធុងសំរាមធ្លាក់គ្រប់ការសាក តែចុះយឺត ហើយត្រូវស្តារចូលប្រវត្តិវិញ) ➜ ការ claim ដដែលបន្ទាប់មិនដក (ចំណូលខ្ពស់ មិនដក ២ ដង)។
 - 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
@@ -230,6 +238,13 @@
   ទិសផ្ទុយ ៖ deploy ដដែល ➜ activate · 503 ➜ activate · ព្យួរ ➜ activate ក្នុងពិដាន (ដេរីវេពី sw.js ពិត) + ៨ វិ. ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ៥៦/៥៦។
 - `ZoeW/tests/exchange-rate-backend-switch.test.ts` ៖ រក្សាអត្រាប្រាក់ព្យួរ (`dbOp` ផុត ➜ 'pending') ➜ `initFirebase()` ប្តូរ Config ➜ ការរក្សាទុកបន្ទាប់ 'done' តាម App ថ្មី · ទិសផ្ទុយ ៖
   គ្មាន teardown ➜ ចុចលើកទី ២ នៅ 'pending' (គ្មានការសរសេរត្រួតគ្នា) ➜ មុនកែ ១ ធ្លាក់ (`'pending'`) · ក្រោយកែ ២/២។
+- `ZoeW/tests/cleanup-applied-ownership.test.ts` ១២–១៩ ៖ ឧបករណ៍ ២ ក្នុងហាងដដែល (store រួម · ទិដ្ឋភាពដាច់) ៖ ពាក់កណ្តាល abandon/close ៖ X ចប់មុន · Y `applied` ពីទិដ្ឋភាពមុន
+  (លក្ខខណ្ឌ ៖ តម្លៃនៅសល់ដែល Y ផ្ញើ = server) ➜ ធុងសំរាម ១ · ដក ១ ដង · X commit តែការសរសេរធុងសំរាមព្យួរ · Y សរសេរមុន ➜ X មិនជាន់ (ពាក់កណ្តាល និងទាំងមូល) · id ៖ លំដាប់ barcode
+  មិនប្តូរ id · `restoredAt`/`closedAt`/មូលហេតុ/សំណុំ/item ផ្សេង ➜ id ផ្សេង · ស្តារហើយ claim ម្តងទៀត ៦ ជុំ ➜ ប្រវែងដដែល (≤ ៦៤) · `ded/<trashId>` ចងនឹង id កំណត់ ➜ មុនកែ ៤ ធ្លាក់
+  (ធុងសំរាម ២ · ចំណូល ៨០ ជំនួស ៩០) · ក្រោយកែ ១៩/១៩ · ធាតុ ៦ (ការ claim ធម្មតាឆ្លង slot មិនមែន overwrite) ប្តូរតាមច្បាប់ថ្មី · `cleanup-journal-cap.test.ts` ព្យួរទ្វារ slot ដែរ
+  (មិនដូច្នោះការព្យួរដែលវាពិពណ៌នាមិនកើត) · checker sandbox (`partial-pickup-cleanup` · `cleanup-interrupt-atomicity` · `ledger-count-integrity` · `stall-lock-release` ·
+  `late-commit` · `db-stall-guard` · `restore-marker-hygiene` · `tx-outcome` · `policy-test` · `emu/crud-rules-flow`) ស្រង់ helper ថ្មី (មិនមាន tree ចាស់ ➜ stub) ហើយ fake
+  ព្យួរ/ចាំទ្វារ slot ដូចទ្វារ `update`។
 - `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
   ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
 
@@ -245,6 +260,7 @@
    ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
 5. ZoeKeyGen (ជម្រើស) ៖ ចូល «🏪 ហាង Supabase» ➜ ចុច ⚙️ (ប្រអប់ PIN) ហើយបោះបង់ ➜ 🔄 Refresh / បង្កើតហាង នៅដើរ (មិនស្ងាត់) · Generate Key ហើយបើក/បិទប្រអប់ PIN ពេលកំពុងបង្កើត ➜
    ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន ហើយ Key ដែលបានបង្កើតបង្ហាញ · Extend/Revoke Key ហើយបិទប្រអប់ PIN ពេលកំពុងរក្សាទុក ➜ ឃើញ ✅ និងបញ្ជីថ្មី។
+6. ZoeW (ជម្រើស · ហាងដែលមានឧបករណ៍ច្រើន) ៖ ក្រោយ Deploy ពិនិត្យ 🗑️ ធុងសំរាមម្តងម្កាល ៖ កញ្ចប់ «ផុតកំណត់» ពាក់កណ្តាលមិនលេចជា ២ ជួរដូចគ្នា · ចំណូលប្រចាំថ្ងៃមិនធ្លាក់ទ្វេដង។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
@@ -3268,7 +3284,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - **ការដកពាក់កណ្តាល + `disconnect` ពេលទិដ្ឋភាពធុងសំរាមចាស់** (`cleanupClaimAccountedElsewhere()`) ៖ ឧបករណ៍ ២ claim barcode ដដែលដែលទុំ ហើយមួយទទួល `applied` តាមការអាន REST
   (តម្លៃនៅសល់ដូចគ្នា) ➜ ពិនិត្យតែធុងសំរាមក្នុងសតិ ➜ ទិដ្ឋភាពចាស់ ឬការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងមិនទាន់មកដល់ ➜ `ours` ➜ ធុងសំរាម ២ + ដក ២ ដង។ ការប្តូរ `stale ➜ unknown`
   ដោះដូរការដក ២ ដងនឹងកញ្ចប់បាត់ (គ្មានធុងសំរាម) ➜ មិនកែដោយសង្ស័យ។ ដំណោះស្រាយរចនាសម្ព័ន្ធ ៖ id ធុងសំរាមកំណត់ពី item + សំណុំ barcode ➜ `claimCleanupTrashSlot()` សម្រេចដូចការ claim
-  ទាំងមូល ➜ ⏳ ម្ចាស់គម្រោងសម្រេច (ផ្លូវលុយ)។
+  ទាំងមូល ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52]។ ពេលសរសេរអ្នកយាម ឃើញថ្នាក់ធំជាង ៖ ការ claim ធម្មតា (ទាំងមូល និងពាក់កណ្តាល) សរសេរធុងសំរាមដោយ overwrite ➜ Y ដែល
+  `applied` ខុស ហើយកាន់ slot មុន X ➜ X ជាន់ ហើយដកម្តងទៀត (token ledger មាន `deletedAt` ផ្សេង ➜ `ded/<trashId>` មិនរារាំង) ➜ ការសរសេរធុងសំរាមនៃការសម្អាតទាំងអស់ឆ្លង slot។
 - **បានពិនិត្យ មិនមែនកំហុស** ៖ fuzz លុយ seed ថ្មី `FUZZ_RUN0=700 FUZZ_RUNS=24 FUZZ_OPS=90` PASS ៣/៣ («ឧបករណ៍ផ្សេងដក» ២៤ លំដាប់ · `ledgerBlip` applied ១៨ · lost ១៨) ·
   `tools/supabase-migrate` (op_id កំណត់ពីទិន្នន័យ ➜ rerun = replay · ផ្ទៀងហាងក្រោយសរសេរ · ចាប់ការសរសេរពីឧបករណ៍ផ្សេង) · ZoeW គ្មាន sink HTML ឆៅ (`tel:` មាន prefix) ·
   Edge Functions ចុះឈ្មោះ/ប្តូរពាក្យសម្ងាត់ · ការដោះ registry ជា batch (rules អនុញ្ញាតលុបជានិច្ច) · rules `exchange_rate` ·

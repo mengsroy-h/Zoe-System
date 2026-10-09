@@ -103,7 +103,12 @@ function buildRunner(appFile) {
         : '            return { trashItem, revenueDeducted: !!revenueApplied };';
 
 
-    const prelude = moneyHelper + flipHelpers + keyedHelpers + `
+    // ⛔ ការ claim ពាក់កណ្តាលមាន id ធុងសំរាមកំណត់ (`cleanupPartialTrashId()` ៖ item + barcode ដែល claim) ➜ ស្រង់ helper ពិត · tree ចាស់ប្រើ `generateUniqueId()`
+    const partialIdHelpers = src.indexOf('function cleanupPartialTrashId(') !== -1
+        ? ['parseTimestampFromId', 'cleanupPartialTrashId'].concat(keyedStyle ? [] : ['ledgerEventToken']).concat(flipStyle ? [] : ['barcodeEntriesOf'])
+            .map((n) => fnBody(src, 'function ' + n + '(', n)).join('\n') + '\n'
+        : '';
+    const prelude = moneyHelper + flipHelpers + keyedHelpers + partialIdHelpers + `
         var NOW = 1000000;
         function getServerNow() { return NOW; }
         function getFormattedDate() { return '2026-08-19'; }

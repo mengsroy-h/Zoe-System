@@ -177,7 +177,7 @@ function confirm() { return true; }
         'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing',
         'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
         'retryAsync', 'settleLockWithin', 'clearScannedRemovalInFlight',
-        'saveSingleDeletedItemToFirebase', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
+        'saveSingleDeletedItemToFirebase', 'claimCleanupTrashSlot', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode',
         'confirmScannedRemoval'];
     const code = preamble
         + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
@@ -204,6 +204,7 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         'zoew_daily_revenue_cod_dod/2026-09-01': { codDollar: 100, dodDollar: 100, totalCount: 10 },
         mrev: { '2026-09': { codDollar: 100, dodDollar: 100, totalCount: 10 } }
     };
+    const TRASH = {};
     const ledgerKeyOf = (ref) => (ref && ref.p === 'mrev' ? 'mrev'
         : (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_daily_revenue_cod_dod/') === 0 ? ref.path : null));
     ctx.__ledgerKeyed = () => {
@@ -223,6 +224,19 @@ globalThis.__confirmRemove = confirmScannedRemoval;
         // ដាច់ *ក្រោយ* transaction commit មិនមែនមុនទេ។
         runTransaction: (ref, updater) => {
             log.txs++;
+            // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារសរសេរធុងសំរាមដូច `update` (ព្យួរពេល `hang`)
+            if (ref && typeof ref.path === 'string' && ref.path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
+                log.updates++;
+                const settle = () => {
+                    const cur = TRASH[ref.path] ? JSON.parse(JSON.stringify(TRASH[ref.path])) : null;
+                    const next = updater(cur);
+                    if (next === undefined) return { committed: false, snapshot: { val: () => cur } };
+                    TRASH[ref.path] = JSON.parse(JSON.stringify(next));
+                    return { committed: true, snapshot: { val: () => next } };
+                };
+                if (mode === 'hang') return new Promise((resolve) => later.push(() => resolve(settle())));
+                return Promise.resolve(settle());
+            }
             const ledgerKey = ledgerKeyOf(ref);
             if (ledgerKey) {
                 const cur = LEDGER[ledgerKey] ? JSON.parse(JSON.stringify(LEDGER[ledgerKey])) : null;
@@ -356,10 +370,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const bodies = ['claimAndCleanupItem', 'removeSingleBarcode']
             .map((n) => ({ name: n, body: extractFn(src, n) || '' }));
         bodies.forEach(({ name, body }) => {
+            // ⛔ ទ្វារសរសេរធុងសំរាម ៖ `saveSingleDeletedItemToFirebase()` ឬ slot create-if-absent `claimCleanupTrashSlot()` (ការសម្អាត) ➜ ច្បាប់ដដែលលើទាំង ២
             ok(name + ' ៖ ⛔ គ្មាន `dbOp(` លើការសរសេរធុងសំរាម',
-                !/dbOp\(\s*(?:retryAsync|notifyIfSlow|saveSingleDeletedItemToFirebase)/.test(body));
+                !/dbOp\(\s*(?:retryAsync|notifyIfSlow|saveSingleDeletedItemToFirebase|claimCleanupTrashSlot)/.test(body));
             ok(name + ' ៖ ជាន់អប្បបរមា — ការសរសេរធុងសំរាមមានពិត',
-                /saveSingleDeletedItemToFirebase\s*\(/.test(body), body.length);
+                /(?:saveSingleDeletedItemToFirebase|claimCleanupTrashSlot)\s*\(/.test(body), body.length);
         });
     }
 

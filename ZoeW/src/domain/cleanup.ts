@@ -4,9 +4,9 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
+import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
-import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerRecordTokens } from './ledger';
+import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
@@ -717,7 +717,19 @@ export function claimCleanupTrashSlot(trashItem) {
         return Promise.reject(new Error('Trash Firebase reference unavailable'));
     }
     return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => (current ? undefined : trashItem))
-        .then((result) => !!(result && result.committed));
+        .then((result) => {
+            if (result && result.committed) return true;
+            const existing = result && result.snapshot ? result.snapshot.val() : null;
+            return !!existing && existing.deletedAt === trashItem.deletedAt;
+        });
+}
+
+export function cleanupPartialTrashId(itemId, reason, claimedPartial) {
+    const stamp = parseTimestampFromId(itemId) || parseFloat(claimedPartial && claimedPartial.createdAt) || 0;
+    const parts = barcodeEntriesOf(claimedPartial && claimedPartial.barcodes)
+        .map(({ barcode }) => [barcode.code, barcode.closedAt || '', barcode.restoredAt || ''].join(':'))
+        .sort();
+    return 'id_' + stamp + '_' + ledgerEventToken(itemId, String(reason) + '|' + parts.join(','), 'c').slice(4);
 }
 
 export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
@@ -820,16 +832,11 @@ export async function claimAndCleanupItem(id, reason) {
     };
     const finishCleanup = async (result) => {
         if (!result.committed || (!claimedWhole && !claimedPartial)) return;
-        let trashSlotDecides = false;
-        if (result.txOutcome === 'applied') {
-            if (claimedWhole) {
-                trashSlotDecides = true;
-            } else {
-                const owner = await cleanupClaimAccountedElsewhere(id, claimedPartial);
-                if (owner !== 'ours') {
-                    if (owner === 'unknown' && window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
-                    return;
-                }
+        if (result.txOutcome === 'applied' && claimedPartial) {
+            const owner = await cleanupClaimAccountedElsewhere(id, claimedPartial);
+            if (owner !== 'ours') {
+                if (owner === 'unknown' && window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
+                return;
             }
         }
         if (!cleanupIsCurrent()) {
@@ -843,7 +850,7 @@ export async function claimAndCleanupItem(id, reason) {
         let revenueCod = 0, revenueDod = 0, revenueCount = 0;
         if (claimedPartial) {
             const partialIsPickup = reason !== 'abandon';
-            trashItem = { ...claimedPartial, id: generateUniqueId() };
+            trashItem = { ...claimedPartial, id: cleanupPartialTrashId(id, reason, claimedPartial) };
             trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b,
                 cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
                 dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
@@ -904,7 +911,7 @@ export async function claimAndCleanupItem(id, reason) {
                 id: id,
                 reason: reason,
                 journalAt: getServerNow(),
-                stage: trashSlotDecides ? CLEANUP_STAGE_SLOT : CLEANUP_STAGE_MOVED,
+                stage: CLEANUP_STAGE_SLOT,
                 trashItem: trashItem,
                 revenue: revenuePending ? { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount } : null
             });
@@ -916,9 +923,7 @@ export async function claimAndCleanupItem(id, reason) {
             dataState.deletedItems.unshift(trashItem);
             let trashSaved = false;
             let trashElsewhere = false;
-            const writeTrash = () => (trashSlotDecides
-                ? claimCleanupTrashSlot(trashItem).then((claimed) => { trashElsewhere = !claimed; })
-                : saveSingleDeletedItemToFirebase(trashItem));
+            const writeTrash = () => claimCleanupTrashSlot(trashItem).then((claimed) => { trashElsewhere = !claimed; });
             await notifyIfSlow(retryAsync(writeTrash, 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {

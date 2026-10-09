@@ -78,6 +78,7 @@ function makeFb() {
             }
         },
         runTransaction: async (ref: any, updater: any) => {
+            if (lab.hangTrash && ref.path.startsWith(TRASH + '/')) return new Promise(() => {});
             const prior = getAt(ref.path);
             const proposed = updater(clone(prior));
             lab.tx.push({ path: ref.path, prior: clone(prior), proposed: clone(proposed) });

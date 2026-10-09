@@ -398,6 +398,23 @@ async function behavior() {
             && el('sbAdminLoginBtn').hidden()
             && K.log.toasts.some((t) => /Admin/.test(t)) && alertsSince(a).length === 0, alertsSince(a));
         ok('បញ្ជីហាងទទេ ➜ «មិនទាន់មានហាង» (មិនមែន «អានមិនបាន»)', /មិនទាន់មានហាង/.test(el('sbTenantListBody').innerHTML), el('sbTenantListBody').innerHTML);
+
+        // ⛔ បិទប្រអប់ PIN (`closeModal('pinModal')` ពិត ➜ invalidateSensitiveSession — ផ្លូវដដែលនឹង clearSigningKey · Signing Key ផុតពេលទំនេរ) មិនមែនការចាកចេញទេ ៖
+        //    ផ្ទាំង Supabase នៅបើក ➜ ប៊ូតុងត្រូវដើរ។ កូដមុនកែ ៖ sbAdminIsCurrent() ពិនិត្យជំនាន់ session រសើបដែលចាប់ពេលចូល ➜ ប៊ូតុងទាំងអស់ return ស្ងាត់។
+        console.log('   · បិទប្រអប់ PIN ក្រោយចូល Supabase ➜ ផ្ទាំងនៅប្រើបាន');
+        const realCloseModal = vm.runInContext('(function () {\n' + ['closeModal', 'clearPinInputValues', 'clearKeypairOutputs'].map((n) => decls.get(n).text).join('\n')
+            + '\nreturn closeModal;\n})()', C);
+        const genBeforePin = vm.runInContext('sensitiveSessionGeneration', C);
+        const pinModalEl = el('pinModal');
+        if (pinModalEl && !pinModalEl.style) pinModalEl.style = {};
+        realCloseModal('pinModal');
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ closeModal(\'pinModal\') ពិតឡើងជំនាន់ session រសើប', vm.runInContext('sensitiveSessionGeneration', C) > genBeforePin);
+        const fPin = K.log.fetches.length;
+        await C.sbAdminRefresh();
+        await drain();
+        ok('⛔ បិទប្រអប់ PIN ➜ session Supabase នៅ · 🔄 Refresh អានបញ្ជីហាងពិត (មិន return ស្ងាត់)',
+            panelOpen() && C.sbAdminIsCurrent(C.sbAdminSession) && K.log.fetches.slice(fPin).some((f) => /\/rest\/v1\/tenants\?/.test(f.url)),
+            { current: C.sbAdminIsCurrent(C.sbAdminSession), fetches: K.log.fetches.slice(fPin).map((f) => f.url) });
         const saved = JSON.parse(K.store.getItem(C.SB_ADMIN_CONFIG_KEY) || 'null');
         ok('Config ដែលរក្សាទុក = URL (គ្មាន / ចុង) · key · អ៊ីមែលអក្សរតូច — គ្មានពាក្យសម្ងាត់', !!saved && saved.url === fake.url && saved.key === PUB
             && saved.email === 'boss@admin.zoe.test' && Object.keys(saved).sort().join() === 'email,key,url', saved);

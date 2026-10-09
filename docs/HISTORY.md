@@ -168,6 +168,11 @@
   PIN ត្រូវ សម្រាប់ ⚙️ Config …) និង `initFirebase()` ធ្វើឲ្យ session រសើបអស់សុពលភាព ➜ `generateLicenseKey()` បញ្ចប់ដោយមិនបង្ហាញ Key (ដូចមុន) តែ `finally` ក៏ពិនិត្យ session ដែរ ➜
   `isGeneratingKey` ជាប់ `true` · ប៊ូតុង «កំពុងបង្កើត...» រហូតដល់ចាកចេញ ហើយ `expireIdleSigningKey()` (បដិសេធពេល `isGeneratingKey`) មិនដក Signing Key ចេញពីសតិទៀតទេ ➜
   ឥឡូវសោ Generate មានម្ចាស់ (`generateKeyOwner` ដូច `noticeSendOwner`) ➜ សំណើដែលចាក់សោជាអ្នកដោះ · សំណើចាស់មិនដោះសោរបស់សំណើថ្មី។
+- 🏪 **ZoeKeyGen ៖ បិទប្រអប់ PIN ក្រោយចូល Supabase Admin ➜ ផ្ទាំង «🏪 ហាង Supabase» នៅប្រើបាន** (deep audit) ៖ `sbAdminIsCurrent()` ពិនិត្យជំនាន់ session រសើប
+  ដែលចាប់ពេលចូល Supabase ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config) · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ឡើងជំនាន់នោះ ➜ ផ្ទាំងនៅបង្ហាញ តែប៊ូតុង
+  បង្កើតហាង · ចេញកូដអញ្ជើញ · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · 🔄 Refresh **return ស្ងាត់** (គ្មានសារ) រហូតដល់ចាកចេញពី Supabase ហើយចូលម្តងទៀត ➜ ឥឡូវ
+  `sbAdminOwnerIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid`) + UI ចូលរួច · session ផ្ទាំងដដែល (`sbAdminSession`) ➜ ការចាកចេញពី ZoeKeyGen នៅតែសម្អាតផ្ទាំងតាម
+  `showLoginModalWithPrefill()` ➜ `sbAdminReset()` ដូចមុន។
 - 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
@@ -191,6 +196,8 @@
   web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
 - `keygen-session-security-test` ៖ `closeModal('pinModal')` ពិតកណ្តាល Generate (ដំណាក់កាលម៉ោង Server · ការសរសេរ) ➜ សោដោះ · ប៊ូតុងប្រើបាន · Generate បន្ទាប់បង្ហាញ Key ➜
   មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩។
+- `keygen-supabase-admin-test` ៖ `closeModal('pinModal')` ពិតក្រោយចូល Supabase ➜ 🔄 Refresh អានបញ្ជីហាងពិត · បង្កើតហាងបន្ទាប់ចុះ DB ➜ មុនកែ ១០ ធ្លាក់ (ការបង្កើតហាង ·
+  កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
 - `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
   ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
 

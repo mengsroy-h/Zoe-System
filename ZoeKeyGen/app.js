@@ -3132,8 +3132,12 @@ async function sbAdminRequest(session, path, method, body) {
     return { ok: !!out.res.ok, status: out.res.status, body: parsed };
 }
 
+function sbAdminOwnerIsCurrent(operation) {
+    return !!(operation && operation.user && isSignedInUiActive && auth && auth.currentUser && auth.currentUser.uid === operation.user.uid);
+}
+
 function sbAdminIsCurrent(session) {
-    return !!session && sbAdminSession === session && isSensitiveSessionCurrent(session.operation, true);
+    return !!session && sbAdminSession === session && sbAdminOwnerIsCurrent(session.operation);
 }
 
 function sbAdminErrorText(result) {
@@ -3176,14 +3180,14 @@ async function sbAdminLogin(event) {
     try {
         const login = await sbAdminRequest({ url: url, key: key, token: '' }, '/auth/v1/token?grant_type=password', 'POST', { email: email, password: password });
         if (passEl) passEl.value = '';
-        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         if (!login.ok || !login.body || typeof login.body.access_token !== 'string') {
             alert(login.status === 400 ? 'អ៊ីមែល ឬពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវ!' : 'ចូល Supabase មិនបាន (' + login.status + ')');
             return;
         }
         const session = { url: url, key: key, token: login.body.access_token, operation: operation };
         const admins = await sbAdminRequest(session, '/rest/v1/platform_admins?select=user_id', 'GET');
-        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         if (!admins.ok || !Array.isArray(admins.body) || admins.body.length !== 1) {
             alert(SB_ADMIN_ERROR_TEXT.forbidden);
             return;
@@ -3201,7 +3205,7 @@ async function sbAdminLogin(event) {
         showToast('✅ ចូល Supabase ជា Admin រួចរាល់');
         await sbAdminRefresh();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || generation !== sbAdminGeneration) return;
+        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         console.error(e);
         alert('ភ្ជាប់ Supabase មិនបានទេ — សូមពិនិត្យ URL និងអ៊ីនធឺណិត!');
     } finally {

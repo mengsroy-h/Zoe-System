@@ -1269,7 +1269,10 @@ function buildContext() {
                 else pendingProbes.push(d);
                 return d.t;
             },
-            firebaseSdkUnavailable: true, isDatabaseInitialized: false, isInitializingFirebase: false
+            firebaseSdkUnavailable: true, isInitializingFirebase: false,
+            // ⛔ ផ្តល់ `isDatabaseInitialized` តែពេល App ប្រកាសវាពិត ៖ ការប្រកាសជំនួស App ធ្លាប់បិទបាំង ZoeKeyGen ដែលអានវា
+            //    ដោយគ្មានការប្រកាស ➜ `ReferenceError` ក្នុងជណ្តើរ SDK លើទំព័រពិត (function-surface ផ្នែកឈ្មោះគ្មានការប្រកាស)
+            ...(/(?:^|\n)\s*(?:let|var)\s+isDatabaseInitialized\b/.test(appSrc) ? { isDatabaseInitialized: false } : {})
         });
         // ⛔ កំណែ 2.22.5 ៖ `reloadForFirebaseSdk()` ចូលប្រើ storage តាម shim
         // `appSessionStore` ជំនួស `sessionStorage` ដោយផ្ទាល់ (getter បោះពេល

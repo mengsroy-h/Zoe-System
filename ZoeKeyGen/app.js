@@ -237,6 +237,7 @@ let lastRoleRestOutcome = '';
 const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
 const SLOW_NETWORK_NOTICE_MS = 4000;
 let isInitializingFirebase = false;
+let isDatabaseInitialized = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
 let infoListenerGeneration = 0;
@@ -871,6 +872,7 @@ async function initFirebase() {
         attachInfoListeners();
 
         setupAuthListener();
+        isDatabaseInitialized = true;
         return true;
     } catch (e) {
         if (e && e.code === 'SDK_UNAVAILABLE') {

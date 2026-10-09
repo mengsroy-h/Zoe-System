@@ -152,12 +152,18 @@
 - ✂️ **ZoeW ☰ · 🩺** (`DeviceInfoLine`) ៖ «<model> · <ប្រព័ន្ធ>» និង «Serial (…) ៖ <លេខ>» ជាអក្សរសុទ្ធ (គ្មាន 📱 · 🔖)។
 - ✂️ **ZoeKeyGen បញ្ជីកៅអី** (`seatDeviceLabel()`) ៖ `d1 · <model> · <ប្រព័ន្ធ> · Serial <លេខ> · ចងនៅ <ថ្ងៃ>` (គ្មាន 📱 · 🔖 · serial មានស្លាក «Serial»)។
   ស្លាក/ប៊ូតុង «📱 n/max» · «📱 ចំនួនឧបករណ៍» មិនប្រែ (មិនមែនបន្ទាត់ model/serial)។
+- 🌐 **ZoeKeyGen ៖ Firebase SDK ផ្ទុកមិនទាន់ពេលបើក ➜ App ភ្ជាប់ឡើងវិញដោយខ្លួនឯង** (deep audit · ផ្នែក ២ «Deep audit ៤») ៖ `isDatabaseInitialized`
+  ត្រូវបានអាន ៤ កន្លែង (`armLateFirebaseSdkListener` · `scheduleFirebaseSdkRetry` ×២ · `retryFirebaseSdkNow`) តែ **មិនដែលប្រកាស** ➜ `ReferenceError` ➜ ជណ្តើរព្យាយាម ·
+  SDK ដែលមកយឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» ➜ ឥឡូវប្រកាស + កំណត់ `true` ពេល `initFirebase()` ជោគជ័យ។
 
 #### អ្នកយាម
 
 - `ZoeW/tests/device-info.test.tsx` ៖ តារាង ៣០ ករណី (ក្រុម · តម្រង iOS · Home Screen 26+ · បង្វិល · DPR ២,៨៨ · ទំហំមិនស្គាល់ ➜ `''` · តម្លៃខូច) · ស្លាកគ្រប់ទំហំ ≤ ៨០ ·
   គ្មានឈ្មោះស្ទួន · `loadDeviceInfo()` ពិតផ្ញើ model ក្រុមទៅ License · `DeviceInfoLine` គ្មាន emoji (`\p{Extended_Pictographic}`) ➜ មុនកែ ៤/១៦ ធ្លាក់ · ក្រោយកែ ១៦/១៦។
 - `keylist-consistency-test` ៖ បន្ទាត់កៅអីទាំង ៣ គ្មាន emoji · serial មានស្លាក «Serial» ➜ មុនកែ ២ ធ្លាក់ (`📱 d1 · … · 🔖 1a2b…`) · ក្រោយកែ ៥០/៥០។
+- `function-surface-test` ផ្នែកថ្មី ៖ ឈ្មោះដែលអានតែគ្មានការប្រកាសក្នុង script ធម្មតា (eslint-scope លើ `<script src>` ពិតរបស់ index.html ទាំង ២ App + `ZoeKeyGen/sw.js`) ·
+  `sdk-offline-boot-test` ផ្នែក ៣ ៖ ZoeKeyGen ក្នុង Chromium ពិត · `connection-recovery-test` ៖ sandbox លែងប្រកាស `isDatabaseInitialized` ជំនួស App ➜ មុនកែ ទាំង ៣ ក្រហម ·
+  ក្រោយកែ ២៧/២៧ · ២៣០/២៣០ · ២៤/២៤។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -165,6 +171,8 @@
 2. iPhone (App លើ Home Screen) ៖ បើក ☰ ➜ ខាងក្រោមឃើញ «iPhone <model ឬក្រុម> · iOS …» និង «Serial (ID App) ៖ …» គ្មាន emoji · ពិនិត្យ Key ម្តង (បើក App ធម្មតា) ➜ ZoeKeyGen
    បញ្ជី Key ➜ បន្ទាត់កៅអី «d1 · iPhone … · iOS … · Serial … · ចងនៅ …»។ ⚠️ បើបង្ហាញត្រឹម «iPhone» ៖ Settings ➜ Display & Brightness ➜ Display Zoom ➜ Default (Larger Text ប្តូរទំហំអេក្រង់) ·
    ឬ model ថ្មីមិនទាន់ក្នុងតារាង ➜ ផ្ញើ `screen.width × screen.height × devicePixelRatio` មក។
+3. ZoeKeyGen (ជម្រើស) ៖ បិទ Wi-Fi/ទិន្នន័យ ➜ បើក ZoeKeyGen ➜ ឃើញ «⚠️ ភ្ជាប់ Server មិនបានទេ … កំពុងព្យាយាមម្តងទៀត...» ➜ បើកបណ្តាញវិញ ➜ ក្នុង ~៥–៣០ វិ.
+   App ភ្ជាប់/ផ្ទុកឡើងវិញដោយខ្លួនឯង (មិនបាច់ចុច Refresh)។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
@@ -3144,6 +3152,26 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-09 — Deep audit ៤ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ») ➜ [2.50.52]
+
+- 🔴 **ZoeKeyGen ៖ `isDatabaseInitialized` មិនដែលប្រកាស** (ការរកឃើញពិត · មានតាំងពី commit ដំបូងរបស់ repo `238d7f5`) ៖ function ជណ្តើរស្តារ SDK ចម្លងពី ZoeW
+  (`firebaseState.isDatabaseInitialized` ➜ ទិដ្ឋភាពអត្ថបទជា global) អានឈ្មោះនេះ ៤ កន្លែង តែ ZoeKeyGen មិនប្រកាស ➜ script ធម្មតា = `ReferenceError` ពេលបន្ទាត់រត់។
+  វាស់ក្នុង Chromium ពិត (gstatic បិទ · ពិដាន SDK ១៥ វិ. ➜ ០,៨ វិ.) មុនកែ ៖ `pageerror`/`unhandledrejection` «isDatabaseInitialized is not defined» ×២ · probe ទៅ host SDK **០** ·
+  ការរង់ចាំ SDK **១** (ជណ្តើរមិនដែលរត់) ខណៈ toast «កំពុងព្យាយាមម្តងទៀត...» · `firebasesdkready` យឺត ➜ `initializeApp` **០** ដង (listener បោះ) ➜ ZoeKeyGen ជាប់ «ក្រៅបណ្ដាញ»
+  រហូតដល់ចុច Refresh ដោយដៃ។ ក្រោយកែ ៖ ReferenceError ០ · ជណ្តើររត់ · SDK យឺត ➜ `initFirebase()` ពិត។
+- **ហេតុអ្វី checker បៃតងក្លែង** ៖ `connection-recovery-test` ស្រង់ function ZoeKeyGen ទៅ `vm` ហើយ **ប្រកាស `isDatabaseInitialized: false` ជំនួស App** (sandbox ទទួលយកអ្វីៗទាំងអស់ ·
+  CLAUDE.md «Warnings» ២) · `sdk-offline-boot-test` វាស់ browser តែ ZoeW។ ឥឡូវ sandbox ផ្តល់អថេរតែពេល App ប្រកាសវាពិត · ផ្នែក browser ZoeKeyGen ថ្មី ·
+  `function-surface-test` វិភាគ scope ពិតរបស់ script ធម្មតាទាំងអស់ពី `<script src>` (probe `ghostFlagNeverDeclared` ត្រូវរកឃើញ · ជាន់ការយោង ≥ ៥០០០/៨០០) ➜ ថ្នាក់ «អាន
+  ឈ្មោះគ្មានការប្រកាស» ទាំងមូល មិនមែនតែឈ្មោះនេះ។ ស្កេនបន្ថែម (ESLint `no-undef` · Node) ៖ `netlify/` · `tools/` · `firebase-backup/` · `supabase/scripts` ➜ ០។
+- **បានវាស់ ហើយមិនមែនកំហុស** ៖ Sentry ១៤ ថ្ងៃ (៧ issue) ៖ `JAVASCRIPT-REACT-D` (2.50.47 · បានកែក្នុង [2.50.49]) · `-7` · `-9` មានក្នុងផ្នែកនេះរួច · `-8`
+  (`permission_denied` ៧ event · APK ហាង Supabase · ១ ដង/ផ្លូវ/ការដាច់ ✓ `dbListenerReportedFailures`) · `-B`/`-C` «Database link unresponsive» (probe zombie socket ✓) ·
+  Supabase Project ផ្ទាល់ ៖ migration live ១៣ = repo ១៣ · advisor security ៖ `zoe_ops` RLS គ្មាន policy (ចេតនា ៖ ចូលតាម definer តែប៉ុណ្ណោះ) · **Leaked Password Protection បិទ**
+  (ការកំណត់ Auth ក្នុង Dashboard · ⏳ ម្ចាស់គម្រោងពិចារណា) · performance ៖ index FK ២ មិនទាន់ប្រើ (តារាងតូច) · listener ZoeW (`detachDatabaseListeners()` មុនភ្ជាប់ ·
+  generation gate គ្រប់ callback) · listener adapter Supabase (`app._unlisten`) · ZoeKeyGen `.info/*` · auth (detach មុន attach)។
+- **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
+  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZoeKeyGen
+  `setupAuthListener()` មិនសម្អាតពិដាន ៨ វិ. ចាស់ (ZoeW សម្អាត) ➜ កម្រណាស់ ៖ Config ថ្មីក្នុង ៨ វិ. ដំបូង · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
 
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 

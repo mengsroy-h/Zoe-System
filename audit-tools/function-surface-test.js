@@ -188,6 +188,104 @@ for (const cfg of APPS) {
         + ' function/callback nodes · ' + dynamicRoutes.size + ' dynamic routes');
 }
 
+// ── ឈ្មោះដែលអាន តែគ្មានការប្រកាសក្នុង script ធម្មតា (classic) ─────────────────────────────────────
+// ⛔ script ធម្មតា (មិនមែន module) ដែលអាន identifier មិនដែលប្រកាស ➜ `ReferenceError` ពេលបន្ទាត់នោះរត់ ➜ function ទាំងមូលដាច់។
+//    sandbox របស់ checker ផ្សេងប្រកាសអថេរដែលខ្វះជំនួស App (`let x = false`) ➜ បៃតងក្លែង។ ផ្នែកនេះវិភាគ scope ពិត
+//    (eslint-scope) ៖ ការយោងដែលនៅសល់ក្នុង global scope ត្រូវតែជា global របស់ browser/SW ឬជាឈ្មោះដែល script ផ្សេងក្នុង
+//    ទំព័រដដែលផ្តល់ (ប្រកាសនៅ top-level ឬ `window.X =` · `global.X =` · `self.X =` · `globalThis.X =`) ។ បញ្ជី script យកពី
+//    `<script src>` ពិតរបស់ index.html (ឯកសារក្រៅ origin ➜ រំលង) · `typeof x` មិនរាប់ (មិនបោះ) · បណ្ណាល័យភាគីទី ៣
+//    (`vendor/` · `qrcode.js` ដែលជាការលើកលែងច្បាប់ comment ដូចគ្នា) ជាអ្នកផ្តល់ឈ្មោះតែប៉ុណ្ណោះ (UMD `define`/`module` ក្រោយ `typeof`)។
+const eslintScope = require('eslint-scope');
+const knownGlobals = require('globals');
+const PROVIDER_OBJECTS = new Set(['window', 'self', 'globalThis', 'global']);
+
+function pageScripts(htmlRel) {
+    const dir = path.dirname(htmlRel);
+    const classic = [];
+    const modules = [];
+    for (const m of read(htmlRel).matchAll(/<script\b([^>]*)\bsrc=["']([^"']+)["'][^>]*>/g)) {
+        const src = m[2];
+        if (/^[a-z]+:\/\//i.test(src)) continue;
+        const rel = path.posix.join(dir, src.replace(/^\.\//, ''));
+        (/\btype=["']module["']/.test(m[1]) ? modules : classic).push(rel);
+    }
+    return { classic, modules };
+}
+
+function scopeOf(source, rel, sourceType) {
+    const ast = (() => {
+        try { return acorn.parse(source, { ecmaVersion: 2024, sourceType, allowHashBang: true, locations: true, ranges: true }); } catch (e) { return null; }
+    })();
+    if (!ast) { check(rel + ' parse បាន (' + sourceType + ')', false); return null; }
+    const typeofArgs = new Set();
+    const provided = new Set();
+    walk(ast, (node) => {
+        if (node.type === 'UnaryExpression' && node.operator === 'typeof' && node.argument.type === 'Identifier') typeofArgs.add(node.argument);
+        if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression' && !node.left.computed
+            && node.left.object.type === 'Identifier' && PROVIDER_OBJECTS.has(node.left.object.name)) provided.add(node.left.property.name);
+    });
+    const manager = eslintScope.analyze(ast, { ecmaVersion: 2024, sourceType });
+    const top = manager.globalScope;
+    const declared = sourceType === 'module' ? [] : top.variables.map((v) => v.name);
+    declared.forEach((name) => provided.add(name));
+    const unresolved = top.through.filter((ref) => !typeofArgs.has(ref.identifier)).map((ref) => ref.identifier);
+    let references = 0;
+    manager.scopes.forEach((s) => { references += s.references.length; });
+    return { provided, unresolved, references };
+}
+
+function undeclaredReads(source, sourceType, env, extra) {
+    const scope = scopeOf(source, 'probe', sourceType);
+    const allowed = Object.assign({}, knownGlobals.builtin, knownGlobals[env] || {});
+    return scope ? scope.unresolved.filter((id) => !(id.name in allowed) && !extra.has(id.name)).map((id) => id.name) : null;
+}
+
+const probeHits = undeclaredReads('let declaredFlag = false;\nfunction f() { if (declaredFlag || ghostFlagNeverDeclared) return; if (typeof maybeGlobal === "undefined") return; return document.title; }',
+    'script', 'browser', new Set());
+check('ការវិភាគ scope អាចធ្លាក់ ៖ probe ដែលអាន `ghostFlagNeverDeclared` ត្រូវរកឃើញ (typeof · document មិនរាប់)',
+    Array.isArray(probeHits) && probeHits.length === 1 && probeHits[0] === 'ghostFlagNeverDeclared', probeHits);
+
+const CLASSIC_PAGES = [
+    { html: 'ZoeKeyGen/index.html', minScripts: 4, minRefs: 5000 },
+    { html: 'ZoeW/index.html', minScripts: 3, minRefs: 800 }
+];
+for (const pageCfg of CLASSIC_PAGES) {
+    const scripts = pageScripts(pageCfg.html);
+    const isThirdParty = (rel) => /\/vendor\/|\/qrcode\.js$/.test(rel);
+    const classic = scripts.classic.filter((rel) => !isThirdParty(rel));
+    const vendors = scripts.classic.filter(isThirdParty);
+    check(pageCfg.html + '៖ script ធម្មតាដែលវិភាគ (ពី <script src> ពិត) >= ' + pageCfg.minScripts,
+        classic.length >= pageCfg.minScripts, classic);
+    const provided = new Set();
+    const analyzed = [];
+    let references = 0;
+    [...classic, ...vendors, ...scripts.modules].forEach((rel) => {
+        const source = read(rel);
+        if (!source) { check('រកឃើញ script ' + rel, false, 'missing'); return; }
+        const isModule = scripts.modules.includes(rel);
+        const scope = scopeOf(source, rel, isModule ? 'module' : 'script');
+        if (!scope) return;
+        scope.provided.forEach((name) => provided.add(name));
+        if (!isModule && !vendors.includes(rel)) { analyzed.push({ rel, scope }); references += scope.references; }
+    });
+    const allowed = Object.assign({}, knownGlobals.builtin, knownGlobals.browser);
+    const undeclared = [];
+    analyzed.forEach(({ rel, scope }) => {
+        scope.unresolved.forEach((id) => {
+            if (id.name in allowed || provided.has(id.name)) return;
+            undeclared.push(rel + ':' + id.loc.start.line + ' ' + id.name);
+        });
+    });
+    check(pageCfg.html + '៖ ជាន់អប្បបរមា ៖ ការយោងដែលវិភាគ >= ' + pageCfg.minRefs, references >= pageCfg.minRefs, references);
+    check(pageCfg.html + '៖ ⛔ គ្មានការអានឈ្មោះដែលមិនដែលប្រកាស (ReferenceError ពេលរត់)', undeclared.length === 0, undeclared);
+}
+{
+    const rel = 'ZoeKeyGen/sw.js';
+    const source = read(rel);
+    const hits = source ? undeclaredReads(source, 'script', 'serviceworker', new Set()) : null;
+    check(rel + '៖ ⛔ គ្មានការអានឈ្មោះដែលមិនដែលប្រកាស (scope SW)', Array.isArray(hits) && hits.length === 0, hits || 'missing');
+}
+
 let helperFunctions = 0;
 let parsedHelpers = 0;
 for (const rel of SHIPPED_HELPERS) {

@@ -281,6 +281,8 @@ function buildContext() {
         normalizeBarcodesOf: () => {},
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
+        // 2.50.49 ៖ អ្នកបិទ flip ធុងសំរាមដែលសោ `ded` បញ្ជាក់ថាដករួច ➜ ការងារលុយ (វាស់ក្នុង `ZoeW/tests/cleanup-ledger-key.test.ts`) មិនមែនការភ្ជាប់
+        runCleanupLedgerKeySweep: () => { log.keySweepRuns = (log.keySweepRuns || 0) + 1; },
         refreshNotifyRemovedView: () => {},
         resetZtoShopSweep: () => {},
         attachZtoShopSweepListener: () => false,

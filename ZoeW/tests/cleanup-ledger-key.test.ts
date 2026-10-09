@@ -455,6 +455,25 @@ describe('អ្នកបោសធុងសំរាម ៖ សោក្នុ�
         expect(trashFlags()).toEqual([false]);
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
     }, 20000);
+
+    it('១២គ. ⛔ សោដែលមិនមែនរបស់ព្រឹត្តិការណ៍នេះ (`back:true` = បូកវិញរួច · `at` ផ្សេង = ព្រឹត្តិការណ៍មុន) ➜ អ្នកបោសមិន flip · លុយមិនប្រែ', async () => {
+        for (const tamper of [(e: any) => { e.back = true; }, (e: any) => { e.at = e.at - 1; }]) {
+            seed([expiredItem()]);
+            lab.plan = { flip: 'hang' };
+            claimAndCleanupItem(ID, 'abandon');
+            await flush();
+            const key = lab.store[DAILY][DAY].ded && lab.store[DAILY][DAY].ded[ID];
+            expect(key).toBeTruthy();
+            tamper(key);
+            localStorage.clear();
+            reloadPage();
+            firebaseState.serverTimeOffsetMs = 30 * 60 * 1000;
+            runScheduledCleanup();
+            await flush();
+            expect(trashFlags()).toEqual([false]);
+            expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        }
+    }, 40000);
 });
 
 describe('rules មិនទាន់ Publish', () => {

@@ -154,7 +154,8 @@
   tombstone របស់ការស្តារ (គ្មាន `undo`) ➜ ការស្តារបូកវិញទាំង ២ រួចហើយ ➜ មិនបូកម្តងទៀត។
 - 🧹 **អ្នកបោស** `runCleanupLedgerKeySweep()` (វដ្ត ៦០ វិ.) ៖ ធុងសំរាម `expired` មិនទាន់ flip ចាស់ជាង `CLEANUP_KEY_SWEEP_GRACE_MS` គ្មាន journal លើឧបករណ៍នេះ ហើយសោនៅថ្ងៃ (`at` ដូចគ្នា) ➜
   flip `isDeducted: true` (មិនប៉ះលុយ) · គ្មានសោ ➜ មិនធ្វើអ្វី ➜ ឧបករណ៍ដែលស្លាប់កណ្តាលការ flip មិនទុកកញ្ចប់ «មិនទាន់ដក» ក្នុងធុងសំរាមទៀត។
-- 🗑️ **purge (២ ថ្ងៃ)** លុបសោនៃធុងសំរាមដែល purge (`releaseCleanupLedgerKeys()`) ➜ record ថ្ងៃមិនរីកឥតឈប់។
+- 🗑️ **purge (២ ថ្ងៃ)** លុបសោនៃធុងសំរាមដែល purge (`releaseCleanupLedgerKeys()`) ➜ record ថ្ងៃមិនរីកឥតឈប់ · ការលុបសោមានពិដាន `dbOp()` ៖ purge
+  រង់ចាំវាក្រោមសោ `deletedCleanupInFlight` ➜ បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) មិនធ្វើឲ្យសោជាប់ ហើយ purge ងាប់ទៀតទេ។
 - 🔐 **rules មិនទាន់ Publish** ➜ ការសរសេរ `ded` ត្រូវបដិសេធ ➜ App ថយទៅ token គ្មានសោ (ការស្តារនៅតែសម្រេចដោយ token · អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ) · rules ចាស់ជាង ring ➜
   ផ្លូវចាស់ (journal `legacy`) ➜ ការស្តារ = «unverified» ដូចមុន។
 - ⚠️ **ព្រំដែន** ៖ App ≤ 2.50.48 ក្នុងហាងដដែលសរសេរ record ថ្ងៃដោយគ្មាន `ded` ➜ សោបាត់ តែ token ក្នុង ring នៅជាភស្តុតាង (App ≥ 2.50.22 រក្សា ring) · App < 2.50.22 លុប ring ➜
@@ -171,6 +172,12 @@
   rules ចាស់ (Publish បច្ចុប្បន្ន) បដិសេធ `ded` តែទទួល token ➜ ការថយក្រោយត្រូវ។
 - `ZoeW/tests/remove-stale-session.test.ts` ៖ យុថ្កាថ្មី (`deductCleanupRevenue` · ច្រកផ្ទាល់) ➜ `stale` មុនសារ/Sentry · `supabase-update-contract` ៖ `releaseCleanupLedgerKeys` = IDEMPOTENT ·
   `finalizeClaimedRestore` + សោដក ១ = BOUNDED។
+- `write-stall-guard-test` ផ្នែក ២ខ (ថ្មី) ៖ purge ជោគជ័យ តែការលុបសោ `ded` ព្យួរ ➜ មុនកែ **FAIL** (សោ `deletedCleanupInFlight` ជាប់ក្រោយ ១៧,៥ វិ.) ➜ ក្រោយកែ ដោះក្នុងពិដាន។
+- `expired-trash-retention-test` ៖ purge ដោះសោ `ded` តែរបស់ធុងសំរាម `expired` ដែល purge ពិត និង `at` ដដែល (សោ `at` ផ្សេង · `pickup` មិនប៉ះ)។
+- `emu/crud-rules-flow` ផ្នែក ៥ (ថ្មី) ៖ ការសម្អាតផុតកំណត់ពិតក្នុង sandbox ➜ payload ពិត (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ + `ded` · flip) ➜ rules ពិតលើ emulator
+  ទទួល · server ៖ ថ្ងៃ/ខែដក ៨,២៩ · ២ · `ded/id_e` = `{ at · cod · dod · count }` · ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ បដិសេធ · `ded` ខុសទម្រង់ ➜ បដិសេធ
+  (mutation បិទការសរសេរ `ded` ➜ ធ្លាក់ ៣)។ មុននេះផ្លូវសរសេរ `ded` គ្មានអ្នកវាស់ជាមួយ rules ពិត (fuzz គ្មាន op ផុតកំណត់)។
+- `ZoeW/tests/cleanup-ledger-key.test.ts` ១២គ (ថ្មី ➜ ១៩) ៖ សោ `back:true` ឬ `at` ផ្សេង ➜ អ្នកបោសមិន flip · លុយមិនប្រែ (mutation ដកលក្ខខណ្ឌ `at`/`back` ➜ ធ្លាក់)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3079,6 +3086,17 @@ record ខែធំជាងមុន (egress) ➜ សោតែក្នុង�
 គ្រាន់ ៖ ring ពេញ ឬ App < 2.50.22 លុប ring ➜ «គ្មាន token» មិនមែនភស្តុតាង «មិនទាន់ចុះ» (ដកពីរដង) ➜ សម្រេចមិនបាន ➜ មិនប៉ះលុយ។ ទំហំ ៖ សោ ~៧០ byte/កញ្ចប់ផុតកំណត់
 ក្នុង record ថ្ងៃ ➜ purge ២ ថ្ងៃលុបវា។ ការសរសេរ `ded` លើ rules ចាស់ (emulator) ៖ ៤០១ ➜ ថយទៅ token គ្មានសោ ➜ ២០០។
 
+**ជុំបញ្ចប់ (session ទី ៣ · run-all STRICT ពេញលើ `d0940f9` ៖ ១៩៦ ជាប់ · ធ្លាក់ ៦)** ៖ handoff រាយការណ៍តែ checker ពាក់ព័ន្ធ ៣០ ➜ run-all ពេញរកឃើញ ៖
+(១) sandbox ៣ ខ្វះ function ថ្មី (`expired-trash-retention-test` · `write-stall-guard-test` ៖ `cleanupLedgerKeyOf` · `connection-recovery-test` ៖
+`runCleanupLedgerKeySweep` ➜ stub ដូចការងារសម្អាតផ្សេង) · (២) **bug ពិត** ៖ `releaseCleanupLedgerKeys()` គ្មានពិដាន ហើយ purge រង់ចាំវាក្រោមសោ ➜
+អ្នកយាម `write-stall-guard-test` ផ្នែក ២ខ មុនកែ FAIL ➜ `dbOp()` · (៣) លិបិក្រមខ្វះជួរ `ZoeW/tests/cleanup-ledger-key.test.ts` ·
+(៤) `zoew-suite-test` លើសពិដាន ៣០០ វិ. (ជំហាន ១៣ តាមលំដាប់ · `native:check` · `rules:check` មិនទាន់រត់) ➜ ⛔ មិនបង្កើន `CHECKER_TIMEOUT` ➜
+`--part=1/2` (ឋិតិវន្ត · vitest) · `--part=2/2` (build ហើយអ្វីៗដែលប្រើ `dist` តាមលំដាប់) ដូច `money-guardian-test` · (៥) `zto-network-boundaries-test`
+«HTTP body ព្យួរ» ៖ fetch ដំបូងក្នុង process + lane ស្របគ្នា ➜ ពិដាន ១០០ms ផុតមុនសំណើទៅដល់ server (វាស់ ៖ ម៉ាស៊ីនពេញ CPU ៖ កំណែចាស់ធ្លាក់ ១/៦ ·
+កំណែថ្មី (កំដៅ fetch · ពិដាន ៤០០ms) ជាប់ ៤/៤) · (៦) `money-guardian-test` ទាំង ២ ផ្នែកជាប់ (២៥ · ២២)។ checker ក្រហម ២ របស់ handoff ៖
+`emu/crud-rules-flow` (sandbox ខ្វះ ៤ ឈ្មោះ ➜ ផ្ទុក function ពិត + ផ្នែក ៥) · `rules:check` (parity Android = web ៖ id/`at` របស់សោ `ded` ថ្មីរាល់ដង ➜ ប្តូរឈ្មោះតាមធុងសំរាម ·
+cod/dod/count ប្រៀបធៀបដដែល ➜ ៧៥ ok)។
+
 ### 2026-10-09 — វីដេអូម្ចាស់គម្រោង ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន ➜ [2.50.48]
 
 **វិធី** ៖ ញែកវីដេអូ ៣ (APK · PWA Android ៩០ ស៊ុម/វិ. · iPhone ៦០ ស៊ុម/វិ.) ជាស៊ុម (`ffmpeg` ២០–៦០ ស៊ុម/វិ.) ➜ វាស់ទីតាំងកាតស្វែងរក · ប្រអប់ស្នើលេខ · keyboard តាមស៊ុម ➜
@@ -4889,7 +4907,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `expired-trash-retention-test` | — | ផ្នែក ១ |
+| `expired-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -5029,7 +5047,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `write-stall-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zoew-suite-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -5038,7 +5056,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `zto-cookie-sync-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zto-network-boundaries-test` | — | ផ្នែក ២ |
+| `zto-network-boundaries-test` | ផ្នែក ២ | ផ្នែក ២ |
 | `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -5053,6 +5071,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |

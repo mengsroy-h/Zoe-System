@@ -63,9 +63,13 @@ async function main() {
         } };
     }
     try {
+        // ⛔ fetch ដំបូងក្នុង process (undici ផ្ទុក lazy) + lane run-all ស្របគ្នា ➜ ពិដាន 100ms ផុតមុនសំណើទៅដល់ server ➜ សេណារីយ៉ូវាស់
+        //    «headers ព្យួរ» ជំនួស «body ព្យួរ» ហើយ `requests.includes('/stall')` ធ្លាក់ (run-all 2.50.49)។ កំដៅផ្លូវ fetch មុន · ពិដាន body ព្យួរ
+        //    ៤០០ms (ស្របនឹងសេណារីយ៉ូក្បែរ ៥០០ms) ⛔ ការអះអាង (abort ពិត · សំណើទៅដល់ · NETLIFY_TIMEOUT transient) នៅដដែល។
+        await nativeFetch(origin + '/ok').then((r) => r.text()).catch(() => {});
         await scenario('HTTP body ព្យួរ ➜ timeout និង abort ពិត', async () => {
             const before = aborts;
-            await assert.rejects(bounded(sync.getNetlifySite('test-site', TOKEN, controls('/stall'))),
+            await assert.rejects(bounded(sync.getNetlifySite('test-site', TOKEN, controls('/stall', 400)), 3000),
                 (error) => error.code === 'NETLIFY_TIMEOUT' && error.transient === true);
             assert.ok(aborts > before);
             assert.ok(requests.includes('/stall'));

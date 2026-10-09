@@ -450,7 +450,7 @@ export function releaseCleanupLedgerKeys(list) {
         if (candidate && candidate.ledgerKey) updates[`zoew_daily_revenue_cod_dod/${candidate.ledgerKey.scanDate}/ded/${candidate.id}`] = null;
     });
     if (!Object.keys(updates).length || !firebaseState.fb || !firebaseState.db) return Promise.resolve();
-    return Promise.resolve().then(() => firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates)).catch(() => {});
+    return dbOp(Promise.resolve().then(() => firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates))).catch(() => {});
 }
 
 export async function resolveCleanupSlot(trashItem) {

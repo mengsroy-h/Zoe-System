@@ -750,7 +750,8 @@ run "write-stall-guard" node audit-tools/write-stall-guard-test.js
 run "stall-lock-release" node audit-tools/stall-lock-release-test.js
 run "locker-claim-guard" node audit-tools/locker-claim-guard-test.js
 run "stale-clear-claim" node audit-tools/stale-clear-claim-test.js
-run "zoew-suite (ZoeW React ៖ tsc · lint · vitest · native · android)" node audit-tools/zoew-suite-test.js
+run "zoew-suite 1/2 (ZoeW React ៖ tsc · lint · vitest · android)" node audit-tools/zoew-suite-test.js --part=1/2
+run "zoew-suite 2/2 (ZoeW React ៖ build · sw · smoke · native · rules)" node audit-tools/zoew-suite-test.js --part=2/2
 
 section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។

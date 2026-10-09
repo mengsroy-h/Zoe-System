@@ -240,6 +240,7 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
                 refreshKeyList: () => { box.refreshed++; },
                 captureSensitiveSession: () => ({ user: { email: 'a@x.com' } }),
                 isSensitiveSessionCurrent: () => true,
+                adminOperationIsCurrent: () => true,
                 withTimeout: (pr) => pr,
                 retryAsync: (fn) => fn(),
                 fb: {

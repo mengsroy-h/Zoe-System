@@ -651,6 +651,14 @@ function isSensitiveSessionCurrent(token, requireAuthorizedUi) {
     return !!(auth && auth.currentUser === token.user && authGeneration === token.authGeneration && isSignedInUiActive);
 }
 
+function adminOwnerIsCurrent(operation) {
+    return !!(operation && operation.user && isSignedInUiActive && auth && auth.currentUser && auth.currentUser.uid === operation.user.uid);
+}
+
+function adminOperationIsCurrent(operation) {
+    return adminOwnerIsCurrent(operation) && operation.authGeneration === authGeneration;
+}
+
 function clearPinInputValues() {
     const pinIn = document.getElementById('securityPinInput');
     if (pinIn) pinIn.value = '';
@@ -2175,7 +2183,7 @@ async function generateLicenseKey() {
     const myGeneration = keyListSessionGeneration;
     try {
         const timeSynced = await waitForServerTimeSync(15000);
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
         if (!timeSynced) {
             alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
             return;
@@ -2185,7 +2193,7 @@ async function generateLicenseKey() {
         const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, {
             appCode: appSelect, days: days, note: note
         });
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
 
         const targetPaths = [appSelect];
         const publicRecord = {
@@ -2207,7 +2215,7 @@ async function generateLicenseKey() {
         }), 3, 1000)));
         writePromise.then((bgResults) => {
             if (!generateAlreadyTimedOut) return;
-            if (myGeneration !== keyListSessionGeneration || !isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            if (myGeneration !== keyListSessionGeneration || !adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
@@ -2222,7 +2230,7 @@ async function generateLicenseKey() {
             if (timeoutErr && timeoutErr.message === 'Generate key timed out') generateAlreadyTimedOut = true;
             throw timeoutErr;
         }
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
         const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
         const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
 
@@ -2233,7 +2241,7 @@ async function generateLicenseKey() {
         let appPathsTagFailed = false;
         if (failedPaths.length > 0) {
             const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.update(fb.ref(db, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths }), 3, 1000)));
-            if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
             appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
             if (appPathsTagFailed) {
                 const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
@@ -2242,7 +2250,7 @@ async function generateLicenseKey() {
             }
         }
 
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
         lastGeneratedKey = keyString;
         document.getElementById('genResultKey').textContent = keyString;
         document.getElementById('genResultBox').classList.remove('hidden');
@@ -2258,7 +2266,7 @@ async function generateLicenseKey() {
         }
         refreshKeyList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
@@ -2667,12 +2675,12 @@ async function toggleRevokeKey(id) {
     if (!row) return;
     const newRevoked = !row.revoked;
     if (!confirm(newRevoked ? 'តើអ្នកចង់ Revoke Key នេះមែនទេ? អ្នកប្រើប្រាស់នឹងលែងចូល App បានក្នុងពេលឆាប់ៗ។' : 'សង្គ្រោះ Key នេះមកវិញ?')) return;
-    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
         write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { revoked: newRevoked })));
         const results = await withTimeout(write, 15000, 'Update timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
             showToast(newRevoked ? '✅ Key ត្រូវបាន Revoke!' : '✅ Key ត្រូវបានសង្គ្រោះមកវិញ!');
@@ -2683,7 +2691,7 @@ async function toggleRevokeKey(id) {
         }
         refreshKeyList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
         if (write && e && e.message === 'Update timed out') {
             armAdminLateWrite(write, isCurrent, (late) => {
@@ -2712,16 +2720,16 @@ async function setKeySeatLimit(id) {
     if (next === row.maxDevices) return;
     if (next < row.seatDevices.length
         && !confirm('Key នេះចងនឹងឧបករណ៍ ' + row.seatDevices.length + ' រួចហើយ។\n\nការបន្ថយមក ' + next + ' ធ្វើឲ្យឧបករណ៍ដែលលើសលែងប្រើ Key នេះបាន។ បន្តទេ?')) return;
-    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
         write = retryAsync(() => Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next }))), 3, 1000);
         await withTimeout(write, 15000, 'Seat limit update timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ!');
         refreshKeyList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'setKeySeatLimit' });
         if (write && e && e.message === 'Seat limit update timed out') {
@@ -2748,16 +2756,16 @@ async function releaseKeySeat(id) {
         return;
     }
     if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
-    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
         write = retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000);
         await withTimeout(write, 15000, 'Release timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
         refreshKeyList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
         if (write && e && e.message === 'Release timed out') {
@@ -2800,18 +2808,18 @@ async function confirmExtendKey() {
     const days = parseFloat(document.getElementById('extendDaysInput').value);
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
     const timeSynced = await waitForServerTimeSync(15000);
-    if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+    if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
     if (!timeSynced) {
         alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
         return;
     }
     const newExpiresAt = getServerNow() + Math.round(days * 86400000);
-    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && db === operationDb;
+    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     let write = null;
     try {
         write = Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${targetId}`), { expiresAt: newExpiresAt })));
         const results = await withTimeout(write, 15000, 'Update timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
             showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់!');
@@ -2823,7 +2831,7 @@ async function confirmExtendKey() {
         if (extendTargetId === targetId) closeModal('extendModal');
         refreshKeyList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
         if (extendTargetId === targetId) closeModal('extendModal');
         if (write && e && e.message === 'Update timed out') {
@@ -2980,7 +2988,7 @@ async function sendNotice() {
     const built = buildNoticePayload(kindEl ? kindEl.value : '', titleEl ? titleEl.value : '', bodyEl ? bodyEl.value : '', getServerNow());
     if (!built.payload) { alert(noticeErrorMessage(built)); return; }
     if (!confirm('ផ្ញើដំណឹងនេះទៅ ZoeW គ្រប់ឧបករណ៍?\n\n' + NOTICE_KIND_LABELS[built.payload.kind] + ' ៖ ' + built.payload.title)) return;
-    if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+    if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
     const bucket = noticeBucketPath();
     const id = newNoticeId(built.payload.at);
     const owner = {};
@@ -2991,7 +2999,7 @@ async function sendNotice() {
     let writeFailed = false;
     try {
         const snap = await withTimeout(fb.get(fb.ref(operationDb, bucket)), 15000, 'Notice read timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         const updates = {};
         noticeIdsToTrim(snap.exists() ? Object.keys(snap.val() || {}) : [], NOTICE_KEEP_MAX)
             .forEach((oldId) => { updates[bucket + '/' + oldId] = null; });
@@ -2999,19 +3007,19 @@ async function sendNotice() {
         write = retryAsync(() => fb.update(fb.ref(operationDb), updates), 3, 1000);
         write.catch(() => { writeFailed = true; });
         await withTimeout(write, 15000, 'Notice send timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         if (titleEl) titleEl.value = '';
         if (bodyEl) bodyEl.value = '';
         showToast('✅ បានផ្ញើដំណឹង! ZoeW នឹងឃើញវាក្នុងផ្ទាំង 🔔 ហើយទូរស័ព្ទដែលបើកការជូនដំណឹងនឹងលោតភ្លាម');
         kickNoticePush();
         refreshNoticeList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'sendNotice' });
         if (write && !writeFailed) {
             write.then(() => {
-                if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+                if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
                 showToast('✅ ដំណឹងដែលរង់ចាំ ត្រូវបានផ្ញើរួចហើយ!');
                 kickNoticePush();
                 refreshNoticeList();
@@ -3038,11 +3046,11 @@ async function deleteNotice(id) {
     if (!confirm('លុបដំណឹង «' + row.title + '»?\n\nZoeW នឹងលែងបង្ហាញវា ពេលទាញលើកក្រោយ។')) return;
     try {
         await withTimeout(retryAsync(() => fb.set(fb.ref(operationDb, noticeBucketPath() + '/' + row.id), null), 3, 1000), 15000, 'Notice delete timed out');
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         showToast('✅ បានលុបដំណឹង!');
         refreshNoticeList();
     } catch (e) {
-        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        if (!adminOperationIsCurrent(operation) || db !== operationDb) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'deleteNotice' });
         alert('លុបដំណឹងមិនបានទេ! សូមពិនិត្យអ៊ីនធឺណិត រួចសាកល្បងម្តងទៀត។');
@@ -3132,12 +3140,8 @@ async function sbAdminRequest(session, path, method, body) {
     return { ok: !!out.res.ok, status: out.res.status, body: parsed };
 }
 
-function sbAdminOwnerIsCurrent(operation) {
-    return !!(operation && operation.user && isSignedInUiActive && auth && auth.currentUser && auth.currentUser.uid === operation.user.uid);
-}
-
 function sbAdminIsCurrent(session) {
-    return !!session && sbAdminSession === session && sbAdminOwnerIsCurrent(session.operation);
+    return !!session && sbAdminSession === session && adminOwnerIsCurrent(session.operation);
 }
 
 function sbAdminErrorText(result) {
@@ -3180,14 +3184,14 @@ async function sbAdminLogin(event) {
     try {
         const login = await sbAdminRequest({ url: url, key: key, token: '' }, '/auth/v1/token?grant_type=password', 'POST', { email: email, password: password });
         if (passEl) passEl.value = '';
-        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
+        if (!adminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         if (!login.ok || !login.body || typeof login.body.access_token !== 'string') {
             alert(login.status === 400 ? 'អ៊ីមែល ឬពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវ!' : 'ចូល Supabase មិនបាន (' + login.status + ')');
             return;
         }
         const session = { url: url, key: key, token: login.body.access_token, operation: operation };
         const admins = await sbAdminRequest(session, '/rest/v1/platform_admins?select=user_id', 'GET');
-        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
+        if (!adminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         if (!admins.ok || !Array.isArray(admins.body) || admins.body.length !== 1) {
             alert(SB_ADMIN_ERROR_TEXT.forbidden);
             return;
@@ -3205,7 +3209,7 @@ async function sbAdminLogin(event) {
         showToast('✅ ចូល Supabase ជា Admin រួចរាល់');
         await sbAdminRefresh();
     } catch (e) {
-        if (!sbAdminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
+        if (!adminOwnerIsCurrent(operation) || generation !== sbAdminGeneration) return;
         console.error(e);
         alert('ភ្ជាប់ Supabase មិនបានទេ — សូមពិនិត្យ URL និងអ៊ីនធឺណិត!');
     } finally {

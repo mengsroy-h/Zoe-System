@@ -173,10 +173,15 @@
   PIN ត្រូវ សម្រាប់ ⚙️ Config …) និង `initFirebase()` ធ្វើឲ្យ session រសើបអស់សុពលភាព ➜ `generateLicenseKey()` បញ្ចប់ដោយមិនបង្ហាញ Key (ដូចមុន) តែ `finally` ក៏ពិនិត្យ session ដែរ ➜
   `isGeneratingKey` ជាប់ `true` · ប៊ូតុង «កំពុងបង្កើត...» រហូតដល់ចាកចេញ ហើយ `expireIdleSigningKey()` (បដិសេធពេល `isGeneratingKey`) មិនដក Signing Key ចេញពីសតិទៀតទេ ➜
   ឥឡូវសោ Generate មានម្ចាស់ (`generateKeyOwner` ដូច `noticeSendOwner`) ➜ សំណើដែលចាក់សោជាអ្នកដោះ · សំណើចាស់មិនដោះសោរបស់សំណើថ្មី។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN កណ្តាលការកែ Key ➜ លទ្ធផល និង ✅ នៅបង្ហាញ** (deep audit · ថ្នាក់ដូចផ្ទាំង Supabase ខាងក្រោម) ៖ Generate · Extend · Revoke ·
+  ចំនួនឧបករណ៍ · ដោះឧបករណ៍ · ផ្ញើ/លុបដំណឹង ពិនិត្យជំនាន់ session រសើប (`isSensitiveSessionCurrent`) ក្រោយ `await` ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config ហើយបោះបង់) ឡើងជំនាន់នោះ ➜
+  ការសរសេរចុះ DB ពិត តែ App **ស្ងាត់** ៖ Key ដែល Generate ចុះក្នុង DB តែមិនបង្ហាញ (Key ខ្មោចក្នុងបញ្ជី ➜ អ្នកលក់ Generate ម្តងទៀត) · គ្មាន ✅ · បញ្ជីមិន Refresh ➜ ឥឡូវ
+  `adminOperationIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid` · `adminOwnerIsCurrent()` ដែលផ្ទាំង Supabase ប្រើ) + `authGeneration` ដដែល ➜ ការចាកចេញ ឬចូលវិញ (គណនីដដែល) នៅតែបោះលទ្ធផលចោល ·
+  ប្រតិបត្តិការសម្ងាត់ (Load/ស្តារ Signing Key · keypair · ចងក្រយៅដៃ · Clipboard) រក្សា `isSensitiveSessionCurrent()` ដដែល។
 - 🏪 **ZoeKeyGen ៖ បិទប្រអប់ PIN ក្រោយចូល Supabase Admin ➜ ផ្ទាំង «🏪 ហាង Supabase» នៅប្រើបាន** (deep audit) ៖ `sbAdminIsCurrent()` ពិនិត្យជំនាន់ session រសើប
   ដែលចាប់ពេលចូល Supabase ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config) · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ឡើងជំនាន់នោះ ➜ ផ្ទាំងនៅបង្ហាញ តែប៊ូតុង
   បង្កើតហាង · ចេញកូដអញ្ជើញ · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · 🔄 Refresh **return ស្ងាត់** (គ្មានសារ) រហូតដល់ចាកចេញពី Supabase ហើយចូលម្តងទៀត ➜ ឥឡូវ
-  `sbAdminOwnerIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid`) + UI ចូលរួច · session ផ្ទាំងដដែល (`sbAdminSession`) ➜ ការចាកចេញពី ZoeKeyGen នៅតែសម្អាតផ្ទាំងតាម
+  `adminOwnerIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid`) + UI ចូលរួច · session ផ្ទាំងដដែល (`sbAdminSession`) ➜ ការចាកចេញពី ZoeKeyGen នៅតែសម្អាតផ្ទាំងតាម
   `showLoginModalWithPrefill()` ➜ `sbAdminReset()` ដូចមុន។
 - 🧰 **ZoeW ៖ Deploy ថ្មីចូលផ្សាយកណ្តាល install របស់ Service Worker ➜ App មិនស** (deep audit · «មិនទាន់វាស់ ៖ install `addAll` ពេល deploy ជាន់» ក្នុង Handoff) ៖
   asset ឈ្មោះ hash របស់ deploy ចាស់លែងមាន ➜ Netlify (`/* ➜ /index.html 200`) ឆ្លើយ `index.html` ➜ `cache.addAll()` (status ok) រក្សា HTML ក្រោម key JS ចម្បង ➜
@@ -208,7 +213,10 @@
   មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
   web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
 - `keygen-session-security-test` ៖ `closeModal('pinModal')` ពិតកណ្តាល Generate (ដំណាក់កាលម៉ោង Server · ការសរសេរ) ➜ សោដោះ · ប៊ូតុងប្រើបាន · Generate បន្ទាប់បង្ហាញ Key ➜
-  មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩។
+  មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩ · បិទប្រអប់ PIN កណ្តាល Generate ➜ Key បង្ហាញ · កណ្តាលការសរសេរ Extend · Revoke · ចំនួនឧបករណ៍ ·
+  ដោះឧបករណ៍ ➜ ✅ + Refresh · ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញ (គណនីដដែល) ➜ គ្មាន ✅ · ការក្លែងការចាកចេញធ្វើដូច `logoutApp()` ពិត (`authGeneration++` · `invalidateSensitiveSession()` ·
+  `isSignedInUiActive = false`, អះអាងលើកូដពិត) ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ១៤២/១៤២ · `keygen-notice-test` ៖ បិទប្រអប់ PIN កណ្តាលការផ្ញើ/លុបដំណឹង ➜ ✅ + ទាញបញ្ជី ➜ មុនកែ ២ ធ្លាក់ ·
+  ក្រោយកែ ៨៣/៨៣។
 - `keygen-supabase-admin-test` ៖ `closeModal('pinModal')` ពិតក្រោយចូល Supabase ➜ 🔄 Refresh អានបញ្ជីហាងពិត · បង្កើតហាងបន្ទាប់ចុះ DB ➜ មុនកែ ១០ ធ្លាក់ (ការបង្កើតហាង ·
   កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
 - `sw-install-integrity-test` ជុំទី ៧ · ៧ខ (browser ពិត · build ពិត · deploy ជាន់មុនផ្ទុកទំព័រ ព្រោះ App ចុះឈ្មោះ sw.js ខ្លួនឯង) ៖ JS ចម្បងទទួល `index.html` ➜ install ធ្លាក់ ·
@@ -229,7 +237,7 @@
 4. Push ៖ ពិនិត្យតាម `ZoeW/README.md` ផ្នែក «ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App» ៖ `…/.netlify/functions/push?op=config` ➜ `web`/`fcm` = `true` ·
    ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
 5. ZoeKeyGen (ជម្រើស) ៖ ចូល «🏪 ហាង Supabase» ➜ ចុច ⚙️ (ប្រអប់ PIN) ហើយបោះបង់ ➜ 🔄 Refresh / បង្កើតហាង នៅដើរ (មិនស្ងាត់) · Generate Key ហើយបើក/បិទប្រអប់ PIN ពេលកំពុងបង្កើត ➜
-   ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន។
+   ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន ហើយ Key ដែលបានបង្កើតបង្ហាញ · Extend/Revoke Key ហើយបិទប្រអប់ PIN ពេលកំពុងរក្សាទុក ➜ ឃើញ ✅ និងបញ្ជីថ្មី។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
@@ -3236,8 +3244,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - 🔴 **ជុំបន្ត (session ដដែល) ៖ ថ្នាក់ «ជំនាន់ session រសើប ប្រើជាសញ្ញាសម្គាល់យូរ»** (ZoeKeyGen) ៖ `closeModal('pinModal')` · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ·
   `initFirebase()` ឡើង `sensitiveSessionGeneration` ដើម្បីបោះបង់ប្រតិបត្តិការ PIN ដែលកំពុងហោះ តែ (១) `finally` របស់ `generateLicenseKey()` ដោះសោតែពេល session នៅ ➜
   សោជាប់ (ប៊ូតុងស្លាប់ · `expireIdleSigningKey()` លែងដក Key) · (២) `sbAdminIsCurrent()` ពិនិត្យជំនាន់ដែលចាប់ពេលចូល Supabase ➜ ផ្ទាំងហាងទាំងមូល return ស្ងាត់ ➜ កែក្នុង
-  [2.50.52] (សោមានម្ចាស់ · `sbAdminOwnerIsCurrent()` = `uid` + UI ចូលរួច)។ ប្រតិបត្តិការខ្លីផ្សេង (Revoke · Extend · ផ្ញើដំណឹង) នៅបោះបង់សារ ✅/⏳ ពេលបិទប្រអប់ PIN កណ្តាល
-  ការសរសេរ (ការសរសេរនៅចុះ · 🔄 Refresh បង្ហាញ) · Generate ដែលត្រូវបិទប្រអប់ PIN កណ្តាល ➜ Key ចុះ DB តែមិនបង្ហាញ (Key ខ្មោចក្នុងបញ្ជី · គ្មានគ្រោះថ្នាក់) ➜ ព្រំដែនដែលទទួលស្គាល់។
+  [2.50.52] (សោមានម្ចាស់ · `adminOwnerIsCurrent()` = `uid` + UI ចូលរួច)។ (៣) ប្រតិបត្តិការកែ Key (Generate · Revoke · Extend · ឧបករណ៍ · ដំណឹង) បោះសារ ✅/⏳ និង Key ដែល
+  Generate ពេលបិទប្រអប់ PIN កណ្តាលការសរសេរ (ការសរសេរនៅចុះ ➜ Key ខ្មោចក្នុងបញ្ជី) ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] (`adminOperationIsCurrent()` = `uid` +
+  `authGeneration`)។ ច្បាប់ ៖ ជំនាន់ session រសើបការពារតែប្រតិបត្តិការ **សម្ងាត់** (Signing Key · keypair · ក្រយៅដៃ · Clipboard) · ប្រតិបត្តិការ admin ចងនឹងអ្នកចូល។ checker ចាស់ក្លែង
+  «ចាកចេញ» ដោយ `invalidateSensitiveSession()` តែម្តង (= បិទប្រអប់ PIN មិនមែនការចាកចេញ) ➜ អះអាងចាស់លាក់ថ្នាក់នេះ ➜ ឥឡូវក្លែងដូច `logoutApp()` ពិត។
 - 🔴 **Service Worker ៖ deploy ជាន់កណ្តាល install** (ធាតុ «មិនទាន់វាស់» ក្នុង Handoff) ➜ វាស់ក្នុង browser ពិត ៖ `cache.addAll()` ទទួល `index.html` 200 ក្រោម key JS ចម្បង ➜
   SW activate ➜ App ស ➜ កែក្នុង [2.50.52] (`shellEntriesFit()`)។ ព្រំដែនដែលនៅសល់ ៖ ឯកសារគ្មាន hash (vendor · `boot-flags.js` · ZoeKeyGen ទាំងមូល) អាចជាលាយ deploy N/N+1
   បើ deploy ជាន់ចំកណ្តាល install (online ដើរ · ក្រៅបណ្តាញអាចខ្វះ asset ថ្មី រហូតដល់ SW បន្ទាប់) ➜ ដំណោះស្រាយដែលអាចធ្វើ ៖ ពិនិត្យ sw.js ពិតក្រោយ `addAll` (មាន `CACHE_VERSION` ដដែល ➜ ទទួល ·

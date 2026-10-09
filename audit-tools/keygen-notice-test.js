@@ -56,7 +56,9 @@ function realDecl(name) {
 
 const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
-    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession'];
+    'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession',
+    'closeModal', 'clearPinInputValues',
+    ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : [])];
 const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',
     'ZOEW_PUSH_ORIGIN', 'NOTICE_PUSH_KICK_TIMEOUT_MS'];
 
@@ -76,6 +78,12 @@ async function drain(n) { for (let i = 0; i < (n || 8); i++) await flush(); }
 
 function snapOf(value) {
     return { exists: () => value !== null && value !== undefined, val: () => (value === undefined ? null : JSON.parse(JSON.stringify(value))) };
+}
+
+// ⛔ ការចាកចេញពិត = `logoutApp()` (`authGeneration++`) + `showLoginModalWithPrefill()` (`invalidateSensitiveSession()` · `isSignedInUiActive = false`)
+//    ការបិទប្រអប់ PIN (`closeModal('pinModal')` ពិត) បង្កើនតែជំនាន់ sensitive ➜ ការក្លែងការចាកចេញត្រូវធ្វើទាំងបី
+function simulateLogout(ctx) {
+    vm.runInContext('authGeneration++; invalidateSensitiveSession(); isSignedInUiActive = false;', ctx);
 }
 
 function build(options) {
@@ -121,6 +129,8 @@ function build(options) {
         var noticeReadFailed = false;
         var isSendingNotice = false;
         var noticeSendOwner = null;
+        var pinTargetAction = null;
+        function clearKeypairOutputs() {}
     `, ctx);
     vm.runInContext(declSources.map((x) => (x[1] || '').replace(/^const /, 'var ')).join('\n'), ctx);
     vm.runInContext(fnSources.map((x) => x[1] || '').join('\n\n'), ctx);
@@ -244,12 +254,46 @@ async function run() {
         fill(h, kinds[0], 'ក', 'ខ');
         const task = h.ctx.sendNotice();
         await drain();
-        h.ctx.invalidateSensitiveSession();
+        simulateLogout(h.ctx);
         commit.resolve();
         await task;
         await drain();
         ok('⛔ logout កណ្តាលការផ្ញើ ➜ គ្មាន toast', h.log.toasts.length === 0, h.log.toasts);
         ok('⛔ logout កណ្តាលការផ្ញើ ➜ មិនទាញបញ្ជីក្រោយ', h.log.refreshes === 0, h.log.refreshes);
+    }
+    {
+        const commit = deferred();
+        const h = build({ update: () => commit.promise });
+        fill(h, kinds[0], 'ក', 'ខ');
+        const task = h.ctx.sendNotice();
+        await drain();
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ការសរសេរដំណឹងចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates.length === 1, h.log.updates.length);
+        h.el('pinModal').classList = { remove() {} };
+        h.el('pinModal').style = {};
+        h.ctx.closeModal('pinModal');
+        commit.resolve();
+        await task;
+        await drain();
+        ok('⛔ បិទប្រអប់ PIN កណ្តាលការផ្ញើ (មិនមែនការចាកចេញ) ➜ toast ✅ + សម្អាតវាល + ទាញបញ្ជី',
+            h.log.toasts.length === 1 && h.log.toasts[0].startsWith('✅') && h.el('noticeTitleInput').value === '' && h.log.refreshes >= 1,
+            { toasts: h.log.toasts, refreshes: h.log.refreshes });
+        ok('⛔ បិទប្រអប់ PIN កណ្តាលការផ្ញើ ➜ ប៊ូតុងផ្ញើបើកវិញ', h.el('noticeSendBtn').disabled === false && h.ctx.isSendingNotice === false);
+    }
+    {
+        const commit = deferred();
+        const h = build({ set: () => commit.promise });
+        vm.runInContext("noticeListCache = [{ id: 'n1760000000000abcdef', kind: 'notice', title: 'ក', body: '', at: 1760000000000 }];", h.ctx);
+        const task = h.ctx.deleteNotice('n1760000000000abcdef');
+        await drain();
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ការលុបដំណឹងចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates.length + h.log.sets.length === 1, { u: h.log.updates.length, s: h.log.sets.length });
+        h.el('pinModal').classList = { remove() {} };
+        h.el('pinModal').style = {};
+        h.ctx.closeModal('pinModal');
+        commit.resolve();
+        await task;
+        await drain();
+        ok('⛔ បិទប្រអប់ PIN កណ្តាលការលុបដំណឹង ➜ toast ✅ + ទាញបញ្ជី', h.log.toasts.some((t) => t.startsWith('✅')) && h.log.refreshes >= 1,
+            { toasts: h.log.toasts, refreshes: h.log.refreshes, alerts: h.log.alerts });
     }
     {
         const oldCommit = deferred();
@@ -259,7 +303,9 @@ async function run() {
         fill(h, kinds[0], 'ចាស់', '');
         const oldTask = h.ctx.sendNotice();
         await drain();
-        vm.runInContext('noticeSendOwner = null; isSendingNotice = false; invalidateSensitiveSession();', h.ctx);
+        vm.runInContext('noticeSendOwner = null; isSendingNotice = false;', h.ctx);
+        simulateLogout(h.ctx);
+        vm.runInContext('authGeneration++; isSignedInUiActive = true;', h.ctx);
         fill(h, kinds[0], 'ថ្មី', '');
         const newTask = h.ctx.sendNotice();
         await drain();
@@ -317,7 +363,7 @@ async function run() {
         });
         fill(h, kinds[0], 'ក', 'ខ');
         await h.ctx.sendNotice();
-        h.ctx.invalidateSensitiveSession();
+        simulateLogout(h.ctx);
         commit.resolve();
         await drain();
         ok('⛔ commit យឺតក្រោយ logout ➜ គ្មាន toast', h.log.toasts.length === 0, h.log.toasts);

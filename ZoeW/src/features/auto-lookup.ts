@@ -5,8 +5,8 @@ import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
-import { lookupApiIsZto, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
-import { addZtoIdentityHeader, lookupApiSendsHeader } from './lookup-api';
+import { lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
+import { addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
@@ -363,6 +363,7 @@ export async function attemptAutoLookup(barcode) {
     };
     const startedAt = Date.now();
     setLookupStatus(barcode, 'loading', isZtoLookup ? '🔎 កំពុងស្វែងរកពី ZTO...' : '🔎 កំពុងស្វែងរកព័ត៌មានអតិថិជន...');
+    let identity = 'none';
     try {
         const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
         const headers = {};
@@ -374,7 +375,7 @@ export async function attemptAutoLookup(barcode) {
                 headers[cfg.headerName] = cfg.headerValue;
             }
         }
-        await addZtoIdentityHeader(cfg, headers);
+        identity = await addZtoIdentityHeader(cfg, headers);
 
         const unreadable = {};
         const out = await retryAsync(
@@ -403,7 +404,12 @@ export async function attemptAutoLookup(barcode) {
         autoLookupFailureAt.delete(lookupKey);
         if (!found) {
             if (isZtoLookup && data && data.code === 'ZTO_OTHER_BRANCH') {
-                setLookupStatus(barcode, 'warn', '⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ');
+                const branchReason = safeLookupReason(data.reason);
+                if (!branchReason || branchReason === 'branch:other') {
+                    setLookupStatus(barcode, 'warn', '⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ');
+                } else {
+                    setLookupStatus(barcode, 'warn', '⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន (Config សាខា ZTO នៅ Netlify) — ជាប់ត្រង់ ' + branchReason);
+                }
                 return;
             }
             setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ');
@@ -417,9 +423,10 @@ export async function attemptAutoLookup(barcode) {
     } catch (e) {
         if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
         autoLookupFailureAt.delete(lookupKey);
+        const identityRetry = !!(e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && ztoIdentityRefusalIsTransient(e.lookupReason, identity));
         autoLookupFailureAt.set(lookupKey, {
             at: Date.now(),
-            ms: lookupFailureCooldownMs(lookupFailureIsDefinitive(e) ? 'definitive' : 'transient')
+            ms: lookupFailureCooldownMs(lookupFailureIsDefinitive(e) && !identityRetry ? 'definitive' : 'transient')
         });
         while (autoLookupFailureAt.size > AUTO_LOOKUP_FAILURE_MAX) {
             autoLookupFailureAt.delete(autoLookupFailureAt.keys().next().value);
@@ -430,9 +437,9 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
             setLookupStatus(barcode, 'error', '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
-        } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED') {
+        } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && !identityRetry) {
             setLookupStatus(barcode, 'error', '🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត');
-        } else if (e && e.lookupCode === 'ZTO_IDENTITY_UNAVAILABLE') {
+        } else if (e && (e.lookupCode === 'ZTO_IDENTITY_UNAVAILABLE' || identityRetry)) {
             setLookupStatus(barcode, 'error', '⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
             setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');

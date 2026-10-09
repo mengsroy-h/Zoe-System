@@ -107,7 +107,7 @@ $secureProxyKey = $null
 $keepProxyKey = $false
 if (-not [string]::IsNullOrWhiteSpace($siteUrl)) {
     Write-Host ''
-    Write-Host 'The ZTO_PROXY_KEY value, the same one as in the Netlify environment.'
+    Write-Host 'The ZTO_PROXY_KEY value, or the key part (after =) of one ZTO_PROXY_KEYS entry, as in the Netlify environment.'
     Write-Host 'It is needed for --check / --auto mode and for the self-check.'
     if ($hasProxyKey) {
         Write-Host 'The old key is already saved - press Enter to keep it.' -ForegroundColor Green

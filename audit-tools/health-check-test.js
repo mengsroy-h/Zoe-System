@@ -65,14 +65,14 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
-    'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader'];
+    'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient'];
 // ⛔ ថេរដេរីវេពីកូដពិត (មិនមែន literal ក្នុង checker)
 function sliceConst(name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
     return m ? 'const ' + name + ' = ' + m[1] + ';' : '';
 }
 const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT',
-    'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS'];
+    'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);

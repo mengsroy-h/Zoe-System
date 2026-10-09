@@ -676,7 +676,8 @@ async function checkCookieHealth(options) {
     let payload;
     try {
         payload = await readDiagnostics(siteUrl, proxyKey, config);
-    } catch (_) {
+    } catch (error) {
+        if (error && error.code === 'DIAG_REJECTED') return { status: 'key-rejected', healthy: false };
         return { status: 'unreachable', healthy: false };
     }
     const info = diagnosticsCookie(payload);
@@ -1109,7 +1110,7 @@ function describeAutoReadiness(readiness) {
     const missing = (readiness && readiness.missing) || [];
     const labels = {
         siteUrl: 'ZoeW Site URL (for example https://zoew.netlify.app)',
-        proxyKey: 'ZTO_PROXY_KEY (the same value as in Netlify)'
+        proxyKey: 'ZTO_PROXY_KEY or one ZTO_PROXY_KEYS key (the same value as in Netlify)'
     };
     if (!missing.length) {
         return 'OK: Site URL and proxy key are ready for --auto mode.';
@@ -1138,6 +1139,10 @@ function describeHealth(health) {
     }
     if (health.status === 'unreachable') {
         return 'WARNING: could not reach the Function. Check your internet or the Site URL.';
+    }
+    if (health.status === 'key-rejected') {
+        return 'WARNING: the Function refused the proxy key. Run ' + (isAndroidRuntime() ? 'setup-termux.sh' : 'setup.cmd')
+            + ' again with ZTO_PROXY_KEY or one key from ZTO_PROXY_KEYS in Netlify.';
     }
     if (health.healthy === null) {
         return 'INFO: the cookie is stored, but ZTO acceptance is not yet verified. Try a parcel lookup.';

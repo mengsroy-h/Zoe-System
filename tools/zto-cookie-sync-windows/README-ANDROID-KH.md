@@ -52,7 +52,7 @@ cd ~/ZTO-Cookie-Sync
 
 1. ដំឡើង `nodejs` និង `android-tools` (ADB)
 2. `npm install --ignore-scripts --no-audit --no-fund`
-3. សួរ Netlify Site ID, Site URL, PAT និង `ZTO_PROXY_KEY`
+3. សួរ Netlify Site ID, Site URL, PAT និង `ZTO_PROXY_KEY` (ឬសោមួយក្នុង `ZTO_PROXY_KEYS` ៖ ផ្នែកក្រោយ `=`)
 4. រក្សា secrets ក្នុង private Termux storage
 5. ផ្ទៀងផ្ទាត់ Site ID + PAT តាម Netlify API
 

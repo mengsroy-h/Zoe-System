@@ -378,7 +378,7 @@ scenario('ការត្រៀមតំណទៅ Lookup API', () => {
 let buildAutoRuntime = null;
 // ⛔ ច្រកទម្រង់ barcode ZTO (`ztoBarcodeShapeIsValid()` · `ZTO_BARCODE_RE`) ស្រង់ពីកូដពិត ➜ barcode សាកល្បងមានទម្រង់ ZTO
 //    (`BC100001`) ដើម្បីឲ្យសេណារីយ៉ូ ZTO វាស់ផ្លូវបណ្ដាញ មិនមែនច្រកទម្រង់ (`lookup-failure-identity-test` វាស់ច្រកនោះ)
-const ZTO_SHAPE_DECLS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS'].map((n) => {
+const ZTO_SHAPE_DECLS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].map((n) => {
     const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
     return m ? m[0] : '';
 }).filter(Boolean);
@@ -523,6 +523,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `ZoeW/tests/zto-detail-identity.test.ts`)
         vm.runInContext(sliceFn('ztoIdToken') || '', ctx);
         vm.runInContext(sliceFn('addZtoIdentityHeader') || '', ctx);
+        vm.runInContext(sliceFn('ztoAccountSignedIn') || '', ctx);
+        vm.runInContext(sliceFn('ztoIdentityRefusalIsTransient') || '', ctx);
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
         vm.runInContext(sliceFn('setLookupStatus'), ctx);
         vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);

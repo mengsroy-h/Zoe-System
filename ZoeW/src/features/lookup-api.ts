@@ -103,11 +103,27 @@ export async function ztoIdToken(timeoutMs?) {
     } catch (e) { return ''; }
 }
 
+export const ZTO_IDENTITY_RETRY_REASONS = ['idtoken:expired', 'idtoken:kid-unknown', 'idtoken:future'];
+
+export function ztoAccountSignedIn() {
+    try {
+        return !!(firebaseState.auth && firebaseState.auth.currentUser);
+    } catch (e) { return false; }
+}
+
 export async function addZtoIdentityHeader(cfg, headers) {
-    if (!lookupApiIsZto(cfg)) return headers;
+    if (!lookupApiIsZto(cfg)) return 'none';
     const token = await ztoIdToken(ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS);
-    if (token) headers['X-Zoe-Id-Token'] = token;
-    return headers;
+    if (token) {
+        headers['X-Zoe-Id-Token'] = token;
+        return 'sent';
+    }
+    return ztoAccountSignedIn() ? 'unread' : 'none';
+}
+
+export function ztoIdentityRefusalIsTransient(reason, identity) {
+    const text = String(reason === null || reason === undefined ? '' : reason);
+    return (text === 'idtoken:missing' && identity === 'unread') || ZTO_IDENTITY_RETRY_REASONS.indexOf(text) !== -1;
 }
 
 export function lookupApiSupportsList(cfg) {

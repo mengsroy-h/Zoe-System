@@ -765,6 +765,7 @@ const FIREBASE_CERTS_MAX_TIMEOUT_MS = 3000;
 const ID_TOKEN_SKEW_MS = 60 * 1000;
 const PROJECT_ID_RE = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const PROJECT_ID_MAX = 16;
+const PROJECT_BRANCHES_MAX = 16;
 const SITE_EMAIL_PREFIX_RE = /^[a-z0-9-]{1,32}$/;
 const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
 
@@ -832,7 +833,7 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
     } else {
         const rows = Array.isArray(out.value.rows) ? out.value.rows : [];
         const row = rows.length === 1 && rows[0] && typeof rows[0] === 'object' ? rows[0] : null;
-        if (!row) verdict = { ok: true, siteCode: '', reason: '' };
+        if (!row) verdict = { ok: false, reason: 'site:no-account' };
         else if (row.status !== 'active') verdict = { ok: false, reason: 'site:tenant-' + (row.status === 'expired' ? 'expired' : 'revoked') };
         else verdict = { ok: true, siteCode: typeof row.branch_code === 'string' ? row.branch_code : '', reason: '' };
     }
@@ -845,23 +846,49 @@ async function resolveListIdentity(idToken, config, startedAt, env) {
     const issuer = idToken ? tokenIssuer(idToken) : '';
     if (supabase && issuer === supabase.issuer) {
         const auth = await verifySupabaseToken(idToken, supabase, certsTimeoutMs(config, startedAt));
-        return { auth: auth, site: auth.ok ? listSiteCodeOf(auth.siteCode) : { code: '', reason: auth.reason } };
+        return { auth: auth, site: auth.ok ? listSiteCodeOf(auth.siteCode) : { code: '', reason: auth.reason }, binding: 'server' };
     }
     if (!supabase && /\/auth\/v1$/.test(issuer)) {
         const auth = { ok: false, reason: 'idtoken:supabase-unset' };
-        return { auth: auth, site: { code: '', reason: auth.reason } };
+        return { auth: auth, site: { code: '', reason: auth.reason }, binding: '' };
     }
-    const auth = await verifyIdToken(idToken, readProjectIds(env), certsTimeoutMs(config, startedAt));
-    return { auth: auth, site: auth.ok ? listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(env))) : { code: '', reason: auth.reason } };
+    const projects = readProjectEntries(env);
+    const auth = await verifyIdToken(idToken, projects.ids, certsTimeoutMs(config, startedAt));
+    if (!auth.ok) return { auth: auth, site: { code: '', reason: auth.reason }, binding: '' };
+    const site = listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(env)));
+    const bound = projects.branches[auth.aud];
+    if (!bound) return { auth: auth, site: site, binding: 'unbound' };
+    if (site.code && bound.indexOf(site.code.toLowerCase()) === -1) {
+        return { auth: auth, site: { code: '', reason: 'site:project-branch' }, binding: 'mismatch' };
+    }
+    return { auth: auth, site: site, binding: 'bound' };
+}
+
+function readProjectEntries(env) {
+    const none = { ids: [], branches: {} };
+    const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
+    if (!raw) return none;
+    const parts = raw.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
+    if (!parts.length || parts.length > PROJECT_ID_MAX) return none;
+    const ids = [];
+    const branches = {};
+    const valid = parts.every((part) => {
+        const cut = part.indexOf(':');
+        const id = cut === -1 ? part : part.slice(0, cut);
+        if (!PROJECT_ID_RE.test(id)) return false;
+        if (ids.indexOf(id) === -1) ids.push(id);
+        if (cut === -1) return true;
+        const codes = part.slice(cut + 1).split('|').map((code) => code.trim());
+        if (!codes.length || codes.length > PROJECT_BRANCHES_MAX || codes.some((code) => !LIST_SITE_CODE_RE.test(code))) return false;
+        const list = branches[id] || (branches[id] = []);
+        codes.forEach((code) => { if (list.indexOf(code) === -1 && list.length < PROJECT_BRANCHES_MAX) list.push(code); });
+        return true;
+    });
+    return valid ? { ids: ids, branches: branches } : none;
 }
 
 function readProjectIds(env) {
-    const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
-    if (!raw) return [];
-    const parts = raw.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
-    if (!parts.length || parts.length > PROJECT_ID_MAX) return [];
-    if (parts.some((part) => !PROJECT_ID_RE.test(part))) return [];
-    return parts;
+    return readProjectEntries(env).ids;
 }
 
 function siteEmailPrefix(env) {
@@ -956,7 +983,7 @@ async function verifyIdToken(token, projectIds, timeoutMs) {
     if (!good) return { ok: false, reason: 'idtoken:signature' };
 
     const email = typeof parsed.payload.email === 'string' ? parsed.payload.email : '';
-    return { ok: true, email: email, reason: '' };
+    return { ok: true, email: email, aud: aud, reason: '' };
 }
 
 function listSiteCodeOf(raw) {
@@ -1814,20 +1841,21 @@ function detailIdentityOf(event) {
 async function resolveDetailAccess(event, config, startedAt) {
     const mode = config.detailIdentity;
     if (mode === 'off') return { verified: false, site: '' };
+    const signal = detailAccessSignal;
     const idToken = detailIdentityOf(event);
     let reason = 'idtoken:missing';
     if (idToken) {
         const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
         if (identity.auth.ok) {
-            detailAccessSignal.verified++;
-            return { verified: true, site: identity.site.code || '' };
+            signal.verified++;
+            return { verified: true, site: identity.site.code || '', binding: identity.binding || '' };
         }
         reason = identity.auth.reason || 'idtoken:invalid';
     }
     const transient = DETAIL_IDENTITY_TRANSIENT_REASONS.indexOf(reason) !== -1;
-    if (!idToken) detailAccessSignal.missing++;
-    else if (transient) detailAccessSignal.unavailable++;
-    else detailAccessSignal.rejected++;
+    if (!idToken) signal.missing++;
+    else if (transient) signal.unavailable++;
+    else signal.rejected++;
     if (mode !== 'require') return { verified: false, site: '' };
     const safeReason = SAFE_REASON_RE.test(reason) ? reason : 'idtoken:invalid';
     if (transient) {
@@ -1843,6 +1871,10 @@ function detailBranchActive(config) {
     return config.detailBranchPaths.length > 0 && config.detailIdentity !== 'off';
 }
 
+function detailAccessIsAwaited(config) {
+    return config.detailIdentity === 'require' || detailBranchActive(config);
+}
+
 function detailBranchRefusal(config, access, body) {
     if (!detailBranchActive(config) || !access || !access.verified || !body || body.found !== true) return '';
     const branches = Array.isArray(body.branches) ? body.branches : [];
@@ -1853,13 +1885,18 @@ function detailBranchRefusal(config, access, body) {
         detailAccessSignal.branchMissing++;
         return 'branch:missing';
     }
+    if (access.binding === 'unbound') {
+        detailAccessSignal.other++;
+        return 'branch:project-unbound';
+    }
     const site = String(access.site || '').trim().toLowerCase();
     if (site && branches.some((value) => String(value).trim().toLowerCase() === site)) {
         detailAccessSignal.matched++;
         return '';
     }
     detailAccessSignal.other++;
-    return site ? 'branch:other' : 'branch:no-account-site';
+    if (site) return 'branch:other';
+    return access.binding === 'mismatch' ? 'branch:project-mismatch' : 'branch:no-account-site';
 }
 
 function detailResponseBody(config, access, body, barcode, cached) {
@@ -1888,9 +1925,15 @@ function detailAccessReport(config, keyLabel, proxyKeys) {
             matched: detailAccessSignal.matched,
             other: detailAccessSignal.other,
             missing: detailAccessSignal.branchMissing,
-            seen: Array.from(detailAccessSignal.seen)
+            seen: Array.from(detailAccessSignal.seen),
+            unboundProjects: unboundProjectCount(process.env)
         }
     };
+}
+
+function unboundProjectCount(env) {
+    const projects = readProjectEntries(env);
+    return projects.ids.filter((id) => !projects.branches[id]).length;
 }
 
 function configErrorResponse(error) {
@@ -2154,8 +2197,12 @@ async function handleRequest(event) {
 
     let access = null;
     if (!wantsDiagnostics && !plan) {
-        access = await resolveDetailAccess(event, config, startedAt);
-        if (access.response) return access.response;
+        if (detailAccessIsAwaited(config)) {
+            access = await resolveDetailAccess(event, config, startedAt);
+            if (access.response) return access.response;
+        } else {
+            resolveDetailAccess(event, config, startedAt).catch(() => {});
+        }
     }
 
     const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();

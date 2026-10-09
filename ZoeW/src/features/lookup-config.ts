@@ -5,7 +5,7 @@ import { appLocalStore, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { lookupApiIsZto } from './customer-table-prefetch';
-import { lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
+import { addZtoIdentityHeader, lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
 import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
@@ -134,6 +134,7 @@ export async function testLookupApiConfig(btnEl?) {
     const typedValue = fieldValue('lookupApiHeaderValueInput').trim();
     const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
+    await addZtoIdentityHeader({ url: url }, headers);
 
     const testIsZto = lookupApiIsZto({ url: url });
     const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;

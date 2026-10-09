@@ -689,6 +689,12 @@ group('ការវិនិច្ឆ័យ ?diag=1', async () => {
 //    401 `ZTO_IDENTITY_REQUIRED` មុន cache និង ZTO · ផ្ទៀងមិនបាន (certs) ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` · (៤) `ZTO_DETAIL_BRANCH_PATHS` ៖
 //    ឆ្លើយតែកញ្ចប់ដែលសាខា (វាលក្នុងកំណត់ត្រា ZTO) = សាខារបស់គណនី ➜ ផ្សេង/គ្មាន ➜ 200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ·
 //    cache មិនរំលងការពិនិត្យណាមួយ។
+// ⛔ ការពិនិត្យប្រឆាំង (workflow) ៖ សាខា Firebase មកពី `email` ដែលអ្នកប្រើប្តូរខ្លួនឯងបាន (`accounts:update`) ➜ បុគ្គលិកហាង A ប្តូរ email ទៅ
+//    `@zoew<សាខា B>.com` ➜ អានលេខទូរស័ព្ទ · COD ហាង B ➜ គម្រោង Firebase នីមួយៗត្រូវចងសាខាលើ server (`FIREBASE_PROJECT_IDS` `projectId:សាខា|សាខា`) ៖
+//    email ក្រៅសាខាដែលចង ➜ មិនមានសាខា (`/detail` `branch:project-mismatch` · `?list=1` `site:no-account`) · គម្រោងមិនចង + កំណត់សាខា `/detail` ➜
+//    `branch:project-unbound` (fail-closed) · Supabase ៖ គណនីគ្មានហាង (`my_account()` ០ ជួរ) ➜ មិនមែនគណនីដែលផ្ទៀងរួច · `optional` គ្មានការកំណត់សាខា
+//    មិនរង់ចាំការផ្ទៀង (Supabase/certs ព្យួរ ➜ មិនបន្ថែម ៣ វិ. លើរាល់ការស្កេន) · `?diag=1` រាប់ verified/missing/rejected/unavailable (ច្រកសម្រេចប្តូរ
+//    `require`) · ផ្ទៀងមិនបាន/កំណត់ខុសលើ server ➜ 503 មិនមែន 401 · ផ្លូវវាលសាខាច្រើន ➜ ត្រូវតែមួយក៏គ្រប់។
 const KEY_A = 'shop-a-key-0123456789abcdef';
 const KEY_B = 'shop-b-key-0123456789abcdef';
 const KEY_PADDED = 'c2hvcC1jLWtleS0wMTIzNDU2Nzg5==';
@@ -712,6 +718,26 @@ function serveOrder(order) {
     jsonResponder.calls = 0;
     global.fetch = withCerts(jsonResponder(order));
 }
+
+const SB_URL = 'https://x.supabase.co';
+function sbToken(sub) {
+    return tokenFor('u@x.com', { claims: { iss: SB_URL + '/auth/v1', role: 'authenticated', sub: sub || 'sb-user' } });
+}
+
+function serveWithSupabase(order, account) {
+    jsonResponder.calls = 0;
+    const zto = withCerts(jsonResponder(order));
+    global.fetch = async (href, init) => {
+        if (String(href).indexOf('supabase.co') !== -1) {
+            if (account === 'hang') return new Promise(() => {});
+            if (account === 'throw') throw new TypeError('fetch failed');
+            return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => account };
+        }
+        return zto(href, init);
+    };
+}
+
+const settleBackground = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 group('សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា', async () => {
     console.log('\n== ១២. សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា ==');
@@ -764,6 +790,8 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const otherSite = tokenForSite('99999');
     const forged = tokenFor('u@zoew12345.com', { forge: true });
     const idEnv = (extra) => resetEnv(Object.assign({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', FIREBASE_PROJECT_IDS: TEST_PROJECT }, extra || {}));
+    const BOUND = TEST_PROJECT + ':12345|99999';
+    const sbEnv = (extra) => resetEnv(Object.assign({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', SUPABASE_URL: SB_URL, SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x' }, extra || {}));
 
     idEnv({});
     serveOrder(ORDER);
@@ -821,7 +849,7 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     ok('⛔ (៣) តម្លៃខុស (`requre`) ➜ 503 `ZTO_CONFIG_INVALID` `detail-identity:invalid` (មិនបើកចំហស្ងាត់ៗ)',
         typo.statusCode === 503 && typoBody.code === 'ZTO_CONFIG_INVALID' && typoBody.reason === 'detail-identity:invalid' && ztoCalls() === 0, typo.body);
 
-    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    idEnv({ FIREBASE_PROJECT_IDS: BOUND, ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER_SITE);
     const same = await callAs(B, KEY, site);
     const sameBody = bodyOf(same) || {};
@@ -837,18 +865,18 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     ok('⛔ (៤) គណនីគ្មានលេខសាខា ➜ `ZTO_OTHER_BRANCH` (មិនបើកចំហ)',
         (bodyOf(noSiteAccount) || {}).code === 'ZTO_OTHER_BRANCH' && noSiteAccount.body.indexOf('0974158508') === -1, noSiteAccount.body);
 
-    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    idEnv({ FIREBASE_PROJECT_IDS: BOUND, ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER);
     const noField = await callAs(B, KEY, site);
     const noFieldBody = bodyOf(noField) || {};
     ok('⛔ (៤) កំណត់ត្រា ZTO គ្មានវាលសាខា ➜ `ZTO_OTHER_BRANCH` `branch:missing` (fail-closed)',
         noFieldBody.code === 'ZTO_OTHER_BRANCH' && noFieldBody.reason === 'branch:missing' && noField.body.indexOf('0974158508') === -1, noField.body);
 
-    idEnv({ ZTO_DETAIL_IDENTITY: 'optional', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    idEnv({ FIREBASE_PROJECT_IDS: BOUND, ZTO_DETAIL_IDENTITY: 'optional', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER_SITE);
     const optAnon = await callAs(B, KEY);
     const optOther = await callAs(B, KEY, otherSite);
-    ok('(៤) `optional` ៖ គ្មាន token ➜ 200 (មិនកំណត់) · token សាខាផ្សេង ➜ `ZTO_OTHER_BRANCH` (សាកលើផលិតកម្មមុន `require`)',
+    ok('(៤) `optional` ៖ គ្មាន token ➜ 200 (មិនកំណត់) · token សាខាផ្សេង ➜ `ZTO_OTHER_BRANCH` (`optional` កំណត់សាខារួចលើគណនីដែលផ្ទៀងបាន ➜ មិនមែនដំណាក់កាលសាកល្បង)',
         optAnon.statusCode === 200 && !!(bodyOf(optAnon) || {}).phone && (bodyOf(optOther) || {}).code === 'ZTO_OTHER_BRANCH',
         [optAnon.body, optOther.body]);
     const optDiag = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
@@ -868,6 +896,111 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const badPath = await callAs(B, KEY, site);
     ok('(៤) ផ្លូវវាលខុស ➜ 503 `ZTO_CONFIG_INVALID` `field:branch`',
         badPath.statusCode === 503 && (bodyOf(badPath) || {}).reason === 'field:branch', badPath.body);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const unbound = await callAs(B, KEY, site);
+    const unboundBody = bodyOf(unbound) || {};
+    ok('⛔ (៤) គម្រោង Firebase មិនចងសាខា (`FIREBASE_PROJECT_IDS` គ្មាន `:សាខា`) + កំណត់សាខា ➜ `ZTO_OTHER_BRANCH` `branch:project-unbound` (email ជាសញ្ញាដែលអ្នកប្រើប្តូរបាន)',
+        unboundBody.code === 'ZTO_OTHER_BRANCH' && unboundBody.reason === 'branch:project-unbound' && unbound.body.indexOf('0974158508') === -1, unbound.body);
+
+    idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ':100', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const spoof = await callAs(B, KEY, site);
+    const spoofBody = bodyOf(spoof) || {};
+    ok('⛔ (៤) បុគ្គលិកហាង A (គម្រោងចងសាខា 100) ប្តូរ email ទៅ `@zoew12345.com` (សាខា B) ➜ `ZTO_OTHER_BRANCH` `branch:project-mismatch` · គ្មានលេខទូរស័ព្ទ · COD',
+        spoofBody.code === 'ZTO_OTHER_BRANCH' && spoofBody.reason === 'branch:project-mismatch' && spoof.body.indexOf('0974158508') === -1 && !('cod' in spoofBody), spoof.body);
+    const spoofList = bodyOf(await callAs({ list: '1' }, KEY, site)) || {};
+    ok('⛔ (៤) token ដដែលលើ `?list=1` ➜ `ZTO_LIST_NOT_CONFIGURED` `site:no-account` (គ្មានសាខាពី email ក្រៅការចង)',
+        spoofList.code === 'ZTO_LIST_NOT_CONFIGURED' && spoofList.reason === 'site:no-account', spoofList);
+    idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ':12345', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    serveOrder(ORDER_SITE);
+    const boundSame = await callAs(B, KEY, site);
+    const boundList = bodyOf(await callAs({ list: '1' }, KEY, site)) || {};
+    ok('ទិសផ្ទុយ ៖ email ក្នុងសាខាដែលចង (12345) ➜ `/detail` 200 + លេខទូរស័ព្ទ · `?list=1` ឆ្លងច្រកអត្តសញ្ញាណ',
+        boundSame.statusCode === 200 && (bodyOf(boundSame) || {}).phone === '0974158508'
+        && boundList.reason !== 'site:no-account' && String(boundList.reason || '').indexOf('idtoken:') !== 0, [boundSame.body, boundList]);
+    idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ',other-proj:200', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
+    const bindDiag = ((bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {}).branch || {};
+    ok('(៤) `?diag=1` ប្រាប់ចំនួនគម្រោង Firebase ដែលមិនទាន់ចងសាខា (`unboundProjects`)', bindDiag.unboundProjects === 1, bindDiag);
+    idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ':bad code!', ZTO_DETAIL_IDENTITY: 'require' });
+    serveOrder(ORDER_SITE);
+    const badBind = await callAs(B, KEY, site);
+    ok('⛔ (៤) ការចងសាខាខុសទម្រង់ ➜ 503 `ZTO_CONFIG_INVALID` `idtoken:project-unset` (fail-closed · មិនហៅ ZTO)',
+        badBind.statusCode === 503 && (bodyOf(badBind) || {}).reason === 'idtoken:project-unset' && ztoCalls() === 0, badBind.body);
+
+    const ORDER_TWO = { success: true, data: Object.assign({}, ORDER.data, { recSiteCode: '55555', dispSiteCode: '12345' }) };
+    idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ':12345|55555|99999', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'recSiteCode,dispSiteCode' });
+    serveOrder(ORDER_TWO);
+    const viaSecond = bodyOf(await callAs(B, KEY, site)) || {};
+    const viaFirst = bodyOf(await callAs(B, KEY, tokenForSite('55555'))) || {};
+    const viaNone = bodyOf(await callAs(B, KEY, otherSite)) || {};
+    ok('⛔ (៤) ផ្លូវវាលសាខា ២ ៖ ត្រូវវាលទី ២ (12345) · ត្រូវវាលទី ១ (55555) ➜ 200 + លេខទូរស័ព្ទ · មិនត្រូវទាំងពីរ (99999) ➜ `branch:other`',
+        viaSecond.phone === '0974158508' && !('branches' in viaSecond) && viaFirst.phone === '0974158508'
+        && viaNone.code === 'ZTO_OTHER_BRANCH' && viaNone.reason === 'branch:other', [viaSecond, viaFirst, viaNone]);
+
+    sbEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    serveWithSupabase(ORDER, []);
+    const orphan = await callAs(B, KEY, sbToken('orphan'));
+    const orphanBody = bodyOf(orphan) || {};
+    ok('⛔ (៣) Supabase ៖ គណនីគ្មានហាង (`my_account()` ០ ជួរ) + `require` ➜ 401 `ZTO_IDENTITY_REQUIRED` `site:no-account` · មិនហៅ ZTO',
+        orphan.statusCode === 401 && orphanBody.code === 'ZTO_IDENTITY_REQUIRED' && orphanBody.reason === 'site:no-account' && ztoCalls() === 0, orphan.body);
+    const orphanList = bodyOf(await callAs({ list: '1' }, KEY, sbToken('orphan-list'))) || {};
+    ok('ទិសផ្ទុយ ៖ គណនីដដែលលើ `?list=1` ➜ `site:no-account` ដដែល',
+        orphanList.code === 'ZTO_LIST_NOT_CONFIGURED' && orphanList.reason === 'site:no-account', orphanList);
+    sbEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    serveWithSupabase(ORDER, [{ status: 'active', branch_code: '12345' }]);
+    const member = await callAs(B, KEY, sbToken('member'));
+    ok('ទិសផ្ទុយ ៖ Supabase សមាជិកហាងសកម្ម ➜ 200 + លេខទូរស័ព្ទ', member.statusCode === 200 && (bodyOf(member) || {}).phone === '0974158508', member.body);
+
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_DETAIL_IDENTITY: 'require' });
+    serveOrder(ORDER);
+    const noProjects = await callAs(B, KEY, site);
+    ok('⛔ (៣) `require` គ្មាន `FIREBASE_PROJECT_IDS` ➜ 503 `ZTO_CONFIG_INVALID` `idtoken:project-unset` (មិនមែន 401 «ចូលម្តងទៀត») · មិនហៅ ZTO',
+        noProjects.statusCode === 503 && (bodyOf(noProjects) || {}).code === 'ZTO_CONFIG_INVALID' && (bodyOf(noProjects) || {}).reason === 'idtoken:project-unset'
+        && ztoCalls() === 0, noProjects.body);
+    sbEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    serveWithSupabase(ORDER, 'throw');
+    const sbDown = await callAs(B, KEY, sbToken('down'));
+    ok('⛔ (៣) Supabase `my_account()` មិនឆ្លើយ ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` `idtoken:supabase-unreachable` · មិនហៅ ZTO',
+        sbDown.statusCode === 503 && (bodyOf(sbDown) || {}).code === 'ZTO_IDENTITY_UNAVAILABLE' && (bodyOf(sbDown) || {}).reason === 'idtoken:supabase-unreachable'
+        && ztoCalls() === 0, sbDown.body);
+    idEnv({ ZTO_DETAIL_IDENTITY: 'require' });
+    serveOrder(ORDER);
+    const sbUnset = await callAs(B, KEY, sbToken('unset'));
+    ok('⛔ (៣) token Supabase តែ Function គ្មាន `SUPABASE_URL` ➜ 503 `ZTO_CONFIG_INVALID` `idtoken:supabase-unset`',
+        sbUnset.statusCode === 503 && (bodyOf(sbUnset) || {}).code === 'ZTO_CONFIG_INVALID' && (bodyOf(sbUnset) || {}).reason === 'idtoken:supabase-unset', sbUnset.body);
+
+    sbEnv({ ZTO_DETAIL_IDENTITY: 'optional' });
+    serveWithSupabase(ORDER, 'hang');
+    const hangStart = Date.now();
+    const hung1 = await callAs(B, KEY, sbToken('hang'));
+    const hungFirstMs = Date.now() - hangStart;
+    const hangCached = Date.now();
+    const hung2 = await callAs(B, KEY, sbToken('hang'));
+    const hungCachedMs = Date.now() - hangCached;
+    ok('⛔ (៣) `optional` គ្មានការកំណត់សាខា + Supabase ព្យួរ ➜ មិនរង់ចាំការផ្ទៀង (ការស្កេនដំបូង < ១ វិ. · cache < ០.៥ វិ.)',
+        hung1.statusCode === 200 && hung2.statusCode === 200 && hungFirstMs < 1000 && hungCachedMs < 500, [hungFirstMs, hungCachedMs]);
+
+    idEnv({ ZTO_DETAIL_IDENTITY: 'optional' });
+    jsonResponder.calls = 0;
+    const certsDownOrder = jsonResponder(ORDER);
+    global.fetch = async (href, init) => {
+        if (String(href).indexOf('googleapis.com') !== -1) throw new TypeError('fetch failed');
+        return certsDownOrder(href, init);
+    };
+    await callAs(B, KEY, site);
+    await settleBackground();
+    serveOrder(ORDER);
+    await callAs(B, KEY);
+    await callAs(B, KEY, forged);
+    await callAs(B, KEY, site);
+    await settleBackground();
+    const counted = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
+    const countedAgain = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
+    ok('⛔ (៣) `?diag=1` រាប់ (`optional`) ៖ verified ១ · missing ១ · rejected ១ · unavailable ១ · `?diag=1` ខ្លួនឯងមិនរាប់ (ច្រកសម្រេចប្តូរ `require`)',
+        counted.verified === 1 && counted.missing === 1 && counted.rejected === 1 && counted.unavailable === 1
+        && countedAgain.verified === 1 && countedAgain.missing === 1 && countedAgain.rejected === 1 && countedAgain.unavailable === 1, [counted, countedAgain]);
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     serveOrder(ORDER);

@@ -59,7 +59,8 @@ const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
-    'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader'];
+    'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
+    'ztoIdentityRefusalIsTransient'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -174,12 +175,13 @@ function buildRuntime(plan) {
      'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
      'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
-     'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader'].forEach((n) => {
+     'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
+     'ztoIdentityRefusalIsTransient'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });
     // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜
     //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `ZoeW/tests/zto-detail-identity.test.ts`)
-    ['ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS'].forEach((n) => {
+    ['ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].forEach((n) => {
         const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
         if (m) vm.runInContext(m[0].trim(), ctx);
     });

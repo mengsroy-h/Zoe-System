@@ -4,12 +4,17 @@
  * ⛔ ច្បាប់ ៖ token ទៅតែ Function ZTO (`lookupApiIsZto()`) ⛔ មិនដែលទៅ API ស្វែងរកផ្សេង (Apps Script · API ផ្ទាល់ខ្លួន) ·
  *    គ្មាន token (មិនទាន់ចូល · យកមិនបាន) ➜ សំណើនៅតែចេញ (Function សម្រេច) · សារ ៖ `ZTO_IDENTITY_REQUIRED` ➜ ចូលម្តងទៀត ·
  *    `ZTO_IDENTITY_UNAVAILABLE` ➜ សាកម្តងទៀត (503 ➜ retry) · `ZTO_OTHER_BRANCH` ➜ «សាខាផ្សេង» មិនមែន «រកមិនឃើញ»។
+ * ⛔ «ផ្ទៀងមិនបាន ≠ ខុស» ៖ គណនីកំពុងចូល តែ token យកមិនទាន់ទាន់ពេល (refresh យឺត · ព្យួរ) ឬ token ផុត/kid ថ្មី ➜ 401 ជាការព្យាយាមម្តងទៀត
+ *    (សារ «ផ្ទៀងផ្ទាត់គណនីមិនបាន» · cooldown ខ្លី) ⛔ មិនដែលប្រាប់ «ចាកចេញ» ហើយចាក់ cooldown វែង · ប៊ូតុង 🧪 ផ្ញើ token ដូចការស្កេន ·
+ *    `ZTO_OTHER_BRANCH` ដែលមូលហេតុមិនមែន `branch:other` (វាលសាខាបាត់ · គណនីគ្មានសាខា · គម្រោងមិនទាន់ចងសាខា) ➜ សារ ⚙️ Config។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState, lookupState, scanState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
-import { attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
+import { AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS, attemptAutoLookup, autoLookupFailureAt, autoLookupInFlight, autoLookupQueueRetries, lookupFastCache } from '../src/features/auto-lookup';
+import { testLookupApiConfig } from '../src/features/lookup-config';
+import { refTo } from '../src/app/refs';
 import { checkZtoStatusForBarcode } from '../src/features/zto-status';
 import { healthLookupRow } from '../src/features/health-check';
 
@@ -49,6 +54,23 @@ function signIn(token: string | null) {
     firebaseState.authGeneration++;
     firebaseState.auth = token === null ? ({ currentUser: null } as any) : ({ currentUser: { uid: 'audit-user' } } as any);
     firebaseState.fb = { getIdTokenResult: async () => ({ token }) } as any;
+}
+
+function signInHungToken() {
+    firebaseState.authGeneration++;
+    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    firebaseState.fb = { getIdTokenResult: () => new Promise(() => {}) } as any;
+}
+
+function cooldownMs() {
+    const entry = Array.from(autoLookupFailureAt.values())[0] as any;
+    return entry ? entry.ms : null;
+}
+
+function bindField(name: string, value: string) {
+    const el = document.createElement('input');
+    el.value = value;
+    refTo(name as any)(el);
 }
 
 beforeEach(() => {
@@ -129,6 +151,74 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
         const status = await scan();
         expect(calls.length).toBe(2);
         expect(status.text).toContain('ផ្ទៀងផ្ទាត់គណនី');
+    });
+
+    it('⛔ គណនីកំពុងចូល តែ token ព្យួរ (refresh យឺត) ➜ សំណើនៅចេញក្រោយពិដាន ៣ វិ. · 401 `idtoken:missing` ➜ សាកម្តងទៀត មិនមែន «ចាកចេញ» · cooldown ខ្លី', async () => {
+        signInHungToken();
+        const calls = serve(401, { error: 'ZTO identity required', code: 'ZTO_IDENTITY_REQUIRED', reason: 'idtoken:missing' });
+        const status = await scan();
+        expect(calls.length).toBe(1);
+        expect(headerOf(calls[0], 'X-Zoe-Id-Token')).toBeUndefined();
+        expect(status.text).toContain('ផ្ទៀងផ្ទាត់គណនី');
+        expect(status.text).not.toContain('ចាកចេញ');
+        expect(cooldownMs()).toBe(AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS);
+    }, 10000);
+
+    it('⛔ 401 `idtoken:expired` · `idtoken:kid-unknown` · `idtoken:future` (token ចាស់ · កូនសោថ្មី · នាឡិកា) ➜ សាកម្តងទៀត · cooldown ខ្លី', async () => {
+        for (const reason of ['idtoken:expired', 'idtoken:kid-unknown', 'idtoken:future']) {
+            autoLookupFailureAt.clear();
+            lookupFastCache.clear();
+            serve(401, { error: 'ZTO identity required', code: 'ZTO_IDENTITY_REQUIRED', reason });
+            const status = await scan();
+            expect(status.text).toContain('ផ្ទៀងផ្ទាត់គណនី');
+            expect(status.text).not.toContain('ចាកចេញ');
+            expect(cooldownMs()).toBe(AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS);
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ 401 `idtoken:signature` (token ក្លែង) · គ្មានគណនីចូល + `idtoken:missing` ➜ «ចាកចេញ ហើយចូលគណនីម្តងទៀត» · cooldown វែង', async () => {
+        serve(401, { error: 'ZTO identity required', code: 'ZTO_IDENTITY_REQUIRED', reason: 'idtoken:signature' });
+        const forged = await scan();
+        expect(forged.text).toContain('ចូលគណនីម្តងទៀត');
+        expect(cooldownMs()).not.toBe(AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS);
+        autoLookupFailureAt.clear();
+        signIn(null);
+        serve(401, { error: 'ZTO identity required', code: 'ZTO_IDENTITY_REQUIRED', reason: 'idtoken:missing' });
+        const signedOut = await scan();
+        expect(signedOut.text).toContain('ចូលគណនីម្តងទៀត');
+        expect(cooldownMs()).not.toBe(AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS);
+    });
+
+    it('⛔ `ZTO_OTHER_BRANCH` មូលហេតុ `branch:missing` · `branch:no-account-site` · `branch:project-unbound` ➜ សារ ⚙️ Config (មិនមែន «សាខាផ្សេង»)', async () => {
+        for (const reason of ['branch:missing', 'branch:no-account-site', 'branch:project-unbound']) {
+            lookupFastCache.clear();
+            serve(200, { success: false, found: false, barcode: BARCODE, code: 'ZTO_OTHER_BRANCH', reason });
+            const status = await scan();
+            expect(status.text).toContain('⚙️');
+            expect(status.text).toContain(reason);
+            expect(status.text).not.toContain('សាខាផ្សេង');
+        }
+        lookupFastCache.clear();
+        serve(200, { success: false, found: false, barcode: BARCODE, code: 'ZTO_OTHER_BRANCH', reason: 'branch:other' });
+        expect((await scan()).text).toContain('សាខាផ្សេង');
+    });
+
+    it('⛔ ប៊ូតុង 🧪 សាកល្បង (`testLookupApiConfig`) ➜ Function ZTO ទទួល `X-Zoe-Id-Token` · API ផ្សេងមិនទទួល', async () => {
+        vi.stubGlobal('prompt', () => BARCODE);
+        vi.stubGlobal('alert', () => {});
+        bindField('lookupApiUrlInput', ZTO_URL);
+        bindField('lookupApiHeaderNameInput', 'X-Zoe-Proxy-Key');
+        bindField('lookupApiHeaderValueInput', 'shop-a-key-0123456789abcdef');
+        const zto = serve(200, { success: true, found: true, phone: '0974158508' });
+        await testLookupApiConfig();
+        expect(zto.length).toBe(1);
+        expect(headerOf(zto[0], 'X-Zoe-Id-Token')).toBe('audit-id-token');
+        expect(headerOf(zto[0], 'X-Zoe-Proxy-Key')).toBe('shop-a-key-0123456789abcdef');
+        bindField('lookupApiUrlInput', OTHER_URL);
+        const other = serve(200, { phone: '0974158508' });
+        await testLookupApiConfig();
+        expect(other.length).toBe(1);
+        expect(headerOf(other[0], 'X-Zoe-Id-Token')).toBeUndefined();
     });
 
     it('(២) 🩺 ជួរ Lookup ZTO បង្ហាញឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` (មិនមែនតម្លៃសោ)', async () => {

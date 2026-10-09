@@ -142,7 +142,8 @@
 
 **ZoeW `2.50.47`** (`zoew-v309` ➜ `zoew-v310`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · migration ថ្មី · env ថ្មី ៣ (ស្រេចចិត្ត · មិនកំណត់ ➜ ឥរិយាបថដដែល) ·
 ⛔ តំបន់ចាក់សោ ZTO ៖ ប្រែតាមសំណើម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK` (`zto-lock.test.ts`) សម្រាប់ `zto-order-detail.js` · `zto-status.ts` · `auto-lookup.ts` · `lookup-api.ts` ·
-អ្នកយាមធ្លាក់មុនកែ ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់បៃតង។
+អ្នកយាមធ្លាក់មុនកែ ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់បៃតង។ ការពិនិត្យប្រឆាំង (workflow ៦ agent · ផ្នែក ២ A71) ➜ កែក្នុងជុំដដែល (មិនទាន់ merge ➜ កំណែដដែល) ៖
+`LOCK` ថ្មីម្តងទៀតសម្រាប់ `zto-order-detail.js` · `auto-lookup.ts` · `lookup-api.ts`។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -156,7 +157,16 @@
 - 🏢 **(៤) កំណត់សាខា** ៖ `ZTO_DETAIL_BRANCH_PATHS` (វាលក្នុងកំណត់ត្រា ZTO) ➜ ឆ្លើយតែពេលលេខសាខាក្នុងកំណត់ត្រា = សាខាគណនី · ផ្សេង · គ្មានវាល · គណនីគ្មានសាខា ➜
   200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App ៖ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ» · cache មិនរំលង ·
   `?diag=1` `access.branch` (`matched` · `other` · `missing` · `seen`) សម្រាប់ផ្ទៀងវាលមុន `require`។
-- 📖 `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ថ្មី (ជំហាន ១–៣) · `guide.html` ផ្នែក ១៤ (សោហាង និងគណនី)។
+- 🔗 **ចងគម្រោង Firebase ↔ សាខា** (A71 ៖ email ជាសញ្ញាដែលអ្នកប្រើប្តូរខ្លួនឯងបាន) ៖ `FIREBASE_PROJECT_IDS` ធាតុ `projectId:សាខា|សាខា` ➜ email ក្រៅសាខាដែលចង ➜
+  គ្មានសាខា (`?list=1` `site:no-account` · `/detail` `branch:project-mismatch`) · គម្រោងមិនចង + កំណត់សាខា `/detail` ➜ `branch:project-unbound` · ការចងខុសទម្រង់ ➜
+  `idtoken:project-unset` · `?diag=1` `access.branch.unboundProjects`។ ធាតុគ្មាន `:` ➜ ដូចមុន (`?list=1` មិនប្រែ)។
+- 👤 គណនី Supabase គ្មានហាង (`my_account()` ០ ជួរ) ➜ មិនមែនគណនីដែលផ្ទៀងរួច (`site:no-account` · 401 ពេល `require`) · `optional` គ្មានការកំណត់សាខា ➜ មិនរង់ចាំការផ្ទៀង
+  (Supabase/certs ព្យួរ ➜ មិនបន្ថែម ៣ វិ. លើរាល់ការស្កេន)។
+- 🔄 App ៖ គណនីកំពុងចូល តែ token យកមិនទាន់ (refresh យឺត > ៣ វិ.) ឬ `idtoken:expired` · `kid-unknown` · `future` ➜ «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត» +
+  cooldown ខ្លី (មិនមែន «ចាកចេញ» + cooldown ៣០ វិ.) · `ZTO_OTHER_BRANCH` មូលហេតុក្រៅ `branch:other` ➜ «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន (Config សាខា ZTO នៅ Netlify) — ជាប់ត្រង់ …» ·
+  ប៊ូតុង 🧪 សាកល្បង ផ្ញើ `X-Zoe-Id-Token` ដូចការស្កេន (តែទៅ Function ZTO)។
+- 🛠️ ឧបករណ៍ Cookie Sync ៖ Function បដិសេធសោ ➜ `key-rejected` «the Function refused the proxy key …» (មិនមែន «could not reach the Function») · prompt ទទួលសោពី `ZTO_PROXY_KEYS`។
+- 📖 `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ថ្មី (ជំហាន ១–៣) · ផ្នែក ៤គ (ការចងគម្រោង) · ផ្នែក ៦ (កូដ ZTO ថ្មី) · `guide.html` ផ្នែក ១៤ (សោហាង និងគណនី) · README ឧបករណ៍ Sync។
 
 #### អ្នកយាម
 
@@ -165,16 +175,23 @@
   `optional` + សាខា · `off` មិនកំណត់ · ផ្លូវខុស · `?diag=1` (label · គ្មានតម្លៃសោ · ការរាប់ · `seen` គ្មានលេខទូរស័ព្ទ) · preflight APK — មុនកែ FAIL ១៨ (១៦៤ ok)។
 - `ZoeW/tests/zto-detail-identity.test.ts` (៨) ៖ ស្កេន · ពិនិត្យស្ថានភាព ➜ មាន token · API ផ្សេង ➜ គ្មាន token · គ្មានគណនី ➜ សំណើនៅចេញ · `ZTO_OTHER_BRANCH` ·
   `ZTO_IDENTITY_REQUIRED` · `ZTO_IDENTITY_UNAVAILABLE` (សាកម្តងទៀត) · 🩺 «សោហាង» — មុនកែ FAIL ៥/៧ (+ 🩺)។
+- A71 ៖ `zto-proxy-test` ផ្នែក ១២ +១៦ (គម្រោងមិនចង · ក្លែង email · `?list=1` · ការចងត្រូវ · `unboundProjects` · ការចងខុសទម្រង់ · វាលសាខា ២ · Supabase គ្មានហាង/សមាជិក ·
+  503 project-unset/supabase-unreachable/supabase-unset · `optional` + Supabase ព្យួរ · ការរាប់ `?diag=1`) — មុនកែ FAIL ១៤ · mutant ១០ (ការរាប់ ៣ · ហេតុផល 503 ២ · `some`➜`every` ·
+  ការចង ២ · Supabase គ្មានហាង · រង់ចាំជានិច្ច) ➜ FAIL ទាំងអស់ · `zto-detail-identity.test.ts` +៥ (token ព្យួរ · expired/kid-unknown/future · ទិសផ្ទុយ signature/គ្មានគណនី ·
+  មូលហេតុសាខា · ប៊ូតុង 🧪) — មុនកែ FAIL ៤ · `zto-cookie-sync-test` +២ (`key-rejected`) — មុនកែ FAIL ២។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។ មិនកំណត់ env ថ្មី ➜ ឥរិយាបថដូចមុនទាំងស្រុង។
 2. **សោតាមហាង** (`ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ជំហាន ១) ៖ បង្កើតសោមួយក្នុងមួយហាង ➜ Netlify `ZTO_PROXY_KEYS` ➜ Trigger deploy ➜ ទូរស័ព្ទនីមួយៗ ៖ API ស្វែងរកអតិថិជន ➜
-   តម្លៃ Header = សោហាងនោះ ➜ 🩺 «សោហាង ឈ្មោះ» ➜ គ្មានទូរស័ព្ទណា «default» ➜ លុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+   តម្លៃ Header = សោហាងនោះ ➜ 🩺 «សោហាង ឈ្មោះ» ➜ គ្មានទូរស័ព្ទណា «default» ➜ ⛔ **ម៉ាស៊ីន Cookie Sync** ៖ រត់ `setup.cmd` / `setup-termux.sh` ម្តងទៀតជាមួយសោមួយក្នុង
+   `ZTO_PROXY_KEYS` ➜ `sync-zto-cookie.cmd --check` OK (🩺 មើលម៉ាស៊ីន Sync មិនឃើញ) ➜ ទើបលុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
 3. **ចងគណនី** (ជំហាន ២) ៖ ទូរស័ព្ទទាំងអស់ update ដល់ 2.50.47 (កំណែចាស់មិនផ្ញើ token ➜ ការស្កេនធ្លាក់ពេល `require`) ➜ `ZTO_DETAIL_IDENTITY=optional` ➜ មួយថ្ងៃ ➜
    `?diag=1` `access.missing` · `rejected` នៅ ០ ➜ `require`។
-4. **កំណត់សាខា** (ជំហាន ៣) ៖ Argus ➜ រកវាលលេខសាខាក្នុង `order/detail` ➜ `ZTO_DETAIL_BRANCH_PATHS` ខណៈ `optional` ➜ `?diag=1` `access.branch.other`/`missing` សម្រាប់
-   កញ្ចប់សាខាខ្លួនឯង = ០ ➜ ទើប `require`។ ⚠️ មិនទាន់វាស់លើទិន្នន័យ ZTO ពិត (ឈ្មោះវាលសាខាក្នុង `order/detail` មិនស្គាល់នៅទីនេះ)។
+4. **កំណត់សាខា** (ជំហាន ៣) ៖ ចងគម្រោង Firebase នីមួយៗ `FIREBASE_PROJECT_IDS=projectId:លេខសាខា` (`?diag=1` `access.branch.unboundProjects` = ០) ➜ Argus ➜ រកវាលលេខសាខាក្នុង
+   `order/detail` លើកញ្ចប់ច្រើន ➜ `ZTO_DETAIL_BRANCH_PATHS` ➜ ⛔ មានប្រសិទ្ធភាពភ្លាមលើគ្រប់ទូរស័ព្ទដែលផ្ញើគណនី (`optional` ក៏ដូច `require` · គ្មានដំណាក់កាលមើលតែប៉ុណ្ណោះ) ➜
+   ស្កេនកញ្ចប់សាខាខ្លួនឯង ➜ `?diag=1` `access.branch.matched` កើន · `other`/`missing` នៅ ០ ➜ មិនដូច្នោះ ➜ `ZTO_DETAIL_BRANCH_PATHS=off` ➜ Trigger deploy ➜ រកវាលម្តងទៀត។
+   ⚠️ មិនទាន់វាស់លើទិន្នន័យ ZTO ពិត (ឈ្មោះវាលសាខាក្នុង `order/detail` មិនស្គាល់នៅទីនេះ)។
 
 ### [2.50.46] — 2026-10-08 · ZoeW ៖ **ស្វែងរករអិលរលូន (ទំព័រទិន្នន័យ · ទំព័រស្កេន) · 🔔 «🔄 ពិនិត្យកំណែថ្មី» · Supabase មិនកាត់ពីរដង · SW មិនផ្ទុក HTML ជា chunk** (Deep audit ៣ · សំណើម្ចាស់គម្រោង)
 
@@ -2987,6 +3004,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A68 | **`ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` មិនចងគណនី/សាខា** (Handoff ៦ច · A59 ➜ ម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ») | Claude ៖ `handleRequest()` ផ្ទៀងតែ `timingSafeEqualText(ZTO_PROXY_KEY, …)` ➜ `/detail` ឆ្លើយលេខទូរស័ព្ទ · COD ដល់អ្នកមានសោ · `?list=1` ចង ID token + សាខារួច (`resolveListIdentity()`) · App ផ្ញើ token តែ `?list=1` · `zto-proxy-test` ផ្នែក ១២ មុនកែ FAIL ១៨ · vitest មុនកែ FAIL ៥ | [2.50.47] ៖ `ZTO_PROXY_KEYS` · `ZTO_DETAIL_IDENTITY` · `ZTO_DETAIL_BRANCH_PATHS` (លំនាំដើមដដែល · ម្ចាស់គម្រោងបើកតាមជំហាន) · `resolveListIdentity()` ប្រើឡើងវិញ (គ្មានការផ្ទៀងទី ២) · ⚠️ វាលសាខា ZTO ពិតត្រូវវាស់លើ Argus |
 | A69 | **run-all STRICT ពេញលើ b3c420c ([2.50.47]) ៖ ធ្លាក់ ៦ · ជោគជ័យ ១៩៦ · មួយផ្នែក ០ · រំលង ០** | Claude ៖ (១) `lookup-prefetch-test` · `lookup-freshness-test` · `lookup-failure-identity-test` · `lookup-burst-test` · `health-check-test` រត់ `attemptAutoLookup()` · `healthLookupRow()` ពិតក្នុង sandbox ដែលគ្មាន helper ថ្មី `addZtoIdentityHeader()` · `ztoAccessText()` ➜ ReferenceError ➜ catch ➜ «មិនអាចភ្ជាប់ ZTO» (FAIL ២៩ ក្នុង `health-check-test` · `lookup-burst-test` ៖ `window is not defined` ក្នុង catch) · (២) ក្រោយបន្ថែម helper ពិត ៖ `lookup-prefetch-test` FAIL ៣ ៖ សេណារីយ៉ូ «Lookup ចាស់មិនដោះសោ Lookup ថ្មី» រាប់ `__fetches` ភ្លាមក្រោយហៅ ខណៈ `fetch` ឥឡូវចេញក្រោយ `await` (សោ `autoLookupInFlight` នៅតែចាក់មុន `await` ➜ ឥរិយាបថស្ទួនមិនប្រែ) · ការអះអាង «មិនបាញ់សំណើទី ៣ ស្ទួន» ដោយគ្មានការរង់ចាំ = PASS ទទេ · (៣) `doc-scope-test` ៖ លិបិក្រម ៣ ជួរ | helper ពិតចូល sandbox (គ្មាន `fb`/`auth` ➜ `ztoIdToken()` ពិតឆ្លើយ '' · ការវាស់ token ៖ `zto-detail-identity.test.ts`) · `settleTurns()` មុនរាប់ `__fetches` (ទាំងការអះអាងវិជ្ជមាន និង «មិនបាញ់») · checker ទាំង ៦ + `checker-coverage` · `hang-guard` · `exit-code-integrity` PASS |
 | A70 | **Claude ២ ៖ ផ្ទៀងឯករាជ្យ 651cb0d (session ផ្សេង · read-only · ម្ចាស់គម្រោងស្នើ)** | Claude ២ ៖ run-all STRICT ពេញ ✅ ២០២ · A60–A67 ៖ tree មុនកែ FAIL · HEAD PASS · mutant នីមួយៗ FAIL ➜ បញ្ជាក់ · រកឃើញ (១) minor ៖ mutant `if (!(age > SB_OP_REPLAY_SAFE_MS))` (conflict គ្មាន `now` ➜ `NaN` ➜ `not-applied` ➜ ledger កាត់ ២ ដង) រស់គ្រប់អ្នកយាម Supabase (vitest ១៨៧ · adapter-parity ៩២ · app-network-e2e · tx-disconnect) · (២) nit ៖ mutant `sentAfter = Date.now() + serverOffset` រស់ (នាឡិកាឧបករណ៍លោតទៅមុខមុនផ្ញើ ➜ អាយុតូចពេក ➜ `not-applied` ខុស) · (៣) A66 ក្នុង Chromium ៖ `focus()`/`scrollIntoView` តម្រង់ទីតាំងដែល**គូរ** (transform រួម) · ៤១៤×៨៩៦ ៖ គ្មានការរំកិល · ៣៧៥×៦៦៧ (keyboard ២៦០) ៖ reveal ក្នុងស៊ុមដំបូងនៃការរអិលរំកិល `#appPages` ១៨px (`searchPhoneInput`) · ៦០px (`entryListSearchInput`) រួចត្រឡប់ ០ ក្នុង ៧០០ms (ស្រដៀង A47) · WebKit វាស់មិនបាន | Claude ៖ ផ្ទៀងប្រឆាំងលើ tree ពិត ៖ (១) `supabase-op-retention` «conflict គ្មាន `now`» (ce5bc34) · (២) តេស្តថ្មី «នាឡិកាលោតទៅមុខ ៣០ ម៉ោង មុនផ្ញើ + ដាច់ ៥០ ម៉ោង» ➜ mutant នីមួយៗ FAIL ១ · កូដពិត PASS ៩/៩ · គ្មានកូដ App ប្រែ · (៣) ⛔ គ្មានកូដ (តំបន់ហាម) ➜ សាកលើ iPhone SE / ទូរស័ព្ទតូចបន្ថែម (⏳ 2.50.46) |
+| A71 | **ការពិនិត្យប្រឆាំង [2.50.47] (workflow ៦ agent ៖ security · regressions · docs-tests + អ្នកផ្ទៀងម្នាក់ក្នុងមួយផ្នែក · ម្ចាស់គម្រោងបើក workflow ក្នុង session នេះ)** ៖ រកឃើញ ១៦ ➜ confirmed ១០ (major ១ · minor ៩) · refuted ៤ · ស្ទួន ២ | Claude ៖ (១) **major** ៖ សាខា Firebase មកពី `email` ក្នុង token ដែលអ្នកប្រើប្តូរបាន (`accounts:update` · sign-up បិទមិនរារាំង) ហើយគ្មានការចងគម្រោង ↔ សាខា ➜ បុគ្គលិកហាង A ប្តូរ email ទៅ `@zoew<សាខា B>.com` ➜ `/detail` ឆ្លើយលេខទូរស័ព្ទ · COD ហាង B (handler ពិត · token fixture) · ⛔ `email_verified` មិនមែនដំណោះស្រាយ (ឧបករណ៍ provision មិនផ្ទៀង email) · (២) Supabase គណនីគ្មានហាង = verified លើ `/detail` ខណៈ `?list=1` បដិសេធ · (៣) token យឺត/ផុត ➜ 401 ➜ «ចាកចេញ» + cooldown ៣០ វិ. (បំពាន «ផ្ទៀងមិនបាន ≠ ខុស») · (៤) `optional` រង់ចាំការផ្ទៀងលើរាល់សំណើ (Supabase ព្យួរ ➜ +៣ វិ. · cache ក៏ដូចគ្នា) · (៥) ប៊ូតុង 🧪 គ្មាន token ➜ 401 ពេល `require` · (៦) ឯកសារ ៖ លុប `ZTO_PROXY_KEY` ➜ Cookie Sync `--auto` ឈប់ស្ងាត់ («could not reach») · «សាក `optional` មុន `require`» មិនមានពិត (សាខាកំណត់រួចលើ `optional`) · (៧) គ្មានអ្នកយាម ៖ ការរាប់ `?diag=1` · 503 ផ្ទៀងមិនបាន/កំណត់ខុស · វាលសាខាច្រើន (mutant ៧ រស់) · refuted ៖ token ទៅ host ផ្សេង (URL កំណត់ក្រោម PIN · sweep សញ្ញាផ្ញើរួចពីមុន) · `optional`+សាខា = ការរចនា (ឯកសារត្រូវកែ ➜ (៦)) · typo env បិទ `?list=1` (លំនាំមានស្រាប់ · fail-closed) · `off` រង់ចាំ token (cache · ពិដាន ៣ វិ.) | [2.50.47] ៖ `FIREBASE_PROJECT_IDS` `projectId:សាខា` · `branch:project-unbound`/`-mismatch` · Supabase `site:no-account` · `optional` មិន await (រាប់ក្នុងធុងដែលចាប់ផ្តើម) · `ztoIdentityRefusalIsTransient()` · សារ ⚙️ តាមមូលហេតុសាខា · 🧪 ផ្ញើ token · Cookie Sync `key-rejected` · ZTO-SETUP ៤គ/៤ឃ/៦ · តេស្តថ្មីធ្លាក់មុនកែ (Function ១៤ · vitest ៤ · Sync ២) · mutant ១០ ➜ FAIL ទាំងអស់ |
 
 - **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
   `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase

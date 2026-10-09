@@ -113,7 +113,7 @@ done
 
 if [ -n "$site_url" ]; then
   say ""
-  say "Enter ZTO_PROXY_KEY (the same value as in Netlify)."
+  say "Enter ZTO_PROXY_KEY, or the key part (after =) of one ZTO_PROXY_KEYS entry (the same value as in Netlify)."
   if [ -f "$PROXY_PATH" ]; then say "A proxy key is already saved - press Enter to keep it."; fi
   while :; do
     IFS= read -r -s -p "Enter ZTO_PROXY_KEY: " proxy_key

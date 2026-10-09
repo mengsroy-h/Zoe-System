@@ -84,7 +84,7 @@ const NEEDED = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'recalcItemMoneyFromBarcodes', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
-    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',

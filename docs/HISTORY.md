@@ -46,8 +46,10 @@
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 1. **`main`** = **ZoeW 2.50.47 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #305 merge រួចទាំងអស់ ([2.50.45] = PR #304 · [2.50.46]–[2.50.47] = PR #305 ពី branch
-   `claude/exciting-gates-nvx9ar` ដែលមាន commit របស់ `claude/dazzling-fermi-hycqee` ជាផ្នែក)។ Branch **`claude/dazzling-fermi-hycqee`** (ចាប់ផ្តើមឡើងវិញពី `main` 250dcca ·
-   **មិនទាន់ merge**) ៖ [2.50.48] ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (APK · PWA Android · PWA iPhone)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   `claude/exciting-gates-nvx9ar` ដែលមាន commit របស់ `claude/dazzling-fermi-hycqee` ជាផ្នែក)។ Branch **`claude/kind-volta-02pazk`** (ពី `main` 250dcca ·
+   **មិនទាន់ merge** · មាន commit [2.50.48] របស់ `claude/dazzling-fermi-hycqee` ដដែល) ៖ [2.50.48] ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (APK · PWA Android · PWA iPhone) ·
+   checker ៣ តាមក្រោយ · [2.50.49] សោដកក្នុង ledger (KC-15 · Task #16 · rules + migration ថ្មី ➜ សកម្មភាពដោយដៃ ក្នុងផ្នែក ១)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
+   ម្ចាស់គម្រោងសាក [2.50.48] លើទូរស័ព្ទពិតទាំង ៣ មុនស្នើ merge។
    វាស់រួចលើ [2.50.46]–[2.50.47] ៖ run-all STRICT ពេញ ✅ ២០២/២០២ លើ 5cc09d8 · ការផ្ទៀងឯករាជ្យ Claude ២ · fuzz លុយជ្រៅ PASS (ផ្នែក ២ A60–A71)។
 2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
@@ -132,6 +134,53 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.49] — 2026-10-09 · ZoeW ៖ **ការដកប្រាក់កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចុះតែម្តង ទោះ App ស្លាប់ពាក់កណ្តាល — សោដកក្នុង ledger** (ហាង KC-15 · Task #16 · ម្ចាស់គម្រោងជ្រើស «សោដកក្នុង ledger»)
+
+**ZoeW `2.50.49`** (`zoew-v311` ➜ `zoew-v312`) · ⛔ ZoeKeyGen មិនប្រែ · **Firebase rules ប្រែ** (`ded/$trashId` ក្នុង `zoew_daily_revenue_cod_dod/$date`) ·
+**migration Supabase ថ្មី** `supabase/migrations/20261009035130_zoe_rules.sql` (`generate-rules-sql.mjs`) · គ្មាន env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💵 **ការដកនៃការសម្អាត ៧ ថ្ងៃ (`expired`)** ៖ transaction ២ ជំហានតាមលំដាប់ **ខែ ➜ ថ្ងៃ** (`deductCleanupLedgerKeyed()` ➜ `commitLedgerEventStep()`) ដែលផ្ទុក token កំណត់ពី
+  (id ធុងសំរាម · `deletedAt`) (`ledgerEventToken()`) ជា `op` និងក្នុង ring `ops` · ថ្ងៃផ្ទុកសោ `ded/<trashId>` = `{ at, cod, dod, count }` (ចំនួនដែល server ដកពិត) ➜
+  **សោនៅថ្ងៃ = ការដកទាំង ២ ចុះហើយ**។ ជំហាននីមួយៗ idempotent ៖ ឃើញសោ ឬ token ➜ «រួចហើយ» (មិនសរសេរ)។ អ្នកសរសេរ ledger ថ្ងៃគ្រប់រូបរក្សា `ded` (`ledgerCarryDed()`)។
+- 🔁 **ការស្តារ (journal stage `ledger`)** ៖ journal កត់ `ledger: 'keyed'` + `prior` (token ក្នុង record ថ្ងៃ/ខែ មុនការដកលើកដំបូង) ➜ App បើកវិញ រត់ការដកម្តងទៀត ៖ សោ/token ➜ រួចហើយ ·
+  token មុនៗនៅតែមាន ➜ ការដកមិនទាន់ចុះ ➜ ដក · គ្មានភស្តុតាង (ring ពេញរុញចេញ · App ចាស់លុប ring) ➜ **មិនប៉ះលុយ** + «⚠️ … មិនអាចផ្ទៀងផ្ទាត់» ដូចមុន។ បរាជ័យបណ្តោះអាសន្ន ➜
+  ព្យាយាមរាល់វដ្ត ៦០ វិ. ≤ `CLEANUP_LEDGER_RETRY_MAX` ដង (សារ «⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។»)។
+- 🔄 **ការស្តារពីធុងសំរាម** ៖ គ្មាន barcode ណា flag `isDeducted` តែសោនៅថ្ងៃ (ការដកចុះ · flip មិនទាន់) ➜ បូកវិញតាមសោ (`restoreLedgerKeyFor()`) · ការបូកវិញដែលមានសោ ➜ សរសេរ
+  tombstone `back: true` ក្នុងការសរសេរ atomic ដដែល ➜ journal ដែលរត់ក្រោយមិនបូកវិញលើកទី ២។
+- ↩️ **ស្តារមុនសោចុះ** (journal ឃើញធុងសំរាមបាត់ ហើយ barcode ត្រឡប់ចូលប្រវត្តិ) ៖ stage `undo` ➜ ថ្ងៃ (បូកវិញតាមសោ + tombstone `back: true, undo: true`) ➜ ខែ (token `u`) ·
+  tombstone របស់ការស្តារ (គ្មាន `undo`) ➜ ការស្តារបូកវិញទាំង ២ រួចហើយ ➜ មិនបូកម្តងទៀត។
+- 🧹 **អ្នកបោស** `runCleanupLedgerKeySweep()` (វដ្ត ៦០ វិ.) ៖ ធុងសំរាម `expired` មិនទាន់ flip ចាស់ជាង `CLEANUP_KEY_SWEEP_GRACE_MS` គ្មាន journal លើឧបករណ៍នេះ ហើយសោនៅថ្ងៃ (`at` ដូចគ្នា) ➜
+  flip `isDeducted: true` (មិនប៉ះលុយ) · គ្មានសោ ➜ មិនធ្វើអ្វី ➜ ឧបករណ៍ដែលស្លាប់កណ្តាលការ flip មិនទុកកញ្ចប់ «មិនទាន់ដក» ក្នុងធុងសំរាមទៀត។
+- 🗑️ **purge (២ ថ្ងៃ)** លុបសោនៃធុងសំរាមដែល purge (`releaseCleanupLedgerKeys()`) ➜ record ថ្ងៃមិនរីកឥតឈប់។
+- 🔐 **rules មិនទាន់ Publish** ➜ ការសរសេរ `ded` ត្រូវបដិសេធ ➜ App ថយទៅ token គ្មានសោ (ការស្តារនៅតែសម្រេចដោយ token · អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ) · rules ចាស់ជាង ring ➜
+  ផ្លូវចាស់ (journal `legacy`) ➜ ការស្តារ = «unverified» ដូចមុន។
+- ⚠️ **ព្រំដែន** ៖ App ≤ 2.50.48 ក្នុងហាងដដែលសរសេរ record ថ្ងៃដោយគ្មាន `ded` ➜ សោបាត់ តែ token ក្នុង ring នៅជាភស្តុតាង (App ≥ 2.50.22 រក្សា ring) · App < 2.50.22 លុប ring ➜
+  សម្រេចមិនបាន ➜ «unverified» (មិនដកពីរដង) ➜ ⛔ ធ្វើបច្ចុប្បន្នភាពគ្រប់ឧបករណ៍ក្នុងហាង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/cleanup-ledger-key.test.ts` (ថ្មី · ១៨) ៖ មុនកែ **FAIL ១៣/១៨** ៖ KC-15 ពិត (`unverified` · ១០០ មិនមែន ៩០) · ការដកចុះតែចម្លើយបាត់ (មិន flip) · ខែ/ថ្ងៃចុះតែម្ខាង (១០០/៩០) ·
+  journal ចាស់រត់ម្តងទៀត · App ចាស់លុបសោ · flip ចុះ + journal មិនទាន់លុប + ស្តារ ➜ **១១០** (បូកវិញ ២ ដង) · ស្តារមិនបូកវិញតាមសោ (៩០) · undo ខែត្រូវកាត់ ➜ ថ្ងៃ **១១០** ·
+  អ្នកបោស · rules បដិសេធ `ded` + ចម្លើយបាត់ ➜ ក្រោយកែ ១៨/១៨ (ទិសផ្ទុយ ៥ ៖ គ្មានភស្តុតាង ➜ មិនប៉ះលុយ · id ដដែលផុតកំណត់ម្តងទៀត ➜ ដកម្តងទៀត · អ្នកបោសមិនដក · rules ចាស់ ➜ ការដកនៅចុះ)។
+- `audit-tools/cleanup-interrupt-atomicity-test.js` ផ្នែក ៣ខ (ថ្មី · ១៨ · record មាន ring) ៖ មុនកែ FAIL (unverified · មិន flip) ➜ ក្រោយ ៧៩/៧៩ · ផ្នែក ៣ (record គ្មាន ring ➜ មិនប៉ះលុយ) មិនប្រែ។
+- `money-guardian-test` mutation ថ្មី ៣ (token មិនរាប់ · សោមិនរាប់ · មិនទាមទារ token មុន) ➜ ចាប់ដោយ `cleanup-interrupt-atomicity-test` ៣ខ-ខ · ៣ខ-គ · ៣ (ដកលើកទី ២)។
+- emulator RTDB ៖ rules ថ្មីទទួលសោ · tombstone ហើយបដិសេធ ៦ រាងខុស (cod អវិជ្ជមាន · ខ្វះ `count` · វាលលើស · ធាតុ primitive · `back:false` · `ded` primitive) ·
+  rules ចាស់ (Publish បច្ចុប្បន្ន) បដិសេធ `ded` តែទទួល token ➜ ការថយក្រោយត្រូវ។
+- `ZoeW/tests/remove-stale-session.test.ts` ៖ យុថ្កាថ្មី (`deductCleanupRevenue` · ច្រកផ្ទាល់) ➜ `stale` មុនសារ/Sentry · `supabase-update-contract` ៖ `releaseCleanupLedgerKeys` = IDEMPOTENT ·
+  `finalizeClaimedRestore` + សោដក ១ = BOUNDED។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ⛔ **Publish Firebase rules** (`firebase-database.rules.json`) ទៅ **គ្រប់អតិថិជន Firebase មុន Deploy** ៖ Firebase Console ➜ Realtime Database ➜ Rules ➜ បិទភ្ជាប់ ➜ Publish ឬ
+   `tools/firebase-provision/deploy-rules.cmd` (មិន Publish ➜ App នៅដើរ តែគ្មានសោ ➜ អ្នកបោស និងការស្តារតាមសោមិនដំណើរការ)។
+2. merge ➜ migration Supabase `20261009035130_zoe_rules.sql` ចូល live តាម GitHub integration (ឬបិទភ្ជាប់ក្នុង SQL Editor) ➜ ផ្ទៀង version ក្រោយ merge។
+3. Deploy **ZoeW** ➜ build APK ថ្មី ➜ ⛔ ធ្វើបច្ចុប្បន្នភាព **គ្រប់ឧបករណ៍** ក្នុងហាង (App ចាស់លុបសោពេលសរសេរ ledger ថ្ងៃដដែល)។
+4. សាក ៖ កញ្ចប់ផុតកំណត់ (៨ ថ្ងៃ) ចូលធុងសំរាម ➜ Console/Supabase ៖ `zoew_daily_revenue_cod_dod/<ថ្ងៃស្កេន>/ded/<id ធុងសំរាម>` មាន `at · cod · dod · count` ·
+   ចំណូល/ចំនួនដក **តែម្តង** · ធាតុធុងសំរាម `isDeducted: true` · ស្តារវា ➜ ប្រាក់បូកវិញតែម្តង ហើយសោមាន `back: true`។
+5. Sentry ៖ «Automatic cleanup revenue awaits confirmation» (zone money) = ការដកមិនទាន់បញ្ជាក់ ➜ journal ព្យាយាមម្តងទៀត · «Interrupted cleanup resumed with unverified ledger» នៅមានពេលគ្មានភស្តុតាង។
 
 ### [2.50.48] — 2026-10-09 · ZoeW ៖ **ស្វែងរក ៖ ប្រអប់ស្នើលេខធ្លាក់ចុះពេលប្រអប់ទៅដល់ · ចលនាមើលឃើញពេញលើ iPhone · សារទទេទំព័រស្កេនមិនលោតតាម keyboard** (វីដេអូម្ចាស់គម្រោង ៣ ៖ APK · PWA Android · PWA iPhone)
 
@@ -3004,6 +3053,32 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-09 — ហាង Supabase KC-15 ៖ ការដកផុតកំណត់ត្រូវកាត់ពាក់កណ្តាល ➜ Task #16 «សោដកក្នុង ledger» ➜ [2.50.49]
+
+**អាការៈ** ៖ «ស្កេនតាមថ្ងៃ» ៣៥៣ ≠ យករួច ២៥៧ + នៅសល់ ៩២ = ៣៤៩។ **មូលហេតុ** ៖ កញ្ចប់ផុតកំណត់ ៣ (barcode ៤ · $12.75 · ថ្ងៃ 2026-10-02) ត្រូវដកនៅ 10-09 ម៉ោង 08:33
+(iPhone · 2.50.47) ចំពេលម្ចាស់គម្រោង redeploy Netlify ➜ ការដកត្រូវកាត់ ➜ journal នៅ stage `ledger` ➜ ការស្តាររាយការណ៍ «unverified» ហើយមិនដក (Sentry JAVASCRIPT-REACT-D · itemCount 1)។
+
+**ការជួសទិន្នន័យ (ម្ចាស់គម្រោងអនុញ្ញាតម្តងមួយៗ · session មុន)** ៖ (១) op `adminRepairKC15expired20261009` (02:37 UTC · DO block ផ្ទៀងតម្លៃមុន + `private.zoe_apply`) ៖
+ថ្ងៃ 10-02 ១៥៧,០៨/៤២ ➜ ១៤៤,៣៣/៣៨ · ខែ 2026-10 ១២៣២,៦៩/២៦២ ➜ ១២១៩,៩៤/២៥៨ · flip barcode ៤ ➜ `isDeducted: true` (count ៤២ មុនជួស = barcode ៤ មិនទាន់ដក ➜ មិនដកពីរដង) ·
+(២) op `adminRepairKC15drift362_20261009` (03:17 UTC) ៖ ថ្ងៃ 10-02 COD លើស +$3.62 ➜ ១៤០,៧១/២,៥/៣៨ · ខែ ១២១៦,៣២/១២,៥/២៥៨ ➜ គ្រប់ថ្ងៃស្មើ identity
+(Σ barcode `isDeducted != true` ក្នុងប្រវត្តិ + ធុងសំរាម)។ ⛔ កុំសរសេរលុយ KC-15 ម្តងទៀត។
+
+**+$3.62 ៖ អ្វីដែលវាស់បាន** ៖ ថ្ងៃ 09-29 ➜ 10-07 នាំចូលពីបញ្ជី ZTO ក្នុងពេលតែមួយ (10-07 00:14–00:23 UTC · 2.50.2/2.50.3) ត្រូវគ្នាទាំងអស់ · 10-02 ជាថ្ងៃតែមួយដែលឆ្លងការដក
+ផុតកំណត់ (10-09 01:33 UTC) · `zoe_ops` (រក្សា ២ ថ្ងៃ · `{ok,seq,docs}` គ្មានចំនួនទឹកប្រាក់) ៖ 10-07 02:19 ➜ 10-09 01:33 គ្មានការសរសេរថ្ងៃ 10-02 · ក្នុង 01:33:34–01:33:53 ថ្ងៃ 10-02
+ត្រូវសរសេរ ២២ ដង ៖ ២០ គូនឹងកញ្ចប់ ២០ ដែល flip · **២ លើស** (seq 3102 · 3125) នៅកន្លែងកញ្ចប់ «unverified» ៣ ➜ សរុប count ០ · COD +៣,៦២ (បើការនាំចូលត្រឹមត្រូវ) ·
+គ្មានការរួមផ្សំធម្មតាណាពន្យល់បាន (មិនមែនដកខ្វះ ១ + ដកពីរដង ១ ដែល count ស្មើ · មិនមែនផ្នែកនៃកញ្ចប់ដែលបូកបាន ៣,៦២) ➜ ចំនួនទឹកប្រាក់នៃការសរសេរនីមួយៗវាស់មិនបានទៀតទេ។
+កូដ cleanup 2.50.45 = 2.50.47 · ការដកផ្ទាល់គណនាពី barcode របស់ server ➜ ចំណុចសង្ស័យ ៖ reload កណ្តាលការដក + ការស្តារ/ការរស់ប៉ះគ្នា។
+
+**ថ្នាក់កំហុស (វាស់លើ tree មុនកែ · `cleanup-ledger-key.test.ts`)** ៖ (ក) ការដកដែលចម្លើយបាត់គ្មានភស្តុតាងនៅ server ➜ ការស្តារជ្រើស «មិនប៉ះលុយ» ជានិច្ច ➜ ledger ខុសដោយស្ងាត់
+(KC-15) · (ខ) flip ចុះ ហើយ App ស្លាប់មុនលុប journal ➜ អ្នកប្រើស្តារ (+១០ តាម flag) ➜ journal stage `flip` ឃើញធុងសំរាមបាត់ + barcode ត្រឡប់ ➜ បូកវិញម្តងទៀត ➜ **១១០** ·
+(គ) undo (`applyCleanupRevenue(+1)`) ដែលកាត់ពាក់កណ្តាល ➜ រត់ម្តងទៀត ➜ ថ្ងៃ **១១០** · (ឃ) ឧបករណ៍ស្លាប់កណ្តាល flip + journal បាត់ ➜ ការស្តារមិនបូកវិញ (flag false) ➜ ៩០។
+
+**ការរចនា (ហេតុអ្វី ខែ ➜ ថ្ងៃ · token កំណត់ · `prior`)** ៖ record ខែ (`zoew_monthly_revenue_cod_dod`) ត្រូវសរសេររាល់ការស្កេន (ring ១២ ប្តូររហ័ស) ➜ សោក្នុងខែនឹងធ្វើឲ្យរាល់ការស្កេនផ្ញើ
+record ខែធំជាងមុន (egress) ➜ សោតែក្នុងថ្ងៃ (record ថ្ងៃផុតកំណត់ ≥ ៨ ថ្ងៃ ស្ងាត់) · ខែដកមុន ➜ សោថ្ងៃ = ទាំង ២ ចុះ។ App ≤ 2.50.48 សរសេរ record ថ្ងៃឡើងវិញដោយគ្មាន `ded` ➜ token
+កំណត់ក្នុង ring ជាភស្តុតាងទី ២ (App ≥ 2.50.22 រក្សា ring ហើយរុញ seq ទាបចេញមុន ➜ token មុនការដកនៅ ⇒ token យើង (seq ខ្ពស់ជាង) ក៏នៅ បើបានចុះ)។ ⛔ token ផ្ទាល់គ្មាន `prior` មិនគ្រប់
+គ្រាន់ ៖ ring ពេញ ឬ App < 2.50.22 លុប ring ➜ «គ្មាន token» មិនមែនភស្តុតាង «មិនទាន់ចុះ» (ដកពីរដង) ➜ សម្រេចមិនបាន ➜ មិនប៉ះលុយ។ ទំហំ ៖ សោ ~៧០ byte/កញ្ចប់ផុតកំណត់
+ក្នុង record ថ្ងៃ ➜ purge ២ ថ្ងៃលុបវា។ ការសរសេរ `ded` លើ rules ចាស់ (emulator) ៖ ៤០១ ➜ ថយទៅ token គ្មានសោ ➜ ២០០។
+
 ### 2026-10-09 — វីដេអូម្ចាស់គម្រោង ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន ➜ [2.50.48]
 
 **វិធី** ៖ ញែកវីដេអូ ៣ (APK · PWA Android ៩០ ស៊ុម/វិ. · iPhone ៦០ ស៊ុម/វិ.) ជាស៊ុម (`ffmpeg` ២០–៦០ ស៊ុម/វិ.) ➜ វាស់ទីតាំងកាតស្វែងរក · ប្រអប់ស្នើលេខ · keyboard តាមស៊ុម ➜
@@ -4863,7 +4938,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
-| `money-guardian-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
+| `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `money-reality-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |

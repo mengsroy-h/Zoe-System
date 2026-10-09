@@ -2,11 +2,11 @@ import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
-import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
+import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual } from './ledger';
+import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
@@ -128,6 +128,16 @@ export const CLEANUP_STAGE_FLIP = 'flip';
 
 export const CLEANUP_STAGE_SLOT = 'slot';
 
+export const CLEANUP_STAGE_UNDO = 'undo';
+
+export const CLEANUP_LEDGER_KEYED = 'keyed';
+
+export const CLEANUP_LEDGER_LEGACY = 'legacy';
+
+export const CLEANUP_LEDGER_RETRY_MAX = 10;
+
+export const CLEANUP_NO_PRIOR = { d: [], m: [] };
+
 export function readCleanupJournal() {
     try {
         const raw = safeStoreGet(appLocalStore, CLEANUP_JOURNAL_KEY);
@@ -185,6 +195,25 @@ export function markCleanupJournalStage(trashId, stage) {
     let changed = false;
     list.forEach((e) => { if (e.trashItem.id === trashId && e.stage !== stage) { e.stage = stage; changed = true; } });
     if (changed) writeCleanupJournal(list);
+}
+
+export function patchCleanupJournalEntry(trashId, fields) {
+    const list = readCleanupJournal();
+    let changed = false;
+    list.forEach((e) => {
+        if (e.trashItem.id !== trashId) return;
+        Object.assign(e, fields);
+        changed = true;
+    });
+    if (changed) writeCleanupJournal(list);
+    return changed;
+}
+
+export function noteCleanupLedgerTry(trashId) {
+    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId);
+    const tries = (entry && typeof entry.tries === 'number' && isFinite(entry.tries) ? entry.tries : 0) + 1;
+    patchCleanupJournalEntry(trashId, { tries });
+    return tries;
 }
 
 export function clearCleanupJournalEntry(trashId) {
@@ -255,7 +284,105 @@ export async function applyCleanupRevenue(itemId, rev, sign) {
     }
 }
 
-export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone) {
+export function cleanupScanDateOf(trashItem) {
+    const at = trashItem && typeof trashItem.deletedAt === 'number' && isFinite(trashItem.deletedAt) ? trashItem.deletedAt : getServerNow();
+    return (trashItem && trashItem.scanDate) || getFormattedDate(at);
+}
+
+export function cleanupEventAt(trashItem) {
+    const at = trashItem ? trashItem.deletedAt : null;
+    return typeof at === 'number' && isFinite(at) && at > 0 ? at : 0;
+}
+
+export function cleanupEventAmounts(rev) {
+    return {
+        cod: Math.round((parseFloat(rev && rev.cod) || 0) * 100) / 100,
+        dod: Math.round((parseFloat(rev && rev.dod) || 0) * 100) / 100,
+        count: parseFloat(rev && rev.count) || 0
+    };
+}
+
+export function cleanupLedgerPrior(scanDate) {
+    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
+    const months = dataState.monthlyRevenueData && typeof dataState.monthlyRevenueData === 'object' ? dataState.monthlyRevenueData : {};
+    return { d: ledgerRecordTokens(days[scanDate]), m: ledgerRecordTokens(months[String(scanDate).substring(0, 7)]) };
+}
+
+export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
+    const at = cleanupEventAt(trashItem);
+    if (!at || !rev || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashItem.id)) return 'refused';
+    const amounts = cleanupEventAmounts(rev);
+    const monthly: any = await commitLedgerEventStep('monthly', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.m : null);
+    if (monthly.state !== 'applied' && monthly.state !== 'already') return monthly.state;
+    const daily: any = await commitLedgerEventStep('daily', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.d : null);
+    if (daily.state === 'applied' || daily.state === 'already' || daily.state === 'restored') return 'deducted';
+    return daily.state === 'refused' ? 'failed' : daily.state;
+}
+
+export async function deductCleanupRevenue(itemId, trashItem, rev) {
+    const prior = cleanupLedgerPrior(rev.scanDate);
+    try { patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_LEDGER, ledger: CLEANUP_LEDGER_KEYED, prior }); } catch (journalErr) {}
+    const keyed = await deductCleanupLedgerKeyed(trashItem, rev, null);
+    if (keyed !== 'refused') return keyed;
+    try { patchCleanupJournalEntry(trashItem.id, { ledger: CLEANUP_LEDGER_LEGACY }); } catch (journalErr) {}
+    const amounts = cleanupEventAmounts(rev);
+    const status = await applyCleanupRevenue(itemId, rev, -1);
+    if (status && status.stale) return 'stale';
+    if (!status || !status.ok) {
+        if (window.ZoeErrors) ZoeErrors.capture(new Error('Automatic cleanup revenue reconciliation did not commit'), { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId });
+        showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
+    }
+    return cleanupLedgerDeducted(status, amounts.cod, amounts.dod, amounts.count) ? 'deducted' : 'legacy-failed';
+}
+
+export async function undoCleanupLedgerKeyed(trashItem, rev, prior, uprior) {
+    const at = cleanupEventAt(trashItem);
+    if (!at || !rev) return 'unknown';
+    const daily: any = await commitLedgerEventStep('daily', rev.scanDate, trashItem.id, at, 'undo', null, prior.d);
+    let amounts = null;
+    let evidence = null;
+    if (daily.state === 'applied') {
+        amounts = daily.entry;
+    } else if (daily.state === 'already') {
+        if (!daily.undo) return 'done';
+        amounts = daily.entry || cleanupEventAmounts(rev);
+    } else if (daily.state === 'absent') {
+        amounts = cleanupEventAmounts(rev);
+        evidence = prior.m;
+    } else {
+        return daily.state === 'refused' ? 'failed' : daily.state;
+    }
+    const monthly: any = await commitLedgerEventStep('monthly', rev.scanDate, trashItem.id, at, 'undo', amounts, uprior ? uprior.m : null, evidence);
+    if (monthly.state === 'applied' || monthly.state === 'already' || monthly.state === 'absent') return 'done';
+    return monthly.state === 'refused' ? 'failed' : monthly.state;
+}
+
+export async function undoCleanupRevenue(entry) {
+    const trashItem = entry.trashItem;
+    const rev = entry.revenue;
+    const rerun = entry.stage === CLEANUP_STAGE_UNDO;
+    const uprior = rerun ? (entry.uprior || CLEANUP_NO_PRIOR) : cleanupLedgerPrior(rev.scanDate);
+    if (!rerun) {
+        try { patchCleanupJournalEntry(trashItem.id, { stage: CLEANUP_STAGE_UNDO, uprior }); } catch (journalErr) {}
+    }
+    return undoCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR, rerun ? uprior : null);
+}
+
+export function cleanupLedgerResult(trashId, state) {
+    if (state === 'done' || state === 'deducted') {
+        clearCleanupJournalEntry(trashId);
+        return '';
+    }
+    if (state === 'unknown' || state === 'refused') {
+        clearCleanupJournalEntry(trashId);
+        return 'unverified';
+    }
+    if (state === 'stale' || noteCleanupLedgerTry(trashId) < CLEANUP_LEDGER_RETRY_MAX) return '';
+    clearCleanupJournalEntry(trashId);
+    return 'unverified';
+}
+
+export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone, entry?) {
     let verdict;
     try {
         verdict = await retryAsync(() => dbOp(markCleanupTrashDeducted(trashItem)), 3, 1500);
@@ -267,8 +394,63 @@ export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone)
     if (dataState.deletedItems.some((t) => t && t.id === trashItem.id)) return false;
     const back = cleanupBarcodesBackInHistory(trashItem);
     if (back === null) return false;
+    if (back && rev && entry && entry.ledger === CLEANUP_LEDGER_KEYED) return undoCleanupRevenue(entry);
     if (back && rev) await applyCleanupRevenue(itemId, rev, 1);
     return true;
+}
+
+export const CLEANUP_KEY_SWEEP_GRACE_MS = 10 * 60 * 1000;
+
+export const CLEANUP_KEY_SWEEP_BATCH = 4;
+
+export const cleanupKeySweepInFlight = new Set();
+
+export function runCleanupLedgerKeySweep() {
+    if (!firebaseState.db || !firebaseState.fb || !cleanupClockIsTrustworthy()) return;
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED) || dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return;
+    const now = getServerNow();
+    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
+    let journaled = [];
+    try { journaled = readCleanupJournal().map((e) => e.trashItem.id); } catch (journalErr) {}
+    let started = 0;
+    for (const item of dataState.deletedItems) {
+        if (started >= CLEANUP_KEY_SWEEP_BATCH) return;
+        if (!item || typeof item.id !== 'string' || item.trashReason !== 'expired') continue;
+        const at = cleanupEventAt(item);
+        if (!at || now - at < CLEANUP_KEY_SWEEP_GRACE_MS) continue;
+        if (journaled.indexOf(item.id) !== -1 || cleanupJournalLive.has(item.id) || cleanupKeySweepInFlight.has(item.id)) continue;
+        if (item.restoreClaim && isActiveRestoreClaim(item.restoreClaim)) continue;
+        if (!barcodeEntriesOf(item.barcodes).some(({ barcode }) => barcode && barcode.isDeducted !== true)) continue;
+        const entry = ledgerDedOf(days[cleanupScanDateOf(item)], item.id);
+        if (!entry || entry.at !== at || entry.back) continue;
+        started++;
+        cleanupKeySweepInFlight.add(item.id);
+        const done = () => { cleanupKeySweepInFlight.delete(item.id); };
+        dbOp(markCleanupTrashDeducted(item)).then(done, (flipErr) => {
+            done();
+            if (dbOpStalled(flipErr)) return;
+            if (window.ZoeErrors) ZoeErrors.capture(flipErr, { zone: 'money', context: 'runCleanupLedgerKeySweep flip', itemId: item.id });
+        });
+    }
+}
+
+export function cleanupLedgerKeyOf(item) {
+    if (!item || item.trashReason !== 'expired' || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
+    const at = cleanupEventAt(item);
+    const scanDate = cleanupScanDateOf(item);
+    if (!at || typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate)) return null;
+    const days = dataState.dailyRevenueData && typeof dataState.dailyRevenueData === 'object' ? dataState.dailyRevenueData : {};
+    const entry = ledgerDedOf(days[scanDate], item.id);
+    return entry && entry.at === at ? { scanDate } : null;
+}
+
+export function releaseCleanupLedgerKeys(list) {
+    const updates = {};
+    (Array.isArray(list) ? list : []).forEach((candidate) => {
+        if (candidate && candidate.ledgerKey) updates[`zoew_daily_revenue_cod_dod/${candidate.ledgerKey.scanDate}/ded/${candidate.id}`] = null;
+    });
+    if (!Object.keys(updates).length || !firebaseState.fb || !firebaseState.db) return Promise.resolve();
+    return Promise.resolve().then(() => firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates)).catch(() => {});
 }
 
 export async function resolveCleanupSlot(trashItem) {
@@ -375,8 +557,12 @@ export async function resumeCleanupJournalEntry(trashId) {
     }
     const rev = entry.revenue;
     let stage = entry.stage;
+    const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
+    if (stage === CLEANUP_STAGE_UNDO) return cleanupLedgerResult(trashItem.id, rev && keyed ? await undoCleanupRevenue(entry) : 'done');
     if (stage === CLEANUP_STAGE_FLIP) {
-        if (!rev || await settleCleanupDeduction(entry.id, trashItem, rev, true)) clearCleanupJournalEntry(trashItem.id);
+        const settled = rev ? await settleCleanupDeduction(entry.id, trashItem, rev, true, entry) : true;
+        if (typeof settled === 'string') return cleanupLedgerResult(trashItem.id, settled);
+        if (settled) clearCleanupJournalEntry(trashItem.id);
         return '';
     }
     let outcome = '';
@@ -400,8 +586,14 @@ export async function resumeCleanupJournalEntry(trashId) {
     }
     if (!present) {
         if (stage !== CLEANUP_STAGE_MOVED) {
-            clearCleanupJournalEntry(trashItem.id);
-            return rev ? 'unverified' : '';
+            if (!keyed || !rev) {
+                clearCleanupJournalEntry(trashItem.id);
+                return rev ? 'unverified' : '';
+            }
+            const gone = cleanupBarcodesBackInHistory(trashItem);
+            if (gone === null) return '';
+            if (gone) return cleanupLedgerResult(trashItem.id, await undoCleanupRevenue(entry));
+            return cleanupLedgerResult(trashItem.id, await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR));
         }
         const back = cleanupBarcodesBackInHistory(trashItem);
         if (back === null) return '';
@@ -421,14 +613,23 @@ export async function resumeCleanupJournalEntry(trashId) {
         }
     }
     if (stage === CLEANUP_STAGE_MOVED && rev) {
-        markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
-        const status = await applyCleanupRevenue(entry.id, rev, -1);
-        if (cleanupLedgerDeducted(status, parseFloat(rev.cod) || 0, parseFloat(rev.dod) || 0, parseFloat(rev.count) || 0)) {
+        const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);
+        if (deduction === 'deducted') {
             markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
             if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return outcome;
+        } else if (deduction !== 'legacy-failed') {
+            return outcome;
         }
     } else if (stage === CLEANUP_STAGE_LEDGER && rev) {
-        outcome = 'unverified';
+        if (!keyed) {
+            outcome = 'unverified';
+        } else {
+            const deduction = await deductCleanupLedgerKeyed(trashItem, rev, entry.prior || CLEANUP_NO_PRIOR);
+            if (deduction !== 'deducted') return cleanupLedgerResult(trashItem.id, deduction);
+            markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP);
+            if (!(await settleCleanupDeduction(entry.id, trashItem, rev, false))) return '';
+            outcome = 'restored';
+        }
     }
     clearCleanupJournalEntry(trashItem.id);
     return outcome;
@@ -661,7 +862,7 @@ export async function claimAndCleanupItem(id, reason) {
                 delete trashItem.closedAt;
                 trashItem.isFromDeletion = false;
                 trashItem.trashReason = 'expired';
-                revenueScanDate = trashItem.scanDate || getFormattedDate();
+                revenueScanDate = cleanupScanDateOf(trashItem);
                 revenueCod = trashItem.cod;
                 revenueDod = trashItem.dod;
                 revenueCount = trashItem.count;
@@ -681,7 +882,7 @@ export async function claimAndCleanupItem(id, reason) {
                         isDeducted: false, isFromDeletion: false }));
                     recalcItemMoneyFromBarcodes(trashItem);
                 }
-                revenueScanDate = trashItem.scanDate || getFormattedDate();
+                revenueScanDate = cleanupScanDateOf(trashItem);
                 revenueCod = Math.round((parseFloat(trashItem.cod) || 0) * 100) / 100;
                 revenueDod = Math.round((parseFloat(trashItem.dod) || 0) * 100) / 100;
                 revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
@@ -756,30 +957,20 @@ export async function claimAndCleanupItem(id, reason) {
                 try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
                 return;
             }
-            try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER); } catch (journalErr) {}
-            const revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
-            let ledgerStatus = null;
-            try {
-                const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
-                    -revenueCod, -revenueDod, -revenueCount);
-                ledgerStatus = status;
-                if (!status || (!status.ok && !status.stale)) {
-                    const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
-                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
-                    showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
-                }
-            } catch (ledgerErr) {
-                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
-            }
-            if (!cleanupIsCurrent()) {
+            const revenue = { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount };
+            const deduction = await deductCleanupRevenue(id, trashItem, revenue);
+            if (deduction === 'stale' || !cleanupIsCurrent()) {
                 noteCleanupSessionSwitch('ledger');
                 return;
             }
-            if (cleanupLedgerDeducted(ledgerStatus, revenueCod, revenueDod, revenueCount)) {
+            if (deduction === 'deducted') {
                 try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_FLIP); } catch (journalErr) {}
-                const settled = await settleCleanupDeduction(id, trashItem,
-                    { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount }, false);
+                const settled = await settleCleanupDeduction(id, trashItem, revenue, false);
                 if (!settled) return;
+            } else if (deduction !== 'legacy-failed') {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Automatic cleanup revenue awaits confirmation'), { zone: 'money', context: 'claimAndCleanupItem ledger ' + deduction, itemId: id, reason });
+                showToast('⏳ ការសម្អាតបានរក្សាទុក — ស្ថិតិប្រាក់នឹង Sync ស្វ័យប្រវត្តិ។');
+                return;
             }
             try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
         } finally {
@@ -827,7 +1018,7 @@ export async function runAutomaticDeletedCleanup() {
             if (activeRestoreClaims.has(item.id)) return;
             staleClaim = true;
         }
-        candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim });
+        candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim, ledgerKey: cleanupLedgerKeyOf(item) });
     });
 
     if (!candidates.length) return;
@@ -855,7 +1046,7 @@ export async function runAutomaticDeletedCleanup() {
             dataState.deletedItems = dataState.deletedItems.filter(item => !purgedSet.has(item.id));
             let purgedBarcodes = [];
             list.forEach((candidate) => { purgedBarcodes = purgedBarcodes.concat(candidate.barcodes); });
-            return releaseBarcodesInRegistry(purgedBarcodes);
+            return Promise.all([releaseBarcodesInRegistry(purgedBarcodes), releaseCleanupLedgerKeys(list)]);
         };
 
         let purged = purgeable;
@@ -908,6 +1099,7 @@ export function runScheduledCleanup() {
     flushPendingRegistryReleases();
     runAutomaticCleanupRules(CLEANUP_SWEEP_BATCH);
     runAutomaticDeletedCleanup();
+    runCleanupLedgerKeySweep();
     runAutomaticCollectedCleanup();
     repairPickupLedgerOnce();
 }

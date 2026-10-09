@@ -350,6 +350,33 @@
             ".validate": "newData.isNumber() && newData.val() >= 1 && $op.length >= 8 && $op.length <= 40"
           }
         },
+        "ded": {
+          ".validate": "newData.hasChildren()",
+          "$trashId": {
+            ".validate": "newData.hasChildren(['at','cod','dod','count']) && $trashId.length >= 1 && $trashId.length <= 64",
+            "at": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "cod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "dod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "count": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "back": {
+              ".validate": "newData.isBoolean() && newData.val() === true"
+            },
+            "undo": {
+              ".validate": "newData.isBoolean() && newData.val() === true"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "$other": {
           ".validate": false
         }

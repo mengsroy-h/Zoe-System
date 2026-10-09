@@ -73,17 +73,23 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
     'applyLedgerBucketDelta', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 
+    'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed',
+    'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue',
+    'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
+    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
+    'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
     'resumeCleanupJournalEntry', 'resumeInterruptedCleanups'];
 const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
     'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_SLOT',
+    'CLEANUP_STAGE_UNDO', 'CLEANUP_LEDGER_KEYED', 'CLEANUP_LEDGER_LEGACY', 'CLEANUP_LEDGER_RETRY_MAX', 'CLEANUP_NO_PRIOR',
     'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);
@@ -118,6 +124,7 @@ function makeRun(opts) {
         increment: (n) => ({ __inc: n }),
         runTransaction: (ref, fn) => {
             if (bump()) return hung();
+            const landed = opts.landAt === writes;
             const p = ref.path;
             let cur, write;
             if (p === 'zoew_monthly_revenue_cod_dod') {
@@ -142,6 +149,7 @@ function makeRun(opts) {
             const out = fn(cur);
             if (out === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
             write(out === null ? null : JSON.parse(JSON.stringify(out)));
+            if (landed) return hung();
             return Promise.resolve({ committed: true, snapshot: { val: () => out } });
         },
         update: (ref, obj) => {
@@ -407,6 +415,83 @@ function packagePlaces(server) {
             Object.keys(next.server.trash).length === 1, Object.keys(next.server.trash));
         ok('⛔ ការស្តារលុប journal ចោល (មិនវិលមករាល់វដ្ត ៦០ វិ.)',
             Object.keys(next.storage).length === 0, next.storage);
+    }
+
+    // ── ៣ខ. ⛔⛔ ការដកមានសោ (KC-15) ៖ record មាន ring `ops` ➜ ការស្តារបញ្ចប់ការដក **តែម្តង** ──
+    //    ការដក = transaction ខែ ➜ ថ្ងៃ ដែលផ្ទុក token កំណត់ពី (trashId · deletedAt) · ថ្ងៃផ្ទុកសោ `ded/<trashId>`។
+    //    journal កត់ token ដែលមានក្នុង record មុនការដកលើកដំបូង (`prior`) ➜ ការស្តារ ៖ សោ/token ➜ «រួចហើយ» ·
+    //    token មុនៗនៅ ➜ មិនទាន់ចុះ ➜ ដក · សម្រេចមិនបាន ➜ មិនប៉ះលុយ + ប្រាប់ (ផ្នែក ៣)។
+    //    ⛔ ទិសទាំង ២ ៖ មិនទាន់ចុះ ➜ ដកតែម្តង · ចុះហើយ (ចម្លើយបាត់) ➜ មិនដកលើកទី ២។
+    const ringed = () => ({
+        history: { [ITEM_ID]: null },
+        trash: {},
+        daily: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seeddaily01', ops: { op_seeddaily01: 1 } } },
+        monthly: { [MONTH]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT, op: 'op_seedmonth01', ops: { op_seedmonth01: 1 } } }
+    });
+    async function cutKeyed(opts) {
+        const run = makeRun(Object.assign({ server: ringed() }, opts));
+        run.box.dailyRevenueData = JSON.parse(JSON.stringify(run.server.daily));
+        run.box.monthlyRevenueData = JSON.parse(JSON.stringify(run.server.monthly));
+        seedItem(run, BARCODES);
+        vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
+        await settle(500);
+        run.timers.forEach(clearTimeout);
+        return run;
+    }
+    const churn = (record) => {
+        const ops = {};
+        for (let i = 0; i < 12; i++) ops['op_churn' + String(i).padStart(4, '0')] = 100 + i;
+        return Object.assign({}, record, { op: 'op_churn0011', ops });
+    };
+    const flipped = (server) => Object.keys(server.trash).length === 1
+        && (server.trash[Object.keys(server.trash)[0]].barcodes || []).every((b) => b && b.isDeducted === true);
+    const dayIs = (server, cod, count) => r2(server.daily[DAY].codDollar) === r2(cod) && server.daily[DAY].totalCount === count;
+    const monthIs = (server, cod, count) => r2(server.monthly[MONTH].codDollar) === r2(cod) && server.monthly[MONTH].totalCount === count;
+    {
+        const run = await cutKeyed({ dieAfter: 2 });
+        ok('លក្ខខណ្ឌចាំបាច់ (៣ខ-ក) ៖ ធុងសំរាមចុះ · ledger មិនទាន់ដក · journal នៅ stage ledger',
+            Object.keys(run.server.trash).length === 1 && dayIs(run.server, START_COD, START_COUNT) && monthIs(run.server, START_COD, START_COUNT)
+            && Object.keys(run.storage).some((k) => String(run.storage[k]).indexOf('"stage":"ledger"') !== -1),
+            { trash: Object.keys(run.server.trash), daily: run.server.daily[DAY], storage: run.storage });
+        const next = await replay(run);
+        ok('⛔⛔ (៣ខ-ក) ការដកមិនដល់ server ➜ ការស្តារដក **តែម្តង** (ថ្ងៃ)', dayIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.daily[DAY]);
+        ok('⛔⛔ (៣ខ-ក) ... ហើយ ledger ខែដកតែម្តង', monthIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.monthly[MONTH]);
+        ok('⛔ (៣ខ-ក) ... ហើយធុងសំរាម flip `isDeducted:true`', flipped(next.server), next.server.trash);
+        ok('⛔ (៣ខ-ក) ... ហើយគ្មានសារ «មិនអាចផ្ទៀងផ្ទាត់»', !next.toasts.some((t) => t.indexOf('⚠️') === 0), next.toasts);
+        ok('⛔ (៣ខ-ក) ... ហើយ journal ទទេ', !Object.keys(next.storage).some((k) => k.indexOf('cleanup') !== -1), next.storage);
+    }
+    {
+        const run = await cutKeyed({ landAt: 4 });
+        ok('លក្ខខណ្ឌចាំបាច់ (៣ខ-ខ) ៖ ខែ និងថ្ងៃចុះ (ចម្លើយថ្ងៃបាត់) · សោនៅថ្ងៃ',
+            dayIs(run.server, START_COD - TOTAL_COD, START_COUNT - 3) && monthIs(run.server, START_COD - TOTAL_COD, START_COUNT - 3)
+            && !!(run.server.daily[DAY].ded && Object.keys(run.server.daily[DAY].ded).length === 1),
+            { daily: run.server.daily[DAY], monthly: run.server.monthly[MONTH] });
+        const next = await replay(run);
+        ok('⛔⛔ (៣ខ-ខ) ការដកចុះតែចម្លើយបាត់ ➜ ការស្តារ **មិនដកលើកទី ២** (ថ្ងៃ)', dayIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.daily[DAY]);
+        ok('⛔⛔ (៣ខ-ខ) ... ហើយខែមិនដកលើកទី ២', monthIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.monthly[MONTH]);
+        ok('⛔ (៣ខ-ខ) ... ហើយធុងសំរាម flip', flipped(next.server), next.server.trash);
+        ok('⛔ (៣ខ-ខ) ... ហើយគ្មានសារ ⚠️', !next.toasts.some((t) => t.indexOf('⚠️') === 0), next.toasts);
+    }
+    {
+        const run = await cutKeyed({ landAt: 4 });
+        run.server.daily[DAY] = churn(run.server.daily[DAY]);
+        ok('លក្ខខណ្ឌចាំបាច់ (៣ខ-គ) ៖ ring ថ្ងៃរុញ token ទាំងអស់ចេញ តែសោនៅ',
+            !!run.server.daily[DAY].ded && !Object.keys(run.server.daily[DAY].ops).some((k) => k.indexOf('op_k') === 0 || k === 'op_seeddaily01'),
+            run.server.daily[DAY]);
+        const next = await replay(run);
+        ok('⛔⛔ (៣ខ-គ) សោក្នុង ledger ថ្ងៃ ➜ «រួចហើយ» ទោះ token ត្រូវរុញចេញ ➜ មិនដកលើកទី ២', dayIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.daily[DAY]);
+        ok('⛔ (៣ខ-គ) ... ហើយធុងសំរាម flip (សម្រេចបាន មិនមែន «unverified»)', flipped(next.server) && !next.toasts.some((t) => t.indexOf('⚠️') === 0),
+            { trash: next.server.trash, toasts: next.toasts });
+    }
+    {
+        const run = await cutKeyed({ landAt: 3 });
+        run.server.monthly[MONTH] = churn(run.server.monthly[MONTH]);
+        ok('លក្ខខណ្ឌចាំបាច់ (៣ខ-ឃ) ៖ ខែចុះ (ចម្លើយបាត់) ហើយ ring ខែរុញ token របស់យើង និង token មុនចេញ · ថ្ងៃមិនទាន់ដក',
+            monthIs(run.server, START_COD - TOTAL_COD, START_COUNT - 3) && dayIs(run.server, START_COD, START_COUNT), run.server);
+        const next = await replay(run);
+        ok('⛔⛔ (៣ខ-ឃ) គ្មានភស្តុតាង (token · token មុន ត្រូវរុញចេញ) ➜ **មិនដកខែលើកទី ២**', monthIs(next.server, START_COD - TOTAL_COD, START_COUNT - 3), next.server.monthly[MONTH]);
+        ok('⛔ (៣ខ-ឃ) ... ហើយមិនប៉ះថ្ងៃ (សម្រេចមិនបាន ➜ មិនប៉ះលុយ)', dayIs(next.server, START_COD, START_COUNT), next.server.daily[DAY]);
+        ok('⛔ (៣ខ-ឃ) ... ហើយប្រាប់ការពិត (⚠️ មិនអាចផ្ទៀងផ្ទាត់)', next.toasts.some((t) => t.indexOf('មិនអាចផ្ទៀងផ្ទាត់') !== -1), next.toasts);
     }
 
     // ── ៤. ⛔ ទិសផ្ទុយ ៖ ការស្តារមិនត្រូវ *ដាស់* កញ្ចប់ដែល purge រួច ──────

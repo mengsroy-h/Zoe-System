@@ -2919,6 +2919,9 @@
     "supabase/migrations/20261008023215_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261009035130_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -3079,6 +3082,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/search-glide-hold.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-ledger-key.test.ts": {
       "policy": "zoew-self-verification"
     }
   }

@@ -94,7 +94,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict',
     'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta',
     'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
+    'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'getFormattedDate'
 ];
@@ -181,7 +181,7 @@ function makeSandbox(opts) {
     vm.createContext(ctx);
     const order = ['getFormattedDate', 'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp',
         'revertLedgerRecordInMemory', 'applyLedgerBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict',
-        'ledgerMemoryCompensationClaimed', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+        'ledgerMemoryCompensationClaimed', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
         'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer',
         'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements'];

@@ -125,7 +125,7 @@ screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke �
 4. បញ្ចូល **ZoeW Site URL** (ឧ. `https://zoew.netlify.app`)។
    វាចាំបាច់សម្រាប់របៀប `--check` និង `--auto`។ ចុច Enter ដើម្បីរំលង។
 5. បញ្ចូល Netlify Personal Access Token ក្នុង prompt ដែលលាក់អក្សរ។
-6. បញ្ចូល **`ZTO_PROXY_KEY`** (តម្លៃដដែលនឹងក្នុង Netlify)។
+6. បញ្ចូល **`ZTO_PROXY_KEY`** (តម្លៃដដែលនឹងក្នុង Netlify) ឬសោមួយក្នុង `ZTO_PROXY_KEYS` (ផ្នែកក្រោយ `=`)។
    ⛔ **prompt នេះលេចឡើងតែក្រោយបំពេញ Site URL ខាងលើ** — បើរំលង Site URL
    នោះវាមិនសួរសោះ ហើយ `--auto` ប្រើមិនបាន។
 7. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
@@ -224,7 +224,7 @@ BOS-MAN-SESSION=...; sidebarStatus=0
 ```text
 ERROR: --auto mode needs these missing values:
    - ZoeW Site URL (for example https://zoew.netlify.app)
-   - ZTO_PROXY_KEY (the same value as in Netlify)
+   - ZTO_PROXY_KEY or one ZTO_PROXY_KEYS key (the same value as in Netlify)
 ```
 
 ដំណោះស្រាយ ៖ រត់ `setup.cmd` ម្តងទៀត ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច

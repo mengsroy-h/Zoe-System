@@ -525,10 +525,33 @@ console.log('\n=== ការតភ្ជាប់ក្នុង index.html ន�
     ok(/@supports \(-webkit-touch-callout: none\)[\s\S]*?\.app-pages\.history-expanded \.table-responsive\s*\{[\s\S]*?overscroll-behavior-y:\s*none/.test(css),
         'iOS full-screen list បិទ rubber-band ខាងក្នុង; Android CSS នៅក្រៅប្លុកនេះ');
     ok(src.indexOf('setupSwipeGestures();') !== -1, 'app.js ហៅ setupSwipeGestures() ពេលចាប់ផ្តើម');
-    // ⛔ React ៖ `onFocus` ក្នុង JSX ពិត ➜ handler ដែលហៅ `setPhoneSearchPulledUp(true)`
+    // ⛔ React ៖ `onFocus` ក្នុង JSX ពិត ➜ handler ដែលហៅ `setPhoneSearchPulledUp(true)` ផ្ទាល់ ឬតាម helper ដែលបញ្ជូន
+    //    ប៉ារ៉ាម៉ែត្រទីមួយរបស់វាទៅ `setPhoneSearchPulledUp()` (ឧ. `glidePhoneSearchPulledUp(true)` ➜ រអិល FLIP · 2.50.46) —
+    //    ខ្សែហៅដេរីវេពីកូដពិត · គ្មាន helper ណាផ្តល់ ➜ ធ្លាក់
+    const pullChain = (S) => {
+        const fnText = (name) => { try { return sliceFn(S, name); } catch (e) { return ''; } };
+        const forwardsPullUp = (name, depth) => {
+            const body = fnText(name);
+            const param = (body.match(/^function\s+\w+\s*\(\s*(\w+)/) || [])[1];
+            if (!param) return false;
+            if (new RegExp('setPhoneSearchPulledUp\\(\\s*' + param + '\\s*\\)').test(body)) return true;
+            if (depth <= 0) return false;
+            return [...body.matchAll(new RegExp('\\b(\\w+)\\(\\s*' + param + '\\s*\\)', 'g'))]
+                .some((m) => m[1] !== name && forwardsPullUp(m[1], depth - 1));
+        };
+        return (name) => {
+            const body = fnText(name);
+            if (/setPhoneSearchPulledUp\(true\)/.test(body)) return true;
+            return [...body.matchAll(/\b(\w+)\(true\)/g)].some((m) => m[1] !== name && forwardsPullUp(m[1], 2));
+        };
+    };
     const onFocus = jsxHandler(ROOT, 'searchPhoneInput', 'onFocus');
-    ok(!!onFocus && /setPhoneSearchPulledUp\(true\)/.test(sliceFn(src, onFocus.name)),
-        'focus លើប្រអប់ស្វែងរក ➜ ហៅ setPhoneSearchPulledUp(true)', onFocus);
+    ok(!!onFocus && pullChain(src)(onFocus.name),
+        'focus លើប្រអប់ស្វែងរក ➜ ហៅ setPhoneSearchPulledUp(true) (ផ្ទាល់ ឬតាម helper)', onFocus);
+    // ⛔ ទិសផ្ទុយ ៖ ដកការហៅ `setPhoneSearchPulledUp(…)` ទាំងអស់ (រក្សានិយមន័យ) ➜ handler ដដែលត្រូវលែងរាប់ថាហូតឡើង
+    const unplugged = src.replace(/(^|[^\w])setPhoneSearchPulledUp\((?=[^)]*\)\s*;)/g, '$1noPhoneSearchPull(');
+    ok(!!onFocus && unplugged !== src && !pullChain(unplugged)(onFocus.name),
+        '⛔ ទិសផ្ទុយ ៖ គ្មាន setPhoneSearchPulledUp() ក្នុងខ្សែហៅ ➜ ការវាស់ធ្លាក់', null);
     ok(/clearSensitiveModalFields\(\)\s*\{[\s\S]{0,200}setPhoneSearchPulledUp\(false\)/.test(src),
         'ចាកចេញ ➜ ដោះការហូតឡើងវិញ');
 }

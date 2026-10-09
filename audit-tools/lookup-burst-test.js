@@ -65,10 +65,10 @@ function sliceFn(name) {
 const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookupTimeoutNoRetry',
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse', 'noteSheetScriptVersion',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
-    'getFastLookupRow', 'setFastLookupRow', 'ztoBarcodeShapeIsValid',
-    'attemptAutoLookup'];
+    'getFastLookupRow', 'setFastLookupRow', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader',
+    'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient', 'attemptAutoLookup'];
 // ⛔ ថេរដែល `attemptAutoLookup()` ពិតប្រើ (ច្រកទម្រង់ barcode ZTO) ➜ ស្រង់ពីកូដពិត
-const CONSTS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT'].map((n) => {
+const CONSTS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].map((n) => {
     const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
     return m ? m[0] : '';
 }).filter(Boolean);

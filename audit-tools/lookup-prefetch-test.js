@@ -378,7 +378,7 @@ scenario('ការត្រៀមតំណទៅ Lookup API', () => {
 let buildAutoRuntime = null;
 // ⛔ ច្រកទម្រង់ barcode ZTO (`ztoBarcodeShapeIsValid()` · `ZTO_BARCODE_RE`) ស្រង់ពីកូដពិត ➜ barcode សាកល្បងមានទម្រង់ ZTO
 //    (`BC100001`) ដើម្បីឲ្យសេណារីយ៉ូ ZTO វាស់ផ្លូវបណ្ដាញ មិនមែនច្រកទម្រង់ (`lookup-failure-identity-test` វាស់ច្រកនោះ)
-const ZTO_SHAPE_DECLS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT'].map((n) => {
+const ZTO_SHAPE_DECLS = ['ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'].map((n) => {
     const m = SRC.match(new RegExp('^ *const ' + n + ' = .*$', 'm'));
     return m ? m[0] : '';
 }).filter(Boolean);
@@ -519,6 +519,12 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('ztoBarcodeShapeIsValid') || 'function ztoBarcodeShapeIsValid() { return true; }', ctx);
         vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
         vm.runInContext(sliceFn('lookupApiSendsHeader') || 'function lookupApiSendsHeader(cfg) { return !!(cfg && cfg.headerName); }', ctx);
+        // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜
+        //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `ZoeW/tests/zto-detail-identity.test.ts`)
+        vm.runInContext(sliceFn('ztoIdToken') || '', ctx);
+        vm.runInContext(sliceFn('addZtoIdentityHeader') || '', ctx);
+        vm.runInContext(sliceFn('ztoAccountSignedIn') || '', ctx);
+        vm.runInContext(sliceFn('ztoIdentityRefusalIsTransient') || '', ctx);
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
         vm.runInContext(sliceFn('setLookupStatus'), ctx);
         vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);
@@ -707,13 +713,18 @@ scenario('លទ្ធផលចាស់មិនសរសេរជាន់ Bar
     ok('status BC200002 ថ្មីនៅដដែល', ctx.__status.textContent === 'ថ្មី', ctx.__status.textContent);
 });
 
+// ⛔ `attemptAutoLookup()` ចាក់សោ `autoLookupInFlight` មុន `await` (សោហាង · ID token ZTO) ហើយ `fetch` ចេញក្រោយ ➜ រង់ចាំ
+//    `settleTurns()` មុនរាប់ `__fetches` (ការអះអាង «មិនបាញ់ស្ទួន» ដោយគ្មានការរង់ចាំ = PASS ទទេ)
+const settleTurns = () => new Promise((resolve) => setTimeout(resolve, 10));
 scenario('Lookup ចាស់មិនត្រូវដោះសោរបស់ Lookup ថ្មីក្រោយប្តូរ Config', async () => {
     const ctx = buildAutoRuntime({ zto: true, deferred: true, loadClear: true });
     const oldLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    await settleTurns();
     ok('សំណើចាស់កំពុងដំណើរការ', ctx.__fetches.length === 1 && ctx.autoLookupInFlight.has('BC100001'));
 
     vm.runInContext('clearCustomerDataTableCache()', ctx);
     const freshLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    await settleTurns();
     ok('ប្តូរ Config ➜ សំណើថ្មីអាចចាប់ផ្តើមភ្លាម', ctx.__fetches.length === 2 && ctx.autoLookupInFlight.has('BC100001'));
 
     ctx.__deferreds[0].resolve({ res: { ok: true, status: 200 }, body: { phone: 'old', success: true } });
@@ -722,6 +733,7 @@ scenario('Lookup ចាស់មិនត្រូវដោះសោរបស់
         ctx.autoLookupInFlight.has('BC100001'), ctx.autoLookupInFlight.size);
 
     const duplicateLookup = vm.runInContext('attemptAutoLookup("BC100001")', ctx);
+    await settleTurns();
     ok('⛔ ខណៈសំណើថ្មីនៅរង់ចាំ ➜ មិនបាញ់សំណើទី ៣ ស្ទួន', ctx.__fetches.length === 2, ctx.__fetches.length);
 
     ctx.__deferreds[1].resolve({ res: { ok: true, status: 200 }, body: { phone: 'new', success: true } });
@@ -875,7 +887,7 @@ scenario('⛔ ទិសផ្ទុយ ៖ ZTO ដែលសោជាប់ ➜ �
     const ctx = buildAutoRuntime({ zto: true, locked: true, fetchSuccess: true });
     ctx.lookupSecretKey = null;
     vm.runInContext('attemptAutoLookup("BC100001")', ctx);
-    return Promise.resolve().then(() => {
+    return settleTurns().then(() => {
         ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ ការសុំ PIN នៅដដែល', ctx.__unlockActions.length === 1, ctx.__unlockActions.length);
         ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ មិនបាញ់សំណើមុនដោះសោ', ctx.__fetches.length === 0, ctx.__fetches);
     });

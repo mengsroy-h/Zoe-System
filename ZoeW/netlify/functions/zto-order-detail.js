@@ -84,6 +84,19 @@ const upstreamTimingSignal = { detail: upstreamTimingBucket(), arrival: upstream
 const SIGNED_MISMATCH_KEYS_MAX = 1000;
 const SIGNED_MISMATCH_TEXTS_MAX = 5;
 const signedMismatchSignal = { at: 0, keys: new Set(), texts: new Set() };
+const PROXY_KEY_LABEL_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const PROXY_KEY_MIN_LENGTH = 16;
+const PROXY_KEY_MAX_LENGTH = 4096;
+const PROXY_KEYS_MAX = 64;
+const DETAIL_IDENTITY_MODES = ['off', 'optional', 'require'];
+const DETAIL_IDENTITY_TRANSIENT_REASONS = ['idtoken:certs', 'idtoken:supabase-unreachable'];
+const DETAIL_IDENTITY_SERVER_REASONS = ['idtoken:project-unset', 'idtoken:supabase-unset'];
+const DETAIL_BRANCH_VALUES_MAX = 8;
+const DETAIL_BRANCH_SEEN_MAX = 8;
+function detailAccessBucket() {
+    return { verified: 0, missing: 0, rejected: 0, unavailable: 0, matched: 0, other: 0, branchMissing: 0, seen: new Set() };
+}
+let detailAccessSignal = detailAccessBucket();
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -561,6 +574,51 @@ function timingSafeEqualText(left, right) {
     return crypto.timingSafeEqual(a, b);
 }
 
+function readProxyKeys(env) {
+    const out = { keys: [], invalid: 0 };
+    const legacy = String((env && env.ZTO_PROXY_KEY) || '');
+    if (legacy) out.keys.push({ label: 'default', key: legacy });
+    const raw = String((env && env.ZTO_PROXY_KEYS) || '').trim();
+    if (!raw) return out;
+    const labels = new Set(out.keys.map((entry) => entry.label));
+    const values = new Set(out.keys.map((entry) => entry.key));
+    raw.split(/[\s,;]+/).filter(Boolean).forEach((part) => {
+        const at = part.indexOf('=');
+        const label = at > 0 ? part.slice(0, at).toLowerCase() : '';
+        const key = at > 0 ? part.slice(at + 1) : '';
+        if (!PROXY_KEY_LABEL_RE.test(label) || key.length < PROXY_KEY_MIN_LENGTH || key.length > PROXY_KEY_MAX_LENGTH
+            || labels.has(label) || values.has(key) || out.keys.length >= PROXY_KEYS_MAX) {
+            out.invalid++;
+            return;
+        }
+        labels.add(label);
+        values.add(key);
+        out.keys.push({ label: label, key: key });
+    });
+    return out;
+}
+
+function matchProxyKey(keys, supplied) {
+    let label = '';
+    keys.forEach((entry) => {
+        if (timingSafeEqualText(entry.key, supplied) && !label) label = entry.label;
+    });
+    return label;
+}
+
+function readDetailIdentity(env) {
+    const raw = String((env && env.ZTO_DETAIL_IDENTITY) || '').trim().toLowerCase();
+    if (!raw) return 'off';
+    if (DETAIL_IDENTITY_MODES.indexOf(raw) === -1) throw new ZtoConfigError('detail-identity:invalid');
+    return raw;
+}
+
+function readDetailBranchPaths(env) {
+    const raw = String((env && env.ZTO_DETAIL_BRANCH_PATHS) || '').trim();
+    if (!raw || /^off$/i.test(raw)) return [];
+    return readFieldPaths(raw, [], 'branch');
+}
+
 function boundedInteger(value, fallback, min, max) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
@@ -707,6 +765,7 @@ const FIREBASE_CERTS_MAX_TIMEOUT_MS = 3000;
 const ID_TOKEN_SKEW_MS = 60 * 1000;
 const PROJECT_ID_RE = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const PROJECT_ID_MAX = 16;
+const PROJECT_BRANCHES_MAX = 16;
 const SITE_EMAIL_PREFIX_RE = /^[a-z0-9-]{1,32}$/;
 const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
 
@@ -774,7 +833,7 @@ async function verifySupabaseToken(token, identity, timeoutMs) {
     } else {
         const rows = Array.isArray(out.value.rows) ? out.value.rows : [];
         const row = rows.length === 1 && rows[0] && typeof rows[0] === 'object' ? rows[0] : null;
-        if (!row) verdict = { ok: true, siteCode: '', reason: '' };
+        if (!row) verdict = { ok: false, reason: 'site:no-account' };
         else if (row.status !== 'active') verdict = { ok: false, reason: 'site:tenant-' + (row.status === 'expired' ? 'expired' : 'revoked') };
         else verdict = { ok: true, siteCode: typeof row.branch_code === 'string' ? row.branch_code : '', reason: '' };
     }
@@ -787,23 +846,45 @@ async function resolveListIdentity(idToken, config, startedAt, env) {
     const issuer = idToken ? tokenIssuer(idToken) : '';
     if (supabase && issuer === supabase.issuer) {
         const auth = await verifySupabaseToken(idToken, supabase, certsTimeoutMs(config, startedAt));
-        return { auth: auth, site: auth.ok ? listSiteCodeOf(auth.siteCode) : { code: '', reason: auth.reason } };
+        return { auth: auth, site: auth.ok ? listSiteCodeOf(auth.siteCode) : { code: '', reason: auth.reason }, binding: 'server' };
     }
     if (!supabase && /\/auth\/v1$/.test(issuer)) {
         const auth = { ok: false, reason: 'idtoken:supabase-unset' };
-        return { auth: auth, site: { code: '', reason: auth.reason } };
+        return { auth: auth, site: { code: '', reason: auth.reason }, binding: '' };
     }
-    const auth = await verifyIdToken(idToken, readProjectIds(env), certsTimeoutMs(config, startedAt));
-    return { auth: auth, site: auth.ok ? listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(env))) : { code: '', reason: auth.reason } };
+    const projects = readProjectEntries(env);
+    const auth = await verifyIdToken(idToken, projects.ids, certsTimeoutMs(config, startedAt));
+    if (!auth.ok) return { auth: auth, site: { code: '', reason: auth.reason }, binding: '' };
+    const site = listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(env)));
+    const bound = projects.branches[auth.aud];
+    if (!bound) return { auth: auth, site: site, binding: 'unbound' };
+    if (site.code && bound.indexOf(site.code.toLowerCase()) === -1) {
+        return { auth: auth, site: { code: '', reason: 'site:project-branch' }, binding: 'mismatch' };
+    }
+    return { auth: auth, site: site, binding: 'bound' };
 }
 
-function readProjectIds(env) {
+function readProjectEntries(env) {
+    const none = { ids: [], branches: {} };
     const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
-    if (!raw) return [];
+    if (!raw) return none;
     const parts = raw.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
-    if (!parts.length || parts.length > PROJECT_ID_MAX) return [];
-    if (parts.some((part) => !PROJECT_ID_RE.test(part))) return [];
-    return parts;
+    if (!parts.length || parts.length > PROJECT_ID_MAX) return none;
+    const ids = [];
+    const branches = {};
+    const valid = parts.every((part) => {
+        const cut = part.indexOf(':');
+        const id = cut === -1 ? part : part.slice(0, cut);
+        if (!PROJECT_ID_RE.test(id)) return false;
+        if (ids.indexOf(id) === -1) ids.push(id);
+        if (cut === -1) return true;
+        const codes = part.slice(cut + 1).split('|').map((code) => code.trim());
+        if (!codes.length || codes.length > PROJECT_BRANCHES_MAX || codes.some((code) => !LIST_SITE_CODE_RE.test(code))) return false;
+        const list = branches[id] || (branches[id] = []);
+        codes.forEach((code) => { if (list.indexOf(code) === -1 && list.length < PROJECT_BRANCHES_MAX) list.push(code); });
+        return true;
+    });
+    return valid ? { ids: ids, branches: branches } : none;
 }
 
 function siteEmailPrefix(env) {
@@ -898,7 +979,7 @@ async function verifyIdToken(token, projectIds, timeoutMs) {
     if (!good) return { ok: false, reason: 'idtoken:signature' };
 
     const email = typeof parsed.payload.email === 'string' ? parsed.payload.email : '';
-    return { ok: true, email: email, reason: '' };
+    return { ok: true, email: email, aud: aud, reason: '' };
 }
 
 function listSiteCodeOf(raw) {
@@ -1232,6 +1313,8 @@ function readConfig(env) {
         dodPaths: readFieldPaths(env.ZTO_FIELD_DOD, DOD_PATHS, 'dod'),
         barcodePaths: readFieldPaths(env.ZTO_FIELD_BARCODE, BARCODE_PATHS, 'barcode'),
         signed: readSignedConfig(env),
+        detailIdentity: readDetailIdentity(env),
+        detailBranchPaths: readDetailBranchPaths(env),
         list: readListConfig(env),
         upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 6000, 2000, 20000),
         budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 9000, 4000, 24000),
@@ -1258,6 +1341,8 @@ function readConfig(env) {
         .update(config.phonePaths.join(',') + config.codPaths.join(',') + config.dodPaths.join(','))
         .update(FIELD_SEPARATOR)
         .update(config.signed.paths.join(',') + '|' + config.signed.values.join(','))
+        .update(FIELD_SEPARATOR)
+        .update(config.detailBranchPaths.join(','))
         .digest('base64url')
         .slice(0, 22);
 
@@ -1417,6 +1502,20 @@ function pickText(candidates, paths) {
     return '';
 }
 
+function pickTexts(candidates, paths, max) {
+    const out = [];
+    for (let i = 0; i < candidates.length; i++) {
+        for (let j = 0; j < paths.length; j++) {
+            const raw = getPath(candidates[i], paths[j]);
+            if (raw === null || raw === undefined || typeof raw === 'object' || typeof raw === 'boolean') continue;
+            const text = String(raw).replace(CONTROL_CHAR_RE, '').trim().slice(0, 64);
+            if (text && out.indexOf(text) === -1) out.push(text);
+            if (out.length >= max) return out;
+        }
+    }
+    return out;
+}
+
 function pickNumber(candidates, paths) {
     for (let i = 0; i < candidates.length; i++) {
         for (let j = 0; j < paths.length; j++) {
@@ -1451,13 +1550,15 @@ function extractOrder(config, upstream) {
     const dod = pickNumber(candidates, config.dodPaths);
     const shown = phoneIsPlaceholder(phone) ? '' : phone;
     if (!shown && cod === null && dod === null) return null;
-    return {
+    const order = {
         barcode: pickText(candidates, config.barcodePaths),
         phone: shown,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         signed: pickSignedVerdict(candidates, config.signed)
     };
+    if (config.detailBranchPaths.length) order.branches = pickTexts(candidates, config.detailBranchPaths, DETAIL_BRANCH_VALUES_MAX);
+    return order;
 }
 
 function abortError() {
@@ -1560,18 +1661,17 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
 
         const order = extractOrder(config, upstream);
         if (!order) return { kind: 'notFound' };
-        return {
-            kind: 'ok',
-            body: {
-                success: true,
-                found: true,
-                barcode: order.barcode || barcode,
-                phone: order.phone,
-                cod: order.cod,
-                dod: order.dod,
-                ztoClosed: order.signed
-            }
+        const body = {
+            success: true,
+            found: true,
+            barcode: order.barcode || barcode,
+            phone: order.phone,
+            cod: order.cod,
+            dod: order.dod,
+            ztoClosed: order.signed
         };
+        if (order.branches) body.branches = order.branches;
+        return { kind: 'ok', body: body };
     }
 
     const upstreamStartedAt = Date.now();
@@ -1728,6 +1828,108 @@ function runSharedLookup(key, config, headers, barcode, session, startedAt, plan
         if (inFlight.get(key) === run) inFlight.delete(key);
     });
     return run;
+}
+
+function detailIdentityOf(event) {
+    return String((event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '');
+}
+
+async function resolveDetailAccess(event, config, startedAt) {
+    const mode = config.detailIdentity;
+    if (mode === 'off') return { verified: false, site: '' };
+    const signal = detailAccessSignal;
+    const idToken = detailIdentityOf(event);
+    let reason = 'idtoken:missing';
+    if (idToken) {
+        const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
+        if (identity.auth.ok) {
+            signal.verified++;
+            return { verified: true, site: identity.site.code || '', binding: identity.binding || '' };
+        }
+        reason = identity.auth.reason || 'idtoken:invalid';
+    }
+    const transient = DETAIL_IDENTITY_TRANSIENT_REASONS.indexOf(reason) !== -1;
+    if (!idToken) signal.missing++;
+    else if (transient) signal.unavailable++;
+    else signal.rejected++;
+    if (mode !== 'require') return { verified: false, site: '' };
+    const safeReason = SAFE_REASON_RE.test(reason) ? reason : 'idtoken:invalid';
+    if (transient) {
+        return { response: json(503, { error: 'ZTO identity check is unavailable', code: 'ZTO_IDENTITY_UNAVAILABLE', reason: safeReason }) };
+    }
+    if (DETAIL_IDENTITY_SERVER_REASONS.indexOf(reason) !== -1) {
+        return { response: json(503, { error: 'ZTO proxy configuration is invalid', code: 'ZTO_CONFIG_INVALID', reason: safeReason }) };
+    }
+    return { response: json(401, { error: 'ZTO identity required', code: 'ZTO_IDENTITY_REQUIRED', reason: safeReason }) };
+}
+
+function detailBranchActive(config) {
+    return config.detailBranchPaths.length > 0 && config.detailIdentity !== 'off';
+}
+
+function detailAccessIsAwaited(config) {
+    return config.detailIdentity === 'require' || detailBranchActive(config);
+}
+
+function detailBranchRefusal(config, access, body) {
+    if (!detailBranchActive(config) || !access || !access.verified || !body || body.found !== true) return '';
+    const branches = Array.isArray(body.branches) ? body.branches : [];
+    branches.forEach((value) => {
+        if (detailAccessSignal.seen.size < DETAIL_BRANCH_SEEN_MAX) detailAccessSignal.seen.add(value);
+    });
+    if (!branches.length) {
+        detailAccessSignal.branchMissing++;
+        return 'branch:missing';
+    }
+    if (access.binding === 'unbound') {
+        detailAccessSignal.other++;
+        return 'branch:project-unbound';
+    }
+    const site = String(access.site || '').trim().toLowerCase();
+    if (site && branches.some((value) => String(value).trim().toLowerCase() === site)) {
+        detailAccessSignal.matched++;
+        return '';
+    }
+    detailAccessSignal.other++;
+    if (site) return 'branch:other';
+    return access.binding === 'mismatch' ? 'branch:project-mismatch' : 'branch:no-account-site';
+}
+
+function detailResponseBody(config, access, body, barcode, cached) {
+    const refusal = detailBranchRefusal(config, access, body);
+    if (refusal) {
+        return { success: false, found: false, barcode: barcode, code: 'ZTO_OTHER_BRANCH', reason: refusal, cached: cached };
+    }
+    const out = Object.assign({}, body, { cached: cached });
+    delete out.branches;
+    return out;
+}
+
+function detailAccessReport(config, keyLabel, proxyKeys) {
+    return {
+        keyLabel: keyLabel || null,
+        keys: proxyKeys.keys.length,
+        invalidKeys: proxyKeys.invalid,
+        identity: config.detailIdentity,
+        verified: detailAccessSignal.verified,
+        missing: detailAccessSignal.missing,
+        rejected: detailAccessSignal.rejected,
+        unavailable: detailAccessSignal.unavailable,
+        branch: {
+            paths: config.detailBranchPaths.slice(0, 4),
+            active: detailBranchActive(config),
+            matched: detailAccessSignal.matched,
+            other: detailAccessSignal.other,
+            missing: detailAccessSignal.branchMissing,
+            seen: Array.from(detailAccessSignal.seen),
+            unboundProjects: unboundProjectCount(process.env)
+        }
+    };
+}
+
+function unboundProjectCount(env) {
+    const projects = readProjectEntries(env);
+    return projects.ids.filter((id) => !projects.branches[id]).length;
 }
 
 function configErrorResponse(error) {
@@ -1903,12 +2105,15 @@ async function handleRequest(event) {
         return json(405, { error: 'Method not allowed' });
     }
 
-    const proxyKey = process.env.ZTO_PROXY_KEY || '';
+    const proxyKeys = readProxyKeys(process.env);
     const suppliedKey = (event.headers && (event.headers['x-zoe-proxy-key'] || event.headers['X-Zoe-Proxy-Key'])) || '';
-    if (!proxyKey) {
-        return json(503, { error: 'ZTO proxy is not configured', code: 'ZTO_PROXY_NOT_CONFIGURED' });
+    if (!proxyKeys.keys.length) {
+        const notConfigured = { error: 'ZTO proxy is not configured', code: 'ZTO_PROXY_NOT_CONFIGURED' };
+        if (proxyKeys.invalid) notConfigured.reason = 'proxy-keys:invalid';
+        return json(503, notConfigured);
     }
-    if (!timingSafeEqualText(proxyKey, suppliedKey)) {
+    const keyLabel = matchProxyKey(proxyKeys.keys, suppliedKey);
+    if (!keyLabel) {
         return json(401, { error: 'Invalid proxy key' });
     }
 
@@ -1986,12 +2191,22 @@ async function handleRequest(event) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
     }
 
+    let access = null;
+    if (!wantsDiagnostics && !plan) {
+        if (detailAccessIsAwaited(config)) {
+            access = await resolveDetailAccess(event, config, startedAt);
+            if (access.response) return access.response;
+        } else {
+            resolveDetailAccess(event, config, startedAt).catch(() => {});
+        }
+    }
+
     const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();
     if (!wantsDiagnostics) {
         const early = plan
             ? readCachedBody(cacheKey, plan.cacheTtlMs, 0)
             : readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
-        if (early) return json(200, Object.assign({}, early, { cached: true }));
+        if (early) return json(200, plan ? Object.assign({}, early, { cached: true }) : detailResponseBody(config, access, early, barcode, true));
     }
 
     let session;
@@ -2010,7 +2225,8 @@ async function handleRequest(event) {
     }
 
     if (wantsDiagnostics) {
-        return json(200, Object.assign(diagnosticsBody(config, headers, authKind, session), { fresh: wantsFreshCookie }));
+        return json(200, Object.assign(diagnosticsBody(config, headers, authKind, session),
+            { fresh: wantsFreshCookie, access: detailAccessReport(config, keyLabel, proxyKeys) }));
     }
 
     if (!authKind) {
@@ -2066,7 +2282,7 @@ async function handleRequest(event) {
         if (companion) body = mergeSignedCompanion(body, companionOutcome);
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
         if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
-        return json(200, Object.assign({}, body, { cached: false }));
+        return json(200, plan ? Object.assign({}, body, { cached: false }) : detailResponseBody(config, access, body, barcode, false));
     }
     if (outcome.kind === 'notFound') {
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
@@ -2090,6 +2306,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     signedMismatchSignal.at = 0;
     signedMismatchSignal.keys.clear();
     signedMismatchSignal.texts.clear();
+    detailAccessSignal = detailAccessBucket();
     Object.keys(upstreamTimingSignal).forEach((kind) => { upstreamTimingSignal[kind] = upstreamTimingBucket(); });
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;

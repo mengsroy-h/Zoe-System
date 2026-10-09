@@ -154,6 +154,38 @@ try {
         await page.waitForTimeout(250);
         const reset = await state(page);
         check(mode.label + ' ៖ filter ថ្មីពេលរមូរជ្រៅ ➜ ត្រឡប់ទៅ ៥០ជួរ នៅកំពូល (មិនផ្ទុកបន្ត)', reset.loaded === 50 && reset.top < 2 && reset.first === 'window-599', reset);
+        await page.evaluate(() => document.activeElement && document.activeElement.blur());
+        await page.waitForFunction(() => !window.uiState.dataPanelSearchFocus && !window.uiState.dataPanelCollapsed, null, { timeout: 3000 }).catch(() => null);
+        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+        await page.waitForTimeout(400);
+        const glide = await page.evaluate(async () => {
+            const glides = (el) => el.getAnimations().filter((a) => !(typeof CSSAnimation === 'function' && a instanceof CSSAnimation)
+                && !(typeof CSSTransition === 'function' && a instanceof CSSTransition) && a.playState !== 'finished').length;
+            const shift = (el) => { const m = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform); return Math.round(Math.abs(m.m41) + Math.abs(m.m42)); };
+            const main = document.getElementById('dataMainSection');
+            const input = document.getElementById('searchPhoneInput');
+            const card = input.closest('.app-card');
+            const box = card.getBoundingClientRect();
+            const before = { main: main.getBoundingClientRect().top, card: box.top, pulled: window.uiState.dataPanelSearchFocus,
+                visible: box.top >= 0 && box.bottom <= window.innerHeight };
+            input.focus();
+            const during = { main: glides(main), card: glides(card), mainTop: main.getBoundingClientRect().top, cardTop: card.getBoundingClientRect().top };
+            await new Promise((r) => setTimeout(r, 700));
+            const after = { main: main.getBoundingClientRect().top, card: card.getBoundingClientRect().top, pulled: window.uiState.dataPanelSearchFocus,
+                anims: glides(main) + glides(card), shift: shift(main) + shift(card) };
+            input.blur();
+            await new Promise((r) => setTimeout(r, 200));
+            const down = { main: glides(main), card: glides(card), pulled: window.uiState.dataPanelSearchFocus };
+            await new Promise((r) => setTimeout(r, 700));
+            const rest = { main: main.getBoundingClientRect().top, anims: glides(main) + glides(card), shift: shift(main) + shift(card) };
+            return { before, during, after, down, rest };
+        });
+        check(mode.label + ' ៖ ចុចស្វែងរកលេខ ➜ ផ្ទាំងហូតឡើងដោយរអិល (FLIP ពីទីតាំងចាស់ · មិនលោត) · ចប់ ➜ គ្មាន transform សល់',
+            glide.before.visible && !glide.before.pulled && glide.after.pulled && Math.abs(glide.after.main - glide.before.main) > 20
+                && glide.during.main > 0 && glide.during.card > 0 && Math.abs(glide.during.mainTop - glide.before.main) < 2 && Math.abs(glide.during.cardTop - glide.before.card) < 2
+                && glide.after.anims === 0 && glide.after.shift === 0, glide);
+        check(mode.label + ' ៖ ចាកចេញពីប្រអប់ស្វែងរកទទេ ➜ ផ្ទាំងចុះវិញដោយរអិល · ចប់ ➜ គ្មាន transform សល់',
+            !glide.down.pulled && glide.down.main > 0 && glide.rest.anims === 0 && glide.rest.shift === 0, glide);
         await page.evaluate(() => {
             window.__kb = [];
             window.addEventListener('resize', () => {
@@ -167,8 +199,10 @@ try {
         await frames(page);
         await page.locator('#searchPhoneInput').focus();
         await page.setViewportSize({ width: 414, height: 896 - 330 });
+        await page.waitForFunction(() => window.__kb.some((k) => k.h < 896), null, { timeout: 5000 }).catch(() => null);
         await frames(page);
         await page.setViewportSize({ width: 414, height: 896 });
+        await page.waitForFunction(() => window.__kb.length && window.__kb[window.__kb.length - 1].h === 896, null, { timeout: 5000 }).catch(() => null);
         await frames(page);
         await page.evaluate(() => document.activeElement && document.activeElement.blur());
         const kb = await page.evaluate(() => window.__kb);
@@ -178,6 +212,35 @@ try {
             opened.keyboard && opened.hidden && opened.visibility === 'hidden' && opened.transition === 'none'
                 && !closed.keyboard && !closed.hidden && closed.visibility === 'visible', kb);
         else check(mode.label + ' ៖ keyboard (គ្របពីលើ មិនប្តូរប្លង់) ➜ របាមិនប្រែ', kb.length >= 2 && kb.every((k) => !k.keyboard && !k.hidden && k.visibility === 'visible'), kb);
+        for (const field of ['entryListSearchInput', 'lockerListSearchInput']) {
+            await page.evaluate((f) => {
+                document.activeElement && document.activeElement.blur();
+                window.switchAppPage('entry');
+                window.setEntryScanMode(f === 'lockerListSearchInput' ? 'locker' : 'parcel');
+            }, field);
+            await page.waitForTimeout(500);
+            await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+            await page.waitForTimeout(300);
+            const entry = await page.evaluate(async (f) => {
+                const glides = (el) => el.getAnimations().filter((a) => !(typeof CSSAnimation === 'function' && a instanceof CSSAnimation)
+                    && !(typeof CSSTransition === 'function' && a instanceof CSSTransition) && a.playState !== 'finished').length;
+                const main = document.getElementById('entryMainSection');
+                const input = document.getElementById(f);
+                const before = { input: input.getBoundingClientRect().top, main: main.getBoundingClientRect().top, collapsed: window.uiState.entryPanelCollapsed };
+                input.focus({ preventScroll: true });
+                const during = { main: glides(main), mainTop: main.getBoundingClientRect().top };
+                await new Promise((r) => setTimeout(r, 700));
+                const after = { input: input.getBoundingClientRect().top, collapsed: window.uiState.entryPanelCollapsed, anims: glides(main) };
+                input.blur();
+                await new Promise((r) => setTimeout(r, 900));
+                const rest = { collapsed: window.uiState.entryPanelCollapsed, anims: glides(main), main: main.getBoundingClientRect().top };
+                return { before, during, after, rest, keyboardTop: window.innerHeight - 330 };
+            }, field);
+            check(mode.label + ' ៖ tab ស្កេន ៖ ចុចស្វែងរក (' + field + ') ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល · ប្រអប់ឡើងលើ (លទ្ធផលមិននៅក្រោម keyboard) · ចាកចេញទទេ ➜ បើកវិញ',
+                !entry.before.collapsed && entry.after.collapsed && entry.during.main > 0
+                    && Math.abs(entry.during.mainTop - entry.before.main) < 2 && entry.after.input < entry.before.input - 100 && entry.after.input < entry.keyboardTop - 300 && entry.after.anims === 0
+                    && !entry.rest.collapsed && entry.rest.anims === 0 && Math.abs(entry.rest.main - entry.before.main) < 2, entry);
+        }
         check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
         await ctx.close();
     }

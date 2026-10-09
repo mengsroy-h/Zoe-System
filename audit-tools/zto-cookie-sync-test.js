@@ -555,8 +555,22 @@ async function run() {
         });
         ok('សុខភាព ៖ គ្មាន Cookie សោះ ➜ មិន healthy',
             noAuth.healthy === false, JSON.stringify(noAuth));
+
+        // ⛔ Function បដិសេធសោ (401 ៖ លុប `ZTO_PROXY_KEY` ចាស់ក្រោយផ្លាស់ទៅ `ZTO_PROXY_KEYS`) ➜ ប្រាប់ «proxy key» ត្រង់ៗ
+        //    មិនមែន «ភ្ជាប់ Function មិនបាន» (បន្ទោសអ៊ីនធឺណិតខុស) · --auto មិនបើក browser
+        const keyRejected = await api.checkCookieHealth({
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            fetchImpl: async () => fakeResponse(401, { error: 'Invalid proxy key' })
+        });
+        ok('⛔ សោត្រូវបដិសេធ (401) ➜ `key-rejected` មិនមែន `unreachable` · --auto មិនបើក browser',
+            keyRejected.status === 'key-rejected' && api.shouldRefreshInAuto(keyRejected) === false, JSON.stringify(keyRejected));
+        const keyText = typeof api.describeHealth === 'function' ? api.describeHealth(keyRejected) : '';
+        ok('⛔ សារ ៖ ប្រាប់ឲ្យកំណត់ proxy key ឡើងវិញ (ZTO_PROXY_KEY ឬ ZTO_PROXY_KEYS) · ASCII',
+            /proxy key/i.test(keyText) && /ZTO_PROXY_KEYS/.test(keyText) && !/could not reach/i.test(keyText) && /^[\x20-\x7e]*$/.test(keyText), keyText);
     } else {
-        for (let i = 0; i < 13; i++) ok('verify/health behavior #' + (i + 1), false);
+        for (let i = 0; i < 15; i++) ok('verify/health behavior #' + (i + 1), false);
     }
 
     ok('របៀប --check និង --auto មានក្នុងកូដ',

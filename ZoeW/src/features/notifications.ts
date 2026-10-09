@@ -13,7 +13,7 @@ import { LICENSE_APP_CODE } from './license';
 import { trashReasonOf } from './trash';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
-import { fetchWithTimeout, linkIsFrugal } from '../services/network';
+import { fetchWithTimeout, linkIsFrugal, withTimeout } from '../services/network';
 
 export interface NotifyExpiryRow {
     key: string;
@@ -441,6 +441,7 @@ function fetchFileFeed(url) {
             if (!items) return false;
             uiState.notifyFeed = items;
             safeStoreSet(appLocalStore, NOTIFY_FEED_CACHE_KEY, JSON.stringify({ items: items }));
+            if (uiState.appUpdateCheck.phase === 'failed') uiState.appUpdateCheck = { phase: 'idle', at: 0 };
             return true;
         }, () => false);
 }
@@ -458,7 +459,7 @@ function fetchSellerNotices(url) {
         }, () => false);
 }
 
-export function fetchNotifyFeed(userAsked?) {
+export function fetchNotifyFeed(userAsked?, versionFeedOnly?) {
     if (uiState.notifyFeedInFlight) return Promise.resolve(false);
     if (!userAsked) {
         if ((navigator.onLine as boolean) === false || linkIsFrugal()) return Promise.resolve(false);
@@ -470,7 +471,7 @@ export function fetchNotifyFeed(userAsked?) {
     uiState.notifyFeedInFlight = true;
     uiState.notifyFeedFetchedAt = Date.now();
     return Promise.all([fetchFileFeed(url), fetchSellerNotices(sellerUrl)])
-        .then((results) => results[0] || results[1], () => false)
+        .then((results) => (versionFeedOnly ? results[0] : results[0] || results[1]), () => false)
         .then((ok) => {
             uiState.notifyFeedInFlight = false;
             return ok;
@@ -492,6 +493,36 @@ export function openNotifyDrawer() {
     clearAppBadge();
     checkApkRelease(newerAppVersion(uiState.notifyFeed));
     fetchNotifyFeed(true).then(() => checkApkRelease(newerAppVersion(uiState.notifyFeed)));
+}
+
+export const APP_UPDATE_CHECK_WAIT_MS = 100;
+export const APP_UPDATE_CHECK_WAIT_MAX = Math.ceil(NOTIFY_FEED_TIMEOUT_MS / APP_UPDATE_CHECK_WAIT_MS);
+
+export function requestServiceWorkerUpdate(): Promise<boolean> {
+    if (isNativeApp()) return Promise.resolve(false);
+    try {
+        const sw: any = typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+        if (!sw || typeof sw.getRegistration !== 'function') return Promise.resolve(false);
+        return Promise.resolve(sw.getRegistration('./'))
+            .then((reg: any) => (reg && typeof reg.update === 'function' ? Promise.resolve(reg.update()).then(() => true) : false))
+            .catch(() => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+export async function checkForAppUpdate(): Promise<void> {
+    if (uiState.appUpdateCheck.phase === 'checking') return;
+    uiState.appUpdateCheck = { phase: 'checking', at: Date.now() };
+    const sw = withTimeout(requestServiceWorkerUpdate(), NOTIFY_FEED_TIMEOUT_MS, 'Service worker update timed out').catch(() => false);
+    for (let waited = 0; uiState.notifyFeedInFlight && waited < APP_UPDATE_CHECK_WAIT_MAX; waited++) {
+        await new Promise((resolve) => setTimeout(resolve, APP_UPDATE_CHECK_WAIT_MS));
+    }
+    const fetched = await fetchNotifyFeed(true, true);
+    const newer = newerAppVersion(uiState.notifyFeed);
+    if (newer) await checkApkRelease(newer, true);
+    await sw;
+    uiState.appUpdateCheck = { phase: fetched ? 'done' : 'failed', at: Date.now() };
 }
 
 export function initNotifications() {

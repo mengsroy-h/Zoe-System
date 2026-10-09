@@ -20,14 +20,14 @@ function fakeServer() {
     const doc = () => ({ r: 'tx', k: 'a', v: value === null ? null : { n: value }, s: seq });
     const apply = (args: any) => {
         const prior = done.get(args.p_op_id);
-        if (prior) return Object.assign({}, prior, { replayed: true });
+        if (prior) return Object.assign({}, prior, { replayed: true, now: Date.now() });
         const op = args.p_ops[0];
         const current = value === null ? null : { n: value };
-        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return { ok: false, conflict: true, value: current };
+        if (JSON.stringify(op.x === undefined ? null : op.x) !== JSON.stringify(current)) return { ok: false, conflict: true, now: Date.now(), value: current };
         value = op.v === null ? null : op.v.n;
         seq++;
         writes.push(args.p_op_id);
-        const result = { ok: true, seq, docs: [doc()] };
+        const result = { ok: true, seq, now: Date.now(), docs: [doc()] };
         done.set(args.p_op_id, result);
         return result;
     };

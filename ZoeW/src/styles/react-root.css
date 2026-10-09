@@ -151,6 +151,8 @@
 .notify-refresh-btn { min-height: 40px; border: none; border-radius: var(--radius-md); background: var(--action-primary); color: #ffffff; font-size: calc(12 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
 .notify-push-btn { width: 100%; margin-top: 8px; }
 .notify-apk-btn { display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 8px; }
+.notify-check-btn { display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 8px; border: 1px solid var(--action-primary); background: var(--card-bg); color: var(--action-primary); }
+.notify-check-btn:disabled { opacity: 0.7; cursor: default; }
 .notify-apk-status { margin-top: 6px; font-size: calc(11.5 * var(--fs-unit)); color: var(--text-muted); line-height: 1.45; overflow-wrap: anywhere; }
 .notify-apk-status.is-warn { color: var(--action-danger); }
 .notify-apk-progress-wrap { margin-top: 8px; }

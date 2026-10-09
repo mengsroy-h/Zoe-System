@@ -230,7 +230,19 @@ function ApkUpdateBlock({ version }: { version: string }) {
     );
 }
 
-function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateReady: boolean }) {
+function UpdateCheckButton({ check }: { check: { phase: string; at: number } }) {
+    const busy = check.phase === 'checking';
+    return (
+        <>
+            {check.phase === 'failed' ? <div className="notify-apk-status is-warn" id="notifyUpdateCheckStatus">⚠️ ពិនិត្យកំណែថ្មីមិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយចុចម្តងទៀត</div> : null}
+            <button type="button" className="notify-refresh-btn notify-check-btn" id="notifyCheckUpdateBtn" disabled={busy} onClick={onAct('checkForAppUpdate')}>
+                {busy ? '⏳ កំពុងពិនិត្យកំណែថ្មី…' : '🔄 ពិនិត្យកំណែថ្មី'}
+            </button>
+        </>
+    );
+}
+
+function VersionSection({ feed, updateReady, check }: { feed: NotifyFeedItem[]; updateReady: boolean; check: { phase: string; at: number } }) {
     const newer = newerAppVersion(feed);
     let status;
     if (updateReady) {
@@ -259,6 +271,7 @@ function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateR
             <div className="notify-section-title">📱 កំណែ App</div>
             <div className="notify-version-line">កំណែបច្ចុប្បន្ន ៖ <strong>{APP_VERSION}</strong></div>
             {status}
+            {updateReady ? null : <UpdateCheckButton check={check} />}
         </section>
     );
 }
@@ -301,7 +314,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyRemovedView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'notifyDismissedIds', 'updateReady', 'pushStatus', 'appUpdateCheck']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -321,7 +334,7 @@ export function NotifyDrawer() {
                 <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
                 <RemovedSection view={s.notifyRemovedView} />
-                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
+                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} check={s.appUpdateCheck} />
                 <FeedSection feed={visibleNotifyFeed(s.notifyFeed, s.notifySellerFeed, s.notifyDismissedIds)} seen={s.notifySeenIds} />
             </div>
             <div className="drawer-foot notify-foot">

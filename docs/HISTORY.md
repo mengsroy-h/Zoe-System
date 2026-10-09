@@ -45,34 +45,51 @@
 
 ស្ថានភាព git (វាស់ 2026-10-08 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.44 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #303 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ ជុំ ១២–១៥ + ជុំ ០ = PR #301 ·
-   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] · ZoeKeyGen 2.24.10 = PR #303)។ Branch `claude/optimistic-darwin-6cqgfh` (ចាប់ផ្តើមថ្មីពី `main` · **មិនទាន់ merge**) ៖
-   [2.50.45] iPhone ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
-2. 🔎 **Deep audit ២ ចប់** (ជុំ ៩–១៥ · ០ · D7)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
+1. **`main`** = **ZoeW 2.50.45 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #304 merge រួចទាំងអស់ (PR #296 ចូលតាម PR #297 · D7 = PR #300 · Deep audit ២ = PR #301 ·
+   [2.50.39]–[2.50.42] = PR #302 · [2.50.43]–[2.50.44] = PR #303 · [2.50.45] = PR #304)។ Branch **`claude/exciting-gates-nvx9ar`** (ចាប់ផ្តើមពី `main` · **មិនទាន់ merge**) ៖
+   [2.50.46] Deep audit ៣ + សំណើម្ចាស់គម្រោង (ស្វែងរករអិល · ទំព័រស្កេន · 🔄 ពិនិត្យកំណែថ្មី) + ជុំបន្ត A60–A67 · branch `claude/dazzling-fermi-hycqee` (1d619b4) ជាផ្នែករបស់វា
+   (fast-forward) ➜ ប្រើ `claude/exciting-gates-nvx9ar` តែមួយ។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   វាស់រួច ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) លើ 1d619b4 ធ្លាក់ ៥ (A60) ➜ កែ · លើ 8bfad33 ជោគជ័យ ២០១ · ធ្លាក់ ១ (លិបិក្រម doc-scope ➜ កែ) · លើ 95e91a0
+   ជោគជ័យ ២០១ · ធ្លាក់ ១ (`sw-backend-chunk-test` race ការវាស់ ➜ កែ · A67) · **លើ 5cc09d8 ✅ ជោគជ័យទាំងអស់ ២០២ · មួយផ្នែក ០ · រំលង ០** (commit ក្រោយនោះកែតែ Handoff ➜
+   `doc-scope-test` · `version-bump-scope` · `repository-file-coverage`) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ · workflow ពិនិត្យ diff (ម្ចាស់គម្រោងបើកក្នុង session នោះ) ៖
+   confirmed ៩ ➜ កែទាំងអស់ · uncertain ១ (A66 ➜ សាកលើ iPhone)។ **Claude ២** (session ផ្ទៀងឯករាជ្យ · read-only) លើ 651cb0d ៖ run-all STRICT ✅ ២០២ · A60–A67 បញ្ជាក់ដោយ
+   mutant · រកឃើញ ២ (ចន្លោះអ្នកយាម Supabase ➜ តេស្តថ្មី · A70) · A66 វាស់ក្នុង Chromium (A70)។ បន្ទាប់មក [2.50.47] (ZTO `/detail` · សំណើម្ចាស់គម្រោង) ៖ run-all STRICT ពេញលើ b3c420c
+   ធ្លាក់ ៦ (A69 ៖ sandbox checker មិនស្គាល់ helper ថ្មី · លិបិក្រម) ➜ កែ។
+2. 🔎 **Deep audit ៣ ចប់** (ផ្នែក ២ «Deep audit ៣»)។ នៅសល់ (ពិចារណា · សួរមុនធ្វើ · ⛔ គ្មាន workflow/agent ដោយគ្មានការអនុញ្ញាត) ៖
    **ព្រំដែនដែលទទួលស្គាល់** ➜ MONEY-4 សម្រេចមិនបាន (`ok:false` + Sentry) · SECURITY-2 ពាក្យ `auth` (`authGeneration` · `authDomain` · `authScope` គួរលាក់) ·
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · `zoe_ops` > ២ ថ្ងៃ · Firebase partial claim · legacy items គ្មាន barcodes · born-closed `closedAt` ·
-   zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq`) · `zoe_ops` purge ·
-   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · network ៖ SW miss-door មិនឆ្លង `shellDeployIsCurrent()` · captive portal probe · sentry ៖ replays REACT-7/-8 ·
-   ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops` (ផ្នែក ២ «ជុំ ១៤»)។
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · Firebase partial claim ពេល deleted view ចាស់ · legacy items គ្មាន barcodes · born-closed `closedAt` ·
+   zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
+   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · auth listener របស់ client ចាស់ក្រោយ `deleteApp` · network ៖ captive portal probe · install `addAll` ពេល deploy ជាន់ ·
+   sentry ៖ replays REACT-7/-8 · ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops`។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
-3. ⏳ **ម្ចាស់គម្រោង ៖ មុនប្តូរ repo ជា Public** (LICENSE · NOTICE រួចក្នុង PR #288 · ផ្នែក ២ «LICENSE · NOTICE មុនដាក់ repo ជាសាធារណៈ») ៖ merge PR #288 មុន
-   (LICENSE ថ្មី) · GitHub Settings ➜ Code security ➜ បើក **Secret scanning** + **Push protection** · អ៊ីមែល commit ចាស់នឹងលេច (កំណត់ «Keep my email addresses
-   private» សម្រាប់ commit ថ្មី) · `CLAUDE.md`/`docs/` ពិពណ៌នាការការពារលម្អិត (ការការពារពិតនៅ Server ➜ មិនមែនរន្ធ តែជាព័ត៌មានដល់អ្នកវាយប្រហារ) ·
-   ✅ sign-up បិទក្នុង Supabase + Firebase (ម្ចាស់គម្រោង 2026-10-06) · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ (អ្នកណាក៏ clone បាន) ·
-   ការអនុវត្តផ្លូវច្បាប់ ➜ ពិគ្រោះមេធាវី។
+3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
+   Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
+   artifact backup (`backup.yml`) អ្នកមានគណនី GitHub ណាក៏ទាញបាន ➜ `ZOE_BACKUP_PASSPHRASE` ចៃដន្យ ≥ ៣២ តួ ([`firebase-backup/README.md`](../firebase-backup/README.md) «ប្រព័ន្ធសុវត្ថិភាព») ·
+   ✅ sign-up បិទក្នុង Supabase + Firebase (ម្ចាស់គម្រោង 2026-10-06) · ⛔ LICENSE ជាការការពារផ្លូវច្បាប់តែប៉ុណ្ណោះ។
 4. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
-5. សាកលើ iPhone/Android ពិត ៖ នៅសល់តែ [2.50.1] (បញ្ជី ⏳ ខាងក្រោម) · ✅ ធាតុ 2.45.x ➜ 2.50.0 ទាំងអស់ ម្ចាស់គម្រោងសាករួច (2026-10-06 ៖ Supabase លើឧបករណ៍ពិត ·
-   ⚙️ ភ្ជាប់ប្រព័ន្ធ · Push · បណ្តាញ «ងាប់ស្ងាត់» · Airplane · ខ្សែរមូរ · ប៊ូតុងខល · `tools/firebase-provision` · Sentry `zone:money` · rules 2.45.4)។ **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
+5. សាកលើ iPhone/Android ពិត ៖ បញ្ជី ⏳ ខាងក្រោម (ធាតុនីមួយៗប្រាប់ឧបករណ៍ និងសកម្មភាព) · ✅ ធាតុ 2.45.x ➜ 2.50.0 ម្ចាស់គម្រោងសាករួច (2026-10-06)។
+   **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
+6. 🗳️ **ការសម្រេចរបស់ម្ចាស់គម្រោងមុនដាក់ប្រើជាផ្លូវការ (Deep audit ៣ · គ្មានកូដ · លេខក្នុងផ្នែក ២ «Deep audit ៣» A55–A59)** ៖
+   (ក) ហាង Firebase មមាញឹកលើគម្រោង **Spark** ៖ ការបើក App/PTR ម្តង ទាញធុងសំរាម ៣០ ថ្ងៃ + `zoew_daily_pickup_cod_dod` ទាំងអស់ (មិនដែលសម្អាត) ➜ ~៤–៩ MB ក្នុងមួយការបើក
+   ពេល ៣០០ កញ្ចប់/ថ្ងៃ ➜ ៣ ឧបករណ៍ × ២០ ការបើក/ថ្ងៃ ≈ ៨–១៦ GB/ខែ ➜ លើស ១០ GB របស់ Spark (Database ឈប់ដល់ខែក្រោយ) ➜ ហាងធំ ៖ Blaze + budget alert ឬ Supabase ·
+   (ខ) License Project តែមួយសម្រាប់អតិថិជនទាំងអស់ ៖ ដំណឹងអ្នកលក់ (`limitToLast=20`) ទាញរៀងរាល់ ៥ នាទី/ឧបករណ៍ ➜ egress កើនតាមចំនួនឧបករណ៍ ➜ ពិនិត្យ Usage · Blaze + budget ·
+   (គ) Netlify Functions ៖ ZTO Palm អានបញ្ជីចុះហត្ថលេខា ២០ វិ. (សកម្ម) · ៦០ វិ. (បើក) ➜ ~១,២០០ ការហៅ/ថ្ងៃ/ឧបករណ៍ ZTO ➜ ពិនិត្យកូតា Netlify មុនបន្ថែមហាង ·
+   (ឃ) Supabase Project តែមួយ ៖ realtime ១ ការតភ្ជាប់/ឧបករណ៍ (Free ២០០ · Pro ៥០០ ព្រមគ្នា) · `zoe_ops` ~៤,៥០០ ជួរ/ហាងមមាញឹក/ថ្ងៃ (រក្សា ២ ថ្ងៃ) ·
+   (ង) Push ៖ ពិដាន `PUSH_SUBS_TOTAL_MAX` ៥,០០០ · ថវិកា cron ២០ វិ. (១៦ ព្រមគ្នា × ~០.៣ វិ./subscription) ≈ ~១,០០០ subscription ក្នុងមួយដំណឹង (ledger ឡើងមុនផ្ញើ ➜ ដែលលើសមិនទទួល) ·
+   (ច) `ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` (លេខទូរស័ព្ទ · COD) មិនចងសាខា ➜ ✅ **កូដរួចក្នុង [2.50.47]** (ម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ») ៖
+   សោតាមហាង · ចងគណនី · កំណត់សាខា ➜ ⏳ ម្ចាស់គម្រោងកំណត់ env តាម [2.50.47] សកម្មភាព ២–៤ (លំនាំដើមមិនប្រែ រហូតដល់កំណត់)។
 
-⛔ **សន្សំកូតា**៖ រត់តែ checker ពាក់ព័ន្ធ (RUNALL_ONLY) ហើយទុក CI វាស់ពេញ; ឆ្លើយជាខ្មែរ។
+⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push)។ ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ក្នុង session មួយ ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ · ឆ្លើយជាខ្មែរ។
 
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · branch `claude/optimistic-darwin-6cqgfh` · មិនទាន់ merge · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Merge ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
+- ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (branch `claude/exciting-gates-nvx9ar` · មិនទាន់ merge · ⚠️ ចលនាវាស់តែក្នុង Chromium)** ៖ Merge ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ · ស្វែងរកក្នុងទំព័រស្កេន ➜ រអិល មិនលោត · keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
+- ⏳ **ZoeW 2.50.45 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar មិនរំកិល · កំណែ iOS 26 ពិត (រាយការណ៍ម្ចាស់គម្រោង · PR #304 merge រួច · ⚠️ មិនទាន់វាស់លើ iPhone)** ៖ Deploy ➜ iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ១០ ដង (ក្រោយ «⋯» ផង) ➜ navbar មិនធ្លាក់/រអិល · keyboard បើក · ☰ ➜ «iOS 26.x» ឬ «iOS 26+» ([2.50.45] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.44 · ZoeKeyGen 2.24.10 — model · serial ទូរស័ព្ទ (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ⚠️ Publish rules License (`ZoeKeyGen/firebase-database.rules.json`) ➜ ☰ · 🩺 ឃើញ model · serial · ZoeKeyGen ឃើញបន្ទាត់កៅអី ([2.50.44] សកម្មភាព ១–៤)។
 - ⏳ **ZoeW 2.50.43 — ទាញ APK ក្នុង App · ប៊ូតុងតែពេល Release ពិតមាន (សំណើម្ចាស់គម្រោង · PR #303 merge រួច)** ៖ ដំឡើង APK 2.50.43 ដោយដៃម្តង ➜ កំណែបន្ទាប់ ៖ 🔔 ពេលកំពុង build ➜ គ្មានប៊ូតុង · ចេញរួច ➜ ទាញក្នុង App ➜ ផ្ទាំងដំឡើង ([2.50.43] សកម្មភាព ២–៣)។
 - ⏳ **ZoeW 2.50.41 · ZoeKeyGen 2.24.9 — password manager · Private Key ចម្លង (PR #302 merge រួច)** ៖ Deploy ZoeW + ZoeKeyGen ➜ Private Key · Supabase Admin · ចូល ZoeW ជាមួយ Google Password Manager / iOS Passwords · ចម្លងពី Notes ([2.50.41] សកម្មភាព ២–៤)។
@@ -120,6 +137,117 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.47] — 2026-10-09 · ZoeW + Function ZTO ៖ **`/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ» · Handoff ៦ច)
+
+**ZoeW `2.50.47`** (`zoew-v309` ➜ `zoew-v310`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · migration ថ្មី · env ថ្មី ៣ (ស្រេចចិត្ត · មិនកំណត់ ➜ ឥរិយាបថដដែល) ·
+⛔ តំបន់ចាក់សោ ZTO ៖ ប្រែតាមសំណើម្ចាស់គម្រោង ➜ sha256 ថ្មីក្នុង `LOCK` (`zto-lock.test.ts`) សម្រាប់ `zto-order-detail.js` · `zto-status.ts` · `auto-lookup.ts` · `lookup-api.ts` ·
+អ្នកយាមធ្លាក់មុនកែ ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់បៃតង។ ការពិនិត្យប្រឆាំង (workflow ៦ agent · ផ្នែក ២ A71) ➜ កែក្នុងជុំដដែល (មិនទាន់ merge ➜ កំណែដដែល) ៖
+`LOCK` ថ្មីម្តងទៀតសម្រាប់ `zto-order-detail.js` · `auto-lookup.ts` · `lookup-api.ts`។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **(២) សោមួយក្នុងមួយហាង** ៖ Netlify `ZTO_PROXY_KEYS` = `ឈ្មោះ=សោ` (comma · បន្ទាត់ថ្មី) · `ZTO_PROXY_KEY` ចាស់នៅដំណើរការ (ឈ្មោះ `default`) ➜ ប្តូរម្តងមួយហាង ·
+  សោហាងមួយលេច ➜ លុបតែធាតុនោះ · ធាតុខុស (គ្មានឈ្មោះ · ឈ្មោះខុស · សោ < ១៦ តួ · ស្ទួន) មិនផ្តល់សិទ្ធិ · `?diag=1` `access.keyLabel` · `keys` · `invalidKeys` ·
+  🩺 ជួរ Lookup ZTO បង្ហាញ «សោហាង ឈ្មោះ» និង «ផ្ទៀងគណនី require/optional»។
+- 👤 **(៣) ចងគណនី** ៖ App ផ្ញើ `X-Zoe-Id-Token` (គណនីដែលកំពុងចូល · ពិដាន ៣ វិ.) លើការស្កេន ZTO និងការពិនិត្យស្ថានភាព ZTO — តែទៅ Function ZTO (`lookupApiIsZto()`) ⛔ មិនដែលទៅ API ស្វែងរកផ្សេង ·
+  Function `ZTO_DETAIL_IDENTITY` = `off` (លំនាំដើម) · `optional` (ពិនិត្យ · មិនបដិសេធ · រាប់) · `require` (គ្មាន/មិនត្រឹមត្រូវ ➜ 401 `ZTO_IDENTITY_REQUIRED` មុន cache និង ZTO ·
+  certs/Supabase មិនឆ្លើយ ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` ➜ App សាកម្តងទៀត) · តម្លៃខុស ➜ `ZTO_CONFIG_INVALID` · App ៖ «🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត» ·
+  «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត»។
+- 🏢 **(៤) កំណត់សាខា** ៖ `ZTO_DETAIL_BRANCH_PATHS` (វាលក្នុងកំណត់ត្រា ZTO) ➜ ឆ្លើយតែពេលលេខសាខាក្នុងកំណត់ត្រា = សាខាគណនី · ផ្សេង · គ្មានវាល · គណនីគ្មានសាខា ➜
+  200 `found:false` `ZTO_OTHER_BRANCH` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App ៖ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង — ZTO មិនបង្ហាញព័ត៌មានអតិថិជនទេ» · cache មិនរំលង ·
+  `?diag=1` `access.branch` (`matched` · `other` · `missing` · `seen`) សម្រាប់ផ្ទៀងវាលមុន `require`។
+- 🔗 **ចងគម្រោង Firebase ↔ សាខា** (A71 ៖ email ជាសញ្ញាដែលអ្នកប្រើប្តូរខ្លួនឯងបាន) ៖ `FIREBASE_PROJECT_IDS` ធាតុ `projectId:សាខា|សាខា` ➜ email ក្រៅសាខាដែលចង ➜
+  គ្មានសាខា (`?list=1` `site:no-account` · `/detail` `branch:project-mismatch`) · គម្រោងមិនចង + កំណត់សាខា `/detail` ➜ `branch:project-unbound` · ការចងខុសទម្រង់ ➜
+  `idtoken:project-unset` · `?diag=1` `access.branch.unboundProjects`។ ធាតុគ្មាន `:` ➜ ដូចមុន (`?list=1` មិនប្រែ)។
+- 👤 គណនី Supabase គ្មានហាង (`my_account()` ០ ជួរ) ➜ មិនមែនគណនីដែលផ្ទៀងរួច (`site:no-account` · 401 ពេល `require`) · `optional` គ្មានការកំណត់សាខា ➜ មិនរង់ចាំការផ្ទៀង
+  (Supabase/certs ព្យួរ ➜ មិនបន្ថែម ៣ វិ. លើរាល់ការស្កេន)។
+- 🔄 App ៖ គណនីកំពុងចូល តែ token យកមិនទាន់ (refresh យឺត > ៣ វិ.) ឬ `idtoken:expired` · `kid-unknown` · `future` ➜ «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត» +
+  cooldown ខ្លី (មិនមែន «ចាកចេញ» + cooldown ៣០ វិ.) · `ZTO_OTHER_BRANCH` មូលហេតុក្រៅ `branch:other` ➜ «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន (Config សាខា ZTO នៅ Netlify) — ជាប់ត្រង់ …» ·
+  ប៊ូតុង 🧪 សាកល្បង ផ្ញើ `X-Zoe-Id-Token` ដូចការស្កេន (តែទៅ Function ZTO)។
+- 🛠️ ឧបករណ៍ Cookie Sync ៖ Function បដិសេធសោ ➜ `key-rejected` «the Function refused the proxy key …» (មិនមែន «could not reach the Function») · prompt ទទួលសោពី `ZTO_PROXY_KEYS`។
+- 📖 `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ថ្មី (ជំហាន ១–៣) · ផ្នែក ៤គ (ការចងគម្រោង) · ផ្នែក ៦ (កូដ ZTO ថ្មី) · `guide.html` ផ្នែក ១៤ (សោហាង និងគណនី) · README ឧបករណ៍ Sync។
+
+#### អ្នកយាម
+
+- `audit-tools/zto-proxy-test.js` ផ្នែក ១២ (Function ពិត · token RS256 ពិតពី `idtoken-fixture.js`) ៖ សោហាង A · B · សោមាន `=` · សោក្រៅបញ្ជី · កាត់មួយតួ · `default` រួមជាមួយ ·
+  ធាតុខុស ៤ · គ្មានសោត្រឹមត្រូវ · `require` គ្មាន token · token ក្លែង · cache មិនរំលង · certs ធ្លាក់ ➜ 503 · `optional` · តម្លៃខុស · សាខាត្រូវ/ផ្សេង/គ្មានវាល/គណនីគ្មានសាខា ·
+  `optional` + សាខា · `off` មិនកំណត់ · ផ្លូវខុស · `?diag=1` (label · គ្មានតម្លៃសោ · ការរាប់ · `seen` គ្មានលេខទូរស័ព្ទ) · preflight APK — មុនកែ FAIL ១៨ (១៦៤ ok)។
+- `ZoeW/tests/zto-detail-identity.test.ts` (៨) ៖ ស្កេន · ពិនិត្យស្ថានភាព ➜ មាន token · API ផ្សេង ➜ គ្មាន token · គ្មានគណនី ➜ សំណើនៅចេញ · `ZTO_OTHER_BRANCH` ·
+  `ZTO_IDENTITY_REQUIRED` · `ZTO_IDENTITY_UNAVAILABLE` (សាកម្តងទៀត) · 🩺 «សោហាង» — មុនកែ FAIL ៥/៧ (+ 🩺)។
+- A71 ៖ `zto-proxy-test` ផ្នែក ១២ +១៦ (គម្រោងមិនចង · ក្លែង email · `?list=1` · ការចងត្រូវ · `unboundProjects` · ការចងខុសទម្រង់ · វាលសាខា ២ · Supabase គ្មានហាង/សមាជិក ·
+  503 project-unset/supabase-unreachable/supabase-unset · `optional` + Supabase ព្យួរ · ការរាប់ `?diag=1`) — មុនកែ FAIL ១៤ · mutant ១០ (ការរាប់ ៣ · ហេតុផល 503 ២ · `some`➜`every` ·
+  ការចង ២ · Supabase គ្មានហាង · រង់ចាំជានិច្ច) ➜ FAIL ទាំងអស់ · `zto-detail-identity.test.ts` +៥ (token ព្យួរ · expired/kid-unknown/future · ទិសផ្ទុយ signature/គ្មានគណនី ·
+  មូលហេតុសាខា · ប៊ូតុង 🧪) — មុនកែ FAIL ៤ · `zto-cookie-sync-test` +២ (`key-rejected`) — មុនកែ FAIL ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy **ZoeW** · build APK ថ្មី។ មិនកំណត់ env ថ្មី ➜ ឥរិយាបថដូចមុនទាំងស្រុង។
+2. **សោតាមហាង** (`ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៤ឃ ជំហាន ១) ៖ បង្កើតសោមួយក្នុងមួយហាង ➜ Netlify `ZTO_PROXY_KEYS` ➜ Trigger deploy ➜ ទូរស័ព្ទនីមួយៗ ៖ API ស្វែងរកអតិថិជន ➜
+   តម្លៃ Header = សោហាងនោះ ➜ 🩺 «សោហាង ឈ្មោះ» ➜ គ្មានទូរស័ព្ទណា «default» ➜ ⛔ **ម៉ាស៊ីន Cookie Sync** ៖ រត់ `setup.cmd` / `setup-termux.sh` ម្តងទៀតជាមួយសោមួយក្នុង
+   `ZTO_PROXY_KEYS` ➜ `sync-zto-cookie.cmd --check` OK (🩺 មើលម៉ាស៊ីន Sync មិនឃើញ) ➜ ទើបលុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+3. **ចងគណនី** (ជំហាន ២) ៖ ទូរស័ព្ទទាំងអស់ update ដល់ 2.50.47 (កំណែចាស់មិនផ្ញើ token ➜ ការស្កេនធ្លាក់ពេល `require`) ➜ `ZTO_DETAIL_IDENTITY=optional` ➜ មួយថ្ងៃ ➜
+   `?diag=1` `access.missing` · `rejected` នៅ ០ ➜ `require`។
+4. **កំណត់សាខា** (ជំហាន ៣) ៖ ចងគម្រោង Firebase នីមួយៗ `FIREBASE_PROJECT_IDS=projectId:លេខសាខា` (`?diag=1` `access.branch.unboundProjects` = ០) ➜ Argus ➜ រកវាលលេខសាខាក្នុង
+   `order/detail` លើកញ្ចប់ច្រើន ➜ `ZTO_DETAIL_BRANCH_PATHS` ➜ ⛔ មានប្រសិទ្ធភាពភ្លាមលើគ្រប់ទូរស័ព្ទដែលផ្ញើគណនី (`optional` ក៏ដូច `require` · គ្មានដំណាក់កាលមើលតែប៉ុណ្ណោះ) ➜
+   ស្កេនកញ្ចប់សាខាខ្លួនឯង ➜ `?diag=1` `access.branch.matched` កើន · `other`/`missing` នៅ ០ ➜ មិនដូច្នោះ ➜ `ZTO_DETAIL_BRANCH_PATHS=off` ➜ Trigger deploy ➜ រកវាលម្តងទៀត។
+   ⚠️ មិនទាន់វាស់លើទិន្នន័យ ZTO ពិត (ឈ្មោះវាលសាខាក្នុង `order/detail` មិនស្គាល់នៅទីនេះ)។
+
+### [2.50.46] — 2026-10-08 · ZoeW ៖ **ស្វែងរករអិលរលូន (ទំព័រទិន្នន័យ · ទំព័រស្កេន) · 🔔 «🔄 ពិនិត្យកំណែថ្មី» · Supabase មិនកាត់ពីរដង · SW មិនផ្ទុក HTML ជា chunk** (Deep audit ៣ · សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.46`** (`zoew-v308` ➜ `zoew-v309`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ តំបន់ហាម ៖ `phone-search.ts` ប្រែតាមសំណើម្ចាស់គម្រោង
+(«ពេលចុចស្វែងរកលេខ ពេល focus auto ហូតឡើង ចលនាអត់ smooth និង keyboard លោតមកក៏មិនសូវរលូន») ➜ sha256 ថ្មីក្នុង `LOCK` (`forbidden-zone-lock`) · `panels.ts` · `panel-motion.ts` ·
+`app.css` · PTR មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ចុចស្វែងរកលេខ ➜ ផ្ទាំងរអិលឡើង** (មុននេះលោតភ្លាម ~៣០០px ក្នុងស៊ុមតែមួយ ខណៈ keyboard ចាប់ផ្តើម)។ ការទាញឡើង/ចុះពេល focus · blur ឥឡូវរអិល ២២០ms
+  ដូចការអូសផ្ទាំង (`glidePhoneSearchPulledUp()` ៖ FLIP កាតស្វែងរក + បញ្ជី តាម `panelGlideFrom()` · ផ្អាក snap ដូចមុន)។ iPhone PWA ៖ ការចុច ➜ រអិលឡើងមុន ➜ `focus({ preventScroll })` ([2.50.45])។
+- ✨ **ទំព័រស្កេន ៖ ចុចស្វែងរកបញ្ជីកញ្ចប់ ឬបញ្ជី Locker ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល** (សំណើម្ចាស់គម្រោង «ពិនិត្យកន្លែងស្វែងរកក្នុង tab ស្កេនផង») ៖ មុននេះប្រអប់នៅ y ៤៣៦ · ៥០៣
+  (៤១៤×៨៩៦) ➜ keyboard គ្របលទ្ធផល ហើយ iOS រំកិលទំព័រ។ ឥឡូវប្រអប់ឡើង y ~១០៦ · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (តែពេល focus ជាអ្នកបង្រួម · មានអក្សរ ➜ នៅបង្រួម · កាមេរ៉ាកំពុងស្កេន ➜ មិនបង្រួម ព្រោះកាមេរ៉ាលាក់នៅតែស្កេន) ·
+  iPhone PWA ៖ ការចុច ➜ បង្រួមមុន ➜ `focus({ preventScroll })` · document រំកិល ➜ ត្រឡប់ ០ (ដូចប្រអប់ស្វែងរកលេខ) · កាមេរ៉ាកំពុងស្កេន ➜ ផ្ទាំងនៅបើក ហើយការចុចជារបស់ iOS
+  (iOS រំកិលបង្ហាញប្រអប់លើ keyboard · `entrySearchMovesField()`) · អ្នកប្រើបើកផ្ទាំងដោយដៃ ➜ ការចាកចេញពីប្រអប់មិនបើកវិញទៀត (អ្នកប្រើជាអ្នកបង្រួម) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ។
+- ✨ **🔔 «📱 កំណែ App» ៖ ប៊ូតុង «🔄 ពិនិត្យកំណែថ្មី»** (សំណើម្ចាស់គម្រោង) ៖ ទាញព័ត៌មានកំណែភ្លាម · APK ៖ សួរ GitHub Release ម្តងទៀតភ្លាម (មុននេះរង់ចាំ ២ នាទីក្រោយ
+  «មិនទាន់មាន») · PWA ៖ សួរ Service Worker ឲ្យទាញកំណែថ្មី ➜ «Refresh ឥឡូវនេះ» · ខណៈពិនិត្យ ➜ ប៊ូតុងបិទ · feed កំណែទាញមិនបាន ➜ ⚠️ (ដំណឹងអ្នកលក់ដែលឆ្លើយមិនរាប់ថាពិនិត្យបាន) ·
+  feed ទាញបានពេលក្រោយ (បើក 🔔) ➜ ⚠️ បាត់។
+- 🐛 **ហាង Supabase ៖ ការកាត់ប្រាក់ដែលចម្លើយបាត់ ហើយផ្ញើម្តងទៀតក្រោយ `zoe_ops` លុបលទ្ធផល (២ ថ្ងៃ) ➜ កាត់ពីរដង** ៖ op ដែលលុបរួចត្រូវវាយតម្លៃ CAS ថ្មី ➜ ប៉ះតម្លៃដែលខ្លួនឯងសរសេររួច
+  ➜ `conflict` ➜ adapter ឆ្លើយ `not-applied` ➜ `runLedgerTransaction()` ផ្ញើម្តងទៀត។ ឥឡូវ ៖ conflict ក្រោយ `SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង < ២ ថ្ងៃ · វាស់តាមនាឡិកា server ៖ `now` របស់
+  conflict ដក `now` ចុងក្រោយដែលឃើញមុនផ្ញើ ➜ នាឡិកាឧបករណ៍ដែលថយក្រោយមិនប៉ះ) សម្រេចដោយ ring `ops`
+  (`txOutcomeWitness`) ➜ `applied` តែម្តង · គ្មាន witness ➜ `unknown` (Sentry money · មិនទាយ)។
+- 🐛 **PWA ៖ deploy ថ្មីខណៈ SW ចាស់គ្រប់គ្រង ➜ chunk ឈ្មោះចាស់ (ឧ. `supabase-backend`) ត្រូវ Netlify ឆ្លើយ `index.html` 200 ➜ SW ផ្ទុក HTML ក្រោម key របស់ chunk**
+  ➜ `import()` បរាជ័យរហូតដល់ SW ថ្មី (ហាង Firebase ប្តូរ Config ទៅ Supabase ចំពេល deploy ➜ «Supabase មិនទាន់រួចរាល់»)។ ឥឡូវ HTML មិនចូល cache ក្រោម key ដែលមិនមែន HTML
+  (`responseFitsKey()` ទាំងទ្វារ miss និង revalidate · អាន header មិនបាន ➜ ផ្ទុកដូចមុន)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/supabase-op-retention.test.ts` (៥) ៖ ព្រំដែន adapter ≤ ពាក់កណ្តាលរយៈរក្សា `zoe_ops` ដែលទាញពី migration ពិត · ledger ផ្ញើវិញក្រោយ ៣ ថ្ងៃ + purge ➜ កាត់តែម្តង
+  (`applied`) · CAS គ្មាន witness ➜ `unknown` + រាយការណ៍ · ទិសផ្ទុយ ៖ ក្នុងបង្អួច (op នៅ) ➜ replay · មិនដែលចុះ + ឧបករណ៍ផ្សេងសរសេរ ➜ `not-applied` ➜ សាកឡើងវិញ ➜ កាត់តែម្តង —
+  មុនកែ FAIL ៣/៥ (ការកាត់ ២ ដង ៖ `applied` ២ · `codDollar` ៩០ ជំនួស ៩៥)។
+- `audit-tools/sw-backend-chunk-test.js` ផ្នែក ៤ (Chromium ពិត · `sw.js` ពិត) ៖ server ឆ្លើយ `index.html` ជំនួស chunk ដែលលែងមាន ➜ SW មិនផ្ទុក · chunk មានវិញ ➜ chunk ពិត —
+  មុនកែ FAIL ២ (ការផ្ទុកលើកក្រោយទទួល HTML ៨៩,៥៩៣ bytes ពី cache)។
+- `ZoeW/scripts/history-window-check.mjs` (APK · PWA Android · PWA iPhone) ៖ ចុចស្វែងរកលេខ ➜ FLIP ចាប់ផ្តើមពីទីតាំងចាស់ (±២px) · ចប់គ្មាន transform សល់ · blur ➜ រអិលចុះ ·
+  ទំព័រស្កេន (បញ្ជីកញ្ចប់ · Locker) ➜ បង្រួមដោយរអិល · ប្រអប់ឡើង ≥ ១០០px · blur ទទេ ➜ បើកវិញ — មុនកែ FAIL ១២/១២ · ការវាស់ keyboard រង់ចាំ `resize` ពិត (មុននេះធ្លាក់ម្តងក្រោមបន្ទុក run-all)។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (៨) ៖ iPhone PWA ចុចប្រអប់ស្វែងរកទំព័រស្កេន ➜ preventDefault · បង្រួមមុន focus · `preventScroll` · blur ទទេ/មានអក្សរ · បង្រួមដោយដៃមុន · កាមេរ៉ាកំពុងស្កេន ·
+  អេក្រង់ធំ · tab ផ្សេង · Android ➜ មិនប៉ះ · document រំកិល ➜ ០។
+- `ZoeW/tests/notify-update-check.test.tsx` (៩) ៖ ខ្សែភ្ជាប់ (registry · allowlist) · APK «មិនទាន់មាន» ទើបពិនិត្យ ➜ ចុច ➜ probe ភ្លាម ➜ ប៊ូតុងទាញយក · PWA `registration.update()` ·
+  កំពុងពិនិត្យ ➜ បិទ · មិនបាន ➜ ⚠️ · feed កំណែធ្លាក់ + ដំណឹងអ្នកលក់ឆ្លើយ ➜ ⚠️ · feed ទាញបានវិញ ➜ ⚠️ បាត់ · `updateReady` ➜ គ្មានប៊ូតុង — ២ ថ្មីមុនកែ FAIL ២។
+- `ZoeW/tests/supabase-op-retention.test.ts` (+២) ៖ នាឡិកាឧបករណ៍ថយក្រោយ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង + purge ➜ កាត់តែម្តង (មុនកែ `applied` ២) · ទិសផ្ទុយ ៖ ការដាច់ ៣ ម៉ោង ➜ replay ·
+  fake server មាននាឡិកាផ្ទាល់ខ្លួន និង `now` ក្នុងចម្លើយ write ដូច migration ពិត។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` (+៦) ៖ កាមេរ៉ា ➜ ការចុចជារបស់ iOS · កាមេរ៉ា + ផ្ទាំងបង្រួមរួច ➜ preventScroll · ការរំកិល document នៅដដែលពេលផ្ទាំងបើក · flag ចាស់ក្រោយបើក/បង្រួមដោយដៃ ·
+  ប្រអប់ Locker លាក់ · focus ម្តងទៀត ➜ នៅបើកវិញ — មុនកែ FAIL ៥។
+- `ZoeW/tests/sw-revalidation-timeout.test.ts` (+២) ៖ ទ្វារ revalidate ៖ HTML ➜ គ្មាន put · JS ➜ put — mutant ដក `responseFitsKey` ពី revalidate ➜ FAIL។
+- `phone-search-swipe-test` · `phone-suggest-test` ៖ onFocus ហូតឡើងតាមខ្សែហៅពិត + ទិសផ្ទុយ · `clock-hygiene` · `loop-termination` · `sw-cache-failure-test` ធ្លាក់លើ tree មុនកែ (A60)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`) · build APK ថ្មី (workflow ពី `main`)។
+2. iPhone PWA · Android PWA · APK ៖ ទំព័រទិន្នន័យ ➜ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើង (មិនលោត) · keyboard បើកដោយទំព័រនៅនឹងកន្លែង · ចាកចេញពីប្រអប់ទទេ ➜ រអិលចុះវិញ។
+   iPhone PWA ៖ មើលជាពិសេសថាទំព័រទាំងមូល (navbar ផង) **មិនធ្លាក់ចុះ ហើយរអិលឡើងវិញ** ពេល keyboard បើក (រោគសញ្ញាវីដេអូ 2.50.45 · A66 ៖ ចលនាចាប់ផ្តើមមុន focus) ➜ ឃើញ ➜ ផ្ញើវីដេអូ។
+   ⚠️ ចលនាវាស់តែក្នុង Chromium (តំបន់ហាម ➜ ត្រូវសាកលើទូរស័ព្ទពិតទាំង ២ មុនចាត់ថារួច) · ⛔ PTR · អូសផ្ទាំង ត្រូវដដែល។
+3. ទំព័រស្កេន ៖ ចុចប្រអប់ស្វែងរកបញ្ជីកញ្ចប់ (និងរបៀប Locker) ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល · លទ្ធផលនៅលើ keyboard · ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ · ស្កេនបន្តបាន។
+   កាមេរ៉ាកំពុងស្កេន ➜ ចុចប្រអប់ស្វែងរក ➜ ផ្ទាំងនៅបើក ហើយប្រអប់មើលឃើញលើ keyboard (iPhone PWA ៖ iOS រំកិលបង្ហាញ)។
+4. 🔔 ➜ «🔄 ពិនិត្យកំណែថ្មី» ៖ APK ពេល Release កំពុង build ➜ ចុចក្រោយ Release ចេញ ➜ ប៊ូតុងទាញយកលេចភ្លាម · PWA ➜ «Refresh ឥឡូវនេះ» ពេលមានកំណែថ្មី។
+5. គ្មានការសាកពិសេសសម្រាប់ Supabase/SW (ការវាស់ក្នុងតេស្ត) · ⚠️ មុនដាក់ប្រើជាផ្លូវការ ៖ អាន Handoff ៦ (កូតា Firebase Spark · License Project · Netlify · Supabase · Push · `ZTO_PROXY_KEY`)។
 
 ### [2.50.45] — 2026-10-08 · ZoeW (iPhone PWA) ៖ **ចុចស្វែងរកលេខ ➜ navbar មិនរំកិល · ☰ · 🩺 បង្ហាញកំណែ iOS 26 ពិត** (រាយការណ៍ម្ចាស់គម្រោង · វីដេអូ)
 
@@ -2847,6 +2975,51 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-08 — Deep audit ៣ (សំណើម្ចាស់គម្រោង ៖ «deep audit គ្រប់ជ្រុងជ្រោយ មុនប្រកាសឲ្យប្រើជាផ្លូវការ») ➜ [2.50.46]
+
+**វិធី** ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) មុនកែ ➜ អានកូដដោយផ្ទាល់ (លុយ · Supabase adapter + SQL · SW · Push · ZTO Function · License ·
+ឯកសារ) ផ្តោតលើបញ្ជី «មិនទាន់វាស់» ក្នុង Handoff · ការប៉ាន់ទំហំទិន្នន័យ/កូតាពេលអតិថិជនច្រើន · សំណើម្ចាស់គម្រោង ៣ ក្នុងជុំដដែល។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A49 | **Supabase ៖ CAS ចម្លើយបាត់ ➜ ផ្ញើវិញក្រោយ `zoe_ops` purge ➜ `not-applied` ខុស ➜ ledger កាត់ ២ ដង** (Handoff «`zoe_ops` > ២ ថ្ងៃ · purge») | Claude ៖ SQL ៖ `zoe_apply()` រក្សា `result` តែពេលជោគជ័យ · `conflict` មិនកត់ · `private.zoe_housekeeping()` លុប op > ២ ថ្ងៃ រៀងរាល់ ៦៤ seq របស់ហាង ➜ op ដែលលុបរួច = op ថ្មី ➜ CAS ប្រៀប `x` ចាស់នឹងតម្លៃដែលខ្លួនឯងសរសេររួច ➜ conflict · adapter (`lost` ➜ `not-applied`) · vitest adapter ពិត + server ក្លែង (op purge) ៖ ៣ ថ្ងៃ ➜ `applied` ២ · `codDollar` ៩០ (ត្រូវ ៩៥) · លក្ខខណ្ឌពិត ៖ ចម្លើយបាត់ចំពេលបណ្តាញដាច់ + App រស់ (APK ផ្ទៃខាងក្រោយ) > ២ ថ្ងៃ + ឧបករណ៍ផ្សេងក្នុងហាងសរសេរ ≥ ៦៤ ដង | `SB_OP_REPLAY_SAFE_MS` (២៤ ម៉ោង) ➜ witness ring ឬ `unknown` · តេស្តទាញរយៈរក្សាពី migration |
+| A50 | **SW ទ្វារ miss ដាក់ចម្លើយ SPA fallback (HTML) ក្រោម key chunk** (Handoff «SW miss-door») | Claude ៖ `netlify.toml` `/* ➜ /index.html 200` + `scripts/serve.mjs` ធ្វើត្រាប់ដូចគ្នា ➜ chunk ឈ្មោះចាស់ក្រោយ deploy = HTML 200 · `sw-backend-chunk-test` ផ្នែក ៤ ថ្មី ៖ មុនកែ FAIL ២ (cache មាន HTML ៨៩,៥៩៣ bytes · ការផ្ទុកក្រោយ chunk មានវិញនៅទទួល HTML) | `responseFitsKey()` · ⛔ មិនប្រើ `shellDeployIsCurrent()` លើទ្វារ miss (បណ្តាញយឺត ➜ chunk មិនចូល cache ➜ បាត់ក្រៅបណ្តាញ) |
+| A51 | **ចុចស្វែងរកលេខ ➜ ផ្ទាំងលោតភ្លាម** (រាយការណ៍ម្ចាស់គម្រោង ៖ «ចលនាអត់ smooth · keyboard លោតមកក៏មិនសូវរលូន») | Claude ៖ `history-window-check` (៤១៤×៨៩៦) ៖ កាតស្វែងរក ៣៥៧ ➜ ៥៩ · បញ្ជី ៤៥៤ ➜ ១៥៦ ក្នុងស៊ុមតែមួយ (គ្មាន animation) លើ APK · PWA Android · PWA iPhone · ផ្លូវអូស/ចុចរបា glide (`panelGlideFrom`) តែផ្លូវ focus មិន glide · ករណីទំព័ររមូរ (កាតនៅ -៣៨) ៖ focus ធម្មតា browser រំកិលមុន onFocus ➜ វាស់ពីការចុចពេលកាតមើលឃើញ (ផ្លូវធម្មតា) | FLIP កាត + បញ្ជី · មុនកែ FAIL ៦ ➜ ០ · ⚠️ ត្រូវសាកលើទូរស័ព្ទពិត |
+| A52 | **ទំព័រស្កេន ៖ ប្រអប់ស្វែងរកនៅក្រោម ➜ keyboard គ្របលទ្ធផល** (សំណើម្ចាស់គម្រោង) | Claude ៖ ប្រអប់ y ៤៣៦ (បញ្ជីកញ្ចប់) · ៥០៣ (Locker) · keyboard ~៣៣០ ➜ ផ្ទៃលទ្ធផល ៦០–១៣០px · គ្មានការបង្រួម · iOS ៖ ផ្លូវ tap/document-scroll គ្របតែ `searchPhoneInput` | `entry-search.ts` · ផ្លូវ iOS ទូទៅ (`IOS_SEARCH_FIELDS`) · មុនកែ FAIL ៦ ➜ ០ |
+| A53 | **🔔 គ្មានវិធីសួរកំណែថ្មីភ្លាម** (សំណើម្ចាស់គម្រោង) | APK ៖ `absent` ➜ សួរម្តងទៀតក្រោយ `APK_RELEASE_RECHECK_MS` (២ នាទី) តែពេលបើក 🔔 · PWA ៖ `reg.update()` តែ visibility/focus/online/៣០ នាទី (gap ១៥ នាទី) | `checkForAppUpdate()` · `checkApkRelease(v, true)` |
+| A54 | **`history-window-check` keyboard ធ្លាក់ក្រោមបន្ទុក run-all** (`zoew-suite` FAIL ក្នុង run-all មុនកែ ២០០/២០២) | Claude ៖ ឯកឯង ៣/៣ PASS · ក្រោម lane ៤ ៖ `window.__kb` មាន resize តែ ១ (Chromium បញ្ចូល resize ២ ពេលស៊ុមយឺត) = artifact ការវាស់ | រង់ចាំ resize ពិត (`waitForFunction`) មុនប្តូរទំហំម្តងទៀត · ការអះអាងមិនប្រែ |
+| A55 | **ហាង Firebase (Spark ១០ GB/ខែ) ៖ egress ពេលអតិថិជនមមាញឹក** (Handoff ៦ក · គ្មានកូដ) | Claude ៖ JSON តាមរូបរាងពិត (`scan-action.ts` · `cleanup.ts`) ៖ ៣០០ កញ្ចប់/ថ្ងៃ ➜ ធុងសំរាម ៣០ ថ្ងៃ ៦,៩៣០ ធាតុ ≈ ៤.៣ MB · `zoew_daily_pickup_cod_dod` ≈ ១៣ kB/ថ្ងៃ (`pickedUpBarcodes` ៩ kB) ≈ ៤.៥ MB/ឆ្នាំ មិនដែលសម្អាត · ចំណូលថ្ងៃ ≈ ១២៥ kB/ឆ្នាំ · listener `onValue` ទាញ root ទាំងមូលរាល់ការផ្ទុកទំព័រ (Web SDK គ្មាន cache disk · PTR = reload) ➜ ~៤–៩ MB/ការបើក · ១០០ កញ្ចប់/ថ្ងៃ ➜ ~១.៥–៣ MB | ម្ចាស់គម្រោងសម្រេច (Blaze + budget · Supabase សម្រាប់ហាងធំ · ឬការបង្រួម `pickedUpBarcodes` ថ្ងៃចាស់ = ការប្តូររចនាសម្ព័ន្ធ) |
+| A56 | **License Project តែមួយ ៖ egress ដំណឹងអ្នកលក់** (Handoff ៦ខ) | Claude ៖ `NOTIFY_FEED_INTERVAL_MS` ៥ នាទី · `limitToLast=20` · title ≤ ១២០ + body ≤ ៦០០ តួ (ខ្មែរ ៣ bytes) ➜ ~៦–៤០ kB/ការទាញ · timer រត់ពេលលាក់ (ច្បាប់ CLAUDE.md) ➜ ឧបករណ៍បើកពេញថ្ងៃ ~២៨៨ ការទាញ ➜ ១០០ ឧបករណ៍ ≈ ៥–១០+ GB/ខែ | ពិនិត្យ Usage · Blaze + budget · (ជម្រើសកូដ ៖ ពង្រីកចន្លោះ ឬរំលងពេលលាក់ = ប្តូរច្បាប់ timer ➜ ត្រូវសំណើ) |
+| A57 | **Netlify Functions ៖ ZTO Palm** (Handoff ៦គ) | Claude ៖ `ZTO_SIGNED_SWEEP_ACTIVE_MS` ២០ វិ. · `VISIBLE` ៦០ វិ. · `GAP` ២ នាទី ➜ ~១៨០/ម៉ោង (សកម្ម) · ~៦០/ម៉ោង (បើក) ➜ ~១,២០០/ថ្ងៃ/ឧបករណ៍ ZTO + `/detail` តាមការស្កេន · cache ក្នុង Function មិនកាត់ចំនួនការហៅ | ពិនិត្យកូតា Netlify មុនបន្ថែមហាង |
+| A58 | **Supabase Project តែមួយ** (Handoff ៦ឃ) | Claude ៖ `zoe_write` ចាក់សោ `zoe_tenant_state` ក្នុងមួយហាង (មិនប៉ះហាងផ្សេង) · `zoe_pull` ប្រើ index `(tenant_id, seq)` · `zoe_ops` ~១៥ ការសរសេរ/កញ្ចប់ ➜ ~៤,៥០០/ថ្ងៃ (៣០០ កញ្ចប់) × ២ ថ្ងៃ · realtime ១ websocket/ឧបករណ៍ | ពិដាន realtime ព្រមគ្នា (Free ២០០ · Pro ៥០០) ជាដែនកំណត់ចំនួនឧបករណ៍បើកព្រមគ្នា |
+| A59 | **Push cron · `ZTO_PROXY_KEY`** (Handoff ៦ង · ៦ច) | Claude ៖ `dispatchNotices()` ឡើង ledger មុនផ្ញើ · `PUSH_RUN_BUDGET_MS` ២០ វិ. · ១៦ ព្រមគ្នា ➜ ~១,០០០ subscription/ដំណឹង · `PUSH_SUBS_TOTAL_MAX` ៥,០០០ · `/detail` ចងតែ `ZTO_PROXY_KEY` (មិនចងអត្តសញ្ញាណ/សាខាដូច `?list=1`) | គ្មានកូដ (តំបន់ចាក់សោ ZTO ➜ ត្រូវសំណើ) |
+| A60 | **run-all STRICT ពេញលើ tree 1d619b4 (emulator RTDB · Postgres ពិត) ៖ ធ្លាក់ ៥ · ជោគជ័យ ១៩៧ · មួយផ្នែក ០ · រំលង ០** (ជុំបន្ត Deep audit ៣) | Claude ៖ (១) `phone-suggest-test` · `phone-search-swipe-test` រំពឹង `phoneSearchFocused()` ហៅ `setPhoneSearchPulledUp(true)` ផ្ទាល់ (ឥឡូវតាម `glidePhoneSearchPulledUp`) ➜ ReferenceError/regex · (២) `sw-cache-failure-test` ៖ `responseFitsKey()` អាន `response.headers` ដោយគ្មាន `try` ➜ TypeError ក្នុង `.then` ➜ `.catch(() => null)` ➜ ចម្លើយបណ្តាញល្អក្លាយ `Response.error()` (impact ជំហាន ៥ ៖ helper ថ្មីលើផ្លូវក្តៅបោះ) · (៣) `clock-hygiene` ៖ `Date.now()` ក្នុង `checkForAppUpdate()` · `probeApkRelease()` គ្មានហេតុផល + ធាតុងាប់ `checkApkRelease` · (៤) `loop-termination` ៖ `while (… elapsedSince(startedAt) < NOTIFY_FEED_TIMEOUT_MS)` គ្មានព្រំដែនរចនាសម្ព័ន្ធ · ក្រោយកែ `zoew-suite` lint ៖ `no-useless-assignment` | checker ស្វែងរកលេខដើរតាមខ្សែហៅពិត (helper ដែលបញ្ជូនប៉ារ៉ាម៉ែត្រទៅ `setPhoneSearchPulledUp`) + ទិសផ្ទុយ (ដកការហៅ ➜ ធ្លាក់) · `responseFitsKey()` អាន headers មិនបាន ➜ ផ្ទុកដូចមុន (fail-open) · `APP_UPDATE_CHECK_WAIT_MAX` ជុំ · allowlist នាឡិកាមានហេតុផលពិត |
+| A61 | **Supabase ៖ បង្អួច `SB_OP_REPLAY_SAFE_MS` វាស់តាមនាឡិកាឧបករណ៍** (workflow ពិនិត្យ diff 2.50.46 · អ្នកផ្ទៀងប្រឆាំង ៖ confirmed) | Claude ៖ `elapsedSince(lostAt)` ៖ នាឡិកាថយក្រោយ *មួយផ្នែក* (ឧ. NTP កែ ៣០ ម៉ោងក្នុងការដាច់ ៥០ ម៉ោង) ➜ អាន ២០ ម៉ោង ≤ ២៤ ➜ `not-applied` ខណៈ op ត្រូវ purge (server ៖ `created_at < now() - 2 days`) ➜ ledger កាត់ ២ ដង · vitest ថ្មី ៖ មុនកែ `applied` ២ | អាយុ = `res.now` (conflict) − `now` ចុងក្រោយដែលឃើញមុនផ្ញើលើកដំបូង (`serverNowSeen` ➜ `sentAfter`) ៖ ចម្លើយដែលទទួលមុនផ្ញើ = ព្រំក្រោមនៃ `created_at` (causality) ➜ គ្មាននាឡិកាឧបករណ៍ · គ្មាន `now` ឬអវិជ្ជមាន ➜ witness/`unknown` · fake `supabase-tx-outcome` ឆ្លើយ conflict មាន `now` ដូច migration ពិត |
+| A62 | **🔔 «🔄 ពិនិត្យកំណែថ្មី» ✅ ពេល feed កំណែទាញមិនបាន តែដំណឹងអ្នកលក់ឆ្លើយ** (confirmed) · **⚠️ នៅជាប់ក្រោយ feed ទាញបានវិញ** (confirmed nit) | Claude ៖ `fetchNotifyFeed()` = `results[0] \|\| results[1]` ➜ License RTDB ឆ្លើយ `null` ក៏ជា «ជោគជ័យ» · ✅ «កំណែចុងក្រោយ» មកពី cache · `appUpdateCheck` `failed` គ្មានអ្នក reset · vitest ថ្មី ២ ៖ មុនកែ FAIL ២ | សេចក្តីសម្រេចពី feed កំណែតែប៉ុណ្ណោះ (`fetchNotifyFeed(true, true)`) · feed កំណែទាញបាន ➜ `failed` ➜ `idle` |
+| A63 | **iPhone PWA · ទំព័រស្កេន · កាមេរ៉ាកំពុងស្កេន ៖ ការចុចប្រអប់ស្វែងរកនៅ preventDefault + `preventScroll` + ការរំកិល document ត្រឡប់ ០ ខណៈផ្ទាំងមិនបង្រួម ➜ ប្រអប់នៅក្រោម keyboard** (confirmed) | Claude ៖ កាមេរ៉ា (`--scan-box-h` ~១៩០px) រុញប្រអប់ទៅ y ~៥៦០ · ~៦៣០ (៤១៤×៨៩៦) · `entrySearchFocused()` លែងបង្រួម (30a6eb4) តែ `searchTapField()` · `restoreIOSDocumentScroll()` មិនដឹង · vitest ថ្មី ២ មុនកែ FAIL | `entrySearchMovesField()` តែមួយ ៖ focus · ការចុច iOS · ការត្រឡប់ ០ (តែពេលផ្ទាំងបង្រួម) ➜ កាមេរ៉ា + ផ្ទាំងបើក ➜ iOS ធម្មតា |
+| A64 | **ទំព័រស្កេន ៖ flag «focus ជាអ្នកបង្រួម» ចាស់ · ប្រអប់ Locker លាក់មានអក្សរ ➜ បើកវិញខុស/មិនបើក** (confirmed nit ×២) | Claude ៖ flag កំណត់តែពេល focus បង្រួម មិនដែលសម្អាតពេលផ្ទាំងបើកដោយដៃ ➜ បង្រួមដោយដៃ ➜ ចាកចេញ ➜ បើកវិញ · `ENTRY_SEARCH_FIELDS.some(value)` អានប្រអប់លាក់ · តេស្តទិសផ្ទុយចាស់ PASS ដោយចៃដន្យ (flag លេចពីតេស្តមុន) · vitest ថ្មី ៣ មុនកែ FAIL | `listenEntrySearchPanel()` (store subscription ៖ ផ្ទាំងបើក ➜ flag សម្អាត · boot សម្អាត) · ពិនិត្យតែប្រអប់នៃរបៀបដែលបង្ហាញ |
+| A65 | **SW ៖ ពាក់កណ្តាល revalidate នៃ `responseFitsKey()` គ្មានអ្នកយាម** (confirmed) | Claude ៖ `sw-backend-chunk-test` ផ្នែក ៤ ដើរតែទ្វារ miss · mutant ដក `responseFitsKey` ពី `revalidateShell()` រស់គ្រប់ checker | `sw-revalidation-timeout.test.ts` +២ (HTML ➜ put ០ · JS ➜ put ១) · mutant ➜ FAIL |
+| A66 | **iPhone PWA ៖ FLIP ចាប់ផ្តើមមុន `focus()` ➜ ប្រអប់គូរនៅទីតាំងចាស់ពេល focus** (uncertain · តំបន់ហាម) | អ្នកផ្ទៀង ៖ លំដាប់កូដពិត (Chromium ៖ កាតនៅទីតាំងចាស់ក្រោយ `focus()`) តែការរំកិលបង្ហាញ keyboard របស់ WebKit វាស់មិនបាន | ⛔ គ្មានកូដ (`phone-search.ts` ចាក់សោ · មិនកែតាមទ្រឹស្តី WebKit) ➜ [2.50.46] សកម្មភាព ២–៣ ៖ មើលការធ្លាក់/រអិលទំព័រទាំងមូល (រោគសញ្ញា A47) · ការវាស់ Chromium របស់ Claude ២ ➜ A70 |
+| A67 | **`sw-backend-chunk-test` ធ្លាក់ម្តងក្នុង run-all STRICT (95e91a0 ៖ ជោគជ័យ ២០១ · ធ្លាក់ ១) ៖ «ទិសផ្ទុយ ៖ chunk ពិតចូល cache ធម្មតា»** (ផ្នែក ៤ ថ្មីរបស់ 2.50.46) | Claude ៖ ទ្វារ miss របស់ SW ឆ្លើយទំព័រមុន `cache.put()` ចប់ (មិន await ដោយចេតនា) តែតេស្តអាន cache ភ្លាមក្រោយ `fetch` · ១២ ដងព្រមគ្នា (៦ × ២) មិនកើតឡើងវិញ ➜ ធ្វើត្រាប់ disk យឺត (put ពន្យារ ៤០០ms ក្នុងច្បាប់ចម្លង sw.js) ➜ ធ្លាក់ ៣ កន្លែង (ផ្នែក ២ ក៏ដូចគ្នា) · ការអះអាងអវិជ្ជមាន «មិនដាក់ HTML» ភ្លាមៗ អាច PASS ទទេពេល put យឺត = ការវាស់ race មិនមែនកូដ App | `cacheHasEventually()` (≤ `CACHE_PUT_SETTLE_MS`) · `cacheStaysEmpty()` (ពេញ `CACHE_PUT_GRACE_MS`) · put យឺត ➜ PASS ២៦ · put យឺត + mutant HTML ទ្វារ miss ➜ FAIL ២ · tree ពិត ➜ PASS ២៦ |
+| A68 | **`ZTO_PROXY_KEY` តែមួយគ្រប់ហាង ៖ `/detail` មិនចងគណនី/សាខា** (Handoff ៦ច · A59 ➜ ម្ចាស់គម្រោង ៖ «ធ្វើ ២ ៣ ៤ ចុះ») | Claude ៖ `handleRequest()` ផ្ទៀងតែ `timingSafeEqualText(ZTO_PROXY_KEY, …)` ➜ `/detail` ឆ្លើយលេខទូរស័ព្ទ · COD ដល់អ្នកមានសោ · `?list=1` ចង ID token + សាខារួច (`resolveListIdentity()`) · App ផ្ញើ token តែ `?list=1` · `zto-proxy-test` ផ្នែក ១២ មុនកែ FAIL ១៨ · vitest មុនកែ FAIL ៥ | [2.50.47] ៖ `ZTO_PROXY_KEYS` · `ZTO_DETAIL_IDENTITY` · `ZTO_DETAIL_BRANCH_PATHS` (លំនាំដើមដដែល · ម្ចាស់គម្រោងបើកតាមជំហាន) · `resolveListIdentity()` ប្រើឡើងវិញ (គ្មានការផ្ទៀងទី ២) · ⚠️ វាលសាខា ZTO ពិតត្រូវវាស់លើ Argus |
+| A69 | **run-all STRICT ពេញលើ b3c420c ([2.50.47]) ៖ ធ្លាក់ ៦ · ជោគជ័យ ១៩៦ · មួយផ្នែក ០ · រំលង ០** | Claude ៖ (១) `lookup-prefetch-test` · `lookup-freshness-test` · `lookup-failure-identity-test` · `lookup-burst-test` · `health-check-test` រត់ `attemptAutoLookup()` · `healthLookupRow()` ពិតក្នុង sandbox ដែលគ្មាន helper ថ្មី `addZtoIdentityHeader()` · `ztoAccessText()` ➜ ReferenceError ➜ catch ➜ «មិនអាចភ្ជាប់ ZTO» (FAIL ២៩ ក្នុង `health-check-test` · `lookup-burst-test` ៖ `window is not defined` ក្នុង catch) · (២) ក្រោយបន្ថែម helper ពិត ៖ `lookup-prefetch-test` FAIL ៣ ៖ សេណារីយ៉ូ «Lookup ចាស់មិនដោះសោ Lookup ថ្មី» រាប់ `__fetches` ភ្លាមក្រោយហៅ ខណៈ `fetch` ឥឡូវចេញក្រោយ `await` (សោ `autoLookupInFlight` នៅតែចាក់មុន `await` ➜ ឥរិយាបថស្ទួនមិនប្រែ) · ការអះអាង «មិនបាញ់សំណើទី ៣ ស្ទួន» ដោយគ្មានការរង់ចាំ = PASS ទទេ · (៣) `doc-scope-test` ៖ លិបិក្រម ៣ ជួរ | helper ពិតចូល sandbox (គ្មាន `fb`/`auth` ➜ `ztoIdToken()` ពិតឆ្លើយ '' · ការវាស់ token ៖ `zto-detail-identity.test.ts`) · `settleTurns()` មុនរាប់ `__fetches` (ទាំងការអះអាងវិជ្ជមាន និង «មិនបាញ់») · checker ទាំង ៦ + `checker-coverage` · `hang-guard` · `exit-code-integrity` PASS |
+| A70 | **Claude ២ ៖ ផ្ទៀងឯករាជ្យ 651cb0d (session ផ្សេង · read-only · ម្ចាស់គម្រោងស្នើ)** | Claude ២ ៖ run-all STRICT ពេញ ✅ ២០២ · A60–A67 ៖ tree មុនកែ FAIL · HEAD PASS · mutant នីមួយៗ FAIL ➜ បញ្ជាក់ · រកឃើញ (១) minor ៖ mutant `if (!(age > SB_OP_REPLAY_SAFE_MS))` (conflict គ្មាន `now` ➜ `NaN` ➜ `not-applied` ➜ ledger កាត់ ២ ដង) រស់គ្រប់អ្នកយាម Supabase (vitest ១៨៧ · adapter-parity ៩២ · app-network-e2e · tx-disconnect) · (២) nit ៖ mutant `sentAfter = Date.now() + serverOffset` រស់ (នាឡិកាឧបករណ៍លោតទៅមុខមុនផ្ញើ ➜ អាយុតូចពេក ➜ `not-applied` ខុស) · (៣) A66 ក្នុង Chromium ៖ `focus()`/`scrollIntoView` តម្រង់ទីតាំងដែល**គូរ** (transform រួម) · ៤១៤×៨៩៦ ៖ គ្មានការរំកិល · ៣៧៥×៦៦៧ (keyboard ២៦០) ៖ reveal ក្នុងស៊ុមដំបូងនៃការរអិលរំកិល `#appPages` ១៨px (`searchPhoneInput`) · ៦០px (`entryListSearchInput`) រួចត្រឡប់ ០ ក្នុង ៧០០ms (ស្រដៀង A47) · WebKit វាស់មិនបាន | Claude ៖ ផ្ទៀងប្រឆាំងលើ tree ពិត ៖ (១) `supabase-op-retention` «conflict គ្មាន `now`» (ce5bc34) · (២) តេស្តថ្មី «នាឡិកាលោតទៅមុខ ៣០ ម៉ោង មុនផ្ញើ + ដាច់ ៥០ ម៉ោង» ➜ mutant នីមួយៗ FAIL ១ · កូដពិត PASS ៩/៩ · គ្មានកូដ App ប្រែ · (៣) ⛔ គ្មានកូដ (តំបន់ហាម) ➜ សាកលើ iPhone SE / ទូរស័ព្ទតូចបន្ថែម (⏳ 2.50.46) |
+| A71 | **ការពិនិត្យប្រឆាំង [2.50.47] (workflow ៦ agent ៖ security · regressions · docs-tests + អ្នកផ្ទៀងម្នាក់ក្នុងមួយផ្នែក · ម្ចាស់គម្រោងបើក workflow ក្នុង session នេះ)** ៖ រកឃើញ ១៦ ➜ confirmed ១០ (major ១ · minor ៩) · refuted ៤ · ស្ទួន ២ | Claude ៖ (១) **major** ៖ សាខា Firebase មកពី `email` ក្នុង token ដែលអ្នកប្រើប្តូរបាន (`accounts:update` · sign-up បិទមិនរារាំង) ហើយគ្មានការចងគម្រោង ↔ សាខា ➜ បុគ្គលិកហាង A ប្តូរ email ទៅ `@zoew<សាខា B>.com` ➜ `/detail` ឆ្លើយលេខទូរស័ព្ទ · COD ហាង B (handler ពិត · token fixture) · ⛔ `email_verified` មិនមែនដំណោះស្រាយ (ឧបករណ៍ provision មិនផ្ទៀង email) · (២) Supabase គណនីគ្មានហាង = verified លើ `/detail` ខណៈ `?list=1` បដិសេធ · (៣) token យឺត/ផុត ➜ 401 ➜ «ចាកចេញ» + cooldown ៣០ វិ. (បំពាន «ផ្ទៀងមិនបាន ≠ ខុស») · (៤) `optional` រង់ចាំការផ្ទៀងលើរាល់សំណើ (Supabase ព្យួរ ➜ +៣ វិ. · cache ក៏ដូចគ្នា) · (៥) ប៊ូតុង 🧪 គ្មាន token ➜ 401 ពេល `require` · (៦) ឯកសារ ៖ លុប `ZTO_PROXY_KEY` ➜ Cookie Sync `--auto` ឈប់ស្ងាត់ («could not reach») · «សាក `optional` មុន `require`» មិនមានពិត (សាខាកំណត់រួចលើ `optional`) · (៧) គ្មានអ្នកយាម ៖ ការរាប់ `?diag=1` · 503 ផ្ទៀងមិនបាន/កំណត់ខុស · វាលសាខាច្រើន (mutant ៧ រស់) · refuted ៖ token ទៅ host ផ្សេង (URL កំណត់ក្រោម PIN · sweep សញ្ញាផ្ញើរួចពីមុន) · `optional`+សាខា = ការរចនា (ឯកសារត្រូវកែ ➜ (៦)) · typo env បិទ `?list=1` (លំនាំមានស្រាប់ · fail-closed) · `off` រង់ចាំ token (cache · ពិដាន ៣ វិ.) | [2.50.47] ៖ `FIREBASE_PROJECT_IDS` `projectId:សាខា` · `branch:project-unbound`/`-mismatch` · Supabase `site:no-account` · `optional` មិន await (រាប់ក្នុងធុងដែលចាប់ផ្តើម) · `ztoIdentityRefusalIsTransient()` · សារ ⚙️ តាមមូលហេតុសាខា · 🧪 ផ្ញើ token · Cookie Sync `key-rejected` · ZTO-SETUP ៤គ/៤ឃ/៦ · តេស្តថ្មីធ្លាក់មុនកែ (Function ១៤ · vitest ៤ · Sync ២) · mutant ១០ ➜ FAIL ទាំងអស់ |
+
+- **ឯកសារ** ៖ Handoff ៖ ស្ថានភាព git (PR #304 merge · repo Public វាស់តាម API) · «នៅសល់តែ [2.50.1]» ផ្ទុយនឹងបញ្ជី ⏳ ១៥ ធាតុ ➜ កែ · «សន្សំកូតា» (ច្បាប់ក្នុង HISTORY ផ្ទុយ
+  `CLAUDE.md` Runbook) ➜ យោង Runbook · `firebase-backup/README.md` ៖ repo សាធារណៈ ➜ artifact ទាញបានដោយអ្នកមានគណនី ➜ ពាក្យសម្ងាត់ចៃដន្យ ≥ ៣២ តួ · `CLAUDE.md` ៖ ច្បាប់ថ្មី ៤ (Supabase
+  conflict ក្រោយបង្អួច · HTML ក្រោម key · glide ស្វែងរក · ប៊ូតុងពិនិត្យកំណែ) ក្នុងជួរដែលមានស្រាប់ (គ្មានជួរថ្មី) · ដកស្ទួន ២ ៖ តារាង Base directory
+  ក្នុង «Netlify: 2 sites» (ដដែលនឹង «Accepted by design» និងជួរ 📝) ➜ យោង · «`function-surface-test.js` blocks duplicate declarations» ក្នុង Short rules (ដដែលនឹងតារាង «Rules carried by specific checkers»)។
+- **ឯកសារឈប់ប្រើ** ៖ ពិនិត្យ `git ls-files` ទាំងអស់ (ឈ្មោះឯកសារ ↔ ការយោង) ➜ គ្មានឯកសារងាប់ · `src/core/runtime.ts` (`ACTION_ALLOWLIST`) អានដោយ checker ➜ រក្សា ·
+  `ZoeW/docs/MIGRATION.md` ធ្វើបច្ចុប្បន្នភាពក្នុង DOCS-5 ➜ រក្សា។
+- **មិនបានរកឃើញ** (អានរួច) ៖ ច្បាប់ RLS · `current_tenant_id()` (user ១ = ហាង ១) · Edge Function register/reset (កូដ ១០០ bit · CORS ចង origin) · `ApkUpdatePlugin.java` (HTTPS ·
+  packageName + versionName · Android ផ្ទៀង signature ពេលដំឡើង) · license meta (display តែប៉ុណ្ណោះ) · listener ស្ទួន (`addEventListener` គ្រប់កន្លែង ➜ scope ឬ function ដដែល) · គ្មាន
+  `innerHTML` ក្នុង ZoeW React · គ្មាន secret ក្នុង repo (`git grep` private key · token · `sb_secret_`)។
+- **ជុំបន្ត (session ថ្មី · A60–A67)** ៖ run-all STRICT ពេញលើ tree ចុងក្រោយរបស់ session មុន (A60) ➜ workflow ពិនិត្យ diff `fe52290..HEAD` (ម្ចាស់គម្រោងបើក
+  workflow ក្នុង session នេះ ៖ ៥ ផ្នែក — លុយ/Supabase · SW · UI ស្វែងរក · ពិនិត្យកំណែ · ឯកសារ/ឧបករណ៍ — រកឃើញ ១២ ➜ អ្នកផ្ទៀងប្រឆាំងម្នាក់ក្នុងមួយផ្នែក ៖ confirmed ៩ ·
+  refuted ១ (កែរួចក្នុង A60) · uncertain ១ (A66) · ការរកឃើញឯកសារ ៣ ៖ guide.html ប្រយោគ 🔄 កាត់ «ចុច ➜» ចេញពីប៊ូតុង 📥 · ករណីកាមេរ៉ាមិនបានសរសេរ · announcements «APK លើ GitHub»
+  បង្ហាញលើគ្រប់វេទិកា ➜ កែ) · fuzz លុយជ្រៅ `FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=80` PASS ៣/៣ (៧ នាទី · `ledgerBlip` applied ១៥ · lost ១១)។
+
 ### 2026-10-08 — iPhone PWA ៖ ចុចស្វែងរកលេខ navbar ធ្លាក់ ហើយរអិលឡើង · iOS 26 បង្ហាញ 18.7 ➜ [2.50.45]
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -4613,7 +4786,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៦ |
 | `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `html-sink-escaping` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `idtoken-fixture` | ផ្នែក ២ | — |
+| `idtoken-fixture` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `item-money-integrity-test` | — | ផ្នែក ១ |
@@ -4640,7 +4813,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `lookup-burst-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-burst-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-config-secret-test` | — | ផ្នែក ១ |
 | `lookup-failure-identity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -4664,8 +4837,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `phone-suggest-test` | — | ផ្នែក ១ |
+| `phone-search-swipe-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `phone-suggest-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `pickup-barcode-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
@@ -4722,7 +4895,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `supabase-rls-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `sw-backend-chunk-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-cache-failure-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-cache-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sw-client-wiring-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -4748,7 +4921,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zto-network-boundaries-test` | — | ផ្នែក ២ |
-| `zto-proxy-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
 | `zto-sync-banner-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `ZoeW/tests/activation-retry.test.ts` | ផ្នែក ១ | — |
@@ -4772,6 +4945,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
@@ -4802,6 +4976,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/pwa-icons.test.ts` | ផ្នែក ១ | — |
@@ -4823,6 +4998,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-gateway-5xx.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-notify-dirty.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-offline-restore.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-op-retention.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-realtime-ws.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-signout-offline.test.ts` | ផ្នែក ១ | — |
@@ -4834,7 +5010,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-unsent-tx.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-update-contract.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/toast-backend.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-live-expiry.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
@@ -4845,6 +5021,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-barcode-shape.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |

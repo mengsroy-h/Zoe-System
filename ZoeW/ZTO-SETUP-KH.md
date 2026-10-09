@@ -494,6 +494,10 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 
 **Project ច្រើន** ➜ បំបែកដោយ comma ៖ `zoew-v1,zoew-branch2` (ដកឃ្លាក៏បាន)។
 
+**ចងគម្រោងនីមួយៗទៅលេខសាខា** (ណែនាំ · ចាំបាច់ពេលប្រើផ្នែក ៤ឃ ជំហានទី ៣) ៖ `Project ID:លេខសាខា` ឧ. `zoew-v1:12345,zoew-branch2:67890` ·
+សាខាច្រើនក្នុងគម្រោងមួយ ➜ `zoew-v1:12345|12346`។ អ្នកប្រើអាចប្តូរ email គណនីខ្លួនឯងបាន ➜ Function ទទួលលេខសាខាពី email តែពេលវាស្ថិតក្នុងសាខាដែលចងសម្រាប់គម្រោងនោះ
+(ក្រៅនោះ ➜ គណនីគ្មានសាខា ➜ `site:no-account`)។ ការចងខុសទម្រង់ ➜ `idtoken:project-unset` (បិទទាំងអស់ · មិនបើកចំហ)។
+
 ⛔ **សូមលុប `ZTO_LIST_SITE_CODE` ចេញ** — កូដលែងអានវាតាំងពីមុនមកហើយ។
 
 បើកែ env ណាមួយ ➜ **Deploys ➜ Trigger deploy ➜ Deploy site**។
@@ -754,6 +758,65 @@ ZoeW លុបកញ្ចប់ដែលអតិថិជនមិនមកយ
 បើកវិញទេ — សាខាមកពីគណនី)។ ដកគ្រីស **Fast Mode** ➜ កុងតាក់ខ្លួនវាក៏
 លាក់ដែរ ហើយ **មុខងារឈប់ទាំងស្រុង**។
 
+## ៤ឃ. ការពារ `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (ណែនាំពេលមានហាងច្រើន)
+
+`/detail` (ការស្វែងរកតាម barcode) ឆ្លើយលេខទូរស័ព្ទ និង COD របស់អតិថិជន។ ពេលហាងច្រើនប្រើ site `zoew` តែមួយ ៖ សោតែមួយដែលលេចពីទូរស័ព្ទមួយ
+បើកការអានកញ្ចប់ ZTO គ្រប់សាខា។ ជំហានទាំង ៣ ខាងក្រោមបិទផ្លូវនោះម្តងមួយជាន់ — ធ្វើតាមលំដាប់ ហើយ **Trigger deploy** ក្រោយការកែ env នីមួយៗ។
+
+### ជំហានទី ១ — សោមួយក្នុងមួយហាង (`ZTO_PROXY_KEYS`)
+
+| Key | តម្លៃ | Secret |
+| --- | --- | --- |
+| `ZTO_PROXY_KEYS` | `ឈ្មោះ=សោ` ក្នុងមួយហាង បំបែកដោយ comma ឬបន្ទាត់ថ្មី (ឧ. `shop-pp1=…,shop-sr2=…`) | ✅ |
+
+- ឈ្មោះ ៖ អក្សរតូច `a-z` · លេខ · `-` (យ៉ាងច្រើន ៣២) មិនស្ទួន · សោ ៖ យ៉ាងតិច ១៦ តួ មិនស្ទួន — បង្កើតដោយពាក្យបញ្ជា PowerShell ក្នុងផ្នែក ១ ម្តងក្នុងមួយហាង។
+- `ZTO_PROXY_KEY` ចាស់នៅដំណើរការជាមួយ (ឈ្មោះ `default`) ➜ ប្តូរម្តងមួយហាង ៖ ទូរស័ព្ទនីមួយៗ ➜ ⚙️ API ស្វែងរកអតិថិជន ➜ តម្លៃ Header = សោហាងនោះ ➜
+  🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ Lookup បង្ហាញ «សោហាង ឈ្មោះ»។ ពេលគ្មានទូរស័ព្ទណាបង្ហាញ `default` ទៀត ➜ លុប `ZTO_PROXY_KEY` ➜ Trigger deploy។
+- សោហាងមួយលេច ➜ លុបតែធាតុនោះ ➜ Trigger deploy ➜ ឲ្យសោថ្មីដល់ហាងនោះ (ហាងផ្សេងមិនប៉ះ)។
+- `?diag=1` ➜ `access.keyLabel` (ឈ្មោះសោដែលសំណើនេះប្រើ) · `keys` (ចំនួនសោត្រឹមត្រូវ) · `invalidKeys` (> ០ = ធាតុខុស ៖ គ្មានឈ្មោះ · ឈ្មោះខុស · សោខ្លី · ស្ទួន
+  ➜ ធាតុនោះមិនផ្តល់សិទ្ធិ)។ គ្មានសោត្រឹមត្រូវណាមួយ ➜ `ZTO_PROXY_NOT_CONFIGURED`។
+- ឧបករណ៍ Cookie Sync (`--check` · `--auto`) ប្រើសោណាមួយក្នុងបញ្ជីបាន (ផ្នែកក្រោយ `=`) ៖ ⛔ **មុនលុប `ZTO_PROXY_KEY`** រត់ `setup.cmd` / `setup-termux.sh`
+  ម្តងទៀតលើគ្រប់ម៉ាស៊ីន Sync (Enter = រក្សាតម្លៃផ្សេង) ជាមួយសោមួយក្នុង `ZTO_PROXY_KEYS` (ឧ. ឈ្មោះ `sync`) ➜ `sync-zto-cookie.cmd --check` ឆ្លើយ OK។
+  🩺 មើលមិនឃើញម៉ាស៊ីន Sync ទេ ➜ បើភ្លេច `--auto` ឈប់បន្តអាយុ Cookie ហើយប្រាប់ «the Function refused the proxy key»។
+
+### ជំហានទី ២ — ចងគណនី (`ZTO_DETAIL_IDENTITY`)
+
+ZoeW ផ្ញើ ID token របស់គណនីដែលកំពុងចូល (header `X-Zoe-Id-Token`) ទៅ Function ZTO តែប៉ុណ្ណោះ (មិនដែលទៅ API ស្វែងរកផ្សេង)។ Function ផ្ទៀងវាដូចបញ្ជី ZTO ៖
+ត្រូវការ `FIREBASE_PROJECT_IDS` (ហាង Firebase · ផ្នែក ៤គ ជំហានទី ២) និង/ឬ `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` (ហាង Supabase)។
+
+| តម្លៃ | ឥរិយាបថ |
+| --- | --- |
+| `off` (លំនាំដើម · មិនកំណត់) | មិនពិនិត្យគណនី |
+| `optional` | ពិនិត្យពេលមាន token · មិនបដិសេធ · រាប់ក្នុង `?diag=1` |
+| `require` | គ្មាន/មិនត្រឹមត្រូវ ➜ 401 `ZTO_IDENTITY_REQUIRED` · ផ្ទៀងមិនបាន (Google/Supabase មិនឆ្លើយ) ➜ 503 `ZTO_IDENTITY_UNAVAILABLE` (App សាកម្តងទៀត) · Function កំណត់ខុស (`idtoken:project-unset` · `idtoken:supabase-unset`) ➜ 503 `ZTO_CONFIG_INVALID` |
+
+គណនី Supabase ដែលគ្មានហាង (`site:no-account`) ➜ បដិសេធដូច token មិនត្រឹមត្រូវ។ App ៖ token យកមិនទាន់ទាន់ពេល (refresh យឺត) · token ផុត · កូនសោ Google ថ្មី ➜
+«⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត» · token ក្លែង/គណនីមិនត្រឹមត្រូវ ➜ «🔒 … សូមចាកចេញ ហើយចូលគណនីម្តងទៀត»។
+
+លំដាប់ ៖ ទូរស័ព្ទទាំងអស់ប្រើ ZoeW កំណែបច្ចុប្បន្ន ➜ `optional` ➜ ស្កេនធម្មតាមួយថ្ងៃ ➜ `?diag=1` ៖ `access.verified` កើន · `access.missing` និង `rejected` នៅ ០
+(លេខរាប់តាម container ➜ ពិនិត្យច្រើនដង) ➜ `require`។ តម្លៃខុស (ឧ. `requre`) ➜ `ZTO_CONFIG_INVALID` `detail-identity:invalid` (Function មិនបើកចំហស្ងាត់ៗ)។
+`?diag=1` ត្រូវការតែសោ (🩺 និងឧបករណ៍ Sync ដំណើរការដដែល)។
+
+### ជំហានទី ៣ — កំណត់សាខា (`ZTO_DETAIL_BRANCH_PATHS`)
+
+Function ឆ្លើយតែកញ្ចប់ដែលលេខសាខាក្នុងកំណត់ត្រា ZTO = លេខសាខារបស់គណនី (ហាង Firebase ៖ email `@zoew<លេខ>.com` ក្នុងសាខាដែលចងសម្រាប់គម្រោងនោះ ·
+ហាង Supabase ៖ `branch_code` ដែល server សរសេរ)។
+
+1. **ចងគម្រោង Firebase នីមួយៗទៅលេខសាខា** ៖ `FIREBASE_PROJECT_IDS` = `Project ID:លេខសាខា` (ផ្នែក ៤គ ជំហានទី ២) ⛔ ធ្វើមុន ៖ គម្រោងដែលមិនចង ➜
+   គណនីរបស់វាមិនឃើញព័ត៌មានកញ្ចប់ណាទាំងអស់ (`branch:project-unbound`) ព្រោះ email ជាសញ្ញាដែលអ្នកប្រើប្តូរខ្លួនឯងបាន។ `?diag=1` ➜ `access.branch.unboundProjects` ត្រូវ ០។
+2. Argus ➜ បើកព័ត៌មានកញ្ចប់ **ច្រើន** របស់សាខាអ្នក (DevTools ➜ Network ➜ `order/detail` ➜ Response) ➜ រកវាលដែលមានលេខសាខាដូចលេខក្នុង email
+   លើគ្រប់កញ្ចប់ (វិធីដូចផ្នែក ៤ខ ជំហានទី ១)។
+3. `ZTO_DETAIL_BRANCH_PATHS` = ឈ្មោះវាលនោះ (ផ្លូវចុច ឧ. `a.b` · ច្រើនបំបែកដោយ comma ➜ ត្រូវវាលណាមួយក៏គ្រប់ · `off` = បិទ) ➜ Trigger deploy។
+   ផ្លូវខុសទម្រង់ ➜ `ZTO_CONFIG_INVALID` `field:branch`។
+4. ⛔ ការកំណត់នេះមានប្រសិទ្ធភាពភ្លាមលើគ្រប់ទូរស័ព្ទដែលផ្ញើគណនី — ទាំង `optional` ទាំង `require` (គ្មានដំណាក់កាលមើលតែប៉ុណ្ណោះ)។ ក្រោយ deploy ភ្លាម ៖
+   ស្កេនកញ្ចប់សាខាខ្លួនឯងពីរបី ➜ `?diag=1` ➜ `access.branch` ៖ `matched` (ត្រូវ) ត្រូវកើន · `other` (សាខាផ្សេង/គម្រោងមិនចង) · `missing` (កំណត់ត្រាគ្មានវាលនោះ) ·
+   `seen` (លេខសាខាដែលឃើញ)។ កញ្ចប់សាខាខ្លួនឯងធ្លាក់ក្នុង `other`/`missing` ➜ ដាក់ `ZTO_DETAIL_BRANCH_PATHS` = `off` ➜ Trigger deploy ➜ រកវាលម្តងទៀត។
+
+កញ្ចប់សាខាផ្សេង ➜ Function ឆ្លើយ `found:false` `ZTO_OTHER_BRANCH` `branch:other` (គ្មានលេខទូរស័ព្ទ · COD) ➜ App បង្ហាញ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
+កំណត់ត្រាគ្មានវាលសាខា (`branch:missing`) · គណនីគ្មានលេខសាខា (`branch:no-account-site`) · email ក្រៅសាខាដែលចង (`branch:project-mismatch`) · គម្រោងមិនចង
+(`branch:project-unbound`) ➜ ក៏គ្មានលេខទូរស័ព្ទ · COD ដែរ តែ App បង្ហាញ «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន … — ជាប់ត្រង់ <មូលហេតុ>»។
+`off` (ឬ `ZTO_DETAIL_IDENTITY` = `off`) ➜ មិនកំណត់សាខា។
+
 ## ៥. ល្បឿន និងស្ថេរភាព
 
 | Key | Default | ន័យ |
@@ -844,7 +907,10 @@ ZTO។ បង្អួចដែលនៅសល់សម្រាប់ការ�
 | `ZTO_AUTH_EXPIRED` | 🔒 ZTO បដិសេធ Cookie | Login Argus និង Lookup ជោគជ័យ រួចរត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
 | `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | រត់ `sync-zto-cookie.cmd` ឬដាក់ `ZTO_COOKIE`/`ZTO_AUTHORIZATION` |
 | `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
-| `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` |
+| `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` · `reason` `proxy-keys:invalid` ➜ គ្រប់ធាតុក្នុង `ZTO_PROXY_KEYS` ខុស (ផ្នែក ៤ឃ ជំហានទី ១) |
+| `ZTO_IDENTITY_REQUIRED` | 🔒 … សូមចាកចេញ ហើយចូលគណនីម្តងទៀត (ឬ ⚠️ ផ្ទៀងផ្ទាត់គណនីមិនបាន — ពេល token យឺត/ផុត) | `ZTO_DETAIL_IDENTITY` = `require` ➜ ផ្នែក ៤ឃ ជំហានទី ២ |
+| `ZTO_IDENTITY_UNAVAILABLE` | ⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន | Google certs/Supabase មិនឆ្លើយ — ស្កេនម្តងទៀត |
+| `ZTO_OTHER_BRANCH` | ⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង · ⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន | `reason` ➜ ផ្នែក ៤ឃ ជំហានទី ៣ |
 | `ZTO_NOT_FOUND` | ⚠️ ZTO មិនឃើញទិន្នន័យ | Barcode នោះមិនមានក្នុង ZTO ពិត — វាយដោយដៃ |
 | `ZTO_RATE_LIMITED` | 🚦 ZTO កំណត់ល្បឿន | រង់ចាំបន្តិច; បន្ថយល្បឿនស្កេន |
 | `ZTO_TIMEOUT` · `ZTO_UPSTREAM_UNAVAILABLE` | ⏱️ ZTO ឆ្លើយតបយឺតពេក | បណ្តាញ ឬ ZTO យឺត — ស្កេនម្តងទៀត |

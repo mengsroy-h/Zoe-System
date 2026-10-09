@@ -86,6 +86,17 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
 const GUIDE_PATH = new URL('./guide.html', self.location.href).pathname;
 const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 
+function responseFitsKey(cacheKey: string | Request, response: Response): boolean {
+    if (typeof cacheKey !== 'string' || /\.html$/i.test(cacheKey) || /\/$/.test(cacheKey)) return true;
+    let type: string;
+    try {
+        type = String(response.headers.get('content-type') || '');
+    } catch (e) {
+        return true;
+    }
+    return !/^\s*text\/html\b/i.test(type);
+}
+
 function cacheKeyFor(request: Request): string | Request {
     const url = new URL(request.url);
     if (request.mode === 'navigate') {
@@ -163,7 +174,7 @@ function revalidateShell(cache: Cache, request: Request, cacheKey: string | Requ
         shellDeployIsCurrent().then((current) => {
             if (!current || released) return;
             return fetch(target, controller ? { signal: controller.signal, cache: FRESH } : { cache: FRESH }).then((response) => {
-                if (released || !response || !response.ok || response.redirected) return;
+                if (released || !response || !response.ok || response.redirected || !responseFitsKey(cacheKey, response)) return;
                 return cache.put(cacheKey, response.clone());
             });
         }).then(release, release);
@@ -266,7 +277,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
                 const networkFetch = timedFetch(networkTarget, networkOptions)
                     .then((response) => {
-                        if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
+                        if (isShell && response && response.ok && !response.redirected && responseFitsKey(cacheKey, response)) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
                     })
                     .catch(() => null);

@@ -3016,6 +3016,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A74 | **iPhone ៖ ចលនាស្វែងរកមើលទៅលោត** | វីដេអូ iPhone (៦០ ស៊ុម/វិ.) ៖ ស៊ុមចុងក្រោយមុនការប្រែ ➜ ស៊ុមបន្ទាប់កាតនៅ ~៩០% នៃចម្ងាយ (២១២ ➜ ៧២ · ចុង ៦៤) · ខ្សែកោង `cubic-bezier(0.22, 1, 0.36, 1)` 220ms ៖ ៨០ms = ៨៩% ➜ iOS មិនបង្ហាញស៊ុម ~៨០ms ពេលរៀបចំ keyboard ខណៈនាឡិកា animation រត់ · ទំព័រស្កេនដូចគ្នា (ផ្ទាំងបង្រួមភ្លាម) · blur (glide ក្នុង timer ១៥០ms) រលូន ➜ មិនមែន Reduce Motion · Chromium ៖ ស៊ុមដំបូង ៣១.៦% · busy-loop ១២០ms ក្រោយស៊ុមដំបូង ➜ ៩៨% | `PANEL_SEARCH_GLIDE` ៖ `cubic-bezier(0.4, 0, 0.2, 1)` (៨០ms = ៣៣%) · pause រហូតស៊ុមហូរ ➜ ក្រោយកក ០% · ⚠️ ការកកលើ iOS អាចកើតក្រៅ web process (ទ្រឹស្តី) ➜ ខ្សែកោងថ្មីជាស្រទាប់ការពារទី ២ |
 | A75 | **ទំព័រស្កេន ៖ ប្រអប់កញ្ចប់ «ឡើងមកឈរពីលើ keyboard តាមក្រោយ»** | វីដេអូ APK ៖ keyboard ពេញ ១២.៦ វិ. ➜ ១២.៨ វិ. សារ «មិនទាន់មាន…» លោតពីក្រោម keyboard មកពីលើ (KeyboardOpenHold បង្រួម WebView តែម្តងពេលចប់) · PWA Android ៖ ដូចគ្នា (Chrome បង្រួមក្រោយ keyboard) · មូលហេតុ ៖ `.table-responsive` `flex: 1` ➜ សារទទេជាកូនចុងកាត ➜ ផ្លាស់ទីតាមបាតកាត (`100dvh`) · Chromium ៖ ផ្ទៃ -៣៣០ ➜ សារ ៧២៥ ➜ ៣៩៥ | `.entry-search-open` ៖ តារាង `flex: 0 0 auto` · សារ `flex: 1 1 auto` (តែពេលស្វែងរកក្នុងផ្ទាំងបង្រួម ➜ សេណារីយ៉ូ `panel-motion-test` ផ្នែក ៩ មិនប្រែ) |
 
+- **អ្នកយាមដែលត្រូវតាមក្រោយ** (run-all STRICT លើ `2705554` ៖ ធ្លាក់ ២ · ជាប់ ២០០) ៖ (១) `layout-thrash` រង់ចាំត្រឹម ៨០ms ក្រោយ focus + input ហើយតម្រូវ `#phoneSuggestBox.show` ➜ ឥឡូវប្រអប់ធ្លាក់ចុះតែក្រោយ glide ចប់ (រង់ចាំស៊ុមហូរ ≤ `PANEL_GLIDE_HOLD_MAX_MS` + `PANEL_SEARCH_GLIDE_MS`) ➜ poll រហូតបង្ហាញក្នុងពិដាន `SUGGEST_SHOW_CEILING_MS` (១៥០០ms · ផុតពិដាន = FAIL)។ មិនមែនបន្ធូរទេ ៖ អ្វីដែលវាស់ (ចំនួនការវាស់ទីតាំងពេលរមូរ ≤ ៤) មិនប្រែ · (២) `doc-scope-test` ៖ លិបិក្រម 🔎 ជួរ `panel-motion-test` (ផ្នែក ១ · ផ្នែក ២) · `panel-snap-ownership-test` (ផ្នែក ១) តាមការលេចថ្មីនៃ [2.50.48]។ គ្មាន bump (តែ `audit-tools/` · ឯកសារ)។
+
 ### 2026-10-08 — Deep audit ៣ (សំណើម្ចាស់គម្រោង ៖ «deep audit គ្រប់ជ្រុងជ្រោយ មុនប្រកាសឲ្យប្រើជាផ្លូវការ») ➜ [2.50.46]
 
 **វិធី** ៖ run-all STRICT ពេញ (emulator RTDB · Postgres ពិត) មុនកែ ➜ អានកូដដោយផ្ទាល់ (លុយ · Supabase adapter + SQL · SW · Push · ZTO Function · License ·
@@ -4840,7 +4842,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `layout-thrash` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -4872,8 +4874,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `network-timeout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `offline-shell-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `page-nav-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `panel-snap-ownership-test` | — | ផ្នែក ២ · ផ្នែក ៦ |
+| `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |

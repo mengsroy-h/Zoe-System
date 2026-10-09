@@ -90,7 +90,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — model iPhone · គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (branch `claude/blissful-curie-9ic58s` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ ឃើញ model/ក្រុម · ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs ([2.50.52] សកម្មភាព ២–៤)។
+- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — model iPhone · គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (branch `claude/blissful-curie-9ic58s` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ ឃើញ model/ក្រុម · ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
 - ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (PR #305 merge រួច · ម្ចាស់គម្រោងសាកលើ APK · PWA Android · PWA iPhone 2026-10-09 ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន មិនរលូន ➜ [2.50.48])** ៖ iPhone PWA · Android PWA · APK ៖ keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
@@ -223,6 +223,8 @@
    App ភ្ជាប់/ផ្ទុកឡើងវិញដោយខ្លួនឯង (មិនបាច់ចុច Refresh)។
 4. Push ៖ ពិនិត្យតាម `ZoeW/README.md` ផ្នែក «ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App» ៖ `…/.netlify/functions/push?op=config` ➜ `web`/`fcm` = `true` ·
    ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
+5. ZoeKeyGen (ជម្រើស) ៖ ចូល «🏪 ហាង Supabase» ➜ ចុច ⚙️ (ប្រអប់ PIN) ហើយបោះបង់ ➜ 🔄 Refresh / បង្កើតហាង នៅដើរ (មិនស្ងាត់) · Generate Key ហើយបើក/បិទប្រអប់ PIN ពេលកំពុងបង្កើត ➜
+   ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 

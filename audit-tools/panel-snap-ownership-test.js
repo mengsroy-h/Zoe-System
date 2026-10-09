@@ -24,7 +24,8 @@ function extractActualSource() {
     const required = new Set([
         'PANEL_GLIDE_MS', 'PANEL_GLIDE_EASING', 'PANEL_GLIDE_SNAP_GRACE_MS',
         'panelGlideTokens', 'panelGlideRelease', 'panelMotionAllowed',
-        'beginPanelGlideSnapPause', 'endPanelGlideSnapPause', 'panelGlideFrom'
+        'beginPanelGlideSnapPause', 'endPanelGlideSnapPause', 'panelGlideFrom',
+        'panelGlideAnimations', 'stopPanelGlide', 'playPanelGlideWhenFramesFlow', 'PANEL_GLIDE_HOLD_MAX_MS', 'PANEL_GLIDE_FLOW_FRAME_MS'
     ]);
     const wanted = new Set([...required, 'panelGlideEpoch']);
     const found = new Map();

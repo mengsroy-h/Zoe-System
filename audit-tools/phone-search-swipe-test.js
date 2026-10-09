@@ -434,8 +434,12 @@ console.log('\n=== iOS ប្រគល់ gesture ពីតារាងទៅផ
         'JSX ពិតគូរ/ដក `.panel-gliding` តាមស្ថានភាពផ្អាក (snap ផ្អាក ➜ ត្រឡប់វិញ)');
     ok(/anim\.finished\.then\(release, release\)/.test(src),
         'ការដក snap pause ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង');
-    ok(/setTimeout\(endPanelGlideSnapPause, PANEL_GLIDE_MS \+ PANEL_GLIDE_SNAP_GRACE_MS\)/.test(src),
-        'មាន timer សុវត្ថិភាព ➜ snap ត្រឡប់មកវិញទោះចលនាត្រូវកាត់ផ្តាច់');
+    // ⛔ ចលនាស្វែងរក (`PANEL_SEARCH_GLIDE`) វែងជាង + រង់ចាំស៊ុមហូរ ➜ timer វាស់តាមរយៈពេលពិត (`spanMs`) ដែលលំនាំដើម = `PANEL_GLIDE_MS`
+    //    (ចលនាអូស/handle នៅដដែល) ➜ ទាំងការហៅលំនាំដើម និង timer ត្រូវមាន
+    ok(/setTimeout\(endPanelGlideSnapPause, spanMs \+ PANEL_GLIDE_SNAP_GRACE_MS\)/.test(src)
+        && /function beginPanelGlideSnapPause\(spanMs = PANEL_GLIDE_MS\)/.test(src)
+        && /beginPanelGlideSnapPause\(timing\.duration \+ \(holding \? PANEL_GLIDE_HOLD_MAX_MS : 0\)\)/.test(src),
+        'មាន timer សុវត្ថិភាព ➜ snap ត្រឡប់មកវិញទោះចលនាត្រូវកាត់ផ្តាច់ (រយៈពេលពិតនៃចលនា · លំនាំដើម PANEL_GLIDE_MS)');
 }
 
 console.log('\n=== កំពុងស្វែងរកលេខទូរស័ព្ទ — កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ ===');

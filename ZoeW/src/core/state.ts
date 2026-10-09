@@ -324,6 +324,7 @@ export interface UiState {
     updateReady: boolean;
     dataPanelCollapsed: boolean;
     entryPanelCollapsed: boolean;
+    entrySearchActive: boolean;
     dataPanelSearchFocus: boolean;
     historyExpanded: boolean;
     panelGliding: boolean;
@@ -423,6 +424,7 @@ export const uiState = createStore<UiState>('uiState', {
     updateReady: false,
     dataPanelCollapsed: false,
     entryPanelCollapsed: false,
+    entrySearchActive: false,
     dataPanelSearchFocus: false,
     historyExpanded: false,
     panelGliding: false,
@@ -436,7 +438,7 @@ export const uiState = createStore<UiState>('uiState', {
 });
 registerStore(uiState);
 uiState.markImmediate(['modalDisplay', 'modalStack', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
-    'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
+    'dataPanelCollapsed', 'entryPanelCollapsed', 'entrySearchActive', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden', 'keyboardOpen']);
 
 export interface PtrView {

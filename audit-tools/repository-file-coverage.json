@@ -3077,6 +3077,9 @@
     },
     "ZoeW/tests/zto-detail-identity.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/search-glide-hold.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

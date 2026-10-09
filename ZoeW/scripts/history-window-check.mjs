@@ -186,6 +186,66 @@ try {
                 && glide.after.anims === 0 && glide.after.shift === 0, glide);
         check(mode.label + ' ៖ ចាកចេញពីប្រអប់ស្វែងរកទទេ ➜ ផ្ទាំងចុះវិញដោយរអិល · ចប់ ➜ គ្មាន transform សល់',
             !glide.down.pulled && glide.down.main > 0 && glide.rest.anims === 0 && glide.rest.shift === 0, glide);
+        const follow = await page.evaluate(async () => {
+            const input = document.getElementById('searchPhoneInput');
+            const card = input.closest('.app-card');
+            const before = card.getBoundingClientRect().top;
+            const samples = [];
+            input.focus();
+            const t0 = performance.now();
+            await new Promise((done) => {
+                const step = (now) => {
+                    const box = document.getElementById('phoneSuggestBox');
+                    const br = box ? box.getBoundingClientRect() : null;
+                    const ir = input.getBoundingClientRect();
+                    samples.push({ t: now, card: card.getBoundingClientRect().top, inputBottom: ir.bottom,
+                        open: !!window.uiState.phoneSuggestOpen && !!br && br.height > 0, boxTop: br ? br.top : null,
+                        opacity: box ? Number(getComputedStyle(box).opacity) : 1 });
+                    if (now - t0 < 700) requestAnimationFrame(step); else done();
+                };
+                requestAnimationFrame(step);
+            });
+            const after = card.getBoundingClientRect().top;
+            input.blur();
+            await new Promise((r) => setTimeout(r, 1000));
+            return { before, after, samples };
+        });
+        const dist = Math.abs(follow.before - follow.after);
+        const open = follow.samples.filter((s) => s.open);
+        const settledAt = follow.samples.find((s) => Math.abs(s.card - follow.after) <= 1);
+        const openWhileMoving = open.filter((s) => Math.abs(s.card - follow.after) > 1).length;
+        const firstOpen = open[0];
+        const lastOpen = open[open.length - 1];
+        const drop = firstOpen && lastOpen ? { first: Math.round(firstOpen.boxTop - firstOpen.inputBottom), last: Math.round(lastOpen.boxTop - lastOpen.inputBottom),
+            opacity: firstOpen.opacity, wait: Math.round(firstOpen.t - settledAt.t) } : null;
+        check(mode.label + ' ៖ ប្រអប់ phone suggestion ធ្លាក់ចុះតែក្រោយប្រអប់ស្វែងរកទៅដល់លើរួច (មិនបង្ហាញពេលកំពុងរអិល · ធ្លាក់ពីលើមកក្រោមប្រអប់)',
+            dist > 20 && open.length >= 5 && openWhileMoving === 0 && !!drop && drop.wait <= 150 && Math.abs(drop.last - 4) <= 1
+                && (drop.first < drop.last - 2 || drop.opacity < 0.95), { dist, openWhileMoving, drop });
+        const steps = [];
+        for (let i = 1; i < follow.samples.length; i++) {
+            const a = follow.samples[i - 1], b = follow.samples[i];
+            if (b.t - a.t <= 20) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
+        }
+        check(mode.label + ' ៖ ចលនាស្វែងរកមិនលោត ៖ ស៊ុមនីមួយៗ (≤ 20ms) ផ្លាស់ទី ≤ ២០% នៃចម្ងាយ',
+            dist > 20 && steps.length >= 4 && Math.max(...steps) <= 0.2, { dist, steps });
+        const stall = await page.evaluate(async () => {
+            const input = document.getElementById('searchPhoneInput');
+            const card = input.closest('.app-card');
+            const before = card.getBoundingClientRect().top;
+            input.focus();
+            await new Promise((r) => requestAnimationFrame(r));
+            const spin = performance.now();
+            let spins = 0;
+            while (performance.now() - spin < 120) spins++;
+            const first = await new Promise((r) => requestAnimationFrame(() => r(card.getBoundingClientRect().top)));
+            await new Promise((r) => setTimeout(r, 900));
+            const rest = card.getBoundingClientRect().top;
+            input.blur();
+            await new Promise((r) => setTimeout(r, 1000));
+            return { before, first, rest, spins: spins > 0, progress: Math.round((before - first) / Math.max(1, before - rest) * 100) / 100 };
+        });
+        check(mode.label + ' ៖ ស៊ុមកក ១២០ms ក្រោយចុច (iOS បើក keyboard) ➜ ចលនាមិនទាន់ចាប់ផ្តើម ➜ មើលឃើញពេញ (មិនលោតទៅចុង)',
+            stall.before - stall.rest > 20 && stall.progress <= 0.2, stall);
         await page.evaluate(() => {
             window.__kb = [];
             window.addEventListener('resize', () => {
@@ -240,6 +300,47 @@ try {
                 !entry.before.collapsed && entry.after.collapsed && entry.during.main > 0
                     && Math.abs(entry.during.mainTop - entry.before.main) < 2 && entry.after.input < entry.before.input - 100 && entry.after.input < entry.keyboardTop - 300 && entry.after.anims === 0
                     && !entry.rest.collapsed && entry.rest.anims === 0 && Math.abs(entry.rest.main - entry.before.main) < 2, entry);
+        }
+        for (const field of ['entryListSearchInput', 'lockerListSearchInput']) {
+            await page.evaluate((f) => {
+                document.activeElement && document.activeElement.blur();
+                window.switchAppPage('entry');
+                window.setEntryScanMode(f === 'lockerListSearchInput' ? 'locker' : 'parcel');
+            }, field);
+            await page.waitForTimeout(500);
+            await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+            await page.waitForTimeout(300);
+            const emptyIcon = field === 'lockerListSearchInput' ? '#lockerListEmptyState .emoji' : '#entryListEmptyState .emoji';
+            const opened = await page.evaluate(async ({ f, icon }) => {
+                const input = document.getElementById(f);
+                input.focus({ preventScroll: true });
+                input.value = 'zz-no-such-row';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                await new Promise((r) => setTimeout(r, 800));
+                const el = document.querySelector(icon);
+                const r = el ? el.getBoundingClientRect() : null;
+                return { shown: !!r && r.height > 0, top: r ? Math.round(r.top) : null, collapsed: window.uiState.entryPanelCollapsed };
+            }, { f: field, icon: emptyIcon });
+            await page.setViewportSize({ width: 414, height: 896 - 330 });
+            await page.waitForFunction(() => window.innerHeight === 896 - 330, null, { timeout: 5000 }).catch(() => null);
+            await frames(page);
+            await page.waitForTimeout(300);
+            const shrunk = await page.evaluate((icon) => {
+                const el = document.querySelector(icon);
+                const r = el ? el.getBoundingClientRect() : null;
+                return { top: r ? Math.round(r.top) : null, h: window.innerHeight };
+            }, emptyIcon);
+            await page.setViewportSize({ width: 414, height: 896 });
+            await page.waitForFunction(() => window.innerHeight === 896, null, { timeout: 5000 }).catch(() => null);
+            await page.evaluate((f) => {
+                const input = document.getElementById(f);
+                input.value = '';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.blur();
+            }, field);
+            await page.waitForTimeout(1000);
+            check(mode.label + ' ៖ tab ស្កេន ៖ ស្វែងរក (' + field + ') ឃើញសារទទេ ➜ keyboard បង្រួមផ្ទៃ ➜ សារនៅដដែលពីលើ keyboard (មិនលោតឡើងតាមក្រោយ)',
+                opened.shown && opened.collapsed && shrunk.top !== null && Math.abs(shrunk.top - opened.top) <= 2 && shrunk.top < shrunk.h - 40, { opened, shrunk });
         }
         check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
         await ctx.close();

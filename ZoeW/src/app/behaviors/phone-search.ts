@@ -2,8 +2,8 @@ import { uiState } from '../../core/state';
 import { applyPhoneSuggestion, hidePhoneSuggestions, searchByPhone, setPhoneSuggestActive, showPhoneSuggestions } from '../../features/phone-suggest';
 import { showAppChrome } from '../../ui/chrome-autohide';
 import { commitNow } from '../flush';
-import { elementOf, fieldValue, scrollChildIntoView } from '../refs';
-import { panelGlideFrom } from './panel-motion';
+import { animateElement, elementOf, fieldValue, isFieldFocused, scrollChildIntoView } from '../refs';
+import { PANEL_SEARCH_GLIDE, panelGlideFrom, panelMotionAllowed, type PanelGlide } from './panel-motion';
 import { syncHistoryExpandedLock } from './panels';
 
 export function scrollPhoneSuggestRowIntoView(index) {
@@ -12,6 +12,24 @@ export function scrollPhoneSuggestRowIntoView(index) {
 
 export function cssPx(value) {
     return (Math.round(value * 1000) / 1000) + 'px';
+}
+
+export const PHONE_SUGGEST_DROP_MS = 180;
+
+export const PHONE_SUGGEST_DROP_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
+
+let phoneSearchGlide: PanelGlide | null = null;
+
+export function phoneSearchGlideRunning() {
+    return !!(phoneSearchGlide && phoneSearchGlide.running());
+}
+
+export function dropPhoneSuggestBox() {
+    if (!uiState.phoneSuggestOpen || !panelMotionAllowed()) return;
+    animateElement(elementOf('phoneSuggestBox'), [
+        { opacity: 0, transform: 'translate3d(0,-10px,0)' },
+        { opacity: 1, transform: 'translate3d(0,0,0)' }
+    ], { duration: PHONE_SUGGEST_DROP_MS, easing: PHONE_SUGGEST_DROP_EASING });
 }
 
 export function positionPhoneSuggestBox() {
@@ -57,8 +75,16 @@ export function glidePhoneSearchPulledUp(on) {
     const mainTop = main ? main.getBoundingClientRect().top : NaN;
     setPhoneSearchPulledUp(on);
     commitNow();
-    panelGlideFrom(card, cardTop);
-    panelGlideFrom(main, mainTop);
+    const glide = panelGlideFrom(card, cardTop, PANEL_SEARCH_GLIDE);
+    phoneSearchGlide = glide;
+    panelGlideFrom(main, mainTop, PANEL_SEARCH_GLIDE);
+    if (!on || !glide) return;
+    hidePhoneSuggestions();
+    glide.settled().then((done) => {
+        if (!done || phoneSearchGlide !== glide || !isFieldFocused('searchPhoneInput')) return;
+        showPhoneSuggestions();
+        dropPhoneSuggestBox();
+    });
 }
 
 export function phoneSearchFocused() {

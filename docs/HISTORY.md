@@ -46,7 +46,11 @@
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
-   ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · push ចុះឈ្មោះឡើងវិញពេលកូនសោ VAPID ប្តូរ (Deep audit ៤ ក្នុងផ្នែក ២) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
+   ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
+   SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
+   `52baeb9` ➜ ជាប់លើ HEAD) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
+   ⏳ **ម្ចាស់គម្រោងសម្រេច** (ផ្នែក ២ «Deep audit ៤ ជុំបន្ត») ៖ id ធុងសំរាមកំណត់សម្រាប់ការដកពាក់កណ្តាល (ការដក ២ ដងពេលឧបករណ៍ ២ + `disconnect`) ·
+   ពិនិត្យ sw.js ក្រោយ `addAll` (ឯកសារគ្មាន hash លាយ deploy) · Supabase Leaked Password Protection · poll realtime ៦០ វិ.។
    ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
    ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ✅ កែរួច ៖ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង
    (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52]) · ZoeKeyGen teardown auth ដូច ZoeW ([2.50.52])។
@@ -59,10 +63,11 @@
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · Firebase partial claim ពេល deleted view ចាស់ · legacy items គ្មាន barcodes · born-closed `closedAt` ·
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · legacy items គ្មាន barcodes · born-closed `closedAt` ·
    zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
-   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · auth listener របស់ client ចាស់ក្រោយ `deleteApp` · network ៖ captive portal probe ·
-   sentry ៖ ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops`។
+   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
+   ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·

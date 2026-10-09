@@ -55,17 +55,26 @@ function addOptionalShell(cache: Cache, url: string): Promise<void> {
             if (controller) { try { controller.abort(); } catch (e) {} }
             resolve();
         }, OPTIONAL_INSTALL_TIMEOUT_MS);
-        cache.add(request).catch(() => {}).then(() => {
+        cache.add(request).then(() => cache.match(url)).then((response) => {
+            if (response && !responseFitsKey(url, response)) return cache.delete(url).then(() => undefined);
+        }).catch(() => {}).then(() => {
             clearTimeout(timer);
             resolve();
         });
     });
 }
 
+function shellEntriesFit(cache: Cache, urls: string[]): Promise<void> {
+    return Promise.all(urls.map((url) => cache.match(url).then((response) => {
+        if (response && !responseFitsKey(url, response)) throw new TypeError('Shell deploy changed during install: ' + url);
+    }))).then(() => undefined);
+}
+
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         Promise.all([caches.open(CACHE_VERSION), previousBackendUse()])
             .then(([cache, backend]) => cache.addAll(CORE_SHELL.concat(backend.used ? BACKEND_SHELL : []).map((url) => new Request(url, { cache: FRESH })))
+                .then(() => shellEntriesFit(cache, CORE_SHELL.concat(backend.used ? BACKEND_SHELL : [])))
                 .then(() => cache.put(SHELL_SCHEME_KEY, new Response('1')))
                 .then(() => (backend.marked ? cache.put(BACKEND_USED_KEY, new Response('1')) : undefined))
                 .then(() => Promise.all(

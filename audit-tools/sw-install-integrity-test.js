@@ -473,6 +473,147 @@ function serve(dir, blocked) {
         }
     }
 
+    // ជុំទី ៧ — ⛔⛔ deploy ថ្មីចូលផ្សាយ **កណ្តាល install** ៖ asset ឈ្មោះ hash របស់ deploy ចាស់លែងមាន ➜ Netlify (`/* ➜ /index.html 200`) ឆ្លើយ
+    //    `index.html` (200 · text/html) ➜ `cache.addAll()` ទទួល (status ok) ហើយរក្សា HTML ក្រោម key JS ➜ SW activate ➜ cache-first ផ្តល់ HTML ជំនួស
+    //    JS ចម្បង ➜ App ស រហូតដល់ SW បន្ទាប់។ ច្បាប់ `responseFitsKey()` (HTML មិនចូលក្រោម key មិនមែន HTML) ត្រូវកាន់ install ដែរ ៖ install ត្រូវធ្លាក់
+    //    (SW redundant ➜ browser សាក sw.js ថ្មីពេលក្រោយ) · OPTIONAL ដែលជា HTML មិននៅក្នុង cache។ ទិសផ្ទុយ ៖ ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល (cache ឈ្មោះដដែល)
+    //    activate ហើយ JS ចម្បងជា JS ពិត។ ZoeW (ZoeKeyGen គ្មានឈ្មោះ hash ➜ គ្មាន fallback ក្រោមឈ្មោះចាស់)។
+    //    ⛔ App ពិតចុះឈ្មោះ sw.js ខ្លួនឯងពេលផ្ទុក ➜ deploy ជាន់ត្រូវមានមុន `goto` (មិនដូច្នោះ install ចប់មុនការជាន់ ➜ វាស់ផ្លូវធម្មតា)។
+    {
+        const realIndex = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+        const appJs = (/\.\/assets\/index-[A-Za-z0-9_-]+\.js/.exec(realIndex) || [])[0] || '';
+        const swText = fs.readFileSync(path.join(dir, 'sw.js'), 'utf8');
+        const optionalMatch = /const OPTIONAL_SHELL = \[([\s\S]*?)\];/.exec(swText);
+        const optionalJs = ((optionalMatch ? optionalMatch[1] : '').match(/'\.\/[^']+\.js'/) || [''])[0].slice(1, -1);
+        ok('ជុំទី ៧ ៖ លក្ខខណ្ឌចាំបាច់ ៖ JS ចម្បង (CORE) និង JS OPTIONAL ក្នុង build ពិត', !!appJs && swText.indexOf("'" + appJs + "'") !== -1 && !!optionalJs,
+            { appJs, optionalJs });
+        const state = { flipped: false, fallbackHits: 0 };
+        const fallbackPaths = new Set([appJs.slice(1), optionalJs.slice(1)]);
+        const srv7 = await new Promise((res) => {
+            const s = http.createServer((req, rsp) => {
+                let p = decodeURIComponent(req.url.split('?')[0]);
+                if (p === '/') p = '/index.html';
+                if (state.flipped && fallbackPaths.has(p)) {
+                    state.fallbackHits++;
+                    rsp.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-cache' });
+                    return rsp.end(realIndex);
+                }
+                const f = path.join(dir, p);
+                if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                rsp.end(fs.readFileSync(f));
+            });
+            const sockets = new Set();
+            s.on('connection', (c) => { sockets.add(c); c.on('close', () => sockets.delete(c)); });
+            s.stopAll = () => new Promise((r) => { sockets.forEach((c) => c.destroy()); s.close(r); });
+            s.listen(0, '127.0.0.1', () => res(s));
+        });
+        const o7 = 'http://127.0.0.1:' + srv7.address().port;
+        const b7 = await chromium.launch({ executablePath: CHROME });
+        const ctx7 = await b7.newContext({ viewport: { width: 412, height: 780 } });
+        const page7 = await ctx7.newPage();
+        await ctx7.route('**', (r) => (r.request().url().startsWith(o7) ? r.continue() : r.abort()));
+        const installOnce = () => page7.evaluate(async ({ js, opt }) => {
+            const reg = await navigator.serviceWorker.register('./sw.js');
+            const w = reg.installing || reg.waiting || reg.active;
+            if (!w) return { err: 'គ្មាន worker' };
+            await new Promise((res) => {
+                const done = () => w.state === 'activated' || w.state === 'redundant';
+                if (done()) return res();
+                w.addEventListener('statechange', () => { if (done()) res(); });
+                setTimeout(res, 40000);
+            });
+            const entries = {};
+            for (const k of await caches.keys()) {
+                const c = await caches.open(k);
+                const typeOf = async (u) => { const r = await c.match(u); return r ? String(r.headers.get('content-type') || '') : null; };
+                entries[k] = { js: await typeOf(js), opt: await typeOf(opt) };
+            }
+            return { state: w.state, entries, controlled: !!navigator.serviceWorker.controller };
+        }, { js: appJs, opt: optionalJs }).catch((e) => ({ err: String(e && e.message || e) }));
+        let flipped = { err: 'មិនបានរត់' };
+        let healed = { err: 'មិនបានរត់' };
+        try {
+            state.flipped = true;
+            await page7.goto(o7 + '/', { waitUntil: 'load', timeout: 30000 });
+            flipped = await installOnce();
+            state.flipped = false;
+            healed = await installOnce();
+        } catch (e) {
+            flipped = flipped.err ? { err: String(e && e.message || e) } : flipped;
+        }
+        await b7.close().catch(() => {});
+        await srv7.stopAll();
+        const htmlUnder = (out, field) => Object.values(out.entries || {}).some((e) => /text\/html/i.test(String(e[field] || '')));
+        ok('ជុំទី ៧ ៖ លក្ខខណ្ឌចាំបាច់ ៖ install ស្នើ JS ចម្បង ហើយទទួល index.html (deploy ជាន់)', state.fallbackHits >= 1 && !flipped.err, { hits: state.fallbackHits, flipped });
+        ok('ជុំទី ៧ ⛔⛔ ៖ HTML ក្រោម key JS ចម្បង (CORE) ➜ install ធ្លាក់ (SW មិន activate · មិនគ្រប់គ្រងទំព័រ)',
+            flipped.state === 'redundant' && !flipped.controlled, flipped);
+        ok('ជុំទី ៧ ⛔ ៖ គ្មាន cache ណាផ្តល់ HTML ជំនួស JS ចម្បងដល់ SW ដែល activate', !(flipped.state === 'activated' && htmlUnder(flipped, 'js')), flipped);
+        ok('ជុំទី ៧ ទិសផ្ទុយ ៖ ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate · JS ចម្បង និង OPTIONAL ជា JS ពិត (មិនមែន HTML សល់ពីលើកមុន)',
+            healed.state === 'activated' && !htmlUnder(healed, 'js') && !htmlUnder(healed, 'opt')
+            && Object.values(healed.entries || {}).some((e) => /javascript/i.test(String(e.js || ''))), healed);
+    }
+
+    // ជុំទី ៧ខ — OPTIONAL ដែលទទួល HTML (CORE ធម្មតា) ៖ SW activate (OPTIONAL មិនរារាំង install) តែ HTML មិនចូល cache ក្រោម key OPTIONAL
+    {
+        const swText = fs.readFileSync(path.join(dir, 'sw.js'), 'utf8');
+        const optionalMatch = /const OPTIONAL_SHELL = \[([\s\S]*?)\];/.exec(swText);
+        const optionalJs = ((optionalMatch ? optionalMatch[1] : '').match(/'\.\/[^']+\.js'/) || [''])[0].slice(1, -1);
+        const realIndex = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+        let hits = 0;
+        const srv7b = await new Promise((res) => {
+            const s = http.createServer((req, rsp) => {
+                let p = decodeURIComponent(req.url.split('?')[0]);
+                if (p === '/') p = '/index.html';
+                if (optionalJs && p === optionalJs.slice(1)) {
+                    hits++;
+                    rsp.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-cache' });
+                    return rsp.end(realIndex);
+                }
+                const f = path.join(dir, p);
+                if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                rsp.end(fs.readFileSync(f));
+            });
+            const sockets = new Set();
+            s.on('connection', (c) => { sockets.add(c); c.on('close', () => sockets.delete(c)); });
+            s.stopAll = () => new Promise((r) => { sockets.forEach((c) => c.destroy()); s.close(r); });
+            s.listen(0, '127.0.0.1', () => res(s));
+        });
+        const o = 'http://127.0.0.1:' + srv7b.address().port;
+        const b = await chromium.launch({ executablePath: CHROME });
+        const c7 = await b.newContext({ viewport: { width: 412, height: 780 } });
+        const p7 = await c7.newPage();
+        await c7.route('**', (r) => (r.request().url().startsWith(o) ? r.continue() : r.abort()));
+        let out = { err: 'មិនបានរត់' };
+        try {
+            await p7.goto(o + '/', { waitUntil: 'load', timeout: 30000 });
+            out = await p7.evaluate(async (opt) => {
+                const reg = await navigator.serviceWorker.register('./sw.js');
+                const w = reg.installing || reg.waiting || reg.active;
+                await new Promise((res) => {
+                    const done = () => w.state === 'activated' || w.state === 'redundant';
+                    if (done()) return res();
+                    w.addEventListener('statechange', () => { if (done()) res(); });
+                    setTimeout(res, 40000);
+                });
+                const types = [];
+                for (const k of await caches.keys()) {
+                    const r = await (await caches.open(k)).match(opt);
+                    if (r) types.push(String(r.headers.get('content-type') || ''));
+                }
+                return { state: w.state, types };
+            }, optionalJs);
+        } catch (e) {
+            out = { err: String(e && e.message || e) };
+        }
+        await b.close().catch(() => {});
+        await srv7b.stopAll();
+        ok('ជុំទី ៧ខ ៖ លក្ខខណ្ឌចាំបាច់ ៖ install ស្នើ OPTIONAL «' + optionalJs + '» ហើយទទួល HTML', hits >= 1 && !out.err, { hits, out });
+        ok('ជុំទី ៧ខ ⛔ ៖ OPTIONAL ទទួល HTML ➜ SW នៅ activate តែ HTML មិននៅក្នុង cache ក្រោម key OPTIONAL',
+            out.state === 'activated' && Array.isArray(out.types) && !out.types.some((t) => /text\/html/i.test(t)), out);
+    }
+
     await browser.close();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);

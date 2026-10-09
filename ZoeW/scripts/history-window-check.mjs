@@ -248,6 +248,37 @@ try {
         });
         check(mode.label + ' ៖ ស៊ុមកក ១២០ms ក្រោយចុច (iOS បើក keyboard) ➜ ចលនាមិនទាន់ចាប់ផ្តើម ➜ មើលឃើញពេញ (មិនលោតទៅចុង)',
             stall.before - stall.rest > 20 && stall.progress <= 0.2, stall);
+        await page.locator('#searchPhoneInput').focus();
+        await page.waitForTimeout(700);
+        const suggestWasOpen = await page.evaluate(() => window.uiState.phoneSuggestOpen);
+        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 500; });
+        await page.waitForTimeout(400);
+        const hiddenSearch = await page.evaluate(() => ({
+            open: window.uiState.phoneSuggestOpen,
+            inputBottom: document.getElementById('searchPhoneInput').getBoundingClientRect().bottom,
+            navbarBottom: document.querySelector('.app-navbar').getBoundingClientRect().bottom
+        }));
+        check(mode.label + ' ៖ រមូរប្រអប់ស្វែងរកចូលក្រោមរបាខាងលើ ➜ suggestion បិទដោយមិនចាំបាច់ប៉ះកន្លែងផ្សេង',
+            suggestWasOpen && hiddenSearch.inputBottom <= hiddenSearch.navbarBottom && !hiddenSearch.open, hiddenSearch);
+        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+        await page.waitForTimeout(400);
+        check(mode.label + ' ៖ រមូរត្រឡប់មកវិញមិនបើក suggestion ចាស់ឡើងវិញ',
+            !await page.evaluate(() => window.uiState.phoneSuggestOpen));
+        await page.evaluate(() => document.getElementById('searchPhoneInput').blur());
+        await page.waitForTimeout(700);
+        await page.locator('#searchPhoneInput').focus();
+        await page.waitForTimeout(700);
+        await page.evaluate(() => { document.getElementById('phoneSuggestBox').scrollTop = 60; });
+        await page.waitForTimeout(100);
+        check(mode.label + ' ៖ រមូរខាងក្នុង suggestion នៅតែបើក និងជ្រើសលេខបាន',
+            await page.evaluate(() => window.uiState.phoneSuggestOpen && document.getElementById('phoneSuggestBox').scrollTop > 0));
+        const chosenPhone = await page.locator('.phone-suggest-item').nth(2).locator('.phone-suggest-number').textContent();
+        await page.locator('.phone-suggest-item').nth(2).click();
+        check(mode.label + ' ៖ ជ្រើសលេខបំពេញវាល ហើយបិទ suggestion',
+            await page.locator('#searchPhoneInput').inputValue() === chosenPhone && !await page.evaluate(() => window.uiState.phoneSuggestOpen));
+        await page.locator('#searchPhoneInput').fill('');
+        await page.evaluate(() => document.getElementById('searchPhoneInput').blur());
+        await page.waitForTimeout(700);
         await page.evaluate(() => {
             window.__kb = [];
             window.addEventListener('resize', () => {
@@ -294,14 +325,34 @@ try {
                 await new Promise((r) => setTimeout(r, 700));
                 const after = { input: input.getBoundingClientRect().top, collapsed: window.uiState.entryPanelCollapsed, anims: glides(main) };
                 input.blur();
+                await new Promise((r) => setTimeout(r, 170));
+                const anim = main.getAnimations().find((a) => !(a instanceof CSSAnimation) && !(a instanceof CSSTransition) && a.playState !== 'finished');
+                const paint = { overlaps: 0, leaks: 0, moving: !!anim };
+                if (anim) {
+                    anim.pause();
+                    const icon = document.querySelector('.scanner-input-wrapper .icon');
+                    const card = input.closest('.app-card');
+                    for (const fraction of [0, 0.2, 0.4, 0.6, 0.8]) {
+                        anim.currentTime = Number(anim.effect.getTiming().duration) * fraction;
+                        const ir = icon.getBoundingClientRect(), cr = card.getBoundingClientRect();
+                        const x = ir.left + ir.width / 2, y = ir.top + ir.height / 2;
+                        if (x > cr.left && x < cr.right && y > cr.top && y < cr.bottom) {
+                            paint.overlaps++;
+                            if (!card.contains(document.elementFromPoint(x, y))) paint.leaks++;
+                        }
+                    }
+                    anim.play();
+                }
                 await new Promise((r) => setTimeout(r, 900));
                 const rest = { collapsed: window.uiState.entryPanelCollapsed, anims: glides(main), main: main.getBoundingClientRect().top };
-                return { before, during, after, rest, keyboardTop: window.innerHeight - 330 };
+                return { before, during, after, rest, paint, keyboardTop: window.innerHeight - 330 };
             }, field);
             check(mode.label + ' ៖ tab ស្កេន ៖ ចុចស្វែងរក (' + field + ') ➜ ផ្ទាំងស្កេនបង្រួមដោយរអិល · ប្រអប់ឡើងលើ (លទ្ធផលមិននៅក្រោម keyboard) · ចាកចេញទទេ ➜ បើកវិញ',
                 !entry.before.collapsed && entry.after.collapsed && entry.during.main > 0
                     && Math.abs(entry.during.mainTop - entry.before.main) < 2 && entry.after.input < entry.before.input - 100 && entry.after.input < entry.keyboardTop - 300 && entry.after.anims === 0
                     && !entry.rest.collapsed && entry.rest.anims === 0 && Math.abs(entry.rest.main - entry.before.main) < 2, entry);
+            check(mode.label + ' ៖ កាតចុះ (' + field + ') គ្របធាតុ scanner ខាងក្រោយពេញលេញគ្រប់ស៊ុម',
+                entry.paint.moving && entry.paint.overlaps >= 2 && entry.paint.leaks === 0, entry.paint);
         }
         for (const field of ['entryListSearchInput', 'lockerListSearchInput']) {
             await page.evaluate((f) => {

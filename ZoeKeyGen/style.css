@@ -400,3 +400,7 @@ input[type="radio"]:focus-visible,
 .sb-member { display: inline-block; margin: 0 4px 2px 0; }
 .sb-member.sb-owner { font-weight: 700; color: var(--text-main); }
 #sbAdminPanel { margin-top: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+    button, .toast { transition: none; }
+}

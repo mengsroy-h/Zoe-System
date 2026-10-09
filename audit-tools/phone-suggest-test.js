@@ -29,6 +29,7 @@ function ok(label, cond, detail) {
 function makeContext(app) {
     const datalistOptions = [];
     const listeners = {};
+    const navbar = { getBoundingClientRect: () => ({ top: 0, bottom: 60 }) };
     const searchInput = {
         value: '',
         getBoundingClientRect: () => ({ top: 200, bottom: 244, left: 10, width: 300 }),
@@ -67,9 +68,11 @@ function makeContext(app) {
         setTimeout,
         clearTimeout,
         scanHistory: [],
+        currentAppPage: 'data',
         window: { innerHeight: 800, addEventListener: () => {} },
         document: {
             activeElement: searchInput,
+            querySelector: (selector) => selector === '.app-navbar' ? navbar : null,
             getElementById: (id) => {
                 if (id === 'searchPhoneInput') return searchInput;
                 if (id === 'phoneSuggestBox') return suggestBox;
@@ -236,6 +239,19 @@ function itemsFixture() {
         h.searchInput.value = '999999';
         h.ctx.showPhoneSuggestions();
         ok('គ្មានលទ្ធផល ➜ មិនបើកដុំទទេ', !h.view.open());
+        h.searchInput.value = '421';
+        const originalRect = h.searchInput.getBoundingClientRect;
+        h.searchInput.getBoundingClientRect = () => ({ top: 10, bottom: 54, left: 10, width: 300, height: 44 });
+        h.ctx.showPhoneSuggestions();
+        ok('ប្រអប់នៅក្រោយ navbar ទោះនៅក្នុងអេក្រង់ ➜ suggestion មិនបង្ហាញ', !h.view.open());
+        h.searchInput.getBoundingClientRect = originalRect;
+        h.ctx.showPhoneSuggestions();
+        ok('ប្រអប់មើលឃើញវិញ និងស្នើបង្ហាញថ្មី ➜ suggestion បើក', h.view.open());
+        h.ctx.window.visualViewport = { offsetTop: 0, height: 220 };
+        h.ctx.positionPhoneSuggestBox();
+        ok('keyboard គ្របប្រអប់ ➜ suggestion បិទ', !h.view.open());
+        delete h.ctx.window.visualViewport;
+        h.ctx.hidePhoneSuggestions();
     }
 
     console.log('-- តារាងស្វែងរក --');
@@ -265,13 +281,13 @@ function itemsFixture() {
     if (h.has('collectPhoneSuggestions')) {
         const big = [];
         for (let i = 0; i < 350; i++) {
-            big.push({ id: 'p' + i, phone: '011' + String(200000 + i), createdAt: 1000 + i, barcodes: [{ code: 'D' + i }] });
+            big.push({ id: 'p' + i, phone: '011000' + String(i).padStart(3, '0'), createdAt: 1000 + i, barcodes: [{ code: 'D' + i }] });
         }
         h.ctx.scanHistory = big;
-        const last = h.ctx.collectPhoneSuggestions('200349');
+        const last = h.ctx.collectPhoneSuggestions('000349');
         ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011000349', last.map((e) => e.phone));
-        const first = h.ctx.collectPhoneSuggestions('200000');
-        ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011200000', first.map((e) => e.phone));
+        const first = h.ctx.collectPhoneSuggestions('011000000');
+        ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011000000', first.map((e) => e.phone));
         h.ctx.updateRecentPhonesList();
         ok('datalist ផ្ទុកបាន ៣០០ លេខ', h.view.datalist().length === 300, h.view.datalist().length);
         h.ctx.scanHistory = itemsFixture();

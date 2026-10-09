@@ -137,6 +137,28 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
+
+**ZoeW `2.50.51`** (`zoew-v313` ➜ `zoew-v314`) · **ZoeKeyGen `2.24.12`** (`zoekeygen-v122` ➜ `zoekeygen-v123`)។ សំណើម្ចាស់គម្រោង៖ វីដេអូពីរ និងរូប emoji ⚡ លេចចូលតារាង; កែពី branch របស់ PR #307 និងដោះស្រាយ checker ដែលធ្លាក់។
+
+#### អ្វីដែលខុសពីមុន
+
+- **ZoeW**៖ suggestion បិទពេលប្រអប់ស្វែងរកចូលក្រោម navbar ឬចេញពីផ្ទៃដែលមើលឃើញ (រួម visual viewport ពេល keyboard បើក)។ ការទាញផ្ទាំងចុះបិទ suggestion មុនចលនា; ការរមូរខាងក្នុង suggestion និងជ្រើសលេខនៅដដែល។
+- **ZoeW**៖ `.page-side` មាន stacking context ផ្ទាល់នៅទំហំទូរស័ព្ទ/ថេប្លេត ដូច្នេះ emoji ⚡ និងធាតុ scanner មិនឆ្លងលើកាតកញ្ចប់/Locker ដែលកំពុងរអិល។ រយៈពេល ខ្សែកោង និង PTR មិនប្រែ។
+- **App ទាំងពីរ**៖ toast គោរព Reduce Motion; ZoeKeyGen ប៊ូតុង និង ZoeW drawer ក៏បិទ transition តាមការកំណត់នេះ។
+- **PR checker**៖ `phone-suggest-test` ប្រើលេខសំយោគ `011000000`–`011000349` ស៊ីគ្នាទាំង fixture, query និងលទ្ធផលរំពឹង; នៅតែសាកលេខទាំងចុងថ្មី និងចុងចាស់ក្នុងបញ្ជី ៣៥០។
+
+#### អ្នកយាម
+
+- `history-window-check`៖ វាស់ suggestion លាក់/រមូរខាងក្នុង/ជ្រើសលេខ និង `elementFromPoint` លើកាតពេលចលនាចុះ ក្នុង profile APK · Android PWA · iPhone PWA។ មុនកែបញ្ហាទាំងពីរធ្លាក់គ្រប់ profile។
+- `boot-animation-test`៖ computed transition របស់ toast និងប៊ូតុងលើ CSS ពិតទាំងពីរ App; Reduce Motion ក្រហមទាំងពីរមុនកែ ខណៈចលនាធម្មតាមានសកម្មភាព។
+- `forbidden-zone-lock`៖ ប្តូរស្នាម `phone-search.ts` តាមសំណើវីដេអូនេះ; សោផ្សេងរក្សាដដែល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- សាកលើ Android និង iPhone ពិតមុន merge៖ រមូរលាក់ប្រអប់ស្វែងរក, ជ្រើសលេខ, បិទ keyboard នៅកាតកញ្ចប់/Locker, អូសផ្ទាំង និង PTR។ Browser profile មិនជំនួសការវាស់ keyboard/compositor លើឧបករណ៍ពិត។
+- ក្រោយ merge និង deploy អនុម័ត៖ ធ្វើបច្ចុប្បន្នភាព PWA ទាំងពីរ និង APK ដើម្បីទទួលកំណែនេះ។ គ្មានការប្តូរ database rules ឬ env។
+
 ### [2.50.50] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **ឯកជនភាព ៖ Sentry ទទួលតែ error ដែលលាក់ secret រួច (Session Replay · tracing · logs របស់ Loader បិទ) · CSP `script-src` តឹង · អ្នកយាម security** (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «បង្កើតអ្នកយាមសម្រាប់ security គ្រប់ផ្នែក … ទាំងក្នុង repo និង app»)
 
 **ZoeW `2.50.50`** (`zoew-v312` ➜ `zoew-v313`) · **ZoeKeyGen `2.24.11`** (`zoekeygen-v121` ➜ `zoekeygen-v122`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
@@ -3093,6 +3115,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
+
+- `positionPhoneSuggestBox()` ពិនិត្យតែ `rect.bottom < 0`៖ input នៅ `top=-4`, `bottom=40` ប៉ុន្តែ navbar បញ្ចប់នៅ `51` ➜ input លាក់ពេញ តែ suggestion នៅបើក។ ព្រំដែនថ្មីប្រើ navbar, appPages និង visual viewport; ពេលប្តូរ search-focus បិទមុន commit។
+- `.scanner-input-wrapper .icon` មាន `z-index: 1`; `.page-side` មិនមាន stacking context ពេលបើក ➜ icon ឆ្លងលើ `.page-main` ដែល transform បង្កើត context កម្រិត auto។ វាស់មុនកែ៖ hit-test ត្រឡប់ icon នៅ ៣ សំណាកកាតកញ្ចប់ និង ២ សំណាក Locker ក្នុង profile នីមួយៗ។ `isolation: isolate` រក្សា z-index របស់ scanner នៅក្នុងផ្ទាំងរបស់វា។
+- CI Audit ផ្នែក 4/4 លើ `c5f792e`៖ `phone-suggest-test` ទទួល `011200349` តែរំពឹង `011000349` ក្រោយការប្តូរលេខ fixture។ កែ generator/query/expectation ទាំងបីទៅលេខសំយោគដូចគ្នា; មិនដក assertion។
+- Reduce Motion៖ computed toast transition នៅតែ `0.25s` ទាំងពីរ App និងប៊ូតុង ZoeKeyGen នៅតែមាន transition។ សាកទាំង `reduce` និង `no-preference` ដើម្បីការពារការបិទចលនាធម្មតាខុសចេតនា។
 
 ### 2026-10-09 — Deep audit security (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «អ្នកយាមសម្រាប់ security គ្រប់ផ្នែក») ➜ [2.50.50]
 

@@ -206,6 +206,22 @@ async function isolateBootContext(context, base) {
     const base = 'http://127.0.0.1:' + server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
     try {
+        for (const app of APPS) {
+            const motionPage = await browser.newPage();
+            await motionPage.setContent('<div class="toast-container"><div class="toast show">សាកល្បង</div></div><button>សាកល្បង</button>');
+            await motionPage.addStyleTag({ content: fs.readFileSync(path.join(ROOT, app, 'style.css'), 'utf8') });
+            for (const reduced of [false, true]) {
+                await motionPage.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+                const transitions = await motionPage.evaluate(() => ['toast', 'button'].map((name) => {
+                    const el = document.querySelector(name === 'toast' ? '.toast' : name);
+                    const css = getComputedStyle(el);
+                    return { name, duration: Math.max(...css.transitionDuration.split(',').map(parseFloat)), opacity: Number(css.opacity) };
+                }));
+                ok(app + ' ៖ toast និងប៊ូតុងគោរព Reduce Motion = ' + reduced,
+                    transitions.length === 2 && transitions.every((t) => reduced ? t.duration === 0 : t.duration > 0), transitions);
+            }
+            await motionPage.close();
+        }
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
         await isolateBootContext(ctx, base);
         const page = await ctx.newPage();

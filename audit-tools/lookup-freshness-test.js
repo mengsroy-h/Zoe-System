@@ -85,6 +85,7 @@ const FNS = [
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
+    'ztoIdToken', 'addZtoIdentityHeader',
     'attemptAutoLookup', 'runSheetImport'
 ];
 const src = {};
@@ -107,7 +108,7 @@ const DECLS = [
     'autoLookupInFlight', 'autoLookupQueueRetries',
     'AUTO_LOOKUP_QUEUE_RETRY_MS', 'AUTO_LOOKUP_QUEUE_MAX_WAIT_MS',
     'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
-    'sheetImportSignature'
+    'sheetImportSignature', 'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS'
 ];
 const decls = [];
 DECLS.forEach((n) => {

@@ -61,6 +61,7 @@ function fakeServer() {
         get: (k: string) => docOf(k),
         purgeOps: () => done.clear(),
         deviceClockBack: (ms: number) => { vi.setSystemTime(Date.now() - ms); clockShift += ms; },
+        deviceClockForward: (ms: number) => { vi.setSystemTime(Date.now() + ms); clockShift -= ms; },
         dropConflictNow: () => { conflictNow = false; }
     };
 }
@@ -90,13 +91,14 @@ const deduct = (current: any, op: any, ring: any) => {
     return next;
 };
 
-async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs = 0, conflictWithoutNow = false) {
+async function lostLedgerWrite(gapMs: number, purge: boolean, deviceClockBackMs = 0, conflictWithoutNow = false, deviceClockForwardBeforeSendMs = 0) {
     vi.useFakeTimers();
     const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
     const server = fakeServer();
     server.set('ledger/2026-10-08', { codDollar: 100, dodDollar: 0, totalCount: 10, op: 'op_firstwriter0', ops: { op_firstwriter0: 1 } });
     const { db, unknown } = await open(server, wait);
     firebaseState.fb = db as any;
+    if (deviceClockForwardBeforeSendMs) server.deviceClockForward(deviceClockForwardBeforeSendMs);
     server.setMode('drop');
     let state: any = 'pending';
     runLedgerTransaction(db.ref('ledger/2026-10-08'), deduct).then((r: any) => { state = r; }, (e: any) => { state = e; });
@@ -146,6 +148,14 @@ describe('Supabase ៖ CAS ដែលចម្លើយបាត់ ហើយផ�
 
     it('⛔ conflict គ្មាន `now` (អាយុវាស់មិនបាន) ➜ មិនទាយ not-applied ➜ witness ➜ កាត់តែម្តង (Claude ២ ៖ mutant `!(age > …)` រស់មុន)', async () => {
         const { state, server } = await lostLedgerWrite(3 * HOUR, true, 0, true);
+        expect(server.applied.length).toBe(1);
+        expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
+        expect(state && state.committed).toBe(true);
+        expect(state.txOutcome).toBe('applied');
+    });
+
+    it('⛔ នាឡិកាឧបករណ៍លោតទៅមុខ ៣០ ម៉ោង ក្រោយចម្លើយ server ចុងក្រោយ មុនផ្ញើ + ដាច់ ៥០ ម៉ោង + op ត្រូវ purge ➜ មិនមែន not-applied ➜ កាត់តែម្តង (ព្រំក្រោមមកពីចម្លើយ server មិនមែននាឡិកាឧបករណ៍ · Claude ២ ៖ mutant `Date.now() + serverOffset` រស់មុន)', async () => {
+        const { state, server } = await lostLedgerWrite(50 * HOUR, true, 0, false, 30 * HOUR);
         expect(server.applied.length).toBe(1);
         expect(server.get('ledger/2026-10-08')).toMatchObject({ codDollar: 95, totalCount: 9 });
         expect(state && state.committed).toBe(true);

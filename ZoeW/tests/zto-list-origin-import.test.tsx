@@ -36,7 +36,7 @@ vi.mock('../src/features/scan-action', () => ({
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-const row = (barcode: string, from?: string) => ({ barcode, phone: '0963897345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00',
+const row = (barcode: string, from?: string) => ({ barcode, phone: '0960007345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00',
     ztoClosed: null, skip: '', from });
 const listReply = (rows: any[]) => vi.fn(async () => json({ success: true, list: true, enabled: true, pages: 1, total: rows.length,
     rows, signed: [], signedOk: true, signedPages: 1 }));
@@ -100,7 +100,7 @@ async function settle() {
 
 describe('ប្រភពកញ្ចប់ ៖ ការបញ្ចូលបញ្ជី ZTO ➜ ប្រវត្តិ', () => {
     it('កញ្ចប់ថ្មីដែលរក្សាទុក + កញ្ចប់មានរួច ➜ ១ ការសរសេរ `origins` · ⛔ preview មិនសរសេរ', async () => {
-        dataState.scanHistory = [{ id: 'old1', phone: '0963897345', scanDate: '2026-10-05', isClosed: false, createdAt: 1,
+        dataState.scanHistory = [{ id: 'old1', phone: '0960007345', scanDate: '2026-10-05', isClosed: false, createdAt: 1,
             barcodes: [{ code: 'ZT0000000901', isClosed: false, cod: 1, dod: 0 }] }];
         vi.stubGlobal('fetch', listReply([row('ZT0000000901', 'Shopee SHPE'), row('ZT0000000902', 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ'), row('ZT0000000903')]));
         await runZtoListSyncPreview();
@@ -115,7 +115,7 @@ describe('ប្រភពកញ្ចប់ ៖ ការបញ្ចូលប�
     });
 
     it('គ្មានកញ្ចប់ថ្មី · មានតែកញ្ចប់មានរួចដែលខ្វះប្រភព ➜ បំពេញប្រភព (គ្មានប្រអប់សួរ) · toast ប្រាប់ចំនួន', async () => {
-        dataState.scanHistory = [{ id: 'old2', phone: '0963897345', scanDate: '2026-10-05', isClosed: false, createdAt: 1,
+        dataState.scanHistory = [{ id: 'old2', phone: '0960007345', scanDate: '2026-10-05', isClosed: false, createdAt: 1,
             barcodes: [{ code: 'ZT0000000911', isClosed: false, cod: 1, dod: 0 }] }];
         const asked: string[] = [];
         vi.stubGlobal('confirm', (q: string) => { asked.push(q); return true; });

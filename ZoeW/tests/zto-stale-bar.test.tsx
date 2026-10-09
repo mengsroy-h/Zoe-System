@@ -53,12 +53,12 @@ const FAILED_TOAST = '⚠️ ពិនិត្យស្ថានភាពនៅ
 let tx: string[] = [];
 
 function openItem(id: string, code: string, ageMs: number) {
-    return { id, phone: '0963897345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
+    return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
         cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
 function closedItem(id: string, code: string) {
-    return { id, phone: '0963897345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - 60000, createdAt: NOW - HOUR,
+    return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - 60000, createdAt: NOW - HOUR,
         cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - 60000, cod: 1, dod: 0 }] };
 }
 

@@ -52,12 +52,12 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 let tx: string[] = [];
 
 function openItem(id: string, code: string, ageMs: number) {
-    return { id, phone: '0963897345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
+    return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,
         cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: false, cod: 1, dod: 0 }] };
 }
 
 function closedItem(id: string, code: string, closedAgoMs: number) {
-    return { id, phone: '0963897345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - closedAgoMs, createdAt: NOW - DAY,
+    return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW, 0), isClosed: true, closedAt: NOW - closedAgoMs, createdAt: NOW - DAY,
         cod: 1, dod: 0, count: 1, barcode: code, barcodes: [{ code, isClosed: true, closedAt: NOW - closedAgoMs, cod: 1, dod: 0 }] };
 }
 

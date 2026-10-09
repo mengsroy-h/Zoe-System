@@ -153,7 +153,7 @@ function buildRuntime(opts) {
         ctx.__net++;
         return new Promise((resolve) => setTimeout(() => resolve({
             res: { ok: true, status: 200 },
-            body: { success: true, found: true, phone: '0974158508', cod: 5, dod: 0 }
+            body: { success: true, found: true, phone: '0970008508', cod: 5, dod: 0 }
         }), o.netDelayMs === undefined ? 300 : o.netDelayMs));
     };
     vm.createContext(ctx);
@@ -349,7 +349,7 @@ scenario('⛔ ធាតុជួរកំព្រា មិនត្រូវ�
     await sleep(20);
     ok('កញ្ចប់ទី ៣ ចូលជួរដូចគ្នា', ctx.autoLookupQueueRetries.has(X));
 
-    tableRow = { code: X, phone: '0974158508', cod: 1, dod: 0 };
+    tableRow = { code: X, phone: '0970008508', cod: 1, dod: 0 };
     await sleep(160);
     ok('⛔ cache ហិត ➔ ធាតុជួរត្រូវលុបចេញ (កុំទុកកំព្រា)',
         !ctx.autoLookupQueueRetries.has(X), [...ctx.autoLookupQueueRetries.keys()]);
@@ -387,7 +387,7 @@ const EARLY_EXITS = [
     } },
     { name: 'cache លឿនក្នុងឧបករណ៍', arm: (ctx, code) => {
         vm.runInContext('setFastLookupRow(' + JSON.stringify(code)
-            + ', "0974158508", 5, 0, getLookupApiConfig())', ctx);
+            + ', "0970008508", 5, 0, getLookupApiConfig())', ctx);
     } }
 ];
 EARLY_EXITS.forEach((exit, i) => {

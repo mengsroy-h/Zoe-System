@@ -222,7 +222,7 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
 
     // ១. កែទឹកប្រាក់ ខណៈ barcode ត្រូវឧបករណ៍ផ្សេងដកចេញរួច (ទិដ្ឋភាពមូលដ្ឋានចាស់)
     {
-        const s = seed({ it1: item('it1', '0968490421', [bc('AA1', 0, 4)]) }, { codDollar: 0, dodDollar: 3.25, totalCount: 1 });
+        const s = seed({ it1: item('it1', '0960000421', [bc('AA1', 0, 4)]) }, { codDollar: 0, dodDollar: 3.25, totalCount: 1 });
         const { ctx, page } = await boot(browser, port, s);
         // ឧបករណ៍ផ្សេងដក AA1 ចេញ ➜ server លែងមាន តែសតិយើងនៅមាន (គ្មាន fireAll)
         await page.evaluate(() => { window.__setPathQuiet('zoew_scan_history_cod_dod/it1', null); });
@@ -274,7 +274,7 @@ const memRev = (page) => page.evaluate((k) => (typeof dailyRevenueData !== 'unde
 
     // ៤. ស្ថិតិយក ៖ បើកកញ្ចប់ដែលបិទ ខណៈ transaction ធ្លាក់ និង packagesPickedUp = 0
     {
-        const s = seed({ it4: item('it4', '0968490421', [bc('DD1', 3, 0, true)], { closedAt: Date.now() - 60000 }) },
+        const s = seed({ it4: item('it4', '0960000421', [bc('DD1', 3, 0, true)], { closedAt: Date.now() - 60000 }) },
             { codDollar: 3, dodDollar: 0, totalCount: 1 }, { packagesPickedUp: 0 });
         const { ctx, page } = await boot(browser, port, s);
         await page.evaluate(() => { window.__failHistoryTx = true; });

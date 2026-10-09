@@ -56,7 +56,8 @@ function directive(csp, name) {
     return m ? m[1].trim().split(/\s+/) : null;
 }
 
-// ត្រូវនឹងច្បាប់ host របស់ CSP ដែលគ្រប់គ្រាន់សម្រាប់គម្រោងនេះ (រួម wildcard មួយថ្នាក់)
+// ត្រូវនឹងច្បាប់ host + path របស់ CSP ដែលគ្រប់គ្រាន់សម្រាប់គម្រោងនេះ (រួម wildcard មួយថ្នាក់)
+// ⛔ path ៖ ប្រភពបញ្ចប់ដោយ `/` (ឧ. `https://www.gstatic.com/firebasejs/`) អនុញ្ញាតតែ URL ក្រោមថតនោះ · គ្មាន path ➜ គ្រប់ path (CSP3)
 function cspAllows(sources, url) {
     if (!sources) return false;
     let parsed;
@@ -68,13 +69,15 @@ function cspAllows(sources, url) {
         let candidate = src;
         if (candidate.indexOf('://') === -1) candidate = parsed.protocol + '//' + candidate;
         let allowed;
-        try { allowed = new URL(candidate); } catch (e) { return false; }
+        try { allowed = new URL(candidate.replace('://*.', '://wildcard.')); } catch (e) { return false; }
         if (allowed.protocol !== parsed.protocol) return false;
-        if (allowed.hostname.indexOf('*.') === 0) {
-            const suffix = allowed.hostname.slice(1);
-            return parsed.hostname.endsWith(suffix);
-        }
-        return allowed.hostname === parsed.hostname;
+        const hostOk = candidate.indexOf('://*.') !== -1
+            ? parsed.hostname.endsWith(allowed.hostname.slice('wildcard'.length))
+            : allowed.hostname === parsed.hostname;
+        if (!hostOk) return false;
+        const p = allowed.pathname;
+        if (p === '/' || p === '') return true;
+        return p.endsWith('/') ? parsed.pathname.indexOf(p) === 0 : parsed.pathname === p;
     });
 }
 
@@ -128,6 +131,13 @@ for (const app of APPS) {
 
     ok(app + ' ៖ គ្មាន script URL ដែល `script-src` នឹងទប់', offenders.length === 0, offenders);
 }
+ok('ទិសផ្ទុយ ៖ `cspAllows()` គោរព path និង wildcard ដូច browser (ថត firebasejs ✓ · ថតផ្សេងលើ host ដដែល ✗ · host ផ្សេង ✗)',
+    cspAllows(['https://www.gstatic.com/firebasejs/'], 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js')
+    && !cspAllows(['https://www.gstatic.com/firebasejs/'], 'https://www.gstatic.com/recaptcha/releases/x/recaptcha__en.js')
+    && cspAllows(['https://*.firebaseio.com'], 'https://zoe-demo.firebaseio.com/.lp?start=t')
+    && !cspAllows(['https://*.firebaseio.com'], 'https://firebaseio.com.evil.example/x.js')
+    && cspAllows(['https://js.sentry-cdn.com'], 'https://js.sentry-cdn.com/abc.min.js')
+    && !cspAllows(["'self'"], 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'));
 
 // ── ២. SheetJS ត្រូវនៅក្នុង repo — កុំនាំវាទៅ CDN ────────────────────
 console.log('\n-- ២. SheetJS ស្ថិតក្នុង repo (ច្បាប់ដដែលនឹង ZXing) --');
@@ -269,7 +279,7 @@ function serve(dir, csp) {
             // library ត្រូវ **ដំណើរការពិត** មិនត្រឹមតែផ្ទុកចូល
             const built = await page.evaluate(() => {
                 try {
-                    const ws = XLSX.utils.aoa_to_sheet([['ល.រ', 'អតិថិជន'], [1, '0976455977']]);
+                    const ws = XLSX.utils.aoa_to_sheet([['ល.រ', 'អតិថិជន'], [1, '0970005977']]);
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, 'ប្រវត្តិ');
                     const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx', bookSST: true });

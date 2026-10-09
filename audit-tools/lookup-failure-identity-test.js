@@ -364,7 +364,7 @@ scenario('⛔ barcode ក្រៅទម្រង់ ZTO ➜ គ្មានស�
     ok('⛔ App មាន `ZTO_BARCODE_RE` ស្មើ `BARCODE_RE` របស់ Function បេះបិទ', !!appLiteral && appLiteral === fnLiteral,
         { app: appLiteral, fn: fnLiteral });
     const fnRe = fnLiteral ? vm.runInNewContext(fnLiteral) : /^$/;
-    const corpus = ['771305', 'ZTO123456', 'ab_cd-12', 'A'.repeat(64), '77130527210012',
+    const corpus = ['771305', 'ZTO123456', 'ab_cd-12', 'A'.repeat(64), '77130500000012',
         'AB12', '12345', 'ABC 12345', 'ABC.12345', 'ABC/12345', 'ក123456', 'A'.repeat(65), 'ABC#12345'];
     const valid = corpus.filter((c) => fnRe.test(c));
     const invalid = corpus.filter((c) => !fnRe.test(c));

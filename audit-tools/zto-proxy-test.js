@@ -153,8 +153,8 @@ function group(label, fn) {
 const ORDER = {
     success: true,
     data: {
-        billCode: '77130527210012',
-        consigneePhone: '0974158508',
+        billCode: '77130500000012',
+        consigneePhone: '0970008508',
         consigneeName: 'Test Customer',
         agentAmount: 6.55,
         arrivalServiceCharge: 1.25
@@ -166,18 +166,18 @@ group('ច្រកទ្វារសោ', async () => {
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     global.fetch = jsonResponder(ORDER);
 
-    const noKey = await proxy.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { barcode: '77130527210012' } });
+    const noKey = await proxy.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { barcode: '77130500000012' } });
     ok('គ្មានសោ ➜ 401', noKey.statusCode === 401, noKey.statusCode);
 
     delete process.env.ZTO_PROXY_KEY;
-    const unconfigured = await call({ barcode: '77130527210012' });
+    const unconfigured = await call({ barcode: '77130500000012' });
     ok('គ្មាន ZTO_PROXY_KEY ➜ 503 ZTO_PROXY_NOT_CONFIGURED',
         unconfigured.statusCode === 503 && JSON.parse(unconfigured.body).code === 'ZTO_PROXY_NOT_CONFIGURED',
         unconfigured.body);
     process.env.ZTO_PROXY_KEY = KEY;
 
     delete process.env.ZTO_COOKIE;
-    const noAuth = await call({ barcode: '77130527210012' });
+    const noAuth = await call({ barcode: '77130500000012' });
     ok('គ្មាន Cookie/Token ➜ 503 ZTO_AUTH_NOT_CONFIGURED',
         noAuth.statusCode === 503 && JSON.parse(noAuth.body).code === 'ZTO_AUTH_NOT_CONFIGURED',
         noAuth.body);
@@ -198,11 +198,11 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     global.fetch = jsonResponder(ORDER);
 
-    const cookieRun = await call({ barcode: '77130527210012' });
+    const cookieRun = await call({ barcode: '77130500000012' });
     const cookieBody = JSON.parse(cookieRun.body);
     ok('Cookie ➜ 200', cookieRun.statusCode === 200, cookieRun.body);
     ok('Cookie ➜ បំពេញ phone/cod/dod ត្រឹមត្រូវ',
-        cookieBody.phone === '0974158508' && cookieBody.cod === 6.55 && cookieBody.dod === 1.25, cookieBody);
+        cookieBody.phone === '0970008508' && cookieBody.cod === 6.55 && cookieBody.dod === 1.25, cookieBody);
     ok('រូបរាងចម្លើយថេរ',
         JSON.stringify(Object.keys(cookieBody).sort()) === JSON.stringify(['barcode', 'cached', 'cod', 'dod', 'found', 'phone', 'success', 'ztoClosed']),
         Object.keys(cookieBody).sort());
@@ -214,7 +214,7 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
         cookieHeaders.Origin === 'https://argus.ztoglobal.com', cookieHeaders.Origin);
     ok('Cookie ➜ ផ្ញើ Referer របស់ Argus', cookieHeaders.Referer === 'https://argus.ztoglobal.com/', cookieHeaders.Referer);
     ok('POST ➜ តួសំណើលំនាំដើម',
-        JSON.stringify(JSON.parse(jsonResponder.last.options.body)) === JSON.stringify({ billCode: '77130527210012', countryCode: 'KH' }),
+        JSON.stringify(JSON.parse(jsonResponder.last.options.body)) === JSON.stringify({ billCode: '77130500000012', countryCode: 'KH' }),
         jsonResponder.last.options.body);
     ok('URL លំនាំដើមនៅដដែល',
         jsonResponder.last.url === 'https://aargus-api.ztoglobal.com/scan/get/order/detail', jsonResponder.last.url);
@@ -234,7 +234,7 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer official-token' });
     global.fetch = jsonResponder(ORDER);
-    const officialRun = await call({ barcode: '77130527210012' });
+    const officialRun = await call({ barcode: '77130500000012' });
     const officialHeaders = jsonResponder.last.options.headers;
     ok('Authorization ➜ 200', officialRun.statusCode === 200, officialRun.body);
     ok('Authorization ➜ ផ្ញើ header ពិត', officialHeaders.Authorization === 'Bearer official-token');
@@ -245,19 +245,19 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer official-token', ZTO_SEND_BROWSER_HEADERS: 'true' });
     global.fetch = jsonResponder(ORDER);
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     ok('ទិសផ្ទុយ ៖ បង្ខំបាន ដោយ ZTO_SEND_BROWSER_HEADERS=true',
         jsonResponder.last.options.headers.Origin === 'https://argus.ztoglobal.com');
 
     resetEnv({ ZTO_TOKEN: 'tok-123', ZTO_TOKEN_HEADER: 'X-Zto-Token' });
     global.fetch = jsonResponder(ORDER);
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     ok('Token ➜ ផ្ញើតាម header ដែលកំណត់', jsonResponder.last.options.headers['X-Zto-Token'] === 'tok-123',
         jsonResponder.last.options.headers);
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer a', ZTO_TOKEN: 'b', ZTO_COOKIE: 'c=d' });
     global.fetch = jsonResponder(ORDER);
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     ok('លំដាប់អាទិភាព ៖ Authorization ឈ្នះ',
         jsonResponder.last.options.headers.Authorization === 'Bearer a'
         && jsonResponder.last.options.headers.Cookie === undefined);
@@ -289,9 +289,9 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer x', ZTO_FIELD_PHONE: 'nothing.here' });
     global.fetch = jsonResponder(ORDER);
-    const fallbackField = await call({ barcode: '77130527210012' });
+    const fallbackField = await call({ barcode: '77130500000012' });
     ok('⛔ ZTO_FIELD_* ខុស ➜ ធ្លាក់ទៅបញ្ជីលំនាំដើម (មិនស្លាប់)',
-        JSON.parse(fallbackField.body).phone === '0974158508', fallbackField.body);
+        JSON.parse(fallbackField.body).phone === '0970008508', fallbackField.body);
 
     resetEnv({
         ZTO_AUTHORIZATION: 'Bearer x',
@@ -312,14 +312,14 @@ group('ទម្រង់ API ណាក៏បាន', async () => {
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer x', ZTO_REQUEST_BODY_JSON: '{"no":"{barcode}","src":"zoew"}' });
     global.fetch = jsonResponder(ORDER);
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     ok('ZTO_REQUEST_BODY_JSON ➜ template ជំនួស {barcode}',
-        JSON.stringify(JSON.parse(jsonResponder.last.options.body)) === JSON.stringify({ no: '77130527210012', src: 'zoew' }),
+        JSON.stringify(JSON.parse(jsonResponder.last.options.body)) === JSON.stringify({ no: '77130500000012', src: 'zoew' }),
         jsonResponder.last.options.body);
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer x', ZTO_REQUEST_HEADERS_JSON: '{"Cookie":"stolen=1","Authorization":"Bearer evil"}' });
     global.fetch = jsonResponder(ORDER);
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     ok('⛔ header បន្ថែមមិនអាចសរសេរជាន់ Cookie/Authorization',
         jsonResponder.last.options.headers.Cookie === undefined
         && jsonResponder.last.options.headers.Authorization === 'Bearer x',
@@ -340,7 +340,7 @@ group('Config ខុស ➜ ធ្លាក់ដែលមានឈ្មោះ'
     for (const entry of cases) {
         resetEnv(Object.assign({ ZTO_AUTHORIZATION: 'Bearer x' }, entry[1]));
         global.fetch = jsonResponder(ORDER);
-        const res = await call({ barcode: '77130527210012' });
+        const res = await call({ barcode: '77130500000012' });
         const body = JSON.parse(res.body);
         ok('Config ខុស ➜ 503 `' + entry[0] + '`',
             res.statusCode === 503 && body.code === 'ZTO_CONFIG_INVALID' && body.reason === entry[0], res.body);
@@ -361,7 +361,7 @@ group('ការបដិសេធ auth', async () => {
     for (const entry of rejections) {
         resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
         global.fetch = entry[1];
-        const res = await call({ barcode: '77130527210012' });
+        const res = await call({ barcode: '77130500000012' });
         ok('ការបដិសេធ ៖ ' + entry[0] + ' ➜ 401 ZTO_AUTH_EXPIRED',
             res.statusCode === 401 && JSON.parse(res.body).code === 'ZTO_AUTH_EXPIRED', res.body);
         ok('⛔ URL របស់ IdP មិនហូរទៅ browser', res.body.indexOf('iam-web.zto.com') === -1);
@@ -369,7 +369,7 @@ group('ការបដិសេធ auth', async () => {
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     global.fetch = jsonResponder(ORDER);
-    const normal = await call({ barcode: '77130527210012' });
+    const normal = await call({ barcode: '77130500000012' });
     ok('⛔ ទិសផ្ទុយ ៖ ចម្លើយធម្មតាមិនត្រូវច្រឡំជាការបដិសេធ auth', normal.statusCode === 200, normal.body);
 });
 
@@ -451,8 +451,8 @@ group('ល្បឿន ៖ cache និង single-flight', async () => {
         calls++;
         return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ORDER };
     };
-    const first = await call({ barcode: '77130527210012' });
-    const second = await call({ barcode: '77130527210012' });
+    const first = await call({ barcode: '77130500000012' });
+    const second = await call({ barcode: '77130500000012' });
     ok('ស្កេនដដែលលើកទី ២ ➜ 200', second.statusCode === 200, second.body);
     ok('⛔ Cache ➜ upstream call តែ **១**', calls === 1, calls);
     ok('cached:false លើកទី ១', JSON.parse(first.body).cached === false);
@@ -460,8 +460,8 @@ group('ល្បឿន ៖ cache និង single-flight', async () => {
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_CACHE_TTL_MS: '0' });
     calls = 0;
-    await call({ barcode: '77130527210012' });
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
+    await call({ barcode: '77130500000012' });
     ok('⛔ ទិសផ្ទុយ ៖ ZTO_CACHE_TTL_MS=0 ➜ បិទ cache (២ call)', calls === 2, calls);
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
@@ -472,9 +472,9 @@ group('ល្បឿន ៖ cache និង single-flight', async () => {
         return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ORDER };
     };
     const parallel = await Promise.all([
-        call({ barcode: '77130527210012' }),
-        call({ barcode: '77130527210012' }),
-        call({ barcode: '77130527210012' })
+        call({ barcode: '77130500000012' }),
+        call({ barcode: '77130500000012' }),
+        call({ barcode: '77130500000012' })
     ]);
     ok('⛔ Single-flight ➜ សំណើស្របគ្នា ៣ ➜ upstream call តែ **១**', calls === 1, calls);
     ok('ទាំង ៣ ទទួលចម្លើយ 200', parallel.every((r) => r.statusCode === 200));
@@ -486,14 +486,14 @@ group('ល្បឿន ៖ cache និង single-flight', async () => {
         if (calls === 1) throw new TypeError('fetch failed');
         return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ORDER };
     };
-    const retried = await call({ barcode: '77130527210012' });
+    const retried = await call({ barcode: '77130500000012' });
     ok('បណ្តាញដាច់មួយភ្លែត ➜ ព្យាយាមឡើងវិញ ➜ 200', retried.statusCode === 200, retried.body);
     ok('ព្យាយាមឡើងវិញពិត (២ call)', calls === 2, calls);
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_CACHE_TTL_MS: '0', ZTO_UPSTREAM_RETRIES: '0' });
     calls = 0;
     global.fetch = async () => { calls++; throw new TypeError('fetch failed'); };
-    const noRetry = await call({ barcode: '77130527210012' });
+    const noRetry = await call({ barcode: '77130500000012' });
     ok('⛔ ទិសផ្ទុយ ៖ ZTO_UPSTREAM_RETRIES=0 ➜ call តែ ១', calls === 1, calls);
     ok('➜ ឆ្លើយជា JSON មិនមែនព្យួរ',
         noRetry.statusCode === 502 && JSON.parse(noRetry.body).code === 'ZTO_UNAVAILABLE', noRetry.body);
@@ -501,7 +501,7 @@ group('ល្បឿន ៖ cache និង single-flight', async () => {
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_CACHE_TTL_MS: '0' });
     calls = 0;
     global.fetch = async () => { calls++; return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }; };
-    const upstream5xx = await call({ barcode: '77130527210012' });
+    const upstream5xx = await call({ barcode: '77130500000012' });
     ok('HTTP 5xx ➜ ព្យាយាមឡើងវិញ រួចឆ្លើយជា JSON', calls === 2 && upstream5xx.statusCode === 502, { calls, status: upstream5xx.statusCode });
 });
 
@@ -519,7 +519,7 @@ group('ស្ថេរភាព ៖ បណ្តាញព្យួរ', async ()
     global.fetch = () => new Promise(() => {});
     const startedAt = Date.now();
     const stalled = await Promise.race([
-        call({ barcode: '77130527210012' }),
+        call({ barcode: '77130500000012' }),
         new Promise((resolve) => setTimeout(() => resolve({ statusCode: 0, body: '{"code":"HUNG"}' }), 9000))
     ]);
     const elapsed = Date.now() - startedAt;
@@ -538,7 +538,7 @@ group('ស្ថេរភាព ៖ បណ្តាញព្យួរ', async ()
         headers: { get: () => 'application/json' },
         json: async () => { throw new SyntaxError('Unexpected token'); }
     });
-    const badJson = await call({ barcode: '77130527210012' });
+    const badJson = await call({ barcode: '77130500000012' });
     ok('ចម្លើយមិនមែន JSON ➜ 502 ZTO_INVALID_RESPONSE',
         badJson.statusCode === 502 && JSON.parse(badJson.body).code === 'ZTO_INVALID_RESPONSE', badJson.body);
 });
@@ -606,8 +606,8 @@ group('query ក្នុង header (APK)', async () => {
         const res = await call(query, headers);
         return { res, upstream: jsonResponder.last ? JSON.stringify([jsonResponder.last.url, jsonResponder.last.options.body]) : null };
     };
-    const viaQuery = await lookup({ barcode: '77130527210012' });
-    const viaHeader = await lookup({}, { 'x-zoe-query': 'barcode=77130527210012' });
+    const viaQuery = await lookup({ barcode: '77130500000012' });
+    const viaHeader = await lookup({}, { 'x-zoe-query': 'barcode=77130500000012' });
     ok('ជាន់អប្បបរមា ៖ query string ➜ 200 + ហៅ upstream', viaQuery.res.statusCode === 200 && !!viaQuery.upstream, viaQuery.res.body);
     ok('⛔ header `x-zoe-query` ➜ ចម្លើយដូច query string បេះបិទ',
         viaHeader.res.statusCode === viaQuery.res.statusCode && viaHeader.res.body === viaQuery.res.body, viaHeader.res.body);
@@ -615,14 +615,14 @@ group('query ក្នុង header (APK)', async () => {
     const nullQuery = await (async () => {
         resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
         global.fetch = jsonResponder(ORDER);
-        return proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY, 'X-Zoe-Query': 'barcode=77130527210012' }, queryStringParameters: null });
+        return proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY, 'X-Zoe-Query': 'barcode=77130500000012' }, queryStringParameters: null });
     })();
     ok('queryStringParameters = null + header (ឈ្មោះអក្សរធំ) ➜ 200', nullQuery.statusCode === 200 && nullQuery.body === viaQuery.res.body, nullQuery.body);
-    const both = await lookup({ barcode: '77130527210012' }, { 'x-zoe-query': 'barcode=<bad>' });
+    const both = await lookup({ barcode: '77130500000012' }, { 'x-zoe-query': 'barcode=<bad>' });
     ok('ទិសផ្ទុយ ៖ query string ឈ្នះ header (header មិនអាចសរសេរជាន់)', both.res.body === viaQuery.res.body, both.res.body);
-    const proto = await lookup({}, { 'x-zoe-query': '__proto__=x&constructor=y&barcode=77130527210012' });
+    const proto = await lookup({}, { 'x-zoe-query': '__proto__=x&constructor=y&barcode=77130500000012' });
     ok('⛔ `__proto__` ក្នុង header មិនពុល prototype', proto.res.statusCode === 200 && ({}).x === undefined && typeof ({}).constructor === 'function', proto.res.body);
-    const tooLong = await lookup({}, { 'x-zoe-query': 'barcode=77130527210012&pad=' + 'a'.repeat(4096) });
+    const tooLong = await lookup({}, { 'x-zoe-query': 'barcode=77130500000012&pad=' + 'a'.repeat(4096) });
     ok('header វែងពេក ➜ មិនអាន (400 គ្មាន barcode · មិនហៅ upstream)', tooLong.res.statusCode === 400 && !tooLong.upstream, tooLong.res.statusCode);
     const preflight = await proxy.handler({ httpMethod: 'OPTIONS', headers: { origin: 'https://localhost', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-zoe-proxy-key, x-zoe-query' }, queryStringParameters: {} });
     ok('preflight ពី https://localhost ➜ អនុញ្ញាត `x-zoe-query`', /x-zoe-query/.test(String(preflight.headers['Access-Control-Allow-Headers'] || '')), preflight.headers);
@@ -654,7 +654,7 @@ group('ការវិនិច្ឆ័យ ?diag=1', async () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
         return slowResponder(url, options);
     };
-    await call({ barcode: '77130527210012' });
+    await call({ barcode: '77130500000012' });
     const timing = JSON.parse((await call({ diag: '1' })).body).upstreamTiming;
     ok('⛔ `?diag=1` កត់ពេល ZTO ឆ្លើយ `/detail` (count · lastMs · avgMs · maxMs ≥ ពេលពិត · timeouts 0)',
         !!timing && timing.detail.count === 1 && timing.detail.lastMs >= 35 && timing.detail.avgMs >= 35
@@ -741,7 +741,7 @@ const settleBackground = () => new Promise((resolve) => setTimeout(resolve, 50))
 
 group('សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា', async () => {
     console.log('\n== ១២. សោតាមហាង · អត្តសញ្ញាណ /detail · សាខា ==');
-    const B = { barcode: '77130527210012' };
+    const B = { barcode: '77130500000012' };
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROXY_KEYS: 'shopa=' + KEY_A + ', shopb=' + KEY_B + '\nshopc=' + KEY_PADDED });
     delete process.env.ZTO_PROXY_KEY;
@@ -811,10 +811,10 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
         forgedRes.statusCode === 401 && (bodyOf(forgedRes) || {}).reason === 'idtoken:signature' && ztoCalls() === 0, forgedRes.body);
     const good = await callAs(B, KEY, site);
     ok('(៣) `require` + token ត្រឹមត្រូវ ➜ 200 + លេខទូរស័ព្ទ',
-        good.statusCode === 200 && (bodyOf(good) || {}).phone === '0974158508' && ztoCalls() === 1, good.body);
+        good.statusCode === 200 && (bodyOf(good) || {}).phone === '0970008508' && ztoCalls() === 1, good.body);
     const cachedNoToken = await callAs(B, KEY);
     ok('⛔ (៣) cache មិនរំលងអត្តសញ្ញាណ ៖ ក្រោយលទ្ធផលចូល cache · គ្មាន token ➜ 401',
-        cachedNoToken.statusCode === 401 && cachedNoToken.body.indexOf('0974158508') === -1, cachedNoToken.body);
+        cachedNoToken.statusCode === 401 && cachedNoToken.body.indexOf('0970008508') === -1, cachedNoToken.body);
     const cachedWithToken = await callAs(B, KEY, site);
     ok('ទិសផ្ទុយ ៖ token ត្រឹមត្រូវ ➜ cache នៅឆ្លើយ (មិនហៅ ZTO ម្តងទៀត)',
         cachedWithToken.statusCode === 200 && (bodyOf(cachedWithToken) || {}).cached === true && ztoCalls() === 1, cachedWithToken.body);
@@ -854,23 +854,23 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const same = await callAs(B, KEY, site);
     const sameBody = bodyOf(same) || {};
     ok('(៤) សាខាត្រូវគ្នា (`dispSiteCode` = 12345 = សាខាគណនី) ➜ 200 + លេខទូរស័ព្ទ',
-        same.statusCode === 200 && sameBody.phone === '0974158508', same.body);
+        same.statusCode === 200 && sameBody.phone === '0970008508', same.body);
     ok('(៤) ចម្លើយមិនបញ្ចេញវាលសាខាខាងក្នុង (`branches`)', !('branches' in sameBody), Object.keys(sameBody));
     const other = await callAs(B, KEY, otherSite);
     const otherBody = bodyOf(other) || {};
     ok('⛔ (៤) សាខាផ្សេង (99999) ➜ 200 `found:false` `ZTO_OTHER_BRANCH` · គ្មានលេខទូរស័ព្ទ · COD (cache មិនរំលង)',
         other.statusCode === 200 && otherBody.found === false && otherBody.code === 'ZTO_OTHER_BRANCH'
-        && other.body.indexOf('0974158508') === -1 && !('cod' in otherBody) && ztoCalls() === 1, other.body);
+        && other.body.indexOf('0970008508') === -1 && !('cod' in otherBody) && ztoCalls() === 1, other.body);
     const noSiteAccount = await callAs(B, KEY, tokenFor('u@zoew.com'));
     ok('⛔ (៤) គណនីគ្មានលេខសាខា ➜ `ZTO_OTHER_BRANCH` (មិនបើកចំហ)',
-        (bodyOf(noSiteAccount) || {}).code === 'ZTO_OTHER_BRANCH' && noSiteAccount.body.indexOf('0974158508') === -1, noSiteAccount.body);
+        (bodyOf(noSiteAccount) || {}).code === 'ZTO_OTHER_BRANCH' && noSiteAccount.body.indexOf('0970008508') === -1, noSiteAccount.body);
 
     idEnv({ FIREBASE_PROJECT_IDS: BOUND, ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER);
     const noField = await callAs(B, KEY, site);
     const noFieldBody = bodyOf(noField) || {};
     ok('⛔ (៤) កំណត់ត្រា ZTO គ្មានវាលសាខា ➜ `ZTO_OTHER_BRANCH` `branch:missing` (fail-closed)',
-        noFieldBody.code === 'ZTO_OTHER_BRANCH' && noFieldBody.reason === 'branch:missing' && noField.body.indexOf('0974158508') === -1, noField.body);
+        noFieldBody.code === 'ZTO_OTHER_BRANCH' && noFieldBody.reason === 'branch:missing' && noField.body.indexOf('0970008508') === -1, noField.body);
 
     idEnv({ FIREBASE_PROJECT_IDS: BOUND, ZTO_DETAIL_IDENTITY: 'optional', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER_SITE);
@@ -882,7 +882,7 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const optDiag = (bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {};
     ok('(៤) `?diag=1` រាប់ការពិនិត្យសាខា (ត្រូវ ១ · ផ្សេង ០ · ផ្សេង ១) និងសាខាដែលឃើញ (គ្មានលេខទូរស័ព្ទ)',
         !!optDiag.branch && optDiag.branch.active === true && optDiag.branch.other === 1 && Array.isArray(optDiag.branch.seen)
-        && optDiag.branch.seen.indexOf('12345') !== -1 && JSON.stringify(optDiag).indexOf('0974158508') === -1, optDiag);
+        && optDiag.branch.seen.indexOf('12345') !== -1 && JSON.stringify(optDiag).indexOf('0970008508') === -1, optDiag);
 
     idEnv({ ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER_SITE);
@@ -902,14 +902,14 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const unbound = await callAs(B, KEY, site);
     const unboundBody = bodyOf(unbound) || {};
     ok('⛔ (៤) គម្រោង Firebase មិនចងសាខា (`FIREBASE_PROJECT_IDS` គ្មាន `:សាខា`) + កំណត់សាខា ➜ `ZTO_OTHER_BRANCH` `branch:project-unbound` (email ជាសញ្ញាដែលអ្នកប្រើប្តូរបាន)',
-        unboundBody.code === 'ZTO_OTHER_BRANCH' && unboundBody.reason === 'branch:project-unbound' && unbound.body.indexOf('0974158508') === -1, unbound.body);
+        unboundBody.code === 'ZTO_OTHER_BRANCH' && unboundBody.reason === 'branch:project-unbound' && unbound.body.indexOf('0970008508') === -1, unbound.body);
 
     idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ':100', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     serveOrder(ORDER_SITE);
     const spoof = await callAs(B, KEY, site);
     const spoofBody = bodyOf(spoof) || {};
     ok('⛔ (៤) បុគ្គលិកហាង A (គម្រោងចងសាខា 100) ប្តូរ email ទៅ `@zoew12345.com` (សាខា B) ➜ `ZTO_OTHER_BRANCH` `branch:project-mismatch` · គ្មានលេខទូរស័ព្ទ · COD',
-        spoofBody.code === 'ZTO_OTHER_BRANCH' && spoofBody.reason === 'branch:project-mismatch' && spoof.body.indexOf('0974158508') === -1 && !('cod' in spoofBody), spoof.body);
+        spoofBody.code === 'ZTO_OTHER_BRANCH' && spoofBody.reason === 'branch:project-mismatch' && spoof.body.indexOf('0970008508') === -1 && !('cod' in spoofBody), spoof.body);
     const spoofList = bodyOf(await callAs({ list: '1' }, KEY, site)) || {};
     ok('⛔ (៤) token ដដែលលើ `?list=1` ➜ `ZTO_LIST_NOT_CONFIGURED` `site:no-account` (គ្មានសាខាពី email ក្រៅការចង)',
         spoofList.code === 'ZTO_LIST_NOT_CONFIGURED' && spoofList.reason === 'site:no-account', spoofList);
@@ -918,7 +918,7 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const boundSame = await callAs(B, KEY, site);
     const boundList = bodyOf(await callAs({ list: '1' }, KEY, site)) || {};
     ok('ទិសផ្ទុយ ៖ email ក្នុងសាខាដែលចង (12345) ➜ `/detail` 200 + លេខទូរស័ព្ទ · `?list=1` ឆ្លងច្រកអត្តសញ្ញាណ',
-        boundSame.statusCode === 200 && (bodyOf(boundSame) || {}).phone === '0974158508'
+        boundSame.statusCode === 200 && (bodyOf(boundSame) || {}).phone === '0970008508'
         && boundList.reason !== 'site:no-account' && String(boundList.reason || '').indexOf('idtoken:') !== 0, [boundSame.body, boundList]);
     idEnv({ FIREBASE_PROJECT_IDS: TEST_PROJECT + ',other-proj:200', ZTO_DETAIL_IDENTITY: 'require', ZTO_DETAIL_BRANCH_PATHS: 'dispSiteCode' });
     const bindDiag = ((bodyOf(await callAs({ diag: '1' }, KEY)) || {}).access || {}).branch || {};
@@ -936,7 +936,7 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     const viaFirst = bodyOf(await callAs(B, KEY, tokenForSite('55555'))) || {};
     const viaNone = bodyOf(await callAs(B, KEY, otherSite)) || {};
     ok('⛔ (៤) ផ្លូវវាលសាខា ២ ៖ ត្រូវវាលទី ២ (12345) · ត្រូវវាលទី ១ (55555) ➜ 200 + លេខទូរស័ព្ទ · មិនត្រូវទាំងពីរ (99999) ➜ `branch:other`',
-        viaSecond.phone === '0974158508' && !('branches' in viaSecond) && viaFirst.phone === '0974158508'
+        viaSecond.phone === '0970008508' && !('branches' in viaSecond) && viaFirst.phone === '0970008508'
         && viaNone.code === 'ZTO_OTHER_BRANCH' && viaNone.reason === 'branch:other', [viaSecond, viaFirst, viaNone]);
 
     sbEnv({ ZTO_DETAIL_IDENTITY: 'require' });
@@ -951,7 +951,7 @@ group('សោតាមហាង · អត្តសញ្ញាណ /detail · ស
     sbEnv({ ZTO_DETAIL_IDENTITY: 'require' });
     serveWithSupabase(ORDER, [{ status: 'active', branch_code: '12345' }]);
     const member = await callAs(B, KEY, sbToken('member'));
-    ok('ទិសផ្ទុយ ៖ Supabase សមាជិកហាងសកម្ម ➜ 200 + លេខទូរស័ព្ទ', member.statusCode === 200 && (bodyOf(member) || {}).phone === '0974158508', member.body);
+    ok('ទិសផ្ទុយ ៖ Supabase សមាជិកហាងសកម្ម ➜ 200 + លេខទូរស័ព្ទ', member.statusCode === 200 && (bodyOf(member) || {}).phone === '0970008508', member.body);
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_DETAIL_IDENTITY: 'require' });
     serveOrder(ORDER);

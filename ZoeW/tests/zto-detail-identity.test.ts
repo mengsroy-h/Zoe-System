@@ -20,7 +20,7 @@ import { healthLookupRow } from '../src/features/health-check';
 
 const ZTO_URL = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
 const OTHER_URL = 'https://api.example.invalid/lookup?code={barcode}';
-const BARCODE = '77130527210012';
+const BARCODE = '77130500000012';
 
 function useConfig(url: string) {
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({
@@ -99,7 +99,7 @@ afterEach(() => {
 
 describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', () => {
     it('⛔ ស្កេន ➜ សំណើ /detail មាន `X-Zoe-Id-Token` + សោហាង', async () => {
-        const calls = serve(200, { success: true, found: true, phone: '0974158508', cod: 6.55, dod: 0 });
+        const calls = serve(200, { success: true, found: true, phone: '0970008508', cod: 6.55, dod: 0 });
         const status = await scan();
         expect(calls.length).toBe(1);
         expect(headerOf(calls[0], 'X-Zoe-Id-Token')).toBe('audit-id-token');
@@ -117,7 +117,7 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
 
     it('⛔ ទិសផ្ទុយ ៖ API ស្វែងរកផ្សេង (មិនមែន Function ZTO) ➜ មិនដែលទទួល ID token', async () => {
         useConfig(OTHER_URL);
-        const calls = serve(200, { phone: '0974158508', cod: 6.55, dod: 0 });
+        const calls = serve(200, { phone: '0970008508', cod: 6.55, dod: 0 });
         await scan();
         expect(calls.length).toBe(1);
         expect(headerOf(calls[0], 'X-Zoe-Id-Token')).toBeUndefined();
@@ -126,7 +126,7 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
 
     it('ទិសផ្ទុយ ៖ គ្មានគណនីចូល ➜ សំណើនៅតែចេញ (គ្មាន token · Function សម្រេច)', async () => {
         signIn(null);
-        const calls = serve(200, { success: true, found: true, phone: '0974158508', cod: 1, dod: 0 });
+        const calls = serve(200, { success: true, found: true, phone: '0970008508', cod: 1, dod: 0 });
         await scan();
         expect(calls.length).toBe(1);
         expect(headerOf(calls[0], 'X-Zoe-Id-Token')).toBeUndefined();
@@ -209,13 +209,13 @@ describe('ZTO /detail ៖ App ផ្ញើ ID token តែទៅ Function ZTO', 
         bindField('lookupApiUrlInput', ZTO_URL);
         bindField('lookupApiHeaderNameInput', 'X-Zoe-Proxy-Key');
         bindField('lookupApiHeaderValueInput', 'shop-a-key-0123456789abcdef');
-        const zto = serve(200, { success: true, found: true, phone: '0974158508' });
+        const zto = serve(200, { success: true, found: true, phone: '0970008508' });
         await testLookupApiConfig();
         expect(zto.length).toBe(1);
         expect(headerOf(zto[0], 'X-Zoe-Id-Token')).toBe('audit-id-token');
         expect(headerOf(zto[0], 'X-Zoe-Proxy-Key')).toBe('shop-a-key-0123456789abcdef');
         bindField('lookupApiUrlInput', OTHER_URL);
-        const other = serve(200, { phone: '0974158508' });
+        const other = serve(200, { phone: '0970008508' });
         await testLookupApiConfig();
         expect(other.length).toBe(1);
         expect(headerOf(other[0], 'X-Zoe-Id-Token')).toBeUndefined();

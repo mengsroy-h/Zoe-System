@@ -20,7 +20,7 @@ const ROOT = process.env.ZTOSTORE_APP_DIR
 const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
 
 const KEY = 'proxy-key-for-tests-0123456789ab';
-const BARCODE = '77130527210012';
+const BARCODE = '77130500000012';
 const ENV_COOKIE = 'BOS-MAN-SESSION=env-cookie-value-1234; sidebarStatus=0';
 const BLOB_COOKIE = 'BOS-MAN-SESSION=blob-cookie-value-9876; sidebarStatus=1';
 const STORE_NAME = 'zto-auth';
@@ -150,7 +150,7 @@ function call(query, options) {
 
 const ORDER = {
     code: '0',
-    data: { billCode: BARCODE, consigneePhone: '0974158508', agentAmount: 6.55, arrivalServiceCharge: 1.25 }
+    data: { billCode: BARCODE, consigneePhone: '0970008508', agentAmount: 6.55, arrivalServiceCharge: 1.25 }
 };
 
 // stub `fetch` ដែលកត់ត្រា header ពិតដែលចេញទៅ ZTO និងអាចត្រឡប់ `Set-Cookie`។
@@ -304,7 +304,7 @@ async function run() {
     blobs = useBlobs();
     net = upstream();
     await call({ barcode: BARCODE });
-    await call({ barcode: '77130527210013' });
+    await call({ barcode: '77130500000013' });
     ok('cache ក្នុងសតិ ➜ អាន store តែម្តង',
         blobs.calls.filter((c) => c.fn === 'get').length === 1,
         blobs.names());
@@ -344,7 +344,7 @@ async function run() {
         blobs.state.readHangs = true;
         net = upstream();
         const swrStart = Date.now();
-        res = await call({ barcode: '77130527210021' });
+        res = await call({ barcode: '77130500000021' });
         const swrMs = Date.now() - swrStart;
         ok('⛔ cache ផុត + Blobs ព្យួរ ➜ lookup នៅតែឆ្លើយ (មិនទប់)',
             res.statusCode === 200 && JSON.parse(res.body).found === true, res.statusCode);
@@ -371,12 +371,12 @@ async function run() {
         proxy.expireCookieCacheForTests();
         blobs.state.value = 'BOS-MAN-SESSION=swr-refreshed-value-4242; sidebarStatus=1';
         net = upstream();
-        await call({ barcode: '77130527210022' });
+        await call({ barcode: '77130500000022' });
         await new Promise((resolve) => setTimeout(resolve, 30));
         ok('⛔ ការធ្វើឲ្យស្រស់ខាងក្រោយកើតឡើងពិត (អាន store លើកទី ២)',
             blobs.calls.filter((c) => c.fn === 'get').length === 2, blobs.names());
         net = upstream();
-        await call({ barcode: '77130527210023' });
+        await call({ barcode: '77130500000023' });
         ok('⛔ សំណើបន្ទាប់ប្រើតម្លៃថ្មីដែលទើបធ្វើឲ្យស្រស់',
             sentCookie(net) === blobs.state.value, sentCookie(net));
 
@@ -389,10 +389,10 @@ async function run() {
         proxy.expireCookieCacheForTests();
         blobs.state.readDelayMs = 60;
         net = upstream(['BOS-MAN-SESSION=renewed-during-refresh-5150; Path=/']);
-        await call({ barcode: '77130527210026' });
+        await call({ barcode: '77130500000026' });
         await new Promise((resolve) => setTimeout(resolve, 140));
         net = upstream();
-        await call({ barcode: '77130527210027' });
+        await call({ barcode: '77130500000027' });
         ok('⛔ ការអានខាងក្រោយដែលយឺត មិនត្រូវសរសេរជាន់ session ថ្មីជាង',
             String(sentCookie(net) || '').indexOf('renewed-during-refresh-5150') !== -1,
             sentCookie(net));
@@ -408,7 +408,7 @@ async function run() {
         blobs.state.value = 'BOS-MAN-SESSION=warmed-value-8888; sidebarStatus=1';
         await call({}, { method: 'OPTIONS' });
         net = upstream();
-        await call({ barcode: '77130527210025' });
+        await call({ barcode: '77130500000025' });
         ok('⛔ ការត្រៀម (OPTIONS) ➜ បញ្ចប់ការអាន ➜ ការស្កេនបន្ទាប់ប្រើតម្លៃថ្មីភ្លាម',
             sentCookie(net) === blobs.state.value, sentCookie(net));
 
@@ -421,7 +421,7 @@ async function run() {
             res.statusCode === 401, res.statusCode);
         blobs.state.value = 'BOS-MAN-SESSION=rotated-after-401-777; sidebarStatus=1';
         net = upstream();
-        await call({ barcode: '77130527210024' });
+        await call({ barcode: '77130500000024' });
         ok('⛔ ក្រោយ 401 ➜ អាន store ភ្លាម (មិនប្រើសតិចាស់តាម SWR)',
             sentCookie(net) === blobs.state.value, sentCookie(net));
     } else {
@@ -450,14 +450,14 @@ async function run() {
     ok('lookup នៅជោគជ័យដដែល', res.statusCode === 200, res.statusCode);
 
     net = upstream(['BOS-MAN-SESSION=renewed-again-99887766; Path=/']);
-    await call({ barcode: '77130527210014' });
+    await call({ barcode: '77130500000014' });
     ok('⛔ Session ប្តូរពិត ➜ រក្សាទុកភ្លាម ទោះក្នុង ៦០ វិនាទី',
         blobs.calls.filter((c) => c.fn === 'set').length === 2, blobs.names());
 
     // ⛔ BOS-MAN-SESSION ថ្មីត្រូវរក្សាទុកភ្លាម និងប្រើបន្តក្នុងសតិ។
     // ការប្តូរគូធម្មតានៅគោរព throttle; zto-cookie-session-test វាស់ឆ្លង TTL។
     net = upstream();
-    await call({ barcode: '77130527210015' });
+    await call({ barcode: '77130500000015' });
     ok('⛔ Session ថ្មីត្រូវប្រើបន្តក្នុងសតិ',
         String(sentCookie(net) || '').indexOf('renewed-again-99887766') !== -1, sentCookie(net));
     ok('⛔ ទិសផ្ទុយ ៖ ការប្រើក្នុងសតិមិនត្រូវក្លាយជាការសរសេរស្ទួន',
@@ -484,7 +484,7 @@ async function run() {
     ok('⛔ ការសរសេរធ្លាក់ ➜ lookup នៅជោគជ័យ (best-effort)',
         res.statusCode === 200 && JSON.parse(res.body).found === true, res.body);
     net = upstream();
-    await call({ barcode: '77130527210016' });
+    await call({ barcode: '77130500000016' });
     ok('⛔ ការសរសេរធ្លាក់ ➜ session ថ្មីនៅតែប្រើក្នុងសតិ (មិនត្រឡប់ទៅចាស់)',
         String(sentCookie(net) || '').indexOf('renewed-value-55667788') !== -1, sentCookie(net));
 

@@ -134,7 +134,7 @@ for (const app of ['ZoeW']) {
         const heldDecl = (src.match(/^ *const lookupAnswersHeldWhileSaving = .*$/m) || [])[0];
         ok(!!heldDecl, 'រកឃើញការប្រកាស lookupAnswersHeldWhileSaving ក្នុង app.js');
         vm.runInContext(heldDecl || 'const lookupAnswersHeldWhileSaving = new Map();', ctx);
-        vm.runInContext("lookupAnswersHeldWhileSaving.set('ZTO9999000222', { phone: '0963897345', cod: 5, dod: 1 });", ctx);
+        vm.runInContext("lookupAnswersHeldWhileSaving.set('ZTO9999000222', { phone: '0960007345', cod: 5, dod: 1 });", ctx);
         const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
         if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
         // ⛔ cache `zoe_docs` របស់ហាង Supabase (IndexedDB) ផ្ទុកទិន្នន័យអតិថិជន ➜ ការចាកចេញលុប database ទាំងមូល ឯករាជ្យពី backend
@@ -195,7 +195,7 @@ for (const app of ['ZoeW']) {
         // ⛔ ដាក់ស្ថានភាពរសើបរបស់បញ្ជី ZTO **មុន** ការចាកចេញ — បើមិនដាក់
         // ការអះអាងខាងក្រោមនឹងបៃតងលើ map ទទេ = ការការពារដែលងាប់។
         vm.runInContext("ztoListSignedProbe.set('77130500000001', true);"
-            + " ztoListSyncResult = { rows: [{ barcode: '77130500000001', phone: '0963897345' }] };", ctx);
+            + " ztoListSyncResult = { rows: [{ barcode: '77130500000001', phone: '0960007345' }] };", ctx);
         try { ctx.showLoginModalWithPrefill(); } catch (e) { threw = e; }
         ok(!!glidePauseFn, 'endPanelGlideSnapPause មានក្នុង app.js');
         // ⛔ React ៖ `#appPages.panel-gliding` ជា `uiState.panelGliding` ដែល JSX គូរ

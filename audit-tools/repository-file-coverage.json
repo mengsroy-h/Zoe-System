@@ -2625,6 +2625,9 @@
     "audit-tools/secret-hygiene.js": {
       "policy": "guard-1"
     },
+    "audit-tools/security-guard-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/semantic-ui-color-test.js": {
       "policy": "guard-1"
     },

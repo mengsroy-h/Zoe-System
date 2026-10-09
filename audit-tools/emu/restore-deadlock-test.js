@@ -56,12 +56,12 @@ const SRC = 'id_1750000000000_aaa';
 const CID = 'id_1750000000000_bbb';
 
 const trashItem = (id, extra) => Object.assign({
-    id, cod: 5, dod: 0, price: 5, count: 1, phone: '098798880',
+    id, cod: 5, dod: 0, price: 5, count: 1, phone: '098000880',
     scanDate: '2026-08-26', time: 't', createdAt: T0, deletedAt: T0,
     isFromDeletion: true, trashReason: 'delete'
 }, extra || {});
 const historyItem = (id, extra) => Object.assign({
-    id, cod: 5, dod: 0, price: 5, count: 1, phone: '098798880',
+    id, cod: 5, dod: 0, price: 5, count: 1, phone: '098000880',
     scanDate: '2026-08-26', time: 't', createdAt: T0, isClosed: false, isCalled: false
 }, extra || {});
 

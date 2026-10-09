@@ -33,7 +33,7 @@
 //    មិនដែលដឹងថាមាន។
 //
 // ៧. ⛔ **barcode ស្ទួនក្នុងទំព័រតែមួយ ជាការវាស់ពិត** (2026-09-11) ៖
-//    `77130533910996` លេច ២ ដងក្នុងទំព័រ ១០០ ជួរ (ZTO ស្កេន «មកដល់» ២ ថ្ងៃ)
+//    `77130500000996` លេច ២ ដងក្នុងទំព័រ ១០០ ជួរ (ZTO ស្កេន «មកដល់» ២ ថ្ងៃ)
 //    ➜ បើបញ្ចូលទាំង ២ ➜ **លុយបូកស្ទួន $6.47**។ ការ de-dupe ត្រូវធ្វើ
 //    **ក្នុងបញ្ជីជាមុន** មិនមែនពឹងលើ registry ខាង server។
 //
@@ -215,8 +215,8 @@ function responder(payload, status) {
 // ─── គំរូជួរដេកពិត (វាស់លើទិន្នន័យផលិតកម្ម 2026-09-11) ────────────────────
 function listRow(extra) {
     return Object.assign({
-        scanBillCode: '77130533910996',
-        consigneeMobile: '855963897345',
+        scanBillCode: '77130500000996',
+        consigneeMobile: '855960007345',
         consigneeName: 'ឈ្មោះអតិថិជន',
         consigneeAddress: '磅湛直营店KC-01',
         customerCodeDesc: 'taobao',
@@ -442,8 +442,8 @@ function firstBody(requests) {
         JSON.stringify(good.body).indexOf('ឈ្មោះអតិថិជន') === -1, true);
     ok('⛔ អាសយដ្ឋានមិនឆ្លងកាត់',
         JSON.stringify(good.body).indexOf('磅湛直营店') === -1, true);
-    ok('barcode អានចេញពី `scanBillCode`', row.barcode === '77130533910996', row.barcode);
-    ok('phone អានចេញពី `consigneeMobile`', row.phone === '855963897345', row.phone);
+    ok('barcode អានចេញពី `scanBillCode`', row.barcode === '77130500000996', row.barcode);
+    ok('phone អានចេញពី `consigneeMobile`', row.phone === '855960007345', row.phone);
     ok('cod អានចេញពី `agentAmount`', row.cod === 6.47, row.cod);
     // ⛔ `fcAmount` ជា **DOD** លើផ្លូវបញ្ជី (ការបញ្ជាក់របស់ម្ចាស់គម្រោង
     // 2026-09-11 លើ payload ពិត) — គំរូនេះមាន `fcAmount: 2.5`។
@@ -455,20 +455,20 @@ function firstBody(requests) {
         good.body && { pages: good.body.pages, total: good.body.total });
 
     // ⛔ **ករណីពិត (payload ផលិតកម្ម 2026-09-11)** ៖ barcode តែមួយ
-    // (`77130529557463`) លេច **៣ ដង** ក្នុងចម្លើយតែមួយ ៖ `03` អីវ៉ាន់មកដល់ ·
+    // (`77130500007463`) លេច **៣ ដង** ក្នុងចម្លើយតែមួយ ៖ `03` អីវ៉ាន់មកដល់ ·
     // `04` ការចែកចាយអីវ៉ាន់ · `05` ចុះហត្ថលេខា។ បើគ្មានជាន់ការពារ
     // `scanTypeDesc` នោះកញ្ចប់ ១ ក្លាយជា **៣ ជួរដេក** ➜ លុយ ៣ ដង។
     // ⛔ ហើយជួរដេកនោះ (`ztda` · COD 0 · លេខទូរស័ព្ទ **ពិត**) មាន
     // `fcAmount: 2.5` ដែលជា **DOD** — ⛔ មិនមែន «ថ្លៃដឹកដែលត្រូវរំលង» ទេ
     // (កែការយល់ដឹងចាស់ តាមការបញ្ជាក់របស់ម្ចាស់គម្រោង)។
     const LIFECYCLE = [
-        listRow({ scanBillCode: '77130529557463', consigneeMobile: '078913186',
+        listRow({ scanBillCode: '77130500007463', consigneeMobile: '078000186',
             customerCodeDesc: 'ztda', agentAmount: 0.0, fcAmount: 2.5,
             scanTime: '2026-09-11 15:11:48', scanTypeDesc: 'អីវ៉ាន់មកដល់' }),
-        listRow({ scanBillCode: '77130529557463', consigneeMobile: '078913186',
+        listRow({ scanBillCode: '77130500007463', consigneeMobile: '078000186',
             customerCodeDesc: 'ztda', agentAmount: 0.0, fcAmount: 2.5,
             scanTime: '2026-09-11 15:13:48', scanTypeDesc: 'ការចែកចាយអីវ៉ាន់' }),
-        listRow({ scanBillCode: '77130529557463', consigneeMobile: '078913186',
+        listRow({ scanBillCode: '77130500007463', consigneeMobile: '078000186',
             customerCodeDesc: 'ztda', agentAmount: 0.0, fcAmount: 2.5,
             scanTime: '2026-09-11 15:15:22', scanTypeDesc: 'ចុះហត្ថលេខា' })
     ];
@@ -479,11 +479,11 @@ function firstBody(requests) {
     const lifeRows = rowsOf(lifeOut.body);
     const lifeBody = lifeOut.body || {};
     ok('⛔ ទាញតែ «អីវ៉ាន់មកដល់» ៖ វដ្តជីវិត ៣ ជួរ ➜ ជួរដេកបញ្ចូលបាន ១', lifeRows.length === 1, lifeRows.length);
-    ok('⛔ `អីវ៉ាន់មកដល់` ➜ ប្រើបាន', lifeRows[0] && lifeRows[0].skip === '' && lifeRows[0].barcode === '77130529557463', lifeRows[0]);
+    ok('⛔ `អីវ៉ាន់មកដល់` ➜ ប្រើបាន', lifeRows[0] && lifeRows[0].skip === '' && lifeRows[0].barcode === '77130500007463', lifeRows[0]);
     ok('⛔ `ការចែកចាយអីវ៉ាន់` ➜ មិនមែនជួរដេក (កុំឲ្យក្លាយជាកញ្ចប់ទី ២) តែរាប់ក្នុង `otherScans`',
         lifeBody.otherScans === 1, lifeBody.otherScans);
     ok('⛔ `ចុះហត្ថលេខា` ➜ មិនមែនជួរដេក ➜ ភស្តុតាង «ZTO បិទរួច» (`signed`)',
-        lifeBody.signedScans === 1 && Array.isArray(lifeBody.signed) && lifeBody.signed[0] === '77130529557463',
+        lifeBody.signedScans === 1 && Array.isArray(lifeBody.signed) && lifeBody.signed[0] === '77130500007463',
         { signedScans: lifeBody.signedScans, signed: lifeBody.signed });
     ok('⛔ ការអភិរក្សខាង server ៖ `rows + otherScans + signedScans` = ជួរដេក upstream',
         lifeRows.length + (lifeBody.otherScans || 0) + (lifeBody.signedScans || 0) === LIFECYCLE.length,
@@ -671,7 +671,7 @@ function firstBody(requests) {
     const mixed = await listCall(listPayload([
         listRow({ scanBillCode: '77130500000001', consigneeMobile: '0', agentAmount: 0, fcAmount: 28.5 }),
         listRow({ scanBillCode: '77130500000002', consigneeMobile: '', agentAmount: 0 }),
-        listRow({ scanBillCode: '77130500000003', consigneeMobile: '081684403', agentAmount: 0 })
+        listRow({ scanBillCode: '77130500000003', consigneeMobile: '081000403', agentAmount: 0 })
     ]), GOOD_LIST_ENV);
     const mixedRows = rowsOf(mixed.body);
     ok('ជួរដេកទាំង ៣ ត្រឡប់មកវិញ (មិនទម្លាក់ស្ងាត់)', mixedRows.length === 3, mixedRows.length);
@@ -682,7 +682,7 @@ function firstBody(requests) {
     ok('⛔ `consigneeMobile` ទទេ ➜ phone ទទេ',
         mixedRows[1] && mixedRows[1].phone === '', mixedRows[1]);
     ok('⛔ ទិសផ្ទុយ ៖ លេខពិតដែល COD = 0 **នៅតែឆ្លងកាត់** (`taobao` បង់មុន)',
-        mixedRows[2] && mixedRows[2].phone === '081684403' && mixedRows[2].cod === 0, mixedRows[2]);
+        mixedRows[2] && mixedRows[2].phone === '081000403' && mixedRows[2].cod === 0, mixedRows[2]);
 
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ៥ក. លេខដាក់កន្លែង ៖ ផ្លូវស្កេន (`/detail`) និងផ្លូវបញ្ជីយល់ស្របគ្នា ==');
@@ -691,7 +691,7 @@ function firstBody(requests) {
     // ➜ រក្សាទុកស្វ័យប្រវត្តិ ➜ `addOrUpdateEntry()` បញ្ចូលកញ្ចប់អ្នកដទៃចូលជួរ `0` តែមួយ (phone + scanDate)។
     // ច្បាប់ ៖ Function តែមួយ ➜ ការវិនិច្ឆ័យលេខដាក់កន្លែងតែមួយ ➜ phone ដូចគ្នាលើផ្លូវទាំង ២ ជានិច្ច។
     const PLACEHOLDER_PHONES = ['0', '000', '', '0-0', ' 0 ', '00 000 000'];
-    const AGREEMENT_PHONES = PLACEHOLDER_PHONES.concat(['+855-0', '081684403', '855963897345']);
+    const AGREEMENT_PHONES = PLACEHOLDER_PHONES.concat(['+855-0', '081000403', '855960007345']);
     let agreementMeasured = 0;
     for (const raw of AGREEMENT_PHONES) {
         const listed = await listCall(listPayload([
@@ -727,10 +727,10 @@ function firstBody(requests) {
     }
     const realBare = await detailCall({}, '77130500000012', {
         success: true,
-        data: { billCode: '77130500000012', consigneeMobile: '081684403' }
+        data: { billCode: '77130500000012', consigneeMobile: '081000403' }
     });
     ok('⛔ ទិសផ្ទុយ ៖ `/detail` លេខពិតគ្មាន COD/DOD ➜ `found:true` ហើយ phone ឆ្លងកាត់ដដែល',
-        !!realBare.body && realBare.body.found === true && realBare.body.phone === '081684403'
+        !!realBare.body && realBare.body.found === true && realBare.body.phone === '081000403'
         && realBare.body.cod === 0 && realBare.body.dod === 0, realBare.body);
 
     // ═════════════════════════════════════════════════════════════════════
@@ -985,13 +985,13 @@ function firstBody(requests) {
     ok('⛔ `classifyZtoListRows` រត់ក្នុង sandbox បាន', typeof classify === 'function', typeof classify);
 
     if (typeof classify === 'function') {
-        const history = [{ id: 'a', phone: '0963897345', barcodes: [{ code: '77130500000111' }] }];
-        const trash = [{ id: 'b', phone: '060633155', barcodes: [{ code: '77130500000222' }] }];
+        const history = [{ id: 'a', phone: '0960007345', barcodes: [{ code: '77130500000111' }] }];
+        const trash = [{ id: 'b', phone: '060000155', barcodes: [{ code: '77130500000222' }] }];
         const input = [
-            { barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-09 08:12:27' },
-            { barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 09:10:16' },
-            { barcode: '77130500000111', phone: '855963897345', cod: 1, dod: 0, at: '2026-09-10 10:00:00' },
-            { barcode: '77130500000222', phone: '85560633155', cod: 2, dod: 0, at: '2026-09-10 10:01:00' },
+            { barcode: '77130500000999', phone: '855960007345', cod: 6.47, dod: 0, at: '2026-09-09 08:12:27' },
+            { barcode: '77130500000999', phone: '855960007345', cod: 6.47, dod: 0, at: '2026-09-10 09:10:16' },
+            { barcode: '77130500000111', phone: '855960007345', cod: 1, dod: 0, at: '2026-09-10 10:00:00' },
+            { barcode: '77130500000222', phone: '85560000155', cod: 2, dod: 0, at: '2026-09-10 10:01:00' },
             { barcode: '77130500000333', phone: '', cod: 0, dod: 0, at: '2026-09-10 10:02:00' },
             { barcode: '', phone: '0999888777', cod: 3, dod: 0, at: '2026-09-10 10:03:00' }
         ];
@@ -1019,7 +1019,7 @@ function firstBody(requests) {
         ok('ជួរដេកថ្មីពិត ➜ `fresh`',
             out.fresh.length === 1 && out.fresh[0].barcode === '77130500000999', out.fresh);
         ok('⛔ លេខទូរស័ព្ទត្រូវបម្លែងទម្រង់ដូចការស្កេន (`855…` ➜ `0…`)',
-            !!out.fresh[0] && out.fresh[0].phone === '0963897345', out.fresh[0]);
+            !!out.fresh[0] && out.fresh[0].phone === '0960007345', out.fresh[0]);
 
         let emptyOut = null;
         try { emptyOut = classify([], [], []); } catch (_) { emptyOut = {}; }
@@ -1035,11 +1035,11 @@ function firstBody(requests) {
         // ⛔ ZTO-E12 (សំណើម្ចាស់គម្រោង ៖ កញ្ចប់ 05 ចូលជា «បិទរួច» លើថ្ងៃ ZTO ស្កេនចុះហត្ថលេខា) ៖ ជួរ `signedRows` ដែល barcode មិននៅក្នុងបញ្ជីមកដល់
         //    និងថ្ងៃចុះហត្ថលេខាក្នុងចន្លោះ ➜ ថ្មី «យករួច» (ម៉ោង = ម៉ោងចុះហត្ថលេខា) · មានក្នុង ZoeW ➜ `existing` · ចាស់ជាងអាយុធុងសំរាម ➜ `too-old-purged` ·
         //    ក្រៅចន្លោះ ➜ មិនរាប់ · ជួរមកដល់ ➜ ផ្លូវដើម + `signedAt`។
-        const arrivalOnly = [{ barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 09:10:16' }];
+        const arrivalOnly = [{ barcode: '77130500000999', phone: '855960007345', cod: 6.47, dod: 0, at: '2026-09-10 09:10:16' }];
         const signedIn = [
-            { barcode: '77130500000999', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 15:00:00', from: '' },
+            { barcode: '77130500000999', phone: '855960007345', cod: 6.47, dod: 0, at: '2026-09-10 15:00:00', from: '' },
             { barcode: '77130500000444', phone: '855977000111', cod: 4.25, dod: 1, at: '2026-09-09 08:30:00', from: 'taobao' },
-            { barcode: '77130500000111', phone: '855963897345', cod: 1, dod: 0, at: '2026-09-10 11:00:00', from: '' },
+            { barcode: '77130500000111', phone: '855960007345', cod: 1, dod: 0, at: '2026-09-10 11:00:00', from: '' },
             { barcode: '77130500000555', phone: '855977000222', cod: 2, dod: 0, at: '2026-09-12 08:00:00', from: '' },
             { barcode: '77130500000666', phone: '855977000333', cod: 2, dod: 0, at: '2026-08-01 08:00:00', from: '' }
         ];
@@ -1300,8 +1300,8 @@ function firstBody(requests) {
     // ⛔ ខាង client ៖ ជួរដេកដែល server សម្គាល់ ត្រូវចូលក្រុម «រំលង»
     if (typeof classify === 'function') {
         const marked = classify([
-            { barcode: '77130500000201', phone: '0963897345', cod: 1, dod: 0, at: '2026-09-10 10:00:00', skip: 'scan-type' },
-            { barcode: '77130500000202', phone: '0963897345', cod: 1, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
+            { barcode: '77130500000201', phone: '0960007345', cod: 1, dod: 0, at: '2026-09-10 10:00:00', skip: 'scan-type' },
+            { barcode: '77130500000202', phone: '0960007345', cod: 1, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
         ], [], []);
         ok('⛔ client ៖ ជួរដេកដែលសម្គាល់ `skip` ➜ ក្រុម «រំលង»',
             marked.skipped.length === 1 && marked.skipped[0].barcode === '77130500000201',
@@ -1465,8 +1465,8 @@ function firstBody(requests) {
 
         if (typeof runImport === 'function') {
             const FRESH = [
-                { barcode: '77130500000901', phone: '855963897345', cod: 6.47, dod: 0, at: '2026-09-10 10:00:00', skip: '', from: 'Shopee SHPE' },
-                { barcode: '77130500000902', phone: '85560633155', cod: 2.44, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
+                { barcode: '77130500000901', phone: '855960007345', cod: 6.47, dod: 0, at: '2026-09-10 10:00:00', skip: '', from: 'Shopee SHPE' },
+                { barcode: '77130500000902', phone: '85560000155', cod: 2.44, dod: 0, at: '2026-09-10 10:01:00', skip: '' }
             ];
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
@@ -1497,7 +1497,7 @@ function firstBody(requests) {
             ok('⛔ ផ្លូវធម្មតា ៖ រក្សាទុកតាម `addOrUpdateEntry()` ម្តងក្នុងមួយ barcode',
                 calls.save.length === 2, calls.save);
             ok('⛔ លេខទូរស័ព្ទដែលរក្សាទុក ត្រូវបម្លែងទម្រង់រួច',
-                calls.save[0] && calls.save[0].phone === '0963897345', calls.save[0]);
+                calls.save[0] && calls.save[0].phone === '0960007345', calls.save[0]);
             ok('⛔ COD ឆ្លងកាត់បេះបិទ · DOD ជា 0 (បញ្ជីគ្មាន DOD)',
                 calls.save[0] && calls.save[0].cod === 6.47 && calls.save[0].dod === 0, calls.save[0]);
             ok('⛔ ផ្លូវជោគជ័យមិនដោះកូនសោ registry', calls.release.length === 0, calls.release);
@@ -1551,7 +1551,7 @@ function firstBody(requests) {
 
             // ⛔ តែក្រុម «ថ្មី» ប៉ុណ្ណោះត្រូវបញ្ចូល
             reset();
-            box.scanHistory = [{ id: 'x', phone: '0963897345', barcodes: [{ code: '77130500000901' }] }];
+            box.scanHistory = [{ id: 'x', phone: '0960007345', barcodes: [{ code: '77130500000901' }] }];
             box.ztoListSyncResult = {
                 rows: FRESH.concat([
                     { barcode: '77130500000903', phone: '', cod: 1, dod: 0, at: '2026-09-10 10:02:00', skip: '' },
@@ -1577,10 +1577,10 @@ function firstBody(requests) {
                 Number.isInteger(CONC) && CONC >= 2 && CONC <= 8, CONC);
             const MANY = [];
             for (let i = 0; i < 6; i++) {
-                MANY.push({ barcode: '7713050000091' + i, phone: '85596389734' + i, cod: 1 + i, dod: 0,
+                MANY.push({ barcode: '7713050000091' + i, phone: '85596000734' + i, cod: 1 + i, dod: 0,
                     at: '2026-09-10 10:0' + i + ':00', skip: '' });
             }
-            const SAME = MANY.map((r) => Object.assign({}, r, { phone: '855963897345' }));
+            const SAME = MANY.map((r) => Object.assign({}, r, { phone: '855960007345' }));
             const loadMany = (rows) => {
                 box.ztoListSyncResult = { rows: rows.slice(), from: '2026-09-08', to: '2026-09-11', total: rows.length };
             };
@@ -1728,9 +1728,9 @@ function firstBody(requests) {
                         + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
                 };
                 const graded = classifyReal([
-                    { barcode: '77130500000801', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
-                    { barcode: '77130500000802', phone: '0963897345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' },
-                    { barcode: '77130500000803', phone: '0963897345', cod: 1, dod: 0, at: '', skip: '' }
+                    { barcode: '77130500000801', phone: '0960007345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
+                    { barcode: '77130500000802', phone: '0960007345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' },
+                    { barcode: '77130500000803', phone: '0960007345', cod: 1, dod: 0, at: '', skip: '' }
                 ], [], []);
                 ok('⛔ ជួរដេកក្នុងព្រំដែន (ក្មេងជាង `ABANDON_AGE_MS`) ➜ នៅជា «ថ្មី»',
                     graded.fresh.some((r) => r.barcode === '77130500000801'), graded.fresh);
@@ -1807,7 +1807,7 @@ function firstBody(requests) {
                     RET === 30 * 24 * 60 * 60 * 1000, RET);
                 const oldAt = zoneText(NOW - AGE - 60000);
                 const gradeOne = (ztoClosed, at) => classifyReal([{
-                    barcode: '77130500000821', phone: '0963897345', cod: 5, dod: 0,
+                    barcode: '77130500000821', phone: '0960007345', cod: 5, dod: 0,
                     at: at || oldAt, skip: '', ztoClosed: ztoClosed
                 }], [], []);
                 const closedOld = gradeOne(true);
@@ -1871,8 +1871,8 @@ function firstBody(requests) {
                 box.__now = NOW;
                 box.ztoListSyncResult = {
                     rows: [
-                        { barcode: '77130500000801', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
-                        { barcode: '77130500000802', phone: '0963897345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' }
+                        { barcode: '77130500000801', phone: '0960007345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
+                        { barcode: '77130500000802', phone: '0960007345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' }
                     ],
                     from: '2026-09-01', to: '2026-09-11', total: 2
                 };
@@ -1894,7 +1894,7 @@ function firstBody(requests) {
                 reset();
                 box.__now = NOW;
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000831', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                    rows: [{ barcode: '77130500000831', phone: '0960007345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
                     from: '2026-09-01', to: '2026-09-11', total: 1
                 };
                 await runImport();
@@ -1924,7 +1924,7 @@ function firstBody(requests) {
                 box.__now = NOW;
                 box.__closeOk = false;
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000832', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                    rows: [{ barcode: '77130500000832', phone: '0960007345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
                     from: '2026-09-01', to: '2026-09-11', total: 1
                 };
                 await runImport();
@@ -1935,7 +1935,7 @@ function firstBody(requests) {
                 // ស្ថិតិយក (`pickedUpBarcodes`) និង mirror ចំណូលប្រចាំថ្ងៃ ត្រូវសរសេរតាម `applyBarcodeCloseChange()` ដដែល ពេល commit មកដល់ —
                 // បើមិនដូច្នេះ កញ្ចប់បិទក្នុងប្រវត្តិ តែមិនដែលចូលស្ថិតិយក/ចំណូលប្រចាំថ្ងៃ (Late commit ៖ ការងារក្រោយ commit រត់ពេលវាមកដល់)
                 const flushLate = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
-                const lateRow = (code) => ({ rows: [{ barcode: code, phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                const lateRow = (code) => ({ rows: [{ barcode: code, phone: '0960007345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
                     from: '2026-09-01', to: '2026-09-11', total: 1 });
                 reset();
                 box.__now = NOW;
@@ -1979,10 +1979,10 @@ function firstBody(requests) {
                 ok('ជាន់អប្បបរមា ៖ `resolveZtoListSignedVerdicts()` រត់ក្នុង sandbox បាន',
                     typeof resolveSigned === 'function', typeof resolveSigned);
                 if (typeof resolveSigned === 'function') {
-                    const oldRow = { barcode: '77130500000841', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '' };
-                    const youngRow = { barcode: '77130500000842', phone: '0963897345', cod: 5, dod: 0, at: zoneText(NOW - 86400000), skip: '' };
-                    const purgedRow = { barcode: '77130500000843', phone: '0963897345', cod: 5, dod: 0, at: zoneText(NOW - RET - 60000), skip: '' };
-                    const knownRow = { barcode: '77130500000844', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: false };
+                    const oldRow = { barcode: '77130500000841', phone: '0960007345', cod: 5, dod: 0, at: oldAt, skip: '' };
+                    const youngRow = { barcode: '77130500000842', phone: '0960007345', cod: 5, dod: 0, at: zoneText(NOW - 86400000), skip: '' };
+                    const purgedRow = { barcode: '77130500000843', phone: '0960007345', cod: 5, dod: 0, at: zoneText(NOW - RET - 60000), skip: '' };
+                    const knownRow = { barcode: '77130500000844', phone: '0960007345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: false };
 
                     reset();
                     box.__now = NOW;
@@ -2007,7 +2007,7 @@ function firstBody(requests) {
                     box.__probeVerdict = true;
                     const many = [];
                     for (let i = 0; i < box.__probeMax + 5; i++) {
-                        many.push({ barcode: '7713050000' + (9000 + i), phone: '0963897345', cod: 1, dod: 0, at: oldAt, skip: '' });
+                        many.push({ barcode: '7713050000' + (9000 + i), phone: '0960007345', cod: 1, dod: 0, at: oldAt, skip: '' });
                     }
                     await resolveSigned({ url: 'x' }, many);
                     ok('⛔ ការសួរមានពិដាន (`ZTO_LIST_SIGNED_PROBE_MAX`) ➜ បញ្ជីវែងមិនក្លាយជាការហៅរាប់រយ',
@@ -2031,9 +2031,9 @@ function firstBody(requests) {
                 box.__now = NOW;
                 box.ztoListSyncResult = {
                     rows: [
-                        { barcode: '77130500000811', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000), skip: '' },
-                        { barcode: '77130500000813', phone: '0963897347', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000 + 3600000), skip: '' },
-                        { barcode: '77130500000812', phone: '0963897346', cod: 1, dod: 0, at: zoneText(NOW - 86400000), skip: '' }
+                        { barcode: '77130500000811', phone: '0960007345', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000), skip: '' },
+                        { barcode: '77130500000813', phone: '0960007347', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000 + 3600000), skip: '' },
+                        { barcode: '77130500000812', phone: '0960007346', cod: 1, dod: 0, at: zoneText(NOW - 86400000), skip: '' }
                     ],
                     from: '2026-09-08', to: '2026-09-11', total: 3
                 };
@@ -2061,8 +2061,8 @@ function firstBody(requests) {
                 box.__now = NOW;
                 evidence.add('77130500000851');
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000851', phone: '0963897345', cod: 3, dod: 1, at: youngAt, skip: '', ztoClosed: null },
-                        { barcode: '77130500000852', phone: '0963897345', cod: 2, dod: 0, at: youngAt, skip: '', ztoClosed: null }],
+                    rows: [{ barcode: '77130500000851', phone: '0960007345', cod: 3, dod: 1, at: youngAt, skip: '', ztoClosed: null },
+                        { barcode: '77130500000852', phone: '0960007345', cod: 2, dod: 0, at: youngAt, skip: '', ztoClosed: null }],
                     from: '2026-09-08', to: '2026-09-11', total: 2
                 };
                 await runImport();
@@ -2084,7 +2084,7 @@ function firstBody(requests) {
                 box.__now = NOW;
                 ['77130500000855', '77130500000856', '77130500000857', '77130500000859'].forEach((c) => evidence.add(c));
                 box.__signedProbe.set('77130500000856', false);
-                const e2Row = (code, at, ztoClosed) => ({ barcode: code, phone: '0963897345', cod: 1, dod: 0, at: at, skip: '', ztoClosed: ztoClosed });
+                const e2Row = (code, at, ztoClosed) => ({ barcode: code, phone: '0960007345', cod: 1, dod: 0, at: at, skip: '', ztoClosed: ztoClosed });
                 const e2 = classifyReal([
                     e2Row('77130500000855', youngAt, false),
                     e2Row('77130500000856', youngAt, null),
@@ -2115,7 +2115,7 @@ function firstBody(requests) {
                 reset();
                 box.__now = NOW;
                 evidence.add('77130500000865');
-                box.scanHistory = [{ id: 'open-e2', phone: '0963897345', barcodes: [{ code: '77130500000865', isClosed: false }] }];
+                box.scanHistory = [{ id: 'open-e2', phone: '0960007345', barcodes: [{ code: '77130500000865', isClosed: false }] }];
                 box.ztoListSyncResult = { rows: [e2Row('77130500000865', youngAt, false)], from: '2026-09-08', to: '2026-09-11', total: 1 };
                 await runImport();
                 ok('⛔ E2 ៖ មានក្នុង ZoeW (បើក) + false + ភស្តុតាង ➜ «បញ្ចូល» បិទ (ទ្វារដូចជុំស្វ័យប្រវត្តិ)',
@@ -2126,12 +2126,12 @@ function firstBody(requests) {
                 evidence.add('77130500000861');
                 evidence.add('77130500000862');
                 box.scanHistory = [
-                    { id: 'open-1', phone: '0963897345', barcodes: [{ code: '77130500000861', isClosed: false }] },
-                    { id: 'done-1', phone: '0963897345', barcodes: [{ code: '77130500000862', isClosed: true }] }
+                    { id: 'open-1', phone: '0960007345', barcodes: [{ code: '77130500000861', isClosed: false }] },
+                    { id: 'done-1', phone: '0960007345', barcodes: [{ code: '77130500000862', isClosed: true }] }
                 ];
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000861', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
-                        { barcode: '77130500000862', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    rows: [{ barcode: '77130500000861', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000862', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' }],
                     from: '2026-09-08', to: '2026-09-11', total: 2
                 };
                 await runImport();
@@ -2148,9 +2148,9 @@ function firstBody(requests) {
                 box.__now = NOW;
                 box.__autoClose = false;
                 evidence.add('77130500000861');
-                box.scanHistory = [{ id: 'open-1', phone: '0963897345', barcodes: [{ code: '77130500000861', isClosed: false }] }];
+                box.scanHistory = [{ id: 'open-1', phone: '0960007345', barcodes: [{ code: '77130500000861', isClosed: false }] }];
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000861', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    rows: [{ barcode: '77130500000861', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' }],
                     from: '2026-09-08', to: '2026-09-11', total: 1
                 };
                 await runImport();
@@ -2165,12 +2165,12 @@ function firstBody(requests) {
                 evidence.add('77130500000871');
                 evidence.add('77130500000872');
                 box.scanHistory = [
-                    { id: 'open-a', phone: '0963897345', barcodes: [{ code: '77130500000871', isClosed: false }] },
-                    { id: 'open-b', phone: '0963897345', barcodes: [{ code: '77130500000872', isClosed: false }] }
+                    { id: 'open-a', phone: '0960007345', barcodes: [{ code: '77130500000871', isClosed: false }] },
+                    { id: 'open-b', phone: '0960007345', barcodes: [{ code: '77130500000872', isClosed: false }] }
                 ];
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000871', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
-                        { barcode: '77130500000872', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    rows: [{ barcode: '77130500000871', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000872', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' }],
                     from: '2026-09-08', to: '2026-09-11', total: 2
                 };
                 await runImport();
@@ -2188,10 +2188,10 @@ function firstBody(requests) {
                     if (label === 'Save timed out') box.__saveHangs = true; else box.__claimHangs = true;
                     box.__timeoutLabel = label;
                     evidence.add('77130500000892');
-                    box.scanHistory = [{ id: 'open-z', phone: '0963897345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
+                    box.scanHistory = [{ id: 'open-z', phone: '0960007345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
                     box.ztoListSyncResult = {
-                        rows: [{ barcode: '77130500000891', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
-                            { barcode: '77130500000892', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                        rows: [{ barcode: '77130500000891', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                            { barcode: '77130500000892', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' }],
                         from: '2026-09-08', to: '2026-09-11', total: 2
                     };
                     await runImport();
@@ -2211,10 +2211,10 @@ function firstBody(requests) {
                 reset();
                 box.__now = NOW;
                 evidence.add('77130500000892');
-                box.scanHistory = [{ id: 'open-z', phone: '0963897345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
+                box.scanHistory = [{ id: 'open-z', phone: '0960007345', barcodes: [{ code: '77130500000892', isClosed: false }] }];
                 box.ztoListSyncResult = {
-                    rows: [{ barcode: '77130500000891', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' },
-                        { barcode: '77130500000892', phone: '0963897345', cod: 1, dod: 0, at: youngAt, skip: '' }],
+                    rows: [{ barcode: '77130500000891', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' },
+                        { barcode: '77130500000892', phone: '0960007345', cod: 1, dod: 0, at: youngAt, skip: '' }],
                     from: '2026-09-08', to: '2026-09-11', total: 2
                 };
                 await runImport();
@@ -2294,7 +2294,7 @@ function firstBody(requests) {
                 ebox.__stamp2('2026-09-10 14:23:11') === ZTO_AT, ebox.__stamp2('2026-09-10 14:23:11'));
             ebox.__now = SYNC_AT;
 
-            await runEntry('77130500000701', '0963897345', 6.47, 0, 'N/A', ZTO_AT);
+            await runEntry('77130500000701', '0960007345', 6.47, 0, 'N/A', ZTO_AT);
             const first = seen.saved[0] || {};
             ok('⛔ **លុយចុះលើថ្ងៃស្កេន ZTO** មិនមែនថ្ងៃ sync',
                 seen.ledgerDays[0] === '2026-09-10', seen.ledgerDays);
@@ -2312,22 +2312,22 @@ function firstBody(requests) {
 
             // ⛔ ទិសផ្ទុយ ៖ ផ្លូវស្កេនដោយដៃ (គ្មានអាគុយម៉ង់ទី ៦) **មិនត្រូវប្រែ**
             seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
-            await runEntry('77130500000702', '0963897346', 1, 0, 'N/A');
+            await runEntry('77130500000702', '0960007346', 1, 0, 'N/A');
             ok('⛔ ទិសផ្ទុយ ៖ គ្មានត្រា ➜ ថ្ងៃ sync ដដែល (ការស្កេនដោយដៃមិនប្រែ)',
                 seen.ledgerDays[0] === '2026-09-12'
                 && (seen.saved[0] || {}).createdAt === SYNC_AT, [seen.ledgerDays, (seen.saved[0] || {}).createdAt]);
 
             seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
-            await runEntry('77130500000703', '0963897347', 1, 0, 'N/A', 0);
-            await runEntry('77130500000704', '0963897348', 1, 0, 'N/A', NaN);
-            await runEntry('77130500000705', '0963897349', 1, 0, 'N/A', -5);
+            await runEntry('77130500000703', '0960007347', 1, 0, 'N/A', 0);
+            await runEntry('77130500000704', '0960007348', 1, 0, 'N/A', NaN);
+            await runEntry('77130500000705', '0960007349', 1, 0, 'N/A', -5);
             ok('⛔ ត្រាមិនត្រឹមត្រូវ (`0` · `NaN` · អវិជ្ជមាន) ➜ ធ្លាក់ចុះទៅម៉ោង sync',
                 seen.ledgerDays.join(',') === '2026-09-12,2026-09-12,2026-09-12', seen.ledgerDays);
 
             // ⛔ អតិថិជនម្នាក់ · ថ្ងៃ ZTO ២ ➜ ជួរដេក ២ · ថ្ងៃ ledger ២
             seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
-            await runEntry('77130500000706', '0963897350', 2, 0, 'N/A', zoneMs(2026, 9, 9, 8, 0, 0));
-            await runEntry('77130500000707', '0963897350', 3, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
+            await runEntry('77130500000706', '0960007350', 2, 0, 'N/A', zoneMs(2026, 9, 9, 8, 0, 0));
+            await runEntry('77130500000707', '0960007350', 3, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
             ok('⛔ អតិថិជនតែម្នាក់ · ថ្ងៃស្កេន ZTO ២ ➜ **មិន merge** (កូនសោ merge = `phone`+`scanDate`)',
                 seen.saved.length === 2, seen.saved.length);
             ok('⛔ ហើយលុយបែកចូល ledger **២ ថ្ងៃ** តាម ZTO',
@@ -2335,8 +2335,8 @@ function firstBody(requests) {
 
             // ⛔ អតិថិជនម្នាក់ · ថ្ងៃ ZTO តែមួយ ➜ merge ចូលជួរដេកតែមួយ
             seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
-            await runEntry('77130500000708', '0963897351', 2, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
-            await runEntry('77130500000709', '0963897351', 3, 0, 'N/A', zoneMs(2026, 9, 10, 19, 45, 0));
+            await runEntry('77130500000708', '0960007351', 2, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
+            await runEntry('77130500000709', '0960007351', 3, 0, 'N/A', zoneMs(2026, 9, 10, 19, 45, 0));
             ok('⛔ ថ្ងៃស្កេន ZTO ដដែល ➜ merge ចូលជួរដេកតែមួយ (`count` = 2)',
                 ebox.scanHistory.length === 1 && ebox.scanHistory[0].count === 2,
                 ebox.scanHistory.map((i) => i.count));
@@ -2467,8 +2467,8 @@ function firstBody(requests) {
     // (ច្បាប់ផ្ទះ ៖ លេខទូរស័ព្ទ និងលុយសំខាន់ជាងបញ្ជី ➜ ការស្កេនមិនត្រូវធ្លាក់)
     resetEnv({ FIREBASE_PROJECT_IDS: PROJECT });
     seenRequests.length = 0;
-    global.fetch = responder({ success: true, data: { consigneeMobile: "855963897345", agentAmount: 1 } });
-    const scanNoTok = await call({ barcode: '77130533910996' });
+    global.fetch = responder({ success: true, data: { consigneeMobile: "855960007345", agentAmount: 1 } });
+    const scanNoTok = await call({ barcode: '77130500000996' });
     ok('⛔ ទិសផ្ទុយ ៖ ការស្កេន **មិនត្រូវការ** ID token', scanNoTok.statusCode === 200, scanNoTok.statusCode);
 
     // ⛔ សាខា ២ មិនត្រូវចែក cache គ្នា (កូនសោផ្ទុកសាខាដែល *ដេរីវេ*)
@@ -3522,7 +3522,7 @@ function firstBody(requests) {
             { signedRows: sr, signed: sRows.body.signed });
         ok('⛔ E12 ៖ ជួរ `signedRows` = ទម្រង់ជួរមកដល់ (`barcode` · `phone` · `cod` · `dod` · `at` · `from`) · phone `0` ➜ \'\' · ⛔ គ្មានឈ្មោះ/អាសយដ្ឋាន',
             !!sr && JSON.stringify(Object.keys(sr[0]).sort()) === '["at","barcode","cod","dod","from","phone"]'
-            && sr[0].phone === '855963897345' && sr[0].cod === 6.47 && sr[0].dod === 2.5 && sr[0].from === 'taobao'
+            && sr[0].phone === '855960007345' && sr[0].cod === 6.47 && sr[0].dod === 2.5 && sr[0].from === 'taobao'
             && sr[1].phone === '' && sr[1].cod === 0 && JSON.stringify(sRows.body).indexOf('ឈ្មោះអតិថិជន') === -1
             && JSON.stringify(sRows.body).indexOf('磅湛') === -1,
             sr);

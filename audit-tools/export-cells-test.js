@@ -95,7 +95,7 @@ sandbox.scanHistory = [
     { id: 'a', phone: '012345678', scanDate: '2026-08-22', time: '10:00', barcodes: [
         { code: '123456789012', cod: 5, dod: 0, locker: 'A1', isClosed: false, time: '10:00' }
     ] },
-    { id: 'b', phone: '0968490421/012000111', scanDate: '2026-08-22', time: '10:05', barcodes: [
+    { id: 'b', phone: '0960000421/012000111', scanDate: '2026-08-22', time: '10:05', barcodes: [
         { code: '0099887766', cod: 0, dod: 3.5, locker: 'B2', isClosed: true, time: '10:05' }
     ] },
     { id: 'c', phone: 'គ្មានលេខ', scanDate: '2026-08-22', time: '10:09', barcodes: [
@@ -155,7 +155,7 @@ const strings = sharedXml ? (sharedXml.match(/<t[^>]*>([^<]*)<\/t>/g) || []).map
 ok('0 នាំមុខរបស់លេខទូរស័ព្ទនៅក្នុងឯកសារ', strings.indexOf('012345678') !== -1, strings.slice(0, 24).join(','));
 ok('Barcode ដែលមាន 0 នាំមុខនៅដដែល', strings.indexOf('0099887766') !== -1, strings.slice(0, 24).join(','));
 ok('Barcode វែងជាលេខសុទ្ធមិនក្លាយជា exponent', strings.indexOf('123456789012') !== -1 && !/1\.23457E\+11/i.test(sheetXml), strings.slice(0, 24).join(','));
-ok('លេខទូរស័ព្ទពីរខ្សែ (/) នៅដដែល', strings.indexOf('0968490421/012000111') !== -1, strings.slice(0, 24).join(','));
+ok('លេខទូរស័ព្ទពីរខ្សែ (/) នៅដដែល', strings.indexOf('0960000421/012000111') !== -1, strings.slice(0, 24).join(','));
 ok('លេខដែលមកជា number ចេញជាអត្ថបទក្នុងឯកសារ', strings.indexOf('12345678') !== -1 && strings.indexOf('987654321098') !== -1, strings.slice(0, 24).join(','));
 
 // index របស់ជួរឈរអត្ថបទ ត្រូវត្រូវនឹង EXPORT_HEADERS ពិត

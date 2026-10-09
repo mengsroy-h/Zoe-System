@@ -108,7 +108,8 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
     export ZOE_MEASURE_ROOT="$MEASURE" ZOE_REPO_ROOT="$REPO" NODE_PATH="$ZOE_NODE_MODULES"
     # checker កម្រិត repo ៖ git · ប្រភព React
     export ZOEWSUITE_APP_DIR="${ZOEWSUITE_APP_DIR:-$REPO}" REPOCOVER_APP_DIR="${REPOCOVER_APP_DIR:-$REPO}" \
-        VERSIONSCOPE_GIT_DIR="${VERSIONSCOPE_GIT_DIR:-$REPO}" DOCSCACHE_APP_DIR="${DOCSCACHE_APP_DIR:-$REPO}"
+        VERSIONSCOPE_GIT_DIR="${VERSIONSCOPE_GIT_DIR:-$REPO}" DOCSCACHE_APP_DIR="${DOCSCACHE_APP_DIR:-$REPO}" \
+        SECURITYGUARD_APP_DIR="${SECURITYGUARD_APP_DIR:-$REPO}"
     exec bash "$MEASURE/audit-tools/run-all.sh" ${BASE_MEASURE:+"$BASE_MEASURE"}
 fi
 
@@ -683,6 +684,7 @@ run "money-guardian 2/2" node audit-tools/money-guardian-test.js --part=2/2
 run "money-reality" node audit-tools/money-reality-test.js
 run "repository-file-coverage" node audit-tools/repository-file-coverage.js
 run "repository-contract" node audit-tools/repository-contract-test.js
+run "security-guard (repo public · bundle ផលិតកម្ម · APK)" node audit-tools/security-guard-test.js
 run "css-classes" node audit-tools/css-classes.js
 run "css-media-override" node audit-tools/css-media-override.js
 run "css-var" node audit-tools/css-var-test.js
@@ -910,6 +912,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     MONEYREALTEST_APP_DIR="$BASE" node audit-tools/money-reality-test.js 2>&1 | tail -1 | sed 's/^/   money-reality:   /'
     REPOCOVER_APP_DIR="$BASE" node audit-tools/repository-file-coverage.js 2>&1 | tail -1 | sed 's/^/   file-coverage:   /'
     REPOCONTRACT_APP_DIR="$BASE" node audit-tools/repository-contract-test.js 2>&1 | tail -1 | sed 's/^/   repo-contract:   /'
+    SECURITYGUARD_APP_DIR="$BASE" node audit-tools/security-guard-test.js 2>&1 | tail -1 | sed 's/^/   security-guard:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     RUNALLRUNNER_APP_DIR="$BASE" node audit-tools/runall-runner-test.js 2>&1 | tail -1 | sed 's/^/   runall-runner:   /'
     EXITCODE_APP_DIR="$BASE" node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'

@@ -56,7 +56,7 @@ const CFG = { enabled: true, fastMode: true, url: 'https://example.invalid/.netl
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 function row(barcode: string, extra: any = {}) {
-    return Object.assign({ barcode, phone: '0963897345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: null, skip: '' }, extra);
+    return Object.assign({ barcode, phone: '0960007345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: null, skip: '' }, extra);
 }
 
 function signedRow(barcode: string, at: string, extra: any = {}) {
@@ -68,7 +68,7 @@ function listBody(extra: any) {
 }
 
 function openItem(id: string, code: string) {
-    return { id, phone: '0963897345', scanDate: '2026-10-01', isClosed: false, createdAt: NOW - 5 * 86400000,
+    return { id, phone: '0960007345', scanDate: '2026-10-01', isClosed: false, createdAt: NOW - 5 * 86400000,
         barcodes: [{ code, isClosed: false, cod: 1, dod: 0, createdAt: NOW - 5 * 86400000 }] };
 }
 

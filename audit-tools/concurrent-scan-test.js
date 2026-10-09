@@ -174,7 +174,7 @@ function makeCtx(server, fbSet) {
 
 function seedOrder(server, codes) {
     server['ord1'] = {
-        id: 'ord1', phone: '0977173546', scanDate: '2026-08-20', isClosed: false,
+        id: 'ord1', phone: '0970003546', scanDate: '2026-08-20', isClosed: false,
         createdAt: 1755000000000, time: 'x', barcode: codes[0],
         cod: codes.length * 5, dod: 0, price: codes.length * 5, count: codes.length,
         barcodes: codes.map((c) => ({ code: c, time: 'x', cod: 5, dod: 0, locker: 'N/A',
@@ -192,7 +192,7 @@ console.log('\n=== ZoeW — ឧបករណ៍ ២ ស្កេនចូល orde
     ctx.scanHistory.push(JSON.parse(JSON.stringify(server['ord1'])));
 
     // device A begins its write; device B lands a different barcode mid-flight
-    const pA = ctx.addOrUpdateEntry('BBB', '0977173546', 7, 0, 'L1');
+    const pA = ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1');
     fbSet.bumpFromOtherDevice('ord1', (it) => {
         it.barcodes.push({ code: 'CCC', time: 'x', cod: 9, dod: 0, locker: 'L2',
             isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: 1755000000000 });
@@ -226,7 +226,7 @@ function runScenario2() {
     const ctx = makeCtx(server, fbSet);
     ctx.scanHistory.push(JSON.parse(JSON.stringify(server['ord1'])));
 
-    ctx.addOrUpdateEntry('BBB', '0977173546', 7, 0, 'L1').then(() => {
+    ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1').then(() => {
         const it = server['ord1'];
         ok(it.barcodes.length === 2, 'barcode ថ្មីត្រូវបានបន្ថែម', it.barcodes.map((b) => b.code));
         ok(it.cod === 12, 'cod = 5 + 7', it.cod);
@@ -259,7 +259,7 @@ function runScenario2b() {
     stale.barcodes[0].isClosed = false;
     ctx.scanHistory.push(stale);
 
-    ctx.addOrUpdateEntry('BBB', '0977173546', 7, 0, 'L1').then(() => {
+    ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1').then(() => {
         const it = server['ord1'];
         ok(it.isClosed === false && it.closedAt === undefined, 'order ត្រូវបានបើកវិញលើ server');
         ok(it.barcodes.length === 2, 'barcode ថ្មីត្រូវបានបន្ថែម', it.barcodes.map((b) => b.code));
@@ -290,7 +290,7 @@ function runScenario3() {
     const ctx = makeCtx(server, fbSet);
     ctx.scanHistory.push(JSON.parse(JSON.stringify(server['ord1'])));
 
-    ctx.addOrUpdateEntry('BBB', '0977173546', 7, 0, 'L1').then(() => {
+    ctx.addOrUpdateEntry('BBB', '0970003546', 7, 0, 'L1').then(() => {
         const codes = (server['ord1'].barcodes || []).map((b) => b && b.code);
         ok(Array.isArray(server['ord1'].barcodes), 'barcodes ត្រូវបានធ្វើឲ្យជា array ពិត', server['ord1'].barcodes);
         ok(codes.includes('AAA') && codes.includes('ZZZ') && codes.includes('BBB'),

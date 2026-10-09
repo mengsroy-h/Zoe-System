@@ -102,12 +102,12 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
 
 // រូបរាងវាលដែល RTDB / ទិន្នន័យចាស់ អាចត្រឡប់មកបាន — មិនមែន barcodes
 const HOSTILE_ITEMS = {
-    numeric_phone:      { id: 'numeric_phone', phone: 968490421, scanDate: D, cod: 5, dod: 0, count: 1, barcode: 'N1', time: '09:00', isClosed: false, barcodes: [{ code: 'N1', cod: 5, dod: 0, locker: 'A1', isClosed: false, time: '09:00' }] },
+    numeric_phone:      { id: 'numeric_phone', phone: 960000421, scanDate: D, cod: 5, dod: 0, count: 1, barcode: 'N1', time: '09:00', isClosed: false, barcodes: [{ code: 'N1', cod: 5, dod: 0, locker: 'A1', isClosed: false, time: '09:00' }] },
     string_money:       { id: 'string_money', phone: '011000111', scanDate: D, cod: '7.5', dod: '2.5', count: '1', barcode: 'S1', time: '09:01', isClosed: 'false', barcodes: [{ code: 'S1', cod: '7.5', dod: '2.5', locker: 'A2', isClosed: false, time: '09:01' }] },
     missing_scandate:   { id: 'missing_scandate', phone: '011000222', cod: 3, dod: 0, count: 1, barcode: 'M1', time: '09:02', isClosed: false, barcodes: [{ code: 'M1', cod: 3, dod: 0, isClosed: false }] },
     legacy_price_only:  { id: 'legacy_price_only', phone: '011000333', scanDate: D, price: 12, count: 1, barcode: 'L1', time: '09:03', isClosed: false },
     count_mismatch:     { id: 'count_mismatch', phone: '011000444', scanDate: D, cod: 4, dod: 0, count: 9, barcode: 'C1', time: '09:04', isClosed: false, barcodes: [{ code: 'C1', cod: 4, dod: 0, isClosed: false }] },
-    numeric_barcode:    { id: 'numeric_barcode', phone: '011000555', scanDate: D, cod: 6, dod: 0, count: 1, barcode: 77130525210213, time: '09:05', isClosed: false, barcodes: [{ code: 77130525210213, cod: 6, dod: 0, isClosed: false }] },
+    numeric_barcode:    { id: 'numeric_barcode', phone: '011000555', scanDate: D, cod: 6, dod: 0, count: 1, barcode: 77130500000213, time: '09:05', isClosed: false, barcodes: [{ code: 77130500000213, cod: 6, dod: 0, isClosed: false }] },
     null_fields:        { id: 'null_fields', phone: null, scanDate: D, cod: null, dod: null, count: null, barcode: null, time: null, isClosed: null, barcodes: [{ code: 'Z1', cod: null, dod: null, locker: null, isClosed: null }] },
     html_in_phone:      { id: 'html_in_phone', phone: '<img src=x onerror=window.__xss=1>', scanDate: D, cod: 1, dod: 0, count: 1, barcode: '<b>x</b>', time: '09:06', isClosed: false, barcodes: [{ code: '<b>x</b>', cod: 1, dod: 0, isClosed: false }] },
     deep_callmark:      { id: 'deep_callmark', phone: '011000666', scanDate: D, cod: 2, dod: 0, count: 1, barcode: 'K1', time: '09:07', isClosed: false, callMark: 'no-answer', callMarkTime: 'not-a-number', isCalled: 'yes', barcodes: [{ code: 'K1', cod: 2, dod: 0, isClosed: false }] }

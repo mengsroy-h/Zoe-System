@@ -544,7 +544,7 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
 
     // ⛔ ការពង្រីកខាងលើ **មិនត្រូវលាក់លើស** — ធាតុទាំងនេះត្រូវការសម្រាប់ debug
     const noOverRedact = ['https://a/?spinner=fast', 'https://a/?design=blue', 'https://a/?mapping=x',
-        'https://a/?locker=A12', 'https://a/?phone=0974158508', 'https://a/?keyboard=on'];
+        'https://a/?locker=A12', 'https://a/?phone=0970008508', 'https://a/?keyboard=on'];
     noOverRedact.forEach((input) => {
         ok('មិនលាក់លើស៖ ' + input.slice(input.indexOf('?')), redact(input) === input, 'got: ' + redact(input));
     });

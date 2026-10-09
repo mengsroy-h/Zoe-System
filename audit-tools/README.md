@@ -340,9 +340,10 @@ bash audit-tools/emu/rules.sh
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
 | `csp-enforced-test.js` | បម្រើ App ជាមួយ **header CSP ពិត** ➜ គ្មានការរំលោភ ហើយ UI នៅដើរ | `CSP_APP_DIR` |
-| `csp-lazy-resource-test.js` | ធនធានផ្ទុក **យឺត** ក៏ត្រូវឆ្លង CSP ដែរ | `CSPLAZY_APP_DIR` |
+| `csp-lazy-resource-test.js` | ធនធានផ្ទុក **យឺត** ក៏ត្រូវឆ្លង CSP ដែរ · `cspAllows()` គោរព path និង wildcard ដូច browser (ប្រភព `https://www.gstatic.com/firebasejs/` អនុញ្ញាតតែថតនោះ) | `CSPLAZY_APP_DIR` |
 | `inline-handler-xss-test.js` | ខ្សែអក្សរពី Firebase មិនធ្លាក់ចូល attribute របស់ handler | `INLINEXSS_APP_DIR` |
 | `html-sink-escaping.js` | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `SINK_APP_DIR` |
+| `security-guard-test.js` | repo **public** + App ដែល ship ៖ secret ក្នុងឯកសារ repo · env និងឈ្មោះ secret server ក្នុងកូដ client · លេខទូរស័ព្ទ/waybill ពិត (fixture ត្រូវជាលេខសំយោគ) · CSP/header · CORS របស់ Function · GitHub Actions (fork · សិទ្ធិ · pin SHA · `persist-credentials`) · Firebase rules សាធារណៈ · Supabase `verify_jwt`/RLS · **bundle ផលិតកម្មពិត** (`vite build` ទៅថតបណ្តោះអាសន្នរាល់ដង ៖ sourcemap · secret · bridge build វាស់) · APK (WebView debug · cleartext · component exported) ➜ បញ្ជីអនុញ្ញាតមានហេតុផល · គ្មានធាតុងាប់ · ទិសផ្ទុយគ្រប់ផ្នែក | `SECURITYGUARD_APP_DIR` |
 | `secret-hygiene.js` | credential ក្នុង DOM · ការលាក់ secret មុនផ្ញើទៅ Sentry · ⛔ **បញ្ជីកូនសោសម្ងាត់ត្រូវគ្រប secret ដែល *ប្រព័ន្ធនេះកាន់*** — ឈ្មោះ **ដេរីវេពីកូដពិត** (អាគុយម៉ង់របស់ `encrypt/decryptLookupSecret()` · `PROXY_KEY_HEADER` · `process.env.ZTO_*KEY` · `SESSION_COOKIE_NAME`) មិនមែនបញ្ជីរឹង ➜ secret ថ្មីនៅជុំក្រោយមិនរអិលកាត់។ ⛔ ទិសផ្ទុយ ៖ ឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង (`path` · `patch` · `dispatch` · `headerName`) មិនត្រូវលាក់ | — |
 | `storage-guard.js` | រាល់ការប៉ះ storage ត្រូវការពារ (getter ខ្លួនវាក៏បោះដែរ) | `STORAGE_APP_DIR` |
 | `storage-blocked-boot-test.js` | storage ដែលត្រូវបិទ ➜ App នៅតែបើកបាន | `STORAGEBOOT_APP_DIR` · `STORAGEBOOT_CHROME` |
@@ -397,7 +398,7 @@ bash audit-tools/emu/rules.sh
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
 | `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
-| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) | `SENTRYRACE_APP_DIR` |
+| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) · Loader ច្របាច់ option ពីលើលំនាំដើមរបស់ Sentry UI ➜ គ្រប់ការហៅ `Sentry.init()` បិទ Session Replay · tracing · logs · PII (ទាំងនោះមិនឆ្លង `beforeSend`) | `SENTRYRACE_APP_DIR` |
 
 #### ការស្កេន · Export · ទម្លាប់គម្រោង
 

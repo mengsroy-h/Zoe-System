@@ -29,6 +29,7 @@ function ok(label, cond, detail) {
 function makeContext(app) {
     const datalistOptions = [];
     const listeners = {};
+    const navbar = { getBoundingClientRect: () => ({ top: 0, bottom: 60 }) };
     const searchInput = {
         value: '',
         getBoundingClientRect: () => ({ top: 200, bottom: 244, left: 10, width: 300 }),
@@ -67,9 +68,11 @@ function makeContext(app) {
         setTimeout,
         clearTimeout,
         scanHistory: [],
+        currentAppPage: 'data',
         window: { innerHeight: 800, addEventListener: () => {} },
         document: {
             activeElement: searchInput,
+            querySelector: (selector) => selector === '.app-navbar' ? navbar : null,
             getElementById: (id) => {
                 if (id === 'searchPhoneInput') return searchInput;
                 if (id === 'phoneSuggestBox') return suggestBox;
@@ -188,8 +191,8 @@ function itemsFixture() {
     for (let i = 0; i < 40; i++) {
         items.push({ id: 'old' + i, phone: '011' + String(100000 + i), createdAt: 1000 + i, barcodes: [{ code: 'B' + i }] });
     }
-    items.push({ id: 'x1', phone: '0968490421', createdAt: 9000, barcodes: [{ code: 'C1' }, { code: 'C2' }] });
-    items.push({ id: 'x2', phone: '0968490421', createdAt: 9500, barcodes: [{ code: 'C3' }] });
+    items.push({ id: 'x1', phone: '0960000421', createdAt: 9000, barcodes: [{ code: 'C1' }, { code: 'C2' }] });
+    items.push({ id: 'x2', phone: '0960000421', createdAt: 9500, barcodes: [{ code: 'C3' }] });
     items.push({ id: 'x3', phone: '0421777888', createdAt: 9600, barcodes: [{ code: 'C4' }] });
     items.push({ id: 'x4', phone: '012-345 678', createdAt: 9700, barcodes: [{ code: 'C5' }] });
     items.push({ id: 'x5', phone: 'គ្មានលេខ', createdAt: 9800, barcodes: [{ code: 'C6' }] });
@@ -205,12 +208,12 @@ function itemsFixture() {
     ok('មាន collectPhoneSuggestions', h.has('collectPhoneSuggestions'));
     if (h.has('collectPhoneSuggestions')) {
         const tail = h.ctx.collectPhoneSuggestions('421');
-        ok('វាយ "421" ➜ រកឃើញ 0968490421', tail.some((e) => e.phone === '0968490421'), tail.map((e) => e.phone));
-        ok('លេខដែលបញ្ចប់ដោយ "421" ឡើងមុនគេ', tail.length && tail[0].phone === '0968490421', tail.map((e) => e.phone));
+        ok('វាយ "421" ➜ រកឃើញ 0960000421', tail.some((e) => e.phone === '0960000421'), tail.map((e) => e.phone));
+        ok('លេខដែលបញ្ចប់ដោយ "421" ឡើងមុនគេ', tail.length && tail[0].phone === '0960000421', tail.map((e) => e.phone));
         ok('លេខដែលមាន "421" នៅកណ្តាល/ដើម ក៏ចេញដែរ', tail.some((e) => e.phone === '0421777888'), tail.map((e) => e.phone));
         ok('រាប់កញ្ចប់បូកបញ្ចូលគ្នាតាមលេខតែមួយ',
-            (tail.find((e) => e.phone === '0968490421') || {}).packages === 3,
-            (tail.find((e) => e.phone === '0968490421') || {}).packages);
+            (tail.find((e) => e.phone === '0960000421') || {}).packages === 3,
+            (tail.find((e) => e.phone === '0960000421') || {}).packages);
         ok('លេខមិនស្ទួន', new Set(tail.map((e) => e.phone)).size === tail.length, tail.map((e) => e.phone));
         ok('"គ្មានលេខ" មិនចូលក្នុងបញ្ជី', !h.ctx.collectPhoneSuggestions('').some((e) => e.phone === 'គ្មានលេខ'));
         ok('សញ្ញា - និងចន្លោះមិនរារាំង៖ "345678" រក 012-345 678',
@@ -236,6 +239,19 @@ function itemsFixture() {
         h.searchInput.value = '999999';
         h.ctx.showPhoneSuggestions();
         ok('គ្មានលទ្ធផល ➜ មិនបើកដុំទទេ', !h.view.open());
+        h.searchInput.value = '421';
+        const originalRect = h.searchInput.getBoundingClientRect;
+        h.searchInput.getBoundingClientRect = () => ({ top: 10, bottom: 54, left: 10, width: 300, height: 44 });
+        h.ctx.showPhoneSuggestions();
+        ok('ប្រអប់នៅក្រោយ navbar ទោះនៅក្នុងអេក្រង់ ➜ suggestion មិនបង្ហាញ', !h.view.open());
+        h.searchInput.getBoundingClientRect = originalRect;
+        h.ctx.showPhoneSuggestions();
+        ok('ប្រអប់មើលឃើញវិញ និងស្នើបង្ហាញថ្មី ➜ suggestion បើក', h.view.open());
+        h.ctx.window.visualViewport = { offsetTop: 0, height: 220 };
+        h.ctx.positionPhoneSuggestBox();
+        ok('keyboard គ្របប្រអប់ ➜ suggestion បិទ', !h.view.open());
+        delete h.ctx.window.visualViewport;
+        h.ctx.hidePhoneSuggestions();
     }
 
     console.log('-- តារាងស្វែងរក --');
@@ -265,13 +281,13 @@ function itemsFixture() {
     if (h.has('collectPhoneSuggestions')) {
         const big = [];
         for (let i = 0; i < 350; i++) {
-            big.push({ id: 'p' + i, phone: '011' + String(200000 + i), createdAt: 1000 + i, barcodes: [{ code: 'D' + i }] });
+            big.push({ id: 'p' + i, phone: '011000' + String(i).padStart(3, '0'), createdAt: 1000 + i, barcodes: [{ code: 'D' + i }] });
         }
         h.ctx.scanHistory = big;
-        const last = h.ctx.collectPhoneSuggestions('200349');
-        ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011200349', last.map((e) => e.phone));
-        const first = h.ctx.collectPhoneSuggestions('200000');
-        ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011200000', first.map((e) => e.phone));
+        const last = h.ctx.collectPhoneSuggestions('000349');
+        ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011000349', last.map((e) => e.phone));
+        const first = h.ctx.collectPhoneSuggestions('011000000');
+        ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011000000', first.map((e) => e.phone));
         h.ctx.updateRecentPhonesList();
         ok('datalist ផ្ទុកបាន ៣០០ លេខ', h.view.datalist().length === 300, h.view.datalist().length);
         h.ctx.scanHistory = itemsFixture();

@@ -38,7 +38,16 @@ export function positionPhoneSuggestBox() {
     const box = elementOf('phoneSuggestBox');
     if (!phoneInput || !box || !uiState.phoneSuggestOpen) return;
     const rect = phoneInput.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight || (rect.width === 0 && rect.height === 0)) {
+    const viewport = window.visualViewport;
+    const viewportTop = viewport ? viewport.offsetTop : 0;
+    const viewportBottom = viewport ? viewportTop + viewport.height : window.innerHeight;
+    const navbar = elementOf('navbar');
+    const pages = elementOf('appPages');
+    const visibleTop = Math.max(viewportTop, navbar ? navbar.getBoundingClientRect().bottom : 0,
+        pages ? pages.getBoundingClientRect().top : 0);
+    const visibleBottom = Math.min(viewportBottom, pages ? pages.getBoundingClientRect().bottom : window.innerHeight);
+    if (uiState.dataPanelCollapsed || (uiState.currentAppPage && uiState.currentAppPage !== 'data') ||
+        rect.top < visibleTop || rect.bottom > visibleBottom || rect.width === 0 || rect.height === 0) {
         hidePhoneSuggestions();
         return;
     }
@@ -46,8 +55,8 @@ export function positionPhoneSuggestBox() {
     uiState.phoneSuggestLeft = cssPx(rect.left);
     commitNow();
     const boxHeight = box.offsetHeight;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    uiState.phoneSuggestTop = (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) ?
+    const spaceBelow = visibleBottom - rect.bottom;
+    uiState.phoneSuggestTop = (spaceBelow < boxHeight + 12 && rect.top - visibleTop > boxHeight + 12) ?
         cssPx(rect.top - boxHeight - 4) : cssPx(rect.bottom + 4);
     commitNow();
 }
@@ -58,6 +67,7 @@ export function setPhoneSearchPulledUp(on) {
     if (on && window.innerWidth >= 992) return;
     const already = uiState.dataPanelSearchFocus;
     if (already === !!on) return;
+    hidePhoneSuggestions();
     uiState.dataPanelSearchFocus = !!on;
     if (on) { showAppChrome(); uiState.dataPanelCollapsed = false; }
     syncHistoryExpandedLock();
@@ -141,4 +151,8 @@ export function setupPhoneSuggestions() {
     };
     window.addEventListener('scroll', schedulePositionPhoneSuggestBox, { capture: true, passive: true });
     window.addEventListener('resize', schedulePositionPhoneSuggestBox);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('scroll', schedulePositionPhoneSuggestBox, { passive: true });
+        window.visualViewport.addEventListener('resize', schedulePositionPhoneSuggestBox, { passive: true });
+    }
 }

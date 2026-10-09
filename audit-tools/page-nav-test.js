@@ -166,7 +166,7 @@ function seedData() {
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {
             id_1000_aaa: {
-                id: 'id_1000_aaa', phone: '0968490421', scanDate: today, createdAt: Date.now() - 1000,
+                id: 'id_1000_aaa', phone: '0960000421', scanDate: today, createdAt: Date.now() - 1000,
                 cod: 30, dod: 0, price: 30, count: 2, barcode: 'BB2', time: '10:00', isClosed: false,
                 barcodes: [
                     { code: 'BB1', time: '09:00', cod: 10, dod: 0, locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 2000 },
@@ -297,7 +297,7 @@ function seedData() {
     check(entryList.visible, 'របៀបបញ្ចូលកញ្ចប់បង្ហាញផ្ទាំងបញ្ជី', JSON.stringify(entryList));
     check(entryList.rows === 1 && entryList.count === '1',
         'បញ្ជីបញ្ចូលកញ្ចប់រាប់តែធាតុថ្ងៃនេះ', JSON.stringify(entryList));
-    check(entryList.text.indexOf('0968490421') !== -1,
+    check(entryList.text.indexOf('0960000421') !== -1,
         'បញ្ជីបញ្ចូលកញ្ចប់បង្ហាញលេខទូរស័ព្ទ', entryList.text.slice(0, 120));
 
     await page.evaluate(() => { if (window.switchAppPage) window.switchAppPage('entry'); });

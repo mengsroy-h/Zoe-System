@@ -49,7 +49,7 @@
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · push ចុះឈ្មោះឡើងវិញពេលកូនសោ VAPID ប្តូរ (Deep audit ៤ ក្នុងផ្នែក ២) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
    ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
    ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ✅ កែរួច ៖ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង
-   (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52])។
+   (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52]) · ZoeKeyGen teardown auth ដូច ZoeW ([2.50.52])។
 1. **`main`** = **ZoeW 2.50.51 · ZoeKeyGen 2.24.12** (PR #307 · `58d0aeb`) ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
    migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
    Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·
@@ -161,6 +161,9 @@
 - 🌐 **ZoeKeyGen ៖ Firebase SDK ផ្ទុកមិនទាន់ពេលបើក ➜ App ភ្ជាប់ឡើងវិញដោយខ្លួនឯង** (deep audit · ផ្នែក ២ «Deep audit ៤») ៖ `isDatabaseInitialized`
   ត្រូវបានអាន ៤ កន្លែង (`armLateFirebaseSdkListener` · `scheduleFirebaseSdkRetry` ×២ · `retryFirebaseSdkNow`) តែ **មិនដែលប្រកាស** ➜ `ReferenceError` ➜ ជណ្តើរព្យាយាម ·
   SDK ដែលមកយឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» ➜ ឥឡូវប្រកាស + កំណត់ `true` ពេល `initFirebase()` ជោគជ័យ។
+- 🔐 **ZoeKeyGen ៖ ប្តូរ Config ➜ auth ចាស់មិនរំខានសម័យថ្មី** (ផ្លូវបងប្អូនធៀប ZoeW) ៖ `initFirebase()` ផ្តាច់ listener auth ចាស់ · លុបពិដាន ៨ វិ. · ឡើង `authGeneration` **មុន**
+  `deleteApp()` (Firebase បញ្ជូន callback `null` ក្រោយ `deleteApp` ➜ បើកប្រអប់ចូល · `sbAdminReset()` លើ admin ដែលចូលរួច) · `setupAuthListener()` រក្សាពិដានតែមួយ
+  (`authRecoveryTimeout`) ➜ ការហៅលើកទី ២ មុន auth ឆ្លើយ មិនទុកពិដានចាស់ដែលលុប IndexedDB Firebase + reload លើ admin ដែលចូលរួចទេ។
 - 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
@@ -182,6 +185,8 @@
 - `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
   មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
   web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
+- `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
+  ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3193,9 +3198,11 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   Supabase Project ផ្ទាល់ ៖ migration live ១៣ = repo ១៣ · advisor security ៖ `zoe_ops` RLS គ្មាន policy (ចេតនា ៖ ចូលតាម definer តែប៉ុណ្ណោះ) · **Leaked Password Protection បិទ**
   (ការកំណត់ Auth ក្នុង Dashboard · ⏳ ម្ចាស់គម្រោងពិចារណា) · performance ៖ index FK ២ មិនទាន់ប្រើ (តារាងតូច) · listener ZoeW (`detachDatabaseListeners()` មុនភ្ជាប់ ·
   generation gate គ្រប់ callback) · listener adapter Supabase (`app._unlisten`) · ZoeKeyGen `.info/*` · auth (detach មុន attach)។
+- 🟠 **ZoeKeyGen ៖ teardown auth ខុសពី ZoeW** (ផ្លូវបងប្អូន · `setupAuthListener` · `initFirebase` ក្នុង `EXPECTED_DIVERGENT` របស់ `shared-fns` ➜ គ្មានអ្នកយាមធៀប) ៖
+  ZoeW ផ្តាច់ auth/ពិដាន/ឡើងជំនាន់មុន `deleteApp` (ច្បាប់ «Stale callbacks») តែ ZoeKeyGen មិនធ្វើ ហើយពិដាន ៨ វិ. ជាអថេរក្នុង function ➜ កែក្នុង [2.50.52]។ ផលប៉ះពាល់
+  តិច (Config License ប្តូរកម្រ) តែជាថ្នាក់ដូច `isDatabaseInitialized` ៖ function ចម្លងពី ZoeW ដោយខ្វះស្ថានភាពរបស់វា។
 - **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
-  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZoeKeyGen
-  `setupAuthListener()` មិនសម្អាតពិដាន ៨ វិ. ចាស់ (ZoeW សម្អាត) ➜ កម្រណាស់ ៖ Config ថ្មីក្នុង ៨ វិ. ដំបូង · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
+  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
 
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 

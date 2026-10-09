@@ -224,6 +224,7 @@ let fb = null;
 let auth = null;
 let db = null;
 let authUnsubscribe = null;
+let authRecoveryTimeout = null;
 let authGeneration = 0;
 let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
@@ -850,6 +851,9 @@ async function initFirebase() {
 
         const existingApps = fb.getApps();
         if (existingApps.length) {
+            if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
+            if (authRecoveryTimeout) { clearTimeout(authRecoveryTimeout); authRecoveryTimeout = null; }
+            authGeneration++;
             detachInfoListeners();
             if (typeof fb.deleteApp === 'function') {
                 await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
@@ -1886,10 +1890,12 @@ async function attemptAuthStorageRecovery() {
 function setupAuthListener() {
     if (!auth) return;
     if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
+    if (authRecoveryTimeout) { clearTimeout(authRecoveryTimeout); authRecoveryTimeout = null; }
 
-    const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
+    authRecoveryTimeout = setTimeout(() => { authRecoveryTimeout = null; attemptAuthStorageRecovery(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
-        clearTimeout(initialAuthTimeout);
+        clearTimeout(authRecoveryTimeout);
+        authRecoveryTimeout = null;
         authGeneration++;
         const myAuthGeneration = authGeneration;
         if (user) {

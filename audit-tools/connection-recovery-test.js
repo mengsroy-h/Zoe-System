@@ -1842,7 +1842,7 @@ function buildContext() {
             ok('ZoeKeyGen ៖ SDK មកមិនដល់ ➜ ពិដាននៅសល់ ៖ toast «កំពុងព្យាយាមម្តងទៀត» · ពិដានអស់ ៖ toast «Refresh ទំព័រ» (មិនមែន «កំពុងព្យាយាម»)',
                 /កំពុងព្យាយាមម្តងទៀត/.test(kgFresh) && /Refresh/.test(kgStuck) && !/កំពុងព្យាយាមម្តងទៀត/.test(kgStuck), JSON.stringify({ kgFresh, kgStuck }));
 
-            function runKeygenInit(changeConfigMidFlight) {
+            function runKeygenInit(changeConfigMidFlight, withExistingApp) {
                 const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
                 const log = { inits: [] };
                 let releaseSdk = null;
@@ -1857,12 +1857,14 @@ function buildContext() {
                     },
                     document: { getElementById: () => null, querySelectorAll: () => [] },
                     __log: log,
+                    __existingApp: !!withExistingApp,
                     __releaseSdk: (fn) => { releaseSdk = fn; }
                 };
                 ctx.window = ctx;
                 vm.createContext(ctx);
                 vm.runInContext([
                     'const appLocalStore = localStorage;',
+                    'let authUnsubscribe = () => { __log.oldAuthOff = true; }, authRecoveryTimeout = null, authGeneration = 0;',
                     'function safeStoreGet(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }',
                     'let firebaseConfig = null, fb = null, auth = null, db = null;',
                     'let dbRefConnected = null, dbRefServerTimeOffset = null;',
@@ -1870,7 +1872,8 @@ function buildContext() {
                     'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
                     'let serverTimeSynced = false, serverTimeOffsetMs = 0;',
                     'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
-                    'const FAKE_SDK = { getApps: () => [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => Promise.resolve(),',
+                    'const FAKE_SDK = { getApps: () => (__existingApp ? [{}] : []), initializeApp: (c) => ({ cfg: c }),',
+                    '  deleteApp: () => { __log.authOffAtDelete = !!__log.oldAuthOff; __log.generationAtDelete = authGeneration; __existingApp = false; return Promise.resolve(); },',
                     '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
                     '  onAuthStateChanged: (a, cb) => (() => {}) };',
                     'function waitForFirebaseSDK() { return new Promise((res) => { __releaseSdk(() => res(FAKE_SDK)); }); }',
@@ -1913,6 +1916,54 @@ function buildContext() {
             for (let i = 0; i < 8; i++) { await Promise.resolve(); kgSame.release(); }
             ok('⛔ ទិសផ្ទុយ ZoeKeyGen ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
                 kgSame.log.inits.length === 1, kgSame.log.inits);
+
+            // ⛔ ដូច ZoeW ៖ Firebase ពិតបញ្ជូន `onAuthStateChanged` ដែលកំពុងរង់ចាំ **ក្រោយ** `deleteApp()` ➜ listener auth ចាស់
+            //    របស់ ZoeKeyGen ត្រូវផ្តាច់ និងជំនាន់ auth ត្រូវឡើង **មុន** លុប App ចាស់ (បើអត់ callback `null` ចាស់បើកប្រអប់ចូល ·
+            //    `sbAdminReset()` លើសម័យ admin ថ្មី)
+            const kgReconfig = runKeygenInit(false, true);
+            for (let i = 0; i < 8; i++) { await Promise.resolve(); kgReconfig.release(); }
+            ok('ZoeKeyGen Reconfig ៖ បានចូលផ្លូវលុប App ចាស់ពិត', 'authOffAtDelete' in kgReconfig.log, kgReconfig.log);
+            ok('⛔ ZoeKeyGen Reconfig ៖ listener auth ចាស់ត្រូវផ្តាច់ ហើយជំនាន់ auth ឡើង មុន deleteApp',
+                kgReconfig.log.authOffAtDelete === true && kgReconfig.log.generationAtDelete > 0, kgReconfig.log);
+
+            // ⛔ ពិដាន ៨ វិ. របស់ `setupAuthListener()` (មិនដែលឮ auth ➜ លុប IndexedDB Firebase + reload) ត្រូវជារបស់ listener **បច្ចុប្បន្ន** ៖
+            //    ការហៅលើកទី ២ (Config ថ្មី) មុន auth ឆ្លើយ ➜ ពិដានចាស់ត្រូវលុប បើអត់វាផ្ទុះលើ admin ដែលចូលរួច ➜ ចាកចេញ + reload
+            const kgSetupSrc = sliceFnFrom(KGINIT, 'setupAuthListener');
+            ok('ស្រង់ setupAuthListener() របស់ ZoeKeyGen បាន', !!kgSetupSrc);
+            function runKeygenAuthTimers(secondSetup) {
+                const timers = [];
+                const log = { recoveries: 0, proceeds: 0, callbacks: [] };
+                const ctx = {
+                    console, Promise, Object, Array, Error,
+                    setTimeout: (fn, ms) => { const t = { fn, ms, dead: false }; timers.push(t); return t; },
+                    clearTimeout: (t) => { if (t) t.dead = true; },
+                    __log: log
+                };
+                vm.createContext(ctx);
+                vm.runInContext([
+                    'let auth = {}, authUnsubscribe = null, authRecoveryTimeout = null, authGeneration = 0, pendingRoleRecheck = false;',
+                    'const fb = { onAuthStateChanged: (a, cb) => { __log.callbacks.push(cb); return () => {}; } };',
+                    'function attemptAuthStorageRecovery() { __log.recoveries++; }',
+                    'function verifyAdminRoleThenProceed() { __log.proceeds++; }',
+                    'function updateAuthButton() {}',
+                    'function showLoginModalWithPrefill() {}',
+                    kgSetupSrc || 'function setupAuthListener() {}',
+                    'globalThis.__setup = () => setupAuthListener();'
+                ].join('\n'), ctx);
+                ctx.__setup();
+                if (secondSetup) {
+                    ctx.__setup();
+                    const cb = log.callbacks[log.callbacks.length - 1];
+                    if (cb) cb({ uid: 'admin' });
+                }
+                timers.filter((t) => !t.dead && t.ms >= 8000).forEach((t) => t.fn());
+                return log;
+            }
+            const kgTimerAlone = runKeygenAuthTimers(false);
+            ok('ZoeKeyGen ៖ ពិដាន ៨ វិ. ដើរពិត (គ្មាន auth ឆ្លើយ ➜ ការស្តារ storage ១ ដង)', kgTimerAlone.recoveries === 1, kgTimerAlone);
+            const kgTimerTwice = runKeygenAuthTimers(true);
+            ok('⛔ ZoeKeyGen ៖ setupAuthListener() ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜ ពិដានចាស់មិនបាញ់ (គ្មានការលុប storage/reload លើ admin ដែលចូលរួច)',
+                kgTimerTwice.proceeds === 1 && kgTimerTwice.recoveries === 0, kgTimerTwice);
         }
 
         const reconfigured = runInit(false, true);

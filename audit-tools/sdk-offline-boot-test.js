@@ -159,9 +159,87 @@ const LICENSE_STUB = `window.ZoeLicense = {
     check(/Refresh/.test(stuck.toasts) && !/កំពុងព្យាយាមម្តងទៀត/.test(stuck.toasts),
         'ពិដានអស់ ➜ toast សុំ Refresh · ⛔ មិនមែន «កំពុងព្យាយាមម្តងទៀត»', stuck.toasts);
     check(!stuck.pinModalOpen && !stuck.configOpen && stuck.appVisible, 'ពិដានអស់ ➜ មិនបើកប្រអប់ PIN/Config · App នៅមើលឃើញ', stuck);
+    server.close();
+
+    // ៣. ⛔ ZoeKeyGen ក្នុង Chromium ពិត ៖ SDK មកមិនដល់ ➜ ជណ្តើរព្យាយាមត្រូវ **រត់ពិត** (probe ទៅ host SDK) និង SDK ដែលមកយឺត
+    //    (`firebasesdkready`) ត្រូវចាប់ផ្តើម `initFirebase()` ពិត ⛔ គ្មាន `ReferenceError` (អថេរដែលមិនដែលប្រកាស ➜ function
+    //    ជណ្តើរ · listener SDK យឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត»)។ sandbox របស់
+    //    connection-recovery ប្រកាសអថេរជំនួស App ➜ មើលមិនឃើញ ➜ វាស់លើទំព័រពិតនៅទីនេះ។
+    console.log('\n=== ZoeKeyGen ៖ SDK មកមិនដល់ ➜ ជណ្តើរ · SDK យឺត (Chromium ពិត) ===');
+    const kgSrc = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'app.js'), 'utf8');
+    const kgProbeUrl = (/const FIREBASE_SDK_PROBE_URL = '([^']+)'/.exec(kgSrc) || [])[1];
+    const kgFirstStep = Number((/const FIREBASE_SDK_RETRY_STEPS_MS = \[(\d+)/.exec(kgSrc) || [])[1]);
+    check(!!kgProbeUrl && kgFirstStep > 0, 'ZoeKeyGen ៖ អាន FIREBASE_SDK_PROBE_URL · ជំហានទី ១ ពីកូដពិត', { kgProbeUrl, kgFirstStep });
+    const kgServer = await serve(path.join(ROOT, 'ZoeKeyGen'));
+    const kgPort = kgServer.address().port;
+    const kgCtx = await browser.newContext({ viewport: { width: 412, height: 850 } });
+    const kgPage = await kgCtx.newPage();
+    const kgErrors = [];
+    let kgProbes = 0;
+    kgPage.on('pageerror', (e) => kgErrors.push(String(e && e.message || e)));
+    kgPage.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await kgPage.route('**', (route) => {
+        const u = route.request().url();
+        if (u.indexOf('/license-verify.js') !== -1) {
+            return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+        }
+        if (u.startsWith('http://127.0.0.1:' + kgPort)) return route.continue();
+        if (kgProbeUrl && u.indexOf(kgProbeUrl) === 0) kgProbes++;
+        return route.abort();
+    });
+    await kgPage.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', authDomain: 'p.firebaseapp.com', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+    await kgPage.addInitScript(`
+        window.__kgRejections = [];
+        window.addEventListener('unhandledrejection', (e) => { window.__kgRejections.push(String(e.reason && e.reason.message || e.reason)); });
+        window.__kgSdkWaits = 0;
+        window.__origSetTimeout = window.setTimeout;
+        window.setTimeout = function (fn, ms) {
+            if (ms === 15000) window.__kgSdkWaits++;
+            return window.__origSetTimeout(fn, ms === 15000 ? 800 : (ms === ${kgFirstStep} ? 300 : ms));
+        };
+    `);
+    await kgPage.goto('http://127.0.0.1:' + kgPort + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await kgPage.waitForTimeout(3500);
+    const kgBefore = await kgPage.evaluate(() => ({
+        sdkWaits: window.__kgSdkWaits,
+        rejections: window.__kgRejections.slice(),
+        toasts: (document.getElementById('toastContainer') || {}).innerText || '',
+        statusText: (document.getElementById('firebaseStatusText') || {}).innerText || ''
+    }));
+    const kgRefErrors = kgErrors.concat(kgBefore.rejections).filter((m) => /is not defined|ReferenceError/.test(m));
+    check(kgRefErrors.length === 0, 'ZoeKeyGen ៖ ⛔ SDK មកមិនដល់ ➜ គ្មាន ReferenceError (pageerror · unhandledrejection)', kgRefErrors);
+    check(kgProbes >= 1 || kgBefore.sdkWaits >= 2, 'ZoeKeyGen ៖ ជណ្តើរព្យាយាមរត់ពិត ➜ probe ទៅ host SDK ឬការរង់ចាំ SDK លើកទី ២ (toast «កំពុងព្យាយាម» មិនកុហក)',
+        { kgProbes, sdkWaits: kgBefore.sdkWaits, toasts: kgBefore.toasts });
+    await kgPage.evaluate(() => {
+        window.__kgInitCalls = 0;
+        const noop = () => {};
+        window.firebaseSDK = {
+            getApps: () => [],
+            initializeApp: () => { window.__kgInitCalls++; return {}; },
+            deleteApp: () => Promise.resolve(),
+            getAuth: () => ({}),
+            setPersistence: () => Promise.resolve(),
+            browserSessionPersistence: {},
+            browserLocalPersistence: {},
+            getDatabase: () => ({}),
+            goOnline: noop,
+            goOffline: noop,
+            ref: () => ({}),
+            onValue: () => noop,
+            off: noop,
+            onAuthStateChanged: () => noop
+        };
+        window.dispatchEvent(new Event('firebasesdkready'));
+    });
+    await kgPage.waitForTimeout(800);
+    const kgAfter = await kgPage.evaluate(() => ({ initCalls: window.__kgInitCalls, rejections: window.__kgRejections.slice() }));
+    const kgLateRefErrors = kgErrors.concat(kgAfter.rejections).filter((m) => /is not defined|ReferenceError/.test(m));
+    check(kgAfter.initCalls >= 1, 'ZoeKeyGen ៖ SDK មកយឺត (`firebasesdkready`) ➜ initFirebase() ចាប់ផ្តើមពិត (initializeApp ត្រូវហៅ)', kgAfter);
+    check(kgLateRefErrors.length === 0, 'ZoeKeyGen ៖ ⛔ listener SDK យឺតមិនបោះ ReferenceError', kgLateRefErrors);
+    await kgCtx.close();
+    kgServer.close();
 
     await browser.close();
-    server.close();
 
     console.log('\n' + (fail === 0 ? '✅ ជោគជ័យទាំងអស់ (' + pass + ')' : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
     process.exit(fail === 0 ? 0 : 1);

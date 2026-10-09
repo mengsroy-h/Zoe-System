@@ -78,7 +78,9 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
-    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimAndCleanupItem'];
+    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem'];
+// ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)
+const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrashId() { return generateUniqueId(); }' };
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
@@ -126,6 +128,10 @@ function makeRun(opts) {
             if (bump()) return hung();
             const landed = opts.landAt === writes;
             const p = ref.path;
+            // ⛔ ការសរសេរធុងសំរាមរបស់ការសម្អាត = transaction create-if-absent លើ `trash/<id>` ➜ ទ្វារដដែលនឹង `update` ត្រូវឆ្លងកាត់ច្រក `trashGate`
+            if (opts.trashGate && p.indexOf('zoew_recently_deleted_cod_dod/') === 0 && !opts.trashGate.open) {
+                return new Promise((resolve) => { opts.trashGate.waiters.push(() => resolve(fb.runTransaction(ref, fn))); });
+            }
             let cur, write;
             if (p === 'zoew_monthly_revenue_cod_dod') {
                 cur = JSON.parse(JSON.stringify(server.monthly));
@@ -243,6 +249,7 @@ function makeRun(opts) {
         if (!body) { if (missingRecovery.indexOf(fn) === -1) missingRecovery.push(fn); return; }
         parts.push(body);
     });
+    Object.keys(OPTIONAL_CORE_FNS).forEach((fn) => parts.push(sliceFrom(SRC, fn) || OPTIONAL_CORE_FNS[fn]));
     vm.runInContext(parts.join('\n\n'), ctx);
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
@@ -736,6 +743,9 @@ function packagePlaces(server) {
         await settle(200);
         const journaled = Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1);
         const waiting = gate.waiters.length;
+        // ⛔ listener ប្រវត្តិពិតដកកញ្ចប់ចេញពីទិដ្ឋភាពភ្លាមក្រោយ claim commit ➜ ទិដ្ឋភាពក្នុងសតិត្រូវស្របនឹង server មុនអ្នកស្តាររត់ (ទិដ្ឋភាពចាស់ = អ្នកស្តារឆ្លើយ
+        //    «elsewhere» ដោយសារ id នៅក្នុងប្រវត្តិ ➜ លាក់ផ្លូវដែលអ្នកស្តារកាន់ slot ជាមួយ `deletedAt` ដដែល ហើយដកលុយម្តងទៀត)
+        run.box.scanHistory.splice(0, run.box.scanHistory.length, ...Object.values(run.server.history).map((v) => JSON.parse(JSON.stringify(v))));
         for (let i = 0; i < resumeCalls; i++) {
             try { vm.runInContext('resumeInterruptedCleanups();', run.ctx); } catch (e) {}
             await settle(150);

@@ -13,7 +13,7 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.50.51`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.50.52`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។
 
 - បង្ហាញ **២ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ និងខាងក្រោមរបា Slide។ ចុចលើលេខ
@@ -323,8 +323,9 @@ Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ�
 ⚙️ របា Slide ➜ **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ**។ វារាយ **៩ ជួរ** ជាមួយសញ្ញា
 ✅ ធម្មតា · ⚠️ គួរមើល · ❌ មានបញ្ហា · ℹ️ មិនបានពិនិត្យ ៖
 
-ខាងលើជួរទាំងនោះ (និងក្នុង ☰ ខាងក្រោម) បង្ហាញ **📱 model · កំណែប្រព័ន្ធ · 🔖 Serial** នៃទូរស័ព្ទនេះ ៖ App Android = Android ID ·
-PWA/iPhone = ID App ១៦ តួ · អ្នកលក់ឃើញដូចគ្នាក្នុង ZoeKeyGen តាមកៅអីក្នុង Key។
+ខាងលើជួរទាំងនោះ (និងក្នុង ☰ ខាងក្រោម) បង្ហាញ **model · កំណែប្រព័ន្ធ · Serial** នៃទូរស័ព្ទនេះ ៖ App Android = Android ID ·
+PWA/iPhone = ID App ១៦ តួ · iPhone ស្គាល់ model ពីទំហំអេក្រង់ និងកំណែ iOS (model ដែលមានអេក្រង់ដូចគ្នាបង្ហាញជាក្រុម ឧ.
+`iPhone 16 Pro / 17 / 17 Pro` · ទំហំអេក្រង់មិនស្គាល់ ដូចជា Display Zoom ➜ `iPhone`) · អ្នកលក់ឃើញដូចគ្នាក្នុង ZoeKeyGen តាមកៅអីក្នុង Key។
 
 | ជួរ | វាប្រាប់អ្វី |
 |---|---|
@@ -413,11 +414,27 @@ Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY
 **ការរៀបចំ (ម្តង · Netlify env របស់ site ZoeW)** ៖
 
 1. `node ZoeW/scripts/gen-vapid.mjs` ➜ ដាក់ `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` (⛔ សម្ងាត់) ក្នុង Netlify env ·
-   `VAPID_SUBJECT` ស្រេចចិត្ត (`mailto:…` ឬ `https://…` · លំនាំដើម = URL របស់ site)។ ⛔ ប្តូរកូនសោ ➜ ឧបករណ៍ទាំងអស់ត្រូវបើកម្តងទៀត។
+   `VAPID_SUBJECT` ស្រេចចិត្ត (`mailto:…` ឬ `https://…` · លំនាំដើម = URL របស់ site)។ ⛔ ប្តូរកូនសោ ➜ ទូរស័ព្ទ/កុំព្យូទ័រចុះឈ្មោះឡើងវិញ
+   ដោយខ្លួនឯងពេលបើក App លើកក្រោយ · iPhone ដែលមិនអនុញ្ញាតឲ្យចុះឈ្មោះដោយគ្មានការចុច ➜ ស្ថានភាពប្តូរជា «បិទ» ➜ ចុច **🔔 បើកការជូនដំណឹង** ម្តងទៀត។
 2. App Android ៖ Firebase Console របស់ **License Project** ➜ Project settings ➜ **Service accounts** ➜ Generate new private
    key ➜ ដាក់ JSON (ឬ base64 របស់វា) ក្នុង `FCM_SERVICE_ACCOUNT` (⛔ សម្ងាត់) · APK ៖ មើល [docs/ANDROID.md](docs/ANDROID.md)។
 3. Deploy ➜ Function `push` (ចុះឈ្មោះ · ដាស់ពី ZoeKeyGen) និង `push-cron` (រាល់ ៥ នាទី) រត់ដោយខ្លួនឯង · ទិន្នន័យ
    subscription រស់ក្នុង Netlify Blobs (`zoew-push`)។ គ្មាន env ➜ ផ្ទាំងប្រាប់ «Server មិនទាន់កំណត់» (អ្វីផ្សេងដើរធម្មតា)។
+   ⛔ កែ/លុប/ដាក់ env ឡើងវិញ ➜ ត្រូវ **Deploy ម្តងទៀត** (Netlify ➜ Deploys ➜ Trigger deploy) ទើប Function ឃើញតម្លៃថ្មី។
+   ទូរស័ព្ទដែលបើកការជូនដំណឹង ចុះឈ្មោះឡើងវិញដោយខ្លួនឯងពេលបើក App (យ៉ាងតិចរៀងរាល់ ៦ ម៉ោង · ក្រោយ server បដិសេធ ➜ សាកម្តងទៀតក្រោយ ១៥ នាទី)
+   ➜ ការចុះឈ្មោះដែលបាត់ពី server (token ប្តូរ · ឧបករណ៍លើសពី ១០ ក្នុង Key មួយ) ត្រឡប់មកវិញដោយមិនបាច់បិទ/បើក។
+
+**ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App** ៖
+
+1. បើក `https://<site ZoeW>/.netlify/functions/push?op=config` ក្នុង browser ➜ ត្រូវឃើញ `"web": true` (PWA · iPhone) និង `"fcm": true`
+   (App Android)។ `false` ➜ env ខ្វះ/ខុសទម្រង់ ឬមិនទាន់ Deploy ក្រោយកែ env។
+2. Netlify ➜ **Logs ➜ Functions ➜ `push-cron`** (មួយបន្ទាត់រាល់ ៥ នាទី) ៖ `"reason":"sent"` + ចំនួន `sent` · `fail` · `gone` = បានផ្ញើ ·
+   `"none"` = គ្មានដំណឹងថ្មី · `"stale"` = ដំណឹងចាស់ជាង ២៤ ម៉ោង (មិនផ្ញើ) · `"notices:read"` = អានដំណឹងពី License Project មិនបាន ·
+   `fail` > 0 ➜ កូនសោ VAPID ឬ `FCM_SERVICE_ACCOUNT` មិនត្រូវ Project (ត្រូវជា **License Project** ដដែលនឹង `google-services.json` របស់ APK)។
+3. ផ្ញើដំណឹងសាកពី ZoeKeyGen (ដំណឹងថ្មី) ➜ ទូរស័ព្ទទទួលក្នុង ≤ ៥ នាទី (ជាធម្មតាភ្លាម)។
+4. ទូរស័ព្ទ ៖ 🔔 ➜ **📲 ជូនដំណឹងលើទូរស័ព្ទ** ត្រូវប្រាប់ថាបើក · បិទ ➜ បើកម្តងទៀត (ចុះឈ្មោះថ្មី) · Android ៖ Settings ➜ Apps ➜ ZoeW ➜
+   Notifications បើក · Xiaomi/Redmi/OPPO/vivo ៖ បើក **Autostart** និង Battery ➜ **No restrictions** · iPhone ៖ បើកពីរូប App លើ Home Screen ·
+   Settings ➜ Notifications ➜ ZoeW បើក · Focus មិនបិទសំឡេងវា។
 
 ### ១២. App Android
 

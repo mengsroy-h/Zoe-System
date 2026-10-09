@@ -166,7 +166,7 @@ export function setupSwipeGestures() {
 }
 
 export function phoneSearchIsActive() {
-    if (uiState.phoneSuggestOpen) return true;
+    if (uiState.phoneSuggestOpen || uiState.dataPanelSearchFocus) return true;
     return !!(isFieldFocused('searchPhoneInput') && fieldValue('searchPhoneInput').trim());
 }
 

@@ -5,7 +5,10 @@
  *    browser មិនផ្តល់)។
  * ⛔ APK ៖ plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) · plugin ជា Proxy thenable ➜ មិន resolve promise ទៅ plugin ·
  *    PWA Android ៖ UA ត្រូវកាត់ (`Android 10; K`) ➜ model ពី `userAgentData.getHighEntropyValues()` (ពិដាន `DEVICE_INFO_TIMEOUT_MS`) ·
- *    iPhone ៖ ត្រឹម «iPhone» + កំណែ iOS · បរាជ័យ ➜ ធ្លាក់ទៅ UA មិនគាំង។
+ *    iPhone ៖ Safari មិនប្រាប់ model ➜ ស្គាល់ពីទំហំអេក្រង់ (`screen` ចំណុច) × `devicePixelRatio` × កំណែ iOS (`IPHONE_MODELS`) ·
+ *    model ដែលមានអេក្រង់ដូចគ្នា ➜ បង្ហាញជាក្រុម «iPhone 16 Pro / 17 / 17 Pro» (ពិត ៖ web មិនអាចបំបែកបាន) · ទំហំមិនស្គាល់
+ *    (Display Zoom · model ថ្មីមិនទាន់ក្នុងតារាង) ➜ «iPhone» ⛔ មិនទាយ · បរាជ័យ ➜ ធ្លាក់ទៅ UA មិនគាំង។
+ * ⛔ សំណើម្ចាស់គម្រោង ៖ បន្ទាត់ model និង serial គ្មាន emoji (ZoeW ☰ · 🩺 និង ZoeKeyGen បញ្ជីកៅអី)។
  * ⛔ រាយការណ៍ម្ចាស់គម្រោង ៖ iPhone iOS 26.5 ពិត តែ ZoeW បង្ហាញ «iOS 18.7» ➜ Safari លើ iOS 26 បង្កកលេខ OS ក្នុង UA (18_6 ➜ 18_7) ដោយចេតនា
  *    ហើយ «Version/26.x» នៅតែពិត ➜ អាន Version ពេល ≥ 26 · UA គ្មាន Version (App លើ Home Screen) + OS បង្កក ➜ ពិនិត្យលក្ខណៈ engine Safari 26
  *    (`CSS.supports`) ➜ «iOS 26+» (មិនដឹងលេខរង) · ទិសផ្ទុយ ៖ iOS 18 ពិត · Chrome iOS (OS ពិត) ➜ ដដែល។
@@ -52,6 +55,23 @@ function setUserAgent(ua: string, uad?: any) {
     Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, get: () => uad });
 }
 
+function setScreen(width: number, height: number, ratio: number) {
+    Object.defineProperty(window.screen, 'width', { configurable: true, get: () => width });
+    Object.defineProperty(window.screen, 'height', { configurable: true, get: () => height });
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, writable: true, value: ratio });
+}
+
+function resetScreen() {
+    delete (window.screen as any).width;
+    delete (window.screen as any).height;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, writable: true, value: 1 });
+}
+
+const EMOJI_RE = /\p{Extended_Pictographic}/u;
+const IOS_175 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+const IOS_265 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1';
+const IOS_HOME_26 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+
 function withCssSupports(features: string[] | null) {
     const value = features ? { supports: (q: string) => features.includes(q) } : { supports: () => { throw new Error('no CSS.supports'); } };
     Object.defineProperty(window, 'CSS', { configurable: true, writable: true, value });
@@ -91,6 +111,7 @@ afterEach(() => {
     delete (window as any).androidBridge;
     delete (window as any).ZoeLicense;
     delete (window as any).CSS;
+    resetScreen();
 });
 
 describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK · PWA)', () => {
@@ -222,6 +243,75 @@ describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK
         expect(metaCalls.length).toBe(1);
     });
 
+    it('⛔ iPhone ៖ model ពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · ក្រុម model អេក្រង់ដូចគ្នា · ទំហំមិនស្គាល់ ➜ «iPhone»', async () => {
+        const { iphoneModelFromScreen } = await import('../src/features/device-info');
+        expect(iphoneModelFromScreen(402, 874, 3, 'iOS 26.5')).toBe('iPhone 16 Pro / 17 / 17 Pro');
+        expect(iphoneModelFromScreen(402, 874, 3, 'iOS 26+')).toBe('iPhone 16 Pro / 17 / 17 Pro / 18 Pro');
+        expect(iphoneModelFromScreen(402, 874, 3, 'iOS 27.0')).toBe('iPhone 16 Pro / 17 / 17 Pro / 18 Pro');
+        expect(iphoneModelFromScreen(402, 874, 3, 'iOS 18.5')).toBe('iPhone 16 Pro');
+        expect(iphoneModelFromScreen(393, 852, 3, 'iOS 17.5')).toBe('iPhone 14 Pro / 15 / 15 Pro');
+        expect(iphoneModelFromScreen(393, 852, 3, 'iOS 16.2')).toBe('iPhone 14 Pro');
+        expect(iphoneModelFromScreen(393, 852, 3, 'iOS 26+')).toBe('iPhone 14 Pro / 15 / 15 Pro / 16');
+        expect(iphoneModelFromScreen(440, 956, 3, 'iOS 26.1')).toBe('iPhone 16 Pro Max / 17 Pro Max');
+        expect(iphoneModelFromScreen(430, 932, 3, 'iOS 26+')).toBe('iPhone 14 Pro Max / 15 Plus / 15 Pro Max / 16 Plus');
+        expect(iphoneModelFromScreen(428, 926, 3, 'iOS 26+')).toBe('iPhone 12 Pro Max / 13 Pro Max / 14 Plus');
+        expect(iphoneModelFromScreen(390, 844, 3, 'iOS 18.2')).toBe('iPhone 12 / 12 Pro / 13 / 13 Pro / 14');
+        expect(iphoneModelFromScreen(390, 844, 3, 'iOS 26+')).toBe('iPhone 12 / 12 Pro / 13 / 13 Pro / 14 / 16e / 17e');
+        expect(iphoneModelFromScreen(420, 912, 3, 'iOS 26+')).toBe('iPhone Air');
+        expect(iphoneModelFromScreen(375, 812, 3, 'iOS 26+')).toBe('iPhone 11 Pro / 12 mini / 13 mini');
+        expect(iphoneModelFromScreen(375, 812, 3, 'iOS 16.7')).toBe('iPhone X / XS / 11 Pro / 12 mini / 13 mini');
+        expect(iphoneModelFromScreen(360, 780, 3, 'iOS 26+')).toBe('iPhone 12 mini / 13 mini');
+        expect(iphoneModelFromScreen(414, 896, 2, 'iOS 18.7')).toBe('iPhone XR / 11');
+        expect(iphoneModelFromScreen(414, 896, 2, 'iOS 26+')).toBe('iPhone 11');
+        expect(iphoneModelFromScreen(414, 896, 3, 'iOS 26+')).toBe('iPhone 11 Pro Max');
+        expect(iphoneModelFromScreen(375, 667, 2, 'iOS 26+')).toBe('iPhone SE (2nd gen) / SE (3rd gen)');
+        expect(iphoneModelFromScreen(375, 667, 2, 'iOS 15.8')).toBe('iPhone 6s / 7 / 8 / SE (2nd gen) / SE (3rd gen)');
+        expect(iphoneModelFromScreen(874, 402, 3, 'iOS 26.5')).toBe('iPhone 16 Pro / 17 / 17 Pro');
+        expect(iphoneModelFromScreen(375, 812, 2.88, 'iOS 26+')).toBe('iPhone 11 Pro / 12 mini / 13 mini');
+        expect(iphoneModelFromScreen(320, 693, 3, 'iOS 26+')).toBe('');
+        expect(iphoneModelFromScreen(402, 874, 2, 'iOS 26+')).toBe('');
+        expect(iphoneModelFromScreen(402, 874, 3, 'iOS 17.5')).toBe('');
+        expect(iphoneModelFromScreen(0, 0, 1, 'iOS 26+')).toBe('');
+        expect(iphoneModelFromScreen(NaN, undefined, null, undefined)).toBe('');
+        expect(iphoneModelFromScreen(-402, -874, 3, 'iOS 26+')).toBe('');
+        expect(iphoneModelFromScreen(402, 874, 3, '')).toBe('iPhone 16 Pro / 17 / 17 Pro / 18 Pro');
+    });
+
+    it('⛔ ស្លាក model iPhone គ្រប់ទំហំ ≤ ៨០ តួ (ព្រំដែន rules `model` 1–80 ក្នុងកៅអី License) · គ្មានឈ្មោះស្ទួន', async () => {
+        const { IPHONE_MODELS, iphoneModelFromScreen } = await import('../src/features/device-info');
+        const names = IPHONE_MODELS.map((m) => m.name);
+        expect(new Set(names).size).toBe(names.length);
+        const screens = new Set(IPHONE_MODELS.flatMap((m) => m.screens.map((s) => s.join('x'))));
+        expect(screens.size).toBeGreaterThanOrEqual(12);
+        for (const key of screens) {
+            const [w, h, r] = key.split('x').map(Number);
+            const label = iphoneModelFromScreen(w, h, r, '');
+            expect(label.length, key).toBeGreaterThan(0);
+            expect(label.length, key).toBeLessThanOrEqual(80);
+        }
+    });
+
+    it('⛔ iPhone PWA ពិត ៖ loadDeviceInfo ផ្ញើ model ក្រុមទៅ License · Home Screen iOS 26+ · Safari iOS 17.5 · ទំហំមិនស្គាល់ ➜ «iPhone»', async () => {
+        setScreen(402, 874, 3);
+        setUserAgent(IOS_HOME_26, undefined);
+        withCssSupports(['anchor-name: --zoe']);
+        let loaded = await freshLoad();
+        expect(loaded.info.model).toBe('iPhone 16 Pro / 17 / 17 Pro / 18 Pro');
+        expect(loaded.info.platform).toBe('iOS 26+');
+        expect(metaCalls[metaCalls.length - 1]).toEqual({ model: 'iPhone 16 Pro / 17 / 17 Pro / 18 Pro', platform: 'iOS 26+', serial: APP_SERIAL });
+        setUserAgent(IOS_265, undefined);
+        loaded = await freshLoad();
+        expect(loaded.info.model).toBe('iPhone 16 Pro / 17 / 17 Pro');
+        setScreen(393, 852, 3);
+        setUserAgent(IOS_175, undefined);
+        loaded = await freshLoad();
+        expect(loaded.info.model).toBe('iPhone 14 Pro / 15 / 15 Pro');
+        expect(loaded.info.platform).toBe('iOS 17.5');
+        setScreen(320, 693, 3);
+        loaded = await freshLoad();
+        expect(loaded.info.model).toBe('iPhone');
+    });
+
     it('UI ៖ បន្ទាត់ឧបករណ៍បង្ហាញ model · platform · serial (តែពេល ready)', () => {
         step(() => { uiState.deviceInfo = { state: 'checking', model: '', platform: '', serial: '', serialKind: '' }; });
         mount(<DeviceInfoLine id="testDeviceInfo" />);
@@ -232,8 +322,12 @@ describe('ស្គាល់ model · serial របស់ឧបករណ៍ (APK
         expect(text).toContain('Android 14');
         expect(text).toContain('Android ID');
         expect(text).toContain('1a2b3c4d5e6f7890');
-        step(() => { uiState.deviceInfo = { state: 'ready', model: 'iPhone', platform: 'iOS 17.5', serial: APP_SERIAL, serialKind: 'app-id' }; });
-        expect(document.getElementById('testDeviceInfo')!.textContent).toContain('ID App');
+        expect(text, 'ZoeW ៖ បន្ទាត់ model · serial គ្មាន emoji').not.toMatch(EMOJI_RE);
+        step(() => { uiState.deviceInfo = { state: 'ready', model: 'iPhone 16 Pro / 17 / 17 Pro', platform: 'iOS 26.5', serial: APP_SERIAL, serialKind: 'app-id' }; });
+        const iphoneText = document.getElementById('testDeviceInfo')!.textContent || '';
+        expect(iphoneText).toContain('ID App');
+        expect(iphoneText).toContain('iPhone 16 Pro / 17 / 17 Pro · iOS 26.5');
+        expect(iphoneText).not.toMatch(EMOJI_RE);
     });
 
     it('⛔ ខ្សែភ្ជាប់ ៖ ☰ footer និង 🩺 គូរបន្ទាត់ឧបករណ៍ · boot · បើក 🩺 ហៅ loadDeviceInfo · ⛔ ផ្លូវ Activation មិនប៉ះ · មិនមែនជួរ 🩺', () => {

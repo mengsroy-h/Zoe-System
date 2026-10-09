@@ -45,7 +45,17 @@
 
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.49 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
+0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
+   ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
+   SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
+   `52baeb9` ➜ ជាប់លើ HEAD) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
+   ✅ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] ៖ id ធុងសំរាមកំណត់ + slot សម្រាប់ការសម្អាតទាំងអស់ · ពិនិត្យ sw.js ក្រោយ install (App ទាំង ២) · ZoeKeyGen ការកែ Key
+   ក្រោយបិទប្រអប់ PIN · ប្រអប់ស្វែងរកលេខមិនបាត់ពេលអូសបញ្ជី (តំបន់ហាម ៖ ⏳ សាក iPhone + Android ពិតមុន merge ៖ [2.50.52] សកម្មភាព ៦)។ ⏳ **ម្ចាស់គម្រោងសម្រេច** ៖
+   Supabase Leaked Password Protection · poll realtime ៦០ វិ.។
+   ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
+   ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ✅ កែរួច ៖ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង
+   (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52]) · ZoeKeyGen teardown auth ដូច ZoeW ([2.50.52])។
+1. **`main`** = **ZoeW 2.50.51 · ZoeKeyGen 2.24.12** (PR #307 · `58d0aeb`) ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
    migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
    Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·
    `security-guard-test`) ➜ PR ថ្មី។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -54,10 +64,11 @@
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · Firebase partial claim ពេល deleted view ចាស់ · legacy items គ្មាន barcodes · born-closed `closedAt` ·
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · legacy items គ្មាន barcodes · born-closed `closedAt` ·
    zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
-   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK · auth listener របស់ client ចាស់ក្រោយ `deleteApp` · network ៖ captive portal probe · install `addAll` ពេល deploy ជាន់ ·
-   sentry ៖ ZoeKeyGen ០ event · event «Perf overlay» ពី build ក្រៅ git · ops ៖ egress ពិតរបស់ ring `ops`។
+   SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
+   ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
@@ -85,6 +96,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — model iPhone · គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (branch `claude/blissful-curie-9ic58s` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ ឃើញ model/ក្រុម · ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
 - ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (PR #305 merge រួច · ម្ចាស់គម្រោងសាកលើ APK · PWA Android · PWA iPhone 2026-10-09 ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន មិនរលូន ➜ [2.50.48])** ៖ iPhone PWA · Android PWA · APK ៖ keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
@@ -136,6 +148,145 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.52] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **model iPhone ពិតពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · បន្ទាត់ model/serial គ្មាន emoji** (សំណើម្ចាស់គម្រោង ៖ «កែកន្លែងបង្ហាញ model ឧបករណ៍ អោយស្គាល់ model ពិតសម្រាប់ iphone … និងដក emoji ចេញទាំង ២ កន្លែង model និង serial ទាំងក្នុង ZoeKeyGen និង ZoeW»)
+
+**ZoeW `2.50.52`** (`zoew-v314` ➜ `zoew-v315`) · **ZoeKeyGen `2.24.13`** (`zoekeygen-v123` ➜ `zoekeygen-v124`) · គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📱 **ZoeW (PWA iPhone)** ៖ Safari មិនប្រាប់ model ក្នុង UA ➜ `iphoneModelFromScreen()` ស្គាល់ពី `screen.width × screen.height` (ចំណុច · បង្វិលក៏ដូចគ្នា) × `devicePixelRatio`
+  (បង្គត់ ➜ 12 mini ២,៨៨ = ៣) × កំណែ iOS (`IPHONE_MODELS` ៖ iPhone SE ១ ➜ 18 Pro Max · កំណែ iOS ដំបូង និងចុងក្រោយដែលគាំទ្រ) ៖
+  `402×874@3` + iOS 26.5 ➜ «iPhone 16 Pro / 17 / 17 Pro» · Home Screen «iOS 26+» ➜ បន្ថែម «18 Pro» · iOS 18.5 ➜ «iPhone 16 Pro» · `420×912@3` ➜ «iPhone Air»។
+  ⛔ model ដែលមានអេក្រង់ដូចគ្នាពិតប្រាកដ (ឧ. 14 Pro · 15 · 15 Pro · 16) web បំបែកមិនបាន ➜ បង្ហាញជាក្រុម មិនទាយមួយ · ទំហំមិនស្គាល់ (Display Zoom «Larger Text» ឧ. `320×693@3` ·
+  model ថ្មីមិនទាន់ក្នុងតារាង · iPhone Duo) ➜ «iPhone» ដូចមុន។ ⚠️ ព្រំដែនដែលទទួលស្គាល់ ៖ iPhone Pro Max ដែលបើក Display Zoom រាយការណ៍ `375×812@3` ដូច 11 Pro / 12 mini / 13 mini
+  ➜ ស្លាកក្រុមតូចនោះ (Serial នៅតែត្រឹមត្រូវ — វាជាអត្តសញ្ញាណពិតរបស់កៅអី)។ model ផ្ញើទៅកៅអី License តាម `setDeviceMeta()` ដដែល (ស្លាកវែងបំផុត ៤៩ តួ ≤ ៨០ របស់ rules)។
+- ✂️ **ZoeW ☰ · 🩺** (`DeviceInfoLine`) ៖ «<model> · <ប្រព័ន្ធ>» និង «Serial (…) ៖ <លេខ>» ជាអក្សរសុទ្ធ (គ្មាន 📱 · 🔖)។
+- ✂️ **ZoeKeyGen បញ្ជីកៅអី** (`seatDeviceLabel()`) ៖ `d1 · <model> · <ប្រព័ន្ធ> · Serial <លេខ> · ចងនៅ <ថ្ងៃ>` (គ្មាន 📱 · 🔖 · serial មានស្លាក «Serial»)។
+  ស្លាក/ប៊ូតុង «📱 n/max» · «📱 ចំនួនឧបករណ៍» មិនប្រែ (មិនមែនបន្ទាត់ model/serial)។
+- 🌐 **ZoeKeyGen ៖ Firebase SDK ផ្ទុកមិនទាន់ពេលបើក ➜ App ភ្ជាប់ឡើងវិញដោយខ្លួនឯង** (deep audit · ផ្នែក ២ «Deep audit ៤») ៖ `isDatabaseInitialized`
+  ត្រូវបានអាន ៤ កន្លែង (`armLateFirebaseSdkListener` · `scheduleFirebaseSdkRetry` ×២ · `retryFirebaseSdkNow`) តែ **មិនដែលប្រកាស** ➜ `ReferenceError` ➜ ជណ្តើរព្យាយាម ·
+  SDK ដែលមកយឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» ➜ ឥឡូវប្រកាស + កំណត់ `true` ពេល `initFirebase()` ជោគជ័យ។
+- 🔐 **ZoeKeyGen ៖ ប្តូរ Config ➜ auth ចាស់មិនរំខានសម័យថ្មី** (ផ្លូវបងប្អូនធៀប ZoeW) ៖ `initFirebase()` ផ្តាច់ listener auth ចាស់ · លុបពិដាន ៨ វិ. · ឡើង `authGeneration` **មុន**
+  `deleteApp()` (Firebase បញ្ជូន callback `null` ក្រោយ `deleteApp` ➜ បើកប្រអប់ចូល · `sbAdminReset()` លើ admin ដែលចូលរួច) · `setupAuthListener()` រក្សាពិដានតែមួយ
+  (`authRecoveryTimeout`) ➜ ការហៅលើកទី ២ មុន auth ឆ្លើយ មិនទុកពិដានចាស់ដែលលុប IndexedDB Firebase + reload លើ admin ដែលចូលរួចទេ។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN ខណៈ Generate Key ➜ ប៊ូតុង Generate មិនស្លាប់ · Signing Key ផុតពេលទំនេរបានវិញ** (deep audit) ៖ `closeModal('pinModal')` (បោះបង់ ឬ
+  PIN ត្រូវ សម្រាប់ ⚙️ Config …) និង `initFirebase()` ធ្វើឲ្យ session រសើបអស់សុពលភាព ➜ `generateLicenseKey()` បញ្ចប់ដោយមិនបង្ហាញ Key (ដូចមុន) តែ `finally` ក៏ពិនិត្យ session ដែរ ➜
+  `isGeneratingKey` ជាប់ `true` · ប៊ូតុង «កំពុងបង្កើត...» រហូតដល់ចាកចេញ ហើយ `expireIdleSigningKey()` (បដិសេធពេល `isGeneratingKey`) មិនដក Signing Key ចេញពីសតិទៀតទេ ➜
+  ឥឡូវសោ Generate មានម្ចាស់ (`generateKeyOwner` ដូច `noticeSendOwner`) ➜ សំណើដែលចាក់សោជាអ្នកដោះ · សំណើចាស់មិនដោះសោរបស់សំណើថ្មី។
+- 🔑 **ZoeKeyGen ៖ បិទប្រអប់ PIN កណ្តាលការកែ Key ➜ លទ្ធផល និង ✅ នៅបង្ហាញ** (deep audit · ថ្នាក់ដូចផ្ទាំង Supabase ខាងក្រោម) ៖ Generate · Extend · Revoke ·
+  ចំនួនឧបករណ៍ · ដោះឧបករណ៍ · ផ្ញើ/លុបដំណឹង ពិនិត្យជំនាន់ session រសើប (`isSensitiveSessionCurrent`) ក្រោយ `await` ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config ហើយបោះបង់) ឡើងជំនាន់នោះ ➜
+  ការសរសេរចុះ DB ពិត តែ App **ស្ងាត់** ៖ Key ដែល Generate ចុះក្នុង DB តែមិនបង្ហាញ (Key ខ្មោចក្នុងបញ្ជី ➜ អ្នកលក់ Generate ម្តងទៀត) · គ្មាន ✅ · បញ្ជីមិន Refresh ➜ ឥឡូវ
+  `adminOperationIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid` · `adminOwnerIsCurrent()` ដែលផ្ទាំង Supabase ប្រើ) + `authGeneration` ដដែល ➜ ការចាកចេញ ឬចូលវិញ (គណនីដដែល) នៅតែបោះលទ្ធផលចោល ·
+  ប្រតិបត្តិការសម្ងាត់ (Load/ស្តារ Signing Key · keypair · ចងក្រយៅដៃ · Clipboard) រក្សា `isSensitiveSessionCurrent()` ដដែល។
+- 🏪 **ZoeKeyGen ៖ បិទប្រអប់ PIN ក្រោយចូល Supabase Admin ➜ ផ្ទាំង «🏪 ហាង Supabase» នៅប្រើបាន** (deep audit) ៖ `sbAdminIsCurrent()` ពិនិត្យជំនាន់ session រសើប
+  ដែលចាប់ពេលចូល Supabase ➜ `closeModal('pinModal')` (ឧ. ⚙️ Config) · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ឡើងជំនាន់នោះ ➜ ផ្ទាំងនៅបង្ហាញ តែប៊ូតុង
+  បង្កើតហាង · ចេញកូដអញ្ជើញ · ពន្យារ · បិទ/បើក · កូដប្តូរពាក្យសម្ងាត់ · 🔄 Refresh **return ស្ងាត់** (គ្មានសារ) រហូតដល់ចាកចេញពី Supabase ហើយចូលម្តងទៀត ➜ ឥឡូវ
+  `adminOwnerIsCurrent()` = អ្នកប្រើ ZoeKeyGen ដដែល (`uid`) + UI ចូលរួច · session ផ្ទាំងដដែល (`sbAdminSession`) ➜ ការចាកចេញពី ZoeKeyGen នៅតែសម្អាតផ្ទាំងតាម
+  `showLoginModalWithPrefill()` ➜ `sbAdminReset()` ដូចមុន។
+- 🧰 **ZoeW ៖ Deploy ថ្មីចូលផ្សាយកណ្តាល install របស់ Service Worker ➜ App មិនស** (deep audit · «មិនទាន់វាស់ ៖ install `addAll` ពេល deploy ជាន់» ក្នុង Handoff) ៖
+  asset ឈ្មោះ hash របស់ deploy ចាស់លែងមាន ➜ Netlify (`/* ➜ /index.html 200`) ឆ្លើយ `index.html` ➜ `cache.addAll()` (status ok) រក្សា HTML ក្រោម key JS ចម្បង ➜
+  SW activate ➜ cache-first ផ្តល់ HTML ជំនួស JS ➜ App ស រហូតដល់ SW បន្ទាប់ (ច្បាប់ `responseFitsKey()` មានតែលើ fetch/ការធ្វើឲ្យស្រស់ មិនលើ install) ➜ ឥឡូវ
+  `shellEntriesFit()` ពិនិត្យ CORE ក្រោយ `addAll` ➜ HTML ក្រោម key មិនមែន HTML ➜ install ធ្លាក់ (browser សាក sw.js ថ្មីពេលក្រោយ) · OPTIONAL ដែលទទួល HTML ត្រូវលុបចេញពី
+  cache (SW នៅ activate · fetch ពេលប្រើពីបណ្តាញ)។
+- 🧰 **ZoeW + ZoeKeyGen ៖ ឯកសារគ្មាន hash ពី deploy ២ មិនលាយក្នុង cache តែមួយ** (ម្ចាស់គម្រោង «កែទាំងអស់» · ព្រំដែនដែលនៅសល់ពីធាតុខាងលើ) ៖ `index.html` ·
+  `boot-flags.js` · vendor · ZoeKeyGen ទាំងមូល មានឈ្មោះដដែលគ្រប់ deploy ➜ deploy ថ្មីចូលផ្សាយកណ្តាល install ➜ cache កំណែ N ផ្ទុកឯកសារ N+1 លាយ N (ក្រៅបណ្តាញ
+  `index.html` ថ្មីយោង asset ដែលគ្មានក្នុង cache) រហូតដល់ SW បន្ទាប់ ➜ ឥឡូវ ក្រោយ cache ពេញ `deployUnchangedDuringInstall()` អាន sw.js ដែលកំពុងផ្សាយ ៖ `CACHE_VERSION` ផ្សេង ➜
+  install ធ្លាក់ (browser install sw.js ថ្មីពេលពិនិត្យបន្ទាប់) · អានមិនបាន ឬព្យួរលើស `INSTALL_DEPLOY_CHECK_TIMEOUT_MS` (១០ វិ.) ➜ ទទួល (មិនមែនភស្តុតាងថាប្តូរ)។ ចំណាយ ៖
+  ការស្នើ sw.js ១ ដង/install (conditional `no-cache`)។
+- 💱 **ZoeW ៖ រក្សាអត្រាប្រាក់ព្យួរ ➜ ប្តូរ Config/backend ➜ ប៊ូតុង «រក្សាទុកអត្រាប្រាក់» ដើរវិញ** (deep audit) ៖ `exchangeRateSaveInFlight` រស់រានឆ្លង logout ដោយចេតនា
+  («settle ក្នុង late handler») តែវាស់លើ Firebase SDK ពិត (emulator) ៖ `set()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ late handler មិនរត់ ➜
+  សោជាប់ ➜ ចុចរក្សាទុក return 'pending' ស្ងាត់ (គ្មាន toast · ប្រអប់មិនបិទ) រហូតដល់ reload ➜ ឥឡូវ teardown ក្នុង `initFirebase()` ដោះសោនេះ (ការសរសេរចាស់ស្លាប់ជាមួយ App ចាស់)។
+- 🔎 **ZoeW ៖ កំពុងស្វែងរកលេខ ហើយអូសបញ្ជី ➜ ប្រអប់ស្វែងរកមិនបាត់** (រាយការណ៍ម្ចាស់គម្រោង ៖ រូប + «PWA iOS ពេលកំពុងស្វែងរក scroll list ទៅក្រោម បាត់ប្រអប់ស្វែងរក» ·
+  តំបន់ហាមឃាត់ ➜ វាស់ iOS និង Android ដោយផ្ទាល់) ៖ ទ្វារ ២ ដែលបង្កើតរោគសញ្ញាដូចគ្នាលើ **iOS និង Android** ៖ (ក) keyboard បើក · លទ្ធផលតិច (តារាងរមូរមិនបាន) ➜ ការអូសហូរទៅ
+  `#appPages` ➜ snap `proximity` ឈប់ត្រឹមក្បាល `.page-main` ➜ កាតស្វែងរកនៅក្រោម navbar · (ខ) keyboard បិទតែលេខនៅ (ប្រអប់នៅហូតឡើង) ➜ អូសឡើង = បង្រួមផ្ទាំងទាំងមូល
+  (`phoneSearchIsActive()` រាប់តែវាលដែល focus) · ហើយ (គ) បញ្ជីវែង ៖ ជួរចុងក្រោយនៅក្រោមអេក្រង់ (កាតបញ្ជីកម្ពស់ពេញអេក្រង់ ចាប់ផ្តើមក្រោមកាតស្វែងរក ➜ លើស ~៩៦px) ➜ ឥឡូវ
+  ពេលប្រអប់ហូតឡើង កាតបញ្ជីយកតែកន្លែងនៅសល់ក្រោមកាតស្វែងរក (`react-root.css` ៖ `.app-pages` `overflow-y: hidden` · ទំព័រសកម្ម `height: 100%` · `.page-main` `flex: 1 1 0` ដូច
+  `history-expanded` ➜ `#appPages` គ្មានអ្វីរមូរ ➜ គ្មានការហូរ គ្មាន snap) · `phoneSearchIsActive()` រាប់ `dataPanelSearchFocus` ដែរ ➜ ច្បាប់ «អូសឡើងមិនបិទផ្ទាំងពេលកំពុងស្វែងរក»
+  ពិតទាំង keyboard បិទ។ ដំណោះស្រាយដំបូង (snap `mandatory` តែត្រឹមកាតស្វែងរក) ទុកប្រអប់បាន តែវាស់ឃើញជួរចុងក្រោយនៃបញ្ជីវែងកាត់ពាក់កណ្តាល ➜ បោះបង់។
+  បញ្ជីវែងនៅរមូរខ្លួនឯងដូចដើម · ចុចដងអូសនៅបង្រួមបាន (ចេតនាច្បាស់) · អូសចុះនៅទាញប្រអប់ចុះវិញ។ សោតំបន់ហាម ៖ `panel-motion.ts` sha256 ថ្មីក្នុង `LOCK` (សំណើម្ចាស់គម្រោង ·
+  ហេតុផលខាងលើ)។
+- 💰 **ZoeW ៖ ឧបករណ៍ ២ សម្អាតកញ្ចប់ដដែលស្របគ្នា ➜ ធុងសំរាម ១ · ដកលុយ ១ ដង** (ម្ចាស់គម្រោង «កែទាំងអស់» · ផ្នែក ២ «ការដកពាក់កណ្តាល + `disconnect`») ៖
+  ឧបករណ៍ X claim barcode ដែលទុំ (commit ធម្មតា) · ឧបករណ៍ Y ផ្ញើពីទិដ្ឋភាពមុន X ហើយចម្លើយបាត់ ➜ ការអាន server ឃើញតម្លៃនៅសល់ដូចដែល Y ផ្ញើ ➜ `applied` ទោះ Y មិនមែនអ្នកដក ➜
+  (ក) ការដកពាក់កណ្តាល ៖ id ធុងសំរាមចៃដន្យ ➜ ធុងសំរាម ២ ច្បាប់ + ដក ២ ដង ពេលធុងសំរាមរបស់ X មិនទាន់មកដល់ទិដ្ឋភាព Y · (ខ) ទាំងមូល និងពាក់កណ្តាល ៖ X សរសេរធុងសំរាមដោយ
+  overwrite ➜ បើ Y កាន់ slot មុន X ការសរសេររបស់ X ជាន់ច្បាប់ Y ហើយដកម្តងទៀត ➜ ឥឡូវ ការ claim ពាក់កណ្តាលមាន id កំណត់ (`cleanupPartialTrashId()` ៖ ម៉ោង item + token នៃ
+  item · មូលហេតុ · barcode ដែល claim ជាមួយ `closedAt`/`restoredAt`) · ការសរសេរធុងសំរាមនៃការសម្អាត **ទាំងអស់** ឆ្លង slot create-if-absent (`claimCleanupTrashSlot()` ៖
+  commit ឬ slot មានច្បាប់របស់យើង (`deletedAt` ដដែល) = របស់យើង) · journal ចាប់ផ្តើមនៅ `slot` ➜ ដកតែម្តង មិនថាលំដាប់ណា។ ព្រំដែនដែលទទួលស្គាល់ ៖ ច្បាប់ចាស់ក្នុង slot ពីវដ្តមុន
+  (ការសរសេរធុងសំរាមធ្លាក់គ្រប់ការសាក តែចុះយឺត ហើយត្រូវស្តារចូលប្រវត្តិវិញ) ➜ ការ claim ដដែលបន្ទាប់មិនដក (ចំណូលខ្ពស់ មិនដក ២ ដង)។
+- 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
+  គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
+  ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
+  ឥឡូវ ៖ ការ resync លើកដំបូងក្នុងទំព័រ (ពេលបើក App) ទាញ `?op=config` ម្តង ➜ កូនសោខុស ➜ `unsubscribe()` + ជាវថ្មីដោយកូនសោថ្មី + ផ្ញើ endpoint ថ្មី · ជាវមិនបាន
+  (Safari ទាមទារការចុច) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ · កូនសោដូចគ្នា ➜ គ្មាន POST (ពិនិត្យតែម្តង/ទំព័រ មិនមែនរាល់ `visibilitychange`)។
+- 📲 **ZoeW ៖ ការចុះឈ្មោះ push ដែលធ្លាក់ ឬបាត់ពី server ➜ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង** (ម្ចាស់គម្រោង ៖ APK «ដើរហើយ» តែក្រោយ 🔔 ➜ 📲 បិទ ➜ បើក) ៖
+  `PUSH_RESYNC_MS` ២៤ ➜ **៦ ម៉ោង** (server បាត់ការចុះឈ្មោះបាន ៖ token FCM ប្តូរខណៈ App បិទ · ពិដាន `PUSH_SUBS_PER_KEY_MAX` ១០/Key ដកចាស់ចេញ ➜ ការបើក App
+  បន្ទាប់ចុះឈ្មោះឡើងវិញ) · ចម្លើយ server មិន `ok` (ឧ. ៥០៣ ពេល env បាត់) ➜ កត់ `failedAt` ➜ resync សាកម្តងទៀតក្រោយ `PUSH_RESYNC_RETRY_MS` (១៥ នាទី) ទោះ sync
+  ជោគជ័យចុងក្រោយថ្មី ⛔ មិនសាករាល់ `visibilitychange` · ទាំង APK (`onNativeToken`) និង web។ ចំណាយ ៖ ≤ ៤ POST/ថ្ងៃ/ឧបករណ៍ (តែពេលបើក App)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` ៖ តារាង ៣០ ករណី (ក្រុម · តម្រង iOS · Home Screen 26+ · បង្វិល · DPR ២,៨៨ · ទំហំមិនស្គាល់ ➜ `''` · តម្លៃខូច) · ស្លាកគ្រប់ទំហំ ≤ ៨០ ·
+  គ្មានឈ្មោះស្ទួន · `loadDeviceInfo()` ពិតផ្ញើ model ក្រុមទៅ License · `DeviceInfoLine` គ្មាន emoji (`\p{Extended_Pictographic}`) ➜ មុនកែ ៤/១៦ ធ្លាក់ · ក្រោយកែ ១៦/១៦។
+- `keylist-consistency-test` ៖ បន្ទាត់កៅអីទាំង ៣ គ្មាន emoji · serial មានស្លាក «Serial» ➜ មុនកែ ២ ធ្លាក់ (`📱 d1 · … · 🔖 1a2b…`) · ក្រោយកែ ៥០/៥០។
+- `function-surface-test` ផ្នែកថ្មី ៖ ឈ្មោះដែលអានតែគ្មានការប្រកាសក្នុង script ធម្មតា (eslint-scope លើ `<script src>` ពិតរបស់ index.html ទាំង ២ App + `ZoeKeyGen/sw.js`) ·
+  `sdk-offline-boot-test` ផ្នែក ៣ ៖ ZoeKeyGen ក្នុង Chromium ពិត · `connection-recovery-test` ៖ sandbox លែងប្រកាស `isDatabaseInitialized` ជំនួស App ➜ មុនកែ ទាំង ៣ ក្រហម ·
+  ក្រោយកែ ២៧/២៧ · ២៣០/២៣០ · ២៤/២៤។
+- `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
+  web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
+- `keygen-session-security-test` ៖ `closeModal('pinModal')` ពិតកណ្តាល Generate (ដំណាក់កាលម៉ោង Server · ការសរសេរ) ➜ សោដោះ · ប៊ូតុងប្រើបាន · Generate បន្ទាប់បង្ហាញ Key ➜
+  មុនកែ ៤ ធ្លាក់ (`isGeneratingKey: true · disabled: true`) · ក្រោយកែ ១២៩/១២៩ · បិទប្រអប់ PIN កណ្តាល Generate ➜ Key បង្ហាញ · កណ្តាលការសរសេរ Extend · Revoke · ចំនួនឧបករណ៍ ·
+  ដោះឧបករណ៍ ➜ ✅ + Refresh · ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញ (គណនីដដែល) ➜ គ្មាន ✅ · ការក្លែងការចាកចេញធ្វើដូច `logoutApp()` ពិត (`authGeneration++` · `invalidateSensitiveSession()` ·
+  `isSignedInUiActive = false`, អះអាងលើកូដពិត) ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ១៤២/១៤២ · `keygen-notice-test` ៖ បិទប្រអប់ PIN កណ្តាលការផ្ញើ/លុបដំណឹង ➜ ✅ + ទាញបញ្ជី ➜ មុនកែ ២ ធ្លាក់ ·
+  ក្រោយកែ ៨៣/៨៣។
+- `keygen-supabase-admin-test` ៖ `closeModal('pinModal')` ពិតក្រោយចូល Supabase ➜ 🔄 Refresh អានបញ្ជីហាងពិត · បង្កើតហាងបន្ទាប់ចុះ DB ➜ មុនកែ ១០ ធ្លាក់ (ការបង្កើតហាង ·
+  កូដអញ្ជើញ · បញ្ជី · XSS ទាំងអស់ return ស្ងាត់) · ក្រោយកែ ១០២/១០២ (Postgres ពិត)។
+- `sw-install-integrity-test` ជុំទី ៧ · ៧ខ (browser ពិត · build ពិត · deploy ជាន់មុនផ្ទុកទំព័រ ព្រោះ App ចុះឈ្មោះ sw.js ខ្លួនឯង) ៖ JS ចម្បងទទួល `index.html` ➜ install ធ្លាក់ ·
+  ម៉ាស៊ីនបម្រើធម្មតា ➜ install ដដែល activate ជាមួយ JS ពិត · OPTIONAL ទទួល HTML ➜ activate តែគ្មាន HTML ក្នុង cache ➜ មុនកែ ៤ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · checker SW ផ្សេង ៨ បៃតង ·
+  ជុំទី ៨ (App ទាំង ២ · ស្របគ្នា) ៖ ការស្នើ script របស់ browser (`Service-Worker: script`) ទទួល sw.js ពិត · ការអានពីក្នុង SW ទទួល sw.js `CACHE_VERSION` ផ្សេង ➜ install ធ្លាក់ ·
+  ទិសផ្ទុយ ៖ deploy ដដែល ➜ activate · 503 ➜ activate · ព្យួរ ➜ activate ក្នុងពិដាន (ដេរីវេពី sw.js ពិត) + ៨ វិ. ➜ មុនកែ ៦ ធ្លាក់ · ក្រោយកែ ៥៦/៥៦។
+- `ZoeW/tests/exchange-rate-backend-switch.test.ts` ៖ រក្សាអត្រាប្រាក់ព្យួរ (`dbOp` ផុត ➜ 'pending') ➜ `initFirebase()` ប្តូរ Config ➜ ការរក្សាទុកបន្ទាប់ 'done' តាម App ថ្មី · ទិសផ្ទុយ ៖
+  គ្មាន teardown ➜ ចុចលើកទី ២ នៅ 'pending' (គ្មានការសរសេរត្រួតគ្នា) ➜ មុនកែ ១ ធ្លាក់ (`'pending'`) · ក្រោយកែ ២/២។
+- `ios-panel-glide-test` ផ្នែក ៧ (build ពិត · Android និង iOS · ការអូសដោយម្រាមដៃពិត CDP) ៖ ចុចប្រអប់ ➜ ហូតឡើង · snap ផ្អាកអំឡុងចលនាហូតឡើង · បញ្ជីវែងរមូរខ្លួនឯង ·
+  វាយលេខ (លទ្ធផល ១) ➜ អូស ➜ ប្រអប់នៅ · blur តែលេខនៅ ➜ អូសឡើង ➜ មិនបង្រួម · ប្រអប់នៅ · បញ្ជីវែងរមូរដល់ចុង ➜ ជួរចុងក្រោយនៅលើរបា Tab ➜ មុនកែ ៦ ធ្លាក់
+  (`pagesTop 97 · cardTop −38` · `collapsed: true` · ជួរចុងក្រោយ ៧៩៥ > ៧១៨) · ក្រោយកែ ៥៦/៥៦ (ការអូសចាប់ផ្តើមកណ្តាលបញ្ជីដែលមើលឃើញ ៖ គែមកាត Android `::after` ចាប់ការចុច) ·
+  `phone-search-swipe-test` ៖ ប្រអប់ហូតឡើង · keyboard បិទ · លេខនៅ ➜ អូសឡើងមិនបង្រួម (ទិសផ្ទុយ ៖ មិនស្វែងរក ➜ បង្រួម) ➜ មុនកែ ១ ធ្លាក់ · ក្រោយកែ ៧១/៧១ ·
+  `history-window-check` (`native:check` · APK · PWA Android · PWA iPhone) ៖ ជំហាន [2.50.51] «រមូរប្រអប់ស្វែងរកចូលក្រោមរបាខាងលើ ➜ suggestion បិទ» លែងកើតបាន (ប្រអប់ហូតឡើង =
+  `#appPages` គ្មានអ្វីរមូរ) ➜ ប្តូរជាការធានាថ្មី ៖ `scrollTop = 500` មិនរុញប្រអប់ចូលក្រោមរបាខាងលើ · suggestion នៅបើកជាប់ក្រោមប្រអប់ (មិនអណ្តែតដាច់ ៖ គោលបំណងនៃសំណើ [2.50.51]) ➜
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ០ · ច្រកសុវត្ថិភាព «ប្រអប់ចេញពីផ្ទៃដែលមើលឃើញ ➜ suggestion បិទ» (navbar · visual viewport) នៅវាស់ក្នុង `phone-suggest-test` ·
+  អ្នកយាមតំបន់ហាមផ្សេង (`gesture-test` ១៣០ · `panel-motion-test` ១០៧ · `panel-snap-ownership-test` ៣០ · `page-nav-test` ៥៥) បៃតងលើ build ដែលកែ។
+- `money-guardian-test` ៖ mutation «ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច» ផ្លាស់ទៅ slot (`(current) => (current ? undefined : trashItem)` ➜ សរសេរជាន់) ព្រោះ
+  ខ្សែយុថ្កាចាស់ (`if (result.txOutcome === 'applied') {`) លែងមាន · `tx-outcome-test` ចាប់វា (ថ្ងៃ ៩២.២៥ ជំនួស ១០០) · mutation «អ្នកស្តារបញ្ចប់ការសម្អាតដែល *នៅរស់*»
+  (ដក `cleanupJournalLive.has()`) រួចខ្លួន ព្រោះ journal ចាប់ផ្តើមនៅ `slot` ➜ អ្នកស្តារឆ្លងកាត់ `resolveCleanupSlot()` ហើយ harness មិនធ្វើសមកាលកម្មទិដ្ឋភាពប្រវត្តិ (id នៅ ➜ «elsewhere»)
+  ➜ `cleanup-interrupt-atomicity-test` ៥ជ ធ្វើសមកាលកម្មទិដ្ឋភាពដូច listener ពិត ➜ mutant ៖ អ្នកស្តារកាន់ slot (`deletedAt` ដដែល = របស់យើង) ហើយដកលើកទី ២ លើផ្លូវ legacy
+  (២១៤.១) ➜ ចាប់បានវិញ · tree ស្អាត ៨២/៨២ ➜ ការពិនិត្យសោរស់នៅតែជាការការពារចាំបាច់។
+- `ZoeW/tests/cleanup-applied-ownership.test.ts` ១២–១៩ ៖ ឧបករណ៍ ២ ក្នុងហាងដដែល (store រួម · ទិដ្ឋភាពដាច់) ៖ ពាក់កណ្តាល abandon/close ៖ X ចប់មុន · Y `applied` ពីទិដ្ឋភាពមុន
+  (លក្ខខណ្ឌ ៖ តម្លៃនៅសល់ដែល Y ផ្ញើ = server) ➜ ធុងសំរាម ១ · ដក ១ ដង · X commit តែការសរសេរធុងសំរាមព្យួរ · Y សរសេរមុន ➜ X មិនជាន់ (ពាក់កណ្តាល និងទាំងមូល) · id ៖ លំដាប់ barcode
+  មិនប្តូរ id · `restoredAt`/`closedAt`/មូលហេតុ/សំណុំ/item ផ្សេង ➜ id ផ្សេង · ស្តារហើយ claim ម្តងទៀត ៦ ជុំ ➜ ប្រវែងដដែល (≤ ៦៤) · `ded/<trashId>` ចងនឹង id កំណត់ ➜ មុនកែ ៤ ធ្លាក់
+  (ធុងសំរាម ២ · ចំណូល ៨០ ជំនួស ៩០) · ក្រោយកែ ១៩/១៩ · ធាតុ ៦ (ការ claim ធម្មតាឆ្លង slot មិនមែន overwrite) ប្តូរតាមច្បាប់ថ្មី · `cleanup-journal-cap.test.ts` ព្យួរទ្វារ slot ដែរ
+  (មិនដូច្នោះការព្យួរដែលវាពិពណ៌នាមិនកើត) · checker sandbox (`partial-pickup-cleanup` · `cleanup-interrupt-atomicity` · `ledger-count-integrity` · `stall-lock-release` ·
+  `late-commit` · `db-stall-guard` · `restore-marker-hygiene` · `tx-outcome` · `policy-test` · `emu/crud-rules-flow`) ស្រង់ helper ថ្មី (មិនមាន tree ចាស់ ➜ stub) ហើយ fake
+  ព្យួរ/ចាំទ្វារ slot ដូចទ្វារ `update`។
+- `connection-recovery-test` ៖ ZoeKeyGen Reconfig មាន App ចាស់ ➜ auth ផ្តាច់ + ជំនាន់ឡើងមុន `deleteApp` · `setupAuthListener()` ២ ដង + auth ឆ្លើយលើ listener ថ្មី ➜
+  ពិដានចាស់មិនបាញ់ (ទិសផ្ទុយ ៖ គ្មាន auth ➜ ការស្តារ ១ ដង) ➜ មុនកែ ២ ធ្លាក់ (`authOffAtDelete: false` · `recoveries: 1`) · ក្រោយកែ ២៣៥/២៣៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Merge ➜ Deploy ZoeW + ZoeKeyGen (គ្មាន rules · migration · env ថ្មី)។
+2. iPhone (App លើ Home Screen) ៖ បើក ☰ ➜ ខាងក្រោមឃើញ «iPhone <model ឬក្រុម> · iOS …» និង «Serial (ID App) ៖ …» គ្មាន emoji · ពិនិត្យ Key ម្តង (បើក App ធម្មតា) ➜ ZoeKeyGen
+   បញ្ជី Key ➜ បន្ទាត់កៅអី «d1 · iPhone … · iOS … · Serial … · ចងនៅ …»។ ⚠️ បើបង្ហាញត្រឹម «iPhone» ៖ Settings ➜ Display & Brightness ➜ Display Zoom ➜ Default (Larger Text ប្តូរទំហំអេក្រង់) ·
+   ឬ model ថ្មីមិនទាន់ក្នុងតារាង ➜ ផ្ញើ `screen.width × screen.height × devicePixelRatio` មក។
+3. ZoeKeyGen (ជម្រើស) ៖ បិទ Wi-Fi/ទិន្នន័យ ➜ បើក ZoeKeyGen ➜ ឃើញ «⚠️ ភ្ជាប់ Server មិនបានទេ … កំពុងព្យាយាមម្តងទៀត...» ➜ បើកបណ្តាញវិញ ➜ ក្នុង ~៥–៣០ វិ.
+   App ភ្ជាប់/ផ្ទុកឡើងវិញដោយខ្លួនឯង (មិនបាច់ចុច Refresh)។
+4. Push ៖ ពិនិត្យតាម `ZoeW/README.md` ផ្នែក «ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App» ៖ `…/.netlify/functions/push?op=config` ➜ `web`/`fcm` = `true` ·
+   ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
+5. ZoeKeyGen (ជម្រើស) ៖ ចូល «🏪 ហាង Supabase» ➜ ចុច ⚙️ (ប្រអប់ PIN) ហើយបោះបង់ ➜ 🔄 Refresh / បង្កើតហាង នៅដើរ (មិនស្ងាត់) · Generate Key ហើយបើក/បិទប្រអប់ PIN ពេលកំពុងបង្កើត ➜
+   ប៊ូតុង «🔐 Generate Key» ត្រឡប់មកប្រើបាន ហើយ Key ដែលបានបង្កើតបង្ហាញ · Extend/Revoke Key ហើយបិទប្រអប់ PIN ពេលកំពុងរក្សាទុក ➜ ឃើញ ✅ និងបញ្ជីថ្មី។
+6. ⛔ **ZoeW ៖ សាកលើ iPhone (App លើ Home Screen) និង Android ពិតមុន merge** (តំបន់ហាមឃាត់ ៖ ការរមូរ · ផ្ទាំង) ៖ ទំព័រទិន្នន័យ ➜ ចុចប្រអប់ស្វែងរកលេខ ➜ វាយលេខដែលមានតែ
+   ១–២ នាក់ ➜ អូសបញ្ជីឡើង/ចុះ ➜ ប្រអប់ស្វែងរកនៅ · ចុច «Done»/បិទ keyboard ➜ អូសបញ្ជីឡើង ➜ ប្រអប់នៅ (ផ្ទាំងមិនបង្រួម) · វាយលេខខ្លី (លទ្ធផលច្រើន) ➜
+   រមូរដល់ចុង ➜ ជួរចុងក្រោយឃើញពេញ · លុបលេខ ឬអូសចុះ ➜ ប្រអប់ត្រឡប់ចុះ ·
+   មិនស្វែងរក ➜ អូសឡើងបង្រួមផ្ទាំង · PTR · ការអូសផ្ទាំង · ចលនាហូតឡើង នៅដូចដើម។ ផ្ញើវីដេអូខ្លីមក ប្រសិនបើខុស។
+7. ZoeW (ជម្រើស · ហាងដែលមានឧបករណ៍ច្រើន) ៖ ក្រោយ Deploy ពិនិត្យ 🗑️ ធុងសំរាមម្តងម្កាល ៖ កញ្ចប់ «ផុតកំណត់» ពាក់កណ្តាលមិនលេចជា ២ ជួរដូចគ្នា · ចំណូលប្រចាំថ្ងៃមិនធ្លាក់ទ្វេដង។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
@@ -3116,6 +3267,63 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-09 — Deep audit ៤ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ») ➜ [2.50.52]
+
+- 🔴 **ZoeKeyGen ៖ `isDatabaseInitialized` មិនដែលប្រកាស** (ការរកឃើញពិត · មានតាំងពី commit ដំបូងរបស់ repo `238d7f5`) ៖ function ជណ្តើរស្តារ SDK ចម្លងពី ZoeW
+  (`firebaseState.isDatabaseInitialized` ➜ ទិដ្ឋភាពអត្ថបទជា global) អានឈ្មោះនេះ ៤ កន្លែង តែ ZoeKeyGen មិនប្រកាស ➜ script ធម្មតា = `ReferenceError` ពេលបន្ទាត់រត់។
+  វាស់ក្នុង Chromium ពិត (gstatic បិទ · ពិដាន SDK ១៥ វិ. ➜ ០,៨ វិ.) មុនកែ ៖ `pageerror`/`unhandledrejection` «isDatabaseInitialized is not defined» ×២ · probe ទៅ host SDK **០** ·
+  ការរង់ចាំ SDK **១** (ជណ្តើរមិនដែលរត់) ខណៈ toast «កំពុងព្យាយាមម្តងទៀត...» · `firebasesdkready` យឺត ➜ `initializeApp` **០** ដង (listener បោះ) ➜ ZoeKeyGen ជាប់ «ក្រៅបណ្ដាញ»
+  រហូតដល់ចុច Refresh ដោយដៃ។ ក្រោយកែ ៖ ReferenceError ០ · ជណ្តើររត់ · SDK យឺត ➜ `initFirebase()` ពិត។
+- **ហេតុអ្វី checker បៃតងក្លែង** ៖ `connection-recovery-test` ស្រង់ function ZoeKeyGen ទៅ `vm` ហើយ **ប្រកាស `isDatabaseInitialized: false` ជំនួស App** (sandbox ទទួលយកអ្វីៗទាំងអស់ ·
+  CLAUDE.md «Warnings» ២) · `sdk-offline-boot-test` វាស់ browser តែ ZoeW។ ឥឡូវ sandbox ផ្តល់អថេរតែពេល App ប្រកាសវាពិត · ផ្នែក browser ZoeKeyGen ថ្មី ·
+  `function-surface-test` វិភាគ scope ពិតរបស់ script ធម្មតាទាំងអស់ពី `<script src>` (probe `ghostFlagNeverDeclared` ត្រូវរកឃើញ · ជាន់ការយោង ≥ ៥០០០/៨០០) ➜ ថ្នាក់ «អាន
+  ឈ្មោះគ្មានការប្រកាស» ទាំងមូល មិនមែនតែឈ្មោះនេះ។ ស្កេនបន្ថែម (ESLint `no-undef` · Node) ៖ `netlify/` · `tools/` · `firebase-backup/` · `supabase/scripts` ➜ ០។
+- 🔴 **Push ៖ កូនសោ VAPID ប្តូរ ➜ PWA «បើក» តែស្ងាត់** (ពីរបាយការណ៍ម្ចាស់គម្រោងក្នុង session នេះ) ៖ `subscribeWeb()` ពិនិត្យកូនសោ (ពេលចុចបើក) តែ `resyncPush()`
+  (ពេលបើក App · រាល់ ២៤ ម៉ោង) មិនពិនិត្យ ➜ subscription ដែលជាវដោយកូនសោចាស់ត្រូវផ្ញើទៅ server រៀងរហូត · push service បដិសេធ (៤០៣ VAPID មិនត្រូវ) ➜ `push-cron`
+  រាប់ `fail` (មិនមែន `gone` ➜ មិនលុប) ➜ គ្មានសញ្ញាណាមួយលើទូរស័ព្ទ។ មិនអាចវាស់ site ពិតពីទីនេះ (proxy បិទ `zoew.netlify.app`) ➜ មូលហេតុផ្សេងដែលនៅអាចមាន ៖ env ថ្មីមិនទាន់
+  Deploy · `FCM_SERVICE_ACCOUNT` ពី Project ផ្សេង (APK) · Xiaomi Autostart ➜ ការពិនិត្យដោយដៃក្នុង README។
+- **បានវាស់ ហើយមិនមែនកំហុស** ៖ Sentry ១៤ ថ្ងៃ (៧ issue) ៖ `JAVASCRIPT-REACT-D` (2.50.47 · បានកែក្នុង [2.50.49]) · `-7` · `-9` មានក្នុងផ្នែកនេះរួច · `-8`
+  (`permission_denied` ៧ event · APK ហាង Supabase · ១ ដង/ផ្លូវ/ការដាច់ ✓ `dbListenerReportedFailures`) · `-B`/`-C` «Database link unresponsive» (probe zombie socket ✓) ·
+  Supabase Project ផ្ទាល់ ៖ migration live ១៣ = repo ១៣ · advisor security ៖ `zoe_ops` RLS គ្មាន policy (ចេតនា ៖ ចូលតាម definer តែប៉ុណ្ណោះ) · **Leaked Password Protection បិទ**
+  (ការកំណត់ Auth ក្នុង Dashboard · ⏳ ម្ចាស់គម្រោងពិចារណា) · performance ៖ index FK ២ មិនទាន់ប្រើ (តារាងតូច) · listener ZoeW (`detachDatabaseListeners()` មុនភ្ជាប់ ·
+  generation gate គ្រប់ callback) · listener adapter Supabase (`app._unlisten`) · ZoeKeyGen `.info/*` · auth (detach មុន attach)។
+- 🟠 **ZoeKeyGen ៖ teardown auth ខុសពី ZoeW** (ផ្លូវបងប្អូន · `setupAuthListener` · `initFirebase` ក្នុង `EXPECTED_DIVERGENT` របស់ `shared-fns` ➜ គ្មានអ្នកយាមធៀប) ៖
+  ZoeW ផ្តាច់ auth/ពិដាន/ឡើងជំនាន់មុន `deleteApp` (ច្បាប់ «Stale callbacks») តែ ZoeKeyGen មិនធ្វើ ហើយពិដាន ៨ វិ. ជាអថេរក្នុង function ➜ កែក្នុង [2.50.52]។ ផលប៉ះពាល់
+  តិច (Config License ប្តូរកម្រ) តែជាថ្នាក់ដូច `isDatabaseInitialized` ៖ function ចម្លងពី ZoeW ដោយខ្វះស្ថានភាពរបស់វា។
+- 🔴 **ជុំបន្ត (session ដដែល) ៖ ថ្នាក់ «ជំនាន់ session រសើប ប្រើជាសញ្ញាសម្គាល់យូរ»** (ZoeKeyGen) ៖ `closeModal('pinModal')` · `clearSigningKey()` · Signing Key ផុតពេលទំនេរ ·
+  `initFirebase()` ឡើង `sensitiveSessionGeneration` ដើម្បីបោះបង់ប្រតិបត្តិការ PIN ដែលកំពុងហោះ តែ (១) `finally` របស់ `generateLicenseKey()` ដោះសោតែពេល session នៅ ➜
+  សោជាប់ (ប៊ូតុងស្លាប់ · `expireIdleSigningKey()` លែងដក Key) · (២) `sbAdminIsCurrent()` ពិនិត្យជំនាន់ដែលចាប់ពេលចូល Supabase ➜ ផ្ទាំងហាងទាំងមូល return ស្ងាត់ ➜ កែក្នុង
+  [2.50.52] (សោមានម្ចាស់ · `adminOwnerIsCurrent()` = `uid` + UI ចូលរួច)។ (៣) ប្រតិបត្តិការកែ Key (Generate · Revoke · Extend · ឧបករណ៍ · ដំណឹង) បោះសារ ✅/⏳ និង Key ដែល
+  Generate ពេលបិទប្រអប់ PIN កណ្តាលការសរសេរ (ការសរសេរនៅចុះ ➜ Key ខ្មោចក្នុងបញ្ជី) ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] (`adminOperationIsCurrent()` = `uid` +
+  `authGeneration`)។ ច្បាប់ ៖ ជំនាន់ session រសើបការពារតែប្រតិបត្តិការ **សម្ងាត់** (Signing Key · keypair · ក្រយៅដៃ · Clipboard) · ប្រតិបត្តិការ admin ចងនឹងអ្នកចូល។ checker ចាស់ក្លែង
+  «ចាកចេញ» ដោយ `invalidateSensitiveSession()` តែម្តង (= បិទប្រអប់ PIN មិនមែនការចាកចេញ) ➜ អះអាងចាស់លាក់ថ្នាក់នេះ ➜ ឥឡូវក្លែងដូច `logoutApp()` ពិត។
+- 🔴 **Service Worker ៖ deploy ជាន់កណ្តាល install** (ធាតុ «មិនទាន់វាស់» ក្នុង Handoff) ➜ វាស់ក្នុង browser ពិត ៖ `cache.addAll()` ទទួល `index.html` 200 ក្រោម key JS ចម្បង ➜
+  SW activate ➜ App ស ➜ កែក្នុង [2.50.52] (`shellEntriesFit()`)។ ព្រំដែនដែលនៅសល់ ៖ ឯកសារគ្មាន hash (vendor · `boot-flags.js` · ZoeKeyGen ទាំងមូល) អាចជាលាយ deploy N/N+1
+  បើ deploy ជាន់ចំកណ្តាល install (online ដើរ · ក្រៅបណ្តាញអាចខ្វះ asset ថ្មី រហូតដល់ SW បន្ទាប់) ➜ ដំណោះស្រាយដែលអាចធ្វើ ៖ ពិនិត្យ sw.js ពិតក្រោយ `addAll` (មាន `CACHE_VERSION` ដដែល ➜ ទទួល ·
+  ខុស ➜ install ធ្លាក់ · បណ្តាញធ្លាក់ ➜ ទទួល) ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52] (`deployUnchangedDuringInstall()` · App ទាំង ២)។
+- 🔬 **វាស់លើ Firebase SDK ពិត (emulator)** ៖ `set()` · `runTransaction()` · `get()` ដែលរង់ចាំ offline **មិន settle ទាល់តែសោះ** ក្រោយ `deleteApp()` ➜ សោដែលដោះតែក្នុង
+  `then`/late handler ជាប់រហូតក្រោយប្តូរ Config/backend ➜ `exchangeRateSaveInFlight` (ប៊ូតុងរក្សាទុកអត្រាប្រាក់ស្ងាត់) កែក្នុង [2.50.52] (teardown ដោះ ដូច
+  `historyPatchFlushInFlight` · `registryReleaseFlushInFlight`)។ សោផ្សេងបានពិនិត្យ ៖ `clearHistoryInFlight` · `pickupResetInFlight` · `deletedCleanupInFlight` · `phoneModalBusy` ·
+  `sessionExpiryCheckInFlight` · `notifyFeedInFlight` · `ztoWarmupInFlight` · push (`scheduleInFlight` · `busy`) មានពិដានគ្រប់ await ✓ · `cleanupResumeInFlight` រង់ចាំប្រតិបត្តិការ
+  ledger ដោយគ្មានពិដាន (ច្បាប់ «⛔ never give up on a time ceiling») ➜ ក្រោយប្តូរ Config ខណៈ resume ព្យួរ ការ resume បន្ទាប់រង់ចាំ reload (journal នៅដដែល · Web Lock របស់ entry ក៏ជាប់
+  ដោយ promise ស្លាប់) ➜ ពន្យារ មិនបាត់ · ព្រំដែនដែលទទួលស្គាល់។
+- **ការដកពាក់កណ្តាល + `disconnect` ពេលទិដ្ឋភាពធុងសំរាមចាស់** (`cleanupClaimAccountedElsewhere()`) ៖ ឧបករណ៍ ២ claim barcode ដដែលដែលទុំ ហើយមួយទទួល `applied` តាមការអាន REST
+  (តម្លៃនៅសល់ដូចគ្នា) ➜ ពិនិត្យតែធុងសំរាមក្នុងសតិ ➜ ទិដ្ឋភាពចាស់ ឬការសរសេរធុងសំរាមរបស់ឧបករណ៍ផ្សេងមិនទាន់មកដល់ ➜ `ours` ➜ ធុងសំរាម ២ + ដក ២ ដង។ ការប្តូរ `stale ➜ unknown`
+  ដោះដូរការដក ២ ដងនឹងកញ្ចប់បាត់ (គ្មានធុងសំរាម) ➜ មិនកែដោយសង្ស័យ។ ដំណោះស្រាយរចនាសម្ព័ន្ធ ៖ id ធុងសំរាមកំណត់ពី item + សំណុំ barcode ➜ `claimCleanupTrashSlot()` សម្រេចដូចការ claim
+  ទាំងមូល ➜ ម្ចាស់គម្រោង «កែទាំងអស់» ➜ កែក្នុង [2.50.52]។ ពេលសរសេរអ្នកយាម ឃើញថ្នាក់ធំជាង ៖ ការ claim ធម្មតា (ទាំងមូល និងពាក់កណ្តាល) សរសេរធុងសំរាមដោយ overwrite ➜ Y ដែល
+  `applied` ខុស ហើយកាន់ slot មុន X ➜ X ជាន់ ហើយដកម្តងទៀត (token ledger មាន `deletedAt` ផ្សេង ➜ `ded/<trashId>` មិនរារាំង) ➜ ការសរសេរធុងសំរាមនៃការសម្អាតទាំងអស់ឆ្លង slot។
+- 🔴 **ប្រអប់ស្វែងរកបាត់ពេលអូសបញ្ជី (រាយការណ៍ម្ចាស់គម្រោង)** ៖ probe ដំបូង (Chromium · iOS standalone ក្លែង · ចុចប្រអប់ ➜ អូស) **មិនឃើញ** ព្រោះមិនវាយលេខ ➜ បញ្ជីវែង
+  រមូរខ្លួនឯង ➜ ការអូសមិនដែលហូរទៅ `#appPages` (សំណួរ ៨ «សេណារីយ៉ូត្រូវចូលស្ថានភាពកំហុស»)។ វាយលេខឲ្យសល់ ១ ជួរ ➜ ឃើញភ្លាមលើ iOS **និង Android** (`pagesTop 96` ·
+  កាតនៅក្រោម navbar) ហើយ blur ➜ ទ្វារទី ២ (`collapse`)។ មេរៀន ៖ «មិនបានឃើញ» ≠ «គ្មាន» ➜ វាស់ស្ថានភាពដែលអ្នកប្រើពិពណ៌នា (កំពុងស្វែងរក = មានលេខ = លទ្ធផលតិច) ➜ កែក្នុង [2.50.52]។
+- **បានពិនិត្យ មិនមែនកំហុស** ៖ fuzz លុយ seed ថ្មី `FUZZ_RUN0=700 FUZZ_RUNS=24 FUZZ_OPS=90` PASS ៣/៣ («ឧបករណ៍ផ្សេងដក» ២៤ លំដាប់ · `ledgerBlip` applied ១៨ · lost ១៨) ·
+  `tools/supabase-migrate` (op_id កំណត់ពីទិន្នន័យ ➜ rerun = replay · ផ្ទៀងហាងក្រោយសរសេរ · ចាប់ការសរសេរពីឧបករណ៍ផ្សេង) · ZoeW គ្មាន sink HTML ឆៅ (`tel:` មាន prefix) ·
+  Edge Functions ចុះឈ្មោះ/ប្តូរពាក្យសម្ងាត់ · ការដោះ registry ជា batch (rules អនុញ្ញាតលុបជានិច្ច) · rules `exchange_rate` ·
+  Sentry ៩០ ថ្ងៃ ៖ events ទាំងអស់ `app: zoew` · `find_dropped_events` គ្មាន `filtered` (Allowed Domains មិនបោះ ZoeKeyGen) ➜ ZoeKeyGen ០ event = គ្មាន error
+  (ឬមិនទាន់មានអ្នកប្រើ) · adapter Supabase ផ្ញើ auth event តែពេលចូល/ចេញ/ស្តារ ➜ `phoneModalBusy` មិនជាប់ · CORS Edge Functions សម្រាប់ APK (`https://localhost` ក្នុង README) ·
+  `dispatchNotices` at-most-once (`onlyIfMatch` ledger) · ការទាញ 🔔 feed · push config មានពិដាន។
+- **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
+  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
+
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 
 - `positionPhoneSuggestBox()` ពិនិត្យតែ `rect.bottom < 0`៖ input នៅ `top=-4`, `bottom=40` ប៉ុន្តែ navbar បញ្ចប់នៅ `51` ➜ input លាក់ពេញ តែ suggestion នៅបើក។ ព្រំដែនថ្មីប្រើ navbar, appPages និង visual viewport; ពេលប្តូរ search-focus បិទមុន commit។
@@ -5056,7 +5264,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `network-pressure-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `network-timeout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `offline-shell-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `page-nav-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5169,6 +5377,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |

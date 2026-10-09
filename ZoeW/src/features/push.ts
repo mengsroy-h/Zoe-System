@@ -18,7 +18,8 @@ export const PUSH_FUNCTION_PATH = '/.netlify/functions/push';
 export const PUSH_STATE_KEY = 'zoew_push_v1';
 export const PUSH_TIMEOUT_MS = 12000;
 export const PUSH_NATIVE_REGISTER_TIMEOUT_MS = 20000;
-export const PUSH_RESYNC_MS = 24 * 60 * 60 * 1000;
+export const PUSH_RESYNC_MS = 6 * 60 * 60 * 1000;
+export const PUSH_RESYNC_RETRY_MS = 15 * 60 * 1000;
 export const PUSH_SCHEDULE_MIN_GAP_MS = 10 * 60 * 1000;
 export const PUSH_SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000;
 export const FCM_CHANNEL_ID = 'zoew_notify';
@@ -46,6 +47,7 @@ interface PushSaved {
     kind: string;
     token: string;
     syncedAt: number;
+    failedAt: number;
     schedSig: string;
     schedAt: number;
 }
@@ -57,7 +59,8 @@ export const pushRuntime = {
     nativeWatchdogSeq: 0,
     scheduleAttemptAt: 0,
     scheduleInFlight: false,
-    nativePendingToken: ''
+    nativePendingToken: '',
+    webKeyChecked: false
 };
 
 function readSaved(): PushSaved {
@@ -68,6 +71,7 @@ function readSaved(): PushSaved {
         kind: raw && typeof raw.kind === 'string' ? raw.kind : '',
         token: raw && typeof raw.token === 'string' ? raw.token : '',
         syncedAt: raw && typeof raw.syncedAt === 'number' ? raw.syncedAt : 0,
+        failedAt: raw && typeof raw.failedAt === 'number' ? raw.failedAt : 0,
         schedSig: raw && typeof raw.schedSig === 'string' ? raw.schedSig : '',
         schedAt: raw && typeof raw.schedAt === 'number' ? raw.schedAt : 0
     };
@@ -281,6 +285,7 @@ async function onNativeToken(token: string) {
         syncExpirySchedule(true);
         return;
     }
+    writeSaved({ failedAt: Date.now() });
     if (enabling || uiState.pushStatus !== 'on') setStatus(statusFromReply(reply));
 }
 
@@ -436,18 +441,37 @@ export function watchPushIdentity(): () => void {
     });
 }
 
+async function webSubscriptionForServerKey(reg: any, sub: any, due: boolean): Promise<any> {
+    const cfg = await fetchPushConfig();
+    const haveKey = sub.options && sub.options.applicationServerKey ? bytesToB64url(sub.options.applicationServerKey) : '';
+    if (!cfg || !cfg.web || !cfg.vapidPublicKey || !haveKey || haveKey === cfg.vapidPublicKey) return due ? sub : 'current';
+    try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
+    try {
+        return await pushStep(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(cfg.vapidPublicKey) }),
+            'Push subscribe timed out');
+    } catch (e) {
+        return false;
+    }
+}
+
 export function resyncPush(): Promise<boolean> {
     refreshPushStatus();
     const saved = readSaved();
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
-    if (elapsedSince(saved.syncedAt) < PUSH_RESYNC_MS) return Promise.resolve(false);
+    const due = saved.failedAt > saved.syncedAt ? elapsedSince(saved.failedAt) >= PUSH_RESYNC_RETRY_MS : elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS;
+    const keyCheck = pushSupport() === 'web' && !pushRuntime.webKeyChecked;
+    if (!due && !keyCheck) return Promise.resolve(false);
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);
     if (pushSupport() === 'native') {
         return loadNativePush().then(({ PN }) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
     }
+    pushRuntime.webKeyChecked = true;
+    let swReg: any = null;
     return withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
-        .then((reg: any) => pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out')).then((sub: any) => {
+        .then((reg: any) => { swReg = reg; return pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out'); })
+        .then((found: any) => (found ? webSubscriptionForServerKey(swReg, found, due) : null)).then((sub: any) => {
+        if (sub === 'current') return false;
         if (!sub) {
             writeSaved({ on: false, syncedAt: 0 });
             setStatus('off');
@@ -460,6 +484,7 @@ export function resyncPush(): Promise<boolean> {
             sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys }
         })) : null)).then((reply) => {
             if (reply && replyOk(reply)) writeSaved({ syncedAt: Date.now() });
+            else writeSaved({ failedAt: Date.now() });
             return !!reply && replyOk(reply);
         });
     }).catch(() => false);

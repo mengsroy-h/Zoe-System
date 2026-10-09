@@ -103,6 +103,7 @@ export async function initFirebase() {
             clearZtoPickupStatusStore();
             pendingHistoryPatches.clear();
             dataState.historyPatchFlushInFlight = false;
+            dataState.exchangeRateSaveInFlight = false;
             detachDatabaseListeners();
             detachInfoListeners();
             firebaseState.isDatabaseInitialized = false;

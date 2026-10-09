@@ -3089,6 +3089,9 @@
     },
     "ZoeW/tests/cleanup-ledger-key.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

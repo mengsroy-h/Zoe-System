@@ -175,6 +175,7 @@ function build(options) {
         'invalidateSensitiveSession',
         'captureSensitiveSession',
         'isSensitiveSessionCurrent',
+        ...(src.indexOf('function adminOperationIsCurrent(') !== -1 ? ['adminOwnerIsCurrent', 'adminOperationIsCurrent'] : []),
         'validateSigningKeyAgainstShippedPublicKey',
         'generateNewKeypair',
         ...(src.indexOf('function normalizeSigningKeyText(') !== -1 ? ['normalizeSigningKeyText'] : []),
@@ -197,7 +198,19 @@ function build(options) {
     return { ctx, license, log, elements, storage, getElementById };
 }
 
+// ⛔ ការចាកចេញពិត ៖ `logoutApp()` បង្កើន `authGeneration` ហើយ `showLoginModalWithPrefill()` ហៅ `invalidateSensitiveSession()` + `isSignedInUiActive = false`
+//    (អះអាងលើកូដពិតក្នុង run() ខាងក្រោម) ➜ ការក្លែងការចាកចេញត្រូវធ្វើទាំងបី មិនមែនតែបង្កើនជំនាន់ sensitive (ដែលការបិទប្រអប់ PIN ក៏ធ្វើដែរ)
+function simulateLogout(ctx) {
+    vm.runInContext('authGeneration++; invalidateSensitiveSession(); isSignedInUiActive = false;', ctx);
+}
+
 async function run() {
+    {
+        const body = (name) => { const m = src.match(new RegExp('\\nfunction ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}')); return m ? m[0] : ''; };
+        ok('លក្ខខណ្ឌការក្លែង ៖ logoutApp() ពិតបង្កើន authGeneration', /authGeneration\+\+/.test(body('logoutApp')));
+        ok('លក្ខខណ្ឌការក្លែង ៖ showLoginModalWithPrefill() ពិតហៅ invalidateSensitiveSession() + isSignedInUiActive = false',
+            /invalidateSensitiveSession\(\)/.test(body('showLoginModalWithPrefill')) && /isSignedInUiActive = false/.test(body('showLoginModalWithPrefill')));
+    }
     console.log('-- logout មុន keypair async ចប់ --');
     let h = build();
     const keypairWait = deferred();
@@ -230,7 +243,7 @@ async function run() {
     const generateTask = h.ctx.generateLicenseKey();
     await drain();
     ok('write ចាប់ផ្ដើមមុន simulate logout', h.log.updates === 1, h.log.updates);
-    h.ctx.invalidateSensitiveSession();
+    simulateLogout(h.ctx);
     writeWait.resolve();
     await generateTask;
     ok('Generated key មិនត្រូវបង្ហាញក្រោយ logout', h.getElementById('genResultKey').textContent === '');
@@ -282,6 +295,75 @@ async function run() {
     await newerGenerate;
     ok('សំណើថ្មីបញ្ចប់ដោយដោះសោ Generate ផ្ទាល់ខ្លួន', h.ctx.isGeneratingKey === false);
 
+    // ⛔ បិទប្រអប់ PIN (`closeModal('pinModal')` ពិត ➜ invalidateSensitiveSession) ខណៈ Generate កំពុងរង់ចាំ ៖ សំណើនោះបញ្ចប់ដោយមិនបង្ហាញ Key
+    //    ប៉ុន្តែ **ត្រូវដោះសោ Generate វិញ** ➜ ប៊ូតុងមិនស្លាប់ ហើយ `expireIdleSigningKey()` (ដែលបដិសេធពេល `isGeneratingKey`) ដក Signing Key បានវិញ។
+    //    កូដមុនកែ ៖ `finally` ពិនិត្យ session ➜ `isGeneratingKey` ជាប់ `true` រហូតដល់ចាកចេញ។
+    console.log('-- បិទប្រអប់ PIN ខណៈ Generate កំពុងរង់ចាំ --');
+    for (const stage of ['clock', 'write']) {
+        h = build({ privateKey: reloadKey });
+        vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', h.ctx);
+        h.getElementById('genDaysInput').value = '30';
+        const pending = deferred();
+        if (stage === 'clock') h.ctx.waitForServerTimeSync = () => pending.promise;
+        else h.ctx.fb.update = () => pending.promise;
+        const pinClosedGenerate = h.ctx.generateLicenseKey();
+        await drain();
+        ok(stage + ' ៖ Generate ចាក់សោមុនបិទប្រអប់ PIN', h.ctx.isGeneratingKey === true);
+        h.getElementById('pinModal').classList.add('active');
+        h.ctx.closeModal('pinModal');
+        pending.resolve(true);
+        await pinClosedGenerate;
+        await drain();
+        ok(stage + ' ៖ ⛔ បិទប្រអប់ PIN កណ្តាល Generate ➜ សោ Generate ដោះវិញ (ប៊ូតុងប្រើបាន · Signing Key ផុតពេលទំនេរបាន)',
+            h.ctx.isGeneratingKey === false && !h.getElementById('genGenerateBtn').disabled,
+            { isGeneratingKey: h.ctx.isGeneratingKey, disabled: h.getElementById('genGenerateBtn').disabled });
+        ok(stage + ' ៖ ⛔ បិទប្រអប់ PIN មិនមែនការចាកចេញ ➜ Key ដែលបានបង្កើត (ចុះ DB) នៅបង្ហាញ (មិនមែន Key ខ្មោចក្នុងបញ្ជី)',
+            h.ctx.lastGeneratedKey === 'signed-key' && h.getElementById('genResultKey').textContent === 'signed-key',
+            { lastGeneratedKey: h.ctx.lastGeneratedKey, shown: h.getElementById('genResultKey').textContent });
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
+        h.ctx.waitForServerTimeSync = () => Promise.resolve(true);
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-after-pin', payload: { id: 'synthetic-after-pin-id' } });
+        await h.ctx.generateLicenseKey();
+        ok(stage + ' ៖ Generate បន្ទាប់បង្ហាញ Key បាន', h.ctx.lastGeneratedKey === 'synthetic-after-pin', h.ctx.lastGeneratedKey);
+    }
+
+    // ⛔ ការកែ Key (Extend · Revoke · ចំនួនឧបករណ៍ · ដោះឧបករណ៍) ៖ បិទប្រអប់ PIN កណ្តាលការសរសេរ (`closeModal('pinModal')` ពិត) មិនមែនការចាកចេញ ➜
+    //    ✅ + Refresh បញ្ជីនៅបង្ហាញ។ ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញដោយគណនីដដែល (វគ្គថ្មី · `authGeneration` ថ្មី) ➜ ការសរសេរចាស់ចប់មិនប៉ះ UI វគ្គថ្មី។
+    console.log('-- បិទប្រអប់ PIN ខណៈការកែ Key កំពុងសរសេរ --');
+    for (const kind of ['extend', 'revoke', 'seat', 'release']) {
+        h = build();
+        vm.runInContext(slice(['closeModal', 'clearPinInputValues', 'clearKeypairOutputs']) + '\nvar pinTargetAction = null;', h.ctx);
+        if (kind === 'extend') { h.ctx.openExtendModal('key-a'); h.getElementById('extendDaysInput').value = '7'; }
+        const pending = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
+        h.ctx.fb.set = () => { h.log.updates++; return pending.promise; };
+        h.ctx.prompt = () => '2';
+        const task = kind === 'extend' ? h.ctx.confirmExtendKey() : kind === 'revoke' ? h.ctx.toggleRevokeKey('key-a')
+            : kind === 'seat' ? h.ctx.setKeySeatLimit('key-a') : h.ctx.releaseKeySeat('key-a');
+        await drain();
+        ok(kind + ' ៖ លក្ខខណ្ឌចាំបាច់ ៖ ការសរសេរចាប់ផ្តើមមុនបិទប្រអប់ PIN', h.log.updates >= 1, h.log.updates);
+        h.getElementById('pinModal').classList.add('active');
+        h.ctx.closeModal('pinModal');
+        pending.resolve();
+        await task;
+        await drain();
+        ok(kind + ' ៖ ⛔ បិទប្រអប់ PIN កណ្តាលការសរសេរ ➜ ✅ នៅបង្ហាញ + Refresh បញ្ជី',
+            h.log.toasts.some((t) => t.startsWith('✅')) && h.log.refreshed >= 1, { toasts: h.log.toasts, refreshed: h.log.refreshed, alerts: h.log.alerts });
+    }
+    {
+        h = build();
+        const pend = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return pend.promise; };
+        const task = h.ctx.toggleRevokeKey('key-a');
+        await drain();
+        vm.runInContext('invalidateSensitiveSession(); isSignedInUiActive = false; authGeneration++; isSignedInUiActive = true;', h.ctx);
+        pend.resolve();
+        await task;
+        await drain();
+        ok('ទិសផ្ទុយ ៖ ចាកចេញ ➜ ចូលវិញ (គណនីដដែល) ➜ ការសរសេរចាស់ចប់មិនបង្ហាញ ✅/Refresh លើវគ្គថ្មី',
+            !h.log.toasts.length && !h.log.refreshed, h.log);
+    }
+
     console.log('-- Signing Key ចាស់ក្នុង session --');
     h = build({ sessionRecord: JSON.stringify({ iv: [1], data: [2] }) });
     h.license.verifyKeyString = () => Promise.resolve({ valid: false });
@@ -328,7 +410,7 @@ async function run() {
         const pendingTask = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('key-a');
         await drain();
         ok(kind + '៖ write ចាប់ផ្តើមមុន logout', h.log.updates === 1, h.log.updates);
-        h.ctx.invalidateSensitiveSession();
+        simulateLogout(h.ctx);
         pendingWrite.resolve();
         await pendingTask;
         ok(kind + '៖ write ចាស់បញ្ចប់ក្រោយ logout មិនបង្ហាញ success/refresh/បិទ modal',
@@ -354,7 +436,7 @@ async function run() {
                 await drain();
                 ok(kind + '/' + failure + '/' + change + '៖ write ត្រូវចាប់ផ្តើមពិត', h.log.updates === 1);
                 if (change === 'db-only') h.ctx.db = { business: 'other' };
-                else h.ctx.invalidateSensitiveSession();
+                else simulateLogout(h.ctx);
                 if (failure === 'timeout') timed.reject(new Error('Update timed out'));
                 else pending.resolve();
                 await task; pending.resolve();
@@ -407,7 +489,7 @@ async function run() {
         await drain();
         timed.reject(new Error('Update timed out'));
         await task; await drain();
-        h.ctx.invalidateSensitiveSession();
+        simulateLogout(h.ctx);
         pending.resolve(); await drain(); await drain();
         ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
     }

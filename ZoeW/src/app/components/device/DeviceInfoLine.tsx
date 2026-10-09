@@ -8,8 +8,8 @@ export function DeviceInfoLine({ id }: { id: string }) {
     const serialLabel = info.serialKind === 'android-id' ? 'Serial (Android ID)' : 'Serial (ID App)';
     return (
         <div className="device-info-line" id={id}>
-            {name ? <span className="device-info-name">📱 {name}</span> : null}
-            {info.serial ? <span className="device-info-serial">🔖 {serialLabel} ៖ <span className="device-info-serial-value">{info.serial}</span></span> : null}
+            {name ? <span className="device-info-name">{name}</span> : null}
+            {info.serial ? <span className="device-info-serial">{serialLabel} ៖ <span className="device-info-serial-value">{info.serial}</span></span> : null}
         </div>
     );
 }

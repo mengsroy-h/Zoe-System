@@ -111,7 +111,7 @@ function buildEnv(src, opts) {
         lockerPanel: mkEl('lockerPanel'),
         dragHandle: mkEl('dragHandle'),
         phoneSuggestBox: mkEl('phoneSuggestBox'),
-        searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchActive ? '012' : '' })
+        searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchValue !== undefined ? o.searchValue : (o.searchActive ? '012' : '') })
     };
 
     const calls = { hideSuggest: 0, position: 0, frames: [], prevented: 0 };
@@ -462,6 +462,19 @@ console.log('\n=== កំពុងស្វែងរកលេខទូរស័�
     swipe(handlers, 'dataMainSection', 300, 200);
     ok(!els.dataSideSection.classList.contains('collapsed'),
         'វាយហើយ តែមិនទាន់មានលទ្ធផល ➜ នៅតែការពារ');
+}
+
+{
+    // ⛔ keyboard បិទ (blur) តែលេខនៅ ➜ ប្រអប់នៅហូតឡើង (`search-focus`) · បញ្ជីបង្ហាញលទ្ធផល ➜ អូសឡើងមិនត្រូវបង្រួមផ្ទាំង (កាតស្វែងរកបាត់ ៖ រាយការណ៍ម្ចាស់គម្រោង)
+    const { els, handlers } = buildEnv(src, { sideClasses: ['search-focus'], searchValue: '012' });
+    swipe(handlers, 'dataMainSection', 300, 200);
+    ok(!els.dataSideSection.classList.contains('collapsed') && els.dataSideSection.classList.contains('search-focus'),
+        'ប្រអប់ហូតឡើង · keyboard បិទ · លេខនៅ ➜ អូសឡើងមិនបង្រួម (ប្រអប់ស្វែងរកនៅ)');
+}
+{
+    const { els, handlers } = buildEnv(src, {});
+    swipe(handlers, 'dataMainSection', 300, 200);
+    ok(els.dataSideSection.classList.contains('collapsed'), 'ទិសផ្ទុយ ៖ មិនស្វែងរក ➜ អូសឡើងនៅបង្រួមដូចដើម');
 }
 
 console.log('\n=== ចុចដងអូស (drag handle) ជាផ្លូវច្បាស់លាស់របស់អ្នកប្រើ ===');

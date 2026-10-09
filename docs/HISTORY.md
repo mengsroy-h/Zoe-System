@@ -3120,7 +3120,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 - `positionPhoneSuggestBox()` ពិនិត្យតែ `rect.bottom < 0`៖ input នៅ `top=-4`, `bottom=40` ប៉ុន្តែ navbar បញ្ចប់នៅ `51` ➜ input លាក់ពេញ តែ suggestion នៅបើក។ ព្រំដែនថ្មីប្រើ navbar, appPages និង visual viewport; ពេលប្តូរ search-focus បិទមុន commit។
 - `.scanner-input-wrapper .icon` មាន `z-index: 1`; `.page-side` មិនមាន stacking context ពេលបើក ➜ icon ឆ្លងលើ `.page-main` ដែល transform បង្កើត context កម្រិត auto។ វាស់មុនកែ៖ hit-test ត្រឡប់ icon នៅ ៣ សំណាកកាតកញ្ចប់ និង ២ សំណាក Locker ក្នុង profile នីមួយៗ។ `isolation: isolate` រក្សា z-index របស់ scanner នៅក្នុងផ្ទាំងរបស់វា។
-- CI Audit ផ្នែក 4/4 លើ `c5f792e`៖ `phone-suggest-test` ទទួល `011200349` តែរំពឹង `011000349` ក្រោយការប្តូរលេខ fixture។ កែ generator/query/expectation ទាំងបីទៅលេខសំយោគដូចគ្នា; មិនដក assertion។
+- CI Audit ផ្នែក 4/4 លើ `c5f792e`៖ `phone-suggest-test` បង្កើតលេខដោយ prefix ចាស់ តែរំពឹង prefix សំយោគថ្មី ក្រោយការប្តូរលេខ fixture។ កែ generator/query/expectation ទាំងបីទៅលេខសំយោគដូចគ្នា; មិនដក assertion។
 - Reduce Motion៖ computed toast transition នៅតែ `0.25s` ទាំងពីរ App និងប៊ូតុង ZoeKeyGen នៅតែមាន transition។ សាកទាំង `reduce` និង `no-preference` ដើម្បីការពារការបិទចលនាធម្មតាខុសចេតនា។
 
 ### 2026-10-09 — Deep audit security (សំណើម្ចាស់គម្រោង ៖ «deep audit security ការពារ និងពង្រឹង និង leak secret» · «អ្នកយាមសម្រាប់ security គ្រប់ផ្នែក») ➜ [2.50.50]

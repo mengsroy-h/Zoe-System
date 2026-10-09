@@ -48,9 +48,8 @@
 0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · push ចុះឈ្មោះឡើងវិញពេលកូនសោ VAPID ប្តូរ (Deep audit ៤ ក្នុងផ្នែក ២) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
    ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-   ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ⏳ ការងារបន្ទាប់ ៖ APK មិនផ្ញើ token
-   ឡើងវិញដោយខ្លួនឯងក្រោយការចុះឈ្មោះធ្លាក់ (server 503 ពេល env បាត់ ➜ ស្ថានភាពនៅ «បើក» · `resyncPush()` native ខ្លាំងតែតាម `PUSH_RESYNC_MS` ២៤ ម៉ោង / ពេលបើក App)
-   ➜ សាងតេស្តដែលធ្លាក់មុនកែ (`push-client.test.tsx`) រួចកែឲ្យ resync ភ្លាមពេលការចុះឈ្មោះចុងក្រោយមិនជោគជ័យ។
+   ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ✅ កែរួច ៖ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង
+   (`PUSH_RESYNC_MS` ៦ ម៉ោង · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` ១៥ នាទី ➜ [2.50.52])។
 1. **`main`** = **ZoeW 2.50.51 · ZoeKeyGen 2.24.12** (PR #307 · `58d0aeb`) ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
    migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
    Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·
@@ -166,7 +165,11 @@
   គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
   ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
   ឥឡូវ ៖ ការ resync លើកដំបូងក្នុងទំព័រ (ពេលបើក App) ទាញ `?op=config` ម្តង ➜ កូនសោខុស ➜ `unsubscribe()` + ជាវថ្មីដោយកូនសោថ្មី + ផ្ញើ endpoint ថ្មី · ជាវមិនបាន
-  (Safari ទាមទារការចុច) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ · កូនសោដូចគ្នា ➜ គ្មាន POST (ពិនិត្យតែម្តង/ទំព័រ មិនមែនរាល់ `visibilitychange`)។ APK (FCM) មិនប៉ះ។
+  (Safari ទាមទារការចុច) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ · កូនសោដូចគ្នា ➜ គ្មាន POST (ពិនិត្យតែម្តង/ទំព័រ មិនមែនរាល់ `visibilitychange`)។
+- 📲 **ZoeW ៖ ការចុះឈ្មោះ push ដែលធ្លាក់ ឬបាត់ពី server ➜ ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង** (ម្ចាស់គម្រោង ៖ APK «ដើរហើយ» តែក្រោយ 🔔 ➜ 📲 បិទ ➜ បើក) ៖
+  `PUSH_RESYNC_MS` ២៤ ➜ **៦ ម៉ោង** (server បាត់ការចុះឈ្មោះបាន ៖ token FCM ប្តូរខណៈ App បិទ · ពិដាន `PUSH_SUBS_PER_KEY_MAX` ១០/Key ដកចាស់ចេញ ➜ ការបើក App
+  បន្ទាប់ចុះឈ្មោះឡើងវិញ) · ចម្លើយ server មិន `ok` (ឧ. ៥០៣ ពេល env បាត់) ➜ កត់ `failedAt` ➜ resync សាកម្តងទៀតក្រោយ `PUSH_RESYNC_RETRY_MS` (១៥ នាទី) ទោះ sync
+  ជោគជ័យចុងក្រោយថ្មី ⛔ មិនសាករាល់ `visibilitychange` · ទាំង APK (`onNativeToken`) និង web។ ចំណាយ ៖ ≤ ៤ POST/ថ្ងៃ/ឧបករណ៍ (តែពេលបើក App)។
 
 #### អ្នកយាម
 
@@ -177,7 +180,8 @@
   `sdk-offline-boot-test` ផ្នែក ៣ ៖ ZoeKeyGen ក្នុង Chromium ពិត · `connection-recovery-test` ៖ sandbox លែងប្រកាស `isDatabaseInitialized` ជំនួស App ➜ មុនកែ ទាំង ៣ ក្រហម ·
   ក្រោយកែ ២៧/២៧ · ២៣០/២៣០ · ២៤/២៤។
 - `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
-  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤។
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤ · ការចុះឈ្មោះធ្លាក់/បាត់ ៖ ពិដាន resync ≤ ៦ ម៉ោង · APK ៧ ម៉ោង ➜ `PN.register` · ៥០៣ ➜ `failedAt` + សាកក្រោយ ១៥ នាទី (មិនមុន) ·
+  web ធ្លាក់ ➜ មិនសាករាល់ការហៅ ➜ ក្រោយ ១៥ នាទីជោគជ័យ ➜ មុនកែ (`b01f5cf`) ៤ ធ្លាក់ · ក្រោយកែ ៤៨/៤៨។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

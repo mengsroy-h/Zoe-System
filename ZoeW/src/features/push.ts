@@ -18,7 +18,8 @@ export const PUSH_FUNCTION_PATH = '/.netlify/functions/push';
 export const PUSH_STATE_KEY = 'zoew_push_v1';
 export const PUSH_TIMEOUT_MS = 12000;
 export const PUSH_NATIVE_REGISTER_TIMEOUT_MS = 20000;
-export const PUSH_RESYNC_MS = 24 * 60 * 60 * 1000;
+export const PUSH_RESYNC_MS = 6 * 60 * 60 * 1000;
+export const PUSH_RESYNC_RETRY_MS = 15 * 60 * 1000;
 export const PUSH_SCHEDULE_MIN_GAP_MS = 10 * 60 * 1000;
 export const PUSH_SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000;
 export const FCM_CHANNEL_ID = 'zoew_notify';
@@ -46,6 +47,7 @@ interface PushSaved {
     kind: string;
     token: string;
     syncedAt: number;
+    failedAt: number;
     schedSig: string;
     schedAt: number;
 }
@@ -69,6 +71,7 @@ function readSaved(): PushSaved {
         kind: raw && typeof raw.kind === 'string' ? raw.kind : '',
         token: raw && typeof raw.token === 'string' ? raw.token : '',
         syncedAt: raw && typeof raw.syncedAt === 'number' ? raw.syncedAt : 0,
+        failedAt: raw && typeof raw.failedAt === 'number' ? raw.failedAt : 0,
         schedSig: raw && typeof raw.schedSig === 'string' ? raw.schedSig : '',
         schedAt: raw && typeof raw.schedAt === 'number' ? raw.schedAt : 0
     };
@@ -282,6 +285,7 @@ async function onNativeToken(token: string) {
         syncExpirySchedule(true);
         return;
     }
+    writeSaved({ failedAt: Date.now() });
     if (enabling || uiState.pushStatus !== 'on') setStatus(statusFromReply(reply));
 }
 
@@ -454,7 +458,7 @@ export function resyncPush(): Promise<boolean> {
     refreshPushStatus();
     const saved = readSaved();
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
-    const due = elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS;
+    const due = saved.failedAt > saved.syncedAt ? elapsedSince(saved.failedAt) >= PUSH_RESYNC_RETRY_MS : elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS;
     const keyCheck = pushSupport() === 'web' && !pushRuntime.webKeyChecked;
     if (!due && !keyCheck) return Promise.resolve(false);
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
@@ -480,6 +484,7 @@ export function resyncPush(): Promise<boolean> {
             sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys }
         })) : null)).then((reply) => {
             if (reply && replyOk(reply)) writeSaved({ syncedAt: Date.now() });
+            else writeSaved({ failedAt: Date.now() });
             return !!reply && replyOk(reply);
         });
     }).catch(() => false);

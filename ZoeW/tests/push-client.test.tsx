@@ -55,7 +55,8 @@ import { abandonAtOf, expiryScheduleTimes, loadNotifyDismissed, NOTIFY_DISMISSED
 import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
-    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity, resyncPush, b64urlToBytes
+    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity, resyncPush, b64urlToBytes,
+    PUSH_RESYNC_MS, PUSH_RESYNC_RETRY_MS
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -290,6 +291,74 @@ describe('⛔ web ៖ Server ប្តូរកូនសោ VAPID (លុប env
         expect(w.pushManager.subscribe).not.toHaveBeenCalled();
         expect(posts.filter((p) => p.op === 'subscribe').length).toBe(0);
         expect(order.filter((o) => o === 'fetch:config').length).toBe(1);
+        expect(uiState.pushStatus).toBe('on');
+    });
+});
+
+describe('⛔ ការចុះឈ្មោះ push ធ្លាក់ ឬបាត់ពី server ➜ ឧបករណ៍ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង (មិនបាច់បិទ/បើកដោយដៃ)', () => {
+    const TOKEN = 'fcmToken:' + 'r'.repeat(40);
+    function asApk() {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+    }
+    function saved() {
+        return JSON.parse(localStorage.getItem(PUSH_STATE_KEY) || '{}');
+    }
+
+    it('ពិដាន resync ខ្លីជាង ១ ថ្ងៃ ៖ server អាចបាត់ការចុះឈ្មោះ (ពិដាន ១០/Key · token ប្តូរ) ➜ ការបើក App បន្ទាប់ចុះឈ្មោះឡើងវិញក្នុងពីរបីម៉ោង', () => {
+        expect(PUSH_RESYNC_MS).toBeLessThanOrEqual(6 * 60 * 60 * 1000);
+        expect(PUSH_RESYNC_RETRY_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
+        expect(PUSH_RESYNC_RETRY_MS).toBeLessThan(PUSH_RESYNC_MS);
+    });
+
+    it('APK ៖ sync ចុងក្រោយ ៧ ម៉ោងមុន ➜ resyncPush() ចុះឈ្មោះ token ឡើងវិញ (PN.register)', async () => {
+        asApk();
+        stubServer();
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: TOKEN, syncedAt: Date.now() - 7 * 60 * 60 * 1000 }));
+        const before = pn.register.mock.calls.length;
+        expect(await resyncPush()).toBe(true);
+        expect(pn.register.mock.calls.length).toBe(before + 1);
+    });
+
+    it('APK ៖ server បដិសេធការចុះឈ្មោះ (503 env បាត់) ➜ កត់ failedAt · ស្ថានភាពនៅ «បើក» · ១៥ នាទីក្រោយ resync សាកម្តងទៀត ទោះ sync ជោគជ័យចុងក្រោយទើបតែ ១ ម៉ោង', async () => {
+        asApk();
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'fcm:unset' } } });
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: TOKEN, syncedAt: Date.now() - 60 * 60 * 1000 }));
+        refreshPushStatus();
+        expect(uiState.pushStatus).toBe('on');
+        await ensureNativePushListeners();
+        await pn.listeners.registration({ value: TOKEN });
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1));
+        await vi.waitFor(() => expect(saved().failedAt).toBeGreaterThan(saved().syncedAt));
+        expect(uiState.pushStatus).toBe('on');
+        const before = pn.register.mock.calls.length;
+        expect(await resyncPush()).toBe(false);
+        expect(pn.register.mock.calls.length).toBe(before);
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { failedAt: Date.now() - PUSH_RESYNC_RETRY_MS - 1000 })));
+        expect(await resyncPush()).toBe(true);
+        expect(pn.register.mock.calls.length).toBe(before + 1);
+    });
+
+    it('web ៖ ការផ្ញើ subscription ធ្លាក់ ➜ មិនសាករាល់ visibilitychange (រង់ចាំ PUSH_RESYNC_RETRY_MS) ➜ ក្រោយនោះសាកម្តងទៀត · ជោគជ័យ ➜ syncedAt ថ្មី', async () => {
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'vapid:unset' } } });
+        const sub = {
+            endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
+            options: { applicationServerKey: b64urlToBytes(VAPID).buffer },
+            toJSON() { return { endpoint: this.endpoint, keys: { p256dh: 'p256', auth: 'auth' } }; },
+            unsubscribe: vi.fn(async () => true)
+        };
+        const w = stubWebPush('granted', sub);
+        w.Notification.permission = 'granted';
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'web', syncedAt: Date.now() - PUSH_RESYNC_MS - 1000 }));
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1);
+        expect(saved().failedAt).toBeGreaterThan(0);
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1);
+        stubServer();
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { failedAt: Date.now() - PUSH_RESYNC_RETRY_MS - 1000 })));
+        expect(await resyncPush()).toBe(true);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(2);
+        expect(saved().syncedAt).toBeGreaterThan(saved().failedAt);
         expect(uiState.pushStatus).toBe('on');
     });
 });

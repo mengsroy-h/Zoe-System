@@ -198,7 +198,8 @@ try {
                     const box = document.getElementById('phoneSuggestBox');
                     const br = box ? box.getBoundingClientRect() : null;
                     const ir = input.getBoundingClientRect();
-                    samples.push({ t: now, card: card.getBoundingClientRect().top, inputBottom: ir.bottom,
+                    const pending = card.getAnimations().some((a) => a.pending);
+                    samples.push({ t: now, pending, card: card.getBoundingClientRect().top, inputBottom: ir.bottom,
                         open: !!window.uiState.phoneSuggestOpen && !!br && br.height > 0, boxTop: br ? br.top : null,
                         opacity: box ? Number(getComputedStyle(box).opacity) : 1 });
                     if (now - t0 < 700) requestAnimationFrame(step); else done();
@@ -224,10 +225,11 @@ try {
         const steps = [];
         for (let i = 1; i < follow.samples.length; i++) {
             const a = follow.samples[i - 1], b = follow.samples[i];
-            if (b.t - a.t <= 20) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
+            if (b.t - a.t <= 20 && !a.pending) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
         }
-        check(mode.label + ' ៖ ចលនាស្វែងរកមិនលោត ៖ ស៊ុមនីមួយៗ (≤ 20ms) ផ្លាស់ទី ≤ ២០% នៃចម្ងាយ',
-            dist > 20 && steps.length >= 4 && Math.max(...steps) <= 0.2, { dist, steps });
+        const started = follow.samples.filter((s) => s.pending).length;
+        check(mode.label + ' ៖ ចលនាស្វែងរកមិនលោត ៖ ស៊ុមនីមួយៗ (≤ 20ms · ចលនាចាប់ផ្តើមរួច) ផ្លាស់ទី ≤ ២០% នៃចម្ងាយ',
+            dist > 20 && started >= 1 && steps.length >= 8 && Math.max(...steps) <= 0.2, { dist, started, steps });
         const stall = await page.evaluate(async () => {
             const input = document.getElementById('searchPhoneInput');
             const card = input.closest('.app-card');

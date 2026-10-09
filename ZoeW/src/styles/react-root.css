@@ -249,6 +249,12 @@
     }
 }
 
+@media (max-width: 991px) {
+    .app-pages:has(> .app-page.active > .page-side.search-focus) { overflow-y: hidden; }
+    .app-pages:has(> .app-page.active > .page-side.search-focus) > .app-page.active { height: 100%; }
+    .app-page.active > .page-side.search-focus + .page-main { flex: 1 1 0; min-height: 0; height: auto; }
+}
+
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }
 .history-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }

@@ -617,7 +617,7 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
 - `.collapsed`/`.search-focus` and the `history-expanded` lock change at `touchend` (never mid-gesture on iOS);
   `touchcancel` drops the intent. ⛔ No `transition` on them (`max-height` from `none` can't animate); collapsed panels
   are `visibility: hidden`.
-- Swiping up never closes the panel during a search (`phoneSearchIsActive()`).
+- Swiping up never closes the panel during a search (`phoneSearchIsActive()`: suggestions open · the field focused with a value · or the search pulled up (`dataPanelSearchFocus`), keyboard closed included) (`ios-panel-glide-test` part 7 · `phone-search-swipe-test`).
 - iOS standalone: while the phone search is pulled up (`dataPanelSearchFocus`) or a scan-tab search field is focused, a document scroll (window `scroll` · `visualViewport` `scroll`) is a
   keyboard artifact (the root is locked, `#appPages` owns scrolling) ➜ `restoreIOSDocumentScroll()` returns it to 0 (`listenIOSDocumentScroll()` in
   boot, besides the `visualViewport` `resize` reset); other fields keep iOS's scroll-into-view; Android/web untouched (`ZoeW/tests/ios-search-viewport.test.ts`).
@@ -811,6 +811,7 @@ They never enter the cache ➜ if render-blocking, a dead network shows a white 
 | `.mrep-table` | `width: max-content; min-width: 100%` ⛔ not `width: 100%` | otherwise `nowrap` text overlaps instead of scrolling |
 | `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` = `padding-top`, which live in **two separate** `@media (max-width: 991px)` blocks ➜ edit one, check the other ⛔ never merge the blocks | PTR dies otherwise |
 | `#appPages.panel-gliding` | `scroll-snap-type: none` | snap fights the glide |
+| data search pulled up (`.page-side.search-focus`, `react-root.css`) | `.app-pages` `overflow-y: hidden` · `> .app-page.active` `height: 100%` · `.page-side.search-focus + .page-main` `flex: 1 1 0; min-height: 0; height: auto` (the list card takes only the space under the search card, like `history-expanded`) ⛔ never switch `.app-pages` `display` | the full-height card overflowed by the search card ➜ a short result list chained the drag to `#appPages` and snapped the search card under the navbar · a long list's last row sat below the screen |
 | `.app-pages.history-expanded` | `display: block` + `> .app-page.active { height: 100% }` ⛔ never switch `.app-pages` `display` by mode | rebuilding the whole layout tree on every drag (`panel-motion-test` part 8) |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | bar space inside the scroll container |
 | `.page-main` / `.app-card` clip | `--tabbar-height`, not `--chrome-bottom`; Android card edges are paint only | safe-area sits below the viewport |

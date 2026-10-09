@@ -20,7 +20,7 @@ const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
     'src/app/behaviors/pull-to-refresh.ts': '08b362228b442ba4323446c54926886696422bdfbe4c91f397f9fc0aafad15d3',
-    'src/app/behaviors/panel-motion.ts': '8997bf0a2cd3ac9d3a3d1da72a61b08e02443020f9f98da82949258cb18dc0c9',
+    'src/app/behaviors/panel-motion.ts': '80121c464a3da55e509f881aaae960c3e6de8dbb8d370c8875cc75a2f4210bf3',
     'src/app/behaviors/panels.ts': 'd63700ee43e3ce68f10ab31104b269d97d9db5676807f2a79e93fb231da56271',
     'src/app/behaviors/chrome-autohide.ts': '05afdce20767ec10babb70283a3cc7429ebaaf856c1addfe5c8d6f9f2f02b664',
     'src/app/behaviors/phone-search.ts': '50db80646372e0e9b93a215794976f23b0f7f898616da9a758df375025cb56cf',

@@ -304,7 +304,7 @@ const MEASURE_OWNERSHIP = async () => {
     ok('style.css មានប្លុក @supports (-webkit-touch-callout: none)', iosBlock !== null);
 
     const runs = {};
-    for (const mode of ['android', 'ios']) {
+    const openApp = async (mode) => {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, hasTouch: true, isMobile: true });
         const page = await ctx.newPage();
         page.on('dialog', (d) => d.accept());
@@ -345,10 +345,125 @@ const MEASURE_OWNERSHIP = async () => {
         }));
         ok(mode + ': iOS gate ត្រូវនឹងរបៀបដែលរំពឹងទុក',
             (mode === 'ios') === (gate.standalone && gate.callout), JSON.stringify(gate));
-
+        return { ctx, page };
+    };
+    for (const mode of ['android', 'ios']) {
+        const { ctx, page } = await openApp(mode);
         runs[mode] = await page.evaluate(MEASURE);
         runs[mode].ownership = await page.evaluate(MEASURE_OWNERSHIP);
         await ctx.close();
+    }
+
+    // ៧ — ⛔ ប្រអប់ស្វែងរកលេខទូរស័ព្ទដែលហូតឡើង (`search-focus`) មិនត្រូវបាត់ពេលអូសបញ្ជី (រាយការណ៍ម្ចាស់គម្រោង ៖ «PWA iOS ពេលកំពុងស្វែងរក scroll list
+    //    ទៅក្រោម បាត់ប្រអប់ស្វែងរក»)។ ទ្វារ ២ ៖ (ក) keyboard បើក · លទ្ធផលតិច (តារាងរមូរមិនបាន) ➜ ការអូសហូរទៅ `#appPages` ➜ snap ត្រឹមក្បាល `.page-main` ➜ កាត
+    //    ស្វែងរកនៅក្រោម navbar · (ខ) keyboard បិទ (blur) តែលេខនៅ ➜ អូសឡើង = `collapse` ➜ ផ្ទាំងទាំងមូល (រួមកាតស្វែងរក) លាក់។ ការអូសដោយម្រាមដៃពិត (CDP
+    //    `Input.dispatchTouchEvent`) ព្រោះ TouchEvent ក្លែង មិនរមូរ · Android និង iOS ដូចគ្នា។ ទិសផ្ទុយ ៖ បញ្ជីវែង ➜ តារាងរមូរខ្លួនឯង · snap នៅផ្អាកអំឡុងចលនាហូតឡើង។
+    const searchRuns = {};
+    for (const mode of ['android', 'ios']) {
+        const { ctx, page } = await openApp(mode);
+        const cdp = await ctx.newCDPSession(page);
+        const out = {};
+        const drag = async () => {
+            const box = await page.locator('#tableResponsive').boundingBox();
+            const x = box.x + box.width / 2;
+            // ចាប់ផ្តើមក្នុងបញ្ជីដែលមើលឃើញ (មិនមែនគែមកាតខាងក្រោម ៖ Android `::after` ចាប់ការចុចនៅលើរបា Tab)
+            const y0 = Math.round(box.y + Math.min(box.height, 400) * 0.8);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0, id: 1 }] });
+            for (let k = 1; k <= 12; k++) {
+                await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 - k * 25, id: 1 }] });
+                await page.waitForTimeout(16);
+            }
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            await page.waitForTimeout(900);
+        };
+        const view = () => page.evaluate(() => {
+            const card = document.getElementById('searchPhoneInput').closest('.app-card');
+            const side = document.getElementById('dataSideSection');
+            const title = card.getBoundingClientRect();
+            const nav = document.querySelector('.app-navbar').getBoundingClientRect();
+            const hit = document.elementFromPoint(title.left + title.width / 2, Math.max(title.top + 12, 0));
+            return {
+                visible: !!hit && card.contains(hit) && title.top >= nav.bottom - 1,
+                cardTop: Math.round(title.top), navBottom: Math.round(nav.bottom),
+                pagesTop: Math.round(document.getElementById('appPages').scrollTop),
+                tableTop: Math.round(document.getElementById('tableResponsive').scrollTop),
+                searchFocus: side.classList.contains('search-focus'), collapsed: side.classList.contains('collapsed'),
+                rows: document.querySelectorAll('#historyTableBody tr[data-id]').length,
+                focused: !!document.activeElement && document.activeElement.id === 'searchPhoneInput'
+            };
+        });
+        const phone = await page.evaluate(() => {
+            const row = document.querySelector('#historyTableBody tr[data-id]');
+            const m = row ? /0\d{8,9}/.exec(row.textContent || '') : null;
+            return m ? m[0] : '';
+        });
+        await page.evaluate(() => {
+            window.__searchGlideSnaps = [];
+            const pg = document.getElementById('appPages');
+            const until = performance.now() + 1500;
+            const tick = () => {
+                if (pg.classList.contains('panel-gliding')) window.__searchGlideSnaps.push(getComputedStyle(pg).scrollSnapType);
+                if (performance.now() < until) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+        const input = await page.locator('#searchPhoneInput').boundingBox();
+        await page.touchscreen.tap(input.x + 30, input.y + input.height / 2);
+        await page.waitForTimeout(1600);
+        out.glideSnaps = await page.evaluate(() => window.__searchGlideSnaps);
+        out.full = await view();
+        out.listEnd = await page.evaluate(async () => {
+            const tr = document.getElementById('tableResponsive');
+            const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+            for (let k = 0; k < 12 && tr.scrollHeight - tr.clientHeight - tr.scrollTop > 1; k++) {
+                tr.scrollTop = tr.scrollHeight;
+                await pause(350);
+            }
+            const rows = document.querySelectorAll('#historyTableBody tr[data-id]');
+            const last = rows[rows.length - 1].getBoundingClientRect();
+            const bar = document.getElementById('pageTabBar');
+            const visibleBottom = document.body.classList.contains('chrome-hidden') || !bar ? innerHeight : bar.getBoundingClientRect().top;
+            const end = { lastBottom: Math.round(last.bottom), visibleBottom: Math.round(visibleBottom), atEnd: Math.round(tr.scrollHeight - tr.clientHeight - tr.scrollTop),
+                pagesTop: Math.round(document.getElementById('appPages').scrollTop) };
+            tr.scrollTop = 0;
+            await pause(300);
+            return end;
+        });
+        await drag();
+        out.fullAfter = await view();
+        await page.keyboard.type(phone, { delay: 20 });
+        await page.waitForTimeout(900);
+        out.typed = await view();
+        await drag();
+        out.typedAfter = await view();
+        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+        await page.waitForTimeout(300);
+        await page.evaluate(() => { if (document.activeElement) document.activeElement.blur(); });
+        await page.waitForTimeout(700);
+        out.blurred = await view();
+        await drag();
+        out.blurredAfter = await view();
+        out.phone = phone;
+        searchRuns[mode] = out;
+        await ctx.close();
+    }
+    for (const [tag, r] of [['Android', searchRuns.android], ['iOS', searchRuns.ios]]) {
+        ok(tag + ': លក្ខខណ្ឌចាំបាច់ ៖ ចុចប្រអប់ស្វែងរក ➜ ហូតឡើង (`search-focus`) · ឃើញកាត',
+            r.full.searchFocus && r.full.visible && r.full.focused, JSON.stringify(r.full));
+        ok(tag + ': snap ផ្អាកអំឡុងចលនាហូតឡើង (`panel-gliding` ឈ្នះ)',
+            r.glideSnaps.length > 0 && r.glideSnaps.every((v) => v === 'none'), JSON.stringify(r.glideSnaps));
+        ok(tag + ': ⛔ ប្រអប់ហូតឡើង · បញ្ជីវែងរមូរដល់ចុង ➜ ជួរចុងក្រោយនៅខាងលើរបា Tab (កាតបញ្ជីយកតែកន្លែងនៅសល់ក្រោមកាតស្វែងរក)',
+            r.listEnd.atEnd <= 1 && r.listEnd.lastBottom <= r.listEnd.visibleBottom + 1 && r.listEnd.pagesTop <= 1, JSON.stringify(r.listEnd));
+        ok(tag + ': ទិសផ្ទុយ ៖ បញ្ជីវែង ➜ អូសឡើងរមូរតារាងខ្លួនឯង · កាតស្វែងរកនៅ',
+            r.fullAfter.tableTop > 0 && r.fullAfter.visible && !r.fullAfter.collapsed, JSON.stringify(r.fullAfter));
+        ok(tag + ': លក្ខខណ្ឌចាំបាច់ ៖ វាយលេខ «' + r.phone + '» ➜ លទ្ធផលតិច (តារាងរមូរមិនបាន)',
+            !!r.phone && r.typed.rows >= 1 && r.typed.rows <= 3 && r.typed.visible, JSON.stringify(r.typed));
+        ok(tag + ': ⛔⛔ keyboard បើក · អូសបញ្ជីលទ្ធផលតិច ➜ ប្រអប់ស្វែងរកនៅ (មិនរមូរទៅក្រោម navbar)',
+            r.typedAfter.visible && r.typedAfter.pagesTop <= 1 && r.typedAfter.searchFocus, JSON.stringify(r.typedAfter));
+        ok(tag + ': លក្ខខណ្ឌចាំបាច់ ៖ blur តែលេខនៅ ➜ នៅហូតឡើង (`search-focus`)',
+            r.blurred.searchFocus && !r.blurred.focused && r.blurred.visible, JSON.stringify(r.blurred));
+        ok(tag + ': ⛔⛔ keyboard បិទ · លេខនៅ · អូសឡើង ➜ ផ្ទាំងមិនបង្រួម · ប្រអប់ស្វែងរកនៅ',
+            r.blurredAfter.visible && !r.blurredAfter.collapsed && r.blurredAfter.pagesTop <= 1, JSON.stringify(r.blurredAfter));
     }
 
     const a = runs.android, i = runs.ios;

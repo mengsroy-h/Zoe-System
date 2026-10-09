@@ -743,6 +743,9 @@ function packagePlaces(server) {
         await settle(200);
         const journaled = Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1);
         const waiting = gate.waiters.length;
+        // ⛔ listener ប្រវត្តិពិតដកកញ្ចប់ចេញពីទិដ្ឋភាពភ្លាមក្រោយ claim commit ➜ ទិដ្ឋភាពក្នុងសតិត្រូវស្របនឹង server មុនអ្នកស្តាររត់ (ទិដ្ឋភាពចាស់ = អ្នកស្តារឆ្លើយ
+        //    «elsewhere» ដោយសារ id នៅក្នុងប្រវត្តិ ➜ លាក់ផ្លូវដែលអ្នកស្តារកាន់ slot ជាមួយ `deletedAt` ដដែល ហើយដកលុយម្តងទៀត)
+        run.box.scanHistory.splice(0, run.box.scanHistory.length, ...Object.values(run.server.history).map((v) => JSON.parse(JSON.stringify(v))));
         for (let i = 0; i < resumeCalls; i++) {
             try { vm.runInContext('resumeInterruptedCleanups();', run.ctx); } catch (e) {}
             await settle(150);

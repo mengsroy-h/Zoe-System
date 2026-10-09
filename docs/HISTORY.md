@@ -48,6 +48,9 @@
 0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · push ចុះឈ្មោះឡើងវិញពេលកូនសោ VAPID ប្តូរ (Deep audit ៤ ក្នុងផ្នែក ២) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
    ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
+   ✅ push ពិត (ម្ចាស់គម្រោង 2026-10-09) ៖ `?op=config` ➜ `web: true · fcm: true` · APK ៖ 🔔 ➜ 📲 បិទ ➜ បើក ➜ **លោតវិញ** ➜ ⏳ ការងារបន្ទាប់ ៖ APK មិនផ្ញើ token
+   ឡើងវិញដោយខ្លួនឯងក្រោយការចុះឈ្មោះធ្លាក់ (server 503 ពេល env បាត់ ➜ ស្ថានភាពនៅ «បើក» · `resyncPush()` native ខ្លាំងតែតាម `PUSH_RESYNC_MS` ២៤ ម៉ោង / ពេលបើក App)
+   ➜ សាងតេស្តដែលធ្លាក់មុនកែ (`push-client.test.tsx`) រួចកែឲ្យ resync ភ្លាមពេលការចុះឈ្មោះចុងក្រោយមិនជោគជ័យ។
 1. **`main`** = **ZoeW 2.50.51 · ZoeKeyGen 2.24.12** (PR #307 · `58d0aeb`) ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
    migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
    Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·

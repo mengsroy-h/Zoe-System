@@ -55,7 +55,7 @@ import { abandonAtOf, expiryScheduleTimes, loadNotifyDismissed, NOTIFY_DISMISSED
 import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, clearNotifications, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
     pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners,
-    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity
+    togglePush, PUSH_TIMEOUT_MS, PUSH_NATIVE_REGISTER_TIMEOUT_MS, watchPushIdentity, resyncPush, b64urlToBytes
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -114,7 +114,7 @@ beforeEach(() => {
     posts.length = 0;
     try { localStorage.clear(); } catch {}
     uiState.pushStatus = 'unknown';
-    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '' });
+    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false, nativePendingToken: '', webKeyChecked: false });
     pushNativeBuild.fcm = true;
     setLicense(LICENSE);
     delete (window as any).Capacitor;
@@ -225,6 +225,71 @@ describe('បើក/បិទ លើ web', () => {
         w.Notification.permission = 'granted';
         localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true }));
         refreshPushStatus();
+        expect(uiState.pushStatus).toBe('on');
+    });
+});
+
+describe('⛔ web ៖ Server ប្តូរកូនសោ VAPID (លុប env ហើយដាក់ថ្មី) ➜ subscription ចាស់ត្រូវជំនួស មិនមែន «បើក» ស្ងាត់', () => {
+    const OLD_VAPID = 'BOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldKeyOldK';
+    function oldSub() {
+        return {
+            endpoint: 'https://fcm.googleapis.com/fcm/send/old',
+            options: { applicationServerKey: b64urlToBytes(OLD_VAPID).buffer },
+            toJSON() { return { endpoint: this.endpoint, keys: { p256dh: 'oldp', auth: 'olda' } }; },
+            unsubscribe: vi.fn(async () => true)
+        };
+    }
+    function savedOn() {
+        appLocalStore.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'web', syncedAt: Date.now() }));
+    }
+
+    it('កូនសោ subscription ≠ កូនសោ server ➜ resyncPush() ជាវគ្គដំបូងក្នុងទំព័រ (ទោះ sync ក្នុង ២៤ ម៉ោង) ជាវ subscription ថ្មីដោយកូនសោថ្មី ➜ ផ្ញើ endpoint ថ្មី', async () => {
+        stubServer();
+        const existing = oldSub();
+        const w = stubWebPush('granted', existing);
+        w.Notification.permission = 'granted';
+        const fresh = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', options: { applicationServerKey: b64urlToBytes(VAPID).buffer },
+            toJSON() { return { endpoint: this.endpoint, keys: { p256dh: 'p256', auth: 'auth' } }; }, unsubscribe: vi.fn(async () => true) };
+        w.pushManager.subscribe.mockImplementation(async () => { w.pushManager.current = fresh; return fresh; });
+        savedOn();
+        expect(await resyncPush()).toBe(true);
+        expect(existing.unsubscribe).toHaveBeenCalledTimes(1);
+        expect(w.pushManager.subscribe).toHaveBeenCalledTimes(1);
+        const key = ((w.pushManager.subscribe.mock.calls[0] as any[])[0] as any).applicationServerKey as Uint8Array;
+        expect(Buffer.from(key).equals(Buffer.from(b64urlToBytes(VAPID)))).toBe(true);
+        const sent = posts.filter((p) => p.op === 'subscribe');
+        expect(sent.length).toBe(1);
+        expect(sent[0].body.sub.endpoint).toBe('https://fcm.googleapis.com/fcm/send/abc');
+        expect(uiState.pushStatus).toBe('on');
+        expect(JSON.parse(appLocalStore.getItem(PUSH_STATE_KEY) || '{}').on).toBe(true);
+    });
+
+    it('ជាវថ្មីមិនបាន (Safari ទាមទារ gesture) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ (អ្នកប្រើចុចបើកម្តងទៀត) · ⛔ មិនផ្ញើ subscription ចាស់', async () => {
+        stubServer();
+        const existing = oldSub();
+        const w = stubWebPush('granted', existing);
+        w.Notification.permission = 'granted';
+        w.pushManager.subscribe.mockImplementation(async () => { throw new DOMException('gesture required', 'NotAllowedError'); });
+        savedOn();
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(0);
+        expect(uiState.pushStatus).toBe('off');
+        expect(JSON.parse(appLocalStore.getItem(PUSH_STATE_KEY) || '{}').on).toBe(false);
+    });
+
+    it('ទិសផ្ទុយ ៖ កូនសោដូចគ្នា · sync ក្នុង ២៤ ម៉ោង ➜ គ្មាន POST · ពិនិត្យកូនសោតែម្តងក្នុងមួយទំព័រ (config មិនទាញរាល់ visibilitychange)', async () => {
+        stubServer();
+        const same = oldSub();
+        same.options.applicationServerKey = b64urlToBytes(VAPID).buffer;
+        const w = stubWebPush('granted', same);
+        w.Notification.permission = 'granted';
+        savedOn();
+        expect(await resyncPush()).toBe(false);
+        expect(await resyncPush()).toBe(false);
+        expect(same.unsubscribe).not.toHaveBeenCalled();
+        expect(w.pushManager.subscribe).not.toHaveBeenCalled();
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(0);
+        expect(order.filter((o) => o === 'fetch:config').length).toBe(1);
         expect(uiState.pushStatus).toBe('on');
     });
 });

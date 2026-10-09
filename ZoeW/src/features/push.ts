@@ -57,7 +57,8 @@ export const pushRuntime = {
     nativeWatchdogSeq: 0,
     scheduleAttemptAt: 0,
     scheduleInFlight: false,
-    nativePendingToken: ''
+    nativePendingToken: '',
+    webKeyChecked: false
 };
 
 function readSaved(): PushSaved {
@@ -436,18 +437,37 @@ export function watchPushIdentity(): () => void {
     });
 }
 
+async function webSubscriptionForServerKey(reg: any, sub: any, due: boolean): Promise<any> {
+    const cfg = await fetchPushConfig();
+    const haveKey = sub.options && sub.options.applicationServerKey ? bytesToB64url(sub.options.applicationServerKey) : '';
+    if (!cfg || !cfg.web || !cfg.vapidPublicKey || !haveKey || haveKey === cfg.vapidPublicKey) return due ? sub : 'current';
+    try { await pushStep(sub.unsubscribe(), 'Push unsubscribe timed out'); } catch (e) {}
+    try {
+        return await pushStep(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(cfg.vapidPublicKey) }),
+            'Push subscribe timed out');
+    } catch (e) {
+        return false;
+    }
+}
+
 export function resyncPush(): Promise<boolean> {
     refreshPushStatus();
     const saved = readSaved();
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
-    if (elapsedSince(saved.syncedAt) < PUSH_RESYNC_MS) return Promise.resolve(false);
+    const due = elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS;
+    const keyCheck = pushSupport() === 'web' && !pushRuntime.webKeyChecked;
+    if (!due && !keyCheck) return Promise.resolve(false);
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
     if (pushIdentityMissing()) return Promise.resolve(false);
     if (pushSupport() === 'native') {
         return loadNativePush().then(({ PN }) => ensureNativePushListeners(PN).then(() => PN.register())).then(() => true, () => false);
     }
+    pushRuntime.webKeyChecked = true;
+    let swReg: any = null;
     return withTimeout(navigator.serviceWorker.ready, PUSH_TIMEOUT_MS, 'Service worker not ready')
-        .then((reg: any) => pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out')).then((sub: any) => {
+        .then((reg: any) => { swReg = reg; return pushStep(reg.pushManager.getSubscription(), 'Push getSubscription timed out'); })
+        .then((found: any) => (found ? webSubscriptionForServerKey(swReg, found, due) : null)).then((sub: any) => {
+        if (sub === 'current') return false;
         if (!sub) {
             writeSaved({ on: false, syncedAt: 0 });
             setStatus('off');

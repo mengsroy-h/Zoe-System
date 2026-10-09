@@ -414,11 +414,25 @@ Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY
 **ការរៀបចំ (ម្តង · Netlify env របស់ site ZoeW)** ៖
 
 1. `node ZoeW/scripts/gen-vapid.mjs` ➜ ដាក់ `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` (⛔ សម្ងាត់) ក្នុង Netlify env ·
-   `VAPID_SUBJECT` ស្រេចចិត្ត (`mailto:…` ឬ `https://…` · លំនាំដើម = URL របស់ site)។ ⛔ ប្តូរកូនសោ ➜ ឧបករណ៍ទាំងអស់ត្រូវបើកម្តងទៀត។
+   `VAPID_SUBJECT` ស្រេចចិត្ត (`mailto:…` ឬ `https://…` · លំនាំដើម = URL របស់ site)។ ⛔ ប្តូរកូនសោ ➜ ទូរស័ព្ទ/កុំព្យូទ័រចុះឈ្មោះឡើងវិញ
+   ដោយខ្លួនឯងពេលបើក App លើកក្រោយ · iPhone ដែលមិនអនុញ្ញាតឲ្យចុះឈ្មោះដោយគ្មានការចុច ➜ ស្ថានភាពប្តូរជា «បិទ» ➜ ចុច **🔔 បើកការជូនដំណឹង** ម្តងទៀត។
 2. App Android ៖ Firebase Console របស់ **License Project** ➜ Project settings ➜ **Service accounts** ➜ Generate new private
    key ➜ ដាក់ JSON (ឬ base64 របស់វា) ក្នុង `FCM_SERVICE_ACCOUNT` (⛔ សម្ងាត់) · APK ៖ មើល [docs/ANDROID.md](docs/ANDROID.md)។
 3. Deploy ➜ Function `push` (ចុះឈ្មោះ · ដាស់ពី ZoeKeyGen) និង `push-cron` (រាល់ ៥ នាទី) រត់ដោយខ្លួនឯង · ទិន្នន័យ
    subscription រស់ក្នុង Netlify Blobs (`zoew-push`)។ គ្មាន env ➜ ផ្ទាំងប្រាប់ «Server មិនទាន់កំណត់» (អ្វីផ្សេងដើរធម្មតា)។
+   ⛔ កែ/លុប/ដាក់ env ឡើងវិញ ➜ ត្រូវ **Deploy ម្តងទៀត** (Netlify ➜ Deploys ➜ Trigger deploy) ទើប Function ឃើញតម្លៃថ្មី។
+
+**ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App** ៖
+
+1. បើក `https://<site ZoeW>/.netlify/functions/push?op=config` ក្នុង browser ➜ ត្រូវឃើញ `"web": true` (PWA · iPhone) និង `"fcm": true`
+   (App Android)។ `false` ➜ env ខ្វះ/ខុសទម្រង់ ឬមិនទាន់ Deploy ក្រោយកែ env។
+2. Netlify ➜ **Logs ➜ Functions ➜ `push-cron`** (មួយបន្ទាត់រាល់ ៥ នាទី) ៖ `"reason":"sent"` + ចំនួន `sent` · `fail` · `gone` = បានផ្ញើ ·
+   `"none"` = គ្មានដំណឹងថ្មី · `"stale"` = ដំណឹងចាស់ជាង ២៤ ម៉ោង (មិនផ្ញើ) · `"notices:read"` = អានដំណឹងពី License Project មិនបាន ·
+   `fail` > 0 ➜ កូនសោ VAPID ឬ `FCM_SERVICE_ACCOUNT` មិនត្រូវ Project (ត្រូវជា **License Project** ដដែលនឹង `google-services.json` របស់ APK)។
+3. ផ្ញើដំណឹងសាកពី ZoeKeyGen (ដំណឹងថ្មី) ➜ ទូរស័ព្ទទទួលក្នុង ≤ ៥ នាទី (ជាធម្មតាភ្លាម)។
+4. ទូរស័ព្ទ ៖ 🔔 ➜ **📲 ជូនដំណឹងលើទូរស័ព្ទ** ត្រូវប្រាប់ថាបើក · បិទ ➜ បើកម្តងទៀត (ចុះឈ្មោះថ្មី) · Android ៖ Settings ➜ Apps ➜ ZoeW ➜
+   Notifications បើក · Xiaomi/Redmi/OPPO/vivo ៖ បើក **Autostart** និង Battery ➜ **No restrictions** · iPhone ៖ បើកពីរូប App លើ Home Screen ·
+   Settings ➜ Notifications ➜ ZoeW បើក · Focus មិនបិទសំឡេងវា។
 
 ### ១២. App Android
 

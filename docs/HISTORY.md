@@ -45,7 +45,10 @@
 
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-1. **`main`** = **ZoeW 2.50.49 · ZoeKeyGen 2.24.10** ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
+0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
+   ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · push ចុះឈ្មោះឡើងវិញពេលកូនសោ VAPID ប្តូរ (Deep audit ៤ ក្នុងផ្នែក ២) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
+   ⛔ session នេះ ៖ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
+1. **`main`** = **ZoeW 2.50.51 · ZoeKeyGen 2.24.12** (PR #307 · `58d0aeb`) ៖ PR #288 ➜ #306 merge រួចទាំងអស់ ([2.50.48]–[2.50.49] = PR #306 · merge `19fd654` ·
    migration Supabase `20261009035130_zoe_rules` អនុវត្តលើ Project រួច (វាស់ `list_migrations`) · ⏳ Publish Firebase rules ទៅគ្រប់អតិថិជន Firebase ([2.50.49] សកម្មភាព ១))។
    Branch **`claude/dazzling-fermi-hycqee`** (ពី `main` `19fd654` · **មិនទាន់ merge**) ៖ [2.50.50] ជុំ security (Sentry Replay/tracing · CSP · លេខអតិថិជនពិតចេញពី repo ·
    `security-guard-test`) ➜ PR ថ្មី។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -85,6 +88,7 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — model iPhone · គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (branch `claude/blissful-curie-9ic58s` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ ឃើញ model/ក្រុម · ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs ([2.50.52] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
 - ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (PR #305 merge រួច · ម្ចាស់គម្រោងសាកលើ APK · PWA Android · PWA iPhone 2026-10-09 ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន មិនរលូន ➜ [2.50.48])** ៖ iPhone PWA · Android PWA · APK ៖ keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
@@ -155,6 +159,11 @@
 - 🌐 **ZoeKeyGen ៖ Firebase SDK ផ្ទុកមិនទាន់ពេលបើក ➜ App ភ្ជាប់ឡើងវិញដោយខ្លួនឯង** (deep audit · ផ្នែក ២ «Deep audit ៤») ៖ `isDatabaseInitialized`
   ត្រូវបានអាន ៤ កន្លែង (`armLateFirebaseSdkListener` · `scheduleFirebaseSdkRetry` ×២ · `retryFirebaseSdkNow`) តែ **មិនដែលប្រកាស** ➜ `ReferenceError` ➜ ជណ្តើរព្យាយាម ·
   SDK ដែលមកយឺត · handler `online` ដាច់ស្ងាត់ ខណៈ toast ថា «កំពុងព្យាយាមម្តងទៀត...» ➜ ឥឡូវប្រកាស + កំណត់ `true` ពេល `initFirebase()` ជោគជ័យ។
+- 📲 **ZoeW ៖ Server ប្តូរកូនសោ VAPID ➜ PWA ចុះឈ្មោះ push ឡើងវិញ** (រាយការណ៍ម្ចាស់គម្រោង ៖ «លុប env ហើយដាក់វិញ … ក្នុង app ឃើញការជូនដំណឹងពី ZoeKeyGen
+  គ្រាន់វាមិនលោត notification ពេលចេញពី app») ៖ `resyncPush()` ផ្ញើ subscription ដែលមានស្រាប់ឡើងវិញដោយមិនពិនិត្យថា `applicationServerKey` របស់វាស្មើកូនសោ server
+  ឥឡូវ ➜ ក្រោយប្តូរ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` server រក្សា subscription ចាស់ (ការផ្ញើធ្លាក់ `fail`) ខណៈ 🔔 បង្ហាញ «បើក» ➜ ស្ងាត់រហូតដល់អ្នកប្រើបិទ/បើកដោយដៃ។
+  ឥឡូវ ៖ ការ resync លើកដំបូងក្នុងទំព័រ (ពេលបើក App) ទាញ `?op=config` ម្តង ➜ កូនសោខុស ➜ `unsubscribe()` + ជាវថ្មីដោយកូនសោថ្មី + ផ្ញើ endpoint ថ្មី · ជាវមិនបាន
+  (Safari ទាមទារការចុច) ➜ ស្ថានភាព «បិទ» ដោយស្មោះ · កូនសោដូចគ្នា ➜ គ្មាន POST (ពិនិត្យតែម្តង/ទំព័រ មិនមែនរាល់ `visibilitychange`)។ APK (FCM) មិនប៉ះ។
 
 #### អ្នកយាម
 
@@ -164,6 +173,8 @@
 - `function-surface-test` ផ្នែកថ្មី ៖ ឈ្មោះដែលអានតែគ្មានការប្រកាសក្នុង script ធម្មតា (eslint-scope លើ `<script src>` ពិតរបស់ index.html ទាំង ២ App + `ZoeKeyGen/sw.js`) ·
   `sdk-offline-boot-test` ផ្នែក ៣ ៖ ZoeKeyGen ក្នុង Chromium ពិត · `connection-recovery-test` ៖ sandbox លែងប្រកាស `isDatabaseInitialized` ជំនួស App ➜ មុនកែ ទាំង ៣ ក្រហម ·
   ក្រោយកែ ២៧/២៧ · ២៣០/២៣០ · ២៤/២៤។
+- `ZoeW/tests/push-client.test.tsx` ៖ កូនសោ VAPID ប្តូរ ➜ ជាវថ្មី + endpoint ថ្មី · ជាវមិនបាន ➜ «បិទ» គ្មាន POST · ទិសផ្ទុយ ៖ កូនសោដូចគ្នា ➜ គ្មាន POST · config ១ ដង/ទំព័រ ➜
+  មុនកែ ៣ ធ្លាក់ · ក្រោយកែ ៤៤/៤៤។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -173,6 +184,8 @@
    ឬ model ថ្មីមិនទាន់ក្នុងតារាង ➜ ផ្ញើ `screen.width × screen.height × devicePixelRatio` មក។
 3. ZoeKeyGen (ជម្រើស) ៖ បិទ Wi-Fi/ទិន្នន័យ ➜ បើក ZoeKeyGen ➜ ឃើញ «⚠️ ភ្ជាប់ Server មិនបានទេ … កំពុងព្យាយាមម្តងទៀត...» ➜ បើកបណ្តាញវិញ ➜ ក្នុង ~៥–៣០ វិ.
    App ភ្ជាប់/ផ្ទុកឡើងវិញដោយខ្លួនឯង (មិនបាច់ចុច Refresh)។
+4. Push ៖ ពិនិត្យតាម `ZoeW/README.md` ផ្នែក «ពិនិត្យពេលដំណឹងបង្ហាញក្នុង 🔔 តែមិនលោតពេលចេញពី App» ៖ `…/.netlify/functions/push?op=config` ➜ `web`/`fcm` = `true` ·
+   ⛔ ក្រោយកែ env ក្នុង Netlify ➜ **Trigger deploy** · Logs ➜ Functions ➜ `push-cron` ➜ `reason`/`sent`/`fail` · iPhone ដែលបង្ហាញ «បិទ» ក្រោយ update ➜ ចុចបើកម្តងទៀត។
 
 ### [2.50.51] — 2026-10-09 · suggestion បិទពេលប្រអប់លាក់ · emoji scanner មិនលេចចូលកាត · Reduce Motion ទាំងពីរ App
 
@@ -3164,6 +3177,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   CLAUDE.md «Warnings» ២) · `sdk-offline-boot-test` វាស់ browser តែ ZoeW។ ឥឡូវ sandbox ផ្តល់អថេរតែពេល App ប្រកាសវាពិត · ផ្នែក browser ZoeKeyGen ថ្មី ·
   `function-surface-test` វិភាគ scope ពិតរបស់ script ធម្មតាទាំងអស់ពី `<script src>` (probe `ghostFlagNeverDeclared` ត្រូវរកឃើញ · ជាន់ការយោង ≥ ៥០០០/៨០០) ➜ ថ្នាក់ «អាន
   ឈ្មោះគ្មានការប្រកាស» ទាំងមូល មិនមែនតែឈ្មោះនេះ។ ស្កេនបន្ថែម (ESLint `no-undef` · Node) ៖ `netlify/` · `tools/` · `firebase-backup/` · `supabase/scripts` ➜ ០។
+- 🔴 **Push ៖ កូនសោ VAPID ប្តូរ ➜ PWA «បើក» តែស្ងាត់** (ពីរបាយការណ៍ម្ចាស់គម្រោងក្នុង session នេះ) ៖ `subscribeWeb()` ពិនិត្យកូនសោ (ពេលចុចបើក) តែ `resyncPush()`
+  (ពេលបើក App · រាល់ ២៤ ម៉ោង) មិនពិនិត្យ ➜ subscription ដែលជាវដោយកូនសោចាស់ត្រូវផ្ញើទៅ server រៀងរហូត · push service បដិសេធ (៤០៣ VAPID មិនត្រូវ) ➜ `push-cron`
+  រាប់ `fail` (មិនមែន `gone` ➜ មិនលុប) ➜ គ្មានសញ្ញាណាមួយលើទូរស័ព្ទ។ មិនអាចវាស់ site ពិតពីទីនេះ (proxy បិទ `zoew.netlify.app`) ➜ មូលហេតុផ្សេងដែលនៅអាចមាន ៖ env ថ្មីមិនទាន់
+  Deploy · `FCM_SERVICE_ACCOUNT` ពី Project ផ្សេង (APK) · Xiaomi Autostart ➜ ការពិនិត្យដោយដៃក្នុង README។
 - **បានវាស់ ហើយមិនមែនកំហុស** ៖ Sentry ១៤ ថ្ងៃ (៧ issue) ៖ `JAVASCRIPT-REACT-D` (2.50.47 · បានកែក្នុង [2.50.49]) · `-7` · `-9` មានក្នុងផ្នែកនេះរួច · `-8`
   (`permission_denied` ៧ event · APK ហាង Supabase · ១ ដង/ផ្លូវ/ការដាច់ ✓ `dbListenerReportedFailures`) · `-B`/`-C` «Database link unresponsive» (probe zombie socket ✓) ·
   Supabase Project ផ្ទាល់ ៖ migration live ១៣ = repo ១៣ · advisor security ៖ `zoe_ops` RLS គ្មាន policy (ចេតនា ៖ ចូលតាម definer តែប៉ុណ្ណោះ) · **Leaked Password Protection បិទ**

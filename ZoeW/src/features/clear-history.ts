@@ -101,6 +101,9 @@ export async function clearClearHistoryFinalization(id, token) {
 }
 
 export async function finalizeClaimedHistoryClear(id, token, trashItem) {
+    const finalizeDb = firebaseState.db;
+    const finalizeGeneration = firebaseState.authGeneration;
+    const finalizeIsCurrent = () => firebaseState.db === finalizeDb && firebaseState.authGeneration === finalizeGeneration;
     const updates = {
         [`zoew_clear_history_finalizations/${id}`]: { token, finalizedAt: getServerNow() },
         [`zoew_recently_deleted_cod_dod/${id}`]: trashItem,
@@ -108,6 +111,7 @@ export async function finalizeClaimedHistoryClear(id, token, trashItem) {
     };
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
+        if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
         try {
             await dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates));
             return;
@@ -125,6 +129,7 @@ export async function finalizeClaimedHistoryClear(id, token, trashItem) {
             } catch (readError) {
                 throw error;
             }
+            if (!finalizeIsCurrent()) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
             const finalization = finalizationSnapshot.exists() ? finalizationSnapshot.val() : null;
             if (!historySnapshot.exists() && trashSnapshot.exists() && finalization && finalization.token === token) return;
             const currentHistory = historySnapshot.exists() ? historySnapshot.val() : null;
@@ -151,8 +156,11 @@ export async function releaseOwnClearHistoryClaim(id, token) {
 }
 
 export async function deleteBesideTakenTrashSlot(id, token) {
+    const besideDb = firebaseState.db;
+    const besideGeneration = firebaseState.authGeneration;
     await releaseOwnClearHistoryClaim(id, token);
     activeClearHistoryClaims.delete(id);
+    if (firebaseState.db !== besideDb || firebaseState.authGeneration !== besideGeneration) throw new Error('CLEAR_HISTORY_SESSION_SWITCHED');
     const outcome = await deleteSingleItem(id, { confirmed: true, quiet: true });
     if (outcome === 'deleted') return;
     if (outcome === 'pending') throw new Error('CLEAR_HISTORY_DELETE_PENDING');
@@ -180,16 +188,21 @@ export async function clearHistory() {
     }
 
     dataState.clearHistoryInFlight = true;
+    const clearDb = firebaseState.db;
+    const clearGeneration = firebaseState.authGeneration;
+    const clearIsCurrent = () => firebaseState.db === clearDb && firebaseState.authGeneration === clearGeneration;
     let clearedCount = 0;
     let blockedCount = 0;
     let failedCount = 0;
     let stalled = false;
     try {
         for (const id of clearedIds) {
+            if (!clearIsCurrent()) return;
             const previous = activeClearHistoryClaims.get(id);
             const token = previous || generateClearHistoryClaimToken();
             try {
                 const claimedItem = await claimHistoryItemForClear(id, token);
+                if (!clearIsCurrent()) return;
                 activeClearHistoryClaims.set(id, token);
                 const trashItem = buildClearHistoryTrashItem(claimedItem, id);
                 if (!trashItem) throw new Error('CLEAR_HISTORY_SOURCE_INVALID');
@@ -202,9 +215,11 @@ export async function clearHistory() {
                     continue;
                 }
                 activeClearHistoryClaims.delete(id);
+                if (!clearIsCurrent()) return;
                 await clearClearHistoryFinalization(id, token).catch(() => {});
                 clearedCount++;
             } catch (error) {
+                if (!clearIsCurrent()) return;
                 const code = error && error.message;
                 if (code === 'CLEAR_HISTORY_DELETE_PENDING') { stalled = true; break; }
                 if (code === 'CLEAR_HISTORY_MISSING' || code === 'CLEAR_HISTORY_IN_PROGRESS' || code === 'RESTORE_IN_PROGRESS' || code === 'CLEAR_HISTORY_CLAIM_LOST') {

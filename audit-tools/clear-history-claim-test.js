@@ -125,6 +125,7 @@ function makeTab(app, shared, suffix) {
         console,
         db: shared.db,
         fb: shared.fb,
+        authGeneration: 0,
         getServerNow: () => shared.now,
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,

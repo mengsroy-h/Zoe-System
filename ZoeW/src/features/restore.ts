@@ -239,6 +239,12 @@ export async function executeRestoreItem() {
     if (!restoredId || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted) return;
     closeModal('restoreWarningModal');
     uiState.pendingRestoreId = null;
+    const restoreDb = firebaseState.db;
+    const restoreGeneration = firebaseState.authGeneration;
+    const restoreIsCurrent = () => firebaseState.db === restoreDb && firebaseState.authGeneration === restoreGeneration;
+    const stopIfSwitched = () => {
+        if (!restoreIsCurrent()) throw new Error('RESTORE_SESSION_SWITCHED');
+    };
     try {
         const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
         if (!safeIdPattern.test(restoredId)) {
@@ -252,13 +258,17 @@ export async function executeRestoreItem() {
             if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
             const previewItem = cloneRestoreItem(previewSnap.val());
             if (!previewItem) throw new Error('ALREADY_RESTORED');
+            stopIfSwitched();
             targetId = await findRestoreTargetId(previewItem);
+            stopIfSwitched();
         }
         const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
+        stopIfSwitched();
         activeRestoreClaims.set(restoredId, { token, targetId });
         if (claimed.replacedClaim && safeIdPattern.test(claimed.replacedClaim.targetId) && claimed.replacedClaim.targetId !== targetId) {
             targetId = claimed.replacedClaim.targetId;
             await bindRestoreClaimTarget(restoredId, token, targetId);
+            stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
         }
 
@@ -328,18 +338,24 @@ export async function executeRestoreItem() {
         };
 
         let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+        stopIfSwitched();
         if (prepared.targetChanged && targetId !== itemToRestore.id) {
             targetId = itemToRestore.id;
             await bindRestoreClaimTarget(restoredId, token, targetId);
+            stopIfSwitched();
             activeRestoreClaims.set(restoredId, { token, targetId });
             prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+            stopIfSwitched();
         }
         if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
         const restoredLedgerKey = restoreLedgerKeyFor(restoredTrash, restoredId, appliedRevenueDeltas);
         await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas, restoredLedgerKey);
+        stopIfSwitched();
         activeRestoreClaims.delete(restoredId);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
+        stopIfSwitched();
         const finalSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`)));
+        stopIfSwitched();
         const resultingLiveItem = finalSnap.exists() ? cloneRestoreItem(finalSnap.val()) : prepared.item;
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
             .map((restoredBc) => pickupBarcodeKey(restoredBc && restoredBc.code))
@@ -352,6 +368,10 @@ export async function executeRestoreItem() {
         updateRecentPhonesList();
         showToast("✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
     } catch (error) {
+        if (!restoreIsCurrent()) {
+            if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
+            return;
+        }
         const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));
         if (error && error.message === 'RESTORE_CLAIM_LOST') activeRestoreClaims.delete(restoredId);
         if (!alreadyRestored) {
@@ -413,12 +433,18 @@ export async function executePermanentDelete() {
     renderRecentlyDeleted();
     openRecentlyDeletedModal();
 
+    const purgeDb = firebaseState.db;
+    const purgeGeneration = firebaseState.authGeneration;
+    const purgeIsCurrent = () => firebaseState.db === purgeDb && firebaseState.authGeneration === purgeGeneration;
     try {
         await releaseStaleRestoreClaimForPurge(id);
+        if (!purgeIsCurrent()) return;
         await notifyIfSlow(deleteSingleDeletedItemFromFirebase(id), TRASH_WRITE_SLOW_NOTICE_MS,
             "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងលុបជាអចិន្ត្រៃយ៍… សូមកុំបិទ App។");
+        if (!purgeIsCurrent()) return;
         releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
     } catch (e) {
+        if (!purgeIsCurrent()) return;
         if (!dataState.deletedItems.some((i) => i && i.id === id)) {
             dataState.deletedItems.splice(Math.min(index, dataState.deletedItems.length), 0, purgedItem);
         }

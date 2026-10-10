@@ -1083,9 +1083,13 @@ export async function runAutomaticDeletedCleanup() {
     if (!candidates.length) return;
 
     dataState.deletedCleanupInFlight = true;
+    const purgeDb = firebaseState.db;
+    const purgeGeneration = firebaseState.authGeneration;
+    const purgeIsCurrent = () => firebaseState.db === purgeDb && firebaseState.authGeneration === purgeGeneration;
     try {
         const purgeable = [];
         for (const candidate of candidates) {
+            if (!purgeIsCurrent()) return;
             if (candidate.staleClaim) {
                 try {
                     await releaseStaleRestoreClaimForPurge(candidate.id);
@@ -1097,10 +1101,10 @@ export async function runAutomaticDeletedCleanup() {
             }
             purgeable.push(candidate);
         }
-        if (!purgeable.length) return;
+        if (!purgeable.length || !purgeIsCurrent()) return;
 
         const applyPurged = (list) => {
-            if (!list || !list.length) return Promise.resolve();
+            if (!list || !list.length || !purgeIsCurrent()) return Promise.resolve();
             const purgedSet = new Set(list.map((c) => c.id));
             dataState.deletedItems = dataState.deletedItems.filter(item => !purgedSet.has(item.id));
             let purgedBarcodes = [];
@@ -1121,6 +1125,7 @@ export async function runAutomaticDeletedCleanup() {
             let lastError = batchError;
             let stalled = false;
             for (const candidate of purgeable) {
+                if (!purgeIsCurrent()) return;
                 const singleWrite = purgeDeletedItemsQuietly([candidate.id]);
                 try {
                     await dbOp(singleWrite);

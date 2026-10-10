@@ -1881,6 +1881,9 @@
     "ZoeW/tests/cleanup-resume-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/session-switch-fuzz.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-deduct-order.test.ts": {
       "policy": "zoew-self-verification"
     },

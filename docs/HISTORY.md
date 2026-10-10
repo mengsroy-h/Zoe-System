@@ -187,6 +187,9 @@
   ការសរសេរធុងសំរាមឡើងវិញ (សម្អាត · លុប · ដក) និងការស្តារ barcode ចូលប្រវត្តិ ឈប់ពេលចាកចេញ/ប្តូរ Config កណ្តាលការសាក (មុន ៖ ការសាកលើកក្រោយសរសេរកញ្ចប់ហាង A
   ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល) · ការបន្តការសម្អាតដែលត្រូវរំខាន ឈប់ពេល session ប្តូរកណ្តាលផ្លូវ (មុន ៖ សរសេរធុងសំរាម និង **កាត់ប្រាក់**
   ក្នុងហាងថ្មី)។
+- 🔐 **ZoeW (Deep audit ៥ ជុំ ៣ · ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់ … ការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា»)** ៖ ចម្លើយ Firebase/Supabase ដែលមកដល់ក្រោយចាកចេញ
+  ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
+  **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
 - 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
   (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
   Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
@@ -208,6 +211,8 @@
   នៃការសរសេរនីមួយៗ) ➜ **ធ្លាក់ ៤/៥ មុនកែ** (ការសាកឡើងវិញសរសេរចូលហាង B) · ជាប់ ៥/៥។
   `ZoeW/tests/cleanup-resume-session.test.ts` (ថ្មី · ៥ · `resumeCleanupJournalEntry` ពិត · ប្តូរហាងនៅការអានធុងសំរាម · ក្រោយសរសេរធុងសំរាម · ពេលអាន slot · ក្រោយជំហាន ledger ខែ ·
   ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
+- ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
+  ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3391,6 +3396,19 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   stage `slot` ដូចគ្នា (៣) · ប្តូរក្រោយសរសេរធុងសំរាមក្នុង A ➜ កាត់ក្នុង B (៤)។ ការប្តូរកណ្តាលជំហាន ledger ខែមិនបន្តទៅថ្ងៃ (`commitLedgerEventStep()` ពិនិត្យ session ក្រោយ
   transaction រួច ➜ ២ ជាប់មុនកែ = អ្នកយាមទិសផ្ទុយ)។ ការកែ ៖ ចាប់ session នៅដើម `resumeCleanupJournalEntry()` · `resolveCleanupSlot()` · `settleCleanupDeduction()` ➜ ពិនិត្យក្រោយ
   `await` នីមួយៗ និងក្នុង closure នៃការសាក (`noRetry`) ➜ journal នៅសម្រាប់ហាងដើម។
+- **ជុំ ៣** (ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់នៅអ្វីដែលមិនទាន់វាស់ ជាពិសេសការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា» · «ផ្ទៀងផ្ទាត់ រកកំហុសទូទាំង project») ៖
+  ជំនួសការអានទ្វារម្តងមួយ (ក្រុមដដែលនៃកំហុសលេចតាមទ្វារជាច្រើន ➜ រចនាសម្ព័ន្ធ ➜ វាស់ជាសំណុំ) ➜ **fuzz ប្តូរ session** (`ZoeW/tests/session-switch-fuzz.test.ts`) ៖ ប្រតិបត្តិការសរសេរពិត ២៧ (ស្កេនរក្សាទុក · ដក · លុប ·
+  បិទ/បើក · កែតម្លៃ · កែលេខ · ការហៅ · Locker · សម្អាត ២ ម៉ោង/៨ ថ្ងៃ · sweep · resume ៣ stage · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · Reset · អត្រាប្រាក់ · registry claim/release ·
+  origin · purge · ដោះ clearClaim ចាស់ · ជួសជុល pickup) ➜ ចម្លើយនៃការហៅ Firebase ទី k មកដល់ក្រោយ macrotask ដែលប្តូរហាង (Database + `authGeneration` ថ្មី) ➜ ដំណើរការ
+  timer ៩០ វិ. (retry · ពិដាន `dbOp` · late commit) ➜ រាប់ការសរសេរដែលចេញក្រោយការប្តូរ (Supabase ៖ ការសរសេរក្រោយការប្តូរ = គណនីថ្មី = ហាងផ្សេង មិនថា ref ចាប់មុនឬអត់)។
+  កំណែដំបូងប្តូរហាងក្នុងកូដ synchronous (កណ្តាលការហៅ) ➜ artifact (ការប្តូរពិតកើតតែពេល event loop ទំនេរ) ➜ ប្តូរដោយ macrotask ➜ លទ្ធផលពិត ៖ **៦ ទ្វារលេច** ៖
+  ដក (transaction ប្រវត្តិឆ្លើយក្រោយការប្តូរ ➜ `finishRemoval()` ចាប់ session ថ្មី ➜ កាត់ ledger ថ្ងៃ/ខែ + ធុងសំរាមក្នុង B) · ស្តារ (គ្រប់ k ៖ claim · ប្រវត្តិ · finalize · mirror ក្នុង B) ·
+  លុបអចិន្ត្រៃយ៍ + purge (ដោះ registry ក្នុង B ➜ ការការពារស្កេនស្ទួនរបស់ B ខូច) · លុបទាំងអស់ (loop + retry finalize) · `repairPickupLedgerOnce()` (សំណុំ barcode + លេខទូរស័ព្ទ A ចូល B)។
+  ការកែ ៖ ចាប់ session នៅដើម ➜ ពិនិត្យក្រោយ `await` នីមួយៗ (ស្តារ ៖ sentinel `RESTORE_SESSION_SWITCHED` ➜ `catch` ឈប់ស្ងាត់ៗ + Sentry money · គ្មាន alert/អានទិដ្ឋភាពឡើងវិញក្នុង B) ·
+  «ដក» ចាប់ session នៅដើម (មិនមែននៅ `finishRemoval()`) ➜ late commit ក្រោយប្តូរ ➜ ឈប់ + Sentry money (ដូច «លុប» · ការសម្អាត)។ ៦ ទ្វារផ្សេង (បិទ/បើក · Locker · ការហៅ · កែលេខ ·
+  `reconcileCollectedHistory()` · `releaseBarcodesInRegistry()` · `saveBarcodeOrigins()` · `commitLedgerEventStep()`) មានការពិនិត្យរួច ➜ ជាប់មុនកែ។ ជួររង់ចាំ (`pendingRegistryReleases` ·
+  `pendingHistoryPatches`) សម្អាតពេលចាកចេញ (`clearSensitiveModalFields()`) និងប្តូរ Config (teardown) រួចហើយ។ ⛔ តំបន់ចាក់សោ ZTO (`zto-list-sync` · `zto-status` · `zto-shop-sweep`)
+  មិនកែ ៖ វាហៅ `claimBarcodeInRegistry()` · `addOrUpdateEntry()` · `applyBarcodeCloseChange()` ដែល fuzz វាស់ ➜ ជាប់ · `markZtoShopSweep()` សរសេរតែត្រាពេល (មិនមែនទិន្នន័យអតិថិជន)។
   ការផ្ទៀងផ្ទាត់ជុំ ២ ៖ vitest ១២៨ ឯកសារ · ១១៦៥/១១៦៥ · `tsc` ស្អាត · checker sandbox ១៩ ពាក់ព័ន្ធ ជាប់ · run-all STRICT (emulator RTDB រស់) លើ `2b72656` បញ្ឈប់ដោយចេតនា
   (រកឃើញ Migrate ក្រោយ commit) ➜ លើ `235e1b7` ៖ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង)។
   ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
@@ -5301,6 +5319,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `cleanup-clock-guard-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `clear-history-claim-test` | ផ្នែក ១ | — |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
@@ -5563,6 +5582,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |

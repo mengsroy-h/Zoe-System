@@ -2154,6 +2154,9 @@
     "ZoeW/tests/shop-pending-cleanup.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/shop-bound-ui-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-cookie-life.test.ts": {
       "policy": "zoew-self-verification"
     },

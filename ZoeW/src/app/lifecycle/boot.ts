@@ -12,10 +12,10 @@ import { CUSTOMER_TABLE_CACHE_MS } from '../../features/customer-table-prefetch'
 import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scanner-input';
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
+import { refreshShopBoundUi } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
-import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
-import { noteZtoUserActivity, refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
+import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
 import { scrollWindowToTop } from '../../platform/document-io';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
@@ -125,8 +125,7 @@ function startCoreServices(): void {
         ensureNativePushListeners();
         resyncPush();
     });
-    refreshZtoAutoCloseUi();
-    refreshZtoListSyncUi();
+    refreshShopBoundUi();
     prefetchCustomerDataTableRowsIfConfigured();
 }
 

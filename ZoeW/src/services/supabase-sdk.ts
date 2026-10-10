@@ -94,17 +94,24 @@ function createAuth(app, env) {
             ownSignOuts--;
         }
     };
+    const tenantOf = (row) => (row && row.tenant_id ? String(row.tenant_id) : '');
+    const noteTenant = (before) => {
+        if (tenantOf(auth._account) === before || typeof env.onTenantChanged !== 'function') return;
+        try { env.onTenantChanged(); } catch (e) { env.onListenerError(e); }
+    };
     const fire = () => {
         const current = auth.currentUser;
         auth._listeners.forEach((cb) => { try { cb(current); } catch (e) { env.onListenerError(e); } });
     };
     const setUser = (session) => {
         if (!session) {
+            const before = tenantOf(auth._account);
             auth.currentUser = null;
             auth._account = null;
             auth._accountUnverified = false;
             try { transport.writeAccount(null); } catch (e) {}
             if (app._db) app._db.setAuthed(false);
+            noteTenant(before);
             return;
         }
         if (auth.currentUser && auth.currentUser.uid === session.user.id) {
@@ -122,12 +129,14 @@ function createAuth(app, env) {
     };
     const blockedReason = (row) => (!row ? 'none' : row.status === 'active' ? null : (row.status === 'expired' ? 'expired' : 'revoked'));
     const applyAccount = (row, persist = true) => {
+        const before = tenantOf(auth._account);
         auth._account = row;
         app._tenantTopic = row && row.tenant_id ? 'zoe:' + row.tenant_id : null;
         if (persist && auth.currentUser) {
             try { transport.writeAccount({ uid: auth.currentUser.uid, row }); } catch (e) {}
         }
         if (app._db) app._db.setTenantTopic(app._tenantTopic);
+        noteTenant(before);
     };
     const verifyAccountNow = async () => {
         if (!auth.currentUser) return null;

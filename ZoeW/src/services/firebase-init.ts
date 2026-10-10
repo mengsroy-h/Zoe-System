@@ -4,6 +4,7 @@ import { pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
 import { appLocalStore, safeStoreGet } from '../core/storage';
 import { setupAuthListener } from '../features/auth';
 import { clearCustomerDataTableCache } from '../features/customer-table';
+import { refreshShopBoundUi } from '../features/lookup-config';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
@@ -25,6 +26,9 @@ function supabaseEnv() {
         },
         onAccountBlocked: (message) => {
             showToast('⚠️ ' + message);
+        },
+        onTenantChanged: () => {
+            refreshShopBoundUi();
         },
         onSessionEnded: (message) => {
             showToast('⚠️ ' + message);

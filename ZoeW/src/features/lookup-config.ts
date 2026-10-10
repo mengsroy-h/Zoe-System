@@ -14,6 +14,11 @@ import { fetchWithTimeout } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
+export function refreshShopBoundUi() {
+    refreshZtoAutoCloseUi();
+    refreshZtoListSyncUi();
+}
+
 export function getLookupApiConfig() {
     try {
         const raw = appLocalStore.getItem('zoew_lookup_api_config');
@@ -112,8 +117,7 @@ export async function saveLookupApiConfig() {
     clearZtoPickupStatusStore();
     setFieldValue('lookupApiHeaderValueInput', '');
     closeModal('lookupApiConfigModal');
-    refreshZtoAutoCloseUi();
-    refreshZtoListSyncUi();
+    refreshShopBoundUi();
     prefetchCustomerDataTableRowsIfConfigured();
     showToast(enabled ? "✅ បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "ℹ️ បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
     if (cfg.headerName && lookupApiIsAppsScript(cfg)) {

@@ -295,6 +295,76 @@ function serve(dir, blocked) {
         });
     }
 
+    // ជុំទី ៤ខ — ⛔ ZoeKeyGen ៖ ច្បាប់ដដែល («រាល់ fetch ដែលបំពេញ cache SW ប្រើ `cache: 'no-cache'`» · App ទាំង ២) ➜ ឯកសារ CORE
+    //    (`qrcode.js`) ដែល HTTP cache កាន់កំណែ A ជាមួយ `immutable` ត្រូវមិនចូល cache របស់ SW ថ្មី (B) ទេ។ វាស់ SW តែម្នាក់ឯង
+    //    មិនពឹង header របស់ `netlify.toml` (header ប្រែ ឬ CDN ចាស់ ➜ ZoeKeyGen ជាប់ឯកសារចាស់គ្រប់ install)។
+    {
+        const kgDir = path.join(ROOT, 'ZoeKeyGen');
+        const kgSw = fs.readFileSync(path.join(kgDir, 'sw.js'), 'utf8');
+        const kgCv = /zoekeygen-v\d+/.exec(kgSw);
+        const kgCore = /const CORE_SHELL = \[([\s\S]*?)\];/.exec(kgSw);
+        ok('ជុំទី ៤ខ ៖ ZoeKeyGen ៖ `qrcode.js` ជា CORE និង CACHE_VERSION ក្នុង sw.js ពិត',
+            !!(kgCv && kgCore && kgCore[1].indexOf("'./qrcode.js'") !== -1), kgCv && kgCv[0]);
+        const realQr = fs.readFileSync(path.join(kgDir, 'qrcode.js'), 'utf8');
+        const kgState = { tag: 'A', qrHits: 0 };
+        const kgServer = await new Promise((res) => {
+            const s = http.createServer((req, rsp) => {
+                let p = decodeURIComponent(req.url.split('?')[0]);
+                if (p === '/') p = '/index.html';
+                if (p === '/qrcode.js') {
+                    kgState.qrHits++;
+                    const etag = '"q-' + kgState.tag + '"';
+                    if (req.headers['if-none-match'] === etag) { rsp.writeHead(304, { ETag: etag }); return rsp.end(); }
+                    rsp.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=31536000, immutable', ETag: etag });
+                    return rsp.end(realQr + '\n//zoe-mark-' + kgState.tag);
+                }
+                if (p === '/sw.js' && kgCv) {
+                    rsp.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
+                    return rsp.end(kgSw.split(kgCv[0]).join(kgCv[0] + '-' + kgState.tag.toLowerCase()));
+                }
+                const f = path.join(kgDir, p);
+                if (!f.startsWith(kgDir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                rsp.end(fs.readFileSync(f));
+            });
+            s.listen(0, '127.0.0.1', () => res(s));
+        });
+        const kgOrigin = 'http://127.0.0.1:' + kgServer.address().port;
+        const kgBrowser = await chromium.launch({ executablePath: CHROME, args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'] });
+        const kgPage = await (await kgBrowser.newContext({ viewport: { width: 412, height: 780 } })).newPage();
+        await kgPage.goto(kgOrigin + '/', { waitUntil: 'load', timeout: 30000 }).catch(() => {});
+        const kgTag = (suffix) => kgPage.evaluate(async (suffix) => {
+            for (let i = 0; i < 80; i++) {
+                for (const k of await caches.keys()) {
+                    if (!k.endsWith(suffix)) continue;
+                    const r = await (await caches.open(k)).match('./qrcode.js');
+                    if (!r) continue;
+                    const text = await r.text();
+                    const m = /zoe-mark-([A-Z])\s*$/.exec(text);
+                    return { key: k, tag: m ? m[1] : null };
+                }
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            return { key: null, tag: null };
+        }, suffix).catch((e) => ({ key: null, tag: null, error: String(e && e.message) }));
+        await kgPage.evaluate(() => navigator.serviceWorker.register('./sw.js').then(() => Promise.race([
+            navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 20000))
+        ]))).catch(() => {});
+        const kgFirst = await kgTag('-a');
+        ok('ជុំទី ៤ខ ៖ ZoeKeyGen ៖ SW ដំបូងចាក់ `qrcode.js` កំណែ A ចូល cache', kgFirst.tag === 'A', kgFirst);
+        kgState.tag = 'B';
+        const kgHitsBefore = kgState.qrHits;
+        await kgPage.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg && reg.update()).catch(() => {}));
+        const kgSecond = await kgTag('-b');
+        ok('ជុំទី ៤ខ ៖ ZoeKeyGen ៖ SW ថ្មី install ទាញ `qrcode.js` ពី server មិនមែនពី HTTP cache ចាស់ (A ➜ B)',
+            kgSecond.tag === 'B', Object.assign({ serverHits: kgState.qrHits - kgHitsBefore }, kgSecond));
+        await kgBrowser.close();
+        await new Promise((r) => {
+            kgServer.close(r);
+            if (typeof kgServer.closeAllConnections === 'function') kgServer.closeAllConnections();
+        });
+    }
+
     // ជុំទី ៥ — ⛔⛔ deploy ថ្មីដែល SW ថ្មី install **មិនជោគជ័យ** (បណ្តាញយឺត/ដាច់ពាក់កណ្តាល · អ្នកប្រើបិទ App កណ្តាល
     //    install ~៣ MB) ➜ SW ចាស់នៅគ្រប់គ្រង ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយ **មិនត្រូវចាក់ឯកសារកំណែថ្មី ចូល cache កំណែចាស់**។
     //    ⛔ `index.html` ថ្មីយោង asset ថ្មី (ឈ្មោះ hash ថ្មី) ដែលមិនមាននៅក្នុង cache ចាស់ ➜ បើកក្រៅបណ្តាញ ➜ **App ស**

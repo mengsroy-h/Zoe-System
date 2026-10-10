@@ -461,9 +461,10 @@ export async function resolveCleanupSlot(trashItem) {
     } catch (readErr) {
         return 'wait';
     }
-    if (existing) return existing.deletedAt === trashItem.deletedAt ? 'ours' : 'elsewhere';
+    if (existing && existing.deletedAt === trashItem.deletedAt) return 'ours';
+    if (existing && trashSlotSharesClaim(existing, trashItem)) return 'elsewhere';
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return 'wait';
-    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id)) return 'elsewhere';
+    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
     const back = cleanupBarcodesBackInHistory(trashItem);
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
@@ -712,7 +713,19 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
 
 export const CLEANUP_FOREIGN_TRASH_WINDOW_MS = 15 * 60 * 1000;
 
-export function claimCleanupTrashSlot(trashItem) {
+export function trashSlotSharesClaim(occupant, trashItem) {
+    const codesOf = (item) => {
+        const codes = cleanupTrashCodes(item);
+        if (!codes.size && item && typeof item.barcode === 'string' && item.barcode) codes.add(item.barcode);
+        return codes;
+    };
+    const ours = codesOf(trashItem);
+    if (!ours.size) return true;
+    const theirs = codesOf(occupant);
+    return Array.from(ours).some((code) => theirs.has(code));
+}
+
+export function claimCleanupTrashSlot(trashItem, moved?) {
     if (!firebaseState.db || !firebaseState.fb || !trashItem || !trashItem.id || !/^[a-zA-Z0-9_-]+$/.test(trashItem.id)) {
         return Promise.reject(new Error('Trash Firebase reference unavailable'));
     }
@@ -720,7 +733,25 @@ export function claimCleanupTrashSlot(trashItem) {
         .then((result) => {
             if (result && result.committed) return true;
             const existing = result && result.snapshot ? result.snapshot.val() : null;
-            return !!existing && existing.deletedAt === trashItem.deletedAt;
+            if (!existing) return false;
+            if (existing.deletedAt === trashItem.deletedAt) return true;
+            if (moved || trashSlotSharesClaim(existing, trashItem)) return false;
+            const from = trashItem.id;
+            const to = cleanupPartialTrashId(from, String(trashItem.trashReason) + '|slot', trashItem);
+            if (!to || to === from || !/^[a-zA-Z0-9_-]{1,64}$/.test(to)) return false;
+            trashItem.id = to;
+            try {
+                const entry = readCleanupJournal().find((e) => e.trashItem.id === from);
+                if (entry) {
+                    noteCleanupJournalEntry(Object.assign({}, entry, { trashItem }));
+                    clearCleanupJournalEntry(from);
+                }
+            } catch (journalErr) {}
+            if (cleanupJournalLive.has(from)) {
+                releaseCleanupJournalLive(from);
+                markCleanupJournalLive(to);
+            }
+            return claimCleanupTrashSlot(trashItem, true);
         });
 }
 

@@ -5,14 +5,14 @@ import { getServerNow } from '../core/clock';
 import { normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
-import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
+import { claimCleanupTrashSlot, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { updateRecentPhonesList } from '../services/db-listeners';
-import { patchHistoryItemFields, saveSingleDeletedItemToFirebase } from '../services/history-write';
+import { patchHistoryItemFields } from '../services/history-write';
 import { armLateCommit, dbOp, dbOpStalled, notifyIfSlow, retryAsync } from '../services/network';
 import { refreshCurrentHistoryView, scheduleHistoryViewRefresh } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -391,7 +391,7 @@ export async function deleteSingleItem(id) {
         updateRecentPhonesList();
 
         let trashSaved = false;
-        await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(removed), 4, 1500),
+        await notifyIfSlow(retryAsync(() => claimCleanupTrashSlot(removed), 4, 1500),
             TRASH_WRITE_SLOW_NOTICE_MS,
             "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការលុប… សូមកុំបិទ App។").then(() => {
             trashSaved = true;

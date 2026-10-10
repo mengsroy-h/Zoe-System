@@ -486,7 +486,8 @@ function runAbandonCleanup(mode) {
         sliceFrom(zoewSrc, 'noteCleanupJournalEntry') || 'function noteCleanupJournalEntry() {}',
         sliceFrom(zoewSrc, 'markCleanupJournalStage') || 'function markCleanupJournalStage() {}',
         sliceFrom(zoewSrc, 'clearCleanupJournalEntry') || 'function clearCleanupJournalEntry() {}',
-        sliceFrom(zoewSrc, 'cleanupPartialTrashId') || 'function cleanupPartialTrashId() { return generateUniqueId(); }'
+        sliceFrom(zoewSrc, 'cleanupPartialTrashId') || 'function cleanupPartialTrashId() { return generateUniqueId(); }',
+        sliceFrom(zoewSrc, 'trashSlotSharesClaim') || 'function trashSlotSharesClaim() { return true; }'
     ];
     for (const fn of CLEANUP_FNS) {
         const body = sliceFrom(zoewSrc, fn);

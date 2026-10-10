@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v124';
+const CACHE_VERSION = 'zoekeygen-v125';
 
 const CORE_SHELL = [
     './',
@@ -18,6 +18,8 @@ const OPTIONAL_SHELL = [
     './icon-512.png'
 ];
 
+const FRESH = 'no-cache';
+
 const SHELL_PATHS = new Set(
     CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
 );
@@ -26,7 +28,7 @@ const OPTIONAL_INSTALL_TIMEOUT_MS = 20000;
 
 function addOptionalShell(cache, url) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const request = controller ? new Request(url, { signal: controller.signal }) : url;
+    const request = new Request(url, controller ? { cache: FRESH, signal: controller.signal } : { cache: FRESH });
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
             if (controller) { try { controller.abort(); } catch (e) {} }
@@ -71,7 +73,7 @@ function deployUnchangedDuringInstall() {
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(CORE_SHELL).then(() => Promise.all(
+            .then((cache) => cache.addAll(CORE_SHELL.map((url) => new Request(url, { cache: FRESH }))).then(() => Promise.all(
                 OPTIONAL_SHELL.map((url) => addOptionalShell(cache, url))
             )))
             .then(() => deployUnchangedDuringInstall())
@@ -257,7 +259,9 @@ self.addEventListener('fetch', (event) => {
     const cacheKey = cacheKeyFor(request);
     const isShell = typeof cacheKey === 'string';
     const networkTarget = request.mode === 'navigate' ? cacheKey : request;
-    const networkOptions = request.mode === 'navigate' ? { signal: request.signal } : undefined;
+    const networkOptions = request.mode === 'navigate'
+        ? { signal: request.signal, cache: FRESH }
+        : (isShell ? { cache: FRESH } : undefined);
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>

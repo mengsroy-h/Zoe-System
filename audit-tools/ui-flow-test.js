@@ -1101,15 +1101,21 @@ function seedData() {
             }, seed._dateKey);
             await page.waitForTimeout(300);
 
-            // ទប់តែការសរសេរទៅធុងសំរាម — transaction និងស្ថិតិត្រូវដើរធម្មតា ដើម្បីមើលការស្តារ
+            // ទប់តែការសរសេរទៅធុងសំរាម — transaction ប្រវត្តិ និងស្ថិតិត្រូវដើរធម្មតា ដើម្បីមើលការស្តារ
+            // ⛔ ទ្វារសរសេរធុងសំរាមមាន ២ ៖ `update()` (ដក) និង slot create-if-absent `runTransaction()` លើ `zoew_recently_deleted_cod_dod/<id>`
+            //    (លុប · ការសម្អាត) ➜ ទប់ទាំងពីរ (ទប់តែ `update()` ➜ ការលុបរត់ឆ្លង ➜ សេណារីយ៉ូ «ធុងសំរាមបរាជ័យ» មិនដែលកើត)។
             await page.evaluate(() => {
                 const origUpd = window.firebaseSDK.update;
-                window.__unblockTrash = () => { window.firebaseSDK.update = origUpd; };
+                const origTx = window.firebaseSDK.runTransaction;
+                window.__unblockTrash = () => { window.firebaseSDK.update = origUpd; window.firebaseSDK.runTransaction = origTx; };
+                const isTrash = (r) => String((r && r.path) || '').indexOf('zoew_recently_deleted_cod_dod') !== -1;
                 window.firebaseSDK.update = function (r, obj) {
-                    if (String(r.path || '').indexOf('zoew_recently_deleted_cod_dod') !== -1) {
-                        return Promise.reject(new Error('permission_denied'));
-                    }
+                    if (isTrash(r)) return Promise.reject(new Error('permission_denied'));
                     return origUpd.call(this, r, obj);
+                };
+                window.firebaseSDK.runTransaction = function (r, fn) {
+                    if (isTrash(r)) return Promise.reject(new Error('permission_denied'));
+                    return origTx.apply(this, arguments);
                 };
             });
 

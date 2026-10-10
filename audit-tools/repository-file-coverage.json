@@ -1866,6 +1866,9 @@
     "ZoeW/tests/cleanup-applied-ownership.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/cleanup-foreign-slot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-deduct-order.test.ts": {
       "policy": "zoew-self-verification"
     },

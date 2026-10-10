@@ -284,6 +284,7 @@ function buildWorld(historySeed, startNow) {
         'const cleanupInFlight = new Set();',
         // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែប្រើ `generateUniqueId()` ➜ គ្មាន helper នេះ (stub មិនត្រូវបានហៅ)
         optionalPart(() => extractFn(src, 'cleanupPartialTrashId'), 'function cleanupPartialTrashId() { return generateUniqueId(); }'),
+        optionalPart(() => extractFn(src, 'trashSlotSharesClaim'), 'function trashSlotSharesClaim() { return true; }'),
         ...REAL_FNS.map((name) => extractFn(src, name)),
         'globalThis.runAutomaticCleanupRules = runAutomaticCleanupRules;',
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'

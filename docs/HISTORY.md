@@ -45,8 +45,10 @@
 
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0. **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **មិនទាន់ merge**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
-   ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ (០ មួយផ្នែក · ០ រំលង · emulator រស់) លើ `3d21e9e` ➜ PR ពេលម្ចាស់គម្រោងស្នើ។
+0. **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **PR #309 បើក · មិនទាន់ merge**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
+   ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
+   ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់)
+   ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
@@ -98,8 +100,8 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.53 — iPhone បង្ហាញត្រឹម «iPhone» (សំណើម្ចាស់គម្រោង · branch `claude/kind-dijkstra-kwqzuc` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ · 🩺 ៖ «iPhone · iOS 26.x» (ឬ «iOS 26+») ·
-  ZoeKeyGen បន្ទាត់កៅអី iPhone ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone នោះបើក App កំណែថ្មី ([2.50.53] សកម្មភាព ២–៣)។
+- ⏳ **ZoeW 2.50.53 · ZoeKeyGen 2.24.14 — iPhone បង្ហាញត្រឹម «iPhone» + Deep audit ៥ (PR #309 · មិនទាន់ merge)** ៖ Merge ➜ Deploy ZoeW + ZoeKeyGen ➜ iPhone ☰ · 🩺 ៖ «iPhone · iOS 26.x» (ឬ «iOS 26+») ·
+  ZoeKeyGen បន្ទាត់កៅអី iPhone ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone នោះបើក App កំណែថ្មី · ZoeKeyGen ៖ ប្រអប់ «⏳ បន្ថែម» អត្ថបទថ្មី ([2.50.53] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (PR #308 merge រួច · model iPhone ពីទំហំអេក្រង់ដកចេញក្នុង [2.50.53])** ៖ Deploy ➜ ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
@@ -153,9 +155,10 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ»)
+### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ») · ZoeW + ZoeKeyGen `2.24.14` ៖ **Deep audit ៥ ៖ ការសម្អាត/ការលុបលើ id ដែលធុងសំរាមនៅកាន់ជីវិតចាស់ · SW ZoeKeyGen ទាញឯកសារស្រស់ · ប្រអប់ Extend ប្រាប់ការពិត** (សំណើម្ចាស់គម្រោង ៖ «deep audit … commit ចូល PR#309»)
 
-**ZoeW `2.50.53`** (`zoew-v315` ➜ `zoew-v316`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.24.13` · README ប៉ុណ្ណោះ)។ គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+**ZoeW `2.50.53`** (`zoew-v315` ➜ `zoew-v316` · PR #309 មិនទាន់ merge ➜ Deep audit ៥ ចូលកំណែដដែល) · **ZoeKeyGen `2.24.14`** (`zoekeygen-v124` ➜ `zoekeygen-v125` · Deep audit ៥)។
+គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -166,18 +169,32 @@
   ការអាន model ពិតលើ iPhone ត្រូវការ App iPhone ដើម (native · Xcode · Apple Developer) — មិនមែនក្នុងជុំនេះ។ App Android អាន hardware ពិតដដែល (`ZoeDevice`)។
 - 🧹 `IPHONE_MODELS` · `iphoneModelFromScreen()` · `iosVersionOf()` · `iosFitsModel()` ដកចេញ ➜ `src/features/device-info.ts` ដូច [2.50.51] បេះបិទ (`git diff 4e7afb4~1` = ០)។
   Serial (ID App ១៦ តួ) · បន្ទាត់គ្មាន emoji ([2.50.52]) មិនប្រែ។ កៅអីដែលកត់ model ក្រុមរួច ➜ `noteSeatMeta()` សរសេរ «iPhone» ពេលពិនិត្យ Key លើកក្រោយ (ខុសពីតម្លៃចាស់)។
+- 🗑️ **ZoeW (Deep audit ៥) ៖ កញ្ចប់ដែលបញ្ចូលក្រោម id ដែលធុងសំរាមនៅកាន់ច្បាប់ចម្លងចាស់** (ការស្កេន/បញ្ជី ZTO លើទិដ្ឋភាពចាស់ ➜ «Merge into a gone item» បង្កើត
+  ធាតុថ្មីក្រោម id ចាស់ ខណៈ `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃការលុប/ផុតកំណត់/យករួចមុន) ៖ ការសម្អាត ៨ ថ្ងៃ និង ២ ម៉ោង ដាក់កញ្ចប់នោះចូលធុងសំរាម (slot ផ្លាស់ទៅ id
+  កំណត់ `cleanupPartialTrashId(id, <trashReason>|slot)`) ហើយ ៨ ថ្ងៃកាត់ប្រាក់ ១ ដង (មុន ៖ កញ្ចប់បាត់ពីប្រវត្តិ និងធុងសំរាម · ប្រាក់មិនកាត់ · កូនសោ registry ជាប់) ·
+  ការ **លុប** ធាតុនោះមិនសរសេរជាន់ច្បាប់ចម្លងចាស់ទៀត (slot ដដែល · ច្បាប់ចម្លងចាស់នៅ ហើយ purge តាមពេលវេលារបស់វា)។ ឧបករណ៍ ២ claim ធាតុដដែល ➜ id ផ្លាស់ដូចគ្នា ➜ ច្បាប់ចម្លង ១ · កាត់ ១ ដង។
+- 🌐 **ZoeKeyGen (Deep audit ៥) ៖ Service Worker ទាញឯកសារសំបកពី server ជានិច្ច** (`cache: 'no-cache'` លើ install CORE/OPTIONAL · navigate · shell ដែលខ្វះក្នុង cache ដូច ZoeW)
+  ➜ HTTP cache ចាស់ (header `immutable` ពី CDN ឬ deploy ចាស់) មិនចូល cache SW ថ្មីទៀតទេ។
+- 🔑 **ZoeKeyGen (Deep audit ៥) ៖ ប្រអប់ «⏳ បន្ថែមសុពលភាព»** ប្រាប់ការពិត ៖ ថ្ងៃផុតកំណត់ថ្មីរក្សាលើ Server · គ្រឿងដែល Activate រួចទទួលវាពេលពិនិត្យ Key បន្ទាប់ ·
+  គ្រឿងថ្មី/Reset Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី (តាមចំនួនឧបករណ៍)។ អត្ថបទមុនប្រាប់ផ្ទុយ («តែគ្រឿងដែល Activate រួច») ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍។
 
 #### អ្នកយាម
 
 - `ZoeW/tests/device-info.test.tsx` ៖ iPhone PWA ពិត (`loadDeviceInfo`) ៧ ទំហំ (`390×844` · `402×874` · `393×852` · `440×956` · `420×912` · `375×812@2.88` · `320×693`) ➜ model «iPhone» ·
   កំណែ iOS ពិត · meta License `{ model: 'iPhone' }` · កូដ ៖ device-info មិនអាន `screen.width/height` · `devicePixelRatio` · គ្មានឈ្មោះ «iPhone <លេខ>» ·
   `IPHONE_MODELS`/`iphoneModelFromScreen` មិន export ➜ **ធ្លាក់ ២ លើកូដ [2.50.52]** (`git show HEAD:…device-info.ts`) · ជាប់ ១៥/១៥ លើកូដថ្មី។
+- `ZoeW/tests/cleanup-foreign-slot.test.ts` (ថ្មី · ៨ · `claimAndCleanupItem` · `resumeCleanupJournalEntry` · `deleteSingleItem` ពិត) ៖ abandon/close លើ id ដែល slot កាន់ជីវិតចាស់ ·
+  ឧបករណ៍ ២ (`applied`) · resume `slot` · ប្រវត្តិ id ដដែលមាន barcode ផ្សេង · លុប · ទិសផ្ទុយ ២ (ច្បាប់ចម្លងដូចគ្នា ➜ «elsewhere» · slot ទំនេរ ➜ id ធាតុ) ➜ **ធ្លាក់ ៦/៨ លើកូដមុនកែ** · ជាប់ ៨/៨។
+- `sw-install-integrity-test` ជុំទី ៤ខ (ZoeKeyGen ៖ `qrcode.js` A `immutable` ក្នុង HTTP cache ➜ SW B ត្រូវទាញ B) ➜ **ធ្លាក់លើ sw.js មុនកែ** · ជាប់ ៥៩/៥៩។
+- `license-clock-rollback-test` ច.៨–ច.៩ (ច.១ វាស់ថា Key ដែល Extend Activate លើគ្រឿងថ្មីបាន ➜ ប្រអប់ Extend មិនត្រូវប្រាប់ផ្ទុយ) ➜ **ធ្លាក់លើ index.html មុនកែ** · ជាប់ ៣៥/៣៥។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-១. Merge ➜ Netlify Deploy **ZoeW** (ZoeKeyGen គ្មាន Deploy)។
+១. Merge ➜ Netlify Deploy **ZoeW** និង **ZoeKeyGen** (`2.24.14`)។
 ២. iPhone (App លើ Home Screen) ៖ ☰ ខាងក្រោម និង 🩺 ➜ «iPhone · iOS 26.x» (ឬ «iOS 26+») · Serial ដដែល។
 ៣. ZoeKeyGen ➜ បញ្ជី Key ➜ កៅអីរបស់ iPhone នោះ ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone បើក App កំណែថ្មី (ពិនិត្យ Key)។ APK ៖ ផ្លូវ Android (`ZoeDevice`) មិនប្រែ (APK 2.50.53 build ដោយ workflow ពេល merge ដូចធម្មតា)។
+៤. ZoeKeyGen ៖ បើកម្តង ➜ កំណែ `2.24.14` ក្នុងប្រអប់ចូល · បញ្ជី Key ➜ «⏳ បន្ថែម» ➜ អត្ថបទថ្មី (គ្រឿងថ្មី/Reset Activate បានរហូតដល់ថ្ងៃថ្មី)។ គ្មានការសាកពិសេសសម្រាប់ការកែធុងសំរាម
+   (កើតតែពេលឧបករណ៍ ២ កែអតិថិជនដដែលព្រមគ្នា) ➜ ពិនិត្យ Sentry `zone: money` ក្រោយ Deploy ដូចធម្មតា។
 
 ### [2.50.52] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **model iPhone ពិតពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · បន្ទាត់ model/serial គ្មាន emoji** (សំណើម្ចាស់គម្រោង ៖ «កែកន្លែងបង្ហាញ model ឧបករណ៍ អោយស្គាល់ model ពិតសម្រាប់ iphone … និងដក emoji ចេញទាំង ២ កន្លែង model និង serial ទាំងក្នុង ZoeKeyGen និង ZoeW»)
 
@@ -3297,6 +3314,38 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-10 — Deep audit ៥ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ» · «commit ចូល PR#309» · គ្មាន agent) ➜ [2.50.53]
+
+- **មូលដ្ឋាន** ៖ run-all STRICT (emulator RTDB រស់) លើ `05a24c5` ៖ ២០៣ ជាប់ · ធ្លាក់ ១ = `repository-file-coverage` ព្រោះអ្នកយាមថ្មីលេចកណ្តាលការរត់ (artifact · មិនមែនកូដ)។
+- 🔴 **ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ** (ការរកឃើញពិត · លុយ + បាត់ទិន្នន័យ) ៖ «Merge into a gone item» (`mergeBarcodeIntoHistoryItem()` ឃើញ null ➜ ធាតុថ្មីក្រោម
+  id ចាស់) ជាទ្វារដែលបានរចនា ប៉ុន្តែគ្មានអ្នកណាវាស់អ្វីកើតឡើងពេលធាតុថ្មីនោះត្រូវសម្អាត ឬលុប ខណៈ `trash/<id>` នៅកាន់ជីវិតចាស់ (លុប ៣០ ថ្ងៃ · ផុតកំណត់ ២ ថ្ងៃ · យករួច ៣០ ថ្ងៃ)។
+  `claimCleanupTrashSlot()` ([2.50.52]) ចាត់ទុក «slot មាន deletedAt ផ្សេង» = ការ claim ដូចគ្នារបស់ឧបករណ៍ផ្សេង ➜ `trashElsewhere` ➜ journal លុប · គ្មាន ledger ➜ barcode ថ្មីដែល
+  claim ចេញពីប្រវត្តិរួច **មិននៅទីណាសោះ** (abandon ៖ ប្រាក់មិនកាត់ ➜ ចំណូលលើស · registry ជាប់ · close ៖ កំណត់ត្រាយករួចបាត់) · resume `slot` ឃើញ `history/<id>` ដែលបង្កើតឡើងវិញ
+  ➜ «elsewhere» ដូចគ្នា · `deleteSingleItem()` សរសេរ trash ដោយ overwrite ➜ ច្បាប់ចម្លងចាស់ (ឧ. ផុតកំណត់ដែលកាត់រួច) បាត់ ហើយ registry របស់វាមិនដែលដោះ។
+  វាស់ (`ZoeW/tests/cleanup-foreign-slot.test.ts` · module ពិត · store រួម) ៖ abandon ➜ ច្បាប់ចម្លង C = **០** · ledger ១០០ (រំពឹង ៩៣) · close ➜ ០ · ឧបករណ៍ ២ ➜ ០ · resume ➜ `''` (រំពឹង `restored`) · លុប ➜ ច្បាប់ចម្លងចាស់ត្រូវជាន់។
+  បង្អួចកើត ៖ Firebase ≈ RTT (ស្កេន/ZTO ខណៈឧបករណ៍ផ្សេងលុប) · **Supabase ធំជាង** ៖ realtime ស្ងាត់ ➜ ទិដ្ឋភាពចាស់រហូត `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ CAS conflict ➜ updater ទទួល null ➜ ធាតុថ្មីក្រោម id ចាស់។
+  **ហេតុអ្វី checker បៃតង** ៖ អ្នកយាម slot ([2.50.52]) seed តែ «ច្បាប់ចម្លងដូចគ្នា» ឬ slot ទំនេរ · `merge-into-deleted-item.test.ts` វាស់តែផ្នែកបញ្ចូល មិនវាស់ជីវិតបន្ទាប់របស់ធាតុថ្មី
+  (សំណួរ ៨ ៖ មិនចូលស្ថានភាពកំហុស)។ ការកែ ៖ `trashSlotSharesClaim()` (ច្បាប់ចម្លងកាន់ barcode ណាមួយរបស់យើង = ការ claim ដូចគ្នា ➜ elsewhere ដដែល · គ្មាន ➜ ជីវិតផ្សេង ➜
+  slot ផ្លាស់ម្តងទៅ `cleanupPartialTrashId(id, <trashReason>|slot)` · journal + live marker ប្តូរ key) · `resolveCleanupSlot()` ៖ ប្រវត្តិ id ដដែលត្រូវកាន់ barcode របស់យើងទើបជាភស្តុតាង ·
+  `deleteSingleItem()` សរសេរតាម slot ដដែល។ Mutation ៥ ➜ ធ្លាក់ ៥ · ១ · ១ · ១ · ១ (គ្មាន move · ប្រវត្តិតាម id · resume ចាត់ទុកគ្រប់ម្ចាស់ជា elsewhere · លុប overwrite ·
+  `trashSlotSharesClaim` ឆ្លើយ false ជានិច្ច ➜ ទិសផ្ទុយ ៦ ចាប់)។ sandbox ៩ ដែលស្រង់ `claimCleanupTrashSlot()` ទទួល helper ថ្មី (stub `true` លើ tree ចាស់ = ឥរិយាបថចាស់) ·
+  `emu/crud-rules-flow` STRICT ៖ ការលុបតាម transaction ឆ្លង rules ពិត ១៣៧/១៣៧ · run-all STRICT លើ tree កែ ៖ ២០២/២០៤ ➜ `ui-flow-test` ៖ fixture «ធុងសំរាមបរាជ័យ»
+  ទប់តែ `update()` ➜ ការលុបតាម slot (`runTransaction()`) ឆ្លង ➜ សេណារីយ៉ូមិនដែលកើត (FAIL ២) ➜ ទប់ទ្វារសរសេរធុងសំរាមទាំង ២ (មិនបន្ធូរការអះអាង ➜ ៩០/៩០) ·
+  `doc-scope-test` ៖ ជួរលិបិក្រមអ្នកយាមថ្មី ➜ run-all STRICT ពេញលើ tree ចុងក្រោយ ៖ ២០៣/២០៤ · `perf` លើសពិដាន ៣០០ វិ. ពេលម៉ាស៊ីនរវល់ (ពេលរត់សរុប ១០១២ វិ.
+  ធៀប ៨៩២ វិ. លើកមុន · ការអះអាងទាំងអស់មុនពិដាន ok) ➜ `RUNALL_RESUME=1` tree ដដែល ៖ `perf` ជាប់ ៧៣,៦ វិ. ➜ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង · emulator រស់)។
+- 🟠 **ZoeKeyGen SW គ្មាន `cache: 'no-cache'`** ៖ កត់ក្នុង Deep audit ជុំ ២ (2026-10-04 · «សង្កេតក្រៅវិសាលភាព ➜ ជុំ ៣») តែមិនដែលធ្វើ ➜ checker វាស់តែ ZoeW (ជុំទី ៤ ប្រើ
+  `zoew-v` · `.wasm`)។ វាស់ browser ពិត (`qrcode.js` A `immutable` ➜ SW B) ៖ cache `-b` កាន់ A (**ធ្លាក់**) ➜ ក្រោយកែ B។ ផលប៉ះពាល់ថ្ងៃនេះតូច (`netlify.toml` ផ្ញើ `no-cache` លើ
+  `*.js` · `*.css` · `*.png`) តែច្បាប់មានដើម្បីមិនពឹង header (CDN ចាស់ · header ប្តូរ)។ checker SW ៨ របស់ ZoeKeyGen ជាប់ទាំងអស់ក្រោយកែ។
+- 🟡 **ប្រអប់ Extend របស់ ZoeKeyGen ប្រាប់ផ្ទុយការពិត** ៖ «ធ្វើការតែលើគ្រឿងដែល Activate រួច … លែងអាច Activate លើគ្រឿងថ្មី» តែ `activate()` យកពិដាន `online.expiresAt`
+  (`license-clock-rollback-test` ច.១ វាស់ ៖ Key ហួស `exp` ដែល sign + DB Extend ➜ `valid`) ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍ · ច.៩ ធ្លាក់លើ index.html មុនកែ។
+- **បានពិនិត្យ មិនមែនកំហុស** ៖ ការលុបជាអចិន្ត្រៃយ៍ដោយដៃមិនដោះ `ded/<id>` (ដោះ ➜ journal `ledger` របស់ឧបករណ៍ផ្សេងរត់ការកាត់ម្តងទៀតពេល ring រុញ token ចេញ ➜ កាត់ ២ ដង ➜
+  ការរក្សាសោ = មានសុវត្ថិភាពជាង · leak ~៧០ byte) · clear-history លើ id ដែល slot កាន់ជីវិតចាស់ ➜ rules បដិសេធ finalize (`!root…recently_deleted/$itemId.exists()`) ➜
+  ធាតុនៅដដែល (fail-safe · លុបម្តងមួយដើរ) · listener DB (generation gate · `detachDatabaseListeners()` មុនភ្ជាប់) · កាមេរ៉ា (`pause` ដដែលមិនស្ទួន · `loadedmetadata` ដកពេលបិទ) ·
+  adapter Supabase (window listener ដកក្នុង `deleteApp` · CAS ពី server view + `waitDeps`) · registry · SW ZoeW (`deployUnchangedDuringInstall` · `responseFitsKey`) · push resync ·
+  Setup Link (PIN + កាត) · តំបន់ចាក់សោ ZTO/Cookie (អានតែប៉ុណ្ណោះ · គ្មានការកែ)។
+- **ព្រំដែនដែលនៅសល់** ៖ `restoreClaimedItemToScanHistory()` ទាំងមូល + `history/<id>` ដែលបង្កើតឡើងវិញ ➜ ត្រឡប់ធាតុបច្ចុប្បន្នដោយមិនបញ្ចូល barcode ដែល claim
+  (តែក្រោយការសរសេរធុងសំរាមបរាជ័យ ៤ ដង **និង** ការបង្កើតឡើងវិញ) · clear-history មិនលុបធាតុនោះរហូតច្បាប់ចម្លងចាស់ purge · `assignLockerToEntry()` ចម្លើយយឺតបង្ហាញ toast ក្រោយប្តូរ Config (សារតែប៉ុណ្ណោះ)។
+
 ### 2026-10-09 — Deep audit ៤ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ») ➜ [2.50.52]
 
 - 🔴 **ZoeKeyGen ៖ `isDatabaseInitialized` មិនដែលប្រកាស** (ការរកឃើញពិត · មានតាំងពី commit ដំបូងរបស់ repo `238d7f5`) ៖ function ជណ្តើរស្តារ SDK ចម្លងពី ZoeW
@@ -5268,7 +5317,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
-| `license-clock-rollback-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `license-clock-rollback-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-clock-trust-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-network-pressure-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5371,7 +5420,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `trash-modal-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `ts-comments` | — | ផ្នែក ៦ |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
-| `ui-flow-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `user-guide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5399,6 +5448,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |

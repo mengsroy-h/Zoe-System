@@ -49,7 +49,7 @@
    ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
    ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
    **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
-   ធាតុគ្មាន `barcodes` ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   ធាតុគ្មាន `barcodes` · Migrate Key · ការសាកឡើងវិញមិនឆ្លង session ➜ run-all STRICT ២០៤/២០៤ លើ `235e1b7` ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
@@ -3385,6 +3385,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   session ពេល `finishRemoval()` ចាប់ផ្តើម (ផ្លូវ late commit ក្នុងហាងដដែលមិនប្រែ) ហើយឈប់មុនការស្តារពេល session ប្តូរ (ព្រំដែន MONEY-3 «ដក» គ្មាន journal ដដែល ៖ Sentry money)។
   **មិនទាន់វាស់** ៖ ផ្លូវ resume (`resumeCleanupJournalEntry()` ៖ `resolveCleanupSlot()` · `settleCleanupDeduction()` · ជំហាន ledger) គ្មានការពិនិត្យ session កណ្តាលផ្លូវ
   (ពិនិត្យតែ scope នៅដើម) ➜ ការចាកចេញ/ប្តូរ Config កណ្តាល resume ➜ handoff «មិនទាន់វាស់»។
+  ការផ្ទៀងផ្ទាត់ជុំ ២ ៖ vitest ១២៨ ឯកសារ · ១១៦៥/១១៦៥ · `tsc` ស្អាត · checker sandbox ១៩ ពាក់ព័ន្ធ ជាប់ · run-all STRICT (emulator RTDB រស់) លើ `2b72656` បញ្ឈប់ដោយចេតនា
+  (រកឃើញ Migrate ក្រោយ commit) ➜ លើ `235e1b7` ៖ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង)។
   ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
   rules ធុងសំរាមគ្មាន `isDeducted` កម្រិតធាតុ) ➜ «ចំណូល (យករួច)» ៨៦ ជំនួស ៩៣ រហូត purge ២ ថ្ងៃ ➜ ឥឡូវ `ensureBarcodeArrayForItem()` ក្នុង claim abandon (ដូច `removeSingleBarcode()`) ·
   sandbox ៥ (`cleanup-interrupt-atomicity` · `db-stall-guard` · `ledger-count-integrity` · `partial-pickup-cleanup` · `restore-marker-hygiene`) ស្រង់ helper នេះ (មុន ៖ ReferenceError ក្នុង updater

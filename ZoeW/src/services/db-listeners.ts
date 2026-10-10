@@ -164,6 +164,10 @@ export function initDatabaseListeners() {
                 dataState.exchangeRateRiel = parseFloat(val);
                 try { appLocalStore.setItem('zoew_exchange_rate', dataState.exchangeRateRiel); } catch (e) {}
                 debouncedRenderAfterHistorySync();
+            } else if (val === null || val === undefined) {
+                dataState.exchangeRateRiel = 4100;
+                try { appLocalStore.removeItem('zoew_exchange_rate'); } catch (e) {}
+                debouncedRenderAfterHistorySync();
             }
         }, (err) => {
             if (listenerGeneration !== firebaseState.dbListenerGeneration) return;

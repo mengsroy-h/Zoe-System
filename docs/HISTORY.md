@@ -75,6 +75,8 @@
    ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
    install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង) · resume ពេលប្តូរ session (កែ ៖ ជុំ ២ ឆ)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
+   🗳️ **ម្ចាស់គម្រោងសម្រេច (Deep audit ៥ ជុំ ៣)** ៖ ឧបករណ៍មួយចូលហាង Supabase ច្រើន ➜ ការកំណត់ Lookup API/តារាងអតិថិជន ជារបស់ឧបករណ៍ (ហាង B ប្រើ Lookup ហាង A) ·
+   push ហាងមុនមិនដោះពេលចាកចេញ ➜ ចង ទៅហាង (ដូច login memory) ឬទុកដូចដើម?
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
    artifact backup (`backup.yml`) អ្នកមានគណនី GitHub ណាក៏ទាញបាន ➜ `ZOE_BACKUP_PASSPHRASE` ចៃដន្យ ≥ ៣២ តួ ([`firebase-backup/README.md`](../firebase-backup/README.md) «ប្រព័ន្ធសុវត្ថិភាព») ·
@@ -190,6 +192,7 @@
 - 🔐 **ZoeW (Deep audit ៥ ជុំ ៣ · ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់ … ការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា»)** ៖ ចម្លើយ Firebase/Supabase ដែលមកដល់ក្រោយចាកចេញ
   ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
   **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
+  អត្រាប្រាក់ ៖ ហាងដែលមិនដែលកំណត់អត្រា បង្ហាញលំនាំដើម 4100 (មុន ៖ បន្តប្រើអត្រារបស់ហាងមុនដែលបានបើកលើឧបករណ៍នេះ)។
 - 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
   (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
   Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
@@ -213,6 +216,7 @@
   ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
 - ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
   ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
+  `ZoeW/tests/exchange-rate-shop-switch.test.ts` (ថ្មី · ២ · `initDatabaseListeners()` ពិត) ➜ **ធ្លាក់ ១/២ មុនកែ** (ហាង B = 4000 របស់ហាង A) · ជាប់ ២/២។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3409,6 +3413,12 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   `reconcileCollectedHistory()` · `releaseBarcodesInRegistry()` · `saveBarcodeOrigins()` · `commitLedgerEventStep()`) មានការពិនិត្យរួច ➜ ជាប់មុនកែ។ ជួររង់ចាំ (`pendingRegistryReleases` ·
   `pendingHistoryPatches`) សម្អាតពេលចាកចេញ (`clearSensitiveModalFields()`) និងប្តូរ Config (teardown) រួចហើយ។ ⛔ តំបន់ចាក់សោ ZTO (`zto-list-sync` · `zto-status` · `zto-shop-sweep`)
   មិនកែ ៖ វាហៅ `claimBarcodeInRegistry()` · `addOrUpdateEntry()` · `applyBarcodeCloseChange()` ដែល fuzz វាស់ ➜ ជាប់ · `markZtoShopSweep()` សរសេរតែត្រាពេល (មិនមែនទិន្នន័យអតិថិជន)។
+  **ទិន្នន័យក្នុងឧបករណ៍ឆ្លងហាង** (វាស់តាម logout ពិត ៖ `onAuthStateChanged(null)` + `clearSensitiveModalFields()` · teardown `initFirebase()`) ៖ ប្រវត្តិ · ធុងសំរាម · ledger · pickup ·
+  mirror · Locker index · តារាងអតិថិជន + cache Lookup (`clearCustomerDataTableCache()`) · ជួររង់ចាំ · ZTO · docs cache Supabase ➜ សម្អាត។ **អត្រាប្រាក់** ➜ កំហុស ៖ listener
+  ធ្វើបច្ចុប្បន្នភាពតែពេលមានតម្លៃ ➜ ហាង B ដែលគ្មាន node បន្តប្រើអត្រាហាង A (memory + `zoew_exchange_rate`) ➜ node ទទេ = 4100 + ដកច្បាប់ចម្លង។ **ការសម្រេចរបស់ម្ចាស់គម្រោង**
+  (ការរចនា មិនមែនកំហុសកូដ ➜ មិនកែ) ៖ ការកំណត់ Lookup API · តារាងអតិថិជន (`zoew_lookup_api_config`) · Excel ទៅ Sheet ជារបស់ **ឧបករណ៍** ➜ ឧបករណ៍មួយដែលចូលហាង Supabase ច្រើន
+  (Project តែមួយ) ប្រើ Lookup/តារាងអតិថិជនរបស់ហាងដែលកំណត់ចុងក្រោយ (ZTO `/detail` ការពារដោយ `ZTO_DETAIL_IDENTITY=require` + `ZTO_DETAIL_BRANCH_PATHS`) · push ហាង Supabase
+  (`supabaseTenantKeyId()`) មិនដោះពេលចាកចេញ ➜ ឧបករណ៍នៅទទួលការរំលឹកជិតផុតកំណត់របស់ហាងមុន (ពេលវេលាប៉ុណ្ណោះ គ្មានទិន្នន័យអតិថិជន) ➜ handoff។
   ការផ្ទៀងផ្ទាត់ជុំ ២ ៖ vitest ១២៨ ឯកសារ · ១១៦៥/១១៦៥ · `tsc` ស្អាត · checker sandbox ១៩ ពាក់ព័ន្ធ ជាប់ · run-all STRICT (emulator RTDB រស់) លើ `2b72656` បញ្ឈប់ដោយចេតនា
   (រកឃើញ Migrate ក្រោយ commit) ➜ លើ `235e1b7` ៖ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង)។
   ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
@@ -5531,6 +5541,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |

@@ -1884,6 +1884,9 @@
     "ZoeW/tests/session-switch-fuzz.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/exchange-rate-shop-switch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-deduct-order.test.ts": {
       "policy": "zoew-self-verification"
     },

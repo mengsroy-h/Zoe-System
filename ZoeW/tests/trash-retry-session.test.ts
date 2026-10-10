@@ -196,7 +196,7 @@ describe('ការសរសេរធុងសំរាមឡើងវិញក�
                 return realTx(ref, updater);
             };
             let outcome = 'ok';
-            try { await restoreClaimedItemToScanHistory(ID, claimed, null); } catch (e) { outcome = 'rejected'; }
+            try { await restoreClaimedItemToScanHistory(ID, claimed, null); } catch { outcome = 'rejected'; }
             if (switchShop) {
                 expect(writesTo(DB_B)).toEqual([]);
                 expect(outcome).toBe('rejected');

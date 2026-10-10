@@ -141,7 +141,7 @@ function makeFb() {
         off: () => {}
     };
 }
-function useShop(db: any, url: string) {
+function attachShop(db: any, url: string) {
     firebaseState.db = db as any;
     try { localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url })); } catch {}
     firebaseState.firebaseConfig = { databaseURL: url } as any;
@@ -156,7 +156,7 @@ function useShop(db: any, url: string) {
 function switchToShopB() {
     lab.switched = true;
     firebaseState.authGeneration++;
-    useShop(DB_B, URL_B);
+    attachShop(DB_B, URL_B);
     dataState.scanHistory = [];
     dataState.deletedItems = [];
     dataState.dailyRevenueData = {};
@@ -196,7 +196,7 @@ function seedShopA() {
     firebaseState.isDatabaseConnected = true;
     firebaseState.serverClockTrusted = true;
     firebaseState.hasEverConnectedToDatabase = true;
-    useShop(DB_A, URL_A);
+    attachShop(DB_A, URL_A);
     dataState.scanHistory = [clone(item1), clone(item2), clone(item3)];
     dataState.deletedItems = [clone(trash)];
     dataState.dailyRevenueData = clone(lab.store[DAILY]);

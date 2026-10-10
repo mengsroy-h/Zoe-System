@@ -144,6 +144,7 @@ function buildWorld(opts) {
         'let isDatabaseConnected = false, hasEverConnectedToDatabase = false;',
         'let dbRefConnected = "connected", dbRefServerTimeOffset = "offset";',
         'let db = {}, fb = null;',
+        'let authGeneration = 0;',
         'let infoListenerGeneration = 0;',
         'let deletedCleanupInFlight = false;',
         'let scanHistory = [], deletedItems = [];',

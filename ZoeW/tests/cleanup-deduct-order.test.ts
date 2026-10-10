@@ -398,7 +398,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         let journalSeenDuringRun = 0;
         lab.beforeTx = () => { journalSeenDuringRun = Math.max(journalSeenDuringRun, readCleanupJournal().length); };
         expect(() => (appLocalStore as Storage).setItem('probe', '1')).toThrow();
-        let appWrites = 0;
+        let appWrites: number;
         try {
             await claimAndCleanupItem(ID, 'abandon');
             await flush();

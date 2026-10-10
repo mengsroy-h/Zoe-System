@@ -46,7 +46,10 @@ const lab = {
     switchAt: Infinity,
     switched: false,
     late: [] as string[],
-    day: ''
+    day: '',
+    rejectWrite: 0,
+    writesSeen: 0,
+    rejectPending: false
 };
 
 function clone<T>(value: T): T {
@@ -82,10 +85,19 @@ function snap(ref: any, value: any) {
 }
 function noteCall(method: string, path: string): Promise<void> | null {
     lab.calls++;
-    if (WRITE_METHODS.has(method)) lab.writes++;
+    if (WRITE_METHODS.has(method)) {
+        lab.writes++;
+        lab.writesSeen++;
+        if (lab.rejectWrite && lab.writesSeen === lab.rejectWrite) lab.rejectPending = true;
+    }
     if (lab.switched && WRITE_METHODS.has(method)) lab.late.push(method + ' ' + path);
     if (lab.calls !== lab.switchAt || lab.switched) return null;
     return new Promise((resolve) => setTimeout(() => { switchToShopB(); resolve(); }, 0));
+}
+function failIfRejected() {
+    if (!lab.rejectPending) return;
+    lab.rejectPending = false;
+    throw new Error('Network error');
 }
 function makeFb() {
     return {
@@ -98,6 +110,7 @@ function makeFb() {
         },
         update: async (ref: any, updates: any) => {
             { const gate = noteCall('update', ref.path); if (gate) await gate; }
+            failIfRejected();
             for (const key of Object.keys(updates)) {
                 const path = [ref.path, key].filter(Boolean).join('/');
                 let value = updates[key];
@@ -107,14 +120,17 @@ function makeFb() {
         },
         set: async (ref: any, value: any) => {
             { const gate = noteCall('set', ref.path); if (gate) await gate; }
+            failIfRejected();
             setAt(ref.path, value);
         },
         remove: async (ref: any) => {
             { const gate = noteCall('remove', ref.path); if (gate) await gate; }
+            failIfRejected();
             setAt(ref.path, null);
         },
         runTransaction: async (ref: any, updater: any) => {
             { const gate = noteCall('runTransaction', ref.path); if (gate) await gate; }
+            failIfRejected();
             const prior = getAt(ref.path);
             const proposed = updater(clone(prior));
             if (proposed === undefined) return { committed: false, snapshot: snap(ref, prior) };
@@ -285,9 +301,12 @@ const SCENARIOS: Scenario[] = [
 async function drain() {
     for (let i = 0; i < 45; i++) await vi.advanceTimersByTimeAsync(2000);
 }
-async function runScenario(s: Scenario, switchAt: number) {
+async function runScenario(s: Scenario, switchAt: number, rejectWrite = 0) {
     lab.calls = 0;
     lab.writes = 0;
+    lab.writesSeen = 0;
+    lab.rejectPending = false;
+    lab.rejectWrite = rejectWrite;
     lab.switchAt = switchAt;
     lab.switched = false;
     lab.late = [];
@@ -322,24 +341,47 @@ afterEach(() => {
     delete (window as any).ZoeErrors;
 });
 
+function resetBetweenRuns() {
+    cleanupInFlight.clear();
+    cleanupJournalLive.clear();
+    activeRestoreClaims.clear();
+    activeClearHistoryClaims.clear();
+    dataState.clearHistoryInFlight = false;
+    try { localStorage.clear(); } catch {}
+    firebaseState.authGeneration++;
+}
+async function leaksOf(s: Scenario, rejectWrite = 0) {
+    resetBetweenRuns();
+    const baseline = await runScenario(s, Infinity, rejectWrite);
+    expect(baseline.writes).toBeGreaterThan(0);
+    const leaks: string[] = [];
+    for (let k = 1; k <= baseline.calls; k++) {
+        resetBetweenRuns();
+        const r = await runScenario(s, k, rejectWrite);
+        if (r.late.length) leaks.push((rejectWrite ? 'w=' + rejectWrite + ' ' : '') + 'k=' + k + '/' + baseline.calls + ' ➜ ' + r.late.join(' · '));
+    }
+    return leaks;
+}
+
 describe('fuzz ប្តូរ session ៖ គ្មានការសរសេរចេញក្រោយការប្តូរហាង', () => {
     for (const s of SCENARIOS) {
         it(s.name, async () => {
-            const baseline = await runScenario(s, Infinity);
-            expect(baseline.writes).toBeGreaterThan(0);
-            const leaks: string[] = [];
-            for (let k = 1; k <= baseline.calls; k++) {
-                cleanupInFlight.clear();
-                cleanupJournalLive.clear();
-                activeRestoreClaims.clear();
-                activeClearHistoryClaims.clear();
-                dataState.clearHistoryInFlight = false;
-                try { localStorage.clear(); } catch {}
-                firebaseState.authGeneration++;
-                const r = await runScenario(s, k);
-                if (r.late.length) leaks.push('k=' + k + '/' + baseline.calls + ' ➜ ' + r.late.join(' · '));
-            }
-            expect(leaks).toEqual([]);
+            expect(await leaksOf(s)).toEqual([]);
         }, 120000);
+    }
+});
+
+// ⛔ ផ្លូវ retry ៖ ការសរសេរទី w (w = ១ … ចំនួនការសរសេររបស់ប្រតិបត្តិការ) ធ្លាក់ (បណ្តាញ) ➜ រង្វិលសាកឡើងវិញនៃជំហាននោះ (`retryAsync()` · រង្វិលដោយដៃ ·
+//    `pendingHistoryPatches`) ត្រូវចូល ➜ ការប្តូរហាងនៅការហៅទី k ណាមួយ ត្រូវឈប់វា ៖ ការសាកបន្ទាប់មិនត្រូវចេញទៅហាងថ្មីទេ។ ⛔ ធ្លាក់តែការសរសេរទី ១ មិនគ្រប់ ៖
+//    ប្រតិបត្តិការច្រើនជំហាន (ស្តារ ៖ claim ➜ សរសេរប្រវត្តិ ➜ finalize) ឈប់នៅជំហានទី ១ ហើយរង្វិល retry ក្រោយៗមិនដែលត្រូវវាស់។
+describe('fuzz ប្តូរ session + ការសរសេរមួយធ្លាក់ ៖ ការសាកឡើងវិញមិនចេញទៅហាងថ្មី', () => {
+    for (const s of SCENARIOS) {
+        it(s.name, async () => {
+            resetBetweenRuns();
+            const plain = await runScenario(s, Infinity);
+            const leaks: string[] = [];
+            for (let w = 1; w <= plain.writes; w++) leaks.push(...await leaksOf(s, w));
+            expect(leaks).toEqual([]);
+        }, 600000);
     }
 });

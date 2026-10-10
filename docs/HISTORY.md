@@ -192,7 +192,7 @@
   ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល) · ការបន្តការសម្អាតដែលត្រូវរំខាន ឈប់ពេល session ប្តូរកណ្តាលផ្លូវ (មុន ៖ សរសេរធុងសំរាម និង **កាត់ប្រាក់**
   ក្នុងហាងថ្មី)។
 - 🔐 **ZoeW (Deep audit ៥ ជុំ ៣ · ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់ … ការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា»)** ៖ ចម្លើយ Firebase/Supabase ដែលមកដល់ក្រោយចាកចេញ
-  ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
+  ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ (ការសាក finalize ក្រោយបណ្តាញធ្លាក់ផង ៖ មុន ៖ **បូកប្រាក់ត្រឡប់** ចូលហាងថ្មី) · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
   **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
   អត្រាប្រាក់ ៖ ហាងដែលមិនដែលកំណត់អត្រា បង្ហាញលំនាំដើម 4100 (មុន ៖ បន្តប្រើអត្រារបស់ហាងមុនដែលបានបើកលើឧបករណ៍នេះ)។
 - 📚 **ZTO-E13 (ZoeW + Function · Deep audit ៥ ជុំ ៣ · សំណើម្ចាស់គម្រោង «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីគ្មាន `pages`** ៖ ទំព័រពេញ (= `pageSize`) ដែល ZTO មិនប្រាប់
@@ -224,6 +224,8 @@
   ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
 - ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
   ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
+  របៀប retry ក្នុង fuzz ដដែល (ការសរសេរទី w ធ្លាក់ · w = ១…W × ប្តូរហាងនៅ k = ១…N) ➜ **ធ្លាក់ ១/២៧ មុនកែ** (ស្តារ ៖ `w=3 k=5/12` · `k=6/12` ➜ finalize សាក `update` ក្នុង B) ·
+  ជាប់ ៥៤/៥៤ · `restore-race-test` sandbox ប្រកាស `authGeneration` (៨/៨)។
   `ZoeW/tests/exchange-rate-shop-switch.test.ts` (ថ្មី · ២ · `initDatabaseListeners()` ពិត) ➜ **ធ្លាក់ ១/២ មុនកែ** (ហាង B = 4000 របស់ហាង A) · ជាប់ ២/២។
 - ZTO-E13 ៖ `ZoeW/tests/zto-pages-unknown.test.tsx` (ថ្មី · ៩ · Function ពិត + client ពិត + ZTO ក្លែងគ្មាន `pages`/`total`) ➜ **ធ្លាក់ ៦/៩ មុនកែ** (ទាញបាន ១០០ ពី ២៥០ ·
   `truncated: false` ពេល ៣៥០ · ភស្តុតាង `ok` ពេល ៣៥០) · ទិសផ្ទុយ ៣ (ទំព័រមិនពេញ ➜ ការហៅ ZTO ១ ដង · ZTO មាន `pages` ➜ ការហៅ `03 1–3` · `05 1–2` ដដែល) · ជាប់ ៩/៩ ·
@@ -3423,7 +3425,11 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ការកែ ៖ ចាប់ session នៅដើម ➜ ពិនិត្យក្រោយ `await` នីមួយៗ (ស្តារ ៖ sentinel `RESTORE_SESSION_SWITCHED` ➜ `catch` ឈប់ស្ងាត់ៗ + Sentry money · គ្មាន alert/អានទិដ្ឋភាពឡើងវិញក្នុង B) ·
   «ដក» ចាប់ session នៅដើម (មិនមែននៅ `finishRemoval()`) ➜ late commit ក្រោយប្តូរ ➜ ឈប់ + Sentry money (ដូច «លុប» · ការសម្អាត)។ ៦ ទ្វារផ្សេង (បិទ/បើក · Locker · ការហៅ · កែលេខ ·
   `reconcileCollectedHistory()` · `releaseBarcodesInRegistry()` · `saveBarcodeOrigins()` · `commitLedgerEventStep()`) មានការពិនិត្យរួច ➜ ជាប់មុនកែ។ ជួររង់ចាំ (`pendingRegistryReleases` ·
-  `pendingHistoryPatches`) សម្អាតពេលចាកចេញ (`clearSensitiveModalFields()`) និងប្តូរ Config (teardown) រួចហើយ។ ⛔ តំបន់ចាក់សោ ZTO (`zto-list-sync` · `zto-status` · `zto-shop-sweep`)
+  `pendingHistoryPatches`) សម្អាតពេលចាកចេញ (`clearSensitiveModalFields()`) និងប្តូរ Config (teardown) រួចហើយ។ **ផ្លូវ retry** ៖ របៀប fuzz ដំបូង «ការសរសេរទី ១ ធ្លាក់»
+  ជាប់ ៥៤/៥៤ = **បៃតងក្លែង** (ការសរសេរទី ១ របស់ការស្តារជា claim ➜ ឈប់មុនដល់ finalize) ➜ ប្តូរទៅ «ការសរសេរទី w ធ្លាក់» គ្រប់ w ➜ រកឃើញ `finalizeClaimedRestore()` ៖
+  រង្វិលសាក ៣ ដង (`update` ពហុផ្លូវ ៖ finalization · លុបធុងសំរាម · **បូកប្រាក់ ledger ត្រឡប់** · កូនសោ ledger) អាន `firebaseState.db` បច្ចុប្បន្ន ➜ ការប្តូរហាងក្នុងចន្លោះ
+  ១,៥ វិ. នៃការសាក ➜ `update` ចេញទៅហាង B (Firebase ៖ rules របង witness បដិសេធ · Supabase ៖ ច្បាប់ដដែល តែការផ្ញើខ្លួនឯងបានលេចរួច) ➜ ការកែ ៖ ចាប់ Database + `authGeneration`
+  នៅដើម ➜ ពិនិត្យមុនការសាកនីមួយៗ និងក្រោយការអានធុងសំរាម (`RESTORE_SESSION_SWITCHED` ➜ `executeRestoreItem()` ឈប់ + Sentry money)។ ⛔ តំបន់ចាក់សោ ZTO (`zto-list-sync` · `zto-status` · `zto-shop-sweep`)
   មិនកែ ៖ វាហៅ `claimBarcodeInRegistry()` · `addOrUpdateEntry()` · `applyBarcodeCloseChange()` ដែល fuzz វាស់ ➜ ជាប់ · `markZtoShopSweep()` សរសេរតែត្រាពេល (មិនមែនទិន្នន័យអតិថិជន)។
   **ទិន្នន័យក្នុងឧបករណ៍ឆ្លងហាង** (វាស់តាម logout ពិត ៖ `onAuthStateChanged(null)` + `clearSensitiveModalFields()` · teardown `initFirebase()`) ៖ ប្រវត្តិ · ធុងសំរាម · ledger · pickup ·
   mirror · Locker index · តារាងអតិថិជន + cache Lookup (`clearCustomerDataTableCache()`) · ជួររង់ចាំ · ZTO · docs cache Supabase ➜ សម្អាត។ **អត្រាប្រាក់** ➜ កំហុស ៖ listener
@@ -5480,6 +5486,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `restore-race-test` | ផ្នែក ១ | — |
 | `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ |

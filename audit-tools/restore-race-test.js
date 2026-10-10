@@ -159,6 +159,7 @@ function tabFor(app, shared, suffix) {
     const context = vm.createContext({
         console,
         db: shared.db,
+        authGeneration: 0,
         dbRefHistory: shared.fb.ref(shared.db, 'zoew_scan_history_cod_dod'),
         fb: shared.fb,
         getServerNow: () => shared.now,

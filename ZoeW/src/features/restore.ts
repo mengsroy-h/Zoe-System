@@ -211,19 +211,27 @@ export async function finalizeClaimedRestore(sourceId, token, targetId, revenueD
     };
     appendRestoreRevenueIncrements(updates, revenueDeltas);
     if (ledgerKey) updates[ledgerKey.path] = ledgerKey.value;
+    const finalizeDb = firebaseState.db;
+    const finalizeGeneration = firebaseState.authGeneration;
+    const stopIfSwitched = () => {
+        if (firebaseState.db !== finalizeDb || firebaseState.authGeneration !== finalizeGeneration) throw new Error('RESTORE_SESSION_SWITCHED');
+    };
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
+        stopIfSwitched();
         try {
-            await dbOp(firebaseState.fb.update(firebaseState.fb.ref(firebaseState.db), updates));
+            await dbOp(firebaseState.fb.update(firebaseState.fb.ref(finalizeDb), updates));
             return;
         } catch (error) {
             lastError = error;
+            stopIfSwitched();
             let trashSnapshot;
             try {
-                trashSnapshot = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${sourceId}`)));
+                trashSnapshot = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(finalizeDb, `zoew_recently_deleted_cod_dod/${sourceId}`)));
             } catch (readError) {
                 throw error;
             }
+            stopIfSwitched();
             if (!trashSnapshot.exists()) return;
             const currentTrash = trashSnapshot.val();
             const currentClaim = currentTrash && currentTrash.restoreClaim;

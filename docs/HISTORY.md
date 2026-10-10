@@ -49,7 +49,8 @@
    ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
    ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
    **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
-   ធាតុគ្មាន `barcodes` · Migrate Key · ការសាកឡើងវិញមិនឆ្លង session ➜ run-all STRICT ២០៤/២០៤ លើ `235e1b7` ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   ធាតុគ្មាន `barcodes` · Migrate Key · ការសាកឡើងវិញមិនឆ្លង session ➜ run-all STRICT ២០៤/២០៤ លើ `235e1b7` · **ជុំ ៣** (fuzz ប្តូរ session · retry · អត្រាប្រាក់ ·
+   ZTO-E13 `pages` · សោ ZTO ថ្មី) ➜ run-all STRICT ២០៤/២០៤ លើ `dd1510c` · CI ៤/៤ បៃតង ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
@@ -70,10 +71,10 @@
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
    **មិនទាន់វាស់** ➜ money ៖ (localStorage ពេញ · born-closed វាស់/គ្របរួចក្នុង Deep audit ៥ ជុំ ៣) ·
-   zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
+   supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
    SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
    ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
-   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង) · resume ពេលប្តូរ session (កែ ៖ ជុំ ២ ឆ)។
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ ZTO `pages` អវត្តមាន (កែ ៖ ZTO-E13) · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN (អ្នកយាមស្រាប់) · legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង) · resume ពេលប្តូរ session (កែ ៖ ជុំ ២ ឆ)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
    🗳️ **ម្ចាស់គម្រោងសម្រេច (Deep audit ៥ ជុំ ៣)** ៖ ឧបករណ៍មួយចូលហាង Supabase ច្រើន ➜ ការកំណត់ Lookup API/តារាងអតិថិជន ជារបស់ឧបករណ៍ (ហាង B ប្រើ Lookup ហាង A) ·
    push ហាងមុនមិនដោះពេលចាកចេញ ➜ ចង ទៅហាង (ដូច login memory) ឬទុកដូចដើម?

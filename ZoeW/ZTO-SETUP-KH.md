@@ -245,7 +245,11 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
     "blobSyncAgeMs": 10800000,
     "blobRenewAgeMs": null,
     "storeReason": null,
-    "renewals": 0
+    "renewals": 0,
+    "life": [
+      { "syncAgeMs": 7200000, "aliveMs": 6900000, "rejectedAfterMs": null, "idleMs": null, "ended": false },
+      { "syncAgeMs": 90000000, "aliveMs": 39600000, "rejectedAfterMs": 50400000, "idleMs": 10800000, "ended": true }
+    ]
   },
   "endpoint": { "host": "...", "path": "...", "method": "POST" },
   "requestHeaders": ["Accept", "Cookie", "..."],
@@ -284,6 +288,7 @@ ZTO មិនឆ្លើយក្នុងពិដាន ➜ Function ឆ្�
 | `renewals` | ចំនួនការរក្សាទុក Cookie បន្តពី Argus ដែលបានបញ្ជាក់ជោគជ័យក្នុង instance នេះ |
 | `authRejectedAgeMs` | ZTO ទើបបដិសេធ Cookie នេះនៅប៉ុន្មាន ms មុន (`null` = មិនដែលបដិសេធ ឬការស្កេនក្រោយនោះជោគជ័យ) — ជាមូលដ្ឋានរបស់របៀប `--auto` |
 | `authAcceptedAgeMs` | ពេលតាំងពី ZTO ទទួលយក Cookie នេះ; auth fields ទាំង ២ ជា `null` មានន័យថាមិនទាន់វាស់ |
+| `life` | អាយុ Cookie តាមការ Sync នីមួយៗ (ថ្មីមុន · ៨ ចុងក្រោយ · Blob `cookie-life`) ៖ `syncAgeMs` ពេលតាំងពី Sync · `aliveMs` ZTO ទទួលចុងក្រោយនៅប៉ុន្មានក្រោយ Sync · `rejectedAfterMs` ZTO បដិសេធនៅប៉ុន្មានក្រោយ Sync · `idleMs` ចន្លោះពីការទទួលចុងក្រោយដល់ការបដិសេធ · `ended` = Cookie នោះស្លាប់ · `[]` = មិនទាន់វាស់ · `null` = អាន Blob មិនបាន។ Cookie ពី env ឬ Sync ដោយឧបករណ៍ដែលមិនដាក់ត្រា ➜ មិនវាស់ |
 
 ⛔ **ក្រោយរត់ `sync-zto-cookie.cmd` ថ្មី ៖ `source` ត្រូវជា `blob`។** បើវានៅ
 `env` សូមមើល `storeReason` ➜ វាប្រាប់ថាធ្លាក់ត្រង់ណា។

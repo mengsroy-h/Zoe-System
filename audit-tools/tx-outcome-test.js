@@ -75,7 +75,7 @@ const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedS
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory', 'runLedgerTransaction',
     'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
+    'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupClaimAccountedElsewhere', 'claimCleanupTrashSlot', 'trashSlotSharesClaim', 'cleanupPartialTrashId', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'removeSingleBarcode', 'ensureBarcodeArrayForItem', 'barcodeRegistryKey', 'claimBarcodeInRegistry'];
 const APP_CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS', 'LEDGER_OP_RING_MAX',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',

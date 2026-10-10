@@ -18,6 +18,7 @@ import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../se
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { shopScope } from '../core/shop-scope';
 
 export const cleanupInFlight = new Set();
 
@@ -163,18 +164,7 @@ export function writeCleanupJournal(entries) {
 }
 
 export function cleanupJournalScope() {
-    try {
-        const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
-        if (!raw) return '';
-        const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        if (found) return found[1];
-        const supabase = /supabaseUrl"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        if (!supabase) return '';
-        const tenant = firebaseState.fb && typeof firebaseState.fb.tenantScope === 'function' ? firebaseState.fb.tenantScope(firebaseState.auth) : '';
-        return tenant ? supabase[1] + '#' + tenant : '';
-    } catch (e) {
-        return '';
-    }
+    return shopScope();
 }
 
 export function cleanupJournalScopeMismatch(entry) {

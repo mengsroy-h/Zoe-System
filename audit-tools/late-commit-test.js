@@ -114,7 +114,7 @@ const REAL_FNS = [
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
 const OPTIONAL_FNS = ['cleanupPartialTrashId', 'trashSlotSharesClaim', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
-    'cleanupJournalScope', 'cleanupJournalScopeMismatch',
+    'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry'];
 const fnSrc = {};
 const missing = [];

@@ -62,6 +62,8 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'healthKeyValidityText', 'licenseFailureMessage',
     // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob · ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ (`?diag=1` `list.signedMismatch`)
     'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',
+    // ⛔ ជួរ ZTO ៖ អាយុ Cookie ក្រោយ Sync (`?diag=1` `cookie.life` ពី Blob `cookie-life`)
+    'ztoCookieLifeText', 'lifeDurationText',
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
@@ -351,6 +353,23 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const envRt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: { source: 'env', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000, blobSyncAgeMs: 3600000 } } });
         const envHtml = await envRt.api.healthLookupRow();
         ok('ទិសផ្ទុយ ៖ Cookie ពី env ➜ គ្មានអាយុ Blob', !/Blob/.test(envHtml), envHtml.slice(0, 400));
+
+        // ⛔ សំណើម្ចាស់គម្រោង ៖ អាយុ Cookie នីមួយៗក្រោយ Sync (`cookie.life`) ៖ ប្រើបានចុងក្រោយ · បដិសេធ · ទំនេរមុនបដិសេធ
+        //    ➜ ព័ត៌មានប៉ុណ្ណោះ ⛔ មិនប្តូរសាលក្រម auth · តែ Cookie ដែលស្លាប់ (`ended`) ទើបរាយ
+        const lifeHtml = await rowFor({ renewals: 0, life: [
+            { syncAgeMs: 3600000, aliveMs: 1800000, rejectedAfterMs: null, idleMs: null, ended: false },
+            { syncAgeMs: 30 * 3600000, aliveMs: 11 * 3600000 + 20 * 60000, rejectedAfterMs: 14 * 3600000,
+                idleMs: 2 * 3600000 + 40 * 60000, ended: true }] },
+        { observed: true, setCookie: true, names: [], ageMs: 1000 });
+        ok('អាយុ Cookie ក្រោយ Sync ➜ «ប្រើបាន 11 ម៉ោង 20 នាទី ➜ បដិសេធនៅ 14 ម៉ោង (ទំនេរ 2 ម៉ោង 40 នាទី …)»',
+            /ប្រើបាន 11 ម៉ោង 20 នាទី ➜ បដិសេធនៅ 14 ម៉ោង \(ទំនេរ 2 ម៉ោង 40 នាទី/.test(lifeHtml), lifeHtml.slice(0, 600));
+        ok('⛔ Cookie ដែលនៅរស់មិនរាយជា «បដិសេធ»', (lifeHtml.match(/បដិសេធនៅ/g) || []).length === 1, lifeHtml.slice(0, 600));
+        ok('⛔ អាយុ Cookie មិនប្តូរសាលក្រម auth (នៅ ✅)', state(lifeHtml) === 'ok', state(lifeHtml));
+        for (const bad of [null, 'x', 42, [null, 5, { ended: true, aliveMs: 'x' }]]) {
+            const junkLife = await rowFor({ renewals: 0, life: bad }, { observed: true, setCookie: true, names: [], ageMs: 1000 });
+            ok('⛔ cookie.life ខូច (' + JSON.stringify(bad) + ') ➜ គ្មានអត្ថបទអាយុ · នៅ ✅',
+                state(junkLife) === 'ok' && !/អាយុ Cookie/.test(junkLife), junkLife.slice(0, 300));
+        }
 
         for (const bad of [null, 'x', 42, [], { observed: 'yes' }]) {
             const junkHtml = await rowFor({ renewals: bad }, bad);

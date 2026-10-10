@@ -1503,6 +1503,9 @@
     "ZoeW/src/core/state.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/core/shop-scope.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/core/storage-keys.ts": {
       "policy": "zoew-app"
     },
@@ -2143,6 +2146,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-bound-settings.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-life.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-pages-unknown.test.tsx": {

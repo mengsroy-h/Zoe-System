@@ -74,6 +74,11 @@ const COOKIE_READ_MIN_TIMEOUT_MS = 300;
 const COOKIE_WRITE_MIN_TIMEOUT_MS = 200;
 const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
+const COOKIE_LIFE_KEY = 'cookie-life';
+const COOKIE_LIFE_MAX = 8;
+const COOKIE_LIFE_ACCEPT_GAP_MS = 600000;
+const COOKIE_LIFE_RETRY_MS = 60000;
+const COOKIE_LIFE_TRIES = 3;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
@@ -105,6 +110,10 @@ const cookieState = {
     renewAttemptValue: '', renewAttemptEtag: '',
     pendingRenewal: null, obsolete: new Set(), mustRevalidate: false
 };
+function cookieLifeBucket() {
+    return { syncedAt: 0, acceptedAt: 0, acceptWrittenAt: 0, rejectWrittenAt: 0, failedAt: 0, inFlight: false };
+}
+let cookieLifeState = cookieLifeBucket();
 let cookieRefreshInFlight = false;
 let cookieWriteInFlight = null;
 let blobsModuleForTests = null;
@@ -419,6 +428,110 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     cookieState.pendingRenewal = null;
     cookieState.mustRevalidate = false;
     return currentCookieCredential(opened.store);
+}
+
+function cookieLifeEntries(raw) {
+    let parsed = null;
+    try {
+        parsed = JSON.parse(String(raw || ''));
+    } catch (_) {
+        parsed = null;
+    }
+    const lives = parsed && Array.isArray(parsed.lives) ? parsed.lives : [];
+    const bySync = new Map();
+    for (let i = 0; i < lives.length && i < COOKIE_LIFE_MAX * 4; i++) {
+        const entry = lives[i];
+        if (!entry || typeof entry !== 'object') continue;
+        const syncedAt = blobStamp(entry.s);
+        if (!syncedAt) continue;
+        const acceptedAt = blobStamp(entry.a);
+        const rejectedAt = blobStamp(entry.r);
+        const prior = bySync.get(syncedAt) || { s: syncedAt, a: 0, r: 0 };
+        bySync.set(syncedAt, {
+            s: syncedAt,
+            a: Math.max(prior.a, acceptedAt >= syncedAt ? acceptedAt : 0),
+            r: Math.max(prior.r, rejectedAt >= syncedAt ? rejectedAt : 0)
+        });
+    }
+    return Array.from(bySync.values()).sort((x, y) => x.s - y.s).slice(-COOKIE_LIFE_MAX);
+}
+
+function cookieLifeText(raw, update) {
+    const prior = cookieLifeEntries(raw);
+    const merged = prior.filter((entry) => entry.s !== update.s);
+    const same = prior.find((entry) => entry.s === update.s);
+    merged.push({ s: update.s, a: Math.max(update.a, same ? same.a : 0), r: Math.max(update.r, same ? same.r : 0) });
+    return JSON.stringify({ v: 1, lives: merged.sort((x, y) => x.s - y.s).slice(-COOKIE_LIFE_MAX) });
+}
+
+function cookieLifeUpdate(session, rejected) {
+    if (!session || !session.store || !session.cookie || cookieState.source !== 'blob') return null;
+    if (!cookieSessionIsCurrent(session)) return null;
+    const syncedAt = cookieState.blobSyncedAt;
+    if (!syncedAt) return null;
+    const life = cookieLifeState;
+    if (life.syncedAt !== syncedAt) {
+        life.syncedAt = syncedAt;
+        life.acceptedAt = 0;
+        life.acceptWrittenAt = 0;
+        life.rejectWrittenAt = 0;
+    }
+    const now = Date.now();
+    if (!rejected) life.acceptedAt = now;
+    if (life.inFlight || elapsedSince(life.failedAt) < COOKIE_LIFE_RETRY_MS) return null;
+    if (rejected) {
+        if (life.rejectWrittenAt && life.rejectWrittenAt >= life.acceptedAt) return null;
+        return { store: session.store, rejected: true, at: now, entry: { s: syncedAt, a: life.acceptedAt, r: now } };
+    }
+    const due = !life.acceptWrittenAt || life.rejectWrittenAt > life.acceptWrittenAt
+        || elapsedSince(life.acceptWrittenAt) >= COOKIE_LIFE_ACCEPT_GAP_MS;
+    return due ? { store: session.store, rejected: false, at: now, entry: { s: syncedAt, a: now, r: 0 } } : null;
+}
+
+async function writeCookieLife(update, timeoutMs) {
+    if (!update || !(timeoutMs > 0)) return;
+    const life = cookieLifeState;
+    life.inFlight = true;
+    const run = async () => {
+        for (let attempt = 0; attempt < COOKIE_LIFE_TRIES; attempt++) {
+            const entry = await update.store.getWithMetadata(COOKIE_LIFE_KEY, { type: 'text' });
+            const etag = entry && typeof entry.etag === 'string' ? entry.etag : '';
+            if (entry && !etag) return false;
+            const next = cookieLifeText(entry && entry.data, update.entry);
+            const result = await update.store.set(COOKIE_LIFE_KEY, next, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
+            if (result && result.modified === true) return true;
+            if (!result || result.modified !== false) return false;
+        }
+        return false;
+    };
+    const write = await settleWithin(run, timeoutMs, 'life');
+    life.inFlight = false;
+    if (life.syncedAt !== update.entry.s) return;
+    if (!write.ok || write.value !== true) {
+        life.failedAt = Date.now();
+        return;
+    }
+    life.failedAt = 0;
+    if (update.rejected) life.rejectWrittenAt = update.at;
+    else life.acceptWrittenAt = update.at;
+}
+
+function cookieLifeView(raw) {
+    const now = Date.now();
+    return cookieLifeEntries(raw).reverse().map((entry) => ({
+        syncAgeMs: Math.max(0, now - entry.s),
+        aliveMs: entry.a ? entry.a - entry.s : null,
+        rejectedAfterMs: entry.r ? entry.r - entry.s : null,
+        idleMs: entry.r && entry.a && entry.r > entry.a ? entry.r - entry.a : null,
+        ended: entry.r > entry.a
+    }));
+}
+
+function readCookieLife(netlifyEvent) {
+    const opened = openCookieStore(netlifyEvent);
+    if (!opened.store) return Promise.resolve(null);
+    return settleWithin(() => opened.store.getWithMetadata(COOKIE_LIFE_KEY, { type: 'text' }), COOKIE_STORE_TIMEOUT_MS, 'life')
+        .then((read) => (read.ok ? cookieLifeView(read.value && read.value.data) : null));
 }
 
 function invalidateCookieCache(session) {
@@ -2213,6 +2326,7 @@ async function handleRequest(event) {
         if (early) return json(200, plan ? Object.assign({}, early, { cached: true }) : detailResponseBody(config, access, early, barcode, true));
     }
 
+    const lifeRead = wantsDiagnostics ? readCookieLife(event) : null;
     let session;
     let headers;
     let authKind;
@@ -2229,7 +2343,9 @@ async function handleRequest(event) {
     }
 
     if (wantsDiagnostics) {
-        return json(200, Object.assign(diagnosticsBody(config, headers, authKind, session),
+        const body = diagnosticsBody(config, headers, authKind, session);
+        body.cookie.life = await lifeRead;
+        return json(200, Object.assign(body,
             { fresh: wantsFreshCookie, access: detailAccessReport(config, keyLabel, proxyKeys) }));
     }
 
@@ -2262,6 +2378,7 @@ async function handleRequest(event) {
         const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan,
             companionRun && { plan: companion, run: companionRun });
         if (!retried) {
+            await writeCookieLife(cookieLifeUpdate(session, true), cookieRenewTimeoutMs(config, startedAt));
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
@@ -2271,15 +2388,18 @@ async function handleRequest(event) {
             session.renewal = '';
             invalidateCookieCache(session);
             noteCookieRejected(session);
+            await writeCookieLife(cookieLifeUpdate(session, true), cookieRenewTimeoutMs(config, startedAt));
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
     }
 
+    const lifeUpdate = outcome.kind === 'ok' || outcome.kind === 'notFound' ? cookieLifeUpdate(session, false) : null;
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
     const companionOutcome = companionRun ? await companionRun : null;
 
-    await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
+    const storeWindowMs = cookieRenewTimeoutMs(config, startedAt);
+    await Promise.all([flushCookieRenewal(session, storeWindowMs), writeCookieLife(lifeUpdate, storeWindowMs)]);
 
     if (outcome.kind === 'ok') {
         let body = outcome.body;
@@ -2314,6 +2434,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     Object.keys(upstreamTimingSignal).forEach((kind) => { upstreamTimingSignal[kind] = upstreamTimingBucket(); });
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
+    cookieLifeState = cookieLifeBucket();
     cookieState.mustRevalidate = false;
     cookieState.value = '';
     cookieState.source = '';

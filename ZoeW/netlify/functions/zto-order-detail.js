@@ -1193,6 +1193,8 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const pages = Number(meta.pages);
     const total = Number(meta.total);
     const counted = rows.length + otherScans + signedScans;
+    const pagesKnown = Number.isFinite(pages);
+    const pageFull = container.rows.length >= config.list.pageSize;
     const body = {
         success: true,
         list: true,
@@ -1201,7 +1203,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         page: page,
         site: String(siteCode || ''),
         siteName: siteName,
-        pages: Number.isFinite(pages) ? pages : (counted ? 1 : 0),
+        pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
         total: Number.isFinite(total) ? total : counted,
         rows: rows,
         otherScans: otherScans,
@@ -1210,6 +1212,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
         signed: config.list.signedType ? signed : null,
         signedOk: kind === 'signed' && !!config.list.signedType
     };
+    if (!pagesKnown && pageFull) body.pagesUnknown = true;
     if (config.list.signedType) body.signedRows = signedRows;
     if (mismatchTexts.length) {
         body.signedMismatchTexts = mismatchTexts;
@@ -1239,6 +1242,7 @@ function mergeSignedCompanion(body, outcome) {
     out.signedRows = signedRows;
     out.signedOk = true;
     out.signedPages = companion.pages;
+    if (companion.pagesUnknown === true) out.signedPagesUnknown = true;
     out.signedTotal = companion.total;
     out.signedListMismatch = companion.signedMismatch;
     if (Array.isArray(companion.signedMismatchTexts)) {

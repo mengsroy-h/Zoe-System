@@ -77,8 +77,7 @@
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
    🗳️ **ម្ចាស់គម្រោងសម្រេច (Deep audit ៥ ជុំ ៣)** ៖ ឧបករណ៍មួយចូលហាង Supabase ច្រើន ➜ ការកំណត់ Lookup API/តារាងអតិថិជន ជារបស់ឧបករណ៍ (ហាង B ប្រើ Lookup ហាង A) ·
    push ហាងមុនមិនដោះពេលចាកចេញ ➜ ចង ទៅហាង (ដូច login memory) ឬទុកដូចដើម?
-   🗳️ **តំបន់ចាក់សោ ZTO (Deep audit ៥ ជុំ ៣ · វាស់)** ៖ ZTO ឆ្លើយទំព័រពេញ (១០០) គ្មាន `meta.pages` ➜ Function `pages: 1` ➜ ការអានចុះហត្ថលេខា «ពេញលេញ» ➜ កញ្ចប់ចុះហត្ថលេខា
-   ទំព័រ ២+ អាចត្រូវកាត់ប្រាក់ជា «ផុតកំណត់» ➜ អនុញ្ញាតកែ (ទំព័រពេញ + គ្មាន `pages` ➜ មិនពេញលេញ) ឬទេ?
+   ✅ **តំបន់ចាក់សោ ZTO (Deep audit ៥ ជុំ ៣)** ៖ ZTO គ្មាន `meta.pages` ➜ កែរួចតាមសំណើម្ចាស់គម្រោង «ZTO កែចុះ» ([2.50.53] · ZTO-E13 · `LOCK` ថ្មី)។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
    artifact backup (`backup.yml`) អ្នកមានគណនី GitHub ណាក៏ទាញបាន ➜ `ZOE_BACKUP_PASSPHRASE` ចៃដន្យ ≥ ៣២ តួ ([`firebase-backup/README.md`](../firebase-backup/README.md) «ប្រព័ន្ធសុវត្ថិភាព») ·
@@ -163,7 +162,8 @@
 ### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ») · ZoeW + ZoeKeyGen `2.24.14` ៖ **Deep audit ៥ ៖ ការសម្អាត/ការលុបលើ id ដែលធុងសំរាមនៅកាន់ជីវិតចាស់ · SW ZoeKeyGen ទាញឯកសារស្រស់ · ប្រអប់ Extend ប្រាប់ការពិត** (សំណើម្ចាស់គម្រោង ៖ «deep audit … commit ចូល PR#309»)
 
 **ZoeW `2.50.53`** (`zoew-v315` ➜ `zoew-v316` · PR #309 មិនទាន់ merge ➜ Deep audit ៥ ចូលកំណែដដែល) · **ZoeKeyGen `2.24.14`** (`zoekeygen-v124` ➜ `zoekeygen-v125` · Deep audit ៥)។
-គ្មាន rules/migration/env ថ្មី · តំបន់ហាម/ចាក់សោមិនប៉ះ។
+គ្មាន rules/migration/env ថ្មី · តំបន់ហាមមិនប៉ះ · តំបន់ចាក់សោ ZTO កែតាមសំណើម្ចាស់គម្រោង «ZTO កែចុះ» និង «ពិនិត្យអោយស្អាតចុះ ZTO ហើយចាក់សោរវិញ»
+(`zto-order-detail.js` · `zto-list-sync.ts` ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`)។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -195,6 +195,12 @@
   ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
   **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
   អត្រាប្រាក់ ៖ ហាងដែលមិនដែលកំណត់អត្រា បង្ហាញលំនាំដើម 4100 (មុន ៖ បន្តប្រើអត្រារបស់ហាងមុនដែលបានបើកលើឧបករណ៍នេះ)។
+- 📚 **ZTO-E13 (ZoeW + Function · Deep audit ៥ ជុំ ៣ · សំណើម្ចាស់គម្រោង «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីគ្មាន `pages`** ៖ ទំព័រពេញ (= `pageSize`) ដែល ZTO មិនប្រាប់
+  ចំនួនទំព័រ ➜ Function រាយ `pagesUnknown: true` និង `pages` = ទំព័រនេះ + ១ (ទំព័រមិនពេញ ➜ ទំព័រនេះ · ទំព័រទទេ ➜ ទំព័រមុន) ➜ ជុំបិទតាម ZTO (`fetchZtoSignedPages()`) និង
+  ប្រអប់ «ទាញបញ្ជីពី ZTO» (`fetchZtoListAllPages()` ៖ បញ្ជីមកដល់ និងភស្តុតាងចុះហត្ថលេខា) អានទំព័របន្ទាប់ម្តងមួយៗរហូតទំព័រមិនពេញ ឬពិដាន ៣ ទំព័រ · ពិដានហើយនៅពេញ ➜
+  `truncated` (ជុំបិទ ៖ អានតាមថ្ងៃ · មិនពេញលេញ ➜ ការសម្អាត ៨ ថ្ងៃរង់ចាំ) · ប្រអប់ ៖ «បញ្ជីវែងជាង ៣ ទំព័រ» · ភស្តុតាង ➜ `partial`) · «ZTO រាយ N» = ផលបូកទំព័រ។
+  មុនកែ ៖ Function រាយ `pages: 1` ➜ client អានតែទំព័រ ១ ហើយហៅថា «ពេញលេញ» ➜ ភស្តុតាងចុះហត្ថលេខាទំព័រ ២+ បាត់ ➜ កញ្ចប់ដែលយករួចអាចត្រូវសម្អាត ៨ ថ្ងៃជា «ផុតកំណត់»
+  (កាត់ប្រាក់) · ប្រអប់ទាញបានត្រឹម ១០០ ជួរដោយគ្មានការព្រមាន។ ZTO ដែលប្រាប់ `pages` ➜ ការហៅ ZTO ដដែល (ទំព័រ ២..N ស្របគ្នា)។
 - 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
   (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
   Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
@@ -219,10 +225,14 @@
 - ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
   ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
   `ZoeW/tests/exchange-rate-shop-switch.test.ts` (ថ្មី · ២ · `initDatabaseListeners()` ពិត) ➜ **ធ្លាក់ ១/២ មុនកែ** (ហាង B = 4000 របស់ហាង A) · ជាប់ ២/២។
+- ZTO-E13 ៖ `ZoeW/tests/zto-pages-unknown.test.tsx` (ថ្មី · ៩ · Function ពិត + client ពិត + ZTO ក្លែងគ្មាន `pages`/`total`) ➜ **ធ្លាក់ ៦/៩ មុនកែ** (ទាញបាន ១០០ ពី ២៥០ ·
+  `truncated: false` ពេល ៣៥០ · ភស្តុតាង `ok` ពេល ៣៥០) · ទិសផ្ទុយ ៣ (ទំព័រមិនពេញ ➜ ការហៅ ZTO ១ ដង · ZTO មាន `pages` ➜ ការហៅ `03 1–3` · `05 1–2` ដដែល) · ជាប់ ៩/៩ ·
+  `zto-list-sync-test` ZTO-E10 ៥ ការអះអាង (ទំព័រ ១/២ ពេញ · មិនពេញ · ទទេ · មាន meta) ➜ **ធ្លាក់ ៣ មុនកែ** · ជាប់ ៥៩៥ ok · អ្នកយាម ZTO ផ្សេងទាំងអស់បៃតង
+  (vitest ZTO ២៤ ឯកសារ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-*` · `zto-negative-cache` · `zto-signed-status` · `zto-network-boundaries`)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-១. Merge ➜ Netlify Deploy **ZoeW** និង **ZoeKeyGen** (`2.24.14`)។
+១. Merge ➜ Netlify Deploy **ZoeW** និង **ZoeKeyGen** (`2.24.14`)។ Function ZTO (`zto-order-detail.js`) ចេញជាមួយ Deploy ZoeW (env មិនប្រែ)។
 ២. iPhone (App លើ Home Screen) ៖ ☰ ខាងក្រោម និង 🩺 ➜ «iPhone · iOS 26.x» (ឬ «iOS 26+») · Serial ដដែល។
 ៣. ZoeKeyGen ➜ បញ្ជី Key ➜ កៅអីរបស់ iPhone នោះ ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone បើក App កំណែថ្មី (ពិនិត្យ Key)។ APK ៖ ផ្លូវ Android (`ZoeDevice`) មិនប្រែ (APK 2.50.53 build ដោយ workflow ពេល merge ដូចធម្មតា)។
 ៤. ZoeKeyGen ៖ បើកម្តង ➜ កំណែ `2.24.14` ក្នុងប្រអប់ចូល · បញ្ជី Key ➜ «⏳ បន្ថែម» ➜ អត្ថបទថ្មី (គ្រឿងថ្មី/Reset Activate បានរហូតដល់ថ្ងៃថ្មី)។ គ្មានការសាកពិសេសសម្រាប់ការកែធុងសំរាម
@@ -3428,7 +3438,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   លក្ខខណ្ឌ) ➜ ការសម្អាតដែលមិនត្រូវរំខាននៅត្រឹមត្រូវ (ធុងសំរាម flip · ledger ៩០ · កាត់ម្តង) · ព្រំដែន ៖ storage ពេញ **និង** App ស្លាប់កណ្តាលការសម្អាត ➜ គ្មាន journal ដើម្បីបន្ត
   (`fail-open` ជាការសម្រេចដែលមានស្រាប់)។ ZTO `pages` អវត្តមាន ➜ វាស់ (probe លើ `zto-list-sync-test` harness ពិត · មិន commit) ៖ ZTO ឆ្លើយ ១០០ ជួរ (ពេញទំព័រ) គ្មាន `meta.pages`
   ➜ Function `pages: 1` ➜ `fetchZtoSignedPages()` `truncated: false` ➜ ការអានចុះហត្ថលេខា «ពេញលេញ» ➜ កញ្ចប់ចុះហត្ថលេខានៅទំព័រ ២+ អាចសម្អាត ៨ ថ្ងៃជា «ផុតកំណត់» (កាត់ប្រាក់)
-  ➜ ⛔ **តំបន់ចាក់សោ** (`zto-order-detail.js` · `zto-list-sync.ts`) ➜ មិនកែ ➜ ស្នើម្ចាស់គម្រោង (ទំព័រពេញ + គ្មាន `pages` ➜ «មិនដឹង» ➜ ជុំមិនពេញលេញ)។ born-closed `closedAt` ·
+  ➜ ⛔ **តំបន់ចាក់សោ** (`zto-order-detail.js` · `zto-list-sync.ts`) ➜ មិនកែ ➜ ស្នើម្ចាស់គម្រោង ➜ ម្ចាស់គម្រោង ៖ «ZTO កែចុះ» ➜ **ZTO-E13** (ខាងក្រោម)។ born-closed `closedAt` ·
   sign list truncate ក្នុងមួយថ្ងៃ ➜ អ្នកយាមដែលមានស្រាប់ (`zto-born-closed-merge` · `zto-signed-cadence` · `zto-signed-only-purge`) · ការសម្អាតពេលអេក្រង់ PIN ➜ រចនាត្រឹមត្រូវ
   (ការងារហាងនៅរត់ · toast រង់ចាំ `releaseHeldToasts()`)។ **វាស់មិនបាននៅទីនេះ** (ត្រូវការបរិស្ថានពិត) ៖ edge functions/CORS លើ APK · captive portal ពិត · egress ring `ops` ·
   event «Perf overlay» · realtime Supabase ស្ងាត់ (poll ៥ នាទី = ការសម្រេចរបស់ម្ចាស់គម្រោងនៅរង់ចាំ)។
@@ -3494,7 +3504,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   (ឬមិនទាន់មានអ្នកប្រើ) · adapter Supabase ផ្ញើ auth event តែពេលចូល/ចេញ/ស្តារ ➜ `phoneModalBusy` មិនជាប់ · CORS Edge Functions សម្រាប់ APK (`https://localhost` ក្នុង README) ·
   `dispatchNotices` at-most-once (`onlyIfMatch` ledger) · ការទាញ 🔔 feed · push config មានពិដាន។
 - **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
-  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
+  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq។
+- **ZTO-E13 (សំណើម្ចាស់គម្រោង ៖ «ZTO កែចុះ» · «ពិនិត្យអោយស្អាតចុះ ZTO ហើយចាក់សោរវិញ»)** ៖ ផ្លូវតំបន់ចាក់សោ ៖ អ្នកយាមមុន ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់ ➜ `LOCK`។
+  ការរចនា ៖ Function មិនដឹងទំព័របន្ទាប់ទេ ➜ «ទំព័រពេញ = ប្រហែលមានបន្ត» (`pagesUnknown` · `pages` = ទំព័រ + ១) · client អាន **តាមលំដាប់** (មិនមែនស្របគ្នាដល់ពិដាន ៖ ZTO
+  ដែលបដិសេធទំព័រហួសចុងនឹងធ្វើឲ្យការទាញទាំងមូលធ្លាក់) · រង្វិល `for (;;)` មានព្រំដែនរចនាសម្ព័ន្ធ (ជុំនីមួយៗ `readArrival`/`readSigned` កើន ឬឈប់ · ≤ ពិដាន ៣) ·
+  ZTO មាន `pages` ➜ រលកតែមួយដូចមុន (វាស់ ៖ ការហៅ upstream ដដែល) · ពិដាន client (៣) ≤ លំនាំដើម server `ZTO_LIST_MAX_PAGES` ចាក់សោដោយ `zto-list-sync-test` ស្រាប់។
+  វាស់មុនកែ ៖ vitest ៦/៩ FAIL · checker ៣ FAIL (`{"pages":1}` · ទំព័រទី ២ ទទេ `{"pages":0}`)។ ព្រំដែន ៖ ZTO ដែលមិនអើពើ `pageNum` (ឆ្លើយទំព័រដដែល) ➜ ស្ទួនក្នុងបញ្ជី (ក្រុម
+  «♻️ ស្ទួន») ហើយពិដាននៅពេញ ➜ `truncated` (មិនពេញលេញ ➜ មិនកាត់ប្រាក់ខុស)។
 
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 
@@ -5652,6 +5668,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-mismatch.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

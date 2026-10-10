@@ -454,6 +454,32 @@ function firstBody(requests) {
         !!good.body && good.body.pages === 2 && good.body.total === 115,
         good.body && { pages: good.body.pages, total: good.body.total });
 
+    // ⛔ ZTO-E13 (សំណើម្ចាស់គម្រោង «ZTO កែចុះ») ៖ ZTO ឆ្លើយ **គ្មាន** `pages`/`total` ៖ ទំព័រពេញ (= `pageSize`) មិនមែនភស្តុតាងថាគ្មានទំព័របន្ទាប់ទេ ➜
+    // `pagesUnknown: true` + `pages` = ទំព័រនេះ + ១ (client អានបន្ត ហើយពិដាននៅតែ «មិនដឹង» ➜ `truncated`) ⛔ មិនដែល `pages: 1` («ពេញលេញ»)។
+    const metaless = (rows, page) => ({ success: true, error: null, data: { pageNum: page || 1, result: rows } });
+    const fullRows = [];
+    for (let i = 0; i < 100; i++) fullRows.push(listRow({ scanBillCode: '7713050' + String(1000000 + i) }));
+    const fullNoMeta = await listCall(metaless(fullRows), GOOD_LIST_ENV);
+    ok('⛔ ZTO-E13 ៖ ទំព័រពេញ (១០០) គ្មាន `meta.pages` ➜ `pagesUnknown: true` · `pages` = ២',
+        !!fullNoMeta.body && fullNoMeta.body.pagesUnknown === true && fullNoMeta.body.pages === 2,
+        fullNoMeta.body && { pages: fullNoMeta.body.pages, pagesUnknown: fullNoMeta.body.pagesUnknown });
+    const fullNoMeta2 = await listCall(metaless(fullRows, 2), GOOD_LIST_ENV, { page: '2' });
+    ok('⛔ ZTO-E13 ៖ ទំព័រទី ២ ពេញ គ្មាន meta ➜ `pages` = ៣ · `pagesUnknown`',
+        !!fullNoMeta2.body && fullNoMeta2.body.pagesUnknown === true && fullNoMeta2.body.pages === 3,
+        fullNoMeta2.body && { pages: fullNoMeta2.body.pages, pagesUnknown: fullNoMeta2.body.pagesUnknown });
+    const shortNoMeta = await listCall(metaless([listRow()]), GOOD_LIST_ENV);
+    ok('ZTO-E13 ទិសផ្ទុយ ៖ ទំព័រមិនពេញ គ្មាន meta ➜ `pages` = ១ · គ្មាន `pagesUnknown`',
+        !!shortNoMeta.body && shortNoMeta.body.pages === 1 && shortNoMeta.body.pagesUnknown === undefined,
+        shortNoMeta.body && { pages: shortNoMeta.body.pages, pagesUnknown: shortNoMeta.body.pagesUnknown });
+    const emptyNoMeta2 = await listCall(metaless([], 2), GOOD_LIST_ENV, { page: '2' });
+    ok('ZTO-E13 ទិសផ្ទុយ ៖ ទំព័រទី ២ ទទេ គ្មាន meta ➜ `pages` = ១ (បញ្ជីចប់នៅទំព័រ ១)',
+        !!emptyNoMeta2.body && emptyNoMeta2.body.pages === 1 && emptyNoMeta2.body.pagesUnknown === undefined,
+        emptyNoMeta2.body && { pages: emptyNoMeta2.body.pages, pagesUnknown: emptyNoMeta2.body.pagesUnknown });
+    const fullWithMeta = await listCall(listPayload(fullRows, { pages: 1, total: 100 }), GOOD_LIST_ENV);
+    ok('ZTO-E13 ទិសផ្ទុយ ៖ ទំព័រពេញ **មាន** `meta.pages` ➜ ទុកចិត្ត ZTO (`pages` = ១ · គ្មាន `pagesUnknown`)',
+        !!fullWithMeta.body && fullWithMeta.body.pages === 1 && fullWithMeta.body.pagesUnknown === undefined,
+        fullWithMeta.body && { pages: fullWithMeta.body.pages, pagesUnknown: fullWithMeta.body.pagesUnknown });
+
     // ⛔ **ករណីពិត (payload ផលិតកម្ម 2026-09-11)** ៖ barcode តែមួយ
     // (`77130500007463`) លេច **៣ ដង** ក្នុងចម្លើយតែមួយ ៖ `03` អីវ៉ាន់មកដល់ ·
     // `04` ការចែកចាយអីវ៉ាន់ · `05` ចុះហត្ថលេខា។ បើគ្មានជាន់ការពារ

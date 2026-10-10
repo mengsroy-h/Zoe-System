@@ -2145,6 +2145,9 @@
     "ZoeW/tests/zto-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-pages-unknown.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {
       "policy": "zoew-self-verification"
     },

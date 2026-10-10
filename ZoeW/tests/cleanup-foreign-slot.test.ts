@@ -300,6 +300,53 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
     }, 20000);
 });
 
+describe('whole claim whose trash write fails while history/<id> was recreated meanwhile', () => {
+    const failTrash: TxHook = ({ path }) => (path === TRASH || path.startsWith(TRASH + '/') ? Promise.reject(Object.assign(new Error('permission_denied'), { noRetry: true })) : undefined);
+
+    it('9. another device recreated history/<id> with D after our claim ➜ C goes back into that item beside D · no trash copy · money untouched', async () => {
+        install('abandon', 'delete');
+        setAt(TRASH + '/' + ID, null);
+        dataState.deletedItems = [];
+        const fresh = { ...recreatedItem('abandon'), barcodes: [barcodeOf('D', 3, { createdAt: getServerNow() })], barcode: 'D', cod: 3, price: 3, createdAt: getServerNow() };
+        let recreated = false;
+        lab.hook = (info) => {
+            if (info.path === HISTORY + '/' + ID && info.proposed === null && !recreated) {
+                info.apply();
+                recreated = true;
+                setAt(HISTORY + '/' + ID, fresh);
+                return { committed: true, snapshot: snap(makeRef(info.path), null) };
+            }
+            return failTrash(info);
+        };
+        await claimAndCleanupItem(ID, 'abandon');
+        await flush(80);
+        expect(recreated).toBe(true);
+        const item = getAt(HISTORY + '/' + ID);
+        expect(item.barcodes.map((b: any) => b.code)).toEqual(['D', 'C']);
+        expect(item.count).toBe(2);
+        expect(item.cod).toBe(10);
+        expect(item.barcodes.every((b: any) => b.isDeducted !== true)).toBe(true);
+        expect(trashCopiesOf('C').length).toBe(0);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('10. reverse ៖ history/<id> stays absent ➜ the claimed item comes back whole under its id', async () => {
+        const { item } = install('abandon', 'delete');
+        setAt(TRASH + '/' + ID, null);
+        dataState.deletedItems = [];
+        lab.hook = failTrash;
+        await claimAndCleanupItem(ID, 'abandon');
+        await flush(80);
+        const back = getAt(HISTORY + '/' + ID);
+        expect(back.barcodes.map((b: any) => b.code)).toEqual(['C']);
+        expect(back.cod).toBe(item.cod);
+        expect(trashCopiesOf('C').length).toBe(0);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+});
+
 describe('Delete (លុប) of an item recreated under an id whose trash slot holds another lifecycle', () => {
     it('7. trash/<id> = the old expired copy (deducted) ➜ the delete copy lands beside it · the old copy untouched · money untouched', async () => {
         const { old } = install('abandon', 'expired');

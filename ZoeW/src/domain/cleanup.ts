@@ -4,7 +4,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
+import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce } from './pickup';
@@ -677,15 +677,17 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             return;
         }
         normalizeBarcodesOf(currentItem);
-        if (claimedWhole) {
-            if (currentItem) return currentItem;
+        if (claimedWhole && !currentItem) {
             const updated = cloneRestoreItem(claimedWhole);
             delete updated.restoreClaim;
             delete updated.restoreClaimId;
             delete updated.restoreClaimToken;
             return updated;
         }
-        const reclaimed = barcodeEntriesOf(claimedPartial.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        const source = claimedWhole ? cloneRestoreItem(claimedWhole) : claimedPartial;
+        if (claimedWhole) ensureBarcodeArrayForItem(source);
+        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        if (!reclaimed.length) return currentItem;
         const base = currentItem || { ...claimedPartial, barcodes: [] };
         if (!currentItem) {
             delete base.restoreClaim;
@@ -800,6 +802,7 @@ export async function claimAndCleanupItem(id, reason) {
 
         if (reason === 'abandon') {
             if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
+            ensureBarcodeArrayForItem(currentItem);
 
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const staleOpen = currentItem.barcodes.filter(b => barcodeAbandonIsRipe(b, ts, getServerNow()));

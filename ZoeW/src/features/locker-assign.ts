@@ -114,6 +114,9 @@ export async function assignLockerToEntry(code) {
         : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;
 
     const myGeneration = ++uiState.lockerAssignGeneration;
+    const assignDb = firebaseState.db;
+    const assignGeneration = firebaseState.authGeneration;
+    const assignIsCurrent = () => firebaseState.db === assignDb && firebaseState.authGeneration === assignGeneration;
     let applied = false;
     let reported = false;
 
@@ -158,6 +161,7 @@ export async function assignLockerToEntry(code) {
     const reportResult = (result, late) => {
         if (reported) return;
         reported = true;
+        if (!assignIsCurrent()) return;
         if (!result || !result.committed || !applied) {
             lockerErrorFeedback();
             showToast('⚠️ កញ្ចប់នេះបានផ្លាស់ប្តូរពីឧបករណ៍ផ្សេងរួចហើយ។ សូមស្កេនម្តងទៀត។');
@@ -174,6 +178,7 @@ export async function assignLockerToEntry(code) {
     const reportFailure = (err) => {
         if (reported) return;
         reported = true;
+        if (!assignIsCurrent()) return;
         console.error('Locker assignment failed: ', err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'assignLockerToEntry' });
         lockerErrorFeedback();

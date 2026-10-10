@@ -47,8 +47,9 @@
 
 0. **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **PR #309 បើក · មិនទាន់ merge**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
    ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
-   ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់)
-   ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
+   **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
+   ធាតុគ្មាន `barcodes` ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
@@ -68,11 +69,11 @@
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · legacy items គ្មាន barcodes · born-closed `closedAt` ·
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · born-closed `closedAt` ·
    zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
    SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
    ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
-   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០)។
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
@@ -177,6 +178,14 @@
   ➜ HTTP cache ចាស់ (header `immutable` ពី CDN ឬ deploy ចាស់) មិនចូល cache SW ថ្មីទៀតទេ។
 - 🔑 **ZoeKeyGen (Deep audit ៥) ៖ ប្រអប់ «⏳ បន្ថែមសុពលភាព»** ប្រាប់ការពិត ៖ ថ្ងៃផុតកំណត់ថ្មីរក្សាលើ Server · គ្រឿងដែល Activate រួចទទួលវាពេលពិនិត្យ Key បន្ទាប់ ·
   គ្រឿងថ្មី/Reset Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី (តាមចំនួនឧបករណ៍)។ អត្ថបទមុនប្រាប់ផ្ទុយ («តែគ្រឿងដែល Activate រួច») ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍។
+- 🗑️ **ZoeW (Deep audit ៥ ជុំ ២ · ម្ចាស់គម្រោង ៖ «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់»)** ៖
+  «លុបទាំងអស់» ធាតុដែល `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន ➜ ចូលធុងសំរាម «លុប» ក្បែរច្បាប់ចម្លងនោះ (មុន ៖ rules បដិសេធការ finalize ៣ ដង ➜ «លុបមិនបានជោគជ័យ» ·
+  `clearClaim` ជាប់លើធាតុ ➜ ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · ដក · លុប រំលងធាតុនោះ រហូត reload ឬផុត lease) · ការសម្អាត ៨ ថ្ងៃលើធាតុចាស់គ្មាន `barcodes` (ទម្រង់មុន React) ➜
+  ធុងសំរាមកាន់ barcode របស់វា `isDeducted: true` (មុន ៖ ledger កាត់រួច តែ «ចំណូល (យករួច)» នៅរាប់វាថាមិនទាន់យក ➜ ចំណូលបង្ហាញតិចជាងពិតរហូត purge) ·
+  ការសម្អាតដែលសរសេរធុងសំរាមមិនបាន ហើយត្រឡប់ទៅប្រវត្តិ ខណៈឧបករណ៍ផ្សេងបង្កើតធាតុឡើងវិញក្រោម id ដដែល ➜ barcode ដែល claim ចូលធាតុនោះ (មុន ៖ បាត់ពីប្រវត្តិ និងធុងសំរាម) ·
+  Locker ៖ ការកំណត់ទីតាំងដែលចុះយឺត (ឬបរាជ័យ) ក្រោយចាកចេញ/ប្តូរ Config ➜ មិនកែទិដ្ឋភាព · មិនបង្ហាញ ✅/❌ ក្នុង session ថ្មី។
+- 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key** ៖ ការសរសេរឡើងវិញ (retry ទី ២–៣) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
+  (មុន ៖ retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ)។
 
 #### អ្នកយាម
 
@@ -187,6 +196,10 @@
   ឧបករណ៍ ២ (`applied`) · resume `slot` · ប្រវត្តិ id ដដែលមាន barcode ផ្សេង · លុប · ទិសផ្ទុយ ២ (ច្បាប់ចម្លងដូចគ្នា ➜ «elsewhere» · slot ទំនេរ ➜ id ធាតុ) ➜ **ធ្លាក់ ៦/៨ លើកូដមុនកែ** · ជាប់ ៨/៨។
 - `sw-install-integrity-test` ជុំទី ៤ខ (ZoeKeyGen ៖ `qrcode.js` A `immutable` ក្នុង HTTP cache ➜ SW B ត្រូវទាញ B) ➜ **ធ្លាក់លើ sw.js មុនកែ** · ជាប់ ៥៩/៥៩។
 - `license-clock-rollback-test` ច.៨–ច.៩ (ច.១ វាស់ថា Key ដែល Extend Activate លើគ្រឿងថ្មីបាន ➜ ប្រអប់ Extend មិនត្រូវប្រាប់ផ្ទុយ) ➜ **ធ្លាក់លើ index.html មុនកែ** · ជាប់ ៣៥/៣៥។
+- ជុំ ២ ៖ `ZoeW/tests/clear-history-foreign-slot.test.ts` (ថ្មី · ៣ · `clearHistory()` ពិត · fake Firebase អនុវត្ត fence ពិតរបស់ rules) ➜ **ធ្លាក់ ២/៣ មុនកែ** · ជាប់ ៣/៣ ·
+  `cleanup-foreign-slot.test.ts` ៩–១០ (ធុងសំរាមបរាជ័យ + ប្រវត្តិបង្កើតឡើងវិញ · ទិសផ្ទុយ) ➜ ៩ **ធ្លាក់មុនកែ** (`['D']`) · ជាប់ ១០/១០ ·
+  `cleanup-deduct-order.test.ts` ១១ (ធាតុគ្មាន `barcodes`) ➜ **ធ្លាក់មុនកែ** · ជាប់ ១២/១២ · `ZoeW/tests/locker-assign-session.test.ts` (ថ្មី · ៤) ➜ **ធ្លាក់ ២ មុនកែ** · ជាប់ ៤/៤ ·
+  `keygen-session-security-test` «ប្តូរ Database កណ្តាល retry» (`retryAsync()` ពិត) ➜ **ធ្លាក់ ២ មុនកែ** · ជាប់ ១៤៧/១៤៧។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3339,12 +3352,28 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - 🟡 **ប្រអប់ Extend របស់ ZoeKeyGen ប្រាប់ផ្ទុយការពិត** ៖ «ធ្វើការតែលើគ្រឿងដែល Activate រួច … លែងអាច Activate លើគ្រឿងថ្មី» តែ `activate()` យកពិដាន `online.expiresAt`
   (`license-clock-rollback-test` ច.១ វាស់ ៖ Key ហួស `exp` ដែល sign + DB Extend ➜ `valid`) ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍ · ច.៩ ធ្លាក់លើ index.html មុនកែ។
 - **បានពិនិត្យ មិនមែនកំហុស** ៖ ការលុបជាអចិន្ត្រៃយ៍ដោយដៃមិនដោះ `ded/<id>` (ដោះ ➜ journal `ledger` របស់ឧបករណ៍ផ្សេងរត់ការកាត់ម្តងទៀតពេល ring រុញ token ចេញ ➜ កាត់ ២ ដង ➜
-  ការរក្សាសោ = មានសុវត្ថិភាពជាង · leak ~៧០ byte) · clear-history លើ id ដែល slot កាន់ជីវិតចាស់ ➜ rules បដិសេធ finalize (`!root…recently_deleted/$itemId.exists()`) ➜
-  ធាតុនៅដដែល (fail-safe · លុបម្តងមួយដើរ) · listener DB (generation gate · `detachDatabaseListeners()` មុនភ្ជាប់) · កាមេរ៉ា (`pause` ដដែលមិនស្ទួន · `loadedmetadata` ដកពេលបិទ) ·
+  ការរក្សាសោ = មានសុវត្ថិភាពជាង · leak ~៧០ byte) · listener DB (generation gate · `detachDatabaseListeners()` មុនភ្ជាប់) · កាមេរ៉ា (`pause` ដដែលមិនស្ទួន · `loadedmetadata` ដកពេលបិទ) ·
   adapter Supabase (window listener ដកក្នុង `deleteApp` · CAS ពី server view + `waitDeps`) · registry · SW ZoeW (`deployUnchangedDuringInstall` · `responseFitsKey`) · push resync ·
   Setup Link (PIN + កាត) · តំបន់ចាក់សោ ZTO/Cookie (អានតែប៉ុណ្ណោះ · គ្មានការកែ)។
-- **ព្រំដែនដែលនៅសល់** ៖ `restoreClaimedItemToScanHistory()` ទាំងមូល + `history/<id>` ដែលបង្កើតឡើងវិញ ➜ ត្រឡប់ធាតុបច្ចុប្បន្នដោយមិនបញ្ចូល barcode ដែល claim
-  (តែក្រោយការសរសេរធុងសំរាមបរាជ័យ ៤ ដង **និង** ការបង្កើតឡើងវិញ) · clear-history មិនលុបធាតុនោះរហូតច្បាប់ចម្លងចាស់ purge · `assignLockerToEntry()` ចម្លើយយឺតបង្ហាញ toast ក្រោយប្តូរ Config (សារតែប៉ុណ្ណោះ)។
+- **ជុំ ២** (ម្ចាស់គម្រោង ៖ «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់» ➜ ព្រំដែន ៥ ដែលជុំ ១ ទុក ➜ អ្នកយាមមុន ➜ កែ) ៖
+  ក. **«លុបទាំងអស់» លើ id ដែល slot កាន់ជីវិតចាស់** ៖ ជុំ ១ កត់ថា «fail-safe» ➜ **ខុស** ៖ rules បដិសេធ finalize (`!root…recently_deleted/$itemId.exists()`) គ្រប់ដង ➜
+  `finalizeClaimedHistoryClear()` សាក ៣ ដង (១,៥ + ៣ វិ.) ➜ «លុបមិនបានជោគជ័យ» + Sentry · `clearClaim` នៅលើធាតុ ហើយ `activeClearHistoryClaims` កាន់ token ➜
+  `releaseStaleClearHistoryClaim()` មិនដោះលើឧបករណ៍នេះ ➜ ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · ដក · លុប រំលងធាតុនោះរហូត reload (ឧបករណ៍ផ្សេង ៖ រហូតផុត lease) · «លុបទាំងអស់» ម្តងទៀតបរាជ័យដដែល។
+  ឥឡូវ ៖ ការអានក្រោយការបដិសេធ (history កាន់ claim របស់យើង + trash មាន) ➜ `CLEAR_HISTORY_SLOT_TAKEN` (មិន retry) ➜ `releaseOwnClearHistoryClaim()` ➜
+  `deleteSingleItem(id, { confirmed, quiet })` (slot ផ្លាស់ពីជុំ ១ · លទ្ធផល `deleted`/`pending`/`blocked`/`missing`/`failed`/`stale` ➜ ចំនួនក្នុងសារសង្ខេបតែមួយ)។
+  អ្នកយាម `clear-history-foreign-slot.test.ts` ៖ fake អនុវត្ត fence finalize + ច្បាប់លុប history ដែលមាន `clearClaim` ពិត (មិនមែន fake ទទួលអ្វីៗទាំងអស់ ➜ សំណួរ «stubs accepting
+  everything») ➜ មុនកែ ៖ ធាតុនៅ · ធ្លាក់ ២/៣ (ទិសផ្ទុយ slot ទំនេរ ៖ ផ្លូវ finalize ដើម · ការបដិសេធ ០)។
+  ខ. **`restoreClaimedItemToScanHistory()` ទាំងមូល + `history/<id>` បង្កើតឡើងវិញ** ៖ `if (currentItem) return currentItem` ➜ barcode ដែល claim បាត់ ➜ ឥឡូវបញ្ចូលដូចផ្លូវផ្នែក
+  (dedupe តាម code · ដក `isDeducted`) · តេស្ត ៩ ៖ មុនកែ `['D']` ➜ `['D','C']` · ១០ (ទិសផ្ទុយ ៖ គ្មានធាតុ ➜ ធាតុដែល claim ទាំងមូល) ជាប់ទាំងពីរ។
+  គ. **`assignLockerToEntry()` ក្រោយប្តូរ session** ៖ ចម្លើយយឺត (ក្រោយពិដាន ១២ វិ.) ក្រោយចាកចេញ/ប្តូរ Database កែ `lockerBarcodeIndex` របស់ session ថ្មី (id + barcode ដដែល ពេលចូល
+  គណនីដដែលវិញ) ហើយបង្ហាញ ✅/❌ ➜ ឥឡូវ `assignIsCurrent()` (db + `authGeneration`) ចាំងមុនរាយការណ៍ · `locker-claim-guard-test` sandbox ប្រកាស `authGeneration`។
+  ឃ. **ZoeKeyGen `generateLicenseKey()`** ៖ ប្រតិបត្តិការ Admin ផ្សេងចាប់ `operationDb` រួច តែ Generate retry ដោយ `fb.ref(db)` ➜ Reconfig ចន្លោះ retry (១ វិ. · ២ វិ.) ➜ Key ចូល
+  License Project ថ្មី ➜ ឥឡូវ `operationDb` + `generateIsCurrent()` (db · admin · Signing Key) · retry ក្រៅ session ➜ `noRetry`។ checker ថ្មីប្រើ `retryAsync()` ពិតពីកូដ ship
+  (stub របស់ harness មិន retry ➜ ស្ថានភាពកំហុសមិនដែលកើត ➜ សំណួរ ៨)។
+  ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
+  rules ធុងសំរាមគ្មាន `isDeducted` កម្រិតធាតុ) ➜ «ចំណូល (យករួច)» ៨៦ ជំនួស ៩៣ រហូត purge ២ ថ្ងៃ ➜ ឥឡូវ `ensureBarcodeArrayForItem()` ក្នុង claim abandon (ដូច `removeSingleBarcode()`) ·
+  sandbox ៥ (`cleanup-interrupt-atomicity` · `db-stall-guard` · `ledger-count-integrity` · `partial-pickup-cleanup` · `restore-marker-hygiene`) ស្រង់ helper នេះ (មុន ៖ ReferenceError ក្នុង updater
+  ➜ ធ្លាក់ ៥៦ · ៤ · ៨ · ១៩) · `policy-test` ស្រង់ `deleteSingleItem(` តាមបុព្វបទ (ប៉ារ៉ាម៉ែត្រ `opts` ថ្មី)។
 
 ### 2026-10-09 — Deep audit ៤ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ») ➜ [2.50.52]
 
@@ -5357,7 +5386,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pin-prompt-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
-| `policy-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | — | ផ្នែក ៦ |
@@ -5446,6 +5475,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -5472,6 +5502,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
+| `ZoeW/tests/locker-assign-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-autofill.test.tsx` | ផ្នែក ១ | — |

@@ -322,18 +322,20 @@ export async function toggleCloseStatus(id?) {
     }
 }
 
-export async function deleteSingleItem(id) {
+export async function deleteSingleItem(id, opts?) {
+    const quiet = !!(opts && opts.quiet);
+    const say = (message) => { if (!quiet) showToast(message); };
     const index = dataState.scanHistory.findIndex(i => i.id === id);
-    if (index === -1) return;
+    if (index === -1) return 'missing';
 
-    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) return;
+    if (!(opts && opts.confirmed) && !confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) return 'cancelled';
 
     if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
         const idErr = new Error('Unsafe id during deleteSingleItem');
         console.error(idErr.message, id);
         if (window.ZoeErrors) ZoeErrors.capture(idErr, { zone: 'data', context: 'deleteSingleItem' });
-        showToast("⚠️ លុបមិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
-        return;
+        say("⚠️ លុបមិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
+        return 'failed';
     }
 
     const deleteDb = firebaseState.db;
@@ -362,7 +364,7 @@ export async function deleteSingleItem(id) {
     const finishDelete = async (result, late) => {
         if (!deleteIsCurrent()) {
             if (claimedWhole && window.ZoeErrors) ZoeErrors.capture(new Error('Delete stopped after a database switch'), { zone: 'data', context: 'deleteSingleItem session switch', itemId: id });
-            return;
+            return 'stale';
         }
         if (!claimedWhole) {
             if (!clearClaimBlocked) {
@@ -371,8 +373,8 @@ export async function deleteSingleItem(id) {
             }
             refreshCurrentHistoryView();
             updateRecentPhonesList();
-            showToast(clearClaimBlocked ? "⚠️ ធាតុនេះកំពុងត្រូវបានលុបជាក្រុមដោយសុវត្ថិភាព។ សូមរង់ចាំបន្តិច។" : "⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
-            return;
+            say(clearClaimBlocked ? "⚠️ ធាតុនេះកំពុងត្រូវបានលុបជាក្រុមដោយសុវត្ថិភាព។ សូមរង់ចាំបន្តិច។" : "⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
+            return clearClaimBlocked ? 'blocked' : 'missing';
         }
 
         const localIdx = dataState.scanHistory.findIndex(i => i.id === id);
@@ -415,12 +417,14 @@ export async function deleteSingleItem(id) {
             if (restoreOk) {
                 refreshCurrentHistoryView();
                 updateRecentPhonesList();
-                showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                say("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
             }
         });
-        if (trashSaved && deleteIsCurrent()) {
-            showToast(late ? "✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!" : "✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
-        }
+        if (!trashSaved) return 'failed';
+        if (!deleteIsCurrent()) return 'stale';
+        if (late) showToast("✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+        else say("✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+        return 'deleted';
     };
     try {
         const deleteTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), deleteUpdater);
@@ -437,24 +441,25 @@ export async function deleteSingleItem(id) {
                         : "⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
                     if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'deleteSingleItem late transaction failed', itemId: id });
                 }, 'deleteSingleItem');
-                showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការលុបនឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំលុបម្ដងទៀត។");
-                return;
+                say("⏳ បណ្តាញឆ្លើយមិនចេញ — ការលុបនឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំលុបម្ដងទៀត។");
+                return 'pending';
             }
             throw txError;
         }
         if (!result || !result.committed) {
             if (restoreClaimBlocked) {
-                showToast("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
-                return;
+                say("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
+                return 'blocked';
             }
             throw new Error('Delete item transaction was not committed');
         }
-        await finishDelete(result, false);
+        return await finishDelete(result, false);
     } catch (e) {
         console.error("Error deleting single item: ", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: "Error deleting single item: " });
         refreshCurrentHistoryView();
         updateRecentPhonesList();
-        showToast("⚠️ ការលុបមិនបានបញ្ចប់ទេ — មិនអាចបញ្ជាក់ថាទិន្នន័យបានផ្លាស់ប្តូរឡើយ។ សូមរង់ចាំ Sync រួចសាកល្បងម្តងទៀត។");
+        say("⚠️ ការលុបមិនបានបញ្ចប់ទេ — មិនអាចបញ្ជាក់ថាទិន្នន័យបានផ្លាស់ប្តូរឡើយ។ សូមរង់ចាំ Sync រួចសាកល្បងម្តងទៀត។");
+        return 'failed';
     }
 }

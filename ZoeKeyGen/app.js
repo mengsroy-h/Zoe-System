@@ -2165,6 +2165,9 @@ async function generateLicenseKey() {
     const privateKeyJwk = signingPrivateKeyJwk;
     if (!privateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
     if (!db || !operation) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
+    const operationDb = db;
+    const generateIsCurrent = () => adminOperationIsCurrent(operation) && db === operationDb && signingPrivateKeyJwk === privateKeyJwk;
+    const generateWrite = (run) => () => (generateIsCurrent() ? run() : Promise.reject(Object.assign(new Error('Generate key session changed'), { noRetry: true })));
 
     const appSelect = LICENSE_APP_CODE;
     const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
@@ -2183,7 +2186,7 @@ async function generateLicenseKey() {
     const myGeneration = keyListSessionGeneration;
     try {
         const timeSynced = await waitForServerTimeSync(15000);
-        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!generateIsCurrent()) return;
         if (!timeSynced) {
             alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
             return;
@@ -2193,7 +2196,7 @@ async function generateLicenseKey() {
         const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, {
             appCode: appSelect, days: days, note: note
         });
-        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!generateIsCurrent()) return;
 
         const targetPaths = [appSelect];
         const publicRecord = {
@@ -2209,13 +2212,13 @@ async function generateLicenseKey() {
         };
 
         let generateAlreadyTimedOut = false;
-        const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(() => fb.update(fb.ref(db), {
+        const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(generateWrite(() => fb.update(fb.ref(operationDb), {
             [`license_keys/${p}/${payload.id}`]: publicRecord,
             [`license_keys_meta/${p}/${payload.id}`]: metaRecord
-        }), 3, 1000)));
+        })), 3, 1000)));
         writePromise.then((bgResults) => {
             if (!generateAlreadyTimedOut) return;
-            if (myGeneration !== keyListSessionGeneration || !adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            if (myGeneration !== keyListSessionGeneration || !generateIsCurrent()) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
@@ -2230,7 +2233,7 @@ async function generateLicenseKey() {
             if (timeoutErr && timeoutErr.message === 'Generate key timed out') generateAlreadyTimedOut = true;
             throw timeoutErr;
         }
-        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!generateIsCurrent()) return;
         const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
         const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
 
@@ -2240,8 +2243,8 @@ async function generateLicenseKey() {
 
         let appPathsTagFailed = false;
         if (failedPaths.length > 0) {
-            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.update(fb.ref(db, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths }), 3, 1000)));
-            if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(generateWrite(() => fb.update(fb.ref(operationDb, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths })), 3, 1000)));
+            if (!generateIsCurrent()) return;
             appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
             if (appPathsTagFailed) {
                 const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
@@ -2250,7 +2253,7 @@ async function generateLicenseKey() {
             }
         }
 
-        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!generateIsCurrent()) return;
         lastGeneratedKey = keyString;
         document.getElementById('genResultKey').textContent = keyString;
         document.getElementById('genResultBox').classList.remove('hidden');
@@ -2266,7 +2269,7 @@ async function generateLicenseKey() {
         }
         refreshKeyList();
     } catch (e) {
-        if (!adminOperationIsCurrent(operation) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!generateIsCurrent()) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'

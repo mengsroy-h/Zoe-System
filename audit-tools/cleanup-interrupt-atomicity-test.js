@@ -78,7 +78,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue',
     'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue',
-    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem'];
+    'settleCleanupDeduction', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem'];
 // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែគ្មាន ➜ stub (ផ្លូវចាស់មិនហៅវា)
 const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrashId() { return generateUniqueId(); }', trashSlotSharesClaim: 'function trashSlotSharesClaim() { return true; }' };
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។

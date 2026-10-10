@@ -189,6 +189,7 @@ function build(options) {
         ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
         'setKeySeatLimit',
         'releaseKeySeat',
+        'migrateLegacyLicenseKeyMetadata',
         'copySensitiveText',
         'copyTextarea',
         'copyGeneratedKey',
@@ -279,6 +280,33 @@ async function run() {
         } else {
             ok(label + ' ៖ retry សរសេរទៅ Database ដើម ហើយបង្ហាញ Key', writes.length === 2 && writes[1] === dbA && h.ctx.lastGeneratedKey === 'signed-key',
                 { writes: writes.length, key: h.ctx.lastGeneratedKey });
+        }
+    }
+
+    // ⛔ Migrate Key ចាស់ ៖ អាន `license_keys` ពី Database A ➜ Reconfig ទៅ License Project B មុនការសរសេរ ➜ ការផ្លាស់ទីដែលគណនាពី A មិនត្រូវសរសេរចូល B
+    //    ហើយ session ចាស់មិនបង្ហាញ ✅ ក្នុង session ថ្មីទេ (ដូចប្រតិបត្តិការ Admin ផ្សេងដែលចាប់ `operationDb`)។
+    console.log('-- ប្តូរ Database ចន្លោះការអាន និងការសរសេររបស់ Migrate --');
+    for (const switchDb of [true, false]) {
+        h = build();
+        const dbA = h.ctx.db;
+        const dbB = { name: 'other-license-project' };
+        const readWait = deferred();
+        const writes = [];
+        h.ctx.fb.get = () => readWait.promise;
+        h.ctx.fb.update = (ref) => { writes.push(ref.db); return Promise.resolve(); };
+        const task = h.ctx.migrateLegacyLicenseKeyMetadata();
+        await drain();
+        if (switchDb) h.ctx.db = dbB;
+        readWait.resolve({ exists: () => true, val: () => ({ ZOE: { 'key-legacy': { expiresAt: 1, revoked: false, note: 'old', createdBy: 'a@b.c' } } }) });
+        await task;
+        await drain();
+        const label = switchDb ? 'Migrate ប្តូរ Database' : 'Migrate ទិសផ្ទុយ ៖ Database ដដែល';
+        if (switchDb) {
+            ok(label + ' ៖ ⛔ មិនសរសេរការផ្លាស់ទីរបស់ A ចូល B', writes.every((d) => d !== dbB), writes.map((d) => (d === dbB ? 'B' : 'A')));
+            ok(label + ' ៖ គ្មាន ✅ ក្នុង session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log.toasts);
+        } else {
+            ok(label + ' ៖ សរសេរទៅ Database ដើមម្តង ហើយ ✅', writes.length === 1 && writes[0] === dbA && h.log.toasts.some((t) => t.startsWith('✅')),
+                { writes: writes.length, toasts: h.log.toasts });
         }
     }
 

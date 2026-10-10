@@ -2627,11 +2627,15 @@ function renderKeyList() {
 }
 
 async function migrateLegacyLicenseKeyMetadata() {
-    if (!db || !auth || !auth.currentUser) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operationDb || !operation) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
     if (!confirm('ដំណើរការនេះនឹងផ្លាស់ទី Note/Email/Scope/appPaths ចេញពី Key សាធារណៈ (license_keys) ទៅកន្លែងឯកជន (license_keys_meta)។\n\n⚠️ ត្រូវ Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) មិនដូច្នេះទេ ដំណើរការនេះនឹងបរាជ័យ។\n\nបន្តទេ?')) return;
 
+    const isCurrent = () => adminOperationIsCurrent(operation) && db === operationDb;
     try {
-        const snap = await withTimeout(fb.get(fb.ref(db, 'license_keys')), 15000, 'Migration read timed out');
+        const snap = await withTimeout(fb.get(fb.ref(operationDb, 'license_keys')), 15000, 'Migration read timed out');
+        if (!isCurrent()) return;
         const data = snap.exists() ? snap.val() : {};
         const updates = {};
         let migratedCount = 0;
@@ -2660,10 +2664,12 @@ async function migrateLegacyLicenseKeyMetadata() {
             return;
         }
 
-        await withTimeout(retryAsync(() => fb.update(fb.ref(db), updates), 3, 1500), 30000, 'Migration write timed out');
+        await withTimeout(retryAsync(() => (isCurrent() ? fb.update(fb.ref(operationDb), updates) : Promise.reject(Object.assign(new Error('Migration session changed'), { noRetry: true }))), 3, 1500), 30000, 'Migration write timed out');
+        if (!isCurrent()) return;
         showToast(`✅ បាន Migrate Key ចំនួន ${migratedCount} ដោយជោគជ័យ!`);
         refreshKeyList();
     } catch (e) {
+        if (!isCurrent()) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'migrateLegacyLicenseKeyMetadata' });
         alert('Migrate មិនជោគជ័យទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួចហើយ រួចសាកល្បងម្តងទៀត។');

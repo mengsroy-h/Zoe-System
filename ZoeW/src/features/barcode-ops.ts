@@ -138,6 +138,9 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             return 'missing';
         }
 
+        const trashDb = firebaseState.db;
+        const trashGeneration = firebaseState.authGeneration;
+        const trashIsCurrent = () => firebaseState.db === trashDb && firebaseState.authGeneration === trashGeneration;
         const committedItem = result.snapshot ? result.snapshot.val() : null;
         const localIdx = dataState.scanHistory.findIndex(i => i.id === itemId);
         if (claimedWhole) {
@@ -180,7 +183,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
         refreshCurrentHistoryView();
 
         let trashSaved = false;
-        await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(itemToTrash), 4, 1500),
+        await notifyIfSlow(retryAsync(() => (trashIsCurrent() ? saveSingleDeletedItemToFirebase(itemToTrash) : Promise.reject(Object.assign(new Error('Remove session changed'), { noRetry: true }))), 4, 1500),
             TRASH_WRITE_SLOW_NOTICE_MS,
             `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
             trashSaved = true;
@@ -190,6 +193,7 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
             console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'removeSingleBarcode trash write failed after retries', itemId });
+            if (!trashIsCurrent()) return;
             let restoredItem = null;
             let restoreOk = false;
             try {

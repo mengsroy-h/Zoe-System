@@ -668,9 +668,13 @@ export async function resumeInterruptedCleanups() {
 }
 
 export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
-    const itemRef = firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`);
+    const restoreDb = firebaseState.db;
+    const restoreGeneration = firebaseState.authGeneration;
+    const itemRef = firebaseState.fb.ref(restoreDb, `zoew_scan_history_cod_dod/${id}`);
     let clearClaimBlocked = false;
-    return retryAsync(() => dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
+    return retryAsync(() => (firebaseState.db !== restoreDb || firebaseState.authGeneration !== restoreGeneration
+        ? Promise.reject(Object.assign(new Error('Restore session changed'), { noRetry: true }))
+        : dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
         clearClaimBlocked = false;
         if (currentItem && currentItem.clearClaim) {
             clearClaimBlocked = true;
@@ -707,7 +711,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             delete updated.closedAt;
         }
         return updated;
-    })), 3, 1500).then((result) => {
+    }))), 3, 1500).then((result) => {
         if (clearClaimBlocked || !result || !result.committed) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
         return result;
     });
@@ -957,7 +961,8 @@ export async function claimAndCleanupItem(id, reason) {
             dataState.deletedItems.unshift(trashItem);
             let trashSaved = false;
             let trashElsewhere = false;
-            const writeTrash = () => claimCleanupTrashSlot(trashItem).then((claimed) => { trashElsewhere = !claimed; });
+            const writeTrash = () => (cleanupIsCurrent() ? claimCleanupTrashSlot(trashItem) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true })))
+                .then((claimed) => { trashElsewhere = !claimed; });
             await notifyIfSlow(retryAsync(writeTrash, 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {

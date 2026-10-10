@@ -84,7 +84,7 @@ const OPTIONAL_CORE_FNS = { cleanupPartialTrashId: 'function cleanupPartialTrash
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
-    'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
+    'readCleanupJournal', 'writeCleanupJournal', 'shopScope', 'shopScopePending', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
     'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
     'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult',
     'resumeCleanupJournalEntry', 'resumeInterruptedCleanups'];

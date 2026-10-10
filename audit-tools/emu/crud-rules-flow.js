@@ -265,6 +265,7 @@ function makeSandbox(store, now) {
         optionalFn(src, 'safeStoreSet', 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
         optionalFn(src, 'safeStoreRemove', 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
         optionalFn(src, 'shopScope', "function shopScope() { return ''; }"),
+        optionalFn(src, 'shopScopePending', 'function shopScopePending() { return false; }'),
         optionalFn(src, 'cleanupJournalScope', "function cleanupJournalScope() { return ''; }"),
         optionalFn(src, 'cleanupJournalScopeMismatch', 'function cleanupJournalScopeMismatch() { return false; }'),
         optionalFn(src, 'readCleanupJournal', 'function readCleanupJournal() { return []; }'),

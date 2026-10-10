@@ -50,7 +50,7 @@
    ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
    **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
    ធាតុគ្មាន `barcodes` · Migrate Key · ការសាកឡើងវិញមិនឆ្លង session ➜ run-all STRICT ២០៤/២០៤ លើ `235e1b7` · **ជុំ ៣** (fuzz ប្តូរ session · retry · អត្រាប្រាក់ ·
-   ZTO-E13 `pages` · សោ ZTO ថ្មី) ➜ run-all STRICT ២០៤/២០៤ លើ `dd1510c` · CI ៤/៤ បៃតង · **ជុំ ៤** (ការកំណត់ · Push ចងហាង · អាយុ Cookie ZTO) ➜
+   ZTO-E13 `pages` · សោ ZTO ថ្មី) ➜ run-all STRICT ២០៤/២០៤ លើ `dd1510c` · CI ៤/៤ បៃតង · **ជុំ ៤** (ការកំណត់ · Push ចងហាង · អាយុ Cookie ZTO · ការពិនិត្យ ZTO ម្តងទៀត ៖ ហាងមិនទាន់ស្គាល់ ➜ ការសម្អាតរង់ចាំ) ➜
    ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
@@ -208,7 +208,8 @@
 - 🏪 **ZoeW (ជុំ ៤ · ម្ចាស់គម្រោង ៖ «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ») ៖ ការកំណត់ដែលជារបស់ហាង** ៖ API ស្វែងរកអតិថិជន/តារាងអតិថិជន (`zoew_lookup_api_config`) និងការតភ្ជាប់
   Excel ➜ Sheet (`zoew_sheet_import_config`) កត់ហាងដែលកំណត់វា (Firebase ៖ `databaseURL` · Supabase ៖ Project + ហាង) ➜ ចូលហាងផ្សេងលើឧបករណ៍ដដែល ➜ មិនប្រើ (ប្រអប់ទទេ ➜
   កំណត់សម្រាប់ហាងនោះ) · ត្រឡប់ហាងដើម ➜ ប្រើបានវិញ។ មុន ៖ ហាង B ស្វែងរកតាម Lookup/តារាងអតិថិជនរបស់ហាង A ហើយ «នាំចូល Excel» សរសេរចូល Sheet ហាង A។
-  ការកំណត់ចាស់ (គ្មានហាង) ➜ ចងទៅហាងដែលបើកវាមុនគេក្រោយ update។
+  ការកំណត់ចាស់ (គ្មានហាង) ➜ ចងទៅហាងដែលបើកវាមុនគេក្រោយ update។ ហាង Supabase ដែល session ស្តារ តែគណនីមិនទាន់មកដល់ (ហាងមិនទាន់ស្គាល់) ➜ ការសម្អាតស្វ័យប្រវត្តិ
+  និងការបន្តការសម្អាតដែលត្រូវរំខាន រង់ចាំរហូតស្គាល់ហាង (ការរង់ចាំបញ្ជី «ចុះហត្ថលេខា» ZTO មុនការសម្អាត ៨ ថ្ងៃ មិនបាត់ · journal ហាង A មិនបន្តក្នុងហាងដែលប្រហែលជាហាង B)។
 - 📲 **ZoeW (ជុំ ៤) ៖ Push ជារបស់ហាង** ៖ ចូលហាងផ្សេង (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ➜ App ចុះឈ្មោះ Push ឡើងវិញក្រោមហាងថ្មីភ្លាម (Supabase ៖ ហាងចាស់លែងផ្ញើ
   ដំណឹងទៅឧបករណ៍នេះ) ហើយផ្ញើកាលវិភាគ «ជិតផុតកំណត់» របស់ហាងថ្មីភ្លាម។ មុន ៖ ឧបករណ៍នៅទទួល «ជិតផុតកំណត់» របស់ហាងចាស់ រហូតដល់ ៦ ម៉ោង (ឬរហូតបិទ/បើក 📲)។
 - ⏱️ **Function ZTO + 🩺 (ជុំ ៤ · តំបន់ចាក់សោ · ម្ចាស់គម្រោង ៖ «ហេតុអ្វី Cookie ពេលខ្លះប្រើបាន ១០–១៤ ម៉ោង ពេលខ្លះ ៣–៤ ម៉ោង») ៖ អាយុ Cookie** ៖ Function កត់ក្នុង
@@ -254,6 +255,8 @@
   ១៧៨ ok · `zto-cookie-store-test` ៖ Blobs ក្លែងបែងចែក key · «diag ទី ២ ប្រើ cache» រាប់តែការអាន key `cookie` ➜ ៩១ ok · អ្នកយាម ZTO ទាំងអស់បៃតង (vitest ZTO + push-server
   ២៤ ឯកសារ ៣២៦ · `zto-list-sync` ៥៩៥ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-session` ៣២ · `zto-cookie-sync` ១៨៣ · `zto-cookie-capture` ៥៦ ·
   `zto-negative-cache` ៣៥ · `zto-signed-status` ៥៧ · `zto-network-boundaries` ១១)។
+  `ZoeW/tests/shop-pending-cleanup.test.tsx` (ថ្មី · ៤ · `runAutomaticCleanupRules` · `resumeInterruptedCleanups` ពិត · ហាង Supabase មិនទាន់ស្គាល់ · ទិសផ្ទុយ ២ ៖ Firebase · Supabase
+  ស្គាល់ គ្មាន ZTO ➜ ផុតកំណត់ធម្មតា) ➜ **ធ្លាក់ ២/៤ លើ `7894e2d`** (ការរង់ចាំ ZTO បាត់ ➜ កញ្ចប់ ៨ ថ្ងៃដកលុយ · journal បន្ត) · លើ `f572e1d` ធ្លាក់តែ journal (ចន្លោះចាស់) · ជាប់ ៤/៤។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -264,6 +267,8 @@
    (កើតតែពេលឧបករណ៍ ២ កែអតិថិជនដដែលព្រមគ្នា) ➜ ពិនិត្យ Sentry `zone: money` ក្រោយ Deploy ដូចធម្មតា។
 ៥. ឧបករណ៍ដែលចូលហាងច្រើន (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ៖ ក្រោយ update ការកំណត់ API ស្វែងរកអតិថិជន/តារាងអតិថិជន និង «នាំចូល Excel ទៅ Sheet» ចាស់
    ចងទៅហាងដែលបើកមុនគេ ➜ ក្នុងហាងនីមួយៗ ☰ ➜ «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ពិនិត្យ/កំណត់ម្តងទៀត។ ឧបករណ៍ហាងតែមួយ ៖ គ្មានអ្វីត្រូវធ្វើ។
+   ⚠️ **ហាង ZTO** ៖ ហាងដែលមិនទាន់កំណត់ API ZTO លើឧបករណ៍នេះ មិនរង់ចាំបញ្ជី «ចុះហត្ថលេខា» មុនការសម្អាត ៨ ថ្ងៃ (លើកលែងតែឧបករណ៍ ZTO ផ្សេងក្នុងហាងនោះកំពុងអាន ៖
+   សញ្ញាហាង `zto_signed_sweep`) ➜ កំណត់ API ZTO ក្នុងហាងនោះភ្លាមក្រោយ update។
    Push ៖ ចូលហាង B ➜ 🔔 ➜ 📲 នៅ «បើក» · ដំណឹង «ជិតផុតកំណត់» មកពីហាង B តែប៉ុណ្ណោះ។
 ៦. ZTO ៖ គ្មាន env ថ្មី ➜ ក្រោយ Deploy ប្រើ Lookup ធម្មតា · ពេល Cookie មួយត្រូវ ZTO បដិសេធ ហើយ Sync ថ្មី ➜ 🩺 ជួរ ZTO បង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜
    បដិសេធនៅ … (ទំនេរ …)»។ ប្រមូល ២–៣ ជីវិត រួចប្រាប់ Claude ដើម្បីវិភាគ (ទំនេរយូរ = ZTO idle timeout · ទំនេរខ្លី = ZTO បិទ session)។ Cookie ដែល Sync ដោយឧបករណ៍ចាស់
@@ -3565,7 +3570,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
     ការបដិសេធដែលកត់) · ថវិកា ៖ `cookieRenewTimeoutMs()` ស្របគ្នាជាមួយ `flushCookieRenewal()` · ធ្លាក់ ➜ មិនសាករហូត `COOKIE_LIFE_RETRY_MS` (Blob ជាប់គាំងមិនបន្ថែម ≤ ០.៩ វិ.
     លើរាល់ការស្កេន) · diag អានស្របគ្នាជាមួយការអាន Cookie (≤ `COOKIE_STORE_TIMEOUT_MS`)។ វាស់មុនកែ ១២/១២ FAIL។ **fake ក្លែង** ៖ Blobs ក្លែងក្នុង `zto-cookie-store-test` មិនបែងចែក key
     (key ណាក៏ = Cookie) ➜ ការសរសេរ `cookie-life` នឹងជាន់ Cookie ក្នុង fake (មិនមែនក្នុង Blobs ពិត) ➜ fake បែងចែក key ឥឡូវ · «diag ទី ២ ប្រើ cache» រាប់តែ key `cookie`។
-    ព្រំដែន ៖ «ប្រើបានចុងក្រោយ» ពី container ផ្សេងច្បាស់ ≤ ១០ នាទី (container ដដែលច្បាស់) · Cookie ពី env ឬ Sync ដោយឧបករណ៍ចាស់ (គ្មាន `syncedAt`) ➜ មិនវាស់។
+    ព្រំដែន ៖ «ប្រើបានចុងក្រោយ» ពី container ផ្សេងច្បាស់ ≤ ១០ នាទី (container ដដែលច្បាស់) · Cookie ពី env ឬ Sync ដោយឧបករណ៍ចាស់ (គ្មាន `syncedAt`) ➜ មិនវាស់ ·
+    Sync session ដដែលម្តងទៀត (ចុចដោយដៃពេលវានៅរស់) ➜ ជីវិតថ្មី (អាយុរាប់ពី Sync ចុងក្រោយ = តិចជាងអាយុពិតនៃការចូល Argus) · `idleMs` មិនរងផល ( `--auto` Sync តែពេល Cookie ស្លាប់)។
+  - **ការពិនិត្យ ZTO ម្តងទៀត (ម្ចាស់គម្រោង ៖ «ពិនិត្យ ZTO អោយហ្មត់ចត់ … ពេលរួចស្អាតចាក់សោរវា»)** ៖ អានការកែជុំ ៤ ពីផ្លូវ ZTO ទាំងអស់ដែលអាន `getLookupApiConfig()` ➜
+    **រកឃើញ regression** ៖ ការកំណត់ដែលចងហាងមិនប្រើពេលហាងមិនទាន់ស្គាល់ ➜ ហាង Supabase ដែល session ស្តារ តែគណនីមិនទាន់មកដល់ (គ្មាន cache គណនី · `my_account()` ក្រៅបណ្តាញ)
+    ➜ `ztoAutoCloseEnabled()` = `false` ➜ `ztoAbandonCleanupIsHeld()` មិនរង់ចាំ ➜ ទិដ្ឋភាពប្រវត្តិស្រស់មកដល់ (Supabase ទាញបានទោះគណនីមិនទាន់ផ្ទៀង) ➜ ការសម្អាត ៨ ថ្ងៃដកលុយកញ្ចប់
+    ដែល ZTO ចុះហត្ថលេខារួច (សញ្ញាហាងជួយតែពេលឧបករណ៍ ZTO ផ្សេងកំពុងអាន)។ ក្នុងផ្លូវដដែល ៖ `cleanupJournalScopeMismatch()` = `false` ពេល scope បច្ចុប្បន្នទទេ ➜ journal របស់ហាង A
+    បន្តក្នុងហាងដែលមិនទាន់ស្គាល់ (ចន្លោះចាស់)។ កែ ៖ `shopScopePending()` (config Supabase + គ្មាន `tenant`) ➜ `runAutomaticCleanupRules()` · `resumeInterruptedCleanups()` រង់ចាំ
+    ⛔ មិនកែឯកសារចាក់សោ (`zto-status.ts` មិនប្រែ ➜ `LOCK` មិនប្រែ) · Firebase ស្គាល់ហាងជានិច្ច (`databaseURL`)។ វាស់ ៖ `7894e2d` ២/៤ FAIL · `f572e1d` ១/៤ (journal) · ក្រោយកែ ៤/៤។
+    sandbox ដែលស្រង់ `runAutomaticCleanupRules()`/`resumeInterruptedCleanups()` (`cleanup-clock-guard-test` · `cleanup-interrupt-atomicity-test` · `partial-pickup-cleanup-test` ·
+    `restore-marker-hygiene-test` · `stale-clear-claim-test` · `emu/crud-rules-flow`) ធ្លាក់ `ReferenceError` ភ្លាម (មិនលេបដូច journal) ➜ ប្រកាស `shopScopePending()` ពិត ➜ ជាប់ទាំងអស់។
+    ព្រំដែនដែលទទួលស្គាល់ ៖ ឧបករណ៍ចូលហាងច្រើន ➜ ហាងដែលមិនទាន់កំណត់ API ZTO លើឧបករណ៍នេះមិនរង់ចាំ ZTO ([2.50.53] សកម្មភាព ៥ ⚠️)។
 
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 
@@ -5411,7 +5426,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `camera-resume-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `cleanup-clock-guard-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `cleanup-clock-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `clear-history-claim-test` | ផ្នែក ១ | — |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5511,7 +5526,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
-| `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `partial-pickup-cleanup-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -5534,7 +5549,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
-| `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `restore-marker-hygiene-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `restore-race-test` | ផ្នែក ១ | — |
 | `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
@@ -5554,7 +5569,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `shared-fns` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `stale-clear-claim-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `stale-write` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -5681,6 +5696,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | ផ្នែក ១ | — |

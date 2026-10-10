@@ -18,7 +18,7 @@ import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../se
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
-import { shopScope } from '../core/shop-scope';
+import { shopScope, shopScopePending } from '../core/shop-scope';
 
 export const cleanupInFlight = new Set();
 
@@ -68,7 +68,7 @@ export const CLEANUP_SWEEP_BATCH = 8;
 export const CLEANUP_SWEEP_YIELD_MS = 50;
 
 export function runAutomaticCleanupRules(sweepLimit?: number) {
-    if (!cleanupClockIsTrustworthy()) return;
+    if (!cleanupClockIsTrustworthy() || shopScopePending()) return;
     const currentTime = getServerNow();
     const visited = sweepLimit ? dataState.cleanupSweepVisited : null;
     let started = 0;
@@ -642,7 +642,7 @@ export async function resumeCleanupJournalEntry(trashId) {
 }
 
 export async function resumeInterruptedCleanups() {
-    if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted) return;
+    if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
     const list = readCleanupJournal();
     if (!list.length) return;
     dataState.cleanupResumeInFlight = true;

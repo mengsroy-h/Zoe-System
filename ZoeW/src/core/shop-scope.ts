@@ -16,6 +16,16 @@ export function shopScope() {
     }
 }
 
+export function shopScopePending() {
+    if (shopScope()) return false;
+    try {
+        const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+        return !!raw && /supabaseUrl"?'?\s*:/.test(raw);
+    } catch (e) {
+        return false;
+    }
+}
+
 export function sameShop(a, b) {
     const key = (scope) => String(scope || '').trim().replace(/\/+(#|$)/, '$1').toLowerCase();
     const left = key(a);

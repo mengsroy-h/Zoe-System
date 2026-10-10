@@ -181,6 +181,9 @@ function buildWorld(opts) {
         extractFn(src, 'getServerNow'),
         extractFn(src, 'serverClockOffsetIsFromServer'),
         CLOCK_GATE,
+        // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ ឆ្លើយ `false` (វាស់ក្នុង `ZoeW/tests/shop-pending-cleanup.test.tsx`)
+        extractFn(src, 'shopScope') || "function shopScope() { return ''; }",
+        extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }',
         extractFn(src, 'detachInfoListeners'),
         extractFn(src, 'attachInfoListeners'),
         extractFn(src, 'runAutomaticCleanupRules'),

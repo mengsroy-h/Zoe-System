@@ -130,7 +130,10 @@ function barcodeCloseIsRipe(b, n) { return !!(b && b.isClosed && typeof b.closed
         'releaseStaleClearHistoryClaim', 'runAutomaticCleanupRules'];
     // ⛔ `dbOp` ពិតហៅ `probeDatabaseLiveness()` ពេលព្យួរ (ការវាស់ភាពរស់ ៖ `emu/app-network-e2e-test`) ➜ stub «មិនវាស់»
     vm.runInContext('var probeDatabaseLiveness = function () { return Promise.resolve(null); };', ctx);
-    vm.runInContext(preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n'
+    // ⛔ ច្រកទ្វារ «ហាងស្គាល់» (`shopScopePending()`) ៖ function ពិត ➜ sandbox គ្មាន Config ➜ `false`
+    const SHOP_GATE = (extractFn(src, 'shopScope') || "function shopScope() { return ''; }") + '\n'
+        + (extractFn(src, 'shopScopePending') || 'function shopScopePending() { return false; }');
+    vm.runInContext(preamble + NEEDED_CONSTS.map(constSource).join('\n') + '\n' + SHOP_GATE + '\n'
         + FNS.map(fnSource).join('\n') + `
 globalThis.__setFb = (i) => { fb = i; };
 globalThis.__seed = (h) => { scanHistory = h; };

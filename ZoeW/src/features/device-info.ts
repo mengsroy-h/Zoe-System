@@ -21,56 +21,6 @@ const IOS_FROZEN_MAJOR = 18;
 const IOS_FROZEN_MINOR = 6;
 const IOS_UNFROZEN_MAJOR = 26;
 const SAFARI_26_FEATURES = ['anchor-name: --zoe', 'animation-timeline: scroll()'];
-const IOS_SUPPORTED = 999;
-
-type IphoneModel = { name: string; screens: Array<[number, number, number]>; ios: [number, number, number] };
-
-export const IPHONE_MODELS: IphoneModel[] = [
-    { name: 'iPhone SE (1st gen)', screens: [[320, 568, 2]], ios: [9, 3, 15] },
-    { name: 'iPhone 6s', screens: [[375, 667, 2]], ios: [9, 0, 15] },
-    { name: 'iPhone 6s Plus', screens: [[414, 736, 3]], ios: [9, 0, 15] },
-    { name: 'iPhone 7', screens: [[375, 667, 2]], ios: [10, 0, 15] },
-    { name: 'iPhone 7 Plus', screens: [[414, 736, 3]], ios: [10, 0, 15] },
-    { name: 'iPhone 8', screens: [[375, 667, 2]], ios: [11, 0, 16] },
-    { name: 'iPhone 8 Plus', screens: [[414, 736, 3]], ios: [11, 0, 16] },
-    { name: 'iPhone X', screens: [[375, 812, 3]], ios: [11, 0, 16] },
-    { name: 'iPhone XS', screens: [[375, 812, 3]], ios: [12, 0, 18] },
-    { name: 'iPhone XS Max', screens: [[414, 896, 3]], ios: [12, 0, 18] },
-    { name: 'iPhone XR', screens: [[414, 896, 2]], ios: [12, 0, 18] },
-    { name: 'iPhone 11', screens: [[414, 896, 2]], ios: [13, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 11 Pro', screens: [[375, 812, 3]], ios: [13, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 11 Pro Max', screens: [[414, 896, 3]], ios: [13, 0, IOS_SUPPORTED] },
-    { name: 'iPhone SE (2nd gen)', screens: [[375, 667, 2]], ios: [13, 4, IOS_SUPPORTED] },
-    { name: 'iPhone 12 mini', screens: [[375, 812, 3], [360, 780, 3]], ios: [14, 1, IOS_SUPPORTED] },
-    { name: 'iPhone 12', screens: [[390, 844, 3]], ios: [14, 1, IOS_SUPPORTED] },
-    { name: 'iPhone 12 Pro', screens: [[390, 844, 3]], ios: [14, 1, IOS_SUPPORTED] },
-    { name: 'iPhone 12 Pro Max', screens: [[428, 926, 3]], ios: [14, 1, IOS_SUPPORTED] },
-    { name: 'iPhone 13 mini', screens: [[375, 812, 3], [360, 780, 3]], ios: [15, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 13', screens: [[390, 844, 3]], ios: [15, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 13 Pro', screens: [[390, 844, 3]], ios: [15, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 13 Pro Max', screens: [[428, 926, 3]], ios: [15, 0, IOS_SUPPORTED] },
-    { name: 'iPhone SE (3rd gen)', screens: [[375, 667, 2]], ios: [15, 4, IOS_SUPPORTED] },
-    { name: 'iPhone 14', screens: [[390, 844, 3]], ios: [16, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 14 Plus', screens: [[428, 926, 3]], ios: [16, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 14 Pro', screens: [[393, 852, 3]], ios: [16, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 14 Pro Max', screens: [[430, 932, 3]], ios: [16, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 15', screens: [[393, 852, 3]], ios: [17, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 15 Plus', screens: [[430, 932, 3]], ios: [17, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 15 Pro', screens: [[393, 852, 3]], ios: [17, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 15 Pro Max', screens: [[430, 932, 3]], ios: [17, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 16', screens: [[393, 852, 3]], ios: [18, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 16 Plus', screens: [[430, 932, 3]], ios: [18, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 16 Pro', screens: [[402, 874, 3]], ios: [18, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 16 Pro Max', screens: [[440, 956, 3]], ios: [18, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 16e', screens: [[390, 844, 3]], ios: [18, 3, IOS_SUPPORTED] },
-    { name: 'iPhone 17', screens: [[402, 874, 3]], ios: [26, 0, IOS_SUPPORTED] },
-    { name: 'iPhone Air', screens: [[420, 912, 3]], ios: [26, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 17 Pro', screens: [[402, 874, 3]], ios: [26, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 17 Pro Max', screens: [[440, 956, 3]], ios: [26, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 17e', screens: [[390, 844, 3]], ios: [26, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 18 Pro', screens: [[402, 874, 3]], ios: [27, 0, IOS_SUPPORTED] },
-    { name: 'iPhone 18 Pro Max', screens: [[440, 956, 3]], ios: [27, 0, IOS_SUPPORTED] }
-];
 
 let devicePending: Promise<DeviceInfo> | null = null;
 
@@ -111,30 +61,6 @@ function applePlatform(ua: string, major: string, minor: string, engine26: boole
     return 'iOS ' + major + '.' + minor;
 }
 
-function iosVersionOf(platform: unknown): { major: number; minor: number; atLeast: boolean } | null {
-    const m = /^iOS (\d{1,3})(?:\.(\d{1,3}))?(\+)?$/.exec(typeof platform === 'string' ? platform : '');
-    return m ? { major: Number(m[1]), minor: Number(m[2] || 0), atLeast: m[3] === '+' } : null;
-}
-
-function iosFitsModel(range: [number, number, number], v: { major: number; minor: number; atLeast: boolean }): boolean {
-    if (v.atLeast) return range[2] >= v.major;
-    const released = v.major > range[0] || (v.major === range[0] && v.minor >= range[1]);
-    return released && v.major <= range[2];
-}
-
-export function iphoneModelFromScreen(width: unknown, height: unknown, pixelRatio: unknown, platform: unknown): string {
-    const w = Number(width);
-    const h = Number(height);
-    const ratio = Math.round(Number(pixelRatio));
-    if (!(w > 0) || !(h > 0) || !(ratio > 0)) return '';
-    const short = Math.round(Math.min(w, h));
-    const long = Math.round(Math.max(w, h));
-    const ios = iosVersionOf(platform);
-    const names = IPHONE_MODELS.filter((m) => m.screens.some((s) => s[0] === short && s[1] === long && s[2] === ratio)
-        && (!ios || iosFitsModel(m.ios, ios))).map((m) => m.name);
-    return names.map((n, i) => (i === 0 ? n : n.replace(/^iPhone /, ''))).join(' / ');
-}
-
 export function deviceFromUserAgent(ua: unknown, engine26 = false): { model: string; platform: string } {
     const s = typeof ua === 'string' ? ua : '';
     const apple = /\b(iPhone|iPad|iPod)\b[^)]*?OS (\d+)[_.](\d+)/.exec(s);
@@ -156,10 +82,6 @@ async function webDeviceInfo(): Promise<{ model: string; platform: string }> {
     const fromUa = deviceFromUserAgent(nav && nav.userAgent, webKitAtLeast26());
     let model = fromUa.model;
     let platform = fromUa.platform;
-    if (model === 'iPhone') {
-        const scr: any = window.screen;
-        model = iphoneModelFromScreen(scr && scr.width, scr && scr.height, window.devicePixelRatio, platform) || model;
-    }
     const uad = nav && nav.userAgentData;
     if (uad && typeof uad.getHighEntropyValues === 'function') {
         try {

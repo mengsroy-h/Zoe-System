@@ -383,12 +383,16 @@ export function cleanupLedgerResult(trashId, state) {
 }
 
 export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone, entry?) {
+    const settleDb = firebaseState.db;
+    const settleGeneration = firebaseState.authGeneration;
+    const settleIsCurrent = () => firebaseState.db === settleDb && firebaseState.authGeneration === settleGeneration;
     let verdict;
     try {
-        verdict = await retryAsync(() => dbOp(markCleanupTrashDeducted(trashItem)), 3, 1500);
+        verdict = await retryAsync(() => (settleIsCurrent() ? dbOp(markCleanupTrashDeducted(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
     } catch (flipErr) {
         return false;
     }
+    if (!settleIsCurrent()) return false;
     if (verdict === 'flipped') return true;
     if (verdict === 'claimed' || !decideGone) return false;
     if (dataState.deletedItems.some((t) => t && t.id === trashItem.id)) return false;
@@ -454,13 +458,17 @@ export function releaseCleanupLedgerKeys(list) {
 }
 
 export async function resolveCleanupSlot(trashItem) {
+    const slotDb = firebaseState.db;
+    const slotGeneration = firebaseState.authGeneration;
+    const slotIsCurrent = () => firebaseState.db === slotDb && firebaseState.authGeneration === slotGeneration;
     let existing = null;
     try {
-        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(slotDb, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
         existing = snap.exists() ? snap.val() : null;
     } catch (readErr) {
         return 'wait';
     }
+    if (!slotIsCurrent()) return 'wait';
     if (existing && existing.deletedAt === trashItem.deletedAt) return 'ours';
     if (existing && trashSlotSharesClaim(existing, trashItem)) return 'elsewhere';
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return 'wait';
@@ -469,7 +477,9 @@ export async function resolveCleanupSlot(trashItem) {
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
     try {
-        return (await retryAsync(() => claimCleanupTrashSlot(trashItem), 3, 1500)) ? 'claimed' : 'elsewhere';
+        const claimed = await retryAsync(() => (slotIsCurrent() ? claimCleanupTrashSlot(trashItem) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
+        if (!slotIsCurrent()) return 'wait';
+        return claimed ? 'claimed' : 'elsewhere';
     } catch (claimErr) {
         return 'wait';
     }
@@ -556,6 +566,9 @@ export async function resumeCleanupJournalEntry(trashId) {
         clearCleanupJournalEntry(trashItem.id);
         return '';
     }
+    const resumeDb = firebaseState.db;
+    const resumeGeneration = firebaseState.authGeneration;
+    const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration;
     const rev = entry.revenue;
     let stage = entry.stage;
     const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
@@ -569,7 +582,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     let outcome = '';
     if (stage === CLEANUP_STAGE_SLOT) {
         const slot = await resolveCleanupSlot(trashItem);
-        if (slot === 'wait') return '';
+        if (slot === 'wait' || !resumeIsCurrent()) return '';
         if (slot === 'elsewhere') {
             clearCleanupJournalEntry(trashItem.id);
             return '';
@@ -580,11 +593,12 @@ export async function resumeCleanupJournalEntry(trashId) {
     }
     let present = false;
     try {
-        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(resumeDb, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
         present = snap.exists();
     } catch (readErr) {
         return '';
     }
+    if (!resumeIsCurrent()) return '';
     if (!present) {
         if (stage !== CLEANUP_STAGE_MOVED) {
             if (!keyed || !rev) {
@@ -605,13 +619,14 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
         try {
-            await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
+            await notifyIfSlow(retryAsync(() => (resumeIsCurrent() ? dbOp(saveSingleDeletedItemToFirebase(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
             outcome = 'restored';
         } catch (writeErr) {
             return '';
         }
+        if (!resumeIsCurrent()) return '';
     }
     if (stage === CLEANUP_STAGE_MOVED && rev) {
         const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);

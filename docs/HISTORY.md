@@ -69,11 +69,11 @@
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · born-closed `closedAt` · resume journal ពេលប្តូរ session កណ្តាលផ្លូវ (Deep audit ៥ ជុំ ២ ច) ·
+   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · born-closed `closedAt` ·
    zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
    SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
    ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
-   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង)។
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង) · resume ពេលប្តូរ session (កែ ៖ ជុំ ២ ឆ)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
@@ -185,7 +185,8 @@
   ការសម្អាតដែលសរសេរធុងសំរាមមិនបាន ហើយត្រឡប់ទៅប្រវត្តិ ខណៈឧបករណ៍ផ្សេងបង្កើតធាតុឡើងវិញក្រោម id ដដែល ➜ barcode ដែល claim ចូលធាតុនោះ (មុន ៖ បាត់ពីប្រវត្តិ និងធុងសំរាម) ·
   Locker ៖ ការកំណត់ទីតាំងដែលចុះយឺត (ឬបរាជ័យ) ក្រោយចាកចេញ/ប្តូរ Config ➜ មិនកែទិដ្ឋភាព · មិនបង្ហាញ ✅/❌ ក្នុង session ថ្មី ·
   ការសរសេរធុងសំរាមឡើងវិញ (សម្អាត · លុប · ដក) និងការស្តារ barcode ចូលប្រវត្តិ ឈប់ពេលចាកចេញ/ប្តូរ Config កណ្តាលការសាក (មុន ៖ ការសាកលើកក្រោយសរសេរកញ្ចប់ហាង A
-  ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល)។
+  ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល) · ការបន្តការសម្អាតដែលត្រូវរំខាន ឈប់ពេល session ប្តូរកណ្តាលផ្លូវ (មុន ៖ សរសេរធុងសំរាម និង **កាត់ប្រាក់**
+  ក្នុងហាងថ្មី)។
 - 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
   (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
   Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
@@ -205,6 +206,8 @@
   `keygen-session-security-test` «ប្តូរ Database កណ្តាល retry» (`retryAsync()` ពិត) · «ប្តូរ Database ចន្លោះការអាន និងការសរសេររបស់ Migrate» ➜ **ធ្លាក់ ២ + ២ មុនកែ** · ជាប់ ១៥០/១៥០។
   `ZoeW/tests/trash-retry-session.test.ts` (ថ្មី · ៥ · `claimAndCleanupItem` · `deleteSingleItem` · `removeSingleBarcode` · `restoreClaimedItemToScanHistory` ពិត · fake កត់ Database
   នៃការសរសេរនីមួយៗ) ➜ **ធ្លាក់ ៤/៥ មុនកែ** (ការសាកឡើងវិញសរសេរចូលហាង B) · ជាប់ ៥/៥។
+  `ZoeW/tests/cleanup-resume-session.test.ts` (ថ្មី · ៥ · `resumeCleanupJournalEntry` ពិត · ប្តូរហាងនៅការអានធុងសំរាម · ក្រោយសរសេរធុងសំរាម · ពេលអាន slot · ក្រោយជំហាន ledger ខែ ·
+  ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3383,8 +3386,11 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   ➜ កញ្ចប់ហាង A ចូលធុងសំរាមហាង B · «ដក» ៖ ការស្តារ barcode ក្រោយបរាជ័យសរសេរចូលប្រវត្តិហាង B (`revertRevenueLedgerDelta()` មាន `applied.isCurrent` រួចហើយ ➜ ledger មិនប៉ះ) ·
   `restoreClaimedItemToScanHistory()` ចាប់ ref ដើម តែនៅលើ Supabase db ដដែល + គណនីថ្មី ➜ tenant ផ្សេង។ ឥឡូវ closure នៃការសាកនីមួយៗពិនិត្យ session (`noRetry`) · «ដក» ចាប់
   session ពេល `finishRemoval()` ចាប់ផ្តើម (ផ្លូវ late commit ក្នុងហាងដដែលមិនប្រែ) ហើយឈប់មុនការស្តារពេល session ប្តូរ (ព្រំដែន MONEY-3 «ដក» គ្មាន journal ដដែល ៖ Sentry money)។
-  **មិនទាន់វាស់** ៖ ផ្លូវ resume (`resumeCleanupJournalEntry()` ៖ `resolveCleanupSlot()` · `settleCleanupDeduction()` · ជំហាន ledger) គ្មានការពិនិត្យ session កណ្តាលផ្លូវ
-  (ពិនិត្យតែ scope នៅដើម) ➜ ការចាកចេញ/ប្តូរ Config កណ្តាល resume ➜ handoff «មិនទាន់វាស់»។
+  ឆ. **resume ពេលប្តូរ session កណ្តាលផ្លូវ** (ម្ចាស់គម្រោង ៖ «ហេតុអីបានមិនទាន់វាស់» ➜ វាស់) ៖ `resumeCleanupJournalEntry()` ពិនិត្យ scope តែនៅដើម ➜ ប្តូរហាងពេលអានធុងសំរាម
+  (stage `moved`) ➜ ទិដ្ឋភាពហាង B «barcode មិនត្រឡប់» ➜ សរសេរធុងសំរាមហាង A ចូល B ➜ **កាត់ ៧ ពី ledger ខែ និងថ្ងៃរបស់ហាង B** ➜ flip ក្នុង B (`ZoeW/tests/cleanup-resume-session.test.ts` ១) ·
+  stage `slot` ដូចគ្នា (៣) · ប្តូរក្រោយសរសេរធុងសំរាមក្នុង A ➜ កាត់ក្នុង B (៤)។ ការប្តូរកណ្តាលជំហាន ledger ខែមិនបន្តទៅថ្ងៃ (`commitLedgerEventStep()` ពិនិត្យ session ក្រោយ
+  transaction រួច ➜ ២ ជាប់មុនកែ = អ្នកយាមទិសផ្ទុយ)។ ការកែ ៖ ចាប់ session នៅដើម `resumeCleanupJournalEntry()` · `resolveCleanupSlot()` · `settleCleanupDeduction()` ➜ ពិនិត្យក្រោយ
+  `await` នីមួយៗ និងក្នុង closure នៃការសាក (`noRetry`) ➜ journal នៅសម្រាប់ហាងដើម។
   ការផ្ទៀងផ្ទាត់ជុំ ២ ៖ vitest ១២៨ ឯកសារ · ១១៦៥/១១៦៥ · `tsc` ស្អាត · checker sandbox ១៩ ពាក់ព័ន្ធ ជាប់ · run-all STRICT (emulator RTDB រស់) លើ `2b72656` បញ្ឈប់ដោយចេតនា
   (រកឃើញ Migrate ក្រោយ commit) ➜ លើ `235e1b7` ៖ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង)។
   ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
@@ -5497,6 +5503,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |

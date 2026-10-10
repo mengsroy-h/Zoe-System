@@ -103,7 +103,9 @@ function serve(dir, blocked) {
                     sw.addEventListener('statechange', () => {
                         if (sw.state === 'activated' || sw.state === 'redundant') res();
                     });
-                    setTimeout(res, 8000);
+                    // ⛔ ពិដាន ២០ វិ. ដូចជុំទី ២ ៖ ៨ វិ. ខ្លីពេលម៉ាស៊ីនរវល់ (run-all ៤ lane) ➜ SW នៅ 'installing' (មិន activate · cache ទទេ) ➜
+                    //    ធ្លាក់ក្លែង។ SW ដែលជាប់ 'installing' ហួស ២០ វិ. នៅតែធ្លាក់ (`installFailed` ត្រូវជា `true`)។
+                    setTimeout(res, 20000);
                 });
                 installFailed = sw.state === 'redundant';
             }

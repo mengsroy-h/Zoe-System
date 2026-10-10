@@ -47,6 +47,11 @@ export default tseslint.config(
     },
 
     {
+        files: ['src/app/components/history/HistoryTableBody.tsx'],
+        rules: { 'react-hooks/incompatible-library': 'off' }
+    },
+
+    {
         files: ['src/app/behaviors/**/*.ts'],
         languageOptions: { globals: { ZoeLicense: 'readonly' } },
         rules: { 'no-empty': 'off', 'prefer-const': 'off', '@typescript-eslint/no-unused-vars': 'off' }

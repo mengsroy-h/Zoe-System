@@ -13,6 +13,7 @@ import { viewState } from '../core/view-state';
 import { sheetImportState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { SHEET_IMPORT_SECRET_SALT, SHEET_IMPORT_STORE_KEY } from '../core/storage-keys';
+import { shopOwnsSetting, shopScope } from '../core/shop-scope';
 import { clearCustomerDataTableCache, seedCustomerTableFromImport } from './customer-table';
 import { scheduleCustomerTableSoonRefresh } from './customer-table-prefetch';
 import { loadScriptOnce } from './export';
@@ -78,7 +79,7 @@ export function readSheetImportStoredConfig() {
         const raw = appLocalStore.getItem(SHEET_IMPORT_STORE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        return parsed && parsed.u && parsed.p ? parsed : null;
+        return parsed && parsed.u && parsed.p && shopOwnsSetting(parsed, SHEET_IMPORT_STORE_KEY) ? parsed : null;
     } catch (e) {
         return null;
     }
@@ -281,7 +282,9 @@ export async function saveSheetImportConfig() {
     setSheetImportMsg('siConfigMsg', 'កំពុងសាកល្បងការតភ្ជាប់...', 'warn');
     try {
         const status = await callSheetImportApi('status', {}, url, password);
-        const stored = { v: 1, u: await encryptSheetImportSecret(url), p: await encryptSheetImportSecret(password) };
+        const stored: any = { v: 1, u: await encryptSheetImportSecret(url), p: await encryptSheetImportSecret(password) };
+        const shop = shopScope();
+        if (shop) stored.shop = shop;
         if (!stored.u || !stored.p || !safeStoreSet(appLocalStore, SHEET_IMPORT_STORE_KEY, JSON.stringify(stored))) {
             setSheetImportMsg('siConfigMsg', 'រក្សាទុកមិនបានទេ — សូមពិនិត្យទំហំផ្ទុករបស់ browser', 'bad');
             return;

@@ -63,6 +63,8 @@ function build(items, ledgerDays) {
         window: {},
         deletedItems: JSON.parse(JSON.stringify(items)),
         deletedCleanupInFlight: false,
+        db: {},
+        authGeneration: 0,
         getServerNow: () => NOW,
         cleanupClockIsTrustworthy: () => true,
         activeRestoreClaims: new Map(),

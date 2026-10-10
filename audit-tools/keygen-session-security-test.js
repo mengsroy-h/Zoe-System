@@ -189,6 +189,7 @@ function build(options) {
         ...(src.indexOf('function armAdminLateWrite(') !== -1 ? ['armAdminLateWrite'] : []),
         'setKeySeatLimit',
         'releaseKeySeat',
+        'migrateLegacyLicenseKeyMetadata',
         'copySensitiveText',
         'copyTextarea',
         'copyGeneratedKey',
@@ -248,6 +249,66 @@ async function run() {
     await generateTask;
     ok('Generated key មិនត្រូវបង្ហាញក្រោយ logout', h.getElementById('genResultKey').textContent === '');
     ok('Generated key មិនត្រូវនៅក្នុង memory ក្រោយ logout', h.ctx.lastGeneratedKey === '');
+
+    // ⛔ Generate ៖ ការសរសេរលើកទី ១ បរាជ័យ ហើយ Database ត្រូវបានប្តូរ (Reconfig ទៅ License Project ផ្សេង) មុន retry ➜ retry មិនត្រូវសរសេរ Key ចូល
+    //    Database ថ្មីទេ (ដូច Revoke · ចំនួនឧបករណ៍ · ដោះឧបករណ៍ · Extend ដែលចាប់ `operationDb` រួចហើយ)។ ប្រើ `retryAsync()` ពិតពីកូដ ship
+    //    (រង់ចាំខ្លី) ព្រោះ stub ខាងលើមិន retry ទេ។
+    console.log('-- ប្តូរ Database កណ្តាល retry របស់ Generate --');
+    for (const switchDb of [true, false]) {
+        h = build({ privateKey: { kty: 'EC', crv: 'P-256', d: 'private', x: 'x', y: 'y' } });
+        vm.runInContext(slice(['retryAsync']), h.ctx);
+        h.ctx.setTimeout = (fn) => setTimeout(fn, 0);
+        h.getElementById('genDaysInput').value = '30';
+        const dbA = h.ctx.db;
+        const dbB = { name: 'other-license-project' };
+        const writes = [];
+        h.ctx.fb.update = (ref) => {
+            writes.push(ref.db);
+            if (writes.length === 1) {
+                if (switchDb) h.ctx.db = dbB;
+                return Promise.reject(new Error('network'));
+            }
+            return Promise.resolve();
+        };
+        await h.ctx.generateLicenseKey();
+        await drain(20);
+        const label = switchDb ? 'ប្តូរ Database' : 'ទិសផ្ទុយ ៖ Database ដដែល';
+        ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ ៖ ការសរសេរលើកទី ១ ទៅ Database ដើម', writes[0] === dbA, writes.length);
+        if (switchDb) {
+            ok(label + ' ៖ ⛔ retry មិនសរសេរ Key ចូល Database ថ្មី', writes.every((d) => d !== dbB), writes.map((d) => (d === dbB ? 'B' : 'A')));
+            ok(label + ' ៖ Key មិនបង្ហាញ', h.ctx.lastGeneratedKey === '', h.ctx.lastGeneratedKey);
+        } else {
+            ok(label + ' ៖ retry សរសេរទៅ Database ដើម ហើយបង្ហាញ Key', writes.length === 2 && writes[1] === dbA && h.ctx.lastGeneratedKey === 'signed-key',
+                { writes: writes.length, key: h.ctx.lastGeneratedKey });
+        }
+    }
+
+    // ⛔ Migrate Key ចាស់ ៖ អាន `license_keys` ពី Database A ➜ Reconfig ទៅ License Project B មុនការសរសេរ ➜ ការផ្លាស់ទីដែលគណនាពី A មិនត្រូវសរសេរចូល B
+    //    ហើយ session ចាស់មិនបង្ហាញ ✅ ក្នុង session ថ្មីទេ (ដូចប្រតិបត្តិការ Admin ផ្សេងដែលចាប់ `operationDb`)។
+    console.log('-- ប្តូរ Database ចន្លោះការអាន និងការសរសេររបស់ Migrate --');
+    for (const switchDb of [true, false]) {
+        h = build();
+        const dbA = h.ctx.db;
+        const dbB = { name: 'other-license-project' };
+        const readWait = deferred();
+        const writes = [];
+        h.ctx.fb.get = () => readWait.promise;
+        h.ctx.fb.update = (ref) => { writes.push(ref.db); return Promise.resolve(); };
+        const task = h.ctx.migrateLegacyLicenseKeyMetadata();
+        await drain();
+        if (switchDb) h.ctx.db = dbB;
+        readWait.resolve({ exists: () => true, val: () => ({ ZOE: { 'key-legacy': { expiresAt: 1, revoked: false, note: 'old', createdBy: 'a@b.c' } } }) });
+        await task;
+        await drain();
+        const label = switchDb ? 'Migrate ប្តូរ Database' : 'Migrate ទិសផ្ទុយ ៖ Database ដដែល';
+        if (switchDb) {
+            ok(label + ' ៖ ⛔ មិនសរសេរការផ្លាស់ទីរបស់ A ចូល B', writes.every((d) => d !== dbB), writes.map((d) => (d === dbB ? 'B' : 'A')));
+            ok(label + ' ៖ គ្មាន ✅ ក្នុង session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log.toasts);
+        } else {
+            ok(label + ' ៖ សរសេរទៅ Database ដើមម្តង ហើយ ✅', writes.length === 1 && writes[0] === dbA && h.log.toasts.some((t) => t.startsWith('✅')),
+                { writes: writes.length, toasts: h.log.toasts });
+        }
+    }
 
     console.log('-- Load Signing Key ឡើងវិញខណៈ Generate កំពុងរង់ចាំ --');
     const reloadKey = { kty: 'EC', crv: 'P-256', d: 'synthetic-private', x: 'x', y: 'y' };

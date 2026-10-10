@@ -45,6 +45,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
     const code = sliceFn(source, 'safeStoreSet') + '\n' + sliceFn(source, 'safeStoreRemove') + '\n'
         + sliceFn(source, 'safeStoreGet') + '\n'
         + sliceFn(source, 'lookupApiIsAppsScript') + '\n'
+        + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
         + sliceFn(source, 'lookupApiSendsHeader') + '\n'
         + source.slice(start, end);
     const storage = new Map();
@@ -116,7 +117,9 @@ function createRuntime(existing, key, encrypt, failStorage) {
             lookupSecretKey: { key: true },
             encryptLookupSecret: async (value) => ({ sealed: value })
         });
-        const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n' + sliceFn(appSource, 'getLookupApiConfig')
+        const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n'
+            + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(appSource, name)).join('\n') + '\n'
+            + sliceFn(appSource, 'getLookupApiConfig')
             + '\n' + migrateSource + '\nthis.runMigration = migrateLookupSecretIfNeeded;';
         vm.runInContext(runtimeCode, context);
         const changed = await context.runMigration();

@@ -384,6 +384,7 @@ export function ztoListPositiveCount(value) {
 export async function fetchZtoListAllPages(cfg, from, to) {
     const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
         signedMismatchTexts: [], signedDescExpected: [], signedState: 'none' };
+    let arrivalTotals = 0;
     const absorb = (body, arrival) => {
         if (!body) return;
         out.signedMismatch += ztoListPositiveCount(body.signedMismatch) + ztoListPositiveCount(body.signedListMismatch);
@@ -394,6 +395,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
             for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
             const reportedTotal = Number(body.total);
             if (isFinite(reportedTotal) && reportedTotal > out.total) out.total = reportedTotal;
+            if (isFinite(reportedTotal) && reportedTotal > 0) arrivalTotals += reportedTotal;
             const other = Number(body.otherScans);
             if (isFinite(other) && other > 0) out.otherScans += other;
         }
@@ -414,33 +416,62 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     absorb(first, true);
     const reported = Number(first.pages);
     out.pages = isFinite(reported) && reported > 0 ? reported : 1;
-    const last = Math.min(out.pages, ZTO_LIST_CLIENT_MAX_PAGES);
-    const signedPages = Number(first.signedPages);
-    const signedLast = first.signedOk === true && isFinite(signedPages)
-        ? Math.min(signedPages, ZTO_LIST_CLIENT_MAX_PAGES) : 0;
-    const arrivalWork = [];
-    for (let page = 2; page <= last; page++) {
-        arrivalWork.push(fetchZtoListPage(cfg, from, to, page, page <= signedLast ? 'withSigned' : undefined));
-    }
-    const signedWork = [];
-    for (let page = last + 1; page <= signedLast; page++) {
-        signedWork.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
-    }
-    const signedSettled = Promise.all(signedWork);
-    const more = await Promise.all(arrivalWork);
-    const extraSigned = await signedSettled;
-    for (let i = 0; i < more.length; i++) absorb(more[i], true);
+    const metaless = first.pagesUnknown === true;
+    let arrivalOpen = metaless;
+    let signedPages = Number(first.signedPages);
+    if (first.signedOk !== true || !isFinite(signedPages)) signedPages = 0;
+    let signedOpen = first.signedOk === true && first.signedPagesUnknown === true;
+    let readArrival = 1;
+    let readSigned = first.signedOk === true ? 1 : 0;
     let signedFailed = false;
-    for (let i = 0; i < more.length; i++) {
-        if (more[i] && i + 2 <= signedLast && more[i].signedOk !== true) signedFailed = true;
+    for (;;) {
+        const last = Math.min(out.pages, ZTO_LIST_CLIENT_MAX_PAGES);
+        const signedLast = signedFailed ? readSigned : Math.min(signedPages, ZTO_LIST_CLIENT_MAX_PAGES);
+        if (last <= readArrival && signedLast <= readSigned) break;
+        const signedFrom = Math.max(last, readSigned) + 1;
+        const arrivalWork = [];
+        for (let page = readArrival + 1; page <= last; page++) {
+            arrivalWork.push(fetchZtoListPage(cfg, from, to, page, page > readSigned && page <= signedLast ? 'withSigned' : undefined));
+        }
+        const signedWork = [];
+        for (let page = signedFrom; page <= signedLast; page++) {
+            signedWork.push(fetchZtoListPage(cfg, from, to, page, 'signed').catch(() => null));
+        }
+        const signedSettled = Promise.all(signedWork);
+        const more = await Promise.all(arrivalWork);
+        const extraSigned = await signedSettled;
+        let signedTail = null;
+        for (let i = 0; i < more.length; i++) absorb(more[i], true);
+        for (let i = 0; i < more.length; i++) {
+            const page = readArrival + 1 + i;
+            if (!more[i] || page <= readSigned || page > signedLast) continue;
+            if (more[i].signedOk !== true) signedFailed = true;
+            else if (page === signedLast) signedTail = { pages: more[i].signedPages, unknown: more[i].signedPagesUnknown === true };
+        }
+        for (let i = 0; i < extraSigned.length; i++) {
+            if (!extraSigned[i] || extraSigned[i].signedOk !== true) signedFailed = true;
+            else if (signedFrom + i === signedLast) signedTail = { pages: extraSigned[i].pages, unknown: extraSigned[i].pagesUnknown === true };
+            absorb(extraSigned[i], false);
+        }
+        if (arrivalOpen) {
+            const tail = more.length ? more[more.length - 1] : null;
+            const tailPages = tail ? Number(tail.pages) : NaN;
+            if (tail && isFinite(tailPages) && tailPages > 0) out.pages = tailPages;
+            arrivalOpen = !!tail && tail.pagesUnknown === true;
+        }
+        if (signedOpen) {
+            const tailPages = signedTail ? Number(signedTail.pages) : NaN;
+            if (!signedFailed && isFinite(tailPages)) signedPages = tailPages;
+            signedOpen = !signedFailed && !!signedTail && signedTail.unknown;
+        }
+        readArrival = Math.max(readArrival, last);
+        readSigned = Math.max(readSigned, signedLast);
+        if (!arrivalOpen && !signedOpen) break;
     }
-    for (let i = 0; i < extraSigned.length; i++) {
-        if (!extraSigned[i] || extraSigned[i].signedOk !== true) signedFailed = true;
-        absorb(extraSigned[i], false);
-    }
+    if (metaless) out.total = Math.max(out.total, arrivalTotals);
     if (first.signedOk === true) {
         out.signedState = signedFailed ? 'partial'
-            : (isFinite(signedPages) && signedPages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok');
+            : (signedPages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok');
     } else if (first.signed === null) {
         out.signedState = 'off';
     } else if (first.signedOk === false) {
@@ -955,19 +986,30 @@ export async function fetchZtoSignedPages(cfg, from, to) {
     const codes = first.signed.slice();
     let signedMismatch = ztoListPositiveCount(first.signedMismatch);
     const reported = Number(first.pages);
-    const pages = isFinite(reported) && reported > 0 ? reported : 1;
-    const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
-    const work = [];
-    for (let page = 2; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signedExact').catch(() => null));
-    const more = await Promise.all(work);
+    let pages = isFinite(reported) && reported > 0 ? reported : 1;
+    let open = first.pagesUnknown === true;
+    let read = 1;
     let partial = false;
-    for (let i = 0; i < more.length; i++) {
-        if (more[i] && more[i].signedOk === true && Array.isArray(more[i].signed)) {
-            for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
-            signedMismatch += ztoListPositiveCount(more[i].signedMismatch);
-        } else {
-            partial = true;
+    for (;;) {
+        const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
+        if (last <= read) break;
+        const work = [];
+        for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'signedExact').catch(() => null));
+        const more = await Promise.all(work);
+        for (let i = 0; i < more.length; i++) {
+            if (more[i] && more[i].signedOk === true && Array.isArray(more[i].signed)) {
+                for (let j = 0; j < more[i].signed.length; j++) codes.push(more[i].signed[j]);
+                signedMismatch += ztoListPositiveCount(more[i].signedMismatch);
+            } else {
+                partial = true;
+            }
         }
+        read = last;
+        const tail = more[more.length - 1];
+        if (!open || partial || !tail) break;
+        const tailPages = Number(tail.pages);
+        if (isFinite(tailPages) && tailPages > 0) pages = tailPages;
+        open = tail.pagesUnknown === true;
     }
-    return { measured: true, codes: codes, truncated: pages > last, partial: partial, signedMismatch: signedMismatch };
+    return { measured: true, codes: codes, truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES, partial: partial, signedMismatch: signedMismatch };
 }

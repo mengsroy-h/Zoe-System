@@ -1503,6 +1503,9 @@
     "ZoeW/src/core/state.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/core/shop-scope.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/core/storage-keys.ts": {
       "policy": "zoew-app"
     },
@@ -1866,6 +1869,27 @@
     "ZoeW/tests/cleanup-applied-ownership.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/cleanup-foreign-slot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/clear-history-foreign-slot.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/locker-assign-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/trash-retry-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/cleanup-resume-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-switch-fuzz.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/exchange-rate-shop-switch.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-deduct-order.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2122,6 +2146,18 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-lock.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-bound-settings.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-pending-cleanup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-cookie-life.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-pages-unknown.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {

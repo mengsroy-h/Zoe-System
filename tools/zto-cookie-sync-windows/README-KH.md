@@ -192,6 +192,8 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 
 ឧបករណ៍ដាក់ **ម៉ោង Sync** ជាមួយ Cookie ក្នុង Netlify Blobs ➜ ZoeW 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ (ជួរ Lookup ZTO)
 បង្ហាញ «Sync ចូល Blob … មុន» (អាយុពិតរបស់ Cookie ក្នុង Blob)។ បើវារាយ «មិនទាន់ស្គាល់» ➜ Sync ម្តង។
+ក្រោយ Cookie មួយត្រូវ ZTO បដិសេធ ជួរដដែលបង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜ បដិសេធនៅ … (ទំនេរ … មុនបដិសេធ)» ៖
+ទំនេរយូរ ➜ ZTO ផុតដោយគ្មានការប្រើ · ទំនេរខ្លី ➜ ZTO បិទ session ពីខាងខ្លួន (ឧ. ចូល Argus ម្តងទៀតក្នុង browser ផ្សេង)។
 
 ⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** ៖
 

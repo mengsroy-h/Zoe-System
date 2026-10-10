@@ -217,6 +217,17 @@ function rec(h) {
         rec(h) && rec(h).onlineExp === T0 + 400 * DAY, rec(h) && rec(h).onlineExp);
     st = await h.L.getStatus('ADM');
     ok('ច.3 ស្ថានភាពជា active', st.state === 'active', st.state);
+    const extendReachesNewDevices = r.valid === true;
+
+    // ⛔ ប្រអប់ «បន្ថែមសុពលភាព» របស់ ZoeKeyGen ត្រូវប្រាប់អ្នកលក់នូវអ្វីដែល ច.1 វាស់ ៖ Key ដែល Extend រួច Activate លើគ្រឿងថ្មីបាន
+    //    ➜ ហាមអត្ថបទថា «តែគ្រឿងដែល Activate រួច» ឬ «លែង/មិនអាច Activate» (អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍)។ ឥរិយាបថប្រែ ➜ អត្ថបទអនុញ្ញាតវិញ។
+    const keygenHtml = fs.readFileSync(path.join(root, 'ZoeKeyGen/index.html'), 'utf8');
+    const extendAt = keygenHtml.indexOf('id="extendModal"');
+    const extendModal = extendAt === -1 ? '' : keygenHtml.slice(extendAt, keygenHtml.indexOf('data-act="confirmExtendKey"', extendAt));
+    const extendText = extendModal.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+    ok('ច.8 ស្រង់ប្រអប់ «បន្ថែមសុពលភាព» ពី ZoeKeyGen/index.html ពិត', extendText.length > 80 && /Activate/.test(extendText), extendText.length);
+    ok('ច.9 ⛔ ប្រអប់នោះមិនប្រាប់ផ្ទុយពី ច.1 (គ្រឿងថ្មី/Reset Activate Key ដែល Extend បាន)',
+        !extendReachesNewDevices || !(/(លែង|មិន)អាច\s*Activate/.test(extendText) || /តែលើគ្រឿងដែល\s*Activate\s*រួច/.test(extendText)), extendText);
 
     h = build({ now: T0 + 100 * DAY, serverNow: T0 + 100 * DAY,
         serverRecord: { revoked: false, expiresAt: T0 + 30 * DAY } });

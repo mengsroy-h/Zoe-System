@@ -166,11 +166,15 @@ export async function repairPickupLedgerOnce() {
     if (!firebaseState.db || !firebaseState.fb || !firebaseState.auth || !firebaseState.auth.currentUser) return;
     if (dbListenerPendingPaths.size || firebaseState.dbListenersFailed) return;
     dataState.pickupLedgerRepairRunning = true;
+    const repairDb = firebaseState.db;
+    const repairGeneration = firebaseState.authGeneration;
+    const repairIsCurrent = () => firebaseState.db === repairDb && firebaseState.authGeneration === repairGeneration;
     try {
         const plans = planPickupLedgerRepair(dataState.dailyPickupData, dataState.scanHistory, dataState.deletedItems);
         for (const plan of plans) {
+            if (!repairIsCurrent()) return;
             if (!/^[0-9-]+$/.test(plan.date)) continue;
-            const dayRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_pickup_cod_dod/${plan.date}`);
+            const dayRef = firebaseState.fb.ref(repairDb, `zoew_daily_pickup_cod_dod/${plan.date}`);
             await dbOp(firebaseState.fb.runTransaction(dayRef, (record) => {
                 if (!record) return record;
                 const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
@@ -178,6 +182,7 @@ export async function repairPickupLedgerOnce() {
                 return buildPickupRecordFromSet(plan.pickedUpBarcodes);
             })).catch(() => {});
         }
+        if (!repairIsCurrent()) return;
         dataState.pickupLedgerRepairDone = true;
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'repairPickupLedgerOnce' });

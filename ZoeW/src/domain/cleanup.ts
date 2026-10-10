@@ -4,7 +4,7 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
+import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce } from './pickup';
@@ -18,6 +18,7 @@ import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../se
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { shopScope, shopScopePending } from '../core/shop-scope';
 
 export const cleanupInFlight = new Set();
 
@@ -67,7 +68,7 @@ export const CLEANUP_SWEEP_BATCH = 8;
 export const CLEANUP_SWEEP_YIELD_MS = 50;
 
 export function runAutomaticCleanupRules(sweepLimit?: number) {
-    if (!cleanupClockIsTrustworthy()) return;
+    if (!cleanupClockIsTrustworthy() || shopScopePending()) return;
     const currentTime = getServerNow();
     const visited = sweepLimit ? dataState.cleanupSweepVisited : null;
     let started = 0;
@@ -163,18 +164,7 @@ export function writeCleanupJournal(entries) {
 }
 
 export function cleanupJournalScope() {
-    try {
-        const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
-        if (!raw) return '';
-        const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        if (found) return found[1];
-        const supabase = /supabaseUrl"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        if (!supabase) return '';
-        const tenant = firebaseState.fb && typeof firebaseState.fb.tenantScope === 'function' ? firebaseState.fb.tenantScope(firebaseState.auth) : '';
-        return tenant ? supabase[1] + '#' + tenant : '';
-    } catch (e) {
-        return '';
-    }
+    return shopScope();
 }
 
 export function cleanupJournalScopeMismatch(entry) {
@@ -383,12 +373,16 @@ export function cleanupLedgerResult(trashId, state) {
 }
 
 export async function settleCleanupDeduction(itemId, trashItem, rev, decideGone, entry?) {
+    const settleDb = firebaseState.db;
+    const settleGeneration = firebaseState.authGeneration;
+    const settleIsCurrent = () => firebaseState.db === settleDb && firebaseState.authGeneration === settleGeneration;
     let verdict;
     try {
-        verdict = await retryAsync(() => dbOp(markCleanupTrashDeducted(trashItem)), 3, 1500);
+        verdict = await retryAsync(() => (settleIsCurrent() ? dbOp(markCleanupTrashDeducted(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
     } catch (flipErr) {
         return false;
     }
+    if (!settleIsCurrent()) return false;
     if (verdict === 'flipped') return true;
     if (verdict === 'claimed' || !decideGone) return false;
     if (dataState.deletedItems.some((t) => t && t.id === trashItem.id)) return false;
@@ -454,21 +448,28 @@ export function releaseCleanupLedgerKeys(list) {
 }
 
 export async function resolveCleanupSlot(trashItem) {
+    const slotDb = firebaseState.db;
+    const slotGeneration = firebaseState.authGeneration;
+    const slotIsCurrent = () => firebaseState.db === slotDb && firebaseState.authGeneration === slotGeneration;
     let existing = null;
     try {
-        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(slotDb, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
         existing = snap.exists() ? snap.val() : null;
     } catch (readErr) {
         return 'wait';
     }
-    if (existing) return existing.deletedAt === trashItem.deletedAt ? 'ours' : 'elsewhere';
+    if (!slotIsCurrent()) return 'wait';
+    if (existing && existing.deletedAt === trashItem.deletedAt) return 'ours';
+    if (existing && trashSlotSharesClaim(existing, trashItem)) return 'elsewhere';
     if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return 'wait';
-    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id)) return 'elsewhere';
+    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
     const back = cleanupBarcodesBackInHistory(trashItem);
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
     try {
-        return (await retryAsync(() => claimCleanupTrashSlot(trashItem), 3, 1500)) ? 'claimed' : 'elsewhere';
+        const claimed = await retryAsync(() => (slotIsCurrent() ? claimCleanupTrashSlot(trashItem) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500);
+        if (!slotIsCurrent()) return 'wait';
+        return claimed ? 'claimed' : 'elsewhere';
     } catch (claimErr) {
         return 'wait';
     }
@@ -555,6 +556,9 @@ export async function resumeCleanupJournalEntry(trashId) {
         clearCleanupJournalEntry(trashItem.id);
         return '';
     }
+    const resumeDb = firebaseState.db;
+    const resumeGeneration = firebaseState.authGeneration;
+    const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration;
     const rev = entry.revenue;
     let stage = entry.stage;
     const keyed = entry.ledger === CLEANUP_LEDGER_KEYED;
@@ -568,7 +572,7 @@ export async function resumeCleanupJournalEntry(trashId) {
     let outcome = '';
     if (stage === CLEANUP_STAGE_SLOT) {
         const slot = await resolveCleanupSlot(trashItem);
-        if (slot === 'wait') return '';
+        if (slot === 'wait' || !resumeIsCurrent()) return '';
         if (slot === 'elsewhere') {
             clearCleanupJournalEntry(trashItem.id);
             return '';
@@ -579,11 +583,12 @@ export async function resumeCleanupJournalEntry(trashId) {
     }
     let present = false;
     try {
-        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(resumeDb, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
         present = snap.exists();
     } catch (readErr) {
         return '';
     }
+    if (!resumeIsCurrent()) return '';
     if (!present) {
         if (stage !== CLEANUP_STAGE_MOVED) {
             if (!keyed || !rev) {
@@ -604,13 +609,14 @@ export async function resumeCleanupJournalEntry(trashId) {
             return '';
         }
         try {
-            await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
+            await notifyIfSlow(retryAsync(() => (resumeIsCurrent() ? dbOp(saveSingleDeletedItemToFirebase(trashItem)) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true }))), 3, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
             outcome = 'restored';
         } catch (writeErr) {
             return '';
         }
+        if (!resumeIsCurrent()) return '';
     }
     if (stage === CLEANUP_STAGE_MOVED && rev) {
         const deduction = await deductCleanupRevenue(entry.id, trashItem, rev);
@@ -636,7 +642,7 @@ export async function resumeCleanupJournalEntry(trashId) {
 }
 
 export async function resumeInterruptedCleanups() {
-    if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted) return;
+    if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted || shopScopePending()) return;
     const list = readCleanupJournal();
     if (!list.length) return;
     dataState.cleanupResumeInFlight = true;
@@ -667,24 +673,30 @@ export async function resumeInterruptedCleanups() {
 }
 
 export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
-    const itemRef = firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`);
+    const restoreDb = firebaseState.db;
+    const restoreGeneration = firebaseState.authGeneration;
+    const itemRef = firebaseState.fb.ref(restoreDb, `zoew_scan_history_cod_dod/${id}`);
     let clearClaimBlocked = false;
-    return retryAsync(() => dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
+    return retryAsync(() => (firebaseState.db !== restoreDb || firebaseState.authGeneration !== restoreGeneration
+        ? Promise.reject(Object.assign(new Error('Restore session changed'), { noRetry: true }))
+        : dbOp(firebaseState.fb.runTransaction(itemRef, (currentItem) => {
         clearClaimBlocked = false;
         if (currentItem && currentItem.clearClaim) {
             clearClaimBlocked = true;
             return;
         }
         normalizeBarcodesOf(currentItem);
-        if (claimedWhole) {
-            if (currentItem) return currentItem;
+        if (claimedWhole && !currentItem) {
             const updated = cloneRestoreItem(claimedWhole);
             delete updated.restoreClaim;
             delete updated.restoreClaimId;
             delete updated.restoreClaimToken;
             return updated;
         }
-        const reclaimed = barcodeEntriesOf(claimedPartial.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        const source = claimedWhole ? cloneRestoreItem(claimedWhole) : claimedPartial;
+        if (claimedWhole) ensureBarcodeArrayForItem(source);
+        const reclaimed = barcodeEntriesOf(source.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
+        if (!reclaimed.length) return currentItem;
         const base = currentItem || { ...claimedPartial, barcodes: [] };
         if (!currentItem) {
             delete base.restoreClaim;
@@ -704,7 +716,7 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
             delete updated.closedAt;
         }
         return updated;
-    })), 3, 1500).then((result) => {
+    }))), 3, 1500).then((result) => {
         if (clearClaimBlocked || !result || !result.committed) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
         return result;
     });
@@ -712,7 +724,19 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
 
 export const CLEANUP_FOREIGN_TRASH_WINDOW_MS = 15 * 60 * 1000;
 
-export function claimCleanupTrashSlot(trashItem) {
+export function trashSlotSharesClaim(occupant, trashItem) {
+    const codesOf = (item) => {
+        const codes = cleanupTrashCodes(item);
+        if (!codes.size && item && typeof item.barcode === 'string' && item.barcode) codes.add(item.barcode);
+        return codes;
+    };
+    const ours = codesOf(trashItem);
+    if (!ours.size) return true;
+    const theirs = codesOf(occupant);
+    return Array.from(ours).some((code) => theirs.has(code));
+}
+
+export function claimCleanupTrashSlot(trashItem, moved?) {
     if (!firebaseState.db || !firebaseState.fb || !trashItem || !trashItem.id || !/^[a-zA-Z0-9_-]+$/.test(trashItem.id)) {
         return Promise.reject(new Error('Trash Firebase reference unavailable'));
     }
@@ -720,7 +744,25 @@ export function claimCleanupTrashSlot(trashItem) {
         .then((result) => {
             if (result && result.committed) return true;
             const existing = result && result.snapshot ? result.snapshot.val() : null;
-            return !!existing && existing.deletedAt === trashItem.deletedAt;
+            if (!existing) return false;
+            if (existing.deletedAt === trashItem.deletedAt) return true;
+            if (moved || trashSlotSharesClaim(existing, trashItem)) return false;
+            const from = trashItem.id;
+            const to = cleanupPartialTrashId(from, String(trashItem.trashReason) + '|slot', trashItem);
+            if (!to || to === from || !/^[a-zA-Z0-9_-]{1,64}$/.test(to)) return false;
+            trashItem.id = to;
+            try {
+                const entry = readCleanupJournal().find((e) => e.trashItem.id === from);
+                if (entry) {
+                    noteCleanupJournalEntry(Object.assign({}, entry, { trashItem }));
+                    clearCleanupJournalEntry(from);
+                }
+            } catch (journalErr) {}
+            if (cleanupJournalLive.has(from)) {
+                releaseCleanupJournalLive(from);
+                markCleanupJournalLive(to);
+            }
+            return claimCleanupTrashSlot(trashItem, true);
         });
 }
 
@@ -769,6 +811,7 @@ export async function claimAndCleanupItem(id, reason) {
 
         if (reason === 'abandon') {
             if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
+            ensureBarcodeArrayForItem(currentItem);
 
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const staleOpen = currentItem.barcodes.filter(b => barcodeAbandonIsRipe(b, ts, getServerNow()));
@@ -923,7 +966,8 @@ export async function claimAndCleanupItem(id, reason) {
             dataState.deletedItems.unshift(trashItem);
             let trashSaved = false;
             let trashElsewhere = false;
-            const writeTrash = () => claimCleanupTrashSlot(trashItem).then((claimed) => { trashElsewhere = !claimed; });
+            const writeTrash = () => (cleanupIsCurrent() ? claimCleanupTrashSlot(trashItem) : Promise.reject(Object.assign(new Error('Cleanup session changed'), { noRetry: true })))
+                .then((claimed) => { trashElsewhere = !claimed; });
             await notifyIfSlow(retryAsync(writeTrash, 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
@@ -1029,9 +1073,13 @@ export async function runAutomaticDeletedCleanup() {
     if (!candidates.length) return;
 
     dataState.deletedCleanupInFlight = true;
+    const purgeDb = firebaseState.db;
+    const purgeGeneration = firebaseState.authGeneration;
+    const purgeIsCurrent = () => firebaseState.db === purgeDb && firebaseState.authGeneration === purgeGeneration;
     try {
         const purgeable = [];
         for (const candidate of candidates) {
+            if (!purgeIsCurrent()) return;
             if (candidate.staleClaim) {
                 try {
                     await releaseStaleRestoreClaimForPurge(candidate.id);
@@ -1043,10 +1091,10 @@ export async function runAutomaticDeletedCleanup() {
             }
             purgeable.push(candidate);
         }
-        if (!purgeable.length) return;
+        if (!purgeable.length || !purgeIsCurrent()) return;
 
         const applyPurged = (list) => {
-            if (!list || !list.length) return Promise.resolve();
+            if (!list || !list.length || !purgeIsCurrent()) return Promise.resolve();
             const purgedSet = new Set(list.map((c) => c.id));
             dataState.deletedItems = dataState.deletedItems.filter(item => !purgedSet.has(item.id));
             let purgedBarcodes = [];
@@ -1067,6 +1115,7 @@ export async function runAutomaticDeletedCleanup() {
             let lastError = batchError;
             let stalled = false;
             for (const candidate of purgeable) {
+                if (!purgeIsCurrent()) return;
                 const singleWrite = purgeDeletedItemsQuietly([candidate.id]);
                 try {
                     await dbOp(singleWrite);

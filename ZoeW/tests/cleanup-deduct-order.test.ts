@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
+import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths, DB_LISTENER_KEY_HISTORY } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, noteCleanupJournalEntry, readCleanupJournal, resumeCleanupJournalEntry } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { ABANDON_AGE_MS } from '../src/features/session';
+import { uncollectedValueByDate } from '../src/features/export';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -388,5 +390,52 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         expect(trash[0].barcodes.map((b: any) => [b.code, b.isDeducted])).toEqual([['A', true]]);
         expect(ledger().codDollar).toBe(90);
         expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('12. localStorage full (QuotaExceededError on every setItem) ➜ the journal cannot be written ➜ the cleanup still lands once: trash flipped · ledger 90 · no throw', async () => {
+        seed([expiredItem()]);
+        const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation(() => { throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' }); });
+        let journalSeenDuringRun = 0;
+        lab.beforeTx = () => { journalSeenDuringRun = Math.max(journalSeenDuringRun, readCleanupJournal().length); };
+        expect(() => (appLocalStore as Storage).setItem('probe', '1')).toThrow();
+        let appWrites: number;
+        try {
+            await claimAndCleanupItem(ID, 'abandon');
+            await flush();
+            appWrites = quota.mock.calls.filter((c: any[]) => c[0] === CLEANUP_JOURNAL_KEY).length;
+        } finally {
+            quota.mockRestore();
+        }
+        expect(appWrites).toBeGreaterThan(0);
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        expect(getAt(TRASH + '/' + ID).barcodes[0].isDeducted).toBe(true);
+        expect(ledger().codDollar).toBe(90);
+        expect(month().codDollar).toBe(90);
+        expect(readCleanupJournal().length).toBe(0);
+        expect(journalSeenDuringRun).toBe(0);
+        expect(cleanupInFlight.size).toBe(0);
+    }, 20000);
+
+    it('11. a legacy item without a barcodes array (item-level barcode · cod) ➜ trash gets the barcode entry flipped to isDeducted:true · the day shows nothing open · a restore adds the 7 back once', async () => {
+        const old = getServerNow() - ABANDON_AGE_MS - 3600000;
+        const legacy: any = { id: ID, phone: '012', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: old, count: 1, cod: 7, dod: 0, price: 7, isClosed: false, isCalled: false, barcode: 'L', locker: 'A1' };
+        seed([legacy]);
+        await claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        const trash = getAt(TRASH + '/' + ID);
+        expect(Array.isArray(trash.barcodes)).toBe(true);
+        expect(trash.barcodes.map((b: any) => [b.code, b.cod, b.isDeducted, b.locker])).toEqual([['L', 7, true, 'A1']]);
+        expect(trash.trashReason).toBe('expired');
+        expect(ledger().codDollar).toBe(93);
+        expect(ledger().totalCount).toBe(9);
+        expect(month().codDollar).toBe(93);
+        expect(readCleanupJournal().length).toBe(0);
+        syncLocalViewsFromServer();
+        expect(uncollectedValueByDate()[DAY]).toBeUndefined();
+        await restoreOnOtherDevice(ID);
+        expect(ledger().codDollar).toBe(100);
+        expect(ledger().totalCount).toBe(10);
+        expect(month().codDollar).toBe(100);
     }, 20000);
 });

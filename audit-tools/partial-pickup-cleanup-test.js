@@ -134,7 +134,7 @@ const REAL_FNS = [
     'saveSingleDeletedItemToFirebase',
     'restoreClaimedItemToScanHistory',
     'ledgerNumber', 'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem',
+    'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem',
     'runAutomaticCleanupRules'
 ];
 
@@ -269,6 +269,8 @@ function buildWorld(historySeed, startNow) {
         optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
         optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
         optionalPart(() => extractFn(src, 'safeStoreRemove'), 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
+        optionalPart(() => extractFn(src, 'shopScope'), "function shopScope() { return ''; }"),
+        optionalPart(() => extractFn(src, 'shopScopePending'), 'function shopScopePending() { return false; }'),
         optionalPart(() => extractFn(src, 'cleanupJournalScope'), "function cleanupJournalScope() { return ''; }"),
         optionalPart(() => extractFn(src, 'cleanupJournalScopeMismatch'), 'function cleanupJournalScopeMismatch() { return false; }'),
         optionalPart(() => extractFn(src, 'readCleanupJournal'), 'function readCleanupJournal() { return []; }'),
@@ -284,6 +286,7 @@ function buildWorld(historySeed, startNow) {
         'const cleanupInFlight = new Set();',
         // ⛔ id ធុងសំរាមកំណត់សម្រាប់ការ claim ពាក់កណ្តាល ៖ tree មុនកែប្រើ `generateUniqueId()` ➜ គ្មាន helper នេះ (stub មិនត្រូវបានហៅ)
         optionalPart(() => extractFn(src, 'cleanupPartialTrashId'), 'function cleanupPartialTrashId() { return generateUniqueId(); }'),
+        optionalPart(() => extractFn(src, 'trashSlotSharesClaim'), 'function trashSlotSharesClaim() { return true; }'),
         ...REAL_FNS.map((name) => extractFn(src, name)),
         'globalThis.runAutomaticCleanupRules = runAutomaticCleanupRules;',
         'globalThis.claimAndCleanupItem = claimAndCleanupItem;'

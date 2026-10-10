@@ -45,7 +45,14 @@
 
 ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0. **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **មិនទាន់ merge**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
+0. **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **PR #309 បើក · មិនទាន់ merge**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
+   ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
+   ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
+   **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
+   ធាតុគ្មាន `barcodes` · Migrate Key · ការសាកឡើងវិញមិនឆ្លង session ➜ run-all STRICT ២០៤/២០៤ លើ `235e1b7` · **ជុំ ៣** (fuzz ប្តូរ session · retry · អត្រាប្រាក់ ·
+   ZTO-E13 `pages` · សោ ZTO ថ្មី) ➜ run-all STRICT ២០៤/២០៤ លើ `dd1510c` · CI ៤/៤ បៃតង · **ជុំ ៤** (ការកំណត់ · Push ចងហាង · អាយុ Cookie ZTO · ការពិនិត្យ ZTO ម្តងទៀត ៖ ហាងមិនទាន់ស្គាល់ ➜ ការសម្អាតរង់ចាំ) ➜
+   ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   **Branch `claude/blissful-curie-9ic58s`** (ពី `main` `58d0aeb` = PR #307 · **merge រួចតាម PR #308 · `7dd7fa2`**) ៖ [2.50.52] model iPhone · បន្ទាត់ model/serial គ្មាន emoji ·
    ZoeKeyGen ស្តារ SDK (`isDatabaseInitialized`) · teardown auth · សោ Generate មានម្ចាស់ · ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN · push (កូនសោ VAPID ប្តូរ · ចុះឈ្មោះឡើងវិញ) ·
    SW deploy ជាន់កណ្តាល install · សោអត្រាប្រាក់ក្រោយប្តូរ Config (Deep audit ៤ ក្នុងផ្នែក ២) ➜ run-all STRICT ២០៣/២០៤ លើ `3d98637` (ធ្លាក់តែ `doc-scope-test` ➜ កែក្នុង
    `52baeb9` ➜ ជាប់លើ HEAD) ➜ PR ថ្មីពេលម្ចាស់គម្រោងស្នើ។
@@ -64,12 +71,15 @@
    SECURITY-1 web គ្មាន PRF ➜ PIN · ZTO-4 ជួរបើក/បិទ ២ ដោយចេតនា · RACES-2 journal ហាងចាស់លុបពេល resume ក្នុងហាងថ្មី · ZTO-1 secret ចាក់សោគ្មានសញ្ញា UI ·
    ZTO-2 ថ្ងៃ Reset បាត់ `pickedUpBarcodes` · MONEY-3 «ដក» ដោយដៃគ្មាន journal · គណនី Supabase body អានមិនបានក្រោយ `finish_registration` ➜ `network` ·
    NATIVE-4 ប្រអប់ JS ក្នុង Dark theme ([2.50.37] សកម្មភាព ៣)។
-   **មិនទាន់វាស់** ➜ money ៖ localStorage quota ពេញ (stage journal) · legacy items គ្មាន barcodes · born-closed `closedAt` ·
-   zto ៖ `pages` អវត្តមាន ➜ complete ខុស · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN · supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
+   **មិនទាន់វាស់** ➜ money ៖ (localStorage ពេញ · born-closed វាស់/គ្របរួចក្នុង Deep audit ៥ ជុំ ៣) ·
+   supabase ៖ realtime ស្ងាត់ (`zoe_broadcast_seq` ➜ poll តែ ៥ នាទី) ·
    SIGNED_IN ឆ្លង tab · edge functions/CORS លើ APK (`ZOE_ALLOWED_ORIGINS` live) · network ៖ captive portal probe · event «Perf overlay» ពី build ក្រៅ git ·
    ops ៖ egress ពិតរបស់ ring `ops`។ **វាស់រួចក្នុង Deep audit ៤** ៖ auth listener ក្រោយ `deleteApp` (ZoeKeyGen កែ) · Sentry ZoeKeyGen ០ event (គ្មាន event ត្រូវបោះ) ·
-   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០)។
+   install `addAll` ពេល deploy ជាន់ (កែ) · Firebase partial claim ពេល deleted view ចាស់ (វិភាគ ➜ ម្ចាស់គម្រោងសម្រេច · ធាតុ ០) · **វាស់រួចក្នុង Deep audit ៥** ៖ ZTO `pages` អវត្តមាន (កែ ៖ ZTO-E13) · sign list truncate ក្នុងមួយថ្ងៃ · cleanup ពេលអេក្រង់ PIN (អ្នកយាមស្រាប់) · legacy items គ្មាន barcodes (កែ ៖ ផ្នែក ២ ជុំ ២ ង) · resume ពេលប្តូរ session (កែ ៖ ជុំ ២ ឆ)។
    **បានបដិសេធ** (កុំរាយការណ៍ម្តងទៀត) ៖ NETWORK-3 · MONEY-5 · NATIVE-2 · NATIVE-5។
+   ✅ **ម្ចាស់គម្រោងសម្រេច «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ» (Deep audit ៥ ជុំ ៤)** ៖ ការកំណត់ Lookup API/តារាងអតិថិជន/Excel ➜ Sheet ចងទៅហាង · Push ចុះឈ្មោះឡើងវិញពេលប្តូរហាង ·
+   អាយុ Cookie ZTO ក្នុង 🩺 (តំបន់ចាក់សោ · `LOCK` ថ្មី) ➜ [2.50.53] · ⏳ ម្ចាស់គម្រោងប្រមូលអាយុ Cookie ២–៣ ជីវិតក្រោយ Deploy ([2.50.53] សកម្មភាព ៦)។
+   ✅ **តំបន់ចាក់សោ ZTO (Deep audit ៥ ជុំ ៣)** ៖ ZTO គ្មាន `meta.pages` ➜ កែរួចតាមសំណើម្ចាស់គម្រោង «ZTO កែចុះ» ([2.50.53] · ZTO-E13 · `LOCK` ថ្មី)។
 3. ✅ **repo `Zoe-System` ជា Public រួច** (វាស់តាម GitHub API 2026-10-08 ៖ `visibility: public`) · LICENSE · NOTICE ក្នុង PR #288។ ⏳ ម្ចាស់គម្រោង ៖ GitHub Settings ➜
    Code security ➜ ផ្ទៀងថា **Secret scanning** + **Push protection** បើក (Claude មើល Settings មិនបាន) · «Keep my email addresses private» សម្រាប់ commit ថ្មី ·
    artifact backup (`backup.yml`) អ្នកមានគណនី GitHub ណាក៏ទាញបាន ➜ `ZOE_BACKUP_PASSPHRASE` ចៃដន្យ ≥ ៣២ តួ ([`firebase-backup/README.md`](../firebase-backup/README.md) «ប្រព័ន្ធសុវត្ថិភាព») ·
@@ -96,7 +106,10 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — model iPhone · គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (branch `claude/blissful-curie-9ic58s` · មិនទាន់ merge)** ៖ Merge ➜ Deploy ➜ iPhone ☰ ឃើញ model/ក្រុម · ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
+- ⏳ **ZoeW 2.50.53 · ZoeKeyGen 2.24.14 — iPhone បង្ហាញត្រឹម «iPhone» + Deep audit ៥ (PR #309 · មិនទាន់ merge)** ៖ Merge ➜ Deploy ZoeW + ZoeKeyGen ➜ iPhone ☰ · 🩺 ៖ «iPhone · iOS 26.x» (ឬ «iOS 26+») ·
+  ZoeKeyGen បន្ទាត់កៅអី iPhone ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone នោះបើក App កំណែថ្មី · ZoeKeyGen ៖ ប្រអប់ «⏳ បន្ថែម» អត្ថបទថ្មី ·
+  ឧបករណ៍ចូលហាងច្រើន ៖ Lookup/Sheet តាមហាង · Push ពីហាងដែលកំពុងបើក · 🩺 «អាយុ Cookie ក្រោយ Sync» ([2.50.53] សកម្មភាព ២–៦)។
+- ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (PR #308 merge រួច · model iPhone ពីទំហំអេក្រង់ដកចេញក្នុង [2.50.53])** ៖ Deploy ➜ ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
 - ⏳ **ZoeW 2.50.48 — ចលនាស្វែងរកតាមវីដេអូម្ចាស់គម្រោង (branch `claude/dazzling-fermi-hycqee` · មិនទាន់ merge · ⚠️ វាស់តែក្នុង Chromium)** ៖ Merge ➜ Deploy · APK ថ្មី ➜ iPhone PWA · Android PWA · APK ៖ ចុចស្វែងរកលេខ ➜ ប្រអប់រអិលឡើងទៅលើពេញ (iPhone ៖ មិនលោតទៅចុងភ្លាម) ➜ បញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ (មិននៅទីតាំងចាស់ ហើយលោត) · ទំព័រស្កេន ៖ ស្វែងរក «zz» (បញ្ជីទទេ) ➜ សារ «មិនទាន់មាន…» នៅក្រោមក្បាលតារាង មិនលោតឡើងពេល keyboard ឡើងពេញ ([2.50.48] សកម្មភាព ២–៤)។
 - ⏳ **ZoeW 2.50.47 — ZTO `/detail` ៖ សោតាមហាង · ចងគណនី · កំណត់សាខា (សំណើម្ចាស់គម្រោង · PR #305 merge រួច)** ៖ Merge ➜ ទូរស័ព្ទទាំងអស់ update ➜ Netlify env តាម [2.50.47] សកម្មភាព ២–៤ ➜ 🩺 បង្ហាញ «សោហាង …» · ស្កេន ZTO ធម្មតា · កញ្ចប់សាខាផ្សេង ➜ «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង»។
 - ⏳ **ZoeW 2.50.46 — Deep audit ៣ + សំណើម្ចាស់គម្រោង (PR #305 merge រួច · ម្ចាស់គម្រោងសាកលើ APK · PWA Android · PWA iPhone 2026-10-09 ៖ ប្រអប់ស្នើលេខ · keyboard · សារទទេទំព័រស្កេន មិនរលូន ➜ [2.50.48])** ៖ iPhone PWA · Android PWA · APK ៖ keyboard មិនគ្របលទ្ធផល · iPhone ៖ ទំព័រទាំងមូលមិនធ្លាក់/រអិល (A66) · **រួមទាំងទូរស័ព្ទអេក្រង់តូច (iPhone SE · ៣៧៥×៦៦៧ ៖ A70)** · កាមេរ៉ាកំពុងស្កេន ➜ ប្រអប់មើលឃើញ · 🔔 «🔄 ពិនិត្យកំណែថ្មី» ([2.50.46] សកម្មភាព ២–៥)។
@@ -148,6 +161,122 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ») · ZoeW + ZoeKeyGen `2.24.14` ៖ **Deep audit ៥ ៖ ការសម្អាត/ការលុបលើ id ដែលធុងសំរាមនៅកាន់ជីវិតចាស់ · SW ZoeKeyGen ទាញឯកសារស្រស់ · ប្រអប់ Extend ប្រាប់ការពិត** (សំណើម្ចាស់គម្រោង ៖ «deep audit … commit ចូល PR#309»)
+
+**ZoeW `2.50.53`** (`zoew-v315` ➜ `zoew-v316` · PR #309 មិនទាន់ merge ➜ Deep audit ៥ ចូលកំណែដដែល) · **ZoeKeyGen `2.24.14`** (`zoekeygen-v124` ➜ `zoekeygen-v125` · Deep audit ៥)។
+គ្មាន rules/migration/env ថ្មី · តំបន់ហាមមិនប៉ះ · តំបន់ចាក់សោ ZTO កែតាមសំណើម្ចាស់គម្រោង «ZTO កែចុះ» និង «ពិនិត្យអោយស្អាតចុះ ZTO ហើយចាក់សោរវិញ»
+(`zto-order-detail.js` · `zto-list-sync.ts` ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`) និង «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ» (ជុំ ៤ ៖ អាយុ Cookie ក្នុង
+`zto-order-detail.js` ➜ `LOCK` ថ្មីម្តងទៀត · Blob `cookie-life` ក្នុង store `zto-auth` បង្កើតដោយខ្លួនឯង)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📱 **ZoeW (PWA iPhone) ☰ · 🩺 · កៅអី Key** ៖ model = «iPhone» គ្រប់ទំហំអេក្រង់ (ដូច [2.50.51]) · កំណែ iOS ពិតនៅដដែល ([2.50.45] ៖ «iOS 26.5» · Home Screen «iOS 26+»)។
+  ហេតុ ៖ [2.50.52] ទាយពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS ➜ ទូរស័ព្ទ `390×844@3` iOS 26.5 ពិតរបស់ម្ចាស់គម្រោងបង្ហាញ «iPhone 12 / 12 Pro / 13 / 13 Pro / 14 / 16e / 17e»
+  (រូបអេក្រង់ ☰) ➜ មិនច្បាស់។ «អានពី hardware» ធ្វើមិនបាន ៖ Safari/PWA មិនផ្តល់ identifier (`iPhone14,5` …) · UA = «iPhone» · WebGL = «Apple GPU» · hardware តែមួយដែលមើលបាន
+  (បញ្ជីកែវកាមេរ៉ាក្រោយ ក្រោយបើកកាមេរ៉ា) បំបែកបានត្រឹម ៣ ក្រុម (១ កែវ 16e/17e · ២ កែវ 12/13/14 · ៣ កែវ 12 Pro/13 Pro) ➜ ម្ចាស់គម្រោងជ្រើស «iPhone»។
+  ការអាន model ពិតលើ iPhone ត្រូវការ App iPhone ដើម (native · Xcode · Apple Developer) — មិនមែនក្នុងជុំនេះ។ App Android អាន hardware ពិតដដែល (`ZoeDevice`)។
+- 🧹 `IPHONE_MODELS` · `iphoneModelFromScreen()` · `iosVersionOf()` · `iosFitsModel()` ដកចេញ ➜ `src/features/device-info.ts` ដូច [2.50.51] បេះបិទ (`git diff 4e7afb4~1` = ០)។
+  Serial (ID App ១៦ តួ) · បន្ទាត់គ្មាន emoji ([2.50.52]) មិនប្រែ។ កៅអីដែលកត់ model ក្រុមរួច ➜ `noteSeatMeta()` សរសេរ «iPhone» ពេលពិនិត្យ Key លើកក្រោយ (ខុសពីតម្លៃចាស់)។
+- 🗑️ **ZoeW (Deep audit ៥) ៖ កញ្ចប់ដែលបញ្ចូលក្រោម id ដែលធុងសំរាមនៅកាន់ច្បាប់ចម្លងចាស់** (ការស្កេន/បញ្ជី ZTO លើទិដ្ឋភាពចាស់ ➜ «Merge into a gone item» បង្កើត
+  ធាតុថ្មីក្រោម id ចាស់ ខណៈ `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃការលុប/ផុតកំណត់/យករួចមុន) ៖ ការសម្អាត ៨ ថ្ងៃ និង ២ ម៉ោង ដាក់កញ្ចប់នោះចូលធុងសំរាម (slot ផ្លាស់ទៅ id
+  កំណត់ `cleanupPartialTrashId(id, <trashReason>|slot)`) ហើយ ៨ ថ្ងៃកាត់ប្រាក់ ១ ដង (មុន ៖ កញ្ចប់បាត់ពីប្រវត្តិ និងធុងសំរាម · ប្រាក់មិនកាត់ · កូនសោ registry ជាប់) ·
+  ការ **លុប** ធាតុនោះមិនសរសេរជាន់ច្បាប់ចម្លងចាស់ទៀត (slot ដដែល · ច្បាប់ចម្លងចាស់នៅ ហើយ purge តាមពេលវេលារបស់វា)។ ឧបករណ៍ ២ claim ធាតុដដែល ➜ id ផ្លាស់ដូចគ្នា ➜ ច្បាប់ចម្លង ១ · កាត់ ១ ដង។
+- 🌐 **ZoeKeyGen (Deep audit ៥) ៖ Service Worker ទាញឯកសារសំបកពី server ជានិច្ច** (`cache: 'no-cache'` លើ install CORE/OPTIONAL · navigate · shell ដែលខ្វះក្នុង cache ដូច ZoeW)
+  ➜ HTTP cache ចាស់ (header `immutable` ពី CDN ឬ deploy ចាស់) មិនចូល cache SW ថ្មីទៀតទេ។
+- 🔑 **ZoeKeyGen (Deep audit ៥) ៖ ប្រអប់ «⏳ បន្ថែមសុពលភាព»** ប្រាប់ការពិត ៖ ថ្ងៃផុតកំណត់ថ្មីរក្សាលើ Server · គ្រឿងដែល Activate រួចទទួលវាពេលពិនិត្យ Key បន្ទាប់ ·
+  គ្រឿងថ្មី/Reset Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី (តាមចំនួនឧបករណ៍)។ អត្ថបទមុនប្រាប់ផ្ទុយ («តែគ្រឿងដែល Activate រួច») ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍។
+- 🗑️ **ZoeW (Deep audit ៥ ជុំ ២ · ម្ចាស់គម្រោង ៖ «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់»)** ៖
+  «លុបទាំងអស់» ធាតុដែល `trash/<id>` នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន ➜ ចូលធុងសំរាម «លុប» ក្បែរច្បាប់ចម្លងនោះ (មុន ៖ rules បដិសេធការ finalize ៣ ដង ➜ «លុបមិនបានជោគជ័យ» ·
+  `clearClaim` ជាប់លើធាតុ ➜ ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · ដក · លុប រំលងធាតុនោះ រហូត reload ឬផុត lease) · ការសម្អាត ៨ ថ្ងៃលើធាតុចាស់គ្មាន `barcodes` (ទម្រង់មុន React) ➜
+  ធុងសំរាមកាន់ barcode របស់វា `isDeducted: true` (មុន ៖ ledger កាត់រួច តែ «ចំណូល (យករួច)» នៅរាប់វាថាមិនទាន់យក ➜ ចំណូលបង្ហាញតិចជាងពិតរហូត purge) ·
+  ការសម្អាតដែលសរសេរធុងសំរាមមិនបាន ហើយត្រឡប់ទៅប្រវត្តិ ខណៈឧបករណ៍ផ្សេងបង្កើតធាតុឡើងវិញក្រោម id ដដែល ➜ barcode ដែល claim ចូលធាតុនោះ (មុន ៖ បាត់ពីប្រវត្តិ និងធុងសំរាម) ·
+  Locker ៖ ការកំណត់ទីតាំងដែលចុះយឺត (ឬបរាជ័យ) ក្រោយចាកចេញ/ប្តូរ Config ➜ មិនកែទិដ្ឋភាព · មិនបង្ហាញ ✅/❌ ក្នុង session ថ្មី ·
+  ការសរសេរធុងសំរាមឡើងវិញ (សម្អាត · លុប · ដក) និងការស្តារ barcode ចូលប្រវត្តិ ឈប់ពេលចាកចេញ/ប្តូរ Config កណ្តាលការសាក (មុន ៖ ការសាកលើកក្រោយសរសេរកញ្ចប់ហាង A
+  ចូលហាង B — ហាង Supabase ៖ គណនីថ្មីក្នុង Project ដដែល) · ការបន្តការសម្អាតដែលត្រូវរំខាន ឈប់ពេល session ប្តូរកណ្តាលផ្លូវ (មុន ៖ សរសេរធុងសំរាម និង **កាត់ប្រាក់**
+  ក្នុងហាងថ្មី)។
+- 🔐 **ZoeW (Deep audit ៥ ជុំ ៣ · ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់ … ការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា»)** ៖ ចម្លើយ Firebase/Supabase ដែលមកដល់ក្រោយចាកចេញ
+  ឬប្តូរ Config មិនបន្តការងាររបស់ហាងចាស់ក្នុងហាងថ្មីទៀតទេ ៖ «ដក» (មុន ៖ **កាត់ប្រាក់** ledger + ធុងសំរាមក្នុងហាងថ្មី) · ការស្តារ (ការសាក finalize ក្រោយបណ្តាញធ្លាក់ផង ៖ មុន ៖ **បូកប្រាក់ត្រឡប់** ចូលហាងថ្មី) · លុបអចិន្ត្រៃយ៍ និង purge ធុងសំរាម (មុន ៖
+  **ដោះកូនសោស្កេនស្ទួន** របស់ហាងថ្មី) · «លុបទាំងអស់» · ការជួសជុលស្ថិតិយករួច (មុន ៖ សរសេរ barcode + លេខទូរស័ព្ទហាងចាស់ចូលស្ថិតិហាងថ្មី)។
+  អត្រាប្រាក់ ៖ ហាងដែលមិនដែលកំណត់អត្រា បង្ហាញលំនាំដើម 4100 (មុន ៖ បន្តប្រើអត្រារបស់ហាងមុនដែលបានបើកលើឧបករណ៍នេះ)។
+- 📚 **ZTO-E13 (ZoeW + Function · Deep audit ៥ ជុំ ៣ · សំណើម្ចាស់គម្រោង «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីគ្មាន `pages`** ៖ ទំព័រពេញ (= `pageSize`) ដែល ZTO មិនប្រាប់
+  ចំនួនទំព័រ ➜ Function រាយ `pagesUnknown: true` និង `pages` = ទំព័រនេះ + ១ (ទំព័រមិនពេញ ➜ ទំព័រនេះ · ទំព័រទទេ ➜ ទំព័រមុន) ➜ ជុំបិទតាម ZTO (`fetchZtoSignedPages()`) និង
+  ប្រអប់ «ទាញបញ្ជីពី ZTO» (`fetchZtoListAllPages()` ៖ បញ្ជីមកដល់ និងភស្តុតាងចុះហត្ថលេខា) អានទំព័របន្ទាប់ម្តងមួយៗរហូតទំព័រមិនពេញ ឬពិដាន ៣ ទំព័រ · ពិដានហើយនៅពេញ ➜
+  `truncated` (ជុំបិទ ៖ អានតាមថ្ងៃ · មិនពេញលេញ ➜ ការសម្អាត ៨ ថ្ងៃរង់ចាំ) · ប្រអប់ ៖ «បញ្ជីវែងជាង ៣ ទំព័រ» · ភស្តុតាង ➜ `partial`) · «ZTO រាយ N» = ផលបូកទំព័រ។
+  មុនកែ ៖ Function រាយ `pages: 1` ➜ client អានតែទំព័រ ១ ហើយហៅថា «ពេញលេញ» ➜ ភស្តុតាងចុះហត្ថលេខាទំព័រ ២+ បាត់ ➜ កញ្ចប់ដែលយករួចអាចត្រូវសម្អាត ៨ ថ្ងៃជា «ផុតកំណត់»
+  (កាត់ប្រាក់) · ប្រអប់ទាញបានត្រឹម ១០០ ជួរដោយគ្មានការព្រមាន។ ZTO ដែលប្រាប់ `pages` ➜ ការហៅ ZTO ដដែល (ទំព័រ ២..N ស្របគ្នា)។
+- 🏪 **ZoeW (ជុំ ៤ · ម្ចាស់គម្រោង ៖ «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ») ៖ ការកំណត់ដែលជារបស់ហាង** ៖ API ស្វែងរកអតិថិជន/តារាងអតិថិជន (`zoew_lookup_api_config`) និងការតភ្ជាប់
+  Excel ➜ Sheet (`zoew_sheet_import_config`) កត់ហាងដែលកំណត់វា (Firebase ៖ `databaseURL` · Supabase ៖ Project + ហាង) ➜ ចូលហាងផ្សេងលើឧបករណ៍ដដែល ➜ មិនប្រើ (ប្រអប់ទទេ ➜
+  កំណត់សម្រាប់ហាងនោះ) · ត្រឡប់ហាងដើម ➜ ប្រើបានវិញ។ មុន ៖ ហាង B ស្វែងរកតាម Lookup/តារាងអតិថិជនរបស់ហាង A ហើយ «នាំចូល Excel» សរសេរចូល Sheet ហាង A។
+  ការកំណត់ចាស់ (គ្មានហាង) ➜ ចងទៅហាងដែលបើកវាមុនគេក្រោយ update។ ហាង Supabase ដែល session ស្តារ តែគណនីមិនទាន់មកដល់ (ហាងមិនទាន់ស្គាល់) ➜ ការសម្អាតស្វ័យប្រវត្តិ
+  និងការបន្តការសម្អាតដែលត្រូវរំខាន រង់ចាំរហូតស្គាល់ហាង (ការរង់ចាំបញ្ជី «ចុះហត្ថលេខា» ZTO មុនការសម្អាត ៨ ថ្ងៃ មិនបាត់ · journal ហាង A មិនបន្តក្នុងហាងដែលប្រហែលជាហាង B)។
+- 📲 **ZoeW (ជុំ ៤) ៖ Push ជារបស់ហាង** ៖ ចូលហាងផ្សេង (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ➜ App ចុះឈ្មោះ Push ឡើងវិញក្រោមហាងថ្មីភ្លាម (Supabase ៖ ហាងចាស់លែងផ្ញើ
+  ដំណឹងទៅឧបករណ៍នេះ) ហើយផ្ញើកាលវិភាគ «ជិតផុតកំណត់» របស់ហាងថ្មីភ្លាម។ មុន ៖ ឧបករណ៍នៅទទួល «ជិតផុតកំណត់» របស់ហាងចាស់ រហូតដល់ ៦ ម៉ោង (ឬរហូតបិទ/បើក 📲)។
+- ⏱️ **Function ZTO + 🩺 (ជុំ ៤ · តំបន់ចាក់សោ · ម្ចាស់គម្រោង ៖ «ហេតុអ្វី Cookie ពេលខ្លះប្រើបាន ១០–១៤ ម៉ោង ពេលខ្លះ ៣–៤ ម៉ោង») ៖ អាយុ Cookie** ៖ Function កត់ក្នុង
+  Blob `cookie-life` តាមការ Sync នីមួយៗ ៖ ពេល ZTO ទទួលចុងក្រោយ និងពេល ZTO បដិសេធ (៨ ការ Sync ចុងក្រោយ) ➜ 🩺 ជួរ ZTO ៖ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន 11 ម៉ោង ➜
+  បដិសេធនៅ 14 ម៉ោង (ទំនេរ 3 ម៉ោង មុនបដិសេធ)» (Cookie ៣ ចុងក្រោយដែលស្លាប់)។ ទំនេរយូរ ➜ ZTO ផុតដោយគ្មានការប្រើ · ទំនេរខ្លី ➜ ZTO បិទ session ពីខាងខ្លួន (ចូល Argus
+  ម្តងទៀតកន្លែងផ្សេង · ZTO restart)។ សាលក្រម ✅/⚠️/❌ មិនប្រែ · ការស្កេនមិនយឺត (សរសេរ ≤ ១ ដង/១០ នាទី ក្នុងថវិកាសំណើ)។
+- 🧹 **ឧបករណ៍អភិវឌ្ឍ (ជុំ ៤ · ម្ចាស់គម្រោង ៖ «ពិនិត្យរក warning ហើយប្រាប់ខ្ញុំ និងកែសម្រួលផង»)** ៖ `npm ci` (npm 11 ក្នុង CI) លែងព្រមាន
+  `install-scripts not yet covered by allowScripts` ➜ `allowScripts` (pinned តាមកំណែ) ក្នុង `ZoeW/package.json` (`esbuild` · `@firebase/util` · `protobufjs`) និង
+  `supabase/package.json` (`@embedded-postgres/linux-x64`) ➜ npm 12 (បិទ install script ដែលមិនទាន់អនុញ្ញាតជាលំនាំដើម) នៅដំឡើង esbuild/Postgres ដូចមុន · eslint ០ warning។
+  អ្នកប្រើមិនឃើញអ្វីប្រែ។
+- 🔑 **ZoeKeyGen (ជុំ ២) ៖ Generate Key · Migrate Key ចាស់** ៖ ការសរសេរ (retry ទី ២–៣ ផង) ទៅ License Project ដែលចាប់ពេលចាប់ផ្តើម ហើយឈប់ពេលប្តូរ Config/ចាកចេញ
+  (មុន ៖ Generate retry អាន `db` បច្ចុប្បន្ន ➜ Reconfig ចន្លោះ retry សរសេរ Key ចូល License Project ថ្មី ហើយបង្ហាញ Key ដូចជោគជ័យ · Migrate អានពី Project A ហើយសរសេរការផ្លាស់ទីចូល
+  Project ដែលភ្ជាប់ពេលអានចប់ + ✅ ក្នុង session ថ្មី)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/device-info.test.tsx` ៖ iPhone PWA ពិត (`loadDeviceInfo`) ៧ ទំហំ (`390×844` · `402×874` · `393×852` · `440×956` · `420×912` · `375×812@2.88` · `320×693`) ➜ model «iPhone» ·
+  កំណែ iOS ពិត · meta License `{ model: 'iPhone' }` · កូដ ៖ device-info មិនអាន `screen.width/height` · `devicePixelRatio` · គ្មានឈ្មោះ «iPhone <លេខ>» ·
+  `IPHONE_MODELS`/`iphoneModelFromScreen` មិន export ➜ **ធ្លាក់ ២ លើកូដ [2.50.52]** (`git show HEAD:…device-info.ts`) · ជាប់ ១៥/១៥ លើកូដថ្មី។
+- `ZoeW/tests/cleanup-foreign-slot.test.ts` (ថ្មី · ៨ · `claimAndCleanupItem` · `resumeCleanupJournalEntry` · `deleteSingleItem` ពិត) ៖ abandon/close លើ id ដែល slot កាន់ជីវិតចាស់ ·
+  ឧបករណ៍ ២ (`applied`) · resume `slot` · ប្រវត្តិ id ដដែលមាន barcode ផ្សេង · លុប · ទិសផ្ទុយ ២ (ច្បាប់ចម្លងដូចគ្នា ➜ «elsewhere» · slot ទំនេរ ➜ id ធាតុ) ➜ **ធ្លាក់ ៦/៨ លើកូដមុនកែ** · ជាប់ ៨/៨។
+- `sw-install-integrity-test` ជុំទី ៤ខ (ZoeKeyGen ៖ `qrcode.js` A `immutable` ក្នុង HTTP cache ➜ SW B ត្រូវទាញ B) ➜ **ធ្លាក់លើ sw.js មុនកែ** · ជាប់ ៥៩/៥៩។
+- `license-clock-rollback-test` ច.៨–ច.៩ (ច.១ វាស់ថា Key ដែល Extend Activate លើគ្រឿងថ្មីបាន ➜ ប្រអប់ Extend មិនត្រូវប្រាប់ផ្ទុយ) ➜ **ធ្លាក់លើ index.html មុនកែ** · ជាប់ ៣៥/៣៥។
+- ជុំ ២ ៖ `ZoeW/tests/clear-history-foreign-slot.test.ts` (ថ្មី · ៣ · `clearHistory()` ពិត · fake Firebase អនុវត្ត fence ពិតរបស់ rules) ➜ **ធ្លាក់ ២/៣ មុនកែ** · ជាប់ ៣/៣ ·
+  `cleanup-foreign-slot.test.ts` ៩–១០ (ធុងសំរាមបរាជ័យ + ប្រវត្តិបង្កើតឡើងវិញ · ទិសផ្ទុយ) ➜ ៩ **ធ្លាក់មុនកែ** (`['D']`) · ជាប់ ១០/១០ ·
+  `cleanup-deduct-order.test.ts` ១១ (ធាតុគ្មាន `barcodes`) ➜ **ធ្លាក់មុនកែ** · ជាប់ ១២/១២ · `ZoeW/tests/locker-assign-session.test.ts` (ថ្មី · ៤) ➜ **ធ្លាក់ ២ មុនកែ** · ជាប់ ៤/៤ ·
+  `keygen-session-security-test` «ប្តូរ Database កណ្តាល retry» (`retryAsync()` ពិត) · «ប្តូរ Database ចន្លោះការអាន និងការសរសេររបស់ Migrate» ➜ **ធ្លាក់ ២ + ២ មុនកែ** · ជាប់ ១៥០/១៥០។
+  `ZoeW/tests/trash-retry-session.test.ts` (ថ្មី · ៥ · `claimAndCleanupItem` · `deleteSingleItem` · `removeSingleBarcode` · `restoreClaimedItemToScanHistory` ពិត · fake កត់ Database
+  នៃការសរសេរនីមួយៗ) ➜ **ធ្លាក់ ៤/៥ មុនកែ** (ការសាកឡើងវិញសរសេរចូលហាង B) · ជាប់ ៥/៥។
+  `ZoeW/tests/cleanup-resume-session.test.ts` (ថ្មី · ៥ · `resumeCleanupJournalEntry` ពិត · ប្តូរហាងនៅការអានធុងសំរាម · ក្រោយសរសេរធុងសំរាម · ពេលអាន slot · ក្រោយជំហាន ledger ខែ ·
+  ទិសផ្ទុយ) ➜ **ធ្លាក់ ៣/៥ មុនកែ** (ធុងសំរាម + ledger ខែ/ថ្ងៃ + flip ក្នុងហាង B) · ជាប់ ៥/៥។
+- ជុំ ៣ ៖ `ZoeW/tests/session-switch-fuzz.test.ts` (ថ្មី · ២៧ ប្រតិបត្តិការសរសេរពិត · ចម្លើយនៃការហៅទី k មកក្រោយ macrotask ដែលប្តូរហាង · k = ១…N · ការរត់មូលដ្ឋាននីមួយៗត្រូវសរសេរ)
+  ➜ **ធ្លាក់ ៦/២៧ មុនកែ** (ដក · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · purge · ជួសជុល pickup) · ជាប់ ២៧/២៧ · `clear-history-claim-test` sandbox ប្រកាស `authGeneration`។
+  របៀប retry ក្នុង fuzz ដដែល (ការសរសេរទី w ធ្លាក់ · w = ១…W × ប្តូរហាងនៅ k = ១…N) ➜ **ធ្លាក់ ១/២៧ មុនកែ** (ស្តារ ៖ `w=3 k=5/12` · `k=6/12` ➜ finalize សាក `update` ក្នុង B) ·
+  ជាប់ ៥៤/៥៤ · `restore-race-test` sandbox ប្រកាស `authGeneration` (៨/៨)។
+  `ZoeW/tests/exchange-rate-shop-switch.test.ts` (ថ្មី · ២ · `initDatabaseListeners()` ពិត) ➜ **ធ្លាក់ ១/២ មុនកែ** (ហាង B = 4000 របស់ហាង A) · ជាប់ ២/២។
+- ZTO-E13 ៖ `ZoeW/tests/zto-pages-unknown.test.tsx` (ថ្មី · ៩ · Function ពិត + client ពិត + ZTO ក្លែងគ្មាន `pages`/`total`) ➜ **ធ្លាក់ ៦/៩ មុនកែ** (ទាញបាន ១០០ ពី ២៥០ ·
+  `truncated: false` ពេល ៣៥០ · ភស្តុតាង `ok` ពេល ៣៥០) · ទិសផ្ទុយ ៣ (ទំព័រមិនពេញ ➜ ការហៅ ZTO ១ ដង · ZTO មាន `pages` ➜ ការហៅ `03 1–3` · `05 1–2` ដដែល) · ជាប់ ៩/៩ ·
+  `zto-list-sync-test` ZTO-E10 ៥ ការអះអាង (ទំព័រ ១/២ ពេញ · មិនពេញ · ទទេ · មាន meta) ➜ **ធ្លាក់ ៣ មុនកែ** · ជាប់ ៥៩៥ ok · អ្នកយាម ZTO ផ្សេងទាំងអស់បៃតង
+  (vitest ZTO ២៤ ឯកសារ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-*` · `zto-negative-cache` · `zto-signed-status` · `zto-network-boundaries`)។
+- ជុំ ៤ ៖ `ZoeW/tests/shop-bound-settings.test.ts` (ថ្មី · ៦ · `getLookupApiConfig` · `saveLookupApiConfig` · `readSheetImportStoredConfig` ពិត · Supabase ហាង A/B · ចាកចេញ ·
+  Firebase Reconfig · ទិសផ្ទុយ ៖ `/` ចុង · ការកំណត់ចាស់) ➜ **ធ្លាក់ ៥/៦ មុនកែ** · ជាប់ ៦/៦ · `push-client.test.tsx` «⛔ Push ជារបស់ហាង» (ថ្មី · ៦ · web · APK · Firebase
+  Reconfig · ការកំណត់ចាស់ · ធ្លាក់ ➜ មិនសាករាល់ `visibilitychange`) ➜ **ធ្លាក់ ៥/៦ មុនកែ** · ជាប់ ៦/៦ · `push-server.test.ts` (subscription ផ្លាស់ពី index ហាង A ទៅ B ·
+  `dispatchExpiry` ហាង A មិនផ្ញើ) ➜ ជាប់លើកូដមុនកែផង (Server ត្រឹមត្រូវរួច) ·
+  `ZoeW/tests/zto-cookie-life.test.ts` (ថ្មី · ១២ · Function ពិត + Blobs ក្លែងដែលបែងចែក key · container ថ្មី · ETag ប្រណាំង · Blob ជាប់គាំង ➜ ឆ្លើយក្នុង ២.៥ វិ. · Cookie env ·
+  ទិន្នន័យខូច · អត្ថបទ 🩺) ➜ **ធ្លាក់ ១២/១២ មុនកែ** · ជាប់ ១២/១២ · `health-check-test` +៧ (អត្ថបទអាយុ · Cookie រស់មិនរាយ «បដិសេធ» · សាលក្រមមិនប្រែ · `cookie.life` ខូច ៤) ➜
+  ១៧៨ ok · `zto-cookie-store-test` ៖ Blobs ក្លែងបែងចែក key · «diag ទី ២ ប្រើ cache» រាប់តែការអាន key `cookie` ➜ ៩១ ok · អ្នកយាម ZTO ទាំងអស់បៃតង (vitest ZTO + push-server
+  ២៤ ឯកសារ ៣២៦ · `zto-list-sync` ៥៩៥ · `zto-sync-banner` ១៩៨ · `zto-proxy` ១៩៧ · `zto-budget` ៦៣ · `zto-cookie-session` ៣២ · `zto-cookie-sync` ១៨៣ · `zto-cookie-capture` ៥៦ ·
+  `zto-negative-cache` ៣៥ · `zto-signed-status` ៥៧ · `zto-network-boundaries` ១១)។
+  `ZoeW/tests/shop-pending-cleanup.test.tsx` (ថ្មី · ៤ · `runAutomaticCleanupRules` · `resumeInterruptedCleanups` ពិត · ហាង Supabase មិនទាន់ស្គាល់ · ទិសផ្ទុយ ២ ៖ Firebase · Supabase
+  ស្គាល់ គ្មាន ZTO ➜ ផុតកំណត់ធម្មតា) ➜ **ធ្លាក់ ២/៤ លើ `7894e2d`** (ការរង់ចាំ ZTO បាត់ ➜ កញ្ចប់ ៨ ថ្ងៃដកលុយ · journal បន្ត) · លើ `f572e1d` ធ្លាក់តែ journal (ចន្លោះចាស់) · ជាប់ ៤/៤។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Merge ➜ Netlify Deploy **ZoeW** និង **ZoeKeyGen** (`2.24.14`)។ Function ZTO (`zto-order-detail.js`) ចេញជាមួយ Deploy ZoeW (env មិនប្រែ)។
+២. iPhone (App លើ Home Screen) ៖ ☰ ខាងក្រោម និង 🩺 ➜ «iPhone · iOS 26.x» (ឬ «iOS 26+») · Serial ដដែល។
+៣. ZoeKeyGen ➜ បញ្ជី Key ➜ កៅអីរបស់ iPhone នោះ ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone បើក App កំណែថ្មី (ពិនិត្យ Key)។ APK ៖ ផ្លូវ Android (`ZoeDevice`) មិនប្រែ (APK 2.50.53 build ដោយ workflow ពេល merge ដូចធម្មតា)។
+៤. ZoeKeyGen ៖ បើកម្តង ➜ កំណែ `2.24.14` ក្នុងប្រអប់ចូល · បញ្ជី Key ➜ «⏳ បន្ថែម» ➜ អត្ថបទថ្មី (គ្រឿងថ្មី/Reset Activate បានរហូតដល់ថ្ងៃថ្មី)។ គ្មានការសាកពិសេសសម្រាប់ការកែធុងសំរាម
+   (កើតតែពេលឧបករណ៍ ២ កែអតិថិជនដដែលព្រមគ្នា) ➜ ពិនិត្យ Sentry `zone: money` ក្រោយ Deploy ដូចធម្មតា។
+៥. ឧបករណ៍ដែលចូលហាងច្រើន (Supabase ៖ គណនីហាងផ្សេង · Firebase ៖ Reconfig) ៖ ក្រោយ update ការកំណត់ API ស្វែងរកអតិថិជន/តារាងអតិថិជន និង «នាំចូល Excel ទៅ Sheet» ចាស់
+   ចងទៅហាងដែលបើកមុនគេ ➜ ក្នុងហាងនីមួយៗ ☰ ➜ «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ពិនិត្យ/កំណត់ម្តងទៀត។ ឧបករណ៍ហាងតែមួយ ៖ គ្មានអ្វីត្រូវធ្វើ។
+   ⚠️ **ហាង ZTO** ៖ ហាងដែលមិនទាន់កំណត់ API ZTO លើឧបករណ៍នេះ មិនរង់ចាំបញ្ជី «ចុះហត្ថលេខា» មុនការសម្អាត ៨ ថ្ងៃ (លើកលែងតែឧបករណ៍ ZTO ផ្សេងក្នុងហាងនោះកំពុងអាន ៖
+   សញ្ញាហាង `zto_signed_sweep`) ➜ កំណត់ API ZTO ក្នុងហាងនោះភ្លាមក្រោយ update។
+   Push ៖ ចូលហាង B ➜ 🔔 ➜ 📲 នៅ «បើក» · ដំណឹង «ជិតផុតកំណត់» មកពីហាង B តែប៉ុណ្ណោះ។
+៦. ZTO ៖ គ្មាន env ថ្មី ➜ ក្រោយ Deploy ប្រើ Lookup ធម្មតា · ពេល Cookie មួយត្រូវ ZTO បដិសេធ ហើយ Sync ថ្មី ➜ 🩺 ជួរ ZTO បង្ហាញ «អាយុ Cookie ក្រោយ Sync ៖ ប្រើបាន … ➜
+   បដិសេធនៅ … (ទំនេរ …)»។ ប្រមូល ២–៣ ជីវិត រួចប្រាប់ Claude ដើម្បីវិភាគ (ទំនេរយូរ = ZTO idle timeout · ទំនេរខ្លី = ZTO បិទ session)។ Cookie ដែល Sync ដោយឧបករណ៍ចាស់
+   (គ្មាន `syncedAt`) ឬពី env ➜ មិនវាស់ ➜ ប្រើ `sync-zto-cookie` បច្ចុប្បន្ន។
 
 ### [2.50.52] — 2026-10-09 · ZoeW + ZoeKeyGen ៖ **model iPhone ពិតពីទំហំអេក្រង់ × pixel ratio × កំណែ iOS · បន្ទាត់ model/serial គ្មាន emoji** (សំណើម្ចាស់គម្រោង ៖ «កែកន្លែងបង្ហាញ model ឧបករណ៍ អោយស្គាល់ model ពិតសម្រាប់ iphone … និងដក emoji ចេញទាំង ២ កន្លែង model និង serial ទាំងក្នុង ZoeKeyGen និង ZoeW»)
 
@@ -3267,6 +3396,103 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-10 — Deep audit ៥ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ» · «commit ចូល PR#309» · គ្មាន agent) ➜ [2.50.53]
+
+- **មូលដ្ឋាន** ៖ run-all STRICT (emulator RTDB រស់) លើ `05a24c5` ៖ ២០៣ ជាប់ · ធ្លាក់ ១ = `repository-file-coverage` ព្រោះអ្នកយាមថ្មីលេចកណ្តាលការរត់ (artifact · មិនមែនកូដ)។
+- 🔴 **ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ** (ការរកឃើញពិត · លុយ + បាត់ទិន្នន័យ) ៖ «Merge into a gone item» (`mergeBarcodeIntoHistoryItem()` ឃើញ null ➜ ធាតុថ្មីក្រោម
+  id ចាស់) ជាទ្វារដែលបានរចនា ប៉ុន្តែគ្មានអ្នកណាវាស់អ្វីកើតឡើងពេលធាតុថ្មីនោះត្រូវសម្អាត ឬលុប ខណៈ `trash/<id>` នៅកាន់ជីវិតចាស់ (លុប ៣០ ថ្ងៃ · ផុតកំណត់ ២ ថ្ងៃ · យករួច ៣០ ថ្ងៃ)។
+  `claimCleanupTrashSlot()` ([2.50.52]) ចាត់ទុក «slot មាន deletedAt ផ្សេង» = ការ claim ដូចគ្នារបស់ឧបករណ៍ផ្សេង ➜ `trashElsewhere` ➜ journal លុប · គ្មាន ledger ➜ barcode ថ្មីដែល
+  claim ចេញពីប្រវត្តិរួច **មិននៅទីណាសោះ** (abandon ៖ ប្រាក់មិនកាត់ ➜ ចំណូលលើស · registry ជាប់ · close ៖ កំណត់ត្រាយករួចបាត់) · resume `slot` ឃើញ `history/<id>` ដែលបង្កើតឡើងវិញ
+  ➜ «elsewhere» ដូចគ្នា · `deleteSingleItem()` សរសេរ trash ដោយ overwrite ➜ ច្បាប់ចម្លងចាស់ (ឧ. ផុតកំណត់ដែលកាត់រួច) បាត់ ហើយ registry របស់វាមិនដែលដោះ។
+  វាស់ (`ZoeW/tests/cleanup-foreign-slot.test.ts` · module ពិត · store រួម) ៖ abandon ➜ ច្បាប់ចម្លង C = **០** · ledger ១០០ (រំពឹង ៩៣) · close ➜ ០ · ឧបករណ៍ ២ ➜ ០ · resume ➜ `''` (រំពឹង `restored`) · លុប ➜ ច្បាប់ចម្លងចាស់ត្រូវជាន់។
+  បង្អួចកើត ៖ Firebase ≈ RTT (ស្កេន/ZTO ខណៈឧបករណ៍ផ្សេងលុប) · **Supabase ធំជាង** ៖ realtime ស្ងាត់ ➜ ទិដ្ឋភាពចាស់រហូត `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ CAS conflict ➜ updater ទទួល null ➜ ធាតុថ្មីក្រោម id ចាស់។
+  **ហេតុអ្វី checker បៃតង** ៖ អ្នកយាម slot ([2.50.52]) seed តែ «ច្បាប់ចម្លងដូចគ្នា» ឬ slot ទំនេរ · `merge-into-deleted-item.test.ts` វាស់តែផ្នែកបញ្ចូល មិនវាស់ជីវិតបន្ទាប់របស់ធាតុថ្មី
+  (សំណួរ ៨ ៖ មិនចូលស្ថានភាពកំហុស)។ ការកែ ៖ `trashSlotSharesClaim()` (ច្បាប់ចម្លងកាន់ barcode ណាមួយរបស់យើង = ការ claim ដូចគ្នា ➜ elsewhere ដដែល · គ្មាន ➜ ជីវិតផ្សេង ➜
+  slot ផ្លាស់ម្តងទៅ `cleanupPartialTrashId(id, <trashReason>|slot)` · journal + live marker ប្តូរ key) · `resolveCleanupSlot()` ៖ ប្រវត្តិ id ដដែលត្រូវកាន់ barcode របស់យើងទើបជាភស្តុតាង ·
+  `deleteSingleItem()` សរសេរតាម slot ដដែល។ Mutation ៥ ➜ ធ្លាក់ ៥ · ១ · ១ · ១ · ១ (គ្មាន move · ប្រវត្តិតាម id · resume ចាត់ទុកគ្រប់ម្ចាស់ជា elsewhere · លុប overwrite ·
+  `trashSlotSharesClaim` ឆ្លើយ false ជានិច្ច ➜ ទិសផ្ទុយ ៦ ចាប់)។ sandbox ៩ ដែលស្រង់ `claimCleanupTrashSlot()` ទទួល helper ថ្មី (stub `true` លើ tree ចាស់ = ឥរិយាបថចាស់) ·
+  `emu/crud-rules-flow` STRICT ៖ ការលុបតាម transaction ឆ្លង rules ពិត ១៣៧/១៣៧ · run-all STRICT លើ tree កែ ៖ ២០២/២០៤ ➜ `ui-flow-test` ៖ fixture «ធុងសំរាមបរាជ័យ»
+  ទប់តែ `update()` ➜ ការលុបតាម slot (`runTransaction()`) ឆ្លង ➜ សេណារីយ៉ូមិនដែលកើត (FAIL ២) ➜ ទប់ទ្វារសរសេរធុងសំរាមទាំង ២ (មិនបន្ធូរការអះអាង ➜ ៩០/៩០) ·
+  `doc-scope-test` ៖ ជួរលិបិក្រមអ្នកយាមថ្មី ➜ run-all STRICT ពេញលើ tree ចុងក្រោយ ៖ ២០៣/២០៤ · `perf` លើសពិដាន ៣០០ វិ. ពេលម៉ាស៊ីនរវល់ (ពេលរត់សរុប ១០១២ វិ.
+  ធៀប ៨៩២ វិ. លើកមុន · ការអះអាងទាំងអស់មុនពិដាន ok) ➜ `RUNALL_RESUME=1` tree ដដែល ៖ `perf` ជាប់ ៧៣,៦ វិ. ➜ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង · emulator រស់)។
+- 🟠 **ZoeKeyGen SW គ្មាន `cache: 'no-cache'`** ៖ កត់ក្នុង Deep audit ជុំ ២ (2026-10-04 · «សង្កេតក្រៅវិសាលភាព ➜ ជុំ ៣») តែមិនដែលធ្វើ ➜ checker វាស់តែ ZoeW (ជុំទី ៤ ប្រើ
+  `zoew-v` · `.wasm`)។ វាស់ browser ពិត (`qrcode.js` A `immutable` ➜ SW B) ៖ cache `-b` កាន់ A (**ធ្លាក់**) ➜ ក្រោយកែ B។ ផលប៉ះពាល់ថ្ងៃនេះតូច (`netlify.toml` ផ្ញើ `no-cache` លើ
+  `*.js` · `*.css` · `*.png`) តែច្បាប់មានដើម្បីមិនពឹង header (CDN ចាស់ · header ប្តូរ)។ checker SW ៨ របស់ ZoeKeyGen ជាប់ទាំងអស់ក្រោយកែ។
+- 🟡 **ប្រអប់ Extend របស់ ZoeKeyGen ប្រាប់ផ្ទុយការពិត** ៖ «ធ្វើការតែលើគ្រឿងដែល Activate រួច … លែងអាច Activate លើគ្រឿងថ្មី» តែ `activate()` យកពិដាន `online.expiresAt`
+  (`license-clock-rollback-test` ច.១ វាស់ ៖ Key ហួស `exp` ដែល sign + DB Extend ➜ `valid`) ➜ អ្នកលក់បង្កើត Key ថ្មីឥតប្រយោជន៍ · ច.៩ ធ្លាក់លើ index.html មុនកែ។
+- **បានពិនិត្យ មិនមែនកំហុស** ៖ ការលុបជាអចិន្ត្រៃយ៍ដោយដៃមិនដោះ `ded/<id>` (ដោះ ➜ journal `ledger` របស់ឧបករណ៍ផ្សេងរត់ការកាត់ម្តងទៀតពេល ring រុញ token ចេញ ➜ កាត់ ២ ដង ➜
+  ការរក្សាសោ = មានសុវត្ថិភាពជាង · leak ~៧០ byte) · listener DB (generation gate · `detachDatabaseListeners()` មុនភ្ជាប់) · កាមេរ៉ា (`pause` ដដែលមិនស្ទួន · `loadedmetadata` ដកពេលបិទ) ·
+  adapter Supabase (window listener ដកក្នុង `deleteApp` · CAS ពី server view + `waitDeps`) · registry · SW ZoeW (`deployUnchangedDuringInstall` · `responseFitsKey`) · push resync ·
+  Setup Link (PIN + កាត) · តំបន់ចាក់សោ ZTO/Cookie (អានតែប៉ុណ្ណោះ · គ្មានការកែ)។
+- **ជុំ ២** (ម្ចាស់គម្រោង ៖ «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់» ➜ ព្រំដែន ៥ ដែលជុំ ១ ទុក ➜ អ្នកយាមមុន ➜ កែ) ៖
+  ក. **«លុបទាំងអស់» លើ id ដែល slot កាន់ជីវិតចាស់** ៖ ជុំ ១ កត់ថា «fail-safe» ➜ **ខុស** ៖ rules បដិសេធ finalize (`!root…recently_deleted/$itemId.exists()`) គ្រប់ដង ➜
+  `finalizeClaimedHistoryClear()` សាក ៣ ដង (១,៥ + ៣ វិ.) ➜ «លុបមិនបានជោគជ័យ» + Sentry · `clearClaim` នៅលើធាតុ ហើយ `activeClearHistoryClaims` កាន់ token ➜
+  `releaseStaleClearHistoryClaim()` មិនដោះលើឧបករណ៍នេះ ➜ ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · ដក · លុប រំលងធាតុនោះរហូត reload (ឧបករណ៍ផ្សេង ៖ រហូតផុត lease) · «លុបទាំងអស់» ម្តងទៀតបរាជ័យដដែល។
+  ឥឡូវ ៖ ការអានក្រោយការបដិសេធ (history កាន់ claim របស់យើង + trash មាន) ➜ `CLEAR_HISTORY_SLOT_TAKEN` (មិន retry) ➜ `releaseOwnClearHistoryClaim()` ➜
+  `deleteSingleItem(id, { confirmed, quiet })` (slot ផ្លាស់ពីជុំ ១ · លទ្ធផល `deleted`/`pending`/`blocked`/`missing`/`failed`/`stale` ➜ ចំនួនក្នុងសារសង្ខេបតែមួយ)។
+  អ្នកយាម `clear-history-foreign-slot.test.ts` ៖ fake អនុវត្ត fence finalize + ច្បាប់លុប history ដែលមាន `clearClaim` ពិត (មិនមែន fake ទទួលអ្វីៗទាំងអស់ ➜ សំណួរ «stubs accepting
+  everything») ➜ មុនកែ ៖ ធាតុនៅ · ធ្លាក់ ២/៣ (ទិសផ្ទុយ slot ទំនេរ ៖ ផ្លូវ finalize ដើម · ការបដិសេធ ០)។
+  ខ. **`restoreClaimedItemToScanHistory()` ទាំងមូល + `history/<id>` បង្កើតឡើងវិញ** ៖ `if (currentItem) return currentItem` ➜ barcode ដែល claim បាត់ ➜ ឥឡូវបញ្ចូលដូចផ្លូវផ្នែក
+  (dedupe តាម code · ដក `isDeducted`) · តេស្ត ៩ ៖ មុនកែ `['D']` ➜ `['D','C']` · ១០ (ទិសផ្ទុយ ៖ គ្មានធាតុ ➜ ធាតុដែល claim ទាំងមូល) ជាប់ទាំងពីរ។
+  គ. **`assignLockerToEntry()` ក្រោយប្តូរ session** ៖ ចម្លើយយឺត (ក្រោយពិដាន ១២ វិ.) ក្រោយចាកចេញ/ប្តូរ Database កែ `lockerBarcodeIndex` របស់ session ថ្មី (id + barcode ដដែល ពេលចូល
+  គណនីដដែលវិញ) ហើយបង្ហាញ ✅/❌ ➜ ឥឡូវ `assignIsCurrent()` (db + `authGeneration`) ចាំងមុនរាយការណ៍ · `locker-claim-guard-test` sandbox ប្រកាស `authGeneration`។
+  ឃ. **ZoeKeyGen `generateLicenseKey()`** ៖ ប្រតិបត្តិការ Admin ផ្សេងចាប់ `operationDb` រួច តែ Generate retry ដោយ `fb.ref(db)` ➜ Reconfig ចន្លោះ retry (១ វិ. · ២ វិ.) ➜ Key ចូល
+  License Project ថ្មី ➜ ឥឡូវ `operationDb` + `generateIsCurrent()` (db · admin · Signing Key) · retry ក្រៅ session ➜ `noRetry`។ checker ថ្មីប្រើ `retryAsync()` ពិតពីកូដ ship
+  (stub របស់ harness មិន retry ➜ ស្ថានភាពកំហុសមិនដែលកើត ➜ សំណួរ ៨)។ ស្កេន `fb.ref(db` ទាំងអស់ក្នុង ZoeKeyGen ➜ `migrateLegacyLicenseKeyMetadata()` (ប៊ូតុងក្នុងបញ្ជី Key) ក៏ដូចគ្នា ៖
+  អាន A ➜ Reconfig ➜ សរសេរការផ្លាស់ទីរបស់ A ចូល B + ✅ ➜ កែតាមលំនាំដដែល (`isCurrent()` ក្រោយការអាន · ក្រោយការសរសេរ · ក្នុង `catch`) · `.info/*` និង `refreshKeyList()` (អានតែប៉ុណ្ណោះ ·
+  `keyListSessionGeneration`) មិនមែនកំហុស។
+  ច. **ការសាកឡើងវិញឆ្លង session (ZoeW)** ៖ ស្កេន `retryAsync(` ទាំងអស់ក្នុង ZoeW ដូច ឃ ➜ ការសរសេរធុងសំរាមរបស់ `claimAndCleanupItem()` · `deleteSingleItem()` ·
+  `removeSingleBarcode()` សាក ៤ ដង (១,៥ · ៣ · ៦ វិ.) តាម `firebaseState.db` បច្ចុប្បន្ន ហើយការពិនិត្យ session នៅតែក្រោយការសាកចប់ ➜ ការសាកដែលកើតក្រោយការចាកចេញ/ប្តូរ Config
+  = ការសរសេរថ្មីក្រោម session ថ្មី (Firebase ៖ Database ថ្មី · Supabase ៖ ការសរសេរដែលរង់ចាំត្រូវបដិសេធដោយ `authScope` ➜ `retryAsync()` សាកម្តងទៀតក្រោមគណនីថ្មី ➜ tenant ផ្សេង)
+  ➜ កញ្ចប់ហាង A ចូលធុងសំរាមហាង B · «ដក» ៖ ការស្តារ barcode ក្រោយបរាជ័យសរសេរចូលប្រវត្តិហាង B (`revertRevenueLedgerDelta()` មាន `applied.isCurrent` រួចហើយ ➜ ledger មិនប៉ះ) ·
+  `restoreClaimedItemToScanHistory()` ចាប់ ref ដើម តែនៅលើ Supabase db ដដែល + គណនីថ្មី ➜ tenant ផ្សេង។ ឥឡូវ closure នៃការសាកនីមួយៗពិនិត្យ session (`noRetry`) · «ដក» ចាប់
+  session ពេល `finishRemoval()` ចាប់ផ្តើម (ផ្លូវ late commit ក្នុងហាងដដែលមិនប្រែ) ហើយឈប់មុនការស្តារពេល session ប្តូរ (ព្រំដែន MONEY-3 «ដក» គ្មាន journal ដដែល ៖ Sentry money)។
+  ឆ. **resume ពេលប្តូរ session កណ្តាលផ្លូវ** (ម្ចាស់គម្រោង ៖ «ហេតុអីបានមិនទាន់វាស់» ➜ វាស់) ៖ `resumeCleanupJournalEntry()` ពិនិត្យ scope តែនៅដើម ➜ ប្តូរហាងពេលអានធុងសំរាម
+  (stage `moved`) ➜ ទិដ្ឋភាពហាង B «barcode មិនត្រឡប់» ➜ សរសេរធុងសំរាមហាង A ចូល B ➜ **កាត់ ៧ ពី ledger ខែ និងថ្ងៃរបស់ហាង B** ➜ flip ក្នុង B (`ZoeW/tests/cleanup-resume-session.test.ts` ១) ·
+  stage `slot` ដូចគ្នា (៣) · ប្តូរក្រោយសរសេរធុងសំរាមក្នុង A ➜ កាត់ក្នុង B (៤)។ ការប្តូរកណ្តាលជំហាន ledger ខែមិនបន្តទៅថ្ងៃ (`commitLedgerEventStep()` ពិនិត្យ session ក្រោយ
+  transaction រួច ➜ ២ ជាប់មុនកែ = អ្នកយាមទិសផ្ទុយ)។ ការកែ ៖ ចាប់ session នៅដើម `resumeCleanupJournalEntry()` · `resolveCleanupSlot()` · `settleCleanupDeduction()` ➜ ពិនិត្យក្រោយ
+  `await` នីមួយៗ និងក្នុង closure នៃការសាក (`noRetry`) ➜ journal នៅសម្រាប់ហាងដើម។
+- **ជុំ ៣** (ម្ចាស់គម្រោង ៖ «វាស់ឡើងវិញទាំងអស់នៅអ្វីដែលមិនទាន់វាស់ ជាពិសេសការពារលេចទិន្នន័យចូលគ្នារវាងហាងខុសគ្នា» · «ផ្ទៀងផ្ទាត់ រកកំហុសទូទាំង project») ៖
+  ជំនួសការអានទ្វារម្តងមួយ (ក្រុមដដែលនៃកំហុសលេចតាមទ្វារជាច្រើន ➜ រចនាសម្ព័ន្ធ ➜ វាស់ជាសំណុំ) ➜ **fuzz ប្តូរ session** (`ZoeW/tests/session-switch-fuzz.test.ts`) ៖ ប្រតិបត្តិការសរសេរពិត ២៧ (ស្កេនរក្សាទុក · ដក · លុប ·
+  បិទ/បើក · កែតម្លៃ · កែលេខ · ការហៅ · Locker · សម្អាត ២ ម៉ោង/៨ ថ្ងៃ · sweep · resume ៣ stage · ស្តារ · លុបអចិន្ត្រៃយ៍ · លុបទាំងអស់ · Reset · អត្រាប្រាក់ · registry claim/release ·
+  origin · purge · ដោះ clearClaim ចាស់ · ជួសជុល pickup) ➜ ចម្លើយនៃការហៅ Firebase ទី k មកដល់ក្រោយ macrotask ដែលប្តូរហាង (Database + `authGeneration` ថ្មី) ➜ ដំណើរការ
+  timer ៩០ វិ. (retry · ពិដាន `dbOp` · late commit) ➜ រាប់ការសរសេរដែលចេញក្រោយការប្តូរ (Supabase ៖ ការសរសេរក្រោយការប្តូរ = គណនីថ្មី = ហាងផ្សេង មិនថា ref ចាប់មុនឬអត់)។
+  កំណែដំបូងប្តូរហាងក្នុងកូដ synchronous (កណ្តាលការហៅ) ➜ artifact (ការប្តូរពិតកើតតែពេល event loop ទំនេរ) ➜ ប្តូរដោយ macrotask ➜ លទ្ធផលពិត ៖ **៦ ទ្វារលេច** ៖
+  ដក (transaction ប្រវត្តិឆ្លើយក្រោយការប្តូរ ➜ `finishRemoval()` ចាប់ session ថ្មី ➜ កាត់ ledger ថ្ងៃ/ខែ + ធុងសំរាមក្នុង B) · ស្តារ (គ្រប់ k ៖ claim · ប្រវត្តិ · finalize · mirror ក្នុង B) ·
+  លុបអចិន្ត្រៃយ៍ + purge (ដោះ registry ក្នុង B ➜ ការការពារស្កេនស្ទួនរបស់ B ខូច) · លុបទាំងអស់ (loop + retry finalize) · `repairPickupLedgerOnce()` (សំណុំ barcode + លេខទូរស័ព្ទ A ចូល B)។
+  ការកែ ៖ ចាប់ session នៅដើម ➜ ពិនិត្យក្រោយ `await` នីមួយៗ (ស្តារ ៖ sentinel `RESTORE_SESSION_SWITCHED` ➜ `catch` ឈប់ស្ងាត់ៗ + Sentry money · គ្មាន alert/អានទិដ្ឋភាពឡើងវិញក្នុង B) ·
+  «ដក» ចាប់ session នៅដើម (មិនមែននៅ `finishRemoval()`) ➜ late commit ក្រោយប្តូរ ➜ ឈប់ + Sentry money (ដូច «លុប» · ការសម្អាត)។ ៦ ទ្វារផ្សេង (បិទ/បើក · Locker · ការហៅ · កែលេខ ·
+  `reconcileCollectedHistory()` · `releaseBarcodesInRegistry()` · `saveBarcodeOrigins()` · `commitLedgerEventStep()`) មានការពិនិត្យរួច ➜ ជាប់មុនកែ។ ជួររង់ចាំ (`pendingRegistryReleases` ·
+  `pendingHistoryPatches`) សម្អាតពេលចាកចេញ (`clearSensitiveModalFields()`) និងប្តូរ Config (teardown) រួចហើយ។ **ផ្លូវ retry** ៖ របៀប fuzz ដំបូង «ការសរសេរទី ១ ធ្លាក់»
+  ជាប់ ៥៤/៥៤ = **បៃតងក្លែង** (ការសរសេរទី ១ របស់ការស្តារជា claim ➜ ឈប់មុនដល់ finalize) ➜ ប្តូរទៅ «ការសរសេរទី w ធ្លាក់» គ្រប់ w ➜ រកឃើញ `finalizeClaimedRestore()` ៖
+  រង្វិលសាក ៣ ដង (`update` ពហុផ្លូវ ៖ finalization · លុបធុងសំរាម · **បូកប្រាក់ ledger ត្រឡប់** · កូនសោ ledger) អាន `firebaseState.db` បច្ចុប្បន្ន ➜ ការប្តូរហាងក្នុងចន្លោះ
+  ១,៥ វិ. នៃការសាក ➜ `update` ចេញទៅហាង B (Firebase ៖ rules របង witness បដិសេធ · Supabase ៖ ច្បាប់ដដែល តែការផ្ញើខ្លួនឯងបានលេចរួច) ➜ ការកែ ៖ ចាប់ Database + `authGeneration`
+  នៅដើម ➜ ពិនិត្យមុនការសាកនីមួយៗ និងក្រោយការអានធុងសំរាម (`RESTORE_SESSION_SWITCHED` ➜ `executeRestoreItem()` ឈប់ + Sentry money)។ ⛔ តំបន់ចាក់សោ ZTO (`zto-list-sync` · `zto-status` · `zto-shop-sweep`)
+  មិនកែ ៖ វាហៅ `claimBarcodeInRegistry()` · `addOrUpdateEntry()` · `applyBarcodeCloseChange()` ដែល fuzz វាស់ ➜ ជាប់ · `markZtoShopSweep()` សរសេរតែត្រាពេល (មិនមែនទិន្នន័យអតិថិជន)។
+  **ទិន្នន័យក្នុងឧបករណ៍ឆ្លងហាង** (វាស់តាម logout ពិត ៖ `onAuthStateChanged(null)` + `clearSensitiveModalFields()` · teardown `initFirebase()`) ៖ ប្រវត្តិ · ធុងសំរាម · ledger · pickup ·
+  mirror · Locker index · តារាងអតិថិជន + cache Lookup (`clearCustomerDataTableCache()`) · ជួររង់ចាំ · ZTO · docs cache Supabase ➜ សម្អាត។ **អត្រាប្រាក់** ➜ កំហុស ៖ listener
+  ធ្វើបច្ចុប្បន្នភាពតែពេលមានតម្លៃ ➜ ហាង B ដែលគ្មាន node បន្តប្រើអត្រាហាង A (memory + `zoew_exchange_rate`) ➜ node ទទេ = 4100 + ដកច្បាប់ចម្លង។ **ការសម្រេចរបស់ម្ចាស់គម្រោង**
+  (ការរចនា មិនមែនកំហុសកូដ ➜ មិនកែ) ៖ ការកំណត់ Lookup API · តារាងអតិថិជន (`zoew_lookup_api_config`) · Excel ទៅ Sheet ជារបស់ **ឧបករណ៍** ➜ ឧបករណ៍មួយដែលចូលហាង Supabase ច្រើន
+  (Project តែមួយ) ប្រើ Lookup/តារាងអតិថិជនរបស់ហាងដែលកំណត់ចុងក្រោយ (ZTO `/detail` ការពារដោយ `ZTO_DETAIL_IDENTITY=require` + `ZTO_DETAIL_BRANCH_PATHS`) · push ហាង Supabase
+  (`supabaseTenantKeyId()`) មិនដោះពេលចាកចេញ ➜ ឧបករណ៍នៅទទួលការរំលឹកជិតផុតកំណត់របស់ហាងមុន (ពេលវេលាប៉ុណ្ណោះ គ្មានទិន្នន័យអតិថិជន) ➜ handoff។
+  **ស្កេនរចនាសម្ព័ន្ធ** (មុខងារ async ក្នុង `ZoeW/src` ដែលសរសេរ Firebase ក្រោយ `await`) ៖ ១១ គ្មានការពិនិត្យ session តែសរសេរតែម្តងនៅដើម (មុន `await` ដំបូង) ហើយអ្នកហៅពិនិត្យរួច
+  (ស្តារ · លុបទាំងអស់ · resume · `applyCleanupRevenue()` ចាប់ផ្តើម ledger synchronous) ➜ គ្មានទ្វារលេចថ្មី។
+  **ធាតុ «មិនទាន់វាស់» ក្នុង handoff** ៖ localStorage ពេញ ➜ វាស់ (`cleanup-deduct-order.test.ts` ១២ ៖ `vi.spyOn(appLocalStore, 'setItem')` បោះ QuotaExceededError ·
+  លក្ខខណ្ឌចាំបាច់ ៖ App ព្យាយាមសរសេរ journal ពិត · ការប្តូរ prototype ដំបូងមិនប៉ះ storage របស់ App ➜ តេស្តជាប់ដោយមិនចូលស្ថានភាព = បៃតងក្លែង ➜ ចាប់បានដោយការអះអាង
+  លក្ខខណ្ឌ) ➜ ការសម្អាតដែលមិនត្រូវរំខាននៅត្រឹមត្រូវ (ធុងសំរាម flip · ledger ៩០ · កាត់ម្តង) · ព្រំដែន ៖ storage ពេញ **និង** App ស្លាប់កណ្តាលការសម្អាត ➜ គ្មាន journal ដើម្បីបន្ត
+  (`fail-open` ជាការសម្រេចដែលមានស្រាប់)។ ZTO `pages` អវត្តមាន ➜ វាស់ (probe លើ `zto-list-sync-test` harness ពិត · មិន commit) ៖ ZTO ឆ្លើយ ១០០ ជួរ (ពេញទំព័រ) គ្មាន `meta.pages`
+  ➜ Function `pages: 1` ➜ `fetchZtoSignedPages()` `truncated: false` ➜ ការអានចុះហត្ថលេខា «ពេញលេញ» ➜ កញ្ចប់ចុះហត្ថលេខានៅទំព័រ ២+ អាចសម្អាត ៨ ថ្ងៃជា «ផុតកំណត់» (កាត់ប្រាក់)
+  ➜ ⛔ **តំបន់ចាក់សោ** (`zto-order-detail.js` · `zto-list-sync.ts`) ➜ មិនកែ ➜ ស្នើម្ចាស់គម្រោង ➜ ម្ចាស់គម្រោង ៖ «ZTO កែចុះ» ➜ **ZTO-E13** (ខាងក្រោម)។ born-closed `closedAt` ·
+  sign list truncate ក្នុងមួយថ្ងៃ ➜ អ្នកយាមដែលមានស្រាប់ (`zto-born-closed-merge` · `zto-signed-cadence` · `zto-signed-only-purge`) · ការសម្អាតពេលអេក្រង់ PIN ➜ រចនាត្រឹមត្រូវ
+  (ការងារហាងនៅរត់ · toast រង់ចាំ `releaseHeldToasts()`)។ **វាស់មិនបាននៅទីនេះ** (ត្រូវការបរិស្ថានពិត) ៖ edge functions/CORS លើ APK · captive portal ពិត · egress ring `ops` ·
+  event «Perf overlay» · realtime Supabase ស្ងាត់ (poll ៥ នាទី = ការសម្រេចរបស់ម្ចាស់គម្រោងនៅរង់ចាំ)។
+  ការផ្ទៀងផ្ទាត់ជុំ ២ ៖ vitest ១២៨ ឯកសារ · ១១៦៥/១១៦៥ · `tsc` ស្អាត · checker sandbox ១៩ ពាក់ព័ន្ធ ជាប់ · run-all STRICT (emulator RTDB រស់) លើ `2b72656` បញ្ឈប់ដោយចេតនា
+  (រកឃើញ Migrate ក្រោយ commit) ➜ លើ `235e1b7` ៖ **២០៤/២០៤** (០ មួយផ្នែក · ០ រំលង)។
+  ង. **ធាតុចាស់គ្មាន `barcodes`** («មិនទាន់វាស់» ក្នុង handoff) ៖ វាស់ ➜ ការសម្អាត ៨ ថ្ងៃ ៖ ledger ១០០ ➜ ៩៣ តែ `uncollectedValueByDate()` នៅរាប់ ៧ (`isDeducted` កម្រិតធាតុមិនដែល flip ·
+  rules ធុងសំរាមគ្មាន `isDeducted` កម្រិតធាតុ) ➜ «ចំណូល (យករួច)» ៨៦ ជំនួស ៩៣ រហូត purge ២ ថ្ងៃ ➜ ឥឡូវ `ensureBarcodeArrayForItem()` ក្នុង claim abandon (ដូច `removeSingleBarcode()`) ·
+  sandbox ៥ (`cleanup-interrupt-atomicity` · `db-stall-guard` · `ledger-count-integrity` · `partial-pickup-cleanup` · `restore-marker-hygiene`) ស្រង់ helper នេះ (មុន ៖ ReferenceError ក្នុង updater
+  ➜ ធ្លាក់ ៥៦ · ៤ · ៨ · ១៩) · `policy-test` ស្រង់ `deleteSingleItem(` តាមបុព្វបទ (ប៉ារ៉ាម៉ែត្រ `opts` ថ្មី)។
+
 ### 2026-10-09 — Deep audit ៤ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ») ➜ [2.50.52]
 
 - 🔴 **ZoeKeyGen ៖ `isDatabaseInitialized` មិនដែលប្រកាស** (ការរកឃើញពិត · មានតាំងពី commit ដំបូងរបស់ repo `238d7f5`) ៖ function ជណ្តើរស្តារ SDK ចម្លងពី ZoeW
@@ -3322,7 +3548,52 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
   (ឬមិនទាន់មានអ្នកប្រើ) · adapter Supabase ផ្ញើ auth event តែពេលចូល/ចេញ/ស្តារ ➜ `phoneModalBusy` មិនជាប់ · CORS Edge Functions សម្រាប់ APK (`https://localhost` ក្នុង README) ·
   `dispatchNotices` at-most-once (`onlyIfMatch` ledger) · ការទាញ 🔔 feed · push config មានពិដាន។
 - **មិនទាន់វាស់/សម្រេច (ទុកម្ចាស់គម្រោង)** ៖ Supabase realtime ស្ងាត់ពី server (`realtime.send` ក្នុង `zoe_broadcast_seq` លេបកំហុសដោយចេតនា) ➜ ឧបករណ៍នៅ `SUBSCRIBED` ហើយទាញតែ
-  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq · ZTO `meta.pages` អវត្តមាន ➜ `pages: 1` (តំបន់ចាក់សោ)។
+  `SB_POLL_REALTIME_MS` (៥ នាទី) ➜ ជម្រើស ៖ ទាញរៀងរាល់ ៦០ វិ. ពេលអេក្រង់បើក (egress តូច · ១ RPC/នាទី/ឧបករណ៍) ឬចាប់ការបាត់ broadcast តាមលេខ seq។
+- **ZTO-E13 (សំណើម្ចាស់គម្រោង ៖ «ZTO កែចុះ» · «ពិនិត្យអោយស្អាតចុះ ZTO ហើយចាក់សោរវិញ»)** ៖ ផ្លូវតំបន់ចាក់សោ ៖ អ្នកយាមមុន ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់ ➜ `LOCK`។
+  ការរចនា ៖ Function មិនដឹងទំព័របន្ទាប់ទេ ➜ «ទំព័រពេញ = ប្រហែលមានបន្ត» (`pagesUnknown` · `pages` = ទំព័រ + ១) · client អាន **តាមលំដាប់** (មិនមែនស្របគ្នាដល់ពិដាន ៖ ZTO
+  ដែលបដិសេធទំព័រហួសចុងនឹងធ្វើឲ្យការទាញទាំងមូលធ្លាក់) · រង្វិល `for (;;)` មានព្រំដែនរចនាសម្ព័ន្ធ (ជុំនីមួយៗ `readArrival`/`readSigned` កើន ឬឈប់ · ≤ ពិដាន ៣) ·
+  ZTO មាន `pages` ➜ រលកតែមួយដូចមុន (វាស់ ៖ ការហៅ upstream ដដែល) · ពិដាន client (៣) ≤ លំនាំដើម server `ZTO_LIST_MAX_PAGES` ចាក់សោដោយ `zto-list-sync-test` ស្រាប់។
+  វាស់មុនកែ ៖ vitest ៦/៩ FAIL · checker ៣ FAIL (`{"pages":1}` · ទំព័រទី ២ ទទេ `{"pages":0}`)។ ព្រំដែន ៖ ZTO ដែលមិនអើពើ `pageNum` (ឆ្លើយទំព័រដដែល) ➜ ស្ទួនក្នុងបញ្ជី (ក្រុម
+  «♻️ ស្ទួន») ហើយពិដាននៅពេញ ➜ `truncated` (មិនពេញលេញ ➜ មិនកាត់ប្រាក់ខុស)។
+- **ជុំ ៤ (ម្ចាស់គម្រោង ៖ «ok ធ្វើទាំង៣ចំណុចហ្នឹងទៅ» ➜ ចំណុចដែលជុំ ៣ ទុកឲ្យម្ចាស់គម្រោងសម្រេច + អាយុ Cookie)** ៖
+  - **ការកំណត់ជាប់ឧបករណ៍** ៖ `zoew_lookup_api_config` · `zoew_sheet_import_config` គ្មានហាង ➜ ហាង B ប្រើ Lookup/តារាងអតិថិជន/Sheet របស់ហាង A។ ការរចនា ៖ `shopScope()`
+    (`src/core/shop-scope.ts`) = មូលដ្ឋានដដែលនឹង journal ការសម្អាត (`cleanupJournalScope()` ហៅវា ➜ គ្មានរូបមន្តទី ២) · `sameShop()` ស្មើ `/` ចុង និងអក្សរធំ/តូច ·
+    ហាងមិនទាន់ស្គាល់ (Supabase មុនបាន `tenant`) ➜ ការកំណត់ដែលចងរួចមិនប្រើ (fail-closed) · ការកំណត់ចាស់ ➜ ចងទៅហាងដំបូងដែលអានវា (ម្ចាស់ពិតមិនអាចដឹង ➜ ព្រំដែនដែលទទួលស្គាល់ ➜
+    [2.50.53] សកម្មភាព ៥)។ វាស់មុនកែ ៥/៦ FAIL។ **checker បៃតងក្លែង** ៖ `late-commit-test` · `tx-outcome-test` ជាប់ទោះ sandbox គ្មាន `shopScope` ព្រោះការហៅ journal fail-open
+    (`ReferenceError` ត្រូវលេប) ➜ journal មិនដែលដំណើរការក្នុង checker ទាំងនោះ ➜ sandbox ៧ (atomicity · tx-outcome · late-commit · db-stall · partial-pickup · crud-rules-flow ·
+    lookup-config-secret) ប្រកាស `shopScope` ពិតឥឡូវ។
+  - **Push** ៖ Server ត្រឹមត្រូវរួច (`subscribe` ក្រោម keyId ថ្មីដកចេញពី `bykey/<ចាស់>` ➜ `push-server.test.ts` ជាប់លើកូដមុនកែ) ➜ ចន្លោះនៅ client ៖ `resyncPush()` ចុះឈ្មោះឡើងវិញ
+    តែរៀងរាល់ `PUSH_RESYNC_MS` (៦ ម៉ោង) ➜ ហាងចាស់ផ្ញើ «ជិតផុតកំណត់» ទៅឧបករណ៍ដែលចូលហាងផ្សេងរហូតដល់ ៦ ម៉ោង · Firebase ៖ keyId = Activation Key (ដដែលគ្រប់ហាង) ➜ `sched/<keyId>`
+    របស់ហាងចាស់នៅ រហូតដល់ហត្ថលេខាកាលវិភាគប្តូរ (ហាងថ្មីដែលកាលវិភាគដូចគ្នា ➜ មិនផ្ញើ)។ កែ ៖ `PushSaved.shop` · `pushShopMoved()` ➜ ចុះឈ្មោះភ្លាម (`resumePushAfterSignIn()`) ·
+    ជោគជ័យ ➜ `syncExpirySchedule(true)` · ធ្លាក់ ➜ `PUSH_RESYNC_RETRY_MS` (មិនរាល់ `visibilitychange`) · ការកំណត់ចាស់គ្មាន `shop` ➜ ចុះឈ្មោះម្តង។ វាស់មុនកែ ៥/៦ FAIL។
+  - **អាយុ Cookie ZTO** (តំបន់ចាក់សោ ៖ អ្នកយាមមុន ➜ កែ ➜ អ្នកយាម ZTO ទាំងអស់ ➜ `LOCK`) ៖ មុន ៖ `authAcceptedAt`/`authRejectedAt` រស់ក្នុង container មួយ ហើយ reset ពេល Cookie
+    ប្តូរតម្លៃ (ការបន្តអាយុ) ➜ គ្មានទិន្នន័យឆ្លើយ «១០–១៤ ម៉ោង ឬ ៣–៤ ម៉ោង»។ ការរចនា ៖ key `cookie-life` ដាច់ពី `cookie` (ឧបករណ៍ Sync សរសេរជាន់ metadata របស់ `cookie` ➜ ប្រវត្តិ
+    មិនអាចនៅទីនោះ) · កូនសោ = `syncedAt` (ការ Sync មួយ = ជីវិតមួយ · ការបន្តអាយុមិនចាប់ជីវិតថ្មី) · បញ្ចូលដោយ max (`a` · `r`) ➜ លំដាប់ការសរសេររវាង container មិនសំខាន់ ·
+    «ស្លាប់» = `r > a` ➜ ការបដិសេធមួយភ្លែតដែល ZTO ទទួលវិញ ព្យាបាលខ្លួនឯង · ETag `onlyIfMatch`/`onlyIfNew` + សាក ៣ ដង · ការបដិសេធកត់តែនៅចម្លើយ `ZTO_AUTH_EXPIRED` ចុងក្រោយ ហើយ
+    តែពេល session នៅជា Cookie បច្ចុប្បន្ន (Cookie ចាស់ដែល Sync ថ្មីជំនួស មិនរាប់ថាស្លាប់) · ការទទួលសរសេរ ≤ ១ ដង/`COOKIE_LIFE_ACCEPT_GAP_MS`/container (ភ្លាមពេល Sync ថ្មី ឬក្រោយ
+    ការបដិសេធដែលកត់) · ថវិកា ៖ `cookieRenewTimeoutMs()` ស្របគ្នាជាមួយ `flushCookieRenewal()` · ធ្លាក់ ➜ មិនសាករហូត `COOKIE_LIFE_RETRY_MS` (Blob ជាប់គាំងមិនបន្ថែម ≤ ០.៩ វិ.
+    លើរាល់ការស្កេន) · diag អានស្របគ្នាជាមួយការអាន Cookie (≤ `COOKIE_STORE_TIMEOUT_MS`)។ វាស់មុនកែ ១២/១២ FAIL។ **fake ក្លែង** ៖ Blobs ក្លែងក្នុង `zto-cookie-store-test` មិនបែងចែក key
+    (key ណាក៏ = Cookie) ➜ ការសរសេរ `cookie-life` នឹងជាន់ Cookie ក្នុង fake (មិនមែនក្នុង Blobs ពិត) ➜ fake បែងចែក key ឥឡូវ · «diag ទី ២ ប្រើ cache» រាប់តែ key `cookie`។
+    ព្រំដែន ៖ «ប្រើបានចុងក្រោយ» ពី container ផ្សេងច្បាស់ ≤ ១០ នាទី (container ដដែលច្បាស់) · Cookie ពី env ឬ Sync ដោយឧបករណ៍ចាស់ (គ្មាន `syncedAt`) ➜ មិនវាស់ ·
+    Sync session ដដែលម្តងទៀត (ចុចដោយដៃពេលវានៅរស់) ➜ ជីវិតថ្មី (អាយុរាប់ពី Sync ចុងក្រោយ = តិចជាងអាយុពិតនៃការចូល Argus) · `idleMs` មិនរងផល ( `--auto` Sync តែពេល Cookie ស្លាប់)។
+  - **ការពិនិត្យ ZTO ម្តងទៀត (ម្ចាស់គម្រោង ៖ «ពិនិត្យ ZTO អោយហ្មត់ចត់ … ពេលរួចស្អាតចាក់សោរវា»)** ៖ អានការកែជុំ ៤ ពីផ្លូវ ZTO ទាំងអស់ដែលអាន `getLookupApiConfig()` ➜
+    **រកឃើញ regression** ៖ ការកំណត់ដែលចងហាងមិនប្រើពេលហាងមិនទាន់ស្គាល់ ➜ ហាង Supabase ដែល session ស្តារ តែគណនីមិនទាន់មកដល់ (គ្មាន cache គណនី · `my_account()` ក្រៅបណ្តាញ)
+    ➜ `ztoAutoCloseEnabled()` = `false` ➜ `ztoAbandonCleanupIsHeld()` មិនរង់ចាំ ➜ ទិដ្ឋភាពប្រវត្តិស្រស់មកដល់ (Supabase ទាញបានទោះគណនីមិនទាន់ផ្ទៀង) ➜ ការសម្អាត ៨ ថ្ងៃដកលុយកញ្ចប់
+    ដែល ZTO ចុះហត្ថលេខារួច (សញ្ញាហាងជួយតែពេលឧបករណ៍ ZTO ផ្សេងកំពុងអាន)។ ក្នុងផ្លូវដដែល ៖ `cleanupJournalScopeMismatch()` = `false` ពេល scope បច្ចុប្បន្នទទេ ➜ journal របស់ហាង A
+    បន្តក្នុងហាងដែលមិនទាន់ស្គាល់ (ចន្លោះចាស់)។ កែ ៖ `shopScopePending()` (config Supabase + គ្មាន `tenant`) ➜ `runAutomaticCleanupRules()` · `resumeInterruptedCleanups()` រង់ចាំ
+    ⛔ មិនកែឯកសារចាក់សោ (`zto-status.ts` មិនប្រែ ➜ `LOCK` មិនប្រែ) · Firebase ស្គាល់ហាងជានិច្ច (`databaseURL`)។ វាស់ ៖ `7894e2d` ២/៤ FAIL · `f572e1d` ១/៤ (journal) · ក្រោយកែ ៤/៤។
+    sandbox ដែលស្រង់ `runAutomaticCleanupRules()`/`resumeInterruptedCleanups()` (`cleanup-clock-guard-test` · `cleanup-interrupt-atomicity-test` · `partial-pickup-cleanup-test` ·
+    `restore-marker-hygiene-test` · `stale-clear-claim-test` · `emu/crud-rules-flow`) ធ្លាក់ `ReferenceError` ភ្លាម (មិនលេបដូច journal) ➜ ប្រកាស `shopScopePending()` ពិត ➜ ជាប់ទាំងអស់។
+    ព្រំដែនដែលទទួលស្គាល់ ៖ ឧបករណ៍ចូលហាងច្រើន ➜ ហាងដែលមិនទាន់កំណត់ API ZTO លើឧបករណ៍នេះមិនរង់ចាំ ZTO ([2.50.53] សកម្មភាព ៥ ⚠️)។
+  - **warning (ម្ចាស់គម្រោង ៖ «ពិនិត្យរក warning ហើយប្រាប់ខ្ញុំ និងកែសម្រួលផង»)** ៖ ប្រភពដែលវាស់ ៖ eslint · tsc · vitest · CI `npm ci` (log ផ្នែក 1/4) · Supabase advisors។
+    ① eslint `react-hooks/incompatible-library` (`HistoryTableBody.tsx` ៖ `useVirtualizer()`) ៖ rule ប្រាប់ថា React Compiler នឹងរំលង memoize ➜ build **មិនប្រើ** React Compiler
+    (`vite.config.mts` គ្មាន babel/compiler) ➜ គ្មានផលពេលរត់ ➜ បិទ rule តែលើឯកសារនោះ (`'use no memo'` សាករួច ៖ warning នៅ)។ ② npm 11 `install-scripts` ៖ advisory ក្នុង npm 11
+    (`strict-allow-scripts` = `false` ➜ script នៅរត់) តែ npm 12 បិទជាលំនាំដើម ➜ `allowScripts` pinned ➜ វាស់ដោយ npm 11.21 ពិត (`npm ci` ក្នុងថតបណ្តោះអាសន្ន) ៖
+    `No packages with unreviewed install scripts` · esbuild 0.28.2 ដំណើរការ · Postgres symlink ១៤។ ③ `deprecated` (`glob@10` · `uuid@9` · `json-ptr` · `node-domexception`) ៖
+    មកពី `firebase-tools` (កំណែចុងក្រោយ 15.33.0 នៅពឹង `glob ^10.5.0`) ➜ `overrides` អាចបំបែក firebase-tools ➜ មិនកែ (រង់ចាំ upstream)។ ④ Supabase WARN «Leaked Password
+    Protection» ➜ ការកំណត់ Dashboard (ម្ចាស់គម្រោងសម្រេច · handoff) · INFO ៣ ដោយចេតនា (`zoe_ops` អានតែតាម function · index របស់ foreign key)។
+    ⑤ `sw-install-integrity-test` ធ្លាក់ ១ ដងក្នុង run-all (load 4.8 លើ CPU ៤) ៖ ជុំទី ១ រង់ចាំ ៨ វិ. ឲ្យ install ដែលបរាជ័យក្លាយជា `redundant` ➜ SW នៅ `installing`
+    (មិន activate · cache ទទេ ➜ ការការពារត្រឹមត្រូវ) ➜ ពិដាន ២០ វិ. ដូចជុំទី ២ (ការអះអាងមិនប្រែ) · រត់ម្នាក់ឯង ➜ ជាប់ · CI ៤/៤ ជាប់លើ tree ដដែល។
 
 ### 2026-10-09 — ចលនាតាមវីដេអូ និងរូប emoji ➜ [2.50.51]
 
@@ -5168,8 +5439,9 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `camera-resume-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `cleanup-clock-guard-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `cleanup-clock-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `clear-history-claim-test` | ផ្នែក ១ | — |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
@@ -5231,14 +5503,14 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `keygen-supabase-admin-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `keylist-consistency-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `khmer-timezone-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
-| `late-commit-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `late-commit-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `layout-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `layout-thrash` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
-| `license-clock-rollback-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `license-clock-rollback-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-clock-trust-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `license-grace-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-network-pressure-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5267,7 +5539,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
-| `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `partial-pickup-cleanup-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -5278,7 +5550,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pin-prompt-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
-| `policy-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | — | ផ្នែក ៦ |
@@ -5290,7 +5562,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
-| `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `restore-marker-hygiene-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
+| `restore-race-test` | ផ្នែក ១ | — |
 | `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ |
@@ -5309,7 +5582,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `shared-fns` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `stale-clear-claim-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `stale-write` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -5341,7 +5614,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `trash-modal-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `ts-comments` | — | ផ្នែក ៦ |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
-| `ui-flow-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `user-guide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5351,7 +5624,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `zto-cookie-session-test` | — | ផ្នែក ២ |
-| `zto-cookie-store-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `zto-cookie-store-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zto-cookie-sync-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -5367,9 +5640,12 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
@@ -5378,6 +5654,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
@@ -5392,6 +5669,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
+| `ZoeW/tests/locker-assign-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/locker-occupant.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/locker-scan-direct.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/login-autofill.test.tsx` | ផ្នែក ១ | — |
@@ -5428,7 +5706,10 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | ផ្នែក ១ | — |
@@ -5453,12 +5734,14 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/toast-live-expiry.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/toast-visibility.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-blocked-sweep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-abandon-signed-gate.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-barcode-shape.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-cookie-life.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | ផ្នែក ១ | — |
@@ -5472,6 +5755,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-mismatch.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

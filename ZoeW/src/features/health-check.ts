@@ -213,6 +213,30 @@ export function ztoBlobAgeText(cookie) {
     return (synced ? ' · Sync ចូល Blob ' + synced + 'មុន' : '') + (renewed ? ' · បន្តអាយុចុងក្រោយ ' + renewed + 'មុន' : '');
 }
 
+function lifeDurationText(ms) {
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
+    const min = Math.floor(ms / 60000);
+    if (min < 60) return durationText(ms);
+    const rest = min % 60;
+    return Math.floor(min / 60) + ' ម៉ោង' + (rest ? ' ' + rest + ' នាទី' : '');
+}
+
+export function ztoCookieLifeText(body) {
+    const life = body && body.cookie && Array.isArray(body.cookie.life) ? body.cookie.life : [];
+    const parts = [];
+    for (let i = 0; i < life.length && i < 8 && parts.length < 3; i++) {
+        const entry = life[i];
+        if (!entry || entry.ended !== true) continue;
+        const alive = lifeDurationText(entry.aliveMs);
+        const rejected = lifeDurationText(entry.rejectedAfterMs);
+        if (!alive && !rejected) continue;
+        const idle = lifeDurationText(entry.idleMs);
+        parts.push((alive ? 'ប្រើបាន ' + alive : 'មិនដែលប្រើបាន') + (rejected ? ' ➜ បដិសេធនៅ ' + rejected : '')
+            + (idle ? ' (ទំនេរ ' + idle + ' មុនបដិសេធ)' : ''));
+    }
+    return parts.length ? ' · អាយុ Cookie ក្រោយ Sync ៖ ' + parts.join(' / ') : '';
+}
+
 function ztoAccessText(body) {
     const access = body && body.access;
     if (!access || typeof access !== 'object') return '';
@@ -304,6 +328,7 @@ export async function healthLookupRow() {
             + (typeof ageMs === 'number' ? ' · Server អានចុងក្រោយ ' + (durationText(ageMs) || '0 នាទី') + 'មុន' : '')
             + (reason ? ' · ' + reason : '')
             + ztoRenewalText(body)
+            + ztoCookieLifeText(body)
             + ztoAccessText(body)
             + mismatchText;
         if (typeof rejectedAgeMs === 'number') {

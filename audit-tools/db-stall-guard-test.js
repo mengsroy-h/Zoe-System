@@ -399,7 +399,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged', 'runLedgerTransaction',
-    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'claimAndCleanupItem'];
+    'correctRevenueLedgerToActual', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimCleanupTrashSlot', 'ensureBarcodeArrayForItem', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
@@ -479,6 +479,7 @@ function runAbandonCleanup(mode) {
         sliceFrom(zoewSrc, 'safeStoreGet') || 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
         sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
         sliceFrom(zoewSrc, 'safeStoreRemove') || 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }',
+        sliceFrom(zoewSrc, 'shopScope') || "function shopScope() { return ''; }",
         sliceFrom(zoewSrc, 'cleanupJournalScope') || "function cleanupJournalScope() { return ''; }",
         sliceFrom(zoewSrc, 'cleanupJournalScopeMismatch') || 'function cleanupJournalScopeMismatch() { return false; }',
         sliceFrom(zoewSrc, 'readCleanupJournal') || 'function readCleanupJournal() { return []; }',
@@ -486,7 +487,8 @@ function runAbandonCleanup(mode) {
         sliceFrom(zoewSrc, 'noteCleanupJournalEntry') || 'function noteCleanupJournalEntry() {}',
         sliceFrom(zoewSrc, 'markCleanupJournalStage') || 'function markCleanupJournalStage() {}',
         sliceFrom(zoewSrc, 'clearCleanupJournalEntry') || 'function clearCleanupJournalEntry() {}',
-        sliceFrom(zoewSrc, 'cleanupPartialTrashId') || 'function cleanupPartialTrashId() { return generateUniqueId(); }'
+        sliceFrom(zoewSrc, 'cleanupPartialTrashId') || 'function cleanupPartialTrashId() { return generateUniqueId(); }',
+        sliceFrom(zoewSrc, 'trashSlotSharesClaim') || 'function trashSlotSharesClaim() { return true; }'
     ];
     for (const fn of CLEANUP_FNS) {
         const body = sliceFrom(zoewSrc, fn);

@@ -3,6 +3,7 @@ import { elapsedSince } from '../core/elapsed';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
+import { sameShop, shopScope } from '../core/shop-scope';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { isNativeAndroid } from '../platform/native';
 import { dbListenerViewIsStale } from '../services/db-listeners';
@@ -50,6 +51,7 @@ interface PushSaved {
     failedAt: number;
     schedSig: string;
     schedAt: number;
+    shop: string;
 }
 
 export const pushRuntime = {
@@ -73,7 +75,8 @@ function readSaved(): PushSaved {
         syncedAt: raw && typeof raw.syncedAt === 'number' ? raw.syncedAt : 0,
         failedAt: raw && typeof raw.failedAt === 'number' ? raw.failedAt : 0,
         schedSig: raw && typeof raw.schedSig === 'string' ? raw.schedSig : '',
-        schedAt: raw && typeof raw.schedAt === 'number' ? raw.schedAt : 0
+        schedAt: raw && typeof raw.schedAt === 'number' ? raw.schedAt : 0,
+        shop: raw && typeof raw.shop === 'string' ? raw.shop : ''
     };
 }
 
@@ -149,6 +152,11 @@ export async function pushCredential(): Promise<{ license: string } | { supabase
     }
     const license = activationKey();
     return license ? { license: license } : null;
+}
+
+export function pushShopMoved(saved: PushSaved): boolean {
+    const here = shopScope();
+    return !!here && !sameShop(saved.shop, here);
 }
 
 function missingIdentityStatus(): PushStatus {
@@ -241,6 +249,7 @@ async function subscribeWeb(): Promise<PushStatus> {
     }
     const json = sub && typeof sub.toJSON === 'function' ? sub.toJSON() : null;
     if (!json || !json.endpoint || !json.keys) return 'error';
+    const shop = shopScope();
     const credential = await pushCredential();
     if (!credential) return missingIdentityStatus();
     const nav: any = navigator;
@@ -249,7 +258,7 @@ async function subscribeWeb(): Promise<PushStatus> {
         sub: { kind: 'web', endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }
     }));
     if (!replyOk(reply)) return statusFromReply(reply);
-    writeSaved({ on: true, kind: 'web', syncedAt: Date.now() });
+    writeSaved({ on: true, kind: 'web', syncedAt: Date.now(), shop: shop });
     return 'on';
 }
 
@@ -264,6 +273,7 @@ function unsubscribeNativeToken(token: string) {
 async function onNativeToken(token: string) {
     pushRuntime.nativeWatchdogSeq++;
     if (!pushRuntime.nativeEnabling && !pushRuntime.nativeWanted && !readSaved().on) return;
+    const shop = shopScope();
     const credential = await pushCredential();
     if (!credential) {
         if (pushRuntime.nativeEnabling) setStatus(missingIdentityStatus());
@@ -280,7 +290,7 @@ async function onNativeToken(token: string) {
         return;
     }
     if (replyOk(reply)) {
-        writeSaved({ on: true, kind: 'fcm', token: token, syncedAt: Date.now() });
+        writeSaved({ on: true, kind: 'fcm', token: token, syncedAt: Date.now(), shop: shop });
         setStatus('on');
         syncExpirySchedule(true);
         return;
@@ -391,7 +401,7 @@ export async function disablePush(): Promise<boolean> {
             try { await pushStep(PN.unregister(), 'Push unregister timed out'); } catch (e) {}
         }
     } catch (e) {}
-    writeSaved({ on: false, kind: '', token: '', syncedAt: 0, schedSig: '', schedAt: 0 });
+    writeSaved({ on: false, kind: '', token: '', syncedAt: 0, schedSig: '', schedAt: 0, shop: '' });
     setStatus('off');
     return true;
 }
@@ -427,6 +437,7 @@ export function togglePush(): Promise<boolean> {
 
 export function resumePushAfterSignIn(): Promise<boolean> {
     refreshPushStatus();
+    resyncPush();
     const token = pushRuntime.nativePendingToken;
     if (!token || pushIdentityMissing()) return Promise.resolve(false);
     return onNativeToken(token).then(() => true, () => false);
@@ -458,7 +469,8 @@ export function resyncPush(): Promise<boolean> {
     refreshPushStatus();
     const saved = readSaved();
     if (!saved.on || uiState.pushStatus !== 'on') return Promise.resolve(false);
-    const due = saved.failedAt > saved.syncedAt ? elapsedSince(saved.failedAt) >= PUSH_RESYNC_RETRY_MS : elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS;
+    const moved = pushShopMoved(saved);
+    const due = saved.failedAt > saved.syncedAt ? elapsedSince(saved.failedAt) >= PUSH_RESYNC_RETRY_MS : (moved || elapsedSince(saved.syncedAt) >= PUSH_RESYNC_MS);
     const keyCheck = pushSupport() === 'web' && !pushRuntime.webKeyChecked;
     if (!due && !keyCheck) return Promise.resolve(false);
     if ((navigator.onLine as boolean) === false) return Promise.resolve(false);
@@ -479,13 +491,18 @@ export function resyncPush(): Promise<boolean> {
         }
         const json = sub.toJSON();
         const nav: any = navigator;
+        const shop = shopScope();
         return pushCredential().then((credential) => (credential ? postPush('subscribe', Object.assign({}, credential, {
             platform: nav.standalone === true ? 'ios' : 'web',
             sub: { kind: 'web', endpoint: json.endpoint, keys: json.keys }
         })) : null)).then((reply) => {
-            if (reply && replyOk(reply)) writeSaved({ syncedAt: Date.now() });
-            else writeSaved({ failedAt: Date.now() });
-            return !!reply && replyOk(reply);
+            if (!reply || !replyOk(reply)) {
+                writeSaved({ failedAt: Date.now() });
+                return false;
+            }
+            writeSaved({ syncedAt: Date.now(), shop: shop });
+            if (moved) syncExpirySchedule(true);
+            return true;
         });
     }).catch(() => false);
 }

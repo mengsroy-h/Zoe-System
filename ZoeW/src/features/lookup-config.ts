@@ -1,6 +1,7 @@
 import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
+import { shopOwnsSetting, shopScope } from '../core/shop-scope';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
@@ -16,7 +17,8 @@ import { showToast } from '../ui/toast';
 export function getLookupApiConfig() {
     try {
         const raw = appLocalStore.getItem('zoew_lookup_api_config');
-        return raw ? JSON.parse(raw) : null;
+        const cfg = raw ? JSON.parse(raw) : null;
+        return shopOwnsSetting(cfg, 'zoew_lookup_api_config') ? cfg : null;
     } catch (e) {
         return null;
     }
@@ -99,6 +101,8 @@ export async function saveLookupApiConfig() {
         dodField: fieldValue('lookupApiDodFieldInput').trim() || 'dod'
     };
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
+    const shop = shopScope();
+    if (shop) cfg.shop = shop;
 
     if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
         alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");

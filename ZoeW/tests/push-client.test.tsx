@@ -979,3 +979,134 @@ describe('🧹 សម្អាតការជូនដំណឹង', () => {
         expect(JSON.parse(localStorage.getItem(NOTIFY_DISMISSED_KEY)!)).toHaveLength(NOTIFY_DISMISSED_MAX);
     });
 });
+
+describe('⛔ Push ជារបស់ហាង (សំណើម្ចាស់គម្រោង ៖ ចងទៅហាង) ៖ ប្តូរហាង ➜ ចុះឈ្មោះឡើងវិញក្រោមហាងថ្មីភ្លាម · កាលវិភាគហាងថ្មីផ្ញើភ្លាម', () => {
+    // server រក្សា subscription មួយក្នុងមួយ endpoint/token ជាមួយ `keyId` តែមួយ ៖ `subscribe` ក្រោមហាងថ្មីផ្លាស់វាចេញពីហាងមុន (`bykey/<A>`) ➜ ការរំលឹកហាងមុនលែងមក។
+    // មុនកែ ៖ App ចុះឈ្មោះឡើងវិញតែរៀងរាល់ `PUSH_RESYNC_MS` ➜ ក្រោយប្តូរហាង ឧបករណ៍នៅទទួលការរំលឹក ៨ ព្រឹករបស់ហាងមុនរហូតដល់ ៦ ម៉ោង ·
+    // កាលវិភាគដែលហត្ថលេខាដូចគ្នា (ឧ. គ្មានកញ្ចប់ជិតផុតកំណត់) មិនផ្ញើ ➜ ហាងថ្មី (Firebase ៖ Key ដដែល) នៅសល់កាលវិភាគហាងមុន។
+    // ⛔ session ផុត (៤ ម៉ោង) / ចូលហាងដដែលវិញ ➜ មិនប៉ះ (ការរំលឹក ៨ ព្រឹកត្រូវមកទោះ App មិនទាន់ចូល)។
+    const SB = 'https://abcd.supabase.co';
+    const FB_A = 'https://shop-a.firebaseio.com';
+    const FB_B = 'https://shop-b.firebaseio.com';
+    const FCM = 'fcmToken:' + 's'.repeat(40);
+    function sbShop(tenant: string) {
+        viewState.backendKind = 'supabase';
+        setLicense(null);
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: SB, supabaseKey: 'sb_publishable_x' }));
+        firebaseState.fb = { tenantScope: (auth: any) => (auth && auth._account ? String(auth._account.tenant_id) : '') } as any;
+        firebaseState.auth = (tenant
+            ? { currentUser: { uid: 'u-' + tenant, getIdToken: async () => 'tok-' + tenant }, _account: { tenant_id: tenant } }
+            : { currentUser: null, _account: null }) as any;
+    }
+    function fbShop(url: string) {
+        viewState.backendKind = 'firebase';
+        setLicense(LICENSE);
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: url, apiKey: 'k', projectId: 'p' }));
+        firebaseState.fb = {} as any;
+        firebaseState.auth = { currentUser: { uid: 'u1' } } as any;
+    }
+    function webSubscribed() {
+        const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', options: { applicationServerKey: b64urlToBytes(VAPID).buffer },
+            toJSON() { return { endpoint: this.endpoint, keys: { p256dh: 'p256', auth: 'auth' } }; }, unsubscribe: vi.fn(async () => true) };
+        const w = stubWebPush('granted', sub);
+        w.Notification.permission = 'granted';
+        pushRuntime.webKeyChecked = true;
+        return w;
+    }
+    function saveOn(extra: any) {
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign({ on: true, kind: 'web', syncedAt: Date.now() - 60000, schedSig: '0:0', schedAt: Date.now() }, extra)));
+    }
+    function saved() {
+        return JSON.parse(localStorage.getItem(PUSH_STATE_KEY) || '{}');
+    }
+    afterEach(() => {
+        firebaseState.fb = null as any;
+    });
+
+    it('⛔ web · Supabase ៖ ចុះឈ្មោះក្រោមហាង A ➜ ចូលហាង B ➜ resyncPush() ចុះឈ្មោះដោយ token ហាង B ភ្លាម · កាលវិភាគហាង B ផ្ញើ', async () => {
+        stubServer();
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a' });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        const sent = posts.filter((p) => p.op === 'subscribe');
+        expect(sent.length).toBe(1);
+        expect(sent[0].body.supabase).toBe('tok-tenant-b');
+        expect(saved().shop).toBe(SB + '#tenant-b');
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'schedule').length).toBe(1));
+        expect(posts.find((p) => p.op === 'schedule')!.body.supabase).toBe('tok-tenant-b');
+    });
+
+    it('ទិសផ្ទុយ ៖ ហាងដដែល (session ផុត ហើយចូលវិញ) ➜ គ្មាន POST · មិនរង់ចាំហាងដែលមិនទាន់ស្គាល់', async () => {
+        stubServer();
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a' });
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(false);
+        sbShop('');
+        expect(await resyncPush()).toBe(false);
+        expect(posts.length).toBe(0);
+        expect(saved().shop).toBe(SB + '#tenant-a');
+    });
+
+    it('ការកំណត់ចាស់គ្មានហាង ➜ ចុះឈ្មោះម្តង ហើយកត់ហាង · លើកទី ២ គ្មាន POST', async () => {
+        stubServer();
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({});
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        expect(saved().shop).toBe(SB + '#tenant-a');
+        const before = posts.filter((p) => p.op === 'subscribe').length;
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(before);
+    });
+
+    it('⛔ ចុះឈ្មោះហាងថ្មីធ្លាក់ ➜ មិនសាករាល់ visibilitychange (រង់ចាំ PUSH_RESYNC_RETRY_MS)', async () => {
+        stubServer({ subscribe: { status: 503, body: { ok: false, reason: 'supabase:unreachable' } } });
+        webSubscribed();
+        sbShop('tenant-a');
+        saveOn({ shop: SB + '#tenant-a' });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(false);
+        expect(await resyncPush()).toBe(false);
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1);
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify(Object.assign(saved(), { failedAt: Date.now() - PUSH_RESYNC_RETRY_MS - 1000 })));
+        await resyncPush();
+        expect(posts.filter((p) => p.op === 'subscribe').length).toBe(2);
+    });
+
+    it('⛔ APK · Supabase ៖ ហាង A ➜ B ➜ PN.register ➜ token ចុះឈ្មោះដោយ token ហាង B · កត់ហាង B', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        stubServer();
+        sbShop('tenant-a');
+        saveOn({ kind: 'fcm', token: FCM, shop: SB + '#tenant-a' });
+        sbShop('tenant-b');
+        refreshPushStatus();
+        const before = pn.register.mock.calls.length;
+        expect(await resyncPush()).toBe(true);
+        expect(pn.register.mock.calls.length).toBe(before + 1);
+        await ensureNativePushListeners();
+        await pn.listeners.registration({ value: FCM });
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'subscribe').length).toBe(1));
+        expect(posts.find((p) => p.op === 'subscribe')!.body.supabase).toBe('tok-tenant-b');
+        await vi.waitFor(() => expect(saved().shop).toBe(SB + '#tenant-b'));
+    });
+
+    it('⛔ Firebase ៖ Reconfig ទៅ Project ហាងផ្សេង (Activation Key ដដែល) ➜ កាលវិភាគហាងថ្មីផ្ញើភ្លាម ទោះហត្ថលេខាដូចគ្នា', async () => {
+        stubServer();
+        webSubscribed();
+        fbShop(FB_A);
+        saveOn({ shop: FB_A });
+        fbShop(FB_B);
+        refreshPushStatus();
+        expect(await resyncPush()).toBe(true);
+        expect(posts.find((p) => p.op === 'subscribe')!.body.license).toBe(LICENSE);
+        await vi.waitFor(() => expect(posts.filter((p) => p.op === 'schedule').length).toBe(1));
+        expect(saved().shop).toBe(FB_B);
+    });
+});

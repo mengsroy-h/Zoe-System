@@ -254,7 +254,7 @@ for (const app of ['ZoeW']) {
         'zoew_monthly_revenue_cod_dod'
     ];
     [
-        ['deleteSingleItem', 'async function deleteSingleItem(id) {'],
+        ['deleteSingleItem', 'async function deleteSingleItem('],
         ['buildClearHistoryTrashItem', 'function buildClearHistoryTrashItem(item, id) {']
     ].forEach(([name, sig]) => {
         const body = fnBody(appSrc, sig, name);

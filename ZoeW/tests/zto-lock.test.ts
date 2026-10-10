@@ -18,8 +18,8 @@ import { describe, expect, it } from 'vitest';
 const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
-    'netlify/functions/zto-order-detail.js': '3ee3d960533e292e9a520d6d2a0e690e7e70915f1b0ce71a8e0750fe1ebbde77',
-    'src/features/zto-list-sync.ts': '18896833934f790ed22f6a47ae08a5acc160351816972fe6f637639ff88521c9',
+    'netlify/functions/zto-order-detail.js': '44ddd007ea9b79c70c3ce32931a33e3fabcad527d2e00f30e7c170fed202cdb0',
+    'src/features/zto-list-sync.ts': '8e3f34d1d1e728bd45c37b3a52c14f45ff1b98acb6d40aed7a210d9de3310686',
     'src/features/zto-status.ts': '968bad5375d7d71cda872de2bd352df2b471129ea91a553e5c802f8858633b6d',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
     'src/features/auto-lookup.ts': '6cba0fb4fc9e42e705ca9d6a6c92c5ba0402f2cd5d49896fe31cfbfaa37f8540',

@@ -77,11 +77,14 @@ function resetEnv(extra) {
 // ក្រោយ `getStore` ក្លាយជាការធ្លាក់ដែលមានឈ្មោះ។
 function makeBlobs(behavior) {
     const state = Object.assign({ value: BLOB_COOKIE }, behavior || {});
+    // ⛔ key ផ្សេងពី `cookie` (ឧ. `cookie-life` ៖ អាយុ Cookie) ជាតម្លៃដាច់ដោយឡែក ដូច Blobs ពិត ➜ ការសរសេររបស់វាមិនជាន់ Cookie
+    const others = new Map();
     const calls = [];
     const etagOf = (value) => '"' + crypto.createHash('sha256').update(String(value || '')).digest('hex') + '"';
     const store = {
         get(key, options) {
             calls.push({ fn: 'get', key, options });
+            if (key !== STORE_KEY) return Promise.resolve(others.has(key) ? others.get(key) : null);
             if (state.readThrows) return Promise.reject(new Error('read failed'));
             if (state.readHangs) return new Promise(() => {});
             // ⛔ ការអានពិតយក **ទិដ្ឋភាព** នៅពេលចាប់ផ្តើម — មិនមែនតម្លៃថ្មីបំផុត
@@ -99,6 +102,13 @@ function makeBlobs(behavior) {
         set(key, value, options) {
             calls.push({ fn: 'set', key, value, metadata: options && options.metadata });
             if (state.writeThrows) return Promise.reject(new Error('write failed'));
+            if (key !== STORE_KEY) {
+                const prior = others.has(key) ? others.get(key) : null;
+                if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(prior)) return Promise.resolve({ modified: false });
+                if (options && options.onlyIfNew && prior !== null) return Promise.resolve({ modified: false });
+                others.set(key, value);
+                return Promise.resolve({ modified: true, etag: etagOf(value) });
+            }
             if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(state.value)) return Promise.resolve({ modified: false });
             if (options && options.onlyIfNew && state.value !== null) return Promise.resolve({ modified: false });
             state.value = value;
@@ -601,13 +611,15 @@ async function run() {
     const freshStore = useBlobs();
     upstream();
     const beforeFresh = JSON.parse((await call({ diag: '1' })).body);
-    const readsAfterFirst = freshStore.calls.filter((c) => c.fn === 'get').length;
+    // ⛔ រាប់តែការអាន key `cookie` ៖ diag អាន key `cookie-life` (អាយុ Cookie) រាល់ដងដោយចេតនា ➜ មិនមែនការអាន Cookie ទេ
+    const cookieReads = () => freshStore.calls.filter((c) => c.fn === 'get' && c.key === STORE_KEY).length;
+    const readsAfterFirst = cookieReads();
     const cachedAgain = JSON.parse((await call({ diag: '1' })).body);
     ok('diag ធម្មតាទី ២ ➜ ប្រើ cache (គ្មានការអាន blob ថ្មី)',
-        freshStore.calls.filter((c) => c.fn === 'get').length === readsAfterFirst, { reads: freshStore.calls.filter((c) => c.fn === 'get').length, readsAfterFirst });
+        cookieReads() === readsAfterFirst, { reads: cookieReads(), readsAfterFirst });
     const freshDiag = JSON.parse((await call({ diag: '1', fresh: '1' })).body);
     ok('⛔ `fresh=1` ➜ អាន blob ថ្មីពិត (រំលង cache)',
-        freshStore.calls.filter((c) => c.fn === 'get').length > readsAfterFirst, { reads: freshStore.calls.filter((c) => c.fn === 'get').length, readsAfterFirst });
+        cookieReads() > readsAfterFirst, { reads: cookieReads(), readsAfterFirst });
     ok('`fresh=1` ឆ្លើយ fingerprint ដដែល (មិនប្តូរអត្ថន័យ)',
         freshDiag.cookie && freshDiag.cookie.fingerprint === beforeFresh.cookie.fingerprint,
         { fresh: freshDiag.cookie, before: beforeFresh.cookie });

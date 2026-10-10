@@ -545,6 +545,23 @@ describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase 
         expect(JSON.stringify([...h.store.data.values()])).not.toContain(SB_OWNER);
     });
 
+    it('⛔ ឧបករណ៍ប្តូរហាង ៖ subscription ដដែលចុះឈ្មោះក្រោមហាង B ➜ ចេញពី index ហាង A ➜ ការរំលឹក ៨ ព្រឹករបស់ A លែងមកឧបករណ៍នេះ', async () => {
+        const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
+        const h = harness({ env: sbEnv() });
+        h.clock.now = at8 - 3600e3;
+        const device = webSub();
+        expect(await h.service.subscribe({ supabase: SB_STAFF }, device.sub, 'web')).toMatchObject({ ok: true });
+        expect(await h.service.saveSchedule({ supabase: SB_STAFF }, [at8 + 3600e3])).toMatchObject({ ok: true, count: 1 });
+        expect(await h.service.subscribe({ supabase: SB_OTHER }, device.sub, 'web')).toMatchObject({ ok: true });
+        expect(JSON.parse(h.store.data.get('bykey/' + supabaseTenantKeyId(TENANT_A))!.value).subs).toEqual([]);
+        expect(JSON.parse(h.store.data.get('bykey/' + supabaseTenantKeyId(TENANT_B))!.value).subs).toHaveLength(1);
+        h.clock.now = at8;
+        const sent: string[] = [];
+        h.push = (url) => { sent.push(url); return { status: 201 }; };
+        await h.service.dispatchExpiry();
+        expect(sent).toEqual([]);
+    });
+
     it('កាលវិភាគ + ការរំលឹកម៉ោង ៨ ៖ តាមហាង · ហាងផ្សេងមិនទទួល', async () => {
         const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 2, 0);
         const h = harness({ env: sbEnv() });

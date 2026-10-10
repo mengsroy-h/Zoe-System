@@ -86,7 +86,7 @@ function buildWorld() {
     };
     vm.createContext(ctx);
     const preamble = `
-let db = {}, fb = null, auth = { currentUser: { email: 'a@b.c' } };
+let db = {}, fb = null, auth = { currentUser: { email: 'a@b.c' } }, authGeneration = 0;
 let lockerBarcodeIndex = {}, activeLocker = 'A1', lockerAssignGeneration = 0;
 const DB_OP_TIMEOUT_MS = 15000;
 const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;

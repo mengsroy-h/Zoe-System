@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.14';
+const APP_VERSION = '2.24.15';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3092,6 +3092,8 @@ let sbAdminGeneration = 0;
 let sbAdminBusy = false;
 let sbTenantCache = [];
 let sbMemberCache = [];
+let sbDeviceCache = [];
+let sbDeviceReadFailed = false;
 let sbTenantReadFailed = false;
 let sbLastInvite = null;
 let sbLastResetCode = '';
@@ -3237,6 +3239,8 @@ function sbAdminReset(expired) {
     sbAdminBusy = false;
     sbTenantCache = [];
     sbMemberCache = [];
+    sbDeviceCache = [];
+    sbDeviceReadFailed = false;
     sbTenantReadFailed = false;
     sbLastInvite = null;
     sbLastResetCode = '';
@@ -3292,10 +3296,12 @@ async function sbAdminRefresh() {
     if (body) body.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     let tenants = null;
     let members = null;
+    let devices = null;
     try {
-        [tenants, members] = await Promise.all([
+        [tenants, members, devices] = await Promise.all([
             sbAdminRequest(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc', 'GET'),
-            sbAdminRequest(session, '/rest/v1/tenant_members?select=tenant_id,username,role&order=created_at.asc', 'GET')
+            sbAdminRequest(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc', 'GET'),
+            sbAdminRequest(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc', 'GET').catch(() => null)
         ]);
     } catch (e) {
         tenants = null;
@@ -3305,6 +3311,8 @@ async function sbAdminRefresh() {
     sbTenantReadFailed = !tenants || !tenants.ok || !Array.isArray(tenants.body);
     sbTenantCache = sbTenantReadFailed ? [] : tenants.body;
     sbMemberCache = members && members.ok && Array.isArray(members.body) ? members.body : [];
+    sbDeviceReadFailed = !devices || !devices.ok || !Array.isArray(devices.body);
+    sbDeviceCache = sbDeviceReadFailed ? [] : devices.body;
     renderSbTenantList();
 }
 
@@ -3312,6 +3320,27 @@ function sbTenantState(row) {
     if (row.revoked) return 'revoked';
     const until = Date.parse(String(row.expires_at || ''));
     return isFinite(until) && until > getServerNow() ? 'active' : 'expired';
+}
+
+function sbDeviceLabel(d) {
+    const parts = [];
+    const model = seatMetaText(d.model, 80);
+    const platform = seatMetaText(d.platform, 40);
+    if (model) parts.push(model);
+    if (platform) parts.push(platform);
+    parts.push('Serial ' + (seatMetaText(d.serial, 64) || '-'));
+    const member = sbMemberCache.find((m) => m.user_id && m.user_id === d.user_id);
+    if (member) parts.push(member.username);
+    const seen = Date.parse(String(d.last_seen || ''));
+    parts.push('ប្រើចុងក្រោយ ' + (isFinite(seen) ? new Date(seen).toLocaleDateString('km-KH') : '-'));
+    return parts.join(' · ');
+}
+
+function sbDevicesHtml(tenantId) {
+    if (sbDeviceReadFailed) return '<div class="seat-device-list"><div class="seat-device-line">⚠️ អានបញ្ជីឧបករណ៍មិនបាន</div></div>';
+    const list = sbDeviceCache.filter((d) => d && d.tenant_id === tenantId);
+    if (!list.length) return '';
+    return '<div class="seat-device-list">' + list.map((d) => '<div class="seat-device-line">' + escapeHtml(sbDeviceLabel(d)) + '</div>').join('') + '</div>';
 }
 
 function renderSbTenantList() {
@@ -3334,12 +3363,13 @@ function renderSbTenantList() {
         const sbStatusHtml = badges[sbTenantState(row)];
         const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
             .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-';
+        const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
         return `<tr>
             <td>${escapeHtml(row.name)}</td>
             <td>${escapeHtml(row.branch_code)}</td>
-            <td>${sbMembersHtml}</td>
+            <td>${sbMembersHtml}${sbDevicesCell}</td>
             <td>${escapeHtml(untilText)}</td>
             <td>${sbStatusHtml}</td>
             <td>

@@ -14,6 +14,7 @@ import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../feat
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
 import { refreshShopBoundUi } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
+import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
@@ -141,6 +142,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         syncExpirySchedule();
     });
     scope.every(60000, () => {
+        noteShopDevice();
         retryZtoShopSweepListener();
         runScheduledCleanup();
         resumeInterruptedCleanups();

@@ -1593,6 +1593,9 @@
     "ZoeW/src/features/device-info.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/shop-device.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/entry-ops.ts": {
       "policy": "zoew-app"
     },
@@ -2155,6 +2158,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/shop-bound-ui-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-device-note.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-cookie-life.test.ts": {
@@ -2962,6 +2968,9 @@
       "policy": "supabase-db"
     },
     "supabase/migrations/20261009035130_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261010140000_zoe_member_devices.sql": {
       "policy": "supabase-db"
     },
     "supabase/package-lock.json": {

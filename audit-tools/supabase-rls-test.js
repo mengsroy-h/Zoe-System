@@ -74,7 +74,8 @@ const EXPECT_PUBLIC_EXEC = {
     zoe_now: ['authenticated'],
     zoe_admin_write: ['service_role'],
     zoe_admin_tenants: ['service_role'],
-    zoe_admin_export: ['service_role']
+    zoe_admin_export: ['service_role'],
+    note_my_device: ['authenticated']
 };
 const EXPECT_PRIVATE_EXEC = {
     is_platform_admin: ['authenticated'],
@@ -109,12 +110,13 @@ const EXPECT_PRIVATE_EXEC = {
     admin_issue_invite: ['authenticated'],
     admin_revoke_invite: ['authenticated'],
     admin_issue_reset_code: ['authenticated'],
-    zoe_write: ['authenticated']
+    zoe_write: ['authenticated'],
+    note_my_device: ['authenticated']
 };
 const SPLINTER_EXCLUDED_SCHEMAS = ['_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_config', '_timescaledb_internal', 'auth', 'cron', 'extensions',
     'graphql', 'graphql_public', 'information_schema', 'net', 'pgmq', 'pgroonga', 'pgsodium', 'pgsodium_masks', 'pgtle', 'pgbouncer', 'pg_catalog', 'realtime',
     'repack', 'storage', 'supabase_functions', 'supabase_migrations', 'tiger', 'topology', 'vault'];
-const EXPECT_AUTH_SELECT = ['member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_docs', 'zoe_tenant_state'];
+const EXPECT_AUTH_SELECT = ['member_devices', 'member_reset_codes', 'platform_admins', 'tenant_invites', 'tenant_members', 'tenants', 'zoe_docs', 'zoe_tenant_state'];
 const API_ROLES = ['anon', 'authenticated', 'service_role'];
 const TABLE_PRIVS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
 const INVITE_RE = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){4}$/;
@@ -525,6 +527,49 @@ async function body(c, rec, extra, mode) {
         denied(await as(c, WA, 'select public.consume_reset_code($1, $2)', ['dara', '0'.repeat(64)])));
     rec('សមាជិក A ៖ admin_issue_reset_code (យកគណនីអ្នកដទៃ) ➜ forbidden',
         raised(await as(c, WA, 'select * from public.admin_issue_reset_code($1, 24)', ['dara']), 'forbidden'));
+    const note = (who, serial, model, platform) => as(c, who, 'select public.note_my_device($1, $2, $3) as ok', [serial, model, platform]);
+    const devRows = async () => rowsOr('select tenant_id, serial, user_id, model, platform, first_seen::text as first_seen, last_seen::text as last_seen from public.member_devices order by tenant_id, serial');
+    const SER_A = 'a1b2c3d4e5f60718';
+    const noteA = await note(WA, SER_A, 'Samsung SM-A546E', 'Android 14');
+    const noteB = await note(WB, 'ffee000011112222', 'iPhone', 'iOS 26.1');
+    const dev1 = await devRows();
+    rec('note_my_device ៖ សមាជិក A · B កត់ឧបករណ៍ ➜ ជួរក្នុងហាងរបស់ខ្លួន (ហាង · គណនី មកពី auth.uid() មិនមែនពី client)',
+        !!noteA.rows && !!noteB.rows && Array.isArray(dev1) && dev1.length === 2
+        && dev1.some((d) => d.tenant_id === A && d.serial === SER_A && d.user_id === uA1 && d.model === 'Samsung SM-A546E' && d.platform === 'Android 14')
+        && dev1.some((d) => d.tenant_id === B && d.user_id === uB1 && d.model === 'iPhone'), { noteA: noteA.error, noteB: noteB.error, dev1 });
+    rec('note_my_device ៖ anon ➜ permission denied', denied(await note(ANON, SER_A, 'x', 'y')));
+    rec('note_my_device ៖ គណនីគ្មានហាង ➜ shop-inactive', raised(await note(PLAIN, SER_A, 'x', 'y'), 'shop-inactive'));
+    rec('note_my_device ៖ serial មិនមែន hex · ខ្លីពេក ➜ device-invalid',
+        raised(await note(WA, 'not-hex-serial!', 'x', 'y'), 'device-invalid') && raised(await note(WA, 'abc', 'x', 'y'), 'device-invalid'));
+    rec('note_my_device ៖ model > ៨០ · platform > ៤០ · តួបញ្ជា ➜ device-invalid',
+        raised(await note(WA, SER_A, 'M'.repeat(81), 'y'), 'device-invalid') && raised(await note(WA, SER_A, 'x', 'P'.repeat(41)), 'device-invalid')
+        && raised(await note(WA, SER_A, 'bad\nmodel', 'y'), 'device-invalid'));
+    const seenBefore = (await devRows()).find((d) => d.serial === SER_A);
+    await note(WA, SER_A, 'Samsung SM-A546E', 'Android 14');
+    const seenSame = (await devRows()).find((d) => d.serial === SER_A);
+    rec('note_my_device ៖ ព័ត៌មានដដែលក្នុង ១ ម៉ោង ➜ មិនសរសេរ (last_seen ដដែល)', !!seenBefore && !!seenSame
+        && seenSame.last_seen === seenBefore.last_seen && /\.\d+/.test(seenBefore.last_seen), { seenBefore, seenSame });
+    await note({ role: 'authenticated', sub: uA2 }, SER_A.toUpperCase(), 'Samsung SM-A546E', 'Android 15');
+    const seenNew = (await devRows()).filter((d) => d.tenant_id === A);
+    rec('note_my_device ៖ serial អក្សរធំ = ឧបករណ៍ដដែល · គណនី/ប្រព័ន្ធថ្មី ➜ កែជួរដដែល (គ្មានជួរស្ទួន)',
+        seenNew.length === 1 && seenNew[0].user_id === uA2 && seenNew[0].platform === 'Android 15', seenNew);
+    const memberSees = ((await as(c, WA, 'select serial from public.member_devices')).rows || [1]).length;
+    const adminDevs = ((await as(c, ADMIN, 'select serial from public.member_devices')).rows || []).length;
+    rec('member_devices ៖ សមាជិកមិនឃើញ (សូម្បីហាងខ្លួន) · admin ឃើញគ្រប់ហាង', memberSees === 0 && adminDevs === 2, { memberSees, adminDevs });
+    rec('សមាជិក A ៖ insert/update/delete member_devices ដោយផ្ទាល់ ➜ permission denied',
+        denied(await as(c, WA, "insert into public.member_devices (tenant_id, serial) values ($1, 'abcdef0123456789')", [B]))
+        && denied(await as(c, WA, "update public.member_devices set model = 'x'"))
+        && denied(await as(c, WA, 'delete from public.member_devices')));
+    for (let i = 0; i < 32; i++) await note(WB, 'b0' + String(i).padStart(14, '0'), 'Phone ' + i, 'Android 13');
+    const capRows = (await devRows()).filter((d) => d.tenant_id === B);
+    rec('ពិដាន ៣០ ឧបករណ៍ក្នុងមួយហាង ➜ ឧបករណ៍ឃើញចាស់ជាងគេចេញ · ឧបករណ៍ចុងក្រោយនៅ',
+        capRows.length === 30 && capRows.some((d) => d.serial === 'b0' + String(31).padStart(14, '0')), capRows.length);
+    rec('ពិដាន ហាង B ➜ ហាង A មិនប៉ះ', (await devRows()).filter((d) => d.tenant_id === A).length === 1);
+    await c.query('update public.tenants set revoked = true where id = $1', [A]);
+    const devRevoked = await note(WA, SER_A, 'x', 'y');
+    await c.query('update public.tenants set revoked = false where id = $1', [A]);
+    rec('note_my_device ៖ ហាងបិទ ➜ shop-inactive', raised(devRevoked, 'shop-inactive'), devRevoked);
+
     const adminSees = (await as(c, ADMIN, 'select count(*)::int as n from public.tenants')).rows;
     rec('admin ឃើញ tenant ទាំងអស់', !!adminSees && adminSees[0].n >= 2, adminSees);
     for (const who of [ANON, PLAIN, WA, ADMIN]) {
@@ -914,6 +959,15 @@ const MUTATIONS = [
         'grant execute on function public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer) to service_role, authenticated;'],
     ['zoe_admin_tenants ឲ្យ anon ហៅបាន', 'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role;',
         'grant execute on function public.zoe_admin_tenants(uuid, integer) to service_role, anon;'],
+    ['policy member_devices ➜ using (true) (សមាជិកឃើញឧបករណ៍គ្រប់ហាង)', 'create policy member_devices_select on public.member_devices for select to authenticated\n    using ((select private.is_platform_admin()));',
+        'create policy member_devices_select on public.member_devices for select to authenticated\n    using (true);'],
+    ['note_my_device យកហាងពី client មិនមែនពី auth.uid()', '    v_tenant := private.current_tenant_id();\n',
+        "    v_tenant := (select t.id from public.tenants t order by t.created_at limit 1);\n"],
+    ['note_my_device ទទួលហាងបិទ', "    if v_tenant is null then\n        raise exception 'shop-inactive' using errcode = '42501';\n    end if;\n    if v_serial", '    if v_serial'],
+    ['member_devices គ្មានពិដានក្នុងមួយហាង', '        order by x.last_seen desc, x.serial offset 30', '        order by x.last_seen desc, x.serial offset 300'],
+    ['note_my_device សរសេររាល់ការហៅ (គ្មានគម្លាត ១ ម៉ោង)', "            or d.last_seen < now() - interval '1 hour';", "            or true;"],
+    ['note_my_device ឲ្យ anon ហៅបាន', 'private.note_my_device(text, text, text), public.note_my_device(text, text, text)\n    to authenticated;',
+        'private.note_my_device(text, text, text), public.note_my_device(text, text, text)\n    to authenticated, anon;'],
     ['zoe_admin_export · zoe_admin_tenants គ្មាន revoke (grant លំនាំដើម ➜ PUBLIC)',
         'revoke all on function public.zoe_admin_tenants(uuid, integer), public.zoe_admin_export(uuid, bigint, text, text, bigint, integer, integer)\n    from public, anon, authenticated, service_role;\n',
         '']

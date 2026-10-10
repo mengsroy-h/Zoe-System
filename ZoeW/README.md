@@ -325,7 +325,7 @@ Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ�
 
 ខាងលើជួរទាំងនោះ (និងក្នុង ☰ ខាងក្រោម) បង្ហាញ **model · កំណែប្រព័ន្ធ · Serial** នៃទូរស័ព្ទនេះ ៖ App Android = Android ID ·
 PWA/iPhone = ID App ១៦ តួ (iPhone បង្ហាញត្រឹម `iPhone` និងកំណែ iOS ព្រោះ Safari មិនប្រាប់ model) · អ្នកលក់ឃើញដូចគ្នាក្នុង
-ZoeKeyGen តាមកៅអីក្នុង Key។
+ZoeKeyGen តាមកៅអីក្នុង Key (ហាង Supabase ៖ ក្នុងបញ្ជីឧបករណ៍របស់ហាង ដែល ZoeW ផ្ញើពេលគណនីចូលហាង)។
 
 | ជួរ | វាប្រាប់អ្វី |
 |---|---|

@@ -300,6 +300,11 @@ export function createSupabaseSdk(makeTransport, env) {
         accountOf(auth) {
             return auth && auth._account ? Object.assign({}, auth._account) : null;
         },
+        async noteDevice(auth, meta) {
+            if (!auth || !auth.currentUser || !auth._account || !meta || !meta.serial) return false;
+            await auth._transport.rpc('note_my_device', { p_serial: String(meta.serial), p_model: String(meta.model || ''), p_platform: String(meta.platform || '') }, 20000);
+            return true;
+        },
         async getIdTokenResult(user) {
             const token = await user.getIdToken();
             const claims = decodeJwtPayload(token);

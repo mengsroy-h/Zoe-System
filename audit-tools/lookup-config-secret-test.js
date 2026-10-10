@@ -79,6 +79,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
         closeModal: () => {},
         refreshZtoAutoCloseUi: () => {},
         refreshZtoListSyncUi: () => {},
+        refreshShopBoundUi: () => {},
         showToast: () => {},
         alert: (message) => alerts.push(String(message)),
         queueMicrotask

@@ -88,7 +88,7 @@ const SB_FN_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind === 'funct
 const SB_VAR_NAMES = [...decls.keys()].filter((n) => decls.get(n).kind !== 'function' && /^(SB_|sb[A-Z])/.test(n));
 const HELPER_FNS = ['fetchWithTimeout', 'elapsedSince', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'adminOwnerIsCurrent', 'safeStoreGet',
     'safeStoreSet', 'escapeHtml', 'copySensitiveText', 'setupLinkDsnIsValid', 'showLoginModalWithPrefill', 'makeQrCode', 'renderQrInto',
-    'downloadQrPng', 'saveQrImage'];
+    'downloadQrPng', 'saveQrImage', 'seatMetaText'];
 const HELPER_VARS = ['SETUP_LINK_URL_KEY', 'SETUP_LINK_DSN_KEY', 'QR_MAX_MODULES'];
 const REQUIRED_SB = ['sbAdminConfigProblem', 'sbAdminLogin', 'sbAdminLogout', 'sbAdminReset', 'sbAdminRefresh', 'renderSbTenantList', 'sbCreateTenant',
     'sbTenantAction', 'sbIssueInvite', 'sbIssueResetCode', 'copySbInviteLink', 'copySbInviteCode', 'copySbResetCode', 'restoreSbAdminConfig'];
@@ -499,6 +499,25 @@ async function behavior() {
         const ownerListHtml = el('sbTenantListBody').innerHTML;
         ok('បញ្ជីបង្ហាញម្ចាស់ sokha ជាអក្សរដិត (sb-owner) · គ្មាន emoji នៅមុខឈ្មោះ',
             /<span class="sb-member sb-owner" title="ម្ចាស់ហាង">sokha<\/span>/.test(ownerListHtml) && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*sokha/u.test(ownerListHtml), ownerListHtml.slice(0, 300));
+        ok('ហាងគ្មានឧបករណ៍ ➜ គ្មានបន្ទាត់ឧបករណ៍ (មិនមែន «អានមិនបាន»)', ownerListHtml.indexOf('seat-device-line') === -1, ownerListHtml.slice(0, 400));
+        console.log('   · ឧបករណ៍របស់ហាង (note_my_device ពិត ➜ member_devices)');
+        const DEV_XSS = '<img src=x onerror=alert(2)> Pixel 8';
+        const noted = await H.as(c, { role: 'authenticated', sub: ownerUid }, 'select public.note_my_device($1, $2, $3) as ok', ['a1b2c3d4e5f60718', DEV_XSS, 'Android 15']);
+        ok('សមាជិកកត់ឧបករណ៍ (RPC ពិត)', !!noted.rows && noted.rows[0].ok === true, noted.error);
+        await C.sbAdminRefresh();
+        const devHtml = el('sbTenantListBody').innerHTML;
+        const devLine = (devHtml.match(/<div class="seat-device-line">([^<]*)<\/div>/) || [])[1] || '';
+        ok('បន្ទាត់ឧបករណ៍ក្រោមហាង ៖ model · ប្រព័ន្ធ · Serial · គណនី · ថ្ងៃប្រើចុងក្រោយ (គ្មាន emoji)',
+            decodeEntities(devLine).indexOf(DEV_XSS + ' · Android 15 · Serial a1b2c3d4e5f60718 · sokha · ប្រើចុងក្រោយ ') === 0
+            && !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(decodeEntities(devLine)), devLine);
+        ok('⛔ XSS ៖ model ឧបករណ៍ escape (គ្មាន <img ឆៅ)', devHtml.indexOf('<img') === -1 && devHtml.indexOf('&lt;img src=x onerror=alert(2)&gt;') !== -1);
+        await c.query('revoke select on table public.member_devices from authenticated');
+        await C.sbAdminRefresh();
+        const devFailHtml = el('sbTenantListBody').innerHTML;
+        await c.query('grant select on table public.member_devices to authenticated');
+        ok('អានឧបករណ៍មិនបាន ➜ «⚠️ អានបញ្ជីឧបករណ៍មិនបាន» (មិនមែន «គ្មាន») · ហាង និងសមាជិកនៅបង្ហាញ',
+            /អានបញ្ជីឧបករណ៍មិនបាន/.test(devFailHtml) && /sb-owner" title="ម្ចាស់ហាង">sokha</.test(devFailHtml) && devFailHtml.indexOf('a1b2c3d4e5f60718') === -1, devFailHtml.slice(0, 400));
+        await C.sbAdminRefresh();
         K.answers.confirm.push(true);
         await C.sbTenantAction(tRow.id, 'sb-invite');
         await drain();

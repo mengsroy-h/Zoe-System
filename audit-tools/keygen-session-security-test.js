@@ -555,6 +555,15 @@ async function run() {
         ok('ព្យួរ ➜ ចាកចេញ ➜ ចុះយឺត ៖ គ្មាន ✅ លើ session ថ្មី', !h.log.toasts.some((t) => t.startsWith('✅')), h.log);
     }
 
+    {
+        const h = build();
+        h.getElementById('setupLookupSecretInput').value = 'private-header-probe';
+        h.getElementById('setupLookupCodeOutput').textContent = '012345';
+        h.ctx.invalidateSensitiveSession();
+        ok('សម័យរសើបបញ្ចប់ ➜ លុប Header និងកូដ Setup Lookup ពីអេក្រង់',
+            h.getElementById('setupLookupSecretInput').value === '' && h.getElementById('setupLookupCodeOutput').textContent === '');
+    }
+
     console.log('-- Clipboard៖ API មិនមាន ឬបដិសេធ មិនត្រូវចម្លងស្ងាត់ ឬអះអាងក្លែងក្លាយ --');
     function clipboardFixture(mode) {
         const f = build();

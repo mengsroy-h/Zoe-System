@@ -21,8 +21,8 @@ export function ConfigModal() {
                 {link ? (
                     <div className={linkSupabase ? 'cfg-link-card cfg-sb' : 'cfg-link-card cfg-fb'} id="configLinkCard">
                         <div className="cfg-link-card-head">
-                            {linkSupabase ? <SupabaseMark /> : <FirebaseMark />}
-                            <span>Setup Link ៖ {linkSupabase ? 'Supabase' : 'Firebase'}</span>
+                            {link.backend === 'lookup' ? <span aria-hidden="true">🔎</span> : linkSupabase ? <SupabaseMark /> : <FirebaseMark />}
+                            <span>Setup Link ៖ {link.backend === 'lookup' ? 'API ស្វែងរកអតិថិជន' : linkSupabase ? 'Supabase' : 'Firebase'}</span>
                         </div>
                         <div className="cfg-link-card-host">{link.host}</div>
                         {link.official ? null : (
@@ -30,9 +30,10 @@ export function ConfigModal() {
                                 ⚠️ Server នេះមិននៅលើ domain ផ្លូវការរបស់ {linkSupabase ? 'Supabase' : 'Firebase'} — ចុច «✅ ភ្ជាប់» តែពេលអ្នកប្រាកដថាអ្នកលក់ផ្ញើ Link នេះ
                             </div>
                         )}
+                        {link.lookupHost ? <div className="cfg-link-card-note">🔎 API ៖ {link.lookupHost} — ត្រូវការកូដ ៦ ខ្ទង់ពីអ្នកលក់</div> : null}
                         {link.invite ? <div className="cfg-link-card-note">📝 មានកូដអញ្ជើញ (ហាងថ្មី ➜ ចុះឈ្មោះ)</div> : null}
                         {link.dsn ? <div className="cfg-link-card-note">🐞 រួមការរាយការណ៍កំហុស (Sentry)</div> : null}
-                        <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" onClick={onAct("connectPendingSetupLink")}>✅ ភ្ជាប់</button>
+                        <button type="button" className="cfg-link-card-btn" id="configLinkConnectBtn" disabled={!!link.busy} onClick={onAct("connectPendingSetupLink")}>✅ ភ្ជាប់</button>
                     </div>
                 ) : null}
                 <div className="cfg-quick">

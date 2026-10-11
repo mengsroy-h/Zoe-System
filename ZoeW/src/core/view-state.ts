@@ -9,7 +9,9 @@ export type DataSummaryId = 'grandTotalCount' | 'todayTotalCount' | 'todayClosed
     | 'summaryCodDollar' | 'summaryCodRiel' | 'summaryDodDollar' | 'summaryDodRiel' | 'summaryTotalDollar' | 'summaryTotalRiel';
 
 export interface ConfigLinkSummary {
-    backend: 'firebase' | 'supabase';
+    backend: 'firebase' | 'supabase' | 'lookup';
+    lookupHost?: string;
+    busy?: boolean;
     host: string;
     invite: boolean;
     official: boolean;

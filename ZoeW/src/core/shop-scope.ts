@@ -8,7 +8,9 @@ export function shopScope() {
         const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
         if (found) return found[1];
         const supabase = /supabaseUrl"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
-        if (!supabase) return '';
+        if (!supabase || firebaseState.isInitializingFirebase) return '';
+        const activeUrl = firebaseState.auth && firebaseState.auth.app && firebaseState.auth.app.options && firebaseState.auth.app.options.supabaseUrl;
+        if (activeUrl && String(activeUrl).replace(/\/+$/, '') !== supabase[1].replace(/\/+$/, '')) return '';
         const tenant = firebaseState.fb && typeof firebaseState.fb.tenantScope === 'function' ? firebaseState.fb.tenantScope(firebaseState.auth) : '';
         return tenant ? supabase[1] + '#' + tenant : '';
     } catch (e) {

@@ -151,12 +151,12 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     // (ច្បាប់ «keep case» ក្នុង CLAUDE.md)។
     if (typeof api.redactEvent === 'function') {
         const ev = {
-            extra: { pin: '1234', apiKey: 'sk-live-abc', sessionToken: 'ST', password: 'p',
+            extra: { keyEnc: { salt: 'probe', iv: 'probe', ct: 'probe' }, setupCode: '012345', lookupCode: '012345', pin: '1234', apiKey: 'sk-live-abc', sessionToken: 'ST', password: 'p',
                      note: 'ok', keyId: 'K1', barcode: 'ABC123', itemId: 'id_123_abc' },
             contexts: { nested: { clientSecret: 'CS' } }
         };
         api.redactEvent(ev);
-        [['pin', ev.extra.pin], ['apiKey', ev.extra.apiKey], ['sessionToken', ev.extra.sessionToken],
+        [['keyEnc', ev.extra.keyEnc], ['setupCode', ev.extra.setupCode], ['lookupCode', ev.extra.lookupCode], ['pin', ev.extra.pin], ['apiKey', ev.extra.apiKey], ['sessionToken', ev.extra.sessionToken],
          ['password', ev.extra.password], ['clientSecret (ជាន់ជ្រៅ)', ev.contexts.nested.clientSecret]
         ].forEach(([label, val]) => {
             ok('តម្លៃក្រោមកូនសោ `' + label + '` ត្រូវលាក់', val === '[redacted]', String(val));

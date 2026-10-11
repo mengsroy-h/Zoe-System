@@ -14,6 +14,11 @@ import { fetchWithTimeout } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
+export function refreshShopBoundUi() {
+    refreshZtoAutoCloseUi();
+    refreshZtoListSyncUi();
+}
+
 export function getLookupApiConfig() {
     try {
         const raw = appLocalStore.getItem('zoew_lookup_api_config');
@@ -53,6 +58,16 @@ export function openLookupApiConfigModal() {
     setVal('lookupApiDodFieldInput', cfg.dodField || 'dod');
 
     openModalHelper('lookupApiConfigModal');
+}
+
+export function storeLookupApiConfig(cfg) {
+    if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
+        alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
+        return false;
+    }
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    return true;
 }
 
 export async function saveLookupApiConfig() {
@@ -104,16 +119,10 @@ export async function saveLookupApiConfig() {
     const shop = shopScope();
     if (shop) cfg.shop = shop;
 
-    if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
-        alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
-        return;
-    }
-    clearCustomerDataTableCache();
-    clearZtoPickupStatusStore();
+    if (!storeLookupApiConfig(cfg)) return;
     setFieldValue('lookupApiHeaderValueInput', '');
     closeModal('lookupApiConfigModal');
-    refreshZtoAutoCloseUi();
-    refreshZtoListSyncUi();
+    refreshShopBoundUi();
     prefetchCustomerDataTableRowsIfConfigured();
     showToast(enabled ? "✅ បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "ℹ️ បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
     if (cfg.headerName && lookupApiIsAppsScript(cfg)) {

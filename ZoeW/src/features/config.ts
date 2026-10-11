@@ -1,9 +1,15 @@
 import { modalIsOpen } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
-import { securityState } from '../core/state';
+import { firebaseState, securityState } from '../core/state';
 import { APP_VERSION } from '../core/version';
 import { viewState, type ConfigLinkSummary } from '../core/view-state';
-import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
+import { appLocalStore, safeStoreGet, safeStoreSet, safeStoreRemove } from '../core/storage';
+import { normalizeSetupLookup, decryptSetupLookup } from '../services/setup-lookup';
+import { lookupApiIsAppsScript } from './lookup-api';
+import { encryptLookupSecret } from '../services/crypto';
+import { shopScope } from '../core/shop-scope';
+import { storeLookupApiConfig, refreshShopBoundUi } from './lookup-config';
+import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { cancelPendingLookupUnlock } from './auto-lookup';
 import { applyPinPromptText, requestPinBeforeConfig } from './pin';
 import { initFirebase } from '../services/firebase-init';
@@ -300,13 +306,16 @@ export function saveFirebaseConfig() {
 }
 
 export function decodeSetupPayload(setupParam) {
+    if (typeof setupParam !== 'string' || setupParam.length > 32000) throw new Error('bad setup length');
     const json = decodeURIComponent(escape(atob(setupParam)));
     const parsed = JSON.parse(json);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('bad setup payload');
+    if (parsed.lookup !== undefined) parsed.lookup = normalizeSetupLookup(parsed.lookup);
     if (parsed.supabaseUrl || parsed.supabaseKey) {
         if (!parsed.supabaseUrl || !parsed.supabaseKey) throw new Error('missing supabaseUrl/supabaseKey');
         return parsed;
     }
+    if (!parsed.apiKey && !parsed.databaseURL && parsed.lookup) return { lookup: parsed.lookup };
     if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
     return parsed;
 }
@@ -326,6 +335,11 @@ export function applySetupPayload(parsed) {
     const linkConfig = Object.assign({}, parsed);
     delete linkConfig.dsn;
     delete linkConfig.invite;
+    delete linkConfig.lookup;
+    if (!parsed.apiKey && !parsed.supabaseUrl) {
+        setFieldValue('setupLinkInput', '');
+        return '';
+    }
     if (linkDsn) setFieldValue('sentryDsnInput', linkDsn);
     rememberSetupInvite(linkInvite, linkInvite ? String(parsed.supabaseUrl) : '');
     fillConfigFields(linkConfig);
@@ -373,6 +387,8 @@ export const OFFICIAL_FIREBASE_HOST = /\.(?:firebaseio\.com|firebasedatabase\.ap
 
 export function setupLinkSummary(parsed): ConfigLinkSummary {
     const supabase = !!(parsed && parsed.supabaseUrl);
+    const lookupOnly = !!(parsed && parsed.lookup && !parsed.apiKey && !supabase);
+    const lookupHost = parsed && parsed.lookup ? new URL(parsed.lookup.url).host : '';
     const raw = String((supabase ? parsed.supabaseUrl : parsed && (parsed.databaseURL || parsed.projectId)) || '');
     let host = raw;
     let hostname = '';
@@ -382,10 +398,11 @@ export function setupLinkSummary(parsed): ConfigLinkSummary {
         hostname = url.hostname;
     } catch (e) {}
     return {
-        backend: supabase ? 'supabase' : 'firebase',
-        host: host,
+        backend: lookupOnly ? 'lookup' : supabase ? 'supabase' : 'firebase',
+        lookupHost,
+        host: lookupOnly ? lookupHost : host,
         invite: supabase && typeof parsed.invite === 'string' && !!parsed.invite,
-        official: (supabase ? OFFICIAL_SUPABASE_HOST : OFFICIAL_FIREBASE_HOST).test(hostname),
+        official: lookupOnly || (supabase ? OFFICIAL_SUPABASE_HOST : OFFICIAL_FIREBASE_HOST).test(hostname),
         dsn: setupLinkDsnIsValid(parsed && parsed.dsn)
     };
 }
@@ -397,6 +414,7 @@ export function connectPendingSetupLink() {
 }
 
 export function connectSetupPayload(parsed, source) {
+    if (parsed && parsed.lookup) return connectLookupSetupPayload(parsed, source);
     viewState.configPendingLink = null;
     applySetupPayload(parsed);
     if (!saveFirebaseConfig()) {
@@ -406,6 +424,79 @@ export function connectSetupPayload(parsed, source) {
     const host = setupLinkSummary(parsed).host;
     showToast('✅ ' + source + ' ត្រឹមត្រូវ ➜ បានរក្សាទុក Config' + (host ? ' ៖ ' + host : ''));
     return true;
+}
+
+export async function connectLookupSetupPayload(parsed, source) {
+    if (!modalIsOpen('configModal') || !securityState.lookupSecretKey) return false;
+    const previousLink = viewState.configPendingLink;
+    if (previousLink && previousLink.busy) return false;
+    let lookup;
+    let backend;
+    try {
+        lookup = normalizeSetupLookup(parsed.lookup);
+        if (parsed.apiKey || parsed.databaseURL || parsed.supabaseUrl || parsed.supabaseKey) {
+            const config = Object.assign({}, parsed);
+            delete config.lookup;
+            delete config.dsn;
+            delete config.invite;
+            backend = normalizeFirebaseConfig(JSON.stringify(config)).config;
+        } else if (!savedConfigObject()) {
+            showToast('⚠️ សូមភ្ជាប់ហាងជាមុនសិន មុនប្រើ Link ដែលមានតែ API។');
+            return false;
+        }
+    } catch (e) {
+        showToast('❌ Setup Link មិនត្រឹមត្រូវទេ!');
+        return false;
+    }
+    const owner = Object.assign(setupLinkSummary(parsed), { payload: parsed, busy: true });
+    viewState.configPendingLink = owner;
+    const pinKey = securityState.lookupSecretKey;
+    const authEpoch = firebaseState.authGeneration;
+    const current = () => securityState.lookupSecretKey === pinKey && firebaseState.authGeneration === authEpoch && viewState.configPendingLink === owner && modalIsOpen('configModal');
+    let code = '';
+    let secret = '';
+    try {
+        code = prompt('បញ្ចូលកូដ ៦ ខ្ទង់ដែលអ្នកលក់ប្រាប់ដាច់ដោយឡែកពី Link/QR៖', '') || '';
+        if (!code) return false;
+        if (!current()) return false;
+        secret = await decryptSetupLookup(lookup, code);
+        code = '';
+        if (!current()) return false;
+        const headerValueEnc = secret ? await encryptLookupSecret(secret) : null;
+        const hadSecret = !!secret;
+        secret = '';
+        if (!current() || (hadSecret && !headerValueEnc)) return false;
+        const cfg: any = Object.assign({}, lookup, { headerValueEnc, autoSubmit: false });
+        delete cfg.keyEnc;
+        const scope = backend ? (backend.databaseURL || '') : shopScope();
+        if (scope) cfg.shop = scope;
+        const oldLookup = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
+        if (!storeLookupApiConfig(cfg)) return false;
+        if (backend) {
+            applySetupPayload(parsed);
+            if (!saveFirebaseConfig()) {
+                if (oldLookup === null) safeStoreRemove(appLocalStore, 'zoew_lookup_api_config');
+                else safeStoreSet(appLocalStore, 'zoew_lookup_api_config', oldLookup);
+                return false;
+            }
+        } else {
+            viewState.configPendingLink = null;
+            setFieldValue('setupLinkInput', '');
+            closeModal('configModal');
+        }
+        refreshShopBoundUi();
+        prefetchCustomerDataTableRowsIfConfigured();
+        showToast('✅ ' + source + ' ៖ បានរក្សាទុក API ស្វែងរកអតិថិជន។');
+        if (cfg.headerName && lookupApiIsAppsScript(cfg)) showToast('ℹ️ Google Apps Script មិនទទួល Header ទេ។ Header នេះមិនត្រូវផ្ញើ។');
+        return true;
+    } catch (e) {
+        if (current()) showToast('❌ កូដមិនត្រឹមត្រូវ ឬ Link ត្រូវបានកែ។ គ្មានការរក្សាទុក។');
+        return false;
+    } finally {
+        code = '';
+        secret = '';
+        if (viewState.configPendingLink === owner) viewState.configPendingLink = previousLink;
+    }
 }
 
 export function announceSetupApplied(linkDsn) {
@@ -436,7 +527,7 @@ export function applySetupLinkFromUrl() {
 
     requestPinBeforeConfig(() => {
         openConfigModal();
-        announceSetupApplied(applySetupPayload(parsed));
+        announceSetupApplied(parsed.lookup ? '' : applySetupPayload(parsed));
         viewState.configPendingLink = Object.assign(setupLinkSummary(parsed), { payload: parsed });
     }, 'setupLink');
 }

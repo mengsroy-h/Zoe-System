@@ -1,0 +1,228 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { webcrypto } from 'node:crypto';
+import { parse } from 'acorn';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { normalizeSetupLookup, decryptSetupLookup } from '../src/services/setup-lookup';
+import { applySetupLinkFromUrl, connectSetupPayload, decodeSetupPayload } from '../src/features/config';
+import { appLocalStore } from '../src/core/storage';
+import { securityState, firebaseState, uiState } from '../src/core/state';
+import { viewState } from '../src/core/view-state';
+import { ConfigModal } from '../src/app/components/modals/ConfigModal';
+import { byId, mount, step, unmount } from './native/react-harness';
+import { deriveLookupSecretKey, decryptLookupSecret } from '../src/services/crypto';
+
+vi.mock('../src/services/firebase-init', () => ({ initFirebase: vi.fn() }));
+vi.mock('../src/features/customer-table', async (original) => ({ ...await original() as any, clearCustomerDataTableCache: vi.fn(), prefetchCustomerDataTableRowsIfConfigured: vi.fn() }));
+const source = readFileSync(resolve(__dirname, '../../ZoeKeyGen/app.js'), 'utf8');
+const ast: any = parse(source, { ecmaVersion: 'latest' });
+const funcs = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && /^(lookupSetup|encryptSetupLookup)/.test(n.id.name));
+const seller = runInNewContext(funcs.map((n: any) => source.slice(n.start, n.end)).join('\n') + '\n({ encryptSetupLookup, lookupSetupCode })',
+    { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob });
+const metadata = { url: 'https://api.example.com/search?barcode={barcode}', enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', phoneField: 'phone', codField: 'cod', dodField: 'dod' };
+function producerHarness() {
+    const elements: any = {};
+    const writes: any[] = [];
+    const element = (id: string) => elements[id] ||= { value: '', checked: false, textContent: '', innerHTML: '', classList: { add() {}, remove() {} } };
+    const ctx: any = { crypto: webcrypto, TextEncoder, Uint8Array, Uint32Array, URL, btoa, atob,
+        auth: { currentUser: { uid: 'seller' } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
+        lookupSetupGeneration: 0, lastGeneratedSetupLink: '', SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
+        document: { getElementById: element }, safeStoreSet: (_store: any, key: string, value: string) => writes.push([key, value]),
+        renderQrInto: (_el: any, link: string) => { element('setupLinkQrContainer').textContent = link; }, alert: vi.fn() };
+    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'setupLinkDsnIsValid', 'generateLookupSetupLink'];
+    const declared = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && (names.includes(n.id.name) || /^(lookupSetup|encryptSetupLookup)/.test(n.id.name)));
+    runInNewContext(declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
+    element('setupLinkUrlInput').value = 'https://zoew.example/';
+    element('setupLookupUrlInput').value = metadata.url;
+    element('setupLookupHeaderInput').value = metadata.headerName;
+    element('setupLookupSecretInput').value = 'seller-private-header';
+    element('setupLookupEnabledCheckbox').checked = true;
+    return { ctx, element, writes };
+}
+
+const encoded = (payload: any) => btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+const sealed = async () => ({ ...metadata, keyEnc: await seller.encryptSetupLookup(metadata, 'seller-private-header', '123456') });
+beforeEach(async () => {
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('prompt', vi.fn(() => '123456'));
+    appLocalStore.clear();
+    appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'key', databaseURL: 'https://shop.firebaseio.com' }));
+    securityState.lookupSecretKey = await deriveLookupSecretKey('654321');
+    mount(<ConfigModal />);
+    uiState.modalDisplay = { configModal: 'flex' };
+    viewState.configPendingLink = null;
+    firebaseState.authGeneration++;
+    firebaseState.isInitializingFirebase = false;
+});
+afterEach(() => { unmount(); vi.unstubAllGlobals(); vi.restoreAllMocks(); firebaseState.isInitializingFirebase = false; firebaseState.auth = null as any; firebaseState.fb = null as any; appLocalStore.clear(); securityState.lookupSecretKey = null; viewState.configPendingLink = null; });
+describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួលពិត', () => {
+    it('អ្នកលក់បង្កើត Link ពិត ៖ កូដបង្ហាញដាច់ដោយឡែក · QR គ្មានកូដ · Header មិន persist', async () => {
+        const h = producerHarness();
+        await h.ctx.generateLookupSetupLink();
+        const url = h.ctx.lastGeneratedSetupLink;
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        const payload = decodeSetupPayload(new URL(url).searchParams.get('setup'));
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
+        expect(h.element('setupLookupSecretInput').value).toBe('');
+        expect(h.element('setupLinkQrContainer').textContent).toBe(url);
+        expect(JSON.stringify(h.writes)).not.toMatch(/seller-private-header|keyEnc/);
+        h.ctx.invalidateSensitiveSession();
+        expect(h.element('setupLookupCodeOutput').textContent).toBe('');
+    });
+    it('អ្នកលក់ logout កណ្ដាល crypto ➜ Link/កូដ/QR មិនលេចក្រោយមក', async () => {
+        const h = producerHarness();
+        const task = h.ctx.generateLookupSetupLink();
+        h.ctx.invalidateSensitiveSession();
+        h.ctx.isSignedInUiActive = false;
+        await task;
+        expect(h.ctx.lastGeneratedSetupLink).toBe('');
+        expect(h.element('setupLookupCodeOutput').textContent).toBe('');
+        expect(h.writes).toEqual([]);
+    });
+    it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {
+        for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^\d{6}$/);
+        const fn: any = funcs.find((n: any) => n.id.name === 'lookupSetupCode');
+        const draws = [4294000000, 7];
+        let attempts = 0;
+        const rng: any = { getRandomValues(a: Uint32Array) { a[0] = draws[attempts++] ?? 4294967295; return a; } };
+        const code = runInNewContext(source.slice(fn.start, fn.end) + '\nlookupSetupCode', { crypto: rng, Uint32Array });
+        expect(code()).toBe('000007');
+        expect(attempts).toBe(2);
+        attempts = 0;
+        draws.length = 0;
+        expect(() => code()).toThrow();
+        expect(attempts).toBe(16);
+    });
+    it('Header UTF-8 ៖ ព្រំដែនអ្នកលក់ និងអ្នកទទួលជាបៃដូចគ្នា', async () => {
+        const secret = 'ក'.repeat(1365);
+        const keyEnc = await seller.encryptSetupLookup(metadata, secret, '123456');
+        expect(await decryptSetupLookup({ ...metadata, keyEnc }, '123456')).toBe(secret);
+        await expect(seller.encryptSetupLookup(metadata, 'ក'.repeat(1366), '123456')).rejects.toThrow();
+    });
+    it('Header មិននៅក្នុង link · កូដត្រូវបើកបាន', async () => {
+        const lookup = await sealed();
+        expect(JSON.stringify(lookup)).not.toContain('seller-private-header');
+        expect(await decryptSetupLookup(lookup, '123456')).toBe('seller-private-header');
+        expect(lookup.keyEnc.iter).toBe(300000);
+    });
+    it('កូដខុស · URL ប្តូរ · ciphertext ប្តូរ ➜ បើកមិនបាន', async () => {
+        const lookup = await sealed();
+        await expect(decryptSetupLookup(lookup, '123457')).rejects.toThrow();
+        await expect(decryptSetupLookup({ ...lookup, url: 'https://evil.example/?barcode={barcode}' }, '123456')).rejects.toThrow();
+        await expect(decryptSetupLookup({ ...lookup, keyEnc: { ...lookup.keyEnc, ct: btoa('bad') } }, '123456')).rejects.toThrow();
+    });
+    it('lookup-only · Firebase+lookup · Supabase+lookup ទទួលបាន', async () => {
+        const lookup = await sealed();
+        for (const backend of [{}, { apiKey: 'k', databaseURL: 'https://s.firebaseio.com' }, { supabaseUrl: 'https://a.supabase.co', supabaseKey: 'sb_publishable_x' }])
+            expect(decodeSetupPayload(encoded({ ...backend, lookup })).lookup).toEqual(lookup);
+    });
+    it('ទប់ URL HTTP · userinfo · គ្មាន barcode · ថវិកា PBKDF ខុស · plaintext', async () => {
+        const lookup = await sealed();
+        for (const url of ['http://api.example/?barcode={barcode}', 'https://key@api.example/?barcode={barcode}', 'https://api.example/'])
+            expect(() => normalizeSetupLookup({ ...lookup, url })).toThrow();
+        expect(() => normalizeSetupLookup({ ...lookup, keyEnc: { ...lookup.keyEnc, iter: 999999999 } })).toThrow();
+        expect(() => normalizeSetupLookup({ ...lookup, headerValue: 'plaintext' })).toThrow();
+    });
+    it('null · array · NaN · undefined បរាជ័យដោយមិនរក្សាទុក', () => {
+        for (const x of [null, [], NaN, undefined]) expect(() => normalizeSetupLookup(x)).toThrow();
+    });
+    it('ចុចភ្ជាប់ ➜ encrypt ក្នុងម៉ាស៊ីន និងចងហាង · គ្មានកូដ/Key ធម្មតាក្នុង storage', async () => {
+        const lookup = await sealed();
+        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+        expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(true);
+        const config = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+        expect(config.shop).toBe('https://shop.firebaseio.com');
+        expect(config.headerValueEnc).toBeTruthy();
+        expect(await decryptLookupSecret(config.headerValueEnc)).toBe('seller-private-header');
+        expect(JSON.stringify(config)).not.toMatch(/seller-private-header|123456|keyEnc/);
+    });
+    it('ឧបករណ៍ថ្មី Firebase និង Supabase ➜ backend និង lookup ដាច់គ្នា · គ្មាន ciphertext លក់ក្នុង backend', async () => {
+        const lookup = await sealed();
+        for (const backend of [{ apiKey: 'k2', databaseURL: 'https://new.firebaseio.com' }, { supabaseUrl: 'https://new.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24) }]) {
+            uiState.modalDisplay = { configModal: 'flex' };
+            expect(await connectSetupPayload({ ...backend, lookup }, 'Setup Link')).toBe(true);
+            const saved = JSON.parse(appLocalStore.getItem('zoew_firebase_config')!);
+            expect(saved).toEqual(backend);
+            const api = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+            expect(api.shop || '').toBe('databaseURL' in backend ? backend.databaseURL : '');
+            expect(await decryptLookupSecret(api.headerValueEnc)).toBe('seller-private-header');
+        }
+    });
+    it('URL ៖ PIN gate · host API បង្ហាញ · មិនសួរកូដ ឬរក្សាទុកដោយស្វ័យប្រវត្តិ', async () => {
+        const lookup = await sealed();
+        const before = window.location.href;
+        (window as any).happyDOM.setURL('https://zoew.example/?setup=' + encodeURIComponent(encoded({ lookup })));
+        try {
+            step(() => applySetupLinkFromUrl());
+            expect(window.location.search).toBe('');
+            expect(typeof securityState.pinTargetAction).toBe('function');
+            step(() => (securityState.pinTargetAction as any)());
+            expect(byId('configLinkCard').textContent).toContain('api.example.com');
+            expect(prompt).not.toHaveBeenCalled();
+            expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+        } finally { (window as any).happyDOM.setURL(before); securityState.pinTargetAction = null; }
+    });
+    it('Supabase ប្តូរ Project ៖ មិនចង API ជាមួយ tenant ចាស់ · tenant ថ្មីចងពេលអាន', async () => {
+        const lookup = await sealed();
+        firebaseState.auth = { app: { options: { supabaseUrl: 'https://old.supabase.co' } }, _account: { tenant_id: 'old' } } as any;
+        firebaseState.fb = { tenantScope: (user: any) => user._account.tenant_id } as any;
+        expect(await connectSetupPayload({ supabaseUrl: 'https://new.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24), lookup }, 'Setup Link')).toBe(true);
+        expect(JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!).shop).toBeUndefined();
+        firebaseState.auth = { app: { options: { supabaseUrl: 'https://new.supabase.co' } }, _account: { tenant_id: 'new' } } as any;
+        const { getLookupApiConfig } = await import('../src/features/lookup-config');
+        expect(getLookupApiConfig().shop).toBe('https://new.supabase.co#new');
+        firebaseState.auth = null as any;
+        firebaseState.fb = null as any;
+    });
+    it('Supabase Project ដដែលពេល reconfig ៖ tenant ចាស់មិនចង API ដែលរង់ចាំហាងថ្មី', async () => {
+        const lookup = await sealed();
+        firebaseState.auth = { app: { options: { supabaseUrl: 'https://new.supabase.co' } }, _account: { tenant_id: 'old' } } as any;
+        firebaseState.fb = { tenantScope: (user: any) => user._account.tenant_id } as any;
+        firebaseState.isInitializingFirebase = true;
+        expect(await connectSetupPayload({ supabaseUrl: 'https://new.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24), lookup }, 'Setup Link')).toBe(true);
+        expect(JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!).shop).toBeUndefined();
+        firebaseState.isInitializingFirebase = false;
+        firebaseState.auth._account.tenant_id = 'new';
+        const { getLookupApiConfig } = await import('../src/features/lookup-config');
+        expect(getLookupApiConfig().shop).toBe('https://new.supabase.co#new');
+    });
+    it('ចុចស្ទួន និងបិទ/បើក modal កណ្ដាល crypto ➜ ការឆ្លើយចាស់មិនសរសេរ', async () => {
+        const lookup = await sealed();
+        const task = connectSetupPayload({ lookup }, 'Setup Link');
+        expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(false);
+        uiState.modalDisplay = {};
+        viewState.configPendingLink = null;
+        uiState.modalDisplay = { configModal: 'flex' };
+        expect(await task).toBe(false);
+        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+    });
+    it('កូដខុស និងបោះបង់ ➜ backend និង Lookup នៅដដែល', async () => {
+        const lookup = await sealed();
+        const before = appLocalStore.getItem('zoew_firebase_config');
+        for (const code of ['999999', null]) {
+            vi.mocked(prompt).mockReturnValue(code);
+            expect(await connectSetupPayload({ apiKey: 'k2', databaseURL: 'https://other.firebaseio.com', lookup }, 'Setup Link')).toBe(false);
+            expect(appLocalStore.getItem('zoew_firebase_config')).toBe(before);
+            expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+        }
+    });
+    it('Logout កណ្ដាល crypto ➜ គ្មានការរក្សាទុកយឺត', async () => {
+        const lookup = await sealed();
+        const pending = connectSetupPayload({ lookup }, 'Setup Link');
+        securityState.lookupSecretKey = null;
+        viewState.configPendingLink = null;
+        firebaseState.authGeneration++;
+    firebaseState.isInitializingFirebase = false;
+        expect(await pending).toBe(false);
+        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+    });
+    it('គ្មាន PIN និង configModal បិទ ➜ មិនប្រើ Link', async () => {
+        const lookup = await sealed();
+        securityState.lookupSecretKey = null;
+        expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(false);
+        uiState.modalDisplay = {};
+        expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(false);
+    });
+});

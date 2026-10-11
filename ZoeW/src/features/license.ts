@@ -6,6 +6,7 @@ import { resumeInterruptedCleanups } from '../domain/cleanup';
 import { updateAuthButton } from './auth';
 import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { captureAuthDatabaseGuard } from './exchange-rate';
+import { refreshShopBoundUi } from './lookup-config';
 import { armSessionExpiryCheck } from './session';
 import { initDatabaseListeners } from '../services/db-listeners';
 import { withTimeout } from '../services/network';
@@ -139,6 +140,7 @@ export function scheduleActivationRetry(user, myAuthGeneration) {
 }
 
 export async function proceedAfterLogin(user, myAuthGeneration) {
+    refreshShopBoundUi();
     let activated;
     try {
         activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');

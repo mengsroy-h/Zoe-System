@@ -43,9 +43,11 @@
 
 ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`)។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 
-ស្ថានភាព git (វាស់ 2026-10-09 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
+ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0. **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **PR #309 បើក · មិនទាន់ merge**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
+0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
+   (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+   **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **merge រួចតាម PR #309 · `5767bc2`**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
    ពីទំហំអេក្រង់មិនច្បាស់ ➜ «ដាក់អោយឃើញតែ iPhone ដូចមុន») ➜ run-all STRICT ២០៤/២០៤ លើ `3d21e9e` · **Deep audit ៥** (ផ្នែក ២) ចូលកំណែដដែល + ZoeKeyGen `2.24.14` ៖
    ធុងសំរាម slot របស់ id ដែលបង្កើតឡើងវិញ · SW ZoeKeyGen `no-cache` · ប្រអប់ Extend ➜ run-all STRICT ២០៤/២០៤ (`RUNALL_RESUME` សម្រាប់ `perf` ដែលលើសពិដានពេលម៉ាស៊ីនរវល់) ·
    **ជុំ ២** (ម្ចាស់គម្រោង «អ្វីនៅសល់កែឲ្យស្អាតទាំងអស់») ៖ «លុបទាំងអស់» លើ slot ជាប់ · ការស្តារទាំងមូលចូលធាតុបង្កើតឡើងវិញ · Locker ក្រោយប្តូរ session · ZoeKeyGen Generate retry ·
@@ -106,7 +108,8 @@
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeW 2.50.53 · ZoeKeyGen 2.24.14 — iPhone បង្ហាញត្រឹម «iPhone» + Deep audit ៥ (PR #309 · មិនទាន់ merge)** ៖ Merge ➜ Deploy ZoeW + ZoeKeyGen ➜ iPhone ☰ · 🩺 ៖ «iPhone · iOS 26.x» (ឬ «iOS 26+») ·
+- ⏳ **ZoeW 2.50.54 · ZoeKeyGen 2.24.15 — ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App · ឧបករណ៍របស់ហាងក្នុង ZoeKeyGen (branch `claude/keen-meitner-arph55` · មិនទាន់ merge)** ៖ Merge (migration ថ្មី) ➜ Deploy ➜ បិទ/បើក App ហាង Supabase ➜ ប៊ូតុងលេចដោយមិនបើក ☰ · ZoeKeyGen បង្ហាញទូរស័ព្ទរបស់ហាង ([2.50.54] សកម្មភាព ១–៣)។
+- ⏳ **ZoeW 2.50.53 · ZoeKeyGen 2.24.14 — iPhone បង្ហាញត្រឹម «iPhone» + Deep audit ៥ (PR #309 merge រួច · `5767bc2`)** ៖ Merge ➜ Deploy ZoeW + ZoeKeyGen ➜ iPhone ☰ · 🩺 ៖ «iPhone · iOS 26.x» (ឬ «iOS 26+») ·
   ZoeKeyGen បន្ទាត់កៅអី iPhone ៖ «d1 · iPhone · iOS … · Serial …» ក្រោយ iPhone នោះបើក App កំណែថ្មី · ZoeKeyGen ៖ ប្រអប់ «⏳ បន្ថែម» អត្ថបទថ្មី ·
   ឧបករណ៍ចូលហាងច្រើន ៖ Lookup/Sheet តាមហាង · Push ពីហាងដែលកំពុងបើក · 🩺 «អាយុ Cookie ក្រោយ Sync» ([2.50.53] សកម្មភាព ២–៦)។
 - ⏳ **ZoeW 2.50.52 · ZoeKeyGen 2.24.13 — គ្មាន emoji · ZoeKeyGen ស្តារ SDK · push ក្រោយប្តូរកូនសោ (PR #308 merge រួច · model iPhone ពីទំហំអេក្រង់ដកចេញក្នុង [2.50.53])** ៖ Deploy ➜ ZoeKeyGen បន្ទាត់កៅអីគ្មាន emoji · push ៖ `?op=config` · `push-cron` logs · ZoeKeyGen ផ្ទាំង Supabase ក្រោយបិទប្រអប់ PIN ([2.50.52] សកម្មភាព ២–៥)។
@@ -161,6 +164,45 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.54] — 2026-10-10 · ZoeW ៖ **ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App (មិនរង់ចាំបើក ☰)** (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309 ៖ «ពេលបើក app ដំបូងអត់មានប៊ូតុង បញ្ជីZTO … តែគ្រាន់តែចុចបើក side menu លេចប៊ូតុង បញ្ជីZTO ភ្លាម ។ ដោយឡែក firebase អត់អីទេ») · ZoeW + ZoeKeyGen `2.24.15` ៖ **ហាង Supabase កត់ model · Serial ទូរស័ព្ទ ដូចកៅអី Key** (សំណើម្ចាស់គម្រោង ៖ «ចង់អោយ Supabase រក្សា model និង serrial id ដូច activate key ដែល» ➜ ជ្រើស «កត់ និងបង្ហាញប៉ុណ្ណោះ»)
+
+**ZoeW `2.50.54`** (`zoew-v316` ➜ `zoew-v317`) · **ZoeKeyGen `2.24.15`** (`zoekeygen-v125` ➜ `zoekeygen-v126`)។ migration Supabase ថ្មី `20261010140000_zoe_member_devices.sql` ·
+គ្មាន rules Firebase/env ថ្មី · តំបន់ហាម និងតំបន់ចាក់សោ ZTO មិនប៉ះ (`LOCK` ដដែល)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔄 **PTR នៅ tablet និងពេល navbar កើនកម្ពស់** (ម្ចាស់ស្នើកែ PTR · branch មិនទាន់ merge ➜ កំណែដដែល)៖ indicator យកកម្ពស់ navbar ដែល App វាស់រួចតាម `--chrome-top`។ មុនកែ tablet 768/800/991px មានចន្លោះ 7px ទល់នឹងទូរស័ព្ទ 10.2px; navbar 100px ធ្វើឱ្យ indicator ជាន់របា។ `gesture-test` ប្រើ touch ពិតក្នុង Chromium ដើម្បីចាប់កំហុសទាំងនេះ និងព្រំដែន 992px; មិនប្ដូរកម្រិតទាញ ឬការសម្រេច refresh។ មុន merge ត្រូវសាកលើ iPhone និង Android ពិត៖ ទាញស្រាល · ទាញដល់ ready · បោះបង់ · refresh · បង្វិលអេក្រង់ និងពិនិត្យ safe-area។ ការវាស់ក្នុង Cloud មិនជំនួសឧបករណ៍ពិតទេ។
+- 🔗 **Setup Link/QR រួម API ស្វែងរកអតិថិជន** (សំណើម្ចាស់ · branch មិនទាន់ merge ➜ កំណែដដែល)៖ មុននេះ Link ភ្ជាប់តែ backend។ កាត ZoeKeyGen បញ្ចូល URL HTTPS · Header · mapping · Fast Mode · enabled និងបង្កើតកូដ ៦ ខ្ទង់ពី Web Crypto។ PBKDF2-SHA256 300000 + AES-GCM ចាក់សោ Header និងផ្ទៀងផ្ទាត់ metadata ដើម្បីទប់ការកែ URL។ ZoeW ឆ្លង PIN · បង្ហាញ host · ចុចភ្ជាប់ · សួរកូដ ➜ encrypt កូនសោក្នុងម៉ាស៊ីន និងចងហាង។ lookup-only សម្រាប់ហាងភ្ជាប់រួច; combined សម្រាប់ Firebase/Supabase ថ្មី។ កូដខុស/បោះបង់/logout កណ្ដាល crypto ➜ គ្មានការរក្សាទុក។ អ្នកយាម `tests/setup-lookup.test.tsx` រត់កូដលក់ និងកូដទទួលពិត; `secret-hygiene` លាក់ `keyEnc` និងកូដ។ **សកម្មភាពដោយដៃ**៖ បង្កើត Link ថ្មី · កត់កូដ និងប្រាប់ដាច់ដោយឡែក · អ្នកទទួលវាយ PIN និងកូដ។ គ្មាន migration/env/rules ថ្មីសម្រាប់ Lookup។
+- 🚚 **ហាង Supabase** ៖ បើក App (ស្តារ session) ➜ ប៊ូតុង «📥 បញ្ជី ZTO» នៅក្បាលប្រវត្តិលេចភ្លាមពេលគណនីស្គាល់ហាង ហើយក្រុម ZTO ក្នុង ☰ គណនាឡើងវិញព្រមគ្នា។
+  មុនកែ ៖ ការកំណត់ API ZTO ចងហាង ([2.50.53] ជុំ ៤) ➜ boot គណនាប៊ូតុងមុន SDK Supabase និងគណនីមកដល់ (ហាងមិនទាន់ស្គាល់ ➜ «មិនមែនហាងនេះ» ➜ លាក់) ហើយគ្មានអ្វីគណនា
+  ឡើងវិញ រហូតបើក ☰ (`openSideDrawer()`)។ Firebase ស្គាល់ហាងពី `databaseURL` តាំងពី boot ➜ មិនរងផលប៉ះពាល់។
+- 🏪 **Firebase Reconfig ពីហាង A ទៅហាង B** (ចន្លោះដដែល · វាស់) ៖ ប៊ូតុងរបស់ហាង A លាក់ពេលចូលហាង B (មុន ៖ នៅលេចរហូតបើក ☰)។
+- ច្រកតែមួយ `refreshShopBoundUi()` (`features/lookup-config.ts`) ៖ boot · រក្សាទុក API ស្វែងរកអតិថិជន · ចូលប្រព័ន្ធ/ស្តារ (`proceedAfterLogin()` មុនការពិនិត្យ License) ·
+  គណនី Supabase មកដល់ ប្តូរ ឬបាត់ (adapter `onTenantChanged` ➜ env របស់ App) · ☰ (`openSideDrawer()` ក្នុងតំបន់ហាម មិនប៉ះ)។
+- 📱 **ហាង Supabase ៖ ឧបករណ៍របស់ហាង** ៖ គណនីស្គាល់ហាង (ស្តារ · ចូល · គណនីមកដល់យឺត) ➜ ZoeW ផ្ញើ model · ប្រព័ន្ធ · Serial (Android ID ឬ ID App ១៦ តួ ដែល ☰ · 🩺 បង្ហាញ)
+  ទៅ RPC `note_my_device` ម្តងក្នុងមួយទំព័រ/គណនី (ធ្លាក់ ➜ សាកម្តងទៀតក្រោយ ៥ នាទីពីវដ្ត ៦០ វិ.) ➜ តារាង `member_devices` (ហាង + Serial · គណនីចុងក្រោយ · ថ្ងៃប្រើចុងក្រោយ ·
+  ≤ ៣០ ក្នុងមួយហាង · មានតែ Admin អាន)។ ZoeKeyGen «🏪 ហាង Supabase» ៖ ក្រោមគណនីនៃហាងនីមួយៗ មួយបន្ទាត់ក្នុងមួយទូរស័ព្ទ
+  `Samsung SM-A546E · Android 14 · Serial … · sokha · ប្រើចុងក្រោយ …` (ទម្រង់ដូចកៅអី Key · គ្មាន emoji) · អានមិនបាន (migration មិនទាន់ដាក់) ➜ «⚠️ អានបញ្ជីឧបករណ៍មិនបាន»។
+  សម្រាប់មើលតែប៉ុណ្ណោះ ⛔ មិនកំណត់ចំនួនទូរស័ព្ទ ហើយមិនប៉ះការចូលប្រព័ន្ធ (ការកំណត់ចំនួនដូច `maxDevices` = ការងារដាច់ដោយឡែក បើម្ចាស់គម្រោងស្នើ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/shop-bound-ui-refresh.test.ts` (ថ្មី · ៦ · adapter Supabase ពិត + transport ពិត + env ពិតរបស់ App តាម `loadSupabaseFb()` · `proceedAfterLogin()` ពិត) ៖ ស្តារ + គណនីក្នុង cache ·
+  គណនីមកដល់យឺត (`my_account()` ឆ្លើយក្រោយ) · ចាកចេញ ➜ លាក់ · ហាងផ្សេង ➜ នៅលាក់ · Supabase ចូលប្រព័ន្ធ · Firebase Reconfig A ➜ B ➜ **ធ្លាក់ ៥/៦ លើ `5767bc2`** (main ក្រោយ PR #309) · ជាប់ ៦/៦ ·
+  mutation ៖ ដក `onTenantChanged` ក្នុង env ➜ ធ្លាក់ ៣ (ផ្លូវ adapter) · ដក `refreshShopBoundUi()` ក្នុង `proceedAfterLogin()` ➜ ធ្លាក់ ២ (ផ្លូវចូលប្រព័ន្ធ)។
+- ឧបករណ៍ Supabase ៖ `supabase-rls-test` +១៤ (Postgres ពិត · `note_my_device` ៖ ហាង/គណនីពី `auth.uid()` · anon · គណនីគ្មានហាង · ហាងបិទ · serial/model/ប្រព័ន្ធខុស ·
+  ព័ត៌មានដដែលក្នុង ១ ម៉ោងមិនសរសេរ · Serial អក្សរធំ = ជួរដដែល · សមាជិកមិនអាន · DML ផ្ទាល់បដិសេធ · ពិដាន ៣០) + mutation ៦ (policy `using (true)` · ហាងពី client ·
+  ទទួលហាងបិទ · គ្មានពិដាន · សរសេររាល់ការហៅ · anon ហៅបាន) ➜ ៤៨០/៤៨០ · `keygen-supabase-admin-test` +៥ (RPC ពិត ➜ បន្ទាត់ឧបករណ៍ · XSS model · អានមិនបាន ≠ គ្មាន) ➜ ១០៧/១០៧ ·
+  `ZoeW/tests/shop-device-note.test.ts` (ថ្មី · ៤ · adapter + transport + env ពិត) ➜ mutation ៖ ដក `noteShopDevice()` ពី env ➜ ធ្លាក់ ៣ · ដកគម្លាតក្រោយធ្លាក់ ➜ ធ្លាក់ ១។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Merge ➜ migration `20261010140000_zoe_member_devices.sql` ចូល Supabase ស្វ័យប្រវត្តិ (GitHub integration) ឬ paste ក្នុង SQL Editor ➜ Netlify Deploy **ZoeW** និង
+   **ZoeKeyGen** (APK 2.50.54 build ដោយ workflow ពេល merge ដូចធម្មតា)។
+២. ហាង Supabase ដែលបានកំណត់ API ZTO និងបើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ៖ បិទ App ទាំងស្រុង ➜ បើកវិញ ➜ ប៊ូតុង «📥 បញ្ជី ZTO» លេចដោយមិនបើក ☰។
+៣. ZoeKeyGen ➜ «🏪 ហាង Supabase» ➜ 🔄 Refresh ៖ ក្រោយទូរស័ព្ទនីមួយៗបើក ZoeW កំណែថ្មី (ចូលហាង) ➜ បន្ទាត់ «model · ប្រព័ន្ធ · Serial · គណនី · ប្រើចុងក្រោយ» ក្រោមហាងនោះ ·
+   Serial ស្មើអ្វីដែលទូរស័ព្ទបង្ហាញក្នុង ☰ ខាងក្រោម។
 
 ### [2.50.53] — 2026-10-10 · ZoeW ៖ **iPhone បង្ហាញត្រឹម «iPhone» + កំណែ iOS (ដកការទាយ model ពីទំហំអេក្រង់)** (សំណើម្ចាស់គម្រោង ៖ «បើអោយវាស់តាមទំហំអេក្រង់ចិងចេញ model មិនច្បាស់ថាមួយណាទេ សូមអោយអានពី hardware វិញទៅ» ➜ ពន្យល់ថា web/PWA លើ iPhone អាន hardware មិនបាន ➜ ម្ចាស់គម្រោង ៖ «ចិងដាក់អោយឃើញតែ iPhone ដូចមុនចុះ») · ZoeW + ZoeKeyGen `2.24.14` ៖ **Deep audit ៥ ៖ ការសម្អាត/ការលុបលើ id ដែលធុងសំរាមនៅកាន់ជីវិតចាស់ · SW ZoeKeyGen ទាញឯកសារស្រស់ · ប្រអប់ Extend ប្រាប់ការពិត** (សំណើម្ចាស់គម្រោង ៖ «deep audit … commit ចូល PR#309»)
 
@@ -5709,6 +5751,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
@@ -5760,3 +5804,4 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ | — |

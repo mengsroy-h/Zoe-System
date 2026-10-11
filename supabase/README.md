@@ -28,9 +28,10 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `tenant_invites` | កូដអញ្ជើញ (**hash តែប៉ុណ្ណោះ**) · ចំនួនប្រើ · ថ្ងៃផុត | admin |
 | `member_reset_codes` | កូដប្តូរពាក្យសម្ងាត់ (**hash តែប៉ុណ្ណោះ**) · ប្រើ ១ ដង · ថ្ងៃផុត | admin |
 | `platform_admins` | អ្នកលក់ (ZoeKeyGen) | ម្នាក់ៗឃើញតែខ្លួនឯង |
+| `member_devices` | ទូរស័ព្ទដែលចូលហាង ៖ `serial` · `model` · `platform` · គណនីចុងក្រោយ · `last_seen` (ZoeW សរសេរតាម `note_my_device` · ≤ ៣០ ក្នុងមួយហាង · សម្រាប់មើលក្នុង ZoeKeyGen) | admin |
 | `zoe_docs` · `zoe_tenant_state` | ទិន្នន័យកញ្ចប់របស់ហាង តាមរូបរាង RTDB (`root`/`key` ➜ JSON) · លេខលំដាប់ `seq` សម្រាប់ទាញតែអ្វីដែលប្រែ | សមាជិកនៃហាងនោះ |
 
-⛔ គ្មាន role ណាសរសេរតារាងដោយផ្ទាល់ទេ ៖ រាល់ការសរសេរឆ្លងកាត់ RPC ខាងក្រោម។ RPC ដែល authenticated ហៅ (`my_account` · `zoe_write` · `admin_*`) ក្នុង
+⛔ គ្មាន role ណាសរសេរតារាងដោយផ្ទាល់ទេ ៖ រាល់ការសរសេរឆ្លងកាត់ RPC ខាងក្រោម។ RPC ដែល authenticated ហៅ (`my_account` · `zoe_write` · `note_my_device` · `admin_*`) ក្នុង
 `public` ជា `security invoker` ដែលហៅ function `security definer` ដែលមានឈ្មោះ · argument · លទ្ធផលដូចគ្នា ក្នុង schema `private` (API មិនបើក)។
 
 ### RPC

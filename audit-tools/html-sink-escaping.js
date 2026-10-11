@@ -104,7 +104,8 @@ const BUILDER_ALLOW = {
         scopeLabel: 'លទ្ធផលផ្ទាល់នៃ escapeHtml()',
         expStr: "toLocaleDateString('km-KH') ឬ '-'",
         sbStatusHtml: 'badge ថេរ ៣ (សកម្ម · ផុតកំណត់ · បិទ) ជ្រើសតាម sbTenantState()',
-        sbMembersHtml: 'HTML សាងខាងលើ; ឈ្មោះគណនីឆ្លង escapeHtml() · class/title ម្ចាស់ថេរ (`keygen-supabase-admin-test` ៖ XSS ឈ្មោះហាង)'
+        sbMembersHtml: 'HTML សាងខាងលើ; ឈ្មោះគណនីឆ្លង escapeHtml() · class/title ម្ចាស់ថេរ (`keygen-supabase-admin-test` ៖ XSS ឈ្មោះហាង)',
+        sbDevicesCell: 'sbDevicesHtml() ៖ បន្ទាត់ឧបករណ៍ (model · ប្រព័ន្ធ · Serial · គណនី · ថ្ងៃ) ឆ្លង escapeHtml() · បន្ទាត់ «អានមិនបាន» ថេរ (`keygen-supabase-admin-test` ៖ XSS model)'
     },
 };
 

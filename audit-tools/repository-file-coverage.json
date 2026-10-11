@@ -607,6 +607,14 @@
       ],
       "evidence": "រត់ prepare-audit-cache.sh ពិតដោយ runner fixture ៤ស្របគ្នា៖ download មិនជាន់ · browser ទាញរួចត្រូវ reuse · RTDB size/checksum ខុសត្រូវទាញជួសជុល · cache ត្រូវមិនទាញ · download fail ត្រូវធ្លាក់។",
       "limitation": "Network downloads និង Docker named volume ពិតមិនរត់ក្នុង fixture; ល្បឿន និង ownership លើ PC ត្រូវផ្ទៀងដោយម្ចាស់គម្រោង។"
+    },
+    "setup-lookup": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "រត់កូដលក់ពិត និង decrypt ពិត រួមការពារ URL កែ · កូដខុស · logout · កូនសោក្នុង storage។",
+      "limitation": "សាក Web Crypto ក្នុង Node និង UI harness; មិនជំនួសការសាកលើទូរស័ព្ទពិត។"
     }
   },
   "files": {
@@ -1593,6 +1601,9 @@
     "ZoeW/src/features/device-info.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/shop-device.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/entry-ops.ts": {
       "policy": "zoew-app"
     },
@@ -2152,6 +2163,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/shop-pending-cleanup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-bound-ui-refresh.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/shop-device-note.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-cookie-life.test.ts": {
@@ -2961,6 +2978,9 @@
     "supabase/migrations/20261009035130_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261010140000_zoe_member_devices.sql": {
+      "policy": "supabase-db"
+    },
     "supabase/package-lock.json": {
       "policy": "supabase-config"
     },
@@ -3128,6 +3148,12 @@
     },
     "ZoeW/tests/exchange-rate-backend-switch.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup-lookup.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/setup-lookup.ts": {
+      "policy": "setup-lookup"
     }
   }
 }

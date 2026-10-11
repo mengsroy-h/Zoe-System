@@ -462,13 +462,24 @@ const GESTURE = function (steps) {
     const ptrPhone = await measurePtrAt(412, 780);
     ok('ទូរស័ព្ទ (412px) ៖ ទាញដល់ ready ពិត (លក្ខខណ្ឌចាំបាច់)', ptrPhone.ready && !ptrPhone.tabAtTop && !ptrPhone.reloaded, ptrPhone);
     ok('ទូរស័ព្ទ ៖ សញ្ញា PTR ពេល ready មិនជាន់ navbar', ptrPhone.gap >= 0, ptrPhone);
-    for (const [w, h, label] of [[1280, 800, 'tablet ផ្តេក 1280×800'], [1194, 834, 'iPad ផ្តេក 1194×834'], [800, 1280, 'tablet បញ្ឈរ 800×1280']]) {
+    for (const [w, h, label] of [[1280, 800, 'tablet ផ្តេក 1280×800'], [1194, 834, 'iPad ផ្តេក 1194×834'], [800, 1280, 'tablet បញ្ឈរ 800×1280'],
+        [768, 1024, 'tablet បញ្ឈរ 768×1024'], [991, 1280, 'ព្រំដែនរបាខាងក្រោម 991px'], [992, 1280, 'ព្រំដែនរបាខាងលើ 992px']]) {
         const m = await measurePtrAt(w, h);
         const wide = w >= 992;
         ok(`${label} ៖ ទាញដល់ ready ពិត · របា Tab ${wide ? 'នៅខាងលើ' : 'នៅខាងក្រោម'} (លក្ខខណ្ឌចាំបាច់)`,
             m.ready && m.tabAtTop === wide && !m.reloaded, m);
         ok(`${label} ៖ សញ្ញា PTR ពេល ready មិនជាន់របាខាងលើ (navbar${wide ? ' + Tab' : ''})`, m.gap >= 0, m);
         ok(`${label} ៖ គម្លាតពីរបាខាងលើស្មើទូរស័ព្ទ (${ptrPhone.gap}px ±2)`, Math.abs(m.gap - ptrPhone.gap) <= 2, { tablet: m.gap, phone: ptrPhone.gap });
+        console.log('  វាស់ PTR ៖ ' + JSON.stringify({ label, ...m }));
+    }
+    await page.evaluate(() => { document.querySelector('.app-navbar').style.minHeight = '100px'; });
+    try {
+        const taller = await measurePtrAt(800, 1280);
+        ok('navbar កើនកម្ពស់ពេល App បើក ៖ ready ពិត និងបានវាស់កម្ពស់ថ្មី', taller.ready && taller.navBottom >= 100 && !taller.reloaded, taller);
+        ok('navbar កើនកម្ពស់ពេល App បើក ៖ គម្លាត PTR ស្មើទូរស័ព្ទ ±2px', Math.abs(taller.gap - ptrPhone.gap) <= 2, taller);
+        console.log('  វាស់ PTR navbar ខ្ពស់ ៖ ' + JSON.stringify(taller));
+    } finally {
+        await page.evaluate(() => { document.querySelector('.app-navbar').style.removeProperty('min-height'); });
     }
     await page.setViewportSize({ width: 412, height: 780 });
     await page.waitForTimeout(450);

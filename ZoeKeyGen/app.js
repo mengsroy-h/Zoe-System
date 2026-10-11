@@ -637,6 +637,10 @@ function liveToastState(key) {
 
 function invalidateSensitiveSession() {
     sensitiveSessionGeneration++;
+    const setupSecret = document.getElementById('setupLookupSecretInput');
+    if (setupSecret) setupSecret.value = '';
+    const setupCode = document.getElementById('setupLookupCodeOutput');
+    if (setupCode) setupCode.textContent = '';
 }
 
 function captureSensitiveSession(requireAuthorizedUi) {
@@ -1615,6 +1619,11 @@ function showLoginModalWithPrefill() {
     clearGeneratedKeyResult();
 
     lastGeneratedSetupLink = '';
+    lookupSetupGeneration++;
+    const lookupSecretInput = document.getElementById('setupLookupSecretInput');
+    if (lookupSecretInput) lookupSecretInput.value = '';
+    const lookupCodeOutput = document.getElementById('setupLookupCodeOutput');
+    if (lookupCodeOutput) lookupCodeOutput.textContent = '';
     const setupLinkConfigInput = document.getElementById('setupLinkConfigInput');
     if (setupLinkConfigInput) setupLinkConfigInput.value = '';
     const setupLinkResultText = document.getElementById('setupLinkResultText');
@@ -2292,6 +2301,7 @@ function copyGeneratedKey() {
 const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ZOE';
 const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ZOE';
 let lastGeneratedSetupLink = '';
+let lookupSetupGeneration = 0;
 
 function setupLinkDsnIsValid(dsn) {
     if (typeof dsn !== 'string' || !dsn) return false;
@@ -2319,7 +2329,57 @@ function restoreSetupLinkBaseUrl() {
     }
 }
 
+function lookupSetupMetadata(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('bad lookup');
+    if ('headerValue' in value || 'code' in value || 'setupCode' in value) throw new Error('plaintext lookup');
+    if (typeof value.url !== 'string' || value.url.length > 4096 || !value.url.includes('{barcode}')) throw new Error('bad lookup URL');
+    const url = value.url.trim();
+    const destination = new URL(url);
+    if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('bad lookup URL');
+    if (typeof value.enabled !== 'boolean' || typeof value.fastMode !== 'boolean') throw new Error('bad lookup flags');
+    const headerName = typeof value.headerName === 'string' ? value.headerName.trim() : '';
+    if (headerName.length > 128 || (headerName && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(headerName))) throw new Error('bad lookup header');
+    const fields = {};
+    for (const name of ['phoneField', 'codField', 'dodField']) {
+        const field = value[name];
+        if (typeof field !== 'string' || !field.trim() || field.length > 128) throw new Error('bad lookup field');
+        fields[name] = field.trim();
+    }
+    return { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+}
+
+function lookupSetupAad(value) {
+    return new TextEncoder().encode('zoe-setup-lookup-v1\n' + JSON.stringify(lookupSetupMetadata(value)));
+}
+
+function lookupSetupCode() {
+    const sample = new Uint32Array(1);
+    for (let attempt = 0; attempt < 16; attempt++) {
+        crypto.getRandomValues(sample);
+        if (sample[0] < 4294000000) return String(sample[0] % 1000000).padStart(6, '0');
+    }
+    throw new Error('lookup randomness unavailable');
+}
+
+async function encryptSetupLookup(metadata, secret, code) {
+    if (!/^\d{6}$/.test(code) || typeof secret !== 'string' || secret.length > 4096) throw new Error('bad lookup secret');
+    const plaintext = new TextEncoder().encode(secret);
+    if (plaintext.length > 4096) throw new Error('bad lookup secret');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 300000 }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: lookupSetupAad(metadata) }, key, plaintext);
+    const base64 = (bytes) => btoa(String.fromCharCode(...bytes));
+    return { v: 1, salt: base64(salt), iv: base64(iv), ct: base64(new Uint8Array(cipher)), iter: 300000 };
+}
+
 function generateSetupLink() {
+    lookupSetupGeneration++;
+    const lookupChoice = document.getElementById('setupLookupIncludeCheckbox');
+    if (lookupChoice && lookupChoice.checked) return generateLookupSetupLink();
+    const codeOutput = document.getElementById('setupLookupCodeOutput');
+    if (codeOutput) codeOutput.textContent = '';
     const urlInput = document.getElementById('setupLinkUrlInput');
     const cfgInput = document.getElementById('setupLinkConfigInput');
     const resultBox = document.getElementById('setupLinkResultBox');
@@ -2329,7 +2389,17 @@ function generateSetupLink() {
     const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
     if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
 
-    const normalized = readNormalizedFirebaseConfig(cfgInput);
+    let candidate;
+    try { candidate = JSON.parse(cfgInput.value); } catch (e) {}
+    let normalized;
+    if (candidate && (candidate.supabaseUrl || candidate.supabaseKey)) {
+        const problem = sbAdminConfigProblem(candidate.supabaseUrl, candidate.supabaseKey);
+        if (problem) { alert(problem); return; }
+        const config = { supabaseUrl: candidate.supabaseUrl.trim().replace(/\/+$/, ''), supabaseKey: candidate.supabaseKey.trim() };
+        if (typeof candidate.loginDomain === 'string') config.loginDomain = candidate.loginDomain;
+        if (typeof candidate.invite === 'string') config.invite = candidate.invite;
+        normalized = { config, extras: [] };
+    } else normalized = readNormalizedFirebaseConfig(cfgInput);
     if (!normalized) return;
     const parsed = normalized.config;
     if (normalized.extras.length) showToast('ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
@@ -2362,6 +2432,69 @@ function generateSetupLink() {
     } catch (e) {
         if (qrContainer) qrContainer.innerHTML = '';
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+    }
+}
+
+async function generateLookupSetupLink() {
+    const session = captureSensitiveSession(true);
+    if (!session) return;
+    const generation = ++lookupSetupGeneration;
+    const current = () => generation === lookupSetupGeneration && isSensitiveSessionCurrent(session, true);
+    const element = (id) => document.getElementById(id);
+    const value = (id) => element(id) ? element(id).value.trim() : '';
+    const checked = (id) => !!(element(id) && element(id).checked);
+    let secret = value('setupLookupSecretInput');
+    let code = '';
+    lastGeneratedSetupLink = '';
+    if (element('setupLookupSecretInput')) element('setupLookupSecretInput').value = '';
+    if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '';
+    if (element('setupLinkResultText')) element('setupLinkResultText').textContent = '';
+    if (element('setupLinkQrContainer')) element('setupLinkQrContainer').innerHTML = '';
+    if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.add('hidden');
+    try {
+        const base = new URL(value('setupLinkUrlInput'));
+        if (base.protocol !== 'https:' || base.username || base.password) throw new Error('bad base');
+        base.search = '';
+        base.hash = '';
+        const payload = {};
+        const raw = value('setupLinkConfigInput');
+        if (raw) {
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch (e) {}
+            if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
+                const problem = sbAdminConfigProblem(parsed.supabaseUrl, parsed.supabaseKey);
+                if (problem) throw new Error('bad backend');
+                payload.supabaseUrl = parsed.supabaseUrl.trim().replace(/\/+$/, '');
+                payload.supabaseKey = parsed.supabaseKey.trim();
+                if (typeof parsed.loginDomain === 'string') payload.loginDomain = parsed.loginDomain;
+                if (typeof parsed.invite === 'string') payload.invite = parsed.invite;
+            } else {
+                const normalized = normalizeFirebaseConfig(raw);
+                Object.assign(payload, normalized.config);
+            }
+        }
+        const dsn = value('setupLinkDsnInput');
+        if (dsn && !setupLinkDsnIsValid(dsn)) throw new Error('bad dsn');
+        if (dsn && raw) payload.dsn = dsn;
+        const lookup = lookupSetupMetadata({ url: value('setupLookupUrlInput'), enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' });
+        if (secret && !lookup.headerName) throw new Error('missing header');
+        code = lookupSetupCode();
+        lookup.keyEnc = await encryptSetupLookup(lookup, secret, code);
+        secret = '';
+        if (!current()) return;
+        payload.lookup = lookup;
+        base.searchParams.set('setup', btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+        lastGeneratedSetupLink = base.href;
+        if (element('setupLinkResultText')) element('setupLinkResultText').textContent = lastGeneratedSetupLink;
+        if (element('setupLookupCodeOutput')) element('setupLookupCodeOutput').textContent = '🔐 ' + code + ' — ប្រាប់អ្នកទទួលដាច់ដោយឡែកពី Link/QR ហើយកត់ទុកឥឡូវនេះ។';
+        if (element('setupLinkResultBox')) element('setupLinkResultBox').classList.remove('hidden');
+        safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
+        renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
+    } catch (e) {
+        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ URL HTTPS ដែលមាន {barcode} · Header · Config Firebase/Supabase។');
+    } finally {
+        secret = '';
+        code = '';
     }
 }
 

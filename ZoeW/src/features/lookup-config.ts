@@ -60,6 +60,16 @@ export function openLookupApiConfigModal() {
     openModalHelper('lookupApiConfigModal');
 }
 
+export function storeLookupApiConfig(cfg) {
+    if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
+        alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
+        return false;
+    }
+    clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
+    return true;
+}
+
 export async function saveLookupApiConfig() {
     let url = fieldValue('lookupApiUrlInput').trim();
     let enabled = fieldChecked('lookupApiEnabledCheckbox');
@@ -109,12 +119,7 @@ export async function saveLookupApiConfig() {
     const shop = shopScope();
     if (shop) cfg.shop = shop;
 
-    if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
-        alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
-        return;
-    }
-    clearCustomerDataTableCache();
-    clearZtoPickupStatusStore();
+    if (!storeLookupApiConfig(cfg)) return;
     setFieldValue('lookupApiHeaderValueInput', '');
     closeModal('lookupApiConfigModal');
     refreshShopBoundUi();

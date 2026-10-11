@@ -172,6 +172,8 @@
 
 #### អ្វីដែលខុសពីមុន
 
+- 🔄 **PTR នៅ tablet និងពេល navbar កើនកម្ពស់** (ម្ចាស់ស្នើកែ PTR · branch មិនទាន់ merge ➜ កំណែដដែល)៖ indicator យកកម្ពស់ navbar ដែល App វាស់រួចតាម `--chrome-top`។ មុនកែ tablet 768/800/991px មានចន្លោះ 7px ទល់នឹងទូរស័ព្ទ 10.2px; navbar 100px ធ្វើឱ្យ indicator ជាន់របា។ `gesture-test` ប្រើ touch ពិតក្នុង Chromium ដើម្បីចាប់កំហុសទាំងនេះ និងព្រំដែន 992px; មិនប្ដូរកម្រិតទាញ ឬការសម្រេច refresh។ មុន merge ត្រូវសាកលើ iPhone និង Android ពិត៖ ទាញស្រាល · ទាញដល់ ready · បោះបង់ · refresh · បង្វិលអេក្រង់ និងពិនិត្យ safe-area។ ការវាស់ក្នុង Cloud មិនជំនួសឧបករណ៍ពិតទេ។
+- 🔗 **Setup Link/QR រួម API ស្វែងរកអតិថិជន** (សំណើម្ចាស់ · branch មិនទាន់ merge ➜ កំណែដដែល)៖ មុននេះ Link ភ្ជាប់តែ backend។ កាត ZoeKeyGen បញ្ចូល URL HTTPS · Header · mapping · Fast Mode · enabled និងបង្កើតកូដ ៦ ខ្ទង់ពី Web Crypto។ PBKDF2-SHA256 300000 + AES-GCM ចាក់សោ Header និងផ្ទៀងផ្ទាត់ metadata ដើម្បីទប់ការកែ URL។ ZoeW ឆ្លង PIN · បង្ហាញ host · ចុចភ្ជាប់ · សួរកូដ ➜ encrypt កូនសោក្នុងម៉ាស៊ីន និងចងហាង។ lookup-only សម្រាប់ហាងភ្ជាប់រួច; combined សម្រាប់ Firebase/Supabase ថ្មី។ កូដខុស/បោះបង់/logout កណ្ដាល crypto ➜ គ្មានការរក្សាទុក។ អ្នកយាម `tests/setup-lookup.test.tsx` រត់កូដលក់ និងកូដទទួលពិត; `secret-hygiene` លាក់ `keyEnc` និងកូដ។ **សកម្មភាពដោយដៃ**៖ បង្កើត Link ថ្មី · កត់កូដ និងប្រាប់ដាច់ដោយឡែក · អ្នកទទួលវាយ PIN និងកូដ។ គ្មាន migration/env/rules ថ្មីសម្រាប់ Lookup។
 - 🚚 **ហាង Supabase** ៖ បើក App (ស្តារ session) ➜ ប៊ូតុង «📥 បញ្ជី ZTO» នៅក្បាលប្រវត្តិលេចភ្លាមពេលគណនីស្គាល់ហាង ហើយក្រុម ZTO ក្នុង ☰ គណនាឡើងវិញព្រមគ្នា។
   មុនកែ ៖ ការកំណត់ API ZTO ចងហាង ([2.50.53] ជុំ ៤) ➜ boot គណនាប៊ូតុងមុន SDK Supabase និងគណនីមកដល់ (ហាងមិនទាន់ស្គាល់ ➜ «មិនមែនហាងនេះ» ➜ លាក់) ហើយគ្មានអ្វីគណនា
   ឡើងវិញ រហូតបើក ☰ (`openSideDrawer()`)។ Firebase ស្គាល់ហាងពី `databaseURL` តាំងពី boot ➜ មិនរងផលប៉ះពាល់។
@@ -5802,3 +5804,4 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ | — |

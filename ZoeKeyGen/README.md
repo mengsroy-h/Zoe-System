@@ -44,7 +44,7 @@
 ### Setup Link និង QR
 
 បង្កើត `https://<app-site>/?setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
-មិនបាច់វាយ Firebase Config ដោយដៃ។ Base URL ចងចាំទុករវាងវគ្គ។
+មិនបាច់វាយ Config Firebase/Supabase ដោយដៃ។ Base URL ចងចាំទុករវាងវគ្គ។
 
 វាល **Sentry DSN** (ស្រេចចិត្ត · ចងចាំទុកដែរ) ដាក់ការរាយការណ៍កំហុសចូល Link
 ផងដែរ ➜ ឧបករណ៍អតិថិជនផ្ញើកំហុសមកអ្នកដោយស្វ័យប្រវត្តិ ដោយមិនបាច់វាយ DSN
@@ -136,10 +136,12 @@ Firebase rules របស់ **License Project** (`ZoeKeyGen/firebase-database.ru
 ### ៤. Provision ឧបករណ៍ថ្មីលឿន (Setup Link / QR)
 
 1. កាត «បង្កើត Setup Link» ➜ បញ្ចូល **Base URL** របស់ site ZoeW។
-2. Paste **Firebase Config** របស់ Project អាជីវកម្ម។
+2. Paste **Firebase Config** ឬ **Supabase Config JSON** (`supabaseUrl` · `supabaseKey` · `invite` ស្រេចចិត្ត) របស់ហាង។ Link មានតែ API ➜ ទុក Config ទទេ។
 3. (ស្រេចចិត្ត) បំពេញ **Sentry DSN** ➜ កំហុសលើឧបករណ៍អតិថិជនមកដល់អ្នក។
 4. ចុចបង្កើត ➜ ចែក **Link** ឬឲ្យអតិថិជនស្កេន **QR** · **💾 រក្សាទុក QR (រូបភាព)** ➜ ទាញយក QR ជា PNG (ផ្ញើតាម Telegram · បោះពុម្ព)។
-5. ខាង ZoeW ៖ Config បំពេញស្វ័យប្រវត្តិ ➜ អ្នកប្រើវាយ PIN ➜ រក្សាទុក។
+5. ខាង ZoeW ៖ វាយ PIN ➜ ពិនិត្យ host របស់ Server/API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់បើ Link មាន API។
+
+**API ស្វែងរកអតិថិជន** ៖ គូស «ដាក់ API ក្នុង Link/QR» ➜ URL HTTPS មាន `{barcode}` · ឈ្មោះ/កូនសោ Header · ជួរឈរ phone/cod/dod · Fast Mode · បើក API។ កូដ ៦ ខ្ទង់បង្ហាញពេលបង្កើតតែប៉ុណ្ណោះ៖ កត់ទុកភ្លាម ហើយប្រាប់ដាច់ដោយឡែកពី Link/QR។ កូនសោមិននៅក្នុង Link ជាអក្សរធម្មតា ហើយ logout សម្អាតកូដ និងកូនសោ។ Google Apps Script មិនទទួល Header។
 
 ### ៥. Revoke · Extend · ដោះឧបករណ៍
 

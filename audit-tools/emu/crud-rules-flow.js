@@ -177,7 +177,7 @@ function makeSandbox(store, now) {
     const ctx = vm.createContext({
         console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
         navigator: { onLine: true },
-        db: {}, authGeneration: 0, fb,
+        db: {}, authGeneration: 0, isInitializingFirebase: false, fb,
         // `cleanupJournalScope()` អាន `auth` តែលើ Config Supabase (Firebase ➜ `databaseURL` មុន) ➜ គ្មាន user ក្នុង sandbox នេះ
         auth: null,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),

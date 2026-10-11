@@ -165,6 +165,25 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeKeyGen 2.24.16] — 2026-10-11 · Setup Lookup ៖ ទទួល URL របស់ ZTO ដែលចាប់ផ្ដើម `/`
+
+**ZoeKeyGen `2.24.16`** (`zoekeygen-v126` ➜ `zoekeygen-v127`)។ ZoeW `2.50.54` / `zoew-v317` ដដែល; កែតែកូដអ្នកបង្កើត Link និងតេស្ត។
+
+#### អ្វីដែលខុសពីមុន
+
+- ម្ចាស់រាយការណ៍ Setup Lookup របស់ ZTO បង្កើត Link មិនបាន និងផ្ដល់ `/.netlify/functions/zto-order-detail?barcode={barcode}`។ ផ្លូវនេះត្រឹមត្រូវតាមការកំណត់ ZoeW ប៉ុន្តែ producer ទាមទារ HTTPS ពេញ។ ឥឡូវ ផ្លូវចាប់ផ្ដើម `/` បំពេញ origin ពី Base URL របស់ ZoeW មុនចាក់សោ Header; មិនយក domain របស់ ZoeKeyGen ហើយមិនយក subpath/query/hash របស់ Base URL។ URL HTTPS ពេញរបស់ proxy ផ្សេងនៅដដែល។
+- វាល URL បង្ហាញទម្រង់ ZTO និងពន្យល់ domain គោលដៅ។ Link មាន HTTPS ពេញ ដែល receiver ផ្ទៀងផ្ទាត់បានដោយ AAD ដដែល។ HTTP, protocol-relative (`//`), userinfo និង URL គ្មាន `{barcode}` នៅតែបដិសេធ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/setup-lookup.test.tsx` រត់ producer ពិត ➜ receiver ពិត៖ relative ZTO + Base URL មាន subpath/query/hash ➜ decrypt និង local encrypted storage; HTTPS proxy ផ្សេង; placeholder ក្នុង path; URL មិនត្រឹមត្រូវ។ ករណី ZTO ថ្មីធ្លាក់លើ source មុនកែ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. Deploy ZoeKeyGen ➜ បិទហើយបើក App ឱ្យបានកំណែ `2.24.16`។ មិនមាន migration/env/rules ថ្មី។
+២. Base URL ដាក់ site របស់ ZoeW គោលដៅ; URL API ដាក់ `/.netlify/functions/zto-order-detail?barcode={barcode}`; Header `X-Zoe-Proxy-Key` និងកូនសោ ➜ បង្កើត Link/QR ថ្មី ហើយប្រាប់កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។ API នៅ domain ផ្សេងត្រូវប្រើ HTTPS ពេញ។
+៣. អ្នកទទួលឆ្លង PIN ពិនិត្យ destination និងវាយកូដ ➜ សាក Lookup បាកូដ។ បើ producer នៅកំណែចាស់ អាចបញ្ចូល URL HTTPS ពេញរបស់ ZoeW បាន។
+
 ### [2.50.54] — 2026-10-10 · ZoeW ៖ **ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App (មិនរង់ចាំបើក ☰)** (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309 ៖ «ពេលបើក app ដំបូងអត់មានប៊ូតុង បញ្ជីZTO … តែគ្រាន់តែចុចបើក side menu លេចប៊ូតុង បញ្ជីZTO ភ្លាម ។ ដោយឡែក firebase អត់អីទេ») · ZoeW + ZoeKeyGen `2.24.15` ៖ **ហាង Supabase កត់ model · Serial ទូរស័ព្ទ ដូចកៅអី Key** (សំណើម្ចាស់គម្រោង ៖ «ចង់អោយ Supabase រក្សា model និង serrial id ដូច activate key ដែល» ➜ ជ្រើស «កត់ និងបង្ហាញប៉ុណ្ណោះ»)
 
 **ZoeW `2.50.54`** (`zoew-v316` ➜ `zoew-v317`) · **ZoeKeyGen `2.24.15`** (`zoekeygen-v125` ➜ `zoekeygen-v126`)។ migration Supabase ថ្មី `20261010140000_zoe_member_devices.sql` ·

@@ -167,8 +167,9 @@ const firebaseConfig = {
         <fieldset style="border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
             <legend>🔎 API ស្វែងរកអតិថិជន</legend>
             <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" style="width:auto; margin:0;" id="setupLookupIncludeCheckbox"> ដាក់ API ក្នុង Link/QR</label>
-            <label for="setupLookupUrlInput">URL HTTPS ដែលមាន {barcode}</label>
-            <input type="url" id="setupLookupUrlInput" autocomplete="off" spellcheck="false" placeholder="https://example.com/api?barcode={barcode}">
+            <label for="setupLookupUrlInput">URL API ដែលមាន {barcode} — HTTPS ឬផ្លូវចាប់ផ្ដើម /</label>
+            <input type="text" id="setupLookupUrlInput" autocomplete="off" spellcheck="false" placeholder="/.netlify/functions/zto-order-detail?barcode={barcode}">
+            <p>ផ្លូវចាប់ផ្ដើម / ប្រើ domain ពី Base URL របស់ ZoeW ខាងលើ។ URL HTTPS ពេញប្រើ domain របស់វា។</p>
             <label for="setupLookupHeaderInput">ឈ្មោះ Header (ឧ. X-Zoe-Proxy-Key)</label>
             <input type="text" id="setupLookupHeaderInput" autocomplete="off" spellcheck="false">
             <label for="setupLookupSecretInput">កូនសោ Header សម្ងាត់</label>

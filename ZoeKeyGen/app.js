@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.15';
+const APP_VERSION = '2.24.16';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2476,7 +2476,9 @@ async function generateLookupSetupLink() {
         const dsn = value('setupLinkDsnInput');
         if (dsn && !setupLinkDsnIsValid(dsn)) throw new Error('bad dsn');
         if (dsn && raw) payload.dsn = dsn;
-        const lookup = lookupSetupMetadata({ url: value('setupLookupUrlInput'), enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' });
+        const rawLookupUrl = value('setupLookupUrlInput');
+        const lookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
+        const lookup = lookupSetupMetadata({ url: lookupUrl, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' });
         if (secret && !lookup.headerName) throw new Error('missing header');
         code = lookupSetupCode();
         lookup.keyEnc = await encryptSetupLookup(lookup, secret, code);
@@ -2491,7 +2493,7 @@ async function generateLookupSetupLink() {
         safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, base.origin + base.pathname);
         renderQrInto(element('setupLinkQrContainer'), lastGeneratedSetupLink);
     } catch (e) {
-        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ URL HTTPS ដែលមាន {barcode} · Header · Config Firebase/Supabase។');
+        if (current()) alert('មិនអាចបង្កើត Setup Link បានទេ! សូមពិនិត្យ Base URL HTTPS · URL API ដែលមាន {barcode} · Header · Config Firebase/Supabase។');
     } finally {
         secret = '';
         code = '';

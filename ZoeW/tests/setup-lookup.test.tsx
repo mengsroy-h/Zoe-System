@@ -81,6 +81,56 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         expect(h.element('setupLookupCodeOutput').textContent).toBe('');
         expect(h.writes).toEqual([]);
     });
+    it('ZTO URL ចាប់ផ្ដើម / ➜ domain របស់ ZoeW គោលដៅ · Header បើកបាន និងរក្សាទុក', async () => {
+        const h = producerHarness();
+        h.element('setupLinkUrlInput').value = 'https://shop.zoew.example/app/?old=1#tab';
+        h.element('setupLookupUrlInput').value = '/.netlify/functions/zto-order-detail?barcode={barcode}';
+        h.element('setupLookupFastCheckbox').checked = true;
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        expect(payload.lookup.url).toBe('https://shop.zoew.example/.netlify/functions/zto-order-detail?barcode={barcode}');
+        expect(payload.lookup.fastMode).toBe(true);
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
+        vi.mocked(prompt).mockReturnValue(code);
+        expect(await connectSetupPayload(payload, 'Setup Link')).toBe(true);
+        const config = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!);
+        expect(config.url).toBe(payload.lookup.url);
+        expect(config.fastMode).toBe(true);
+        expect(await decryptLookupSecret(config.headerValueEnc)).toBe('seller-private-header');
+    });
+    it('URL HTTPS ពេញ ➜ មិនប្ដូរ domain ទៅ Base URL', async () => {
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = 'https://proxy.example/.netlify/functions/zto-order-detail?barcode={barcode}';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        expect(payload.lookup.url).toBe(h.element('setupLookupUrlInput').value);
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
+    });
+    it('URL ផ្លូវ / ដែលមាន barcode ក្នុង path ➜ placeholder នៅដដែល', async () => {
+        const h = producerHarness();
+        h.element('setupLookupUrlInput').value = '/api/{barcode}?mode=fast';
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        expect(payload.lookup.url).toBe('https://zoew.example/api/{barcode}?mode=fast');
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
+    });
+    it('ផ្លូវ / មិនបើកច្រក URL HTTP · protocol-relative · userinfo · គ្មាន barcode', async () => {
+        for (const url of ['http://proxy.example/?barcode={barcode}', '//proxy.example/?barcode={barcode}', 'https://secret@proxy.example/?barcode={barcode}', '/.netlify/functions/zto-order-detail']) {
+            const h = producerHarness();
+            h.element('setupLookupUrlInput').value = url;
+            await h.ctx.generateLookupSetupLink();
+            expect(h.ctx.alert).toHaveBeenCalledOnce();
+            expect(h.ctx.lastGeneratedSetupLink).toBe('');
+            expect(h.element('setupLookupCodeOutput').textContent).toBe('');
+            expect(h.writes).toEqual([]);
+        }
+    });
     it('កូដ ៦ ខ្ទង់មានសូន្យខាងមុខ និងមិនប្រើ Math.random', () => {
         for (let i = 0; i < 30; i++) expect(seller.lookupSetupCode()).toMatch(/^\d{6}$/);
         const fn: any = funcs.find((n: any) => n.id.name === 'lookupSetupCode');

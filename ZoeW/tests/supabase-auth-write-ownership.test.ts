@@ -58,3 +58,35 @@ it('real supabase-js: a refresh pending beyond cached restoration can still repl
   const stored = JSON.parse(rows.get(SB_AUTH_STORAGE_KEY)!); transport.close();
   expect(stored.access_token).toBe(fresh.access_token);
 });
+it('real supabase-js: a pending restoration refresh cannot publish auth storage after logout', async () => {
+  vi.useFakeTimers(); vi.stubGlobal('BroadcastChannel', undefined);
+  const rows = new Map([[SB_AUTH_STORAGE_KEY, JSON.stringify({ ...session('A'), expires_at: Math.floor(Date.now() / 1000) - 3600 })]]);
+  let signedOut = false;
+  const staleWrites: string[] = [];
+  const storage = { getItem: (k: string) => rows.get(k) ?? null, setItem: (k: string, v: string) => {
+    if (signedOut && k === SB_AUTH_STORAGE_KEY) staleWrites.push(JSON.parse(v).user.id);
+    rows.set(k, v);
+  }, removeItem: (k: string) => rows.delete(k) };
+  const emptyStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const pending = deferred<Response>(); let requests = 0;
+  const transport = createSupabaseTransport({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' },
+    { localStorage: storage, sessionStorage: emptyStorage, eventTarget: new EventTarget(), fetch: async (url: any) => {
+      if (String(url).includes('grant_type=refresh_token')) {
+        requests++;
+        if (requests === 1) return pending.promise;
+        return new Response(JSON.stringify(session('A')), { status: 200 });
+      }
+      return new Response(null, { status: 204 });
+    } });
+  const restored = transport.restoreSession(); await turn();
+  expect(requests).toBe(1);
+  await vi.advanceTimersByTimeAsync(SB_RESTORE_CEILING_MS + 1); expect((await restored)?.user.id).toBe('A');
+  const logout = transport.signOut(); await vi.advanceTimersByTimeAsync(SB_SIGN_OUT_CEILING_MS + 1); await logout;
+  expect(rows.get(SB_AUTH_STORAGE_KEY)).toBeUndefined();
+  signedOut = true;
+  pending.resolve(new Response(JSON.stringify(session('A')), { status: 200 }));
+  await vi.advanceTimersByTimeAsync(5000);
+  const stored = rows.get(SB_AUTH_STORAGE_KEY); transport.close();
+  expect(staleWrites).toEqual([]);
+  expect(stored).toBeUndefined();
+});

@@ -3154,6 +3154,12 @@
     },
     "ZoeW/src/services/setup-lookup.ts": {
       "policy": "setup-lookup"
+    },
+    "ZoeW/tests/ios-history-bottom.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/phone-suggest-idle-scroll.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

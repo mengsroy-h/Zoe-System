@@ -5851,3 +5851,5 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |

@@ -3222,6 +3222,30 @@
     },
     "ZoeW/tests/sdk-listener-owner.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/auth-flow-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/password-save-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-expiry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-realtime-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-sync-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tenant-app-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/exchange-rate-completion-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-auth-write-ownership.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

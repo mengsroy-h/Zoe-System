@@ -418,7 +418,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             return overlay.has(k) ? overlay.get(k) : serverDoc(root, key);
         };
         for (const w of pending) {
-            if (!w.overlay || w.scope !== authScope) continue;
+            if (!w.overlay || w.scope !== authScope || w.topic !== tenantTopic) continue;
             applyOpsToDocs(getDoc, w.ops).forEach((v, k) => overlay.set(k, v));
         }
         return getDoc;
@@ -429,7 +429,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (!path.length) {
             const out = {};
             const roots = new Set(server.keys());
-            for (const w of pending) if (w.overlay && w.scope === authScope) for (const op of w.ops) roots.add(op.p[0]);
+            for (const w of pending) if (w.overlay && w.scope === authScope && w.topic === tenantTopic) for (const op of w.ops) roots.add(op.p[0]);
             roots.forEach((root) => {
                 const v = getDoc(root, null);
                 if (v !== null) out[root] = v;
@@ -644,15 +644,21 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             while (wantSync && !closed) {
                 wantSync = false;
                 const epoch = sessionEpoch;
+                const syncScope = authScope;
+                const syncTopic = tenantTopic;
+                const syncAuthed = authed;
+                const syncIsCurrent = () => epoch === sessionEpoch && syncScope === authScope && syncTopic === tenantTopic && syncAuthed === authed;
                 if (!online || (navigator.onLine as boolean) === false) { setConnected(false); break; }
                 if (!authed) {
                     try {
                         await transport.ping(rpcTimeoutMs);
                         if (closed) return;
+                        if (!syncIsCurrent()) { cacheTried = false; wantSync = true; continue; }
                         retryAttempt = 0;
                         setConnected(true);
                     } catch (e) {
                         if (closed) return;
+                        if (!syncIsCurrent()) { wantSync = true; continue; }
                         setConnected(false);
                         scheduleRetry();
                         break;
@@ -665,7 +671,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         const scope = cacheScope;
                         const rec = await loadCacheWithin(scope);
                         if (closed) return;
-                        if (epoch !== sessionEpoch) { wantSync = true; continue; }
+                        if (!syncIsCurrent()) { cacheTried = false; wantSync = true; continue; }
                         if (scope === cacheScope && authed && cursor === 0 && server.size === 0 && docsCacheRecordIsValid(rec, scope)) seedFromCache(rec);
                     }
                 }
@@ -677,7 +683,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         if (cursor > 0 && pullFullHead !== null) args.p_full_head = pullFullHead;
                         const res = await rpc('zoe_pull', args);
                         if (closed) return;
-                        if (epoch !== sessionEpoch) { staleSession = true; break; }
+                        if (!syncIsCurrent()) { staleSession = true; break; }
                         if (cacheTenant !== null) {
                             const sameShop = !!res && typeof res.tenant === 'string' && res.tenant === cacheTenant;
                             cacheTenant = null;
@@ -724,7 +730,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     scheduleCacheSave();
                 } catch (e) {
                     if (closed) return;
-                    if (epoch !== sessionEpoch) { wantSync = true; continue; }
+                    if (!syncIsCurrent()) { wantSync = true; continue; }
                     if (e instanceof SbRpcError && (e.code === '42501' || e.status === 401 || e.status === 403)) {
                         forbidden = e;
                         setConnected(true);
@@ -822,7 +828,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     let writeSeq = 0;
     const enqueueWrite = (ops, path, overlay) => {
-        const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope };
+        const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic };
         let resolveDone;
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
@@ -837,7 +843,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (closed) { settleWrite(w); rejectDone(firebaseLikeError('disconnect', path)); return; }
                 await waitForLink();
                 if (closed) continue;
-                if (authScope !== w.scope) {
+                if (authScope !== w.scope || tenantTopic !== w.topic) {
                     if (authed) { settleWrite(w); notify(); rejectDone(firebaseLikeError('permission_denied', path)); return; }
                     await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                     continue;
@@ -845,17 +851,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 const sendEpoch = sessionEpoch;
                 try {
                     const res = await rpc('zoe_write', { p_op_id: w.opId, p_ops: ops.map((o) => Object.assign({}, o)) });
-                    retryAttempt = 0;
-                    setConnected(true);
-                    if (sendEpoch === sessionEpoch) applyWriteResult(res);
+                    if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) {
+                        retryAttempt = 0;
+                        setConnected(true);
+                        applyWriteResult(res);
+                    }
                     settleWrite(w);
                     notify();
                     resolveDone(res);
                     return;
                 } catch (e) {
                     if (e instanceof SbNetworkError) {
-                        setConnected(false);
-                        scheduleRetry();
+                        if (sendEpoch === sessionEpoch && authScope === w.scope && tenantTopic === w.topic) { setConnected(false); scheduleRetry(); }
                         await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                         continue;
                     }
@@ -997,7 +1004,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let outer;
         const run = async () => {
             const txScope = authScope;
-            const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope: txScope };
+            const txTopic = tenantTopic;
+            const gate: any = { seq: ++writeSeq, keys: opDocKeys({ p: path }), ops: [], overlay: false, scope: txScope, topic: txTopic };
             let release;
             gate.done = new Promise<void>((res) => { release = res; });
             pending.push(gate);
@@ -1031,7 +1039,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     let sendEpoch = sessionEpoch;
                     for (;;) {
                         if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
-                        if (authScope !== txScope) {
+                        if (authScope !== txScope || tenantTopic !== txTopic) {
                             if (authed) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
                             await delay(retrySteps[Math.min(lostAttempts, retrySteps.length - 1)]);
                             continue;
@@ -1045,8 +1053,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                                 if (lost) throw giveUp();
                                 throw rpcFailureToError(e, path);
                             }
-                            setConnected(false);
-                            scheduleRetry();
+                            if (sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic) { setConnected(false); scheduleRetry(); }
                             if (!lost && !e.unsent) {
                                 lost = disconnectError();
                                 txDisconnectResolving.set(outer, lost);
@@ -1058,9 +1065,9 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         }
                     }
-                    setConnected(true);
+                    if (sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic) setConnected(true);
                     if (res && res.ok) {
-                        const current = sendEpoch === sessionEpoch;
+                        const current = sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic;
                         if (current) applyWriteResult(res);
                         notify();
                         const committed = { committed: true, snapshot: new SbSnapshot(ref, res.replayed || !current ? next : cloneCanonical(serverValueAt(path))) };
@@ -1071,6 +1078,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         return committed;
                     }
                     if (res && res.conflict) {
+                        if (sendEpoch !== sessionEpoch || authScope !== txScope || tenantTopic !== txTopic) throw lost ? giveUp() : firebaseLikeError('permission_denied', path);
                         if (lost) {
                             const age = sentAfter > 0 && typeof res.now === 'number' && Number.isFinite(res.now) ? res.now - sentAfter : NaN;
                             if (age >= 0 && age <= SB_OP_REPLAY_SAFE_MS) {
@@ -1134,21 +1142,28 @@ export function createSupabaseDatabase(transport, hooks, options?) {
 
     db.setTenantTopic = (topic) => {
         if (tenantTopic === topic) return;
+        const changedShop = tenantTopic !== null && topic !== null;
         stopRealtime();
         tenantTopic = topic;
+        if (changedShop) resetSyncView();
         startRealtime();
+        if (authed && changedShop) requestSync();
     };
 
     db.setAuthed = (value, scope?) => {
         const next = !!value;
         const nextScope = next && typeof scope === 'string' && scope ? scope : null;
-        if (nextScope !== authScope) markAllDirty();
+        const changedScope = nextScope !== authScope;
+        if (changedScope) {
+            if (authScope !== null && nextScope !== null) resetSyncView();
+            markAllDirty();
+        }
         authScope = nextScope;
         if (nextScope !== cacheScope) {
             cacheScope = nextScope;
             cacheTried = false;
         }
-        if (authed === next) return;
+        if (authed === next) { if (authed && changedScope) requestSync(); return; }
         authed = next;
         if (authed) {
             startRealtime();
@@ -1158,11 +1173,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
     };
 
-    db.resetForSignOut = () => {
+    const resetSyncView = () => {
         sessionEpoch++;
-        authScope = null;
-        stopRealtime();
-        authed = false;
         clearServerView();
         cursor = 0;
         pullFullHead = null;
@@ -1170,7 +1182,6 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         pullStageAbove = 0;
         if (cacheSaveTimer) { clearTimeout(cacheSaveTimer); cacheSaveTimer = null; }
         cacheGeneration++;
-        cacheScope = null;
         cacheTried = false;
         cacheTenant = null;
         serverTenant = null;
@@ -1178,8 +1189,18 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         clearDocsCache();
         ready = false;
         forbidden = null;
-        tenantTopic = null;
         listeners.forEach((l: any) => { l.fired = false; l.last = null; });
+        markAllDirty();
+        setConnected(false);
+    };
+
+    db.resetForSignOut = () => {
+        stopRealtime();
+        authScope = null;
+        authed = false;
+        cacheScope = null;
+        tenantTopic = null;
+        resetSyncView();
     };
 
     db.onBrowserOnline = () => {

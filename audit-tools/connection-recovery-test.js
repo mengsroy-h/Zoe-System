@@ -1712,13 +1712,14 @@ function buildContext() {
 {
     const initSrc = sliceFn('initFirebase');
     ok('ស្រង់ initFirebase() បាន', !!initSrc);
+    ok('SDK init harness ៖ namespace មកពីថេរពិតរបស់ App', !!sliceConst('ZTO_SHOP_SWEEP_PATH'));
 
     function runInit(changeConfigMidFlight, withExistingApp) {
         const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
-        const log = { inits: [], toasts: [] };
+        const log = { inits: [], toasts: [], errors: [] };
         let releaseSdk = null;
         const ctx = {
-            console, Promise, JSON, Object, Array, Error, Set, Map, Date,
+            console: { ...console, error: (...args) => { log.errors.push(args.map(String).join(" ")); } }, Promise, JSON, Object, Array, Error, Set, Map, Date,
             setTimeout, clearTimeout, isNaN, String, Number,
             navigator: { onLine: true },
             localStorage: {
@@ -1755,7 +1756,7 @@ function buildContext() {
             'let dailyPickupData = {}, lockerBarcodeIndex = {};',
             'let dailyCollectedData = { "2026-09-12": { OLD_BUSINESS_BARCODE: { c: 9, d: 2 } } };',
             'const FAKE_SDK = { getApps: () => __existingApp ? [{}] : [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => { __log.retryAtDelete = __retryState(); __log.authOffAtDelete = !!__log.oldAuthOff; __existingApp = false; return Promise.resolve(); },',
-            '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
+            '  getAuth: () => ({ currentUser: null }), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
             '  onAuthStateChanged: (a, callback) => { __log.authCallback = callback; return () => {}; } };',
             'let __sdkGate = null;',
             'function waitForFirebaseSDK() { return new Promise((res) => { __sdkGate = () => res(FAKE_SDK); __releaseSdk(__sdkGate); }); }',
@@ -1771,6 +1772,7 @@ function buildContext() {
             'function scheduleFirebaseSdkRetry() {}',
             'function checkPinAndOpenConfig() {}',
             'function showToast(m) { __log.toasts.push(m); }',
+            sliceConst('ZTO_SHOP_SWEEP_PATH') || 'const ZTO_SHOP_SWEEP_PATH = "";',
             sliceFn('withTransactionOutcomeResolution') || 'function withTransactionOutcomeResolution(sdk) { return sdk; }',
             sliceFn('isSupabaseConfig') || 'function isSupabaseConfig() { return false; }',
             'function loadSupabaseFb() { __log.supabaseLoads = (__log.supabaseLoads || 0) + 1; return Promise.reject(new Error("Supabase SDK is not ready")); }',
@@ -1792,11 +1794,13 @@ function buildContext() {
     (async () => {
         const changed = runInit(true);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); changed.release(); }
+        ok("Initialization changed ៖ គ្មានកំហុសដែល catch បាំង", changed.log.errors.length === 0, changed.log.errors);
         ok('⛔ Config ថ្មីដែលរក្សាទុកកណ្តាលការផ្ទុក SDK ➜ ត្រូវយកមកប្រើ មិនត្រូវបាត់',
             changed.log.inits.indexOf('https://new.example') !== -1, changed.log.inits);
 
         const same = runInit(false);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); same.release(); }
+        ok("Initialization same ៖ គ្មានកំហុសដែល catch បាំង", same.log.errors.length === 0, same.log.errors);
         ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
             same.log.inits.length === 1, same.log.inits);
 
@@ -1874,7 +1878,7 @@ function buildContext() {
                     'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
                     'const FAKE_SDK = { getApps: () => (__existingApp ? [{}] : []), initializeApp: (c) => ({ cfg: c }),',
                     '  deleteApp: () => { __log.authOffAtDelete = !!__log.oldAuthOff; __log.generationAtDelete = authGeneration; __existingApp = false; return Promise.resolve(); },',
-                    '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
+                    '  getAuth: () => ({ currentUser: null }), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
                     '  onAuthStateChanged: (a, cb) => (() => {}) };',
                     'function waitForFirebaseSDK() { return new Promise((res) => { __releaseSdk(() => res(FAKE_SDK)); }); }',
                     'function invalidateSensitiveSession() {}',
@@ -1968,6 +1972,7 @@ function buildContext() {
 
         const reconfigured = runInit(false, true);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); reconfigured.release(); }
+        ok("Initialization reconfigured ៖ គ្មានកំហុសដែល catch បាំង", reconfigured.log.errors.length === 0, reconfigured.log.errors);
         ok('Reconfig ៖ បានចូលផ្លូវដោះ Firebase App ចាស់ពិត', reconfigured.log.detachedData === 1 && !reconfigured.ctx.__existingApp);
         ok('Reconfig ៖ ចំណូលប្រចាំថ្ងៃរបស់អាជីវកម្មចាស់មិននៅសល់ក្នុងសតិពេលរង់ចាំ listener ថ្មី',
             Object.keys(reconfigured.ctx.__collected()).length === 0, reconfigured.ctx.__collected());
@@ -1982,9 +1987,11 @@ function buildContext() {
 
         const signedOut = runInit(false);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); signedOut.release(); }
+        ok("Initialization signedOut ៖ គ្មានកំហុសដែល catch បាំង", signedOut.log.errors.length === 0, signedOut.log.errors);
         vm.runInContext([
             'authUnsubscribe = null; authRecoveryTimeout = null; let autoLoginAttempted = false;',
             'function attemptAuthStorageRecovery() {}',
+            sliceFn('loginBackendScope') || 'function loginBackendScope() { return ""; }',
             'function resetClearHistoryOperationState() {}',
             'function clearCustomerDataTableCache() {}',
             'function applyCurrentFilter() {}',

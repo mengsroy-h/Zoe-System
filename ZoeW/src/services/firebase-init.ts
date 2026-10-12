@@ -9,8 +9,11 @@ import { noteShopDevice } from '../features/shop-device';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
+import { clearSensitiveModalFields } from '../features/session';
+import { applyCurrentFilter } from '../features/monthly-report';
+import { renderRecentlyDeleted } from '../features/trash';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
-import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
+import { detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from './db-listeners';
 import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
 import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
@@ -28,7 +31,27 @@ function supabaseEnv() {
         onAccountBlocked: (message) => {
             showToast('⚠️ ' + message);
         },
-        onTenantChanged: () => {
+        onTenantChanged: (before, after) => {
+            if (before && after && before !== after) {
+                firebaseState.authGeneration++;
+                const initialized = firebaseState.isDatabaseInitialized;
+                detachDatabaseListeners();
+                resetDbListenerHealthState();
+                firebaseState.isDatabaseInitialized = false;
+                dataState.scanHistory = [];
+                dataState.deletedItems = [];
+                dataState.dailyRevenueData = {};
+                dataState.monthlyRevenueData = {};
+                dataState.dailyPickupData = {};
+                dataState.dailyCollectedData = {};
+                uiState.lockerBarcodeIndex = {};
+                clearCustomerDataTableCache();
+                clearSensitiveModalFields();
+                applyCurrentFilter();
+                renderRecentlyDeleted();
+                updateRecentPhonesList();
+                if (initialized && firebaseState.db && firebaseState.fb) initDatabaseListeners();
+            }
             refreshShopBoundUi();
             noteShopDevice();
         },

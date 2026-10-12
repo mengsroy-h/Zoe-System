@@ -165,6 +165,28 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.58] — 2026-10-12 · Audit ផ្តោត race, login/security និង Firebase/Supabase listener
+
+**ZoeW `2.50.58`** (`zoew-v320` ➜ `zoew-v321`)។ ZoeKeyGen មិនប្រែ។ គ្មាន migration/env/rules ថ្មី; គោលការណ៍ Delete/Remove និង COD/DOD ដដែល។
+
+- Login ពិនិត្យ ready និងភាពស្របគ្នារវាង Config, auth.app.options និង stored Config មុនផ្ញើ credentials; ចាប់ auth/SDK/backend scope មុន persistence; មិនផ្ញើ credentials A ទៅ auth B ក្រោយ Config ប្តូរ។ Completion/error/finally ចាស់មិនជាន់ email/password field ឬ busy state របស់ login ថ្មី។
+- Auth listener ចង owner និង currentUser; callback queued ចាស់ក្រោយ unsubscribe/replacement ឬ snapshot user A ខណៈ auth មាន B មិនប្តូរ auth generation និងមិនបន្ត activation។ Auth storage recovery ពិនិត្យ owner និង timeout token ក្រោយ IndexedDB enumeration មុន delete/reload; auth ready កណ្តាល enumeration ធ្វើឱ្យ recovery ចាស់ឈប់។
+- Logout និង session expiry មិនសម្អាត remembered session/សោ/UI របស់សម័យថ្មី បើ response ចាស់មកយឺត ទោះ success ឬ failure។
+- Logout/session expiry invalidate generation ភ្លាម; completion ចាស់ និង periodic expiry ចាស់មិនលុប login ថ្មី ទោះ UID និង user object ដដែល។
+- Supabase SDK៖ response auth ចាស់ត្រូវបដិសេធមុន SDK សរសេរ session ឬជូនដំណឹង listener; login A ដែលមកក្រោយ logout/login B មិនស្តារ A ទៀត។ ការស្តារពី cache មិន invalidate refresh ដែលកំពុងរង់ចាំលើ session ដដែល។ `supabase-auth-write-ownership.test.ts` ប្រើ supabase-js ពិត។
+- អត្រាប្រាក់៖ write owner token ដោះតែ mutex របស់ខ្លួន; late ACK/reject ពី App Supabase ដែលបិទ មិនដោះ mutex របស់ backend ថ្មី។ ការដោះ mutex ក្រោយ logout លើ backend ដដែលនៅដដែល ដើម្បីកុំឱ្យ write ដែលនៅរស់ជាន់សម័យថ្មី។ `exchange-rate-completion-race.test.ts` រត់ feature + adapter ពិត។
+- Remembered password៖ crypto និង IndexedDB open ចាស់មិន overwrite/delete record ថ្មី។ Save/forget ពិនិត្យ generation ក្នុង transaction action; មិនហៅ global forget ពី stale save។ AES-GCM និង backend/account binding ដដែល។
+- Supabase Realtime៖ token/setAuth បញ្ចប់ក្រោយ close មិនបង្កើត channel; queued broadcast/status និង token failure ក្រោយ unsubscribe/session change មិនបន្ត callbacks។ Channel teardown promise rejection ត្រូវបានសម្អាត។
+- Tenant ប្ដូរលើ UID/db ដដែល៖ SDK ផ្តល់ tenant មុន/ក្រោយឱ្យ App; App invalidate auth generation, សម្អាត business/sensitive views និងភ្ជាប់ listeners ទៅសម័យថ្មី។ `tenant-app-session.test.ts` វាស់ App handler ពិត និង SDK seam ពិត; guard របស់ flow ចាស់ផុតសុពលភាព។
+- Supabase sync ចង pull និង offline write/CAS retry ជាមួយ tenant និង auth scope; ប្ដូរហាង invalidate snapshot/cursor/cache ហើយទាញ view ថ្មី។ A acknowledgement ដែល server ទទួលរួចនៅជា success ប៉ុន្តែមិនបញ្ចូល docs A ក្នុង B; conflict ចាស់មិន retry ទៅ B។ `supabase-sync-owner.test.ts` វាស់ទាំងផ្លូវនេះ។
+- Regression ប្រើ source ពិត៖ តេស្តថ្មីទាំង ៨ ឯកសារនៅក្នុង index ខាងក្រោម; រត់ដូចគ្នាលើ main `4649331` និង source ក្រោយកែ។ លទ្ធផលវាស់ និង STRICT កត់ក្នុងផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ក្រោយ deploy សាក iPhone/Android៖ login/logout និងប្តូរ Config ពេលបណ្តាញយឺត ឬដាច់; ចងចាំ password និងបើក App វិញ។ មិនត្រូវការ data migration ឬ Publish rules ថ្មី។
+២. Supabase Leaked Password Protection និង access JWT ដែលនៅ valid ក្រោយ session revoke ជាព្រំដែនដដែលដែលផ្នែក ១មុនបានកត់; audit នេះមិនផ្លាស់ប្តូរការកំណត់ផលិតកម្ម។
+៣. លទ្ធផលវាស់បញ្ជាក់សេណារីយ៉ូដែលបានរត់; មិនធានាថាគ្រប់ interleaving ឬ outage ផលិតកម្មមិនអាចមានកំហុសឡើយ។
+
 ### [2.50.57] — 2026-10-12 · PR #312៖ បញ្ចប់ការកែ race និង barcode ពី Deep audit ឡើងវិញ
 
 **ZoeW `2.50.57`** (`zoew-v319` ➜ `zoew-v320`)។ **ZoeKeyGen `2.24.17` មិនប្រែ**។ គ្មាន migration/env/rules ថ្មី។ គោលការណ៍ Delete/Remove និងការបូកដក COD/DOD ដដែល។
@@ -3537,6 +3559,20 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
+
+មូលដ្ឋាន `4649331` ដែលបាន merge PR #312។ តេស្តថ្មីដូចគ្នា ៤៤ សេណារីយ៉ូ ក្នុង ៨ ឯកសារ៖ មុនកែ ៤០ FAIL និង ៤ control PASS; ក្រោយកែ ៤៤/៤៤ PASS។ នេះជាចំនួនសេណារីយ៉ូបរាជ័យ មិនមែនកំហុសឯករាជ្យ ៤០ ទេ។ ប្រើ feature និង adapter ពិត; ករណី Supabase auth storage ប្រើ supabase-js `2.117.2` ពិត ពន្យារ HTTP response។ Login A ក្រោយ logout ឬ login B ធ្លាប់សរសេរ A ទៅ storage ទោះ outer generation guard បដិសេធ promise; ឥឡូវ guard នៅមុន SDK ទទួល response។ Control បញ្ជាក់ cached restore មិនបិទ refresh ដែលមកក្រោយពិដាន ៣ វិនាទី។ ក្រុម auth/transport ពាក់ព័ន្ធ ២៦ ឯកសារ ១៨៩ PASS; តេស្ត control refresh ដែលបន្ថែមក្រោយការរត់នេះបាន PASS ក្នុងក្រុម ៤៤។
+
+ចន្លោះ checker៖ `connection-recovery-test` ធ្លាប់ catch initialization error ប៉ុន្តែនៅ PASS។ Harness ថ្មីចាប់ error និងដាក់ dependency ពិត (`loginBackendScope`, `ZTO_SHOP_SWEEP_PATH`, auth.currentUser); បញ្ជាក់ init គ្មាន error លាក់ ក្នុង ៤ ករណី។ ចំនួន assertions ថ្មី ២៤០ PASS។ Cache delta របស់ Supabase App E2E ធ្លាក់ពេល tenant ប្តូរកណ្តាល cache load; កែ cacheTried ដើម្បីសាក cache របស់ context ថ្មីវិញ។ State hygiene ចែង lifetime នៃ opaque write owner token ដែលគ្មាន credentials/data និងមាន regression សម្រាប់ ACK/reject ចាស់។
+
+វាស់តាមលំដាប់៖ network/login/sync ដំបូង ២៥ checker៖ ២៣ PASS និង ២ FAIL; ក្រោយកែ ៥ checker ដែលពាក់ព័ន្ធ PASS ទាំងអស់។ Backend writes ដំបូង ១២ checker៖ ១១ PASS និង ១ FAIL; connection harness ថ្មី ២៤០ PASS, write stall ៤៣ PASS និង state hygiene PASS ក្រោយកែ។ មាន Firebase SDK + emulator/rules ពិត និង Supabase SDK + embedded Postgres/schema/RLS ពិត; adapter parity ៩២ PASS, CRUD ១៣៧ PASS, disconnect transaction ២៥ PASS, transaction outcome ១១០ PASS, late commit ៦៧ PASS។ មិនសរសេរ production data។
+
+Supabase production read-only 2026-10-12៖ `ACTIVE_HEALTHY`; តារាង public ទាំង ៩ បើក RLS, anon គ្មាន SELECT និង authenticated គ្មាន direct INSERT/UPDATE/DELETE។ Advisor មាន INFO `zoe_ops` គ្មាន policy (table idempotency តាម RPC), INFO index មិនទាន់ប្រើ ២ និង WARN [Leaked Password Protection disabled](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) ដូចមុន។ មិនប្តូរ production settings។
+
+Financial flows៖ checker ដែលជ្រើស ២៣/២០៤ PASS ទាំងអស់ · ០ skip/partial; គ្រប policy, partial cleanup, pickup ledger/repair/reset, price abort, restore/clear-history fences, emulator restore/ledger និង money guardian mutation ទាំងពីរផ្នែក។ Revenue fuzz ១២×៤៥ និង collected mirror ៥×៨ PASS។ `npm audit` ពិតលើ ZoeW, Supabase និង Firebase provision៖ vulnerabilities ០ ទាំងបី។
+
+Full STRICT ២០៤ checker កំពុងវាស់ជុំនេះ រួម financial fuzz seeds ថ្មី ៣០០–៣១១ (`FUZZ_RUNS=12`, `FUZZ_OPS=55`) និង mirror seeds ៣០០–៣១២ (`MFUZZ_RUNS=13`, `MFUZZ_OPS=11`)។ លទ្ធផលចុងក្រោយត្រូវកត់តាមការវាស់ពិត។ គោលការណ៍ Delete មិនដកប្រាក់, Remove/expired ដក និង restore បូកតែករណី isDeducted ដដែល។ Cloud tests មិនជំនួសការសាក iPhone/Android ពិត ឬធានាគ្រប់ interleaving/outage ទេ។
+
 ### 2026-10-12 — PR #312៖ Deep audit ឡើងវិញ និងកែចន្លោះក្នុង checker
 
 កូដមុនកែ `076ed7b`។ បន្ទាប់ពី run-all STRICT ២០៤ checker ឆ្លងទាំងអស់ (រត់ពេញ និង resume លើ fingerprint `21cc6286fb77f49e` ដដែល · ០ skip/partial) តេស្ត race និង barcode បន្ថែមនៅតែបង្ហាញកំហុសពិត ៤៖ `zoe_read` យឺតជាន់ cache ហាងថ្មី · verification របស់ App បិទលុប session ថ្មី · Sheet open decrypt យឺតដាក់ plaintext ហាងចាស់ · `%` ជាន់ key punctuation ធ្វើឱ្យ barcode ទីពីរទាមទារមិនបាន និង pickup ២ ក្លាយជា ១។ កំណែថ្មីការពារ ownership នៅ await និងធ្វើ key bijective តាម barcode ដែល normalize រួច។ ទិន្នន័យ barcode ពិតគ្មាន `%` តាមការបញ្ជាក់ម្ចាស់គម្រោង។
@@ -5963,3 +5999,16 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-expiry-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/supabase-sync-owner.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/tenant-app-session.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

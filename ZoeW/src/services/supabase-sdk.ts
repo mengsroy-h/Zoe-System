@@ -100,8 +100,9 @@ function createAuth(app, env) {
     };
     const tenantOf = (row) => (row && row.tenant_id ? String(row.tenant_id) : '');
     const noteTenant = (before) => {
-        if (tenantOf(auth._account) === before || typeof env.onTenantChanged !== 'function') return;
-        try { env.onTenantChanged(); } catch (e) { env.onListenerError(e); }
+        const after = tenantOf(auth._account);
+        if (after === before || typeof env.onTenantChanged !== 'function') return;
+        try { env.onTenantChanged(before, after); } catch (e) { env.onListenerError(e); }
     };
     const fire = () => {
         const current = auth.currentUser;

@@ -173,6 +173,8 @@ export function createSupabaseTransport(config, deps?) {
     const localArea = (deps && deps.localStorage) || storeOf('localStorage');
     const storage = createModeStorage(localArea, (deps && deps.sessionStorage) || storeOf('sessionStorage'));
     claimSessionStorageFor(storage, url);
+    let closed = false;
+    let generation = 0;
     const clientOwner = createWithWindowListenerOwner(() => createClient(url, key, {
         auth: {
             storage,
@@ -182,17 +184,21 @@ export function createSupabaseTransport(config, deps?) {
             detectSessionInUrl: false
         },
         global: {
-            fetch: (input, init) => sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs).then((res) => sbSoftenRefreshRateLimit(input, res))
+            fetch: (input, init) => {
+                const epoch = generation;
+                return sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs).then((res) => {
+                    if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true);
+                    return sbSoftenRefreshRateLimit(input, res);
+                });
+            }
         }
     }));
     const client = clientOwner.value;
     const toSession = (s) => (s && s.access_token && s.user ? { accessToken: s.access_token, user: { id: s.user.id, email: s.user.email || '' } } : null);
-    let closed = false;
-    let generation = 0;
     client.auth.initialize().then(() => { if (closed) return client.auth.dispose(); }).catch(() => {});
     let boundUid = null;
     let boundEnded = false;
-    const bindTo = (uid) => { generation++; boundUid = uid; boundEnded = false; };
+    const bindTo = (uid, advance = true) => { if (advance) generation++; boundUid = uid; boundEnded = false; };
     const foreignListeners = new Set<(next: any) => void>();
     const noteForeignSession = (next) => {
         if (closed || boundEnded) return;
@@ -288,7 +294,7 @@ export function createSupabaseTransport(config, deps?) {
             let restored = null;
             if (out && out.data && out.data.session) restored = toSession(out.data.session);
             else if (!(out && !out.error)) restored = storedSession();
-            bindTo(restored ? restored.user.id : null);
+            bindTo(restored ? restored.user.id : null, false);
             return restored;
         },
         async signIn(email, password) {
@@ -361,22 +367,25 @@ export function createSupabaseTransport(config, deps?) {
         subscribe(topic, onEvent, onStatus) {
             let channel = null;
             let cancelled = false;
+            const epoch = generation;
+            const isCurrent = () => !cancelled && !closed && !boundEnded && epoch === generation;
             (async () => {
                 try {
+                    if (!isCurrent()) return;
                     const token = await accessToken();
-                    if (cancelled) return;
+                    if (!isCurrent()) return;
                     await client.realtime.setAuth(token);
-                    if (cancelled) return;
+                    if (!isCurrent()) return;
                     channel = client.channel(topic, { config: { private: true, broadcast: { self: false } } });
-                    channel.on('broadcast', { event: 'seq' }, (msg) => onEvent(msg && msg.payload));
-                    channel.subscribe((status) => onStatus(status));
+                    channel.on('broadcast', { event: 'seq' }, (msg) => { if (isCurrent()) onEvent(msg && msg.payload); });
+                    channel.subscribe((status) => { if (isCurrent()) onStatus(status); });
                 } catch (e) {
-                    onStatus('CHANNEL_ERROR');
+                    if (isCurrent()) onStatus('CHANNEL_ERROR');
                 }
             })();
             return () => {
                 cancelled = true;
-                if (channel) { try { client.removeChannel(channel); } catch (e) {} }
+                if (channel) { try { Promise.resolve(client.removeChannel(channel)).catch(() => {}); } catch (e) {} }
             };
         },
         async callFunction(name, body) {
@@ -399,7 +408,7 @@ export function createSupabaseTransport(config, deps?) {
             clientOwner.release();
             foreignListeners.clear();
             if (eventTarget && typeof eventTarget.removeEventListener === 'function') eventTarget.removeEventListener('storage', onStorage);
-            try { client.removeAllChannels(); } catch (e) {}
+            try { client.removeAllChannels().catch(() => {}); } catch (e) {}
             try { client.auth.dispose().catch(() => {}); } catch (e) {}
         }
     };

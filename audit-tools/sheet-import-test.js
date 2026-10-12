@@ -203,7 +203,7 @@ const FAKE_SDK = function () {
         getApps: () => [],
         deleteApp: () => Promise.resolve(),
         getAuth: () => ({ currentUser: { uid: 'u1', email: 'a@b.c' } }),
-        onAuthStateChanged: (a, cb) => { setTimeout(() => cb({ uid: 'u1', email: 'a@b.c' }), 10); return noop; },
+        onAuthStateChanged: (a, cb) => { setTimeout(() => cb(a.currentUser), 10); return noop; },
         signInWithEmailAndPassword: () => Promise.resolve({ user: { uid: 'u1' } }),
         signOut: () => Promise.resolve(),
         setPersistence: () => Promise.resolve(),

@@ -62,6 +62,8 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
         const counts = { session: 0, license: 0, expired: 0, captured: 0 };
         const context = vm.createContext({
             Promise,
+            authGeneration: 0,
+            db: {},
             auth: { currentUser: { uid: 'u1' } },
             isModalOpen: false,
             isDatabaseInitialized: true,

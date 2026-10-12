@@ -14,7 +14,7 @@ afterAll(() => vi.unstubAllGlobals());
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { resolve, promise }; };
 const reply = (uid: string) => {
   const now = Math.floor(Date.now() / 1000);
-  const token = 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify({ sub: uid, user_id: uid, aud: 'audit-auth', iss: 'https://securetoken.google.com/audit-auth', iat: now, exp: now + 3600, auth_time: now })).toString('base64url') + '.x';
+  const token = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url') + '.' + Buffer.from(JSON.stringify({ sub: uid, user_id: uid, aud: 'audit-auth', iss: 'https://securetoken.google.com/audit-auth', iat: now, exp: now + 3600, auth_time: now })).toString('base64url') + '.fake-signature';
   return new Response(JSON.stringify({ localId: uid, idToken: token, refreshToken: 'fake-' + uid, expiresIn: '3600' }), { status: 200 });
 };
 for (const mode of ['logout', 'replacement', 'normal']) {

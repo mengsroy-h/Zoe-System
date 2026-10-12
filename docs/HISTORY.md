@@ -180,6 +180,8 @@
 - ប្រវត្តិ 320px៖ លេខរៀងវែង/ស្លាកអាចបត់ក្នុងក្រឡាខ្លួន មិនជាន់ក្រឡាអតិថិជន; ទទឹងជួរឈរមិនប្រែ។
 - dependency៖ pin `source-map-js 1.2.2` និង `@grpc/grpc-js 1.13.6` តាម advisory ថ្មី; `npm audit` ពី 5 high ទៅ 0 vulnerability។ Firebase SDK version ដដែល។
 
+**ការបន្តតាមសំណើម្ចាស់គម្រោង «CLI មាន ៣ high ពី braces … កែអោយត្រឹមត្រូវបានអត់»**៖ Firebase Provision **1.0.1** ប្រើ `braces` local backport `3.0.3-zoe.1`។ CLI/chokidar version ដដែល; parser ចង brace/paren depth 100 ហើយ walkers ពិនិត្យ AST ផ្ទាល់/child cycle មុន recursion។ upstream source និង MIT license រក្សា និងផ្ទៀង hash; glob behavior និង module ផ្ទុកពិតមានតេស្ត។ npm audit សម្រាប់ local dependency មិនមែនភស្តុតាងកូដ patched; ត្រូវឆ្លងករណី exploit/corpus/mutation ផង។
+
 #### អ្នកយាម
 
 - `ZoeW/tests/shop-bound-settings.test.ts`៖ ៧ ករណី race ថ្មីធ្លាក់មុនកែ; ក្រោយកែមានលទ្ធផលថ្មីឈ្នះ និងគ្មានការសរសេរ/ផ្ញើសោឆ្លងហាង។
@@ -3514,6 +3516,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-12 — CLI braces backport តាមសំណើម្ចាស់គម្រោង
+
+- បញ្ជាក់កំណែដើម `braces@3.0.3`៖ balanced pattern depth 4900 ប្រវែង 9801 តួ ➜ compile បោះ Maximum call stack size exceeded លើ Node ពិត។ AST depth 20000 ក៏ឆ្លង character gate ដែរ។
+- `tools/firebase-provision` **1.0.1**៖ local fork **3.0.3-zoe.1** (មិនមែនកំណែផ្លូវការ) + parser cap 100 រួម parentheses និង walker guard តាម iterative validation។ AST ដែល caller ផ្ដល់ផ្ទាល់ និង child cycle ក៏បដិសេធដោយ BRACES_MAX_DEPTH។ quoted/escaped/class literals មិនចាត់ជានesting។ CLI 15.32.1 · chokidar 3.6.0 · dependency registry ផ្សេងទៀតរក្សា lock ដដែល។
+- npm file dependency/override ចងទៅ vendor ដែល pack ដំឡើងតាម npm ci --ignore-scripts។ សាក clean install ដោយដក NODE_PATH; actual chokidar require.resolve និង bytes ដូច source patched។ មិនពឹង global module ឬ postinstall hook។
+- `firebase-provision-test`៖ corpus 38 ករណីពី upstream · public entrypoints · cap/cap+1 · exploit string · unclosed nesting · direct AST/cycle · literal ទិសផ្ទុយ · runtime byte identity និង watcher glob {a,b} ផ្ទាល់។ ដក guard ទាំង ៤ ទ្វារ ➜ behavior controls ក្រហម។ CLI HTTPS provisioning + mutation នៅឆ្លង (សរុប 187/187)។
+- Provenance និង MIT license រក្សា; ដកតែបន្ទាត់ backport នឹងទទួល hash ត្រូវនឹង upstream package bytes។ រាល់ឯកសារ vendor/fixture មានការចុះ guard coverage។
+- ភស្តុតាងការកែជាលទ្ធផល exploit/behavior/source ត្រឹមត្រូវ។ Registry advisory មិនបានវាយតម្លៃ fork ក្នុង repo; npm audit សម្រាប់ local package មិនធានាកូដនេះដោយខ្លួនវាទេ។ មិនអះអាងបានដោះស្រាយ regex complexity ឬការប្រើ glob មិនទុកចិត្តគ្រប់ប្រភេទ។
+- Full run STRICT ទាំង 204 checker (tree fingerprint ac43fd7383a14b42)៖ 196 PASS · 8 FAIL · 0 partial · 0 skip។ FAIL 1 ជា version នៅក្រៅ header ក្នុង CLAUDE.md ➜ កែ និង rerun docs 99/99; Postgres 7 នៅជាប់ UID mapping។
+- CI មុននៅ commit 5423eb0៖ 3 shard ឆ្លង; shard 2 ធ្លាក់តែ keygen-supabase-admin-test ដែលនៅរំពឹងប៊ូតុង 3 ក្រោយ UI មានប៊ូតុង Lookup ទី 4។ កែ assertion ឱ្យគ្រប sb-lookup និង action/id ទាំង 4 ដដែល។ Local Postgres ជាប់ UID ដូចមុន; ត្រូវឱ្យ CI ជុំថ្មីវាស់ SQL path នោះ។
 
 ### 2026-10-12 — Deep audit ទាំង Project និង Supabase Lookup
 

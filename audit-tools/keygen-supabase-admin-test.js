@@ -451,8 +451,8 @@ async function behavior() {
         const label1 = el('sbInviteResultLabel').textContent;
         ok('ស្លាកកូដប្រើ textContent (ឈ្មោះហាងឆៅ ➜ មិនមែន HTML)', label1.indexOf(XSS) !== -1);
         let btns = rowButtons(listHtml);
-        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ជួរដេកមានប៊ូតុង ៣ (sb-invite · sb-extend · sb-revoke) ចង id ហាងពិត',
-            btns.length === 3 && btns.every((b) => b.id === tRow.id) && btns.map((b) => b.action).sort().join() === 'sb-extend,sb-invite,sb-revoke', btns);
+        ok('⛔ លក្ខខណ្ឌចាំបាច់ ៖ ជួរដេកមានប៊ូតុង ៤ (sb-lookup · sb-invite · sb-extend · sb-revoke) ចង id ហាងពិត',
+            btns.length === 4 && btns.every((b) => b.id === tRow.id) && btns.map((b) => b.action).sort().join() === 'sb-extend,sb-invite,sb-lookup,sb-revoke', btns);
         ok('ការចុចប៊ូតុងក្នុងបញ្ជីឆ្លង sbTenantAction(dataset.tenantId, dataset.action)',
             /getElementById\('sbTenantListBody'\)[\s\S]{0,400}sbTenantAction\(btn\.dataset\.tenantId, btn\.dataset\.action\)/.test(src));
 

@@ -615,6 +615,14 @@
       ],
       "evidence": "រត់កូដលក់ពិត និង decrypt ពិត រួមការពារ URL កែ · កូដខុស · logout · កូនសោក្នុង storage។",
       "limitation": "សាក Web Crypto ក្នុង Node និង UI harness; មិនជំនួសការសាកលើទូរស័ព្ទពិត។"
+    },
+    "braces-backport": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/firebase-provision-test.js"
+      ],
+      "evidence": "ផ្ទៀង bytes upstream 3.0.3 និង backport ដែល chokidar/CLI ផ្ទុកពិត; corpus glob 38 ករណី · depth cap/bypass AST/cycle · quoted/escaped/class · mutation 4 ទ្វារ · watcher brace glob ពិត។",
+      "limitation": "ការកែចង recursive AST depth សម្រាប់ GHSA-vfj7-8cjw-p6xm; មិនអះអាងគ្របគ្រងភាពស្មុគស្មាញរបស់ regex/glob គ្រប់ប្រភេទ ឬ upstream បានចេញកំណែ patched ទេ។"
     }
   },
   "files": {
@@ -3160,6 +3168,45 @@
     },
     "ZoeW/tests/phone-suggest-idle-scroll.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "audit-tools/fixtures/braces-compat.json": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/.npmrc": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/LICENSE": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/UPSTREAM.json": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/index.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/compile.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/constants.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/depth.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/expand.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/parse.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/stringify.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/lib/utils.js": {
+      "policy": "braces-backport"
+    },
+    "tools/firebase-provision/vendor/braces/package.json": {
+      "policy": "braces-backport"
     }
   }
 }

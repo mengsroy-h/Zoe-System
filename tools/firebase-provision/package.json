@@ -1,6 +1,6 @@
 {
   "name": "zoe-firebase-provision",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Creates and hardens one Firebase project per ZoeW customer (project, Realtime Database, rules, locked sign-up, staff accounts) and deploys rules to all customers.",
   "main": "provision.js",
@@ -13,13 +13,15 @@
     "test": "node ../../audit-tools/firebase-provision-test.js"
   },
   "dependencies": {
-    "firebase-tools": "15.32.1"
+    "firebase-tools": "15.32.1",
+    "braces": "file:vendor/braces"
   },
   "overrides": {
     "basic-ftp": "6.2.3",
     "@opentelemetry/core": "2.8.0",
     "gaxios": {
       "uuid": "11.1.1"
-    }
+    },
+    "braces": "$braces"
   }
 }

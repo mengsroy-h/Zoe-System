@@ -137,7 +137,12 @@ if (!history.length && !deleted.length) {
 
 // ម្ចាស់ = barcode គ្រប់កន្លែងក្នុងប្រវត្តិ **និង** ធុងសំរាម (ទាំង ២ ខាង)
 const owned = new Set();
-const addOwned = (code) => { const k = sb.barcodeRegistryKey(code); if (k) owned.add(k); };
+const addOwned = (code) => {
+    const k = sb.barcodeRegistryKey(code);
+    if (!k) return;
+    owned.add(k);
+    owned.add(k.replace(/%25/g, '%'));
+};
 [history, deleted].forEach((list) => list.forEach((item) => {
     if (Array.isArray(item.barcodes)) item.barcodes.forEach((b) => { if (b && b.code) addOwned(b.code); });
     else if (item.barcodes && typeof item.barcodes === 'object') {
@@ -149,10 +154,10 @@ const addOwned = (code) => { const k = sb.barcodeRegistryKey(code); if (k) owned
     if (item.barcode) addOwned(item.barcode);
 }));
 
-// ⛔ កូនសោក្នុង dump ត្រូវឆ្លងកាត់រូបមន្តដដែល មុនប្រៀបធៀប
+// ⛔ កូនសោក្នុង dump បាន encode រួចហើយ; កុំ encode % ម្ដងទៀត។
 const registryKeys = Object.keys(registry);
 const normalized = new Map();
-registryKeys.forEach((k) => { normalized.set(k, sb.barcodeRegistryKey(k)); });
+registryKeys.forEach((k) => { normalized.set(k, String(k).trim().toUpperCase()); });
 const orphans = registryKeys.filter((k) => !owned.has(normalized.get(k)));
 
 console.log('registry keys : ' + registryKeys.length);

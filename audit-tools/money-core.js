@@ -109,7 +109,7 @@ function recalcItemMoneyFromBarcodes(target) {
 
 function barcodeRegistryKey(code) {
         const normalized = String(code || '').trim().toUpperCase();
-        return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+        return normalized.replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
     }
 
 function rawSnapshotToItemList(data, label) {

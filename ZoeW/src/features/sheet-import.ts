@@ -185,7 +185,16 @@ export function drawerSheetImportFlow() {
 export async function openSheetImportModal(pin) {
     clearSheetImportSession();
     openModalHelper('sheetImportModal');
-    sheetImportState.sheetImportKey = await deriveSheetImportKey(pin);
+    const generation = sheetOperationGeneration;
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    let openingKey = null;
+    const current = () => generation === sheetOperationGeneration && shopScope() === shop
+        && firebaseState.authGeneration === authEpoch && sheetImportState.sheetImportKey === openingKey;
+    const key = await deriveSheetImportKey(pin);
+    if (!current()) return;
+    openingKey = key;
+    sheetImportState.sheetImportKey = key;
     if (!sheetImportState.sheetImportKey) {
         setSheetImportMsg('siConfigMsg', 'បង្កើតកូនសោអ៊ិនគ្រីបមិនបានទេ! សូមប្រើ HTTPS រួចសាកល្បងម្តងទៀត។', 'bad');
         return;
@@ -193,7 +202,9 @@ export async function openSheetImportModal(pin) {
     const stored = readSheetImportStoredConfig();
     if (!stored) return;
     const url = await decryptSheetImportSecret(stored.u);
+    if (!current()) return;
     const password = await decryptSheetImportSecret(stored.p);
+    if (!current()) return;
     if (!url || !password) {
         setSheetImportMsg('siConfigMsg', 'ស្រាយការតភ្ជាប់មិនបានទេ — ប្រហែល Security PIN ត្រូវបានប្តូរ។ សូមកំណត់ការតភ្ជាប់ម្តងទៀត។', 'bad');
         return;

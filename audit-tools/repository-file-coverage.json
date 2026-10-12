@@ -3207,6 +3207,21 @@
     },
     "tools/firebase-provision/vendor/braces/package.json": {
       "policy": "braces-backport"
+    },
+    "ZoeW/tests/audit-lifecycle.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/barcode-key-encoding.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/audit-checker-outcomes.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/platform/sdk-listener-owner.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/sdk-listener-owner.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

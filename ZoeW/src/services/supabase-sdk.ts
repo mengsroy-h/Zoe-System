@@ -82,6 +82,10 @@ function makeUser(auth, session) {
 function createAuth(app, env) {
     const transport = app._transport;
     const auth: any = { app, currentUser: null, _transport: transport, _listeners: new Set(), _ready: false, _account: null, _accountUnverified: false };
+    let closed = false;
+    let generation = 0;
+    const cleanups = [];
+    const ended = () => new Error(SB_SESSION_ENDED_TEXT);
     let restoring = true;
     let lostWhileRestoring = false;
     let ownSignOuts = 0;
@@ -104,6 +108,7 @@ function createAuth(app, env) {
         auth._listeners.forEach((cb) => { try { cb(current); } catch (e) { env.onListenerError(e); } });
     };
     const setUser = (session) => {
+        if (closed) return;
         if (!session) {
             const before = tenantOf(auth._account);
             auth.currentUser = null;
@@ -129,6 +134,7 @@ function createAuth(app, env) {
     };
     const blockedReason = (row) => (!row ? 'none' : row.status === 'active' ? null : (row.status === 'expired' ? 'expired' : 'revoked'));
     const applyAccount = (row, persist = true) => {
+        if (closed) return;
         const before = tenantOf(auth._account);
         auth._account = row;
         app._tenantTopic = row && row.tenant_id ? 'zoe:' + row.tenant_id : null;
@@ -139,16 +145,17 @@ function createAuth(app, env) {
         noteTenant(before);
     };
     const verifyAccountNow = async () => {
-        if (!auth.currentUser) return null;
+        if (closed || !auth.currentUser) return null;
+        const epoch = generation;
         const uid = auth.currentUser.uid;
         let row;
         try {
             row = await accountOf();
         } catch (e) {
-            if (auth.currentUser && auth.currentUser.uid === uid) auth._accountUnverified = true;
+            if (!closed && epoch === generation && auth.currentUser && auth.currentUser.uid === uid) auth._accountUnverified = true;
             return null;
         }
-        if (!auth.currentUser || auth.currentUser.uid !== uid) return null;
+        if (closed || epoch !== generation || !auth.currentUser || auth.currentUser.uid !== uid) return null;
         auth._accountUnverified = false;
         const reason = blockedReason(row);
         if (reason) {
@@ -160,28 +167,37 @@ function createAuth(app, env) {
         return null;
     };
     auth._verifyAccount = () => {
+        if (closed) return Promise.resolve(null);
         if (!verifying) verifying = verifyAccountNow().finally(() => { verifying = null; });
         return verifying;
     };
     auth._onChange = (cb) => {
+        if (closed) return () => {};
         auth._listeners.add(cb);
-        if (auth._ready) Promise.resolve().then(() => { if (auth._listeners.has(cb)) cb(auth.currentUser); });
+        if (auth._ready) Promise.resolve().then(() => { if (!closed && auth._listeners.has(cb)) cb(auth.currentUser); });
         return () => auth._listeners.delete(cb);
     };
     auth._signIn = async (email, password) => {
+        if (closed) throw ended();
+        const epoch = ++generation;
+        restoring = false;
+        const current = () => !closed && epoch === generation;
         let session;
         try {
             session = await transport.signIn(loginEmailFor(email, app.options.loginDomain), password);
         } catch (e) {
             throw new Error(authErrorMessage(e));
         }
+        if (!current()) throw ended();
         let row;
         try {
             row = await accountOf();
         } catch (e) {
+            if (!current()) throw ended();
             await ownSignOut().catch(() => {});
             throw new Error(authErrorMessage(e));
         }
+        if (!current()) throw ended();
         const reason = blockedReason(row);
         if (reason) {
             await ownSignOut().catch(() => {});
@@ -194,6 +210,10 @@ function createAuth(app, env) {
         return { user: auth.currentUser, providerId: 'supabase', operationType: 'signIn' };
     };
     auth._signOut = async () => {
+        if (closed) throw ended();
+        const epoch = ++generation;
+        if (restoring) lostWhileRestoring = true;
+        restoring = false;
         const had = !!auth.currentUser;
         let failed = null;
         try {
@@ -201,16 +221,21 @@ function createAuth(app, env) {
         } catch (e) {
             failed = e;
         }
+        if (closed || epoch !== generation) return;
         if (app._db) app._db.resetForSignOut();
         setUser(null);
-        if (had) fire();
+        const becameReady = !auth._ready;
+        auth._ready = true;
+        if (had || becameReady) fire();
         if (failed) throw failed;
     };
     auth._setPersistence = async (persistence) => {
         transport.setPersistence(persistence && persistence.type === 'SESSION' ? 'session' : 'local');
     };
-    transport.onSession((event, session) => {
+    cleanups.push(transport.onSession((event, session) => {
+        if (closed) return;
         if (event === 'SIGNED_OUT') {
+            if (!ownSignOuts && !restoring) generation++;
             const ended = !ownSignOuts && (!!auth.currentUser || restoring);
             if (restoring) lostWhileRestoring = true;
             if (auth.currentUser) {
@@ -225,17 +250,21 @@ function createAuth(app, env) {
             auth.currentUser._session = session;
             if (event === 'TOKEN_REFRESHED' && auth._accountUnverified) auth._verifyAccount();
         }
-    });
+    }));
     if (typeof transport.onForeignSession === 'function') {
-        transport.onForeignSession(() => {
+        cleanups.push(transport.onForeignSession(() => {
+            if (closed) return;
             if (!auth.currentUser) return;
+            generation++;
             if (app._db) app._db.resetForSignOut();
             setUser(null);
             fire();
             if (env.onSessionEnded) env.onSessionEnded(SB_SESSION_ENDED_TEXT);
-        });
+        }));
     }
+    const restoringGeneration = generation;
     transport.restoreSession().then((restored) => {
+        if (closed || restoringGeneration !== generation) return;
         restoring = false;
         const session = lostWhileRestoring ? null : restored;
         setUser(session);
@@ -245,14 +274,25 @@ function createAuth(app, env) {
             if (cached && cached.uid === session.user.id && cached.row && cached.row.tenant_id) applyAccount(cached.row, false);
         }
     }, () => {
+        if (closed || restoringGeneration !== generation) return;
         restoring = false;
         setUser(null);
     }).then(() => {
+        if (closed || restoringGeneration !== generation) return;
         auth._ready = true;
         fire();
         if (auth.currentUser) auth._verifyAccount();
     });
-    auth._close = () => { auth._listeners.clear(); };
+    auth._close = () => {
+        if (closed) return;
+        closed = true;
+        generation++;
+        auth.currentUser = null;
+        auth._account = null;
+        auth._listeners.clear();
+        cleanups.forEach((off) => { if (typeof off === 'function') { try { off(); } catch (e) {} } });
+        cleanups.length = 0;
+    };
     return auth;
 }
 

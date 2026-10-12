@@ -84,6 +84,17 @@ console.log('\n=== ១. dump ធម្មតា ៖ ម្ចាស់មិន�
         r.out.indexOf('ORPHAN0001') === -1 && r.out.indexOf('OWN0000001') === -1, r.out.slice(0, 200));
 }
 
+{
+    const dump = writeDump('encoded-identity.json', {
+        zoew_scan_history_cod_dod: { i1: { id: 'i1', barcodes: [{ code: 'AB.C' }, { code: 'AB%2EC' }, { code: 'OLD%CODE' }] } },
+        zoew_recently_deleted_cod_dod: {},
+        zoew_barcode_registry: { 'AB%2EC': true, 'AB%252EC': true, 'OLD%CODE': true, 'OLD%25CODE': true, ORPHAN: true }
+    });
+    const r = run(dump, path.join(TMP, 'encoded-out.json'));
+    ok('⛔ កូនសោ encode និង legacy % ដែលមានម្ចាស់ មិនចូល payload លុប',
+        r.code === 0 && !!r.payload && JSON.stringify(Object.keys(r.payload)) === '["ORPHAN"]', r.out);
+}
+
 // ── សេណារីយ៉ូ ២ ៖ ម្ចាស់ក្នុង *ធុងសំរាម* តែម្យ៉ាង ក៏ជាម្ចាស់ដែរ ──────────
 // ⛔ ថ្នាក់ពិត ៖ អ្នកប្រើលុបចេញពីប្រវត្តិ តែធាតុនៅក្នុងធុងសំរាម ➜ barcode
 // នោះនៅមានម្ចាស់ ហើយ **អាចស្តារបាន** ➜ លុបកូនសោ = បំផ្លាញការការពារ

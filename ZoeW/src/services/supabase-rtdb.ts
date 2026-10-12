@@ -564,6 +564,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const rpc = async (fn, args) => {
+        const epoch = sessionEpoch;
+        const topic = tenantTopic;
         const t0 = Date.now();
         let data;
         try {
@@ -573,7 +575,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             throw e;
         }
         if (fn === 'zoe_write' && (!data || typeof data !== 'object')) throw new SbNetworkError('write reply empty');
-        if (data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
+        if (!closed && epoch === sessionEpoch && topic === tenantTopic && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
         return data;
     };
 
@@ -914,6 +916,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.get = async (ref) => {
+        const epoch = sessionEpoch;
+        const scope = authScope;
+        const topic = tenantTopic;
+        const current = () => !closed && epoch === sessionEpoch && scope === authScope && topic === tenantTopic;
+        if (!current()) throw disconnectError();
         const path = ref._path;
         if (path[0] === '.info') return new SbSnapshot(ref, path[1] === 'connected' ? connected : serverOffset);
         if (!path.length) throw new Error('get() on the database root is not supported');
@@ -921,6 +928,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         try {
             res = await rpc('zoe_read', { p_root: path[0], p_key: path.length > 1 ? path[1] : null });
         } catch (e) {
+            if (!current()) throw disconnectError();
             if (e instanceof SbNetworkError) {
                 setConnected(false);
                 scheduleRetry();
@@ -928,6 +936,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             }
             throw rpcFailureToError(e, path);
         }
+        if (!current()) throw disconnectError();
         for (const d of (res && res.docs) || []) {
             if (typeof d.s === 'number' && d.s > 0) putDoc(d.r, d.k, d.v === undefined ? null : d.v, d.s);
         }

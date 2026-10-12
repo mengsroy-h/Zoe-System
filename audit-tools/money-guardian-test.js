@@ -210,7 +210,7 @@ function runGuard(guard, appDir) {
             { env, encoding: 'utf8', timeout: 240000, maxBuffer: 64 * 1024 * 1024 },
             (err, stdout, stderr) => {
                 if (!err) { resolve({ code: 0, out: stdout || '' }); return; }
-                resolve({ code: typeof err.code === 'number' ? err.code : 1, out: (stdout || '') + (stderr || '') });
+                resolve({ code: typeof err.code === 'number' ? err.code : 1, interrupted: !!err.killed || !!err.signal || typeof err.code !== 'number', out: (stdout || '') + (stderr || '') });
             });
     });
 }
@@ -290,7 +290,11 @@ mutants.forEach((entry, mi) => {
 });
 const verdicts = await runPool(tasks.map((t) => t.run));
 const caughtBy = mutants.map(() => []);
-tasks.forEach((t, i) => { if (verdicts[i].code !== 0) caughtBy[t.mi].push(t.g.file); });
+tasks.forEach((t, i) => {
+    if (verdicts[i].interrupted) {
+        ok(false, '⛔ អ្នកយាមត្រូវបានផ្ដាច់/ផុតម៉ោង មិនមែនចាប់ mutation បាន៖ ' + t.g.file + ' · ' + mutants[t.mi].m.name);
+    } else if (verdicts[i].code !== 0) caughtBy[t.mi].push(t.g.file);
+});
 
 let applicable = 0;
 mutants.forEach(({ m, dir }, mi) => {

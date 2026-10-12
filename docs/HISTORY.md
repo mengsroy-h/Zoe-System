@@ -165,6 +165,26 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.57] — 2026-10-12 · PR #312៖ បញ្ចប់ការកែ race និង barcode ពី Deep audit ឡើងវិញ
+
+**ZoeW `2.50.57`** (`zoew-v319` ➜ `zoew-v320`)។ **ZoeKeyGen `2.24.17` មិនប្រែ**។ គ្មាន migration/env/rules ថ្មី។ គោលការណ៍ Delete/Remove និងការបូកដក COD/DOD ដដែល។
+
+#### អ្វីដែលខុសពីមុន · អ្នកយាម
+
+- Supabase `get()` ពិនិត្យសម័យ គណនី និង tenant មុនបញ្ចូល response; សំណើហាង A ដែលឆ្លើយក្រោយចាកចេញ មិនជាន់ cache/listener ហាង B។
+- បិទ Supabase App ដក auth subscription ទាំងពីរ និង dispose BroadcastChannel/visibility listener របស់ SDK; បញ្ឈប់ការសរសេរ storage របស់ transport ចាស់។ Window listeners ដែល SDK បង្កើតក្នុង constructor ចង owner ហើយដកពេល close; initialize យឺតចប់ក្រោយ close ត្រូវ dispose ម្ដងទៀត។ Account verification/restore/logout ដែលនៅរង់ចាំ មិនលុបការចូលប្រព័ន្ធថ្មី។
+- Excel → Sheet៖ ការបើកប្រអប់ពិនិត្យសម័យ/ហាង/សោនៅរាល់ await; decrypt ចាស់មិនដាក់ URL/ពាក្យសម្ងាត់ និងមិនផ្ញើ status របស់ហាងចាស់។
+- Registry/pickup៖ escape `%` ដើម្បីឱ្យ `AB.C` និង `AB%2EC` មាន key ដាច់ពីគ្នា; barcode គ្មាន `%` រក្សា key ចាស់ដដែល។ ឧបករណ៍ registry-orphan មិន encode key ក្នុង dump ពីរដង និងការពារ key legacy ដែលមានម្ចាស់។
+- CLI audit៖ `money-core.js` ផលិតឡើងវិញពី encoder ថ្មី; `money-reality-check.js` និង `redact-dump.js` រក្សាទំនាក់ទំនង barcode encoded និង numeric identities។ Numeric phone/barcode/id/secret មិននៅ plaintext ក្នុង dump ដែលសម្អាត។
+- `audit-lifecycle.test.ts` · `barcode-key-encoding.test.ts` · `audit-checker-outcomes.test.ts` វាស់ function ពិត + WebCrypto/supabase-js/child timeout ពិត។ Money guardian លែងរាប់ការផ្ដាច់/timeout ជា mutation detection; backup checker កំណត់ child umask ដើម្បីកុំឱ្យ mode 0600 mutation បៃតងតាមម៉ាស៊ីន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ទិន្នន័យពិតមានតែ barcode ធម្មតាគ្មាន `%` (ម្ចាស់គម្រោងបញ្ជាក់ក្នុងជុំនេះ)៖ **គ្មានការផ្លាស់ទីទិន្នន័យ**។ បើនាំចូល backup ចាស់ពីប្រភពផ្សេងដែលមាន `%` ត្រូវពិនិត្យ registry/pickup/collected/origins មុនប្រើ; កុំប្ដូរ key ឬ totals ដោយស្វ័យប្រវត្តិ។
+២. ក្រោយ deploy សាក iPhone Safari/PWA និង Android PWA/APK ពិត៖ ប្តូរហាងខណៈបណ្តាញយឺត · ចាកចេញ/ចូលវិញ · បិទ/បើក Excel → Sheet · រមូរបញ្ជីវែង។ Headless Chromium មិនជំនួស hardware ពិតទេ។
+៣. Supabase Leaked Password Protection នៅ disabled; ត្រូវពិនិត្យ Settings/គម្រោងថ្លៃដោយម្ចាស់គម្រោង។ Session revoke ទុក access JWT ដែលមិនទាន់ផុតប្រើបានតាមព្រំដែនដែល README ទទួលស្គាល់; មិនប្តូរគោលការណ៍នេះក្នុងជុំនេះ។ មិនទាន់ merge។
+៤. បើធ្លាប់សម្អាត dump ដោយកំណែចាស់ ត្រូវសម្អាតពី dump ដើមឡើងវិញមុនផ្ញើ និងពិនិត្យឯកសារចាស់ដែលបានផ្ញើ សម្រាប់ phone/barcode/secret ដែលជា JSON number។ ឧបករណ៍ថ្មីត្រូវមាន `money-core.js` ក្នុងថតដូចគ្នា។
+
 ### [2.50.56 / ZoeKeyGen 2.24.17] — 2026-10-12 · Deep audit ទាំង Project និង Link Lookup ចងហាង Supabase
 
 **សំណើម្ចាស់គម្រោង**៖ deep audit function · ភាពរលូន · network · Supabase/Firebase · SW · race · listener · security ដោយមិនទុកចិត្ត checker បៃតង និងបន្ថែមការចង API តាម ZoeKeyGen សម្រាប់ហាង Supabase។
@@ -3517,6 +3537,22 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-12 — PR #312៖ Deep audit ឡើងវិញ និងកែចន្លោះក្នុង checker
+
+កូដមុនកែ `076ed7b`។ បន្ទាប់ពី run-all STRICT ២០៤ checker ឆ្លងទាំងអស់ (រត់ពេញ និង resume លើ fingerprint `21cc6286fb77f49e` ដដែល · ០ skip/partial) តេស្ត race និង barcode បន្ថែមនៅតែបង្ហាញកំហុសពិត ៤៖ `zoe_read` យឺតជាន់ cache ហាងថ្មី · verification របស់ App បិទលុប session ថ្មី · Sheet open decrypt យឺតដាក់ plaintext ហាងចាស់ · `%` ជាន់ key punctuation ធ្វើឱ្យ barcode ទីពីរទាមទារមិនបាន និង pickup ២ ក្លាយជា ១។ កំណែថ្មីការពារ ownership នៅ await និងធ្វើ key bijective តាម barcode ដែល normalize រួច។ ទិន្នន័យ barcode ពិតគ្មាន `%` តាមការបញ្ជាក់ម្ចាស់គម្រោង។
+
+Checker ចាស់៖ child money guard timeout/SIGTERM ត្រូវបម្លែងទៅ code 1 ហើយរាប់ថា «ចាប់ mutant បាន»។ តេស្ត child ពិតបញ្ជាក់កំហុស ហើយកំណែថ្មីចាត់ interrupted ជា FAIL របស់ checker; មិនរាប់ចូល caughtBy។ Backup mode mutation មិនលេចក្រោម umask 0077; checker ថ្មីកំណត់តែ umask កូន 0022 ពេល spawn ហើយស្តារ parent ភ្លាមៗ។ មិនសរសេរទិន្នន័យផលិតកម្ម។
+
+តេស្ត regression ១៩ ដូចគ្នារត់លើកូដមុនកែ៖ ១៥ FAIL · ៤ control PASS។ ក្រោយកែ៖ ១៩/១៩ PASS; បន្ថែម owner safety ២ ករណី (capture/unrelated listener និង constructor throw)៖ សរុប ២១/២១ PASS; typecheck/lint ឆ្លង។ Full run-all STRICT លើ fingerprint `7350fc3cd36cbff0`៖ ២០១ PASS · ៣ FAIL · ០ partial · ០ skip (៣១២២ វិនាទី)។ FAIL គឺលិបិក្រមតេស្តថ្មីខ្វះ ៣ ឈ្មោះ · generated money-core ចាស់ · feed មាន update ចាស់ និងថ្មី ខុសសំណើទុកតែ update ចុងក្រោយ។ កែទាំង៣ និងរត់ checker ដែលប៉ះ និង meta/metadata/security សរុប ១០ ឡើងវិញលើ fingerprint `13b3ae5c396df491`៖ ១០/១០ PASS · ០ FAIL/skip/partial។ Money CLI ៦០/៦០; តេស្ត CLI ដូចគ្នាលើឧបករណ៍មុនកែ៖ ៥៦ PASS · ៤ FAIL (encoded identity និង numeric PII)។ សាលក្រម checker ២០៤ បន្ទាប់ពីផ្ទៀងផ្ទាត់ការកែផ្នែកដែលប៉ះ៖ PASS ទាំងអស់; មិនអះអាង full fresh run ថ្មីមួយដែលឆ្លងទាំង២០៤លើ hash ចុងក្រោយទេ។ Source App/runtime នៅដដែលក្រោយ full run; ក្រោយមកកែតែ feed, ឯកសារ និងឧបករណ៍ CLI ដែលមាន regression ផ្ទាល់។
+
+Supabase SDK cleanup ដែលរកឃើញបន្ថែម៖ Chromium ពិត + supabase-js ពិត, បើក/បិទ client ២០ ដង៖ កូដមុនកែនៅសល់ window listener ៦០ និង BroadcastChannel មិនបិទ ២០; ក្រោយកែនៅសល់ ០ listener និងបិទ channel ២០/២០។ Listener របស់ App ដែលមិនមែន SDK នៅដើរ; pageerror ០។ Auth init យឺតដែលភ្ជាប់ visibility listener ក្រោយ close ក៏មាន regression pre-fix red ➜ fixed។ Constructor scope កាន់ listener តែក្នុង createClient synchronous ហើយស្ដារ descriptor ដើមភ្លាមៗ; មិនប្ដូរកូដ SDK/vendor។
+
+CLI consumers បន្ថែម៖ `money-reality-check.js` encode registry/collected keys ពីរដង ហើយ `redact-dump.js` hash raw barcode ខុសពី key ដែល encode រួច; fixture `AB.C`/`AB%2EC` រាយកំហុសលុយក្លែងក្លាយ ៣ ទោះ ledger ត្រឹមត្រូវ។ Numeric phone/barcode/secret នៅក្នុង JSON number មិនត្រូវ hash ហើយឧបករណ៍នៅរាយ safe to share។ កែដោយប្រើ barcode encoder ពិតពី money-core និង numeric whitelist តាម schema (រួម c/d និង pickedUpPhones counters)។ `money-reality-test` វាស់ encoded និង numeric dump មុន/ក្រោយសម្អាត, អត្តសញ្ញាណមិនលេច, ចំនួន/ទឹកប្រាក់មិនប្រែ; test ថ្មីធ្លាក់លើឧបករណ៍មុនកែ។ គ្មានការអាន ឬសរសេរទិន្នន័យអតិថិជនពិត។
+
+ការវាស់បន្ថែមមុនកែ៖ fuzz seed 200–227 × 75 operations (28×75) ជាប់ invariants និងផ្លូវ other-device/applied-lost; browser 3000 history + 3000 trash នៅ 360/1024px, initDatabaseListeners 30 ដងនៅតែ 10 subscriptions (path មួយមានតែ ១), page/listener error ០, frame p95 16.7ms; desktop មាន frame យឺត 116.6ms មួយ។ មិនអះអាង hardware FPS។ Local PostgreSQL suites រត់បានដោយ embedded PG17; ការខកខាន UID ក្នុងកំណត់ត្រាមុនមិនមែន FAIL SQL ដែលនៅសល់ទេ។ Supabase live read-only៖ migration 14 ដូច repo · public tables 9 មាន RLS · anon គ្មាន SELECT · authenticated គ្មាន direct DML · forged user_metadata មិនក្លាយជា admin។ Leaked Password Protection disabled និង JWT revoke boundary នៅដដែល។
+
+
+
 ### 2026-10-12 — CLI braces backport តាមសំណើម្ចាស់គម្រោង
 
 - បញ្ជាក់កំណែដើម `braces@3.0.3`៖ balanced pattern depth 4900 ប្រវែង 9801 តួ ➜ compile បោះ Maximum call stack size exceeded លើ Node ពិត។ AST depth 20000 ក៏ឆ្លង character gate ដែរ។
@@ -5686,8 +5722,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
-| `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `money-reality-test` | ផ្នែក ១ | ផ្នែក ២ |
+| `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `monthly-ledger-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -5714,7 +5750,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | — | ផ្នែក ៦ |
 | `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-release-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -5867,6 +5903,9 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ | — |

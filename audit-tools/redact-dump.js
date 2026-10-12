@@ -31,6 +31,11 @@ try { db = JSON.parse(raw.toString('utf8')); }
 catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(1); }
 
 // salt ចៃដន្យក្នុងមួយការរត់ ➜ ⛔ hash **បញ្ច្រាសមិនបាន** ទោះដឹងលេខទូរស័ព្ទក៏ដោយ
+const barcodeContext = require('vm').createContext({});
+require('vm').runInContext(fs.readFileSync(path.join(__dirname, 'money-core.js'), 'utf8'), barcodeContext);
+const barcodeKey = barcodeContext.barcodeRegistryKey;
+if (typeof barcodeKey !== 'function') throw new Error('Barcode encoder is missing from money-core.js');
+
 const SALT = crypto.randomBytes(16);
 const memo = new Map();
 // ⛔ **namespace តែមួយ** សម្រាប់អត្តសញ្ញាណទាំងអស់ ៖ តម្លៃដដែល ត្រូវឲ្យ hash
@@ -67,13 +72,14 @@ const NODE_KEY = /^zoew_/;                 // ឈ្មោះ node កម្រ�
 const FIELD_KEY = /^[a-z][A-Za-z]*$/;      // ឈ្មោះវាល camelCase ៖ barcodes · codDollar
 const isStructKey = (k) => DATE_KEY.test(k) || NODE_KEY.test(k) || FIELD_KEY.test(k);
 let hashed = 0, dropped = 0, kept = 0;
-function walk(node, keyName) {
-    if (Array.isArray(node)) return node.map((x) => walk(x, keyName));
+function walk(node, keyName, parentName, rootName) {
+    if (Array.isArray(node)) return node.map((x) => walk(x, keyName, parentName, rootName));
     if (node === null || typeof node !== 'object') {
-        if (typeof node === 'number' || typeof node === 'boolean') { kept++; return node; }
         if (AS_PHONE.has(keyName)) { hashed++; return h(node); }
-        if (AS_CODE.has(keyName)) { hashed++; return h(node); }
-        if (KEEP_EXACT.has(keyName)) { kept++; return node; }
+        if (AS_CODE.has(keyName)) { hashed++; return h(keyName === 'code' || keyName === 'barcode' ? barcodeKey(node) : node); }
+        if (KEEP_EXACT.has(keyName) || typeof node === 'boolean'
+            || (typeof node === 'number' && ((rootName === 'zoew_daily_collected_cod_dod' && (keyName === 'c' || keyName === 'd'))
+                || (rootName === 'zoew_daily_pickup_cod_dod' && parentName === 'pickedUpPhones')))) { kept++; return node; }
         hashed++; return h(node);
     }
     const res = {};
@@ -84,7 +90,7 @@ function walk(node, keyName) {
         if (isStructKey(k)) { kept++; }
         else if (/^[0-9+]{6,}$/.test(k)) { outKey = h(k); hashed++; }
         else { outKey = h(k); hashed++; }   // ⛔ អ្វីដែលនៅសល់ជាអត្តសញ្ញាណ ➜ hash (fail closed)
-        res[outKey] = walk(node[k], k);
+        res[outKey] = walk(node[k], k, keyName, rootName || (keyName === '' ? k : ''));
     });
     return res;
 }

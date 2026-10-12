@@ -2,6 +2,7 @@ import { firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { fetchWithTimeout, withTimeout } from './network';
 import { txDisconnectResolving } from './tx-disconnect';
+import { withFirebaseAuthOwnership } from './firebase-auth-owner';
 
 export { txDisconnectResolving };
 
@@ -270,6 +271,7 @@ export function runTransactionResolved(sdk, ref, updater, options) {
 
 export function withTransactionOutcomeResolution(sdk) {
     if (!sdk || typeof sdk !== 'object' || typeof Proxy !== 'function') return sdk;
+    if (typeof sdk.beforeAuthStateChanged === 'function') sdk = withFirebaseAuthOwnership(sdk);
     if (sdk.__txOutcomeResolved) return sdk;
     return new Proxy(sdk, {
         get(target, prop) {

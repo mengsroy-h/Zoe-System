@@ -174,12 +174,13 @@
 - Logout និង session expiry មិនសម្អាត remembered session/សោ/UI របស់សម័យថ្មី បើ response ចាស់មកយឺត ទោះ success ឬ failure។
 - Logout/session expiry invalidate generation ភ្លាម; completion ចាស់ និង periodic expiry ចាស់មិនលុប login ថ្មី ទោះ UID និង user object ដដែល។
 - Supabase SDK៖ response auth ចាស់ត្រូវបដិសេធមុន SDK សរសេរ session ឬជូនដំណឹង listener; login A ដែលមកក្រោយ logout/login B មិនស្តារ A ទៀត។ ការស្តារពី cache មិន invalidate refresh ដែលកំពុងរង់ចាំលើ session ដដែល។ `supabase-auth-write-ownership.test.ts` ប្រើ supabase-js ពិត។
+- Firebase SDK៖ auth facade រៀប signin តាមលំដាប់ក្នុង auth ដដែល និង invalidate ភ្លាមពេល logout/សំណើ login ថ្មី។ `beforeAuthStateChanged` រារាំង signin ចាស់មុនរក្សា user/session និង listener; guard ត្រូវដោះក្នុង finally។ `firebase-auth-write-ownership.test.ts` ប្រើ Firebase Auth `12.19.0` ពិត។
 - អត្រាប្រាក់៖ write owner token ដោះតែ mutex របស់ខ្លួន; late ACK/reject ពី App Supabase ដែលបិទ មិនដោះ mutex របស់ backend ថ្មី។ ការដោះ mutex ក្រោយ logout លើ backend ដដែលនៅដដែល ដើម្បីកុំឱ្យ write ដែលនៅរស់ជាន់សម័យថ្មី។ `exchange-rate-completion-race.test.ts` រត់ feature + adapter ពិត។
 - Remembered password៖ crypto និង IndexedDB open ចាស់មិន overwrite/delete record ថ្មី។ Save/forget ពិនិត្យ generation ក្នុង transaction action; មិនហៅ global forget ពី stale save។ AES-GCM និង backend/account binding ដដែល។
 - Supabase Realtime៖ token/setAuth បញ្ចប់ក្រោយ close មិនបង្កើត channel; queued broadcast/status និង token failure ក្រោយ unsubscribe/session change មិនបន្ត callbacks។ Channel teardown promise rejection ត្រូវបានសម្អាត។
 - Tenant ប្ដូរលើ UID/db ដដែល៖ SDK ផ្តល់ tenant មុន/ក្រោយឱ្យ App; App invalidate auth generation, សម្អាត business/sensitive views និងភ្ជាប់ listeners ទៅសម័យថ្មី។ `tenant-app-session.test.ts` វាស់ App handler ពិត និង SDK seam ពិត; guard របស់ flow ចាស់ផុតសុពលភាព។
 - Supabase sync ចង pull និង offline write/CAS retry ជាមួយ tenant និង auth scope; ប្ដូរហាង invalidate snapshot/cursor/cache ហើយទាញ view ថ្មី។ A acknowledgement ដែល server ទទួលរួចនៅជា success ប៉ុន្តែមិនបញ្ចូល docs A ក្នុង B; conflict ចាស់មិន retry ទៅ B។ `supabase-sync-owner.test.ts` វាស់ទាំងផ្លូវនេះ។
-- Regression ប្រើ source ពិត៖ តេស្តថ្មីទាំង ៨ ឯកសារនៅក្នុង index ខាងក្រោម; រត់ដូចគ្នាលើ main `4649331` និង source ក្រោយកែ។ លទ្ធផលវាស់ និង STRICT កត់ក្នុងផ្នែក ២។
+- Regression ប្រើ source ពិត៖ តេស្តថ្មីទាំង ៩ ឯកសារនៅក្នុង index ខាងក្រោម; រត់ដូចគ្នាលើ main `4649331` និង source ក្រោយកែ។ លទ្ធផលវាស់ និង STRICT កត់ក្នុងផ្នែក ២។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3561,7 +3562,9 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
 
-មូលដ្ឋាន `4649331` ដែលបាន merge PR #312។ តេស្តថ្មីដូចគ្នា ៤៤ សេណារីយ៉ូ ក្នុង ៨ ឯកសារ៖ មុនកែ ៤០ FAIL និង ៤ control PASS; ក្រោយកែ ៤៤/៤៤ PASS។ នេះជាចំនួនសេណារីយ៉ូបរាជ័យ មិនមែនកំហុសឯករាជ្យ ៤០ ទេ។ ប្រើ feature និង adapter ពិត; ករណី Supabase auth storage ប្រើ supabase-js `2.117.2` ពិត ពន្យារ HTTP response។ Login A ក្រោយ logout ឬ login B ធ្លាប់សរសេរ A ទៅ storage ទោះ outer generation guard បដិសេធ promise; ឥឡូវ guard នៅមុន SDK ទទួល response។ Control បញ្ជាក់ cached restore មិនបិទ refresh ដែលមកក្រោយពិដាន ៣ វិនាទី។ ក្រុម auth/transport ពាក់ព័ន្ធ ២៦ ឯកសារ ១៨៩ PASS; តេស្ត control refresh ដែលបន្ថែមក្រោយការរត់នេះបាន PASS ក្នុងក្រុម ៤៤។
+Firebase Auth SDK ពិតមានករណីបន្ថែម៖ native signin A មកក្រោយ logout ប្តូរ currentUser ពី null ទៅ A និងហៅ listener; signin B ខណៈ A នៅរង់ចាំក៏អាចហៅ listener A កណ្តាល។ Regression ៤៖ មុនកែ ២ FAIL និង control ២ PASS; ក្រោយ auth facade ៤/៤ PASS។ Control គ្រប normal signin/logout និង invalid credentials ➜ login ថ្មី។ Guard ចុះមុន SDK ប្តូរ user និងដោះក្រោយ request; signin ជំនួសរង់ចាំ request ចាស់ settle ដើម្បីកុំឱ្យ guard ចាស់បដិសេធ request ថ្មី។ មិនកែ SDK/vendor។ Full STRICT ដំបូងត្រូវបានបញ្ឈប់ក្រោយរកឃើញករណីនេះ ទោះ checker ដែលចប់ PASS ក៏ដោយ; មិនរាប់វាជា full run ជោគជ័យ។
+
+មូលដ្ឋាន `4649331` ដែលបាន merge PR #312។ តេស្តថ្មីដូចគ្នា ៤៨ សេណារីយ៉ូ ក្នុង ៩ ឯកសារ៖ មុនកែ ៤២ FAIL និង ៦ control PASS; ក្រោយកែ ៤៨/៤៨ PASS។ នេះជាចំនួនសេណារីយ៉ូបរាជ័យ មិនមែនកំហុសឯករាជ្យ ៤២ ទេ។ ប្រើ feature និង adapter ពិត; ករណី Supabase auth storage ប្រើ supabase-js `2.117.2` ពិត ពន្យារ HTTP response។ Login A ក្រោយ logout ឬ login B ធ្លាប់សរសេរ A ទៅ storage ទោះ outer generation guard បដិសេធ promise; ឥឡូវ guard នៅមុន SDK ទទួល response។ Control បញ្ជាក់ cached restore មិនបិទ refresh ដែលមកក្រោយពិដាន ៣ វិនាទី។ ក្រុម auth/transport ពាក់ព័ន្ធ ២៦ ឯកសារ ១៨៩ PASS; តេស្ត control refresh ដែលបន្ថែមក្រោយការរត់នេះបាន PASS ក្នុងក្រុម ៤៨។
 
 ចន្លោះ checker៖ `connection-recovery-test` ធ្លាប់ catch initialization error ប៉ុន្តែនៅ PASS។ Harness ថ្មីចាប់ error និងដាក់ dependency ពិត (`loginBackendScope`, `ZTO_SHOP_SWEEP_PATH`, auth.currentUser); បញ្ជាក់ init គ្មាន error លាក់ ក្នុង ៤ ករណី។ ចំនួន assertions ថ្មី ២៤០ PASS។ Cache delta របស់ Supabase App E2E ធ្លាក់ពេល tenant ប្តូរកណ្តាល cache load; កែ cacheTried ដើម្បីសាក cache របស់ context ថ្មីវិញ។ State hygiene ចែង lifetime នៃ opaque write owner token ដែលគ្មាន credentials/data និងមាន regression សម្រាប់ ACK/reject ចាស់។
 
@@ -6012,3 +6015,5 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+
+| `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

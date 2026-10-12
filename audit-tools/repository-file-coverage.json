@@ -3246,6 +3246,12 @@
     },
     "ZoeW/tests/supabase-auth-write-ownership.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/firebase-auth-owner.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

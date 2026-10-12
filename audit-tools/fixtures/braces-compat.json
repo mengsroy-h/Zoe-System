@@ -1,0 +1,399 @@
+{
+  "source": "braces@3.0.3 ផ្លូវការ · corpus លទ្ធផលមុន backport",
+  "cases": [
+    {
+      "input": "",
+      "options": {},
+      "compiled": "",
+      "expanded": [],
+      "stringified": ""
+    },
+    {
+      "input": "a",
+      "options": {},
+      "compiled": "a",
+      "expanded": [
+        "a"
+      ],
+      "stringified": "a"
+    },
+    {
+      "input": "abc",
+      "options": {},
+      "compiled": "abc",
+      "expanded": [
+        "abc"
+      ],
+      "stringified": "abc"
+    },
+    {
+      "input": "{a,b}",
+      "options": {},
+      "compiled": "(a|b)",
+      "expanded": [
+        "a",
+        "b"
+      ],
+      "stringified": "{a,b}"
+    },
+    {
+      "input": "src/{foo,bar}/**/*.{js,ts}",
+      "options": {},
+      "compiled": "src/(foo|bar)/**/*.(js|ts)",
+      "expanded": [
+        "src/foo/**/*.js",
+        "src/foo/**/*.ts",
+        "src/bar/**/*.js",
+        "src/bar/**/*.ts"
+      ],
+      "stringified": "src/{foo,bar}/**/*.{js,ts}"
+    },
+    {
+      "input": "x{1..4}",
+      "options": {},
+      "compiled": "x([1-4])",
+      "expanded": [
+        "x1",
+        "x2",
+        "x3",
+        "x4"
+      ],
+      "stringified": "x{1..4}"
+    },
+    {
+      "input": "{01..03}",
+      "options": {},
+      "compiled": "(0[1-3])",
+      "expanded": [
+        "01",
+        "02",
+        "03"
+      ],
+      "stringified": "{01..03}"
+    },
+    {
+      "input": "{a..d}",
+      "options": {},
+      "compiled": "([a-d])",
+      "expanded": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "stringified": "{a..d}"
+    },
+    {
+      "input": "{1..9..2}",
+      "options": {},
+      "compiled": "(1|3|5|7|9)",
+      "expanded": [
+        "1",
+        "3",
+        "5",
+        "7",
+        "9"
+      ],
+      "stringified": "{1..9..2}"
+    },
+    {
+      "input": "{{a,b},c}",
+      "options": {},
+      "compiled": "((a|b)|c)",
+      "expanded": [
+        "a",
+        "b",
+        "c"
+      ],
+      "stringified": "{{a,b},c}"
+    },
+    {
+      "input": "pre{a,,b}post",
+      "options": {},
+      "compiled": "pre(a|b)post",
+      "expanded": [
+        "preapost",
+        "prepost",
+        "prebpost"
+      ],
+      "stringified": "pre{a,,b}post"
+    },
+    {
+      "input": "{,a}",
+      "options": {},
+      "compiled": "(|a)",
+      "expanded": [
+        "",
+        "a"
+      ],
+      "stringified": "{,a}"
+    },
+    {
+      "input": "\\{a,b\\}",
+      "options": {},
+      "compiled": "{a,b}",
+      "expanded": [
+        "{a,b}"
+      ],
+      "stringified": "{a,b}"
+    },
+    {
+      "input": "\"{a,b}\"",
+      "options": {},
+      "compiled": "{a,b}",
+      "expanded": [
+        "{a,b}"
+      ],
+      "stringified": "{a,b}"
+    },
+    {
+      "input": "'{a,b}'",
+      "options": {},
+      "compiled": "{a,b}",
+      "expanded": [
+        "{a,b}"
+      ],
+      "stringified": "{a,b}"
+    },
+    {
+      "input": "`{a,b}`",
+      "options": {},
+      "compiled": "{a,b}",
+      "expanded": [
+        "{a,b}"
+      ],
+      "stringified": "{a,b}"
+    },
+    {
+      "input": "[{}]",
+      "options": {},
+      "compiled": "[{}]",
+      "expanded": [
+        "[{}]"
+      ],
+      "stringified": "[{}]"
+    },
+    {
+      "input": "${a,b}",
+      "options": {},
+      "compiled": "${a,b}",
+      "expanded": [
+        "${a,b}"
+      ],
+      "stringified": "${a,b}"
+    },
+    {
+      "input": "{a,b",
+      "options": {},
+      "compiled": "{a,b",
+      "expanded": [
+        "{a,b"
+      ],
+      "stringified": "{a,b"
+    },
+    {
+      "input": "a}b",
+      "options": {},
+      "compiled": "a}b",
+      "expanded": [
+        "a}b"
+      ],
+      "stringified": "a}b"
+    },
+    {
+      "input": "{a}",
+      "options": {},
+      "compiled": "{a}",
+      "expanded": [
+        "{a}"
+      ],
+      "stringified": "{a}"
+    },
+    {
+      "input": "{}",
+      "options": {},
+      "compiled": "{}",
+      "expanded": [
+        "{}"
+      ],
+      "stringified": "{}"
+    },
+    {
+      "input": "(foo/{a,b})",
+      "options": {},
+      "compiled": "(foo/(a|b))",
+      "expanded": [
+        "(foo/a)",
+        "(foo/b)"
+      ],
+      "stringified": "(foo/{a,b})"
+    },
+    {
+      "input": "!({a,b}*)",
+      "options": {},
+      "compiled": "!((a|b)*)",
+      "expanded": [
+        "!(a*)",
+        "!(b*)"
+      ],
+      "stringified": "!({a,b}*)"
+    },
+    {
+      "input": "a/{foo,{bar,baz}}/*.js",
+      "options": {},
+      "compiled": "a/(foo|(bar|baz))/*.js",
+      "expanded": [
+        "a/foo/*.js",
+        "a/bar/*.js",
+        "a/baz/*.js"
+      ],
+      "stringified": "a/{foo,{bar,baz}}/*.js"
+    },
+    {
+      "input": "{a,b}{c,d}",
+      "options": {},
+      "compiled": "(a|b)(c|d)",
+      "expanded": [
+        "ac",
+        "ad",
+        "bc",
+        "bd"
+      ],
+      "stringified": "{a,b}{c,d}"
+    },
+    {
+      "input": "{1..3}{x,y}",
+      "options": {},
+      "compiled": "([1-3])(x|y)",
+      "expanded": [
+        "1x",
+        "1y",
+        "2x",
+        "2y",
+        "3x",
+        "3y"
+      ],
+      "stringified": "{1..3}{x,y}"
+    },
+    {
+      "input": "{a...b}",
+      "options": {},
+      "compiled": "{a...b}",
+      "expanded": [
+        "{a...b}"
+      ],
+      "stringified": "{a...b}"
+    },
+    {
+      "input": "{1..}",
+      "options": {},
+      "compiled": "{1..}",
+      "expanded": [
+        "{1..}"
+      ],
+      "stringified": "{1..}"
+    },
+    {
+      "input": "{a,b,,c}",
+      "options": {},
+      "compiled": "(a|b|c)",
+      "expanded": [
+        "a",
+        "b",
+        "",
+        "c"
+      ],
+      "stringified": "{a,b,,c}"
+    },
+    {
+      "input": "a{b}c",
+      "options": {},
+      "compiled": "a{b}c",
+      "expanded": [
+        "a{b}c"
+      ],
+      "stringified": "a{b}c"
+    },
+    {
+      "input": "{,a,}",
+      "options": {
+        "noempty": true
+      },
+      "compiled": "(|a|)",
+      "expanded": [
+        "a"
+      ],
+      "stringified": "{,a,}"
+    },
+    {
+      "input": "{a,a,b}",
+      "options": {
+        "nodupes": true
+      },
+      "compiled": "(a|a|b)",
+      "expanded": [
+        "a",
+        "b"
+      ],
+      "stringified": "{a,a,b}"
+    },
+    {
+      "input": "\"{a,b}\"",
+      "options": {
+        "keepQuotes": true
+      },
+      "compiled": "\"{a,b}\"",
+      "expanded": [
+        "\"{a,b}\""
+      ],
+      "stringified": "\"{a,b}\""
+    },
+    {
+      "input": "\\{a,b\\}",
+      "options": {
+        "keepEscaping": true
+      },
+      "compiled": "\\{a,b\\}",
+      "expanded": [
+        "\\{a,b\\}"
+      ],
+      "stringified": "\\{a,b\\}"
+    },
+    {
+      "input": "a{b,c",
+      "options": {
+        "escapeInvalid": true
+      },
+      "compiled": "a\\{b,c",
+      "expanded": [
+        "a{b,c"
+      ],
+      "stringified": "a{b,c"
+    },
+    {
+      "input": "{1..5..2}",
+      "options": {
+        "rangeLimit": 10
+      },
+      "compiled": "(1|3|5)",
+      "expanded": [
+        "1",
+        "3",
+        "5"
+      ],
+      "stringified": "{1..5..2}"
+    },
+    {
+      "input": "{a,b}",
+      "options": {
+        "expand": true
+      },
+      "compiled": "(a|b)",
+      "expanded": [
+        "a",
+        "b"
+      ],
+      "stringified": "{a,b}"
+    }
+  ]
+}

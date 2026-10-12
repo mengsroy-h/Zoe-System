@@ -165,6 +165,86 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.57] — 2026-10-12 · PR #312៖ បញ្ចប់ការកែ race និង barcode ពី Deep audit ឡើងវិញ
+
+**ZoeW `2.50.57`** (`zoew-v319` ➜ `zoew-v320`)។ **ZoeKeyGen `2.24.17` មិនប្រែ**។ គ្មាន migration/env/rules ថ្មី។ គោលការណ៍ Delete/Remove និងការបូកដក COD/DOD ដដែល។
+
+#### អ្វីដែលខុសពីមុន · អ្នកយាម
+
+- Supabase `get()` ពិនិត្យសម័យ គណនី និង tenant មុនបញ្ចូល response; សំណើហាង A ដែលឆ្លើយក្រោយចាកចេញ មិនជាន់ cache/listener ហាង B។
+- បិទ Supabase App ដក auth subscription ទាំងពីរ និង dispose BroadcastChannel/visibility listener របស់ SDK; បញ្ឈប់ការសរសេរ storage របស់ transport ចាស់។ Window listeners ដែល SDK បង្កើតក្នុង constructor ចង owner ហើយដកពេល close; initialize យឺតចប់ក្រោយ close ត្រូវ dispose ម្ដងទៀត។ Account verification/restore/logout ដែលនៅរង់ចាំ មិនលុបការចូលប្រព័ន្ធថ្មី។
+- Excel → Sheet៖ ការបើកប្រអប់ពិនិត្យសម័យ/ហាង/សោនៅរាល់ await; decrypt ចាស់មិនដាក់ URL/ពាក្យសម្ងាត់ និងមិនផ្ញើ status របស់ហាងចាស់។
+- Registry/pickup៖ escape `%` ដើម្បីឱ្យ `AB.C` និង `AB%2EC` មាន key ដាច់ពីគ្នា; barcode គ្មាន `%` រក្សា key ចាស់ដដែល។ ឧបករណ៍ registry-orphan មិន encode key ក្នុង dump ពីរដង និងការពារ key legacy ដែលមានម្ចាស់។
+- CLI audit៖ `money-core.js` ផលិតឡើងវិញពី encoder ថ្មី; `money-reality-check.js` និង `redact-dump.js` រក្សាទំនាក់ទំនង barcode encoded និង numeric identities។ Numeric phone/barcode/id/secret មិននៅ plaintext ក្នុង dump ដែលសម្អាត។
+- `audit-lifecycle.test.ts` · `barcode-key-encoding.test.ts` · `audit-checker-outcomes.test.ts` វាស់ function ពិត + WebCrypto/supabase-js/child timeout ពិត។ Money guardian លែងរាប់ការផ្ដាច់/timeout ជា mutation detection; backup checker កំណត់ child umask ដើម្បីកុំឱ្យ mode 0600 mutation បៃតងតាមម៉ាស៊ីន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ទិន្នន័យពិតមានតែ barcode ធម្មតាគ្មាន `%` (ម្ចាស់គម្រោងបញ្ជាក់ក្នុងជុំនេះ)៖ **គ្មានការផ្លាស់ទីទិន្នន័យ**។ បើនាំចូល backup ចាស់ពីប្រភពផ្សេងដែលមាន `%` ត្រូវពិនិត្យ registry/pickup/collected/origins មុនប្រើ; កុំប្ដូរ key ឬ totals ដោយស្វ័យប្រវត្តិ។
+២. ក្រោយ deploy សាក iPhone Safari/PWA និង Android PWA/APK ពិត៖ ប្តូរហាងខណៈបណ្តាញយឺត · ចាកចេញ/ចូលវិញ · បិទ/បើក Excel → Sheet · រមូរបញ្ជីវែង។ Headless Chromium មិនជំនួស hardware ពិតទេ។
+៣. Supabase Leaked Password Protection នៅ disabled; ត្រូវពិនិត្យ Settings/គម្រោងថ្លៃដោយម្ចាស់គម្រោង។ Session revoke ទុក access JWT ដែលមិនទាន់ផុតប្រើបានតាមព្រំដែនដែល README ទទួលស្គាល់; មិនប្តូរគោលការណ៍នេះក្នុងជុំនេះ។ មិនទាន់ merge។
+៤. បើធ្លាប់សម្អាត dump ដោយកំណែចាស់ ត្រូវសម្អាតពី dump ដើមឡើងវិញមុនផ្ញើ និងពិនិត្យឯកសារចាស់ដែលបានផ្ញើ សម្រាប់ phone/barcode/secret ដែលជា JSON number។ ឧបករណ៍ថ្មីត្រូវមាន `money-core.js` ក្នុងថតដូចគ្នា។
+
+### [2.50.56 / ZoeKeyGen 2.24.17] — 2026-10-12 · Deep audit ទាំង Project និង Link Lookup ចងហាង Supabase
+
+**សំណើម្ចាស់គម្រោង**៖ deep audit function · ភាពរលូន · network · Supabase/Firebase · SW · race · listener · security ដោយមិនទុកចិត្ត checker បៃតង និងបន្ថែមការចង API តាម ZoeKeyGen សម្រាប់ហាង Supabase។
+
+**ZoeW `2.50.56`** (`zoew-v318` ➜ `zoew-v319`) · **ZoeKeyGen `2.24.17`** (`zoekeygen-v127` ➜ `zoekeygen-v128`)។ គ្មាន migration/env/rules ថ្មី និងមិនប្តូរគោលការណ៍លុយ។
+
+#### អ្វីដែលខុសពីមុន
+
+- ZoeKeyGen៖ 🏪 ហាង ➜ 🔗 API ស្វែងរក បំពេញ Config Supabase និងជ្រើសហាងក្នុងផ្ទាំង Link។ target `shop` = Project + tenant UUID ចូល AES-GCM AAD។ ZoeW រក្សា target មុន Login; គណនីហាងផ្សេងមិនយក API នោះទៅប្រើ។ កែ/ដក tenant ឬប្តូរ Project មិនទទួល។ Link ចាស់ដែលគ្មាន target នៅតែអានបាន។ Supabase Admin ចាកចេញកណ្តាល encrypt ➜ គ្មាន Link/QR/កូដលេចយឺត។
+- Lookup៖ encrypt/migrate ពន្យារ ក្រោយប្តូរហាង/គណនី/សោ PIN មិនរក្សាទុកលទ្ធផលចាស់។ Save ថ្មីឈ្នះ Save ចាស់។ Test API មិនផ្ញើ Header របស់ហាងចាស់ក្រោយ decrypt យឺត ហើយមិនបង្ហាញលទ្ធផលចាស់ក្នុងសម័យថ្មី។
+- Excel → Sheet៖ status/encrypt/import/clear យឺតក្រោយប្តូរហាង មិនចងការតភ្ជាប់ ឬ cache/UI ហាង A ទៅ B; owner ការពារ finally ចាស់មិនបញ្ចប់ការងារថ្មី។
+- SW ទាំងពីរ៖ `caches.keys()`/`caches.delete()` បោះកំហុសពេល activate នៅតែហៅ `clients.claim()`; ការលុប cache ចាស់មិនទប់ activation។ filter cache របស់ App ដដែល។
+- ប្រវត្តិ 320px៖ លេខរៀងវែង/ស្លាកអាចបត់ក្នុងក្រឡាខ្លួន មិនជាន់ក្រឡាអតិថិជន; ទទឹងជួរឈរមិនប្រែ។
+- dependency៖ pin `source-map-js 1.2.2` និង `@grpc/grpc-js 1.13.6` តាម advisory ថ្មី; `npm audit` ពី 5 high ទៅ 0 vulnerability។ Firebase SDK version ដដែល។
+
+**ការបន្តតាមសំណើម្ចាស់គម្រោង «CLI មាន ៣ high ពី braces … កែអោយត្រឹមត្រូវបានអត់»**៖ Firebase Provision **1.0.1** ប្រើ `braces` local backport `3.0.3-zoe.1`។ CLI/chokidar version ដដែល; parser ចង brace/paren depth 100 ហើយ walkers ពិនិត្យ AST ផ្ទាល់/child cycle មុន recursion។ upstream source និង MIT license រក្សា និងផ្ទៀង hash; glob behavior និង module ផ្ទុកពិតមានតេស្ត។ npm audit សម្រាប់ local dependency មិនមែនភស្តុតាងកូដ patched; ត្រូវឆ្លងករណី exploit/corpus/mutation ផង។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/shop-bound-settings.test.ts`៖ ៧ ករណី race ថ្មីធ្លាក់មុនកែ; ក្រោយកែមានលទ្ធផលថ្មីឈ្នះ និងគ្មានការសរសេរ/ផ្ញើសោឆ្លងហាង។
+- `ZoeW/tests/setup-lookup.test.tsx`៖ producer UI ពិត ➜ ciphertext ➜ receiver ពិត ➜ target scope; tamper/strip tenant · Project ខុស · Admin logout ក្នុង encrypt; legacy ទាំងពីរ backend នៅតែឆ្លង។
+- `ZoeW/tests/sw-revalidation-timeout.test.ts`៖ activate Cache failure ៤ ករណីធ្លាក់មុនកែ; ក្រោយកែ claim ១ ដង។
+- `layout-check`៖ ករណីលេខរៀងជាន់ក្រឡាធ្លាក់មុនកែ ➜ ក្រោយកែ 151/151។ `dependency-security-test` ចាក់សោ patch floor ក្នុង lockfile។
+- កំណត់ត្រា audit និងព្រំដែនការសាក៖ ផ្នែក ២ «Deep audit ទាំង Project និង Supabase Lookup»។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. សាក deploy preview ZoeKeyGen៖ ចូល Supabase Admin ➜ ជ្រើសហាង ➜ 🔗 API ស្វែងរក ➜ បំពេញ URL/Header ➜ Link/QR + កូដ ៦ ខ្ទង់ដាច់ដោយឡែក។
+២. សាក ZoeW៖ PIN ➜ បើក Link ➜ កូដ ➜ ចូលគណនីហាងគោលដៅ ➜ Lookup។ សាកគណនីហាងផ្សេង និង Link ចាស់ Firebase/Supabase ផង។
+៣. សាក iPhone PWA + Android PWA + APK ពិត៖ search · keyboard · scrollbar · បញ្ជីវែង · modal · PTR · ប្តូរហាងពេលសំណើកំពុងរង់ចាំ។ មិនទាន់ merge។
+៤. Supabase live advisor នៅរាយ Leaked Password Protection disabled; ត្រូវពិនិត្យ Settings និងគម្រោងថ្លៃមុនបើក។ Local Postgres transaction suite ជាប់ UID mapping របស់បរិស្ថាននេះ; ត្រូវរត់លើ runner ដែលអាចប្តូរទៅ OS user Postgres។ មិនរាប់ការខកខានជា PASS។
+
+
+### [2.50.55] — 2026-10-12 · iPhone PWA ៖ scrollbar ពីរត្រួតគ្នា · ប្រវត្តិមិនដល់បាត · កាត់ការងារអំឡុងរមូរ
+
+**សំណើម្ចាស់គម្រោង**៖ វីដេអូ `17952.mp4` បង្ហាញស្វែងរកលេខ ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បាត់ ➜ របា Tab លាក់ ប៉ុន្តែប្រវត្តិនៅទុកចន្លោះនៅបាត។ ម្ចាស់បញ្ជាក់ថា scrollbar បន្ថែមដាក់ដោយចេតនាសម្រាប់ APK និង iOS PWA ព្រោះពីមុនមិនមាន; ឥឡូវ iOS បង្ហាញពីរ។ ការសង្ស័យថា Safari update មិនទាន់ផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត។ ម្ចាស់ស្នើបន្ថែមឱ្យ App ទាំងមូលរលូនជាងមុន ព្រោះ APK និង PWA Android រលូនជាងពេលខ្លះ។
+
+**ZoeW `2.50.55`** (`zoew-v317` ➜ `zoew-v318`)។ ZoeKeyGen ដដែល; គ្មាន migration/env/rules ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- `@supports (-webkit-touch-callout: none)` រក្សា padding របស់របា Tab លើ `.app-pages` ដែលនៅស្ថានភាពស្វែងរក ទោះ `chrome-hidden`។ ច្បាប់ប្រគល់ចន្លោះវិញធ្លាប់គ្របតែ `history-expanded`។ ឥឡូវវាគ្រប `.app-pages` ទាំងអស់នៅផ្លូវ iOS ហើយទុក `--page-extension` និងគែម ៨px ដដែល។
+- `drawsOwnScrollThumb()` ដំឡើងខ្សែបន្ថែមតែលើ APK Android។ iOS PWA ប្រើ scrollbar ប្រព័ន្ធ។ PTR របស់ iOS និងខ្សែ ៣px របស់ APK នៅដដែល។
+- ការរមូរគ្រប់ផ្ទាំង/ប្រអប់ធ្លាប់ដាក់ rAF ដើម្បីកំណត់ទីតាំងបញ្ជីណែនាំលេខ ទោះបញ្ជីបិទ ហើយហៅ `commitNow()` ដោយបង្ខំ flush React គ្រប់ store មុនពិនិត្យថាមានបញ្ជី។ ឥឡូវបញ្ជីបិទ ➜ មិនដាក់ rAF និងមិន flush; បញ្ជីបើកនៅតែវាស់មួយដងក្នុងស៊ុម។ ផ្លូវរួមនេះជួយ iOS · Android · desktop ដោយមិនប្តូររយៈពេល/easing ចលនា។
+- iOS មិនមាន watcher របស់ scrollbar បន្ថែមដែលអាន `getBoundingClientRect()` រាល់ស៊ុមពេលខ្សែលេច។
+- ការកែតំបន់ហាមមានសំណើពិត និងកត់ក្នុងសោ `app.css` + `phone-search.ts`; `chrome-autohide` · ចលនាផ្ទាំង · snap · PTR មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-history-bottom.test.ts` វាស់ cascade CSS ពិតនៅស្ថានភាព search + chrome-hidden និង platform gate។ ករណីទាំងពីរធ្លាក់លើកូដមុនកែ។
+- `phone-suggest-idle-scroll.test.ts` ធ្លាក់លើ source មុនកែ៖ បញ្ជីបិទនៅតែ flush និងដាក់ rAF។ ក្រោយកែ ៣០ scroll + resize ➜ ០ rAF; បញ្ជីបើក ➜ ១ rAF ដដែល។
+- `audit-tools/panel-motion-test.js` បន្ថែមស្វែងរក ➜ បើក/បិទ modal ➜ របាលាក់ · safe-area ០/៣៤px ដោយវាស់គែមផ្ទាំងពិត។ `scroll-thumb.test.tsx` វាស់ការរមូរ iOS មិនដំឡើង overlay និងរក្សាតេស្តខ្សែពេញលើ APK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⏳ សាក deploy preview លើ iPhone PWA ពិត៖ ធ្វើដូចវីដេអូ ចុចស្វែងរក ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បិទ ➜ បិទ modal ➜ អូសបញ្ជីឱ្យរបា Tab លាក់។ គែមប្រវត្តិចុះដល់បាត ហើយមាន scrollbar តែមួយ។ សាកលេខទទេ និងលេខដែលវាយរួច; សាកបង្វិលអេក្រង់ និងត្រឡប់មក App វិញ។
+២. ⏳ សាក APK Android ពិត៖ ខ្សែ ៣px លេចពេលរមូរ ហើយបាត់ក្រោយស្ងៀម; keyboard · របា Tab · អូសបើក/បិទផ្ទាំង · PTR ដំណើរការដូចមុន។ ត្រូវផ្ទៀងផ្ទាត់ឧបករណ៍ទាំងពីរមុន merge។
+៣. ក្រោយ merge/deploy បើក ZoeW ឱ្យបាន `2.50.55`។
+
+
 ### [ZoeKeyGen 2.24.16] — 2026-10-11 · Setup Lookup ៖ ទទួល URL របស់ ZTO ដែលចាប់ផ្ដើម `/`
 
 **ZoeKeyGen `2.24.16`** (`zoekeygen-v126` ➜ `zoekeygen-v127`)។ ZoeW `2.50.54` / `zoew-v317` ដដែល; កែតែកូដអ្នកបង្កើត Link និងតេស្ត។
@@ -3457,6 +3537,60 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-12 — PR #312៖ Deep audit ឡើងវិញ និងកែចន្លោះក្នុង checker
+
+កូដមុនកែ `076ed7b`។ បន្ទាប់ពី run-all STRICT ២០៤ checker ឆ្លងទាំងអស់ (រត់ពេញ និង resume លើ fingerprint `21cc6286fb77f49e` ដដែល · ០ skip/partial) តេស្ត race និង barcode បន្ថែមនៅតែបង្ហាញកំហុសពិត ៤៖ `zoe_read` យឺតជាន់ cache ហាងថ្មី · verification របស់ App បិទលុប session ថ្មី · Sheet open decrypt យឺតដាក់ plaintext ហាងចាស់ · `%` ជាន់ key punctuation ធ្វើឱ្យ barcode ទីពីរទាមទារមិនបាន និង pickup ២ ក្លាយជា ១។ កំណែថ្មីការពារ ownership នៅ await និងធ្វើ key bijective តាម barcode ដែល normalize រួច។ ទិន្នន័យ barcode ពិតគ្មាន `%` តាមការបញ្ជាក់ម្ចាស់គម្រោង។
+
+Checker ចាស់៖ child money guard timeout/SIGTERM ត្រូវបម្លែងទៅ code 1 ហើយរាប់ថា «ចាប់ mutant បាន»។ តេស្ត child ពិតបញ្ជាក់កំហុស ហើយកំណែថ្មីចាត់ interrupted ជា FAIL របស់ checker; មិនរាប់ចូល caughtBy។ Backup mode mutation មិនលេចក្រោម umask 0077; checker ថ្មីកំណត់តែ umask កូន 0022 ពេល spawn ហើយស្តារ parent ភ្លាមៗ។ មិនសរសេរទិន្នន័យផលិតកម្ម។
+
+តេស្ត regression ១៩ ដូចគ្នារត់លើកូដមុនកែ៖ ១៥ FAIL · ៤ control PASS។ ក្រោយកែ៖ ១៩/១៩ PASS; បន្ថែម owner safety ២ ករណី (capture/unrelated listener និង constructor throw)៖ សរុប ២១/២១ PASS; typecheck/lint ឆ្លង។ Full run-all STRICT លើ fingerprint `7350fc3cd36cbff0`៖ ២០១ PASS · ៣ FAIL · ០ partial · ០ skip (៣១២២ វិនាទី)។ FAIL គឺលិបិក្រមតេស្តថ្មីខ្វះ ៣ ឈ្មោះ · generated money-core ចាស់ · feed មាន update ចាស់ និងថ្មី ខុសសំណើទុកតែ update ចុងក្រោយ។ កែទាំង៣ និងរត់ checker ដែលប៉ះ និង meta/metadata/security សរុប ១០ ឡើងវិញលើ fingerprint `13b3ae5c396df491`៖ ១០/១០ PASS · ០ FAIL/skip/partial។ Money CLI ៦០/៦០; តេស្ត CLI ដូចគ្នាលើឧបករណ៍មុនកែ៖ ៥៦ PASS · ៤ FAIL (encoded identity និង numeric PII)។ សាលក្រម checker ២០៤ បន្ទាប់ពីផ្ទៀងផ្ទាត់ការកែផ្នែកដែលប៉ះ៖ PASS ទាំងអស់; មិនអះអាង full fresh run ថ្មីមួយដែលឆ្លងទាំង២០៤លើ hash ចុងក្រោយទេ។ Source App/runtime នៅដដែលក្រោយ full run; ក្រោយមកកែតែ feed, ឯកសារ និងឧបករណ៍ CLI ដែលមាន regression ផ្ទាល់។
+
+Supabase SDK cleanup ដែលរកឃើញបន្ថែម៖ Chromium ពិត + supabase-js ពិត, បើក/បិទ client ២០ ដង៖ កូដមុនកែនៅសល់ window listener ៦០ និង BroadcastChannel មិនបិទ ២០; ក្រោយកែនៅសល់ ០ listener និងបិទ channel ២០/២០។ Listener របស់ App ដែលមិនមែន SDK នៅដើរ; pageerror ០។ Auth init យឺតដែលភ្ជាប់ visibility listener ក្រោយ close ក៏មាន regression pre-fix red ➜ fixed។ Constructor scope កាន់ listener តែក្នុង createClient synchronous ហើយស្ដារ descriptor ដើមភ្លាមៗ; មិនប្ដូរកូដ SDK/vendor។
+
+CLI consumers បន្ថែម៖ `money-reality-check.js` encode registry/collected keys ពីរដង ហើយ `redact-dump.js` hash raw barcode ខុសពី key ដែល encode រួច; fixture `AB.C`/`AB%2EC` រាយកំហុសលុយក្លែងក្លាយ ៣ ទោះ ledger ត្រឹមត្រូវ។ Numeric phone/barcode/secret នៅក្នុង JSON number មិនត្រូវ hash ហើយឧបករណ៍នៅរាយ safe to share។ កែដោយប្រើ barcode encoder ពិតពី money-core និង numeric whitelist តាម schema (រួម c/d និង pickedUpPhones counters)។ `money-reality-test` វាស់ encoded និង numeric dump មុន/ក្រោយសម្អាត, អត្តសញ្ញាណមិនលេច, ចំនួន/ទឹកប្រាក់មិនប្រែ; test ថ្មីធ្លាក់លើឧបករណ៍មុនកែ។ គ្មានការអាន ឬសរសេរទិន្នន័យអតិថិជនពិត។
+
+ការវាស់បន្ថែមមុនកែ៖ fuzz seed 200–227 × 75 operations (28×75) ជាប់ invariants និងផ្លូវ other-device/applied-lost; browser 3000 history + 3000 trash នៅ 360/1024px, initDatabaseListeners 30 ដងនៅតែ 10 subscriptions (path មួយមានតែ ១), page/listener error ០, frame p95 16.7ms; desktop មាន frame យឺត 116.6ms មួយ។ មិនអះអាង hardware FPS។ Local PostgreSQL suites រត់បានដោយ embedded PG17; ការខកខាន UID ក្នុងកំណត់ត្រាមុនមិនមែន FAIL SQL ដែលនៅសល់ទេ។ Supabase live read-only៖ migration 14 ដូច repo · public tables 9 មាន RLS · anon គ្មាន SELECT · authenticated គ្មាន direct DML · forged user_metadata មិនក្លាយជា admin។ Leaked Password Protection disabled និង JWT revoke boundary នៅដដែល។
+
+
+
+### 2026-10-12 — CLI braces backport តាមសំណើម្ចាស់គម្រោង
+
+- បញ្ជាក់កំណែដើម `braces@3.0.3`៖ balanced pattern depth 4900 ប្រវែង 9801 តួ ➜ compile បោះ Maximum call stack size exceeded លើ Node ពិត។ AST depth 20000 ក៏ឆ្លង character gate ដែរ។
+- `tools/firebase-provision` **1.0.1**៖ local fork **3.0.3-zoe.1** (មិនមែនកំណែផ្លូវការ) + parser cap 100 រួម parentheses និង walker guard តាម iterative validation។ AST ដែល caller ផ្ដល់ផ្ទាល់ និង child cycle ក៏បដិសេធដោយ BRACES_MAX_DEPTH។ quoted/escaped/class literals មិនចាត់ជានesting។ CLI 15.32.1 · chokidar 3.6.0 · dependency registry ផ្សេងទៀតរក្សា lock ដដែល។
+- npm file dependency/override ចងទៅ vendor ដែល pack ដំឡើងតាម npm ci --ignore-scripts។ សាក clean install ដោយដក NODE_PATH; actual chokidar require.resolve និង bytes ដូច source patched។ មិនពឹង global module ឬ postinstall hook។
+- `firebase-provision-test`៖ corpus 38 ករណីពី upstream · public entrypoints · cap/cap+1 · exploit string · unclosed nesting · direct AST/cycle · literal ទិសផ្ទុយ · runtime byte identity និង watcher glob {a,b} ផ្ទាល់។ ដក guard ទាំង ៤ ទ្វារ ➜ behavior controls ក្រហម។ CLI HTTPS provisioning + mutation នៅឆ្លង (សរុប 187/187)។
+- Provenance និង MIT license រក្សា; ដកតែបន្ទាត់ backport នឹងទទួល hash ត្រូវនឹង upstream package bytes។ រាល់ឯកសារ vendor/fixture មានការចុះ guard coverage។
+- ភស្តុតាងការកែជាលទ្ធផល exploit/behavior/source ត្រឹមត្រូវ។ Registry advisory មិនបានវាយតម្លៃ fork ក្នុង repo; npm audit សម្រាប់ local package មិនធានាកូដនេះដោយខ្លួនវាទេ។ មិនអះអាងបានដោះស្រាយ regex complexity ឬការប្រើ glob មិនទុកចិត្តគ្រប់ប្រភេទ។
+- Full run STRICT ទាំង 204 checker (tree fingerprint ac43fd7383a14b42)៖ 196 PASS · 8 FAIL · 0 partial · 0 skip។ FAIL 1 ជា version នៅក្រៅ header ក្នុង CLAUDE.md ➜ កែ និង rerun docs 99/99; Postgres 7 នៅជាប់ UID mapping។
+- CI មុននៅ commit 5423eb0៖ 3 shard ឆ្លង; shard 2 ធ្លាក់តែ keygen-supabase-admin-test ដែលនៅរំពឹងប៊ូតុង 3 ក្រោយ UI មានប៊ូតុង Lookup ទី 4។ កែ assertion ឱ្យគ្រប sb-lookup និង action/id ទាំង 4 ដដែល។ Local Postgres ជាប់ UID ដូចមុន; ត្រូវឱ្យ CI ជុំថ្មីវាស់ SQL path នោះ។
+
+### 2026-10-12 — Deep audit ទាំង Project និង Supabase Lookup
+
+មូលដ្ឋានគឺ PR #312។ តេស្តបៃតងអះអាងតែសេណារីយ៉ូដែលវាស់; ប្រើកូដពិត, ពន្យារពេល promise, ផ្លាស់ប្តូរហាងកណ្តាល await និងបដិសេធ Cache API ដើម្បីរកចន្លោះថ្មី។ អ្នកយាមថ្មីនៅក្នុង `ZoeW/tests/shop-bound-settings.test.ts` · `ZoeW/tests/setup-lookup.test.tsx` · `ZoeW/tests/sw-revalidation-timeout.test.ts`។
+
+| ផ្នែក | អ្វីដែលវាស់ និងភស្តុតាង | ព្រំដែន |
+|---|---|---|
+| Function/លុយ | full guards សម្រាប់ close/remove/delete/restore · registry · ledger · cleanup; fuzz លើ seed និងចំនួន operation បន្ថែម | មិនប្តូរគោលការណ៍លុយ; fake SDK មិនជំនួស rules ពិត |
+| Race | Lookup Save/Migrate/Test និង Sheet Save/Status/Clear ៧ ករណី pre-fix red ➜ fixed; save ថ្មីឈ្នះ save ចាស់ | crypto/network promise ពន្យារដោយចេតនាលើ function ពិត |
+| Supabase Lookup | UI ជ្រើសហាង ➜ ciphertext AAD ➜ ZoeW store/get; tenant tamper/strip និង backend mismatch បដិសេធ | Header Secret/code មិននៅក្នុង Link/storage plaintext; legacy Link ដដែល |
+| SW | activate keys/delete failure ទាំងពីរ App ៤ ករណី pre-fix red ➜ claim ឆ្លង; offline/cache/deploy tests | មិនរាប់ Cache API failure ជាបណ្តាញដើរ |
+| Smooth/layout | browser traces និង perf guards · iOS/Android paths · 600-row native/PWA harness; 320px index collision កែ ➜ layout 151/151 | Chromium ក្លែង iOS មិនមែន Safari ពិត; hardware FPS មិនទាន់វាស់ |
+| Firebase/network | emulator ពិត, real rules, SDK transaction តាម TCP proxy drop-request/drop-ack; network connect/offline/body-hang/reconnect guards | localhost ត្រូវរត់ emulator និង checker ក្នុង exec/network namespace ដូចគ្នា; Node SDK មិនប្រើ ambient HTTP proxy |
+| Duplicate listener/session | listener leak · backend switch/detach · auth/session race · logout/reconnect lifecycle guards និងអាន callers | លទ្ធផលតែសេណារីយ៉ូដែលរត់ |
+| Supabase live | project healthy; migration ដល់ member_devices; RLS លើ public tables ទាំងអស់; anon គ្មាន select និង authenticated គ្មាន direct DML; RPC grants/private wrappers; read-only JWT user_metadata=admin មិនអាន tenant/docs/admin rows និងមិនក្លាយជា admin | គ្មានការកែទិន្នន័យផលិតកម្ម; local Postgres ៥ suite និង parity ២ មិនអាច init ដោយ UID map មានតែ uid 0 |
+| Security/dependency | npm audit ZoeW 5 high ➜ patched 0; Supabase/Backup/Cookie tool 0; Firebase Provision 11 ➜ 3 high upstream braces គ្មាន patch; secret hygiene · CSP · shipped bundle · license/PIN · input/XSS guards | audit live: Leaked Password Protection disabled; unused-index INFO មិនមែនមូលហេតុលុប index |
+
+`dependency-security-test`៖ lockfile មុនកែមាន source-map-js 1.2.1 និង grpc 1.9.16 ➜ patch floor ត្រូវធ្លាក់; lockfile ថ្មីឆ្លង។ CLI lockfile ចាស់ basic-ftp/Core/uuid ក៏ធ្លាក់ patch floor; CLI ថ្មី HTTPS workflow + mutation 93/93 ហើយ PubSub ផ្ទុកបាន និង inbound baggage 1000 entries ត្រូវកាត់ត្រឹម 180។ Sheet Status/Clear control ប្រើ source មុនកែដាច់ពី test suite ផ្សេង ➜ ធ្លាក់ ២ ទោះ shopScope A/B ត្រឹមត្រូវ; ក្រោយកែឆ្លង។ បិទ Sheet កណ្តាល await សម្អាត busy/button flags ភ្លាមៗ និងដក owner របស់សំណើចាស់។
+
+**ការផ្ទៀងផ្ទាត់ចុងក្រោយ**៖ run-all STRICT ជាមួយ Firebase emulator ពិត រត់ checker ទាំង ២០៤ លើ code tree `2c932bd5a2c7eb92` (០ partial · ០ skip)៖ ១៩៤ PASS · ១០ FAIL។ ៣ ករណីគឺ harness ដែលមិនទាន់ចាក់ state/helper Sheet ថ្មី ២ និងលិបិក្រម ១ ➜ កែហើយ rerun៖ logout 72/72 · freshness 171/171 · docs 99/99។ ដូច្នេះការវាស់ដែលឆ្លងសរុប ១៩៧; នៅសល់ Postgres ៧ ជា FAIL ដោយ UID map មិនមែនបញ្ហា SQL ដែលបានបញ្ជាក់។ React suite ទាំងពីរ · layout 151/151 · perf 31/31 · native និង Firebase emulator suites ឆ្លង។ Fuzz បន្ថែម seed 100–113៖ 14×50 ឆ្លង · cross-device injection 14 · ledger applied/lost 6/10។
+
+CLI dependency patch ធ្វើក្រោយ full run ➜ សាកផ្នែកដែលប៉ះឡើងវិញ៖ HTTPS Provision + mutation 93/93 · dependency guard 23/23 · meta-checker 36/36។ Control lockfile ចាស់ធ្លាក់ ៥ patch floor ពិត (ZoeW ២ · CLI ៣); មិនរាប់ CLI npm audit នៅសល់ ៣ high ជា ០ ហើយមិនអះអាងថា full run លើ commit ចុងក្រោយបៃតងទាំង ២០៤។
+
+Live Supabase logs 24h៖ source ៩ · severity ERROR/FATAL ០ ក្នុង aggregate ដែលសាក; នេះមិនបញ្ជាក់គ្មាន HTTP 4xx/5xx ទាំងអស់ទេ។ `zoe_ops` RLS/no-policy មានដោយចេតនា និងគ្មាន anon/authenticated select/DML grant។
+
+Advisory យោង៖ [source-map-js](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) · [grpc certificates](https://github.com/advisories/GHSA-m9gg-hp2v-232j) · [grpc error disclosure](https://github.com/advisories/GHSA-f596-whhp-79r4)។ ផ្លូវ upgrade ជា patch override; មិន downgrade Firebase តាម npm audit suggestion។ CLI៖ [basic-ftp](https://github.com/advisories/GHSA-c475-qrg2-pj4r) · [OpenTelemetry Core](https://github.com/advisories/GHSA-8988-4f7v-96qf) · [uuid](https://github.com/advisories/GHSA-w5hq-g745-h8pq) · [braces គ្មាន patch](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)។ មិន override chokidar ទៅ major ដែលបាត់ glob behavior ដើម្បីឱ្យ audit បៃតងទេ។
+
+
 ### 2026-10-10 — Deep audit ៥ (សំណើម្ចាស់គម្រោង ៖ «deep audit Network, Race, duplicate listener, sw, firebase, supabase, money, ច្បាប់លុប ដក, zto, Cookie … កុំជឿជាក់លើ checker ក្រែង checker បៃតងក្លែងក្លាយ» · «commit ចូល PR#309» · គ្មាន agent) ➜ [2.50.53]
 
 - **មូលដ្ឋាន** ៖ run-all STRICT (emulator RTDB រស់) លើ `05a24c5` ៖ ២០៣ ជាប់ · ធ្លាក់ ១ = `repository-file-coverage` ព្រោះអ្នកយាមថ្មីលេចកណ្តាលការរត់ (artifact · មិនមែនកូដ)។
@@ -5522,7 +5656,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `css-var-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `daily-collected-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `dependency-security-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `dependency-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `dom-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
@@ -5588,8 +5722,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
-| `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `money-reality-test` | ផ្នែក ១ | ផ្នែក ២ |
+| `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `monthly-ledger-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -5616,7 +5750,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `react-view` | — | ផ្នែក ៦ |
 | `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-release-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -5769,7 +5903,10 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
@@ -5823,4 +5960,6 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |

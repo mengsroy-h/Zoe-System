@@ -512,6 +512,42 @@ function pngDiff(bufA, bufB, tol) {
             ok('iOS: លាក់របា ➜ គែមក្រោមកាតចុះជិតបាតអេក្រង់ (គ្មានចន្លោះទទេ)',
                 r2.viewportH - r2.hidden.cardBottom >= 0 && r2.viewportH - r2.hidden.cardBottom <= 16,
                 { bottom: r2.hidden.cardBottom, viewportH: r2.viewportH });
+            for (const safeArea of [0, 34]) {
+                const padding = await page2.addStyleTag({ content: 'html, body { min-height: calc(100dvh + ' + safeArea + 'px); }' });
+                await page2.evaluate(() => {
+                    window.measureAppChromeSize();
+                    window.setPhoneSearchPulledUp(true);
+                    window.showAppChrome();
+                    const field = document.getElementById('searchPhoneInput');
+                    field.value = '09';
+                    field.focus();
+                });
+                await page2.waitForTimeout(400);
+                const afterModal = await page2.evaluate(async () => {
+                    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+                    const main = document.getElementById('dataMainSection');
+                    const pages = document.getElementById('appPages');
+                    const shownBottom = main.getBoundingClientRect().bottom;
+                    window.hideAppChrome();
+                    window.openViewListModal(window.dataState.scanHistory[0].id);
+                    document.getElementById('searchPhoneInput').blur();
+                    await wait(200);
+                    const modalOpened = window.uiState.isModalOpen;
+                    window.dismissModal('viewListModal');
+                    await wait(400);
+                    return { modalOpened, search: window.uiState.dataPanelSearchFocus,
+                        hidden: document.body.classList.contains('chrome-hidden'),
+                        bottom: main.getBoundingClientRect().bottom, shownBottom,
+                        gap: window.innerHeight - main.getBoundingClientRect().bottom,
+                        padding: getComputedStyle(pages).paddingBottom };
+                });
+                ok('iOS: ស្វែងរក ➜ បើកកញ្ចប់ ➜ keyboard បិទ ➜ របាលាក់ · safe-area ' + safeArea,
+                    afterModal.modalOpened && afterModal.search && afterModal.hidden, JSON.stringify(afterModal));
+                ok('iOS: ស្វែងរកនៅបើក · របាលាក់ ➜ ប្រវត្តិដល់បាត · safe-area ' + safeArea,
+                    afterModal.gap >= 0 && afterModal.gap <= 16 && afterModal.bottom > afterModal.shownBottom + 20,
+                    JSON.stringify(afterModal));
+                await padding.evaluate((el) => el.remove());
+            }
         }
         await ctx2.close();
     }

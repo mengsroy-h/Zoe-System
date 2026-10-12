@@ -1038,6 +1038,111 @@ function skip(reason) {
     console.log('SKIP — ' + reason + ' (រត់ ៖ npm ci --prefix tools/firebase-provision)');
 }
 
+async function checkBracesBackport(deps) {
+    const { createRequire } = require('module');
+    const dir = path.join(TOOL, 'vendor', 'braces');
+    let metadata, corpus, fill, installedRequire, installedDir;
+    try {
+        metadata = JSON.parse(fs.readFileSync(path.join(dir, 'UPSTREAM.json'), 'utf8'));
+        corpus = JSON.parse(read('audit-tools/fixtures/braces-compat.json'));
+        installedRequire = createRequire(path.join(deps, 'chokidar', 'index.js'));
+        installedDir = path.dirname(installedRequire.resolve('braces'));
+        fill = createRequire(path.join(deps, 'braces', 'index.js'))('fill-range');
+    } catch (e) { ok('braces backport ៖ source/fixture/dependency អានបានពិត', false, e.message); return; }
+    const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+    ok('braces ៖ provenance ជា package 3.0.3 ផ្លូវការដែលបានផ្ទៀងផ្ទាត់',
+        digest(fs.readFileSync(path.join(dir, 'UPSTREAM.json'))) === '865f90dce189a512c80a099a10ec1c255cd4e409dd61e006eb99b4975b13612a');
+    const files = Object.keys(metadata.originalSha256);
+    const changes = {
+        'package.json': [['3.0.3-zoe.1', '3.0.3']],
+        'lib/parse.js': [["const { MAX_DEPTH, rejectDepth } = require('./depth');\n", ''], ['      if (stack.length > MAX_DEPTH) rejectDepth();\n', '']],
+        'lib/compile.js': [["const { assertDepth } = require('./depth');\n", ''], ['  assertDepth(ast);\n', '']],
+        'lib/expand.js': [["const { assertDepth } = require('./depth');\n", ''], ['  assertDepth(ast);\n', '']],
+        'lib/stringify.js': [["const { assertDepth } = require('./depth');\n", ''], ['  assertDepth(ast);\n', '']]
+    };
+    for (const name of files) {
+        const bytes = fs.readFileSync(path.join(dir, name));
+        let original = bytes.toString('utf8');
+        for (const [from, to] of changes[name] || []) original = original.split(from).join(to);
+        ok('braces upstream bytes ៖ ' + name, digest(original) === metadata.originalSha256[name]);
+        ok('CLI/chokidar ផ្ទុក backport bytes ពិត ៖ ' + name,
+            digest(fs.readFileSync(path.join(installedDir, name))) === digest(bytes));
+    }
+    ok('CLI/chokidar ផ្ទុក depth guard ពិត',
+        digest(fs.readFileSync(path.join(installedDir, 'lib', 'depth.js'))) === digest(fs.readFileSync(path.join(dir, 'lib', 'depth.js'))));
+    const pkg = JSON.parse(read('tools/firebase-provision/package.json'));
+    const lock = JSON.parse(read('tools/firebase-provision/package-lock.json'));
+    ok('braces install ៖ local dependency/override/packed lock ដូចគ្នា',
+        pkg.dependencies.braces === 'file:vendor/braces' && pkg.overrides.braces === '$braces'
+        && lock.packages['node_modules/braces'].resolved === 'file:vendor/braces'
+        && lock.packages['node_modules/braces'].version === '3.0.3-zoe.1'
+        && !lock.packages['node_modules/braces'].link && /install-links=true/.test(read('tools/firebase-provision/.npmrc')));
+    function load(mutation) {
+        const cache = new Map();
+        function local(name) {
+            if (cache.has(name)) return cache.get(name).exports;
+            let code = fs.readFileSync(path.join(dir, name), 'utf8');
+            if (mutation === name) code = name === 'lib/parse.js'
+                ? code.split('      if (stack.length > MAX_DEPTH) rejectDepth();\n').join('')
+                : code.replace('  assertDepth(ast);\n', '');
+            const module = { exports: {} }; cache.set(name, module);
+            const req = id => id === 'fill-range' ? fill : local(path.posix.normalize(path.posix.join(path.posix.dirname(name), id)) + '.js');
+            vm.runInThisContext('(function(module,exports,require){\n' + code + '\n})', { filename: path.join(dir, name) })(module, module.exports, req);
+            return module.exports;
+        }
+        return local('index.js');
+    }
+    const braces = load();
+    ok('braces corpus ៖ ជាន់អប្បបរមា ៣០ ករណីពីកំណែផ្លូវការ', corpus.cases.length >= 30);
+    for (const c of corpus.cases) {
+        const results = [braces.compile(c.input, c.options), braces.expand(c.input, c.options), braces.stringify(c.input, c.options), braces(c.input, c.options)];
+        const expected = [c.compiled, c.expanded, c.stringified, c.options.expand ? c.expanded : [c.compiled]];
+        ok('braces glob behavior ដដែល ៖ ' + JSON.stringify([c.input, c.options]), JSON.stringify(results) === JSON.stringify(expected));
+    }
+    const cap = require(path.join(dir, 'lib', 'depth.js')).MAX_DEPTH;
+    ok('braces depth policy ដូច provenance ដែលចាក់សោ', cap === metadata.maxDepth);
+    const nested = (n, open = '{', close = '}') => open.repeat(n) + 'a' + close.repeat(n);
+    function ast(n) {
+        const root = { type: 'root', nodes: [] }; let node = root;
+        for (let i = 0; i < n; i++) { const child = { type: 'paren', nodes: [], parent: node }; node.nodes.push(child); node = child; }
+        node.nodes.push({ type: 'text', value: 'a', parent: node }); return root;
+    }
+    function refused(fn) { try { fn(); return false; } catch (e) { return e.code === 'BRACES_MAX_DEPTH' && !/call stack/i.test(e.message); } }
+    for (const method of ['parse', 'compile', 'expand', 'stringify']) {
+        ok('braces ' + method + ' ៖ cap + 1 បដិសេធដោយ guard', refused(() => braces[method](nested(cap + 1))));
+        ok('braces ' + method + ' ៖ exploit 4900 នៅក្រោម character cap', refused(() => braces[method](nested(4900))));
+        ok('braces ' + method + ' ៖ parentheses ត្រូវបានចង depth ផង', refused(() => braces[method](nested(cap + 1, '(', ')'))));
+        ok('braces ' + method + ' ៖ unclosed nesting បដិសេធមុន cleanup', refused(() => braces[method]('{'.repeat(cap + 1))));
+    }
+    for (const method of ['compile', 'expand', 'stringify']) {
+        ok('braces ' + method + ' ៖ AST ផ្ទាល់មិនឆ្លង parser ក៏ចង depth', refused(() => braces[method](ast(20000))));
+        const cycle = { type: 'root', nodes: [] }; cycle.nodes.push(cycle);
+        ok('braces ' + method + ' ៖ child cycle បដិសេធ', refused(() => braces[method](cycle)));
+        ok('braces ' + method + ' ៖ cap ត្រឹមត្រូវនៅទទួល', JSON.stringify(braces[method](nested(cap))) === JSON.stringify(method === 'expand' ? [nested(cap)] : nested(cap)));
+    }
+    for (const input of ['"' + nested(4900) + '"', '\\{'.repeat(cap + 1) + 'a' + '\\}'.repeat(cap + 1), '[' + nested(cap + 1) + ']']) {
+        ok('braces quoted/escaped/class ជា literal មិនរាប់ជា depth', typeof braces.compile(input) === 'string');
+    }
+    for (const [file, method] of [['lib/parse.js', 'parse'], ['lib/compile.js', 'compile'], ['lib/expand.js', 'expand'], ['lib/stringify.js', 'stringify']]) {
+        const mutant = load(file);
+        ok('M ដក depth guard ' + file + ' ➜ ករណីឥរិយាបថក្រហម', !refused(() => mutant[method](method === 'parse' ? nested(4900) : ast(20000))));
+    }
+    const temp = tempDir('zoe-braces-watch-');
+    const chokidar = createRequire(path.join(deps, 'firebase-tools', 'lib', 'index.js'))('chokidar');
+    for (const name of ['a', 'b', 'c']) { fs.mkdirSync(path.join(temp, name)); fs.writeFileSync(path.join(temp, name, 'file.txt'), 'first'); }
+    const seen = []; let watcher;
+    try {
+        await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('glob watcher timed out')), 5000);
+            watcher = chokidar.watch(path.join(temp, '{a,b}', '*.txt'), { ignoreInitial: false });
+            watcher.on('add', name => seen.push(path.relative(temp, name).replace(/\\/g, '/')));
+            watcher.on('error', error => { clearTimeout(timer); reject(error); });
+            watcher.on('ready', () => { clearTimeout(timer); resolve(); });
+        });
+        ok('chokidar brace glob ពិត ➜ a/b តែប៉ុណ្ណោះ', JSON.stringify(seen.sort()) === JSON.stringify(['a/file.txt', 'b/file.txt']));
+    } finally { if (watcher) await watcher.close(); fs.rmSync(temp, { recursive: true, force: true }); }
+}
+
 (async () => {
     const contract = staticContract();
     if (!contract) {
@@ -1053,6 +1158,7 @@ function skip(reason) {
         if (!deps) {
             skip('firebase-tools ' + pin['firebase-tools'] + ' មិនទាន់ដំឡើង');
         } else {
+            await checkBracesBackport(deps);
             const tls = makeTls(tlsDir);
             if (!tls) {
                 skip('openssl មិនមាន (ត្រូវការសម្រាប់ Google ក្លែងលើ HTTPS)');

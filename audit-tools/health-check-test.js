@@ -67,7 +67,8 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
-    'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient'];
+    'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
+    'shopScope', 'safeStoreGet'];
 // ⛔ ថេរដេរីវេពីកូដពិត (មិនមែន literal ក្នុង checker)
 function sliceConst(name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
@@ -151,6 +152,8 @@ function buildRuntime(over) {
         customerDataTableFetchedAt: 1,
         customerTableIsPartial: !!o.partial,
         lookupSecretKey: o.unlocked === false ? null : {},
+        authGeneration: 0,
+        lookupTestGeneration: 0,
         SHEET_SCRIPT_VERSION_EXPECTED: 1,
         sheetScriptVersionSeen: o.scriptSeen === undefined ? null : o.scriptSeen,
         dbListenerViewIsStale: () => !!o.stale,

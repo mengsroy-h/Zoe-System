@@ -72,6 +72,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
             removeItem: (name) => { storage.delete(name); }
         },
         lookupSecretKey: key,
+        authGeneration: 0,
         encryptLookupSecret: encrypt,
         clearCustomerDataTableCache: () => {},
         clearZtoPickupStatusStore: () => {},
@@ -116,9 +117,10 @@ function createRuntime(existing, key, encrypt, failStorage) {
                 setItem: (name, value) => storage.set(name, String(value))
             },
             lookupSecretKey: { key: true },
+            authGeneration: 0,
             encryptLookupSecret: async (value) => ({ sealed: value })
         });
-        const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n'
+        const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n' + sliceFn(appSource, 'safeStoreGet') + '\n'
             + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(appSource, name)).join('\n') + '\n'
             + sliceFn(appSource, 'getLookupApiConfig')
             + '\n' + migrateSource + '\nthis.runMigration = migrateLookupSecretIfNeeded;';

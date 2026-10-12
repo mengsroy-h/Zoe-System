@@ -1,3 +1,4 @@
+import { createWithWindowListenerOwner } from '../platform/sdk-listener-owner';
 import { createClient } from '@supabase/supabase-js';
 import { SbNetworkError, SbRpcError } from './supabase-rtdb';
 
@@ -36,6 +37,7 @@ function storeOf(name) {
 
 export function createModeStorage(localStore, sessionStore) {
     let mode = 'local';
+    let closed = false;
     const read = (store, key) => {
         try { return store ? store.getItem(key) : null; } catch (e) { return null; }
     };
@@ -49,10 +51,12 @@ export function createModeStorage(localStore, sessionStore) {
         setMode(next) { mode = next === 'session' ? 'session' : 'local'; },
         getMode() { return mode; },
         getItem(key) {
+            if (closed) return null;
             const local = read(localStore, key);
             return local !== null ? local : read(sessionStore, key);
         },
         setItem(key, value) {
+            if (closed) return;
             const inSession = read(sessionStore, key) !== null;
             const inLocal = read(localStore, key) !== null;
             const target = inSession && !inLocal ? 'session' : (inLocal ? 'local' : mode);
@@ -63,9 +67,11 @@ export function createModeStorage(localStore, sessionStore) {
             }
         },
         removeItem(key) {
+            if (closed) return;
             drop(localStore, key);
             drop(sessionStore, key);
-        }
+        },
+        close() { closed = true; }
     };
 }
 
@@ -167,7 +173,7 @@ export function createSupabaseTransport(config, deps?) {
     const localArea = (deps && deps.localStorage) || storeOf('localStorage');
     const storage = createModeStorage(localArea, (deps && deps.sessionStorage) || storeOf('sessionStorage'));
     claimSessionStorageFor(storage, url);
-    const client = createClient(url, key, {
+    const clientOwner = createWithWindowListenerOwner(() => createClient(url, key, {
         auth: {
             storage,
             storageKey: SB_AUTH_STORAGE_KEY,
@@ -178,14 +184,18 @@ export function createSupabaseTransport(config, deps?) {
         global: {
             fetch: (input, init) => sbFetchWithCeiling(fetchImpl, input, init, fetchTimeoutMs).then((res) => sbSoftenRefreshRateLimit(input, res))
         }
-    });
+    }));
+    const client = clientOwner.value;
     const toSession = (s) => (s && s.access_token && s.user ? { accessToken: s.access_token, user: { id: s.user.id, email: s.user.email || '' } } : null);
+    let closed = false;
+    let generation = 0;
+    client.auth.initialize().then(() => { if (closed) return client.auth.dispose(); }).catch(() => {});
     let boundUid = null;
     let boundEnded = false;
-    const bindTo = (uid) => { boundUid = uid; boundEnded = false; };
+    const bindTo = (uid) => { generation++; boundUid = uid; boundEnded = false; };
     const foreignListeners = new Set<(next: any) => void>();
     const noteForeignSession = (next) => {
-        if (boundEnded) return;
+        if (closed || boundEnded) return;
         boundEnded = true;
         foreignListeners.forEach((cb) => { try { cb(next); } catch (e) {} });
     };
@@ -228,16 +238,22 @@ export function createSupabaseTransport(config, deps?) {
     const unsentWithin = (promise, timeoutMs) => sbWithin(promise, timeoutMs).catch((e) => { throw new SbNetworkError(String((e && e.message) || 'timeout'), true); });
     const sessionEndedElsewhere = () => new SbRpcError('session ended in another tab', 'session-ended', 401, '');
     const rpc = async (fn, args, timeoutMs) => {
+        const epoch = generation;
+        const checkCurrent = () => { if (closed || epoch !== generation) throw new SbNetworkError('session-ended', true); };
+        checkCurrent();
         const current = await unsentWithin(currentSession().catch(() => null), timeoutMs);
         if (!current && sessionStored()) throw new SbNetworkError('auth-unavailable', true);
         if (isForeign(current)) {
             noteForeignSession(toSession(current));
             throw sessionEndedElsewhere();
         }
+        checkCurrent();
         let token = current ? current.access_token : null;
         let res = await post('/rest/v1/rpc/' + fn, args, token, timeoutMs);
         if (res.status === 401 && token) {
+            checkCurrent();
             const refreshed = await unsentWithin(client.auth.refreshSession().catch(() => null), timeoutMs);
+            checkCurrent();
             const next = refreshed && refreshed.data && refreshed.data.session ? refreshed.data.session.access_token : null;
             if (next && next !== token) {
                 token = next;
@@ -261,10 +277,13 @@ export function createSupabaseTransport(config, deps?) {
         url,
         loginDomain: config.loginDomain,
         async restoreSession(ceilingMs = SB_RESTORE_CEILING_MS) {
+            if (closed) return null;
+            const epoch = generation;
             let timer = null;
             const ceiling = new Promise((resolve) => { timer = setTimeout(() => resolve(null), ceilingMs); });
             const loaded = client.auth.getSession().then((out) => ({ out }), () => null);
             const settled: any = await Promise.race([loaded, ceiling]).finally(() => clearTimeout(timer));
+            if (closed || epoch !== generation) return null;
             const out = settled && settled.out;
             let restored = null;
             if (out && out.data && out.data.session) restored = toSession(out.data.session);
@@ -273,12 +292,15 @@ export function createSupabaseTransport(config, deps?) {
             return restored;
         },
         async signIn(email, password) {
+            if (closed) throw sessionEndedElsewhere();
+            const epoch = ++generation;
             let out;
             try {
                 out = await client.auth.signInWithPassword({ email, password });
             } catch (e) {
                 throw new SbNetworkError(String((e && e.message) || e));
             }
+            if (closed || epoch !== generation) throw sessionEndedElsewhere();
             if (out.error) {
                 const err: any = new Error(out.error.message || 'auth error');
                 err.code = (out.error as any).code || '';
@@ -291,12 +313,15 @@ export function createSupabaseTransport(config, deps?) {
             return signedIn;
         },
         async signOut() {
+            if (closed) return;
             bindTo(null);
+            const epoch = generation;
             const revoke = async () => {
                 const token = await accessToken().catch(() => null);
-                if (token) await post('/auth/v1/logout?scope=local', {}, token, SB_SIGN_OUT_CEILING_MS);
+                if (token && !closed && epoch === generation) await post('/auth/v1/logout?scope=local', {}, token, SB_SIGN_OUT_CEILING_MS);
             };
             await sbWithin(revoke(), SB_SIGN_OUT_CEILING_MS).catch(() => {});
+            if (closed || epoch !== generation) return;
             clearStoredSession();
             if (sessionStored()) throw new SbNetworkError('sign-out-storage');
         },
@@ -367,10 +392,15 @@ export function createSupabaseTransport(config, deps?) {
             return { status: res.status, body: parsed && typeof parsed === 'object' ? parsed : { ok: false, code: 'bad-response' } };
         },
         close() {
+            if (closed) return;
+            closed = true;
+            generation++;
+            storage.close();
+            clientOwner.release();
             foreignListeners.clear();
             if (eventTarget && typeof eventTarget.removeEventListener === 'function') eventTarget.removeEventListener('storage', onStorage);
             try { client.removeAllChannels(); } catch (e) {}
-            try { client.auth.stopAutoRefresh(); } catch (e) {}
+            try { client.auth.dispose().catch(() => {}); } catch (e) {}
         }
     };
 }

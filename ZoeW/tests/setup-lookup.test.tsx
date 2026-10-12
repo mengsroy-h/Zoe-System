@@ -29,8 +29,11 @@ function producerHarness() {
         auth: { currentUser: { uid: 'seller' } }, authGeneration: 1, sensitiveSessionGeneration: 1, isSignedInUiActive: true,
         lookupSetupGeneration: 0, lastGeneratedSetupLink: '', SETUP_LINK_URL_KEY: 'base', appLocalStore: {},
         document: { getElementById: element }, safeStoreSet: (_store: any, key: string, value: string) => writes.push([key, value]),
+        sbTenantCache: [], sbAdminSession: null, sbTenantReadFailed: false,
+        sbAdminIsCurrent: (session: any) => !!session && session === ctx.sbAdminSession,
+        getServerNow: () => Date.now(), switchKgTab: vi.fn(), showToast: vi.fn(),
         renderQrInto: (_el: any, link: string) => { element('setupLinkQrContainer').textContent = link; }, alert: vi.fn() };
-    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'setupLinkDsnIsValid', 'generateLookupSetupLink'];
+    const names = ['captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession', 'setupLinkDsnIsValid', 'generateLookupSetupLink', 'prepareSbLookupSetup', 'renderSbLookupTargets', 'sbTenantState', 'escapeHtml', 'sbAdminConfigProblem', 'sbAdminJwtRole'];
     const declared = ast.body.filter((n: any) => n.type === 'FunctionDeclaration' && (names.includes(n.id.name) || /^(lookupSetup|encryptSetupLookup)/.test(n.id.name)));
     runInNewContext(declared.map((n: any) => source.slice(n.start, n.end)).join('\n'), ctx);
     element('setupLinkUrlInput').value = 'https://zoew.example/';
@@ -274,5 +277,78 @@ describe('Setup Lookup ៖ កូដលក់ពិត ➜ កូដទទួល
         expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(false);
         uiState.modalDisplay = {};
         expect(await connectSetupPayload({ lookup }, 'Setup Link')).toBe(false);
+    });
+});
+
+
+describe('Deep audit ៖ Link Lookup ចងហាង Supabase ជាក់លាក់', () => {
+    const url = 'https://target.supabase.co';
+    const target = url + '#11111111-1111-4111-8111-111111111111';
+    const targetMetadata = { ...metadata, shop: target };
+    const targeted = async () => ({ ...targetMetadata, keyEnc: await seller.encryptSetupLookup(targetMetadata, 'target-secret', '123456') });
+
+    it('combined Link ➜ កត់ហាងគោលដៅ មុនចូលគណនី · ហាងផ្សេងមិនអាចយកទៅប្រើ', async () => {
+        const lookup = await targeted();
+        expect(await connectSetupPayload({ supabaseUrl: url, supabaseKey: 'sb_publishable_' + 'k'.repeat(24), lookup }, 'Setup Link')).toBe(true);
+        expect(JSON.parse(appLocalStore.getItem('zoew_lookup_api_config')!).shop).toBe(target);
+        firebaseState.fb = { tenantScope: () => '22222222-2222-4222-8222-222222222222' } as any;
+        firebaseState.auth = { app: { options: { supabaseUrl: url } } } as any;
+        const { getLookupApiConfig } = await import('../src/features/lookup-config');
+        expect(getLookupApiConfig()).toBeNull();
+        firebaseState.fb = { tenantScope: () => target.split('#')[1] } as any;
+        expect(getLookupApiConfig()?.shop).toBe(target);
+    });
+
+    it('កែ target tenant ឬដក target ចេញ ➜ AES-GCM បដិសេធ', async () => {
+        const lookup = await targeted();
+        await expect(decryptSetupLookup({ ...lookup, shop: url + '#22222222-2222-4222-8222-222222222222' }, '123456')).rejects.toThrow();
+        const stripped: any = { ...lookup }; delete stripped.shop;
+        await expect(decryptSetupLookup(stripped, '123456')).rejects.toThrow();
+    });
+
+    it('target Project មិនដូច backend ➜ គ្មានការរក្សាទុក', async () => {
+        expect(await connectSetupPayload({ supabaseUrl: 'https://other.supabase.co', supabaseKey: 'sb_publishable_' + 'k'.repeat(24), lookup: await targeted() }, 'Setup Link')).toBe(false);
+        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBeNull();
+    });
+});
+
+
+describe('ZoeKeyGen ៖ ជ្រើសហាង Supabase ពិតពីបញ្ជីទៅ Setup Link', () => {
+    const tenant = { id: '11111111-1111-4111-8111-111111111111', name: '<ហាង A>', branch_code: '881859', expires_at: '2099-01-01T00:00:00Z', revoked: false };
+    function selected() {
+        const h = producerHarness();
+        const session = { url: 'https://target.supabase.co', key: 'sb_publishable_' + 'k'.repeat(24) };
+        h.ctx.sbAdminSession = session;
+        h.ctx.sbTenantCache = [tenant];
+        h.ctx.prepareSbLookupSetup(session, tenant);
+        return { ...h, session };
+    }
+    it('ប៊ូតុងហាង ➜ Config/Supabase/tenant បំពេញ ➜ Link មាន shop ដែល AES-GCM ការពារ', async () => {
+        const h = selected();
+        expect(h.element('setupLookupTenantSelect').value).toBe(tenant.id);
+        expect(h.element('setupLookupIncludeCheckbox').checked).toBe(true);
+        expect(h.element('setupLookupTenantSelect').innerHTML).toContain('&lt;ហាង A&gt;');
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).not.toHaveBeenCalled();
+        const payload = decodeSetupPayload(new URL(h.ctx.lastGeneratedSetupLink).searchParams.get('setup'));
+        expect(payload.supabaseUrl).toBe(h.session.url);
+        expect(payload.lookup.shop).toBe(h.session.url + '#' + tenant.id);
+        const code = h.element('setupLookupCodeOutput').textContent.match(/\d{6}/)[0];
+        expect(await decryptSetupLookup(payload.lookup, code)).toBe('seller-private-header');
+    });
+    it('Supabase Admin ចាកចេញក្នុង encrypt ➜ គ្មាន Link/QR/កូដយឺតលេចក្រោយ', async () => {
+        const h = selected();
+        const task = h.ctx.generateLookupSetupLink();
+        h.ctx.sbAdminSession = null;
+        await task;
+        expect(h.ctx.lastGeneratedSetupLink).toBe('');
+        expect(h.element('setupLookupCodeOutput').textContent).toBe('');
+    });
+    it('ប្តូរ Config ទៅ Project ផ្សេង ខណៈ tenant នៅជ្រើស ➜ បដិសេធ', async () => {
+        const h = selected();
+        h.element('setupLinkConfigInput').value = JSON.stringify({ supabaseUrl: 'https://other.supabase.co', supabaseKey: h.session.key });
+        await h.ctx.generateLookupSetupLink();
+        expect(h.ctx.alert).toHaveBeenCalledOnce();
+        expect(h.ctx.lastGeneratedSetupLink).toBe('');
     });
 });

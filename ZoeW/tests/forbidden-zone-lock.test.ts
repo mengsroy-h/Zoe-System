@@ -23,10 +23,10 @@ const LOCK: Record<string, string> = {
     'src/app/behaviors/panel-motion.ts': '80121c464a3da55e509f881aaae960c3e6de8dbb8d370c8875cc75a2f4210bf3',
     'src/app/behaviors/panels.ts': 'd63700ee43e3ce68f10ab31104b269d97d9db5676807f2a79e93fb231da56271',
     'src/app/behaviors/chrome-autohide.ts': '05afdce20767ec10babb70283a3cc7429ebaaf856c1addfe5c8d6f9f2f02b664',
-    'src/app/behaviors/phone-search.ts': '50db80646372e0e9b93a215794976f23b0f7f898616da9a758df375025cb56cf',
+    'src/app/behaviors/phone-search.ts': 'ab48b1ea572cb857a244ad356c11bcd2e78c7f3d60e0ad4eaa334960c89c68ea',
     'src/ui/chrome-autohide.ts': '54de996080789c214a5e20725cff58a491557198e04def6f8cd1c7e823960ca9',
     'src/ui/page-nav.ts': 'cc25e1a946db5e759b2e5666b893324bd7b069e85bc6deb4ed7206072a4cd6e5',
-    'src/styles/app.css': 'dc8a48ec4294dcbc9545c5d933d644a82737fa99032ad3348369b9dc55e6e9d4'
+    'src/styles/app.css': '0e751d9c9b86a2609e22f33055d46f17dd4e95eab29fc8c3eb5566065f544389'
 };
 
 const ZONE_FUNCTIONS = ['setupIOSPullToRefresh', 'panelGlideFrom', 'beginPanelGlideSnapPause', 'endPanelGlideSnapPause', 'bindPanelSwipe',

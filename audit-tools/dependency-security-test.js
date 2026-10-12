@@ -19,6 +19,25 @@ function ok(label, cond, detail) {
     else { console.log('   FAIL  ' + label + (detail !== undefined ? '  ➜ ' + JSON.stringify(detail) : '')); fail++; }
 }
 
+const packageLockPath = path.join(ROOT, 'ZoeW', 'package-lock.json');
+let packageLock = null;
+try { packageLock = JSON.parse(fs.readFileSync(packageLockPath, 'utf8')); } catch (e) {}
+for (const [name, floor] of [['source-map-js', '1.2.2'], ['@grpc/grpc-js', '1.13.6']]) {
+    const versions = Object.entries(packageLock && packageLock.packages || {})
+        .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
+    ok('⛔ dependency ' + name + ' ៖ lockfile មាន និងគ្រប់កំណែដល់ patch សុវត្ថិភាព',
+        versions.length > 0 && versions.every((version) => versionAtLeast(version, floor)), versions);
+}
+
+let provisionLock = null;
+try { provisionLock = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools', 'firebase-provision', 'package-lock.json'), 'utf8')); } catch (e) {}
+for (const [name, floor] of [['basic-ftp', '6.2.1'], ['@opentelemetry/core', '2.8.0'], ['uuid', '11.1.1']]) {
+    const versions = Object.entries(provisionLock && provisionLock.packages || {})
+        .filter(([rel]) => rel.endsWith('/' + name)).map(([, value]) => value.version);
+    ok('⛔ Firebase Provision dependency ' + name + ' ៖ lockfile មាន និងគ្រប់កំណែដល់ patch សុវត្ថិភាព',
+        versions.length > 0 && versions.every((version) => versionAtLeast(version, floor)), versions);
+}
+
 let source = null;
 try { source = fs.readFileSync(VENDOR); } catch (e) {}
 ok('រកឃើញ SheetJS ដែល vendor ក្នុង ZoeW', !!source && source.length > 500000, source && source.length);

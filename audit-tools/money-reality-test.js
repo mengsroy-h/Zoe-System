@@ -285,6 +285,64 @@ try {
         ok('money គ្មានកូដលុយ ➜ exit 3 មិនមែនលុយខុស', missingApp.status === 3 && /money code not found/.test(missingApp.text));
     });
 
+    scenario('barcode punctuation និង literal % រក្សាទំនាក់ទំនងមុន/ក្រោយសម្អាត', () => {
+        const data = copy();
+        withSecondClose(data);
+        data.zoew_daily_revenue_cod_dod[day].totalCount = 5;
+        data.zoew_daily_revenue_cod_dod[day].codDollar += 1.5;
+        data.zoew_monthly_revenue_cod_dod['2026-09'].totalCount = 5;
+        data.zoew_monthly_revenue_cod_dod['2026-09'].codDollar += 1.5;
+        [[closedCode, 'AB.C', 'AB%2EC'], [secondCode, 'AB%2EC', 'AB%252EC']].forEach(([oldCode, rawCode, key]) => {
+            Object.values(data.zoew_scan_history_cod_dod).forEach((item) => item.barcodes.forEach((b) => {
+                if (String(b.code).toUpperCase() === oldCode) b.code = rawCode;
+            }));
+            [data.zoew_barcode_registry, data.zoew_daily_pickup_cod_dod[pickupDay].pickedUpBarcodes,
+                data.zoew_daily_collected_cod_dod[pickupDay]].forEach((record) => {
+                record[key] = record[oldCode];
+                delete record[oldCode];
+            });
+        });
+        const encodedDump = save('encoded-identities.json', data);
+        const plain = report(encodedDump, 'encoded report.txt');
+        ok('⛔ registry/collected keys encode រួច មិនត្រូវ encode ពីរដង',
+            plain.status === 0 && /✅ \d+   ⚠️ 0   ❌ 0/.test(plain.body), plain.body);
+        const redacted = path.join(tempRoot, 'encoded-redacted.json');
+        const redaction = run('redact-dump.js', [encodedDump, redacted]);
+        const after = report(redacted, 'encoded-redacted report.txt');
+        ok('⛔ សម្អាត barcode សញ្ញាពិសេសដោយ encoder ពិត រក្សាការវាស់ទាំងអស់ដដែល',
+            redaction.status === 0 && after.status === 0 && measured(plain.body) === measured(after.body), after.body);
+        const text = fs.readFileSync(redacted, 'utf8');
+        ok('⛔ barcode raw និង encoded key ពិតមិនលេចក្នុងឯកសារសម្អាត',
+            !text.includes('AB.C') && !text.includes('AB%2EC') && !text.includes('AB%252EC'));
+    });
+
+    scenario('សម្អាត numeric identities និង unknown numeric secrets ដោយរក្សាលុយ', () => {
+        const data = copy();
+        const numericPhone = Number(phone.replace('+', ''));
+        [data.zoew_scan_history_cod_dod, data.zoew_recently_deleted_cod_dod].forEach((items) => Object.values(items).forEach((item) => {
+            item.phone = numericPhone;
+            item.barcodes.forEach((b) => { if (/^[0-9]+$/.test(b.code)) b.code = Number(b.code); });
+        }));
+        data.zoew_daily_pickup_cod_dod[pickupDay].pickedUpPhones = { [numericPhone]: 1 };
+        data.zoew_settings = { fixture: { password: 1234561234, customSecret: 3434343434, c: 9898989898 } };
+        const numericDump = save('numeric-private.json', data);
+        const plain = report(numericDump, 'numeric-private report.txt');
+        const redacted = path.join(tempRoot, 'numeric-private-redacted.json');
+        const redaction = run('redact-dump.js', [numericDump, redacted]);
+        const text = fs.readFileSync(redacted, 'utf8');
+        ok('⛔ numeric phone/barcode និង numeric secrets មិនលេចក្នុង output ដែលរាយ safe',
+            redaction.status === 0 && [numericPhone, Number(openCode), Number(deletedCode), 1234561234, 3434343434, 9898989898].every((v) => !text.includes(String(v))));
+        const clean = JSON.parse(text);
+        const pickup = clean.zoew_daily_pickup_cod_dod[pickupDay];
+        ok('⛔ ទឹកប្រាក់ shorthand c/d និង phone counters នៅតែជាលេខដដែល',
+            Object.values(pickup.pickedUpPhones)[0] === 1
+            && Object.values(clean.zoew_daily_collected_cod_dod[pickupDay])[0].c === 5.5
+            && clean.zoew_daily_revenue_cod_dod[day].codDollar === 17.75);
+        const after = report(redacted, 'numeric-private-redacted report.txt');
+        ok('⛔ សម្អាត numeric identities រក្សាទំនាក់ទំនង និងការវាស់លុយដដែល',
+            plain.status === 0 && after.status === 0 && measured(plain.body) === measured(after.body), after.body);
+    });
+
     // ⛔ ZoeW React ៖ repo ដែលអ្នកប្រើទាញ (Download ZIP) គ្មាន `ZoeW/app.js` ទេ ➜ CLI អានកូដលុយពី `audit-tools/money-core.js`
     //    ដែលផលិតពី src ពិត។ វាស់ ២ ទិស ៖ (១) repo React (src/main.tsx + money-core) ➜ ការវាស់ **ដូច** ការអានពី app.js បេះបិទ;
     //    (២) money-core ចាស់ជាងកូដ ➜ ធ្លាក់ (បើអត់ អ្នកប្រើវាស់លុយដោយរូបមន្តចាស់ ខណៈ App ship រូបមន្តថ្មី)។

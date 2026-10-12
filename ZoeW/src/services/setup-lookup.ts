@@ -14,7 +14,15 @@ function lookupSetupMetadata(value) {
         if (typeof field !== 'string' || !field.trim() || field.length > 128) throw new Error('bad lookup field');
         fields[name] = field.trim();
     }
-    return { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+    const metadata: any = { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+    if ('shop' in value) {
+        if (typeof value.shop !== 'string' || value.shop.length > 512) throw new Error('bad lookup shop');
+        const target = new URL(value.shop);
+        if (target.protocol !== 'https:' || target.username || target.password || target.search || target.pathname !== '/' ||
+            !/^#[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target.hash)) throw new Error('bad lookup shop');
+        metadata.shop = target.origin + target.hash;
+    }
+    return metadata;
 }
 
 function lookupSetupAad(value) {

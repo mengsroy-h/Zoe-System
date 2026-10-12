@@ -325,9 +325,9 @@ if (!collectedDays.length && !collectedBadDays.length) {
     collectedDays.forEach((d) => {
         const set = sb.collectedSetFromRecord(collected[d]);
         Object.keys(set).forEach((raw) => {
-            // ⛔ normalize ទាំង ២ ខាង (ច្បាប់ដដែលនឹងផ្នែក ៧) — dump ដែលសម្អាត
-            // រួចផ្លាស់កូនសោទៅអក្សរតូច ➜ ការវាស់ត្រូវដូចគ្នាមុន/ក្រោយសម្អាត
-            const k = sb.pickupBarcodeKey(raw) || raw;
+            // ⛔ កូនសោក្នុង dump encode រួចហើយ៖ normalize តែអក្សរធំ/តូច ដូចផ្នែក ៧។
+            // dump សម្អាតមាន hash អក្សរតូច; កុំ encode % ម្ដងទៀត។
+            const k = String(raw).trim().toUpperCase();
             const list = mirrorByKey.get(k) || [];
             list.push({ day: d, c: set[raw].c, d: set[raw].d });
             mirrorByKey.set(k, list);
@@ -487,7 +487,7 @@ else {
         barcodesOf(it).forEach((b) => { if (b.code) owned.add(rkey(b.code)); });
         if (it.barcode) owned.add(rkey(it.barcode));
     }));
-    const rk = Object.keys(registry).map((k) => rkey(k));
+    const rk = Object.keys(registry).map((k) => String(k).trim().toUpperCase());
     const orphan = rk.filter((k) => !owned.has(k));
     const unreg = [...owned].filter((k) => rk.indexOf(k) === -1);
     if (!orphan.length) ok('កូនសោ registry ' + rk.length + ' ទាំងអស់មានម្ចាស់');

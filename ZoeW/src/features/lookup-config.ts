@@ -1,8 +1,8 @@
 import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { securityState } from '../core/state';
+import { firebaseState, securityState } from '../core/state';
 import { shopOwnsSetting, shopScope } from '../core/shop-scope';
-import { appLocalStore, safeStoreSet } from '../core/storage';
+import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { lookupApiIsZto } from './customer-table-prefetch';
@@ -30,10 +30,15 @@ export function getLookupApiConfig() {
 }
 
 export async function migrateLookupSecretIfNeeded() {
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const key = securityState.lookupSecretKey;
     const cfg = getLookupApiConfig();
+    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     if (!cfg || !cfg.headerValue || cfg.headerValueEnc || !securityState.lookupSecretKey) return false;
     const encrypted = await encryptLookupSecret(cfg.headerValue);
-    if (!encrypted) return false;
+    if (!encrypted || shopScope() !== shop || firebaseState.authGeneration !== authEpoch || securityState.lookupSecretKey !== key
+        || safeStoreGet(appLocalStore, 'zoew_lookup_api_config') !== stored) return false;
     const migrated = Object.assign({}, cfg, { headerValueEnc: encrypted });
     delete migrated.headerValue;
     return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(migrated));
@@ -70,7 +75,15 @@ export function storeLookupApiConfig(cfg) {
     return true;
 }
 
+let lookupSaveGeneration = 0;
+
 export async function saveLookupApiConfig() {
+    const generation = ++lookupSaveGeneration;
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const key = securityState.lookupSecretKey;
+    const current = () => generation === lookupSaveGeneration && shopScope() === shop
+        && firebaseState.authGeneration === authEpoch && securityState.lookupSecretKey === key;
     let url = fieldValue('lookupApiUrlInput').trim();
     let enabled = fieldChecked('lookupApiEnabledCheckbox');
 
@@ -79,6 +92,13 @@ export async function saveLookupApiConfig() {
         return;
     }
 
+    const snapshot = {
+        autoSubmit: fieldChecked('lookupApiAutoSubmitCheckbox'), fastMode: fieldChecked('lookupApiFastModeCheckbox'),
+        headerName: fieldValue('lookupApiHeaderNameInput').trim(),
+        phoneField: fieldValue('lookupApiPhoneFieldInput').trim() || 'phone',
+        codField: fieldValue('lookupApiCodFieldInput').trim() || 'cod',
+        dodField: fieldValue('lookupApiDodFieldInput').trim() || 'dod'
+    };
     const existingCfg = getLookupApiConfig() || {};
     const headerValueRaw = fieldValue('lookupApiHeaderValueInput').trim();
     let headerValueEnc = existingCfg.headerValueEnc || null;
@@ -90,6 +110,7 @@ export async function saveLookupApiConfig() {
             return;
         }
         const encryptedHeaderValue = await encryptLookupSecret(headerValueRaw);
+        if (!current()) return;
         if (!encryptedHeaderValue) {
             alert("មិនអាចអ៊ិនគ្រីប Secret បានទេ! សូមសាកល្បងម្តងទៀត។ ការផ្លាស់ប្តូរមិនទាន់ត្រូវបានរក្សាទុកទេ។");
             return;
@@ -98,25 +119,16 @@ export async function saveLookupApiConfig() {
         legacyHeaderValue = '';
     } else if (!headerValueEnc && legacyHeaderValue && securityState.lookupSecretKey) {
         const migratedHeaderValue = await encryptLookupSecret(legacyHeaderValue);
+        if (!current()) return;
         if (migratedHeaderValue) {
             headerValueEnc = migratedHeaderValue;
             legacyHeaderValue = '';
         }
     }
 
-    const cfg: any = {
-        enabled: enabled,
-        autoSubmit: fieldChecked('lookupApiAutoSubmitCheckbox'),
-        fastMode: fieldChecked('lookupApiFastModeCheckbox'),
-        url: url,
-        headerName: fieldValue('lookupApiHeaderNameInput').trim(),
-        headerValueEnc: headerValueEnc,
-        phoneField: fieldValue('lookupApiPhoneFieldInput').trim() || 'phone',
-        codField: fieldValue('lookupApiCodFieldInput').trim() || 'cod',
-        dodField: fieldValue('lookupApiDodFieldInput').trim() || 'dod'
-    };
+    if (!current()) return;
+    const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
-    const shop = shopScope();
     if (shop) cfg.shop = shop;
 
     if (!storeLookupApiConfig(cfg)) return;
@@ -130,7 +142,16 @@ export async function saveLookupApiConfig() {
     }
 }
 
+let lookupTestGeneration = 0;
+
 export async function testLookupApiConfig(btnEl?) {
+    const generation = ++lookupTestGeneration;
+    viewState.lookupTestBusy = false;
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const key = securityState.lookupSecretKey;
+    const current = () => generation === lookupTestGeneration && shopScope() === shop
+        && firebaseState.authGeneration === authEpoch && securityState.lookupSecretKey === key;
     let url = fieldValue('lookupApiUrlInput').trim();
     if (!url || !url.includes('{barcode}')) {
         alert("សូមបញ្ចូល URL ដែលមាន {barcode} ជាមុនសិន!");
@@ -146,20 +167,24 @@ export async function testLookupApiConfig(btnEl?) {
     const existingCfg = getLookupApiConfig() || {};
     const typedValue = fieldValue('lookupApiHeaderValueInput').trim();
     const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
+    if (!current()) return;
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
     await addZtoIdentityHeader({ url: url }, headers);
+    if (!current()) return;
 
     const testIsZto = lookupApiIsZto({ url: url });
     const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;
     showToast(testIsZto ? "⏳ កំពុងសាកល្បង ZTO..." : "⏳ កំពុងសាកល្បង API...");
     viewState.lookupTestBusy = true;
     const progressTimers = testIsZto ? [
-        setTimeout(() => showToast("⏳ នៅរង់ចាំ ZTO ឆ្លើយតប...", 'warn'), 6000)
+        setTimeout(() => { if (current()) showToast("⏳ នៅរង់ចាំ ZTO ឆ្លើយតប...", 'warn'); }, 6000)
     ] : [];
     try {
         const out = await fetchWithTimeout(testUrl, { headers }, testTimeoutMs, 'Test API timed out', (r) => r.text());
+        if (!current()) return;
         alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
     } catch (e) {
+        if (!current()) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'testLookupApiConfig' });
         const timedOut = e && e.message === 'Test API timed out';
         const slowNote = testIsZto
@@ -168,6 +193,6 @@ export async function testLookupApiConfig(btnEl?) {
         alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (timedOut ? slowNote : e.message));
     } finally {
         progressTimers.forEach((timer) => clearTimeout(timer));
-        viewState.lookupTestBusy = false;
+        if (generation === lookupTestGeneration) viewState.lookupTestBusy = false;
     }
 }

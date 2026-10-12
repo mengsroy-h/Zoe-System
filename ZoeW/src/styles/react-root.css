@@ -605,8 +605,8 @@
 .origin-chip-icon { flex: none; line-height: 1; }
 .origin-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .origin-chip-more { flex: none; }
-.history-table tr[data-id] > td:first-child { padding-left: 2px; padding-right: 2px; white-space: nowrap; }
-.history-table .row-num-mark { min-width: 0; padding: 0 1px; }
+.history-table tr[data-id] > td:first-child { padding-left: 2px; padding-right: 2px; white-space: normal; overflow-wrap: anywhere; }
+.history-table .row-num-mark { min-width: 0; max-width: 100%; box-sizing: border-box; padding: 0 1px; overflow-wrap: anywhere; }
 @media (max-width: 699px) {
     .history-table tr[data-id] > td:first-child { font-size: calc(9.5 * var(--fs-unit)); }
 }

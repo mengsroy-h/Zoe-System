@@ -117,7 +117,8 @@ for (const app of ['ZoeW']) {
             if (decl) vm.runInContext(decl, ctx);
         });
         ['sheetImportKey', 'sheetImportUrl', 'sheetImportPassword', 'sheetImportWorkbook',
-         'sheetImportSheetRows', 'sheetImportHeaders', 'sheetImportSignature', 'sheetImportBusy'].forEach((n) => {
+         'sheetImportSheetRows', 'sheetImportHeaders', 'sheetImportSignature', 'sheetImportBusy',
+         'sheetConfigOwner', 'sheetOperationGeneration'].forEach((n) => {
             const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
         });

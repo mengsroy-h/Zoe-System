@@ -143,11 +143,14 @@ function runNode(script, args, opts) {
         const t0 = Date.now();
         let out = '', err = '', timedOut = false;
         let child;
+        const previousUmask = o.umask === undefined ? null : process.umask(o.umask);
         try {
             child = cp.spawn(process.execPath, [script].concat(args || []), { cwd: o.cwd || os.tmpdir(), env: cleanEnv(o.env), stdio: ['ignore', 'pipe', 'pipe'] });
         } catch (e) {
             resolve({ code: null, out: '', err: String(e), all: String(e), ms: 0, timedOut });
             return;
+        } finally {
+            if (previousUmask !== null) process.umask(previousUmask);
         }
         child.stdout.setEncoding('utf8'); child.stdout.on('data', (d) => { out += d; });
         child.stderr.setEncoding('utf8'); child.stderr.on('data', (d) => { err += d; });
@@ -432,7 +435,7 @@ async function backupChain(rec, ctx, toolRoot) {
     try {
         const runDir = path.join(rt, 'zoe-backup');
         const targets = [{ type: 'supabase', name: 'sb-main', url: ctx.fake.url, secretKey: SECRET }];
-        const cfg = await runNode(path.join(toolRoot, 'firebase-backup', 'ci-config.js'), [runDir], { env: { ZOE_BACKUP_TARGETS: JSON.stringify(targets) } });
+        const cfg = await runNode(path.join(toolRoot, 'firebase-backup', 'ci-config.js'), [runDir], { umask: 0o022, env: { ZOE_BACKUP_TARGETS: JSON.stringify(targets) } });
         rec('ci-config ៖ target Supabase ➜ exit 0', cfg.code === 0, cfg.all.slice(-400));
         const config = fs.existsSync(path.join(runDir, 'config.json')) ? JSON.parse(fs.readFileSync(path.join(runDir, 'config.json'), 'utf8')) : null;
         const entry = config && (config.businesses || []).find((b) => b.name === 'sb-main');

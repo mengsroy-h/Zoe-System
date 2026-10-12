@@ -81,3 +81,24 @@ describe('ZoeW SW ៖ ទ្វារ revalidate មិនផ្ទុក HTML (
         });
     }
 });
+
+
+for (const app of ['ZoeW', 'ZoeKeyGen']) describe(app + ' Deep audit ៖ activate ខណៈ Cache API បរាជ័យ', () => {
+    for (const mode of ['keys', 'delete']) it(mode + ' បដិសេធ ➜ នៅ claim ឧបករណ៍ និងបញ្ចប់ activate', async () => {
+        const handlers: Record<string, (event: any) => void> = {};
+        const claim = vi.fn(async () => {});
+        const source = fs.readFileSync(new URL(app === 'ZoeW' ? '../src/sw/sw.ts' : '../../ZoeKeyGen/sw.js', import.meta.url), 'utf8');
+        const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
+        const ctx = vm.createContext({
+            __CACHE_VERSION__: 'zoew-probe-v1', __CORE_SHELL__: [], __OPTIONAL_SHELL__: [], __BACKEND_SHELL__: [],
+            self: { location: new URL('https://audit.invalid/sw.js'), addEventListener(type: string, fn: any) { handlers[type] = fn; }, clients: { claim } },
+            caches: { keys: async () => { if (mode === 'keys') throw new Error('SecurityError'); return [app === 'ZoeW' ? 'zoew-old' : 'zoekeygen-old']; }, delete: async () => { throw new Error('QuotaExceededError'); } },
+            navigator: { onLine: true }, URL, Request, Response, setTimeout, clearTimeout, Date
+        });
+        vm.runInContext(js, ctx);
+        let finished!: Promise<unknown>;
+        handlers.activate({ waitUntil(value: Promise<unknown>) { finished = value; } });
+        await expect(finished).resolves.toBeUndefined();
+        expect(claim).toHaveBeenCalledOnce();
+    });
+});

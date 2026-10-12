@@ -33,6 +33,7 @@ export function dropPhoneSuggestBox() {
 }
 
 export function positionPhoneSuggestBox() {
+    if (!uiState.phoneSuggestOpen) return;
     commitNow();
     const phoneInput = elementOf('searchPhoneInput');
     const box = elementOf('phoneSuggestBox');
@@ -143,6 +144,7 @@ export function pickPhoneSuggestion(index: number) {
 export function setupPhoneSuggestions() {
     let positionFrame = null;
     const schedulePositionPhoneSuggestBox = () => {
+        if (!uiState.phoneSuggestOpen) return;
         if (positionFrame !== null) return;
         positionFrame = requestAnimationFrame(() => {
             positionFrame = null;

@@ -165,6 +165,33 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.55] — 2026-10-12 · iPhone PWA ៖ scrollbar ពីរត្រួតគ្នា · ប្រវត្តិមិនដល់បាត · កាត់ការងារអំឡុងរមូរ
+
+**សំណើម្ចាស់គម្រោង**៖ វីដេអូ `17952.mp4` បង្ហាញស្វែងរកលេខ ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បាត់ ➜ របា Tab លាក់ ប៉ុន្តែប្រវត្តិនៅទុកចន្លោះនៅបាត។ ម្ចាស់បញ្ជាក់ថា scrollbar បន្ថែមដាក់ដោយចេតនាសម្រាប់ APK និង iOS PWA ព្រោះពីមុនមិនមាន; ឥឡូវ iOS បង្ហាញពីរ។ ការសង្ស័យថា Safari update មិនទាន់ផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត។ ម្ចាស់ស្នើបន្ថែមឱ្យ App ទាំងមូលរលូនជាងមុន ព្រោះ APK និង PWA Android រលូនជាងពេលខ្លះ។
+
+**ZoeW `2.50.55`** (`zoew-v317` ➜ `zoew-v318`)។ ZoeKeyGen ដដែល; គ្មាន migration/env/rules ថ្មី។
+
+#### អ្វីដែលខុសពីមុន
+
+- `@supports (-webkit-touch-callout: none)` រក្សា padding របស់របា Tab លើ `.app-pages` ដែលនៅស្ថានភាពស្វែងរក ទោះ `chrome-hidden`។ ច្បាប់ប្រគល់ចន្លោះវិញធ្លាប់គ្របតែ `history-expanded`។ ឥឡូវវាគ្រប `.app-pages` ទាំងអស់នៅផ្លូវ iOS ហើយទុក `--page-extension` និងគែម ៨px ដដែល។
+- `drawsOwnScrollThumb()` ដំឡើងខ្សែបន្ថែមតែលើ APK Android។ iOS PWA ប្រើ scrollbar ប្រព័ន្ធ។ PTR របស់ iOS និងខ្សែ ៣px របស់ APK នៅដដែល។
+- ការរមូរគ្រប់ផ្ទាំង/ប្រអប់ធ្លាប់ដាក់ rAF ដើម្បីកំណត់ទីតាំងបញ្ជីណែនាំលេខ ទោះបញ្ជីបិទ ហើយហៅ `commitNow()` ដោយបង្ខំ flush React គ្រប់ store មុនពិនិត្យថាមានបញ្ជី។ ឥឡូវបញ្ជីបិទ ➜ មិនដាក់ rAF និងមិន flush; បញ្ជីបើកនៅតែវាស់មួយដងក្នុងស៊ុម។ ផ្លូវរួមនេះជួយ iOS · Android · desktop ដោយមិនប្តូររយៈពេល/easing ចលនា។
+- iOS មិនមាន watcher របស់ scrollbar បន្ថែមដែលអាន `getBoundingClientRect()` រាល់ស៊ុមពេលខ្សែលេច។
+- ការកែតំបន់ហាមមានសំណើពិត និងកត់ក្នុងសោ `app.css` + `phone-search.ts`; `chrome-autohide` · ចលនាផ្ទាំង · snap · PTR មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-history-bottom.test.ts` វាស់ cascade CSS ពិតនៅស្ថានភាព search + chrome-hidden និង platform gate។ ករណីទាំងពីរធ្លាក់លើកូដមុនកែ។
+- `phone-suggest-idle-scroll.test.ts` ធ្លាក់លើ source មុនកែ៖ បញ្ជីបិទនៅតែ flush និងដាក់ rAF។ ក្រោយកែ ៣០ scroll + resize ➜ ០ rAF; បញ្ជីបើក ➜ ១ rAF ដដែល។
+- `audit-tools/panel-motion-test.js` បន្ថែមស្វែងរក ➜ បើក/បិទ modal ➜ របាលាក់ · safe-area ០/៣៤px ដោយវាស់គែមផ្ទាំងពិត។ `scroll-thumb.test.tsx` វាស់ការរមូរ iOS មិនដំឡើង overlay និងរក្សាតេស្តខ្សែពេញលើ APK។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⏳ សាក deploy preview លើ iPhone PWA ពិត៖ ធ្វើដូចវីដេអូ ចុចស្វែងរក ➜ បើកបញ្ជីកញ្ចប់ ➜ keyboard បិទ ➜ បិទ modal ➜ អូសបញ្ជីឱ្យរបា Tab លាក់។ គែមប្រវត្តិចុះដល់បាត ហើយមាន scrollbar តែមួយ។ សាកលេខទទេ និងលេខដែលវាយរួច; សាកបង្វិលអេក្រង់ និងត្រឡប់មក App វិញ។
+២. ⏳ សាក APK Android ពិត៖ ខ្សែ ៣px លេចពេលរមូរ ហើយបាត់ក្រោយស្ងៀម; keyboard · របា Tab · អូសបើក/បិទផ្ទាំង · PTR ដំណើរការដូចមុន។ ត្រូវផ្ទៀងផ្ទាត់ឧបករណ៍ទាំងពីរមុន merge។
+៣. ក្រោយ merge/deploy បើក ZoeW ឱ្យបាន `2.50.55`។
+
+
 ### [ZoeKeyGen 2.24.16] — 2026-10-11 · Setup Lookup ៖ ទទួល URL របស់ ZTO ដែលចាប់ផ្ដើម `/`
 
 **ZoeKeyGen `2.24.16`** (`zoekeygen-v126` ➜ `zoekeygen-v127`)។ ZoeW `2.50.54` / `zoew-v317` ដដែល; កែតែកូដអ្នកបង្កើត Link និងតេស្ត។

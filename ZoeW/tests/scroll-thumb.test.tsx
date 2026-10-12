@@ -1,8 +1,7 @@
 /**
- * ⛔ Scrollbar លើ APK និង iPhone PWA (សំណើម្ចាស់គម្រោង ៖ «PWA Android មានហើយ · ដាក់តូចកុំបាំងអីផ្សេង»)
- *    iOS WebKit មិនគូរ `::-webkit-scrollbar` ➜ App គូរខ្សែស្តើង ៣px ខ្លួនឯង ៖ លេចពេលរមូរបញ្ឈរ · បាត់ក្រោយស្ងៀម ·
+ * ⛔ Scrollbar លើ APK Android ៖ ខ្សែស្តើង ៣px លេចពេលរមូរបញ្ឈរ · បាត់ក្រោយស្ងៀម ·
  *    `pointer-events: none` · មិនប្តូរ layout · មិនជាន់របា Tab/navbar (លើកលែងក្នុង modal/drawer) ·
- *    ⛔ web/PWA Android/desktop មិនប៉ះ (គ្មាន listener · គ្មានធាតុ)។
+ *    ⛔ web/PWA រួម iPhone ប្រើខ្សែប្រព័ន្ធ (គ្មាន listener · គ្មានធាតុរបស់ App)។
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -35,7 +34,7 @@ async function scrollTo(el: HTMLElement, top: number) {
     step(() => {});
 }
 
-describe('ខ្សែ scrollbar ស្តើង (APK · iPhone PWA)', () => {
+describe('ខ្សែ scrollbar ស្តើង (APK Android)', () => {
     it('ធរណីមាត្រ ៖ កម្ពស់សមាមាត្រ · អប្បបរមា ២៤px · ចុង/ដើម · មិនរមូរ ➜ គ្មាន', () => {
         const rect = { top: 100, bottom: 300, right: 380 };
         const band = scrollThumbBand(rect, 800, false, 60, 50)!;
@@ -76,9 +75,22 @@ describe('ខ្សែ scrollbar ស្តើង (APK · iPhone PWA)', () => {
         el.remove();
     });
 
-    describe('iPhone PWA (navigator.standalone)', () => {
+    it('iPhone PWA ៖ គ្មានខ្សែជាន់ scrollbar ប្រព័ន្ធ · គ្មាន listener បន្ថែម', async () => {
+        Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true });
+        expect(setupScrollThumb()).toBe(false);
+        mount(<ScrollThumb />);
+        const el = fakeScroller({ scrollHeight: 1000, clientHeight: 200, top: 0, rect: { top: 100, bottom: 300, right: 380 } });
+        await scrollTo(el, 300);
+        expect(scrollThumbState.view).toBe(null);
+        expect(document.querySelector('.scroll-thumb')).toBe(null);
+        unmount();
+        el.remove();
+        delete (window.navigator as any).standalone;
+    });
+
+    describe('APK Android (Capacitor)', () => {
         beforeAll(() => {
-            Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true });
+            (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
             uiState.chromeTopVar = '60px';
             uiState.tabbarHeightVar = '50px';
             uiState.chromeHidden = false;
@@ -88,7 +100,7 @@ describe('ខ្សែ scrollbar ស្តើង (APK · iPhone PWA)', () => {
         });
         afterAll(() => {
             unmount();
-            delete (window.navigator as any).standalone;
+            delete (window as any).Capacitor;
         });
 
         it('រមូរបញ្ឈរ ➜ ខ្សែលេចត្រង់គែមស្តាំ · ស្តើង · មិនចាប់ការចុច', async () => {

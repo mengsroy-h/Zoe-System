@@ -41,7 +41,7 @@ export function pullToRefreshSupported(): boolean {
 }
 
 export function drawsOwnScrollThumb(): boolean {
-    return pullToRefreshSupported();
+    return isNativeAndroid();
 }
 
 export function resolveNativeApiUrl(url: string): string {

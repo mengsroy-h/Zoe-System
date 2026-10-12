@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreSet, safeStoreRemove } from '../c
 import { normalizeSetupLookup, decryptSetupLookup } from '../services/setup-lookup';
 import { lookupApiIsAppsScript } from './lookup-api';
 import { encryptLookupSecret } from '../services/crypto';
-import { shopScope } from '../core/shop-scope';
+import { sameShop, shopScope } from '../core/shop-scope';
 import { storeLookupApiConfig, refreshShopBoundUi } from './lookup-config';
 import { prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { cancelPendingLookupUnlock } from './auto-lookup';
@@ -470,6 +470,18 @@ export async function connectLookupSetupPayload(parsed, source) {
         delete cfg.keyEnc;
         const scope = backend ? (backend.databaseURL || '') : shopScope();
         if (scope) cfg.shop = scope;
+        if (lookup.shop) {
+            const project = backend || savedConfigObject();
+            if (!project || !project.supabaseUrl || !sameShop(lookup.shop.split('#')[0], project.supabaseUrl)) {
+                showToast('❌ Link API នេះចងទៅ Project Supabase ផ្សេង។ គ្មានការរក្សាទុក។');
+                return false;
+            }
+            if (!backend && !sameShop(lookup.shop, shopScope())) {
+                showToast('❌ សូមចូលហាងគោលដៅរបស់ Link នេះជាមុនសិន។');
+                return false;
+            }
+            cfg.shop = lookup.shop;
+        }
         const oldLookup = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
         if (!storeLookupApiConfig(cfg)) return false;
         if (backend) {

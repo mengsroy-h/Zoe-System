@@ -10,7 +10,7 @@ function sheetImportViewNow(): any {
 
 import { fieldValue, openFilePicker, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { sheetImportState } from '../core/state';
+import { firebaseState, sheetImportState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { SHEET_IMPORT_SECRET_SALT, SHEET_IMPORT_STORE_KEY } from '../core/storage-keys';
 import { shopOwnsSetting, shopScope } from '../core/shop-scope';
@@ -149,6 +149,8 @@ export function sheetImportColumnLetter(index) {
 }
 
 export function clearSheetImportSession() {
+    sheetConfigOwner = null;
+    sheetOperationGeneration++;
     sheetImportState.sheetImportKey = null;
     sheetImportState.sheetImportUrl = '';
     sheetImportState.sheetImportPassword = '';
@@ -157,6 +159,10 @@ export function clearSheetImportSession() {
     sheetImportState.sheetImportHeaders = [];
     sheetImportState.sheetImportSignature = '';
     sheetImportState.sheetImportBusy = false;
+    viewState.siConfigSaving = false;
+    viewState.siImportBtnDisabled = false;
+    viewState.siImportBtnText = 'នាំចូលទៅ Sheet';
+    viewState.siClearBtnBusy = false;
     (['siApiUrlInput', 'siApiPasswordInput', 'siFileInput'] as const).forEach((id) => {
         setFieldValue(id, '');
     });
@@ -250,16 +256,36 @@ export function sheetImportStatusText(spreadsheetName, sheetName, rowCount) {
     return head + ' · មាន ' + rowCount + ' ជួរដេក';
 }
 
+let sheetOperationGeneration = 0;
+
+function captureSheetImportOperation() {
+    const generation = ++sheetOperationGeneration;
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const key = sheetImportState.sheetImportKey;
+    const url = sheetImportState.sheetImportUrl;
+    const password = sheetImportState.sheetImportPassword;
+    return () => generation === sheetOperationGeneration && shopScope() === shop
+        && firebaseState.authGeneration === authEpoch && sheetImportState.sheetImportKey === key
+        && sheetImportState.sheetImportUrl === url && sheetImportState.sheetImportPassword === password;
+}
+
 export async function refreshSheetImportStatus() {
+    if (sheetImportState.sheetImportBusy) return null;
+    const current = captureSheetImportOperation();
     try {
         const status = await callSheetImportApi('status', {});
+        if (!current()) return null;
         setSheetImportFoot(sheetImportStatusText(status.spreadsheetName, status.sheetName, status.rowCount));
         return status;
     } catch (e) {
+        if (!current()) return null;
         setSheetImportMsg('siConfigMsg', e.message, 'bad');
         return null;
     }
 }
+
+let sheetConfigOwner: object | null = null;
 
 export async function saveSheetImportConfig() {
     if (sheetImportState.sheetImportBusy) return;
@@ -277,13 +303,22 @@ export async function saveSheetImportConfig() {
         setSheetImportMsg('siConfigMsg', 'សម័យ PIN បានផុតកំណត់! សូមបិទប្រអប់នេះ ហើយបើកម្តងទៀតដើម្បីវាយ PIN សាជាថ្មី។', 'bad');
         return;
     }
+    const owner = {};
+    sheetConfigOwner = owner;
+    const operationCurrent = captureSheetImportOperation();
+    const shop = shopScope();
+    const authEpoch = firebaseState.authGeneration;
+    const key = sheetImportState.sheetImportKey;
+    const current = () => sheetConfigOwner === owner && operationCurrent() && shopScope() === shop
+        && firebaseState.authGeneration === authEpoch && sheetImportState.sheetImportKey === key;
     sheetImportState.sheetImportBusy = true;
     viewState.siConfigSaving = true;
     setSheetImportMsg('siConfigMsg', 'កំពុងសាកល្បងការតភ្ជាប់...', 'warn');
     try {
         const status = await callSheetImportApi('status', {}, url, password);
+        if (!current()) return;
         const stored: any = { v: 1, u: await encryptSheetImportSecret(url), p: await encryptSheetImportSecret(password) };
-        const shop = shopScope();
+        if (!current()) return;
         if (shop) stored.shop = shop;
         if (!stored.u || !stored.p || !safeStoreSet(appLocalStore, SHEET_IMPORT_STORE_KEY, JSON.stringify(stored))) {
             setSheetImportMsg('siConfigMsg', 'រក្សាទុកមិនបានទេ — សូមពិនិត្យទំហំផ្ទុករបស់ browser', 'bad');
@@ -298,10 +333,14 @@ export async function saveSheetImportConfig() {
         setSheetImportFoot(sheetImportStatusText(status.spreadsheetName, status.sheetName, status.rowCount));
         showToast('✅ ការតភ្ជាប់ត្រឹមត្រូវ!');
     } catch (e) {
+        if (!current()) return;
         setSheetImportMsg('siConfigMsg', e.message, 'bad');
     } finally {
-        viewState.siConfigSaving = false;
-        sheetImportState.sheetImportBusy = false;
+        if (sheetConfigOwner === owner) {
+            sheetConfigOwner = null;
+            viewState.siConfigSaving = false;
+            sheetImportState.sheetImportBusy = false;
+        }
     }
 }
 
@@ -501,6 +540,9 @@ export async function runSheetImport() {
     }
     const mode = fieldValue('siModeSel');
     if (mode === 'replace' && !confirm('ជួរដេកទាំងអស់ក្នុង Sheet នឹងត្រូវលុប រួចជំនួសដោយ ' + rows.length + ' ជួរដេកពីឯកសារនេះ។ តើបន្តទេ?')) return;
+    const owner = {};
+    sheetConfigOwner = owner;
+    const current = captureSheetImportOperation();
     sheetImportState.sheetImportBusy = true;
     viewState.siImportBtnDisabled = true;
     viewState.siImportBtnText = 'កំពុងនាំចូល...';
@@ -509,6 +551,7 @@ export async function runSheetImport() {
         const result = await callSheetImportApi('import', {
             payload: { rows: rows, mode: mode, mapping: currentSheetImportMapping(), signature: sheetImportState.sheetImportSignature }
         });
+        if (!current()) return;
         const parts = ['✅ រួចរាល់ — បន្ថែម ' + result.added, 'កែ ' + result.updated, 'ដដែល ' + result.unchanged];
         if (result.skippedNoBarcode) parts.push('រំលង ' + result.skippedNoBarcode);
         if (result.duplicatesInFile) parts.push('ស្ទួនក្នុងឯកសារ ' + result.duplicatesInFile);
@@ -519,34 +562,46 @@ export async function runSheetImport() {
         scheduleCustomerTableSoonRefresh(true);
         showToast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
     } catch (e) {
+        if (!current()) return;
         setSheetImportMsg('siActionMsg', e.message, 'bad');
         showToast('❌ នាំចូលមិនបានទេ! ' + e.message);
     } finally {
-        viewState.siImportBtnDisabled = false;
-        viewState.siImportBtnText = 'នាំចូលទៅ Sheet';
-        sheetImportState.sheetImportBusy = false;
+        if (sheetConfigOwner === owner) {
+            sheetConfigOwner = null;
+            viewState.siImportBtnDisabled = false;
+            viewState.siImportBtnText = 'នាំចូលទៅ Sheet';
+            sheetImportState.sheetImportBusy = false;
+        }
     }
 }
 
 export async function runSheetImportClear() {
     if (sheetImportState.sheetImportBusy) return;
     if (!confirm('ជួរដេកទាំងអស់ក្នុង tab គោលដៅនឹងត្រូវលុប ដោយទុកតែជួរ header។ សកម្មភាពនេះមិនអាចដកវិញបានទេ។ តើបន្តទេ?')) return;
+    const owner = {};
+    sheetConfigOwner = owner;
+    const current = captureSheetImportOperation();
     sheetImportState.sheetImportBusy = true;
     viewState.siClearBtnBusy = true;
     setSheetImportMsg('siClearMsg', '');
     try {
         const result = await callSheetImportApi('clear', { confirm: 'CLEAR' });
+        if (!current()) return;
         setSheetImportMsg('siClearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
         setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
         clearCustomerDataTableCache();
         scheduleCustomerTableSoonRefresh(true);
         showToast('✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក');
     } catch (e) {
+        if (!current()) return;
         setSheetImportMsg('siClearMsg', e.message, 'bad');
         showToast('❌ សម្អាតមិនបានទេ! ' + e.message);
     } finally {
-        viewState.siClearBtnBusy = false;
-        sheetImportState.sheetImportBusy = false;
+        if (sheetConfigOwner === owner) {
+            sheetConfigOwner = null;
+            viewState.siClearBtnBusy = false;
+            sheetImportState.sheetImportBusy = false;
+        }
     }
 }
 

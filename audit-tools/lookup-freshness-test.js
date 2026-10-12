@@ -86,12 +86,13 @@ const FNS = [
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
     'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
-    'attemptAutoLookup', 'runSheetImport'
+    'attemptAutoLookup', 'runSheetImport', 'captureSheetImportOperation', 'shopScope', 'safeStoreGet'
 ];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
 
 const DECLS = [
+    'authGeneration', 'sheetConfigOwner', 'sheetOperationGeneration', 'sheetImportKey', 'sheetImportUrl', 'sheetImportPassword',
     'CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS',
     'CUSTOMER_TABLE_RETRY_STEPS_MS', 'CUSTOMER_TABLE_RETRY_BUSY_MS',
     'CUSTOMER_TABLE_SOON_MS', 'CUSTOMER_TABLE_SOON_BUSY_MS', 'CUSTOMER_TABLE_SOON_MAX_WAIT_MS',

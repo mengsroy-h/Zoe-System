@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.16';
+const APP_VERSION = '2.24.17';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2345,7 +2345,15 @@ function lookupSetupMetadata(value) {
         if (typeof field !== 'string' || !field.trim() || field.length > 128) throw new Error('bad lookup field');
         fields[name] = field.trim();
     }
-    return { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+    const metadata = { url, enabled: value.enabled, fastMode: value.fastMode, headerName, phoneField: fields['phoneField'], codField: fields['codField'], dodField: fields['dodField'] };
+    if ('shop' in value) {
+        if (typeof value.shop !== 'string' || value.shop.length > 512) throw new Error('bad lookup shop');
+        const target = new URL(value.shop);
+        if (target.protocol !== 'https:' || target.username || target.password || target.search || target.pathname !== '/' ||
+            !/^#[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target.hash)) throw new Error('bad lookup shop');
+        metadata.shop = target.origin + target.hash;
+    }
+    return metadata;
 }
 
 function lookupSetupAad(value) {
@@ -2439,7 +2447,9 @@ async function generateLookupSetupLink() {
     const session = captureSensitiveSession(true);
     if (!session) return;
     const generation = ++lookupSetupGeneration;
-    const current = () => generation === lookupSetupGeneration && isSensitiveSessionCurrent(session, true);
+    let targetSession = null;
+    const current = () => generation === lookupSetupGeneration && isSensitiveSessionCurrent(session, true)
+        && (!targetSession || sbAdminIsCurrent(targetSession));
     const element = (id) => document.getElementById(id);
     const value = (id) => element(id) ? element(id).value.trim() : '';
     const checked = (id) => !!(element(id) && element(id).checked);
@@ -2479,6 +2489,14 @@ async function generateLookupSetupLink() {
         const rawLookupUrl = value('setupLookupUrlInput');
         const lookupUrl = rawLookupUrl.startsWith('/') && !rawLookupUrl.startsWith('//') ? base.origin + rawLookupUrl : rawLookupUrl;
         const lookup = lookupSetupMetadata({ url: lookupUrl, enabled: checked('setupLookupEnabledCheckbox'), fastMode: checked('setupLookupFastCheckbox'), headerName: value('setupLookupHeaderInput'), phoneField: value('setupLookupPhoneInput') || 'phone', codField: value('setupLookupCodInput') || 'cod', dodField: value('setupLookupDodInput') || 'dod' });
+        const tenantId = value('setupLookupTenantSelect');
+        if (tenantId) {
+            targetSession = sbAdminSession;
+            const tenant = sbTenantCache.find((row) => row.id === tenantId);
+            if (!sbAdminIsCurrent(targetSession) || !tenant || sbTenantState(tenant) !== 'active' ||
+                payload.supabaseUrl !== targetSession.url) throw new Error('bad lookup target');
+            lookup.shop = targetSession.url + '#' + tenant.id;
+        }
         if (secret && !lookup.headerName) throw new Error('missing header');
         code = lookupSetupCode();
         lookup.keyEnc = await encryptSetupLookup(lookup, secret, code);
@@ -3379,6 +3397,14 @@ function sbAdminReset(expired) {
     sbTenantReadFailed = false;
     sbLastInvite = null;
     sbLastResetCode = '';
+    renderSbLookupTargets();
+    const lookupTarget = document.getElementById('setupLookupTenantSelect');
+    if (lookupTarget) lookupTarget.value = '';
+    lookupSetupGeneration++;
+    lastGeneratedSetupLink = '';
+    ['setupLinkResultText', 'setupLookupCodeOutput'].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    const lookupQr = document.getElementById('setupLinkQrContainer');
+    if (lookupQr) lookupQr.innerHTML = '';
     setSbAdminBusy(false);
     const body = document.getElementById('sbTenantListBody');
     if (body) body.innerHTML = '';
@@ -3478,7 +3504,37 @@ function sbDevicesHtml(tenantId) {
     return '<div class="seat-device-list">' + list.map((d) => '<div class="seat-device-line">' + escapeHtml(sbDeviceLabel(d)) + '</div>').join('') + '</div>';
 }
 
+function renderSbLookupTargets() {
+    const select = document.getElementById('setupLookupTenantSelect');
+    if (!select) return;
+    const previous = select.value;
+    const rows = sbAdminIsCurrent(sbAdminSession) && !sbTenantReadFailed ? sbTenantCache.filter((row) => sbTenantState(row) === 'active') : [];
+    select.innerHTML = '<option value="">ចងទៅហាងដែលភ្ជាប់លើឧបករណ៍អតិថិជន</option>' + rows.map((row) =>
+        '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(row.name) + ' · ' + escapeHtml(row.branch_code) + '</option>').join('');
+    select.value = rows.some((row) => row.id === previous) ? previous : '';
+}
+
+function prepareSbLookupSetup(session, tenant) {
+    if (!sbAdminIsCurrent(session) || !tenant || sbTenantState(tenant) !== 'active') return;
+    const config = document.getElementById('setupLinkConfigInput');
+    const include = document.getElementById('setupLookupIncludeCheckbox');
+    const select = document.getElementById('setupLookupTenantSelect');
+    if (!config || !include || !select) return;
+    lookupSetupGeneration++;
+    lastGeneratedSetupLink = '';
+    ['setupLinkResultText', 'setupLookupCodeOutput'].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    const qr = document.getElementById('setupLinkQrContainer');
+    if (qr) qr.innerHTML = '';
+    config.value = JSON.stringify({ supabaseUrl: session.url, supabaseKey: session.key }, null, 2);
+    include.checked = true;
+    renderSbLookupTargets();
+    select.value = tenant.id;
+    switchKgTab('link');
+    showToast('ℹ️ បំពេញ URL API និង Header សម្រាប់ «' + tenant.name + '» រួចបង្កើត Link។');
+}
+
 function renderSbTenantList() {
+    renderSbLookupTargets();
     const body = document.getElementById('sbTenantListBody');
     if (!body) return;
     if (sbTenantReadFailed) {
@@ -3509,6 +3565,7 @@ function renderSbTenantList() {
             <td>${sbStatusHtml}</td>
             <td>
                 <div class="btn-row">
+                    <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-lookup">🔗 API ស្វែងរក</button>
                     <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-invite">🎟️ កូដអញ្ជើញ</button>
                     <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-extend">⏳ ពន្យារ</button>
                     <button class="btn-mini" data-tenant-id="${escapeHtml(row.id)}" data-action="sb-revoke">${row.revoked ? '✅ បើកវិញ' : '⛔ បិទ'}</button>
@@ -3614,6 +3671,7 @@ async function sbTenantAction(tenantId, action) {
     if (!session || sbAdminBusy || !sbAdminIsCurrent(session)) return;
     const tenant = sbTenantCache.find((t) => t.id === tenantId);
     if (!tenant) return;
+    if (action === 'sb-lookup') { prepareSbLookupSetup(session, tenant); return; }
     let args = null;
     let rpc = 'admin_update_tenant';
     if (action === 'sb-invite') {

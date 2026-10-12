@@ -56,8 +56,8 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.55` (`zoew-v318`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.16` (`zoekeygen-v127`) | `zoekeygen` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.56` (`zoew-v319`) | `zoew` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.17` (`zoekeygen-v128`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -940,7 +940,7 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
 - `CORE_SHELL` uses atomic `cache.addAll()` ⛔ no whole-install ceiling on it (a slow but progressing download of the shell must
   finish; a hung CORE request leaves install to the browser's own event limit). Each `OPTIONAL_SHELL` entry settles within
   `OPTIONAL_INSTALL_TIMEOUT_MS` (abort + structural resolve) ➜ a hung optional never holds install or `skipWaiting()`; both apps.
-- Cache API failure is never fatal: `networkOnly(request)` in 3 places (`cache.match()` second `.then` argument ·
+- Activate cache cleanup failure still reaches `clients.claim()`; prefix filters stay unchanged. Cache API failure is never fatal: `networkOnly(request)` in 3 places (`cache.match()` second `.then` argument ·
   `caches.open()` outer `.catch` · the `./index.html` fallback); it resolves to `Response.error()`. Navigation miss or
   Cache API rejection fetches the same shell `cacheKey` with `request.signal` ⛔ never cache JS under the `index.html` key.
 - `/.netlify/functions/` ➜ `networkOnly()` (never cached).
@@ -1095,10 +1095,10 @@ Scan Management ➜ Arrival Scan ➜ a Waybill (`POST https://aargus-api.ztoglob
   one tap ⛔ never auto-save a URL link — it can come from anyone); in-modal QR/image/paste save at once via
   `connectSetupPayload()` (a rejected config ➜ not saved, manual section opens); query removed via
   `history.replaceState`; abandoned links don't survive logout, active PIN flows keep them (`isPinFlowPending()`).
-  Lookup-only links require an existing shop; combined links accept Firebase/Supabase. Lookup metadata (including HTTPS URL)
+  Lookup-only links require an existing shop; combined links accept Firebase/Supabase. Lookup metadata (including HTTPS URL and optional Supabase project/tenant `shop` target)
   is authenticated with AES-GCM; `keyEnc` uses PBKDF2-SHA256 and a separately delivered cryptographically random six-digit
   code. Wrong code/cancel/session change writes nothing. Re-encrypt Header under the PIN `lookupSecretKey`, bind to
-  `shopScope()` (Supabase binds once tenant is known), clear customer/ZTO caches and refresh shop UI. Never persist or
+  `shopScope()` (legacy Supabase links bind once tenant is known; targeted links keep their authenticated tenant and reject project mismatches), clear customer/ZTO caches and refresh shop UI. Never persist or
   report plaintext Header/code; seller logout clears them. Guards: `tests/setup-lookup.test.tsx` · `secret-hygiene`.
 - `firebase-backup/`: Node.js 18+ CLI, no dependencies; `config.json` · `secrets/` · `backups/` gitignored ⛔ never commit
   service-account keys; `.partial` ➜ `renameSync()`; runs by hand/Task Scheduler and via `backup.yml` (cron `0 19 * * *`):

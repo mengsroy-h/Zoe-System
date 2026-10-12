@@ -17,11 +17,16 @@ vi.mock('../src/app/refs', async (importOriginal) => {
     });
 });
 
-import { firebaseState } from '../src/core/state';
+import { firebaseState, securityState, sheetImportState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
+import { shopScope } from '../src/core/shop-scope';
 import { SHEET_IMPORT_STORE_KEY } from '../src/core/storage-keys';
-import { getLookupApiConfig, saveLookupApiConfig } from '../src/features/lookup-config';
-import { readSheetImportStoredConfig } from '../src/features/sheet-import';
+import * as lookupCrypto from '../src/services/crypto';
+import { getLookupApiConfig, migrateLookupSecretIfNeeded, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
+import * as customerTable from '../src/features/customer-table';
+import { viewState } from '../src/core/view-state';
+import * as network from '../src/services/network';
+import { deriveSheetImportKey, readSheetImportStoredConfig, saveSheetImportConfig, refreshSheetImportStatus, runSheetImportClear } from '../src/features/sheet-import';
 
 const SB_URL = 'https://abcd.supabase.co';
 const FB_A = 'https://shop-a.firebaseio.com';
@@ -117,5 +122,145 @@ describe('ការតភ្ជាប់ Excel ➜ Sheet ៖ ជារបស់�
         expect(readSheetImportStoredConfig()).toBeNull();
         useSupabaseTenant('tenant-a');
         expect(readSheetImportStoredConfig()).toMatchObject({ u: SHEET.u });
+    });
+});
+
+
+describe('Deep audit ៖ លទ្ធផល encrypt ចាស់មិនឆ្លងហាង', () => {
+    afterEach(() => { vi.restoreAllMocks(); securityState.lookupSecretKey = null; });
+
+    it('migration សោហាង A ពន្យារ ➜ ហាង B កំណត់ថ្មី ➜ A មិនជាន់ B', async () => {
+        useSupabaseTenant('tenant-a');
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValue: 'old-a' }));
+        securityState.lookupSecretKey = {} as CryptoKey;
+        let finish!: (value: any) => void;
+        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const task = migrateLookupSecretIfNeeded();
+        useSupabaseTenant('tenant-b');
+        const next = { ...LOOKUP, url: 'https://b.example/?code={barcode}', shop: SB_URL + '#tenant-b' };
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(next));
+        finish({ iv: 'a', ct: 'a' });
+        expect(await task).toBe(false);
+        expect(stored('zoew_lookup_api_config')).toEqual(next);
+    });
+
+    it('Save ចាប់ផ្តើមហាង A ➜ ប្តូរហាងក្នុង encrypt ➜ មិនរក្សាទុកក្នុង B', async () => {
+        useSupabaseTenant('tenant-a');
+        fields.values.lookupApiUrlInput = 'https://a.example/?code={barcode}';
+        fields.values.lookupApiHeaderValueInput = 'a-secret';
+        securityState.lookupSecretKey = {} as CryptoKey;
+        let finish!: (value: any) => void;
+        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const task = saveLookupApiConfig();
+        useSupabaseTenant('tenant-b');
+        finish({ iv: 'a', ct: 'a' });
+        await task;
+        expect(stored('zoew_lookup_api_config')).toBeNull();
+    });
+
+    it('Save ចាស់មកក្រោយ Save ថ្មីក្នុងហាងដដែល ➜ ថ្មីឈ្នះ', async () => {
+        useFirebase(FB_A);
+        securityState.lookupSecretKey = {} as CryptoKey;
+        const pending: ((value: any) => void)[] = [];
+        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+        fields.values.lookupApiUrlInput = 'https://old.example/?code={barcode}';
+        fields.values.lookupApiHeaderValueInput = 'old-secret';
+        const old = saveLookupApiConfig();
+        fields.values.lookupApiUrlInput = 'https://new.example/?code={barcode}';
+        fields.values.lookupApiHeaderValueInput = 'new-secret';
+        const latest = saveLookupApiConfig();
+        pending[1]({ iv: 'new', ct: 'new' });
+        await latest;
+        pending[0]({ iv: 'old', ct: 'old' });
+        await old;
+        expect(stored('zoew_lookup_api_config')).toMatchObject({ url: 'https://new.example/?code={barcode}', headerValueEnc: { iv: 'new', ct: 'new' } });
+    });
+});
+
+
+describe('Deep audit ៖ សំណើចាស់ក្រោយប្តូរហាង', () => {
+    afterEach(() => { vi.restoreAllMocks(); securityState.lookupSecretKey = null; sheetImportState.sheetImportKey = null; sheetImportState.sheetImportBusy = false; });
+
+    it('Test API ហាង A កំពុង decrypt ➜ ប្តូរទៅ B ➜ មិនផ្ញើ Header A ជាមួយគណនី B', async () => {
+        useSupabaseTenant('tenant-a');
+        fields.values.lookupApiUrlInput = 'https://a.example/?code={barcode}';
+        fields.values.lookupApiHeaderNameInput = 'X-Shop-Key';
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValueEnc: { iv: 'a', ct: 'a' } }));
+        let finish!: (value: string) => void;
+        vi.spyOn(lookupCrypto, 'decryptLookupSecret').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        vi.stubGlobal('prompt', () => '123456');
+        const task = testLookupApiConfig();
+        useSupabaseTenant('tenant-b');
+        finish('a-secret');
+        await task;
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('រក្សាទុក Sheet ហាង A កំពុងសាក API ➜ ប្តូរទៅ B ➜ មិនចង A ទៅ B', async () => {
+        useFirebase(FB_A);
+        fields.values.siApiUrlInput = 'https://script.google.com/macros/s/A/exec';
+        fields.values.siApiPasswordInput = 'a-password';
+        sheetImportState.sheetImportKey = await deriveSheetImportKey('123456');
+        let finish!: (value: any) => void;
+        vi.spyOn(network, 'fetchWithTimeout').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const task = saveSheetImportConfig();
+        useFirebase(FB_B);
+        finish({ res: { ok: true }, body: JSON.stringify({ ok: true, data: { spreadsheetName: 'A', sheetName: 'A', rowCount: 0 } }) });
+        await task;
+        expect(stored(SHEET_IMPORT_STORE_KEY)).toBeNull();
+    });
+});
+
+
+describe('Deep audit ៖ ទិសផ្ទុយនៃ migration សោ', () => {
+    afterEach(() => { vi.restoreAllMocks(); securityState.lookupSecretKey = null; });
+    it('ហាង/សម័យដដែល ➜ migrate secret ចាស់បាន និងរក្សា shop', async () => {
+        useFirebase(FB_A);
+        securityState.lookupSecretKey = {} as CryptoKey;
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...LOOKUP, headerValue: 'a-secret' }));
+        vi.spyOn(lookupCrypto, 'encryptLookupSecret').mockResolvedValue({ iv: [1], data: [2] });
+        expect(await migrateLookupSecretIfNeeded()).toBe(true);
+        expect(stored('zoew_lookup_api_config')).toMatchObject({ shop: FB_A, headerValueEnc: { iv: [1], data: [2] } });
+        expect(stored('zoew_lookup_api_config')).not.toHaveProperty('headerValue');
+    });
+    it('Storage បោះ SecurityError ➜ migration false មិន reject', async () => {
+        const read = vi.spyOn(Object.getPrototypeOf(appLocalStore), 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
+        try { await expect(migrateLookupSecretIfNeeded()).resolves.toBe(false); }
+        finally { read.mockRestore(); }
+    });
+});
+
+
+describe('Deep audit ៖ លទ្ធផល Sheet មិនប៉ះ cache/UI ហាងថ្មី', () => {
+    afterEach(() => { vi.restoreAllMocks(); sheetImportState.sheetImportBusy = false; });
+    it('Clear ហាង A ត្រឡប់ក្រោយប្តូរទៅ B ➜ មិនសម្អាត cache B', async () => {
+        useFirebase(FB_A);
+        sheetImportState.sheetImportUrl = 'https://script.google.com/macros/s/A/exec';
+        sheetImportState.sheetImportPassword = 'a';
+        vi.stubGlobal('confirm', () => true);
+        const cleared = vi.spyOn(customerTable, 'clearCustomerDataTableCache').mockImplementation(() => {});
+        let finish!: (value: any) => void;
+        vi.spyOn(network, 'fetchWithTimeout').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const task = runSheetImportClear();
+        expect(shopScope()).toBe(FB_A);
+        useFirebase(FB_B);
+        expect(shopScope()).toBe(FB_B);
+        finish({ res: { ok: true }, body: JSON.stringify({ ok: true, data: { removed: 5, sheetName: 'A', rowsAfter: 0 } }) });
+        await task;
+        expect(cleared).not.toHaveBeenCalled();
+    });
+    it('Status ហាង A យឺត ➜ ហាង B បង្ហាញគោលដៅថ្មី ➜ A មិនជាន់ footer', async () => {
+        useFirebase(FB_A);
+        sheetImportState.sheetImportUrl = 'https://script.google.com/macros/s/A/exec';
+        let finish!: (value: any) => void;
+        vi.spyOn(network, 'fetchWithTimeout').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+        const task = refreshSheetImportStatus();
+        expect(shopScope()).toBe(FB_A);
+        useFirebase(FB_B);
+        expect(shopScope()).toBe(FB_B);
+        viewState.siStatusFoot = 'ហាង B';
+        finish({ res: { ok: true }, body: JSON.stringify({ ok: true, data: { spreadsheetName: 'A', sheetName: 'A', rowCount: 5 } }) });
+        await task;
+        expect(viewState.siStatusFoot).toBe('ហាង B');
     });
 });

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v127';
+const CACHE_VERSION = 'zoekeygen-v128';
 
 const CORE_SHELL = [
     './',
@@ -85,7 +85,7 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
             Promise.all(keys.filter((key) => key.startsWith('zoekeygen-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
-        ).then(() => self.clients.claim())
+        ).catch(() => {}).then(() => self.clients.claim())
     );
 });
 

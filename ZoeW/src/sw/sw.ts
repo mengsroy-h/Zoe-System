@@ -118,7 +118,7 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
     event.waitUntil(
         caches.keys().then((keys) =>
             Promise.all(keys.filter((key) => (key.startsWith('zoew-') || key.startsWith('zoeadmin-')) && key !== CACHE_VERSION).map((key) => caches.delete(key)))
-        ).then(() => self.clients.claim())
+        ).catch(() => {}).then(() => self.clients.claim())
     );
 });
 

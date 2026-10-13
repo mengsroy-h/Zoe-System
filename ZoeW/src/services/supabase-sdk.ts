@@ -1,5 +1,6 @@
 import { SbIncrement, SbNetworkError, SbRpcError, createSupabaseDatabase } from './supabase-rtdb';
 import { createIdbDocsCache } from './supabase-docs-cache';
+import { createLocalWriteJournal } from './write-journal';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
@@ -368,8 +369,10 @@ export function createSupabaseSdk(makeTransport, env) {
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
                     onTxOutcomeUnknown: env.onTxOutcomeUnknown,
+                    onWriteRecovery: env.onWriteRecovery,
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
-                }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache }, env.dbOptions));
+                }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,
+                    writeJournal: env.writeJournal === undefined ? (typeof window !== 'undefined' ? createLocalWriteJournal() : null) : env.writeJournal }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);

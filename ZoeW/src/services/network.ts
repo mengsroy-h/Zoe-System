@@ -12,6 +12,7 @@ import { showToast } from '../ui/toast';
 import { nativeFunctionRequest, resolveNativeApiUrl } from '../platform/native';
 import { refreshNotifyView } from '../features/notifications';
 import { probeDatabaseLiveness } from './connection';
+import { captureConnectionOperation } from './connection-flow';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -168,6 +169,7 @@ export function ztoRequestBarcodeIsRefused(url) {
 }
 
 export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promise<any> {
+    const lease = captureConnectionOperation();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const opts = Object.assign({}, options || {});
     const sourceSignal = opts.signal || null;
@@ -175,8 +177,10 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     let settled = false;
     let timer = null;
+    let stopWatching = null;
     return new Promise((resolve, reject) => {
         const cleanup = () => {
+            if (stopWatching) { stopWatching(); stopWatching = null; }
             if (timer !== null) {
                 clearTimeout(timer);
                 timer = null;
@@ -194,6 +198,13 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             error.name = 'AbortError';
             reject(error);
         };
+        const abortFromScope = () => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            cleanup();
+            reject(Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true }));
+        };
         if (sourceSignal && typeof sourceSignal.addEventListener === 'function') {
             if (sourceSignal.aborted) {
                 abortFromSource();
@@ -201,6 +212,8 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             }
             sourceSignal.addEventListener('abort', abortFromSource, { once: true });
         }
+        stopWatching = lease.watch(abortFromScope);
+        if (settled) return;
         timer = setTimeout(() => {
             if (settled) return;
             settled = true;
@@ -211,14 +224,17 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
         const legacyUrl = resolveNativeApiUrl(url);
         const request = lookupState.nativeQueryHeaderUnsupported ? { url: legacyUrl, options: opts } : nativeFunctionRequest(url, opts);
         fetch(request.url, request.options).then((res) => {
+            if (!lease.current()) { abortFromScope(); return null; }
             if (request.url === legacyUrl || settled || !res || res.status !== 400) return res;
             if (ztoRequestBarcodeIsRefused(legacyUrl)) return res;
             return fetch(legacyUrl, opts).then((legacy) => {
+                if (!lease.current()) { abortFromScope(); return null; }
                 if (legacy && legacy.status !== 400) lookupState.nativeQueryHeaderUnsupported = true;
                 return legacy;
             });
         }).then((res) => {
             if (settled) return null;
+            if (!lease.current()) { abortFromScope(); return null; }
             if (!readBody) return { res: res, body: undefined };
             return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));
         }, (err) => {
@@ -229,6 +245,7 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             return null;
         }).then((out) => {
             if (settled || !out) return;
+            if (!lease.current()) { abortFromScope(); return; }
             settled = true;
             cleanup();
             resolve(out);

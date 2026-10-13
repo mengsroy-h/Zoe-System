@@ -19,6 +19,7 @@ import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
 import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
+import { withConnectionOwnership } from './connection-flow';
 
 let supabaseSdkPromise = null;
 
@@ -66,7 +67,8 @@ function supabaseEnv() {
             if (txOutcomeUnknownReported.has(path)) return;
             txOutcomeUnknownReported.add(path);
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
-        }
+        },
+        onWriteRecovery: () => renderConnectionStatus()
     };
 }
 
@@ -99,7 +101,7 @@ export async function initFirebase() {
         const previousFb = firebaseState.fb;
         let nextFb;
         if (useSupabase) {
-            nextFb = await loadSupabaseFb();
+            nextFb = withConnectionOwnership(await loadSupabaseFb());
         } else {
             preconnectToDatabaseHost(firebaseState.firebaseConfig);
             nextFb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
@@ -151,6 +153,7 @@ export async function initFirebase() {
             await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
         }
         firebaseState.fb = nextFb;
+        if (typeof nextFb.setConnectionFlowReporter === 'function') nextFb.setConnectionFlowReporter(renderConnectionStatus);
 
         const firebaseApp = firebaseState.fb.getApps().length ? firebaseState.fb.getApps()[0] : firebaseState.fb.initializeApp(firebaseState.firebaseConfig);
         firebaseState.auth = firebaseState.fb.getAuth(firebaseApp);

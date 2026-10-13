@@ -103,7 +103,8 @@ describe('Registry ៖ ការងារចាស់មិនសរសេរគ
         firebaseState.isInitializingFirebase = false;
         const before = firebaseState.authGeneration;
         expect(await initFirebase()).toBe(true);
-        expect(firebaseState.fb).toBe(sb.sdk);
+        expect(firebaseState.fb.initializeApp).toBe(sb.sdk.initializeApp);
+        expect(firebaseState.fb.__connectionOwned).toBe(true);
         expect(oldDelivered).toBe(false);
         expect(firebaseState.authGeneration).toBe(before + 1);
 

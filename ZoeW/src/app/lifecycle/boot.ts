@@ -51,6 +51,7 @@ export function bootApplication(scope: LifecycleScope): void {
     scope.onLoad(() => {
         startCoreServices();
         startPeriodicTasks(scope);
+        scope.onDispose(setupConnectionRecovery());
         startScanEngine();
         startInteractions();
         startGlobalDismissals(scope);
@@ -188,7 +189,6 @@ function startScanEngine(): void {
 function startInteractions(): void {
     oncePerPage('interactions', () => {
         setupHardwareScanner();
-        setupConnectionRecovery();
         switchAppPage('data');
         initBiometricUi();
         setupSwipeGestures();

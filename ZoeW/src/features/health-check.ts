@@ -18,6 +18,7 @@ import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
+import { connectionFlowSnapshot } from '../services/connection-flow';
 import { closeSideDrawer } from '../ui/page-nav';
 import { isNativeApp } from '../platform/native';
 
@@ -60,6 +61,11 @@ export function healthDatabaseRow() {
 }
 
 export async function healthDatabaseLiveRow() {
+    if (firebaseState.fb && typeof firebaseState.fb.retryWriteRecovery === 'function' && firebaseState.db && firebaseState.auth && firebaseState.auth.currentUser) {
+        try { await withTimeout(firebaseState.fb.retryWriteRecovery(firebaseState.db), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
+    }
+    const phase = connectionFlowSnapshot().phase;
+    if (phase === 'blocked') return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ ដើម្បីការពារប្រាក់ស្ទួន។ សូមពិនិត្យទិន្នន័យ និងចុចពិនិត្យម្តងទៀត។');
     const base = healthDatabaseRow();
     if (base.state !== 'ok') return base;
     const alive = await probeDatabaseLiveness('health');

@@ -24,6 +24,7 @@ export interface ViewState {
 
     connectionStatus: 'online' | 'connecting' | 'offline' | null;
     connectionText: string;
+    connectionPhase: import('../services/connection-flow').ConnectionPhase;
 
     bootSplashPhase: 'shown' | 'out' | 'gone';
     bootRevealing: boolean;
@@ -119,6 +120,7 @@ export interface ViewState {
 export const viewState = createStore<ViewState>('viewState', {
     appVersionLabel: '',
     connectionStatus: null,
+    connectionPhase: 'unconfigured',
     connectionText: 'ក្រៅបណ្ដាញ',
     bootSplashPhase: 'shown',
     bootRevealing: false,

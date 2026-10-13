@@ -336,6 +336,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     const pollFallbackMs = opt.pollFallbackMs || SB_POLL_FALLBACK_MS;
     const pullPage = opt.pullPage || SB_PULL_PAGE;
     const docsCache = opt.docsCache || null;
+    const writeJournal = opt.writeJournal || null;
+    const liveWriteIds = new Set<string>();
+    let recoveryBlocked = 0;
+    let recoveredContext = null;
+    let recoveringWrites = null;
     const cacheFirstSaveMs = opt.docsCacheFirstSaveMs || SB_DOCS_CACHE_FIRST_SAVE_MS;
     const cacheMinIntervalMs = opt.docsCacheMinIntervalMs || SB_DOCS_CACHE_MIN_INTERVAL_MS;
     const cacheLoadMaxMs = opt.docsCacheLoadMaxMs || SB_DOCS_CACHE_LOAD_MAX_MS;
@@ -567,16 +572,97 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const epoch = sessionEpoch;
         const topic = tenantTopic;
         const t0 = Date.now();
+        let journalRow = null;
+        if (fn === 'zoe_write' && writeJournal) {
+            if (!authScope || !topic) throw new SbRpcError('write context unavailable', 'write_context', 0, '');
+            const prior = writeJournal.list(authScope, topic).find((row) => row.opId === args.p_op_id);
+            journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
+                ops: args.p_ops, createdAt: Date.now() }, { stage: 'sent', sentAfter: prior && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
+            if (!writeJournal.put(journalRow)) throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
+        }
         let data;
         try {
             data = await transport.rpc(fn, args, rpcTimeoutMs);
         } catch (e) {
+            if (journalRow) {
+                if (e instanceof SbNetworkError && e.unsent) {
+                    if (!authed || authScope !== journalRow.scope || tenantTopic !== journalRow.topic) {
+                        if (journalRow.uncertain) { journalRow.stage = 'cancelled'; writeJournal.put(journalRow); }
+                        else writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
+                    } else { journalRow.stage = journalRow.uncertain ? 'sent' : 'queued'; writeJournal.put(journalRow); }
+                } else if (e instanceof SbNetworkError || e instanceof SbRpcError && e.code === 'bad_response') {
+                    journalRow.uncertain = true;
+                    if (!authed || authScope !== journalRow.scope || tenantTopic !== journalRow.topic) journalRow.stage = 'cancelled';
+                    writeJournal.put(journalRow);
+                } else if (journalRow.uncertain) { journalRow.stage = 'unresolved'; writeJournal.put(journalRow); }
+                else writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
+            }
             if (fn === 'zoe_write' && e instanceof SbRpcError && e.code === 'bad_response') throw new SbNetworkError('write reply unreadable');
             throw e;
         }
         if (fn === 'zoe_write' && (!data || typeof data !== 'object')) throw new SbNetworkError('write reply empty');
+        if (journalRow && (data.ok || data.conflict && journalRow.sentAfter > 0 && Number.isFinite(data.now)
+            && data.now - journalRow.sentAfter >= 0 && data.now - journalRow.sentAfter <= SB_OP_REPLAY_SAFE_MS)) {
+            writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
+        }
         if (!closed && epoch === sessionEpoch && topic === tenantTopic && data && typeof data === 'object' && typeof data.now === 'number') noteServerTime(data.now, t0, Date.now());
         return data;
+    };
+
+    const recoverWrites = () => {
+        if (!writeJournal || !authed || !authScope || !tenantTopic) return Promise.resolve();
+        const context = authScope + '\n' + tenantTopic;
+        if (recoveredContext === context) return Promise.resolve();
+        if (recoveringWrites) return recoveringWrites;
+        const scope = authScope; const topic = tenantTopic; const epoch = sessionEpoch;
+        const current = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const running = (async () => {
+            recoveryBlocked = 0;
+            let rows;
+            try { rows = writeJournal.list(scope, topic); }
+            catch (e) {
+                if (current()) {
+                    recoveryBlocked = 1;
+                    recoveredContext = context;
+                    if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: 1 });
+                }
+                return;
+            }
+            for (const row of rows) {
+                if (!current()) return;
+                if (liveWriteIds.has(row.opId)) continue;
+                const age = serverNowSeen - row.sentAfter;
+                if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage === 'cancelled' || row.stage !== 'queued'
+                    && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
+                    recoveryBlocked++; continue;
+                }
+                const res = await rpc('zoe_write', { p_op_id: row.opId, p_ops: row.ops });
+                if (!current()) return;
+                if (res && res.ok) applyWriteResult(res);
+                else if (res && res.conflict && row.sentAfter > 0 && Number.isFinite(res.now)
+                    && res.now - row.sentAfter >= 0 && res.now - row.sentAfter <= SB_OP_REPLAY_SAFE_MS) {
+                    writeJournal.remove(scope, topic, row.opId);
+                } else recoveryBlocked++;
+            }
+            if (current()) {
+                recoveredContext = context;
+                if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
+            }
+        })();
+        recoveringWrites = running;
+        running.finally(() => { if (recoveringWrites === running) recoveringWrites = null; }).catch(() => {});
+        return running;
+    };
+
+    const waitForWriteRecovery = async () => {
+        if (!writeJournal) return;
+        if (!ready || recoveredContext !== authScope + '\n' + tenantTopic) {
+            await new Promise<void>((resolve) => {
+                const wait = () => { if (closed || ready && recoveredContext === authScope + '\n' + tenantTopic) resolve(); else waiters.add(wait); };
+                wait();
+            });
+        }
+        if (recoveryBlocked) throw firebaseLikeError('write_recovery_pending', []);
     };
 
     const wakeWaiters = () => {
@@ -719,11 +805,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         }
                     }
                     if (staleSession) { wantSync = true; continue; }
+                    await recoverWrites();
+                    if (!syncIsCurrent()) { wantSync = true; continue; }
                     forbidden = null;
                     retryAttempt = 0;
                     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
                     setConnected(true);
                     ready = true;
+                    wakeWaiters();
                     notify();
                     hooks.onSynced();
                     schedulePoll();
@@ -797,6 +886,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const settleWrite = (w) => {
+        if (w.opId) liveWriteIds.delete(w.opId);
         const i = pending.indexOf(w);
         if (i === -1) return;
         pending.splice(i, 1);
@@ -829,6 +919,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     let writeSeq = 0;
     const enqueueWrite = (ops, path, overlay) => {
         const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic };
+        if (writeJournal) {
+            if (!w.scope || !w.topic || !writeJournal.put({ v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
+                ops, stage: 'queued', sentAfter: 0, createdAt: Date.now() })) return Promise.reject(firebaseLikeError('write_journal_unavailable', path));
+        }
+        liveWriteIds.add(w.opId);
         let resolveDone;
         let rejectDone;
         w.done = new Promise((res, rej) => { resolveDone = res; rejectDone = rej; });
@@ -839,12 +934,19 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         (async () => {
             await waitDeps(w);
+            try { await waitForWriteRecovery(); } catch (e) { settleWrite(w); rejectDone(e); return; }
             for (;;) {
                 if (closed) { settleWrite(w); rejectDone(firebaseLikeError('disconnect', path)); return; }
                 await waitForLink();
                 if (closed) continue;
                 if (authScope !== w.scope || tenantTopic !== w.topic) {
-                    if (authed) { settleWrite(w); notify(); rejectDone(firebaseLikeError('permission_denied', path)); return; }
+                    if (authed) {
+                        if (writeJournal) {
+                            const row = writeJournal.list(w.scope, w.topic).find((x) => x.opId === w.opId);
+                            if (row && row.stage === 'queued') writeJournal.remove(w.scope, w.topic, w.opId);
+                        }
+                        settleWrite(w); notify(); rejectDone(firebaseLikeError('permission_denied', path)); return;
+                    }
                     await delay(retrySteps[Math.min(retryAttempt, retrySteps.length - 1)]);
                     continue;
                 }
@@ -1011,6 +1113,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             pending.push(gate);
             try {
                 await waitDeps(gate);
+                await waitForWriteRecovery();
                 let base;
                 if (ready && !forbidden) {
                     base = cloneCanonical(serverValueAt(path));
@@ -1025,6 +1128,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     const next = toCanonical(proposed, describe(path));
                     const op = { k: 'cas', p: path, x: base, v: next };
                     const opId = newOpId();
+                    gate.opId = opId;
+                    liveWriteIds.add(opId);
                     await waitForLink();
                     let res;
                     let lost = null;
@@ -1065,6 +1170,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                             if (closed) throw lost ? giveUp() : firebaseLikeError('disconnect', path);
                         }
                     }
+                    liveWriteIds.delete(opId);
                     if (sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic) setConnected(true);
                     if (res && res.ok) {
                         const current = sendEpoch === sessionEpoch && authScope === txScope && tenantTopic === txTopic;
@@ -1109,6 +1215,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 }
                 throw firebaseLikeError('maxretry', path, 'Transaction had too many retries');
             } finally {
+                if (gate.opId) liveWriteIds.delete(gate.opId);
                 const i = pending.indexOf(gate);
                 if (i !== -1) pending.splice(i, 1);
                 release();
@@ -1174,6 +1281,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     const resetSyncView = () => {
+        recoveredContext = null;
+        recoveryBlocked = 0;
         sessionEpoch++;
         clearServerView();
         cursor = 0;
@@ -1195,6 +1304,14 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.resetForSignOut = () => {
+        if (writeJournal && authScope && tenantTopic) {
+            try {
+                for (const row of writeJournal.list(authScope, tenantTopic)) {
+                    if (row.stage === 'queued') writeJournal.remove(authScope, tenantTopic, row.opId);
+                    else { row.stage = 'cancelled'; writeJournal.put(row); }
+                }
+            } catch (e) { hooks.onListenerError(e); }
+        }
         stopRealtime();
         authScope = null;
         authed = false;
@@ -1233,6 +1350,12 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.isReady = () => ready;
+    db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites });
+    db.retryWriteRecovery = () => {
+        recoveredContext = null;
+        requestSync();
+        return waitForWriteRecovery();
+    };
     db.cursor = () => cursor;
     db.snapshotState = () => {
         const out = {};

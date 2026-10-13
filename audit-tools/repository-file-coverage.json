@@ -3252,6 +3252,36 @@
     },
     "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/connection-flow.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/write-journal.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/native-write-recovery.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-flow-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-request-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/durable-connection-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-durable-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-native-retry-identity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261013004220_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261013004512_receipt_auth_uid.sql": {
+      "policy": "supabase-db"
     }
   }
 }

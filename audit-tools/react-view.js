@@ -127,6 +127,25 @@ function reactRuntime(src, options) {
     }
     parts.push(store);
     parts.push(storeDefinitions(src));
+    const connectionHelpers = ['captureConnectionOperation', 'connectionFlowSnapshot', 'nativeWriteRecoveryState', 'withConnectionOwnership'];
+    if (connectionHelpers.some(name => sliceFunction(src, name))) {
+        for (const name of ['nativeRecoveryStates', 'connectionLeases', 'stopConnectionLeaseObserver']) {
+            if (exclude.has(name)) continue;
+            const decl = new RegExp('^\\s*(?:const|let) ' + name + ' = [^;]+;', 'm').exec(src);
+            if (decl) parts.push(decl[0].trim());
+        }
+        for (const name of ['auth', 'db', 'fb', 'authGeneration', 'firebaseSdkUnavailable', 'isInitializingFirebase',
+            'sessionExpiryCheck', 'authLoginOperation', 'isDatabaseInitialized', 'isDatabaseConnected', 'dbListenersFailed']) {
+            const decl = new RegExp('^\\s*let ' + name + ' = ([^;]+);', 'm').exec(src);
+            if (decl) parts.push('if (typeof ' + name + ' === "undefined") globalThis.' + name + ' = ' + decl[1] + ';');
+        }
+        parts.push('if (typeof dbListenerPendingPaths === "undefined") globalThis.dbListenerPendingPaths = new Set();');
+        for (const name of connectionHelpers) {
+            if (exclude.has(name)) continue;
+            const fn = sliceFunction(src, name);
+            if (fn) parts.push(fn);
+        }
+    }
     const modalIds = /^ *const MODAL_IDS = \[[^\]]*\];/m.exec(src);
     if (modalIds) parts.push(modalIds[0].trim());
     for (const name of REACT_CONSTS) {

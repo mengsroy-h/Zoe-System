@@ -165,6 +165,29 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.59] — 2026-10-13 · Connection flow ទាំង ៦ ចំណុចតាមសំណើម្ចាស់គម្រោង
+
+**ZoeW** (`zoew-v321` ➜ `zoew-v322`)។ ZoeKeyGen រក្សាកំណែដដែល។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- App បែងចែកការចាប់ផ្តើម ចូលប្រព័ន្ធ ទាញទិន្នន័យ ក្រៅបណ្តាញ ស្ដារ និងការសរសេរដែលមិនទាន់ផ្ទៀងផ្ទាត់។ ភ្ជាប់ transport រួច តែ views ឬ recovery នៅរង់ចាំ ➜ មិនរាយ ready។
+- SDK facade និង network requests ចង backend/user/tenant/session; callback/read ចាស់មិនជាន់សម័យថ្មី។ Registry ដោះ subscription និង callback ជាមួយម្ចាស់របស់វា; reconnect lifecycle មាន cleanup និងមិនចុះ window listener ស្ទួន។
+- Pending writes មាន journal តាម backend/user/ហាង។ Firebase set/update បញ្ចូល data និង immutable receipt ក្នុង atomic update ដដែល; replay ផ្ទៀងផ្ទាត់ receipt មុន ហើយ increment មិនអនុវត្តស្ទួន។ Supabase រក្សា op_id ដើម និងចង replay window តាមម៉ោង Server។
+- Native transaction recovery ប្រើ Web Locks ដើម្បីកុំ replay operation ដែល tab ផ្សេងនៅកាន់។ Ledger intent មាន requested delta និង event identity ដើម; តែអនុវត្តពេល witness បញ្ជាក់សុវត្ថិភាព។ Platform គ្មាន Web Locks មិនសាក transaction ដែលមិនទាន់មាន verdict ដោយការស្មាន។
+- SDK retry របស់ ledger មិនគណនាប្រាក់ម្តងទៀតពេល op token របស់ខ្លួនមានរួច។ លទ្ធផលមិនច្បាស់ ➜ ផ្អាកការសរសេរថ្មី និងអាចផ្ទៀងផ្ទាត់តាម 🩺 ពិនិត្យប្រព័ន្ធ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/connection-flow-contract.test.ts` · `ZoeW/tests/connection-request-owner.test.ts` · `ZoeW/tests/durable-connection-write.test.ts` · `ZoeW/tests/native-durable-write.test.ts` · `ZoeW/tests/ledger-native-retry-identity.test.ts`។ `emu/app-network-e2e-test` វាស់ SDK ពិត + reload + receipt replay និង `emu/supabase-rules-parity-test` វាស់ auth.uid ជាមួយ RTDB/Postgres។ លទ្ធផលចុងក្រោយនៅផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មីមុនប្រើ App កំណែនេះ** (`firebase-database.rules.json` ឬ tools/firebase-provision/deploy-rules.cmd) ដើម្បីអនុញ្ញាត `zoew_write_receipts` ជាមួយការសរសេរទិន្នន័យ។ គ្មានការប្តូរ License rules។
+2. Supabase migrations `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` អនុវត្តតាម GitHub integration ក្រោយ merge; ផ្ទៀងផ្ទាត់ការចូលរបស់វាមុន deploy។
+3. Deploy ZoeW និង build APK ថ្មី។ សាក iPhone PWA, Android PWA និង APK៖ offline write ➜ បិទ/បើក ➜ reconnect; logout/login និងប្តូរហាងពេល request យឺត; App ពីរ tabs និងឧបករណ៍ពីរ។ កុំសម្អាត site data ពេលមាន pending writes; Firebase receipts មិនត្រូវលុបជាការសម្អាតធម្មតា។
+4. គោលការណ៍ Delete មិនដកប្រាក់, Remove/expired ដក និង restore បូកតែ isDeducted ដដែល។ Supabase Leaked Password Protection ជាការសម្រេចរបស់ម្ចាស់គម្រោងដូចមុន។
+
 ### [2.50.58] — 2026-10-12 · Audit ផ្តោត race, login/security និង Firebase/Supabase listener
 
 **ZoeW `2.50.58`** (`zoew-v320` ➜ `zoew-v321`)។ ZoeKeyGen មិនប្រែ។ គ្មាន migration/env/rules ថ្មី; គោលការណ៍ Delete/Remove និង COD/DOD ដដែល។
@@ -3559,6 +3582,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-13 — Connection architecture ទាំង ៦ ចំណុច · ZoeW 2.50.59
+
+មូលដ្ឋាន `f7c3043` ក្នុង PR #313។ តេស្តថ្មីដូចគ្នា ២០ ករណីក្នុង ៥ ឯកសារ៖ មុនកែ ១៧ FAIL និង ៣ control PASS; ក្រោយកែ ២០/២០ PASS។ វាស់ lifecycle readiness, listener ownership, logout/tenant switch ពេល fetch ឬ body នៅរង់ចាំ, Supabase lost ACK/reload ជាមួយ op_id ដើម, offline queue, storage quota, replay window ផុត, Firebase immutable receipt និង SDK transaction callback មកពីរដង។ ចំនួន FAIL ជាចំនួនសេណារីយ៉ូ មិនមែនកំហុសឯករាជ្យ ១៧ ទេ។ Full Vitest ដំបូងក្រោយកែ fixture ownership៖ ១៥៨ ឯកសារ / ១៤០៩ tests PASS; ការរត់ពេញលើ tree ចុងក្រោយត្រូវផ្ទៀងផ្ទាត់បន្ថែម។
+
+Real SDK/RTDB បានចាប់កំហុសដែល fake SDK មិនបដិសេធ៖ `ref(db, '')` មិនអនុញ្ញាត path ទទេ ➜ ប្រើ `ref(db)`; native journal ត្រូវដកពេល verdict `not-applied` ជាក់លាក់ ដើម្បីកុំរារាំងការដកបន្ទាប់; recovery ត្រូវរង់ចាំម្ចាស់ Web Lock ហើយពិនិត្យ journal វិញដោយខ្លួនឯង។ Supabase recovery conflict ត្រូវពិនិត្យអាយុម្តងទៀតតាមម៉ោង response មុនដក journal; replay window អាចផុតកណ្តាល request។ Replay attempt ដែល unsent មិនលុបភាពមិនច្បាស់នៃ attempt មុនដែលបានផ្ញើរួចទេ; intent នៅ sent ឬ cancelled តាម owner ដើម។ Receipt replay បញ្ជាក់ counter មិនស្ទួន តែ UI ជាប់ syncing ទោះ phase ready និង journal ទទេ ➜ snapshot ចុងក្រោយត្រូវ render connection status; regression ដាច់ដោយឡែកធ្លាក់លើការអនុវត្តមុនកែច្រកនេះ។ `connection-recovery-test` ចាប់ initialization error និងវាស់ syncing មុន snapshot មកដល់ / ready ក្រោយគ្រប់ view មកដល់។ Supabase adapter parity ពិត ៩២ PASS និង RTDB/Postgres rules parity ១៣ PASS ក្នុងការរត់ផ្តោត; ការរត់ផ្តោតមិនមែនសាលក្រមពេញលេញ ២០៤ checker ទេ។
+
+Native set/update បញ្ចូលទិន្នន័យ និង receipt ក្នុង atomic SDK update ដដែល; receipt មាន UID និង hash ហើយ rules មិនអនុញ្ញាត overwrite/delete។ Native CAS recovery ប្រើ ledger witness និង requested intent ដើម; គ្មាន Web Locks ➜ អានផ្ទៀងផ្ទាត់បាន តែមិន replay transaction ដែល outcome មិនទាន់ច្បាស់។ Supabase replay ប្រើ server-clock window ខ្លីជាង retention របស់ `zoe_ops`; outcome ចាស់ឬមិនច្បាស់រក្សា journal និងផ្អាក writes។ មិនអាចអះអាងថាគ្រប់ network failure ឬ race ដែលអាចកើតមានត្រូវបានលុបទាំងអស់ទេ។ សកម្មភាព Publish Firebase rules / Supabase migrations / ឧបករណ៍ពិតនៅផ្នែក ១។
 
 ### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
 

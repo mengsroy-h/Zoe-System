@@ -57,7 +57,7 @@ export function noteDbListenerAlive(pathKey) {
         firebaseState.dbListenerProgressAt = Date.now();
         firebaseState.dbListenerPendingSeen = dbListenerPendingPaths.size;
     }
-    if (wasPending && !dbListenerPendingPaths.size) refreshLiveToasts();
+    if (wasPending && !dbListenerPendingPaths.size) { renderConnectionStatus(); refreshLiveToasts(); }
     if (!firebaseState.dbListenersFailed || dbListenerPendingPaths.size || dbListenerFailedPaths.size) return;
     firebaseState.dbListenersFailed = false;
     firebaseState.dbListenerOutageNoticeShown = false;

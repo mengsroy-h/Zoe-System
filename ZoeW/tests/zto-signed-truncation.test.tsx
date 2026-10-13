@@ -309,12 +309,12 @@ describe('ការពិនិត្យប្រឆាំង (អ្នកយ�
             if (first) { first = false; await gate; }
             return srv.fetch(u);
         }));
-        const pending = fetchZtoSignedCodes(CFG, d(7), d(0));
+        const pending = fetchZtoSignedCodes(CFG, d(7), d(0)).then(() => 'completed', (error) => error.code);
         await new Promise((r) => setTimeout(r, 0));
         clearStore();
         firebaseState.authGeneration++;
         release(null);
-        await pending;
+        expect(await pending).toBe('CONNECTION_SCOPE_CHANGED');
         long = false;
         const before = srv.requests.length;
         await fetchZtoSignedCodes(CFG, d(7), d(0));

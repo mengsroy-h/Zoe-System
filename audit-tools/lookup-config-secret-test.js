@@ -86,7 +86,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
         queueMicrotask
     });
     // ⛔ ស្រទាប់ React (`fieldValue` · `fieldChecked` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
-    vm.runInContext(reactRuntime(source, { context }), context);
+    vm.runInContext(reactRuntime(source, { context, exclude: ['appLocalStore', 'appSessionStore'] }), context);
     // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
     // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
     // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។

@@ -127,6 +127,8 @@ function reactRuntime(src, options) {
     }
     parts.push(store);
     parts.push(storeDefinitions(src));
+    parts.push('if (typeof window !== "undefined" && typeof localStorage !== "undefined" && typeof window.localStorage === "undefined") window.localStorage = localStorage;');
+    parts.push('if (typeof window !== "undefined" && typeof sessionStorage !== "undefined" && typeof window.sessionStorage === "undefined") window.sessionStorage = sessionStorage;');
     const connectionHelpers = ['captureConnectionOperation', 'connectionFlowSnapshot', 'nativeWriteRecoveryState', 'withConnectionOwnership'];
     if (connectionHelpers.some(name => sliceFunction(src, name))) {
         for (const name of ['nativeRecoveryStates', 'connectionLeases', 'stopConnectionLeaseObserver']) {

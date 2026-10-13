@@ -55,7 +55,8 @@ it('control: an interrupted ledger transaction whose witness cannot decide still
 });
 
 it('a receipt read that fails on the network defers verification instead of blocking; the write proceeds once the read answers', async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const realTick = () => new Promise(r => setImmediate(r));
   let resolve!: (v: any) => void; const first = lab(() => new Promise(r => { resolve = r; }));
   const write = first.sdk.set(first.sdk.ref(first.db, 'zoew_settings/exchange_rate'), 4200);
   await vi.waitFor(() => expect(resolve).toBeTypeOf('function')); const saved = records();
@@ -66,11 +67,11 @@ it('a receipt read that fails on the network defers verification instead of bloc
   let settled: string | null = null;
   const pending = verdictOf(second.sdk.set(second.sdk.ref(second.db, 'zoew_settings/exchange_rate'), 4300)).then(v => { settled = v; return v; });
   let deferred = false;
-  for (let i = 0; i < 200 && !deferred; i++) { await vi.advanceTimersByTimeAsync(10); deferred = nativeWriteRecoveryState(second.db).deferred; }
-  await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS * 3);
+  for (let i = 0; i < 2000 && !deferred; i++) { await realTick(); await vi.advanceTimersByTimeAsync(1); deferred = nativeWriteRecoveryState(second.db).deferred; }
+  for (let i = 0; i < 3; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
   const whileDown = { settled, blocked: nativeWriteRecoveryState(second.db).blocked, deferred };
   network = true;
-  await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS + 50);
+  for (let i = 0; i < 2000 && settled === null; i++) { await vi.advanceTimersByTimeAsync(NATIVE_RECOVERY_RETRY_GAP_MS); for (let k = 0; k < 20; k++) await realTick(); }
   const verdict = await pending;
   resolve(undefined); await write;
   expect(whileDown).toEqual({ settled: null, blocked: 0, deferred: true });

@@ -461,12 +461,6 @@ function capture() {
             if (r) { if (r.emuDenied) probeDenied++; else probeAllowed++; }
             await compareState(sc, 'probe#' + i + ' ' + who + ' ' + m + ' ' + (p || '/'));
         }
-        await sc.drop();
-        const probeMis = stats.mismatches.slice(before);
-        console.log('    probe ៖ ' + PROBE_STEPS.length + ' ជំហាន · RTDB បដិសេធ ' + probeDenied + ' · ទទួល ' + probeAllowed);
-        check(probeMis.length === 0, 'probe semantics ៖ verdict Postgres = RTDB គ្រប់ជំហាន (' + PROBE_STEPS.length + ')',
-            probeMis.slice(0, 8).map((d) => JSON.stringify(d)).join('\n        '));
-        check(probeDenied >= 20 && probeAllowed >= 20, 'probe មិនទទេ ៖ បដិសេធ ≥ ២០ និងទទួល ≥ ២០', 'deny=' + probeDenied + ' allow=' + probeAllowed);
         const receiptSteps = RECEIPT_STEPS(member.sub, Date.now());
         const receiptWrong = [];
         for (let i = 0; i < receiptSteps.length; i++) {
@@ -476,6 +470,12 @@ function capture() {
             await compareState(sc, 'receipt#' + i + ' ' + who + ' ' + m + ' ' + p);
         }
         check(receiptWrong.length === 0, 'receipt rules ៖ បង្កើតតែ uid ខ្លួន · មិនសរសេរជាន់ · លុបបានតែ receipt ខ្លួនដែលចាស់ជាង ២ ថ្ងៃ (' + receiptSteps.length + ' ជំហាន · RTDB = Postgres)', receiptWrong.join('\n        '));
+        await sc.drop();
+        const probeMis = stats.mismatches.slice(before);
+        console.log('    probe ៖ ' + PROBE_STEPS.length + ' ជំហាន · RTDB បដិសេធ ' + probeDenied + ' · ទទួល ' + probeAllowed);
+        check(probeMis.length === 0, 'probe semantics ៖ verdict Postgres = RTDB គ្រប់ជំហាន (' + PROBE_STEPS.length + ')',
+            probeMis.slice(0, 8).map((d) => JSON.stringify(d)).join('\n        '));
+        check(probeDenied >= 20 && probeAllowed >= 20, 'probe មិនទទេ ៖ បដិសេធ ≥ ២០ និងទទួល ≥ ២០', 'deny=' + probeDenied + ' allow=' + probeAllowed);
         check(stats.stateDiffs.length === 0, 'probe ៖ ទិន្នន័យចុងក្រោយ Postgres = RTDB (array/null/ការលុប)', stats.stateDiffs.join('\n        '));
 
         for (const mutant of ENGINE_MUTANTS) {

@@ -315,7 +315,7 @@ const BOOT = function (seed) {
         resolveExchange(ok) {
             const held = heldExchange;
             heldExchange = null;
-            exchangeMode = 'normal';
+            exchangeMode = ok ? 'normal' : 'reject';
             if (!held) return false;
             if (!ok) held.reject(new Error('permission_denied'));
             else { if (held.values) Object.keys(held.values).forEach(key => setPath((held.ref.path ? held.ref.path + '/' : '') + key, held.values[key])); else setPath(held.ref.path, held.value); fireAll(); held.resolve(); }
@@ -333,12 +333,13 @@ const BOOT = function (seed) {
         onValue: (ref, callback) => { listeners.push({ path: ref.path, callback }); setTimeout(() => callback(ref.path === '.info/connected' ? { val: () => true } : snapshot(ref.path)), 0); return () => {}; },
         off: () => {}, goOnline: () => {}, get: (ref) => Promise.resolve(snapshot(ref.path)),
         set: (ref, value) => {
+            if (ref.path === 'zoew_settings/exchange_rate' && exchangeMode === 'reject') return Promise.reject(new Error('permission_denied'));
             if (ref.path === 'zoew_settings/exchange_rate' && exchangeMode === 'hold') {
                 return new Promise((resolve, reject) => { heldExchange = { ref, value, resolve, reject }; });
             }
             setPath(ref.path, value); fireAll(); return Promise.resolve();
         },
-        update: (ref, values) => { if (exchangeMode === 'hold' && Object.keys(values).some(key => (ref.path ? ref.path + '/' : '') + key === 'zoew_settings/exchange_rate')) return new Promise((resolve, reject) => { heldExchange = { ref, values, resolve, reject }; }); const base = ref.path ? ref.path + '/' : ''; Object.keys(values).forEach((key) => setPath(base + key, values[key])); fireAll(); return Promise.resolve(); },
+        update: (ref, values) => { const exchange = Object.keys(values).some(key => (ref.path ? ref.path + '/' : '') + key === 'zoew_settings/exchange_rate'); if (exchangeMode === 'reject' && exchange) return Promise.reject(new Error('permission_denied')); if (exchangeMode === 'hold' && exchange) return new Promise((resolve, reject) => { heldExchange = { ref, values, resolve, reject }; }); const base = ref.path ? ref.path + '/' : ''; Object.keys(values).forEach((key) => setPath(base + key, values[key])); fireAll(); return Promise.resolve(); },
         runTransaction: (ref, updater) => {
             if (ref.path.indexOf('zoew_scan_history_cod_dod/') === 0 && historyMode === 'hold') {
                 return new Promise((resolve, reject) => { heldHistory = { ref, updater, resolve, reject }; });

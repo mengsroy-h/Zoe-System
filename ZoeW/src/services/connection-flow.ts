@@ -125,6 +125,11 @@ export function withConnectionOwnership(sdk) {
                 const recovery = nativeRecovery(databases.get(db), db);
                 return recovery ? recovery.retry() : Promise.resolve();
             };
+            if (prop === 'discardPendingWrites') return (db) => {
+                if (target.__supabase) return typeof db.discardPendingWrites === 'function' ? db.discardPendingWrites() : { count: 0, paths: [] };
+                const recovery = nativeRecovery(databases.get(db), db);
+                return recovery ? recovery.discard() : { count: 0, paths: [] };
+            };
             if (prop === 'getAuth') return (app) => { const auth = target.getAuth(app); const ownerScope = entryFor(app); if (ownerScope) ownerScope.auth = auth; return auth; };
             if (prop === 'getDatabase') return (app) => { const db = target.getDatabase(app); const ownerScope = entryFor(app); databases.set(db, ownerScope); if (ownerScope) ownerScope.db = db; return db; };
             if (prop === 'ref') return (db, path) => {

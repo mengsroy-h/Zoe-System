@@ -1361,6 +1361,22 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         requestSync();
         return waitForWriteRecovery();
     };
+    db.discardPendingWrites = () => {
+        const out = { count: 0, paths: [] };
+        if (!writeJournal || !authScope || !tenantTopic) return out;
+        let rows = [];
+        try { rows = writeJournal.list(authScope, tenantTopic); } catch (e) { rows = []; }
+        for (const row of rows) {
+            if (liveWriteIds.has(row.opId)) continue;
+            for (const op of row.ops) out.paths.push(op.p.join('/'));
+            writeJournal.remove(authScope, tenantTopic, row.opId);
+            out.count++;
+        }
+        recoveredContext = null;
+        recoveryBlocked = 0;
+        requestSync();
+        return out;
+    };
     db.cursor = () => cursor;
     db.snapshotState = () => {
         const out = {};

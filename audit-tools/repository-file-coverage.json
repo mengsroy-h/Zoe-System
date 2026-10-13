@@ -3297,6 +3297,12 @@
     },
     "supabase/migrations/20261013093425_zoe_rules.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/src/features/pending-writes.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/discard-pending-writes.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

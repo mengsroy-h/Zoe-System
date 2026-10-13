@@ -165,6 +165,24 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.61] — 2026-10-13 · ផ្លូវចេញសម្រាប់ការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន (PIN)
+
+**ZoeW** (`zoew-v323` ➜ `zoew-v324`)។ ZoeKeyGen រក្សាកំណែដដែល។ បន្តពី [2.50.60] តាមសំណើម្ចាស់គម្រោង «កែឲ្យស្អាតទាំងអស់» ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) លែងរារាំងឧបករណ៍រហូតដល់សម្អាត site data ទៀត។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- ☰ ឧបករណ៍ ➜ **«🧹 លុបការសរសេររង់ចាំ»** លេចតែពេលស្ថានភាពជា «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» (blocked) · ក្រោម PIN · មាន confirm ប្រាប់ថាការសរសេរទាំងនោះមិនត្រូវអនុវត្តឡើងវិញ និងឲ្យផ្ទៀងផ្ទាត់កញ្ចប់/ចំណូលដោយដៃ។
+- លុប ➜ journal row ទាំងអស់នៃ backend/គណនី/ហាងបច្ចុប្បន្នត្រូវដក (Supabase ៖ តែគណនី + ហាងនេះ · ការសរសេរកំពុងដើរមិនប៉ះ) · Sentry money កត់ផ្លូវដែលលុប · recovery រត់ឡើងវិញ ➜ ការសរសេរថ្មីដំណើរការ។ 🩺 និងបន្ទាត់ស្ថានភាពប្រាប់ផ្លូវនេះ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/discard-pending-writes.test.tsx` (Firebase blocked ➜ លុប ➜ Sentry money ➜ សរសេរបាន · confirm បដិសេធ ➜ នៅ blocked · Supabase ដកតែហាងនេះ · ប៊ូតុងលេចតែពេល blocked + PIN key) · `pin-prompt-test` (key `discardPendingWrites`) · `doc-scope-test` (ស្លាករបា Slide)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ដូច [2.50.60] ៖ Publish Firebase rules · migration Supabase · សាកឧបករណ៍ពិត។ បន្ថែម ៖ ធ្វើឲ្យឧបករណ៍ blocked (ឧ. ប្តូរ hash របស់ journal row ក្នុង localStorage) ➜ ☰ ឧបករណ៍ ➜ លុប ➜ សរសេរបាន។
+2. ពេលឃើញ Sentry «Pending writes discarded by the owner» ➜ ផ្ទៀងផ្ទាត់ចំណូលថ្ងៃនោះជាមួយ `check-money.cmd`។
+
 ### [2.50.60] — 2026-10-13 · Deep audit PR #313 ឡើងវិញ ៖ ការសរសេររង់ចាំមិនរារាំង App ទាំងមូល
 
 **ZoeW** (`zoew-v322` ➜ `zoew-v323`)។ ZoeKeyGen រក្សាកំណែដដែល។ ជុំនេះវាស់ PR #313 ដោយ probe ពិត (មិនទុកចិត្ត checker បៃតង) ➜ រកឃើញ ៨ ចន្លោះដែល checker ទាំង ២០៤ មិនបានឃើញ ហើយកែទាំងអស់ជាមួយអ្នកយាមថ្មី ១៥ ករណី (មុនកែ ១២ FAIL · ៣ control PASS)។
@@ -6119,5 +6137,6 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |

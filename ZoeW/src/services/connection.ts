@@ -66,7 +66,7 @@ export function renderConnectionStatus() {
         : (reconnecting
             ? "កំពុងភ្ជាប់ឡើងវិញ..."
             : (settling ? "កំពុងភ្ជាប់..." : (firebaseSdkNeedsRefresh() ? "សូម Refresh ទំព័រ" : "ក្រៅបណ្ដាញ")));
-    if (viewState.connectionPhase === 'blocked') viewState.connectionText = 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យមុនសរសេរបន្ត';
+    if (viewState.connectionPhase === 'blocked') viewState.connectionText = 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍';
     else if (pendingData) viewState.connectionText = viewState.connectionPhase === 'syncing' ? 'កំពុងទាញទិន្នន័យ...' : 'កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...';
     refreshLiveToasts();
     noteConnectionTransition(prevStatus, viewState.connectionStatus);

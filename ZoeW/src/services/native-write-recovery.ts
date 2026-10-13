@@ -192,6 +192,19 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }
     };
     const retry = () => { if (!state.recovering) runRecovery(); return verified(); };
+    const discard = () => {
+        const out = { count: 0, paths: [] as string[] };
+        if (!journaled) return out;
+        let rows = [];
+        try { rows = journal.list(scope, topic); } catch (e) { rows = []; }
+        for (const row of rows) {
+            for (const op of row.ops) out.paths.push(op.p.join('/'));
+            remove(row.opId);
+            out.count++;
+        }
+        runRecovery();
+        return out;
+    };
     const mutate = (method, ref, value, options?, ownedPath?) => {
         if (!journaled) return method === 'runTransaction' ? sdk.runTransaction(ref, value, options) : sdk[method](ref, value);
         const opId = 'native_' + crypto.randomUUID().replace(/-/g, '');
@@ -280,5 +293,5 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         txMutationSources.set(running, source);
         return running;
     };
-    return { uid, retry, mutate, current };
+    return { uid, retry, discard, mutate, current };
 }

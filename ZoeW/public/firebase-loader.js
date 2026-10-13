@@ -20,6 +20,7 @@
 
                 getAuth: authMod.getAuth,
                 onAuthStateChanged: authMod.onAuthStateChanged,
+                beforeAuthStateChanged: authMod.beforeAuthStateChanged,
                 signInWithEmailAndPassword: authMod.signInWithEmailAndPassword,
                 signOut: authMod.signOut,
                 setPersistence: authMod.setPersistence,

@@ -165,6 +165,137 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeKeyGen 2.24.18] — 2026-10-14 · ZoeKeyGen ៖ ទម្រង់តាមលំដាប់ការងារ · របាស្ថានភាព · កាតវគ្គ · ចាកចេញស្វ័យប្រវត្តិ · CSP គ្មាន inline style
+
+**ZoeKeyGen `2.24.18`** (`zoekeygen-v128` ➜ `zoekeygen-v129`)។ ZoeW `2.50.62` ដដែល។ សំណើម្ចាស់គម្រោង ៖ «រៀបចំ layout របស់ ZoeKeyGen ឡើងវិញអោយងាយស្រួលប្រើនិងត្រឹមត្រូវតាមលំដាប់ និងពង្រឹងសុវត្ថិភាពការពារការវាយប្រហារ»។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កាតរៀបតាមលំដាប់ការងារ ហើយមានលេខ ៖ ១ Signing Key ➜ ២ បង្កើត Key ➜ ៣ បញ្ជី Key ➜ ៤ ហាង Supabase ➜ ៥ Setup Link ➜ ៦ ដំណឹង (ពីមុន ៖ Link និងដំណឹងមុនហាង · បញ្ជី Key នៅបាតទំព័រ)។ របា Tab ទូរស័ព្ទ ៖ បង្កើត · បញ្ជី · ហាង · Link · ដំណឹង។ លើកុំព្យូទ័រ Setup Link ពេញទទឹង (ពីមុនកាតវែងម្ខាងទុកចន្លោះទទេ)។
+- របាស្ថានភាពខាងលើគ្រប់ផ្ទាំង ៖ chip ចូលរួច · Signing Key · Supabase Admin (ពណ៌តាមស្ថានភាពពិត) + ប៊ូតុង «➡️ ជំហានបន្ទាប់» (ចូល ➜ Load Signing Key ➜ ✅ រួចរាល់) ដែលបើកប្រអប់ចូល ឬនាំទៅកាតនោះ។
+- កាត «🔒 វគ្គ និងសុវត្ថិភាព» (ក្បែរ «បង្កើត Key») ៖ អ្នកប្រើ · ស្ថានភាព Signing Key / Supabase Admin ជាមួយពិដានទុកចោល · «🔒 ចាក់សោវគ្គឥឡូវ» (ដក Signing Key + Supabase Admin ចេញពីសតិភ្លាម) · «⚙️ Config · PIN · ក្រយៅដៃ»។
+- **ចាកចេញដោយស្វ័យប្រវត្តិ** ក្រោយមិនប្រើ ៣០ នាទី (ចុច/វាយ = សកម្មភាព · នាឡិកាថយក្រោយ = ផុត) ៖ ចាក់សោវគ្គ រួចចាកចេញ (គ្មាន confirm · លើកលែងកំពុង Generate ឬ Keypair ថ្មីមិនទាន់ចម្លង) — ពីមុនសម័យ Admin (Revoke · Extend · កៅអី · ដំណឹង) នៅបើករហូតលើឧបករណ៍ដែលទុកចោល។
+- សុវត្ថិភាព header ៖ `style-src` គ្មាន `'unsafe-inline'` (style attribute ៣៥ ក្នុង `index.html` ➜ class · `--modal-w` តាម class `modal-w-*` · QR ជា SVG រួចហើយ) · `X-XSS-Protection: 0` (filter ចាស់ដែលបង្ក XS-Leak)។
+
+#### អ្នកយាម
+
+`csp-enforced-test` ផ្នែក ៣ (ថ្មី ៖ ZoeKeyGen ក្រោម header ពិត ៖ ០ ការរំលោភ ពេល boot · ផ្ទាំង ៥ · ប្រអប់ PIN · QR · ទទឹង modal តាម class · probe ផ្ទុយ ៖ style ដែលចាក់ត្រូវបដិសេធ) · `keygen-session-security-test` (ថ្មី ១២ ករណី ៖ ពិដាន ១០–៦០ នាទី ≥ Signing Key · មិនចូល/កំពុង Generate/Keypair មិនចម្លង ➜ មិនចាកចេញ · សកម្មភាពពន្យារ · ដល់ពិដាន ➜ lock silent + logoutApp(true) · នាឡិកាថយក្រោយ · ខ្សែភ្ជាប់ boot · `logoutApp(true)` គ្មាន confirm · `lockKeygenSession` ៖ mutation ពិដាន ×១០០ ➜ ធ្លាក់ ២) · `dom-hygiene` (`kgNextBtn` ស្លាកថេរ) · `keygen-supabase-admin-test` (stub `refreshKgStatus`) · `layout-check` · `css-classes` · `fluid-type-focus`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeKeyGen (Netlify base `ZoeKeyGen`) ➜ header CSP ថ្មីចូលជាធរមាន · គ្មាន rules ថ្មី។
+2. សាកលើទូរស័ព្ទ + កុំព្យូទ័រ ៖ ចូល ➜ ស្ថានភាព «ជំហានបន្ទាប់» ➜ Load Signing Key ➜ chip បៃតង · «ចាក់សោវគ្គឥឡូវ» ➜ Signing Key ចេញ · ទុកចោល ៣០ នាទី ➜ ចាកចេញ · QR/ប្រអប់ទាំងអស់បង្ហាញធម្មតា (Console គ្មាន CSP violation)។
+
+### [2.50.62] — 2026-10-14 · ប្រាក់ Sync ត្រឹមត្រូវ ទោះបិទ App ពេលក្រៅបណ្តាញ (ledger replay មិនបញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ)
+
+**ZoeW** (`zoew-v324` ➜ `zoew-v325`)។ ZoeKeyGen រក្សាកំណែដដែល។ Deep audit ជុំទី ៣ តាមសំណើម្ចាស់គម្រោង («លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន … តេស្តអោយបានច្រើនដង») ➜ checker ថ្មី `emu/money-multidevice-emu-test` (ឧបករណ៍ ២ ពិត · SDK ពិត · rules ពិត · offline · reload) រកឃើញថា journal របស់ [2.50.59] replay delta ledger **ដោយឯករាជ្យ** ពីការសរសេរទិន្នន័យដែលជាដៃគូ ➜ កែតម្លៃ ឬស្កេនក្រៅបណ្តាញ រួច reload (PTR · បិទ App) ➜ ledger ប្រែ តែតម្លៃកញ្ចប់មិនប្រែ (ឬផ្ទុយ)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កែតម្លៃកញ្ចប់ ឬស្កេន ខណៈក្រៅបណ្តាញ ហើយបើក App វិញមុនបណ្តាញមក ➜ ស្ថិតិប្រាក់ប្រែ**តែ**ពេលតម្លៃកញ្ចប់ប្រែពិតលើ Server (ទាំង Firebase និង Supabase) · បើស្ថិតិប្រែរួចខណៈកញ្ចប់នៅតម្លៃចាស់ ➜ កែត្រឡប់វិញម្តងដោយស្វ័យប្រវត្តិ · អានពី Server មិនបាន ➜ រង់ចាំបណ្តាញ (មិនទាយ · មិន blocked)។
+- ការដក · ការសម្អាត · ការកែស្ថិតិដោយដៃ ៖ ដូចដើម (delta របស់វាតាមក្រោយការសរសេរទិន្នន័យដែលចុះរួច)។
+
+#### អ្នកយាម
+
+`emu/money-multidevice-emu-test` (ថ្មី ៖ ៣/៣ លំដាប់ធ្លាក់លើដើមឈើមុនកែ ➜ ៤/៤ ជាប់) · `ZoeW/tests/ledger-replay-companion.test.ts` (ថ្មី · ៩ · Firebase recovery · លំដាប់ companion ក្រោយ update) · `ZoeW/tests/supabase-ledger-replay-companion.test.ts` (ថ្មី · ៤ · adapter ៖ ៣/៤ ធ្លាក់មុនកែ) · `vitest` ពេញ · `run-all` STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. គ្មាន Firebase rules ថ្មី · គ្មាន migration Supabase ថ្មី · គ្មាន env ថ្មី (ការកែទាំងអស់នៅក្នុង App)។ Merge ➜ Netlify deploy ➜ App ទាញកំណែថ្មី។
+2. ⛔ សាកលើឧបករណ៍ពិត ៖ បិទ Wi‑Fi/data ➜ កែតម្លៃកញ្ចប់មួយ ➜ ទាញ PTR (ឬបិទ App) មុនបើកបណ្តាញ ➜ បើកបណ្តាញ ➜ ពិនិត្យថា «ចំណូល (យករួច)» និងតម្លៃកញ្ចប់ស៊ីគ្នា (ទាំងហាង Firebase និង Supabase)។
+
+### [2.50.61] — 2026-10-13 · ផ្លូវចេញសម្រាប់ការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន (PIN)
+
+**ZoeW** (`zoew-v323` ➜ `zoew-v324`)។ ZoeKeyGen រក្សាកំណែដដែល។ បន្តពី [2.50.60] តាមសំណើម្ចាស់គម្រោង «កែឲ្យស្អាតទាំងអស់» ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) លែងរារាំងឧបករណ៍រហូតដល់សម្អាត site data ទៀត។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- ☰ ឧបករណ៍ ➜ **«🧹 លុបការសរសេររង់ចាំ»** លេចតែពេលស្ថានភាពជា «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» (blocked) · ក្រោម PIN · មាន confirm ប្រាប់ថាការសរសេរទាំងនោះមិនត្រូវអនុវត្តឡើងវិញ និងឲ្យផ្ទៀងផ្ទាត់កញ្ចប់/ចំណូលដោយដៃ។
+- លុប ➜ journal row ទាំងអស់នៃ backend/គណនី/ហាងបច្ចុប្បន្នត្រូវដក (Supabase ៖ តែគណនី + ហាងនេះ · ការសរសេរកំពុងដើរមិនប៉ះ) · Sentry money កត់ផ្លូវដែលលុប · recovery រត់ឡើងវិញ ➜ ការសរសេរថ្មីដំណើរការ។ 🩺 និងបន្ទាត់ស្ថានភាពប្រាប់ផ្លូវនេះ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/discard-pending-writes.test.tsx` (Firebase blocked ➜ លុប ➜ Sentry money ➜ សរសេរបាន · confirm បដិសេធ ➜ នៅ blocked · Supabase ដកតែហាងនេះ · ប៊ូតុងលេចតែពេល blocked + PIN key) · `pin-prompt-test` (key `discardPendingWrites`) · `doc-scope-test` (ស្លាករបា Slide)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. ដូច [2.50.60] ៖ Publish Firebase rules · migration Supabase · សាកឧបករណ៍ពិត។ បន្ថែម ៖ ធ្វើឲ្យឧបករណ៍ blocked (ឧ. ប្តូរ hash របស់ journal row ក្នុង localStorage) ➜ ☰ ឧបករណ៍ ➜ លុប ➜ សរសេរបាន។
+2. ពេលឃើញ Sentry «Pending writes discarded by the owner» ➜ ផ្ទៀងផ្ទាត់ចំណូលថ្ងៃនោះជាមួយ `check-money.cmd`។
+
+### [2.50.60] — 2026-10-13 · Deep audit PR #313 ឡើងវិញ ៖ ការសរសេររង់ចាំមិនរារាំង App ទាំងមូល
+
+**ZoeW** (`zoew-v322` ➜ `zoew-v323`)។ ZoeKeyGen រក្សាកំណែដដែល។ ជុំនេះវាស់ PR #313 ដោយ probe ពិត (មិនទុកចិត្ត checker បៃតង) ➜ រកឃើញ ៨ ចន្លោះដែល checker ទាំង ២០៤ មិនបានឃើញ ហើយកែទាំងអស់ជាមួយអ្នកយាមថ្មី ១៥ ករណី (មុនកែ ១២ FAIL · ៣ control PASS)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **Firebase ៖ transaction ធម្មតា (កញ្ចប់ · registry · ស្ថិតិ) ដែលបាត់ពាក់កណ្តាលផ្លូវ** (បិទ App · ឧបករណ៍សម្លាប់ App · reload ខណៈការសរសេរនៅក្រៅបណ្តាញ) **មិនរារាំងការសរសេរទាំងអស់របស់ឧបករណ៍ទៀតទេ**។ ពីមុន journal row បែបនេះធ្វើឲ្យ App បង្ហាញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» ហើយបដិសេធការស្កេន · បិទ · Locker · អត្រាប្រាក់ គ្រប់យ៉ាងរហូត (🩺 ពិនិត្យម្តងទៀតក៏ដដែល)។ ឥឡូវ row ធម្មតាសម្រេចតាមតម្លៃ Server ៖ ស្មើតម្លៃដែលផ្ញើ = បានអនុវត្ត · ផ្សេង = មិនបានអនុវត្ត (ដូចមុនមាន journal)។ តែ intent ប្រាក់ (ledger) ដែលសាក្សីសម្រេចមិនបាន ទើបនៅរង់ចាំ 🩺 (ដូច PR #313)។
+- **ក្រៅបណ្តាញ ឬ Server មិនឆ្លើយពេលបើក App ដែលមាន journal row** ➜ App រង់ចាំបណ្តាញ (ការសរសេររង់ចាំ · ស្ថានភាព «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...») ហើយសាកអានឡើងវិញរៀងរាល់ ២ វិ. ពេល online ⛔ មិនចាត់ទុកជា «រារាំង» ទៀត។
+- **ហាង Firebase ដែល rules មិនទាន់ Publish** ➜ ការសរសេរនៅដើរតាមផ្លូវ SDK ធម្មតា (គ្មាន receipt) ជំនួសឲ្យ «permission_denied» គ្រប់ការសរសេរ; receipt ដែល rules មិនឲ្យអាន ➜ row ត្រូវទម្លាក់ មិនរារាំង។
+- **ហាង Supabase ៖ ការសរសេរដែលនៅសល់ពីការចាកចេញ** (ចេញពេល request កំពុងដើរ) ត្រូវផ្ញើឡើងវិញដោយ `op_id` ដើមពេលគណនីដដែលចូលហាងដដែលវិញ (ក្នុងបង្អួច ២ ថ្ងៃ) ⛔ ពីមុន row «cancelled» រារាំងការសរសេរទាំងអស់នៃសម័យបន្ទាប់ជារៀងរហូត។ ការសរសេរដែលត្រូវបដិសេធពេល recovery រារាំង មិនទុក row «queued» ឲ្យ replay ក្រោយ (phantom write)។
+- **Listener ដែលចុះមុនហាងស្គាល់** (session ស្តារក្រៅបណ្តាញ · account មកយឺត) បន្តទទួលទិន្នន័យក្រោយហាងមក ⛔ ពីមុនវាស្ងាត់ជារៀងរហូត (view stale រហូតដល់ reload)។ ការប្តូរពីហាង A ទៅ B នៅតែបញ្ចប់ listener ចាស់។
+- **ទាញកំណែ App និងសេចក្តីជូនដំណឹងអ្នកលក់** (`announcements.json` · seller notices) មិនត្រូវបោះបង់ពេលការចូលប្រព័ន្ធស្តារពេលបើក App ទៀត ➜ 🔔 មិនបង្ហាញ ⚠️ ខុសរាល់ការបើក។
+- **Browser ដែល localStorage បិទ** (private mode) ➜ ការសរសេរដើរដោយគ្មាន journal (fail-open ដូច journal សម្អាត) ⛔ ពីមុនបដិសេធការសរសេរទាំងអស់។ row journal ខូចមួយ មិនធ្វើឲ្យ scope ទាំងមូលខូច។
+- **Firebase receipts (`zoew_write_receipts`) មិនកើនរហូតទៀត** ៖ rules ឲ្យឧបករណ៍លុបតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ ហើយ App សម្អាតវាដោយស្វ័យប្រវត្តិម្តងក្នុងមួយសម័យក្រោយ recovery ស្អាត (≤ 500 ក្នុងមួយដង)។ Journal row ចាស់ជាង ២ ថ្ងៃ មិន replay ទេ (receipt អាចត្រូវសម្អាតរួច) ➜ រង់ចាំ 🩺 ដូច Supabase។
+- ការសរសេរដែលត្រូវបដិសេធមុនផ្ញើ (session ប្តូរ · ផុតកំណត់ · កំពុង init) ផ្តល់ verdict `not-applied` ជាក់លាក់ ⛔ មិនមែន `unknown` (Sentry money ក្លែងក្លាយ · ledger «មិនដែល ok») ទៀត។
+
+#### អ្នកយាម
+
+`ZoeW/tests/native-recovery-plain-cas.test.ts` (row ធម្មតា · deferred · rules refuse · storage បិទ · control intent ប្រាក់) · `ZoeW/tests/native-receipt-retention.test.ts` (rules = ថេរ · purge · row ផុតបង្អួច) · `ZoeW/tests/supabase-journal-recovery.test.ts` (row ក្រោយ sign-out · phantom · row ខូច) · `ZoeW/tests/connection-scope-discovery.test.ts` (listener មុនហាងស្គាល់ + control · lease · fetch scope page · verdict not-applied) · `emu/supabase-rules-parity-test` (probe rules receipt ៖ RTDB = Postgres និង verdict រំពឹង ៩ ជំហាន)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មី (កំណែនេះ · ជំនួស rules របស់ 2.50.59 ដែលមិនទាន់ Publish) ទៅគ្រប់ project អតិថិជនមុន merge** (`firebase-database.rules.json` ឬ `tools/firebase-provision/deploy-rules.cmd`) ៖ `zoew_write_receipts/$operation` ឥឡូវឲ្យលុប receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ។ ហាងដែល rules យឺត នៅសរសេរបានតាមផ្លូវធម្មតា (គ្មាន receipt) ទើបមិនដាច់ទៀត។
+2. Supabase migration ថ្មី `20261013093425_zoe_rules.sql` (បន្ថែមលើ `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` របស់ PR #313) អនុវត្តតាម GitHub integration ក្រោយ merge ឬបិទភ្ជាប់ក្នុង SQL Editor។
+3. Deploy ZoeW និង build APK ថ្មី។ សាកពិត ៖ ស្កេនខណៈបណ្តាញយឺត ➜ សម្លាប់ App មុនការសរសេរចប់ ➜ បើកវិញ ➜ ត្រូវស្កេនបន្តបាន (មិនឃើញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់»); បើក App ក្រៅបណ្តាញដែលមានការសរសេររង់ចាំ ➜ ចូលបណ្តាញ ➜ ការសរសេរចប់ដោយខ្លួនឯង; Supabase ៖ ចាកចេញពេលបណ្តាញគាំង ➜ ចូលវិញ ➜ សរសេរបាន។
+4. **ការសម្រេចរបស់ម្ចាស់គម្រោង (មិនបានសាងសង់)** ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · row ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) នៅរារាំងការសរសេរនៃឧបករណ៍រហូតដល់សម្អាត site data — ត្រូវការផ្លូវចេញ (ឧ. ប៊ូតុងក្រោម PIN «លុបការសរសេររង់ចាំ» ដែលកត់ Sentry money) ប្រសិនបើម្ចាស់គម្រោងចង់បាន។
+5. គោលការណ៍ Delete មិនដកប្រាក់ · Remove/expired ដក · restore បូកតែ `isDeducted` ដដែល។ ZTO · PTR · ចលនា · ZoeKeyGen មិនប៉ះ។
+
+### [2.50.59] — 2026-10-13 · Connection flow ទាំង ៦ ចំណុចតាមសំណើម្ចាស់គម្រោង
+
+**ZoeW** (`zoew-v321` ➜ `zoew-v322`)។ ZoeKeyGen រក្សាកំណែដដែល។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- App បែងចែកការចាប់ផ្តើម ចូលប្រព័ន្ធ ទាញទិន្នន័យ ក្រៅបណ្តាញ ស្ដារ និងការសរសេរដែលមិនទាន់ផ្ទៀងផ្ទាត់។ ភ្ជាប់ transport រួច តែ views ឬ recovery នៅរង់ចាំ ➜ មិនរាយ ready។
+- SDK facade និង network requests ចង backend/user/tenant/session; callback/read ចាស់មិនជាន់សម័យថ្មី។ Registry ដោះ subscription និង callback ជាមួយម្ចាស់របស់វា; reconnect lifecycle មាន cleanup និងមិនចុះ window listener ស្ទួន។
+- Pending writes មាន journal តាម backend/user/ហាង។ Firebase set/update បញ្ចូល data និង immutable receipt ក្នុង atomic update ដដែល; replay ផ្ទៀងផ្ទាត់ receipt មុន ហើយ increment មិនអនុវត្តស្ទួន។ Supabase រក្សា op_id ដើម និងចង replay window តាមម៉ោង Server។
+- Native transaction recovery ប្រើ Web Locks ដើម្បីកុំ replay operation ដែល tab ផ្សេងនៅកាន់។ Ledger intent មាន requested delta និង event identity ដើម; តែអនុវត្តពេល witness បញ្ជាក់សុវត្ថិភាព។ Platform គ្មាន Web Locks មិនសាក transaction ដែលមិនទាន់មាន verdict ដោយការស្មាន។
+- SDK retry របស់ ledger មិនគណនាប្រាក់ម្តងទៀតពេល op token របស់ខ្លួនមានរួច។ លទ្ធផលមិនច្បាស់ ➜ ផ្អាកការសរសេរថ្មី និងអាចផ្ទៀងផ្ទាត់តាម 🩺 ពិនិត្យប្រព័ន្ធ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/connection-flow-contract.test.ts` · `ZoeW/tests/connection-request-owner.test.ts` · `ZoeW/tests/durable-connection-write.test.ts` · `ZoeW/tests/native-durable-write.test.ts` · `ZoeW/tests/ledger-native-retry-identity.test.ts`។ `emu/app-network-e2e-test` វាស់ SDK ពិត + reload + receipt replay និង `emu/supabase-rules-parity-test` វាស់ auth.uid ជាមួយ RTDB/Postgres។ លទ្ធផលចុងក្រោយនៅផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មីមុនប្រើ App កំណែនេះ** (`firebase-database.rules.json` ឬ tools/firebase-provision/deploy-rules.cmd) ដើម្បីអនុញ្ញាត `zoew_write_receipts` ជាមួយការសរសេរទិន្នន័យ។ គ្មានការប្តូរ License rules។
+2. Supabase migrations `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` អនុវត្តតាម GitHub integration ក្រោយ merge; ផ្ទៀងផ្ទាត់ការចូលរបស់វាមុន deploy។
+3. Deploy ZoeW និង build APK ថ្មី។ សាក iPhone PWA, Android PWA និង APK៖ offline write ➜ បិទ/បើក ➜ reconnect; logout/login និងប្តូរហាងពេល request យឺត; App ពីរ tabs និងឧបករណ៍ពីរ។ កុំសម្អាត site data ពេលមាន pending writes; Firebase receipts មិនត្រូវលុបជាការសម្អាតធម្មតា។
+4. គោលការណ៍ Delete មិនដកប្រាក់, Remove/expired ដក និង restore បូកតែ isDeducted ដដែល។ Supabase Leaked Password Protection ជាការសម្រេចរបស់ម្ចាស់គម្រោងដូចមុន។
+
+### [2.50.58] — 2026-10-12 · Audit ផ្តោត race, login/security និង Firebase/Supabase listener
+
+**ZoeW `2.50.58`** (`zoew-v320` ➜ `zoew-v321`)។ ZoeKeyGen មិនប្រែ។ គ្មាន migration/env/rules ថ្មី; គោលការណ៍ Delete/Remove និង COD/DOD ដដែល។
+
+- Login ពិនិត្យ ready និងភាពស្របគ្នារវាង Config, auth.app.options និង stored Config មុនផ្ញើ credentials; ចាប់ auth/SDK/backend scope មុន persistence; មិនផ្ញើ credentials A ទៅ auth B ក្រោយ Config ប្តូរ។ Completion/error/finally ចាស់មិនជាន់ email/password field ឬ busy state របស់ login ថ្មី។
+- Auth listener ចង owner និង currentUser; callback queued ចាស់ក្រោយ unsubscribe/replacement ឬ snapshot user A ខណៈ auth មាន B មិនប្តូរ auth generation និងមិនបន្ត activation។ Auth storage recovery ពិនិត្យ owner និង timeout token ក្រោយ IndexedDB enumeration មុន delete/reload; auth ready កណ្តាល enumeration ធ្វើឱ្យ recovery ចាស់ឈប់។
+- Logout និង session expiry មិនសម្អាត remembered session/សោ/UI របស់សម័យថ្មី បើ response ចាស់មកយឺត ទោះ success ឬ failure។
+- Logout/session expiry invalidate generation ភ្លាម; completion ចាស់ និង periodic expiry ចាស់មិនលុប login ថ្មី ទោះ UID និង user object ដដែល។
+- Supabase SDK៖ response auth ចាស់ត្រូវបដិសេធមុន SDK សរសេរ session ឬជូនដំណឹង listener; login A ដែលមកក្រោយ logout/login B មិនស្តារ A ទៀត។ ការស្តារពី cache មិន invalidate refresh ដែលកំពុងរង់ចាំលើ session ដដែល។ `supabase-auth-write-ownership.test.ts` ប្រើ supabase-js ពិត។
+- Firebase SDK៖ auth facade រៀប signin តាមលំដាប់ក្នុង auth ដដែល និង invalidate ភ្លាមពេល logout/សំណើ login ថ្មី។ `beforeAuthStateChanged` រារាំង signin ចាស់មុនរក្សា user/session និង listener; guard ត្រូវដោះក្នុង finally។ `firebase-auth-write-ownership.test.ts` ប្រើ Firebase Auth `12.19.0` ពិត។
+- អត្រាប្រាក់៖ write owner token ដោះតែ mutex របស់ខ្លួន; late ACK/reject ពី App Supabase ដែលបិទ មិនដោះ mutex របស់ backend ថ្មី។ ការដោះ mutex ក្រោយ logout លើ backend ដដែលនៅដដែល ដើម្បីកុំឱ្យ write ដែលនៅរស់ជាន់សម័យថ្មី។ `exchange-rate-completion-race.test.ts` រត់ feature + adapter ពិត។
+- Remembered password៖ crypto និង IndexedDB open ចាស់មិន overwrite/delete record ថ្មី។ Save/forget ពិនិត្យ generation ក្នុង transaction action; មិនហៅ global forget ពី stale save។ AES-GCM និង backend/account binding ដដែល។
+- Supabase Realtime៖ token/setAuth បញ្ចប់ក្រោយ close មិនបង្កើត channel; queued broadcast/status និង token failure ក្រោយ unsubscribe/session change មិនបន្ត callbacks។ Channel teardown promise rejection ត្រូវបានសម្អាត។
+- Tenant ប្ដូរលើ UID/db ដដែល៖ SDK ផ្តល់ tenant មុន/ក្រោយឱ្យ App; App invalidate auth generation, សម្អាត business/sensitive views និងភ្ជាប់ listeners ទៅសម័យថ្មី។ `tenant-app-session.test.ts` វាស់ App handler ពិត និង SDK seam ពិត; guard របស់ flow ចាស់ផុតសុពលភាព។
+- Supabase sync ចង pull និង offline write/CAS retry ជាមួយ tenant និង auth scope; ប្ដូរហាង invalidate snapshot/cursor/cache ហើយទាញ view ថ្មី។ A acknowledgement ដែល server ទទួលរួចនៅជា success ប៉ុន្តែមិនបញ្ចូល docs A ក្នុង B; conflict ចាស់មិន retry ទៅ B។ `supabase-sync-owner.test.ts` វាស់ទាំងផ្លូវនេះ។
+- Regression ប្រើ source ពិត៖ `auth-flow-race.test.ts` · `password-save-race.test.ts` · `session-expiry-race.test.ts` · `supabase-realtime-race.test.ts` និងតេស្តថ្មីទាំង ៩ ឯកសារនៅក្នុង index ខាងក្រោម; រត់ដូចគ្នាលើ main `4649331` និង source ក្រោយកែ។ លទ្ធផលវាស់ និង STRICT កត់ក្នុងផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ក្រោយ deploy សាក iPhone/Android៖ login/logout និងប្តូរ Config ពេលបណ្តាញយឺត ឬដាច់; ចងចាំ password និងបើក App វិញ។ មិនត្រូវការ data migration ឬ Publish rules ថ្មី។
+២. Supabase Leaked Password Protection និង access JWT ដែលនៅ valid ក្រោយ session revoke ជាព្រំដែនដដែលដែលផ្នែក ១មុនបានកត់; audit នេះមិនផ្លាស់ប្តូរការកំណត់ផលិតកម្ម។
+៣. លទ្ធផលវាស់បញ្ជាក់សេណារីយ៉ូដែលបានរត់; មិនធានាថាគ្រប់ interleaving ឬ outage ផលិតកម្មមិនអាចមានកំហុសឡើយ។
+
 ### [2.50.57] — 2026-10-12 · PR #312៖ បញ្ចប់ការកែ race និង barcode ពី Deep audit ឡើងវិញ
 
 **ZoeW `2.50.57`** (`zoew-v319` ➜ `zoew-v320`)។ **ZoeKeyGen `2.24.17` មិនប្រែ**។ គ្មាន migration/env/rules ថ្មី។ គោលការណ៍ Delete/Remove និងការបូកដក COD/DOD ដដែល។
@@ -3537,6 +3668,82 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — Deep audit ជុំទី ៣ ៖ ឧបករណ៍ ២ ពិតលើ emulator · ledger replay បញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ · ZoeW 2.50.62
+
+សំណើម្ចាស់គម្រោង ៖ «deep audit ស៊ីជម្រៅមួយជុំទៀត … លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន ការសម្អាតស្វ័យប្រវត្តិដំណើរការត្រឹមត្រូវបំផុត តេស្តអោយបានច្រើនដង»។ មូលដ្ឋាន `ab53ef9` (2.50.61)។
+
+- **តេស្តច្រើនដង (ឧបករណ៍ដែលមាន · seed ថ្មី · ដដែលៗ)** ៖ `revenue-fuzz` ៣ ជួរ seed ថ្មី (RUN0 100 × ១៤ × ៥០ · RUN0 500 × ៨ × ១២០ ➜ PASS · ledgerBlip ទាំង ២ របៀបបាញ់) · `collected-mirror-fuzz` RUN0 50 × ៨ × ១៤ ➜ ៧២៩ ok · `collected-value-fuzz` RUN0 1000 × ៤០០ ➜ ៣៥១២ ok · `emu/tx-disconnect` ×២ · `emu/ledger-revert` ×២ · `emu/restore-mutation` ×២ · `emu/app-writes-rules` · `emu/app-network-e2e` ×២ · `cleanup-interrupt-atomicity` ×៣ · `concurrent-scan` ×៣ · `partial-pickup-cleanup` · `duplicate-money` ×២ · `money-guardian` · vitest (session-switch fuzz · cleanup journal · trash retry · late commit · durable write · journal recovery · ledger ring) ×៣ ➜ **ទាំងអស់ជាប់** — គ្មានការដក/បូកស្ទួនក្នុងថ្នាក់ដែលឧបករណ៍ដែលមានវាស់។ ⛔ `revenue-fuzz` RUN0 300 × ១០ × ៨០ ធ្លាក់ម្តងដោយ harness (`page.evaluate: Resulting promise was garbage collected` — ទំព័រ reload ខណៈ evaluate ក្រោមការរវល់ CPU ពី checker ផ្សេងស្របគ្នា; រត់ម្តងទៀត ២ លំដាប់ដដែល ➜ ជាប់) — សូមមើលការរត់ម្តងទៀតខាងក្រោម។
+- **ចន្លោះដែលឧបករណ៍មិនវាស់** ៖ គ្មាន checker ណាដាក់ **ឧបករណ៍ ២ ពិត** (App ពិត ២ context · SDK Firebase ពិត · rules ពិត) ឲ្យប្រជែងគ្នាលើទិន្នន័យតែមួយ ហើយ**ស្លាប់ពាក់កណ្តាលប្រតិបត្តិការ** (offline ➜ reload)។ `revenue-fuzz` = ឧបករណ៍ ១ លើ fake SDK (ឧបករណ៍ផ្សេង = ការចាក់) · `emu/app-network-e2e` = ការសរសេរ ១ ក្រោយ reload។ ➜ ឧបករណ៍ថ្មី `audit-tools/emu/money-multidevice-emu-test.js` ៖ ឧបករណ៍ A/B (uid ផ្សេង) · ១២ ជុំ × ៣–៤ លំដាប់ · op ចៃដន្យ (ស្កេន · បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ការសម្អាត ២h/៧ថ្ងៃ ដែលធ្វើឲ្យចាស់តាម REST owner រួចឲ្យឧបករណ៍ទាំងពីររត់ `runAutomaticCleanupRules()` ព្រមគ្នា) · របៀបបណ្តាញ ៖ online · offline➜online · offline➜**reload** (150–1550ms ក្រោយចាប់ផ្តើម op) · ស្ងប់ = ops ចប់ · pending ០ · journal ០ · cleanup journal ០ · phase ready · អថេរអានពី server (REST owner) ៖ ledger ថ្ងៃ = ផលបូក barcode `isDeducted !== true` · ledger ខែ = ផលបូកថ្ងៃ · ស្ថិតិយក = barcode បិទ · sum(pickedUpPhones) · barcode មិនស្ទួន · registry មិនកំព្រា · barcode ដែលធ្លាប់ដល់ server មិនបាត់ · គ្មានឧបករណ៍ blocked។
+- **លទ្ធផលលើដើមឈើមុនកែ (2.50.61)** ៖ **ធ្លាក់ ៣/៣ លំដាប់** · ទាំង ៣ ចប់ដោយ `editPrice[offline-reload]` ៖ ឧ. run 0 ledger ថ្ងៃ cod ៨៧,០៨ ខណៈផលបូក barcode ៩១,២៦ (count ស្មើ ៧ = ៧) — ledger ប្រែតាម delta កែតម្លៃ តែ barcode នៅតម្លៃចាស់។ មូលហេតុ ៖ `saveEditedBarcodePrice()` និង `addOrUpdateEntry()` ចេញ delta ledger (`addRevenueToDailyAndMonthlyRecord`) **មុន** transaction ទិន្នន័យ (ledger optimistic · `correctRevenueLedgerToActual` ក្រោយ commit) ➜ ក្រៅបណ្តាញ ទាំងពីរចូល journal (row intent `revenue-delta` + row CAS history) ➜ reload ➜ queue SDK បាត់ ➜ recovery ៖ row CAS history ទម្លាក់ (តម្លៃ ≠ ផ្ញើ) តែ row intent ledger ➜ witness `not-applied` ➜ **replay** ➜ ពាក់កណ្តាលប្រតិបត្តិការ។ ស្កេន ៖ ការអះអាង registry (transaction) មុន ➜ ក្រៅបណ្តាញទាំងស្រុង មិនដល់ delta ទេ (ជាប់ · run 1 #0) តែបង្អួច «claim ack ➜ offline» មានដូចគ្នា។ ដក ៖ delta ចេញក្រោយ transaction history ack ➜ replay ត្រឹមត្រូវ (មិនប៉ះ)។ Supabase (probe `supabase-ledger-replay-companion.test.ts` លើ adapter ពិត + server ក្លែង CAS) ៖ ថ្នាក់ដដែល ៖ row CAS នីមួយៗ replay ដោយឯករាជ្យ ➜ CAS ledger conflict (ឧបករណ៍ផ្សេងសរសេរ ledger) ខណៈ CAS history ចុះ ➜ ledger ៥០ ជំនួស ៥៥ · ផ្ទុយ (history conflict · ledger ចុះ) ➜ ៤៥ ជំនួស ៤០ — **៣/៤ ធ្លាក់មុនកែ**។
+- **កែ** ៖ intent `revenue-delta` ដែលការសរសេរទិន្នន័យជាដៃគូនៅដាច់ដោយឡែក (ស្កេន · កែតម្លៃ) ដឹកនាំ `companion` (`ledgerDeltaCompanion()` ៖ item · barcode · តម្លៃថ្មី · តម្លៃចាស់ — ស្កេន ៖ `targetItemId` បង្កើតមុន delta) ➜ Firebase `settleRow` ៖ អាន item តាម REST (អានមិនបាន ➜ deferred · មិនទាយ) ➜ `ledgerCompanionState()` ៖ `holds` ➜ replay (ដូចដើម) · `prior` + witness applied ➜ ដកវិញម្តង (token `op_r…` ➜ idempotent · recovery ម្តងទៀត ០ ការសរសេរ) · `absent`/`unknown` (ដកដោយឧបករណ៍ផ្សេង · កែបន្ត) ➜ ទម្លាក់ដោយមិនសរសេរ · Supabase `recoverWrites` ៖ row ដែលមាន companion មិន resend CAS ដើមទេ (base ចាស់នឹង conflict ខណៈ row ដៃគូចុះ) ➜ សម្រេចក្រោយ row ឯទៀត ➜ transaction ថ្មីពី intent (`ledgerJournalUpdate` · witness token) ក្រោយ recovery ចប់ (មិនមែនក្នុងវា ៖ `waitForWriteRecovery` រង់ចាំ recovery ➜ deadlock វាស់បានជុំទី ១)។
+- **លំដាប់** ៖ item ថ្មីស្កេនក្រៅបណ្តាញ = `update` (receipt) ដែលត្រូវផ្ញើឡើងវិញ + row intent ledger ដែល queue មុន ➜ recovery ជុំដំបូងសម្រេច ledger មុន (`absent` ➜ ទម្លាក់) រួចទើប item ចុះ ➜ ledger ខ្វះកញ្ចប់ (mutation «ជុំតែមួយ» ➜ count ២ ជំនួស ៣ · គ្មានការសរសេរ ledger) ➜ Firebase `runRecovery` និង Supabase `recoverWrites` សម្រេច row ដែលមាន companion **ក្រោយ row ឯទៀតទាំងអស់**។
+- **អ្នកយាមដែលត្រូវតាមក្រោយ** ៖ helper ថ្មី (`ledgerDeltaIntent` · `ledgerDeltaCompanion` · `ledgerCompanionState`) ចូលបញ្ជីស្រង់របស់ checker sandbox ១៣ (`revenue-rules-clamp` · `price-edit-abort` · `late-commit` · `cleanup-interrupt-atomicity` · `emu/ledger-revert` · `ledger-failed-apply-revert` · `tx-outcome` · `monthly-ledger-agreement` · `ledger-count-integrity` · `concurrent-scan` · `zto-list-sync` …) — sandbox ដែលខូចព្រោះ helper ថ្មី = checker រត់កូដពិត · `item-money` ៖ វាល companion ឈ្មោះ `wantCod`/`wantDod` (មិនមែនការសរសេរ `.cod/.dod`) · `clear-history-claim-test` ធ្លាក់ដោយ `DB_OP_TIMEOUT_MS` ប្រកាសពីរដង ៖ adapter Supabase (`supabase-rtdb.ts` រួច `supabase-sdk.ts`) import `domain/ledger` ➜ Vite ប្តូរ closure នៃ chunk `supabase-backend` ➜ លំដាប់ module ក្នុងទិដ្ឋភាព checker ប្រែទាំងស្រុង (CLEAR_HISTORY block ឥឡូវគ្របលើ `network.ts`) ➜ helper ចូលតាម `supabaseEnv().ledgerCompanion` ➜ លំដាប់ដូចដើមទាំង ១០០% (diff `audit-module-views.json` ទទេ) — កត់ជា trap ក្នុង CLAUDE.md។
+- **ភស្តុតាង** ៖ `emu/money-multidevice-emu-test` ៤/៤ លំដាប់ × ១២ ជុំ ជាប់ក្រោយកែ · លំដាប់បន្ថែម RUN0 10 × ៦ × ១៦ ➜ ជាប់ (offline+reload · ការសម្អាតប្រជែង · ស្តារ/ដក ស្របគ្នា) · ពេលរត់លំនាំដើម ≈ ៥៥ វិ. (offline+reload ៦ · offline+online ៥ · ការសម្អាតប្រជែង ៣ · op ស្របគ្នា ១០+) · `ledger-replay-companion.test.ts` ៩/៩ (ធ្លាក់ ៧/៨ លើដើមឈើមុនកែ · តេស្តលំដាប់ធ្លាក់លើ mutation ជុំតែមួយ) · `supabase-ledger-replay-companion.test.ts` ៤/៤ (៣/៤ ធ្លាក់មុនកែ) · vitest ពេញ ១៦៥ ឯកសារ · ១៤៥២ តេស្ត · run-all STRICT **២០៥/២០៥** (partial ០ · SKIP ០ · `revenue-fuzz` RUN0 300 × ១០ × ៨០ រត់ម្តងទៀតម្នាក់ឯង ➜ PASS)។ ព្រំដែនដែលទទួល ៖ barcode ស្កេនក្រៅបណ្តាញដែល queue បាត់ដោយ reload មុន claim ចុះ មិនដែលដល់ server (ដូចមុន [2.50.59]) · delta ledger ស្កេនចុះរួចតែ save បាត់ (barcode `absent`) ➜ ទម្លាក់ដោយគ្មានការដកវិញ (មិនអាចបែងចែកពី «ដកដោយឧបករណ៍ផ្សេង» ដោយមិនអានធុងសំរាមទាំងមូល) ➜ ledger ខ្ពស់ បង្អួច RTT មួយ · receipt `zoew_write_receipts` ត្រូវអានទាំងមូលម្តងក្នុងមួយ session (purge) ហើយ receipt របស់គណនីដែលលែងប្រើមិនដែល purge (ទំហំ · មិនមែនលុយ)។
+
+### 2026-10-13 — CI ធ្លាក់លើ `a5e2f89` (ផ្នែក 2/4) ៖ `shop-device-note.test.ts` រង់ចាំ fake ms ថេរ ខណៈ SHA-256 ពិតដើរលើ thread pool · គ្មាន bump
+
+រាយការណ៍ម្ចាស់គម្រោង ៖ «CI fail»។ run 718 (`a5e2f89`) ៖ shard 2/4 ធ្លាក់ ១ (`zoew-suite 1/2` ➜ `npm run test`) ៖ `tests/shop-device-note.test.ts` «បើក App ៖ គណនីស្គាល់ហាង ➜ ផ្ញើ serial…» ➜ `expected [] to deeply equal [{…}]` (note `note_my_device` មិនដែលផ្ញើក្នុង `advance(3000)`); run 717 (`54cc15c`) ជាប់ · ៤ commits រវាងនោះ (2.50.61) មិនប៉ះ `shop-device` · `device-info` · transport · SDK Supabase ទេ។
+
+- **បន្តផលមិនបាន** ៖ ឯកសារតេស្តរត់ ១២ ដង ក្រោម CPU hog ៦ ➜ ០/១២ ធ្លាក់ · ៣២ ដង ៨ instance ស្របគ្នា ➜ ០/៣២ ➜ មិនមែន CPU ធម្មតាទេ។
+- **មូលហេតុវាស់បាន** ៖ `loadDeviceInfo()` ➜ `appSerialOf()` = `crypto.subtle.digest` ពិត (libuv thread pool ➜ macrotask) ក្នុងផ្លូវ boot (`restoreSession` ➜ `applyAccount` ➜ `onTenantChanged` ➜ `noteShopDevice()`)។ `advance(3000)` = ១២ × `advanceTimersByTimeAsync(250)` ➜ ផ្តល់ tick ពិតតែពីរបី ➜ digest ដែលយឺតលើសពីនោះ ➜ note មិនទាន់ផ្ញើ ➜ `[]`។ Probe ៖ ពន្យារតែ digest ទី១ (ផ្លូវ boot) ដោយ `setTimeout` ពិត ➜ **២ms ជាប់ · ១០ms ធ្លាក់ · ៣០ms ធ្លាក់ · ១០០ms ធ្លាក់** ដោយ assertion ដូច CI ដូចគ្នា (probe ដំបូងដែលពន្យារគ្រប់ digest ជាប់រហូត ១២០០ms ព្រោះ `await appSerialOf()` របស់តេស្តខ្លួនឯងរង់ចាំពេលពិតអោយ — probe ខុស)។ Runner CI ៤ core រត់ `money-guardian` + `supabase-app-network-e2e` + vitest `auto` ស្របគ្នា ➜ thread pool យឺត ១០ms+ កើតបាន។
+- **កែ (តេស្តតែប៉ុណ្ណោះ · កូដ App មិនប្រែ)** ៖ `settle(done, maxFakeMs, maxRealMs)` ៖ រង់ចាំ `realSetTimeout(5)` ពិត (ចាប់មុន `useFakeTimers`) រវាងជំហាន fake ២៥០ms រហូត note មកដល់ · ពិដានពេលពិត ២០០០ms តាម `Date.now` ពិតដែលចាប់ទុក (⛔ `process.hrtime` · `performance.now` ត្រូវ fake-timers ក្លែងដែរ ➜ ពិដានបានវាស់ fake ms ➜ ជុំមួយ loop គ្មានពិដាន ➜ ធ្លាក់ដោយ timeout ៥s ជំនួស assertion) · `advance()` នៅដដែលសម្រាប់ `SHOP_DEVICE_RETRY_MS` (ការហៅបន្ទាប់ `await` ដោយតេស្តផ្ទាល់)។
+- **ភស្តុតាង** ៖ តេស្តកែរួច ៣/៣ ជាប់ (≈ ២,២s) · probe digest ទី១ យឺត **១០០ms · ១០០០ms ➜ ជាប់** · mutation «server មិនដែលទទួល note» ➜ **ធ្លាក់ ៣/៣ ដោយ assertion** (`expected [] …` · «សាកម្តង» · `expected +0 to be 1`) ក្នុង ≈ ២s ក្នុងមួយតេស្ត (មិនមែន timeout)។ `typecheck` · `lint` ជាប់។
+
+### 2026-10-13 — Deep audit PR #313 ឡើងវិញ (probe ពិត · មិនទុកចិត្ត checker) · ZoeW 2.50.60
+
+មូលដ្ឋាន `eb88d7b` (PR #313 head · ៨ commits លើ `main` `4649331`)។ run-all STRICT លើដើមឈើ PR មុនកែ ៖ **២០២/២០៤ PASS · partial ០ · SKIP ០** (ធ្លាក់ ២ ជា artifact នៃការរត់ probe ស្របគ្នា ៖ `repository-file-coverage` ឃើញឯកសារ probe បណ្តោះអាសន្ន · `native:check` history-window-check ចលនាស្វែងរក iPhone ផុតពេលម៉ាស៊ីនរវល់) — ⛔ បៃតង ២០៤/២០៤ របស់ PR មិនបានឃើញចន្លោះ ៨ ខាងក្រោមទេ ព្រោះគ្មាន checker ណាវាស់ «journal row នៅសល់ក្រោយបិទ App» · «ចាកចេញពេល request កំពុងដើរ» · «listener ចុះមុនហាងស្គាល់» · «fetch ពេល auth ស្តារ» ឬ «localStorage បិទ»។
+
+Probe ១២ ករណី (vitest · adapter ពិត · fake SDK · transport ក្លែង) ធ្លាក់ទាំង ១២ លើ `eb88d7b` ហើយ control ៣ ជាប់; ក្រោយកែ ១៥/១៥ PASS ៖
+
+1. **Firebase ៖ transaction ធម្មតាបាត់ពាក់កណ្តាលផ្លូវ ➜ រារាំងឧបករណ៍រហូត** (`recoverRow()` ៖ row គ្មាន `hash` · គ្មាន `intent` · គ្មាន token ➜ `resolved = false` ➜ `blocked++` ➜ `mutate()` បដិសេធគ្រប់ការសរសេរ `write_recovery_pending`; 🩺 ➜ recovery ដដែល ➜ blocked ដដែល)។ វាស់ ៖ តម្លៃ Server ដដែល (មិនបានអនុវត្ត) និងតម្លៃបរទេស ទាំង ២ ➜ `write_recovery_pending` · dispatched ០ · row ១។ កែ ៖ row ធម្មតាសម្រេចតាមតម្លៃតែប៉ុណ្ណោះ ➜ ទម្លាក់ (`if (token) resolved = false`)។ Control ៖ intent ledger ដែលសាក្សីសម្រេចមិនបាន នៅ blocked ដដែល។
+2. **ការអាន receipt បរាជ័យលើបណ្តាញ (ក្រៅបណ្តាញ · Server មិនឆ្លើយ) ➜ blocked** (catch នៃ recovery ➜ `blocked++`)។ កែ ៖ `deferred` + `verified()` loop (`NATIVE_RECOVERY_RETRY_GAP_MS` · តែ online) · ការសរសេររង់ចាំ · phase `recovering`។ វាស់ ៖ fetch ធ្លាក់ ៣ ជុំ ➜ settled null · blocked ០ · deferred true ➜ បណ្តាញមក ➜ `sent` · dispatched ២ (resend + ថ្មី) · row ០។
+3. **rules មិនទាន់ Publish ➜ ហាងសរសេរអ្វីមិនបាន** (`sendAtomic` ➜ `permission_denied` លើផ្លូវ receipt ➜ ការសរសេរទាំងអស់ធ្លាក់; គ្មាន Web Locks ➜ អាន receipt ➜ 401 ➜ blocked)។ កែ ៖ `receiptRefused` ➜ ការសរសេរដដែលម្តងតាម SDK ធម្មតា · row ទម្លាក់; receipt ដែលអានមិនបាន (`txReadWasRefused`) លើ row hash ➜ ទម្លាក់។ វាស់ ៖ `sent` · sent [4200] · reads ០ · blocked ០។
+4. **localStorage បិទ ➜ ការសរសេរទាំងអស់ត្រូវបដិសេធ** (`persist()` ➜ `write_journal_unavailable`)។ កែ ៖ `journal.available()` ➜ គ្មាន journal ➜ `mutate()` ហៅ SDK ត្រង់។ row ខូច ➜ `list()` រំលង ⛔ មិន throw (ពីមុន row ខូចមួយ ➜ Supabase `recoverWrites` blocked រហូត)។
+5. **Supabase ៖ row `cancelled` ពី sign-out ➜ សម័យបន្ទាប់ blocked រហូត** (`recoverWrites()` ៖ `cancelled` ➜ `blocked++`; `retryWriteRecovery()` ➜ ដដែល)។ វាស់ ៖ `WRITE_RECOVERY_PENDING` ទាំង set និង retry។ កែ ៖ `cancelled` ដើរតាមច្បាប់ `sent` (op_id ដដែល · ក្នុង `SB_OP_REPLAY_SAFE_MS`)។ វាស់ ៖ replay op_id ដើម · សរសេរ ២ · blocked ០ · row ០; control ៖ row ផុតបង្អួច នៅ blocked ១។
+6. **Supabase ៖ ការសរសេរដែល recovery បដិសេធ ទុក row `queued`** ➜ replay ពេលក្រោយ (phantom)។ កែ ៖ `enqueueWrite()` ដក row ពេល `waitForWriteRecovery()` throw។
+7. **Listener ចុះមុនហាងស្គាល់ ➜ ស្ងាត់ជារៀងរហូត** (`capture()` ៖ tenant `''` ➜ `'A'` ➜ `current()` false ➜ callback ត្រូវច្រោះ មិនបិទ · មិនប្រាប់ App)។ វាស់ (`createSupabaseSdk` ពិត · `readAccount` null · `my_account` យឺត) ៖ មុន account ឃើញ ១ ធាតុ · ក្រោយ account មិនឃើញធាតុ ២ ដែលសរសេរ; control (account cached) ឃើញ ២។ កែ ៖ tenant `''` ពេលចាប់ = មិនចង (`capture()` · `captureConnectionOperation()`); A ➜ B នៅបញ្ចប់ដដែល។
+8. **fetch កំណែ App ពេលបើក App ត្រូវ abort ដោយ auth ស្តារ** (`initNotifications()` ➜ `fetchNotifyFeed(false)` មុន `onAuthStateChanged` ➜ `authGeneration++` ➜ `CONNECTION_SCOPE_CHANGED`)។ កែ ៖ `fetchWithTimeout(…, { scope: 'page' })` សម្រាប់ feed · seller notices; request ទៅ Function នៅចងដដែល។
+
+ចន្លោះរចនាដែលកែបន្ថែម ៖ **`zoew_write_receipts` កើនរហូត** (rules PR #313 ហាមលុប · ១ receipt ក្នុងមួយ `set`/`update` · ~២–៤ ក្នុងមួយកញ្ចប់ · backup ទាំងមូលកើនជារៀងរាល់ថ្ងៃ) ➜ rules ឲ្យលុប receipt ខ្លួនឯង `at < now - 172800000` · `purgeReceipts()` (SDK `get` · ≤ 500 · ម្តងក្នុងមួយសម័យក្រោយ recovery ស្អាត) · row hash ដែល `queuedAt` ចាស់ជាងបង្អួច ➜ blocked (receipt អាចបាត់) · probe parity ៩ ជំហានមាន verdict រំពឹង (បង្កើតតែ uid ខ្លួន · មិនជាន់ · លុបតែចាស់ជាង ២ ថ្ងៃ · មិនលុបរបស់អ្នកដទៃ)។ **Verdict `unknown` លើការសរសេរដែលមិនដែលផ្ញើ** (`ended()` របស់ Proxy) ➜ `not-applied` (ledger resend ≤ 3 ដង ➜ verdict ជាក់លាក់ · គ្មាន Sentry money ក្លែង)។
+
+លទ្ធផលចុងក្រោយលើ `d893c3b` ៖ run-all STRICT (emulator RTDB · Postgres ពិត · firebase-tools ពិត) **២០៤/២០៤ PASS · partial ០ · SKIP ០** · vitest ១៤៣៦ ករណី + ១៥ ថ្មី PASS · probe parity receipt ៩ ជំហាន RTDB = Postgres។ ជុំ ១ លើ `cbe133a` ធ្លាក់ ៥ (package.json មិនទាន់ bump · probe receipt រត់ក្រោយ `sc.drop()` · harness toast reject តែម្តង ➜ fallback ឃើញ success · probe SDK ប្តូរពី ZoeKeyGen · លិបិក្រម) ➜ កែក្នុង `b668d46`; ជុំ ២ ធ្លាក់ ១ (តេស្ត deferred រង់ចាំ digest មិនគ្រប់ក្រោម CPU រវល់) ➜ កែក្នុង `d893c3b`។
+
+ZoeW 2.50.61 (ផ្លូវចេញ PIN «លុបការសរសេររង់ចាំ») ៖ run-all STRICT **២០៤/២០៤ PASS · partial ០ · SKIP ០** លើ `f754d44` (ជុំមុនធ្លាក់ ១១ ដោយ emulator RTDB ស្លាប់កណ្តាលការរត់ (ECONNREFUSED) + helper មិនប្រើ ➜ ចាប់ផ្តើម emulator ឡើងវិញ · ដក helper)។
+
+ពិនិត្យដោយអាន (គ្មានកំហុស · មិនកែ) ៖ Delete/Remove/restore ទៅតាមតារាងសេណារីយ៉ូ (`isDeducted` នៅជាវាលសម្រេចតែមួយ) · `runLedgerTransaction()` replay ដោយ token ខ្លួនឯង ➜ `txAppliedDelta` = delta នៃជុំដែល commit (RTDB commit តែពេល hash ស្មើ) ➜ មិនដកស្ទួន · `withFirebaseAuthOwnership` (`beforeAuthStateChanged` ពិត) · `setupConnectionRecovery()` cleanup · `probeDatabaseLiveness` epoch · SW (`CACHE_VERSION` តែប៉ុណ្ណោះ) · `secret-hygiene` (journal ក្នុង localStorage មានទិន្នន័យអតិថិជនតែ row ដែលកំពុងដើរ · scope តាមគណនី)។ ដែលមិនបានវាស់លើឧបករណ៍ពិត ៖ iPhone/Android PWA + APK (សកម្មភាព ៣ ផ្នែក ១)។
+
+### 2026-10-13 — Connection architecture ទាំង ៦ ចំណុច · ZoeW 2.50.59
+
+មូលដ្ឋាន `f7c3043` ក្នុង PR #313។ តេស្តថ្មីដូចគ្នា ២៥ ករណីក្នុង ៥ ឯកសារ៖ មុនកែ ២១ FAIL និង ៤ control PASS; ក្រោយកែ ២៥/២៥ PASS។ វាស់ lifecycle readiness, listener ownership, logout/tenant switch ពេល fetch ឬ body នៅរង់ចាំ, Supabase lost ACK/reload ជាមួយ op_id ដើម, offline queue, storage quota, replay window ផុត, Firebase immutable receipt និង SDK transaction callback មកពីរដង។ ចំនួន FAIL ជាចំនួនសេណារីយ៉ូ មិនមែនកំហុសឯករាជ្យ ២១ ទេ។ Full Vitest ដំបូងក្រោយកែ fixture ownership៖ ១៥៨ ឯកសារ / ១៤០៩ tests PASS; ការរត់ពេញលើ tree ចុងក្រោយត្រូវផ្ទៀងផ្ទាត់បន្ថែម។
+
+Real SDK/RTDB បានចាប់កំហុសដែល fake SDK មិនបដិសេធ៖ `ref(db, '')` មិនអនុញ្ញាត path ទទេ ➜ ប្រើ `ref(db)`; native journal ត្រូវដកពេល verdict `not-applied` ជាក់លាក់ ដើម្បីកុំរារាំងការដកបន្ទាប់; recovery ត្រូវរង់ចាំម្ចាស់ Web Lock ហើយពិនិត្យ journal វិញដោយខ្លួនឯង។ Supabase recovery conflict ត្រូវពិនិត្យអាយុម្តងទៀតតាមម៉ោង response មុនដក journal; replay window អាចផុតកណ្តាល request។ Replay attempt ដែល unsent មិនលុបភាពមិនច្បាស់នៃ attempt មុនដែលបានផ្ញើរួចទេ; intent នៅ sent ឬ cancelled តាម owner ដើម។ Receipt replay បញ្ជាក់ counter មិនស្ទួន តែ UI ជាប់ syncing ទោះ phase ready និង journal ទទេ ➜ snapshot ចុងក្រោយត្រូវ render connection status; regression ដាច់ដោយឡែកធ្លាក់លើការអនុវត្តមុនកែច្រកនេះ។ `connection-recovery-test` ចាប់ initialization error និងវាស់ syncing មុន snapshot មកដល់ / ready ក្រោយគ្រប់ view មកដល់។ Supabase adapter parity ពិត ៩២ PASS និង RTDB/Postgres rules parity ១៣ PASS ក្នុងការរត់ផ្តោត; ការរត់ផ្តោតមិនមែនសាលក្រមពេញលេញ ២០៤ checker ទេ។
+
+Native set/update បញ្ចូលទិន្នន័យ និង receipt ក្នុង atomic SDK update ដដែល; receipt មាន UID និង hash ហើយ rules មិនអនុញ្ញាត overwrite/delete។ Ledger ចាស់ដែលគ្មាន token ទទួល metadata anchor តាម CAS មុន delta ដំបូង ដោយមិនប្រែប្រាក់; requested money intent រក្សា prepared មុនរង់ចាំ ACK របស់ metadata និងប្តូរ sent ក្នុង updater មុនផ្ញើ delta ដូច្នេះ reload កណ្តាលការរៀបចំមិនបាត់ intent។ Recovery updater រក្សា witness និង journal មុនការសរសេររបស់ខ្លួនផង; witness ដែលមិនច្បាស់នៅ unknown ដដែល។ Native CAS recovery ប្រើ ledger witness និង requested intent ដើម; គ្មាន Web Locks ➜ អានផ្ទៀងផ្ទាត់បាន តែមិន replay transaction ដែល outcome មិនទាន់ច្បាស់។ Supabase replay ប្រើ server-clock window ខ្លីជាង retention របស់ `zoe_ops`; outcome ចាស់ឬមិនច្បាស់រក្សា journal និងផ្អាក writes។ Native receipt recovery ផ្ទៀងផ្ទាត់ hash នៃ payload មុន replay; payload ប្រែត្រូវរក្សា និង blocked។ PERMISSION_DENIED របស់ write ថ្មីដែលកាន់ Web Lock មិនត្រូវបាត់ក្រោម error ពី receipt read។ Pending counter គ្រប request ដែលនៅរង់ចាំ lock និង SDK; 🩺 មិនរាយ healthy ពេល write នៅ pending ហើយ fuzz វាស់ invariant ក្រោយ pending ចប់ (ពិដាន ១.៥ វិនាទី; មិនចាំតម្លៃដែលរំពឹងឬបង្កើនពិដាន checker)។
+
+Full STRICT ជុំដំបូង ១៧៣ PASS / ៣១ FAIL និង CI ធ្លាក់ទាំង ៤ ផ្នែក; មិនរាប់វាជា full green។ ការរត់ផ្តោតក្រោយកែ dependency/atomic-path fixtures និងកំហុស runtime បាន PASS ២៧/២៩; ករណីពីរចុងក្រោយកែហើយរត់ឡើងវិញជាមួយ backend parity និង health បាន PASS ទាំង ៥ ដែលជ្រើស។ លទ្ធផលទាំងនេះមិនមែន full run ស្អាតមួយទេ; ត្រូវរត់ STRICT ពេញឡើងវិញលើ tree ចុងក្រោយ។ ក្រុម React typecheck/lint/Vitest/Android បាន PASS ក្នុងការរត់ថ្មី។ Checker Web/Android ដំបូងប្រៀបធៀប receipt UUID/hash ពី platform ខុសគ្នា ➜ កែឱ្យផ្ទៀងផ្ទាត់ hash ទៅ raw payload ក្នុង platform នីមួយៗ មុន normalize protocol identity; ចំនួន receipt និង UID/timestamp និង DB/ប្រាក់នៅប្រៀបធៀបដដែល។ cleanup-rules-check បាន PASS ៨៥ ករណី។ Shared VM runtime ត្រូវចង window.storage ឱ្យត្រឹម browser និងមិនប្រកាស storage ជាន់ដែល harness ផ្គត់ផ្គង់; PIN/biometric/secret/late-commit assertions ដើមបាន PASS។
+
+មិនអាចអះអាងថាគ្រប់ network failure ឬ race ដែលអាចកើតមានត្រូវបានលុបទាំងអស់ទេ។ សកម្មភាព Publish Firebase rules / Supabase migrations / ឧបករណ៍ពិតនៅផ្នែក ១។
+
+លទ្ធផលចុងក្រោយលើ source `9eb6f17` (App code ដូច `cd44676`)៖ STRICT ពេញក្នុង session បាន PASS ២០៤/២០៤ checker, FAIL ០, partial ០ និង SKIP ០។ CI run `38353611586` បាន PASS ទាំង ៤ ផ្នែក៖ ៥៤ + ៥០ + ៥០ + ៥០ = ២០៤; គ្មាន partial/SKIP។ React suite ទាំងពីរបាន PASS រួម typecheck, lint, Vitest, Android, build, SW, smoke, native និង cleanup rules។ Financial fuzz ក្រៅ default seeds ៣០០–៣១៣៖ ១៤ លំដាប់ × ៥០ ប្រតិបត្តិការ, invariant ទាំងអស់ PASS; other-device remove ១៤ លំដាប់, applied ACK ៥ និង lost ACK ៧ លំដាប់។ មិនបានរំលង checker ឬបង្កើន timeout; local money-guardian រត់ JOBS=៤ តាម option ដែលមានស្រាប់។ ចុងក្រោយនេះផ្លាស់តែកំណត់ត្រាលទ្ធផល; App source និងអ្នកយាមមិនប្រែ។
+
+### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
+
+`firebase-auth-write-ownership.test.ts`៖ Firebase Auth SDK ពិតមានករណីបន្ថែម៖ native signin A មកក្រោយ logout ប្តូរ currentUser ពី null ទៅ A និងហៅ listener; signin B ខណៈ A នៅរង់ចាំក៏អាចហៅ listener A កណ្តាល។ Regression ៤៖ មុនកែ ២ FAIL និង control ២ PASS; ក្រោយ auth facade ៤/៤ PASS។ Control គ្រប normal signin/logout និង invalid credentials ➜ login ថ្មី។ Guard ចុះមុន SDK ប្តូរ user និងដោះក្រោយ request; signin ជំនួសរង់ចាំ request ចាស់ settle ដើម្បីកុំឱ្យ guard ចាស់បដិសេធ request ថ្មី។ មិនកែ SDK/vendor។ Full STRICT ដំបូងត្រូវបានបញ្ឈប់ក្រោយរកឃើញករណីនេះ ទោះ checker ដែលចប់ PASS ក៏ដោយ; មិនរាប់វាជា full run ជោគជ័យ។
+
+មូលដ្ឋាន `4649331` ដែលបាន merge PR #312។ តេស្តថ្មីដូចគ្នា ៤៩ សេណារីយ៉ូ ក្នុង ៩ ឯកសារ៖ មុនកែ ៤២ FAIL និង ៧ control PASS; ក្រោយកែ ៤៩/៤៩ PASS។ នេះជាចំនួនសេណារីយ៉ូបរាជ័យ មិនមែនកំហុសឯករាជ្យ ៤២ ទេ។ ប្រើ feature និង adapter ពិត; `supabase-auth-write-ownership.test.ts`៖ ករណី Supabase auth storage ប្រើ supabase-js `2.117.2` ពិត ពន្យារ HTTP response។ Login A ក្រោយ logout ឬ login B ធ្លាប់សរសេរ A ទៅ storage ទោះ outer generation guard បដិសេធ promise; ឥឡូវ guard នៅមុន SDK ទទួល response។ Control បញ្ជាក់ cached restore មិនបិទ refresh ដែលមកក្រោយពិដាន ៣ វិនាទី។ ក្រុម auth/transport ពាក់ព័ន្ធ ២៦ ឯកសារ ១៨៩ PASS; តេស្ត control refresh ដែលបន្ថែមក្រោយការរត់នេះបាន PASS ក្នុងក្រុម ៤៩។ Control refresh មកយឺតក្រោយ logout វាស់ storage writes ក្រោយ logout និង storage ចុងក្រោយ៖ PASS ទាំងកូដមុនកែ និងក្រោយកែ; មិនចាត់វាជាកំហុសថ្មី។
+
+ចន្លោះ checker៖ `connection-recovery-test` ធ្លាប់ catch initialization error ប៉ុន្តែនៅ PASS។ Harness ថ្មីចាប់ error និងដាក់ dependency ពិត (`loginBackendScope`, `ZTO_SHOP_SWEEP_PATH`, auth.currentUser); បញ្ជាក់ init គ្មាន error លាក់ ក្នុង ៤ ករណី។ ចំនួន assertions ថ្មី ២៤០ PASS។ Cache delta របស់ Supabase App E2E ធ្លាក់ពេល tenant ប្តូរកណ្តាល cache load; កែ cacheTried ដើម្បីសាក cache របស់ context ថ្មីវិញ។ State hygiene ចែង lifetime នៃ opaque write owner token ដែលគ្មាន credentials/data និងមាន regression សម្រាប់ ACK/reject ចាស់។
+
+វាស់តាមលំដាប់៖ network/login/sync ដំបូង ២៥ checker៖ ២៣ PASS និង ២ FAIL; ក្រោយកែ ៥ checker ដែលពាក់ព័ន្ធ PASS ទាំងអស់។ Backend writes ដំបូង ១២ checker៖ ១១ PASS និង ១ FAIL; connection harness ថ្មី ២៤០ PASS, write stall ៤៣ PASS និង state hygiene PASS ក្រោយកែ។ មាន Firebase SDK + emulator/rules ពិត និង Supabase SDK + embedded Postgres/schema/RLS ពិត; adapter parity ៩២ PASS, CRUD ១៣៧ PASS, disconnect transaction ២៥ PASS, transaction outcome ១១០ PASS, late commit ៦៧ PASS។ មិនសរសេរ production data។
+
+Supabase production read-only 2026-10-12៖ `ACTIVE_HEALTHY`; តារាង public ទាំង ៩ បើក RLS, anon គ្មាន SELECT និង authenticated គ្មាន direct INSERT/UPDATE/DELETE។ Advisor មាន INFO `zoe_ops` គ្មាន policy (table idempotency តាម RPC), INFO index មិនទាន់ប្រើ ២ និង WARN [Leaked Password Protection disabled](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) ដូចមុន។ មិនប្តូរ production settings។
+
+Financial flows៖ checker ដែលជ្រើស ២៣/២០៤ PASS ទាំងអស់ · ០ skip/partial; គ្រប policy, partial cleanup, pickup ledger/repair/reset, price abort, restore/clear-history fences, emulator restore/ledger និង money guardian mutation ទាំងពីរផ្នែក។ Revenue fuzz ១២×៤៥ និង collected mirror ៥×៨ PASS។ `npm audit` ពិតលើ ZoeW, Supabase និង Firebase provision៖ vulnerabilities ០ ទាំងបី។
+
+កែ checker ក្រោយ full/CI រកឃើញ drift៖ periodic VM ដាក់ authGeneration/database ពិតដែល helper ប្រើ; page navigation រង់ចាំ microtask logout មុនអានចំនួន SDK calls; toast order ស្គាល់ SDK alias ដែលចាប់ពី fb ពិត។ Sheet import/App Lock fake initial callback ប្រើ auth.currentUser ដូច SDK API ជំនួស user clone មិនស្របគ្នា ដែលធ្វើឱ្យ auth recovery រំខាន flow។ Native auth fixture បង្កើត JWT unsigned ពី claims ក្លែងក្លាយ (`fake-signature`) ជំនួស literal ដែល security guard ចាត់ជាទិន្នន័យសម្ងាត់; មិនដាក់ allowlist។ ក្រោយកែ៖ periodic ៧៧, security ៥៥, navigation ៥៥, toast ៩០, Sheet import ៨២, App Lock ១៦២ និង docs ៩៩ PASS; native SDK តេស្ត ៤/៤ PASS។ គ្មាន assertion ដក ឬប្តូរ expected outcome ដើម្បីបៃតង។
+
+Full STRICT ២០៤ checker លើ fingerprint `b263b4a3014a9a68`៖ ១៩៧ PASS · ៧ FAIL · ០ skip/partial (២១០៦ វិនាទី)។ FAIL ៦ ជា fixture/index drift ដែលបានកែខាងលើ; meta exit-code integrity ធ្លាក់ព្រោះ poisoned child ឆ្លងពិដាន ៦០ វិនាទី ហើយត្រូវចាត់ FAIL ត្រឹមត្រូវ។ ក្រោយកែ រត់ checker ដែលពាក់ព័ន្ធ ១៣ លើ fresh fingerprint `2d59ec07f316ff3c`៖ ១៣/១៣ PASS · ០ skip/partial រួម meta ដោយប្រើ concurrency និងពិដានដើម។ App/runtime bytes នៅដដែល (`app.js` SHA-256 `f7b24f8aecde3d9692c09e5188f8b6a42972e89ad7e1f90e3a98ab36c8923942`); មិនអះអាងមាន full local run ថ្មីលើ hash ចុងក្រោយឆ្លងទាំង២០៤ទេ។ CI fresh លើ commit `d166cc8` (run `38272187747`) ផ្នែកទាំង ៤/៤ SUCCESS គ្រប checker ទាំង២០៤។ Financial fuzz seeds បន្ថែម ៣០០–៣១១ (`FUZZ_RUNS=12`, `FUZZ_OPS=55`) PASS (១៩១.២ វិនាទី) និង mirror seeds ៣០០–៣១២ (`MFUZZ_RUNS=13`, `MFUZZ_OPS=11`) PASS (១៦៨.៩ វិនាទី)។ គោលការណ៍ Delete មិនដកប្រាក់, Remove/expired ដក និង restore បូកតែករណី isDeducted ដដែល។ Cloud tests មិនជំនួសការសាក iPhone/Android ពិត ឬធានាគ្រប់ interleaving/outage ទេ។
+
 ### 2026-10-12 — PR #312៖ Deep audit ឡើងវិញ និងកែចន្លោះក្នុង checker
 
 កូដមុនកែ `076ed7b`។ បន្ទាប់ពី run-all STRICT ២០៤ checker ឆ្លងទាំងអស់ (រត់ពេញ និង resume លើ fingerprint `21cc6286fb77f49e` ដដែល · ០ skip/partial) តេស្ត race និង barcode បន្ថែមនៅតែបង្ហាញកំហុសពិត ៤៖ `zoe_read` យឺតជាន់ cache ហាងថ្មី · verification របស់ App បិទលុប session ថ្មី · Sheet open decrypt យឺតដាក់ plaintext ហាងចាស់ · `%` ជាន់ key punctuation ធ្វើឱ្យ barcode ទីពីរទាមទារមិនបាន និង pickup ២ ក្លាយជា ១។ កំណែថ្មីការពារ ownership នៅ await និងធ្វើ key bijective តាម barcode ដែល normalize រួច។ ទិន្នន័យ barcode ពិតគ្មាន `%` តាមការបញ្ជាក់ម្ចាស់គម្រោង។
@@ -5636,7 +5843,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `cleanup-clock-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `clear-history-claim-test` | ផ្នែក ១ | — |
+| `clear-history-claim-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
@@ -5649,7 +5856,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `concurrent-scan-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `connection-state-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `csp-enforced-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `csp-enforced-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `csp-lazy-resource-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `css-classes` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `css-media-override` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5658,11 +5865,12 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `dependency-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `dom-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `dom-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `emu/money-multidevice-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -5861,6 +6069,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
@@ -5908,7 +6117,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
@@ -5963,3 +6172,36 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-expiry-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/supabase-sync-owner.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/tenant-app-session.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+
+| `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+
+| `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |

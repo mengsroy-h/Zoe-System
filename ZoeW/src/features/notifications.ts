@@ -434,7 +434,7 @@ export function notifyFeedUrl() {
 
 function fetchFileFeed(url) {
     if (!url) return Promise.resolve(false);
-    return fetchWithTimeout(url, { cache: 'no-store' }, NOTIFY_FEED_TIMEOUT_MS, 'Notify feed timed out',
+    return fetchWithTimeout(url, { cache: 'no-store', scope: 'page' }, NOTIFY_FEED_TIMEOUT_MS, 'Notify feed timed out',
         (res) => (res && res.ok ? res.json() : null))
         .then((out) => {
             const items = sanitizeFeed(out && out.body);
@@ -448,7 +448,7 @@ function fetchFileFeed(url) {
 
 function fetchSellerNotices(url) {
     if (!url) return Promise.resolve(false);
-    return fetchWithTimeout(url, { cache: 'no-store' }, NOTIFY_FEED_TIMEOUT_MS, 'Seller notices timed out',
+    return fetchWithTimeout(url, { cache: 'no-store', scope: 'page' }, NOTIFY_FEED_TIMEOUT_MS, 'Seller notices timed out',
         (res) => (res && res.ok ? res.json().then((data) => ({ data: data })) : null))
         .then((out) => {
             const items = out && out.body ? sanitizeSellerNotices(out.body.data) : null;

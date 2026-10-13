@@ -19,15 +19,16 @@ function fakeSdk(name: string, setImpl: () => Promise<void>) {
     const sdk: any = {
         getApps: () => apps,
         deleteApp: async () => { apps = []; },
-        initializeApp: () => { const a = { name }; apps.push(a); return a; },
-        getAuth: () => ({ currentUser: null, owner: name }),
-        getDatabase: () => ({ name }),
+        initializeApp: (options: any) => { const a = { name, options }; apps.push(a); return a; },
+        getAuth: (app: any) => ({ app, currentUser: { uid: 'rate-user' }, owner: name }),
+        getDatabase: (app: any) => ({ app, name }),
         goOnline() {},
         off() {},
-        ref: (db: any, path: string) => ({ owner: name, db, path }),
+        ref: (db: any, path = '') => ({ owner: name, db, path, toString: () => String(db.app?.options?.databaseURL || 'https://old.firebaseio.com') + '/' + path }),
         onValue: () => () => {},
         onAuthStateChanged: () => () => {},
-        set: (ref: any, value: any) => { sets.push({ ref, value }); return box.setImpl(); }
+        set: (ref: any, value: any) => { sets.push({ ref, value }); return box.setImpl(); },
+        update: (ref: any, value: any) => { sets.push({ ref, value }); return box.setImpl(); }
     };
     return { sdk, sets, box };
 }
@@ -36,6 +37,7 @@ beforeEach(() => {
     vi.useFakeTimers();
     firebaseState.authGeneration++;
     firebaseState.isInitializingFirebase = false;
+    firebaseState.sessionExpiryCheck = 'live';
     dataState.exchangeRateSaveInFlight = false;
 });
 afterEach(() => {

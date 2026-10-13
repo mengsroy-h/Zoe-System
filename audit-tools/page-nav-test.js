@@ -454,7 +454,7 @@ function seedData() {
     // ⛔ **ច្បាប់ CSP ៤ ៖ កុំបន្ថែម listener ទី ២ លើធាតុដែលមាន `data-act` រួច។**
     // `onclick` លើធាតុ + delegation លើ `document` បាញ់ **ទាំងពីរ** ➜ សកម្មភាព
     // រត់ពីរដង។ ការវាស់ត្រូវរាប់ **ការហៅពិត** មិនមែនអានកូដ។
-    const authFire = await page.evaluate(() => {
+    const authFire = await page.evaluate(async () => {
         const btn = document.getElementById('navAuthBtn');
         if (!btn) return { err: 'no button' };
         const realLogin = window.showLoginModalWithPrefill;
@@ -514,6 +514,7 @@ function seedData() {
         btn.click();
         settle();
         tap('[data-act="confirmLogout"]');
+        await new Promise((resolve) => setTimeout(resolve, 0));
         const confirmed = { logouts: logouts, modal: modalShown() };
 
         if (isReact) sdk.signOut = realSignOut;

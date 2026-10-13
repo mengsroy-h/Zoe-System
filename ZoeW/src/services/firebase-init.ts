@@ -9,13 +9,18 @@ import { noteShopDevice } from '../features/shop-device';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
+import { clearSensitiveModalFields } from '../features/session';
+import { applyCurrentFilter } from '../features/monthly-report';
+import { renderRecentlyDeleted } from '../features/trash';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
-import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
+import { detachDatabaseListeners, initDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from './db-listeners';
 import { FIREBASE_SDK_REFRESH_TEXT, armLateFirebaseSdkListener, firebaseSdkNeedsRefresh, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
 import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx-outcome';
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
+import { withConnectionOwnership } from './connection-flow';
+import { ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
 
 let supabaseSdkPromise = null;
 
@@ -28,7 +33,27 @@ function supabaseEnv() {
         onAccountBlocked: (message) => {
             showToast('⚠️ ' + message);
         },
-        onTenantChanged: () => {
+        onTenantChanged: (before, after) => {
+            if (before && after && before !== after) {
+                firebaseState.authGeneration++;
+                const initialized = firebaseState.isDatabaseInitialized;
+                detachDatabaseListeners();
+                resetDbListenerHealthState();
+                firebaseState.isDatabaseInitialized = false;
+                dataState.scanHistory = [];
+                dataState.deletedItems = [];
+                dataState.dailyRevenueData = {};
+                dataState.monthlyRevenueData = {};
+                dataState.dailyPickupData = {};
+                dataState.dailyCollectedData = {};
+                uiState.lockerBarcodeIndex = {};
+                clearCustomerDataTableCache();
+                clearSensitiveModalFields();
+                applyCurrentFilter();
+                renderRecentlyDeleted();
+                updateRecentPhonesList();
+                if (initialized && firebaseState.db && firebaseState.fb) initDatabaseListeners();
+            }
             refreshShopBoundUi();
             noteShopDevice();
         },
@@ -43,7 +68,9 @@ function supabaseEnv() {
             if (txOutcomeUnknownReported.has(path)) return;
             txOutcomeUnknownReported.add(path);
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
-        }
+        },
+        onWriteRecovery: () => renderConnectionStatus(),
+        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
     };
 }
 
@@ -76,7 +103,7 @@ export async function initFirebase() {
         const previousFb = firebaseState.fb;
         let nextFb;
         if (useSupabase) {
-            nextFb = await loadSupabaseFb();
+            nextFb = withConnectionOwnership(await loadSupabaseFb());
         } else {
             preconnectToDatabaseHost(firebaseState.firebaseConfig);
             nextFb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
@@ -128,6 +155,7 @@ export async function initFirebase() {
             await Promise.all(existingApps.map(([owner, a]) => (typeof owner.deleteApp === 'function' ? owner.deleteApp(a).catch(() => {}) : null)));
         }
         firebaseState.fb = nextFb;
+        if (typeof nextFb.setConnectionFlowReporter === 'function') nextFb.setConnectionFlowReporter(renderConnectionStatus);
 
         const firebaseApp = firebaseState.fb.getApps().length ? firebaseState.fb.getApps()[0] : firebaseState.fb.initializeApp(firebaseState.firebaseConfig);
         firebaseState.auth = firebaseState.fb.getAuth(firebaseApp);

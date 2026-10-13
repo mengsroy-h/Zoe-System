@@ -108,7 +108,9 @@ const LOCAL_CLOCK_OK = {
         loadSigningKey: 'ត្រាសកម្មភាពពេល Load Signing Key — ដូច `noteSigningKeyActivity`',
         tryRestoreSigningKeyFromSession: 'ត្រាសកម្មភាពពេលស្តារ Signing Key — ដូច `noteSigningKeyActivity`',
         sbAdminActivity: 'ត្រាសកម្មភាពនៃ session Admin Supabase (ពិដានស្ងៀម) — local សុទ្ធសាធ · អ្នកអាន `expireIdleSbAdmin()` ឆ្លង `elapsedSince()` ➜ ថយក្រោយ ➜ Infinity ➜ ចាកចេញ (fail-closed)',
-        sbAdminLogin: 'ត្រាសកម្មភាពពេលចូល Admin Supabase — ដូច `sbAdminActivity`'
+        sbAdminLogin: 'ត្រាសកម្មភាពពេលចូល Admin Supabase — ដូច `sbAdminActivity`',
+        noteKeygenActivity: 'ត្រាសកម្មភាពនៃសម័យ Admin ZoeKeyGen (ពិដានចាកចេញស្វ័យប្រវត្តិ) — local សុទ្ធសាធ · អ្នកអាន `expireIdleKeygenSession` វាស់ដោយ `elapsedSince`',
+        updateAuthButton: 'ត្រាសកម្មភាពពេលចូលប្រព័ន្ធ — ដូច `noteKeygenActivity`'
     },
     'ZoeW/license-verify.js': {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',

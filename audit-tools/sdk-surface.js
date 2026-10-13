@@ -151,7 +151,11 @@ for (const app of APPS) {
             ? ok(app + ' ៖ ឈ្មោះដែលមានតែក្នុង adapter Supabase ប្រើក្រោមច្រកទ្វារគ្រប់កន្លែង')
             : bad(app + ' ៖ `fb.X` មានតែក្នុង adapter Supabase តែគ្មានច្រកទ្វារ ➜ `undefined` លើហាង Firebase', unguarded.join(', '));
     }
-    const missing = [...used.keys()].filter((n) => !exported.has(n) && !sbSurface.has(n));
+    const facadeStart = appSrc.indexOf('function withConnectionOwnership(');
+    const facadeEnd = facadeStart < 0 ? -1 : appSrc.indexOf('\n    function ', facadeStart + 1);
+    const facadeBody = facadeStart < 0 ? '' : appSrc.slice(facadeStart, facadeEnd < 0 ? appSrc.length : facadeEnd);
+    const facadeSurface = new Set([...facadeBody.matchAll(/if \(prop === '([A-Za-z_$][\w$]*)'\) return/g)].map(m => m[1]));
+    const missing = [...used.keys()].filter((n) => !exported.has(n) && !sbSurface.has(n) && !facadeSurface.has(n));
     missing.length === 0
         ? ok(app + ' ៖ **គ្រប់ `fb.X` មានក្នុង window.firebaseSDK**')
         : bad(app + ' ៖ `fb.X` ដែល loader មិន export ➜ `undefined` លើផលិតកម្ម',

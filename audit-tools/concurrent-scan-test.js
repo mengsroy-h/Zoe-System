@@ -165,7 +165,7 @@ function makeCtx(server, fbSet) {
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
                       'freshHistoryItemShell', 'freshHistoryItemFrom',
-                      'mergeBarcodeIntoHistoryItem', 'addOrUpdateEntry']) {
+                      'mergeBarcodeIntoHistoryItem', 'ledgerDeltaCompanion', 'addOrUpdateEntry']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }

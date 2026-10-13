@@ -123,8 +123,9 @@ function extractFn(name) {
 }
 let summaryPrinted = false;
 // ⛔ React ៖ helper អាស្រ័យលើ `resolveNativeApiUrl()` (`platform/native.ts`) ➜ ចាក់កូដពិតរបស់វាផង (web ៖ គ្មាន Capacitor)
-const FN = extractFn('fetchWithTimeout') && ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl', 'nativeFunctionRequest', 'moveQueryToHeader']
-    .map((n) => extractFn(n) || '').join('\n') + '\nvar lookupState = { nativeQueryHeaderUnsupported: false };\n' + extractFn('fetchWithTimeout');
+const FN = extractFn('fetchWithTimeout') && require('./react-view.js').reactRuntime(src) + '\n'
+    + ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl', 'nativeFunctionRequest', 'moveQueryToHeader']
+    .map((n) => extractFn(n) || '').join('\n') + '\n' + extractFn('fetchWithTimeout');
 ok('ស្រង់ fetchWithTimeout ពិតចេញពី app.js បាន', !!FN);
 if (!FN) {
     // គ្មាន helper ➜ ផ្នែក browser គ្មានអ្វីត្រូវរត់។ ចាកចេញយ៉ាងស្អាតជំនួស

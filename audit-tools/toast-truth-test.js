@@ -235,7 +235,8 @@ console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ t
         armAt !== -1 && announceAt !== -1 && armAt < announceAt, { armAt, announceAt, armTokens });
 
     const markAt = expire.indexOf("sessionExpiryCheck = 'expired'");
-    const signOutAt = expire.indexOf('fb.signOut');
+    const capturedSdk = /\bconst\s+(\w+)\s*=\s*fb\s*;/.exec(expire);
+    const signOutAt = expire.indexOf((capturedSdk ? capturedSdk[1] : 'fb') + '.signOut(');
     ok('ZoeW ៖ forceExpireSession សម្គាល់វគ្គថាស្លាប់ **មុន** ការចាកចេញ async',
         markAt !== -1 && signOutAt !== -1 && markAt < signOutAt, { markAt, signOutAt });
     ok('ZoeW ៖ ហើយកែ toast ដែលរស់ភ្លាម (មិនរង់ចាំព្រឹត្តិការណ៍បណ្តាញបន្ទាប់)',

@@ -37,7 +37,7 @@ export function SideDrawer() {
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
     const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
-        'biometricUnsupported', 'biometricToggleText']);
+        'biometricUnsupported', 'biometricToggleText', 'connectionPhase']);
     return (
         <aside className={open ? 'side-drawer open' : 'side-drawer'} id="sideDrawer" aria-hidden={open ? 'false' : 'true'}>
             <div className="drawer-head">
@@ -122,6 +122,15 @@ export function SideDrawer() {
                     <button type="button" className="drawer-item" onClick={onAct("openHealthCheck")}>
                         <span className="ico">🩺</span>
                         <span>ពិនិត្យសុខភាពប្រព័ន្ធ</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={v.connectionPhase === 'blocked' ? 'drawer-item' : 'drawer-item hidden'}
+                        id="discardPendingWritesBtn"
+                        onClick={onAct("drawerDiscardPendingWritesFlow")}
+                    >
+                        <span className="ico">🧹</span>
+                        <span>លុបការសរសេររង់ចាំ</span>
                     </button>
                 </DrawerGroup>
             </div>

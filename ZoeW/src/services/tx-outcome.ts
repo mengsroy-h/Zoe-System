@@ -1,7 +1,9 @@
 import { firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { fetchWithTimeout, withTimeout } from './network';
-import { txDisconnectResolving } from './tx-disconnect';
+import { txDisconnectResolving, txMutationSources } from './tx-disconnect';
+import { withFirebaseAuthOwnership } from './firebase-auth-owner';
+import { withConnectionOwnership } from './connection-flow';
 
 export { txDisconnectResolving };
 
@@ -21,7 +23,10 @@ export const txOutcomeUnknownReported = new Set();
 
 export function transactionDisconnectPending(promise) {
     if (!promise || typeof promise !== 'object') return null;
-    return txDisconnectResolving.get(promise) || null;
+    const direct = txDisconnectResolving.get(promise);
+    if (direct) return direct;
+    const source = txMutationSources.get(promise);
+    return source && source.promise && source.promise !== promise ? transactionDisconnectPending(source.promise) : null;
 }
 
 export function transactionOutcomeUnknown(error) {
@@ -232,6 +237,7 @@ export function runTransactionResolved(sdk, ref, updater, options) {
         sent = result === undefined ? undefined : txCloneJson(result);
         return result;
     };
+    if (updater && updater.connectionIntent) (tracked as any).connectionIntent = updater.connectionIntent;
     let started;
     try {
         started = options === undefined ? sdk.runTransaction(ref, tracked) : sdk.runTransaction(ref, tracked, options);
@@ -270,8 +276,9 @@ export function runTransactionResolved(sdk, ref, updater, options) {
 
 export function withTransactionOutcomeResolution(sdk) {
     if (!sdk || typeof sdk !== 'object' || typeof Proxy !== 'function') return sdk;
+    if (typeof sdk.beforeAuthStateChanged === 'function') sdk = withFirebaseAuthOwnership(sdk);
     if (sdk.__txOutcomeResolved) return sdk;
-    return new Proxy(sdk, {
+    const resolved = new Proxy(sdk, {
         get(target, prop) {
             if (prop === '__txOutcomeResolved') return true;
             if (prop === 'runTransaction') {
@@ -281,4 +288,5 @@ export function withTransactionOutcomeResolution(sdk) {
             return target[prop];
         }
     });
+    return withConnectionOwnership(resolved);
 }

@@ -327,6 +327,66 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
     ok('គ្មានកំហុស runtime ក្រោម CSP តឹងរឹង', realErrs.length === 0, realErrs.slice(0, 3));
 
     await ctx.close();
+
+    // === ផ្នែកទី ៣ — ZoeKeyGen ក្រោម CSP ពិត ៖ `style-src` គ្មាន 'unsafe-inline' (សំណើម្ចាស់គម្រោង ៖ ពង្រឹងសុវត្ថិភាព) ===
+    //    គ្រប់ style ចេញពី style.css (class) · modal · QR (SVG) · ផ្ទាំង · ប្រអប់ ➜ ០ ការរំលោភ · probe ផ្ទុយ ៖ style attribute ដែលចាក់ ➜ រំលោភពិត
+    console.log('\n=== ផ្នែកទី ៣ — ZoeKeyGen ក្រោម CSP ពិត (style-src តឹងរឹង) ===');
+    const kgCsp = readCsp('ZoeKeyGen');
+    const kgStyle = (/style-src ([^;]+)/.exec(kgCsp || '') || [])[1] || '';
+    ok("ZoeKeyGen ៖ `style-src` គ្មាន 'unsafe-inline'", !!kgStyle && kgStyle.indexOf("'unsafe-inline'") === -1, kgStyle);
+    const kgHtml = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'index.html'), 'utf8');
+    ok('ZoeKeyGen ៖ `index.html` គ្មាន attribute `style=` (ទាំងអស់ជា class)', !/\sstyle="/.test(kgHtml), (kgHtml.match(/\sstyle="[^"]*"/g) || []).slice(0, 3));
+    const kgServer = await serve(path.join(appRoot, 'ZoeKeyGen'), kgCsp);
+    const kgOrigin = 'http://127.0.0.1:' + kgServer.address().port;
+    const kgCtx = await browser.newContext({ viewport: { width: 412, height: 780 } });
+    const kgPage = await kgCtx.newPage();
+    const kgErrors = [];
+    kgPage.on('pageerror', (e) => kgErrors.push(String(e && e.message || e)));
+    await kgPage.addInitScript(() => {
+        window.__cspViolations = [];
+        document.addEventListener('securitypolicyviolation', (e) => {
+            window.__cspViolations.push({ directive: e.violatedDirective, blocked: String(e.blockedURI || '').slice(0, 80), sample: String(e.sample || '').slice(0, 80) });
+        });
+    });
+    await kgPage.route('**', (route) => (route.request().url().startsWith(kgOrigin) ? route.continue() : route.abort()));
+    await kgPage.goto(kgOrigin + '/', { waitUntil: 'load', timeout: 30000 });
+    await kgPage.waitForTimeout(2500);
+    const kg = await kgPage.evaluate(async () => {
+        const px = (el, prop) => (el ? parseFloat(getComputedStyle(el)[prop]) : NaN);
+        const box = document.getElementById('appContainer');
+        if (box) box.classList.remove('hidden');
+        const tabs = [];
+        for (const t of ['create', 'list', 'shop', 'link', 'notice']) { if (typeof window.switchKgTab === 'function') window.switchKgTab(t); tabs.push(t); }
+        const qrBox = document.getElementById('setupLinkQrContainer');
+        const qrOk = typeof window.renderQrInto === 'function' && window.renderQrInto(qrBox, 'https://zoew.example/setup?x=1') && !!qrBox.querySelector('svg');
+        const pin = document.getElementById('pinModal');
+        if (pin) pin.style.display = 'flex';
+        await new Promise((r) => setTimeout(r, 200));
+        const widths = {
+            pin: px(document.querySelector('#pinModal .modal-content'), 'maxWidth'),
+            keypair: px(document.querySelector('#keypairModal .modal-content'), 'maxWidth'),
+            qr: px(qrBox.querySelector('svg'), 'width')
+        };
+        const checkRow = document.querySelector('.check-row');
+        const status = document.getElementById('kgStatus');
+        const before = (window.__cspViolations || []).length;
+        const probe = document.createElement('div');
+        probe.innerHTML = '<span style="color:red">probe</span>';
+        document.body.appendChild(probe);
+        await new Promise((r) => setTimeout(r, 200));
+        const violations = window.__cspViolations || [];
+        return { tabs, qrOk, widths, checkRowFlex: checkRow ? getComputedStyle(checkRow).display : null, statusFlex: status ? getComputedStyle(status).display : null,
+            beforeProbe: violations.slice(0, before), probeViolations: violations.slice(before) };
+    });
+    ok('ZoeKeyGen ៖ ០ ការរំលោភ CSP ពេល boot · ផ្ទាំងទាំង ៥ · ប្រអប់ PIN · QR (SVG)', kg.beforeProbe.length === 0 && kg.tabs.length === 5 && kg.qrOk === true, kg);
+    ok('ZoeKeyGen ៖ ទទឹងប្រអប់តាម class (`modal-w-300` < `modal-w-460`) · QR មានទទឹង · check-row និង status ជា flex (style ចេញពី style.css)',
+        kg.widths.pin > 100 && kg.widths.keypair > kg.widths.pin && kg.widths.qr > 50 && kg.checkRowFlex === 'flex' && kg.statusFlex === 'flex', kg.widths);
+    ok('ZoeKeyGen ៖ probe ផ្ទុយ — style attribute ដែលចាក់ត្រូវ CSP បដិសេធពិត (`style-src-attr`)',
+        kg.probeViolations.length >= 1 && kg.probeViolations.every((v) => /style-src/.test(v.directive)), kg.probeViolations);
+    const kgRealErrs = kgErrors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED|Failed to fetch|dynamically imported module|NetworkError/i.test(e));
+    ok('ZoeKeyGen ៖ គ្មានកំហុស runtime ក្រោម CSP តឹងរឹង', kgRealErrs.length === 0, kgRealErrs.slice(0, 3));
+    await kgCtx.close();
+    kgServer.close();
     await browser.close();
     await new Promise((r) => { server.close(r); if (server.closeAllConnections) server.closeAllConnections(); });
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));

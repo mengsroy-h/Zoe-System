@@ -23,6 +23,7 @@ export interface FirebaseState {
     authUnsubscribe: any;
     authRecoveryTimeout: any;
     authGeneration: number;
+    authLoginOperation: any;
     sessionExpiryCheck: string;
     isDatabaseConnected: boolean;
     hasEverConnectedToDatabase: boolean;
@@ -82,6 +83,7 @@ export const firebaseState = createStore<FirebaseState>('firebaseState', {
     authUnsubscribe: null,
     authRecoveryTimeout: null,
     authGeneration: 0,
+    authLoginOperation: null,
     sessionExpiryCheck: 'pending',
     isDatabaseConnected: false,
     hasEverConnectedToDatabase: false,
@@ -133,6 +135,7 @@ export interface DataState {
     dailyCollectedData: Record<string, any>;
     pickupResetInFlight: boolean;
     exchangeRateSaveInFlight: boolean;
+    exchangeRateSaveOperation: any;
     historyPatchFlushInFlight: boolean;
     registryReleaseFlushInFlight: boolean;
     pickupLedgerRepairDone: boolean;
@@ -156,6 +159,7 @@ export const dataState = createStore<DataState>('dataState', {
     dailyCollectedData: {},
     pickupResetInFlight: false,
     exchangeRateSaveInFlight: false,
+    exchangeRateSaveOperation: null,
     historyPatchFlushInFlight: false,
     registryReleaseFlushInFlight: false,
     pickupLedgerRepairDone: false,

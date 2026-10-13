@@ -2353,6 +2353,9 @@
     "audit-tools/emu/app-network-e2e-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/money-multidevice-emu-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/app-writes-rules-test.js": {
       "policy": "guard-1"
     },
@@ -3221,6 +3224,93 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/sdk-listener-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/auth-flow-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/password-save-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/session-expiry-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-realtime-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-sync-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tenant-app-session.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/exchange-rate-completion-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-auth-write-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/firebase-auth-owner.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/firebase-auth-write-ownership.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/connection-flow.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/write-journal.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/native-write-recovery.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-flow-contract.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-request-owner.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/durable-connection-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-durable-write.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-native-retry-identity.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261013004220_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261013004512_receipt_auth_uid.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/tests/native-recovery-plain-cas.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-replay-companion.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-ledger-replay-companion.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-scope-discovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-receipt-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261013093425_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "ZoeW/src/features/pending-writes.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/discard-pending-writes.test.tsx": {
       "policy": "zoew-self-verification"
     }
   }

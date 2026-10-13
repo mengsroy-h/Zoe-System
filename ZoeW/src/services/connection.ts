@@ -10,6 +10,7 @@ import { firebaseSdkNeedsRefresh, retryFirebaseSdkNow } from './firebase-sdk';
 import { flushPendingHistoryPatches } from './history-write';
 import { noteConnectionTransition, refreshLiveToasts } from '../ui/toast';
 import { dbListenerPendingPaths } from '../core/text';
+import { connectionFlowSnapshot } from './connection-flow';
 
 export const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 
@@ -52,16 +53,21 @@ export function connectionIsSettlingIn() {
 }
 
 export function renderConnectionStatus() {
-    const online = connectionLooksOnline();
+    viewState.connectionPhase = connectionFlowSnapshot().phase;
+    const transportOnline = connectionLooksOnline();
+    const pendingData = transportOnline && ['syncing', 'recovering', 'blocked'].includes(viewState.connectionPhase);
+    const online = transportOnline && !pendingData;
     const reconnecting = !online && firebaseState.isDatabaseConnected && firebaseState.dbListenersFailed && (navigator.onLine as boolean) !== false;
     const settling = !online && !reconnecting && connectionIsSettlingIn();
     const prevStatus = viewState.connectionStatus;
-    viewState.connectionStatus = online ? 'online' : ((reconnecting || settling) ? 'connecting' : 'offline');
+    viewState.connectionStatus = online ? 'online' : ((reconnecting || settling || pendingData) ? 'connecting' : 'offline');
     viewState.connectionText = online
         ? "ភ្ជាប់ Server រួចរាល់"
         : (reconnecting
             ? "កំពុងភ្ជាប់ឡើងវិញ..."
             : (settling ? "កំពុងភ្ជាប់..." : (firebaseSdkNeedsRefresh() ? "សូម Refresh ទំព័រ" : "ក្រៅបណ្ដាញ")));
+    if (viewState.connectionPhase === 'blocked') viewState.connectionText = 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍';
+    else if (pendingData) viewState.connectionText = viewState.connectionPhase === 'syncing' ? 'កំពុងទាញទិន្នន័យ...' : 'កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...';
     refreshLiveToasts();
     noteConnectionTransition(prevStatus, viewState.connectionStatus);
 }
@@ -135,6 +141,7 @@ export function probeDatabaseLiveness(reason?) {
     if (firebaseState.dbLivenessProbe) return firebaseState.dbLivenessProbe;
     if (!databaseLivenessProbeAllowed()) return Promise.resolve(null);
     const probeDb = firebaseState.db;
+    const probeAuthEpoch = firebaseState.authGeneration;
     const generation = firebaseState.infoListenerGeneration;
     const probe = new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), DB_LIVENESS_PROBE_TIMEOUT_MS);
@@ -143,8 +150,8 @@ export function probeDatabaseLiveness(reason?) {
         try { started = firebaseState.fb.get(firebaseState.fb.ref(probeDb, DB_LIVENESS_PROBE_PATH)); } catch (e) { started = null; }
         Promise.resolve(started).then(answered, answered);
     }).then((alive) => {
-        firebaseState.dbLivenessProbe = null;
-        if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation) return null;
+        if (firebaseState.dbLivenessProbe === probe) firebaseState.dbLivenessProbe = null;
+        if (firebaseState.db !== probeDb || firebaseState.infoListenerGeneration !== generation || firebaseState.authGeneration !== probeAuthEpoch) return null;
         if (alive) {
             firebaseState.lastDbLivenessOkAt = Date.now();
             return true;
@@ -162,8 +169,11 @@ export function probeDatabaseLivenessIfIdle() {
     return probeDatabaseLiveness('idle');
 }
 
+let connectionRecoveryCleanup: (() => void) | null = null;
+
 export function setupConnectionRecovery() {
-    window.addEventListener('online', () => {
+    if (connectionRecoveryCleanup) connectionRecoveryCleanup();
+    const onOnline = () => {
         firebaseState.networkJustReturned = true;
         renderConnectionStatus();
         retryFirebaseSdkNow();
@@ -174,12 +184,14 @@ export function setupConnectionRecovery() {
         if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
             ZoeLicense.syncServerTime().catch(() => {});
         }
-    });
-    window.addEventListener('offline', () => {
+    };
+    const onOffline = () => {
         clearReconnectWatchdog();
         renderConnectionStatus();
-    });
-    onDocumentVisibilityChange(() => {
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    const offVisible = onDocumentVisibilityChange(() => {
         if (documentIsHidden()) {
             firebaseState.documentHiddenAt = Date.now();
             return;
@@ -192,6 +204,17 @@ export function setupConnectionRecovery() {
         retryFailedDbListenersNow();
         if (hiddenFor >= DB_LIVENESS_RESUME_HIDDEN_MS) probeDatabaseLiveness('resume');
     });
+    let active = true;
+    const cleanup = () => {
+        if (!active) return;
+        active = false;
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+        offVisible();
+        if (connectionRecoveryCleanup === cleanup) connectionRecoveryCleanup = null;
+    };
+    connectionRecoveryCleanup = cleanup;
+    return cleanup;
 }
 
 export function scheduleInfoListenerRecovery() {

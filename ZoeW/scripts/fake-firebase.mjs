@@ -108,7 +108,7 @@ export const FAKE_SDK = function (seed) {
         get: (r) => Promise.resolve(snapOf(r.path)),
         set: (r, v) => { window.__writeLog.push({ op: 'set', path: r.path, value: clone(v) }); setPath(r.path, v); fireAll(); return Promise.resolve(); },
         update: (r, obj) => {
-            window.__writeLog.push({ op: 'update', path: r.path, keys: Object.keys(obj), value: clone(obj) });
+            window.__writeLog.push({ op: 'update', path: r.path, keys: Object.keys(obj), value: clone(obj), rawValue: JSON.parse(JSON.stringify(obj)) });
             Object.keys(obj).forEach((k) => setPath((r.path ? r.path + '/' : '') + k, obj[k]));
             fireAll(); return Promise.resolve();
         },

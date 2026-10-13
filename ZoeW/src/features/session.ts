@@ -66,14 +66,20 @@ export const SESSION_EXPIRED_TOAST = '⏱️ ផុតកំណត់ ៤ ម៉
 export const SESSION_SIGNED_OUT_TOAST = '⚠️ បានចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត';
 
 export function forceExpireSession() {
+    const expiryGeneration = ++firebaseState.authGeneration;
+    const expiryAuth = firebaseState.auth;
+    const expiryFb = firebaseState.fb;
+    const expiryScope = loginBackendScope();
+    const expiredUser = expiryAuth && expiryAuth.currentUser;
     firebaseState.sessionExpiryCheck = 'expired';
     refreshLiveToasts();
     const finish = () => {
+        if (firebaseState.auth !== expiryAuth || firebaseState.fb !== expiryFb || loginBackendScope() !== expiryScope || (expiryAuth.currentUser && (expiryAuth.currentUser !== expiredUser || firebaseState.authGeneration !== expiryGeneration)) || firebaseState.authLoginOperation) return;
         clearRememberedSession(true);
         showLoginModalWithPrefill();
         reannounceOrShowToast(SESSION_EXPIRED_TOAST);
     };
-    firebaseState.fb.signOut(firebaseState.auth).then(finish, finish);
+    expiryFb.signOut(expiryAuth).then(finish, finish);
 }
 
 export function armSessionExpiryCheck(user, generation) {
@@ -93,9 +99,12 @@ export function runSessionExpiryCheck() {
     if (firebaseState.sessionExpiryCheckInFlight || firebaseState.sessionExpiryCheck === 'pending' || firebaseState.sessionExpiryCheck === 'expired') return Promise.resolve(false);
     if (!firebaseState.auth || !firebaseState.auth.currentUser) return Promise.resolve(false);
     firebaseState.sessionExpiryCheckInFlight = true;
+    const generation = firebaseState.authGeneration;
+    const sessionAuth = firebaseState.auth;
+    const database = firebaseState.db;
     const user = firebaseState.auth.currentUser;
     return isFirebaseSessionExpired(user).then((expired) => {
-        if (expired && firebaseState.auth && firebaseState.auth.currentUser === user) forceExpireSession();
+        if (expired && generation === firebaseState.authGeneration && firebaseState.auth === sessionAuth && firebaseState.db === database && sessionAuth.currentUser === user) forceExpireSession();
         return expired;
     }, () => false).finally(() => {
         firebaseState.sessionExpiryCheckInFlight = false;

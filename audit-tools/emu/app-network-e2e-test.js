@@ -584,6 +584,31 @@ function unsignedToken(uid, email, projectId, authTime) {
         check(dup.length === 0, 'path នីមួយៗមាន onValue សកម្មតែ ១ (គ្មាន listener ស្ទួនក្រោយការឆ្លង ៦ ដង)', dup);
         const liveWs = proxy.live().filter((c) => c.kind === 'ws');
         check(liveWs.length === 1, 'WebSocket រស់តែ ១ ក្រោយការឆ្លងទាំងអស់ (គ្មានការតភ្ជាប់ស្របគ្នា)', liveWs.map((c) => c.id));
+        console.log('\n── durable write ៖ SDK ពិត · reload · receipt មិនអនុវត្តស្ទួន ──');
+        await owner('zoew_settings/exchange_rate.json', 'PUT', 4100);
+        await page.evaluate(() => {
+            fb.goOffline(db);
+            window.__pendingReceiptWrite = fb.set(fb.ref(db, 'zoew_settings/exchange_rate'), fb.increment(5)).catch(() => 'ended');
+        });
+        const journalAt = await waitUntil(() => page.evaluate(() => Object.keys(localStorage).some(k => k.startsWith('zoew_connection_writes_v1:'))), 3000);
+        const savedWrites = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => [k, localStorage.getItem(k)]));
+        const beforeReplay = await (await owner('zoew_settings/exchange_rate.json')).json();
+        check(journalAt >= 0 && savedWrites.length === 1 && beforeReplay === 4100,
+            'SDK write ក្រៅបណ្តាញរក្សាចូល journal មុនផ្ញើ · server មិនទាន់ប្រែ', { journalAt, count: savedWrites.length, beforeReplay });
+        await page.reload({ waitUntil: 'load' });
+        const durableRecoveredAt = await waitUntil(async () => (await statusText()) === ONLINE_TEXT
+            && await page.evaluate(() => !Object.keys(localStorage).some(k => k.startsWith('zoew_connection_writes_v1:'))), 30000);
+        const afterReplay = await (await owner('zoew_settings/exchange_rate.json')).json();
+        check(durableRecoveredAt >= 0 && afterReplay === 4105, 'reload ស្ដារ intent ដើមដោយ SDK និង rules ពិត · increment ម្តង', { durableRecoveredAt, afterReplay });
+        await page.evaluate((rows) => { for (const [key, value] of rows) localStorage.setItem(key, value); }, savedWrites);
+        await page.reload({ waitUntil: 'load' });
+        const deduplicatedAt = await waitUntil(async () => (await statusText()) === ONLINE_TEXT
+            && await page.evaluate(() => !Object.keys(localStorage).some(k => k.startsWith('zoew_connection_writes_v1:'))), 30000);
+        const afterDuplicate = await (await owner('zoew_settings/exchange_rate.json')).json();
+        const recoveryDetail = await page.evaluate(() => ({ status: document.getElementById('firebaseStatusText')?.innerText,
+            phase: connectionFlowSnapshot(), recovery: nativeWriteRecoveryState(db), rows: Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => JSON.parse(localStorage.getItem(k))) }));
+        check(deduplicatedAt >= 0 && afterDuplicate === 4105, 'receipt ផ្ទៀងផ្ទាត់ applied write ក្រោយ reload ម្តងទៀត · មិន increment ស្ទួន', { deduplicatedAt, afterDuplicate, recoveryDetail });
+        await page.evaluate(() => fb.set(fb.ref(db, 'zoew_settings/exchange_rate'), 4100));
         // ── ឈ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ៤ ម៉ោង ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──
         console.log('\n── ឈ. បើក App ក្រោយ ៦.៥ ម៉ោង ➜ ផុតកំណត់ ➜ ចូលវិញដោយពាក្យសម្ងាត់ដែលចងចាំ ──');
         const loginVisible = () => page.evaluate(() => { const m = document.getElementById('loginModal'); return !!m && getComputedStyle(m).display !== 'none'; }).catch(() => null);

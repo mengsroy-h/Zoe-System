@@ -274,6 +274,16 @@
       "name": "documentHiddenAt",
       "init": "0",
       "line": 4860
+    },
+    {
+      "name": "authLoginOperation",
+      "init": "null",
+      "line": 0
+    },
+    {
+      "name": "dbRefZtoSignedSweep",
+      "init": "null",
+      "line": 0
     }
   ],
   "dataState": [
@@ -361,6 +371,11 @@
       "name": "clearHistoryInFlight",
       "init": "false",
       "line": 14592
+    },
+    {
+      "name": "exchangeRateSaveOperation",
+      "init": "null",
+      "line": 0
     }
   ],
   "scanState": [

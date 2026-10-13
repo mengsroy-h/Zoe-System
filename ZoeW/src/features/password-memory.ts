@@ -31,11 +31,11 @@ export function setRememberPasswordPref(enabled) {
 }
 
 export function forgetLoginPassword() {
-    memorySeq++;
+    const seq = ++memorySeq;
     prefillSeq++;
     prefilledPassword = '';
     try {
-        return lookupKeyDbRun('readwrite', (store) => store.delete(REMEMBERED_PASSWORD_ID)).then((r) => r !== null, () => false);
+        return lookupKeyDbRun('readwrite', (store) => seq === memorySeq ? store.delete(REMEMBERED_PASSWORD_ID) : null).then((r) => seq === memorySeq && r !== null, () => false);
     } catch (e) {
         return Promise.resolve(false);
     }
@@ -52,12 +52,10 @@ export async function rememberLoginPassword(login, password, scope) {
         const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: bindingOf(scope, name) }, key, new TextEncoder().encode(password));
+        if (mySeq !== memorySeq) return false;
         const record = { key, iv: Array.from(iv), data: Array.from(new Uint8Array(data)) };
-        const stored = await lookupKeyDbRun('readwrite', (store) => store.put(record, REMEMBERED_PASSWORD_ID));
-        if (mySeq !== memorySeq) {
-            await forgetLoginPassword();
-            return false;
-        }
+        const stored = await lookupKeyDbRun('readwrite', (store) => mySeq === memorySeq ? store.put(record, REMEMBERED_PASSWORD_ID) : null);
+        if (mySeq !== memorySeq) return false;
         return stored !== null;
     } catch (e) {
         return false;

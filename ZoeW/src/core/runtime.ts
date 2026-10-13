@@ -32,6 +32,7 @@ export const ACTION_ALLOWLIST = [
     "drawerBiometricFlow",
     "drawerConfigFlow",
     "drawerCustomerTableFlow",
+    "drawerDiscardPendingWritesFlow",
     "drawerLockerSettingsFlow",
     "drawerLookupApiFlow",
     "drawerSheetImportFlow",

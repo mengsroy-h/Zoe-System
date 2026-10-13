@@ -223,7 +223,7 @@ function seedEmpty(){ const t=new Date();
           return window.__origTx.apply(this, arguments);   // registry + revenue នៅដើរ
       };
       window.firebaseSDK.update = function(r, o){
-          if (r && String(r.path).indexOf('zoew_scan_history_cod_dod') === 0) {
+          if (r && String(r.path).indexOf('zoew_scan_history_cod_dod') === 0 || Object.keys(o).some(p => p.indexOf('zoew_scan_history_cod_dod') === 0)) {
               return Promise.reject(new Error('permission_denied'));
           }
           return window.__origUpdate.apply(this, arguments);

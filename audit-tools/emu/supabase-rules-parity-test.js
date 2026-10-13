@@ -37,7 +37,7 @@ const MIN_USER_WRITES = 150;
 const REQUIRED_ROOTS = ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod', '(root)', 'zoew_daily_revenue_cod_dod',
     'zoew_monthly_revenue_cod_dod', 'zoew_daily_pickup_cod_dod', 'zoew_daily_collected_cod_dod', 'zoew_barcode_registry',
     'zoew_restore_finalizations'];
-const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'admin-uid' }));
+let AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'admin-uid' }));
 const DEPS_DIRS = [process.env.SUPABASE_DEPS_DIR, path.join(ROOT, 'supabase', 'node_modules'), path.join(REPO, 'supabase', 'node_modules')].filter(Boolean);
 
 let pass = 0, fail = 0;
@@ -110,8 +110,13 @@ async function pgSetupTenant(transform) {
     let sql = fs.readdirSync(migDir).filter((f) => /^\d{14}_[a-z0-9_]+\.sql$/.test(f)).sort()
         .map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n;\n');
     if (transform) {
-        if (sql.split(transform[1]).length !== 2) throw new Error('engine mutant anchor must appear once: ' + transform[0]);
-        sql = sql.replace(transform[1], transform[2]);
+        const at = sql.lastIndexOf(transform[1]);
+        if (at === -1) throw new Error('engine mutant anchor missing: ' + transform[0]);
+        const declarations = [...sql.slice(0, at).matchAll(/create(?: or replace)? function private\.[a-z_]+\(/g)];
+        const begin = declarations.at(-1).index;
+        const end = sql.indexOf('\n$$;', at) + 4;
+        if (sql.slice(begin, end).split(transform[1]).length !== 2) throw new Error('effective engine mutant anchor must appear once: ' + transform[0]);
+        sql = sql.slice(0, at) + transform[2] + sql.slice(at + transform[1].length);
     }
     await c.query(sql);
     const t = await c.query("insert into public.tenants (name, branch_code, expires_at) values ('parity', '100001', now() + interval '30 days') returning id");
@@ -120,6 +125,7 @@ async function pgSetupTenant(transform) {
     pg = c;
     tenant = t.rows[0].id;
     member = { role: 'authenticated', sub: uid };
+    AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid }));
 }
 
 async function pgSetRules(rulesJson, compileRules, rulesSql) {
@@ -235,6 +241,17 @@ const stats = { user: 0, denied: 0, mismatches: [], stateDiffs: [], unsupported:
 //    ទទួលវា) ទេដែលត្រូវចម្លងជា owner ដើម្បីរក្សាស្ថានភាពឲ្យស្មើ fuzz។ បើអត់ mutant ដែល rules បដិសេធចូលទិន្នន័យ (វាស់បាន ៖ `op` ក្រោម root
 //    នៃ PATCH ច្រើនផ្លូវ ➜ `zoe_admin_write` បដិសេធផ្លូវ root ➜ checker គាំង «owner write on Postgres failed» ខណៈ rules ទាំង ២ និយាយដូចគ្នា)
 async function both(sc, who, method, p, v, label, probe) {
+    const timestamp = Date.now();
+    const normalizeReceipt = (value, at) => {
+        if (at[0] === 'zoew_write_receipts') {
+            if (at.at(-1) === 'uid' && value === 'admin-uid') return member.sub;
+            if (at.at(-1) === 'at' && value && value['.sv'] === 'timestamp') return timestamp;
+        }
+        if (!value || typeof value !== 'object') return value;
+        if (Array.isArray(value)) return value.map((item, i) => normalizeReceipt(item, at.concat(String(i))));
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeReceipt(item, at.concat(key.split('/')))]));
+    };
+    v = normalizeReceipt(v, String(p || '').split('/').filter(Boolean));
     if (who === 'owner') {
         await sc.owner(method, p, v);
         await pgOwner(method, p, v);
@@ -288,8 +305,23 @@ const PROBE_RULES = { rules: { '.read': true,
     fence: { '$k': { '.write': "auth != null && (!data.exists() || root.child('keys').child($k).val() === newData.child('t').val() || newData.parent().parent().child('keys').child($k).val() === newData.child('t').val())" } },
     keys: { '$k': { '.write': 'auth != null', '.validate': 'newData.isString()' } },
     par: { '$k': { '.write': 'auth != null', 'c': { '.validate': "newData.parent().child('d').exists()" } } },
-    err: { '$k': { '.write': "auth != null && (root.child('keys').child(newData.child('ref').val()).exists() || newData.child('ref').val() === null)" } }
+    err: { '$k': { '.write': "auth != null && (root.child('keys').child(newData.child('ref').val()).exists() || newData.child('ref').val() === null)" } },
+    uidGuard: { '$k': { '.write': 'auth != null && newData.val() === auth.uid' } },
+    // ដូច `zoew_write_receipts/$operation` ពិត ៖ បង្កើតបានតែ uid ខ្លួនឯង · លុបបានតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ (`NATIVE_RECEIPT_RETENTION_MS`)
+    rcpt: { '$k': { '.write': "auth != null && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - 172800000))" } }
 } };
+// [who · method · path · value · emulator verdict ដែលរំពឹង (true = denied)] — rules receipt ត្រូវបដិសេធ/ទទួលឲ្យត្រូវ មិនមែនគ្រាន់តែស្មើគ្នា
+const RECEIPT_STEPS = (uid, now) => [
+    ['owner', 'PUT', 'rcpt/old', { uid, at: now - 3 * 86400000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/young', { uid, at: now - 1000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/foreign', { uid: 'foreign-user', at: now - 3 * 86400000, hash: 'h' }, null],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h' }, false],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h2' }, true],
+    ['user', 'PUT', 'rcpt/stolen', { uid: 'foreign-user', at: now - 1000, hash: 'h' }, true],
+    ['user', 'PUT', 'rcpt/young', null, true],
+    ['user', 'PUT', 'rcpt/foreign', null, true],
+    ['user', 'PUT', 'rcpt/old', null, false]
+];
 const PROBE_STEPS = [
     ['user', 'PUT', 'anc/k1', { a: 1, b: 2 }], ['user', 'PATCH', 'anc/k1', { a: 5 }], ['user', 'PUT', 'anc/k2/a', 1], ['user', 'PATCH', '', { 'anc/k3/a': 1 }],
     ['user', 'PUT', 'anc/k1/z', 3], ['user', 'PUT', 'anc/k1/a', null], ['user', 'PATCH', 'anc/k1', { a: 7, b: 8 }],
@@ -422,12 +454,22 @@ function capture() {
         await pgOwnerSnapshot({});
         let probeDenied = 0, probeAllowed = 0;
         const before = stats.mismatches.length;
+        PROBE_STEPS.push(['user', 'PUT', 'uidGuard/own', member.sub], ['user', 'PUT', 'uidGuard/foreign', 'foreign-user']);
         for (let i = 0; i < PROBE_STEPS.length; i++) {
             const [who, m, p, v] = PROBE_STEPS[i];
             const r = await both(sc, who, m, p, v, 'probe#' + i);
             if (r) { if (r.emuDenied) probeDenied++; else probeAllowed++; }
             await compareState(sc, 'probe#' + i + ' ' + who + ' ' + m + ' ' + (p || '/'));
         }
+        const receiptSteps = RECEIPT_STEPS(member.sub, Date.now());
+        const receiptWrong = [];
+        for (let i = 0; i < receiptSteps.length; i++) {
+            const [who, m, p, v, expectDenied] = receiptSteps[i];
+            const r = await both(sc, who, m, p, v, 'receipt#' + i);
+            if (expectDenied !== null && (!r || r.emuDenied !== expectDenied)) receiptWrong.push('receipt#' + i + ' ' + who + ' ' + m + ' ' + p + ' ➜ ' + JSON.stringify(r && r.emuDenied));
+            await compareState(sc, 'receipt#' + i + ' ' + who + ' ' + m + ' ' + p);
+        }
+        check(receiptWrong.length === 0, 'receipt rules ៖ បង្កើតតែ uid ខ្លួន · មិនសរសេរជាន់ · លុបបានតែ receipt ខ្លួនដែលចាស់ជាង ២ ថ្ងៃ (' + receiptSteps.length + ' ជំហាន · RTDB = Postgres)', receiptWrong.join('\n        '));
         await sc.drop();
         const probeMis = stats.mismatches.slice(before);
         console.log('    probe ៖ ' + PROBE_STEPS.length + ' ជំហាន · RTDB បដិសេធ ' + probeDenied + ' · ទទួល ' + probeAllowed);

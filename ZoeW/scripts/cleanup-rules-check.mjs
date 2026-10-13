@@ -20,6 +20,7 @@
  */
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -159,12 +160,31 @@ async function run(label, dir, native) {
     await page.waitForTimeout(3500);
     await page.clock.pauseAt(NOW + 20000);
     await tick(page, 3000);
-    const afterBoot = await page.evaluate(() => window.__fakeDump());
+    const snapshot = async name => {
+        const got = await page.evaluate(() => ({ db: window.__fakeDump(), writes: window.__writeLog }));
+        const receipts = got.db.zoew_write_receipts || {};
+        const captured = new Map();
+        for (const write of got.writes || []) {
+            if (write.op !== 'update' || !write.rawValue) continue;
+            const values = write.rawValue;
+            const keys = Object.keys(values);
+            const receiptKeys = keys.filter(key => key.startsWith('zoew_write_receipts/'));
+            if (receiptKeys.length !== 1) continue;
+            const ops = keys.filter(key => !receiptKeys.includes(key)).map(key => ({ k: 'set',
+                p: ((write.path ? write.path + '/' : '') + key).split('/').filter(Boolean), v: values[key] }));
+            captured.set(receiptKeys[0].split('/')[1], createHash('sha256').update(JSON.stringify(ops)).digest('hex'));
+        }
+        const invalid = Object.entries(receipts).filter(([id, receipt]) => receipt.uid !== 'u1'
+            || !/^[a-f0-9]{64}$/.test(receipt.hash) || captured.get(id) !== receipt.hash);
+        ok(`${label} ៖ ${name} — receipt នីមួយៗចង UID និង hash ទៅ payload ពិត`, invalid.length === 0, invalid.map(([id]) => id));
+        return got.db;
+    };
+    const afterBoot = await snapshot('ក្រោយផ្ទុក');
 
     /* ដោយដៃ ៖ លុប 0106 · ដក MR1 · ស្តារ MR1 · ស្តារ 0106 */
     const steps = [];
     const step = async (name, fn) => {
-        try { await fn(); steps.push({ name, db: await page.evaluate(() => window.__fakeDump()) }); }
+        try { await fn(); steps.push({ name, db: await snapshot(name) }); }
         catch (e) { steps.push({ name, error: String(e.message).split('\n')[0] }); }
     };
     await click(page, '#btnFilterAll');
@@ -300,6 +320,11 @@ function assertRules(res) {
 
 /** ធ្វើឲ្យត្រាពេលវេលាដែល App បោះ **ថ្មី** ស្មើ ➜ ប្រៀបធៀប *អ្វីផ្លាស់ទីទៅណា* និង *លុយ* */
 function normalize(db) {
+    if (db.zoew_write_receipts) {
+        const receipts = Object.values(db.zoew_write_receipts).map(receipt => ({ ...receipt, hash: '<payload hash ដែលផ្ទៀងផ្ទាត់រួច>' }))
+            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        db = Object.assign({}, db, { zoew_write_receipts: receipts });
+    }
     const trashIn = db.zoew_recently_deleted_cod_dod || {};
     const rekey = {};
     const trashLabel = {};

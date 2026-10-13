@@ -137,7 +137,7 @@ function makeEnv(opts) {
     const ctx = vm.createContext(sandbox);
     // ⛔ ZoeW ជា React ៖ UI ជីវមាត្រ (ស្លាកកុងតាក់ · ប៊ូតុងក្នុងប្រអប់ PIN) ជា `viewState` ដែល JSX គូរ ➜
     //    ស្រទាប់ React ពិត (ឃ្លាំង · `isNativeApp()` ផ្លូវ web) ចូល sandbox មុនមុខងារ
-    vm.runInContext(reactRuntime(src, { context: sandbox }), ctx);
+    vm.runInContext(reactRuntime(src, { context: sandbox, exclude: ['appLocalStore', 'appSessionStore'] }), ctx);
     // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
     // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
     // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។

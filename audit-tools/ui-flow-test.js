@@ -1110,7 +1110,7 @@ function seedData() {
                 window.__unblockTrash = () => { window.firebaseSDK.update = origUpd; window.firebaseSDK.runTransaction = origTx; };
                 const isTrash = (r) => String((r && r.path) || '').indexOf('zoew_recently_deleted_cod_dod') !== -1;
                 window.firebaseSDK.update = function (r, obj) {
-                    if (isTrash(r)) return Promise.reject(new Error('permission_denied'));
+                    if (isTrash(r) || Object.keys(obj).some(p => isTrash({ path: p }))) return Promise.reject(new Error('permission_denied'));
                     return origUpd.call(this, r, obj);
                 };
                 window.firebaseSDK.runTransaction = function (r, fn) {

@@ -367,7 +367,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 #    ការបែងចែក មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test
 #    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
 RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
-    ui-flow-test:96 supabase-app-network-e2e-test:95 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 collected-mirror-fuzz-test:50
+    ui-flow-test:96 supabase-app-network-e2e-test:95 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 emu/money-multidevice-emu-test:60 collected-mirror-fuzz-test:50
     layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:63
     emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
     ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
@@ -674,6 +674,7 @@ run "emu/license-seat-rules" node audit-tools/emu/license-seat-rules-test.js
 run "emu/tx-disconnect" node audit-tools/emu/tx-disconnect-emu-test.js
 run "emu/app-writes-rules" node audit-tools/emu/app-writes-rules-test.js
 run "emu/app-network-e2e" node audit-tools/emu/app-network-e2e-test.js
+run "emu/money-multidevice" node audit-tools/emu/money-multidevice-emu-test.js
 run "emu/supabase-rules-parity" node audit-tools/emu/supabase-rules-parity-test.js
 run "emu/supabase-adapter-parity" node audit-tools/emu/supabase-adapter-parity-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
@@ -953,6 +954,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
     APPWRITES_APP_DIR="$BASE" node audit-tools/emu/app-writes-rules-test.js 2>&1 | tail -1 | sed 's/^/   app-writes-emu:  /'
     NETE2E_APP_DIR="$BASE" node audit-tools/emu/app-network-e2e-test.js 2>&1 | tail -1 | sed 's/^/   app-network-e2e: /'
+    MONEYMD_APP_DIR="$BASE" node audit-tools/emu/money-multidevice-emu-test.js 2>&1 | tail -1 | sed 's/^/   money-multidev:  /'
     SBPARITY_APP_DIR="$BASE" node audit-tools/emu/supabase-rules-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-rules-parity: /'
     SBADAPTER_APP_DIR="$BASE" node audit-tools/emu/supabase-adapter-parity-test.js 2>&1 | tail -1 | sed 's/^/   sb-adapter-parity: /'
     SUPABASE_APP_DIR="$BASE" node audit-tools/supabase-rls-test.js 2>&1 | tail -1 | sed 's/^/   supabase-rls:    /'

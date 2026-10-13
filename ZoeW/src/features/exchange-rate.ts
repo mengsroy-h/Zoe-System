@@ -46,6 +46,13 @@ export async function saveExchangeRate() {
     }
 
     dataState.exchangeRateSaveInFlight = true;
+    const operation = {};
+    dataState.exchangeRateSaveOperation = operation;
+    const releaseWrite = () => {
+        if (dataState.exchangeRateSaveOperation !== operation) return;
+        dataState.exchangeRateSaveOperation = null;
+        dataState.exchangeRateSaveInFlight = false;
+    };
     let exchangeRateWrite = null;
     let lateArmed = false;
     try {
@@ -56,11 +63,11 @@ export async function saveExchangeRate() {
     } catch (error) {
         if (exchangeRateWrite && dbOpStalled(error)) {
             lateArmed = armLateWrite(exchangeRateWrite, () => {
-                dataState.exchangeRateSaveInFlight = false;
+                releaseWrite();
                 if (!sessionIsCurrent()) return;
                 showToast(`✅ បណ្តាញត្រឡប់មកវិញ — អត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ បានរក្សាទុកទៅ Firebase រួចរាល់!`);
             }, () => {
-                dataState.exchangeRateSaveInFlight = false;
+                releaseWrite();
                 if (!sessionIsCurrent()) return;
                 restorePreviousRate();
                 showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
@@ -74,6 +81,6 @@ export async function saveExchangeRate() {
         if (sessionIsCurrent()) showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
         return 'failed';
     } finally {
-        if (!lateArmed) dataState.exchangeRateSaveInFlight = false;
+        if (!lateArmed) releaseWrite();
     }
 }

@@ -7,7 +7,7 @@ import { formatScanStamp, getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta } from '../domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, reconstructPickupSet } from '../domain/pickup';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -548,7 +548,7 @@ export function saveEditedBarcodePrice() {
             const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
             let editRevenueApplied = null;
             if (revenueApplied) {
-                editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
+                editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0, ledgerDeltaCompanion(editedItemId, editedBarcodeCode, newCod, newDod, oldCod, oldDod));
             }
 
             serverApplied = false;

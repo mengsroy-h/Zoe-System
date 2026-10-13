@@ -65,15 +65,15 @@ export function commitRevenueBucketDelta(scanDateStr, bucket, codToAdd, dodToAdd
     return { applied, server: commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, applied) };
 }
 
-export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
+export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd, companion?) {
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     if (!scanDateStr) scanDateStr = getFormattedDate();
     const ymKey = scanDateStr.substring(0, 7);
     const appliedDaily = applyLedgerBucketDelta(dataState.dailyRevenueData, scanDateStr, codToAdd, dodToAdd, countToAdd);
-    const dailyServer = commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDaily);
+    const dailyServer = commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDaily, false, companion);
     const appliedMonthly = applyLedgerBucketDelta(dataState.monthlyRevenueData, ymKey, codToAdd, dodToAdd, countToAdd);
-    const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly);
+    const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly, false, companion);
     return {
         isCurrent: () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration,
         scanDate: scanDateStr,
@@ -127,7 +127,7 @@ export function ledgerTagged(record, op, ring) {
     return ring ? { ...record, op, ops: ring } : { ...record, op };
 }
 
-export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordOf = (value) => value, event?) {
+export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordOf = (value) => value, event?, connectionIntent?) {
     const sdk = firebaseState.fb;
     let op = event ? event.token : 'op_';
     if (!event) {
@@ -141,11 +141,30 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordO
         }
     }
     const send = (level, retries) => {
-        const updater: any = (current) => update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null, level > 2);
+        let lastDelta = null;
+        let replayed = false;
+        let proposalBefore = null;
+        const epoch = !sdk.__supabase && typeof sdk.connectionEpoch === 'function' ? sdk.connectionEpoch(ref) : null;
+        const updater: any = (current) => {
+            const record = recordOf(current);
+            if (level && !event && ledgerTokenSeen(record, op)) {
+                if (!lastDelta) throw Object.assign(new Error('Ledger operation outcome unknown'), { txOutcome: 'unknown' });
+                replayed = true;
+                return current;
+            }
+            if (lastDelta && epoch !== null && epoch !== sdk.connectionEpoch(ref)
+                && ledgerOpWitness(record, proposalBefore, op) !== 'not-applied') throw Object.assign(new Error('Ledger operation outcome unknown'), { txOutcome: 'unknown' });
+            const before = ledgerTotalsOf(record);
+            if (!lastDelta) proposalBefore = record && typeof record === 'object' ? JSON.parse(JSON.stringify(record)) : record;
+            const next = update(current, level ? op : null, level > 1 ? ledgerOpRing(recordOf(current), op) : null, level > 2);
+            if (next !== undefined) lastDelta = ledgerAppliedDelta(before, ledgerTotalsOf(recordOf(next)));
+            return next;
+        };
+        if (connectionIntent && level) updater.connectionIntent = { ...connectionIntent, token: op, keyed: level > 2 };
         if (level) updater.txOutcomeWitness = event
             ? (server, prior) => event.witness(recordOf(server), recordOf(prior))
             : (server, prior) => ledgerOpWitness(recordOf(server), recordOf(prior), op);
-        return sdk.runTransaction(ref, updater).catch((error) => {
+        return sdk.runTransaction(ref, updater).then((result) => replayed && result && result.committed ? { ...result, txAppliedDelta: lastDelta } : result).catch((error) => {
             if (error && error.txOutcome === 'not-applied' && retries > 0) return send(level, retries - 1);
             if (!level || !/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
             if (event && level < 3) throw error;
@@ -153,6 +172,47 @@ export function runLedgerTransaction(ref, update, notAppliedRetries = 3, recordO
         });
     };
     return send(event ? 3 : 2, notAppliedRetries);
+}
+
+export function ledgerJournalRecord(value, intent) {
+    return intent.bucket === 'daily' ? value : value && typeof value === 'object' ? value[intent.key] : null;
+}
+
+export function ledgerJournalWitness(value, prior, intent) {
+    const record = ledgerJournalRecord(value, intent);
+    if (intent.kind === 'ledger-event' && intent.bucket === 'daily') {
+        const entry = ledgerDedOf(record, intent.trashId);
+        if (entry && entry.at === intent.at && (intent.mode !== 'undo' || entry.back && entry.undo)) return 'applied';
+    }
+    return ledgerOpWitness(record, ledgerJournalRecord(prior, intent), intent.token);
+}
+
+export function ledgerJournalUpdate(value, intent) {
+    const daily = intent.bucket === 'daily';
+    const months = daily ? null : value && typeof value === 'object' ? value : {};
+    const record = daily ? value : months[intent.key] || null;
+    const ring = ledgerOpRing(record, intent.token);
+    let cod = intent.cod; let dod = intent.dod; let count = intent.count; let decision;
+    if (intent.kind === 'ledger-event') {
+        decision = ledgerEventDecision(daily, intent.mode, record, intent.trashId, intent.at, intent.prior, intent.deductionPrior);
+        if (decision.state !== 'apply') return;
+        const size = intent.mode === 'undo' && decision.entry ? decision.entry : intent.amounts;
+        cod = decision.sign * ledgerNumber(size.cod); dod = decision.sign * ledgerNumber(size.dod); count = decision.sign * ledgerNumber(size.count);
+    }
+    const before = ledgerTotalsOf(record);
+    const after = ledgerDeltaWithClamp(before, cod, dod, count, daily ? 'Daily' : 'Monthly', intent.key);
+    let next = daily ? ledgerCarryDed(record, after) : after;
+    if (daily && intent.kind === 'ledger-event' && intent.keyed) {
+        const applied = ledgerAppliedDelta(before, after);
+        const entry = intent.mode === 'undo'
+            ? { at: intent.at, cod: decision.entry.cod, dod: decision.entry.dod, count: decision.entry.count, back: true, undo: true }
+            : { at: intent.at, cod: -applied.cod, dod: -applied.dod, count: -applied.count };
+        next = { ...next, ded: { ...(next.ded || {}), [intent.trashId]: ledgerDedValue(entry) } };
+    }
+    const tagged = ledgerTagged(next, intent.token, ring);
+    if (daily) return tagged;
+    months[intent.key] = tagged;
+    return ledgerLatestMonths(months);
 }
 
 export function ledgerEventToken(trashId, at, mode) {
@@ -314,7 +374,7 @@ export function commitLedgerEventStep(bucket, scanDateStr, trashId, at, mode, am
         if (entry && entry.at === at && (!undo || (entry.back && entry.undo))) return 'applied';
         return ledgerOpWitness(server, prior2, token);
     };
-    return runLedgerTransaction(ref, update, 3, recordOf, { token, witness }).then((result) => {
+    return runLedgerTransaction(ref, update, 3, recordOf, { token, witness }, { kind: 'ledger-event', bucket, key: daily ? scanDateStr : ymKey, trashId, at, mode, amounts, prior, deductionPrior }).then((result) => {
         if (!current()) return { state: 'stale' };
         if (!verdict) return { state: 'failed' };
         if (verdict.state !== 'applied') return verdict;
@@ -477,7 +537,35 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
     }).catch(() => monthlyVerdict);
 }
 
-export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?) {
+export function ledgerDeltaCompanion(itemId, code, cod?, dod?, priorCod?, priorDod?) {
+    if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(String(itemId)) || !code) return null;
+    const companion: any = { path: 'zoew_scan_history_cod_dod/' + itemId, code: String(code) };
+    if (typeof cod === 'number' && isFinite(cod)) companion.wantCod = cod;
+    if (typeof dod === 'number' && isFinite(dod)) companion.wantDod = dod;
+    if (typeof priorCod === 'number' && isFinite(priorCod)) companion.priorCod = priorCod;
+    if (typeof priorDod === 'number' && isFinite(priorDod)) companion.priorDod = priorDod;
+    return companion;
+}
+
+export function ledgerCompanionState(item, companion) {
+    const list = item && typeof item === 'object' ? item.barcodes : null;
+    const barcodes = Array.isArray(list) ? list : list && typeof list === 'object' ? Object.keys(list).map((k) => list[k]) : [];
+    let found = barcodes.find((b) => b && b.code === companion.code) || null;
+    if (!found && item && typeof item === 'object' && !barcodes.length && item.barcode === companion.code) found = { cod: item.cod, dod: item.dod };
+    if (!found) return 'absent';
+    const near = (actual, expected) => typeof expected !== 'number' || Math.abs((parseFloat(actual) || 0) - expected) < 0.005;
+    if (near(found.cod, companion.wantCod) && near(found.dod, companion.wantDod)) return 'holds';
+    if (typeof companion.priorCod === 'number' && near(found.cod, companion.priorCod) && near(found.dod, companion.priorDod)) return 'prior';
+    return 'unknown';
+}
+
+export function ledgerDeltaIntent(bucket, key, cod, dod, count, companion?) {
+    const intent: any = { kind: 'revenue-delta', bucket, key, cod, dod, count };
+    if (companion && typeof companion === 'object' && companion.path && companion.code) intent.companion = companion;
+    return intent;
+}
+
+export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.dailyRevenueData[scanDateStr];
     const rollbackMemory = () => {
@@ -501,7 +589,8 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
         };
         serverAfter = ledgerCarryDed(current, ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr));
         return ledgerTagged(serverAfter, op, ring);
-    }).then((result) => {
+    }, 3, (value) => value, null, ledgerDeltaIntent('daily', scanDateStr, codToAdd, dodToAdd, countToAdd, companion)).then((result) => {
+        if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
@@ -515,7 +604,7 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
     });
 }
 
-export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?) {
+export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.monthlyRevenueData[ymKey];
     const rollbackMemory = () => {
@@ -545,7 +634,8 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
             latestThreeMonths[key] = months[key];
         });
         return latestThreeMonths;
-    }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null)).then((result) => {
+    }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null), null, ledgerDeltaIntent('monthly', ymKey, codToAdd, dodToAdd, countToAdd, companion)).then((result) => {
+        if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");

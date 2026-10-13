@@ -55,7 +55,8 @@ describe('backend switch (NETWORK-2) ៖ the old listeners are detached through 
         sb.sdk = next.sdk;
         appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_test' }));
         expect(await initFirebase()).toBe(true);
-        expect(firebaseState.fb).toBe(next.sdk);
+        expect(firebaseState.fb.initializeApp).toBe(next.sdk.initializeApp);
+        expect(firebaseState.fb.__connectionOwned).toBe(true);
         expect(oldRefs(old.off)).toEqual([...REF_FIELDS].sort());
         expect(oldRefs(next.off)).toEqual([]);
     });

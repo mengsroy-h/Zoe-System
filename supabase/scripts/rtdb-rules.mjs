@@ -103,6 +103,7 @@ export function parseExpression(src, scope) {
                 if (arity < 0 && args.length > 1) throw new Error(name + ' expects at most 1 argument in ' + src);
                 node = { t: 'm', n: name, o: node, a: args };
             } else {
+                if (name === 'uid' && node.t === 'auth') { node = { t: 'auth_uid' }; continue; }
                 if (!PROPERTIES.has(name)) throw new Error('unsupported property ' + name + ' in ' + src);
                 node = { t: 'p', n: name, o: node };
             }

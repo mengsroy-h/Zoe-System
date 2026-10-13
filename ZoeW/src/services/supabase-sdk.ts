@@ -1,5 +1,6 @@
 import { SbIncrement, SbNetworkError, SbRpcError, createSupabaseDatabase } from './supabase-rtdb';
 import { createIdbDocsCache } from './supabase-docs-cache';
+import { createLocalWriteJournal } from './write-journal';
 import { SB_LOGIN_DOMAIN_DEFAULT, isSupabaseConfig } from './supabase-config';
 import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 
@@ -100,8 +101,9 @@ function createAuth(app, env) {
     };
     const tenantOf = (row) => (row && row.tenant_id ? String(row.tenant_id) : '');
     const noteTenant = (before) => {
-        if (tenantOf(auth._account) === before || typeof env.onTenantChanged !== 'function') return;
-        try { env.onTenantChanged(); } catch (e) { env.onListenerError(e); }
+        const after = tenantOf(auth._account);
+        if (after === before || typeof env.onTenantChanged !== 'function') return;
+        try { env.onTenantChanged(before, after); } catch (e) { env.onListenerError(e); }
     };
     const fire = () => {
         const current = auth.currentUser;
@@ -296,6 +298,12 @@ function createAuth(app, env) {
     return auth;
 }
 
+function availableWriteJournal() {
+    if (typeof window === 'undefined') return null;
+    const journal = createLocalWriteJournal();
+    return journal.available() ? journal : null;
+}
+
 export function createSupabaseSdk(makeTransport, env) {
     const apps = [];
     const sdk: any = {
@@ -367,8 +375,11 @@ export function createSupabaseSdk(makeTransport, env) {
                     onSynced: () => { if (app._auth && app._auth.currentUser && (!app._tenantTopic || app._auth._accountUnverified)) app._auth._verifyAccount(); },
                     onForbidden: () => { if (app._auth && app._auth.currentUser) app._auth._verifyAccount(); },
                     onTxOutcomeUnknown: env.onTxOutcomeUnknown,
+                    onWriteRecovery: env.onWriteRecovery,
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
-                }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache }, env.dbOptions));
+                }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,
+                    writeJournal: env.writeJournal === undefined ? availableWriteJournal() : env.writeJournal,
+                    ledgerCompanion: env.ledgerCompanion }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);

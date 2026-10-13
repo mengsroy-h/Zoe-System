@@ -1,7 +1,7 @@
 import { fieldChecked, fieldValue, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
-import { appSessionStore, safeStoreGet, safeStoreSet } from '../core/storage';
+import { appLocalStore, appSessionStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { AUTH_STUCK_RECOVERY_FLAG } from '../core/storage-keys';
 import { clearPendingInvite } from './account';
 import { clearAppUnlockedForSession } from './app-lock';
@@ -17,7 +17,8 @@ import { renderRecentlyDeleted } from './trash';
 import { detachDatabaseListeners, resetDbListenerHealthState, updateRecentPhonesList } from '../services/db-listeners';
 import { showToast } from '../ui/toast';
 
-export async function attemptAuthStorageRecovery() {
+export async function attemptAuthStorageRecovery(isCurrent = () => true) {
+    if (!isCurrent()) return;
     if (safeStoreGet(appSessionStore, AUTH_STUCK_RECOVERY_FLAG)) {
         showLoginModalWithPrefill();
         return;
@@ -26,6 +27,7 @@ export async function attemptAuthStorageRecovery() {
     try {
         if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
             const dbs = await indexedDB.databases();
+            if (!isCurrent()) return;
             await Promise.all(dbs
                 .filter((d) => d.name && /firebase/i.test(d.name))
                 .map((d) => new Promise<void>((resolve) => {
@@ -37,11 +39,14 @@ export async function attemptAuthStorageRecovery() {
             );
         }
     } catch (e) {}
-    window.location.reload();
+    if (isCurrent()) window.location.reload();
 }
 
 export function setupAuthListener() {
     if (!firebaseState.auth) return;
+
+    firebaseState.authLoginOperation = null;
+    viewState.loginBusy = false;
 
     if (firebaseState.authUnsubscribe) {
         try { firebaseState.authUnsubscribe(); } catch (e) {}
@@ -52,9 +57,19 @@ export function setupAuthListener() {
         firebaseState.authRecoveryTimeout = null;
     }
 
-    firebaseState.authRecoveryTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
+    const listenerAuth = firebaseState.auth;
+    const listenerFb = firebaseState.fb;
+    const listenerScope = loginBackendScope();
+    let active = true;
+    const isCurrent = () => active && firebaseState.auth === listenerAuth && firebaseState.fb === listenerFb && loginBackendScope() === listenerScope;
+    const recoveryTimer = setTimeout(() => {
+        if (!isCurrent() || firebaseState.authRecoveryTimeout !== recoveryTimer) return;
+        attemptAuthStorageRecovery(() => isCurrent() && firebaseState.authRecoveryTimeout === recoveryTimer);
+    }, 8000);
+    firebaseState.authRecoveryTimeout = recoveryTimer;
 
-    firebaseState.authUnsubscribe = firebaseState.fb.onAuthStateChanged(firebaseState.auth, (user) => {
+    const unsubscribe = listenerFb.onAuthStateChanged(listenerAuth, (user) => {
+        if (!isCurrent() || user !== listenerAuth.currentUser) return;
         clearTimeout(firebaseState.authRecoveryTimeout);
         firebaseState.authRecoveryTimeout = null;
         firebaseState.authGeneration++;
@@ -83,6 +98,10 @@ export function setupAuthListener() {
             showLoginModalWithPrefill();
         }
     });
+    firebaseState.authUnsubscribe = () => {
+        active = false;
+        unsubscribe();
+    };
 }
 
 export function loginWithFirebase() {
@@ -109,16 +128,27 @@ export function loginWithFirebase() {
 
 export function performLogin(email, password, rememberMe, rememberPassword = !rememberPasswordPrefIsOff()) {
     if (!firebaseState.auth || viewState.loginBusy) return;
+    if (!loginBackendIsReady()) {
+        showToast('⚠️ ការភ្ជាប់ហាងមិនទាន់រួចរាល់ — សូមរង់ចាំ ឬ Refresh ទំព័រ។');
+        return;
+    }
     viewState.loginBusy = true;
 
     const generationAtLogin = firebaseState.authGeneration;
     const scopeAtLogin = loginBackendScope();
+    const loginAuth = firebaseState.auth;
+    const loginFb = firebaseState.fb;
+    const operation = {};
+    firebaseState.authLoginOperation = operation;
+    const isCurrent = () => firebaseState.authLoginOperation === operation && firebaseState.auth === loginAuth && firebaseState.fb === loginFb && loginBackendScope() === scopeAtLogin && loginBackendIsReady();
 
-    firebaseState.fb.setPersistence(firebaseState.auth, rememberMe ? firebaseState.fb.browserLocalPersistence : firebaseState.fb.browserSessionPersistence)
+    return Promise.resolve().then(() => loginFb.setPersistence(loginAuth, rememberMe ? loginFb.browserLocalPersistence : loginFb.browserSessionPersistence))
         .then(() => {
-            return firebaseState.fb.signInWithEmailAndPassword(firebaseState.auth, email, password);
+            if (!isCurrent() || firebaseState.authGeneration !== generationAtLogin) return null;
+            return loginFb.signInWithEmailAndPassword(loginAuth, email, password);
         })
         .then((userCredential) => {
+            if (!isCurrent() || !userCredential || (firebaseState.authGeneration !== generationAtLogin && loginAuth.currentUser !== userCredential.user)) return;
             firebaseState.autoLoginAttempted = false;
 
             if (rememberMe) {
@@ -136,12 +166,28 @@ export function performLogin(email, password, rememberMe, rememberPassword = !re
             }
         })
         .catch((error) => {
+            if (!isCurrent()) return;
             alert("ការចូលប្រព័ន្ធមិនជោគជ័យ៖ " + error.message);
         })
         .finally(() => {
+            if (firebaseState.authLoginOperation !== operation) return;
+            firebaseState.authLoginOperation = null;
             viewState.loginBusy = false;
-            setFieldValue('loginPasswordInput', '');
+            if (firebaseState.auth === loginAuth && firebaseState.fb === loginFb && loginBackendScope() === scopeAtLogin) setFieldValue('loginPasswordInput', '');
         });
+}
+
+function loginBackendIsReady() {
+    if (firebaseState.isInitializingFirebase || firebaseState.firebaseSdkUnavailable) return false;
+    try {
+        const scope = loginBackendScope();
+        const options = firebaseState.auth && firebaseState.auth.app && firebaseState.auth.app.options;
+        if (options && loginBackendScope(options) !== scope) return false;
+        const saved = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+        return !saved || loginBackendScope(JSON.parse(saved)) === scope;
+    } catch (e) {
+        return false;
+    }
 }
 
 export function updateAuthButton(isLoggedIn) {
@@ -149,14 +195,24 @@ export function updateAuthButton(isLoggedIn) {
 }
 
 export function logoutApp() {
+    const logoutGeneration = ++firebaseState.authGeneration;
+    firebaseState.authLoginOperation = null;
+    viewState.loginBusy = false;
     clearAppUnlockedForSession();
     if (firebaseState.auth) {
-        firebaseState.fb.signOut(firebaseState.auth).then(() => {
+        const logoutAuth = firebaseState.auth;
+        const logoutFb = firebaseState.fb;
+        const scope = loginBackendScope();
+        const user = logoutAuth.currentUser;
+        const isCurrent = () => firebaseState.auth === logoutAuth && firebaseState.fb === logoutFb && loginBackendScope() === scope && (!logoutAuth.currentUser || logoutAuth.currentUser === user) && (firebaseState.authGeneration === logoutGeneration || !logoutAuth.currentUser) && !firebaseState.authLoginOperation;
+        return Promise.resolve().then(() => logoutFb.signOut(logoutAuth)).then(() => {
+            if (!isCurrent()) return;
             resetClearHistoryOperationState();
             clearRememberedSession(false);
             showLoginModalWithPrefill();
             showToast("✅ បានចាកចេញពីប្រព័ន្ធ!");
         }).catch(() => {
+            if (!isCurrent()) return;
             resetClearHistoryOperationState();
             clearRememberedSession(false);
             showLoginModalWithPrefill();

@@ -3648,6 +3648,8 @@ Probe ១២ ករណី (vitest · adapter ពិត · fake SDK · transport 
 
 លទ្ធផលចុងក្រោយលើ `d893c3b` ៖ run-all STRICT (emulator RTDB · Postgres ពិត · firebase-tools ពិត) **២០៤/២០៤ PASS · partial ០ · SKIP ០** · vitest ១៤៣៦ ករណី + ១៥ ថ្មី PASS · probe parity receipt ៩ ជំហាន RTDB = Postgres។ ជុំ ១ លើ `cbe133a` ធ្លាក់ ៥ (package.json មិនទាន់ bump · probe receipt រត់ក្រោយ `sc.drop()` · harness toast reject តែម្តង ➜ fallback ឃើញ success · probe SDK ប្តូរពី ZoeKeyGen · លិបិក្រម) ➜ កែក្នុង `b668d46`; ជុំ ២ ធ្លាក់ ១ (តេស្ត deferred រង់ចាំ digest មិនគ្រប់ក្រោម CPU រវល់) ➜ កែក្នុង `d893c3b`។
 
+ZoeW 2.50.61 (ផ្លូវចេញ PIN «លុបការសរសេររង់ចាំ») ៖ run-all STRICT **២០៤/២០៤ PASS · partial ០ · SKIP ០** លើ `f754d44` (ជុំមុនធ្លាក់ ១១ ដោយ emulator RTDB ស្លាប់កណ្តាលការរត់ (ECONNREFUSED) + helper មិនប្រើ ➜ ចាប់ផ្តើម emulator ឡើងវិញ · ដក helper)។
+
 ពិនិត្យដោយអាន (គ្មានកំហុស · មិនកែ) ៖ Delete/Remove/restore ទៅតាមតារាងសេណារីយ៉ូ (`isDeducted` នៅជាវាលសម្រេចតែមួយ) · `runLedgerTransaction()` replay ដោយ token ខ្លួនឯង ➜ `txAppliedDelta` = delta នៃជុំដែល commit (RTDB commit តែពេល hash ស្មើ) ➜ មិនដកស្ទួន · `withFirebaseAuthOwnership` (`beforeAuthStateChanged` ពិត) · `setupConnectionRecovery()` cleanup · `probeDatabaseLiveness` epoch · SW (`CACHE_VERSION` តែប៉ុណ្ណោះ) · `secret-hygiene` (journal ក្នុង localStorage មានទិន្នន័យអតិថិជនតែ row ដែលកំពុងដើរ · scope តាមគណនី)។ ដែលមិនបានវាស់លើឧបករណ៍ពិត ៖ iPhone/Android PWA + APK (សកម្មភាព ៣ ផ្នែក ១)។
 
 ### 2026-10-13 — Connection architecture ទាំង ៦ ចំណុច · ZoeW 2.50.59

@@ -1,5 +1,4 @@
 import { firebaseState } from '../core/state';
-import { viewState } from '../core/view-state';
 import { requestPinBeforeConfig } from './pin';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
@@ -8,10 +7,6 @@ import { DB_LIVENESS_PROBE_TIMEOUT_MS, renderConnectionStatus } from '../service
 import { connectionFlowSnapshot } from '../services/connection-flow';
 
 export const PENDING_WRITES_DISCARD_PATHS_MAX = 20;
-
-export function pendingWritesDiscardAvailable() {
-    return viewState.connectionPhase === 'blocked';
-}
 
 export function drawerDiscardPendingWritesFlow() {
     drawerAction(function () { requestPinBeforeConfig(discardPendingWrites, 'discardPendingWrites'); });

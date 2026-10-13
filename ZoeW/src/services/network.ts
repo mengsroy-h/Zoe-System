@@ -168,10 +168,13 @@ export function ztoRequestBarcodeIsRefused(url) {
     }
 }
 
+const PAGE_LEASE = { current: () => true, watch: () => () => {} };
+
 export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promise<any> {
-    const lease = captureConnectionOperation();
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const opts = Object.assign({}, options || {});
+    const lease = opts.scope === 'page' ? PAGE_LEASE : captureConnectionOperation();
+    delete opts.scope;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const sourceSignal = opts.signal || null;
     if (controller) opts.signal = controller.signal;
     const timeoutErr = new Error(timeoutMsg || 'Timed out');

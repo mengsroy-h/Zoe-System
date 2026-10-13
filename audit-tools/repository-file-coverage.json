@@ -3282,6 +3282,21 @@
     },
     "supabase/migrations/20261013004512_receipt_auth_uid.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/tests/native-recovery-plain-cas.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-journal-recovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/connection-scope-discovery.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native-receipt-retention.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "supabase/migrations/20261013093425_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

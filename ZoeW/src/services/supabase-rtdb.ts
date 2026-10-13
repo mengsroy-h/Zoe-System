@@ -632,7 +632,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 if (!current()) return;
                 if (liveWriteIds.has(row.opId)) continue;
                 const age = serverNowSeen - row.sentAfter;
-                if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage === 'cancelled' || row.stage !== 'queued'
+                if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage !== 'queued'
                     && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
                     recoveryBlocked++; continue;
                 }
@@ -934,7 +934,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         }
         (async () => {
             await waitDeps(w);
-            try { await waitForWriteRecovery(); } catch (e) { settleWrite(w); rejectDone(e); return; }
+            try { await waitForWriteRecovery(); }
+            catch (e) {
+                if (writeJournal) writeJournal.remove(w.scope, w.topic, w.opId);
+                settleWrite(w); rejectDone(e); return;
+            }
             for (;;) {
                 if (closed) { settleWrite(w); rejectDone(firebaseLikeError('disconnect', path)); return; }
                 await waitForLink();

@@ -487,7 +487,7 @@
     "zoew_write_receipts": {
       "$operation": {
         ".read": "auth != null",
-        ".write": "auth != null && !data.exists() && newData.exists() && newData.child('uid').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - 172800000))",
         ".validate": "newData.hasChildren(['uid', 'at', 'hash'])",
         "uid": {
           ".validate": "newData.isString() && newData.val() === auth.uid"

@@ -165,6 +165,34 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.60] — 2026-10-13 · Deep audit PR #313 ឡើងវិញ ៖ ការសរសេររង់ចាំមិនរារាំង App ទាំងមូល
+
+**ZoeW** (`zoew-v322` ➜ `zoew-v323`)។ ZoeKeyGen រក្សាកំណែដដែល។ ជុំនេះវាស់ PR #313 ដោយ probe ពិត (មិនទុកចិត្ត checker បៃតង) ➜ រកឃើញ ៨ ចន្លោះដែល checker ទាំង ២០៤ មិនបានឃើញ ហើយកែទាំងអស់ជាមួយអ្នកយាមថ្មី ១៥ ករណី (មុនកែ ១២ FAIL · ៣ control PASS)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **Firebase ៖ transaction ធម្មតា (កញ្ចប់ · registry · ស្ថិតិ) ដែលបាត់ពាក់កណ្តាលផ្លូវ** (បិទ App · ឧបករណ៍សម្លាប់ App · reload ខណៈការសរសេរនៅក្រៅបណ្តាញ) **មិនរារាំងការសរសេរទាំងអស់របស់ឧបករណ៍ទៀតទេ**។ ពីមុន journal row បែបនេះធ្វើឲ្យ App បង្ហាញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» ហើយបដិសេធការស្កេន · បិទ · Locker · អត្រាប្រាក់ គ្រប់យ៉ាងរហូត (🩺 ពិនិត្យម្តងទៀតក៏ដដែល)។ ឥឡូវ row ធម្មតាសម្រេចតាមតម្លៃ Server ៖ ស្មើតម្លៃដែលផ្ញើ = បានអនុវត្ត · ផ្សេង = មិនបានអនុវត្ត (ដូចមុនមាន journal)។ តែ intent ប្រាក់ (ledger) ដែលសាក្សីសម្រេចមិនបាន ទើបនៅរង់ចាំ 🩺 (ដូច PR #313)។
+- **ក្រៅបណ្តាញ ឬ Server មិនឆ្លើយពេលបើក App ដែលមាន journal row** ➜ App រង់ចាំបណ្តាញ (ការសរសេររង់ចាំ · ស្ថានភាព «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...») ហើយសាកអានឡើងវិញរៀងរាល់ ២ វិ. ពេល online ⛔ មិនចាត់ទុកជា «រារាំង» ទៀត។
+- **ហាង Firebase ដែល rules មិនទាន់ Publish** ➜ ការសរសេរនៅដើរតាមផ្លូវ SDK ធម្មតា (គ្មាន receipt) ជំនួសឲ្យ «permission_denied» គ្រប់ការសរសេរ; receipt ដែល rules មិនឲ្យអាន ➜ row ត្រូវទម្លាក់ មិនរារាំង។
+- **ហាង Supabase ៖ ការសរសេរដែលនៅសល់ពីការចាកចេញ** (ចេញពេល request កំពុងដើរ) ត្រូវផ្ញើឡើងវិញដោយ `op_id` ដើមពេលគណនីដដែលចូលហាងដដែលវិញ (ក្នុងបង្អួច ២ ថ្ងៃ) ⛔ ពីមុន row «cancelled» រារាំងការសរសេរទាំងអស់នៃសម័យបន្ទាប់ជារៀងរហូត។ ការសរសេរដែលត្រូវបដិសេធពេល recovery រារាំង មិនទុក row «queued» ឲ្យ replay ក្រោយ (phantom write)។
+- **Listener ដែលចុះមុនហាងស្គាល់** (session ស្តារក្រៅបណ្តាញ · account មកយឺត) បន្តទទួលទិន្នន័យក្រោយហាងមក ⛔ ពីមុនវាស្ងាត់ជារៀងរហូត (view stale រហូតដល់ reload)។ ការប្តូរពីហាង A ទៅ B នៅតែបញ្ចប់ listener ចាស់។
+- **ទាញកំណែ App និងសេចក្តីជូនដំណឹងអ្នកលក់** (`announcements.json` · seller notices · ការស្ទង់ SDK) មិនត្រូវបោះបង់ពេលការចូលប្រព័ន្ធស្តារពេលបើក App ទៀត ➜ 🔔 មិនបង្ហាញ ⚠️ ខុសរាល់ការបើក។
+- **Browser ដែល localStorage បិទ** (private mode) ➜ ការសរសេរដើរដោយគ្មាន journal (fail-open ដូច journal សម្អាត) ⛔ ពីមុនបដិសេធការសរសេរទាំងអស់។ row journal ខូចមួយ មិនធ្វើឲ្យ scope ទាំងមូលខូច។
+- **Firebase receipts (`zoew_write_receipts`) មិនកើនរហូតទៀត** ៖ rules ឲ្យឧបករណ៍លុបតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ ហើយ App សម្អាតវាដោយស្វ័យប្រវត្តិម្តងក្នុងមួយសម័យក្រោយ recovery ស្អាត (≤ 500 ក្នុងមួយដង)។ Journal row ចាស់ជាង ២ ថ្ងៃ មិន replay ទេ (receipt អាចត្រូវសម្អាតរួច) ➜ រង់ចាំ 🩺 ដូច Supabase។
+- ការសរសេរដែលត្រូវបដិសេធមុនផ្ញើ (session ប្តូរ · ផុតកំណត់ · កំពុង init) ផ្តល់ verdict `not-applied` ជាក់លាក់ ⛔ មិនមែន `unknown` (Sentry money ក្លែងក្លាយ · ledger «មិនដែល ok») ទៀត។
+
+#### អ្នកយាម
+
+`ZoeW/tests/native-recovery-plain-cas.test.ts` (row ធម្មតា · deferred · rules refuse · storage បិទ · control intent ប្រាក់) · `ZoeW/tests/native-receipt-retention.test.ts` (rules = ថេរ · purge · row ផុតបង្អួច) · `ZoeW/tests/supabase-journal-recovery.test.ts` (row ក្រោយ sign-out · phantom · row ខូច) · `ZoeW/tests/connection-scope-discovery.test.ts` (listener មុនហាងស្គាល់ + control · lease · fetch scope page · verdict not-applied) · `emu/supabase-rules-parity-test` (probe rules receipt ៖ RTDB = Postgres និង verdict រំពឹង ៩ ជំហាន)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Publish Firebase Business rules ថ្មី (កំណែនេះ · ជំនួស rules របស់ 2.50.59 ដែលមិនទាន់ Publish) ទៅគ្រប់ project អតិថិជនមុន merge** (`firebase-database.rules.json` ឬ `tools/firebase-provision/deploy-rules.cmd`) ៖ `zoew_write_receipts/$operation` ឥឡូវឲ្យលុប receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ។ ហាងដែល rules យឺត នៅសរសេរបានតាមផ្លូវធម្មតា (គ្មាន receipt) ទើបមិនដាច់ទៀត។
+2. Supabase migration ថ្មី `20261013093425_zoe_rules.sql` (បន្ថែមលើ `20261013004220_zoe_rules.sql` និង `20261013004512_receipt_auth_uid.sql` របស់ PR #313) អនុវត្តតាម GitHub integration ក្រោយ merge ឬបិទភ្ជាប់ក្នុង SQL Editor។
+3. Deploy ZoeW និង build APK ថ្មី។ សាកពិត ៖ ស្កេនខណៈបណ្តាញយឺត ➜ សម្លាប់ App មុនការសរសេរចប់ ➜ បើកវិញ ➜ ត្រូវស្កេនបន្តបាន (មិនឃើញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់»); បើក App ក្រៅបណ្តាញដែលមានការសរសេររង់ចាំ ➜ ចូលបណ្តាញ ➜ ការសរសេរចប់ដោយខ្លួនឯង; Supabase ៖ ចាកចេញពេលបណ្តាញគាំង ➜ ចូលវិញ ➜ សរសេរបាន។
+4. **ការសម្រេចរបស់ម្ចាស់គម្រោង (មិនបានសាងសង់)** ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · row ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) នៅរារាំងការសរសេរនៃឧបករណ៍រហូតដល់សម្អាត site data — ត្រូវការផ្លូវចេញ (ឧ. ប៊ូតុងក្រោម PIN «លុបការសរសេររង់ចាំ» ដែលកត់ Sentry money) ប្រសិនបើម្ចាស់គម្រោងចង់បាន។
+5. គោលការណ៍ Delete មិនដកប្រាក់ · Remove/expired ដក · restore បូកតែ `isDeducted` ដដែល។ ZTO · PTR · ចលនា · ZoeKeyGen មិនប៉ះ។
+
 ### [2.50.59] — 2026-10-13 · Connection flow ទាំង ៦ ចំណុចតាមសំណើម្ចាស់គម្រោង
 
 **ZoeW** (`zoew-v321` ➜ `zoew-v322`)។ ZoeKeyGen រក្សាកំណែដដែល។
@@ -3583,6 +3611,25 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-13 — Deep audit PR #313 ឡើងវិញ (probe ពិត · មិនទុកចិត្ត checker) · ZoeW 2.50.60
+
+មូលដ្ឋាន `eb88d7b` (PR #313 head · ៨ commits លើ `main` `4649331`)។ run-all STRICT លើដើមឈើ PR មុនកែ ៖ **២០២/២០៤ PASS · partial ០ · SKIP ០** (ធ្លាក់ ២ ជា artifact នៃការរត់ probe ស្របគ្នា ៖ `repository-file-coverage` ឃើញឯកសារ probe បណ្តោះអាសន្ន · `native:check` history-window-check ចលនាស្វែងរក iPhone ផុតពេលម៉ាស៊ីនរវល់) — ⛔ បៃតង ២០៤/២០៤ របស់ PR មិនបានឃើញចន្លោះ ៨ ខាងក្រោមទេ ព្រោះគ្មាន checker ណាវាស់ «journal row នៅសល់ក្រោយបិទ App» · «ចាកចេញពេល request កំពុងដើរ» · «listener ចុះមុនហាងស្គាល់» · «fetch ពេល auth ស្តារ» ឬ «localStorage បិទ»។
+
+Probe ១២ ករណី (vitest · adapter ពិត · fake SDK · transport ក្លែង) ធ្លាក់ទាំង ១២ លើ `eb88d7b` ហើយ control ៣ ជាប់; ក្រោយកែ ១៥/១៥ PASS ៖
+
+1. **Firebase ៖ transaction ធម្មតាបាត់ពាក់កណ្តាលផ្លូវ ➜ រារាំងឧបករណ៍រហូត** (`recoverRow()` ៖ row គ្មាន `hash` · គ្មាន `intent` · គ្មាន token ➜ `resolved = false` ➜ `blocked++` ➜ `mutate()` បដិសេធគ្រប់ការសរសេរ `write_recovery_pending`; 🩺 ➜ recovery ដដែល ➜ blocked ដដែល)។ វាស់ ៖ តម្លៃ Server ដដែល (មិនបានអនុវត្ត) និងតម្លៃបរទេស ទាំង ២ ➜ `write_recovery_pending` · dispatched ០ · row ១។ កែ ៖ row ធម្មតាសម្រេចតាមតម្លៃតែប៉ុណ្ណោះ ➜ ទម្លាក់ (`if (token) resolved = false`)។ Control ៖ intent ledger ដែលសាក្សីសម្រេចមិនបាន នៅ blocked ដដែល។
+2. **ការអាន receipt បរាជ័យលើបណ្តាញ (ក្រៅបណ្តាញ · Server មិនឆ្លើយ) ➜ blocked** (catch នៃ recovery ➜ `blocked++`)។ កែ ៖ `deferred` + `verified()` loop (`NATIVE_RECOVERY_RETRY_GAP_MS` · តែ online) · ការសរសេររង់ចាំ · phase `recovering`។ វាស់ ៖ fetch ធ្លាក់ ៣ ជុំ ➜ settled null · blocked ០ · deferred true ➜ បណ្តាញមក ➜ `sent` · dispatched ២ (resend + ថ្មី) · row ០។
+3. **rules មិនទាន់ Publish ➜ ហាងសរសេរអ្វីមិនបាន** (`sendAtomic` ➜ `permission_denied` លើផ្លូវ receipt ➜ ការសរសេរទាំងអស់ធ្លាក់; គ្មាន Web Locks ➜ អាន receipt ➜ 401 ➜ blocked)។ កែ ៖ `receiptRefused` ➜ ការសរសេរដដែលម្តងតាម SDK ធម្មតា · row ទម្លាក់; receipt ដែលអានមិនបាន (`txReadWasRefused`) លើ row hash ➜ ទម្លាក់។ វាស់ ៖ `sent` · sent [4200] · reads ០ · blocked ០។
+4. **localStorage បិទ ➜ ការសរសេរទាំងអស់ត្រូវបដិសេធ** (`persist()` ➜ `write_journal_unavailable`)។ កែ ៖ `journal.available()` ➜ គ្មាន journal ➜ `mutate()` ហៅ SDK ត្រង់។ row ខូច ➜ `list()` រំលង ⛔ មិន throw (ពីមុន row ខូចមួយ ➜ Supabase `recoverWrites` blocked រហូត)។
+5. **Supabase ៖ row `cancelled` ពី sign-out ➜ សម័យបន្ទាប់ blocked រហូត** (`recoverWrites()` ៖ `cancelled` ➜ `blocked++`; `retryWriteRecovery()` ➜ ដដែល)។ វាស់ ៖ `WRITE_RECOVERY_PENDING` ទាំង set និង retry។ កែ ៖ `cancelled` ដើរតាមច្បាប់ `sent` (op_id ដដែល · ក្នុង `SB_OP_REPLAY_SAFE_MS`)។ វាស់ ៖ replay op_id ដើម · សរសេរ ២ · blocked ០ · row ០; control ៖ row ផុតបង្អួច នៅ blocked ១។
+6. **Supabase ៖ ការសរសេរដែល recovery បដិសេធ ទុក row `queued`** ➜ replay ពេលក្រោយ (phantom)។ កែ ៖ `enqueueWrite()` ដក row ពេល `waitForWriteRecovery()` throw។
+7. **Listener ចុះមុនហាងស្គាល់ ➜ ស្ងាត់ជារៀងរហូត** (`capture()` ៖ tenant `''` ➜ `'A'` ➜ `current()` false ➜ callback ត្រូវច្រោះ មិនបិទ · មិនប្រាប់ App)។ វាស់ (`createSupabaseSdk` ពិត · `readAccount` null · `my_account` យឺត) ៖ មុន account ឃើញ ១ ធាតុ · ក្រោយ account មិនឃើញធាតុ ២ ដែលសរសេរ; control (account cached) ឃើញ ២។ កែ ៖ tenant `''` ពេលចាប់ = មិនចង (`capture()` · `captureConnectionOperation()`); A ➜ B នៅបញ្ចប់ដដែល។
+8. **fetch កំណែ App ពេលបើក App ត្រូវ abort ដោយ auth ស្តារ** (`initNotifications()` ➜ `fetchNotifyFeed(false)` មុន `onAuthStateChanged` ➜ `authGeneration++` ➜ `CONNECTION_SCOPE_CHANGED`)។ កែ ៖ `fetchWithTimeout(…, { scope: 'page' })` សម្រាប់ feed · seller notices · SDK probe; request ទៅ Function នៅចងដដែល។
+
+ចន្លោះរចនាដែលកែបន្ថែម ៖ **`zoew_write_receipts` កើនរហូត** (rules PR #313 ហាមលុប · ១ receipt ក្នុងមួយ `set`/`update` · ~២–៤ ក្នុងមួយកញ្ចប់ · backup ទាំងមូលកើនជារៀងរាល់ថ្ងៃ) ➜ rules ឲ្យលុប receipt ខ្លួនឯង `at < now - 172800000` · `purgeReceipts()` (SDK `get` · ≤ 500 · ម្តងក្នុងមួយសម័យក្រោយ recovery ស្អាត) · row hash ដែល `queuedAt` ចាស់ជាងបង្អួច ➜ blocked (receipt អាចបាត់) · probe parity ៩ ជំហានមាន verdict រំពឹង (បង្កើតតែ uid ខ្លួន · មិនជាន់ · លុបតែចាស់ជាង ២ ថ្ងៃ · មិនលុបរបស់អ្នកដទៃ)។ **Verdict `unknown` លើការសរសេរដែលមិនដែលផ្ញើ** (`ended()` របស់ Proxy) ➜ `not-applied` (ledger resend ≤ 3 ដង ➜ verdict ជាក់លាក់ · គ្មាន Sentry money ក្លែង)។
+
+ពិនិត្យដោយអាន (គ្មានកំហុស · មិនកែ) ៖ Delete/Remove/restore ទៅតាមតារាងសេណារីយ៉ូ (`isDeducted` នៅជាវាលសម្រេចតែមួយ) · `runLedgerTransaction()` replay ដោយ token ខ្លួនឯង ➜ `txAppliedDelta` = delta នៃជុំដែល commit (RTDB commit តែពេល hash ស្មើ) ➜ មិនដកស្ទួន · `withFirebaseAuthOwnership` (`beforeAuthStateChanged` ពិត) · `setupConnectionRecovery()` cleanup · `probeDatabaseLiveness` epoch · SW (`CACHE_VERSION` តែប៉ុណ្ណោះ) · `secret-hygiene` (journal ក្នុង localStorage មានទិន្នន័យអតិថិជនតែ row ដែលកំពុងដើរ · scope តាមគណនី)។ ដែលមិនបានវាស់លើឧបករណ៍ពិត ៖ iPhone/Android PWA + APK (សកម្មភាព ៣ ផ្នែក ១)។
+
 ### 2026-10-13 — Connection architecture ទាំង ៦ ចំណុច · ZoeW 2.50.59
 
 មូលដ្ឋាន `f7c3043` ក្នុង PR #313។ តេស្តថ្មីដូចគ្នា ២៥ ករណីក្នុង ៥ ឯកសារ៖ មុនកែ ២១ FAIL និង ៤ control PASS; ក្រោយកែ ២៥/២៥ PASS។ វាស់ lifecycle readiness, listener ownership, logout/tenant switch ពេល fetch ឬ body នៅរង់ចាំ, Supabase lost ACK/reload ជាមួយ op_id ដើម, offline queue, storage quota, replay window ផុត, Firebase immutable receipt និង SDK transaction callback មកពីរដង។ ចំនួន FAIL ជាចំនួនសេណារីយ៉ូ មិនមែនកំហុសឯករាជ្យ ២១ ទេ។ Full Vitest ដំបូងក្រោយកែ fixture ownership៖ ១៥៨ ឯកសារ / ១៤០៩ tests PASS; ការរត់ពេញលើ tree ចុងក្រោយត្រូវផ្ទៀងផ្ទាត់បន្ថែម។
@@ -6066,5 +6113,9 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |

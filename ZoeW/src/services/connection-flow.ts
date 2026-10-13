@@ -9,11 +9,11 @@ let stopConnectionLeaseObserver: (() => void) | null = null;
 export function captureConnectionOperation() {
     const leaseAuth = firebaseState.auth; const leaseDb = firebaseState.db; const sdk = firebaseState.fb;
     const epoch = firebaseState.authGeneration; const uid = leaseAuth && leaseAuth.currentUser && leaseAuth.currentUser.uid;
-    const tenant = leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id;
+    const tenant = (leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id) || '';
     const config = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     const current = () => leaseAuth === firebaseState.auth && leaseDb === firebaseState.db && sdk === firebaseState.fb
         && epoch === firebaseState.authGeneration && uid === (leaseAuth && leaseAuth.currentUser && leaseAuth.currentUser.uid)
-        && tenant === (leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id)
+        && (tenant === '' || tenant === ((leaseAuth && leaseAuth._account && leaseAuth._account.tenant_id) || ''))
         && config === safeStoreGet(appLocalStore, 'zoew_firebase_config');
     return {
         current,
@@ -48,7 +48,7 @@ export function connectionFlowSnapshot() {
     else if (firebaseState.authLoginOperation) phase = 'authenticating';
     else if (!firebaseState.auth || !firebaseState.auth.currentUser) phase = 'signed-out';
     else if (nativeWriteRecoveryState(firebaseState.db).blocked) phase = 'blocked';
-    else if (nativeWriteRecoveryState(firebaseState.db).recovering || nativeWriteRecoveryState(firebaseState.db).external) phase = 'recovering';
+    else if (nativeWriteRecoveryState(firebaseState.db).recovering || nativeWriteRecoveryState(firebaseState.db).deferred || nativeWriteRecoveryState(firebaseState.db).external) phase = 'recovering';
     else if (firebaseState.db && typeof firebaseState.db.recoveryState === 'function' && firebaseState.db.recoveryState().blocked) phase = 'blocked';
     else if (typeof navigator !== 'undefined' && navigator.onLine === false) phase = 'offline';
     else if (!firebaseState.isDatabaseConnected || firebaseState.dbListenersFailed) phase = 'recovering';
@@ -73,7 +73,7 @@ export function withConnectionOwnership(sdk) {
         if (!ownerScope) { ownerScope = { app, auth: null, epoch: 0, closed: false }; apps.set(app, ownerScope); }
         return ownerScope;
     };
-    const ended = () => Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true, txOutcome: 'unknown' });
+    const ended = () => Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true, txOutcome: 'not-applied' });
     const scopeOf = (ownerScope) => {
         const ownerAuth = ownerScope && ownerScope.auth;
         return ownerAuth && ownerAuth._account && ownerAuth._account.tenant_id || '';
@@ -85,7 +85,7 @@ export function withConnectionOwnership(sdk) {
         const tenant = scopeOf(ownerScope);
         const appEpoch = ownerAuth && ownerAuth === firebaseState.auth ? firebaseState.authGeneration : null;
         const config = appEpoch !== null ? safeStoreGet(appLocalStore, 'zoew_firebase_config') : null;
-        return () => !ownerScope || (!ownerScope.closed && (!bound || (ownerScope.epoch === epoch && scopeOf(ownerScope) === tenant
+        return () => !ownerScope || (!ownerScope.closed && (!bound || (ownerScope.epoch === epoch && (tenant === '' || scopeOf(ownerScope) === tenant)
             && (ownerScope.auth && ownerScope.auth.currentUser && ownerScope.auth.currentUser.uid) === uid
             && (appEpoch === null || firebaseState.auth === ownerAuth && firebaseState.authGeneration === appEpoch
                 && config === safeStoreGet(appLocalStore, 'zoew_firebase_config')))));
@@ -122,11 +122,8 @@ export function withConnectionOwnership(sdk) {
             };
             if (prop === 'retryWriteRecovery') return (db) => {
                 if (target.__supabase) return typeof db.retryWriteRecovery === 'function' ? db.retryWriteRecovery() : Promise.resolve();
-                const ownerScope = databases.get(db);
-                if (ownerScope && ownerScope.recovery && ownerScope.recovery.current() && nativeWriteRecoveryState(db).recovering) return ownerScope.recovery.recovery;
-                if (ownerScope) ownerScope.recovery = null;
-                const recovery = nativeRecovery(ownerScope, db);
-                return recovery ? recovery.recovery : Promise.resolve();
+                const recovery = nativeRecovery(databases.get(db), db);
+                return recovery ? recovery.retry() : Promise.resolve();
             };
             if (prop === 'getAuth') return (app) => { const auth = target.getAuth(app); const ownerScope = entryFor(app); if (ownerScope) ownerScope.auth = auth; return auth; };
             if (prop === 'getDatabase') return (app) => { const db = target.getDatabase(app); const ownerScope = entryFor(app); databases.set(db, ownerScope); if (ownerScope) ownerScope.db = db; return db; };

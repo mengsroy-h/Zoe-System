@@ -50,7 +50,7 @@ export function firebaseSdkReloadCount() {
 
 export function probeFirebaseSdkHost() {
     try {
-        return fetchWithTimeout(FIREBASE_SDK_PROBE_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', credentials: 'omit' },
+        return fetchWithTimeout(FIREBASE_SDK_PROBE_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', credentials: 'omit', scope: 'page' },
             FIREBASE_SDK_PROBE_TIMEOUT_MS, 'Firebase SDK probe timed out').then(() => true, () => false);
     } catch (e) {
         return Promise.resolve(false);

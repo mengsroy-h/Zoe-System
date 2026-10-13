@@ -306,8 +306,22 @@ const PROBE_RULES = { rules: { '.read': true,
     keys: { '$k': { '.write': 'auth != null', '.validate': 'newData.isString()' } },
     par: { '$k': { '.write': 'auth != null', 'c': { '.validate': "newData.parent().child('d').exists()" } } },
     err: { '$k': { '.write': "auth != null && (root.child('keys').child(newData.child('ref').val()).exists() || newData.child('ref').val() === null)" } },
-    uidGuard: { '$k': { '.write': 'auth != null && newData.val() === auth.uid' } }
+    uidGuard: { '$k': { '.write': 'auth != null && newData.val() === auth.uid' } },
+    // ដូច `zoew_write_receipts/$operation` ពិត ៖ បង្កើតបានតែ uid ខ្លួនឯង · លុបបានតែ receipt ខ្លួនឯងដែលចាស់ជាង ២ ថ្ងៃ (`NATIVE_RECEIPT_RETENTION_MS`)
+    rcpt: { '$k': { '.write': "auth != null && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('uid').val() === auth.uid && data.child('at').val() < now - 172800000))" } }
 } };
+// [who · method · path · value · emulator verdict ដែលរំពឹង (true = denied)] — rules receipt ត្រូវបដិសេធ/ទទួលឲ្យត្រូវ មិនមែនគ្រាន់តែស្មើគ្នា
+const RECEIPT_STEPS = (uid, now) => [
+    ['owner', 'PUT', 'rcpt/old', { uid, at: now - 3 * 86400000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/young', { uid, at: now - 1000, hash: 'h' }, null],
+    ['owner', 'PUT', 'rcpt/foreign', { uid: 'foreign-user', at: now - 3 * 86400000, hash: 'h' }, null],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h' }, false],
+    ['user', 'PUT', 'rcpt/mine', { uid, at: now - 1000, hash: 'h2' }, true],
+    ['user', 'PUT', 'rcpt/stolen', { uid: 'foreign-user', at: now - 1000, hash: 'h' }, true],
+    ['user', 'PUT', 'rcpt/young', null, true],
+    ['user', 'PUT', 'rcpt/foreign', null, true],
+    ['user', 'PUT', 'rcpt/old', null, false]
+];
 const PROBE_STEPS = [
     ['user', 'PUT', 'anc/k1', { a: 1, b: 2 }], ['user', 'PATCH', 'anc/k1', { a: 5 }], ['user', 'PUT', 'anc/k2/a', 1], ['user', 'PATCH', '', { 'anc/k3/a': 1 }],
     ['user', 'PUT', 'anc/k1/z', 3], ['user', 'PUT', 'anc/k1/a', null], ['user', 'PATCH', 'anc/k1', { a: 7, b: 8 }],
@@ -453,6 +467,15 @@ function capture() {
         check(probeMis.length === 0, 'probe semantics ៖ verdict Postgres = RTDB គ្រប់ជំហាន (' + PROBE_STEPS.length + ')',
             probeMis.slice(0, 8).map((d) => JSON.stringify(d)).join('\n        '));
         check(probeDenied >= 20 && probeAllowed >= 20, 'probe មិនទទេ ៖ បដិសេធ ≥ ២០ និងទទួល ≥ ២០', 'deny=' + probeDenied + ' allow=' + probeAllowed);
+        const receiptSteps = RECEIPT_STEPS(member.sub, Date.now());
+        const receiptWrong = [];
+        for (let i = 0; i < receiptSteps.length; i++) {
+            const [who, m, p, v, expectDenied] = receiptSteps[i];
+            const r = await both(sc, who, m, p, v, 'receipt#' + i);
+            if (expectDenied !== null && (!r || r.emuDenied !== expectDenied)) receiptWrong.push('receipt#' + i + ' ' + who + ' ' + m + ' ' + p + ' ➜ ' + JSON.stringify(r && r.emuDenied));
+            await compareState(sc, 'receipt#' + i + ' ' + who + ' ' + m + ' ' + p);
+        }
+        check(receiptWrong.length === 0, 'receipt rules ៖ បង្កើតតែ uid ខ្លួន · មិនសរសេរជាន់ · លុបបានតែ receipt ខ្លួនដែលចាស់ជាង ២ ថ្ងៃ (' + receiptSteps.length + ' ជំហាន · RTDB = Postgres)', receiptWrong.join('\n        '));
         check(stats.stateDiffs.length === 0, 'probe ៖ ទិន្នន័យចុងក្រោយ Postgres = RTDB (array/null/ការលុប)', stats.stateDiffs.join('\n        '));
 
         for (const mutant of ENGINE_MUTANTS) {

@@ -22,7 +22,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings របស់ទូរស័ព្ទ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 | model · serial ឧបករណ៍ | model ពី `userAgentData` (Chrome Android) · iPhone ត្រឹម «iPhone» · serial = ID App ១៦ តួ (SHA-256 នៃ ID License) | plugin ក្នុង App `ZoeDevice` (`DeviceInfoPlugin.java`) ៖ `Build.MANUFACTURER` + `Build.MODEL` · កំណែ Android · serial = **Android ID** (`Settings.Secure.ANDROID_ID` ៖ ស្ថិតស្ថេរលើទូរស័ព្ទនោះ + keystore ដដែល · ប្តូរតែពេល Factory reset) · គ្មានសិទ្ធិថ្មី (serial ពិតរបស់ hardware Android 10+ ហាម App ធម្មតា) |
-| ធ្វើបច្ចុប្បន្នភាព App | Service Worker ទាញកំណែថ្មីដោយខ្លួនឯង | 🔔 «📱 កំណែ App» ៖ plugin ក្នុង App `ZoeApkUpdate` (`ApkUpdatePlugin.java`) សួរ GitHub ថា Release `zoew-android-v<កំណែ>` មាន `ZoeW-<កំណែ>.apk` ពិតឬនៅ (HEAD មិនតាម redirect ៖ 302 = មាន · 404 = គ្មាន) ➜ ប៊ូតុងតែពេលមាន ➜ ទាញចូល cache របស់ App (របារីកចម្រើន · ផ្ទៀង package និង versionName) ➜ ផ្ទាំងដំឡើងរបស់ Android (សិទ្ធិ `REQUEST_INSTALL_PACKAGES` · លើកដំបូង «អនុញ្ញាតពីប្រភពនេះ») · APK ចាស់ក្នុង cache លុបពេលបើក App ក្រោយដំឡើង |
+| ធ្វើបច្ចុប្បន្នភាព App | Service Worker ទាញកំណែថ្មីដោយខ្លួនឯង | 🔔 «📱 កំណែ App» ៖ plugin ក្នុង App `ZoeApkUpdate` (`ApkUpdatePlugin.java`) សួរ repo Release public (`ZOE_RELEASES_REPO` ក្នុង workflow · មានតែ Release · មិនមាន source) ថា Release `zoew-android-v<កំណែ>` មាន `ZoeW-<កំណែ>.apk` ពិតឬនៅ (HEAD មិនតាម redirect ៖ 302 = មាន · 404 = គ្មាន) ➜ ប៊ូតុងតែពេលមាន ➜ ទាញចូល cache របស់ App (របារីកចម្រើន · ផ្ទៀង package និង versionName) ➜ ផ្ទាំងដំឡើងរបស់ Android (សិទ្ធិ `REQUEST_INSTALL_PACKAGES` · លើកដំបូង «អនុញ្ញាតពីប្រភពនេះ») · APK ចាស់ក្នុង cache លុបពេលបើក App ក្រោយដំឡើង |
 
 ---
 
@@ -48,15 +48,26 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 
 `.github/workflows/android-release.yml` build APK ដែល **sign រួច** ហើយបង្កើត **GitHub Release** មួយក្នុងមួយកំណែ
 (`zoew-android-v<APP_VERSION>` · ឯកសារ `ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION` ប្រែលើ `main` ឬចុច
-**Actions ➜ Android APK ➜ Run workflow**។ ទាញយក ៖ ទំព័រ repo ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
-ទូរស័ព្ទដែលមាន App រួច ៖ 🔔 ➜ «📥 ទាញយក និងដំឡើង APK» (បង្ហាញតែក្រោយ Release មានឯកសារ APK) ➜ ទាញ និងដំឡើងក្នុង App ·
+**Actions ➜ Android APK ➜ Run workflow**។ Release ផ្លូវការចេញ **២ កន្លែង** ៖ repo source នេះ (បណ្ណសារ · ឃើញតែអ្នកមានសិទ្ធិពេល
+repo ជា Private) និង **repo Release public** `ZOE_RELEASES_REPO` (កំណត់ក្នុង workflow · repo ទទេដែលមានតែ Release · មិនមាន source)
+ដែល App probe (`RELEASE_BASE` ក្នុង `ApkUpdatePlugin.java` · `npm run android:check` ផ្ទៀងថាស្មើ) ➜ source ជា Private បាន ដោយទូរស័ព្ទនៅ
+update ស្វ័យប្រវត្តិ។ ទាញយកដោយដៃ ៖ ទំព័រ repo Release ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
+ទូរស័ព្ទដែលមាន App រួច ៖ 🔔 ➜ «📥 ទាញយក និងដំឡើង APK» (បង្ហាញតែក្រោយ Release ក្នុង repo Release មានឯកសារ APK) ➜ ទាញ និងដំឡើងក្នុង App ·
 លុប Release ឬ build មិនទាន់ចប់ ➜ ប៊ូតុងមិនបង្ហាញ។
+
+**Repo Release (រៀបចំម្តង)** ៖ GitHub ➜ New repository ➜ ឈ្មោះដូច `ZOE_RELEASES_REPO` · **Public** · ធីក «Add a README file»
+(⛔ repo ទទេសោះគ្មាន commit ➜ `gh release create` បង្កើត tag មិនបាន) ➜ Settings ➜ Developer settings ➜ Fine-grained personal access
+tokens ➜ token ថ្មី ៖ Repository access = **តែ repo Release នោះ** · Permissions ➜ Contents = **Read and write** (គ្មានសិទ្ធិផ្សេង) ➜ ដាក់ជា
+secret `ZOE_RELEASES_TOKEN` ក្នុង repo source។ ⛔ គ្មាន secret ➜ workflow លើ `main` **ធ្លាក់មុន build** (Release ដែលទូរស័ព្ទទាញមិនបាន
+មិនត្រូវចេញ) · token ផុតកំណត់ ➜ ដូចគ្នា ➜ បង្កើតថ្មីរួចដាក់ secret ឡើងវិញ។ Release ដែលមានរួចក្នុង repo source តែមិនទាន់មានក្នុង
+repo Release (ឧ. secret ដាក់ក្រោយ) ➜ **Actions ➜ Android APK ➜ Run workflow ➜ main** ➜ workflow ចម្លង APK + `.sha256` + កំណត់ចំណាំ
+ទៅ repo Release ដោយមិន build ម្តងទៀត។
 
 ### APK សាកពី branch (មុន merge)
 
 **Actions ➜ Android APK ➜ Run workflow** ➜ «Use workflow from» ជ្រើស **branch** (មិនមែន `main`) ➜ **Run workflow** ➜ workflow build APK
 ដែល sign ដោយ keystore ដដែល ហើយបង្កើត **Pre-release** `zoew-android-v<កំណែ>-test.<commit ៧ តួ>` (ឯកសារ `ZoeW-<កំណែ>-test.<commit>.apk`)
-➜ **Releases** ➜ ទាញ APK ➜ ដំឡើងជាន់ App ដែលមានស្រាប់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។ Pre-release មួយក្នុងមួយ commit ·
+➜ **Releases** របស់ repo source (⛔ APK សាកមិនចេញទៅ repo Release public) ➜ ទាញ APK ➜ ដំឡើងជាន់ App ដែលមានស្រាប់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។ Pre-release មួយក្នុងមួយ commit ·
 push លើ branch មិន build ស្វ័យប្រវត្តិ · Release ផ្លូវការនៃកំណែដដែល (ពី `main`) ដំឡើងជាន់ APK សាកបាន។ ⛔ APK សាកសម្រាប់ម្ចាស់គម្រោងសាក
 តែប៉ុណ្ណោះ (កុំចែកឲ្យអតិថិជន) · លុប Pre-release និង tag របស់វាពេលលែងត្រូវការ (Releases ➜ Delete)។
 
@@ -72,9 +83,9 @@ ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទា�
 
 **ការរៀបចំ (ម្តង)** ៖
 
-1. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៤ ៖ `ZOEW_KEYSTORE_BASE64` (keystore ជា base64
+1. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៥ ៖ `ZOEW_KEYSTORE_BASE64` (keystore ជា base64
    បន្ទាត់តែមួយ) · `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` (`zoew`) · `ZOEW_KEY_PASSWORD` (ស្មើ `ZOEW_KEYSTORE_PASSWORD` —
-   PKCS12 ប្រើពាក្យសម្ងាត់តែមួយ)។ base64 ពី `zoew-release.jks` ៖ `base64 -w0 zoew-release.jks` · Windows PowerShell ៖
+   PKCS12 ប្រើពាក្យសម្ងាត់តែមួយ) · `ZOE_RELEASES_TOKEN` (PAT fine-grained របស់ repo Release public — មើល «APK ពី GitHub Releases»)។ base64 ពី `zoew-release.jks` ៖ `base64 -w0 zoew-release.jks` · Windows PowerShell ៖
    `[Convert]::ToBase64String([IO.File]::ReadAllBytes("zoew-release.jks"))`។
 2. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. Password Manager + ច្បាប់ចម្លង ២ កន្លែង) — បាត់ keystore =
    App ដំឡើងជាន់មិនបានទៀតទេ។ ⛔ កុំ commit វា (`.gitignore` ហាម `*.jks` · `*.keystore` ហើយ `npm run android:check` ពិនិត្យ)។

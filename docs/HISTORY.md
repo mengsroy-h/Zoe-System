@@ -90,6 +90,10 @@
    បច្ចុប្បន្ន តែ **នៅក្នុង commit ចាស់** (អ្នកណាក៏អានបាន) ➜ ម្ចាស់គម្រោងសម្រេច ៖ (ក) ប្តូរ repo ជា Private (ងាយបំផុត · CI/Netlify ដើរដដែល · runner self-hosted ត្រូវការ
    លក្ខខណ្ឌ `private == true` រួចហើយ) ឬ (ខ) សរសេរប្រវត្តិឡើងវិញ (`git filter-repo` + force-push `main` · ⛔ បំបែក clone/fork · ត្រូវការការអនុញ្ញាតច្បាស់) ·
    secret ពិត ៖ ស្កេនប្រវត្តិពេញ (blob ៧៦៦២) ➜ **គ្មាន** (តែ fixture តេស្ត ២ ដែលមានក្នុងបញ្ជីអនុញ្ញាត)។
+3ខ. ⏳ **ប្តូរ repo ជា Private (ម្ចាស់គម្រោង 2026-10-14 ៖ «ដាក់ Private» ➜ «តោះចាប់ផ្តើមប្តូរ»)** ៖ ✅ ជំហាន ២ កូដ ([2.50.63] ៖ APK ចែកតាម repo Release public) ·
+   ⏳ ម្ចាស់គម្រោង ៖ ① Insights ➜ Forks (fork ដែលមាននៅ public បន្ត) · ② បង្កើត repo `Zoe-System-releases` + secret `ZOE_RELEASES_TOKEN` មុន merge · ③ រង់ចាំទូរស័ព្ទទាំងអស់ដល់
+   2.50.63+ · ④ Make private · ⑤ ផ្ទៀង Audit (Run workflow) · Netlify preview · Supabase · Claude · APK Run workflow ➜ repo Release · quota Actions (GitHub-hosted ≈ ៣៤ នាទី/ push
+   audit ➜ self-hosted ជំហាន ១៣ ពេលមិនគ្រប់)។ ⛔ Private មិនដកច្បាប់ចម្លងដែលមានរួច · មិនការពារ APK ពី patch · `security-guard-test` រក្សាការសន្មត «repo អាចឃើញ»។
 4. ⏸️ **Supabase deep audit ជុំ ២** (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ») ៖ ចប់ផ្នែក SQL គណនី · ៨ ផ្នែកទៀតនៅសល់ (ផ្នែក ២ «Supabase deep audit ជុំ ២»)។
 5. សាកលើ iPhone/Android ពិត ៖ បញ្ជី ⏳ ខាងក្រោម (ធាតុនីមួយៗប្រាប់ឧបករណ៍ និងសកម្មភាព) · ✅ ធាតុ 2.45.x ➜ 2.50.0 ម្ចាស់គម្រោងសាករួច (2026-10-06)។
    **រក្សា Firebase និង Supabase ជាជម្រើសរបស់អតិថិជន**។
@@ -185,6 +189,31 @@
 
 1. Deploy ZoeKeyGen (Netlify base `ZoeKeyGen`) ➜ header CSP ថ្មីចូលជាធរមាន · គ្មាន rules ថ្មី។
 2. សាកលើទូរស័ព្ទ + កុំព្យូទ័រ ៖ ចូល ➜ ស្ថានភាព «ជំហានបន្ទាប់» ➜ Load Signing Key ➜ chip បៃតង · «ចាក់សោវគ្គឥឡូវ» ➜ Signing Key ចេញ · ទុកចោល ៣០ នាទី ➜ ចាកចេញ · QR/ប្រអប់ទាំងអស់បង្ហាញធម្មតា (Console គ្មាន CSP violation)។
+
+### [2.50.63] — 2026-10-14 · APK Android ចែកតាម repo Release public ដាច់ដោយឡែក (រៀបចំប្តូរ repo source ជា Private)
+
+**ZoeW** (`zoew-v325` ➜ `zoew-v326`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ សំណើម្ចាស់គម្រោង («តោះចាប់ផ្តើមប្តូរ» repo ទៅ Private · ក្រោយសំណួរ «បើគេទាញ source code ទៅដោះ Activation Key … ប្រើបានអត់?») ➜ ជំហានទី ២ នៃផែនការ ៖ Release ផ្លូវការរបស់ APK ចេញទៅ repo public ដែលមានតែ Release (`ZOE_RELEASES_REPO` = `mengsroy-h/Zoe-System-releases`) ព្រោះ Release ក្នុង repo Private ទាមទារ login ➜ `ApkUpdatePlugin.java` probe ➜ 404 ជានិច្ច ➜ ប៊ូតុង «📥 ទាញយក និងដំឡើង APK» លែងលេចលើគ្រប់ទូរស័ព្ទ (ឧបករណ៍លែង update ស្វ័យប្រវត្តិ)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- App Android probe និងទាញ APK ពី `https://github.com/mengsroy-h/Zoe-System-releases/releases/download/zoew-android-v<កំណែ>/ZoeW-<កំណែ>.apk` (`RELEASE_BASE`)។ ប៊ូតុង · របារីក · ការផ្ទៀង package/versionName · ផ្ទាំងដំឡើង ៖ ដូចដដែល។
+- ⛔ កំណែ ≤ 2.50.62 probe repo source ➜ ក្រោយ repo source ជា Private ➜ 404 ➜ ប៊ូតុងមិនលេច ➜ ត្រូវ sideload ដោយដៃម្តង ➜ **ប្តូរ Private តែក្រោយទូរស័ព្ទទាំងអស់ដំឡើង 2.50.63 ឬក្រោយ** (ខណៈ repo source នៅ public ទូរស័ព្ទទាំងនោះឃើញ 2.50.63 តាម Release ក្នុង repo source ដូចដដែល)។
+
+#### workflow `android-release.yml`
+
+- env `ZOE_RELEASES_REPO` · step «ពិនិត្យ token របស់ repo Release» (main · `ZOE_RELEASES_TOKEN` គ្មាន ➜ `exit 1` មុន build · កត់ `mirrored`) · Release ពី `main` ➜ repo source (បណ្ណសារ · token ធម្មតា) **និង** repo Release (PAT fine-grained Contents R/W តែ repo នោះ) · step «ចម្លង Release ដែលមានរួច» (exists=true · mirrored=false ➜ `gh release download` + `create --repo` · មិន build) · APK សាក (branch ផ្សេង) ចេញតែក្នុង repo source។
+- secret ទី ៥ `ZOE_RELEASES_TOKEN` ចូលបញ្ជី server-only របស់ `security-guard-test` (មិនដែលលេចក្នុង client/bundle)។
+
+#### អ្នកយាម
+
+`npm run android:check` 3ខ (RELEASE_BASE = `https://github.com/<ZOE_RELEASES_REPO>/releases/download/` អានពី workflow · repo ≠ repo source — mutation ៖ ចង្អុល `RELEASE_BASE` ត្រឡប់ទៅ repo source ➜ ១ FAIL; ការរៀបលំដាប់ apksigner/pin វាស់ទល់នឹង step «បង្កើត GitHub Release» ព្រោះ step ចម្លងនៅមុនវាហើយមិន build) · `repository-contract-test` (+៤ ករណីលើ script ពិត ៖ main ➜ `gh release create` ២ ដង · ទី ២ ដោយ `ZOE_RELEASES_TOKEN` + `--repo` · branch ផ្សេង ➜ ១ ដងគ្មាន `--repo` · main គ្មាន token ➜ ធ្លាក់ · step token/ចម្លងមានលក្ខខណ្ឌត្រឹមត្រូវ) · `ZoeW/tests/notify-apk-link.test.tsx` (URL Java = URL workflow តាម `ZOE_RELEASES_REPO` · repo ≠ source) · `run-all` STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **មុន merge** ៖ GitHub ➜ New repository `Zoe-System-releases` · **Public** · ធីក «Add a README file» (repo គ្មាន commit ➜ tag បង្កើតមិនបាន) ➜ Developer settings ➜ Fine-grained PAT ៖ Repository access = តែ repo នោះ · Contents = Read and write ➜ Settings ➜ Secrets ➜ `ZOE_RELEASES_TOKEN` ក្នុង `Zoe-System` (មើល `ZoeW/docs/ANDROID.md` «APK ពី GitHub Releases»)។ ⛔ គ្មាន secret ➜ workflow APK លើ `main` ធ្លាក់ (ដោយចេតនា)។
+2. ក្រោយ merge ៖ workflow ចេញ Release 2.50.63 ទៅ repo ទាំងពីរ ➜ ទូរស័ព្ទ 2.50.62 ➜ 🔔 ➜ «📥» ➜ ដំឡើង ➜ App ថ្មី probe repo Release ➜ ផ្ទៀងលើទូរស័ព្ទពិត ៖ បើក 🔔 ➜ «📱 កំណែ App» មិនបង្ហាញប៊ូតុង (ទាន់សម័យ) · browser incognito ➜ `https://github.com/mengsroy-h/Zoe-System-releases/releases` ឃើញ APK។
+3. Private ៖ តាមផែនការ (ពិនិត្យ Insights ➜ Forks · រង់ចាំទូរស័ព្ទទាំងអស់ដល់ 2.50.63+ តាម Sentry tag `release` · Make private · ផ្ទៀង Audit/Netlify/Supabase/Claude · quota Actions — `docs/SELF-HOSTED-RUNNERS.md` ជំហាន ១៣–១៤)។
+4. Firebase rules · migration Supabase ៖ គ្មាន។
 
 ### [2.50.62] — 2026-10-14 · ប្រាក់ Sync ត្រឹមត្រូវ ទោះបិទ App ពេលក្រៅបណ្តាញ (ledger replay មិនបញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ)
 

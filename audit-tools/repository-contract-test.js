@@ -476,15 +476,17 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
         const bin = path.join(temp, 'bin');
         fs.mkdirSync(bin);
         fs.writeFileSync(path.join(bin, 'cygpath'), '#!/bin/sh\nwhile [ "${1#-}" != "$1" ]; do shift; done\nprintf \'%s\\n\' "$1"\n', { mode: 0o755 });
-        fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nif [ "$1 $2" = "release view" ]; then exit 1; fi\nif [ "$1 $2" = "release create" ]; then shift 2; for a in "$@"; do printf \'%s\\n\' "$a"; done > "$GH_LOG"; exit 0; fi\nexit 3\n', { mode: 0o755 });
-        const run = (ref, refName) => {
+        fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nif [ "$1 $2" = "release view" ]; then exit 1; fi\nif [ "$1 $2" = "release create" ]; then shift 2; { printf \'%s %s\\n\' --CALL-- "${GH_TOKEN:-}"; for a in "$@"; do printf \'%s\\n\' "$a"; done; } >> "$GH_LOG"; exit 0; fi\nexit 3\n', { mode: 0o755 });
+        const releasesRepo = (apk.match(/^\s+ZOE_RELEASES_REPO:\s*(\S+)\s*$/m) || [])[1] || '';
+        check('repo Release public (`ZOE_RELEASES_REPO`) ដាច់ពី repo source ➜ source ជា Private បាន', /^[\w.-]+\/[\w.-]+$/.test(releasesRepo) && releasesRepo !== 'mengsroy-h/Zoe-System', releasesRepo);
+        const run = (ref, refName, releasesToken = 'rel-token') => {
             const work = fs.mkdtempSync(path.join(temp, 'w-'));
             fs.mkdirSync(path.join(work, 'ZoeW', 'src', 'core'), { recursive: true });
             fs.writeFileSync(path.join(work, 'ZoeW', 'src', 'core', 'version.ts'), "export const APP_VERSION = '9.8.7';\n");
             const out = path.join(work, 'out.txt');
             fs.writeFileSync(out, '');
             const env = { ...process.env, PATH: bin + path.delimiter + process.env.PATH, GITHUB_REF: ref, GITHUB_SHA: 'abcdef1234567890',
-                GITHUB_OUTPUT: out, REF_NAME: refName, GH_LOG: path.join(work, 'gh.log'), GH_TOKEN: 'x' };
+                GITHUB_OUTPUT: out, REF_NAME: refName, GH_LOG: path.join(work, 'gh.log'), GH_TOKEN: 'x', ZOE_RELEASES_REPO: releasesRepo, RELEASES_TOKEN: releasesToken };
             const m = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', meta], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
             const outputs = {};
             fs.readFileSync(out, 'utf8').split('\n').filter(Boolean).forEach((line) => { const i = line.indexOf('='); outputs[line.slice(0, i)] = line.slice(i + 1); });
@@ -496,9 +498,14 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
                 fs.writeFileSync(path.join(work, outputs.file + '.sha256'), 'deadbeef  ' + outputs.file + '\n');
             }
             const r = cp.spawnSync('bash', ['-eo', 'pipefail', '-c', filled], { cwd: work, env, encoding: 'utf8', timeout: 20000 });
-            const args = fs.existsSync(env.GH_LOG) ? fs.readFileSync(env.GH_LOG, 'utf8').split('\n').filter(Boolean) : [];
+            const log = fs.existsSync(env.GH_LOG) ? fs.readFileSync(env.GH_LOG, 'utf8') : '';
+            const calls = log.split(/^--CALL-- /m).filter(Boolean).map((block) => {
+                const lines = block.split('\n').filter(Boolean);
+                return { token: lines[0], args: lines.slice(1) };
+            });
+            const args = calls.length ? calls[0].args : [];
             const notes = fs.existsSync(path.join(work, 'notes.md')) ? fs.readFileSync(path.join(work, 'notes.md'), 'utf8') : '';
-            return { meta: m, rel: r, outputs, args, notes, pwned: fs.existsSync(path.join(work, 'pwned')) };
+            return { meta: m, rel: r, outputs, args, calls, notes, pwned: fs.existsSync(path.join(work, 'pwned')) };
         };
         const test = run('refs/heads/feature', 'feature');
         check('branch ផ្សេង ➜ test=true · ស្លាក/ឯកសារមាន «-test.<commit ៧ តួ>»',
@@ -519,6 +526,26 @@ scenario('APK សាក ៖ branch ផ្សេងពី main ➜ Pre-release �
         const evil = run('refs/heads/x', 'x$(touch pwned)`touch pwned`');
         check('ឈ្មោះ branch ចូលតាម env (មិនរត់ជា shell)', evil.rel.status === 0 && !evil.pwned && evil.notes.includes('$(touch pwned)'),
             evil.rel.stderr);
+        const mirror = main.calls[1] || { token: '', args: [] };
+        check('main ➜ Release ទី ២ ទៅ repo Release public ដោយ token ZOE_RELEASES_TOKEN (ស្លាក · APK · sha256 ដូចគ្នា · គ្មាន --prerelease)',
+            main.calls.length === 2 && main.calls[0].token === 'x' && mirror.token === 'rel-token' && mirror.args[0] === 'zoew-android-v9.8.7'
+            && mirror.args.includes('ZoeW-9.8.7.apk') && mirror.args.includes('ZoeW-9.8.7.apk.sha256') && mirror.args.includes('--repo') && mirror.args.includes(releasesRepo)
+            && !mirror.args.includes('--prerelease') && !main.calls[0].args.includes('--repo'),
+            JSON.stringify(main.calls));
+        check('branch ផ្សេង ➜ APK សាកចេញតែក្នុង repo source (មិនទៅ repo Release public)',
+            test.calls.length === 1 && !test.calls[0].args.includes('--repo') && !test.calls[0].args.includes(releasesRepo), JSON.stringify(test.calls));
+        const noToken = run('refs/heads/main', 'main', '');
+        check('⛔ main គ្មាន ZOE_RELEASES_TOKEN ➜ step ធ្លាក់ (ឧបករណ៍មិនត្រូវឃើញកំណែដែលទាញមិនបាន) · មិនហៅ repo Release',
+            noToken.rel.status !== 0 && noToken.calls.length === 1 && !noToken.calls[0].args.includes('--repo') && /ZOE_RELEASES_TOKEN/.test(noToken.rel.stdout + noToken.rel.stderr),
+            noToken.rel.status + ' ' + JSON.stringify(noToken.calls));
+        const tokenStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ពិនិត្យ token របស់ repo Release')) || '';
+        const mirrorStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: ចម្លង Release ដែលមានរួចទៅ repo Release')) || '';
+        check('token ត្រូវពិនិត្យមុន build (main · exit 1 បើគ្មាន) · Release ដែលមានរួចតែមិនទាន់ចម្លង ➜ ចម្លងដោយ download + create --repo (គ្មាន build ម្តងទៀត)',
+            tokenStep.includes("if: steps.meta.outputs.test == 'false'") && /RELEASES_TOKEN: \$\{\{ secrets\.ZOE_RELEASES_TOKEN \}\}/.test(tokenStep) && /-z "\$RELEASES_TOKEN"[\s\S]*?exit 1/.test(tokenStep)
+            && /mirrored=(true|false)/.test(tokenStep) && apk.indexOf(tokenStep) < apk.indexOf('- name: ពិនិត្យ secret របស់ keystore')
+            && mirrorStep.includes("steps.meta.outputs.exists == 'true' && steps.releases.outputs.mirrored == 'false'") && /gh release download "\$TAG"/.test(mirrorStep)
+            && /gh release create "\$TAG" mirror\/\*[\s\S]*?--repo "\$ZOE_RELEASES_REPO"/.test(mirrorStep),
+            (tokenStep.slice(0, 60) + ' | ' + mirrorStep.slice(0, 60)).replace(/\n/g, ' '));
         const webStep = (apk.match(/^      -[^\n]*(?:\n(?!      -)[^\n]*)*/gm) || []).find((st) => st.includes('- name: Build web')) || '';
         check('APK សាក និង Release ពី main build web ដូចគ្នា (android:sync · គ្មានការកំណត់ផ្សេងតាម test)',
             webStep.includes('npm run android:sync --prefix ZoeW') && !/outputs\.test|VITE_[A-Z_]+:/.test(webStep), webStep);

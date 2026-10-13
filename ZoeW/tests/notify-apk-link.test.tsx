@@ -81,6 +81,7 @@ import { mount, step, unmount } from './native/react-harness';
 
 const ROOT = path.join(__dirname, '..', '..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'android-release.yml'), 'utf8');
+const RELEASES_REPO = (/^\s+ZOE_RELEASES_REPO:\s*(\S+)\s*$/m.exec(WORKFLOW) || [])[1];
 const JAVA_FILE = path.join(ROOT, 'ZoeW', 'android', 'app', 'src', 'main', 'java', 'com', 'zoesystem', 'zoew', 'ApkUpdatePlugin.java');
 const JAVA = fs.existsSync(JAVA_FILE) ? fs.readFileSync(JAVA_FILE, 'utf8') : '';
 const STALL_MS: number = (apkUpdate as any).APK_DOWNLOAD_STALL_MS || 45000;
@@ -90,9 +91,10 @@ function releaseUrlFromWorkflow(version: string) {
     const main = WORKFLOW.slice(WORKFLOW.indexOf('refs/heads/main'), WORKFLOW.indexOf('else', WORKFLOW.indexOf('refs/heads/main')));
     const tag = (/TAG="([^"]+)"/.exec(main) || [])[1];
     const file = (/FILE="([^"]+)"/.exec(main) || [])[1];
-    expect(tag && file).toBeTruthy();
+    expect(tag && file && RELEASES_REPO).toBeTruthy();
+    expect(RELEASES_REPO, 'repo Release ដាច់ពី repo source (source ជា Private ➜ Release របស់វាទាញមិនបានដោយគ្មាន login)').not.toBe('mengsroy-h/Zoe-System');
     const sub = (t: string) => t.replace(/\$\{VERSION\}/g, version);
-    return 'https://github.com/mengsroy-h/Zoe-System/releases/download/' + sub(tag!) + '/' + sub(file!);
+    return 'https://github.com/' + RELEASES_REPO + '/releases/download/' + sub(tag!) + '/' + sub(file!);
 }
 
 function javaConst(name: string) {

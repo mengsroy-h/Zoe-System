@@ -156,6 +156,11 @@ const probeBody = javaMethodBody(apkPluginSrc, 'void probe(');
 ok('probe ៖ HEAD · មិនតាម redirect · មាន = redirect ទៅ *.githubusercontent.com (https) · 404 = គ្មាន',
     /setInstanceFollowRedirects\(false\)/.test(probeBody) && /setRequestMethod\("HEAD"\)/.test(probeBody) && /assetLocation\(/.test(probeBody) &&
     /HTTP_NOT_FOUND/.test(probeBody) && /"\.githubusercontent\.com"/.test(apkPluginSrc) && /"https"\.equals\(url\.getProtocol\(\)\)/.test(javaMethodBody(apkPluginSrc, 'boolean assetLocation(')));
+const releaseWorkflow = read('../.github/workflows/android-release.yml');
+const releasesRepo = (releaseWorkflow.match(/^\s+ZOE_RELEASES_REPO:\s*(\S+)\s*$/m) || [])[1] || '';
+ok('⛔ RELEASE_BASE ក្នុង plugin = repo Release public របស់ workflow (`ZOE_RELEASES_REPO` · ដាច់ពី repo source ➜ source ជា Private បាន ដោយឧបករណ៍នៅ update)',
+    /^[\w.-]+\/[\w.-]+$/.test(releasesRepo) && releasesRepo !== 'mengsroy-h/Zoe-System'
+    && apkPluginSrc.includes(`static final String RELEASE_BASE = "https://github.com/${releasesRepo}/releases/download/";`), releasesRepo);
 ok('probe · download ៖ ពេលកំណត់ connect · read (បណ្តាញស្លាប់មិនជាប់)', (apkPluginSrc.match(/setConnectTimeout\(CONNECT_TIMEOUT_MS\)/g) || []).length === 2 &&
     (apkPluginSrc.match(/setReadTimeout\(READ_TIMEOUT_MS\)/g) || []).length === 2);
 const fetchBody = javaMethodBody(apkPluginSrc, 'void fetch(');
@@ -384,7 +389,9 @@ ok('build.gradle ដាក់ signingConfig តែពេលមាន keystore (A
 ok('workflow គ្មានផ្លូវ debug/unsigned (assembleDebug · debug.keystore)', releaseWf.length > 1000 && !/assembleDebug|debug\.keystore/.test(releaseWf));
 const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || [''])[0];
 ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
-ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
+const buildReleaseAt = releaseWf.indexOf('- name: បង្កើត GitHub Release');
+ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release (ជំហានចម្លង Release ដែលមានរួច ទាញឯកសារដែលផ្ទៀងរួចពី Release ដើម · មិន build)',
+    /apksigner"? verify/i.test(releaseWf) && buildReleaseAt !== -1 && releaseWf.indexOf('apksigner') < buildReleaseAt);
 ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
 const gsjAt = releaseWf.indexOf('ZoeW/android/app/google-services.json');
 const webBuildAt = releaseWf.indexOf('npm run android:sync');
@@ -395,7 +402,7 @@ ok('FCM ៖ vite ដេរីវេ __FCM_CONFIGURED__ ពីវត្តមា�
 const certPin = read('android/release-cert.sha256').trim();
 ok('វិញ្ញាបនបត្រ keystore pin ក្នុង android/release-cert.sha256 (SHA-256 · 64 hex)', /^[0-9a-f]{64}$/.test(certPin), certPin.slice(0, 12) + '…');
 const pinAt = releaseWf.indexOf('if ! GOT=$(node ZoeW/scripts/apk-cert-check.mjs apk-certs.txt ZoeW/android/release-cert.sha256');
-const pinGate = releaseWf.slice(pinAt, releaseWf.indexOf('gh release create'));
+const pinGate = releaseWf.slice(pinAt, buildReleaseAt);
 ok('workflow ប្រៀបវិញ្ញាបនបត្រ APK នឹង pin តាម apk-cert-check.mjs ហើយធ្លាក់មុន Release',
     pinAt > 0 && releaseWf.indexOf('apksigner') < pinAt && /^if ! GOT=\$\(node ZoeW\/scripts\/apk-cert-check\.mjs[^\n]*then\s*\n[^\n]*\n\s*exit 1/.test(pinGate) &&
     !/grep[^\n]*SHA-256 digest/.test(releaseWf));

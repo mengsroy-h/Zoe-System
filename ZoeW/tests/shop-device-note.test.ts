@@ -4,6 +4,8 @@
  *    ច្បាប់ ៖ គណនីស្គាល់ហាង (`onTenantChanged` ➜ `noteShopDevice()`) ➜ RPC `note_my_device` (serial · model · ប្រព័ន្ធ ពី `loadDeviceInfo()`)
  *    ម្តងក្នុងមួយទំព័រ/គណនី/ព័ត៌មាន · ធ្លាក់ ➜ សាកម្តងទៀតក្រោយ `SHOP_DEVICE_RETRY_MS` (វដ្ត ៦០ វិ.) · ហាងនិងគណនីមកពី server (`auth.uid()`) ·
  *    ហាង Firebase ➜ គ្មានការហៅ (កៅអី License កត់រួច)។ ⛔ ការបង្ហាញតែប៉ុណ្ណោះ — មិនសម្រេចសិទ្ធិចូល។
+ *    ⛔ Serial = SHA-256 ពិត (`crypto.subtle` ➜ thread pool) ក្រោម fake timers ➜ រង់ចាំដោយ tick ពិត (`settle()`) រហូតដល់ note មកដល់
+ *    (ពិដាន) — មិនមែនចំនួន fake ms ថេរ (CI ដែលរវល់ ➜ digest យឺត ➜ `[]`)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { firebaseState } from '../src/core/state';
@@ -65,8 +67,22 @@ function fakeNetwork(tenant: string) {
     return { state, fetch };
 }
 
+const realSetTimeout = globalThis.setTimeout;
+const realWait = (ms: number) => new Promise<void>((resolve) => realSetTimeout(resolve, ms));
+const realDateNow = Date.now;
+const realNowMs = () => realDateNow();
+
 async function advance(ms: number) {
     for (let t = 0; t < ms; t += 250) await vi.advanceTimersByTimeAsync(250);
+}
+
+async function settle(done: () => boolean, maxFakeMs = 3000, maxRealMs = 2000) {
+    const started = realNowMs();
+    for (let fake = 0; !done() && realNowMs() - started < maxRealMs;) {
+        await realWait(5);
+        if (done()) return;
+        if (fake < maxFakeMs) { await vi.advanceTimersByTimeAsync(250); fake += 250; }
+    }
 }
 
 let apps: { sdk: any; app: any }[] = [];
@@ -115,7 +131,7 @@ describe('Supabase ៖ កត់ឧបករណ៍តាមហាង (`note_my_d
     it('⛔ បើក App ៖ គណនីស្គាល់ហាង ➜ ផ្ញើ serial · model · ប្រព័ន្ធ ម្តង (token គណនីនោះ) · ការហៅម្តងទៀតមិនផ្ញើស្ទួន', async () => {
         vi.useFakeTimers();
         const b = await bootShop('tenant-a');
-        await advance(3000);
+        await settle(() => b.net.state.notes.length >= 1);
         const serial = await appSerialOf(DEVICE_ID);
         const info = await loadDeviceInfo();
         expect(serial).toMatch(/^[0-9a-f]{16}$/);
@@ -131,7 +147,7 @@ describe('Supabase ៖ កត់ឧបករណ៍តាមហាង (`note_my_d
         vi.useFakeTimers();
         const b = await bootShop('tenant-b', 'u2');
         b.net.state.fail = true;
-        await advance(3000);
+        await settle(() => b.net.state.auth.length >= 1);
         const tries = b.net.state.auth.length;
         expect(tries, 'សាកម្តង').toBeGreaterThanOrEqual(1);
         expect(await noteShopDevice()).toBe(false);
@@ -145,10 +161,10 @@ describe('Supabase ៖ កត់ឧបករណ៍តាមហាង (`note_my_d
     it('គណនីហាងផ្សេង (គណនីថ្មី) ➜ ផ្ញើម្តងទៀតសម្រាប់ហាងនោះ', async () => {
         vi.useFakeTimers();
         const first = await bootShop('tenant-c', 'u3');
-        await advance(3000);
+        await settle(() => first.net.state.notes.length >= 1);
         expect(first.net.state.notes.length).toBe(1);
         const second = await bootShop('tenant-d', 'u4');
-        await advance(3000);
+        await settle(() => second.net.state.notes.length >= 1);
         expect(second.net.state.notes.length, 'ហាង D ទទួលឧបករណ៍ដដែល').toBe(1);
         expect(second.net.state.auth[0]).toBe('Bearer live.token.u4');
     });

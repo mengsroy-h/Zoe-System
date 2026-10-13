@@ -3629,6 +3629,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-13 — CI ធ្លាក់លើ `a5e2f89` (ផ្នែក 2/4) ៖ `shop-device-note.test.ts` រង់ចាំ fake ms ថេរ ខណៈ SHA-256 ពិតដើរលើ thread pool · គ្មាន bump
+
+រាយការណ៍ម្ចាស់គម្រោង ៖ «CI fail»។ run 718 (`a5e2f89`) ៖ shard 2/4 ធ្លាក់ ១ (`zoew-suite 1/2` ➜ `npm run test`) ៖ `tests/shop-device-note.test.ts` «បើក App ៖ គណនីស្គាល់ហាង ➜ ផ្ញើ serial…» ➜ `expected [] to deeply equal [{…}]` (note `note_my_device` មិនដែលផ្ញើក្នុង `advance(3000)`); run 717 (`54cc15c`) ជាប់ · ៤ commits រវាងនោះ (2.50.61) មិនប៉ះ `shop-device` · `device-info` · transport · SDK Supabase ទេ។
+
+- **បន្តផលមិនបាន** ៖ ឯកសារតេស្តរត់ ១២ ដង ក្រោម CPU hog ៦ ➜ ០/១២ ធ្លាក់ · ៣២ ដង ៨ instance ស្របគ្នា ➜ ០/៣២ ➜ មិនមែន CPU ធម្មតាទេ។
+- **មូលហេតុវាស់បាន** ៖ `loadDeviceInfo()` ➜ `appSerialOf()` = `crypto.subtle.digest` ពិត (libuv thread pool ➜ macrotask) ក្នុងផ្លូវ boot (`restoreSession` ➜ `applyAccount` ➜ `onTenantChanged` ➜ `noteShopDevice()`)។ `advance(3000)` = ១២ × `advanceTimersByTimeAsync(250)` ➜ ផ្តល់ tick ពិតតែពីរបី ➜ digest ដែលយឺតលើសពីនោះ ➜ note មិនទាន់ផ្ញើ ➜ `[]`។ Probe ៖ ពន្យារតែ digest ទី១ (ផ្លូវ boot) ដោយ `setTimeout` ពិត ➜ **២ms ជាប់ · ១០ms ធ្លាក់ · ៣០ms ធ្លាក់ · ១០០ms ធ្លាក់** ដោយ assertion ដូច CI ដូចគ្នា (probe ដំបូងដែលពន្យារគ្រប់ digest ជាប់រហូត ១២០០ms ព្រោះ `await appSerialOf()` របស់តេស្តខ្លួនឯងរង់ចាំពេលពិតអោយ — probe ខុស)។ Runner CI ៤ core រត់ `money-guardian` + `supabase-app-network-e2e` + vitest `auto` ស្របគ្នា ➜ thread pool យឺត ១០ms+ កើតបាន។
+- **កែ (តេស្តតែប៉ុណ្ណោះ · កូដ App មិនប្រែ)** ៖ `settle(done, maxFakeMs, maxRealMs)` ៖ រង់ចាំ `realSetTimeout(5)` ពិត (ចាប់មុន `useFakeTimers`) រវាងជំហាន fake ២៥០ms រហូត note មកដល់ · ពិដានពេលពិត ២០០០ms តាម `Date.now` ពិតដែលចាប់ទុក (⛔ `process.hrtime` · `performance.now` ត្រូវ fake-timers ក្លែងដែរ ➜ ពិដានបានវាស់ fake ms ➜ ជុំមួយ loop គ្មានពិដាន ➜ ធ្លាក់ដោយ timeout ៥s ជំនួស assertion) · `advance()` នៅដដែលសម្រាប់ `SHOP_DEVICE_RETRY_MS` (ការហៅបន្ទាប់ `await` ដោយតេស្តផ្ទាល់)។
+- **ភស្តុតាង** ៖ តេស្តកែរួច ៣/៣ ជាប់ (≈ ២,២s) · probe digest ទី១ យឺត **១០០ms · ១០០០ms ➜ ជាប់** · mutation «server មិនដែលទទួល note» ➜ **ធ្លាក់ ៣/៣ ដោយ assertion** (`expected [] …` · «សាកម្តង» · `expected +0 to be 1`) ក្នុង ≈ ២s ក្នុងមួយតេស្ត (មិនមែន timeout)។ `typecheck` · `lint` ជាប់។
+
 ### 2026-10-13 — Deep audit PR #313 ឡើងវិញ (probe ពិត · មិនទុកចិត្ត checker) · ZoeW 2.50.60
 
 មូលដ្ឋាន `eb88d7b` (PR #313 head · ៨ commits លើ `main` `4649331`)។ run-all STRICT លើដើមឈើ PR មុនកែ ៖ **២០២/២០៤ PASS · partial ០ · SKIP ០** (ធ្លាក់ ២ ជា artifact នៃការរត់ probe ស្របគ្នា ៖ `repository-file-coverage` ឃើញឯកសារ probe បណ្តោះអាសន្ន · `native:check` history-window-check ចលនាស្វែងរក iPhone ផុតពេលម៉ាស៊ីនរវល់) — ⛔ បៃតង ២០៤/២០៤ របស់ PR មិនបានឃើញចន្លោះ ៨ ខាងក្រោមទេ ព្រោះគ្មាន checker ណាវាស់ «journal row នៅសល់ក្រោយបិទ App» · «ចាកចេញពេល request កំពុងដើរ» · «listener ចុះមុនហាងស្គាល់» · «fetch ពេល auth ស្តារ» ឬ «localStorage បិទ»។
@@ -6055,7 +6064,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |

@@ -35,6 +35,7 @@ const ACCEPTED = {
     firebaseStatusText: 'connection status label',
     navAuthBtn: 'auth button label',
     logoutBtn: 'button label',
+    kgNextBtn: 'ZoeKeyGen ៖ ស្លាកប៊ូតុង «ជំហានបន្ទាប់» (អត្ថបទថេរ · គ្មានទិន្នន័យអ្នកប្រើ)',
     btnFilterAll: 'filter button label',
     selectedFilterTitle: 'filter name only',
     zoomSlider: 'camera zoom value',

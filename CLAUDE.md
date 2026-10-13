@@ -57,7 +57,7 @@ only this text protects them.
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
 | **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.62` (`zoew-v325`) | `zoew` |
-| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.17` (`zoekeygen-v128`) | `zoekeygen` |
+| **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.18` (`zoekeygen-v129`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
   and builds to `ZoeW/dist/`. Where this file says `ZoeW/app.js` · `index.html` · `sw.js`, the code is `src/**` · JSX ·
@@ -351,6 +351,7 @@ only this text protects them.
 | Ledger money and parcel count always move together | `ledger-count-integrity-test.js` |
 | Every path making the app usable arms `armSessionExpiryCheck()` (a `'pending'` gate nobody settles is a trap) | `periodic-network-guard-test.js` |
 | SW passes the abort signal via `networkOptions` (navigate targets are strings) — measure the real `fetch` handler | `sw-abort-propagation-test.js` |
+| ZoeKeyGen layout and session: cards numbered in work order (១ Signing Key · ២ Generate · ៣ Key list · ៤ Supabase shops · ៥ Setup Link · ៦ notices; tabs create · list · shop · link · notice) · status strip (`refreshKgStatus()`: login · Signing Key · Supabase Admin chips + «ជំហានបន្ទាប់» ➜ `goToKgNext()`) · «វគ្គ និងសុវត្ថិភាព» card · `lockKeygenSession()` (Signing Key + Supabase Admin out of memory at once) · idle admin logout `KEYGEN_IDLE_LOGOUT_MS` (activity = pointerdown/keydown · 30s cycle + visibilitychange · `logoutApp(true)` skips the keypair confirm · never while generating or with an uncopied keypair · clock backwards = expired) | `keygen-session-security-test.js` · `csp-enforced-test.js` · `dom-hygiene` · `layout-check` |
 | ZoeKeyGen biometrics: WebAuthn PRF only · discoverable passkey (`residentKey: 'required'`) · decrypted PIN verified · PIN change unbinds · hung admin writes ➜ "⏳ not confirmed" + late ✅ (`armAdminLateWrite()`) · Signing Key idle expiry (`SIGNING_KEY_IDLE_MS`) · admin operations (Generate · Extend · Revoke · seat limit · seat release · notices · legacy metadata migration) are bound to the signed-in admin: `adminOperationIsCurrent()` = same `uid` + same `authGeneration` (logout or re-login drops the result) ⛔ never the sensitive-session generation (a PIN modal close is not a logout ➜ the written Key and the ✅ still show) · every admin read and write, retries included, goes to the database captured when the operation started (`operationDb`) (Generate and the migration also stop retrying once the operation is no longer current) ⛔ never the live `db` after an `await` or inside a retry (a Reconfig in between writes the Key, or another project's metadata, into another License Project); secret operations (Signing Key load/restore · keypair · biometric enrollment · clipboard) keep `isSensitiveSessionCurrent()` · the Generate lock has an owner (`generateKeyOwner`): a session invalidated mid-generate (Config · logout) drops the result but releases the lock ⛔ never release by session check | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` · `keygen-biometric-test.js` · `keygen-notice-test.js` |
 | Real data checks need a dump ➜ not in `run-all.sh` | `money-reality-check.js` · `money-reality-test.js` |
 | Duplicate declarations · dead functions | `function-surface-test.js` |
@@ -789,7 +790,7 @@ raw `Date.now()` on purpose.
    by state (`navAuthFlow()`); `page-nav-test` counts 1 real call; `action-binding-test` locks it in both apps.
 5. `<head>` scripts live in `boot-flags.js` (`<script src>` before the stylesheet, in the SW core shell via
    `serviceWorkerPlugin` ➜ `__CORE_SHELL__`).
-6. `style-src` keeps `'unsafe-inline'` ⛔ don't remove without request and measurement.
+6. ZoeW `style-src` keeps `'unsafe-inline'` ⛔ don't remove without request and measurement. ZoeKeyGen has **no** `'unsafe-inline'` in `style-src` (owner request): no `style=` attribute in `index.html` (utility classes · `modal-w-*` carry `--modal-w`) · QR as SVG · CSSOM writes only; `csp-enforced-test` part 3 loads it under the real header (0 violations · reverse probe) ⛔ never add an inline style there.
 7. ⛔ No CDN in `script-src` (scan engine and SheetJS are vendored; `sw.js` drops cross-origin requests).
 
 ## ⛔ Cross-origin resources in `<head>`

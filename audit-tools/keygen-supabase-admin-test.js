@@ -289,7 +289,7 @@ function buildKeygen(env) {
         appLocalStore: store,
         hasUncopiedKeypair: () => false,
         isPinFlowPending: () => false,
-        refreshLiveToasts() {}, closeModal() {}, clearGeneratedKeyResult() {}, clearSigningKey() {}, openModalHelper() {}
+        refreshLiveToasts() {}, closeModal() {}, clearGeneratedKeyResult() {}, clearSigningKey() {}, openModalHelper() {}, refreshKgStatus() {}
     };
     sandbox.window = sandbox;
     sandbox.qrcode = (type, level) => {

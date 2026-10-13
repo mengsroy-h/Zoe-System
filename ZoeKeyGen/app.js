@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.17';
+const APP_VERSION = '2.24.18';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -21,7 +21,9 @@ const ACTION_ALLOWLIST = [
     "generateLicenseKey",
     "generateNewKeypair",
     "generateSetupLink",
+    "goToKgNext",
     "loadSigningKey",
+    "lockKeygenSession",
     "migrateLegacyLicenseKeyMetadata",
     "navAuthFlow",
     "openConfigFlow",
@@ -1926,8 +1928,8 @@ function setupAuthListener() {
     });
 }
 
-function logoutApp() {
-    if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
+function logoutApp(auto) {
+    if (!auto && hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
     authGeneration++;
     pendingRoleRecheck = false;
     updateAuthButton(false);
@@ -1948,6 +1950,8 @@ function updateAuthButton(isLoggedIn) {
     const btn = document.getElementById('navAuthBtn');
     if (!btn) return;
     btn.textContent = authButtonIsLoggedIn ? '🚪 ចាកចេញ' : '🔑 ចូល';
+    if (authButtonIsLoggedIn) keygenLastActivityAt = Date.now();
+    refreshKgStatus();
 }
 
 let signingPrivateKeyJwk = null;
@@ -1976,6 +1980,7 @@ function expireIdleSigningKey() {
 function updateSigningKeyBadge() {
     const form = document.getElementById('signingKeyForm');
     if (form) form.classList.toggle('hidden', !!signingPrivateKeyJwk);
+    refreshKgStatus();
     const badge = document.getElementById('signingKeyStatusBadge');
     if (!badge) return;
     if (signingPrivateKeyJwk) {
@@ -3362,6 +3367,7 @@ async function sbAdminLogin(event) {
         }
         sbAdminSession = session;
         sbAdminLastUseAt = Date.now();
+        refreshKgStatus();
         const panel = document.getElementById('sbAdminPanel');
         if (panel) panel.classList.remove('hidden');
         const logoutBtn = document.getElementById('sbAdminLogoutBtn');
@@ -3389,6 +3395,7 @@ function sbAdminReset(expired) {
     sbAdminGeneration++;
     sbAdminSession = null;
     sbAdminLastUseAt = 0;
+    refreshKgStatus();
     sbAdminBusy = false;
     sbTenantCache = [];
     sbMemberCache = [];
@@ -3825,6 +3832,81 @@ const KG_TAB_CLASS = { create: 'kg-tab-create', list: 'kg-tab-list', link: 'kg-t
 const KG_TABS = Object.keys(KG_TAB_CLASS);
 const KG_TAB_KEY = 'zoekeygen_tab_v1';
 
+const KEYGEN_IDLE_LOGOUT_MS = 30 * 60 * 1000;
+let keygenLastActivityAt = 0;
+let kgNextTarget = null;
+
+function noteKeygenActivity() {
+    if (authButtonIsLoggedIn) keygenLastActivityAt = Date.now();
+}
+
+function expireIdleKeygenSession() {
+    if (!authButtonIsLoggedIn || isGeneratingKey || hasUncopiedKeypair()) return false;
+    if (elapsedSince(keygenLastActivityAt) < KEYGEN_IDLE_LOGOUT_MS) return false;
+    keygenLastActivityAt = 0;
+    lockKeygenSession(true);
+    logoutApp(true);
+    showToast('🔒 ចាកចេញដោយស្វ័យប្រវត្តិ ក្រោយមិនប្រើ ' + khmerMinutes(KEYGEN_IDLE_LOGOUT_MS) + ' នាទី — សូមចូលម្តងទៀត។');
+    return true;
+}
+
+function khmerMinutes(ms) {
+    return String(Math.round(ms / 60000)).replace(/\d/g, (d) => '០១២៣៤៥៦៧៨៩'[Number(d)]);
+}
+
+function lockKeygenSession(silent) {
+    clearSigningKey(true);
+    if (sbAdminSession) sbAdminLogout();
+    invalidateSensitiveSession();
+    refreshKgStatus();
+    if (!silent) showToast('🔒 វគ្គត្រូវបានចាក់សោ ៖ Signing Key និង Supabase Admin ដកចេញពីសតិរួច។');
+}
+
+function setKgText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function refreshKgStatus() {
+    const loggedIn = !!authButtonIsLoggedIn;
+    const keyLoaded = !!signingPrivateKeyJwk;
+    const shopIn = !!sbAdminSession;
+    const chip = (id, on, text) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.classList.toggle('on', on);
+    };
+    chip('kgChipLogin', loggedIn, loggedIn ? '🔐 ចូលរួច' : '🔐 មិនទាន់ចូល');
+    chip('kgChipKey', keyLoaded, keyLoaded ? '🔑 Signing Key Load រួច' : '🔑 Signing Key មិនទាន់ Load');
+    chip('kgChipShop', shopIn, shopIn ? '🏪 Supabase Admin ចូលរួច' : '🏪 Supabase មិនទាន់ចូល');
+    const user = auth && auth.currentUser && auth.currentUser.email ? auth.currentUser.email : '';
+    setKgText('kgSessionUser', loggedIn && user ? user : '—');
+    setKgText('kgSessionKey', keyLoaded ? 'Load រួច · ដកចេញក្រោយមិនប្រើ ' + khmerMinutes(SIGNING_KEY_IDLE_MS) + ' នាទី' : 'មិនទាន់ Load');
+    setKgText('kgSessionShop', shopIn ? 'ចូលរួច · ដកចេញក្រោយមិនប្រើ ' + khmerMinutes(SB_ADMIN_IDLE_MS) + ' នាទី' : 'មិនទាន់ចូល');
+    setKgText('kgSessionNote', 'ចាកចេញពី ZoeKeyGen ដោយស្វ័យប្រវត្តិក្រោយមិនប្រើ ' + khmerMinutes(KEYGEN_IDLE_LOGOUT_MS)
+        + ' នាទី · PIN ការពារ Config · Setup Link · Keypair ថ្មី · «ចាក់សោវគ្គឥឡូវ» ដក Signing Key និង Supabase Admin ចេញពីសតិភ្លាម។');
+    if (!loggedIn) kgNextTarget = { text: 'ចូលប្រព័ន្ធ', login: true };
+    else if (!keyLoaded) kgNextTarget = { text: 'Load Signing Key (១)', tab: 'create', id: 'signingKeyForm' };
+    else kgNextTarget = { text: 'រួចរាល់ — បង្កើត Key (២) · បញ្ជី (៣) · ហាង (៤)', tab: 'create', id: 'genDaysInput', done: true };
+    const btn = document.getElementById('kgNextBtn');
+    if (btn) {
+        btn.textContent = (kgNextTarget.done ? '✅ ' : '➡️ ជំហានបន្ទាប់ ៖ ') + kgNextTarget.text;
+        btn.classList.toggle('done', !!kgNextTarget.done);
+    }
+}
+
+function goToKgNext() {
+    const target = kgNextTarget;
+    if (!target) return;
+    if (target.login) { showLoginModalWithPrefill(); return; }
+    switchKgTab(target.tab);
+    const el = document.getElementById(target.id);
+    const card = el && el.closest ? el.closest('.app-card') : null;
+    if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'start' });
+    if (el && typeof el.focus === 'function' && target.id === 'genDaysInput') el.focus({ preventScroll: true });
+}
+
 function switchKgTab(name) {
     const tab = KG_TABS.indexOf(name) === -1 ? 'create' : name;
     const box = document.getElementById('appContainer');
@@ -3847,6 +3929,7 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreSetupLinkBaseUrl();
     restoreSbAdminConfig();
     switchKgTab(safeStoreGet(appLocalStore, KG_TAB_KEY) || 'create');
+    refreshKgStatus();
     refreshBiometricUi();
     setupIOSPullToRefresh();
 
@@ -3857,13 +3940,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', noteSigningKeyActivity, { capture: true, passive: true });
     document.addEventListener('pointerdown', sbAdminActivity, { capture: true, passive: true });
     document.addEventListener('keydown', sbAdminActivity, { capture: true, passive: true });
+    ['pointerdown', 'keydown'].forEach((evt) => document.addEventListener(evt, noteKeygenActivity, { capture: true, passive: true }));
     setInterval(expireIdleSigningKey, 30000);
     setInterval(expireIdleSbAdmin, 30000);
+    setInterval(expireIdleKeygenSession, 30000);
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         expireIdleSigningKey();
         expireIdleSbAdmin();
+        expireIdleKeygenSession();
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();

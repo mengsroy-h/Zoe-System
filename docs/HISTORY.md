@@ -165,6 +165,27 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeKeyGen 2.24.18] — 2026-10-14 · ZoeKeyGen ៖ ទម្រង់តាមលំដាប់ការងារ · របាស្ថានភាព · កាតវគ្គ · ចាកចេញស្វ័យប្រវត្តិ · CSP គ្មាន inline style
+
+**ZoeKeyGen `2.24.18`** (`zoekeygen-v128` ➜ `zoekeygen-v129`)។ ZoeW `2.50.62` ដដែល។ សំណើម្ចាស់គម្រោង ៖ «រៀបចំ layout របស់ ZoeKeyGen ឡើងវិញអោយងាយស្រួលប្រើនិងត្រឹមត្រូវតាមលំដាប់ និងពង្រឹងសុវត្ថិភាពការពារការវាយប្រហារ»។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កាតរៀបតាមលំដាប់ការងារ ហើយមានលេខ ៖ ១ Signing Key ➜ ២ បង្កើត Key ➜ ៣ បញ្ជី Key ➜ ៤ ហាង Supabase ➜ ៥ Setup Link ➜ ៦ ដំណឹង (ពីមុន ៖ Link និងដំណឹងមុនហាង · បញ្ជី Key នៅបាតទំព័រ)។ របា Tab ទូរស័ព្ទ ៖ បង្កើត · បញ្ជី · ហាង · Link · ដំណឹង។ លើកុំព្យូទ័រ Setup Link ពេញទទឹង (ពីមុនកាតវែងម្ខាងទុកចន្លោះទទេ)។
+- របាស្ថានភាពខាងលើគ្រប់ផ្ទាំង ៖ chip ចូលរួច · Signing Key · Supabase Admin (ពណ៌តាមស្ថានភាពពិត) + ប៊ូតុង «➡️ ជំហានបន្ទាប់» (ចូល ➜ Load Signing Key ➜ ✅ រួចរាល់) ដែលបើកប្រអប់ចូល ឬនាំទៅកាតនោះ។
+- កាត «🔒 វគ្គ និងសុវត្ថិភាព» (ក្បែរ «បង្កើត Key») ៖ អ្នកប្រើ · ស្ថានភាព Signing Key / Supabase Admin ជាមួយពិដានទុកចោល · «🔒 ចាក់សោវគ្គឥឡូវ» (ដក Signing Key + Supabase Admin ចេញពីសតិភ្លាម) · «⚙️ Config · PIN · ក្រយៅដៃ»។
+- **ចាកចេញដោយស្វ័យប្រវត្តិ** ក្រោយមិនប្រើ ៣០ នាទី (ចុច/វាយ = សកម្មភាព · នាឡិកាថយក្រោយ = ផុត) ៖ ចាក់សោវគ្គ រួចចាកចេញ (គ្មាន confirm · លើកលែងកំពុង Generate ឬ Keypair ថ្មីមិនទាន់ចម្លង) — ពីមុនសម័យ Admin (Revoke · Extend · កៅអី · ដំណឹង) នៅបើករហូតលើឧបករណ៍ដែលទុកចោល។
+- សុវត្ថិភាព header ៖ `style-src` គ្មាន `'unsafe-inline'` (style attribute ៣៥ ក្នុង `index.html` ➜ class · `--modal-w` តាម class `modal-w-*` · QR ជា SVG រួចហើយ) · `X-XSS-Protection: 0` (filter ចាស់ដែលបង្ក XS-Leak)។
+
+#### អ្នកយាម
+
+`csp-enforced-test` ផ្នែក ៣ (ថ្មី ៖ ZoeKeyGen ក្រោម header ពិត ៖ ០ ការរំលោភ ពេល boot · ផ្ទាំង ៥ · ប្រអប់ PIN · QR · ទទឹង modal តាម class · probe ផ្ទុយ ៖ style ដែលចាក់ត្រូវបដិសេធ) · `keygen-session-security-test` (ថ្មី ១២ ករណី ៖ ពិដាន ១០–៦០ នាទី ≥ Signing Key · មិនចូល/កំពុង Generate/Keypair មិនចម្លង ➜ មិនចាកចេញ · សកម្មភាពពន្យារ · ដល់ពិដាន ➜ lock silent + logoutApp(true) · នាឡិកាថយក្រោយ · ខ្សែភ្ជាប់ boot · `logoutApp(true)` គ្មាន confirm · `lockKeygenSession` ៖ mutation ពិដាន ×១០០ ➜ ធ្លាក់ ២) · `dom-hygiene` (`kgNextBtn` ស្លាកថេរ) · `keygen-supabase-admin-test` (stub `refreshKgStatus`) · `layout-check` · `css-classes` · `fluid-type-focus`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeKeyGen (Netlify base `ZoeKeyGen`) ➜ header CSP ថ្មីចូលជាធរមាន · គ្មាន rules ថ្មី។
+2. សាកលើទូរស័ព្ទ + កុំព្យូទ័រ ៖ ចូល ➜ ស្ថានភាព «ជំហានបន្ទាប់» ➜ Load Signing Key ➜ chip បៃតង · «ចាក់សោវគ្គឥឡូវ» ➜ Signing Key ចេញ · ទុកចោល ៣០ នាទី ➜ ចាកចេញ · QR/ប្រអប់ទាំងអស់បង្ហាញធម្មតា (Console គ្មាន CSP violation)។
+
 ### [2.50.62] — 2026-10-14 · ប្រាក់ Sync ត្រឹមត្រូវ ទោះបិទ App ពេលក្រៅបណ្តាញ (ledger replay មិនបញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ)
 
 **ZoeW** (`zoew-v324` ➜ `zoew-v325`)។ ZoeKeyGen រក្សាកំណែដដែល។ Deep audit ជុំទី ៣ តាមសំណើម្ចាស់គម្រោង («លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន … តេស្តអោយបានច្រើនដង») ➜ checker ថ្មី `emu/money-multidevice-emu-test` (ឧបករណ៍ ២ ពិត · SDK ពិត · rules ពិត · offline · reload) រកឃើញថា journal របស់ [2.50.59] replay delta ledger **ដោយឯករាជ្យ** ពីការសរសេរទិន្នន័យដែលជាដៃគូ ➜ កែតម្លៃ ឬស្កេនក្រៅបណ្តាញ រួច reload (PTR · បិទ App) ➜ ledger ប្រែ តែតម្លៃកញ្ចប់មិនប្រែ (ឬផ្ទុយ)។
@@ -5822,7 +5843,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `checker-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `cleanup-clock-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `clear-history-claim-test` | ផ្នែក ១ | — |
+| `clear-history-claim-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
@@ -5835,7 +5856,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `concurrent-scan-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `connection-state-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `csp-enforced-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `csp-enforced-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `csp-lazy-resource-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `css-classes` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `css-media-override` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -5844,7 +5865,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `dependency-security-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
-| `dom-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `dom-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |

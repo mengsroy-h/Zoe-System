@@ -66,12 +66,19 @@
 
 <div class="app-container hidden kg-tab-create" id="appContainer">
 
+    <div class="kg-status" id="kgStatus" role="status" aria-live="polite">
+        <span class="kg-chip" id="kgChipLogin">🔐 មិនទាន់ចូល</span>
+        <span class="kg-chip" id="kgChipKey">🔑 Signing Key មិនទាន់ Load</span>
+        <span class="kg-chip" id="kgChipShop">🏪 Supabase មិនទាន់ចូល</span>
+        <button type="button" class="kg-next" id="kgNextBtn" data-act="goToKgNext">➡️ ជំហានបន្ទាប់ ៖ ចូលប្រព័ន្ធ</button>
+    </div>
+
     <div class="app-card card-wide" data-tab="create">
         <div class="card-header">
-            <div class="card-title">🔑 Signing Key</div>
-            <span class="badge" id="signingKeyStatusBadge" style="background:var(--danger-light); color:#a3123a;">មិនទាន់ Load</span>
+            <div class="card-title">១ · 🔑 Signing Key</div>
+            <span class="badge badge-revoked" id="signingKeyStatusBadge">មិនទាន់ Load</span>
         </div>
-        <div class="card-subtitle" style="margin-bottom:10px;">
+        <div class="card-subtitle mb-10">
             Private Key មិនត្រូវបានរក្សាទុកនៅឯណាឡើយ ជាលំនាំដើម (មិនមែន localStorage មិនមែន Firebase) — វានៅតែក្នុងសតិ browser
             រហូតដល់អ្នកបិទទំព័រ ឬ Refresh។ សូមរក្សា Private Key របស់អ្នកឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។
             ចង់ចៀសវាង Paste ម្តងទៀតរាល់ពេល Reload/Multitasking? ជ្រើសរើសខាងក្រោម (ត្រូវការ PIN ដើម្បីការពារ)។
@@ -81,8 +88,8 @@
             <input type="text" id="signingKeyUsername" class="hidden" name="username" autocomplete="username" value="ZoeKeyGen Signing Key" readonly tabindex="-1" aria-hidden="true">
             <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON) ឬបំពេញពី Password Manager</label>
             <input type="password" id="privateKeyInput" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'>
-            <label style="display:flex; align-items:center; gap:6px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
-                <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
+            <label class="check-row">
+                <input type="checkbox" id="rememberSigningKeyCheckbox" class="check-box">
                 🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
             </label>
             <div class="btn-row mb-8">
@@ -94,20 +101,20 @@
         </div>
 
         <details>
-            <summary style="cursor:pointer; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600;">មិនទាន់មាន Signing Key? បង្កើត Keypair ថ្មី</summary>
-            <div style="margin-top:10px;">
+            <summary class="details-summary">មិនទាន់មាន Signing Key? បង្កើត Keypair ថ្មី</summary>
+            <div class="mt-10">
                 <div class="danger-box">
                     ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗទាំងអស់ (ដែល Verify ដោយ Public Key ចាស់) ប្រើលែងកើតទៀត លុះត្រាតែ
                     អ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុងឯកសារ <code>license-verify.js</code> របស់ ZoeW និង ZoeKeyGen ទាំងពីរ រួច Deploy ឡើងវិញ។
                 </div>
-                <button class="btn-secondary" style="width:100%;" data-act="generateNewKeypair">🆕 បង្កើត Keypair ថ្មី</button>
+                <button class="btn-secondary w-full" data-act="generateNewKeypair">🆕 បង្កើត Keypair ថ្មី</button>
             </div>
         </details>
     </div>
 
     <div class="app-card" data-tab="create">
         <div class="card-header">
-            <div class="card-title">✨ បង្កើត Key ថ្មី</div>
+            <div class="card-title">២ · ✨ បង្កើត Key ថ្មី</div>
         </div>
 
         <div class="form-grid">
@@ -124,115 +131,59 @@
                 <input type="text" id="genNoteInput" placeholder="ឧ. ម៉ាស៊ីនស្កេនកន្លែងទី ១">
             </div>
         </div>
-        <button class="btn-primary" style="width:100%;" id="genGenerateBtn" data-act="generateLicenseKey">🔐 Generate Key</button>
+        <button class="btn-primary w-full" id="genGenerateBtn" data-act="generateLicenseKey">🔐 Generate Key</button>
 
-        <div id="genResultBox" class="hidden" style="margin-top:12px;">
+        <div id="genResultBox" class="hidden mt-12">
             <label>Key ដែលបានបង្កើត (ចម្លងផ្ញើឲ្យអ្នកប្រើប្រាស់)</label>
             <div class="key-output" id="genResultKey"></div>
-            <button class="btn-secondary" style="width:100%;" data-act="copyGeneratedKey">📋 ចម្លង Key</button>
+            <button class="btn-secondary w-full" data-act="copyGeneratedKey">📋 ចម្លង Key</button>
         </div>
     </div>
 
-    <div class="app-card" data-tab="link">
+    <div class="app-card" data-tab="create">
         <div class="card-header">
-            <div class="card-title">🔗 បង្កើត Setup Link</div>
+            <div class="card-title">🔒 វគ្គ និងសុវត្ថិភាព</div>
         </div>
-        <div class="card-subtitle" style="margin-bottom:10px;">
-            បង្កើត Link មួយសម្រាប់ភ្ជាប់ Config Firebase/Supabase និង API ស្វែងរកអតិថិជនលើឧបករណ៍អតិថិជន — បើក Link នេះម្តងលើឧបករណ៍គោលដៅ
-            (App នឹងសួរបញ្ជាក់មុននឹងកំណត់) ជំនួសការ Paste Config JSON ដោយដៃរាល់ឧបករណ៍។ Config Firebase មិនមែនជាព័ត៌មានសម្ងាត់ទេ
-            (សុវត្ថិភាពពិតប្រាកដស្ថិតនៅ Server-side Rules) ប៉ុន្តែសូមចម្លងផ្ញើ Link នេះទៅឧបករណ៍គោលដៅផ្ទាល់ (ឧ. តាម Telegram) មិនមែនផ្សព្វផ្សាយជាសាធារណៈ។
-        </div>
-
-        <div class="form-grid">
-            <div>
-                <label for="setupLinkUrlInput">Base URL របស់ ZoeW (ចងចាំដោយស្វ័យប្រវត្តិ)</label>
-                <input type="text" id="setupLinkUrlInput" placeholder="https://your-app.netlify.app">
-            </div>
-            <div>
-                <label for="setupLinkDsnInput">Sentry DSN (ស្រេចចិត្ត — ឲ្យកំហុសលើឧបករណ៍អតិថិជនមកដល់អ្នក)</label>
-                <input type="text" id="setupLinkDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
-            </div>
-        </div>
-
-        <label for="setupLinkConfigInput">Config Firebase ឬ Supabase របស់ជំនួញនេះ — ទុកទទេសម្រាប់ Link ដែលមានតែ API</label>
-        <textarea id="setupLinkConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
-
-const firebaseConfig = {
-  apiKey: "...",
-  authDomain: "...",
-  databaseURL: "...",
-  projectId: "..."
-};'></textarea>
-
-        <fieldset style="border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; margin-bottom:12px;">
-            <legend>🔎 API ស្វែងរកអតិថិជន</legend>
-        <div class="mb-8">
-            <label for="setupLookupTenantSelect">ហាង Supabase សម្រាប់ API ស្វែងរក</label>
-            <select id="setupLookupTenantSelect"><option value="">ចងទៅហាងដែលភ្ជាប់លើឧបករណ៍អតិថិជន</option></select>
-            <div class="card-subtitle">ជ្រើសហាងពីផ្ទាំង 🏪 ហាង ➜ 🔗 API ស្វែងរក។ Link ដែលជ្រើសហាងប្រើបានសម្រាប់ហាងនោះ។</div>
-        </div>
-            <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" style="width:auto; margin:0;" id="setupLookupIncludeCheckbox"> ដាក់ API ក្នុង Link/QR</label>
-            <label for="setupLookupUrlInput">URL API ដែលមាន {barcode} — HTTPS ឬផ្លូវចាប់ផ្ដើម /</label>
-            <input type="text" id="setupLookupUrlInput" autocomplete="off" spellcheck="false" placeholder="/.netlify/functions/zto-order-detail?barcode={barcode}">
-            <p>ផ្លូវចាប់ផ្ដើម / ប្រើ domain ពី Base URL របស់ ZoeW ខាងលើ។ URL HTTPS ពេញប្រើ domain របស់វា។</p>
-            <label for="setupLookupHeaderInput">ឈ្មោះ Header (ឧ. X-Zoe-Proxy-Key)</label>
-            <input type="text" id="setupLookupHeaderInput" autocomplete="off" spellcheck="false">
-            <label for="setupLookupSecretInput">កូនសោ Header សម្ងាត់</label>
-            <input type="password" id="setupLookupSecretInput" autocomplete="off" spellcheck="false">
-            <label for="setupLookupPhoneInput">ជួរឈរទូរស័ព្ទ</label><input type="text" id="setupLookupPhoneInput" value="phone">
-            <label for="setupLookupCodInput">ជួរឈរ COD</label><input type="text" id="setupLookupCodInput" value="cod">
-            <label for="setupLookupDodInput">ជួរឈរ DOD</label><input type="text" id="setupLookupDodInput" value="dod">
-            <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" style="width:auto; margin:0;" id="setupLookupFastCheckbox"> Fast Mode</label>
-            <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" style="width:auto; margin:0;" id="setupLookupEnabledCheckbox" checked> បើក API</label>
-            <p>កូនសោចាក់សោដោយកូដ ៦ ខ្ទង់។ ប្រាប់កូដដាច់ដោយឡែកពី Link/QR។ Google Apps Script មិនទទួល Header ទេ។</p>
-        </fieldset>
-
-        <button class="btn-primary" style="width:100%;" data-act="generateSetupLink">🔗 បង្កើត Link</button>
-
-        <div id="setupLinkResultBox" class="hidden" style="margin-top:12px;">
-            <p id="setupLookupCodeOutput" role="status" aria-live="polite"></p>
-            <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
-            <div class="key-output" id="setupLinkResultText" style="word-break:break-all;"></div>
-            <button class="btn-secondary" style="width:100%;" data-act="copySetupLink">📋 ចម្លង Link</button>
-            <div id="setupLinkQrContainer" class="qr-box"></div>
-            <button class="btn-secondary qr-save-btn" style="width:100%;" data-act="saveSetupLinkQr">💾 រក្សាទុក QR (រូបភាព)</button>
-        </div>
-    </div>
-
-    <div class="app-card card-wide" data-tab="notice">
-        <div class="card-header">
-            <div class="card-title">🔔 ផ្ញើដំណឹងទៅ ZoeW</div>
-            <button class="btn-mini" data-act="refreshNoticeList">🔄 Refresh</button>
-        </div>
-        <div class="card-subtitle mb-8">
-            ដំណឹងលេចក្នុងផ្ទាំង 🔔 របស់ ZoeW គ្រប់ឧបករណ៍ ពេល ZoeW ទាញលើកក្រោយ (ពេលបើក App · ពេលបើកផ្ទាំង 🔔 · រាល់ ៥ នាទី)។
-            ⚠️ អ្នកណាក៏អានដំណឹងនេះបាន — កុំដាក់ព័ត៌មានសម្ងាត់។ រក្សាទុកតែ ២០ ចុងក្រោយ (ចាស់ជាងគេលុបដោយស្វ័យប្រវត្តិ)។
-        </div>
-        <div class="form-grid">
-            <div class="col-half">
-                <label for="noticeKindInput">ប្រភេទ</label>
-                <select id="noticeKindInput">
-                    <option value="notice">📢 សេចក្តីប្រកាស</option>
-                    <option value="maintenance">🛠️ ការថែទាំប្រព័ន្ធ</option>
-                </select>
-            </div>
-            <div class="col-half">
-                <label for="noticeTitleInput">ចំណងជើង (ដល់ 120 តួ)</label>
-                <input type="text" id="noticeTitleInput" maxlength="120" placeholder="ឧ. ថែទាំប្រព័ន្ធ ថ្ងៃអាទិត្យ ម៉ោង ៩ យប់">
-            </div>
-        </div>
-        <label for="noticeBodyInput">ខ្លឹមសារ (ស្រេចចិត្ត · ដល់ 600 តួ)</label>
-        <textarea id="noticeBodyInput" class="notice-body-input" maxlength="600" placeholder="ឧ. App អាចភ្ជាប់មិនបានប្រហែល ១០ នាទី។"></textarea>
-        <button class="btn-primary notice-send-btn" id="noticeSendBtn" data-act="sendNotice">📨 ផ្ញើដំណឹង</button>
-        <label>ដំណឹងដែលបានផ្ញើ</label>
-        <ul class="notice-list" id="noticeListBody">
-            <li class="notice-empty">កំពុងផ្ទុក...</li>
+        <ul class="kg-session-list">
+            <li><span>អ្នកប្រើ</span><b id="kgSessionUser">—</b></li>
+            <li><span>Signing Key</span><b id="kgSessionKey">មិនទាន់ Load</b></li>
+            <li><span>Supabase Admin</span><b id="kgSessionShop">មិនទាន់ចូល</b></li>
         </ul>
+        <div class="card-subtitle mb-10" id="kgSessionNote"></div>
+        <div class="btn-row">
+            <button type="button" class="btn-secondary" data-act="lockKeygenSession">🔒 ចាក់សោវគ្គឥឡូវ</button>
+            <button type="button" class="btn-secondary" data-act="openConfigFlow">⚙️ Config · PIN · ក្រយៅដៃ</button>
+        </div>
+    </div>
+
+    <div class="app-card card-wide" data-tab="list">
+        <div class="card-header">
+            <div class="card-title">៣ · 📋 បញ្ជី Key ទាំងអស់</div>
+            <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
+            <button class="btn-mini" data-act="migrateLegacyLicenseKeyMetadata" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>App</th>
+                        <th>ID</th>
+                        <th>ចំណាំ</th>
+                        <th>ផុតកំណត់</th>
+                        <th>ស្ថានភាព</th>
+                        <th>សកម្មភាព</th>
+                    </tr>
+                </thead>
+                <tbody id="keyListBody">
+                    <tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="app-card card-wide" data-tab="shop">
         <div class="card-header">
-            <div class="card-title">🏪 ហាង Supabase (Project តែមួយ)</div>
+            <div class="card-title">៤ · 🏪 ហាង Supabase (Project តែមួយ)</div>
             <button class="btn-mini" data-act="sbAdminRefresh">🔄 Refresh</button>
         </div>
         <div class="card-subtitle mb-8">
@@ -321,43 +272,115 @@ const firebaseConfig = {
         </div>
     </div>
 
-    <div class="app-card card-wide" data-tab="list">
+    <div class="app-card card-wide" data-tab="link">
         <div class="card-header">
-            <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
-            <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
-            <button class="btn-mini" data-act="migrateLegacyLicenseKeyMetadata" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>
+            <div class="card-title">៥ · 🔗 បង្កើត Setup Link</div>
         </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>App</th>
-                        <th>ID</th>
-                        <th>ចំណាំ</th>
-                        <th>ផុតកំណត់</th>
-                        <th>ស្ថានភាព</th>
-                        <th>សកម្មភាព</th>
-                    </tr>
-                </thead>
-                <tbody id="keyListBody">
-                    <tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>
-                </tbody>
-            </table>
+        <div class="card-subtitle mb-10">
+            បង្កើត Link មួយសម្រាប់ភ្ជាប់ Config Firebase/Supabase និង API ស្វែងរកអតិថិជនលើឧបករណ៍អតិថិជន — បើក Link នេះម្តងលើឧបករណ៍គោលដៅ
+            (App នឹងសួរបញ្ជាក់មុននឹងកំណត់) ជំនួសការ Paste Config JSON ដោយដៃរាល់ឧបករណ៍។ Config Firebase មិនមែនជាព័ត៌មានសម្ងាត់ទេ
+            (សុវត្ថិភាពពិតប្រាកដស្ថិតនៅ Server-side Rules) ប៉ុន្តែសូមចម្លងផ្ញើ Link នេះទៅឧបករណ៍គោលដៅផ្ទាល់ (ឧ. តាម Telegram) មិនមែនផ្សព្វផ្សាយជាសាធារណៈ។
         </div>
+
+        <div class="form-grid">
+            <div>
+                <label for="setupLinkUrlInput">Base URL របស់ ZoeW (ចងចាំដោយស្វ័យប្រវត្តិ)</label>
+                <input type="text" id="setupLinkUrlInput" placeholder="https://your-app.netlify.app">
+            </div>
+            <div>
+                <label for="setupLinkDsnInput">Sentry DSN (ស្រេចចិត្ត — ឲ្យកំហុសលើឧបករណ៍អតិថិជនមកដល់អ្នក)</label>
+                <input type="text" id="setupLinkDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
+            </div>
+        </div>
+
+        <label for="setupLinkConfigInput">Config Firebase ឬ Supabase របស់ជំនួញនេះ — ទុកទទេសម្រាប់ Link ដែលមានតែ API</label>
+        <textarea id="setupLinkConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
+
+const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "..."
+};'></textarea>
+
+        <fieldset class="fieldset-box">
+            <legend>🔎 API ស្វែងរកអតិថិជន</legend>
+        <div class="mb-8">
+            <label for="setupLookupTenantSelect">ហាង Supabase សម្រាប់ API ស្វែងរក</label>
+            <select id="setupLookupTenantSelect"><option value="">ចងទៅហាងដែលភ្ជាប់លើឧបករណ៍អតិថិជន</option></select>
+            <div class="card-subtitle">ជ្រើសហាងពីផ្ទាំង 🏪 ហាង ➜ 🔗 API ស្វែងរក។ Link ដែលជ្រើសហាងប្រើបានសម្រាប់ហាងនោះ។</div>
+        </div>
+            <label class="check-line"><input type="checkbox" class="check-box" id="setupLookupIncludeCheckbox"> ដាក់ API ក្នុង Link/QR</label>
+            <label for="setupLookupUrlInput">URL API ដែលមាន {barcode} — HTTPS ឬផ្លូវចាប់ផ្ដើម /</label>
+            <input type="text" id="setupLookupUrlInput" autocomplete="off" spellcheck="false" placeholder="/.netlify/functions/zto-order-detail?barcode={barcode}">
+            <p>ផ្លូវចាប់ផ្ដើម / ប្រើ domain ពី Base URL របស់ ZoeW ខាងលើ។ URL HTTPS ពេញប្រើ domain របស់វា។</p>
+            <label for="setupLookupHeaderInput">ឈ្មោះ Header (ឧ. X-Zoe-Proxy-Key)</label>
+            <input type="text" id="setupLookupHeaderInput" autocomplete="off" spellcheck="false">
+            <label for="setupLookupSecretInput">កូនសោ Header សម្ងាត់</label>
+            <input type="password" id="setupLookupSecretInput" autocomplete="off" spellcheck="false">
+            <label for="setupLookupPhoneInput">ជួរឈរទូរស័ព្ទ</label><input type="text" id="setupLookupPhoneInput" value="phone">
+            <label for="setupLookupCodInput">ជួរឈរ COD</label><input type="text" id="setupLookupCodInput" value="cod">
+            <label for="setupLookupDodInput">ជួរឈរ DOD</label><input type="text" id="setupLookupDodInput" value="dod">
+            <label class="check-line"><input type="checkbox" class="check-box" id="setupLookupFastCheckbox"> Fast Mode</label>
+            <label class="check-line"><input type="checkbox" class="check-box" id="setupLookupEnabledCheckbox" checked> បើក API</label>
+            <p>កូនសោចាក់សោដោយកូដ ៦ ខ្ទង់។ ប្រាប់កូដដាច់ដោយឡែកពី Link/QR។ Google Apps Script មិនទទួល Header ទេ។</p>
+        </fieldset>
+
+        <button class="btn-primary w-full" data-act="generateSetupLink">🔗 បង្កើត Link</button>
+
+        <div id="setupLinkResultBox" class="hidden mt-12">
+            <p id="setupLookupCodeOutput" role="status" aria-live="polite"></p>
+            <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
+            <div class="key-output break-all" id="setupLinkResultText"></div>
+            <button class="btn-secondary w-full" data-act="copySetupLink">📋 ចម្លង Link</button>
+            <div id="setupLinkQrContainer" class="qr-box"></div>
+            <button class="btn-secondary qr-save-btn" data-act="saveSetupLinkQr">💾 រក្សាទុក QR (រូបភាព)</button>
+        </div>
+    </div>
+
+    <div class="app-card card-wide" data-tab="notice">
+        <div class="card-header">
+            <div class="card-title">៦ · 🔔 ផ្ញើដំណឹងទៅ ZoeW</div>
+            <button class="btn-mini" data-act="refreshNoticeList">🔄 Refresh</button>
+        </div>
+        <div class="card-subtitle mb-8">
+            ដំណឹងលេចក្នុងផ្ទាំង 🔔 របស់ ZoeW គ្រប់ឧបករណ៍ ពេល ZoeW ទាញលើកក្រោយ (ពេលបើក App · ពេលបើកផ្ទាំង 🔔 · រាល់ ៥ នាទី)។
+            ⚠️ អ្នកណាក៏អានដំណឹងនេះបាន — កុំដាក់ព័ត៌មានសម្ងាត់។ រក្សាទុកតែ ២០ ចុងក្រោយ (ចាស់ជាងគេលុបដោយស្វ័យប្រវត្តិ)។
+        </div>
+        <div class="form-grid">
+            <div class="col-half">
+                <label for="noticeKindInput">ប្រភេទ</label>
+                <select id="noticeKindInput">
+                    <option value="notice">📢 សេចក្តីប្រកាស</option>
+                    <option value="maintenance">🛠️ ការថែទាំប្រព័ន្ធ</option>
+                </select>
+            </div>
+            <div class="col-half">
+                <label for="noticeTitleInput">ចំណងជើង (ដល់ 120 តួ)</label>
+                <input type="text" id="noticeTitleInput" maxlength="120" placeholder="ឧ. ថែទាំប្រព័ន្ធ ថ្ងៃអាទិត្យ ម៉ោង ៩ យប់">
+            </div>
+        </div>
+        <label for="noticeBodyInput">ខ្លឹមសារ (ស្រេចចិត្ត · ដល់ 600 តួ)</label>
+        <textarea id="noticeBodyInput" class="notice-body-input" maxlength="600" placeholder="ឧ. App អាចភ្ជាប់មិនបានប្រហែល ១០ នាទី។"></textarea>
+        <button class="btn-primary notice-send-btn" id="noticeSendBtn" data-act="sendNotice">📨 ផ្ញើដំណឹង</button>
+        <label>ដំណឹងដែលបានផ្ញើ</label>
+        <ul class="notice-list" id="noticeListBody">
+            <li class="notice-empty">កំពុងផ្ទុក...</li>
+        </ul>
     </div>
 
     <nav class="kg-tabbar" id="kgTabBar" aria-label="ផ្ទាំង">
         <button type="button" class="kg-tab active" data-tab="create" data-act="switchKgTab" data-args='["create"]'><span class="tab-ico">✨</span><span>បង្កើត</span></button>
         <button type="button" class="kg-tab" data-tab="list" data-act="switchKgTab" data-args='["list"]'><span class="tab-ico">📋</span><span>បញ្ជី</span></button>
-        <button type="button" class="kg-tab" data-tab="link" data-act="switchKgTab" data-args='["link"]'><span class="tab-ico">🔗</span><span>Link</span></button>
         <button type="button" class="kg-tab" data-tab="shop" data-act="switchKgTab" data-args='["shop"]'><span class="tab-ico">🏪</span><span>ហាង</span></button>
+        <button type="button" class="kg-tab" data-tab="link" data-act="switchKgTab" data-args='["link"]'><span class="tab-ico">🔗</span><span>Link</span></button>
         <button type="button" class="kg-tab" data-tab="notice" data-act="switchKgTab" data-args='["notice"]'><span class="tab-ico">🔔</span><span>ដំណឹង</span></button>
     </nav>
 
 </div>
 
 <div id="pinModal" class="modal">
-    <div class="modal-content" style="--modal-w: 300;">
+    <div class="modal-content modal-w-300">
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p id="pinModalMsg">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN" autocomplete="off">
@@ -372,7 +395,7 @@ const firebaseConfig = {
 </div>
 
 <div id="pinSetupModal" class="modal">
-    <div class="modal-content" style="--modal-w: 300;">
+    <div class="modal-content modal-w-300">
         <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
         <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ (យ៉ាងតិច ៦ តួអក្សរ)</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
@@ -383,7 +406,7 @@ const firebaseConfig = {
 </div>
 
 <div id="configModal" class="modal">
-    <div class="modal-content" style="--modal-w: 380;">
+    <div class="modal-content modal-w-380">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>ត្រូវប្រើ Firebase Project <b>ដាច់ដោយឡែក</b> សម្រាប់ License (មិនមែន Project របស់ ZoeW ទេ) — មើលជំហានបង្កើតក្នុង README.md។</p>
         <textarea id="firebaseConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
@@ -394,7 +417,7 @@ const firebaseConfig = {
   databaseURL: "...",
   projectId: "..."
 };'></textarea>
-        <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
+        <p class="mt-14">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="bio-toggle-row">
             <span>🫆 ចូលដោយក្រយៅដៃ ឬមុខ ៖ <b id="biometricToggleState">បិទ</b></span>
@@ -427,32 +450,32 @@ const firebaseConfig = {
 </div>
 
 <div id="keypairModal" class="modal" data-close="dismissKeypairModal">
-    <div class="modal-content" style="--modal-w: 460;">
+    <div class="modal-content modal-w-460">
         <h3>🆕 Keypair ថ្មីត្រូវបានបង្កើត</h3>
-        <div class="danger-box" style="text-align:left;">
+        <div class="danger-box text-left">
             រក្សាទុក Private Key ខាងក្រោមឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។ វានឹងបាត់បង់ជារៀងរហូតបើអ្នកបិទប្រអប់នេះ
             ដោយមិនបានចម្លងទុក! កុំដាក់វាចូល Git ឬបញ្ជូនតាម Chat/Email ធម្មតាឡើយ។ Private Key ថ្មីនេះ Load មិនបានរហូតដល់ Public Key ខាងក្រោម
             ត្រូវដាក់ក្នុង license-verify.js របស់ App ទាំងអស់ ហើយ Deploy។
         </div>
-        <label style="text-align:left;">Private Key (សម្ងាត់ — កុំចែក)</label>
-        <textarea id="newPrivateKeyOutput" readonly style="min-height:90px;"></textarea>
-        <button class="btn-secondary" style="width:100%; margin-bottom:12px;" data-act="copyTextarea" data-args='["newPrivateKeyOutput"]'>📋 ចម្លង Private Key</button>
+        <label class="text-left">Private Key (សម្ងាត់ — កុំចែក)</label>
+        <textarea id="newPrivateKeyOutput" class="min-h-90" readonly></textarea>
+        <button class="btn-secondary w-full mb-12" data-act="copyTextarea" data-args='["newPrivateKeyOutput"]'>📋 ចម្លង Private Key</button>
 
-        <label style="text-align:left;">Public Key (ដាក់ក្នុង license-verify.js គ្រប់ App)</label>
-        <textarea id="newPublicKeyOutput" readonly style="min-height:70px;"></textarea>
-        <button class="btn-secondary" style="width:100%;" data-act="copyTextarea" data-args='["newPublicKeyOutput"]'>📋 ចម្លង Public Key</button>
+        <label class="text-left">Public Key (ដាក់ក្នុង license-verify.js គ្រប់ App)</label>
+        <textarea id="newPublicKeyOutput" class="min-h-70" readonly></textarea>
+        <button class="btn-secondary w-full" data-act="copyTextarea" data-args='["newPublicKeyOutput"]'>📋 ចម្លង Public Key</button>
 
-        <div class="modal-btns" style="margin-top:12px;">
+        <div class="modal-btns mt-12">
             <button class="btn-cancel" data-act="dismissKeypairModal">បិទ</button>
         </div>
     </div>
 </div>
 
 <div id="extendModal" class="modal">
-    <div class="modal-content" style="--modal-w: 320;">
+    <div class="modal-content modal-w-320">
         <h3>⏳ បន្ថែមសុពលភាព</h3>
         <p>បញ្ចូលចំនួនថ្ងៃបន្ថែម គិតចាប់ពីពេលនេះ</p>
-        <p style="font-size:calc(12 * var(--fs-unit)); color:#a3123a; text-align:left; line-height:1.5;">ℹ️ ថ្ងៃផុតកំណត់ថ្មីរក្សាទុកលើ Server ៖ គ្រឿងដែល Activate រួចទទួលថ្ងៃថ្មីពេលពិនិត្យ Key បន្ទាប់ (ត្រូវការអ៊ីនធឺណិត) ហើយគ្រឿងថ្មី ឬគ្រឿងដែល Reset <strong>Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី</strong> តាមចំនួនឧបករណ៍របស់ Key។</p>
+        <p class="modal-note-danger">ℹ️ ថ្ងៃផុតកំណត់ថ្មីរក្សាទុកលើ Server ៖ គ្រឿងដែល Activate រួចទទួលថ្ងៃថ្មីពេលពិនិត្យ Key បន្ទាប់ (ត្រូវការអ៊ីនធឺណិត) ហើយគ្រឿងថ្មី ឬគ្រឿងដែល Reset <strong>Activate Key នេះបានរហូតដល់ថ្ងៃថ្មី</strong> តាមចំនួនឧបករណ៍របស់ Key។</p>
         <input type="number" id="extendDaysInput" value="30" min="1" step="1">
         <div class="modal-btns">
             <button class="btn-confirm" data-act="confirmExtendKey">រក្សាទុក</button>

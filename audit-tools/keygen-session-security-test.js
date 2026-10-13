@@ -700,6 +700,90 @@ async function run() {
         && /setInterval\(expireIdleSigningKey, \d+\)/.test(bootBlock)
         && /'visibilitychange', \(\) => \{\s*if \(document\.hidden\) return;\s*expireIdleSigningKey\(\);/.test(bootBlock));
 
+    // ⛔ សំណើម្ចាស់គម្រោង (ពង្រឹងសុវត្ថិភាព) ៖ សម័យ Admin (Revoke · Extend · កៅអី · ដំណឹង) មិនត្រូវនៅបើកជារៀងរហូតលើឧបករណ៍ដែលទុកចោល
+    //    ➜ មិនប្រើ ≥ KEYGEN_IDLE_LOGOUT_MS ➜ ចាក់សោវគ្គ (Signing Key · Supabase Admin ចេញពីសតិ) រួចចាកចេញ (`logoutApp(true)` គ្មាន confirm)
+    //    · សកម្មភាពពន្យារ · មិនទាន់ចូល/កំពុង Generate/Keypair មិនទាន់ចម្លង ➜ មិនចាកចេញ · នាឡិកាថយក្រោយ ➜ ចាកចេញ (fail-closed)
+    console.log('-- ចាកចេញស្វ័យប្រវត្តិក្រោយមិនប្រើ (សម័យ Admin) --');
+    function idleLogoutFixture(loggedIn) {
+        const f = build();
+        f.clock = { now: 1700000000000 };
+        f.ctx.Date = class extends Date { static now() { return f.clock.now; } };
+        f.ctx.__logouts = [];
+        f.ctx.__locks = [];
+        f.ctx.logoutApp = (auto) => { f.ctx.__logouts.push(auto === true); };
+        f.ctx.lockKeygenSession = (silent) => { f.ctx.__locks.push(silent === true); };
+        f.ctx.hasUncopiedKeypair = () => false;
+        vm.runInContext(realDecl('KEYGEN_IDLE_LOGOUT_MS') + '\nvar keygenLastActivityAt = 0; authButtonIsLoggedIn = ' + (loggedIn ? 'true' : 'false') + '; isGeneratingKey = false;', f.ctx);
+        vm.runInContext(slice(['elapsedSince', 'noteKeygenActivity', 'expireIdleKeygenSession', 'khmerMinutes']), f.ctx);
+        vm.runInContext('keygenLastActivityAt = Date.now();', f.ctx);
+        return f;
+    }
+    const logoutMs = vm.runInNewContext(realDecl('KEYGEN_IDLE_LOGOUT_MS').replace(/^const /, 'var ') + '; KEYGEN_IDLE_LOGOUT_MS');
+    ok('KEYGEN_IDLE_LOGOUT_MS ជាលេខ ១០–៦០ នាទី ហើយ ≥ SIGNING_KEY_IDLE_MS', logoutMs >= 10 * 60000 && logoutMs <= 60 * 60000 && logoutMs >= idleMs, logoutMs);
+    let il = idleLogoutFixture(false);
+    il.clock.now += logoutMs * 3;
+    ok('មិនទាន់ចូល ➜ មិនចាកចេញ', il.ctx.expireIdleKeygenSession() === false && il.ctx.__logouts.length === 0);
+    il = idleLogoutFixture(true);
+    il.clock.now += logoutMs - 1000;
+    ok('ចូលរួច · មិនទាន់ដល់ពិដាន ➜ នៅ', il.ctx.expireIdleKeygenSession() === false && il.ctx.__logouts.length === 0);
+    il.ctx.noteKeygenActivity();
+    il.clock.now += logoutMs - 1000;
+    ok('សកម្មភាពពន្យារពិដាន ➜ នៅ', il.ctx.expireIdleKeygenSession() === false && il.ctx.__logouts.length === 0);
+    il.clock.now += 2000;
+    ok('⛔ ដល់ពិដាន ➜ ចាក់សោវគ្គ (silent) រួចចាកចេញ (auto · គ្មាន confirm) · ត្រាសកម្មភាព ០ · សារប្រាប់',
+        il.ctx.expireIdleKeygenSession() === true && JSON.stringify(il.ctx.__locks) === '[true]' && JSON.stringify(il.ctx.__logouts) === '[true]'
+        && vm.runInContext('keygenLastActivityAt', il.ctx) === 0 && il.log.toasts.some((t) => /ស្វ័យប្រវត្តិ/.test(t)), { locks: il.ctx.__locks, logouts: il.ctx.__logouts, toasts: il.log.toasts });
+    il = idleLogoutFixture(true);
+    vm.runInContext('isGeneratingKey = true;', il.ctx);
+    il.clock.now += logoutMs * 3;
+    ok('កំពុង Generate Key ➜ មិនចាកចេញ', il.ctx.expireIdleKeygenSession() === false && il.ctx.__logouts.length === 0);
+    il = idleLogoutFixture(true);
+    il.ctx.hasUncopiedKeypair = () => true;
+    il.clock.now += logoutMs * 3;
+    ok('Keypair ថ្មីមិនទាន់ចម្លង ➜ មិនចាកចេញ (Private Key មិនបាត់ស្ងាត់)', il.ctx.expireIdleKeygenSession() === false && il.ctx.__logouts.length === 0);
+    il = idleLogoutFixture(true);
+    il.clock.now -= 60000;
+    ok('⛔ នាឡិកាថយក្រោយ ➜ ចាកចេញ (fail-closed)', il.ctx.expireIdleKeygenSession() === true && il.ctx.__logouts.length === 1);
+    ok('⛔ ខ្សែភ្ជាប់ ៖ pointerdown/keydown ➜ noteKeygenActivity · setInterval ➜ expireIdleKeygenSession · visibilitychange ➜ expireIdleKeygenSession',
+        /\['pointerdown', 'keydown'\]\.forEach\(\(evt\) => document\.addEventListener\(evt, noteKeygenActivity, \{ capture: true, passive: true \}\)\)/.test(bootBlock)
+        && /setInterval\(expireIdleKeygenSession, \d+\)/.test(bootBlock)
+        && /'visibilitychange', \(\) => \{\s*if \(document\.hidden\) return;[\s\S]{0,200}expireIdleKeygenSession\(\);/.test(bootBlock));
+    ok('⛔ ការចូល (updateAuthButton(true)) ចាប់ផ្តើមនាឡិកាទុកចោល',
+        /function updateAuthButton\(isLoggedIn\) \{[\s\S]*?if \(authButtonIsLoggedIn\) keygenLastActivityAt = Date\.now\(\);/.test(src));
+    // logoutApp(auto) ៖ auto ➜ មិនសួរ confirm ទោះ Keypair មិនទាន់ចម្លង · ដោយដៃ ➜ សួរ
+    const lo = build();
+    lo.ctx.__confirms = 0; lo.ctx.__signOuts = 0;
+    lo.ctx.confirm = () => { lo.ctx.__confirms++; return false; };
+    lo.ctx.hasUncopiedKeypair = () => true;
+    lo.ctx.updateAuthButton = () => {};
+    lo.ctx.showLoginModalWithPrefill = () => {};
+    lo.ctx.fb = { signOut: () => { lo.ctx.__signOuts++; return Promise.resolve(); } };
+    vm.runInContext('var pendingRoleRecheck = false;', lo.ctx);
+    vm.runInContext(slice(['logoutApp']), lo.ctx);
+    lo.ctx.logoutApp();
+    const manual = { confirms: lo.ctx.__confirms, signOuts: lo.ctx.__signOuts };
+    lo.ctx.logoutApp(true);
+    ok('logoutApp() ដោយដៃ ➜ confirm (Keypair មិនទាន់ចម្លង) · បដិសេធ ➜ មិនចាកចេញ · logoutApp(true) ➜ ចាកចេញដោយគ្មាន confirm',
+        manual.confirms === 1 && manual.signOuts === 0 && lo.ctx.__confirms === 1 && lo.ctx.__signOuts === 1, { manual, confirms: lo.ctx.__confirms, signOuts: lo.ctx.__signOuts });
+    // lockKeygenSession ៖ ដក Signing Key · Supabase Admin · ជំនាន់ session រសើប · toast លុះត្រាតែ silent
+    const lk = build();
+    lk.ctx.__calls = [];
+    lk.ctx.clearSigningKey = (silent) => { lk.ctx.__calls.push('clearSigningKey:' + silent); };
+    lk.ctx.sbAdminLogout = () => { lk.ctx.__calls.push('sbAdminLogout'); };
+    lk.ctx.invalidateSensitiveSession = () => { lk.ctx.__calls.push('invalidate'); };
+    lk.ctx.refreshKgStatus = () => { lk.ctx.__calls.push('refresh'); };
+    vm.runInContext('var sbAdminSession = { token: "t" };', lk.ctx);
+    vm.runInContext(slice(['lockKeygenSession']), lk.ctx);
+    lk.ctx.lockKeygenSession(true);
+    const silentCalls = lk.ctx.__calls.slice();
+    const toastsBefore = lk.log.toasts.length;
+    vm.runInContext('sbAdminSession = null;', lk.ctx);
+    lk.ctx.lockKeygenSession(false);
+    ok('lockKeygenSession ៖ clearSigningKey(true) · sbAdminLogout (ពេលមាន session) · invalidateSensitiveSession · refresh · toast តែពេលមិន silent',
+        JSON.stringify(silentCalls) === '["clearSigningKey:true","sbAdminLogout","invalidate","refresh"]' && toastsBefore === 0
+        && JSON.stringify(lk.ctx.__calls.slice(4)) === '["clearSigningKey:true","invalidate","refresh"]'
+        && lk.log.toasts.length === 1 && /ចាក់សោ/.test(lk.log.toasts[0]), { silentCalls, calls: lk.ctx.__calls, toasts: lk.log.toasts });
+
     // ⛔ សំណើម្ចាស់គម្រោង ៖ Private Key ដែល ZoeKeyGen បង្កើត (`JSON.stringify(exportKey)` ៖ មាន `key_ops` · `ext`) ហើយចម្លងតាម chat/Notes/Password Manager
     //    ត្រូវ Load បាន ៖ « » “ ” · តួមើលមិនឃើញ · អត្ថបទជុំវិញ · បន្ទាត់បាក់កណ្តាលតម្លៃ · CRLF · ' ➜ JWK ស្អាតតែ kty·crv·d·x·y ទៅ signNewKey ·
     //    Public Key ➜ សារ «នេះជា Public Key» · អត្ថបទមិនមែន JSON ➜ សារ JSON · Keypair ថ្មីដែល Public Key មិនទាន់ deploy ➜ សារប្រាប់ឲ្យ Deploy · ⛔ គ្មាន Sentry សម្រាប់កំហុសអ្នកប្រើ។

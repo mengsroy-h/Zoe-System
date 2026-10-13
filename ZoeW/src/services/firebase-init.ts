@@ -20,6 +20,7 @@ import { txOutcomeUnknownReported, withTransactionOutcomeResolution } from './tx
 import { isSupabaseConfig } from './supabase-config';
 import { showToast } from '../ui/toast';
 import { withConnectionOwnership } from './connection-flow';
+import { ledgerCompanionState, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
 
 let supabaseSdkPromise = null;
 
@@ -68,7 +69,8 @@ function supabaseEnv() {
             txOutcomeUnknownReported.add(path);
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Transaction outcome unknown after disconnect'), { zone: 'money', context: 'supabaseTransaction', path });
         },
-        onWriteRecovery: () => renderConnectionStatus()
+        onWriteRecovery: () => renderConnectionStatus(),
+        ledgerCompanion: { state: ledgerCompanionState, witness: ledgerJournalWitness, update: ledgerJournalUpdate }
     };
 }
 

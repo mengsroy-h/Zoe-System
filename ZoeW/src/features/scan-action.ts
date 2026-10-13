@@ -6,7 +6,7 @@ import { appLocalStore, safeStoreSet } from '../core/storage';
 import { normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
 import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
-import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta } from '../domain/ledger';
+import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
 import { armLookupFocus, attemptAutoLookup, clearLookupStatus, fillEmptyLookupFields, lookupAnswersHeldWhileSaving, takeHeldLookupAnswer } from './auto-lookup';
 import { handleLockerScan } from './locker-assign';
@@ -239,7 +239,8 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         existingIndex = dataState.scanHistory.findIndex(item => item.phone === phone && item.scanDate === dateString && (bornClosed ? item.isClosed === true : !item.isClosed));
     }
 
-    const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
+    const targetItemId = existingIndex !== -1 ? dataState.scanHistory[existingIndex].id : generateUniqueId();
+    const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1, ledgerDeltaCompanion(targetItemId, barcode, cod, dod));
     const scanIsCurrent = () => typeof scanRevenueApplied.isCurrent !== 'function' || scanRevenueApplied.isCurrent();
     const reconcileSavedScanRevenue = () => {
         if (!scanIsCurrent()) return Promise.resolve(false);
@@ -331,7 +332,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
             });
     } else {
         let newItem: any = {
-            id: generateUniqueId(),
+            id: targetItemId,
             createdAt: currentTimeMillis,
             phone: phone,
             cod: cod,

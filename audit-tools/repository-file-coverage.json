@@ -2353,6 +2353,9 @@
     "audit-tools/emu/app-network-e2e-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/money-multidevice-emu-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/app-writes-rules-test.js": {
       "policy": "guard-1"
     },
@@ -3284,6 +3287,12 @@
       "policy": "supabase-db"
     },
     "ZoeW/tests/native-recovery-plain-cas.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ledger-replay-companion.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/supabase-ledger-replay-companion.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/supabase-journal-recovery.test.ts": {

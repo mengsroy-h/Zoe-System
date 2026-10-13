@@ -2263,7 +2263,7 @@ function firstBody(requests) {
     const ENTRY_NAMES = ['addOrUpdateEntry', 'getZoneDateKey', 'getFormattedClockTime',
         'appZoneParts', 'appZoneWallClockToMillis', 'ztoScanStampMillis',
         'getFormattedDate', 'normalizeBarcodesOf', 'barcodeEntriesOf',
-        'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState'];
+        'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState', 'ledgerDeltaCompanion'];
     const entryParts = ENTRY_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const entryMissingNames = ENTRY_NAMES.filter((name) => !extractFn(APP_SRC, name));
     ok('ជាន់អប្បបរមា ៖ ស្រង់ `addOrUpdateEntry` និងផ្លូវនាឡិកាពិតបាន',

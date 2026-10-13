@@ -378,7 +378,8 @@ export function createSupabaseSdk(makeTransport, env) {
                     onWriteRecovery: env.onWriteRecovery,
                     onClockSkew: (offsetMs) => { if (env.onClockSkew) env.onClockSkew(sbClockSkewText(offsetMs)); }
                 }, Object.assign({ docsCache: env.docsCache === undefined ? createIdbDocsCache() : env.docsCache,
-                    writeJournal: env.writeJournal === undefined ? availableWriteJournal() : env.writeJournal }, env.dbOptions));
+                    writeJournal: env.writeJournal === undefined ? availableWriteJournal() : env.writeJournal,
+                    ledgerCompanion: env.ledgerCompanion }, env.dbOptions));
                 const user = app._auth && app._auth.currentUser;
                 app._db.setAuthed(!!user, user ? docsCacheScope(app, user.uid) : null);
                 if (app._tenantTopic) app._db.setTenantTopic(app._tenantTopic);

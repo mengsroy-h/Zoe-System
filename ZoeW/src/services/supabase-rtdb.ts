@@ -568,7 +568,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         fireInfo();
     };
 
-    const rpc = async (fn, args) => {
+    const rpc = async (fn, args, intent?) => {
         const epoch = sessionEpoch;
         const topic = tenantTopic;
         const t0 = Date.now();
@@ -578,6 +578,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             const prior = writeJournal.list(authScope, topic).find((row) => row.opId === args.p_op_id);
             journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
                 ops: args.p_ops, queuedAt: Date.now() }, { stage: 'sent', sentAfter: prior && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
+            if (intent && typeof intent === 'object' && intent.companion && !journalRow.intent) journalRow.intent = intent;
             if (!writeJournal.put(journalRow)) throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
         }
         let data;
@@ -609,6 +610,35 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         return data;
     };
 
+    const ledgerRules = opt.ledgerCompanion && typeof opt.ledgerCompanion.state === 'function' && typeof opt.ledgerCompanion.witness === 'function'
+        && typeof opt.ledgerCompanion.update === 'function' ? opt.ledgerCompanion : null;
+    const companionRow = (row) => !!(ledgerRules && row && row.intent && typeof row.intent === 'object' && row.intent.kind === 'revenue-delta'
+        && row.intent.companion && typeof row.intent.companion === 'object' && typeof row.intent.companion.path === 'string'
+        && Array.isArray(row.ops) && row.ops.length === 1 && row.ops[0].k === 'cas');
+    const companionDecision = (row) => {
+        const intent = row.intent;
+        const op = row.ops[0];
+        const held = ledgerRules.state(exportVal(cloneCanonical(serverValueAt(parsePath(intent.companion.path)))), intent.companion);
+        const witnessed = ledgerRules.witness(exportVal(cloneCanonical(serverValueAt(op.p))), exportVal(cloneCanonical(op.x === undefined ? null : op.x)), intent);
+        if (witnessed === 'applied') {
+            if (held !== 'prior') return null;
+            const undo = { ...intent, token: String(intent.token).replace(/^op_/, 'op_r'), cod: -(Number(intent.cod) || 0), dod: -(Number(intent.dod) || 0), count: -(Number(intent.count) || 0) };
+            delete undo.companion;
+            return undo;
+        }
+        if (held !== 'holds') return null;
+        const apply = { ...intent };
+        delete apply.companion;
+        return apply;
+    };
+    const ledgerFollowUp = async (intent) => {
+        const updater: any = Object.assign((latest) => {
+            if (ledgerRules.witness(latest, null, intent) === 'applied') return;
+            return ledgerRules.update(latest, intent);
+        }, { txOutcomeWitness: (server, prior) => ledgerRules.witness(server, prior, intent) });
+        try { await db.runTransaction(db.ref(intent.bucket === 'daily' ? 'zoew_daily_revenue_cod_dod/' + intent.key : 'zoew_monthly_revenue_cod_dod'), updater); }
+        catch (e) { hooks.onListenerError(e); }
+    };
     const recoverWrites = () => {
         if (!writeJournal || !authed || !authScope || !tenantTopic) return Promise.resolve();
         const context = authScope + '\n' + tenantTopic;
@@ -616,6 +646,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         if (recoveringWrites) return recoveringWrites;
         const scope = authScope; const topic = tenantTopic; const epoch = sessionEpoch;
         const current = () => !closed && authed && scope === authScope && topic === tenantTopic && epoch === sessionEpoch;
+        const followUps = [];
         const running = (async () => {
             recoveryBlocked = 0;
             let rows;
@@ -628,9 +659,11 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                 }
                 return;
             }
+            const companions = [];
             for (const row of rows) {
                 if (!current()) return;
                 if (liveWriteIds.has(row.opId)) continue;
+                if (companionRow(row)) { companions.push(row); continue; }
                 const age = serverNowSeen - row.sentAfter;
                 if (topic !== 'zoe:' + serverTenant || row.stage === 'unresolved' || row.stage !== 'queued'
                     && (!(row.sentAfter > 0) || !(age >= 0 && age <= SB_OP_REPLAY_SAFE_MS))) {
@@ -644,13 +677,25 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                     writeJournal.remove(scope, topic, row.opId);
                 } else recoveryBlocked++;
             }
+            for (const row of companions) {
+                if (!current()) return;
+                if (topic !== 'zoe:' + serverTenant) { recoveryBlocked++; continue; }
+                const decided = companionDecision(row);
+                if (decided) followUps.push(decided);
+                writeJournal.remove(scope, topic, row.opId);
+            }
             if (current()) {
                 recoveredContext = context;
                 if (typeof hooks.onWriteRecovery === 'function') hooks.onWriteRecovery({ blocked: recoveryBlocked });
             }
         })();
         recoveringWrites = running;
-        running.finally(() => { if (recoveringWrites === running) recoveringWrites = null; }).catch(() => {});
+        running.finally(() => { if (recoveringWrites === running) recoveringWrites = null; }).then(async () => {
+            for (const intent of followUps) {
+                if (!current()) return;
+                await ledgerFollowUp(intent);
+            }
+        }).catch(() => {});
         return running;
     };
 
@@ -1155,7 +1200,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
                         }
                         sendEpoch = sessionEpoch;
                         try {
-                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] });
+                            res = await rpc('zoe_write', { p_op_id: opId, p_ops: [op] }, updateFn.connectionIntent);
                             break;
                         } catch (e) {
                             if (!(e instanceof SbNetworkError)) {

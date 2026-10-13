@@ -165,6 +165,24 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.62] — 2026-10-14 · ប្រាក់ Sync ត្រឹមត្រូវ ទោះបិទ App ពេលក្រៅបណ្តាញ (ledger replay មិនបញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ)
+
+**ZoeW** (`zoew-v324` ➜ `zoew-v325`)។ ZoeKeyGen រក្សាកំណែដដែល។ Deep audit ជុំទី ៣ តាមសំណើម្ចាស់គម្រោង («លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន … តេស្តអោយបានច្រើនដង») ➜ checker ថ្មី `emu/money-multidevice-emu-test` (ឧបករណ៍ ២ ពិត · SDK ពិត · rules ពិត · offline · reload) រកឃើញថា journal របស់ [2.50.59] replay delta ledger **ដោយឯករាជ្យ** ពីការសរសេរទិន្នន័យដែលជាដៃគូ ➜ កែតម្លៃ ឬស្កេនក្រៅបណ្តាញ រួច reload (PTR · បិទ App) ➜ ledger ប្រែ តែតម្លៃកញ្ចប់មិនប្រែ (ឬផ្ទុយ)។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- កែតម្លៃកញ្ចប់ ឬស្កេន ខណៈក្រៅបណ្តាញ ហើយបើក App វិញមុនបណ្តាញមក ➜ ស្ថិតិប្រាក់ប្រែ**តែ**ពេលតម្លៃកញ្ចប់ប្រែពិតលើ Server (ទាំង Firebase និង Supabase) · បើស្ថិតិប្រែរួចខណៈកញ្ចប់នៅតម្លៃចាស់ ➜ កែត្រឡប់វិញម្តងដោយស្វ័យប្រវត្តិ · អានពី Server មិនបាន ➜ រង់ចាំបណ្តាញ (មិនទាយ · មិន blocked)។
+- ការដក · ការសម្អាត · ការកែស្ថិតិដោយដៃ ៖ ដូចដើម (delta របស់វាតាមក្រោយការសរសេរទិន្នន័យដែលចុះរួច)។
+
+#### អ្នកយាម
+
+`emu/money-multidevice-emu-test` (ថ្មី ៖ ៣/៣ លំដាប់ធ្លាក់លើដើមឈើមុនកែ ➜ ៤/៤ ជាប់) · `ZoeW/tests/ledger-replay-companion.test.ts` (ថ្មី · ៩ · Firebase recovery · លំដាប់ companion ក្រោយ update) · `ZoeW/tests/supabase-ledger-replay-companion.test.ts` (ថ្មី · ៤ · adapter ៖ ៣/៤ ធ្លាក់មុនកែ) · `vitest` ពេញ · `run-all` STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. គ្មាន Firebase rules ថ្មី · គ្មាន migration Supabase ថ្មី · គ្មាន env ថ្មី (ការកែទាំងអស់នៅក្នុង App)។ Merge ➜ Netlify deploy ➜ App ទាញកំណែថ្មី។
+2. ⛔ សាកលើឧបករណ៍ពិត ៖ បិទ Wi‑Fi/data ➜ កែតម្លៃកញ្ចប់មួយ ➜ ទាញ PTR (ឬបិទ App) មុនបើកបណ្តាញ ➜ បើកបណ្តាញ ➜ ពិនិត្យថា «ចំណូល (យករួច)» និងតម្លៃកញ្ចប់ស៊ីគ្នា (ទាំងហាង Firebase និង Supabase)។
+
 ### [2.50.61] — 2026-10-13 · ផ្លូវចេញសម្រាប់ការសរសេររង់ចាំដែលផ្ទៀងផ្ទាត់មិនបាន (PIN)
 
 **ZoeW** (`zoew-v323` ➜ `zoew-v324`)។ ZoeKeyGen រក្សាកំណែដដែល។ បន្តពី [2.50.60] តាមសំណើម្ចាស់គម្រោង «កែឲ្យស្អាតទាំងអស់» ៖ row ដែលសម្រេចមិនបានជារៀងរហូត (intent ប្រាក់ដែល ring ប្តូរអស់ · ផុតបង្អួច ២ ថ្ងៃ · receipt hash ខុស) លែងរារាំងឧបករណ៍រហូតដល់សម្អាត site data ទៀត។
@@ -3629,6 +3647,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — Deep audit ជុំទី ៣ ៖ ឧបករណ៍ ២ ពិតលើ emulator · ledger replay បញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ · ZoeW 2.50.62
+
+សំណើម្ចាស់គម្រោង ៖ «deep audit ស៊ីជម្រៅមួយជុំទៀត … លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន ការសម្អាតស្វ័យប្រវត្តិដំណើរការត្រឹមត្រូវបំផុត តេស្តអោយបានច្រើនដង»។ មូលដ្ឋាន `ab53ef9` (2.50.61)។
+
+- **តេស្តច្រើនដង (ឧបករណ៍ដែលមាន · seed ថ្មី · ដដែលៗ)** ៖ `revenue-fuzz` ៣ ជួរ seed ថ្មី (RUN0 100 × ១៤ × ៥០ · RUN0 500 × ៨ × ១២០ ➜ PASS · ledgerBlip ទាំង ២ របៀបបាញ់) · `collected-mirror-fuzz` RUN0 50 × ៨ × ១៤ ➜ ៧២៩ ok · `collected-value-fuzz` RUN0 1000 × ៤០០ ➜ ៣៥១២ ok · `emu/tx-disconnect` ×២ · `emu/ledger-revert` ×២ · `emu/restore-mutation` ×២ · `emu/app-writes-rules` · `emu/app-network-e2e` ×២ · `cleanup-interrupt-atomicity` ×៣ · `concurrent-scan` ×៣ · `partial-pickup-cleanup` · `duplicate-money` ×២ · `money-guardian` · vitest (session-switch fuzz · cleanup journal · trash retry · late commit · durable write · journal recovery · ledger ring) ×៣ ➜ **ទាំងអស់ជាប់** — គ្មានការដក/បូកស្ទួនក្នុងថ្នាក់ដែលឧបករណ៍ដែលមានវាស់។ ⛔ `revenue-fuzz` RUN0 300 × ១០ × ៨០ ធ្លាក់ម្តងដោយ harness (`page.evaluate: Resulting promise was garbage collected` — ទំព័រ reload ខណៈ evaluate ក្រោមការរវល់ CPU ពី checker ផ្សេងស្របគ្នា; រត់ម្តងទៀត ២ លំដាប់ដដែល ➜ ជាប់) — សូមមើលការរត់ម្តងទៀតខាងក្រោម។
+- **ចន្លោះដែលឧបករណ៍មិនវាស់** ៖ គ្មាន checker ណាដាក់ **ឧបករណ៍ ២ ពិត** (App ពិត ២ context · SDK Firebase ពិត · rules ពិត) ឲ្យប្រជែងគ្នាលើទិន្នន័យតែមួយ ហើយ**ស្លាប់ពាក់កណ្តាលប្រតិបត្តិការ** (offline ➜ reload)។ `revenue-fuzz` = ឧបករណ៍ ១ លើ fake SDK (ឧបករណ៍ផ្សេង = ការចាក់) · `emu/app-network-e2e` = ការសរសេរ ១ ក្រោយ reload។ ➜ ឧបករណ៍ថ្មី `audit-tools/emu/money-multidevice-emu-test.js` ៖ ឧបករណ៍ A/B (uid ផ្សេង) · ១២ ជុំ × ៣–៤ លំដាប់ · op ចៃដន្យ (ស្កេន · បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ការសម្អាត ២h/៧ថ្ងៃ ដែលធ្វើឲ្យចាស់តាម REST owner រួចឲ្យឧបករណ៍ទាំងពីររត់ `runAutomaticCleanupRules()` ព្រមគ្នា) · របៀបបណ្តាញ ៖ online · offline➜online · offline➜**reload** (150–1550ms ក្រោយចាប់ផ្តើម op) · ស្ងប់ = ops ចប់ · pending ០ · journal ០ · cleanup journal ០ · phase ready · អថេរអានពី server (REST owner) ៖ ledger ថ្ងៃ = ផលបូក barcode `isDeducted !== true` · ledger ខែ = ផលបូកថ្ងៃ · ស្ថិតិយក = barcode បិទ · sum(pickedUpPhones) · barcode មិនស្ទួន · registry មិនកំព្រា · barcode ដែលធ្លាប់ដល់ server មិនបាត់ · គ្មានឧបករណ៍ blocked។
+- **លទ្ធផលលើដើមឈើមុនកែ (2.50.61)** ៖ **ធ្លាក់ ៣/៣ លំដាប់** · ទាំង ៣ ចប់ដោយ `editPrice[offline-reload]` ៖ ឧ. run 0 ledger ថ្ងៃ cod ៨៧,០៨ ខណៈផលបូក barcode ៩១,២៦ (count ស្មើ ៧ = ៧) — ledger ប្រែតាម delta កែតម្លៃ តែ barcode នៅតម្លៃចាស់។ មូលហេតុ ៖ `saveEditedBarcodePrice()` និង `addOrUpdateEntry()` ចេញ delta ledger (`addRevenueToDailyAndMonthlyRecord`) **មុន** transaction ទិន្នន័យ (ledger optimistic · `correctRevenueLedgerToActual` ក្រោយ commit) ➜ ក្រៅបណ្តាញ ទាំងពីរចូល journal (row intent `revenue-delta` + row CAS history) ➜ reload ➜ queue SDK បាត់ ➜ recovery ៖ row CAS history ទម្លាក់ (តម្លៃ ≠ ផ្ញើ) តែ row intent ledger ➜ witness `not-applied` ➜ **replay** ➜ ពាក់កណ្តាលប្រតិបត្តិការ។ ស្កេន ៖ ការអះអាង registry (transaction) មុន ➜ ក្រៅបណ្តាញទាំងស្រុង មិនដល់ delta ទេ (ជាប់ · run 1 #0) តែបង្អួច «claim ack ➜ offline» មានដូចគ្នា។ ដក ៖ delta ចេញក្រោយ transaction history ack ➜ replay ត្រឹមត្រូវ (មិនប៉ះ)។ Supabase (probe `supabase-ledger-replay-companion.test.ts` លើ adapter ពិត + server ក្លែង CAS) ៖ ថ្នាក់ដដែល ៖ row CAS នីមួយៗ replay ដោយឯករាជ្យ ➜ CAS ledger conflict (ឧបករណ៍ផ្សេងសរសេរ ledger) ខណៈ CAS history ចុះ ➜ ledger ៥០ ជំនួស ៥៥ · ផ្ទុយ (history conflict · ledger ចុះ) ➜ ៤៥ ជំនួស ៤០ — **៣/៤ ធ្លាក់មុនកែ**។
+- **កែ** ៖ intent `revenue-delta` ដែលការសរសេរទិន្នន័យជាដៃគូនៅដាច់ដោយឡែក (ស្កេន · កែតម្លៃ) ដឹកនាំ `companion` (`ledgerDeltaCompanion()` ៖ item · barcode · តម្លៃថ្មី · តម្លៃចាស់ — ស្កេន ៖ `targetItemId` បង្កើតមុន delta) ➜ Firebase `settleRow` ៖ អាន item តាម REST (អានមិនបាន ➜ deferred · មិនទាយ) ➜ `ledgerCompanionState()` ៖ `holds` ➜ replay (ដូចដើម) · `prior` + witness applied ➜ ដកវិញម្តង (token `op_r…` ➜ idempotent · recovery ម្តងទៀត ០ ការសរសេរ) · `absent`/`unknown` (ដកដោយឧបករណ៍ផ្សេង · កែបន្ត) ➜ ទម្លាក់ដោយមិនសរសេរ · Supabase `recoverWrites` ៖ row ដែលមាន companion មិន resend CAS ដើមទេ (base ចាស់នឹង conflict ខណៈ row ដៃគូចុះ) ➜ សម្រេចក្រោយ row ឯទៀត ➜ transaction ថ្មីពី intent (`ledgerJournalUpdate` · witness token) ក្រោយ recovery ចប់ (មិនមែនក្នុងវា ៖ `waitForWriteRecovery` រង់ចាំ recovery ➜ deadlock វាស់បានជុំទី ១)។
+- **លំដាប់** ៖ item ថ្មីស្កេនក្រៅបណ្តាញ = `update` (receipt) ដែលត្រូវផ្ញើឡើងវិញ + row intent ledger ដែល queue មុន ➜ recovery ជុំដំបូងសម្រេច ledger មុន (`absent` ➜ ទម្លាក់) រួចទើប item ចុះ ➜ ledger ខ្វះកញ្ចប់ (mutation «ជុំតែមួយ» ➜ count ២ ជំនួស ៣ · គ្មានការសរសេរ ledger) ➜ Firebase `runRecovery` និង Supabase `recoverWrites` សម្រេច row ដែលមាន companion **ក្រោយ row ឯទៀតទាំងអស់**។
+- **អ្នកយាមដែលត្រូវតាមក្រោយ** ៖ helper ថ្មី (`ledgerDeltaIntent` · `ledgerDeltaCompanion` · `ledgerCompanionState`) ចូលបញ្ជីស្រង់របស់ checker sandbox ១៣ (`revenue-rules-clamp` · `price-edit-abort` · `late-commit` · `cleanup-interrupt-atomicity` · `emu/ledger-revert` · `ledger-failed-apply-revert` · `tx-outcome` · `monthly-ledger-agreement` · `ledger-count-integrity` · `concurrent-scan` · `zto-list-sync` …) — sandbox ដែលខូចព្រោះ helper ថ្មី = checker រត់កូដពិត · `item-money` ៖ វាល companion ឈ្មោះ `wantCod`/`wantDod` (មិនមែនការសរសេរ `.cod/.dod`) · `clear-history-claim-test` ធ្លាក់ដោយ `DB_OP_TIMEOUT_MS` ប្រកាសពីរដង ៖ adapter Supabase (`supabase-rtdb.ts` រួច `supabase-sdk.ts`) import `domain/ledger` ➜ Vite ប្តូរ closure នៃ chunk `supabase-backend` ➜ លំដាប់ module ក្នុងទិដ្ឋភាព checker ប្រែទាំងស្រុង (CLEAR_HISTORY block ឥឡូវគ្របលើ `network.ts`) ➜ helper ចូលតាម `supabaseEnv().ledgerCompanion` ➜ លំដាប់ដូចដើមទាំង ១០០% (diff `audit-module-views.json` ទទេ) — កត់ជា trap ក្នុង CLAUDE.md។
+- **ភស្តុតាង** ៖ `emu/money-multidevice-emu-test` ៤/៤ លំដាប់ × ១២ ជុំ ជាប់ក្រោយកែ · លំដាប់បន្ថែម RUN0 10 × ៦ × ១៦ ➜ ជាប់ (offline+reload · ការសម្អាតប្រជែង · ស្តារ/ដក ស្របគ្នា) · ពេលរត់លំនាំដើម ≈ ៥៥ វិ. (offline+reload ៦ · offline+online ៥ · ការសម្អាតប្រជែង ៣ · op ស្របគ្នា ១០+) · `ledger-replay-companion.test.ts` ៩/៩ (ធ្លាក់ ៧/៨ លើដើមឈើមុនកែ · តេស្តលំដាប់ធ្លាក់លើ mutation ជុំតែមួយ) · `supabase-ledger-replay-companion.test.ts` ៤/៤ (៣/៤ ធ្លាក់មុនកែ) · vitest ពេញ ១៦៥ ឯកសារ · ១៤៥២ តេស្ត · run-all STRICT **២០៥/២០៥** (partial ០ · SKIP ០ · `revenue-fuzz` RUN0 300 × ១០ × ៨០ រត់ម្តងទៀតម្នាក់ឯង ➜ PASS)។ ព្រំដែនដែលទទួល ៖ barcode ស្កេនក្រៅបណ្តាញដែល queue បាត់ដោយ reload មុន claim ចុះ មិនដែលដល់ server (ដូចមុន [2.50.59]) · delta ledger ស្កេនចុះរួចតែ save បាត់ (barcode `absent`) ➜ ទម្លាក់ដោយគ្មានការដកវិញ (មិនអាចបែងចែកពី «ដកដោយឧបករណ៍ផ្សេង» ដោយមិនអានធុងសំរាមទាំងមូល) ➜ ledger ខ្ពស់ បង្អួច RTT មួយ · receipt `zoew_write_receipts` ត្រូវអានទាំងមូលម្តងក្នុងមួយ session (purge) ហើយ receipt របស់គណនីដែលលែងប្រើមិនដែល purge (ទំហំ · មិនមែនលុយ)។
+
 ### 2026-10-13 — CI ធ្លាក់លើ `a5e2f89` (ផ្នែក 2/4) ៖ `shop-device-note.test.ts` រង់ចាំ fake ms ថេរ ខណៈ SHA-256 ពិតដើរលើ thread pool · គ្មាន bump
 
 រាយការណ៍ម្ចាស់គម្រោង ៖ «CI fail»។ run 718 (`a5e2f89`) ៖ shard 2/4 ធ្លាក់ ១ (`zoew-suite 1/2` ➜ `npm run test`) ៖ `tests/shop-device-note.test.ts` «បើក App ៖ គណនីស្គាល់ហាង ➜ ផ្ញើ serial…» ➜ `expected [] to deeply equal [{…}]` (note `note_my_device` មិនដែលផ្ញើក្នុង `advance(3000)`); run 717 (`54cc15c`) ជាប់ · ៤ commits រវាងនោះ (2.50.61) មិនប៉ះ `shop-device` · `device-info` · transport · SDK Supabase ទេ។
@@ -5819,6 +5849,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `emu/money-multidevice-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -6017,6 +6048,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ledger-stale-session.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/list-render-scope.test.tsx` | ផ្នែក ១ | ផ្នែក ៦ |
@@ -6147,6 +6179,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
 

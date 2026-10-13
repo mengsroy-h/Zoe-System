@@ -65,15 +65,15 @@ export function commitRevenueBucketDelta(scanDateStr, bucket, codToAdd, dodToAdd
     return { applied, server: commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, applied) };
 }
 
-export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
+export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd, companion?) {
     const operationDb = firebaseState.db;
     const operationAuth = firebaseState.authGeneration;
     if (!scanDateStr) scanDateStr = getFormattedDate();
     const ymKey = scanDateStr.substring(0, 7);
     const appliedDaily = applyLedgerBucketDelta(dataState.dailyRevenueData, scanDateStr, codToAdd, dodToAdd, countToAdd);
-    const dailyServer = commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDaily);
+    const dailyServer = commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDaily, false, companion);
     const appliedMonthly = applyLedgerBucketDelta(dataState.monthlyRevenueData, ymKey, codToAdd, dodToAdd, countToAdd);
-    const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly);
+    const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly, false, companion);
     return {
         isCurrent: () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration,
         scanDate: scanDateStr,
@@ -537,7 +537,35 @@ export function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
     }).catch(() => monthlyVerdict);
 }
 
-export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?) {
+export function ledgerDeltaCompanion(itemId, code, cod?, dod?, priorCod?, priorDod?) {
+    if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(String(itemId)) || !code) return null;
+    const companion: any = { path: 'zoew_scan_history_cod_dod/' + itemId, code: String(code) };
+    if (typeof cod === 'number' && isFinite(cod)) companion.wantCod = cod;
+    if (typeof dod === 'number' && isFinite(dod)) companion.wantDod = dod;
+    if (typeof priorCod === 'number' && isFinite(priorCod)) companion.priorCod = priorCod;
+    if (typeof priorDod === 'number' && isFinite(priorDod)) companion.priorDod = priorDod;
+    return companion;
+}
+
+export function ledgerCompanionState(item, companion) {
+    const list = item && typeof item === 'object' ? item.barcodes : null;
+    const barcodes = Array.isArray(list) ? list : list && typeof list === 'object' ? Object.keys(list).map((k) => list[k]) : [];
+    let found = barcodes.find((b) => b && b.code === companion.code) || null;
+    if (!found && item && typeof item === 'object' && !barcodes.length && item.barcode === companion.code) found = { cod: item.cod, dod: item.dod };
+    if (!found) return 'absent';
+    const near = (actual, expected) => typeof expected !== 'number' || Math.abs((parseFloat(actual) || 0) - expected) < 0.005;
+    if (near(found.cod, companion.wantCod) && near(found.dod, companion.wantDod)) return 'holds';
+    if (typeof companion.priorCod === 'number' && near(found.cod, companion.priorCod) && near(found.dod, companion.priorDod)) return 'prior';
+    return 'unknown';
+}
+
+export function ledgerDeltaIntent(bucket, key, cod, dod, count, companion?) {
+    const intent: any = { kind: 'revenue-delta', bucket, key, cod, dod, count };
+    if (companion && typeof companion === 'object' && companion.path && companion.code) intent.companion = companion;
+    return intent;
+}
+
+export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.dailyRevenueData[scanDateStr];
     const rollbackMemory = () => {
@@ -561,7 +589,7 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
         };
         serverAfter = ledgerCarryDed(current, ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr));
         return ledgerTagged(serverAfter, op, ring);
-    }, 3, (value) => value, null, { kind: 'revenue-delta', bucket: 'daily', key: scanDateStr, cod: codToAdd, dod: dodToAdd, count: countToAdd }).then((result) => {
+    }, 3, (value) => value, null, ledgerDeltaIntent('daily', scanDateStr, codToAdd, dodToAdd, countToAdd, companion)).then((result) => {
         if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
@@ -576,7 +604,7 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
     });
 }
 
-export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?) {
+export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly?, companion?) {
     const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
     const recordRef = serverOnly ? null : dataState.monthlyRevenueData[ymKey];
     const rollbackMemory = () => {
@@ -606,7 +634,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
             latestThreeMonths[key] = months[key];
         });
         return latestThreeMonths;
-    }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null), null, { kind: 'revenue-delta', bucket: 'monthly', key: ymKey, cod: codToAdd, dod: dodToAdd, count: countToAdd }).then((result) => {
+    }, 3, (value) => (value && typeof value === 'object' ? value[ymKey] : null), null, ledgerDeltaIntent('monthly', ymKey, codToAdd, dodToAdd, countToAdd, companion)).then((result) => {
         if (result && result.committed && result.txAppliedDelta) return result.txAppliedDelta;
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();

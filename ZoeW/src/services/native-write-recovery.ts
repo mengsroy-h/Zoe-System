@@ -1,6 +1,6 @@
 import { createLocalWriteJournal } from './write-journal';
 import { txReadServerValue, txReadWasRefused, txRestUrl, txSameValue } from './tx-outcome';
-import { ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
+import { ledgerCompanionState, ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
 import { getServerNow } from '../core/clock';
 
@@ -92,6 +92,16 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         }
         if (count && current()) await sdk.update(root, updates);
     };
+    const companionState = async (companion) => ledgerCompanionState(await read(String(companion.path)), companion);
+    const undoAppliedDelta = async (op, intent) => {
+        const undo = { ...intent, token: String(intent.token).replace(/^op_/, 'op_r'), cod: -(Number(intent.cod) || 0), dod: -(Number(intent.dod) || 0), count: -(Number(intent.count) || 0) };
+        delete undo.companion;
+        const updater = Object.assign(latest => {
+            if (!current() || ledgerJournalWitness(latest, null, undo) === 'applied') return;
+            return ledgerJournalUpdate(latest, undo);
+        }, { txOutcomeWitness: (server, prior) => ledgerJournalWitness(server, prior, undo) });
+        await sdk.runTransaction(sdk.ref(db, op.p.join('/')), updater);
+    };
     const settleRow = async (row, canReplay) => {
         if (!current()) return;
         if (row.hash) {
@@ -115,6 +125,16 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                 if (op.k !== 'cas' || op.p[0] !== rootName || !['ledger-event', 'revenue-delta'].includes(intent.kind)
                     || !/^op_[0-9a-z_]{5,37}$/.test(intent.token) || ledgerJournalRecord(op.v, intent)?.op !== intent.token) { resolved = false; continue; }
                 const witnessed = ledgerJournalWitness(value, op.x, intent);
+                if (intent.kind === 'revenue-delta' && intent.companion && typeof intent.companion === 'object') {
+                    const held = await companionState(intent.companion);
+                    if (witnessed === 'applied') {
+                        if (held !== 'prior') continue;
+                        if (!canReplay) { resolved = false; continue; }
+                        await undoAppliedDelta(op, intent);
+                        continue;
+                    }
+                    if (held !== 'holds') continue;
+                }
                 if (witnessed === 'applied') continue;
                 const prepared = row.stage === 'prepared';
                 if (!canReplay || !prepared && witnessed !== 'not-applied' && !txSameValue(value, op.x)) { resolved = false; continue; }
@@ -158,7 +178,9 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         recovery = (async () => {
         if (!journaled) return;
         try {
-            for (const row of journal.list(scope, topic)) {
+            const rows = journal.list(scope, topic);
+            const companion = (row) => !!(row.intent && row.intent.companion);
+            for (const row of rows.filter(row => !companion(row)).concat(rows.filter(companion))) {
                 if (!current()) return;
                 const result = await operationLock(row.opId, true, async allowed => { await recoverRow(row, allowed); return true; });
                 if (result === null) { externalRows.push(row); state.external++; }

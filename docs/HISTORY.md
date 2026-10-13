@@ -3595,6 +3595,8 @@ Full STRICT ជុំដំបូង ១៧៣ PASS / ៣១ FAIL និង CI �
 
 មិនអាចអះអាងថាគ្រប់ network failure ឬ race ដែលអាចកើតមានត្រូវបានលុបទាំងអស់ទេ។ សកម្មភាព Publish Firebase rules / Supabase migrations / ឧបករណ៍ពិតនៅផ្នែក ១។
 
+លទ្ធផលចុងក្រោយលើ source `9eb6f17` (App code ដូច `cd44676`)៖ STRICT ពេញក្នុង session បាន PASS ២០៤/២០៤ checker, FAIL ០, partial ០ និង SKIP ០។ CI run `38353611586` បាន PASS ទាំង ៤ ផ្នែក៖ ៥៤ + ៥០ + ៥០ + ៥០ = ២០៤; គ្មាន partial/SKIP។ React suite ទាំងពីរបាន PASS រួម typecheck, lint, Vitest, Android, build, SW, smoke, native និង cleanup rules។ Financial fuzz ក្រៅ default seeds ៣០០–៣១៣៖ ១៤ លំដាប់ × ៥០ ប្រតិបត្តិការ, invariant ទាំងអស់ PASS; other-device remove ១៤ លំដាប់, applied ACK ៥ និង lost ACK ៧ លំដាប់។ មិនបានរំលង checker ឬបង្កើន timeout; local money-guardian រត់ JOBS=៤ តាម option ដែលមានស្រាប់។ ចុងក្រោយនេះផ្លាស់តែកំណត់ត្រាលទ្ធផល; App source និងអ្នកយាមមិនប្រែ។
+
 ### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
 
 `firebase-auth-write-ownership.test.ts`៖ Firebase Auth SDK ពិតមានករណីបន្ថែម៖ native signin A មកក្រោយ logout ប្តូរ currentUser ពី null ទៅ A និងហៅ listener; signin B ខណៈ A នៅរង់ចាំក៏អាចហៅ listener A កណ្តាល។ Regression ៤៖ មុនកែ ២ FAIL និង control ២ PASS; ក្រោយ auth facade ៤/៤ PASS។ Control គ្រប normal signin/logout និង invalid credentials ➜ login ថ្មី។ Guard ចុះមុន SDK ប្តូរ user និងដោះក្រោយ request; signin ជំនួសរង់ចាំ request ចាស់ settle ដើម្បីកុំឱ្យ guard ចាស់បដិសេធ request ថ្មី។ មិនកែ SDK/vendor។ Full STRICT ដំបូងត្រូវបានបញ្ឈប់ក្រោយរកឃើញករណីនេះ ទោះ checker ដែលចប់ PASS ក៏ដោយ; មិនរាប់វាជា full run ជោគជ័យ។

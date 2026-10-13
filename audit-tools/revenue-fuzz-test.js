@@ -537,6 +537,13 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                     if (fired) { trail.push('ledgerBlip:' + fired); await page.waitForTimeout(300); }
                 }
                 await page.waitForTimeout(170);
+                await page.evaluate(async () => {
+                    const started = performance.now();
+                    while (typeof nativeWriteRecoveryState === 'function' && nativeWriteRecoveryState(db).pending > 0) {
+                        if (performance.now() - started >= 1500) throw new Error('Pending writes did not settle before the invariant check');
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    }
+                });
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);
                 if (done && String(done).indexOf('threw:') === 0) { broke = 'op threw: ' + done; break; }
@@ -549,6 +556,10 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                             hist: window.__fakeStore.zoew_scan_history_cod_dod,
                             trash: window.__fakeStore.zoew_recently_deleted_cod_dod,
                             rev: window.__fakeStore.zoew_daily_revenue_cod_dod,
+                            phase: typeof connectionFlowSnapshot === 'function' ? connectionFlowSnapshot() : null,
+                            recovery: typeof nativeWriteRecoveryState === 'function' ? nativeWriteRecoveryState(db) : null,
+                            journal: Object.keys(localStorage).filter(k => k.startsWith('zoew_connection_writes_v1:')).map(k => JSON.parse(localStorage.getItem(k))),
+                            toasts: document.getElementById('toastContainer')?.textContent,
                             memIds: (typeof scanHistory !== 'undefined' ? scanHistory : []).map((x) => x && x.id)
                         }));
                         console.log('    DUMP ' + JSON.stringify(dump, null, 1));

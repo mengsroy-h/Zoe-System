@@ -99,7 +99,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
-    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
+    'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'cleanupTrashCodes', 'cleanupLedgerDeducted', 'markCleanupTrashDeducted', 'cleanupBarcodesBackInHistory', 'applyCleanupRevenue', 'settleCleanupDeduction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerTotalsOf', 'ledgerLatestMonths', 'ledgerMirrorStep', 'ledgerEventDecision', 'commitLedgerEventStep', 'cleanupScanDateOf', 'cleanupEventAt', 'cleanupEventAmounts', 'cleanupLedgerPrior', 'deductCleanupLedgerKeyed', 'deductCleanupRevenue', 'patchCleanupJournalEntry', 'noteCleanupLedgerTry', 'undoCleanupLedgerKeyed', 'undoCleanupRevenue', 'cleanupLedgerResult', 'resolveCleanupSlot', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
@@ -215,6 +215,9 @@ function makeSandbox(txPlan, opts) {
         + (SRC.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n'
         + fnSrc.ledgerOpRingOf + '\n'
         + fnSrc.ledgerOpRing + '\n'
+        + fnSrc.ledgerTokenSeen + '\n'
+        + fnSrc.ledgerRecordTokens + '\n'
+        + fnSrc.ledgerTotalsOf + '\n'
         + fnSrc.ledgerOpWitness + '\n'
         + fnSrc.ledgerTagged + '\n'
         + fnSrc.runLedgerTransaction + '\n'

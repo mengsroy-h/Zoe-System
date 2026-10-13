@@ -1,13 +1,14 @@
 import { createLocalWriteJournal } from './write-journal';
 import { txReadServerValue, txRestUrl, txSameValue } from './tx-outcome';
-import { ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness } from '../domain/ledger';
+import { ledgerJournalRecord, ledgerJournalUpdate, ledgerJournalWitness, ledgerRecordTokens, ledgerOpRing } from '../domain/ledger';
 import { txMutationSources } from './tx-disconnect';
+import { getServerNow } from '../core/clock';
 
 const nativeRecoveryStates = new WeakMap<object, any>();
 export const NATIVE_WRITE_RECEIPTS = 'zoew_write_receipts';
 
 export function nativeWriteRecoveryState(db) {
-    return db && nativeRecoveryStates.get(db) || { blocked: 0, recovering: false };
+    return db && nativeRecoveryStates.get(db) || { blocked: 0, recovering: false, pending: 0 };
 }
 
 export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseFactory) {
@@ -16,11 +17,15 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const root = sdk.ref(db);
     const scope = String(root) + '|' + uid;
     const topic = 'firebase';
-    const state = { blocked: 0, recovering: true, external: 0 };
+    const state = { blocked: 0, recovering: true, external: 0, pending: 0 };
     const externalRows = [];
     nativeRecoveryStates.set(db, state);
     const changed = () => { if (current()) report(); };
     const remove = (id) => journal.remove(scope, topic, id);
+    const payloadHash = async (ops) => {
+        const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(ops)));
+        return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2, '0')).join('');
+    };
     const read = async (path) => {
         if (!current()) throw new Error('Connection session changed');
         const ref = sdk.ref(db, path);
@@ -29,7 +34,7 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         return result;
     };
     const receiptMatches = (receipt, row) => !!receipt && receipt.uid === uid && receipt.hash === row.hash;
-    const sendAtomic = async (row) => {
+    const sendAtomic = async (row, freshLocked = false) => {
         if (!current()) throw new Error('Connection session changed');
         const updates = {};
         for (const op of row.ops) updates[op.p.join('/')] = op.v;
@@ -37,7 +42,10 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         let started;
         try { started = sdk.update(root, updates); } catch (e) { e.nativeUnsent = true; throw e; }
         try { await started; }
-        catch (e) { if (!current() || !receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e; }
+        catch (e) {
+            if (!current() || freshLocked && /permission[_ ]denied/i.test(String(e.code || e.message))) throw e;
+            if (!receiptMatches(await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId), row)) throw e;
+        }
     };
     const operationLock = (id, available, action) => {
         const locks = typeof navigator !== 'undefined' && navigator.locks;
@@ -55,6 +63,8 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
     const recoverRow = async (row, canReplay) => {
         if (!current()) return;
         if (row.hash) {
+            if (await payloadHash(row.ops) !== row.hash) { if (current()) state.blocked++; return; }
+            if (!current()) return;
             const receipt = await read(NATIVE_WRITE_RECEIPTS + '/' + row.opId);
             if (!receiptMatches(receipt, row)) {
                 if (receipt) { state.blocked++; return; }
@@ -73,12 +83,20 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
                     || !/^op_[0-9a-z_]{5,37}$/.test(intent.token) || ledgerJournalRecord(op.v, intent)?.op !== intent.token) { resolved = false; continue; }
                 const witnessed = ledgerJournalWitness(value, op.x, intent);
                 if (witnessed === 'applied') continue;
-                if (!canReplay || witnessed !== 'not-applied' && !txSameValue(value, op.x)) { resolved = false; continue; }
-                const result = await sdk.runTransaction(sdk.ref(db, op.p.join('/')), latest => {
+                const prepared = row.stage === 'prepared';
+                if (!canReplay || !prepared && witnessed !== 'not-applied' && !txSameValue(value, op.x)) { resolved = false; continue; }
+                const updater = Object.assign(latest => {
                     if (!current() || ledgerJournalWitness(latest, op.x, intent) === 'applied') return;
-                    if (ledgerJournalWitness(latest, op.x, intent) !== 'not-applied' && !txSameValue(latest, op.x)) return;
-                    return ledgerJournalUpdate(latest, intent);
-                });
+                    if (!prepared && ledgerJournalWitness(latest, op.x, intent) !== 'not-applied' && !txSameValue(latest, op.x)) return;
+                    const before = latest === undefined ? null : JSON.parse(JSON.stringify(latest));
+                    const next = ledgerJournalUpdate(latest, intent);
+                    if (next !== undefined) {
+                        row.stage = 'sent'; row.ops = [{ k: 'cas', p: op.p, x: before, v: next }];
+                        if (!journal.put(row)) throw Object.assign(new Error('Write journal unavailable'), { code: 'write_journal_unavailable', noRetry: true });
+                    }
+                    return next;
+                }, { txOutcomeWitness: (server, prior) => ledgerJournalWitness(server, prior, intent) });
+                const result = await sdk.runTransaction(sdk.ref(db, op.p.join('/')), updater);
                 if (result && (result.committed || ledgerJournalWitness(result.snapshot?.val(), op.x, intent) === 'applied')) continue;
                 resolved = false; continue;
             }
@@ -115,56 +133,85 @@ export function createNativeWriteRecovery(sdk, auth, db, current, report, leaseF
         } catch (e) { if (current()) state.blocked++; }
         finally { state.recovering = false; changed(); }
     })();
-    const mutate = (method, ref, value, options?) => {
+    const mutate = (method, ref, value, options?, ownedPath?) => {
         const opId = 'native_' + crypto.randomUUID().replace(/-/g, '');
         const source = { promise: null };
-        const running = operationLock(opId, false, async () => {
-        await recovery;
-        if (!current() || state.blocked) throw Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true });
-        for (const external of externalRows) {
-            await operationLock(external.opId, false, async allowed => {
-                const row = journal.list(scope, topic).find(r => r.opId === external.opId);
-                if (row) await recoverRow(row, allowed);
-            });
-        }
-        state.external = 0;
-        if (!current() || state.blocked) throw Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true });
-        const path = new URL(String(ref)).pathname.split('/').filter(Boolean).map(decodeURIComponent);
-        const row: any = { v: 1, scope, topic, opId, sentAfter: 0, stage: 'sent', createdAt: Date.now(), ops: [] as any[] };
-        if (method === 'runTransaction' && value.connectionIntent) row.intent = value.connectionIntent;
-        const persist = () => {
-            if (!current() || !journal.put(row)) throw Object.assign(new Error('Write journal unavailable'), { code: 'write_journal_unavailable', noRetry: true });
-        };
-        try {
-            let result;
-            if (method === 'runTransaction') {
-                const updater = Object.assign((prior) => {
-                    if (!current()) return;
-                    const before = prior === undefined ? null : JSON.parse(JSON.stringify(prior));
-                    const next = value(prior);
-                    if (next !== undefined) { row.ops = [{ k: 'cas', p: path, x: before, v: next }]; persist(); }
-                    return next;
-                }, value);
-                source.promise = sdk.runTransaction(ref, updater, options);
-                result = await source.promise;
-            } else {
-                row.ops = method === 'update' ? Object.keys(value).map((key) => ({ k: 'set', p: path.concat(key.split('/')), v: value[key] }))
-                    : [{ k: 'set', p: path, v: value }];
-                if (row.ops.some((op) => op.p[0] === NATIVE_WRITE_RECEIPTS)) throw new Error('Write receipt path is reserved');
-                const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(row.ops)));
-                row.hash = Array.from(new Uint8Array(bytes), (n) => n.toString(16).padStart(2, '0')).join('');
-                persist();
-                await sendAtomic(row);
-                result = undefined;
+        state.pending++;
+        const running = operationLock(opId, false, async locked => {
+            await recovery;
+            if (!current() || state.blocked) throw Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true });
+            for (const external of externalRows) {
+                await operationLock(external.opId, false, async allowed => {
+                    const row = journal.list(scope, topic).find(r => r.opId === external.opId);
+                    if (row) await recoverRow(row, allowed);
+                });
             }
-            remove(opId);
-            return result;
-        } catch (e) {
-            if (e.nativeUnsent || e.txOutcome === 'not-applied' || /permission_denied|PERMISSION_DENIED|write_journal_unavailable/.test(String(e && (e.code || e.message)))) remove(opId);
-            else if (row.ops.length && current()) { state.blocked++; changed(); }
-            throw e;
-        }
+            state.external = 0;
+            if (!current() || state.blocked) throw Object.assign(new Error('Write outcome needs verification'), { code: 'write_recovery_pending', noRetry: true });
+            const path = ownedPath === undefined ? new URL(String(ref)).pathname.split('/').filter(Boolean).map(decodeURIComponent)
+                : String(ownedPath).split('/').filter(Boolean);
+            const row: any = { v: 1, scope, topic, opId, sentAfter: 0, stage: 'sent', queuedAt: getServerNow(), ops: [] as any[] };
+            if (method === 'runTransaction' && value.connectionIntent) row.intent = value.connectionIntent;
+            const persist = () => {
+                if (!current() || !journal.put(row)) throw Object.assign(new Error('Write journal unavailable'), { code: 'write_journal_unavailable', noRetry: true });
+            };
+            try {
+                let result;
+                if (method === 'runTransaction') {
+                    let needsAnchor = false;
+                    const updater = Object.assign((prior) => {
+                        if (!current()) return;
+                        const record = row.intent && ledgerJournalRecord(prior, row.intent);
+                        if (record && typeof record === 'object' && !ledgerRecordTokens(record).length) {
+                            const tagged = { ...record, op: row.intent.token, ops: ledgerOpRing(record, row.intent.token) };
+                            row.stage = 'prepared'; row.ops = [{ k: 'cas', p: path, x: JSON.parse(JSON.stringify(prior)),
+                                v: row.intent.bucket === 'daily' ? tagged : { ...prior, [row.intent.key]: tagged } }];
+                            persist(); needsAnchor = true; return;
+                        }
+                        const before = prior === undefined ? null : JSON.parse(JSON.stringify(prior));
+                        const next = value(prior);
+                        if (next !== undefined) { row.stage = 'sent'; row.ops = [{ k: 'cas', p: path, x: before, v: next }]; persist(); }
+                        return next;
+                    }, value);
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        needsAnchor = false;
+                        source.promise = sdk.runTransaction(ref, updater, options);
+                        result = await source.promise;
+                        if (!needsAnchor) break;
+                        const anchor = 'op_a' + crypto.randomUUID().replace(/-/g, '');
+                        try {
+                            source.promise = sdk.runTransaction(ref, latest => {
+                                if (!current()) return;
+                                const record = ledgerJournalRecord(latest, row.intent);
+                                if (!record || typeof record !== 'object' || ledgerRecordTokens(record).length) return;
+                                const tagged = { ...record, op: anchor, ops: ledgerOpRing(record, anchor) };
+                                return row.intent.bucket === 'daily' ? tagged : { ...latest, [row.intent.key]: tagged };
+                            }, options);
+                            await source.promise;
+                        } catch (e) {
+                            if (!current() || e.noRetry || /permission[_ ]denied/i.test(String(e.code || e.message))) throw e;
+                        }
+                    }
+                    if (needsAnchor) throw Object.assign(new Error('Ledger identity initialization needs retry'), { code: 'write_recovery_pending', noRetry: true });
+                    if (!current() && row.stage === 'prepared') throw Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', txOutcome: 'unknown', noRetry: true });
+                } else {
+                    row.ops = method === 'update' ? Object.keys(value).map((key) => ({ k: 'set', p: path.concat(key.split('/')), v: value[key] }))
+                        : [{ k: 'set', p: path, v: value }];
+                    if (row.ops.some((op) => op.p[0] === NATIVE_WRITE_RECEIPTS)) throw new Error('Write receipt path is reserved');
+                    row.hash = await payloadHash(row.ops);
+                    persist();
+                    await sendAtomic(row, locked);
+                    result = undefined;
+                }
+                remove(opId);
+                return result;
+            } catch (e) {
+                if (e.nativeUnsent || e.txOutcome === 'not-applied' || /permission[_ ]denied|write_journal_unavailable/i.test(String(e && (e.code || e.message)))) remove(opId);
+                else if (row.ops.length && current()) { state.blocked++; changed(); }
+                throw e;
+            }
         });
+        running.finally(() => { state.pending = Math.max(0, state.pending - 1); }).catch(() => {});
         txMutationSources.set(running, source);
         return running;
     };

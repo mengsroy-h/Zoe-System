@@ -77,7 +77,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerRejectionVerdict', 'ledgerMarkUnknown', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'ledgerDedOf', 'ledgerDedValue', 'ledgerCarryDed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
-    'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
+    'ledgerTokenSeen', 'ledgerRecordTokens', 'ledgerTotalsOf', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness', 'ledgerTagged',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
@@ -328,6 +328,9 @@ function makeSandbox(seed) {
         + (SRC.match(/^\s*const LEDGER_OP_RING_MAX\s*=\s*[^;]+;/m) || [''])[0].trim() + '\n'
         + fnSrc.ledgerOpRingOf + '\n'
         + fnSrc.ledgerOpRing + '\n'
+        + fnSrc.ledgerTokenSeen + '\n'
+        + fnSrc.ledgerRecordTokens + '\n'
+        + fnSrc.ledgerTotalsOf + '\n'
         + fnSrc.ledgerOpWitness + '\n'
         + fnSrc.ledgerTagged + '\n'
         + fnSrc.runLedgerTransaction + '\n'

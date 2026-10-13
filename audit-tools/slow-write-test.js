@@ -136,7 +136,7 @@ const BOOT = function (seed) {
     function maybeDefer(p, apply) {
         const f = failFor(p);
         if (f) return new Promise((_, reject) => {
-            rawSetTimeout(() => reject(new Error('simulated write failure')), f);
+            rawSetTimeout(() => reject(Object.assign(new Error('simulated write failure'), { code: 'PERMISSION_DENIED' })), f);
         });
         const d = slowFor(p);
         if (!d) return Promise.resolve(apply());
@@ -167,7 +167,7 @@ const BOOT = function (seed) {
         off: () => {},
         get: (r) => Promise.resolve(snapOf(r.path)),
         set: (r, v) => maybeDefer(r.path, () => { setPath(r.path, v); fireFor(r.path); }),
-        update: (r, obj) => maybeDefer(r.path, () => {
+        update: (r, obj) => maybeDefer((r.path ? r.path + '/' : '') + Object.keys(obj).find(k => !k.startsWith('zoew_write_receipts/')), () => {
             const touched = [];
             Object.keys(obj).forEach((k) => {
                 const full = (r.path ? r.path + '/' : '') + k;

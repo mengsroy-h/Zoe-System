@@ -242,7 +242,7 @@ function runOfflineOnline() {
         console, Set, Math, Date: { now: () => clock.now },
         setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
         navigator: { get onLine() { return net.up; } },
-        window: { addEventListener: (name, fn) => { handlers[name] = fn; } },
+        window: { addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener: (name, fn) => { if (handlers[name] === fn) delete handlers[name]; } },
         document: { getElementById: () => null },
         fb: { goOffline: () => {}, goOnline: () => { goOnlineAt.push(clock.now); } }, db: {},
         isDatabaseConnected: false, dbListenersFailed: false,
@@ -253,7 +253,7 @@ function runOfflineOnline() {
     vm.runInContext([sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') + '\n' +
         FNS.map(sliceFn).join('\n\n') + '\n' + sliceFn('setupConnectionRecovery') + '\n' +
         (sliceFn('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }') + '\n' +
-        'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
+        'let connectionRecoveryCleanup = null;\nlet reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
         'let hasEverConnectedToDatabase = true;\nlet networkJustReturned = false;\nlet ztoStatusFailStreak = 0;\n' +
         'setupConnectionRecovery();\nthis.__nudge = nudgeDatabaseConnection;\n' +
         'this.__watchdog = () => ({ timer: reconnectWatchdogTimer !== null, attempt: reconnectWatchdogAttempt });\n' +

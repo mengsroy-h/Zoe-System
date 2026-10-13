@@ -85,7 +85,7 @@ FNS.forEach((n) => {
 
 const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
     'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS',
-    'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txOutcomeUnknownReported', 'txDisconnectResolving'];
+    'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths', 'txOutcomeUnknownReported', 'txDisconnectResolving', 'txMutationSources'];
 const decls = [];
 DECLS.forEach((n) => {
     const m = SRC.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm'));

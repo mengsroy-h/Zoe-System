@@ -365,6 +365,8 @@ function runPatch(mode) {
     vm.runInContext('const pendingHistoryPatches = new Map();', ctx);
     vm.runInContext('let scanHistory = [' + JSON.stringify(item) + '];', ctx);
     vm.runInContext(sliceConst(zoewSrc, 'txDisconnectResolving') || 'const txDisconnectResolving = new WeakMap();', ctx);
+    const aliases = sliceConst(zoewSrc, 'txMutationSources');
+    if (aliases) vm.runInContext(aliases, ctx);
     for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'transactionDisconnectPending', 'armLateCommit', 'patchHistoryItemFields']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return Promise.resolve({ missing: fn });

@@ -64,8 +64,9 @@ export async function healthDatabaseLiveRow() {
     if (firebaseState.fb && typeof firebaseState.fb.retryWriteRecovery === 'function' && firebaseState.db && firebaseState.auth && firebaseState.auth.currentUser) {
         try { await withTimeout(firebaseState.fb.retryWriteRecovery(firebaseState.db), DB_LIVENESS_PROBE_TIMEOUT_MS, 'Write verification timed out'); } catch (e) {}
     }
-    const phase = connectionFlowSnapshot().phase;
+    const flow = connectionFlowSnapshot(); const phase = flow.phase;
     if (phase === 'blocked') return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — មិនទាន់អនុវត្តឡើងវិញ ដើម្បីការពារប្រាក់ស្ទួន។ សូមពិនិត្យទិន្នន័យ និងចុចពិនិត្យម្តងទៀត។');
+    if (flow.pendingWrites) return healthRow('warn', databaseHealthLabel(), 'មានការសរសេរ ' + flow.pendingWrites + ' កំពុងដំណើរការ — សូមរង់ចាំលទ្ធផល។');
     const base = healthDatabaseRow();
     if (base.state !== 'ok') return base;
     const alive = await probeDatabaseLiveness('health');

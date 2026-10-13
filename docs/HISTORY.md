@@ -3585,11 +3585,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ### 2026-10-13 — Connection architecture ទាំង ៦ ចំណុច · ZoeW 2.50.59
 
-មូលដ្ឋាន `f7c3043` ក្នុង PR #313។ តេស្តថ្មីដូចគ្នា ២០ ករណីក្នុង ៥ ឯកសារ៖ មុនកែ ១៧ FAIL និង ៣ control PASS; ក្រោយកែ ២០/២០ PASS។ វាស់ lifecycle readiness, listener ownership, logout/tenant switch ពេល fetch ឬ body នៅរង់ចាំ, Supabase lost ACK/reload ជាមួយ op_id ដើម, offline queue, storage quota, replay window ផុត, Firebase immutable receipt និង SDK transaction callback មកពីរដង។ ចំនួន FAIL ជាចំនួនសេណារីយ៉ូ មិនមែនកំហុសឯករាជ្យ ១៧ ទេ។ Full Vitest ដំបូងក្រោយកែ fixture ownership៖ ១៥៨ ឯកសារ / ១៤០៩ tests PASS; ការរត់ពេញលើ tree ចុងក្រោយត្រូវផ្ទៀងផ្ទាត់បន្ថែម។
+មូលដ្ឋាន `f7c3043` ក្នុង PR #313។ តេស្តថ្មីដូចគ្នា ២៥ ករណីក្នុង ៥ ឯកសារ៖ មុនកែ ២១ FAIL និង ៤ control PASS; ក្រោយកែ ២៥/២៥ PASS។ វាស់ lifecycle readiness, listener ownership, logout/tenant switch ពេល fetch ឬ body នៅរង់ចាំ, Supabase lost ACK/reload ជាមួយ op_id ដើម, offline queue, storage quota, replay window ផុត, Firebase immutable receipt និង SDK transaction callback មកពីរដង។ ចំនួន FAIL ជាចំនួនសេណារីយ៉ូ មិនមែនកំហុសឯករាជ្យ ២១ ទេ។ Full Vitest ដំបូងក្រោយកែ fixture ownership៖ ១៥៨ ឯកសារ / ១៤០៩ tests PASS; ការរត់ពេញលើ tree ចុងក្រោយត្រូវផ្ទៀងផ្ទាត់បន្ថែម។
 
 Real SDK/RTDB បានចាប់កំហុសដែល fake SDK មិនបដិសេធ៖ `ref(db, '')` មិនអនុញ្ញាត path ទទេ ➜ ប្រើ `ref(db)`; native journal ត្រូវដកពេល verdict `not-applied` ជាក់លាក់ ដើម្បីកុំរារាំងការដកបន្ទាប់; recovery ត្រូវរង់ចាំម្ចាស់ Web Lock ហើយពិនិត្យ journal វិញដោយខ្លួនឯង។ Supabase recovery conflict ត្រូវពិនិត្យអាយុម្តងទៀតតាមម៉ោង response មុនដក journal; replay window អាចផុតកណ្តាល request។ Replay attempt ដែល unsent មិនលុបភាពមិនច្បាស់នៃ attempt មុនដែលបានផ្ញើរួចទេ; intent នៅ sent ឬ cancelled តាម owner ដើម។ Receipt replay បញ្ជាក់ counter មិនស្ទួន តែ UI ជាប់ syncing ទោះ phase ready និង journal ទទេ ➜ snapshot ចុងក្រោយត្រូវ render connection status; regression ដាច់ដោយឡែកធ្លាក់លើការអនុវត្តមុនកែច្រកនេះ។ `connection-recovery-test` ចាប់ initialization error និងវាស់ syncing មុន snapshot មកដល់ / ready ក្រោយគ្រប់ view មកដល់។ Supabase adapter parity ពិត ៩២ PASS និង RTDB/Postgres rules parity ១៣ PASS ក្នុងការរត់ផ្តោត; ការរត់ផ្តោតមិនមែនសាលក្រមពេញលេញ ២០៤ checker ទេ។
 
-Native set/update បញ្ចូលទិន្នន័យ និង receipt ក្នុង atomic SDK update ដដែល; receipt មាន UID និង hash ហើយ rules មិនអនុញ្ញាត overwrite/delete។ Native CAS recovery ប្រើ ledger witness និង requested intent ដើម; គ្មាន Web Locks ➜ អានផ្ទៀងផ្ទាត់បាន តែមិន replay transaction ដែល outcome មិនទាន់ច្បាស់។ Supabase replay ប្រើ server-clock window ខ្លីជាង retention របស់ `zoe_ops`; outcome ចាស់ឬមិនច្បាស់រក្សា journal និងផ្អាក writes។ មិនអាចអះអាងថាគ្រប់ network failure ឬ race ដែលអាចកើតមានត្រូវបានលុបទាំងអស់ទេ។ សកម្មភាព Publish Firebase rules / Supabase migrations / ឧបករណ៍ពិតនៅផ្នែក ១។
+Native set/update បញ្ចូលទិន្នន័យ និង receipt ក្នុង atomic SDK update ដដែល; receipt មាន UID និង hash ហើយ rules មិនអនុញ្ញាត overwrite/delete។ Ledger ចាស់ដែលគ្មាន token ទទួល metadata anchor តាម CAS មុន delta ដំបូង ដោយមិនប្រែប្រាក់; requested money intent រក្សា prepared មុនរង់ចាំ ACK របស់ metadata និងប្តូរ sent ក្នុង updater មុនផ្ញើ delta ដូច្នេះ reload កណ្តាលការរៀបចំមិនបាត់ intent។ Recovery updater រក្សា witness និង journal មុនការសរសេររបស់ខ្លួនផង; witness ដែលមិនច្បាស់នៅ unknown ដដែល។ Native CAS recovery ប្រើ ledger witness និង requested intent ដើម; គ្មាន Web Locks ➜ អានផ្ទៀងផ្ទាត់បាន តែមិន replay transaction ដែល outcome មិនទាន់ច្បាស់។ Supabase replay ប្រើ server-clock window ខ្លីជាង retention របស់ `zoe_ops`; outcome ចាស់ឬមិនច្បាស់រក្សា journal និងផ្អាក writes។ Native receipt recovery ផ្ទៀងផ្ទាត់ hash នៃ payload មុន replay; payload ប្រែត្រូវរក្សា និង blocked។ PERMISSION_DENIED របស់ write ថ្មីដែលកាន់ Web Lock មិនត្រូវបាត់ក្រោម error ពី receipt read។ Pending counter គ្រប request ដែលនៅរង់ចាំ lock និង SDK; 🩺 មិនរាយ healthy ពេល write នៅ pending ហើយ fuzz វាស់ invariant ក្រោយ pending ចប់ (ពិដាន ១.៥ វិនាទី; មិនចាំតម្លៃដែលរំពឹងឬបង្កើនពិដាន checker)។
+
+Full STRICT ជុំដំបូង ១៧៣ PASS / ៣១ FAIL និង CI ធ្លាក់ទាំង ៤ ផ្នែក; មិនរាប់វាជា full green។ ការរត់ផ្តោតក្រោយកែ dependency/atomic-path fixtures និងកំហុស runtime បាន PASS ២៧/២៩; ករណីពីរចុងក្រោយកែហើយរត់ឡើងវិញជាមួយ backend parity និង health បាន PASS ទាំង ៥ ដែលជ្រើស។ លទ្ធផលទាំងនេះមិនមែន full run ស្អាតមួយទេ; ត្រូវរត់ STRICT ពេញឡើងវិញលើ tree ចុងក្រោយ។
+
+មិនអាចអះអាងថាគ្រប់ network failure ឬ race ដែលអាចកើតមានត្រូវបានលុបទាំងអស់ទេ។ សកម្មភាព Publish Firebase rules / Supabase migrations / ឧបករណ៍ពិតនៅផ្នែក ១។
 
 ### 2026-10-12 — Audit race/login/network ក្រោយ merge PR #312 · ZoeW 2.50.58
 
@@ -6050,3 +6054,15 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 
 | `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+
+| `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
+
+| `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |

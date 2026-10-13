@@ -577,7 +577,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (!authScope || !topic) throw new SbRpcError('write context unavailable', 'write_context', 0, '');
             const prior = writeJournal.list(authScope, topic).find((row) => row.opId === args.p_op_id);
             journalRow = Object.assign({}, prior || { v: 1, scope: authScope, topic, opId: args.p_op_id,
-                ops: args.p_ops, createdAt: Date.now() }, { stage: 'sent', sentAfter: prior && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
+                ops: args.p_ops, queuedAt: Date.now() }, { stage: 'sent', sentAfter: prior && prior.sentAfter > 0 ? prior.sentAfter : serverNowSeen });
             if (!writeJournal.put(journalRow)) throw new SbRpcError('write journal unavailable', 'write_journal', 0, '');
         }
         let data;
@@ -921,7 +921,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         const w: any = { seq: ++writeSeq, ops, path, overlay, keys: ops.flatMap(opDocKeys), opId: newOpId(), scope: authScope, topic: tenantTopic };
         if (writeJournal) {
             if (!w.scope || !w.topic || !writeJournal.put({ v: 1, scope: w.scope, topic: w.topic, opId: w.opId,
-                ops, stage: 'queued', sentAfter: 0, createdAt: Date.now() })) return Promise.reject(firebaseLikeError('write_journal_unavailable', path));
+                ops, stage: 'queued', sentAfter: 0, queuedAt: Date.now() })) return Promise.reject(firebaseLikeError('write_journal_unavailable', path));
         }
         liveWriteIds.add(w.opId);
         let resolveDone;
@@ -1350,7 +1350,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
     };
 
     db.isReady = () => ready;
-    db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites });
+    db.recoveryState = () => ({ blocked: recoveryBlocked, recovering: !!recoveringWrites,
+        pending: pending.filter(w => w.scope === authScope && w.topic === tenantTopic).length });
     db.retryWriteRecovery = () => {
         recoveredContext = null;
         requestSync();

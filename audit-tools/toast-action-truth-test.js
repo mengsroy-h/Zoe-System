@@ -318,7 +318,7 @@ const BOOT = function (seed) {
             exchangeMode = 'normal';
             if (!held) return false;
             if (!ok) held.reject(new Error('permission_denied'));
-            else { setPath(held.ref.path, held.value); fireAll(); held.resolve(); }
+            else { if (held.values) Object.keys(held.values).forEach(key => setPath((held.ref.path ? held.ref.path + '/' : '') + key, held.values[key])); else setPath(held.ref.path, held.value); fireAll(); held.resolve(); }
             return true;
         }
     };
@@ -338,7 +338,7 @@ const BOOT = function (seed) {
             }
             setPath(ref.path, value); fireAll(); return Promise.resolve();
         },
-        update: (ref, values) => { const base = ref.path ? ref.path + '/' : ''; Object.keys(values).forEach((key) => setPath(base + key, values[key])); fireAll(); return Promise.resolve(); },
+        update: (ref, values) => { if (exchangeMode === 'hold' && Object.keys(values).some(key => (ref.path ? ref.path + '/' : '') + key === 'zoew_settings/exchange_rate')) return new Promise((resolve, reject) => { heldExchange = { ref, values, resolve, reject }; }); const base = ref.path ? ref.path + '/' : ''; Object.keys(values).forEach((key) => setPath(base + key, values[key])); fireAll(); return Promise.resolve(); },
         runTransaction: (ref, updater) => {
             if (ref.path.indexOf('zoew_scan_history_cod_dod/') === 0 && historyMode === 'hold') {
                 return new Promise((resolve, reject) => { heldHistory = { ref, updater, resolve, reject }; });

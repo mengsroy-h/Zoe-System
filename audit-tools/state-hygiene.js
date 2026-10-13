@@ -32,6 +32,7 @@ const ACCEPTED = {
         dbRefDailyPickup: 'ref object, detached via fb.off; holds no data',
         dbRefExchangeRate: 'ref object, detached via fb.off; holds no data',
         authUnsubscribe: 'the listener must survive logout to see the next login',
+        connectionRecoveryCleanup: 'page lifecycle cleanup, contains only online/offline/visibility handlers and no user data; survives logout for the next login and runs on app scope disposal; connection-flow-contract.test.ts checks replacement and disposal',
         authRecoveryTimeout: 'cleared in the auth callback itself',
         authGeneration: 'monotonic counter, resetting it would break generation guards',
         lookupSaveGeneration: 'លំដាប់សំណើកើនជានិច្ច; reset អាចឱ្យ promise ចាស់មានលេខដូចសំណើថ្មី · គ្មានទិន្នន័យឬសោ',

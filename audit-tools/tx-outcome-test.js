@@ -61,7 +61,7 @@ const TX_FNS = ['transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSa
     'txSnapshotOf', 'reportTxOutcomeUnknown',
     'runTransactionResolved', 'withTransactionOutcomeResolution'];
 const TX_CONSTS = ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_GAP_MS', 'TX_OUTCOME_MAX_REFUSALS', 'TX_OUTCOME_GATE_RELEASE_FAILS', 'txResolvingPaths',
-    'txDisconnectResolving'];
+    'txDisconnectResolving', 'txMutationSources'];
 const APP_FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
     'fetchWithTimeout',
     'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
@@ -237,7 +237,7 @@ function makeRun(opts) {
     box.window = box;
     box.authGeneration = 0;
     const ctx = vm.createContext(box);
-    const parts = [];
+    const parts = [require('./react-view.js').reactRuntime(SRC, { exclude: TX_FNS.concat(APP_FNS, TX_CONSTS, APP_CONSTS), context: box })];
     TX_CONSTS.concat(APP_CONSTS).forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     parts.push('const txOutcomeUnknownReported = new Set();');
     parts.push('let serverClockTrusted = true, cleanupResumeInFlight = false;');

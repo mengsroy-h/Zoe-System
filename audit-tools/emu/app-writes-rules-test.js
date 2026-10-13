@@ -106,7 +106,9 @@ async function replay(cap, rules, tag) {
             const body = withServerValues(entry.v);
             const res = await req(method, at('/' + (entry.p || '') + '.json', true), body);
             if (denied(res)) {
-                out.denied.push({ run: run.run, i, method, path: entry.p || '/', tx: !!entry.tx, why: res.body.slice(0, 120), value: JSON.stringify(entry.v).slice(0, 160) });
+                const paths = entry.m === 'PATCH' && entry.v && typeof entry.v === 'object'
+                    ? Object.keys(entry.v).map(key => (entry.p ? entry.p + '/' : '') + key) : [entry.p || '/'];
+                out.denied.push({ run: run.run, i, method, path: entry.p || '/', paths, tx: !!entry.tx, why: res.body.slice(0, 120), value: JSON.stringify(entry.v).slice(0, 160) });
                 await req(method, at('/' + (entry.p || '') + '.json'), body);
             }
         }
@@ -184,13 +186,15 @@ async function replay(cap, rules, tag) {
 
     // ⛔ សញ្ញាហាង ZTO (`zoew_settings/zto_signed_sweep`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរពិតរបស់ `markZtoShopSweep()` ·
     //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules ដែលគ្មាន node នេះ (ដូច rules ចាស់) ➜ បដិសេធ។
-    const sweepMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && String(e.p || '') === 'zoew_settings/zto_signed_sweep').length, 0);
+    const markerPath = p => p === 'zoew_settings/zto_signed_sweep' || p.startsWith('zoew_settings/zto_signed_sweep/');
+    const sweepMarks = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && (markerPath(String(e.p || ''))
+        || e.m === 'PATCH' && e.v && Object.keys(e.v).some(key => markerPath((e.p ? e.p + '/' : '') + key)))).length, 0);
     console.log('    សញ្ញាហាង ZTO ៖ ការសរសេរ ' + sweepMarks);
     check(sweepMarks >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរសញ្ញាហាង ZTO ≥ ១', 'sweepMarks=' + sweepMarks);
     const noMarkRules = JSON.parse(JSON.stringify(rules));
     delete noMarkRules.rules.zoew_settings.zto_signed_sweep;
     const noMark = await replay(cap.data, noMarkRules, 'no-mark-rules');
-    check(noMark.denied.filter((d) => d.path === 'zoew_settings/zto_signed_sweep').length >= sweepMarks,
+    check(noMark.denied.filter((d) => d.paths.some(markerPath)).length >= sweepMarks,
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `zto_signed_sweep`) បដិសេធសញ្ញាហាង (ការវាស់រសើប)',
         'denied=' + noMark.denied.length + ' sweepMarks=' + sweepMarks);
 

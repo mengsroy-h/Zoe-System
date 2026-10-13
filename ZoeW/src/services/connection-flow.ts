@@ -55,6 +55,8 @@ export function connectionFlowSnapshot() {
     else if (!firebaseState.isDatabaseInitialized || dbListenerPendingPaths.size) phase = 'syncing';
     else phase = 'ready';
     return { phase, epoch: firebaseState.authGeneration, pendingViews: dbListenerPendingPaths.size,
+        pendingWrites: (nativeWriteRecoveryState(firebaseState.db).pending || 0)
+            + (firebaseState.db && typeof firebaseState.db.recoveryState === 'function' ? firebaseState.db.recoveryState().pending || 0 : 0),
         canWrite: phase === 'ready' || phase === 'syncing' || phase === 'recovering' || phase === 'offline' };
 }
 
@@ -67,24 +69,24 @@ export function withConnectionOwnership(sdk) {
     let report = () => {};
     const entryFor = (app) => {
         if (!app || typeof app !== 'object') return null;
-        let entry = apps.get(app);
-        if (!entry) { entry = { app, auth: null, epoch: 0, closed: false }; apps.set(app, entry); }
-        return entry;
+        let ownerScope = apps.get(app);
+        if (!ownerScope) { ownerScope = { app, auth: null, epoch: 0, closed: false }; apps.set(app, ownerScope); }
+        return ownerScope;
     };
     const ended = () => Object.assign(new Error('Connection session changed'), { code: 'CONNECTION_SCOPE_CHANGED', noRetry: true, txOutcome: 'unknown' });
-    const scopeOf = (entry) => {
-        const ownerAuth = entry && entry.auth;
+    const scopeOf = (ownerScope) => {
+        const ownerAuth = ownerScope && ownerScope.auth;
         return ownerAuth && ownerAuth._account && ownerAuth._account.tenant_id || '';
     };
-    const capture = (entry, bound = true) => {
-        const ownerAuth = entry && entry.auth;
+    const capture = (ownerScope, bound = true) => {
+        const ownerAuth = ownerScope && ownerScope.auth;
         const uid = ownerAuth && ownerAuth.currentUser && ownerAuth.currentUser.uid;
-        const epoch = entry && entry.epoch;
-        const tenant = scopeOf(entry);
+        const epoch = ownerScope && ownerScope.epoch;
+        const tenant = scopeOf(ownerScope);
         const appEpoch = ownerAuth && ownerAuth === firebaseState.auth ? firebaseState.authGeneration : null;
         const config = appEpoch !== null ? safeStoreGet(appLocalStore, 'zoew_firebase_config') : null;
-        return () => !entry || (!entry.closed && (!bound || (entry.epoch === epoch && scopeOf(entry) === tenant
-            && (entry.auth && entry.auth.currentUser && entry.auth.currentUser.uid) === uid
+        return () => !ownerScope || (!ownerScope.closed && (!bound || (ownerScope.epoch === epoch && scopeOf(ownerScope) === tenant
+            && (ownerScope.auth && ownerScope.auth.currentUser && ownerScope.auth.currentUser.uid) === uid
             && (appEpoch === null || firebaseState.auth === ownerAuth && firebaseState.authGeneration === appEpoch
                 && config === safeStoreGet(appLocalStore, 'zoew_firebase_config')))));
     };
@@ -94,16 +96,16 @@ export function withConnectionOwnership(sdk) {
         streams.delete(row);
         if (typeof row.off === 'function') { try { row.off(); } catch (e) {} }
     };
-    const nativeRecovery = (entry, ownedDb) => {
-        if (sdk.__supabase || !entry || !entry.auth || entry.auth !== firebaseState.auth || ownedDb !== firebaseState.db || !entry.auth.currentUser) return null;
-        const uid = entry.auth.currentUser.uid;
-        if (!entry.recovery || entry.recovery.uid !== uid || !entry.recovery.current()) entry.recovery = createNativeWriteRecovery(sdk, entry.auth, ownedDb, capture(entry), () => report(), captureConnectionOperation);
-        return entry.recovery;
+    const nativeRecovery = (ownerScope, ownedDb) => {
+        if (sdk.__supabase || !ownerScope || !ownerScope.auth || ownerScope.auth !== firebaseState.auth || ownedDb !== firebaseState.db || !ownerScope.auth.currentUser) return null;
+        const uid = ownerScope.auth.currentUser.uid;
+        if (!ownerScope.recovery || ownerScope.recovery.uid !== uid || !ownerScope.recovery.current()) ownerScope.recovery = createNativeWriteRecovery(sdk, ownerScope.auth, ownedDb, capture(ownerScope), () => report(), captureConnectionOperation);
+        return ownerScope.recovery;
     };
-    const listen = (entry, path, callback, start, bound = true) => {
-        for (const row of [...streams]) if (row.entry === entry && row.path === path && row.callback === callback) stop(row);
-        const row: any = { entry, path, callback, active: true, off: null };
-        const current = capture(entry, bound);
+    const listen = (ownerScope, path, callback, start, bound = true) => {
+        for (const row of [...streams]) if (row.ownerScope === ownerScope && row.path === path && row.callback === callback) stop(row);
+        const row: any = { ownerScope, path, callback, active: true, off: null };
+        const current = capture(ownerScope, bound);
         streams.add(row);
         try { row.off = start((...args) => { if (row.active && current()) callback(...args); }, () => row.active && current(), () => stop(row)); }
         catch (e) { stop(row); throw e; }
@@ -115,31 +117,31 @@ export function withConnectionOwnership(sdk) {
             if (prop === '__connectionOwned') return true;
             if (prop === 'setConnectionFlowReporter') return (callback) => { report = typeof callback === 'function' ? callback : () => {}; };
             if (prop === 'connectionEpoch') return (ref) => {
-                const entry = refs.get(ref)?.entry;
-                return entry && typeof entry.transportConnected === 'boolean' ? entry.transportEpoch || 0 : null;
+                const ownerScope = refs.get(ref)?.ownerScope;
+                return ownerScope && typeof ownerScope.transportConnected === 'boolean' ? ownerScope.transportEpoch || 0 : null;
             };
             if (prop === 'retryWriteRecovery') return (db) => {
                 if (target.__supabase) return typeof db.retryWriteRecovery === 'function' ? db.retryWriteRecovery() : Promise.resolve();
-                const entry = databases.get(db);
-                if (entry && entry.recovery && entry.recovery.current() && nativeWriteRecoveryState(db).recovering) return entry.recovery.recovery;
-                if (entry) entry.recovery = null;
-                const recovery = nativeRecovery(entry, db);
+                const ownerScope = databases.get(db);
+                if (ownerScope && ownerScope.recovery && ownerScope.recovery.current() && nativeWriteRecoveryState(db).recovering) return ownerScope.recovery.recovery;
+                if (ownerScope) ownerScope.recovery = null;
+                const recovery = nativeRecovery(ownerScope, db);
                 return recovery ? recovery.recovery : Promise.resolve();
             };
-            if (prop === 'getAuth') return (app) => { const auth = target.getAuth(app); const entry = entryFor(app); if (entry) entry.auth = auth; return auth; };
-            if (prop === 'getDatabase') return (app) => { const db = target.getDatabase(app); const entry = entryFor(app); databases.set(db, entry); if (entry) entry.db = db; return db; };
+            if (prop === 'getAuth') return (app) => { const auth = target.getAuth(app); const ownerScope = entryFor(app); if (ownerScope) ownerScope.auth = auth; return auth; };
+            if (prop === 'getDatabase') return (app) => { const db = target.getDatabase(app); const ownerScope = entryFor(app); databases.set(db, ownerScope); if (ownerScope) ownerScope.db = db; return db; };
             if (prop === 'ref') return (db, path) => {
                 const ref = target.ref(db, path);
-                refs.set(ref, { entry: databases.get(db) || entryFor(db && db.app), db, path: String(path || '').replace(/^\/+/, '') });
+                refs.set(ref, { ownerScope: databases.get(db) || entryFor(db && db.app), db, path: String(path || '').replace(/^\/+/, '') });
                 return ref;
             };
             if (prop === 'onValue') return (ref, cb, errCb) => {
-                const meta = refs.get(ref) || { entry: null, path: String(ref) };
-                return listen(meta.entry, meta.path, cb, (deliver, current, cancel) => target.onValue(ref, (snapshot) => {
-                    if (meta.entry && meta.path === '.info/connected' && current()) {
+                const meta = refs.get(ref) || { ownerScope: null, path: String(ref) };
+                return listen(meta.ownerScope, meta.path, cb, (deliver, current, cancel) => target.onValue(ref, (snapshot) => {
+                    if (meta.ownerScope && meta.path === '.info/connected' && current()) {
                         const connected = snapshot.val() === true;
-                        if (meta.entry.transportConnected !== connected) meta.entry.transportEpoch = (meta.entry.transportEpoch || 0) + 1;
-                        meta.entry.transportConnected = connected;
+                        if (meta.ownerScope.transportConnected !== connected) meta.ownerScope.transportEpoch = (meta.ownerScope.transportEpoch || 0) + 1;
+                        meta.ownerScope.transportConnected = connected;
                     }
                     deliver(snapshot);
                 },
@@ -147,18 +149,18 @@ export function withConnectionOwnership(sdk) {
             };
             if (prop === 'off') return (ref) => {
                 const meta = refs.get(ref);
-                if (meta) for (const row of [...streams]) if (row.entry === meta.entry && row.path === meta.path) stop(row);
+                if (meta) for (const row of [...streams]) if (row.ownerScope === meta.ownerScope && row.path === meta.path) stop(row);
                 return target.off(ref);
             };
             if (prop === 'onAuthStateChanged') return (auth, cb) => listen(entryFor(auth.app), '@auth', cb,
                 (deliver) => target.onAuthStateChanged(auth, (user) => {
                     if (user !== auth.currentUser) return;
-                    const entry = entryFor(auth.app);
+                    const ownerScope = entryFor(auth.app);
                     deliver(user);
-                    if (user && entry && entry.db) nativeRecovery(entry, entry.db);
+                    if (user && ownerScope && ownerScope.db) nativeRecovery(ownerScope, ownerScope.db);
                 }), false);
             if (prop === 'get') return async (ref) => {
-                const current = capture(refs.get(ref)?.entry);
+                const current = capture(refs.get(ref)?.ownerScope);
                 if (!current()) throw ended();
                 const result = await target.get(ref);
                 if (!current()) throw ended();
@@ -166,30 +168,30 @@ export function withConnectionOwnership(sdk) {
             };
             if (prop === 'runTransaction') return (ref, updater, options) => {
                 const meta = refs.get(ref);
-                const current = capture(refs.get(ref)?.entry);
-                if (!current() || meta?.entry?.auth && !meta.entry.auth.currentUser
-                    || meta?.entry?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
+                const current = capture(refs.get(ref)?.ownerScope);
+                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser
+                    || meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
                 const guarded = Object.assign((value) => { if (!current()) throw ended(); return updater(value); }, updater);
-                const recovery = nativeRecovery(meta?.entry, meta?.db);
-                if (recovery) return recovery.mutate('runTransaction', ref, guarded, options);
+                const recovery = nativeRecovery(meta?.ownerScope, meta?.db);
+                if (recovery) return recovery.mutate('runTransaction', ref, guarded, options, meta.path);
                 return target.runTransaction(ref, guarded, options);
             };
             if (prop === 'set' || prop === 'update') return (ref, value) => {
                 const meta = refs.get(ref);
-                const current = capture(meta?.entry);
-                if (!current() || meta?.entry?.auth && !meta.entry.auth.currentUser
-                    || meta?.entry?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
-                const recovery = nativeRecovery(meta?.entry, meta?.db);
-                if (recovery) return recovery.mutate(prop, ref, value);
+                const current = capture(meta?.ownerScope);
+                if (!current() || meta?.ownerScope?.auth && !meta.ownerScope.auth.currentUser
+                    || meta?.ownerScope?.auth === firebaseState.auth && !connectionFlowSnapshot().canWrite) return Promise.reject(ended());
+                const recovery = nativeRecovery(meta?.ownerScope, meta?.db);
+                if (recovery) return recovery.mutate(prop, ref, value, undefined, meta.path);
                 return target[prop](ref, value);
             };
             if (prop === 'signOut' || prop === 'signInWithEmailAndPassword') return (auth, ...args) => {
-                const entry = entryFor(auth.app); if (entry) entry.epoch++;
+                const ownerScope = entryFor(auth.app); if (ownerScope) ownerScope.epoch++;
                 return target[prop](auth, ...args);
             };
             if (prop === 'deleteApp') return (app) => {
-                const entry = entryFor(app); if (entry) { entry.closed = true; entry.epoch++; }
-                for (const row of [...streams]) if (row.entry === entry) stop(row);
+                const ownerScope = entryFor(app); if (ownerScope) { ownerScope.closed = true; ownerScope.epoch++; }
+                for (const row of [...streams]) if (row.ownerScope === ownerScope) stop(row);
                 return target.deleteApp(app);
             };
             return target[prop];

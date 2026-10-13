@@ -33,7 +33,10 @@ const GIT_DIR = process.env.VERSIONSCOPE_GIT_DIR ? path.resolve(process.env.VERS
 //    (src · public · index.html · vite.config) បូក dependency (`package.json`/lock ៖ React · Firebase ចូល bundle —
 //    ផ្ទុយពី App vanilla ដែល package.json ជា manifest របស់ server តែប៉ុណ្ណោះ)។ ស្ពាន build វាស់មិន ship ទេ។
 const REACT_VERSION_FILES = { app: 'src/core/version.ts', cache: 'src/sw/cache-version.ts' };
-const REACT_SHIPPED = /^(src\/|public\/|index\.html$|vite\.config\.mts$|package(-lock)?\.json$)/;
+// ⛔ កូដ native Android (`android/app/src/main/**` ៖ Java · AndroidManifest · res) និង `capacitor.config.ts` ចូល **APK** (`APP_VERSION` =
+//    versionName · Release `zoew-android-v<APP_VERSION>` មួយក្នុងមួយកំណែ ➜ គ្មានការឡើងកំណែ = plugin ថ្មីមិនដែលដល់ទូរស័ព្ទ) ➜ ជាកូដ ship ដែរ ·
+//    ផ្លូវ build (`android/build.gradle` · `gradle/` · `android/app/build/`) មិនមែន។
+const REACT_SHIPPED = /^(src\/|public\/|index\.html$|vite\.config\.mts$|capacitor\.config\.ts$|package(-lock)?\.json$|android\/app\/src\/main\/)/;
 const REACT_AUDIT_ONLY = /^src\/(expose-globals\.ts|audit-compat\.ts|audit-annotate\.ts|_generated-state\.json)$/;
 function isReactSource(app) { return fs.existsSync(path.join(GIT_DIR, app, 'src', 'main.tsx')); }
 
@@ -216,6 +219,11 @@ function manifestChangedForShip(app) {
         && !same((o) => { o.scripts.build = 'npm run rules:check && vite build'; }));
     ok('ទិសផ្ទុយ ៖ ច្រកផ្សាយរកមិនឃើញ ➜ script ទាំងអស់រាប់ (fail-closed)',
         shippedManifestView(base, new Set()) !== shippedManifestView(edit((o) => { o.scripts['rules:check'] = 'x'; }), new Set()));
+    ok('ទិសទាំង ២ ៖ កូដ native Android (`android/app/src/main/**` · `capacitor.config.ts`) ជាកូដ ship (APK) · ផ្លូវ build Gradle · output · README មិនមែន',
+        ['android/app/src/main/java/com/zoesystem/zoew/ApkUpdatePlugin.java', 'android/app/src/main/AndroidManifest.xml', 'android/app/src/main/res/xml/file_paths.xml', 'capacitor.config.ts']
+            .every((f) => REACT_SHIPPED.test(f))
+        && ['android/app/build.gradle', 'android/build.gradle', 'android/gradle.properties', 'android/app/build/outputs/apk/release/app-release.apk', 'android/release-cert.sha256', 'docs/ANDROID.md', 'README.md']
+            .every((f) => !REACT_SHIPPED.test(f)));
     for (const app of present.filter((a) => fs.existsSync(path.join(GIT_DIR, a, 'package.json')) && fs.existsSync(path.join(GIT_DIR, a, 'src', 'main.tsx')))) {
         const real = releaseEntryScripts(app);
         ok(app + ' ៖ ជាន់អប្បបរមា ៖ ច្រកផ្សាយដេរីវេពី netlify.toml + workflow មាន `build` និង `android:sync`',

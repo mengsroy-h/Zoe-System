@@ -206,7 +206,7 @@
 
 #### អ្នកយាម
 
-`npm run android:check` 3ខ (RELEASE_BASE = `https://github.com/<ZOE_RELEASES_REPO>/releases/download/` អានពី workflow · repo ≠ repo source — mutation ៖ ចង្អុល `RELEASE_BASE` ត្រឡប់ទៅ repo source ➜ ១ FAIL; ការរៀបលំដាប់ apksigner/pin វាស់ទល់នឹង step «បង្កើត GitHub Release» ព្រោះ step ចម្លងនៅមុនវាហើយមិន build) · `repository-contract-test` (+៤ ករណីលើ script ពិត ៖ main ➜ `gh release create` ២ ដង · ទី ២ ដោយ `ZOE_RELEASES_TOKEN` + `--repo` · branch ផ្សេង ➜ ១ ដងគ្មាន `--repo` · main គ្មាន token ➜ ធ្លាក់ · step token/ចម្លងមានលក្ខខណ្ឌត្រឹមត្រូវ) · `ZoeW/tests/notify-apk-link.test.tsx` (URL Java = URL workflow តាម `ZOE_RELEASES_REPO` · repo ≠ source) · `run-all` STRICT។
+`npm run android:check` 3ខ (RELEASE_BASE = `https://github.com/<ZOE_RELEASES_REPO>/releases/download/` អានពី workflow · repo ≠ repo source — mutation ៖ ចង្អុល `RELEASE_BASE` ត្រឡប់ទៅ repo source ➜ ១ FAIL; ការរៀបលំដាប់ apksigner/pin វាស់ទល់នឹង step «បង្កើត GitHub Release» ព្រោះ step ចម្លងនៅមុនវាហើយមិន build) · `repository-contract-test` (+៤ ករណីលើ script ពិត ៖ main ➜ `gh release create` ២ ដង · ទី ២ ដោយ `ZOE_RELEASES_TOKEN` + `--repo` · branch ផ្សេង ➜ ១ ដងគ្មាន `--repo` · main គ្មាន token ➜ ធ្លាក់ · step token/ចម្លងមានលក្ខខណ្ឌត្រឹមត្រូវ) · `ZoeW/tests/notify-apk-link.test.tsx` (URL Java = URL workflow តាម `ZOE_RELEASES_REPO` · repo ≠ source) · `version-bump-scope` (ថ្មី ៖ កូដ native Android `android/app/src/main/**` · `capacitor.config.ts` រាប់ជាកូដ ship របស់ ZoeW React — ជុំនេះកែតែ Java ➜ checker ចាស់អាន «គ្មានការកែពិត» ហើយបដិសេធការឡើងកំណែ ខណៈ Release ថ្មីត្រូវការកំណែថ្មី · probe ២ ទិស) · `run-all` STRICT។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

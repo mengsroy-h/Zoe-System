@@ -230,7 +230,10 @@
   ជំនួស) · `function-surface-test` (`batchScanIsRunning` គ្មានអ្នកហៅ ➜ ប្រើក្នុង `openBatchScanModal`) · `state-hygiene` (`keyboardPanScope` ➜ ACCEPTED) ·
   `repository-file-coverage` (`LabelPrintModal.tsx` គ្មាន mapping) · `security-guard` (លេខទូរស័ព្ទ/waybill ពិតពីរូបម្ចាស់គម្រោងក្នុង test ➜ លេខសំយោគ `0960001234` ·
   `771000003…`) · `css-classes` (`.label-date` គ្មាន rule · class `'layout-' + x` ➜ ផែនទី class ជាអក្សរពេញ) · `toast-action-truth` (toast «⏹️ …» គ្មានន័យ ➜ «ℹ️ …») ➜
-  ទាំង ៨ PASS លើ `RUNALL_ONLY` (`setup-link-logout` ៧២ · `clear-history-claim` ៦ · `function-surface` ២៧ · `security-guard` ៥៥ · `toast-action-truth` ៦៧) ➜ ជុំ ៦ ពេញលើ tree ចុងក្រោយ (ខាងក្រោម)។
+  ទាំង ៨ PASS លើ `RUNALL_ONLY` (`setup-link-logout` ៧២ · `clear-history-claim` ៦ · `function-surface` ២៧ · `security-guard` ៥៥ · `toast-action-truth` ៦៧) ➜ **ជុំ ៦ (`fbb48c0`) ៖ ២០៣/២០៥ · ០ រំលង** — ធ្លាក់ ២ ៖ `export-cells-test` (sandbox កាត់ `buildExportRows()` ហៅ `filteredHistoryItems()` ដែលមិនមានក្នុង sandbox ➜ `buildExportRows()`
+  ហៅ `getFilteredDataByDate()` ផ្ទាល់ដដែល · `filteredHistoryItems()` នៅតែសម្រាប់ `label-print` ➜ `RUNALL_ONLY` PASS ៣៣) · `zoew-suite 2/2` ➜ `history-window-check` «PWA Android ៖
+  ចលនាស្វែងរកមិនលោត» ស៊ុមទី ៨ ផ្លាស់ទី ២២.៦% ក្រោយស៊ុម ០ (ស៊ុមធ្លាក់ពេល ៤ lanes រវល់ · កូដចាក់សោមិនប៉ះ · PASS ជុំ ៥) ➜ រត់ `npm run native:check` តែឯងម្តង ➜ ១១៦ ok ·
+  history-window ០ FAIL (APK · PWA Android · PWA iPhone ទាំង ៣ ✅) = flake ពី CPU ⛔ មិនប្តូរពិដាន។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

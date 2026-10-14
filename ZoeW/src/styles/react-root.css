@@ -662,6 +662,7 @@
 .health-advice.health-ok { border-color: rgba(34, 197, 94, 0.45); }
 .health-advice.health-warn { border-color: rgba(234, 179, 8, 0.55); }
 .health-advice.health-bad { border-color: rgba(239, 68, 68, 0.55); }
+.health-advice.health-info { border-color: var(--border-color); }
 
 @media (max-width: 991px) {
     .page-main.entry-search-open .app-card:has(> .empty-state:not(.hidden)) > .table-responsive {

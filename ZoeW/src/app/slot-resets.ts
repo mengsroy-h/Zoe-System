@@ -62,7 +62,7 @@ export function resetReactOwned(id: string): boolean {
         case 'dailyStatsContainer': uiState.dailyStatsView = null; return true;
         case 'collectedStatsContainer': uiState.collectedStatsView = null; return true;
         case 'customerDataTableBody': lookupState.customerTableView = null; return true;
-        case 'healthCheckList': uiState.healthRows = null; return true;
+        case 'healthCheckList': uiState.healthRows = null; uiState.healthAdvice = null; return true;
         case 'barcodeListContainer': uiState.viewListView = null; return true;
         case 'lockerGrid': uiState.lockerGridView = null; return true;
         case 'menuContentContainer': uiState.moreMenuItems = null; return true;

@@ -260,6 +260,20 @@ export function noteConnectionTransition(prev, next) {
     }
 }
 
+export function liveWritePhaseState(head) {
+    const phase = viewState.connectionPhase;
+    if (phase === 'blocked') {
+        return { msg: '⚠️ ' + head + ' តែមានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍', kind: 'warn', settled: true };
+    }
+    if (phase === 'recovering') {
+        return { msg: '🔄 ' + head + ' — កំពុងផ្ទៀងផ្ទាត់ការសរសេររង់ចាំ...', kind: 'info', settled: false };
+    }
+    if (phase === 'syncing') {
+        return { msg: '🔄 ' + head + ' — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
+    }
+    return null;
+}
+
 export function liveToastState(key) {
     if (key === 'network') {
         if (!signedInForToast()) return null;
@@ -272,7 +286,7 @@ export function liveToastState(key) {
         if (firebaseState.dbListenersFailed || dbListenerPendingPaths.size) {
             return { msg: '🔄 ភ្ជាប់ Server វិញ — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
         }
-        return { msg: '✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
+        return liveWritePhaseState('ភ្ជាប់ Server វិញ') || { msg: '✅ ភ្ជាប់ Server វិញ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
     }
     if (key !== 'signin' && key !== 'config') return null;
     if (key === 'signin' && (firebaseState.sessionExpiryCheck === 'expired' || !firebaseState.auth || !firebaseState.auth.currentUser)) {
@@ -297,6 +311,8 @@ export function liveToastState(key) {
     if (dbListenerPendingPaths.size) {
         return { msg: '🔄 ចូលប្រព័ន្ធរួច — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
     }
+    const writePhase = liveWritePhaseState('ចូលប្រព័ន្ធរួច');
+    if (writePhase) return writePhase;
     if (firebaseState.sessionExpiryCheck === 'pending') {
         return { msg: '🔄 ចូលប្រព័ន្ធរួច — កំពុងផ្ទៀងផ្ទាត់វគ្គ...', kind: 'info', settled: false };
     }

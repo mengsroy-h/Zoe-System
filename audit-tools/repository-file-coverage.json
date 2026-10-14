@@ -1261,6 +1261,9 @@
     "ZoeW/src/app/components/health/HealthCheckList.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/health/HealthAdviceBox.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/health/model.ts": {
       "policy": "zoew-react-ui"
     },
@@ -1624,6 +1627,9 @@
     "ZoeW/src/features/health-check.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/health-advice.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/license.ts": {
       "policy": "zoew-app"
     },
@@ -1849,6 +1855,9 @@
     "ZoeW/tests/forbidden-zone-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/health-advice.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/history-paging.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -2048,6 +2057,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/network-toast.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/network-toast-phase.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notifications.test.tsx": {

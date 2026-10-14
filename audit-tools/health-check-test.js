@@ -60,6 +60,8 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'databaseHealthLabel', 'healthTenantRow',
     // ⛔ ជួរ License (Firebase) ៖ សុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) · សារមូលហេតុពី `licenseFailureMessage()` ពិត
     'healthKeyValidityText', 'licenseFailureMessage',
+    // ⛔ 🧠 ការណែនាំ (`runHealthCheck()` ហៅ `buildHealthAdvice(rows)` ក្រោយជួរ) — pure · អានជួរដែលវាស់បានប៉ុណ្ណោះ
+    'buildHealthAdvice', 'rowKind', 'detailHas', 'databaseStep', 'licenseStep', 'lookupStep', 'stepFor',
     // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob · ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ (`?diag=1` `list.signedMismatch`)
     'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',
     // ⛔ ជួរ ZTO ៖ អាយុ Cookie ក្រោយ Sync (`?diag=1` `cookie.life` ពី Blob `cookie-life`)
@@ -75,7 +77,8 @@ function sliceConst(name) {
     return m ? 'const ' + name + ' = ' + m[1] + ';' : '';
 }
 const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT',
-    'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS'];
+    'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS',
+    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_NETWORK', 'HEALED_BY_DATABASE'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);

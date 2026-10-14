@@ -45,6 +45,7 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **មិនទាន់ merge**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
    (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **merge រួចតាម PR #309 · `5767bc2`**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
@@ -168,6 +169,26 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.64] — 2026-10-14 · 🧠 ការណែនាំឆ្លាតវៃក្នុង 🩺 ពិនិត្យសុខភាព · toast រស់និយាយតាមដំណាក់កាលការសរសេរ (Deep audit ជុំទី ៤)
+
+**ZoeW** (`zoew-v326` ➜ `zoew-v327`)។ ⛔ **ZoeKeyGen មិនប្រែ**។ សំណើម្ចាស់គម្រោង ៖ «Deep Audit Project ទាំងមូល កែសម្រួលកំហុស បំពេញចន្លោះ ពង្រឹងសុវត្ថិភាព ការងារលេចធ្លាយ secret ដំណើរការរលូនគ្រប់ flow … real live toast និងបន្ថែមភាពឆ្លាតវៃ អោយដូច CLAUDE Ai»។ លទ្ធផលវាស់ និងចន្លោះដែលរកឃើញ ៖ ផ្នែក ២ «Deep audit ជុំទី ៤»។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ 🧠 ការណែនាំ** (ប្រអប់ក្រោមបញ្ជី ៩ ជួរ) ៖ App អានលទ្ធផលទាំងអស់ រួចប្រាប់ **មូលហេតុចម្បង** និង **ជំហានត្រូវធ្វើមុន** (យ៉ាងច្រើន ៣ · ❌ មុន ⚠️) ជាភាសាធម្មតា — ឧ. ក្រៅបណ្ដាញ ➜ «ភ្ជាប់ WiFi ឬទិន្នន័យចល័តសិន» ហើយប្រាប់ថាជួរ Firebase/Supabase · នាឡិកា · Lookup · អាជ្ញាប័ណ្ណ **នឹងជាវិញដោយខ្លួនឯង** (មិនរាយជាជំហាន) · Server ដាច់ តែបណ្ដាញល្អ ➜ Config/Setup Link មុន · Cookie ZTO បដិសេធ ➜ sync-zto-cookie · Key ជិតផុត ➜ ទាក់ទងអ្នកលក់ · ការសរសេរ blocked ➜ ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ»។ ទាំងអស់ ✅ ➜ «ប្រព័ន្ធដំណើរការធម្មតា — មិនចាំបាច់ធ្វើអ្វីទេ»។ វាដេរីវេពីជួរដែលវាស់បានប៉ុណ្ណោះ (អានតែប៉ុណ្ណោះ · គ្មានបណ្ដាញ · គ្មានការសរសេរ) ហើយបាត់ជាមួយជួរពេលចាកចេញ។
+- **Toast បណ្ដាញ · toast ចូលប្រព័ន្ធ និយាយតាមដំណាក់កាលពិត** ៖ ខណៈ App ផ្ទៀងផ្ទាត់ការសរសេររង់ចាំ (journal Firebase ពេលបើក App · replay Supabase ក្រោយក្រៅបណ្ដាញ) toast ប្រាប់ «🔄 … កំពុងផ្ទៀងផ្ទាត់ការសរសេររង់ចាំ...» ហើយ ✅ លេចម្តងពេលចប់ · ការសរសេរដែលផ្ទៀងផ្ទាត់មិនបាន (blocked) ➜ «⚠️ … មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់ — សូមពិនិត្យទិន្នន័យ ឬលុបវាតាម ☰ ឧបករណ៍» · listener មិនទាន់ភ្ជាប់ ➜ «កំពុងទាញទិន្នន័យ»។ ពីមុន toast និយាយ «✅ ទិន្នន័យទាន់សម័យ» ខណៈរបាខាងលើប្រាប់ «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» (ផ្ទុយគ្នា)។
+- **ហាង Supabase** ៖ ពេល adapter ផ្ញើការសរសេរដែលសល់ឡើងវិញ (`recoveryState().recovering`) របាខាងលើប្រាប់ «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» (ពណ៌លឿង) ដូច Firebase — ពីមុន «ភ្ជាប់ Server រួចរាល់» ខណៈ replay នៅដើរ។
+
+#### អ្នកយាម
+
+`ZoeW/tests/network-toast-phase.test.tsx` (ថ្មី ៥ ករណី ៖ Supabase recovering ➜ ដំណាក់កាល `recovering` · របា · toast មិន ✅ · ចប់ ➜ ✅ ម្តង / Firebase journal (mock `nativeWriteRecoveryState`) ➜ toast ចូលប្រព័ន្ធ / blocked ➜ ⚠️ បញ្ចប់ · មិនដែល ✅ / syncing / ក្រៅបណ្ដាញ និង listener ងាប់ឈ្នះ — ធ្លាក់ ៤/៥ លើដើមឈើមុនកែ) · `ZoeW/tests/health-advice.test.ts` (ថ្មី ៧ ករណី ៖ ទាំងអស់ ✅ · ក្រៅបណ្ដាញបង្ក្រាបជួរផលវិបាក · Server ដាច់ · ❌ មុន ⚠️ + ពិដាន ៣ + គ្មានស្ទួន · blocked · ទិន្នន័យខូច · logout លុប) · តេស្ត ZoeW ១,៤៦៥ · `typecheck` · `lint` · `purity` · `slot` · run-all STRICT។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy ZoeW (Netlify) · APK ចេញតាម workflow ធម្មតា។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+3. **Apps Script Lookup (ហាងដែលប្រើ Google Sheet)** ៖ script.google.com ➜ project `google-sheets-api` ➜ ជំនួស `Code.gs` ដោយឯកសារថ្មី (`CACHE_TTL_SECONDS = 60`) ➜ **Deploy ➜ New version** (`SCRIPT_VERSION` នៅ 1 ➜ 🩺 មិន ⚠️)។ មិន Deploy ➜ ឧបករណ៍ផ្សេងឃើញការនាំចូលក្រៅ ZoeW យឺត ≤ ៥ នាទីដូចមុន (មិនមែនកំហុស)។
+2. សាកលើទូរស័ព្ទពិត ៖ ☰ ➜ 🩺 ➜ ប្រអប់ 🧠 លេចក្រោមបញ្ជី (បិទ WiFi ➜ ពិនិត្យម្តងទៀត ➜ ជំហានទី ១ = ភ្ជាប់បណ្ដាញ · ជួរ Server/Lookup រាយថា «នឹងជាវិញដោយខ្លួនឯង») · ហាង Supabase ៖ ស្កេនក្រៅបណ្ដាញ ➜ បើកបណ្ដាញ ➜ របា «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» មួយភ្លែត ➜ «ភ្ជាប់ Server រួចរាល់» · toast ✅ ម្តង។
 
 ### [ZoeKeyGen 2.24.18] — 2026-10-14 · ZoeKeyGen ៖ ទម្រង់តាមលំដាប់ការងារ · របាស្ថានភាព · កាតវគ្គ · ចាកចេញស្វ័យប្រវត្តិ · CSP គ្មាន inline style
 
@@ -3697,6 +3718,19 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
+
+សំណើម្ចាស់គម្រោង ៖ «Deep Audit Project ទាំងមូល … real live toast និងបន្ថែមភាពឆ្លាតវៃ»។ វិធី ៖ Sentry (issue មិនទាន់ដោះស្រាយ ៩ · ៣០ ថ្ងៃ) · អានផ្លូវពិត (Remove · Delete · Restore · close/reopen · scan save · ledger · registry · toast · connection flow · sheet import · Apps Script ២ · lookup) · run-all STRICT baseline លើ `ef0bf5b` (PR #314) ➜ ០ FAIL · វាស់ចន្លោះដែល checker មិនយាម។
+
+- **Sentry (ឧបករណ៍ពិត · 2.50.47–2.50.57)** ៖ `Database link unresponsive` (probe ពេល resume · ៣ អ្នកប្រើ Android 16 APK) · `Database operation stalled` · `Cleanup stopped after a database switch` (ការសម្អាត ២ ម៉ោង stage `claim` ដែលចប់ក្រោយប្តូរ session · iPhone PWA) · `Interrupted cleanup resumed with unverified ledger` (2.50.47 ចាស់ ៖ journal `ledger` គ្មានភស្តុតាង ➜ មិនប៉ះលុយ · ប្រាប់អ្នកប្រើ) · `permission_denied` លើ trash ៧ ដង (rules មិនទាន់ Publish · [2.50.49] សកម្មភាព ១) · «Perf overlay» ១៣៦ event ពី build ក្រៅ git ➜ **ទាំងអស់ជាអ្នកយាមដែលដើរតាមការរចនា** — គ្មាន event ប្រាក់ស្ទួន · គ្មាន exception មិនស្គាល់។
+- **ចន្លោះ ១ (កែ)** ៖ `liveToastState()` អាន transport · listener ប៉ុណ្ណោះ ➜ ✅ «ទិន្នន័យទាន់សម័យ» ខណៈ `connectionFlowSnapshot()` = `recovering` (journal Firebase · replay Supabase) ឬ `blocked` ឬ `syncing` (`isDatabaseInitialized` false · គ្មាន path pending) — របាខាងលើ (`renderConnectionStatus()`) ប្រាប់ «កំពុងផ្ទៀងផ្ទាត់ការសរសេរ...» តែ toast ប្រាប់ ✅ ➜ ផ្ទុយគ្នា · ការសរសេររង់ចាំដែលនឹងប្តូរលេខមិនទាន់សម្រេច។ កែ ៖ `liveWritePhaseState(head)` អាន `viewState.connectionPhase` (ដាក់ដោយ `renderConnectionStatus()` មុន `refreshLiveToasts()` — មិនហៅ `connectionFlowSnapshot()` ពី `toast.ts` ព្រោះ `connection-flow ➜ native-write-recovery ➜ tx-outcome ➜ network ➜ toast` ជារង្វង់) ➜ `blocked` = ⚠️ settled · `recovering` · `syncing` = 🔄 unsettled · `config` មិនប្រែ (សារនោះនិយាយតែការតភ្ជាប់)។ តេស្តធ្លាក់ ៤/៥ លើដើមឈើមុនកែ (`expected 'ready' to be 'recovering'` · `null to be 'signin'` · `'success' to be 'warn'` · `0 to be 1`)។
+- **ចន្លោះ ២ (កែ)** ៖ `connectionFlowSnapshot()` អាន `db.recoveryState().blocked` របស់ Supabase តែមិនអាន `.recovering` ➜ ខណៈ `recoverWrites()` ផ្ញើ `zoe_write` ឡើងវិញ ដំណាក់កាល = `ready` (Firebase ៖ `nativeWriteRecoveryState().recovering` ចូល `recovering` រួចហើយ) ➜ របា «ភ្ជាប់ Server រួចរាល់» ខណៈ replay ដើរ · `canWrite` មិនប្រែ (`recovering` សរសេរបាន)។
+- **ចន្លោះ ៣ (កែក្នុង template · ម្ចាស់គម្រោងសម្រេច «យកស្អាត»)** ៖ `zto-import/google-sheets-api/Code.gs` cache `customer_rows_v2_<lastRow>` ប្តូរសោតែពេលចំនួនជួរប្រែ · សំណើ `fresh=1` អានពី Sheet រួច **សរសេរ cache ឡើងវិញ** ➜ ការនាំចូលពី ZoeW (`scheduleCustomerTableSoonRefresh(true)`) ធ្វើឲ្យឧបករណ៍ផ្សេងឃើញទិន្នន័យថ្មីភ្លាម (JSON ≤ 90KB · ធំជាង ➜ cache មិនប្រើ) ➜ ចន្លោះនៅសល់តែពេលនាំចូល **ក្រៅ ZoeW** (Watch.gs · Index.html) ដែលកែជួរដែលមាន ឬ `replace` ចំនួនស្មើ ➜ ឧបករណ៍ផ្សេងអានចាស់ ≤ ៥ នាទី។ ជម្រើសដែលបដិសេធ ៖ សោតាមម៉ោងកែ Sheet (ត្រូវ `DriveApp.getFileById().getLastUpdated()` ➜ scope Drive ទាំងមូល + អនុញ្ញាតឡើងវិញ · ហៅ Drive រាល់សំណើ · ប្រែតាម tab ណាក៏បាន) · អ្នកសរសេរលុប cache អ្នកអាន (project ២ `CacheService` ដាច់ ➜ ត្រូវ `UrlFetchApp` + API_KEY ឆ្លង project)។ កែ ៖ `CACHE_TTL_SECONDS` 300 ➜ **60** (អាន Sheet ពេញ ≤ ១ ដង/នាទី · `SCRIPT_VERSION` 1 ដដែល ព្រោះទម្រង់ចម្លើយមិនប្រែ) · `google-sheets-cache-test` អាន TTL ពី `Code.gs` ហើយចាក់សោ ១០ ≤ TTL ≤ ៦០ (mutation 300 ➜ ធ្លាក់ · 60 ➜ ជាប់)។ ⛔ `Code.gs` ជា template ➜ ត្រូវ Deploy ដោយដៃ (សកម្មភាព ៣ ក្នុង [2.50.64])។
+- **អានហើយគ្មានកំហុស (ភស្តុតាង = អ្នកយាមស្រាប់)** ៖ Remove/Delete/Restore/close ផ្លូវ session · late commit · trash slot · registry release (`executePermanentDelete()` ដោះសោភ្លាមគ្មាន `registryReleaseVerdict()` — ត្រឹមត្រូវ ៖ barcode ក្នុងធុងសំរាមស្កេនម្តងទៀតមិនបាន (`isBarcodeAlreadyUsed()` + registry) ➜ គ្មានម្ចាស់ផ្សេង) · scan save (claim ➜ ledger ➜ data · `null` ពេល barcode មានរួច = registry ស៊ីគ្នា) · sheet import (ពាក្យសម្ងាត់ encrypted AES-GCM តាម PIN · URL regex `/exec` · `LockService` · replace សរសេរមុនលុប) · lookup Apps Script (`API_KEY` fail-closed) · auth/session (4 ម៉ោង · `authGeneration` · persistence) · secret ៖ `headerValue` plaintext មានតែផ្លូវ legacy ➜ `encryptLookupSecret` ពេលរក្សាទុក · គ្មាន `console.log` secret · `security-guard-test` បៃតង។
+- **🧠 ការណែនាំ (មុខងារថ្មី · «ភាពឆ្លាតវៃ»)** ៖ `src/features/health-advice.ts` (pure · `buildHealthAdvice(rows)` ➜ `{ level · title · steps ≤ 3 · healed }`) ៖ ស្គាល់ជួរតាម label (`HEALTH_ADVICE_LABELS` · Lookup តាមបុព្វបទ · Firebase/Supabase) · ជំហានតាមអត្ថបទ detail (`detailHas()`) · ច្បាប់មូលហេតុ ៖ `HEALED_BY_NETWORK` (database · clock · lookup · license) · `HEALED_BY_DATABASE` (clock) · ទម្ងន់ ❌ ០ / ⚠️ ១០ + ប្រភេទ (network ០ · storage ១ · database ២ · ផ្សេង ៣) · `HealthAdviceBox` (react-root.css · មិនប៉ះ `app.css` ដែលចាក់សោ) · `uiState.healthAdvice` null ពេល run ថ្មី និងពេល `healthCheckList` reset។ `doc-scope-test` ផ្នែក គ រាប់ `health…Row()` ក្នុង `runHealthCheck()` ដដែល ៩ (advice មិនមែនជួរ)។
+- **ឯកសារ** ៖ `guide.html` §១៧ ធាតុ 🧠 · `announcements.json` ធាតុ `update` = 2.50.64 · `repository-file-coverage.json` +៤ ឯកសារ។
+- **ភស្តុតាង (run-all STRICT · emulator RTDB · Postgres ពិត · firebase-tools ពិត)** ៖ baseline `ef0bf5b` ➜ ២០៤/២០៥ (ធ្លាក់តែ `version-bump-scope` ព្រោះកូដកំពុងកែខណៈរត់) · ជុំ ១ លើ `929e37f` ➜ ២០០/២០៥ (README កំណែចាស់ ×២ · `health-check-test` មិនស្រង់ `buildHealthAdvice` · `css-classes` class ផ្សំ `'health-' + level` · `emu/supabase-rules-parity` capture ធ្លាក់ក្រោម CPU រវល់) ➜ កែ `b2a0da9`–`5e7f2ee` · ជុំ ២ លើ `5e7f2ee` ➜ **២០៣/២០៥** (ធ្លាក់ `doc-scope-test` លិបិក្រមខ្វះឈ្មោះថ្មី ៣ · `revenue-fuzz` Playwright «Resulting promise was garbage collected» នៅ ៣,៨ វិ. មុនតេស្តចាប់ផ្តើម) ➜ កែលិបិក្រម `8070cb1` ➜ `RUNALL_ONLY=doc-scope-test,revenue-fuzz-test` **២/២ PASS** (revenue-fuzz ១៤៦ វិ. · ៣/៣)។ Fuzz seed ថ្មីលើដើមឈើវាស់ `8070cb1` ៖ `FUZZ_RUN0=700 FUZZ_RUNS=10 FUZZ_OPS=60 revenue-fuzz` ➜ PASS ៣/៣ (invariant ចំណូល ១០ លំដាប់ × ៦០ · «ឧបករណ៍ផ្សេងដក» បាញ់ ១០ · ledgerBlip applied ៩ · lost ៨) · `MFUZZ_RUN0=300 MFUZZ_RUNS=8 MFUZZ_OPS=40 collected-mirror-fuzz` ➜ ✅ ១,៩៧៧ · `CONNFUZZ_RUN0=200 CONNFUZZ_RUNS=6 CONNFUZZ_OPS=80 connection-state-fuzz` ➜ ✅ ៤,៤៣៩ (ជំហាន ៤៨០ · ស្ថានភាពចម្រុះ ២៣០)។ មិនអះអាង full fresh run ១ ដងដែលឆ្លង ២០៥/២០៥ លើ hash ចុងក្រោយ (`8070cb1` ប្រែពី `5e7f2ee` តែ `docs/HISTORY.md`)។
+
 ### 2026-10-14 — Deep audit ជុំទី ៣ ៖ ឧបករណ៍ ២ ពិតលើ emulator · ledger replay បញ្ចប់ពាក់កណ្តាលប្រតិបត្តិការ · ZoeW 2.50.62
 
 សំណើម្ចាស់គម្រោង ៖ «deep audit ស៊ីជម្រៅមួយជុំទៀត … លែងមានកំហុសក្នុងការ sync/write ចូល backend និងគ្មានការដក/បូកស្ទួន ការសម្អាតស្វ័យប្រវត្តិដំណើរការត្រឹមត្រូវបំផុត តេស្តអោយបានច្រើនដង»។ មូលដ្ឋាន `ab53ef9` (2.50.61)។
@@ -5918,7 +5952,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `function-surface-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `google-sheets-cache-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `health-check-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៦ |
@@ -6232,5 +6266,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

@@ -3,6 +3,7 @@ import { useStoreValue } from '../../hooks/useStore';
 import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { HealthCheckList } from '../health/HealthCheckList';
+import { HealthAdviceBox } from '../health/HealthAdviceBox';
 import { DeviceInfoLine } from '../device/DeviceInfoLine';
 
 export function HealthCheckModal() {
@@ -15,6 +16,7 @@ export function HealthCheckModal() {
                 <div id="healthCheckList" className="health-list">
                     <HealthCheckList />
                 </div>
+                <HealthAdviceBox />
                 <p className="health-note">
                     ការពិនិត្យនេះ{' '}
                     <b>អានតែប៉ុណ្ណោះ</b>

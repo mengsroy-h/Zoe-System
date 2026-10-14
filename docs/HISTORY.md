@@ -189,7 +189,7 @@
 - 🖨️ **បោះពុម្ពស្លាកកញ្ចប់** (ម្ចាស់គម្រោង ៖ «print លេខទូរស័ព្ទនិង barcode ថ្ងៃទី/ខែ ឧ. (15/10) តែលេខទូរស័ព្ទសុំដាក់ធំៗ … យកទៅបិទជាប់កញ្ចប់អីវ៉ាន់ព្រោះកញ្ចប់អីវ៉ាន់មិនមានលេខទូរស័ព្ទទេ»)
   ៖ ម៉ឺនុយ (...) ខាងលើ «🖨️ បោះពុម្ពស្លាក (តម្រង)» = កញ្ចប់ទាំងអស់តាមតម្រងថ្ងៃ · ម៉ឺនុយ (...) តាមជួរ «🖨️ បោះពុម្ពស្លាក» = អតិថិជននោះ ➜ **ផ្ទាំង `labelPrintModal`** (ម្ចាស់គម្រោង ៖
   «បន្ថែម modal print … ដូច modal sheet … ធ្វើតាមគំនិតរបស់អ្នក») ៖ វិសាលភាព · សង្ខេប (ស្លាក N · អតិថិជន M) · ទំហំស្លាក **មួយសន្លឹកមួយស្លាក** (ម្ចាស់គម្រោង ៖ «ដាក់អោយចេញម្តងមួយសន្លឹក … មិនមែន print ជា A4 ទេ … ដូច price tag») ៖ `50x30` លំនាំដើម (ម្ចាស់គម្រោង ៖ «ប្រើជាមួយ printer តូចបែបនេះបានផង 50×30mm» — Niimbot B1 ៖ named page
-  `@page zoeLabel50x30 { size: 50mm 30mm }` · ស្លាក 47×27mm · លេខ 17pt · Barcode 7mm · ⚠️ ម៉ាស៊ីនប្រភេទនេះបោះពុម្ពតាម App របស់វា ➜ Save as PDF ➜ App) · `40x30` · `60x40` (named page ផ្ទាល់ខ្លួន · អក្សរតាមទំហំ) · `single` (ទំហំតាម dialog) · `a4-3` (៩/ទំព័រ) · `a4-2` (ធំ) ជាជម្រើសបន្ទាប់បន្សំ (`break-after: page` លើស្លាកតូចទាំងអស់) · កុងតាក់ តម្លៃ $ · ថ្ងៃ/ខែ · Locker · «តែកញ្ចប់មិនទាន់យក» (លំនាំដើមបើក ៖ រំលង Barcode `isClosed`) · ជម្រើសរក្សាទុក `zoew_label_print_v1` ·
+  `@page zoeLabel50x30 { size: 50mm 30mm }` · ស្លាក 47×27mm · លេខ 17pt · Barcode 7mm · ⚠️ ម៉ាស៊ីនប្រភេទនេះបោះពុម្ពតាម App របស់វា ➜ Save as PDF ➜ App · ⚠️ Safari/iOS មិនស្គាល់ named page ➜ ទំហំទំព័រតាម dialog ប៉ុណ្ណោះ · Chromium/Android/APK ត្រឹមត្រូវ) · `40x30` · `60x40` (named page ផ្ទាល់ខ្លួន · អក្សរតាមទំហំ) · `single` (ទំហំតាម dialog) · `a4-3` (៩/ទំព័រ) · `a4-2` (ធំ) ជាជម្រើសបន្ទាប់បន្សំ (`break-after: page` លើស្លាកតូចទាំងអស់) · កុងតាក់ តម្លៃ $ · ថ្ងៃ/ខែ · Locker · «តែកញ្ចប់មិនទាន់យក» (លំនាំដើមបើក ៖ រំលង Barcode `isClosed`) · ជម្រើសរក្សាទុក `zoew_label_print_v1` ·
   **preview ផ្ទាល់** (`LabelSheet` ដដែល · ≤ ៦ · `zoom` .55) · «🖨️ បោះពុម្ព» (បិទពេលគ្មានស្លាក) · screenshot ទូរស័ព្ទ/កុំព្យូទ័រ ផ្ញើម្ចាស់គម្រោង។ ស្លាកមួយក្នុងមួយ Barcode
   (`features/label-print.ts` ➜ `buildLabelRows()`) ៖ លេខទូរស័ព្ទ ៣០pt ដិត · Code 128 (SVG ដដែលនឹងបញ្ជី ZTO · ស្កេនបាន) · លេខ Barcode · ថ្ងៃ/ខែ ពី `scanDate`
   (`labelDateOf('2026-10-15')` = 15/10) · ទឹកប្រាក់ «COD $6.93 · DOD $…» (`labelMoneyText()` · តែ > 0 · ដូចដែលម្ចាស់គម្រោងសរសេរដោយដៃលើបុង ៖ ថ្ងៃ · លេខ · ដុល្លារ) · Locker (N/A ➜ គ្មាន) · គ្មានលេខ ➜ «—»។ ផ្លូវបោះពុម្ព = ផ្លូវ PDF export ដដែល (`uiState.pdfExportView = { kind: 'labels' }` ➜
@@ -198,7 +198,7 @@
   របៀបបញ្ចូលកញ្ចប់ ➜ «📋 បញ្ចូលច្រើន» (ក្រោមប្រអប់ Hardware scanner) ➜ ផ្ទាំង `batchScanModal` (textarea មួយជួរមួយ Barcode · ឧបករណ៍ស្កេនផ្ញើ Enter ➜ ជួរថ្មី · រាប់ចំនួន)
   ➜ «▶️ ចាប់ផ្តើម» ➜ `startBatchScan()` (`features/batch-scan.ts`) បញ្ចូល **ម្តងមួយៗតាម `triggerScanAction()` ដដែល** (ផ្លូវស្កេនធម្មតា ៖ claim · lookup · ផ្ទាំងបញ្ជាក់ ·
   Fast Mode autoSubmit) ហើយរង់ចាំ `phoneModal` បិទ (រក្សាទុក ឬបោះបង់) ទើបបន្ត (subscription លើ `uiState` · គ្មាន timer) · Barcode មានរួច ➜ រំលង · ផ្ទាំងផ្សេងបើក ➜ រង់ចាំ ·
-  ប្តូររបៀបស្កេន ➜ ឈប់ + សរុប · ប្តូរ session ➜ ឈប់ស្ងាត់ · «⏹️ បញ្ឈប់» ➜ ចប់ក្រោយកញ្ចប់បច្ចុប្បន្ន · logout ➜ `resetBatchScan()` · បន្ទាត់ស្ថានភាព «📋 កំពុងបញ្ចូល N/M · code» ក្នុង
+  ប្តូររបៀបស្កេន ឬក្រៅបណ្ដាញ (`navigator.onLine === false` · ដូចការនាំចូលបញ្ជី ZTO) ➜ ឈប់ + សរុប · ប្តូរ session ➜ ឈប់ស្ងាត់ · «⏹️ បញ្ឈប់» ➜ ចប់ក្រោយកញ្ចប់បច្ចុប្បន្ន · logout ➜ `resetBatchScan()` · បន្ទាត់ស្ថានភាព «📋 កំពុងបញ្ចូល N/M · code» ក្នុង
   ប្រអប់ scanner · ចប់ ➜ toast «✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល N · មានរួច K · រំលង J» (រាប់ Barcode ដែលចូលបញ្ជី — ការរក្សាទុកនីមួយៗប្រាប់ ✅/⏳/⚠️ របស់វាដដែល) · ≤ `BATCH_SCAN_MAX` (200)។
 - 📳 **iPhone PWA ៖ PTR ញ័រពេលទាញគ្រប់** (ម្ចាស់គម្រោង ៖ «iOS PTR អត់ញ័រ» · A77)។ WebKit គ្មាន `navigator.vibrate` ➜ `hapticTick()` ធ្លាក់ទៅ `iosHapticSwitchTick()`
   (`platform/document-io.ts`) ៖ `<label><input type="checkbox" switch>` លាក់ក្រៅអេក្រង់ (មិន `display: none`) សាងម្តងក្នុងទំព័រ ➜ `label.click()` ➜ Safari (iOS 17.4+)
@@ -215,8 +215,9 @@
 - `ZoeW/tests/label-print.test.tsx` (ថ្មី ៩) ៖ `labelDateOf` · `labelMoneyText` · `buildLabelRows` (មួយ Barcode មួយស្លាក · — · Locker · ធាតុចាស់ · `openOnly`) · ជម្រើស
   localStorage (លំនាំដើម · ខូច) · ម៉ឺនុយ ➜ modal (វាល · preview ៣ · សង្ខេប · class ប្លង់) · ប្តូរជម្រើស ➜ preview + រក្សាទុក + ផ្ទុកវិញ · បោះពុម្ព ➜ modal បិទ · view `labels`
   + `options` · `#pdfExportPrintArea` គូរគ្រប់ស្លាក · `afterprint` សម្អាត · តាមជួរ · ≤ `LABEL_PREVIEW_MAX` · ទទេ/stale/យករួចទាំងអស់ ➜ toast/សង្ខេប · ប៊ូតុងបិទ · logout · ខ្សែភ្ជាប់ · CSS។
-- `ZoeW/tests/batch-scan.test.ts` (ថ្មី ៩) ៖ ញែក · រាប់ · ៣ Barcode ម្តងមួយៗ រង់ចាំផ្ទាំង · មានរួច/trigger គ្មានផ្ទាំង ➜ បន្ត · ផ្ទាំងផ្សេង ➜ រង់ចាំ · បញ្ឈប់ · ប្តូររបៀប/session/logout ·
-  ទទេ/លើសពិដាន · ខ្សែភ្ជាប់ (MODAL_IDS · AppShell · ACTION_ALLOWLIST = ACTION_NAMES · PageEntry · logout)។ `triggerScanAction` mock ➜ ផ្លូវស្កេនពិតមិនប្រែ។
+- `ZoeW/tests/batch-scan.test.ts` (ថ្មី ១១) ៖ ញែក · រាប់ · ៣ Barcode ម្តងមួយៗ រង់ចាំផ្ទាំង · មានរួច/trigger គ្មានផ្ទាំង ➜ បន្ត · ផ្ទាំងផ្សេង ➜ រង់ចាំ · បញ្ឈប់ · ប្តូររបៀប/session/logout ·
+  ក្រៅបណ្ដាញ ➜ ឈប់ · ទទេ/លើសពិដាន · ខ្សែភ្ជាប់ (MODAL_IDS · AppShell · ACTION_ALLOWLIST = ACTION_NAMES · PageEntry · logout) · **`triggerScanAction` ពិត** ➜ `attemptAutoLookup(code)` ហៅម្តងមួយតាមលំដាប់
+  ហើយ `phoneModal` ពិតបើក (ម្ចាស់គម្រោង ៖ «Lookup ឆ្លើយត្រូវអត់?» — ផ្លូវ lookup ដដែលនឹងស្កេនធម្មតា · ZTO ពិតសាកលើឧបករណ៍) (១១ ករណី)។
 - `ZoeW/tests/haptic-ios-switch.test.ts` (ថ្មី ៥) ៖ គ្មាន `vibrate` + `switch` មាន ➜ label + `input[switch]` មួយក្នុង `<body>` · ចុច ➜ `checked` ផ្លាស់រាល់ដង · សាងម្តង ·
   `vibrate` មាន ➜ ហៅ `vibrate` · គ្មាន switch · គ្មាន `switch` ➜ គ្មានធាតុ · មិន throw · CSS `.haptic-switch` ក្រៅអេក្រង់ មិន `display: none` — លើដើមឈើមុនកែ ធ្លាក់។
 

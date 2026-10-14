@@ -67,7 +67,7 @@ export function openBatchScanModal() {
     setTimeout(() => focusField('batchBarcodeInput'), 150);
 }
 
-function endBatchScan(reason: 'done' | 'stopped' | 'session' | 'mode') {
+function endBatchScan(reason: 'done' | 'stopped' | 'session' | 'mode' | 'offline') {
     const run = batchRun;
     if (!run) return;
     batchRun = null;
@@ -79,7 +79,7 @@ function endBatchScan(reason: 'done' | 'stopped' | 'session' | 'mode') {
     if (run.existing) parts.push('មានរួច ' + run.existing);
     if (run.skipped) parts.push('រំលង ' + run.skipped);
     if (left > 0) parts.push('មិនទាន់បញ្ចូល ' + left);
-    const head = reason === 'done' ? '✅ បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : '⏹️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ ');
+    const head = reason === 'done' ? '✅ បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : (reason === 'offline' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ក្រៅបណ្ដាញ — ភ្ជាប់វិញ រួចចាប់ផ្តើមម្តងទៀត) ៖ ' : '⏹️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ '));
     showToast(head + parts.join(' · '));
 }
 
@@ -106,6 +106,7 @@ function pumpBatchScan() {
     }
     if (uiState.isModalOpen) return;
     if (uiState.entryScanMode !== 'parcel') { endBatchScan('mode'); return; }
+    if ((navigator.onLine as boolean) === false) { endBatchScan('offline'); return; }
     while (run.index < run.queue.length) {
         const code = run.queue[run.index];
         run.index++;

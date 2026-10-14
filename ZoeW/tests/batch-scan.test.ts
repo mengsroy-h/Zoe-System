@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import * as scanAction from '../src/features/scan-action';
+import * as autoLookup from '../src/features/auto-lookup';
 import * as toastModule from '../src/ui/toast';
 const toasts: string[] = [];
 let trigger: ReturnType<typeof vi.spyOn>;
@@ -183,6 +184,22 @@ describe('បញ្ចូល Barcode ច្រើន ៖ ម្តងមួយ�
         expect(trigger.mock.calls.filter((c) => c[0] === 'Y2').length).toBe(0);
     });
 
+    it('⛔ ក្រៅបណ្ដាញ (navigator.onLine = false) ពេលផ្ទាំងបិទ ➜ ឈប់ · សល់រាយ «មិនទាន់បញ្ចូល» · Barcode បន្ទាប់មិន trigger (ដូចការនាំចូលបញ្ជី ZTO)', () => {
+        opensModal = new Set(['O1', 'O2', 'O3']);
+        input.value = 'O1 O2 O3';
+        startBatchScan();
+        Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+        try {
+            finishModal(true);
+            expect(batchScanIsRunning()).toBe(false);
+            expect(trigger.mock.calls.map((c) => c[0])).toEqual(['O1']);
+            expect(toasts[toasts.length - 1]).toContain('ក្រៅបណ្ដាញ');
+            expect(toasts[toasts.length - 1]).toContain('មិនទាន់បញ្ចូល 2');
+        } finally {
+            Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+        }
+    });
+
     it('ទទេ ➜ toast · លើស BATCH_SCAN_MAX ➜ toast មិនចាប់ផ្តើម · openBatchScanModal តែរបៀប parcel និងគ្មានផ្ទាំង', () => {
         input.value = '  \n ';
         startBatchScan();
@@ -213,5 +230,28 @@ describe('បញ្ចូល Barcode ច្រើន ៖ ម្តងមួយ�
         expect(entry).toMatch(/onAct\("openBatchScanModal"\)/);
         expect(entry).toMatch(/onAct\("stopBatchScan"\)/);
         expect(readFileSync(path.join(root, 'features', 'session.ts'), 'utf8')).toMatch(/resetBatchScan\(\);/);
+    });
+});
+
+describe('បញ្ចូល Barcode ច្រើន ៖ triggerScanAction ពិត ➜ Lookup ស្វ័យប្រវត្តិហៅសម្រាប់គ្រប់ Barcode ដូចស្កេនធម្មតា', () => {
+    it('⛔ ៣ Barcode ៖ attemptAutoLookup(code) ម្តងមួយ តាមលំដាប់ · ផ្ទាំង phoneModal ពិតបើក (pendingBarcode = code) · បិទ ➜ Barcode បន្ទាប់', () => {
+        trigger.mockRestore();
+        const lookups: string[] = [];
+        vi.spyOn(autoLookup, 'attemptAutoLookup').mockImplementation((code: any) => { lookups.push(String(code)); return Promise.resolve(false); });
+        input.value = 'L1\nL2\nL3';
+        startBatchScan();
+        expect(lookups).toEqual(['L1']);
+        expect(modalIsOpen('phoneModal')).toBe(true);
+        expect(scanState.pendingBarcode).toBe('L1');
+        expect(uiState.isModalOpen).toBe(true);
+        finishModal(true);
+        expect(lookups).toEqual(['L1', 'L2']);
+        expect(scanState.pendingBarcode).toBe('L2');
+        finishModal(false);
+        expect(lookups).toEqual(['L1', 'L2', 'L3']);
+        finishModal(true);
+        expect(batchScanIsRunning()).toBe(false);
+        expect(modalIsOpen('phoneModal')).toBe(false);
+        expect(toasts[toasts.length - 1]).toBe('✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល 2 · រំលង 1');
     });
 });

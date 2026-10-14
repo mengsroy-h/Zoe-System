@@ -56,6 +56,7 @@ export function DocumentEffects() {
     useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
     useHtmlVar('--ios-keyboard-inset', iosKeyboardInset > 0 ? iosKeyboardInset + 'px' : '0px');
     useHtmlVar('--modal-kb-pan', modalViewportHeight > 0 ? modalViewportTop + 'px' : '0px');
+    useHtmlVar('--modal-kb-line', modalViewportHeight > 0 ? (modalViewportTop + modalViewportHeight) + 'px' : '100%');
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

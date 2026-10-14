@@ -5,8 +5,8 @@
 //    keyboard បាំង ≥ KEYBOARD_MIN_INSET_PX ➜ ប្រអប់នៅ **ទីតាំងដដែលលើអេក្រង់** (កំពូល · ឆ្វេង · ស្តាំ ដូចពេល keyboard បិទ ទោះ iOS រំកិល
 //    visual viewport ក៏ដោយ) · មានតែបាតខ្លីមកត្រឹម keyboard (គម្លាត MODAL_KEYBOARD_GAP_PX) ហើយរមូរក្នុងខ្លួន ➜ ប្រអប់វាយដែល focus
 //    មើលឃើញពីលើ keyboard · ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ ➜ មិនប្តូរអ្វីទាំងអស់ · ផ្ទៃដែលនៅសល់ក្រោមកំពូលតិចជាង
-//    MODAL_KEYBOARD_MIN_VISIBLE_PX ➜ ទើបលើកកំពូលឡើង (ប្រអប់តូច) · ផ្ទៃងងឹត (backdrop) គ្របពេញ layout viewport ហើយលាតចុះក្រោមតាម
-//    ការរំកិល ➜ នៅក្រោយ keyboard មានពណ៌តែមួយ · keyboard បិទ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរប្លង់ ហើយប្រអប់វាយមើលឃើញ ។
+//    MODAL_KEYBOARD_MIN_VISIBLE_PX ➜ ទើបលើកកំពូលឡើង (ប្រអប់តូច) · ផ្ទៃងងឹត (backdrop) គ្របពេញ layout viewport ហើយពីបន្ទាត់ keyboard
+//    ចុះក្រោម (ទាំងការរំកិល) ជាស្រទាប់ស្រអាប់ ➜ នៅក្រោយ keyboard ថ្លារបស់ iPhone មានពណ៌តែមួយ (វាស់ pixel ពីរូបថតពិត) · keyboard បិទ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរប្លង់ ហើយប្រអប់វាយមើលឃើញ ។
 // វិធី ៖ App ពិត (audit build) · visualViewport ក្លែង (Chromium មិនមាន keyboard) · បញ្ជីប្រអប់ និងប្រអប់វាយ **ដេរីវេពី DOM ពិត**
 //    (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea ដែលមើលឃើញពេលបើក) · ទំហំទូរស័ព្ទ ៣ · ផ្ទៃមើលឃើញរំកិល (offsetTop) ·
 //    ទិសផ្ទុយ (keyboard បិទ · APK បង្រួម viewport · ជាន់អប្បបរមា) · ចំនួនថេរអានពី app.js ពិត ។
@@ -83,6 +83,33 @@ const IOS_FLAGS = function () {
     } catch (e) {}
 };
 
+// អ្នកស្រាយ PNG តូច (8-bit · non-interlaced · ទម្រង់ដែល Chromium ថត) ➜ វាស់ pixel ដែលភ្នែកឃើញ
+function decodePng(buf) {
+    const zlib = require('zlib');
+    let p = 8, w = 0, h = 0, ct = 0, bd = 0; const idat = [];
+    while (p < buf.length) {
+        const len = buf.readUInt32BE(p), type = buf.toString('ascii', p + 4, p + 8), data = buf.slice(p + 8, p + 8 + len);
+        if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); bd = data[8]; ct = data[9]; }
+        else if (type === 'IDAT') idat.push(data);
+        p += 12 + len;
+    }
+    const bpp = ct === 6 ? 4 : ct === 2 ? 3 : 0;
+    if (bd !== 8 || !bpp) throw new Error('PNG មិនគាំទ្រ ៖ bitDepth ' + bd + ' colorType ' + ct);
+    const raw = zlib.inflateSync(Buffer.concat(idat)), stride = w * bpp, px = Buffer.alloc(h * stride);
+    for (let y = 0; y < h; y++) {
+        const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1;
+        for (let x = 0; x < stride; x++) {
+            const a = x >= bpp ? px[y * stride + x - bpp] : 0, b = y ? px[(y - 1) * stride + x] : 0;
+            const c = (x >= bpp && y) ? px[(y - 1) * stride + x - bpp] : 0;
+            let v = raw[src + x];
+            if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
+            else if (f === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+            px[y * stride + x] = v & 255;
+        }
+    }
+    return { w, h, bpp, px };
+}
+
 const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(r, t)), ms || 260);
 
 async function openApp(browser, port, size, fakeViewport) {
@@ -141,7 +168,9 @@ const MEASURE = function ({ id, index, sel, gap }) {
     }
     const fieldTall = fr.height > vv.height * 0.5;
     const after = getComputedStyle(modal, '::after');
-    const afterHeight = after.content === 'none' || after.display === 'none' ? 0 : (parseFloat(after.height) || 0);
+    const afterOn = after.content !== 'none' && after.display !== 'none';
+    const afterHeight = afterOn ? (parseFloat(after.height) || 0) : 0;
+    const afterTop = afterOn ? mr.top + (parseFloat(after.top) || 0) : mr.bottom;
     const probeY = Math.min(window.innerHeight - 3, Math.max(visBottom + 3, window.innerHeight - 20));
     const behind = visBottom < window.innerHeight - 4 ? document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(probeY)) : modal;
     return {
@@ -149,8 +178,8 @@ const MEASURE = function ({ id, index, sel, gap }) {
         visTop: Math.round(visTop), visBottom: Math.round(visBottom), inner: window.innerHeight,
         screen: [Math.round(cr.top - visTop), Math.round(cr.bottom - visTop), Math.round(cr.left), Math.round(cr.right)],
         content: [Math.round(cr.top), Math.round(cr.bottom)], field: [Math.round(fr.top), Math.round(fr.bottom)],
-        backdrop: [Math.round(mr.top), Math.round(mr.bottom), Math.round(afterHeight)],
-        backdropFull: mr.top <= 1 && mr.bottom + afterHeight >= window.innerHeight + visTop - 1,
+        backdrop: [Math.round(mr.top), Math.round(mr.bottom), Math.round(afterTop), Math.round(afterTop + afterHeight)],
+        backdropFull: mr.top <= 1 && Math.max(mr.bottom, afterTop + afterHeight) >= window.innerHeight + visTop - 1 && afterTop <= mr.bottom + 1,
         behindCovered: !!behind && modal.contains(behind),
         bottomAbove: cr.bottom <= visBottom - gap + 1,
         fieldInside: fr.top >= visTop - 1 && (fieldTall ? fr.top + 40 <= visBottom : fr.bottom <= visBottom - gap + 1) && !clippedBy,
@@ -278,7 +307,7 @@ const SIZES = [
                 await settle(page);
                 const panned = await page.evaluate(MEASURE, { id: 'manualAdjustModal', index: last.index, sel: FIELD_SELECTOR, gap: GAP });
                 const pannedProblems = placementProblems(base, panned);
-                check(fields.length >= 2 && panned.visTop === 140 && pannedProblems.length === 0 && panned.backdrop[2] >= 139,
+                check(fields.length >= 2 && panned.visTop === 140 && pannedProblems.length === 0 && panned.backdrop[3] >= panned.inner + 139,
                     '⛔ ផ្ទៃមើលឃើញរំកិល ១៤០px ➜ ប្រអប់នៅទីតាំងដដែលលើអេក្រង់ · បាតត្រឹម keyboard · backdrop លាតចុះក្រោម ១៤០px (ពណ៌តែមួយក្រោយ keyboard)',
                     JSON.stringify({ base, panned, pannedProblems }));
                 const first = fields[0];
@@ -390,6 +419,51 @@ const SIZES = [
             await ctx.close();
         }
 
+        console.log('\n=== ⛔ ក្រោយ keyboard ពណ៌តែមួយ (រូបថតពិត ៖ keyboard របស់ iPhone ថ្លា ➜ អ្វីនៅក្រោយវាលេចមក) ===');
+        {
+            const cases = [];
+            for (const size of [SIZES[0], SIZES[2]]) {
+                const { ctx, page, ready } = await openApp(browser, port, size, true);
+                if (!ready) { bad('ពណ៌ក្រោយ keyboard ៖ audit bridge ' + size.label); await ctx.close(); continue; }
+                // toast ជាសារបណ្តោះអាសន្ន (មិនមែនផ្ទៃ) ➜ លាក់ពេលថត ដើម្បីវាស់តែផ្ទៃ backdrop ពិត
+                await page.addStyleTag({ content: '.toast-container { display: none !important; }' });
+                for (const pageName of ['data', 'entry']) {
+                    await closeAll(page);
+                    await page.evaluate(() => window.__kb.close());
+                    await page.evaluate((p) => { if (typeof switchAppPage === 'function') switchAppPage(p); }, pageName);
+                    await settle(page, 300);
+                    const ids = size === SIZES[0] ? ['pinModal', 'lookupApiConfigModal', 'editPhoneModal', 'batchScanModal', 'loginModal'] : ['pinModal', 'lookupApiConfigModal', 'batchScanModal'];
+                    for (const id of ids) {
+                        for (const pan of (size === SIZES[0] ? [0, 140] : [0])) {
+                            await closeAll(page);
+                            await page.evaluate(() => window.__kb.close());
+                            await page.evaluate((m) => openModalHelper(m), id);
+                            await settle(page, 380);
+                            await page.evaluate(({ id, sel }) => { const f = document.getElementById(id).querySelector(sel); if (f) f.focus({ preventScroll: true }); }, { id, sel: FIELD_SELECTOR });
+                            await page.evaluate(({ kb, pan }) => window.__kb.open(kb, pan), { kb: size.kb, pan });
+                            await settle(page);
+                            const top = size.h - size.kb + pan + 1;
+                            const height = size.h - top - 1;
+                            if (height < 20) continue;
+                            const shot = await page.screenshot({ clip: { x: 0, y: top, width: size.w, height } });
+                            const img = decodePng(shot);
+                            const lo = [255, 255, 255], hi = [0, 0, 0];
+                            for (let i = 0; i < img.px.length; i += img.bpp) {
+                                for (let k = 0; k < 3; k++) { const v = img.px[i + k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
+                            }
+                            const spread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+                            cases.push({ size: size.w + '×' + size.h, page: pageName, id, pan, spread, lo, hi });
+                        }
+                    }
+                }
+                await ctx.close();
+            }
+            const mixed = cases.filter((c) => c.spread > 3);
+            check(cases.length >= 24 && mixed.length === 0,
+                '⛔ គ្រប់ករណី (' + cases.length + ' ៖ ប្រអប់ ៥ · ទំព័រទិន្នន័យ/ស្កេន · រំកិល ០/១៤០ · ទំហំ ២) ➜ ផ្ទៃក្រោយ keyboard មានពណ៌តែមួយ (គម្លាត ≤ ៣)',
+                JSON.stringify(mixed.slice(0, 6)) + (mixed.length > 6 ? ' … +' + (mixed.length - 6) : ''));
+        }
+
         console.log('\n=== ⛔ សុវត្ថិភាព ៖ ប្រអប់ចូល · Activate · PIN មិនអាចរំលង (keyboard បិទ · បើក · រំកិល) ===');
         {
             const size = SIZES[0];
@@ -401,8 +475,8 @@ const SIZES = [
             await page.addInitScript(FAKE_VIEWPORT);
             await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
             await page.waitForTimeout(900);
-            const ready = await page.evaluate(() => typeof openModalHelper === 'function' && typeof requestPinBeforeConfig === 'function' && typeof hashPin === 'function');
-            check(ready, 'សុវត្ថិភាព ៖ audit bridge (openModalHelper · requestPinBeforeConfig · hashPin)');
+            const ready = await page.evaluate(() => typeof openModalHelper === 'function' && typeof requestPinBeforeConfig === 'function' && typeof hashPin === 'function' && typeof showAppLockScreen === 'function');
+            check(ready, 'សុវត្ថិភាព ៖ audit bridge (openModalHelper · requestPinBeforeConfig · hashPin · showAppLockScreen)');
             if (ready) {
                 const COVER = function ({ id }) {
                     const modal = document.getElementById(id);
@@ -492,6 +566,62 @@ const SIZES = [
                 const right = await page.evaluate(() => ({ ran: window.__ran, open: openModalIds().includes('pinModal') }));
                 check(wrong.ran === 0 && wrong.open && right.ran === 1 && !right.open,
                     '⛔ iPhone ៖ ចុចប្រអប់ PIN (focus ដោយកូដ) + PIN ខុស ➜ មិនរត់ · PIN ត្រូវ ➜ រត់ម្តង (សាក spy ពិត)', JSON.stringify({ wrong, right }));
+
+                await closeAll(page);
+                await page.evaluate(() => window.__kb.close());
+                await page.evaluate(async () => {
+                    localStorage.setItem('zoew_security_pin_hash', await hashPin('246810'));
+                    localStorage.removeItem('zoew_pin_fail_count');
+                    localStorage.removeItem('zoew_pin_lockout_until');
+                    showAppLockScreen();
+                });
+                await settle(page, 300);
+                const lockLeaks = [];
+                for (const [label, kb, pan] of states) {
+                    await page.evaluate(() => window.__kb.close());
+                    if (kb) {
+                        await page.evaluate(() => { const f = document.getElementById('appLockPinInput'); if (f) f.focus({ preventScroll: true }); });
+                        await page.evaluate(({ kb, pan }) => window.__kb.open(kb, pan), { kb, pan });
+                    }
+                    await settle(page);
+                    const c = await page.evaluate(() => {
+                        const lock = document.getElementById('appLockScreen');
+                        const leaks = [];
+                        let points = 0;
+                        for (let y = 4; y < window.innerHeight; y += 24) {
+                            for (let x = 4; x < window.innerWidth; x += 24) {
+                                points++;
+                                const el = document.elementFromPoint(x, y);
+                                if (el && !lock.contains(el) && el !== document.body && el !== document.documentElement) leaks.push([x, y, el.id || el.className || el.tagName]);
+                            }
+                        }
+                        return { open: lock.classList.contains('is-open'), points, leaks: leaks.slice(0, 5), leakCount: leaks.length };
+                    });
+                    if (!c.open || c.leakCount || c.points < 400) lockLeaks.push(Object.assign({ label }, c));
+                }
+                check(lockLeaks.length === 0, '⛔ ផ្ទាំងចាក់សោ App ៖ គ្រប់ចំណុចលើអេក្រង់ (keyboard បិទ/បើក/រំកិល) ជារបស់ផ្ទាំងចាក់សោ ➜ ចុចទំព័រខាងក្រោយមិនបាន', JSON.stringify(lockLeaks));
+                for (const [x, y] of [[6, 6], [size.w - 6, size.h / 2], [size.w / 2, size.h - 6]]) {
+                    await page.touchscreen.tap(x, y);
+                    await settle(page, 100);
+                }
+                await page.keyboard.press('Escape');
+                await settle(page, 150);
+                const lockInput = await page.evaluate(() => { const r = document.getElementById('appLockPinInput').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+                await page.touchscreen.tap(lockInput.x, lockInput.y);
+                await settle(page, 150);
+                await page.keyboard.type('135791');
+                await page.keyboard.press('Enter');
+                await settle(page, 1500);
+                const lockWrong = await page.evaluate(() => ({ open: document.getElementById('appLockScreen').classList.contains('is-open'), locked: document.body.classList.contains('app-locked') }));
+                await page.evaluate(() => { localStorage.removeItem('zoew_pin_fail_count'); localStorage.removeItem('zoew_pin_lockout_until'); });
+                await page.touchscreen.tap(lockInput.x, lockInput.y);
+                await settle(page, 150);
+                await page.keyboard.type('246810');
+                await page.keyboard.press('Enter');
+                await settle(page, 1800);
+                const lockRight = await page.evaluate(() => ({ open: document.getElementById('appLockScreen').classList.contains('is-open'), locked: document.body.classList.contains('app-locked') }));
+                check(lockWrong.open && lockWrong.locked && !lockRight.open && !lockRight.locked,
+                    '⛔ ផ្ទាំងចាក់សោ App ៖ ចុចជ្រុង/ចំហៀង/ក្រោម · Escape · PIN ខុស ➜ នៅចាក់សោ · PIN ត្រូវ ➜ ដោះ (សាកពិត)', JSON.stringify({ lockWrong, lockRight }));
             }
             await ctx.close();
         }

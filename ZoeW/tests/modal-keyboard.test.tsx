@@ -3,7 +3,7 @@
  *    ទាំងមូល ព្រោះ modal ខ្លះវែងអាចផុត (ឧ. API ស្វែងរកអតិថិជន) អោយរំកិលកុំអោយបាំងតែកន្លែងបញ្ចូលអក្សរឬលេខបានហើយ» · «ផ្ទៃថ្លាពីលើ keyboard
  *    ពណ៌ពីរខុសគ្នា»។ iPhone មិនបង្រួម layout viewport ពេល keyboard បើក ➜ `.modal` (fixed · ១០០%) នៅកណ្តាលអេក្រង់ពេញ។
  * ⛔ ច្បាប់ ៖ ប្រអប់បើក + `innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX` ➜ `uiState.modalViewportTop/Height` (ផ្ទៃមើលឃើញ) ·
- *    `body.modal-keyboard` · `--modal-kb-pan` ➜ backdrop (`.modal` ពេញ + `::after` លាតចុះតាមការរំកិល) មានពណ៌តែមួយក្រោយ keyboard ·
+ *    `body.modal-keyboard` · `--modal-kb-pan` · `--modal-kb-line` ➜ backdrop `.modal` ពេញ + `::after` ស្រទាប់ស្រអាប់ពណ៌តែមួយពីបន្ទាត់ keyboard ចុះក្រោម ·
  *    ប្រអប់ខាងលើ (ប្រអប់វាយដែល focus · ឬប្រអប់ខាងលើគេ) ដែលបាតនៅក្រោយ keyboard ➜ `uiState.modalKeyboardFit` ➜ `.modal-kb` ៖ កំពូលនៅ
  *    **ទីតាំងដើមលើអេក្រង់** (ទោះ iOS រំកិល `offsetTop`) · មានតែបាតខ្លីមកត្រឹម keyboard (`MODAL_KEYBOARD_GAP_PX`) ហើយរមូរក្នុងខ្លួន ·
  *    ផ្ទៃនៅសល់ < `MODAL_KEYBOARD_MIN_VISIBLE_PX` ឬអ្នករមូរខាងក្នុងទាបជាងប្រអប់វាយ ➜ ទើបលើកកំពូលឡើង · ប្រអប់វាយដែល focus រមូរចូលមើលឃើញ
@@ -246,11 +246,13 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         expect(modal.style.getPropertyValue('--modal-kb-shift')).toBe('51px');
         expect(modal.style.getPropertyValue('--modal-kb-max')).toBe((508 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 63) + 'px');
         expect(document.documentElement.style.getPropertyValue('--modal-kb-pan')).toBe('0px');
+        expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe('508px');
         vv.offsetTop = 120;
         vv.dispatchEvent(new Event('scroll'));
         expect(uiState.modalViewportTop).toBe(120);
         expect(uiState.modalKeyboardFit!.top).toBe(183);
         expect(document.documentElement.style.getPropertyValue('--modal-kb-pan')).toBe('120px');
+        expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe('628px');
         keyboard(0);
         expect(uiState.modalViewportHeight).toBe(0);
         expect(uiState.modalKeyboardFit).toBeNull();
@@ -258,6 +260,7 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         expect(modal.classList.contains('modal-kb')).toBe(false);
         expect(modal.style.getPropertyValue('--modal-kb-shift')).toBe('');
         expect(document.documentElement.style.getPropertyValue('--modal-kb-pan')).toBe('0px');
+        expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe('100%');
     });
 
     it('⛔ ទីតាំងដើមវាស់ពេលមិនទាន់តម្រូវ ហើយរក្សាទុក (keyboard ប្តូរកម្ពស់មិនវាស់ប្រអប់ដែលបានតម្រូវ) · ប្រអប់ដែលនៅពីលើ keyboard ➜ គ្មាន .modal-kb', async () => {
@@ -495,17 +498,19 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
 });
 
 describe('ខ្សែភ្ជាប់', () => {
-    it('⛔ boot ចាក់ listenModalKeyboard · react-root.css ៖ backdrop ::after លាតតាម --modal-kb-pan + safe-area · .modal-kb កំពូល/max-height ពីអថេរ · DocumentEffects', () => {
+    it('⛔ boot ចាក់ listenModalKeyboard · react-root.css ៖ backdrop ::after (safe-area · keyboard ➜ ស្រទាប់ពណ៌តែមួយពី --modal-kb-line ចុះក្រោម) · .modal-kb កំពូល/max-height ពីអថេរ · DocumentEffects', () => {
         const root = path.resolve(__dirname, '..');
         const boot = readFileSync(path.join(root, 'src/app/lifecycle/boot.ts'), 'utf8');
         expect(/listenModalKeyboard\(scope\)/.test(boot)).toBe(true);
         const css = readFileSync(path.join(root, 'src/styles/react-root.css'), 'utf8');
-        expect(/\.modal::after \{ content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc\(env\(safe-area-inset-bottom, 0px\) \+ var\(--modal-kb-pan, 0px\)\); background: inherit;/.test(css)).toBe(true);
+        expect(/\.modal::after \{ content: ''; position: absolute; left: 0; right: 0; top: 100%; height: env\(safe-area-inset-bottom, 0px\); background: inherit;/.test(css)).toBe(true);
+        expect(/body\.modal-keyboard \.modal::after \{ top: var\(--modal-kb-line, 100%\); height: auto; bottom: calc\(0px - var\(--modal-kb-pan, 0px\) - env\(safe-area-inset-bottom, 0px\)\); background: linear-gradient\(rgba\(15, 23, 42, 0\.6\), rgba\(15, 23, 42, 0\.6\)\), var\(--body-bg\);/.test(css)).toBe(true);
         expect(/\.modal\.modal-kb \{ align-items: flex-start; \}/.test(css)).toBe(true);
         expect(/\.modal\.modal-kb > \.modal-content \{ margin-top: var\(--modal-kb-shift, 0px\); max-height: var\(--modal-kb-max, 85vh\); \}/.test(css)).toBe(true);
         expect(/--modal-vv-/.test(css)).toBe(false);
         const fx = readFileSync(path.join(root, 'src/app/components/shell/DocumentEffects.tsx'), 'utf8');
         expect(/useBodyClass\('modal-keyboard', modalViewportHeight > 0\)/.test(fx)).toBe(true);
         expect(/useHtmlVar\('--modal-kb-pan', modalViewportHeight > 0 \? modalViewportTop \+ 'px' : '0px'\)/.test(fx)).toBe(true);
+        expect(/useHtmlVar\('--modal-kb-line', modalViewportHeight > 0 \? \(modalViewportTop \+ modalViewportHeight\) \+ 'px' : '100%'\)/.test(fx)).toBe(true);
     });
 });

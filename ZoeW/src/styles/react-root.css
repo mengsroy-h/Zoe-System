@@ -263,7 +263,8 @@
     html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
 }
 
-.modal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc(env(safe-area-inset-bottom, 0px) + var(--modal-kb-pan, 0px)); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; }
+.modal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: env(safe-area-inset-bottom, 0px); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; }
+body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: auto; bottom: calc(0px - var(--modal-kb-pan, 0px) - env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.6)), var(--body-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .modal.modal-kb { align-items: flex-start; }
 .modal.modal-kb > .modal-content { margin-top: var(--modal-kb-shift, 0px); max-height: var(--modal-kb-max, 85vh); }
 html.ios-standalone body.modal-keyboard,

@@ -21,6 +21,7 @@ import { openModalHelper } from '../ui/modal';
 import { connectionFlowSnapshot } from '../services/connection-flow';
 import { closeSideDrawer } from '../ui/page-nav';
 import { isNativeApp } from '../platform/native';
+import { buildHealthAdvice } from './health-advice';
 
 export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
 
@@ -365,6 +366,7 @@ export async function runHealthCheck() {
     const run = ++uiState.healthRunSeq;
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
+    uiState.healthAdvice = null;
     uiState.touch();
     const rows = [healthNetworkRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
     const [databaseRow, licenseRow, lookupRow] = await Promise.all([healthDatabaseLiveRow(), healthLicenseRow(), healthLookupRow()]);
@@ -373,6 +375,7 @@ export async function runHealthCheck() {
     rows.push(lookupRow);
     if (run !== uiState.healthRunSeq || !modalIsOpen('healthCheckModal')) return;
     uiState.healthRows = rows;
+    uiState.healthAdvice = buildHealthAdvice(rows);
     uiState.touch();
     viewState.healthRecheckBusy = false;
 }

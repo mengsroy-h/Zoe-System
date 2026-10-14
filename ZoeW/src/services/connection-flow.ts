@@ -50,6 +50,7 @@ export function connectionFlowSnapshot() {
     else if (nativeWriteRecoveryState(firebaseState.db).blocked) phase = 'blocked';
     else if (nativeWriteRecoveryState(firebaseState.db).recovering || nativeWriteRecoveryState(firebaseState.db).deferred || nativeWriteRecoveryState(firebaseState.db).external) phase = 'recovering';
     else if (firebaseState.db && typeof firebaseState.db.recoveryState === 'function' && firebaseState.db.recoveryState().blocked) phase = 'blocked';
+    else if (firebaseState.db && typeof firebaseState.db.recoveryState === 'function' && firebaseState.db.recoveryState().recovering) phase = 'recovering';
     else if (typeof navigator !== 'undefined' && navigator.onLine === false) phase = 'offline';
     else if (!firebaseState.isDatabaseConnected || firebaseState.dbListenersFailed) phase = 'recovering';
     else if (!firebaseState.isDatabaseInitialized || dbListenerPendingPaths.size) phase = 'syncing';

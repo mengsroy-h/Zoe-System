@@ -1,7 +1,8 @@
 import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
-import type { LifecycleScope } from '../lifecycle/scope';
+import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, type RefName } from '../refs';
+import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
 import { panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 import { glidePhoneSearchPulledUp } from './phone-search';
@@ -14,9 +15,16 @@ const IOS_SEARCH_FIELDS: readonly RefName[] = ['searchPhoneInput', ...ENTRY_SEAR
 
 let searchTap: { id: number; x: number; y: number; at: number; field: RefName } | null = null;
 let searchFocusRefused = false;
+let keyboardPan: { id: number; x: number; y: number; block: boolean | null } | null = null;
+let keyboardLocked = false;
+let keyboardPanScope: LifecycleScope | null = null;
+
+export function iosSearchDocumentLocked(): boolean {
+    return (uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) && usesIOSPanelHandoff();
+}
 
 export function restoreIOSDocumentScroll(): void {
-    if (!(uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) || !usesIOSPanelHandoff()) return;
+    if (!iosSearchDocumentLocked()) return;
     if ((window.scrollY || 0) === 0) return;
     scrollWindowToTop();
 }
@@ -24,6 +32,92 @@ export function restoreIOSDocumentScroll(): void {
 export function listenIOSDocumentScroll(scope: LifecycleScope): void {
     scope.listen(window, 'scroll', restoreIOSDocumentScroll, { passive: true });
     if (window.visualViewport) scope.listen(window.visualViewport, 'scroll', restoreIOSDocumentScroll);
+}
+
+export function iosKeyboardInsetPx(): number {
+    const viewport = window.visualViewport;
+    if (!viewport || !iosSearchDocumentLocked() || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX) return 0;
+    const inset = Math.round(window.innerHeight - viewport.height);
+    return inset >= KEYBOARD_MIN_INSET_PX && Number.isFinite(inset) ? inset : 0;
+}
+
+function armIOSKeyboardPanBlock(on: boolean): void {
+    if (on === (keyboardPanScope !== null)) return;
+    if (!on) {
+        keyboardPanScope!.dispose();
+        keyboardPanScope = null;
+        keyboardPan = null;
+        return;
+    }
+    keyboardPanScope = createLifecycleScope();
+    keyboardPanScope.listen(document, 'touchmove', blockIOSKeyboardPan, { capture: true, passive: false });
+}
+
+export function measureIOSKeyboardInset(): void {
+    keyboardLocked = iosSearchDocumentLocked();
+    armIOSKeyboardPanBlock(keyboardLocked);
+    const inset = iosKeyboardInsetPx();
+    if (uiState.iosKeyboardInset !== inset) uiState.iosKeyboardInset = inset;
+}
+
+function verticalRoom(node: Element, down: boolean): boolean {
+    if (node.scrollHeight - node.clientHeight <= 1) return false;
+    const overflowY = window.getComputedStyle(node).overflowY;
+    if (overflowY !== 'auto' && overflowY !== 'scroll') return false;
+    return down ? node.scrollTop > 0 : node.scrollTop + node.clientHeight < node.scrollHeight - 1;
+}
+
+function keyboardPanBlocked(target: EventTarget | null, down: boolean): boolean {
+    let node: Element | null = target && (target as Node).nodeType === 1 ? (target as Element) : null;
+    while (node) {
+        if (verticalRoom(node, down)) return false;
+        node = node.parentElement;
+    }
+    return true;
+}
+
+export function noteIOSKeyboardTouchStart(e: TouchEvent): void {
+    keyboardPan = null;
+    if (!e.touches || e.touches.length !== 1 || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX || !iosSearchDocumentLocked()) return;
+    const t = e.touches[0];
+    keyboardPan = { id: t.identifier, x: t.clientX, y: t.clientY, block: null };
+}
+
+export function blockIOSKeyboardPan(e: TouchEvent): void {
+    const pan = keyboardPan;
+    if (!pan || !e.cancelable || !e.touches || e.touches.length !== 1) return;
+    const t = touchById(e.touches, pan.id);
+    if (!t) return;
+    if (pan.block === null) {
+        const dx = t.clientX - pan.x;
+        const dy = t.clientY - pan.y;
+        if (dx === 0 && dy === 0) return;
+        const field = e.target as HTMLElement | null;
+        const inField = !!field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA');
+        pan.block = Math.abs(dy) >= Math.abs(dx) && !inField && iosSearchDocumentLocked() && keyboardPanBlocked(e.target, dy > 0);
+    }
+    if (pan.block) e.preventDefault();
+}
+
+export function forgetIOSKeyboardTouch(): void {
+    keyboardPan = null;
+}
+
+export function listenIOSKeyboard(scope: LifecycleScope): void {
+    keyboardPan = null;
+    keyboardLocked = false;
+    armIOSKeyboardPanBlock(false);
+    if (!usesIOSPanelHandoff()) return;
+    if (window.visualViewport) scope.listen(window.visualViewport, 'resize', measureIOSKeyboardInset);
+    scope.onDispose(uiState.subscribe(() => {
+        if (iosSearchDocumentLocked() === keyboardLocked) return;
+        measureIOSKeyboardInset();
+    }));
+    scope.onDispose(() => armIOSKeyboardPanBlock(false));
+    scope.listen(document, 'touchstart', noteIOSKeyboardTouchStart, { capture: true, passive: true });
+    scope.listen(document, 'touchend', forgetIOSKeyboardTouch, { capture: true, passive: true });
+    scope.listen(document, 'touchcancel', forgetIOSKeyboardTouch, { capture: true, passive: true });
+    measureIOSKeyboardInset();
 }
 
 function touchById(list: ArrayLike<Touch> | null | undefined, id: number): Touch | null {

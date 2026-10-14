@@ -26,6 +26,7 @@ export function DocumentEffects() {
     const scrollLocked = useStoreValue(uiState, (s) => s.isModalOpen);
     const chromeHidden = useStoreValue(uiState, (s) => s.chromeHidden);
     const keyboardOpen = useStoreValue(uiState, (s) => s.keyboardOpen);
+    const iosKeyboardInset = useStoreValue(uiState, (s) => s.iosKeyboardInset);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
@@ -40,11 +41,13 @@ export function DocumentEffects() {
     useBodyClass('perf-lite', perfLite);
     useBodyClass('chrome-hidden', chromeHidden || keyboardOpen);
     useBodyClass('keyboard-open', keyboardOpen);
+    useBodyClass('ios-keyboard', iosKeyboardInset > 0);
 
     useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
     useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));
     useHtmlVar('--page-extension', useStoreValue(uiState, (s) => s.pageExtensionVar));
     useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
+    useHtmlVar('--ios-keyboard-inset', iosKeyboardInset > 0 ? iosKeyboardInset + 'px' : '0px');
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

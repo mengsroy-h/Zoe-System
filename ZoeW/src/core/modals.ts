@@ -34,6 +34,8 @@ export const MODAL_IDS = [
     'lockerPickerModal',
     'lockerSettingsModal',
     'locationWarningModal',
+    'batchScanModal',
+    'labelPrintModal',
 ] as const;
 
 export type ModalId = (typeof MODAL_IDS)[number];

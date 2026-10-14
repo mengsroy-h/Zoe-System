@@ -45,7 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **មិនទាន់ merge**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ខ. **Branch `ccr-20e725de-tpecua`** (ពី `main` `7960a90` = PR #315 · **មិនទាន់ merge**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
+    ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) · PTR ញ័រតាម `<input switch>` (A77) · 🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **merge រួចតាម PR #315 · `7960a90`**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
    (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **merge រួចតាម PR #309 · `5767bc2`**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
@@ -169,6 +171,83 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.65] — 2026-10-14 · ZoeW ៖ **🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន · iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard · PTR ញ័រ**
+
+**ZoeW `2.50.65`** (`zoew-v327` ➜ `zoew-v328`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts`) មិនប៉ះ · Android (APK · PWA) · កុំព្យូទ័រ មិនប្រែ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ VID_20261014_155824) ៖ «ចលនា scroll របស់ PWA iOS ដូចខុសប្រក្រតី ដោយឡែកចំពោះ APK និង PWA Android រលូនល្អ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ (ប្រអប់ទាញឡើង · keyboard បើក) ➜ អូសលើកាតបញ្ជី ➜ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក) រំកិលឡើងតាមម្រាមដៃ បង្ហាញចន្លោះទទេ
+  ហើយលែងដៃ ➜ លោតត្រឡប់ក្នុង ១ ស៊ុម** (ផ្នែក ២ A76)។ មូលហេតុ ៖ iOS មិនបង្រួម viewport ពេល keyboard បើក (Android បង្រួម) ➜ កាតបញ្ជី (`100dvh`) លាតដល់ក្រោយ keyboard ·
+  iOS អនុញ្ញាតឲ្យអូស document ទោះ root ចាក់សោ ➜ `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ (ចុងកាយវិការ) = លោត។ ឥឡូវ ៖ (១) `visualViewport`
+  `resize` វាស់កម្ពស់ keyboard (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜ `uiState.iosKeyboardInset` ➜ `body.ios-keyboard` + `--ios-keyboard-inset`
+  ➜ `.app-pages` `padding-bottom` ➜ កាតបញ្ជីចប់ ៨px ពីលើ keyboard ហើយបញ្ជីរមូរក្នុងកាតខ្លួនឯង (ដូច Android) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ ➜
+  `preventDefault()` (`blockIOSKeyboardPan()`) ➜ document មិនរំកិល · អ្នករមូរមានកន្លែង · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ ➜ iOS ធម្មតា · `restoreIOSDocumentScroll()`
+  នៅជាខ្សែការពារទីពីរ។ ប្រអប់បិទ ឬ keyboard បិទ ➜ ០ ➜ ទម្រង់ដើម។
+- 🖨️ **បោះពុម្ពស្លាកកញ្ចប់** (ម្ចាស់គម្រោង ៖ «print លេខទូរស័ព្ទនិង barcode ថ្ងៃទី/ខែ ឧ. (15/10) តែលេខទូរស័ព្ទសុំដាក់ធំៗ … យកទៅបិទជាប់កញ្ចប់អីវ៉ាន់ព្រោះកញ្ចប់អីវ៉ាន់មិនមានលេខទូរស័ព្ទទេ»)
+  ៖ ម៉ឺនុយ (...) ខាងលើ «🖨️ បោះពុម្ពស្លាក (តម្រង)» = កញ្ចប់ទាំងអស់តាមតម្រងថ្ងៃ · ម៉ឺនុយ (...) តាមជួរ «🖨️ បោះពុម្ពស្លាក» = អតិថិជននោះ ➜ **ផ្ទាំង `labelPrintModal`** (ម្ចាស់គម្រោង ៖
+  «បន្ថែម modal print … ដូច modal sheet … ធ្វើតាមគំនិតរបស់អ្នក») ៖ វិសាលភាព · សង្ខេប (ស្លាក N · អតិថិជន M) · ទំហំស្លាក **មួយសន្លឹកមួយស្លាក** (ម្ចាស់គម្រោង ៖ «ដាក់អោយចេញម្តងមួយសន្លឹក … មិនមែន print ជា A4 ទេ … ដូច price tag») ៖ `50x30` លំនាំដើម (ម្ចាស់គម្រោង ៖ «ប្រើជាមួយ printer តូចបែបនេះបានផង 50×30mm» — Niimbot B1 ៖ named page
+  `@page zoeLabel50x30 { size: 50mm 30mm }` · ស្លាក 47×27mm · លេខ 17pt · Barcode 7mm · ⚠️ ម៉ាស៊ីនប្រភេទនេះបោះពុម្ពតាម App របស់វា ➜ Save as PDF ➜ App · ⚠️ Safari/iOS មិនស្គាល់ named page ➜ ទំហំទំព័រតាម dialog ប៉ុណ្ណោះ · Chromium/Android/APK ត្រឹមត្រូវ) · `40x30` · `60x40` (named page ផ្ទាល់ខ្លួន · អក្សរតាមទំហំ) · `single` (ទំហំតាម dialog) · `a4-3` (៩/ទំព័រ) · `a4-2` (ធំ) ជាជម្រើសបន្ទាប់បន្សំ (`break-after: page` លើស្លាកតូចទាំងអស់) · កុងតាក់ តម្លៃ $ · ថ្ងៃ/ខែ · Locker · «តែកញ្ចប់មិនទាន់យក» (លំនាំដើមបើក ៖ រំលង Barcode `isClosed`) · ជម្រើសរក្សាទុក `zoew_label_print_v1` ·
+  **preview ផ្ទាល់** (`LabelSheet` ដដែល · ≤ ៦ · `zoom` .55) · «🖨️ បោះពុម្ព» (បិទពេលគ្មានស្លាក) · screenshot ទូរស័ព្ទ/កុំព្យូទ័រ ផ្ញើម្ចាស់គម្រោង។ ស្លាកមួយក្នុងមួយ Barcode
+  (`features/label-print.ts` ➜ `buildLabelRows()`) ៖ លេខទូរស័ព្ទ ៣០pt ដិត · Code 128 (SVG ដដែលនឹងបញ្ជី ZTO · ស្កេនបាន) · លេខ Barcode · ថ្ងៃ/ខែ ពី `scanDate`
+  (`labelDateOf('2026-10-15')` = 15/10) · ទឹកប្រាក់ «COD $6.93 · DOD $…» (`labelMoneyText()` · តែ > 0 · ដូចដែលម្ចាស់គម្រោងសរសេរដោយដៃលើបុង ៖ ថ្ងៃ · លេខ · ដុល្លារ) · Locker (N/A ➜ គ្មាន) · គ្មានលេខ ➜ «—»។ ផ្លូវបោះពុម្ព = ផ្លូវ PDF export ដដែល (`uiState.pdfExportView = { kind: 'labels' }` ➜
+  `#pdfExportPrintArea` `LabelSheet` ➜ `beginPdfPrint()` ៖ web print dialog · APK plugin printer) · A4 ផ្ដេក (`@page` ដដែល) ៣ ជួរឈរ · ទទេ ➜ toast តាម `emptyViewMessage` · គ្មាន print។
+- 📋 **បញ្ចូល Barcode ច្រើន** (ម្ចាស់គម្រោង ៖ «វាយបញ្ចូល ឬឧបករណ៍ស្កេន barcode បានច្រើន 10-20 barcode ទើបចុចបញ្ចូលម្តង ហើយអោយ auto lookup ដូចគ្នាបេះបិទ») ៖ ទំព័រស្កេន ·
+  របៀបបញ្ចូលកញ្ចប់ ➜ «📋 បញ្ចូលច្រើន» (ក្រោមប្រអប់ Hardware scanner) ➜ ផ្ទាំង `batchScanModal` (textarea មួយជួរមួយ Barcode · ឧបករណ៍ស្កេនផ្ញើ Enter ➜ ជួរថ្មី · រាប់ចំនួន)
+  ➜ «▶️ ចាប់ផ្តើម» ➜ `startBatchScan()` (`features/batch-scan.ts`) បញ្ចូល **ម្តងមួយៗតាម `triggerScanAction()` ដដែល** (ផ្លូវស្កេនធម្មតា ៖ claim · lookup · ផ្ទាំងបញ្ជាក់ ·
+  Fast Mode autoSubmit) ហើយរង់ចាំ `phoneModal` បិទ (រក្សាទុក ឬបោះបង់) ទើបបន្ត (subscription លើ `uiState` · គ្មាន timer) · Barcode មានរួច ➜ រំលង · ផ្ទាំងផ្សេងបើក ➜ រង់ចាំ ·
+  ប្តូររបៀបស្កេន ឬក្រៅបណ្ដាញ (`navigator.onLine === false` · ដូចការនាំចូលបញ្ជី ZTO) ➜ ឈប់ + សរុប · ប្តូរ session ➜ ឈប់ស្ងាត់ · «⏹️ បញ្ឈប់» ➜ ចប់ក្រោយកញ្ចប់បច្ចុប្បន្ន · logout ➜ `resetBatchScan()` · បន្ទាត់ស្ថានភាព «📋 កំពុងបញ្ចូល N/M · code» ក្នុង
+  ប្រអប់ scanner · ចប់ ➜ toast «✅ បញ្ចូលច្រើនចប់ ៖ បញ្ចូល N · មានរួច K · រំលង J» (រាប់ Barcode ដែលចូលបញ្ជី — ការរក្សាទុកនីមួយៗប្រាប់ ✅/⏳/⚠️ របស់វាដដែល) · ≤ `BATCH_SCAN_MAX` (200)។
+- 📳 **iPhone PWA ៖ PTR ញ័រពេលទាញគ្រប់** (ម្ចាស់គម្រោង ៖ «iOS PTR អត់ញ័រ» · A77)។ WebKit គ្មាន `navigator.vibrate` ➜ `hapticTick()` ធ្លាក់ទៅ `iosHapticSwitchTick()`
+  (`platform/document-io.ts`) ៖ `<label><input type="checkbox" switch>` លាក់ក្រៅអេក្រង់ (មិន `display: none`) សាងម្តងក្នុងទំព័រ ➜ `label.click()` ➜ Safari (iOS 17.4+)
+  លេងញ័រពេល switch ផ្លាស់ · browser គ្មាន `switch` (`'switch' in input` មិនពិត) ➜ គ្មានអ្វី · Android web នៅ `vibrate` · APK នៅ Capacitor Haptics ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium គ្មាន keyboard iOS ហើយគ្មាន `switch` ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (A76) · haptic ពីឯកសារ WebKit (A77) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` (ថ្មី ១០) ៖ inset ពី `visualViewport` (≥ កម្រិត · keyboard បិទ ➜ ០ · ប្រអប់បិទខណៈ keyboard បើក ➜ ០ · ទាញឡើងម្តងទៀត ➜ វាស់ឡើងវិញ ·
+  ប្រអប់មិនទាញឡើង · អេក្រង់ធំ · Android/web ➜ ០ · គ្មាន listener) · ខ្សែភ្ជាប់ (boot · `DocumentEffects` · `react-root.css` ត្រឹម `html.ios-standalone body.ios-keyboard`) ·
+  `touchmove` (preventDefault ក្រៅអ្នករមូរ · ចាក់សោក្នុងកាយវិការ · អ្នករមូរមានកន្លែង/ដល់ចុង/ត្រឡប់ទិស · ផ្ដេក · ប្រអប់អក្សរ · ម្រាមដៃពីរ · មិន cancelable · listener
+  capture + មិន passive) — លើដើមឈើមុនកែ ១០/១០ ធ្លាក់។ `ios-search-viewport` · `ios-search-tap-focus` នៅបៃតង (២៥/២៥)។
+- `ZoeW/tests/label-print.test.tsx` (ថ្មី ៩) ៖ `labelDateOf` · `labelMoneyText` · `buildLabelRows` (មួយ Barcode មួយស្លាក · — · Locker · ធាតុចាស់ · `openOnly`) · ជម្រើស
+  localStorage (លំនាំដើម · ខូច) · ម៉ឺនុយ ➜ modal (វាល · preview ៣ · សង្ខេប · class ប្លង់) · ប្តូរជម្រើស ➜ preview + រក្សាទុក + ផ្ទុកវិញ · បោះពុម្ព ➜ modal បិទ · view `labels`
+  + `options` · `#pdfExportPrintArea` គូរគ្រប់ស្លាក · `afterprint` សម្អាត · តាមជួរ · ≤ `LABEL_PREVIEW_MAX` · ទទេ/stale/យករួចទាំងអស់ ➜ toast/សង្ខេប · ប៊ូតុងបិទ · logout · ខ្សែភ្ជាប់ · CSS។
+- `ZoeW/tests/batch-scan.test.ts` (ថ្មី ១១) ៖ ញែក · រាប់ · ៣ Barcode ម្តងមួយៗ រង់ចាំផ្ទាំង · មានរួច/trigger គ្មានផ្ទាំង ➜ បន្ត · ផ្ទាំងផ្សេង ➜ រង់ចាំ · បញ្ឈប់ · ប្តូររបៀប/session/logout ·
+  ក្រៅបណ្ដាញ ➜ ឈប់ · ទទេ/លើសពិដាន · ខ្សែភ្ជាប់ (MODAL_IDS · AppShell · ACTION_ALLOWLIST = ACTION_NAMES · PageEntry · logout) · **`triggerScanAction` ពិត** ➜ `attemptAutoLookup(code)` ហៅម្តងមួយតាមលំដាប់
+  ហើយ `phoneModal` ពិតបើក (ម្ចាស់គម្រោង ៖ «Lookup ឆ្លើយត្រូវអត់?» — ផ្លូវ lookup ដដែលនឹងស្កេនធម្មតា · ZTO ពិតសាកលើឧបករណ៍) (១១ ករណី)។
+- `ZoeW/tests/haptic-ios-switch.test.ts` (ថ្មី ៥) ៖ គ្មាន `vibrate` + `switch` មាន ➜ label + `input[switch]` មួយក្នុង `<body>` · ចុច ➜ `checked` ផ្លាស់រាល់ដង · សាងម្តង ·
+  `vibrate` មាន ➜ ហៅ `vibrate` · គ្មាន switch · គ្មាន `switch` ➜ គ្មានធាតុ · មិន throw · CSS `.haptic-switch` ក្រៅអេក្រង់ មិន `display: none` — លើដើមឈើមុនកែ ធ្លាក់។
+
+#### ភស្តុតាង (run-all STRICT · emulator RTDB · Postgres ពិត)
+
+- ជុំ ១ (`c7c056d`) ៖ ២០១/២០៥ — ធ្លាក់ ៤ ពីការកែ tree កណ្តាលរត់ (កំណែក្នុង README/CLAUDE.md · ឯកសារថ្មីមិនទាន់ map · `gesture` ៖ listener `touchmove` ទប់ទី ២ លើ document)
+  ➜ listener ចងតែខណៈប្រអប់ស្វែងរកទាញឡើង · ជុំ ២–៤ ឈប់ដោយដៃ (commit ថ្មីចេញបន្ត) · **ជុំ ៥ (`6071e43`) ៖ ១៩៧/២០៥ — ធ្លាក់ ៨ ជាចន្លោះនៃការងារថ្មី** ៖
+  `setup-link-logout-test` (sandbox ខ្វះ stub `resetBatchScan`/`resetLabelPrint`) · `clear-history-claim-test` (import `label-print ➜ ui/more-menu` ប្តូរលំដាប់ module ក្នុង
+  text view ➜ `clearHistory()` មុន `CLEAR_HISTORY_CLAIM_LEASE_MS` ➜ ប្លុក helper រកមិនឃើញ ➜ វាស់ edge នីមួយៗដោយ build-audit ៥ variant ➜ `filteredHistoryItems()` ក្នុង `export.ts`
+  ជំនួស) · `function-surface-test` (`batchScanIsRunning` គ្មានអ្នកហៅ ➜ ប្រើក្នុង `openBatchScanModal`) · `state-hygiene` (`keyboardPanScope` ➜ ACCEPTED) ·
+  `repository-file-coverage` (`LabelPrintModal.tsx` គ្មាន mapping) · `security-guard` (លេខទូរស័ព្ទ/waybill ពិតពីរូបម្ចាស់គម្រោងក្នុង test ➜ លេខសំយោគ `0960001234` ·
+  `771000003…`) · `css-classes` (`.label-date` គ្មាន rule · class `'layout-' + x` ➜ ផែនទី class ជាអក្សរពេញ) · `toast-action-truth` (toast «⏹️ …» គ្មានន័យ ➜ «ℹ️ …») ➜
+  ទាំង ៨ PASS លើ `RUNALL_ONLY` (`setup-link-logout` ៧២ · `clear-history-claim` ៦ · `function-surface` ២៧ · `security-guard` ៥៥ · `toast-action-truth` ៦៧) ➜ **ជុំ ៦ (`fbb48c0`) ៖ ២០៣/២០៥ · ០ រំលង** — ធ្លាក់ ២ ៖ `export-cells-test` (sandbox កាត់ `buildExportRows()` ហៅ `filteredHistoryItems()` ដែលមិនមានក្នុង sandbox ➜ `buildExportRows()`
+  ហៅ `getFilteredDataByDate()` ផ្ទាល់ដដែល · `filteredHistoryItems()` នៅតែសម្រាប់ `label-print` ➜ `RUNALL_ONLY` PASS ៣៣) · `zoew-suite 2/2` ➜ `history-window-check` «PWA Android ៖
+  ចលនាស្វែងរកមិនលោត» ស៊ុមទី ៨ ផ្លាស់ទី ២២.៦% ក្រោយស៊ុម ០ (ស៊ុមធ្លាក់ពេល ៤ lanes រវល់ · កូដចាក់សោមិនប៉ះ · PASS ជុំ ៥) ➜ រត់ `npm run native:check` តែឯងម្តង ➜ ១១៦ ok ·
+  history-window ០ FAIL (APK · PWA Android · PWA iPhone ទាំង ៣ ✅) = flake ពី CPU ⛔ មិនប្តូរពិដាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ keyboard បើក ➜ (ក) កាតបញ្ជីចប់ពីលើ keyboard (គ្មានជួរនៅក្រោយ keyboard) · (ខ) អូសឡើង/ចុះលើកាត ➜ navbar និងប្រអប់ស្វែងរក
+   នៅនឹងកន្លែង · គ្មានលោត · (គ) បញ្ជីវែង (> ៥ ជួរ) ➜ រមូរក្នុងកាតដល់ជួរចុងក្រោយ · (ឃ) បញ្ជីស្នើលេខវែង ➜ រមូរបាន · (ង) ប្រអប់ស្វែងរកទំព័រស្កេន ➜ ដូចគ្នា ·
+   (ច) បិទ keyboard ➜ ទម្រង់ដើម។ នៅខុស ➜ ថតវីដេអូម្តងទៀត។
+3. iPhone ៖ ទាញចុះដើម្បីផ្ទុកឡើងវិញ ➜ ញ័រម្ដងពេលទាញគ្រប់ (iOS 17.4 ឡើង · ការកំណត់ System Haptics បើក)។ មិនញ័រ ➜ ប្រាប់កំណែ iOS។
+4. Android (APK · PWA) ៖ ស្វែងរក · PTR ដដែល (គួរតែមិនប្រែ)។
+5. 🖨️ ស្លាក ៖ ស្កេនកញ្ចប់ ២–៣ ➜ ម៉ឺនុយ (...) ខាងលើ ➜ «🖨️ បោះពុម្ពស្លាក (ថ្ងៃនេះ)» ➜ ផ្ទាំងបើក (preview · ប្តូរប្លង់/កុងតាក់ ➜ preview ប្រែ · បិទ/បើកវិញ ➜ ជម្រើសនៅ) ➜ «🖨️ បោះពុម្ព» ➜
+   print dialog បង្ហាញស្លាក (លេខធំ · Barcode · COD/DOD $ · ថ្ងៃ/ខែ · Locker) ➜ បោះពុម្ព ឬ Save as PDF · ប្លង់ «ម៉ាស៊ីនបោះពុម្ពស្លាក» ➜ មួយស្លាកមួយទំព័រ ·
+   ស្កេនស្លាកដែលបោះពុម្ពដោយឧបករណ៍ស្កេន ➜ លេខត្រូវ · ម៉ឺនុយតាមជួរ ➜ តែអតិថិជននោះ · APK ➜ ផ្ទាំង printer Android។ ទំហំ/ប្លង់មិនសម ➜ ប្រាប់ទំហំក្រដាស/ម៉ាស៊ីនបោះពុម្ពដែលប្រើ។
+6. 📋 បញ្ចូលច្រើន ៖ ទំព័រស្កេន ➜ «📋 បញ្ចូលច្រើន» ➜ ស្កេន ៣–៥ Barcode ដោយឧបករណ៍ (មួយជួរមួយ) ➜ ▶️ ចាប់ផ្តើម ➜ កញ្ចប់បញ្ចូលម្តងមួយៗ (Fast Mode ➜ ដោយខ្លួនឯង · ក្រៅ Fast Mode ➜
+   ផ្ទាំងបញ្ជាក់ម្តងមួយ) ➜ សាររំលង Barcode មានរួច · ⏹️ បញ្ឈប់ · ប្តូររបៀបស្កេនពាក់កណ្តាល ➜ ឈប់ + សរុប។
 
 ### [2.50.64] — 2026-10-14 · 🧠 ការណែនាំឆ្លាតវៃក្នុង 🩺 ពិនិត្យសុខភាព · toast រស់និយាយតាមដំណាក់កាលការសរសេរ (Deep audit ជុំទី ៤)
 
@@ -3718,6 +3797,16 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោង ៖ iPhone PWA ស្វែងរកលេខពេល keyboard បើក ➜ ទំព័ររំកិលតាមម្រាមដៃ ហើយលោតត្រឡប់ ➜ [2.50.65]
+
+**វិធី** ៖ ញែកវីដេអូ (VID_20261014_155824 · ៨៨៤×១៩២០ · ៦០ ស៊ុម/វិ. · ២១.៩ វិ. · keyboard លេខបើកពេញវីដេអូ · ប្រអប់ស្វែងរកទាញឡើង) ជាស៊ុម ៣០ ស៊ុម/វិ. (`ffmpeg`) ➜ វាស់ទីតាំងបញ្ឈរ
+នៃកាតស្វែងរក + ក្បាលបញ្ជី (template ១៤០px) រាល់ស៊ុម ➜ អានកូដ `ios-viewport.ts` · CSS `search-focus` · ច្បាប់ 2.50.42/2.50.45 ➜ សង់ vitest ដែលធ្លាក់លើកូដមុនកែ ➜ កែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A76 | **iPhone PWA ៖ អូសលើកាតបញ្ជីខណៈស្វែងរកលេខ ➜ ទំព័រទាំងមូលរំកិលឡើង ហើយលោតត្រឡប់** (ម្ចាស់គម្រោង ៖ «ចលនា scroll iOS ខុសប្រក្រតី · APK · PWA Android រលូន») | ព្រឹត្តិការណ៍ ៧ (១.១ · ២.៣ · ៣.៧ · ៤.៨ · ៦.២ · ១៨.២ · ១៩.៤ វិ.) ដូចគ្នា ៖ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក · កាត) រំកិលឡើង > ២០០px (មាត្រដ្ឋាន ៤៨០) ក្នុង ១៣០–៣០០ms តាមម្រាមដៃ ➜ បង្ហាញផ្នែកសដែលនៅក្រោយ keyboard (ប៊ូតុង «បន្ថែម» · ចន្លោះទទេ) ➜ ឈរ ២០០–៣០០ms ➜ ត្រឡប់ ០ ក្នុង **១ ស៊ុម** (មិនមែន rubber band ដែលមានចលនា) · Chromium (ក្លែង iOS standalone) ៖ `.page-main` ក្រោម `search-focus` = `flex: 1 1 0` ក្នុង `.app-page.active { height: 100% }` នៃ `.app-pages` = `100dvh − chrome` ➜ iOS មិនបង្រួម `100dvh`/`innerHeight` ពេល keyboard បើក (Android បង្រួម) ➜ កាតលាតដល់ក្រោយ keyboard · ជួរនៅទីនោះមើលមិនឃើញក្រៅពីអូស document (iOS អនុញ្ញាតទោះ `html.ios-standalone { overflow-y: hidden }`) · `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ = ចុងកាយវិការ (WebKit ផ្ញើ `scroll` ពេល viewport ស្ថិរ) ➜ លោត ១ ស៊ុម | (១) inset keyboard ពី `visualViewport` ➜ `.app-pages` `padding-bottom` ➜ កាតចប់ពីលើ keyboard (គ្មានជួរលាក់ · គ្មានហេតុអូស) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរមានកន្លែង ➜ `preventDefault()` (ដូច body-scroll-lock លើ iOS) ➜ document មិនរំកិល · ការត្រឡប់ ០ នៅជាខ្សែទីពីរ · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ ➜ ត្រូវសាកលើ iPhone ពិត · `ZoeW/tests/ios-keyboard-pan.test.ts` ១០ ធ្លាក់លើដើមឈើមុនកែ |
+| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ |
+
 ### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
 
 សំណើម្ចាស់គម្រោង ៖ «Deep Audit Project ទាំងមូល … real live toast និងបន្ថែមភាពឆ្លាតវៃ»។ វិធី ៖ Sentry (issue មិនទាន់ដោះស្រាយ ៩ · ៣០ ថ្ងៃ) · អានផ្លូវពិត (Remove · Delete · Restore · close/reopen · scan save · ledger · registry · toast · connection flow · sheet import · Apps Script ២ · lookup) · run-all STRICT baseline លើ `ef0bf5b` (PR #314) ➜ ០ FAIL · វាស់ចន្លោះដែល checker មិនយាម។
@@ -5944,7 +6033,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
-| `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `export-cells-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `firebase-config-paste-test` | ផ្នែក ១ | ផ្នែក ៣ |
@@ -6102,6 +6191,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/adaptive-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/app-icon-logo.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/batch-scan.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
@@ -6124,8 +6214,11 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/haptic-ios-switch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |

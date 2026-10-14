@@ -99,6 +99,10 @@ export function getExportFilenameBase() {
     return `ZoeW_${label}_${getFormattedDate()}`.replace(/[^a-zA-Z0-9_\-]/g, '');
 }
 
+export function filteredHistoryItems() {
+    return getFilteredDataByDate();
+}
+
 export function buildExportRows() {
     const filteredData = getFilteredDataByDate();
     const rows = [];

@@ -40,6 +40,8 @@ import { HealthCheckModal } from './modals/HealthCheckModal';
 import { LockerPickerModal } from './modals/LockerPickerModal';
 import { LockerSettingsModal } from './modals/LockerSettingsModal';
 import { LocationWarningModal } from './modals/LocationWarningModal';
+import { BatchScanModal } from './modals/BatchScanModal';
+import { LabelPrintModal } from './modals/LabelPrintModal';
 import { ToastContainer } from './ToastContainer';
 import { PdfExportPrintArea } from './PdfExportPrintArea';
 
@@ -88,6 +90,8 @@ export function AppShell() {
             <LockerPickerModal />
             <LockerSettingsModal />
             <LocationWarningModal />
+            <BatchScanModal />
+            <LabelPrintModal />
             <ToastContainer />
             <PdfExportPrintArea />
         </>

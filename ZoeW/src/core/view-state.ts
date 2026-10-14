@@ -89,6 +89,11 @@ export interface ViewState {
     listModalPhoneText: string;
     editBcPcText: string;
     callMarkPhoneText: string;
+    batchScanStatus: string;
+    batchScanCountText: string;
+    labelPrintTitle: string;
+    labelPrintSummary: string;
+    labelPrintPreview: any | null;
     editModalBarcodeText: string;
     locationWarningText: string;
 
@@ -203,6 +208,11 @@ export const viewState = createStore<ViewState>('viewState', {
     listModalPhoneText: '',
     editBcPcText: '',
     callMarkPhoneText: '',
+    batchScanStatus: '',
+    batchScanCountText: '',
+    labelPrintTitle: '',
+    labelPrintSummary: '',
+    labelPrintPreview: null,
     editModalBarcodeText: '',
     locationWarningText: '',
 

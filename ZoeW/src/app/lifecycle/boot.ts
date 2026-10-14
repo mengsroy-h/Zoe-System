@@ -42,7 +42,7 @@ import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
 import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, moreMenuScrollDismisses, noteMoreMenuInput } from './layers';
 import { setupNativeShell } from './native-shell';
-import { listenIOSDocumentScroll, listenIOSSearchFocus } from '../behaviors/ios-viewport';
+import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
 import { oncePerPage, type LifecycleScope } from './scope';
 
@@ -68,6 +68,7 @@ function bootShell(scope: LifecycleScope): void {
     }
     listenIOSDocumentScroll(scope);
     listenIOSSearchFocus(scope);
+    listenIOSKeyboard(scope);
     listenEntrySearchPanel(scope);
 
     if ('serviceWorker' in navigator && !isNativeApp()) {

@@ -1,3 +1,4 @@
+import { iosHapticSwitchTick } from './document-io';
 import { isNativeApp } from './native';
 
 export const HAPTIC_TICK_MS = 10;
@@ -11,6 +12,7 @@ export function hapticTick(): void {
     }
     try {
         const nav = navigator as Navigator & { vibrate?: (pattern: number) => boolean };
-        if (typeof nav.vibrate === 'function') nav.vibrate(HAPTIC_TICK_MS);
+        if (typeof nav.vibrate === 'function') { nav.vibrate(HAPTIC_TICK_MS); return; }
+        iosHapticSwitchTick();
     } catch { }
 }

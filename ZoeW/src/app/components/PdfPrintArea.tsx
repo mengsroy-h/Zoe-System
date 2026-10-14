@@ -12,18 +12,21 @@ export interface PdfTableView {
 }
 
 export function LabelSheet({ view }: { view: LabelPrintView }) {
+    const o = view.options;
     return (
-        <div className="label-sheet" data-label-count={view.labels.length}>
+        <div className={'label-sheet layout-' + o.layout} data-label-count={view.labels.length}>
             {view.labels.map((row, i) => (
                 <div className="label" key={row.barcode + '~' + i}>
                     <div className="label-phone">{row.phone}</div>
                     <div className="label-bc"><Code128Svg code={row.barcode} /></div>
                     <div className="label-code">{row.barcode}</div>
-                    {labelMoneyText(row) ? <div className="label-money">{labelMoneyText(row)}</div> : null}
-                    <div className="label-meta">
-                        <span className="label-date">{row.date}</span>
-                        {row.locker ? <span className="label-locker">{row.locker}</span> : null}
-                    </div>
+                    {o.money && labelMoneyText(row) ? <div className="label-money">{labelMoneyText(row)}</div> : null}
+                    {(o.date && row.date) || (o.locker && row.locker) ? (
+                        <div className="label-meta">
+                            {o.date && row.date ? <span className="label-date">{row.date}</span> : null}
+                            {o.locker && row.locker ? <span className="label-locker">{row.locker}</span> : null}
+                        </div>
+                    ) : null}
                 </div>
             ))}
         </div>

@@ -12,7 +12,7 @@ import { openExchangeRateModal } from '../features/exchange-rate';
 import { getCurrentFilterLabel, openExportDataModal } from '../features/export';
 import { applyCurrentFilter, openMonthlyReportModal } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
-import { printLabelsForFilter, printLabelsForItem } from '../features/label-print';
+import { openLabelPrintModal } from '../features/label-print';
 import { openManualAdjustModal } from '../features/stats-modals';
 import { openRecentlyDeletedModal } from '../features/trash';
 
@@ -45,9 +45,9 @@ export function moreMenuResetPickup() { requestPinBeforeResetPickup(); closeGlob
 
 export function moreMenuClearHistory() { requestPinBeforeClearHistory(); closeGlobalMoreMenu(); }
 
-export function moreMenuPrintLabels() { closeGlobalMoreMenu(); printLabelsForFilter(); }
+export function moreMenuPrintLabels() { closeGlobalMoreMenu(); openLabelPrintModal({ kind: 'filter' }); }
 
-export function moreMenuPrintItemLabels(id?) { closeGlobalMoreMenu(); printLabelsForItem(id); }
+export function moreMenuPrintItemLabels(id?) { closeGlobalMoreMenu(); openLabelPrintModal({ kind: 'item', id: String(id || '') }); }
 
 export function moreMenuViewList(id?) { openViewListModal(id); closeGlobalMoreMenu(); }
 

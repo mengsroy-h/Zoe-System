@@ -14,6 +14,7 @@ import { forgetLoginPassword, prefillRememberedPassword } from './password-memor
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { resetBatchScan } from './batch-scan';
+import { resetLabelPrint } from './label-print';
 import { expandedTrashGroups } from './locker';
 import { hidePhoneSuggestions } from './phone-suggest';
 import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
@@ -132,6 +133,8 @@ export function clearSensitiveModalFields() {
     restoreAfterPdfExport();
     resetBatchScan();
     closeModal('batchScanModal');
+    resetLabelPrint();
+    closeModal('labelPrintModal');
     if (!isPinFlowPending()) securityState.pinTargetAction = null;
     uiState.pendingRestoreId = null;
     uiState.pendingPermanentDeleteId = null;

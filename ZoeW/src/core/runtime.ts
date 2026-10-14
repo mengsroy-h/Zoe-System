@@ -89,6 +89,7 @@ export const ACTION_ALLOWLIST = [
     "openZtoListSyncModal",
     "openZtoSyncModal",
     "pickSheetImportFile",
+    "printLabelsFromModal",
     "promptPermanentDelete",
     "promptRestoreDeletedItem",
     "recheckZtoPickupStatus",
@@ -144,5 +145,6 @@ export const ACTION_ALLOWLIST = [
     "toggleTorch",
     "toggleTrashGroup",
     "updateBatchScanCount",
+    "updateLabelPrintPreview",
     "verifySecurityPin",
 ];

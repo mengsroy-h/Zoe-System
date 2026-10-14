@@ -204,6 +204,7 @@
 - `ZoeW/tests/ios-keyboard-pan.test.ts` +១ ៖ អូសបញ្ឈរលើប្រអប់ស្វែងរក (ចុះ/ឡើង) ➜ preventDefault · ផ្ដេក ➜ មិនប៉ះ · ប្រអប់អក្សរផ្សេង ➜ មិនប៉ះ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ — លើ 2.50.69 ធ្លាក់។
 - `gesture-test` ៖ browser ពិត · `#searchPhoneInput` ដែល focus (ចុះ/ឡើង) និង `#entryListSearchInput` (ផ្ទាំងស្កេន) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (គំរូ `webkitPan`) ·
   ផ្ដេក ➜ មិនចាប់ — លើ 2.50.69 ១ ធ្លាក់ ➜ ១៧០/១៧០។
+- ភស្តុតាង ៖ `run-all.sh` STRICT (emulator រស់) **២០៥/២០៥** ពេញលេញ (០ មួយផ្នែក · ០ រំលង) លើ `d39b280` · vitest ១៧២ ឯកសារ / ១៥១០ · tsc · eslint · purity ១៥/១៥។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

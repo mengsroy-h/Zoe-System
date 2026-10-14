@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ជ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `f5e9bd7` · **មិនទាន់ merge**) ៖ [2.50.71] ប្រអប់ដែលមានកន្លែងវាយរំកិលឡើងនៅពីលើ keyboard
+    (សំណើម្ចាស់គម្រោង · ផ្នែក ២ A86) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.71]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ឆ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `46fe346` · **មិនទាន់ merge**) ៖ [2.50.70] អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រមិនរំកិល
     (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A85) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.70]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ច. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `5fad053` · **មិនទាន់ merge**) ៖ [2.50.69] ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ (សំណើម្ចាស់គម្រោង) ៖
@@ -183,6 +185,42 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.71] — 2026-10-14 · ZoeW ៖ **ប្រអប់ដែលមានកន្លែងវាយអក្សរ/លេខ រំកិលឡើងនៅពីលើ keyboard** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.71`** (`zoew-v333` ➜ `zoew-v334`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ឯកសារថ្មី `src/app/behaviors/modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `boot.ts` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «បន្ថែមមុខងារអោយ modal ណាដែលមានប្រអប់វាយបញ្ចូលអក្សរឬលេខឆ្លាតវៃ ចេះរកិលពេលបាំង keyboard ហើយសូមតេស្តអោយហ្មត់ចត់»។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ប្រអប់ណាក៏ដោយដែលបើក ពេល keyboard បាំងផ្នែកខាងក្រោម ➜ ប្រអប់ស្ថិតក្នុងផ្ទៃដែលមើលឃើញពីលើ keyboard ហើយកន្លែងដែលកំពុងវាយលេចឲ្យឃើញ** (ផ្នែក ២ A86)។
+  iPhone មិនបង្រួមទំព័រពេល keyboard បើក ➜ `.modal` (fixed · ១០០%) នៅកណ្តាលអេក្រង់ពេញ ➜ keyboard បាំងពាក់កណ្តាលក្រោម (PIN · Config · Lookup API · Login · …)។ ឥឡូវ ៖
+  `listenModalKeyboard()` (visualViewport `resize`/`scroll` · `focusin` · ប្រអប់បើក/បិទ) ➜ `modalKeyboardViewport()` (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜
+  `uiState.modalViewportTop/Height` ➜ `body.modal-keyboard` + `--modal-vv-top` · `--modal-vv-height` ➜ `.modal` យកផ្ទៃមើលឃើញ · `.modal-content` `max-height: 100%` (ប្រអប់វែងរមូរក្នុងខ្លួន) ➜
+  `revealFocusedModalField()` រមូរកន្លែងវាយចូលមើលឃើញ (គម្លាត ១២px · `setElementScrollTop` · មិនប្រើ `scrollIntoView` ដែលរមូរទំព័រលើ iOS)។ iOS រំកិលផ្ទៃមើលឃើញ (`offsetTop`) ➜ ប្រអប់តាម ·
+  ប្តូរកន្លែងវាយ ➜ រមូរតាម · បិទ keyboard ឬបិទប្រអប់ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរ។ `guide.html` ផ្នែក ៥ ពន្យល់។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (ថ្មី · browser ពិត · App ពិត · visualViewport ក្លែង) ៖ ប្រអប់ និងកន្លែងវាយ **ដេរីវេពី DOM** (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea មើលឃើញ ៖ ៣៤ កន្លែងវាយ)
+  × ទំហំ ៣ (390×844 keyboard 336 · 375×667 keyboard 260 · 320×568 keyboard 253) ➜ កាតប្រអប់ និងកន្លែងវាយនៅក្នុងផ្ទៃមើលឃើញ · មិនត្រូវអ្នករមូរកាត់ · ផ្ទៃមើលឃើញរំកិល ១៤០px · ប្តូរកន្លែងវាយ ·
+  បើកប្រអប់ខណៈ keyboard បើករួច · ទិសផ្ទុយ (keyboard បិទ ➜ ទីតាំងដើម · បិទប្រអប់ · គម្លាតតូច · APK បង្រួម viewport) · ជាន់អប្បបរមា (≥ ១៥ ប្រអប់ · ≥ ៦០ ការវាស់ · ≥ ១០ ករណីបាំងមុនការកែ) —
+  លើ 2.50.70 ៧ ធ្លាក់ ➜ ១៨/១៨ · mutation (បិទ `revealFocusedModalField()`) ➜ ៣ ធ្លាក់។
+- `ZoeW/tests/modal-keyboard.test.tsx` (ថ្មី · ១០) ៖ ផ្ទៃមើលឃើញ (offsetTop · clamp · គម្លាតតូច · ប្រអប់បិទ · គ្មាន visualViewport · NaN/០/អវិជ្ជមាន · APK) · listener ➜ state ➜ body class + អថេរ CSS ·
+  ប្រអប់បិទ/បើកខណៈ keyboard បើក · ការរមូរកន្លែងវាយ (ក្រោម · លើ · មើលឃើញហើយ · textarea ខ្ពស់) · focusin · focus ក្រៅប្រអប់ · dispose · ខ្សែភ្ជាប់ boot/CSS/DocumentEffects។
+- `state-hygiene` ៖ `modalWasOpen` ➜ `ACCEPTED` ជាមួយហេតុផល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ បើកប្រអប់ PIN · Config (☰ ➜ Config) · API ស្វែងរកអតិថិជន · កែលេខទូរស័ព្ទ · កែតម្លៃកញ្ចប់ ➜ ចុចកន្លែងវាយ ➜ keyboard បើក ➜ ប្រអប់ទាំងមូលនៅពីលើ keyboard ·
+   កន្លែងវាយមើលឃើញ · ប្រអប់វែងរមូរក្នុងខ្លួន · ចុចកន្លែងវាយបន្ទាប់ ➜ លេចឲ្យឃើញ · បិទ keyboard ➜ ប្រអប់ត្រឡប់កណ្តាល។
+2. **iPhone តូច (SE)** ៖ សាកដូចខ្ទង់ ១ (ផ្ទៃមើលឃើញតូចបំផុត)។
+3. **Android** (APK · PWA) ៖ ប្រអប់នៅពីលើ keyboard ដូចមុន (APK មិនប្តូរ)។
+4. សកម្មភាព ១–៣ របស់ [2.50.70] នៅតែត្រូវសាក។
+
+---
 
 ### [2.50.70] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ និង navbar មិនរំកិល (ដូច Android)**
 
@@ -3999,6 +4037,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — សំណើម្ចាស់គម្រោង ៖ ប្រអប់ដែលមានកន្លែងវាយ ត្រូវ keyboard បាំង
+
+**វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` (App ពិត · visualViewport ក្លែងព្រោះ Chromium គ្មាន keyboard · បញ្ជីប្រអប់ពី DOM) រត់លើ 2.50.70 ➜ ធ្លាក់ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A86 | **ប្រអប់ដែលមានកន្លែងវាយ ៖ keyboard បាំងកាត ឬកន្លែងវាយ** | 2.50.70 ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ៖ គ្រប់ទំហំធ្លាក់ (ឧ. 390×844 ៖ PIN កាត [308,536] ផ្ទៃមើលឃើញ [0,508] · Config [205,639] · 320×568 ៖ កន្លែងវាយ PIN [272,318] ក្រោមផ្ទៃ [0,315]) · ផ្ទៃរំកិល ១៤០ ➜ កាតមិនតាម · បើកប្រអប់ខណៈ keyboard បើក ➜ នៅក្រោម · APK (viewport បង្រួម) ➜ នៅក្នុងរួច | `listenModalKeyboard()` ➜ `.modal` = visualViewport · `.modal-content` 100% · `revealFocusedModalField()` · ១៨/១៨ · mutation (បិទការរមូរកន្លែងវាយ) ➜ ៣ ធ្លាក់ · ⚠️ សកម្មភាព ១–២ [2.50.71] |
+
 ### 2026-10-14 — រាយការណ៍ម្ចាស់គម្រោង ៖ មានតែការអូសក្នុងប្រអប់វាយលេខស្វែងរកដែលរំកិលទំព័រ (iPhone)
 
 **វិធី** ៖ ម្ចាស់គម្រោងបញ្ជាក់ ៖ កន្លែងផ្សេងទប់បាន · មានតែការអូសចាប់ផ្តើមក្នុងប្រអប់វាយលេខ ➜ អាន `blockIOSKeyboardPan()` (លើកលែង `INPUT`/`TEXTAREA` គ្រប់ប្រអប់) និងប្រភព WebKit
@@ -6327,6 +6373,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
@@ -6488,6 +6535,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |

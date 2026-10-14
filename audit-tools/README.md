@@ -380,6 +380,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `layout-check.js` | CSS បំបែក/លើសទទឹង លើ 320–1440px (**អះអាង ២ ខាង**) | `LAYOUT_APP_DIR` |
 | `fluid-type-focus-test.js` | មាត្រដ្ឋានអក្សរ ៣ ជំហាន និងសញ្ញាផ្តោត | `FLUIDTYPE_APP_DIR` |
+| `modal-keyboard-test.js` | ប្រអប់ (modal) ដែលមានប្រអប់វាយ ៖ keyboard បាំង ➜ ប្រអប់ និងប្រអប់វាយនៅក្នុងផ្ទៃមើលឃើញ (គ្រប់ប្រអប់ពី DOM · ទំហំទូរស័ព្ទ ៣ · APK មិនប្តូរ) | `MODALKB_APP_DIR` |
 | `gesture-test.js` | PTR · ការលាក់របា Tab · ចង្វាក់ស៊ុម | `GESTURE_APP_DIR` |
 | `history-menu-dismiss-test.js` | Chromium ពិត៖ ម៉ឺនុយ (...) បិទពេលអូសផ្ទាំង/រមូរខាងក្រៅ · ចលនាបើក និង Reduce Motion · ចុច/រមូរក្នុងម៉ឺនុយ | `HISTORYMENU_APP_DIR` |
 | `panel-motion-test.js` | ចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើ · snap ↔ PTR) · ស៊ុមក្រោមកាតលើ Android ដូច iOS (ប្រៀបរូបថត pixel) | `PANELMOTION_APP_DIR` · `PANELMOTION_SHOT_DIR` (រក្សារូបថត) |

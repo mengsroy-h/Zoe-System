@@ -29,6 +29,8 @@ export function DocumentEffects() {
     const iosKeyboardInset = useStoreValue(uiState, (s) => s.iosKeyboardInset);
     const iosKeyboardListFixed = useStoreValue(uiState, (s) => s.iosKeyboardListFixed);
     const iosKeyboardSuggestFixed = useStoreValue(uiState, (s) => s.iosKeyboardSuggestFixed);
+    const modalViewportTop = useStoreValue(uiState, (s) => s.modalViewportTop);
+    const modalViewportHeight = useStoreValue(uiState, (s) => s.modalViewportHeight);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
@@ -46,12 +48,15 @@ export function DocumentEffects() {
     useBodyClass('ios-keyboard', iosKeyboardInset > 0);
     useBodyClass('ios-keyboard-list-fixed', iosKeyboardInset > 0 && iosKeyboardListFixed);
     useBodyClass('ios-keyboard-suggest-fixed', iosKeyboardInset > 0 && iosKeyboardSuggestFixed);
+    useBodyClass('modal-keyboard', modalViewportHeight > 0);
 
     useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
     useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));
     useHtmlVar('--page-extension', useStoreValue(uiState, (s) => s.pageExtensionVar));
     useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
     useHtmlVar('--ios-keyboard-inset', iosKeyboardInset > 0 ? iosKeyboardInset + 'px' : '0px');
+    useHtmlVar('--modal-vv-top', modalViewportTop + 'px');
+    useHtmlVar('--modal-vv-height', modalViewportHeight > 0 ? modalViewportHeight + 'px' : '100%');
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

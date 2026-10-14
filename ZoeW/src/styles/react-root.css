@@ -263,6 +263,9 @@
     html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
 }
 
+body.modal-keyboard .modal { top: var(--modal-vv-top, 0px); height: var(--modal-vv-height, 100%); }
+body.modal-keyboard .modal-content { max-height: 100%; }
+
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }
 .history-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }

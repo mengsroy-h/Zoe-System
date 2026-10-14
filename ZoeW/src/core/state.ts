@@ -267,6 +267,8 @@ export interface UiState {
     iosKeyboardInset: number;
     iosKeyboardListFixed: boolean;
     iosKeyboardSuggestFixed: boolean;
+    modalViewportTop: number;
+    modalViewportHeight: number;
     pdfExportOriginalTitle: any;
     monthlyReportMonth: string;
     lastRecallSignature: string;
@@ -371,6 +373,8 @@ export const uiState = createStore<UiState>('uiState', {
     iosKeyboardInset: 0,
     iosKeyboardListFixed: false,
     iosKeyboardSuggestFixed: false,
+    modalViewportTop: 0,
+    modalViewportHeight: 0,
     pdfExportOriginalTitle: null,
     monthlyReportMonth: '',
     lastRecallSignature: '',

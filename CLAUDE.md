@@ -634,7 +634,7 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside a text field (`ZoeW/tests/ios-keyboard-pan.test.ts`).
   Pulling the search down (`dataPanelSearchFocus` true ➜ false, iOS standalone phone) pauses snap (`beginPanelGlideSnapPause()`) **before** React commits it
   (`settleIOSSearchPullDown()` runs in the store subscriber, inside the immediate commit): while pulled up `.page-main`'s snap offset is 0 = the scroll position, so WebKit
-  records it as the snapped box and its `resnapAfterLayout()` (synchronous, in the first layout after the commit) would scroll to `.page-main`'s new offset — the search card
+  records it as the snapped box and its re-snap after layout (WebKit `ScrollSnapAnimatorState::resnapAfterLayout` · synchronous, in the first layout after the commit) would scroll to `.page-main`'s new offset — the search card
   under the navbar · with snap off WebKit drops its snap state and rebuilds it at 0 when the pause ends (nearest within proximity: none) ⛔ never check or correct before the
   commit only. `#appPages` still scrolled after that commit ➜ 0 + a new `panelGlideFrom()` from the visible position of the search card and the list card ⛔ never an
   instant jump · once more after `IOS_SEARCH_PULLDOWN_SETTLE_MS` unless a finger touched meanwhile, the search was pulled up again or the field is focused — Chromium

@@ -208,6 +208,13 @@
 - `npm run purity:check` ៖ ពិដានការលើកលែង `platform/document-io.ts` ត្រឡប់ដូចមុន switch haptic (`createElement` ៤ · `document.body` ៣ · `appendChild` ៣ · `click` ១ · ដក `setAttribute` · `className`) —
   PR #317 ដកកូដ haptic តែទុកពិដាន ➜ ២ FAIL («ធាតុងាប់» · «ពិដានតឹង») ➜ ១៥/១៥។
 
+#### ភស្តុតាង (session · emulator RTDB · Postgres ពិត)
+
+- vitest ១៧២ ឯកសារ · ១៥០៤ · `tsc -b` · eslint · `purity:check` ១៥/១៥ · strip-comments ស្អាត ២៦០។
+- run-all STRICT (`0c99f7d`) ៖ ២០២/២០៥ — ធ្លាក់ ៣ ៖ `doc-scope-test` (CLAUDE.md យោង `resnapAfterLayout()` ជា helper ដែលមិនមានក្នុង repo · លិបិក្រម `forbidden-zone-lock.test.ts` ខ្វះ ផ្នែក ១ ➜ កែទាំង ២) ·
+  `layout` (`pinSetupModal` @768px 271u < 276u ពេល ៤ lanes រវល់ · CSS មិនប៉ះក្នុងជុំនេះ) · `revenue-fuzz` («Resulting promise was garbage collected» របស់ Playwright · មិនមែន assertion) ➜
+  `RUNALL_ONLY` លើ tree ដដែល ៖ `layout` ១៧៥ PASS · `revenue-fuzz` PASS ➜ ធ្លាក់តែពេលម៉ាស៊ីនរវល់ ⛔ មិនប្តូរពិដាន។
+
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
@@ -6251,7 +6258,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `stats-screen-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
+| `strip-comments` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-data-tools-test` | ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -6316,7 +6323,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |

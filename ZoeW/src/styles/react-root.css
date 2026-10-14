@@ -729,6 +729,7 @@
 .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
 .label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
 .label-money { margin-top: 1mm; font-size: 17pt; font-weight: 800; white-space: nowrap; }
+.label-date { font-variant-numeric: tabular-nums; }
 .label-locker::before { content: '📍'; }
 @media print {
     #pdfExportPrintArea .label-sheet { width: 100%; }

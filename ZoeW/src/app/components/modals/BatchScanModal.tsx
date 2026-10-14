@@ -16,7 +16,7 @@ export function BatchScanModal() {
                     ref={refTo('batchBarcodeInput')}
                     className="batch-scan-input"
                     rows={8}
-                    placeholder={'77105373308\n77105374841\n…'}
+                    placeholder={'77100000308\n77100000841\n…'}
                     autoComplete="off"
                     spellCheck={false}
                     onInput={onAct('updateBatchScanCount')}

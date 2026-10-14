@@ -57,7 +57,7 @@ export function updateBatchScanCount() {
 }
 
 export function openBatchScanModal() {
-    if (uiState.isModalOpen || batchRun) return;
+    if (uiState.isModalOpen || batchScanIsRunning()) return;
     if (uiState.entryScanMode !== 'parcel') {
         showToast('⚠️ ការបញ្ចូលច្រើនប្រើបានតែក្នុងរបៀប «បញ្ចូលកញ្ចប់»។');
         return;
@@ -79,7 +79,7 @@ function endBatchScan(reason: 'done' | 'stopped' | 'session' | 'mode' | 'offline
     if (run.existing) parts.push('មានរួច ' + run.existing);
     if (run.skipped) parts.push('រំលង ' + run.skipped);
     if (left > 0) parts.push('មិនទាន់បញ្ចូល ' + left);
-    const head = reason === 'done' ? '✅ បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : (reason === 'offline' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ក្រៅបណ្ដាញ — ភ្ជាប់វិញ រួចចាប់ផ្តើមម្តងទៀត) ៖ ' : '⏹️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ '));
+    const head = reason === 'done' ? '✅ បញ្ចូលច្រើនចប់ ៖ ' : (reason === 'mode' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ប្តូររបៀបស្កេន) ៖ ' : (reason === 'offline' ? '⚠️ ការបញ្ចូលច្រើនឈប់ (ក្រៅបណ្ដាញ — ភ្ជាប់វិញ រួចចាប់ផ្តើមម្តងទៀត) ៖ ' : 'ℹ️ បានបញ្ឈប់ការបញ្ចូលច្រើន ៖ '));
     showToast(head + parts.join(' · '));
 }
 
@@ -150,7 +150,7 @@ export function stopBatchScan() {
     if (batchRun.waiting && modalIsOpen('phoneModal')) {
         batchRun.queue.length = batchRun.index;
         renderBatchScanStatus();
-        showToast('⏹️ នឹងបញ្ឈប់ក្រោយកញ្ចប់នេះ។');
+        showToast('ℹ️ នឹងបញ្ឈប់ក្រោយកញ្ចប់នេះ។');
         return;
     }
     endBatchScan('stopped');

@@ -49,7 +49,7 @@ beforeEach(() => {
     uiState.modalDisplay = {};
     uiState.modalStack = [];
     dataState.scanHistory = [
-        item('I1', '093385837', '2026-10-15', [{ code: '77105373308751', locker: 'A1', cod: 6.93 }, { code: '77105374841', dod: 2.5, cod: 1, isClosed: true }]),
+        item('I1', '0960001234', '2026-10-15', [{ code: '77100000308751', locker: 'A1', cod: 6.93 }, { code: '77100000841', dod: 2.5, cod: 1, isClosed: true }]),
         item('I2', 'គ្មានលេខ', '2026-10-14', [{ code: 'NOPHONE1' }]),
         { id: 'I3', phone: '0961234567', scanDate: '2026-10-09', barcode: 'LEGACY1', locker: 'B2', cod: '3.5', dod: -1 } as any
     ];
@@ -77,12 +77,12 @@ describe('ស្លាកកញ្ចប់ ៖ ទិន្នន័យ', () =>
 
     it('⛔ buildLabelRows ៖ ស្លាកមួយក្នុងមួយ Barcode · — · Locker N/A ➜ «» · ធាតុចាស់ ➜ ១ · openOnly ➜ រំលង isClosed', () => {
         expect(buildLabelRows(dataState.scanHistory)).toEqual([
-            { phone: '093385837', barcode: '77105373308751', date: '15/10', locker: 'A1', cod: 6.93, dod: 0 },
-            { phone: '093385837', barcode: '77105374841', date: '15/10', locker: '', cod: 1, dod: 2.5 },
+            { phone: '0960001234', barcode: '77100000308751', date: '15/10', locker: 'A1', cod: 6.93, dod: 0 },
+            { phone: '0960001234', barcode: '77100000841', date: '15/10', locker: '', cod: 1, dod: 2.5 },
             { phone: '—', barcode: 'NOPHONE1', date: '14/10', locker: '', cod: 0, dod: 0 },
             { phone: '0961234567', barcode: 'LEGACY1', date: '09/10', locker: 'B2', cod: 3.5, dod: 0 }
         ]);
-        expect(buildLabelRows(dataState.scanHistory, { openOnly: true }).map((r) => r.barcode)).toEqual(['77105373308751', 'NOPHONE1', 'LEGACY1']);
+        expect(buildLabelRows(dataState.scanHistory, { openOnly: true }).map((r) => r.barcode)).toEqual(['77100000308751', 'NOPHONE1', 'LEGACY1']);
         expect(buildLabelRows(null)).toEqual([]);
         expect(buildLabelRows([null, {}, { barcodes: [{ code: '' }] }])).toEqual([]);
     });
@@ -110,9 +110,9 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(viewState.labelPrintSummary).toContain('ស្លាក 3');
         expect(viewState.labelPrintSummary).toContain('អតិថិជន 3');
         const first = labelsIn('#labelPrintPreview')[0];
-        expect(first.querySelector('.label-phone')!.textContent).toBe('093385837');
+        expect(first.querySelector('.label-phone')!.textContent).toBe('0960001234');
         expect(first.querySelector('.label-bc svg rect')).toBeTruthy();
-        expect(first.querySelector('.label-code')!.textContent).toBe('77105373308751');
+        expect(first.querySelector('.label-code')!.textContent).toBe('77100000308751');
         expect(first.querySelector('.label-money')!.textContent).toBe('COD $6.93');
         expect(first.querySelector('.label-date')!.textContent).toBe('15/10');
         expect(first.querySelector('.label-locker')!.textContent).toBe('A1');
@@ -161,12 +161,12 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
 
     it('ម៉ឺនុយតាមជួរ ➜ តែអតិថិជននោះ · preview ≤ LABEL_PREVIEW_MAX ខណៈបោះពុម្ពទាំងអស់ · id មិនស្គាល់ ➜ toast គ្មាន modal', () => {
         step(() => moreMenuPrintItemLabels('I1'));
-        expect(viewState.labelPrintTitle).toBe('អតិថិជន 093385837');
+        expect(viewState.labelPrintTitle).toBe('អតិថិជន 0960001234');
         expect(labelsIn('#labelPrintPreview').length).toBe(1);
         step(() => { field('labelOpenOnly').checked = false; updateLabelPrintPreview(); });
         expect(labelsIn('#labelPrintPreview').length).toBe(2);
         step(() => { printLabelsFromModal(); });
-        expect(uiState.pdfExportView.labels.map((l: any) => l.barcode)).toEqual(['77105373308751', '77105374841']);
+        expect(uiState.pdfExportView.labels.map((l: any) => l.barcode)).toEqual(['77100000308751', '77100000841']);
         expect(printed[0]).toBe('ZoeW_label_I1');
         step(() => restoreAfterPdfExport());
         dataState.scanHistory = Array.from({ length: 10 }, (_, i) => item('M' + i, '09600000' + i, '2026-10-15', [{ code: 'MANY' + i }]));

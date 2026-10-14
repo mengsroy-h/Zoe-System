@@ -5,10 +5,9 @@ import { LABEL_PRINT_OPTIONS_KEY } from '../core/storage-keys';
 import { STATS_DAILY_VIEW_KEYS } from '../core/text';
 import { viewState } from '../core/view-state';
 import { emptyViewMessage } from '../services/db-listeners';
+import { beginPdfPrint, filteredHistoryItems, getCurrentFilterLabel, getExportFilenameBase } from './export';
 import { closeModal, openModalHelper } from '../ui/modal';
-import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
-import { beginPdfPrint, getCurrentFilterLabel, getExportFilenameBase } from './export';
 
 export type LabelLayout = '50x30' | '40x30' | '60x40' | 'single' | 'a4-3' | 'a4-2';
 
@@ -120,7 +119,7 @@ function labelScopeItems(scope: LabelPrintScope | null) {
         const item = dataState.scanHistory.find((i) => i && i.id === scope.id);
         return item ? [item] : [];
     }
-    return getFilteredDataByDate();
+    return filteredHistoryItems();
 }
 
 function labelScopeTitle(scope: LabelPrintScope | null) {

@@ -1,5 +1,5 @@
 import { uiState } from '../../core/state';
-import { labelMoneyText, type LabelPrintView } from '../../features/label-print';
+import { labelMoneyText, type LabelLayout, type LabelPrintView } from '../../features/label-print';
 import { useStore } from '../hooks/useStore';
 import { Code128Svg } from './zto/Code128Svg';
 
@@ -11,10 +11,19 @@ export interface PdfTableView {
     footer: React.ReactNode;
 }
 
+const LABEL_SHEET_CLASS: Record<LabelLayout, string> = {
+    '50x30': 'label-sheet layout-50x30',
+    '40x30': 'label-sheet layout-40x30',
+    '60x40': 'label-sheet layout-60x40',
+    'single': 'label-sheet layout-single',
+    'a4-3': 'label-sheet layout-a4-3',
+    'a4-2': 'label-sheet layout-a4-2'
+};
+
 export function LabelSheet({ view }: { view: LabelPrintView }) {
     const o = view.options;
     return (
-        <div className={'label-sheet layout-' + o.layout} data-label-count={view.labels.length}>
+        <div className={LABEL_SHEET_CLASS[o.layout] || LABEL_SHEET_CLASS['50x30']} data-label-count={view.labels.length}>
             {view.labels.map((row, i) => (
                 <div className="label" key={row.barcode + '~' + i}>
                     <div className="label-phone">{row.phone}</div>

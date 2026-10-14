@@ -221,6 +221,17 @@
 - `ZoeW/tests/haptic-ios-switch.test.ts` (ថ្មី ៥) ៖ គ្មាន `vibrate` + `switch` មាន ➜ label + `input[switch]` មួយក្នុង `<body>` · ចុច ➜ `checked` ផ្លាស់រាល់ដង · សាងម្តង ·
   `vibrate` មាន ➜ ហៅ `vibrate` · គ្មាន switch · គ្មាន `switch` ➜ គ្មានធាតុ · មិន throw · CSS `.haptic-switch` ក្រៅអេក្រង់ មិន `display: none` — លើដើមឈើមុនកែ ធ្លាក់។
 
+#### ភស្តុតាង (run-all STRICT · emulator RTDB · Postgres ពិត)
+
+- ជុំ ១ (`c7c056d`) ៖ ២០១/២០៥ — ធ្លាក់ ៤ ពីការកែ tree កណ្តាលរត់ (កំណែក្នុង README/CLAUDE.md · ឯកសារថ្មីមិនទាន់ map · `gesture` ៖ listener `touchmove` ទប់ទី ២ លើ document)
+  ➜ listener ចងតែខណៈប្រអប់ស្វែងរកទាញឡើង · ជុំ ២–៤ ឈប់ដោយដៃ (commit ថ្មីចេញបន្ត) · **ជុំ ៥ (`6071e43`) ៖ ១៩៧/២០៥ — ធ្លាក់ ៨ ជាចន្លោះនៃការងារថ្មី** ៖
+  `setup-link-logout-test` (sandbox ខ្វះ stub `resetBatchScan`/`resetLabelPrint`) · `clear-history-claim-test` (import `label-print ➜ ui/more-menu` ប្តូរលំដាប់ module ក្នុង
+  text view ➜ `clearHistory()` មុន `CLEAR_HISTORY_CLAIM_LEASE_MS` ➜ ប្លុក helper រកមិនឃើញ ➜ វាស់ edge នីមួយៗដោយ build-audit ៥ variant ➜ `filteredHistoryItems()` ក្នុង `export.ts`
+  ជំនួស) · `function-surface-test` (`batchScanIsRunning` គ្មានអ្នកហៅ ➜ ប្រើក្នុង `openBatchScanModal`) · `state-hygiene` (`keyboardPanScope` ➜ ACCEPTED) ·
+  `repository-file-coverage` (`LabelPrintModal.tsx` គ្មាន mapping) · `security-guard` (លេខទូរស័ព្ទ/waybill ពិតពីរូបម្ចាស់គម្រោងក្នុង test ➜ លេខសំយោគ `0960001234` ·
+  `771000003…`) · `css-classes` (`.label-date` គ្មាន rule · class `'layout-' + x` ➜ ផែនទី class ជាអក្សរពេញ) · `toast-action-truth` (toast «⏹️ …» គ្មានន័យ ➜ «ℹ️ …») ➜
+  ទាំង ៨ PASS លើ `RUNALL_ONLY` (`setup-link-logout` ៧២ · `clear-history-claim` ៦ · `function-surface` ២៧ · `security-guard` ៥៥ · `toast-action-truth` ៦៧) ➜ ជុំ ៦ ពេញលើ tree ចុងក្រោយ (ខាងក្រោម)។
+
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 1. Deploy **ZoeW** (merge ចូល `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។

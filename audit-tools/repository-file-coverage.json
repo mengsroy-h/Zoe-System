@@ -1321,6 +1321,9 @@
     "ZoeW/src/app/components/modals/HealthCheckModal.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/modals/LabelPrintModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/modals/LocationWarningModal.tsx": {
       "policy": "zoew-react-ui"
     },

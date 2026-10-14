@@ -104,13 +104,10 @@ export function settleIOSSearchPullDown(): void {
     const pages = elementOf('appPages');
     if (!pages) return;
     if (pages.scrollTop > 0) {
-        const card = elementOf('dataSearchCard');
-        const main = elementOf('dataMainSection');
-        const cardTop = card ? card.getBoundingClientRect().top : NaN;
-        const mainTop = main ? main.getBoundingClientRect().top : NaN;
+        const gliders = [elementOf('dataSearchCard'), elementOf('dataMainSection')];
+        const tops = gliders.map((el) => (el ? el.getBoundingClientRect().top : NaN));
         setElementScrollTop(pages, 0);
-        panelGlideFrom(card, cardTop, PANEL_SEARCH_GLIDE);
-        panelGlideFrom(main, mainTop, PANEL_SEARCH_GLIDE);
+        gliders.forEach((el, i) => panelGlideFrom(el, tops[i], PANEL_SEARCH_GLIDE));
     }
     pullDownSettleTimer = setTimeout(restIOSSearchPullDown, IOS_SEARCH_PULLDOWN_SETTLE_MS);
 }

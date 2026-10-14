@@ -897,6 +897,60 @@ const GESTURE = function (steps) {
         window.switchAppPage('data');
         await new Promise((r) => setTimeout(r, 300));
     });
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA · VID_20261015_051457) ៖ ប្រអប់ «បញ្ចូល Barcode ច្រើន» + keyboard ➜ អូសលើផ្ទៃខាងក្រោយ ➜ ទំព័រ និងប្រអប់រំកិល
+    //    ហើយប្រអប់រត់តាម offsetTop យឺតមួយស៊ុម (ញ៉ាក់) ➜ ខណៈ body.modal-keyboard ៖ touch-action none (body · .modal) + touchmove ដំបូងត្រូវចាប់ គ្រប់កន្លែង
+    //    លើកលែងអ្នករមូរដែលមានកន្លែង (textarea វែង · កាតវែង) · អូសផ្ដេកក្នុង textarea ➜ ទុកឲ្យ iOS
+    const kbModal = await page.evaluate(async () => {
+        window.openModalHelper('batchScanModal');
+        await new Promise((r) => setTimeout(r, 450));
+        const area = document.getElementById('batchBarcodeInput');
+        area.value = '';
+        area.focus({ preventScroll: true });
+        window.uiState.modalViewportTop = 0;
+        window.uiState.modalViewportHeight = window.innerHeight - 336;
+        await new Promise((r) => setTimeout(r, 250));
+        const at = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; };
+        const box = document.querySelector('#batchScanModal .modal-content');
+        return { cls: document.body.classList.contains('modal-keyboard'), focused: document.activeElement === area,
+            boxRoom: box.scrollHeight > box.clientHeight + 1, area: at(area), box: at(box.querySelector('h3') || box), height: window.innerHeight - 336 };
+    });
+    const kbModalTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify({ backdrop: '#batchScanModal' }) + ')');
+    const modalDrag = (selector, at, points) => runGesture({ selector, x: at.x, startY: at.y, points, webkitPan: true });
+    const upFrom = (y) => [{ y: y - 2 }, { y: y - 6 }, { y: y - 14 }, { y: y - 30 }];
+    const downFrom = (y) => [{ y: y + 2 }, { y: y + 6 }, { y: y + 14 }, { y: y + 30 }];
+    const mBackdrop = await modalDrag('#batchScanModal', { x: 6, y: Math.round(kbModal.height / 2) }, upFrom(Math.round(kbModal.height / 2)));
+    const mBox = await modalDrag('#batchScanModal .modal-content', kbModal.box, downFrom(kbModal.box.y));
+    const mArea = await modalDrag('#batchBarcodeInput', kbModal.area, upFrom(kbModal.area.y));
+    const mAreaSide = await modalDrag('#batchBarcodeInput', kbModal.area, [{ dx: 4, y: kbModal.area.y }, { dx: 12, y: kbModal.area.y + 1 }, { dx: 30, y: kbModal.area.y + 1 }]);
+    ok('លក្ខខណ្ឌ ៖ ប្រអប់បើក · textarea focus · body.modal-keyboard · កាតរមូរមិនបាន', kbModal.cls && kbModal.focused && !kbModal.boxRoom, kbModal);
+    ok('ប្រអប់ + keyboard ➜ ផ្ទៃខាងក្រោយ (.modal) ៖ WebKit ហាមអូស Y (touch-action none)', !!kbModalTouch.backdrop && kbModalTouch.backdrop.preventsPanY === true, kbModalTouch.backdrop);
+    ok('⛔ ប្រអប់ + keyboard ➜ អូសលើផ្ទៃខាងក្រោយ · កាត · textarea (គ្មានកន្លែង) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (ទំព័រមិនរំកិល)',
+        [mBackdrop, mBox, mArea].every((g) => g.firstPrevented === true && g.nativePan === false && !g.reloaded), { mBackdrop, mBox, mArea });
+    ok('ទិសផ្ទុយ ៖ អូសផ្ដេកក្នុង textarea ➜ មិនចាប់ (ទស្សន៍ទ្រនិច)', mAreaSide.prevented === 0, mAreaSide);
+    const kbModalLong = await page.evaluate(async () => {
+        const area = document.getElementById('batchBarcodeInput');
+        const lines = [];
+        for (let i = 0; i < 80; i++) lines.push('7710000' + String(10000 + i));
+        area.value = lines.join('\n');
+        area.scrollTop = 0;
+        await new Promise((r) => setTimeout(r, 120));
+        return { room: area.scrollHeight > area.clientHeight + 1 };
+    });
+    const mAreaLong = await modalDrag('#batchBarcodeInput', kbModal.area, upFrom(kbModal.area.y));
+    ok('ទិសផ្ទុយ ៖ textarea វែង (មានកន្លែង) ➜ មិនចាប់ (textarea រមូរក្នុងខ្លួន)', kbModalLong.room && mAreaLong.firstPrevented === false, { room: kbModalLong, drag: mAreaLong });
+    await page.evaluate(async () => {
+        window.uiState.modalViewportHeight = 0;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const mClosed = await modalDrag('#batchScanModal', { x: 6, y: Math.round(kbModal.height / 2) }, upFrom(Math.round(kbModal.height / 2)));
+    ok('ទិសផ្ទុយ ៖ keyboard បិទ (គ្មាន body.modal-keyboard) ➜ មិនចាប់', mClosed.prevented === 0, mClosed);
+    await page.evaluate(async () => {
+        const area = document.getElementById('batchBarcodeInput');
+        area.value = '';
+        area.blur();
+        window.closeModal('batchScanModal');
+        await new Promise((r) => setTimeout(r, 300));
+    });
     await resetState();
 
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');

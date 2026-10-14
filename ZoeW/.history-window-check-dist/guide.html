@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#E31837">
+    <meta name="description" content="សៀវភៅណែនាំផ្លូវការសម្រាប់កម្មវិធី ZoeW">
+    <title>សៀវភៅណែនាំ ZoeW</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --brand: #E31837;
+            --primary: #0066FF;
+            --danger: #E61F26;
+            --collected: #15803D;
+            --pending: #B45309;
+            --total: #6D28D9;
+            --ink: #172033;
+            --muted: #5E6B7D;
+            --line: #DCE3EC;
+            --paper: #FFFFFF;
+            --canvas: #F5F7FA;
+            --soft-blue: #EAF2FF;
+            --soft-green: #ECFDF3;
+            --soft-amber: #FFF8E7;
+            --soft-red: #FFF0F1;
+            --soft-purple: #F4F0FF;
+            --radius: 14px;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background: var(--canvas);
+            color: var(--ink);
+            font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
+            font-size: 16px;
+            line-height: 1.75;
+        }
+        a { color: #0054D6; text-underline-offset: 3px; }
+        a:hover { color: #003D99; }
+        :focus-visible { outline: 3px solid #F59E0B; outline-offset: 3px; border-radius: 4px; }
+        .skip-link {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            z-index: 20;
+            transform: translateY(-160%);
+            padding: 9px 12px;
+            border-radius: 8px;
+            background: var(--ink);
+            color: #FFFFFF;
+        }
+        .skip-link:focus { transform: translateY(0); }
+        .topbar {
+            background: var(--brand);
+            color: #FFFFFF;
+            padding: max(10px, env(safe-area-inset-top)) 18px 10px;
+        }
+        .topbar-inner, .hero, .layout, .footer-inner { width: min(1160px, 100%); margin: 0 auto; }
+        .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+        .brand-mark {
+            display: block;
+            flex: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 22%;
+            box-shadow: 0 0 0 2px rgba(255,255,255,.85);
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 40px;
+            padding: 7px 12px;
+            border: 1px solid rgba(255,255,255,.55);
+            border-radius: 999px;
+            color: #FFFFFF;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .hero { padding: 40px 20px 24px; }
+        .eyebrow { color: var(--brand); font-weight: 800; letter-spacing: .02em; }
+        h1 { max-width: 820px; margin: 4px 0 10px; font-size: clamp(30px, 6vw, 52px); line-height: 1.25; }
+        .lead { max-width: 820px; margin: 0; color: var(--muted); font-size: clamp(17px, 2.4vw, 21px); }
+        .quick-note {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .quick-note article { padding: 15px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+        .quick-note strong { display: block; margin-bottom: 2px; }
+        .quick-note span { color: var(--muted); font-size: 14px; }
+        .layout { display: grid; grid-template-columns: 265px minmax(0, 1fr); gap: 22px; padding: 0 20px 48px; align-items: start; }
+        .toc {
+            position: sticky;
+            top: 14px;
+            max-height: calc(100vh - 28px);
+            overflow: auto;
+            padding: 15px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--paper);
+        }
+        .toc strong { display: block; margin-bottom: 8px; }
+        .toc ol { margin: 0; padding-left: 24px; }
+        .toc li { margin: 4px 0; }
+        .toc a { color: var(--ink); text-decoration: none; font-size: 14px; }
+        .toc a:hover { color: var(--primary); text-decoration: underline; }
+        main { min-width: 0; }
+        section {
+            scroll-margin-top: 16px;
+            margin-bottom: 18px;
+            padding: clamp(18px, 4vw, 30px);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--paper);
+            box-shadow: 0 4px 18px rgba(23,32,51,.045);
+        }
+        h2 { margin: 0 0 12px; font-size: clamp(22px, 4vw, 30px); line-height: 1.4; }
+        h3 { margin: 22px 0 8px; font-size: 19px; line-height: 1.5; }
+        p { margin: 8px 0; }
+        ul, ol { padding-left: 26px; }
+        li + li { margin-top: 5px; }
+        .callout { margin: 15px 0; padding: 13px 15px; border-left: 5px solid var(--primary); border-radius: 9px; background: var(--soft-blue); }
+        .callout.warning { border-color: var(--pending); background: var(--soft-amber); }
+        .callout.danger { border-color: var(--danger); background: var(--soft-red); }
+        .callout.success { border-color: var(--collected); background: var(--soft-green); }
+        .steps { counter-reset: step; list-style: none; padding: 0; }
+        .steps > li { position: relative; min-height: 42px; padding-left: 50px; }
+        .steps > li::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #FFFFFF;
+            font-weight: 800;
+        }
+        .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; background: #FFFFFF; }
+        th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+        th { background: #F0F4F8; font-size: 14px; }
+        tr:last-child td { border-bottom: 0; }
+        code, kbd { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+        code { padding: 2px 6px; border-radius: 5px; background: #EEF2F7; overflow-wrap: anywhere; }
+        kbd { padding: 2px 6px; border: 1px solid #BFC9D6; border-bottom-width: 2px; border-radius: 5px; background: #FFFFFF; }
+        .palette { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+        .swatch { padding: 14px; border-radius: 10px; color: #FFFFFF; font-weight: 800; }
+        .swatch small { display: block; color: inherit; opacity: .88; font-weight: 600; }
+        .collected { background: var(--collected); }
+        .pending { background: var(--pending); }
+        .total { background: var(--total); }
+        .action { background: var(--primary); }
+        .destructive { background: var(--danger); }
+        .neutral { background: #64748B; }
+        .equation { padding: 16px; border: 1px solid #DDD6FE; border-radius: 10px; background: var(--soft-purple); color: #4C1D95; font-size: 18px; font-weight: 800; text-align: center; }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding-left: 28px; position: relative; }
+        .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--collected); font-weight: 900; }
+        details { margin: 10px 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: #FAFBFD; }
+        summary { cursor: pointer; font-weight: 800; }
+        footer { padding: 26px 20px calc(26px + env(safe-area-inset-bottom)); background: #162033; color: #D7DFEA; }
+        footer a { color: #FFFFFF; }
+        .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        @media (max-width: 820px) {
+            .layout { grid-template-columns: 1fr; }
+            .toc { position: static; max-height: none; }
+            .quick-note, .palette { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 520px) {
+            body { font-size: 15px; }
+            .topbar-inner { align-items: flex-start; }
+            .back-link { padding: 6px 9px; font-size: 13px; }
+            .hero { padding-top: 26px; }
+            .layout, .hero { padding-left: 12px; padding-right: 12px; }
+            section { padding: 17px 14px; }
+            th, td { min-width: 130px; padding: 9px; }
+        }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+        @media print {
+            body { background: #FFFFFF; color: #000000; font-size: 11pt; }
+            .topbar, .toc, .skip-link, footer { display: none; }
+            .hero, .layout { width: 100%; padding: 0; display: block; }
+            .hero { margin-bottom: 18px; }
+            section { break-inside: avoid; box-shadow: none; border-color: #B8B8B8; margin-bottom: 10px; }
+            a { color: #000000; text-decoration: none; }
+            .table-wrap { overflow: visible; }
+        }
+    </style>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">រំលងទៅមាតិកាសំខាន់</a>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand"><svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><linearGradient id="guideLogoBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e31837"/><stop offset="1" stop-color="#c3122d"/></linearGradient><linearGradient id="guideLogoLeft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdebec"/><stop offset="1" stop-color="#fce4e6"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#guideLogoBg)"/><g stroke-width="8" stroke-linejoin="round"><path d="M256 162 L363 217 L256 272 L149 217 Z" fill="#fffcfc" stroke="#fffcfc"/><path d="M149 217 L256 272 L256 388 L149 333 Z" fill="url(#guideLogoLeft)" stroke="url(#guideLogoLeft)"/><path d="M256 272 L363 217 L363 333 L256 388 Z" fill="#fce0e2" stroke="#fce0e2"/><path d="M256 269 L256 392" stroke="#e31837" stroke-width="10" stroke-linecap="round" fill="none"/></g></svg><span>ZoeW · ឯកសារផ្លូវការ</span></div>
+            <a class="back-link" href="./index.html">← ត្រឡប់ទៅ App</a>
+        </div>
+    </header>
+
+    <div class="hero">
+        <div class="eyebrow">សៀវភៅណែនាំអ្នកប្រើប្រាស់</div>
+        <h1>របៀបប្រើ ZoeW ឲ្យបានត្រឹមត្រូវ និងមានសុវត្ថិភាព</h1>
+        <p class="lead">ចាប់ពីការដំឡើង ការស្កេន ការគ្រប់គ្រង Locker និងទឹកប្រាក់ រហូតដល់របាយការណ៍ ការបម្រុងទុក និងការដោះស្រាយបញ្ហា។</p>
+        <div class="quick-note">
+            <article><strong>📱 PWA</strong><span>ដំឡើងដូច App និងដំណើរការក្រៅបណ្ដាញ</span></article>
+            <article><strong>🔐 ទិន្នន័យពិត</strong><span>Firebase Authentication + Security PIN + ជីវមាត្រ</span></article>
+            <article><strong>💵 ទឹកប្រាក់ត្រឹមត្រូវ</strong><span>យករួច មិនទាន់យក និងសរុបទាំងអស់បែងចែកច្បាស់</span></article>
+        </div>
+    </div>
+
+    <div class="layout">
+        <nav class="toc" aria-label="មាតិកាសៀវភៅណែនាំ">
+            <strong>មាតិកា</strong>
+            <ol>
+                <li><a href="#overview">ស្គាល់ ZoeW</a></li>
+                <li><a href="#getting-started">ចាប់ផ្ដើម និងដំឡើង</a></li>
+                <li><a href="#setup">Activation និង Firebase</a></li>
+                <li><a href="#shop-account">គណនីហាង (កូដអញ្ជើញ)</a></li>
+                <li><a href="#security">ចូលប្រព័ន្ធ និងសុវត្ថិភាព</a></li>
+                <li><a href="#interface">ផ្នែកនៃ App</a></li>
+                <li><a href="#scan">ការស្កេនកញ្ចប់</a></li>
+                <li><a href="#locker">ទីតាំង Locker</a></li>
+                <li><a href="#records">ស្វែងរក និងគ្រប់គ្រង</a></li>
+                <li><a href="#pickup">បិទ បើក និងយករួច</a></li>
+                <li><a href="#money">ទឹកប្រាក់ COD/DOD</a></li>
+                <li><a href="#statistics">ស្ថិតិ និងរបាយការណ៍</a></li>
+                <li><a href="#edit-delete">កែ ដក លុប និងស្តារ</a></li>
+                <li><a href="#import-export">Import និង Export</a></li>
+                <li><a href="#lookup">Lookup និង ZTO</a></li>
+                <li><a href="#zto-list">ទាញបញ្ជីកញ្ចប់ពី ZTO</a></li>
+                <li><a href="#offline">Offline និង Update</a></li>
+                <li><a href="#android">App Android</a></li>
+                <li><a href="#backup">Backup និងឯកជនភាព</a></li>
+                <li><a href="#health">ពិនិត្យសុខភាព</a></li>
+                <li><a href="#troubleshooting">ដោះស្រាយបញ្ហា</a></li>
+                <li><a href="#checklist">បញ្ជីត្រួតពិនិត្យ</a></li>
+            </ol>
+        </nav>
+
+        <main id="main-content">
+            <section id="overview">
+                <h2>១. ស្គាល់ ZoeW</h2>
+                <p>ZoeW ជា PWA សម្រាប់គ្រប់គ្រងកញ្ចប់អីវ៉ាន់ អតិថិជន ទីតាំង Locker ទឹកប្រាក់ និងស្ថិតិអាជីវកម្ម។ ទិន្នន័យសំខាន់រក្សាទុកក្នុង Firebase Realtime Database ហើយ App អាចដំឡើងលើ Android, iPhone, tablet និង desktop។</p>
+                <div class="callout"><strong>ប្រភពលេខកំណែ៖</strong> លេខកំណែដែលបង្ហាញក្នុងប្រអប់ Login និងខាងក្រោមរបា Slide ជាលេខពិតរបស់ ZoeW។ ចុចលើលេខនោះដើម្បីបើកសៀវភៅនេះ។</div>
+                <h3>ពាក្យសំខាន់</h3>
+                <ul>
+                    <li><strong>កញ្ចប់</strong> អាចមាន Barcode មួយ ឬច្រើន ហើយភ្ជាប់លេខទូរស័ព្ទតែមួយ។</li>
+                    <li><strong>COD</strong> និង <strong>DOD</strong> ជាទឹកប្រាក់ពីរប្រភេទដែល App កត់ត្រាដាច់ដោយឡែក។</li>
+                    <li><strong>យករួច</strong> មានន័យថា Barcode ត្រូវបានបិទដោយសារអតិថិជនមកយក។</li>
+                    <li><strong>មិនទាន់យក</strong> ជា Barcode ដែលនៅរង់ចាំ និងមិនទាន់ត្រូវរាប់ជាចំណូល។</li>
+                </ul>
+            </section>
+
+            <section id="getting-started">
+                <h2>២. ចាប់ផ្ដើម និងដំឡើង</h2>
+                <ol class="steps">
+                    <li><strong>បើក URL ផ្លូវការ</strong><br>ប្រើ Chrome, Edge ឬ Safari កំណែថ្មី។ កុំប្រើ URL ដែលផ្ញើពីប្រភពមិនស្គាល់។</li>
+                    <li><strong>ដាក់ Activation Key</strong><br>ការផ្ទៀងផ្ទាត់លើកដំបូងត្រូវការអ៊ីនធឺណិត។ ហាងដែលចូលប្រើដោយ <a href="#shop-account">កូដអញ្ជើញ</a> ➜ មើលផ្នែក ៣ខ។</li>
+                    <li><strong>កំណត់ Firebase និងចូលប្រព័ន្ធ</strong><br>ប្រើ Setup Link/QR ឬបញ្ចូល Config ដោយដៃ រួចចូលដោយគណនី Firebase។</li>
+                    <li><strong>កំណត់ Security PIN</strong><br>PIN ការពារសកម្មភាពសំខាន់ និងអ៊ិនគ្រីបការកំណត់រសើបលើឧបករណ៍។</li>
+                    <li><strong>ដំឡើងជា PWA</strong><br>Android/Chrome៖ ម៉ឺនុយ browser → Install app។ iPhone/Safari៖ Share → Add to Home Screen។ ឬប្រើ <a href="#android">App Android</a> ដែលអ្នកលក់ផ្ញើជាឯកសារ APK។</li>
+                </ol>
+                <div class="callout warning"><strong>កុំលុប browser data ដោយមិនចាំបាច់។</strong> វាអាចលុប Activation, PIN, cache Offline និងការកំណត់ដែលរក្សាទុកលើឧបករណ៍។ ទិន្នន័យក្នុង Firebase មិនត្រូវលុបតាមទេ។</div>
+            </section>
+
+            <section id="setup">
+                <h2>៣. Activation និង Firebase</h2>
+                <h3>ចំនួនឧបករណ៍ក្នុង Activation Key ១</h3>
+                <p>Activation Key ១ ប្រើបានតាម <strong>ចំនួនឧបករណ៍ដែលអ្នកលក់កំណត់</strong> (លំនាំដើម ១ ឧបករណ៍ អតិបរមា ៥)។ ឧបករណ៍នីមួយៗកក់កៅអី ១ នៅពេល Activate ដំបូង ហើយកៅអីនោះនៅជាប់នឹងឧបករណ៍នោះ។</p>
+                <ul>
+                    <li>ឧបករណ៍ដដែល Activate ម្ដងទៀត <strong>មិនស៊ីកៅអីថ្មី</strong>។</li>
+                    <li>សារ <strong>«Key នេះប្រើគ្រប់ចំនួនឧបករណ៍ដែលអនុញ្ញាតហើយ!»</strong> មានន័យថាកៅអីអស់ ➜ សុំអ្នកលក់ចុច <strong>📱 ចំនួនឧបករណ៍</strong> ដើម្បីបន្ថែម ឬ <strong>🔓 ដោះឧបករណ៍</strong> ដើម្បីដោះឧបករណ៍ចាស់ចេញ។</li>
+                    <li>ប្ដូរទូរស័ព្ទ ឬលុប browser data ➜ ឧបករណ៍ក្លាយជាឧបករណ៍ថ្មី ➜ ត្រូវការកៅអីទំនេរ។ សុំ <strong>🔓 ដោះឧបករណ៍</strong> ជាមុន។</li>
+                    <li>សារ <strong>«សម្គាល់ឧបករណ៍នេះមិនបានទេ!»</strong> មានន័យថា Storage របស់ Browser ត្រូវបានបិទ ➜ បើក Cookie/Storage រួចសាកម្ដងទៀត។</li>
+                    <li><strong>ស្គាល់ទូរស័ព្ទ</strong> ៖ ☰ (ខាងក្រោម) និង <a href="#health">🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</a> បង្ហាញ <strong>model · កំណែប្រព័ន្ធ</strong> និង <strong>Serial</strong> ៖ App Android = Android ID · PWA/iPhone = ID App ១៦ តួ (iPhone បង្ហាញត្រឹម «iPhone» និងកំណែ iOS ព្រោះ Safari មិនប្រាប់ model)។ ZoeW ផ្ញើវាទៅកៅអីក្នុង Key ពេលពិនិត្យ Key ➜ អ្នកលក់ឃើញក្នុង ZoeKeyGen ថាកៅអីណាជាទូរស័ព្ទណា ➜ ពេលសុំ <strong>🔓 ដោះឧបករណ៍</strong> សូមអាន Serial ឲ្យអ្នកលក់។ ហាង Supabase (គ្មាន Key) ៖ ZoeW ផ្ញើវាទៅហាងពេលគណនីចូល ➜ អ្នកលក់ឃើញបញ្ជីទូរស័ព្ទរបស់ហាងក្នុង ZoeKeyGen។</li>
+                </ul>
+                <div class="callout warning"><strong>iPhone ៖</strong> App ដែលដំឡើងលើអេក្រង់ដើម និង Safari ធម្មតា ប្រើ Storage <strong>ដាច់ពីគ្នា</strong> ➜ ពួកវារាប់ជាឧបករណ៍ ២ ផ្សេងគ្នា។ សូម <strong>ដំឡើងជា PWA មុន</strong> រួចទើប Activate។</div>
+                <h3>Setup Link/QR</h3>
+                <ol>
+                    <li>ទទួល Setup Link ឬ QR ពី ZoeKeyGen ដែលទុកចិត្តបាន។ មិនទាន់មានគណនី ឬ Setup Link ➜ ចុចតំណ <strong>@mengsroyhun</strong> ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ដើម្បីទាក់ទងបង្កើតគណនីតាម Telegram។</li>
+                    <li>បើក link នោះ ឬនៅ ZoeW ចូលរបា Slide → <strong>Config / Reconfig</strong> → ប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> ហើយជ្រើសមួយ ៖ <strong>📷 ស្កេន QR (Setup Link)</strong> ដោយកាមេរ៉ា · <strong>🖼️ QR ពីរូបភាព</strong> (រូបថតអេក្រង់ QR ដែលទទួលតាម chat) · ឬបិទភ្ជាប់ Link ក្នុងវាល <strong>Setup Link</strong> រួចចុច <strong>ប្រើ Link</strong>។</li>
+                    <li>វាយ Security PIN — មិនទាន់មាន PIN ➜ App ឲ្យបង្កើត PIN ថ្មីមុន។</li>
+                    <li>ស្កេន QR ឬបិទភ្ជាប់ Link ត្រឹមត្រូវ ➜ App រក្សាទុក ហើយភ្ជាប់ Server ភ្លាម។ បើក Link ពីសារ ➜ ប្រអប់បង្ហាញ Server ដែលនឹងភ្ជាប់ ➜ ពិនិត្យ ហើយចុច <strong>✅ ភ្ជាប់</strong>។</li>
+                    <li>រង់ចាំស្ថានភាពបង្ហាញថា «ភ្ជាប់ Server រួចរាល់»។</li>
+                </ol>
+                <h3>បញ្ចូល Config ដោយដៃ</h3>
+                <p>ក្នុងប្រអប់ <strong>⚙️ ភ្ជាប់ប្រព័ន្ធ</strong> បើក switch <strong>✍️ បំពេញ Config ដោយដៃ</strong> ជ្រើសប្រភេទ Server ហើយចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ៖</p>
+                <ul>
+                    <li><strong>Firebase</strong> ៖ ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</li>
+                    <li><strong>Supabase</strong> ៖ បំពេញ <strong>Project URL</strong> (<code>https://….supabase.co</code>) និង <strong>Publishable key</strong> (<code>sb_publishable_…</code>) ពី Supabase → Project Settings → API។ ⛔ App បដិសេធ Secret key (<code>sb_secret_…</code>)។</li>
+                </ul>
+                <div class="callout danger"><strong>សុវត្ថិភាព៖</strong> Firebase Config មិនមែនជាពាក្យសម្ងាត់ ប៉ុន្តែ Database Rules និង Authentication ត្រូវតែកំណត់ត្រឹមត្រូវ។ កុំផ្ញើ PIN, ពាក្យសម្ងាត់ ឬ API secret ក្នុង chat ឬ screenshot។</div>
+            </section>
+
+            <section id="shop-account">
+                <h2>៣ខ. គណនីហាង ៖ ចុះឈ្មោះដោយកូដអញ្ជើញ</h2>
+                <p>ហាងដែលអ្នកលក់បង្កើតក្នុង <strong>ប្រព័ន្ធរួម (Supabase)</strong> ចូលប្រើដោយ <strong>កូដអញ្ជើញ</strong> ៖ អ្នកចុះឈ្មោះដោយខ្លួនឯង ហើយគណនីចងនឹងហាង និងលេខសាខា ZTO របស់ហាងដោយស្វ័យប្រវត្តិ។</p>
+                <h3>ម្ចាស់ហាងចុះឈ្មោះលើកដំបូង</h3>
+                <ol class="steps">
+                    <li><strong>បើក Setup Link ឬស្កេន QR</strong> ដែលអ្នកលក់ផ្ញើ (Link ផ្ទុកកូដអញ្ជើញ)។</li>
+                    <li><strong>វាយ Security PIN</strong> (មិនទាន់មាន ➜ បង្កើតថ្មី) ពិនិត្យ Server លើកាត Setup Link រួចចុច <strong>✅ ភ្ជាប់</strong> (ស្កេន QR ក្នុងប្រអប់ ⚙️ ភ្ជាប់ប្រព័ន្ធ ➜ ភ្ជាប់ភ្លាម)។ កាតបង្ហាញ ⚠️ ពេល Server មិននៅលើ domain ផ្លូវការរបស់ Supabase ឬ Firebase។</li>
+                    <li>App ពិនិត្យកូដអញ្ជើញជាមួយ Server ➜ កូដនៅប្រើបាន ➜ ប្រអប់ <strong>📝 ចុះឈ្មោះ</strong> លេចដោយស្វ័យប្រវត្តិ (កូដបំពេញរួច)។ កូដប្រើរួច ឬផុត ➜ App បង្ហាញប្រអប់ <strong>ចូលប្រព័ន្ធ</strong> ជំនួស (ហាងនោះមានគណនីរួច)។</li>
+                    <li>ជ្រើស <strong>ឈ្មោះគណនី</strong> (៣–៣២ តួ ៖ a–z · 0–9 · <code>.</code> · <code>_</code>) និង <strong>ពាក្យសម្ងាត់</strong> យ៉ាងតិច ៨ តួ (វាយ ២ ដង) ➜ <strong>ចុះឈ្មោះ</strong> ➜ App ចូលប្រព័ន្ធភ្លាម។</li>
+                </ol>
+                <div class="callout warning"><strong>កូដអញ្ជើញប្រើបានតែ ១ ដង</strong> ហើយផុតកំណត់ក្នុង ៧ ថ្ងៃ។ កូដខុស ប្រើរួច ឬផុត ➜ សុំកូដថ្មីពីអ្នកលក់។</div>
+                <p>បណ្តាញយឺតពេលចុះឈ្មោះ ហើយ App ប្រាប់ «មិនដឹងថាការចុះឈ្មោះបានសម្រេចឬអត់» ➜ សាក <strong>ចូលប្រព័ន្ធ</strong> ដោយឈ្មោះគណនី និងពាក្យសម្ងាត់ដដែលជាមុន ឬចុច <strong>ចុះឈ្មោះ</strong> ម្ដងទៀតដោយកូដ ឈ្មោះគណនី និងពាក្យសម្ងាត់ដដែល ➜ គណនីដែលបានចុះឈ្មោះរួចចូលប្រព័ន្ធបានធម្មតា (កូដមិនស៊ីម្ដងទៀតទេ)។</p>
+                <h3>បុគ្គលិក និងឧបករណ៍ផ្សេង</h3>
+                <ul>
+                    <li>បុគ្គលិកម្នាក់ៗមានគណនីផ្ទាល់ខ្លួន ៖ សុំ <strong>កូដអញ្ជើញបុគ្គលិក</strong> ពីអ្នកលក់ ➜ ចុះឈ្មោះលើឧបករណ៍របស់គេ ដូចជំហានខាងលើ។</li>
+                    <li>ឧបករណ៍ទី ២ របស់គណនីដដែល ឬ Reconfig ដោយ Setup Link ដដែល ៖ កូដក្នុង Link ប្រើរួច ➜ App បើកប្រអប់ <strong>ចូលប្រព័ន្ធ</strong> ភ្លាម ➜ ចូលដោយឈ្មោះគណនី និងពាក្យសម្ងាត់ (មិនបាច់ចុះឈ្មោះម្ដងទៀតទេ)។</li>
+                    <li>ការ Login ប្រចាំថ្ងៃប្រើ <strong>ឈ្មោះគណនី</strong> មិនមែនអ៊ីមែល។ «ចងចាំគណនី» ចងនឹងប្រព័ន្ធ (Firebase/Supabase) និង Project នីមួយៗ ➜ App បំពេញតែឈ្មោះគណនីរបស់ប្រព័ន្ធដែលកំពុងភ្ជាប់។</li>
+                    <li>ប្រអប់ចូលប្រព័ន្ធ ចុះឈ្មោះ និងប្តូរពាក្យសម្ងាត់ ស្គាល់ <strong>Google Password Manager</strong> និង <strong>iOS Passwords</strong> ៖ ចូលជោគជ័យ ➜ browser សួររក្សាពាក្យសម្ងាត់ ➜ លើកក្រោយចុចប្រអប់ឈ្មោះគណនី ➜ ជ្រើសគណនី។</li>
+                    <li>«ចងចាំពាក្យសម្ងាត់លើឧបករណ៍នេះ» (ធីករួចជាលំនាំដើម · ត្រូវការ «ចងចាំគណនី» ផង) ៖ ក្រោយចូលជោគជ័យ App រក្សាពាក្យសម្ងាត់ជាអក្សរកូដលើឧបករណ៍នេះ ➜ ពេលផុត ៤ ម៉ោង ប្រអប់ចូលបំពេញពាក្យសម្ងាត់ឲ្យ (អ្នកនៅចុច <strong>ចូលប្រព័ន្ធ</strong> ខ្លួនឯង)។ ដកធីក ➜ លុបពាក្យសម្ងាត់ដែលចងចាំភ្លាម។ ចាកចេញ ឬប្ដូរពាក្យសម្ងាត់ ➜ លុបដូចគ្នា។ ឧបករណ៍ប្រើរួមគ្នា ៖ គួរដកធីក។</li>
+                </ul>
+                <h3>ភ្លេចពាក្យសម្ងាត់</h3>
+                <ol>
+                    <li>សុំ <strong>កូដប្ដូរពាក្យសម្ងាត់</strong> ពីអ្នកលក់ (ប្រើបាន ១ ដង · ២៤ ម៉ោង)។</li>
+                    <li>ប្រអប់ចូលប្រព័ន្ធ ➜ <strong>🔑 ភ្លេចពាក្យសម្ងាត់?</strong> ➜ ឈ្មោះគណនី · កូដ · ពាក្យសម្ងាត់ថ្មី (២ ដង)។</li>
+                    <li>ឧបករណ៍ផ្សេងដែលចូលដោយពាក្យសម្ងាត់ចាស់ត្រូវចាកចេញ (យឺតបំផុតពេលវគ្គរបស់វាផុត) ➜ ចូលវិញដោយពាក្យសម្ងាត់ថ្មី។</li>
+                </ol>
+                <h3>ហាងផុតកំណត់ ឬត្រូវបានបិទ</h3>
+                <p>គណនីទាំងអស់របស់ហាងចាកចេញ ហើយចូលមិនបាន រហូតដល់អ្នកលក់ពន្យារ ឬបើកហាងវិញ។ ទិន្នន័យកញ្ចប់ <strong>មិនត្រូវលុប</strong> ទេ។ ស្ថានភាពហាង (ឈ្មោះ · សាខា · ថ្ងៃផុត) មើលបានក្នុង <a href="#health">🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</a> ជួរ <strong>ហាង (Supabase)</strong>។</p>
+            </section>
+
+            <section id="security">
+                <h2>៤. ចូលប្រព័ន្ធ និងសុវត្ថិភាព</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ស្រទាប់</th><th>តួនាទី</th><th>ត្រូវចាំ</th></tr></thead>
+                        <tbody>
+                            <tr><td>Activation Key</td><td>អនុញ្ញាតឧបករណ៍ប្រើ ZoeW</td><td>Offline អនុគ្រោះបានរហូតដល់ ៣ ថ្ងៃតាមគោលការណ៍អាជ្ញាប័ណ្ណ</td></tr>
+                            <tr><td>Firebase Login</td><td>ការពារទិន្នន័យ server</td><td>វគ្គចូលប្រព័ន្ធមានរយៈពេលកំណត់</td></tr>
+                            <tr><td>Security PIN</td><td>ការពារមុខងាររសើប និងបង្កើតកូនសោអ៊ិនគ្រីប</td><td>ខុស ៥ ដង ចាក់សោ ១ នាទី</td></tr>
+                            <tr><td>ក្រយៅដៃ/មុខ</td><td>ដោះសោ PIN ឲ្យលឿន</td><td>ជាជម្រើសបន្ថែម មិនមែនជំនួស PIN ទេ</td></tr>
+                            <tr><td>🔒 ចាក់សោពេលបើក App</td><td>បាំងអេក្រង់ពេលបើក App ឬពេលត្រឡប់មកវិញ</td><td>ស្រទាប់ចូលប្រើលើឧបករណ៍ — <strong>មិនកាត់វគ្គចូលប្រព័ន្ធទេ</strong></td></tr>
+                            <tr><td>🔐 ចូលដោយក្រយៅដៃ ឬមុខ</td><td>ដោះសោ PIN ដោយជីវមាត្រ</td><td>ត្រូវវាយ PIN ពិតម្ដងជាមុនសិន · web ត្រូវការឧបករណ៍ដែលការពារ PIN ដោយស្នាមម្រាមដៃ/មុខ (WebAuthn PRF ៖ passkey ក្នុង iCloud Keychain ឬ Google Password Manager) · ឧបករណ៍ផ្សេងប្រើ PIN · App Android ប្រើក្រយៅដៃរបស់ទូរស័ព្ទ</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>ពេលបើក App ក្នុងវគ្គថ្មី ឬត្រឡប់ពី App ផ្សេង អេក្រង់សោអាចបង្ហាញ។ វាយ PIN ឬប្រើជីវមាត្រ។ Refresh ក្នុងវគ្គដដែលមិនគួរសុំ PIN ម្ដងទៀត។</p>
+                <p>កុងតាក់ទាំង ២ ខាងលើរស់នៅក្នុង <strong>⚙️ របា Slide</strong> ➜ <strong>🔒 ចាក់សោពេលបើក App</strong> និង <strong>🔐 ចូលដោយក្រយៅដៃ ឬមុខ</strong>។</p>
+                <p>ការបើក និងការបិទ <strong>🔒 ចាក់សោពេលបើក App</strong> ធ្វើនៅកុងតាក់ដដែល ៖ ចុចវា រួចវាយ PIN។ ស្លាកខាងស្ដាំរាយស្ថានភាពបច្ចុប្បន្ន — <strong>បើក</strong> · <strong>បិទ</strong> ឬ <strong>ត្រូវកំណត់ PIN</strong>។ ការបិទសោ <strong>មិនលុប Security PIN</strong> និងមិនកាត់វគ្គចូលប្រព័ន្ធទេ — មុខងារដែលការពារដោយ PIN នៅដំណើរការដដែល។</p>
+                <div class="callout warning"><strong>ភ្លេច PIN?</strong> មុខងារនេះលុប PIN និងការចងជីវមាត្រលើឧបករណ៍ រួចចាកចេញ។ ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ត្រូវកំណត់ឡើងវិញ។</div>
+            </section>
+
+            <section id="interface">
+                <h2>៥. ផ្នែកនៃ App</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ផ្នែក</th><th>អ្វីដែលមាន</th></tr></thead>
+                        <tbody>
+                            <tr><td>ទិន្នន័យ</td><td>កញ្ចប់នៅសល់ ស្កេនតាមថ្ងៃ អតិថិជនយក ទឹកប្រាក់ តម្រង និងតារាងប្រវត្តិ</td></tr>
+                            <tr><td>ស្កេន</td><td>របៀបបញ្ចូលកញ្ចប់/Locker/ដកកញ្ចប់ កាមេរ៉ា hardware scanner រូបភាព និងវាយ Barcode</td></tr>
+                            <tr><td>របា Slide</td><td>Firebase, Lookup API, តារាងអតិថិជន, Locker, Google Sheet, Health Check, PIN, ជីវមាត្រ និង Login</td></tr>
+                            <tr><td>ម៉ឺនុយ (…) </td><td>Export, របាយការណ៍ខែ, កែទឹកប្រាក់, អត្រាប្ដូរប្រាក់, ធុងសំរាម, Reset និងលុបទាំងអស់</td></tr>
+                            <tr><td>ជូនដំណឹង 🔔</td><td>ប៊ូតុងជ្រុងស្តាំខាងលើ បើកផ្ទាំងពីខាងស្តាំ ៖ កញ្ចប់ជិតផុតកំណត់ កញ្ចប់ដែលដករួច ព័ត៌មានកំណែ App សេចក្តីប្រកាស/ការថែទាំ ដំណឹងពីអ្នកលក់ និងស្លាក Powered By ZoeW</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="callout">ប្រអប់ដែលមានកន្លែងវាយអក្សរ ឬលេខ ៖ ពេល keyboard បើកបាំងផ្នែកខាងក្រោម ប្រអប់រំកិលឡើងនៅពីលើ keyboard ហើយកន្លែងដែលកំពុងវាយលេចឲ្យឃើញជានិច្ច។ ប្រអប់វែងរមូរនៅក្នុងខ្លួន។ បិទ keyboard ➜ ប្រអប់ត្រឡប់ទីតាំងដើម។</div>
+            </section>
+
+            <section id="scan">
+                <h2>៦. ការស្កេនកញ្ចប់</h2>
+                <h3>ជ្រើសរបៀបស្កេន ៣</h3>
+                <ul>
+                    <li><strong>បញ្ចូលកញ្ចប់</strong>៖ សម្រាប់កញ្ចប់ថ្មី។</li>
+                    <li><strong>កំណត់ទីតាំង Locker</strong>៖ សម្រាប់ផ្លាស់ទីតាំង Barcode ដែលមានស្រាប់។</li>
+                    <li><strong>ស្កេនដកកញ្ចប់</strong>៖ សម្រាប់ដក Barcode ពិតចេញ និងកាត់ស្ថិតិម្តងគត់។</li>
+                </ul>
+                <h3>ផ្លូវបញ្ចូល ៤</h3>
+                <ul>
+                    <li><strong>កាមេរ៉ា</strong>៖ អនុញ្ញាតសិទ្ធិកាមេរ៉ា រក្សា Barcode ឲ្យនៅក្នុងស៊ុម ហើយរង់ចាំការបញ្ជាក់ពីរស៊ុម។</li>
+                    <li><strong>Hardware scanner</strong>៖ ដាក់ cursor ក្នុងប្រអប់ រួចស្កេនឲ្យឧបករណ៍បញ្ចូន Enter។</li>
+                    <li><strong>រូបភាព</strong>៖ ជ្រើសរូបច្បាស់ដែលមាន Barcode CODE-128 មួយ។</li>
+                    <li><strong>វាយដោយដៃ</strong>៖ វាយ Barcode ពេញ រួចចុច បញ្ជូន។</li>
+                </ul>
+                <h3>បញ្ចូល Barcode ច្រើនក្នុងពេលតែមួយ</h3>
+                <ol>
+                    <li>របៀប <strong>បញ្ចូលកញ្ចប់</strong> ➜ ចុច <strong>📋 បញ្ចូលច្រើន</strong> (ក្រោមប្រអប់ Hardware scanner)។</li>
+                    <li>ស្កេនដោយឧបករណ៍ ឬវាយ Barcode មួយជួរមួយ (១០–២០ ក៏បាន · ចន្លោះ ឬសញ្ញាក្បៀសក៏ញែកបាន) ➜ App រាប់ចំនួនឲ្យ។</li>
+                    <li>ចុច <strong>▶️ ចាប់ផ្តើម</strong> ➜ App បញ្ចូលម្តងមួយៗ ដូចស្កេនធម្មតា ៖ Lookup ស្វ័យប្រវត្តិ · Fast Mode រក្សាទុកដោយខ្លួនឯង · រកមិនឃើញ ➜ ផ្ទាំងបញ្ជាក់បើករង់ចាំអ្នកបំពេញ ឬរំលង រួចបន្តទៅ Barcode បន្ទាប់។</li>
+                    <li>បន្ទាត់ស្ថានភាព «📋 កំពុងបញ្ចូល N/M» បង្ហាញដំណើរការ · <strong>⏹️ បញ្ឈប់</strong> បញ្ចប់ក្រោយកញ្ចប់បច្ចុប្បន្ន · ចប់ ➜ សារសរុប (បញ្ចូល · មានរួច · រំលង)។</li>
+                </ol>
+                <h3>បំពេញទិន្នន័យក្រោយស្កេន</h3>
+                <ol>
+                    <li>ពិនិត្យ Barcode និងស្ថានភាព Lookup។</li>
+                    <li>បំពេញ ឬផ្ទៀងផ្ទាត់លេខទូរស័ព្ទ។</li>
+                    <li>ពិនិត្យទីតាំង Locker និងទឹកប្រាក់ COD/DOD។</li>
+                    <li>ចុច <strong>យល់ព្រម</strong> ដើម្បីរក្សាទុក។ ប្រសិនបើ Lookup រកមិនឃើញ ហើយអ្នកពិតជាចង់បន្តដោយគ្មានទិន្នន័យនោះ ចុច <strong>រំលង</strong>។</li>
+                </ol>
+                <h3>ដកកញ្ចប់ដោយស្កេន Barcode</h3>
+                <ol>
+                    <li>ជ្រើស <strong>ស្កេនដកកញ្ចប់</strong> ដែលមានពណ៌ក្រហម។</li>
+                    <li>ស្កេន Barcode តាមផ្លូវណាមួយក្នុងចំណោមផ្លូវ ៤ ខាងលើ។</li>
+                    <li>ផ្ទៀងផ្ទាត់ Barcode, លេខទូរស័ព្ទ, Locker, COD, DOD និងស្ថានភាពក្នុងផ្ទាំងបញ្ជាក់។</li>
+                    <li>ចុច <strong>បញ្ជាក់ដក</strong> តែម្តង។ ការដកប៉ះស្ថិតិភ្លាម ហើយការស្តារពីធុងសំរាមនឹងបូកត្រឡប់ម្តងគត់។</li>
+                </ol>
+                <div class="callout danger"><strong>របៀបដកមិនត្រូវបានចងចាំក្រោយ Refresh ទេ។</strong> App ត្រឡប់ទៅរបៀបបញ្ចូលកញ្ចប់ជានិច្ច ដើម្បីកុំឲ្យការស្កេនបន្ទាប់ដកដោយចៃដន្យ។ ការដក Barcode ធ្វើតាមរបៀប «ស្កេនដកកញ្ចប់» នេះ។</div>
+                <div class="palette" aria-label="ពណ៌ប៊ូតុង">
+                    <div class="swatch action">#0066FF<small>យល់ព្រម · រក្សាទុក · បិទ</small></div>
+                    <div class="swatch destructive">#E61F26<small>រំលង · បើកវិញ · លុប · បញ្ជាក់ដក</small></div>
+                    <div class="swatch neutral">ប្រផេះ<small>បោះបង់ · បិទផ្ទាំង</small></div>
+                </div>
+                <div class="callout warning">បើសារ Lookup នៅតែ «កំពុងស្វែងរក» អ្នកអាចវាយលេខបានក្រោយ ១.៨ វិនាទី។ ទិន្នន័យដែលអ្នកវាយដោយដៃមិនត្រូវឲ្យលទ្ធផលយឺតសរសេរជាន់ឡើយ។</div>
+            </section>
+
+            <section id="locker">
+                <h2>៧. កំណត់ទីតាំង Locker</h2>
+                <ol>
+                    <li>បើកទំព័រ ស្កេន។</li>
+                    <li>ជ្រើសរបៀប <strong>កំណត់ទីតាំង Locker</strong>។</li>
+                    <li>ជ្រើសទូបច្ចុប្បន្ន ឬបន្ថែមឈ្មោះទីតាំងថ្មី។</li>
+                    <li>ស្កេន Barcode ដែលត្រូវផ្លាស់ទៅទីតាំងនោះ។</li>
+                    <li>ពិនិត្យសារបញ្ជាក់។ បើទីតាំងចាស់មានរួច App នឹងព្រមានមុនផ្លាស់ទី។</li>
+                </ol>
+                <p>ពណ៌ស្វាយត្រូវបានប្រើសម្រាប់ទីតាំង Locker ដើម្បីកុំច្រឡំជាមួយទឹកប្រាក់ ឬសកម្មភាពគ្រោះថ្នាក់។</p>
+            </section>
+
+            <section id="records">
+                <h2>៨. ស្វែងរក និងគ្រប់គ្រងកំណត់ត្រា</h2>
+                <ul>
+                    <li>ប្រើតម្រង <strong>ថ្ងៃនេះ · ម្សិលមិញ · ម្សិលម្ងៃ · ទាំងអស់</strong> ឬជ្រើសថ្ងៃជាក់លាក់។</li>
+                    <li>តារាងបង្ហាញ <strong>៥០ ជួរថ្មីបំផុត</strong>មុន ហើយទាញ ៥០ ជួរទៀតដោយស្វ័យប្រវត្តិពេលរមូរជិតដល់ចុងក្រោម (ឬចុច <strong>«⬇️ បង្ហាញ … ជួរទៀត»</strong>)។ ចំនួនកញ្ចប់សរុបនៅក្បាលតារាងរាប់ទាំងអស់ · ប្តូរតម្រង ឬស្វែងរក ➜ ត្រឡប់ទៅ ៥០ ជួរដំបូងនៅកំពូលតារាង។</li>
+                    <li>ស្វែងរកតាមកន្ទុយលេខទូរស័ព្ទ ៣–៤ ខ្ទង់។ លើទូរស័ព្ទ ចុចប្រអប់ស្វែងរក ➜ ប្រអប់រអិលឡើងខាងលើ (keyboard មិនគ្របលទ្ធផល) ហើយបញ្ជីលេខស្នើធ្លាក់ចុះពេលប្រអប់ទៅដល់ · ចាកចេញពីប្រអប់ទទេ ➜ ត្រឡប់ចុះវិញ។ ប្រអប់ស្វែងរកក្នុងទំព័រស្កេន (បញ្ជីកញ្ចប់ · បញ្ជី Locker) ក៏ដូចគ្នា ៖ ផ្ទាំងស្កេនបង្រួម ហើយសារបញ្ជីទទេនៅក្រោមក្បាលតារាង ពីលើ keyboard ➜ ចាកចេញពីប្រអប់ទទេ ➜ ផ្ទាំងស្កេនបើកវិញ (ពេលកាមេរ៉ាកំពុងស្កេន ផ្ទាំងស្កេននៅបើក)។</li>
+                    <li>ចុច <strong>«កញ្ចប់សរុប: N»</strong> ក្នុងជួរដេក ដើម្បីមើល Barcode នីមួយៗក្នុងកញ្ចប់ (រួមទាំងប្រភពរបស់ Barcode នីមួយៗ)។</li>
+                    <li><strong>ប្រភពកញ្ចប់</strong> បង្ហាញក្រោមលេខទូរស័ព្ទ ពេលកញ្ចប់ចូលតាម «➕ បញ្ចូល» ពីបញ្ជី ZTO ៖ <strong>🇨🇳 ចិន</strong> (ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ) · <strong>🇻🇳 វៀតណាម</strong> (Shopee SHPE) · <strong>📍 ឈ្មោះ</strong> សម្រាប់កន្លែងផ្សេង · <strong>+N</strong> = Barcode ក្នុងជួរនោះមកពីប្រភពច្រើន។ កញ្ចប់ដែលស្កេនដោយដៃមិនមានប្រភព។</li>
+                    <li>ចុច 📞 ដើម្បីខល ហើយសម្គាល់ អត់លើក, អត់ចូល ឬខុសលេខតាមស្ថានភាពពិត។</li>
+                    <li>ប្រើម៉ឺនុយ ⋮ ក្នុងជួរ ដើម្បីកែលេខ កែតម្លៃ Barcode ឬលុបកញ្ចប់ទាំងមូល។ ការដក Barcode មួយត្រូវធ្វើពីរបៀប <strong>ស្កេនដកកញ្ចប់</strong>។</li>
+                </ul>
+                <div class="callout">ស្ថានភាពការខលដែលបណ្តាញយឺតអាចចូលជួររង់ចាំ ហើយសរសេរឡើងវិញពេលភ្ជាប់។ មិនចាំបាច់ចុចស្ទួន។</div>
+            </section>
+
+            <section id="pickup">
+                <h2>៩. បិទ បើក និងស្ថានភាព «យករួច»</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ប៊ូតុង</th><th>ពណ៌</th><th>ផលប៉ះពាល់</th></tr></thead>
+                        <tbody>
+                            <tr><td>✅ បិទ</td><td><strong style="color:#0066FF">ខៀវ #0066FF</strong></td><td>សម្គាល់ថាអតិថិជនយករួច និងបន្ថែមទៅចំណូល/ស្ថិតិយក</td></tr>
+                            <tr><td>❌ បើក</td><td><strong style="color:#E61F26">ក្រហម #E61F26</strong></td><td>ត្រឡប់ពីយករួចទៅមិនទាន់យក និងដកចេញពីចំណូល/ស្ថិតិយក</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>អ្នកអាចបិទ/បើកទាំងកញ្ចប់ពីជួរមេ ឬ Barcode មួយៗពីផ្ទាំងបញ្ជី។ Barcode បិទលើស ២ ម៉ោងអាចចូលធុងសំរាមប្រភេទ <code>pickup</code> ដោយស្វ័យប្រវត្តិ ប៉ុន្តែមិនដកទឹកប្រាក់ពីចំណូល។</p>
+                <div class="callout danger"><strong>កុំចុច បើក ដើម្បីគ្រាន់តែមើល។</strong> វាជាសកម្មភាពប្ដូរស្ថានភាពហិរញ្ញវត្ថុពិត។</div>
+                <h3>🔄 បិទតាម ZTO ស្វ័យប្រវត្តិ</h3>
+                <p>កុងតាក់នេះ និង <strong>ទាញបញ្ជីកញ្ចប់ពី ZTO</strong> លេចក្នុង <strong>⚙️ របា Slide</strong> <strong>តែពេលអ្នកគូស «Fast Mode សម្រាប់ ZTO Lookup»</strong> ក្នុងប្រអប់ API ស្វែងរក។ ដកគ្រីស ➜ កុងតាក់ទាំង ២ លាក់ ហើយមុខងារទាំង ២ ឈប់ (ការកំណត់ចាស់មិនបាត់ ➜ គូសវិញ ➜ វាត្រឡប់មកដដែល)។</p>
+                <p>ក្នុង <strong>⚙️ របា Slide</strong> មានកុងតាក់ <strong>បិទតាម ZTO ស្វ័យប្រវត្តិ</strong> (លំនាំដើម <strong>បើក</strong>)។ ពេលវាបើក ZoeW សួរ ZTO បន្តិចម្ដងៗ ហើយកញ្ចប់ណាដែល <strong>ZTO បិទរួច</strong> ត្រូវបិទ «យក» ក្នុង ZoeW ដោយខ្លួនឯង — ដូចអ្នកចុចដោយដៃបេះបិទ។</p>
+                <ul>
+                    <li>បិទតែពេលចម្លើយជា <strong>«បិទរួច» ច្បាស់លាស់</strong>។ ចម្លើយ «មិនទាន់បិទ» ឬ «វាស់មិនបាន» <strong>មិនបិទទេ</strong>។</li>
+                    <li><strong>បិទតាម ZTO Palm</strong> ៖ ពេលមានកញ្ចប់បើក ZoeW អានបញ្ជីស្កេន <strong>«ចុះហត្ថលេខា»</strong> របស់សាខា (ស្កេនលើ ZTO Palm) រៀងរាល់ <strong>២០ វិនាទី</strong> ពេលកំពុងប្រើ (ទោះប្រអប់ស្កេនបើក) · <strong>១ នាទី</strong> ពេលបើកទុកចោល · <strong>២ នាទី</strong> ពេល App នៅខាងក្រោយ ➜ កញ្ចប់ដែលនៅបើកក្នុង ZoeW ហើយមានក្នុងបញ្ជីនោះ ត្រូវបិទ «យក» ដោយខ្លួនឯង ហើយចូលស្ថិតិ «យករួច» ដូចចុចបិទដោយដៃ។ ការអាននេះប្រើមុខងារបញ្ជី ZTO នៅ server ដដែល (លេខសាខាមកពីគណនីដែលចូលប្រព័ន្ធ) ➜ server ដែលមិនទាន់កំណត់មុខងារបញ្ជី ➜ ZoeW សួរ ZTO ម្ដងមួយកញ្ចប់។ កញ្ចប់ដែល ZoeW បិទតាម ZTO ហើយអ្នកបើកវិញដោយដៃ ➜ ZoeW មិនបិទវាម្ដងទៀតក្នុង <strong>១ ម៉ោង</strong> (ចុច «ពិនិត្យម្ដងទៀត» លើរបាលឿង ➜ ពិនិត្យភ្លាម)។</li>
+                    <li>កញ្ចប់មិនទាន់យកដែលហួស ៧ ថ្ងៃ <strong>រង់ចាំ</strong> ZoeW អានបញ្ជី «ចុះហត្ថលេខា» ពេញលេញសិន (យូរបំផុត ៣០ នាទីក្នុងមួយលើក) មុនចូលធុងសំរាមជា «ផុតកំណត់» ➜ កញ្ចប់ដែលអតិថិជនយករួចត្រូវបិទ «យក» មិនដកលុយ។ ទូរស័ព្ទផ្សេងក្នុងហាងដដែល (ទោះមិនបើក ZTO) ក៏រង់ចាំដូចគ្នា។</li>
+                    <li>កញ្ចប់ដែលចូលធុងសំរាមរួច <strong>មិនត្រូវបិទឡើងវិញ</strong> ទេ។</li>
+                    <li>បិទកុងតាក់នេះ ➜ ការបិទស្វ័យប្រវត្តិឈប់ ហើយការប្រើទិន្នន័យថយចុះ។ របាដាស់តឿនខាងក្រោមនៅដំណើរការដដែល។</li>
+                </ul>
+                <h3>របាលឿង «ZTO មិនទាន់បិទ»</h3>
+                <p>ពេលមានកញ្ចប់ដែលអ្នកបិទ «យក» ក្នុង ZoeW រួច តែ <strong>ZTO នៅមិនទាន់បិទ</strong> របាលឿងលេចនៅលើផ្ទាំង 📋 ប្រវត្តិ។ ចុចវាដើម្បីបើកបញ្ជី ➜ ក្នុងនោះមាន <strong>រូប Barcode</strong> ដែលអ្នកអាចយកទៅស្កេនចូល ZTO Palm បាន។ ពេលស្កេនចុះហត្ថលេខាលើ ZTO Palm រួច កញ្ចប់នោះចេញពីរបាដោយខ្លួនឯងក្នុងប្រហែល <strong>២០ វិនាទី</strong> ពេលកំពុងប្រើ (ពេល «បិទតាម ZTO ស្វ័យប្រវត្តិ» បើក)។</p>
+                <div class="callout"><strong>«⏳ ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន»</strong> មានន័យថា ZoeW មិនទាន់ទទួលទិន្នន័យគ្រប់ ➜ វាមិនអះអាងថា «អស់ហើយ» ទេ។ រង់ចាំបន្តិច សញ្ញានេះនឹងបាត់ដោយខ្លួនឯង។</div>
+            </section>
+
+            <section id="money">
+                <h2>១០. ទឹកប្រាក់ COD/DOD និងអត្ថន័យពណ៌</h2>
+                <div class="palette">
+                    <div class="swatch collected">យករួច<small>បៃតង #15803D · ចំណូលពិត</small></div>
+                    <div class="swatch pending">មិនទាន់យក<small>លឿងទុំ #B45309 · កំពុងរង់ចាំ</small></div>
+                    <div class="swatch total">សរុបទាំងអស់<small>ស្វាយ #6D28D9 · ផលបូករួម</small></div>
+                </div>
+                <div class="equation">ចំណូល (យករួច) + មិនទាន់យក = តម្លៃកញ្ចប់ទាំងអស់</div>
+                <ul>
+                    <li><strong>ចំណូល</strong> រាប់តែ Barcode ដែលយករួច មិនមែន ledger ឆៅទាំងអស់ទេ។</li>
+                    <li><strong>មិនទាន់យក</strong> អាចត្រូវដកស្វ័យប្រវត្តិពេលលើស ៧×២៤ ម៉ោង និងចូលថ្ងៃទី ៨។</li>
+                    <li><strong>តម្លៃកញ្ចប់ទាំងអស់</strong> រួមទាំងយករួច និងមិនទាន់យក។</li>
+                    <li>បើប្រវត្តិមិនទាន់ទាញមកគ្រប់ ចំណូលបង្ហាញ <strong>—</strong> ដែលមានន័យថា «វាស់មិនបាន» មិនមែន $0.00 ទេ។</li>
+                    <li>តម្លៃជារៀលគណនាតាមអត្រាប្ដូរប្រាក់ក្នុងម៉ឺនុយ (…) ហើយចែករំលែករវាងឧបករណ៍។</li>
+                </ul>
+            </section>
+
+            <section id="statistics">
+                <h2>១១. ស្ថិតិ និងរបាយការណ៍</h2>
+                <div class="callout"><strong>មានលេខ ២ ប្រភេទ ហើយវាខុសគ្នា — សូមកុំច្រឡំ។</strong> មួយគិតតាម <strong>ថ្ងៃស្កេនកញ្ចប់ចូល</strong> មួយទៀតគិតតាម <strong>ថ្ងៃដែលអតិថិជនមកយក</strong>។</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ផ្ទាំង</th><th>គិតតាមថ្ងៃណា</th><th>ឆ្លើយសំណួរអ្វី</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>📅 កញ្ចប់ប្រចាំថ្ងៃ</strong></td><td><strong>ថ្ងៃស្កេនចូល</strong></td><td>កញ្ចប់ដែលចូលថ្ងៃនោះ — យករួចប៉ុន្មាន នៅសល់ប៉ុន្មាន</td></tr>
+                            <tr><td><strong>💵 ចំណូលប្រចាំថ្ងៃ</strong></td><td><strong>ថ្ងៃបិទ «យក»</strong></td><td>ថ្ងៃនោះទទួលលុយចូលប៉ុន្មាន</td></tr>
+                            <tr><td><strong>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</strong></td><td>ថ្ងៃស្កេនចូល</td><td>សង្ខេបមួយខែ បូក Export</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>📅 កញ្ចប់ប្រចាំថ្ងៃ</h3>
+                <p><strong>អតិថិជនយក</strong> រាប់លេខទូរស័ព្ទផ្សេងៗគ្នាដែលមាន Barcode បិទយ៉ាងតិចមួយ។ <strong>កញ្ចប់យករួច</strong> រាប់ចំនួន Barcode បិទ។</p>
+                <h3>💵 ចំណូលប្រចាំថ្ងៃ (តាមថ្ងៃយក)</h3>
+                <p>ចុចប៊ូតុង <strong>💵 ចំណូលប្រចាំថ្ងៃ</strong> នៅក្បាលផ្ទាំង 📋 ប្រវត្តិ។ បង្ហាញទឹកប្រាក់តាមថ្ងៃដែលចុច «យក» លើកញ្ចប់ ដោយមិនគិតថាកញ្ចប់ស្កេនចូលថ្ងៃណាទេ។ ទិន្នន័យរក្សាទុកសម្រាប់ ៧ ថ្ងៃចុងក្រោយ។</p>
+                <ul>
+                    <li>កញ្ចប់ស្កេនចូលថ្ងៃចន្ទ តែអតិថិជនមកយកថ្ងៃពុធ ➜ លុយចុះលើ <strong>ថ្ងៃពុធ</strong>។</li>
+                    <li>បើអ្នកចុច <strong>❌ បើក</strong> វិញ ➜ លុយនោះដកចេញពី <strong>ថ្ងៃដើម</strong> ដែលវាធ្លាប់ចុះ។</li>
+                    <li>រក្សាទុក <strong>៧ ថ្ងៃចុងក្រោយ</strong> ក្នុង Database ហើយថ្ងៃចាស់ជាងនោះ <strong>លុបចោលដោយស្វ័យប្រវត្តិ</strong> ជំនួសដោយថ្ងៃថ្មី។</li>
+                    <li>ផ្ទាំងនេះមិនប្តូរ ledger តាមថ្ងៃស្កេនចូល/ខែ។ បើមានសារ Sync មិនពេញលេញ ត្រូវផ្ទៀងផ្ទាត់មុនយកលេខទៅបិទបញ្ជី។</li>
+                </ul>
+                <div class="callout"><strong>ហេតុអ្វីលេខ ២ នេះមិនស្មើគ្នា?</strong> ព្រោះវារាប់តាមថ្ងៃខុសគ្នា។ ចំនួនមិនស្មើគ្នា <strong>មិនមែនកំហុសទេ</strong>។</div>
+                <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
+                <ol>
+                    <li>ម៉ឺនុយ (…) → របាយការណ៍អាជីវកម្មប្រចាំខែ (ជ្រើសខែបាន)។</li>
+                    <li>ជ្រើសខែ ហើយពិនិត្យ ចំណូល COD/DOD, កញ្ចប់ចូល, កញ្ចប់យករួច, អតិថិជនយក, មិនទាន់យក និងតម្លៃទាំងអស់។</li>
+                    <li>តារាងខាងក្រោមបំបែកលេខតាមថ្ងៃ។</li>
+                    <li>Export ទៅ Excel ឬ PDF តាមតម្រូវការ។</li>
+                </ol>
+                <div class="callout success">របាយការណ៍ខែអានតែប៉ុណ្ណោះ និងគិតពីកំណត់ត្រាប្រចាំថ្ងៃដែលរក្សាទុកជានិច្ច។ ការបើក ឬ Export មិនកែទិន្នន័យទេ។</div>
+            </section>
+
+            <section id="edit-delete">
+                <h2>១២. កែ ដក លុប និងស្តារ</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>សកម្មភាព</th><th>អត្ថន័យ</th><th>ទឹកប្រាក់</th></tr></thead>
+                        <tbody>
+                            <tr><td>កែតម្លៃ</td><td>កែ COD/DOD របស់ Barcode</td><td>កែ ledger តាមភាពខុសគ្នា</td></tr>
+                            <tr><td>ដក</td><td>ស្កេន និងផ្ទៀងផ្ទាត់ Barcode មួយពីកញ្ចប់</td><td>ដកតម្លៃភ្លាម ហើយបូកវិញពេលស្តារ</td></tr>
+                            <tr><td>លុប</td><td>ដាក់កញ្ចប់ទាំងមូលទៅធុងសំរាម</td><td>មិនប្ដូរចំណូល</td></tr>
+                            <tr><td>ស្តារ</td><td>យកធាតុពីធុងសំរាមត្រឡប់មកវិញ</td><td>អនុវត្តតាមប្រភេទដែលបានលុប</td></tr>
+                            <tr><td>លុបអចិន្ត្រៃយ៍</td><td>ដកចេញពីធុងសំរាមជាអចិន្ត្រៃយ៍</td><td>មិនអាចស្តារវិញ</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>រយៈពេលសម្អាត និងការស្តារ</h3>
+                <ul>
+                    <li>Barcode យករួចលើស <strong>២ ម៉ោង</strong> ចូលធុងសំរាម ដោយមិនដកទឹកប្រាក់។</li>
+                    <li>Barcode មិនទាន់យកលើស <strong>៧×២៤ ម៉ោង</strong> (ចូលថ្ងៃទី ៨) ចូលធុងសំរាមប្រភេទផុតកំណត់ ហើយដកទឹកប្រាក់។</li>
+                    <li>App ត្រូវបិទ ឬ Refresh ពាក់កណ្តាលការដកទឹកប្រាក់នៃកញ្ចប់ផុតកំណត់ ➜ ពេលបើកវិញ App បញ្ចប់ការដកនោះ ហើយដកតែម្តងគត់។</li>
+                    <li>ធាតុផុតកំណត់ក្នុងធុងសំរាមលើស <strong>២ ថ្ងៃ</strong> លុបអចិន្ត្រៃយ៍; ប្រភេទផ្សេងលើស <strong>៣០ ថ្ងៃ</strong> ទើបលុប។</li>
+                    <li>ស្តារធាតុដែលបាន <strong>លុប</strong> មិនបូកស្ទួន។ ស្តារធាតុដែលបាន <strong>ដក</strong> បូកត្រឡប់តែទឹកប្រាក់ដែលធ្លាប់ដក។</li>
+                    <li>Barcode ស្តារដែលមិនទាន់យក ចាប់អាយុរង់ចាំ ៧ ថ្ងៃពីពេលស្តារ; ដែលយករួចចាប់ ២ ម៉ោងឡើងវិញ។ Barcode ផ្សេងក្នុងកញ្ចប់ដដែលរក្សាអាយុរបស់ខ្លួន។</li>
+                </ul>
+                <div class="callout danger"><strong>ពណ៌ក្រហមមានន័យថាសកម្មភាពគ្រោះថ្នាក់។</strong> អានសារបញ្ជាក់ និងពិនិត្យលេខទូរស័ព្ទ/Barcode មុនចុច។</div>
+                <p><strong>Reset ចំនួនយករួច</strong> ប៉ះតែតម្រងថ្ងៃដែលកំពុងជ្រើស និងមិនប៉ះទឹកប្រាក់។ <strong>លុបទាំងអស់</strong> ជាសកម្មភាពដាច់ដោយឡែកដែលត្រូវការផ្ទៀងផ្ទាត់ PIN។</p>
+            </section>
+
+            <section id="import-export">
+                <h2>១៣. Import Google Sheet និង Export</h2>
+                <h3>នាំចូល Excel ទៅ Google Sheet</h3>
+                <ol>
+                    <li>របា Slide → នាំចូល Excel ទៅ Sheet → វាយ Security PIN។</li>
+                    <li>កំណត់ Web app URL និងពាក្យសម្ងាត់ រួចសាកល្បង និងរក្សាទុក។ ការតភ្ជាប់នេះជារបស់ហាងដែលកំពុងបើក ៖ ទូរស័ព្ទដែលចូលហាងច្រើន ត្រូវកំណត់សម្រាប់ហាងនីមួយៗ។</li>
+                    <li>ជ្រើស <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code> ឬ <code>.tsv</code>។</li>
+                    <li>ផ្ទៀងផ្ទាត់ Tab, ជួរ header និង mapping Barcode/DOD/COD/Phone។</li>
+                    <li>ជ្រើសរបៀប ជំនួសទាំងអស់, បន្ថែម+កែ ឬបន្ថែមតែ Barcode ថ្មី។</li>
+                </ol>
+                <h3>Export</h3>
+                <ul>
+                    <li><strong>Excel</strong> រក្សាលេខទូរស័ព្ទ និង Barcode ជា TEXT ដើម្បីរក្សាលេខ ០ នាំមុខ។</li>
+                    <li><strong>CSV សម្រាប់ Google Sheet</strong> បិទអក្សរដែលអាចក្លាយជារូបមន្តគ្រោះថ្នាក់។</li>
+                    <li><strong>PDF</strong> ប្រើ print dialog របស់ browser ដើម្បីរក្សាទម្រង់អក្សរខ្មែរ។</li>
+                </ul>
+                <h3>បោះពុម្ពស្លាកកញ្ចប់</h3>
+                <ul>
+                    <li>ម៉ឺនុយ (...) ខាងលើ ➜ <strong>🖨️ បោះពុម្ពស្លាក</strong> = កញ្ចប់ទាំងអស់តាមតម្រងថ្ងៃ · ម៉ឺនុយ (...) តាមជួរ ➜ ស្លាករបស់អតិថិជននោះ ➜ ផ្ទាំងបោះពុម្ពបើក។</li>
+                    <li>ក្នុងផ្ទាំង ៖ ជ្រើសទំហំស្លាក — មួយសន្លឹកមួយស្លាក ៖ 50×30mm (លំនាំដើម · ម៉ាស៊ីនបោះពុម្ពស្លាកតូចដូច price tag) · 40×30 · 60×40 · ទំហំផ្សេង · ឬក្រដាស A4 ៣/២ ជួរឈរ · កុងតាក់ បង្ហាញតម្លៃ $ / ថ្ងៃ-ខែ / Locker · <strong>បង្ហាញតែកញ្ចប់មិនទាន់យក</strong> (បើកជាស្រេច) · ឃើញគំរូស្លាកភ្លាម ➜ ចុច <strong>🖨️ បោះពុម្ព</strong>។ ជម្រើសត្រូវចងចាំលើឧបករណ៍នេះ។</li>
+                    <li>ស្លាកមួយក្នុងមួយ Barcode ៖ <strong>លេខទូរស័ព្ទធំ</strong> · Barcode (Code 128 ស្កេនបាន) · លេខ Barcode · ថ្ងៃ/ខែ (ឧ. 15/10) · ទឹកប្រាក់ COD/DOD ($) · Locker — កាត់ដាក់លើកញ្ចប់ដែលគ្មានលេខទូរស័ព្ទ (ជំនួសការសរសេរដោយដៃ)។</li>
+                    <li>ប្រើ print dialog (ឬម៉ាស៊ីនបោះពុម្ពរបស់ App Android) · ជ្រើស «Save as PDF» បានដែរ។</li>
+                    <li><strong>ម៉ាស៊ីនបោះពុម្ពស្លាកតូច Bluetooth (ឧ. Niimbot B1 · ស្លាក 50×30mm)</strong> ៖ ម៉ាស៊ីនប្រភេទនេះបោះពុម្ពតាម App របស់វាប៉ុណ្ណោះ (មិនមែន printer ប្រព័ន្ធ) ➜ ជ្រើសប្លង់ «ស្លាក 50×30mm» ➜ «Save as PDF» (ឬចែករំលែក) ➜ បើក PDF ក្នុង App របស់ម៉ាស៊ីន ➜ បោះពុម្ព។ ម៉ាស៊ីនដែលស្គាល់ជា printer ប្រព័ន្ធ (AirPrint · Android print service) បោះពុម្ពផ្ទាល់ពី print dialog។ ទំហំស្លាកតូច (50×30 …) ត្រូវតាមលើ Android · App Android · Chrome/Edge កុំព្យូទ័រ; លើ iPhone/Safari ត្រូវជ្រើសទំហំក្រដាសក្នុង print dialog ដោយដៃ។</li>
+                </ul>
+                <div class="callout warning">ឯកសារ Export អាចមានលេខទូរស័ព្ទ និងទិន្នន័យហិរញ្ញវត្ថុ។ រក្សាទុកនៅកន្លែងមានសុវត្ថិភាព និងលុបចេញពីឧបករណ៍សាធារណៈក្រោយប្រើ។</div>
+            </section>
+
+            <section id="lookup">
+                <p><strong>API តាម Setup Link/QR</strong>៖ វាយ PIN ➜ ពិនិត្យ host API ➜ ចុច «✅ ភ្ជាប់» ➜ បញ្ចូលកូដ ៦ ខ្ទង់ដែលអ្នកលក់ប្រាប់ដាច់ដោយឡែកពី Link។ កូដខុស ឬបោះបង់ មិនរក្សាទុក។ Link មានតែ API ប្រើសម្រាប់ឧបករណ៍ដែលភ្ជាប់ហាងរួច; Link រួម Config Firebase/Supabase ប្រើសម្រាប់ឧបករណ៍ថ្មី។ កូនសោ Header ចាក់សោក្នុងម៉ាស៊ីនដោយ PIN។</p>
+                <h2>១៤. Lookup API និង ZTO</h2>
+                <p>Lookup អាចបំពេញលេខទូរស័ព្ទ និងតម្លៃពី Google Sheet ឬ ZTO Cambodia។ ការកំណត់ secret ត្រូវបានអ៊ិនគ្រីប AES-GCM ដោយកូនសោចេញពី Security PIN។</p>
+                <ul>
+                    <li>ការកំណត់ API ស្វែងរកអតិថិជន និងតារាងអតិថិជន ជារបស់ហាងដែលកំពុងបើក ៖ ចូលហាងផ្សេងលើទូរស័ព្ទដដែល ➜ ការកំណត់ទទេ ហើយកំណត់សម្រាប់ហាងនោះដោយឡែក · ត្រឡប់ហាងដើម ➜ ការកំណត់ចាស់មកវិញ។</li>
+                    <li>តារាងអតិថិជន cache ៥ នាទី ហើយអាចបំពេញភ្លាមពីសតិ។</li>
+                    <li>ZTO Fast Mode ចងចាំលទ្ធផលបាន ១០ នាទី និងលទ្ធផលមិនឃើញរយៈពេលខ្លី ១៥ វិនាទី។</li>
+                    <li><strong>DOD ក៏បំពេញពី ZTO ដែរ</strong> ៖ កញ្ចប់ដែលអតិថិជនបង់ <strong>ថ្លៃដឹកពេលទទួល</strong> (ប្រភេទ <code>ztda</code>) មាន COD 0 តែ DOD ពិត — ស្កេនម្តងនោះបំពេញឲ្យខ្លួនឯង។ កញ្ចប់ Shopee ដែលថ្លៃដឹកបង់រួច នៅបាន <strong>DOD 0</strong> ដដែល។ <em>(មុនកំណែ 2.35.1 ការស្កេនបាន DOD 0 រាល់កញ្ចប់ ➜ ត្រូវវាយដោយដៃ)</em></li>
+                    <li>បណ្តាញយឺតបង្ហាញស្ថានភាពជាក់លាក់ ហើយមិនសរសេរជាន់អ្វីដែលអ្នកវាយដោយដៃ។</li>
+                    <li>Cookie/Token របស់ ZTO ត្រូវរស់ខាង server ប៉ុណ្ណោះ មិនដាក់ក្នុង App client ឡើយ។</li>
+                    <li><strong>សោហាង និងគណនី</strong> ៖ តម្លៃ Header ក្នុង API ស្វែងរកអតិថិជន ជាសោរបស់ហាងនីមួយៗ — 🩺 ពិនិត្យសុខភាពប្រព័ន្ធបង្ហាញឈ្មោះសោហាងដែលទូរស័ព្ទកំពុងប្រើ។ ពេល Server តម្រូវ ZTO ឆ្លើយតែទូរស័ព្ទដែលចូលគណនីហាង ហើយបង្ហាញតែកញ្ចប់នៃសាខាហាងនោះ ៖ «🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល» ➜ ចាកចេញ ហើយចូលគណនីម្តងទៀត · «⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន» ➜ ស្កេនម្តងទៀត · «⚠️ កញ្ចប់នេះជារបស់សាខាផ្សេង» ➜ ZTO មិនបង្ហាញព័ត៌មានអតិថិជន (វាយលេខទូរស័ព្ទ និងតម្លៃដោយដៃ) · «⚙️ ផ្ទៀងសាខាកញ្ចប់នេះមិនបាន» ➜ ប្រាប់អ្នកគ្រប់គ្រង server (មូលហេតុបង្ហាញនៅចុងសារ)។ ប៊ូតុង 🧪 សាកល្បង ផ្ញើគណនីដូចការស្កេន។</li>
+                </ul>
+                <div class="callout">បើ ZTO បង្ហាញថាគ្មាន Cookie សូមដំណើរការ sync tool លើ Windows ឬទាក់ទងអ្នកគ្រប់គ្រង server។ មិនចាំបាច់ redeploy ZoeW។</div>
+            </section>
+
+            <section id="zto-list">
+                <h2>១៤ខ. ទាញបញ្ជីកញ្ចប់ពី ZTO</h2>
+                <p>មុខងារនេះទាញ <strong>បញ្ជីកញ្ចប់ដែល ZTO ស្កេន «អីវ៉ាន់មកដល់»</strong> តាមជួរកាលបរិច្ឆេទ ដើម្បីកុំឲ្យអ្នកភ្លេចបញ្ចូលកញ្ចប់ណាមួយ។ វា <strong>បិទដោយលំនាំដើម</strong>។ ប្រអប់បង្ហាញ <strong>🏢 ឈ្មោះសាខា និងលេខសាខា</strong> ដែលបញ្ជីនោះជារបស់ ហើយទាញទំព័រទាំងអស់ព្រមគ្នា។</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ជំហាន</th><th>ធ្វើនៅឯណា</th></tr></thead>
+                        <tbody>
+                            <tr><td>១. គូស <strong>Fast Mode សម្រាប់ ZTO Lookup</strong></td><td>⚙️ របា Slide ➜ API ស្វែងរក (បើមិនគូស កុងតាក់មិនលេច)</td></tr>
+                            <tr><td>២. ចុចកុងតាក់ <strong>📥 ទាញបញ្ជីកញ្ចប់ពី ZTO</strong> ➜ បើក</td><td>⚙️ របា Slide (គ្មានលេខសាខាត្រូវបំពេញទេ — វាមកពីគណនីដែលចូលប្រព័ន្ធ)</td></tr>
+                            <tr><td>៣. ចុចប៊ូតុង <strong>📥 បញ្ជី ZTO</strong></td><td>ក្បាលផ្ទាំង 📋 ប្រវត្តិ (លេចតែពេលកុងតាក់បើក)</td></tr>
+                            <tr><td>៤. ជ្រើសថ្ងៃ ➜ ចុច <strong>📥 ទាញបញ្ជី</strong></td><td>ប្រអប់បញ្ជី ZTO</td></tr>
+                            <tr><td>៥. ពិនិត្យក្រុមទាំង ៤ ➜ ចុច <strong>➕ បញ្ចូលកញ្ចប់ថ្មី</strong></td><td>ប្រអប់ដដែល</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ក្រុម</th><th>មានន័យថា</th></tr></thead>
+                        <tbody>
+                            <tr><td>🆕 ថ្មី</td><td>មិនទាន់មានក្នុង ZoeW — <strong>តែក្រុមនេះទេដែលត្រូវបញ្ចូល</strong></td></tr>
+                            <tr><td>✅ មានក្នុង ZoeW រួច</td><td>ស្កេនចូលរួចហើយ ➜ ទុកចោល</td></tr>
+                            <tr><td>♻️ ស្ទួនក្នុងបញ្ជី ZTO</td><td>ZTO ស្កេន barcode ដដែលច្រើនដង ➜ រាប់តែម្ដង</td></tr>
+                            <tr><td>⏭️ រំលង</td><td>មិនបញ្ចូល — មូលហេតុសរសេរជាប់ជួរដេកនីមួយៗ ៖ មិនមែនកញ្ចប់អតិថិជន · ឬ <strong>ចាស់ជាង ៨ ថ្ងៃ ហើយ ZTO មិនទាន់បិទបញ្ជី</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="callout danger"><strong>ការបញ្ចូលប៉ះលុយពិត។</strong> កញ្ចប់នីមួយៗដើរដូចការស្កេនដោយដៃបេះបិទ ➜ <strong>ស្ថិតិប្រាក់ឡើងតាម COD នៅថ្ងៃដែល ZTO ស្កេន</strong>។ ការទាញបញ្ជីខ្លួនវា <strong>មិនបញ្ចូលអ្វីដោយស្វ័យប្រវត្តិទេ</strong> — អ្នកមើលមុន រួចចុចបញ្ចូលដោយខ្លួនឯង។</div>
+                <ul>
+                    <li><strong>បញ្ជីមានតែស្កេន «អីវ៉ាន់មកដល់»</strong> ➜ ស្កេនប្រភេទផ្សេងរបស់ barcode ដដែល (ចែកចាយ · ចុះហត្ថលេខា) មិនក្លាយជាជួរដេកទេ ➜ ប្រអប់ប្រាប់ចំនួន «⏭️ ស្កេនប្រភេទផ្សេង N ជួរ មិនរាប់»។</li>
+                    <li><strong>កញ្ចប់ដែល ZTO ចុះហត្ថលេខារួច</strong> (អតិថិជនយករួច) ➜ ស្លាក <strong>🔒</strong> ➜ ចុច «➕ បញ្ចូល» ➜ វាចូលជា <strong>«យករួច»</strong> ➜ <strong>ចូលស្ថិតិ «យករួច» ដូចចុចបិទដោយដៃ</strong> · COD ចូលស្ថិតិលើថ្ងៃ ZTO ស្កេន · ចូលធុងសំរាមក្រោម «យករួច» ក្នុង ២ ម៉ោង ➜ <strong>លុយមិនត្រូវដកវិញទេ</strong>។ កញ្ចប់ដែលមិនមានក្នុងបញ្ជីចុះហត្ថលេខា ចូលជា «មិនទាន់យក»។</li>
+                    <li><strong>កញ្ចប់ក្នុងក្រុម «✅ មានក្នុង ZoeW រួច» ដែលនៅបើក តែ ZTO ចុះហត្ថលេខារួច</strong> ➜ ស្លាក <strong>🔒</strong> ➜ ចុច «➕ បញ្ចូល» ➜ វាបិទ «យក» ក្នុង ZoeW (ពេលកុងតាក់ <strong>បិទតាម ZTO ស្វ័យប្រវត្តិ</strong> បើក)។</li>
+                    <li><strong>⚠️ ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទប្រភេទស្កេនខុសពីការកំណត់ Server</strong> (ឧ. ZTO ផ្ញើជាភាសាផ្សេង) ➜ ZoeW មិនរាប់វាជាភស្តុតាងបិទ ហើយប្រអប់ប្រាប់ចំនួនជួរនោះ ➜ <strong>🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</strong> ក៏បង្ហាញ ⚠️ លើជួរ ZTO ដែរ ➜ សូមប្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធឲ្យកែ <code>ZTO_LIST_SIGNED_SCAN_DESC</code>។</li>
+                    <li><strong>លេខសាខាមកពីគណនីដែលចូលប្រព័ន្ធ</strong> — មិនមានវាលឲ្យវាយក្នុង App ទេ។ អ៊ីមែលរបស់សាខានីមួយៗមានទម្រង់ <code>ឈ្មោះ@zoew&lt;លេខសាខា&gt;.com</code> (ឧ. <code>sok@zoew881859.com</code> ➜ សាខា <code>881859</code>) ➜ server អានលេខនោះចេញពីអត្តសញ្ញាណដោយខ្លួនឯង។ ដូច្នេះ <strong>ឧបករណ៍មួយអានបានតែបញ្ជីរបស់សាខាខ្លួនឯង</strong>។ ត្រូវប្ដូរសាខា ៖ ចាកចេញ រួចចូលដោយអ៊ីមែលរបស់សាខាថ្មី។ គណនីដែលអ៊ីមែលគ្មានលេខសាខា ➜ មុខងារបញ្ជីមិនដំណើរការ។</li>
+                    <li><strong>ប្រភពកញ្ចប់</strong> ៖ ជួរដេកនីមួយៗបង្ហាញកន្លែងដែល ZTO ទទួលកញ្ចប់ ៖ «ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ» ➜ <strong>🇨🇳 ចិន</strong> · «Shopee SHPE» ➜ <strong>🇻🇳 វៀតណាម</strong> · កន្លែងផ្សេង (ឧ. សាខាក្នុងស្រុក) ➜ <strong>📍</strong> ឈ្មោះដូច ZTO សរសេរ។ ចុច «➕ បញ្ចូល» ➜ ប្រភពរក្សាទុកក្នុងកញ្ចប់ ហើយបង្ហាញក្នុងតារាងប្រវត្តិ (កញ្ចប់ដែលមានក្នុង ZoeW រួចក៏ទទួលប្រភពដែរ)។</li>
+                    <li><strong>DOD</strong> មកពីវាល «ថ្លៃដឹកដែលអតិថិជនបង់ពេលទទួល» របស់ ZTO ➜ កញ្ចប់ខ្លះបាន <code>0</code> ➜ កែដោយដៃក្រោយបាន។</li>
+                    <li><strong>កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ទាំងស្រុង</strong> ➜ កញ្ចប់ចុះក្នុងប្រវត្តិ <strong>នៅថ្ងៃដែល ZTO ស្កេន</strong> ហើយ <strong>ស្ថិតិប្រាក់ក៏ចុះលើថ្ងៃនោះដែរ</strong> មិនមែនថ្ងៃដែលអ្នកចុចបញ្ចូលទេ។ អតិថិជនម្នាក់ដែលមានកញ្ចប់ ២ ថ្ងៃ ZTO ផ្សេងគ្នា ➜ ចុះជា <strong>ជួរដេក ២</strong>។</li>
+                    <li><strong>ថ្ងៃចាប់ផ្ដើមរាប់ ៨ ថ្ងៃ ក៏ជាថ្ងៃស្កេនរបស់ ZTO ដែរ។</strong> កញ្ចប់ដែល ZTO ស្កេនយូរជាងនោះ ត្រូវសម្រេចតាម <strong>ស្ថានភាពនៅ ZTO</strong> មិនមែនតាមអាយុទេ ៖
+                        <ul>
+                            <li><strong>ZTO បិទបញ្ជីរួច</strong> (អតិថិជនយករួច) ➜ បញ្ចូលជា <strong>«យករួច»</strong> ➜ ស្លាក <strong>🔒</strong> លេចជាប់ជួរដេក ➜ <strong>COD ចូលស្ថិតិលើថ្ងៃ ZTO</strong> ហើយកញ្ចប់ចូលធុងសំរាមក្រោម <strong>«យករួច»</strong> ក្នុង ២ ម៉ោង ➜ <strong>លុយមិនត្រូវដកវិញទេ</strong>។</li>
+                            <li><strong>ZTO មិនទាន់បិទបញ្ជី</strong> ➜ <strong>រំលង</strong> (បើបញ្ចូល វានឹងចូលធុងសំរាមជា «ផុតកំណត់» ភ្លាម ហើយដកលុយវិញ)។</li>
+                            <li><strong>ពិនិត្យស្ថានភាពមិនបាន</strong> ➜ <strong>រំលង</strong> ➜ សាកទាញបញ្ជីម្ដងទៀត។</li>
+                            <li><strong>ចាស់ជាង ៣០ ថ្ងៃ</strong> ➜ <strong>រំលងជានិច្ច</strong> ទោះ ZTO បិទរួច ៖ ធុងសំរាមលុបកំណត់ត្រាចាស់រួច ➜ ពិនិត្យមិនបានថាធ្លាប់បញ្ចូលឬអត់ ➜ ការបញ្ចូលនឹងប្រថុយ <strong>លុយបូកស្ទួន</strong>។</li>
+                        </ul>
+                    </li>
+                    <li>ពេលទាញបញ្ជីដែលមានកញ្ចប់ចាស់ អ្នកឃើញ <strong>«⏳ កំពុងពិនិត្យស្ថានភាព ZTO»</strong> មួយភ្លែត ➜ វាសួរ ZTO ៤ កញ្ចប់ព្រមគ្នា ➜ <strong>យឺតបន្តិច គឺធម្មតា</strong>។</li>
+                    <li>កញ្ចប់ដែល ZTO មិនផ្ដល់ម៉ោងស្កេន ➜ ប្រើម៉ោងបញ្ចូលជំនួស ហើយប្រអប់បញ្ជាក់ប្រាប់ចំនួននោះមុនអ្នកចុចយល់ព្រម។</li>
+                    <li><strong>ក្រោយបញ្ចូល បើតារាងមើលទៅទទេ នោះមិនមែនកំហុសទេ</strong> ➜ តារាងត្រងតាម <strong>ថ្ងៃនេះ</strong> ចំណែកកញ្ចប់ចុះលើថ្ងៃ ZTO។ សារបញ្ចប់រាយថ្ងៃទាំងនោះ ➜ <strong>ប្ដូរតម្រងថ្ងៃ</strong> ទើបឃើញពួកវា។ ⛔ កុំចុច «➕ បញ្ចូល» ម្ដងទៀត។</li>
+                    <li>ទីតាំង Locker ចាប់ផ្ដើមជា <code>N/A</code> ➜ កំណត់ក្រោយតាមរបៀបធម្មតា។</li>
+                    <li>ពិដាន <strong>១០០ កញ្ចប់</strong> ក្នុងមួយដង។ បញ្ជីវែងជាងនេះ ➜ បំបែកជួរកាលបរិច្ឆេទ។</li>
+                    <li>ចុច «➕ បញ្ចូល» ២ ដងលើបញ្ជីដដែល ➜ ជុំទី ២ រាយ «♻️ ស្ទួន» ➜ <strong>លុយមិនបូកស្ទួនទេ</strong>។</li>
+                </ul>
+                <div class="callout warning"><strong>ពេលឃើញ «⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server»</strong> ➜ អ្នកគ្រប់គ្រង server ត្រូវដាក់ការកំណត់សាខាជាមុនសិន។ ការស្កេនធម្មតា <strong>នៅដំណើរការដដែល</strong>។</div>
+                <div class="callout"><strong>«⏳ ទិន្នន័យមិនទាន់មកដល់គ្រប់ — មិនអាចបញ្ចូលបានទេ»</strong> ជាការការពារ ៖ បើទិដ្ឋភាពមិនពេញ កញ្ចប់ដែលមានរួចអាចរាយជា «ថ្មី» ➜ បញ្ចូលស្ទួន ➜ លុយស្ទួន។ រង់ចាំទិន្នន័យមកដល់ រួចសាកម្ដងទៀត។</div>
+            </section>
+
+            <section id="offline">
+                <h2>១៥. Offline, Sync និង Update</h2>
+                <ul>
+                    <li>Service Worker cache សំបក App, ម៉ាស៊ីនស្កេន, SheetJS និងសៀវភៅនេះ។</li>
+                    <li>នៅ Offline អ្នកអាចបើក App និងប្រើធនធានដែលបាន cache ប៉ុន្តែការផ្ទៀងផ្ទាត់ server និងការសរសេរខ្លះត្រូវរង់ចាំបណ្តាញ។</li>
+                    <li>សារ <strong>⏳ នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ</strong> មានន័យថាការងារចូលជួររង់ចាំ។ កុំចុចសកម្មភាពដដែលម្ដងទៀត។</li>
+                    <li>ការសរសេររង់ចាំរក្សាលើឧបករណ៍។ ពេលបើក App វិញ ប្រព័ន្ធផ្ទៀងផ្ទាត់លទ្ធផលមុនអនុវត្តម្តងទៀត ដើម្បីការពារប្រាក់ស្ទួន។ បើបង្ហាញ «មានការសរសេរមិនទាន់ផ្ទៀងផ្ទាត់» សូមបើក 🩺 ពិនិត្យប្រព័ន្ធ និងពិនិត្យទិន្នន័យមុនសរសេរបន្ត; បើវាផ្ទៀងផ្ទាត់មិនបានជារៀងរហូត ☰ ឧបករណ៍ ➜ «🧹 លុបការសរសេររង់ចាំ» (PIN) លុបវាចោល រួចផ្ទៀងផ្ទាត់កញ្ចប់ និងចំណូលដោយដៃ។ កុំសម្អាតទិន្នន័យ App ខណៈការសរសេរកំពុងរង់ចាំ។</li>
+                    <li><strong>ភ្ជាប់ Server រួចរាល់</strong> ត្រូវបានវាស់ពិត ៖ ពេល WiFi នៅភ្ជាប់តែបាត់អ៊ីនធឺណិត ឬទូរស័ព្ទភ្ញាក់ពីការដាក់ចោល App សួរ Server ដោយខ្លួនឯង ➜ បើមិនឆ្លើយក្នុង ១០ វិនាទី ស្ថានភាពប្តូរទៅ <strong>កំពុងភ្ជាប់…</strong> ហើយ App ភ្ជាប់វិញដោយខ្លួនឯងពេលអ៊ីនធឺណិតមកវិញ (មិនបាច់ Refresh)។</li>
+                    <li>ពេលមានកំណែថ្មី របាជូនដំណឹងបង្ហាញឲ្យ Refresh។ រង់ចាំការងារសំខាន់ចប់សិន មុន Refresh។</li>
+                </ul>
+                <h3>ផ្ទាំងជូនដំណឹង 🔔</h3>
+                <ul>
+                    <li>លេខក្រហមលើ 🔔 = កញ្ចប់ជិតផុតកំណត់ + កញ្ចប់ដែលដករួចមិនទាន់មើល + សារមិនទាន់អាន + កំណែថ្មីដែលទាញរួច។ ចុច 🔔 ដើម្បីបើក ហើយបិទវិញ ➜ សារត្រូវរាប់ថាបានមើល · កញ្ចប់ដែលដករួចត្រូវរាប់ថាបានមើល ពេលបិទផ្ទាំង ឬបិទក្រុម 📤 ខណៈបញ្ជីរបស់វាពន្លា (ក្រុមបិទ ➜ លេខក្រហមនៅដដែល)។</li>
+                    <li><strong>📲 ជូនដំណឹងលើទូរស័ព្ទ</strong> ៖ ចុច «🔔 បើកការជូនដំណឹង» ហើយអនុញ្ញាត ➜ ដំណឹងពីអ្នកលក់ និងការរំលឹកកញ្ចប់ជិតផុតកំណត់ (រាល់ព្រឹក ម៉ោង ៨ តាមទិន្នន័យពេលបើក App ចុងក្រោយ) លោតលើទូរស័ព្ទ ទោះ App បិទ។ ចុចលើការជូនដំណឹង ➜ បើកផ្ទាំងនេះ។ iPhone ត្រូវដំឡើង ZoeW លើ Home Screen សិន។ បដិសេធរួច ➜ បើកវិញក្នុង Settings របស់ទូរស័ព្ទ។ ហាងដែលចូលដោយឈ្មោះគណនី ៖ ការជូនដំណឹងចងនឹងគណនីហាង (ចូលប្រព័ន្ធរួចទើបបើកបាន)។ ទូរស័ព្ទដែលចូលហាងច្រើន ៖ ការជូនដំណឹងមកពីហាងដែលកំពុងបើកតែប៉ុណ្ណោះ (ចូលហាងផ្សេង ➜ App ចុះឈ្មោះឡើងវិញដោយខ្លួនឯង)។</li>
+                    <li><strong>📦 និង 📤 ជាក្រុមពន្លា</strong> ដូចម៉ឺនុយ ☰ ៖ ក្បាលក្រុមបង្ហាញចំនួនកញ្ចប់ (<strong>—</strong> = ទិន្នន័យមិនទាន់ទាញចប់ មិនមែន «គ្មាន») និងស្លាក «ថ្មី» · ចុចក្បាលដើម្បីពន្លា ឬបិទ · បញ្ជីបង្ហាញម្តង ២០ ជួរ ហើយទាញបន្ថែមពេលរមូរដល់ចុងបញ្ជី ឬចុច «⬇️ បង្ហាញ … ទៀត» ➜ មើលបានគ្រប់កញ្ចប់ · App ចងចាំក្រុមដែលអ្នកពន្លា។</li>
+                    <li><strong>📦 កញ្ចប់ជិតផុតកំណត់</strong> ៖ កញ្ចប់មិនទាន់យក ដែលនឹងដល់ច្បាប់ ៧ ថ្ងៃ ក្នុង ២៤ ម៉ោងខាងមុខ (ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ និងដកលុយ)។ ទាក់ទងអតិថិជន ឬបិទ «យក» មុនពេលនោះ។ បើឃើញ «⏳ … មិនទាន់មកដល់» មានន័យថាទិន្នន័យមិនទាន់ទាញចប់ មិនមែន «គ្មាន» ទេ។</li>
+                    <li><strong>📤 កញ្ចប់ដែលដករួច</strong> ៖ កញ្ចប់ដែលប្រព័ន្ធដកចេញព្រោះផុតកំណត់ (ដកលុយ) ហើយនៅក្នុង 🗑️ ធុងសំរាម — លេខទូរស័ព្ទ ចំនួនកញ្ចប់ ទូ Locker និងពេលដក (ស្លាក «ថ្មី» = មិនទាន់មើល)។ យកកញ្ចប់ទាំងនោះចេញពីទូ ហើយប្រគល់ត្រឡប់ · អតិថិជនមកយកទាន់ ➜ ស្តារពីធុងសំរាម (បន្ថែមលុយវិញ)។ ធាតុបាត់ពីបញ្ជីពេលស្តារ ឬពេលធុងសំរាមសម្អាតវាចោល។</li>
+                    <li><strong>📱 កំណែ App</strong> ៖ កំណែបច្ចុប្បន្ន និងថាមានកំណែថ្មីឬអត់។ App Android ៖ ពេលមានកំណែថ្មី App ពិនិត្យ GitHub Release មុន ➜ ប៊ូតុង <strong>📥 ទាញយក និងដំឡើង APK</strong> បង្ហាញតែពេលឯកសារ APK ពិតមាន (ខណៈកំពុង build ➜ «⏳ មិនទាន់មានលើ GitHub Release» ហើយ App ពិនិត្យម្តងទៀតពេលបើក 🔔)។ ចុច 📥 ➜ App ទាញក្នុង App ផ្ទាល់ (របារីកចម្រើន · ✖️ បោះបង់) ➜ ផ្ទាំងដំឡើងរបស់ Android លោតឡើង ➜ ចុច «ដំឡើង» (ទិន្នន័យ និងការកំណត់នៅដដែល)។ លើកដំបូង Android សួរ «អនុញ្ញាតពីប្រភពនេះ» ➜ បើក ➜ ត្រឡប់មក ➜ ផ្ទាំងដំឡើងបើកបន្ត។ ប៊ូតុង <strong>🔄 ពិនិត្យកំណែថ្មី</strong> ទាញព័ត៌មានកំណែភ្លាម (មិនបាច់រង់ចាំ) ៖ App Android សួរ GitHub Release ភ្លាម · PWA សួរ App ឲ្យទាញកំណែថ្មីភ្លាម ➜ ពេលទាញរួច បង្ហាញ «Refresh ឥឡូវនេះ» · ពិនិត្យមិនបាន ➜ ⚠️ ហើយចុចម្តងទៀតបាន។ លើកុំព្យូទ័រ ផ្ទាំងនេះធំជាងលើទូរស័ព្ទបន្តិច។</li>
+                    <li><strong>📢 សេចក្តីប្រកាស និងការថែទាំ</strong> ៖ សារពីអ្នកគ្រប់គ្រងប្រព័ន្ធ (ការឡើងកំណែ ការថែទាំ) និង <strong>ដំណឹងដែលអ្នកលក់ផ្ញើពី ZoeKeyGen</strong> (២០ ចុងក្រោយ) ទាញពី server ពេលបើក App ពេលបើកផ្ទាំង 🔔 ពេលត្រឡប់មកវិញ និងរាល់ ៥ នាទី — មិនចាំបាច់ Update App។ ពេលក្រៅបណ្តាញ ផ្ទាំងបង្ហាញដំណឹងដែលទាញចុងក្រោយ។ ប៊ូតុង <strong>🧹 សម្អាត</strong> លាក់ដំណឹងទាំងនោះ និងលុបការជូនដំណឹងលើរបាទូរស័ព្ទ (ដំណឹងថ្មីនៅលេចធម្មតា · បញ្ជីកញ្ចប់ជិតផុតកំណត់មិនត្រូវសម្អាតទេ ព្រោះវាជាទិន្នន័យពិត)។</li>
+                </ul>
+                <h3>បើកំណែមិនទាន់ផ្លាស់</h3>
+                <ol>
+                    <li>ភ្ជាប់បណ្តាញល្អ ហើយបិទ/បើក App ម្ដង។</li>
+                    <li>ចុច Refresh ពេលរបា Update បង្ហាញ។</li>
+                    <li>បើនៅតែចាស់ សូមលុប PWA ហើយដំឡើងម្ដងទៀត តែត្រូវប្រាកដថាចាំ URL, Login និង PIN recovery plan។</li>
+                </ol>
+            </section>
+
+            <section id="android">
+                <h2>១៥ខ. App Android</h2>
+                <p>App Android ប្រើទិន្នន័យ Firebase និងច្បាប់លុយដូច web បេះបិទ។ លេខកំណែក្នុង Settings → Apps → ZoeW ស្មើលេខកំណែដែលបង្ហាញក្នុង App។</p>
+                <ul>
+                    <li><strong>ប៊ូតុង Back</strong>៖ បិទម៉ឺនុយ ប្រអប់ ឬរបា Slide ជាមុន → ត្រឡប់ទៅអេក្រង់មុនម្ដងមួយជំហាន (ទំព័រ និងរបៀបស្កេន) → ចុងក្រោយបង្រួម App។ Back មិនត្រឡប់ចូលរបៀប <strong>ដក</strong> វិញទេ វាត្រឡប់ជារបៀប <strong>កញ្ចប់</strong>។</li>
+                    <li><strong>ទាញចុះ</strong> ពីផ្នែកខាងលើនៃអេក្រង់ នៅកំពូលបញ្ជី ដើម្បីផ្ទុកទិន្នន័យឡើងវិញ។ ទូរស័ព្ទ Android ញ័រម្ដងពេលទាញគ្រប់ ➜ លែងដៃដើម្បីផ្ទុក។ ពេលប្រអប់ ម៉ឺនុយ ឬរបា Slide បើក ឬពេលផ្ទាំងប្រវត្តិហូតឡើងពេញអេក្រង់ ការទាញចុះមិនផ្ទុកទំព័រឡើងវិញទេ។</li>
+                    <li><strong>ខ្សែរមូរ (scrollbar)</strong>៖ ពេលរមូរបញ្ជី ខ្សែស្តើងពណ៌ប្រផេះលេចត្រង់គែមស្តាំ ប្រាប់ទីតាំងក្នុងបញ្ជី ហើយបាត់វិញពេលឈប់រមូរ (App Android និង iPhone ដែលដំឡើងលើអេក្រង់ដើម)។ វាមិនបាំងការចុច ហើយមិនជាន់របា Tab ទេ។</li>
+                    <li><strong>ក្រយៅដៃ/មុខ</strong> ប្រើផ្ទាំងជីវមាត្ររបស់ Android។ បើបន្ថែមក្រយៅដៃថ្មីក្នុងទូរស័ព្ទ App សុំឲ្យវាយ PIN ហើយបើកក្រយៅដៃម្ដងទៀត។</li>
+                    <li><strong>Export Excel/CSV</strong> បើកផ្ទាំង Share (Drive, Telegram, Excel…)។ <strong>PDF</strong> បើកផ្ទាំង Print → Save as PDF។</li>
+                </ul>
+                <div class="callout warning"><strong>App Android និង PWA លើទូរស័ព្ទដដែល រាប់ជា ២ ឧបករណ៍ក្នុង Key។</strong> ប្រើតែមួយ ឬសុំអ្នកលក់បន្ថែមចំនួនឧបករណ៍។ App មិន backup ទិន្នន័យទៅទូរស័ព្ទថ្មីទេ ដូច្នេះពេលប្ដូរទូរស័ព្ទ ត្រូវ Activate, Config និង Login ឡើងវិញ។</div>
+            </section>
+
+            <section id="backup">
+                <h2>១៦. Backup, Privacy និងការការពារទិន្នន័យ</h2>
+                <ul>
+                    <li>រៀបចំ Firebase Backup តាមគោលការណ៍អាជីវកម្ម និងសាកល្បង Restore ជាប្រចាំ។ Backup ដែលមិនធ្លាប់សាកល្បង Restore មិនទាន់ជាភស្តុតាងថាអាចប្រើបានទេ។</li>
+                    <li>កុំចែករំលែក Activation Key, Login, PIN, Setup Link, API secret ឬឯកសារ Export។</li>
+                    <li>ចាកចេញពី App មុនប្រគល់ឧបករណ៍ឲ្យអ្នកផ្សេង។</li>
+                    <li>ប្រើ Firebase Rules default-deny និង Publish rules ដោយដៃពេលមានការកែដែលបានអនុម័ត។</li>
+                    <li>Sentry លាក់ secret មុនផ្ញើ report ប៉ុន្តែ Barcode និងលេខសម្គាល់បច្ចេកទេសអាចត្រូវរក្សាទុកសម្រាប់ដោះស្រាយបញ្ហា។</li>
+                </ul>
+                <div class="callout danger">ZoeW មិនមានតួនាទីអ្នកប្រើច្រើនកម្រិតទេ។ គណនីដែលចូលបានអាចប្រើមុខងារដូចគ្នា ដូច្នេះត្រូវគ្រប់គ្រងគណនី Firebase យ៉ាងតឹងរឹង។</div>
+            </section>
+
+            <section id="health">
+                <h2>១៧. ពិនិត្យសុខភាពប្រព័ន្ធ</h2>
+                <p>របា Slide → <strong>🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</strong>។ វាអានស្ថានភាពបណ្តាញ, Firebase, ម៉ោង server, អាជ្ញាប័ណ្ណ, local storage, Offline cache, តារាងអតិថិជន, Lookup និងកំណែ Apps Script។ វាមិនកែទិន្នន័យ ឬទឹកប្រាក់ទេ។</p>
+                <ul>
+                    <li><strong>អាជ្ញាប័ណ្ណ</strong> (Firebase) ៖ សុពលភាព Activation Key — ថ្ងៃផុត និងចំនួនថ្ងៃនៅសល់។ នៅសល់ ៧ ថ្ងៃ ឬតិចជាងនេះ ➜ ⚠️ ជិតផុតកំណត់ (ទាក់ទងអ្នកលក់ដើម្បីពន្យារ) · ផុត ឬ Revoke ➜ ❌។ ហាង Supabase ៖ ជួរ <strong>ហាង (Supabase)</strong> បង្ហាញស្ថានភាពហាងជំនួស។</li>
+                    <li><strong>🧠 ការណែនាំ</strong> (ក្រោមបញ្ជី) ៖ App អានលទ្ធផលទាំងអស់ រួចប្រាប់ <strong>មូលហេតុចម្បង</strong> និង <strong>ជំហានត្រូវធ្វើមុន</strong> (យ៉ាងច្រើន ៣) តាមលំដាប់ — ឧ. ក្រៅបណ្ដាញ ➜ ភ្ជាប់បណ្ដាញសិន ហើយវាប្រាប់ថាជួរ Firebase/Supabase · Lookup · នាឡិកា នឹងជាវិញដោយខ្លួនឯង (មិនចាំបាច់ធ្វើអ្វីលើជួរទាំងនោះ)។ វាដេរីវេពីជួរដែលវាស់បានប៉ុណ្ណោះ — មិនផ្ញើអ្វីទៅ Server ទេ។</li>
+                    <li><strong>Lookup អតិថិជន (ZTO)</strong> ៖ ពេលដែល Cookie ត្រូវ Sync ចូល Blob («Sync ចូល Blob … មុន») និងការបន្តអាយុចុងក្រោយ។ «មិនទាន់ស្គាល់» ➜ រត់ឧបករណ៍ Sync Cookie ម្តង ដើម្បីឲ្យ App ដឹងអាយុពិត។ «អាយុ Cookie ក្រោយ Sync» ប្រាប់ Cookie ដែល ZTO បដិសេធរួច ៖ ប្រើបានប៉ុន្មាន · បដិសេធនៅពេលណា · ទំនេរប៉ុន្មានមុនបដិសេធ។</li>
+                </ul>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>សញ្ញា</th><th>អត្ថន័យ</th><th>សកម្មភាព</th></tr></thead>
+                        <tbody>
+                            <tr><td>✅</td><td>ធម្មតា</td><td>មិនចាំបាច់ធ្វើអ្វី</td></tr>
+                            <tr><td>⚠️</td><td>គួរពិនិត្យ ឬពិនិត្យមិនបាន</td><td>អានមូលហេតុ; ផ្ទៀងផ្ទាត់បណ្តាញ/PIN</td></tr>
+                            <tr><td>❌</td><td>មានបញ្ហាដែលបានផ្ទៀងផ្ទាត់</td><td>អនុវត្តការណែនាំក្នុងជួរនោះ</td></tr>
+                            <tr><td>ℹ️</td><td>ព័ត៌មាន ឬមិនទាន់អាចវាស់</td><td>ពិនិត្យម្ដងទៀតពេលលក្ខខណ្ឌរួចរាល់</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>១៨. ដោះស្រាយបញ្ហា</h2>
+                <details open>
+                    <summary>App បង្ហាញ Offline ឬទិន្នន័យមិនមក</summary>
+                    <ol><li>ពិនិត្យអ៊ីនធឺណិត និងស្ថានភាព Server នៅក្បាល App។</li><li>បើក Health Check ដើម្បីមើល listener ណាដែលមិនទាន់មក។</li><li>រង់ចាំការតភ្ជាប់ឡើងវិញ មុនចុចសកម្មភាពស្ទួន។</li></ol>
+                </details>
+                <details>
+                    <summary>កាមេរ៉ាមិនបើក ឬស្កេនមិនចូល</summary>
+                    <ol><li>អនុញ្ញាត Camera permission ក្នុង browser/system settings។</li><li>ប្រើពន្លឺល្អ និងរក្សា Barcode ឲ្យត្រង់/ច្បាស់។</li><li>សាកល្បង hardware scanner, រូបភាព ឬវាយដោយដៃ។</li><li>ផ្ទៀងផ្ទាត់ថា Barcode ជា CODE-128 ត្រឹមត្រូវ។</li></ol>
+                </details>
+                <details>
+                    <summary>ចំណូលបង្ហាញ —</summary>
+                    <p>វាមានន័យថាប្រវត្តិមិនទាន់មកដល់គ្រប់ ដូច្នេះ App មិនអាចដក «មិនទាន់យក» ពី ledger ដោយសុវត្ថិភាព។ ពិនិត្យ Firebase និងរង់ចាំ sync។ កុំចាត់ទុកវាជា $0.00។</p>
+                </details>
+                <details>
+                    <summary>បិទ/បើក ឬលុបនៅសារ ⏳</summary>
+                    <p>កុំចុចម្ដងទៀត។ App នឹងបញ្ចប់ transaction, ធុងសំរាម និងការកែ ledger ពេលបណ្តាញត្រឡប់មកវិញ។ ពិនិត្យ Health Check បន្ទាប់ពីភ្ជាប់។</p>
+                </details>
+                <details>
+                    <summary>លេខទូរស័ព្ទមិនបំពេញស្វ័យប្រវត្តិ</summary>
+                    <p>ពិនិត្យ Lookup config, PIN unlock, តារាងអតិថិជន និង ZTO Cookie។ អ្នកនៅតែអាចវាយលេខដោយដៃ ហើយលទ្ធផលយឺតមិនគួរសរសេរជាន់វា។</p>
+                </details>
+                <details>
+                    <summary>App បង្ហាញ «⚠️ App ជួបបញ្ហាក្នុងការបង្ហាញ»</summary>
+                    <p>ផ្ទាំងមួយក្នុង App មិនអាចបង្ហាញបាន (ឧ. ទិន្នន័យមានរូបរាងមិនធម្មតា)។ ចុច «🔄 ផ្ទុក App ឡើងវិញ»។ កំហុសត្រូវបានរាយការណ៍ដោយស្វ័យប្រវត្តិ។ ការងារដែលកំពុងរង់ចាំបណ្តាញ (⏳) អាចមិនទាន់ចុះ ➜ ក្រោយផ្ទុកឡើងវិញ សូមពិនិត្យកញ្ចប់ចុងក្រោយដែលអ្នកបានស្កេន។ បើផ្ទាំងនេះលេចម្តងហើយម្តងទៀត សូមកត់ពេលវេលា និងសកម្មភាពចុងក្រោយ រួចទាក់ទងជំនួយ។</p>
+                </details>
+                <details>
+                    <summary>ត្រូវការជំនួយបន្ថែម</summary>
+                    <p>កត់លេខកំណែ ZoeW, ពេលវេលាកើតបញ្ហា, មុខងារដែលប្រើ និងសារកំហុស ដោយលាក់ PIN/secret។ ទាក់ទង <a href="https://t.me/mengsroyhun" rel="noopener">@mengsroyhun តាម Telegram</a>។</p>
+                </details>
+            </section>
+
+            <section id="checklist">
+                <h2>១៩. បញ្ជីត្រួតពិនិត្យប្រចាំថ្ងៃ</h2>
+                <ul class="checklist">
+                    <li>ស្ថានភាព Server បៃតង និង Firebase ទាញទិន្នន័យមកគ្រប់។</li>
+                    <li>ថ្ងៃ/ម៉ោងឧបករណ៍ត្រឹមត្រូវ ហើយ Health Check មិនមាន ❌។</li>
+                    <li>Locker បច្ចុប្បន្នត្រឹមត្រូវ មុនស្កេនជាបន្តបន្ទាប់។</li>
+                    <li>ពិនិត្យលេខទូរស័ព្ទ និង COD/DOD មុនចុច យល់ព្រម។</li>
+                    <li>ផ្ទៀងផ្ទាត់ «យករួច + មិនទាន់យក = តម្លៃកញ្ចប់ទាំងអស់»។</li>
+                    <li>កុំចុចសកម្មភាពម្ដងទៀតពេល App បង្ហាញ ⏳។</li>
+                    <li>Export/Backup តាមកាលវិភាគ និងរក្សាឯកសារដោយសុវត្ថិភាព។</li>
+                    <li>ចាកចេញពេលបញ្ចប់ការងារលើឧបករណ៍ដែលមានអ្នកប្រើច្រើន។</li>
+                </ul>
+                <p><strong>ការបោះពុម្ព៖</strong> ប្រើម៉ឺនុយ browser → Print ឬ <kbd>Ctrl</kbd> + <kbd>P</kbd> ដើម្បីរក្សាសៀវភៅនេះជា PDF។</p>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <div class="footer-inner">
+            <span>© 2026 ZoeW · សៀវភៅណែនាំអ្នកប្រើប្រាស់</span>
+            <span><a href="#main-content">ត្រឡប់ទៅខាងលើ</a> · <a href="./index.html">បើក ZoeW</a></span>
+        </div>
+    </footer>
+</body>
+</html>

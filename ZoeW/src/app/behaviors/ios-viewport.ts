@@ -30,6 +30,14 @@ export function iosSearchDocumentLocked(): boolean {
     return (uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) && usesIOSPanelHandoff();
 }
 
+export function iosModalKeyboardLocked(): boolean {
+    return uiState.modalViewportHeight > 0 && usesIOSPanelHandoff();
+}
+
+function iosKeyboardPanLocked(): boolean {
+    return iosModalKeyboardLocked() || (iosSearchDocumentLocked() && window.innerWidth < IOS_SEARCH_WIDE_MIN_PX);
+}
+
 export function restoreIOSDocumentScroll(): void {
     if (!iosSearchDocumentLocked()) return;
     if ((window.scrollY || 0) === 0) return;
@@ -90,7 +98,7 @@ function armIOSKeyboardPanBlock(on: boolean): void {
 
 export function measureIOSKeyboardInset(): void {
     keyboardLocked = iosSearchDocumentLocked();
-    armIOSKeyboardPanBlock(keyboardLocked);
+    armIOSKeyboardPanBlock(keyboardLocked || iosModalKeyboardLocked());
     const inset = iosKeyboardInsetPx();
     if (uiState.iosKeyboardInset !== inset) uiState.iosKeyboardInset = inset;
 }
@@ -156,7 +164,7 @@ export function noteIOSKeyboardTouchStart(e: TouchEvent): void {
     keyboardPan = null;
     pullDownTouchSeen = true;
     if (pullDownSettleTimer !== null && uiState.panelGliding) endPanelGlideSnapPause();
-    if (!e.touches || e.touches.length !== 1 || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX || !iosSearchDocumentLocked()) return;
+    if (!e.touches || e.touches.length !== 1 || !iosKeyboardPanLocked()) return;
     const t = e.touches[0];
     keyboardPan = { id: t.identifier, x: t.clientX, y: t.clientY, block: null };
 }
@@ -171,8 +179,9 @@ export function blockIOSKeyboardPan(e: TouchEvent): void {
         const dy = t.clientY - pan.y;
         if (dx === 0 && dy === 0) return;
         const field = e.target as HTMLElement | null;
-        const inField = !!field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') && !IOS_SEARCH_FIELDS.some((name) => elementOf(name) === field);
-        pan.block = Math.abs(dy) >= Math.abs(dx) && !inField && iosSearchDocumentLocked() && keyboardPanBlocked(e.target, dy > 0);
+        const inField = !!field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') && !IOS_SEARCH_FIELDS.some((name) => elementOf(name) === field) &&
+            !(iosModalKeyboardLocked() && typeof field.closest === 'function' && !!field.closest('.modal'));
+        pan.block = Math.abs(dy) >= Math.abs(dx) && !inField && iosKeyboardPanLocked() && keyboardPanBlocked(e.target, dy > 0);
     }
     if (pan.block) e.preventDefault();
 }
@@ -192,7 +201,8 @@ export function listenIOSKeyboard(scope: LifecycleScope): void {
     if (window.visualViewport) scope.listen(window.visualViewport, 'resize', measureIOSKeyboardInset);
     scope.onDispose(uiState.subscribe(() => {
         noteIOSSearchPullState();
-        if (iosSearchDocumentLocked() === keyboardLocked) return;
+        const searchLocked = iosSearchDocumentLocked();
+        if (searchLocked === keyboardLocked && (searchLocked || iosModalKeyboardLocked()) === (keyboardPanScope !== null)) return;
         measureIOSKeyboardInset();
     }));
     scope.onDispose(() => { armIOSKeyboardPanBlock(false); clearPullDownSettle(); });

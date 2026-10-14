@@ -265,6 +265,9 @@
 
 body.modal-keyboard .modal { top: var(--modal-vv-top, 0px); height: var(--modal-vv-height, 100%); }
 body.modal-keyboard .modal-content { max-height: 100%; }
+html.ios-standalone body.modal-keyboard,
+html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
+html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }
 
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }

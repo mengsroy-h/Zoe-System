@@ -672,7 +672,8 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
   not targets.
 - ⛔ Owner rules: start in the **top 40%** (`PTR_START_ZONE_RATIO`) · any open layer ➜ no PTR (`ptrBlockedByOverlay()`,
   state remembered at `pointerdown` on `window` capture) · one haptic tick at the threshold (`hapticTick()`; iPhone web
-  has no vibration API).
+  has no vibration API ➜ `iosHapticSwitchTick()` (`platform/document-io.ts`) clicks a hidden `<label><input type="checkbox" switch>` — Safari plays a haptic
+  when a switch toggles; feature-detected by `'switch' in input`, created once, off-screen ⛔ never `display: none` · `ZoeW/tests/haptic-ios-switch.test.ts`).
 - ⛔ Panel `.collapsed`/`.search-focus` or `history-expanded` ➜ PTR fully off; the non-passive listener is armed ahead and
   removed via `MutationObserver` ⛔ never installed after `touchstart`.
 - PTR layout (`react-root.css` only): below 992px, `.ptr-indicator` uses `top: calc(var(--chrome-top, 51px) - 41px)`

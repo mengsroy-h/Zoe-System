@@ -46,7 +46,7 @@
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 0ខ. **Branch `ccr-20e725de-tpecua`** (ពី `main` `7960a90` = PR #315 · **មិនទាន់ merge**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
-    ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+    ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) · PTR ញ័រតាម `<input switch>` (A77) ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **merge រួចតាម PR #315 · `7960a90`**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
    (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -186,7 +186,11 @@
   ➜ `.app-pages` `padding-bottom` ➜ កាតបញ្ជីចប់ ៨px ពីលើ keyboard ហើយបញ្ជីរមូរក្នុងកាតខ្លួនឯង (ដូច Android) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ ➜
   `preventDefault()` (`blockIOSKeyboardPan()`) ➜ document មិនរំកិល · អ្នករមូរមានកន្លែង · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ ➜ iOS ធម្មតា · `restoreIOSDocumentScroll()`
   នៅជាខ្សែការពារទីពីរ។ ប្រអប់បិទ ឬ keyboard បិទ ➜ ០ ➜ ទម្រង់ដើម។
-- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium គ្មាន keyboard iOS ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (A76) ➜ ត្រូវសាក (សកម្មភាព ២)។
+- 📳 **iPhone PWA ៖ PTR ញ័រពេលទាញគ្រប់** (ម្ចាស់គម្រោង ៖ «iOS PTR អត់ញ័រ» · A77)។ WebKit គ្មាន `navigator.vibrate` ➜ `hapticTick()` ធ្លាក់ទៅ `iosHapticSwitchTick()`
+  (`platform/document-io.ts`) ៖ `<label><input type="checkbox" switch>` លាក់ក្រៅអេក្រង់ (មិន `display: none`) សាងម្តងក្នុងទំព័រ ➜ `label.click()` ➜ Safari (iOS 17.4+)
+  លេងញ័រពេល switch ផ្លាស់ · browser គ្មាន `switch` (`'switch' in input` មិនពិត) ➜ គ្មានអ្វី · Android web នៅ `vibrate` · APK នៅ Capacitor Haptics ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium គ្មាន keyboard iOS ហើយគ្មាន `switch` ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (A76) · haptic ពីឯកសារ WebKit (A77) ➜ ត្រូវសាក (សកម្មភាព ២)។
 
 #### អ្នកយាម
 
@@ -194,6 +198,8 @@
   ប្រអប់មិនទាញឡើង · អេក្រង់ធំ · Android/web ➜ ០ · គ្មាន listener) · ខ្សែភ្ជាប់ (boot · `DocumentEffects` · `react-root.css` ត្រឹម `html.ios-standalone body.ios-keyboard`) ·
   `touchmove` (preventDefault ក្រៅអ្នករមូរ · ចាក់សោក្នុងកាយវិការ · អ្នករមូរមានកន្លែង/ដល់ចុង/ត្រឡប់ទិស · ផ្ដេក · ប្រអប់អក្សរ · ម្រាមដៃពីរ · មិន cancelable · listener
   capture + មិន passive) — លើដើមឈើមុនកែ ១០/១០ ធ្លាក់។ `ios-search-viewport` · `ios-search-tap-focus` នៅបៃតង (២៥/២៥)។
+- `ZoeW/tests/haptic-ios-switch.test.ts` (ថ្មី ៥) ៖ គ្មាន `vibrate` + `switch` មាន ➜ label + `input[switch]` មួយក្នុង `<body>` · ចុច ➜ `checked` ផ្លាស់រាល់ដង · សាងម្តង ·
+  `vibrate` មាន ➜ ហៅ `vibrate` · គ្មាន switch · គ្មាន `switch` ➜ គ្មានធាតុ · មិន throw · CSS `.haptic-switch` ក្រៅអេក្រង់ មិន `display: none` — លើដើមឈើមុនកែ ធ្លាក់។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -201,7 +207,8 @@
 2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ keyboard បើក ➜ (ក) កាតបញ្ជីចប់ពីលើ keyboard (គ្មានជួរនៅក្រោយ keyboard) · (ខ) អូសឡើង/ចុះលើកាត ➜ navbar និងប្រអប់ស្វែងរក
    នៅនឹងកន្លែង · គ្មានលោត · (គ) បញ្ជីវែង (> ៥ ជួរ) ➜ រមូរក្នុងកាតដល់ជួរចុងក្រោយ · (ឃ) បញ្ជីស្នើលេខវែង ➜ រមូរបាន · (ង) ប្រអប់ស្វែងរកទំព័រស្កេន ➜ ដូចគ្នា ·
    (ច) បិទ keyboard ➜ ទម្រង់ដើម។ នៅខុស ➜ ថតវីដេអូម្តងទៀត។
-3. Android (APK · PWA) ៖ ស្វែងរកដដែល (គួរតែមិនប្រែ)។
+3. iPhone ៖ ទាញចុះដើម្បីផ្ទុកឡើងវិញ ➜ ញ័រម្ដងពេលទាញគ្រប់ (iOS 17.4 ឡើង · ការកំណត់ System Haptics បើក)។ មិនញ័រ ➜ ប្រាប់កំណែ iOS។
+4. Android (APK · PWA) ៖ ស្វែងរក · PTR ដដែល (គួរតែមិនប្រែ)។
 
 ### [2.50.64] — 2026-10-14 · 🧠 ការណែនាំឆ្លាតវៃក្នុង 🩺 ពិនិត្យសុខភាព · toast រស់និយាយតាមដំណាក់កាលការសរសេរ (Deep audit ជុំទី ៤)
 
@@ -3759,6 +3766,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A76 | **iPhone PWA ៖ អូសលើកាតបញ្ជីខណៈស្វែងរកលេខ ➜ ទំព័រទាំងមូលរំកិលឡើង ហើយលោតត្រឡប់** (ម្ចាស់គម្រោង ៖ «ចលនា scroll iOS ខុសប្រក្រតី · APK · PWA Android រលូន») | ព្រឹត្តិការណ៍ ៧ (១.១ · ២.៣ · ៣.៧ · ៤.៨ · ៦.២ · ១៨.២ · ១៩.៤ វិ.) ដូចគ្នា ៖ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក · កាត) រំកិលឡើង > ២០០px (មាត្រដ្ឋាន ៤៨០) ក្នុង ១៣០–៣០០ms តាមម្រាមដៃ ➜ បង្ហាញផ្នែកសដែលនៅក្រោយ keyboard (ប៊ូតុង «បន្ថែម» · ចន្លោះទទេ) ➜ ឈរ ២០០–៣០០ms ➜ ត្រឡប់ ០ ក្នុង **១ ស៊ុម** (មិនមែន rubber band ដែលមានចលនា) · Chromium (ក្លែង iOS standalone) ៖ `.page-main` ក្រោម `search-focus` = `flex: 1 1 0` ក្នុង `.app-page.active { height: 100% }` នៃ `.app-pages` = `100dvh − chrome` ➜ iOS មិនបង្រួម `100dvh`/`innerHeight` ពេល keyboard បើក (Android បង្រួម) ➜ កាតលាតដល់ក្រោយ keyboard · ជួរនៅទីនោះមើលមិនឃើញក្រៅពីអូស document (iOS អនុញ្ញាតទោះ `html.ios-standalone { overflow-y: hidden }`) · `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ = ចុងកាយវិការ (WebKit ផ្ញើ `scroll` ពេល viewport ស្ថិរ) ➜ លោត ១ ស៊ុម | (១) inset keyboard ពី `visualViewport` ➜ `.app-pages` `padding-bottom` ➜ កាតចប់ពីលើ keyboard (គ្មានជួរលាក់ · គ្មានហេតុអូស) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរមានកន្លែង ➜ `preventDefault()` (ដូច body-scroll-lock លើ iOS) ➜ document មិនរំកិល · ការត្រឡប់ ០ នៅជាខ្សែទីពីរ · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ ➜ ត្រូវសាកលើ iPhone ពិត · `ZoeW/tests/ios-keyboard-pan.test.ts` ១០ ធ្លាក់លើដើមឈើមុនកែ |
+| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ |
 
 ### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
 
@@ -6166,6 +6174,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/haptic-ios-switch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

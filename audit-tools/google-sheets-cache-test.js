@@ -134,7 +134,11 @@ function testSmallRowsAreCached() {
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.put[0].key, 'customer_rows_v2_3');
-    assert.strictEqual(api.calls.put[0].ttl, 300);
+    const declaredTtl = /var\s+CACHE_TTL_SECONDS\s*=\s*(\d+)\s*;/.exec(source);
+    assert.ok(declaredTtl, 'CACHE_TTL_SECONDS ត្រូវប្រកាសជាចំនួនគត់');
+    assert.ok(Number(declaredTtl[1]) >= 10 && Number(declaredTtl[1]) <= 60,
+        '⛔ cache អ្នកអាន ≤ ៦០ វិ. (ការសម្រេចម្ចាស់គម្រោង ៖ ការនាំចូលក្រៅ ZoeW ត្រូវឃើញលើឧបករណ៍ផ្សេងក្នុង ១ នាទី) · ≥ ១០ វិ. (quota) — បាន ' + declaredTtl[1]);
+    assert.strictEqual(api.calls.put[0].ttl, Number(declaredTtl[1]));
     assert.deepStrictEqual(JSON.parse(api.calls.put[0].value), rows);
 }
 

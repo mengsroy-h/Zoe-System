@@ -1,5 +1,5 @@
 var SCRIPT_VERSION = 1;
-var CACHE_TTL_SECONDS = 300;
+var CACHE_TTL_SECONDS = 60;
 var CACHE_KEY_PREFIX = 'customer_rows_v2_';
 
 function doGet(e) {

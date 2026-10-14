@@ -337,7 +337,7 @@ only this text protects them.
 | **Netlify config** | ⛔ No root `netlify.toml` (read by both sites) · CSP · `functions` · headers match what the app ships | `netlify-config-scope-test` |
 | **Document scope** | READMEs and `ZTO-SETUP-KH.md` usage only · history only in `docs/HISTORY*.md` · `CLAUDE.md` rules only (no versions/dates outside the header table) · current-version claims derived from code (incl. `CACHE_VERSION`) · checker lists derived (guide words · `listReadmeFiles()` · UI surfaces · 🩺 rows · `collectedValueOf()` screens · 📝 count · every `audit-tools/*.js` in its README · `money-reality-check.js` section counts) · removed surfaces never live in docs (storage keys exist in shipped code) · new surfaces appear in `guide.html` (`licenseFailureMessage()` · `LICENSE_SEAT_SLOTS`) · every `run "emu/…"` named in the Runbook degradation paragraph | `doc-scope-test` · `user-guide-test` |
 | **Netlify Base directory** | Case-sensitive `ZoeW` · `ZoeKeyGen` (UI only) | 📝 |
-| **`zto-import` · Apps Script** | `SCRIPT_VERSION` rises on every response from one exit point | `google-sheets-cache-test` · `health-check-test` |
+| **`zto-import` · Apps Script** | `SCRIPT_VERSION` rises on every response from one exit point · the reader cache (`CACHE_TTL_SECONDS`) stays 10–60 s (owner decision: an import made outside ZoeW reaches other devices within a minute; a `fresh=1` read rewrites the shared cache) | `google-sheets-cache-test` · `health-check-test` |
 
 ### Rules carried by specific checkers
 

@@ -48,20 +48,29 @@ export function iosKeyboardInsetPx(): number {
     return inset >= KEYBOARD_MIN_INSET_PX && Number.isFinite(inset) ? inset : 0;
 }
 
+function overflowsY(node: Element): boolean {
+    return node.scrollHeight - node.clientHeight > 1;
+}
+
 export function measureIOSKeyboardListRoom(): void {
     const scroller = keyboardLocked ? activePanelSections().scroller : null;
-    const fixed = !!scroller && !(scroller.scrollHeight - scroller.clientHeight > 1);
+    const fixed = !!scroller && !overflowsY(scroller);
     if (uiState.iosKeyboardListFixed !== fixed) uiState.iosKeyboardListFixed = fixed;
+    const box = keyboardLocked && uiState.phoneSuggestOpen ? elementOf('phoneSuggestBox') : null;
+    const suggestFixed = !!box && !overflowsY(box);
+    if (uiState.iosKeyboardSuggestFixed !== suggestFixed) uiState.iosKeyboardSuggestFixed = suggestFixed;
 }
 
 function watchIOSKeyboardListRoom(on: boolean): void {
     if (listRoomObserver) listRoomObserver.disconnect();
     listRoomObserver = null;
     const scroller = on ? activePanelSections().scroller : null;
-    if (scroller && typeof ResizeObserver === 'function') {
+    const box = on ? elementOf('phoneSuggestBox') : null;
+    if ((scroller || box) && typeof ResizeObserver === 'function') {
         listRoomObserver = new ResizeObserver(measureIOSKeyboardListRoom);
-        listRoomObserver.observe(scroller);
-        if (scroller.firstElementChild) listRoomObserver.observe(scroller.firstElementChild);
+        if (scroller) listRoomObserver.observe(scroller);
+        if (scroller && scroller.firstElementChild) listRoomObserver.observe(scroller.firstElementChild);
+        if (box) listRoomObserver.observe(box);
     }
     measureIOSKeyboardListRoom();
 }
@@ -87,7 +96,7 @@ export function measureIOSKeyboardInset(): void {
 }
 
 function verticalRoom(node: Element, down: boolean): boolean {
-    if (node.scrollHeight - node.clientHeight <= 1) return false;
+    if (!overflowsY(node)) return false;
     const overflowY = window.getComputedStyle(node).overflowY;
     if (overflowY !== 'auto' && overflowY !== 'scroll') return false;
     return down ? node.scrollTop > 0 : node.scrollTop + node.clientHeight < node.scrollHeight - 1;

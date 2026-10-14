@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uiState } from '../src/core/state';
 import { AppPages } from '../src/app/components/AppPages';
+import { PhoneSuggestBox } from '../src/app/components/PhoneSuggestBox';
 import { DocumentEffects } from '../src/app/components/shell/DocumentEffects';
 import { commitNow } from '../src/app/flush';
 import { elementOf } from '../src/app/refs';
@@ -127,7 +128,7 @@ beforeEach(() => {
         return a;
     };
     uiState.dataPanelSearchFocus = false;
-    mount(<><DocumentEffects /><AppPages /></>);
+    mount(<><DocumentEffects /><AppPages /><PhoneSuggestBox /></>);
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = false;
 });
 
@@ -139,6 +140,8 @@ afterEach(() => {
     uiState.dataPanelSearchFocus = false;
     uiState.iosKeyboardInset = 0;
     uiState.iosKeyboardListFixed = false;
+    uiState.iosKeyboardSuggestFixed = false;
+    uiState.phoneSuggestOpen = false;
     unmount();
     delete (Element.prototype as any).animate;
     Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realInnerWidth });
@@ -276,12 +279,52 @@ describe('iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក
         expect(uiState.iosKeyboardListFixed).toBe(false);
     });
 
-    it('⛔ ខ្សែភ្ជាប់ ៖ react-root.css ៖ keyboard បើក ➜ body · .app-pages touch-action none (WebKit ហាម scroll view មេ) · បញ្ជីរមូរមិនបាន ➜ touch-action none (iOS standalone តែប៉ុណ្ណោះ)', async () => {
+    it('⛔ keyboard បើក · Suggestion លេខទូរស័ព្ទរមូរមិនបាន (ជួរតិច) ➜ body.ios-keyboard-suggest-fixed · ជួរច្រើន (រមូរបាន) ➜ ដក · Suggestion បិទ ឬ keyboard បិទ ➜ ដក', async () => {
+        const model = webkitSnapModel();
+        iosViewport.listenIOSKeyboard(scope());
+        const box = byId('phoneSuggestBox');
+        let sh = 90;
+        Object.defineProperty(box, 'scrollHeight', { configurable: true, get: () => sh });
+        Object.defineProperty(box, 'clientHeight', { configurable: true, get: () => Math.min(sh, 240) });
+        await pullUpAndSettle(model);
+        uiState.iosKeyboardInset = 336;
+        uiState.phoneSuggestOpen = true;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(uiState.iosKeyboardSuggestFixed).toBe(true);
+        expect(document.body.classList.contains('ios-keyboard-suggest-fixed')).toBe(true);
+        sh = 520;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(uiState.iosKeyboardSuggestFixed).toBe(false);
+        expect(document.body.classList.contains('ios-keyboard-suggest-fixed')).toBe(false);
+        sh = 90;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(document.body.classList.contains('ios-keyboard-suggest-fixed')).toBe(true);
+        uiState.phoneSuggestOpen = false;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(uiState.iosKeyboardSuggestFixed).toBe(false);
+        expect(document.body.classList.contains('ios-keyboard-suggest-fixed')).toBe(false);
+        uiState.phoneSuggestOpen = true;
+        iosViewport.measureIOSKeyboardListRoom();
+        uiState.iosKeyboardInset = 0;
+        commitNow();
+        expect(document.body.classList.contains('ios-keyboard-suggest-fixed')).toBe(false);
+        glidePhoneSearchPulledUp(false);
+        await finishGlides();
+        expect(uiState.iosKeyboardSuggestFixed).toBe(false);
+    });
+
+    it('⛔ ខ្សែភ្ជាប់ ៖ react-root.css ៖ keyboard បើក ➜ body · .app-pages touch-action none (WebKit ហាម scroll view មេ) · បញ្ជី/Suggestion រមូរមិនបាន ➜ touch-action none · ចុងបញ្ជី/Suggestion មិនបន្ត (iOS standalone តែប៉ុណ្ណោះ)', async () => {
         const { readFileSync } = await import('node:fs');
         const path = await import('node:path');
         const css = readFileSync(path.resolve(__dirname, '../src/styles/react-root.css'), 'utf8');
-        const rule = /html\.ios-standalone body\.ios-keyboard,\s*html\.ios-standalone body\.ios-keyboard \.app-pages,\s*html\.ios-standalone body\.ios-keyboard-list-fixed \.app-page\.active > \.page-main \.table-responsive \{ touch-action: none; \}/;
+        const rule = /html\.ios-standalone body\.ios-keyboard,\s*html\.ios-standalone body\.ios-keyboard \.app-pages,\s*html\.ios-standalone body\.ios-keyboard-list-fixed \.app-page\.active > \.page-main \.table-responsive,\s*html\.ios-standalone body\.ios-keyboard-suggest-fixed \.phone-suggest \{ touch-action: none; \}/;
+        const contain = /html\.ios-standalone body\.ios-keyboard \.app-page\.active > \.page-main \.table-responsive,\s*html\.ios-standalone body\.ios-keyboard \.phone-suggest \{ overscroll-behavior-y: contain; \}/;
         expect(rule.test(css)).toBe(true);
+        expect(contain.test(css)).toBe(true);
         expect(/body\.ios-keyboard[^{]*\{[^}]*touch-action/.test(css.replace(rule, ''))).toBe(false);
     });
 });

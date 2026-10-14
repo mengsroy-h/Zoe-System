@@ -255,10 +255,12 @@
     .app-page.active > .page-side.search-focus + .page-main { flex: 1 1 0; min-height: 0; height: auto; }
     html.ios-standalone body.ios-keyboard .app-pages:has(> .app-page.active > .page-side.search-focus),
     html.ios-standalone body.ios-keyboard .app-pages.history-expanded { padding-bottom: calc(var(--ios-keyboard-inset, 0px) + 8px); }
-    html.ios-standalone body.ios-keyboard .app-page.active > .page-main .table-responsive { overscroll-behavior-y: contain; }
+    html.ios-standalone body.ios-keyboard .app-page.active > .page-main .table-responsive,
+    html.ios-standalone body.ios-keyboard .phone-suggest { overscroll-behavior-y: contain; }
     html.ios-standalone body.ios-keyboard,
     html.ios-standalone body.ios-keyboard .app-pages,
-    html.ios-standalone body.ios-keyboard-list-fixed .app-page.active > .page-main .table-responsive { touch-action: none; }
+    html.ios-standalone body.ios-keyboard-list-fixed .app-page.active > .page-main .table-responsive,
+    html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
 }
 
 .trash-more-row td { border-bottom: none; }

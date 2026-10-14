@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.68` (`zoew-v331`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.69` (`zoew-v332`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.18` (`zoekeygen-v129`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -635,9 +635,13 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   ⛔ The touchmove block alone is not enough (owner video: the page and the navbar still moved): WebKit decides the main scroll view's pan in the UI process from the
   `touch-action` at the touch start ➜ while `body.ios-keyboard`, `body` and `.app-pages` get `touch-action: none` (`react-root.css`; `.app-pages`' `overflow-x` computes to
   `auto`, so it restarts the used value at `auto` and needs its own `none`) · scroll containers inside restart at `auto` ➜ the list scrolls · the active list scroller
-  (`activePanelSections().scroller`) that cannot scroll (empty · short) has no child scroll view ➜ `measureIOSKeyboardListRoom()` (ResizeObserver on the scroller and its
-  content while the search is locked) ➜ `uiState.iosKeyboardListFixed` ➜ `body.ios-keyboard-list-fixed` ➜ `touch-action: none` on it (`gesture-test` WebKit used-touch-action
-  model · `ZoeW/tests/ios-search-resnap.test.tsx`).
+  (`activePanelSections().scroller`) and the open phone suggestion box (`.phone-suggest`, fixed · `overflow-y: auto`) that cannot scroll (empty · short · few
+  suggestions) have no child scroll view ➜ `measureIOSKeyboardListRoom()` (ResizeObserver on the scroller, its content and the suggestion box while the search is locked)
+  ➜ `uiState.iosKeyboardListFixed` · `iosKeyboardSuggestFixed` ➜ `body.ios-keyboard-list-fixed` · `body.ios-keyboard-suggest-fixed` ➜ `touch-action: none` on it · both
+  get `overscroll-behavior-y: contain` (a scrollable end never chains to the main scroll view) ⛔ every point above the keyboard either refuses the Y pan or lies in a
+  scroller with room + contain (`gesture-test` WebKit used-touch-action model on a 22px grid, data and scan pages, few and many suggestions ·
+  `ZoeW/tests/ios-search-resnap.test.tsx`). Not covered: a modal's `.modal-content` that cannot scroll keeps iOS's own keyboard behavior
+  (as in every modal); its backdrop refuses the pan.
   Pulling the search down (`dataPanelSearchFocus` true ➜ false, iOS standalone phone) pauses snap (`beginPanelGlideSnapPause()`) **before** React commits it
   (`settleIOSSearchPullDown()` runs in the store subscriber, inside the immediate commit): while pulled up `.page-main`'s snap offset is 0 = the scroll position, so WebKit
   records it as the snapped box and its re-snap after layout (WebKit `ScrollSnapAnimatorState::resnapAfterLayout` · synchronous, in the first layout after the commit) would scroll to `.page-main`'s new offset — the search card

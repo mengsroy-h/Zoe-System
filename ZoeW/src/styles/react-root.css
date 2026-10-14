@@ -693,8 +693,8 @@
 .label-bc svg { display: block; width: 100%; height: 100%; }
 .label-bc svg rect { fill: #000; }
 .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
-.label-meta { display: flex; justify-content: center; gap: 4mm; margin-top: 1.5mm; font-size: 13pt; font-weight: 700; }
-.label-money { font-size: 15pt; }
+.label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
+.label-money { margin-top: 1mm; font-size: 17pt; font-weight: 800; white-space: nowrap; }
 .label-locker::before { content: '📍'; }
 @media print {
     #pdfExportPrintArea .label-sheet { width: 100%; }

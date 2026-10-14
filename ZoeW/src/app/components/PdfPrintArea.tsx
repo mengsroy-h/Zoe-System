@@ -19,9 +19,9 @@ export function LabelSheet({ view }: { view: LabelPrintView }) {
                     <div className="label-phone">{row.phone}</div>
                     <div className="label-bc"><Code128Svg code={row.barcode} /></div>
                     <div className="label-code">{row.barcode}</div>
+                    {labelMoneyText(row) ? <div className="label-money">{labelMoneyText(row)}</div> : null}
                     <div className="label-meta">
                         <span className="label-date">{row.date}</span>
-                        {labelMoneyText(row) ? <span className="label-money">{labelMoneyText(row)}</span> : null}
                         {row.locker ? <span className="label-locker">{row.locker}</span> : null}
                     </div>
                 </div>

@@ -40,7 +40,7 @@ function finishModal(save: boolean) {
 
 beforeEach(() => {
     toasts.length = 0;
-    vi.spyOn(toastModule, 'showToast').mockImplementation((t: any) => { toasts.push(String(t)); });
+    vi.spyOn(toastModule, 'showToast').mockImplementation((t: any) => { toasts.push(String(t)); return 0; });
     opensModal = new Set();
     trigger = vi.spyOn(scanAction, 'triggerScanAction').mockImplementation((code: string) => {
         if (!opensModal.has(code)) return;

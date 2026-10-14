@@ -21,7 +21,7 @@ import { DB_LISTENER_KEY_HISTORY, dbListenerFailedPaths, dbListenerPendingPaths,
 import { LABEL_PRINT_OPTIONS_KEY } from '../src/core/storage-keys';
 import { MODAL_IDS, modalIsOpen } from '../src/core/modals';
 import { restoreAfterPdfExport } from '../src/features/export';
-import { buildLabelRows, DEFAULT_LABEL_OPTIONS, LABEL_PREVIEW_MAX, labelDateOf, labelMoneyText, loadLabelOptions, openLabelPrintModal, printLabelsFromModal, resetLabelPrint, updateLabelPrintPreview } from '../src/features/label-print';
+import { buildLabelRows, DEFAULT_LABEL_OPTIONS, LABEL_LAYOUTS, LABEL_PREVIEW_MAX, labelDateOf, labelMoneyText, loadLabelOptions, openLabelPrintModal, printLabelsFromModal, resetLabelPrint, updateLabelPrintPreview } from '../src/features/label-print';
 import { ACTION_NAMES } from '../src/core/action-registry';
 import { moreMenuPrintItemLabels, moreMenuPrintLabels } from '../src/ui/more-menu';
 import { closeModal } from '../src/ui/modal';
@@ -38,7 +38,7 @@ const labelsIn = (sel: string) => document.querySelectorAll(sel + ' .label');
 beforeEach(() => {
     printed.length = 0;
     toasts.length = 0;
-    vi.spyOn(toastModule, 'showToast').mockImplementation((t: any) => { toasts.push(String(t)); });
+    vi.spyOn(toastModule, 'showToast').mockImplementation((t: any) => { toasts.push(String(t)); return 0; });
     try { localStorage.removeItem(LABEL_PRINT_OPTIONS_KEY); } catch {}
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
@@ -89,8 +89,10 @@ describe('ស្លាកកញ្ចប់ ៖ ទិន្នន័យ', () =>
 
     it('ជម្រើស ៖ លំនាំដើម · រក្សាទុក/ផ្ទុកពី localStorage · តម្លៃខូច ➜ លំនាំដើម', () => {
         expect(loadLabelOptions()).toEqual(DEFAULT_LABEL_OPTIONS);
-        localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, JSON.stringify({ layout: 'single', money: false, date: 'x', openOnly: false }));
-        expect(loadLabelOptions()).toEqual({ layout: 'single', money: false, locker: true, date: true, openOnly: false });
+        localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, JSON.stringify({ layout: '50x30', money: false, date: 'x', openOnly: false }));
+        expect(loadLabelOptions()).toEqual({ layout: '50x30', money: false, locker: true, date: true, openOnly: false });
+        localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, JSON.stringify({ layout: 'nope' }));
+        expect(loadLabelOptions().layout).toBe('a4-3');
         localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, '{bad');
         expect(loadLabelOptions()).toEqual(DEFAULT_LABEL_OPTIONS);
     });
@@ -216,6 +218,11 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(pt && Number(pt[1]) >= 24).toBe(true);
         expect(/\.label\s*\{[^}]*break-inside:\s*avoid/.test(css)).toBe(true);
         expect(/\.label-sheet\.layout-single \.label\s*\{[^}]*break-after:\s*page/.test(css)).toBe(true);
+        expect(/@page zoeLabel50x30\s*\{\s*size:\s*50mm 30mm/.test(css)).toBe(true);
+        expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*page:\s*zoeLabel50x30[^}]*break-after:\s*page/.test(css)).toBe(true);
+        expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*width:\s*47mm[^}]*height:\s*27mm/.test(css)).toBe(true);
+        expect(LABEL_LAYOUTS).toEqual(['a4-3', 'a4-2', 'single', '50x30']);
+        expect(readFileSync(path.join(root, 'app', 'components', 'modals', 'LabelPrintModal.tsx'), 'utf8')).toMatch(/<option value="50x30">/);
         expect(/\.label-print-modal-content\s*\{[^}]*max-width:\s*clamp\(340px/.test(css)).toBe(true);
     });
 });

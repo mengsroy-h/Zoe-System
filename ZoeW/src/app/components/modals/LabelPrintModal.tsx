@@ -22,7 +22,8 @@ export function LabelPrintModal() {
                     <select id="labelLayoutSelect" ref={refTo('labelLayoutSelect')} onChange={onAct('updateLabelPrintPreview')}>
                         <option value="a4-3">A4 ផ្ដេក · ៣ ជួរឈរ (៩ ស្លាកក្នុងមួយទំព័រ)</option>
                         <option value="a4-2">A4 ផ្ដេក · ២ ជួរឈរ (ស្លាកធំ)</option>
-                        <option value="single">ម៉ាស៊ីនបោះពុម្ពស្លាក · មួយស្លាកមួយទំព័រ</option>
+                        <option value="50x30">ស្លាក 50×30mm · ម៉ាស៊ីនបោះពុម្ពស្លាកតូច (មួយស្លាកមួយទំព័រ)</option>
+                        <option value="single">ម៉ាស៊ីនបោះពុម្ពស្លាកផ្សេង · មួយស្លាកមួយទំព័រ (ទំហំតាម print dialog)</option>
                     </select>
                 </label>
                 <div className="label-print-toggles">

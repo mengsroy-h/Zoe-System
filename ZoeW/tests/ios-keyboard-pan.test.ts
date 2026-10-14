@@ -7,7 +7,7 @@
  *    ➜ កាតបញ្ជីចប់ពីលើ keyboard ដូច Android · ប្រអប់បិទ ➜ ០ · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែង ➜ `preventDefault()` (document មិនរំកិល) ·
  *    ក្នុងអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ · Android/web · អេក្រង់ធំ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ។
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { uiState } from '../src/core/state';

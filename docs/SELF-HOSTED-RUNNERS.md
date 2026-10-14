@@ -490,7 +490,7 @@ Repo → Settings → General → Danger Zone → Change repository visibility �
 
 Self-hosted jobs នឹង skip បើ repo នៅ Public។ ផ្ដល់សិទ្ធិកែ source/workflow តែអ្នកដែលទុកចិត្ត ព្រោះ workflow អនុវត្តកូដលើ PC របស់អ្នក។
 
-Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ។ GitHub Release ក្នុង repo Private ក៏ទាមទារសិទ្ធិ; បើចែក App ទៅអតិថិជន ចែកតែ signed APK តាមកន្លែងផ្សេង ដោយមិនផ្ដល់សិទ្ធិចូល source repo។
+Private បិទការទាញ source ពីអ្នកគ្មានសិទ្ធិ ប៉ុន្តែមិនដកច្បាប់ចម្លងដែលគេធ្លាប់ទាញរួចទេ ហើយ fork សាធារណៈដែលមានស្រាប់នៅ public បន្ត (GitHub បំបែកវាចេញ) ➜ មើល Insights → Forks មុនប្ដូរ។ GitHub Release ក្នុង repo Private ទាមទារសិទ្ធិ ➜ Release ផ្លូវការរបស់ APK ចេញទៅ repo Release public ដាច់ដោយឡែក (`ZOE_RELEASES_REPO` ក្នុង `android-release.yml` · secret `ZOE_RELEASES_TOKEN` · មើល `ZoeW/docs/ANDROID.md`) ដែល App probe ➜ ទូរស័ព្ទនៅ update ស្វ័យប្រវត្តិ។ ⛔ ប្ដូរ Private តែក្រោយកំណែដែល probe repo Release នោះដល់ទូរស័ព្ទទាំងអស់រួច (កំណែមុនៗ probe repo source ➜ 404 ➜ ត្រូវ sideload ដោយដៃ)។ នាទី Actions របស់ repo Private ចេញពី quota (GitHub-hosted) — ជំហាន ១៣ សម្រាប់ប្ដូរទៅ self-hosted។
 
 Self-hosted compute មិនប្រើ quota នាទី GitHub-hosted; artifact/cache នៅ GitHub មាន quota ផ្សេង។ Self-hosted Audit រក្សា npm cache ក្នុង home volumes ហើយប្រើ Chromium/RTDB binary cache រួមក្នុង `audit-binaries` volume។ GitHub-hosted Audit ប្រើ explicit npm cache ដែល key ដេរីវេពី lockfiles របស់ ZoeW, supabase និង firebase-provision។ APK workflow បិទ automatic npm cache upload ហើយប្រើ cache របស់ម៉ាស៊ីនដែលរត់។
 

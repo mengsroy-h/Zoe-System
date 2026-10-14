@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 @CapacitorPlugin(name = "ZoeApkUpdate")
 public class ApkUpdatePlugin extends Plugin {
 
-    static final String RELEASE_BASE = "https://github.com/mengsroy-h/Zoe-System/releases/download/";
+    static final String RELEASE_BASE = "https://github.com/mengsroy-h/Zoe-System-releases/releases/download/";
     static final String TAG_PREFIX = "zoew-android-v";
     static final String FILE_PREFIX = "ZoeW-";
     static final String FILE_SUFFIX = ".apk";

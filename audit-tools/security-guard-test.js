@@ -226,7 +226,7 @@ console.log('\n== ខ. App ដែល ship (bundle client) ==');
     ok(envUse.length >= 2, 'ជាន់អប្បបរមា ៖ រកឃើញការប្រើ env ក្នុង client (ឧ. DEV) ➜ ការវាស់មិនទទេ', envUse.length);
     // ⛔ ឈ្មោះ secret របស់ server មិនត្រូវលេចក្នុងកូដ client (សញ្ញាថាកូដ server/secret ត្រូវបានលាយចូល bundle)
     const SERVER_ONLY = ['SUPABASE_SERVICE_ROLE_KEY', 'ZOE_SECRET_KEY', 'NETLIFY_AUTH_TOKEN', 'ZOE_BACKUP_PASSPHRASE', 'ZOEW_KEYSTORE_PASSWORD', 'ZOEW_KEY_PASSWORD',
-        'VAPID_PRIVATE_KEY', 'FIREBASE_SERVICE_ACCOUNT', 'GOOGLE_APPLICATION_CREDENTIALS'];
+        'VAPID_PRIVATE_KEY', 'FIREBASE_SERVICE_ACCOUNT', 'GOOGLE_APPLICATION_CREDENTIALS', 'ZOE_RELEASES_TOKEN'];
     const serverNames = [];
     for (const n of clientFiles) for (const s of SERVER_ONLY) if (TEXT.get(n).indexOf(s) !== -1) serverNames.push(n + ' ➜ ' + s);
     ok(serverNames.length === 0, '⛔ ឈ្មោះ secret របស់ server មិនលេចក្នុងកូដ client', serverNames.join(' · '));
@@ -546,7 +546,7 @@ console.log('\n== ជ. bundle ផលិតកម្មពិត (vite build ➜ 
 // ⛔ ការវាស់ប្រភពមិនឃើញអ្វីដែល build បញ្ចូល (define · env · plugin · vendor) ➜ build ពិតរាល់ដង (≈ ២ វិនាទី) មិនពឹង `ZoeW/dist` ដែលនៅសល់
 const AUDIT_BRIDGE_MARKERS = ['__auditRebind', 'zoew-audit-rebind'];
 const SERVER_ONLY_IN_BUNDLE = ['SUPABASE_SERVICE_ROLE_KEY', 'ZOE_SECRET_KEY', 'NETLIFY_AUTH_TOKEN', 'ZTO_PROXY_KEY', 'ZTO_PROXY_KEYS', 'ZTO_COOKIE',
-    'VAPID_PRIVATE_KEY', 'ZOEW_KEYSTORE_PASSWORD', 'ZOE_BACKUP_PASSPHRASE'];
+    'VAPID_PRIVATE_KEY', 'ZOEW_KEYSTORE_PASSWORD', 'ZOE_BACKUP_PASSPHRASE', 'ZOE_RELEASES_TOKEN'];
 function bundleProblems(files) {
     const p = [];
     for (const f of files) {

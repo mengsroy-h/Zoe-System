@@ -4,11 +4,12 @@
 #    ផ្សេង ➜ អ្នកប្រើត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី)។
 #    ដូច្នេះ ៖ គ្មាន keystore ➜ **មិន build** (⛔ គ្មានការធ្លាក់ចុះទៅ debug key ដែលប្រែរាល់ការរត់)។
 #
-# Secret ៤ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល ZoeW/docs/ANDROID.md) ៖
+# Secret ៥ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល ZoeW/docs/ANDROID.md) ៖
 #   · ZOEW_KEYSTORE_BASE64   — ឯកសារ keystore (.jks) ជា base64
 #   · ZOEW_KEYSTORE_PASSWORD — ពាក្យសម្ងាត់ keystore
 #   · ZOEW_KEY_ALIAS         — ឈ្មោះ key
 #   · ZOEW_KEY_PASSWORD      — ពាក្យសម្ងាត់ key
+#   · ZOE_RELEASES_TOKEN      — PAT fine-grained សម្រាប់ repo Release public (ខាងក្រោម)
 #
 # វិញ្ញាបនបត្រ (SHA-256) របស់ keystore នោះ pin ក្នុង ZoeW/android/release-cert.sha256 ➜ secret ដែលចង្អុលទៅ keystore
 # ផ្សេង ➜ ជំហានផ្ទៀងផ្ទាត់ធ្លាក់ ➜ គ្មាន Release (APK ដែលទូរស័ព្ទដំឡើងជាន់មិនបាន មិនត្រូវចេញដល់អ្នកប្រើ)។
@@ -18,6 +19,13 @@
 #
 # APK សាក (មុន merge) ៖ «Run workflow» ➜ ជ្រើស branch ផ្សេងពី `main` ➜ APK sign ដោយ keystore ដដែល (ដំឡើងជាន់ App ចាស់បាន) ចេញជា
 # **Pre-release** `zoew-android-v<APP_VERSION>-test.<commit ៧ តួ>` (មួយក្នុងមួយ commit) ➜ មិនប៉ះ Release ផ្លូវការ · push លើ branch មិន build។
+#
+# ⛔ Release ផ្លូវការ (ពី `main`) ចេញ ២ កន្លែង ៖ repo នេះ (បណ្ណសារ · ឃើញតែអ្នកមានសិទ្ធិពេល repo ជា Private) និង repo public `ZOE_RELEASES_REPO`
+#    (ទទេ · មានតែ Release · មិនមាន source) ដែល App probe ដើម្បីទាញ APK ក្នុង App (`ApkUpdatePlugin.java` `RELEASE_BASE`)
+#    ➜ repo source ជា Private បាន ដោយឧបករណ៍នៅ update ស្វ័យប្រវត្តិ។ secret ទី ៥ ៖ ZOE_RELEASES_TOKEN — fine-grained PAT
+#    «Contents: Read and write» តែលើ repo Release នោះ ⛔ គ្មាន ➜ Release ពី main មិនចេញ (ធ្លាក់មុន build · ឧបករណ៍មិនត្រូវឃើញកំណែដែលទាញមិនបាន)។
+#    Release ដែលមានរួចក្នុង repo នេះ តែមិនទាន់មានក្នុង repo Release ➜ «Run workflow» លើ main ចម្លងវាដោយមិន build ម្តងទៀត។
+#    APK សាក (branch ផ្សេង) ចេញតែក្នុង repo នេះ (មិនចែកសាធារណៈ)។
 
 name: Android APK
 
@@ -30,6 +38,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  ZOE_RELEASES_REPO: mengsroy-h/Zoe-System-releases
 
 concurrency:
   group: android-release
@@ -104,6 +115,39 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: ពិនិត្យ token របស់ repo Release
+        id: releases
+        if: steps.meta.outputs.test == 'false'
+        env:
+          RELEASES_TOKEN: ${{ secrets.ZOE_RELEASES_TOKEN }}
+        run: |
+          GITHUB_OUTPUT=$(cygpath -u "$GITHUB_OUTPUT")
+          if [ -z "$RELEASES_TOKEN" ]; then
+            echo "::error::secret ZOE_RELEASES_TOKEN គ្មាន ➜ Release ទៅ ${ZOE_RELEASES_REPO} មិនបាន ➜ ឧបករណ៍មិនឃើញកំណែថ្មី ➜ មិន build (មើល ZoeW/docs/ANDROID.md)"
+            exit 1
+          fi
+          if GH_TOKEN="$RELEASES_TOKEN" gh release view "${{ steps.meta.outputs.tag }}" --repo "$ZOE_RELEASES_REPO" >/dev/null 2>&1; then
+            echo "mirrored=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mirrored=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: ចម្លង Release ដែលមានរួចទៅ repo Release
+        if: steps.meta.outputs.test == 'false' && steps.meta.outputs.exists == 'true' && steps.releases.outputs.mirrored == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASES_TOKEN: ${{ secrets.ZOE_RELEASES_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p mirror
+          gh release download "$TAG" --dir mirror --pattern '*.apk' --pattern '*.sha256'
+          gh release view "$TAG" --json body --jq .body > mirror-notes.md
+          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" mirror/* \
+            --repo "$ZOE_RELEASES_REPO" \
+            --title "ZoeW ${{ steps.meta.outputs.version }} (Android)" \
+            --notes-file mirror-notes.md
+          echo "::notice::Release ${TAG} ចម្លងទៅ ${ZOE_RELEASES_REPO} រួច"
 
       - name: ពិនិត្យ secret របស់ keystore
         id: keystore
@@ -204,6 +248,7 @@ jobs:
         if: steps.keystore.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASES_TOKEN: ${{ secrets.ZOE_RELEASES_TOKEN }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           OUT="${{ steps.meta.outputs.file }}"
@@ -239,6 +284,16 @@ jobs:
             --title "$TITLE" \
             --notes-file notes.md \
             "${FLAGS[@]}"
+          if [ "${{ steps.meta.outputs.test }}" = "false" ]; then
+            if [ -z "$RELEASES_TOKEN" ]; then
+              echo "::error::secret ZOE_RELEASES_TOKEN គ្មាន ➜ Release ចេញតែក្នុង repo នេះ ➜ ឧបករណ៍មិនឃើញ ➜ ដាក់ secret រួច «Run workflow» លើ main ដើម្បីចម្លង"
+              exit 1
+            fi
+            GH_TOKEN="$RELEASES_TOKEN" gh release create "${{ steps.meta.outputs.tag }}" "$OUT" "$OUT.sha256" \
+              --repo "$ZOE_RELEASES_REPO" \
+              --title "$TITLE" \
+              --notes-file notes.md
+          fi
 
       - name: លុប keystore ចេញពី runner
         if: always()

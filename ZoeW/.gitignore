@@ -5,6 +5,7 @@ dist-audit
 *.tsbuildinfo
 # លទ្ធផលកណ្តាលរបស់ codemod
 tools/_*
-# លទ្ធផល build របស់ native-check · rules:check (លុបខ្លួនឯងពេលចប់)
+# លទ្ធផល build របស់ native-check · rules:check · history-window-check (លុបខ្លួនឯងពេលចប់)
 .native-check-dist
 .rules-check-dist
+.history-window-check-dist

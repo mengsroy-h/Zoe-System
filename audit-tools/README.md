@@ -350,7 +350,7 @@ bash audit-tools/emu/rules.sh
 | `dom-hygiene.js` · `state-hygiene.js` | គ្មានទិន្នន័យអតិថិជនសល់ក្រោយចាកចេញ | — |
 | `setup-link-logout-test.js` | Setup Link មិនរស់រានក្រោយចាកចេញ | `SETUP_APP_DIR` |
 | `setup-link-roundtrip-test.js` · `setup-link-browser-test.js` | ZoeKeyGen encode ↔ ZoeW decode | `SETUPRT_APP_DIR` · `SETUPLINK_APP_DIR` |
-| `pin-prompt-test.js` | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `PINPROMPT_APP_DIR` |
+| `pin-prompt-test.js` | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ · សកម្មភាពក្រោយ PIN មិនអាចហៅដោយផ្ទាល់ពីប៊ូតុង (រំលង PIN) · ប្រអប់កំណត់ PIN បើកតែពេលគ្មាន PIN | `PINPROMPT_APP_DIR` |
 | `biometric-unlock-test.js` | ជីវមាត្រជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN | `BIOMETRIC_APP_DIR` |
 | `app-lock-test.js` | ចាក់សោ App ៖ មិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ · កុងតាក់ប្តូរបានទាំង ២ ទិស (បើក និងបិទ) | `APPLOCK_APP_DIR` · `APPLOCK_CHROME` |
 | `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
@@ -380,7 +380,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `layout-check.js` | CSS បំបែក/លើសទទឹង លើ 320–1440px (**អះអាង ២ ខាង**) | `LAYOUT_APP_DIR` |
 | `fluid-type-focus-test.js` | មាត្រដ្ឋានអក្សរ ៣ ជំហាន និងសញ្ញាផ្តោត | `FLUIDTYPE_APP_DIR` |
-| `modal-keyboard-test.js` | ប្រអប់ (modal) ដែលមានប្រអប់វាយ ៖ keyboard បាំង ➜ ប្រអប់ និងប្រអប់វាយនៅក្នុងផ្ទៃមើលឃើញ (គ្រប់ប្រអប់ពី DOM · ទំហំទូរស័ព្ទ ៣ · APK មិនប្តូរ) | `MODALKB_APP_DIR` |
+| `modal-keyboard-test.js` | ប្រអប់ (modal) ដែលមានប្រអប់វាយ ៖ keyboard បាំង ➜ ប្រអប់នៅទីតាំងដដែល មានតែបាតខ្លីត្រឹម keyboard · ប្រអប់វាយមើលឃើញ · backdrop ពណ៌តែមួយក្រោយ keyboard (គ្រប់ប្រអប់ពី DOM · ទំហំទូរស័ព្ទ ៣ · រំកិល · APK) · ចុចប្រអប់វាយលើ iPhone · ប្រអប់ចូល/Activate/PIN មិនអាចរំលង | `MODALKB_APP_DIR` |
 | `gesture-test.js` | PTR · ការលាក់របា Tab · ចង្វាក់ស៊ុម | `GESTURE_APP_DIR` |
 | `history-menu-dismiss-test.js` | Chromium ពិត៖ ម៉ឺនុយ (...) បិទពេលអូសផ្ទាំង/រមូរខាងក្រៅ · ចលនាបើក និង Reduce Motion · ចុច/រមូរក្នុងម៉ឺនុយ | `HISTORYMENU_APP_DIR` |
 | `panel-motion-test.js` | ចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើ · snap ↔ PTR) · ស៊ុមក្រោមកាតលើ Android ដូច iOS (ប្រៀបរូបថត pixel) | `PANELMOTION_APP_DIR` · `PANELMOTION_SHOT_DIR` (រក្សារូបថត) |

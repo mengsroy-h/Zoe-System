@@ -263,8 +263,9 @@
     html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
 }
 
-body.modal-keyboard .modal { top: var(--modal-vv-top, 0px); height: var(--modal-vv-height, 100%); }
-body.modal-keyboard .modal-content { max-height: 100%; }
+.modal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc(env(safe-area-inset-bottom, 0px) + var(--modal-kb-pan, 0px)); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; }
+.modal.modal-kb { align-items: flex-start; }
+.modal.modal-kb > .modal-content { margin-top: var(--modal-kb-shift, 0px); max-height: var(--modal-kb-max, 85vh); }
 html.ios-standalone body.modal-keyboard,
 html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
 html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }

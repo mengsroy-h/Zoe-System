@@ -20,6 +20,7 @@ interface ModalProps extends Omit<HTMLAttributes<HTMLDivElement>, 'id' | 'style'
 export function Modal({ id, close, noDismiss, style, className, children, ...rest }: ModalProps) {
     const display = useStoreValue(uiState, (s) => s.modalDisplay[id]);
     const zIndex = useStoreValue(uiState, (s) => modalStackZ(s, id));
+    const fit = useStoreValue(uiState, (s) => (s.modalKeyboardFit && s.modalKeyboardFit.id === id ? s.modalKeyboardFit : null));
     const ref = useCallback((el: HTMLDivElement | null) => {
         if (el) {
             elements.set(id, el);
@@ -30,11 +31,13 @@ export function Modal({ id, close, noDismiss, style, className, children, ...res
         }
     }, [id, close, noDismiss]);
     const layered = zIndex === null ? style : Object.assign({}, style, { zIndex });
-    const finalStyle = display ? Object.assign({}, layered, { display }) : layered;
+    const shown = display ? Object.assign({}, layered, { display }) : layered;
+    const finalStyle = fit ? Object.assign({}, shown, { '--modal-kb-shift': fit.shift + 'px', '--modal-kb-max': fit.max + 'px' }) as CSSProperties : shown;
+    const classes = (className ? 'modal ' + className : 'modal') + (fit ? ' modal-kb' : '');
     return (
         <div
             id={id}
-            className={className ? 'modal ' + className : 'modal'}
+            className={classes}
             style={finalStyle}
             data-close={close}
             data-nodismiss={noDismiss ? 'true' : undefined}

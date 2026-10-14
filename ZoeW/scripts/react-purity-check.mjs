@@ -76,7 +76,8 @@ const REFS = 'app/refs.ts';
 const REFS_WHY = 'ច្រកចេញរបស់ React (ref) — React គ្មានទម្រង់ប្រកាស (declarative) សម្រាប់ ';
 const DOC_FX = 'app/components/shell/DocumentEffects.tsx';
 const APP_ALLOWED = {
-    [REFS + ':.focus()']: [3, REFS_WHY + 'focus (`focusField` · ការសាកម្តងទៀតក្រោយការគូរ · `focusFieldAsIs`)'],
+    [REFS + ':.focus()']: [4, REFS_WHY + 'focus (`focusField` · ការសាកម្តងទៀតក្រោយការគូរ · `focusFieldAsIs` · `focusElementWithoutScroll` ៖ ប្រអប់វាយក្នុងប្រអប់លើ iPhone)'],
+    [REFS + ':.setSelectionRange()']: [1, REFS_WHY + 'caret នៅចុងអត្ថបទ មុន focus ដោយកូដ (`focusElementWithoutScroll` ៖ WebKit ជ្រើសអត្ថបទទាំងអស់ពេល focus ដោយកូដ បើគ្មាន selection ចាំទុក)'],
     [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],
     [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
     [REFS + ':.value =']: [1, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue`)'],

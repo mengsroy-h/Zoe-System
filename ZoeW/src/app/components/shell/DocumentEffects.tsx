@@ -55,8 +55,7 @@ export function DocumentEffects() {
     useHtmlVar('--page-extension', useStoreValue(uiState, (s) => s.pageExtensionVar));
     useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
     useHtmlVar('--ios-keyboard-inset', iosKeyboardInset > 0 ? iosKeyboardInset + 'px' : '0px');
-    useHtmlVar('--modal-vv-top', modalViewportTop + 'px');
-    useHtmlVar('--modal-vv-height', modalViewportHeight > 0 ? modalViewportHeight + 'px' : '100%');
+    useHtmlVar('--modal-kb-pan', modalViewportHeight > 0 ? modalViewportTop + 'px' : '0px');
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

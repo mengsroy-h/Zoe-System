@@ -169,6 +169,15 @@ export function focusField(name: RefName, options?: FocusOptions): void {
     }
 }
 
+export function focusElementWithoutScroll(el: HTMLElement): boolean {
+    const field = el as HTMLInputElement;
+    if (document.activeElement !== el && typeof field.setSelectionRange === 'function' && typeof field.value === 'string') {
+        try { field.setSelectionRange(field.value.length, field.value.length); } catch {}
+    }
+    el.focus({ preventScroll: true });
+    return document.activeElement === el;
+}
+
 export function focusFieldAsIs(name: RefName): void {
     const el = elementOf(name);
     if (el) el.focus();

@@ -241,6 +241,13 @@ export const scanState = createStore<ScanState>('scanState', {
 });
 registerStore(scanState);
 
+export interface ModalKeyboardFit {
+    id: string;
+    top: number;
+    max: number;
+    shift: number;
+}
+
 export interface UiState {
     perfSamplePending: boolean;
     displayHz: number;
@@ -269,6 +276,7 @@ export interface UiState {
     iosKeyboardSuggestFixed: boolean;
     modalViewportTop: number;
     modalViewportHeight: number;
+    modalKeyboardFit: ModalKeyboardFit | null;
     pdfExportOriginalTitle: any;
     monthlyReportMonth: string;
     lastRecallSignature: string;
@@ -375,6 +383,7 @@ export const uiState = createStore<UiState>('uiState', {
     iosKeyboardSuggestFixed: false,
     modalViewportTop: 0,
     modalViewportHeight: 0,
+    modalKeyboardFit: null,
     pdfExportOriginalTitle: null,
     monthlyReportMonth: '',
     lastRecallSignature: '',

@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ញ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `b802db2` · **មិនទាន់ merge**) ៖ [2.50.73] ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លី ·
+    backdrop គ្របពេញ (ពណ៌តែមួយ) · តេស្តសុវត្ថិភាព PIN/Login (សំណើម្ចាស់គម្រោង · ផ្នែក ២ A88–A89) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៤ របស់ [2.50.73]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ឈ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `7360f31` · **មិនទាន់ merge**) ៖ [2.50.72] ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ទំព័រមិនរំកិល
     (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A87) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.72]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ជ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `f5e9bd7` · **មិនទាន់ merge**) ៖ [2.50.71] ប្រអប់ដែលមានកន្លែងវាយរំកិលឡើងនៅពីលើ keyboard
@@ -187,6 +189,55 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.73] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លីត្រឹម keyboard · backdrop គ្របពេញ · តេស្តសុវត្ថិភាព PIN/Login**
+
+**ZoeW `2.50.73`** (`zoew-v335` ➜ `zoew-v336`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `Modal.tsx` · `refs.ts` (`focusElementWithoutScroll`) · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង (លើ 2.50.72) ៖ «កុំអោយរំកិលឡើងទាំងមូលអី ព្រោះ modal ខ្លះវែងអាចផុត ឧទាហរណ៍ modal "API ស្វែងរកអតិថិជន" អោយរំកិលកុំអោយបាំងតែកន្លែងបញ្ចូលអក្សរឬលេខបានហើយ ·
+តេស្តមើលផងទាំង ios android អោយហ្មត់ចត់ · បន្ទាប់ពីកែរួចសូមតេស្តប្រព័ន្ធសុវត្ថិភាពផង ក្រែងអាច bypass ឬរំលង modal pin code និង login · ផ្ទៃពីសរថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នា»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ប្រអប់ + keyboard ➜ ប្រអប់ទាំងមូលរំកិលឡើង (ប្រអប់វែងផុតអេក្រង់) · ពីលើ keyboard ពណ៌ពីរ** (ផ្នែក ២ A88)។ [2.50.71] បង្រួម `.modal` ទាំងមូលឲ្យស្មើផ្ទៃមើលឃើញ ➜ កាតចុះមក
+  កណ្តាលផ្ទៃនោះ (PIN ៖ កំពូល ៣០៨ ➜ ១៤០) ហើយផ្ទៃងងឹតឈប់ត្រឹម keyboard ➜ ក្រោយ keyboard ថ្លាជាទំព័រ (កាត · ប៊ូតុង) ➜ ពណ៌ពីរ។ ឥឡូវ ៖ `.modal` ពេញ layout viewport ជានិច្ច ហើយ `::after`
+  លាតចុះក្រោមតាមការរំកិល (`--modal-kb-pan`) + `env(safe-area-inset-bottom)` ➜ ក្រោយ keyboard ជាផ្ទៃងងឹតតែមួយ · មានតែប្រអប់ខាងលើគេដែលបាតនៅក្រោយ keyboard ទទួល `.modal-kb`
+  (`modalKeyboardFitFor()` ➜ `uiState.modalKeyboardFit` ➜ `Modal.tsx`) ៖ កំពូល · ឆ្វេង · ស្តាំ **ដដែលលើអេក្រង់** (វាស់ពេលមិនទាន់តម្រូវ · គ្មាន transform · iOS រំកិល `offsetTop` ➜ បូកវា) ·
+  មានតែបាតខ្លីមកត្រឹម keyboard (គម្លាត `MODAL_KEYBOARD_GAP_PX` ៨px) ហើយរមូរក្នុងខ្លួន ➜ កន្លែងវាយមើលឃើញ (គម្លាត ≤ ១២px ៖ អ្នករមូរតូចបង្រួមគម្លាត) · ប្រអប់ដែលនៅពីលើ keyboard រួច ➜ មិនប៉ះ ·
+  ផ្ទៃនៅសល់ < `MODAL_KEYBOARD_MIN_VISIBLE_PX` (១៨០px) ឬអ្នករមូរខាងក្នុងទាបជាងកន្លែងវាយ ➜ ទើបលើកកំពូល · បើកប្រអប់ខណៈ keyboard បើក ➜ វាស់ក្រោយ React គូរ (microtask) ·
+  ជាន់ប្រអប់ ➜ តម្រូវតែប្រអប់ខាងលើគេ · APK (WebView បង្រួម) ➜ មិនប្តូរប្លង់ តែ `resize` រមូរកន្លែងវាយមកមើលឃើញ។
+- ✨ **iPhone (App លើ Home Screen) ៖ ចុចកន្លែងវាយក្នុងប្រអប់ ➜ keyboard បើកដោយទំព័រមិនរំកិល** ៖ ការចុច (មិនអូស · មិនសង្កត់យូរ · ម្រាមដៃមួយ) លើកន្លែងវាយដែលមិនទាន់ focus
+  ➜ `touchend` `preventDefault()` + `focusElementWithoutScroll()` (caret នៅចុងអត្ថបទ · `focus({ preventScroll: true })`) ➜ iOS មិនរំកិលទំព័រទាំងមូលដើម្បីបង្ហាញវា (ប្រអប់រមូរខ្លួនឯង) ·
+  កន្លែងវាយដែល focus រួច · date · checkbox · readonly · Android/web ➜ ធម្មតា · focus មិនជាប់ ➜ ការចុចបន្ទាប់ទុកឲ្យ iOS។
+- 🔒 **តេស្តសុវត្ថិភាព PIN/Login** (ផ្នែក ២ A89) ៖ ប្រអប់ចូល · Activate · PIN · កំណត់ PIN ៖ គ្រប់ចំណុចលើអេក្រង់ (ក្រឡា ២៤px · keyboard បិទ/បើក/រំកិល) ជារបស់ប្រអប់ ·
+  ប្រអប់ចូល/Activate មិនបិទដោយការចុចផ្ទៃងងឹត ឬ Escape · ការបោះបង់ PIN មិនរត់សកម្មភាព · PIN ខុសមិនរត់ · PIN ត្រូវរត់ម្តង · គ្មានសកម្មភាពក្រោយ PIN ណាដែលប៊ូតុងហៅដោយផ្ទាល់បាន ·
+  ប្រអប់កំណត់ PIN បើកតែពេលគ្មាន PIN ទុក។ ⚠️ លើ [2.50.71]–[2.50.72] (មិនដែលនៅ `main`) ផ្ទៃក្រោយ keyboard គ្មានផ្ទៃងងឹត ➜ ទំព័រខាងក្រោយប្រអប់ចូល/PIN ទទួលការចុចបាន (ពេល keyboard
+  កំពុងចុះ) — ឥឡូវបិទ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (សរសេរឡើងវិញ) ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ➜ កំពូល · ឆ្វេង · ស្តាំដដែល (ឬលើកតែពេលផ្ទៃតូច) · បាតត្រឹម keyboard · កន្លែងវាយមើលឃើញ · backdrop ពេញ ·
+  `elementFromPoint` ក្នុងផ្ទៃ keyboard = ប្រអប់ · `lookupApiConfigModal` កំពូលដដែលគ្រប់ទំហំ · រំកិល ១៤០ (`::after` ≥ ១៣៩px) · ប្តូរកន្លែងវាយ · keyboard បិទ ➜ ដូចដើម · បិទប្រអប់ ·
+  បើកប្រអប់ខណៈ keyboard បើក · APK (ប្រអប់វែង កន្លែងវាយខាងក្រោម) · ការចុចលើ iPhone (preventDefault · caret ចុង · ទិសផ្ទុយ) · សុវត្ថិភាព (ក្រឡា · noDismiss · Escape · PIN ខុស/ត្រូវ) —
+  លើ 2.50.72 ១៥ ធ្លាក់ ➜ ៣២/៣២។
+- `ZoeW/tests/modal-keyboard.test.tsx` (សរសេរឡើងវិញ · ២០) ៖ `modalKeyboardFitFor()` (នៅពីលើ ➜ null · វែង · រំកិល · តូចទាប ➜ ជាន់ · raised · cap · NaN) · Modal ពិត ៖ class/អថេរ ·
+  ទីតាំងដើមរក្សាទុក · ប្រអប់បិទ/បើក/ជាន់ (microtask) · reveal (គម្លាតបង្រួម · textarea ខ្ពស់) · raised · APK resize · dispose · ការចុច iPhone (៤) · ខ្សែភ្ជាប់ CSS។
+- `pin-prompt-test` +៦ ៖ គោលដៅក្រោយ PIN (១៤ ឈ្មោះ + `openConfigModal`) មិននៅក្នុង `ACTION_REGISTRY` ∪ `ACTION_ALLOWLIST` លើកលែងតែពិនិត្យខ្លួនឯង (២ ៖ ZTO) · ប្រអប់កំណត់ PIN
+  បើកតែពេលគ្មាន PIN · ជាន់អប្បបរមា — mutation (`openSheetImportModal` ចូល `ACTION_REGISTRY`) ➜ ធ្លាក់។
+- `react-purity` ៖ ច្រកចេញ `refs.ts` `.focus()` ៣ ➜ ៤ · `.setSelectionRange()` ១ (មានហេតុផល)។ `state-hygiene` ៖ អថេរ ៦ ថ្មីមានហេតុផល។
+- repo ៖ ថត `ZoeW/.history-window-check-dist` (លទ្ធផល build បណ្តោះអាសន្នរបស់ `history-window-check` ដែលរត់មិនទាន់ចប់) commit ដោយចៃដន្យក្នុង `b802db2` ➜ លុប ·
+  `ZoeW/.gitignore` ការពារ (`repository-file-coverage` ធ្លាក់លើវា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ☰ ➜ «API ស្វែងរកអតិថិជន» (PIN) ➜ ចុចកន្លែងវាយខាងក្រោម (Header · Password) ➜ ប្រអប់នៅកន្លែងដដែល (ចំណងជើងនៅដដែល) · បាតឈប់ពីលើ keyboard · កន្លែងវាយលេចឡើង ·
+   ទំព័រមិនរំកិល · ផ្ទៃពីលើ keyboard ពណ៌តែមួយ (ងងឹត) · រមូរប្រអប់ឡើងចុះបាន · បិទ keyboard ➜ ប្រអប់ដូចដើម។
+2. **iPhone PWA** ៖ ប្រអប់ PIN · កែលេខទូរស័ព្ទ · «📋 បញ្ចូលច្រើន» · Config ➜ ដូចខ្ទង់ ១ · ចុចកន្លែងវាយដែល focus រួច ➜ caret តាមកន្លែងចុច (ធម្មតា)។
+3. **Android** (APK · PWA) ៖ ប្រអប់ដដែល ➜ keyboard មិនបាំងកន្លែងវាយ · ប្រអប់មិនផុតអេក្រង់។
+4. **សុវត្ថិភាព** ៖ ប្រអប់ PIN បើក ➜ ចុចផ្ទៃងងឹត ឬបោះបង់ ➜ សកម្មភាពមិនរត់ · ប្រអប់ចូល ➜ ចុចផ្ទៃងងឹតមិនបិទ · ទំព័រខាងក្រោយចុចមិនបាន (ទាំងពេល keyboard បើក)។
+
+---
 
 ### [2.50.72] — 2026-10-15 · ZoeW ៖ **iPhone PWA ៖ ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ឬលើប្រអប់ ទំព័រមិនរំកិល (មិនញ៉ាក់)**
 
@@ -4069,6 +4120,16 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.72 ៖ ប្រអប់វែងផុតអេក្រង់ · ពីលើ keyboard ពណ៌ពីរ · តេស្តសុវត្ថិភាព PIN/Login
+
+**វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` សរសេរច្បាប់ថ្មី (ទីតាំងដើមលើអេក្រង់ · បាតត្រឹម keyboard · backdrop + `elementFromPoint` ក្នុងផ្ទៃ keyboard · ក្រឡាសុវត្ថិភាព) រត់លើ
+2.50.72 (`b802db2`) ➜ ធ្លាក់ ➜ ទើបកែ · `pin-prompt-test` ផ្នែកថ្មីរត់លើ mutation ➜ ធ្លាក់។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A88 | **ប្រអប់ + keyboard ➜ ប្រអប់ទាំងមូលរំកិល (ប្រអប់វែងផុត) · ក្រោយ keyboard គ្មានផ្ទៃងងឹត (ពណ៌ពីរ) · ទំព័រខាងក្រោយប្រអប់ចូល/PIN ទទួលការចុច** | 2.50.72 ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ធ្លាក់គ្រប់ទំហំ (390×844 ៖ PIN កំពូល ៣០៨ ➜ ១៤០ · backdrop [០,៥០៨] ឈប់ត្រឹម keyboard · ក្រោយ keyboard = ទំព័រ) · `lookupApiConfigModal` ១៨/១៨ កំពូលផ្លាស់ទី · រំកិល ១៤០ ៖ កំពូលលើអេក្រង់ ១៩៣ ➜ ២៥ · ក្រឡាសុវត្ថិភាព ៖ ២៣៨/៥៩៥ ចំណុចជាទំព័រ (`daily-stats-btn` · `appPages` ក្រោយ keyboard · `app-navbar` ពេលរំកិល) សម្រាប់ login · Activate · PIN · កំណត់ PIN · ចុចផ្ទៃងងឹតក្រោម keyboard មិនបោះបង់ PIN (ការចុចទៅទំព័រ) · APK ៖ កន្លែងវាយចុងក្រោយ [៦៤៧,៦៩៣] នៅក្រោមកាត (បាត ៤៧០) · iPhone ៖ ចុចកន្លែងវាយ ➜ touchend មិន preventDefault (iOS រំកិលទំព័រ) | `.modal` ពេញ + `::after` (`--modal-kb-pan` + safe-area) · `.modal-kb` តែប្រអប់ខាងលើគេ (កំពូលដើម + `offsetTop` · `max-height` ត្រឹម keyboard − ៨) · reveal គម្លាតបង្រួម · raised ពេលអ្នករមូរខាងក្នុងតូចជាងកន្លែងវាយ (`sheetImportModal` 320×568 ៖ `si-scroll` ៥៣px) · វាស់ក្រោយ React គូរ (`editPhoneModal` បើកខណៈ keyboard បើក ៖ មុន ➜ មិនតម្រូវ) · APK `resize` reveal · ការចុច iPhone ➜ `focusElementWithoutScroll()` ➜ ៣២/៣២ |
+| A89 | **ផ្លូវរំលង PIN/Login ដែលអ្នកប្រើធ្វើបាន** | ផ្លូវដែលពិនិត្យ ៖ ចុចផ្ទៃងងឹត · Escape · Back (`native-back`) · ទំព័រខាងក្រោយ (ក្រឡា) · ប៊ូតុងដែលហៅគោលដៅក្រោយ PIN ដោយផ្ទាល់ (`ACTION_REGISTRY` ∪ `ACTION_ALLOWLIST` ៖ ១៤៨ ឈ្មោះ) · ប្រអប់កំណត់ PIN ពេលមាន PIN · PIN ខុស (សោ ៥ ដង/៦០ វិ.) · ការបោះបង់ (`cancelPinEntryFlow`/`cancelPinSetupFlow` សម្អាត `pinTargetAction`) ៖ គោលដៅក្រោយ PIN ១៤ ឈ្មោះ + `openConfigModal` ➜ ០ ដែលប៊ូតុងហៅដោយផ្ទាល់ · ២ ពិនិត្យខ្លួនឯង (`openZtoListSyncModal` · `recheckZtoPickupStatus` ៖ សោ secret ➜ `requestPinBeforeConfig(ខ្លួនឯង)`) · `pinSetupModal` បើកតែ `!savedPin` (២ កន្លែង) | គ្មានផ្លូវរំលងដែលអ្នកប្រើធ្វើបាន (ក្រៅពី A88 ដែលកែរួច) · `pin-prompt-test` ចាក់សោ (mutation ➜ ធ្លាក់) · ព្រំដែនដែលទទួលស្គាល់ ៖ ការកែ DOM/localStorage ដោយ DevTools (PIN · ចំនួនខុស) — «Inspect element» ការពារមិនបាន ហើយទិន្នន័យការពារដោយ rules (`auth != null`) មិនមែនដោយប្រអប់ |
+
 ### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.71 ៖ ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ➜ ញ៉ាក់
 
 **វិធី** ៖ វីដេអូ `_030` (៨៨០×១៩២០ · ១២.៧ វិ.) ➜ ស៊ុម ៥/វិ.
@@ -6438,7 +6499,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `pin-prompt-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `pin-prompt-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |

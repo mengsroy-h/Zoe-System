@@ -45,6 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ឃ. **Branch `ccr-83fa86c5-4um7el`** (ពីក្បាល PR #317 `9906650` = branch `ccr-20e725de-tpecua` · **មិនទាន់ merge** · មាន commit របស់ PR #317 ទាំងអស់) ៖ [2.50.67] iPhone PWA ៖
+    PTR ចាប់ touchmove ដំបូង (ច្បាប់ WebKit · ផ្នែក ២ A79) · ផ្អាក snap មុន commit ការទាញប្រអប់ស្វែងរកចុះ (re-snap ទៅ `.page-main` · A80) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.67]) ➜
+    PR ថ្មីពេលម្ចាស់គម្រោងស្នើ (ជំនួស PR #317) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0គ. **Branch `ccr-20e725de-tpecua`** (ចាប់ឡើងវិញពី `main` `9272d88` = PR #316 · **មិនទាន់ merge**) ៖ [2.50.66] iPhone PWA ៖ PTR ដូច 2.50.64 (switch haptic ដកចេញ · A77) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (ផ្នែក ២ A78) ·
     ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើ ៣២០px ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.66]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ខ. **Branch `ccr-20e725de-tpecua` (ជុំមុន)** (ពី `main` `7960a90` = PR #315 · **merge រួចតាម PR #316 · `9272d88` · ម្ចាស់គម្រោង «Merge»**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
@@ -173,6 +176,47 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.67] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ PTR កេះគ្រប់ដង (ចាប់ touchmove ដំបូង) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកមិនលាក់ (snap ផ្អាកមុន commit)**
+
+**ZoeW `2.50.67`** (`zoew-v329` ➜ `zoew-v330`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ZTO មិនប៉ះ · **តំបន់ហាម PTR** ៖ `pull-to-refresh.ts` កែតាមរបាយការណ៍វីដេអូ
+(`LOCK` sha256 ថ្មី ក្នុង `forbidden-zone-lock.test.ts`) · `panel-motion.ts` · `phone-search.ts` · `app.css` មិនប៉ះ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ២ ៖ VID_20261014_200654_541 · VID_20261014_200654_804 · លើ PR #317) ៖ «PTR នៅតែពិបាក · ស្វែងរក នៅតែមិនលិបបាត់ពេលបិទ keyboard»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ PTR ម្តងកេះម្តងអត់** (ផ្នែក ២ A79)។ វីដេអូ ៖ ទាញ ≥ ៧ ដង ទំព័រ bounce ចុះ ~១០០–១៩០pt គ្មានរង្វង់ PTR · កេះតែ ១ ដង។ មូលហេតុ (ប្រភព WebKit ពិត) ៖
+  WebKit ពន្យារ UIScrollView pan តែចំពោះ touchmove **ដំបូង** (`m_touchMovePreventionState`) · PTR ហៅ `preventDefault()` តែក្រោយ `AXIS_SLOP` 22px ➜ touchmove ដំបូង
+  មិនត្រូវចាប់ ➜ pan ចាប់ផ្តើមនៅ ~១០pt ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ touchmove បន្ទាប់ `cancelable: false` ➜ PTR `park()` (កេះបានតែពេល move ដំបូងលោត ≥ 22px)។
+  ឥឡូវ ៖ ការទាញដែល PTR តាម (កំពូល · ៤០% ខាងលើ · មិនមែនប្រអប់/ម៉ឺនុយ/ប៊ូតុង) ចាប់ touchmove ចុះបញ្ឈរ **តាំងពី move ដំបូង** (`claimsBeforeSlop()` ៖ ដូច APK) ➜ iOS មិនចាប់ផ្តើម pan ·
+  គ្មាន bounce · កម្រិត indicator/refresh ដដែល (56 · 213px)។ ប៊ូតុងក្នុងជួរតារាង ➜ មិនចាប់មុន slop (tap នៅធម្មតា) · អូសឡើង/ផ្ដេក · តារាងរមូររួច · ប្រអប់ · ម៉ឺនុយ · ប៊ូតុង/វាលក្រៅតារាង ➜ ដូចដើម។
+  Android (APK) មិនប្រែ (ចាប់មុន slop ដូចដើម · រួមទាំងប៊ូតុងក្នុងតារាង)។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរករអិលឡើងលាក់ក្រោម navbar ~១ វិ. ហើយលោតត្រឡប់** (ផ្នែក ២ A80 · ការកែ [2.50.66] ពិនិត្យ **មុន** React commit ➜ ឃើញ ០ ➜ មិនធ្វើអ្វី)។
+  មូលហេតុ (ប្រភព WebKit ពិត) ៖ `.page-main` ជាគោលដៅ snap តែមួយ · ខណៈប្រអប់ទាញឡើង offset របស់វា = ០ = ទីតាំងរមូរ ➜ WebKit កត់វាជាប្រអប់ដែល snap ➜ ទាញចុះ ➜
+  `resnapAfterLayout()` ក្នុង layout ដំបូងក្រោយ commit (សមកាល) រំកិលទៅ offset ថ្មីរបស់ `.page-main` ➜ ការរអិលទៅទីតាំងនោះ ➜ ការពិនិត្យយឺត (`IOS_SEARCH_PULLDOWN_SETTLE_MS`) លោតត្រឡប់ ០។
+  ឥឡូវ ៖ `settleIOSSearchPullDown()` ផ្អាក snap (`beginPanelGlideSnapPause()` ➜ `panel-gliding`) **ក្នុង commit ដដែលនឹងការទាញចុះ** ➜ WebKit លុប snap state ➜ គ្មាន re-snap ➜ ប្រអប់ស្វែងរក
+  រអិលចុះទៅកន្លែងដើម (ក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ») ➜ snap ត្រឡប់នៅ ០ (គ្មានគោលដៅក្នុង proximity) ➜ នៅដដែល។ Android/web · អេក្រង់ ≥ 992 មិនប្រែ។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ WebKit (`webkitPan` ៖ pan ចាប់ផ្តើមនៅ ១០px បើ touchmove ដំបូងមិនត្រូវចាប់ · ក្រោយនោះ `cancelable: false` លើកលែង move មុន pan ត្រូវចាប់) ៖ ទាញ ២ · ៤ · ១២ px/ស៊ុម ➜
+  move ដំបូងត្រូវចាប់ · គ្មាន pan · ready · ទិសផ្ទុយ (អូសឡើង ➜ pan ធម្មតា · ប៊ូតុងក្នុងជួរ ➜ មិនចាប់) · អូសខ្លី 14px ➜ ចាប់ move ដំបូង តែមិន refresh · indicator លាក់ — លើដើមឈើ PR #317 ៨ ធ្លាក់ ➜ ១៥០/១៥០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` (ថ្មី ៤) ៖ គំរូ re-snap របស់ WebKit លើ DOM ដែល React ពិតគូរ (`AppPages` · លំដាប់ commit ពិត) ៖ គំរូអាចធ្លាក់ (គ្មានការផ្អាក ➜ re-snap · ប្រអប់ស្វែងរកលាក់ ·
+  ការរអិលឡើង = វីដេអូ) · ទាញចុះ ➜ `panel-gliding` · គ្មាន re-snap · scrollTop ០ · ការរអិលចុះទៅទីតាំងពិត · ក្រោយ snap ត្រឡប់ + ការពិនិត្យយឺត ➜ ០ · App មិនសរសេរ scroll · ទាញឡើង/ចុះម្តងទៀត —
+  លើដើមឈើ PR #317 ៣/៤ ធ្លាក់ (គំរូដែលអាចធ្លាក់ជាប់)។ `ios-search-pulldown.test.ts` ៖ + snap ផ្អាក · Android/web មិនផ្អាក។
+- `forbidden-zone-lock` ៖ sha256 `pull-to-refresh.ts` ថ្មី (សំណើ ៖ វីដេអូម្ចាស់គម្រោងខាងលើ)។
+- `npm run purity:check` ៖ ពិដានការលើកលែង `platform/document-io.ts` ត្រឡប់ដូចមុន switch haptic (`createElement` ៤ · `document.body` ៣ · `appendChild` ៣ · `click` ១ · ដក `setAttribute` · `className`) —
+  PR #317 ដកកូដ haptic តែទុកពិដាន ➜ ២ FAIL («ធាតុងាប់» · «ពិដានតឹង») ➜ ១៥/១៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទាញចុះពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល (យឺត · ធម្មតា · លឿន) ➜ រង្វង់ PTR តាមម្រាមដៃតាំងពីដើម · ទំព័រមិន bounce · លែងដៃពេលរង្វង់ក្រហម ➜ ផ្ទុកឡើងវិញគ្រប់ដង។
+   ពិនិត្យទិសផ្ទុយ ៖ ចុចប៊ូតុងជួរតារាង · អូសបញ្ជីឡើង · អូសផ្ដេក ➜ ធម្មតា។ នៅពិបាក ➜ វីដេអូ + ប្រាប់កន្លែងដាក់ម្រាមដៃ (ទាញចាប់ពីក្រោម ៤០% មិនកេះ ៖ ច្បាប់ម្ចាស់គម្រោង)។
+2. **iPhone PWA** ៖ ស្វែងរកលេខ ➜ បិទ keyboard (ចុច «✓» ឬចុចក្រៅ · ប្រអប់ទទេ) ➜ ប្រអប់ស្វែងរករអិលចុះទៅក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ⛔ មិនឡើងលាក់ក្រោម navbar · មិនលោត។
+3. **Android** (APK · PWA) ៖ PTR · ស្វែងរក ដូចដើម។
+
+---
 
 ### [2.50.66] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ · ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើអេក្រង់តូច**
 
@@ -3844,6 +3888,18 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោងលើ PR #317 ៖ iPhone PTR នៅពិបាក · ប្រអប់ស្វែងរកនៅលាក់ពេលបិទ keyboard ➜ ប្រភព WebKit ពិត
+
+**វិធី** ៖ ញែកវីដេអូ ២ (ffmpeg ៖ ២–១២ ស៊ុម/វិ. · ស៊ុមកាត់ផ្នែកខាងលើ) ➜ សម្មតិកម្មពីការអានកូដ ➜ អានប្រភព WebKit ពិត (GitHub `WebKit/WebKit` `main` ៖
+`WKContentViewInteraction.mm` · `WebPageProxy.cpp` · `ScrollSnapAnimatorState.cpp` · `ScrollingEffectsController.cpp` · `ScrollableArea.cpp` · `ScrollAnimator.cpp` ·
+`LocalFrameView.cpp` · `LocalFrameViewLayoutContext.cpp` · `ScrollSnapOffsetsInfo.cpp`) ➜ គំរូក្នុងអ្នកយាម (Chromium/happy-dom មិនអនុវត្តច្បាប់ WebKit) ➜ ធ្លាក់លើដើមឈើ PR #317 ➜ កែ។
+⚠️ ការចាប់ DOM `cancelable` សម្រាប់ touch event «unpreventable» នៅក្នុង WebKitAdditions (មិនមែនប្រភពបើក) ➜ សន្និដ្ឋានពីវីដេអូ (ទាញវែងគ្មានរង្វង់ = PTR `park()` ដោយ `!e.cancelable`)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A79 | **iPhone PWA ៖ PTR ម្តងកេះម្តងអត់** (ម្ចាស់គម្រោង ៖ «PTR នៅតែពិបាក» ក្រោយ switch haptic ដកចេញ · A77 មិនមែនមូលហេតុ) | វីដេអូ `_541` (៨៨០×១៩២០ · ២៧.២ វិ.) ៖ ទាញ ≥ ៧ ដង ទំព័រ bounce ~១០០–១៩០pt (រង្វង់មិនលេច) · កេះ ១ ដង (១២.៦ វិ. ៖ រង្វង់ + ទំព័រ bounce ព្រមគ្នា) · WebKit ៖ `handlePreventableTouchEvent` ➜ `m_touchMovePreventionState` `Waiting` តែ touchmove **ដំបូង** ➜ `doneDeferringTouchMove(handled)` · `scrollViewWillStartPanOrPinchGesture` ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ event បន្ទាប់ `handleUnpreventableTouchEvent` លើកលែង `isDefaultPrevented` ជាប់ (`_touchEvent:preventsNativeGestures:`) · PTR iOS ចាប់តែក្រោយ `AXIS_SLOP` 22px > hysteresis pan ~១០pt ➜ ករណីកេះ = move ដំបូងលោតឆ្ងាយ ឬ move មុន pan ត្រូវចាប់ (bounce + រង្វង់ = ស៊ុម ១២.៦ វិ.) | `claimsBeforeSlop()` ៖ iOS standalone ចាប់ touchmove ចុះបញ្ឈរតាំងពី move ដំបូង (ដូច APK) · ប៊ូតុងក្នុងជួរតារាងមិនចាប់មុន slop · `gesture-test` គំរូ `webkitPan` ៨ ធ្លាក់លើ PR #317 ➜ ១៥០/១៥០ · `LOCK` ថ្មី · ⚠️ សកម្មភាព ១ [2.50.67] |
+| A80 | **iPhone PWA ៖ បិទ keyboard ➜ ប្រអប់ស្វែងរកនៅលាក់ ~១ វិ.** (ការកែ A78 មិនដើរ) | វីដេអូ `_804` (៨៨០×១៩២០ · ១៤.៤ វិ.) ៖ blur ៨.៩០ វិ. ➜ ប្រអប់ស្វែងរក **រអិលឡើង** ៨.៩៨–៩.៣២ ➜ លាក់ក្រោម navbar ➜ លោតត្រឡប់ ៩.៩៨ (= ១៥០ms blur + `IOS_SEARCH_PULLDOWN_SETTLE_MS` ៩៩០ms) · ករណីទី ១ (៣.០ ➜ ៤.០ វិ.) ដូចគ្នា · CSS ៖ `.page-main` ជាគោលដៅ snap តែមួយ · WebKit ៖ `ScrollSnapAnimatorState::resnapAfterLayout` រក្សាប្រអប់ដែល snap មុន layout · ខណៈទាញឡើង offset `.page-main` = ០ = scrollTop ➜ កត់ `.page-main` · `performPostLayoutTasks` ➜ `resnapAfterLayout()` សមកាលក្នុង layout ដែល `getBoundingClientRect` បង្ខំ (`runOrScheduleAsynchronousTasks`) ➜ ការពិនិត្យ [2.50.66] រត់ក្នុង subscriber **មុន** React commit (`dataPanelSearchFocus` immediate ➜ `flushSync`) ➜ ឃើញ ០ · `scroll-snap-type: none` ➜ `setSnapOffsetsInfo(empty)` ➜ `m_scrollSnapState = nullptr` · state ថ្មី ➜ `updateActiveScrollSnapIndexForClientOffset()` (proximity ០.៣ snapport) · scroll ពី App ➜ `setCurrentPosition` ➜ index ជិតបំផុត | `settleIOSSearchPullDown()` ៖ `beginPanelGlideSnapPause()` មុន commit (commit ដដែល) · `ios-search-resnap.test.tsx` ៤ (គំរូ WebKit លើ React ពិត · ៣ ធ្លាក់លើ PR #317 · ១ = គំរូអាចធ្លាក់) · ⚠️ សកម្មភាព ២ [2.50.67] |
+
 ### 2026-10-14 — វីដេអូម្ចាស់គម្រោង ៖ iPhone PWA ស្វែងរកលេខពេល keyboard បើក ➜ ទំព័ររំកិលតាមម្រាមដៃ ហើយលោតត្រឡប់ ➜ [2.50.65]
 
 **វិធី** ៖ ញែកវីដេអូ (VID_20261014_155824 · ៨៨៤×១៩២០ · ៦០ ស៊ុម/វិ. · ២១.៩ វិ. · keyboard លេខបើកពេញវីដេអូ · ប្រអប់ស្វែងរកទាញឡើង) ជាស៊ុម ៣០ ស៊ុម/វិ. (`ffmpeg`) ➜ វាស់ទីតាំងបញ្ឈរ
@@ -6267,6 +6323,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |

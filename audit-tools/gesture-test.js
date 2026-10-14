@@ -130,25 +130,45 @@ function seed(n) {
 }
 
 // បញ្ជូន touch event ពិតចូលទំព័រ ហើយរាយការណ៍ថាតើ touchmove ត្រូវបាន preventDefault ដែរឬទេ
+//
+// ⛔ `steps.webkitPan` = គំរូនៃច្បាប់ WebKit iOS (ប្រភពពិត ៖ WKContentViewInteraction.mm `_touchEventsRecognized` ·
+//    `scrollViewWillStartPanOrPinchGesture` · `_touchEvent:preventsNativeGestures:` · WebPageProxy.cpp `m_touchMovePreventionState`) ៖
+//    UIScrollView pan ត្រូវ «ពន្យារ» តែចំពោះ touchmove **ដំបូង** ប៉ុណ្ណោះ ➜ touchmove ដំបូងមិនត្រូវ preventDefault ➜ pan ចាប់ផ្តើមនៅ
+//    WEBKIT_PAN_SLOP_PX (hysteresis របស់ UIKit) ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ touchmove បន្ទាប់មិនអាចបោះបង់បាន
+//    (`cancelable: false`) លើកលែងតែ touchmove មួយត្រូវ preventDefault មុន pan ចាប់ផ្តើម (`isDefaultPrevented` ជាប់)។
+//    touchmove ដំបូងត្រូវ preventDefault ➜ native gestures ត្រូវបោះបង់ទាំងស្រុង (គ្មាន bounce)។ Chromium មិនអនុវត្តច្បាប់នេះ ➜ គំរូ។
+const WEBKIT_PAN_SLOP_PX = 10;
 const GESTURE = function (steps) {
     return new Promise((resolve) => {
         const target = steps.selector ? document.querySelector(steps.selector) : (document.elementFromPoint(steps.x, steps.startY) || document.body);
         let prevented = 0;
+        let firstPrevented = null;
         let maxIndicatorOpacity = 0;
+        let wasReady = false;
         let secondTouch = null;
         let blockingAfterStart = 0;
+        const pan = { began: false, latched: false, at: null };
         const bounced = [];
         const touch = (id, x, y) => new Touch({ identifier: id, target: target, clientX: x, clientY: y, pageX: x, pageY: y });
         const fire = (type, touches, changed) => {
+            const moving = type === 'touchmove';
+            const cancelable = type !== 'touchcancel' && !(steps.webkitPan && moving && pan.began && !pan.latched);
             const event = new TouchEvent(type, {
                 bubbles: true,
-                cancelable: type !== 'touchcancel',
+                cancelable: cancelable,
                 touches: touches,
                 targetTouches: touches,
                 changedTouches: changed
             });
             target.dispatchEvent(event);
-            if (type === 'touchmove' && event.defaultPrevented) prevented++;
+            if (moving && event.defaultPrevented) prevented++;
+            if (moving && firstPrevented === null) firstPrevented = event.defaultPrevented;
+            if (moving && cancelable && event.defaultPrevented && !pan.began) pan.latched = true;
+            if (steps.webkitPan && moving && !pan.began && firstPrevented === false && changed[0] &&
+                Math.abs(changed[0].clientY - steps.startY) >= steps.panSlop) {
+                pan.began = true;
+                pan.at = Math.round(changed[0].clientY - steps.startY);
+            }
         };
         let primary = touch(1, steps.x, steps.startY);
         fire('touchstart', [primary], [primary]);
@@ -179,13 +199,16 @@ const GESTURE = function (steps) {
                 }
                 const indicator = document.querySelector('.ptr-indicator');
                 if (indicator) maxIndicatorOpacity = Math.max(maxIndicatorOpacity, parseFloat(indicator.style.opacity) || 0);
+                if (indicator && indicator.classList.contains('ready')) wasReady = true;
                 requestAnimationFrame(tick);
                 return;
             }
             if (Number.isFinite(steps.endY)) {
                 primary = touch(1, steps.x + (steps.endDx || 0), steps.endY);
             }
-            if (secondTouch) {
+            if (steps.cancelAtEnd) {
+                fire('touchcancel', [], [primary]);
+            } else if (secondTouch) {
                 fire('touchend', [secondTouch], [primary]);
                 fire('touchend', [], [secondTouch]);
             } else {
@@ -201,7 +224,8 @@ const GESTURE = function (steps) {
                 }, 60);
             }
             bounced.forEach((el) => { delete el.scrollTop; el.scrollTop = 0; });
-            setTimeout(() => resolve({ prevented: prevented, maxIndicatorOpacity: maxIndicatorOpacity,
+            setTimeout(() => resolve({ prevented: prevented, firstPrevented: firstPrevented, maxIndicatorOpacity: maxIndicatorOpacity,
+                ready: wasReady, nativePan: pan.began, nativePanAt: pan.at,
                 blockingAfterStart: blockingAfterStart,
                 blockingAfterEnd: typeof window.__blockingTouchMoveCount === 'function' ? window.__blockingTouchMoveCount() : -1 }), 420);
         };
@@ -293,7 +317,7 @@ const GESTURE = function (steps) {
         await page.evaluate(() => window.__blockingTouchMoveCount()) === 1);
 
     const runGesture = async (steps) => {
-        const out = await page.evaluate('(' + GESTURE.toString() + ')(' + JSON.stringify(steps) + ')');
+        const out = await page.evaluate('(' + GESTURE.toString() + ')(' + JSON.stringify({ panSlop: WEBKIT_PAN_SLOP_PX, ...steps }) + ')');
         out.reloaded = takeReloads() > 0;
         return out;
     };
@@ -334,9 +358,12 @@ const GESTURE = function (steps) {
     }));
 
     // ១) កំហុសដែលអ្នកប្រើរាយការណ៍៖ រមូរធម្មតាពីកំពូល មិនត្រូវក្លាយជា refresh
+    // ⛔ iOS ៖ WebKit សម្រេច pan តាម touchmove **ដំបូង** ➜ ទាញចុះពីកំពូល PTR ចាប់តាំងពី move ដំបូង (ដូច APK) ➜ ការពិតដែលត្រូវការ ៖
+    //    អូសខ្លីមិន refresh · indicator លាក់ (ការរមូរឡើង/ផ្ដេក/តារាងរមូររួច/ប្រអប់/ម៉ឺនុយ/ប៊ូតុង នៅមិនត្រូវចាប់ ៖ ខាងក្រោម)
     await resetState();
     const gentle = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
-    ok('អូសខ្លីៗពីកំពូល (14px) ➜ មិនរារាំងការរមូរ និងមិនកេះ refresh', gentle.prevented === 0 && !gentle.reloaded, gentle);
+    ok('អូសខ្លីៗពីកំពូល (14px) ➜ មិនកេះ refresh · indicator លាក់', !gentle.reloaded && gentle.maxIndicatorOpacity === 0, gentle);
+    ok('អូសចុះពីកំពូល ➜ PTR ចាប់ touchmove ដំបូង (WebKit សម្រេច pan តាម move ដំបូង)', gentle.firstPrevented === true, gentle);
 
     await resetState();
     const ordinary = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 312 }, { y: 326 }, { y: 338 }, { y: 348 }] });
@@ -400,6 +427,25 @@ const GESTURE = function (steps) {
     const rowControlShort = await runGesture({ selector: '#historyTableBody .close-btn', x: 330, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
     ok('អូសខ្លី 14px ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ ទុកជា tap/scroll ធម្មតា',
         rowControlShort.prevented === 0 && !rowControlShort.reloaded, rowControlShort);
+
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA) ៖ ទាញចុះវែង ➜ ទំព័រ bounce តាម iOS ហើយ PTR មិនកេះ (ម្តងកេះម្តងអត់) ➜ ច្បាប់ WebKit (`webkitPan`)
+    //    ៖ ទាញក្នុងល្បឿនធម្មតា (៤px/ស៊ុម · ២px/ស៊ុម) ត្រូវកេះគ្រប់ដង ហើយ iOS មិនចាប់ផ្តើម pan (គ្មាន bounce)
+    console.log('\n=== PTR លើ iPhone ៖ ច្បាប់ WebKit (pan សម្រេចតាម touchmove ដំបូង) ===');
+    //    (touchcancel ពេលចប់ ៖ navigation ពិតនៅផ្នែក «ការទាញពិតប្រាកដ» ចុងក្រោយ · ready = travel ≥ កម្រិតដែល touchend ប្រើសម្រេច refresh)
+    for (const [label, stepPx] of [['ល្បឿនធម្មតា ៤px/ស៊ុម', 4], ['យឺត ២px/ស៊ុម', 2], ['លឿន ១២px/ស៊ុម', 12]]) {
+        await resetState();
+        const points = [];
+        for (let d = stepPx; d <= 264; d += stepPx) points.push({ y: 300 + d });
+        const pull = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: points, webkitPan: true, cancelAtEnd: true });
+        ok('WebKit ' + label + ' ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan', pull.firstPrevented === true && pull.nativePan === false, pull);
+        ok('WebKit ' + label + ' ➜ ទាញដល់កម្រិត ➜ PTR ត្រៀម refresh (ready)', pull.ready === true && !pull.reloaded, pull);
+    }
+    await resetState();
+    const webkitUp = await runGesture({ selector: '#appPages', x: 200, startY: 400, points: [{ y: 396 }, { y: 388 }, { y: 370 }, { y: 340 }], webkitPan: true });
+    ok('WebKit ទិសផ្ទុយ ៖ អូសឡើង ➜ មិនចាប់ · iOS រមូរធម្មតា (pan ចាប់ផ្តើម)', webkitUp.prevented === 0 && webkitUp.nativePan === true && !webkitUp.reloaded, webkitUp);
+    await resetState();
+    const webkitRow = await runGesture({ selector: '#historyTableBody .close-btn', x: 330, startY: 300, points: [{ y: 302 }, { y: 305 }, { y: 309 }, { y: 312 }], webkitPan: true });
+    ok('WebKit ទិសផ្ទុយ ៖ ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ មិនចាប់មុន slop (tap នៅធម្មតា)', webkitRow.prevented === 0 && !webkitRow.reloaded, webkitRow);
 
     // === ទីតាំងសញ្ញា PTR ធៀបនឹងរបាខាងលើ តាមទំហំអេក្រង់ ===
     // ⛔ tablet ផ្តេក (≥992px) ៖ របា Tab ផ្លាស់ទៅនៅក្រោម navbar ➜ សញ្ញា PTR (fixed · តម្លៃកំណត់សម្រាប់ទូរស័ព្ទ) ធ្លាក់ជាន់លើរបា Tab

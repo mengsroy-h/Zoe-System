@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.66` (`zoew-v329`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.67` (`zoew-v330`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.18` (`zoekeygen-v129`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -75,7 +75,8 @@ only this text protects them.
   ([`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) section 5) can't be done on this machine.
 - 📱 **Android (Capacitor)**: `ZoeW/android/` · [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md). ⛔ Web **fails closed**:
   `src/platform/native.ts` is the single decider · plugins load by dynamic import only on native · web/iOS unchanged.
-  ⛔ PTR on Android native goes through `setupIOSPullToRefresh()` plus a pre-slop capture **only on Android native**.
+  ⛔ PTR on Android native goes through `setupIOSPullToRefresh()` plus a pre-slop capture (iOS standalone has it too, except
+  row buttons — see «Pull-to-refresh»).
   Guards: `npm run android:check` (APK version = `APP_VERSION` · appId · permissions · logo · ⛔ `MainActivity` requests
   the highest-Hz mode — don't remove · splash: ⛔ no `android:background` · no title/ActionBar · `postSplashScreenTheme` =
   `BridgeActivity` theme · icon = vector `drawable/splash_icon.xml` from `icon.svg` ⛔ not `@mipmap` · ⛔ permission
@@ -631,9 +632,13 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   `padding-bottom` (`react-root.css`, `html.ios-standalone` only) so the list card ends above the keyboard and scrolls inside, and a vertical `touchmove` outside a
   scroller with room in that direction is `preventDefault()`ed (`blockIOSKeyboardPan()`: the document pan iOS allows with the keyboard up, which `restoreIOSDocumentScroll()`
   would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside a text field (`ZoeW/tests/ios-keyboard-pan.test.ts`).
-  Pulling the search down (`dataPanelSearchFocus` true ➜ false, iOS standalone phone) returns `#appPages` to 0 in the same microtask (`settleIOSSearchPullDown()`: `setElementScrollTop()` + a new `panelGlideFrom()` from the visible
-  position of the search card and the list card ⛔ never an instant jump) and once more after `IOS_SEARCH_PULLDOWN_SETTLE_MS` unless a finger touched meanwhile, the search was pulled up again or the field is focused —
-  Chromium clamps to 0 by itself (Android correct), WebKit leaves the search card under the navbar (`ZoeW/tests/ios-search-pulldown.test.ts`).
+  Pulling the search down (`dataPanelSearchFocus` true ➜ false, iOS standalone phone) pauses snap (`beginPanelGlideSnapPause()`) **before** React commits it
+  (`settleIOSSearchPullDown()` runs in the store subscriber, inside the immediate commit): while pulled up `.page-main`'s snap offset is 0 = the scroll position, so WebKit
+  records it as the snapped box and its `resnapAfterLayout()` (synchronous, in the first layout after the commit) would scroll to `.page-main`'s new offset — the search card
+  under the navbar · with snap off WebKit drops its snap state and rebuilds it at 0 when the pause ends (nearest within proximity: none) ⛔ never check or correct before the
+  commit only. `#appPages` still scrolled after that commit ➜ 0 + a new `panelGlideFrom()` from the visible position of the search card and the list card ⛔ never an
+  instant jump · once more after `IOS_SEARCH_PULLDOWN_SETTLE_MS` unless a finger touched meanwhile, the search was pulled up again or the field is focused — Chromium
+  clamps to 0 by itself (Android correct) (`ZoeW/tests/ios-search-resnap.test.tsx`: WebKit re-snap model on the real React DOM · `ZoeW/tests/ios-search-pulldown.test.ts`).
   That reset lands mid keyboard animation (the page drops, then slides back) ➜ iOS must not scroll at all: a tap on an unfocused search input (phone search or scan tab · iOS
   standalone · < 992px · one finger · ≤ `IOS_SEARCH_TAP_SLOP_PX` · ≤ `IOS_SEARCH_TAP_MAX_MS`) ➜ `focusIOSSearchWithoutScroll()` prevents the `touchend`,
   pulls the search up (scan tab: collapses the scan panel) **before** `focus({ preventScroll: true })` (`listenIOSSearchFocus()` in boot, capture, `touchend` non-passive); drags · long
@@ -675,6 +680,11 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
 - `boot-flags.js` sets `html.ios-standalone` before the stylesheet; `#appPages` is the single scroll owner.
 - PTR only when every container is at the top (`scrollTop <= 1`), one touch, clearly down; modals/drawer/inputs/bars are
   not targets.
+- ⛔ WebKit decides native panning on the **first** `touchmove` only (`m_touchMovePreventionState`); once UIKit's pan begins
+  (~10pt) with no `touchmove` prevented, later ones are uncancelable ➜ PTR parks · the page only bounces ➜ a tracked pull claims
+  every downward, mostly vertical `touchmove` before `AXIS_SLOP` (`claimsBeforeSlop()`), on iOS standalone and Android native ⛔ never
+  wait for the slop before the first `preventDefault()` · iOS keeps row buttons (`button, a` inside the table) unclaimed before the
+  slop (a tap stays a tap) · upward · sideways · nested scrolled · overlays · controls stay native (`gesture-test` WebKit model).
 - ⛔ Owner rules: start in the **top 40%** (`PTR_START_ZONE_RATIO`) · any open layer ➜ no PTR (`ptrBlockedByOverlay()`,
   state remembered at `pointerdown` on `window` capture) · one haptic tick at the threshold (`hapticTick()`: APK ➜ Capacitor Haptics · web ➜
   `navigator.vibrate` only; iPhone web has no vibration API and the `<input type="checkbox" switch>` trick is closed — since iOS 26.5 WebKit plays that haptic

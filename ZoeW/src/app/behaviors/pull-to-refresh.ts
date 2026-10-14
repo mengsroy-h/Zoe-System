@@ -29,7 +29,7 @@ export function ptrIndicatorElement(): any {
 
 export function setupIOSPullToRefresh() {
     if (!pullToRefreshSupported()) return;
-    const claimBeforeSlop = isNativeAndroid();
+    const claimRowActionsBeforeSlop = isNativeAndroid();
 
     const pages = elementOf('appPages');
     if (!pages) return;
@@ -162,6 +162,11 @@ export function setupIOSPullToRefresh() {
         if (startScroller && !atPullTop(startScroller.scrollTop)) return false;
         if (startActiveScroller && startActiveScroller.offsetParent !== null && !atPullTop(startActiveScroller.scrollTop)) return false;
         return true;
+    }
+
+    function claimsBeforeSlop(target) {
+        if (claimRowActionsBeforeSlop) return true;
+        return !(target && target.closest && target.closest('button, a'));
     }
 
     function attachPullMoveListener() {
@@ -328,7 +333,7 @@ export function setupIOSPullToRefresh() {
 
         if (!engaged) {
             if (Math.abs(deltaY) < AXIS_SLOP && Math.abs(deltaX) < AXIS_SLOP) {
-                if (claimBeforeSlop && deltaY > 0 && deltaY >= Math.abs(deltaX) * AXIS_RATIO && e.cancelable) e.preventDefault();
+                if (deltaY > 0 && deltaY >= Math.abs(deltaX) * AXIS_RATIO && e.cancelable && claimsBeforeSlop(e.target)) e.preventDefault();
                 return;
             }
             if (settlingScroll) cancelScrollSettling();

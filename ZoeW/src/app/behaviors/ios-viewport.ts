@@ -4,7 +4,7 @@ import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
-import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, panelGlideFrom } from './panel-motion';
+import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
 import { panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 import { glidePhoneSearchPulledUp } from './phone-search';
 
@@ -12,6 +12,7 @@ export const IOS_SEARCH_TAP_SLOP_PX = 10;
 export const IOS_SEARCH_TAP_MAX_MS = 500;
 const IOS_SEARCH_WIDE_MIN_PX = 992;
 export const IOS_SEARCH_PULLDOWN_SETTLE_MS = PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS + PANEL_GLIDE_SNAP_GRACE_MS + 200;
+export const IOS_SEARCH_PULLDOWN_SNAP_PAUSE_MS = PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS;
 
 const IOS_SEARCH_FIELDS: readonly RefName[] = ['searchPhoneInput', ...ENTRY_SEARCH_FIELDS];
 
@@ -103,9 +104,10 @@ export function settleIOSSearchPullDown(): void {
     pullDownTouchSeen = false;
     const pages = elementOf('appPages');
     if (!pages) return;
+    const gliders = [elementOf('dataSearchCard'), elementOf('dataMainSection')];
+    const tops = gliders.map((el) => (el ? el.getBoundingClientRect().top : NaN));
+    beginPanelGlideSnapPause(IOS_SEARCH_PULLDOWN_SNAP_PAUSE_MS);
     if (pages.scrollTop > 0) {
-        const gliders = [elementOf('dataSearchCard'), elementOf('dataMainSection')];
-        const tops = gliders.map((el) => (el ? el.getBoundingClientRect().top : NaN));
         setElementScrollTop(pages, 0);
         gliders.forEach((el, i) => panelGlideFrom(el, tops[i], PANEL_SEARCH_GLIDE));
     }

@@ -1,7 +1,8 @@
 /**
  * ⛔ រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone PWA ក្រោយ 2.50.65) ៖ ស្វែងរកលេខ ➜ ចុចបិទ keyboard ➜ ទំព័ររំកិលឡើង ➜ ប្រអប់ស្វែងរកលាក់ក្រោម navbar (Android ត្រឹមត្រូវ ៖
  *    Chromium វាស់បាន `#appPages.scrollTop = 0` ក្រោយទាញចុះ · WebKit ទុកទីតាំងផ្សេង)។
- * ⛔ ច្បាប់ ៖ iOS standalone · ទូរស័ព្ទ ៖ ប្រអប់ស្វែងរកទាញចុះ (`dataPanelSearchFocus` true ➜ false) ➜ `#appPages` ត្រឡប់ ០ (ប្រអប់ស្វែងរកឃើញពេញ) ក្នុង microtask ដដែល
+ * ⛔ ច្បាប់ ៖ iOS standalone · ទូរស័ព្ទ ៖ ប្រអប់ស្វែងរកទាញចុះ (`dataPanelSearchFocus` true ➜ false) ➜ snap ផ្អាក (`panel-gliding`) មុន React commit
+ *    (re-snap របស់ WebKit ៖ `ios-search-resnap.test.tsx`) · `#appPages` នៅតែរំកិល ➜ ត្រឡប់ ០ (ប្រអប់ស្វែងរកឃើញពេញ) ក្នុង flush ដដែល
  *    ហើយការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (`panelGlideFrom` លើកាតស្វែងរក + កាតបញ្ជី · មិនលោត) · ក្រោយ `IOS_SEARCH_PULLDOWN_SETTLE_MS` បើ WebKit រំកិលម្តងទៀត
  *    (keyboard បិទយឺត) ➜ ០ ម្តងទៀត — ⛔ មិនប៉ះពេលមានម្រាមដៃប៉ះក្នុងចន្លោះនោះ · ប្រអប់ទាញឡើងវិញ · ប្រអប់នៅ focus · scrollTop = 0 រួច · Android/web · អេក្រង់ធំ។
  */
@@ -81,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
     disposers.splice(0).forEach((fn) => fn());
+    panelMotion.endPanelGlideSnapPause();
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -95,9 +97,10 @@ afterEach(() => {
 });
 
 describe('iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (#appPages ត្រឡប់ ០)', () => {
-    it('⛔ ទាញចុះខណៈ #appPages រំកិលរួច ➜ scrollTop 0 ក្នុង flush ដដែល · ការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (កាតស្វែងរក · កាតបញ្ជី · ចលនាស្វែងរក)', () => {
+    it('⛔ ទាញចុះខណៈ #appPages រំកិលរួច ➜ snap ផ្អាក · scrollTop 0 ក្នុង flush ដដែល · ការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (កាតស្វែងរក · កាតបញ្ជី · ចលនាស្វែងរក)', () => {
         boot();
         pullUpThenDown(411);
+        expect(uiState.panelGliding).toBe(true);
         expect(pages.scrollTop).toBe(0);
         expect(glide).toHaveBeenCalledTimes(2);
         expect(glide.mock.calls[0]).toEqual([card, -37, panelMotion.PANEL_SEARCH_GLIDE]);
@@ -144,12 +147,13 @@ describe('iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក
         expect(pages.scrollTop).toBe(300);
     });
 
-    it('ទិសផ្ទុយ ៖ Android/web (មិនមែន iOS standalone) · អេក្រង់ធំ ➜ scrollTop មិនប៉ះ · គ្មានការរអិល', () => {
+    it('ទិសផ្ទុយ ៖ Android/web (មិនមែន iOS standalone) · អេក្រង់ធំ ➜ scrollTop មិនប៉ះ · គ្មានការរអិល · snap មិនផ្អាក', () => {
         setIOSStandalone(false);
         boot();
         pullUpThenDown(411);
         expect(pages.scrollTop).toBe(411);
         expect(glide).not.toHaveBeenCalled();
+        expect(uiState.panelGliding).toBe(false);
         disposers.splice(0).forEach((fn) => fn());
         listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
 

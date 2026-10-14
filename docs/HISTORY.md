@@ -45,7 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **មិនទាន់ merge**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ខ. **Branch `ccr-20e725de-tpecua`** (ពី `main` `7960a90` = PR #315 · **មិនទាន់ merge**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
+    ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **merge រួចតាម PR #315 · `7960a90`**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
    (រាយការណ៍ម្ចាស់គម្រោងក្រោយ merge PR #309) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
    **Branch `claude/kind-dijkstra-kwqzuc`** (ពី `main` `7dd7fa2` = PR #308 · **merge រួចតាម PR #309 · `5767bc2`**) ៖ [2.50.53] iPhone បង្ហាញត្រឹម «iPhone» (ម្ចាស់គម្រោង ៖ ក្រុម model
@@ -169,6 +171,37 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.65] — 2026-10-14 · ZoeW (iPhone PWA) ៖ **ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard · ទំព័រលែងរំកិលតាមម្រាមដៃ ហើយលោតត្រឡប់**
+
+**ZoeW `2.50.65`** (`zoew-v327` ➜ `zoew-v328`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts`) មិនប៉ះ · Android (APK · PWA) · កុំព្យូទ័រ មិនប្រែ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ VID_20261014_155824) ៖ «ចលនា scroll របស់ PWA iOS ដូចខុសប្រក្រតី ដោយឡែកចំពោះ APK និង PWA Android រលូនល្អ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ (ប្រអប់ទាញឡើង · keyboard បើក) ➜ អូសលើកាតបញ្ជី ➜ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក) រំកិលឡើងតាមម្រាមដៃ បង្ហាញចន្លោះទទេ
+  ហើយលែងដៃ ➜ លោតត្រឡប់ក្នុង ១ ស៊ុម** (ផ្នែក ២ A76)។ មូលហេតុ ៖ iOS មិនបង្រួម viewport ពេល keyboard បើក (Android បង្រួម) ➜ កាតបញ្ជី (`100dvh`) លាតដល់ក្រោយ keyboard ·
+  iOS អនុញ្ញាតឲ្យអូស document ទោះ root ចាក់សោ ➜ `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ (ចុងកាយវិការ) = លោត។ ឥឡូវ ៖ (១) `visualViewport`
+  `resize` វាស់កម្ពស់ keyboard (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜ `uiState.iosKeyboardInset` ➜ `body.ios-keyboard` + `--ios-keyboard-inset`
+  ➜ `.app-pages` `padding-bottom` ➜ កាតបញ្ជីចប់ ៨px ពីលើ keyboard ហើយបញ្ជីរមូរក្នុងកាតខ្លួនឯង (ដូច Android) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ ➜
+  `preventDefault()` (`blockIOSKeyboardPan()`) ➜ document មិនរំកិល · អ្នករមូរមានកន្លែង · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ ➜ iOS ធម្មតា · `restoreIOSDocumentScroll()`
+  នៅជាខ្សែការពារទីពីរ។ ប្រអប់បិទ ឬ keyboard បិទ ➜ ០ ➜ ទម្រង់ដើម។
+- ⚠️ **មិនទាន់វាស់លើ iPhone ពិត** ៖ Chromium គ្មាន keyboard iOS ➜ មូលហេតុសន្និដ្ឋានពីរូបវីដេអូ (A76) ➜ ត្រូវសាក (សកម្មភាព ២)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` (ថ្មី ១០) ៖ inset ពី `visualViewport` (≥ កម្រិត · keyboard បិទ ➜ ០ · ប្រអប់បិទខណៈ keyboard បើក ➜ ០ · ទាញឡើងម្តងទៀត ➜ វាស់ឡើងវិញ ·
+  ប្រអប់មិនទាញឡើង · អេក្រង់ធំ · Android/web ➜ ០ · គ្មាន listener) · ខ្សែភ្ជាប់ (boot · `DocumentEffects` · `react-root.css` ត្រឹម `html.ios-standalone body.ios-keyboard`) ·
+  `touchmove` (preventDefault ក្រៅអ្នករមូរ · ចាក់សោក្នុងកាយវិការ · អ្នករមូរមានកន្លែង/ដល់ចុង/ត្រឡប់ទិស · ផ្ដេក · ប្រអប់អក្សរ · ម្រាមដៃពីរ · មិន cancelable · listener
+  capture + មិន passive) — លើដើមឈើមុនកែ ១០/១០ ធ្លាក់។ `ios-search-viewport` · `ios-search-tap-focus` នៅបៃតង (២៥/២៥)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy **ZoeW** (merge ចូល `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+2. iPhone (App លើ Home Screen) ៖ ចុចស្វែងរកលេខ ➜ keyboard បើក ➜ (ក) កាតបញ្ជីចប់ពីលើ keyboard (គ្មានជួរនៅក្រោយ keyboard) · (ខ) អូសឡើង/ចុះលើកាត ➜ navbar និងប្រអប់ស្វែងរក
+   នៅនឹងកន្លែង · គ្មានលោត · (គ) បញ្ជីវែង (> ៥ ជួរ) ➜ រមូរក្នុងកាតដល់ជួរចុងក្រោយ · (ឃ) បញ្ជីស្នើលេខវែង ➜ រមូរបាន · (ង) ប្រអប់ស្វែងរកទំព័រស្កេន ➜ ដូចគ្នា ·
+   (ច) បិទ keyboard ➜ ទម្រង់ដើម។ នៅខុស ➜ ថតវីដេអូម្តងទៀត។
+3. Android (APK · PWA) ៖ ស្វែងរកដដែល (គួរតែមិនប្រែ)។
 
 ### [2.50.64] — 2026-10-14 · 🧠 ការណែនាំឆ្លាតវៃក្នុង 🩺 ពិនិត្យសុខភាព · toast រស់និយាយតាមដំណាក់កាលការសរសេរ (Deep audit ជុំទី ៤)
 
@@ -3718,6 +3751,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោង ៖ iPhone PWA ស្វែងរកលេខពេល keyboard បើក ➜ ទំព័ររំកិលតាមម្រាមដៃ ហើយលោតត្រឡប់ ➜ [2.50.65]
+
+**វិធី** ៖ ញែកវីដេអូ (VID_20261014_155824 · ៨៨៤×១៩២០ · ៦០ ស៊ុម/វិ. · ២១.៩ វិ. · keyboard លេខបើកពេញវីដេអូ · ប្រអប់ស្វែងរកទាញឡើង) ជាស៊ុម ៣០ ស៊ុម/វិ. (`ffmpeg`) ➜ វាស់ទីតាំងបញ្ឈរ
+នៃកាតស្វែងរក + ក្បាលបញ្ជី (template ១៤០px) រាល់ស៊ុម ➜ អានកូដ `ios-viewport.ts` · CSS `search-focus` · ច្បាប់ 2.50.42/2.50.45 ➜ សង់ vitest ដែលធ្លាក់លើកូដមុនកែ ➜ កែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A76 | **iPhone PWA ៖ អូសលើកាតបញ្ជីខណៈស្វែងរកលេខ ➜ ទំព័រទាំងមូលរំកិលឡើង ហើយលោតត្រឡប់** (ម្ចាស់គម្រោង ៖ «ចលនា scroll iOS ខុសប្រក្រតី · APK · PWA Android រលូន») | ព្រឹត្តិការណ៍ ៧ (១.១ · ២.៣ · ៣.៧ · ៤.៨ · ៦.២ · ១៨.២ · ១៩.៤ វិ.) ដូចគ្នា ៖ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក · កាត) រំកិលឡើង > ២០០px (មាត្រដ្ឋាន ៤៨០) ក្នុង ១៣០–៣០០ms តាមម្រាមដៃ ➜ បង្ហាញផ្នែកសដែលនៅក្រោយ keyboard (ប៊ូតុង «បន្ថែម» · ចន្លោះទទេ) ➜ ឈរ ២០០–៣០០ms ➜ ត្រឡប់ ០ ក្នុង **១ ស៊ុម** (មិនមែន rubber band ដែលមានចលនា) · Chromium (ក្លែង iOS standalone) ៖ `.page-main` ក្រោម `search-focus` = `flex: 1 1 0` ក្នុង `.app-page.active { height: 100% }` នៃ `.app-pages` = `100dvh − chrome` ➜ iOS មិនបង្រួម `100dvh`/`innerHeight` ពេល keyboard បើក (Android បង្រួម) ➜ កាតលាតដល់ក្រោយ keyboard · ជួរនៅទីនោះមើលមិនឃើញក្រៅពីអូស document (iOS អនុញ្ញាតទោះ `html.ios-standalone { overflow-y: hidden }`) · `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ = ចុងកាយវិការ (WebKit ផ្ញើ `scroll` ពេល viewport ស្ថិរ) ➜ លោត ១ ស៊ុម | (១) inset keyboard ពី `visualViewport` ➜ `.app-pages` `padding-bottom` ➜ កាតចប់ពីលើ keyboard (គ្មានជួរលាក់ · គ្មានហេតុអូស) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរមានកន្លែង ➜ `preventDefault()` (ដូច body-scroll-lock លើ iOS) ➜ document មិនរំកិល · ការត្រឡប់ ០ នៅជាខ្សែទីពីរ · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ ➜ ត្រូវសាកលើ iPhone ពិត · `ZoeW/tests/ios-keyboard-pan.test.ts` ១០ ធ្លាក់លើដើមឈើមុនកែ |
+
 ### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
 
 សំណើម្ចាស់គម្រោង ៖ «Deep Audit Project ទាំងមូល … real live toast និងបន្ថែមភាពឆ្លាតវៃ»។ វិធី ៖ Sentry (issue មិនទាន់ដោះស្រាយ ៩ · ៣០ ថ្ងៃ) · អានផ្លូវពិត (Remove · Delete · Restore · close/reopen · scan save · ledger · registry · toast · connection flow · sheet import · Apps Script ២ · lookup) · run-all STRICT baseline លើ `ef0bf5b` (PR #314) ➜ ០ FAIL · វាស់ចន្លោះដែល checker មិនយាម។
@@ -6126,6 +6168,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |

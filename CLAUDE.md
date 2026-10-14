@@ -624,6 +624,11 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
 - iOS standalone: while the phone search is pulled up (`dataPanelSearchFocus`) or a scan-tab search field is focused, a document scroll (window `scroll` · `visualViewport` `scroll`) is a
   keyboard artifact (the root is locked, `#appPages` owns scrolling) ➜ `restoreIOSDocumentScroll()` returns it to 0 (`listenIOSDocumentScroll()` in
   boot, besides the `visualViewport` `resize` reset); other fields keep iOS's scroll-into-view; Android/web untouched (`ZoeW/tests/ios-search-viewport.test.ts`).
+  iOS never shrinks the viewport for its keyboard (Android does) ➜ while that search is pulled up (`iosSearchDocumentLocked()`), `visualViewport` `resize` measures
+  `innerHeight - visualViewport.height` (≥ `KEYBOARD_MIN_INSET_PX`) into `uiState.iosKeyboardInset` ➜ `body.ios-keyboard` + `--ios-keyboard-inset` ➜ `.app-pages`
+  `padding-bottom` (`react-root.css`, `html.ios-standalone` only) so the list card ends above the keyboard and scrolls inside, and a vertical `touchmove` outside a
+  scroller with room in that direction is `preventDefault()`ed (`blockIOSKeyboardPan()`: the document pan iOS allows with the keyboard up, which `restoreIOSDocumentScroll()`
+  would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside a text field (`ZoeW/tests/ios-keyboard-pan.test.ts`).
   That reset lands mid keyboard animation (the page drops, then slides back) ➜ iOS must not scroll at all: a tap on an unfocused search input (phone search or scan tab · iOS
   standalone · < 992px · one finger · ≤ `IOS_SEARCH_TAP_SLOP_PX` · ≤ `IOS_SEARCH_TAP_MAX_MS`) ➜ `focusIOSSearchWithoutScroll()` prevents the `touchend`,
   pulls the search up (scan tab: collapses the scan panel) **before** `focus({ preventScroll: true })` (`listenIOSSearchFocus()` in boot, capture, `touchend` non-passive); drags · long

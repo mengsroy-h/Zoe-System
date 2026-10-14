@@ -253,6 +253,9 @@
     .app-pages:has(> .app-page.active > .page-side.search-focus) { overflow-y: hidden; }
     .app-pages:has(> .app-page.active > .page-side.search-focus) > .app-page.active { height: 100%; }
     .app-page.active > .page-side.search-focus + .page-main { flex: 1 1 0; min-height: 0; height: auto; }
+    html.ios-standalone body.ios-keyboard .app-pages:has(> .app-page.active > .page-side.search-focus),
+    html.ios-standalone body.ios-keyboard .app-pages.history-expanded { padding-bottom: calc(var(--ios-keyboard-inset, 0px) + 8px); }
+    html.ios-standalone body.ios-keyboard .app-page.active > .page-main .table-responsive { overscroll-behavior-y: contain; }
 }
 
 .trash-more-row td { border-bottom: none; }

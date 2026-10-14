@@ -5951,7 +5951,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `fluid-type-focus-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `function-surface-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
-| `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `google-sheets-cache-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `health-check-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៦ |
@@ -6265,5 +6265,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

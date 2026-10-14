@@ -104,7 +104,7 @@ export function filteredHistoryItems() {
 }
 
 export function buildExportRows() {
-    const filteredData = filteredHistoryItems();
+    const filteredData = getFilteredDataByDate();
     const rows = [];
     let rowNum = 0;
     filteredData.forEach(item => {

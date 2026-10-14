@@ -45,7 +45,7 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0គ. **Branch `ccr-20e725de-tpecua`** (ចាប់ឡើងវិញពី `main` `9272d88` = PR #316 · **មិនទាន់ merge**) ៖ [2.50.66] iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (ផ្នែក ២ A78) ·
+0គ. **Branch `ccr-20e725de-tpecua`** (ចាប់ឡើងវិញពី `main` `9272d88` = PR #316 · **មិនទាន់ merge**) ៖ [2.50.66] iPhone PWA ៖ PTR ដូច 2.50.64 (switch haptic ដកចេញ · A77) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (ផ្នែក ២ A78) ·
     ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើ ៣២០px ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.66]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ខ. **Branch `ccr-20e725de-tpecua` (ជុំមុន)** (ពី `main` `7960a90` = PR #315 · **merge រួចតាម PR #316 · `9272d88` · ម្ចាស់គម្រោង «Merge»**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
     ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) · PTR ញ័រតាម `<input switch>` (A77) · 🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -187,6 +187,12 @@
   `setElementScrollTop()` ហើយការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (`panelGlideFrom()` លើកាតស្វែងរក + កាតបញ្ជី · ចលនាស្វែងរកដដែល ➜ មិនលោត) · ក្រោយ
   `IOS_SEARCH_PULLDOWN_SETTLE_MS` (ការរអិល + hold + grace + 200ms) បើ WebKit រំកិលម្តងទៀត (keyboard បិទយឺត) ➜ ០ ម្តងទៀត ⛔ មិនប៉ះពេលមានម្រាមដៃប៉ះក្នុងចន្លោះនោះ ·
   ប្រអប់ទាញឡើងវិញ · ប្រអប់នៅ focus។ Android/web · អេក្រង់ ≥ 992 ➜ មិនប៉ះ។ ប្រអប់ដែលមានលេខនៅក្នុង (មិនទាញចុះ) នៅដដែលដូចមុន។
+- 🐛 **iPhone PWA ៖ PTR ម្តងដើរម្តងអត់ (ម្ចាស់គម្រោង ៖ «PTR មុនលើ iOS ស្រួលកេះដូច APK និង PWA Chrome តែឥឡូវម្តងកេះបានម្តងអត់») ហើយនៅតែមិនញ័រ** (A77 កែ)។
+  ការប្រែតែមួយគត់លើផ្លូវ PTR iOS ក្នុង 2.50.65 (diff `7960a90..9272d88` ៖ touch · scroll · PTR · iOS) = `iosHapticSwitchTick()` ➜ `label.click()` លើ
+  `<input switch>` **ក្នុងកាយវិការទាញ** (touchmove · ដល់កម្រិត) ➜ WebKit បញ្ចប់/កាត់ touch ➜ PTR ចោល · ហើយ iOS 26.5+ (WebKit bug 309082) លេងញ័រតែពីចុចផ្ទាល់
+  (click ពី script = untrusted) ➜ មិនញ័រទោះដើរ។ ឥឡូវ ៖ ដក switch ចេញទាំងស្រុង (`haptics.ts` web ➜ `navigator.vibrate` តែប៉ុណ្ណោះ · `document-io.ts` ·
+  `.haptic-switch` · `haptic-ios-switch.test.ts`) ➜ PTR iOS ដូច 2.50.64 · ⛔ ព្រំដែនទទួលស្គាល់ ៖ iPhone web គ្មានញ័រ PTR (APK · Android ញ័រដូចដើម) ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
 - 📊 **«កញ្ចប់សរុប (នៅសល់)» កាត់ «…» លើអេក្រង់តូច** ៖ `.stat-card .label` ក្នុង `app.css` (ចាក់សោ) ជា `nowrap + ellipsis` ➜ វាស់ ៖ ៣២០ ទាំង ៣ ស្លាក · ៣៦០–៤១២ ស្លាកទី ១ ·
   ១២៨០ ទាំង ៣ (ជួរឈរ ៣៨០px) ➜ `react-root.css` បត់បន្ទាត់ (`white-space: normal` · `overflow-wrap: anywhere` ៖ «អតិថិជនយក» គ្មានកន្លែងបត់ក្នុងពុម្ពជំនួសរបស់ CI ➜ បត់ក្នុងពាក្យជាជាងកាត់ · មិនកាត់) ➜ អានបានគ្រប់ទទឹង (វាស់ ៣២០–១២៨០ ជាមួយពុម្ព Kantumruy Pro ពិត និងពុម្ពជំនួស ៖ ០ កាត់)។
 - 📋 **ប៊ូតុង «📋 បញ្ចូលច្រើន» ≠ «📁 យក Barcode ពីរូបភាព»** (១៨០×៣៨ ទល់ ១២៨×៤២ ៖ `button` មាន margin UA · ទទឹងតាមអក្សរ) ➜ `flex: 1 1 0` · `margin: 0` · `font-family: inherit` ·
@@ -205,6 +211,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
+0. **iPhone PWA** ៖ PTR ទាញពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល ➜ ត្រូវកេះគ្រប់ដង ដូច 2.50.64 (ញ័រ ៖ គ្មាន — ព្រំដែន iOS)។
 1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ចុចក្រៅប្រអប់ដើម្បីបិទ keyboard (ប្រអប់ទទេ) ➜ ទំព័រត្រូវត្រឡប់ទៅកំពូល ៖ កាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ប្រអប់ស្វែងរក ·
    កាតបញ្ជីតាមលំដាប់ ⛔ ប្រអប់ស្វែងរកមិនលាក់ក្រោម navbar។ បើនៅលាក់ ➜ ថតវីដេអូ (ម៉ោងបិទ keyboard ➜ ទីតាំងចុងក្រោយ) — WebKit អាចរំកិលក្រោយ ១ វិ.។
 2. **iPhone** ៖ ស្លាក «កញ្ចប់សរុប (នៅសល់)» បង្ហាញ ២ បន្ទាត់ · ទំព័រស្កេន ប៊ូតុងទាំង ២ ស្មើគ្នា · ផ្ទាំងបោះពុម្ពស្លាកគំរូមិនលើសអេក្រង់។
@@ -3845,7 +3852,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A76 | **iPhone PWA ៖ អូសលើកាតបញ្ជីខណៈស្វែងរកលេខ ➜ ទំព័រទាំងមូលរំកិលឡើង ហើយលោតត្រឡប់** (ម្ចាស់គម្រោង ៖ «ចលនា scroll iOS ខុសប្រក្រតី · APK · PWA Android រលូន») | ព្រឹត្តិការណ៍ ៧ (១.១ · ២.៣ · ៣.៧ · ៤.៨ · ៦.២ · ១៨.២ · ១៩.៤ វិ.) ដូចគ្នា ៖ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក · កាត) រំកិលឡើង > ២០០px (មាត្រដ្ឋាន ៤៨០) ក្នុង ១៣០–៣០០ms តាមម្រាមដៃ ➜ បង្ហាញផ្នែកសដែលនៅក្រោយ keyboard (ប៊ូតុង «បន្ថែម» · ចន្លោះទទេ) ➜ ឈរ ២០០–៣០០ms ➜ ត្រឡប់ ០ ក្នុង **១ ស៊ុម** (មិនមែន rubber band ដែលមានចលនា) · Chromium (ក្លែង iOS standalone) ៖ `.page-main` ក្រោម `search-focus` = `flex: 1 1 0` ក្នុង `.app-page.active { height: 100% }` នៃ `.app-pages` = `100dvh − chrome` ➜ iOS មិនបង្រួម `100dvh`/`innerHeight` ពេល keyboard បើក (Android បង្រួម) ➜ កាតលាតដល់ក្រោយ keyboard · ជួរនៅទីនោះមើលមិនឃើញក្រៅពីអូស document (iOS អនុញ្ញាតទោះ `html.ios-standalone { overflow-y: hidden }`) · `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ = ចុងកាយវិការ (WebKit ផ្ញើ `scroll` ពេល viewport ស្ថិរ) ➜ លោត ១ ស៊ុម | (១) inset keyboard ពី `visualViewport` ➜ `.app-pages` `padding-bottom` ➜ កាតចប់ពីលើ keyboard (គ្មានជួរលាក់ · គ្មានហេតុអូស) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរមានកន្លែង ➜ `preventDefault()` (ដូច body-scroll-lock លើ iOS) ➜ document មិនរំកិល · ការត្រឡប់ ០ នៅជាខ្សែទីពីរ · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ ➜ ត្រូវសាកលើ iPhone ពិត · `ZoeW/tests/ios-keyboard-pan.test.ts` ១០ ធ្លាក់លើដើមឈើមុនកែ |
-| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ |
+| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ · ⛔ **ដកចេញក្នុង [2.50.66]** ៖ `label.click()` ក្នុងកាយវិការធ្វើឲ្យ PTR iOS ម្តងដើរម្តងអត់ (ម្ចាស់គម្រោង) · iOS 26.5+ លេងញ័រតែពីចុចផ្ទាល់ (WebKit bug 309082 · ios-haptics «iOS 17.4–26.4») ➜ ព្រំដែនទទួលស្គាល់ ៖ iPhone web គ្មានញ័រ PTR |
 | A78 | **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកលាក់ក្រោម navbar** (ម្ចាស់គម្រោង ៖ «scroll ទៅលាក់ ស្វែងរក អត់ជិតស្អាត» · Android ត្រឹមត្រូវ) | រូបថត ៖ navbar នៅនឹង · ក្រោម navbar ឃើញតែផ្នែកក្រោមប្រអប់ស្វែងរក (≈ 45px) · ដៃអូស · កាតបញ្ជី ➜ `#appPages` រំកិល (មិនមែន document) · Chromium ក្លែង iOS (audit build · ៣៩០×៨៤៤ · ៣៧៥×៦៦៧) ៖ ចាប់ពី scrollTop ០ · កណ្តាល (411) · snap `.page-main` (411) ➜ ទាញឡើង ➜ `overflow-y: hidden` · ចន្លោះរមូរ ០ ➜ scrollTop ០ ➜ ទាញចុះ ➜ ០ · កាតស្វែងរក top 374 (ឃើញពេញ) ➜ Chromium/Android មិនបង្កបាន · WebKit ៖ snap offsets ២ (page-side · page-main) ស្មើ ០ ខណៈទាញឡើង ➜ ក្រោយប្លង់ប្រែ re-snap ទៅ `.page-main` ឬរក្សាទីតាំងមុន focus (វាស់មិនបានក្រៅ iPhone) | `settleIOSSearchPullDown()` ៖ ទាញចុះ ➜ `#appPages` ០ ក្នុង microtask ដដែល + `panelGlideFrom()` ពីទីតាំងដែលឃើញ (មិនលោត) · ពិនិត្យយឺត `IOS_SEARCH_PULLDOWN_SETTLE_MS` (ម្រាមដៃប៉ះ · ទាញឡើងវិញ · focus ➜ មិនប៉ះ) · iOS standalone ទូរស័ព្ទតែប៉ុណ្ណោះ · `ios-search-pulldown.test.ts` ៥ (មុនកែ ៤ ធ្លាក់) · ⚠️ សកម្មភាព ១ [2.50.66] |
 
 ### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
@@ -6255,7 +6262,6 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/haptic-ios-switch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |

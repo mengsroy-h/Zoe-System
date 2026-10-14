@@ -1945,9 +1945,6 @@
     "ZoeW/tests/zto-abandon-blocked-sweep.test.tsx": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/haptic-ios-switch.test.ts": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/history-patch-late-commit.test.ts": {
       "policy": "zoew-self-verification"
     },

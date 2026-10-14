@@ -118,7 +118,6 @@ const ACCEPTED = {
         searchTap: 'start point and id of the current touch on the phone search input (coordinates and a timestamp, no customer data); cleared on every touchend/touchcancel',
         searchFocusRefused: 'per-page flag that iOS refused a programmatic focus (a boolean about the browser, no customer data); reset by listenIOSSearchFocus()',
         keyboardPan: 'start point, id and the latched verdict of the current touch while the iOS keyboard pan is blocked (coordinates and a boolean, no customer data); cleared on every touchend/touchcancel',
-        hapticSwitch: 'the hidden <label><input switch> that plays the iOS haptic (an element handle outside #root, no customer data); created once per page',
         keyboardPanScope: 'lifecycle scope holding the non-passive touchmove listener while the phone search is pulled up on iOS (a listener handle, no customer data); disposed when the search closes and on boot-scope dispose',
         keyboardLocked: 'last seen value of iosSearchDocumentLocked() (a boolean about the layout, no customer data); the store subscription re-measures the keyboard inset only when it flips',
         searchPulledUp: 'last seen value of iosSearchPulledUp() (a boolean about the layout, no customer data); the store subscription settles the #appPages scroll only on the true ➜ false flip; reset by listenIOSKeyboard()',

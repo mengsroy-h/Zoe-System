@@ -676,9 +676,10 @@ calc(100dvh + 34px)`) and re-run `measureAppChromeSize()`. Changes here need a d
 - PTR only when every container is at the top (`scrollTop <= 1`), one touch, clearly down; modals/drawer/inputs/bars are
   not targets.
 - ⛔ Owner rules: start in the **top 40%** (`PTR_START_ZONE_RATIO`) · any open layer ➜ no PTR (`ptrBlockedByOverlay()`,
-  state remembered at `pointerdown` on `window` capture) · one haptic tick at the threshold (`hapticTick()`; iPhone web
-  has no vibration API ➜ `iosHapticSwitchTick()` (`platform/document-io.ts`) clicks a hidden `<label><input type="checkbox" switch>` — Safari plays a haptic
-  when a switch toggles; feature-detected by `'switch' in input`, created once, off-screen ⛔ never `display: none` · `ZoeW/tests/haptic-ios-switch.test.ts`).
+  state remembered at `pointerdown` on `window` capture) · one haptic tick at the threshold (`hapticTick()`: APK ➜ Capacitor Haptics · web ➜
+  `navigator.vibrate` only; iPhone web has no vibration API and the `<input type="checkbox" switch>` trick is closed — since iOS 26.5 WebKit plays that haptic
+  only on a trusted tap, and a script `label.click()` inside the pull gesture broke PTR itself (owner report: iOS PTR fired only sometimes) ⛔ never call
+  `.click()` on anything from the PTR path · accepted boundary: no PTR haptic on iPhone web).
 - ⛔ Panel `.collapsed`/`.search-focus` or `history-expanded` ➜ PTR fully off; the non-passive listener is armed ahead and
   removed via `MutationObserver` ⛔ never installed after `touchstart`.
 - PTR layout (`react-root.css` only): below 992px, `.ptr-indicator` uses `top: calc(var(--chrome-top, 51px) - 41px)`

@@ -815,6 +815,18 @@ const GESTURE = function (steps) {
     });
     const kbFull = await page.evaluate(() => ({ fixedClass: document.body.classList.contains('ios-keyboard-list-fixed') }));
     ok('ទិសផ្ទុយ ៖ បញ្ជីមានជួររមូរបានវិញ ➜ ដក body.ios-keyboard-list-fixed', kbFull.fixedClass === false, kbFull);
+    // `touch-action: none` លើបញ្ជីដែលរមូរបញ្ឈរមិនបាន ហាមអ័ក្ស X ដែរ ➜ ត្រឹមត្រូវតែពេលតារាងមិនរមូរផ្ដេក (៣២០ · ៤១២ · មានជួរ)
+    const kbWide = [];
+    for (const w of [320, 412]) {
+        await page.setViewportSize({ width: w, height: 780 });
+        kbWide.push(await page.evaluate(async (w) => {
+            await new Promise((r) => setTimeout(r, 260));
+            const tr = document.getElementById('tableResponsive');
+            return { w, rows: document.querySelectorAll('#historyTableBody tr').length, sw: tr.scrollWidth, cw: tr.clientWidth };
+        }, w));
+    }
+    ok('បញ្ជីប្រវត្តិមិនរមូរផ្ដេក (៣២០ · ៤១២) ➜ touch-action none ពេលរមូរបញ្ឈរមិនបាន មិនដកការរមូរណាមួយ',
+        kbWide.every((m) => m.rows > 0 && m.cw > 0 && m.sw <= m.cw + 1), kbWide);
     await page.evaluate(async () => {
         window.uiState.iosKeyboardInset = 0;
         await new Promise((r) => setTimeout(r, 160));

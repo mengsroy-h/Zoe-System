@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.69` (`zoew-v332`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.70` (`zoew-v333`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.18` (`zoekeygen-v129`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -631,7 +631,10 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   `innerHeight - visualViewport.height` (≥ `KEYBOARD_MIN_INSET_PX`) into `uiState.iosKeyboardInset` ➜ `body.ios-keyboard` + `--ios-keyboard-inset` ➜ `.app-pages`
   `padding-bottom` (`react-root.css`, `html.ios-standalone` only) so the list card ends above the keyboard and scrolls inside, and a vertical `touchmove` outside a
   scroller with room in that direction is `preventDefault()`ed (`blockIOSKeyboardPan()`: the document pan iOS allows with the keyboard up, which `restoreIOSDocumentScroll()`
-  would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside a text field (`ZoeW/tests/ios-keyboard-pan.test.ts`).
+  would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside another text field · the search fields themselves (`IOS_SEARCH_FIELDS`)
+  block vertical drags too: the focused field's text-interaction pan (a `UIPanGestureRecognizer` under the web view) ignores `touch-action` and moved the page
+  while every other point stood still (owner report) ➜ only a prevented **first** `touchmove` fails it (WebKit `_touchMoveDeferringGestureRecognizer`); horizontal
+  drags stay native (caret) (`ZoeW/tests/ios-keyboard-pan.test.ts` · `gesture-test` focused data and scan search fields).
   ⛔ The touchmove block alone is not enough (owner video: the page and the navbar still moved): WebKit decides the main scroll view's pan in the UI process from the
   `touch-action` at the touch start ➜ while `body.ios-keyboard`, `body` and `.app-pages` get `touch-action: none` (`react-root.css`; `.app-pages`' `overflow-x` computes to
   `auto`, so it restarts the used value at `auto` and needs its own `none`) · scroll containers inside restart at `auto` ➜ the list scrolls · the active list scroller

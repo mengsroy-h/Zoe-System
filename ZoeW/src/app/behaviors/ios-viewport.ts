@@ -171,7 +171,7 @@ export function blockIOSKeyboardPan(e: TouchEvent): void {
         const dy = t.clientY - pan.y;
         if (dx === 0 && dy === 0) return;
         const field = e.target as HTMLElement | null;
-        const inField = !!field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA');
+        const inField = !!field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') && !IOS_SEARCH_FIELDS.some((name) => elementOf(name) === field);
         pan.block = Math.abs(dy) >= Math.abs(dx) && !inField && iosSearchDocumentLocked() && keyboardPanBlocked(e.target, dy > 0);
     }
     if (pan.block) e.preventDefault();

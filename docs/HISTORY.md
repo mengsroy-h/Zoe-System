@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ឆ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `46fe346` · **មិនទាន់ merge**) ៖ [2.50.70] អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រមិនរំកិល
+    (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A85) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.70]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ច. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `5fad053` · **មិនទាន់ merge**) ៖ [2.50.69] ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ (សំណើម្ចាស់គម្រោង) ៖
     keyboard បើក ➜ បញ្ជីលេខដែលស្នើមិនរំកិលទំព័រ (ផ្នែក ២ A83) · ការដោះ snap ភ្លាមក្រោយទាញចុះត្រូវប្រភព WebKit (A84) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.69]) ➜
     ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -181,6 +183,37 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.70] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ និង navbar មិនរំកិល (ដូច Android)**
+
+**ZoeW `2.50.70`** (`zoew-v332` ➜ `zoew-v333`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែតែមួយបន្ទាត់ក្នុង `ios-viewport.ts` (`blockIOSKeyboardPan()`)។
+រាយការណ៍ម្ចាស់គម្រោង (លើ PR #317 Deploy Preview) ៖ «Scroll កន្លែងផ្សេងអត់បានទេ តែពេល scroll ប៉ះក្នុងប្រអប់ស្វែងរកបានទៅ … ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ
+ស្វែងរក បាន scroll ទៅ តែ android អត់អី … ចលនានោះមកពីខ្ញុំ scroll ទើបលោតចុះលោតឡើង … android ពេលកំពុងស្វែងរក scroll បានតែ list បញ្ជី និង list suggestion phone number
+ខ្ញុំចង់បានបែប android … សូមអានកូដរបស់ android ហើយ ធ្វើតាមអោយដូច android ទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូសឡើងចុះក្នុងប្រអប់វាយលេខស្វែងរកខ្លួនឯង ➜ ទំព័រទាំងមូល និង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A85)។ Android មិនមានកូដពិសេសទេ ៖
+  Chrome/WebView បង្រួមទំព័រពេល keyboard បើក ➜ គ្មានចន្លោះឲ្យអូស។ iOS មិនបង្រួម ➜ `ios-viewport.ts` ទប់ការអូសខ្លួនឯង ហើយ `blockIOSKeyboardPan()` លើកលែងគ្រប់ប្រអប់អក្សរ ➜
+  ការអូសចាប់ផ្តើមលើប្រអប់វាយលេខដែលកំពុង focus រត់ទៅ pan របស់ text interaction (មិនស្តាប់ `touch-action`) ➜ ទំព័ររំកិល។ ឥឡូវ ៖ ប្រអប់ស្វែងរក (`IOS_SEARCH_FIELDS` ៖ លេខទូរស័ព្ទ ·
+  ផ្ទាំងស្កេន) អូសបញ្ឈរ ➜ ទប់ touchmove ដំបូង (WebKit បោះបង់ pan ទាំងអស់ក្រោម web view) · អូសផ្ដេក ➜ ទស្សន៍ទ្រនិចដូចធម្មតា · ប្រអប់អក្សរផ្សេង ➜ ដូចដើម · Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` +១ ៖ អូសបញ្ឈរលើប្រអប់ស្វែងរក (ចុះ/ឡើង) ➜ preventDefault · ផ្ដេក ➜ មិនប៉ះ · ប្រអប់អក្សរផ្សេង ➜ មិនប៉ះ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ — លើ 2.50.69 ធ្លាក់។
+- `gesture-test` ៖ browser ពិត · `#searchPhoneInput` ដែល focus (ចុះ/ឡើង) និង `#entryListSearchInput` (ផ្ទាំងស្កេន) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (គំរូ `webkitPan`) ·
+  ផ្ដេក ➜ មិនចាប់ — លើ 2.50.69 ១ ធ្លាក់ ➜ ១៧០/១៧០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ដាក់ម្រាមដៃក្នុងប្រអប់វាយលេខ ហើយអូសឡើងចុះ ➜ ទំព័រ និង navbar មិនរំកិល · ចុចក្នុងប្រអប់ ➜ វាយលេខបានធម្មតា · អូសឆ្វេងស្តាំ ➜ ទស្សន៍ទ្រនិចផ្លាស់ទី។
+2. **iPhone PWA** ៖ ផ្ទាំងស្កេន ➜ ប្រអប់ស្វែងរកបញ្ជី ➜ ដូចសកម្មភាព ១។
+3. **iPhone PWA** ៖ សកម្មភាព ១–២ របស់ [2.50.69] និង [2.50.68] នៅតែត្រូវសាក (អូសលើបញ្ជីលេខដែលស្នើ · ក្រៅបញ្ជី · បិទ keyboard ហើយអូសឡើង)។
+4. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
 
 ### [2.50.69] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ keyboard បើក ➜ អូសលើបញ្ជីលេខដែលស្នើ ទំព័រមិនរំកិល** (ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)
 
@@ -3964,6 +3997,15 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-14 — រាយការណ៍ម្ចាស់គម្រោង ៖ មានតែការអូសក្នុងប្រអប់វាយលេខស្វែងរកដែលរំកិលទំព័រ (iPhone)
+
+**វិធី** ៖ ម្ចាស់គម្រោងបញ្ជាក់ ៖ កន្លែងផ្សេងទប់បាន · មានតែការអូសចាប់ផ្តើមក្នុងប្រអប់វាយលេខ ➜ អាន `blockIOSKeyboardPan()` (លើកលែង `INPUT`/`TEXTAREA` គ្រប់ប្រអប់) និងប្រភព WebKit
+`main` (`WKContentViewInteraction.mm` `deferringGestureRecognizer:shouldDeferOtherGestureRecognizer:` · `HTMLInputElement::createInnerTextStyle`)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A85 | **keyboard បើក ➜ អូសឡើងចុះក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ + navbar រំកិល** | WebKit ៖ `_touchMoveDeferringGestureRecognizer` ពន្យារ `UIPanGestureRecognizer`/`UIPinchGestureRecognizer` ទាំងអស់ក្រោម web view ហើយបោះបង់វាតែពេល touchmove ដំបូងត្រូវ preventDefault (`_touchStartedNearSelectionHandle` ➜ មិនពន្យារ) · inner text របស់ input = `overflow: hidden` (មិនមែនអ្នករមូរ ➜ touch-action `none` ពី body) ➜ pan ដែលរំកិលទំព័រ = pan របស់ text interaction ដែល touch-action មិនឃាត់ · `blockIOSKeyboardPan()` លើកលែងប្រអប់អក្សរ ➜ មិនទប់ · Chromium (`gesture-test` `webkitPan`) ៖ `#searchPhoneInput` focus · អូសចុះ/ឡើង ➜ touchmove ដំបូងមិនចាប់ ➜ pan ចាប់ផ្តើម | ប្រអប់ស្វែងរក (`IOS_SEARCH_FIELDS`) អូសបញ្ឈរ ➜ ទប់ · `gesture-test` ១ ធ្លាក់លើ 2.50.69 ➜ ១៧០ · `ios-keyboard-pan.test.ts` +១ · ⚠️ សកម្មភាព ១–២ [2.50.70] |
 
 ### 2026-10-14 — ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ (សំណើម្ចាស់គម្រោង) ៖ keyboard បើក · បញ្ជីលេខដែលស្នើ · ការដោះ snap ភ្លាម
 

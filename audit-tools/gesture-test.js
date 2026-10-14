@@ -827,6 +827,28 @@ const GESTURE = function (steps) {
     }
     ok('បញ្ជីប្រវត្តិមិនរមូរផ្ដេក (៣២០ · ៤១២) ➜ touch-action none ពេលរមូរបញ្ឈរមិនបាន មិនដកការរមូរណាមួយ',
         kbWide.every((m) => m.rows > 0 && m.cw > 0 && m.sw <= m.cw + 1), kbWide);
+    // ⛔ ម្ចាស់គម្រោង (iPhone PWA) ៖ «ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ ស្វែងរក បាន scroll ទៅ តែ android អត់អី» ៖ ប្រអប់អក្សរដែលកំពុង focus
+    //    មាន pan របស់ text interaction (UIPanGestureRecognizer ក្រោម web view) ដែល touch-action មិនឃាត់ ➜ touchmove ដំបូងត្រូវ preventDefault
+    //    (WKContentViewInteraction `_touchMoveDeferringGestureRecognizer` ពន្យារ UIPanGestureRecognizer ទាំងអស់) · អូសផ្ដេក (ទស្សន៍ទ្រនិច) ➜ ទុកឲ្យ iOS
+    const kbInput = await page.evaluate(async () => {
+        const input = document.getElementById('searchPhoneInput');
+        if (input) input.focus({ preventScroll: true });
+        await new Promise((r) => setTimeout(r, 120));
+        const r = input ? input.getBoundingClientRect() : null;
+        return { focused: !!input && document.activeElement === input, pulled: window.uiState.dataPanelSearchFocus === true,
+            x: r ? Math.round(r.left + r.width / 2) : 0, y: r ? Math.round(r.top + r.height / 2) : 0 };
+    });
+    const kbInputDown = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ y: kbInput.y + 2 }, { y: kbInput.y + 6 }, { y: kbInput.y + 14 }, { y: kbInput.y + 30 }], webkitPan: true });
+    const kbInputUp = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ y: kbInput.y - 2 }, { y: kbInput.y - 6 }, { y: kbInput.y - 14 }, { y: kbInput.y - 30 }], webkitPan: true });
+    const kbInputSide = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ dx: 4, y: kbInput.y }, { dx: 12, y: kbInput.y + 1 }, { dx: 30, y: kbInput.y + 1 }], webkitPan: true });
+    ok('keyboard បើក · អូសបញ្ឈរក្នុងប្រអប់វាយលេខ (focus) ចុះ/ឡើង ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (ទំព័រមិនរំកិល ដូច Android)',
+        kbInput.focused && kbInput.pulled && kbInputDown.firstPrevented === true && kbInputDown.nativePan === false &&
+        kbInputUp.firstPrevented === true && kbInputUp.nativePan === false && !kbInputDown.reloaded && !kbInputUp.reloaded,
+        { state: kbInput, down: kbInputDown, up: kbInputUp });
+    ok('ទិសផ្ទុយ ៖ អូសផ្ដេកក្នុងប្រអប់វាយលេខ ➜ មិនចាប់ (ទស្សន៍ទ្រនិច/អក្សររបស់ iOS)', kbInputSide.prevented === 0, kbInputSide);
     await page.evaluate(async () => {
         window.uiState.iosKeyboardInset = 0;
         await new Promise((r) => setTimeout(r, 160));
@@ -859,6 +881,14 @@ const GESTURE = function (steps) {
     ok('keyboard បើក · ផ្ទាំងស្កេន (ស្វែងរកបញ្ជី) ➜ គ្រប់ចំណុចលើ keyboard ៖ scroll view មេមិនរំកិល',
         kbEntry.page === 'entry' && kbEntry.focused && kbEntry.collapsed && kbEntry.keyboardClass && kbEntryGrid.points >= 150 && Object.keys(kbEntryGrid.leaks).length === 0,
         { state: kbEntry, points: kbEntryGrid.points, leaks: kbEntryGrid.leaks });
+    const kbEntryAt = await page.evaluate(() => {
+        const r = document.getElementById('entryListSearchInput').getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    });
+    const kbEntryDrag = await runGesture({ selector: '#entryListSearchInput', x: kbEntryAt.x, startY: kbEntryAt.y,
+        points: [{ y: kbEntryAt.y - 2 }, { y: kbEntryAt.y - 6 }, { y: kbEntryAt.y - 14 }, { y: kbEntryAt.y - 30 }], webkitPan: true });
+    ok('keyboard បើក · ផ្ទាំងស្កេន ៖ អូសបញ្ឈរក្នុងប្រអប់ស្វែងរកបញ្ជី (focus) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan',
+        kbEntryDrag.firstPrevented === true && kbEntryDrag.nativePan === false, kbEntryDrag);
     await page.evaluate(async () => {
         window.uiState.iosKeyboardInset = 0;
         const input = document.getElementById('entryListSearchInput');

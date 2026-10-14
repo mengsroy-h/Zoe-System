@@ -111,7 +111,7 @@ export function buildLabelRows(items, options?: { openOnly?: boolean }) {
 }
 
 export function labelCustomerCount(rows: LabelRow[]) {
-    return new Set(rows.map((r) => r.phone)).size;
+    return new Set((Array.isArray(rows) ? rows : []).map((r) => (r && r.phone) || '')).size;
 }
 
 function labelScopeItems(scope: LabelPrintScope | null) {

@@ -203,6 +203,7 @@
   បញ្ជីទទេ ➜ `body.ios-keyboard-list-fixed` + ហាម · បញ្ជីមានជួរវិញ ➜ ដក · keyboard បិទ ➜ ដូចដើម — លើ 2.50.67 ៥ ធ្លាក់ ➜ ១៦០/១៦០។
 - `ZoeW/tests/ios-search-resnap.test.tsx` +៤ ៖ ការផ្អាកមិនលើសការរអិល · ម្រាមដៃបញ្ចប់ការផ្អាក (ក្រៅចន្លោះ ➜ មិនប៉ះ) · `iosKeyboardListFixed` ↔ class · ខ្សែភ្ជាប់ CSS — លើ 2.50.67 ៤/៤ ធ្លាក់។
   `ios-search-pulldown.test.ts` ៖ snap ផ្អាកពេលអាន layout ហើយដោះវិញភ្លាម។
+- `state-hygiene` (CI ផ្នែក ៣ ធ្លាក់លើ `c799f42`) ៖ `listRoomObserver` (ResizeObserver នៃបញ្ជី · គ្មានទិន្នន័យអតិថិជន · ផ្ដាច់ដោយ `watchIOSKeyboardListRoom(false)` ពេលស្វែងរកបិទ និង boot-scope dispose) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

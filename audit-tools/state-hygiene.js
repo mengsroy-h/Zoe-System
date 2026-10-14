@@ -119,6 +119,7 @@ const ACCEPTED = {
         searchFocusRefused: 'per-page flag that iOS refused a programmatic focus (a boolean about the browser, no customer data); reset by listenIOSSearchFocus()',
         keyboardPan: 'start point, id and the latched verdict of the current touch while the iOS keyboard pan is blocked (coordinates and a boolean, no customer data); cleared on every touchend/touchcancel',
         keyboardPanScope: 'lifecycle scope holding the non-passive touchmove listener while the phone search is pulled up on iOS (a listener handle, no customer data); disposed when the search closes and on boot-scope dispose',
+        listRoomObserver: 'ResizeObserver on the active list scroller while the phone search is pulled up on iOS (an observer handle, no customer data); disconnected and nulled by watchIOSKeyboardListRoom(false) when the search closes and on boot-scope dispose through armIOSKeyboardPanBlock(false)',
         keyboardLocked: 'last seen value of iosSearchDocumentLocked() (a boolean about the layout, no customer data); the store subscription re-measures the keyboard inset only when it flips',
         searchPulledUp: 'last seen value of iosSearchPulledUp() (a boolean about the layout, no customer data); the store subscription settles the #appPages scroll only on the true ➜ false flip; reset by listenIOSKeyboard()',
         pullDownSettleTimer: 'timer handle of the late scroll check after the phone search is pulled down on iOS (no customer data); cleared on pull-up, on boot-scope dispose and by listenIOSKeyboard()',

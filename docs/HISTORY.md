@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ង. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `1a18a03` · **មិនទាន់ merge**) ៖ [2.50.68] iPhone PWA ៖ keyboard បើក ➜ ទំព័រមិនរំកិល (touch-action · ផ្នែក ២ A81) ·
+    ការផ្អាក snap ក្រោយទាញចុះខ្លី · ម្រាមដៃបញ្ចប់ការផ្អាក (A82) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.68]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ឃ. **Branch `ccr-83fa86c5-4um7el`** (ពីក្បាល PR #317 `9906650` = branch `ccr-20e725de-tpecua` · **មិនទាន់ merge** · មាន commit របស់ PR #317 ទាំងអស់) ៖ [2.50.67] iPhone PWA ៖
     PTR ចាប់ touchmove ដំបូង (ច្បាប់ WebKit · ផ្នែក ២ A79) · ផ្អាក snap មុន commit ការទាញប្រអប់ស្វែងរកចុះ (re-snap ទៅ `.page-main` · A80) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.67]) ➜
     push ចូល branch PR #317 (`ccr-20e725de-tpecua` · ម្ចាស់គម្រោងជ្រើស «Push ចូល PR #317» · fast-forward ពី `9906650`) ➜ Deploy Preview របស់ #317 = 2.50.67 ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
@@ -176,6 +178,40 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.68] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ ស្វែងរក (keyboard បើក) ➜ ទំព័រ និង navbar មិនរំកិល · បិទ keyboard ហើយអូសភ្លាម ➜ snap ទៅកាតបញ្ជីពេញ**
+
+**ZoeW `2.50.68`** (`zoew-v330` ➜ `zoew-v331`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css` · `DocumentEffects.tsx` · `state.ts`។
+រាយការណ៍ម្ចាស់គម្រោង (លើ 2.50.67 ៖ «PTR ដើរល្អដូច android ហើយ») ៖ «ios ពេលកំពុងប្រើប្រអប់ស្វែងរក scroll ទាំងទំព័របាន ពេល scroll ទៅដើរទាំង navbar អត់ល្អដូច apk និង pwa android»
+(វីដេអូ VID_20261014_213311_441) · «ពេលខ្លះបិទ keyboard ហើយ scroll ឡើង … ប្រអប់ស្វែងរកអត់លិចបាត់ស្អាត លិចបានពាក់កណ្តាលទាល់តែយើង scroll រុញថែម» (រូបថត)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូស ➜ ទំព័រទាំងមូលព្រមទាំង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A81 · វីដេអូ ៖ បញ្ជីទទេ «គ្មានទិន្នន័យ» · ៤.៥ · ៧.៥ · ៩–១០.៥ វិ.)។
+  ការទប់ `touchmove` របស់ [2.50.65] មិនគ្រប់គ្រាន់លើឧបករណ៍ពិត ➜ ឥឡូវប្រើច្រកដែល WebKit សម្រេចខ្លួនឯងក្នុង UI process ពេលចាប់ផ្តើមប៉ះ (មិនរង់ចាំ JS) ៖
+  `touch-action: none` លើ `body` និង `.app-pages` ខណៈ `body.ios-keyboard` (navbar · ប្រអប់ស្វែងរក · ក្បាលកាត · ដងអូស ➜ scroll view មេមិនរំកិល) · បញ្ជីដែលរមូរបាន ➜ `auto`
+  (អ្នករមូរចាប់ផ្តើមពី auto ឡើងវិញ ➜ បញ្ជីរមូរដូច Android) · បញ្ជីដែលរមូរមិនបាន (ទទេ · ខ្លី ៖ គ្មាន scroll view កូន ➜ scroll view មេយកការអូស) ➜
+  `measureIOSKeyboardListRoom()` (ResizeObserver លើបញ្ជី និងខ្លឹមសារ) ➜ `body.ios-keyboard-list-fixed` ➜ `touch-action: none` លើបញ្ជីនោះ។ keyboard បិទ ➜ ដូចដើម · Android/web មិនប្រែ។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ហើយអូសបញ្ជីឡើងភ្លាម ➜ ប្រអប់ស្វែងរកលិចពាក់កណ្តាលក្រោម navbar** (A82)។ ការផ្អាក snap ក្រោយទាញចុះ ([2.50.67]) នៅដល់ពិដាន (~០.៨ វិ.)
+  ➜ ការអូសក្នុងចន្លោះនោះឈប់ដោយគ្មាន snap។ ឥឡូវ ៖ ការផ្អាករបស់ `settleIOSSearchPullDown()` គ្របតែ layout នៃ commit (ដោះវិញភ្លាម · ការរអិលស្វែងរកផ្អាកខ្លួនឯង) · ម្រាមដៃប៉ះក្នុងចន្លោះ
+  ទាញចុះ ➜ `endPanelGlideSnapPause()` ➜ ការអូសរបស់អ្នកប្រើ snap ទៅកាតបញ្ជីពេញ។ re-snap ទៅ `.page-main` ([2.50.67]) នៅតែមិនកើត (snap state ត្រូវលុបក្នុង layout ដែលផ្អាក)។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ `computeUsedTouchAction` របស់ WebKit លើ CSS ពិត ៖ keyboard បើក ➜ navbar · ប្រអប់ស្វែងរក · ចំណងជើង · ដងអូស · ក្បាលកាតបញ្ជី ហាមអូស Y · ជួរបញ្ជី `auto` ·
+  បញ្ជីទទេ ➜ `body.ios-keyboard-list-fixed` + ហាម · បញ្ជីមានជួរវិញ ➜ ដក · keyboard បិទ ➜ ដូចដើម — លើ 2.50.67 ៥ ធ្លាក់ ➜ ១៦០/១៦០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` +៤ ៖ ការផ្អាកមិនលើសការរអិល · ម្រាមដៃបញ្ចប់ការផ្អាក (ក្រៅចន្លោះ ➜ មិនប៉ះ) · `iosKeyboardListFixed` ↔ class · ខ្សែភ្ជាប់ CSS — លើ 2.50.67 ៤/៤ ធ្លាក់។
+  `ios-search-pulldown.test.ts` ៖ snap ផ្អាកពេលអាន layout ហើយដោះវិញភ្លាម។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ អូសលើ navbar · ប្រអប់ស្វែងរក · កាតបញ្ជី (ទទេ និងមានជួរច្រើន) ➜ ទំព័រ និង navbar មិនរំកិល · បញ្ជីមានជួរ ➜ រមូរ · ចុចជួរ/ប៊ូតុង ➜ ធម្មតា។
+2. **iPhone PWA** ៖ បិទ keyboard (ប្រអប់ទទេ) ហើយអូសបញ្ជីឡើងភ្លាម ➜ កាតបញ្ជីឡើងដល់ក្រោម navbar ពេញ · ⛔ ប្រអប់ស្វែងរកមិនឈប់ពាក់កណ្តាល។ PTR ដូច 2.50.67។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
 
 ### [2.50.67] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ PTR កេះគ្រប់ដង (ចាប់ touchmove ដំបូង) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកមិនលាក់ (snap ផ្អាកមុន commit)**
 
@@ -3894,6 +3930,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោងលើ 2.50.67 ៖ iPhone keyboard បើក ទំព័ររំកិល · ប្រអប់ស្វែងរកលិចពាក់កណ្តាលក្រោយបិទ keyboard
+
+**វិធី** ៖ វីដេអូ `_441` (៨៨០×១៩២០ · ១៣.៨ វិ.) + រូបថត ➜ ប្រភព WebKit ពិត (`WKContentViewInteraction.mm` `_handleTouchActionsForTouchEvent` · `WKTouchActionGestureRecognizer.mm` ·
+`WKWebViewIOS.mm` `axesToPreventScrollingForPanGestureInScrollView` · `ScrollingTreeScrollingNodeDelegateIOS.mm` · `StyleAdjuster.cpp` `computeUsedTouchAction`) ➜ គំរូក្នុង `gesture-test` លើ CSS ពិត។
+⚠️ ហេតុដែល `blockIOSKeyboardPan()` មិនទប់ក្នុងវីដេអូ (បញ្ជីទទេ ➜ Chromium វាស់ «គ្មានកន្លែង» ➜ ការសម្រេច block) មិនទាន់វាស់បានក្រៅ iPhone ➜ ការកែមិនពឹង JS ទៀតទេ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A81 | **iPhone PWA ៖ keyboard បើក ➜ ទំព័រ + navbar រំកិល** | វីដេអូ ៖ ស្វែងរក (keyboard · បញ្ជីទទេ) ➜ ៤.៥ · ៧.៥ · ៩.០–១០.៥ វិ. ទំព័រទាំងមូលឡើង ~៦០pt (navbar ចេញ) ➜ លោតត្រឡប់ · WebKit ៖ touch-action នៅចំណុចចាប់ផ្តើម ➜ `_preventsPanningInYAxis` ➜ scroll view មេមិនរំកិល (UI process · មិនពឹង JS) · Chromium វាស់ (គំរូ WebKit) ៖ navbar `pan-y` (html/body) · ប្រអប់ស្វែងរក `manipulation` · កាត · ដងអូស `auto` (`.app-pages` `overflow-y: hidden` ➜ `overflow-x` = `auto` ➜ ចាប់ផ្តើម auto ឡើងវិញ) ➜ មិនហាម Y ទាំងអស់ · បញ្ជីទទេ ៖ sh = ch = 246 (គ្មាន scroll view កូន) | `body.ios-keyboard` ➜ `touch-action: none` លើ `body` · `.app-pages` · បញ្ជីរមូរមិនបាន ➜ `body.ios-keyboard-list-fixed` · `gesture-test` ៥ ធ្លាក់លើ 2.50.67 ➜ ១៦០ · ⚠️ សកម្មភាព ១ [2.50.68] |
+| A82 | **iPhone PWA ៖ បិទ keyboard ហើយអូស ➜ ប្រអប់ស្វែងរកលិចពាក់កណ្តាល** (រូបថត ៖ កាតបញ្ជីនៅ ~៤៨pt ក្រោមទីតាំង snap · ក្នុង proximity) | ការផ្អាក snap របស់ [2.50.67] មិនដោះ token (រង់ចាំពិដាន `PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS + PANEL_GLIDE_SNAP_GRACE_MS` ≈ ០.៨ វិ.) ➜ UIScrollView កំណត់គោលដៅនៅពេលលែងដៃ (snap offsets ទទេ) ➜ ឈប់ពាក់កណ្តាល | ដោះការផ្អាកភ្លាមក្រោយ layout នៃ commit · ម្រាមដៃក្នុងចន្លោះទាញចុះ ➜ `endPanelGlideSnapPause()` · `ios-search-resnap.test.tsx` +៤ (៤ ធ្លាក់លើ 2.50.67) · ⚠️ សកម្មភាព ២ [2.50.68] |
 
 ### 2026-10-14 — វីដេអូម្ចាស់គម្រោងលើ PR #317 ៖ iPhone PTR នៅពិបាក · ប្រអប់ស្វែងរកនៅលាក់ពេលបិទ keyboard ➜ ប្រភព WebKit ពិត
 

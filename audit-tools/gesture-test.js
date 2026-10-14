@@ -673,6 +673,101 @@ const GESTURE = function (steps) {
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
 
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA · VID_20261014_213311) ៖ ស្វែងរក (keyboard បើក) ➜ អូស ➜ ទំព័រទាំងមូលព្រមទាំង navbar រំកិល ➜ លោតត្រឡប់។
+    //    iOS ផ្តល់ចន្លោះរមូរដល់ scroll view មេរបស់ WebKit ពេល keyboard បើក ➜ touch-action គឺជាច្រកដែល WebKit សម្រេចក្នុង UI process ពេលចាប់ផ្តើមប៉ះ
+    //    (WKContentViewInteraction `_handleTouchActionsForTouchEvent` ➜ `preventsPanningInYAxis` ➜ WKWebView `axesToPreventScrollingForPanGestureInScrollView`)
+    //    មិនរង់ចាំ JS ➜ គំរូ `computeUsedTouchAction` (StyleAdjuster.cpp ៖ អ្នករមូរ overflow auto/scroll ចាប់ផ្តើមពី auto ឡើងវិញ · none ឈ្នះ ·
+    //    keyword manipulation មិនកាត់ផ្ដាច់) លើ CSS ពិតក្នុង Chromium ៖ ក្រៅបញ្ជី ➜ ហាមអូស Y · ក្នុងបញ្ជីដែលរមូរបាន ➜ auto (បញ្ជីរមូរ)។
+    console.log('\n=== iPhone ៖ keyboard បើក (ស្វែងរក) ➜ ទំព័រមិនរំកិល (touch-action របស់ WebKit) ===');
+    const WEBKIT_TOUCH_ACTION = function (selectors) {
+        const used = (el) => {
+            const chain = [];
+            for (let n = el; n && n.nodeType === 1; n = n.parentElement) chain.unshift(n);
+            let u = 'auto';
+            for (const n of chain) {
+                const cs = getComputedStyle(n);
+                if (/^(auto|scroll)$/.test(cs.overflowX) || /^(auto|scroll)$/.test(cs.overflowY)) u = 'auto';
+                const own = cs.touchAction || 'auto';
+                if (own === 'auto') continue;
+                if (u === 'none' || own === 'none') { u = 'none'; continue; }
+                if (u === 'auto' || u === 'manipulation') { u = own; continue; }
+                if (own === 'manipulation') continue;
+                const shared = own.split(/\s+/).filter((t) => u.split(/\s+/).indexOf(t) !== -1);
+                u = shared.length ? shared.join(' ') : 'none';
+            }
+            return u;
+        };
+        const out = {};
+        Object.keys(selectors).forEach((k) => {
+            const el = document.querySelector(selectors[k]);
+            if (!el) { out[k] = null; return; }
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 12)) || el;
+            const u = used(hit);
+            out[k] = { used: u, preventsPanY: u !== 'auto' && !/\b(pan-y|manipulation)\b/.test(u), hit: hit.id || hit.className || hit.tagName };
+        });
+        return out;
+    };
+    const TOUCH_POINTS = {
+        navbar: '.app-navbar',
+        searchInput: '#searchPhoneInput',
+        searchTitle: '#dataSideSection .app-card:last-child .card-title',
+        handle: '#dragHandle',
+        listHeader: '#dataMainSection .history-section > .card-header',
+        listRow: '#historyTableBody tr:first-child td:nth-child(2)'
+    };
+    await resetState();
+    await page.evaluate(async () => {
+        window.uiState.dataPanelSearchFocus = true;
+        await new Promise((r) => setTimeout(r, 120));
+        window.uiState.iosKeyboardInset = 336;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const kbTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify(TOUCH_POINTS) + ')');
+    const kbState = await page.evaluate(() => {
+        const tr = document.getElementById('tableResponsive');
+        return { keyboardClass: document.body.classList.contains('ios-keyboard'), standalone: document.documentElement.classList.contains('ios-standalone'),
+            listScrolls: !!tr && tr.scrollHeight > tr.clientHeight + 1 };
+    });
+    ok('លក្ខខណ្ឌ ៖ iOS standalone · ប្រអប់ស្វែងរកទាញឡើង · body.ios-keyboard · បញ្ជីរមូរបាន', kbState.keyboardClass && kbState.standalone && kbState.listScrolls, kbState);
+    ['navbar', 'searchInput', 'searchTitle', 'handle', 'listHeader'].forEach((k) => {
+        ok('keyboard បើក ➜ ' + k + ' ៖ WebKit ហាមអូស Y លើ scroll view (touch-action none)', !!kbTouch[k] && kbTouch[k].preventsPanY === true, kbTouch[k]);
+    });
+    ok('keyboard បើក ➜ ក្នុងបញ្ជីដែលរមូរបាន ៖ touch-action auto (បញ្ជីរមូរដូច Android)', !!kbTouch.listRow && kbTouch.listRow.used === 'auto', kbTouch.listRow);
+    // បញ្ជីទទេ (វីដេអូ ៖ «គ្មានទិន្នន័យ») ៖ `.table-responsive` (overflow auto) ចាប់ផ្តើម touch-action ពី auto ឡើងវិញ ទោះរមូរមិនបាន ➜ គ្មាន
+    //    scroll view កូន ➜ scroll view មេរបស់ WebKit យកការអូស ➜ ត្រូវតែ none ពេលរមូរមិនបាន (`body.ios-keyboard-list-fixed` ពី `measureIOSKeyboardListRoom()`)
+    await page.evaluate(async () => {
+        window.filterDataByDate('yesterday');
+        await new Promise((r) => setTimeout(r, 400));
+    });
+    const kbEmpty = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify({ list: '#tableResponsive' }) + ')');
+    const kbEmptyState = await page.evaluate(() => {
+        const tr = document.getElementById('tableResponsive');
+        return { rows: document.querySelectorAll('#historyTableBody tr').length, listScrolls: tr.scrollHeight > tr.clientHeight + 1,
+            fixedClass: document.body.classList.contains('ios-keyboard-list-fixed') };
+    });
+    ok('keyboard បើក · បញ្ជីទទេ (រមូរមិនបាន) ➜ body.ios-keyboard-list-fixed · WebKit ហាមអូស Y លើបញ្ជី',
+        !kbEmptyState.listScrolls && kbEmptyState.fixedClass && !!kbEmpty.list && kbEmpty.list.preventsPanY === true, { state: kbEmptyState, touch: kbEmpty.list });
+    await page.evaluate(async () => {
+        window.filterDataByDate('today');
+        await new Promise((r) => setTimeout(r, 400));
+    });
+    const kbFull = await page.evaluate(() => ({ fixedClass: document.body.classList.contains('ios-keyboard-list-fixed') }));
+    ok('ទិសផ្ទុយ ៖ បញ្ជីមានជួររមូរបានវិញ ➜ ដក body.ios-keyboard-list-fixed', kbFull.fixedClass === false, kbFull);
+    await page.evaluate(async () => {
+        window.uiState.iosKeyboardInset = 0;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const kbClosedTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify(TOUCH_POINTS) + ')');
+    ok('ទិសផ្ទុយ ៖ keyboard បិទ ➜ navbar · ប្រអប់ស្វែងរក ៖ touch-action ដើម (មិនហាម Y)',
+        !!kbClosedTouch.navbar && kbClosedTouch.navbar.preventsPanY === false && !!kbClosedTouch.searchInput && kbClosedTouch.searchInput.preventsPanY === false, kbClosedTouch);
+    await page.evaluate(async () => {
+        window.uiState.dataPanelSearchFocus = false;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    await page.waitForTimeout(900);
+    await resetState();
+
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
     // ⛔ របាប្តូរតែពេល **អ្នកប្រើ** រមូរ (touch/wheel/key ≤ CHROME_SCROLL_INTENT_MS) ➜ helper បញ្ជូន `wheel` មុនរមូរ (input ពិត · `touchmove` ក្លែងគ្មាន `touches` ធ្វើឲ្យ handler PTR បោះ) ហើយ
     //    ពេលរបាទើបប្តូរ រង់ចាំ CHROME_FLIP_SETTLE_MS (ដេរីវេពី App) មុនការរមូរបន្ទាប់ (មនុស្សមិនបញ្ច្រាសទិសក្នុងពេលនោះ)

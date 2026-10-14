@@ -4,8 +4,8 @@ import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
-import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
-import { panelIsCollapsed, usesIOSPanelHandoff } from './panels';
+import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, endPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
+import { activePanelSections, panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 import { glidePhoneSearchPulledUp } from './phone-search';
 
 export const IOS_SEARCH_TAP_SLOP_PX = 10;
@@ -24,6 +24,7 @@ let keyboardPanScope: LifecycleScope | null = null;
 let searchPulledUp = false;
 let pullDownSettleTimer: ReturnType<typeof setTimeout> | null = null;
 let pullDownTouchSeen = false;
+let listRoomObserver: ResizeObserver | null = null;
 
 export function iosSearchDocumentLocked(): boolean {
     return (uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) && usesIOSPanelHandoff();
@@ -47,8 +48,27 @@ export function iosKeyboardInsetPx(): number {
     return inset >= KEYBOARD_MIN_INSET_PX && Number.isFinite(inset) ? inset : 0;
 }
 
+export function measureIOSKeyboardListRoom(): void {
+    const scroller = keyboardLocked ? activePanelSections().scroller : null;
+    const fixed = !!scroller && !(scroller.scrollHeight - scroller.clientHeight > 1);
+    if (uiState.iosKeyboardListFixed !== fixed) uiState.iosKeyboardListFixed = fixed;
+}
+
+function watchIOSKeyboardListRoom(on: boolean): void {
+    if (listRoomObserver) listRoomObserver.disconnect();
+    listRoomObserver = null;
+    const scroller = on ? activePanelSections().scroller : null;
+    if (scroller && typeof ResizeObserver === 'function') {
+        listRoomObserver = new ResizeObserver(measureIOSKeyboardListRoom);
+        listRoomObserver.observe(scroller);
+        if (scroller.firstElementChild) listRoomObserver.observe(scroller.firstElementChild);
+    }
+    measureIOSKeyboardListRoom();
+}
+
 function armIOSKeyboardPanBlock(on: boolean): void {
     if (on === (keyboardPanScope !== null)) return;
+    watchIOSKeyboardListRoom(on);
     if (!on) {
         keyboardPanScope!.dispose();
         keyboardPanScope = null;
@@ -106,11 +126,12 @@ export function settleIOSSearchPullDown(): void {
     if (!pages) return;
     const gliders = [elementOf('dataSearchCard'), elementOf('dataMainSection')];
     const tops = gliders.map((el) => (el ? el.getBoundingClientRect().top : NaN));
-    beginPanelGlideSnapPause(IOS_SEARCH_PULLDOWN_SNAP_PAUSE_MS);
+    const releaseSnap = beginPanelGlideSnapPause(IOS_SEARCH_PULLDOWN_SNAP_PAUSE_MS);
     if (pages.scrollTop > 0) {
         setElementScrollTop(pages, 0);
         gliders.forEach((el, i) => panelGlideFrom(el, tops[i], PANEL_SEARCH_GLIDE));
     }
+    releaseSnap();
     pullDownSettleTimer = setTimeout(restIOSSearchPullDown, IOS_SEARCH_PULLDOWN_SETTLE_MS);
 }
 
@@ -125,6 +146,7 @@ function noteIOSSearchPullState(): void {
 export function noteIOSKeyboardTouchStart(e: TouchEvent): void {
     keyboardPan = null;
     pullDownTouchSeen = true;
+    if (pullDownSettleTimer !== null && uiState.panelGliding) endPanelGlideSnapPause();
     if (!e.touches || e.touches.length !== 1 || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX || !iosSearchDocumentLocked()) return;
     const t = e.touches[0];
     keyboardPan = { id: t.identifier, x: t.clientX, y: t.clientY, block: null };

@@ -265,6 +265,7 @@ export interface UiState {
     chromeHidden: boolean;
     keyboardOpen: boolean;
     iosKeyboardInset: number;
+    iosKeyboardListFixed: boolean;
     pdfExportOriginalTitle: any;
     monthlyReportMonth: string;
     lastRecallSignature: string;
@@ -367,6 +368,7 @@ export const uiState = createStore<UiState>('uiState', {
     chromeHidden: false,
     keyboardOpen: false,
     iosKeyboardInset: 0,
+    iosKeyboardListFixed: false,
     pdfExportOriginalTitle: null,
     monthlyReportMonth: '',
     lastRecallSignature: '',

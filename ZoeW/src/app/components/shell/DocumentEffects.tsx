@@ -27,6 +27,7 @@ export function DocumentEffects() {
     const chromeHidden = useStoreValue(uiState, (s) => s.chromeHidden);
     const keyboardOpen = useStoreValue(uiState, (s) => s.keyboardOpen);
     const iosKeyboardInset = useStoreValue(uiState, (s) => s.iosKeyboardInset);
+    const iosKeyboardListFixed = useStoreValue(uiState, (s) => s.iosKeyboardListFixed);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
@@ -42,6 +43,7 @@ export function DocumentEffects() {
     useBodyClass('chrome-hidden', chromeHidden || keyboardOpen);
     useBodyClass('keyboard-open', keyboardOpen);
     useBodyClass('ios-keyboard', iosKeyboardInset > 0);
+    useBodyClass('ios-keyboard-list-fixed', iosKeyboardInset > 0 && iosKeyboardListFixed);
 
     useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
     useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));

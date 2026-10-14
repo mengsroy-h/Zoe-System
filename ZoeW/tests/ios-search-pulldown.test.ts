@@ -97,10 +97,22 @@ afterEach(() => {
 });
 
 describe('iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (#appPages ត្រឡប់ ០)', () => {
-    it('⛔ ទាញចុះខណៈ #appPages រំកិលរួច ➜ snap ផ្អាក · scrollTop 0 ក្នុង flush ដដែល · ការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (កាតស្វែងរក · កាតបញ្ជី · ចលនាស្វែងរក)', () => {
+    it('⛔ ទាញចុះខណៈ #appPages រំកិលរួច ➜ snap ផ្អាកពេលអាន layout ហើយដោះវិញភ្លាម · scrollTop 0 ក្នុង flush ដដែល · ការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (កាតស្វែងរក · កាតបញ្ជី · ចលនាស្វែងរក)', () => {
         boot();
-        pullUpThenDown(411);
-        expect(uiState.panelGliding).toBe(true);
+        let glidingAtRead: boolean[] = [];
+        let st = 0;
+        Object.defineProperty(pages, 'scrollTop', { configurable: true, get() { glidingAtRead.push(uiState.panelGliding); return st; }, set(v: number) { st = v; } });
+        uiState.dataPanelSearchFocus = true;
+        uiState.flush();
+        st = 411;
+        rect(card, -37);
+        rect(main, 59);
+        glidingAtRead = [];
+        uiState.dataPanelSearchFocus = false;
+        uiState.flush();
+        expect(glidingAtRead.length).toBeGreaterThan(0);
+        expect(glidingAtRead.every(Boolean)).toBe(true);
+        expect(uiState.panelGliding).toBe(false);
         expect(pages.scrollTop).toBe(0);
         expect(glide).toHaveBeenCalledTimes(2);
         expect(glide.mock.calls[0]).toEqual([card, -37, panelMotion.PANEL_SEARCH_GLIDE]);

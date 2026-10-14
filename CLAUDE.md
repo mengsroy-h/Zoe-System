@@ -56,7 +56,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.67` (`zoew-v330`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.68` (`zoew-v331`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.18` (`zoekeygen-v129`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -632,12 +632,20 @@ hangs ➜ `withTimeout` throws ➜ the save is refused.
   `padding-bottom` (`react-root.css`, `html.ios-standalone` only) so the list card ends above the keyboard and scrolls inside, and a vertical `touchmove` outside a
   scroller with room in that direction is `preventDefault()`ed (`blockIOSKeyboardPan()`: the document pan iOS allows with the keyboard up, which `restoreIOSDocumentScroll()`
   would snap back) ⛔ never block a scroller with room · a horizontal drag · a drag inside a text field (`ZoeW/tests/ios-keyboard-pan.test.ts`).
+  ⛔ The touchmove block alone is not enough (owner video: the page and the navbar still moved): WebKit decides the main scroll view's pan in the UI process from the
+  `touch-action` at the touch start ➜ while `body.ios-keyboard`, `body` and `.app-pages` get `touch-action: none` (`react-root.css`; `.app-pages`' `overflow-x` computes to
+  `auto`, so it restarts the used value at `auto` and needs its own `none`) · scroll containers inside restart at `auto` ➜ the list scrolls · the active list scroller
+  (`activePanelSections().scroller`) that cannot scroll (empty · short) has no child scroll view ➜ `measureIOSKeyboardListRoom()` (ResizeObserver on the scroller and its
+  content while the search is locked) ➜ `uiState.iosKeyboardListFixed` ➜ `body.ios-keyboard-list-fixed` ➜ `touch-action: none` on it (`gesture-test` WebKit used-touch-action
+  model · `ZoeW/tests/ios-search-resnap.test.tsx`).
   Pulling the search down (`dataPanelSearchFocus` true ➜ false, iOS standalone phone) pauses snap (`beginPanelGlideSnapPause()`) **before** React commits it
   (`settleIOSSearchPullDown()` runs in the store subscriber, inside the immediate commit): while pulled up `.page-main`'s snap offset is 0 = the scroll position, so WebKit
   records it as the snapped box and its re-snap after layout (WebKit `ScrollSnapAnimatorState::resnapAfterLayout` · synchronous, in the first layout after the commit) would scroll to `.page-main`'s new offset — the search card
   under the navbar · with snap off WebKit drops its snap state and rebuilds it at 0 when the pause ends (nearest within proximity: none) ⛔ never check or correct before the
-  commit only. `#appPages` still scrolled after that commit ➜ 0 + a new `panelGlideFrom()` from the visible position of the search card and the list card ⛔ never an
-  instant jump · once more after `IOS_SEARCH_PULLDOWN_SETTLE_MS` unless a finger touched meanwhile, the search was pulled up again or the field is focused — Chromium
+  commit only. That pause covers only the commit's layout (released at once; the search glides keep their own) and a touch inside the pull-down window
+  (`IOS_SEARCH_PULLDOWN_SETTLE_MS`) ends any glide pause (`noteIOSKeyboardTouchStart()` ➜ `endPanelGlideSnapPause()`) ⛔ never leave snap off while the user scrolls (the scroll
+  rests with the search card half under the navbar). `#appPages` still scrolled after that commit ➜ 0 + a new `panelGlideFrom()` from the visible position of the search
+  card and the list card ⛔ never an instant jump · once more after `IOS_SEARCH_PULLDOWN_SETTLE_MS` unless a finger touched meanwhile, the search was pulled up again or the field is focused — Chromium
   clamps to 0 by itself (Android correct) (`ZoeW/tests/ios-search-resnap.test.tsx`: WebKit re-snap model on the real React DOM · `ZoeW/tests/ios-search-pulldown.test.ts`).
   That reset lands mid keyboard animation (the page drops, then slides back) ➜ iOS must not scroll at all: a tap on an unfocused search input (phone search or scan tab · iOS
   standalone · < 992px · one finger · ≤ `IOS_SEARCH_TAP_SLOP_PX` · ≤ `IOS_SEARCH_TAP_MAX_MS`) ➜ `focusIOSSearchWithoutScroll()` prevents the `touchend`,

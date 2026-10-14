@@ -11,9 +11,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uiState } from '../src/core/state';
 import { AppPages } from '../src/app/components/AppPages';
-import '../src/app/flush';
+import { DocumentEffects } from '../src/app/components/shell/DocumentEffects';
+import { commitNow } from '../src/app/flush';
 import { elementOf } from '../src/app/refs';
-import { endPanelGlideSnapPause, PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE_MS } from '../src/app/behaviors/panel-motion';
+import { beginPanelGlideSnapPause, endPanelGlideSnapPause, PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE_MS } from '../src/app/behaviors/panel-motion';
 import { glidePhoneSearchPulledUp } from '../src/app/behaviors/phone-search';
 import * as iosViewport from '../src/app/behaviors/ios-viewport';
 import { byId, mount, unmount } from './native/react-harness';
@@ -126,7 +127,7 @@ beforeEach(() => {
         return a;
     };
     uiState.dataPanelSearchFocus = false;
-    mount(<AppPages />);
+    mount(<><DocumentEffects /><AppPages /></>);
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = false;
 });
 
@@ -136,6 +137,8 @@ afterEach(() => {
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
     endPanelGlideSnapPause();
     uiState.dataPanelSearchFocus = false;
+    uiState.iosKeyboardInset = 0;
+    uiState.iosKeyboardListFixed = false;
     unmount();
     delete (Element.prototype as any).animate;
     Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realInnerWidth });
@@ -203,5 +206,82 @@ describe('iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក
         glidePhoneSearchPulledUp(false);
         expect(model.m.resnaps).toBe(0);
         expect(model.cardTop()).toBe(PADDING + DAILY_CARD);
+    });
+    it('⛔ ការផ្អាក snap មិនលើសការរអិល ៖ ការរអិលចប់ ➜ snap ត្រឡប់ភ្លាម (មិនរង់ចាំពិដាន) ➜ ការរមូររបស់អ្នកប្រើក្រោយបិទ keyboard snap ដូចធម្មតា', async () => {
+        const model = webkitSnapModel();
+        iosViewport.listenIOSKeyboard(scope());
+        await pullUpAndSettle(model);
+        glidePhoneSearchPulledUp(false);
+        expect(byId('appPages').classList.contains('panel-gliding')).toBe(true);
+        expect(anims.length).toBeGreaterThan(0);
+        anims.splice(0).forEach((a) => a.end());
+        for (let i = 0; i < 4; i++) await Promise.resolve();
+        expect(uiState.panelGliding).toBe(false);
+        expect(byId('appPages').classList.contains('panel-gliding')).toBe(false);
+        expect(model.m.resnaps).toBe(0);
+    });
+
+    it('⛔ ម្រាមដៃប៉ះខណៈ snap ផ្អាកក្រោយទាញចុះ (រូបថតម្ចាស់គម្រោង ៖ ប្រអប់ស្វែងរកលិចពាក់កណ្តាល) ➜ snap ត្រឡប់ភ្លាម · ទិសផ្ទុយ ៖ ក្រៅចន្លោះទាញចុះ ➜ មិនប៉ះ', async () => {
+        const model = webkitSnapModel();
+        iosViewport.listenIOSKeyboard(scope());
+        await pullUpAndSettle(model);
+        glidePhoneSearchPulledUp(false);
+        expect(uiState.panelGliding).toBe(true);
+        const main = byId('dataMainSection');
+        const touchAt = () => {
+            const ev = new Event('touchstart', { bubbles: true, cancelable: true });
+            Object.defineProperty(ev, 'touches', { value: [{ identifier: 1, clientX: 100, clientY: 500, target: main }] });
+            main.dispatchEvent(ev);
+        };
+        touchAt();
+        expect(uiState.panelGliding).toBe(false);
+        expect(byId('appPages').classList.contains('panel-gliding')).toBe(false);
+        expect(model.m.resnaps).toBe(0);
+        await finishGlides();
+        vi.advanceTimersByTime(iosViewport.IOS_SEARCH_PULLDOWN_SETTLE_MS);
+        beginPanelGlideSnapPause();
+        touchAt();
+        expect(uiState.panelGliding).toBe(true);
+        endPanelGlideSnapPause();
+    });
+
+    it('⛔ keyboard បើក · បញ្ជីរមូរមិនបាន (ទទេ · ខ្លី ៖ វីដេអូម្ចាស់គម្រោង) ➜ body.ios-keyboard-list-fixed (touch-action none លើបញ្ជី) · បញ្ជីរមូរបាន ➜ ដក · keyboard បិទ ➜ ដក', async () => {
+        const model = webkitSnapModel();
+        iosViewport.listenIOSKeyboard(scope());
+        const list = byId('tableResponsive');
+        let sh = 246;
+        Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => sh });
+        Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => 246 });
+        await pullUpAndSettle(model);
+        uiState.iosKeyboardInset = 336;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(uiState.iosKeyboardListFixed).toBe(true);
+        expect(document.body.classList.contains('ios-keyboard')).toBe(true);
+        expect(document.body.classList.contains('ios-keyboard-list-fixed')).toBe(true);
+        sh = 900;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(uiState.iosKeyboardListFixed).toBe(false);
+        expect(document.body.classList.contains('ios-keyboard-list-fixed')).toBe(false);
+        sh = 246;
+        iosViewport.measureIOSKeyboardListRoom();
+        commitNow();
+        expect(document.body.classList.contains('ios-keyboard-list-fixed')).toBe(true);
+        uiState.iosKeyboardInset = 0;
+        commitNow();
+        expect(document.body.classList.contains('ios-keyboard-list-fixed')).toBe(false);
+        glidePhoneSearchPulledUp(false);
+        await finishGlides();
+        expect(uiState.iosKeyboardListFixed).toBe(false);
+    });
+
+    it('⛔ ខ្សែភ្ជាប់ ៖ react-root.css ៖ keyboard បើក ➜ body · .app-pages touch-action none (WebKit ហាម scroll view មេ) · បញ្ជីរមូរមិនបាន ➜ touch-action none (iOS standalone តែប៉ុណ្ណោះ)', async () => {
+        const { readFileSync } = await import('node:fs');
+        const path = await import('node:path');
+        const css = readFileSync(path.resolve(__dirname, '../src/styles/react-root.css'), 'utf8');
+        const rule = /html\.ios-standalone body\.ios-keyboard,\s*html\.ios-standalone body\.ios-keyboard \.app-pages,\s*html\.ios-standalone body\.ios-keyboard-list-fixed \.app-page\.active > \.page-main \.table-responsive \{ touch-action: none; \}/;
+        expect(rule.test(css)).toBe(true);
+        expect(/body\.ios-keyboard[^{]*\{[^}]*touch-action/.test(css.replace(rule, ''))).toBe(false);
     });
 });

@@ -678,7 +678,9 @@
 
 .haptic-switch { position: fixed; top: 0; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 
-.batch-scan-btn { cursor: pointer; }
+.batch-scan-btn { cursor: pointer; font-family: inherit; }
+.upload-fallback-row { gap: 8px; align-items: stretch; }
+.upload-fallback-row .file-upload-btn { flex: 1 1 0; min-width: 0; box-sizing: border-box; min-height: 38px; margin: 0; padding: 4px 8px; white-space: normal; line-height: 1.25; }
 .batch-scan-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 6px 8px; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.1); color: #fff; font-size: calc(11 * var(--fs-unit)); font-weight: 600; }
 .batch-scan-status span { min-width: 0; overflow-wrap: anywhere; }
 .batch-scan-stop { flex: none; background: var(--action-danger); color: #fff; border: none; border-radius: var(--radius-md); padding: 4px 10px; min-height: 30px; font-size: calc(10 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
@@ -741,7 +743,7 @@
 .label-print-summary { min-height: 1.4em; margin: 0 0 8px; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); }
 .label-print-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; font-size: calc(11 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); }
 .label-print-field select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: calc(12 * var(--fs-unit)); color: var(--text-main); background: #fff; }
-.label-print-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px 10px; margin-bottom: 8px; }
+.label-print-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2px 10px; margin-bottom: 8px; }
 .label-print-toggles .remember-container { margin: 0; }
 .label-preview { max-height: 36vh; overflow: auto; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f1f5f9; }
 .label-preview .label-sheet { zoom: 0.55; }
@@ -754,4 +756,9 @@
     .label-preview .label-sheet, .label-preview .label-sheet.layout-a4-2 { grid-template-columns: 1fr 1fr; }
     .label-preview .label-sheet { zoom: 0.45; }
 }
+@media (max-width: 359px) {
+    .label-preview .label-sheet.layout-50x30, .label-preview .label-sheet.layout-40x30 { zoom: 1.3; }
+    .label-preview .label-sheet.layout-60x40 { zoom: 1.1; }
+}
+.stat-card .label { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
 

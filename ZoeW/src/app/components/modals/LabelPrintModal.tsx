@@ -43,7 +43,7 @@ export function LabelPrintModal() {
                     </label>
                     <label className="remember-container">
                         <input type="checkbox" id="labelOpenOnly" ref={refTo('labelOpenOnly')} onChange={onAct('updateLabelPrintPreview')} />
-                        <span>តែកញ្ចប់មិនទាន់យក</span>
+                        <span>បង្ហាញតែកញ្ចប់មិនទាន់យក</span>
                     </label>
                 </div>
                 <div className="label-preview" id="labelPrintPreview" aria-label="គំរូស្លាក">

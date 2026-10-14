@@ -196,7 +196,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         step(() => openLabelPrintModal({ kind: 'filter' }));
         expect(modalIsOpen('labelPrintModal')).toBe(true);
         expect(labelsIn('#labelPrintPreview').length).toBe(0);
-        expect(viewState.labelPrintSummary).toContain('តែកញ្ចប់មិនទាន់យក');
+        expect(viewState.labelPrintSummary).toContain('បង្ហាញតែកញ្ចប់មិនទាន់យក');
         expect((document.querySelector('#labelPrintModal .btn-confirm') as HTMLButtonElement).disabled).toBe(true);
         expect(printLabelsFromModal()).toBe(false);
         step(() => resetLabelPrint());

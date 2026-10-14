@@ -1,15 +1,17 @@
 import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
 import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
-import { elementOf, focusField, isFieldFocused, type RefName } from '../refs';
+import { elementOf, focusField, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
+import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, panelGlideFrom } from './panel-motion';
 import { panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 import { glidePhoneSearchPulledUp } from './phone-search';
 
 export const IOS_SEARCH_TAP_SLOP_PX = 10;
 export const IOS_SEARCH_TAP_MAX_MS = 500;
 const IOS_SEARCH_WIDE_MIN_PX = 992;
+export const IOS_SEARCH_PULLDOWN_SETTLE_MS = PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS + PANEL_GLIDE_SNAP_GRACE_MS + 200;
 
 const IOS_SEARCH_FIELDS: readonly RefName[] = ['searchPhoneInput', ...ENTRY_SEARCH_FIELDS];
 
@@ -18,6 +20,9 @@ let searchFocusRefused = false;
 let keyboardPan: { id: number; x: number; y: number; block: boolean | null } | null = null;
 let keyboardLocked = false;
 let keyboardPanScope: LifecycleScope | null = null;
+let searchPulledUp = false;
+let pullDownSettleTimer: ReturnType<typeof setTimeout> | null = null;
+let pullDownTouchSeen = false;
 
 export function iosSearchDocumentLocked(): boolean {
     return (uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) && usesIOSPanelHandoff();
@@ -76,8 +81,51 @@ function keyboardPanBlocked(target: EventTarget | null, down: boolean): boolean 
     return true;
 }
 
+function iosSearchPulledUp(): boolean {
+    return uiState.dataPanelSearchFocus && usesIOSPanelHandoff() && window.innerWidth < IOS_SEARCH_WIDE_MIN_PX;
+}
+
+function clearPullDownSettle(): void {
+    if (pullDownSettleTimer !== null) clearTimeout(pullDownSettleTimer);
+    pullDownSettleTimer = null;
+}
+
+export function restIOSSearchPullDown(): void {
+    pullDownSettleTimer = null;
+    if (pullDownTouchSeen || iosSearchPulledUp() || isFieldFocused('searchPhoneInput')) return;
+    const pages = elementOf('appPages');
+    if (!pages || !(pages.scrollTop > 0)) return;
+    setElementScrollTop(pages, 0);
+}
+
+export function settleIOSSearchPullDown(): void {
+    clearPullDownSettle();
+    pullDownTouchSeen = false;
+    const pages = elementOf('appPages');
+    if (!pages) return;
+    if (pages.scrollTop > 0) {
+        const card = elementOf('dataSearchCard');
+        const main = elementOf('dataMainSection');
+        const cardTop = card ? card.getBoundingClientRect().top : NaN;
+        const mainTop = main ? main.getBoundingClientRect().top : NaN;
+        setElementScrollTop(pages, 0);
+        panelGlideFrom(card, cardTop, PANEL_SEARCH_GLIDE);
+        panelGlideFrom(main, mainTop, PANEL_SEARCH_GLIDE);
+    }
+    pullDownSettleTimer = setTimeout(restIOSSearchPullDown, IOS_SEARCH_PULLDOWN_SETTLE_MS);
+}
+
+function noteIOSSearchPullState(): void {
+    const pulled = iosSearchPulledUp();
+    if (pulled === searchPulledUp) return;
+    searchPulledUp = pulled;
+    if (pulled) clearPullDownSettle();
+    else settleIOSSearchPullDown();
+}
+
 export function noteIOSKeyboardTouchStart(e: TouchEvent): void {
     keyboardPan = null;
+    pullDownTouchSeen = true;
     if (!e.touches || e.touches.length !== 1 || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX || !iosSearchDocumentLocked()) return;
     const t = e.touches[0];
     keyboardPan = { id: t.identifier, x: t.clientX, y: t.clientY, block: null };
@@ -106,17 +154,22 @@ export function forgetIOSKeyboardTouch(): void {
 export function listenIOSKeyboard(scope: LifecycleScope): void {
     keyboardPan = null;
     keyboardLocked = false;
+    searchPulledUp = false;
+    pullDownTouchSeen = false;
+    clearPullDownSettle();
     armIOSKeyboardPanBlock(false);
     if (!usesIOSPanelHandoff()) return;
     if (window.visualViewport) scope.listen(window.visualViewport, 'resize', measureIOSKeyboardInset);
     scope.onDispose(uiState.subscribe(() => {
+        noteIOSSearchPullState();
         if (iosSearchDocumentLocked() === keyboardLocked) return;
         measureIOSKeyboardInset();
     }));
-    scope.onDispose(() => armIOSKeyboardPanBlock(false));
+    scope.onDispose(() => { armIOSKeyboardPanBlock(false); clearPullDownSettle(); });
     scope.listen(document, 'touchstart', noteIOSKeyboardTouchStart, { capture: true, passive: true });
     scope.listen(document, 'touchend', forgetIOSKeyboardTouch, { capture: true, passive: true });
     scope.listen(document, 'touchcancel', forgetIOSKeyboardTouch, { capture: true, passive: true });
+    searchPulledUp = iosSearchPulledUp();
     measureIOSKeyboardInset();
 }
 

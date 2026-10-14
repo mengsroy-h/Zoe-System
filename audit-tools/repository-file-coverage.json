@@ -1981,6 +1981,9 @@
     "ZoeW/tests/ios-keyboard-pan.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-search-pulldown.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ios-search-tap-focus.test.ts": {
       "policy": "zoew-self-verification"
     },

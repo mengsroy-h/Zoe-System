@@ -696,6 +696,52 @@ async function historyRowLayout(browser, port) {
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            // ⛔ រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ក្រោយ 2.50.65) ៖ (១) ស្លាក «កញ្ចប់សរុប (នៅសល់)» ក្នុង «គ្រប់គ្រងប្រចាំថ្ងៃ» កាត់ «…» លើអេក្រង់តូច (វាស់ ៖ ៣២០ ទាំង ៣ ស្លាក · ៣៦០–៤១២
+            //    ស្លាកទី ១ · ១២៨០ ទាំង ៣ ក្នុងជួរឈរ ៣៨០px) ➜ បត់បន្ទាត់ ⛔ មិនកាត់ · (២) ប៊ូតុង «📋 បញ្ចូលច្រើន» មិនស្មើ «📁 យក Barcode ពីរូបភាព» (១៨០×៣៨ ទល់ ១២៨×៤២) ➜ ទទឹង
+            //    និងកម្ពស់ស្មើគ្នា (±1px) · (៣) ផ្ទាំងបោះពុម្ពស្លាក ៖ គំរូស្លាក 50×30 (zoom 1.6) ធំជាងកន្លែងគំរូនៅ ៣២០ (២៩២/២៥៨px ➜ លេខទូរស័ព្ទកាត់) ➜ zoom តាមទទឹង ⛔ គ្មាន scroll ផ្តេក
+            //    ក្នុង `#labelPrintPreview` សម្រាប់ស្លាកតូចទាំង ៣ ទំហំ (ស្លាកពិត ៖ លេខ ១០ ខ្ទង់ · Barcode · COD/DOD · ថ្ងៃ · Locker)។
+            if (app === 'ZoeW') {
+                const small = await page.evaluate(() => {
+                    const labels = [...document.querySelectorAll('.stat-card .label')].map((l) => ({ t: l.textContent, cut: l.scrollWidth > l.clientWidth + 1, nowrap: getComputedStyle(l).whiteSpace === 'nowrap', ellipsis: getComputedStyle(l).textOverflow === 'ellipsis' }));
+                    const dataPage = document.getElementById('pageData'), entryPage = document.getElementById('pageEntry');
+                    const wasData = !!dataPage && dataPage.classList.contains('active');
+                    if (dataPage) dataPage.classList.remove('active');
+                    if (entryPage) entryPage.classList.add('active');
+                    const a = document.querySelector('.upload-fallback-row .file-upload-btn:not(.batch-scan-btn)'), b = document.getElementById('batchScanBtn');
+                    const ra = a && a.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+                    const row = a && a.parentElement ? a.parentElement.getBoundingClientRect() : null;
+                    const buttons = { a: ra && [Math.round(ra.width), Math.round(ra.height)], b: rb && [Math.round(rb.width), Math.round(rb.height)],
+                        inside: !!(ra && rb && row && ra.left >= row.left - 1 && rb.right <= row.right + 1), textCut: !!(a && b && (a.scrollWidth > a.clientWidth + 1 || b.scrollWidth > b.clientWidth + 1)) };
+                    if (entryPage) entryPage.classList.remove('active');
+                    if (dataPage && wasData) dataPage.classList.add('active');
+                    const modal = document.getElementById('labelPrintModal'), pv = document.getElementById('labelPrintPreview');
+                    const preview = [];
+                    if (modal && pv) {
+                        const prevDisplay = modal.style.display;
+                        modal.style.display = 'flex';
+                        const bars = Array.from({ length: 34 }, (_, i) => '<rect x="' + (10 + i * 4) + '" y="0" width="' + (1 + (i % 3)) + '" height="60"></rect>').join('');
+                        const label = '<div class="label"><div class="label-phone">0960000001</div><div class="label-bc"><svg viewBox="0 0 176 60" preserveAspectRatio="none">' + bars + '</svg></div>' +
+                            '<div class="label-code">77130500000000</div><div class="label-money">COD $12.40 · DOD $1.25</div><div class="label-meta"><span class="label-date">14/10</span><span class="label-locker">A12</span></div></div>';
+                        for (const layout of ['50x30', '40x30', '60x40']) {
+                            pv.innerHTML = '<div class="label-sheet layout-' + layout + '">' + label + label + '</div>';
+                            const sheet = pv.firstElementChild, phone = pv.querySelector('.label-phone');
+                            preview.push({ layout, pvW: pv.clientWidth, sheetW: Math.round(sheet.getBoundingClientRect().width), scrollX: pv.scrollWidth > pv.clientWidth + 1,
+                                phoneCut: phone.scrollWidth > phone.clientWidth + 1, zoom: getComputedStyle(sheet).zoom });
+                        }
+                        pv.innerHTML = '';
+                        modal.style.display = prevDisplay;
+                    }
+                    return { labels, buttons, preview };
+                });
+                check(small.labels.length === 3 && small.labels.every((l) => !l.cut && !l.nowrap && !l.ellipsis),
+                    '⛔ ' + label + ': ស្លាកក្រឡាស្ថិតិ «កញ្ចប់សរុប (នៅសល់)» · «ស្កេនតាមថ្ងៃ» · «អតិថិជនយក» អានបានទាំងអស់ (បត់បន្ទាត់ · មិនកាត់ «…»)', JSON.stringify(small.labels));
+                const bt = small.buttons;
+                check(!!(bt.a && bt.b) && Math.abs(bt.a[0] - bt.b[0]) <= 1 && Math.abs(bt.a[1] - bt.b[1]) <= 1 && bt.inside && !bt.textCut,
+                    '⛔ ' + label + ': ប៊ូតុង «📁 យក Barcode ពីរូបភាព» និង «📋 បញ្ចូលច្រើន» ទទឹង/កម្ពស់ស្មើគ្នា · ក្នុងជួរ · អក្សរមិនកាត់', JSON.stringify(bt));
+                check(small.preview.length === 3 && small.preview.every((p) => !p.scrollX && !p.phoneCut && p.sheetW <= p.pvW + 1),
+                    '⛔ ' + label + ': គំរូស្លាកតូច (50×30 · 40×30 · 60×40) សមទទឹងកន្លែងគំរូ ⛔ គ្មាន scroll ផ្តេក · លេខទូរស័ព្ទមិនកាត់', JSON.stringify(small.preview));
+            }
+
             // ⛔ modal ជាន់គ្នា (App ទាំង ២) ៖ modal ដែល **បើកក្រោយ** ត្រូវនៅខាងលើជានិច្ច — z-index ស្មើគ្នា ➜ លំដាប់ក្នុង DOM ឈ្នះ ➜ ឧ. ប្រអប់ PIN
             //    (ឈរមុន Config ក្នុង DOM) បើកពី ⚙️ Config ➜ លោតពីក្រោយ (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ ZoeKeyGen បើកក្រយៅដៃ/មុខ · វាស់បាន ZoeW ខុស
             //    ៤៦៥/៩៣០ គូ · ZoeKeyGen ១៥/៣០)។ វាស់គ្រប់គូ (A ➜ B) តាម `openModalHelper()` ពិត និង `elementFromPoint()` ចំកណ្តាលប្រអប់ B · បើក A

@@ -11,6 +11,7 @@ import { closeCameraManually, submitManualBarcode } from '../features/daily-stat
 import { handleCallAction, openCallMarkModal, openEditModal, saveEditedPhone, setCallMark, toggleCloseStatus } from '../features/entry-ops';
 import { saveExchangeRate } from '../features/exchange-rate';
 import { exportDataAsCsvForSheets, exportDataAsExcel, exportDataAsPDF } from '../features/export';
+import { openBatchScanModal, startBatchScan, stopBatchScan, updateBatchScanCount } from '../features/batch-scan';
 import { openHealthCheck, runHealthCheck } from '../features/health-check';
 import { toggleRememberPassword } from '../features/password-memory';
 import { submitActivationKey } from '../features/license';
@@ -33,7 +34,7 @@ import { requestCameraPermission, toggleTorch } from '../services/camera';
 import { debouncedSearchByPhone } from '../services/scan-engine';
 import { renderEntryList, renderLockerList } from '../ui/entry-list';
 import { closeModal, dismissPhoneModal } from '../ui/modal';
-import { filterDataByCustomDate, filterDataByDate, moreMenuClearHistory, moreMenuDelete, moreMenuEditPhone, moreMenuExchangeRate, moreMenuExport, moreMenuManualAdjust, moreMenuMonthlyReport, moreMenuRecentlyDeleted, moreMenuResetPickup, moreMenuViewList, toggleHeaderMoreDropdown, toggleMoreDropdown } from '../ui/more-menu';
+import { filterDataByCustomDate, filterDataByDate, moreMenuClearHistory, moreMenuDelete, moreMenuEditPhone, moreMenuExchangeRate, moreMenuExport, moreMenuManualAdjust, moreMenuMonthlyReport, moreMenuPrintItemLabels, moreMenuPrintLabels, moreMenuRecentlyDeleted, moreMenuResetPickup, moreMenuViewList, toggleHeaderMoreDropdown, toggleMoreDropdown } from '../ui/more-menu';
 import { closeSideDrawer, openSideDrawer, switchAppPage } from '../ui/page-nav';
 import { checkForAppUpdate, openNotifyDrawer, toggleNotifyGroup } from '../features/notifications';
 import { cancelApkUpdate, startApkUpdate } from '../features/apk-update';
@@ -53,6 +54,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     cancelRestoreItem,
     cancelScannedRemoval,
     checkForAppUpdate,
+    clearNotifications,
     closeCameraManually,
     closeConfigQrScanner,
     closeEditBarcodeModal,
@@ -108,9 +110,12 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     moreMenuExport,
     moreMenuManualAdjust,
     moreMenuMonthlyReport,
+    moreMenuPrintItemLabels,
+    moreMenuPrintLabels,
     moreMenuRecentlyDeleted,
     moreMenuResetPickup,
     moreMenuViewList,
+    openBatchScanModal,
     openCallMarkModal,
     openCollectedStatsModal,
     openConfigQrScanner,
@@ -122,8 +127,6 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openNotifyDrawer,
     openRegisterForm,
     openResetPasswordForm,
-    togglePush,
-    clearNotifications,
     openSideDrawer,
     openViewListModal,
     openZtoListSyncModal,
@@ -157,17 +160,19 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     selectCustomLocker,
     setCallMark,
     setEntryScanMode,
-    showMoreTrashRows,
     showMoreHistoryRows,
+    showMoreTrashRows,
+    startApkUpdate,
+    startBatchScan,
+    stopBatchScan,
     submitActivationKey,
     submitAppLockForm,
-    submitSecurityPinForm,
     submitLoginForm,
-    submitRegisterForm,
-    submitResetPasswordForm,
     submitManualAdjustment,
     submitManualBarcode,
-    startApkUpdate,
+    submitRegisterForm,
+    submitResetPasswordForm,
+    submitSecurityPinForm,
     switchAppPage,
     testLookupApiConfig,
     toggleCloseStatus,
@@ -177,9 +182,11 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     toggleIndividualBarcodeClose,
     toggleMoreDropdown,
     toggleNotifyGroup,
+    togglePush,
     toggleRememberPassword,
     toggleTorch,
     toggleTrashGroup,
+    updateBatchScanCount,
     verifySecurityPin,
 });
 

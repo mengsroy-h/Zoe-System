@@ -4,6 +4,7 @@ export const REF_NAMES = [
     'activationKeyInput',
     'appLockPinInput',
     'appPages',
+    'batchBarcodeInput',
     'configQrImageInput',
     'configQrVideo',
     'customDateInput',

@@ -100,8 +100,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
     disposers.splice(0).forEach((fn) => fn());
+    listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
+    vi.restoreAllMocks();
     page.remove();
     uiState.dataPanelSearchFocus = false;
     uiState.iosKeyboardInset = 0;
@@ -210,10 +211,24 @@ describe('iPhone PWA ៖ អូសខណៈស្វែងរកលេខ ➜ do
         expect(drag(row, { x: 100, y: 500 }, { x: 100, y: 420 }).defaultPrevented).toBe(false);
     });
 
-    it('⛔ ខ្សែភ្ជាប់ ៖ touchmove នៅ document · capture · មិន passive (preventDefault ដើរ)', () => {
+    it('⛔ ខ្សែភ្ជាប់ ៖ touchmove មិន passive លើ document **តែខណៈប្រអប់ទាញឡើង** (PTR នៅជា listener ទប់តែមួយក្នុងរបៀបធម្មតា) · ប្រអប់បិទ ➜ ដកចេញ', () => {
+        const added: any[] = [];
+        const removed: any[] = [];
+        const realAdd = document.addEventListener.bind(document);
+        const realRemove = document.removeEventListener.bind(document);
+        vi.spyOn(document, 'addEventListener').mockImplementation((type: any, h: any, o: any) => { if (type === 'touchmove') added.push(o); realAdd(type, h, o); });
+        vi.spyOn(document, 'removeEventListener').mockImplementation((type: any, h: any, o: any) => { if (type === 'touchmove') removed.push(o); realRemove(type, h, o); });
+        uiState.dataPanelSearchFocus = false;
         boot();
-        const move = listeners.find(([t, type]) => t === document && type === 'touchmove');
-        expect(move).toBeTruthy();
-        expect(move![3]).toEqual({ capture: true, passive: false });
+        expect(added.length).toBe(0);
+        expect(listeners.some(([t, type]) => t === document && type === 'touchmove')).toBe(false);
+        uiState.dataPanelSearchFocus = true;
+        uiState.flush();
+        expect(added).toEqual([{ capture: true, passive: false }]);
+        expect(drag(row, { x: 100, y: 500 }, { x: 100, y: 420 }).defaultPrevented).toBe(true);
+        uiState.dataPanelSearchFocus = false;
+        uiState.flush();
+        expect(removed.length).toBe(1);
+        expect(drag(row, { x: 100, y: 500 }, { x: 100, y: 420 }).defaultPrevented).toBe(false);
     });
 });

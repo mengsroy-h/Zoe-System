@@ -13,6 +13,7 @@ import { forgetRememberedLogin, loginBackendScope, rememberedLoginFor } from './
 import { forgetLoginPassword, prefillRememberedPassword } from './password-memory';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
+import { resetBatchScan } from './batch-scan';
 import { expandedTrashGroups } from './locker';
 import { hidePhoneSuggestions } from './phone-suggest';
 import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
@@ -129,6 +130,8 @@ export function clearSensitiveModalFields() {
     ztoState.ztoListSyncInFlight = false;
     closeModal('ztoListSyncModal');
     restoreAfterPdfExport();
+    resetBatchScan();
+    closeModal('batchScanModal');
     if (!isPinFlowPending()) securityState.pinTargetAction = null;
     uiState.pendingRestoreId = null;
     uiState.pendingPermanentDeleteId = null;

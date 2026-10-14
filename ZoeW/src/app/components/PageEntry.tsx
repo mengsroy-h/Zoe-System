@@ -94,7 +94,7 @@ export function PageEntry() {
     const collapsed = useStoreValue(uiState, (s) => s.entryPanelCollapsed);
     const searching = useStoreValue(uiState, (s) => s.entryPanelCollapsed && s.entrySearchActive);
     const v = useStoreFields(viewState, ['entryModeShown', 'removeScanDetail', 'entryListCountText', 'entryListEmpty',
-        'lockerListEmpty', 'activeLockerLabel']);
+        'lockerListEmpty', 'activeLockerLabel', 'batchScanStatus']);
     const mode = v.entryModeShown;
     let pageCls = active ? 'app-page active' : 'app-page';
     if (mode === 'remove') pageCls += ' remove-scan-active';
@@ -148,6 +148,9 @@ export function PageEntry() {
                     </div>
                     <div className="upload-fallback-row">
                         <label className="file-upload-btn" htmlFor="fileInput">📁 យក Barcode ពីរូបភាព</label>
+                        {mode === 'parcel' ? (
+                            <button type="button" className="file-upload-btn batch-scan-btn" id="batchScanBtn" onClick={onAct("openBatchScanModal")}>📋 បញ្ចូលច្រើន</button>
+                        ) : null}
                         <input
                             type="file"
                             id="fileInput"
@@ -156,6 +159,12 @@ export function PageEntry() {
                             onChange={onAct("decodeImageFile", { evt: true })}
                         />
                     </div>
+                    {v.batchScanStatus ? (
+                        <div className="batch-scan-status" id="batchScanStatus" role="status" aria-live="polite">
+                            <span>{v.batchScanStatus}</span>
+                            <button type="button" className="batch-scan-stop" onClick={onAct("stopBatchScan")}>⏹️ បញ្ឈប់</button>
+                        </div>
+                    ) : null}
                 </div>
             </div>
             <div className={searching ? 'page-main entry-search-open' : 'page-main'} id="entryMainSection" ref={refTo('entryMainSection')}>

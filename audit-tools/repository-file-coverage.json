@@ -1285,6 +1285,9 @@
     "ZoeW/src/app/components/modals/ActivationModal.tsx": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/modals/BatchScanModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/modals/CallMarkModal.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1585,6 +1588,9 @@
     "ZoeW/src/features/barcode-ops.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/batch-scan.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/barcode-origin.ts": {
       "policy": "zoew-app"
     },
@@ -1628,6 +1634,9 @@
       "policy": "zoew-app"
     },
     "ZoeW/src/features/health-advice.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/label-print.ts": {
       "policy": "zoew-app"
     },
     "ZoeW/src/features/license.ts": {
@@ -1825,6 +1834,9 @@
     "ZoeW/tests/async-settle.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/batch-scan.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/barcode-origin.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1934,6 +1946,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/history-patch-late-commit.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/label-print.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/late-commit-stale-session.test.ts": {

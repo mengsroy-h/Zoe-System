@@ -1,5 +1,7 @@
 import { uiState } from '../../core/state';
+import { labelMoneyText, type LabelPrintView } from '../../features/label-print';
 import { useStore } from '../hooks/useStore';
+import { Code128Svg } from './zto/Code128Svg';
 
 export interface PdfTableView {
     title: string;
@@ -9,27 +11,48 @@ export interface PdfTableView {
     footer: React.ReactNode;
 }
 
+export function LabelSheet({ view }: { view: LabelPrintView }) {
+    return (
+        <div className="label-sheet" data-label-count={view.labels.length}>
+            {view.labels.map((row, i) => (
+                <div className="label" key={row.barcode + '~' + i}>
+                    <div className="label-phone">{row.phone}</div>
+                    <div className="label-bc"><Code128Svg code={row.barcode} /></div>
+                    <div className="label-code">{row.barcode}</div>
+                    <div className="label-meta">
+                        <span className="label-date">{row.date}</span>
+                        {labelMoneyText(row) ? <span className="label-money">{labelMoneyText(row)}</span> : null}
+                        {row.locker ? <span className="label-locker">{row.locker}</span> : null}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function PdfPrintArea() {
     useStore(uiState);
-    const view = uiState.pdfExportView as PdfTableView | null;
+    const view = uiState.pdfExportView as PdfTableView | LabelPrintView | null;
     if (!view) return null;
+    if ((view as LabelPrintView).kind === 'labels') return <LabelSheet view={view as LabelPrintView} />;
+    const table = view as PdfTableView;
     return (
         <>
-            <h2>{view.title}</h2>
+            <h2>{table.title}</h2>
             <table>
-                <thead><tr>{view.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{table.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
-                    {view.rows.map((cells, i) => (
+                    {table.rows.map((cells, i) => (
                         <tr key={i}>{cells.map((c, j) => <td key={j}>{c}</td>)}</tr>
                     ))}
                     <tr className="export-total-row">
-                        {view.totalRow.cells.map((c, j) => (
-                            <td key={j} colSpan={view.totalRow.spans ? view.totalRow.spans[j] : undefined}>{c}</td>
+                        {table.totalRow.cells.map((c, j) => (
+                            <td key={j} colSpan={table.totalRow.spans ? table.totalRow.spans[j] : undefined}>{c}</td>
                         ))}
                     </tr>
                 </tbody>
             </table>
-            <p className="export-footer">{view.footer}</p>
+            <p className="export-footer">{table.footer}</p>
         </>
     );
 }

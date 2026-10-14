@@ -12,6 +12,7 @@ import { openExchangeRateModal } from '../features/exchange-rate';
 import { getCurrentFilterLabel, openExportDataModal } from '../features/export';
 import { applyCurrentFilter, openMonthlyReportModal } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
+import { printLabelsForFilter, printLabelsForItem } from '../features/label-print';
 import { openManualAdjustModal } from '../features/stats-modals';
 import { openRecentlyDeletedModal } from '../features/trash';
 
@@ -43,6 +44,10 @@ export function moreMenuRecentlyDeleted() { openRecentlyDeletedModal(); closeGlo
 export function moreMenuResetPickup() { requestPinBeforeResetPickup(); closeGlobalMoreMenu(); }
 
 export function moreMenuClearHistory() { requestPinBeforeClearHistory(); closeGlobalMoreMenu(); }
+
+export function moreMenuPrintLabels() { closeGlobalMoreMenu(); printLabelsForFilter(); }
+
+export function moreMenuPrintItemLabels(id?) { closeGlobalMoreMenu(); printLabelsForItem(id); }
 
 export function moreMenuViewList(id?) { openViewListModal(id); closeGlobalMoreMenu(); }
 
@@ -90,6 +95,7 @@ export function positionMenuSafely(menuName, rect) {
 export function toggleHeaderMoreDropdown(btn?, event?) {
     showGlobalMoreMenu(btn, event, [
         { label: '📤 Export Data', action: 'moreMenuExport' },
+        { label: '🖨️ បោះពុម្ពស្លាក (' + getCurrentFilterLabel() + ')', action: 'moreMenuPrintLabels' },
         { label: '📈 របាយការណ៍អាជីវកម្មប្រចាំខែ', action: 'moreMenuMonthlyReport' },
         { label: '✏️ កែទឹកប្រាក់/កញ្ចប់', action: 'moreMenuManualAdjust' },
         { label: '💱 អត្រាប្រាក់ (' + dataState.exchangeRateRiel + '៛)', action: 'moreMenuExchangeRate' },
@@ -106,6 +112,7 @@ export function toggleMoreDropdown(btn?, event?, id?) {
         items.push({ label: '💵 កែតម្លៃកញ្ចប់', action: 'moreMenuViewList', args: [id] });
     }
     items.push({ label: '✏️ កែលេខទូរស័ព្ទ', action: 'moreMenuEditPhone', args: [id] });
+    items.push({ label: '🖨️ បោះពុម្ពស្លាក', action: 'moreMenuPrintItemLabels', args: [id] });
     items.push({ label: '🗑️ លុប', action: 'moreMenuDelete', args: [id], cls: 'delete-opt' });
     showGlobalMoreMenu(btn, event, items);
 }

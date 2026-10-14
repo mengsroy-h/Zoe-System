@@ -703,6 +703,24 @@
 .label-sheet.layout-50x30 .label-code { font-size: 6.5pt; letter-spacing: 0.3mm; margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-money { font-size: 10pt; margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
+@page zoeLabel40x30 { size: 40mm 30mm; margin: 1.5mm; }
+.label-sheet.layout-40x30 { display: block; }
+.label-sheet.layout-40x30 .label { page: zoeLabel40x30; break-after: page; page-break-after: always; width: 37mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 0.8mm; border: none; border-radius: 0; }
+.label-sheet.layout-40x30 .label:last-child { break-after: auto; page-break-after: auto; }
+.label-sheet.layout-40x30 .label-phone { font-size: 14pt; letter-spacing: 0.2mm; line-height: 1.05; }
+.label-sheet.layout-40x30 .label-bc { height: 6.5mm; margin-top: 0.8mm; }
+.label-sheet.layout-40x30 .label-code { font-size: 5.5pt; letter-spacing: 0.2mm; margin-top: 0.3mm; }
+.label-sheet.layout-40x30 .label-money { font-size: 9pt; margin-top: 0.3mm; white-space: normal; }
+.label-sheet.layout-40x30 .label-meta { font-size: 7.5pt; gap: 2.5mm; margin-top: 0.3mm; }
+@page zoeLabel60x40 { size: 60mm 40mm; margin: 2mm; }
+.label-sheet.layout-60x40 { display: block; }
+.label-sheet.layout-60x40 .label { page: zoeLabel60x40; break-after: page; page-break-after: always; width: 56mm; height: 36mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 1mm 1.5mm; border: none; border-radius: 0; }
+.label-sheet.layout-60x40 .label:last-child { break-after: auto; page-break-after: auto; }
+.label-sheet.layout-60x40 .label-phone { font-size: 22pt; letter-spacing: 0.4mm; line-height: 1.05; }
+.label-sheet.layout-60x40 .label-bc { height: 10mm; margin-top: 1mm; }
+.label-sheet.layout-60x40 .label-code { font-size: 8pt; letter-spacing: 0.4mm; margin-top: 0.4mm; }
+.label-sheet.layout-60x40 .label-money { font-size: 13pt; margin-top: 0.5mm; }
+.label-sheet.layout-60x40 .label-meta { font-size: 10pt; gap: 4mm; margin-top: 0.5mm; }
 .label { break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
 .label-phone { font-size: 30pt; font-weight: 800; line-height: 1.1; letter-spacing: 0.5mm; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .label-bc { margin: 2mm auto 0; height: 13mm; }
@@ -727,8 +745,9 @@
 .label-preview { max-height: 36vh; overflow: auto; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f1f5f9; }
 .label-preview .label-sheet { zoom: 0.55; }
 .label-preview .label-sheet.layout-single .label { border: 0.3mm dashed #94a3b8; margin-bottom: 3mm; }
-.label-preview .label-sheet.layout-50x30 { zoom: 1.6; }
-.label-preview .label-sheet.layout-50x30 .label { border: 0.3mm dashed #94a3b8; margin: 0 auto 2mm; background: #fff; }
+.label-preview .label-sheet.layout-50x30, .label-preview .label-sheet.layout-40x30 { zoom: 1.6; }
+.label-preview .label-sheet.layout-60x40 { zoom: 1.3; }
+.label-preview .label-sheet.layout-50x30 .label, .label-preview .label-sheet.layout-40x30 .label, .label-preview .label-sheet.layout-60x40 .label { border: 0.3mm dashed #94a3b8; margin: 0 auto 2mm; background: #fff; }
 .label-preview-empty { text-align: center; padding: 18px 0; color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); }
 @media (max-width: 699px) {
     .label-preview .label-sheet, .label-preview .label-sheet.layout-a4-2 { grid-template-columns: 1fr 1fr; }

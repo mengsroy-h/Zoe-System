@@ -10,7 +10,7 @@ import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
 import { beginPdfPrint, getCurrentFilterLabel, getExportFilenameBase } from './export';
 
-export type LabelLayout = 'a4-3' | 'a4-2' | 'single' | '50x30';
+export type LabelLayout = '50x30' | '40x30' | '60x40' | 'single' | 'a4-3' | 'a4-2';
 
 export interface LabelOptions {
     layout: LabelLayout;
@@ -47,8 +47,8 @@ export type LabelPrintScope = { kind: 'filter' } | { kind: 'item'; id: string };
 
 export const LABEL_NO_PHONE_TEXT = '—';
 export const LABEL_PREVIEW_MAX = 6;
-export const LABEL_LAYOUTS: readonly LabelLayout[] = ['a4-3', 'a4-2', 'single', '50x30'];
-export const DEFAULT_LABEL_OPTIONS: LabelOptions = { layout: 'a4-3', money: true, locker: true, date: true, openOnly: true };
+export const LABEL_LAYOUTS: readonly LabelLayout[] = ['50x30', '40x30', '60x40', 'single', 'a4-3', 'a4-2'];
+export const DEFAULT_LABEL_OPTIONS: LabelOptions = { layout: '50x30', money: true, locker: true, date: true, openOnly: true };
 
 let labelPrintScope: LabelPrintScope | null = null;
 

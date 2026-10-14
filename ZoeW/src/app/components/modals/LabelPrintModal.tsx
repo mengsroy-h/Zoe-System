@@ -18,12 +18,14 @@ export function LabelPrintModal() {
                 </p>
                 <p className="label-print-summary" id="labelPrintSummary" aria-live="polite">{v.labelPrintSummary}</p>
                 <label className="label-print-field">
-                    <span>ប្លង់ក្រដាស</span>
+                    <span>ទំហំស្លាក (មួយសន្លឹកមួយស្លាក)</span>
                     <select id="labelLayoutSelect" ref={refTo('labelLayoutSelect')} onChange={onAct('updateLabelPrintPreview')}>
-                        <option value="a4-3">A4 ផ្ដេក · ៣ ជួរឈរ (៩ ស្លាកក្នុងមួយទំព័រ)</option>
-                        <option value="a4-2">A4 ផ្ដេក · ២ ជួរឈរ (ស្លាកធំ)</option>
-                        <option value="50x30">ស្លាក 50×30mm · ម៉ាស៊ីនបោះពុម្ពស្លាកតូច (មួយស្លាកមួយទំព័រ)</option>
-                        <option value="single">ម៉ាស៊ីនបោះពុម្ពស្លាកផ្សេង · មួយស្លាកមួយទំព័រ (ទំហំតាម print dialog)</option>
+                        <option value="50x30">ស្លាក 50×30mm (ម៉ាស៊ីនបោះពុម្ពស្លាកតូច)</option>
+                        <option value="40x30">ស្លាក 40×30mm</option>
+                        <option value="60x40">ស្លាក 60×40mm</option>
+                        <option value="single">ស្លាកទំហំផ្សេង (ទំហំតាម print dialog)</option>
+                        <option value="a4-3">ក្រដាស A4 ផ្ដេក · ៣ ជួរឈរ (៩ ស្លាកក្នុងមួយទំព័រ)</option>
+                        <option value="a4-2">ក្រដាស A4 ផ្ដេក · ២ ជួរឈរ (ស្លាកធំ)</option>
                     </select>
                 </label>
                 <div className="label-print-toggles">

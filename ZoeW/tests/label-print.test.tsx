@@ -92,7 +92,7 @@ describe('ស្លាកកញ្ចប់ ៖ ទិន្នន័យ', () =>
         localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, JSON.stringify({ layout: '50x30', money: false, date: 'x', openOnly: false }));
         expect(loadLabelOptions()).toEqual({ layout: '50x30', money: false, locker: true, date: true, openOnly: false });
         localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, JSON.stringify({ layout: 'nope' }));
-        expect(loadLabelOptions().layout).toBe('a4-3');
+        expect(loadLabelOptions().layout).toBe('50x30');
         localStorage.setItem(LABEL_PRINT_OPTIONS_KEY, '{bad');
         expect(loadLabelOptions()).toEqual(DEFAULT_LABEL_OPTIONS);
     });
@@ -103,7 +103,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         step(() => moreMenuPrintLabels());
         expect(modalIsOpen('labelPrintModal')).toBe(true);
         expect(viewState.labelPrintTitle).toContain('ទាំងអស់');
-        expect(field('labelLayoutSelect').value).toBe('a4-3');
+        expect(field('labelLayoutSelect').value).toBe('50x30');
         expect(field('labelShowMoney').checked).toBe(true);
         expect(field('labelOpenOnly').checked).toBe(true);
         expect(labelsIn('#labelPrintPreview').length).toBe(3);
@@ -116,13 +116,14 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(first.querySelector('.label-money')!.textContent).toBe('COD $6.93');
         expect(first.querySelector('.label-date')!.textContent).toBe('15/10');
         expect(first.querySelector('.label-locker')!.textContent).toBe('A1');
-        expect(document.querySelector('#labelPrintPreview .label-sheet')!.className).toBe('label-sheet layout-a4-3');
+        expect(document.querySelector('#labelPrintPreview .label-sheet')!.className).toBe('label-sheet layout-50x30');
     });
 
     it('⛔ ប្តូរជម្រើស ➜ preview ប្រែ (ប្លង់ · បិទតម្លៃ/ថ្ងៃ/Locker · openOnly បិទ ➜ ៤) · រក្សាទុកក្នុង localStorage', () => {
         step(() => openLabelPrintModal({ kind: 'filter' }));
         step(() => {
             field('labelLayoutSelect').value = 'a4-2';
+            expect((field('labelLayoutSelect') as unknown as HTMLSelectElement).options.length).toBe(6);
             field('labelShowMoney').checked = false;
             field('labelShowDate').checked = false;
             field('labelShowLocker').checked = false;
@@ -221,7 +222,12 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(/@page zoeLabel50x30\s*\{\s*size:\s*50mm 30mm/.test(css)).toBe(true);
         expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*page:\s*zoeLabel50x30[^}]*break-after:\s*page/.test(css)).toBe(true);
         expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*width:\s*47mm[^}]*height:\s*27mm/.test(css)).toBe(true);
-        expect(LABEL_LAYOUTS).toEqual(['a4-3', 'a4-2', 'single', '50x30']);
+        expect(LABEL_LAYOUTS).toEqual(['50x30', '40x30', '60x40', 'single', 'a4-3', 'a4-2']);
+        expect(DEFAULT_LABEL_OPTIONS.layout).toBe('50x30');
+        for (const sz of ['40x30', '60x40']) {
+            expect(new RegExp('@page zoeLabel' + sz + '\\s*\\{\\s*size:\\s*' + sz.replace('x', 'mm ') + 'mm').test(css)).toBe(true);
+            expect(new RegExp('\\.label-sheet\\.layout-' + sz + ' \\.label\\s*\\{[^}]*page:\\s*zoeLabel' + sz + '[^}]*break-after:\\s*page').test(css)).toBe(true);
+        }
         expect(readFileSync(path.join(root, 'app', 'components', 'modals', 'LabelPrintModal.tsx'), 'utf8')).toMatch(/<option value="50x30">/);
         expect(/\.label-print-modal-content\s*\{[^}]*max-width:\s*clamp\(340px/.test(css)).toBe(true);
     });

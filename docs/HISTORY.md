@@ -218,8 +218,8 @@
   ការប៉ះ App វិញ (`pointerdown` · `keydown`) · ការបោះពុម្ពថ្មីចាប់ផ្តើមពីសូន្យ · logout សម្អាតភ្លាម។
 - 🐛 **APK ៖ ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត** (គ្រប់ប្រអប់ · A103)។ `KeyboardOpenHold` រក្សាកម្ពស់ WebView ពេល keyboard លោត ប៉ុន្តែ visualViewport បង្រួមភ្លាម ➜
   ការតម្រូវ (ច្បាប់ iPhone ៖ បាតត្រឹម keyboard) ផ្លាស់ទីប្រអប់ម្តង ➜ ចប់ចលនា WebView បង្រួម ➜ ប្រអប់ចូលកណ្តាលវិញ ផ្លាស់ទីលើកទីពីរ (PIN ៖ ផ្លាស់ទីតែពេលចប់)។
-  ឥឡូវលើ APK ការតម្រូវដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard ដូចប្លង់ក្រោយ WebView បង្រួម (`modalKeyboardHoldFitFor()` ៖ padding · ៨៥vh តាមកម្ពស់ថ្មី) ➜ ផ្លាស់ទីតែម្តង
-  ពេល keyboard ចាប់ផ្តើម · «នាំចូល Excel ទៅ Sheet» រក្សាប្លង់ flex (`modal-kb-hold`)។ iPhone · Android PWA មិនប្រែ។
+  ឥឡូវលើ Android (`isAndroidDevice()` ៖ APK និង PWA Chrome ដែលបង្រួមក្រោយ keyboard ដែរ · A75) ការតម្រូវដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard ដូចប្លង់ក្រោយ viewport បង្រួម
+  (`modalKeyboardHoldFitFor()` ៖ padding · ៨៥vh តាមកម្ពស់ថ្មី) ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម · «នាំចូល Excel ទៅ Sheet» រក្សាប្លង់ flex (`modal-kb-hold`)។ iPhone មិនប្រែ។
 - 🐛 **iPhone ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រទាំងមូលធ្លាក់ចុះ ១៣០pt ហើយលោតត្រឡប់** (A104)។ ប្រអប់ focus កន្លែងវាយដោយកូដ (១៥០ms សម្រាប់ម៉ាស៊ីនស្កេន) ដោយ iOS
   មិនបើក keyboard · ការចុចលើកន្លែងវាយដែល focus រួចទៅផ្លូវ iOS ដើម ➜ WebKit រំកិលទំព័រពេល keyboard លោត ➜ `restoreIOSDocumentScroll()` ទាញត្រឡប់ ០ កណ្តាលចលនា។
   ឥឡូវ កន្លែងវាយដែល focus រួច តែ keyboard មិនទាន់បើក (ហើយមិនទាន់ចុចម្តង) ➜ ចាប់ការចុចដូចកន្លែងវាយមិនទាន់ focus (blur + `focus({ preventScroll })`) ·
@@ -229,7 +229,7 @@
 
 - `ZoeW/tests/print-relayout.test.tsx` (ថ្មី · ៤) ៖ ស្លាក · PDF តារាង ៖ `beforeprint`/`afterprint` ៣ ដង ➜ ស្លាក/ជួរនៅ · ប៉ះ/ចុចគ្រាប់ចុច ➜ សម្អាត + ចំណងជើងដើម ·
   ការប៉ះមុន `afterprint` មិនសម្អាត · ការបោះពុម្ពថ្មី · logout — លើកូដចាស់ FAIL ៣ · `label-print.test` ៖ ការអះអាង «afterprint សម្អាត» (ចាក់សោកំហុស) ➜ ប៉ះ App វិញទើបសម្អាត។
-- `modal-keyboard-test` ៖ APK (bridge Capacitor ក្លែង · visualViewport បង្រួម ➜ WebView បង្រួម) × ២ ទំហំ × គ្រប់ប្រអប់ដែលមានកន្លែងវាយ (១៨ · ដេរីវេពី DOM) ៖ ទីតាំងពេលលោត =
+- `modal-keyboard-test` ៖ APK (bridge Capacitor ក្លែង · visualViewport បង្រួម ➜ WebView បង្រួម) × ២ ទំហំ + PWA Chrome Android (UA) × គ្រប់ប្រអប់ដែលមានកន្លែងវាយ (១៨ · ដេរីវេពី DOM) ៖ ទីតាំងពេលលោត =
   ក្រោយ WebView បង្រួម (±1px) · បាតនៅពីលើ keyboard · កន្លែងវាយមើលឃើញ — លើកូដចាស់ FAIL ២ (១៨/១៨ ប្រអប់ផ្លាស់ទីពីរដង ឧ. PIN 343 ➜ 343 ➜ 178) · iPhone «បញ្ចូលច្រើន» ពិត ៖
   focus ដោយកូដ ➜ ចុច ➜ preventDefault · `preventScroll` · ទិសផ្ទុយ (keyboard បើក · មិនមែន iOS) — លើកូដចាស់ FAIL ២។
 - `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `modalKeyboardHoldFitFor()` (តម្លៃពីវីដេអូ · ៨៥vh តាមកម្ពស់ថ្មី · NaN/០) · ចុចកន្លែងវាយដែល focus ដោយកូដ ➜ ចាប់ · keyboard បើក /
@@ -239,7 +239,7 @@
 
 0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.79` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
 1. **បោះពុម្ព (iPhone · APK)** ៖ 🖨️ បោះពុម្ពស្លាក ឬ Export PDF ➜ ប្តូរ Paper size (A4 ➜ A3 ➜ A5 ➜ Letter) · ទិសក្រដាស ➜ ទិន្នន័យនៅគ្រប់ទំព័រ · ត្រឡប់មក App ➜ ប្រើធម្មតា។
-2. **APK** ៖ «📋 បញ្ចូលច្រើន» · PIN · កែលេខ · Config ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ឡើងតែម្តងពេល keyboard ចាប់ផ្តើមលោត (មិនកន្ត្រាក់ពេល keyboard ឈប់)។
+2. **APK · PWA Android** ៖ «📋 បញ្ចូលច្រើន» · PIN · កែលេខ · Config ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ឡើងតែម្តងពេល keyboard ចាប់ផ្តើមលោត (មិនកន្ត្រាក់ពេល keyboard ឈប់)។
 3. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រ និង navbar នៅនឹងកន្លែង (មិនធ្លាក់ចុះ) · ចុចម្តងទៀតពេល keyboard បើក ➜ caret តាមកន្លែងចុច · **iPad** (keyboard អណ្តែត) ដូចគ្នា។
 4. ⚠️ iPhone ៖ ការបោះពុម្ពលើកដំបូងអាចបង្ហាញ «This website has been blocked from automatically printing» (សារ iOS) ➜ «Allow»។ សកម្មភាពរបស់ [2.50.67]–[2.50.78] នៅដដែល។
 
@@ -4362,7 +4362,7 @@ App ពិត (audit build) ក្នុង Chromium ៖ APK ក្លែង (br
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A102 | **បោះពុម្ព ៖ ប្តូរ Paper size ➜ «Page 1 of 1» ស** | iPhone ៖ A4 «Page 1 of 7» ស្លាកពេញ ➜ A3 ➜ «Page 1 of 1» ស ➜ A4 ➜ «Page 1 of 2» ស · APK ៖ Letter ៤៨ ទំព័រ ➜ ISO A5 ➜ «1/1» ស · មូលហេតុ ៖ `beginPdfPrint()` ចង `afterprint` ➜ `restoreAfterPdfExport()` · WebKit/WebView ផ្ញើ `beforeprint`/`afterprint` រាល់ការគូរ preview (ផ្ទាំងបោះពុម្ពនៅបើក) | `afterprint` ➜ `armPdfExportRestore()` · សម្អាតតែពេល `pointerdown`/`keydown` លើ document · `print-relayout.test` លើកូដចាស់ FAIL ៣ ➜ ៤/៤ |
-| A103 | **APK ៖ ប្រអប់ផ្លាស់ទី ២ ដងពេល keyboard លោត** | វីដេអូ ៖ កាត «បញ្ចូលច្រើន» កំពូល 684 ➜ 375 (−៣០៩px ≈ ១១៨dp) នៅស៊ុមដំបូងនៃ keyboard ➜ ឈរ ➜ ចប់ចលនា ➜ 295 (−៨០px) + ស៊ុមខូច ៣ · ស៊ុមកណ្តាល ៖ ស្រទាប់ `.modal::after` ស្រអាប់ចាប់ពីបន្ទាត់ keyboard ចុងក្រោយ ➜ visualViewport បង្រួមភ្លាមពេល `KeyboardOpenHold` រក្សា WebView · Chromium ក្លែង (412×915 · keyboard 330) ៖ ១៨/១៨ ប្រអប់ (បញ្ចូលច្រើន 252 ➜ 165 ➜ 87 · PIN 343 ➜ 343 ➜ 178) | APK ៖ `modalKeyboardHoldFitFor()` = កណ្តាលផ្ទៃពីលើ keyboard (padding · cap ៨៥vh × កម្ពស់ថ្មី/ចាស់) ➜ ១៨/១៨ × ២ ទំហំ ផ្លាស់ទីតែម្តង (±1px) · `.si-modal-content` រក្សា flex (`modal-kb-hold`) · ⚠️ ប្រអប់មានធាតុ vh ខាងក្នុង (ឧ. preview Excel ៣០vh) អាចរំកិលតិចពេល WebView បង្រួម · ស៊ុមខូចពេល WebView ប្តូរទំហំ ជារបស់ WebView |
+| A103 | **APK ៖ ប្រអប់ផ្លាស់ទី ២ ដងពេល keyboard លោត** | វីដេអូ ៖ កាត «បញ្ចូលច្រើន» កំពូល 684 ➜ 375 (−៣០៩px ≈ ១១៨dp) នៅស៊ុមដំបូងនៃ keyboard ➜ ឈរ ➜ ចប់ចលនា ➜ 295 (−៨០px) + ស៊ុមខូច ៣ · ស៊ុមកណ្តាល ៖ ស្រទាប់ `.modal::after` ស្រអាប់ចាប់ពីបន្ទាត់ keyboard ចុងក្រោយ ➜ visualViewport បង្រួមភ្លាមពេល `KeyboardOpenHold` រក្សា WebView · Chromium ក្លែង (412×915 · keyboard 330) ៖ ១៨/១៨ ប្រអប់ (បញ្ចូលច្រើន 252 ➜ 165 ➜ 87 · PIN 343 ➜ 343 ➜ 178) | Android (APK · PWA Chrome) ៖ `modalKeyboardHoldFitFor()` = កណ្តាលផ្ទៃពីលើ keyboard (padding · cap ៨៥vh × កម្ពស់ថ្មី/ចាស់) ➜ ១៨/១៨ × APK ២ ទំហំ + PWA ផ្លាស់ទីតែម្តង (±1px) · `.si-modal-content` រក្សា flex (`modal-kb-hold`) · ⚠️ ប្រអប់មានធាតុ vh ខាងក្នុង (ឧ. preview Excel ៣០vh) អាចរំកិលតិចពេល WebView បង្រួម · ស៊ុមខូចពេល WebView ប្តូរទំហំ ជារបស់ WebView |
 | A104 | **iPhone ៖ «បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រធ្លាក់ ១៣០pt ហើយលោតត្រឡប់** | ស៊ុម ៦០fps ៖ ស៊ុម ៤–៥ ទំព័ររំកិលឡើង −៨ · −២០px (WebKit បង្ហាញកន្លែងវាយ តាមចលនា keyboard) ➜ ស៊ុម ៦ ធ្លាក់ +៣០០px (ផ្ទៃសខាងលើ ៖ backdrop ក៏ធ្លាក់) ➜ ត្រឡប់ ០ ក្នុង ១០ ស៊ុម (rubber band) · កន្លែងវាយមានស៊ុម focus មុនចុច ➜ `openBatchScanModal()` focus ១៥០ms (iOS មិនបើក keyboard) ➜ ការចុចលើកន្លែងវាយដែល focus រួចទៅផ្លូវ iOS ដើម (`modalTapField()` បដិសេធ `activeElement`) ➜ `restoreIOSDocumentScroll()` (2.50.77) ទាញ ០ កណ្តាលចលនា WebKit | focus រួច + keyboard មិនទាន់បើក + មិនទាន់ចុច ➜ ចាប់ (blur + `focus({ preventScroll })`) · `modal-keyboard-test` + `modal-keyboard.test` លើកូដចាស់ FAIL ២ + ២ · ⚠️ keyboard ពិតរបស់ iOS វាស់មិនបាន ➜ សាកលើ iPhone ពិត |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.77 ៖ តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំ ធៀបស្តង់ដារ App ទូទៅ

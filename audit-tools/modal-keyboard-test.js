@@ -404,21 +404,25 @@ const SIZES = [
             await ctx.close();
         }
 
-        console.log('\n=== APK (KeyboardOpenHold) ៖ keyboard ចាប់ផ្តើមលោត ➜ visualViewport បង្រួម (WebView នៅកម្ពស់ដើម) ➜ ចប់ ➜ WebView បង្រួម ===');
+        console.log('\n=== Android (APK KeyboardOpenHold · PWA Chrome) ៖ keyboard ចាប់ផ្តើមលោត ➜ visualViewport បង្រួម (viewport នៅកម្ពស់ដើម) ➜ ចប់ ➜ viewport បង្រួម ===');
         // វីដេអូ APK របស់ម្ចាស់គម្រោង ៖ «កន្ត្រាក់ ២ ដង ពេល keyboard លោតឡើង គ្រប់ modal» ៖ ប្រអប់ឡើង ១១៨dp ពេល keyboard ចាប់ផ្តើម (ការតម្រូវតាមបាត)
         //   ហើយ ៣០dp ទៀតពេល WebView បង្រួម (ចូលកណ្តាលវិញ) ➜ ច្បាប់ ៖ ទីតាំងពេល keyboard កំពុងលោត = ទីតាំងក្រោយ WebView បង្រួម (ផ្លាស់ទីតែម្តង) ·
-        //   បាតកាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ · គ្រប់ប្រអប់ដែលមានប្រអប់វាយ (ដេរីវេពី DOM) × ២ ទំហំ
-        for (const size of [{ w: 412, h: 915, kb: 330 }, { w: 360, h: 740, kb: 300 }]) {
-            const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
+        //   បាតកាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ · គ្រប់ប្រអប់ដែលមានប្រអប់វាយ (ដេរីវេពី DOM) × APK ២ ទំហំ · PWA Chrome Android (UA) ១ ទំហំ
+        //   (HISTORY A75 ៖ Chrome PWA ក៏បង្រួមក្រោយ keyboard)
+        const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+        for (const size of [{ w: 412, h: 915, kb: 330, apk: true }, { w: 360, h: 740, kb: 300, apk: true }, { w: 412, h: 915, kb: 330, apk: false }]) {
+            const ctx = await browser.newContext(Object.assign({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' },
+                size.apk ? {} : { userAgent: ANDROID_UA }));
             const page = await ctx.newPage();
             page.on('dialog', (d) => d.dismiss().catch(() => {}));
             await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
-            await page.addInitScript(APK_BRIDGE);
+            if (size.apk) await page.addInitScript(APK_BRIDGE);
             await page.addInitScript(FAKE_VIEWPORT);
             await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
             await page.waitForTimeout(900);
-            const ready = await page.evaluate(() => typeof openModalHelper === 'function' && !!(window.Capacitor && window.Capacitor.isNativePlatform()));
-            if (!ready) { bad('APK hold ៖ audit bridge'); await ctx.close(); continue; }
+            const ready = await page.evaluate((apk) => typeof openModalHelper === 'function' &&
+                (apk ? !!(window.Capacitor && window.Capacitor.isNativePlatform()) : !window.Capacitor && /Android/.test(navigator.userAgent)), size.apk);
+            if (!ready) { bad('Android hold ៖ audit bridge · ' + (size.apk ? 'APK' : 'PWA UA')); await ctx.close(); continue; }
             const ids = await modalIdsWithFields(page);
             const problems = [];
             let measured = 0, movedAtStart = 0;
@@ -459,7 +463,7 @@ const SIZES = [
                 if (issues.length) problems.push(id + ' ' + size.w + '×' + size.h + ' ៖ ' + issues.join(' · '));
             }
             check(measured >= 15 && movedAtStart >= 12 && problems.length === 0,
-                '⛔ APK ' + size.w + '×' + size.h + ' · keyboard ' + size.kb + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ WebView បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ',
+                '⛔ ' + (size.apk ? 'APK ' : 'PWA Chrome Android ') + size.w + '×' + size.h + ' · keyboard ' + size.kb + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ WebView បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ',
                 JSON.stringify({ measured, movedAtStart, problems: problems.slice(0, 6) }));
             await ctx.close();
         }

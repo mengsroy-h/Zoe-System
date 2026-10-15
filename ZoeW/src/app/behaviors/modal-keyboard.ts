@@ -1,6 +1,6 @@
 import { modalIsOpen } from '../../core/modals';
 import { uiState, type ModalKeyboardFit } from '../../core/state';
-import { isNativeAndroid } from '../../platform/native';
+import { isAndroidDevice } from '../../platform/native';
 import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
@@ -154,7 +154,7 @@ function fitModalToKeyboard(view: { top: number; height: number }): boolean {
         }
         naturalBox = Object.assign({ id }, naturalBoxOf(modal, content));
     }
-    const fit = isNativeAndroid() ? modalKeyboardHoldFitFor(naturalBox, view, window.innerHeight) : modalKeyboardFitFor(naturalBox, view);
+    const fit = isAndroidDevice() ? modalKeyboardHoldFitFor(naturalBox, view, window.innerHeight) : modalKeyboardFitFor(naturalBox, view);
     return setModalKeyboardFit(fit ? Object.assign({ id }, fit) : null);
 }
 

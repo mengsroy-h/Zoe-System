@@ -20,6 +20,7 @@
 //   (ឃ) Chrome Android ៖ «ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែសារទទេ ៣ វិ.» — visual viewport រំកិលរួច ➜ ការបង្រួម + focus({ preventScroll }) ទុកប្រអប់ពីលើផ្ទៃមើលឃើញ។
 //       ច្បាប់ ៖ ចុចស្វែងរក ➜ offsetTop ០ (documentElement.scrollIntoView · window.scrollTo មិនប៉ះ visual viewport) — visual viewport ពិត (pinch លើ meta ពង្រីកបាន)
 //   (ង) ឧបករណ៍ស្កេន Bluetooth/USB (សំណើម្ចាស់គម្រោង) ៖ គ្មានអ្វី focus (ទូរស័ព្ទ) ➜ ការស្កេនទៅប្រអប់ Barcode · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ➜ បញ្ជូន ·
+//       ផ្ទាំងលេខទូរស័ព្ទបើក ➜ ការស្កេនមិនចូល COD (ចូលជួរ ➜ បើកក្រោយផ្ទាំងបិទ) · ការវាយល្បឿនមនុស្សចូលប្រអប់ (`execCommand` លើ type=number) ·
 //       «📋 បញ្ចូលច្រើន» ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · Tab ➜ ជួរថ្មី ·
 //       ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus ➜ មិនលួច — ព្រឹត្តិការណ៍ keyboard ពិត (CDP) · Android · iPhone · កុំព្យូទ័រ
 //   ទិសផ្ទុយ ៖ ប្រអប់វាយក្នុងប្រអប់ (modal) លើ Android ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
@@ -503,6 +504,28 @@ const SAFE_TOP = function (px) {
                 count: document.getElementById('batchScanCount').textContent, phoneModal: openModalIds().includes('phoneModal') }));
             check(batch.value === code + '\n7710\n' && batch.active === 'batchBarcodeInput' && batch.count === '2 Barcode' && !batch.phoneModal,
                 '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» (គ្មានអ្វី focus) ➜ ស្កេន ២ (keyboard ខ្មែរ · suffix Tab) ➜ ២ ជួរឡាតាំង · focus នៅប្រអប់ · ចំនួន «2 Barcode»', JSON.stringify(batch));
+            await reset();
+            const first = 'ZTQUEUEA0001';
+            const next = '77100000308752';
+            await page.evaluate((a) => triggerScanAction(a), first);
+            await settle(page, 450);
+            await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
+            await page.keyboard.type('2.5', { delay: 110 });
+            await settle(page, 250);
+            const human = await page.evaluate(() => document.getElementById('modalCodInput').value);
+            await page.keyboard.type(next, { delay: 8 });
+            await page.keyboard.press('Enter');
+            await settle(page, 300);
+            const held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
+                active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
+                status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+            await page.evaluate(() => closeModal('phoneModal'));
+            await settle(page, 400);
+            const after = await result();
+            check(human === '2.5' && held.cod === '2.5' && held.phone === '' && held.active === 'modalCodInput' && held.pending === first && held.status.indexOf(next) === -1 && held.status.indexOf('0/1') !== -1 &&
+                after.pending === next && after.phoneModal && after.field === '',
+                '⛔ ' + dev.label + ' ៖ ផ្ទាំងលេខទូរស័ព្ទបើក · វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូលប្រអប់ · ស្កេន ' + next + ' + Enter ➜ COD · លេខទូរស័ព្ទមិនប្រែ · focus នៅ COD · ចូលជួរ ➜ បិទផ្ទាំង ➜ ' + next + ' បើកបន្ទាប់',
+                JSON.stringify({ human, held, after }));
             await ctx.close();
         }
 

@@ -4,7 +4,7 @@
  *    keyboard ខ្មែរ ➜ `key` = «១» (`code` = Digit1) ➜ Barcode ជាលេខខ្មែរ · Tab ➜ ចេញពីប្រអប់ ការស្កេនមិនបញ្ជូន។
  * ⛔ ច្បាប់ ៖ ទំព័រស្កេន · គ្មានប្រអប់/ផ្ទាំងចំហៀង · មិនចាក់សោ · គ្មានកន្លែងវាយអក្សរ focus ➜ គ្រាប់ចុចតួអក្សរ ➜ ប្រអប់ Barcode (focus មិនរំកិល) ·
  *    `key` មិនមែន ASCII ➜ តួអក្សរ US នៃគ្រាប់ (`code`) · លេខខ្មែរ ➜ លេខឡាតាំង (ការស្កេនទាំងអស់ · បញ្ចូលច្រើន) · ≥ SCANNER_MIN_CHARS គ្រាប់លឿន
- *    (≤ SCANNER_KEY_GAP_MS) + Tab ក្នុង SCANNER_SUFFIX_GAP_MS ➜ បញ្ជូនដូច Enter។ ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus · ប្រអប់បើក · ទំព័រទិន្នន័យ · ចាក់សោ ·
+ *    (≤ SCANNER_KEY_GAP_MS) + Tab ក្នុង SCANNER_SUFFIX_GAP_MS ➜ បញ្ជូនដូច Enter។ ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus · ប្រអប់បើក (គ្រាប់ចុចត្រូវទប់ ➜ `scanner-modal-queue.test.tsx` · មិនចូលប្រអប់ Barcode) · ទំព័រទិន្នន័យ · ចាក់សោ ·
  *    វាយយឺត + Tab · Shift+Tab · Ctrl ➜ មិនប៉ះ។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -225,7 +225,7 @@ describe('ឧបករណ៍ស្កេន ៖ ការស្កេនមិ�
     it('ទិសផ្ទុយ ៖ «📋 បញ្ចូលច្រើន» មិននៅខាងលើ (ផ្ទាំងបញ្ជាក់លើវា) · វាយយឺត + Tab ក្នុងប្រអប់បញ្ចូលច្រើន ➜ Tab ធម្មតា', () => {
         step(() => { openModalHelper('batchScanModal'); openModalHelper('phoneModal'); });
         (document.activeElement as HTMLElement | null)?.blur?.();
-        expect(key(document.body, '7', 'Digit7', 0).defaultPrevented).toBe(false);
+        expect(key(document.body, '7', 'Digit7', 0).defaultPrevented).toBe(true);
         expect((byId('batchBarcodeInput') as HTMLTextAreaElement).value).toBe('');
         step(() => closeModal('phoneModal'));
         const batch = byId('batchBarcodeInput') as HTMLTextAreaElement;
@@ -247,10 +247,11 @@ describe('ឧបករណ៍ស្កេន ៖ ការស្កេនមិ�
             () => { uiState.drawerOpen = true; },
             () => { uiState.notifyDrawerOpen = true; }
         ];
-        for (const set of cases) {
+        cases.forEach((set, i) => {
             step(set);
-            expect(key(document.body, '7', 'Digit7', 100).defaultPrevented).toBe(false);
+            expect(key(document.body, '7', 'Digit7', 100 + i * 1000).defaultPrevented).toBe(i === 0);
             expect(document.activeElement).toBe(document.body);
+            expect((byId('hwScannerInput') as HTMLInputElement).value).toBe('');
             step(() => {
                 uiState.isModalOpen = false;
                 uiState.currentAppPage = 'entry';
@@ -258,8 +259,8 @@ describe('ឧបករណ៍ស្កេន ៖ ការស្កេនមិ�
                 uiState.drawerOpen = false;
                 uiState.notifyDrawerOpen = false;
             });
-        }
-        expect(key(document.body, 'v', 'KeyV', 200, { ctrlKey: true }).defaultPrevented).toBe(false);
+        });
+        expect(key(document.body, 'v', 'KeyV', 9000, { ctrlKey: true }).defaultPrevented).toBe(false);
         expect(document.activeElement).toBe(document.body);
         expect(focusOptions).toEqual([]);
         expect(scanState.pendingBarcode || '').toBe('');

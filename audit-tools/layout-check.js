@@ -628,8 +628,9 @@ async function phoneModalEnterNext(browser, port) {
     const at = () => page.evaluate(() => ({ active: (document.activeElement || {}).id || (document.activeElement || {}).tagName, open: openModalIds().indexOf('phoneModal') !== -1 }));
     const start = await at();
     const steps = [];
+    // ល្បឿនមនុស្ស (90ms/គ្រាប់) ៖ គ្រាប់ ≥ SCANNER_MIN_CHARS ក្នុង ≤ SCANNER_KEY_GAP_MS + Enter = ការស្កេន ➜ ចូលជួរ (scanner-modal-queue) មិនមែនការវាយ
     for (const [text, want] of [['0960000999', 'modalLockerInput'], ['A1', 'modalCodInput'], ['2.5', 'modalDodInput'], ['1', null]]) {
-        await page.keyboard.type(text);
+        await page.keyboard.type(text, { delay: 90 });
         await page.keyboard.press('Enter');
         await page.waitForTimeout(150);
         steps.push(Object.assign({ text, want }, await at()));

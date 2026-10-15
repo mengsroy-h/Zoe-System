@@ -80,7 +80,8 @@ const APP_ALLOWED = {
     [REFS + ':.setSelectionRange()']: [1, REFS_WHY + 'caret នៅចុងអត្ថបទ មុន focus ដោយកូដ (`focusElementWithoutScroll` ៖ WebKit ជ្រើសអត្ថបទទាំងអស់ពេល focus ដោយកូដ បើគ្មាន selection ចាំទុក)'],
     [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],
     [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
-    [REFS + ':.value =']: [1, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue`)'],
+    [REFS + ':.value =']: [2, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue` · `typeIntoElement` ៖ ប្រអប់ `type=number` ដែលមិនទទួល `setRangeText` ពេលវាលែង focus)'],
+    [REFS + ':document.execCommand']: [1, REFS_WHY + 'ការវាយអក្សរដូចគ្រាប់ពិតនៅ caret (`typeIntoElement` ៖ គ្រាប់ចុចដែលម៉ាស៊ីនស្កេនទប់ពេលផ្ទាំងបើក ត្រឡប់ចូលប្រអប់វិញពេលជាការវាយរបស់មនុស្ស · `insertText` ដើរលើ `type=number` · ជាមួយ undo · `input`)'],
     [REFS + ':.checked =']: [1, 'input **uncontrolled** (`defaultChecked`) — React ណែនាំ ref សម្រាប់វា (`setFieldChecked`)'],
     [REFS + ':.scrollTop =']: [2, REFS_WHY + 'ទីតាំងរមូរ (`setScrollTop` · `setElementScrollTop`)'],
     [REFS + ':.scrollIntoView()']: [2, REFS_WHY + 'ការរមូរកូនឲ្យមើលឃើញ (`scrollChildIntoView`) · ការត្រឡប់ visual viewport ដែល keyboard Chrome រំកិលទៅកំពូល (`resetVisualViewportPan` ៖ `window.scrollTo` រំកិលតែ layout viewport)'],
@@ -202,7 +203,7 @@ for (const f of appFiles) {
     }
 }
 /* src/app ៖ ការសរសេរ DOM ត្រឹមច្រកចេញដែលមានហេតុផល (`APP_ALLOWED`) */
-const isAppWrite = (kind) => kind === '.classList' || kind === '.style' || kind === '.dataset' || / =$/.test(kind) ||
+const isAppWrite = (kind) => kind === '.classList' || kind === '.style' || kind === '.dataset' || / =$/.test(kind) || kind === 'document.execCommand' ||
     kind === 'element.addEventListener()' || (/^\.(\w+)\(\)$/.test(kind) && APP_WRITE_METHODS.has(kind.slice(1, -2)));
 const appAllowUsed = new Set();
 const appAllowCount = {};

@@ -150,15 +150,31 @@ export function setFieldValue(name: RefName, value: string): void {
     if (el) el.value = value;
 }
 
-export function insertFieldText(name: RefName, text: string): boolean {
-    const el = elementOf<HTMLInputElement>(name);
-    if (!el || typeof el.setRangeText !== 'function') return false;
-    const end = el.value.length;
-    const from = typeof el.selectionStart === 'number' ? el.selectionStart : end;
-    const to = typeof el.selectionEnd === 'number' ? el.selectionEnd : from;
-    try { el.setRangeText(text, from, to, 'end'); } catch { return false; }
+export function typeIntoElement(target: Element | null, text: string): boolean {
+    const el = target as HTMLInputElement | null;
+    if (!el || !text || !el.isConnected || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') || el.disabled || el.readOnly) return false;
+    if (document.activeElement === el) {
+        let typed: boolean;
+        try { typed = document.execCommand('insertText', false, text); } catch { typed = false; }
+        if (typed) return true;
+    }
+    let ranged = false;
+    try {
+        const end = el.value.length;
+        const from = typeof el.selectionStart === 'number' ? el.selectionStart : end;
+        const to = typeof el.selectionEnd === 'number' ? el.selectionEnd : from;
+        el.setRangeText(text, from, to, 'end');
+        ranged = true;
+    } catch {}
+    if (!ranged) {
+        try { el.value += text; } catch { return false; }
+    }
     try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
     return true;
+}
+
+export function insertFieldText(name: RefName, text: string): boolean {
+    return typeIntoElement(elementOf(name), text);
 }
 
 export function fieldChecked(name: RefName): boolean {

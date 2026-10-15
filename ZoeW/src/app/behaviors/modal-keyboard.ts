@@ -56,6 +56,10 @@ export function keyboardVisibleViewport(): { top: number; height: number } | nul
     return { top, height };
 }
 
+export function softKeyboardShown(): boolean {
+    return uiState.keyboardOpen || keyboardVisibleViewport() !== null;
+}
+
 export function modalKeyboardViewport(): { top: number; height: number } | null {
     return uiState.isModalOpen ? keyboardVisibleViewport() : null;
 }

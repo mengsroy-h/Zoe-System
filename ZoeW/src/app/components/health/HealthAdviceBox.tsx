@@ -17,7 +17,7 @@ export function HealthAdviceBox() {
     return (
         <div id="healthAdvice" className={HEALTH_ADVICE_CLASSES[advice.level] || HEALTH_ADVICE_CLASSES.info}>
             <div className="health-advice-head">
-                <span className="health-ico">🧠</span>
+                <span className="health-ico">💡</span>
                 <span>{(known ? HEALTH_ICONS[advice.level] : HEALTH_ICONS.info) + ' ' + advice.title}</span>
             </div>
             {advice.steps.length ? (

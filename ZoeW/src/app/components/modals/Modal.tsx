@@ -33,7 +33,7 @@ export function Modal({ id, close, noDismiss, style, className, children, ...res
     const layered = zIndex === null ? style : Object.assign({}, style, { zIndex });
     const shown = display ? Object.assign({}, layered, { display }) : layered;
     const finalStyle = fit ? Object.assign({}, shown, { '--modal-kb-shift': fit.shift + 'px', '--modal-kb-max': fit.max + 'px' }) as CSSProperties : shown;
-    const classes = (className ? 'modal ' + className : 'modal') + (fit ? ' modal-kb' : '');
+    const classes = (className ? 'modal ' + className : 'modal') + (fit ? (fit.hold ? ' modal-kb modal-kb-hold' : ' modal-kb') : '');
     return (
         <div
             id={id}

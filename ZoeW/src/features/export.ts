@@ -13,7 +13,7 @@ import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listener
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
-import { printCurrentView, saveTextFile, saveWorkbook } from '../platform/file-output';
+import { PRINT_RETURNED_EVENT, printCurrentView, saveTextFile, saveWorkbook } from '../platform/file-output';
 
 export const EXPORT_LIBS = {
     xlsx: { url: './vendor/xlsx.full.min.js' }
@@ -185,7 +185,24 @@ export async function exportDataAsExcel() {
     }
 }
 
+let pdfExportRestoreArmed = false;
+
+function disarmPdfExportRestore() {
+    if (!pdfExportRestoreArmed) return;
+    pdfExportRestoreArmed = false;
+    window.removeEventListener('pointerdown', restoreAfterPdfExport, true);
+    window.removeEventListener('keydown', restoreAfterPdfExport, true);
+}
+
+export function armPdfExportRestore() {
+    if (pdfExportRestoreArmed || !uiState.pdfExportView) return;
+    pdfExportRestoreArmed = true;
+    window.addEventListener('pointerdown', restoreAfterPdfExport, true);
+    window.addEventListener('keydown', restoreAfterPdfExport, true);
+}
+
 export function restoreAfterPdfExport() {
+    disarmPdfExportRestore();
     if (uiState.pdfExportOriginalTitle !== null) {
         viewState.documentTitle = null;
         uiState.pdfExportOriginalTitle = null;
@@ -218,10 +235,12 @@ export function exportDataAsPDF() {
 }
 
 export function beginPdfPrint(filenameBase: string) {
+    disarmPdfExportRestore();
     if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = documentBaseTitle();
     viewState.documentTitle = filenameBase;
     commitNow();
-    window.addEventListener('afterprint', restoreAfterPdfExport);
+    window.addEventListener('afterprint', armPdfExportRestore);
+    window.addEventListener(PRINT_RETURNED_EVENT, restoreAfterPdfExport);
     noteAppLockExcuse();
     reportPrintFailure(printCurrentView(filenameBase));
 }

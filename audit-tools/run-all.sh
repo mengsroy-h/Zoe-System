@@ -92,6 +92,7 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
         fi
     fi
     echo "   root វាស់ ៖ $MEASURE"
+    echo "   ZoeW/app.js ក្នុង checker = ទិដ្ឋភាពអត្ថបទ build ពី ZoeW/src/** (ZoeW/scripts/build-audit.mjs) · App ពិតរត់ build Vite (ZoeW/dist)"
     # state ៖ លំនាំដើមរស់ក្នុង git-dir (មិនដែល commit · build វាស់មិនលុប) · ផ្លូវទាក់ទងគិតពី cwd របស់អ្នកហៅ
     # ⛔ hash គណនាលើ **repo** មិនមែន root វាស់ ៖ zoew-suite · version-bump-scope វាស់ repo ដោយផ្ទាល់
     if [ -z "${RUNALL_STATE+set}" ]; then
@@ -368,7 +369,7 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
 #    ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ runner GitHub CPU ២ (2026-10-01 · run 36823040166 + job firebase-rules សម្រាប់ emu/* ពេល STRICT)។
 RUNALL_HINTS="money-guardian-test:160 exit-code-integrity:284 zoew-suite-test:190 revenue-fuzz-test:132 app-lock-test:101
     ui-flow-test:96 supabase-app-network-e2e-test:95 checker-coverage:89 emu/supabase-rules-parity-test:70 emu/app-network-e2e-test:75 emu/money-multidevice-emu-test:60 collected-mirror-fuzz-test:50
-    layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:63
+    modal-keyboard-device-test:110 layout-check:46 fluid-type-focus-test:44 write-stall-guard-test:40 panel-motion-test:39 sw-install-integrity-test:63
     emu/supabase-adapter-parity-test:35 runall-runner-test:35 gesture-test:34 perf-check:33 sheet-import-test:32
     ledger-clamp-symmetry-test:27 cleanup-interrupt-atomicity-test:24 late-commit-test:22 storage-blocked-boot-test:21
     slow-write-test:18 stale-clear-claim-test:17 ios-panel-glide-test:16 listener-leak-test:14 scan-remove-mode-test:14
@@ -742,6 +743,7 @@ run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "modal-keyboard (browser ពិត)" node audit-tools/modal-keyboard-test.js
+run "modal-keyboard-device (browser ពិត · Android APK/PWA · iPhone · iPad)" node audit-tools/modal-keyboard-device-test.js
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "toast-action-truth (browser ពិត)" node audit-tools/toast-action-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
@@ -924,6 +926,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
     FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
     MODALKB_APP_DIR="$BASE" node audit-tools/modal-keyboard-test.js 2>&1 | tail -1 | sed 's/^/   modal-keyboard:  /'
+    MODALKB_DEVICE_APP_DIR="$BASE" node audit-tools/modal-keyboard-device-test.js 2>&1 | tail -1 | sed 's/^/   modalkb-device:  /'
     TOAST_APP_DIR="$BASE" node audit-tools/toast-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-truth:     /'
     TOAST_ACTION_APP_DIR="$BASE" node audit-tools/toast-action-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-actions:   /'
     CSPLAZY_APP_DIR="$BASE" node audit-tools/csp-lazy-resource-test.js 2>&1 | tail -1 | sed 's/^/   csp-lazy:        /'

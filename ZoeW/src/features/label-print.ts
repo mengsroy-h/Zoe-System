@@ -8,6 +8,9 @@ import { emptyViewMessage } from '../services/db-listeners';
 import { beginPdfPrint, filteredHistoryItems, getCurrentFilterLabel, getExportFilenameBase } from './export';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
+import { shareImageFiles } from '../platform/file-output';
+import { noteAppLockExcuse } from './app-lock';
+import { drawLabelImage } from './label-image';
 
 export type LabelLayout = '50x30' | '40x30' | '60x40' | 'single' | 'a4-3' | 'a4-2';
 
@@ -175,14 +178,21 @@ export function openLabelPrintModal(scope: LabelPrintScope) {
     return true;
 }
 
-export function printLabelsFromModal() {
+function labelRowsFromModal(): { options: LabelOptions; rows: LabelRow[] } | null {
     const options = readLabelOptionsFromFields();
     saveLabelOptions(options);
     const rows = buildLabelRows(labelScopeItems(labelPrintScope), options);
     if (!rows.length) {
         showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, '⚠️ គ្មានកញ្ចប់សម្រាប់បោះពុម្ពស្លាកទេ!'));
-        return false;
+        return null;
     }
+    return { options, rows };
+}
+
+export function printLabelsFromModal() {
+    const picked = labelRowsFromModal();
+    if (!picked) return false;
+    const { options, rows } = picked;
     const scope = labelPrintScope;
     const fileLabel = scope && scope.kind === 'item'
         ? 'ZoeW_label_' + String(scope.id).replace(/[^a-zA-Z0-9_-]/g, '')
@@ -192,6 +202,57 @@ export function printLabelsFromModal() {
     uiState.pdfExportView = view;
     beginPdfPrint(fileLabel);
     return true;
+}
+
+export const LABEL_IMAGE_MAX = 200;
+
+export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<{ name: string; dataUrl: string }> {
+    const used = new Map<string, number>();
+    const files: Array<{ name: string; dataUrl: string }> = [];
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        if (!row || !row.barcode) return;
+        const canvas = drawLabelImage({
+            phone: row.phone,
+            barcode: row.barcode,
+            money: options.money ? labelMoneyText(row) : '',
+            date: options.date ? row.date : '',
+            locker: options.locker ? row.locker : ''
+        }, options.layout);
+        if (!canvas) return;
+        const base = 'ZoeW_label_' + (String(row.barcode).replace(/[^a-zA-Z0-9]/g, '') || 'x');
+        const seen = (used.get(base) || 0) + 1;
+        used.set(base, seen);
+        const name = seen === 1 ? base + '.png' : base + '_' + seen + '.png';
+        files.push({ name, dataUrl: canvas.toDataURL('image/png') });
+    });
+    return files;
+}
+
+export function saveLabelImagesFromModal() {
+    const picked = labelRowsFromModal();
+    if (!picked) return false;
+    const { options, rows } = picked;
+    if (rows.length > LABEL_IMAGE_MAX) {
+        showToast('⚠️ ស្លាក ' + rows.length + ' ច្រើនពេក (រូបភាព ≤ ' + LABEL_IMAGE_MAX + ' ក្នុងមួយដង) — ជ្រើសថ្ងៃក្នុងតម្រង ឬបោះពុម្ពតាមជួរ');
+        return false;
+    }
+    const files = labelImageFiles(rows, options);
+    if (!files.length) {
+        showToast('❌ បង្កើតរូបភាពស្លាកមិនបាន');
+        return false;
+    }
+    noteAppLockExcuse();
+    return Promise.resolve(shareImageFiles(files, 'ស្លាកកញ្ចប់ ZoeW')).then((result) => {
+        if (result === 'cancelled') return true;
+        showToast(result === 'shared'
+            ? '✅ រូបភាពស្លាក ' + files.length + ' — រក្សាទុកក្នុង Gallery ឬបើកក្នុង App NIIMBOT'
+            : '✅ បានទាញយករូបភាពស្លាក ' + files.length);
+        return true;
+    }, (e) => {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Label image share failed:' });
+        showToast('❌ រក្សាទុករូបភាពស្លាកមិនបាន');
+        return false;
+    });
 }
 
 export function resetLabelPrint() {

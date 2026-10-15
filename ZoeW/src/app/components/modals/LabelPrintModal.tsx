@@ -18,7 +18,7 @@ export function LabelPrintModal() {
                 </p>
                 <p className="label-print-summary" id="labelPrintSummary" aria-live="polite">{v.labelPrintSummary}</p>
                 <label className="label-print-field">
-                    <span>ទំហំស្លាក (មួយសន្លឹកមួយស្លាក)</span>
+                    <span>ទំហំស្លាក</span>
                     <select id="labelLayoutSelect" ref={refTo('labelLayoutSelect')} onChange={onAct('updateLabelPrintPreview')}>
                         <option value="50x30">ស្លាក 50×30mm (ម៉ាស៊ីនបោះពុម្ពស្លាកតូច)</option>
                         <option value="40x30">ស្លាក 40×30mm</option>
@@ -28,6 +28,7 @@ export function LabelPrintModal() {
                         <option value="a4-2">ក្រដាស A4 ផ្ដេក · ២ ជួរឈរ (ស្លាកធំ)</option>
                     </select>
                 </label>
+                <p className="label-print-hint" id="labelPrintPaperHint">💡 ក្រដាសតាមផ្ទាំងបោះពុម្ព ៖ ក្រដាសស្លាក (50×30 · 40×30 · 60×40) ➜ ១ ស្លាកក្នុងមួយទំព័រ · A4 · A5 · Letter ➜ ស្លាកច្រើនក្នុងមួយទំព័រ។</p>
                 <div className="label-print-toggles">
                     <label className="remember-container">
                         <input type="checkbox" id="labelShowMoney" ref={refTo('labelShowMoney')} onChange={onAct('updateLabelPrintPreview')} />
@@ -51,6 +52,10 @@ export function LabelPrintModal() {
                         ? <LabelSheet view={{ kind: 'labels', title: '', labels: preview.rows, options: preview.options }} />
                         : <div className="label-preview-empty">📭 គ្មានស្លាកសម្រាប់បង្ហាញ</div>}
                 </div>
+                <button type="button" className="label-image-btn" id="labelImageBtn" onClick={onAct('saveLabelImagesFromModal')} disabled={!preview || !preview.total}>
+                    🖼️ រក្សាទុកជារូបភាព (NIIMBOT · App ស្លាក)
+                </button>
+                <p className="label-print-hint">💡 NIIMBOT ៖ រក្សាទុករូបភាព ➜ បើក App NIIMBOT ➜ បញ្ចូលរូបពី Gallery ➜ បោះពុម្ព (រូបមួយស្លាកមួយ · ទំហំតាមស្លាកដែលជ្រើស)។</p>
                 <div className="modal-btns">
                     <button className="btn-confirm" onClick={onAct('printLabelsFromModal')} disabled={!preview || !preview.total}>🖨️ បោះពុម្ព</button>
                     <button className="btn-cancel" onClick={onAct('closeModal', { args: ['labelPrintModal'] })}>បិទ</button>

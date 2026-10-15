@@ -22,6 +22,8 @@ export function saveTextFile(text: string, filename: string, mimeType: string): 
     return shareNativeFile(filename, utf8ToBase64(text));
 }
 
+export const PRINT_RETURNED_EVENT = 'zoew-print-returned';
+
 export function printCurrentView(jobName: string): Promise<void> | void {
     if (!isNativeApp()) {
         window.print();
@@ -31,14 +33,14 @@ export function printCurrentView(jobName: string): Promise<void> | void {
         .then(async ([{ Printer }, { App }]) => {
             const resumed = await App.addListener('resume', () => {
                 resumed.remove();
-                window.dispatchEvent(new Event('afterprint'));
+                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
             });
             noteAppLockExcuse();
             try {
                 await Printer.printWebView({ name: jobName });
             } catch (e) {
                 resumed.remove();
-                window.dispatchEvent(new Event('afterprint'));
+                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
                 throw e;
             }
         });
@@ -52,6 +54,62 @@ function utf8ToBase64(text: string): string {
         binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
     }
     return btoa(binary);
+}
+
+export type ShareImagesResult = 'shared' | 'saved' | 'cancelled';
+
+function dataUrlBase64(dataUrl: string): string {
+    const i = dataUrl.indexOf(',');
+    return i >= 0 ? dataUrl.slice(i + 1) : '';
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+    const binary = atob(dataUrlBase64(dataUrl));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: 'image/png' });
+}
+
+export function shareImageFiles(files: Array<{ name: string; dataUrl: string }>, title: string): Promise<ShareImagesResult> {
+    if (isNativeApp()) return shareNativeImages(files, title);
+    const blobs = files.map((f) => ({ name: f.name, blob: dataUrlToBlob(f.dataUrl) }));
+    const nav = window.navigator as any;
+    try {
+        const list = blobs.map((b) => new File([b.blob], b.name, { type: 'image/png' }));
+        if (typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: list })) {
+            return Promise.resolve(nav.share({ files: list, title })).then(() => 'shared' as ShareImagesResult, (e) => {
+                if (e && e.name === 'AbortError') return 'cancelled' as ShareImagesResult;
+                throw e;
+            });
+        }
+    } catch {}
+    blobs.forEach((b) => {
+        const url = URL.createObjectURL(b.blob);
+        downloadObjectUrl(url, b.name);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    return Promise.resolve('saved');
+}
+
+async function shareNativeImages(files: Array<{ name: string; dataUrl: string }>, title: string): Promise<ShareImagesResult> {
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+        import('@capacitor/filesystem'),
+        import('@capacitor/share')
+    ]);
+    const uris: string[] = [];
+    for (const f of files) {
+        const written = await Filesystem.writeFile({ path: 'labels/' + f.name, data: dataUrlBase64(f.dataUrl), directory: Directory.Cache, recursive: true });
+        uris.push(written.uri);
+    }
+    noteAppLockExcuse();
+    try {
+        await Share.share({ title, files: uris, dialogTitle: 'រក្សាទុក ឬផ្ញើរូបភាពស្លាក' });
+        return 'shared';
+    } catch (e) {
+        const message = String((e && (e as any).message) || '');
+        if (/cancel/i.test(message)) return 'cancelled';
+        throw e;
+    }
 }
 
 async function shareNativeFile(filename: string, base64: string): Promise<void> {

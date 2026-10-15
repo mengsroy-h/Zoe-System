@@ -75,7 +75,7 @@ const CLI_GUARDS = new Map([
 const SLOW = new Set([
     'gesture-test.js', 'ui-flow-test.js', 'layout-check.js', 'scan-engine-test.js',
     'panel-motion-test.js', 'boot-animation-test.js', 'csp-enforced-test.js',
-    'fluid-type-focus-test.js', 'modal-keyboard-test.js', 'toast-truth-test.js', 'revenue-fuzz-test.js',
+    'fluid-type-focus-test.js', 'modal-keyboard-test.js', 'modal-keyboard-device-test.js', 'toast-truth-test.js', 'revenue-fuzz-test.js',
     'perf-check.js', 'duplicate-scan-test.js', 'sw-shell-latency-test.js'
 ]);
 

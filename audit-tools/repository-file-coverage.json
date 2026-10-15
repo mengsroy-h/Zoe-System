@@ -1645,6 +1645,9 @@
     "ZoeW/src/features/label-print.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/label-image.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/license.ts": {
       "policy": "zoew-app"
     },
@@ -1952,6 +1955,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/label-print.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/print-relayout.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/label-image.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/late-commit-stale-session.test.ts": {
@@ -2459,6 +2468,9 @@
       "policy": "guard-1"
     },
     "audit-tools/modal-keyboard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/modal-keyboard-device-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/function-surface-test.js": {

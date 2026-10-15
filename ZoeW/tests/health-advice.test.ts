@@ -1,5 +1,5 @@
 /**
- * ⛔ 🧠 ការណែនាំក្នុង 🩺 ពិនិត្យសុខភាព (សំណើម្ចាស់គម្រោង ៖ «បន្ថែមភាពឆ្លាតវៃ») ៖ ដេរីវេពី **ជួរដែលវាស់បាន** ប៉ុណ្ណោះ (គ្មានបណ្ដាញ · គ្មានការសរសេរ) ៖
+ * ⛔ 💡 ការណែនាំក្នុង 🩺 ពិនិត្យសុខភាព (សំណើម្ចាស់គម្រោង ៖ «បន្ថែមភាពឆ្លាតវៃ») ៖ ដេរីវេពី **ជួរដែលវាស់បាន** ប៉ុណ្ណោះ (គ្មានបណ្ដាញ · គ្មានការសរសេរ) ៖
  *    (១) មូលហេតុឫសគល់មុន ៖ ក្រៅបណ្ដាញ ➜ ជំហានទី ១ = ភ្ជាប់បណ្ដាញ · ជួរដែលជាផលវិបាក (Firebase/Supabase · នាឡិកា · Lookup · អាជ្ញាប័ណ្ណ) ត្រូវរាយជា «នឹងជាវិញដោយខ្លួនឯង» មិនមែនជាជំហាន
  *    (២) ❌ មុន ⚠️ · ≤ `HEALTH_ADVICE_MAX_STEPS` ជំហាន · ជំហានស្ទួនមិនរាយ ២ ដង
  *    (៣) ទាំងអស់ ✅/ℹ️ ➜ level `ok` · គ្មានជំហាន · (៤) ជួរ ℹ️ មិនដែលបង្កើតជំហាន · (៥) ការណែនាំតាមមូលហេតុក្នុង detail (Cookie បដិសេធ · Key ជិតផុត · ការសរសេរ blocked)
@@ -19,7 +19,7 @@ function healthy() {
         healthRow('info', L.table, 'មិនទាន់ទាញមកទេ'), healthRow('info', L.script, 'មិនពាក់ព័ន្ធ'), healthRow('info', L.lookup, 'មិនទាន់បើក')];
 }
 
-describe('🧠 ការណែនាំសុខភាព', () => {
+describe('💡 ការណែនាំសុខភាព', () => {
     it('ទាំងអស់ ✅/ℹ️ ➜ ok · គ្មានជំហាន · ℹ️ មិនបង្កើតជំហាន', () => {
         const advice = buildHealthAdvice(healthy());
         expect(advice.level).toBe('ok');
@@ -94,5 +94,25 @@ describe('🧠 ការណែនាំសុខភាព', () => {
         expect(resetReactOwned('healthCheckList')).toBe(true);
         expect(uiState.healthRows).toBeNull();
         expect(uiState.healthAdvice).toBeNull();
+    });
+});
+
+describe('💡 ការណែនាំ ៖ រូបតំណាង (សំណើម្ចាស់គម្រោង ៖ «សូមដូរ emoji 🧠 ចេញ ដាក់ 💡»)', () => {
+    it('⛔ HealthAdviceBox ពិត ➜ .health-ico = 💡 · guide.html · README ZoeW ប្រើ 💡 ហើយគ្មាន 🧠', async () => {
+        const { HealthAdviceBox } = await import('../src/app/components/health/HealthAdviceBox');
+        const { createElement } = await import('react');
+        const { mount, unmount, step } = await import('./native/react-harness');
+        const { readFileSync } = await import('node:fs');
+        const path = await import('node:path');
+        uiState.healthAdvice = buildHealthAdvice(healthy());
+        mount(createElement(HealthAdviceBox));
+        expect(document.querySelector('#healthAdvice .health-ico')!.textContent).toBe('💡');
+        step(() => { uiState.healthAdvice = null; });
+        unmount();
+        for (const file of ['public/guide.html', 'README.md']) {
+            const text = readFileSync(path.join(__dirname, '..', file), 'utf8');
+            expect(text).toContain('💡 ការណែនាំ');
+            expect(text).not.toContain('🧠');
+        }
     });
 });

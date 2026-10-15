@@ -246,6 +246,7 @@ export interface ModalKeyboardFit {
     top: number;
     max: number;
     shift: number;
+    hold?: boolean;
 }
 
 export interface UiState {

@@ -232,7 +232,7 @@ await scenario('១. boot លើ Android native', async () => {
     const csvText = csv ? Buffer.from(csv.options.data, 'base64').toString('utf8') : '';
     ok('Export CSV ៖ សរសេរ .csv (UTF-8 អក្សរខ្មែររក្សាដដែល)', !!csv && /[ក-៿]/.test(csvText), csvText.slice(0, 80));
 
-    /* Export PDF ➜ Printer + afterprint ពេល resume */
+    /* Export PDF ➜ Printer ➜ resume (ត្រឡប់ពីផ្ទាំងបោះពុម្ព) ➜ សម្អាត */
     const titleBefore = await page.title();
     await page.click('.header-more-btn');
     await page.click('[data-act="moreMenuExport"]');
@@ -245,8 +245,24 @@ await scenario('១. boot លើ Android native', async () => {
     const locked0 = await page.evaluate(() => document.body.classList.contains('app-locked'));
     await fire(page, 'App', 'resume');
     await page.waitForTimeout(300);
-    ok('Export PDF ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព ➜ afterprint ➜ ចំណងជើងវិញ', (await page.title()) === titleBefore, await page.title());
+    ok('Export PDF ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume) ➜ ចំណងជើងវិញ', (await page.title()) === titleBefore, await page.title());
     ok('Export PDF ៖ គ្មានសោ App ក្លែង (គ្មាន PIN)', locked0 === false);
+
+    /* ស្លាកជារូបភាព (NIIMBOT) ៖ PNG មួយស្លាកមួយ ➜ Filesystem (Cache · labels/) ➜ Share មួយដងជាមួយឯកសារទាំងអស់ */
+    const sharesBefore = (await calls(page, 'Share', 'share')).length;
+    await page.click('.header-more-btn');
+    await page.click('[data-act="moreMenuPrintLabels"]');
+    await page.waitForTimeout(300);
+    const labelCount = await page.evaluate(() => { const m = /ស្លាក (\d+)/.exec((document.getElementById('labelPrintSummary') || {}).textContent || ''); return m ? Number(m[1]) : 0; });
+    await page.click('#labelImageBtn');
+    await page.waitForTimeout(1200);
+    const pngs = (await calls(page, 'Filesystem', 'writeFile')).filter((c) => /^labels\/ZoeW_label_[A-Za-z0-9_]+\.png$/.test(c.options.path));
+    const pngOk = pngs.length > 0 && pngs.every((c) => c.options.directory === 'CACHE' && Buffer.from(c.options.data, 'base64').subarray(1, 4).toString() === 'PNG');
+    ok('ស្លាកជារូបភាព ៖ PNG មួយស្លាកមួយ (' + pngs.length + ' = ' + labelCount + ') ក្នុង Cache/labels', labelCount > 0 && pngs.length === labelCount && pngOk, pngs.map((c) => c.options.path).slice(0, 3));
+    const imgShares = (await calls(page, 'Share', 'share')).slice(sharesBefore);
+    ok('ស្លាកជារូបភាព ៖ Share ១ ដងជាមួយឯកសារទាំងអស់ (file://)', imgShares.length === 1 && Array.isArray(imgShares[0].options.files) && imgShares[0].options.files.length === labelCount && imgShares[0].options.files.every((u) => u.startsWith('file://')), imgShares);
+    await page.click('#labelPrintModal .btn-cancel');
+    await page.waitForTimeout(200);
 
     /* PTR ៖ តំបន់កេះ · ស្រទាប់បើក · ញ័រ (សំណើម្ចាស់គម្រោង) */
     const noReload = () => page.waitForEvent('framenavigated', { timeout: 3000 }).then(() => false, () => true);

@@ -769,8 +769,9 @@ const SAFE_TOP = function (px) {
                 }
                 return { start, end, dist: Math.round(dist), maxStep: Math.round(maxStep), ahead: Math.round(ahead * 100) / 100, mid, back, over, span: moveAt < 0 || arriveAt < 0 ? 0 : arriveAt - moveAt, running: rec.running, frames: f.length };
             };
-            // ចម្ងាយខ្លី (< ៤០px) ៖ ខ្សែកោងបន្ថយល្បឿនដល់ ±១px មុន ➜ ពេល/ស៊ុមកណ្តាលជាន់ទាបជាង
-            const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= (g.dist >= 40 ? 4 : 3) && g.back === 0 && g.over === 0 &&
+            // ចម្ងាយខ្លី (< ៤០px) ៖ ខ្សែកោងបន្ថយល្បឿនដល់ ±១px មុន ➜ ពេលជាន់ទាបជាង · ស៊ុមកណ្តាល ≥ ២ ៖ runner CI (CPU ២ · tablet 1280×800) គូរ ~៣០–៥០ms/ស៊ុម
+            //    ➜ ៣ ស៊ុមកណ្តាលក្នុង MODAL_GLIDE_MS (CI 780) · លោតមួយស៊ុម = ០ ស៊ុមកណ្តាល · ពេល ≈ ១ ស៊ុម ➜ នៅធ្លាក់ជានិច្ច
+            const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= 2 && g.back === 0 && g.over === 0 &&
                 g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
             const GLIDE_DEVICES = [
                 { label: 'APK ទូរស័ព្ទ 412×915 · keyboard 330', w: 412, h: 915, kb: 330, apk: true },
@@ -851,7 +852,7 @@ const SAFE_TOP = function (px) {
                     await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                     const re = glideOf(await page.evaluate(() => window.__glide));
                     const at = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                    check(index >= 0 && re.dist >= 8 && re.ahead <= 0.1 && re.mid >= 4 && re.back === 0 && re.over === 0 && re.running === 0 && Math.abs(re.end - at.card[0]) <= 1 && at.card[1] <= dev.h - dev.kb + 1,
+                    check(index >= 0 && re.dist >= 8 && re.ahead <= 0.1 && re.mid >= 2 && re.back === 0 && re.over === 0 && re.running === 0 && Math.abs(re.end - at.card[0]) <= 1 && at.card[1] <= dev.h - dev.kb + 1,
                         '⛔ ' + dev.label + ' ៖ keyboard ប្តូរកម្ពស់កណ្តាលចលនា (' + Math.round(dev.kb * 0.55) + ' ➜ ' + dev.kb + ') ➜ កាតបន្តពីទីតាំងបច្ចុប្បន្ន (គ្មានលោត · មិនត្រឡប់ក្រោយ) ➜ ឈប់ត្រឹមទីតាំងថ្មី',
                         JSON.stringify({ re, at: at.card }));
                 }

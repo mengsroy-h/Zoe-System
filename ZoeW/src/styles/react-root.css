@@ -257,6 +257,20 @@
     }
 }
 
+@media (max-width: 991px) and (orientation: landscape) and (max-height: 500px) {
+    #entrySideSection {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: start;
+    }
+    #entrySideSection > .scan-mode-row { grid-column: 1 / -1; }
+    #entrySideSection > .remove-scan-banner,
+    #entrySideSection > .app-card { grid-column: 1; }
+    #entrySideSection > .hardware-scanner-box { grid-column: 2; grid-row: 2 / span 2; }
+    .page-tabbar { padding: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
+    .page-tab { flex-direction: row; gap: 6px; padding: 6px; min-height: 36px; }
+}
+
 @media (max-width: 991px) {
     .app-pages:has(> .app-page.active > .page-side.search-focus) { overflow-y: hidden; }
     .app-pages:has(> .app-page.active > .page-side.search-focus) > .app-page.active { height: 100%; }

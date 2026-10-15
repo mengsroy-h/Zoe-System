@@ -11,7 +11,7 @@
  *    iPhone standalone ៖ ចុចប្រអប់វាយ (មិនទាន់ focus) ក្នុងប្រអប់ ➜ `focus({ preventScroll: true })` (caret នៅចុង) ➜ iOS មិនរំកិលទំព័រទាំងមូល។
  *    browser ពិតគ្រប់ប្រអប់ ៖ `audit-tools/modal-keyboard-test.js` ។
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -21,6 +21,9 @@ import * as modalKeyboard from '../src/app/behaviors/modal-keyboard';
 import { Modal } from '../src/app/components/modals/Modal';
 import { DocumentEffects } from '../src/app/components/shell/DocumentEffects';
 import { commitNow } from '../src/app/flush';
+import { focusField, refTo } from '../src/app/refs';
+import { BatchScanModal } from '../src/app/components/modals/BatchScanModal';
+import { openBatchScanModal } from '../src/features/batch-scan';
 import { closeModal, openModalHelper } from '../src/ui/modal';
 import { byId, mount, unmount } from './native/react-harness';
 
@@ -131,7 +134,7 @@ beforeEach(() => {
 afterEach(() => {
     disposers.splice(0).forEach((fn) => fn());
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
-    ['manualAdjustModal', 'editPhoneModal'].forEach((id) => closeModal(id));
+    ['manualAdjustModal', 'editPhoneModal', 'batchScanModal'].forEach((id) => closeModal(id));
     commitNow();
     unmount();
     uiState.isModalOpen = false;
@@ -574,6 +577,44 @@ describe('toast ⟷ keyboard ៖ ផ្ទៃដែល keyboard បាំង (ke
         expect(uiState.keyboardCover).toBe(0);
         modalKeyboard.listenModalKeyboard(scope());
         expect(uiState.keyboardCover).toBe(336);
+    });
+});
+
+describe('ប្រអប់ ⟷ keyboard ៖ focus ដោយកូដមិនរំកិលទំព័រ (រាយការណ៍ម្ចាស់គម្រោង ៖ «បញ្ចូលច្រើន» ពេលខ្លះទំព័ររអិលឡើង navbar បាត់)', () => {
+    it('⛔ focusField() លើប្រអប់វាយក្នុង .modal ➜ focus({ preventScroll: true }) ជានិច្ច (iOS មិនរំកិល document) · ក្រៅប្រអប់ ➜ options ដដែល', () => {
+        mount(<><BatchScanModal /><input id="mkOutside" ref={refTo('hwScannerInput')} /></>);
+        openModalHelper('batchScanModal');
+        commitNow();
+        const calls: Array<{ id: string; options: any }> = [];
+        const spy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: any) { calls.push({ id: this.id, options }); });
+        focusField('batchBarcodeInput');
+        focusField('batchBarcodeInput', { focusVisible: true } as any);
+        focusField('hwScannerInput');
+        focusField('hwScannerInput', { preventScroll: false });
+        spy.mockRestore();
+        expect(calls).toEqual([
+            { id: 'batchBarcodeInput', options: { preventScroll: true } },
+            { id: 'batchBarcodeInput', options: { focusVisible: true, preventScroll: true } },
+            { id: 'mkOutside', options: undefined },
+            { id: 'mkOutside', options: { preventScroll: false } }
+        ]);
+    });
+
+    it('⛔ openBatchScanModal() (focus ក្រោយ ១៥០ms ដើម្បីម៉ាស៊ីនស្កេន) ➜ preventScroll', () => {
+        vi.useFakeTimers();
+        try {
+            mount(<BatchScanModal />);
+            uiState.entryScanMode = 'parcel';
+            const calls: any[] = [];
+            const spy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: any) { calls.push([this.id, options]); });
+            openBatchScanModal();
+            vi.advanceTimersByTime(200);
+            spy.mockRestore();
+            expect(calls).toEqual([['batchBarcodeInput', { preventScroll: true }]]);
+        } finally {
+            closeModal('batchScanModal');
+            vi.useRealTimers();
+        }
     });
 });
 

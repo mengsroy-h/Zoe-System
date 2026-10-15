@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ឍ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-cff7ce20-gn6c83`** (ពីក្បាល `13a0421` · **មិនទាន់ merge**) ៖ [2.50.77] ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយ និង navbar នៅនឹងកន្លែង ·
+    វាស់គ្រប់ប្រអប់លើទូរស័ព្ទ និង tablet បញ្ឈរ/ផ្តេក (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A95) ➜ ⚠️ សាកលើ iPhone/iPad ពិត (សកម្មភាព ១–៣ របស់ [2.50.77]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ឌ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-cff7ce20-gn6c83`** (ពីក្បាល `a7d9b02` · **មិនទាន់ merge**) ៖ [2.50.76] ប្រអប់ + keyboard ➜ ប្រអប់ខ្លីឃើញទាំងមូល ·
     ប្រអប់វែងប្រើផ្ទៃពេញពីលើ keyboard (រូបថតម្ចាស់គម្រោង · ផ្នែក ២ A94) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.76]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ឋ. **Branch `ccr-cff7ce20-gn6c83`** (ពីក្បាល PR #317 `be04280` · **មិនទាន់ merge**) ៖ [2.50.75] CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ (ផ្នែក ២ A91) · toast នៅពីលើ keyboard (A92) ·
@@ -196,6 +198,39 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.77] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយ និង navbar នៅនឹងកន្លែង · វាស់គ្រប់ប្រអប់លើទូរស័ព្ទ និង tablet បញ្ឈរ/ផ្តេក**
+
+**ZoeW `2.50.77`** (`zoew-v339` ➜ `zoew-v340`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `refs.ts` (`focusField()`) · `ios-viewport.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង ៖ «📋 បញ្ចូលច្រើន ពេលបើក keyboard ពេលខ្លះ ផ្ទៃ background រអិលទៅលើ បាត់ navbar ដូចក្នុងរូប · សូមពិនិត្យ វាស់គ្រប់ modal អោយត្រូវស្តង់ដារ
+គ្រប់ទំហំអេក្រង់ រួមទាំង tablet ផ្តេក ឬ បញ្ឈរ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយរអិលឡើង · navbar បាត់ (ពេលខ្លះ)** (ផ្នែក ២ A95)។ `openBatchScanModal()` focus ប្រអប់វាយ ១៥០ms ក្រោយចុច (សម្រាប់ម៉ាស៊ីនស្កេន)
+  ដោយ `focusField()` គ្មាន `preventScroll` ➜ ពេល iOS បើក keyboard (មិនមែនរាល់ដង ៖ focus ក្នុង `setTimeout`) វារំកិល document ដើម្បីបង្ហាញប្រអប់វាយ ➜ navbar ចេញពីអេក្រង់ ·
+  ប្រអប់កែលេខ · លេខទូរស័ព្ទក្រោយស្កេន · Activate · ចូលប្រព័ន្ធ (ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់) focus ដោយកូដដូចគ្នា · ការការពារ «document ត្រឡប់ ០» មានតែពេលស្វែងរក។ ឥឡូវ ៖
+  `focusField()` បន្ថែម `preventScroll` ជានិច្ចលើប្រអប់វាយក្នុង `.modal` (ប្រអប់តម្រូវខ្លួនពីលើ keyboard ដោយខ្លួនឯង) · ខណៈប្រអប់បើកលើ iPhone standalone document រំកិល ➜
+  ត្រឡប់ ០ (`restoreIOSDocumentScroll()` ដូចពេលស្វែងរក) · Android/web មិនប្រែ។
+- 🐛 **ទូរស័ព្ទផ្តេក ៖ «នាំចូល Excel ទៅ Sheet» + keyboard ➜ ផ្ទៃរមូរខាងក្នុងនៅ ៤px · ប្រអប់វាយមើលមិនឃើញ** (A95)។ កាត flex (`.si-modal-content` ៖ ក្បាល · ផ្ទៃរមូរ · ប៊ូតុង)
+  ក្នុងកម្ពស់ ១៧០px ពីលើ keyboard ➜ ក្បាល និងប៊ូតុងយកស្ទើរទាំងអស់។ ឥឡូវ ពេលតម្រូវពីលើ keyboard (`.modal-kb`) កាតនោះជាអ្នករមូរតែមួយ (`display: block`) ➜ ប្រអប់វាយរមូរមកមើលឃើញ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` ៖ ទំហំ ៧ (ទូរស័ព្ទ ៤ · ទូរស័ព្ទផ្តេក 844×390 · iPad បញ្ឈរ 820×1180 · iPad ផ្តេក 1180×820 + status bar ក្លែង) × គ្រប់ប្រអប់វាយ (៣៤) · (ក) `focusField()` លើគ្រប់ប្រអប់វាយ (ref)
+  ក្នុងគ្រប់ប្រអប់ និង `openBatchScanModal()` ពិត ➜ `preventScroll` · (ខ) document រំកិល ២២០px ខណៈប្រអប់បើក ➜ ០ (iOS) · គ្មានប្រអប់ / Android ➜ មិនប៉ះ — លើ `13a0421` FAIL ៤
+  (ទូរស័ព្ទផ្តេក `sheetImportModal` · (ក) ៣៤ ករណី + «បញ្ចូលច្រើន» · (ខ) ២២០) ➜ ក្រោយកែ ៥៣/៥៣។
+- `ZoeW/tests/modal-keyboard.test.tsx` +២ (`focusField()` ក្នុង/ក្រៅប្រអប់ · `openBatchScanModal()` ក្រោយ ១៥០ms) · `ZoeW/tests/ios-search-viewport.test.ts` +១ (ប្រអប់បើក ➜ ០ · Android ➜ មិនប៉ះ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទំព័រស្កេន ➜ «📋 បញ្ចូលច្រើន» (ច្រើនដង) ➜ keyboard បើក ➜ navbar នៅលើអេក្រង់ជានិច្ច · ទំព័រខាងក្រោយមិនរអិល · កែលេខ · ចូលប្រព័ន្ធ ដូចគ្នា។
+2. **iPad** (បញ្ឈរ · ផ្តេក) និង **iPhone ផ្តេក** ៖ ប្រអប់ PIN · «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ចុចកន្លែងវាយ ➜ កន្លែងវាយមើលឃើញពីលើ keyboard · ប្រអប់មិនផុតអេក្រង់។
+3. **Android** ៖ ដូចដើម។ សកម្មភាពរបស់ [2.50.67]–[2.50.76] នៅដដែល។
+
+---
 
 ### [2.50.76] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់ខ្លីឃើញទាំងមូល · ប្រអប់វែងប្រើផ្ទៃពេញពីលើ keyboard** (រូបថត iPhone ម្ចាស់គម្រោង)
 
@@ -4231,6 +4266,16 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-15 — រាយការណ៍ម្ចាស់គម្រោងលើ 2.50.76 ៖ «បញ្ចូលច្រើន» + keyboard ➜ ទំព័ររអិលឡើង navbar បាត់ · វាស់គ្រប់ទំហំ រួម tablet
+
+**វិធី** ៖ អាន focus ដោយកូដទាំងអស់ (`grep focusField(`) ➜ `openBatchScanModal()` focus ក្នុង `setTimeout` ១៥០ms គ្មាន `preventScroll` · Chromium មិនរំកិល document សម្រាប់ធាតុ fixed ➜ វាស់ **មូលហេតុ** ជំនួស ៖
+spy `HTMLElement.prototype.focus` (options) + គំរូ document រំកិល (spacer absolute ➜ document រមូរបាន ដូច iOS ពេល keyboard) · ទំហំ tablet/ផ្តេកក្នុងច្បាប់ទីតាំង ➜ ធ្លាក់លើ `13a0421` ➜ ទើបកែ ·
+run-all STRICT ពេញលើ `13a0421` (2.50.76) ៖ ✅ ២០៦/២០៦ (០ មួយផ្នែក · ០ រំលង)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A95 | **ទំព័រខាងក្រោយរអិលឡើងពេល keyboard បើកក្នុងប្រអប់ · ទូរស័ព្ទផ្តេក Sheet import** | `focusField()` លើប្រអប់វាយ (ref) ៣៤ ក្នុងគ្រប់ប្រអប់ ➜ `preventScroll: false` ៣៤/៣៤ · `openBatchScanModal()` ពិត ➜ `batchBarcodeInput` `preventScroll: false` · document `scrollTo(0, 220)` ខណៈប្រអប់បើក (iOS standalone) ➜ នៅ ២២០ (`restoreIOSDocumentScroll()` តែពេលស្វែងរក) · 844×390 keyboard ២០០ ៖ `sheetImportModal` ផ្ទៃរមូរ `.si-scroll` [១០២,១០៦] = ៤px ➜ ប្រអប់វាយ ៤ មើលមិនឃើញ · iPad បញ្ឈរ/ផ្តេក ៖ ត្រឹមត្រូវរួច | `focusField()` ➜ `preventScroll` ក្នុង `.modal` · `iosModalDocumentLocked()` · `.modal.modal-kb > .si-modal-content { display: block }` ➜ `modal-keyboard-test` FAIL ៤ ➜ ៥៣/៥៣ |
 
 ### 2026-10-15 — រូបថត iPhone ម្ចាស់គម្រោងលើ 2.50.75 ៖ ប៊ូតុង PIN · ចំណងជើង «បញ្ចូលច្រើន» ត្រូវកាត់
 

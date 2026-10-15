@@ -30,6 +30,10 @@ export function iosSearchDocumentLocked(): boolean {
     return (uiState.dataPanelSearchFocus || (panelIsCollapsed('entry') && entrySearchFieldFocused())) && usesIOSPanelHandoff();
 }
 
+function iosModalDocumentLocked(): boolean {
+    return uiState.isModalOpen && usesIOSPanelHandoff();
+}
+
 export function iosModalKeyboardLocked(): boolean {
     return uiState.modalViewportHeight > 0 && usesIOSPanelHandoff();
 }
@@ -39,7 +43,7 @@ function iosKeyboardPanLocked(): boolean {
 }
 
 export function restoreIOSDocumentScroll(): void {
-    if (!iosSearchDocumentLocked()) return;
+    if (!iosSearchDocumentLocked() && !iosModalDocumentLocked()) return;
     if ((window.scrollY || 0) === 0) return;
     scrollWindowToTop();
 }

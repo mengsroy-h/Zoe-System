@@ -274,6 +274,7 @@
 body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: auto; bottom: calc(0px - var(--modal-kb-pan, 0px) - env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.6)), var(--body-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .modal.modal-kb { align-items: flex-start; }
 .modal.modal-kb > .modal-content { margin-top: var(--modal-kb-shift, 0px); max-height: var(--modal-kb-max, 85vh); }
+.modal.modal-kb > .si-modal-content { display: block; }
 html.ios-standalone body.modal-keyboard,
 html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
 html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }

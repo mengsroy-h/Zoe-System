@@ -9,7 +9,8 @@
 //    ផ្ទៃងងឹត (backdrop) គ្របពេញ layout viewport ហើយពីបន្ទាត់ keyboard
 //    ចុះក្រោម (ទាំងការរំកិល) ជាស្រទាប់ស្រអាប់ ➜ នៅក្រោយ keyboard ថ្លារបស់ iPhone មានពណ៌តែមួយ (វាស់ pixel ពីរូបថតពិត) · keyboard បិទ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរប្លង់ ហើយប្រអប់វាយមើលឃើញ ។
 // វិធី ៖ App ពិត (audit build) · visualViewport ក្លែង (Chromium មិនមាន keyboard) · បញ្ជីប្រអប់ និងប្រអប់វាយ **ដេរីវេពី DOM ពិត**
-//    (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea ដែលមើលឃើញពេលបើក) · ទំហំទូរស័ព្ទ ៤ · ផ្ទៃមើលឃើញរំកិល (offsetTop) · status bar ក្លែង ·
+//    (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea ដែលមើលឃើញពេលបើក) · ទំហំ ៧ (ទូរស័ព្ទ ៤ · ទូរស័ព្ទផ្តេក · tablet បញ្ឈរ/ផ្តេក) · ផ្ទៃមើលឃើញរំកិល (offsetTop) · status bar ក្លែង ·
+//    focus ដោយកូដ (`focusField()` · `openBatchScanModal()`) ➜ preventScroll · document រំកិល (artifact keyboard iOS) ខណៈប្រអប់បើក ➜ ០ ·
 //    ទិសផ្ទុយ (keyboard បិទ · APK បង្រួម viewport · ជាន់អប្បបរមា) · ចំនួនថេរអានពី app.js ពិត ។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {
@@ -229,7 +230,10 @@ const SIZES = [
     { w: 390, h: 844, kb: 336, label: 'iPhone 390×844 · keyboard 336' },
     { w: 375, h: 667, kb: 260, label: 'iPhone SE 375×667 · keyboard 260' },
     { w: 320, h: 568, kb: 253, label: 'ទូរស័ព្ទតូច 320×568 · keyboard 253' },
-    { w: 393, h: 852, kb: 400, label: 'iPhone 393×852 · keyboard 400 (រូបថតម្ចាស់គម្រោង)', safe: 47 }
+    { w: 393, h: 852, kb: 400, label: 'iPhone 393×852 · keyboard 400 (រូបថតម្ចាស់គម្រោង)', safe: 47 },
+    { w: 844, h: 390, kb: 200, label: 'iPhone ផ្តេក 844×390 · keyboard 200' },
+    { w: 820, h: 1180, kb: 375, label: 'iPad បញ្ឈរ 820×1180 · keyboard 375', safe: 24 },
+    { w: 1180, h: 820, kb: 440, label: 'iPad ផ្តេក 1180×820 · keyboard 440', safe: 24 }
 ];
 
 (async () => {
@@ -435,6 +439,95 @@ const SIZES = [
                 check(second[1] === false, 'ទិសផ្ទុយ ៖ ចុចប្រអប់វាយដែល focus រួច ➜ iOS ធ្វើខ្លួនឯង (ដាក់ caret តាមកន្លែងចុច)', JSON.stringify(second));
             } else {
                 check(!target.standalone && first.prevented[0] === false, 'ទិសផ្ទុយ ៖ មិនមែន iOS standalone (Android · web) ➜ មិនប៉ះការចុច', JSON.stringify({ target, first }));
+            }
+            await ctx.close();
+        }
+
+        console.log('\n=== ⛔ ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយមិនរំកិល (រាយការណ៍ ៖ «បញ្ចូលច្រើន» ពេលខ្លះទំព័ររអិលឡើង navbar បាត់) ===');
+        // iOS រំកិល document ដើម្បីបង្ហាញប្រអប់វាយដែល focus ដោយ **កូដ** (គ្មាន preventScroll) ពេល keyboard បើក ➜ navbar ចេញពីអេក្រង់ ➜
+        //   (ក) រាល់ focus ដោយកូដចូលប្រអប់វាយក្នុង .modal ត្រូវ preventScroll (ប្រអប់តម្រូវខ្លួនពីលើ keyboard ដោយខ្លួនឯង) ·
+        //   (ខ) ទោះ iOS រំកិល document ក៏ដោយ ខណៈប្រអប់បើក (iOS standalone) ➜ ត្រឡប់ ០ · ទិសផ្ទុយ ៖ គ្មានប្រអប់ · Android ➜ មិនប៉ះ ។
+        for (const ios of [true, false]) {
+            const size = SIZES[3];
+            const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
+            const page = await ctx.newPage();
+            page.on('dialog', (d) => d.dismiss().catch(() => {}));
+            await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+            if (ios) await page.addInitScript(IOS_FLAGS);
+            await page.addInitScript(FAKE_VIEWPORT);
+            await page.addInitScript(() => {
+                window.__focusLog = [];
+                const real = HTMLElement.prototype.focus;
+                HTMLElement.prototype.focus = function (options) {
+                    window.__focusLog.push({ id: this.id || this.tagName, inModal: !!(this.closest && this.closest('.modal')), preventScroll: !!(options && options.preventScroll) });
+                    return real.call(this, options);
+                };
+            });
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(900);
+            const ready = await page.evaluate(() => typeof openModalHelper === 'function' && typeof focusField === 'function' && typeof openBatchScanModal === 'function');
+            if (!ready) { bad('ទំព័រមិនរំកិល ៖ audit bridge (focusField · openBatchScanModal)'); await ctx.close(); continue; }
+            if (ios) {
+                await closeAll(page);
+                const ids = await modalIdsWithFields(page);
+                let called = 0;
+                for (const id of ids) {
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 300);
+                    called += await page.evaluate(({ id, sel }) => {
+                        let n = 0;
+                        for (const f of Array.from(document.getElementById(id).querySelectorAll(sel))) {
+                            const r = f.getBoundingClientRect();
+                            if (!f.id || !(r.width > 0 && r.height > 0)) continue;
+                            const before = window.__focusLog.length;
+                            focusField(f.id);
+                            if (window.__focusLog.length > before) n++;
+                        }
+                        return n;
+                    }, { id, sel: FIELD_SELECTOR });
+                }
+                await closeAll(page);
+                await page.evaluate(() => { if (typeof switchAppPage === 'function') switchAppPage('entry'); });
+                await settle(page, 300);
+                const mark = await page.evaluate(() => window.__focusLog.length);
+                await page.evaluate(() => openBatchScanModal());
+                await settle(page, 400);
+                const log = await page.evaluate(() => window.__focusLog.slice());
+                const modalCalls = log.slice(0, mark).filter((c) => c.inModal);
+                const unsafe = modalCalls.filter((c) => !c.preventScroll);
+                check(called >= 20 && modalCalls.length >= called && unsafe.length === 0,
+                    '⛔ (ក) focusField() លើគ្រប់ប្រអប់វាយ (ref) ក្នុងគ្រប់ប្រអប់ (' + called + ') ➜ preventScroll (iOS មិនរំកិលទំព័រ)', JSON.stringify(unsafe.slice(0, 8)));
+                const batch = log.slice(mark).filter((c) => c.id === 'batchBarcodeInput');
+                check(batch.length >= 1 && batch.every((c) => c.inModal && c.preventScroll),
+                    '⛔ (ក) «📋 បញ្ចូលច្រើន» (openBatchScanModal ពិត ៖ focus ក្រោយ ១៥០ms) ➜ preventScroll', JSON.stringify(batch));
+            }
+            await closeAll(page);
+            await page.evaluate(() => {
+                const spacer = document.createElement('div');
+                spacer.id = '__docSpacer';
+                // ទីតាំង absolute ➜ ហៀរចូល viewport (body `overflow: hidden` កាត់កូនធម្មតា) ➜ document រមូរបាន ដូច iOS ពេល keyboard បើក
+                spacer.style.cssText = 'position: absolute; top: 0; left: 0; height: 3000px; width: 1px; pointer-events: none;';
+                document.body.appendChild(spacer);
+            });
+            const docScroll = async () => {
+                await page.evaluate(() => window.scrollTo(0, 220));
+                await settle(page, 200);
+                return page.evaluate(() => Math.round(window.scrollY));
+            };
+            const noModal = await docScroll();
+            await page.evaluate(() => window.scrollTo(0, 0));
+            await page.evaluate(() => openModalHelper('batchScanModal'));
+            await settle(page, 300);
+            const withModal = await docScroll();
+            const standalone = await page.evaluate(() => document.documentElement.classList.contains('ios-standalone'));
+            await page.evaluate(() => { window.scrollTo(0, 0); const s = document.getElementById('__docSpacer'); if (s) s.remove(); });
+            if (ios) {
+                check(standalone && withModal === 0 && noModal === 220,
+                    '⛔ (ខ) iPhone standalone ៖ document រំកិល ២២០px ខណៈប្រអប់បើក ➜ ត្រឡប់ ០ (navbar នៅលើអេក្រង់) · ទិសផ្ទុយ ៖ គ្មានប្រអប់ ➜ មិនប៉ះ (គំរូអាចធ្លាក់)', JSON.stringify({ standalone, withModal, noModal }));
+            } else {
+                check(!standalone && withModal === 220 && noModal === 220,
+                    'ទិសផ្ទុយ ៖ Android/web (មិនមែន iOS standalone) ➜ document មិនប៉ះ ទោះប្រអប់បើក', JSON.stringify({ standalone, withModal, noModal }));
             }
             await ctx.close();
         }

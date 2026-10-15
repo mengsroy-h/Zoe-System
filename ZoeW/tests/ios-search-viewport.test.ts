@@ -4,8 +4,9 @@
  *    Chromium (touch) ៖ ស្ថានភាព App ដូចគ្នាបេះបិទរវាងការចុចធម្មតា និងការចុចក្រោយ «⋯» ➜ មូលហេតុនៅ iOS ៖ keyboard រំកិល document
  *    (`window.scrollY` ≠ ០) ដើម្បីបង្ហាញប្រអប់តាមទីតាំង *មុន* ការទាញឡើង ➜ App កែតែពេល `visualViewport` `resize` ➜ ការរំកិលដែលមកក្រោយ resize នៅជាប់។
  * ⛔ ច្បាប់ ៖ iOS standalone (`html.ios-standalone` ចាក់សោ root ➜ `#appPages` ជាអ្នករមូរតែមួយ ➜ document រំកិល = artifact របស់ keyboard) ·
- *    ពេលប្រអប់ស្វែងរកលេខទាញឡើង (`dataPanelSearchFocus`) ➜ document រំកិល (`scroll` លើ window · `visualViewport`) ➜ ត្រឡប់ ០ ·
- *    ទិសផ្ទុយ ៖ Android/web ធម្មតា · ប្រអប់ផ្សេង (iOS ត្រូវរំកិលដើម្បីបង្ហាញវា) · document មិនរំកិល · ការរមូរខាងក្នុង (`#appPages`) ➜ មិនប៉ះ។
+ *    ពេលប្រអប់ស្វែងរកលេខទាញឡើង (`dataPanelSearchFocus`) ឬប្រអប់ (modal) បើក (ប្រអប់តម្រូវខ្លួនពីលើ keyboard ដោយខ្លួនឯង · រាយការណ៍ ៖ «បញ្ចូលច្រើន»
+ *    ពេលខ្លះទំព័ររអិលឡើង navbar បាត់) ➜ document រំកិល (`scroll` លើ window · `visualViewport`) ➜ ត្រឡប់ ០ ·
+ *    ទិសផ្ទុយ ៖ Android/web ធម្មតា · ប្រអប់វាយផ្សេងក្រៅ modal (iOS ត្រូវរំកិលដើម្បីបង្ហាញវា) · document មិនរំកិល · ការរមូរខាងក្នុង (`#appPages`) ➜ មិនប៉ះ។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -82,6 +83,22 @@ describe('iOS PWA ៖ keyboard រំកិល document ខណៈស្វែង
         uiState.dataPanelSearchFocus = false;
         pan(window, 250);
         expect(scrollCalls).toEqual([]);
+    });
+
+    it('⛔ ប្រអប់ (modal) បើក ➜ document រំកិល (keyboard ពីប្រអប់វាយក្នុងប្រអប់ ឧ. «បញ្ចូលច្រើន») ➜ ត្រឡប់ ០ ទោះមិនស្វែងរក · Android ➜ មិនប៉ះ', () => {
+        uiState.dataPanelSearchFocus = false;
+        uiState.isModalOpen = true;
+        try {
+            pan(window, 260);
+            pan(vv, 140);
+            expect(scrollCalls).toEqual([[0, 0], [0, 0]]);
+            scrollCalls = [];
+            setIOSStandalone(false);
+            pan(window, 260);
+            expect(scrollCalls).toEqual([]);
+        } finally {
+            uiState.isModalOpen = false;
+        }
     });
 
     it('ទិសផ្ទុយ ៖ document មិនរំកិល · ការរមូរខាងក្នុង (#appPages) ➜ មិនហៅ scrollTo', () => {

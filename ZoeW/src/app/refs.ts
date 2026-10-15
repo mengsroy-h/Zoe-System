@@ -163,9 +163,10 @@ export function focusField(name: RefName, options?: FocusOptions): void {
     commitNow();
     const el = elementOf(name);
     if (!el) return;
-    el.focus(options);
+    const opts = typeof el.closest === 'function' && el.closest('.modal') ? Object.assign({}, options, { preventScroll: true }) : options;
+    el.focus(opts);
     if (document.activeElement !== el && el.offsetParent === null) {
-        setTimeout(() => { if (el.isConnected) el.focus(options); }, 0);
+        setTimeout(() => { if (el.isConnected) el.focus(opts); }, 0);
     }
 }
 

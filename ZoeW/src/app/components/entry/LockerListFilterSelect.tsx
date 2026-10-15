@@ -1,5 +1,7 @@
 import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
+import { refTo } from '../../refs';
+import { entrySearchBlurred } from '../../behaviors/entry-search';
 import { renderLockerList } from '../../../ui/entry-list';
 
 export function LockerListFilterSelect() {
@@ -7,8 +9,10 @@ export function LockerListFilterSelect() {
     const options = (uiState.lockerFilterOptions || []) as string[];
     return (
         <select id="lockerListFilter"
+            ref={refTo('lockerListFilter')}
             value={uiState.lockerFilterValue || ''}
-            onChange={(e) => { uiState.lockerFilterValue = e.target.value; renderLockerList(); }}>
+            onChange={(e) => { uiState.lockerFilterValue = e.target.value; renderLockerList(); }}
+            onBlur={entrySearchBlurred}>
             <option value="">ទីតាំងទាំងអស់</option>
             {options.map((l) => <option value={l} key={l}>{l}</option>)}
         </select>

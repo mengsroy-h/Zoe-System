@@ -32,6 +32,7 @@ export const REF_NAMES = [
     'labelShowLocker',
     'labelShowMoney',
     'lockerCountInput',
+    'lockerListFilter',
     'lockerListSearchInput',
     'lockerPrefixInput',
     'lockerTableResponsive',

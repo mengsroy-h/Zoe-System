@@ -46,7 +46,7 @@
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 0ថ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `72cd9a4` = PR #318 · **មិនទាន់ merge**) ៖ [2.50.80] វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ពេល keyboard លោតចប់ ·
-    iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ (ផ្នែក ២ A110–A111) ➜ ⚠️ សាកលើ APK/iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.80]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+    iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ · បញ្ជី Locker ធ្លាក់ពេលចុច «ទីតាំងទាំងអស់» (ផ្នែក ២ A110–A112) ➜ ⚠️ សាកលើ APK/iPhone ពិត (សកម្មភាព ១–៥ របស់ [2.50.80]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ត. **PR #318 merge ចូល `main` រួច** (`72cd9a4` · squash · ម្ចាស់គម្រោង «Merge» · CI ៤/៤ បៃតង) ៖ [2.50.79] វីដេអូម្ចាស់គម្រោងលើ 2.50.78 ៖ ប្តូរទំហំក្រដាស ➜ ក្រដាសស ·
     APK ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត · iPhone «បញ្ចូលច្រើន» ទំព័រធ្លាក់ចុះមួយភ្លែត · វាស់គ្រប់ទំហំ/ឧបករណ៍ (ស្លាក A5) · 🧠 ➜ 💡 · បោះពុម្ពឆ្លាតវៃ · ស្លាកជារូបភាព NIIMBOT
     (PR #318 · ផ្នែក ២ A102–A109) ➜ ម្ចាស់គម្រោងសាករួច ៖ iPhone ប្រអប់ ✅ · APK នៅញ៉ាក់ · iPhone កន្លែងវាយ Barcode ធ្លាក់ ➜ 0ថ។
@@ -206,11 +206,12 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.80] — 2026-10-15 · ZoeW ៖ **APK ៖ ប្រអប់មិនញ៉ាក់ពេល keyboard លោតចប់ · iPhone ៖ ចុចកន្លែងវាយ Barcode ទំព័រមិនធ្លាក់**
+### [2.50.80] — 2026-10-15 · ZoeW ៖ **APK ៖ ប្រអប់មិនញ៉ាក់ពេល keyboard លោតចប់ · iPhone ៖ ចុចកន្លែងវាយ Barcode ទំព័រមិនធ្លាក់ · បញ្ជី Locker មិនធ្លាក់ពេលជ្រើសទីតាំង**
 
 **ZoeW `2.50.80`** (`zoew-v342` ➜ `zoew-v343`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` · `app.css` · ZTO) មិនប៉ះ —
-ការកែក្នុង `modal-keyboard.ts` តែមួយ (ហៅ `noteKeyboardViewport()` ដែលមានរួចក្នុង `chrome-autohide.ts` · មិនកែឯកសារនោះ)។
-រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ១ · APK ១ លើ 2.50.79) ៖ «Android នៅតែញ៉ាក់ពេល keyboard លោតមក ios modal លែងអីហើយ តែមកកើតលើ កន្លែងវាយបញ្ចូល barcode វិញ»។
+ការកែក្នុង `modal-keyboard.ts` (ហៅ `noteKeyboardViewport()` ដែលមានរួចក្នុង `chrome-autohide.ts` · មិនកែឯកសារនោះ) · `entry-search.ts` · `LockerListFilterSelect.tsx` · `refs.ts`។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ១ · APK ១ លើ 2.50.79) ៖ «Android នៅតែញ៉ាក់ពេល keyboard លោតមក ios modal លែងអីហើយ តែមកកើតលើ កន្លែងវាយបញ្ចូល barcode វិញ» ·
+បន្ទាប់មក ៖ «Ios ពេលប្រអប់ស្វែងរក📍 បញ្ជីទីតាំង Lockerកំពុងតែ ឡើង ហើយពេលចុច ទីតាំងទាំងអស់ ធ្លាក់មកភ្លាមធ្វើអោយសល់ កន្លែង select ទីតាំង · គ្រប់ modal លើ android មិនមែនគ្រាន់តែ modal បញ្ចូលច្រើន ទេ»។
 
 #### អ្វីដែលខុសពីមុន
 
@@ -222,12 +223,17 @@
   រំកិលទំព័រពេល keyboard លោត។ ឥឡូវ (iOS standalone · គ្មានប្រអប់បើក) ការចុចកន្លែងវាយ Barcode ដែលនឹងនៅពីលើ keyboard (`pageFieldStaysAboveKeyboard()` ៖ inset ធំបំផុតដែលវាស់បាន
   នៅទទឹងនេះ ឬ `PAGE_TAP_KEYBOARD_RATIO` ៥០% នៃកម្ពស់) ➜ `touchend` preventDefault + `focus({ preventScroll })` ដូចកន្លែងវាយក្នុងប្រអប់ · iPad (UA កុំព្យូទ័រ ៖ App focus កន្លែងវាយ
   ដោយកូដ គ្មាន keyboard) ➜ ចាប់ដូចគ្នា · keyboard នឹងបាំងកន្លែងវាយ (iPhone ផ្តេក · iPad ផ្តេក) ➜ iOS ធ្វើខ្លួនឯង ដើម្បីបង្ហាញវា។ Android មិនប្រែ។
+- 🐛 **ទំព័រស្កេន «📍 បញ្ជីទីតាំង Locker» ៖ ស្វែងរកឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីធ្លាក់ចុះ សល់តែ select** (A112 · គ្រប់ឧបករណ៍)។ ចុច select ➜ ប្រអប់ស្វែងរក blur ➜
+  `entrySearchBlurred()` ឃើញប្រអប់ទទេ ➜ បើកផ្ទាំងស្កេនវិញ ➜ បញ្ជីធ្លាក់ពីក្រោយ picker។ ឥឡូវ select ទីតាំងជាផ្នែកនៃការស្វែងរក (`entrySearchInUse()`) ៖ focus ទៅ select ឬទីតាំងដែលជ្រើស
+  ➜ ផ្ទាំងនៅបង្រួម (បញ្ជីនៅខាងលើ) · ចាកចេញពី select ពេលស្វែងរកទទេ និង «ទីតាំងទាំងអស់» ➜ បើកវិញ។ ការអូស/handle បើកផ្ទាំងបានជានិច្ច។
 
 #### អ្នកយាម
 
 - `modal-keyboard-device-test` ៖ (ក) APK +ជំហាន «inset ចាស់» (setViewportSize បង្រួម ខណៈ visualViewport នៅរាយការណ៍ keyboard ➜ ប្រអប់នៅទីតាំងដដែល ±1px · ៥ ទំហំ × ១៧ ប្រអប់) ·
   (គ) ថ្មី ៖ កន្លែងវាយ Barcode លើ App ពិត × iPhone SE 375×667 · iPhone 393×852 · Pro Max 430×932 (ចាប់ · `preventScroll` · document ០ · keyboard បើក ➜ iOS) · iPad បញ្ឈរ
   (focus ដោយកូដ ➜ ចាប់) · ទិសផ្ទុយ iPhone ផ្តេក · iPad ផ្តេក (keyboard ពិតបាំង ➜ iOS) — លើ `72cd9a4` (មុនកែ) FAIL ៩ (APK ៥ · iPhone/iPad ៤) ➜ ២១/២១។
+- `ZoeW/tests/search-glide-hold.test.ts` +១ ៖ ស្វែងរក Locker ឡើង ➜ focus select ➜ នៅបង្រួម · ជ្រើសទីតាំង ➜ នៅបង្រួម · «ទីតាំងទាំងអស់» ➜ បើកវិញ · ប្រអប់ស្វែងរកចាកចេញទទេ ➜ បើកវិញ —
+  មុនកែ FAIL · `native:check` (`history-window-check`) +៣ (APK · PWA Android · PWA iPhone ៖ App ពិត · ref + `onBlur` លើ select ពិត) — មុនកែ FAIL ៣ ➜ ០ FAIL។
 - `ZoeW/tests/modal-keyboard.test.tsx` +២ ៖ hold ចប់ + inset ចាស់ ➜ `keyboardOpen` · គ្មាន `.modal-kb` · `keyboardCover` ០ (visualViewport មុន/ក្រោយ window `resize`) · កន្លែងវាយ
   Barcode ៖ ចាប់ · keyboard បើក ➜ iOS · keyboard ធ្លាប់វាស់ (៣៣៦) កំណត់បន្ទាត់ · ផ្តេក ➜ iOS · focus ដោយកូដ ➜ ចាប់ · កន្លែងវាយផ្សេង · ប្រអប់បើក · មិនមែន iOS ➜ មិនប៉ះ — មុនកែ FAIL ២។
 
@@ -238,6 +244,9 @@
 1. **APK** ៖ បើក PIN · «📋 បញ្ចូលច្រើន» · កែលេខ ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម ហើយនៅស្ងៀមពេល keyboard លោតចប់ (គ្មានការលោតឡើងហើយត្រឡប់)។
 2. **iPhone (PWA)** ៖ ទំព័រស្កេន ➜ ចុចកន្លែងវាយ Barcode ➜ keyboard លោតឡើង ទំព័រ និង navbar នៅនឹងកន្លែង · វាយ/ស្កេន ➜ Enter ធម្មតា · iPhone ផ្តេក ➜ iOS បង្ហាញកន្លែងវាយពីលើ keyboard។
 3. **iPad (PWA)** ៖ ទំព័រស្កេន ➜ ចុចកន្លែងវាយ Barcode (បញ្ឈរ) ➜ ទំព័រនៅនឹងកន្លែង។
+4. **iPhone · Android** ៖ ទំព័រស្កេន ➜ 📍 កំណត់ទីតាំង Locker ➜ ចុចប្រអប់ស្វែងរក (បញ្ជីឡើង) ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីនៅខាងលើ · ជ្រើសទីតាំង ➜ បញ្ជីច្រោះ ·
+   ជ្រើស «ទីតាំងទាំងអស់» វិញ (ស្វែងរកទទេ) ➜ ផ្ទាំងស្កេនបើកវិញ។
+5. **APK** ៖ សាកប្រអប់ផ្សេងៗ (PIN · កែលេខ · កែតម្លៃ · Config · API ស្វែងរកអតិថិជន · Login …) ➜ គ្រប់ប្រអប់ផ្លាស់ទីតែម្តង (ការកែមួយសម្រាប់គ្រប់ប្រអប់ · វាស់ ១៧ ប្រអប់ × ៥ ទំហំ)។
 
 ### [2.50.79] — 2026-10-15 · ZoeW ៖ **បោះពុម្ព ៖ ប្តូរទំហំក្រដាស ➜ ទិន្នន័យនៅ · APK ៖ ប្រអប់ផ្លាស់ទីតែម្តងពេល keyboard លោត · iPhone ៖ «បញ្ចូលច្រើន» ទំព័រមិនធ្លាក់**
 
@@ -4413,7 +4422,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ · iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់
+### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ · iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ · បញ្ជី Locker ធ្លាក់
 
 **វិធី** ៖ វីដេអូ ២ (iPhone · APK) ➜ ffmpeg ស៊ុមម្តងមួយ (pts) · ពង្រីកស៊ុមចប់ keyboard ➜ App ពិត (audit build) ក្នុង Chromium ៖ APK ក្លែង (setViewportSize បង្រួម ខណៈ visualViewport ក្លែង
 នៅរាយការណ៍ inset ចាស់) · iPhone/iPad standalone ក្លែង (UA iPhone ➜ App មិន focus ដោយកូដ · UA កុំព្យូទ័រ iPad ➜ focus ដោយកូដ) ➜ guard ធ្លាក់លើកូដចាស់ ➜ ទើបកែ។
@@ -4422,6 +4431,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 |---|---|---|---|
 | A110 | **APK ៖ ប្រអប់លោតឡើងហើយត្រឡប់ពេល keyboard លោតចប់** | វីដេអូពង្រីក ៖ មានតែកាតប្រអប់ផ្លាស់ទី (ទំព័រខាងក្រោយនៅ) ➜ ច្របាប់ទៅកំពូល ~៣–៥ ស៊ុម ហើយត្រឡប់ = «ស៊ុមខូច ៣» របស់ A103 · មូលហេតុ ៖ `KeyboardOpenHold.release()` (MATCH_PARENT) បង្រួម WebView ខណៈ Chromium នៅរាយការណ៍ inset IME ➜ `visualViewport.height` = កម្ពស់បង្រួម − keyboard ➜ `modalKeyboardHoldFitFor()` តម្រូវលើផ្ទៃ ២៥៥px (412×915 ៖ PIN កំពូល 178 ➜ 13 ➜ 178 · បាត 407 ➜ 242) · ការកែលើកទី ១ (`keyboardOpen` ➜ null តែប៉ុណ្ណោះ) ៖ ដដែល 178 ➜ 13 — វាស់ ៖ `body.keyboard-open` មាន តែការវាស់ visualViewport រត់ **មុន** window `resize` (Chromium មិនធានាលំដាប់) ហើយគ្មានអ្វីវាស់ម្តងទៀត | `keyboardVisibleViewport()` ➜ null ពេល `keyboardOpen` · `noteKeyboardViewport()` (មានរួច · មិនកែឯកសារចាក់សោ) ចុះឈ្មោះលើ visualViewport `resize` មុនការវាស់ · ការប្តូរ `keyboardOpen` ➜ `queueModalMeasure()` + `measureKeyboardCover()` ➜ APK ៥ ទំហំ ✅ · PWA Chrome · iPhone មិនប្រែ |
 | A111 | **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់ហើយរអិលត្រឡប់** | វីដេអូ ៖ ស៊ុម 0.70–0.81 វិ. navbar និងទំព័រធ្លាក់ចុះ ពេល keyboard លោត ➜ ត្រឡប់ · `hwScannerInput` នៅក្រៅប្រអប់ ➜ មិនចូលការចាប់របស់ប្រអប់ (A104) · ទីតាំង (App ពិត) ៖ បាត 319 (375×667 · 393×852 = ៤៨% · ៣៧%) · 322 (430×932) · 275 (852×393 = ៧០%) · 275 (iPad 820×1180) · 441 (iPad 1180×820 = ៥៤%) ⟷ keyboard ពិត ~៣៩% បញ្ឈរ · ~៥៣% iPhone ផ្តេក · ~៤៩% iPad ផ្តេក ➜ ការចាប់គ្រប់ទំហំនឹងបាំងកន្លែងវាយពេលផ្តេក | ការចាប់ប្រអប់ពង្រីកទៅ `hwScannerInput` (គ្មានប្រអប់បើក) តែពេលបាត + `MODAL_KEYBOARD_GAP_PX` ≤ បន្ទាត់ keyboard (inset ធំបំផុតដែលវាស់នៅទទឹងនេះ ឬ ៥០% ៖ ៤៥% ធ្លាក់ iPad ផ្តេក 449 ≤ 451) · ផ្តេក ➜ iOS · iPad focus ដោយកូដ ➜ ចាប់ដូច A104 ➜ ✅ |
+| A112 | **ស្វែងរក «📍 បញ្ជីទីតាំង Locker» ឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីធ្លាក់** (រាយការណ៍ម្ចាស់គម្រោង iPhone) | App ពិត (APK · PWA Android · PWA iPhone ក្លែង) ៖ focus ស្វែងរក ➜ ផ្ទាំងបង្រួម (បញ្ជីឡើង) ➜ focus `#lockerListFilter` ➜ ៩០០ms ក្រោយ ផ្ទាំងបើកវិញ (`entryPanelCollapsed` false) ➜ បញ្ជីធ្លាក់ · មូលហេតុ ៖ `entrySearchBlurred()` ពិនិត្យតែប្រអប់ស្វែងរក (focus · អត្ថបទ) · select ក្នុង `.filter-bar` ដដែលមិនរាប់ | `entrySearchInUse()` ៖ ប្រអប់ស្វែងរក focus · Locker ៖ select focus · ទីតាំងជ្រើស · អត្ថបទ ➜ មិនបើក · select មាន ref + `onBlur={entrySearchBlurred}` ➜ «ទីតាំងទាំងអស់» + ទទេ ➜ បើកវិញ ➜ ✅ ៣/៣ |
 
 ### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.78 ៖ ប្តូរ Paper size ➜ ក្រដាសស · APK ប្រអប់កន្ត្រាក់ ២ ដង · iPhone «បញ្ចូលច្រើន» ទំព័រធ្លាក់មួយភ្លែត
 

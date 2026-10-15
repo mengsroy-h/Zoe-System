@@ -150,13 +150,15 @@ export function setFieldValue(name: RefName, value: string): void {
     if (el) el.value = value;
 }
 
-export function insertFieldText(name: RefName, text: string): void {
+export function insertFieldText(name: RefName, text: string): boolean {
     const el = elementOf<HTMLInputElement>(name);
-    if (!el) return;
+    if (!el || typeof el.setRangeText !== 'function') return false;
     const end = el.value.length;
     const from = typeof el.selectionStart === 'number' ? el.selectionStart : end;
     const to = typeof el.selectionEnd === 'number' ? el.selectionEnd : from;
-    try { el.setRangeText(text, from, to, 'end'); } catch { el.value += text; }
+    try { el.setRangeText(text, from, to, 'end'); } catch { return false; }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    return true;
 }
 
 export function fieldChecked(name: RefName): boolean {

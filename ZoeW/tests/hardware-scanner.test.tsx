@@ -15,6 +15,10 @@ import { latinDigits } from '../src/core/text';
 import { parseBatchBarcodes } from '../src/features/batch-scan';
 import { SCANNER_KEY_GAP_MS, SCANNER_MIN_CHARS, SCANNER_SUFFIX_GAP_MS, noteScannerKeyDown, scannerKeyChar, usLayoutChar } from '../src/app/behaviors/scanner-input';
 import { AppPages } from '../src/app/components/AppPages';
+import { BatchScanModal } from '../src/app/components/modals/BatchScanModal';
+import { PhoneModal } from '../src/app/components/modals/PhoneModal';
+import { closeModal, openModalHelper } from '../src/ui/modal';
+import { viewState } from '../src/core/view-state';
 import '../src/app/flush';
 import { byId, mount, step, unmount } from './native/react-harness';
 
@@ -25,7 +29,11 @@ function key(target: EventTarget, k: string, code: string, t: number, extra: Par
     const ev = new KeyboardEvent('keydown', Object.assign({ key: k, code, bubbles: true, cancelable: true }, extra));
     Object.defineProperty(ev, 'timeStamp', { value: t });
     target.dispatchEvent(ev);
-    if (!ev.defaultPrevented && target instanceof HTMLInputElement && k.length === 1 && !extra.ctrlKey) target.value += k;
+    const editable = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    if (!ev.defaultPrevented && editable && (k.length === 1 || (k === 'Enter' && target instanceof HTMLTextAreaElement)) && !extra.ctrlKey) {
+        (target as HTMLInputElement).value += k === 'Enter' ? '\n' : k;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     if (!ev.defaultPrevented && k === 'Enter' && target === byId('hwScannerInput')) {
         const press = new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', charCode: 13, keyCode: 13, bubbles: true, cancelable: true });
         target.dispatchEvent(press);
@@ -59,7 +67,7 @@ beforeEach(() => {
         uiState.entryScanMode = 'parcel';
         securityState.appIsLocked = false;
     });
-    mount(<AppPages />);
+    mount(<><AppPages /><BatchScanModal /><PhoneModal /></>);
     document.addEventListener('keydown', noteScannerKeyDown, true);
     focusOptions = [];
     const field = byId('hwScannerInput') as HTMLInputElement;
@@ -69,6 +77,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    step(() => { closeModal('phoneModal'); closeModal('batchScanModal'); });
     document.removeEventListener('keydown', noteScannerKeyDown, true);
     vi.restoreAllMocks();
     unmount();
@@ -102,6 +111,9 @@ describe('ឧបករណ៍ស្កេន (Bluetooth/USB) ៖ គ្រាប�
         expect(scannerKeyChar(ev({ key: '&', code: 'Digit1' }))).toBe('&');
         expect(scannerKeyChar(ev({ key: '៩', code: '' }))).toBe('9');
         expect(scannerKeyChar(ev({ key: 'ក', code: '' }))).toBe('');
+        expect(scannerKeyChar(ev({ key: 'ុះ', code: 'KeyH', shiftKey: true }))).toBe('H');
+        expect(scannerKeyChar(ev({ key: 'ោះ', code: 'KeyO' }))).toBe('o');
+        expect(scannerKeyChar(ev({ key: 'ុះ', code: '' }))).toBe('');
     });
 
     it('ទិសផ្ទុយ ៖ Ctrl/Meta/Alt · Space · Enter/Tab · Unidentified (keyboard លើអេក្រង់) · composing · តម្លៃខុស ➜ ទទេ មិនបោះ', () => {
@@ -192,6 +204,34 @@ describe('ឧបករណ៍ស្កេន ៖ ការស្កេនមិ�
         for (const c of '77100') { key(document.activeElement || document.body, c, 'Digit' + c, t); t += 10; }
         expect(key(field, 'Tab', 'Tab', t + SCANNER_SUFFIX_GAP_MS + 1).defaultPrevented).toBe(false);
         expect(scanned).toEqual([]);
+    });
+
+    it('⛔ «📋 បញ្ចូលច្រើន» ៖ គ្មានអ្វី focus ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · keyboard ខ្មែរ ➜ ឡាតាំង · suffix Tab ➜ ជួរថ្មី (focus នៅ · ការស្កេនបន្ទាប់មិនបាត់) · Enter ➜ ជួរថ្មី · ចំនួនរាប់ឡើង · មិនបញ្ជូន', () => {
+        step(() => openModalHelper('batchScanModal'));
+        const batch = byId('batchBarcodeInput') as HTMLTextAreaElement;
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        scan('77100000308751', 0, 12, 'Tab', KHMER_DIGITS);
+        expect(document.activeElement).toBe(batch);
+        expect(batch.value).toBe('77100000308751\n');
+        const letters: Record<string, string> = { Z: 'ឋ', T: 'ទ' };
+        scan('ZT88', 1000, 12, 'Tab', Object.assign({}, KHMER_DIGITS, letters));
+        scan('9100', 2000, 12, 'Enter');
+        expect(batch.value).toBe('77100000308751\nZT88\n9100\n');
+        expect(parseBatchBarcodes(batch.value)).toEqual(['77100000308751', 'ZT88', '9100']);
+        expect(viewState.batchScanCountText).toBe('3 Barcode');
+        expect(scanned).toEqual([]);
+    });
+
+    it('ទិសផ្ទុយ ៖ «📋 បញ្ចូលច្រើន» មិននៅខាងលើ (ផ្ទាំងបញ្ជាក់លើវា) · វាយយឺត + Tab ក្នុងប្រអប់បញ្ចូលច្រើន ➜ Tab ធម្មតា', () => {
+        step(() => { openModalHelper('batchScanModal'); openModalHelper('phoneModal'); });
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        expect(key(document.body, '7', 'Digit7', 0).defaultPrevented).toBe(false);
+        expect((byId('batchBarcodeInput') as HTMLTextAreaElement).value).toBe('');
+        step(() => closeModal('phoneModal'));
+        const batch = byId('batchBarcodeInput') as HTMLTextAreaElement;
+        batch.focus();
+        expect(scan('77100', 1000, 200, 'Tab').defaultPrevented).toBe(false);
+        expect(batch.value).toBe('77100');
     });
 
     it('ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus · ប្រអប់ (modal) បើក · ទំព័រទិន្នន័យ · ចាក់សោ · ផ្ទាំងចំហៀង · Ctrl+V ➜ មិនលួច', () => {

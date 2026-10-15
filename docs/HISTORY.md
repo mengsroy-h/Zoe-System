@@ -270,6 +270,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
   `KEYBOARD_TRUST_MS` · ទំព័របង្រួម · កំពុងបិទមិនកត់) · ការសាក Chrome ៤០៧ ចាំក្រោយ `KEYBOARD_TRUST_MS` (មិនកត់ភ្លាម) — កូដមុនកែ FAIL ៥ ➜ ៤៦/៤៦ ·
   `modal-keyboard-device-test` (ក២) ៖ ៥ ផ្ទាំងលេខ × APK ៣ + Chrome ២ ៖ keyboard ប្រាប់ +៨០ ➜ WebView/ទំព័របង្រួមតាមពិត ➜ លើកដំបូងមិនចុះ · ចាំកម្ពស់ពិត · លើកក្រោយទៅទីតាំងពិត
   តែម្តង (គ្មាន `.modal-kb`) — build `178e0a2` FAIL ៥ (កាតចុះ ១០០ ➜ ១៣៩ ដូចវីដេអូ · ចាំ ៤១០ ខុសជំនួស ៣៣០) ➜ ៨០/៨០។
+  `modal-keyboard-device-test` រត់តែឯង ៣០៩ វិ. ក្រោយ (ក២) ➜ run-all «ព្យួរ — លើសពិដាន 300s» ➜ ចែកជា `--part=1/2` ((ក) ១១៧ + (ខ) ៣៥ វិ.) · `--part=2/2` ((ក២) ៦៩ · (គ) ៤៩ · (ង) ២៣ · ផ្សេង ១៤ វិ.) ដូច `zoew-suite` (ពិនិត្យថា run-all រត់ផ្នែកទាំង ២ · ក្រុមគ្របគ្រប់ផ្នែកម្តងគត់) ⛔ មិនបង្កើន `CHECKER_TIMEOUT`។
 - ទិសអេក្រង់ ៖ `ZoeW/tests/orientation-lock.test.ts` ៥ (PWA ទូរស័ព្ទ ➜ `portrait-primary` ម្តង · foldable បើក ➜ `any` · tablet · ៥៩៩/៦០០ · tab · APK · iPhone · iPad · កុំព្យូទ័រ
   ➜ មិនហៅ · បដិសេធ · បោះ · គ្មាន ➜ មិនបោះ · ព្រំដែន ៦០០ ដូចគ្នានឹង `MainActivity` · AndroidManifest គ្មាន `screenOrientation`) · `npm run android:check` +៥ ·
   `orientationFor()` ពិត compile (`javac` + android stub) ៖ ៣២០ · ៤១១ · ៥៩៩ ➜ PORTRAIT · ៦០០ · ៦៧៣ · ៨០០ · ០ · −១ ➜ UNSPECIFIED។
@@ -7344,6 +7345,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

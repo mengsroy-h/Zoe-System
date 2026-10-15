@@ -743,7 +743,8 @@ run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "modal-keyboard (browser ពិត)" node audit-tools/modal-keyboard-test.js
-run "modal-keyboard-device (browser ពិត · Android APK/PWA · iPhone · iPad)" node audit-tools/modal-keyboard-device-test.js
+run "modal-keyboard-device 1/2 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)" node audit-tools/modal-keyboard-device-test.js --part=1/2
+run "modal-keyboard-device 2/2 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)" node audit-tools/modal-keyboard-device-test.js --part=2/2
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "toast-action-truth (browser ពិត)" node audit-tools/toast-action-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js

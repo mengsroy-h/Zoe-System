@@ -52,6 +52,22 @@ let pass = 0, fail = 0;
 const ok = (n) => { console.log('  ok    ' + n); pass++; };
 const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')); fail++; };
 const check = (c, n, d) => (c ? ok(n) : bad(n, d));
+// ⛔ `--part=k/2` (ដូច `zoew-suite-test` · `money-guardian-test`) ៖ ផ្នែកទាំងអស់រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ.
+//    («ព្យួរ — លើសពិដាន 300s» ក្រោយ (ក២)) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ run-all រត់ផ្នែកទាំង ២ (lane ផ្សេងគ្នា) · គ្មាន `--part` ➜
+//    ផ្នែកទាំងអស់ (baseline · checker-coverage) · ផ្នែកនីមួយៗត្រូវស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅចុងក្រោយ)។
+const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ']];
+const PART = (() => {
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
+    if (!arg) return { k: 1, n: 1 };
+    const m = /^--part=(\d+)\/(\d+)$/.exec(arg);
+    if (!m || +m[2] !== PART_GROUPS.length || +m[1] < 1 || +m[1] > +m[2]) return null;
+    return { k: +m[1], n: +m[2] };
+})();
+const sectionsAsked = new Set();
+const inPart = (name) => {
+    sectionsAsked.add(name);
+    return !!PART && (PART.n === 1 || PART_GROUPS[PART.k - 1].indexOf(name) !== -1);
+};
 
 function serve(dir) {
     return new Promise((res) => {
@@ -230,490 +246,525 @@ const SAFE_TOP = function (px) {
         const exists = fs.existsSync(path.join(APP, 'index.html'));
         check(exists, 'App ZoeW (audit build) រកឃើញ ៖ ' + APP);
         if (!exists) return;
-
-        console.log('\n=== (ក) Android ៖ keyboard ចាប់ផ្តើមលោត (visualViewport បង្រួម · viewport នៅកម្ពស់ដើម) ➜ ចប់ (viewport បង្រួម) ➜ ប្រអប់ផ្លាស់ទីតែម្តង ===');
-        let androidMeasured = 0;
-        for (const dev of ANDROID_DEVICES) {
-            const { ctx, page, ready } = await openApp(browser, port, dev, dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : [FAKE_VIEWPORT], dev.apk ? null : { userAgent: ANDROID_UA });
-            const kind = ready && await page.evaluate((apk) => apk ? !!(window.Capacitor && window.Capacitor.isNativePlatform()) : !window.Capacitor && /Android/.test(navigator.userAgent), dev.apk);
-            if (!ready || !kind) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
-            const ids = await modalIdsWithFields(page);
-            const problems = [];
-            let measured = 0, movedAtStart = 0, staleMeasured = 0;
-            for (const id of ids) {
-                await page.setViewportSize({ width: dev.w, height: dev.h });
-                await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
-                await closeAll(page);
-                await page.evaluate((m) => openModalHelper(m), id);
-                await settle(page, 320);
-                const index = await firstVisibleField(page, id);
-                if (index < 0) continue;
-                await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index, sel: FIELD_SELECTOR });
-                const base = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                await settle(page, 160);
-                const hold = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                let stale = null;
-                if (dev.apk) {
-                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
-                    await page.evaluate(() => window.__kb.fire());
-                    await settle(page, 60);
-                    stale = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                }
-                await page.evaluate(() => window.__kb.set(0));
-                await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
-                await page.evaluate(() => window.__kb.fire());
-                await settle(page, 200);
-                const after = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                measured++;
-                if (stale) staleMeasured++;
-                if (Math.abs(hold.card[0] - base.card[0]) > 1) movedAtStart++;
-                const line = dev.h - dev.kb;
-                const issues = [];
-                if (Math.abs(hold.card[0] - after.card[0]) > 1 || Math.abs(hold.card[1] - after.card[1]) > 1) issues.push('ផ្លាស់ទីពីរដង ' + base.card[0] + ' ➜ ' + hold.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + after.card[1] + ')');
-                if (stale && (Math.abs(stale.card[0] - hold.card[0]) > 1 || Math.abs(stale.card[1] - hold.card[1]) > 1)) issues.push('ស្ទុះពេល WebView បង្រួម (inset keyboard ចាស់) ' + hold.card[0] + ' ➜ ' + stale.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + stale.card[1] + ')');
-                if (hold.card[1] > line + 1) issues.push('បាតកាត ' + hold.card[1] + ' នៅក្រោយ keyboard ' + line);
-                if (hold.card[0] < 0) issues.push('កំពូលកាតផុតអេក្រង់ ' + hold.card[0]);
-                if (hold.field[0] < 0 || hold.field[1] > line + 1) issues.push('ប្រអប់វាយមើលមិនឃើញ [' + hold.field[0] + ',' + hold.field[1] + ']');
-                if (!hold.focused || !hold.fitted) issues.push('focus/.modal-kb');
-                if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
+        check(!!PART, '⛔ --part ត្រូវជា k/' + PART_GROUPS.length, process.argv.slice(2).join(' '));
+        if (!PART) return;
+        if (PART.n > 1) {
+            console.log('  ផ្នែក ' + PART.k + '/' + PART.n + ' ៖ ' + PART_GROUPS[PART.k - 1].join(' · '));
+            let runall = '';
+            try { runall = fs.readFileSync(path.join(__dirname, 'run-all.sh'), 'utf8').replace(/^\s*#.*$/gm, ''); } catch (e) {}
+            const listed = [];
+            for (let k = 1; k <= PART.n; k++) {
+                if (new RegExp('node\\s+audit-tools/modal-keyboard-device-test\\.js\\s+--part=' + k + '/' + PART.n + '(?=\\s|$)', 'm').test(runall)) listed.push(k);
             }
-            androidMeasured += measured;
-            check(measured >= 15 && movedAtStart >= Math.floor(measured * 0.6) && problems.length === 0 && (!dev.apk || staleMeasured === measured),
-                '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ viewport បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ' +
-                    (dev.apk ? ' · APK ៖ WebView បង្រួមពេល Chromium នៅរាយការណ៍ keyboard (inset ចាស់) ➜ ប្រអប់មិនស្ទុះ' : ''),
-                JSON.stringify({ measured, movedAtStart, staleMeasured, problems: problems.slice(0, 6) }));
-            await ctx.close();
+            check(listed.length === PART.n, '⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = ករណីដែលគ្មាននរណារត់)', 'ឃើញ ' + listed.join(','));
         }
-        check(androidMeasured >= ANDROID_DEVICES.length * 15, 'ជាន់អប្បបរមា ៖ Android វាស់ ' + androidMeasured + ' ករណី (ឧបករណ៍ ' + ANDROID_DEVICES.length + ')');
 
-        console.log('\n=== (ក២) វីដេអូ Android (keyboard លេខ) ៖ keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY +80) ពេលចាប់ផ្តើម ហើយស្ងប់ keyboard លេខ ➜ លើកដំបូង ៖ កាតមិនចុះ · ចាំកម្ពស់ពិត ➜ លើកក្រោយ ៖ កាតទៅទីតាំងពិតតែម្តង ===');
-        for (const dev of ANDROID_DEVICES.filter((d) => d.h > d.w)) {
-            const { ctx, page, ready } = await openApp(browser, port, dev, dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : [FAKE_VIEWPORT], dev.apk ? null : { userAgent: ANDROID_UA });
-            if (!ready) { bad('(ក២) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
-            const ids = (await modalIdsWithFields(page)).filter((id) => ['manualAdjustModal', 'editPhoneModal', 'editBarcodePriceModal', 'exchangeRateModal', 'phoneModal'].includes(id));
-            const problems = [];
-            let measured = 0, wouldDrop = 0, learnedOnce = 0;
-            for (const id of ids) {
-                const runs = [];
-                for (let round = 0; round < 2; round++) {
+        if (inPart('ក')) {
+            console.log('\n=== (ក) Android ៖ keyboard ចាប់ផ្តើមលោត (visualViewport បង្រួម · viewport នៅកម្ពស់ដើម) ➜ ចប់ (viewport បង្រួម) ➜ ប្រអប់ផ្លាស់ទីតែម្តង ===');
+            let androidMeasured = 0;
+            for (const dev of ANDROID_DEVICES) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : [FAKE_VIEWPORT], dev.apk ? null : { userAgent: ANDROID_UA });
+                const kind = ready && await page.evaluate((apk) => apk ? !!(window.Capacitor && window.Capacitor.isNativePlatform()) : !window.Capacitor && /Android/.test(navigator.userAgent), dev.apk);
+                if (!ready || !kind) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const ids = await modalIdsWithFields(page);
+                const problems = [];
+                let measured = 0, movedAtStart = 0, staleMeasured = 0;
+                for (const id of ids) {
                     await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
                     await closeAll(page);
                     await page.evaluate((m) => openModalHelper(m), id);
                     await settle(page, 320);
                     const index = await firstVisibleField(page, id);
-                    if (index < 0) break;
-                    await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
-                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb + 80);
+                    if (index < 0) continue;
+                    await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index, sel: FIELD_SELECTOR });
+                    const base = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                     await settle(page, 160);
                     const hold = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    let stale = null;
                     if (dev.apk) {
-                        await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                        await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                        await page.evaluate(() => window.__kb.fire());
                         await settle(page, 60);
+                        stale = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                     }
-                    await page.evaluate(() => window.__kb.open(0));
-                    await settle(page, Math.max(200, KEYBOARD_SETTLE_FLOOR + 150));
+                    await page.evaluate(() => window.__kb.set(0));
+                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    await page.evaluate(() => window.__kb.fire());
+                    await settle(page, 200);
                     const after = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                    const mem = await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1') || '');
-                    runs.push({ hold, after, natural: Math.round((dev.h - dev.kb - (hold.card[1] - hold.card[0])) / 2), learned: mem.includes(':' + dev.kb) });
+                    measured++;
+                    if (stale) staleMeasured++;
+                    if (Math.abs(hold.card[0] - base.card[0]) > 1) movedAtStart++;
+                    const line = dev.h - dev.kb;
+                    const issues = [];
+                    if (Math.abs(hold.card[0] - after.card[0]) > 1 || Math.abs(hold.card[1] - after.card[1]) > 1) issues.push('ផ្លាស់ទីពីរដង ' + base.card[0] + ' ➜ ' + hold.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + after.card[1] + ')');
+                    if (stale && (Math.abs(stale.card[0] - hold.card[0]) > 1 || Math.abs(stale.card[1] - hold.card[1]) > 1)) issues.push('ស្ទុះពេល WebView បង្រួម (inset keyboard ចាស់) ' + hold.card[0] + ' ➜ ' + stale.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + stale.card[1] + ')');
+                    if (hold.card[1] > line + 1) issues.push('បាតកាត ' + hold.card[1] + ' នៅក្រោយ keyboard ' + line);
+                    if (hold.card[0] < 0) issues.push('កំពូលកាតផុតអេក្រង់ ' + hold.card[0]);
+                    if (hold.field[0] < 0 || hold.field[1] > line + 1) issues.push('ប្រអប់វាយមើលមិនឃើញ [' + hold.field[0] + ',' + hold.field[1] + ']');
+                    if (!hold.focused || !hold.fitted) issues.push('focus/.modal-kb');
+                    if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
                 }
-                if (runs.length < 2) continue;
-                measured++;
-                const [first, second] = runs;
-                const line = dev.h - dev.kb;
-                if (first.natural > first.hold.card[0] + 2) wouldDrop++;
-                if (first.learned) learnedOnce++; else problems.push(id + ' ៖ មិនចាំ ' + JSON.stringify(await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1'))));
-                if (Math.abs(first.after.card[0] - first.hold.card[0]) > 1) problems.push(id + ' ៖ លើកដំបូងចុះ ' + first.hold.card[0] + ' ➜ ' + first.after.card[0]);
-                if (Math.abs(second.after.card[0] - second.hold.card[0]) > 1) problems.push(id + ' ៖ លើកក្រោយផ្លាស់ទីពីរដង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0]);
-                if (second.after.fitted || Math.abs(second.hold.card[0] - second.natural) > 2) problems.push(id + ' ៖ លើកក្រោយមិនទៅទីតាំងពិតតែម្តង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0] + ' (ពិត ' + second.natural + ' · .modal-kb ' + second.after.fitted + ')');
-                for (const r of runs) if (r.after.card[1] > line + 1 || r.after.card[0] < 0 || r.after.field[1] > line + 1) problems.push(id + ' ៖ មើលមិនឃើញ ' + JSON.stringify(r.after));
+                androidMeasured += measured;
+                check(measured >= 15 && movedAtStart >= Math.floor(measured * 0.6) && problems.length === 0 && (!dev.apk || staleMeasured === measured),
+                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ viewport បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ' +
+                        (dev.apk ? ' · APK ៖ WebView បង្រួមពេល Chromium នៅរាយការណ៍ keyboard (inset ចាស់) ➜ ប្រអប់មិនស្ទុះ' : ''),
+                    JSON.stringify({ measured, movedAtStart, staleMeasured, problems: problems.slice(0, 6) }));
+                await ctx.close();
             }
-            check(measured >= 4 && wouldDrop >= 1 && learnedOnce === measured && problems.length === 0,
-                '⛔ ' + dev.label + ' ៖ ' + measured + ' ផ្ទាំងលេខ ➜ keyboard ប្រាប់ ' + (dev.kb + 80) + ' ហើយ' + (dev.apk ? ' WebView' : ' ទំព័រ') + ' បង្រួមតាម keyboard ពិត ' + dev.kb + ' ➜ លើកដំបូងកាតមិនចុះ · ចាំ ' + dev.kb + ' ➜ លើកក្រោយកាតទៅទីតាំងពិតតែម្តង (ទោះ keyboard ប្រាប់ចាស់) · មើលឃើញពេញ',
-                JSON.stringify({ measured, wouldDrop, learnedOnce, problems: problems.slice(0, 6) }));
-            await ctx.close();
+            check(androidMeasured >= ANDROID_DEVICES.length * 15, 'ជាន់អប្បបរមា ៖ Android វាស់ ' + androidMeasured + ' ករណី (ឧបករណ៍ ' + ANDROID_DEVICES.length + ')');
         }
 
-        console.log('\n=== (ខ) iPhone · iPad (standalone) ៖ ប្រអប់វាយដែល focus ដោយកូដ (គ្មាន keyboard) ➜ ចុច ➜ preventDefault + focus({ preventScroll }) · keyboard បើក ➜ iOS ===');
-        for (const dev of IOS_DEVICES) {
-            const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG]);
-            if (!ready) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
-            const ids = await modalIdsWithFields(page);
-            const problems = [];
-            let measured = 0;
-            for (const id of ids) {
-                await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
-                await closeAll(page);
-                await page.evaluate((m) => openModalHelper(m), id);
-                await settle(page, 320);
-                const index = await firstVisibleField(page, id);
-                if (index < 0) continue;
-                await page.evaluate(({ id, index, sel }) => { Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }); window.__touchEnds = []; window.__focusLog = []; }, { id, index, sel: FIELD_SELECTOR });
-                const at = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                const hit = await page.evaluate(({ x, y, id }) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest('#' + id) && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'); }, { x: at.field[2], y: at.field[3], id });
-                if (!hit) continue;
-                await page.touchscreen.tap(at.field[2], at.field[3]);
-                await settle(page, 120);
-                const first = await page.evaluate(({ id, index, sel }) => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement === Array.from(document.getElementById(id).querySelectorAll(sel))[index], scrollY: window.scrollY }), { id, index, sel: FIELD_SELECTOR });
-                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                await settle(page, 160);
-                const again = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
-                await page.touchscreen.tap(again.field[2], Math.max(again.field[0] + 4, Math.min(again.field[3], again.field[1] - 4)));
-                await settle(page, 120);
-                const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
-                measured++;
-                const issues = [];
-                if (first.prevented[0] !== true) issues.push('ចុចលើកទី ១ មិនត្រូវចាប់');
-                if (first.focus.length !== 1 || !first.focus[0].preventScroll) issues.push('focus ' + JSON.stringify(first.focus));
-                if (!first.focused) issues.push('បាត់ focus');
-                if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
-                if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន ' + os + ' ' + JSON.stringify(second));
-                if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
+        if (inPart('ក២')) {
+            console.log('\n=== (ក២) វីដេអូ Android (keyboard លេខ) ៖ keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY +80) ពេលចាប់ផ្តើម ហើយស្ងប់ keyboard លេខ ➜ លើកដំបូង ៖ កាតមិនចុះ · ចាំកម្ពស់ពិត ➜ លើកក្រោយ ៖ កាតទៅទីតាំងពិតតែម្តង ===');
+            for (const dev of ANDROID_DEVICES.filter((d) => d.h > d.w)) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : [FAKE_VIEWPORT], dev.apk ? null : { userAgent: ANDROID_UA });
+                if (!ready) { bad('(ក២) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const ids = (await modalIdsWithFields(page)).filter((id) => ['manualAdjustModal', 'editPhoneModal', 'editBarcodePriceModal', 'exchangeRateModal', 'phoneModal'].includes(id));
+                const problems = [];
+                let measured = 0, wouldDrop = 0, learnedOnce = 0;
+                for (const id of ids) {
+                    const runs = [];
+                    for (let round = 0; round < 2; round++) {
+                        await page.setViewportSize({ width: dev.w, height: dev.h });
+                        await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                        await closeAll(page);
+                        await page.evaluate((m) => openModalHelper(m), id);
+                        await settle(page, 320);
+                        const index = await firstVisibleField(page, id);
+                        if (index < 0) break;
+                        await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
+                        await page.evaluate((kb) => window.__kb.open(kb), dev.kb + 80);
+                        await settle(page, 160);
+                        const hold = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                        await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                        if (dev.apk) {
+                            await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                            await settle(page, 60);
+                        }
+                        await page.evaluate(() => window.__kb.open(0));
+                        await settle(page, Math.max(200, KEYBOARD_SETTLE_FLOOR + 150));
+                        const after = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                        const mem = await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1') || '');
+                        runs.push({ hold, after, natural: Math.round((dev.h - dev.kb - (hold.card[1] - hold.card[0])) / 2), learned: mem.includes(':' + dev.kb) });
+                    }
+                    if (runs.length < 2) continue;
+                    measured++;
+                    const [first, second] = runs;
+                    const line = dev.h - dev.kb;
+                    if (first.natural > first.hold.card[0] + 2) wouldDrop++;
+                    if (first.learned) learnedOnce++; else problems.push(id + ' ៖ មិនចាំ ' + JSON.stringify(await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1'))));
+                    if (Math.abs(first.after.card[0] - first.hold.card[0]) > 1) problems.push(id + ' ៖ លើកដំបូងចុះ ' + first.hold.card[0] + ' ➜ ' + first.after.card[0]);
+                    if (Math.abs(second.after.card[0] - second.hold.card[0]) > 1) problems.push(id + ' ៖ លើកក្រោយផ្លាស់ទីពីរដង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0]);
+                    if (second.after.fitted || Math.abs(second.hold.card[0] - second.natural) > 2) problems.push(id + ' ៖ លើកក្រោយមិនទៅទីតាំងពិតតែម្តង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0] + ' (ពិត ' + second.natural + ' · .modal-kb ' + second.after.fitted + ')');
+                    for (const r of runs) if (r.after.card[1] > line + 1 || r.after.card[0] < 0 || r.after.field[1] > line + 1) problems.push(id + ' ៖ មើលមិនឃើញ ' + JSON.stringify(r.after));
+                }
+                check(measured >= 4 && wouldDrop >= 1 && learnedOnce === measured && problems.length === 0,
+                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ផ្ទាំងលេខ ➜ keyboard ប្រាប់ ' + (dev.kb + 80) + ' ហើយ' + (dev.apk ? ' WebView' : ' ទំព័រ') + ' បង្រួមតាម keyboard ពិត ' + dev.kb + ' ➜ លើកដំបូងកាតមិនចុះ · ចាំ ' + dev.kb + ' ➜ លើកក្រោយកាតទៅទីតាំងពិតតែម្តង (ទោះ keyboard ប្រាប់ចាស់) · មើលឃើញពេញ',
+                    JSON.stringify({ measured, wouldDrop, learnedOnce, problems: problems.slice(0, 6) }));
+                await ctx.close();
             }
-            check(measured >= 12 && problems.length === 0,
-                '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ប្រអប់វាយ focus ដោយកូដ (keyboard បិទ) ➜ ចុច ➜ ចាប់ (preventScroll · នៅ focus · document ០) · keyboard បើក ➜ iOS ធ្វើខ្លួនឯង',
-                JSON.stringify({ measured, problems: problems.slice(0, 6) }));
-
-            await closeAll(page);
-            await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
-            const batchReady = await page.evaluate(() => typeof openBatchScanModal === 'function');
-            if (!batchReady) { bad(dev.label + ' ៖ openBatchScanModal'); await ctx.close(); continue; }
-            await page.evaluate(() => { uiState.entryScanMode = 'parcel'; openBatchScanModal(); });
-            await settle(page, 450);
-            const bat = await page.evaluate(() => {
-                const el = document.getElementById('batchBarcodeInput');
-                const r = el.getBoundingClientRect();
-                window.__touchEnds = [];
-                window.__focusLog = [];
-                return { focused: document.activeElement === el, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(20, r.height / 2)) };
-            });
-            await page.touchscreen.tap(bat.x, bat.y);
-            await settle(page, 160);
-            const res = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
-            check(bat.focused && res.prevented[0] === true && res.focus.length === 1 && res.focus[0].preventScroll && res.focused === 'batchBarcodeInput' && res.scrollY === 0,
-                '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» ពិត (focus ក្រោយ ១៥០ms · គ្មាន keyboard) ➜ ចុច ➜ ចាប់ · focus({ preventScroll }) ម្តង · ទំព័រមិនរំកិល',
-                JSON.stringify({ bat, res }));
-            await ctx.close();
         }
 
-        console.log('\n=== (គ) iPhone · iPad (standalone) · Chrome Android ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់/មិនរំកិល (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ ប្រព័ន្ធធ្វើខ្លួនឯង ===');
-        for (const dev of SCANNER_DEVICES) {
-            const os = dev.android ? 'Android' : 'iOS';
-            const inits = dev.android ? [FAKE_VIEWPORT, TAP_LOG] : [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG];
-            if (dev.safeTop) inits.push('(' + SAFE_TOP.toString() + ')(' + dev.safeTop + ');');
-            const { ctx, page, ready } = await openApp(browser, port, dev, inits, { userAgent: dev.ua });
-            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
-            if (!pageReady) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
-            await closeAll(page);
-            if (dev.learn) {
-                await page.evaluate(() => { switchAppPage('entry'); setEntryScanMode('parcel'); document.getElementById('hwScannerInput').focus({ preventScroll: true }); });
-                for (const px of dev.learn) { await page.evaluate((v) => window.__kb.open(v), px); await settle(page, 60); }
-                await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
-                await settle(page, 120);
-            }
-            await page.evaluate((m) => { switchAppPage('entry'); setEntryScanMode(m); openModalIds().slice().forEach((id) => closeModal(id)); }, dev.mode || 'parcel');
-            await settle(page, 400);
-            const at = await page.evaluate(() => {
-                const el = document.getElementById('hwScannerInput');
-                const r = el.getBoundingClientRect();
-                const x = Math.round(r.left + Math.min(40, r.width / 2));
-                const y = Math.round(r.top + r.height / 2);
-                const hit = document.elementFromPoint(x, y) === el;
-                window.__touchEnds = [];
-                window.__focusLog = [];
-                return { x, y, bottom: Math.round(r.bottom), hit, focused: document.activeElement === el, h: window.innerHeight };
-            });
-            if (!at.hit) { bad(dev.label + ' ៖ ប្រអប់វាយ Barcode មិននៅលើអេក្រង់', JSON.stringify(at)); await ctx.close(); continue; }
-            await page.touchscreen.tap(at.x, at.y);
-            await settle(page, 160);
-            const first = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
-            const issues = [];
-            if (at.focused !== dev.byCode) issues.push('focus មុនចុច ' + at.focused);
-            if (dev.catch) {
-                if (first.prevented[0] !== true) issues.push('ចុចមិនត្រូវចាប់ (' + os + ' រំកិលទំព័រ)');
-                if (first.focus.length !== 1 || !first.focus[0].preventScroll || first.focus[0].id !== 'hwScannerInput') issues.push('focus ' + JSON.stringify(first.focus));
-                if (first.focused !== 'hwScannerInput') issues.push('បាត់ focus');
-                if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
-                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                await settle(page, 160);
-                await page.touchscreen.tap(at.x, at.y);
-                await settle(page, 120);
-                const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
-                if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
-                if (at.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + at.bottom);
-            } else {
-                if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ ' + os + ' តែត្រូវចាប់');
-                if (first.focus.some((f) => f.preventScroll)) issues.push('focus ' + JSON.stringify(first.focus));
-                if (at.bottom + 8 <= at.h - dev.kb) issues.push('ប្រអប់នៅពីលើ keyboard ពិត (' + dev.kb + ') ➜ ករណីនេះមិនមែនទិសផ្ទុយ');
-            }
-            check(issues.length === 0,
-                (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
-                    (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
-                JSON.stringify({ at, first, issues }));
-            if (dev.catch && !dev.byCode) {
-                const near = [];
-                for (const sel of ['#hardwareScannerLabel', '#hardwareScannerBox .scanner-input-wrapper .icon']) {
-                    await page.evaluate(() => { window.__kb.open(0); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+        if (inPart('ខ')) {
+            console.log('\n=== (ខ) iPhone · iPad (standalone) ៖ ប្រអប់វាយដែល focus ដោយកូដ (គ្មាន keyboard) ➜ ចុច ➜ preventDefault + focus({ preventScroll }) · keyboard បើក ➜ iOS ===');
+            for (const dev of IOS_DEVICES) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG]);
+                if (!ready) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const ids = await modalIdsWithFields(page);
+                const problems = [];
+                let measured = 0;
+                for (const id of ids) {
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, id);
+                    if (index < 0) continue;
+                    await page.evaluate(({ id, index, sel }) => { Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }); window.__touchEnds = []; window.__focusLog = []; }, { id, index, sel: FIELD_SELECTOR });
+                    const at = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    const hit = await page.evaluate(({ x, y, id }) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest('#' + id) && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'); }, { x: at.field[2], y: at.field[3], id });
+                    if (!hit) continue;
+                    await page.touchscreen.tap(at.field[2], at.field[3]);
                     await settle(page, 120);
-                    const spot = await page.evaluate((sel) => {
-                        const el = document.querySelector(sel);
-                        if (!el) return null;
-                        const r = el.getBoundingClientRect();
-                        const x = Math.round(r.left + Math.min(20, r.width / 2));
-                        const y = Math.round(r.top + r.height / 2);
-                        const hit = document.elementFromPoint(x, y);
-                        window.__touchEnds = [];
-                        window.__focusLog = [];
-                        return { x, y, hit: !!hit && el.contains(hit) };
-                    }, sel);
-                    if (!spot || !spot.hit) { near.push({ sel, spot, miss: true }); continue; }
-                    await page.touchscreen.tap(spot.x, spot.y);
+                    const first = await page.evaluate(({ id, index, sel }) => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement === Array.from(document.getElementById(id).querySelectorAll(sel))[index], scrollY: window.scrollY }), { id, index, sel: FIELD_SELECTOR });
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                     await settle(page, 160);
-                    near.push(Object.assign({ sel }, await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(),
-                        focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }))));
+                    const again = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    await page.touchscreen.tap(again.field[2], Math.max(again.field[0] + 4, Math.min(again.field[3], again.field[1] - 4)));
+                    await settle(page, 120);
+                    const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
+                    measured++;
+                    const issues = [];
+                    if (first.prevented[0] !== true) issues.push('ចុចលើកទី ១ មិនត្រូវចាប់');
+                    if (first.focus.length !== 1 || !first.focus[0].preventScroll) issues.push('focus ' + JSON.stringify(first.focus));
+                    if (!first.focused) issues.push('បាត់ focus');
+                    if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
+                    if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន ' + os + ' ' + JSON.stringify(second));
+                    if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
                 }
-                const nearOk = near.length === 2 && near.every((n) => !n.miss && (dev.android
-                    ? n.prevented[0] === false && !n.focus.some((f) => f.preventScroll)
-                    : n.prevented[0] === true && n.focus.length === 1 && n.focus[0].preventScroll && n.focus[0].id === 'hwScannerInput' && n.focused === 'hwScannerInput' && n.scrollY === 0));
-                check(nearOk, (dev.android ? 'ទិសផ្ទុយ ៖ ' : '⛔ ') + dev.label + ' ៖ ចុចស្លាក «ស្កេន Barcode…» · រូប ⚡ ➜ ' +
-                    (dev.android ? 'Android ដូចដើម (មិនប៉ះ)' : 'ចាប់ដូចចុចប្រអប់ (label មិនឲ្យ iOS focus រំកិលទំព័រ) · focus({ preventScroll }) · document ០'), JSON.stringify(near));
-            }
-            await ctx.close();
-        }
+                check(measured >= 12 && problems.length === 0,
+                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ប្រអប់វាយ focus ដោយកូដ (keyboard បិទ) ➜ ចុច ➜ ចាប់ (preventScroll · នៅ focus · document ០) · keyboard បើក ➜ iOS ធ្វើខ្លួនឯង',
+                    JSON.stringify({ measured, problems: problems.slice(0, 6) }));
 
-        console.log('\n=== (ឃ) Chrome Android ៖ visual viewport រំកិលរួច (keyboard បើកពីប្រអប់មុន) ➜ ចុចស្វែងរក tab ស្កេន ➜ ទំព័រត្រឡប់កំពូល · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ (visual viewport ពិត ៖ pinch) ===');
-        for (const mode of ['parcel', 'locker']) {
-            const field = mode === 'locker' ? 'lockerListSearchInput' : 'entryListSearchInput';
-            const { ctx, page, ready } = await openApp(browser, port, { w: 411, h: 830 }, [ZOOMABLE, TAP_LOG], { userAgent: ANDROID_UA, deviceScaleFactor: 2.625 });
-            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
-            if (!pageReady) { bad('(ឃ) ' + mode + ' ៖ audit bridge'); await ctx.close(); continue; }
-            await page.evaluate((m) => { openModalIds().slice().forEach((id) => closeModal(id)); switchAppPage('entry'); setEntryScanMode(m); }, mode);
-            await settle(page, 400);
-            await page.evaluate(() => { if (openModalIds().length && typeof chooseLocker === 'function') chooseLocker('A5'); openModalIds().slice().forEach((id) => closeModal(id)); });
-            await settle(page, 400);
-            const cdp = await ctx.newCDPSession(page);
-            await cdp.send('Input.synthesizePinchGesture', { x: 205, y: 800, scaleFactor: 1.12, relativeSpeed: 600 });
-            await settle(page, 500);
-            const before = await page.evaluate((id) => {
-                const r = document.getElementById(id).getBoundingClientRect();
-                window.__touchEnds = [];
-                window.__focusLog = [];
-                return { off: Math.round(visualViewport.offsetTop), offL: visualViewport.offsetLeft, scale: visualViewport.scale, top: Math.round(r.top), bottom: Math.round(r.bottom), left: r.left, width: r.width };
-            }, field);
-            if (!(before.off > 0)) { bad('(ឃ) ' + mode + ' ៖ visual viewport មិនរំកិល (pinch)', JSON.stringify(before)); await ctx.close(); continue; }
-            await page.touchscreen.tap(Math.round(before.left + Math.min(40, before.width / 2) - before.offL), Math.round((before.top + before.bottom) / 2 - before.off));
-            await settle(page, 900);
-            const after = await page.evaluate((id) => {
-                const el = document.getElementById(id);
-                const r = el.getBoundingClientRect();
-                return { off: Math.round(visualViewport.offsetTop), height: Math.round(visualViewport.height), focused: document.activeElement === el, collapsed: uiState.entryPanelCollapsed,
-                    top: Math.round(r.top), bottom: Math.round(r.bottom), prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice() };
-            }, field);
-            check(after.prevented[0] === true && after.focused && after.collapsed && after.off === 0 && after.top >= after.off && after.bottom <= after.off + after.height &&
-                after.focus.length === 1 && after.focus[0].preventScroll,
-                '⛔ Chrome Android 411×830 · ' + field + ' ៖ visual viewport រំកិល ' + before.off + 'px ➜ ចុចស្វែងរក ➜ offsetTop ០ (navbar ឃើញ) · ផ្ទាំងបង្រួម · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ · focus({ preventScroll }) ម្តង',
-                JSON.stringify({ before, after }));
-            await ctx.close();
-        }
-
-        console.log('\n=== (ង) ឧបករណ៍ស្កេន Bluetooth/USB (keyboard HID ៖ ព្រឹត្តិការណ៍ keyboard ពិតរបស់ Chromium) ➜ ស្កេនមិនបាត់ · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ===');
-        for (const dev of HID_DEVICES) {
-            const { ctx, page, ready } = await openApp(browser, port, dev, dev.ios ? [IOS_FLAGS] : [], dev.ctx);
-            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function' && typeof scanState === 'object');
-            if (!pageReady) { bad('(ង) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
-            const reset = async () => {
-                await page.evaluate(() => {
-                    openModalIds().slice().forEach((id) => closeModal(id));
-                    switchAppPage('entry');
-                    setEntryScanMode('parcel');
-                    scanState.pendingBarcode = '';
-                    document.getElementById('hwScannerInput').value = '';
-                    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-                });
-                await settle(page, 250);
-            };
-            const result = () => page.evaluate(() => ({ pending: scanState.pendingBarcode, phoneModal: openModalIds().includes('phoneModal'), scrollY: window.scrollY,
-                active: document.activeElement && document.activeElement.id, field: document.getElementById('hwScannerInput').value }));
-            const code = '77100000308751';
-            await reset();
-            const before = await page.evaluate(() => document.activeElement === document.body);
-            await page.keyboard.type(code, { delay: 8 });
-            await page.keyboard.press('Enter');
-            await settle(page, 300);
-            const plain = await result();
-            check(before && plain.pending === code && plain.phoneModal && plain.scrollY === 0,
-                '⛔ ' + dev.label + ' ៖ គ្មានអ្វី focus ➜ ស្កេន ' + code + ' + Enter ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode នេះ · ទំព័រមិនរំកិល', JSON.stringify({ before, plain }));
-            await reset();
-            const cdp = await ctx.newCDPSession(page);
-            for (const c of code) {
-                const khmer = String.fromCharCode(0x17E0 + Number(c));
-                await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: khmer, code: 'Digit' + c, text: khmer, unmodifiedText: khmer, windowsVirtualKeyCode: 48 + Number(c) });
-                await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: khmer, code: 'Digit' + c, windowsVirtualKeyCode: 48 + Number(c) });
-            }
-            await page.keyboard.press('Enter');
-            await settle(page, 300);
-            const khmer = await result();
-            check(khmer.pending === code && khmer.phoneModal,
-                '⛔ ' + dev.label + ' ៖ keyboard ខ្មែរ (key «៧៧១…» · code Digit*) ➜ Barcode ' + code + ' (មិនមែនលេខខ្មែរ)', JSON.stringify(khmer));
-            await reset();
-            await page.keyboard.type(code, { delay: 8 });
-            await page.keyboard.press('Tab');
-            await settle(page, 300);
-            const tab = await result();
-            check(tab.pending === code && tab.phoneModal,
-                '⛔ ' + dev.label + ' ៖ ឧបករណ៍ស្កេនបញ្ចប់ដោយ Tab ➜ បញ្ជូនដូច Enter', JSON.stringify(tab));
-            await reset();
-            await page.evaluate(() => document.getElementById('entryListSearchInput').focus({ preventScroll: true }));
-            await page.keyboard.type('0961', { delay: 8 });
-            await settle(page, 200);
-            const search = await page.evaluate(() => ({ value: document.getElementById('entryListSearchInput').value, active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
-                field: document.getElementById('hwScannerInput').value }));
-            check(search.value === '0961' && search.active === 'entryListSearchInput' && !search.pending && search.field === '',
-                'ទិសផ្ទុយ ៖ ' + dev.label + ' ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ នៅប្រអប់ស្វែងរក (ឧបករណ៍ស្កេនមិនលួច)', JSON.stringify(search));
-            await reset();
-            await page.evaluate(() => openBatchScanModal());
-            await settle(page, 400);
-            await page.evaluate(() => { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
-            for (const c of code + '\t' + '7710\t') {
-                if (c === '\t') { await page.keyboard.press('Tab'); continue; }
-                const khmer = String.fromCharCode(0x17E0 + Number(c));
-                await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: khmer, code: 'Digit' + c, text: khmer, unmodifiedText: khmer, windowsVirtualKeyCode: 48 + Number(c) });
-                await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: khmer, code: 'Digit' + c, windowsVirtualKeyCode: 48 + Number(c) });
-            }
-            await settle(page, 200);
-            const batch = await page.evaluate(() => ({ value: document.getElementById('batchBarcodeInput').value, active: document.activeElement && document.activeElement.id,
-                count: document.getElementById('batchScanCount').textContent, phoneModal: openModalIds().includes('phoneModal') }));
-            check(batch.value === code + '\n7710\n' && batch.active === 'batchBarcodeInput' && batch.count === '2 Barcode' && !batch.phoneModal,
-                '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» (គ្មានអ្វី focus) ➜ ស្កេន ២ (keyboard ខ្មែរ · suffix Tab) ➜ ២ ជួរឡាតាំង · focus នៅប្រអប់ · ចំនួន «2 Barcode»', JSON.stringify(batch));
-            // ⛔ ម៉ាស៊ីនតេស្តអាចផ្អាក > SCANNER_KEY_GAP_MS រវាងគ្រាប់ពីរ (CDP · GC) ➜ ការស្កេនក្លែងក្លាយជាការវាយរបស់មនុស្សតាមច្បាប់ App (មិនមែនកំហុស App) ➜ វាស់ចន្លោះពិត
-            //    (event.timeStamp ក្នុងទំព័រ) ហើយធ្វើ scenario ម្តងទៀតតែពេលនោះ (≤ ៣ ដង) · App ខុសពេលល្បឿនស្កេនត្រឹមត្រូវ ➜ នៅធ្លាក់ដដែល
-            await page.evaluate(() => { if (!window.__kdOn) { window.__kdOn = true; window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); } });
-            const markBurst = () => page.evaluate(() => { window.__kd = []; });
-            const burstGap = () => page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
-            const first = 'ZTQUEUEA0001';
-            const next = '77100000308752';
-            let human = '', held = null, bare = null, capped = null, gaps = [];
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                await page.evaluate(() => { try { stopBatchScan(); } catch (e) {} });
-                await reset();
-                await page.evaluate((a) => triggerScanAction(a), first);
+                await closeAll(page);
+                await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                const batchReady = await page.evaluate(() => typeof openBatchScanModal === 'function');
+                if (!batchReady) { bad(dev.label + ' ៖ openBatchScanModal'); await ctx.close(); continue; }
+                await page.evaluate(() => { uiState.entryScanMode = 'parcel'; openBatchScanModal(); });
                 await settle(page, 450);
-                await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
-                await page.keyboard.type('2.5', { delay: 110 });
-                await settle(page, 250);
-                human = await page.evaluate(() => document.getElementById('modalCodInput').value);
-                await markBurst();
-                await page.keyboard.type(next, { delay: 8 });
-                const nextGap = await burstGap();
-                await page.keyboard.press('Enter');
-                await settle(page, 300);
-                held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
-                    active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
-                    status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
-                await markBurst();
-                await page.keyboard.type('77100000308753', { delay: 8 });
-                const bareGap = await burstGap();
-                await settle(page, 450);
-                bare = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value,
-                    status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
-                capped = await page.evaluate(async () => {
-                    document.getElementById('modalCodInput').value = '7810122334455';
-                    await confirmPhone(false);
-                    return { open: openModalIds().includes('phoneModal'), pending: scanState.pendingBarcode, active: document.activeElement && document.activeElement.id };
+                const bat = await page.evaluate(() => {
+                    const el = document.getElementById('batchBarcodeInput');
+                    const r = el.getBoundingClientRect();
+                    window.__touchEnds = [];
+                    window.__focusLog = [];
+                    return { focused: document.activeElement === el, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(20, r.height / 2)) };
                 });
-                gaps = [nextGap, bareGap];
-                if (SCANNER_GAP_MS > 0 && nextGap < SCANNER_GAP_MS && bareGap < SCANNER_GAP_MS) break;
+                await page.touchscreen.tap(bat.x, bat.y);
+                await settle(page, 160);
+                const res = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
+                check(bat.focused && res.prevented[0] === true && res.focus.length === 1 && res.focus[0].preventScroll && res.focused === 'batchBarcodeInput' && res.scrollY === 0,
+                    '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» ពិត (focus ក្រោយ ១៥០ms · គ្មាន keyboard) ➜ ចុច ➜ ចាប់ · focus({ preventScroll }) ម្តង · ទំព័រមិនរំកិល',
+                    JSON.stringify({ bat, res }));
+                await ctx.close();
             }
-            check(SCANNER_GAP_MS > 0 && gaps.length === 2 && gaps.every((g) => g < SCANNER_GAP_MS),
-                dev.label + ' ៖ ជាន់អប្បបរមា ៖ ការស្កេនក្លែងចេញក្នុងល្បឿនម៉ាស៊ីនស្កេន (ចន្លោះពិត < SCANNER_KEY_GAP_MS ' + SCANNER_GAP_MS + 'ms)', JSON.stringify(gaps));
-            check(bare.cod === '2.5' && bare.status.indexOf('77100000308753') === -1 && capped.open && capped.pending === first && capped.active === 'modalCodInput',
-                '⛔ ' + dev.label + ' ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab ➜ COD មិនប្រែ · មិនចូលជួរ · COD 7810122334455 (បិទភ្ជាប់) ➜ «យល់ព្រម» មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD',
-                JSON.stringify({ bare, capped }));
-            await page.evaluate(() => closeModal('phoneModal'));
-            await settle(page, 400);
-            const after = await result();
-            check(human === '2.5' && held.cod === '2.5' && held.phone === '' && held.active === 'modalCodInput' && held.pending === first && held.status.indexOf(next) === -1 && held.status.indexOf('0/1') !== -1 &&
-                after.pending === next && after.phoneModal && after.field === '',
-                '⛔ ' + dev.label + ' ៖ ផ្ទាំងលេខទូរស័ព្ទបើក · វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូលប្រអប់ · ស្កេន ' + next + ' + Enter ➜ COD · លេខទូរស័ព្ទមិនប្រែ · focus នៅ COD · ចូលជួរ ➜ បិទផ្ទាំង ➜ ' + next + ' បើកបន្ទាប់',
-                JSON.stringify({ human, held, after }));
-            await ctx.close();
         }
 
-        console.log('\n=== (ច) zoom (pinch) មិនមែន keyboard ៖ កុំព្យូទ័រ (visual viewport ពិត ៖ Emulation.setPageScaleFactor) ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើកចូលជួរ ===');
-        {
-            const { ctx, page, ready } = await openApp(browser, port, { w: 1280, h: 800 }, [], { hasTouch: false, isMobile: false });
-            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof triggerScanAction === 'function' && typeof softKeyboardShown === 'function');
-            if (pageReady) {
+        if (inPart('គ')) {
+            console.log('\n=== (គ) iPhone · iPad (standalone) · Chrome Android ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់/មិនរំកិល (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ ប្រព័ន្ធធ្វើខ្លួនឯង ===');
+            for (const dev of SCANNER_DEVICES) {
+                const os = dev.android ? 'Android' : 'iOS';
+                const inits = dev.android ? [FAKE_VIEWPORT, TAP_LOG] : [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG];
+                if (dev.safeTop) inits.push('(' + SAFE_TOP.toString() + ')(' + dev.safeTop + ');');
+                const { ctx, page, ready } = await openApp(browser, port, dev, inits, { userAgent: dev.ua });
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
+                if (!pageReady) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                await closeAll(page);
+                if (dev.learn) {
+                    await page.evaluate(() => { switchAppPage('entry'); setEntryScanMode('parcel'); document.getElementById('hwScannerInput').focus({ preventScroll: true }); });
+                    for (const px of dev.learn) { await page.evaluate((v) => window.__kb.open(v), px); await settle(page, 60); }
+                    await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
+                    await settle(page, 120);
+                }
+                await page.evaluate((m) => { switchAppPage('entry'); setEntryScanMode(m); openModalIds().slice().forEach((id) => closeModal(id)); }, dev.mode || 'parcel');
+                await settle(page, 400);
+                const at = await page.evaluate(() => {
+                    const el = document.getElementById('hwScannerInput');
+                    const r = el.getBoundingClientRect();
+                    const x = Math.round(r.left + Math.min(40, r.width / 2));
+                    const y = Math.round(r.top + r.height / 2);
+                    const hit = document.elementFromPoint(x, y) === el;
+                    window.__touchEnds = [];
+                    window.__focusLog = [];
+                    return { x, y, bottom: Math.round(r.bottom), hit, focused: document.activeElement === el, h: window.innerHeight };
+                });
+                if (!at.hit) { bad(dev.label + ' ៖ ប្រអប់វាយ Barcode មិននៅលើអេក្រង់', JSON.stringify(at)); await ctx.close(); continue; }
+                await page.touchscreen.tap(at.x, at.y);
+                await settle(page, 160);
+                const first = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
+                const issues = [];
+                if (at.focused !== dev.byCode) issues.push('focus មុនចុច ' + at.focused);
+                if (dev.catch) {
+                    if (first.prevented[0] !== true) issues.push('ចុចមិនត្រូវចាប់ (' + os + ' រំកិលទំព័រ)');
+                    if (first.focus.length !== 1 || !first.focus[0].preventScroll || first.focus[0].id !== 'hwScannerInput') issues.push('focus ' + JSON.stringify(first.focus));
+                    if (first.focused !== 'hwScannerInput') issues.push('បាត់ focus');
+                    if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                    await settle(page, 160);
+                    await page.touchscreen.tap(at.x, at.y);
+                    await settle(page, 120);
+                    const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
+                    if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
+                    if (at.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + at.bottom);
+                } else {
+                    if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ ' + os + ' តែត្រូវចាប់');
+                    if (first.focus.some((f) => f.preventScroll)) issues.push('focus ' + JSON.stringify(first.focus));
+                    if (at.bottom + 8 <= at.h - dev.kb) issues.push('ប្រអប់នៅពីលើ keyboard ពិត (' + dev.kb + ') ➜ ករណីនេះមិនមែនទិសផ្ទុយ');
+                }
+                check(issues.length === 0,
+                    (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
+                        (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
+                    JSON.stringify({ at, first, issues }));
+                if (dev.catch && !dev.byCode) {
+                    const near = [];
+                    for (const sel of ['#hardwareScannerLabel', '#hardwareScannerBox .scanner-input-wrapper .icon']) {
+                        await page.evaluate(() => { window.__kb.open(0); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+                        await settle(page, 120);
+                        const spot = await page.evaluate((sel) => {
+                            const el = document.querySelector(sel);
+                            if (!el) return null;
+                            const r = el.getBoundingClientRect();
+                            const x = Math.round(r.left + Math.min(20, r.width / 2));
+                            const y = Math.round(r.top + r.height / 2);
+                            const hit = document.elementFromPoint(x, y);
+                            window.__touchEnds = [];
+                            window.__focusLog = [];
+                            return { x, y, hit: !!hit && el.contains(hit) };
+                        }, sel);
+                        if (!spot || !spot.hit) { near.push({ sel, spot, miss: true }); continue; }
+                        await page.touchscreen.tap(spot.x, spot.y);
+                        await settle(page, 160);
+                        near.push(Object.assign({ sel }, await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(),
+                            focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }))));
+                    }
+                    const nearOk = near.length === 2 && near.every((n) => !n.miss && (dev.android
+                        ? n.prevented[0] === false && !n.focus.some((f) => f.preventScroll)
+                        : n.prevented[0] === true && n.focus.length === 1 && n.focus[0].preventScroll && n.focus[0].id === 'hwScannerInput' && n.focused === 'hwScannerInput' && n.scrollY === 0));
+                    check(nearOk, (dev.android ? 'ទិសផ្ទុយ ៖ ' : '⛔ ') + dev.label + ' ៖ ចុចស្លាក «ស្កេន Barcode…» · រូប ⚡ ➜ ' +
+                        (dev.android ? 'Android ដូចដើម (មិនប៉ះ)' : 'ចាប់ដូចចុចប្រអប់ (label មិនឲ្យ iOS focus រំកិលទំព័រ) · focus({ preventScroll }) · document ០'), JSON.stringify(near));
+                }
+                await ctx.close();
+            }
+        }
+
+        if (inPart('ឃ')) {
+            console.log('\n=== (ឃ) Chrome Android ៖ visual viewport រំកិលរួច (keyboard បើកពីប្រអប់មុន) ➜ ចុចស្វែងរក tab ស្កេន ➜ ទំព័រត្រឡប់កំពូល · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ (visual viewport ពិត ៖ pinch) ===');
+            for (const mode of ['parcel', 'locker']) {
+                const field = mode === 'locker' ? 'lockerListSearchInput' : 'entryListSearchInput';
+                const { ctx, page, ready } = await openApp(browser, port, { w: 411, h: 830 }, [ZOOMABLE, TAP_LOG], { userAgent: ANDROID_UA, deviceScaleFactor: 2.625 });
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
+                if (!pageReady) { bad('(ឃ) ' + mode + ' ៖ audit bridge'); await ctx.close(); continue; }
+                await page.evaluate((m) => { openModalIds().slice().forEach((id) => closeModal(id)); switchAppPage('entry'); setEntryScanMode(m); }, mode);
+                await settle(page, 400);
+                await page.evaluate(() => { if (openModalIds().length && typeof chooseLocker === 'function') chooseLocker('A5'); openModalIds().slice().forEach((id) => closeModal(id)); });
+                await settle(page, 400);
                 const cdp = await ctx.newCDPSession(page);
-                const next = '77100000308761';
-                let zoomed = null, out = null, gap = Infinity;
-                for (let attempt = 1; attempt <= 3; attempt++) {
-                    await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+                await cdp.send('Input.synthesizePinchGesture', { x: 205, y: 800, scaleFactor: 1.12, relativeSpeed: 600 });
+                await settle(page, 500);
+                const before = await page.evaluate((id) => {
+                    const r = document.getElementById(id).getBoundingClientRect();
+                    window.__touchEnds = [];
+                    window.__focusLog = [];
+                    return { off: Math.round(visualViewport.offsetTop), offL: visualViewport.offsetLeft, scale: visualViewport.scale, top: Math.round(r.top), bottom: Math.round(r.bottom), left: r.left, width: r.width };
+                }, field);
+                if (!(before.off > 0)) { bad('(ឃ) ' + mode + ' ៖ visual viewport មិនរំកិល (pinch)', JSON.stringify(before)); await ctx.close(); continue; }
+                await page.touchscreen.tap(Math.round(before.left + Math.min(40, before.width / 2) - before.offL), Math.round((before.top + before.bottom) / 2 - before.off));
+                await settle(page, 900);
+                const after = await page.evaluate((id) => {
+                    const el = document.getElementById(id);
+                    const r = el.getBoundingClientRect();
+                    return { off: Math.round(visualViewport.offsetTop), height: Math.round(visualViewport.height), focused: document.activeElement === el, collapsed: uiState.entryPanelCollapsed,
+                        top: Math.round(r.top), bottom: Math.round(r.bottom), prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice() };
+                }, field);
+                check(after.prevented[0] === true && after.focused && after.collapsed && after.off === 0 && after.top >= after.off && after.bottom <= after.off + after.height &&
+                    after.focus.length === 1 && after.focus[0].preventScroll,
+                    '⛔ Chrome Android 411×830 · ' + field + ' ៖ visual viewport រំកិល ' + before.off + 'px ➜ ចុចស្វែងរក ➜ offsetTop ០ (navbar ឃើញ) · ផ្ទាំងបង្រួម · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ · focus({ preventScroll }) ម្តង',
+                    JSON.stringify({ before, after }));
+                await ctx.close();
+            }
+        }
+
+        if (inPart('ង')) {
+            console.log('\n=== (ង) ឧបករណ៍ស្កេន Bluetooth/USB (keyboard HID ៖ ព្រឹត្តិការណ៍ keyboard ពិតរបស់ Chromium) ➜ ស្កេនមិនបាត់ · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ===');
+            for (const dev of HID_DEVICES) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, dev.ios ? [IOS_FLAGS] : [], dev.ctx);
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function' && typeof scanState === 'object');
+                if (!pageReady) { bad('(ង) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const reset = async () => {
                     await page.evaluate(() => {
-                        try { stopBatchScan(); } catch (e) {}
                         openModalIds().slice().forEach((id) => closeModal(id));
                         switchAppPage('entry');
                         setEntryScanMode('parcel');
                         scanState.pendingBarcode = '';
+                        document.getElementById('hwScannerInput').value = '';
+                        if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
                     });
                     await settle(page, 250);
-                    await page.evaluate((a) => triggerScanAction(a), 'ZTZOOMA0001');
+                };
+                const result = () => page.evaluate(() => ({ pending: scanState.pendingBarcode, phoneModal: openModalIds().includes('phoneModal'), scrollY: window.scrollY,
+                    active: document.activeElement && document.activeElement.id, field: document.getElementById('hwScannerInput').value }));
+                const code = '77100000308751';
+                await reset();
+                const before = await page.evaluate(() => document.activeElement === document.body);
+                await page.keyboard.type(code, { delay: 8 });
+                await page.keyboard.press('Enter');
+                await settle(page, 300);
+                const plain = await result();
+                check(before && plain.pending === code && plain.phoneModal && plain.scrollY === 0,
+                    '⛔ ' + dev.label + ' ៖ គ្មានអ្វី focus ➜ ស្កេន ' + code + ' + Enter ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode នេះ · ទំព័រមិនរំកិល', JSON.stringify({ before, plain }));
+                await reset();
+                const cdp = await ctx.newCDPSession(page);
+                for (const c of code) {
+                    const khmer = String.fromCharCode(0x17E0 + Number(c));
+                    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: khmer, code: 'Digit' + c, text: khmer, unmodifiedText: khmer, windowsVirtualKeyCode: 48 + Number(c) });
+                    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: khmer, code: 'Digit' + c, windowsVirtualKeyCode: 48 + Number(c) });
+                }
+                await page.keyboard.press('Enter');
+                await settle(page, 300);
+                const khmer = await result();
+                check(khmer.pending === code && khmer.phoneModal,
+                    '⛔ ' + dev.label + ' ៖ keyboard ខ្មែរ (key «៧៧១…» · code Digit*) ➜ Barcode ' + code + ' (មិនមែនលេខខ្មែរ)', JSON.stringify(khmer));
+                await reset();
+                await page.keyboard.type(code, { delay: 8 });
+                await page.keyboard.press('Tab');
+                await settle(page, 300);
+                const tab = await result();
+                check(tab.pending === code && tab.phoneModal,
+                    '⛔ ' + dev.label + ' ៖ ឧបករណ៍ស្កេនបញ្ចប់ដោយ Tab ➜ បញ្ជូនដូច Enter', JSON.stringify(tab));
+                await reset();
+                await page.evaluate(() => document.getElementById('entryListSearchInput').focus({ preventScroll: true }));
+                await page.keyboard.type('0961', { delay: 8 });
+                await settle(page, 200);
+                const search = await page.evaluate(() => ({ value: document.getElementById('entryListSearchInput').value, active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
+                    field: document.getElementById('hwScannerInput').value }));
+                check(search.value === '0961' && search.active === 'entryListSearchInput' && !search.pending && search.field === '',
+                    'ទិសផ្ទុយ ៖ ' + dev.label + ' ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ នៅប្រអប់ស្វែងរក (ឧបករណ៍ស្កេនមិនលួច)', JSON.stringify(search));
+                await reset();
+                await page.evaluate(() => openBatchScanModal());
+                await settle(page, 400);
+                await page.evaluate(() => { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+                for (const c of code + '\t' + '7710\t') {
+                    if (c === '\t') { await page.keyboard.press('Tab'); continue; }
+                    const khmer = String.fromCharCode(0x17E0 + Number(c));
+                    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: khmer, code: 'Digit' + c, text: khmer, unmodifiedText: khmer, windowsVirtualKeyCode: 48 + Number(c) });
+                    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: khmer, code: 'Digit' + c, windowsVirtualKeyCode: 48 + Number(c) });
+                }
+                await settle(page, 200);
+                const batch = await page.evaluate(() => ({ value: document.getElementById('batchBarcodeInput').value, active: document.activeElement && document.activeElement.id,
+                    count: document.getElementById('batchScanCount').textContent, phoneModal: openModalIds().includes('phoneModal') }));
+                check(batch.value === code + '\n7710\n' && batch.active === 'batchBarcodeInput' && batch.count === '2 Barcode' && !batch.phoneModal,
+                    '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» (គ្មានអ្វី focus) ➜ ស្កេន ២ (keyboard ខ្មែរ · suffix Tab) ➜ ២ ជួរឡាតាំង · focus នៅប្រអប់ · ចំនួន «2 Barcode»', JSON.stringify(batch));
+                // ⛔ ម៉ាស៊ីនតេស្តអាចផ្អាក > SCANNER_KEY_GAP_MS រវាងគ្រាប់ពីរ (CDP · GC) ➜ ការស្កេនក្លែងក្លាយជាការវាយរបស់មនុស្សតាមច្បាប់ App (មិនមែនកំហុស App) ➜ វាស់ចន្លោះពិត
+                //    (event.timeStamp ក្នុងទំព័រ) ហើយធ្វើ scenario ម្តងទៀតតែពេលនោះ (≤ ៣ ដង) · App ខុសពេលល្បឿនស្កេនត្រឹមត្រូវ ➜ នៅធ្លាក់ដដែល
+                await page.evaluate(() => { if (!window.__kdOn) { window.__kdOn = true; window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); } });
+                const markBurst = () => page.evaluate(() => { window.__kd = []; });
+                const burstGap = () => page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
+                const first = 'ZTQUEUEA0001';
+                const next = '77100000308752';
+                let human = '', held = null, bare = null, capped = null, gaps = [];
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    await page.evaluate(() => { try { stopBatchScan(); } catch (e) {} });
+                    await reset();
+                    await page.evaluate((a) => triggerScanAction(a), first);
                     await settle(page, 450);
                     await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
-                    await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1.6 });
-                    await settle(page, 350);
-                    zoomed = await page.evaluate(() => ({ scale: Math.round(visualViewport.scale * 100) / 100, vvH: Math.round(visualViewport.height), innerH: innerHeight,
-                        kb: softKeyboardShown(), cover: uiState.keyboardCover, fit: !!uiState.modalKeyboardFit, mem: localStorage.getItem('zoew_keyboard_inset_v1') }));
-                    await page.evaluate(() => { window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); });
+                    await page.keyboard.type('2.5', { delay: 110 });
+                    await settle(page, 250);
+                    human = await page.evaluate(() => document.getElementById('modalCodInput').value);
+                    await markBurst();
                     await page.keyboard.type(next, { delay: 8 });
-                    gap = await page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
+                    const nextGap = await burstGap();
                     await page.keyboard.press('Enter');
-                    await settle(page, 400);
-                    out = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, pending: scanState.pendingBarcode,
+                    await settle(page, 300);
+                    held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
+                        active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
                         status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
-                    if (SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS) break;
+                    await markBurst();
+                    await page.keyboard.type('77100000308753', { delay: 8 });
+                    const bareGap = await burstGap();
+                    await settle(page, 450);
+                    bare = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value,
+                        status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+                    capped = await page.evaluate(async () => {
+                        document.getElementById('modalCodInput').value = '7810122334455';
+                        await confirmPhone(false);
+                        return { open: openModalIds().includes('phoneModal'), pending: scanState.pendingBarcode, active: document.activeElement && document.activeElement.id };
+                    });
+                    gaps = [nextGap, bareGap];
+                    if (SCANNER_GAP_MS > 0 && nextGap < SCANNER_GAP_MS && bareGap < SCANNER_GAP_MS) break;
                 }
-                check(zoomed && zoomed.scale > 1.5 && zoomed.vvH < zoomed.innerH - KEYBOARD_MIN_INSET_FLOOR && !zoomed.kb && zoomed.cover === 0 && !zoomed.fit && !zoomed.mem,
-                    '⛔ កុំព្យូទ័រ 1280×800 ៖ zoom ១.៦ (visual viewport ' + (zoomed && zoomed.vvH) + ' < innerHeight) ➜ មិនមែន keyboard (softKeyboardShown false · toast ០ · ប្រអប់មិនតម្រូវ · មិនចាំ)', JSON.stringify(zoomed));
-                check(SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS && out && out.cod === '' && out.pending === 'ZTZOOMA0001' && out.status.indexOf(next) === -1 && out.status.indexOf('0/1') !== -1,
-                    '⛔ កុំព្យូទ័រ zoom ១.៦ · ផ្ទាំងលេខទូរស័ព្ទបើក · focus COD ➜ ម៉ាស៊ីនស្កេន ' + next + ' + Enter ➜ ចូលជួរ «📥» · COD មិនប្រែ', JSON.stringify({ gap, out }));
-            } else bad('(ច) zoom ៖ audit bridge');
-            await ctx.close();
+                check(SCANNER_GAP_MS > 0 && gaps.length === 2 && gaps.every((g) => g < SCANNER_GAP_MS),
+                    dev.label + ' ៖ ជាន់អប្បបរមា ៖ ការស្កេនក្លែងចេញក្នុងល្បឿនម៉ាស៊ីនស្កេន (ចន្លោះពិត < SCANNER_KEY_GAP_MS ' + SCANNER_GAP_MS + 'ms)', JSON.stringify(gaps));
+                check(bare.cod === '2.5' && bare.status.indexOf('77100000308753') === -1 && capped.open && capped.pending === first && capped.active === 'modalCodInput',
+                    '⛔ ' + dev.label + ' ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab ➜ COD មិនប្រែ · មិនចូលជួរ · COD 7810122334455 (បិទភ្ជាប់) ➜ «យល់ព្រម» មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD',
+                    JSON.stringify({ bare, capped }));
+                await page.evaluate(() => closeModal('phoneModal'));
+                await settle(page, 400);
+                const after = await result();
+                check(human === '2.5' && held.cod === '2.5' && held.phone === '' && held.active === 'modalCodInput' && held.pending === first && held.status.indexOf(next) === -1 && held.status.indexOf('0/1') !== -1 &&
+                    after.pending === next && after.phoneModal && after.field === '',
+                    '⛔ ' + dev.label + ' ៖ ផ្ទាំងលេខទូរស័ព្ទបើក · វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូលប្រអប់ · ស្កេន ' + next + ' + Enter ➜ COD · លេខទូរស័ព្ទមិនប្រែ · focus នៅ COD · ចូលជួរ ➜ បិទផ្ទាំង ➜ ' + next + ' បើកបន្ទាប់',
+                    JSON.stringify({ human, held, after }));
+                await ctx.close();
+            }
         }
 
-        console.log('\n=== ទិសផ្ទុយ ៖ Android (មិនមែន iOS standalone) ➜ មិនប៉ះការចុចក្នុងប្រអប់ · iPhone ➜ ច្បាប់តម្រូវ iPhone (បាតត្រឹម keyboard មិនមែនកណ្តាល) ===');
-        {
-            const dev = { w: 412, h: 915, kb: 330 };
-            const { ctx, page, ready } = await openApp(browser, port, dev, [FAKE_VIEWPORT, TAP_LOG], { userAgent: ANDROID_UA });
-            if (ready) {
-                await page.evaluate(() => { uiState.entryScanMode = 'parcel'; openBatchScanModal(); });
-                await settle(page, 450);
-                const at = await page.evaluate(() => { const r = document.getElementById('batchBarcodeInput').getBoundingClientRect(); window.__touchEnds = []; window.__focusLog = []; return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 20) }; });
-                await page.touchscreen.tap(at.x, at.y);
-                await settle(page, 160);
-                const res = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
-                check(res.prevented[0] === false && res.focus === 0, 'ទិសផ្ទុយ ៖ PWA Chrome Android ➜ ចុចប្រអប់វាយ ➜ មិនប៉ះ (preventDefault គ្មាន)', JSON.stringify(res));
-            } else bad('ទិសផ្ទុយ Android ៖ audit bridge');
-            await ctx.close();
+        if (inPart('ច')) {
+            console.log('\n=== (ច) zoom (pinch) មិនមែន keyboard ៖ កុំព្យូទ័រ (visual viewport ពិត ៖ Emulation.setPageScaleFactor) ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើកចូលជួរ ===');
+            {
+                const { ctx, page, ready } = await openApp(browser, port, { w: 1280, h: 800 }, [], { hasTouch: false, isMobile: false });
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof triggerScanAction === 'function' && typeof softKeyboardShown === 'function');
+                if (pageReady) {
+                    const cdp = await ctx.newCDPSession(page);
+                    const next = '77100000308761';
+                    let zoomed = null, out = null, gap = Infinity;
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+                        await page.evaluate(() => {
+                            try { stopBatchScan(); } catch (e) {}
+                            openModalIds().slice().forEach((id) => closeModal(id));
+                            switchAppPage('entry');
+                            setEntryScanMode('parcel');
+                            scanState.pendingBarcode = '';
+                        });
+                        await settle(page, 250);
+                        await page.evaluate((a) => triggerScanAction(a), 'ZTZOOMA0001');
+                        await settle(page, 450);
+                        await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
+                        await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1.6 });
+                        await settle(page, 350);
+                        zoomed = await page.evaluate(() => ({ scale: Math.round(visualViewport.scale * 100) / 100, vvH: Math.round(visualViewport.height), innerH: innerHeight,
+                            kb: softKeyboardShown(), cover: uiState.keyboardCover, fit: !!uiState.modalKeyboardFit, mem: localStorage.getItem('zoew_keyboard_inset_v1') }));
+                        await page.evaluate(() => { window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); });
+                        await page.keyboard.type(next, { delay: 8 });
+                        gap = await page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
+                        await page.keyboard.press('Enter');
+                        await settle(page, 400);
+                        out = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, pending: scanState.pendingBarcode,
+                            status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+                        if (SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS) break;
+                    }
+                    check(zoomed && zoomed.scale > 1.5 && zoomed.vvH < zoomed.innerH - KEYBOARD_MIN_INSET_FLOOR && !zoomed.kb && zoomed.cover === 0 && !zoomed.fit && !zoomed.mem,
+                        '⛔ កុំព្យូទ័រ 1280×800 ៖ zoom ១.៦ (visual viewport ' + (zoomed && zoomed.vvH) + ' < innerHeight) ➜ មិនមែន keyboard (softKeyboardShown false · toast ០ · ប្រអប់មិនតម្រូវ · មិនចាំ)', JSON.stringify(zoomed));
+                    check(SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS && out && out.cod === '' && out.pending === 'ZTZOOMA0001' && out.status.indexOf(next) === -1 && out.status.indexOf('0/1') !== -1,
+                        '⛔ កុំព្យូទ័រ zoom ១.៦ · ផ្ទាំងលេខទូរស័ព្ទបើក · focus COD ➜ ម៉ាស៊ីនស្កេន ' + next + ' + Enter ➜ ចូលជួរ «📥» · COD មិនប្រែ', JSON.stringify({ gap, out }));
+                } else bad('(ច) zoom ៖ audit bridge');
+                await ctx.close();
+            }
+        }
+
+        if (inPart('ទិសផ្ទុយ')) {
+            console.log('\n=== ទិសផ្ទុយ ៖ Android (មិនមែន iOS standalone) ➜ មិនប៉ះការចុចក្នុងប្រអប់ · iPhone ➜ ច្បាប់តម្រូវ iPhone (បាតត្រឹម keyboard មិនមែនកណ្តាល) ===');
+            {
+                const dev = { w: 412, h: 915, kb: 330 };
+                const { ctx, page, ready } = await openApp(browser, port, dev, [FAKE_VIEWPORT, TAP_LOG], { userAgent: ANDROID_UA });
+                if (ready) {
+                    await page.evaluate(() => { uiState.entryScanMode = 'parcel'; openBatchScanModal(); });
+                    await settle(page, 450);
+                    const at = await page.evaluate(() => { const r = document.getElementById('batchBarcodeInput').getBoundingClientRect(); window.__touchEnds = []; window.__focusLog = []; return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 20) }; });
+                    await page.touchscreen.tap(at.x, at.y);
+                    await settle(page, 160);
+                    const res = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
+                    check(res.prevented[0] === false && res.focus === 0, 'ទិសផ្ទុយ ៖ PWA Chrome Android ➜ ចុចប្រអប់វាយ ➜ មិនប៉ះ (preventDefault គ្មាន)', JSON.stringify(res));
+                } else bad('ទិសផ្ទុយ Android ៖ audit bridge');
+                await ctx.close();
+            }
+            {
+                const dev = { w: 393, h: 852, kb: 400 };
+                const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT]);
+                if (ready) {
+                    await page.evaluate(() => openModalHelper('pinModal'));
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, 'pinModal');
+                    await page.evaluate(({ index, sel }) => Array.from(document.getElementById('pinModal').querySelectorAll(sel))[index].focus({ preventScroll: true }), { index, sel: FIELD_SELECTOR });
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                    await settle(page, 200);
+                    const r = await page.evaluate(RECT, { id: 'pinModal', index, sel: FIELD_SELECTOR });
+                    const line = dev.h - dev.kb - 8;
+                    check(index >= 0 && r.fitted && Math.abs(r.card[1] - line) <= 1,
+                        'ទិសផ្ទុយ ៖ iPhone (keyboard ៤០០) ➜ ប្រអប់ PIN ឡើងតែល្មមឲ្យបាតត្រឹម keyboard − ៨ (ច្បាប់ iPhone · មិនមែនកណ្តាល Android)', JSON.stringify({ r, line }));
+                } else bad('ទិសផ្ទុយ iPhone ៖ audit bridge');
+                await ctx.close();
+            }
         }
         {
-            const dev = { w: 393, h: 852, kb: 400 };
-            const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT]);
-            if (ready) {
-                await page.evaluate(() => openModalHelper('pinModal'));
-                await settle(page, 320);
-                const index = await firstVisibleField(page, 'pinModal');
-                await page.evaluate(({ index, sel }) => Array.from(document.getElementById('pinModal').querySelectorAll(sel))[index].focus({ preventScroll: true }), { index, sel: FIELD_SELECTOR });
-                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                await settle(page, 200);
-                const r = await page.evaluate(RECT, { id: 'pinModal', index, sel: FIELD_SELECTOR });
-                const line = dev.h - dev.kb - 8;
-                check(index >= 0 && r.fitted && Math.abs(r.card[1] - line) <= 1,
-                    'ទិសផ្ទុយ ៖ iPhone (keyboard ៤០០) ➜ ប្រអប់ PIN ឡើងតែល្មមឲ្យបាតត្រឹម keyboard − ៨ (ច្បាប់ iPhone · មិនមែនកណ្តាល Android)', JSON.stringify({ r, line }));
-            } else bad('ទិសផ្ទុយ iPhone ៖ audit bridge');
-            await ctx.close();
+            const flat = [].concat(...PART_GROUPS);
+            const once = flat.length === new Set(flat).size;
+            const same = flat.length === sectionsAsked.size && flat.every((n) => sectionsAsked.has(n));
+            check(once && same, '⛔ ក្រុម --part គ្របផ្នែកទាំងអស់នៃ checker ម្តងគត់ (' + PART_GROUPS.map((g) => g.length).join(' + ') + ' = ' + sectionsAsked.size + ')',
+                JSON.stringify({ groups: PART_GROUPS, asked: Array.from(sectionsAsked) }));
         }
     } catch (e) {
         bad('កំហុសមិនរំពឹង ៖ ' + (e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e));

@@ -178,14 +178,21 @@ export function openLabelPrintModal(scope: LabelPrintScope) {
     return true;
 }
 
-export function printLabelsFromModal() {
+function labelRowsFromModal(): { options: LabelOptions; rows: LabelRow[] } | null {
     const options = readLabelOptionsFromFields();
     saveLabelOptions(options);
     const rows = buildLabelRows(labelScopeItems(labelPrintScope), options);
     if (!rows.length) {
         showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, '⚠️ គ្មានកញ្ចប់សម្រាប់បោះពុម្ពស្លាកទេ!'));
-        return false;
+        return null;
     }
+    return { options, rows };
+}
+
+export function printLabelsFromModal() {
+    const picked = labelRowsFromModal();
+    if (!picked) return false;
+    const { options, rows } = picked;
     const scope = labelPrintScope;
     const fileLabel = scope && scope.kind === 'item'
         ? 'ZoeW_label_' + String(scope.id).replace(/[^a-zA-Z0-9_-]/g, '')
@@ -222,13 +229,9 @@ export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<
 }
 
 export function saveLabelImagesFromModal() {
-    const options = readLabelOptionsFromFields();
-    saveLabelOptions(options);
-    const rows = buildLabelRows(labelScopeItems(labelPrintScope), options);
-    if (!rows.length) {
-        showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, '⚠️ គ្មានកញ្ចប់សម្រាប់បោះពុម្ពស្លាកទេ!'));
-        return false;
-    }
+    const picked = labelRowsFromModal();
+    if (!picked) return false;
+    const { options, rows } = picked;
     if (rows.length > LABEL_IMAGE_MAX) {
         showToast('⚠️ ស្លាក ' + rows.length + ' ច្រើនពេក (រូបភាព ≤ ' + LABEL_IMAGE_MAX + ' ក្នុងមួយដង) — ជ្រើសថ្ងៃក្នុងតម្រង ឬបោះពុម្ពតាមជួរ');
         return false;

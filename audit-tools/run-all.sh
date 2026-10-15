@@ -92,6 +92,7 @@ if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js 
         fi
     fi
     echo "   root វាស់ ៖ $MEASURE"
+    echo "   ZoeW/app.js ក្នុង checker = ទិដ្ឋភាពអត្ថបទ build ពី ZoeW/src/** (ZoeW/scripts/build-audit.mjs) · App ពិតរត់ build Vite (ZoeW/dist)"
     # state ៖ លំនាំដើមរស់ក្នុង git-dir (មិនដែល commit · build វាស់មិនលុប) · ផ្លូវទាក់ទងគិតពី cwd របស់អ្នកហៅ
     # ⛔ hash គណនាលើ **repo** មិនមែន root វាស់ ៖ zoew-suite · version-bump-scope វាស់ repo ដោយផ្ទាល់
     if [ -z "${RUNALL_STATE+set}" ]; then

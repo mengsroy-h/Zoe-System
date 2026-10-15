@@ -39,7 +39,7 @@ vi.mock('../src/domain/ledger', async (orig) => ({
     revertRevenueLedgerDelta: () => {},
 }));
 
-import { triggerScanAction } from '../src/features/scan-action';
+import { confirmPhone, SCAN_MONEY_MAX, triggerScanAction } from '../src/features/scan-action';
 import * as scanRemove from '../src/features/scan-remove';
 import * as toast from '../src/ui/toast';
 import { fieldValue, setFieldValue, typeIntoElement } from '../src/app/refs';
@@ -347,6 +347,73 @@ describe('ម៉ាស៊ីនស្កេន ពេលផ្ទាំងលេ
         await settle();
         expect(phoneModalOpen()).toBe(false);
         expect(viewState.batchScanStatus).toBe('');
+    });
+});
+
+describe('Fast Mode ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab · COD/DOD ធំខុសធម្មតា មិនដែលត្រូវរក្សាទុក', () => {
+    it('⛔ លុយ ៖ ម៉ាស៊ីនស្កេនគ្មាន suffix ស្កេនចូល COD ពេល lookup កំពុងរក ➜ COD នៅទទេ · ប្រាប់ ➜ Auto save រក្សាទុកតម្លៃ lookup', async () => {
+        const a = 'ZTQY' + seq + '0001';
+        const b = '7810' + seq + '55667788';
+        openScan(a);
+        await settle();
+        focus('modalCodInput');
+        for (const ch of b) { press(ch); wait(8); }
+        wait(400);
+        await settle();
+        expect(fieldValue('modalCodInput')).toBe('');
+        expect(h.toasts.some((t) => t.startsWith('⚠️') && t.includes('Enter'))).toBe(true);
+        expect(viewState.batchScanStatus).toBe('');
+        answer({ found: true, phone: '012345678', cod: 5, dod: 1 });
+        await settle(50);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['012345678', 5, 1]]);
+    });
+
+    it('⛔ ម៉ាស៊ីនស្កេនគ្មាន suffix · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ មិនចូលប្រអប់ (ការស្កេនបន្ទាប់មិនក្លាយជា «BC»)', async () => {
+        openScan('ZTQZ' + seq + '0001');
+        await settle();
+        focus('hwScannerInput');
+        for (const ch of 'ZTQZ' + seq + '0002') { press(ch, { shiftKey: /[A-Z]/.test(ch) }); wait(8); }
+        wait(400);
+        await settle();
+        expect(fieldValue('hwScannerInput')).toBe('');
+    });
+
+    it('⛔ លុយ ៖ COD លើស SCAN_MONEY_MAX (បិទភ្ជាប់ · keyboard លើអេក្រង់) ➜ Auto save មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD ➜ កែ ➜ រក្សាទុក', async () => {
+        const a = 'ZTQU' + seq + '0001';
+        openScan(a);
+        await settle();
+        step(() => setFieldValue('modalCodInput', '7810122334455'));
+        answer({ found: true, phone: '012345678', cod: 5, dod: 1 });
+        await settle(50);
+        await settle(50);
+        expect(h.saves).toEqual([]);
+        expect(phoneModalOpen()).toBe(true);
+        expect(scanState.pendingBarcode).toBe(a);
+        expect(h.toasts.some((t) => t.startsWith('⚠️') && t.includes('COD') && t.includes('7810122334455'))).toBe(true);
+        expect(document.activeElement && document.activeElement.id).toBe('modalCodInput');
+        expect(viewState.phoneModalBusy).toBe(false);
+        step(() => setFieldValue('modalCodInput', '5'));
+        await confirmPhone(false);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['012345678', 5, 1]]);
+    });
+
+    it('⛔ លុយ ៖ DOD លើស SCAN_MONEY_MAX · «រំលង» ក៏មិនរក្សាទុក · ទិសផ្ទុយ ៖ ត្រឹម SCAN_MONEY_MAX ➜ រក្សាទុក', async () => {
+        useLookup(false);
+        openScan('ZTQT' + seq + '0001');
+        await settle(200);
+        step(() => setFieldValue('modalDodInput', String(SCAN_MONEY_MAX + 0.01)));
+        await confirmPhone(true);
+        await settle(50);
+        expect(h.saves).toEqual([]);
+        expect(phoneModalOpen()).toBe(true);
+        expect(h.toasts.some((t) => t.startsWith('⚠️') && t.includes('DOD'))).toBe(true);
+        expect(document.activeElement && document.activeElement.id).toBe('modalDodInput');
+        step(() => { setFieldValue('modalDodInput', String(SCAN_MONEY_MAX)); setFieldValue('modalCodInput', String(SCAN_MONEY_MAX)); });
+        await confirmPhone(true);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['គ្មានលេខ', SCAN_MONEY_MAX, SCAN_MONEY_MAX]]);
     });
 });
 

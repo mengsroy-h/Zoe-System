@@ -108,6 +108,17 @@ check('Service Worker មិនបង្វែរ guide.html ឬ Netlify /guide 
     check('⛔ សៀវភៅប្រាប់ផ្លូវដោះស្រាយ (ដោះឧបករណ៍)', guide.includes('ដោះឧបករណ៍'));
 })();
 
+// ⛔ ពិដាន COD/DOD ក្នុងផ្ទាំងស្កេន (`SCAN_MONEY_MAX` ៖ Auto save ក៏មិនរក្សាទុកលើសវា) ➜ សៀវភៅប្រាប់ចំនួនពិតដែលស្រង់ពី `app.js`
+//    (ចំនួនសរសេរដោយដៃក្នុងឯកសារចាស់ស្ងាត់ៗពេលកូដប្តូរ)
+(function scanMoneyCeiling() {
+    let appSrc = '';
+    try { appSrc = fs.readFileSync(path.join(appDir, 'app.js'), 'utf8'); } catch (e) { appSrc = ''; }
+    const ceiling = /\bSCAN_MONEY_MAX\s*=\s*(\d+)\s*;/.exec(appSrc);
+    check('ជាន់អប្បបរមា ៖ ស្រង់ `SCAN_MONEY_MAX` ចេញពី `app.js` បាន', !!ceiling);
+    check('⛔ សៀវភៅប្រាប់ពិដាន COD/DOD ក្នុងផ្ទាំងស្កេន = `SCAN_MONEY_MAX` ពិត',
+        !!ceiling && guide.includes('$' + ceiling[1]) && guide.includes('Auto save'));
+})();
+
 if (failures) {
     console.error('\n❌ user guide test ធ្លាក់ ' + failures + ' ចំណុច');
     process.exit(1);

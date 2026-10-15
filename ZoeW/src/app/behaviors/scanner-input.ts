@@ -92,9 +92,15 @@ function dropHeldKeys(): void {
 function releaseHeldKeys(): void {
     const held = heldKeys;
     if (!held) return;
+    const scanned = scanBurst.count >= SCANNER_MIN_CHARS;
     dropHeldKeys();
     forgetScanBurst();
-    typeIntoElement(held.el, held.text);
+    if (!scanned) {
+        typeIntoElement(held.el, held.text);
+        return;
+    }
+    if (held.broken) setFieldValue(held.broken, '');
+    showToast(`⚠️ ការស្កេន (${held.scan}) គ្មាន Enter/Tab ពីម៉ាស៊ីនស្កេន ➜ មិនបានបញ្ចូលក្នុងផ្ទាំងទេ។ សូមកំណត់ម៉ាស៊ីនស្កេនឲ្យបញ្ចប់ដោយ Enter ឬ Tab រួចស្កេនម្ដងទៀត។`);
 }
 
 function continuesHeldBurst(e: KeyboardEvent, at: number): boolean {

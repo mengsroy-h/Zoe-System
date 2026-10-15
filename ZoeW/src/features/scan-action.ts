@@ -22,6 +22,8 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes, rejectScanAndRefocus } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 
+export const SCAN_MONEY_MAX = 100000;
+
 export function triggerScanAction(barcode) {
     if (uiState.isModalOpen) return;
 
@@ -117,6 +119,15 @@ export async function confirmPhone(isSkip = false) {
 
     if (!Number.isFinite(cod) || cod < 0) cod = 0;
     if (!Number.isFinite(dod) || dod < 0) dod = 0;
+
+    const oversized = cod > SCAN_MONEY_MAX ? 'modalCodInput' : (dod > SCAN_MONEY_MAX ? 'modalDodInput' : null);
+    if (oversized) {
+        const label = oversized === 'modalCodInput' ? 'COD' : 'DOD';
+        const amount = oversized === 'modalCodInput' ? cod : dod;
+        showToast(`⚠️ ${label} $${amount} ធំខុសធម្មតា (លើស $${SCAN_MONEY_MAX}) — ប្រហែលជាលេខ Barcode ឬលេខទូរស័ព្ទចូលខុសប្រអប់។ មិនបានរក្សាទុកទេ ៖ សូមកែ ${label} ហើយចុច «យល់ព្រម» ម្ដងទៀត។`);
+        focusField(oversized);
+        return;
+    }
 
     if (isSkip || !phone) {
         phone = "គ្មានលេខ";

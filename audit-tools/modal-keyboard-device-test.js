@@ -21,6 +21,7 @@
 //       ច្បាប់ ៖ ចុចស្វែងរក ➜ offsetTop ០ (documentElement.scrollIntoView · window.scrollTo មិនប៉ះ visual viewport) — visual viewport ពិត (pinch លើ meta ពង្រីកបាន)
 //   (ង) ឧបករណ៍ស្កេន Bluetooth/USB (សំណើម្ចាស់គម្រោង) ៖ គ្មានអ្វី focus (ទូរស័ព្ទ) ➜ ការស្កេនទៅប្រអប់ Barcode · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ➜ បញ្ជូន ·
 //       ផ្ទាំងលេខទូរស័ព្ទបើក ➜ ការស្កេនមិនចូល COD (ចូលជួរ ➜ បើកក្រោយផ្ទាំងបិទ) · ការវាយល្បឿនមនុស្សចូលប្រអប់ (`execCommand` លើ type=number) ·
+//       ការស្កេនគ្មាន Enter/Tab ➜ មិនចូល · COD លើស SCAN_MONEY_MAX ➜ មិនរក្សាទុក ·
 //       «📋 បញ្ចូលច្រើន» ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · Tab ➜ ជួរថ្មី ·
 //       ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus ➜ មិនលួច — ព្រឹត្តិការណ៍ keyboard ពិត (CDP) · Android · iPhone · កុំព្យូទ័រ
 //   ទិសផ្ទុយ ៖ ប្រអប់វាយក្នុងប្រអប់ (modal) លើ Android ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
@@ -519,6 +520,18 @@ const SAFE_TOP = function (px) {
             const held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
                 active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
                 status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+            await page.keyboard.type('77100000308753', { delay: 8 });
+            await settle(page, 450);
+            const bare = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value,
+                status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+            const capped = await page.evaluate(async () => {
+                document.getElementById('modalCodInput').value = '7810122334455';
+                await confirmPhone(false);
+                return { open: openModalIds().includes('phoneModal'), pending: scanState.pendingBarcode, active: document.activeElement && document.activeElement.id };
+            });
+            check(bare.cod === '2.5' && bare.status.indexOf('77100000308753') === -1 && capped.open && capped.pending === first && capped.active === 'modalCodInput',
+                '⛔ ' + dev.label + ' ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab ➜ COD មិនប្រែ · មិនចូលជួរ · COD 7810122334455 (បិទភ្ជាប់) ➜ «យល់ព្រម» មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD',
+                JSON.stringify({ bare, capped }));
             await page.evaluate(() => closeModal('phoneModal'));
             await settle(page, 400);
             const after = await result();

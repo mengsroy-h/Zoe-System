@@ -337,11 +337,15 @@ async function printRelayoutPdf(browser, port) {
     const ready = await page.evaluate(() => typeof beginPdfPrint === 'function' && typeof buildLabelRows === 'function' && typeof normalizeLabelOptions === 'function' && typeof LABEL_LAYOUTS !== 'undefined' && typeof uiState === 'object');
     check(ready, 'ZoeW បោះពុម្ព ៖ មាន beginPdfPrint · buildLabelRows · LABEL_LAYOUTS (audit build)');
     if (!ready) { await ctx.close(); return; }
-    const PAPERS = [{ format: 'A4' }, { format: 'A3' }, { format: 'A5' }, { format: 'Letter' }, { format: 'Legal' }, { format: 'A4', landscape: true }];
+    const PAPERS = [{ format: 'A4' }, { format: 'A3' }, { format: 'A5' }, { format: 'Letter' }, { format: 'Legal' }, { format: 'A4', landscape: true },
+        { width: '4in', height: '6in', name: '4×6in' }, { width: '50mm', height: '30mm', name: '50×30', roll: true }, { width: '40mm', height: '30mm', name: '40×30', roll: true },
+        { width: '60mm', height: '40mm', name: '60×40', roll: true }];
     const layouts = await page.evaluate(() => LABEL_LAYOUTS.slice());
     const cases = layouts.map((layout) => ({ layout })).concat([{ layout: null }]);
     const rows = [];
     let pdfs = 0;
+    await page.evaluate(() => { uiState.pdfExportView = null; commitNow(); });
+    const blank = Math.max(...await Promise.all([{ format: 'A4' }, { width: '50mm', height: '30mm' }].map(async (p) => (await page.pdf(p)).length)));
     for (const c of cases) {
         const n = await page.evaluate((layout) => {
             window.print = () => {};
@@ -361,21 +365,95 @@ async function printRelayoutPdf(browser, port) {
         }, c.layout);
         const seen = [];
         for (const paper of PAPERS) {
-            const buf = await page.pdf(Object.assign({ printBackground: false }, paper));
+            const buf = await page.pdf(Object.assign({ printBackground: false }, paper.format ? { format: paper.format, landscape: !!paper.landscape } : { width: paper.width, height: paper.height }));
             pdfs++;
             const pages = (buf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
             const dom = await page.evaluate((layout) => document.querySelectorAll(layout ? '#pdfExportPrintArea .label' : '#pdfExportPrintArea tbody tr').length, c.layout);
-            seen.push({ paper: paper.format + (paper.landscape ? '↔' : ''), dom, pages });
+            seen.push({ paper: paper.name || paper.format + (paper.landscape ? '↔' : ''), roll: !!paper.roll, dom, pages, inked: buf.length > blank * 2 });
         }
         const events = await page.evaluate(() => window.__printEvents);
         await page.mouse.click(5, 5);
         const cleared = await page.evaluate(() => ({ view: uiState.pdfExportView === null, nodes: document.querySelectorAll('#pdfExportPrintArea *').length }));
         rows.push({ layout: c.layout || 'pdf-table', n, events, seen, cleared });
     }
-    const broken = rows.filter((r) => r.n < 24 || r.events < PAPERS.length * 2 || r.seen.some((s) => s.dom !== r.n || s.pages < 2) || !r.cleared.view || r.cleared.nodes !== 0);
+    const broken = rows.filter((r) => r.n < 24 || r.events < PAPERS.length * 2 || r.seen.some((s) => s.dom !== r.n || !s.inked) || !r.cleared.view || r.cleared.nodes !== 0);
     check(rows.length === layouts.length + 1 && pdfs === rows.length * PAPERS.length && broken.length === 0,
-        '⛔ ZoeW បោះពុម្ព ៖ ប្តូរក្រដាស (A4 · A3 · A5 · Letter · Legal · A4 ផ្តេក ៖ beforeprint/afterprint ពិត) ➜ ស្លាក ' + layouts.length + ' ប្លង់ + តារាង PDF មានទិន្នន័យគ្រប់ PDF (' + pdfs + ') · ចុច App វិញ ➜ សម្អាត',
+        '⛔ ZoeW បោះពុម្ព ៖ ប្តូរក្រដាស (A4 · A3 · A5 · Letter · Legal · A4 ផ្តេក · 4×6in · ក្រដាសស្លាក ៣ ៖ beforeprint/afterprint ពិត) ➜ ស្លាក ' + layouts.length + ' ប្លង់ + តារាង PDF មានទិន្នន័យគ្រប់ PDF (' + pdfs + ') · ចុច App វិញ ➜ សម្អាត',
         JSON.stringify(broken.slice(0, 3)));
+    // ⛔ សំណើម្ចាស់គម្រោង ៖ «ធ្វើអោយវាឆ្លាតវៃ អាចឆ្លាស់គ្រប់ប្រភេទក្រដាស» ៖ ក្រដាសតាមផ្ទាំងបោះពុម្ពសម្រេចប្លង់ (ទំហំ CSS មិនបង្ខំ) ➜ ក្រដាសស្លាក (រមូរ) ➜
+    //   ១ ស្លាក/ទំព័រ គ្រប់ប្លង់ · ក្រដាសធំ ➜ ស្លាកច្រើនក្នុងមួយទំព័រ (≥ ២ · «single» ➜ ១/ទំព័រ)
+    const dumb = rows.filter((r) => r.layout !== 'pdf-table').map((r) => ({ layout: r.layout, bad: r.seen.filter((s) =>
+        s.roll ? s.pages !== r.n : (r.layout === 'single' ? s.pages !== r.n : s.pages > (s.paper === '4×6in' ? r.n : r.n / 2))).map((s) => s.paper + ':' + s.pages) })).filter((r) => r.bad.length);
+    check(rows.length === layouts.length + 1 && dumb.length === 0,
+        '⛔ ZoeW បោះពុម្ពឆ្លាតវៃ ៖ ក្រដាសស្លាក (50×30 · 40×30 · 60×40) ➜ ១ ស្លាក/ទំព័រ គ្រប់ប្លង់ ' + layouts.length + ' · ក្រដាសធំ (A4 · A3 · A5 · Letter · Legal) ➜ ស្លាកច្រើនក្នុងមួយទំព័រ (single ➜ ១/ទំព័រ) · 4×6in ➜ ≤ ១ ទំព័រ/ស្លាក',
+        JSON.stringify(dumb));
+    await ctx.close();
+}
+
+// ⛔ សំណើម្ចាស់គម្រោង (NIIMBOT B1 ៖ Bluetooth តាម App NIIMBOT · មិនមែនម៉ាស៊ីនបោះពុម្ពរបស់ប្រព័ន្ធ) ៖ «🖼️ រក្សាទុកជារូបភាព» ➜ ស្លាកនីមួយៗជា PNG ទំហំពិត
+//   (៨ ចំណុច/mm = 203dpi ៖ 50×30 ➜ 400×240) · Barcode អានវិញបានដោយម៉ាស៊ីនស្កេនរបស់ App (ZXing ពិត) · ខ្លឹមសារមិនប៉ះគែម · ប្លង់ A4 ➜ ទំហំ 50×30 ·
+//   ចែករំលែក ៖ `navigator.share({ files })` (iPhone · Android) ជា PNG មួយស្លាកមួយឯកសារ
+async function labelImageExport(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.addInitScript(() => {
+        window.__shared = [];
+        Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && d.files && d.files.length) });
+        Object.defineProperty(navigator, 'share', { configurable: true, value: (d) => { window.__shared.push((d.files || []).map((f) => ({ name: f.name, type: f.type, size: f.size }))); return Promise.resolve(); } });
+    });
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof labelImageFiles === 'function' && typeof saveLabelImagesFromModal === 'function' && typeof buildLabelRows === 'function');
+    check(ready, 'ZoeW ស្លាកជារូបភាព (NIIMBOT) ៖ មាន labelImageFiles · saveLabelImagesFromModal (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.waitForFunction(() => typeof scanEngineReady === 'function' && scanEngineReady(), null, { timeout: 15000 }).catch(() => {});
+    const res = await page.evaluate(async () => {
+        const items = [
+            { id: 'N1', phone: '0960001234', scanDate: '2026-10-15', locker: 'A12', barcodes: [{ code: '77100000308751', cod: 1234.56, dod: 245.5, locker: 'B7', isClosed: false }] },
+            { id: 'N2', phone: '+85512345678', scanDate: '2026-10-09', locker: 'N/A', barcodes: [{ code: 'ZT880000000123', cod: 2.5, dod: 0, locker: 'N/A', isClosed: false }] },
+            { id: 'N3', phone: 'គ្មានលេខ', scanDate: '2026-10-15', locker: 'C1', barcodes: [{ code: 'KH77100000841', cod: 0, dod: 0, locker: 'C1', isClosed: false }] }
+        ];
+        const out = [];
+        for (const [layout, mm] of [['50x30', [50, 30]], ['40x30', [40, 30]], ['60x40', [60, 40]], ['a4-3', [50, 30]]]) {
+            const options = normalizeLabelOptions({ layout, money: true, date: true, locker: true, openOnly: false });
+            const rows = buildLabelRows(items, options);
+            const files = labelImageFiles(rows, options);
+            for (let i = 0; i < files.length; i++) {
+                const img = await new Promise((r) => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = files[i].dataUrl; });
+                if (!img) { out.push({ layout, name: files[i].name, bad: 'decode' }); continue; }
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth; c.height = img.naturalHeight;
+                const g = c.getContext('2d', { willReadFrequently: true });
+                g.drawImage(img, 0, 0);
+                const d = g.getImageData(0, 0, c.width, c.height).data;
+                let dark = 0, edge = 0;
+                for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+                    const k = (y * c.width + x) * 4;
+                    if (d[k] + d[k + 1] + d[k + 2] < 384) { dark++; if (x < 2 || y < 2 || x >= c.width - 2 || y >= c.height - 2) edge++; }
+                }
+                const read = typeof decodeBarcodeFromCanvasManual === 'function' && scanEngineReady() ? await decodeBarcodeFromCanvasManual(buildReaderOptions(true), c) : null;
+                out.push({ layout, name: files[i].name, w: c.width, h: c.height, wantW: mm[0] * 8, wantH: mm[1] * 8, ratio: dark / (c.width * c.height), edge, read, code: rows[i].barcode });
+            }
+        }
+        window.__shared = [];
+        uiState.pdfExportView = null;
+        return out;
+    });
+    const sizeBad = res.filter((r) => r.bad || r.w !== r.wantW || r.h !== r.wantH);
+    check(res.length === 12 && sizeBad.length === 0,
+        '⛔ ZoeW ស្លាកជារូបភាព ៖ PNG ទំហំពិត ៨ ចំណុច/mm (50×30 ➜ 400×240 · 40×30 ➜ 320×240 · 60×40 ➜ 480×320 · ប្លង់ A4 ➜ 400×240) · ៣ ស្លាក × ៤ ប្លង់', JSON.stringify(sizeBad.slice(0, 4)));
+    const inkBad = res.filter((r) => !(r.ratio > 0.04 && r.ratio < 0.6) || r.edge > 0);
+    check(inkBad.length === 0, '⛔ ZoeW ស្លាកជារូបភាព ៖ មានខ្លឹមសារ (ខ្មៅ ៤–៦០%) · គ្មានអ្វីប៉ះគែម ២ ចំណុច (មិនកាត់)', JSON.stringify(inkBad.slice(0, 4)));
+    const readBad = res.filter((r) => r.read !== r.code);
+    check(res.some((r) => r.read !== null) && readBad.length === 0, '⛔ ZoeW ស្លាកជារូបភាព ៖ Barcode ក្នុងរូបអានវិញបានដោយម៉ាស៊ីនស្កេនរបស់ App (ZXing) = លេខកញ្ចប់', JSON.stringify(readBad.slice(0, 4)));
+    const names = new Set(res.filter((r) => r.layout === '50x30').map((r) => r.name));
+    check(names.size === 3 && [...names].every((n) => /^ZoeW_label_[A-Za-z0-9]+\.png$/.test(n)), 'ZoeW ស្លាកជារូបភាព ៖ ឈ្មោះឯកសារ ZoeW_label_<Barcode>.png មិនស្ទួន', JSON.stringify([...names]));
+    await page.evaluate(() => { dataState.scanHistory = [{ id: 'S1', phone: '0960001111', scanDate: '2026-10-15', locker: 'A1', barcodes: [{ code: '77100000555', cod: 1, dod: 0, locker: 'A1', isClosed: false }, { code: '77100000556', cod: 0, dod: 2, locker: 'A1', isClosed: false }] }]; uiState.currentFilterMode = 'all'; });
+    const shared = await page.evaluate(() => { openLabelPrintModal({ kind: 'item', id: 'S1' }); commitNow(); const r = saveLabelImagesFromModal(); return Promise.resolve(r).then(() => ({ shared: window.__shared.slice(), open: openModalIds() })); });
+    check(shared.shared.length === 1 && shared.shared[0].length === 2 && shared.shared[0].every((f) => f.type === 'image/png' && f.size > 500 && /^ZoeW_label_77100000(555|556)\.png$/.test(f.name)),
+        '⛔ ZoeW ស្លាកជារូបភាព ៖ ប៊ូតុងក្នុងផ្ទាំងបោះពុម្ព ➜ navigator.share({ files }) ១ ដង · PNG មួយស្លាកមួយឯកសារ (២)', JSON.stringify(shared));
     await ctx.close();
 }
 
@@ -392,9 +470,11 @@ async function labelPrintFit(browser, port) {
     await page.addStyleTag({ content: '#pdfExportPrintArea .label-sheet, #pdfExportPrintArea .label-sheet * { font-family: "Liberation Sans", Arial, sans-serif !important; }' });
     const layouts = await page.evaluate(() => LABEL_LAYOUTS.slice());
     const results = [];
-    const PAPERS = [[1047, 'A4 ផ្តេក · A3 បញ្ឈរ'], [718, 'A4 បញ្ឈរ'], [740, 'Letter · Legal បញ្ឈរ'], [484, 'A5 បញ្ឈរ']];
-    for (const [w, paper] of PAPERS) {
-        await page.setViewportSize({ width: w, height: 740 });
+    // ផ្ទៃក្នុងទំព័រ (px @96dpi) ៖ ក្រដាសធំ ➜ margin ១០mm · ក្រដាសស្លាក (រមូរ) ➜ margin ១.៥mm (ម៉ាស៊ីនបោះពុម្ពស្លាក ៖ ទំហំតាមផ្ទាំងបោះពុម្ព)
+    const PAPERS = [[1047, 740, 'A4 ផ្តេក · A3 បញ្ឈរ'], [718, 1047, 'A4 បញ្ឈរ'], [740, 980, 'Letter · Legal បញ្ឈរ'], [484, 718, 'A5 បញ្ឈរ'], [308, 500, '4×6in បញ្ឈរ'],
+        [178, 102, 'ក្រដាសស្លាក 50×30', true], [140, 102, 'ក្រដាសស្លាក 40×30', true], [215, 140, 'ក្រដាសស្លាក 60×40', true]];
+    for (const [w, h, paper, roll] of PAPERS) {
+        await page.setViewportSize({ width: w, height: h });
         for (const layout of layouts) {
             const count = await page.evaluate(({ layout, money, phones }) => {
                 const items = money.map(([cod, dod], i) => ({ id: 'L' + i, phone: phones[i % phones.length], scanDate: '2026-10-15', locker: 'A12',
@@ -431,16 +511,18 @@ async function labelPrintFit(browser, port) {
                         if (ch.classList.contains('label-phone') && new Set([...range.getClientRects()].map((x) => Math.round(x.top))).size > 1) phoneSplit++;
                     }
                 }
-                return { n: labels.length, moneyDrawn, phoneSplit, bad, widths: [...widths], sheetOver: sheet.scrollWidth - sheet.clientWidth, right: Math.round(sheet.getBoundingClientRect().right), vw: document.documentElement.clientWidth,
+                const vh = window.innerHeight;
+                const tooTall = labels.filter((lb) => { const r = lb.getBoundingClientRect(); return r.height > vh + 1 || r.width > document.documentElement.clientWidth + 1; }).length;
+                return { n: labels.length, moneyDrawn, phoneSplit, bad, tooTall, widths: [...widths], sheetOver: sheet.scrollWidth - sheet.clientWidth, right: Math.round(sheet.getBoundingClientRect().right), vw: document.documentElement.clientWidth,
                     font: getComputedStyle(sheet.querySelector('.label-money') || sheet).fontFamily };
             });
             await page.emulateMedia({ media: 'screen' });
-            results.push(Object.assign({ paper, layout, count }, m || { missing: true }));
+            results.push(Object.assign({ paper, roll: !!roll, layout, count }, m || { missing: true }));
         }
     }
     await page.evaluate(() => { uiState.pdfExportView = null; commitNow(); });
-    check(results.length === layouts.length * PAPERS.length && PAPERS.length >= 4 && layouts.length >= 6 && results.every((r) => !r.missing && r.n === LABEL_FIT_MONEY.length && r.count === r.n && r.moneyDrawn === r.n && /Liberation/.test(r.font)),
-        'ZoeW ស្លាកបោះពុម្ព ៖ ជាន់អប្បបរមា ៖ ស្លាកពិត ' + LABEL_FIT_MONEY.length + ' (លុយ ' + LABEL_FIT_MONEY.length + ' ទំហំ) × layout ' + layouts.length + ' × ក្រដាស ' + PAPERS.length + ' (A4 ផ្តេក/បញ្ឈរ · Letter · A5) គូរក្នុង print media',
+    check(results.length === layouts.length * PAPERS.length && PAPERS.length >= 8 && layouts.length >= 6 && results.every((r) => !r.missing && r.n === LABEL_FIT_MONEY.length && r.count === r.n && r.moneyDrawn === r.n && /Liberation/.test(r.font)),
+        'ZoeW ស្លាកបោះពុម្ព ៖ ជាន់អប្បបរមា ៖ ស្លាកពិត ' + LABEL_FIT_MONEY.length + ' (លុយ ' + LABEL_FIT_MONEY.length + ' ទំហំ) × layout ' + layouts.length + ' × ក្រដាស ' + PAPERS.length + ' (A4 ផ្តេក/បញ្ឈរ · Letter · A5 · 4×6in · ក្រដាសស្លាក ៣) គូរក្នុង print media',
         JSON.stringify(results.filter((r) => r.missing || r.n !== LABEL_FIT_MONEY.length || r.moneyDrawn !== r.n || !/Liberation/.test(r.font || '')).slice(0, 3)));
     check(results.every((r) => r.bad && r.bad.length === 0),
         '⛔ ZoeW ស្លាកបោះពុម្ព ៖ គ្រប់ layout ➜ លេខទូរស័ព្ទ · Barcode · COD/DOD · ថ្ងៃ/Locker នៅក្នុងប្រអប់ស្លាក (មិនកាត់លើក្រដាស · មិនហួសបាតស្លាកទំហំថេរ)',
@@ -450,6 +532,9 @@ async function labelPrintFit(browser, port) {
     check(results.every((r) => r.widths && r.widths.length === 1 && r.sheetOver <= 1 && r.right <= r.vw + 1),
         '⛔ ZoeW ស្លាកបោះពុម្ព ៖ ស្លាកទទឹងស្មើគ្នា · សន្លឹកមិនលើសទទឹងក្រដាស (A4 ៣/២ ជួរឈរ · បញ្ឈរ/ផ្តេក · Letter · A5)',
         JSON.stringify(results.filter((r) => !(r.widths && r.widths.length === 1 && r.sheetOver <= 1 && r.right <= r.vw + 1)).map((r) => [r.paper, r.layout, r.widths, r.sheetOver, r.right, r.vw])));
+    check(results.filter((r) => r.roll).length === layouts.length * 3 && results.every((r) => r.tooTall === 0),
+        '⛔ ZoeW ស្លាកបោះពុម្ពឆ្លាតវៃ ៖ គ្រប់ប្លង់ × ក្រដាសស្លាក (50×30 · 40×30 · 60×40) ➜ ស្លាកនីមួយៗល្មមមួយទំព័រ (ទទឹង · កម្ពស់ ≤ ផ្ទៃទំព័រ) · ក្រដាសធំ ➜ ស្លាកមិនលើសទំព័រ',
+        JSON.stringify(results.filter((r) => r.tooTall).map((r) => [r.paper, r.layout, r.tooTall])));
     await ctx.close();
 }
 
@@ -1403,6 +1488,7 @@ async function historyRowLayout(browser, port) {
             await toastTabbarLayout(browser, port);
             await labelPrintFit(browser, port);
             await printRelayoutPdf(browser, port);
+            await labelImageExport(browser, port);
             await tapTargetLayout(browser, port);
             await phoneModalEnterNext(browser, port);
         }

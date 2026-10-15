@@ -721,28 +721,22 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .label-sheet.layout-single { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .label-sheet.layout-single .label { border: none; break-after: page; page-break-after: always; }
 .label-sheet.layout-single .label:last-child { break-after: auto; page-break-after: auto; }
-@page zoeLabel50x30 { size: 50mm 30mm; margin: 1.5mm; }
 .label-sheet.layout-50x30 { display: block; --label-phone-max: 17pt; --label-phone-ls: 0.3mm; --label-money-max: 10pt; }
-.label-sheet.layout-50x30 .label { page: zoeLabel50x30; break-after: page; page-break-after: always; width: 47mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 1mm; border: none; border-radius: 0; }
-.label-sheet.layout-50x30 .label:last-child { break-after: auto; page-break-after: auto; }
+.label-sheet.layout-50x30 .label { width: 47mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 1mm; border: none; border-radius: 0; }
 .label-sheet.layout-50x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-50x30 .label-bc { height: 7mm; margin-top: 0.8mm; }
 .label-sheet.layout-50x30 .label-code { --label-code-max: 6.5pt; --label-code-ls: 0.3mm; margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
-@page zoeLabel40x30 { size: 40mm 30mm; margin: 1.5mm; }
 .label-sheet.layout-40x30 { display: block; --label-phone-max: 14pt; --label-phone-ls: 0.2mm; --label-money-max: 9pt; }
-.label-sheet.layout-40x30 .label { page: zoeLabel40x30; break-after: page; page-break-after: always; width: 37mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 0.8mm; border: none; border-radius: 0; }
-.label-sheet.layout-40x30 .label:last-child { break-after: auto; page-break-after: auto; }
+.label-sheet.layout-40x30 .label { width: 37mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 0.8mm; border: none; border-radius: 0; }
 .label-sheet.layout-40x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-40x30 .label-bc { height: 6.5mm; margin-top: 0.8mm; }
 .label-sheet.layout-40x30 .label-code { --label-code-max: 5.5pt; --label-code-ls: 0.2mm; margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-meta { font-size: 7.5pt; gap: 2.5mm; margin-top: 0.3mm; }
-@page zoeLabel60x40 { size: 60mm 40mm; margin: 2mm; }
 .label-sheet.layout-60x40 { display: block; --label-phone-max: 22pt; --label-phone-ls: 0.4mm; --label-money-max: 13pt; }
-.label-sheet.layout-60x40 .label { page: zoeLabel60x40; break-after: page; page-break-after: always; width: 56mm; height: 36mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 1mm 1.5mm; border: none; border-radius: 0; }
-.label-sheet.layout-60x40 .label:last-child { break-after: auto; page-break-after: auto; }
+.label-sheet.layout-60x40 .label { width: 56mm; height: 36mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 1mm 1.5mm; border: none; border-radius: 0; }
 .label-sheet.layout-60x40 .label-phone { line-height: 1.05; }
 .label-sheet.layout-60x40 .label-bc { height: 10mm; margin-top: 1mm; }
 .label-sheet.layout-60x40 .label-code { --label-code-max: 8pt; --label-code-ls: 0.4mm; margin-top: 0.4mm; }
@@ -761,10 +755,34 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 @media print {
     #pdfExportPrintArea .label-sheet { width: 100%; }
 }
+@media print and (min-width: 75.1mm) and (min-height: 50.1mm) {
+    #pdfExportPrintArea .label-sheet.layout-a4-3 { grid-template-columns: repeat(auto-fill, minmax(min(100%, max(60mm, calc((100% - 8mm) / 3))), 1fr)); }
+    #pdfExportPrintArea .label-sheet.layout-a4-2 { grid-template-columns: repeat(auto-fill, minmax(min(100%, max(85mm, calc((100% - 5mm) / 2))), 1fr)); }
+    #pdfExportPrintArea .label-sheet.layout-50x30,
+    #pdfExportPrintArea .label-sheet.layout-40x30,
+    #pdfExportPrintArea .label-sheet.layout-60x40 { display: flex; flex-wrap: wrap; align-content: flex-start; }
+    #pdfExportPrintArea .label-sheet.layout-50x30 .label,
+    #pdfExportPrintArea .label-sheet.layout-40x30 .label,
+    #pdfExportPrintArea .label-sheet.layout-60x40 .label { flex: none; outline: 0.2mm dashed #94a3b8; outline-offset: -0.1mm; }
+}
+@media print and (max-width: 75mm), print and (max-height: 50mm) {
+    @page { margin: 1.5mm; }
+    #pdfExportPrintArea .label-sheet { display: block; gap: 0; --label-phone-max: 17pt; --label-phone-ls: 0.3mm; --label-money-max: 10pt; }
+    #pdfExportPrintArea .label-sheet .label { width: auto; height: auto; max-width: 100%; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 1mm; border: none; outline: none; border-radius: 0; break-after: page; page-break-after: always; }
+    #pdfExportPrintArea .label-sheet .label:last-child { break-after: auto; page-break-after: auto; }
+    #pdfExportPrintArea .label-sheet .label-phone { line-height: 1.05; }
+    #pdfExportPrintArea .label-sheet .label-bc { height: 7mm; margin-top: 0.8mm; }
+    #pdfExportPrintArea .label-sheet .label-code { --label-code-max: 6.5pt; --label-code-ls: 0.3mm; margin-top: 0.3mm; }
+    #pdfExportPrintArea .label-sheet .label-money { margin-top: 0.3mm; }
+    #pdfExportPrintArea .label-sheet .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
+}
 
 .label-print-modal-content { max-width: clamp(340px, 60vw, 640px); text-align: left; }
 .label-print-modal-content h3 { text-align: center; }
 .label-print-scope { margin: 0 0 2px; font-size: calc(12 * var(--fs-unit)); }
+.label-print-hint { margin: 0 0 8px; font-size: calc(10.5 * var(--fs-unit)); line-height: 1.45; color: var(--text-muted); }
+.label-image-btn { display: block; width: 100%; min-height: 44px; margin: 0 0 4px; padding: 8px 12px; border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--primary-light); color: var(--primary); font-family: inherit; font-size: calc(12 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
+.label-image-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .label-print-summary { min-height: 1.4em; margin: 0 0 8px; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); }
 .label-print-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; font-size: calc(11 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); }
 .label-print-field select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: calc(12 * var(--fs-unit)); color: var(--text-main); background: #fff; }

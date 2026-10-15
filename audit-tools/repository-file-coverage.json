@@ -1645,6 +1645,9 @@
     "ZoeW/src/features/label-print.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/label-image.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/license.ts": {
       "policy": "zoew-app"
     },
@@ -1955,6 +1958,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/print-relayout.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/label-image.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/late-commit-stale-session.test.ts": {

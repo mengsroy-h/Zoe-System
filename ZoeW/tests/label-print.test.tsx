@@ -206,11 +206,11 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(viewState.labelPrintTitle).toBe('');
     });
 
-    it('⛔ ខ្សែភ្ជាប់ ៖ MODAL_IDS · AppShell · សកម្មភាព · ម៉ឺនុយ · logout · CSS (.label-phone ≥ 24pt · break-inside · layout-single break-after · ស្លាកនៅក្រោម .label-sheet តែប៉ុណ្ណោះ)', () => {
+    it('⛔ ខ្សែភ្ជាប់ ៖ MODAL_IDS · AppShell · សកម្មភាព · ម៉ឺនុយ · logout · CSS (.label-phone ≥ 24pt · break-inside · layout-single break-after · ស្លាកនៅក្រោម .label-sheet តែប៉ុណ្ណោះ · ក្រដាសតាមផ្ទាំងបោះពុម្ព ៖ គ្មានទំហំបង្ខំ · ក្រដាសស្លាក ➜ ១/ទំព័រ)', () => {
         const root = path.join(__dirname, '..', 'src');
         expect(MODAL_IDS).toContain('labelPrintModal');
         expect(readFileSync(path.join(root, 'app', 'components', 'AppShell.tsx'), 'utf8')).toMatch(/<LabelPrintModal \/>/);
-        ['moreMenuPrintLabels', 'moreMenuPrintItemLabels', 'updateLabelPrintPreview', 'printLabelsFromModal'].forEach((a) => expect(ACTION_NAMES).toContain(a));
+        ['moreMenuPrintLabels', 'moreMenuPrintItemLabels', 'updateLabelPrintPreview', 'printLabelsFromModal', 'saveLabelImagesFromModal'].forEach((a) => expect(ACTION_NAMES).toContain(a));
         const menu = readFileSync(path.join(root, 'ui', 'more-menu.ts'), 'utf8');
         expect(menu).toMatch(/label: '🖨️ បោះពុម្ពស្លាក \(' \+ getCurrentFilterLabel\(\) \+ '\)', action: 'moreMenuPrintLabels'/);
         expect(menu).toMatch(/label: '🖨️ បោះពុម្ពស្លាក', action: 'moreMenuPrintItemLabels', args: \[id\]/);
@@ -222,15 +222,13 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(/\.label-sheet \.label\s*\{[^}]*break-inside:\s*avoid/.test(css)).toBe(true);
         expect(/(^|\n)\.label(-(phone|bc|code|meta|money|date|locker))?(?![\w-])/.test(css)).toBe(false);
         expect(/\.label-sheet\.layout-single \.label\s*\{[^}]*break-after:\s*page/.test(css)).toBe(true);
-        expect(/@page zoeLabel50x30\s*\{\s*size:\s*50mm 30mm/.test(css)).toBe(true);
-        expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*page:\s*zoeLabel50x30[^}]*break-after:\s*page/.test(css)).toBe(true);
+        expect(/@page\s+zoeLabel|size:\s*\d+mm \d+mm/.test(css)).toBe(false);
+        const roll = /@media print and \(max-width: 75mm\), print and \(max-height: 50mm\) \{([\s\S]*?)\n\}/.exec(css);
+        expect(!!roll && /@page \{ margin: 1\.5mm; \}/.test(roll[1]) && /#pdfExportPrintArea \.label-sheet \.label \{[^}]*break-after: page/.test(roll[1])).toBe(true);
+        expect(/@media print and \(min-width: 75\.1mm\) and \(min-height: 50\.1mm\)/.test(css)).toBe(true);
         expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*width:\s*47mm[^}]*height:\s*27mm/.test(css)).toBe(true);
         expect(LABEL_LAYOUTS).toEqual(['50x30', '40x30', '60x40', 'single', 'a4-3', 'a4-2']);
         expect(DEFAULT_LABEL_OPTIONS.layout).toBe('50x30');
-        for (const sz of ['40x30', '60x40']) {
-            expect(new RegExp('@page zoeLabel' + sz + '\\s*\\{\\s*size:\\s*' + sz.replace('x', 'mm ') + 'mm').test(css)).toBe(true);
-            expect(new RegExp('\\.label-sheet\\.layout-' + sz + ' \\.label\\s*\\{[^}]*page:\\s*zoeLabel' + sz + '[^}]*break-after:\\s*page').test(css)).toBe(true);
-        }
         expect(readFileSync(path.join(root, 'app', 'components', 'modals', 'LabelPrintModal.tsx'), 'utf8')).toMatch(/<option value="50x30">/);
         expect(/\.label-print-modal-content\s*\{[^}]*max-width:\s*clamp\(340px/.test(css)).toBe(true);
     });

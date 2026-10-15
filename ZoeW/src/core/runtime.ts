@@ -90,6 +90,7 @@ export const ACTION_ALLOWLIST = [
     "openZtoSyncModal",
     "pickSheetImportFile",
     "printLabelsFromModal",
+    "saveLabelImagesFromModal",
     "promptPermanentDelete",
     "promptRestoreDeletedItem",
     "recheckZtoPickupStatus",

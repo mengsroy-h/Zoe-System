@@ -46,7 +46,8 @@
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
 0ត. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `655677e` · **មិនទាន់ merge**) ៖ [2.50.79] វីដេអូម្ចាស់គម្រោងលើ 2.50.78 ៖ ប្តូរទំហំក្រដាស ➜ ក្រដាសស ·
-    APK ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត · iPhone «បញ្ចូលច្រើន» ទំព័រធ្លាក់ចុះមួយភ្លែត · វាស់គ្រប់ទំហំ/ឧបករណ៍ (ស្លាក A5) · 🧠 ➜ 💡 (ផ្នែក ២ A102–A105) ➜ ⚠️ សាកលើ iPhone/APK ពិត (សកម្មភាព ១–៣ របស់ [2.50.79]) ➜
+    APK ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត · iPhone «បញ្ចូលច្រើន» ទំព័រធ្លាក់ចុះមួយភ្លែត · វាស់គ្រប់ទំហំ/ឧបករណ៍ (ស្លាក A5) · 🧠 ➜ 💡 · បោះពុម្ពឆ្លាតវៃ · ស្លាកជារូបភាព NIIMBOT
+    (PR #318 · ផ្នែក ២ A102–A107) ➜ ⚠️ សាកលើ iPhone/APK ពិត (សកម្មភាព ១–៣ របស់ [2.50.79]) ➜
     ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ណ. **PR #317 (`ccr-20e725de-tpecua` · [2.50.66]–[2.50.78]) merge ចូល `main` រួច** (`655677e` · squash · ម្ចាស់គម្រោងស្នើ «Merge ហ្មងទៅ») ៖ ម្ចាស់គម្រោងសាករួច «គ្រប់យ៉ាងដំណើរការត្រឹមត្រូវហើយ»
     លើកលែងចំណុចក្នុង 0ត · ធាតុ 0ឍ–0ញ ខាងក្រោមចូល `main` ជាមួយ PR នេះ។
@@ -207,7 +208,8 @@
 ### [2.50.79] — 2026-10-15 · ZoeW ៖ **បោះពុម្ព ៖ ប្តូរទំហំក្រដាស ➜ ទិន្នន័យនៅ · APK ៖ ប្រអប់ផ្លាស់ទីតែម្តងពេល keyboard លោត · iPhone ៖ «បញ្ចូលច្រើន» ទំព័រមិនធ្លាក់**
 
 **ZoeW `2.50.79`** (`zoew-v341` ➜ `zoew-v342`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · ZTO) មិនប៉ះ —
-ការកែក្នុង `export.ts` · `file-output.ts` · `modal-keyboard.ts` · `Modal.tsx` · `state.ts` (`ModalKeyboardFit.hold`) · `PdfPrintArea.tsx` · `HealthAdviceBox.tsx` · `react-root.css` · `guide.html`។
+ការកែក្នុង `export.ts` · `file-output.ts` · `modal-keyboard.ts` · `Modal.tsx` · `state.ts` (`ModalKeyboardFit.hold`) · `PdfPrintArea.tsx` · `HealthAdviceBox.tsx` · `label-print.ts` ·
+`label-image.ts` (ថ្មី) · `LabelPrintModal.tsx` · `action-registry.ts` · `runtime.ts` · `react-root.css` · `guide.html`។
 រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ២ · APK ១ លើ 2.50.78) ៖ «គ្រប់យ៉ាងដំណើរការត្រឹមត្រូវហើយ តែនៅមានចំណុចទើសភ្នែក ៖ លើ iOS ពេលបើក modal បញ្ចូលច្រើន ហើយចុចឲ្យចេញ keyboard
 ទំព័រទាំងមូលធ្លាក់ចុះមួយភ្លែត · android កន្ត្រាក់ ២ ដង ពេល keyboard លោតឡើង គ្រប់ modal · ពេលប្តូរ Paper size កន្លែង print បាត់ទិន្នន័យពី ZoeW ឃើញតែក្រដាស ស ទាំង iOS និង android» ·
 បន្ទាប់មក ៖ «វាស់គ្រប់ទំហំអេក្រង់ គ្រប់ប្រភេទឧបករណ៍ផង ក្រែងមានចន្លោះឬកំហុស · សូមដូរ emoji 🧠 ចេញ ដាក់ 💡 · ហើយបើក pr ផង»។
@@ -220,6 +222,13 @@
 - 🐛 **ស្លាក ៖ ក្រដាស A5 · ប្លង់ A4 ៣ ជួរឈរ ➜ លេខ Barcode ហួសស្លាក** (A105 ៖ រកឃើញដោយការវាស់គ្រប់ទំហំក្រដាស)។ ឥឡូវលេខ Barcode បង្រួមល្មមស្លាកដូចលេខទូរស័ព្ទ និងលុយ
   (`--label-code-chars` · `--label-code-max` តាមប្លង់ · មួយបន្ទាត់)។
 - ✨ **🩺 ពិនិត្យសុខភាព ៖ ការណែនាំក្រោមបញ្ជីប្រើរូប 💡** (សំណើម្ចាស់គម្រោង) — App · `guide.html` · README។
+- ✨ **បោះពុម្ពស្លាកឆ្លាតវៃ ៖ ក្រដាសតាមផ្ទាំងបោះពុម្ព** (សំណើម្ចាស់គម្រោង ៖ «ធ្វើអោយវាឆ្លាតវៃ អាចឆ្លាស់គ្រប់ប្រភេទក្រដាស» · A106)។ ដក `@page … { size }` ដែលបង្ខំ
+  (Chromium · WebView Android គោរពវាទោះជ្រើសក្រដាសអ្វី ➜ ស្លាកតូចមួយក្នុង A4 មួយ · ទំព័រទទេឆ្លាស់លើរមូរ · «single» លើ 50×30 បែកជា ៥ ទំព័រ) ➜ ក្រដាសស្លាក (`max-width: 75mm` ឬ
+  `max-height: 50mm` · margin ១.៥mm) ➜ គ្រប់ប្លង់ ១ ស្លាក/ទំព័រល្មមក្រដាស · ក្រដាសធំ ➜ ស្លាក 50×30 · 40×30 · 60×40 តម្រៀបទំហំពិត (មានបន្ទាត់កាត់) · A4 ៣/២ ជួរឈរ
+  បន្ថយជួរឈរលើក្រដាសតូច (A5 · 4×6in)។ ផ្ទាំងបោះពុម្ពមានសារណែនាំ 💡 អំពីក្រដាស។
+- ✨ **ស្លាកជារូបភាព (NIIMBOT B1 · App ស្លាក)** (សំណើរបស់ខ្ញុំ · ម្ចាស់គម្រោងយល់ព្រម · A107)។ ប៊ូតុង «🖼️ រក្សាទុកជារូបភាព» ➜ PNG មួយស្លាកមួយ ទំហំពិត
+  (`drawLabelImage()` ៖ ៨ ចំណុច/mm = 203dpi · 50×30 ➜ 400×240 · ស-ខ្មៅសុទ្ធសម្រាប់ម៉ាស៊ីនកម្តៅ) ➜ `shareImageFiles()` ៖ iPhone/Android Web Share (ឯកសារ) · APK Filesystem +
+  Share មួយដង · កុំព្យូទ័រ ទាញយក · ≤ `LABEL_IMAGE_MAX` ២០០ ក្នុងមួយដង។
 - 🐛 **APK ៖ ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត** (គ្រប់ប្រអប់ · A103)។ `KeyboardOpenHold` រក្សាកម្ពស់ WebView ពេល keyboard លោត ប៉ុន្តែ visualViewport បង្រួមភ្លាម ➜
   ការតម្រូវ (ច្បាប់ iPhone ៖ បាតត្រឹម keyboard) ផ្លាស់ទីប្រអប់ម្តង ➜ ចប់ចលនា WebView បង្រួម ➜ ប្រអប់ចូលកណ្តាលវិញ ផ្លាស់ទីលើកទីពីរ (PIN ៖ ផ្លាស់ទីតែពេលចប់)។
   ឥឡូវលើ Android (`isAndroidDevice()` ៖ APK និង PWA Chrome ដែលបង្រួមក្រោយ keyboard ដែរ · A75) ការតម្រូវដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard ដូចប្លង់ក្រោយ viewport បង្រួម
@@ -239,7 +248,11 @@
   «បញ្ចូលច្រើន» ពិត · ទិសផ្ទុយ (Android មិនប៉ះការចុច · iPhone នៅច្បាប់បាតត្រឹម keyboard) — លើ `655677e` (មុនកែ) FAIL ១១ (ឧ. PIN 343 ➜ 343 ➜ 178) ➜ ១៥/១៥។
 - `layout-check` +២ ៖ `printRelayoutPdf` (Chromium `page.pdf()` ផ្ញើ `beforeprint`/`afterprint` ពិតរាល់ PDF ដូចទូរស័ព្ទ ៖ ស្លាក ៦ ប្លង់ + តារាង PDF × ក្រដាស ៦ = ៤២ PDF ៖
   DOM + ចំនួនទំព័រ PDF · ចុច App វិញ ➜ សម្អាត) — លើ `655677e` ៖ A4 ២៤ ទំព័រ ➜ A3 «១ ទំព័រ» ស (ដូចវីដេអូ) FAIL · `labelPrintFit` ក្រដាស ២ ➜ ៤ (+ Letter · A5) — មុនកែ FAIL ២ (A5 ៖ លេខ Barcode ហួស)។
-- `native:check` ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume) ➜ ចំណងជើងវិញ (ក្រោយប្តូរ `afterprint` ការអះអាងនេះធ្លាក់ ➜ `PRINT_RETURNED_EVENT`) · `health-advice.test` +១ (💡 · មុនកែ FAIL)។
+- `native:check` ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume) ➜ ចំណងជើងវិញ (ក្រោយប្តូរ `afterprint` ការអះអាងនេះធ្លាក់ ➜ `PRINT_RETURNED_EVENT`) · ស្លាកជារូបភាពលើ APK (PNG ៤ = ៤ ក្នុង
+  Cache/labels · Share ១ ដង) · `health-advice.test` +១ (💡 · មុនកែ FAIL)។
+- `layout-check` ៖ `printRelayoutPdf` ក្រដាស ៦ ➜ ១០ (+ 4×6in · ក្រដាសស្លាក 50×30 · 40×30 · 60×40) + ការអះអាងឆ្លាតវៃ (រមូរ ➜ ២៤/២៤ ទំព័រ · ក្រដាសធំ ➜ ≥ ២ ស្លាក/ទំព័រ) ·
+  `labelPrintFit` ក្រដាស ៤ ➜ ៨ (+ 4×6in · ក្រដាសស្លាក ៣ ៖ ស្លាកល្មមមួយទំព័រ) — មុនកែ FAIL ៥ · `labelImageExport` (ថ្មី ៖ ទំហំ PNG · ខ្លឹមសារមិនប៉ះគែម · ZXing អាន Barcode
+  វិញ · ឈ្មោះ · `navigator.share`) — មុនកែ FAIL · `ZoeW/tests/label-image.test.tsx` (ថ្មី · ៥) · `label-print.test` ៖ ការអះអាង `@page zoeLabel… { size }` (ចាក់សោកំហុស) ➜ គ្មានទំហំបង្ខំ។
 - `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `modalKeyboardHoldFitFor()` (តម្លៃពីវីដេអូ · ៨៥vh តាមកម្ពស់ថ្មី · NaN/០) · ចុចកន្លែងវាយដែល focus ដោយកូដ ➜ ចាប់ · keyboard បើក /
   ចុចរួចម្តង ➜ iOS · focus ម្តងទៀតដោយកូដ ➜ ចាប់វិញ — ការអះអាងចាស់ «focus រួច ➜ iOS ជានិច្ច» (ចាក់សោកំហុស) ចែកជាករណីទាំងនេះ។
 
@@ -250,7 +263,10 @@
 2. **APK · PWA Android** ៖ «📋 បញ្ចូលច្រើន» · PIN · កែលេខ · Config ➜ ចុចកន្លែងវាយ ➜ ប្រអប់ឡើងតែម្តងពេល keyboard ចាប់ផ្តើមលោត (មិនកន្ត្រាក់ពេល keyboard ឈប់)។
 3. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រ និង navbar នៅនឹងកន្លែង (មិនធ្លាក់ចុះ) · ចុចម្តងទៀតពេល keyboard បើក ➜ caret តាមកន្លែងចុច · **iPad** (keyboard អណ្តែត) ដូចគ្នា។
 4. ⚠️ iPhone ៖ ការបោះពុម្ពលើកដំបូងអាចបង្ហាញ «This website has been blocked from automatically printing» (សារ iOS) ➜ «Allow»។ ☰ ➜ 🩺 ➜ ការណែនាំមានរូប 💡។
-   ស្លាក A4 ៣ ជួរឈរ ➜ ក្រដាស A5 ➜ លេខ Barcode នៅក្នុងស្លាក។ សកម្មភាពរបស់ [2.50.67]–[2.50.78] នៅដដែល។
+   ស្លាក A4 ៣ ជួរឈរ ➜ ក្រដាស A5 ➜ លេខ Barcode នៅក្នុងស្លាក។
+5. **បោះពុម្ពឆ្លាតវៃ** ៖ ស្លាក 50×30 ➜ ក្រដាស A4 ➜ ស្លាកច្រើនក្នុងមួយទំព័រ · ម៉ាស៊ីនស្លាក (ក្រដាស 50×30) ➜ មួយស្លាកមួយទំព័រ គ្មានទំព័រទទេ។
+6. **NIIMBOT B1** ៖ ផ្ទាំងបោះពុម្ពស្លាក ➜ «🖼️ រក្សាទុកជារូបភាព» ➜ រក្សាទុកក្នុង Photos/Gallery ➜ App NIIMBOT ➜ បញ្ចូលរូប (ស្លាក 50×30) ➜ បោះពុម្ព ➜ ស្កេន Barcode លើស្លាកដែលចេញ។
+   សកម្មភាពរបស់ [2.50.67]–[2.50.78] នៅដដែល។
 
 ---
 
@@ -4372,6 +4388,8 @@ App ពិត (audit build) ក្នុង Chromium ៖ APK ក្លែង (br
 |---|---|---|---|
 | A102 | **បោះពុម្ព ៖ ប្តូរ Paper size ➜ «Page 1 of 1» ស** | iPhone ៖ A4 «Page 1 of 7» ស្លាកពេញ ➜ A3 ➜ «Page 1 of 1» ស ➜ A4 ➜ «Page 1 of 2» ស · APK ៖ Letter ៤៨ ទំព័រ ➜ ISO A5 ➜ «1/1» ស · មូលហេតុ ៖ `beginPdfPrint()` ចង `afterprint` ➜ `restoreAfterPdfExport()` · WebKit/WebView ផ្ញើ `beforeprint`/`afterprint` រាល់ការគូរ preview (ផ្ទាំងបោះពុម្ពនៅបើក) | `afterprint` ➜ `armPdfExportRestore()` · សម្អាតតែពេល `pointerdown`/`keydown` លើ document · `print-relayout.test` លើកូដចាស់ FAIL ៣ ➜ ៤/៤ |
 | A103 | **APK ៖ ប្រអប់ផ្លាស់ទី ២ ដងពេល keyboard លោត** | វីដេអូ ៖ កាត «បញ្ចូលច្រើន» កំពូល 684 ➜ 375 (−៣០៩px ≈ ១១៨dp) នៅស៊ុមដំបូងនៃ keyboard ➜ ឈរ ➜ ចប់ចលនា ➜ 295 (−៨០px) + ស៊ុមខូច ៣ · ស៊ុមកណ្តាល ៖ ស្រទាប់ `.modal::after` ស្រអាប់ចាប់ពីបន្ទាត់ keyboard ចុងក្រោយ ➜ visualViewport បង្រួមភ្លាមពេល `KeyboardOpenHold` រក្សា WebView · Chromium ក្លែង (412×915 · keyboard 330) ៖ ១៨/១៨ ប្រអប់ (បញ្ចូលច្រើន 252 ➜ 165 ➜ 87 · PIN 343 ➜ 343 ➜ 178) | Android (APK · PWA Chrome) ៖ `modalKeyboardHoldFitFor()` = កណ្តាលផ្ទៃពីលើ keyboard (padding · cap ៨៥vh × កម្ពស់ថ្មី/ចាស់) ➜ ១៨/១៨ × APK ២ ទំហំ + PWA ផ្លាស់ទីតែម្តង (±1px) · `.si-modal-content` រក្សា flex (`modal-kb-hold`) · ⚠️ ប្រអប់មានធាតុ vh ខាងក្នុង (ឧ. preview Excel ៣០vh) អាចរំកិលតិចពេល WebView បង្រួម · ស៊ុមខូចពេល WebView ប្តូរទំហំ ជារបស់ WebView |
+| A106 | **បោះពុម្ពស្លាកមិនឆ្លាតវៃ ៖ ទំហំ CSS បង្ខំ** (សំណើ ៖ «អាចឆ្លាស់គ្រប់ប្រភេទក្រដាស») | `page.pdf()` ២៤ ស្លាក ៖ 50×30 លើ A4/A3/A5/Letter/Legal/4×6 ➜ ២៤ ទំព័រ (១ ស្លាកតូច/ទំព័រ) · លើក្រដាស 50×30 ➜ ៤៨ ទំព័រ (ទទេឆ្លាស់ ៖ margin ២mm) · 60×40 លើ 50×30 ➜ ៤៨ · «single» លើ 50×30 ➜ ១២០ (ស្លាកបែក ៥ ទំព័រ) · A4 ៣ ជួរឈរលើរមូរ ➜ អក្សរកាត់ · វីដេអូ Android ៖ Letter «1/48» ស្លាកតូចជ្រុងទំព័រ · Chromium ៖ media query `print` វាស់តាមក្រដាស (50×30 · 60×40 ➜ តូច · A4 · 4×6 ➜ ធំ) | ក្រដាសសម្រេច ៖ រមូរ ➜ ១/ទំព័រគ្រប់ប្លង់ (២៤/២៤) · A4 ➜ ១ ទំព័រ · A5 ➜ ២ · 4×6 ➜ ៦ · `labelPrintFit` × ៨ ក្រដាស ✅ |
+| A107 | **NIIMBOT B1 ៖ បោះពុម្ពតាម App NIIMBOT ប៉ុណ្ណោះ** (Bluetooth · ទទឹង ២០–៥០mm · 203dpi) | «Save as PDF» ➜ ក្រដាស Letter + ស្លាកតូចជ្រុង ➜ ត្រូវកាត់ក្នុង App | PNG ទំហំពិត (៨ ចំណុច/mm) · ZXing អាន Barcode វិញ ១២/១២ · iPhone/Android Share · APK Share · កុំព្យូទ័រទាញយក |
 | A105 | **ស្លាក ៖ ក្រដាស A5 + ប្លង់ A4 ៣ ជួរឈរ ➜ លេខ Barcode ហួសស្លាក** (ការវាស់គ្រប់ទំហំក្រដាសតាមសំណើ) | `labelPrintFit` A5 (484px) ៖ «ZT880000000000» ទទឹង ១៤៧px ⟷ ក្នុងស្លាក ១២៧px (១១ ស្លាក) · សន្លឹកលើស ៩px · Letter ឆ្លង | `.label-code` បង្រួម (`100cqw` ÷ តួ · monospace ០.៦២em) ➜ ៤ ក្រដាស × ៦ ប្លង់ ✅ |
 | A104 | **iPhone ៖ «បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រធ្លាក់ ១៣០pt ហើយលោតត្រឡប់** | ស៊ុម ៦០fps ៖ ស៊ុម ៤–៥ ទំព័ររំកិលឡើង −៨ · −២០px (WebKit បង្ហាញកន្លែងវាយ តាមចលនា keyboard) ➜ ស៊ុម ៦ ធ្លាក់ +៣០០px (ផ្ទៃសខាងលើ ៖ backdrop ក៏ធ្លាក់) ➜ ត្រឡប់ ០ ក្នុង ១០ ស៊ុម (rubber band) · កន្លែងវាយមានស៊ុម focus មុនចុច ➜ `openBatchScanModal()` focus ១៥០ms (iOS មិនបើក keyboard) ➜ ការចុចលើកន្លែងវាយដែល focus រួចទៅផ្លូវ iOS ដើម (`modalTapField()` បដិសេធ `activeElement`) ➜ `restoreIOSDocumentScroll()` (2.50.77) ទាញ ០ កណ្តាលចលនា WebKit | focus រួច + keyboard មិនទាន់បើក + មិនទាន់ចុច ➜ ចាប់ (blur + `focus({ preventScroll })`) · `modal-keyboard-test` + `modal-keyboard.test` លើកូដចាស់ FAIL ២ + ២ · ⚠️ keyboard ពិតរបស់ iOS វាស់មិនបាន ➜ សាកលើ iPhone ពិត |
 

@@ -12,7 +12,7 @@ import { handleCallAction, openCallMarkModal, openEditModal, saveEditedPhone, se
 import { saveExchangeRate } from '../features/exchange-rate';
 import { exportDataAsCsvForSheets, exportDataAsExcel, exportDataAsPDF } from '../features/export';
 import { openBatchScanModal, startBatchScan, stopBatchScan, updateBatchScanCount } from '../features/batch-scan';
-import { printLabelsFromModal, updateLabelPrintPreview } from '../features/label-print';
+import { printLabelsFromModal, saveLabelImagesFromModal, updateLabelPrintPreview } from '../features/label-print';
 import { openHealthCheck, runHealthCheck } from '../features/health-check';
 import { toggleRememberPassword } from '../features/password-memory';
 import { submitActivationKey } from '../features/license';
@@ -134,6 +134,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openZtoSyncModal,
     pickSheetImportFile,
     printLabelsFromModal,
+    saveLabelImagesFromModal,
     promptPermanentDelete,
     promptRestoreDeletedItem,
     recheckZtoPickupStatus,

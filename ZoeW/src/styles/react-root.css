@@ -113,8 +113,8 @@
     cursor: pointer;
 }
 .nav-bell-btn:active { background: var(--primary-light); border-color: var(--primary); }
-.nav-menu-btn, .drawer-close { position: relative; }
-.nav-menu-btn::after, .nav-bell-btn::after, .drawer-close::after, .modal-close-x::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+.drawer-close { position: relative; }
+.drawer-close::after, .modal-close-x::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; }
 .nav-bell-badge {
     position: absolute;
     top: -6px;

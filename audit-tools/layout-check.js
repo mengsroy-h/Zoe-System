@@ -392,13 +392,15 @@ async function labelPrintFit(browser, port) {
     await ctx.close();
 }
 
-// ⛔ តេស្តប្រើប្រចាំថ្ងៃ ៖ ប៊ូតុងរុករកចម្បង ☰ · 🔔 (៣២×៣២) និង ✖ បិទ ☰/🔔/ប្រអប់ស្កេន (២៨×២៨) តូចជាងគោលដៅចុចស្តង់ដារ ៤៤×៤៤ (Apple HIG ៤៤pt ·
-//    Material ៤៨dp) ➜ ផ្ទៃចុច ៤៤×៤៤ ចំកណ្តាលប៊ូតុង ⛔ រូបរាងមិនប្តូរ ៖ elementFromPoint លើជ្រុង និងគែមនៃប្រអប់ ៤០×៤០ ➜ ប៊ូតុងនោះ ·
-//    ទិសផ្ទុយ ៖ ធាតុចុចបានផ្សេងក្នុងស្រទាប់ដដែលនៅទទួលការចុចចំកណ្តាលរបស់វា (ផ្ទៃពង្រីកមិនលួចការចុច) · ទំហំមើលឃើញដដែល។
-const TAP_TARGET_STEPS = [['ទំព័រ', '', ['#navMenuBtn', '#navNotifyBtn']], ['☰', 'openSideDrawer()', ['#sideDrawer .drawer-close']],
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃ ៖ ✖ បិទ ☰/🔔/ប្រអប់ស្កេន (២៨×២៨) តូចជាងគោលដៅចុចស្តង់ដារ ៤៤×៤៤ (Apple HIG ៤៤pt · Material ៤៨dp) ➜ ផ្ទៃចុច ៤៤ ចំកណ្តាល
+//    ប៊ូតុង ⛔ រូបរាងមិនប្តូរ ៖ elementFromPoint លើគែម ±២១px និងអង្កត់ទ្រូង ±១៥px (រង្វង់ ៤៤ · ជ្រុងកាតមូលកាត់ជ្រុងការ៉េ) ➜ ប៊ូតុងនោះ ·
+//    ទិសផ្ទុយ ៖ ធាតុចុចបានផ្សេងក្នុងស្រទាប់ដដែលនៅទទួលការចុចចំកណ្តាលរបស់វា · ☰ · 🔔 ក្នុង navbar ⛔ មិនពង្រីក (ផ្ទៃចុចជិតបាត navbar ➜ Chromium
+//    touch adjustment ទាញការប៉ះចាប់ផ្តើម PTR ក្រោម navbar ទៅប៊ូតុង ➜ PTR លើ APK មិនកេះ ៖ `native:check` ធ្លាក់) ➜ ក្រោមបាតប៊ូតុង ៤px មិនមែនប៊ូតុង។
+const TAP_TARGET_STEPS = [['☰', 'openSideDrawer()', ['#sideDrawer .drawer-close']],
     ['🔔', 'openNotifyDrawer()', ['#notifyDrawer .drawer-close']], ['ប្រអប់ស្កេន', "openModalHelper('phoneModal')", ['#phoneModalCloseX']]];
 async function tapTargetLayout(browser, port) {
     const rows = [];
+    const navbar = [];
     for (const [w, h, mobile] of [[390, 844, true], [320, 568, true], [1280, 800, false]]) {
         const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: mobile, isMobile: mobile });
         const page = await ctx.newPage();
@@ -417,7 +419,7 @@ async function tapTargetLayout(browser, port) {
                 const out = targets.map((el) => {
                     const r = el.getBoundingClientRect();
                     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                    const pts = [[-20, -20], [20, -20], [-20, 20], [20, 20], [0, -21], [0, 21], [-21, 0], [21, 0]];
+                    const pts = [[-15, -15], [15, -15], [-15, 15], [15, 15], [0, -21], [0, 21], [-21, 0], [21, 0]];
                     const miss = pts.filter(([dx, dy]) => { const hit = document.elementFromPoint(cx + dx, cy + dy); return !hit || !el.contains(hit); });
                     return { sel: el.id || el.className, size: Math.round(r.width) + '×' + Math.round(r.height), miss: miss.length, missAt: miss.slice(0, 3) };
                 });
@@ -434,12 +436,22 @@ async function tapTargetLayout(browser, port) {
             }, sels);
             rows.push(Object.assign({ w, name }, m));
         }
+        await page.evaluate(() => { openModalIds().slice().forEach((id) => closeModal(id)); closeSideDrawer(); });
+        await page.waitForTimeout(350);
+        navbar.push(Object.assign({ w }, await page.evaluate(() => ['navMenuBtn', 'navNotifyBtn'].map((id) => {
+            const el = document.getElementById(id);
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.bottom + 4);
+            return { id, h: Math.round(r.height), below: !!hit && el.contains(hit) };
+        }))));
         await ctx.close();
     }
-    check(rows.length === 12 && rows.every((r) => r.found && r.out.every((o) => /^(2[0-9]|3[0-9])×/.test(o.size))),
-        'ZoeW គោលដៅចុច ៖ ជាន់អប្បបរមា ៖ ☰ · 🔔 · ✖ ☰ · ✖ 🔔 · ✖ ប្រអប់ស្កេន បង្ហាញ (៣ ទំហំ) · រូបរាងតូចដដែល (២០–៣៩px)', JSON.stringify(rows.filter((r) => !r.found || !r.out).slice(0, 4)));
+    check(rows.length === 9 && rows.every((r) => r.found && r.out.every((o) => /^(2[0-9]|3[0-9])×/.test(o.size))),
+        'ZoeW គោលដៅចុច ៖ ជាន់អប្បបរមា ៖ ✖ ☰ · ✖ 🔔 · ✖ ប្រអប់ស្កេន បង្ហាញ (៣ ទំហំ) · រូបរាងតូចដដែល (២០–៣៩px)', JSON.stringify(rows.filter((r) => !r.found || !r.out).slice(0, 4)));
+    check(navbar.length === 3 && navbar.every((n) => [0, 1].every((i) => n[i] && n[i].h >= 20 && !n[i].below)),
+        'ទិសផ្ទុយ ៖ ZoeW គោលដៅចុច ៖ ☰ · 🔔 ក្នុង navbar មិនពង្រីកចុះក្រោម (ក្រោមបាតប៊ូតុង ៤px មិនមែនប៊ូតុង ៖ PTR ចាប់ផ្តើមក្រោម navbar)', JSON.stringify(navbar));
     check(rows.every((r) => r.out && r.out.every((o) => o.miss === 0)),
-        '⛔ ZoeW គោលដៅចុច ៖ ☰ · 🔔 · ✖ ➜ ផ្ទៃចុច ៤៤×៤៤ (ជ្រុង · គែម ±២០–២១px ពីកណ្តាលចុចត្រូវប៊ូតុង) ទូរស័ព្ទ ៣៩០ · ៣២០ · desktop',
+        '⛔ ZoeW គោលដៅចុច ៖ ✖ ➜ ផ្ទៃចុច ៤៤ (គែម ±២១px · អង្កត់ទ្រូង ±១៥px ពីកណ្តាលចុចត្រូវប៊ូតុង) ទូរស័ព្ទ ៣៩០ · ៣២០ · desktop',
         JSON.stringify(rows.filter((r) => r.out && r.out.some((o) => o.miss)).map((r) => [r.w, r.name, r.out.filter((o) => o.miss)])).slice(0, 900));
     check(rows.every((r) => r.stolen && r.stolen.length === 0),
         'ទិសផ្ទុយ ៖ ZoeW គោលដៅចុច ៖ ផ្ទៃពង្រីកមិនលួចការចុចធាតុផ្សេងក្នុងស្រទាប់ដដែល', JSON.stringify(rows.filter((r) => r.stolen && r.stolen.length).map((r) => [r.w, r.name, r.stolen])));

@@ -417,6 +417,77 @@ describe('Fast Mode ៖ ម៉ាស៊ីនស្កេនគ្មាន Ente
     });
 });
 
+describe('Auto save ពី lookup ↔ មនុស្សកំពុងវាយក្នុងផ្ទាំង (auto-lookup.ts · សំណើម្ចាស់គម្រោង)', () => {
+    it('⛔ លុយ ៖ វាយ COD «1» (ចង់វាយ 15) ពេល lookup កំពុងរក ➜ lookup ស្គាល់ ➜ មិនរក្សាទុកស្វ័យប្រវត្តិ · លេខទូរស័ព្ទបំពេញ · ប្រាប់ចំនួន lookup ➜ វាយបន្ត «5» ➜ យល់ព្រម ➜ COD 15', async () => {
+        const a = 'ZTQL' + seq + '0001';
+        openScan(a);
+        await settle();
+        focus('modalCodInput');
+        humanType('1');
+        await settle();
+        expect(fieldValue('modalCodInput')).toBe('1');
+        answer({ found: true, phone: '012345678', cod: 15, dod: 1 });
+        await settle(50);
+        await settle(50);
+        expect(h.saves).toEqual([]);
+        expect(phoneModalOpen()).toBe(true);
+        expect(fieldValue('modalPhoneInput')).toBe('012345678');
+        expect(fieldValue('modalDodInput')).toBe('1');
+        expect(h.toasts.some((t) => t.startsWith('ℹ️') && t.includes('COD 15') && t.includes('យល់ព្រម'))).toBe(true);
+        expect(document.activeElement && document.activeElement.id).toBe('modalCodInput');
+        humanType('5');
+        await settle(200);
+        expect(fieldValue('modalCodInput')).toBe('15');
+        await confirmPhone(false);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['012345678', 15, 1]]);
+    });
+
+    it('⛔ lookup រកមិនឃើញ ពេលកំពុងវាយ COD ➜ cursor មិនលោតទៅលេខទូរស័ព្ទ (លេខបន្ទាប់មិនចូលប្រអប់ខុស)', async () => {
+        const a = 'ZTQO' + seq + '0001';
+        openScan(a);
+        await settle();
+        focus('modalCodInput');
+        humanType('1');
+        answer({ found: false });
+        await settle(400);
+        await settle(400);
+        expect(document.activeElement && document.activeElement.id).toBe('modalCodInput');
+        humanType('5');
+        await settle(200);
+        expect(fieldValue('modalCodInput')).toBe('15');
+        expect(fieldValue('modalPhoneInput')).toBe('');
+    });
+
+    it('⛔ ចុចប្រអប់ Locker (មិនទាន់វាយ) ពេល lookup កំពុងរក ➜ lookup រកមិនឃើញ ➜ cursor នៅ Locker', async () => {
+        openScan('ZTQJ' + seq + '0001');
+        await settle();
+        focus('modalLockerInput');
+        answer({ found: false });
+        await settle(400);
+        await settle(400);
+        expect(document.activeElement && document.activeElement.id).toBe('modalLockerInput');
+    });
+
+    it('ទិសផ្ទុយ ៖ មិនវាយអ្វីសោះ ➜ lookup ស្គាល់ ➜ Auto save ដូចដើម · lookup រកមិនឃើញ ➜ cursor ទៅលេខទូរស័ព្ទ', async () => {
+        const a = 'ZTQI' + seq + '0001';
+        openScan(a);
+        await settle();
+        answer({ found: true, phone: '012345678', cod: 5, dod: 1 });
+        await settle(50);
+        await settle(50);
+        expect(h.saves.map((s) => [s.phone, s.cod, s.dod])).toEqual([['012345678', 5, 1]]);
+        const b = 'ZTQI' + seq + '0002';
+        openScan(b);
+        await settle();
+        answer({ found: false });
+        await settle(400);
+        await settle(400);
+        expect(scanState.pendingBarcode).toBe(b);
+        expect(document.activeElement && document.activeElement.id).toBe('modalPhoneInput');
+    });
+});
+
 describe('ការវាយដោយមនុស្សក្នុងផ្ទាំងលេខទូរស័ព្ទ នៅដូចដើម (ទិសផ្ទុយ)', () => {
     it('វាយលេខទូរស័ព្ទ · Locker · COD ល្បឿនមនុស្ស + Enter ➜ តម្លៃចូលប្រអប់ · Enter ទៅប្រអប់បន្ទាប់ · គ្មានជួរ', async () => {
         useLookup(false);

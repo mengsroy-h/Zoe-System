@@ -22,7 +22,7 @@ const LOCK: Record<string, string> = {
     'src/features/zto-list-sync.ts': '8e3f34d1d1e728bd45c37b3a52c14f45ff1b98acb6d40aed7a210d9de3310686',
     'src/features/zto-status.ts': '968bad5375d7d71cda872de2bd352df2b471129ea91a553e5c802f8858633b6d',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
-    'src/features/auto-lookup.ts': '6cba0fb4fc9e42e705ca9d6a6c92c5ba0402f2cd5d49896fe31cfbfaa37f8540',
+    'src/features/auto-lookup.ts': '738abb8c77203925b686ac381f0cfde5c4b243a3b4f41208f7ff508aab9428e6',
     'src/features/lookup-api.ts': '6a517501c9cc7115a7dfe81143f1aa26820f5a51ebee18de0d668d93a9c02aad',
     'src/app/components/zto/model.ts': '7ff06f4dbcb4de0bfd8a562c26577ab93df6961b653d778d8f13bf0211b50cab',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',

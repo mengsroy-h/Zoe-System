@@ -959,8 +959,13 @@ at `:root` and a height-only resize (APK keyboard) never recalcs every element �
 - `rememberCustomerTableRow()` feeds network lookups back ⛔ never insert empty rows for "not found".
   `customerTableIsPartial`: partial miss ➜ network; fresh complete miss ➜ nothing scheduled; scheduled pulls give up
   after `CUSTOMER_TABLE_SOON_MAX_WAIT_MS`.
-- `armLookupFocus()`: focus after `LOOKUP_FOCUS_GRACE_MS` (250ms) once, unless the user typed, the modal closed or
-  `pendingBarcode` changed.
+- `armLookupFocus()`: focus after `LOOKUP_FOCUS_GRACE_MS` (250ms) once, unless the user typed (`scanState.phoneModalTyped`
+  or the phone field holds text), a text field inside the modal has focus, the modal closed or `pendingBarcode` changed ⛔ never
+  pull the caret out of a field being typed (the next digit landed in the phone field). Lookup auto-save
+  (`applyLookupFillToModal()` ➜ `confirmPhone(false)`) runs only while nobody typed in the scan dialog: `scanState.phoneModalTyped`
+  = any `input` on its four fields (`notePhoneModalInput()`; reset by `triggerScanAction()`; lookup fills write without an
+  event) ➜ typed: fill empty fields only + ℹ️ with the lookup COD/DOD, the person saves ⛔ never save a value mid-typing
+  (`ZoeW/tests/scanner-modal-queue.test.tsx` · `lookup-prefetch-test`; `auto-lookup.ts` is in the ZTO lock).
 - `planPickupLedgerRepair()` repairs a day only when the closed-barcode set rebuilt from history + trash has exactly
   `packagesPickedUp` keys (`pickupSetSize(set) === recorded`) and differs from the stored `pickedUpBarcodes`; `repairPickupLedgerOnce()`
   re-checks the same equality on the server value inside its transaction; `pickupResetInFlight` releases in

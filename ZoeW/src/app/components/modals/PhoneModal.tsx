@@ -3,6 +3,7 @@ import { viewState } from '../../../core/view-state';
 import { onAct } from '../../actions';
 import { useStoreFields } from '../../hooks/useStore';
 import { blurActiveElement, focusField, refTo, type RefName } from '../../refs';
+import { notePhoneModalInput } from '../../../features/scan-action';
 
 const PHONE_MODAL_FIELDS: RefName[] = ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'];
 
@@ -43,13 +44,14 @@ export function PhoneModal() {
                     aria-live="polite"
                     hidden={!status.text}
                 >{status.text}</div>
-                <input type="tel" id="modalPhoneInput" ref={refTo('modalPhoneInput')} placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList" enterKeyHint="next" onKeyDown={phoneModalEnter} />
+                <input type="tel" id="modalPhoneInput" ref={refTo('modalPhoneInput')} placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList" enterKeyHint="next" onKeyDown={phoneModalEnter} onInput={notePhoneModalInput} />
                 <input
                     type="text"
                     id="modalLockerInput"
                     ref={refTo('modalLockerInput')}
                     enterKeyHint="next"
                     onKeyDown={phoneModalEnter}
+                    onInput={notePhoneModalInput}
                     placeholder="ទីតាំង Locker (ឧ. A1)"
                     style={{ marginTop: "4px" }}
                 />
@@ -59,6 +61,7 @@ export function PhoneModal() {
                     ref={refTo('modalCodInput')}
                     enterKeyHint="next"
                     onKeyDown={phoneModalEnter}
+                    onInput={notePhoneModalInput}
                     placeholder="តម្លៃ COD ($)"
                     step={0.01}
                     min={0}
@@ -70,6 +73,7 @@ export function PhoneModal() {
                     ref={refTo('modalDodInput')}
                     enterKeyHint="done"
                     onKeyDown={phoneModalEnter}
+                    onInput={notePhoneModalInput}
                     placeholder="តម្លៃ DOD ($)"
                     step={0.01}
                     min={0}

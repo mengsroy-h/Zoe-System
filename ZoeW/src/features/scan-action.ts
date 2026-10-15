@@ -51,6 +51,7 @@ export function triggerScanAction(barcode) {
     if (navigator.vibrate) navigator.vibrate(150);
 
     scanState.pendingBarcode = cleanBarcode;
+    scanState.phoneModalTyped = false;
     viewState.modalBarcodeText = cleanBarcode;
 
     setFieldValue('modalPhoneInput', "");
@@ -72,6 +73,10 @@ export function triggerScanAction(barcode) {
     } else {
         armLookupFocus('modalPhoneInput', cleanBarcode, lookupPromise);
     }
+}
+
+export function notePhoneModalInput() {
+    if (scanState.pendingBarcode) scanState.phoneModalTyped = true;
 }
 
 export function dropOptimisticBarcode(code) {

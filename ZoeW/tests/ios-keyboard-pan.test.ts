@@ -123,6 +123,18 @@ describe('iPhone PWA ៖ keyboard បើកខណៈស្វែងរកលេ�
         expect(uiState.iosKeyboardInset).toBe(336);
     });
 
+    it('⛔ zoom (pinch ១.៦) គ្មាន keyboard ➜ ០ (មិនមែន keyboard) · zoom + keyboard ៣៣៦ ➜ ៣៣៦ (height × scale)', () => {
+        boot();
+        (vv as any).scale = 1.6;
+        keyboard(844 / 1.6);
+        expect(uiState.iosKeyboardInset).toBe(0);
+        keyboard((844 - 336) / 1.6);
+        expect(uiState.iosKeyboardInset).toBe(336);
+        (vv as any).scale = 1;
+        keyboard(844 - 336);
+        expect(uiState.iosKeyboardInset).toBe(336);
+    });
+
     it('⛔ keyboard បិទ (viewport ពេញ) ➜ ០ · គម្លាតតូចជាងកម្រិត (របា) ➜ ០', () => {
         boot();
         keyboard(844 - 336);

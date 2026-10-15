@@ -45,7 +45,16 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ទ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `5a360b8` = PR #319 · PR #320 · **មិនទាន់ merge**) ៖ [2.50.81] វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក
+0ធ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `1529f3e` = PR #320 · **មិនទាន់ merge**) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
+    ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចុចកន្លែងវាយ Barcode · គ្រប់របៀប) · «សូមកុំកែអោយប៉ះពាល់ដល់android»
+    ➜ ពង្រីក (zoom) មិនមែន keyboard (A128) · iOS ចុចស្លាក/⚡ ចាប់ដូចប្រអប់ (A129) · បន្ទាប់មក វីដេអូម្ចាស់គម្រោង Android «ពេលវាលោតតែលេខ … មានកន្ត្រាក់ពេលបើកmodal» (A131) ·
+    «សូមធ្វើអោយវឆ្លាតវៃចេះវាស់ keyboard ដោយខ្លួនឯងបាន ស្វ័យប្រវត្តិ មិនថាគេប្រើ keybaord thirdparty ឬគេពង្រីកទំហំ keybaord» (A132) · «lock កុំអោយផ្តេកបានលើទូរស័ព្ទ ទាំងអស់
+    តែសម្រាប់ tablet អោយផ្តេកបាន» (A133) ➜ ⚠️ សាក iPhone · Android (សកម្មភាព ១–៥ របស់ [2.50.82]) · iPhone ចាក់សោទិសមិនបាន (Apple) ➜ ម្ចាស់គម្រោងជ្រើស «ទុកដូចសព្វថ្ងៃ» (Control Center · មិនបិទ App ពេលផ្តេក) ·
+    «android apk លែងអីហើយ តែថែម animation សម្រាប់modal ពេលលោតតាម keybaord ក្នុងappទាំងមូលផង» (A134) · «iphone នៅតែដូចមុន ធ្លាក់ទំព័រពេល ចុច ប្រអប់វាយបញ្ចូល barcode
+    ពេល keyboard លោតមក តែម្តងម្កាលទេ» (A135 ៖ ឧបករណ៍វាស់លើ iPhone ពិត ➜ Sentry `iosPageTap` ➜ ⚠️ ចាំម្ចាស់គម្រោងសាក (សកម្មភាព ៦) ហើយអាន Sentry មុនកែ)។
+    ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ទ. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #320 merge ចូល `main` រួច** (`1529f3e` · squash · ម្ចាស់គម្រោង «merge» · CI 777 ៤/៤ · run-all STRICT ២០៧/២០៧ · APK `zoew-android-v2.50.81` ✅ ·
+    ម្ចាស់គម្រោង ៖ «android ដំណើរការរលូនល្អហើយគ្មានកំហុស មិនថាប្តូរទៅ ភាសាខ្មែរ ឬ អង់គ្លេស» · «លើកុំព្យូទ័រ ទាញរូបភាព niimbot បានហើយ») ៖ [2.50.81] វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក
     ចុចកន្លែងវាយ ទំព័រធ្លាក់ · Android ស្វែងរក Locker កន្ត្រាក់ឡើងលើ · App ចាំកម្ពស់ keyboard ពិត (ផ្នែក ២ A114–A116) · វីដេអូ Chrome Android លើ deploy preview ៖ ចុចកន្លែងវាយ Barcode
     ទំព័ររំកិល · ស្វែងរកក្រោយទំព័ររំកិល ➜ ឃើញតែសារទទេ · ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ការផ្ទៀងផ្ទាត់ឡើងវិញ (ផ្នែក ២ A117–A120) ➜ ម្ចាស់គម្រោងសាករួច ៖
     «Ios លែងអីហើយដំណើរការត្រឹមត្រូវក្នុង preview 320 ជា PWA» · Chrome Android បញ្ជាក់លំដាប់ «ចុចវាយបញ្ចូល barcode បន្ទាប់ចុចស្វែងរក ➜ លោតផុត · ស្វែងរកមុនមិនអី» (= A117–A118) ·
@@ -217,6 +226,91 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.82] — 2026-10-15 · ZoeW ៖ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល) · Android ៖ ចាំកម្ពស់ keyboard ពិត (keyboard ណាក៏បាន · ពង្រីកទំហំ) ➜ ផ្ទាំង keyboard លេខឡើងតែម្តង · ទូរស័ព្ទនៅបញ្ឈរ tablet បង្វិលបាន · iPhone ៖ ចុចស្លាក «ស្កេន Barcode…» · ⚡ ទំព័រមិនធ្លាក់ · ពង្រីកអេក្រង់ (zoom) មិនមែន keyboard**
+
+**ZoeW `2.50.82`** (`zoew-v344` ➜ `zoew-v345`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · Android native ៖ `MainActivity.java` (ទិសអេក្រង់) ➜ APK ថ្មី ·
+⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` · `phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` · `ios-viewport.ts` · `refs.ts` ·
+`platform/orientation.ts` · `boot.ts`។
+សំណើម្ចាស់គម្រោង ៖ «ពិនិតមើល ការវាស់ keyboard ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «android ដំណើរការរលូនល្អហើយគ្មានកំហុស មិនថាប្តូរទៅ ភាសាខ្មែរ ឬ អង់គ្លេស» ·
+«តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចម្លើយ ៖ ចុចកន្លែងវាយ Barcode · កញ្ចប់ · Locker · ដក · មិនប្រាកដ) · «សូមកុំកែអោយប៉ះពាល់ដល់android ព្រោះandroid ដំណើរការត្រឹមត្រូវហើយ» ·
+បន្ទាប់មក ៖ «android ដូចខ្វះការវាស់ keybaord ពេលវាលោតតែលេខ មិនមែន អក្សរ ដូច modal កែលេខទូរស័ព្ទ កែទឹកប្រាក់ … មានកន្ត្រាក់ពេលបើកmodal ទាំងនោះ» (ចម្លើយ ៖ APK · Chrome / PWA ·
+keyboard បិទមុន · «លោតឡើង ហើយត្រឡប់ចុះ» · វីដេអូ · «ក្រៅពីហ្នឹង រលូនគ្រប់យ៉ាង») · «សូមធ្វើអោយវឆ្លាតវៃចេះវាស់ keyboard ដោយខ្លួនឯងបាន ស្វ័យប្រវត្តិ មិនថាគេប្រើ keybaord
+thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ lock កុំអោយផ្តេកបានលើទូរស័ព្ទ ទាំងអស់ តែសម្រាប់ tablet អោយផ្តេកបាន» · «android apk លែងអីហើយ តែថែម animation សម្រាប់modal
+ពេលលោតតាម keybaord ក្នុងappទាំងមូលផង»។ ➜ Android ប្តូរតែករណីទាំងនេះ ៖ ផ្ទាំង keyboard ដែលធ្លាប់ចុះវិញ · ការចាំកម្ពស់ · ទិសអេក្រង់ទូរស័ព្ទ · ចលនា (ទីតាំងចុងក្រោយនៅដដែល ៖
+`modal-keyboard-device-test` (ក) ៥ APK + ២ Chrome ជាប់ដដែល)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល)** (ផ្នែក ២ A134)។ ផ្ទាំងដែលត្រូវផ្លាស់ទីព្រោះ keyboard (iPhone · iPad · APK · Chrome/PWA) លោតភ្លាមមួយស៊ុម ➜ ឥឡូវ កាតរអិលពីកន្លែងដែល
+  មើលឃើញទៅកន្លែងថ្មី (`glideModalCard()` ៖ `transform` តាម Web Animations · `composite: 'add'` · `MODAL_GLIDE_MS` ២៥០ · easeOutCubic ៖ GPU គូរ · គ្មាន layout ក្នុងស៊ុម) ពេល keyboard បើក ·
+  បិទ · ប្តូរកម្ពស់កណ្តាលចលនា (បន្តពីទីតាំងបច្ចុប្បន្ន) · APK ៖ WebView ធំឡើងពេល keyboard បិទ (`ResizeObserver` លើ `.modal` ៖ ទីតាំងចាស់ = `modalRest`) · ទីតាំងចុងក្រោយ · ការវាស់ ·
+  ការរំកិលប្រអប់វាយ ដូចដើម (ការវាស់មិនរាប់ `transform`)។ ⛔ ភ្លាមដូចដើម ៖ visual viewport រំកិល (កាតនៅនឹងលើអេក្រង់) · មាតិកាប្រអប់ប្តូរទំហំ · បង្វិល · iPhone/កុំព្យូទ័រ viewport
+  ប្តូរ (មិនមែន keyboard) · «បន្ថយចលនា» (`prefers-reduced-motion`) · ⛔ `.modal` មិនផ្លាស់ទី។
+- 🔬 **iPhone ៖ វាស់ពេលទំព័រធ្លាក់ក្រោយចុចកន្លែងវាយ Barcode** (ផ្នែក ២ A135 ៖ «ម្តងម្កាល» · Chromium គ្មាន WebKit ➜ វាស់នៅទីនេះមិនបាន)។ iOS standalone ៖ ចុចកន្លែងវាយ Barcode ·
+  ស្លាក · ⚡ (គ្មានប្រអប់បើក) ➜ កត់ផ្លូវ (`caught` · `moved` · `slow` · `focused-tapped` · `focused-keyboard` · `covered` · `refused` · `multi` · `uncancelable`) + លេខ
+  (dx · dy · ms · ទីតាំងប្រអប់ · keyboard ដែលចាំ · focus) ➜ ក្នុង `PAGE_TAP_PROBE_MS` ក្រោយលែងដៃ ដោយគ្មានម្រាមដៃលើអេក្រង់ ៖ document · visual viewport · `#appPages` រំកិល ➜ Sentry
+  ម្តង/ផ្លូវ/ទំព័រ (`zone: 'ui'` · `context: 'iosPageTap <ផ្លូវ> <អ្វីរំកិល>'` · លេខតែប៉ុណ្ណោះ ⛔ មិនផ្ញើអត្ថបទប្រអប់)។ ⛔ មិនប្តូរឥរិយាបថ ៖ ការចាប់ · focus ដូចដើម · Android · កុំព្យូទ័រ ➜ មិនកត់។
+- 🐛 **Android (APK · Chrome) ៖ ផ្ទាំង keyboard លេខ (កែលេខទូរស័ព្ទ · កែទឹកប្រាក់ · កែប្រែ COD/DOD · អត្រាប្រាក់) កន្ត្រាក់ «លោតឡើង ហើយត្រឡប់ចុះ»** (ផ្នែក ២ A131 ·
+  វីដេអូ)។ keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY ពីការប្រើមុន) ពេលចាប់ផ្តើម ➜ កាតឡើងខ្ពស់ពេក ➜ keyboard លេខស្ងប់ (ទាបជាង) ➜ WebView បង្រួម ➜ កាតចុះ ៤៥px។ ឥឡូវ ៖ ពេល keyboard
+  នៅបើក កាត Android មិនចុះវិញទេ (`androidFitStaysUp()` · ឆ្លងការបង្រួម WebView/ទំព័រ `androidHeldFitView()`) ខណៈនៅមើលឃើញពេញ · keyboard ខ្ពស់ជាង ➜ ឡើង · ស្មើ ➜ ដូចដើម។
+- ✨ **Android ចាំកម្ពស់ keyboard ពិតដោយខ្លួនឯង** (ផ្នែក ២ A132 ៖ keyboard ក្រុមហ៊ុនណាក៏បាន · ពង្រីក ឬបង្រួមទំហំ)។ កម្ពស់ពិត = កម្ពស់ទំព័រពេញមុន keyboard −
+  ផ្ទៃមើលឃើញ (`keyboardSession`) កត់តែពេលវាស្ងប់ ៖ ទំព័របង្រួមហើយនៅដដែល `KEYBOARD_SETTLE_MS` · ឬ visualViewport នៅដដែល `KEYBOARD_TRUST_MS` ក្រៅ APK ⛔ មិនដែលកត់កម្ពស់ពេល APK
+  hold (keyboard ប្រាប់ចាស់) · តាមទំហំអេក្រង់ + ប្រភេទ keyboard (`tel` · `number` · `decimal` · អក្សរ …) ➜ បើកលើកក្រោយ កាតទៅទីតាំងពិតតែម្តង (`learnedKeyboardView()`) ទោះ
+  keyboard ប្រាប់កម្ពស់ចាស់ · ប្តូរទំហំ keyboard ➜ ឡើងម្តង ហើយចាំថ្មី · ក្បួនចុចកន្លែងវាយ Barcode (Android) ប្រើកម្ពស់ពិតនេះដែរ។ ⛔ iPhone ចាំដូចដើម។
+- ✨ **ទូរស័ព្ទនៅបញ្ឈរ · tablet បង្វិលបាន** (ផ្នែក ២ A133)។ APK ៖ `MainActivity` សម្រេចតាមទទឹងតូចបំផុត (`smallestScreenWidthDp` < `TABLET_MIN_WIDTH_DP` ៦០០ ➜
+  `SCREEN_ORIENTATION_PORTRAIT` · ផ្សេង ➜ `UNSPECIFIED`) ក្នុង `onCreate` (មុន `super` ៖ មិនគូរផ្តេកមុន) និង `onConfigurationChanged` (ទូរស័ព្ទបត់ · បំបែកអេក្រង់) · PWA
+  Android ដែលដំឡើង ៖ manifest `portrait-primary` (ចាក់សោទូរស័ព្ទ) + tablet សុំ `screen.orientation.lock('any')` (`applyOrientationLock()` ពេល boot និង `resize` · បដិសេធ ➜
+  ស្ងាត់) · iPhone ៖ Apple មិនឲ្យ App web ចាក់សោ ➜ `guide.html` ណែនាំ Control Center · Browser tab ➜ មិនប៉ះ។
+- 🐛 **iPhone · iPad ៖ ចុចស្លាក «ស្កេន Barcode…» ឬរូប ⚡ ➜ ទំព័រធ្លាក់** (ផ្នែក ២ A129)។ ស្លាក `label for="hwScannerInput"` នៅពីលើកន្លែងវាយ ៖ ចុចវា (ឧ. ចុចខាងលើប្រអប់បន្តិច)
+  ➜ iOS focus កន្លែងវាយខ្លួនឯង មិនឆ្លងការចាប់របស់ App ➜ WebKit រំកិលទំព័រ · ⚡ (absolute លើប្រអប់) ៖ ចុចមិនធ្វើអ្វី។ ឥឡូវ iOS standalone ៖ ចុចស្លាក · ⚡ ➜ ចាប់ដូចចុចប្រអប់
+  (`iosPageTapFieldOf()` ➜ `focus({ preventScroll })` · ច្បាប់ keyboard ដដែល ៖ keyboard នឹងបាំង ➜ iOS) · ប៊ូតុង «បញ្ជូន» · ស្លាក «📁» · ការអូស ➜ មិនប៉ះ · ⛔ Android ដូចដើម។
+- 🐛💰 **ពង្រីកអេក្រង់ (pinch zoom) ➜ App យល់ថាមាន keyboard** (ផ្នែក ២ A128)។ កុំព្យូទ័រ (trackpad · អេក្រង់ប៉ះ) · iPad ៖ zoom ១.៦ ➜ `innerHeight − visualViewport.height` = ៣០០
+  ➜ `softKeyboardShown()` ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងលេខទូរស័ព្ទបើក វាយ Barcode ចូលប្រអប់ COD ផ្ទាល់ (មិនចូលជួរ «📥») · toast ឡើង ៣០០px · ផ្ទាំងបង្រួម · ចាំ «keyboard» ៣០០។
+  ឥឡូវ keyboard = `innerHeight − visualViewport.height × scale` (`visualViewportKeyboardInset()` ៖ scale គិតតែពេល > ១ · រូបមន្តតែមួយសម្រាប់ផ្ទាំង · toast · ការចាំ · ស្វែងរក iOS) ➜
+  zoom គ្មាន keyboard ➜ ០ · zoom + keyboard ➜ keyboard ពិត · Android · iPhone ធម្មតា (scale ១) ➜ រូបមន្តដដែល។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ zoom (គ្មាន keyboard ➜ គ្មានផ្ទៃ · `softKeyboardShown()` false · toast ០ · មិនចាំ · zoom + keyboard ➜ ចាំ ៣៣៦ · ទិសផ្ទុយ scale ១/គ្មាន/< ១/NaN
+  ➜ រូបមន្តដដែល) · ស្លាក/⚡ (iOS ចាប់ · keyboard បើក ➜ iOS · ប៊ូតុង · ស្លាក 📁 · អូស ➜ មិនប៉ះ · Android ➜ មិនប៉ះ) · `ios-keyboard-pan.test.ts` +១ (zoom ➜ ០ · zoom + keyboard ➜ ៣៣៦) —
+  កូដមុនកែ FAIL ៤ ➜ ១៤៩/១៤៩ (៩ ឯកសារ keyboard · ស្វែងរក · ម៉ាស៊ីនស្កេន)។
+- `modal-keyboard-device-test` (Chromium ពិត) +១៦ ៖ (គ) ចុចពិតលើស្លាក · ⚡ ៖ iPhone ៨ ករណី ➜ ចាប់ · Android ៦ ➜ ដូចដើម (ទិសផ្ទុយ) · (ច) កុំព្យូទ័រ 1280×800 ៖
+  `Emulation.setPageScaleFactor` ១.៦ ➜ មិនមែន keyboard · ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · COD មិនប្រែ — build មុនកែ FAIL ១០ (iPhone ៨ · zoom ២ · Android ៦ ជាប់) ➜ ៧៥/៧៥។
+- Android keyboard លេខ · ការចាំ ៖ `ZoeW/tests/modal-keyboard.test.tsx` +៤ (Chrome ៣៨០ ➜ ៣០០ កាតនៅ ១១២ · APK hold ៣៨០ ➜ WebView ៣០០ កាតនៅ ១១២ · ឆ្លាតវៃ APK ៖ ចាំ ៣០០ ក្រោយ
+  `KEYBOARD_SETTLE_MS` ➜ បើកលើកក្រោយ hold ៣៨០ កាត ១៥២ តែម្តង · keyboard ពង្រីក ៣៦០ ➜ ឡើងម្តង ចាំ ៣៦០ · hold មិនកត់ទោះយូរ · អក្សរ ≠ លេខ · Chrome ៖ visualViewport ស្ងប់
+  `KEYBOARD_TRUST_MS` · ទំព័របង្រួម · កំពុងបិទមិនកត់) · ការសាក Chrome ៤០៧ ចាំក្រោយ `KEYBOARD_TRUST_MS` (មិនកត់ភ្លាម) — កូដមុនកែ FAIL ៥ ➜ ៤៦/៤៦ ·
+  `modal-keyboard-device-test` (ក២) ៖ ៥ ផ្ទាំងលេខ × APK ៣ + Chrome ២ ៖ keyboard ប្រាប់ +៨០ ➜ WebView/ទំព័របង្រួមតាមពិត ➜ លើកដំបូងមិនចុះ · ចាំកម្ពស់ពិត · លើកក្រោយទៅទីតាំងពិត
+  តែម្តង (គ្មាន `.modal-kb`) — build `178e0a2` FAIL ៥ (កាតចុះ ១០០ ➜ ១៣៩ ដូចវីដេអូ · ចាំ ៤១០ ខុសជំនួស ៣៣០) ➜ ៨០/៨០។
+  `modal-keyboard-device-test` រត់តែឯង ៣០៩ វិ. ក្រោយ (ក២) ➜ run-all «ព្យួរ — លើសពិដាន 300s» ➜ ចែកជា `--part=1/2` ((ក) ១១៧ + (ខ) ៣៥ វិ.) · `--part=2/2` ((ក២) ៦៩ · (គ) ៤៩ · (ង) ២៣ · ផ្សេង ១៤ វិ.) ដូច `zoew-suite` (ពិនិត្យថា run-all រត់ផ្នែកទាំង ២ · ក្រុមគ្របគ្រប់ផ្នែកម្តងគត់) ⛔ មិនបង្កើន `CHECKER_TIMEOUT`។
+- ចលនា ៖ `modal-keyboard-device-test` ផ្នែក (ឆ) `--part=3/3` (Chromium ពិត · ថតទីតាំងកាតលើអេក្រង់រាល់ស៊ុម) ៖ ១៧ ប្រអប់ × APK ទូរស័ព្ទ · APK tablet ផ្តេក · Chrome · iPhone · iPad ➜
+  keyboard បើក/បិទ ➜ ជំហាននីមួយៗតាមខ្សែកោងក្នុងរយៈស៊ុម (+១០%) · ស៊ុមកណ្តាលផ្លូវ · មិនត្រឡប់ក្រោយ · មិនហួស · ≈ `MODAL_GLIDE_MS` · ឈប់ត្រឹមទីតាំងត្រូវ · APK WebView បង្រួម ➜ មិនផ្លាស់ទី ·
+  iPhone/iPad visual viewport រំកិល ➜ នៅនឹង · keyboard ប្តូរកម្ពស់កណ្តាលចលនា ➜ បន្ត · ទិសផ្ទុយ ៖ មាតិកាធំឡើង ➜ ភ្លាម ហើយ keyboard ក្រោយមក រអិលពីទីតាំងថ្មី · បង្វិល tablet · iPhone viewport ប្តូរ ➜ ភ្លាម ·
+  «បន្ថយចលនា» ➜ ភ្លាម — build មុនកែ (`a9d20c6`) FAIL ៩ (កាតលោតមួយស៊ុម ៖ ស៊ុមកណ្តាល ០) ➜ ១៩/១៩ · mutation (មិនតាមដានទំហំកាត · ចលនាលើ viewport គ្រប់វេទិកា) FAIL ៤ ·
+  `settle()` រង់ចាំចលនាចប់មុនវាស់ទីតាំងសម្រាក ➜ ផ្នែក ១/៣ ១៦/១៦ · ២/៣ ៧១/៧១ (ផ្នែកនីមួយៗ ~១៦០ វិ. < ៣០០) · `modal-keyboard-test` វាស់ទីតាំងដើមកណ្តាលចលនាបិទ (រង់ចាំ ១២០ms <
+  `MODAL_GLIDE_MS`) ➜ iPad ផ្តេក FAIL ១ ➜ `settle()` រង់ចាំចលនាដូចគ្នា ➜ ៥៣/៥៣ ប៉ុន្តែ ៣១០ វិ. ➜ ចែក `--part=1/3` (ទូរស័ព្ទ ៤ ទំហំ ១២០ វិ.) · `2/3` (ផ្តេក · iPad ៩០ វិ.) · `3/3` (ផ្នែកផ្សេង ១០៣ វិ.)
+  (ក្រុមគ្របទំហំទាំង ៧ ម្តងគត់ · run-all រត់ផ្នែកទាំង ៣) ⛔ មិនបង្កើន `CHECKER_TIMEOUT`។
+- ការវាស់ iPhone ៖ `ZoeW/tests/ios-page-tap-probe.test.ts` ៤ (ចាប់ ➜ document រំកិល ➜ ផ្ញើម្តង · លេខតែប៉ុណ្ណោះ (គ្មានអត្ថបទប្រអប់) · អូស ➜ visual viewport · ចុចយូរ ➜ `#appPages` ·
+  ចុចម្តងទៀតពេល focus រួច ➜ document · ផ្លូវនីមួយៗម្តង · ទិសផ្ទុយ ៖ ម្រាមដៃនៅលើអេក្រង់ · ក្រោយ `PAGE_TAP_PROBE_MS` · មិនរំកិល · ធាតុផ្សេង · Android · ប្រអប់បើក · ZoeErrors គ្មាន) —
+  កូដមុនកែ FAIL ២ ➜ ៤/៤ · mutation (ដកលក្ខខណ្ឌម្រាមដៃ · ដក «ម្តង/ផ្លូវ») FAIL ១ ម្តងៗ។
+- ទិសអេក្រង់ ៖ `ZoeW/tests/orientation-lock.test.ts` ៥ (PWA ទូរស័ព្ទ ➜ `portrait-primary` ម្តង · foldable បើក ➜ `any` · tablet · ៥៩៩/៦០០ · tab · APK · iPhone · iPad · កុំព្យូទ័រ
+  ➜ មិនហៅ · បដិសេធ · បោះ · គ្មាន ➜ មិនបោះ · ព្រំដែន ៦០០ ដូចគ្នានឹង `MainActivity` · AndroidManifest គ្មាន `screenOrientation`) · `npm run android:check` +៥ ·
+  `orientationFor()` ពិត compile (`javac` + android stub) ៖ ៣២០ · ៤១១ · ៥៩៩ ➜ PORTRAIT · ៦០០ · ៦៧៣ · ៨០០ · ០ · −១ ➜ UNSPECIFIED។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.82` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone (PWA)** ៖ ទំព័រស្កេន (កញ្ចប់ · Locker · ដក) ➜ ចុចស្លាក «ស្កេន Barcode…» ពីលើប្រអប់ ឬ ⚡ ➜ keyboard លោត · ទំព័រ និង navbar នៅនឹងកន្លែង · ចុចកន្លែងវាយច្រើនដង ➜ មិនធ្លាក់។
+   បើនៅធ្លាក់ម្តងម្កាល ➜ សូមថតវីដេអូ (ផ្នែក ២ A129 ៖ ផ្លូវផ្សេងទៀតដែលមិនអាចវាស់នៅទីនេះ)។
+2. **កុំព្យូទ័រ + ម៉ាស៊ីនស្កេន USB** ៖ ពង្រីកអេក្រង់ (pinch លើ trackpad) ➜ ស្កេន ➜ ផ្ទាំងលេខទូរស័ព្ទបើក ➜ ចុច COD ➜ ស្កេនម្តងទៀត ➜ ចូលជួរ «📥» · COD មិនប្រែ។
+3. **Android keyboard លេខ (APK និង Chrome/PWA)** ៖ បើក «កែលេខទូរស័ព្ទ» (ឬ «កែប្រែ COD, DOD») ➜ ប៉ះកន្លែងវាយ ➜ កាតឡើងតែម្តង មិនចុះវិញ ➜ បិទ ➜ ប៉ះប្រអប់ស្វែងរក (keyboard អក្សរ)
+   ➜ បិទ ➜ បើកផ្ទាំងលេខម្តងទៀត ➜ កាតទៅកន្លែងតែម្តង (ករណីវីដេអូ)។ ប្តូរទំហំ keyboard (Gboard ៖ ⚙️ ➜ កម្ពស់ keyboard) ➜ បើកម្តង កាតអាចឡើងម្តង ➜ បើកលើកក្រោយ ទៅកន្លែងពិតភ្លាម។
+4. **ទិសអេក្រង់** ៖ ទូរស័ព្ទ Android (APK ថ្មី · PWA ដែលដំឡើង) បង្វិលផ្តេក ➜ App នៅបញ្ឈរ · tablet ➜ បង្វិលបាន · ទូរស័ព្ទបត់ ៖ បើកធំ ➜ បង្វិលបាន · បត់វិញ ➜ បញ្ឈរ។ PWA tablet
+   ដែលនៅបញ្ឈរ ➜ ដក App ហើយដំឡើងពី Chrome ម្តងទៀត (Chrome ខ្លះមិនឲ្យ PWA ដោះសោទិស ➜ ប្រាប់ខ្ញុំ)។ iPhone ៖ ចាក់សោពី Control Center (Apple មិនឲ្យ App web ចាក់សោ)។
+5. **ផ្ទាំងរអិលតាម keyboard (iPhone · iPad · APK · Chrome)** ៖ បើក «បញ្ចូលច្រើន» · «កែលេខទូរស័ព្ទ» · ផ្ទាំង PIN ➜ ប៉ះកន្លែងវាយ ➜ កាតរអិលឡើងទន្ទឹមនឹង keyboard (មិនលោតភ្លាម) ➜
+   បិទ keyboard ➜ រអិលចុះវិញ។ ចលនាលឿន ឬយឺតពេកធៀប keyboard ➜ ប្រាប់ខ្ញុំ (`MODAL_GLIDE_MS`)។ «បន្ថយចលនា» (Reduce Motion) បើក ➜ ទៅកន្លែងភ្លាម។
+6. **iPhone ៖ ទំព័រធ្លាក់ម្តងម្កាល (ឧបករណ៍វាស់)** ៖ ប្រើ App ស្កេនធម្មតា (ចុចកន្លែងវាយ Barcode · ស្លាក · ⚡ · គ្រប់របៀប) ទាល់តែទំព័រធ្លាក់ម្តង ➜ ប្រាប់ខ្ញុំម៉ោងប្រហាក់ប្រហែល ➜
+   ខ្ញុំអាន Sentry (`zone: ui` · `iosPageTap …`) ➜ ដឹងផ្លូវពិត ➜ កែតែផ្លូវនោះ (អ្នកយាមមុនកែ)។
 
 ### [2.50.81] — 2026-10-15 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · Fast Mode មិនរក្សាទុក COD ខុស · iPhone ៖ របៀបស្កេនដក ចុចកន្លែងវាយ ទំព័រមិនធ្លាក់ · App ចាំកម្ពស់ keyboard ពិត · Android (App · Chrome) ៖ កន្លែងវាយ Barcode · ស្វែងរក មិនរំកិលទំព័រ**
 
@@ -4592,6 +4686,19 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`1529f3e`) ៖ ពិនិត្យការវាស់ keyboard ស្វ័យប្រវត្តិ · iOS ទាញទំព័រម្តងម្កាលក្នុង tab ស្កេន
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A128 | **ពង្រីក (pinch zoom) ➜ App យល់ថាមាន keyboard** | Chromium ពិត 1280×800 · `Emulation.setPageScaleFactor` ១.៦ ៖ `visualViewport.height` ៥០០ / `innerHeight` ៨០០ ➜ `softKeyboardShown()` true · `keyboardCover` ៣០០ · `modalKeyboardFit` · `zoew_keyboard_inset_v1` = `{"1280x800\|number":300}` · ផ្ទាំងលេខទូរស័ព្ទបើក + focus COD ➜ ម៉ាស៊ីនស្កេន `77100000308752` + Enter ➜ COD = Barcode (មិនចូលជួរ · `SCAN_MONEY_MAX` រារាំងការរក្សាទុក ➜ ការស្កេនបាត់) · zoom ១ ➜ ចូលជួរ · iPad (mobile emulation) ៖ meta `user-scalable=no` ➜ Chromium មិន zoom (Safari iOS មិនគោរព meta ➜ ក្លែងក្នុង vitest) · Android ៖ meta ➜ zoom មិនបាន (scale ១) | `visualViewportKeyboardInset()` (`refs.ts`) ៖ `innerHeight − round(height × scale)` · scale តែ > ១ ➜ Android · iPhone ធម្មតា រូបមន្តដដែល · `keyboardVisibleViewport()` · ការចាំ · `iosKeyboardInsetPx()` ប្រើមួយនេះ ➜ ✅ |
+| A129 | **iOS ៖ ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ម្តងម្កាល (គ្រប់របៀប)** | ផ្លូវដែលរួចពីការចាប់ ៖ (១) ស្លាក `label for="hwScannerInput"` ពីលើប្រអប់ ➜ iOS focus ខ្លួនឯង (ចុចពិត Chromium ៖ touchend មិន preventDefault · focus មិនឆ្លង `focus({ preventScroll })` · iPhone ៨ ករណី) · (២) ⚡ absolute លើប្រអប់ (z-index ១) ➜ ចុចមិនធ្វើអ្វី · (៣) ការចុចរំកិល > `MODAL_TAP_SLOP_PX` ឬយូរជាង `MODAL_TAP_MAX_MS` ➜ iOS (កម្រិតការចុចរបស់ UIKit មិនអាចវាស់នៅទីនេះ) · (៤) focus មិនជាប់ម្តង ➜ `modalFocusRefused` រហូតដល់ reload · (៥) ប្រអប់ focus រួច + ចុចរួច + គ្មាន keyboard ➜ iOS (keyboard អណ្តែត iPad) | (១)(២) ចាប់ដូចប្រអប់តែ iOS (`iosPageTapFieldOf()`) ➜ ✅ · (៣)–(៥) គ្មានភស្តុតាងលើឧបករណ៍ ➜ មិនប្តូរ · បើនៅធ្លាក់ ➜ វីដេអូ |
+| A130 | **ការចាំ keyboard ៖ ចំណុចផ្សេងទៀតដែលពិនិត្យ** | ប្តូរភាសា keyboard (ខ្មែរ/អង់គ្លេស) ➜ កម្ពស់ចុងក្រោយដែលស្ងប់ (ម្ចាស់គម្រោង ៖ Android រលូន) · keyboard បិទខណៈប្រអប់នៅ focus (ប៊ូតុងលាក់ keyboard iPad · Gboard) ➜ ព្រឹត្តិការណ៍ពេលបិទអាចចាំតម្លៃពាក់កណ្តាល (បើ WebKit រាយការណ៍រាល់ស៊ុម) · បង្វិលអេក្រង់ខណៈ keyboard បើក ➜ លំដាប់ `resize` WebKit មិនអាចវាស់នៅទីនេះ | មិនប្តូរ (គ្មានភស្តុតាង · Android មិនប៉ះតាមសំណើ) |
+| A131 | **Android ៖ ផ្ទាំង keyboard លេខកន្ត្រាក់ (លោតឡើង ហើយត្រឡប់ចុះ)** | វីដេអូម្ចាស់គម្រោង (APK · «កែប្រែ COD, DOD») ស៊ុមដោយស៊ុម ៖ បើកលើកដំបូង កាត ៦២៦ ➜ ១៨៤ នៅដដែល · ក្រោយប្រើ keyboard អក្សរ បើកម្តងទៀត ៖ ៦២៦ ➜ ១៣៩ (keyboard ចាប់ផ្តើម · IME ប្រាប់កម្ពស់ QWERTY ចាស់) ➜ ១៨៤ ពេល hold ចប់ (WebView បង្រួមតាម keyboard លេខពិត · កំពូល keyboard ១៥២១/១៥១៧ ស្មើគ្នាទាំងពីរលើក) · Chromium ពិត (keyboard +៨០ ➜ ពិត) ៖ ១០០ ➜ ១៣៩ · ២១ ➜ ៤០ · ២៤៥ ➜ ២៨៥ · Chrome (ទំព័របង្រួម) ដូចគ្នា | Android ៖ keyboard នៅបើក ➜ កាតមិនចុះ (`androidFitStaysUp()` · `androidHeldFitView()` ៖ APK `keyboardOpen` ឬទំព័របង្រួម `keyboardLayoutShrank()`) ➜ ✅ |
+| A132 | **Android ៖ ការចាំ keyboard កត់កម្ពស់ចាស់** | build `178e0a2` ៖ `zoew_keyboard_inset_v1` = `{"412x915\|number":410}` (កម្ពស់ដែល IME ប្រាប់ពេលចាប់ផ្តើម) ជំនួស ៣៣០ (ពិត) ៖ `measureKeyboardCover()` កត់រាល់ `resize` ពេល visualViewport មាន keyboard · APK ក្រោយ WebView បង្រួម (inset ០) មិនកត់ទាល់តែសោះ ➜ Android មិនដែលមានកម្ពស់ពិត · keyboard ក្រុមហ៊ុនផ្សេង · ពង្រីកទំហំ ➜ ដូចគ្នា | Android ៖ `keyboardSession` (កម្ពស់ទំព័រពេញពេល keyboard លេចដំបូង) ➜ កម្ពស់ = ពេញ − ផ្ទៃមើលឃើញ · កត់តែពេលស្ងប់ (`KEYBOARD_SETTLE_MS` ក្រោយបង្រួម · `KEYBOARD_TRUST_MS` visualViewport ក្រៅ APK · ⛔ APK hold) · `learnedKeyboardView()` ដាក់កាតតាមកម្ពស់ដែលចាំ មុនស្ងប់ · iPhone ដូចដើម ➜ ✅ |
+| A133 | **ទូរស័ព្ទបង្វិលផ្តេក (សំណើម្ចាស់គម្រោង ៖ ទូរស័ព្ទមិនផ្តេក · tablet ផ្តេកបាន)** | APK ៖ AndroidManifest គ្មាន `screenOrientation` · `MainActivity` មិនស្នើ ➜ បង្វិលតាម sensor · PWA Android ៖ manifest `portrait-primary` ចាក់សោ **tablet ផង** · iPhone/iPad ៖ WebKit មិនគោរព manifest `orientation` ហើយ `screen.orientation.lock()` មិនមាន ➜ ចាក់សោពី web មិនបាន · ប្លង់ទូរស័ព្ទផ្តេក (A124) នៅសម្រាប់ iPhone · Browser tab | APK `orientationFor(smallestScreenWidthDp)` (< ៦០០ ➜ PORTRAIT) · PWA tablet `lock('any')` · iPhone ៖ ម្ចាស់គម្រោងជ្រើស «ទុកដូចសព្វថ្ងៃ» (Control Center · ប្លង់ផ្តេក A124 នៅ · មិនបិទ App ពេលផ្តេក ៖ ស្កេនកាមេរ៉ាទូរស័ព្ទផ្អៀងមិនរំខាន) |
+| A134 | **ផ្ទាំងលោតភ្លាមតាម keyboard (សំណើម្ចាស់គម្រោង ៖ ថែមចលនា App ទាំងមូល)** | build `a9d20c6` (Chromium ពិត · ថតរាល់ស៊ុម) ៖ ១៧ ប្រអប់ × ៥ ឧបករណ៍ ➜ កាតផ្លាស់ទីក្នុង ១ ស៊ុម (ស៊ុមកណ្តាល ០ ៖ PIN iPhone ៣១២ ➜ ២៨០ · Chrome ២៥៧ ➜ ១០៧) · ការតម្រូវប្តូរ `margin-top`/`align-items` (CSS transition មិនអាចចាប់ពី `center` ➜ `flex-start` · ទោះបានក៏ layout រាល់ស៊ុម) · APK ៖ keyboard បិទ ➜ WebView ធំឡើង ➜ កាតទៅកណ្តាលថ្មីដោយ layout ផ្ទាល់ (fit បាត់តាំងពី WebView បង្រួម ៖ គ្មានការតម្រូវណាប្តូរ) | FLIP ៖ `glideModalCard()` ចាប់ទីតាំងដែលមើលឃើញ (`modalRest` + offset ចលនា) ➜ `transform` Web Animations (`composite: 'add'` · `MODAL_GLIDE_MS`) · `ResizeObserver` លើកាត (មាតិកា ➜ កត់ភ្លាម) និង `.modal` (Android viewport ➜ រអិល) · visual viewport រំកិល ➜ ទីតាំងលើអេក្រង់ដដែល ➜ គ្មានចលនា ➜ ✅ |
+| A135 | **iPhone ៖ ទំព័រធ្លាក់ម្តងម្កាល ក្រោយចុចកន្លែងវាយ Barcode (រាយការណ៍ម្ចាស់គម្រោងលើ 2.50.82)** | Chromium គ្មាន WebKit ➜ ការសាក (គ) ជាប់ទាំងអស់ · អានកូដ (មិនមែនភស្តុតាង) ៖ ផ្លូវដែលការចុចទៅ iOS ដើម ៖ អូស > `MODAL_TAP_SLOP_PX` ឬចុចយូរ > `MODAL_TAP_MAX_MS` ដែល UIKit នៅរាប់ជាការចុច · ចុចម្តងទៀតលើប្រអប់ដែល focus រួច ក្រោយ keyboard បិទ (`modalTapFocused`) · `modalFocusRefused` · ការប៉ាន់ «keyboard នឹងបាំង» (`pageFieldStaysAboveKeyboard()`) | វាស់លើឧបករណ៍ពិត ៖ `iosPageTap` (ផ្លូវ + លេខ ➜ Sentry ពេលទំព័ររំកិលក្នុង `PAGE_TAP_PROBE_MS` គ្មានម្រាមដៃ) ➜ ⚠️ ចាំទិន្នន័យ ➜ កែតែផ្លូវដែលវាស់ឃើញ (អ្នកយាមមុនកែ) |
+
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
 - CI 776 លើ `b86ed08` ៖ ៤/៤ ✅ (CI 775 លើ `42628fc` ត្រូវបោះបង់ដោយ push ថ្មី · ផ្នែក 4/4 ជាប់មុនបោះបង់)។
@@ -7225,6 +7332,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-page-tap-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
@@ -7266,6 +7374,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

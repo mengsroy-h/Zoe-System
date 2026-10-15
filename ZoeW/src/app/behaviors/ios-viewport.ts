@@ -2,7 +2,7 @@ import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
 import { isAndroidDevice } from '../../platform/native';
 import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
-import { elementOf, focusField, isFieldFocused, resetVisualViewportPan, setElementScrollTop, type RefName } from '../refs';
+import { elementOf, focusField, isFieldFocused, resetVisualViewportPan, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
 import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, endPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
@@ -57,7 +57,7 @@ export function listenIOSDocumentScroll(scope: LifecycleScope): void {
 export function iosKeyboardInsetPx(): number {
     const viewport = window.visualViewport;
     if (!viewport || !iosSearchDocumentLocked() || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX) return 0;
-    const inset = Math.round(window.innerHeight - viewport.height);
+    const inset = visualViewportKeyboardInset();
     return inset >= KEYBOARD_MIN_INSET_PX && Number.isFinite(inset) ? inset : 0;
 }
 

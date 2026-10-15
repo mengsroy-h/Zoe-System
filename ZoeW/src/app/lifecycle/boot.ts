@@ -45,6 +45,7 @@ import { setupNativeShell } from './native-shell';
 import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
 import { listenModalKeyboard } from '../behaviors/modal-keyboard';
+import { applyOrientationLock } from '../../platform/orientation';
 import { oncePerPage, type LifecycleScope } from './scope';
 
 export function bootApplication(scope: LifecycleScope): void {
@@ -72,6 +73,8 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSKeyboard(scope);
     listenEntrySearchPanel(scope);
     listenModalKeyboard(scope);
+    applyOrientationLock();
+    scope.listen(window, 'resize', applyOrientationLock);
 
     if ('serviceWorker' in navigator && !isNativeApp()) {
         scope.onLoad(() => registerServiceWorker(scope));

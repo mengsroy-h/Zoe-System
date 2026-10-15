@@ -2,12 +2,12 @@ import { modalIsOpen } from '../../core/modals';
 import { uiState, type ModalKeyboardFit } from '../../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../../core/storage';
 import { KEYBOARD_INSET_KEY } from '../../core/storage-keys';
-import { isAndroidDevice } from '../../platform/native';
+import { isAndroidDevice, isNativeAndroid } from '../../platform/native';
 import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
-import { blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, type RefName } from '../refs';
+import { animateElement, blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
@@ -20,6 +20,11 @@ export const PAGE_TAP_KEYBOARD_RATIO = 0.5;
 export const PAGE_TAP_PHONE_KEYBOARD_RATIO = 0.45;
 export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
 export const KEYBOARD_MEMORY_MAX = 24;
+export const KEYBOARD_SETTLE_MS = 400;
+export const KEYBOARD_TRUST_MS = 1000;
+export const MODAL_GLIDE_MS = 250;
+export const MODAL_GLIDE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
+export const PAGE_TAP_PROBE_MS = 1500;
 
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
@@ -38,11 +43,21 @@ let modalStackSeen: string[] = [];
 let modalDisplaySeen: Record<string, string> = {};
 let keyboardOpenSeen = false;
 let measureQueued = false;
-let naturalBox: (ModalNaturalBox & { id: string }) | null = null;
+let naturalBox: (ModalNaturalBox & { id: string; layout: number; width: number }) | null = null;
 let modalTap: { id: number; x: number; y: number; at: number; field: HTMLElement } | null = null;
 let modalFocusRefused = false;
 let modalTapFocused: HTMLElement | null = null;
 let keyboardMemory: Record<string, number> | null = null;
+let keyboardSession: { w: number; h: number; seen: string; settled: boolean } | null = null;
+let keyboardSettleTimer: ReturnType<typeof setTimeout> | null = null;
+let modalRest: { card: HTMLElement; top: number; width: number } | null = null;
+let modalGlide: { card: HTMLElement; to: number; anim: Animation } | null = null;
+let modalWatched: HTMLElement | null = null;
+let modalResizeObserver: ResizeObserver | null = null;
+let pageTapStart: { field: HTMLElement; x: number; y: number; at: number; touches: number; focused: boolean; tapped: boolean; keyboard: boolean; above: boolean; refused: boolean } | null = null;
+let pageTapProbe: { path: string; until: number; pagesAt: number; numbers: Record<string, number> } | null = null;
+let pageTapReported: string[] = [];
+let touchesDown = 0;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -50,7 +65,7 @@ export function keyboardVisibleViewport(): { top: number; height: number } | nul
     const layout = window.innerHeight;
     const height = Math.round(vv.height);
     if (!Number.isFinite(layout) || !Number.isFinite(height) || height <= 0) return null;
-    if (layout - height < KEYBOARD_MIN_INSET_PX) return null;
+    if (visualViewportKeyboardInset() < KEYBOARD_MIN_INSET_PX) return null;
     const offset = Math.round(vv.offsetTop);
     const top = Number.isFinite(offset) ? Math.min(Math.max(0, offset), layout - height) : 0;
     return { top, height };
@@ -66,7 +81,8 @@ export function modalKeyboardViewport(): { top: number; height: number } | null 
 
 export function measureKeyboardCover(): void {
     const view = keyboardVisibleViewport();
-    if (view) rememberKeyboardInset(Math.round(window.innerHeight) - view.height);
+    const android = trackAndroidKeyboard();
+    if (view && !android) rememberKeyboardInset(keyboardScreenKey(), visualViewportKeyboardInset());
     const cover = view ? Math.max(0, Math.round(window.innerHeight) - view.top - view.height) : 0;
     if (uiState.keyboardCover !== cover) uiState.keyboardCover = cover;
 }
@@ -84,6 +100,88 @@ function keyboardScreenKey(): string {
     return Math.round(window.innerWidth) + 'x' + Math.round(window.innerHeight) + '|';
 }
 
+function visibleViewportHeight(): number {
+    const vv = window.visualViewport;
+    const layout = Math.round(window.innerHeight);
+    if (!vv) return layout;
+    const height = Math.round(vv.height * (vv.scale > 1 ? vv.scale : 1));
+    return Number.isFinite(height) && height > 0 ? Math.min(height, layout) : layout;
+}
+
+function clearKeyboardSettle(): void {
+    if (keyboardSettleTimer !== null) clearTimeout(keyboardSettleTimer);
+    keyboardSettleTimer = null;
+}
+
+function endKeyboardSession(): void {
+    keyboardSession = null;
+    clearKeyboardSettle();
+}
+
+function keyboardLayoutShrank(): boolean {
+    const s = keyboardSession;
+    return !!s && Math.round(window.innerWidth) === s.w && s.h - Math.round(window.innerHeight) >= KEYBOARD_MIN_INSET_PX;
+}
+
+function sessionInset(s: NonNullable<typeof keyboardSession>): number {
+    return Math.round(window.innerWidth) === s.w ? s.h - visibleViewportHeight() : 0;
+}
+
+function settleAndroidKeyboard(s: NonNullable<typeof keyboardSession>, inset: number): void {
+    keyboardSettleTimer = null;
+    if (keyboardSession !== s || sessionInset(s) !== inset) return;
+    rememberKeyboardInset(s.w + 'x' + s.h + '|', inset);
+    if (s.settled) return;
+    s.settled = true;
+    if (uiState.isModalOpen && uiState.modalViewportHeight > 0) measureModalKeyboard();
+}
+
+function trackAndroidKeyboard(): boolean {
+    if (!isAndroidDevice()) {
+        if (keyboardSession) endKeyboardSession();
+        return false;
+    }
+    const w = Math.round(window.innerWidth);
+    const layout = Math.round(window.innerHeight);
+    if (!Number.isFinite(w) || !Number.isFinite(layout) || layout <= 0) {
+        endKeyboardSession();
+        return true;
+    }
+    let s = keyboardSession;
+    if (s && s.w !== w) {
+        endKeyboardSession();
+        s = null;
+    }
+    if (!s) {
+        if (uiState.keyboardOpen || layout - visibleViewportHeight() < KEYBOARD_MIN_INSET_PX) return true;
+        s = keyboardSession = { w, h: layout, seen: '', settled: false };
+    }
+    if (layout > s.h) s.h = layout;
+    const inset = sessionInset(s);
+    if (inset < KEYBOARD_MIN_INSET_PX) {
+        endKeyboardSession();
+        return true;
+    }
+    const shrank = s.h - layout >= KEYBOARD_MIN_INSET_PX;
+    if (shrank) s.settled = true;
+    const seen = inset + (shrank ? '|shrank' : '|view');
+    if (seen === s.seen) return true;
+    s.seen = seen;
+    clearKeyboardSettle();
+    if (!shrank && isNativeAndroid()) return true;
+    const session = s;
+    keyboardSettleTimer = setTimeout(() => settleAndroidKeyboard(session, inset), shrank ? KEYBOARD_SETTLE_MS : KEYBOARD_TRUST_MS);
+    return true;
+}
+
+function learnedKeyboardView(view: { top: number; height: number }): { top: number; height: number } {
+    const s = keyboardSession;
+    if (!s || s.settled || Math.round(window.innerWidth) !== s.w || Math.round(window.innerHeight) !== s.h) return view;
+    const learned = loadKeyboardMemory()[s.w + 'x' + s.h + '|' + keyboardKind(document.activeElement)];
+    if (!(learned >= KEYBOARD_MIN_INSET_PX) || learned >= s.h) return view;
+    return { top: view.top, height: Math.max(0, Math.min(s.h - learned, s.h - view.top)) };
+}
+
 function loadKeyboardMemory(): Record<string, number> {
     if (keyboardMemory) return keyboardMemory;
     let parsed: unknown;
@@ -99,11 +197,11 @@ function loadKeyboardMemory(): Record<string, number> {
     return memory;
 }
 
-function rememberKeyboardInset(inset: number): void {
+function rememberKeyboardInset(screen: string, inset: number): void {
     const kind = keyboardKind(document.activeElement);
     if (!kind) return;
     const memory = loadKeyboardMemory();
-    const key = keyboardScreenKey() + kind;
+    const key = screen + kind;
     if (memory[key] === inset) return;
     delete memory[key];
     memory[key] = inset;
@@ -220,13 +318,123 @@ function fitModalToKeyboard(view: { top: number; height: number }): boolean {
             uiState.modalKeyboardFit = null;
             commitNow();
         }
-        naturalBox = Object.assign({ id }, naturalBoxOf(modal, content));
+        naturalBox = Object.assign({ id, layout: window.innerHeight, width: window.innerWidth }, naturalBoxOf(modal, content));
     }
-    const fit = isAndroidDevice() ? modalKeyboardHoldFitFor(naturalBox, view, window.innerHeight) : modalKeyboardFitFor(naturalBox, view);
+    if (isAndroidDevice()) {
+        const room = learnedKeyboardView(view);
+        const fit = modalKeyboardHoldFitFor(naturalBox, room, naturalBox.layout);
+        if (now && now.id === id && androidFitStaysUp(fit, room)) return false;
+        return setModalKeyboardFit(Object.assign({ id }, fit));
+    }
+    const fit = modalKeyboardFitFor(naturalBox, view);
     return setModalKeyboardFit(fit ? Object.assign({ id }, fit) : null);
 }
 
+function androidFitStaysUp(next: { top: number }, view: { top: number; height: number }): boolean {
+    const now = uiState.modalKeyboardFit;
+    if (!now || !naturalBox || now.id !== naturalBox.id || next.top <= now.top || window.innerWidth !== naturalBox.width) return false;
+    const height = Math.min(naturalBox.height, now.max);
+    return Number.isFinite(height) && now.top >= view.top && now.top + height <= view.top + view.height;
+}
+
+function androidHeldFitView(): { top: number; height: number } | null {
+    const now = uiState.modalKeyboardFit;
+    if (!(uiState.keyboardOpen || keyboardLayoutShrank()) || !now || !naturalBox || now.id !== naturalBox.id || now.id !== topmostModal() || !isAndroidDevice()) return null;
+    const height = Math.round(window.innerHeight);
+    return Number.isFinite(height) && height > 0 ? { top: 0, height } : null;
+}
+
+function topmostModalCard(): { id: string; card: HTMLElement } | null {
+    const id = topmostModal();
+    const modal = id ? modalElement(id) : null;
+    const card = modal ? modalContentOf(modal) : null;
+    return id && card ? { id, card } : null;
+}
+
+function cardLayoutTop(card: HTMLElement): number {
+    const modal = card.parentElement;
+    return modal && card.offsetParent === modal && card.offsetHeight > 0 ? modal.getBoundingClientRect().top + card.offsetTop : NaN;
+}
+
+function modalCardShownTop(card: HTMLElement): number {
+    if (!modalRest || modalRest.card !== card) return NaN;
+    const offset = modalGlide && modalGlide.card === card ? card.getBoundingClientRect().top - cardLayoutTop(card) : 0;
+    return modalRest.top + offset;
+}
+
+function modalMotionAllowed(): boolean {
+    try {
+        return typeof window.matchMedia !== 'function' || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+        return true;
+    }
+}
+
+function stopModalGlide(): void {
+    const glide = modalGlide;
+    modalGlide = null;
+    if (!glide) return;
+    try { glide.anim.cancel(); } catch (e) {}
+}
+
+function watchModalCard(card: HTMLElement | null): void {
+    if (card === modalWatched) return;
+    modalWatched = card;
+    if (!modalResizeObserver) return;
+    modalResizeObserver.disconnect();
+    if (!card) return;
+    modalResizeObserver.observe(card);
+    if (card.parentElement) modalResizeObserver.observe(card.parentElement);
+}
+
+function glideModalCard(shown: number, animate: boolean): void {
+    const now = topmostModalCard();
+    watchModalCard(now ? now.card : null);
+    if (modalGlide && (!now || modalGlide.card !== now.card)) stopModalGlide();
+    const to = now ? cardLayoutTop(now.card) - uiState.modalViewportTop : NaN;
+    if (!now || !Number.isFinite(to)) {
+        stopModalGlide();
+        modalRest = null;
+        return;
+    }
+    const was = modalRest;
+    modalRest = { card: now.card, top: to, width: window.innerWidth };
+    if (modalGlide && Math.abs(modalGlide.to - to) < 1) return;
+    const running = !!modalGlide;
+    stopModalGlide();
+    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width) return;
+    const from = Math.round(shown - to);
+    if (!Number.isFinite(from) || Math.abs(from) < 2 || !modalMotionAllowed()) return;
+    let anim: Animation | null;
+    try {
+        anim = animateElement(now.card, [{ transform: 'translate3d(0,' + from + 'px,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: MODAL_GLIDE_MS, easing: MODAL_GLIDE_EASING, composite: 'add' });
+    } catch (e) {
+        anim = null;
+    }
+    if (!anim) return;
+    const glide = { card: now.card, to, anim };
+    modalGlide = glide;
+    anim.onfinish = () => {
+        if (modalGlide === glide) modalGlide = null;
+    };
+}
+
+function noteModalResized(entries: ResizeObserverEntry[]): void {
+    const now = topmostModalCard();
+    if (!now || now.card !== modalWatched) return;
+    const viewport = isAndroidDevice() && entries.some((entry) => entry.target === now.card.parentElement);
+    glideModalCard(modalCardShownTop(now.card), viewport);
+}
+
 export function measureModalKeyboard(): void {
+    trackAndroidKeyboard();
+    const now = topmostModalCard();
+    const shown = now ? modalCardShownTop(now.card) : NaN;
+    placeModalForKeyboard();
+    glideModalCard(shown, true);
+}
+
+function placeModalForKeyboard(): void {
     modalWasOpen = uiState.isModalOpen;
     modalStackSeen = uiState.modalStack;
     modalDisplaySeen = uiState.modalDisplay;
@@ -238,8 +446,11 @@ export function measureModalKeyboard(): void {
     if (uiState.modalViewportTop !== top) { uiState.modalViewportTop = top; changed = true; }
     if (uiState.modalViewportHeight !== height) { uiState.modalViewportHeight = height; changed = true; }
     if (!view) {
-        naturalBox = null;
-        if (setModalKeyboardFit(null)) changed = true;
+        const held = androidHeldFitView();
+        if (!held || !naturalBox || !androidFitStaysUp(modalKeyboardHoldFitFor(naturalBox, held, naturalBox.layout), held)) {
+            naturalBox = null;
+            if (setModalKeyboardFit(null)) changed = true;
+        }
         if (changed) commitNow();
         return;
     }
@@ -267,8 +478,22 @@ function revealAfterResize(): void {
     if (uiState.isModalOpen && uiState.modalViewportHeight === 0) revealFocusedModalField();
 }
 
+function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
+    const node = target as Element | null;
+    if (!node || typeof node.closest !== 'function' || !usesIOSPanelHandoff()) return null;
+    for (const name of PAGE_TAP_FIELDS) {
+        const field = elementOf(name);
+        if (!field || node === field) continue;
+        const label = node.closest('label') as HTMLLabelElement | null;
+        if (label && label.htmlFor && label.htmlFor === field.id) return field;
+        const icon = node.closest('.icon');
+        if (icon && field.parentElement && icon.parentElement === field.parentElement) return field;
+    }
+    return null;
+}
+
 function modalTapField(target: EventTarget | null): HTMLElement | null {
-    const el = target as HTMLInputElement | null;
+    const el = (iosPageTapFieldOf(target) || target) as HTMLInputElement | null;
     if (!el || typeof el.closest !== 'function' || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return null;
     if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly) return null;
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
@@ -287,7 +512,87 @@ export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
     return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
 }
 
+function pageTapProbeField(target: EventTarget | null): HTMLElement | null {
+    if (!usesIOSPanelHandoff() || uiState.isModalOpen) return null;
+    const field = elementOf('hwScannerInput');
+    return field && (target === field || iosPageTapFieldOf(target) === field) ? field : null;
+}
+
+function notePageTapStart(e: TouchEvent): void {
+    pageTapStart = null;
+    const field = pageTapProbeField(e.target);
+    if (!field || !e.touches || !e.touches.length) return;
+    const t = e.touches[0];
+    pageTapStart = {
+        field, x: t.clientX, y: t.clientY, at: e.timeStamp, touches: e.touches.length,
+        focused: document.activeElement === field, tapped: modalTapFocused === field, keyboard: !!keyboardVisibleViewport(),
+        above: pageFieldStaysAboveKeyboard(field), refused: modalFocusRefused
+    };
+}
+
+function notePageTapEnd(e: TouchEvent, caught: boolean): void {
+    const start = pageTapStart;
+    pageTapStart = null;
+    if (!start || !e.changedTouches || !e.changedTouches.length) return;
+    const t = e.changedTouches[0];
+    const dx = Math.round(t.clientX - start.x);
+    const dy = Math.round(t.clientY - start.y);
+    const ms = Math.round(e.timeStamp - start.at);
+    const path = caught ? 'caught'
+        : start.refused ? 'refused'
+            : start.focused && start.keyboard ? 'focused-keyboard'
+                : start.focused && start.tapped ? 'focused-tapped'
+                    : !start.above ? 'covered'
+                        : start.touches > 1 ? 'multi'
+                            : Math.max(Math.abs(dx), Math.abs(dy)) > MODAL_TAP_SLOP_PX ? 'moved'
+                                : ms > MODAL_TAP_MAX_MS ? 'slow'
+                                    : !e.cancelable ? 'uncancelable' : 'other';
+    const box = start.field.getBoundingClientRect();
+    const pages = elementOf('appPages');
+    pageTapProbe = {
+        path,
+        until: performance.now() + PAGE_TAP_PROBE_MS,
+        pagesAt: pages ? pages.scrollTop : 0,
+        numbers: {
+            dx, dy, ms, fieldTop: Math.round(box.top), fieldBottom: Math.round(box.bottom), innerHeight: window.innerHeight, innerWidth: window.innerWidth,
+            keyboardSeen: rememberedKeyboardInset(start.field), keyboard: start.keyboard ? 1 : 0, focused: start.focused ? 1 : 0, tapped: start.tapped ? 1 : 0
+        }
+    };
+}
+
+function notePageMoved(e: Event): void {
+    const probe = pageTapProbe;
+    if (!probe || touchesDown > 0) return;
+    if (performance.now() > probe.until) {
+        pageTapProbe = null;
+        return;
+    }
+    const vv = window.visualViewport;
+    const pages = elementOf('appPages');
+    const target = e.target;
+    const what = target === vv ? 'viewport' : target === document || target === document.documentElement || target === window ? 'document' : target === pages ? 'pages' : '';
+    if (!what) return;
+    const scrollY = Math.round(window.scrollY || 0);
+    const viewportTop = vv ? Math.round(vv.offsetTop) : 0;
+    if (what === 'pages' ? !pages || Math.abs(pages.scrollTop - probe.pagesAt) <= 1 : scrollY <= 1 && viewportTop <= 1) return;
+    pageTapProbe = null;
+    if (pageTapReported.indexOf(probe.path + ' ' + what) !== -1) return;
+    pageTapReported = pageTapReported.concat(probe.path + ' ' + what);
+    const errors = window.ZoeErrors;
+    if (!errors || typeof errors.capture !== 'function') return;
+    try {
+        errors.capture(new Error('iOS page moved after a barcode field tap'), Object.assign({ zone: 'ui', context: 'iosPageTap ' + probe.path + ' ' + what }, probe.numbers,
+            { scrollY, viewportTop, pagesMoved: pages ? Math.round(pages.scrollTop - probe.pagesAt) : 0 }));
+    } catch (err) {}
+}
+
+function noteTouchesDown(e: TouchEvent): void {
+    touchesDown = e.touches ? e.touches.length : 0;
+}
+
 export function noteModalTouchStart(e: TouchEvent): void {
+    noteTouchesDown(e);
+    notePageTapStart(e);
     modalTap = null;
     if (modalFocusRefused) return;
     const ios = usesIOSPanelHandoff();
@@ -299,8 +604,10 @@ export function noteModalTouchStart(e: TouchEvent): void {
     modalTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }
 
-export function forgetModalTap(): void {
+export function forgetModalTap(e?: TouchEvent): void {
     modalTap = null;
+    pageTapStart = null;
+    if (e) noteTouchesDown(e);
 }
 
 function forgetModalTapFocus(): void {
@@ -308,9 +615,14 @@ function forgetModalTapFocus(): void {
 }
 
 export function focusModalFieldWithoutScroll(e: TouchEvent): void {
+    noteTouchesDown(e);
     const tap = modalTap;
     modalTap = null;
-    if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) return;
+    if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) {
+        notePageTapEnd(e, false);
+        return;
+    }
+    notePageTapEnd(e, true);
     e.preventDefault();
     if (document.activeElement === tap.field) blurActiveElement();
     if (focusElementWithoutScroll(tap.field)) modalTapFocused = tap.field;
@@ -328,16 +640,36 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     modalFocusRefused = false;
     modalTapFocused = null;
     keyboardMemory = null;
+    endKeyboardSession();
+    stopModalGlide();
+    modalRest = null;
+    modalWatched = null;
+    pageTapStart = null;
+    pageTapProbe = null;
+    pageTapReported = [];
+    touchesDown = 0;
+    if (modalResizeObserver) modalResizeObserver.disconnect();
+    modalResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(noteModalResized) : null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;
     if (uiState.keyboardCover !== 0) uiState.keyboardCover = 0;
+    scope.listen(window, 'resize', trackAndroidKeyboard);
     scope.listen(window, 'resize', revealAfterResize);
     scope.listen(document, 'touchstart', noteModalTouchStart, { capture: true, passive: true });
     scope.listen(document, 'touchend', focusModalFieldWithoutScroll, { capture: true, passive: false });
     scope.listen(document, 'touchcancel', forgetModalTap, { capture: true, passive: true });
     scope.listen(document, 'focusin', forgetModalTapFocus, { capture: true });
+    scope.listen(document, 'scroll', notePageMoved, { capture: true, passive: true });
     scope.onDispose(() => {
+        endKeyboardSession();
+        stopModalGlide();
+        if (modalResizeObserver) modalResizeObserver.disconnect();
+        modalResizeObserver = null;
+        modalRest = null;
+        modalWatched = null;
+        pageTapStart = null;
+        pageTapProbe = null;
         naturalBox = null;
         modalTap = null;
         modalTapFocused = null;
@@ -353,6 +685,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(vv, 'scroll', measureModalKeyboard);
     scope.listen(vv, 'resize', measureKeyboardCover);
     scope.listen(vv, 'scroll', measureKeyboardCover);
+    scope.listen(vv, 'scroll', notePageMoved);
     measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {

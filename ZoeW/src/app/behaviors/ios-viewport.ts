@@ -221,6 +221,13 @@ function touchById(list: ArrayLike<Touch> | null | undefined, id: number): Touch
     return null;
 }
 
+export function tapEndedInPlace(e: TouchEvent, tap: { id: number; x: number; y: number; at: number }, slopPx: number, maxMs: number): boolean {
+    if (!e.cancelable || (e.touches && e.touches.length)) return false;
+    const t = touchById(e.changedTouches, tap.id);
+    if (!t || Math.abs(t.clientX - tap.x) > slopPx || Math.abs(t.clientY - tap.y) > slopPx) return false;
+    return e.timeStamp - tap.at <= maxMs;
+}
+
 function searchTapField(target: EventTarget | null): RefName | null {
     if (!target) return null;
     for (const field of IOS_SEARCH_FIELDS) {
@@ -249,10 +256,7 @@ export function forgetIOSSearchTap(): void {
 export function focusIOSSearchWithoutScroll(e: TouchEvent): void {
     const tap = searchTap;
     searchTap = null;
-    if (!tap || !e.cancelable || (e.touches && e.touches.length) || searchTapField(e.target) !== tap.field) return;
-    const t = touchById(e.changedTouches, tap.id);
-    if (!t || Math.abs(t.clientX - tap.x) > IOS_SEARCH_TAP_SLOP_PX || Math.abs(t.clientY - tap.y) > IOS_SEARCH_TAP_SLOP_PX) return;
-    if (!(e.timeStamp - tap.at <= IOS_SEARCH_TAP_MAX_MS)) return;
+    if (!tap || searchTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, IOS_SEARCH_TAP_SLOP_PX, IOS_SEARCH_TAP_MAX_MS)) return;
     e.preventDefault();
     const phone = tap.field === 'searchPhoneInput';
     if (phone) glidePhoneSearchPulledUp(true);

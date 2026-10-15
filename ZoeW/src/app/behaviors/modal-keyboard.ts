@@ -6,6 +6,7 @@ import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
 import { focusElementWithoutScroll, setElementScrollTop } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
+import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
 
 export const MODAL_FIELD_MARGIN_PX = 12;
@@ -32,9 +33,9 @@ let naturalBox: (ModalNaturalBox & { id: string }) | null = null;
 let modalTap: { id: number; x: number; y: number; at: number; field: HTMLElement } | null = null;
 let modalFocusRefused = false;
 
-export function modalKeyboardViewport(): { top: number; height: number } | null {
+export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
-    if (!vv || !uiState.isModalOpen) return null;
+    if (!vv) return null;
     const layout = window.innerHeight;
     const height = Math.round(vv.height);
     if (!Number.isFinite(layout) || !Number.isFinite(height) || height <= 0) return null;
@@ -42,6 +43,16 @@ export function modalKeyboardViewport(): { top: number; height: number } | null 
     const offset = Math.round(vv.offsetTop);
     const top = Number.isFinite(offset) ? Math.min(Math.max(0, offset), layout - height) : 0;
     return { top, height };
+}
+
+export function modalKeyboardViewport(): { top: number; height: number } | null {
+    return uiState.isModalOpen ? keyboardVisibleViewport() : null;
+}
+
+export function measureKeyboardCover(): void {
+    const view = keyboardVisibleViewport();
+    const cover = view ? Math.max(0, Math.round(window.innerHeight) - view.top - view.height) : 0;
+    if (uiState.keyboardCover !== cover) uiState.keyboardCover = cover;
 }
 
 export function modalKeyboardFitFor(box: ModalNaturalBox, view: { top: number; height: number }): Omit<ModalKeyboardFit, 'id'> | null {
@@ -199,14 +210,6 @@ function modalTapField(target: EventTarget | null): HTMLElement | null {
     return modal && modal.id && modalIsOpen(modal.id) ? el : null;
 }
 
-function touchById(list: ArrayLike<Touch> | null | undefined, id: number): Touch | null {
-    if (!list) return null;
-    for (let i = 0; i < list.length; i++) {
-        if (list[i] && list[i].identifier === id) return list[i];
-    }
-    return null;
-}
-
 export function noteModalTouchStart(e: TouchEvent): void {
     modalTap = null;
     if (modalFocusRefused || !uiState.isModalOpen || !usesIOSPanelHandoff()) return;
@@ -223,10 +226,7 @@ export function forgetModalTap(): void {
 export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     const tap = modalTap;
     modalTap = null;
-    if (!tap || !e.cancelable || (e.touches && e.touches.length) || modalTapField(e.target) !== tap.field) return;
-    const t = touchById(e.changedTouches, tap.id);
-    if (!t || Math.abs(t.clientX - tap.x) > MODAL_TAP_SLOP_PX || Math.abs(t.clientY - tap.y) > MODAL_TAP_SLOP_PX) return;
-    if (!(e.timeStamp - tap.at <= MODAL_TAP_MAX_MS)) return;
+    if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) return;
     e.preventDefault();
     if (!focusElementWithoutScroll(tap.field)) modalFocusRefused = true;
 }
@@ -242,6 +242,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;
+    if (uiState.keyboardCover !== 0) uiState.keyboardCover = 0;
     scope.listen(window, 'resize', revealAfterResize);
     scope.listen(document, 'touchstart', noteModalTouchStart, { capture: true, passive: true });
     scope.listen(document, 'touchend', focusModalFieldWithoutScroll, { capture: true, passive: false });
@@ -252,11 +253,15 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         uiState.modalViewportTop = 0;
         uiState.modalViewportHeight = 0;
         uiState.modalKeyboardFit = null;
+        uiState.keyboardCover = 0;
     });
     const vv = window.visualViewport;
     if (!vv) return;
     scope.listen(vv, 'resize', measureModalKeyboard);
     scope.listen(vv, 'scroll', measureModalKeyboard);
+    scope.listen(vv, 'resize', measureKeyboardCover);
+    scope.listen(vv, 'scroll', measureKeyboardCover);
+    measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {
         if (uiState.isModalOpen === modalWasOpen && uiState.modalStack === modalStackSeen && uiState.modalDisplay === modalDisplaySeen) return;

@@ -277,6 +277,7 @@ export interface UiState {
     modalViewportTop: number;
     modalViewportHeight: number;
     modalKeyboardFit: ModalKeyboardFit | null;
+    keyboardCover: number;
     pdfExportOriginalTitle: any;
     monthlyReportMonth: string;
     lastRecallSignature: string;
@@ -384,6 +385,7 @@ export const uiState = createStore<UiState>('uiState', {
     modalViewportTop: 0,
     modalViewportHeight: 0,
     modalKeyboardFit: null,
+    keyboardCover: 0,
     pdfExportOriginalTitle: null,
     monthlyReportMonth: '',
     lastRecallSignature: '',

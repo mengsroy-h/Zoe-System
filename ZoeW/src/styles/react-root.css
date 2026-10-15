@@ -270,6 +270,7 @@ body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: aut
 html.ios-standalone body.modal-keyboard,
 html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
 html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }
+.toast-container { bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-cover, 0px))); }
 
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }

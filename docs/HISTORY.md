@@ -45,6 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
+0ឋ. **Branch `ccr-cff7ce20-gn6c83`** (ពីក្បាល PR #317 `be04280` · **មិនទាន់ merge**) ៖ [2.50.75] CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ (ផ្នែក ២ A91) · toast នៅពីលើ keyboard (A92) ·
+    ការផ្ទៀងផ្ទាត់ PR ឡើងវិញ (A93) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.75]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ដ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `a5bf0af` · **មិនទាន់ merge**) ៖ [2.50.74] ផ្ទៃក្រោយ keyboard (ពីលើ keyboard) ពណ៌តែមួយ ·
     តេស្តសុវត្ថិភាពផ្ទាំងចាក់សោ (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A90) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.74]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ញ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `b802db2` · **មិនទាន់ merge**) ៖ [2.50.73] ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លី ·
@@ -191,6 +193,46 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.75] — 2026-10-15 · ZoeW ៖ **CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ · toast នៅពីលើ keyboard (ផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)**
+
+**ZoeW `2.50.75`** (`zoew-v337` ➜ `zoew-v338`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «PR317 CI fail សូមផ្ទៀងផ្ទាត់ការងារក្នុង PR ឡើងវិញទាំងអស់ ក្រែងមានចន្លោះឬមុខងារខ្លះខុសស្តង់ដារ សូមកែសម្រួលអោយដំណើរការដូច app ស្តង់ដារទូទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **CI របស់ PR #317 (`be04280`) ធ្លាក់ ៣ ផ្នែក** (ផ្នែក ២ A91) ៖ ផ្នែក ២/៤ `zoew-suite-test` (`npm run lint` ៖ `no-useless-assignment` លើ `caret` ក្នុង
+  `ZoeW/tests/modal-keyboard.test.tsx`) · ផ្នែក ៣/៤ `function-surface-test` (top-level `touchById` ប្រកាស ២ ដង ៖ `ios-viewport.ts` · `modal-keyboard.ts`) · ផ្នែក ៤/៤
+  `code-duplication-test` (តួ `touchById` ១៤០ តួ + ប្លុករូបរាងដូចគ្នា ៣៤៨ តួ ៖ ការពិនិត្យការចុច ម្រាមដៃ · គម្លាត · ពេល)។ ឥឡូវការពិនិត្យការចុចរស់នៅកន្លែងតែមួយ
+  `tapEndedInPlace()` (`ios-viewport.ts`) ដែលប្រអប់ស្វែងរក និងប្រអប់ (modal) ប្រើរួមគ្នា — ឥរិយាបថដដែល (`touchById` ដដែលទ្រាំ `changedTouches` មានធាតុ `null`)។
+- 🐛 **iPhone ៖ toast នៅក្រោយ keyboard** (A92)។ iOS មិនបង្រួម layout viewport ពេល keyboard បើក ➜ `.toast-container` (fixed · បាត ២៤px) នៅក្រោយ keyboard ➜ ប៊ូតុងក្នុងប្រអប់
+  (keyboard នៅបើក ព្រោះប៊ូតុងមិនយក focus លើ iOS) ហាក់ដូចជាមិនដំណើរការ ៖ «▶️ ចាប់ផ្តើម» ក្នុង «📋 បញ្ចូលច្រើន» ពេលទទេ («⚠️ សូមវាយ ឬស្កេន Barcode…») · «🧪 សាកល្បង» ក្នុង
+  «API ស្វែងរកអតិថិជន» («⏳ កំពុងសាកល្បង…») · សារកូដអញ្ជើញក្នុងប្រអប់ចូល · Barcode ស្ទួនពេលវាយក្នុង `hwScannerInput`។ ឥឡូវ `measureKeyboardCover()` (visualViewport
+  `resize`/`scroll` · មានឬគ្មានប្រអប់) ➜ `uiState.keyboardCover` (layout px ក្រោមផ្ទៃមើលឃើញ · តិចជាង `KEYBOARD_MIN_INSET_PX` ➜ ០ · APK ➜ ០) ➜ `--keyboard-cover` ➜
+  `.toast-container` `bottom: 24px + max(safe-area, cover)` ➜ toast នៅពីលើ keyboard ទាំងពេល iOS រំកិល `offsetTop` និងនៅខាងលើប្រអប់ · keyboard បិទ ➜ បាត ២៤px ដូចដើម ·
+  Android Chrome/PWA (keyboard បង្រួមតែ visual viewport) ទទួលដូចគ្នា។
+- 🔎 **ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ** (A93) ៖ កូដដែលប្តូរក្នុង PR (`ios-viewport.ts` · `modal-keyboard.ts` · `Modal.tsx` · `DocumentEffects.tsx` · `refs.ts` · `react-root.css` ·
+  `pull-to-refresh.ts` · `haptics.ts` · ស្លាក/ប៊ូតុង/ផ្ទាំងបោះពុម្ព) អានម្តងមួយៗ ➜ ចន្លោះដែលវាស់ឃើញតែ A92 · សម្មតិកម្មដែលវាស់ហើយបដិសេធ ៖ បង្វិលអេក្រង់ខណៈ keyboard បើក (កាតនៅក្នុងផ្ទៃមើលឃើញ) ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` +៥ ៖ toast ពីលើ keyboard (ទំព័រ · ប្រអប់ ៣ · រំកិល ០/១៤០ · ទំហំ ២ ៖ ១៦ ករណី · `elementFromPoint` ➜ toast នៅខាងលើប្រអប់) · ទិសផ្ទុយ keyboard បិទ (បាត ២៤px ·
+  ទំហំ ២) · APK (`--keyboard-cover` ០ · បាត ២៤px នៃ viewport ដែលបង្រួម) · គំរូអាចធ្លាក់ (ទីតាំងដើមនៅក្រោយ keyboard ១៦/១៦) — លើ `be04280` toast ១៦/១៦ នៅ ៧៩០–៨២០ ក្រោមផ្ទៃមើលឃើញ
+  (៥០៨ · ៦៤៨ ពេលរំកិល) ➜ FAIL ➜ ក្រោយកែ ៤០/៤០។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `keyboardCover` · `--keyboard-cover` (៣៣៦ · ១៩៦ ពេលរំកិល ១៤០ · ០) · ប្រអប់ + keyboard · ទិសផ្ទុយ (គម្លាតតូច · APK · NaN/០/អវិជ្ជមាន/Infinity ·
+  គ្មាន visualViewport) · dispose ➜ ០ · listen ម្តងទៀតវាស់ភ្លាម · ខ្សែភ្ជាប់ CSS — ២៤/២៤។
+- CI ៖ `npm run lint` ស្អាត · `function-surface-test` ២៧/២៧ · `code-duplication-test` ១៤/១៤ (លើ `be04280` ១ FAIL · ២ FAIL)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចប្រអប់វាយ (keyboard បើក) ➜ លុបអក្សរទាំងអស់ ➜ «▶️ ចាប់ផ្តើម» ➜ សារ «⚠️ សូមវាយ ឬស្កេន Barcode…» លេចពីលើ keyboard ·
+   «API ស្វែងរកអតិថិជន» ➜ ចុចកន្លែងវាយ ➜ «🧪 សាកល្បង» ➜ សារ «⏳ កំពុងសាកល្បង…» ពីលើ keyboard · បិទ keyboard ➜ សារនៅខាងក្រោមអេក្រង់។
+2. **Android** ៖ APK ➜ toast នៅខាងក្រោមពីលើ keyboard (មិនប្រែ) · Chrome/PWA ➜ toast ពីលើ keyboard។
+3. សកម្មភាពរបស់ [2.50.67]–[2.50.74] នៅដដែល (សាក iPhone ពិតមុន merge)។
+
+---
 
 ### [2.50.74] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ផ្ទៃក្រោយ keyboard ពណ៌តែមួយ · តេស្តសុវត្ថិភាពផ្ទាំងចាក់សោ**
 
@@ -4154,6 +4196,17 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-15 — សំណើម្ចាស់គម្រោង ៖ CI PR #317 ធ្លាក់ · ផ្ទៀងផ្ទាត់ការងារក្នុង PR ឡើងវិញ (ចន្លោះ · មុខងារខុសស្តង់ដារ)
+
+**វិធី** ៖ log CI លើ `be04280` (ផ្នែក ២ · ៣ · ៤ ធ្លាក់ ១ ក្នុងមួយផ្នែក) ➜ កែ ➜ checker ទាំង ៣ ជាប់លើ build វាស់ · អានកូដដែល PR ប្តូរ ➜ សម្មតិកម្ម ➜ វាស់ក្នុង Chromium ពិត (visualViewport ក្លែងរបស់
+`modal-keyboard-test`) មុនកែ ➜ ឧបករណ៍ធ្លាក់លើ tree មុនកែ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A91 | **CI ៣ ផ្នែកធ្លាក់** | `zoew-suite-test` ៖ eslint `no-useless-assignment` (`let caret = null; try { caret = … } catch (e) { caret = null; }` ➜ តម្លៃដំបូងមិនដែលអាន) + `@typescript-eslint/no-unused-vars` (`e`) · `function-surface-test` ៖ `touchById ×2` · `code-duplication-test` ៖ `touchById@25848 \| touchById@26090` (១៤០ តួ) + ប្លុក ៣៤៨ តួ (`focusIOSSearchWithoutScroll` ធៀប `focusModalFieldWithoutScroll`) ៖ [2.50.73] ចម្លង helper ជំនួសការនាំចូល | `catch {}` · `tapEndedInPlace(e, tap, slopPx, maxMs)` មួយ (cancelable · គ្មានម្រាមដៃនៅលើ · `touchById` · គម្លាត · ពេល) ➜ ៖ eslint ស្អាត · ២៧/២៧ · ១៤/១៤ · vitest iOS ៧ ឯកសារ ៧៨/៧៨ (`ios-search-tap-focus` ទ្រាំ `changedTouches` `[null, …]` ➜ រក្សា `touchById` ⛔ មិនមែន `touchByIdentifier()` របស់ `panel-motion.ts` ដែលអាន `.identifier` លើ `null`) |
+| A92 | **toast នៅក្រោយ keyboard (iPhone · Android Chrome)** | toast `fixed` បាត ២៤px នៃ layout viewport ៖ iOS មិនបង្រួមវា ➜ keyboard ៣៣៦px បាំង ➜ App ពិត ៖ ១៦/១៦ ករណី (ទំព័រ · `batchScanModal` · `pinModal` · `lookupApiConfigModal` · រំកិល ០/១៤០ · 390×844 · 320×568) toast នៅ ៧៩០–៨២០ ធៀបផ្ទៃមើលឃើញ ០–៥០៨ / ១៤០–៦៤៨ · ផ្លូវពិត ៖ ប៊ូតុងក្នុងប្រអប់ (iOS មិនបិទ keyboard) · `startBatchScan()` ទទេ · `testLookupApiConfig` · កូដអញ្ជើញ · Barcode ស្ទួនក្នុង `hwScannerInput` | `measureKeyboardCover()` ➜ `uiState.keyboardCover` ➜ `--keyboard-cover` ➜ `.toast-container` ➜ ១៦/១៦ នៅក្នុងផ្ទៃមើលឃើញ និងនៅខាងលើប្រអប់ · keyboard បិទ / APK ➜ ២៤px · `modal-keyboard-test` +៥ · vitest +៤ |
+| A93 | **សម្មតិកម្មដែលវាស់ហើយបដិសេធ** | បង្វិលអេក្រង់ខណៈ keyboard បើក (`naturalBox` វាស់ក្នុងបញ្ឈរ) ៖ 844×390 keyboard ២០០ ➜ `lookupApiConfigModal` កំពូល ១២ បាត ១៨២ ≤ ផ្ទៃមើលឃើញ ១៩០ · `editPhoneModal` ដូចគ្នា (ផ្លូវ «ផ្ទៃនៅសល់ < ជាន់» លើកកំពូល) · caret នៅចុងពេលចុចប្រអប់វាយលើកដំបូង (iOS) ៖ ការសម្រេចរបស់ [2.50.73] (ការចុចលើកទី ២ ដាក់ caret តាមកន្លែងចុច) | មិនប្តូរ |
+
 ### 2026-10-15 — រាយការណ៍ម្ចាស់គម្រោង ៖ ផ្ទៃពីលើ keyboard ពណ៌ពីរ (ទើសភ្នែក) · តេស្តសុវត្ថិភាពម្តងទៀត
 
 **វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` ថតរូប (Chromium screenshot · ស្រាយ PNG) តំបន់ក្រោយ keyboard ហើយវាស់គម្លាតពណ៌ រត់លើ 2.50.73 (`a5bf0af`) ➜ ធ្លាក់ ➜ ទើបកែ។
@@ -6435,7 +6488,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `code-duplication-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
 | `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -6612,7 +6665,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `write-stall-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zoew-suite-test` | ផ្នែក ២ | ផ្នែក ៦ |
+| `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `zto-cookie-session-test` | — | ផ្នែក ២ |

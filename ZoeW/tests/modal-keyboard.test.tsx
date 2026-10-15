@@ -125,6 +125,7 @@ beforeEach(() => {
     uiState.modalViewportTop = 0;
     uiState.modalViewportHeight = 0;
     uiState.modalKeyboardFit = null;
+    uiState.keyboardCover = 0;
 });
 
 afterEach(() => {
@@ -137,6 +138,7 @@ afterEach(() => {
     uiState.modalViewportTop = 0;
     uiState.modalViewportHeight = 0;
     uiState.modalKeyboardFit = null;
+    uiState.keyboardCover = 0;
     setIOSStandalone(false);
     Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: realInnerHeight });
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -432,8 +434,8 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         for (const id of ['mkField', 'mkArea', 'mkDate', 'mkCheck', 'mkReadonly', 'mkTop']) {
             const el = byId(id) as HTMLInputElement;
             el.focus = function (this: HTMLInputElement, options?: any) {
-                let caret: number | null = null;
-                try { caret = this.selectionStart; } catch (e) { caret = null; }
+                let caret: number | null;
+                try { caret = this.selectionStart; } catch { caret = null; }
                 focusCalls.push({ id, options, caret });
                 if (!refuse) realFocus.call(this, options);
             } as any;
@@ -497,6 +499,77 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
     });
 });
 
+describe('toast ⟷ keyboard ៖ ផ្ទៃដែល keyboard បាំង (keyboardCover · --keyboard-cover)', () => {
+    function mountEffects() {
+        mount(<DocumentEffects />);
+        modalKeyboard.listenModalKeyboard(scope());
+        commitNow();
+    }
+    const cssVar = () => document.documentElement.style.getPropertyValue('--keyboard-cover');
+
+    it('⛔ keyboard បើក (គ្មានប្រអប់ក៏ដោយ) ➜ keyboardCover = innerHeight − (offsetTop + height) · --keyboard-cover · បិទ ➜ ០', () => {
+        mountEffects();
+        expect(uiState.isModalOpen).toBe(false);
+        expect(uiState.keyboardCover).toBe(0);
+        expect(cssVar()).toBe('0px');
+        keyboard(336);
+        commitNow();
+        expect(uiState.keyboardCover).toBe(336);
+        expect(cssVar()).toBe('336px');
+        keyboard(336, 140);
+        commitNow();
+        expect(uiState.keyboardCover).toBe(196);
+        expect(cssVar()).toBe('196px');
+        keyboard(0);
+        commitNow();
+        expect(uiState.keyboardCover).toBe(0);
+        expect(cssVar()).toBe('0px');
+    });
+
+    it('⛔ ប្រអប់បើក + keyboard ➜ toast គ្របដូចគ្នា (ផ្ទៃស្រទាប់ ::after ចាប់ពី --modal-kb-line)', () => {
+        mount(<><DocumentEffects /><TwoModals /></>);
+        modalKeyboard.listenModalKeyboard(scope());
+        openModalHelper('manualAdjustModal');
+        commitNow();
+        keyboard(336, 120);
+        commitNow();
+        expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe((120 + 844 - 336) + 'px');
+        expect(uiState.keyboardCover).toBe(844 - (120 + 844 - 336));
+    });
+
+    it('ទិសផ្ទុយ ៖ គម្លាតតូចជាង KEYBOARD_MIN_INSET_PX · APK (innerHeight = visualViewport) · តម្លៃខុស · គ្មាន visualViewport ➜ ០ មិនបោះ', () => {
+        mountEffects();
+        keyboard(KEYBOARD_MIN_INSET_PX - 1);
+        expect(uiState.keyboardCover).toBe(0);
+        keyboard(KEYBOARD_MIN_INSET_PX);
+        expect(uiState.keyboardCover).toBe(KEYBOARD_MIN_INSET_PX);
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 508 });
+        vv.height = 508;
+        vv.offsetTop = 0;
+        vv.dispatchEvent(new Event('resize'));
+        expect(uiState.keyboardCover).toBe(0);
+        for (const bad of [NaN, 0, -10, Infinity]) {
+            vv.height = bad;
+            expect(() => vv.dispatchEvent(new Event('resize'))).not.toThrow();
+            expect(uiState.keyboardCover).toBe(0);
+        }
+        Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined });
+        expect(() => modalKeyboard.measureKeyboardCover()).not.toThrow();
+        expect(uiState.keyboardCover).toBe(0);
+    });
+
+    it('⛔ dispose ➜ ០ · listen ម្តងទៀតចាប់ផ្តើមពី ០ ហើយវាស់ភ្លាម (keyboard បើករួច)', () => {
+        mountEffects();
+        keyboard(336);
+        expect(uiState.keyboardCover).toBe(336);
+        disposers.splice(0).forEach((fn) => fn());
+        listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
+        expect(uiState.keyboardCover).toBe(0);
+        modalKeyboard.listenModalKeyboard(scope());
+        expect(uiState.keyboardCover).toBe(336);
+    });
+});
+
 describe('ខ្សែភ្ជាប់', () => {
     it('⛔ boot ចាក់ listenModalKeyboard · react-root.css ៖ backdrop ::after (safe-area · keyboard ➜ ស្រទាប់ពណ៌តែមួយពី --modal-kb-line ចុះក្រោម) · .modal-kb កំពូល/max-height ពីអថេរ · DocumentEffects', () => {
         const root = path.resolve(__dirname, '..');
@@ -512,5 +585,7 @@ describe('ខ្សែភ្ជាប់', () => {
         expect(/useBodyClass\('modal-keyboard', modalViewportHeight > 0\)/.test(fx)).toBe(true);
         expect(/useHtmlVar\('--modal-kb-pan', modalViewportHeight > 0 \? modalViewportTop \+ 'px' : '0px'\)/.test(fx)).toBe(true);
         expect(/useHtmlVar\('--modal-kb-line', modalViewportHeight > 0 \? \(modalViewportTop \+ modalViewportHeight\) \+ 'px' : '100%'\)/.test(fx)).toBe(true);
+        expect(/useHtmlVar\('--keyboard-cover', keyboardCover > 0 \? keyboardCover \+ 'px' : '0px'\)/.test(fx)).toBe(true);
+        expect(/\.toast-container \{ bottom: calc\(24px \+ max\(env\(safe-area-inset-bottom, 0px\), var\(--keyboard-cover, 0px\)\)\); \}/.test(css)).toBe(true);
     });
 });

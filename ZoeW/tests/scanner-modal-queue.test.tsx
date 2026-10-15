@@ -385,14 +385,35 @@ describe('ការវាយដោយមនុស្សក្នុងផ្ទ�
         expect(fieldValue('modalPhoneInput')).toBe('096');
     });
 
-    it('keyboard លើអេក្រង់ (Android APK keyboardOpen) ➜ គ្រាប់ចុចមិនត្រូវទប់', async () => {
+    it('keyboard លើអេក្រង់ iPhone បង្ហាញ (visual viewport បង្រួម) ➜ គ្រាប់ចុចមិនត្រូវទប់', async () => {
         useLookup(false);
         openScan('ZTQK' + seq + '0001');
         await settle(200);
         focus('modalPhoneInput');
-        step(() => { uiState.keyboardOpen = true; });
+        vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(852);
+        vi.stubGlobal('visualViewport', { height: 500, offsetTop: 0, width: 393 });
         press('0');
         expect(fieldValue('modalPhoneInput')).toBe('0');
+    });
+
+    it('⛔ លុយ ៖ Android បង្ហាញ keyboard លើអេក្រង់ពេលភ្ជាប់ម៉ាស៊ីនស្កេន ➜ ការស្កេនមិនចូល COD (គ្រាប់ keyboard លើអេក្រង់ Android = Unidentified មិនត្រូវទប់)', async () => {
+        vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36');
+        useLookup(false);
+        const a = 'ZTQG' + seq + '0001';
+        const b = 'ZTQG' + seq + '0002';
+        openScan(a);
+        await settle(200);
+        focus('modalCodInput');
+        step(() => { uiState.keyboardOpen = true; });
+        const soft = press('Unidentified');
+        expect(soft.defaultPrevented).toBe(false);
+        wait(500);
+        scan(b);
+        await settle();
+        expect(fieldValue('modalCodInput')).toBe('');
+        step(() => closeModal('phoneModal'));
+        await settle(200);
+        expect(scanState.pendingBarcode).toBe(b);
     });
 
     it('ផ្ទាំង PIN (ប្រអប់វាយរបស់ផ្ទាំងផ្សេង) ➜ មិនប៉ះ', async () => {

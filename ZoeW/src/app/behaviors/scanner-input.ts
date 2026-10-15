@@ -6,6 +6,7 @@ import { closeConfigQrScanner } from '../../features/config-qr';
 import { showCameraClosedBox, stopCurrentStream, submitManualBarcode } from '../../features/daily-stats';
 import { showToast } from '../../ui/toast';
 import { activeElementTakesText, elementOf, focusElementWithoutScroll, focusFieldAsIs, insertFieldText, setFieldValue, typeIntoElement, type RefName } from '../refs';
+import { isAndroidDevice } from '../../platform/native';
 import { softKeyboardShown } from './modal-keyboard';
 
 export const SCANNER_KEY_GAP_MS = 60;
@@ -75,7 +76,7 @@ function forgetScanBurst(): void {
 }
 
 function scannerHoldScope(): boolean {
-    if (!uiState.isModalOpen || securityState.appIsLocked || softKeyboardShown()) return false;
+    if (!uiState.isModalOpen || securityState.appIsLocked || (softKeyboardShown() && !isAndroidDevice())) return false;
     const stack = Array.isArray(uiState.modalStack) ? uiState.modalStack : [];
     if (stack[stack.length - 1] === 'batchScanModal') return false;
     const active = document.activeElement;

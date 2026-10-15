@@ -4,6 +4,8 @@ export const LABEL_PRINT_OPTIONS_KEY = 'zoew_label_print_v1';
 
 export const DISPLAY_HZ_PEAK_KEY = 'zoew_display_hz_peak_v1';
 
+export const KEYBOARD_INSET_KEY = 'zoew_keyboard_inset_v1';
+
 export const FIREBASE_SDK_RELOAD_KEY = 'zoe_firebase_sdk_reload_count';
 
 export const LOOKUP_KEY_DB_NAME = 'zoew_lookup_key_v1';

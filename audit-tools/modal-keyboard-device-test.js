@@ -173,7 +173,8 @@ const SCANNER_DEVICES = [
     { label: 'iPhone 393×852 · status bar 59 · របៀបកញ្ចប់', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'parcel' },
     { label: 'iPhone 393×852 · status bar 59 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
     { label: 'iPhone Pro Max 430×932 · status bar 59 · របៀបដក', w: 430, h: 932, kb: 375, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
-    { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: false, byCode: false, safeTop: 20, mode: 'remove' }
+    { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: false, byCode: false, safeTop: 20, mode: 'remove' },
+    { label: 'iPhone 393×852 · status bar 59 · របៀបដក ក្រោយ keyboard បើកម្តង (លោតហួស 420 ➜ ស្ងប់ 365 ៖ ចាំ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove', learn: [420, 365] }
 ];
 
 // របារស្ថានភាព iPhone (safe-area-inset-top) ៖ Chromium មាន env(safe-area-*) = ០ ➜ រុញទំព័រចុះតាមកម្ពស់ពិត (វាស់ពីវីដេអូ ៖ កន្លែងវាយរបៀបដក បាត 442pt លើ 852)
@@ -320,6 +321,12 @@ const SAFE_TOP = function (px) {
             const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
             if (!pageReady) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
             await closeAll(page);
+            if (dev.learn) {
+                await page.evaluate(() => { switchAppPage('entry'); setEntryScanMode('parcel'); document.getElementById('hwScannerInput').focus({ preventScroll: true }); });
+                for (const px of dev.learn) { await page.evaluate((v) => window.__kb.open(v), px); await settle(page, 60); }
+                await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
+                await settle(page, 120);
+            }
             await page.evaluate((m) => { switchAppPage('entry'); setEntryScanMode(m); openModalIds().slice().forEach((id) => closeModal(id)); }, dev.mode || 'parcel');
             await settle(page, 400);
             const at = await page.evaluate(() => {

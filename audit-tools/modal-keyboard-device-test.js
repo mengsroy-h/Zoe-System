@@ -12,11 +12,11 @@
 //       (visualViewport = WebView បង្រួម − keyboard) ➜ ការតម្រូវច្របាច់ប្រអប់ទៅលើ។ ច្បាប់ ៖ `uiState.keyboardOpen` (WebView បង្រួមសម្រាប់ keyboard) ➜ គ្មានការតម្រូវ ·
 //       ជំហាន ៖ setViewportSize (បង្រួម) + visualViewport នៅ inset ចាស់ ➜ ប្រអប់នៅទីតាំងដដែល (±1px)
 //   (គ) iPhone (វីដេអូលើ 2.50.79) ៖ «ចុចកន្លែងវាយបញ្ចូល Barcode ទំព័រធ្លាក់» — ប្រអប់វាយ Barcode (ទំព័រស្កេន · ក្រៅប្រអប់) ចុចទៅផ្លូវ iOS ដើម។ ច្បាប់ ៖
-//       ប្រអប់នៅពីលើបន្ទាត់ keyboard (ធ្លាប់វាស់ ឬ PAGE_TAP_KEYBOARD_RATIO) ➜ preventDefault + focus({ preventScroll }) · keyboard នឹងបាំងប្រអប់ (ផ្តេក) ➜ iOS ·
+//       ប្រអប់នៅពីលើបន្ទាត់ keyboard (ធ្លាប់វាស់ ឬ PAGE_TAP_KEYBOARD_RATIO) ➜ preventDefault + focus({ preventScroll }) · keyboard នឹងបាំងប្រអប់ (iPad ផ្តេក · iPhone SE របៀបដក) ➜ iOS ·
 //       iPhone SE · iPhone · Pro Max · ផ្តេក · iPad បញ្ឈរ/ផ្តេក (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)
 //   (គ) Chrome Android (វីដេអូលើ 2.50.81) ៖ «ចុចកន្លែងវាយ Barcode (របៀបដក) ទំព័ររំកិលឡើង navbar បាត់» — keyboard Chrome មិនបង្រួមទំព័រ (resizes-visual) ➜
 //       Chromium រំកិល visual viewport ដើម្បីបង្ហាញប្រអប់ (ScrollFocusedEditableElementIntoView)។ ច្បាប់ ៖ ដូច iPhone ➜ preventDefault + focus({ preventScroll }) ·
-//       ផ្តេក/tablet ផ្តេក (keyboard បាំង) ➜ Android
+//       tablet ផ្តេក (keyboard បាំង) ➜ Android · ទូរស័ព្ទផ្តេក (A124 ៖ ផ្ទាំងស្កេន ២ ជួរឈរ ➜ កន្លែងវាយខាងលើស្តាំ ពីលើ keyboard ពិត) ➜ ចាប់
 //   (ឃ) Chrome Android ៖ «ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែសារទទេ ៣ វិ.» — visual viewport រំកិលរួច ➜ ការបង្រួម + focus({ preventScroll }) ទុកប្រអប់ពីលើផ្ទៃមើលឃើញ។
 //       ច្បាប់ ៖ ចុចស្វែងរក ➜ offsetTop ០ (documentElement.scrollIntoView · window.scrollTo មិនប៉ះ visual viewport) — visual viewport ពិត (pinch លើ meta ពង្រីកបាន)
 //   (ង) ឧបករណ៍ស្កេន Bluetooth/USB (សំណើម្ចាស់គម្រោង) ៖ គ្មានអ្វី focus (ទូរស័ព្ទ) ➜ ការស្កេនទៅប្រអប់ Barcode · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ➜ បញ្ជូន ·
@@ -41,6 +41,8 @@ if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chr
 
 const ROOT = process.env.MODALKB_DEVICE_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
+// ពិដានចន្លោះគ្រាប់ម៉ាស៊ីនស្កេន ស្រង់ពីកូដ App (មិនសរសេរលេខរឹង) ៖ ការស្កេនក្លែងដែលចន្លោះពិត (event.timeStamp) លើសវា មិនមែនជាការស្កេនទេ
+const SCANNER_GAP_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bSCANNER_KEY_GAP_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
 
@@ -192,7 +194,7 @@ const SCANNER_DEVICES = [
     { label: 'iPhone SE 375×667', w: 375, h: 667, kb: 260, ua: IPHONE_UA, catch: true, byCode: false },
     { label: 'iPhone 393×852', w: 393, h: 852, kb: 336, ua: IPHONE_UA, catch: true, byCode: false },
     { label: 'iPhone Pro Max 430×932', w: 430, h: 932, kb: 346, ua: IPHONE_UA, catch: true, byCode: false },
-    { label: 'iPhone ផ្តេក 852×393', w: 852, h: 393, kb: 209, ua: IPHONE_UA, catch: false, byCode: false },
+    { label: 'iPhone ផ្តេក 852×393 (ផ្ទាំងស្កេន ២ ជួរឈរ ៖ កន្លែងវាយខាងលើស្តាំ)', w: 852, h: 393, kb: 209, ua: IPHONE_UA, catch: true, byCode: false },
     { label: 'iPad បញ្ឈរ 820×1180 (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)', w: 820, h: 1180, kb: 375, ua: IPAD_UA, catch: true, byCode: true },
     { label: 'iPad ផ្តេក 1180×820 (UA កុំព្យូទ័រ)', w: 1180, h: 820, kb: 398, ua: IPAD_UA, catch: false, byCode: true },
     { label: 'iPhone 393×852 · status bar 59 · របៀបកញ្ចប់', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'parcel' },
@@ -204,7 +206,8 @@ const SCANNER_DEVICES = [
     { label: 'Chrome Android 360×740 · របៀបដក · keyboard 300', w: 360, h: 740, kb: 300, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
     { label: 'Chrome Android 412×915 · របៀបកញ្ចប់ · keyboard 330', w: 412, h: 915, kb: 330, ua: ANDROID_UA, android: true, catch: true, byCode: false },
     { label: 'Android tablet បញ្ឈរ 800×1280 · របៀបដក · keyboard 420', w: 800, h: 1280, kb: 420, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
-    { label: 'Android ផ្តេក 915×412 · keyboard 190', w: 915, h: 412, kb: 190, ua: ANDROID_UA, android: true, catch: false, byCode: false },
+    { label: 'Android ផ្តេក 915×412 · keyboard 190 (ផ្ទាំងស្កេន ២ ជួរឈរ)', w: 915, h: 412, kb: 190, ua: ANDROID_UA, android: true, catch: true, byCode: false },
+    { label: 'Android ផ្តេក 780×360 · របៀបដក · keyboard 200 (A124)', w: 780, h: 360, kb: 200, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
     { label: 'Android tablet ផ្តេក 1280×800 · របៀបដក · keyboard 360', w: 1280, h: 800, kb: 360, ua: ANDROID_UA, android: true, catch: false, byCode: false, mode: 'remove' }
 ];
 
@@ -505,30 +508,47 @@ const SAFE_TOP = function (px) {
                 count: document.getElementById('batchScanCount').textContent, phoneModal: openModalIds().includes('phoneModal') }));
             check(batch.value === code + '\n7710\n' && batch.active === 'batchBarcodeInput' && batch.count === '2 Barcode' && !batch.phoneModal,
                 '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» (គ្មានអ្វី focus) ➜ ស្កេន ២ (keyboard ខ្មែរ · suffix Tab) ➜ ២ ជួរឡាតាំង · focus នៅប្រអប់ · ចំនួន «2 Barcode»', JSON.stringify(batch));
-            await reset();
+            // ⛔ ម៉ាស៊ីនតេស្តអាចផ្អាក > SCANNER_KEY_GAP_MS រវាងគ្រាប់ពីរ (CDP · GC) ➜ ការស្កេនក្លែងក្លាយជាការវាយរបស់មនុស្សតាមច្បាប់ App (មិនមែនកំហុស App) ➜ វាស់ចន្លោះពិត
+            //    (event.timeStamp ក្នុងទំព័រ) ហើយធ្វើ scenario ម្តងទៀតតែពេលនោះ (≤ ៣ ដង) · App ខុសពេលល្បឿនស្កេនត្រឹមត្រូវ ➜ នៅធ្លាក់ដដែល
+            await page.evaluate(() => { if (!window.__kdOn) { window.__kdOn = true; window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); } });
+            const markBurst = () => page.evaluate(() => { window.__kd = []; });
+            const burstGap = () => page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
             const first = 'ZTQUEUEA0001';
             const next = '77100000308752';
-            await page.evaluate((a) => triggerScanAction(a), first);
-            await settle(page, 450);
-            await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
-            await page.keyboard.type('2.5', { delay: 110 });
-            await settle(page, 250);
-            const human = await page.evaluate(() => document.getElementById('modalCodInput').value);
-            await page.keyboard.type(next, { delay: 8 });
-            await page.keyboard.press('Enter');
-            await settle(page, 300);
-            const held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
-                active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
-                status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
-            await page.keyboard.type('77100000308753', { delay: 8 });
-            await settle(page, 450);
-            const bare = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value,
-                status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
-            const capped = await page.evaluate(async () => {
-                document.getElementById('modalCodInput').value = '7810122334455';
-                await confirmPhone(false);
-                return { open: openModalIds().includes('phoneModal'), pending: scanState.pendingBarcode, active: document.activeElement && document.activeElement.id };
-            });
+            let human = '', held = null, bare = null, capped = null, gaps = [];
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                await page.evaluate(() => { try { stopBatchScan(); } catch (e) {} });
+                await reset();
+                await page.evaluate((a) => triggerScanAction(a), first);
+                await settle(page, 450);
+                await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
+                await page.keyboard.type('2.5', { delay: 110 });
+                await settle(page, 250);
+                human = await page.evaluate(() => document.getElementById('modalCodInput').value);
+                await markBurst();
+                await page.keyboard.type(next, { delay: 8 });
+                const nextGap = await burstGap();
+                await page.keyboard.press('Enter');
+                await settle(page, 300);
+                held = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, phone: document.getElementById('modalPhoneInput').value,
+                    active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
+                    status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+                await markBurst();
+                await page.keyboard.type('77100000308753', { delay: 8 });
+                const bareGap = await burstGap();
+                await settle(page, 450);
+                bare = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value,
+                    status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+                capped = await page.evaluate(async () => {
+                    document.getElementById('modalCodInput').value = '7810122334455';
+                    await confirmPhone(false);
+                    return { open: openModalIds().includes('phoneModal'), pending: scanState.pendingBarcode, active: document.activeElement && document.activeElement.id };
+                });
+                gaps = [nextGap, bareGap];
+                if (SCANNER_GAP_MS > 0 && nextGap < SCANNER_GAP_MS && bareGap < SCANNER_GAP_MS) break;
+            }
+            check(SCANNER_GAP_MS > 0 && gaps.length === 2 && gaps.every((g) => g < SCANNER_GAP_MS),
+                dev.label + ' ៖ ជាន់អប្បបរមា ៖ ការស្កេនក្លែងចេញក្នុងល្បឿនម៉ាស៊ីនស្កេន (ចន្លោះពិត < SCANNER_KEY_GAP_MS ' + SCANNER_GAP_MS + 'ms)', JSON.stringify(gaps));
             check(bare.cod === '2.5' && bare.status.indexOf('77100000308753') === -1 && capped.open && capped.pending === first && capped.active === 'modalCodInput',
                 '⛔ ' + dev.label + ' ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab ➜ COD មិនប្រែ · មិនចូលជួរ · COD 7810122334455 (បិទភ្ជាប់) ➜ «យល់ព្រម» មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD',
                 JSON.stringify({ bare, capped }));

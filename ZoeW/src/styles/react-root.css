@@ -263,10 +263,10 @@
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         align-items: start;
     }
-    #entrySideSection > .scan-mode-row { grid-column: 1 / -1; }
+    #entrySideSection > .scan-mode-row,
     #entrySideSection > .remove-scan-banner,
     #entrySideSection > .app-card { grid-column: 1; }
-    #entrySideSection > .hardware-scanner-box { grid-column: 2; grid-row: 2 / span 2; }
+    #entrySideSection > .hardware-scanner-box { grid-column: 2; grid-row: 1 / span 3; }
     .page-tabbar { padding: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
     .page-tab { flex-direction: row; gap: 6px; padding: 6px; min-height: 36px; }
 }

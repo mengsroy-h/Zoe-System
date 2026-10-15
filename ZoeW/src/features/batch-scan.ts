@@ -162,7 +162,8 @@ export function queueScannedCode(raw: string): boolean {
         showToast(`⚠️ Barcode (${code}) មិនបានបញ្ចូល — សូមស្កេននៅទំព័រស្កេន។`);
         return false;
     }
-    if (modalIsOpen('phoneModal') && String(scanState.pendingBarcode || '').trim().toUpperCase() === key) {
+    const shown = modalIsOpen('phoneModal') ? scanState.pendingBarcode : (modalIsOpen('scanRemoveModal') && uiState.pendingScannedRemoval ? uiState.pendingScannedRemoval.barcodeCode : '');
+    if (String(shown || '').trim().toUpperCase() === key) {
         showToast(`ℹ️ Barcode (${code}) កំពុងបើកនៅផ្ទាំងនេះរួចហើយ។`);
         return false;
     }

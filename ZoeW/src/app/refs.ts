@@ -152,7 +152,7 @@ export function setFieldValue(name: RefName, value: string): void {
 
 export function typeIntoElement(target: Element | null, text: string): boolean {
     const el = target as HTMLInputElement | null;
-    if (!el || !text || !el.isConnected || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') || el.disabled || el.readOnly) return false;
+    if (!el || !text || !el.isConnected || !fieldTakesText(el)) return false;
     if (document.activeElement === el) {
         let typed: boolean;
         try { typed = document.execCommand('insertText', false, text); } catch { typed = false; }
@@ -239,11 +239,16 @@ export function activeElementIsTextField(): boolean {
 
 const TEXT_ENTRY_TYPES = new Set(['', 'text', 'search', 'tel', 'number', 'email', 'url', 'password']);
 
+function fieldTakesText(el: HTMLInputElement): boolean {
+    if (el.disabled || el.readOnly) return false;
+    if (el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && TEXT_ENTRY_TYPES.has(String(el.type || '').toLowerCase());
+}
+
 export function activeElementTakesText(): boolean {
     const el = document.activeElement as HTMLInputElement | null;
     if (!el || el.disabled || el.readOnly) return false;
-    if (el.tagName === 'TEXTAREA') return true;
-    if (el.tagName === 'INPUT') return TEXT_ENTRY_TYPES.has(String(el.type || '').toLowerCase());
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return fieldTakesText(el);
     return !!el.isContentEditable;
 }
 

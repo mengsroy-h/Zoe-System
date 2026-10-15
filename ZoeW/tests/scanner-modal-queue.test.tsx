@@ -42,7 +42,7 @@ vi.mock('../src/domain/ledger', async (orig) => ({
 import { triggerScanAction } from '../src/features/scan-action';
 import * as scanRemove from '../src/features/scan-remove';
 import * as toast from '../src/ui/toast';
-import { fieldValue, setFieldValue } from '../src/app/refs';
+import { fieldValue, setFieldValue, typeIntoElement } from '../src/app/refs';
 import { dataState, firebaseState, scanState, securityState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
@@ -409,7 +409,37 @@ describe('ការវាយដោយមនុស្សក្នុងផ្ទ�
     });
 });
 
+describe('គ្រាប់ដែលទប់ត្រឡប់តែចូលប្រអប់វាយអក្សរ', () => {
+    it('checkbox ក្នុងផ្ទាំង focus ➜ វាយអក្សរ ➜ `value`/`checked` មិនប្រែ (typeIntoElement បដិសេធ)', async () => {
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        document.body.appendChild(box);
+        openScan('ZTQV' + seq + '0001');
+        await settle();
+        step(() => box.focus());
+        press('x');
+        expect(typeIntoElement(box, 'x')).toBe(false);
+        await settle(200);
+        expect(box.value).toBe('on');
+        expect(box.checked).toBe(false);
+        box.remove();
+    });
+});
+
 describe('ផ្ទាំងបញ្ជាក់ «ដក» ៖ Enter របស់ម៉ាស៊ីនស្កេនមិនចុចប៊ូតុង', () => {
+    it('ស្កេន Barcode ដែលផ្ទាំងដកកំពុងបង្ហាញម្តងទៀត ➜ មិនចូលជួរ · ប្រាប់', async () => {
+        const a = 'ZTQW' + seq + '0001';
+        step(() => {
+            uiState.entryScanMode = 'remove';
+            uiState.pendingScannedRemoval = { itemId: 'item-w', barcodeCode: a };
+            openModalHelper('scanRemoveModal');
+        });
+        scan(a);
+        await settle();
+        expect(viewState.batchScanStatus).toBe('');
+        expect(h.toasts.some((t) => t.startsWith('ℹ️') && t.includes(a))).toBe(true);
+    });
+
     it('⛔ លុយ ៖ ប៊ូតុង «🗑️ បញ្ជាក់ដក» focus ➜ ស្កេន B + Enter ➜ មិនដក · ផ្ទាំងនៅ ➜ បោះបង់ ➜ B ស្កេនក្នុងរបៀបដក', async () => {
         const removeSpy = vi.spyOn(scanRemove, 'confirmScannedRemoval');
         const handled: string[] = [];

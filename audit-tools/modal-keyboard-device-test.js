@@ -169,8 +169,21 @@ const SCANNER_DEVICES = [
     { label: 'iPhone Pro Max 430×932', w: 430, h: 932, kb: 346, ua: IPHONE_UA, catch: true, byCode: false },
     { label: 'iPhone ផ្តេក 852×393', w: 852, h: 393, kb: 209, ua: IPHONE_UA, catch: false, byCode: false },
     { label: 'iPad បញ្ឈរ 820×1180 (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)', w: 820, h: 1180, kb: 375, ua: IPAD_UA, catch: true, byCode: true },
-    { label: 'iPad ផ្តេក 1180×820 (UA កុំព្យូទ័រ)', w: 1180, h: 820, kb: 398, ua: IPAD_UA, catch: false, byCode: true }
+    { label: 'iPad ផ្តេក 1180×820 (UA កុំព្យូទ័រ)', w: 1180, h: 820, kb: 398, ua: IPAD_UA, catch: false, byCode: true },
+    { label: 'iPhone 393×852 · status bar 59 · របៀបកញ្ចប់', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'parcel' },
+    { label: 'iPhone 393×852 · status bar 59 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
+    { label: 'iPhone Pro Max 430×932 · status bar 59 · របៀបដក', w: 430, h: 932, kb: 375, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
+    { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: false, byCode: false, safeTop: 20, mode: 'remove' }
 ];
+
+// របារស្ថានភាព iPhone (safe-area-inset-top) ៖ Chromium មាន env(safe-area-*) = ០ ➜ រុញទំព័រចុះតាមកម្ពស់ពិត (វាស់ពីវីដេអូ ៖ កន្លែងវាយរបៀបដក បាត 442pt លើ 852)
+const SAFE_TOP = function (px) {
+    document.addEventListener('DOMContentLoaded', () => {
+        const s = document.createElement('style');
+        s.textContent = 'html.ios-standalone body { padding-top: ' + px + 'px !important; }';
+        document.head.appendChild(s);
+    });
+};
 
 (async () => {
     const server = await serve(APP);
@@ -301,11 +314,13 @@ const SCANNER_DEVICES = [
 
         console.log('\n=== (គ) iPhone · iPad (standalone) ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់ (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ iOS ===');
         for (const dev of SCANNER_DEVICES) {
-            const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG], { userAgent: dev.ua });
-            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function');
+            const inits = [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG];
+            if (dev.safeTop) inits.push('(' + SAFE_TOP.toString() + ')(' + dev.safeTop + ');');
+            const { ctx, page, ready } = await openApp(browser, port, dev, inits, { userAgent: dev.ua });
+            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
             if (!pageReady) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
             await closeAll(page);
-            await page.evaluate(() => switchAppPage('entry'));
+            await page.evaluate((m) => { switchAppPage('entry'); setEntryScanMode(m); openModalIds().slice().forEach((id) => closeModal(id)); }, dev.mode || 'parcel');
             await settle(page, 400);
             const at = await page.evaluate(() => {
                 const el = document.getElementById('hwScannerInput');

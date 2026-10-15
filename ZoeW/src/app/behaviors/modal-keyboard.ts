@@ -15,6 +15,8 @@ export const MODAL_KEYBOARD_GAP_PX = 8;
 export const MODAL_TAP_SLOP_PX = 10;
 export const MODAL_TAP_MAX_MS = 500;
 export const PAGE_TAP_KEYBOARD_RATIO = 0.5;
+export const PAGE_TAP_PHONE_KEYBOARD_RATIO = 0.45;
+export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
 
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
@@ -225,7 +227,8 @@ export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
     const height = window.innerHeight;
     if (!Number.isFinite(height) || height <= 0) return false;
     const seen = keyboardInsetSeen && keyboardInsetSeen.width === window.innerWidth ? keyboardInsetSeen.inset : 0;
-    const inset = seen > 0 ? seen : Math.round(height * PAGE_TAP_KEYBOARD_RATIO);
+    const phone = window.innerWidth < PAGE_TAP_PHONE_MAX_WIDTH && height > window.innerWidth;
+    const inset = seen > 0 ? seen : Math.round(height * (phone ? PAGE_TAP_PHONE_KEYBOARD_RATIO : PAGE_TAP_KEYBOARD_RATIO));
     const box = el.getBoundingClientRect();
     return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
 }

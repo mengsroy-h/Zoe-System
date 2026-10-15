@@ -233,9 +233,34 @@ describe('tab ស្កេន ៖ ស្វែងរកបញ្ជីកញ្�
         }
     });
 
-    it('ទិសផ្ទុយ ៖ Android/web ➜ ការចុចទុកឲ្យ browser (focus ធម្មតា ➜ onFocus បង្រួម)', () => {
+    it('⛔ វីដេអូ APK ៖ Android (App · Chrome) ៖ ចុចប្រអប់ស្វែងរក Locker · បញ្ជីកញ្ចប់ ➜ preventDefault · បង្រួមមុន · focus({ preventScroll }) (Chromium មិនរំកិលទំព័រពេល keyboard លោត)', () => {
+        setIOSStandalone(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        try {
+            expect(tap(lockerInput, 1000).defaultPrevented).toBe(true);
+            expect(focusCalls).toEqual([{ field: 'lockerListSearchInput', options: { preventScroll: true }, collapsed: true }]);
+            expect(document.activeElement).toBe(lockerInput);
+            lockerInput.blur();
+            uiState.entryPanelCollapsed = false;
+            focusCalls = [];
+            expect(tap(entryInput, 2000).defaultPrevented).toBe(true);
+            expect(focusCalls).toEqual([{ field: 'entryListSearchInput', options: { preventScroll: true }, collapsed: true }]);
+            entryInput.blur();
+            uiState.entryPanelCollapsed = false;
+            focusCalls = [];
+            scanState.isCameraScanning = true;
+            expect(tap(lockerInput, 3000).defaultPrevented).toBe(false);
+            expect(focusCalls).toEqual([]);
+        } finally {
+            scanState.isCameraScanning = false;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+        }
+    });
+
+    it('ទិសផ្ទុយ ៖ កុំព្យូទ័រ/web (មិនមែន iOS standalone · មិនមែន Android) ➜ ការចុចទុកឲ្យ browser (focus ធម្មតា ➜ onFocus បង្រួម)', () => {
         setIOSStandalone(false);
         expect(tap(entryInput, 1000).defaultPrevented).toBe(false);
+        expect(tap(lockerInput, 2000).defaultPrevented).toBe(false);
         expect(focusCalls).toEqual([]);
     });
 

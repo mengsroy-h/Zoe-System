@@ -1,5 +1,6 @@
 import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
+import { isAndroidDevice } from '../../platform/native';
 import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
 import { elementOf, focusField, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
@@ -246,9 +247,11 @@ function searchTapField(target: EventTarget | null): RefName | null {
 
 export function noteIOSSearchTouchStart(e: TouchEvent): void {
     searchTap = null;
-    if (searchFocusRefused || !usesIOSPanelHandoff() || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX) return;
+    if (searchFocusRefused || window.innerWidth >= IOS_SEARCH_WIDE_MIN_PX) return;
+    const ios = usesIOSPanelHandoff();
+    if (!ios && !isAndroidDevice()) return;
     const field = searchTapField(e.target);
-    if (!e.touches || e.touches.length !== 1 || !field) return;
+    if (!e.touches || e.touches.length !== 1 || !field || (!ios && field === 'searchPhoneInput')) return;
     const t = e.touches[0];
     searchTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }

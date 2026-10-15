@@ -587,7 +587,7 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         expect(focusCalls).toEqual([]);
     });
 
-    it('⛔ វីដេអូ iPhone ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ preventDefault · focus({ preventScroll }) ➜ ទំព័រមិនធ្លាក់ · focus ដោយកូដ (iPad) ➜ ចាប់ · keyboard បាំងប្រអប់ (ផ្តេក · keyboard ដែលធ្លាប់វាស់) ➜ iOS ធ្វើខ្លួនឯង', () => {
+    it('⛔ វីដេអូ iPhone ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ preventDefault · focus({ preventScroll }) ➜ ទំព័រមិនធ្លាក់ · ទូរស័ព្ទបញ្ឈរ (របៀបដក ៖ បាត ៥២%) ➜ ប៉ាន់ keyboard ៤៥% ➜ ចាប់ · focus ដោយកូដ (iPad) ➜ ចាប់ · keyboard បាំងប្រអប់ (ផ្តេក · keyboard ដែលធ្លាប់វាស់) ➜ iOS ធ្វើខ្លួនឯង', () => {
         setup();
         closeModal('manualAdjustModal');
         commitNow();
@@ -618,6 +618,14 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
             scanner.blur();
             top = 844 - 336 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 30 + 1;
             expect(tap(scanner, { x: 50, y: 480, t: 400 }, { x: 50, y: 480, t: 460 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 393 });
+            vv.height = 844;
+            scanner.blur();
+            top = 413;
+            expect(844 - Math.round(844 * modalKeyboard.PAGE_TAP_PHONE_KEYBOARD_RATIO)).toBeGreaterThanOrEqual(top + 30 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(844 - Math.round(844 * modalKeyboard.PAGE_TAP_KEYBOARD_RATIO)).toBeLessThan(top + 30 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(tap(scanner, { x: 50, y: 425, t: 470 }, { x: 50, y: 425, t: 490 }).defaultPrevented).toBe(true);
+            scanner.blur();
             Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 852 });
             Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 393 });
             vv.height = 393;

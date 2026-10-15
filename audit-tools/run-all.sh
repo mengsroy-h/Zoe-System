@@ -742,9 +742,12 @@ run "boot-animation (browser ពិត)" node audit-tools/boot-animation-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
-run "modal-keyboard (browser ពិត)" node audit-tools/modal-keyboard-test.js
-run "modal-keyboard-device 1/2 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)" node audit-tools/modal-keyboard-device-test.js --part=1/2
-run "modal-keyboard-device 2/2 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)" node audit-tools/modal-keyboard-device-test.js --part=2/2
+run "modal-keyboard 1/3 (browser ពិត ៖ ទូរស័ព្ទ ៤ ទំហំ)" node audit-tools/modal-keyboard-test.js --part=1/3
+run "modal-keyboard 2/3 (browser ពិត ៖ ទូរស័ព្ទផ្តេក · iPad)" node audit-tools/modal-keyboard-test.js --part=2/3
+run "modal-keyboard 3/3 (browser ពិត ៖ រំកិល · APK · ចុច · toast · សុវត្ថិភាព)" node audit-tools/modal-keyboard-test.js --part=3/3
+run "modal-keyboard-device 1/3 (browser ពិត · Android APK/PWA · iPhone · iPad ៖ ប្រអប់)" node audit-tools/modal-keyboard-device-test.js --part=1/3
+run "modal-keyboard-device 2/3 (browser ពិត · keyboard លេខ · ចុចកន្លែងវាយ Barcode · ម៉ាស៊ីនស្កេន · zoom)" node audit-tools/modal-keyboard-device-test.js --part=2/3
+run "modal-keyboard-device 3/3 (browser ពិត · ប្រអប់រអិលតាម keyboard ៖ ស៊ុមម្តងៗ)" node audit-tools/modal-keyboard-device-test.js --part=3/3
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "toast-action-truth (browser ពិត)" node audit-tools/toast-action-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js

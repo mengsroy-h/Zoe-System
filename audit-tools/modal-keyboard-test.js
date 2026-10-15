@@ -35,6 +35,18 @@ const GAP = appConst('MODAL_KEYBOARD_GAP_PX', 8);
 const PAD = 12;
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 
+// ⛔ `--part=k/3` (ដូច `modal-keyboard-device-test`) ៖ ទំហំ ៧ × ប្រអប់វាយ ៣៤ (~៣០ វិ./ទំហំ) + ផ្នែកផ្សេង (~១០០ វិ.) ➜ > ៣០០ វិ. ពេលរង់ចាំចលនាកាតចប់
+//    (MODAL_GLIDE_MS) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ ផ្នែក k = ទំហំ SIZE_PARTS[k − 1] · ផ្នែកចុងក្រោយ = ផ្នែកផ្សេងទាំងអស់ · គ្មាន `--part` ➜ ទាំងអស់ ·
+//    run-all រត់ផ្នែកទាំង ៣ · ទំហំនីមួយៗស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅដើម)។
+const SIZE_PARTS = [[0, 1, 2, 3], [4, 5, 6], []];
+const PART = (() => {
+    const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
+    if (!arg) return { k: 1, n: 1 };
+    const m = /^--part=(\d+)\/(\d+)$/.exec(arg);
+    if (!m || +m[2] !== SIZE_PARTS.length || +m[1] < 1 || +m[1] > +m[2]) return null;
+    return { k: +m[1], n: +m[2] };
+})();
+
 let pass = 0, fail = 0;
 const ok = (n) => { console.log('  ok    ' + n); pass++; };
 const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')); fail++; };
@@ -112,7 +124,11 @@ function decodePng(buf) {
     return { w, h, bpp, px };
 }
 
-const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(r, t)), ms || 260);
+// ⛔ ប្រអប់រអិលតាម keyboard (MODAL_GLIDE_MS) ៖ ទីតាំងដែលវាស់ = ទីតាំងសម្រាក ➜ រង់ចាំចលនាលើកាតចប់ (ពិដាន ១ វិ.) · ចលនាខ្លួនវា ៖ modal-keyboard-device-test (ឆ)
+const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(r, t)).then(() => {
+    const cards = document.getAnimations ? document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.matches && a.effect.target.matches('.modal-content')) : [];
+    return Promise.race([Promise.all(cards.map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))]);
+}), ms || 260);
 
 async function openApp(browser, port, size, fakeViewport) {
     const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
@@ -244,7 +260,27 @@ const SIZES = [
         const exists = fs.existsSync(path.join(APP, 'index.html'));
         check(exists, 'App ZoeW (audit build) រកឃើញ ៖ ' + APP);
         if (!exists) return;
+        check(!!PART, '⛔ --part ត្រូវជា k/' + SIZE_PARTS.length, process.argv.slice(2).join(' '));
+        if (!PART) return;
+        {
+            const flat = [].concat(...SIZE_PARTS);
+            check(flat.length === SIZES.length && SIZES.every((_, i) => flat.indexOf(i) !== -1),
+                '⛔ ក្រុម --part គ្របទំហំទាំង ' + SIZES.length + ' ម្តងគត់', JSON.stringify(SIZE_PARTS));
+        }
+        if (PART.n > 1) {
+            console.log('  ផ្នែក ' + PART.k + '/' + PART.n);
+            let runall = '';
+            try { runall = fs.readFileSync(path.join(__dirname, 'run-all.sh'), 'utf8').replace(/^\s*#.*$/gm, ''); } catch (e) {}
+            const listed = [];
+            for (let k = 1; k <= PART.n; k++) {
+                if (new RegExp('node\\s+audit-tools/modal-keyboard-test\\.js\\s+--part=' + k + '/' + PART.n + '(?=\\s|$)', 'm').test(runall)) listed.push(k);
+            }
+            check(listed.length === PART.n, '⛔ run-all.sh រត់ផ្នែកទាំង ' + PART.n + ' (ផ្នែកដែលបាត់ = ករណីដែលគ្មាននរណារត់)', 'ឃើញ ' + listed.join(','));
+        }
+        const sizesHere = PART.n === 1 ? SIZES : SIZE_PARTS[PART.k - 1].map((i) => SIZES[i]);
+        const othersHere = PART.n === 1 || PART.k === PART.n;
 
+        if (sizesHere.length) {
         console.log('\n=== ប្រអប់ ⟷ keyboard (iPhone · Android Chrome/PWA ៖ keyboard បាំង · layout viewport មិនបង្រួម · ផ្ទៃមើលឃើញ = visualViewport) ===');
         let measured = 0;
         let overlapsWithout = 0;
@@ -252,7 +288,7 @@ const SIZES = [
         const longTop = [];
         let shortFitted = 0;
         let longFitted = 0;
-        for (const size of SIZES) {
+        for (const size of sizesHere) {
             const { ctx, page, ready } = await openApp(browser, port, size, true);
             check(ready, size.label + ' ៖ audit bridge (openModalHelper · closeModal · openModalIds)');
             if (!ready) { await ctx.close(); continue; }
@@ -260,7 +296,7 @@ const SIZES = [
             if (size.safe) await page.addStyleTag({ content: '.modal { --modal-safe-top: ' + size.safe + 'px !important; }' });
             await closeAll(page);
             const ids = await modalIdsWithFields(page);
-            if (size === SIZES[0]) {
+            if (size === sizesHere[0]) {
                 check(ids.length >= 15, 'ជាន់អប្បបរមា ៖ ប្រអប់ដែលមានប្រអប់វាយ ≥ ១៥ (ដេរីវេពី DOM)', 'ឃើញ ' + ids.length + ' ៖ ' + ids.join(' '));
             }
             const failures = [];
@@ -308,12 +344,14 @@ const SIZES = [
                 JSON.stringify(failures.slice(0, 6)) + (failures.length > 6 ? ' … +' + (failures.length - 6) : ''));
             await ctx.close();
         }
-        check(longTop.length >= SIZES.length && longTop.every(Boolean), '⛔ ប្រអប់វែង «API ស្វែងរកអតិថិជន» (lookupApiConfigModal) ៖ កំពូលនៅកំពូលផ្ទៃមើលឃើញ (ក្រោម status bar ក្លែង) មិនផុតអេក្រង់ គ្រប់ទំហំ · គ្រប់ប្រអប់វាយ',
+        check(longTop.length >= sizesHere.length && longTop.every(Boolean), '⛔ ប្រអប់វែង «API ស្វែងរកអតិថិជន» (lookupApiConfigModal) ៖ កំពូលនៅកំពូលផ្ទៃមើលឃើញ (ក្រោម status bar ក្លែង) មិនផុតអេក្រង់ គ្រប់ទំហំ · គ្រប់ប្រអប់វាយ',
             JSON.stringify(longTop));
-        check(shortFitted >= 10 && longFitted >= 10, 'គំរូអាចធ្លាក់ ៖ ផ្លូវទាំង ២ ត្រូវរត់ (ប្រអប់ខ្លីដែល keyboard បាំង ≥ ១០ · ប្រអប់វែង ≥ ១០)', JSON.stringify({ shortFitted, longFitted }));
+        check(shortFitted >= 10 && longFitted >= 10, 'គំរូអាចធ្លាក់ ៖ ផ្លូវទាំង ២ ត្រូវរត់ (ប្រអប់ខ្លីដែល keyboard បាំង ' + shortFitted + ' ≥ ១០ · ប្រអប់វែង ' + longFitted + ' ≥ ១០)', JSON.stringify({ shortFitted, longFitted }));
         check(modalSeen.size >= 12, 'ជាន់អប្បបរមា ៖ ប្រអប់ដែលបានវាស់ជាមួយប្រអប់វាយមើលឃើញ ≥ ១២', 'ឃើញ ' + modalSeen.size + ' ៖ ' + Array.from(modalSeen).join(' '));
-        check(measured >= 60, 'ជាន់អប្បបរមា ៖ ការវាស់ (ប្រអប់វាយ × ទំហំ) ≥ ៦០', 'វាស់ ' + measured);
-        check(overlapsWithout >= 10, 'គំរូអាចធ្លាក់ ៖ ករណីដែល keyboard បាំងកាត ឬប្រអប់វាយ (មុនការតម្រូវ) ≥ ១០ (សេណារីយ៉ូពិត)', 'ឃើញ ' + overlapsWithout);
+        check(measured >= 20 * sizesHere.length, 'ជាន់អប្បបរមា ៖ ការវាស់ (ប្រអប់វាយ × ទំហំ) ' + measured + ' ≥ ២០ × ' + sizesHere.length + ' ទំហំ', 'វាស់ ' + measured);
+        check(overlapsWithout >= 10, 'គំរូអាចធ្លាក់ ៖ ករណីដែល keyboard បាំងកាត ឬប្រអប់វាយ (មុនការតម្រូវ) ' + overlapsWithout + ' ≥ ១០ (សេណារីយ៉ូពិត)', 'ឃើញ ' + overlapsWithout);
+        }
+        if (!othersHere) return;
 
         console.log('\n=== ផ្ទៃមើលឃើញរំកិល (iOS រំកិល visual viewport) · ប្តូរប្រអប់វាយ · keyboard បិទ · បើកប្រអប់ខណៈ keyboard បើក ===');
         {

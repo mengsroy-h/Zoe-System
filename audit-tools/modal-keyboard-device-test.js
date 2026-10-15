@@ -44,6 +44,7 @@ const APP = path.join(ROOT, 'ZoeW');
 // ពិដានចន្លោះគ្រាប់ម៉ាស៊ីនស្កេន ស្រង់ពីកូដ App (មិនសរសេរលេខរឹង) ៖ ការស្កេនក្លែងដែលចន្លោះពិត (event.timeStamp) លើសវា មិនមែនជាការស្កេនទេ
 const SCANNER_GAP_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bSCANNER_KEY_GAP_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const KEYBOARD_SETTLE_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_SETTLE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
+const GLIDE_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bMODAL_GLIDE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const KEYBOARD_MIN_INSET_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_MIN_INSET_PX = (\d+)/); return m ? Number(m[1]) : Infinity; } catch (e) { return Infinity; } })();
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
@@ -55,7 +56,7 @@ const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 // ⛔ `--part=k/2` (ដូច `zoew-suite-test` · `money-guardian-test`) ៖ ផ្នែកទាំងអស់រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ.
 //    («ព្យួរ — លើសពិដាន 300s» ក្រោយ (ក២)) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ run-all រត់ផ្នែកទាំង ២ (lane ផ្សេងគ្នា) · គ្មាន `--part` ➜
 //    ផ្នែកទាំងអស់ (baseline · checker-coverage) · ផ្នែកនីមួយៗត្រូវស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅចុងក្រោយ)។
-const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ']];
+const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ']];
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -83,20 +84,21 @@ function serve(dir) {
     });
 }
 
-// visualViewport ក្លែង ៖ `__kb.set(px)` (គ្មានព្រឹត្តិការណ៍) · `__kb.fire()` · `__kb.open(px)` = set + fire
+// visualViewport ក្លែង ៖ `__kb.set(px)` (គ្មានព្រឹត្តិការណ៍) · `__kb.fire()` · `__kb.open(px)` = set + fire · `__kb.pan(px)` = visual viewport រំកិល (offsetTop) + fire
 const FAKE_VIEWPORT = function () {
     const fake = new EventTarget();
     let inset = 0;
+    let pan = 0;
     Object.defineProperty(fake, 'height', { get: () => window.innerHeight - inset });
     Object.defineProperty(fake, 'width', { get: () => window.innerWidth });
-    Object.defineProperty(fake, 'offsetTop', { get: () => 0 });
+    Object.defineProperty(fake, 'offsetTop', { get: () => pan });
     Object.defineProperty(fake, 'offsetLeft', { get: () => 0 });
     Object.defineProperty(fake, 'pageTop', { get: () => window.scrollY || 0 });
     Object.defineProperty(fake, 'pageLeft', { get: () => 0 });
     Object.defineProperty(fake, 'scale', { get: () => 1 });
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: fake });
     const fire = () => { fake.dispatchEvent(new Event('resize')); fake.dispatchEvent(new Event('scroll')); };
-    window.__kb = { set(px) { inset = px; }, fire, open(px) { inset = px; fire(); } };
+    window.__kb = { set(px) { inset = px; }, fire, open(px) { inset = px; fire(); }, pan(px) { pan = px; fire(); } };
 };
 
 // bridge Capacitor ក្លែងតិចបំផុត ៖ App ដឹងថាជា APK (`isNativeAndroid()`) · plugin ឆ្លើយ {} (fail-open)
@@ -139,7 +141,12 @@ const TAP_LOG = function () {
 const FIELD_SELECTOR = 'textarea, input:not([type]), input[type="text"], input[type="number"], input[type="tel"], input[type="password"], ' +
     'input[type="email"], input[type="search"], input[type="url"]';
 
-const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(r, t)), ms || 200);
+// ⛔ ប្រអប់រអិលតាម keyboard (MODAL_GLIDE_MS) ៖ វាស់ទីតាំងសម្រាក ➜ រង់ចាំចលនាលើកាតចប់ (ពិដាន ១ វិ. ៖ ចលនាមិនចប់ ➜ វាស់កណ្តាលផ្លូវ ➜ ក្រហម) ·
+//    ចលនាខ្លួនវា (ចាប់ពីទីតាំងចាស់ · គ្មានលោត · ទិសដៅ) វាស់ក្នុងផ្នែក (ឆ)
+const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(r, t)).then(() => {
+    const cards = document.getAnimations ? document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.matches && a.effect.target.matches('.modal-content')) : [];
+    return Promise.race([Promise.all(cards.map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))]);
+}), ms || 200);
 
 async function openApp(browser, port, size, inits, extra) {
     const ctx = await browser.newContext(Object.assign({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' }, extra || {}));
@@ -721,6 +728,198 @@ const SAFE_TOP = function (px) {
                     check(SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS && out && out.cod === '' && out.pending === 'ZTZOOMA0001' && out.status.indexOf(next) === -1 && out.status.indexOf('0/1') !== -1,
                         '⛔ កុំព្យូទ័រ zoom ១.៦ · ផ្ទាំងលេខទូរស័ព្ទបើក · focus COD ➜ ម៉ាស៊ីនស្កេន ' + next + ' + Enter ➜ ចូលជួរ «📥» · COD មិនប្រែ', JSON.stringify({ gap, out }));
                 } else bad('(ច) zoom ៖ audit bridge');
+                await ctx.close();
+            }
+        }
+
+        if (inPart('ឆ')) {
+            console.log('\n=== (ឆ) សំណើម្ចាស់គម្រោង ៖ «ថែម animation សម្រាប់ modal ពេលលោតតាម keyboard ក្នុង App ទាំងមូល» ➜ កាតរអិលពីទីតាំងចាស់ទៅទីតាំងថ្មី (បើក · បិទ keyboard) · គ្មានលោតមួយជំហាន · ឈប់ត្រឹមទីតាំងត្រូវ ===');
+            check(GLIDE_MS >= 150 && GLIDE_MS <= 400, 'MODAL_GLIDE_MS ស្រង់ពីកូដ App (' + GLIDE_MS + ') ក្នុង ១៥០–៤០០ ms (ប្រហែលល្បឿន keyboard)');
+            // ថតទីតាំងកាតលើអេក្រង់ (កំពូលកាត − visualViewport.offsetTop) រាល់ស៊ុម ចាប់ពីមុនព្រឹត្តិការណ៍ ➜ ព្រឹត្តិការណ៍ (ក្នុង browser ឬពី Node) ➜ ចប់
+            const RECORD = ({ id, ms }) => {
+                const card = document.getElementById(id).querySelector('.modal-content');
+                const frames = [];
+                const t0 = performance.now();
+                window.__glide = new Promise((done) => {
+                    const tick = (t) => {
+                        frames.push({ t: Math.round(t - t0), top: Math.round((card.getBoundingClientRect().top - visualViewport.offsetTop) * 10) / 10 });
+                        if (performance.now() - t0 < ms) requestAnimationFrame(tick);
+                        else done({ frames, running: card.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSAnimation)).length });
+                    };
+                    requestAnimationFrame(tick);
+                });
+            };
+            const waitFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+            // ចលនាមួយ ៖ ចាប់ពី frames[0] ➜ ចុង · ជំហាននីមួយៗ ≤ វឌ្ឍនភាពខ្សែកោង (easeOutCubic) ក្នុងរយៈស៊ុមនោះ + ១០% (ស៊ុមធ្លាក់លើ CI ធ្វើឲ្យជំហានធំ ·
+            //    លោតមួយជំហាន = ១០០% ក្នុង ១ ស៊ុម) · ស៊ុមកណ្តាលផ្លូវ · មិនត្រឡប់ក្រោយ · មិនហួស · ដល់ចុងក្រោយ ≈ MODAL_GLIDE_MS
+            const curve = (dt) => 1 - Math.pow(1 - Math.min(1, (dt + 20) / GLIDE_MS), 3);
+            const glideOf = (rec) => {
+                const f = rec.frames;
+                const start = f[0].top, end = f[f.length - 1].top, dist = Math.abs(end - start), dir = Math.sign(end - start);
+                let maxStep = 0, ahead = 0, back = 0, over = 0, mid = 0, moveAt = -1, arriveAt = -1;
+                for (let i = 1; i < f.length; i++) {
+                    const step = f[i].top - f[i - 1].top;
+                    maxStep = Math.max(maxStep, Math.abs(step));
+                    if (dist > 0) ahead = Math.max(ahead, Math.abs(step) / dist - curve(f[i].t - f[i - 1].t));
+                    if (dir && step * dir < -1) back++;
+                    if (dir && (f[i].top - end) * dir > 1) over++;
+                    if (Math.abs(f[i].top - start) > 1 && Math.abs(f[i].top - end) > 1) mid++;
+                    if (moveAt < 0 && Math.abs(f[i].top - start) > 1) moveAt = f[i - 1].t;
+                    if (arriveAt < 0 && Math.abs(f[i].top - end) <= 1) arriveAt = f[i].t;
+                }
+                return { start, end, dist: Math.round(dist), maxStep: Math.round(maxStep), ahead: Math.round(ahead * 100) / 100, mid, back, over, span: moveAt < 0 || arriveAt < 0 ? 0 : arriveAt - moveAt, running: rec.running, frames: f.length };
+            };
+            // ចម្ងាយខ្លី (< ៤០px) ៖ ខ្សែកោងបន្ថយល្បឿនដល់ ±១px មុន ➜ ពេល/ស៊ុមកណ្តាលជាន់ទាបជាង
+            const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= (g.dist >= 40 ? 4 : 3) && g.back === 0 && g.over === 0 &&
+                g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
+            const GLIDE_DEVICES = [
+                { label: 'APK ទូរស័ព្ទ 412×915 · keyboard 330', w: 412, h: 915, kb: 330, apk: true },
+                { label: 'APK tablet ផ្តេក 1280×800 · keyboard 360', w: 1280, h: 800, kb: 360, apk: true },
+                { label: 'PWA Chrome Android 360×740 · keyboard 300', w: 360, h: 740, kb: 300, android: true },
+                { label: 'iPhone 393×852 · keyboard 336', w: 393, h: 852, kb: 336, ios: true },
+                { label: 'iPad បញ្ឈរ 820×1180 · keyboard 375', w: 820, h: 1180, kb: 375, ios: true }
+            ];
+            for (const dev of GLIDE_DEVICES) {
+                const inits = dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : dev.ios ? [IOS_FLAGS, FAKE_VIEWPORT] : [FAKE_VIEWPORT];
+                const { ctx, page, ready } = await openApp(browser, port, dev, inits, dev.android ? { userAgent: ANDROID_UA } : null);
+                if (!ready) { bad('(ឆ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const ids = await modalIdsWithFields(page);
+                const problems = [];
+                let measured = 0, moved = 0, glidedUp = 0, glidedBack = 0, still = 0, panned = 0;
+                for (const id of ids) {
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, id);
+                    if (index < 0) continue;
+                    await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
+                    await settle(page, 60);
+                    measured++;
+                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
+                    await waitFrame(page);
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                    const up = glideOf(await page.evaluate(() => window.__glide));
+                    const fitted = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    if (up.dist < 8) { if (fitted.card[1] > dev.h - dev.kb + 1) problems.push(id + ' ៖ មិនផ្លាស់ទី ហើយបាំងដោយ keyboard ' + JSON.stringify(fitted.card)); continue; }
+                    moved++;
+                    if (smooth(up)) glidedUp++; else problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
+                    if (Math.abs(up.end - fitted.card[0]) > 1 || fitted.card[1] > dev.h - dev.kb + 1 || fitted.card[0] < 0) problems.push(id + ' ៖ ចុងចលនា ' + up.end + ' ≠ ទីតាំងត្រូវ ' + JSON.stringify(fitted.card));
+                    if (dev.apk) {
+                        await page.evaluate(RECORD, { id, ms: 260 });
+                        await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                        await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                        const shrink = glideOf(await page.evaluate(() => window.__glide));
+                        if (shrink.dist <= 1 && shrink.maxStep <= 1 && shrink.running === 0) still++; else problems.push(id + ' ៖ WebView បង្រួម ➜ ផ្លាស់ទីម្តងទៀត ' + JSON.stringify(shrink));
+                    }
+                    if (dev.ios && panned < 4) {
+                        await page.evaluate(RECORD, { id, ms: 200 });
+                        await waitFrame(page);
+                        await page.evaluate(() => window.__kb.pan(48));
+                        const pan = glideOf(await page.evaluate(() => window.__glide));
+                        if (pan.dist <= 1 && pan.maxStep <= 1 && pan.running === 0) panned++; else problems.push(id + ' ៖ visual viewport រំកិល ➜ កាតផ្លាស់ទីលើអេក្រង់ (ត្រូវនៅនឹង) ' + JSON.stringify(pan));
+                        await page.evaluate(() => window.__kb.pan(0));
+                        await settle(page, 60);
+                    }
+                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
+                    await waitFrame(page);
+                    if (dev.apk) await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => window.__kb.open(0));
+                    const down = glideOf(await page.evaluate(() => window.__glide));
+                    if (smooth(down) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
+                }
+                // ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ មិនផ្លាស់ទី (ច្បាប់ ៖ «untouched») ➜ ពិនិត្យតែកុំឲ្យ keyboard បាំង · ប្រអប់ដែលផ្លាស់ទីទាំងអស់ត្រូវរអិល
+                check(measured >= 12 && moved >= 4 && glidedUp === moved && glidedBack === moved && problems.length === 0 && (!dev.apk || still === moved) && (!dev.ios || panned >= 3),
+                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ (' + moved + ' ផ្លាស់ទី) ➜ keyboard បើក ➜ កាតរអិល ' + glidedUp + ' (ជំហានតាមខ្សែកោង · ស៊ុមកណ្តាលផ្លូវ · ≈ MODAL_GLIDE_MS · ឈប់ត្រឹមទីតាំងត្រូវ) · keyboard បិទ ➜ រអិលត្រឡប់ ' + glidedBack +
+                        (dev.apk ? ' · WebView បង្រួម ➜ មិនផ្លាស់ទីម្តងទៀត ' + still : '') + (dev.ios ? ' · visual viewport រំកិល ➜ កាតនៅនឹងលើអេក្រង់ ' + panned : ''),
+                    JSON.stringify({ measured, moved, glidedUp, glidedBack, still, panned, problems: problems.slice(0, 5) }));
+
+                if (!dev.apk) {
+                    const id = 'phoneModal';
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, id);
+                    await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index, sel: FIELD_SELECTOR });
+                    await settle(page, 60);
+                    await page.evaluate(RECORD, { id, ms: GLIDE_MS + 400 });
+                    await waitFrame(page);
+                    await page.evaluate((kb) => window.__kb.open(kb), Math.round(dev.kb * 0.55));
+                    await page.evaluate((ms) => new Promise((r) => setTimeout(r, ms)), Math.round(GLIDE_MS * 0.4));
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                    const re = glideOf(await page.evaluate(() => window.__glide));
+                    const at = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    check(index >= 0 && re.dist >= 8 && re.ahead <= 0.1 && re.mid >= 4 && re.back === 0 && re.over === 0 && re.running === 0 && Math.abs(re.end - at.card[0]) <= 1 && at.card[1] <= dev.h - dev.kb + 1,
+                        '⛔ ' + dev.label + ' ៖ keyboard ប្តូរកម្ពស់កណ្តាលចលនា (' + Math.round(dev.kb * 0.55) + ' ➜ ' + dev.kb + ') ➜ កាតបន្តពីទីតាំងបច្ចុប្បន្ន (គ្មានលោត · មិនត្រឡប់ក្រោយ) ➜ ឈប់ត្រឹមទីតាំងថ្មី',
+                        JSON.stringify({ re, at: at.card }));
+                }
+                await ctx.close();
+            }
+            // ទិសផ្ទុយ ៖ ចលនាតែតាម keyboard ➜ មាតិកាប្រអប់ប្តូរទំហំ (គ្មាន keyboard) · បង្វិល · iPhone/កុំព្យូទ័រ viewport ប្តូរ ➜ ភ្លាមដូចមុន ·
+            //    keyboard បើកក្រោយមាតិកាប្តូរ ➜ រអិលពីទីតាំងថ្មី (មិនមែនទីតាំងចាស់ ៖ លោតត្រឡប់)
+            for (const dev of [
+                { label: 'APK tablet 800×1280 · keyboard 420', w: 800, h: 1280, kb: 420, apk: true, rotate: true },
+                { label: 'PWA Chrome Android 360×740 · keyboard 300', w: 360, h: 740, kb: 300, android: true },
+                { label: 'iPhone 393×852 · keyboard 336', w: 393, h: 852, kb: 336, ios: true, resize: 700 }
+            ]) {
+                const inits = dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : dev.ios ? [IOS_FLAGS, FAKE_VIEWPORT] : [FAKE_VIEWPORT];
+                const { ctx, page, ready } = await openApp(browser, port, dev, inits, dev.android ? { userAgent: ANDROID_UA } : null);
+                if (!ready) { bad('(ឆ) ទិសផ្ទុយ ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                const id = 'phoneModal';
+                await page.evaluate((m) => openModalHelper(m), id);
+                await settle(page, 320);
+                const index = await firstVisibleField(page, id);
+                await page.evaluate(RECORD, { id, ms: 220 });
+                await waitFrame(page);
+                await page.evaluate((m) => { const d = document.createElement('div'); d.id = '__grow'; d.style.height = '140px'; document.getElementById(m).querySelector('.modal-content').appendChild(d); }, id);
+                const grow = glideOf(await page.evaluate(() => window.__glide));
+                await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
+                await settle(page, 60);
+                await page.evaluate(RECORD, { id, ms: GLIDE_MS + 300 });
+                await waitFrame(page);
+                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                const up = glideOf(await page.evaluate(() => window.__glide));
+                check(index >= 0 && grow.dist >= 20 && grow.mid === 0 && grow.running === 0 && smooth(up),
+                    'ទិសផ្ទុយ ' + dev.label + ' ៖ មាតិកាប្រអប់ធំឡើង (គ្មាន keyboard) ➜ ផ្លាស់ទីភ្លាមដូចមុន (គ្មានចលនា) · keyboard បើកក្រោយ ➜ រអិលពីទីតាំងថ្មី (គ្មានលោតត្រឡប់)',
+                    JSON.stringify({ grow, up }));
+                if (dev.rotate || dev.resize) {
+                    await page.evaluate(() => { document.getElementById('__grow').remove(); window.__kb.set(0); window.__kb.fire(); document.activeElement && document.activeElement.blur(); });
+                    await settle(page, 200);
+                    await page.evaluate(RECORD, { id, ms: 220 });
+                    await waitFrame(page);
+                    await page.setViewportSize(dev.rotate ? { width: dev.h, height: dev.w } : { width: dev.w, height: dev.resize });
+                    const turn = glideOf(await page.evaluate(() => window.__glide));
+                    check(turn.dist >= 20 && turn.mid === 0 && turn.running === 0,
+                        'ទិសផ្ទុយ ' + dev.label + ' ៖ ' + (dev.rotate ? 'បង្វិល (' + dev.h + '×' + dev.w + ')' : 'viewport ប្តូរកម្ពស់ (' + dev.h + ' ➜ ' + dev.resize + ' ៖ មិនមែន keyboard iOS)') + ' គ្មាន keyboard ➜ ប្រអប់ទៅកណ្តាលថ្មីភ្លាម (គ្មានចលនា)',
+                        JSON.stringify(turn));
+                }
+                await ctx.close();
+            }
+            {
+                const dev = { w: 393, h: 852, kb: 336 };
+                const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT], { reducedMotion: 'reduce' });
+                if (ready) {
+                    const ids = (await modalIdsWithFields(page)).slice(0, 8);
+                    const jumps = [];
+                    for (const id of ids) {
+                        await page.evaluate(() => window.__kb.open(0));
+                        await closeAll(page);
+                        await page.evaluate((m) => openModalHelper(m), id);
+                        await settle(page, 320);
+                        const index = await firstVisibleField(page, id);
+                        if (index < 0) continue;
+                        await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index, sel: FIELD_SELECTOR });
+                        await settle(page, 60);
+                        await page.evaluate(RECORD, { id, ms: 200 });
+                        await waitFrame(page);
+                        await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                        const g = glideOf(await page.evaluate(() => window.__glide));
+                        if (g.dist >= 8) jumps.push(g.maxStep >= g.dist - 1 && g.mid === 0 && g.running === 0);
+                    }
+                    check(jumps.length >= 4 && jumps.every(Boolean), 'ទិសផ្ទុយ ៖ iPhone «បន្ថយចលនា» (prefers-reduced-motion) ➜ ' + jumps.length + ' ប្រអប់ ➜ កាតទៅទីតាំងថ្មីភ្លាម (គ្មានចលនា)', JSON.stringify(jumps));
+                } else bad('(ឆ) បន្ថយចលនា ៖ audit bridge');
                 await ctx.close();
             }
         }

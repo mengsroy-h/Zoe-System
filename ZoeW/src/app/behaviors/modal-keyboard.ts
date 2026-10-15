@@ -7,7 +7,7 @@ import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
-import { blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
+import { animateElement, blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
@@ -22,6 +22,8 @@ export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
 export const KEYBOARD_MEMORY_MAX = 24;
 export const KEYBOARD_SETTLE_MS = 400;
 export const KEYBOARD_TRUST_MS = 1000;
+export const MODAL_GLIDE_MS = 250;
+export const MODAL_GLIDE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
 
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
@@ -47,6 +49,10 @@ let modalTapFocused: HTMLElement | null = null;
 let keyboardMemory: Record<string, number> | null = null;
 let keyboardSession: { w: number; h: number; seen: string; settled: boolean } | null = null;
 let keyboardSettleTimer: ReturnType<typeof setTimeout> | null = null;
+let modalRest: { card: HTMLElement; top: number; width: number } | null = null;
+let modalGlide: { card: HTMLElement; to: number; anim: Animation } | null = null;
+let modalWatched: HTMLElement | null = null;
+let modalResizeObserver: ResizeObserver | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -333,8 +339,97 @@ function androidHeldFitView(): { top: number; height: number } | null {
     return Number.isFinite(height) && height > 0 ? { top: 0, height } : null;
 }
 
+function topmostModalCard(): { id: string; card: HTMLElement } | null {
+    const id = topmostModal();
+    const modal = id ? modalElement(id) : null;
+    const card = modal ? modalContentOf(modal) : null;
+    return id && card ? { id, card } : null;
+}
+
+function cardLayoutTop(card: HTMLElement): number {
+    const modal = card.parentElement;
+    return modal && card.offsetParent === modal && card.offsetHeight > 0 ? modal.getBoundingClientRect().top + card.offsetTop : NaN;
+}
+
+function modalCardShownTop(card: HTMLElement): number {
+    if (!modalRest || modalRest.card !== card) return NaN;
+    const offset = modalGlide && modalGlide.card === card ? card.getBoundingClientRect().top - cardLayoutTop(card) : 0;
+    return modalRest.top + offset;
+}
+
+function modalMotionAllowed(): boolean {
+    try {
+        return typeof window.matchMedia !== 'function' || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+        return true;
+    }
+}
+
+function stopModalGlide(): void {
+    const glide = modalGlide;
+    modalGlide = null;
+    if (!glide) return;
+    try { glide.anim.cancel(); } catch (e) {}
+}
+
+function watchModalCard(card: HTMLElement | null): void {
+    if (card === modalWatched) return;
+    modalWatched = card;
+    if (!modalResizeObserver) return;
+    modalResizeObserver.disconnect();
+    if (!card) return;
+    modalResizeObserver.observe(card);
+    if (card.parentElement) modalResizeObserver.observe(card.parentElement);
+}
+
+function glideModalCard(shown: number, animate: boolean): void {
+    const now = topmostModalCard();
+    watchModalCard(now ? now.card : null);
+    if (modalGlide && (!now || modalGlide.card !== now.card)) stopModalGlide();
+    const to = now ? cardLayoutTop(now.card) - uiState.modalViewportTop : NaN;
+    if (!now || !Number.isFinite(to)) {
+        stopModalGlide();
+        modalRest = null;
+        return;
+    }
+    const was = modalRest;
+    modalRest = { card: now.card, top: to, width: window.innerWidth };
+    if (modalGlide && Math.abs(modalGlide.to - to) < 1) return;
+    const running = !!modalGlide;
+    stopModalGlide();
+    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width) return;
+    const from = Math.round(shown - to);
+    if (!Number.isFinite(from) || Math.abs(from) < 2 || !modalMotionAllowed()) return;
+    let anim: Animation | null;
+    try {
+        anim = animateElement(now.card, [{ transform: 'translate3d(0,' + from + 'px,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: MODAL_GLIDE_MS, easing: MODAL_GLIDE_EASING, composite: 'add' });
+    } catch (e) {
+        anim = null;
+    }
+    if (!anim) return;
+    const glide = { card: now.card, to, anim };
+    modalGlide = glide;
+    anim.onfinish = () => {
+        if (modalGlide === glide) modalGlide = null;
+    };
+}
+
+function noteModalResized(entries: ResizeObserverEntry[]): void {
+    const now = topmostModalCard();
+    if (!now || now.card !== modalWatched) return;
+    const viewport = isAndroidDevice() && entries.some((entry) => entry.target === now.card.parentElement);
+    glideModalCard(modalCardShownTop(now.card), viewport);
+}
+
 export function measureModalKeyboard(): void {
     trackAndroidKeyboard();
+    const now = topmostModalCard();
+    const shown = now ? modalCardShownTop(now.card) : NaN;
+    placeModalForKeyboard();
+    glideModalCard(shown, true);
+}
+
+function placeModalForKeyboard(): void {
     modalWasOpen = uiState.isModalOpen;
     modalStackSeen = uiState.modalStack;
     modalDisplaySeen = uiState.modalDisplay;
@@ -454,6 +549,11 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     modalTapFocused = null;
     keyboardMemory = null;
     endKeyboardSession();
+    stopModalGlide();
+    modalRest = null;
+    modalWatched = null;
+    if (modalResizeObserver) modalResizeObserver.disconnect();
+    modalResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(noteModalResized) : null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;
@@ -466,6 +566,11 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'focusin', forgetModalTapFocus, { capture: true });
     scope.onDispose(() => {
         endKeyboardSession();
+        stopModalGlide();
+        if (modalResizeObserver) modalResizeObserver.disconnect();
+        modalResizeObserver = null;
+        modalRest = null;
+        modalWatched = null;
         naturalBox = null;
         modalTap = null;
         modalTapFocused = null;

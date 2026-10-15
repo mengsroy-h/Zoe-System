@@ -6802,6 +6802,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `modal-keyboard-device-test` | ផ្នែក ១ | — |
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |

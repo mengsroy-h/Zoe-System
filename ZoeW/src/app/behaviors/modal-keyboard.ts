@@ -5,8 +5,8 @@ import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
-import { blurActiveElement, focusElementWithoutScroll, setElementScrollTop } from '../refs';
-import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
+import { blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, type RefName } from '../refs';
+import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
 
@@ -14,6 +14,9 @@ export const MODAL_FIELD_MARGIN_PX = 12;
 export const MODAL_KEYBOARD_GAP_PX = 8;
 export const MODAL_TAP_SLOP_PX = 10;
 export const MODAL_TAP_MAX_MS = 500;
+export const PAGE_TAP_KEYBOARD_RATIO = 0.5;
+
+const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
 const MODAL_TAP_TYPES = new Set(['text', 'tel', 'number', 'password', 'email', 'search', 'url', 'textarea']);
 
@@ -28,15 +31,17 @@ export interface ModalNaturalBox {
 let modalWasOpen = false;
 let modalStackSeen: string[] = [];
 let modalDisplaySeen: Record<string, string> = {};
+let keyboardOpenSeen = false;
 let measureQueued = false;
 let naturalBox: (ModalNaturalBox & { id: string }) | null = null;
 let modalTap: { id: number; x: number; y: number; at: number; field: HTMLElement } | null = null;
 let modalFocusRefused = false;
 let modalTapFocused: HTMLElement | null = null;
+let keyboardInsetSeen: { width: number; inset: number } | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
-    if (!vv) return null;
+    if (!vv || uiState.keyboardOpen) return null;
     const layout = window.innerHeight;
     const height = Math.round(vv.height);
     if (!Number.isFinite(layout) || !Number.isFinite(height) || height <= 0) return null;
@@ -52,8 +57,15 @@ export function modalKeyboardViewport(): { top: number; height: number } | null 
 
 export function measureKeyboardCover(): void {
     const view = keyboardVisibleViewport();
+    if (view) noteKeyboardInsetSeen(Math.round(window.innerHeight) - view.height);
     const cover = view ? Math.max(0, Math.round(window.innerHeight) - view.top - view.height) : 0;
     if (uiState.keyboardCover !== cover) uiState.keyboardCover = cover;
+}
+
+function noteKeyboardInsetSeen(inset: number): void {
+    const width = window.innerWidth;
+    if (keyboardInsetSeen && keyboardInsetSeen.width === width && keyboardInsetSeen.inset >= inset) return;
+    keyboardInsetSeen = { width, inset };
 }
 
 export function modalKeyboardFitFor(box: ModalNaturalBox, view: { top: number; height: number }): Omit<ModalKeyboardFit, 'id'> | null {
@@ -162,6 +174,7 @@ export function measureModalKeyboard(): void {
     modalWasOpen = uiState.isModalOpen;
     modalStackSeen = uiState.modalStack;
     modalDisplaySeen = uiState.modalDisplay;
+    keyboardOpenSeen = uiState.keyboardOpen;
     const view = modalKeyboardViewport();
     const top = view ? view.top : 0;
     const height = view ? view.height : 0;
@@ -204,12 +217,22 @@ function modalTapField(target: EventTarget | null): HTMLElement | null {
     if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly) return null;
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
     const modal = el.closest('.modal') as HTMLElement | null;
-    return modal && modal.id && modalIsOpen(modal.id) ? el : null;
+    if (modal) return modal.id && modalIsOpen(modal.id) ? el : null;
+    return !uiState.isModalOpen && PAGE_TAP_FIELDS.some((name) => elementOf(name) === el) && pageFieldStaysAboveKeyboard(el) ? el : null;
+}
+
+export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
+    const height = window.innerHeight;
+    if (!Number.isFinite(height) || height <= 0) return false;
+    const seen = keyboardInsetSeen && keyboardInsetSeen.width === window.innerWidth ? keyboardInsetSeen.inset : 0;
+    const inset = seen > 0 ? seen : Math.round(height * PAGE_TAP_KEYBOARD_RATIO);
+    const box = el.getBoundingClientRect();
+    return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
 }
 
 export function noteModalTouchStart(e: TouchEvent): void {
     modalTap = null;
-    if (modalFocusRefused || !uiState.isModalOpen || !usesIOSPanelHandoff()) return;
+    if (modalFocusRefused || !usesIOSPanelHandoff()) return;
     const field = modalTapField(e.target);
     if (!field || !e.touches || e.touches.length !== 1) return;
     const t = e.touches[0];
@@ -238,11 +261,13 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     modalWasOpen = false;
     modalStackSeen = uiState.modalStack;
     modalDisplaySeen = uiState.modalDisplay;
+    keyboardOpenSeen = uiState.keyboardOpen;
     measureQueued = false;
     naturalBox = null;
     modalTap = null;
     modalFocusRefused = false;
     modalTapFocused = null;
+    keyboardInsetSeen = null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;
@@ -263,6 +288,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     });
     const vv = window.visualViewport;
     if (!vv) return;
+    scope.listen(vv, 'resize', noteKeyboardViewport);
     scope.listen(vv, 'resize', measureModalKeyboard);
     scope.listen(vv, 'scroll', measureModalKeyboard);
     scope.listen(vv, 'resize', measureKeyboardCover);
@@ -270,6 +296,11 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {
+        if (uiState.keyboardOpen !== keyboardOpenSeen) {
+            keyboardOpenSeen = uiState.keyboardOpen;
+            measureKeyboardCover();
+            if (uiState.isModalOpen || uiState.modalViewportHeight > 0) queueModalMeasure(scope);
+        }
         if (uiState.isModalOpen === modalWasOpen && uiState.modalStack === modalStackSeen && uiState.modalDisplay === modalDisplaySeen) return;
         modalWasOpen = uiState.isModalOpen;
         modalStackSeen = uiState.modalStack;

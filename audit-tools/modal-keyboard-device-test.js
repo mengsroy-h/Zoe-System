@@ -8,6 +8,12 @@
 //   (ខ) iPhone ៖ «បើក modal បញ្ចូលច្រើន ហើយចុចឲ្យចេញ keyboard ទំព័រទាំងមូលធ្លាក់ចុះមួយភ្លែត» — ប្រអប់វាយដែល focus ដោយកូដ (iOS មិនបើក keyboard)
 //       ចុចទៅផ្លូវ iOS ដើម ➜ WebKit រំកិលទំព័រ ➜ `restoreIOSDocumentScroll()` ទាញ ០ កណ្តាលចលនា។ ច្បាប់ ៖ ប្រអប់វាយ focus រួច + keyboard មិនទាន់បើក + មិនទាន់ចុច ➜
 //       touchend preventDefault + focus({ preventScroll }) · keyboard បើករួច ➜ iOS ធ្វើខ្លួនឯង — គ្រប់ប្រអប់ × iPhone · iPad + «បញ្ចូលច្រើន» ពិត (`openBatchScanModal()`)
+//   (ក) APK (វីដេអូលើ 2.50.79) ៖ «នៅតែញ៉ាក់ពេល keyboard លោតមក» — hold ចប់ ➜ WebView បង្រួម ប៉ុន្តែ Chromium នៅរាយការណ៍ inset keyboard ចាស់ ៣–៥ ស៊ុម
+//       (visualViewport = WebView បង្រួម − keyboard) ➜ ការតម្រូវច្របាច់ប្រអប់ទៅលើ។ ច្បាប់ ៖ `uiState.keyboardOpen` (WebView បង្រួមសម្រាប់ keyboard) ➜ គ្មានការតម្រូវ ·
+//       ជំហាន ៖ setViewportSize (បង្រួម) + visualViewport នៅ inset ចាស់ ➜ ប្រអប់នៅទីតាំងដដែល (±1px)
+//   (គ) iPhone (វីដេអូលើ 2.50.79) ៖ «ចុចកន្លែងវាយបញ្ចូល Barcode ទំព័រធ្លាក់» — ប្រអប់វាយ Barcode (ទំព័រស្កេន · ក្រៅប្រអប់) ចុចទៅផ្លូវ iOS ដើម។ ច្បាប់ ៖
+//       ប្រអប់នៅពីលើបន្ទាត់ keyboard (ធ្លាប់វាស់ ឬ PAGE_TAP_KEYBOARD_RATIO) ➜ preventDefault + focus({ preventScroll }) · keyboard នឹងបាំងប្រអប់ (ផ្តេក) ➜ iOS ·
+//       iPhone SE · iPhone · Pro Max · ផ្តេក · iPad បញ្ឈរ/ផ្តេក (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)
 //   ទិសផ្ទុយ ៖ មិនមែន iOS standalone (Android) ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
 // វិធី ៖ App ពិត (audit build) · bridge Capacitor ក្លែង (APK) · visualViewport ក្លែង (Chromium គ្មាន keyboard) · setViewportSize = viewport បង្រួម។
 
@@ -153,6 +159,19 @@ const IOS_DEVICES = [
     { label: 'iPad បញ្ឈរ 820×1180', w: 820, h: 1180, kb: 375 }
 ];
 
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+const IPAD_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+
+// ប្រអប់វាយ Barcode (ទំព័រស្កេន · ក្រៅប្រអប់) ៖ catch = ប្រអប់នៅពីលើបន្ទាត់ keyboard ប៉ាន់ (PAGE_TAP_KEYBOARD_RATIO) ➜ ចាប់ · បើមិនដូច្នោះ ➜ iOS (keyboard បាំង ➜ iOS ត្រូវបង្ហាញ)
+const SCANNER_DEVICES = [
+    { label: 'iPhone SE 375×667', w: 375, h: 667, kb: 260, ua: IPHONE_UA, catch: true, byCode: false },
+    { label: 'iPhone 393×852', w: 393, h: 852, kb: 336, ua: IPHONE_UA, catch: true, byCode: false },
+    { label: 'iPhone Pro Max 430×932', w: 430, h: 932, kb: 346, ua: IPHONE_UA, catch: true, byCode: false },
+    { label: 'iPhone ផ្តេក 852×393', w: 852, h: 393, kb: 209, ua: IPHONE_UA, catch: false, byCode: false },
+    { label: 'iPad បញ្ឈរ 820×1180 (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)', w: 820, h: 1180, kb: 375, ua: IPAD_UA, catch: true, byCode: true },
+    { label: 'iPad ផ្តេក 1180×820 (UA កុំព្យូទ័រ)', w: 1180, h: 820, kb: 398, ua: IPAD_UA, catch: false, byCode: true }
+];
+
 (async () => {
     const server = await serve(APP);
     const port = server.address().port;
@@ -170,7 +189,7 @@ const IOS_DEVICES = [
             if (!ready || !kind) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
             const ids = await modalIdsWithFields(page);
             const problems = [];
-            let measured = 0, movedAtStart = 0;
+            let measured = 0, movedAtStart = 0, staleMeasured = 0;
             for (const id of ids) {
                 await page.setViewportSize({ width: dev.w, height: dev.h });
                 await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
@@ -184,16 +203,25 @@ const IOS_DEVICES = [
                 await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                 await settle(page, 160);
                 const hold = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                let stale = null;
+                if (dev.apk) {
+                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    await page.evaluate(() => window.__kb.fire());
+                    await settle(page, 60);
+                    stale = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                }
                 await page.evaluate(() => window.__kb.set(0));
                 await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
                 await page.evaluate(() => window.__kb.fire());
                 await settle(page, 200);
                 const after = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                 measured++;
+                if (stale) staleMeasured++;
                 if (Math.abs(hold.card[0] - base.card[0]) > 1) movedAtStart++;
                 const line = dev.h - dev.kb;
                 const issues = [];
                 if (Math.abs(hold.card[0] - after.card[0]) > 1 || Math.abs(hold.card[1] - after.card[1]) > 1) issues.push('ផ្លាស់ទីពីរដង ' + base.card[0] + ' ➜ ' + hold.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + after.card[1] + ')');
+                if (stale && (Math.abs(stale.card[0] - hold.card[0]) > 1 || Math.abs(stale.card[1] - hold.card[1]) > 1)) issues.push('ស្ទុះពេល WebView បង្រួម (inset keyboard ចាស់) ' + hold.card[0] + ' ➜ ' + stale.card[0] + ' ➜ ' + after.card[0] + ' (បាត ' + hold.card[1] + ' ➜ ' + stale.card[1] + ')');
                 if (hold.card[1] > line + 1) issues.push('បាតកាត ' + hold.card[1] + ' នៅក្រោយ keyboard ' + line);
                 if (hold.card[0] < 0) issues.push('កំពូលកាតផុតអេក្រង់ ' + hold.card[0]);
                 if (hold.field[0] < 0 || hold.field[1] > line + 1) issues.push('ប្រអប់វាយមើលមិនឃើញ [' + hold.field[0] + ',' + hold.field[1] + ']');
@@ -201,9 +229,10 @@ const IOS_DEVICES = [
                 if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
             }
             androidMeasured += measured;
-            check(measured >= 15 && movedAtStart >= Math.floor(measured * 0.6) && problems.length === 0,
-                '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ viewport បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ',
-                JSON.stringify({ measured, movedAtStart, problems: problems.slice(0, 6) }));
+            check(measured >= 15 && movedAtStart >= Math.floor(measured * 0.6) && problems.length === 0 && (!dev.apk || staleMeasured === measured),
+                '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ viewport បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ' +
+                    (dev.apk ? ' · APK ៖ WebView បង្រួមពេល Chromium នៅរាយការណ៍ keyboard (inset ចាស់) ➜ ប្រអប់មិនស្ទុះ' : ''),
+                JSON.stringify({ measured, movedAtStart, staleMeasured, problems: problems.slice(0, 6) }));
             await ctx.close();
         }
         check(androidMeasured >= ANDROID_DEVICES.length * 15, 'ជាន់អប្បបរមា ៖ Android វាស់ ' + androidMeasured + ' ករណី (ឧបករណ៍ ' + ANDROID_DEVICES.length + ')');
@@ -267,6 +296,54 @@ const IOS_DEVICES = [
             check(bat.focused && res.prevented[0] === true && res.focus.length === 1 && res.focus[0].preventScroll && res.focused === 'batchBarcodeInput' && res.scrollY === 0,
                 '⛔ ' + dev.label + ' ៖ «📋 បញ្ចូលច្រើន» ពិត (focus ក្រោយ ១៥០ms · គ្មាន keyboard) ➜ ចុច ➜ ចាប់ · focus({ preventScroll }) ម្តង · ទំព័រមិនរំកិល',
                 JSON.stringify({ bat, res }));
+            await ctx.close();
+        }
+
+        console.log('\n=== (គ) iPhone · iPad (standalone) ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់ (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ iOS ===');
+        for (const dev of SCANNER_DEVICES) {
+            const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG], { userAgent: dev.ua });
+            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function');
+            if (!pageReady) { bad(dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+            await closeAll(page);
+            await page.evaluate(() => switchAppPage('entry'));
+            await settle(page, 400);
+            const at = await page.evaluate(() => {
+                const el = document.getElementById('hwScannerInput');
+                const r = el.getBoundingClientRect();
+                const x = Math.round(r.left + Math.min(40, r.width / 2));
+                const y = Math.round(r.top + r.height / 2);
+                const hit = document.elementFromPoint(x, y) === el;
+                window.__touchEnds = [];
+                window.__focusLog = [];
+                return { x, y, bottom: Math.round(r.bottom), hit, focused: document.activeElement === el, h: window.innerHeight };
+            });
+            if (!at.hit) { bad(dev.label + ' ៖ ប្រអប់វាយ Barcode មិននៅលើអេក្រង់', JSON.stringify(at)); await ctx.close(); continue; }
+            await page.touchscreen.tap(at.x, at.y);
+            await settle(page, 160);
+            const first = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
+            const issues = [];
+            if (at.focused !== dev.byCode) issues.push('focus មុនចុច ' + at.focused);
+            if (dev.catch) {
+                if (first.prevented[0] !== true) issues.push('ចុចមិនត្រូវចាប់ (iOS រំកិលទំព័រ)');
+                if (first.focus.length !== 1 || !first.focus[0].preventScroll || first.focus[0].id !== 'hwScannerInput') issues.push('focus ' + JSON.stringify(first.focus));
+                if (first.focused !== 'hwScannerInput') issues.push('បាត់ focus');
+                if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
+                await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                await settle(page, 160);
+                await page.touchscreen.tap(at.x, at.y);
+                await settle(page, 120);
+                const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
+                if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
+                if (at.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + at.bottom);
+            } else {
+                if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ iOS តែត្រូវចាប់');
+                if (first.focus.some((f) => f.preventScroll)) issues.push('focus ' + JSON.stringify(first.focus));
+                if (at.bottom + 8 <= at.h - dev.kb) issues.push('ប្រអប់នៅពីលើ keyboard ពិត (' + dev.kb + ') ➜ ករណីនេះមិនមែនទិសផ្ទុយ');
+            }
+            check(issues.length === 0,
+                (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
+                    (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ iOS' : 'keyboard នឹងបាំងប្រអប់ ➜ iOS ធ្វើខ្លួនឯង'),
+                JSON.stringify({ at, first, issues }));
             await ctx.close();
         }
 

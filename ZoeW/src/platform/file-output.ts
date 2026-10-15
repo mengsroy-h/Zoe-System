@@ -22,6 +22,8 @@ export function saveTextFile(text: string, filename: string, mimeType: string): 
     return shareNativeFile(filename, utf8ToBase64(text));
 }
 
+export const PRINT_RETURNED_EVENT = 'zoew-print-returned';
+
 export function printCurrentView(jobName: string): Promise<void> | void {
     if (!isNativeApp()) {
         window.print();
@@ -31,14 +33,14 @@ export function printCurrentView(jobName: string): Promise<void> | void {
         .then(async ([{ Printer }, { App }]) => {
             const resumed = await App.addListener('resume', () => {
                 resumed.remove();
-                window.dispatchEvent(new Event('afterprint'));
+                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
             });
             noteAppLockExcuse();
             try {
                 await Printer.printWebView({ name: jobName });
             } catch (e) {
                 resumed.remove();
-                window.dispatchEvent(new Event('afterprint'));
+                window.dispatchEvent(new Event(PRINT_RETURNED_EVENT));
                 throw e;
             }
         });

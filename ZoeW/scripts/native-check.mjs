@@ -232,7 +232,7 @@ await scenario('១. boot លើ Android native', async () => {
     const csvText = csv ? Buffer.from(csv.options.data, 'base64').toString('utf8') : '';
     ok('Export CSV ៖ សរសេរ .csv (UTF-8 អក្សរខ្មែររក្សាដដែល)', !!csv && /[ក-៿]/.test(csvText), csvText.slice(0, 80));
 
-    /* Export PDF ➜ Printer + afterprint ពេល resume */
+    /* Export PDF ➜ Printer ➜ resume (ត្រឡប់ពីផ្ទាំងបោះពុម្ព) ➜ សម្អាត */
     const titleBefore = await page.title();
     await page.click('.header-more-btn');
     await page.click('[data-act="moreMenuExport"]');
@@ -245,7 +245,7 @@ await scenario('១. boot លើ Android native', async () => {
     const locked0 = await page.evaluate(() => document.body.classList.contains('app-locked'));
     await fire(page, 'App', 'resume');
     await page.waitForTimeout(300);
-    ok('Export PDF ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព ➜ afterprint ➜ ចំណងជើងវិញ', (await page.title()) === titleBefore, await page.title());
+    ok('Export PDF ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume) ➜ ចំណងជើងវិញ', (await page.title()) === titleBefore, await page.title());
     ok('Export PDF ៖ គ្មានសោ App ក្លែង (គ្មាន PIN)', locked0 === false);
 
     /* PTR ៖ តំបន់កេះ · ស្រទាប់បើក · ញ័រ (សំណើម្ចាស់គម្រោង) */

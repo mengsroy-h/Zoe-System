@@ -60,7 +60,7 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'databaseHealthLabel', 'healthTenantRow',
     // ⛔ ជួរ License (Firebase) ៖ សុពលភាព Activation Key (ថ្ងៃផុត · ថ្ងៃនៅសល់) · សារមូលហេតុពី `licenseFailureMessage()` ពិត
     'healthKeyValidityText', 'licenseFailureMessage',
-    // ⛔ 🧠 ការណែនាំ (`runHealthCheck()` ហៅ `buildHealthAdvice(rows)` ក្រោយជួរ) — pure · អានជួរដែលវាស់បានប៉ុណ្ណោះ
+    // ⛔ 💡 ការណែនាំ (`runHealthCheck()` ហៅ `buildHealthAdvice(rows)` ក្រោយជួរ) — pure · អានជួរដែលវាស់បានប៉ុណ្ណោះ
     'buildHealthAdvice', 'rowKind', 'detailHas', 'databaseStep', 'licenseStep', 'lookupStep', 'stepFor',
     // ⛔ ជួរ ZTO ៖ អាយុពិតរបស់ Cookie ក្នុង Blob · ជួរ «ចុះហត្ថលេខា» ដែលអត្ថបទផ្ទុយ (`?diag=1` `list.signedMismatch`)
     'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',

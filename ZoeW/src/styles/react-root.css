@@ -715,7 +715,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .batch-scan-input { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: calc(13 * var(--fs-unit)); line-height: 1.5; letter-spacing: 1px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
 .batch-scan-count { min-height: 1.4em; margin: 6px 0 0; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); text-align: left; }
 
-.label-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4mm; --label-phone-max: 30pt; --label-phone-ls: 0.5mm; --label-money-max: 17pt; }
+.label-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4mm; --label-phone-max: 30pt; --label-phone-ls: 0.5mm; --label-money-max: 17pt; --label-code-max: 11pt; --label-code-ls: 0.6mm; }
 .label-sheet.layout-a4-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; --label-phone-max: 38pt; --label-money-max: 20pt; }
 .label-sheet.layout-a4-2 .label-bc { height: 16mm; }
 .label-sheet.layout-single { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -727,7 +727,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .label-sheet.layout-50x30 .label:last-child { break-after: auto; page-break-after: auto; }
 .label-sheet.layout-50x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-50x30 .label-bc { height: 7mm; margin-top: 0.8mm; }
-.label-sheet.layout-50x30 .label-code { font-size: 6.5pt; letter-spacing: 0.3mm; margin-top: 0.3mm; }
+.label-sheet.layout-50x30 .label-code { --label-code-max: 6.5pt; --label-code-ls: 0.3mm; margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
 @page zoeLabel40x30 { size: 40mm 30mm; margin: 1.5mm; }
@@ -736,7 +736,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .label-sheet.layout-40x30 .label:last-child { break-after: auto; page-break-after: auto; }
 .label-sheet.layout-40x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-40x30 .label-bc { height: 6.5mm; margin-top: 0.8mm; }
-.label-sheet.layout-40x30 .label-code { font-size: 5.5pt; letter-spacing: 0.2mm; margin-top: 0.3mm; }
+.label-sheet.layout-40x30 .label-code { --label-code-max: 5.5pt; --label-code-ls: 0.2mm; margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-meta { font-size: 7.5pt; gap: 2.5mm; margin-top: 0.3mm; }
 @page zoeLabel60x40 { size: 60mm 40mm; margin: 2mm; }
@@ -745,7 +745,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .label-sheet.layout-60x40 .label:last-child { break-after: auto; page-break-after: auto; }
 .label-sheet.layout-60x40 .label-phone { line-height: 1.05; }
 .label-sheet.layout-60x40 .label-bc { height: 10mm; margin-top: 1mm; }
-.label-sheet.layout-60x40 .label-code { font-size: 8pt; letter-spacing: 0.4mm; margin-top: 0.4mm; }
+.label-sheet.layout-60x40 .label-code { --label-code-max: 8pt; --label-code-ls: 0.4mm; margin-top: 0.4mm; }
 .label-sheet.layout-60x40 .label-money { margin-top: 0.5mm; }
 .label-sheet.layout-60x40 .label-meta { font-size: 10pt; gap: 4mm; margin-top: 0.5mm; }
 .label-sheet .label { container-type: inline-size; break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
@@ -753,7 +753,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .label-sheet .label-bc { margin: 2mm auto 0; height: 13mm; }
 .label-sheet .label-bc svg { display: block; width: 100%; height: 100%; }
 .label-sheet .label-bc svg rect { fill: #000; }
-.label-sheet .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
+.label-sheet .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--label-code-max); font-size: min(var(--label-code-max), calc((100cqw / var(--label-code-chars, 14) - var(--label-code-ls)) / 0.62)); letter-spacing: var(--label-code-ls); white-space: nowrap; }
 .label-sheet .label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
 .label-sheet .label-money { margin-top: 1mm; font-size: var(--label-money-max); font-size: min(var(--label-money-max), calc(100cqw / (var(--label-money-chars, 20) * 0.62))); font-weight: 800; white-space: nowrap; }
 .label-sheet .label-date { font-variant-numeric: tabular-nums; }

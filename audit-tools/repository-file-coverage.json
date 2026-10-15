@@ -2464,6 +2464,9 @@
     "audit-tools/modal-keyboard-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/modal-keyboard-device-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/function-surface-test.js": {
       "policy": "guard-1"
     },

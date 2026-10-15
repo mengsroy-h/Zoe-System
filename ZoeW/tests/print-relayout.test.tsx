@@ -17,6 +17,7 @@ import { viewState } from '../src/core/view-state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { LABEL_PRINT_OPTIONS_KEY } from '../src/core/storage-keys';
 import { armPdfExportRestore, beginPdfPrint, exportDataAsPDF, restoreAfterPdfExport } from '../src/features/export';
+import { PRINT_RETURNED_EVENT } from '../src/platform/file-output';
 import { openLabelPrintModal, printLabelsFromModal, resetLabelPrint } from '../src/features/label-print';
 import { closeModal } from '../src/ui/modal';
 import { PdfExportPrintArea } from '../src/app/components/PdfExportPrintArea';
@@ -51,6 +52,7 @@ beforeEach(() => {
 afterEach(() => {
     step(() => { closeModal('labelPrintModal'); resetLabelPrint(); restoreAfterPdfExport(); });
     window.removeEventListener('afterprint', armPdfExportRestore);
+    window.removeEventListener(PRINT_RETURNED_EVENT, restoreAfterPdfExport);
     vi.restoreAllMocks();
     unmount();
     dataState.scanHistory = [];
@@ -104,6 +106,18 @@ describe('បោះពុម្ព ៖ ប្តូរក្រដាស (គូ
         expect(labels()).toBe(1);
         userTouch();
         expect(labels()).toBe(0);
+    });
+
+    it('⛔ APK ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព (resume ➜ PRINT_RETURNED_EVENT) ➜ សម្អាតភ្លាម + ចំណងជើងដើម · afterprint ពេលគូរ preview មិនសម្អាត', () => {
+        step(() => openLabelPrintModal({ kind: 'filter' }));
+        step(() => { printLabelsFromModal(); });
+        relayout();
+        relayout();
+        expect(labels()).toBe(3);
+        step(() => window.dispatchEvent(new Event(PRINT_RETURNED_EVENT)));
+        expect(uiState.pdfExportView).toBeNull();
+        expect(labels()).toBe(0);
+        expect(viewState.documentTitle).toBeNull();
     });
 
     it('logout (restoreAfterPdfExport) ➜ សម្អាតភ្លាម · គ្មាន listener សល់', () => {

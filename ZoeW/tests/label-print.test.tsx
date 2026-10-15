@@ -196,7 +196,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         step(() => openLabelPrintModal({ kind: 'filter' }));
         expect(modalIsOpen('labelPrintModal')).toBe(true);
         expect(labelsIn('#labelPrintPreview').length).toBe(0);
-        expect(viewState.labelPrintSummary).toContain('តែកញ្ចប់មិនទាន់យក');
+        expect(viewState.labelPrintSummary).toContain('បង្ហាញតែកញ្ចប់មិនទាន់យក');
         expect((document.querySelector('#labelPrintModal .btn-confirm') as HTMLButtonElement).disabled).toBe(true);
         expect(printLabelsFromModal()).toBe(false);
         step(() => resetLabelPrint());
@@ -204,7 +204,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(viewState.labelPrintTitle).toBe('');
     });
 
-    it('⛔ ខ្សែភ្ជាប់ ៖ MODAL_IDS · AppShell · សកម្មភាព · ម៉ឺនុយ · logout · CSS (.label-phone ≥ 24pt · break-inside · layout-single break-after)', () => {
+    it('⛔ ខ្សែភ្ជាប់ ៖ MODAL_IDS · AppShell · សកម្មភាព · ម៉ឺនុយ · logout · CSS (.label-phone ≥ 24pt · break-inside · layout-single break-after · ស្លាកនៅក្រោម .label-sheet តែប៉ុណ្ណោះ)', () => {
         const root = path.join(__dirname, '..', 'src');
         expect(MODAL_IDS).toContain('labelPrintModal');
         expect(readFileSync(path.join(root, 'app', 'components', 'AppShell.tsx'), 'utf8')).toMatch(/<LabelPrintModal \/>/);
@@ -214,10 +214,11 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(menu).toMatch(/label: '🖨️ បោះពុម្ពស្លាក', action: 'moreMenuPrintItemLabels', args: \[id\]/);
         expect(readFileSync(path.join(root, 'features', 'session.ts'), 'utf8')).toMatch(/resetLabelPrint\(\);/);
         const css = readFileSync(path.join(root, 'styles', 'react-root.css'), 'utf8');
-        const phone = /\.label-phone\s*\{([^}]*)\}/.exec(css);
-        const pt = /font-size:\s*(\d+)pt/.exec(phone![1]);
+        const pt = /\n\.label-sheet\s*\{[^}]*--label-phone-max:\s*(\d+)pt/.exec(css);
         expect(pt && Number(pt[1]) >= 24).toBe(true);
-        expect(/\.label\s*\{[^}]*break-inside:\s*avoid/.test(css)).toBe(true);
+        expect(/\.label-sheet \.label-phone\s*\{[^}]*font-size:\s*min\(var\(--label-phone-max\)/.test(css)).toBe(true);
+        expect(/\.label-sheet \.label\s*\{[^}]*break-inside:\s*avoid/.test(css)).toBe(true);
+        expect(/(^|\n)\.label(-(phone|bc|code|meta|money|date|locker))?(?![\w-])/.test(css)).toBe(false);
         expect(/\.label-sheet\.layout-single \.label\s*\{[^}]*break-after:\s*page/.test(css)).toBe(true);
         expect(/@page zoeLabel50x30\s*\{\s*size:\s*50mm 30mm/.test(css)).toBe(true);
         expect(/\.label-sheet\.layout-50x30 \.label\s*\{[^}]*page:\s*zoeLabel50x30[^}]*break-after:\s*page/.test(css)).toBe(true);

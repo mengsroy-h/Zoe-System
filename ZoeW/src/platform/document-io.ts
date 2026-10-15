@@ -63,28 +63,6 @@ export function injectScript(spec: ScriptSpec): HTMLScriptElement {
     return script;
 }
 
-let hapticSwitch: HTMLLabelElement | null | undefined;
-
-export function iosHapticSwitchTick(): boolean {
-    if (hapticSwitch === undefined) {
-        hapticSwitch = null;
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        if (!('switch' in input)) return false;
-        input.setAttribute('switch', '');
-        input.tabIndex = -1;
-        const label = document.createElement('label');
-        label.className = 'haptic-switch';
-        label.setAttribute('aria-hidden', 'true');
-        label.appendChild(input);
-        document.body.appendChild(label);
-        hapticSwitch = label;
-    }
-    if (!hapticSwitch) return false;
-    hapticSwitch.click();
-    return true;
-}
-
 export function downloadObjectUrl(url: string, filename: string): void {
     const a = document.createElement('a');
     a.href = url;

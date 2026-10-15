@@ -2,7 +2,17 @@ import { Modal } from './Modal';
 import { viewState } from '../../../core/view-state';
 import { onAct } from '../../actions';
 import { useStoreFields } from '../../hooks/useStore';
-import { refTo } from '../../refs';
+import { blurActiveElement, focusField, refTo, type RefName } from '../../refs';
+
+const PHONE_MODAL_FIELDS: RefName[] = ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'];
+
+function phoneModalEnter(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    const next = PHONE_MODAL_FIELDS[PHONE_MODAL_FIELDS.indexOf(e.currentTarget.id as RefName) + 1];
+    if (next) focusField(next);
+    else blurActiveElement();
+}
 
 export function PhoneModal() {
     const v = useStoreFields(viewState, ['modalBarcodeText', 'phoneModalBusy', 'lookupStatus']);
@@ -33,11 +43,13 @@ export function PhoneModal() {
                     aria-live="polite"
                     hidden={!status.text}
                 >{status.text}</div>
-                <input type="tel" id="modalPhoneInput" ref={refTo('modalPhoneInput')} placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList" />
+                <input type="tel" id="modalPhoneInput" ref={refTo('modalPhoneInput')} placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList" enterKeyHint="next" onKeyDown={phoneModalEnter} />
                 <input
                     type="text"
                     id="modalLockerInput"
                     ref={refTo('modalLockerInput')}
+                    enterKeyHint="next"
+                    onKeyDown={phoneModalEnter}
                     placeholder="ទីតាំង Locker (ឧ. A1)"
                     style={{ marginTop: "4px" }}
                 />
@@ -45,6 +57,8 @@ export function PhoneModal() {
                     type="number"
                     id="modalCodInput"
                     ref={refTo('modalCodInput')}
+                    enterKeyHint="next"
+                    onKeyDown={phoneModalEnter}
                     placeholder="តម្លៃ COD ($)"
                     step={0.01}
                     min={0}
@@ -54,6 +68,8 @@ export function PhoneModal() {
                     type="number"
                     id="modalDodInput"
                     ref={refTo('modalDodInput')}
+                    enterKeyHint="done"
+                    onKeyDown={phoneModalEnter}
                     placeholder="តម្លៃ DOD ($)"
                     step={0.01}
                     min={0}

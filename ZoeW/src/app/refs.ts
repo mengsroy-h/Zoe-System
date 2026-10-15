@@ -163,10 +163,20 @@ export function focusField(name: RefName, options?: FocusOptions): void {
     commitNow();
     const el = elementOf(name);
     if (!el) return;
-    el.focus(options);
+    const opts = typeof el.closest === 'function' && el.closest('.modal') ? Object.assign({}, options, { preventScroll: true }) : options;
+    el.focus(opts);
     if (document.activeElement !== el && el.offsetParent === null) {
-        setTimeout(() => { if (el.isConnected) el.focus(options); }, 0);
+        setTimeout(() => { if (el.isConnected) el.focus(opts); }, 0);
     }
+}
+
+export function focusElementWithoutScroll(el: HTMLElement): boolean {
+    const field = el as HTMLInputElement;
+    if (document.activeElement !== el && typeof field.setSelectionRange === 'function' && typeof field.value === 'string') {
+        try { field.setSelectionRange(field.value.length, field.value.length); } catch {}
+    }
+    el.focus({ preventScroll: true });
+    return document.activeElement === el;
 }
 
 export function focusFieldAsIs(name: RefName): void {

@@ -248,5 +248,63 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     ok('បើកប្រអប់ PIN ➜ សម្អាតវាលដែលវាយពីមុន', pinIn.value === '', pinIn.value);
 }
 
+console.log('\n=== ⛔ សកម្មភាពដែលរត់ក្រោយ PIN មិនអាចហៅដោយផ្ទាល់ពីប៊ូតុង (រំលង PIN) ===');
+// ⛔ សំណើម្ចាស់គម្រោង ៖ «តេស្តប្រព័ន្ធសុវត្ថិភាព ក្រែងអាច bypass ឬរំលង modal pin code»។ ប៊ូតុងក្នុង App ហៅសកម្មភាពតាមឈ្មោះ ៖
+//    `onAct("x")`/`act("x")` ➜ `ACTION_REGISTRY` · `data-act` ➜ `ACTION_ALLOWLIST` ➜ ឈ្មោះណាដែលនៅក្នុងបញ្ជីទាំងនោះ ប៊ូតុងណាក៏ហៅបាន។
+//    គោលដៅដែល `requestPinBeforeConfig(target, …)` រត់ក្រោយ PIN ត្រឹមត្រូវ (និង `openConfigModal` ៖ គោលដៅលំនាំដើមពេល target = null)
+//    ត្រូវ **មិននៅក្នុងបញ្ជីទាំងពីរ** — លើកលែងតែវាពិនិត្យខ្លួនឯង (ហៅ `requestPinBeforeConfig(ខ្លួនឯង, …)` ពេលសោនៅជាប់ ៖ ZTO) ។
+//    ដេរីវេពីកូដពិតទាំងសងខាង ៖ គោលដៅពីកន្លែងហៅពិត · បញ្ជីពីកូដ ship ។
+{
+    const regAt = appJs.indexOf('const ACTION_REGISTRY = Object.freeze({');
+    const regNames = [];
+    if (regAt !== -1) {
+        const open = appJs.indexOf('{', regAt);
+        const close = matchBrace(appJs, open, '{', '}');
+        appJs.slice(open + 1, close).split(',').forEach((part) => {
+            const m = /^\s*([A-Za-z_$][\w$]*)\s*(?::|$)/.exec(part);
+            if (m) regNames.push(m[1]);
+        });
+    }
+    const allowAt = appJs.indexOf('const ACTION_ALLOWLIST = [');
+    const allowNames = [];
+    if (allowAt !== -1) {
+        const open = appJs.indexOf('[', allowAt);
+        const close = matchBrace(appJs, open, '[', ']');
+        const re = /["']([A-Za-z_$][\w$]*)["']/g;
+        let m;
+        const body = appJs.slice(open + 1, close);
+        while ((m = re.exec(body))) allowNames.push(m[1]);
+    }
+    const reachable = new Set(regNames.concat(allowNames));
+    ok('ជាន់អប្បបរមា ៖ ឈ្មោះសកម្មភាពដែលប៊ូតុងហៅបាន (ACTION_REGISTRY ∪ ACTION_ALLOWLIST) ≥ ១០០', reachable.size >= 100, reachable.size);
+    const targets = new Set(['openConfigModal']);
+    callSites.forEach((c) => {
+        const t = String(c.args[0] || '').trim();
+        if (/^[A-Za-z_$][\w$]*$/.test(t) && t !== 'null' && t !== 'undefined' && t !== 'targetAction') targets.add(t);
+    });
+    ok('ជាន់អប្បបរមា ៖ គោលដៅក្រោយ PIN ដែលមានឈ្មោះ ≥ ១០', targets.size >= 10, Array.from(targets));
+    const exposed = [];
+    const selfGated = [];
+    targets.forEach((t) => {
+        if (!reachable.has(t)) return;
+        let body = '';
+        try { body = sliceFn(appJs, t); } catch (e) { body = ''; }
+        if (new RegExp('requestPinBeforeConfig\\(\\s*' + t.replace(/\$/g, '\\$') + '\\s*,').test(body)) selfGated.push(t);
+        else exposed.push(t);
+    });
+    ok('⛔ គ្មានគោលដៅក្រោយ PIN ណាដែលប៊ូតុងហៅដោយផ្ទាល់បាន ដោយមិនពិនិត្យ PIN ខ្លួនឯង', exposed.length === 0, { exposed, selfGated });
+    const pinFns = ['verifySecurityPin', 'saveNewSecurityPin', 'cancelPinEntryFlow', 'cancelPinSetupFlow'];
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ប៊ូតុងរបស់ប្រអប់ PIN ខ្លួនឯងនៅក្នុងបញ្ជី (ការស្រង់បញ្ជីពិត)', pinFns.every((n) => reachable.has(n)), pinFns.filter((n) => !reachable.has(n)));
+    const saveBody = (() => { try { return sliceFn(appJs, 'saveNewSecurityPin'); } catch (e) { return ''; } })();
+    const setupOpeners = callArgs(appJs, 'openModalHelper').filter((c) => c.args[0] === "'pinSetupModal'");
+    const guarded = setupOpeners.every((c) => {
+        const fnStart = appJs.lastIndexOf('function ', c.offset);
+        const fnBody = appJs.slice(fnStart, c.offset);
+        return /zoew_security_pin_hash/.test(fnBody) && /if \(!savedPin\)/.test(fnBody);
+    });
+    ok('⛔ ប្រអប់កំណត់ PIN ថ្មីបើកតែពេលគ្មាន PIN ទុក (មិនអាចសរសេរជាន់ PIN ចាស់ដោយមិនស្គាល់វា)', setupOpeners.length >= 2 && guarded, setupOpeners.length);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ saveNewSecurityPin រត់គោលដៅក្រោយកំណត់ PIN (ផ្លូវតែមួយដែលត្រូវការប្រអប់កំណត់)', /pinTargetAction/.test(saveBody));
+}
+
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
 process.exit(fail === 0 ? 0 : 1);

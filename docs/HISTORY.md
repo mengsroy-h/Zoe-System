@@ -45,7 +45,36 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ខ. **Branch `ccr-20e725de-tpecua`** (ពី `main` `7960a90` = PR #315 · **មិនទាន់ merge**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
+0ណ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-cff7ce20-gn6c83`** (ពីក្បាល `203be0b` · **មិនទាន់ merge**) ៖ [2.50.78] តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំអេក្រង់
+    (សំណើម្ចាស់គម្រោង · ផ្នែក ២ A96–A101) ➜ ⚠️ បោះពុម្ពស្លាកពិត · សាកលើ iPhone/Android ពិត (សកម្មភាព ១–៤ របស់ [2.50.78]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឍ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-cff7ce20-gn6c83`** (ពីក្បាល `13a0421` · **មិនទាន់ merge**) ៖ [2.50.77] ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយ និង navbar នៅនឹងកន្លែង ·
+    វាស់គ្រប់ប្រអប់លើទូរស័ព្ទ និង tablet បញ្ឈរ/ផ្តេក (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A95) ➜ ⚠️ សាកលើ iPhone/iPad ពិត (សកម្មភាព ១–៣ របស់ [2.50.77]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឌ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-cff7ce20-gn6c83`** (ពីក្បាល `a7d9b02` · **មិនទាន់ merge**) ៖ [2.50.76] ប្រអប់ + keyboard ➜ ប្រអប់ខ្លីឃើញទាំងមូល ·
+    ប្រអប់វែងប្រើផ្ទៃពេញពីលើ keyboard (រូបថតម្ចាស់គម្រោង · ផ្នែក ២ A94) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.76]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឋ. **Branch `ccr-cff7ce20-gn6c83`** (ពីក្បាល PR #317 `be04280` · **មិនទាន់ merge**) ៖ [2.50.75] CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ (ផ្នែក ២ A91) · toast នៅពីលើ keyboard (A92) ·
+    ការផ្ទៀងផ្ទាត់ PR ឡើងវិញ (A93) ➜ push ចូល branch PR #317 (`ccr-20e725de-tpecua` · ម្ចាស់គម្រោងជ្រើស «Push ចូល PR #317» · fast-forward `be04280..a7d9b02`) ➜
+    ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.75]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ដ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `a5bf0af` · **មិនទាន់ merge**) ៖ [2.50.74] ផ្ទៃក្រោយ keyboard (ពីលើ keyboard) ពណ៌តែមួយ ·
+    តេស្តសុវត្ថិភាពផ្ទាំងចាក់សោ (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A90) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.74]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ញ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `b802db2` · **មិនទាន់ merge**) ៖ [2.50.73] ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លី ·
+    backdrop គ្របពេញ (ពណ៌តែមួយ) · តេស្តសុវត្ថិភាព PIN/Login (សំណើម្ចាស់គម្រោង · ផ្នែក ២ A88–A89) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៤ របស់ [2.50.73]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឈ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `7360f31` · **មិនទាន់ merge**) ៖ [2.50.72] ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ទំព័រមិនរំកិល
+    (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A87) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.72]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ជ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `f5e9bd7` · **មិនទាន់ merge**) ៖ [2.50.71] ប្រអប់ដែលមានកន្លែងវាយរំកិលឡើងនៅពីលើ keyboard
+    (សំណើម្ចាស់គម្រោង · ផ្នែក ២ A86) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.71]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឆ. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `46fe346` · **មិនទាន់ merge**) ៖ [2.50.70] អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រមិនរំកិល
+    (រាយការណ៍ម្ចាស់គម្រោង · ផ្នែក ២ A85) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–៣ របស់ [2.50.70]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ច. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `5fad053` · **មិនទាន់ merge**) ៖ [2.50.69] ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ (សំណើម្ចាស់គម្រោង) ៖
+    keyboard បើក ➜ បញ្ជីលេខដែលស្នើមិនរំកិលទំព័រ (ផ្នែក ២ A83) · ការដោះ snap ភ្លាមក្រោយទាញចុះត្រូវប្រភព WebKit (A84) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.69]) ➜
+    ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ង. **Branch `ccr-20e725de-tpecua` (PR #317) = `ccr-83fa86c5-4um7el`** (ពីក្បាល `1a18a03` · **មិនទាន់ merge**) ៖ [2.50.68] iPhone PWA ៖ keyboard បើក ➜ ទំព័រមិនរំកិល (touch-action · ផ្នែក ២ A81) ·
+    ការផ្អាក snap ក្រោយទាញចុះខ្លី · ម្រាមដៃបញ្ចប់ការផ្អាក (A82) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.68]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ឃ. **Branch `ccr-83fa86c5-4um7el`** (ពីក្បាល PR #317 `9906650` = branch `ccr-20e725de-tpecua` · **មិនទាន់ merge** · មាន commit របស់ PR #317 ទាំងអស់) ៖ [2.50.67] iPhone PWA ៖
+    PTR ចាប់ touchmove ដំបូង (ច្បាប់ WebKit · ផ្នែក ២ A79) · ផ្អាក snap មុន commit ការទាញប្រអប់ស្វែងរកចុះ (re-snap ទៅ `.page-main` · A80) ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.67]) ➜
+    push ចូល branch PR #317 (`ccr-20e725de-tpecua` · ម្ចាស់គម្រោងជ្រើស «Push ចូល PR #317» · fast-forward ពី `9906650`) ➜ Deploy Preview របស់ #317 = 2.50.67 ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0គ. **Branch `ccr-20e725de-tpecua`** (ចាប់ឡើងវិញពី `main` `9272d88` = PR #316 · **មិនទាន់ merge**) ៖ [2.50.66] iPhone PWA ៖ PTR ដូច 2.50.64 (switch haptic ដកចេញ · A77) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ (ផ្នែក ២ A78) ·
+    ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើ ៣២០px ➜ ⚠️ សាកលើ iPhone ពិត (សកម្មភាព ១–២ របស់ [2.50.66]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ខ. **Branch `ccr-20e725de-tpecua` (ជុំមុន)** (ពី `main` `7960a90` = PR #315 · **merge រួចតាម PR #316 · `9272d88` · ម្ចាស់គម្រោង «Merge»**) ៖ [2.50.65] iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard ·
     ទំព័រលែងរំកិលតាមម្រាមដៃ (ផ្នែក ២ A76) · PTR ញ័រតាម `<input switch>` (A77) · 🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន ➜ ⚠️ ត្រូវសាកលើ iPhone ពិត (សកម្មភាព ២ របស់ [2.50.65]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0ក. **Branch `ccr-6afceb2d-utly3m`** (ពី `main` `ef0bf5b` = PR #314 · **merge រួចតាម PR #315 · `7960a90`**) ៖ [2.50.64] Deep audit ជុំទី ៤ ៖ 🧠 ការណែនាំក្នុង 🩺 · toast រស់តាមដំណាក់កាលការសរសេរ · Supabase replay ចូលដំណាក់កាល `recovering` (ផ្នែក ២ «Deep audit ជុំទី ៤» · cache Apps Script Lookup ➜ ៦០ វិ. (template · ⏳ Deploy ដោយដៃ)) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
 0. **Branch `claude/keen-meitner-arph55`** (ពី `main` `5767bc2` = PR #309 · **មិនទាន់ merge**) ៖ [2.50.54] ហាង Supabase ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចពេលបើក App
@@ -171,6 +200,490 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.78] — 2026-10-15 · ZoeW ៖ **តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំអេក្រង់ ➜ ស្លាកបោះពុម្ពសមក្រដាស · ក្រឡាស្ថិតិ · toast ពីលើរបា Tab · Enter ទៅប្រអប់បន្ទាប់**
+
+**ZoeW `2.50.78`** (`zoew-v340` ➜ `zoew-v341`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `react-root.css` · `PdfPrintArea.tsx` (`LabelSheet`) · `PhoneModal.tsx`។
+សំណើម្ចាស់គម្រោង ៖ «សូមតេស្ត app ទាំងមូល ទម្រង់បង្ហាញគ្រប់ទំហំ តាមសកម្មភាពប្រើប្រចាំថ្ងៃជាក់ស្តែង ដោយគំនិតរបស់អ្នក សាកល្បងមើលថាតើវាត្រឹមត្រូវតាមស្តង់ដារ app ទូទៅទេ»។
+តេស្ត ៖ App ពិត (audit build · Firebase ក្លែង · ទិន្នន័យ ៣៩ ជួរ · font Kantumruy Pro/Inter ពិត) × ទំហំ ១៤ (ទូរស័ព្ទ ៥ · ទូរស័ព្ទផ្តេក ២ · iPad ៥ · កុំព្យូទ័រ ២) × ស្ថានភាព ៣៩
+(ទំព័រទិន្នន័យ/ស្កេន/Locker/ដក · ☰ · 🔔 · ម៉ឺនុយ · ប្រអប់ ២៨ · ស្វែងរក · រមូរដល់ចុង) + លំហូរប្រចាំថ្ងៃ (ស្កេន ➜ រក្សាទុក · ស្ទួន · Locker · ដក · បិទ · លុប ➜ ស្តារ) ៖
+គ្មាន scroll ផ្តេក · គ្មានធាតុលើសអេក្រង់ · ប្រអប់ ២៨ សមអេក្រង់ ប៊ូតុងទាំងអស់ចុចដល់ · លំហូរទាំងអស់មានសារ ✅/⚠️ ត្រឹមត្រូវ · គ្មាន error ក្នុង console — ចំណុចខុសស្តង់ដារដែលវាស់ឃើញ ៖
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ក្រឡាស្ថិតិ «កញ្ចប់សរុប (នៅសល់)» · «ស្កេនតាមថ្ងៃ» · «អតិថិជនយក» មានប្រអប់ដាច់ៗ ផ្ទៃស និង padding ៣mm ជុំវិញស្លាក** (គ្រប់អេក្រង់ · ផ្នែក ២ A96)។
+  CSS ស្លាកបោះពុម្ព (2.50.65) ប្រើឈ្មោះ class ទូទៅ `.label` ដែល `span.label` នៃក្រឡាស្ថិតិក៏ប្រើ ➜ ឥឡូវ CSS ស្លាកបោះពុម្ពទាំងអស់នៅក្រោម `.label-sheet` ➜ ស្លាកក្រឡាជាអក្សរតូចធម្មតា។
+- 🐛 **ស្លាកបោះពុម្ព ៖ COD/DOD ត្រូវកាត់លើក្រដាស · លេខទូរស័ព្ទបំបែកបន្ទាត់ · A4 បញ្ឈរលើសក្រដាស** (A97)។ 60×40 ៖ «COD $25.00 · DOD $3.50» (៥៣.៥/៥៣.០mm) ·
+  50×30 ៖ «COD $1234.56 · DOD $245.50» · 40×30 ៖ លុយបត់ ២ បន្ទាត់ ➜ ថ្ងៃ/Locker ហួសបាតស្លាក · លេខ ១២ ខ្ទង់ (+855…) បំបែក · A4 ៣ ជួរឈរ បញ្ឈរ ៖ ជួរឈរទី ៣ ហួសក្រដាស ៣១៦px។
+  ឥឡូវ ស្លាកនីមួយៗជា container (`container-type: inline-size`) ➜ លេខទូរស័ព្ទ និងលុយបង្រួមល្មមទទឹងស្លាក (`--label-phone-chars` · `--label-money-chars` ពី `LabelSheet` ·
+  ទំហំអតិបរមាតាម layout ដដែល) · មួយបន្ទាត់ · ក្រឡាចត្រង្គ A4 `minmax(0, 1fr)` ➜ ស្លាកទទឹងស្មើ មិនលើសក្រដាស។
+- 🐛 **toast បាំងរបា Tab ខាងក្រោម** (ទូរស័ព្ទ · tablet < ៩៩២ · A98)។ toast (រាល់ការស្កេន/រក្សាទុក) នៅបាត ២៤px ➜ ជាន់ស្លាក «📋 ទិន្នន័យ» · «📷 ស្កេន» ➜
+  ឥឡូវ toast នៅពីលើរបា Tab ១២px (ស្តង់ដារ snackbar ពីលើ bottom navigation) · របា Tab លាក់ (រមូរ) / desktop / keyboard បើក ➜ ដូចដើម។
+- 🐛 **ចំនួនរៀលសរុបប្រចាំថ្ងៃ ៖ «៛» ធ្លាក់ទៅបន្ទាត់ថ្មីម្នាក់ឯង** (៣២០ · iPad · ១២៨០ · A99) ➜ «61,203,160 ៛» នៅបន្ទាត់តែមួយ។
+- ✨ **ប្រអប់ស្កេន ៖ Enter ទៅប្រអប់បន្ទាប់** (A100)។ លេខទូរស័ព្ទ ➜ Locker ➜ COD ➜ DOD (`enterKeyHint` next · DOD done ➜ បិទ keyboard) ⛔ Enter មិនរក្សាទុក
+  (ម៉ាស៊ីនស្កេនផ្ញើ Enter ក្រោយ Barcode ➜ ការស្កេនខុសប្រអប់មិនក្លាយជាលេខ/លុយដែលរក្សាទុក)។ ✨ ✖ បិទ (ផ្ទាំង ☰ · 🔔 · ប្រអប់ស្កេន · ២៨px) មានផ្ទៃចុច ៤៤×៤៤ (រូបរាងដដែល)។
+  ⛔ ☰ · 🔔 ក្នុង navbar មិនពង្រីក ៖ Chromium (touch adjustment) បញ្ជូនការចុចក្រោម navbar ទៅប៊ូតុង ➜ PTR មិនចាប់ផ្តើម (ផ្នែក ២ A101)។
+
+#### អ្នកយាម
+
+- `layout-check` +៤៣ ៖ ក្រឡាស្ថិតិគ្មាន CSS ស្លាកជ្រាប (ទំហំ ៨ · ទិសផ្ទុយ ៖ ស្លាកក្នុង `.label-sheet` នៅមានគែម) · «៛» មិនធ្លាក់ម្នាក់ឯង (Range តួលេខ ⟷ «៛») ·
+  `toastTabbarLayout` (៥ ទំហំ · `chrome-hidden` · desktop) · `labelPrintFit` (`LabelSheet` ពិត · media print · ៨ ទំហំលុយ × ៦ layout × A4 ផ្តេក/បញ្ឈរ · font 'Liberation Sans') ·
+  `tapTargetLayout` (elementFromPoint គែម ±២១px · អង្កត់ទ្រូង ±១៥px · ទិសផ្ទុយ ៖ ☰ · 🔔 មិនពង្រីកចុះក្រោម · មិនលួចការចុចធាតុផ្សេង) · `phoneModalEnterNext` — លើ `203be0b` FAIL ២២ ➜ ក្រោយកែ ២១៨/២១៨។
+- `modal-keyboard-test` ៖ ទីតាំងដើមរបស់ toast (keyboard បិទ) = ពីលើរបា Tab ពេលវាបង្ហាញ · `ZoeW/tests/label-print.test.tsx` ៖ CSS ស្លាកនៅក្រោម `.label-sheet` តែប៉ុណ្ណោះ (លើ CSS ចាស់ FAIL)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **បោះពុម្ពស្លាកពិត** (50×30 · 60×40 · A4) ៖ កញ្ចប់មានទាំង COD និង DOD ➜ ចំនួនលុយពេញក្នុងស្លាក · លេខទូរស័ព្ទមួយបន្ទាត់ · A4 បញ្ឈរ ៣ ជួរឈរ មិនកាត់។
+2. **iPhone · Android** ៖ ក្រឡាស្ថិតិ ៣ ជាអក្សរធម្មតា · ស្កេន ➜ toast នៅពីលើរបា «ទិន្នន័យ · ស្កេន»។
+3. **Android/កុំព្យូទ័រ** ៖ ប្រអប់ស្កេន ➜ វាយលេខ + Enter ➜ ទៅ Locker ➜ COD ➜ DOD · Enter លើ DOD មិនរក្សាទុក (ចុច «យល់ព្រម»)។
+4. សកម្មភាពរបស់ [2.50.67]–[2.50.77] នៅដដែល។
+
+---
+
+### [2.50.77] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយ និង navbar នៅនឹងកន្លែង · វាស់គ្រប់ប្រអប់លើទូរស័ព្ទ និង tablet បញ្ឈរ/ផ្តេក**
+
+**ZoeW `2.50.77`** (`zoew-v339` ➜ `zoew-v340`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `refs.ts` (`focusField()`) · `ios-viewport.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង ៖ «📋 បញ្ចូលច្រើន ពេលបើក keyboard ពេលខ្លះ ផ្ទៃ background រអិលទៅលើ បាត់ navbar ដូចក្នុងរូប · សូមពិនិត្យ វាស់គ្រប់ modal អោយត្រូវស្តង់ដារ
+គ្រប់ទំហំអេក្រង់ រួមទាំង tablet ផ្តេក ឬ បញ្ឈរ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ប្រអប់ + keyboard ➜ ទំព័រខាងក្រោយរអិលឡើង · navbar បាត់ (ពេលខ្លះ)** (ផ្នែក ២ A95)។ `openBatchScanModal()` focus ប្រអប់វាយ ១៥០ms ក្រោយចុច (សម្រាប់ម៉ាស៊ីនស្កេន)
+  ដោយ `focusField()` គ្មាន `preventScroll` ➜ ពេល iOS បើក keyboard (មិនមែនរាល់ដង ៖ focus ក្នុង `setTimeout`) វារំកិល document ដើម្បីបង្ហាញប្រអប់វាយ ➜ navbar ចេញពីអេក្រង់ ·
+  ប្រអប់កែលេខ · លេខទូរស័ព្ទក្រោយស្កេន · Activate · ចូលប្រព័ន្ធ (ចុះឈ្មោះ · ប្តូរពាក្យសម្ងាត់) focus ដោយកូដដូចគ្នា · ការការពារ «document ត្រឡប់ ០» មានតែពេលស្វែងរក។ ឥឡូវ ៖
+  `focusField()` បន្ថែម `preventScroll` ជានិច្ចលើប្រអប់វាយក្នុង `.modal` (ប្រអប់តម្រូវខ្លួនពីលើ keyboard ដោយខ្លួនឯង) · ខណៈប្រអប់បើកលើ iPhone standalone document រំកិល ➜
+  ត្រឡប់ ០ (`restoreIOSDocumentScroll()` ដូចពេលស្វែងរក) · Android/web មិនប្រែ។
+- 🐛 **ទូរស័ព្ទផ្តេក ៖ «នាំចូល Excel ទៅ Sheet» + keyboard ➜ ផ្ទៃរមូរខាងក្នុងនៅ ៤px · ប្រអប់វាយមើលមិនឃើញ** (A95)។ កាត flex (`.si-modal-content` ៖ ក្បាល · ផ្ទៃរមូរ · ប៊ូតុង)
+  ក្នុងកម្ពស់ ១៧០px ពីលើ keyboard ➜ ក្បាល និងប៊ូតុងយកស្ទើរទាំងអស់។ ឥឡូវ ពេលតម្រូវពីលើ keyboard (`.modal-kb`) កាតនោះជាអ្នករមូរតែមួយ (`display: block`) ➜ ប្រអប់វាយរមូរមកមើលឃើញ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` ៖ ទំហំ ៧ (ទូរស័ព្ទ ៤ · ទូរស័ព្ទផ្តេក 844×390 · iPad បញ្ឈរ 820×1180 · iPad ផ្តេក 1180×820 + status bar ក្លែង) × គ្រប់ប្រអប់វាយ (៣៤) · (ក) `focusField()` លើគ្រប់ប្រអប់វាយ (ref)
+  ក្នុងគ្រប់ប្រអប់ និង `openBatchScanModal()` ពិត ➜ `preventScroll` · (ខ) document រំកិល ២២០px ខណៈប្រអប់បើក ➜ ០ (iOS) · គ្មានប្រអប់ / Android ➜ មិនប៉ះ — លើ `13a0421` FAIL ៤
+  (ទូរស័ព្ទផ្តេក `sheetImportModal` · (ក) ៣៤ ករណី + «បញ្ចូលច្រើន» · (ខ) ២២០) ➜ ក្រោយកែ ៥៣/៥៣។
+- `ZoeW/tests/modal-keyboard.test.tsx` +២ (`focusField()` ក្នុង/ក្រៅប្រអប់ · `openBatchScanModal()` ក្រោយ ១៥០ms) · `ZoeW/tests/ios-search-viewport.test.ts` +១ (ប្រអប់បើក ➜ ០ · Android ➜ មិនប៉ះ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទំព័រស្កេន ➜ «📋 បញ្ចូលច្រើន» (ច្រើនដង) ➜ keyboard បើក ➜ navbar នៅលើអេក្រង់ជានិច្ច · ទំព័រខាងក្រោយមិនរអិល · កែលេខ · ចូលប្រព័ន្ធ ដូចគ្នា។
+2. **iPad** (បញ្ឈរ · ផ្តេក) និង **iPhone ផ្តេក** ៖ ប្រអប់ PIN · «API ស្វែងរកអតិថិជន» · «នាំចូល Excel ទៅ Sheet» ➜ ចុចកន្លែងវាយ ➜ កន្លែងវាយមើលឃើញពីលើ keyboard · ប្រអប់មិនផុតអេក្រង់។
+3. **Android** ៖ ដូចដើម។ សកម្មភាពរបស់ [2.50.67]–[2.50.76] នៅដដែល។
+
+---
+
+### [2.50.76] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់ខ្លីឃើញទាំងមូល · ប្រអប់វែងប្រើផ្ទៃពេញពីលើ keyboard** (រូបថត iPhone ម្ចាស់គម្រោង)
+
+**ZoeW `2.50.76`** (`zoew-v338` ➜ `zoew-v339`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `react-root.css` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ២ លើ 2.50.75) ៖ ប្រអប់ PIN ➜ ប៊ូតុង «ផ្ទៀងផ្ទាត់ · បោះបង់» ត្រូវកាត់ពាក់កណ្តាល · «📋 បញ្ចូលច្រើន» ➜ ចំណងជើងត្រូវកាត់ ខណៈផ្ទៃពីលើកាតទំនេរ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ប្រអប់ខ្លីត្រូវកាត់ ទោះផ្ទៃពីលើ keyboard គ្រប់គ្រាន់** (ផ្នែក ២ A94)។ [2.50.73] រក្សាកំពូលកាតនៅដដែល (ដើម្បីកុំឲ្យប្រអប់វែងផុតអេក្រង់) ហើយកាត់តែបាត ➜ ប្រអប់
+  PIN (២២៨px) ត្រូវកាត់មក ១៨០px (ប៊ូតុងបាត់) ខណៈផ្ទៃពីលើ keyboard មាន ៣៨៩px · «បញ្ចូលច្រើន» (៤១០px) ត្រូវកាត់មក ២២៣px ហើយរមូរលាក់ចំណងជើង។ ឥឡូវ ៖
+  ប្រអប់ដែលល្មមផ្ទៃពីលើ keyboard ➜ ឡើងតែល្មមឲ្យបាតត្រឹម keyboard (គម្លាត ៨px) ➜ ឃើញទាំងមូល · ប្រអប់វែងជាងផ្ទៃនោះ ➜ កំពូលនៅកំពូលផ្ទៃមើលឃើញ
+  (ក្រោម status bar ៖ `--modal-safe-top` = `env(safe-area-inset-top)` + ៨px · ឬ padding ១២px) ហើយរមូរក្នុងខ្លួន ⛔ មិនដែលផុតអេក្រង់ (ការព្រួយបារម្ភរបស់ [2.50.73]
+  រក្សាទុក) · ប្រអប់ដែលនៅពីលើ keyboard ស្រាប់ ➜ មិនប្តូរ · ផ្ទៃមើលឃើញរំកិល (`offsetTop`) ➜ ប្រអប់ខ្លីនៅទីតាំងលើអេក្រង់ដដែល។ ផ្លូវ «លើកកំពូល» (`raised` ·
+  `focusedModalFieldClipped()` · ជាន់ ១៨០px) ដកចេញ ព្រោះច្បាប់ថ្មីប្រើផ្ទៃពេញរួចហើយ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` ៖ ច្បាប់ទីតាំងថ្មី (ប្រអប់ខ្លី ៖ មិនកាត់ · កំពូល = បន្ទាត់ keyboard − កម្ពស់ · ប្រអប់វែង ៖ កំពូល = កំពូលផ្ទៃមើលឃើញ · បាតដល់ keyboard · គ្រប់ករណី ៖ មិនក្រោម status bar) ·
+  ទំហំទី ៤ iPhone 393×852 · keyboard ៤០០ (ដូចរូបថត) + status bar ក្លែង ៤៧px · «API ស្វែងរកអតិថិជន» នៅកំពូលផ្ទៃមើលឃើញគ្រប់ទំហំ · ផ្លូវទាំង ២ ត្រូវរត់ (≥ ១០ ម្នាក់) —
+  លើ `a7d9b02` FAIL ៩ (pinModal ៖ «ល្មមផ្ទៃ ៣៨៩ ≥ ២២៨» តែកាត់ · ផ្ទៃរំកិល · ប្តូរប្រអប់វាយ · បើកប្រអប់ខណៈ keyboard បើក) ➜ ក្រោយកែ ៤៣/៤៣។
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ `modalKeyboardFitFor()` (ប្រអប់ខ្លីឡើងល្មម · ប្រអប់វែងនៅកំពូលផ្ទៃ · `safe` · ផ្ទៃរំកិល · តម្លៃខុស) · DOM ៖ ករណីរូបថត 393×852 + `--modal-safe-top` ·
+  ខ្សែភ្ជាប់ CSS `@property --modal-safe-top` — ២៤/២៤។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ☰ ➜ Config (PIN) ➜ ចុចកន្លែងវាយ PIN ➜ ប្រអប់ឡើងពីលើ keyboard ទាំងមូល (ចំណងជើង · កន្លែងវាយ · ប៊ូតុង «ផ្ទៀងផ្ទាត់ · បោះបង់» ឃើញពេញ) · «📋 បញ្ចូលច្រើន»
+   ➜ ចុចប្រអប់វាយ ➜ ចំណងជើងនៅក្រោមរបារស្ថានភាព · កន្លែងវាយមើលឃើញ · រមូរក្នុងប្រអប់ដើម្បីឃើញប៊ូតុង · «API ស្វែងរកអតិថិជន» ➜ ប្រអប់មិនផុតអេក្រង់។
+2. **Android** (APK) ៖ ប្រអប់ + keyboard ដូចដើម · Chrome/PWA ៖ ដូច iPhone។
+3. សកម្មភាពរបស់ [2.50.67]–[2.50.75] នៅដដែល (សាក iPhone ពិតមុន merge)។
+
+---
+
+### [2.50.75] — 2026-10-15 · ZoeW ៖ **CI របស់ PR #317 ធ្លាក់ ៣ ➜ កែ · toast នៅពីលើ keyboard (ផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)**
+
+**ZoeW `2.50.75`** (`zoew-v337` ➜ `zoew-v338`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «PR317 CI fail សូមផ្ទៀងផ្ទាត់ការងារក្នុង PR ឡើងវិញទាំងអស់ ក្រែងមានចន្លោះឬមុខងារខ្លះខុសស្តង់ដារ សូមកែសម្រួលអោយដំណើរការដូច app ស្តង់ដារទូទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **CI របស់ PR #317 (`be04280`) ធ្លាក់ ៣ ផ្នែក** (ផ្នែក ២ A91) ៖ ផ្នែក ២/៤ `zoew-suite-test` (`npm run lint` ៖ `no-useless-assignment` លើ `caret` ក្នុង
+  `ZoeW/tests/modal-keyboard.test.tsx`) · ផ្នែក ៣/៤ `function-surface-test` (top-level `touchById` ប្រកាស ២ ដង ៖ `ios-viewport.ts` · `modal-keyboard.ts`) · ផ្នែក ៤/៤
+  `code-duplication-test` (តួ `touchById` ១៤០ តួ + ប្លុករូបរាងដូចគ្នា ៣៤៨ តួ ៖ ការពិនិត្យការចុច ម្រាមដៃ · គម្លាត · ពេល)។ ឥឡូវការពិនិត្យការចុចរស់នៅកន្លែងតែមួយ
+  `tapEndedInPlace()` (`ios-viewport.ts`) ដែលប្រអប់ស្វែងរក និងប្រអប់ (modal) ប្រើរួមគ្នា — ឥរិយាបថដដែល (`touchById` ដដែលទ្រាំ `changedTouches` មានធាតុ `null`)។
+- 🐛 **iPhone ៖ toast នៅក្រោយ keyboard** (A92)។ iOS មិនបង្រួម layout viewport ពេល keyboard បើក ➜ `.toast-container` (fixed · បាត ២៤px) នៅក្រោយ keyboard ➜ ប៊ូតុងក្នុងប្រអប់
+  (keyboard នៅបើក ព្រោះប៊ូតុងមិនយក focus លើ iOS) ហាក់ដូចជាមិនដំណើរការ ៖ «▶️ ចាប់ផ្តើម» ក្នុង «📋 បញ្ចូលច្រើន» ពេលទទេ («⚠️ សូមវាយ ឬស្កេន Barcode…») · «🧪 សាកល្បង» ក្នុង
+  «API ស្វែងរកអតិថិជន» («⏳ កំពុងសាកល្បង…») · សារកូដអញ្ជើញក្នុងប្រអប់ចូល · Barcode ស្ទួនពេលវាយក្នុង `hwScannerInput`។ ឥឡូវ `measureKeyboardCover()` (visualViewport
+  `resize`/`scroll` · មានឬគ្មានប្រអប់) ➜ `uiState.keyboardCover` (layout px ក្រោមផ្ទៃមើលឃើញ · តិចជាង `KEYBOARD_MIN_INSET_PX` ➜ ០ · APK ➜ ០) ➜ `--keyboard-cover` ➜
+  `.toast-container` `bottom: 24px + max(safe-area, cover)` ➜ toast នៅពីលើ keyboard ទាំងពេល iOS រំកិល `offsetTop` និងនៅខាងលើប្រអប់ · keyboard បិទ ➜ បាត ២៤px ដូចដើម ·
+  Android Chrome/PWA (keyboard បង្រួមតែ visual viewport) ទទួលដូចគ្នា។
+- 🔎 **ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ** (A93) ៖ កូដដែលប្តូរក្នុង PR (`ios-viewport.ts` · `modal-keyboard.ts` · `Modal.tsx` · `DocumentEffects.tsx` · `refs.ts` · `react-root.css` ·
+  `pull-to-refresh.ts` · `haptics.ts` · ស្លាក/ប៊ូតុង/ផ្ទាំងបោះពុម្ព) អានម្តងមួយៗ ➜ ចន្លោះដែលវាស់ឃើញតែ A92 · សម្មតិកម្មដែលវាស់ហើយបដិសេធ ៖ បង្វិលអេក្រង់ខណៈ keyboard បើក (កាតនៅក្នុងផ្ទៃមើលឃើញ) ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` +៥ ៖ toast ពីលើ keyboard (ទំព័រ · ប្រអប់ ៣ · រំកិល ០/១៤០ · ទំហំ ២ ៖ ១៦ ករណី · `elementFromPoint` ➜ toast នៅខាងលើប្រអប់) · ទិសផ្ទុយ keyboard បិទ (បាត ២៤px ·
+  ទំហំ ២) · APK (`--keyboard-cover` ០ · បាត ២៤px នៃ viewport ដែលបង្រួម) · គំរូអាចធ្លាក់ (ទីតាំងដើមនៅក្រោយ keyboard ១៦/១៦) — លើ `be04280` toast ១៦/១៦ នៅ ៧៩០–៨២០ ក្រោមផ្ទៃមើលឃើញ
+  (៥០៨ · ៦៤៨ ពេលរំកិល) ➜ FAIL ➜ ក្រោយកែ ៤០/៤០។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ `keyboardCover` · `--keyboard-cover` (៣៣៦ · ១៩៦ ពេលរំកិល ១៤០ · ០) · ប្រអប់ + keyboard · ទិសផ្ទុយ (គម្លាតតូច · APK · NaN/០/អវិជ្ជមាន/Infinity ·
+  គ្មាន visualViewport) · dispose ➜ ០ · listen ម្តងទៀតវាស់ភ្លាម · ខ្សែភ្ជាប់ CSS — ២៤/២៤។
+- CI ៖ `npm run lint` ស្អាត · `function-surface-test` ២៧/២៧ · `code-duplication-test` ១៤/១៤ (លើ `be04280` ១ FAIL · ២ FAIL)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ «📋 បញ្ចូលច្រើន» ➜ ចុចប្រអប់វាយ (keyboard បើក) ➜ លុបអក្សរទាំងអស់ ➜ «▶️ ចាប់ផ្តើម» ➜ សារ «⚠️ សូមវាយ ឬស្កេន Barcode…» លេចពីលើ keyboard ·
+   «API ស្វែងរកអតិថិជន» ➜ ចុចកន្លែងវាយ ➜ «🧪 សាកល្បង» ➜ សារ «⏳ កំពុងសាកល្បង…» ពីលើ keyboard · បិទ keyboard ➜ សារនៅខាងក្រោមអេក្រង់។
+2. **Android** ៖ APK ➜ toast នៅខាងក្រោមពីលើ keyboard (មិនប្រែ) · Chrome/PWA ➜ toast ពីលើ keyboard។
+3. សកម្មភាពរបស់ [2.50.67]–[2.50.74] នៅដដែល (សាក iPhone ពិតមុន merge)។
+
+---
+
+### [2.50.74] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ផ្ទៃក្រោយ keyboard ពណ៌តែមួយ · តេស្តសុវត្ថិភាពផ្ទាំងចាក់សោ**
+
+**ZoeW `2.50.74`** (`zoew-v336` ➜ `zoew-v337`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `react-root.css` · `DocumentEffects.tsx` · `guide.html`។
+រាយការណ៍ម្ចាស់គម្រោង ៖ «ផ្ទៃពីសរថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នាទៀត សូមសម្រួល · រំកិល background លែងបានហើយ ok តែនៅទើសភ្នែកកន្លែងសរ · បន្ទាប់ពីកែរួចសូមតេស្តសុវត្ថិភាព
+ក្រែងអាច bypass ឬរំលង modal pin code និង login»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **keyboard របស់ iPhone ថ្លា ➜ អ្វីនៅក្រោយវាលេចមកជាពណ៌ច្រើន** (ផ្នែក ២ A90)។ [2.50.73] ផ្ទៃងងឹតគ្របក្រោយ keyboard រួច ប៉ុន្តែវាថ្លា ៦០% ➜ កាត · ប៊ូតុង · របារ tab
+  ខាងក្រោមលេចតាមពណ៌ផ្សេងៗ (rgb ៨,១៤,២៥ ដល់ ១១១,១១៦,១២៧)។ ឥឡូវ ខណៈប្រអប់កាន់ keyboard (`body.modal-keyboard`) `.modal::after` ជាស្រទាប់ **ស្រអាប់** (ពណ៌ផ្ទៃងងឹតលើ `--body-bg`)
+  ពីបន្ទាត់ keyboard (`--modal-kb-line` = `offsetTop` + កម្ពស់ផ្ទៃមើលឃើញ) ចុះក្រោមរហូតហួសការរំកិល + safe-area ➜ keyboard និងរបារពីលើវាឃើញពណ៌តែមួយ · កាតប្រអប់ឈប់ពីលើបន្ទាត់នោះ ៨px
+  ជានិច្ច ➜ ស្រទាប់មិនបាំងអ្វីដែលមើលឃើញ · keyboard បិទ ➜ ដូចដើម · APK មិនប្រែ។
+- 🔒 **តេស្តសុវត្ថិភាពបន្ថែម** (A90) ៖ ផ្ទាំងចាក់សោ App ៖ គ្រប់ចំណុចលើអេក្រង់ (keyboard បិទ/បើក/រំកិល) ជារបស់ផ្ទាំងចាក់សោ · ចុចជ្រុង/ចំហៀង/ក្រោម · Escape · PIN ខុស ➜ នៅចាក់សោ ·
+  PIN ត្រូវ ➜ ដោះ · ប្រអប់ចូល · Activate · PIN · កំណត់ PIN ដូច [2.50.73] (ក្រឡា · noDismiss · Escape · PIN ខុស/ត្រូវ) · `pin-prompt-test` (គោលដៅក្រោយ PIN មិនអាចហៅពីប៊ូតុង)។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` +២ ៖ **រូបថតពិត** ផ្ទៃក្រោយ keyboard (ប្រអប់ ៥ · ទំព័រទិន្នន័យ/ស្កេន · រំកិល ០/១៤០ · ទំហំ ២ ៖ ២៦ ករណី) ➜ គម្លាតពណ៌ ≤ ៣ · ផ្ទាំងចាក់សោ App (ក្រឡា · ចុច ·
+  Escape · PIN ខុស/ត្រូវ) — លើ 2.50.73 ៤០/៤០ ពណ៌ច្រើន (គម្លាត ១០២–១០៣ · មុនបង្រួមមក ២៦ ករណី) ➜ ៣៥/៣៥។ `backdropFull` អានទីតាំង `::after` ពិត (top + height)។
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ `--modal-kb-line` (៥០៨ · ៦២៨ ពេលរំកិល · `100%` ពេលបិទ) · ខ្សែភ្ជាប់ CSS ថ្មី — ២០/២០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ បើកប្រអប់ (PIN · API ស្វែងរកអតិថិជន · កែលេខ · «📋 បញ្ចូលច្រើន») ➜ ចុចកន្លែងវាយ ➜ keyboard និងរបារពីលើវា (ផ្ទៃថ្លា) ពណ៌តែមួយ ទាំងទំព័រទិន្នន័យ និងទំព័រស្កេន ·
+   ប្រអប់នៅកន្លែងដដែល · អូសផ្ទៃខាងក្រោយមិនរំកិល។
+2. **iPhone PWA** ៖ បើក «ចាក់សោពេលបើក App» ➜ ចេញ/ចូល App ➜ ផ្ទាំងចាក់សោ ➜ ចុចកន្លែងវាយ PIN ➜ ចុចកន្លែងផ្សេង · PIN ខុស ➜ នៅចាក់សោ · PIN ត្រូវ ➜ ដោះ។
+3. **Android** (APK · PWA) ៖ ប្រអប់ + keyboard ➜ ធម្មតា (keyboard មិនថ្លា ➜ មិនប្រែ)។
+
+---
+
+### [2.50.73] — 2026-10-15 · ZoeW ៖ **ប្រអប់ + keyboard ➜ ប្រអប់នៅកន្លែងដដែល មានតែបាតខ្លីត្រឹម keyboard · backdrop គ្របពេញ · តេស្តសុវត្ថិភាព PIN/Login**
+
+**ZoeW `2.50.73`** (`zoew-v335` ➜ `zoew-v336`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `Modal.tsx` · `refs.ts` (`focusElementWithoutScroll`) · `state.ts` · `DocumentEffects.tsx` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង (លើ 2.50.72) ៖ «កុំអោយរំកិលឡើងទាំងមូលអី ព្រោះ modal ខ្លះវែងអាចផុត ឧទាហរណ៍ modal "API ស្វែងរកអតិថិជន" អោយរំកិលកុំអោយបាំងតែកន្លែងបញ្ចូលអក្សរឬលេខបានហើយ ·
+តេស្តមើលផងទាំង ios android អោយហ្មត់ចត់ · បន្ទាប់ពីកែរួចសូមតេស្តប្រព័ន្ធសុវត្ថិភាពផង ក្រែងអាច bypass ឬរំលង modal pin code និង login · ផ្ទៃពីសរថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នា»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **ប្រអប់ + keyboard ➜ ប្រអប់ទាំងមូលរំកិលឡើង (ប្រអប់វែងផុតអេក្រង់) · ពីលើ keyboard ពណ៌ពីរ** (ផ្នែក ២ A88)។ [2.50.71] បង្រួម `.modal` ទាំងមូលឲ្យស្មើផ្ទៃមើលឃើញ ➜ កាតចុះមក
+  កណ្តាលផ្ទៃនោះ (PIN ៖ កំពូល ៣០៨ ➜ ១៤០) ហើយផ្ទៃងងឹតឈប់ត្រឹម keyboard ➜ ក្រោយ keyboard ថ្លាជាទំព័រ (កាត · ប៊ូតុង) ➜ ពណ៌ពីរ។ ឥឡូវ ៖ `.modal` ពេញ layout viewport ជានិច្ច ហើយ `::after`
+  លាតចុះក្រោមតាមការរំកិល (`--modal-kb-pan`) + `env(safe-area-inset-bottom)` ➜ ក្រោយ keyboard ជាផ្ទៃងងឹតតែមួយ · មានតែប្រអប់ខាងលើគេដែលបាតនៅក្រោយ keyboard ទទួល `.modal-kb`
+  (`modalKeyboardFitFor()` ➜ `uiState.modalKeyboardFit` ➜ `Modal.tsx`) ៖ កំពូល · ឆ្វេង · ស្តាំ **ដដែលលើអេក្រង់** (វាស់ពេលមិនទាន់តម្រូវ · គ្មាន transform · iOS រំកិល `offsetTop` ➜ បូកវា) ·
+  មានតែបាតខ្លីមកត្រឹម keyboard (គម្លាត `MODAL_KEYBOARD_GAP_PX` ៨px) ហើយរមូរក្នុងខ្លួន ➜ កន្លែងវាយមើលឃើញ (គម្លាត ≤ ១២px ៖ អ្នករមូរតូចបង្រួមគម្លាត) · ប្រអប់ដែលនៅពីលើ keyboard រួច ➜ មិនប៉ះ ·
+  ផ្ទៃនៅសល់ < `MODAL_KEYBOARD_MIN_VISIBLE_PX` (១៨០px) ឬអ្នករមូរខាងក្នុងទាបជាងកន្លែងវាយ ➜ ទើបលើកកំពូល · បើកប្រអប់ខណៈ keyboard បើក ➜ វាស់ក្រោយ React គូរ (microtask) ·
+  ជាន់ប្រអប់ ➜ តម្រូវតែប្រអប់ខាងលើគេ · APK (WebView បង្រួម) ➜ មិនប្តូរប្លង់ តែ `resize` រមូរកន្លែងវាយមកមើលឃើញ។
+- ✨ **iPhone (App លើ Home Screen) ៖ ចុចកន្លែងវាយក្នុងប្រអប់ ➜ keyboard បើកដោយទំព័រមិនរំកិល** ៖ ការចុច (មិនអូស · មិនសង្កត់យូរ · ម្រាមដៃមួយ) លើកន្លែងវាយដែលមិនទាន់ focus
+  ➜ `touchend` `preventDefault()` + `focusElementWithoutScroll()` (caret នៅចុងអត្ថបទ · `focus({ preventScroll: true })`) ➜ iOS មិនរំកិលទំព័រទាំងមូលដើម្បីបង្ហាញវា (ប្រអប់រមូរខ្លួនឯង) ·
+  កន្លែងវាយដែល focus រួច · date · checkbox · readonly · Android/web ➜ ធម្មតា · focus មិនជាប់ ➜ ការចុចបន្ទាប់ទុកឲ្យ iOS។
+- 🔒 **តេស្តសុវត្ថិភាព PIN/Login** (ផ្នែក ២ A89) ៖ ប្រអប់ចូល · Activate · PIN · កំណត់ PIN ៖ គ្រប់ចំណុចលើអេក្រង់ (ក្រឡា ២៤px · keyboard បិទ/បើក/រំកិល) ជារបស់ប្រអប់ ·
+  ប្រអប់ចូល/Activate មិនបិទដោយការចុចផ្ទៃងងឹត ឬ Escape · ការបោះបង់ PIN មិនរត់សកម្មភាព · PIN ខុសមិនរត់ · PIN ត្រូវរត់ម្តង · គ្មានសកម្មភាពក្រោយ PIN ណាដែលប៊ូតុងហៅដោយផ្ទាល់បាន ·
+  ប្រអប់កំណត់ PIN បើកតែពេលគ្មាន PIN ទុក។ ⚠️ លើ [2.50.71]–[2.50.72] (មិនដែលនៅ `main`) ផ្ទៃក្រោយ keyboard គ្មានផ្ទៃងងឹត ➜ ទំព័រខាងក្រោយប្រអប់ចូល/PIN ទទួលការចុចបាន (ពេល keyboard
+  កំពុងចុះ) — ឥឡូវបិទ។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (សរសេរឡើងវិញ) ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ➜ កំពូល · ឆ្វេង · ស្តាំដដែល (ឬលើកតែពេលផ្ទៃតូច) · បាតត្រឹម keyboard · កន្លែងវាយមើលឃើញ · backdrop ពេញ ·
+  `elementFromPoint` ក្នុងផ្ទៃ keyboard = ប្រអប់ · `lookupApiConfigModal` កំពូលដដែលគ្រប់ទំហំ · រំកិល ១៤០ (`::after` ≥ ១៣៩px) · ប្តូរកន្លែងវាយ · keyboard បិទ ➜ ដូចដើម · បិទប្រអប់ ·
+  បើកប្រអប់ខណៈ keyboard បើក · APK (ប្រអប់វែង កន្លែងវាយខាងក្រោម) · ការចុចលើ iPhone (preventDefault · caret ចុង · ទិសផ្ទុយ) · សុវត្ថិភាព (ក្រឡា · noDismiss · Escape · PIN ខុស/ត្រូវ) —
+  លើ 2.50.72 ១៥ ធ្លាក់ ➜ ៣២/៣២។
+- `ZoeW/tests/modal-keyboard.test.tsx` (សរសេរឡើងវិញ · ២០) ៖ `modalKeyboardFitFor()` (នៅពីលើ ➜ null · វែង · រំកិល · តូចទាប ➜ ជាន់ · raised · cap · NaN) · Modal ពិត ៖ class/អថេរ ·
+  ទីតាំងដើមរក្សាទុក · ប្រអប់បិទ/បើក/ជាន់ (microtask) · reveal (គម្លាតបង្រួម · textarea ខ្ពស់) · raised · APK resize · dispose · ការចុច iPhone (៤) · ខ្សែភ្ជាប់ CSS។
+- `pin-prompt-test` +៦ ៖ គោលដៅក្រោយ PIN (១៤ ឈ្មោះ + `openConfigModal`) មិននៅក្នុង `ACTION_REGISTRY` ∪ `ACTION_ALLOWLIST` លើកលែងតែពិនិត្យខ្លួនឯង (២ ៖ ZTO) · ប្រអប់កំណត់ PIN
+  បើកតែពេលគ្មាន PIN · ជាន់អប្បបរមា — mutation (`openSheetImportModal` ចូល `ACTION_REGISTRY`) ➜ ធ្លាក់។
+- `react-purity` ៖ ច្រកចេញ `refs.ts` `.focus()` ៣ ➜ ៤ · `.setSelectionRange()` ១ (មានហេតុផល)។ `state-hygiene` ៖ អថេរ ៦ ថ្មីមានហេតុផល។
+- repo ៖ ថត `ZoeW/.history-window-check-dist` (លទ្ធផល build បណ្តោះអាសន្នរបស់ `history-window-check` ដែលរត់មិនទាន់ចប់) commit ដោយចៃដន្យក្នុង `b802db2` ➜ លុប ·
+  `ZoeW/.gitignore` ការពារ (`repository-file-coverage` ធ្លាក់លើវា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ☰ ➜ «API ស្វែងរកអតិថិជន» (PIN) ➜ ចុចកន្លែងវាយខាងក្រោម (Header · Password) ➜ ប្រអប់នៅកន្លែងដដែល (ចំណងជើងនៅដដែល) · បាតឈប់ពីលើ keyboard · កន្លែងវាយលេចឡើង ·
+   ទំព័រមិនរំកិល · ផ្ទៃពីលើ keyboard ពណ៌តែមួយ (ងងឹត) · រមូរប្រអប់ឡើងចុះបាន · បិទ keyboard ➜ ប្រអប់ដូចដើម។
+2. **iPhone PWA** ៖ ប្រអប់ PIN · កែលេខទូរស័ព្ទ · «📋 បញ្ចូលច្រើន» · Config ➜ ដូចខ្ទង់ ១ · ចុចកន្លែងវាយដែល focus រួច ➜ caret តាមកន្លែងចុច (ធម្មតា)។
+3. **Android** (APK · PWA) ៖ ប្រអប់ដដែល ➜ keyboard មិនបាំងកន្លែងវាយ · ប្រអប់មិនផុតអេក្រង់។
+4. **សុវត្ថិភាព** ៖ ប្រអប់ PIN បើក ➜ ចុចផ្ទៃងងឹត ឬបោះបង់ ➜ សកម្មភាពមិនរត់ · ប្រអប់ចូល ➜ ចុចផ្ទៃងងឹតមិនបិទ · ទំព័រខាងក្រោយចុចមិនបាន (ទាំងពេល keyboard បើក)។
+
+---
+
+### [2.50.72] — 2026-10-15 · ZoeW ៖ **iPhone PWA ៖ ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ឬលើប្រអប់ ទំព័រមិនរំកិល (មិនញ៉ាក់)**
+
+**ZoeW `2.50.72`** (`zoew-v334` ➜ `zoew-v335`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css`។
+រាយការណ៍ម្ចាស់គម្រោង (លើ 2.50.71 · វីដេអូ VID_20261015_051457_030) ៖ «ចន្លោះមួយពេល modal បើកពេល scroll ទៅផ្ទៃ background រំកិលបានធ្វើអោយចលនាញ៉ាក់»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ប្រអប់បើក + keyboard ➜ អូសលើផ្ទៃងងឹតខាងក្រោយ ➜ ទំព័រ និងប្រអប់រំកិលឡើង រួចប្រអប់លោតត្រឡប់** (ផ្នែក ២ A87)។ keyboard បើក ➜ iOS ឲ្យរំកិលផ្ទៃមើលឃើញ
+  (visual viewport) ➜ ប្រអប់ ([2.50.71]) តាម `offsetTop` ពី event `scroll` យឺតមួយស៊ុម ➜ ញ៉ាក់។ ឥឡូវ ការចាក់សោការអូសរបស់ការស្វែងរក ([2.50.68]–[2.50.70]) អនុវត្តលើប្រអប់ដែរ ខណៈ
+  `body.modal-keyboard` (`iosModalKeyboardLocked()` ➜ `iosKeyboardPanLocked()`) ៖ `body` · `.modal` `touch-action: none` · `.modal-content` `overscroll-behavior-y: contain` · touchmove ដំបូងត្រូវចាប់លើ
+  ផ្ទៃខាងក្រោយ · កាត · កន្លែងវាយ (រួមទាំង textarea គ្មានកន្លែង) · textarea និងកាតវែង ➜ រមូរក្នុងខ្លួន · អូសផ្ដេក ➜ ទស្សន៍ទ្រនិច · keyboard បិទ ➜ ដូចដើម · Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` +៤ ៖ ផ្ទៃខាងក្រោយ · កាតគ្មានកន្លែង · input · textarea គ្មានកន្លែង ➜ preventDefault · textarea/កាតមានកន្លែង ➜ មិនប៉ះ · ដល់ចុង ➜ ទប់ · ផ្ដេក ➜ មិនប៉ះ ·
+  keyboard បិទ · មិនមែន iOS standalone ➜ គ្មាន listener · ខ្សែភ្ជាប់ CSS — លើ 2.50.71 ៤/៤ ធ្លាក់។
+- `gesture-test` ៖ browser ពិត · ប្រអប់ `batchScanModal` + textarea focus + `body.modal-keyboard` ➜ ផ្ទៃខាងក្រោយ WebKit ហាម Y · ផ្ទៃខាងក្រោយ · កាត · textarea ➜ touchmove ដំបូងត្រូវចាប់
+  · iOS មិនចាប់ផ្តើម pan (`webkitPan`) · ទិសផ្ទុយ (ផ្ដេក · textarea វែង · keyboard បិទ) — លើ 2.50.71 ២ ធ្លាក់ ➜ ១៧៦/១៧៦។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ផ្ទាំងស្កេន ➜ «📋 បញ្ចូលច្រើន» ➜ ចុចប្រអប់វាយ (keyboard បើក) ➜ អូសលើផ្ទៃងងឹតខាងក្រោយ · លើប្រអប់ · ក្នុងប្រអប់វាយ ➜ ទំព័រ និងប្រអប់មិនរំកិល · មិនញ៉ាក់ ·
+   ចុចប៊ូតុង «▶ ចាប់ផ្តើម» · «បិទ» ➜ ធម្មតា · បិទភ្ជាប់បញ្ជី Barcode វែង ➜ ប្រអប់វាយរមូរក្នុងខ្លួន។
+2. **iPhone PWA** ៖ សាកប្រអប់ផ្សេងដែលមានកន្លែងវាយ (PIN · Config · កែលេខ) ដូចខ្ទង់ ១ + សកម្មភាព ១–២ របស់ [2.50.71]។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.71] — 2026-10-14 · ZoeW ៖ **ប្រអប់ដែលមានកន្លែងវាយអក្សរ/លេខ រំកិលឡើងនៅពីលើ keyboard** (សំណើម្ចាស់គម្រោង)
+
+**ZoeW `2.50.71`** (`zoew-v333` ➜ `zoew-v334`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ឯកសារថ្មី `src/app/behaviors/modal-keyboard.ts` · `state.ts` · `DocumentEffects.tsx` · `boot.ts` · `react-root.css` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «បន្ថែមមុខងារអោយ modal ណាដែលមានប្រអប់វាយបញ្ចូលអក្សរឬលេខឆ្លាតវៃ ចេះរកិលពេលបាំង keyboard ហើយសូមតេស្តអោយហ្មត់ចត់»។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ប្រអប់ណាក៏ដោយដែលបើក ពេល keyboard បាំងផ្នែកខាងក្រោម ➜ ប្រអប់ស្ថិតក្នុងផ្ទៃដែលមើលឃើញពីលើ keyboard ហើយកន្លែងដែលកំពុងវាយលេចឲ្យឃើញ** (ផ្នែក ២ A86)។
+  iPhone មិនបង្រួមទំព័រពេល keyboard បើក ➜ `.modal` (fixed · ១០០%) នៅកណ្តាលអេក្រង់ពេញ ➜ keyboard បាំងពាក់កណ្តាលក្រោម (PIN · Config · Lookup API · Login · …)។ ឥឡូវ ៖
+  `listenModalKeyboard()` (visualViewport `resize`/`scroll` · `focusin` · ប្រអប់បើក/បិទ) ➜ `modalKeyboardViewport()` (`innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX`) ➜
+  `uiState.modalViewportTop/Height` ➜ `body.modal-keyboard` + `--modal-vv-top` · `--modal-vv-height` ➜ `.modal` យកផ្ទៃមើលឃើញ · `.modal-content` `max-height: 100%` (ប្រអប់វែងរមូរក្នុងខ្លួន) ➜
+  `revealFocusedModalField()` រមូរកន្លែងវាយចូលមើលឃើញ (គម្លាត ១២px · `setElementScrollTop` · មិនប្រើ `scrollIntoView` ដែលរមូរទំព័រលើ iOS)។ iOS រំកិលផ្ទៃមើលឃើញ (`offsetTop`) ➜ ប្រអប់តាម ·
+  ប្តូរកន្លែងវាយ ➜ រមូរតាម · បិទ keyboard ឬបិទប្រអប់ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរ។ `guide.html` ផ្នែក ៥ ពន្យល់។
+
+#### អ្នកយាម
+
+- `modal-keyboard-test` (ថ្មី · browser ពិត · App ពិត · visualViewport ក្លែង) ៖ ប្រអប់ និងកន្លែងវាយ **ដេរីវេពី DOM** (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea មើលឃើញ ៖ ៣៤ កន្លែងវាយ)
+  × ទំហំ ៣ (390×844 keyboard 336 · 375×667 keyboard 260 · 320×568 keyboard 253) ➜ កាតប្រអប់ និងកន្លែងវាយនៅក្នុងផ្ទៃមើលឃើញ · មិនត្រូវអ្នករមូរកាត់ · ផ្ទៃមើលឃើញរំកិល ១៤០px · ប្តូរកន្លែងវាយ ·
+  បើកប្រអប់ខណៈ keyboard បើករួច · ទិសផ្ទុយ (keyboard បិទ ➜ ទីតាំងដើម · បិទប្រអប់ · គម្លាតតូច · APK បង្រួម viewport) · ជាន់អប្បបរមា (≥ ១៥ ប្រអប់ · ≥ ៦០ ការវាស់ · ≥ ១០ ករណីបាំងមុនការកែ) —
+  លើ 2.50.70 ៧ ធ្លាក់ ➜ ១៨/១៨ · mutation (បិទ `revealFocusedModalField()`) ➜ ៣ ធ្លាក់។
+- `ZoeW/tests/modal-keyboard.test.tsx` (ថ្មី · ១០) ៖ ផ្ទៃមើលឃើញ (offsetTop · clamp · គម្លាតតូច · ប្រអប់បិទ · គ្មាន visualViewport · NaN/០/អវិជ្ជមាន · APK) · listener ➜ state ➜ body class + អថេរ CSS ·
+  ប្រអប់បិទ/បើកខណៈ keyboard បើក · ការរមូរកន្លែងវាយ (ក្រោម · លើ · មើលឃើញហើយ · textarea ខ្ពស់) · focusin · focus ក្រៅប្រអប់ · dispose · ខ្សែភ្ជាប់ boot/CSS/DocumentEffects។
+- `state-hygiene` ៖ `modalWasOpen` ➜ `ACCEPTED` ជាមួយហេតុផល។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ បើកប្រអប់ PIN · Config (☰ ➜ Config) · API ស្វែងរកអតិថិជន · កែលេខទូរស័ព្ទ · កែតម្លៃកញ្ចប់ ➜ ចុចកន្លែងវាយ ➜ keyboard បើក ➜ ប្រអប់ទាំងមូលនៅពីលើ keyboard ·
+   កន្លែងវាយមើលឃើញ · ប្រអប់វែងរមូរក្នុងខ្លួន · ចុចកន្លែងវាយបន្ទាប់ ➜ លេចឲ្យឃើញ · បិទ keyboard ➜ ប្រអប់ត្រឡប់កណ្តាល។
+2. **iPhone តូច (SE)** ៖ សាកដូចខ្ទង់ ១ (ផ្ទៃមើលឃើញតូចបំផុត)។
+3. **Android** (APK · PWA) ៖ ប្រអប់នៅពីលើ keyboard ដូចមុន (APK មិនប្តូរ)។
+4. សកម្មភាព ១–៣ របស់ [2.50.70] នៅតែត្រូវសាក។
+
+---
+
+### [2.50.70] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ អូសក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ និង navbar មិនរំកិល (ដូច Android)**
+
+**ZoeW `2.50.70`** (`zoew-v332` ➜ `zoew-v333`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែតែមួយបន្ទាត់ក្នុង `ios-viewport.ts` (`blockIOSKeyboardPan()`)។
+រាយការណ៍ម្ចាស់គម្រោង (លើ PR #317 Deploy Preview) ៖ «Scroll កន្លែងផ្សេងអត់បានទេ តែពេល scroll ប៉ះក្នុងប្រអប់ស្វែងរកបានទៅ … ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ
+ស្វែងរក បាន scroll ទៅ តែ android អត់អី … ចលនានោះមកពីខ្ញុំ scroll ទើបលោតចុះលោតឡើង … android ពេលកំពុងស្វែងរក scroll បានតែ list បញ្ជី និង list suggestion phone number
+ខ្ញុំចង់បានបែប android … សូមអានកូដរបស់ android ហើយ ធ្វើតាមអោយដូច android ទៅ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូសឡើងចុះក្នុងប្រអប់វាយលេខស្វែងរកខ្លួនឯង ➜ ទំព័រទាំងមូល និង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A85)។ Android មិនមានកូដពិសេសទេ ៖
+  Chrome/WebView បង្រួមទំព័រពេល keyboard បើក ➜ គ្មានចន្លោះឲ្យអូស។ iOS មិនបង្រួម ➜ `ios-viewport.ts` ទប់ការអូសខ្លួនឯង ហើយ `blockIOSKeyboardPan()` លើកលែងគ្រប់ប្រអប់អក្សរ ➜
+  ការអូសចាប់ផ្តើមលើប្រអប់វាយលេខដែលកំពុង focus រត់ទៅ pan របស់ text interaction (មិនស្តាប់ `touch-action`) ➜ ទំព័ររំកិល។ ឥឡូវ ៖ ប្រអប់ស្វែងរក (`IOS_SEARCH_FIELDS` ៖ លេខទូរស័ព្ទ ·
+  ផ្ទាំងស្កេន) អូសបញ្ឈរ ➜ ទប់ touchmove ដំបូង (WebKit បោះបង់ pan ទាំងអស់ក្រោម web view) · អូសផ្ដេក ➜ ទស្សន៍ទ្រនិចដូចធម្មតា · ប្រអប់អក្សរផ្សេង ➜ ដូចដើម · Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-keyboard-pan.test.ts` +១ ៖ អូសបញ្ឈរលើប្រអប់ស្វែងរក (ចុះ/ឡើង) ➜ preventDefault · ផ្ដេក ➜ មិនប៉ះ · ប្រអប់អក្សរផ្សេង ➜ មិនប៉ះ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ — លើ 2.50.69 ធ្លាក់។
+- `gesture-test` ៖ browser ពិត · `#searchPhoneInput` ដែល focus (ចុះ/ឡើង) និង `#entryListSearchInput` (ផ្ទាំងស្កេន) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (គំរូ `webkitPan`) ·
+  ផ្ដេក ➜ មិនចាប់ — លើ 2.50.69 ១ ធ្លាក់ ➜ ១៧០/១៧០។
+- ភស្តុតាង ៖ `run-all.sh` STRICT (emulator រស់) **២០៥/២០៥** ពេញលេញ (០ មួយផ្នែក · ០ រំលង) លើ `d39b280` · vitest ១៧២ ឯកសារ / ១៥១០ · tsc · eslint · purity ១៥/១៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ដាក់ម្រាមដៃក្នុងប្រអប់វាយលេខ ហើយអូសឡើងចុះ ➜ ទំព័រ និង navbar មិនរំកិល · ចុចក្នុងប្រអប់ ➜ វាយលេខបានធម្មតា · អូសឆ្វេងស្តាំ ➜ ទស្សន៍ទ្រនិចផ្លាស់ទី។
+2. **iPhone PWA** ៖ ផ្ទាំងស្កេន ➜ ប្រអប់ស្វែងរកបញ្ជី ➜ ដូចសកម្មភាព ១។
+3. **iPhone PWA** ៖ សកម្មភាព ១–២ របស់ [2.50.69] និង [2.50.68] នៅតែត្រូវសាក (អូសលើបញ្ជីលេខដែលស្នើ · ក្រៅបញ្ជី · បិទ keyboard ហើយអូសឡើង)។
+4. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.69] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ keyboard បើក ➜ អូសលើបញ្ជីលេខដែលស្នើ ទំព័រមិនរំកិល** (ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ)
+
+**ZoeW `2.50.69`** (`zoew-v331` ➜ `zoew-v332`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css` · `DocumentEffects.tsx` · `state.ts`។
+សំណើម្ចាស់គម្រោង ៖ «ផ្ទៀងផ្ទាត់ ឡើងវិញទាំងអស់នៅអ្វីដែលទើបកែលើ PR 317 ក្រែងមាន កំហុស ឬចន្លោះ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូសលើបញ្ជីលេខទូរស័ព្ទដែលស្នើ (`.phone-suggest`) ➜ ទំព័រ និង navbar នៅតែរំកិល** (ផ្នែក ២ A83)។ [2.50.68] ការពារតែកន្លែងក្រៅបញ្ជី
+  និងបញ្ជីប្រវត្តិ ៖ ប្រអប់ Suggestion (fixed · `overflow-y: auto` ➜ touch-action ចាប់ផ្តើម `auto` ឡើងវិញ) ជួរតិច ➜ រមូរមិនបាន ➜ scroll view មេយកការអូស · ជួរច្រើន ➜ ចុងបញ្ជីបន្តទៅ
+  scroll view មេ។ ឥឡូវ ៖ `measureIOSKeyboardListRoom()` វាស់ប្រអប់ Suggestion ដែលបើកដែរ (ResizeObserver) ➜ `uiState.iosKeyboardSuggestFixed` ➜ `body.ios-keyboard-suggest-fixed` ➜
+  `touch-action: none` · ប្រអប់ Suggestion `overscroll-behavior-y: contain` ខណៈ `body.ios-keyboard`។ Android/web មិនប្រែ។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ WebKit used-touch-action លើ **ក្រឡា ២២px** នៃផ្ទៃខាងលើ keyboard (មិនមែនតែចំណុចដែលរើស) ៖ ចំណុចនីមួយៗ ហាមអូស Y ឬនៅក្នុងអ្នករមូរកូនដែលមានចន្លោះ + `contain` ·
+  ទំព័រទិន្នន័យ (បញ្ជីពេញ · ទទេ) · Suggestion ២ ជួរ (រមូរមិនបាន) · ១២ ជួរ (រមូរបាន) · ទំព័រស្កេន (ស្វែងរកបញ្ជី) · ទិសផ្ទុយ ៖ keyboard បិទ ➜ គំរូរកឃើញចំណុចដែល scroll view មេយក ·
+  តារាងប្រវត្តិមិនរមូរផ្ដេក (៣២០ · ៤១២ ➜ `touch-action: none` លើបញ្ជីខ្លីមិនដកការរមូរផ្ដេក) — លើ 2.50.68 Suggestion ២/២ ធ្លាក់ ➜ ១៦៧/១៦៧។
+- `ZoeW/tests/ios-search-resnap.test.tsx` +១ (`iosKeyboardSuggestFixed` ↔ class · បិទ Suggestion · keyboard បិទ) · ខ្សែភ្ជាប់ CSS (touch-action + contain) — លើ 2.50.68 ២/២ ធ្លាក់។
+- ភស្តុតាង ៖ `run-all.sh` STRICT (emulator រស់) **២០៥/២០៥** ពេញលេញ (០ មួយផ្នែក · ០ រំលង) លើ `16dc7e1` · vitest ១៧២ ឯកសារ / ១៥០៩ · tsc · eslint · purity ១៥/១៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ វាយលេខ ១–២ ខ្ទង់ក្នុងប្រអប់ស្វែងរក (keyboard បើក · បញ្ជីលេខដែលស្នើលេច) ➜ អូសឡើងចុះលើបញ្ជីនោះ ➜ ទំព័រ និង navbar មិនរំកិល · បញ្ជីវែងរមូរក្នុងប្រអប់ · ចុចលេខ ➜ ស្វែងរកធម្មតា។
+2. **iPhone PWA** ៖ សកម្មភាព ១–២ របស់ [2.50.68] (អូសក្រៅបញ្ជី · បិទ keyboard ហើយអូសឡើង) នៅតែត្រូវសាក។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.68] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ ស្វែងរក (keyboard បើក) ➜ ទំព័រ និង navbar មិនរំកិល · បិទ keyboard ហើយអូសភ្លាម ➜ snap ទៅកាតបញ្ជីពេញ**
+
+**ZoeW `2.50.68`** (`zoew-v330` ➜ `zoew-v331`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · `panels.ts` · ZTO) មិនប៉ះ —
+ការកែក្នុង `ios-viewport.ts` · `react-root.css` · `DocumentEffects.tsx` · `state.ts`។
+រាយការណ៍ម្ចាស់គម្រោង (លើ 2.50.67 ៖ «PTR ដើរល្អដូច android ហើយ») ៖ «ios ពេលកំពុងប្រើប្រអប់ស្វែងរក scroll ទាំងទំព័របាន ពេល scroll ទៅដើរទាំង navbar អត់ល្អដូច apk និង pwa android»
+(វីដេអូ VID_20261014_213311_441) · «ពេលខ្លះបិទ keyboard ហើយ scroll ឡើង … ប្រអប់ស្វែងរកអត់លិចបាត់ស្អាត លិចបានពាក់កណ្តាលទាល់តែយើង scroll រុញថែម» (រូបថត)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ keyboard បើក ➜ អូស ➜ ទំព័រទាំងមូលព្រមទាំង navbar រំកិល ហើយលោតត្រឡប់** (ផ្នែក ២ A81 · វីដេអូ ៖ បញ្ជីទទេ «គ្មានទិន្នន័យ» · ៤.៥ · ៧.៥ · ៩–១០.៥ វិ.)។
+  ការទប់ `touchmove` របស់ [2.50.65] មិនគ្រប់គ្រាន់លើឧបករណ៍ពិត ➜ ឥឡូវប្រើច្រកដែល WebKit សម្រេចខ្លួនឯងក្នុង UI process ពេលចាប់ផ្តើមប៉ះ (មិនរង់ចាំ JS) ៖
+  `touch-action: none` លើ `body` និង `.app-pages` ខណៈ `body.ios-keyboard` (navbar · ប្រអប់ស្វែងរក · ក្បាលកាត · ដងអូស ➜ scroll view មេមិនរំកិល) · បញ្ជីដែលរមូរបាន ➜ `auto`
+  (អ្នករមូរចាប់ផ្តើមពី auto ឡើងវិញ ➜ បញ្ជីរមូរដូច Android) · បញ្ជីដែលរមូរមិនបាន (ទទេ · ខ្លី ៖ គ្មាន scroll view កូន ➜ scroll view មេយកការអូស) ➜
+  `measureIOSKeyboardListRoom()` (ResizeObserver លើបញ្ជី និងខ្លឹមសារ) ➜ `body.ios-keyboard-list-fixed` ➜ `touch-action: none` លើបញ្ជីនោះ។ keyboard បិទ ➜ ដូចដើម · Android/web មិនប្រែ។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ហើយអូសបញ្ជីឡើងភ្លាម ➜ ប្រអប់ស្វែងរកលិចពាក់កណ្តាលក្រោម navbar** (A82)។ ការផ្អាក snap ក្រោយទាញចុះ ([2.50.67]) នៅដល់ពិដាន (~០.៨ វិ.)
+  ➜ ការអូសក្នុងចន្លោះនោះឈប់ដោយគ្មាន snap។ ឥឡូវ ៖ ការផ្អាករបស់ `settleIOSSearchPullDown()` គ្របតែ layout នៃ commit (ដោះវិញភ្លាម · ការរអិលស្វែងរកផ្អាកខ្លួនឯង) · ម្រាមដៃប៉ះក្នុងចន្លោះ
+  ទាញចុះ ➜ `endPanelGlideSnapPause()` ➜ ការអូសរបស់អ្នកប្រើ snap ទៅកាតបញ្ជីពេញ។ re-snap ទៅ `.page-main` ([2.50.67]) នៅតែមិនកើត (snap state ត្រូវលុបក្នុង layout ដែលផ្អាក)។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ `computeUsedTouchAction` របស់ WebKit លើ CSS ពិត ៖ keyboard បើក ➜ navbar · ប្រអប់ស្វែងរក · ចំណងជើង · ដងអូស · ក្បាលកាតបញ្ជី ហាមអូស Y · ជួរបញ្ជី `auto` ·
+  បញ្ជីទទេ ➜ `body.ios-keyboard-list-fixed` + ហាម · បញ្ជីមានជួរវិញ ➜ ដក · keyboard បិទ ➜ ដូចដើម — លើ 2.50.67 ៥ ធ្លាក់ ➜ ១៦០/១៦០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` +៤ ៖ ការផ្អាកមិនលើសការរអិល · ម្រាមដៃបញ្ចប់ការផ្អាក (ក្រៅចន្លោះ ➜ មិនប៉ះ) · `iosKeyboardListFixed` ↔ class · ខ្សែភ្ជាប់ CSS — លើ 2.50.67 ៤/៤ ធ្លាក់។
+  `ios-search-pulldown.test.ts` ៖ snap ផ្អាកពេលអាន layout ហើយដោះវិញភ្លាម។
+- `state-hygiene` (CI ផ្នែក ៣ ធ្លាក់លើ `c799f42`) ៖ `listRoomObserver` (ResizeObserver នៃបញ្ជី · គ្មានទិន្នន័យអតិថិជន · ផ្ដាច់ដោយ `watchIOSKeyboardListRoom(false)` ពេលស្វែងរកបិទ និង boot-scope dispose) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ អូសលើ navbar · ប្រអប់ស្វែងរក · កាតបញ្ជី (ទទេ និងមានជួរច្រើន) ➜ ទំព័រ និង navbar មិនរំកិល · បញ្ជីមានជួរ ➜ រមូរ · ចុចជួរ/ប៊ូតុង ➜ ធម្មតា។
+2. **iPhone PWA** ៖ បិទ keyboard (ប្រអប់ទទេ) ហើយអូសបញ្ជីឡើងភ្លាម ➜ កាតបញ្ជីឡើងដល់ក្រោម navbar ពេញ · ⛔ ប្រអប់ស្វែងរកមិនឈប់ពាក់កណ្តាល។ PTR ដូច 2.50.67។
+3. **Android** (APK · PWA) ៖ មិនប្រែ។
+
+---
+
+### [2.50.67] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ PTR កេះគ្រប់ដង (ចាប់ touchmove ដំបូង) · បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកមិនលាក់ (snap ផ្អាកមុន commit)**
+
+**ZoeW `2.50.67`** (`zoew-v329` ➜ `zoew-v330`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ZTO មិនប៉ះ · **តំបន់ហាម PTR** ៖ `pull-to-refresh.ts` កែតាមរបាយការណ៍វីដេអូ
+(`LOCK` sha256 ថ្មី ក្នុង `forbidden-zone-lock.test.ts`) · `panel-motion.ts` · `phone-search.ts` · `app.css` មិនប៉ះ។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ២ ៖ VID_20261014_200654_541 · VID_20261014_200654_804 · លើ PR #317) ៖ «PTR នៅតែពិបាក · ស្វែងរក នៅតែមិនលិបបាត់ពេលបិទ keyboard»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ PTR ម្តងកេះម្តងអត់** (ផ្នែក ២ A79)។ វីដេអូ ៖ ទាញ ≥ ៧ ដង ទំព័រ bounce ចុះ ~១០០–១៩០pt គ្មានរង្វង់ PTR · កេះតែ ១ ដង។ មូលហេតុ (ប្រភព WebKit ពិត) ៖
+  WebKit ពន្យារ UIScrollView pan តែចំពោះ touchmove **ដំបូង** (`m_touchMovePreventionState`) · PTR ហៅ `preventDefault()` តែក្រោយ `AXIS_SLOP` 22px ➜ touchmove ដំបូង
+  មិនត្រូវចាប់ ➜ pan ចាប់ផ្តើមនៅ ~១០pt ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ touchmove បន្ទាប់ `cancelable: false` ➜ PTR `park()` (កេះបានតែពេល move ដំបូងលោត ≥ 22px)។
+  ឥឡូវ ៖ ការទាញដែល PTR តាម (កំពូល · ៤០% ខាងលើ · មិនមែនប្រអប់/ម៉ឺនុយ/ប៊ូតុង) ចាប់ touchmove ចុះបញ្ឈរ **តាំងពី move ដំបូង** (`claimsBeforeSlop()` ៖ ដូច APK) ➜ iOS មិនចាប់ផ្តើម pan ·
+  គ្មាន bounce · កម្រិត indicator/refresh ដដែល (56 · 213px)។ ប៊ូតុងក្នុងជួរតារាង ➜ មិនចាប់មុន slop (tap នៅធម្មតា) · អូសឡើង/ផ្ដេក · តារាងរមូររួច · ប្រអប់ · ម៉ឺនុយ · ប៊ូតុង/វាលក្រៅតារាង ➜ ដូចដើម។
+  Android (APK) មិនប្រែ (ចាប់មុន slop ដូចដើម · រួមទាំងប៊ូតុងក្នុងតារាង)។
+- 🐛 **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរករអិលឡើងលាក់ក្រោម navbar ~១ វិ. ហើយលោតត្រឡប់** (ផ្នែក ២ A80 · ការកែ [2.50.66] ពិនិត្យ **មុន** React commit ➜ ឃើញ ០ ➜ មិនធ្វើអ្វី)។
+  មូលហេតុ (ប្រភព WebKit ពិត) ៖ `.page-main` ជាគោលដៅ snap តែមួយ · ខណៈប្រអប់ទាញឡើង offset របស់វា = ០ = ទីតាំងរមូរ ➜ WebKit កត់វាជាប្រអប់ដែល snap ➜ ទាញចុះ ➜
+  `resnapAfterLayout()` ក្នុង layout ដំបូងក្រោយ commit (សមកាល) រំកិលទៅ offset ថ្មីរបស់ `.page-main` ➜ ការរអិលទៅទីតាំងនោះ ➜ ការពិនិត្យយឺត (`IOS_SEARCH_PULLDOWN_SETTLE_MS`) លោតត្រឡប់ ០។
+  ឥឡូវ ៖ `settleIOSSearchPullDown()` ផ្អាក snap (`beginPanelGlideSnapPause()` ➜ `panel-gliding`) **ក្នុង commit ដដែលនឹងការទាញចុះ** ➜ WebKit លុប snap state ➜ គ្មាន re-snap ➜ ប្រអប់ស្វែងរក
+  រអិលចុះទៅកន្លែងដើម (ក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ») ➜ snap ត្រឡប់នៅ ០ (គ្មានគោលដៅក្នុង proximity) ➜ នៅដដែល។ Android/web · អេក្រង់ ≥ 992 មិនប្រែ។
+
+#### អ្នកយាម
+
+- `gesture-test` ៖ គំរូ WebKit (`webkitPan` ៖ pan ចាប់ផ្តើមនៅ ១០px បើ touchmove ដំបូងមិនត្រូវចាប់ · ក្រោយនោះ `cancelable: false` លើកលែង move មុន pan ត្រូវចាប់) ៖ ទាញ ២ · ៤ · ១២ px/ស៊ុម ➜
+  move ដំបូងត្រូវចាប់ · គ្មាន pan · ready · ទិសផ្ទុយ (អូសឡើង ➜ pan ធម្មតា · ប៊ូតុងក្នុងជួរ ➜ មិនចាប់) · អូសខ្លី 14px ➜ ចាប់ move ដំបូង តែមិន refresh · indicator លាក់ — លើដើមឈើ PR #317 ៨ ធ្លាក់ ➜ ១៥០/១៥០។
+- `ZoeW/tests/ios-search-resnap.test.tsx` (ថ្មី ៤) ៖ គំរូ re-snap របស់ WebKit លើ DOM ដែល React ពិតគូរ (`AppPages` · លំដាប់ commit ពិត) ៖ គំរូអាចធ្លាក់ (គ្មានការផ្អាក ➜ re-snap · ប្រអប់ស្វែងរកលាក់ ·
+  ការរអិលឡើង = វីដេអូ) · ទាញចុះ ➜ `panel-gliding` · គ្មាន re-snap · scrollTop ០ · ការរអិលចុះទៅទីតាំងពិត · ក្រោយ snap ត្រឡប់ + ការពិនិត្យយឺត ➜ ០ · App មិនសរសេរ scroll · ទាញឡើង/ចុះម្តងទៀត —
+  លើដើមឈើ PR #317 ៣/៤ ធ្លាក់ (គំរូដែលអាចធ្លាក់ជាប់)។ `ios-search-pulldown.test.ts` ៖ + snap ផ្អាក · Android/web មិនផ្អាក។
+- `forbidden-zone-lock` ៖ sha256 `pull-to-refresh.ts` ថ្មី (សំណើ ៖ វីដេអូម្ចាស់គម្រោងខាងលើ)។
+- `npm run purity:check` ៖ ពិដានការលើកលែង `platform/document-io.ts` ត្រឡប់ដូចមុន switch haptic (`createElement` ៤ · `document.body` ៣ · `appendChild` ៣ · `click` ១ · ដក `setAttribute` · `className`) —
+  PR #317 ដកកូដ haptic តែទុកពិដាន ➜ ២ FAIL («ធាតុងាប់» · «ពិដានតឹង») ➜ ១៥/១៥។
+
+#### ភស្តុតាង (session · emulator RTDB · Postgres ពិត)
+
+- vitest ១៧២ ឯកសារ · ១៥០៤ · `tsc -b` · eslint · `purity:check` ១៥/១៥ · strip-comments ស្អាត ២៦០។
+- run-all STRICT (`0c99f7d`) ៖ ២០២/២០៥ — ធ្លាក់ ៣ ៖ `doc-scope-test` (CLAUDE.md យោង `resnapAfterLayout()` ជា helper ដែលមិនមានក្នុង repo · លិបិក្រម `forbidden-zone-lock.test.ts` ខ្វះ ផ្នែក ១ ➜ កែទាំង ២) ·
+  `layout` (`pinSetupModal` @768px 271u < 276u ពេល ៤ lanes រវល់ · CSS មិនប៉ះក្នុងជុំនេះ) · `revenue-fuzz` («Resulting promise was garbage collected» របស់ Playwright · មិនមែន assertion) ➜
+  `RUNALL_ONLY` លើ tree ដដែល ៖ `layout` ១៧៥ PASS · `revenue-fuzz` PASS ➜ ធ្លាក់តែពេលម៉ាស៊ីនរវល់ ⛔ មិនប្តូរពិដាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone PWA** ៖ ទាញចុះពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល (យឺត · ធម្មតា · លឿន) ➜ រង្វង់ PTR តាមម្រាមដៃតាំងពីដើម · ទំព័រមិន bounce · លែងដៃពេលរង្វង់ក្រហម ➜ ផ្ទុកឡើងវិញគ្រប់ដង។
+   ពិនិត្យទិសផ្ទុយ ៖ ចុចប៊ូតុងជួរតារាង · អូសបញ្ជីឡើង · អូសផ្ដេក ➜ ធម្មតា។ នៅពិបាក ➜ វីដេអូ + ប្រាប់កន្លែងដាក់ម្រាមដៃ (ទាញចាប់ពីក្រោម ៤០% មិនកេះ ៖ ច្បាប់ម្ចាស់គម្រោង)។
+2. **iPhone PWA** ៖ ស្វែងរកលេខ ➜ បិទ keyboard (ចុច «✓» ឬចុចក្រៅ · ប្រអប់ទទេ) ➜ ប្រអប់ស្វែងរករអិលចុះទៅក្រោមកាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ⛔ មិនឡើងលាក់ក្រោម navbar · មិនលោត។
+3. **Android** (APK · PWA) ៖ PTR · ស្វែងរក ដូចដើម។
+
+---
+
+### [2.50.66] — 2026-10-14 · ZoeW ៖ **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកនៅឃើញ · ស្លាកស្ថិតិបត់បន្ទាត់ · ប៊ូតុង «បញ្ចូលច្រើន» ស្មើ · ផ្ទាំងបោះពុម្ពលើអេក្រង់តូច**
+
+**ZoeW `2.50.66`** (`zoew-v328` ➜ `zoew-v329`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `app.css` · `phone-search.ts` · ZTO) មិនប៉ះ — ការកែទាំងអស់ក្នុង `ios-viewport.ts` · `react-root.css` · `LabelPrintModal.tsx`។
+រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ៣ សន្លឹក ក្រោយ merge PR #316) ៖ «iOS ពេលចុចបិទ keyboard scroll ទៅលាក់ ស្វែងរក អត់ជិតស្អាត · ប៊ូតុង បញ្ចូលច្រើនមិនស្មើគេឯង · ពិនិត្យ modal ថ្មីអោយសមស្របគ្រប់ទំហំអេក្រង់ · ទម្រង់បង្ហាញថ្មីធ្វើអោយអានអក្សរមិនអស់ នៅកន្លែង គ្រប់គ្រងកញ្ចប់ប្រចាំថ្ងៃ លើអេក្រង់តូច»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone PWA ៖ ស្វែងរកលេខ ➜ បិទ keyboard ➜ ទំព័ររំកិលឡើង ➜ ប្រអប់ស្វែងរកលាក់ក្រោម navbar** (ផ្នែក ២ A78)។ Chromium (ក្លែង iOS) វាស់បាន ៖ ទាញឡើង ➜ `#appPages` គ្មានចន្លោះរមូរ ➜
+  `scrollTop` ត្រឡប់ ០ ➜ ទាញចុះ ➜ ០ (ប្រអប់ស្វែងរកនៅ 374px · ឃើញពេញ) — Android ត្រឹមត្រូវដូចម្ចាស់គម្រោងនិយាយ។ WebKit ទុកទីតាំងផ្សេង (snap `.page-main` ឬទីតាំងមុន focus) ➜
+  ឥឡូវ ៖ ប្រអប់ទាញចុះ (`dataPanelSearchFocus` true ➜ false · iOS standalone · ទូរស័ព្ទ) ➜ `settleIOSSearchPullDown()` ក្នុង microtask ដដែល ៖ `#appPages` ➜ ០ តាម
+  `setElementScrollTop()` ហើយការរអិលចាប់ផ្តើមឡើងវិញពីទីតាំងដែលឃើញ (`panelGlideFrom()` លើកាតស្វែងរក + កាតបញ្ជី · ចលនាស្វែងរកដដែល ➜ មិនលោត) · ក្រោយ
+  `IOS_SEARCH_PULLDOWN_SETTLE_MS` (ការរអិល + hold + grace + 200ms) បើ WebKit រំកិលម្តងទៀត (keyboard បិទយឺត) ➜ ០ ម្តងទៀត ⛔ មិនប៉ះពេលមានម្រាមដៃប៉ះក្នុងចន្លោះនោះ ·
+  ប្រអប់ទាញឡើងវិញ · ប្រអប់នៅ focus។ Android/web · អេក្រង់ ≥ 992 ➜ មិនប៉ះ។ ប្រអប់ដែលមានលេខនៅក្នុង (មិនទាញចុះ) នៅដដែលដូចមុន។
+- 🐛 **iPhone PWA ៖ PTR ម្តងដើរម្តងអត់ (ម្ចាស់គម្រោង ៖ «PTR មុនលើ iOS ស្រួលកេះដូច APK និង PWA Chrome តែឥឡូវម្តងកេះបានម្តងអត់») ហើយនៅតែមិនញ័រ** (A77 កែ)។
+  ការប្រែតែមួយគត់លើផ្លូវ PTR iOS ក្នុង 2.50.65 (diff `7960a90..9272d88` ៖ touch · scroll · PTR · iOS) = `iosHapticSwitchTick()` ➜ `label.click()` លើ
+  `<input switch>` **ក្នុងកាយវិការទាញ** (touchmove · ដល់កម្រិត) ➜ WebKit បញ្ចប់/កាត់ touch ➜ PTR ចោល · ហើយ iOS 26.5+ (WebKit bug 309082) លេងញ័រតែពីចុចផ្ទាល់
+  (click ពី script = untrusted) ➜ មិនញ័រទោះដើរ។ ឥឡូវ ៖ ដក switch ចេញទាំងស្រុង (`haptics.ts` web ➜ `navigator.vibrate` តែប៉ុណ្ណោះ · `document-io.ts` ·
+  `.haptic-switch` · `haptic-ios-switch.test.ts`) ➜ PTR iOS ដូច 2.50.64 · ⛔ ព្រំដែនទទួលស្គាល់ ៖ iPhone web គ្មានញ័រ PTR (APK · Android ញ័រដូចដើម) ·
+  ឯកសារ PTR ចាក់សោមិនប៉ះ (ហៅ `hapticTick()` ដដែល)។
+- 📊 **«កញ្ចប់សរុប (នៅសល់)» កាត់ «…» លើអេក្រង់តូច** ៖ `.stat-card .label` ក្នុង `app.css` (ចាក់សោ) ជា `nowrap + ellipsis` ➜ វាស់ ៖ ៣២០ ទាំង ៣ ស្លាក · ៣៦០–៤១២ ស្លាកទី ១ ·
+  ១២៨០ ទាំង ៣ (ជួរឈរ ៣៨០px) ➜ `react-root.css` បត់បន្ទាត់ (`white-space: normal` · `overflow-wrap: anywhere` ៖ «អតិថិជនយក» គ្មានកន្លែងបត់ក្នុងពុម្ពជំនួសរបស់ CI ➜ បត់ក្នុងពាក្យជាជាងកាត់ · មិនកាត់) ➜ អានបានគ្រប់ទទឹង (វាស់ ៣២០–១២៨០ ជាមួយពុម្ព Kantumruy Pro ពិត និងពុម្ពជំនួស ៖ ០ កាត់)។
+- 📋 **ប៊ូតុង «📋 បញ្ចូលច្រើន» ≠ «📁 យក Barcode ពីរូបភាព»** (១៨០×៣៨ ទល់ ១២៨×៤២ ៖ `button` មាន margin UA · ទទឹងតាមអក្សរ) ➜ `flex: 1 1 0` · `margin: 0` · `font-family: inherit` ·
+  បត់អក្សរ ➜ ស្មើគ្នា (វាស់ ៣២០–១២៨០ ៖ ទទឹងស្មើ · កម្ពស់ស្មើ)។
+- 🖨️ **ផ្ទាំងបោះពុម្ពស្លាកលើអេក្រង់តូច** ៖ គំរូ 50×30 (zoom 1.6) ទទឹង ២៩២px ក្នុងកន្លែង ២៥៨px នៅ ៣២០ ➜ scroll ផ្តេក · លេខទូរស័ព្ទកាត់ ➜ `@media (max-width: 359px)` zoom 1.3
+  (60×40 ➜ 1.1) ➜ សមទទឹង · កុងតាក់ «តែកញ្ចប់មិនទាន់យក» ➜ «បង្ហាញតែកញ្ចប់មិនទាន់យក» (ស្រៈ «ែ» នៅដើមពាក្យគូរចូលចន្លោះប្រអប់ធីក ➜ មើលទៅជាប់ · ឥឡូវចាប់ផ្តើមដូចកុងតាក់ដទៃ) ·
+  ក្រឡាកុងតាក់ ≥ 200px (desktop ៖ ២ ជួរឈរ មិនបត់អក្សរ)។ ផ្ទាំង «📋 បញ្ចូល Barcode ច្រើន» វាស់ ៣២០–១២៨០ ៖ សមរួចហើយ (មិនប្រែ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-search-pulldown.test.ts` (ថ្មី ៥) ៖ ទាញចុះខណៈ `#appPages` រំកិលរួច ➜ ០ + រអិលឡើងវិញ ២ ធាតុ (កាតស្វែងរក · កាតបញ្ជី · `PANEL_SEARCH_GLIDE`) · WebKit រំកិលម្តងទៀត
+  ➜ ០ នៅ `IOS_SEARCH_PULLDOWN_SETTLE_MS` (> ការរអិល + hold + grace) · ទិសផ្ទុយ (ម្រាមដៃប៉ះ · ទាញឡើងវិញ · focus · Android/web · អេក្រង់ធំ) · ខ្សែភ្ជាប់ (`setElementScrollTop` ·
+  `listenIOSKeyboard`) — លើដើមឈើមុនកែ ៤/៥ ធ្លាក់ (ទិសផ្ទុយជាប់ដោយសារគ្មានកូដ)។
+- `layout-check` +៣ ក្នុង ZoeW គ្រប់ទំហំ (៣២០ · ៣៦០ · ៤១២ · ៧៦៨ · ១០២៤ · ១២៨០) ៖ ស្លាកក្រឡាស្ថិតិ ៣ មិនកាត់ · មិន `nowrap`/`ellipsis` · ប៊ូតុងទាំង ២ ទទឹង/កម្ពស់ ±1px · ក្នុងជួរ ·
+  អក្សរមិនកាត់ · គំរូស្លាកតូច ៣ ទំហំ (ស្លាកពិត ៖ លេខ ១០ ខ្ទង់ · Barcode · COD/DOD · ថ្ងៃ · Locker) គ្មាន scroll ផ្តេក · លេខមិនកាត់ — លើដើមឈើមុនកែ ធ្លាក់ (ស្លាក · ប៊ូតុង · ៣២០ preview)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. **iPhone PWA** ៖ PTR ទាញពី ៤០% ខាងលើ ពេលបញ្ជីនៅកំពូល ➜ ត្រូវកេះគ្រប់ដង ដូច 2.50.64 (ញ័រ ៖ គ្មាន — ព្រំដែន iOS)។
+1. **iPhone PWA** ៖ ស្វែងរកលេខ (keyboard បើក) ➜ ចុចក្រៅប្រអប់ដើម្បីបិទ keyboard (ប្រអប់ទទេ) ➜ ទំព័រត្រូវត្រឡប់ទៅកំពូល ៖ កាត «គ្រប់គ្រងប្រចាំថ្ងៃ» · ប្រអប់ស្វែងរក ·
+   កាតបញ្ជីតាមលំដាប់ ⛔ ប្រអប់ស្វែងរកមិនលាក់ក្រោម navbar។ បើនៅលាក់ ➜ ថតវីដេអូ (ម៉ោងបិទ keyboard ➜ ទីតាំងចុងក្រោយ) — WebKit អាចរំកិលក្រោយ ១ វិ.។
+2. **iPhone** ៖ ស្លាក «កញ្ចប់សរុប (នៅសល់)» បង្ហាញ ២ បន្ទាត់ · ទំព័រស្កេន ប៊ូតុងទាំង ២ ស្មើគ្នា · ផ្ទាំងបោះពុម្ពស្លាកគំរូមិនលើសអេក្រង់។
+3. **Android** (APK · PWA) ៖ មិនប្រែ (ពិនិត្យស្លាកស្ថិតិ · ប៊ូតុង)។
+
+---
 
 ### [2.50.65] — 2026-10-14 · ZoeW ៖ **🖨️ បោះពុម្ពស្លាកកញ្ចប់ · 📋 បញ្ចូល Barcode ច្រើន · iPhone PWA ៖ ស្វែងរកលេខពេល keyboard បើក ➜ កាតបញ្ជីចប់ពីលើ keyboard · PTR ញ័រ**
 
@@ -3797,6 +4310,131 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.77 ៖ តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំ ធៀបស្តង់ដារ App ទូទៅ
+
+**វិធី** ៖ ស្គ្រីបរុករក (មិនមែនអ្នកយាម) លើ App ពិត + Firebase ក្លែង · font ពិត (Kantumruy Pro · Inter ពី npm) · ១៤ ទំហំ × ៣៩ ស្ថានភាព ៖ វាស់ ធាតុលើសអេក្រង់ · អត្ថបទកាត់ ·
+ប៊ូតុងដែលធាតុផ្សេងបាំង (elementFromPoint) · ប៊ូតុងក្នុងប្រអប់ចុចដល់ (scrollIntoView) · ទំហំគោលដៅចុច · អក្សរតូច · «៛» ធ្លាក់ម្នាក់ឯង (Range) · រូបថត ➜ ចំណុចដែលឃើញ ➜ សរសេរអ្នកយាមក្នុង
+`layout-check` ➜ ធ្លាក់លើ `203be0b` ➜ ទើបកែ · run-all STRICT ពេញលើ `203be0b` (2.50.77) ៖ ✅ ២០៦/២០៦ (០ មួយផ្នែក · ០ រំលង)។ ត្រឹមត្រូវរួច (មិនកែ) ៖ scroll ផ្តេក ០ · ប្រអប់ ២៨ ×
+ទំហំ ១៤ សមអេក្រង់ · ប៊ូតុងចុចដល់ទាំងអស់ · លំហូរ ស្កេន ➜ រក្សាទុក · ស្ទួន · Locker · ដក · បិទ · លុប ➜ ស្តារ មានសារត្រឹមត្រូវ ·
+គោលដៅចុចផ្សេង (ប៊ូតុងតម្រង ២៧px · «📅 កញ្ចប់ប្រចាំថ្ងៃ» ២០px · «⋮» ២៥×២៤) ឆ្លង WCAG 2.2 AA (២៤px តាមគម្លាត) ➜ ទុកដដែល (ការពង្រីកនឹងប្តូរកម្ពស់ជួរ)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A96 | **CSS ស្លាកបោះពុម្ពជ្រាបចូលក្រឡាស្ថិតិ** | `.stat-card .label` ៖ `border-top-style: dashed` · `padding: 11.34px` (៣mm) · `background: #fff` គ្រប់ទំហំ ៨ (រូបថត ៖ ប្រអប់ដាច់ៗជុំវិញស្លាក ៣) · មូលហេតុ ៖ `.label { … }` ទូទៅក្នុង `react-root.css` (2.50.65) | CSS ស្លាកនៅក្រោម `.label-sheet` ➜ `none` · `0px` · ថ្លា (ទិសផ្ទុយ ៖ `.label-sheet .label` នៅ dashed) |
+| A97 | **ស្លាកបោះពុម្ពកាត់លុយ · បំបែកលេខ · លើសក្រដាស** | `LabelSheet` ពិត · media print · 'Liberation Sans' ៖ 50×30 លុយ ២ លើស (១៨៦/១៧៤px) · 40×30 meta ហួសបាត ៣ · លេខបំបែក ២ · 60×40 លុយ/meta ហួស ៧ · A4 ៣ ជួរឈរ ទទឹង [៣៣៤,៣៦០,៣០៩] សន្លឹកលើស ៣១៦px (បញ្ឈរ) · A4 ២ ជួរឈរ លើស ១០៩px · font ពិត ៖ em/តួ លុយ ០.៤៩–០.៦១ · លេខ ០.៥០–០.៦៥ | `container-type: inline-size` + `min(អតិបរមា, 100cqw / (តួ × ០.៦២))` (លុយ) · `(100cqw / តួ − letter-spacing) / ០.៦៦` (លេខ) · `minmax(0, 1fr)` ➜ ៤ ការអះអាង ✅ |
+| A98 | **toast ជាន់របា Tab** | `#toastContainer` បាត ៥៤៤ ⟷ របា Tab កំពូល ៥០៨ (៣២០×៥៦៨) · ៨៧៦ ⟷ ៨៣៨ (៤១២) · ១០០០ ⟷ ៩៥៩ (៧៦៨) · ៤០៦ ⟷ ៣៦៥ (៩៣២×៤៣០) | `max(--tabbar-height + 12px, 24px + max(safe-area, --keyboard-cover))` ពេលរបា Tab បង្ហាញ < ៩៩២ ➜ ✅ · `chrome-hidden` · desktop ➜ ២៤px |
+| A99 | **«៛» ធ្លាក់ម្នាក់ឯង** | «61,203,160 ៛» ៖ top តួលេខចុងក្រោយ ≠ «៛» (> ៣px) លើ ៣២០ · ៣៦០ · ៤១២ · ១២៨០ · ១៤៤០ (iPad ១០២៤–១៣៦៦ ក្នុងស្គ្រីបរុករក) | `white-space: nowrap` លើ `#summary*Riel` ➜ ✅ |
+| A100 | **ប្រអប់ស្កេន ៖ Enter គ្មានប្រសិទ្ធភាព · ✖ តូច** | វាយលេខ + Enter ➜ cursor នៅដដែល (Locker/COD/DOD ត្រូវកណ្តុរ) · ☰ 🔔 ៣២×៣២ · ✖ ២៨×២៨ ➜ ចុច ±២០px ពីកណ្តាល ➜ ខុស ៨/៨ ចំណុច | Enter ➜ ប្រអប់បន្ទាប់ · DOD ➜ blur · `confirmPhone` ០ ដង · ✖ `::after` ៤៤×៤៤ ➜ ✅ · មិនលួចការចុចធាតុផ្សេង |
+| A101 | **ផ្ទៃចុច ☰ ៤៤px ➜ PTR លើ APK ស្លាប់** (CI លើ `bc32e1f` ៖ shard ៣/៤) | `npm run native:check` FAIL ៣ ៖ ទាញចុះ ➜ មិន `spinning` · គ្មាន haptic · គ្មាន reload ➜ touch CDP នៅ (៤០,៥២) ក្រោម navbar ➜ Chromium touch adjustment បញ្ជូនទៅ `navMenuBtn` (`::after` ហួសបាត navbar ៦px) ➜ PTR ត្រូវ block · shard ២/៤ ៖ កណ្តាល ✖ ប្រអប់ស្កេន នៅ ២២px ពីជ្រុងកាត ➜ ចំណុចអង្កត់ទ្រូង (២០,−២០) ធ្លាក់លើជ្រុងមូលរបស់កាត (`--radius-xl` ➜ ក្រៅកាត) ➜ `layout` FAIL ១ | ដកការពង្រីក ☰ · 🔔 ➜ `native:check` ១១៦/០ · `tapTargetLayout` ៖ ទិសផ្ទុយ ក្រោមបាត ☰ · 🔔 ៤px មិនមែនប៊ូតុង (ដាក់ការពង្រីកវិញ ➜ FAIL) · អង្កត់ទ្រូង ±១៥px |
+
+### 2026-10-15 — រាយការណ៍ម្ចាស់គម្រោងលើ 2.50.76 ៖ «បញ្ចូលច្រើន» + keyboard ➜ ទំព័ររអិលឡើង navbar បាត់ · វាស់គ្រប់ទំហំ រួម tablet
+
+**វិធី** ៖ អាន focus ដោយកូដទាំងអស់ (`grep focusField(`) ➜ `openBatchScanModal()` focus ក្នុង `setTimeout` ១៥០ms គ្មាន `preventScroll` · Chromium មិនរំកិល document សម្រាប់ធាតុ fixed ➜ វាស់ **មូលហេតុ** ជំនួស ៖
+spy `HTMLElement.prototype.focus` (options) + គំរូ document រំកិល (spacer absolute ➜ document រមូរបាន ដូច iOS ពេល keyboard) · ទំហំ tablet/ផ្តេកក្នុងច្បាប់ទីតាំង ➜ ធ្លាក់លើ `13a0421` ➜ ទើបកែ ·
+run-all STRICT ពេញលើ `13a0421` (2.50.76) ៖ ✅ ២០៦/២០៦ (០ មួយផ្នែក · ០ រំលង)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A95 | **ទំព័រខាងក្រោយរអិលឡើងពេល keyboard បើកក្នុងប្រអប់ · ទូរស័ព្ទផ្តេក Sheet import** | `focusField()` លើប្រអប់វាយ (ref) ៣៤ ក្នុងគ្រប់ប្រអប់ ➜ `preventScroll: false` ៣៤/៣៤ · `openBatchScanModal()` ពិត ➜ `batchBarcodeInput` `preventScroll: false` · document `scrollTo(0, 220)` ខណៈប្រអប់បើក (iOS standalone) ➜ នៅ ២២០ (`restoreIOSDocumentScroll()` តែពេលស្វែងរក) · 844×390 keyboard ២០០ ៖ `sheetImportModal` ផ្ទៃរមូរ `.si-scroll` [១០២,១០៦] = ៤px ➜ ប្រអប់វាយ ៤ មើលមិនឃើញ · iPad បញ្ឈរ/ផ្តេក ៖ ត្រឹមត្រូវរួច | `focusField()` ➜ `preventScroll` ក្នុង `.modal` · `iosModalDocumentLocked()` · `.modal.modal-kb > .si-modal-content { display: block }` ➜ `modal-keyboard-test` FAIL ៤ ➜ ៥៣/៥៣ |
+
+### 2026-10-15 — រូបថត iPhone ម្ចាស់គម្រោងលើ 2.50.75 ៖ ប៊ូតុង PIN · ចំណងជើង «បញ្ចូលច្រើន» ត្រូវកាត់
+
+**វិធី** ៖ App ពិត (audit build) · visualViewport ក្លែង 393×852 · keyboard ៤០០ (អានពីរូបថត ៖ ១.៥ px ក្នុងមួយ CSS px · បន្ទាត់ keyboard ≈ ៤៥២) ➜ វាស់កាតមុនកែ ➜ សរសេរច្បាប់ទីតាំងថ្មីក្នុង
+`modal-keyboard-test` ➜ ធ្លាក់លើ `a7d9b02` ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A94 | **ប្រអប់ខ្លីត្រូវកាត់ · ប្រអប់វែងមិនប្រើផ្ទៃពីលើ** | 2.50.75 · 393×852 · keyboard ៤០០ ៖ `pinModal` ២២៨px ➜ កាត [២៦៤,៤៤៤] = ១៨០ (ជាន់ `MODAL_KEYBOARD_MIN_VISIBLE_PX`) · ប៊ូតុងមើលមិនឃើញ · `editPhoneModal` ២១១ ➜ ១៨០ · `batchScanModal` ៤១០ ➜ ២២៣ (`scrollTop` ៣២ ➜ ចំណងជើងលាក់) ខណៈផ្ទៃ [១២,៤៤៤] = ៤៣២ · `lookupApiConfigModal` ៧៩០ ➜ ៣៨០ (កំពូល ៦៤ ៖ ៥២px ទំនេរពីលើ) · 375×667 ៖ ចំណងជើង «API» ក៏លាក់ដែរ · មូលហេតុ ៖ «កំពូលមិនផ្លាស់ទី» អនុវត្តលើគ្រប់ប្រអប់ ទោះប្រអប់នោះល្មមផ្ទៃ | `modalKeyboardFitFor()` ៖ ល្មម ➜ `top = line − height` · មិនល្មម ➜ `top = offsetTop + max(pad, --modal-safe-top + GAP)` · ដក `raised` · `focusedModalFieldClipped()` · `MODAL_KEYBOARD_MIN_VISIBLE_PX` · `modal-keyboard-test` (ទំហំទី ៤ + status bar ក្លែង) FAIL ៩ ➜ ៤៣/៤៣ |
+
+### 2026-10-15 — សំណើម្ចាស់គម្រោង ៖ CI PR #317 ធ្លាក់ · ផ្ទៀងផ្ទាត់ការងារក្នុង PR ឡើងវិញ (ចន្លោះ · មុខងារខុសស្តង់ដារ)
+
+**វិធី** ៖ log CI លើ `be04280` (ផ្នែក ២ · ៣ · ៤ ធ្លាក់ ១ ក្នុងមួយផ្នែក) ➜ កែ ➜ checker ទាំង ៣ ជាប់លើ build វាស់ · អានកូដដែល PR ប្តូរ ➜ សម្មតិកម្ម ➜ វាស់ក្នុង Chromium ពិត (visualViewport ក្លែងរបស់
+`modal-keyboard-test`) មុនកែ ➜ ឧបករណ៍ធ្លាក់លើ tree មុនកែ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A91 | **CI ៣ ផ្នែកធ្លាក់** | `zoew-suite-test` ៖ eslint `no-useless-assignment` (`let caret = null; try { caret = … } catch (e) { caret = null; }` ➜ តម្លៃដំបូងមិនដែលអាន) + `@typescript-eslint/no-unused-vars` (`e`) · `function-surface-test` ៖ `touchById ×2` · `code-duplication-test` ៖ `touchById@25848 \| touchById@26090` (១៤០ តួ) + ប្លុក ៣៤៨ តួ (`focusIOSSearchWithoutScroll` ធៀប `focusModalFieldWithoutScroll`) ៖ [2.50.73] ចម្លង helper ជំនួសការនាំចូល | `catch {}` · `tapEndedInPlace(e, tap, slopPx, maxMs)` មួយ (cancelable · គ្មានម្រាមដៃនៅលើ · `touchById` · គម្លាត · ពេល) ➜ ៖ eslint ស្អាត · ២៧/២៧ · ១៤/១៤ · vitest iOS ៧ ឯកសារ ៧៨/៧៨ (`ios-search-tap-focus` ទ្រាំ `changedTouches` `[null, …]` ➜ រក្សា `touchById` ⛔ មិនមែន `touchByIdentifier()` របស់ `panel-motion.ts` ដែលអាន `.identifier` លើ `null`) |
+| A92 | **toast នៅក្រោយ keyboard (iPhone · Android Chrome)** | toast `fixed` បាត ២៤px នៃ layout viewport ៖ iOS មិនបង្រួមវា ➜ keyboard ៣៣៦px បាំង ➜ App ពិត ៖ ១៦/១៦ ករណី (ទំព័រ · `batchScanModal` · `pinModal` · `lookupApiConfigModal` · រំកិល ០/១៤០ · 390×844 · 320×568) toast នៅ ៧៩០–៨២០ ធៀបផ្ទៃមើលឃើញ ០–៥០៨ / ១៤០–៦៤៨ · ផ្លូវពិត ៖ ប៊ូតុងក្នុងប្រអប់ (iOS មិនបិទ keyboard) · `startBatchScan()` ទទេ · `testLookupApiConfig` · កូដអញ្ជើញ · Barcode ស្ទួនក្នុង `hwScannerInput` | `measureKeyboardCover()` ➜ `uiState.keyboardCover` ➜ `--keyboard-cover` ➜ `.toast-container` ➜ ១៦/១៦ នៅក្នុងផ្ទៃមើលឃើញ និងនៅខាងលើប្រអប់ · keyboard បិទ / APK ➜ ២៤px · `modal-keyboard-test` +៥ · vitest +៤ |
+| A93 | **សម្មតិកម្មដែលវាស់ហើយបដិសេធ** | បង្វិលអេក្រង់ខណៈ keyboard បើក (`naturalBox` វាស់ក្នុងបញ្ឈរ) ៖ 844×390 keyboard ២០០ ➜ `lookupApiConfigModal` កំពូល ១២ បាត ១៨២ ≤ ផ្ទៃមើលឃើញ ១៩០ · `editPhoneModal` ដូចគ្នា (ផ្លូវ «ផ្ទៃនៅសល់ < ជាន់» លើកកំពូល) · caret នៅចុងពេលចុចប្រអប់វាយលើកដំបូង (iOS) ៖ ការសម្រេចរបស់ [2.50.73] (ការចុចលើកទី ២ ដាក់ caret តាមកន្លែងចុច) | មិនប្តូរ |
+
+### 2026-10-15 — រាយការណ៍ម្ចាស់គម្រោង ៖ ផ្ទៃពីលើ keyboard ពណ៌ពីរ (ទើសភ្នែក) · តេស្តសុវត្ថិភាពម្តងទៀត
+
+**វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` ថតរូប (Chromium screenshot · ស្រាយ PNG) តំបន់ក្រោយ keyboard ហើយវាស់គម្លាតពណ៌ រត់លើ 2.50.73 (`a5bf0af`) ➜ ធ្លាក់ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A90 | **ផ្ទៃក្រោយ keyboard ថ្លា ពណ៌ច្រើន · ផ្ទាំងចាក់សោ App ក្រោម keyboard** | 2.50.73 ៖ ៤០/៤០ ករណីពណ៌ច្រើន (390×844 ទំព័រទិន្នន័យ ៖ rgb [៨,១៤,២៥] ➜ [១១១,១១៦,១២៧] គម្លាត ១០៣ · រំកិល ១៤០ ៖ ១០២) ៖ ផ្ទៃងងឹតថ្លា ៦០% លើកាត · ប៊ូតុង · របារ tab ➜ keyboard ថ្លារបស់ iPhone ឃើញពណ៌ច្រើន · ផ្ទាំងចាក់សោ ៖ ក្រឡាគ្មានចំណុចលេច (ទំព័រខាងក្រោយ `visibility: hidden`) · ចុច · Escape · PIN ខុស ➜ នៅចាក់សោ | `.modal::after` ស្រអាប់ (ផ្ទៃងងឹតលើ `--body-bg`) ពី `--modal-kb-line` ចុះក្រោម ➜ ៤០/៤០ ពណ៌តែមួយ (គម្លាត ≤ ៣ · checker រក្សា ២៦ ករណី) · ផ្ទាំងចាក់សោ ៖ គ្មានផ្លូវរំលង (ចាក់សោក្នុង `modal-keyboard-test`) |
+
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.72 ៖ ប្រអប់វែងផុតអេក្រង់ · ពីលើ keyboard ពណ៌ពីរ · តេស្តសុវត្ថិភាព PIN/Login
+
+**វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` សរសេរច្បាប់ថ្មី (ទីតាំងដើមលើអេក្រង់ · បាតត្រឹម keyboard · backdrop + `elementFromPoint` ក្នុងផ្ទៃ keyboard · ក្រឡាសុវត្ថិភាព) រត់លើ
+2.50.72 (`b802db2`) ➜ ធ្លាក់ ➜ ទើបកែ · `pin-prompt-test` ផ្នែកថ្មីរត់លើ mutation ➜ ធ្លាក់។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A88 | **ប្រអប់ + keyboard ➜ ប្រអប់ទាំងមូលរំកិល (ប្រអប់វែងផុត) · ក្រោយ keyboard គ្មានផ្ទៃងងឹត (ពណ៌ពីរ) · ទំព័រខាងក្រោយប្រអប់ចូល/PIN ទទួលការចុច** | 2.50.72 ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ធ្លាក់គ្រប់ទំហំ (390×844 ៖ PIN កំពូល ៣០៨ ➜ ១៤០ · backdrop [០,៥០៨] ឈប់ត្រឹម keyboard · ក្រោយ keyboard = ទំព័រ) · `lookupApiConfigModal` ១៨/១៨ កំពូលផ្លាស់ទី · រំកិល ១៤០ ៖ កំពូលលើអេក្រង់ ១៩៣ ➜ ២៥ · ក្រឡាសុវត្ថិភាព ៖ ២៣៨/៥៩៥ ចំណុចជាទំព័រ (`daily-stats-btn` · `appPages` ក្រោយ keyboard · `app-navbar` ពេលរំកិល) សម្រាប់ login · Activate · PIN · កំណត់ PIN · ចុចផ្ទៃងងឹតក្រោម keyboard មិនបោះបង់ PIN (ការចុចទៅទំព័រ) · APK ៖ កន្លែងវាយចុងក្រោយ [៦៤៧,៦៩៣] នៅក្រោមកាត (បាត ៤៧០) · iPhone ៖ ចុចកន្លែងវាយ ➜ touchend មិន preventDefault (iOS រំកិលទំព័រ) | `.modal` ពេញ + `::after` (`--modal-kb-pan` + safe-area) · `.modal-kb` តែប្រអប់ខាងលើគេ (កំពូលដើម + `offsetTop` · `max-height` ត្រឹម keyboard − ៨) · reveal គម្លាតបង្រួម · raised ពេលអ្នករមូរខាងក្នុងតូចជាងកន្លែងវាយ (`sheetImportModal` 320×568 ៖ `si-scroll` ៥៣px) · វាស់ក្រោយ React គូរ (`editPhoneModal` បើកខណៈ keyboard បើក ៖ មុន ➜ មិនតម្រូវ) · APK `resize` reveal · ការចុច iPhone ➜ `focusElementWithoutScroll()` ➜ ៣២/៣២ |
+| A89 | **ផ្លូវរំលង PIN/Login ដែលអ្នកប្រើធ្វើបាន** | ផ្លូវដែលពិនិត្យ ៖ ចុចផ្ទៃងងឹត · Escape · Back (`native-back`) · ទំព័រខាងក្រោយ (ក្រឡា) · ប៊ូតុងដែលហៅគោលដៅក្រោយ PIN ដោយផ្ទាល់ (`ACTION_REGISTRY` ∪ `ACTION_ALLOWLIST` ៖ ១៤៨ ឈ្មោះ) · ប្រអប់កំណត់ PIN ពេលមាន PIN · PIN ខុស (សោ ៥ ដង/៦០ វិ.) · ការបោះបង់ (`cancelPinEntryFlow`/`cancelPinSetupFlow` សម្អាត `pinTargetAction`) ៖ គោលដៅក្រោយ PIN ១៤ ឈ្មោះ + `openConfigModal` ➜ ០ ដែលប៊ូតុងហៅដោយផ្ទាល់ · ២ ពិនិត្យខ្លួនឯង (`openZtoListSyncModal` · `recheckZtoPickupStatus` ៖ សោ secret ➜ `requestPinBeforeConfig(ខ្លួនឯង)`) · `pinSetupModal` បើកតែ `!savedPin` (២ កន្លែង) | គ្មានផ្លូវរំលងដែលអ្នកប្រើធ្វើបាន (ក្រៅពី A88 ដែលកែរួច) · `pin-prompt-test` ចាក់សោ (mutation ➜ ធ្លាក់) · ព្រំដែនដែលទទួលស្គាល់ ៖ ការកែ DOM/localStorage ដោយ DevTools (PIN · ចំនួនខុស) — «Inspect element» ការពារមិនបាន ហើយទិន្នន័យការពារដោយ rules (`auth != null`) មិនមែនដោយប្រអប់ |
+
+### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.71 ៖ ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ➜ ញ៉ាក់
+
+**វិធី** ៖ វីដេអូ `_030` (៨៨០×១៩២០ · ១២.៧ វិ.) ➜ ស៊ុម ៥/វិ.
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A87 | **ប្រអប់ + keyboard ➜ អូសផ្ទៃខាងក្រោយ ➜ ទំព័រ + ប្រអប់រំកិល ហើយលោតត្រឡប់** | វីដេអូ ៖ ២.៤ វិ. focus ➜ iOS រំកិលទំព័រ (ប្រអប់នៅកំពូល) ➜ ២.៦ វិ. ប្រអប់ចុះមកកណ្តាលពីលើ keyboard ([2.50.71]) · ៤.០–៥.២ វិ. អូស ➜ ប្រអប់ឡើងបាត់ក្បាលក្រោម status bar · ទំព័រខាងក្រោយឃើញនៅបាត ➜ លោតត្រឡប់ · ការចាក់សោការអូស (`blockIOSKeyboardPan` · touch-action) មានតែពេលស្វែងរក ➜ ប្រអប់គ្មាន · Chromium (`gesture-test` `webkitPan`) ៖ ផ្ទៃខាងក្រោយ touch-action `auto` · touchmove ដំបូងមិនចាប់ (ផ្ទៃខាងក្រោយ · កាត · textarea) | `iosKeyboardPanLocked()` រួមប្រអប់ · `gesture-test` ២ ធ្លាក់លើ 2.50.71 ➜ ១៧៦ · `ios-keyboard-pan.test.ts` +៤ · ⚠️ ការលោតពេល focus ដំបូង (iOS បង្ហាញកន្លែងវាយមុន keyboard ចប់) នៅដដែល · ⚠️ សកម្មភាព ១–២ [2.50.72] |
+
+### 2026-10-14 — សំណើម្ចាស់គម្រោង ៖ ប្រអប់ដែលមានកន្លែងវាយ ត្រូវ keyboard បាំង
+
+**វិធី** ៖ ឧបករណ៍មុន ៖ `modal-keyboard-test` (App ពិត · visualViewport ក្លែងព្រោះ Chromium គ្មាន keyboard · បញ្ជីប្រអប់ពី DOM) រត់លើ 2.50.70 ➜ ធ្លាក់ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A86 | **ប្រអប់ដែលមានកន្លែងវាយ ៖ keyboard បាំងកាត ឬកន្លែងវាយ** | 2.50.70 ៖ ៣៤ កន្លែងវាយ × ៣ ទំហំ ៖ គ្រប់ទំហំធ្លាក់ (ឧ. 390×844 ៖ PIN កាត [308,536] ផ្ទៃមើលឃើញ [0,508] · Config [205,639] · 320×568 ៖ កន្លែងវាយ PIN [272,318] ក្រោមផ្ទៃ [0,315]) · ផ្ទៃរំកិល ១៤០ ➜ កាតមិនតាម · បើកប្រអប់ខណៈ keyboard បើក ➜ នៅក្រោម · APK (viewport បង្រួម) ➜ នៅក្នុងរួច | `listenModalKeyboard()` ➜ `.modal` = visualViewport · `.modal-content` 100% · `revealFocusedModalField()` · ១៨/១៨ · mutation (បិទការរមូរកន្លែងវាយ) ➜ ៣ ធ្លាក់ · ⚠️ សកម្មភាព ១–២ [2.50.71] |
+
+### 2026-10-14 — រាយការណ៍ម្ចាស់គម្រោង ៖ មានតែការអូសក្នុងប្រអប់វាយលេខស្វែងរកដែលរំកិលទំព័រ (iPhone)
+
+**វិធី** ៖ ម្ចាស់គម្រោងបញ្ជាក់ ៖ កន្លែងផ្សេងទប់បាន · មានតែការអូសចាប់ផ្តើមក្នុងប្រអប់វាយលេខ ➜ អាន `blockIOSKeyboardPan()` (លើកលែង `INPUT`/`TEXTAREA` គ្រប់ប្រអប់) និងប្រភព WebKit
+`main` (`WKContentViewInteraction.mm` `deferringGestureRecognizer:shouldDeferOtherGestureRecognizer:` · `HTMLInputElement::createInnerTextStyle`)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A85 | **keyboard បើក ➜ អូសឡើងចុះក្នុងប្រអប់វាយលេខស្វែងរក ➜ ទំព័រ + navbar រំកិល** | WebKit ៖ `_touchMoveDeferringGestureRecognizer` ពន្យារ `UIPanGestureRecognizer`/`UIPinchGestureRecognizer` ទាំងអស់ក្រោម web view ហើយបោះបង់វាតែពេល touchmove ដំបូងត្រូវ preventDefault (`_touchStartedNearSelectionHandle` ➜ មិនពន្យារ) · inner text របស់ input = `overflow: hidden` (មិនមែនអ្នករមូរ ➜ touch-action `none` ពី body) ➜ pan ដែលរំកិលទំព័រ = pan របស់ text interaction ដែល touch-action មិនឃាត់ · `blockIOSKeyboardPan()` លើកលែងប្រអប់អក្សរ ➜ មិនទប់ · Chromium (`gesture-test` `webkitPan`) ៖ `#searchPhoneInput` focus · អូសចុះ/ឡើង ➜ touchmove ដំបូងមិនចាប់ ➜ pan ចាប់ផ្តើម | ប្រអប់ស្វែងរក (`IOS_SEARCH_FIELDS`) អូសបញ្ឈរ ➜ ទប់ · `gesture-test` ១ ធ្លាក់លើ 2.50.69 ➜ ១៧០ · `ios-keyboard-pan.test.ts` +១ · ⚠️ សកម្មភាព ១–២ [2.50.70] |
+
+### 2026-10-14 — ការផ្ទៀងផ្ទាត់ PR #317 ឡើងវិញ (សំណើម្ចាស់គម្រោង) ៖ keyboard បើក · បញ្ជីលេខដែលស្នើ · ការដោះ snap ភ្លាម
+
+**វិធី** ៖ អាន diff ទាំងមូល `origin/main..5fad053` (កូដដែលដឹកជញ្ជូន) ➜ ចំណុចដែល tool មិនទាន់វាស់ ៖ checker [2.50.68] ពិនិត្យតែ ៦ ចំណុចដែលរើស ➜ ប្តូរទៅក្រឡា ២២px លើផ្ទៃខាងលើ
+keyboard ទាំងមូល (ទំព័រទិន្នន័យ · ទំព័រស្កេន · Suggestion) · ប្រភព WebKit `main` (`LocalFrameViewLayoutContext.cpp` · `LocalFrameView.cpp` · `RenderLayerScrollableArea.cpp` ·
+`ScrollingEffectsController.cpp` · `ScrollableArea.cpp`) សម្រាប់ការដោះ snap ភ្លាម។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A83 | **keyboard បើក ➜ អូសលើបញ្ជីលេខដែលស្នើ ➜ ទំព័ររំកិល** | ក្រឡា ៣៨០ ចំណុច ៖ Suggestion ២ ជួរ (sh = ch) ➜ `.phone-suggest-item` · `-number` · `-meta` ៤២ ចំណុច `auto` ➜ scroll view មេ · ១២ ជួរ (រមូរបាន) ➜ ១៥៤ ចំណុចក្នុង `#phoneSuggestBox` `overscroll-behavior-y: auto` (ចុងបញ្ជីបន្ត) · ទំព័រស្កេន ៖ ០ · ទំព័រទិន្នន័យ (បញ្ជីពេញ · ទទេ) ៖ ០ | `iosKeyboardSuggestFixed` ➜ `body.ios-keyboard-suggest-fixed` ➜ `touch-action: none` · `contain` · `gesture-test` ២ ធ្លាក់លើ 2.50.68 ➜ ១៦៦ · ⚠️ សកម្មភាព ១ [2.50.69] |
+| A84 | **ការដោះ snap ភ្លាមក្នុង `settleIOSSearchPullDown()` ([2.50.68]) នៅតែលុប snap state?** | WebKit ៖ អ្នករមូរ overflow (`#appPages`) គណនា snap offsets ក្នុង layout ខ្លួនឯង (`RenderLayerScrollableArea::updateScrollInfoAfterLayout` ➜ `updateSnapOffsets` ➜ `scroll-snap-type: none` ➜ `clearSnapOffsets` ➜ `m_scrollSnapState = nullptr`) · layout ដែលបង្ខំ (អាន `scrollTop`) ដំណើរការ post-layout ភ្លាម (`runOrScheduleAsynchronousTasks`) · state ថ្មីជ្រើសសន្ទស្សន៍ជិតបំផុត (`shouldComputeCurrentSnapIndices`) · ការទាញចុះតាម `glidePhoneSearchPulledUp()` កាន់ token ការរអិលខ្លួនឯងរហូតចប់ | គ្មានការកែ · ⚠️ `resnapAfterLayout` ក្នុង `performPostLayoutTasks` សម្រាប់តែ frame view ក្នុង WebKit `main` ➜ យន្តការ re-snap ពិតលើ iOS ដែលកំពុងប្រើ មិនទាន់វាស់បាន ➜ ការផ្អាកគ្រប layout នៃ commit ទាំងពីរករណី |
+| — | `.modal-content` ដែលរមូរមិនបាន ពេលប្រអប់បើកលើការស្វែងរកទាញឡើង + keyboard | backdrop `none` (ហាម) · ក្នុង `.modal-content` (`overflow-y: auto`) ➜ `auto` ដូចប្រអប់ទាំងអស់ពីមុន | មិនកែ (ក្រៅសំណើ · មិនមែនការថយក្រោយ) · កត់ក្នុង `CLAUDE.md` «Not covered» |
+
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោងលើ 2.50.67 ៖ iPhone keyboard បើក ទំព័ររំកិល · ប្រអប់ស្វែងរកលិចពាក់កណ្តាលក្រោយបិទ keyboard
+
+**វិធី** ៖ វីដេអូ `_441` (៨៨០×១៩២០ · ១៣.៨ វិ.) + រូបថត ➜ ប្រភព WebKit ពិត (`WKContentViewInteraction.mm` `_handleTouchActionsForTouchEvent` · `WKTouchActionGestureRecognizer.mm` ·
+`WKWebViewIOS.mm` `axesToPreventScrollingForPanGestureInScrollView` · `ScrollingTreeScrollingNodeDelegateIOS.mm` · `StyleAdjuster.cpp` `computeUsedTouchAction`) ➜ គំរូក្នុង `gesture-test` លើ CSS ពិត។
+⚠️ ហេតុដែល `blockIOSKeyboardPan()` មិនទប់ក្នុងវីដេអូ (បញ្ជីទទេ ➜ Chromium វាស់ «គ្មានកន្លែង» ➜ ការសម្រេច block) មិនទាន់វាស់បានក្រៅ iPhone ➜ ការកែមិនពឹង JS ទៀតទេ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A81 | **iPhone PWA ៖ keyboard បើក ➜ ទំព័រ + navbar រំកិល** | វីដេអូ ៖ ស្វែងរក (keyboard · បញ្ជីទទេ) ➜ ៤.៥ · ៧.៥ · ៩.០–១០.៥ វិ. ទំព័រទាំងមូលឡើង ~៦០pt (navbar ចេញ) ➜ លោតត្រឡប់ · WebKit ៖ touch-action នៅចំណុចចាប់ផ្តើម ➜ `_preventsPanningInYAxis` ➜ scroll view មេមិនរំកិល (UI process · មិនពឹង JS) · Chromium វាស់ (គំរូ WebKit) ៖ navbar `pan-y` (html/body) · ប្រអប់ស្វែងរក `manipulation` · កាត · ដងអូស `auto` (`.app-pages` `overflow-y: hidden` ➜ `overflow-x` = `auto` ➜ ចាប់ផ្តើម auto ឡើងវិញ) ➜ មិនហាម Y ទាំងអស់ · បញ្ជីទទេ ៖ sh = ch = 246 (គ្មាន scroll view កូន) | `body.ios-keyboard` ➜ `touch-action: none` លើ `body` · `.app-pages` · បញ្ជីរមូរមិនបាន ➜ `body.ios-keyboard-list-fixed` · `gesture-test` ៥ ធ្លាក់លើ 2.50.67 ➜ ១៦០ · ⚠️ សកម្មភាព ១ [2.50.68] |
+| A82 | **iPhone PWA ៖ បិទ keyboard ហើយអូស ➜ ប្រអប់ស្វែងរកលិចពាក់កណ្តាល** (រូបថត ៖ កាតបញ្ជីនៅ ~៤៨pt ក្រោមទីតាំង snap · ក្នុង proximity) | ការផ្អាក snap របស់ [2.50.67] មិនដោះ token (រង់ចាំពិដាន `PANEL_SEARCH_GLIDE_MS + PANEL_GLIDE_HOLD_MAX_MS + PANEL_GLIDE_SNAP_GRACE_MS` ≈ ០.៨ វិ.) ➜ UIScrollView កំណត់គោលដៅនៅពេលលែងដៃ (snap offsets ទទេ) ➜ ឈប់ពាក់កណ្តាល | ដោះការផ្អាកភ្លាមក្រោយ layout នៃ commit · ម្រាមដៃក្នុងចន្លោះទាញចុះ ➜ `endPanelGlideSnapPause()` · `ios-search-resnap.test.tsx` +៤ (៤ ធ្លាក់លើ 2.50.67) · ⚠️ សកម្មភាព ២ [2.50.68] |
+
+### 2026-10-14 — វីដេអូម្ចាស់គម្រោងលើ PR #317 ៖ iPhone PTR នៅពិបាក · ប្រអប់ស្វែងរកនៅលាក់ពេលបិទ keyboard ➜ ប្រភព WebKit ពិត
+
+**វិធី** ៖ ញែកវីដេអូ ២ (ffmpeg ៖ ២–១២ ស៊ុម/វិ. · ស៊ុមកាត់ផ្នែកខាងលើ) ➜ សម្មតិកម្មពីការអានកូដ ➜ អានប្រភព WebKit ពិត (GitHub `WebKit/WebKit` `main` ៖
+`WKContentViewInteraction.mm` · `WebPageProxy.cpp` · `ScrollSnapAnimatorState.cpp` · `ScrollingEffectsController.cpp` · `ScrollableArea.cpp` · `ScrollAnimator.cpp` ·
+`LocalFrameView.cpp` · `LocalFrameViewLayoutContext.cpp` · `ScrollSnapOffsetsInfo.cpp`) ➜ គំរូក្នុងអ្នកយាម (Chromium/happy-dom មិនអនុវត្តច្បាប់ WebKit) ➜ ធ្លាក់លើដើមឈើ PR #317 ➜ កែ។
+⚠️ ការចាប់ DOM `cancelable` សម្រាប់ touch event «unpreventable» នៅក្នុង WebKitAdditions (មិនមែនប្រភពបើក) ➜ សន្និដ្ឋានពីវីដេអូ (ទាញវែងគ្មានរង្វង់ = PTR `park()` ដោយ `!e.cancelable`)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A79 | **iPhone PWA ៖ PTR ម្តងកេះម្តងអត់** (ម្ចាស់គម្រោង ៖ «PTR នៅតែពិបាក» ក្រោយ switch haptic ដកចេញ · A77 មិនមែនមូលហេតុ) | វីដេអូ `_541` (៨៨០×១៩២០ · ២៧.២ វិ.) ៖ ទាញ ≥ ៧ ដង ទំព័រ bounce ~១០០–១៩០pt (រង្វង់មិនលេច) · កេះ ១ ដង (១២.៦ វិ. ៖ រង្វង់ + ទំព័រ bounce ព្រមគ្នា) · WebKit ៖ `handlePreventableTouchEvent` ➜ `m_touchMovePreventionState` `Waiting` តែ touchmove **ដំបូង** ➜ `doneDeferringTouchMove(handled)` · `scrollViewWillStartPanOrPinchGesture` ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ event បន្ទាប់ `handleUnpreventableTouchEvent` លើកលែង `isDefaultPrevented` ជាប់ (`_touchEvent:preventsNativeGestures:`) · PTR iOS ចាប់តែក្រោយ `AXIS_SLOP` 22px > hysteresis pan ~១០pt ➜ ករណីកេះ = move ដំបូងលោតឆ្ងាយ ឬ move មុន pan ត្រូវចាប់ (bounce + រង្វង់ = ស៊ុម ១២.៦ វិ.) | `claimsBeforeSlop()` ៖ iOS standalone ចាប់ touchmove ចុះបញ្ឈរតាំងពី move ដំបូង (ដូច APK) · ប៊ូតុងក្នុងជួរតារាងមិនចាប់មុន slop · `gesture-test` គំរូ `webkitPan` ៨ ធ្លាក់លើ PR #317 ➜ ១៥០/១៥០ · `LOCK` ថ្មី · ⚠️ សកម្មភាព ១ [2.50.67] |
+| A80 | **iPhone PWA ៖ បិទ keyboard ➜ ប្រអប់ស្វែងរកនៅលាក់ ~១ វិ.** (ការកែ A78 មិនដើរ) | វីដេអូ `_804` (៨៨០×១៩២០ · ១៤.៤ វិ.) ៖ blur ៨.៩០ វិ. ➜ ប្រអប់ស្វែងរក **រអិលឡើង** ៨.៩៨–៩.៣២ ➜ លាក់ក្រោម navbar ➜ លោតត្រឡប់ ៩.៩៨ (= ១៥០ms blur + `IOS_SEARCH_PULLDOWN_SETTLE_MS` ៩៩០ms) · ករណីទី ១ (៣.០ ➜ ៤.០ វិ.) ដូចគ្នា · CSS ៖ `.page-main` ជាគោលដៅ snap តែមួយ · WebKit ៖ `ScrollSnapAnimatorState::resnapAfterLayout` រក្សាប្រអប់ដែល snap មុន layout · ខណៈទាញឡើង offset `.page-main` = ០ = scrollTop ➜ កត់ `.page-main` · `performPostLayoutTasks` ➜ `resnapAfterLayout()` សមកាលក្នុង layout ដែល `getBoundingClientRect` បង្ខំ (`runOrScheduleAsynchronousTasks`) ➜ ការពិនិត្យ [2.50.66] រត់ក្នុង subscriber **មុន** React commit (`dataPanelSearchFocus` immediate ➜ `flushSync`) ➜ ឃើញ ០ · `scroll-snap-type: none` ➜ `setSnapOffsetsInfo(empty)` ➜ `m_scrollSnapState = nullptr` · state ថ្មី ➜ `updateActiveScrollSnapIndexForClientOffset()` (proximity ០.៣ snapport) · scroll ពី App ➜ `setCurrentPosition` ➜ index ជិតបំផុត | `settleIOSSearchPullDown()` ៖ `beginPanelGlideSnapPause()` មុន commit (commit ដដែល) · `ios-search-resnap.test.tsx` ៤ (គំរូ WebKit លើ React ពិត · ៣ ធ្លាក់លើ PR #317 · ១ = គំរូអាចធ្លាក់) · ⚠️ សកម្មភាព ២ [2.50.67] |
+
 ### 2026-10-14 — វីដេអូម្ចាស់គម្រោង ៖ iPhone PWA ស្វែងរកលេខពេល keyboard បើក ➜ ទំព័ររំកិលតាមម្រាមដៃ ហើយលោតត្រឡប់ ➜ [2.50.65]
 
 **វិធី** ៖ ញែកវីដេអូ (VID_20261014_155824 · ៨៨៤×១៩២០ · ៦០ ស៊ុម/វិ. · ២១.៩ វិ. · keyboard លេខបើកពេញវីដេអូ · ប្រអប់ស្វែងរកទាញឡើង) ជាស៊ុម ៣០ ស៊ុម/វិ. (`ffmpeg`) ➜ វាស់ទីតាំងបញ្ឈរ
@@ -3805,7 +4443,8 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
 | A76 | **iPhone PWA ៖ អូសលើកាតបញ្ជីខណៈស្វែងរកលេខ ➜ ទំព័រទាំងមូលរំកិលឡើង ហើយលោតត្រឡប់** (ម្ចាស់គម្រោង ៖ «ចលនា scroll iOS ខុសប្រក្រតី · APK · PWA Android រលូន») | ព្រឹត្តិការណ៍ ៧ (១.១ · ២.៣ · ៣.៧ · ៤.៨ · ៦.២ · ១៨.២ · ១៩.៤ វិ.) ដូចគ្នា ៖ ទំព័រទាំងមូល (navbar · ប្រអប់ស្វែងរក · កាត) រំកិលឡើង > ២០០px (មាត្រដ្ឋាន ៤៨០) ក្នុង ១៣០–៣០០ms តាមម្រាមដៃ ➜ បង្ហាញផ្នែកសដែលនៅក្រោយ keyboard (ប៊ូតុង «បន្ថែម» · ចន្លោះទទេ) ➜ ឈរ ២០០–៣០០ms ➜ ត្រឡប់ ០ ក្នុង **១ ស៊ុម** (មិនមែន rubber band ដែលមានចលនា) · Chromium (ក្លែង iOS standalone) ៖ `.page-main` ក្រោម `search-focus` = `flex: 1 1 0` ក្នុង `.app-page.active { height: 100% }` នៃ `.app-pages` = `100dvh − chrome` ➜ iOS មិនបង្រួម `100dvh`/`innerHeight` ពេល keyboard បើក (Android បង្រួម) ➜ កាតលាតដល់ក្រោយ keyboard · ជួរនៅទីនោះមើលមិនឃើញក្រៅពីអូស document (iOS អនុញ្ញាតទោះ `html.ios-standalone { overflow-y: hidden }`) · `restoreIOSDocumentScroll()` (2.50.42) ត្រឡប់ ០ ពេល `scroll` មកដល់ = ចុងកាយវិការ (WebKit ផ្ញើ `scroll` ពេល viewport ស្ថិរ) ➜ លោត ១ ស៊ុម | (១) inset keyboard ពី `visualViewport` ➜ `.app-pages` `padding-bottom` ➜ កាតចប់ពីលើ keyboard (គ្មានជួរលាក់ · គ្មានហេតុអូស) · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរមានកន្លែង ➜ `preventDefault()` (ដូច body-scroll-lock លើ iOS) ➜ document មិនរំកិល · ការត្រឡប់ ០ នៅជាខ្សែទីពីរ · ⚠️ keyboard iOS វាស់មិនបានក្នុងបរិស្ថាននេះ ➜ ត្រូវសាកលើ iPhone ពិត · `ZoeW/tests/ios-keyboard-pan.test.ts` ១០ ធ្លាក់លើដើមឈើមុនកែ |
-| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ |
+| A77 | **iPhone PWA ៖ PTR អត់ញ័រ** (ម្ចាស់គម្រោង) | `hapticTick()` ៖ APK ➜ Capacitor Haptics · web ➜ `navigator.vibrate` — WebKit (iOS Safari · PWA) គ្មាន `vibrate` ➜ គ្មានអ្វី (ច្បាប់ចាស់ «iPhone web has no vibration API») · ឯកសារ WebKit/Safari 17.4 ៖ `<input type="checkbox" switch>` លេង haptic ប្រព័ន្ធពេលផ្លាស់ ទាំងពី `label.click()` (ការប្រើទូទៅ ៖ បណ្ណាល័យ haptic web លើ iOS 18) · Chromium/Firefox/jsdom គ្មាន IDL `switch` ➜ `'switch' in input` = false | `iosHapticSwitchTick()` ជាផ្លូវធ្លាក់ក្រោយ `vibrate` · សាងម្តង · ក្រៅអេក្រង់ · ⚠️ វាស់មិនបានក្រៅ iPhone ➜ សកម្មភាព ៣ · `haptic-ios-switch.test.ts` ៥ · ⛔ **ដកចេញក្នុង [2.50.66]** ៖ `label.click()` ក្នុងកាយវិការធ្វើឲ្យ PTR iOS ម្តងដើរម្តងអត់ (ម្ចាស់គម្រោង) · iOS 26.5+ លេងញ័រតែពីចុចផ្ទាល់ (WebKit bug 309082 · ios-haptics «iOS 17.4–26.4») ➜ ព្រំដែនទទួលស្គាល់ ៖ iPhone web គ្មានញ័រ PTR |
+| A78 | **iPhone PWA ៖ បិទ keyboard ក្រោយស្វែងរក ➜ ប្រអប់ស្វែងរកលាក់ក្រោម navbar** (ម្ចាស់គម្រោង ៖ «scroll ទៅលាក់ ស្វែងរក អត់ជិតស្អាត» · Android ត្រឹមត្រូវ) | រូបថត ៖ navbar នៅនឹង · ក្រោម navbar ឃើញតែផ្នែកក្រោមប្រអប់ស្វែងរក (≈ 45px) · ដៃអូស · កាតបញ្ជី ➜ `#appPages` រំកិល (មិនមែន document) · Chromium ក្លែង iOS (audit build · ៣៩០×៨៤៤ · ៣៧៥×៦៦៧) ៖ ចាប់ពី scrollTop ០ · កណ្តាល (411) · snap `.page-main` (411) ➜ ទាញឡើង ➜ `overflow-y: hidden` · ចន្លោះរមូរ ០ ➜ scrollTop ០ ➜ ទាញចុះ ➜ ០ · កាតស្វែងរក top 374 (ឃើញពេញ) ➜ Chromium/Android មិនបង្កបាន · WebKit ៖ snap offsets ២ (page-side · page-main) ស្មើ ០ ខណៈទាញឡើង ➜ ក្រោយប្លង់ប្រែ re-snap ទៅ `.page-main` ឬរក្សាទីតាំងមុន focus (វាស់មិនបានក្រៅ iPhone) | `settleIOSSearchPullDown()` ៖ ទាញចុះ ➜ `#appPages` ០ ក្នុង microtask ដដែល + `panelGlideFrom()` ពីទីតាំងដែលឃើញ (មិនលោត) · ពិនិត្យយឺត `IOS_SEARCH_PULLDOWN_SETTLE_MS` (ម្រាមដៃប៉ះ · ទាញឡើងវិញ · focus ➜ មិនប៉ះ) · iOS standalone ទូរស័ព្ទតែប៉ុណ្ណោះ · `ios-search-pulldown.test.ts` ៥ (មុនកែ ៤ ធ្លាក់) · ⚠️ សកម្មភាព ១ [2.50.66] |
 
 ### 2026-10-14 — Deep audit ជុំទី ៤ ៖ toast ↔ ដំណាក់កាលការសរសេរ · Supabase replay មិនចូលដំណាក់កាល · 🧠 ការណែនាំ · ZoeW 2.50.64
 
@@ -5999,7 +6638,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `clock-hygiene` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `code-duplication-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `code-duplication-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
 | `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
 | `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
@@ -6080,6 +6719,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ |
@@ -6104,7 +6744,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `pin-prompt-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `pin-prompt-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -6147,7 +6787,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `stats-screen-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `strip-comments` | — | ផ្នែក ១ · ផ្នែក ៦ |
+| `strip-comments` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-data-tools-test` | ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -6175,7 +6815,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `write-stall-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zoew-suite-test` | ផ្នែក ២ | ផ្នែក ៦ |
+| `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `zto-budget-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `zto-cookie-session-test` | — | ផ្នែក ២ |
@@ -6212,13 +6852,14 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ២ | — |
+| `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/haptic-ios-switch.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
@@ -6240,6 +6881,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |

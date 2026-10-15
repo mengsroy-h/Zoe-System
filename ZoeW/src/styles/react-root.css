@@ -4,6 +4,12 @@
     initial-value: 1px;
 }
 
+@property --modal-safe-top {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
 #root {
     display: contents;
 }
@@ -107,6 +113,8 @@
     cursor: pointer;
 }
 .nav-bell-btn:active { background: var(--primary-light); border-color: var(--primary); }
+.drawer-close { position: relative; }
+.drawer-close::after, .modal-close-x::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; }
 .nav-bell-badge {
     position: absolute;
     top: -6px;
@@ -255,7 +263,26 @@
     .app-page.active > .page-side.search-focus + .page-main { flex: 1 1 0; min-height: 0; height: auto; }
     html.ios-standalone body.ios-keyboard .app-pages:has(> .app-page.active > .page-side.search-focus),
     html.ios-standalone body.ios-keyboard .app-pages.history-expanded { padding-bottom: calc(var(--ios-keyboard-inset, 0px) + 8px); }
-    html.ios-standalone body.ios-keyboard .app-page.active > .page-main .table-responsive { overscroll-behavior-y: contain; }
+    html.ios-standalone body.ios-keyboard .app-page.active > .page-main .table-responsive,
+    html.ios-standalone body.ios-keyboard .phone-suggest { overscroll-behavior-y: contain; }
+    html.ios-standalone body.ios-keyboard,
+    html.ios-standalone body.ios-keyboard .app-pages,
+    html.ios-standalone body.ios-keyboard-list-fixed .app-page.active > .page-main .table-responsive,
+    html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
+}
+
+.modal { --modal-safe-top: env(safe-area-inset-top, 0px); }
+.modal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: env(safe-area-inset-bottom, 0px); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; }
+body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: auto; bottom: calc(0px - var(--modal-kb-pan, 0px) - env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.6)), var(--body-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.modal.modal-kb { align-items: flex-start; }
+.modal.modal-kb > .modal-content { margin-top: var(--modal-kb-shift, 0px); max-height: var(--modal-kb-max, 85vh); }
+.modal.modal-kb > .si-modal-content { display: block; }
+html.ios-standalone body.modal-keyboard,
+html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
+html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }
+.toast-container { bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-cover, 0px))); }
+@media (max-width: 991px) {
+    body:not(.chrome-hidden) .toast-container { bottom: max(calc(var(--tabbar-height, 0px) + 12px), calc(24px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-cover, 0px)))); }
 }
 
 .trash-more-row td { border-bottom: none; }
@@ -676,9 +703,10 @@
     }
 }
 
-.haptic-switch { position: fixed; top: 0; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 
-.batch-scan-btn { cursor: pointer; }
+.batch-scan-btn { cursor: pointer; font-family: inherit; }
+.upload-fallback-row { gap: 8px; align-items: stretch; }
+.upload-fallback-row .file-upload-btn { flex: 1 1 0; min-width: 0; box-sizing: border-box; min-height: 38px; margin: 0; padding: 4px 8px; white-space: normal; line-height: 1.25; }
 .batch-scan-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 6px 8px; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.1); color: #fff; font-size: calc(11 * var(--fs-unit)); font-weight: 600; }
 .batch-scan-status span { min-width: 0; overflow-wrap: anywhere; }
 .batch-scan-stop { flex: none; background: var(--action-danger); color: #fff; border: none; border-radius: var(--radius-md); padding: 4px 10px; min-height: 30px; font-size: calc(10 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
@@ -686,51 +714,49 @@
 .batch-scan-input { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: calc(13 * var(--fs-unit)); line-height: 1.5; letter-spacing: 1px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
 .batch-scan-count { min-height: 1.4em; margin: 6px 0 0; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); text-align: left; }
 
-.label-sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
-.label-sheet.layout-a4-2 { grid-template-columns: repeat(2, 1fr); gap: 5mm; }
-.label-sheet.layout-a4-2 .label-phone { font-size: 38pt; }
+.label-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4mm; --label-phone-max: 30pt; --label-phone-ls: 0.5mm; --label-money-max: 17pt; }
+.label-sheet.layout-a4-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; --label-phone-max: 38pt; --label-money-max: 20pt; }
 .label-sheet.layout-a4-2 .label-bc { height: 16mm; }
-.label-sheet.layout-a4-2 .label-money { font-size: 20pt; }
-.label-sheet.layout-single { grid-template-columns: 1fr; gap: 0; }
+.label-sheet.layout-single { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .label-sheet.layout-single .label { border: none; break-after: page; page-break-after: always; }
 .label-sheet.layout-single .label:last-child { break-after: auto; page-break-after: auto; }
 @page zoeLabel50x30 { size: 50mm 30mm; margin: 1.5mm; }
-.label-sheet.layout-50x30 { display: block; }
+.label-sheet.layout-50x30 { display: block; --label-phone-max: 17pt; --label-phone-ls: 0.3mm; --label-money-max: 10pt; }
 .label-sheet.layout-50x30 .label { page: zoeLabel50x30; break-after: page; page-break-after: always; width: 47mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 1mm; border: none; border-radius: 0; }
 .label-sheet.layout-50x30 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-50x30 .label-phone { font-size: 17pt; letter-spacing: 0.3mm; line-height: 1.05; }
+.label-sheet.layout-50x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-50x30 .label-bc { height: 7mm; margin-top: 0.8mm; }
 .label-sheet.layout-50x30 .label-code { font-size: 6.5pt; letter-spacing: 0.3mm; margin-top: 0.3mm; }
-.label-sheet.layout-50x30 .label-money { font-size: 10pt; margin-top: 0.3mm; }
+.label-sheet.layout-50x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
 @page zoeLabel40x30 { size: 40mm 30mm; margin: 1.5mm; }
-.label-sheet.layout-40x30 { display: block; }
+.label-sheet.layout-40x30 { display: block; --label-phone-max: 14pt; --label-phone-ls: 0.2mm; --label-money-max: 9pt; }
 .label-sheet.layout-40x30 .label { page: zoeLabel40x30; break-after: page; page-break-after: always; width: 37mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 0.8mm; border: none; border-radius: 0; }
 .label-sheet.layout-40x30 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-40x30 .label-phone { font-size: 14pt; letter-spacing: 0.2mm; line-height: 1.05; }
+.label-sheet.layout-40x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-40x30 .label-bc { height: 6.5mm; margin-top: 0.8mm; }
 .label-sheet.layout-40x30 .label-code { font-size: 5.5pt; letter-spacing: 0.2mm; margin-top: 0.3mm; }
-.label-sheet.layout-40x30 .label-money { font-size: 9pt; margin-top: 0.3mm; white-space: normal; }
+.label-sheet.layout-40x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-meta { font-size: 7.5pt; gap: 2.5mm; margin-top: 0.3mm; }
 @page zoeLabel60x40 { size: 60mm 40mm; margin: 2mm; }
-.label-sheet.layout-60x40 { display: block; }
+.label-sheet.layout-60x40 { display: block; --label-phone-max: 22pt; --label-phone-ls: 0.4mm; --label-money-max: 13pt; }
 .label-sheet.layout-60x40 .label { page: zoeLabel60x40; break-after: page; page-break-after: always; width: 56mm; height: 36mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 1mm 1.5mm; border: none; border-radius: 0; }
 .label-sheet.layout-60x40 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-60x40 .label-phone { font-size: 22pt; letter-spacing: 0.4mm; line-height: 1.05; }
+.label-sheet.layout-60x40 .label-phone { line-height: 1.05; }
 .label-sheet.layout-60x40 .label-bc { height: 10mm; margin-top: 1mm; }
 .label-sheet.layout-60x40 .label-code { font-size: 8pt; letter-spacing: 0.4mm; margin-top: 0.4mm; }
-.label-sheet.layout-60x40 .label-money { font-size: 13pt; margin-top: 0.5mm; }
+.label-sheet.layout-60x40 .label-money { margin-top: 0.5mm; }
 .label-sheet.layout-60x40 .label-meta { font-size: 10pt; gap: 4mm; margin-top: 0.5mm; }
-.label { break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
-.label-phone { font-size: 30pt; font-weight: 800; line-height: 1.1; letter-spacing: 0.5mm; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.label-bc { margin: 2mm auto 0; height: 13mm; }
-.label-bc svg { display: block; width: 100%; height: 100%; }
-.label-bc svg rect { fill: #000; }
-.label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
-.label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
-.label-money { margin-top: 1mm; font-size: 17pt; font-weight: 800; white-space: nowrap; }
-.label-date { font-variant-numeric: tabular-nums; }
-.label-locker::before { content: '📍'; }
+.label-sheet .label { container-type: inline-size; break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
+.label-sheet .label-phone { font-size: var(--label-phone-max); font-size: min(var(--label-phone-max), calc((100cqw / var(--label-phone-chars, 10) - var(--label-phone-ls)) / 0.66)); font-weight: 800; line-height: 1.1; letter-spacing: var(--label-phone-ls); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.label-sheet .label-bc { margin: 2mm auto 0; height: 13mm; }
+.label-sheet .label-bc svg { display: block; width: 100%; height: 100%; }
+.label-sheet .label-bc svg rect { fill: #000; }
+.label-sheet .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
+.label-sheet .label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
+.label-sheet .label-money { margin-top: 1mm; font-size: var(--label-money-max); font-size: min(var(--label-money-max), calc(100cqw / (var(--label-money-chars, 20) * 0.62))); font-weight: 800; white-space: nowrap; }
+.label-sheet .label-date { font-variant-numeric: tabular-nums; }
+.label-sheet .label-locker::before { content: '📍'; }
 @media print {
     #pdfExportPrintArea .label-sheet { width: 100%; }
 }
@@ -741,7 +767,7 @@
 .label-print-summary { min-height: 1.4em; margin: 0 0 8px; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); }
 .label-print-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; font-size: calc(11 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); }
 .label-print-field select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: calc(12 * var(--fs-unit)); color: var(--text-main); background: #fff; }
-.label-print-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px 10px; margin-bottom: 8px; }
+.label-print-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2px 10px; margin-bottom: 8px; }
 .label-print-toggles .remember-container { margin: 0; }
 .label-preview { max-height: 36vh; overflow: auto; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f1f5f9; }
 .label-preview .label-sheet { zoom: 0.55; }
@@ -754,4 +780,10 @@
     .label-preview .label-sheet, .label-preview .label-sheet.layout-a4-2 { grid-template-columns: 1fr 1fr; }
     .label-preview .label-sheet { zoom: 0.45; }
 }
+@media (max-width: 359px) {
+    .label-preview .label-sheet.layout-50x30, .label-preview .label-sheet.layout-40x30 { zoom: 1.3; }
+    .label-preview .label-sheet.layout-60x40 { zoom: 1.1; }
+}
+.stat-card .label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.3; }
+.financial-row #summaryCodRiel, .financial-row #summaryDodRiel, .financial-row #summaryTotalRiel { white-space: nowrap; }
 

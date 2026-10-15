@@ -5,7 +5,8 @@
  * ⛔ ច្បាប់ ៖ iOS standalone · ទូរស័ព្ទ · ប្រអប់ស្វែងរកទាញឡើង (`iosSearchDocumentLocked()`) ៖ (១) `visualViewport` `resize` ➜ `uiState.iosKeyboardInset` =
  *    `innerHeight - visualViewport.height` (≥ `KEYBOARD_MIN_INSET_PX`) ➜ `body.ios-keyboard` + `--ios-keyboard-inset` ➜ `.app-pages` padding-bottom
  *    ➜ កាតបញ្ជីចប់ពីលើ keyboard ដូច Android · ប្រអប់បិទ ➜ ០ · (២) `touchmove` បញ្ឈរក្រៅអ្នករមូរដែលមានកន្លែង ➜ `preventDefault()` (document មិនរំកិល) ·
- *    ក្នុងអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ · អូសផ្ដេក · ក្នុងប្រអប់អក្សរ · ម្រាមដៃពីរ · Android/web · អេក្រង់ធំ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ។
+ *    ក្នុងអ្នករមូរដែលមានកន្លែងក្នុងទិសនោះ · អូសផ្ដេក · ក្នុងប្រអប់អក្សរផ្សេង · ម្រាមដៃពីរ · Android/web · អេក្រង់ធំ · ប្រអប់មិនទាញឡើង ➜ មិនប៉ះ ·
+ *    ប្រអប់វាយលេខស្វែងរកខ្លួនឯង (`IOS_SEARCH_FIELDS`) ៖ អូសបញ្ឈរ ➜ preventDefault (ម្ចាស់គម្រោង ៖ មានតែកន្លែងនោះដែលទំព័រនៅរំកិល)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -13,6 +14,7 @@ import path from 'node:path';
 import { uiState } from '../src/core/state';
 import * as iosViewport from '../src/app/behaviors/ios-viewport';
 import { KEYBOARD_MIN_INSET_PX } from '../src/app/behaviors/chrome-autohide';
+import { refTo } from '../src/app/refs';
 
 const listeners: Array<[EventTarget, string, any, any]> = [];
 const disposers: Array<() => void> = [];
@@ -23,6 +25,7 @@ let page: HTMLElement;
 let scroller: HTMLElement;
 let row: HTMLElement;
 let input: HTMLInputElement;
+let searchInput: HTMLInputElement;
 
 function scope() {
     return {
@@ -93,8 +96,10 @@ beforeEach(() => {
     scroller.style.overflowY = 'auto';
     row = document.createElement('div');
     input = document.createElement('input');
+    searchInput = document.createElement('input');
     scroller.appendChild(row);
-    page.append(input, scroller);
+    page.append(searchInput, input, scroller);
+    refTo('searchPhoneInput')(searchInput);
     document.body.appendChild(page);
     setScroll(scroller, 300, 300, 0);
 });
@@ -103,6 +108,7 @@ afterEach(() => {
     disposers.splice(0).forEach((fn) => fn());
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
     vi.restoreAllMocks();
+    refTo('searchPhoneInput')(null);
     page.remove();
     uiState.dataPanelSearchFocus = false;
     uiState.iosKeyboardInset = 0;
@@ -211,6 +217,17 @@ describe('iPhone PWA ៖ អូសខណៈស្វែងរកលេខ ➜ do
         expect(drag(row, { x: 100, y: 500 }, { x: 100, y: 420 }).defaultPrevented).toBe(false);
     });
 
+    it('⛔ អូសបញ្ឈរក្នុងប្រអប់វាយលេខស្វែងរកខ្លួនឯង (ម្ចាស់គម្រោង ៖ «ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ ស្វែងរក បាន scroll ទៅ តែ android អត់អី») ➜ preventDefault · ផ្ដេក (ទស្សន៍ទ្រនិច) ➜ មិនប៉ះ', () => {
+        boot();
+        searchInput.focus();
+        expect(drag(searchInput, { x: 100, y: 100 }, { x: 101, y: 40 }).defaultPrevented).toBe(true);
+        expect(drag(searchInput, { x: 100, y: 100 }, { x: 100, y: 160 }).defaultPrevented).toBe(true);
+        expect(drag(searchInput, { x: 100, y: 100 }, { x: 180, y: 96 }).defaultPrevented).toBe(false);
+        expect(drag(input, { x: 100, y: 100 }, { x: 100, y: 40 }).defaultPrevented).toBe(false);
+        uiState.dataPanelSearchFocus = false;
+        expect(drag(searchInput, { x: 100, y: 100 }, { x: 100, y: 40 }).defaultPrevented).toBe(false);
+    });
+
     it('⛔ ខ្សែភ្ជាប់ ៖ touchmove មិន passive លើ document **តែខណៈប្រអប់ទាញឡើង** (PTR នៅជា listener ទប់តែមួយក្នុងរបៀបធម្មតា) · ប្រអប់បិទ ➜ ដកចេញ', () => {
         const added: any[] = [];
         const removed: any[] = [];
@@ -230,5 +247,79 @@ describe('iPhone PWA ៖ អូសខណៈស្វែងរកលេខ ➜ do
         uiState.flush();
         expect(removed.length).toBe(1);
         expect(drag(row, { x: 100, y: 500 }, { x: 100, y: 420 }).defaultPrevented).toBe(false);
+    });
+});
+
+describe('iPhone PWA ៖ ប្រអប់បើក + keyboard (body.modal-keyboard) ➜ អូសផ្ទៃខាងក្រោយ ឬក្នុងប្រអប់ ➜ ទំព័រមិនរំកិល (វីដេអូម្ចាស់គម្រោង VID_20261015_051457)', () => {
+    let modal: HTMLElement;
+    let box: HTMLElement;
+    let modalInput: HTMLInputElement;
+    let area: HTMLTextAreaElement;
+    beforeEach(() => {
+        uiState.dataPanelSearchFocus = false;
+        modal = document.createElement('div');
+        modal.className = 'modal';
+        box = document.createElement('div');
+        box.className = 'modal-content';
+        box.style.overflowY = 'auto';
+        modalInput = document.createElement('input');
+        area = document.createElement('textarea');
+        area.style.overflowY = 'auto';
+        box.append(modalInput, area);
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+        setScroll(box, 400, 400, 0);
+        setScroll(area, 90, 90, 0);
+    });
+    afterEach(() => {
+        modal.remove();
+        uiState.modalViewportHeight = 0;
+        uiState.modalViewportTop = 0;
+    });
+
+    it('⛔ keyboard បើកក្នុងប្រអប់ ➜ អូសលើផ្ទៃខាងក្រោយ · ក្នុងកាតដែលរមូរមិនបាន · ក្នុងប្រអប់វាយ · textarea គ្មានកន្លែង ➜ preventDefault', () => {
+        boot();
+        uiState.modalViewportHeight = 508;
+        uiState.flush();
+        expect(drag(modal, { x: 20, y: 700 }, { x: 22, y: 600 }).defaultPrevented).toBe(true);
+        expect(drag(box, { x: 100, y: 300 }, { x: 100, y: 380 }).defaultPrevented).toBe(true);
+        expect(drag(modalInput, { x: 100, y: 120 }, { x: 101, y: 60 }).defaultPrevented).toBe(true);
+        expect(drag(area, { x: 100, y: 200 }, { x: 100, y: 140 }).defaultPrevented).toBe(true);
+    });
+
+    it('textarea · កាតដែលមានកន្លែងរមូរក្នុងទិសនោះ ➜ មិនប៉ះ (រមូរក្នុងខ្លួន) · ដល់ចុង ➜ preventDefault · អូសផ្ដេក ➜ មិនប៉ះ', () => {
+        boot();
+        uiState.modalViewportHeight = 508;
+        uiState.flush();
+        setScroll(area, 600, 90, 0);
+        expect(drag(area, { x: 100, y: 200 }, { x: 100, y: 140 }).defaultPrevented).toBe(false);
+        expect(drag(area, { x: 100, y: 140 }, { x: 100, y: 200 }).defaultPrevented).toBe(true);
+        setScroll(box, 900, 400, 0);
+        expect(drag(box, { x: 100, y: 380 }, { x: 100, y: 300 }).defaultPrevented).toBe(false);
+        expect(drag(modalInput, { x: 100, y: 120 }, { x: 180, y: 118 }).defaultPrevented).toBe(false);
+    });
+
+    it('ទិសផ្ទុយ ៖ keyboard បិទ (modalViewportHeight ០) · មិនមែន iOS standalone ➜ គ្មាន listener ទប់', () => {
+        boot();
+        expect(drag(modal, { x: 20, y: 700 }, { x: 22, y: 600 }).defaultPrevented).toBe(false);
+        uiState.modalViewportHeight = 508;
+        uiState.flush();
+        expect(drag(modal, { x: 20, y: 700 }, { x: 22, y: 600 }).defaultPrevented).toBe(true);
+        uiState.modalViewportHeight = 0;
+        uiState.flush();
+        expect(drag(modal, { x: 20, y: 700 }, { x: 22, y: 600 }).defaultPrevented).toBe(false);
+        disposers.splice(0).forEach((fn) => fn());
+        listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
+        setIOSStandalone(false);
+        boot();
+        uiState.modalViewportHeight = 508;
+        uiState.flush();
+        expect(drag(modal, { x: 20, y: 700 }, { x: 22, y: 600 }).defaultPrevented).toBe(false);
+    });
+
+    it('⛔ ខ្សែភ្ជាប់ ៖ react-root.css ៖ body.modal-keyboard (iOS standalone) ➜ body · .modal touch-action none · .modal-content contain', () => {
+        const css = readFileSync(path.resolve(__dirname, '../src/styles/react-root.css'), 'utf8');
+        expect(/html\.ios-standalone body\.modal-keyboard,\s*html\.ios-standalone body\.modal-keyboard \.modal \{ touch-action: none; \}/.test(css)).toBe(true);
+        expect(/html\.ios-standalone body\.modal-keyboard \.modal-content \{ overscroll-behavior-y: contain; \}/.test(css)).toBe(true);
     });
 });

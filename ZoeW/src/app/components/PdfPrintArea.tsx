@@ -20,24 +20,31 @@ const LABEL_SHEET_CLASS: Record<LabelLayout, string> = {
     'a4-2': 'label-sheet layout-a4-2'
 };
 
+function labelFitStyle(phone: string, money: string): React.CSSProperties {
+    return { ['--label-phone-chars' as string]: Math.max(1, String(phone).length), ['--label-money-chars' as string]: Math.max(1, money.length) } as React.CSSProperties;
+}
+
 export function LabelSheet({ view }: { view: LabelPrintView }) {
     const o = view.options;
     return (
         <div className={LABEL_SHEET_CLASS[o.layout] || LABEL_SHEET_CLASS['50x30']} data-label-count={view.labels.length}>
-            {view.labels.map((row, i) => (
-                <div className="label" key={row.barcode + '~' + i}>
-                    <div className="label-phone">{row.phone}</div>
-                    <div className="label-bc"><Code128Svg code={row.barcode} /></div>
-                    <div className="label-code">{row.barcode}</div>
-                    {o.money && labelMoneyText(row) ? <div className="label-money">{labelMoneyText(row)}</div> : null}
-                    {(o.date && row.date) || (o.locker && row.locker) ? (
-                        <div className="label-meta">
-                            {o.date && row.date ? <span className="label-date">{row.date}</span> : null}
-                            {o.locker && row.locker ? <span className="label-locker">{row.locker}</span> : null}
-                        </div>
-                    ) : null}
-                </div>
-            ))}
+            {view.labels.map((row, i) => {
+                const money = o.money ? labelMoneyText(row) : '';
+                return (
+                    <div className="label" key={row.barcode + '~' + i} style={labelFitStyle(row.phone, money)}>
+                        <div className="label-phone">{row.phone}</div>
+                        <div className="label-bc"><Code128Svg code={row.barcode} /></div>
+                        <div className="label-code">{row.barcode}</div>
+                        {money ? <div className="label-money">{money}</div> : null}
+                        {(o.date && row.date) || (o.locker && row.locker) ? (
+                            <div className="label-meta">
+                                {o.date && row.date ? <span className="label-date">{row.date}</span> : null}
+                                {o.locker && row.locker ? <span className="label-locker">{row.locker}</span> : null}
+                            </div>
+                        ) : null}
+                    </div>
+                );
+            })}
         </div>
     );
 }

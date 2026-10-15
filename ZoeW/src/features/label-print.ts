@@ -157,7 +157,7 @@ export function updateLabelPrintPreview() {
     viewState.labelPrintPreview = preview;
     viewState.labelPrintSummary = rows.length
         ? 'ស្លាក ' + rows.length + ' · អតិថិជន ' + preview.customers + (rows.length > LABEL_PREVIEW_MAX ? ' · បង្ហាញគំរូ ' + LABEL_PREVIEW_MAX + ' ដំបូង' : '')
-        : (options.openOnly ? 'គ្មានកញ្ចប់ដែលមិនទាន់យកក្នុងវិសាលភាពនេះ — បិទ «តែកញ្ចប់មិនទាន់យក» ដើម្បីបោះពុម្ពទាំងអស់' : 'គ្មានកញ្ចប់ក្នុងវិសាលភាពនេះ');
+        : (options.openOnly ? 'គ្មានកញ្ចប់ដែលមិនទាន់យកក្នុងវិសាលភាពនេះ — បិទ «បង្ហាញតែកញ្ចប់មិនទាន់យក» ដើម្បីបោះពុម្ពទាំងអស់' : 'គ្មានកញ្ចប់ក្នុងវិសាលភាពនេះ');
     return preview;
 }
 

@@ -130,25 +130,45 @@ function seed(n) {
 }
 
 // បញ្ជូន touch event ពិតចូលទំព័រ ហើយរាយការណ៍ថាតើ touchmove ត្រូវបាន preventDefault ដែរឬទេ
+//
+// ⛔ `steps.webkitPan` = គំរូនៃច្បាប់ WebKit iOS (ប្រភពពិត ៖ WKContentViewInteraction.mm `_touchEventsRecognized` ·
+//    `scrollViewWillStartPanOrPinchGesture` · `_touchEvent:preventsNativeGestures:` · WebPageProxy.cpp `m_touchMovePreventionState`) ៖
+//    UIScrollView pan ត្រូវ «ពន្យារ» តែចំពោះ touchmove **ដំបូង** ប៉ុណ្ណោះ ➜ touchmove ដំបូងមិនត្រូវ preventDefault ➜ pan ចាប់ផ្តើមនៅ
+//    WEBKIT_PAN_SLOP_PX (hysteresis របស់ UIKit) ➜ `_touchEventsCanPreventNativeGestures = NO` ➜ touchmove បន្ទាប់មិនអាចបោះបង់បាន
+//    (`cancelable: false`) លើកលែងតែ touchmove មួយត្រូវ preventDefault មុន pan ចាប់ផ្តើម (`isDefaultPrevented` ជាប់)។
+//    touchmove ដំបូងត្រូវ preventDefault ➜ native gestures ត្រូវបោះបង់ទាំងស្រុង (គ្មាន bounce)។ Chromium មិនអនុវត្តច្បាប់នេះ ➜ គំរូ។
+const WEBKIT_PAN_SLOP_PX = 10;
 const GESTURE = function (steps) {
     return new Promise((resolve) => {
         const target = steps.selector ? document.querySelector(steps.selector) : (document.elementFromPoint(steps.x, steps.startY) || document.body);
         let prevented = 0;
+        let firstPrevented = null;
         let maxIndicatorOpacity = 0;
+        let wasReady = false;
         let secondTouch = null;
         let blockingAfterStart = 0;
+        const pan = { began: false, latched: false, at: null };
         const bounced = [];
         const touch = (id, x, y) => new Touch({ identifier: id, target: target, clientX: x, clientY: y, pageX: x, pageY: y });
         const fire = (type, touches, changed) => {
+            const moving = type === 'touchmove';
+            const cancelable = type !== 'touchcancel' && !(steps.webkitPan && moving && pan.began && !pan.latched);
             const event = new TouchEvent(type, {
                 bubbles: true,
-                cancelable: type !== 'touchcancel',
+                cancelable: cancelable,
                 touches: touches,
                 targetTouches: touches,
                 changedTouches: changed
             });
             target.dispatchEvent(event);
-            if (type === 'touchmove' && event.defaultPrevented) prevented++;
+            if (moving && event.defaultPrevented) prevented++;
+            if (moving && firstPrevented === null) firstPrevented = event.defaultPrevented;
+            if (moving && cancelable && event.defaultPrevented && !pan.began) pan.latched = true;
+            if (steps.webkitPan && moving && !pan.began && firstPrevented === false && changed[0] &&
+                Math.abs(changed[0].clientY - steps.startY) >= steps.panSlop) {
+                pan.began = true;
+                pan.at = Math.round(changed[0].clientY - steps.startY);
+            }
         };
         let primary = touch(1, steps.x, steps.startY);
         fire('touchstart', [primary], [primary]);
@@ -179,13 +199,16 @@ const GESTURE = function (steps) {
                 }
                 const indicator = document.querySelector('.ptr-indicator');
                 if (indicator) maxIndicatorOpacity = Math.max(maxIndicatorOpacity, parseFloat(indicator.style.opacity) || 0);
+                if (indicator && indicator.classList.contains('ready')) wasReady = true;
                 requestAnimationFrame(tick);
                 return;
             }
             if (Number.isFinite(steps.endY)) {
                 primary = touch(1, steps.x + (steps.endDx || 0), steps.endY);
             }
-            if (secondTouch) {
+            if (steps.cancelAtEnd) {
+                fire('touchcancel', [], [primary]);
+            } else if (secondTouch) {
                 fire('touchend', [secondTouch], [primary]);
                 fire('touchend', [], [secondTouch]);
             } else {
@@ -201,7 +224,8 @@ const GESTURE = function (steps) {
                 }, 60);
             }
             bounced.forEach((el) => { delete el.scrollTop; el.scrollTop = 0; });
-            setTimeout(() => resolve({ prevented: prevented, maxIndicatorOpacity: maxIndicatorOpacity,
+            setTimeout(() => resolve({ prevented: prevented, firstPrevented: firstPrevented, maxIndicatorOpacity: maxIndicatorOpacity,
+                ready: wasReady, nativePan: pan.began, nativePanAt: pan.at,
                 blockingAfterStart: blockingAfterStart,
                 blockingAfterEnd: typeof window.__blockingTouchMoveCount === 'function' ? window.__blockingTouchMoveCount() : -1 }), 420);
         };
@@ -293,7 +317,7 @@ const GESTURE = function (steps) {
         await page.evaluate(() => window.__blockingTouchMoveCount()) === 1);
 
     const runGesture = async (steps) => {
-        const out = await page.evaluate('(' + GESTURE.toString() + ')(' + JSON.stringify(steps) + ')');
+        const out = await page.evaluate('(' + GESTURE.toString() + ')(' + JSON.stringify({ panSlop: WEBKIT_PAN_SLOP_PX, ...steps }) + ')');
         out.reloaded = takeReloads() > 0;
         return out;
     };
@@ -334,9 +358,12 @@ const GESTURE = function (steps) {
     }));
 
     // ១) កំហុសដែលអ្នកប្រើរាយការណ៍៖ រមូរធម្មតាពីកំពូល មិនត្រូវក្លាយជា refresh
+    // ⛔ iOS ៖ WebKit សម្រេច pan តាម touchmove **ដំបូង** ➜ ទាញចុះពីកំពូល PTR ចាប់តាំងពី move ដំបូង (ដូច APK) ➜ ការពិតដែលត្រូវការ ៖
+    //    អូសខ្លីមិន refresh · indicator លាក់ (ការរមូរឡើង/ផ្ដេក/តារាងរមូររួច/ប្រអប់/ម៉ឺនុយ/ប៊ូតុង នៅមិនត្រូវចាប់ ៖ ខាងក្រោម)
     await resetState();
     const gentle = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
-    ok('អូសខ្លីៗពីកំពូល (14px) ➜ មិនរារាំងការរមូរ និងមិនកេះ refresh', gentle.prevented === 0 && !gentle.reloaded, gentle);
+    ok('អូសខ្លីៗពីកំពូល (14px) ➜ មិនកេះ refresh · indicator លាក់', !gentle.reloaded && gentle.maxIndicatorOpacity === 0, gentle);
+    ok('អូសចុះពីកំពូល ➜ PTR ចាប់ touchmove ដំបូង (WebKit សម្រេច pan តាម move ដំបូង)', gentle.firstPrevented === true, gentle);
 
     await resetState();
     const ordinary = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 312 }, { y: 326 }, { y: 338 }, { y: 348 }] });
@@ -400,6 +427,25 @@ const GESTURE = function (steps) {
     const rowControlShort = await runGesture({ selector: '#historyTableBody .close-btn', x: 330, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
     ok('អូសខ្លី 14px ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ ទុកជា tap/scroll ធម្មតា',
         rowControlShort.prevented === 0 && !rowControlShort.reloaded, rowControlShort);
+
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA) ៖ ទាញចុះវែង ➜ ទំព័រ bounce តាម iOS ហើយ PTR មិនកេះ (ម្តងកេះម្តងអត់) ➜ ច្បាប់ WebKit (`webkitPan`)
+    //    ៖ ទាញក្នុងល្បឿនធម្មតា (៤px/ស៊ុម · ២px/ស៊ុម) ត្រូវកេះគ្រប់ដង ហើយ iOS មិនចាប់ផ្តើម pan (គ្មាន bounce)
+    console.log('\n=== PTR លើ iPhone ៖ ច្បាប់ WebKit (pan សម្រេចតាម touchmove ដំបូង) ===');
+    //    (touchcancel ពេលចប់ ៖ navigation ពិតនៅផ្នែក «ការទាញពិតប្រាកដ» ចុងក្រោយ · ready = travel ≥ កម្រិតដែល touchend ប្រើសម្រេច refresh)
+    for (const [label, stepPx] of [['ល្បឿនធម្មតា ៤px/ស៊ុម', 4], ['យឺត ២px/ស៊ុម', 2], ['លឿន ១២px/ស៊ុម', 12]]) {
+        await resetState();
+        const points = [];
+        for (let d = stepPx; d <= 264; d += stepPx) points.push({ y: 300 + d });
+        const pull = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: points, webkitPan: true, cancelAtEnd: true });
+        ok('WebKit ' + label + ' ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan', pull.firstPrevented === true && pull.nativePan === false, pull);
+        ok('WebKit ' + label + ' ➜ ទាញដល់កម្រិត ➜ PTR ត្រៀម refresh (ready)', pull.ready === true && !pull.reloaded, pull);
+    }
+    await resetState();
+    const webkitUp = await runGesture({ selector: '#appPages', x: 200, startY: 400, points: [{ y: 396 }, { y: 388 }, { y: 370 }, { y: 340 }], webkitPan: true });
+    ok('WebKit ទិសផ្ទុយ ៖ អូសឡើង ➜ មិនចាប់ · iOS រមូរធម្មតា (pan ចាប់ផ្តើម)', webkitUp.prevented === 0 && webkitUp.nativePan === true && !webkitUp.reloaded, webkitUp);
+    await resetState();
+    const webkitRow = await runGesture({ selector: '#historyTableBody .close-btn', x: 330, startY: 300, points: [{ y: 302 }, { y: 305 }, { y: 309 }, { y: 312 }], webkitPan: true });
+    ok('WebKit ទិសផ្ទុយ ៖ ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ មិនចាប់មុន slop (tap នៅធម្មតា)', webkitRow.prevented === 0 && !webkitRow.reloaded, webkitRow);
 
     // === ទីតាំងសញ្ញា PTR ធៀបនឹងរបាខាងលើ តាមទំហំអេក្រង់ ===
     // ⛔ tablet ផ្តេក (≥992px) ៖ របា Tab ផ្លាស់ទៅនៅក្រោម navbar ➜ សញ្ញា PTR (fixed · តម្លៃកំណត់សម្រាប់ទូរស័ព្ទ) ធ្លាក់ជាន់លើរបា Tab
@@ -626,6 +672,286 @@ const GESTURE = function (steps) {
 
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA · VID_20261014_213311) ៖ ស្វែងរក (keyboard បើក) ➜ អូស ➜ ទំព័រទាំងមូលព្រមទាំង navbar រំកិល ➜ លោតត្រឡប់។
+    //    iOS ផ្តល់ចន្លោះរមូរដល់ scroll view មេរបស់ WebKit ពេល keyboard បើក ➜ touch-action គឺជាច្រកដែល WebKit សម្រេចក្នុង UI process ពេលចាប់ផ្តើមប៉ះ
+    //    (WKContentViewInteraction `_handleTouchActionsForTouchEvent` ➜ `preventsPanningInYAxis` ➜ WKWebView `axesToPreventScrollingForPanGestureInScrollView`)
+    //    មិនរង់ចាំ JS ➜ គំរូ `computeUsedTouchAction` (StyleAdjuster.cpp ៖ អ្នករមូរ overflow auto/scroll ចាប់ផ្តើមពី auto ឡើងវិញ · none ឈ្នះ ·
+    //    keyword manipulation មិនកាត់ផ្ដាច់) លើ CSS ពិតក្នុង Chromium ៖ ក្រៅបញ្ជី ➜ ហាមអូស Y · ក្នុងបញ្ជីដែលរមូរបាន ➜ auto (បញ្ជីរមូរ)។
+    console.log('\n=== iPhone ៖ keyboard បើក (ស្វែងរក) ➜ ទំព័រមិនរំកិល (touch-action របស់ WebKit) ===');
+    const WEBKIT_TOUCH_ACTION = function (selectors, gridInset) {
+        const used = (el) => {
+            const chain = [];
+            for (let n = el; n && n.nodeType === 1; n = n.parentElement) chain.unshift(n);
+            let u = 'auto';
+            for (const n of chain) {
+                const cs = getComputedStyle(n);
+                if (/^(auto|scroll)$/.test(cs.overflowX) || /^(auto|scroll)$/.test(cs.overflowY)) u = 'auto';
+                const own = cs.touchAction || 'auto';
+                if (own === 'auto') continue;
+                if (u === 'none' || own === 'none') { u = 'none'; continue; }
+                if (u === 'auto' || u === 'manipulation') { u = own; continue; }
+                if (own === 'manipulation') continue;
+                const shared = own.split(/\s+/).filter((t) => u.split(/\s+/).indexOf(t) !== -1);
+                u = shared.length ? shared.join(' ') : 'none';
+            }
+            return u;
+        };
+        const out = {};
+        Object.keys(selectors).forEach((k) => {
+            const el = document.querySelector(selectors[k]);
+            if (!el) { out[k] = null; return; }
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 12)) || el;
+            const u = used(hit);
+            out[k] = { used: u, preventsPanY: u !== 'auto' && !/\b(pan-y|manipulation)\b/.test(u), hit: hit.id || hit.className || hit.tagName };
+        });
+        if (typeof gridInset !== 'number') return out;
+        const name = (n) => n ? (n.id ? '#' + n.id : n.tagName.toLowerCase() + (typeof n.className === 'string' && n.className ? '.' + n.className.trim().split(/\s+/).join('.') : '')) : null;
+        const roomScroller = (el) => {
+            for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+                if (/^(auto|scroll)$/.test(getComputedStyle(n).overflowY) && n.scrollHeight > n.clientHeight + 1) return n;
+            }
+            return null;
+        };
+        const bottom = window.innerHeight - gridInset;
+        const leaks = {};
+        let points = 0;
+        for (let y = 6; y < bottom - 4; y += 22) {
+            for (let x = 6; x < window.innerWidth - 4; x += 22) {
+                const hit = document.elementFromPoint(x, y);
+                if (!hit) continue;
+                points++;
+                const u = used(hit);
+                if (u !== 'auto' && !/\b(pan-y|manipulation)\b/.test(u)) continue;
+                const sc = roomScroller(hit);
+                const ob = sc ? getComputedStyle(sc).overscrollBehaviorY : '';
+                if (sc && (ob === 'contain' || ob === 'none')) continue;
+                const key = name(hit) + ' ➜ ' + (sc ? name(sc) + ' (overscroll ' + ob + ')' : 'scroll view មេ');
+                if (!leaks[key]) leaks[key] = { x, y, used: u, count: 0 };
+                leaks[key].count++;
+            }
+        }
+        out.__grid = { points, leaks };
+        return out;
+    };
+    const TOUCH_POINTS = {
+        navbar: '.app-navbar',
+        searchInput: '#searchPhoneInput',
+        searchTitle: '#dataSideSection .app-card:last-child .card-title',
+        handle: '#dragHandle',
+        listHeader: '#dataMainSection .history-section > .card-header',
+        listRow: '#historyTableBody tr:first-child td:nth-child(2)'
+    };
+    await resetState();
+    await page.evaluate(async () => {
+        window.uiState.dataPanelSearchFocus = true;
+        await new Promise((r) => setTimeout(r, 120));
+        window.uiState.iosKeyboardInset = 336;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const KB_INSET = 336;
+    const kbGridOf = () => page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')({}, ' + KB_INSET + ')').then((r) => r.__grid);
+    const kbTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify(TOUCH_POINTS) + ')');
+    const kbState = await page.evaluate(() => {
+        const tr = document.getElementById('tableResponsive');
+        return { keyboardClass: document.body.classList.contains('ios-keyboard'), standalone: document.documentElement.classList.contains('ios-standalone'),
+            listScrolls: !!tr && tr.scrollHeight > tr.clientHeight + 1 };
+    });
+    ok('លក្ខខណ្ឌ ៖ iOS standalone · ប្រអប់ស្វែងរកទាញឡើង · body.ios-keyboard · បញ្ជីរមូរបាន', kbState.keyboardClass && kbState.standalone && kbState.listScrolls, kbState);
+    ['navbar', 'searchInput', 'searchTitle', 'handle', 'listHeader'].forEach((k) => {
+        ok('keyboard បើក ➜ ' + k + ' ៖ WebKit ហាមអូស Y លើ scroll view (touch-action none)', !!kbTouch[k] && kbTouch[k].preventsPanY === true, kbTouch[k]);
+    });
+    ok('keyboard បើក ➜ ក្នុងបញ្ជីដែលរមូរបាន ៖ touch-action auto (បញ្ជីរមូរដូច Android)', !!kbTouch.listRow && kbTouch.listRow.used === 'auto', kbTouch.listRow);
+    // ⛔ ចំណុចដែលបានរើស ≠ គ្រប់កន្លែងដែលម្រាមដៃអាចប៉ះ ➜ ក្រឡា ២២px លើផ្ទៃខាងលើ keyboard ៖ ចំណុចនីមួយៗត្រូវតែ (ក) WebKit ហាមអូស Y ឬ
+    //    (ខ) ធាតុរមូរកូនដែលមានចន្លោះរមូរ ហើយ `overscroll-behavior-y` contain/none (ចុងបញ្ជីមិនបន្តទៅ scroll view មេ) ➜ ក្រៅពីនេះ = ទំព័ររំកិល។
+    const kbGrid = await kbGridOf();
+    ok('keyboard បើក ➜ គ្រប់ចំណុចលើ keyboard (ក្រឡា ២២px) ៖ ហាមអូស Y ឬបញ្ជីរមូរបាន + overscroll contain (scroll view មេមិនរំកិល)',
+        kbGrid.points >= 150 && Object.keys(kbGrid.leaks).length === 0, kbGrid);
+    // Suggestion លេខទូរស័ព្ទ (`.phone-suggest` ៖ fixed · overflow-y auto · ≤ 240px) ៖ ជួរតិច ➜ រមូរមិនបាន ➜ auto ទៅ scroll view មេ ·
+    //    ជួរច្រើន ➜ រមូរបាន តែចុងបញ្ជីបន្តទៅ scroll view មេ ➜ ត្រូវការទាំង contain និង none ពេលគ្មានចន្លោះ
+    const openKbSuggest = (n) => page.evaluate(async (n) => {
+        const items = [];
+        for (let i = 0; i < n; i++) items.push({ phone: '012000' + String(100 + i), packages: 1 + i });
+        window.renderPhoneSuggestions(items);
+        window.uiState.phoneSuggestOpen = true;
+        window.positionPhoneSuggestBox();
+        await new Promise((r) => setTimeout(r, 240));
+        const box = document.getElementById('phoneSuggestBox');
+        return { shown: !!box && box.classList.contains('show') && box.getBoundingClientRect().height > 0,
+            room: !!box && box.scrollHeight > box.clientHeight + 1, rows: box ? box.querySelectorAll('.phone-suggest-item').length : 0 };
+    }, n);
+    for (const n of [2, 12]) {
+        const st = await openKbSuggest(n);
+        const g = await kbGridOf();
+        const suggestPoints = Object.keys(g.leaks).filter((k) => k.indexOf('phone-suggest') !== -1);
+        ok('keyboard បើក · Suggestion ' + n + ' ជួរ (' + (n === 2 ? 'រមូរមិនបាន' : 'រមូរបាន') + ') ➜ គ្រប់ចំណុច ៖ scroll view មេមិនរំកិល',
+            st.shown && st.rows === n && st.room === (n !== 2) && g.points >= 150 && Object.keys(g.leaks).length === 0,
+            { state: st, points: g.points, leaks: g.leaks, suggestPoints });
+    }
+    await page.evaluate(async () => {
+        window.hidePhoneSuggestions();
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    // បញ្ជីទទេ (វីដេអូ ៖ «គ្មានទិន្នន័យ») ៖ `.table-responsive` (overflow auto) ចាប់ផ្តើម touch-action ពី auto ឡើងវិញ ទោះរមូរមិនបាន ➜ គ្មាន
+    //    scroll view កូន ➜ scroll view មេរបស់ WebKit យកការអូស ➜ ត្រូវតែ none ពេលរមូរមិនបាន (`body.ios-keyboard-list-fixed` ពី `measureIOSKeyboardListRoom()`)
+    await page.evaluate(async () => {
+        window.filterDataByDate('yesterday');
+        await new Promise((r) => setTimeout(r, 400));
+    });
+    const kbEmpty = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify({ list: '#tableResponsive' }) + ')');
+    const kbEmptyState = await page.evaluate(() => {
+        const tr = document.getElementById('tableResponsive');
+        return { rows: document.querySelectorAll('#historyTableBody tr').length, listScrolls: tr.scrollHeight > tr.clientHeight + 1,
+            fixedClass: document.body.classList.contains('ios-keyboard-list-fixed') };
+    });
+    ok('keyboard បើក · បញ្ជីទទេ (រមូរមិនបាន) ➜ body.ios-keyboard-list-fixed · WebKit ហាមអូស Y លើបញ្ជី',
+        !kbEmptyState.listScrolls && kbEmptyState.fixedClass && !!kbEmpty.list && kbEmpty.list.preventsPanY === true, { state: kbEmptyState, touch: kbEmpty.list });
+    const kbEmptyGrid = await kbGridOf();
+    ok('keyboard បើក · បញ្ជីទទេ ➜ គ្រប់ចំណុចលើ keyboard ៖ scroll view មេមិនរំកិល', kbEmptyGrid.points >= 150 && Object.keys(kbEmptyGrid.leaks).length === 0, kbEmptyGrid);
+    await page.evaluate(async () => {
+        window.filterDataByDate('today');
+        await new Promise((r) => setTimeout(r, 400));
+    });
+    const kbFull = await page.evaluate(() => ({ fixedClass: document.body.classList.contains('ios-keyboard-list-fixed') }));
+    ok('ទិសផ្ទុយ ៖ បញ្ជីមានជួររមូរបានវិញ ➜ ដក body.ios-keyboard-list-fixed', kbFull.fixedClass === false, kbFull);
+    // `touch-action: none` លើបញ្ជីដែលរមូរបញ្ឈរមិនបាន ហាមអ័ក្ស X ដែរ ➜ ត្រឹមត្រូវតែពេលតារាងមិនរមូរផ្ដេក (៣២០ · ៤១២ · មានជួរ)
+    const kbWide = [];
+    for (const w of [320, 412]) {
+        await page.setViewportSize({ width: w, height: 780 });
+        kbWide.push(await page.evaluate(async (w) => {
+            await new Promise((r) => setTimeout(r, 260));
+            const tr = document.getElementById('tableResponsive');
+            return { w, rows: document.querySelectorAll('#historyTableBody tr').length, sw: tr.scrollWidth, cw: tr.clientWidth };
+        }, w));
+    }
+    ok('បញ្ជីប្រវត្តិមិនរមូរផ្ដេក (៣២០ · ៤១២) ➜ touch-action none ពេលរមូរបញ្ឈរមិនបាន មិនដកការរមូរណាមួយ',
+        kbWide.every((m) => m.rows > 0 && m.cw > 0 && m.sw <= m.cw + 1), kbWide);
+    // ⛔ ម្ចាស់គម្រោង (iPhone PWA) ៖ «ទាល់តែយកម្រាមដៃទៅអូស scroll ក្នុងប្រអប់វាយលេខ ស្វែងរក បាន scroll ទៅ តែ android អត់អី» ៖ ប្រអប់អក្សរដែលកំពុង focus
+    //    មាន pan របស់ text interaction (UIPanGestureRecognizer ក្រោម web view) ដែល touch-action មិនឃាត់ ➜ touchmove ដំបូងត្រូវ preventDefault
+    //    (WKContentViewInteraction `_touchMoveDeferringGestureRecognizer` ពន្យារ UIPanGestureRecognizer ទាំងអស់) · អូសផ្ដេក (ទស្សន៍ទ្រនិច) ➜ ទុកឲ្យ iOS
+    const kbInput = await page.evaluate(async () => {
+        const input = document.getElementById('searchPhoneInput');
+        if (input) input.focus({ preventScroll: true });
+        await new Promise((r) => setTimeout(r, 120));
+        const r = input ? input.getBoundingClientRect() : null;
+        return { focused: !!input && document.activeElement === input, pulled: window.uiState.dataPanelSearchFocus === true,
+            x: r ? Math.round(r.left + r.width / 2) : 0, y: r ? Math.round(r.top + r.height / 2) : 0 };
+    });
+    const kbInputDown = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ y: kbInput.y + 2 }, { y: kbInput.y + 6 }, { y: kbInput.y + 14 }, { y: kbInput.y + 30 }], webkitPan: true });
+    const kbInputUp = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ y: kbInput.y - 2 }, { y: kbInput.y - 6 }, { y: kbInput.y - 14 }, { y: kbInput.y - 30 }], webkitPan: true });
+    const kbInputSide = await runGesture({ selector: '#searchPhoneInput', x: kbInput.x, startY: kbInput.y,
+        points: [{ dx: 4, y: kbInput.y }, { dx: 12, y: kbInput.y + 1 }, { dx: 30, y: kbInput.y + 1 }], webkitPan: true });
+    ok('keyboard បើក · អូសបញ្ឈរក្នុងប្រអប់វាយលេខ (focus) ចុះ/ឡើង ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (ទំព័រមិនរំកិល ដូច Android)',
+        kbInput.focused && kbInput.pulled && kbInputDown.firstPrevented === true && kbInputDown.nativePan === false &&
+        kbInputUp.firstPrevented === true && kbInputUp.nativePan === false && !kbInputDown.reloaded && !kbInputUp.reloaded,
+        { state: kbInput, down: kbInputDown, up: kbInputUp });
+    ok('ទិសផ្ទុយ ៖ អូសផ្ដេកក្នុងប្រអប់វាយលេខ ➜ មិនចាប់ (ទស្សន៍ទ្រនិច/អក្សររបស់ iOS)', kbInputSide.prevented === 0, kbInputSide);
+    await page.evaluate(async () => {
+        window.uiState.iosKeyboardInset = 0;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const kbClosedTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify(TOUCH_POINTS) + ')');
+    ok('ទិសផ្ទុយ ៖ keyboard បិទ ➜ navbar · ប្រអប់ស្វែងរក ៖ touch-action ដើម (មិនហាម Y)',
+        !!kbClosedTouch.navbar && kbClosedTouch.navbar.preventsPanY === false && !!kbClosedTouch.searchInput && kbClosedTouch.searchInput.preventsPanY === false, kbClosedTouch);
+    const kbClosedGrid = await kbGridOf();
+    ok('ទិសផ្ទុយ ៖ keyboard បិទ ➜ គំរូក្រឡារកឃើញចំណុចដែល scroll view មេយក (គំរូអាចធ្លាក់)', kbClosedGrid.points >= 150 && Object.keys(kbClosedGrid.leaks).length > 0,
+        { points: kbClosedGrid.points, leakKinds: Object.keys(kbClosedGrid.leaks).length });
+    await page.evaluate(async () => {
+        window.uiState.dataPanelSearchFocus = false;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    await page.waitForTimeout(900);
+    // ផ្ទាំងស្កេន ៖ ប៉ះប្រអប់ស្វែងរកបញ្ជី ➜ ផ្ទាំងស្កេនបង្រួម (`iosSearchDocumentLocked()` ផ្នែក entry) ➜ keyboard ➜ ច្បាប់ដូចគ្នាលើគ្រប់ចំណុច
+    const kbEntry = await page.evaluate(async () => {
+        window.switchAppPage('entry');
+        await new Promise((r) => setTimeout(r, 300));
+        const input = document.getElementById('entryListSearchInput');
+        if (input) input.focus();
+        await new Promise((r) => setTimeout(r, 700));
+        window.uiState.iosKeyboardInset = 336;
+        await new Promise((r) => setTimeout(r, 200));
+        const side = document.getElementById('entrySideSection');
+        return { page: window.uiState.currentAppPage, focused: !!input && document.activeElement === input,
+            collapsed: !!side && side.classList.contains('collapsed'), keyboardClass: document.body.classList.contains('ios-keyboard') };
+    });
+    const kbEntryGrid = await kbGridOf();
+    ok('keyboard បើក · ផ្ទាំងស្កេន (ស្វែងរកបញ្ជី) ➜ គ្រប់ចំណុចលើ keyboard ៖ scroll view មេមិនរំកិល',
+        kbEntry.page === 'entry' && kbEntry.focused && kbEntry.collapsed && kbEntry.keyboardClass && kbEntryGrid.points >= 150 && Object.keys(kbEntryGrid.leaks).length === 0,
+        { state: kbEntry, points: kbEntryGrid.points, leaks: kbEntryGrid.leaks });
+    const kbEntryAt = await page.evaluate(() => {
+        const r = document.getElementById('entryListSearchInput').getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    });
+    const kbEntryDrag = await runGesture({ selector: '#entryListSearchInput', x: kbEntryAt.x, startY: kbEntryAt.y,
+        points: [{ y: kbEntryAt.y - 2 }, { y: kbEntryAt.y - 6 }, { y: kbEntryAt.y - 14 }, { y: kbEntryAt.y - 30 }], webkitPan: true });
+    ok('keyboard បើក · ផ្ទាំងស្កេន ៖ អូសបញ្ឈរក្នុងប្រអប់ស្វែងរកបញ្ជី (focus) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan',
+        kbEntryDrag.firstPrevented === true && kbEntryDrag.nativePan === false, kbEntryDrag);
+    await page.evaluate(async () => {
+        window.uiState.iosKeyboardInset = 0;
+        const input = document.getElementById('entryListSearchInput');
+        if (input) input.blur();
+        await new Promise((r) => setTimeout(r, 700));
+        window.switchAppPage('data');
+        await new Promise((r) => setTimeout(r, 300));
+    });
+    // ⛔ វីដេអូម្ចាស់គម្រោង (iPhone PWA · VID_20261015_051457) ៖ ប្រអប់ «បញ្ចូល Barcode ច្រើន» + keyboard ➜ អូសលើផ្ទៃខាងក្រោយ ➜ ទំព័រ និងប្រអប់រំកិល
+    //    ហើយប្រអប់រត់តាម offsetTop យឺតមួយស៊ុម (ញ៉ាក់) ➜ ខណៈ body.modal-keyboard ៖ touch-action none (body · .modal) + touchmove ដំបូងត្រូវចាប់ គ្រប់កន្លែង
+    //    លើកលែងអ្នករមូរដែលមានកន្លែង (textarea វែង · កាតវែង) · អូសផ្ដេកក្នុង textarea ➜ ទុកឲ្យ iOS
+    const kbModal = await page.evaluate(async () => {
+        window.openModalHelper('batchScanModal');
+        await new Promise((r) => setTimeout(r, 450));
+        const area = document.getElementById('batchBarcodeInput');
+        area.value = '';
+        area.focus({ preventScroll: true });
+        window.uiState.modalViewportTop = 0;
+        window.uiState.modalViewportHeight = window.innerHeight - 336;
+        await new Promise((r) => setTimeout(r, 250));
+        const at = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; };
+        const box = document.querySelector('#batchScanModal .modal-content');
+        return { cls: document.body.classList.contains('modal-keyboard'), focused: document.activeElement === area,
+            boxRoom: box.scrollHeight > box.clientHeight + 1, area: at(area), box: at(box.querySelector('h3') || box), height: window.innerHeight - 336 };
+    });
+    const kbModalTouch = await page.evaluate('(' + WEBKIT_TOUCH_ACTION.toString() + ')(' + JSON.stringify({ backdrop: '#batchScanModal' }) + ')');
+    const modalDrag = (selector, at, points) => runGesture({ selector, x: at.x, startY: at.y, points, webkitPan: true });
+    const upFrom = (y) => [{ y: y - 2 }, { y: y - 6 }, { y: y - 14 }, { y: y - 30 }];
+    const downFrom = (y) => [{ y: y + 2 }, { y: y + 6 }, { y: y + 14 }, { y: y + 30 }];
+    const mBackdrop = await modalDrag('#batchScanModal', { x: 6, y: Math.round(kbModal.height / 2) }, upFrom(Math.round(kbModal.height / 2)));
+    const mBox = await modalDrag('#batchScanModal .modal-content', kbModal.box, downFrom(kbModal.box.y));
+    const mArea = await modalDrag('#batchBarcodeInput', kbModal.area, upFrom(kbModal.area.y));
+    const mAreaSide = await modalDrag('#batchBarcodeInput', kbModal.area, [{ dx: 4, y: kbModal.area.y }, { dx: 12, y: kbModal.area.y + 1 }, { dx: 30, y: kbModal.area.y + 1 }]);
+    ok('លក្ខខណ្ឌ ៖ ប្រអប់បើក · textarea focus · body.modal-keyboard · កាតរមូរមិនបាន', kbModal.cls && kbModal.focused && !kbModal.boxRoom, kbModal);
+    ok('ប្រអប់ + keyboard ➜ ផ្ទៃខាងក្រោយ (.modal) ៖ WebKit ហាមអូស Y (touch-action none)', !!kbModalTouch.backdrop && kbModalTouch.backdrop.preventsPanY === true, kbModalTouch.backdrop);
+    ok('⛔ ប្រអប់ + keyboard ➜ អូសលើផ្ទៃខាងក្រោយ · កាត · textarea (គ្មានកន្លែង) ➜ touchmove ដំបូងត្រូវចាប់ · iOS មិនចាប់ផ្តើម pan (ទំព័រមិនរំកិល)',
+        [mBackdrop, mBox, mArea].every((g) => g.firstPrevented === true && g.nativePan === false && !g.reloaded), { mBackdrop, mBox, mArea });
+    ok('ទិសផ្ទុយ ៖ អូសផ្ដេកក្នុង textarea ➜ មិនចាប់ (ទស្សន៍ទ្រនិច)', mAreaSide.prevented === 0, mAreaSide);
+    const kbModalLong = await page.evaluate(async () => {
+        const area = document.getElementById('batchBarcodeInput');
+        const lines = [];
+        for (let i = 0; i < 80; i++) lines.push('7710000' + String(10000 + i));
+        area.value = lines.join('\n');
+        area.scrollTop = 0;
+        await new Promise((r) => setTimeout(r, 120));
+        return { room: area.scrollHeight > area.clientHeight + 1 };
+    });
+    const mAreaLong = await modalDrag('#batchBarcodeInput', kbModal.area, upFrom(kbModal.area.y));
+    ok('ទិសផ្ទុយ ៖ textarea វែង (មានកន្លែង) ➜ មិនចាប់ (textarea រមូរក្នុងខ្លួន)', kbModalLong.room && mAreaLong.firstPrevented === false, { room: kbModalLong, drag: mAreaLong });
+    await page.evaluate(async () => {
+        window.uiState.modalViewportHeight = 0;
+        await new Promise((r) => setTimeout(r, 160));
+    });
+    const mClosed = await modalDrag('#batchScanModal', { x: 6, y: Math.round(kbModal.height / 2) }, upFrom(Math.round(kbModal.height / 2)));
+    ok('ទិសផ្ទុយ ៖ keyboard បិទ (គ្មាន body.modal-keyboard) ➜ មិនចាប់', mClosed.prevented === 0, mClosed);
+    await page.evaluate(async () => {
+        const area = document.getElementById('batchBarcodeInput');
+        area.value = '';
+        area.blur();
+        window.closeModal('batchScanModal');
+        await new Promise((r) => setTimeout(r, 300));
+    });
+    await resetState();
 
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
     // ⛔ របាប្តូរតែពេល **អ្នកប្រើ** រមូរ (touch/wheel/key ≤ CHROME_SCROLL_INTENT_MS) ➜ helper បញ្ជូន `wheel` មុនរមូរ (input ពិត · `touchmove` ក្លែងគ្មាន `touches` ធ្វើឲ្យ handler PTR បោះ) ហើយ

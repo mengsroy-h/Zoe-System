@@ -27,6 +27,11 @@ export function DocumentEffects() {
     const chromeHidden = useStoreValue(uiState, (s) => s.chromeHidden);
     const keyboardOpen = useStoreValue(uiState, (s) => s.keyboardOpen);
     const iosKeyboardInset = useStoreValue(uiState, (s) => s.iosKeyboardInset);
+    const iosKeyboardListFixed = useStoreValue(uiState, (s) => s.iosKeyboardListFixed);
+    const iosKeyboardSuggestFixed = useStoreValue(uiState, (s) => s.iosKeyboardSuggestFixed);
+    const modalViewportTop = useStoreValue(uiState, (s) => s.modalViewportTop);
+    const modalViewportHeight = useStoreValue(uiState, (s) => s.modalViewportHeight);
+    const keyboardCover = useStoreValue(uiState, (s) => s.keyboardCover);
     const appLocked = useStoreValue(viewState, (s) => s.appLockOpen);
     const bootRevealing = useStoreValue(viewState, (s) => s.bootRevealing);
     const perfLite = useStoreValue(viewState, (s) => s.perfLite);
@@ -42,12 +47,18 @@ export function DocumentEffects() {
     useBodyClass('chrome-hidden', chromeHidden || keyboardOpen);
     useBodyClass('keyboard-open', keyboardOpen);
     useBodyClass('ios-keyboard', iosKeyboardInset > 0);
+    useBodyClass('ios-keyboard-list-fixed', iosKeyboardInset > 0 && iosKeyboardListFixed);
+    useBodyClass('ios-keyboard-suggest-fixed', iosKeyboardInset > 0 && iosKeyboardSuggestFixed);
+    useBodyClass('modal-keyboard', modalViewportHeight > 0);
 
     useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
     useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));
     useHtmlVar('--page-extension', useStoreValue(uiState, (s) => s.pageExtensionVar));
     useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
     useHtmlVar('--ios-keyboard-inset', iosKeyboardInset > 0 ? iosKeyboardInset + 'px' : '0px');
+    useHtmlVar('--modal-kb-pan', modalViewportHeight > 0 ? modalViewportTop + 'px' : '0px');
+    useHtmlVar('--modal-kb-line', modalViewportHeight > 0 ? (modalViewportTop + modalViewportHeight) + 'px' : '100%');
+    useHtmlVar('--keyboard-cover', keyboardCover > 0 ? keyboardCover + 'px' : '0px');
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

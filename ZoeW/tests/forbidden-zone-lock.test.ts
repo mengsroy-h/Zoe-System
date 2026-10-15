@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
-    'src/app/behaviors/pull-to-refresh.ts': '08b362228b442ba4323446c54926886696422bdfbe4c91f397f9fc0aafad15d3',
+    'src/app/behaviors/pull-to-refresh.ts': '8151b2aca1291ba78c08ac4c59b0a0f618b19633989e50994edb084e15148e33',
     'src/app/behaviors/panel-motion.ts': '80121c464a3da55e509f881aaae960c3e6de8dbb8d370c8875cc75a2f4210bf3',
     'src/app/behaviors/panels.ts': 'd63700ee43e3ce68f10ab31104b269d97d9db5676807f2a79e93fb231da56271',
     'src/app/behaviors/chrome-autohide.ts': '05afdce20767ec10babb70283a3cc7429ebaaf856c1addfe5c8d6f9f2f02b664',

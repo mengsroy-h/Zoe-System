@@ -44,6 +44,7 @@ import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, m
 import { setupNativeShell } from './native-shell';
 import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
+import { listenModalKeyboard } from '../behaviors/modal-keyboard';
 import { oncePerPage, type LifecycleScope } from './scope';
 
 export function bootApplication(scope: LifecycleScope): void {
@@ -70,6 +71,7 @@ function bootShell(scope: LifecycleScope): void {
     listenIOSSearchFocus(scope);
     listenIOSKeyboard(scope);
     listenEntrySearchPanel(scope);
+    listenModalKeyboard(scope);
 
     if ('serviceWorker' in navigator && !isNativeApp()) {
         scope.onLoad(() => registerServiceWorker(scope));

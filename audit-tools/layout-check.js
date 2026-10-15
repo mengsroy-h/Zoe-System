@@ -264,6 +264,243 @@ async function pinEnterSubmits(browser, port) {
     await phone.ctx.close();
 }
 
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃគ្រប់ទំហំ ៖ toast (សារក្រោយស្កេន · រក្សាទុក · បិទ) នៅបាត ២៤px ➜ ជាន់របា Tab ខាងក្រោម (ទូរស័ព្ទ · tablet < ៩៩២) ៖ ស្លាក
+//    «📋 ទិន្នន័យ» · «📷 ស្កេន» ត្រូវបាំងរាល់ការស្កេន។ ស្តង់ដារ (snackbar ពីលើ bottom navigation) ➜ toast នៅពីលើរបា Tab (គម្លាត ៤–៣០px) ·
+//    ទិសផ្ទុយ ៖ របា Tab លាក់ (`chrome-hidden`) ➜ ចុះដល់ ២៤px · desktop (របា Tab នៅខាងលើ) ➜ ២៤px។ វាស់ `#toastContainer` (toast ថ្មីនៅបាតវា)។
+async function toastTabbarLayout(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof showToast === 'function');
+    check(ready, 'ZoeW toast ⟷ របា Tab ៖ មាន showToast (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    const probe = (text, hide) => page.evaluate(async ({ text, hide }) => {
+        if (hide) document.body.classList.add('chrome-hidden');
+        showToast('⚠️ ' + text);
+        await new Promise((r) => setTimeout(r, 450));
+        const found = [...document.querySelectorAll('.toast')].some((t) => t.textContent.indexOf(text) >= 0);
+        const box = document.getElementById('toastContainer').getBoundingClientRect();
+        const tab = document.getElementById('pageTabBar');
+        const tr = tab.getBoundingClientRect();
+        const out = { found, bottom: Math.round(box.bottom), tabTop: Math.round(tr.top), tabH: Math.round(tr.height), vh: window.innerHeight,
+            bottomBar: tr.height > 20 && tr.top > window.innerHeight / 2 && getComputedStyle(tab).visibility !== 'hidden' };
+        if (hide) document.body.classList.remove('chrome-hidden');
+        return out;
+    }, { text, hide });
+    const rows = [];
+    for (const [w, h] of [[320, 568], [412, 900], [768, 1024], [932, 430], [1280, 800]]) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(250);
+        rows.push(Object.assign({ w }, await probe('toast-tab-' + w, false)));
+    }
+    const phones = rows.filter((r) => r.w < 992);
+    check(rows.every((r) => r.found) && phones.length === 4 && phones.every((r) => r.bottomBar),
+        'ZoeW toast ⟷ របា Tab ៖ ជាន់អប្បបរមា ៖ toast ពិតបង្ហាញ · របា Tab នៅបាតអេក្រង់ < ៩៩២ (៤ ទំហំ)', JSON.stringify(rows));
+    check(phones.every((r) => r.bottom <= r.tabTop - 4 && r.bottom >= r.tabTop - 30),
+        '⛔ ZoeW toast ⟷ របា Tab ៖ ទូរស័ព្ទ · tablet ➜ toast នៅពីលើរបា Tab (មិនបាំងស្លាក «ទិន្នន័យ» · «ស្កេន»)', JSON.stringify(phones));
+    const desk = rows.find((r) => r.w === 1280);
+    check(!!desk && !desk.bottomBar && Math.abs(desk.bottom - (desk.vh - 24)) <= 1,
+        'ទិសផ្ទុយ ៖ ZoeW toast ⟷ របា Tab ៖ desktop (របា Tab នៅខាងលើ) ➜ toast បាត ២៤px', JSON.stringify(desk));
+    await page.setViewportSize({ width: 412, height: 900 });
+    await page.waitForTimeout(250);
+    const hidden = await probe('toast-tab-hidden', true);
+    check(hidden.found && Math.abs(hidden.bottom - (hidden.vh - 24)) <= 1,
+        'ទិសផ្ទុយ ៖ ZoeW toast ⟷ របា Tab ៖ របា Tab លាក់ (`chrome-hidden`) ➜ toast ចុះដល់បាត ២៤px', JSON.stringify(hidden));
+    await ctx.close();
+}
+
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃ ៖ ស្លាកបោះពុម្ពពិត (`LabelSheet` · `#pdfExportPrintArea` · media print) ៖ «COD $25.00 · DOD $3.50» លើស្លាក 60×40 (53.5/53.0mm) ·
+//    «COD $1234.56 · DOD $245.50» លើ 50×30 (48.8/45.0mm) ➜ ស្លាក `overflow: hidden` កាត់ចំនួនលុយលើក្រដាសពិត · 40×30 បត់លុយជា ២ បន្ទាត់ ➜ ថ្ងៃ/Locker ធ្លាក់ហួសបាតស្លាក ·
+//    A4 (៣/២ ជួរឈរ) ៖ លុយ `nowrap` ពង្រីកជួរឈរ (ស្លាកទទឹងមិនស្មើ · ជួរឈរទី ៣ ហួសក្រដាសបញ្ឈរ)។ ច្បាប់ ៖ គ្រប់ layout · A4 ផ្តេក (២៧៧mm) និងបញ្ឈរ (១៩០mm) ៖
+//    អត្ថបទគ្រប់ជួរនៅក្នុងប្រអប់ស្លាក · ស្លាកទំហំថេរ ៖ មិនហួសបាត · លេខទូរស័ព្ទមួយបន្ទាត់ · ស្លាកក្នុងក្រឡាចត្រង្គទទឹងស្មើ · សន្លឹកមិនលើសទទឹង។
+//    អក្សរ ៖ 'Liberation Sans' (មានទាំងនៅទីនេះ និង CI តាម playwright --with-deps) ➜ លទ្ធផលមិនអាស្រ័យ font ម៉ាស៊ីន។
+const LABEL_FIT_MONEY = [[2, 0], [12.5, 0], [0, 3.25], [12.5, 2], [25, 3.5], [125.5, 12.5], [1234.56, 245.5], [99999.99, 9999.99]];
+const LABEL_FIT_PHONES = ['0960000421', '012345678', '+85512345678', '0888888888'];
+async function labelPrintFit(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 1047, height: 740 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof buildLabelRows === 'function' && typeof normalizeLabelOptions === 'function' && typeof commitNow === 'function' && typeof LABEL_LAYOUTS !== 'undefined' && typeof uiState === 'object');
+    check(ready, 'ZoeW ស្លាកបោះពុម្ព ៖ មាន buildLabelRows · normalizeLabelOptions · LABEL_LAYOUTS (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.addStyleTag({ content: '#pdfExportPrintArea .label-sheet, #pdfExportPrintArea .label-sheet * { font-family: "Liberation Sans", Arial, sans-serif !important; }' });
+    const layouts = await page.evaluate(() => LABEL_LAYOUTS.slice());
+    const results = [];
+    for (const [w, paper] of [[1047, 'A4 ផ្តេក'], [718, 'A4 បញ្ឈរ']]) {
+        await page.setViewportSize({ width: w, height: 740 });
+        for (const layout of layouts) {
+            const count = await page.evaluate(({ layout, money, phones }) => {
+                const items = money.map(([cod, dod], i) => ({ id: 'L' + i, phone: phones[i % phones.length], scanDate: '2026-10-15', locker: 'A12',
+                    barcodes: [{ code: 'ZT88000000' + String(i).padStart(4, '0'), cod, dod, locker: 'B7', isClosed: false }] }));
+                const options = normalizeLabelOptions({ layout, money: true, date: true, locker: true, openOnly: false });
+                const labels = buildLabelRows(items, options);
+                uiState.pdfExportView = { kind: 'labels', title: '', labels, options };
+                commitNow();
+                return labels.length;
+            }, { layout, money: LABEL_FIT_MONEY, phones: LABEL_FIT_PHONES });
+            await page.emulateMedia({ media: 'print' });
+            await page.waitForTimeout(120);
+            const m = await page.evaluate(() => {
+                const sheet = document.querySelector('#pdfExportPrintArea .label-sheet');
+                if (!sheet) return null;
+                const labels = [...sheet.querySelectorAll('.label')];
+                const bad = [];
+                let phoneSplit = 0, moneyDrawn = 0;
+                const widths = new Set();
+                for (const lb of labels) {
+                    const lr = lb.getBoundingClientRect(), cs = getComputedStyle(lb);
+                    widths.add(Math.round(lr.width));
+                    const inL = lr.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft) - 0.5;
+                    const inR = lr.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight) + 0.5;
+                    const inB = lr.bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom) + 0.5;
+                    const fixed = cs.overflow === 'hidden';
+                    for (const ch of lb.children) {
+                        const range = document.createRange();
+                        range.selectNodeContents(ch);
+                        const tr = range.getBoundingClientRect(), cr = ch.getBoundingClientRect();
+                        if (ch.classList.contains('label-money') && ch.textContent) moneyDrawn++;
+                        if (tr.left < inL || tr.right > inR) bad.push(ch.className + ' «' + ch.textContent + '» [' + tr.left.toFixed(1) + ',' + tr.right.toFixed(1) + '] ⟷ [' + inL.toFixed(1) + ',' + inR.toFixed(1) + ']');
+                        if (fixed && cr.bottom > inB) bad.push(ch.className + ' «' + ch.textContent + '» បាត ' + cr.bottom.toFixed(1) + ' > ' + inB.toFixed(1));
+                        if (ch.classList.contains('label-phone') && new Set([...range.getClientRects()].map((x) => Math.round(x.top))).size > 1) phoneSplit++;
+                    }
+                }
+                return { n: labels.length, moneyDrawn, phoneSplit, bad, widths: [...widths], sheetOver: sheet.scrollWidth - sheet.clientWidth, right: Math.round(sheet.getBoundingClientRect().right), vw: document.documentElement.clientWidth,
+                    font: getComputedStyle(sheet.querySelector('.label-money') || sheet).fontFamily };
+            });
+            await page.emulateMedia({ media: 'screen' });
+            results.push(Object.assign({ paper, layout, count }, m || { missing: true }));
+        }
+    }
+    await page.evaluate(() => { uiState.pdfExportView = null; commitNow(); });
+    check(results.length === layouts.length * 2 && layouts.length >= 6 && results.every((r) => !r.missing && r.n === LABEL_FIT_MONEY.length && r.count === r.n && r.moneyDrawn === r.n && /Liberation/.test(r.font)),
+        'ZoeW ស្លាកបោះពុម្ព ៖ ជាន់អប្បបរមា ៖ ស្លាកពិត ' + LABEL_FIT_MONEY.length + ' (លុយ ' + LABEL_FIT_MONEY.length + ' ទំហំ) × layout ' + layouts.length + ' × ក្រដាស ២ គូរក្នុង print media',
+        JSON.stringify(results.filter((r) => r.missing || r.n !== LABEL_FIT_MONEY.length || r.moneyDrawn !== r.n || !/Liberation/.test(r.font || '')).slice(0, 3)));
+    check(results.every((r) => r.bad && r.bad.length === 0),
+        '⛔ ZoeW ស្លាកបោះពុម្ព ៖ គ្រប់ layout ➜ លេខទូរស័ព្ទ · Barcode · COD/DOD · ថ្ងៃ/Locker នៅក្នុងប្រអប់ស្លាក (មិនកាត់លើក្រដាស · មិនហួសបាតស្លាកទំហំថេរ)',
+        JSON.stringify(results.filter((r) => r.bad && r.bad.length).map((r) => ({ paper: r.paper, layout: r.layout, bad: r.bad.slice(0, 3), more: r.bad.length }))).slice(0, 1400));
+    check(results.every((r) => r.phoneSplit === 0),
+        '⛔ ZoeW ស្លាកបោះពុម្ព ៖ លេខទូរស័ព្ទនៅបន្ទាត់តែមួយគ្រប់ layout (មិនបំបែកលេខ)', JSON.stringify(results.filter((r) => r.phoneSplit).map((r) => [r.paper, r.layout, r.phoneSplit])));
+    check(results.every((r) => r.widths && r.widths.length === 1 && r.sheetOver <= 1 && r.right <= r.vw + 1),
+        '⛔ ZoeW ស្លាកបោះពុម្ព ៖ ស្លាកទទឹងស្មើគ្នា · សន្លឹកមិនលើសទទឹងក្រដាស (A4 ៣/២ ជួរឈរ · បញ្ឈរ/ផ្តេក)',
+        JSON.stringify(results.filter((r) => !(r.widths && r.widths.length === 1 && r.sheetOver <= 1 && r.right <= r.vw + 1)).map((r) => [r.paper, r.layout, r.widths, r.sheetOver, r.right, r.vw])));
+    await ctx.close();
+}
+
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃ ៖ ✖ បិទ ☰/🔔/ប្រអប់ស្កេន (២៨×២៨) តូចជាងគោលដៅចុចស្តង់ដារ ៤៤×៤៤ (Apple HIG ៤៤pt · Material ៤៨dp) ➜ ផ្ទៃចុច ៤៤ ចំកណ្តាល
+//    ប៊ូតុង ⛔ រូបរាងមិនប្តូរ ៖ elementFromPoint លើគែម ±២១px និងអង្កត់ទ្រូង ±១៥px (រង្វង់ ៤៤ · ជ្រុងកាតមូលកាត់ជ្រុងការ៉េ) ➜ ប៊ូតុងនោះ ·
+//    ទិសផ្ទុយ ៖ ធាតុចុចបានផ្សេងក្នុងស្រទាប់ដដែលនៅទទួលការចុចចំកណ្តាលរបស់វា · ☰ · 🔔 ក្នុង navbar ⛔ មិនពង្រីក (ផ្ទៃចុចជិតបាត navbar ➜ Chromium
+//    touch adjustment ទាញការប៉ះចាប់ផ្តើម PTR ក្រោម navbar ទៅប៊ូតុង ➜ PTR លើ APK មិនកេះ ៖ `native:check` ធ្លាក់) ➜ ក្រោមបាតប៊ូតុង ៤px មិនមែនប៊ូតុង។
+const TAP_TARGET_STEPS = [['☰', 'openSideDrawer()', ['#sideDrawer .drawer-close']],
+    ['🔔', 'openNotifyDrawer()', ['#notifyDrawer .drawer-close']], ['ប្រអប់ស្កេន', "openModalHelper('phoneModal')", ['#phoneModalCloseX']]];
+async function tapTargetLayout(browser, port) {
+    const rows = [];
+    const navbar = [];
+    for (const [w, h, mobile] of [[390, 844, true], [320, 568, true], [1280, 800, false]]) {
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: mobile, isMobile: mobile });
+        const page = await ctx.newPage();
+        page.on('dialog', (d) => d.dismiss().catch(() => {}));
+        await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(900);
+        const ready = await page.evaluate(() => ['openSideDrawer', 'closeSideDrawer', 'openNotifyDrawer', 'openModalHelper', 'closeModal', 'openModalIds'].every((f) => typeof window[f] === 'function'));
+        if (!ready) { rows.push({ w, ready }); await ctx.close(); continue; }
+        for (const [name, open, sels] of TAP_TARGET_STEPS) {
+            await page.evaluate((code) => { openModalIds().slice().forEach((id) => closeModal(id)); closeSideDrawer(); if (code) (0, eval)(code); }, open);
+            await page.waitForTimeout(450);
+            const m = await page.evaluate((sels) => {
+                const vis = (el) => { const cs = getComputedStyle(el); const r = el.getBoundingClientRect(); return cs.visibility !== 'hidden' && cs.display !== 'none' && r.width > 0 && r.height > 0; };
+                const targets = sels.map((s) => document.querySelector(s)).filter(Boolean);
+                const out = targets.map((el) => {
+                    const r = el.getBoundingClientRect();
+                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                    const pts = [[-15, -15], [15, -15], [-15, 15], [15, 15], [0, -21], [0, 21], [-21, 0], [21, 0]];
+                    const miss = pts.filter(([dx, dy]) => { const hit = document.elementFromPoint(cx + dx, cy + dy); return !hit || !el.contains(hit); });
+                    return { sel: el.id || el.className, size: Math.round(r.width) + '×' + Math.round(r.height), miss: miss.length, missAt: miss.slice(0, 3) };
+                });
+                const layer = targets[0] ? (targets[0].closest('.modal, .side-drawer') || document.body) : document.body;
+                const stolen = [...layer.querySelectorAll('button, a[href], input:not([type="hidden"]), select, textarea, [role="button"]')]
+                    .filter((el) => targets.indexOf(el) === -1 && !targets.some((t) => t.contains(el)) && vis(el))
+                    .filter((el) => {
+                        const r = el.getBoundingClientRect();
+                        const x = Math.min(Math.max(r.left + r.width / 2, 1), window.innerWidth - 2), y = Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 2);
+                        const hit = document.elementFromPoint(x, y);
+                        return !!hit && targets.some((t) => t.contains(hit));
+                    }).map((el) => el.id || el.className || el.tagName);
+                return { found: targets.length === sels.length, out, stolen };
+            }, sels);
+            rows.push(Object.assign({ w, name }, m));
+        }
+        await page.evaluate(() => { openModalIds().slice().forEach((id) => closeModal(id)); closeSideDrawer(); });
+        await page.waitForTimeout(350);
+        navbar.push(Object.assign({ w }, await page.evaluate(() => ['navMenuBtn', 'navNotifyBtn'].map((id) => {
+            const el = document.getElementById(id);
+            const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.bottom + 4);
+            return { id, h: Math.round(r.height), below: !!hit && el.contains(hit) };
+        }))));
+        await ctx.close();
+    }
+    check(rows.length === 9 && rows.every((r) => r.found && r.out.every((o) => /^(2[0-9]|3[0-9])×/.test(o.size))),
+        'ZoeW គោលដៅចុច ៖ ជាន់អប្បបរមា ៖ ✖ ☰ · ✖ 🔔 · ✖ ប្រអប់ស្កេន បង្ហាញ (៣ ទំហំ) · រូបរាងតូចដដែល (២០–៣៩px)', JSON.stringify(rows.filter((r) => !r.found || !r.out).slice(0, 4)));
+    check(navbar.length === 3 && navbar.every((n) => [0, 1].every((i) => n[i] && n[i].h >= 20 && !n[i].below)),
+        'ទិសផ្ទុយ ៖ ZoeW គោលដៅចុច ៖ ☰ · 🔔 ក្នុង navbar មិនពង្រីកចុះក្រោម (ក្រោមបាតប៊ូតុង ៤px មិនមែនប៊ូតុង ៖ PTR ចាប់ផ្តើមក្រោម navbar)', JSON.stringify(navbar));
+    check(rows.every((r) => r.out && r.out.every((o) => o.miss === 0)),
+        '⛔ ZoeW គោលដៅចុច ៖ ✖ ➜ ផ្ទៃចុច ៤៤ (គែម ±២១px · អង្កត់ទ្រូង ±១៥px ពីកណ្តាលចុចត្រូវប៊ូតុង) ទូរស័ព្ទ ៣៩០ · ៣២០ · desktop',
+        JSON.stringify(rows.filter((r) => r.out && r.out.some((o) => o.miss)).map((r) => [r.w, r.name, r.out.filter((o) => o.miss)])).slice(0, 900));
+    check(rows.every((r) => r.stolen && r.stolen.length === 0),
+        'ទិសផ្ទុយ ៖ ZoeW គោលដៅចុច ៖ ផ្ទៃពង្រីកមិនលួចការចុចធាតុផ្សេងក្នុងស្រទាប់ដដែល', JSON.stringify(rows.filter((r) => r.stolen && r.stolen.length).map((r) => [r.w, r.name, r.stolen])));
+}
+
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃ (កុំព្យូទ័រ + ម៉ាស៊ីនស្កេន) ៖ ប្រអប់ស្កេន «🎉 ស្កេនបានជោគជ័យ!» ៖ វាយលេខទូរស័ព្ទ + Enter ➜ គ្មានអ្វីកើតឡើង (ត្រូវយកកណ្តុរ) ·
+//    ទូរស័ព្ទ Android ៖ ប៊ូតុង «Enter» របស់ keyboard មិនទៅប្រអប់បន្ទាប់។ ស្តង់ដារ ៖ Enter ➜ ប្រអប់បន្ទាប់ (ទូរស័ព្ទ ➜ Locker ➜ COD ➜ DOD) ·
+//    `enterKeyHint` = next · ចុងក្រោយ done ➜ បិទ keyboard ⛔ Enter មិនដែលរក្សាទុក (ម៉ាស៊ីនស្កេនផ្ញើ Enter ក្រោយ Barcode ➜ ការស្កេនខុសប្រអប់មិនក្លាយជាលេខ/លុយ)។
+async function phoneModalEnterNext(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(900);
+    const ready = await page.evaluate(() => {
+        if (typeof triggerScanAction !== 'function' || typeof openModalIds !== 'function' || typeof confirmPhone !== 'function') return false;
+        openModalIds().slice().forEach((id) => closeModal(id));
+        window.__confirmCalls = 0;
+        const real = confirmPhone;
+        window.confirmPhone = function () { window.__confirmCalls++; return real.apply(this, arguments); };
+        triggerScanAction('ZTENTERNEXT0001');
+        return true;
+    });
+    check(ready, 'ZoeW ប្រអប់ស្កេន Enter ៖ មាន triggerScanAction · confirmPhone (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.waitForTimeout(400);
+    const at = () => page.evaluate(() => ({ active: (document.activeElement || {}).id || (document.activeElement || {}).tagName, open: openModalIds().indexOf('phoneModal') !== -1 }));
+    const start = await at();
+    const steps = [];
+    for (const [text, want] of [['0960000999', 'modalLockerInput'], ['A1', 'modalCodInput'], ['2.5', 'modalDodInput'], ['1', null]]) {
+        await page.keyboard.type(text);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(150);
+        steps.push(Object.assign({ text, want }, await at()));
+    }
+    const fin = await page.evaluate(() => ({ hints: ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'].map((id) => document.getElementById(id).enterKeyHint),
+        values: ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'].map((id) => document.getElementById(id).value), confirms: window.__confirmCalls }));
+    check(start.open && start.active === 'modalPhoneInput', 'ZoeW ប្រអប់ស្កេន Enter ៖ ជាន់អប្បបរមា ៖ ស្កេន ➜ ប្រអប់បើក · cursor នៅប្រអប់លេខទូរស័ព្ទ', JSON.stringify(start));
+    check(steps.slice(0, 3).every((s) => s.open && s.active === s.want),
+        '⛔ ZoeW ប្រអប់ស្កេន Enter ៖ លេខទូរស័ព្ទ ➜ Locker ➜ COD ➜ DOD (Enter ទៅប្រអប់បន្ទាប់)', JSON.stringify(steps));
+    const last = steps[3];
+    check(!!last && last.open && ['modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput'].indexOf(last.active) === -1 && fin.confirms === 0,
+        '⛔ ZoeW ប្រអប់ស្កេន Enter ៖ DOD + Enter ➜ បិទ keyboard (ចេញពីប្រអប់វាយ) ⛔ មិនរក្សាទុក · ប្រអប់នៅបើក', JSON.stringify({ last, confirms: fin.confirms }));
+    check(fin.values.join('|') === '0960000999|A1|2.5|1' && fin.hints.join('|') === 'next|next|next|done',
+        'ZoeW ប្រអប់ស្កេន Enter ៖ តម្លៃដែលវាយនៅដដែល · enterKeyHint = next ×៣ · done', JSON.stringify(fin));
+    await ctx.close();
+}
+
 // ⛔ UI-5/UI-6 ៖ ជួរ 🔔 «ជិតផុតកំណត់» · «ដករួច» ត្រូវបង្ហាញ Locker ពេញ (ទីតាំងសម្រាប់ទៅយកកញ្ចប់ចេញពីទូ) ៖ ព័ត៌មានបត់បន្ទាត់ មិនកាត់ «…» ·
 //    ជួរមិនលើសផ្ទាំង។ វាស់ `scrollWidth`/`clientWidth` ក្នុង browser ពិតលើទូរស័ព្ទ ៣២០ · ៤១២។
 async function notifyRowLayout(browser, port) {
@@ -696,6 +933,90 @@ async function historyRowLayout(browser, port) {
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            // ⛔ រាយការណ៍ម្ចាស់គម្រោង (រូបថត iPhone ក្រោយ 2.50.65) ៖ (១) ស្លាក «កញ្ចប់សរុប (នៅសល់)» ក្នុង «គ្រប់គ្រងប្រចាំថ្ងៃ» កាត់ «…» លើអេក្រង់តូច (វាស់ ៖ ៣២០ ទាំង ៣ ស្លាក · ៣៦០–៤១២
+            //    ស្លាកទី ១ · ១២៨០ ទាំង ៣ ក្នុងជួរឈរ ៣៨០px) ➜ បត់បន្ទាត់ ⛔ មិនកាត់ · (២) ប៊ូតុង «📋 បញ្ចូលច្រើន» មិនស្មើ «📁 យក Barcode ពីរូបភាព» (១៨០×៣៨ ទល់ ១២៨×៤២) ➜ ទទឹង
+            //    និងកម្ពស់ស្មើគ្នា (±1px) · (៣) ផ្ទាំងបោះពុម្ពស្លាក ៖ គំរូស្លាក 50×30 (zoom 1.6) ធំជាងកន្លែងគំរូនៅ ៣២០ (២៩២/២៥៨px ➜ លេខទូរស័ព្ទកាត់) ➜ zoom តាមទទឹង ⛔ គ្មាន scroll ផ្តេក
+            //    ក្នុង `#labelPrintPreview` សម្រាប់ស្លាកតូចទាំង ៣ ទំហំ (ស្លាកពិត ៖ លេខ ១០ ខ្ទង់ · Barcode · COD/DOD · ថ្ងៃ · Locker)។
+            if (app === 'ZoeW') {
+                const small = await page.evaluate(() => {
+                    const labels = [...document.querySelectorAll('.stat-card .label')].map((l) => ({ t: l.textContent, cut: l.scrollWidth > l.clientWidth + 1, nowrap: getComputedStyle(l).whiteSpace === 'nowrap', ellipsis: getComputedStyle(l).textOverflow === 'ellipsis' }));
+                    const dataPage = document.getElementById('pageData'), entryPage = document.getElementById('pageEntry');
+                    const wasData = !!dataPage && dataPage.classList.contains('active');
+                    if (dataPage) dataPage.classList.remove('active');
+                    if (entryPage) entryPage.classList.add('active');
+                    const a = document.querySelector('.upload-fallback-row .file-upload-btn:not(.batch-scan-btn)'), b = document.getElementById('batchScanBtn');
+                    const ra = a && a.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+                    const row = a && a.parentElement ? a.parentElement.getBoundingClientRect() : null;
+                    const buttons = { a: ra && [Math.round(ra.width), Math.round(ra.height)], b: rb && [Math.round(rb.width), Math.round(rb.height)],
+                        inside: !!(ra && rb && row && ra.left >= row.left - 1 && rb.right <= row.right + 1), textCut: !!(a && b && (a.scrollWidth > a.clientWidth + 1 || b.scrollWidth > b.clientWidth + 1)) };
+                    if (entryPage) entryPage.classList.remove('active');
+                    if (dataPage && wasData) dataPage.classList.add('active');
+                    const modal = document.getElementById('labelPrintModal'), pv = document.getElementById('labelPrintPreview');
+                    const preview = [];
+                    if (modal && pv) {
+                        const prevDisplay = modal.style.display;
+                        modal.style.display = 'flex';
+                        const bars = Array.from({ length: 34 }, (_, i) => '<rect x="' + (10 + i * 4) + '" y="0" width="' + (1 + (i % 3)) + '" height="60"></rect>').join('');
+                        const label = '<div class="label"><div class="label-phone">0960000001</div><div class="label-bc"><svg viewBox="0 0 176 60" preserveAspectRatio="none">' + bars + '</svg></div>' +
+                            '<div class="label-code">77130500000000</div><div class="label-money">COD $12.40 · DOD $1.25</div><div class="label-meta"><span class="label-date">14/10</span><span class="label-locker">A12</span></div></div>';
+                        for (const layout of ['50x30', '40x30', '60x40']) {
+                            pv.innerHTML = '<div class="label-sheet layout-' + layout + '">' + label + label + '</div>';
+                            const sheet = pv.firstElementChild, phone = pv.querySelector('.label-phone');
+                            preview.push({ layout, pvW: pv.clientWidth, sheetW: Math.round(sheet.getBoundingClientRect().width), scrollX: pv.scrollWidth > pv.clientWidth + 1,
+                                phoneCut: phone.scrollWidth > phone.clientWidth + 1, zoom: getComputedStyle(sheet).zoom });
+                        }
+                        pv.innerHTML = '';
+                        modal.style.display = prevDisplay;
+                    }
+                    return { labels, buttons, preview };
+                });
+                check(small.labels.length === 3 && small.labels.every((l) => !l.cut && !l.nowrap && !l.ellipsis),
+                    '⛔ ' + label + ': ស្លាកក្រឡាស្ថិតិ «កញ្ចប់សរុប (នៅសល់)» · «ស្កេនតាមថ្ងៃ» · «អតិថិជនយក» អានបានទាំងអស់ (បត់បន្ទាត់ · មិនកាត់ «…»)', JSON.stringify(small.labels));
+                const bt = small.buttons;
+                check(!!(bt.a && bt.b) && Math.abs(bt.a[0] - bt.b[0]) <= 1 && Math.abs(bt.a[1] - bt.b[1]) <= 1 && bt.inside && !bt.textCut,
+                    '⛔ ' + label + ': ប៊ូតុង «📁 យក Barcode ពីរូបភាព» និង «📋 បញ្ចូលច្រើន» ទទឹង/កម្ពស់ស្មើគ្នា · ក្នុងជួរ · អក្សរមិនកាត់', JSON.stringify(bt));
+                check(small.preview.length === 3 && small.preview.every((p) => !p.scrollX && !p.phoneCut && p.sheetW <= p.pvW + 1),
+                    '⛔ ' + label + ': គំរូស្លាកតូច (50×30 · 40×30 · 60×40) សមទទឹងកន្លែងគំរូ ⛔ គ្មាន scroll ផ្តេក · លេខទូរស័ព្ទមិនកាត់', JSON.stringify(small.preview));
+
+                // ⛔ តេស្តប្រើប្រចាំថ្ងៃគ្រប់ទំហំ ៖ (១) CSS ស្លាកបោះពុម្ព `.label { border dashed · padding 3mm · ផ្ទៃស }` ជាឈ្មោះ class ទូទៅ ➜ ជ្រាបចូល
+                //    `span.label` នៃក្រឡាស្ថិតិ «កញ្ចប់សរុប (នៅសល់)» · «ស្កេនតាមថ្ងៃ» · «អតិថិជនយក» (ប្រអប់ដាច់ៗជុំវិញស្លាក ៣ គ្រប់អេក្រង់) ➜ CSS ស្លាកនៅក្រោម
+                //    `.label-sheet` ប៉ុណ្ណោះ (ទិសផ្ទុយ ៖ ស្លាកក្នុង `.label-sheet` នៅមានគែមដាច់ៗ) · (២) «61,203,160 ៛» បត់បន្ទាត់មុន «៛» ➜ «៛» នៅម្នាក់ឯង
+                //    (៣២០ · ៣៦០ · iPad · ១២៨០) ➜ ចំនួនរៀលនៃសរុបប្រចាំថ្ងៃនៅបន្ទាត់តែមួយ (វាស់ Range តួលេខចុងក្រោយ ⟷ «៛» ពិត)
+                const statMoney = await page.evaluate(async () => {
+                    const look = (l) => { const cs = getComputedStyle(l); return { border: cs.borderTopStyle, pad: cs.paddingTop + ' ' + cs.paddingLeft, bg: cs.backgroundColor }; };
+                    const stat = [...document.querySelectorAll('.stat-card .label')].map((l) => Object.assign({ t: l.textContent }, look(l)));
+                    const sheet = document.createElement('div');
+                    sheet.className = 'label-sheet layout-a4-3';
+                    sheet.innerHTML = '<div class="label"><div class="label-phone">0960000001</div></div>';
+                    document.body.appendChild(sheet);
+                    const print = look(sheet.firstElementChild);
+                    sheet.remove();
+                    const ids = ['summaryCodRiel', 'summaryDodRiel', 'summaryTotalRiel'];
+                    const keep = viewState.dataSummary;
+                    viewState.dataSummary = Object.assign({}, keep, { summaryCodDollar: '$12472.60', summaryCodRiel: '51,137,660 ៛', summaryDodDollar: '$2455.00',
+                        summaryDodRiel: '10,065,500 ៛', summaryTotalDollar: '$14927.60', summaryTotalRiel: '61,203,160 ៛' });
+                    commitNow();
+                    const riel = ids.map((id) => {
+                        const el = document.getElementById(id);
+                        const n = el && el.firstChild;
+                        if (!n || n.nodeType !== 3 || !el.getBoundingClientRect().width) return { id, drawn: false };
+                        const t = n.textContent, i = t.indexOf('៛');
+                        let j = i - 1;
+                        while (j >= 0 && /\s/.test(t[j])) j--;
+                        const at = (k) => { const r = document.createRange(); r.setStart(n, k); r.setEnd(n, k + 1); return r.getBoundingClientRect(); };
+                        return { id, drawn: i > 0 && j >= 0, text: t, split: i > 0 && j >= 0 ? Math.abs(at(i).top - at(j).top) > 3 : null };
+                    });
+                    viewState.dataSummary = keep;
+                    commitNow();
+                    return { stat, print, riel };
+                });
+                check(statMoney.stat.length === 3 && statMoney.stat.every((s) => s.border === 'none' && s.pad === '0px 0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(s.bg)),
+                    '⛔ ' + label + ': ស្លាកក្រឡាស្ថិតិ ៣ គ្មានប្រអប់ស្លាកបោះពុម្ពជ្រាបចូល (គែម · padding · ផ្ទៃស)', JSON.stringify(statMoney.stat));
+                check(statMoney.print.border === 'dashed', 'ទិសផ្ទុយ ៖ ' + label + ': ស្លាកក្នុង `.label-sheet` នៅមានគែមដាច់ៗ', JSON.stringify(statMoney.print));
+                check(statMoney.riel.length === 3 && statMoney.riel.every((r) => r.drawn && r.split === false),
+                    '⛔ ' + label + ': ចំនួនរៀលសរុបប្រចាំថ្ងៃ («61,203,160 ៛») នៅបន្ទាត់តែមួយ ⛔ «៛» មិនធ្លាក់ម្នាក់ឯង', JSON.stringify(statMoney.riel));
+            }
+
             // ⛔ modal ជាន់គ្នា (App ទាំង ២) ៖ modal ដែល **បើកក្រោយ** ត្រូវនៅខាងលើជានិច្ច — z-index ស្មើគ្នា ➜ លំដាប់ក្នុង DOM ឈ្នះ ➜ ឧ. ប្រអប់ PIN
             //    (ឈរមុន Config ក្នុង DOM) បើកពី ⚙️ Config ➜ លោតពីក្រោយ (រាយការណ៍ដោយម្ចាស់គម្រោង ៖ ZoeKeyGen បើកក្រយៅដៃ/មុខ · វាស់បាន ZoeW ខុស
             //    ៤៦៥/៩៣០ គូ · ZoeKeyGen ១៥/៣០)។ វាស់គ្រប់គូ (A ➜ B) តាម `openModalHelper()` ពិត និង `elementFromPoint()` ចំកណ្តាលប្រអប់ B · បើក A
@@ -1018,6 +1339,10 @@ async function historyRowLayout(browser, port) {
             await ztoSyncListPaging(browser, port);
             await notifyRowLayout(browser, port);
             await pinEnterSubmits(browser, port);
+            await toastTabbarLayout(browser, port);
+            await labelPrintFit(browser, port);
+            await tapTargetLayout(browser, port);
+            await phoneModalEnterNext(browser, port);
         }
         if (app === 'ZoeKeyGen') await keygenPasswordForms(browser, port);
 

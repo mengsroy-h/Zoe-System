@@ -416,6 +416,17 @@ describe('ការវាយដោយមនុស្សក្នុងផ្ទ�
         expect(scanState.pendingBarcode).toBe(b);
     });
 
+    it('ផ្ទាំងមិនមែនដំណើរការស្កេន (PIN) · គ្មានប្រអប់ focus ➜ វាយលឿន + Enter ➜ មិនចូលជួរ · ប្រាប់ឲ្យបិទផ្ទាំងសិន', async () => {
+        step(() => { uiState.isModalOpen = true; uiState.modalStack = ['pinModal']; });
+        scan('135791');
+        await settle();
+        expect(viewState.batchScanStatus).toBe('');
+        expect(h.toasts.some((t) => t.startsWith('⚠️') && t.includes('បិទផ្ទាំងនេះ'))).toBe(true);
+        step(() => { uiState.modalStack = []; uiState.isModalOpen = false; });
+        await settle(200);
+        expect(phoneModalOpen()).toBe(false);
+    });
+
     it('ផ្ទាំង PIN (ប្រអប់វាយរបស់ផ្ទាំងផ្សេង) ➜ មិនប៉ះ', async () => {
         const pin = document.createElement('input');
         pin.type = 'password';

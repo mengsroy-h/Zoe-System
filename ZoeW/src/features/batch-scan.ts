@@ -10,6 +10,8 @@ import { showToast } from '../ui/toast';
 
 export const BATCH_SCAN_MAX = 200;
 
+const SCAN_FLOW_MODALS = ['phoneModal', 'scanRemoveModal', 'locationWarningModal'];
+
 interface BatchRun {
     queue: string[];
     index: number;
@@ -168,6 +170,11 @@ export function queueScannedCode(raw: string): boolean {
         return false;
     }
     const run = batchRun;
+    const open = Array.isArray(uiState.modalStack) ? uiState.modalStack : [];
+    if (!run && open.length && !open.some((id) => SCAN_FLOW_MODALS.indexOf(id) !== -1)) {
+        showToast(`⚠️ Barcode (${code}) មិនបានបញ្ចូល — បិទផ្ទាំងនេះ រួចស្កេនម្ដងទៀត។`);
+        return false;
+    }
     if (run) {
         const waiting = run.queue.slice(run.index).concat(run.current ? [run.current] : []);
         if (waiting.some((c) => c.toUpperCase() === key)) {

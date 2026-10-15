@@ -1,14 +1,15 @@
 // ថ្នាក់កំហុសដែលឧបករណ៍នេះចាក់សោ ៖ ប្រអប់ (modal) ដែលមានប្រអប់វាយអក្សរ/លេខ ត្រូវ keyboard បាំង ។
 //   iPhone (និង browser ដែលមិនបង្រួមទំព័រពេល keyboard បើក) មិនប្តូរកម្ពស់ layout viewport ទេ ➜ `.modal` (fixed · កម្ពស់ ១០០%)
 //   នៅកណ្តាលអេក្រង់ពេញ ➜ ពាក់កណ្តាលក្រោមរបស់ប្រអប់ និងប្រអប់វាយដែលកំពុងប្រើ នៅក្រោយ keyboard ។
-// ⛔ ច្បាប់ (ម្ចាស់គម្រោង ៖ «កុំអោយរំកិលឡើងទាំងមូល ព្រោះ modal ខ្លះវែងអាចផុត» · «ផ្ទៃថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នា») ៖
-//    keyboard បាំង ≥ KEYBOARD_MIN_INSET_PX ➜ ប្រអប់នៅ **ទីតាំងដដែលលើអេក្រង់** (កំពូល · ឆ្វេង · ស្តាំ ដូចពេល keyboard បិទ ទោះ iOS រំកិល
-//    visual viewport ក៏ដោយ) · មានតែបាតខ្លីមកត្រឹម keyboard (គម្លាត MODAL_KEYBOARD_GAP_PX) ហើយរមូរក្នុងខ្លួន ➜ ប្រអប់វាយដែល focus
-//    មើលឃើញពីលើ keyboard · ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ ➜ មិនប្តូរអ្វីទាំងអស់ · ផ្ទៃដែលនៅសល់ក្រោមកំពូលតិចជាង
-//    MODAL_KEYBOARD_MIN_VISIBLE_PX ➜ ទើបលើកកំពូលឡើង (ប្រអប់តូច) · ផ្ទៃងងឹត (backdrop) គ្របពេញ layout viewport ហើយពីបន្ទាត់ keyboard
+// ⛔ ច្បាប់ (ម្ចាស់គម្រោង ៖ «កុំអោយរំកិលឡើងទាំងមូល ព្រោះ modal ខ្លះវែងអាចផុត» · «ផ្ទៃថ្លាពីលើ keyboard ពណ៌ពីរខុសគ្នា» · រូបថត iPhone ៖
+//    ប៊ូតុង PIN ត្រូវកាត់ · ចំណងជើង «បញ្ចូលច្រើន» ត្រូវកាត់ ខណៈផ្ទៃពីលើកាតទំនេរ) ៖ keyboard បាំង ≥ KEYBOARD_MIN_INSET_PX ➜
+//    ឆ្វេង · ស្តាំដដែល · ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ ➜ មិនប្តូរអ្វីទាំងអស់ · ប្រអប់ខ្លីល្មមផ្ទៃពីលើ keyboard ➜ ឡើងតែល្មមឲ្យបាតត្រឹម
+//    keyboard (គម្លាត MODAL_KEYBOARD_GAP_PX) ➜ ឃើញទាំងមូល មិនកាត់ · ប្រអប់វែងជាងផ្ទៃនោះ ➜ កំពូលនៅកំពូលផ្ទៃមើលឃើញ (padding · ក្រោម
+//    status bar `--modal-safe-top` + គម្លាត) ⛔ មិនដែលផុតអេក្រង់ · បាតត្រឹម keyboard · រមូរក្នុងខ្លួន ➜ ប្រអប់វាយដែល focus មើលឃើញ ·
+//    ផ្ទៃងងឹត (backdrop) គ្របពេញ layout viewport ហើយពីបន្ទាត់ keyboard
 //    ចុះក្រោម (ទាំងការរំកិល) ជាស្រទាប់ស្រអាប់ ➜ នៅក្រោយ keyboard ថ្លារបស់ iPhone មានពណ៌តែមួយ (វាស់ pixel ពីរូបថតពិត) · keyboard បិទ ➜ ដូចដើម · APK (WebView បង្រួមខ្លួនឯង) ➜ មិនប្តូរប្លង់ ហើយប្រអប់វាយមើលឃើញ ។
 // វិធី ៖ App ពិត (audit build) · visualViewport ក្លែង (Chromium មិនមាន keyboard) · បញ្ជីប្រអប់ និងប្រអប់វាយ **ដេរីវេពី DOM ពិត**
-//    (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea ដែលមើលឃើញពេលបើក) · ទំហំទូរស័ព្ទ ៣ · ផ្ទៃមើលឃើញរំកិល (offsetTop) ·
+//    (គ្រប់ `.modal` ដែលមាន input អក្សរ/លេខ ឬ textarea ដែលមើលឃើញពេលបើក) · ទំហំទូរស័ព្ទ ៤ · ផ្ទៃមើលឃើញរំកិល (offsetTop) · status bar ក្លែង ·
 //    ទិសផ្ទុយ (keyboard បិទ · APK បង្រួម viewport · ជាន់អប្បបរមា) · ចំនួនថេរអានពី app.js ពិត ។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {
@@ -30,7 +31,7 @@ function appConst(name, fallback) {
     return m ? Number(m[1]) : fallback;
 }
 const GAP = appConst('MODAL_KEYBOARD_GAP_PX', 8);
-const MIN_VISIBLE = appConst('MODAL_KEYBOARD_MIN_VISIBLE_PX', 180);
+const PAD = 12;
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 
 let pass = 0, fail = 0;
@@ -173,8 +174,10 @@ const MEASURE = function ({ id, index, sel, gap }) {
     const afterTop = afterOn ? mr.top + (parseFloat(after.top) || 0) : mr.bottom;
     const probeY = Math.min(window.innerHeight - 3, Math.max(visBottom + 3, window.innerHeight - 20));
     const behind = visBottom < window.innerHeight - 4 ? document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(probeY)) : modal;
+    const safe = parseFloat(getComputedStyle(modal).getPropertyValue('--modal-safe-top')) || 0;
     return {
-        id, index, focused: document.activeElement === field, bodyClass: document.body.classList.contains('modal-keyboard'),
+        id, index, focused: document.activeElement === field, bodyClass: document.body.classList.contains('modal-keyboard'), safe,
+        cut: content.scrollHeight > content.clientHeight + 1,
         visTop: Math.round(visTop), visBottom: Math.round(visBottom), inner: window.innerHeight,
         screen: [Math.round(cr.top - visTop), Math.round(cr.bottom - visTop), Math.round(cr.left), Math.round(cr.right)],
         content: [Math.round(cr.top), Math.round(cr.bottom)], field: [Math.round(fr.top), Math.round(fr.bottom)],
@@ -194,20 +197,26 @@ const BASE = function ({ id }) {
     return [Math.round(r.top), Math.round(r.bottom), Math.round(r.left), Math.round(r.right)];
 };
 
-// ច្បាប់ទីតាំង ៖ base = ទីតាំងដើម · m = ការវាស់ពេល keyboard បើក ➜ កំហុស (ទទេ = ត្រូវ)
+// ច្បាប់ទីតាំង ៖ base = ទីតាំងដើម (keyboard បិទ) · m = ការវាស់ពេល keyboard បើក ➜ កំហុស (ទទេ = ត្រូវ) · កូអរដោនេលើអេក្រង់ (rect − offsetTop)
+//   ceil = កំពូលអប្បបរមា = max(padding, status bar + គម្លាត) · line = បន្ទាត់ keyboard − គម្លាត
 function placementProblems(base, m) {
     const problems = [];
     const pan = m.visTop;
     const line = m.visBottom - pan - GAP;
-    const room = line - base[0];
-    const floor = Math.min(base[1] - base[0], MIN_VISIBLE);
+    const ceil = Math.max(PAD, m.safe + GAP);
+    const height = base[1] - base[0];
     if (Math.abs(m.screen[2] - base[2]) > 1 || Math.abs(m.screen[3] - base[3]) > 1) problems.push('ឆ្វេង/ស្តាំប្តូរ');
-    if (room >= floor) {
-        if (Math.abs(m.screen[0] - base[0]) > 1) problems.push('កំពូលផ្លាស់ទី ' + base[0] + ' ➜ ' + m.screen[0]);
-    } else if (m.screen[0] > base[0] + 1 || m.screen[0] < 11) {
-        problems.push('កំពូល (ផ្ទៃតូច) ' + base[0] + ' ➜ ' + m.screen[0]);
+    if (m.screen[0] < ceil - 1) problems.push('កំពូលក្រោម status bar/ផុតអេក្រង់ ' + m.screen[0] + ' < ' + ceil);
+    if (base[1] <= line + 1) {
+        if (Math.abs(m.screen[0] - base[0]) > 1) problems.push('ប្រអប់នៅពីលើ keyboard រួច តែកំពូលប្តូរ ' + base[0] + ' ➜ ' + m.screen[0]);
+        if (pan === 0 && Math.abs(m.screen[1] - base[1]) > 1) problems.push('ប្រអប់នៅពីលើ keyboard រួច តែបាតប្តូរ');
+    } else if (height <= line - ceil + 1) {
+        if (m.cut) problems.push('ប្រអប់ខ្លីត្រូវកាត់ (ល្មមផ្ទៃ ' + (line - ceil) + ' ≥ ' + height + ')');
+        if (Math.abs(m.screen[0] - (line - height)) > 1) problems.push('ប្រអប់ខ្លី ៖ កំពូល ' + m.screen[0] + ' ≠ ' + (line - height) + ' (ឡើងតែល្មម)');
+    } else {
+        if (Math.abs(m.screen[0] - ceil) > 1) problems.push('ប្រអប់វែង ៖ កំពូល ' + m.screen[0] + ' ≠ កំពូលផ្ទៃមើលឃើញ ' + ceil);
+        if (m.screen[1] < line - 1) problems.push('ប្រអប់វែង ៖ បាត ' + m.screen[1] + ' មិនប្រើផ្ទៃដល់ keyboard ' + line);
     }
-    if (base[1] <= line + 1 && pan === 0 && Math.abs(m.screen[1] - base[1]) > 1) problems.push('ប្រអប់នៅពីលើ keyboard រួច តែបាតប្តូរ');
     if (!m.bottomAbove) problems.push('បាតនៅក្រោយ keyboard');
     if (!m.backdropFull) problems.push('backdrop មិនពេញ');
     if (!m.behindCovered) problems.push('ក្រោយ keyboard មិនមែន backdrop');
@@ -219,7 +228,8 @@ function placementProblems(base, m) {
 const SIZES = [
     { w: 390, h: 844, kb: 336, label: 'iPhone 390×844 · keyboard 336' },
     { w: 375, h: 667, kb: 260, label: 'iPhone SE 375×667 · keyboard 260' },
-    { w: 320, h: 568, kb: 253, label: 'ទូរស័ព្ទតូច 320×568 · keyboard 253' }
+    { w: 320, h: 568, kb: 253, label: 'ទូរស័ព្ទតូច 320×568 · keyboard 253' },
+    { w: 393, h: 852, kb: 400, label: 'iPhone 393×852 · keyboard 400 (រូបថតម្ចាស់គម្រោង)', safe: 47 }
 ];
 
 (async () => {
@@ -235,11 +245,15 @@ const SIZES = [
         let measured = 0;
         let overlapsWithout = 0;
         const modalSeen = new Set();
-        const longKept = [];
+        const longTop = [];
+        let shortFitted = 0;
+        let longFitted = 0;
         for (const size of SIZES) {
             const { ctx, page, ready } = await openApp(browser, port, size, true);
             check(ready, size.label + ' ៖ audit bridge (openModalHelper · closeModal · openModalIds)');
             if (!ready) { await ctx.close(); continue; }
+            // status bar ក្លែង (Chromium ៖ env(safe-area-inset-top) = 0) ➜ អថេរដដែលដែល App អាន
+            if (size.safe) await page.addStyleTag({ content: '.modal { --modal-safe-top: ' + size.safe + 'px !important; }' });
             await closeAll(page);
             const ids = await modalIdsWithFields(page);
             if (size === SIZES[0]) {
@@ -274,19 +288,25 @@ const SIZES = [
                     modalSeen.add(id);
                     const problems = placementProblems(base, m);
                     if (problems.length) failures.push(Object.assign({ name: f.name, problems, base }, m));
-                    if (id === 'lookupApiConfigModal') longKept.push(problems.length === 0 && Math.abs(m.screen[0] - base[0]) <= 1);
+                    const room = m.visBottom - m.visTop - GAP - Math.max(PAD, m.safe + GAP);
+                    if (base[1] > m.visBottom - m.visTop - GAP + 1) {
+                        if (base[1] - base[0] <= room + 1) shortFitted++;
+                        else longFitted++;
+                    }
+                    if (id === 'lookupApiConfigModal') longTop.push(problems.length === 0 && Math.abs(m.screen[0] - Math.max(PAD, m.safe + GAP)) <= 1 && m.safe === (size.safe || 0));
                     await page.evaluate(() => window.__kb.close());
                     await settle(page, 120);
                 }
                 await page.evaluate((m) => closeModal(m), id);
             }
             check(perSize > 0 && failures.length === 0,
-                '⛔ ' + size.label + ' ៖ គ្រប់ប្រអប់វាយ (' + perSize + ') ➜ ប្រអប់នៅទីតាំងដដែល (កំពូល · ឆ្វេង · ស្តាំ) · បាតត្រឹម keyboard · ប្រអប់វាយមើលឃើញ · ក្រោយ keyboard ជា backdrop',
+                '⛔ ' + size.label + ' ៖ គ្រប់ប្រអប់វាយ (' + perSize + ') ➜ ឆ្វេង · ស្តាំដដែល · ប្រអប់ខ្លីឃើញទាំងមូល (មិនកាត់) · ប្រអប់វែងនៅកំពូលផ្ទៃមើលឃើញ (មិនផុត) · បាតត្រឹម keyboard · ប្រអប់វាយមើលឃើញ · ក្រោយ keyboard ជា backdrop',
                 JSON.stringify(failures.slice(0, 6)) + (failures.length > 6 ? ' … +' + (failures.length - 6) : ''));
             await ctx.close();
         }
-        check(longKept.length >= 3 && longKept.every(Boolean), '⛔ ប្រអប់វែង «API ស្វែងរកអតិថិជន» (lookupApiConfigModal) ៖ កំពូលមិនផ្លាស់ទី មិនផុតអេក្រង់ គ្រប់ទំហំ · គ្រប់ប្រអប់វាយ',
-            JSON.stringify(longKept));
+        check(longTop.length >= SIZES.length && longTop.every(Boolean), '⛔ ប្រអប់វែង «API ស្វែងរកអតិថិជន» (lookupApiConfigModal) ៖ កំពូលនៅកំពូលផ្ទៃមើលឃើញ (ក្រោម status bar ក្លែង) មិនផុតអេក្រង់ គ្រប់ទំហំ · គ្រប់ប្រអប់វាយ',
+            JSON.stringify(longTop));
+        check(shortFitted >= 10 && longFitted >= 10, 'គំរូអាចធ្លាក់ ៖ ផ្លូវទាំង ២ ត្រូវរត់ (ប្រអប់ខ្លីដែល keyboard បាំង ≥ ១០ · ប្រអប់វែង ≥ ១០)', JSON.stringify({ shortFitted, longFitted }));
         check(modalSeen.size >= 12, 'ជាន់អប្បបរមា ៖ ប្រអប់ដែលបានវាស់ជាមួយប្រអប់វាយមើលឃើញ ≥ ១២', 'ឃើញ ' + modalSeen.size + ' ៖ ' + Array.from(modalSeen).join(' '));
         check(measured >= 60, 'ជាន់អប្បបរមា ៖ ការវាស់ (ប្រអប់វាយ × ទំហំ) ≥ ៦០', 'វាស់ ' + measured);
         check(overlapsWithout >= 10, 'គំរូអាចធ្លាក់ ៖ ករណីដែល keyboard បាំងកាត ឬប្រអប់វាយ (មុនការតម្រូវ) ≥ ១០ (សេណារីយ៉ូពិត)', 'ឃើញ ' + overlapsWithout);

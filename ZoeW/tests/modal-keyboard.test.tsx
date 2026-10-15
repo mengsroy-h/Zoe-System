@@ -4,9 +4,9 @@
  *    ពណ៌ពីរខុសគ្នា»។ iPhone មិនបង្រួម layout viewport ពេល keyboard បើក ➜ `.modal` (fixed · ១០០%) នៅកណ្តាលអេក្រង់ពេញ។
  * ⛔ ច្បាប់ ៖ ប្រអប់បើក + `innerHeight - visualViewport.height` ≥ `KEYBOARD_MIN_INSET_PX` ➜ `uiState.modalViewportTop/Height` (ផ្ទៃមើលឃើញ) ·
  *    `body.modal-keyboard` · `--modal-kb-pan` · `--modal-kb-line` ➜ backdrop `.modal` ពេញ + `::after` ស្រទាប់ស្រអាប់ពណ៌តែមួយពីបន្ទាត់ keyboard ចុះក្រោម ·
- *    ប្រអប់ខាងលើ (ប្រអប់វាយដែល focus · ឬប្រអប់ខាងលើគេ) ដែលបាតនៅក្រោយ keyboard ➜ `uiState.modalKeyboardFit` ➜ `.modal-kb` ៖ កំពូលនៅ
- *    **ទីតាំងដើមលើអេក្រង់** (ទោះ iOS រំកិល `offsetTop`) · មានតែបាតខ្លីមកត្រឹម keyboard (`MODAL_KEYBOARD_GAP_PX`) ហើយរមូរក្នុងខ្លួន ·
- *    ផ្ទៃនៅសល់ < `MODAL_KEYBOARD_MIN_VISIBLE_PX` ឬអ្នករមូរខាងក្នុងទាបជាងប្រអប់វាយ ➜ ទើបលើកកំពូលឡើង · ប្រអប់វាយដែល focus រមូរចូលមើលឃើញ
+ *    ប្រអប់ខាងលើគេដែលបាតនៅក្រោយ keyboard ➜ `uiState.modalKeyboardFit` ➜ `.modal-kb` ៖ ប្រអប់ខ្លីឡើងតែល្មមឲ្យបាតត្រឹម keyboard
+ *    (`MODAL_KEYBOARD_GAP_PX`) ➜ ឃើញទាំងមូល (រូបថតម្ចាស់គម្រោង ៖ ប៊ូតុង PIN ត្រូវកាត់) · ប្រអប់វែងជាងផ្ទៃពីលើ keyboard ➜ កំពូលនៅកំពូលផ្ទៃមើលឃើញ
+ *    (padding · ក្រោម status bar `--modal-safe-top` + គម្លាត ⛔ មិនដែលផុតអេក្រង់) ហើយរមូរក្នុងខ្លួន · ប្រអប់វាយដែល focus រមូរចូលមើលឃើញ
  *    (`revealFocusedModalField()` ៖ គម្លាត ≤ `MODAL_FIELD_MARGIN_PX`) · APK (viewport បង្រួម) ➜ គ្មានការប្តូរប្លង់ តែ `resize` បង្ហាញប្រអប់វាយ ·
  *    iPhone standalone ៖ ចុចប្រអប់វាយ (មិនទាន់ focus) ក្នុងប្រអប់ ➜ `focus({ preventScroll: true })` (caret នៅចុង) ➜ iOS មិនរំកិលទំព័រទាំងមូល។
  *    browser ពិតគ្រប់ប្រអប់ ៖ `audit-tools/modal-keyboard-test.js` ។
@@ -185,40 +185,42 @@ describe('ប្រអប់ ⟷ keyboard ៖ ផ្ទៃមើលឃើញ (vi
 
 describe('ប្រអប់ ⟷ keyboard ៖ ការតម្រូវ (modalKeyboardFitFor)', () => {
     const GAP = modalKeyboard.MODAL_KEYBOARD_GAP_PX;
-    const FLOOR = modalKeyboard.MODAL_KEYBOARD_MIN_VISIBLE_PX;
 
     it('⛔ ប្រអប់នៅពីលើ keyboard រួច (គ្មានការរំកិល) ➜ null (មិនប្តូរអ្វីទាំងអស់)', () => {
         expect(modalKeyboard.modalKeyboardFitFor({ top: 100, height: 300, pad: 12, cap: 717 }, { top: 0, height: 508 })).toBeNull();
         expect(modalKeyboard.modalKeyboardFitFor({ top: 100, height: 508 - GAP - 100, pad: 12, cap: 717 }, { top: 0, height: 508 })).toBeNull();
     });
 
-    it('⛔ ប្រអប់វែង (API ស្វែងរកអតិថិជន) ➜ កំពូលដដែល · បាតត្រឹម keyboard · margin = កំពូល − padding', () => {
-        expect(modalKeyboard.modalKeyboardFitFor({ top: 63, height: 717, pad: 12, cap: 717 }, { top: 0, height: 508 }))
-            .toEqual({ top: 63, max: 508 - GAP - 63, shift: 51 });
+    it('⛔ ប្រអប់ខ្លី (PIN · កែលេខ) ដែល keyboard បាំង ➜ ឡើងតែល្មមឲ្យបាតត្រឹម keyboard ➜ ឃើញទាំងមូល (ប៊ូតុងមិនកាត់) · រូបថត iPhone 393×852 · keyboard ៤០០', () => {
+        const pin = modalKeyboard.modalKeyboardFitFor({ top: 312, height: 228, pad: 12, cap: 724, safe: 47 }, { top: 0, height: 452 });
+        expect(pin).toEqual({ top: 452 - GAP - 228, max: 228, shift: 452 - GAP - 228 - 12 });
+        expect(pin!.max).toBeGreaterThanOrEqual(228);
+        expect(modalKeyboard.modalKeyboardFitFor({ top: 400, height: 200, pad: 12, cap: 717 }, { top: 0, height: 508 }))
+            .toEqual({ top: 300, max: 200, shift: 288 });
     });
 
-    it('⛔ iOS រំកិល visual viewport (offsetTop) ➜ ទីតាំងលើអេក្រង់ដដែល (កំពូល layout = ដើម + offsetTop) · ប្រអប់ដែលនៅពីលើ keyboard ក៏តាមដែរ', () => {
+    it('⛔ ប្រអប់វែងជាងផ្ទៃពីលើ keyboard ➜ កំពូលនៅកំពូលផ្ទៃមើលឃើញ (padding · ក្រោម status bar + គម្លាត) ⛔ មិនដែលផុតអេក្រង់ · បាតត្រឹម keyboard · រមូរក្នុងខ្លួន', () => {
+        expect(modalKeyboard.modalKeyboardFitFor({ top: 63, height: 717, pad: 12, cap: 717 }, { top: 0, height: 508 }))
+            .toEqual({ top: 12, max: 508 - GAP - 12, shift: 0 });
+        expect(modalKeyboard.modalKeyboardFitFor({ top: 221, height: 410, pad: 12, cap: 724, safe: 47 }, { top: 0, height: 452 }))
+            .toEqual({ top: 47 + GAP, max: 452 - GAP - 47 - GAP, shift: 47 + GAP - 12 });
+        expect(modalKeyboard.modalKeyboardFitFor({ top: 30, height: 1000, pad: 12, cap: 300 }, { top: 0, height: 700 }))
+            .toEqual({ top: 12, max: 300, shift: 0 });
+    });
+
+    it('⛔ iOS រំកិល visual viewport (offsetTop) ➜ ប្រអប់ខ្លីនៅទីតាំងលើអេក្រង់ដដែល (កំពូល layout = ដើម + offsetTop) · ប្រអប់វែងនៅកំពូលផ្ទៃមើលឃើញ', () => {
         expect(modalKeyboard.modalKeyboardFitFor({ top: 63, height: 717, pad: 12, cap: 717 }, { top: 140, height: 508 }))
-            .toEqual({ top: 203, max: 508 - GAP - 63, shift: 191 });
+            .toEqual({ top: 152, max: 508 - GAP - 12, shift: 140 });
         const small = modalKeyboard.modalKeyboardFitFor({ top: 100, height: 200, pad: 12, cap: 717 }, { top: 140, height: 508 });
         expect(small).toEqual({ top: 240, max: 140 + 508 - GAP - 240, shift: 228 });
         expect(small!.max).toBeGreaterThanOrEqual(200);
     });
 
-    it('⛔ ប្រអប់តូចនៅទាប (ផ្ទៃនៅសល់ < MODAL_KEYBOARD_MIN_VISIBLE_PX) ➜ លើកកំពូលតែល្មមឲ្យឃើញ min(កម្ពស់, ជាន់) · មិនលើសពី padding', () => {
-        expect(modalKeyboard.modalKeyboardFitFor({ top: 400, height: 200, pad: 12, cap: 717 }, { top: 0, height: 508 }))
-            .toEqual({ top: 508 - GAP - FLOOR, max: FLOOR, shift: 508 - GAP - FLOOR - 12 });
-        expect(modalKeyboard.modalKeyboardFitFor({ top: 400, height: 110, pad: 12, cap: 717 }, { top: 0, height: 508 }))
-            .toEqual({ top: 508 - GAP - 110, max: 110, shift: 508 - GAP - 110 - 12 });
+    it('ទិសផ្ទុយ ៖ គ្មាន safe (Android · web) ➜ កំពូលអប្បបរមា = padding · តម្លៃខុសមិនបោះ', () => {
         expect(modalKeyboard.modalKeyboardFitFor({ top: 150, height: 300, pad: 12, cap: 717 }, { top: 0, height: 150 }))
             .toEqual({ top: 12, max: 150 - GAP - 12, shift: 0 });
-    });
-
-    it('⛔ raised (អ្នករមូរខាងក្នុងទាបជាងប្រអប់វាយ) ➜ កំពូល = offsetTop + padding · max-height មិនលើស cap ដើម · តម្លៃខុសមិនបោះ', () => {
-        expect(modalKeyboard.modalKeyboardFitFor({ top: 60, height: 448, pad: 12, cap: 482, raised: true }, { top: 0, height: 315 }))
-            .toEqual({ top: 12, max: 315 - GAP - 12, shift: 0 });
-        expect(modalKeyboard.modalKeyboardFitFor({ top: 30, height: 1000, pad: 12, cap: 300 }, { top: 0, height: 700 }))
-            .toEqual({ top: 30, max: 300, shift: 18 });
+        expect(modalKeyboard.modalKeyboardFitFor({ top: 150, height: 300, pad: 12, cap: 717, safe: NaN }, { top: 0, height: 150 }))
+            .toEqual({ top: 12, max: 150 - GAP - 12, shift: 0 });
         expect(() => modalKeyboard.modalKeyboardFitFor({ top: NaN, height: NaN, pad: NaN, cap: Infinity }, { top: 0, height: 500 })).not.toThrow();
     });
 });
@@ -243,16 +245,16 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         keyboard(336);
         expect(uiState.modalViewportHeight).toBe(508);
         expect(document.body.classList.contains('modal-keyboard')).toBe(true);
-        expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 63, max: 508 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 63, shift: 51 });
+        expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 12, max: 508 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12, shift: 0 });
         expect(modal.classList.contains('modal-kb')).toBe(true);
-        expect(modal.style.getPropertyValue('--modal-kb-shift')).toBe('51px');
-        expect(modal.style.getPropertyValue('--modal-kb-max')).toBe((508 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 63) + 'px');
+        expect(modal.style.getPropertyValue('--modal-kb-shift')).toBe('0px');
+        expect(modal.style.getPropertyValue('--modal-kb-max')).toBe((508 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12) + 'px');
         expect(document.documentElement.style.getPropertyValue('--modal-kb-pan')).toBe('0px');
         expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe('508px');
         vv.offsetTop = 120;
         vv.dispatchEvent(new Event('scroll'));
         expect(uiState.modalViewportTop).toBe(120);
-        expect(uiState.modalKeyboardFit!.top).toBe(183);
+        expect(uiState.modalKeyboardFit!.top).toBe(132);
         expect(document.documentElement.style.getPropertyValue('--modal-kb-pan')).toBe('120px');
         expect(document.documentElement.style.getPropertyValue('--modal-kb-line')).toBe('628px');
         keyboard(0);
@@ -272,7 +274,7 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         keyboard(336);
         box(content, 63, 437);
         keyboard(300);
-        expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 63, max: 844 - 300 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 63, shift: 51 });
+        expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 12, max: 844 - 300 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12, shift: 0 });
         keyboard(0);
         box(content, 300, 150);
         keyboard(336);
@@ -344,7 +346,6 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         const r = field.getBoundingClientRect();
         expect(r.top).toBeGreaterThanOrEqual(170);
         expect(r.bottom).toBeLessThanOrEqual(223);
-        expect(modalKeyboard.focusedModalFieldClipped()).toBe(false);
         scrollable(content, 900, 300);
         content.scrollTop = 0;
         box(content, 50, 300);
@@ -355,21 +356,27 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         expect(area.getBoundingClientRect().top).toBe(50);
     });
 
-    it('⛔ អ្នករមូរខាងក្នុងទាបជាងប្រអប់វាយ (មើលមិនឃើញពេញ) ➜ លើកកំពូលម្តង (raised) ➜ មិនលើកទៀត · keyboard បិទ ➜ ដក', async () => {
-        const { content } = openLong();
+    it('⛔ រូបថត iPhone ៖ ប្រអប់ PIN ខ្លី (៣៩៣×៨៥២ · keyboard ៤០០) ➜ ឡើងល្មម ឃើញទាំងមូល · ប្រអប់វែង + status bar (--modal-safe-top) ➜ កំពូលក្រោម status bar + គម្លាត', async () => {
+        mount(<><DocumentEffects /><TwoModals /></>);
+        modalKeyboard.listenModalKeyboard(scope());
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 852 });
+        vv.height = 852;
+        openModalHelper('editPhoneModal');
+        commitNow();
+        const modal = byId('editPhoneModal');
+        box(modal, 0, 852);
+        box(byId('mkContent2'), 312, 228);
         await settle();
-        box(content, 60, 448);
-        const inner = byId('mkScroll');
-        scrollable(inner, 300, 30);
-        inner.getBoundingClientRect = () => rect(170, 30);
-        const field = byId('mkField');
-        field.getBoundingClientRect = () => rect(170, 46);
-        field.focus();
-        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 568 });
-        keyboard(253);
-        expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 12, max: 315 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12, shift: 0 });
-        keyboard(240);
-        expect(uiState.modalKeyboardFit!.top).toBe(12);
+        byId('mkPhone').focus();
+        keyboard(400);
+        const GAP = modalKeyboard.MODAL_KEYBOARD_GAP_PX;
+        expect(uiState.modalKeyboardFit).toEqual({ id: 'editPhoneModal', top: 452 - GAP - 228, max: 228, shift: 452 - GAP - 228 - 12 });
+        keyboard(0);
+        expect(uiState.modalKeyboardFit).toBeNull();
+        box(byId('mkContent2'), 221, 410);
+        modal.style.setProperty('--modal-safe-top', '47px');
+        keyboard(400);
+        expect(uiState.modalKeyboardFit).toEqual({ id: 'editPhoneModal', top: 47 + GAP, max: 452 - GAP - 47 - GAP, shift: 47 + GAP - 12 });
         keyboard(0);
         expect(uiState.modalKeyboardFit).toBeNull();
     });
@@ -581,6 +588,8 @@ describe('ខ្សែភ្ជាប់', () => {
         expect(/\.modal\.modal-kb \{ align-items: flex-start; \}/.test(css)).toBe(true);
         expect(/\.modal\.modal-kb > \.modal-content \{ margin-top: var\(--modal-kb-shift, 0px\); max-height: var\(--modal-kb-max, 85vh\); \}/.test(css)).toBe(true);
         expect(/--modal-vv-/.test(css)).toBe(false);
+        expect(/@property --modal-safe-top \{\s*syntax: '<length>';\s*inherits: false;\s*initial-value: 0px;\s*\}/.test(css)).toBe(true);
+        expect(/\.modal \{ --modal-safe-top: env\(safe-area-inset-top, 0px\); \}/.test(css)).toBe(true);
         const fx = readFileSync(path.join(root, 'src/app/components/shell/DocumentEffects.tsx'), 'utf8');
         expect(/useBodyClass\('modal-keyboard', modalViewportHeight > 0\)/.test(fx)).toBe(true);
         expect(/useHtmlVar\('--modal-kb-pan', modalViewportHeight > 0 \? modalViewportTop \+ 'px' : '0px'\)/.test(fx)).toBe(true);

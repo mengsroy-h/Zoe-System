@@ -11,7 +11,6 @@ import { usesIOSPanelHandoff } from './panels';
 
 export const MODAL_FIELD_MARGIN_PX = 12;
 export const MODAL_KEYBOARD_GAP_PX = 8;
-export const MODAL_KEYBOARD_MIN_VISIBLE_PX = 180;
 export const MODAL_TAP_SLOP_PX = 10;
 export const MODAL_TAP_MAX_MS = 500;
 
@@ -22,7 +21,7 @@ export interface ModalNaturalBox {
     height: number;
     pad: number;
     cap: number;
-    raised?: boolean;
+    safe?: number;
 }
 
 let modalWasOpen = false;
@@ -60,9 +59,8 @@ export function modalKeyboardFitFor(box: ModalNaturalBox, view: { top: number; h
     const line = pan + view.height - MODAL_KEYBOARD_GAP_PX;
     let top = box.top + pan;
     if (pan === 0 && top + box.height <= line) return null;
-    const floor = Math.min(box.height, MODAL_KEYBOARD_MIN_VISIBLE_PX);
-    if (box.raised) top = pan + box.pad;
-    else if (line - top < floor) top = Math.max(pan + box.pad, line - floor);
+    const ceil = pan + Math.max(box.pad, (box.safe || 0) + MODAL_KEYBOARD_GAP_PX);
+    if (top + box.height > line) top = Math.max(ceil, line - box.height);
     top = Math.round(top);
     const max = Math.max(0, Math.floor(Math.min(box.cap, line - top)));
     return { top, max, shift: Math.round(top - box.pad) };
@@ -97,20 +95,6 @@ export function revealFocusedModalField(): void {
     }
 }
 
-export function focusedModalFieldClipped(inModal?: Element | null): boolean {
-    const field = focusedModalField();
-    if (!field) return false;
-    const modal = field.closest('.modal');
-    if (inModal && modal !== inModal) return false;
-    const rect = field.getBoundingClientRect();
-    for (let node = field.parentElement; node && node !== modal; node = node.parentElement) {
-        if (!scrollsY(node)) continue;
-        const box = node.getBoundingClientRect();
-        if (rect.top < box.top - 1 || rect.bottom > box.bottom + 1) return true;
-    }
-    return false;
-}
-
 function modalContentOf(modal: HTMLElement): HTMLElement | null {
     for (const child of Array.from(modal.children)) {
         if (child.matches('.modal-content')) return child as HTMLElement;
@@ -121,9 +105,17 @@ function modalContentOf(modal: HTMLElement): HTMLElement | null {
 function naturalBoxOf(modal: HTMLElement, content: HTMLElement): ModalNaturalBox {
     const box = modal.getBoundingClientRect();
     const cap = parseFloat(window.getComputedStyle(content).maxHeight);
-    const pad = parseFloat(window.getComputedStyle(modal).paddingTop);
+    const style = window.getComputedStyle(modal);
+    const pad = parseFloat(style.paddingTop);
+    const safe = parseFloat(style.getPropertyValue('--modal-safe-top'));
     const top = content.offsetParent === modal ? box.top + content.offsetTop : content.getBoundingClientRect().top;
-    return { top, height: content.offsetHeight, pad: Number.isFinite(pad) ? pad : 0, cap: Number.isFinite(cap) && cap > 0 ? cap : Infinity };
+    return {
+        top,
+        height: content.offsetHeight,
+        pad: Number.isFinite(pad) ? pad : 0,
+        cap: Number.isFinite(cap) && cap > 0 ? cap : Infinity,
+        safe: Number.isFinite(safe) && safe > 0 ? safe : 0
+    };
 }
 
 function setModalKeyboardFit(next: ModalKeyboardFit | null): boolean {
@@ -172,14 +164,6 @@ export function measureModalKeyboard(): void {
     }
     if (fitModalToKeyboard(view)) changed = true;
     if (changed) commitNow();
-    revealFocusedModalField();
-    const box = naturalBox;
-    const fit = uiState.modalKeyboardFit;
-    if (!box || box.raised || !fit || fit.id !== box.id || fit.top <= view.top + box.pad || !focusedModalFieldClipped(modalElement(box.id))) return;
-    box.raised = true;
-    const raised = modalKeyboardFitFor(box, view);
-    if (!setModalKeyboardFit(raised ? Object.assign({ id: box.id }, raised) : null)) return;
-    commitNow();
     revealFocusedModalField();
 }
 

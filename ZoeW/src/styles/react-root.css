@@ -4,6 +4,12 @@
     initial-value: 1px;
 }
 
+@property --modal-safe-top {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
 #root {
     display: contents;
 }
@@ -263,6 +269,7 @@
     html.ios-standalone body.ios-keyboard-suggest-fixed .phone-suggest { touch-action: none; }
 }
 
+.modal { --modal-safe-top: env(safe-area-inset-top, 0px); }
 .modal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: env(safe-area-inset-bottom, 0px); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; }
 body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: auto; bottom: calc(0px - var(--modal-kb-pan, 0px) - env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.6)), var(--body-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .modal.modal-kb { align-items: flex-start; }

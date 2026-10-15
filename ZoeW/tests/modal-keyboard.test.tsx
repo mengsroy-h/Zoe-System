@@ -16,7 +16,7 @@ import { act } from 'react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { uiState } from '../src/core/state';
-import { KEYBOARD_MIN_INSET_PX } from '../src/app/behaviors/chrome-autohide';
+import { KEYBOARD_MIN_INSET_PX, noteKeyboardIntent, noteKeyboardViewport } from '../src/app/behaviors/chrome-autohide';
 import * as modalKeyboard from '../src/app/behaviors/modal-keyboard';
 import { Modal } from '../src/app/components/modals/Modal';
 import { DocumentEffects } from '../src/app/components/shell/DocumentEffects';
@@ -430,6 +430,48 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         outside.remove();
     });
 
+    it('⛔ វីដេអូ APK ៖ hold ចប់ ➜ WebView បង្រួម ខណៈ visualViewport នៅរាយការណ៍ keyboard (inset ចាស់ ៣–៥ ស៊ុម) ➜ uiState.keyboardOpen ➜ គ្មាន .modal-kb (ប្រអប់មិនស្ទុះទៅលើ) · លំដាប់ resize ណាក៏ដោយ', async () => {
+        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+        try {
+            const { modal } = openLong();
+            await settle();
+            noteKeyboardViewport();
+            const field = byId('mkField');
+            const holdThenRelease = async (visualFirst: boolean) => {
+                field.focus();
+                noteKeyboardIntent({ target: field } as unknown as Event);
+                keyboard(336);
+                await settle();
+                expect(uiState.keyboardOpen).toBe(false);
+                expect(uiState.modalKeyboardFit && uiState.modalKeyboardFit.hold).toBe(true);
+                expect(modal.classList.contains('modal-kb')).toBe(true);
+                Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 508 });
+                if (visualFirst) keyboard(336);
+                else noteKeyboardViewport();
+                await settle();
+                expect(uiState.keyboardOpen).toBe(true);
+                expect(uiState.modalViewportHeight).toBe(0);
+                expect(uiState.modalKeyboardFit).toBeNull();
+                expect(uiState.keyboardCover).toBe(0);
+                expect(modal.classList.contains('modal-kb')).toBe(false);
+                expect(document.body.classList.contains('modal-keyboard')).toBe(false);
+                keyboard(0);
+                await settle();
+                expect(uiState.modalKeyboardFit).toBeNull();
+                Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 844 });
+                keyboard(0);
+                await settle();
+                expect(uiState.keyboardOpen).toBe(false);
+            };
+            await holdThenRelease(true);
+            await holdThenRelease(false);
+        } finally {
+            (window as any).Capacitor = undefined;
+            noteKeyboardViewport();
+        }
+        expect(uiState.keyboardOpen).toBe(false);
+    });
+
     it('ទិសផ្ទុយ ៖ focus ក្រៅប្រអប់ (ឧ. ប្រអប់ស្វែងរក) ➜ មិនរមូរ · dispose ➜ ០ ហើយ listener ដក', async () => {
         const { content } = openLong();
         await settle();
@@ -543,6 +585,66 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         commitNow();
         expect(tap(byId('mkField'), { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }).defaultPrevented).toBe(false);
         expect(focusCalls).toEqual([]);
+    });
+
+    it('⛔ វីដេអូ iPhone ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ preventDefault · focus({ preventScroll }) ➜ ទំព័រមិនធ្លាក់ · focus ដោយកូដ (iPad) ➜ ចាប់ · keyboard បាំងប្រអប់ (ផ្តេក · keyboard ដែលធ្លាប់វាស់) ➜ iOS ធ្វើខ្លួនឯង', () => {
+        setup();
+        closeModal('manualAdjustModal');
+        commitNow();
+        const realWidth = window.innerWidth;
+        const scanner = document.createElement('input');
+        scanner.type = 'text';
+        scanner.id = 'hwScannerInput';
+        const other = document.createElement('input');
+        document.body.append(scanner, other);
+        refTo('hwScannerInput')(scanner);
+        let top = 290;
+        scanner.getBoundingClientRect = () => rect(top, 30);
+        other.getBoundingClientRect = () => rect(top, 30);
+        const calls: any[] = [];
+        const realFocus = HTMLElement.prototype.focus;
+        scanner.focus = function (this: HTMLInputElement, options?: any) { calls.push(options); realFocus.call(this, options); } as any;
+        try {
+            expect(844 - Math.round(844 * modalKeyboard.PAGE_TAP_KEYBOARD_RATIO)).toBeGreaterThanOrEqual(320 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(tap(scanner, { x: 50, y: 300, t: 0 }, { x: 51, y: 302, t: 90 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            expect(document.activeElement).toBe(scanner);
+            keyboard(336);
+            expect(tap(scanner, { x: 50, y: 300, t: 200 }, { x: 50, y: 300, t: 260 }).defaultPrevented).toBe(false);
+            keyboard(0);
+            scanner.blur();
+            top = 440;
+            expect(tap(scanner, { x: 50, y: 450, t: 300 }, { x: 50, y: 450, t: 360 }).defaultPrevented).toBe(true);
+            scanner.blur();
+            top = 844 - 336 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 30 + 1;
+            expect(tap(scanner, { x: 50, y: 480, t: 400 }, { x: 50, y: 480, t: 460 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 852 });
+            Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 393 });
+            vv.height = 393;
+            top = 244;
+            expect(tap(scanner, { x: 50, y: 250, t: 500 }, { x: 50, y: 250, t: 560 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 1180 });
+            vv.height = 1180;
+            scanner.focus({ preventScroll: true });
+            calls.length = 0;
+            expect(tap(scanner, { x: 50, y: 250, t: 600 }, { x: 50, y: 250, t: 660 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            expect(tap(scanner, { x: 50, y: 250, t: 700 }, { x: 50, y: 250, t: 760 }).defaultPrevented).toBe(false);
+            scanner.blur();
+            expect(tap(other, { x: 50, y: 250, t: 800 }, { x: 50, y: 250, t: 860 }).defaultPrevented).toBe(false);
+            openModalHelper('editPhoneModal');
+            commitNow();
+            expect(tap(scanner, { x: 50, y: 250, t: 900 }, { x: 50, y: 250, t: 960 }).defaultPrevented).toBe(false);
+            closeModal('editPhoneModal');
+            commitNow();
+            setIOSStandalone(false);
+            expect(tap(scanner, { x: 50, y: 250, t: 1000 }, { x: 50, y: 250, t: 1060 }).defaultPrevented).toBe(false);
+        } finally {
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
+            refTo('hwScannerInput')(null);
+            scanner.remove();
+            other.remove();
+        }
     });
 
     it('⛔ focus មិនជាប់ ➜ ការចុចបន្ទាប់ទុកឲ្យ iOS (fail-open ៖ វាយបានជានិច្ច)', () => {

@@ -11,6 +11,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uiState } from '../src/core/state';
+import { viewState } from '../src/core/view-state';
 import { refTo } from '../src/app/refs';
 import {
     PANEL_GLIDE_EASING, PANEL_GLIDE_FLOW_FRAME_MS, PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_MS, PANEL_SEARCH_GLIDE,
@@ -182,6 +183,50 @@ describe('tab ស្កេន ៖ ការស្វែងរកពេលផ្�
         await Promise.resolve();
         await Promise.resolve();
         expect(uiState.entrySearchActive).toBe(false);
+    });
+
+    it('⛔ រាយការណ៍ម្ចាស់គម្រោង (iPhone) ៖ ស្វែងរក «📍 បញ្ជីទីតាំង Locker» ឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីមិនធ្លាក់ (ផ្ទាំងនៅបង្រួម) · ជ្រើសទីតាំង ➜ នៅបង្រួម · «ទីតាំងទាំងអស់» + ស្វែងរកទទេ ➜ បើកវិញ', () => {
+        vi.useFakeTimers();
+        const locker = document.createElement('input');
+        const select = document.createElement('select');
+        ['', 'A1'].forEach((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v || 'ទីតាំងទាំងអស់'; select.appendChild(o); });
+        main.append(locker, select);
+        refTo('lockerListSearchInput')(locker);
+        refTo('lockerListFilter')(select);
+        viewState.entryModeShown = 'locker';
+        try {
+            locker.focus();
+            entrySearch.entrySearchFocused();
+            expect(uiState.entryPanelCollapsed).toBe(true);
+            select.focus();
+            entrySearch.entrySearchBlurred();
+            vi.advanceTimersByTime(200);
+            expect(uiState.entryPanelCollapsed).toBe(true);
+            expect(uiState.entrySearchActive).toBe(true);
+            uiState.lockerFilterValue = 'A1';
+            select.blur();
+            entrySearch.entrySearchBlurred();
+            vi.advanceTimersByTime(200);
+            expect(uiState.entryPanelCollapsed).toBe(true);
+            select.focus();
+            uiState.lockerFilterValue = '';
+            select.blur();
+            entrySearch.entrySearchBlurred();
+            vi.advanceTimersByTime(200);
+            expect(uiState.entryPanelCollapsed).toBe(false);
+            locker.focus();
+            entrySearch.entrySearchFocused();
+            expect(uiState.entryPanelCollapsed).toBe(true);
+            locker.blur();
+            entrySearch.entrySearchBlurred();
+            vi.advanceTimersByTime(200);
+            expect(uiState.entryPanelCollapsed).toBe(false);
+        } finally {
+            uiState.lockerFilterValue = '';
+            viewState.entryModeShown = 'parcel';
+            refTo('lockerListSearchInput')(null);
+            refTo('lockerListFilter')(null);
+        }
     });
 
     it('⛔ ផ្ទាំងបង្រួមដោយដៃមុន ➜ focus ធ្វើឲ្យ active តែចាកចេញមិនបើកផ្ទាំងវិញ (ច្បាប់ដើម)', () => {

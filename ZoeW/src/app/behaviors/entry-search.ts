@@ -16,6 +16,12 @@ export function entrySearchFieldFocused(): boolean {
     return ENTRY_SEARCH_FIELDS.some((f) => isFieldFocused(f));
 }
 
+function entrySearchInUse(): boolean {
+    if (entrySearchFieldFocused()) return true;
+    if (viewState.entryModeShown === 'locker') return isFieldFocused('lockerListFilter') || !!uiState.lockerFilterValue || !!fieldValue('lockerListSearchInput').trim();
+    return !!fieldValue('entryListSearchInput').trim();
+}
+
 export function glideEntryPanelCollapsed(collapsed: boolean): boolean {
     const main = elementOf('entryMainSection');
     if (!main || !elementOf('entrySideSection') || panelIsCollapsed('entry') === collapsed) return false;
@@ -53,8 +59,7 @@ export function entrySearchFocused(): void {
 
 export function entrySearchBlurred(): void {
     setTimeout(() => {
-        if (!entrySearchCollapsed || entrySearchFieldFocused()) return;
-        if (fieldValue(viewState.entryModeShown === 'locker' ? 'lockerListSearchInput' : 'entryListSearchInput').trim()) return;
+        if (!entrySearchCollapsed || entrySearchInUse()) return;
         entrySearchCollapsed = false;
         if (uiState.currentAppPage === 'entry') glideEntryPanelCollapsed(false);
         else setPanelCollapsed('entry', false);

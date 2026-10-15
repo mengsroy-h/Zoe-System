@@ -399,6 +399,34 @@ try {
             check(mode.label + ' ៖ tab ស្កេន ៖ ស្វែងរក (' + field + ') ឃើញសារទទេ ➜ keyboard បង្រួមផ្ទៃ ➜ សារនៅដដែលពីលើ keyboard (មិនលោតឡើងតាមក្រោយ)',
                 opened.shown && opened.collapsed && shrunk.top !== null && Math.abs(shrunk.top - opened.top) <= 2 && shrunk.top < shrunk.h - 40, { opened, shrunk });
         }
+        await page.evaluate(() => {
+            document.activeElement && document.activeElement.blur();
+            window.switchAppPage('entry');
+            window.setEntryScanMode('locker');
+        });
+        await page.waitForTimeout(500);
+        await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+        await page.waitForTimeout(300);
+        const lockerFilter = await page.evaluate(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const main = document.getElementById('entryMainSection');
+            const input = document.getElementById('lockerListSearchInput');
+            const select = document.getElementById('lockerListFilter');
+            const open = main.getBoundingClientRect().top;
+            input.focus({ preventScroll: true });
+            await wait(700);
+            const up = { collapsed: window.uiState.entryPanelCollapsed, top: main.getBoundingClientRect().top };
+            select.focus({ preventScroll: true });
+            await wait(900);
+            const picking = { collapsed: window.uiState.entryPanelCollapsed, top: main.getBoundingClientRect().top, focused: document.activeElement === select };
+            select.blur();
+            await wait(900);
+            const done = { collapsed: window.uiState.entryPanelCollapsed, top: main.getBoundingClientRect().top };
+            return { open, up, picking, done };
+        });
+        check(mode.label + ' ៖ tab ស្កេន ៖ ស្វែងរក «📍 បញ្ជីទីតាំង Locker» ឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីនៅដដែល (មិនធ្លាក់) · ចាកចេញ (ទទេ) ➜ បើកវិញ',
+            lockerFilter.up.collapsed && lockerFilter.up.top < lockerFilter.open - 100 && lockerFilter.picking.focused && lockerFilter.picking.collapsed
+                && Math.abs(lockerFilter.picking.top - lockerFilter.up.top) < 2 && !lockerFilter.done.collapsed && Math.abs(lockerFilter.done.top - lockerFilter.open) < 2, lockerFilter);
         check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
         await ctx.close();
     }

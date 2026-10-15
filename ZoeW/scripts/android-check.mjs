@@ -88,6 +88,18 @@ ok('MainActivity ៖ onResume ស្នើម្តងទៀត (ត្រឡប
 const refreshBody = javaMethodBody(mainActivity, 'void preferHighestRefreshRate(');
 ok('MainActivity ៖ កំណត់ preferredDisplayModeId តាម mode ដែលជ្រើស', /preferredDisplayModeId\s*=\s*best\.getModeId\(\)/.test(refreshBody) && /setAttributes\(/.test(refreshBody));
 ok('MainActivity ៖ ការបរាជ័យមិនគាំង App (catch RuntimeException)', /catch\s*\(\s*RuntimeException/.test(refreshBody));
+/* ⛔ សំណើម្ចាស់គម្រោង ៖ ទូរស័ព្ទមិនបង្វិលផ្តេក · tablet បង្វិលបាន ➜ ទទឹងតូចបំផុត < TABLET_MIN_WIDTH_DP (sw600dp) = បញ្ឈរ · ផ្សេងទៀត = UNSPECIFIED ·
+ *    onCreate (មុន super ៖ មិនគូរផ្តេកមុន) និង onConfigurationChanged (foldable បើក/បិទ · ចេញពីបំបែកអេក្រង់) · ⛔ មិនដាក់ screenOrientation ក្នុង
+ *    AndroidManifest (វាចាក់សោ tablet ផង) */
+ok('MainActivity ៖ onCreate ចាក់សោទូរស័ព្ទឲ្យបញ្ឈរ មុន super.onCreate', /lockPhoneToPortrait\(\);\s*super\.onCreate\(savedInstanceState\);/.test(javaMethodBody(mainActivity, 'void onCreate(')));
+ok('MainActivity ៖ onConfigurationChanged (foldable · បំបែកអេក្រង់) សម្រេចម្តងទៀត', /super\.onConfigurationChanged\(newConfig\);\s*lockPhoneToPortrait\(\);/.test(javaMethodBody(mainActivity, 'void onConfigurationChanged(')));
+const orientBody = javaMethodBody(mainActivity, 'void lockPhoneToPortrait(');
+ok('MainActivity ៖ សម្រេចតាម smallestScreenWidthDp · setRequestedOrientation តែពេលប្តូរ · ការបរាជ័យមិនគាំង App',
+    /orientationFor\(getResources\(\)\.getConfiguration\(\)\.smallestScreenWidthDp\)/.test(orientBody)
+    && /if \(getRequestedOrientation\(\) != wanted\) setRequestedOrientation\(wanted\);/.test(orientBody) && /catch\s*\(\s*RuntimeException/.test(orientBody));
+ok('MainActivity ៖ ទូរស័ព្ទ (< 600dp) = PORTRAIT · tablet = UNSPECIFIED',
+    /static final int TABLET_MIN_WIDTH_DP = 600;/.test(mainActivity)
+    && /smallestWidthDp > 0 && smallestWidthDp < TABLET_MIN_WIDTH_DP\s*\?\s*ActivityInfo\.SCREEN_ORIENTATION_PORTRAIT\s*:\s*ActivityInfo\.SCREEN_ORIENTATION_UNSPECIFIED/.test(javaMethodBody(mainActivity, 'int orientationFor(')));
 /* ⛔ keyboard បើក (វីដេអូម្ចាស់គម្រោង) ៖ `SystemBars` របស់ Capacitor ដាក់ padding = កម្ពស់ IME ពេញភ្លាមពេលចលនាចាប់ផ្តើម ➜ WebView រួញមុន keyboard
  *    ឡើងមកដល់ ➜ ចន្លោះទទេ ~០,៣ វិ.។ Android 11+ ៖ `onPrepare` រក្សាកម្ពស់ WebView ដដែល (ដក clip) ➜ keyboard រំកិលពីលើទំព័រ ➜ `onEnd` (ឬ
  *    KEYBOARD_HOLD_MAX_MS) ត្រឡប់ MATCH_PARENT · ⛔ មិនប្រើ `ViewCompat` (Android < 11 វាជំនួស listener insets របស់ Capacitor) */
@@ -114,6 +126,7 @@ ok('SystemBars insetsHandling = native', /insetsHandling:\s*'native'/.test(capCo
 /* ── ៣. សិទ្ធិ ─────────────────────────────────────────────────────────── */
 const manifest = read('android/app/src/main/AndroidManifest.xml');
 ok('សិទ្ធិ CAMERA (ស្កេន Barcode)', manifest.includes('android.permission.CAMERA'));
+ok('AndroidManifest គ្មាន screenOrientation (MainActivity សម្រេច ៖ tablet បង្វិលបាន)', !/screenOrientation/.test(manifest));
 ok('សិទ្ធិ VIBRATE (សញ្ញាស្កេន)', manifest.includes('android.permission.VIBRATE'));
 ok('កាមេរ៉ាមិនមែនលក្ខខណ្ឌដំឡើង (required=false)', /android\.hardware\.camera"\s+android:required="false"/.test(manifest));
 ok('ហាម backup (កៅអី License មិនត្រូវក្លែងតាមការស្តារ)', manifest.includes('android:allowBackup="false"'));

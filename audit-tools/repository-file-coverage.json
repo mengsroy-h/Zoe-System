@@ -1729,6 +1729,9 @@
     "ZoeW/src/platform/native.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/platform/orientation.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/services/camera.ts": {
       "policy": "zoew-app"
     },
@@ -1862,6 +1865,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/device-info.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/orientation-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/firebase-loader-gate.test.ts": {

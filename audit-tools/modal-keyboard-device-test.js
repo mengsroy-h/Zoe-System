@@ -43,6 +43,7 @@ const ROOT = process.env.MODALKB_DEVICE_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
 // ពិដានចន្លោះគ្រាប់ម៉ាស៊ីនស្កេន ស្រង់ពីកូដ App (មិនសរសេរលេខរឹង) ៖ ការស្កេនក្លែងដែលចន្លោះពិត (event.timeStamp) លើសវា មិនមែនជាការស្កេនទេ
 const SCANNER_GAP_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bSCANNER_KEY_GAP_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
+const KEYBOARD_SETTLE_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_SETTLE_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
 const KEYBOARD_MIN_INSET_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_MIN_INSET_PX = (\d+)/); return m ? Number(m[1]) : Infinity; } catch (e) { return Infinity; } })();
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
@@ -285,6 +286,55 @@ const SAFE_TOP = function (px) {
             await ctx.close();
         }
         check(androidMeasured >= ANDROID_DEVICES.length * 15, 'ជាន់អប្បបរមា ៖ Android វាស់ ' + androidMeasured + ' ករណី (ឧបករណ៍ ' + ANDROID_DEVICES.length + ')');
+
+        console.log('\n=== (ក២) វីដេអូ Android (keyboard លេខ) ៖ keyboard ប្រាប់កម្ពស់ចាស់ (QWERTY +80) ពេលចាប់ផ្តើម ហើយស្ងប់ keyboard លេខ ➜ លើកដំបូង ៖ កាតមិនចុះ · ចាំកម្ពស់ពិត ➜ លើកក្រោយ ៖ កាតទៅទីតាំងពិតតែម្តង ===');
+        for (const dev of ANDROID_DEVICES.filter((d) => d.h > d.w)) {
+            const { ctx, page, ready } = await openApp(browser, port, dev, dev.apk ? [APK_BRIDGE, FAKE_VIEWPORT] : [FAKE_VIEWPORT], dev.apk ? null : { userAgent: ANDROID_UA });
+            if (!ready) { bad('(ក២) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+            const ids = (await modalIdsWithFields(page)).filter((id) => ['manualAdjustModal', 'editPhoneModal', 'editBarcodePriceModal', 'exchangeRateModal', 'phoneModal'].includes(id));
+            const problems = [];
+            let measured = 0, wouldDrop = 0, learnedOnce = 0;
+            for (const id of ids) {
+                const runs = [];
+                for (let round = 0; round < 2; round++) {
+                    await page.setViewportSize({ width: dev.w, height: dev.h });
+                    await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                    await closeAll(page);
+                    await page.evaluate((m) => openModalHelper(m), id);
+                    await settle(page, 320);
+                    const index = await firstVisibleField(page, id);
+                    if (index < 0) break;
+                    await page.evaluate(({ id, index, sel }) => { const f = Array.from(document.getElementById(id).querySelectorAll(sel))[index]; f.dispatchEvent(new Event('pointerdown', { bubbles: true })); f.focus({ preventScroll: true }); }, { id, index, sel: FIELD_SELECTOR });
+                    await page.evaluate((kb) => window.__kb.open(kb), dev.kb + 80);
+                    await settle(page, 160);
+                    const hold = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    await page.setViewportSize({ width: dev.w, height: dev.h - dev.kb });
+                    if (dev.apk) {
+                        await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
+                        await settle(page, 60);
+                    }
+                    await page.evaluate(() => window.__kb.open(0));
+                    await settle(page, Math.max(200, KEYBOARD_SETTLE_FLOOR + 150));
+                    const after = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
+                    const mem = await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1') || '');
+                    runs.push({ hold, after, natural: Math.round((dev.h - dev.kb - (hold.card[1] - hold.card[0])) / 2), learned: mem.includes(':' + dev.kb) });
+                }
+                if (runs.length < 2) continue;
+                measured++;
+                const [first, second] = runs;
+                const line = dev.h - dev.kb;
+                if (first.natural > first.hold.card[0] + 2) wouldDrop++;
+                if (first.learned) learnedOnce++; else problems.push(id + ' ៖ មិនចាំ ' + JSON.stringify(await page.evaluate(() => localStorage.getItem('zoew_keyboard_inset_v1'))));
+                if (Math.abs(first.after.card[0] - first.hold.card[0]) > 1) problems.push(id + ' ៖ លើកដំបូងចុះ ' + first.hold.card[0] + ' ➜ ' + first.after.card[0]);
+                if (Math.abs(second.after.card[0] - second.hold.card[0]) > 1) problems.push(id + ' ៖ លើកក្រោយផ្លាស់ទីពីរដង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0]);
+                if (second.after.fitted || Math.abs(second.hold.card[0] - second.natural) > 2) problems.push(id + ' ៖ លើកក្រោយមិនទៅទីតាំងពិតតែម្តង ' + second.hold.card[0] + ' ➜ ' + second.after.card[0] + ' (ពិត ' + second.natural + ' · .modal-kb ' + second.after.fitted + ')');
+                for (const r of runs) if (r.after.card[1] > line + 1 || r.after.card[0] < 0 || r.after.field[1] > line + 1) problems.push(id + ' ៖ មើលមិនឃើញ ' + JSON.stringify(r.after));
+            }
+            check(measured >= 4 && wouldDrop >= 1 && learnedOnce === measured && problems.length === 0,
+                '⛔ ' + dev.label + ' ៖ ' + measured + ' ផ្ទាំងលេខ ➜ keyboard ប្រាប់ ' + (dev.kb + 80) + ' ហើយ' + (dev.apk ? ' WebView' : ' ទំព័រ') + ' បង្រួមតាម keyboard ពិត ' + dev.kb + ' ➜ លើកដំបូងកាតមិនចុះ · ចាំ ' + dev.kb + ' ➜ លើកក្រោយកាតទៅទីតាំងពិតតែម្តង (ទោះ keyboard ប្រាប់ចាស់) · មើលឃើញពេញ',
+                JSON.stringify({ measured, wouldDrop, learnedOnce, problems: problems.slice(0, 6) }));
+            await ctx.close();
+        }
 
         console.log('\n=== (ខ) iPhone · iPad (standalone) ៖ ប្រអប់វាយដែល focus ដោយកូដ (គ្មាន keyboard) ➜ ចុច ➜ preventDefault + focus({ preventScroll }) · keyboard បើក ➜ iOS ===');
         for (const dev of IOS_DEVICES) {

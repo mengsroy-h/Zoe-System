@@ -1,5 +1,7 @@
 package com.zoesystem.zoew;
 
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -21,14 +23,36 @@ import java.util.List;
 public class MainActivity extends BridgeActivity {
 
     static final long KEYBOARD_HOLD_MAX_MS = 1000;
+    static final int TABLET_MIN_WIDTH_DP = 600;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkUpdatePlugin.class);
         registerPlugin(DeviceInfoPlugin.class);
+        lockPhoneToPortrait();
         super.onCreate(savedInstanceState);
         preferHighestRefreshRate();
         holdWebViewWhileKeyboardOpens();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        lockPhoneToPortrait();
+    }
+
+    private void lockPhoneToPortrait() {
+        try {
+            int wanted = orientationFor(getResources().getConfiguration().smallestScreenWidthDp);
+            if (getRequestedOrientation() != wanted) setRequestedOrientation(wanted);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    static int orientationFor(int smallestWidthDp) {
+        return smallestWidthDp > 0 && smallestWidthDp < TABLET_MIN_WIDTH_DP
+            ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     }
 
     private void holdWebViewWhileKeyboardOpens() {

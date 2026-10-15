@@ -344,8 +344,12 @@ await scenario('១. boot លើ Android native', async () => {
         const log = window.__ptrLog = { classes: [] };
         new MutationObserver(() => { log.classes.push(ind.className); }).observe(ind, { attributes: true, attributeFilter: ['class'] });
     });
-    const reloaded = page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true, () => false);
+    const pullStartedAt = Date.now();
+    let reloadedAt = 0;
+    const noteReload = () => { if (!reloadedAt) reloadedAt = Date.now(); };
+    page.on('framenavigated', noteReload);
     const pulled = await pull(page, 300);
+    const releasedAt = Date.now();
     ok('PTR ៖ រកចំណុចទាញបាន', pulled);
     const ptrEnd = await page.evaluate(() => {
         const ind = document.querySelector('.ptr-indicator');
@@ -355,7 +359,10 @@ await scenario('១. boot លើ Android native', async () => {
         ptrEnd.finalOpacity === '1' && ptrEnd.finalTransform === 'translateY(50px)', ptrEnd);
     const ticks = (await calls(page, 'Haptics', 'impact').catch(() => [])).slice(ticksBefore);
     ok('PTR ៖ ឆ្លងព្រំដែន ➜ ញ័រ **ម្តង** (Haptics.impact · LIGHT)', ticks.length === 1 && ticks[0].options.style === 'LIGHT', ticks);
-    ok('PTR លើ native ៖ ទាញចុះ ➜ ផ្ទុកឡើងវិញ', await reloaded);
+    while (!reloadedAt && Date.now() - releasedAt < 6000) await new Promise((res) => setTimeout(res, 50));
+    page.off('framenavigated', noteReload);
+    ok('PTR លើ native ៖ ទាញចុះ ➜ ផ្ទុកឡើងវិញ (≤ 6 វិ. ក្រោយលែងដៃ)', reloadedAt !== 0,
+        { pullMs: releasedAt - pullStartedAt, reloadAfterReleaseMs: reloadedAt ? reloadedAt - releasedAt : null });
     await page.waitForTimeout(2500);
     ok('PTR ៖ ក្រោយផ្ទុកឡើងវិញ App ចាប់ផ្តើមម្តងទៀត', await page.evaluate(() => document.querySelectorAll('#historyTableBody tr').length > 0));
     await closeSession(s, 'native boot');

@@ -68,10 +68,19 @@ const FAKE_VIEWPORT = function () {
     Object.defineProperty(fake, 'scale', { get: () => 1 });
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: fake });
     window.__kb = {
+        set(px) { inset = px; top = 0; },
+        fire() { fake.dispatchEvent(new Event('resize')); fake.dispatchEvent(new Event('scroll')); },
         open(px, at) { inset = px; top = at || 0; fake.dispatchEvent(new Event('resize')); fake.dispatchEvent(new Event('scroll')); },
         close() { inset = 0; top = 0; fake.dispatchEvent(new Event('resize')); fake.dispatchEvent(new Event('scroll')); },
         state() { return { inset, top, height: window.innerHeight - inset }; }
     };
+};
+
+// bridge Capacitor ក្លែងតិចបំផុត ៖ App ដឹងថាជា APK (`isNativeAndroid()`) · plugin ឆ្លើយ {} (fail-open)
+const APK_BRIDGE = function () {
+    window.androidBridge = { postMessage() {} };
+    window.Capacitor = { PluginHeaders: [], isNativePlatform: () => true, getPlatform: () => 'android',
+        nativePromise() { return Promise.resolve({}); }, nativeCallback() { return '1'; } };
 };
 
 const IOS_FLAGS = function () {
@@ -395,6 +404,66 @@ const SIZES = [
             await ctx.close();
         }
 
+        console.log('\n=== APK (KeyboardOpenHold) ៖ keyboard ចាប់ផ្តើមលោត ➜ visualViewport បង្រួម (WebView នៅកម្ពស់ដើម) ➜ ចប់ ➜ WebView បង្រួម ===');
+        // វីដេអូ APK របស់ម្ចាស់គម្រោង ៖ «កន្ត្រាក់ ២ ដង ពេល keyboard លោតឡើង គ្រប់ modal» ៖ ប្រអប់ឡើង ១១៨dp ពេល keyboard ចាប់ផ្តើម (ការតម្រូវតាមបាត)
+        //   ហើយ ៣០dp ទៀតពេល WebView បង្រួម (ចូលកណ្តាលវិញ) ➜ ច្បាប់ ៖ ទីតាំងពេល keyboard កំពុងលោត = ទីតាំងក្រោយ WebView បង្រួម (ផ្លាស់ទីតែម្តង) ·
+        //   បាតកាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ · គ្រប់ប្រអប់ដែលមានប្រអប់វាយ (ដេរីវេពី DOM) × ២ ទំហំ
+        for (const size of [{ w: 412, h: 915, kb: 330 }, { w: 360, h: 740, kb: 300 }]) {
+            const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
+            const page = await ctx.newPage();
+            page.on('dialog', (d) => d.dismiss().catch(() => {}));
+            await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+            await page.addInitScript(APK_BRIDGE);
+            await page.addInitScript(FAKE_VIEWPORT);
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(900);
+            const ready = await page.evaluate(() => typeof openModalHelper === 'function' && !!(window.Capacitor && window.Capacitor.isNativePlatform()));
+            if (!ready) { bad('APK hold ៖ audit bridge'); await ctx.close(); continue; }
+            const ids = await modalIdsWithFields(page);
+            const problems = [];
+            let measured = 0, movedAtStart = 0;
+            for (const id of ids) {
+                await page.setViewportSize({ width: size.w, height: size.h });
+                await page.evaluate(() => { window.__kb.set(0); window.__kb.fire(); });
+                await closeAll(page);
+                await page.evaluate((m) => openModalHelper(m), id);
+                await settle(page, 450);
+                const fields = await visibleFields(page, id);
+                if (!fields.length) continue;
+                const rect = (index) => page.evaluate(({ id, index, sel }) => {
+                    const modal = document.getElementById(id);
+                    const field = Array.from(modal.querySelectorAll(sel))[index];
+                    const content = modal.querySelector('.modal-content') || modal.firstElementChild;
+                    const c = content.getBoundingClientRect();
+                    const f = field.getBoundingClientRect();
+                    return { card: [Math.round(c.top), Math.round(c.bottom)], field: [Math.round(f.top), Math.round(f.bottom)], focused: document.activeElement === field };
+                }, { id, index, sel: FIELD_SELECTOR });
+                await page.evaluate(({ id, index, sel }) => Array.from(document.getElementById(id).querySelectorAll(sel))[index].focus({ preventScroll: true }), { id, index: fields[0].index, sel: FIELD_SELECTOR });
+                const base = await rect(fields[0].index);
+                await page.evaluate((kb) => { window.__kb.set(kb); window.__kb.fire(); }, size.kb);
+                await settle(page, 200);
+                const hold = await rect(fields[0].index);
+                await page.evaluate(() => window.__kb.set(0));
+                await page.setViewportSize({ width: size.w, height: size.h - size.kb });
+                await page.evaluate(() => window.__kb.fire());
+                await settle(page, 250);
+                const after = await rect(fields[0].index);
+                measured++;
+                if (Math.abs(hold.card[0] - base.card[0]) > 1) movedAtStart++;
+                const line = size.h - size.kb;
+                const issues = [];
+                if (Math.abs(hold.card[0] - after.card[0]) > 1 || Math.abs(hold.card[1] - after.card[1]) > 1) issues.push('ផ្លាស់ទីពីរដង ' + base.card[0] + ' ➜ ' + hold.card[0] + ' ➜ ' + after.card[0]);
+                if (hold.card[1] > line + 1) issues.push('បាតកាត ' + hold.card[1] + ' នៅក្រោយ keyboard ' + line);
+                if (hold.field[0] < 0 || hold.field[1] > line + 1) issues.push('ប្រអប់វាយមិនមើលឃើញ [' + hold.field + ']');
+                if (!hold.focused) issues.push('focus');
+                if (issues.length) problems.push(id + ' ' + size.w + '×' + size.h + ' ៖ ' + issues.join(' · '));
+            }
+            check(measured >= 15 && movedAtStart >= 12 && problems.length === 0,
+                '⛔ APK ' + size.w + '×' + size.h + ' · keyboard ' + size.kb + ' ៖ ' + measured + ' ប្រអប់ ➜ ផ្លាស់ទីតែម្តងពេល keyboard ចាប់ផ្តើម (ទីតាំងពេលលោត = ក្រោយ WebView បង្រួម ±1px) · បាតនៅពីលើ keyboard · ប្រអប់វាយមើលឃើញ',
+                JSON.stringify({ measured, movedAtStart, problems: problems.slice(0, 6) }));
+            await ctx.close();
+        }
+
         console.log('\n=== iPhone (standalone) ៖ ចុចប្រអប់វាយក្នុងប្រអប់ ➜ focus ដោយគ្មានការរំកិលទំព័រ · ទិសផ្ទុយ ===');
         for (const ios of [true, false]) {
             const size = SIZES[0];
@@ -439,6 +508,61 @@ const SIZES = [
                 check(second[1] === false, 'ទិសផ្ទុយ ៖ ចុចប្រអប់វាយដែល focus រួច ➜ iOS ធ្វើខ្លួនឯង (ដាក់ caret តាមកន្លែងចុច)', JSON.stringify(second));
             } else {
                 check(!target.standalone && first.prevented[0] === false, 'ទិសផ្ទុយ ៖ មិនមែន iOS standalone (Android · web) ➜ មិនប៉ះការចុច', JSON.stringify({ target, first }));
+            }
+            await ctx.close();
+        }
+
+        console.log('\n=== iPhone (standalone) ៖ «បញ្ចូលច្រើន» focus ប្រអប់វាយដោយកូដ (គ្មាន keyboard) ➜ ចុច ➜ មិនទុកឲ្យ iOS (វីដេអូ ៖ ទំព័រធ្លាក់ ១៣០pt ហើយលោតត្រឡប់) ===');
+        // iOS ៖ focus ដោយកូដក្រៅកាយវិការ (`openBatchScanModal()` ក្រោយ ១៥០ms សម្រាប់ម៉ាស៊ីនស្កេន) មិនបើក keyboard · ចុចប្រអប់វាយដែល focus រួចនោះ ➜ ផ្លូវ iOS ដើម ➜
+        //   WebKit រំកិលទំព័រដើម្បីបង្ហាញប្រអប់វាយ ពេល keyboard លោត ➜ `restoreIOSDocumentScroll()` ទាញត្រឡប់ ០ កណ្តាលចលនា ➜ ទំព័រធ្លាក់ចុះ ហើយលោតត្រឡប់ ·
+        //   ច្បាប់ ៖ ប្រអប់វាយដែល focus រួចតែ keyboard មិនទាន់បើក ➜ ចាប់ការចុចដូចប្រអប់មិនទាន់ focus (blur + focus({ preventScroll })) · keyboard បើករួច ➜ iOS ធ្វើខ្លួនឯង
+        for (const ios of [true, false]) {
+            const size = SIZES[3];
+            const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
+            const page = await ctx.newPage();
+            page.on('dialog', (d) => d.dismiss().catch(() => {}));
+            await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+            if (ios) await page.addInitScript(IOS_FLAGS);
+            await page.addInitScript(FAKE_VIEWPORT);
+            await page.addInitScript(() => {
+                window.__touchEnds = [];
+                window.__focusLog = [];
+                window.addEventListener('touchend', (e) => { window.__touchEnds.push(e.defaultPrevented); }, false);
+                const real = HTMLElement.prototype.focus;
+                HTMLElement.prototype.focus = function (options) {
+                    window.__focusLog.push({ id: this.id || this.tagName, preventScroll: !!(options && options.preventScroll) });
+                    return real.call(this, options);
+                };
+            });
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(900);
+            const ready = await page.evaluate(() => typeof openBatchScanModal === 'function' && typeof openModalHelper === 'function');
+            if (!ready) { bad('iOS «បញ្ចូលច្រើន» ៖ audit bridge (openBatchScanModal)'); await ctx.close(); continue; }
+            await page.evaluate(() => { uiState.entryScanMode = 'parcel'; openModalIds().slice().forEach((m) => closeModal(m)); openBatchScanModal(); });
+            await settle(page, 450);
+            const at = await page.evaluate(() => {
+                const el = document.getElementById('batchBarcodeInput');
+                const r = el.getBoundingClientRect();
+                window.__focusLog = [];
+                return { focused: document.activeElement === el, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(20, r.height / 2)) };
+            });
+            await page.touchscreen.tap(at.x, at.y);
+            await settle(page, 200);
+            const first = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(), focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }));
+            if (ios) {
+                check(at.focused && first.prevented[0] === true && first.focus.length === 1 && first.focus[0].id === 'batchBarcodeInput' && first.focus[0].preventScroll && first.focused === 'batchBarcodeInput' && first.scrollY === 0,
+                    '⛔ iPhone standalone ៖ «បញ្ចូលច្រើន» (ប្រអប់វាយ focus ដោយកូដ · គ្មាន keyboard) ➜ ចុច ➜ touchend preventDefault · focus({ preventScroll }) ម្តង · នៅ focus · ទំព័រមិនរំកិល',
+                    JSON.stringify({ at, first }));
+                await page.evaluate((kb) => window.__kb.open(kb), size.kb);
+                await settle(page, 200);
+                const ta = await page.evaluate(() => { const r = document.getElementById('batchBarcodeInput').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(20, r.height / 2)) }; });
+                await page.touchscreen.tap(ta.x, ta.y);
+                await settle(page, 200);
+                const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
+                check(second.prevented[1] === false && second.focus === 1,
+                    'ទិសផ្ទុយ ៖ keyboard បើករួច ➜ ចុចប្រអប់វាយ ➜ iOS ធ្វើខ្លួនឯង (ដាក់ caret តាមកន្លែងចុច)', JSON.stringify(second));
+            } else {
+                check(first.prevented[0] === false && first.focus.length === 0, 'ទិសផ្ទុយ ៖ មិនមែន iOS standalone ➜ មិនប៉ះការចុច', JSON.stringify({ at, first }));
             }
             await ctx.close();
         }

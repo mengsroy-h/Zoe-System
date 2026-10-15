@@ -277,6 +277,7 @@ body.modal-keyboard .modal::after { top: var(--modal-kb-line, 100%); height: aut
 .modal.modal-kb { align-items: flex-start; }
 .modal.modal-kb > .modal-content { margin-top: var(--modal-kb-shift, 0px); max-height: var(--modal-kb-max, 85vh); }
 .modal.modal-kb > .si-modal-content { display: block; }
+.modal.modal-kb-hold > .si-modal-content { display: flex; }
 html.ios-standalone body.modal-keyboard,
 html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
 html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }

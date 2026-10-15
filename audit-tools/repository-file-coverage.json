@@ -1954,6 +1954,9 @@
     "ZoeW/tests/label-print.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/print-relayout.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/late-commit-stale-session.test.ts": {
       "policy": "zoew-self-verification"
     },

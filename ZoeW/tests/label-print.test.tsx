@@ -20,7 +20,7 @@ import { viewState } from '../src/core/view-state';
 import { DB_LISTENER_KEY_HISTORY, dbListenerFailedPaths, dbListenerPendingPaths, VIEW_NOT_MEASURABLE_NOTICE } from '../src/core/text';
 import { LABEL_PRINT_OPTIONS_KEY } from '../src/core/storage-keys';
 import { MODAL_IDS, modalIsOpen } from '../src/core/modals';
-import { restoreAfterPdfExport } from '../src/features/export';
+import { armPdfExportRestore, restoreAfterPdfExport } from '../src/features/export';
 import { buildLabelRows, DEFAULT_LABEL_OPTIONS, LABEL_LAYOUTS, LABEL_PREVIEW_MAX, labelDateOf, labelMoneyText, loadLabelOptions, openLabelPrintModal, printLabelsFromModal, resetLabelPrint, updateLabelPrintPreview } from '../src/features/label-print';
 import { ACTION_NAMES } from '../src/core/action-registry';
 import { moreMenuPrintItemLabels, moreMenuPrintLabels } from '../src/ui/more-menu';
@@ -58,7 +58,7 @@ beforeEach(() => {
 
 afterEach(() => {
     step(() => { closeModal('labelPrintModal'); resetLabelPrint(); restoreAfterPdfExport(); });
-    window.removeEventListener('afterprint', restoreAfterPdfExport);
+    window.removeEventListener('afterprint', armPdfExportRestore);
     vi.restoreAllMocks();
     unmount();
     dataState.scanHistory = [];
@@ -141,7 +141,7 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(field('labelOpenOnly').checked).toBe(false);
     });
 
-    it('⛔ «បោះពុម្ព» ➜ modal បិទ · pdfExportView { kind: labels, options } · #pdfExportPrintArea គូរគ្រប់ស្លាក · print · afterprint សម្អាត', () => {
+    it('⛔ «បោះពុម្ព» ➜ modal បិទ · pdfExportView { kind: labels, options } · #pdfExportPrintArea គូរគ្រប់ស្លាក · print · afterprint ➜ នៅ (ប្តូរក្រដាស) · ប៉ះ App វិញ ➜ សម្អាត', () => {
         step(() => openLabelPrintModal({ kind: 'filter' }));
         step(() => { expect(printLabelsFromModal()).toBe(true); });
         expect(modalIsOpen('labelPrintModal')).toBe(false);
@@ -155,6 +155,8 @@ describe('ស្លាកកញ្ចប់ ៖ modal ➜ preview ➜ បោះ�
         expect(labels[1].querySelector('.label-phone')!.textContent).toBe('—');
         expect(labels[1].querySelector('.label-money')).toBeNull();
         step(() => window.dispatchEvent(new Event('afterprint')));
+        expect(labelsIn('#pdfExportPrintArea').length).toBe(3);
+        step(() => document.dispatchEvent(new Event('pointerdown', { bubbles: true })));
         expect(uiState.pdfExportView).toBeNull();
         expect(labelsIn('#pdfExportPrintArea').length).toBe(0);
     });

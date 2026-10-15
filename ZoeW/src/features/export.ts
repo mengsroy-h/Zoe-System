@@ -185,7 +185,24 @@ export async function exportDataAsExcel() {
     }
 }
 
+let pdfExportRestoreArmed = false;
+
+function disarmPdfExportRestore() {
+    if (!pdfExportRestoreArmed) return;
+    pdfExportRestoreArmed = false;
+    document.removeEventListener('pointerdown', restoreAfterPdfExport, true);
+    document.removeEventListener('keydown', restoreAfterPdfExport, true);
+}
+
+export function armPdfExportRestore() {
+    if (pdfExportRestoreArmed || !uiState.pdfExportView) return;
+    pdfExportRestoreArmed = true;
+    document.addEventListener('pointerdown', restoreAfterPdfExport, true);
+    document.addEventListener('keydown', restoreAfterPdfExport, true);
+}
+
 export function restoreAfterPdfExport() {
+    disarmPdfExportRestore();
     if (uiState.pdfExportOriginalTitle !== null) {
         viewState.documentTitle = null;
         uiState.pdfExportOriginalTitle = null;
@@ -218,10 +235,11 @@ export function exportDataAsPDF() {
 }
 
 export function beginPdfPrint(filenameBase: string) {
+    disarmPdfExportRestore();
     if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = documentBaseTitle();
     viewState.documentTitle = filenameBase;
     commitNow();
-    window.addEventListener('afterprint', restoreAfterPdfExport);
+    window.addEventListener('afterprint', armPdfExportRestore);
     noteAppLockExcuse();
     reportPrintFailure(printCurrentView(filenameBase));
 }

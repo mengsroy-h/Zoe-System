@@ -228,6 +228,27 @@ describe('ប្រអប់ ⟷ keyboard ៖ ការតម្រូវ (modal
     });
 });
 
+describe('APK ៖ keyboard កំពុងលោត (KeyboardOpenHold) ➜ ប្រអប់នៅទីតាំងដែល WebView បង្រួមរួចនឹងដាក់ (modalKeyboardHoldFitFor)', () => {
+    it('⛔ វីដេអូ APK ៖ ប្រអប់កណ្តាលផ្ទៃពីលើ keyboard = ប្លង់ក្រោយ WebView បង្រួម (padding · ៨៥vh តាមកម្ពស់ថ្មី) ➜ ផ្លាស់ទីតែម្តង', () => {
+        expect(modalKeyboard.modalKeyboardHoldFitFor({ top: 252, height: 411, pad: 12, cap: 0.85 * 915 }, { top: 0, height: 585 }, 915))
+            .toEqual({ top: 87, max: Math.floor(0.85 * 585), shift: 75, hold: true });
+        expect(modalKeyboard.modalKeyboardHoldFitFor({ top: 343, height: 229, pad: 12, cap: 0.85 * 915 }, { top: 0, height: 585 }, 915))
+            .toEqual({ top: 178, max: Math.floor(0.85 * 585), shift: 166, hold: true });
+        expect(modalKeyboard.modalKeyboardHoldFitFor({ top: 69, height: 777, pad: 12, cap: 0.85 * 915 }, { top: 0, height: 585 }, 915))
+            .toEqual({ top: 44, max: Math.floor(0.85 * 585), shift: 32, hold: true });
+    });
+
+    it('ទិសផ្ទុយ ៖ គ្មាន cap · ផ្ទៃតូចជាងប្រអប់ ➜ ពេញផ្ទៃ (padding) មិនលើស · តម្លៃខុសមិនបោះ ហើយមិនអវិជ្ជមាន', () => {
+        expect(modalKeyboard.modalKeyboardHoldFitFor({ top: 10, height: 900, pad: 12, cap: Infinity }, { top: 0, height: 400 }, 800))
+            .toEqual({ top: 12, max: 376, shift: 0, hold: true });
+        const odd = modalKeyboard.modalKeyboardHoldFitFor({ top: NaN, height: NaN, pad: 12, cap: NaN }, { top: 0, height: 500 }, NaN);
+        expect(() => modalKeyboard.modalKeyboardHoldFitFor({ top: 0, height: -5, pad: 12, cap: 0 }, { top: 0, height: 10 }, 0)).not.toThrow();
+        expect(odd).toEqual({ top: 12, max: 476, shift: 0, hold: true });
+        expect(modalKeyboard.modalKeyboardHoldFitFor({ top: 0, height: 100, pad: NaN, cap: 0 }, { top: 0, height: 300 }, 600))
+            .toEqual({ top: 100, max: 300, shift: 100, hold: true });
+    });
+});
+
 describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal ពិត)', () => {
     function openLong(): { modal: HTMLElement; content: HTMLElement } {
         mount(<><DocumentEffects /><TwoModals /></>);
@@ -467,13 +488,40 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         expect(document.activeElement).toBe(field);
     });
 
-    it('ទិសផ្ទុយ ៖ ប្រអប់វាយដែល focus រួច · អូស · សង្កត់យូរ · ម្រាមដៃពីរ · date · checkbox · readonly ➜ iOS ធ្វើខ្លួនឯង', () => {
+    it('⛔ វីដេអូ iPhone ៖ ប្រអប់វាយ focus ដោយកូដ (ឧ. «បញ្ចូលច្រើន» ១៥០ms ៖ គ្មាន keyboard) ➜ ចុច ➜ preventDefault · blur + focus({ preventScroll }) (iOS មិនរំកិល document ពេលបើក keyboard)', () => {
+        setup();
+        const field = byId('mkField');
+        field.focus({ preventScroll: true });
+        focusCalls = [];
+        const end = tap(field, { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 });
+        expect(end.defaultPrevented).toBe(true);
+        expect(focusCalls).toEqual([{ id: 'mkField', options: { preventScroll: true }, caret: 0 }]);
+        expect(document.activeElement).toBe(field);
+    });
+
+    it('ទិសផ្ទុយ ៖ ប្រអប់វាយដែល focus រួច + keyboard បើក ➜ iOS ធ្វើខ្លួនឯង (ដាក់ caret តាមកន្លែងចុច) · ចុចរួចម្តង (keyboard អណ្តែតលើ iPad ៖ visualViewport មិនបង្រួម) ➜ iOS ធ្វើខ្លួនឯង · focus ម្តងទៀតដោយកូដ ➜ ចាប់វិញ', () => {
         setup();
         const field = byId('mkField');
         field.focus();
+        keyboard(336);
         focusCalls = [];
         expect(tap(field, { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }).defaultPrevented).toBe(false);
+        keyboard(0);
         field.blur();
+        expect(tap(field, { x: 50, y: 200, t: 100 }, { x: 50, y: 200, t: 180 }).defaultPrevented).toBe(true);
+        expect(tap(field, { x: 50, y: 200, t: 300 }, { x: 50, y: 200, t: 380 }).defaultPrevented).toBe(false);
+        expect(focusCalls.length).toBe(1);
+        field.blur();
+        field.focus({ preventScroll: true });
+        focusCalls = [];
+        expect(tap(field, { x: 50, y: 200, t: 500 }, { x: 50, y: 200, t: 580 }).defaultPrevented).toBe(true);
+        expect(focusCalls.length).toBe(1);
+    });
+
+    it('ទិសផ្ទុយ ៖ អូស · សង្កត់យូរ · ម្រាមដៃពីរ · date · checkbox · readonly ➜ iOS ធ្វើខ្លួនឯង', () => {
+        setup();
+        const field = byId('mkField');
+        focusCalls = [];
         expect(tap(field, { x: 50, y: 200, t: 0 }, { x: 50, y: 200 + modalKeyboard.MODAL_TAP_SLOP_PX + 1, t: 80 }).defaultPrevented).toBe(false);
         expect(tap(field, { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: modalKeyboard.MODAL_TAP_MAX_MS + 1 }).defaultPrevented).toBe(false);
         expect(tap(field, { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }, 2).defaultPrevented).toBe(false);

@@ -1,10 +1,11 @@
 import { modalIsOpen } from '../../core/modals';
 import { uiState, type ModalKeyboardFit } from '../../core/state';
+import { isNativeAndroid } from '../../platform/native';
 import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
-import { focusElementWithoutScroll, setElementScrollTop } from '../refs';
+import { blurActiveElement, focusElementWithoutScroll, setElementScrollTop } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
@@ -31,6 +32,7 @@ let measureQueued = false;
 let naturalBox: (ModalNaturalBox & { id: string }) | null = null;
 let modalTap: { id: number; x: number; y: number; at: number; field: HTMLElement } | null = null;
 let modalFocusRefused = false;
+let modalTapFocused: HTMLElement | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -64,6 +66,16 @@ export function modalKeyboardFitFor(box: ModalNaturalBox, view: { top: number; h
     top = Math.round(top);
     const max = Math.max(0, Math.floor(Math.min(box.cap, line - top)));
     return { top, max, shift: Math.round(top - box.pad) };
+}
+
+export function modalKeyboardHoldFitFor(box: ModalNaturalBox, view: { top: number; height: number }, layout: number): Omit<ModalKeyboardFit, 'id'> {
+    const pad = Number.isFinite(box.pad) ? Math.max(0, box.pad) : 0;
+    const scale = layout > 0 && Number.isFinite(layout) ? Math.min(1, view.height / layout) : 1;
+    const room = Math.max(0, view.height - 2 * pad);
+    const cap = Math.min(Number.isFinite(box.cap) && box.cap > 0 ? box.cap * scale : Infinity, room);
+    const height = Number.isFinite(box.height) ? Math.min(Math.max(0, box.height), cap) : cap;
+    const top = Math.round(view.top + pad + (room - height) / 2);
+    return { top, max: Math.max(0, Math.floor(cap)), shift: Math.round(top - pad), hold: true };
 }
 
 function scrollsY(node: Element): boolean {
@@ -121,7 +133,7 @@ function naturalBoxOf(modal: HTMLElement, content: HTMLElement): ModalNaturalBox
 function setModalKeyboardFit(next: ModalKeyboardFit | null): boolean {
     const now = uiState.modalKeyboardFit;
     if (!now && !next) return false;
-    if (now && next && now.id === next.id && now.top === next.top && now.max === next.max && now.shift === next.shift) return false;
+    if (now && next && now.id === next.id && now.top === next.top && now.max === next.max && now.shift === next.shift && !!now.hold === !!next.hold) return false;
     uiState.modalKeyboardFit = next;
     return true;
 }
@@ -142,7 +154,7 @@ function fitModalToKeyboard(view: { top: number; height: number }): boolean {
         }
         naturalBox = Object.assign({ id }, naturalBoxOf(modal, content));
     }
-    const fit = modalKeyboardFitFor(naturalBox, view);
+    const fit = isNativeAndroid() ? modalKeyboardHoldFitFor(naturalBox, view, window.innerHeight) : modalKeyboardFitFor(naturalBox, view);
     return setModalKeyboardFit(fit ? Object.assign({ id }, fit) : null);
 }
 
@@ -189,7 +201,8 @@ function revealAfterResize(): void {
 function modalTapField(target: EventTarget | null): HTMLElement | null {
     const el = target as HTMLInputElement | null;
     if (!el || typeof el.closest !== 'function' || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return null;
-    if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly || document.activeElement === el) return null;
+    if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly) return null;
+    if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
     const modal = el.closest('.modal') as HTMLElement | null;
     return modal && modal.id && modalIsOpen(modal.id) ? el : null;
 }
@@ -207,12 +220,18 @@ export function forgetModalTap(): void {
     modalTap = null;
 }
 
+function forgetModalTapFocus(): void {
+    modalTapFocused = null;
+}
+
 export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     const tap = modalTap;
     modalTap = null;
     if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) return;
     e.preventDefault();
-    if (!focusElementWithoutScroll(tap.field)) modalFocusRefused = true;
+    if (document.activeElement === tap.field) blurActiveElement();
+    if (focusElementWithoutScroll(tap.field)) modalTapFocused = tap.field;
+    else modalFocusRefused = true;
 }
 
 export function listenModalKeyboard(scope: LifecycleScope): void {
@@ -223,6 +242,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     naturalBox = null;
     modalTap = null;
     modalFocusRefused = false;
+    modalTapFocused = null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;
@@ -231,9 +251,11 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'touchstart', noteModalTouchStart, { capture: true, passive: true });
     scope.listen(document, 'touchend', focusModalFieldWithoutScroll, { capture: true, passive: false });
     scope.listen(document, 'touchcancel', forgetModalTap, { capture: true, passive: true });
+    scope.listen(document, 'focusin', forgetModalTapFocus, { capture: true });
     scope.onDispose(() => {
         naturalBox = null;
         modalTap = null;
+        modalTapFocused = null;
         uiState.modalViewportTop = 0;
         uiState.modalViewportHeight = 0;
         uiState.modalKeyboardFit = null;

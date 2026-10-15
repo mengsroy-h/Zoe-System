@@ -113,6 +113,8 @@
     cursor: pointer;
 }
 .nav-bell-btn:active { background: var(--primary-light); border-color: var(--primary); }
+.nav-menu-btn, .drawer-close { position: relative; }
+.nav-menu-btn::after, .nav-bell-btn::after, .drawer-close::after, .modal-close-x::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; }
 .nav-bell-badge {
     position: absolute;
     top: -6px;
@@ -279,6 +281,9 @@ html.ios-standalone body.modal-keyboard,
 html.ios-standalone body.modal-keyboard .modal { touch-action: none; }
 html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: contain; }
 .toast-container { bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-cover, 0px))); }
+@media (max-width: 991px) {
+    body:not(.chrome-hidden) .toast-container { bottom: max(calc(var(--tabbar-height, 0px) + 12px), calc(24px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-cover, 0px)))); }
+}
 
 .trash-more-row td { border-bottom: none; }
 .history-more-row td { border-bottom: none; }
@@ -709,51 +714,49 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .batch-scan-input { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: calc(13 * var(--fs-unit)); line-height: 1.5; letter-spacing: 1px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
 .batch-scan-count { min-height: 1.4em; margin: 6px 0 0; font-size: calc(11.5 * var(--fs-unit)); font-weight: 700; color: var(--primary); text-align: left; }
 
-.label-sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
-.label-sheet.layout-a4-2 { grid-template-columns: repeat(2, 1fr); gap: 5mm; }
-.label-sheet.layout-a4-2 .label-phone { font-size: 38pt; }
+.label-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4mm; --label-phone-max: 30pt; --label-phone-ls: 0.5mm; --label-money-max: 17pt; }
+.label-sheet.layout-a4-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; --label-phone-max: 38pt; --label-money-max: 20pt; }
 .label-sheet.layout-a4-2 .label-bc { height: 16mm; }
-.label-sheet.layout-a4-2 .label-money { font-size: 20pt; }
-.label-sheet.layout-single { grid-template-columns: 1fr; gap: 0; }
+.label-sheet.layout-single { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .label-sheet.layout-single .label { border: none; break-after: page; page-break-after: always; }
 .label-sheet.layout-single .label:last-child { break-after: auto; page-break-after: auto; }
 @page zoeLabel50x30 { size: 50mm 30mm; margin: 1.5mm; }
-.label-sheet.layout-50x30 { display: block; }
+.label-sheet.layout-50x30 { display: block; --label-phone-max: 17pt; --label-phone-ls: 0.3mm; --label-money-max: 10pt; }
 .label-sheet.layout-50x30 .label { page: zoeLabel50x30; break-after: page; page-break-after: always; width: 47mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 1mm; border: none; border-radius: 0; }
 .label-sheet.layout-50x30 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-50x30 .label-phone { font-size: 17pt; letter-spacing: 0.3mm; line-height: 1.05; }
+.label-sheet.layout-50x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-50x30 .label-bc { height: 7mm; margin-top: 0.8mm; }
 .label-sheet.layout-50x30 .label-code { font-size: 6.5pt; letter-spacing: 0.3mm; margin-top: 0.3mm; }
-.label-sheet.layout-50x30 .label-money { font-size: 10pt; margin-top: 0.3mm; }
+.label-sheet.layout-50x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-50x30 .label-meta { font-size: 8pt; gap: 3mm; margin-top: 0.3mm; }
 @page zoeLabel40x30 { size: 40mm 30mm; margin: 1.5mm; }
-.label-sheet.layout-40x30 { display: block; }
+.label-sheet.layout-40x30 { display: block; --label-phone-max: 14pt; --label-phone-ls: 0.2mm; --label-money-max: 9pt; }
 .label-sheet.layout-40x30 .label { page: zoeLabel40x30; break-after: page; page-break-after: always; width: 37mm; height: 27mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 0.5mm 0.8mm; border: none; border-radius: 0; }
 .label-sheet.layout-40x30 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-40x30 .label-phone { font-size: 14pt; letter-spacing: 0.2mm; line-height: 1.05; }
+.label-sheet.layout-40x30 .label-phone { line-height: 1.05; }
 .label-sheet.layout-40x30 .label-bc { height: 6.5mm; margin-top: 0.8mm; }
 .label-sheet.layout-40x30 .label-code { font-size: 5.5pt; letter-spacing: 0.2mm; margin-top: 0.3mm; }
-.label-sheet.layout-40x30 .label-money { font-size: 9pt; margin-top: 0.3mm; white-space: normal; }
+.label-sheet.layout-40x30 .label-money { margin-top: 0.3mm; }
 .label-sheet.layout-40x30 .label-meta { font-size: 7.5pt; gap: 2.5mm; margin-top: 0.3mm; }
 @page zoeLabel60x40 { size: 60mm 40mm; margin: 2mm; }
-.label-sheet.layout-60x40 { display: block; }
+.label-sheet.layout-60x40 { display: block; --label-phone-max: 22pt; --label-phone-ls: 0.4mm; --label-money-max: 13pt; }
 .label-sheet.layout-60x40 .label { page: zoeLabel60x40; break-after: page; page-break-after: always; width: 56mm; height: 36mm; box-sizing: border-box; overflow: hidden; margin: 0; padding: 1mm 1.5mm; border: none; border-radius: 0; }
 .label-sheet.layout-60x40 .label:last-child { break-after: auto; page-break-after: auto; }
-.label-sheet.layout-60x40 .label-phone { font-size: 22pt; letter-spacing: 0.4mm; line-height: 1.05; }
+.label-sheet.layout-60x40 .label-phone { line-height: 1.05; }
 .label-sheet.layout-60x40 .label-bc { height: 10mm; margin-top: 1mm; }
 .label-sheet.layout-60x40 .label-code { font-size: 8pt; letter-spacing: 0.4mm; margin-top: 0.4mm; }
-.label-sheet.layout-60x40 .label-money { font-size: 13pt; margin-top: 0.5mm; }
+.label-sheet.layout-60x40 .label-money { margin-top: 0.5mm; }
 .label-sheet.layout-60x40 .label-meta { font-size: 10pt; gap: 4mm; margin-top: 0.5mm; }
-.label { break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
-.label-phone { font-size: 30pt; font-weight: 800; line-height: 1.1; letter-spacing: 0.5mm; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.label-bc { margin: 2mm auto 0; height: 13mm; }
-.label-bc svg { display: block; width: 100%; height: 100%; }
-.label-bc svg rect { fill: #000; }
-.label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
-.label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
-.label-money { margin-top: 1mm; font-size: 17pt; font-weight: 800; white-space: nowrap; }
-.label-date { font-variant-numeric: tabular-nums; }
-.label-locker::before { content: '📍'; }
+.label-sheet .label { container-type: inline-size; break-inside: avoid; page-break-inside: avoid; border: 0.3mm dashed #94a3b8; border-radius: 2mm; padding: 3mm 3mm 2.5mm; text-align: center; color: #000; background: #fff; }
+.label-sheet .label-phone { font-size: var(--label-phone-max); font-size: min(var(--label-phone-max), calc((100cqw / var(--label-phone-chars, 10) - var(--label-phone-ls)) / 0.66)); font-weight: 800; line-height: 1.1; letter-spacing: var(--label-phone-ls); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.label-sheet .label-bc { margin: 2mm auto 0; height: 13mm; }
+.label-sheet .label-bc svg { display: block; width: 100%; height: 100%; }
+.label-sheet .label-bc svg rect { fill: #000; }
+.label-sheet .label-code { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11pt; letter-spacing: 0.6mm; }
+.label-sheet .label-meta { display: flex; justify-content: center; gap: 5mm; margin-top: 1mm; font-size: 13pt; font-weight: 700; }
+.label-sheet .label-money { margin-top: 1mm; font-size: var(--label-money-max); font-size: min(var(--label-money-max), calc(100cqw / (var(--label-money-chars, 20) * 0.62))); font-weight: 800; white-space: nowrap; }
+.label-sheet .label-date { font-variant-numeric: tabular-nums; }
+.label-sheet .label-locker::before { content: '📍'; }
 @media print {
     #pdfExportPrintArea .label-sheet { width: 100%; }
 }
@@ -782,4 +785,5 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
     .label-preview .label-sheet.layout-60x40 { zoom: 1.1; }
 }
 .stat-card .label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.3; }
+.financial-row #summaryCodRiel, .financial-row #summaryDodRiel, .financial-row #summaryTotalRiel { white-space: nowrap; }
 

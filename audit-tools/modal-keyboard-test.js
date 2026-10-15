@@ -594,8 +594,14 @@ const SIZES = [
                 const hit = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
                 el.style.pointerEvents = keep[0];
                 if (box) box.style.pointerEvents = keep[1];
+                // ទីតាំងដើម (keyboard បិទ) ៖ បាត ២៤px · ទូរស័ព្ទ/tablet ដែលរបា Tab បង្ហាញនៅបាត ➜ ពីលើរបា Tab ១២px (layout-check «toast ⟷ របា Tab»)
+                const tab = document.getElementById('pageTabBar');
+                const tr = tab ? tab.getBoundingClientRect() : null;
+                const barShown = !!tr && tr.height > 20 && tr.top > window.innerHeight / 2 && !document.body.classList.contains('chrome-hidden');
+                const rest = Math.round(document.getElementById('toastContainer').getBoundingClientRect().bottom);
+                const home = barShown ? Math.min(window.innerHeight - 24, Math.round(tr.top) - 12) : window.innerHeight - 24;
                 return { found: true, top: Math.round(r.top), bottom: Math.round(r.bottom), visTop: Math.round(visTop), visBottom: Math.round(visBottom), inner: window.innerHeight,
-                    inside: r.top >= visTop - 1 && r.bottom <= visBottom - 8, onTop: !!hit && el.contains(hit) };
+                    inside: r.top >= visTop - 1 && r.bottom <= visBottom - 8, onTop: !!hit && el.contains(hit), rest, home, barShown };
             };
             const cases = [];
             let hiddenAtBase = 0;
@@ -618,7 +624,7 @@ const SIZES = [
                         await page.evaluate((t) => showToast('⚠️ ' + t), text);
                         await settle(page, 450);
                         const m = await page.evaluate(TOAST, text);
-                        if (m.found && m.inner - 24 > m.visBottom) hiddenAtBase++;
+                        if (m.found && m.home > m.visBottom) hiddenAtBase++;
                         cases.push(Object.assign({ size: size.w + '×' + size.h, id: id || 'ទំព័រ', pan }, m));
                     }
                 }
@@ -628,15 +634,15 @@ const SIZES = [
                 await page.evaluate(() => showToast('⚠️ kbtoast-closed'));
                 await settle(page, 450);
                 const closed = await page.evaluate(TOAST, 'kbtoast-closed');
-                check(closed.found && closed.inside && Math.abs(closed.bottom - (closed.inner - 24)) <= 1,
-                    'ទិសផ្ទុយ ៖ ' + size.label + ' keyboard បិទ ➜ toast នៅកន្លែងដើម (បាត ២៤px)', JSON.stringify(closed));
+                check(closed.found && closed.inside && Math.abs(closed.rest - closed.home) <= 1,
+                    'ទិសផ្ទុយ ៖ ' + size.label + ' keyboard បិទ ➜ toast នៅកន្លែងដើម (បាត ២៤px · ពីលើរបា Tab ពេលវាបង្ហាញ)', JSON.stringify(closed));
                 await ctx.close();
             }
             const wrong = cases.filter((c) => !c.found || !c.inside || !c.onTop);
             check(cases.length >= 16 && wrong.length === 0,
                 '⛔ គ្រប់ករណី (' + cases.length + ' ៖ ទំព័រ · ប្រអប់ ៣ · រំកិល ០/១៤០ · ទំហំ ២) ➜ toast នៅក្នុងផ្ទៃមើលឃើញពីលើ keyboard ហើយនៅខាងលើប្រអប់',
                 JSON.stringify(wrong.slice(0, 6)) + (wrong.length > 6 ? ' … +' + (wrong.length - 6) : ''));
-            check(hiddenAtBase >= 16, 'គំរូអាចធ្លាក់ ៖ ទីតាំងដើមរបស់ toast (បាត ២៤px) នៅក្រោយ keyboard គ្រប់ករណី (សេណារីយ៉ូពិត)', 'ឃើញ ' + hiddenAtBase);
+            check(hiddenAtBase >= 16, 'គំរូអាចធ្លាក់ ៖ ទីតាំងដើមរបស់ toast (បាត ២៤px · ពីលើរបា Tab) នៅក្រោយ keyboard គ្រប់ករណី (សេណារីយ៉ូពិត)', 'ឃើញ ' + hiddenAtBase);
             const apkSize = SIZES[0];
             const { ctx, page, ready } = await openApp(browser, port, apkSize, false);
             if (ready) {
@@ -646,8 +652,8 @@ const SIZES = [
                 await settle(page, 450);
                 const apk = await page.evaluate(TOAST, 'kbtoast-apk');
                 const cover = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--keyboard-cover').trim());
-                check(apk.found && apk.inside && Math.abs(apk.bottom - (apk.inner - 24)) <= 1 && (cover === '0px' || cover === ''),
-                    'ទិសផ្ទុយ ៖ APK (WebView បង្រួម viewport) ➜ --keyboard-cover ០ · toast បាត ២៤px នៃ viewport ដែលបង្រួម', JSON.stringify({ apk, cover }));
+                check(apk.found && apk.inside && Math.abs(apk.rest - apk.home) <= 1 && (cover === '0px' || cover === ''),
+                    'ទិសផ្ទុយ ៖ APK (WebView បង្រួម viewport) ➜ --keyboard-cover ០ · toast នៅកន្លែងដើមនៃ viewport ដែលបង្រួម', JSON.stringify({ apk, cover }));
             } else bad('toast ⟷ keyboard ៖ audit bridge APK');
             await ctx.close();
         }

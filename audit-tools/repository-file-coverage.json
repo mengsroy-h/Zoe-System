@@ -1870,6 +1870,9 @@
     "ZoeW/tests/orientation-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-page-tap-probe.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/firebase-loader-gate.test.ts": {
       "policy": "zoew-self-verification"
     },

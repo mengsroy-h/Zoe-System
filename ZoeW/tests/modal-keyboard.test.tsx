@@ -656,6 +656,66 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         }
     });
 
+    it('⛔ វីដេអូ Chrome Android (របៀបដក) ៖ ចុចប្រអប់វាយ Barcode ➜ preventDefault · focus({ preventScroll }) (Chromium រំលង ScrollFocusedEditableElementIntoView ៖ visual viewport មិនរំកិល navbar មិនបាត់ · ចុចម្តងទៀតក៏ដូច្នេះ) · focus ដោយកូដ គ្មាន keyboard ➜ ចាប់ · ប្រអប់វាយក្នុងប្រអប់ (modal) · focus រួច + keyboard · keyboard ពិតបាំង ➜ Android ធ្វើខ្លួនឯង', () => {
+        setup(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        const realWidth = window.innerWidth;
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 411 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 830 });
+        vv.height = 830;
+        const scanner = document.createElement('input');
+        scanner.type = 'text';
+        scanner.id = 'hwScannerInput';
+        let top = 361;
+        scanner.getBoundingClientRect = () => rect(top, 34);
+        const calls: any[] = [];
+        const realFocus = HTMLElement.prototype.focus;
+        scanner.focus = function (this: HTMLInputElement, options?: any) { calls.push(options); realFocus.call(this, options); } as any;
+        try {
+            expect(tap(byId('mkField'), { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }).defaultPrevented).toBe(false);
+            closeModal('manualAdjustModal');
+            commitNow();
+            document.body.append(scanner);
+            refTo('hwScannerInput')(scanner);
+            expect(830 - Math.round(830 * modalKeyboard.PAGE_TAP_PHONE_KEYBOARD_RATIO)).toBeGreaterThanOrEqual(395 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(tap(scanner, { x: 50, y: 370, t: 100 }, { x: 51, y: 371, t: 190 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            expect(document.activeElement).toBe(scanner);
+            keyboard(407);
+            expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(407);
+            expect(tap(scanner, { x: 50, y: 370, t: 300 }, { x: 50, y: 370, t: 360 }).defaultPrevented).toBe(false);
+            expect(calls.length).toBe(1);
+            keyboard(0);
+            scanner.blur();
+            expect(tap(scanner, { x: 50, y: 370, t: 400 }, { x: 50, y: 370, t: 460 }).defaultPrevented).toBe(true);
+            expect(calls.length).toBe(2);
+            scanner.blur();
+            scanner.focus();
+            calls.length = 0;
+            expect(tap(scanner, { x: 50, y: 370, t: 470 }, { x: 50, y: 370, t: 490 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            uiState.keyboardOpen = true;
+            scanner.blur();
+            scanner.focus();
+            calls.length = 0;
+            expect(tap(scanner, { x: 50, y: 370, t: 495 }, { x: 50, y: 370, t: 499 }).defaultPrevented).toBe(false);
+            uiState.keyboardOpen = false;
+            scanner.blur();
+            top = 830 - 407 - 34 - modalKeyboard.MODAL_KEYBOARD_GAP_PX + 1;
+            expect(tap(scanner, { x: 50, y: top + 5, t: 500 }, { x: 50, y: top + 5, t: 560 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Windows' } });
+            top = 361;
+            expect(tap(scanner, { x: 50, y: 370, t: 600 }, { x: 50, y: 370, t: 660 }).defaultPrevented).toBe(false);
+            expect(calls).toEqual([]);
+        } finally {
+            uiState.keyboardOpen = false;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
+            refTo('hwScannerInput')(null);
+            scanner.remove();
+        }
+    });
+
     it('⛔ focus មិនជាប់ ➜ ការចុចបន្ទាប់ទុកឲ្យ iOS (fail-open ៖ វាយបានជានិច្ច)', () => {
         setup();
         refuse = true;

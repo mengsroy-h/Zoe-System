@@ -285,9 +285,12 @@ export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
 
 export function noteModalTouchStart(e: TouchEvent): void {
     modalTap = null;
-    if (modalFocusRefused || !usesIOSPanelHandoff()) return;
+    if (modalFocusRefused) return;
+    const ios = usesIOSPanelHandoff();
+    if (!ios && !isAndroidDevice()) return;
     const field = modalTapField(e.target);
     if (!field || !e.touches || e.touches.length !== 1) return;
+    if (!ios && (field.closest('.modal') || (document.activeElement === field && uiState.keyboardOpen))) return;
     const t = e.touches[0];
     modalTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }

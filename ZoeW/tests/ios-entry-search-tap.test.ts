@@ -257,6 +257,41 @@ describe('tab ស្កេន ៖ ស្វែងរកបញ្ជីកញ្�
         }
     });
 
+    it('⛔ វីដេអូ Chrome Android ៖ visual viewport រំកិលរួច (keyboard បើកពីប្រអប់មុន) ➜ ចុចស្វែងរក ➜ ទំព័រត្រឡប់កំពូល (documentElement.scrollIntoView start · window.scrollTo មិនប៉ះ visual viewport) មុនបង្រួម ➜ ប្រអប់ស្វែងរកមិនផុតពីលើ · មិនរំកិល · iOS ➜ មិនប៉ះ', () => {
+        setIOSStandalone(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        const realVV = Object.getOwnPropertyDescriptor(window, 'visualViewport');
+        const vv = { offsetTop: 179, height: 423 };
+        Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
+        const root = document.documentElement;
+        const reveals: any[] = [];
+        root.scrollIntoView = ((options: any) => { reveals.push({ options, collapsed: uiState.entryPanelCollapsed }); vv.offsetTop = 0; }) as any;
+        try {
+            expect(tap(entryInput, 1000).defaultPrevented).toBe(true);
+            expect(reveals).toEqual([{ options: { block: 'start', inline: 'nearest', behavior: 'instant' }, collapsed: false }]);
+            expect(focusCalls).toEqual([{ field: 'entryListSearchInput', options: { preventScroll: true }, collapsed: true }]);
+            entryInput.blur();
+            uiState.entryPanelCollapsed = false;
+            focusCalls = [];
+            reveals.length = 0;
+            expect(tap(lockerInput, 2000).defaultPrevented).toBe(true);
+            expect(reveals).toEqual([]);
+            expect(focusCalls.length).toBe(1);
+            lockerInput.blur();
+            uiState.entryPanelCollapsed = false;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+            setIOSStandalone(true);
+            vv.offsetTop = 120;
+            expect(tap(entryInput, 3000).defaultPrevented).toBe(true);
+            expect(reveals).toEqual([]);
+        } finally {
+            delete (root as any).scrollIntoView;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+            if (realVV) Object.defineProperty(window, 'visualViewport', realVV);
+            else delete (window as any).visualViewport;
+        }
+    });
+
     it('ទិសផ្ទុយ ៖ កុំព្យូទ័រ/web (មិនមែន iOS standalone · មិនមែន Android) ➜ ការចុចទុកឲ្យ browser (focus ធម្មតា ➜ onFocus បង្រួម)', () => {
         setIOSStandalone(false);
         expect(tap(entryInput, 1000).defaultPrevented).toBe(false);

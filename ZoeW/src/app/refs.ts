@@ -150,6 +150,15 @@ export function setFieldValue(name: RefName, value: string): void {
     if (el) el.value = value;
 }
 
+export function insertFieldText(name: RefName, text: string): void {
+    const el = elementOf<HTMLInputElement>(name);
+    if (!el) return;
+    const end = el.value.length;
+    const from = typeof el.selectionStart === 'number' ? el.selectionStart : end;
+    const to = typeof el.selectionEnd === 'number' ? el.selectionEnd : from;
+    try { el.setRangeText(text, from, to, 'end'); } catch { el.value += text; }
+}
+
 export function fieldChecked(name: RefName): boolean {
     const el = field(name) as HTMLInputElement | null;
     return !!(el && el.checked);
@@ -180,6 +189,14 @@ export function focusElementWithoutScroll(el: HTMLElement): boolean {
     return document.activeElement === el;
 }
 
+export function resetVisualViewportPan(): boolean {
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    if (!vv || !(vv.offsetTop > 0) || !root || typeof root.scrollIntoView !== 'function') return false;
+    try { root.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' }); } catch { return false; }
+    return true;
+}
+
 export function focusFieldAsIs(name: RefName): void {
     const el = elementOf(name);
     if (el) el.focus();
@@ -200,6 +217,16 @@ export function activeElementIsTextField(): boolean {
     if (!el) return false;
     const tag = el.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+const TEXT_ENTRY_TYPES = new Set(['', 'text', 'search', 'tel', 'number', 'email', 'url', 'password']);
+
+export function activeElementTakesText(): boolean {
+    const el = document.activeElement as HTMLInputElement | null;
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.tagName === 'TEXTAREA') return true;
+    if (el.tagName === 'INPUT') return TEXT_ENTRY_TYPES.has(String(el.type || '').toLowerCase());
+    return !!el.isContentEditable;
 }
 
 export function activeElementIsInModal(): boolean {

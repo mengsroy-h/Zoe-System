@@ -3,7 +3,7 @@ import { viewState } from '../core/view-state';
 import { dataState, firebaseState, scanState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreSet } from '../core/storage';
-import { normalizeStoredPhone } from '../core/text';
+import { latinDigits, normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
 import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -25,7 +25,7 @@ import { showToast } from '../ui/toast';
 export function triggerScanAction(barcode) {
     if (uiState.isModalOpen) return;
 
-    let cleanBarcode = String(barcode || '').trim();
+    let cleanBarcode = latinDigits(String(barcode || '')).trim();
     if (!cleanBarcode) return;
 
     if (uiState.entryScanMode === 'locker') {

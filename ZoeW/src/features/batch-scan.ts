@@ -1,5 +1,6 @@
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { modalIsOpen } from '../core/modals';
+import { latinDigits } from '../core/text';
 import { firebaseState, uiState } from '../core/state';
 import { viewState } from '../core/view-state';
 import { isBarcodeAlreadyUsed } from '../domain/registry';
@@ -28,7 +29,7 @@ export function parseBatchBarcodes(text) {
     const seen = new Set<string>();
     const codes: string[] = [];
     String(text || '').split(/[\s,;]+/).forEach((raw) => {
-        const code = raw.trim();
+        const code = latinDigits(raw).trim();
         if (!code) return;
         const key = code.toUpperCase();
         if (seen.has(key)) return;

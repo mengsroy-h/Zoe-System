@@ -14,7 +14,14 @@
 //   (គ) iPhone (វីដេអូលើ 2.50.79) ៖ «ចុចកន្លែងវាយបញ្ចូល Barcode ទំព័រធ្លាក់» — ប្រអប់វាយ Barcode (ទំព័រស្កេន · ក្រៅប្រអប់) ចុចទៅផ្លូវ iOS ដើម។ ច្បាប់ ៖
 //       ប្រអប់នៅពីលើបន្ទាត់ keyboard (ធ្លាប់វាស់ ឬ PAGE_TAP_KEYBOARD_RATIO) ➜ preventDefault + focus({ preventScroll }) · keyboard នឹងបាំងប្រអប់ (ផ្តេក) ➜ iOS ·
 //       iPhone SE · iPhone · Pro Max · ផ្តេក · iPad បញ្ឈរ/ផ្តេក (UA កុំព្យូទ័រ ➜ focus ដោយកូដ)
-//   ទិសផ្ទុយ ៖ មិនមែន iOS standalone (Android) ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
+//   (គ) Chrome Android (វីដេអូលើ 2.50.81) ៖ «ចុចកន្លែងវាយ Barcode (របៀបដក) ទំព័ររំកិលឡើង navbar បាត់» — keyboard Chrome មិនបង្រួមទំព័រ (resizes-visual) ➜
+//       Chromium រំកិល visual viewport ដើម្បីបង្ហាញប្រអប់ (ScrollFocusedEditableElementIntoView)។ ច្បាប់ ៖ ដូច iPhone ➜ preventDefault + focus({ preventScroll }) ·
+//       ផ្តេក/tablet ផ្តេក (keyboard បាំង) ➜ Android
+//   (ឃ) Chrome Android ៖ «ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែសារទទេ ៣ វិ.» — visual viewport រំកិលរួច ➜ ការបង្រួម + focus({ preventScroll }) ទុកប្រអប់ពីលើផ្ទៃមើលឃើញ។
+//       ច្បាប់ ៖ ចុចស្វែងរក ➜ offsetTop ០ (documentElement.scrollIntoView · window.scrollTo មិនប៉ះ visual viewport) — visual viewport ពិត (pinch លើ meta ពង្រីកបាន)
+//   (ង) ឧបករណ៍ស្កេន Bluetooth/USB (សំណើម្ចាស់គម្រោង) ៖ គ្មានអ្វី focus (ទូរស័ព្ទ) ➜ ការស្កេនទៅប្រអប់ Barcode · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ➜ បញ្ជូន ·
+//       ទិសផ្ទុយ ៖ ប្រអប់ស្វែងរក focus ➜ មិនលួច — ព្រឹត្តិការណ៍ keyboard ពិត (CDP) · Android · iPhone · កុំព្យូទ័រ
+//   ទិសផ្ទុយ ៖ ប្រអប់វាយក្នុងប្រអប់ (modal) លើ Android ➜ មិនប៉ះការចុច · iPhone (មិនមែន Android) ➜ ច្បាប់តម្រូវ iPhone ដដែល (មិនមែនកណ្តាល)
 // វិធី ៖ App ពិត (audit build) · bridge Capacitor ក្លែង (APK) · visualViewport ក្លែង (Chromium គ្មាន keyboard) · setViewportSize = viewport បង្រួម។
 
 let chromium;
@@ -74,6 +81,14 @@ const APK_BRIDGE = function () {
     window.androidBridge = { postMessage() {} };
     window.Capacitor = { PluginHeaders: [], isNativePlatform: () => true, getPlatform: () => 'android',
         nativePromise() { return Promise.resolve({}); }, nativeCallback() { return '1'; } };
+};
+
+// meta viewport ពង្រីកបាន ៖ visual viewport ពិតរំកិលបាន (pinch) ដូច keyboard Chrome Android (resizes-visual) រំកិលវា
+const ZOOMABLE = function () {
+    document.addEventListener('DOMContentLoaded', () => {
+        const meta = document.querySelector('meta[name="viewport"]');
+        if (meta) meta.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+    });
 };
 
 const IOS_FLAGS = function () {
@@ -162,6 +177,13 @@ const IOS_DEVICES = [
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
 const IPAD_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
 
+// ឧបករណ៍ស្កេន HID ៖ ទូរស័ព្ទ Android (Bluetooth) · iPhone standalone (Bluetooth) · កុំព្យូទ័រ (USB · គ្មាន touch)
+const HID_DEVICES = [
+    { label: 'Android 412×915 (Bluetooth)', w: 412, h: 915, ctx: { userAgent: ANDROID_UA } },
+    { label: 'iPhone 393×852 standalone (Bluetooth)', w: 393, h: 852, ios: true, ctx: { userAgent: IPHONE_UA } },
+    { label: 'កុំព្យូទ័រ 1280×800 (USB)', w: 1280, h: 800, ctx: { isMobile: false, hasTouch: false } }
+];
+
 // ប្រអប់វាយ Barcode (ទំព័រស្កេន · ក្រៅប្រអប់) ៖ catch = ប្រអប់នៅពីលើបន្ទាត់ keyboard ប៉ាន់ (PAGE_TAP_KEYBOARD_RATIO) ➜ ចាប់ · បើមិនដូច្នោះ ➜ iOS (keyboard បាំង ➜ iOS ត្រូវបង្ហាញ)
 const SCANNER_DEVICES = [
     { label: 'iPhone SE 375×667', w: 375, h: 667, kb: 260, ua: IPHONE_UA, catch: true, byCode: false },
@@ -174,7 +196,13 @@ const SCANNER_DEVICES = [
     { label: 'iPhone 393×852 · status bar 59 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
     { label: 'iPhone Pro Max 430×932 · status bar 59 · របៀបដក', w: 430, h: 932, kb: 375, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
     { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: false, byCode: false, safeTop: 20, mode: 'remove' },
-    { label: 'iPhone 393×852 · status bar 59 · របៀបដក ក្រោយ keyboard បើកម្តង (លោតហួស 420 ➜ ស្ងប់ 365 ៖ ចាំ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove', learn: [420, 365] }
+    { label: 'iPhone 393×852 · status bar 59 · របៀបដក ក្រោយ keyboard បើកម្តង (លោតហួស 420 ➜ ស្ងប់ 365 ៖ ចាំ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove', learn: [420, 365] },
+    { label: 'Chrome Android 411×830 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ + របារ URL 407)', w: 411, h: 830, kb: 407, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
+    { label: 'Chrome Android 360×740 · របៀបដក · keyboard 300', w: 360, h: 740, kb: 300, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
+    { label: 'Chrome Android 412×915 · របៀបកញ្ចប់ · keyboard 330', w: 412, h: 915, kb: 330, ua: ANDROID_UA, android: true, catch: true, byCode: false },
+    { label: 'Android tablet បញ្ឈរ 800×1280 · របៀបដក · keyboard 420', w: 800, h: 1280, kb: 420, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
+    { label: 'Android ផ្តេក 915×412 · keyboard 190', w: 915, h: 412, kb: 190, ua: ANDROID_UA, android: true, catch: false, byCode: false },
+    { label: 'Android tablet ផ្តេក 1280×800 · របៀបដក · keyboard 360', w: 1280, h: 800, kb: 360, ua: ANDROID_UA, android: true, catch: false, byCode: false, mode: 'remove' }
 ];
 
 // របារស្ថានភាព iPhone (safe-area-inset-top) ៖ Chromium មាន env(safe-area-*) = ០ ➜ រុញទំព័រចុះតាមកម្ពស់ពិត (វាស់ពីវីដេអូ ៖ កន្លែងវាយរបៀបដក បាត 442pt លើ 852)
@@ -284,7 +312,7 @@ const SAFE_TOP = function (px) {
                 if (first.focus.length !== 1 || !first.focus[0].preventScroll) issues.push('focus ' + JSON.stringify(first.focus));
                 if (!first.focused) issues.push('បាត់ focus');
                 if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
-                if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
+                if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន ' + os + ' ' + JSON.stringify(second));
                 if (issues.length) problems.push(id + ' ៖ ' + issues.join(' · '));
             }
             check(measured >= 12 && problems.length === 0,
@@ -313,9 +341,10 @@ const SAFE_TOP = function (px) {
             await ctx.close();
         }
 
-        console.log('\n=== (គ) iPhone · iPad (standalone) ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់ (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ iOS ===');
+        console.log('\n=== (គ) iPhone · iPad (standalone) · Chrome Android ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ ទំព័រមិនធ្លាក់/មិនរំកិល (preventDefault + focus({ preventScroll })) · keyboard នឹងបាំងប្រអប់ ➜ ប្រព័ន្ធធ្វើខ្លួនឯង ===');
         for (const dev of SCANNER_DEVICES) {
-            const inits = [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG];
+            const os = dev.android ? 'Android' : 'iOS';
+            const inits = dev.android ? [FAKE_VIEWPORT, TAP_LOG] : [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG];
             if (dev.safeTop) inits.push('(' + SAFE_TOP.toString() + ')(' + dev.safeTop + ');');
             const { ctx, page, ready } = await openApp(browser, port, dev, inits, { userAgent: dev.ua });
             const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
@@ -346,7 +375,7 @@ const SAFE_TOP = function (px) {
             const issues = [];
             if (at.focused !== dev.byCode) issues.push('focus មុនចុច ' + at.focused);
             if (dev.catch) {
-                if (first.prevented[0] !== true) issues.push('ចុចមិនត្រូវចាប់ (iOS រំកិលទំព័រ)');
+                if (first.prevented[0] !== true) issues.push('ចុចមិនត្រូវចាប់ (' + os + ' រំកិលទំព័រ)');
                 if (first.focus.length !== 1 || !first.focus[0].preventScroll || first.focus[0].id !== 'hwScannerInput') issues.push('focus ' + JSON.stringify(first.focus));
                 if (first.focused !== 'hwScannerInput') issues.push('បាត់ focus');
                 if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
@@ -358,18 +387,110 @@ const SAFE_TOP = function (px) {
                 if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
                 if (at.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + at.bottom);
             } else {
-                if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ iOS តែត្រូវចាប់');
+                if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ ' + os + ' តែត្រូវចាប់');
                 if (first.focus.some((f) => f.preventScroll)) issues.push('focus ' + JSON.stringify(first.focus));
                 if (at.bottom + 8 <= at.h - dev.kb) issues.push('ប្រអប់នៅពីលើ keyboard ពិត (' + dev.kb + ') ➜ ករណីនេះមិនមែនទិសផ្ទុយ');
             }
             check(issues.length === 0,
                 (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
-                    (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ iOS' : 'keyboard នឹងបាំងប្រអប់ ➜ iOS ធ្វើខ្លួនឯង'),
+                    (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
                 JSON.stringify({ at, first, issues }));
             await ctx.close();
         }
 
-        console.log('\n=== ទិសផ្ទុយ ៖ Android (មិនមែន iOS standalone) ➜ មិនប៉ះការចុច · iPhone ➜ ច្បាប់តម្រូវ iPhone (បាតត្រឹម keyboard មិនមែនកណ្តាល) ===');
+        console.log('\n=== (ឃ) Chrome Android ៖ visual viewport រំកិលរួច (keyboard បើកពីប្រអប់មុន) ➜ ចុចស្វែងរក tab ស្កេន ➜ ទំព័រត្រឡប់កំពូល · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ (visual viewport ពិត ៖ pinch) ===');
+        for (const mode of ['parcel', 'locker']) {
+            const field = mode === 'locker' ? 'lockerListSearchInput' : 'entryListSearchInput';
+            const { ctx, page, ready } = await openApp(browser, port, { w: 411, h: 830 }, [ZOOMABLE, TAP_LOG], { userAgent: ANDROID_UA, deviceScaleFactor: 2.625 });
+            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
+            if (!pageReady) { bad('(ឃ) ' + mode + ' ៖ audit bridge'); await ctx.close(); continue; }
+            await page.evaluate((m) => { openModalIds().slice().forEach((id) => closeModal(id)); switchAppPage('entry'); setEntryScanMode(m); }, mode);
+            await settle(page, 400);
+            await page.evaluate(() => { if (openModalIds().length && typeof chooseLocker === 'function') chooseLocker('A5'); openModalIds().slice().forEach((id) => closeModal(id)); });
+            await settle(page, 400);
+            const cdp = await ctx.newCDPSession(page);
+            await cdp.send('Input.synthesizePinchGesture', { x: 205, y: 800, scaleFactor: 1.12, relativeSpeed: 600 });
+            await settle(page, 500);
+            const before = await page.evaluate((id) => {
+                const r = document.getElementById(id).getBoundingClientRect();
+                window.__touchEnds = [];
+                window.__focusLog = [];
+                return { off: Math.round(visualViewport.offsetTop), offL: visualViewport.offsetLeft, scale: visualViewport.scale, top: Math.round(r.top), bottom: Math.round(r.bottom), left: r.left, width: r.width };
+            }, field);
+            if (!(before.off > 0)) { bad('(ឃ) ' + mode + ' ៖ visual viewport មិនរំកិល (pinch)', JSON.stringify(before)); await ctx.close(); continue; }
+            await page.touchscreen.tap(Math.round(before.left + Math.min(40, before.width / 2) - before.offL), Math.round((before.top + before.bottom) / 2 - before.off));
+            await settle(page, 900);
+            const after = await page.evaluate((id) => {
+                const el = document.getElementById(id);
+                const r = el.getBoundingClientRect();
+                return { off: Math.round(visualViewport.offsetTop), height: Math.round(visualViewport.height), focused: document.activeElement === el, collapsed: uiState.entryPanelCollapsed,
+                    top: Math.round(r.top), bottom: Math.round(r.bottom), prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice() };
+            }, field);
+            check(after.prevented[0] === true && after.focused && after.collapsed && after.off === 0 && after.top >= after.off && after.bottom <= after.off + after.height &&
+                after.focus.length === 1 && after.focus[0].preventScroll,
+                '⛔ Chrome Android 411×830 · ' + field + ' ៖ visual viewport រំកិល ' + before.off + 'px ➜ ចុចស្វែងរក ➜ offsetTop ០ (navbar ឃើញ) · ផ្ទាំងបង្រួម · ប្រអប់ស្វែងរកនៅក្នុងផ្ទៃមើលឃើញ · focus({ preventScroll }) ម្តង',
+                JSON.stringify({ before, after }));
+            await ctx.close();
+        }
+
+        console.log('\n=== (ង) ឧបករណ៍ស្កេន Bluetooth/USB (keyboard HID ៖ ព្រឹត្តិការណ៍ keyboard ពិតរបស់ Chromium) ➜ ស្កេនមិនបាត់ · keyboard ខ្មែរ ➜ លេខឡាតាំង · suffix Tab ===');
+        for (const dev of HID_DEVICES) {
+            const { ctx, page, ready } = await openApp(browser, port, dev, dev.ios ? [IOS_FLAGS] : [], dev.ctx);
+            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function' && typeof scanState === 'object');
+            if (!pageReady) { bad('(ង) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+            const reset = async () => {
+                await page.evaluate(() => {
+                    openModalIds().slice().forEach((id) => closeModal(id));
+                    switchAppPage('entry');
+                    setEntryScanMode('parcel');
+                    scanState.pendingBarcode = '';
+                    document.getElementById('hwScannerInput').value = '';
+                    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+                });
+                await settle(page, 250);
+            };
+            const result = () => page.evaluate(() => ({ pending: scanState.pendingBarcode, phoneModal: openModalIds().includes('phoneModal'), scrollY: window.scrollY,
+                active: document.activeElement && document.activeElement.id, field: document.getElementById('hwScannerInput').value }));
+            const code = '77100000308751';
+            await reset();
+            const before = await page.evaluate(() => document.activeElement === document.body);
+            await page.keyboard.type(code, { delay: 8 });
+            await page.keyboard.press('Enter');
+            await settle(page, 300);
+            const plain = await result();
+            check(before && plain.pending === code && plain.phoneModal && plain.scrollY === 0,
+                '⛔ ' + dev.label + ' ៖ គ្មានអ្វី focus ➜ ស្កេន ' + code + ' + Enter ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode នេះ · ទំព័រមិនរំកិល', JSON.stringify({ before, plain }));
+            await reset();
+            const cdp = await ctx.newCDPSession(page);
+            for (const c of code) {
+                const khmer = String.fromCharCode(0x17E0 + Number(c));
+                await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: khmer, code: 'Digit' + c, text: khmer, unmodifiedText: khmer, windowsVirtualKeyCode: 48 + Number(c) });
+                await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: khmer, code: 'Digit' + c, windowsVirtualKeyCode: 48 + Number(c) });
+            }
+            await page.keyboard.press('Enter');
+            await settle(page, 300);
+            const khmer = await result();
+            check(khmer.pending === code && khmer.phoneModal,
+                '⛔ ' + dev.label + ' ៖ keyboard ខ្មែរ (key «៧៧១…» · code Digit*) ➜ Barcode ' + code + ' (មិនមែនលេខខ្មែរ)', JSON.stringify(khmer));
+            await reset();
+            await page.keyboard.type(code, { delay: 8 });
+            await page.keyboard.press('Tab');
+            await settle(page, 300);
+            const tab = await result();
+            check(tab.pending === code && tab.phoneModal,
+                '⛔ ' + dev.label + ' ៖ ឧបករណ៍ស្កេនបញ្ចប់ដោយ Tab ➜ បញ្ជូនដូច Enter', JSON.stringify(tab));
+            await reset();
+            await page.evaluate(() => document.getElementById('entryListSearchInput').focus({ preventScroll: true }));
+            await page.keyboard.type('0961', { delay: 8 });
+            await settle(page, 200);
+            const search = await page.evaluate(() => ({ value: document.getElementById('entryListSearchInput').value, active: document.activeElement && document.activeElement.id, pending: scanState.pendingBarcode,
+                field: document.getElementById('hwScannerInput').value }));
+            check(search.value === '0961' && search.active === 'entryListSearchInput' && !search.pending && search.field === '',
+                'ទិសផ្ទុយ ៖ ' + dev.label + ' ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ នៅប្រអប់ស្វែងរក (ឧបករណ៍ស្កេនមិនលួច)', JSON.stringify(search));
+            await ctx.close();
+        }
+
+        console.log('\n=== ទិសផ្ទុយ ៖ Android (មិនមែន iOS standalone) ➜ មិនប៉ះការចុចក្នុងប្រអប់ · iPhone ➜ ច្បាប់តម្រូវ iPhone (បាតត្រឹម keyboard មិនមែនកណ្តាល) ===');
         {
             const dev = { w: 412, h: 915, kb: 330 };
             const { ctx, page, ready } = await openApp(browser, port, dev, [FAKE_VIEWPORT, TAP_LOG], { userAgent: ANDROID_UA });

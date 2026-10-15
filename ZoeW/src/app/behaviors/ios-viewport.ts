@@ -2,7 +2,7 @@ import { uiState } from '../../core/state';
 import { scrollWindowToTop } from '../../platform/document-io';
 import { isAndroidDevice } from '../../platform/native';
 import { createLifecycleScope, type LifecycleScope } from '../lifecycle/scope';
-import { elementOf, focusField, isFieldFocused, setElementScrollTop, type RefName } from '../refs';
+import { elementOf, focusField, isFieldFocused, resetVisualViewportPan, setElementScrollTop, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchBlurred, entrySearchFieldFocused, entrySearchFocused, entrySearchMovesField } from './entry-search';
 import { PANEL_GLIDE_HOLD_MAX_MS, PANEL_GLIDE_SNAP_GRACE_MS, PANEL_SEARCH_GLIDE, PANEL_SEARCH_GLIDE_MS, beginPanelGlideSnapPause, endPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
@@ -265,6 +265,7 @@ export function focusIOSSearchWithoutScroll(e: TouchEvent): void {
     searchTap = null;
     if (!tap || searchTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, IOS_SEARCH_TAP_SLOP_PX, IOS_SEARCH_TAP_MAX_MS)) return;
     e.preventDefault();
+    if (!usesIOSPanelHandoff() && isAndroidDevice()) resetVisualViewportPan();
     const phone = tap.field === 'searchPhoneInput';
     if (phone) glidePhoneSearchPulledUp(true);
     else entrySearchFocused();

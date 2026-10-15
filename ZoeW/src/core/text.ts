@@ -26,6 +26,10 @@ export const dbListenerPendingPaths = new Set();
 
 export const dbListenerFailedPaths = new Set();
 
+export function latinDigits(text: string): string {
+    return String(text).replace(/[\u17E0-\u17E9]/g, (d) => String(d.charCodeAt(0) - 0x17E0));
+}
+
 export function sanitizePhoneNumber(phoneStr) {
     if (!phoneStr) return '';
     let trimmed = String(phoneStr).trim();

@@ -187,6 +187,56 @@ describe('ប្រអប់ ⟷ keyboard ៖ ផ្ទៃមើលឃើញ (vi
     });
 });
 
+describe('zoom (pinch) មិនមែន keyboard ៖ keyboard = innerHeight − visualViewport.height × scale', () => {
+    let field: HTMLInputElement;
+    const KEY = 'zoew_keyboard_inset_v1';
+    const zoom = (scale: unknown, height: number) => {
+        (vv as any).scale = scale;
+        vv.height = height;
+        vv.dispatchEvent(new Event('resize'));
+    };
+
+    beforeEach(() => {
+        field = document.createElement('input');
+        field.type = 'text';
+        document.body.append(field);
+        field.focus();
+        modalKeyboard.listenModalKeyboard(scope());
+    });
+
+    afterEach(() => {
+        field.remove();
+    });
+
+    it('⛔ Chromium ពិត (កុំព្យូទ័រ trackpad pinch ១.៦) ៖ គ្មាន keyboard ➜ គ្មានផ្ទៃ keyboard · softKeyboardShown false (ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើកចូលជួរ មិនចូល COD) · keyboardCover ០ · មិនចាំជា keyboard', () => {
+        zoom(1.6, 844 / 1.6);
+        uiState.isModalOpen = true;
+        expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+        expect(modalKeyboard.softKeyboardShown()).toBe(false);
+        expect(uiState.keyboardCover).toBe(0);
+        expect(localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it('⛔ zoom ១.៦ + keyboard ៣៣៦ ➜ ផ្ទៃមើលឃើញ (layout px) · ចាំ keyboard ពិត ៣៣៦ (មិនមែន ៥២៦)', () => {
+        zoom(1.6, (844 - 336) / 1.6);
+        uiState.isModalOpen = true;
+        expect(modalKeyboard.modalKeyboardViewport()).toEqual({ top: 0, height: 318 });
+        expect(modalKeyboard.softKeyboardShown()).toBe(true);
+        expect(JSON.parse(localStorage.getItem(KEY) || '{}')).toEqual({ [window.innerWidth + 'x844|text']: 336 });
+    });
+
+    it('ទិសផ្ទុយ ៖ scale ១ (Android · iPhone ធម្មតា) · គ្មាន scale · scale < ១ · NaN ➜ រូបមន្តដដែល (innerHeight − height)', () => {
+        uiState.isModalOpen = true;
+        for (const scale of [1, undefined, 0.5, NaN]) {
+            zoom(scale, 844 - 336);
+            expect(modalKeyboard.modalKeyboardViewport()).toEqual({ top: 0, height: 508 });
+            expect(uiState.keyboardCover).toBe(336);
+            zoom(scale, 844 - (KEYBOARD_MIN_INSET_PX - 1));
+            expect(modalKeyboard.modalKeyboardViewport()).toBeNull();
+        }
+    });
+});
+
 describe('ប្រអប់ ⟷ keyboard ៖ ការតម្រូវ (modalKeyboardFitFor)', () => {
     const GAP = modalKeyboard.MODAL_KEYBOARD_GAP_PX;
 
@@ -713,6 +763,57 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
             Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
             refTo('hwScannerInput')(null);
             scanner.remove();
+        }
+    });
+
+    it('⛔ រាយការណ៍ម្ចាស់គម្រោង (iOS ៖ ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ម្តងម្កាល គ្រប់របៀប) ៖ ចុចស្លាក «ស្កេន Barcode…» (label for) ឬរូប ⚡ ➜ ចាប់ដូចចុចប្រអប់ (label មិនដល់ iOS) · keyboard បើក ➜ iOS · ប៊ូតុង · ស្លាកផ្សេង ➜ មិនប៉ះ · ទិសផ្ទុយ Android ➜ មិនប៉ះ', () => {
+        setup();
+        closeModal('manualAdjustModal');
+        commitNow();
+        const realWidth = window.innerWidth;
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 393 });
+        const box = document.createElement('div');
+        box.innerHTML = '<label for="hwScannerInput" id="hardwareScannerLabel">ស្កេន Barcode</label>' +
+            '<div class="scanner-input-wrapper"><span class="icon">⚡</span><input type="text" id="hwScannerInput"><button type="button">បញ្ជូន</button></div>' +
+            '<label for="fileInput">📁</label>';
+        document.body.append(box);
+        const scanner = box.querySelector('#hwScannerInput') as HTMLInputElement;
+        const label = box.querySelector('#hardwareScannerLabel') as HTMLElement;
+        const icon = box.querySelector('.icon') as HTMLElement;
+        const button = box.querySelector('button') as HTMLElement;
+        const fileLabel = box.querySelector('label[for="fileInput"]') as HTMLElement;
+        refTo('hwScannerInput')(scanner);
+        scanner.getBoundingClientRect = () => rect(290, 30);
+        const calls: any[] = [];
+        const realFocus = HTMLElement.prototype.focus;
+        scanner.focus = function (this: HTMLInputElement, options?: any) { calls.push(options); realFocus.call(this, options); } as any;
+        try {
+            expect(tap(label, { x: 60, y: 280, t: 0 }, { x: 60, y: 281, t: 80 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            expect(document.activeElement).toBe(scanner);
+            scanner.blur();
+            expect(tap(icon, { x: 12, y: 305, t: 200 }, { x: 12, y: 305, t: 260 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }, { preventScroll: true }]);
+            expect(document.activeElement).toBe(scanner);
+            keyboard(336);
+            expect(tap(label, { x: 60, y: 280, t: 300 }, { x: 60, y: 280, t: 360 }).defaultPrevented).toBe(false);
+            keyboard(0);
+            scanner.blur();
+            expect(tap(button, { x: 360, y: 305, t: 400 }, { x: 360, y: 305, t: 460 }).defaultPrevented).toBe(false);
+            expect(tap(fileLabel, { x: 60, y: 340, t: 500 }, { x: 60, y: 340, t: 560 }).defaultPrevented).toBe(false);
+            expect(tap(label, { x: 60, y: 280, t: 600 }, { x: 60, y: 300, t: 660 }).defaultPrevented).toBe(false);
+            expect(calls.length).toBe(2);
+            setIOSStandalone(false);
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+            expect(tap(label, { x: 60, y: 280, t: 700 }, { x: 60, y: 280, t: 760 }).defaultPrevented).toBe(false);
+            expect(tap(icon, { x: 12, y: 305, t: 800 }, { x: 12, y: 305, t: 860 }).defaultPrevented).toBe(false);
+            expect(calls.length).toBe(2);
+            expect(tap(scanner, { x: 50, y: 305, t: 900 }, { x: 50, y: 305, t: 960 }).defaultPrevented).toBe(true);
+        } finally {
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
+            refTo('hwScannerInput')(null);
+            box.remove();
         }
     });
 

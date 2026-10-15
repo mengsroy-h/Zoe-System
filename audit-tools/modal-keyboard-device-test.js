@@ -43,6 +43,7 @@ const ROOT = process.env.MODALKB_DEVICE_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
 // ពិដានចន្លោះគ្រាប់ម៉ាស៊ីនស្កេន ស្រង់ពីកូដ App (មិនសរសេរលេខរឹង) ៖ ការស្កេនក្លែងដែលចន្លោះពិត (event.timeStamp) លើសវា មិនមែនជាការស្កេនទេ
 const SCANNER_GAP_MS = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bSCANNER_KEY_GAP_MS = (\d+)/); return m ? Number(m[1]) : 0; } catch (e) { return 0; } })();
+const KEYBOARD_MIN_INSET_FLOOR = (() => { try { const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/\bKEYBOARD_MIN_INSET_PX = (\d+)/); return m ? Number(m[1]) : Infinity; } catch (e) { return Infinity; } })();
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
 
@@ -401,6 +402,34 @@ const SAFE_TOP = function (px) {
                 (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
                     (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
                 JSON.stringify({ at, first, issues }));
+            if (dev.catch && !dev.byCode) {
+                const near = [];
+                for (const sel of ['#hardwareScannerLabel', '#hardwareScannerBox .scanner-input-wrapper .icon']) {
+                    await page.evaluate(() => { window.__kb.open(0); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+                    await settle(page, 120);
+                    const spot = await page.evaluate((sel) => {
+                        const el = document.querySelector(sel);
+                        if (!el) return null;
+                        const r = el.getBoundingClientRect();
+                        const x = Math.round(r.left + Math.min(20, r.width / 2));
+                        const y = Math.round(r.top + r.height / 2);
+                        const hit = document.elementFromPoint(x, y);
+                        window.__touchEnds = [];
+                        window.__focusLog = [];
+                        return { x, y, hit: !!hit && el.contains(hit) };
+                    }, sel);
+                    if (!spot || !spot.hit) { near.push({ sel, spot, miss: true }); continue; }
+                    await page.touchscreen.tap(spot.x, spot.y);
+                    await settle(page, 160);
+                    near.push(Object.assign({ sel }, await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.slice(),
+                        focused: document.activeElement && document.activeElement.id, scrollY: window.scrollY }))));
+                }
+                const nearOk = near.length === 2 && near.every((n) => !n.miss && (dev.android
+                    ? n.prevented[0] === false && !n.focus.some((f) => f.preventScroll)
+                    : n.prevented[0] === true && n.focus.length === 1 && n.focus[0].preventScroll && n.focus[0].id === 'hwScannerInput' && n.focused === 'hwScannerInput' && n.scrollY === 0));
+                check(nearOk, (dev.android ? 'ទិសផ្ទុយ ៖ ' : '⛔ ') + dev.label + ' ៖ ចុចស្លាក «ស្កេន Barcode…» · រូប ⚡ ➜ ' +
+                    (dev.android ? 'Android ដូចដើម (មិនប៉ះ)' : 'ចាប់ដូចចុចប្រអប់ (label មិនឲ្យ iOS focus រំកិលទំព័រ) · focus({ preventScroll }) · document ០'), JSON.stringify(near));
+            }
             await ctx.close();
         }
 
@@ -559,6 +588,48 @@ const SAFE_TOP = function (px) {
                 after.pending === next && after.phoneModal && after.field === '',
                 '⛔ ' + dev.label + ' ៖ ផ្ទាំងលេខទូរស័ព្ទបើក · វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូលប្រអប់ · ស្កេន ' + next + ' + Enter ➜ COD · លេខទូរស័ព្ទមិនប្រែ · focus នៅ COD · ចូលជួរ ➜ បិទផ្ទាំង ➜ ' + next + ' បើកបន្ទាប់',
                 JSON.stringify({ human, held, after }));
+            await ctx.close();
+        }
+
+        console.log('\n=== (ច) zoom (pinch) មិនមែន keyboard ៖ កុំព្យូទ័រ (visual viewport ពិត ៖ Emulation.setPageScaleFactor) ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើកចូលជួរ ===');
+        {
+            const { ctx, page, ready } = await openApp(browser, port, { w: 1280, h: 800 }, [], { hasTouch: false, isMobile: false });
+            const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof triggerScanAction === 'function' && typeof softKeyboardShown === 'function');
+            if (pageReady) {
+                const cdp = await ctx.newCDPSession(page);
+                const next = '77100000308761';
+                let zoomed = null, out = null, gap = Infinity;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+                    await page.evaluate(() => {
+                        try { stopBatchScan(); } catch (e) {}
+                        openModalIds().slice().forEach((id) => closeModal(id));
+                        switchAppPage('entry');
+                        setEntryScanMode('parcel');
+                        scanState.pendingBarcode = '';
+                    });
+                    await settle(page, 250);
+                    await page.evaluate((a) => triggerScanAction(a), 'ZTZOOMA0001');
+                    await settle(page, 450);
+                    await page.evaluate(() => document.getElementById('modalCodInput').focus({ preventScroll: true }));
+                    await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1.6 });
+                    await settle(page, 350);
+                    zoomed = await page.evaluate(() => ({ scale: Math.round(visualViewport.scale * 100) / 100, vvH: Math.round(visualViewport.height), innerH: innerHeight,
+                        kb: softKeyboardShown(), cover: uiState.keyboardCover, fit: !!uiState.modalKeyboardFit, mem: localStorage.getItem('zoew_keyboard_inset_v1') }));
+                    await page.evaluate(() => { window.__kd = []; window.addEventListener('keydown', (e) => window.__kd.push(e.timeStamp), true); });
+                    await page.keyboard.type(next, { delay: 8 });
+                    gap = await page.evaluate(() => { const t = window.__kd; let m = 0; for (let i = 1; i < t.length; i++) m = Math.max(m, t[i] - t[i - 1]); return Math.round(m); });
+                    await page.keyboard.press('Enter');
+                    await settle(page, 400);
+                    out = await page.evaluate(() => ({ cod: document.getElementById('modalCodInput').value, pending: scanState.pendingBarcode,
+                        status: (document.getElementById('batchScanStatus') || {}).textContent || '' }));
+                    if (SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS) break;
+                }
+                check(zoomed && zoomed.scale > 1.5 && zoomed.vvH < zoomed.innerH - KEYBOARD_MIN_INSET_FLOOR && !zoomed.kb && zoomed.cover === 0 && !zoomed.fit && !zoomed.mem,
+                    '⛔ កុំព្យូទ័រ 1280×800 ៖ zoom ១.៦ (visual viewport ' + (zoomed && zoomed.vvH) + ' < innerHeight) ➜ មិនមែន keyboard (softKeyboardShown false · toast ០ · ប្រអប់មិនតម្រូវ · មិនចាំ)', JSON.stringify(zoomed));
+                check(SCANNER_GAP_MS > 0 && gap < SCANNER_GAP_MS && out && out.cod === '' && out.pending === 'ZTZOOMA0001' && out.status.indexOf(next) === -1 && out.status.indexOf('0/1') !== -1,
+                    '⛔ កុំព្យូទ័រ zoom ១.៦ · ផ្ទាំងលេខទូរស័ព្ទបើក · focus COD ➜ ម៉ាស៊ីនស្កេន ' + next + ' + Enter ➜ ចូលជួរ «📥» · COD មិនប្រែ', JSON.stringify({ gap, out }));
+            } else bad('(ច) zoom ៖ audit bridge');
             await ctx.close();
         }
 

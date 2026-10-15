@@ -7,7 +7,7 @@ import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
 import { topmostModal } from '../lifecycle/layers';
 import type { LifecycleScope } from '../lifecycle/scope';
-import { blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, type RefName } from '../refs';
+import { blurActiveElement, elementOf, focusElementWithoutScroll, setElementScrollTop, visualViewportKeyboardInset, type RefName } from '../refs';
 import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { tapEndedInPlace } from './ios-viewport';
 import { usesIOSPanelHandoff } from './panels';
@@ -50,7 +50,7 @@ export function keyboardVisibleViewport(): { top: number; height: number } | nul
     const layout = window.innerHeight;
     const height = Math.round(vv.height);
     if (!Number.isFinite(layout) || !Number.isFinite(height) || height <= 0) return null;
-    if (layout - height < KEYBOARD_MIN_INSET_PX) return null;
+    if (visualViewportKeyboardInset() < KEYBOARD_MIN_INSET_PX) return null;
     const offset = Math.round(vv.offsetTop);
     const top = Number.isFinite(offset) ? Math.min(Math.max(0, offset), layout - height) : 0;
     return { top, height };
@@ -66,7 +66,7 @@ export function modalKeyboardViewport(): { top: number; height: number } | null 
 
 export function measureKeyboardCover(): void {
     const view = keyboardVisibleViewport();
-    if (view) rememberKeyboardInset(Math.round(window.innerHeight) - view.height);
+    if (view) rememberKeyboardInset(visualViewportKeyboardInset());
     const cover = view ? Math.max(0, Math.round(window.innerHeight) - view.top - view.height) : 0;
     if (uiState.keyboardCover !== cover) uiState.keyboardCover = cover;
 }
@@ -267,8 +267,22 @@ function revealAfterResize(): void {
     if (uiState.isModalOpen && uiState.modalViewportHeight === 0) revealFocusedModalField();
 }
 
+function iosPageTapFieldOf(target: EventTarget | null): HTMLElement | null {
+    const node = target as Element | null;
+    if (!node || typeof node.closest !== 'function' || !usesIOSPanelHandoff()) return null;
+    for (const name of PAGE_TAP_FIELDS) {
+        const field = elementOf(name);
+        if (!field || node === field) continue;
+        const label = node.closest('label') as HTMLLabelElement | null;
+        if (label && label.htmlFor && label.htmlFor === field.id) return field;
+        const icon = node.closest('.icon');
+        if (icon && field.parentElement && icon.parentElement === field.parentElement) return field;
+    }
+    return null;
+}
+
 function modalTapField(target: EventTarget | null): HTMLElement | null {
-    const el = target as HTMLInputElement | null;
+    const el = (iosPageTapFieldOf(target) || target) as HTMLInputElement | null;
     if (!el || typeof el.closest !== 'function' || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return null;
     if (!MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) || el.disabled || el.readOnly) return null;
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;

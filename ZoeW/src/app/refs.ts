@@ -207,6 +207,16 @@ export function focusElementWithoutScroll(el: HTMLElement): boolean {
     return document.activeElement === el;
 }
 
+export function visualViewportKeyboardInset(): number {
+    const vv = window.visualViewport;
+    if (!vv) return 0;
+    const scale = vv.scale > 1 ? vv.scale : 1;
+    const height = Math.round(vv.height * scale);
+    const layout = window.innerHeight;
+    if (!Number.isFinite(layout) || !Number.isFinite(height) || height <= 0) return 0;
+    return layout - height;
+}
+
 export function resetVisualViewportPan(): boolean {
     const vv = window.visualViewport;
     const root = document.documentElement;

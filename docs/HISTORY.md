@@ -45,7 +45,11 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ទ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `5a360b8` = PR #319 · PR #320 · **មិនទាន់ merge**) ៖ [2.50.81] វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក
+0ធ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `1529f3e` = PR #320 · **មិនទាន់ merge**) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
+    ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចុចកន្លែងវាយ Barcode · គ្រប់របៀប) · «សូមកុំកែអោយប៉ះពាល់ដល់android»
+    ➜ ពង្រីក (zoom) មិនមែន keyboard (A128) · iOS ចុចស្លាក/⚡ ចាប់ដូចប្រអប់ (A129) · Android មិនប្តូរ ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.82])។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ទ. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #320 merge ចូល `main` រួច** (`1529f3e` · squash · ម្ចាស់គម្រោង «merge» · CI 777 ៤/៤ · run-all STRICT ២០៧/២០៧ · APK `zoew-android-v2.50.81` ✅ ·
+    ម្ចាស់គម្រោង ៖ «android ដំណើរការរលូនល្អហើយគ្មានកំហុស មិនថាប្តូរទៅ ភាសាខ្មែរ ឬ អង់គ្លេស» · «លើកុំព្យូទ័រ ទាញរូបភាព niimbot បានហើយ») ៖ [2.50.81] វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក
     ចុចកន្លែងវាយ ទំព័រធ្លាក់ · Android ស្វែងរក Locker កន្ត្រាក់ឡើងលើ · App ចាំកម្ពស់ keyboard ពិត (ផ្នែក ២ A114–A116) · វីដេអូ Chrome Android លើ deploy preview ៖ ចុចកន្លែងវាយ Barcode
     ទំព័ររំកិល · ស្វែងរកក្រោយទំព័ររំកិល ➜ ឃើញតែសារទទេ · ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ការផ្ទៀងផ្ទាត់ឡើងវិញ (ផ្នែក ២ A117–A120) ➜ ម្ចាស់គម្រោងសាករួច ៖
     «Ios លែងអីហើយដំណើរការត្រឹមត្រូវក្នុង preview 320 ជា PWA» · Chrome Android បញ្ជាក់លំដាប់ «ចុចវាយបញ្ចូល barcode បន្ទាប់ចុចស្វែងរក ➜ លោតផុត · ស្វែងរកមុនមិនអី» (= A117–A118) ·
@@ -217,6 +221,39 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.82] — 2026-10-15 · ZoeW ៖ **iPhone ៖ ចុចស្លាក «ស្កេន Barcode…» · ⚡ ទំព័រមិនធ្លាក់ · ពង្រីកអេក្រង់ (zoom) មិនមែន keyboard (ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើកចូលជួរ)**
+
+**ZoeW `2.50.82`** (`zoew-v344` ➜ `zoew-v345`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ Android មិនប្តូរ (សំណើម្ចាស់គម្រោង) · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` · `ios-viewport.ts` · `refs.ts`។
+សំណើម្ចាស់គម្រោង ៖ «ពិនិតមើល ការវាស់ keyboard ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «android ដំណើរការរលូនល្អហើយគ្មានកំហុស មិនថាប្តូរទៅ ភាសាខ្មែរ ឬ អង់គ្លេស» ·
+«តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចម្លើយ ៖ ចុចកន្លែងវាយ Barcode · កញ្ចប់ · Locker · ដក · មិនប្រាកដ) · «សូមកុំកែអោយប៉ះពាល់ដល់android ព្រោះandroid ដំណើរការត្រឹមត្រូវហើយ»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone · iPad ៖ ចុចស្លាក «ស្កេន Barcode…» ឬរូប ⚡ ➜ ទំព័រធ្លាក់** (ផ្នែក ២ A129)។ ស្លាក `label for="hwScannerInput"` នៅពីលើកន្លែងវាយ ៖ ចុចវា (ឧ. ចុចខាងលើប្រអប់បន្តិច)
+  ➜ iOS focus កន្លែងវាយខ្លួនឯង មិនឆ្លងការចាប់របស់ App ➜ WebKit រំកិលទំព័រ · ⚡ (absolute លើប្រអប់) ៖ ចុចមិនធ្វើអ្វី។ ឥឡូវ iOS standalone ៖ ចុចស្លាក · ⚡ ➜ ចាប់ដូចចុចប្រអប់
+  (`iosPageTapFieldOf()` ➜ `focus({ preventScroll })` · ច្បាប់ keyboard ដដែល ៖ keyboard នឹងបាំង ➜ iOS) · ប៊ូតុង «បញ្ជូន» · ស្លាក «📁» · ការអូស ➜ មិនប៉ះ · ⛔ Android ដូចដើម។
+- 🐛💰 **ពង្រីកអេក្រង់ (pinch zoom) ➜ App យល់ថាមាន keyboard** (ផ្នែក ២ A128)។ កុំព្យូទ័រ (trackpad · អេក្រង់ប៉ះ) · iPad ៖ zoom ១.៦ ➜ `innerHeight − visualViewport.height` = ៣០០
+  ➜ `softKeyboardShown()` ➜ ម៉ាស៊ីនស្កេនពេលផ្ទាំងលេខទូរស័ព្ទបើក វាយ Barcode ចូលប្រអប់ COD ផ្ទាល់ (មិនចូលជួរ «📥») · toast ឡើង ៣០០px · ផ្ទាំងបង្រួម · ចាំ «keyboard» ៣០០។
+  ឥឡូវ keyboard = `innerHeight − visualViewport.height × scale` (`visualViewportKeyboardInset()` ៖ scale គិតតែពេល > ១ · រូបមន្តតែមួយសម្រាប់ផ្ទាំង · toast · ការចាំ · ស្វែងរក iOS) ➜
+  zoom គ្មាន keyboard ➜ ០ · zoom + keyboard ➜ keyboard ពិត · Android · iPhone ធម្មតា (scale ១) ➜ រូបមន្តដដែល។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-keyboard.test.tsx` +៤ ៖ zoom (គ្មាន keyboard ➜ គ្មានផ្ទៃ · `softKeyboardShown()` false · toast ០ · មិនចាំ · zoom + keyboard ➜ ចាំ ៣៣៦ · ទិសផ្ទុយ scale ១/គ្មាន/< ១/NaN
+  ➜ រូបមន្តដដែល) · ស្លាក/⚡ (iOS ចាប់ · keyboard បើក ➜ iOS · ប៊ូតុង · ស្លាក 📁 · អូស ➜ មិនប៉ះ · Android ➜ មិនប៉ះ) · `ios-keyboard-pan.test.ts` +១ (zoom ➜ ០ · zoom + keyboard ➜ ៣៣៦) —
+  កូដមុនកែ FAIL ៤ ➜ ១៤៩/១៤៩ (៩ ឯកសារ keyboard · ស្វែងរក · ម៉ាស៊ីនស្កេន)។
+- `modal-keyboard-device-test` (Chromium ពិត) +១៦ ៖ (គ) ចុចពិតលើស្លាក · ⚡ ៖ iPhone ៨ ករណី ➜ ចាប់ · Android ៦ ➜ ដូចដើម (ទិសផ្ទុយ) · (ច) កុំព្យូទ័រ 1280×800 ៖
+  `Emulation.setPageScaleFactor` ១.៦ ➜ មិនមែន keyboard · ម៉ាស៊ីនស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · COD មិនប្រែ — build មុនកែ FAIL ១០ (iPhone ៨ · zoom ២ · Android ៦ ជាប់) ➜ ៧៥/៧៥។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.82` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone (PWA)** ៖ ទំព័រស្កេន (កញ្ចប់ · Locker · ដក) ➜ ចុចស្លាក «ស្កេន Barcode…» ពីលើប្រអប់ ឬ ⚡ ➜ keyboard លោត · ទំព័រ និង navbar នៅនឹងកន្លែង · ចុចកន្លែងវាយច្រើនដង ➜ មិនធ្លាក់។
+   បើនៅធ្លាក់ម្តងម្កាល ➜ សូមថតវីដេអូ (ផ្នែក ២ A129 ៖ ផ្លូវផ្សេងទៀតដែលមិនអាចវាស់នៅទីនេះ)។
+2. **កុំព្យូទ័រ + ម៉ាស៊ីនស្កេន USB** ៖ ពង្រីកអេក្រង់ (pinch លើ trackpad) ➜ ស្កេន ➜ ផ្ទាំងលេខទូរស័ព្ទបើក ➜ ចុច COD ➜ ស្កេនម្តងទៀត ➜ ចូលជួរ «📥» · COD មិនប្រែ។
+3. **Android** ៖ ដូចមុន (មិនប្តូរ)។
 
 ### [2.50.81] — 2026-10-15 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · Fast Mode មិនរក្សាទុក COD ខុស · iPhone ៖ របៀបស្កេនដក ចុចកន្លែងវាយ ទំព័រមិនធ្លាក់ · App ចាំកម្ពស់ keyboard ពិត · Android (App · Chrome) ៖ កន្លែងវាយ Barcode · ស្វែងរក មិនរំកិលទំព័រ**
 
@@ -4591,6 +4628,14 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 - ✅ **ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត (2026-09-29)** ៖ logo និងផ្ទាំង 🔔 (badge · កញ្ចប់ជិតផុតកំណត់ · សារប្រកាស) លើ iPhone PWA · Android PWA · APK ត្រឹមត្រូវ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`1529f3e`) ៖ ពិនិត្យការវាស់ keyboard ស្វ័យប្រវត្តិ · iOS ទាញទំព័រម្តងម្កាលក្នុង tab ស្កេន
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A128 | **ពង្រីក (pinch zoom) ➜ App យល់ថាមាន keyboard** | Chromium ពិត 1280×800 · `Emulation.setPageScaleFactor` ១.៦ ៖ `visualViewport.height` ៥០០ / `innerHeight` ៨០០ ➜ `softKeyboardShown()` true · `keyboardCover` ៣០០ · `modalKeyboardFit` · `zoew_keyboard_inset_v1` = `{"1280x800\|number":300}` · ផ្ទាំងលេខទូរស័ព្ទបើក + focus COD ➜ ម៉ាស៊ីនស្កេន `77100000308752` + Enter ➜ COD = Barcode (មិនចូលជួរ · `SCAN_MONEY_MAX` រារាំងការរក្សាទុក ➜ ការស្កេនបាត់) · zoom ១ ➜ ចូលជួរ · iPad (mobile emulation) ៖ meta `user-scalable=no` ➜ Chromium មិន zoom (Safari iOS មិនគោរព meta ➜ ក្លែងក្នុង vitest) · Android ៖ meta ➜ zoom មិនបាន (scale ១) | `visualViewportKeyboardInset()` (`refs.ts`) ៖ `innerHeight − round(height × scale)` · scale តែ > ១ ➜ Android · iPhone ធម្មតា រូបមន្តដដែល · `keyboardVisibleViewport()` · ការចាំ · `iosKeyboardInsetPx()` ប្រើមួយនេះ ➜ ✅ |
+| A129 | **iOS ៖ ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ម្តងម្កាល (គ្រប់របៀប)** | ផ្លូវដែលរួចពីការចាប់ ៖ (១) ស្លាក `label for="hwScannerInput"` ពីលើប្រអប់ ➜ iOS focus ខ្លួនឯង (ចុចពិត Chromium ៖ touchend មិន preventDefault · focus មិនឆ្លង `focus({ preventScroll })` · iPhone ៨ ករណី) · (២) ⚡ absolute លើប្រអប់ (z-index ១) ➜ ចុចមិនធ្វើអ្វី · (៣) ការចុចរំកិល > `MODAL_TAP_SLOP_PX` ឬយូរជាង `MODAL_TAP_MAX_MS` ➜ iOS (កម្រិតការចុចរបស់ UIKit មិនអាចវាស់នៅទីនេះ) · (៤) focus មិនជាប់ម្តង ➜ `modalFocusRefused` រហូតដល់ reload · (៥) ប្រអប់ focus រួច + ចុចរួច + គ្មាន keyboard ➜ iOS (keyboard អណ្តែត iPad) | (១)(២) ចាប់ដូចប្រអប់តែ iOS (`iosPageTapFieldOf()`) ➜ ✅ · (៣)–(៥) គ្មានភស្តុតាងលើឧបករណ៍ ➜ មិនប្តូរ · បើនៅធ្លាក់ ➜ វីដេអូ |
+| A130 | **ការចាំ keyboard ៖ ចំណុចផ្សេងទៀតដែលពិនិត្យ** | ប្តូរភាសា keyboard (ខ្មែរ/អង់គ្លេស) ➜ កម្ពស់ចុងក្រោយដែលស្ងប់ (ម្ចាស់គម្រោង ៖ Android រលូន) · keyboard បិទខណៈប្រអប់នៅ focus (ប៊ូតុងលាក់ keyboard iPad · Gboard) ➜ ព្រឹត្តិការណ៍ពេលបិទអាចចាំតម្លៃពាក់កណ្តាល (បើ WebKit រាយការណ៍រាល់ស៊ុម) · បង្វិលអេក្រង់ខណៈ keyboard បើក ➜ លំដាប់ `resize` WebKit មិនអាចវាស់នៅទីនេះ | មិនប្តូរ (គ្មានភស្តុតាង · Android មិនប៉ះតាមសំណើ) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 

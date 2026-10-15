@@ -475,8 +475,12 @@ async function printRelayoutPdf(browser, port) {
 // ⛔ សំណើម្ចាស់គម្រោង (NIIMBOT B1 ៖ Bluetooth តាម App NIIMBOT · មិនមែនម៉ាស៊ីនបោះពុម្ពរបស់ប្រព័ន្ធ) ៖ «🖼️ រក្សាទុកជារូបភាព» ➜ ស្លាកនីមួយៗជា PNG ទំហំពិត
 //   (៨ ចំណុច/mm = 203dpi ៖ 50×30 ➜ 400×240) · Barcode អានវិញបានដោយម៉ាស៊ីនស្កេនរបស់ App (ZXing ពិត) · ខ្លឹមសារមិនប៉ះគែម · ប្លង់ A4 ➜ ទំហំ 50×30 ·
 //   ចែករំលែក ៖ `navigator.share({ files })` (iPhone · Android) ជា PNG មួយស្លាកមួយឯកសារ
+const LABEL_SHARE_UA = {
+    android: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+    windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0'
+};
 async function labelImageExport(browser, port) {
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, userAgent: LABEL_SHARE_UA.android });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
@@ -537,6 +541,42 @@ async function labelImageExport(browser, port) {
     check(shared.shared.length === 1 && shared.shared[0].length === 2 && shared.shared[0].every((f) => f.type === 'image/png' && f.size > 500 && /^ZoeW_label_77100000(555|556)\.png$/.test(f.name)),
         '⛔ ZoeW ស្លាកជារូបភាព ៖ ប៊ូតុងក្នុងផ្ទាំងបោះពុម្ព ➜ navigator.share({ files }) ១ ដង · PNG មួយស្លាកមួយឯកសារ (២)', JSON.stringify(shared));
     await ctx.close();
+    // ⛔ តេស្តប្រើប្រចាំថ្ងៃ (ម្ចាស់គម្រោង ៖ «រក្សាទុកស្លាក រូបភាព niimbot អត់បានលើ កុំព្យូទ័រ លោត toast រក្សាទុករូបភាពស្លាកមិនបាន») ៖ Chrome · Edge លើ Windows/Mac
+    //    មាន Web Share ➜ App បើកផ្ទាំង Share របស់ប្រព័ន្ធ · Share បដិសេធ (NotAllowedError ៖ ឯកសារច្រើន · ផុតសកម្មភាព) ➜ ❌ ។ ច្បាប់ ៖ កុំព្យូទ័រ ➜ ទាញយក PNG ពិត (download event)
+    //    ⛔ គ្មាន Share · សារ ✅ · ទូរស័ព្ទ Share បដិសេធ ➜ ទាញយកជំនួស (ទិសផ្ទុយ AbortError ➜ គ្មានទាញយក)
+    for (const [label, ua, mobile, reject] of [['កុំព្យូទ័រ Windows (Edge មាន Web Share)', LABEL_SHARE_UA.windows, false, 'NotAllowedError'],
+        ['Android Share បដិសេធ (NotAllowedError)', LABEL_SHARE_UA.android, true, 'NotAllowedError'], ['Android បោះបង់ Share (AbortError)', LABEL_SHARE_UA.android, true, 'AbortError']]) {
+        const dctx = await browser.newContext(Object.assign({ userAgent: ua, acceptDownloads: true }, mobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } }));
+        const dpage = await dctx.newPage();
+        dpage.on('dialog', (d) => d.dismiss().catch(() => {}));
+        await dpage.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+        await dpage.addInitScript((err) => {
+            window.__shared = 0;
+            Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && d.files && d.files.length) });
+            Object.defineProperty(navigator, 'share', { configurable: true, value: () => { window.__shared++; return Promise.reject(Object.assign(new Error('Permission denied'), { name: err })); } });
+        }, reject);
+        const downloads = [];
+        dpage.on('download', (d) => downloads.push(d.suggestedFilename()));
+        await dpage.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await dpage.waitForTimeout(800);
+        const ok2 = await dpage.evaluate(() => typeof saveLabelImagesFromModal === 'function' && typeof openLabelPrintModal === 'function');
+        if (!ok2) { bad('ZoeW ស្លាកជារូបភាព ៖ ' + label + ' ៖ audit bridge'); await dctx.close(); continue; }
+        const r = await dpage.evaluate(async () => {
+            dataState.scanHistory = [{ id: 'S1', phone: '0960001111', scanDate: '2026-10-15', locker: 'A1', barcodes: [{ code: '77100000555', cod: 1, dod: 0, locker: 'A1', isClosed: false }, { code: '77100000556', cod: 0, dod: 2, locker: 'A1', isClosed: false }] }];
+            uiState.currentFilterMode = 'all';
+            openLabelPrintModal({ kind: 'item', id: 'S1' }); commitNow();
+            const done = await Promise.resolve(saveLabelImagesFromModal());
+            await new Promise((res) => setTimeout(res, 300));
+            return { done, shared: window.__shared, toasts: [...document.querySelectorAll('.toast')].map((t) => t.textContent.trim().slice(0, 60)) };
+        });
+        await dpage.waitForTimeout(800);
+        const want = reject === 'AbortError' ? 0 : 2;
+        const okFlow = r.done === true && downloads.length === want && downloads.every((n) => /^ZoeW_label_77100000(555|556)\.png$/.test(n)) &&
+            (mobile ? r.shared === 1 : r.shared === 0) && !r.toasts.some((t) => t.indexOf('❌') === 0) && (want ? r.toasts.some((t) => t.indexOf('✅ បានទាញយករូបភាពស្លាក 2') === 0) : true);
+        check(okFlow, (reject === 'AbortError' ? 'ទិសផ្ទុយ ៖ ' : '⛔ ') + 'ZoeW ស្លាកជារូបភាព ៖ ' + label + ' ➜ ' + (want ? 'ទាញយក PNG ' + want + (mobile ? ' ជំនួស' : ' (គ្មានផ្ទាំង Share)') + ' · ✅ · គ្មាន ❌' : 'គ្មានទាញយក · គ្មានសារ'),
+            JSON.stringify({ r, downloads }));
+        await dctx.close();
+    }
 }
 
 async function labelPrintFit(browser, port) {

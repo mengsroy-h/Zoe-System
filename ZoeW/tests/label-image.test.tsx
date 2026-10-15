@@ -42,6 +42,19 @@ const items = [
 ];
 let shared: any[];
 
+const UA = {
+    iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1',
+    android: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+    windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
+    mac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    ipad: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15'
+};
+const realUA = window.navigator.userAgent;
+function setDevice(ua: string, touchPoints = 0) {
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: ua });
+    Object.defineProperty(window.navigator, 'maxTouchPoints', { configurable: true, value: touchPoints });
+}
+
 function stubShare(canShare: boolean, reject?: any) {
     shared = [];
     Object.defineProperty(window.navigator, 'canShare', { configurable: true, value: canShare ? () => true : undefined });
@@ -66,6 +79,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    setDevice(realUA, 0);
     step(() => { closeModal('labelPrintModal'); resetLabelPrint(); });
     vi.restoreAllMocks();
     unmount();
@@ -112,19 +126,24 @@ describe('ស្លាកជារូបភាព (NIIMBOT)', () => {
 
     it('⛔ Share ៖ navigator.share({ files: PNG }) ➜ shared · បោះបង់ (AbortError) ➜ cancelled · គ្មាន Web Share (កុំព្យូទ័រ) ➜ ទាញយកមួយៗ ➜ saved', async () => {
         const files = [{ name: 'a.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }, { name: 'b.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }];
+        setDevice(UA.iphone, 5);
         stubShare(true);
         expect(await shareImageFiles(files, 'T')).toBe('shared');
         expect(shared[0].files.map((f: File) => [f.name, f.type])).toEqual([['a.png', 'image/png'], ['b.png', 'image/png']]);
         stubShare(true, Object.assign(new Error('x'), { name: 'AbortError' }));
         expect(await shareImageFiles(files, 'T')).toBe('cancelled');
+        expect(h.downloads).toEqual([]);
         stubShare(true, Object.assign(new Error('boom'), { name: 'NotAllowedError' }));
-        await expect(shareImageFiles(files, 'T')).rejects.toThrow('boom');
+        expect(await shareImageFiles(files, 'T')).toBe('saved');
+        expect(h.downloads).toEqual(['a.png', 'b.png']);
+        h.downloads = [];
         stubShare(false);
         expect(await shareImageFiles(files, 'T')).toBe('saved');
         expect(h.downloads).toEqual(['a.png', 'b.png']);
     });
 
     it('⛔ ប៊ូតុងក្នុងផ្ទាំង ➜ Share ១ ដង + សារ ✅ · បោះបង់ ➜ គ្មានសារ · ច្រើនជាង LABEL_IMAGE_MAX ➜ សារណែនាំ គ្មាន Share · គ្មាន canvas ➜ ❌', async () => {
+        setDevice(UA.android, 5);
         step(() => openLabelPrintModal({ kind: 'filter' }));
         stubShare(true);
         expect(await saveLabelImagesFromModal()).toBe(true);
@@ -144,5 +163,41 @@ describe('ស្លាកជារូបភាព (NIIMBOT)', () => {
         h.canvas = false;
         expect(await saveLabelImagesFromModal()).toBe(false);
         expect(toasts[toasts.length - 1]).toContain('❌');
+    });
+    it('⛔ កុំព្យូទ័រ (Windows · Mac ៖ Chrome/Edge មាន Web Share) ➜ ទាញយក PNG តែម្តង ⛔ មិនបើកផ្ទាំង Share · ទិសផ្ទុយ iPad (UA Mac + touch) ➜ Share', async () => {
+        const files = [{ name: 'a.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }, { name: 'b.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }];
+        for (const ua of [UA.windows, UA.mac]) {
+            setDevice(ua, 0);
+            stubShare(true);
+            h.downloads = [];
+            expect(await shareImageFiles(files, 'T')).toBe('saved');
+            expect(shared.length).toBe(0);
+            expect(h.downloads).toEqual(['a.png', 'b.png']);
+        }
+        setDevice(UA.ipad, 5);
+        stubShare(true);
+        h.downloads = [];
+        expect(await shareImageFiles(files, 'T')).toBe('shared');
+        expect(shared.length).toBe(1);
+        expect(h.downloads).toEqual([]);
+    });
+
+    it('⛔ ប៊ូតុងក្នុងផ្ទាំង ៖ កុំព្យូទ័រ ➜ «✅ បានទាញយក» (គ្មាន ❌) · ទូរស័ព្ទ Share បដិសេធ (NotAllowedError ៖ ឯកសារច្រើនពេក · ផុតសកម្មភាពអ្នកប្រើ) ➜ ទាញយកជំនួស ✅', async () => {
+        step(() => openLabelPrintModal({ kind: 'filter' }));
+        setDevice(UA.windows, 0);
+        stubShare(true, Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }));
+        expect(await saveLabelImagesFromModal()).toBe(true);
+        expect(shared.length).toBe(0);
+        expect(h.downloads.length).toBe(3);
+        expect(toasts[toasts.length - 1]).toMatch(/^✅ បានទាញយករូបភាពស្លាក 3/);
+        expect(toasts.some((t) => t.indexOf('❌') === 0)).toBe(false);
+        toasts.length = 0; h.downloads = [];
+        setDevice(UA.android, 5);
+        stubShare(true, Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }));
+        expect(await saveLabelImagesFromModal()).toBe(true);
+        expect(shared.length).toBe(1);
+        expect(h.downloads.length).toBe(3);
+        expect(toasts[toasts.length - 1]).toMatch(/^✅ បានទាញយករូបភាពស្លាក 3/);
+        expect(toasts.some((t) => t.indexOf('❌') === 0)).toBe(false);
     });
 });

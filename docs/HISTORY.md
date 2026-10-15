@@ -4391,6 +4391,7 @@ App ពិត (audit build) ក្នុង Chromium ៖ APK ក្លែង (br
 | A106 | **បោះពុម្ពស្លាកមិនឆ្លាតវៃ ៖ ទំហំ CSS បង្ខំ** (សំណើ ៖ «អាចឆ្លាស់គ្រប់ប្រភេទក្រដាស») | `page.pdf()` ២៤ ស្លាក ៖ 50×30 លើ A4/A3/A5/Letter/Legal/4×6 ➜ ២៤ ទំព័រ (១ ស្លាកតូច/ទំព័រ) · លើក្រដាស 50×30 ➜ ៤៨ ទំព័រ (ទទេឆ្លាស់ ៖ margin ២mm) · 60×40 លើ 50×30 ➜ ៤៨ · «single» លើ 50×30 ➜ ១២០ (ស្លាកបែក ៥ ទំព័រ) · A4 ៣ ជួរឈរលើរមូរ ➜ អក្សរកាត់ · វីដេអូ Android ៖ Letter «1/48» ស្លាកតូចជ្រុងទំព័រ · Chromium ៖ media query `print` វាស់តាមក្រដាស (50×30 · 60×40 ➜ តូច · A4 · 4×6 ➜ ធំ) | ក្រដាសសម្រេច ៖ រមូរ ➜ ១/ទំព័រគ្រប់ប្លង់ (២៤/២៤) · A4 ➜ ១ ទំព័រ · A5 ➜ ២ · 4×6 ➜ ៦ · `labelPrintFit` × ៨ ក្រដាស ✅ |
 | A107 | **NIIMBOT B1 ៖ បោះពុម្ពតាម App NIIMBOT ប៉ុណ្ណោះ** (Bluetooth · ទទឹង ២០–៥០mm · 203dpi) | «Save as PDF» ➜ ក្រដាស Letter + ស្លាកតូចជ្រុង ➜ ត្រូវកាត់ក្នុង App | PNG ទំហំពិត (៨ ចំណុច/mm) · ZXing អាន Barcode វិញ ១២/១២ · iPhone/Android Share · APK Share · កុំព្យូទ័រទាញយក |
 | A105 | **ស្លាក ៖ ក្រដាស A5 + ប្លង់ A4 ៣ ជួរឈរ ➜ លេខ Barcode ហួសស្លាក** (ការវាស់គ្រប់ទំហំក្រដាសតាមសំណើ) | `labelPrintFit` A5 (484px) ៖ «ZT880000000000» ទទឹង ១៤៧px ⟷ ក្នុងស្លាក ១២៧px (១១ ស្លាក) · សន្លឹកលើស ៩px · Letter ឆ្លង | `.label-code` បង្រួម (`100cqw` ÷ តួ · monospace ០.៦២em) ➜ ៤ ក្រដាស × ៦ ប្លង់ ✅ |
+| A108 | **CI លើ PR #318 ៖ ៣ ផ្នែកក្រហម** | `doc-scope-test` ៖ លិបិក្រមខ្វះ `modal-keyboard-device-test` · `minmax(` ក្នុង CLAUDE.md អានជាឈ្មោះ helper · `state-hygiene` ៖ `modalTapFocused` មិនកត់ហេតុផល · `loop-termination` ៖ `labelImageFiles()` រង្វិល `for` ស្វែងរកឈ្មោះទំនេរ គ្មានពិដាន | លិបិក្រម + ពាក្យ CLAUDE.md · ACCEPTED មានហេតុផល (handle ធាតុ · សម្អាតពេល focusin) · ឈ្មោះស្ទួនរាប់តាម `Map` (គ្មានរង្វិល · Barcode សល់តែអក្សរ/លេខ ➜ `_n` មិនជាន់ឈ្មោះផ្សេង · `label-image.test` ៣ ឈ្មោះ) ➜ ✅ |
 | A104 | **iPhone ៖ «បញ្ចូលច្រើន» ➜ ចុចកន្លែងវាយ ➜ ទំព័រធ្លាក់ ១៣០pt ហើយលោតត្រឡប់** | ស៊ុម ៦០fps ៖ ស៊ុម ៤–៥ ទំព័ររំកិលឡើង −៨ · −២០px (WebKit បង្ហាញកន្លែងវាយ តាមចលនា keyboard) ➜ ស៊ុម ៦ ធ្លាក់ +៣០០px (ផ្ទៃសខាងលើ ៖ backdrop ក៏ធ្លាក់) ➜ ត្រឡប់ ០ ក្នុង ១០ ស៊ុម (rubber band) · កន្លែងវាយមានស៊ុម focus មុនចុច ➜ `openBatchScanModal()` focus ១៥០ms (iOS មិនបើក keyboard) ➜ ការចុចលើកន្លែងវាយដែល focus រួចទៅផ្លូវ iOS ដើម (`modalTapField()` បដិសេធ `activeElement`) ➜ `restoreIOSDocumentScroll()` (2.50.77) ទាញ ០ កណ្តាលចលនា WebKit | focus រួច + keyboard មិនទាន់បើក + មិនទាន់ចុច ➜ ចាប់ (blur + `focus({ preventScroll })`) · `modal-keyboard-test` + `modal-keyboard.test` លើកូដចាស់ FAIL ២ + ២ · ⚠️ keyboard ពិតរបស់ iOS វាស់មិនបាន ➜ សាកលើ iPhone ពិត |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.77 ៖ តេស្ត App ទាំងមូលតាមការប្រើប្រចាំថ្ងៃ គ្រប់ទំហំ ធៀបស្តង់ដារ App ទូទៅ
@@ -6802,7 +6803,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `lookup-prefetch-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `modal-keyboard-device-test` | ផ្នែក ១ | — |
+| `modal-keyboard-device-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |

@@ -99,10 +99,13 @@ describe('ស្លាកជារូបភាព (NIIMBOT)', () => {
         expect(h.texts).toEqual(['0960001234', '77100000308751']);
     });
 
-    it('ឈ្មោះស្ទួន ➜ បន្ថែម _2 · គ្មាន canvas ➜ គ្មានឯកសារ', () => {
+    it('ឈ្មោះស្ទួន ➜ បន្ថែម _2 · _3 (Barcode ដែលសល់តែអក្សរដូចគ្នាក៏ដូច្នេះ) · គ្មាន canvas ➜ គ្មានឯកសារ', () => {
         const options = normalizeLabelOptions({ layout: '40x30' });
         const row = buildLabelRows(items, { openOnly: false })[0];
-        expect(labelImageFiles([row, row], options).map((f) => f.name)).toEqual(['ZoeW_label_77100000308751.png', 'ZoeW_label_77100000308751_2.png']);
+        expect(labelImageFiles([row, row, row], options).map((f) => f.name)).toEqual(['ZoeW_label_77100000308751.png', 'ZoeW_label_77100000308751_2.png', 'ZoeW_label_77100000308751_3.png']);
+        const names = labelImageFiles([{ ...row, barcode: 'ZT-88' }, { ...row, barcode: 'ZT88' }, { ...row, barcode: 'ZT8_8' }], options).map((f) => f.name);
+        expect(names).toEqual(['ZoeW_label_ZT88.png', 'ZoeW_label_ZT88_2.png', 'ZoeW_label_ZT88_3.png']);
+        expect(new Set(names).size).toBe(names.length);
         h.canvas = false;
         expect(labelImageFiles([row], options)).toEqual([]);
     });

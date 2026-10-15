@@ -200,7 +200,7 @@ export function printLabelsFromModal() {
 export const LABEL_IMAGE_MAX = 200;
 
 export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<{ name: string; dataUrl: string }> {
-    const used = new Set<string>();
+    const used = new Map<string, number>();
     const files: Array<{ name: string; dataUrl: string }> = [];
     (Array.isArray(rows) ? rows : []).forEach((row) => {
         if (!row || !row.barcode) return;
@@ -213,9 +213,9 @@ export function labelImageFiles(rows: LabelRow[], options: LabelOptions): Array<
         }, options.layout);
         if (!canvas) return;
         const base = 'ZoeW_label_' + (String(row.barcode).replace(/[^a-zA-Z0-9]/g, '') || 'x');
-        let name = base + '.png';
-        for (let n = 2; used.has(name); n++) name = base + '_' + n + '.png';
-        used.add(name);
+        const seen = (used.get(base) || 0) + 1;
+        used.set(base, seen);
+        const name = seen === 1 ? base + '.png' : base + '_' + seen + '.png';
         files.push({ name, dataUrl: canvas.toDataURL('image/png') });
     });
     return files;

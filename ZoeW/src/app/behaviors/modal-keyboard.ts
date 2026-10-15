@@ -1,5 +1,7 @@
 import { modalIsOpen } from '../../core/modals';
 import { uiState, type ModalKeyboardFit } from '../../core/state';
+import { appLocalStore, safeStoreGet, safeStoreSet } from '../../core/storage';
+import { KEYBOARD_INSET_KEY } from '../../core/storage-keys';
 import { isAndroidDevice } from '../../platform/native';
 import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
@@ -15,6 +17,9 @@ export const MODAL_KEYBOARD_GAP_PX = 8;
 export const MODAL_TAP_SLOP_PX = 10;
 export const MODAL_TAP_MAX_MS = 500;
 export const PAGE_TAP_KEYBOARD_RATIO = 0.5;
+export const PAGE_TAP_PHONE_KEYBOARD_RATIO = 0.45;
+export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
+export const KEYBOARD_MEMORY_MAX = 24;
 
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
@@ -37,7 +42,7 @@ let naturalBox: (ModalNaturalBox & { id: string }) | null = null;
 let modalTap: { id: number; x: number; y: number; at: number; field: HTMLElement } | null = null;
 let modalFocusRefused = false;
 let modalTapFocused: HTMLElement | null = null;
-let keyboardInsetSeen: { width: number; inset: number } | null = null;
+let keyboardMemory: Record<string, number> | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -51,21 +56,72 @@ export function keyboardVisibleViewport(): { top: number; height: number } | nul
     return { top, height };
 }
 
+export function softKeyboardShown(): boolean {
+    return uiState.keyboardOpen || keyboardVisibleViewport() !== null;
+}
+
 export function modalKeyboardViewport(): { top: number; height: number } | null {
     return uiState.isModalOpen ? keyboardVisibleViewport() : null;
 }
 
 export function measureKeyboardCover(): void {
     const view = keyboardVisibleViewport();
-    if (view) noteKeyboardInsetSeen(Math.round(window.innerHeight) - view.height);
+    if (view) rememberKeyboardInset(Math.round(window.innerHeight) - view.height);
     const cover = view ? Math.max(0, Math.round(window.innerHeight) - view.top - view.height) : 0;
     if (uiState.keyboardCover !== cover) uiState.keyboardCover = cover;
 }
 
-function noteKeyboardInsetSeen(inset: number): void {
-    const width = window.innerWidth;
-    if (keyboardInsetSeen && keyboardInsetSeen.width === width && keyboardInsetSeen.inset >= inset) return;
-    keyboardInsetSeen = { width, inset };
+function keyboardKind(el: Element | null): string {
+    const field = el as HTMLInputElement | null;
+    if (!field || (field.tagName !== 'INPUT' && field.tagName !== 'TEXTAREA')) return '';
+    const mode = String(field.getAttribute('inputmode') || '').toLowerCase();
+    if (mode) return mode;
+    const type = String(field.type || '').toLowerCase();
+    return type === 'tel' || type === 'number' || type === 'email' || type === 'url' ? type : 'text';
+}
+
+function keyboardScreenKey(): string {
+    return Math.round(window.innerWidth) + 'x' + Math.round(window.innerHeight) + '|';
+}
+
+function loadKeyboardMemory(): Record<string, number> {
+    if (keyboardMemory) return keyboardMemory;
+    let parsed: unknown;
+    try { parsed = JSON.parse(safeStoreGet(appLocalStore, KEYBOARD_INSET_KEY) || 'null'); } catch { parsed = null; }
+    const memory: Record<string, number> = {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (const key of Object.keys(parsed as Record<string, unknown>).slice(-KEYBOARD_MEMORY_MAX)) {
+            const inset = Number((parsed as Record<string, unknown>)[key]);
+            if (key.length <= 48 && Number.isFinite(inset) && inset >= KEYBOARD_MIN_INSET_PX && inset <= 4000) memory[key] = Math.round(inset);
+        }
+    }
+    keyboardMemory = memory;
+    return memory;
+}
+
+function rememberKeyboardInset(inset: number): void {
+    const kind = keyboardKind(document.activeElement);
+    if (!kind) return;
+    const memory = loadKeyboardMemory();
+    const key = keyboardScreenKey() + kind;
+    if (memory[key] === inset) return;
+    delete memory[key];
+    memory[key] = inset;
+    const keys = Object.keys(memory);
+    for (let i = 0; i < keys.length - KEYBOARD_MEMORY_MAX; i++) delete memory[keys[i]];
+    safeStoreSet(appLocalStore, KEYBOARD_INSET_KEY, JSON.stringify(memory));
+}
+
+export function rememberedKeyboardInset(el: Element): number {
+    const memory = loadKeyboardMemory();
+    const screen = keyboardScreenKey();
+    const exact = memory[screen + keyboardKind(el)];
+    if (exact) return exact;
+    let widest = 0;
+    for (const key of Object.keys(memory)) {
+        if (key.startsWith(screen) && memory[key] > widest) widest = memory[key];
+    }
+    return widest;
 }
 
 export function modalKeyboardFitFor(box: ModalNaturalBox, view: { top: number; height: number }): Omit<ModalKeyboardFit, 'id'> | null {
@@ -224,17 +280,21 @@ function modalTapField(target: EventTarget | null): HTMLElement | null {
 export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
     const height = window.innerHeight;
     if (!Number.isFinite(height) || height <= 0) return false;
-    const seen = keyboardInsetSeen && keyboardInsetSeen.width === window.innerWidth ? keyboardInsetSeen.inset : 0;
-    const inset = seen > 0 ? seen : Math.round(height * PAGE_TAP_KEYBOARD_RATIO);
+    const seen = rememberedKeyboardInset(el);
+    const phone = window.innerWidth < PAGE_TAP_PHONE_MAX_WIDTH && height > window.innerWidth;
+    const inset = seen > 0 ? seen : Math.round(height * (phone ? PAGE_TAP_PHONE_KEYBOARD_RATIO : PAGE_TAP_KEYBOARD_RATIO));
     const box = el.getBoundingClientRect();
     return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
 }
 
 export function noteModalTouchStart(e: TouchEvent): void {
     modalTap = null;
-    if (modalFocusRefused || !usesIOSPanelHandoff()) return;
+    if (modalFocusRefused) return;
+    const ios = usesIOSPanelHandoff();
+    if (!ios && !isAndroidDevice()) return;
     const field = modalTapField(e.target);
     if (!field || !e.touches || e.touches.length !== 1) return;
+    if (!ios && (field.closest('.modal') || (document.activeElement === field && uiState.keyboardOpen))) return;
     const t = e.touches[0];
     modalTap = { id: t.identifier, x: t.clientX, y: t.clientY, at: e.timeStamp, field };
 }
@@ -267,7 +327,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     modalTap = null;
     modalFocusRefused = false;
     modalTapFocused = null;
-    keyboardInsetSeen = null;
+    keyboardMemory = null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
     if (uiState.modalViewportHeight !== 0) uiState.modalViewportHeight = 0;
     if (uiState.modalKeyboardFit) uiState.modalKeyboardFit = null;

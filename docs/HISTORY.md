@@ -45,8 +45,20 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ថ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `72cd9a4` = PR #318 · **មិនទាន់ merge**) ៖ [2.50.80] វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ពេល keyboard លោតចប់ ·
-    iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ · បញ្ជី Locker ធ្លាក់ពេលចុច «ទីតាំងទាំងអស់» (ផ្នែក ២ A110–A112) ➜ ⚠️ សាកលើ APK/iPhone ពិត (សកម្មភាព ១–៥ របស់ [2.50.80]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ទ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `5a360b8` = PR #319 · PR #320 · **មិនទាន់ merge**) ៖ [2.50.81] វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក
+    ចុចកន្លែងវាយ ទំព័រធ្លាក់ · Android ស្វែងរក Locker កន្ត្រាក់ឡើងលើ · App ចាំកម្ពស់ keyboard ពិត (ផ្នែក ២ A114–A116) · វីដេអូ Chrome Android លើ deploy preview ៖ ចុចកន្លែងវាយ Barcode
+    ទំព័ររំកិល · ស្វែងរកក្រោយទំព័ររំកិល ➜ ឃើញតែសារទទេ · ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ការផ្ទៀងផ្ទាត់ឡើងវិញ (ផ្នែក ២ A117–A120) ➜ ម្ចាស់គម្រោងសាករួច ៖
+    «Ios លែងអីហើយដំណើរការត្រឹមត្រូវក្នុង preview 320 ជា PWA» · Chrome Android បញ្ជាក់លំដាប់ «ចុចវាយបញ្ចូល barcode បន្ទាប់ចុចស្វែងរក ➜ លោតផុត · ស្វែងរកមុនមិនអី» (= A117–A118) ·
+    ក្រោយ `c26de70` ៖ «Preview រួចហើយ ជោគជ័យហើយ» · បន្ទាប់មក ការស្កេនពេលផ្ទាំងលេខទូរស័ព្ទបើក ➜ ជួរ (A121 ៖ Auto save មុនកែរក្សាទុក COD = លេខ Barcode) · Fast Mode ៖ ស្កេនគ្មាន Enter/Tab ·
+    COD/DOD លើស `SCAN_MONEY_MAX` (A122) · Lookup Auto save ពេលកំពុងវាយ (A123 · `auto-lookup.ts` ក្នុងសោ ZTO តាមសំណើ) ➜ ⚠️ នៅសល់ ៖
+    APK + ម៉ាស៊ីនស្កេនពិត (សកម្មភាព ៤–៨ របស់ [2.50.81]) ➜ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+    តេស្តលំហូរប្រចាំថ្ងៃ ១៤ ឧបករណ៍លើ `8d66650` (ផ្នែក ២ A124–A126) ៖ App ត្រូវ · A124 (ទូរស័ព្ទផ្តេក ៖ ប៊ូតុងទំព័រស្កេនក្រោមរបា Tab) កែតាមសំណើ ៖ ផ្ទាំងស្កេន ២ ជួរឈរ + របា Tab បង្រួម (សកម្មភាព ៩)។
+    រាយការណ៍ម្ចាស់គម្រោង ៖ NIIMBOT «រក្សាទុកជារូបភាព» លើកុំព្យូទ័រ ➜ ❌ (A127) ➜ កុំព្យូទ័រទាញយក PNG · Share បដិសេធ ➜ ទាញយកជំនួស (សកម្មភាព ១០)។
+    ផ្ទៀងផ្ទាត់ + តេស្តឡើងវិញលើ `b86ed08` (ផ្នែក ២) ៖ CI ៤/៤ · លំហូរ ៥១៨/៥១៨ · flow2 ៧២/៧២ · ប្លង់មុន/ក្រោយ ១៣ ទំហំខុស ០ · `native:check` ពិដាន PTR រាប់ពីលែងដៃ។
+    ម្ចាស់គម្រោង ៖ «បើកែហើយ push ហ្មងទៅចាំមើល CI លឿនជាង» ➜ កែ ➜ push ភ្លាម ➜ មើល CI (run-all ក្នុង session ជាសញ្ញាទី ២)។
+0ថ. **PR #319 merge ចូល `main` រួច** (`5a360b8` · squash · ម្ចាស់គម្រោង «Merge» · CI ៤/៤ · run-all STRICT ២០៧/២០៧) ៖ ម្ចាស់គម្រោងសាករួច ៖ «ios នៅមានចន្លោះតែ1 ក្រៅពីហ្នឹងដំណើរការត្រឹមត្រូវ» ·
+    Android ប្រអប់ «គ្រាន់បើជាងមុនច្រើន សឹងតែមិនចាប់អារម្មណ៍» ➜ 0ទ។ (ដើម ៖ [2.50.80] វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ពេល keyboard លោតចប់ ·
+    iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ · បញ្ជី Locker ធ្លាក់ពេលចុច «ទីតាំងទាំងអស់» · ផ្នែក ២ A110–A113)។
 0ត. **PR #318 merge ចូល `main` រួច** (`72cd9a4` · squash · ម្ចាស់គម្រោង «Merge» · CI ៤/៤ បៃតង) ៖ [2.50.79] វីដេអូម្ចាស់គម្រោងលើ 2.50.78 ៖ ប្តូរទំហំក្រដាស ➜ ក្រដាសស ·
     APK ប្រអប់កន្ត្រាក់ ២ ដងពេល keyboard លោត · iPhone «បញ្ចូលច្រើន» ទំព័រធ្លាក់ចុះមួយភ្លែត · វាស់គ្រប់ទំហំ/ឧបករណ៍ (ស្លាក A5) · 🧠 ➜ 💡 · បោះពុម្ពឆ្លាតវៃ · ស្លាកជារូបភាព NIIMBOT
     (PR #318 · ផ្នែក ២ A102–A109) ➜ ម្ចាស់គម្រោងសាករួច ៖ iPhone ប្រអប់ ✅ · APK នៅញ៉ាក់ · iPhone កន្លែងវាយ Barcode ធ្លាក់ ➜ 0ថ។
@@ -205,6 +217,164 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.81] — 2026-10-15 · ZoeW ៖ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ស្កេនពេលផ្ទាំងបើក ➜ ចូលជួរ · Fast Mode មិនរក្សាទុក COD ខុស · iPhone ៖ របៀបស្កេនដក ចុចកន្លែងវាយ ទំព័រមិនធ្លាក់ · App ចាំកម្ពស់ keyboard ពិត · Android (App · Chrome) ៖ កន្លែងវាយ Barcode · ស្វែងរក មិនរំកិលទំព័រ**
+
+**ZoeW `2.50.81`** (`zoew-v343` ➜ `zoew-v344`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `phone-search.ts` · `app.css` · ZTO) មិនប៉ះ —
+ការកែក្នុង `modal-keyboard.ts` · `ios-viewport.ts` · `storage-keys.ts` · `scanner-input.ts` · `refs.ts` · `core/text.ts` · `scan-action.ts` · `batch-scan.ts` · `react-root.css` · `file-output.ts` · `guide.html` · `README.md`។
+រាយការណ៍ម្ចាស់គម្រោង (វីដេអូ iPhone ១ · APK ១ លើ 2.50.80) ៖ «ios នៅមានចន្លោះតែ1 ក្រៅពីហ្នឹងដំណើរការត្រឹមត្រូវ គឺចន្លោះកន្លែង ស្កេនដកកញ្ចប់ ពេលចុច ក្នុងប្រអប់វាយ keyboard ឡើងមក
+ធ្លាក់ ទំព័រទាំងមូល បន្តិច។ ដោយលែក android តាម modal នីមួយៗគ្រាន់បើជាងមុនច្រើន … តែចំនុចខ្លាំងគឺ កន្លែង ស្វែងរក ក្នុង locker ចុចស្វែងរកទៅទាញកន្ត្រាក់ឡើងលើ» ·
+បន្ទាប់មក ៖ «ចុះអាចអោយវា ឆ្លាតវៃវាស់keybaordដោយខ្លួនឯង គ្រប់ឧបករណ៍គ្រប់ទំហំទៅបានអត់» · «ពិនិត្យមើល របៀបស្កេនតាម ឧបករណ៍ស្កេន មិនថា Bluetooth ឬ usb ផងថាវាដំណើរការធម្មតាឬអត់» ·
+«ដោយស្វ័យប្រវត្តិ និយាយអោយចំ អោយគ្របយ៉ាងវាគណនា ដោយស្វ័យប្រវត្តិទៅបានអត់» · វីដេអូ Chrome Android លើ deploy preview 320 (គ្មានអត្ថបទ) ·
+«កែអោយស្អាតទាំងអស់ទៅ … តែបើកន្លែងណាប៉ះតំបន់លុយសូមសាងអ្នកយាមមុនកែកូដ និងអោយការស្កេនដោយម៉ាស៊ីនស្កេន ប្រើក្នុង បញ្ចូលច្រើនបានផង និង ពិនិត្យផ្លូវ Auto save
+ពេលស្គាល់លេខទូរស័ព្ទពី lookup ផងក្រែងកែរួចវាប្រជែងគ្នាជាមួយការបន្ថែមថ្មី»។
+
+#### អ្វីដែលខុសពីមុន
+
+- ✨ **ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ** (សំណើម្ចាស់គម្រោង · A119)។ មុននេះ ៖ ទូរស័ព្ទគ្មានអ្វី focus (ក្រោយរក្សាទុក · ក្រោយចុចប៊ូតុង) ➜ ការស្កេនបាត់ · keyboard ខ្មែរ ➜ Barcode ជាលេខខ្មែរ
+  «៧៧១…» · ម៉ាស៊ីនកំណត់ suffix Tab ➜ ចេញពីប្រអប់ ការស្កេនមិនបញ្ជូន។ ឥឡូវ ៖ ទំព័រស្កេន · គ្មានប្រអប់/ផ្ទាំងចំហៀង · មិនចាក់សោ · គ្មានកន្លែងវាយអក្សរ focus (ប៊ូតុង · select ·
+  checkbox រាប់ថាគ្មាន) ➜ គ្រាប់ចុចតួអក្សរចូលប្រអប់ «⚡ ស្កេន Barcode» (focus មិនរំកិល) · `key` មិនមែន ASCII ➜ តួអក្សរ US នៃគ្រាប់ (`code` ៖ ម៉ាស៊ីនស្កេនក្លែង keyboard US) ·
+  លេខខ្មែរ ០–៩ ➜ 0–9 នៅ `triggerScanAction()` (ផ្លូវស្កេនតែមួយ) និង «បញ្ចូលច្រើន» · ≥ `SCANNER_MIN_CHARS` គ្រាប់លឿន (≤ `SCANNER_KEY_GAP_MS`) + Tab ក្នុង `SCANNER_SUFFIX_GAP_MS`
+  ➜ បញ្ជូនដូច Enter។ ⛔ មិនបញ្ជូនដោយគ្មាន suffix (Bluetooth អាចផ្អាកកណ្តាល Barcode ➜ Barcode ខ្លី = លុយខុស)។ «📋 បញ្ចូលច្រើន» ដូចគ្នា (A120) ៖ ប្រអប់បញ្ចូលច្រើននៅខាងលើ +
+  គ្មានកន្លែងវាយ focus ➜ ការស្កេនចូលប្រអប់បញ្ចូលច្រើន · keyboard ខ្មែរ ➜ ឡាតាំង · Tab លឿន ➜ ជួរថ្មី (focus នៅ) · ចំនួនរាប់ឡើង (`input`) · គ្រាប់ខ្មែរដែលវាយតួអក្សរច្រើន («ុះ») ក៏តាម `code`។
+- 🐛💰 **ស្កេនពេលផ្ទាំង «🎉 ស្កេនបានជោគជ័យ!» បើក ➜ លេខ Barcode ចូលប្រអប់ ➜ Auto save រក្សាទុកលុយខុស** (សំណើម្ចាស់គម្រោង · A121)។ វាស់លើកូដមុនកែ (App ពិត · lookup
+  Auto save) ៖ focus នៅ COD ➜ ស្កេន B ➜ lookup ស្គាល់លេខទូរស័ព្ទ ➜ Auto save រក្សាទុក A ជាមួយ **COD = ៧ ៨១០ ១២២ ៣៣៤ ៤៥៥** (លេខ B) និង «✅ រក្សាទុកបានជោគជ័យ!» · DOD ដូចគ្នា ·
+  លេខទូរស័ព្ទ ➜ lookup មិនបំពេញ (ប្រអប់មិនទទេ) ➜ គ្មាន Auto save · Locker = លេខ B · ប្រអប់ Barcode នៅក្រោយផ្ទាំង ➜ B នៅជាប់ ➜ ការស្កេនបន្ទាប់ក្លាយជា «BC» (Barcode ខុស) ·
+  ប៊ូតុង «🗑️ បញ្ជាក់ដក» focus ➜ Enter របស់ម៉ាស៊ីនស្កេនចុចវា (កាត់លុយ) · B បាត់គ្រប់ករណី។ ឥឡូវ ៖ ពេលផ្ទាំងបើក (មិនមែន «📋 បញ្ចូលច្រើន») · keyboard លើអេក្រង់មិនបង្ហាញ ·
+  focus នៅប្រអប់ផ្ទាំងលេខទូរស័ព្ទ · ប្រអប់ Barcode ឬគ្មានកន្លែងវាយ ➜ គ្រាប់ចុចតួអក្សរត្រូវទប់ (≤ `SCANNER_KEY_GAP_MS` · ≤ `SCANNER_SUFFIX_GAP_MS` ពេលវាដូចការស្កេន) ៖
+  ការវាយរបស់មនុស្ស ➜ ចូលប្រអប់ដដែលនៅ caret (`typeIntoElement()` ៖ `execCommand('insertText')` ដើរលើ `type=number`) · ការស្កេន (≥ `SCANNER_MIN_CHARS` គ្រាប់លឿន + Enter/Tab)
+  ➜ ប្រអប់ និងប៊ូតុងមិនប៉ះ (Enter មិនទៅប្រអប់បន្ទាប់ · មិនចុចប៊ូតុង) ➜ ចូលជួរ (`queueScannedCode()` ៖ «📥 ការស្កេនតាមជួរ» + ⏹️) ➜ បើកតាមលំដាប់ក្រោយផ្ទាំងបិទ តាមផ្លូវស្កេនធម្មតា
+  (`triggerScanAction()` · របៀបស្កេនដដែល · ការដកកំពុងដំណើរការ ➜ រង់ចាំ · តែពេលផ្ទាំងដំណើរការស្កេនបើក ៖ លេខទូរស័ព្ទ · ដក · ព្រមាន Locker; ផ្ទាំងផ្សេងតែឯង
+  (PIN · Config) ➜ មិនចូលជួរ ប្រាប់ឲ្យបិទផ្ទាំងសិន) · ផ្ទាំងបិទពាក់កណ្តាលការស្កេន (Auto save) ➜ Barcode ពេញនៅតែចូលជួរ (មិនកាត់) · Barcode ដែលផ្ទាំង
+  លេខទូរស័ព្ទ ឬផ្ទាំងដកកំពុងបង្ហាញ (អានពីរដង) · មាននៅក្នុងជួររួច ➜ ប្រាប់ មិនបន្ថែម · «📋 បញ្ចូលច្រើន» កំពុងរត់ ➜ បន្ថែមចុងជួរ · ប្តូរគណនី/ហាង ➜ ទម្លាក់ស្ងាត់ · ទំព័រផ្សេង ➜ មិនចូលជួរ ប្រាប់ឲ្យស្កេននៅទំព័រស្កេន ·
+  ផ្ទាំងបើកពាក់កណ្តាលការស្កេនលើទំព័រ ➜ មិនចូលជួរ ប្រាប់ឲ្យស្កេនម្ដងទៀត។ Auto save ពី lookup ឥឡូវអានតែតម្លៃដែល lookup/មនុស្សបំពេញ (ការស្កេនមិនដែលនៅក្នុងប្រអប់)។
+  keyboard លើអេក្រង់ iPhone បង្ហាញ (ការវាយលើទូរស័ព្ទ) · ប្រអប់វាយរបស់ផ្ទាំងផ្សេង (PIN · Config · កែតម្លៃ) ➜ មិនប៉ះ · Android ៖ keyboard លើអេក្រង់ផ្ញើ `Unidentified`
+  (មិនត្រូវទប់) ➜ ម៉ាស៊ីនស្កេនត្រូវចាប់ទោះ «Show virtual keyboard» បើក។
+- 💰 **Fast Mode ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab · COD/DOD ធំខុសធម្មតា** (សំណើម្ចាស់គម្រោង «ដែលអ្នកថា Fast mode មានចន្លោះនោះសូមកែអោយស្អាតចុះ» · A122)។
+  វាស់លើ `e33a872` ៖ ម៉ាស៊ីនស្កេនដែលមិនផ្ញើ Enter/Tab ស្កេនពេល focus នៅ COD ➜ គ្រាប់ដែលទប់ត្រឡប់ចូល COD ក្រោយ `SCANNER_SUFFIX_GAP_MS` ➜
+  COD = `78101355667788` ➜ lookup ស្គាល់ ➜ Auto save រក្សាទុកលុយខុស · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ B នៅជាប់ · COD បិទភ្ជាប់/វាយលើ keyboard
+  លើអេក្រង់ (មិនឆ្លងការទប់) `7810122334455` ➜ Auto save · «រំលង» រក្សាទុកដូចដើម។ ឥឡូវ ៖ (១) ការទប់ ៖ ≥ `SCANNER_MIN_CHARS` គ្រាប់លឿនដែលចប់ដោយគ្មាន
+  Enter/Tab = ម៉ាស៊ីនស្កេនគ្មាន suffix ➜ បោះបង់ + ប្រាប់ឲ្យកំណត់ Enter/Tab ⛔ មិនដែលចូលប្រអប់ (ការវាយរបស់មនុស្ស < `SCANNER_MIN_CHARS` គ្រាប់លឿន
+  ចូលដូចដើម) · (២) ផ្លូវរក្សាទុកតែមួយ `confirmPhone()` (Auto save · «រំលង» · «យល់ព្រម») ៖ COD ឬ DOD លើស `SCAN_MONEY_MAX` ($100000) ➜ មិនរក្សាទុក ·
+  មិន claim · មិនសរសេរអ្វី · ផ្ទាំងនៅ · focus ប្រអប់នោះ · ប្រាប់ចំនួន ➜ កែ ហើយ «យល់ព្រម» ម្ដងទៀត។ ផ្លូវផ្សេង (កែតម្លៃកញ្ចប់ · នាំចូលបញ្ជី ZTO) មិនប្រែ។
+- 💰 **Lookup Auto save ពេលមនុស្សកំពុងវាយ · cursor លោតចេញពីប្រអប់** (សំណើម្ចាស់គម្រោង «ត្រូវការកែ auto-lookup.ts របស់ ZTO ដែរឬ បើត្រូវកែក៏កែចុះ» ·
+  ឯកសារក្នុងសោ ZTO · A123)។ វាស់លើ `d50bb01` ៖ វាយ COD «1» (ចង់ 15) ពេល lookup កំពុងរក ➜ lookup ស្គាល់ ➜ Auto save រក្សាទុក
+  `["012345678", 1, 1]` (COD $1) · lookup រកមិនឃើញ ពេលកំពុងវាយ COD ➜ `armLookupFocus()` ទាញ cursor ទៅលេខទូរស័ព្ទ ➜ «5» ចូលលេខទូរស័ព្ទ
+  (COD `1` · phone `5`) · ចុចប្រអប់ Locker (មិនទាន់វាយ) ➜ cursor លោតទៅលេខទូរស័ព្ទ។ ឥឡូវ ៖ `scanState.phoneModalTyped` = មាន `input` លើប្រអប់ទាំង ៤
+  (`notePhoneModalInput()` · កំណត់ឡើងវិញរាល់ការស្កេន · lookup បំពេញដោយគ្មាន event) ➜ Auto save តែពេលមិនទាន់វាយ · វាយរួច ➜ បំពេញតែប្រអប់ទទេ +
+  «ℹ️ រកឃើញអតិថិជន (COD … · DOD …) — អ្នកបានវាយ … ចុច «យល់ព្រម»» · `armLookupFocus()` មិនទាញ cursor ពេលបានវាយ ឬប្រអប់វាយក្នុងផ្ទាំងកំពុង focus។
+- 🐛 **Chrome Android ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ និង navbar រំកិលឡើង ហើយនៅដដែល** (A117)។ keyboard Chrome បង្រួមតែ visual viewport (resizes-visual) ➜ Chromium
+  `ScrollFocusedEditableElementIntoView` រំកិល visual viewport ឲ្យប្រអប់នៅកណ្តាល ពេលប្រអប់មិននៅក្នុងផ្ទៃមើលឃើញទាំងស្រុង។ ឥឡូវការចុចកន្លែងវាយ Barcode លើ Android (App · Chrome)
+  ចាប់ដូច iPhone ពេលវានៅពីលើ keyboard (ការចាំ/ប៉ាន់ដដែល) ➜ `focus({ preventScroll: true })` ➜ Chromium រំលងការរំកិល (ចុចម្តងទៀតក៏ដូច្នេះ ៖ focus options នៅជាប់)។
+  ប្រអប់វាយក្នុងប្រអប់ (modal) · ប្រអប់ focus រួច + keyboard បើក · keyboard បាំង (ផ្តេក) ➜ Android ធ្វើខ្លួនឯង។
+- 🐛 **Chrome Android ៖ ទំព័ររំកិលរួច (keyboard បើក) ➜ ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែ «📭» ~៣ វិ.** (A118)។ ការបង្រួមផ្ទាំង + `focus({ preventScroll })` ទុកប្រអប់ស្វែងរកពីលើ
+  visual viewport ដែលនៅរំកិល។ ឥឡូវការចុចស្វែងរក tab ស្កេនលើ Android ត្រឡប់ visual viewport ទៅកំពូលមុន (`resetVisualViewportPan()` ៖ `documentElement.scrollIntoView` ·
+  ⛔ `window.scrollTo` រំកិលតែ layout viewport — វាស់ក្នុង Chromium ពិត)។
+
+- 🐛 **iPhone ៖ របៀបស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់** (A114)។ ប៊ូតុងក្រហម និងផ្ទាំងពណ៌ផ្កាឈូករុញកន្លែងវាយចុះ ➜ បាត 442pt លើ 852 (៥២% · រួមរបារស្ថានភាព 59pt)
+  ធំជាងការប៉ាន់ keyboard ៥០% ➜ ការចុចទៅផ្លូវ iOS ដើម។ keyboard ខ្មែរពិតរបស់ម្ចាស់គម្រោងយក ៤៣% (កំពូល 487pt)។ ឥឡូវទូរស័ព្ទបញ្ឈរ (ទទឹង < `PAGE_TAP_PHONE_MAX_WIDTH` ៦០០)
+  ប៉ាន់ ៤៥% (`PAGE_TAP_PHONE_KEYBOARD_RATIO`) ➜ ចាប់ការចុច · iPad · ផ្តេក នៅ ៥០% · iPhone SE (667) របៀបដក ➜ keyboard ពិតបាំង ➜ iOS ធ្វើខ្លួនឯង។
+- ✨ **App ចាំកម្ពស់ keyboard ពិតរបស់ឧបករណ៍** (សំណើម្ចាស់គម្រោង · A116)។ keyboard បើកពេលកន្លែងវាយណាមួយ focus ➜ កត់កម្ពស់ចុងក្រោយដែលស្ងប់ តាមទំហំអេក្រង់ (បញ្ឈរ/ផ្តេក ·
+  split) និងប្រភេទ keyboard (អក្សរ · លេខ · tel …) ក្នុង `zoew_keyboard_inset_v1` (ការកំណត់ឧបករណ៍ ៖ នៅក្រោយ reload · បិទ App) ➜ ការសម្រេចចាប់ការចុចកន្លែងវាយ Barcode ប្រើ keyboard
+  ពិត · ការប៉ាន់ (៤៥% · ៥០%) ប្រើតែមុន keyboard បើកលើកដំបូងលើឧបករណ៍ ឬទំហំអេក្រង់នោះ។ មុននេះ App ចាំតម្លៃ **ធំបំផុត** ក្នុង memory ៖ keyboard iOS លោតហួសពេលបើក ➜
+  តម្លៃហួសត្រូវចាំ ➜ របៀបដកនៅទៅផ្លូវ iOS ទោះ keyboard បានបើកម្តងរួច (ដូចវីដេអូ)។
+- 🐛 **Android (App · Chrome) ៖ ចុចប្រអប់ស្វែងរក Locker ➜ ទំព័រកន្ត្រាក់ឡើងលើ** (A115)។ keyboard លោតខណៈការរអិលនៅទុកប្រអប់ទាប ➜ Chromium រំកិលទំព័រទាំងមូល (navbar បាត់)
+  ដើម្បីបង្ហាញប្រអប់ ➜ ការរអិលបន្តឡើង ➜ រំកិលហួស (ប្រអប់ស្វែងរកបាត់ពីលើ) ➜ លោតត្រឡប់។ ឥឡូវប្រអប់ស្វែងរក tab ស្កេន (បញ្ជីកញ្ចប់ · Locker) លើ Android ចាប់ការចុចដូច iOS ៖
+  `touchend` preventDefault ➜ បង្រួមផ្ទាំងស្កេនមុន ➜ `focus({ preventScroll: true })` (Chromium មិនរំកិលពេល keyboard លោត)។ កាមេរ៉ាកំពុងស្កេន ➜ ធ្វើតាម browser ·
+  ប្រអប់ស្វែងរកលេខ (ទំព័រទិន្នន័យ) លើ Android មិនប្រែ (តំបន់ហាម · មិនមានរាយការណ៍)។
+- 🐛 **ទូរស័ព្ទផ្តេក ៖ ប៊ូតុងទំព័រស្កេននៅក្រោមរបា Tab** (សំណើម្ចាស់គម្រោង «កែ A124 ទៅ ហើយ push ហ្មង សាងអ្នកយាមសិនមុនកែ» · ផ្នែក ២ A124)។ Android ផ្តេក 780×360 ៖
+  «📁 យក Barcode ពីរូបភាព» · «📋 បញ្ចូលច្រើន» នៅក្រោមរបា Tab (កម្ពស់ ៦៦) ពេលទំព័រនៅកំពូល · របៀបដក ៖ កន្លែងវាយ Barcode · «បញ្ជូន» ក៏នៅក្រោម (780×360 · iPhone SE ផ្តេក 667×375) ·
+  APK 756×336 ៖ ប៊ូតុងតម្រងថ្ងៃ (ទំព័រទិន្នន័យ) ក៏នៅក្រោម · អូសតិច (< ~១០០px) ➜ snap ទាញត្រឡប់ ០ (តំបន់ហាម ⛔ មិនប៉ះ) ➜ ចុចមិនបាន។ ឥឡូវ ទូរស័ព្ទផ្តេក (< ៩៩២ · កម្ពស់ ≤ ៥០០) ៖
+  ផ្ទាំងស្កេន ២ ជួរឈរ (ឆ្វេង ៖ ប៊ូតុងរបៀប ៣ · ផ្ទាំងរបៀបដក · កាមេរ៉ា · ស្តាំខាងលើ ៖ កន្លែងវាយ Barcode · រូបភាព · បញ្ចូលច្រើន ៖ ជួរឈរនីមួយៗទទឹងប្រហែលទូរស័ព្ទបញ្ឈរ ·
+  កន្លែងវាយបាត ១១៧px ➜ keyboard ផ្តេកពិត (iPhone 209/393 · Android 190–200) មិនបាំង ➜ ការចុចត្រូវចាប់ (ទំព័រមិនរំកិល · ច្បាប់ A114/A117 ដដែល)) ·
+  របា Tab បង្រួម (រូបនៅក្បែរអក្សរ · ផ្ទៃចុច ៣៦px ៖ ដូចរបា Tab iPhone ផ្តេក) ➜ គ្រប់ប៊ូតុង/កន្លែងវាយចុចបានពេលទំព័រនៅកំពូល (កម្ពស់ ៣០០–៤៣០)។ CSS តែក្នុង `react-root.css`
+  (`@media (max-width: 991px) and (orientation: landscape) and (max-height: 500px)`) ⛔ បញ្ឈរ · tablet · desktop · snap · ចលនាផ្ទាំង មិនប្រែ។
+- 🐛 **កុំព្យូទ័រ ៖ «🖼️ រក្សាទុកជារូបភាព» (NIIMBOT) ➜ «❌ រក្សាទុករូបភាពស្លាកមិនបាន»** (រាយការណ៍ម្ចាស់គម្រោង ៖ «រក្សាទុកស្លាក រូបភាព niimbot អត់បានលើ កុំព្យូទ័រ
+  លោត toast រក្សាទុករូបភាពស្លាកមិនបាន» · ផ្នែក ២ A127)។ Chrome · Edge លើ Windows/Mac មាន Web Share ជាមួយឯកសារ ➜ App បើកផ្ទាំង Share ជំនួសការទាញយក · Share បដិសេធ
+  (`NotAllowedError` ៖ ឯកសារច្រើន · សកម្មភាពអ្នកប្រើផុតក្រោយគូររូប) ➜ ❌ ហើយគ្មានឯកសារ។ ឥឡូវ ៖ កុំព្យូទ័រ ➜ ទាញយក PNG ផ្ទាល់ (`imageShareSheetPreferred()` ៖ ទូរស័ព្ទ ·
+  iPad (Macintosh + ចុចច្រើនម្រាម) ប៉ុណ្ណោះបើក Share) · Share បដិសេធដោយហេតុផលផ្សេងពីការបោះបង់ ➜ ទាញយកជំនួស (✅) · បោះបង់ (`AbortError`) ➜ គ្មានសារ ដូចមុន ·
+  APK មិនប្រែ។ NIIMBOT ដំណើរការជាមួយកុំព្យូទ័រ ៖ PNG ដែលទាញយក ➜ ផ្ញើទៅទូរស័ព្ទ ➜ App NIIMBOT ➜ បញ្ចូលរូប។
+
+#### អ្នកយាម
+
+- `modal-keyboard-device-test` (គ) +៤ ឧបករណ៍ក្លែងរបារស្ថានភាព (`SAFE_TOP`) ៖ iPhone 393×852 status 59 (របៀបកញ្ចប់ · របៀបដក keyboard ខ្មែរ 365) · Pro Max របៀបដក ➜ ចាប់ ·
+  iPhone SE status 20 របៀបដក ➜ iOS — លើ `5a360b8` FAIL ១ (របៀបដក បាត 442 ៖ មិនចាប់) ➜ ២៥/២៥ · +១ keyboard លោតហួស 420 ➜ ស្ងប់ 365 ក្នុងរបៀបកញ្ចប់ ➜ របៀបដក ➜ ចាប់ —
+  លើ `c611d62` (ចាំធំបំផុត) FAIL ១ ➜ ២៦/២៦។
+- `ZoeW/tests/modal-keyboard.test.tsx` +៥ (ការចាំ keyboard) ៖ លោតហួស ➜ ចាំតម្លៃស្ងប់ · reload ➜ នៅចាំ · ឧបករណ៍ថ្មី ➜ ៤៥% · តាមប្រភេទ (tel មិនប៉ះអក្សរ · មិនទាន់វាស់ ➜ ធំបំផុតនៃអេក្រង់) ·
+  ទំហំអេក្រង់ផ្សេង ➜ ដាច់ពីគ្នា · គ្មាន field focus ➜ មិនចាំ · storage ខូច ➜ មិនប្រើ · ពិដាន `KEYBOARD_MEMORY_MAX` — មុនកែ FAIL ៥។
+- `history-window-check` +៣ ៖ ចុចពិត (touchscreen) លើប្រអប់ស្វែងរក Locker ៖ APK · PWA Android ➜ ចាប់ · បង្រួម · `preventScroll` · document ០ · PWA iPhone (មិនមែន standalone) ➜ browser —
+  មុនកែ FAIL ២ ➜ ០។
+- `ZoeW/tests/ios-entry-search-tap.test.ts` ៖ Android ➜ ចាប់ (Locker · បញ្ជីកញ្ចប់ · កាមេរ៉ា ➜ browser) · ការអះអាងចាស់ «Android/web ➜ browser» ចែកជាកុំព្យូទ័រ/web ➜ browser ·
+  `ZoeW/tests/ios-search-tap-focus.test.ts` ៖ ប្រអប់ស្វែងរកលេខលើ Android ➜ មិនប៉ះ · `ZoeW/tests/modal-keyboard.test.tsx` ៖ ទូរស័ព្ទបញ្ឈរ ៤៥% (៥០% ធ្លាក់) — មុនកែ FAIL ២។
+- `modal-keyboard-device-test` (គ) +៦ Android (Chrome 411×830 របៀបដក keyboard 407 · 360×740 · 412×915 · tablet បញ្ឈរ ➜ ចាប់ · ផ្តេក · tablet ផ្តេក ➜ Android) · (ឃ) visual viewport ពិត
+  (meta ពង្រីកបាន + pinch ➜ offsetTop 88) ➜ ចុចស្វែងរកបញ្ជីកញ្ចប់ · Locker ➜ offsetTop ០ · ប្រអប់ក្នុងផ្ទៃមើលឃើញ · (ង) ម៉ាស៊ីនស្កេន ៖ ព្រឹត្តិការណ៍ keyboard ពិត (CDP) Android · iPhone ·
+  កុំព្យូទ័រ ៖ គ្មានអ្វី focus + Enter · keyboard ខ្មែរ (key «៧» · code Digit7) · suffix Tab ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode ពិត · ទិសផ្ទុយ ប្រអប់ស្វែងរក ➜ មិនលួច —
+  មុនកែ FAIL ១៥ (៦ + ៩) ➜ ៤៦/៤៦។
+- `ZoeW/tests/hardware-scanner.test.tsx` (ថ្មី · ១១) ៖ តួអក្សរ US តាម `code` (Shift · CapsLock · Numpad · សញ្ញា · ឈ្មោះ prototype) · keyboard ខ្មែរ · Ctrl/Space/Unidentified ➜ ទទេ ·
+  `latinDigits` · បញ្ចូលច្រើន · `triggerScanAction()` លេខខ្មែរ · គ្មាន focus · ប៊ូតុង/select focus (Enter មិនចុចប៊ូតុង · select មិនប្តូរ) · Tab លឿន ➜ បញ្ជូន · វាយយឺត/តិច/Shift+Tab/Tab យឺត ➜
+  មិនបញ្ជូន · ប្រអប់ស្វែងរក · modal · ទំព័រទិន្នន័យ · ចាក់សោ · ផ្ទាំងចំហៀង ➜ មិនលួច — មុនកែ FAIL ១១ ·
+  `ZoeW/tests/modal-keyboard.test.tsx` +១ Android ៖ ចុចកន្លែងវាយ Barcode ➜ ចាប់ · ចាំ keyboard 407 · focus ដោយកូដគ្មាន keyboard ➜ ចាប់ · keyboard បើក · modal · បាំង · កុំព្យូទ័រ ➜ មិនចាប់ ·
+  `ZoeW/tests/ios-entry-search-tap.test.ts` +១ ៖ visual viewport រំកិល ➜ `documentElement.scrollIntoView` មុនបង្រួម · មិនរំកិល · iOS ➜ មិនហៅ — មុនកែ FAIL ២។
+- ការផ្ទៀងផ្ទាត់ឡើងវិញ (សំណើម្ចាស់គម្រោង · A120) ៖ `hardware-scanner.test.tsx` +២ («📋 បញ្ចូលច្រើន» ៖ គ្មាន focus · ខ្មែរ · Tab ➜ ជួរថ្មី · Enter · ចំនួន «3 Barcode» · ទិសផ្ទុយ ផ្ទាំងបញ្ជាក់
+  លើវា · វាយយឺត + Tab) · គ្រាប់ខ្មែរតួអក្សរច្រើន — លើ `c7b23da` FAIL ២ · `modal-keyboard-device-test` (ង) +៣ «📋 បញ្ចូលច្រើន» ព្រឹត្តិការណ៍ keyboard ពិត ➜ ៤៩/៤៩ ·
+  `react-purity-check` ស្គាល់ `setRangeText` · ច្រកចេញ `refs.ts` មានហេតុផល (`scrollIntoView` ២ · `setRangeText` ១) — `c7b23da` FAIL ១ (`.value` លើសពិដាន) ·
+  `repository-file-coverage.json` + `ZoeW/tests/hardware-scanner.test.tsx` — `c7b23da` FAIL ១។
+- 💰 `ZoeW/tests/scanner-modal-queue.test.tsx` (ថ្មី · ២១ ៖ App ពិត · lookup Auto save ពិត · registry/ledger/save ក្លែង) ៖ focus COD · លេខទូរស័ព្ទ · DOD · Locker ➜ ស្កេន B + Enter ➜
+  ប្រអប់មិនប្រែ · focus មិនរំកិល ➜ Auto save រក្សាទុក A = lookup (`012345678` · ៥ · ១) ➜ B បើកបន្ទាប់ · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ B · C តាមលំដាប់ (មិន «BC») · ផ្ទាំងបិទពាក់កណ្តាល ➜
+  Barcode ពេញ · អានពីរដង · «📋 បញ្ចូលច្រើន» X · Y · C · ប្តូរវគ្គ ➜ ទម្លាក់ · ⏹️ · ផ្ទាំងបើកពាក់កណ្តាលការស្កេនលើទំព័រ · ប៊ូតុង «🗑️ បញ្ជាក់ដក» focus ➜ មិនដក ➜ B ក្នុងរបៀបដក ·
+  ទំព័រទិន្នន័យ ➜ មិនចុចប៊ូតុង · ទិសផ្ទុយ ៖ ការវាយល្បឿនមនុស្ស (លេខទូរស័ព្ទ · Locker · COD + Enter ទៅប្រអប់បន្ទាប់) · លឿន ៣ តួ ➜ មិនបាត់ · keyboard លើអេក្រង់ · ផ្ទាំង PIN ➜ មិនប៉ះ —
+  លើកូដមុនកែ FAIL ១២ ➜ ១៧/១៧ · ការពិនិត្យ diff ខ្លួនឯង +២ ៖ checkbox ក្នុងផ្ទាំង focus ➜ គ្រាប់ដែលទប់មិនប្តូរ `value` (`typeIntoElement()` ទទួលតែប្រអប់វាយអក្សរ) ·
+  ស្កេន Barcode ដែលផ្ទាំង «ដក» កំពុងបង្ហាញ ➜ មិនចូលជួរ — លើ `0f2b40e` FAIL ២ ➜ ១៩/១៩ · Android បង្ហាញ keyboard លើអេក្រង់ពេលភ្ជាប់ម៉ាស៊ីនស្កេន
+  («Show virtual keyboard») ➜ ការស្កេននៅតែមិនចូល COD (keyboard លើអេក្រង់ Android ផ្ញើ `Unidentified` មិនត្រូវទប់) — លើ `56a567c` FAIL ១ ➜ ២០/២០ ·
+  ផ្ទាំងមិនមែនដំណើរការស្កេន (PIN តែឯង) · គ្មានប្រអប់ focus ➜ វាយលេខលឿន + Enter ➜ មិនចូលជួរ ប្រាប់ឲ្យបិទផ្ទាំងសិន (`SCAN_FLOW_MODALS`) — លើ `b1e3898` FAIL ១ ➜ ២១/២១ ·
+  💰 Fast Mode +៤ ៖ ម៉ាស៊ីនស្កេនគ្មាន suffix ចូល COD ➜ COD ទទេ · ប្រាប់ ➜ Auto save = lookup · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ ទទេ · COD `7810122334455`
+  ➜ Auto save មិនរក្សាទុក · ផ្ទាំងនៅ · focus COD ➜ កែជា ៥ ➜ រក្សាទុក ៥ · DOD លើសពិដាន + «រំលង» ➜ មិនរក្សាទុក · ទិសផ្ទុយ ត្រឹម `SCAN_MONEY_MAX` ➜ រក្សាទុក —
+  លើ `e33a872` FAIL ៤ ➜ ២៥/២៥ · `modal-keyboard-device-test` (ង) +៣ (ព្រឹត្តិការណ៍ keyboard ពិត ៖ គ្មាន Enter/Tab ➜ COD មិនប្រែ · COD ធំ ➜ «យល់ព្រម»
+  មិនរក្សាទុក) — លើ `e33a872` FAIL ៦ (៣ ថ្មី + ៣ «បិទ ➜ បើកបន្ទាប់» ៖ «យល់ព្រម» រក្សាទុក COD ធំ ហើយបិទផ្ទាំង) ➜ ៥៥/៥៥ ·
+  💰 Lookup ↔ ការវាយ +៤ ៖ វាយ COD «1» ➜ lookup ស្គាល់ ➜ មិន Auto save · ℹ️ COD 15 ➜ វាយ «5» ➜ យល់ព្រម ➜ COD 15 · រកមិនឃើញពេលវាយ COD ➜ cursor នៅ COD ·
+  ចុច Locker ➜ cursor នៅ Locker · ទិសផ្ទុយ មិនវាយ ➜ Auto save ដូចដើម · រកមិនឃើញ ➜ cursor ទៅលេខទូរស័ព្ទ — លើ `d50bb01` FAIL ៣ ➜ ២៩/២៩ ·
+  `tests/zto-lock.test.ts` sha256 `auto-lookup.ts` ថ្មី · `lookup-prefetch-test` ២៦៤/២៦៤ (`react-view` ផ្តល់ `activeElementIsInModal` ឲ្យ sandbox) ·
+  `zto-list-sync-test` ៥៩៥ · `zto-sync-banner-test` ១៩៨ · `user-guide-test` ៖ `guide.html` ប្រាប់ពិដានដែលស្រង់ពី `SCAN_MONEY_MAX` · `hardware-scanner.test.tsx` ទិសផ្ទុយ «modal បើក» ៖ គ្រាប់ត្រូវទប់ (មិនចូលប្រអប់ Barcode) ·
+  `modal-keyboard-device-test` (ង) +៣ (Android · iPhone · កុំព្យូទ័រ ៖ ព្រឹត្តិការណ៍ keyboard ពិត) ៖ វាយ COD «2.5» ល្បឿនមនុស្ស ➜ ចូល · ស្កេន + Enter ➜ COD មិនប្រែ · ចូលជួរ ➜
+  បិទ ➜ បើកបន្ទាប់ — កូដមុនកែ FAIL ៣ ➜ ៥២/៥២ · `layout-check` វាយលេខទូរស័ព្ទល្បឿនមនុស្ស (90ms/គ្រាប់ ៖ ០ms = ការស្កេន) · `react-purity-check` ស្គាល់ `document.execCommand` ·
+  `state-hygiene` `heldKeys` មានហេតុផល · CI លើ `e33a872` ៖ `toast-action-truth` FAIL ១ (toast «📥 Barcode (…)» គ្មានសញ្ញាប្រភេទ) ➜ «⏳ 📥 …» (ចូលជួរ = កំពុងរង់ចាំ) ➜ ៦៧/៦៧។
+- `layout-check` +៧ (`landscapeScanReach` · A124) ៖ ទូរស័ព្ទផ្តេក ៧ ទំហំ (780×360 · 756×336 · 780×300 · 640×360 · 667×375 · 844×390 · 932×430) × ៣ របៀប ៖ គ្រប់ប៊ូតុង/កន្លែងវាយ
+  ក្នុង `#entrySideSection` ចុចត្រូវចំកណ្តាលពេល scroll ០ · ទំព័រទិន្នន័យ (≥ ៣៣៦) ប៊ូតុងតម្រង ៤ · `--tabbar-height` = កម្ពស់របា Tab ពិតក្រោយបង្វិល · ផ្ទៃចុច Tab ≥ ៣២px · ទិសផ្ទុយ ៖
+  បញ្ឈរ (៣៩០ · ៣៦០ · ៧៦៨) ផ្ទាំងជួរឈរតែមួយ · រូប Tab នៅលើអក្សរ — កូដមុនកែ FAIL ២ (៧៨០×៣៦០ ៖ រូបភាព · បញ្ចូលច្រើន ➜ របា Tab · របៀបដក ៖ កន្លែងវាយ · ៧៥៦×៣៣៦ តម្រង) ➜ ៧/៧។
+- `modal-keyboard-device-test` (គ) ៖ ការរៀបលើកទី ១ (ប៊ូតុងរបៀបពេញខាងលើ · កន្លែងវាយក្រោម ៖ បាត ១៨៣) ធ្វើឲ្យ iPhone ផ្តេក 852×393 ចាប់ការចុច ខណៈ keyboard ពិត ២០៩ គ្របគម្លាត ៨px ➜
+  FAIL ២ ➜ ប្លង់ថ្មី ៖ កន្លែងវាយខាងលើស្តាំ (បាត ១១៧) ➜ ទូរស័ព្ទផ្តេក ២ ករណី (iPhone 852×393 · Android 915×412) ប្តូរពី «ប្រព័ន្ធ» ទៅ «ចាប់» (preventDefault · `preventScroll` · document ០ ·
+  keyboard ពិតមិនបាំង ៖ test ផ្ទៀងផ្ទាត់ខ្លួនឯង) + Android 780×360 របៀបដក keyboard ២០០ (A124) · ទិសផ្ទុយ «keyboard បាំង ➜ ប្រព័ន្ធ» នៅ (iPad ផ្តេក · Android tablet ផ្តេក · iPhone SE របៀបដក) ·
+  (ង) ការស្កេនក្លែងពេលផ្ទាំងបើក ៖ ម៉ាស៊ីនតេស្តផ្អាក > `SCANNER_KEY_GAP_MS` (CDP · GC ៖ ធ្លាក់ ២ ដងក្នុង ៣ ការរត់ · build មុន/ក្រោយកែ ០/២០ ពេលរត់ម្នាក់ឯង · ចន្លោះ ១៥–២៩ms) ➜ វាស់ចន្លោះពិត
+  (`event.timeStamp`) · ធ្វើម្តងទៀតតែពេលនោះ (≤ ៣) · ការអះអាងជាន់អប្បបរមា «ល្បឿនម៉ាស៊ីនស្កេន» · mutation (`count >= 4` ➜ `false` ៖ ការស្កេនគ្មាន suffix វាយចូល COD) ➜ FAIL ៣ ➜ ៥៩/៥៩។
+- `ZoeW/tests/label-image.test.tsx` +២ (A127) ៖ Windows · Mac (មាន `navigator.share`) ➜ ទាញយក · គ្មាន Share · iPad ➜ Share · Android `NotAllowedError` ➜ ទាញយកជំនួស ·
+  ប៊ូតុងលើកុំព្យូទ័រ ➜ «✅ បានទាញយករូបភាពស្លាក 3» គ្មាន ❌ · ការអះអាងចាស់ «NotAllowedError ➜ reject» (ចាក់សោកំហុស) ប្តូរ — កូដមុនកែ FAIL ៣ ➜ ៧/៧ ·
+  `layout-check` +៣ (`labelImageExport` ៖ browser ពិត · ការទាញយកពិតរបស់ Playwright) ៖ Edge Windows Share បដិសេធ ➜ ទាញយក PNG ២ · ✅ · Android `NotAllowedError` ➜ ទាញយក ២ ·
+  ទិសផ្ទុយ Android `AbortError` ➜ ០ ទាញយក · គ្មានសារ — build មុនកែ FAIL ២ (Edge · Android ៖ «❌ រក្សាទុករូបភាពស្លាកមិនបាន» · ០ ឯកសារ) ➜ ៩/៩។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.81` (workflow `main`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone (PWA)** ៖ ទំព័រស្កេន ➜ 🗑️ ស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode ➜ keyboard លោតឡើង ទំព័រ និង navbar នៅនឹងកន្លែង (របៀបកញ្ចប់ · Locker ដូចគ្នា)។
+2. **APK · Chrome Android** ៖ 📍 កំណត់ទីតាំង Locker ➜ ចុចប្រអប់ស្វែងរក (ផ្ទាំងស្កេនបើក) ➜ បញ្ជីរអិលឡើងតែម្តង ប្រអប់ស្វែងរកនៅពីលើ keyboard (navbar មិនបាត់) · 📦 បញ្ជីកញ្ចប់ដូចគ្នា ·
+   keyboard លោត ➜ វាយបាន (បើ keyboard មិនលោត ➜ ចុចម្តងទៀត ហើយប្រាប់ខ្ញុំ)។
+3. **APK** ៖ ប្រអប់ផ្សេងៗ ➜ នៅដូច 2.50.80។
+4. **Chrome Android · APK** ៖ ទំព័រស្កេន ➜ 🗑️ ស្កេនដកកញ្ចប់ ➜ ចុចកន្លែងវាយ Barcode (keyboard ខ្មែរ ឬអង់គ្លេស) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង · ចុចម្តងទៀតក៏ដូច្នេះ ·
+   បន្ទាប់មកចុចប្រអប់ស្វែងរក 📦 បញ្ជីកញ្ចប់ ➜ ប្រអប់ស្វែងរកនៅកំពូល (navbar ឃើញ) ភ្លាម។
+5. **ម៉ាស៊ីនស្កេន Bluetooth (ទូរស័ព្ទ) · USB (កុំព្យូទ័រ)** ៖ ទំព័រស្កេន ➜ មិនចុចប្រអប់ ➜ ស្កេន ➜ ផ្ទាំងបញ្ជាក់បើកជាមួយ Barcode ត្រឹមត្រូវ · ស្កេនបន្តបន្ទាប់ (ក្រោយរក្សាទុក)
+   មិនបាត់ · ប្តូរ keyboard ជាខ្មែរ ➜ ស្កេន ➜ Barcode ជាលេខឡាតាំង · ម៉ាស៊ីនកំណត់ suffix Tab ក៏បញ្ជូន · កំពុងវាយក្នុងប្រអប់ស្វែងរក ➜ ការស្កេនចូលប្រអប់ស្វែងរក។
+6. **ម៉ាស៊ីនស្កេន ពេលផ្ទាំង «🎉 ស្កេនបានជោគជ័យ!» បើក** ៖ ស្កេន A ➜ ផ្ទាំង A បើក ➜ ចុចប្រអប់ COD ➜ ស្កេន B ➜ COD នៅទទេ · ឃើញ «📥 ការស្កេនតាមជួរ» ➜ រក្សាទុក ឬបោះបង់ A ➜
+   ផ្ទាំង B បើកដោយខ្លួនឯង · Auto save (lookup ស្គាល់លេខ) ពេលស្កេនបន្តបន្ទាប់លឿនៗ ➜ A · B · C រក្សាទុកតាមលំដាប់ លុយត្រូវ · វាយលេខទូរស័ព្ទ/COD ដោយដៃនៅធម្មតា
+   (បើអក្សរយឺត ឬបាត់ ➜ ប្រាប់ខ្ញុំ)។
+7. **Fast Mode** ៖ ផ្ទាំងស្កេនបើក ➜ វាយ COD «7810122334455» ➜ «យល់ព្រម» ➜ ⚠️ មិនរក្សាទុក ផ្ទាំងនៅ ➜ កែជាចំនួនពិត ➜ រក្សាទុក ·
+   ម៉ាស៊ីនស្កេនដែលមិនទាន់កំណត់ Enter/Tab ➜ ស្កេនពេលផ្ទាំងបើក ➜ ⚠️ ប្រាប់ឲ្យកំណត់ Enter/Tab (COD មិនប្រែ)។
+8. **Lookup (ZTO) ពេលកំពុងវាយ** ៖ ស្កេន ➜ ចុច COD ហើយវាយភ្លាម (មុន lookup ចប់) ➜ lookup ស្គាល់ ➜ មិនរក្សាទុកស្វ័យប្រវត្តិ · ឃើញ ℹ️ COD/DOD
+   ពី ZTO · cursor នៅ COD ➜ វាយចប់ ➜ «យល់ព្រម» · មិនវាយអ្វី ➜ Auto save ដូចធម្មតា។
+9. **ទូរស័ព្ទផ្តេក (APK · Chrome Android · iPhone)** ៖ បង្វិលទូរស័ព្ទ ➜ ទំព័រស្កេន ➜ ប៊ូតុងរបៀប · កាមេរ៉ានៅឆ្វេង · កន្លែងវាយ Barcode · «📁» · «📋 បញ្ចូលច្រើន» នៅស្តាំខាងលើ
+   ពីលើរបា Tab (មិនបាច់អូស) · ចុចកន្លែងវាយ ➜ keyboard លោត ទំព័រមិនរំកិល កន្លែងវាយនៅពីលើ keyboard · 🗑️ របៀបដក ដូចគ្នា · បើកកាមេរ៉ាផ្តេក ➜ ស្កេនបាន ·
+   បង្វិលត្រឡប់បញ្ឈរ ➜ ដូចមុន (ជួរឈរតែមួយ · រូប Tab នៅលើអក្សរ) ·
+   ទំព័រទិន្នន័យផ្តេក ➜ ប៊ូតុងតម្រងថ្ងៃចុចបាន។
+10. **កុំព្យូទ័រ (Chrome · Edge) ៖ NIIMBOT** ៖ ផ្ទាំងបោះពុម្ពស្លាក ➜ «🖼️ រក្សាទុកជារូបភាព» ➜ PNG ទាញយកចូល Downloads (មួយស្លាកមួយឯកសារ · Browser អាចសួរ «ទាញយកឯកសារច្រើន» ➜ អនុញ្ញាត) ·
+   ✅ គ្មាន ❌ ➜ ផ្ញើ PNG ទៅទូរស័ព្ទ ➜ App NIIMBOT បញ្ចូលរូប ➜ បោះពុម្ព · ទូរស័ព្ទ ➜ ផ្ទាំង Share ដូចមុន។
 
 ### [2.50.80] — 2026-10-15 · ZoeW ៖ **APK ៖ ប្រអប់មិនញ៉ាក់ពេល keyboard លោតចប់ · iPhone ៖ ចុចកន្លែងវាយ Barcode ទំព័រមិនធ្លាក់ · បញ្ជី Locker មិនធ្លាក់ពេលជ្រើសទីតាំង**
 
@@ -4422,6 +4592,66 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
+
+- CI 776 លើ `b86ed08` ៖ ៤/៤ ✅ (CI 775 លើ `42628fc` ត្រូវបោះបង់ដោយ push ថ្មី · ផ្នែក 4/4 ជាប់មុនបោះបង់)។
+- ការផ្ទៀងផលប៉ះពាល់ `ada318c..b86ed08` ៖ (១) បន្ទាត់លុប ៖ announcements ថែមក្បៀស · ប្រយោគ NIIMBOT ក្នុង guide ពង្រីក · កូដ Share រៀបឡើងវិញក្នុង `download()` +
+  `imageShareSheetPreferred()` · (៣) អ្នកប្រើ `shareImageFiles()` តែ `saveLabelImagesFromModal()` (`'saved'` ➜ «✅ បានទាញយក…» ពិត) · (៤) Share ៖ esbuild bundle កូដមុន/ក្រោយ ១០ UA ×
+  ១០ ចម្លើយ Share = ១០០ ករណី ➜ ដូចគ្នា ៥២ · ប្រែ ៤៨ (កុំព្យូទ័រ ➜ ទាញយក · ទូរស័ព្ទ/iPad Share បដិសេធ ➜ ទាញយក) · ០ ករណីគ្មានឯកសារ គ្មាន Share (ក្រៅពីបោះបង់) ·
+  ប្លង់ ៖ `getBoundingClientRect()` គ្រប់ធាតុ (ទំព័រទិន្នន័យ · ស្កេន ៣ របៀប · navbar · របា Tab) build មុន/ក្រោយ ១៣ ទំហំ (ទូរស័ព្ទបញ្ឈរ ៥ · tablet ៤ · ព្រំដែន 991×501 ·
+  desktop ៣) ➜ ខុស ០ · ទិសផ្ទុយ ទូរស័ព្ទផ្តេក ២ ➜ ខុស ៧៥២ (ប្លង់ ២ ជួរឈរ · របា Tab ៦៦ ➜ ៤៥) · (៥) `imageShareSheetPreferred()` លើ `userAgent` · `maxTouchPoints` `undefined` ➜ មិនបោះកំហុស។
+- តេស្ត App ទាំងមូល ៖ លំហូរប្រចាំថ្ងៃ ១៤ ឧបករណ៍ ៥១៨/៥១៨ · flow2 ៧២/៧២ (ស្គ្រីប ៖ រំលងជួរ spacer ទទេរបស់ virtualizer) · ប្លង់ ៥៦០ ស្ថានភាព ➜ ប្រែតែទូរស័ព្ទផ្តេក ២
+  (កន្លែងវាយ Barcode ទទឹង ៥៨១ ➜ ២៥១ ក្នុងជួរឈររបស់វា · ធាតុនៅក្រោមក្បាលតារាងពេលរមូរដល់ចុង ៧ ➜ ២) · កំហុស JavaScript ០។
+- `native:check` ធ្លាក់ ១ ក្នុង run-all ក្នុង session (ម៉ាស៊ីន ៤ CPU · lane ៤ រវល់) ៖ «PTR លើ native ៖ ទាញចុះ ➜ ផ្ទុកឡើងវិញ» ➜ រត់ម្នាក់ឯង ១១៨/១១៨ · CI ៤/៤ ✅។ មូលហេតុ ៖
+  `waitForEvent('framenavigated', 6000)` ចាប់ផ្តើមមុន `pull()` ដែលបញ្ជូន touchMove CDP ៥០ ដង ហើយរង់ចាំ ack ម្តងមួយៗ (២.១ វិ. ក្រោម busy loop ៦ · App ផ្ទុកឡើងវិញ ០.៣៦ វិ.
+  ក្រោយលែងដៃ) ➜ ពិដានរាប់ពេលរបស់ harness ➜ ឥឡូវ ៦ វិ. ចាប់ពីលែងដៃ · detail `pullMs` · `reloadAfterReleaseMs` · mutation (`location.reload` ➜ គ្មាន) ➜ FAIL ២ (ផ្នែក ១ +
+  ៤ខ latch ដែលមិនប្តូរ ៖ dispatch ក្នុង `evaluate` តែមួយ) · busy loop ៨ ➜ ១១៨/១១៨ · ⛔ មិនបង្កើនពិដាន។ ឧបករណ៍តែប៉ុណ្ណោះ ➜ មិនប្តូរកំណែ។
+
+### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`8d66650`) ៖ តេស្តលំហូរប្រើប្រាស់ប្រចាំថ្ងៃ គ្រប់ទំហំអេក្រង់ គ្រប់ឧបករណ៍
+
+**វិធី** ៖ ស្គ្រីបរុករក (មិនមែនអ្នកយាម) លើ App ពិត (audit build `8d66650`) + Firebase ក្លែង + lookup ក្លែង (ឆ្លើយក្រោយ ១.៥ វិ.) · ចុចពិត (touch លើទូរស័ព្ទ/tablet ·
+កណ្តុរលើកុំព្យូទ័រ) ហើយពិនិត្យ `elementFromPoint` មុនចុចរាល់ដង · keyboard ពិត (មនុស្ស ១៣០ms/គ្រាប់ · ម៉ាស៊ីនស្កេន ៤ms/គ្រាប់ + Enter) · ឧបករណ៍ ១៤ (iPhone ៣២០ · ៣៧៥ · ៣៩០ · ៤៣០ ·
+Android ៣៦០ · ៤១២ · iPhone/Android ផ្តេក · iPad mini · Air ផ្តេក · Pro · Android tablet · Laptop · Desktop) × ៣៧ ការអះអាង ៖ ម៉ាស៊ីនស្កេនមិនចុចប្រអប់ ➜ វាយដោយដៃ ➜ រក្សាទុក ·
+ស្កេនពេលផ្ទាំងបើក ➜ ជួរ ➜ ផ្ទាំងបន្ទាប់បើកឯង · ស្ទួន · COD ធំខុស ➜ កែ ➜ រក្សាទុក · Lookup Auto save / កំពុងវាយ · Locker · ដក · ស្វែងរក · បិទ/បើក (ស្ថិតិយករួច) · កែតម្លៃ ·
+កែលេខ · លុប ➜ ស្តារ (លុបមិនដក · ដកបន្ថែមវិញ) · ស្ថិតិ ២ · បញ្ចូលច្រើន · ស្លាក · Export · COD/DOD/ចំនួនគ្រប់ជួរ = សរុប Barcode · កំហុស JS ·
+បន្ថែម ៦ ឧបករណ៍ × ១២ ៖ Enter ពីលេខទូរស័ព្ទ ➜ Locker ➜ COD ➜ DOD (Enter លើ DOD មិនរក្សាទុក) · ល្បឿនវាយ · តម្រងថ្ងៃ · ប្លង់ ១៤ ទំហំ × ៤០ ស្ថានភាព ធៀបជុំមុន។
+លទ្ធផល ៖ ៥១១/៥១៨ + ៧១/៧២ (ខុសទាំងអស់ពន្យល់ខាងក្រោម) · ប្លង់ ០ ថ្មី · កំហុស JS ០ · ចំណូលថ្ងៃ (+ រក្សាទុក · − ដក · + ស្តារការដក · លុបមិនប៉ះ · កែតម្លៃ = ភាពខុសគ្នា) ត្រូវគ្រប់ឧបករណ៍ ·
+CI លើ `8d66650` ៤/៤ បៃតង។ ការអះអាងខុសរបស់ស្គ្រីបខ្លួនឯង (មិនមែន App) ៖ marker ចុចចាស់នៅលើប៊ូតុងមុន · ជួរ spacer របស់ virtualizer (Android) គ្មានថ្ងៃ ➜ កែស្គ្រីប។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A124 | **Android ផ្តេក 780×360 ៖ «📋 បញ្ចូលច្រើន» នៅក្រោមរបា Tab** | ប៊ូតុង ២៧៩–៣១៧ ⟷ កំពូលរបា Tab ២៩៤ (កម្ពស់ ៦៦) ➜ កណ្តាលប៊ូតុងជារបា Tab · អូសពិត (touch CDP) ៦០px ➜ snap ត្រឡប់ ០ · ១២០ · ២០០px ➜ snap ទៅ `.page-main` (២៧៤) ➜ ប៊ូតុងទៅក្រោម navbar ➜ ចុចបានតែ ១៥px ខាងលើ · 732×412 · iPhone 667×375 · 844×390 ចុចបាន | សំណើម្ចាស់គម្រោង «កែ A124 ទៅ ហើយ push ហ្មង សាងអ្នកយាមសិនមុនកែ» ➜ `layout-check` `landscapeScanReach` (មុនកែ FAIL ២ ៖ របៀបដក ៖ កន្លែងវាយ Barcode · «បញ្ជូន» ក៏នៅក្រោមរបា Tab · 756×336 ប៊ូតុងតម្រងទំព័រទិន្នន័យ) ➜ ផ្ទាំងស្កេន ២ ជួរឈរ + របា Tab បង្រួម តែទូរស័ព្ទផ្តេក (`react-root.css`) ➜ ៧/៧ ✅ · snap · ចលនាផ្ទាំង មិនប៉ះ |
+| A125 | **Tablet ៖ ចុច «✅ បិទ» ភ្លាមក្រោយចេញពីស្វែងរក ➜ បិទជួរផ្សេង** | iPad mini · Android tablet ៖ ស្គ្រីបចុច ៥០០ms ក្រោយ blur · វាស់រាល់ស៊ុម ៖ ជួររអិល ៤៥០ ➜ ៧៤០ ក្នុង ~៤៩០ms (ទាញស្វែងរកចុះ `PANEL_SEARCH_GLIDE` + រង់ស៊ុម) ទូរស័ព្ទដូចគ្នា · `elementFromPoint` ត្រូវ ➜ touch មកដល់ពេលជួររំកិល | ចលនាដែលម្ចាស់គម្រោងផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត (តំបន់ហាម) · រង់ ១ វិ. ➜ ៧៤/៧៤ ✅ · មិនកែ |
+| A126 | **ការវាយលឿន ↔ ម៉ាស៊ីនស្កេន ក្នុងផ្ទាំងលេខទូរស័ព្ទ** | ៩០ · ៧០ · ៦១ms/គ្រាប់ + Enter ➜ លេខចូលប្រអប់ · cursor ទៅ Locker · មិនចូលជួរ (៦ ឧបករណ៍) · ៤៥ms (២២ គ្រាប់/វិ.) ➜ ⚠️ «គ្មាន Enter/Tab» · ៣០ms + Enter ➜ ជួរ | ដូចការរចនា (`SCANNER_KEY_GAP_MS`) ✅ |
+| A127 | **កុំព្យូទ័រ ៖ «🖼️ រក្សាទុកជារូបភាព» ➜ «❌ រក្សាទុករូបភាពស្លាកមិនបាន»** (រាយការណ៍ម្ចាស់គម្រោង) | Edge Windows (browser ពិត) ៖ `navigator.share` + `canShare({ files })` = true ➜ App បើក Share ជំនួសការទាញយក (A107 ចង់ឲ្យកុំព្យូទ័រទាញយក) · Share បដិសេធ `NotAllowedError` ➜ ❌ · ០ ឯកសារ · Android ដូចគ្នាពេលបដិសេធ | `imageShareSheetPreferred()` ៖ តែទូរស័ព្ទ · iPad បើក Share · បដិសេធ (មិនមែនបោះបង់) ➜ ទាញយកជំនួស (`file-output.ts`) · អ្នកយាម `label-image.test.tsx` (មុនកែ FAIL ៣) · `layout-check` (មុនកែ FAIL ២) ➜ ✅ |
+
+### 2026-10-15 — វីដេអូ Chrome Android លើ deploy preview 320 · ម៉ាស៊ីនស្កេន Bluetooth/USB ស្វ័យប្រវត្តិ · ការស្កេនពេលផ្ទាំងបើក ➜ ជួរ
+
+**វិធី** ៖ វីដេអូ Chrome Android (1080×2400 · keyboard ខ្មែរ/អង់គ្លេស · របារ URL ខាងក្រោម) ➜ ffmpeg ៤ ស៊ុម/វិ. ➜ វាស់កន្លែងវាយ · navbar · keyboard ·
+កូដ Chromium (`web_frame_widget_impl.cc` · `web_view_impl.cc` · `local_dom_window.cc` · `root_frame_viewport.cc` · `mouse_event_manager.cc` · `document.cc`) ·
+Chromium ពិត ៖ meta viewport ពង្រីកបាន + pinch ➜ visual viewport រំកិលពិត · ព្រឹត្តិការណ៍ keyboard ពិត (CDP `Input.dispatchKeyEvent` ៖ key «១» · code Digit1)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A117 | **Chrome Android ៖ ចុចកន្លែងវាយ Barcode (របៀបដក) ➜ ទំព័រ និង navbar រំកិលឡើង ~១៨០px ហើយនៅ** | វីដេអូ ៖ ស៊ុម 2.5 ➜ 3.0 វិ. កន្លែងវាយពី ៤៤–៤៧% ទៅ ២៤–២៧% (ប្រហែលកណ្តាលផ្ទៃពីលើ keyboard) · keyboard ខ្មែរ + របារ URL កំពូល ៤៩% · ពេលខ្លះមិនរំកិល (26.25–27.0 វិ.) ពេលខ្លះរំកិល (ចុចម្តងទៀត) · កូដ ៖ `ComputeScaleAndScrollForEditableElementRects` រំកិល (កណ្តាល) តែពេលប្រអប់/caret មិននៅក្នុង visual viewport ទាំងស្រុង · `ScrollFocusedEditableElementIntoView` រំលងពេល `GetFocusOptions()->preventScroll()` · ចុចប្រអប់ដែល focus រួច ➜ `HandleMouseFocus` មិនហៅ `SetFocusedElement` ➜ options នៅជាប់ · ទីតាំងពិត (App · UA Android) ៖ 411×830 របៀបដក បាត 384 (៤៦%) · 360×740 393 (៥៣%) · 915×412 343 (៨៣%) | ការចុចកន្លែងវាយ Barcode លើ Android ចាប់ដូច iPhone (`noteModalTouchStart` ៖ `isAndroidDevice()` · modal ➜ មិនចាប់ · focus រួច + `keyboardOpen`/visualViewport ➜ មិនចាប់) ➜ ✅ ៦ ឧបករណ៍ |
+| A118 | **Chrome Android ៖ ទំព័ររំកិលរួច ➜ ចុចស្វែងរកបញ្ជីកញ្ចប់ ➜ ឃើញតែ «📭» ៣ វិ.** | វីដេអូ ៖ 4.75 វិ. ទំព័ររំកិល (ពី A117) ➜ 5.0 ចុចស្វែងរក ➜ 5.25–8.0 តែសារទទេនៅកំពូល ➜ បិទ keyboard ➜ ត្រឡប់ · visual viewport នៅរំកិល ១៧៩px ខណៈការបង្រួមលើកប្រអប់ទៅ y≈១១០ · Chromium ពិត (pinch ➜ offsetTop 88) ៖ `window.scrollTo(0, 0)` ➜ 88 (ប៉ះតែ layout viewport ៖ `LocalDOMWindow::scrollTo` ➜ `LayoutViewport()`) · `documentElement.scrollIntoView({ block: 'start' })` ➜ ០ (`RootFrameViewport::ScrollIntoView` ចែកការរំកិលដល់ visual viewport) | `resetVisualViewportPan()` (refs) ក្នុងការចុចស្វែងរក Android មុនបង្រួម ➜ App ពិត (pinch) ៖ ៨៨ ➜ ០ · ប្រអប់ស្វែងរក y ១០៦/១៧៣ ក្នុងផ្ទៃ ➜ ✅ (មុនកែ 88 នៅដដែល) |
+| A119 | **ម៉ាស៊ីនស្កេន Bluetooth/USB** (សំណើម្ចាស់គម្រោង) | App ពិត (Chromium · ព្រឹត្តិការណ៍ keyboard ពិត) ៖ ទូរស័ព្ទ ៖ App មិន focus ប្រអប់ (`safeFocusScanner()` តែកុំព្យូទ័រ) ➜ ស្កេនក្រោយរក្សាទុក ➜ បាត់ · កុំព្យូទ័រ ៖ ក្រោយចុចប៊ូតុង (ការចុចប៊ូតុងមិន focus ប្រអប់) ➜ បាត់ ហើយ Enter ចុចប៊ូតុងនោះ · keyboard ខ្មែរ ៖ key «១» code Digit1 ➜ ប្រអប់ទទួល «១» · Tab ➜ focus ចេញ មិនបញ្ជូន · focus ក្នុង `keydown` ➜ តួអក្សរចូលប្រអប់ថ្មី (Chromium) ប៉ុន្តែ App បញ្ចូលខ្លួនឯង (មិនពឹងលើ engine) · មុនកែ FAIL ៩/១២ | `noteScannerKeyDown()` (document `keydown` capture) · `scannerKeyChar()` (`key` ASCII ➜ ដដែល · ផ្សេង ➜ `usLayoutChar(code)` · លេខខ្មែរ) · `latinDigits()` · Tab លឿន ➜ `submitManualBarcode()` ➜ ✅ ១២/១២ (Android · iPhone · កុំព្យូទ័រ) |
+| A120 | **ការផ្ទៀងផ្ទាត់ឡើងវិញ** (សំណើម្ចាស់គម្រោង ៖ «សូមផ្ទៀងផ្ទាត់ការងារឡើងវិញ ក្រែងមានចន្លោះ») | ៤ ចន្លោះលើ `c7b23da` ៖ (១) `repository-file-coverage` FAIL ៖ តេស្តថ្មីគ្មាន mapping (ឯកសារនីមួយៗក្នុង `ZoeW/tests/` មានជួរផ្ទាល់) · (២) `npm run purity:check` FAIL ៖ `refs.ts` `.value +=` (fallback) លើសពិដាន `.value =` ១ · `scrollIntoView` ២ > ១ — ការពិនិត្យទាំងពីរមិនបានរត់មុន push (run-all រត់ក្នុងផ្ទៃខាងក្រោយ) ➜ CI ផ្នែក `zoew-suite 1/2` · `repository-file-coverage` នឹងក្រហម · (៣) keyboard ខ្មែរ NiDA មានគ្រាប់ដែលវាយតួអក្សរ ២ («ុះ» · «ោះ») ➜ `scannerKeyChar()` ទទួលតែ `key` មួយតួ ➜ ទុកឲ្យ native ➜ Barcode ជាអក្សរខ្មែរ · (៤) «📋 បញ្ចូលច្រើន» (ប្រអប់សម្រាប់ម៉ាស៊ីនស្កេន) ៖ keyboard ខ្មែរមិនបម្លែង · suffix Tab ➜ focus ចេញ ➜ ការស្កេនបន្ទាប់បាត់ · គ្មាន focus ក្នុងប្រអប់ ➜ បាត់ | (១) mapping `zoew-self-verification` ➜ ១០/១០ · (២) `insertFieldText()` គ្មាន fallback `.value` (បញ្ចូលមិនបាន ➜ `false` ➜ គ្រាប់ទៅ native) · `setRangeText` ក្នុង `DOM_METHODS` · ច្រកចេញមានហេតុផល ➜ ១៥/១៥ · (៣) `key` មិនមែន ASCII (មួយ ឬច្រើនតួ) ➜ `usLayoutChar(code)` · (៤) `scannerCaptureField()` ៖ «📋 បញ្ចូលច្រើន» ខាងលើ ➜ `batchBarcodeInput` · Tab លឿន ➜ ជួរថ្មី · `input` ➜ ចំនួន ➜ ✅ vitest +២ · ឧបករណ៍ពិត ៤៩/៤៩ |
+| A121 | **ការស្កេនពេលផ្ទាំងលេខទូរស័ព្ទបើក ↔ Auto save ពី lookup** (សំណើម្ចាស់គម្រោង ៖ «ពិនិត្យផ្លូវ Auto save ពេលស្គាល់លេខទូរស័ព្ទពី lookup … ក្រែងប្រជែងគ្នាជាមួយការបន្ថែមថ្មី» · «ប៉ះតំបន់លុយ សាងអ្នកយាមមុន») | កូដមុនកែ (App ពិត · `triggerScanAction` · lookup ពិតតាម `fetch` ក្លែង · `confirmPhone` ពិត · registry/ledger/save ក្លែង · ព្រឹត្តិការណ៍ keyboard ដែលធ្វើតាម browser ៖ គ្រាប់មិន `preventDefault` ➜ ចូលប្រអប់ · Enter លើប៊ូតុង ➜ ចុច) ៖ ផ្ទាំង A បើក (lookup កំពុងរក) ➜ ស្កេន B ៖ focus COD ➜ lookup ស្គាល់ ➜ Auto save រក្សាទុក A `["012345678", 7810122334455, 1]` + «✅ រក្សាទុកបានជោគជ័យ!» · DOD ➜ `[…, 5, 7810322334455]` · លេខទូរស័ព្ទ ➜ «✅ បានទាញយក…» គ្មាន Auto save (`fillEmptyLookupFields()` បំពេញតែប្រអប់ទទេ) · Locker ➜ Locker = B · ប្រអប់ Barcode ក្រោយផ្ទាំង ➜ `submitManualBarcode()` ចេញពេលផ្ទាំងបើក ➜ «BC» · ផ្ទាំងបិទពាក់កណ្តាល ➜ កន្ទុយ B ចូលប្រអប់ Barcode ហើយបញ្ជូន (Barcode ខ្លី) · «🗑️ បញ្ជាក់ដក» focus ➜ Enter ចុច (កាត់លុយ) · `type=number` ៖ `setRangeText` បោះ `InvalidStateError` (happy-dom · Chromium) · `execCommand('insertText')` ក្នុង Chromium ពិត ៖ «1» «.» «5» ➜ `1.5` · caret កណ្តាលលេខទូរស័ព្ទ ➜ ត្រូវ | ទប់គ្រាប់ពេលផ្ទាំងបើក (`scannerHoldScope()` · `heldKeys`) ➜ ការវាយត្រឡប់ចូលប្រអប់ (`typeIntoElement()`) · ការស្កេន ➜ ជួរ (`queueScannedCode()` ➜ ការរត់ «📥» នៃជួរ «📋 បញ្ចូលច្រើន» ៖ របៀបស្កេន · រង់ចាំការដក) ➜ `scanner-modal-queue.test.tsx` ២០ (កូដមុនកែ FAIL ១២ · checkbox + ផ្ទាំងដកស្កេនដដែល លើ `0f2b40e` FAIL ២ · Android keyboard លើអេក្រង់ លើ `56a567c` FAIL ១ · ផ្ទាំង PIN តែឯង លើ `b1e3898` FAIL ១) · `modal-keyboard-device-test` (ង) កូដមុនកែ FAIL ៣ ➜ ៥២/៥២ · ការប៉ះពាល់ ៖ `layout-check` វាយ ០ms = ការស្កេន ➜ 90ms · ទិសផ្ទុយ «modal បើក» ក្នុងតេស្តម៉ាស៊ីនស្កេន ➜ គ្រាប់ត្រូវទប់ · Auto save មិនប្រែ (ឯកសារ ZTO ចាក់សោ `auto-lookup.ts` មិនប៉ះ) |
+| A122 | **Fast Mode ៖ ម៉ាស៊ីនស្កេនគ្មាន Enter/Tab · COD/DOD ធំខុសធម្មតា** (សំណើម្ចាស់គម្រោង ៖ «ដែលអ្នកថា Fast mode មានចន្លោះនោះសូមកែអោយស្អាតចុះ») | `e33a872` (App ពិត · lookup Auto save ពិត · registry/ledger/save ក្លែង) ៖ គ្រាប់លឿន ១៤ គ្មាន suffix ចូល COD ➜ timer `SCANNER_SUFFIX_GAP_MS` ត្រឡប់គ្រាប់ចូល COD (`78101355667788`) ➜ Auto save · ប្រអប់ Barcode ក្រោយផ្ទាំង = `ZTQZ140002` · COD `7810122334455` ដែលមិនឆ្លងការទប់ (បិទភ្ជាប់ · keyboard លើអេក្រង់ iPhone) ➜ `confirmPhone()` រក្សាទុក (Auto save · «រំលង») · checker ១៣ ដែលស្រង់ `confirmPhone` ចូល sandbox (`duplicate-money` · `revenue-fuzz` · …) ៖ ថេរថ្មីមិនបាក់ពួកវា | ស្រទាប់ ២ ៖ ការទប់បោះបង់ការស្កេនគ្មាន suffix (`releaseHeldKeys()` ៖ ≥ `SCANNER_MIN_CHARS` ➜ toast) · `confirmPhone()` បដិសេធ COD/DOD > `SCAN_MONEY_MAX` មុន claim/ledger ➜ `scanner-modal-queue.test.tsx` +៤ (`e33a872` FAIL ៤) · `modal-keyboard-device-test` (ង) +៣ · `user-guide-test` ស្រង់ពិដានពីកូដ |
+| A123 | **Lookup Auto save ↔ មនុស្សកំពុងវាយ (`auto-lookup.ts` ក្នុងសោ ZTO)** (សំណើម្ចាស់គម្រោង ៖ «ត្រូវការកែ auto-lookup.ts របស់ ZTO ដែរឬ បើត្រូវកែក៏កែចុះ») | ចម្លើយ ៖ ត្រូវ — វាស់លើ `d50bb01` (App ពិត · lookup ពិតតាម `fetch` ក្លែង) ៖ `applyLookupFillToModal()` រក្សាទុកស្វ័យប្រវត្តិពេល lookup បំពេញលេខទូរស័ព្ទ ទោះមនុស្សកំពុងវាយ COD ➜ `["012345678", 1, 1]` (ចង់ 15) · `armLookupFocus()` ពិនិត្យតែប្រអប់លេខទូរស័ព្ទទទេ ➜ ទាញ cursor ចេញពី COD/Locker ➜ «5» ចូលលេខទូរស័ព្ទ · ច្បាប់ CLAUDE.md «unless the user typed» មានក្នុងអត្ថបទ តែកូដពិនិត្យតែលេខទូរស័ព្ទ | `scanState.phoneModalTyped` (`input` លើប្រអប់ ៤ · កំណត់ឡើងវិញក្នុង `triggerScanAction()`) ➜ Auto save តែពេលមិនទាន់វាយ (វាយរួច ➜ ℹ️ ជាមួយ COD/DOD lookup) · `armLookupFocus()` មិនទាញ cursor ពេលបានវាយ ឬប្រអប់វាយក្នុងផ្ទាំង focus ➜ `scanner-modal-queue.test.tsx` +៤ (`d50bb01` FAIL ៣) · សោ ZTO ៖ sha256 `auto-lookup.ts` ថ្មីក្នុង `tests/zto-lock.test.ts` តាមសំណើនេះ · អ្នកយាម ZTO ទាំងអស់បៃតង |
+
+### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.80 ៖ iPhone របៀបស្កេនដក ទំព័រធ្លាក់ · Android ស្វែងរក Locker កន្ត្រាក់
+
+**វិធី** ៖ វីដេអូ iPhone (60fps) · APK (~90fps) ➜ ffmpeg ស៊ុមម្តងមួយ (pts) ➜ វាស់ទីតាំងកន្លែងវាយ · navbar · កំពូល keyboard ពីស៊ុមពេញទំហំ ➜ App ពិត (audit build) ក្នុង Chromium ៖ iPhone standalone
+ក្លែង + របារស្ថានភាពក្លែង (padding 59px ៖ ទីតាំងត្រូវនឹងវីដេអូ ៖ កញ្ចប់ 378 · ដក 442) · Android ចុចពិតដោយ touchscreen ➜ guard ធ្លាក់លើកូដចាស់ ➜ ទើបកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A114 | **iPhone ៖ របៀបស្កេនដក ➜ ចុចកន្លែងវាយ ➜ ទំព័រ និង navbar ធ្លាក់ ~៩០pt ហើយត្រឡប់** (របៀបកញ្ចប់ ✅) | វីដេអូ ៖ ស៊ុម 7.15–7.35 វិ. navbar ធ្លាក់ពី 78 ទៅ 171 (panel px) មុន keyboard · កន្លែងវាយរបៀបដក បាត 442pt (ប៊ូតុងក្រហម + ផ្ទាំងផ្កាឈូក ៖ +64pt ធៀបរបៀបកញ្ចប់ 378) · keyboard ខ្មែរ + របារ ⌃⌄✓ កំពូល 487pt (៤៣%) · ច្បាប់ ៥០% ➜ បន្ទាត់ 426 < 450 ➜ មិនចាប់ · តម្លៃ keyboard ដែលវាស់ (`keyboardInsetSeen`) ក្នុងការក្លែង ➜ ចាប់ ប៉ុន្តែលើឧបករណ៍ការចុចដដែលធ្លាក់ ➜ មិនពឹងលើវាតែមួយ | ទូរស័ព្ទបញ្ឈរ ៤៥% (`PAGE_TAP_PHONE_KEYBOARD_RATIO`) ៖ 450 ≤ 469 ➜ ចាប់ · SE (667 · status 20) របៀបដក ➜ keyboard ពិត 305 បាំង ➜ iOS · iPad/ផ្តេក ៥០% ➜ ✅ |
+| A115 | **Android ៖ ចុចប្រអប់ស្វែងរក Locker ➜ ទំព័រកន្ត្រាក់ឡើងលើ** | វីដេអូ ៖ ចុចលើកទី ២ (35.2 វិ.) ៖ keyboard ចាប់ផ្តើមខណៈប្រអប់ស្វែងរកនៅទាប ➜ navbar បាត់ (ទំព័រទាំងមូលរំកិល) ➜ បន្ទាប់មកតែសារទទេនៅកំពូល (ប្រអប់ស្វែងរកផុតពីលើ) ➜ ត្រឡប់ · ចុចលើកទី ១ (33.5 វិ.) keyboard មកក្រោយការរអិល ➜ រលូន · Chromium `ScrollFocusedEditableElementIntoView` ពេល IME បង្ហាញ ➜ តែ focus ដែលគ្មាន `preventScroll` | ប្រអប់ស្វែងរក tab ស្កេនលើ Android ចាប់ការចុចដូច iOS (`noteIOSSearchTouchStart` ៖ `isAndroidDevice()` · ប្រអប់ស្វែងរកលេខមិនរាប់) ➜ បង្រួមមុន + `focus({ preventScroll })` ➜ ✅ |
+| A116 | **ហេតុអ្វីតម្លៃ keyboard ដែលវាស់មិនបានជួយក្នុងវីដេអូ** (សំណើម្ចាស់គម្រោង ៖ «ឆ្លាតវៃវាស់ keyboard ដោយខ្លួនឯង») | វីដេអូ ៖ ចុចរបៀបកញ្ចប់ (keyboard បើក 2.3 វិ.) មុនរបៀបដក (7.1 វិ.) ➜ App គួរតែស្គាល់ keyboard រួច · ការក្លែង ៖ keyboard ស្ងប់តែមួយ ➜ ចាប់ · keyboard iOS លោតហួស (spring) ➜ ព្រឹត្តិការណ៍ visualViewport មួយមានកម្ពស់ធំជាងចុងក្រោយ ➜ `keyboardInsetSeen` ទុក **ធំបំផុត** ➜ 420 ➜ បន្ទាត់ 432 < 450 ➜ មិនចាប់ (ធ្លាក់ដូចវីដេអូ · FAIL លើ `c611d62`) · តម្លៃនៅតែក្នុង memory (reload បាត់) | `zoew_keyboard_inset_v1` ៖ តម្លៃចុងក្រោយដែលស្ងប់ (កត់តែពេលកន្លែងវាយ focus ៖ ពេលបិទ keyboard field blur មុន ➜ តម្លៃពេលបិទមិនចូល) · តាមអេក្រង់ × ប្រភេទ · នៅក្រោយ reload ➜ ✅ ២៦/២៦ |
+
 ### 2026-10-15 — វីដេអូម្ចាស់គម្រោងលើ 2.50.79 ៖ APK ប្រអប់នៅញ៉ាក់ · iPhone ចុចកន្លែងវាយ Barcode ទំព័រធ្លាក់ · បញ្ជី Locker ធ្លាក់
 
 **វិធី** ៖ វីដេអូ ២ (iPhone · APK) ➜ ffmpeg ស៊ុមម្តងមួយ (pts) · ពង្រីកស៊ុមចប់ keyboard ➜ App ពិត (audit build) ក្នុង Chromium ៖ APK ក្លែង (setViewportSize បង្រួម ខណៈ visualViewport ក្លែង
@@ -6889,7 +7119,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `price-edit-abort-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `react-view` | — | ផ្នែក ៦ |
+| `react-view` | ផ្នែក ១ | ផ្នែក ៦ |
 | `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
@@ -6951,7 +7181,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ts-comments` | — | ផ្នែក ៦ |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ |
 | `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `user-guide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `user-guide-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -7144,6 +7374,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/hardware-scanner.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |

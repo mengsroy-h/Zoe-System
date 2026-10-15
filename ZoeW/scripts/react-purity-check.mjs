@@ -80,10 +80,12 @@ const APP_ALLOWED = {
     [REFS + ':.setSelectionRange()']: [1, REFS_WHY + 'caret នៅចុងអត្ថបទ មុន focus ដោយកូដ (`focusElementWithoutScroll` ៖ WebKit ជ្រើសអត្ថបទទាំងអស់ពេល focus ដោយកូដ បើគ្មាន selection ចាំទុក)'],
     [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],
     [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
-    [REFS + ':.value =']: [1, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue`)'],
+    [REFS + ':.value =']: [2, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue` · `typeIntoElement` ៖ ប្រអប់ `type=number` ដែលមិនទទួល `setRangeText` ពេលវាលែង focus)'],
+    [REFS + ':document.execCommand']: [1, REFS_WHY + 'ការវាយអក្សរដូចគ្រាប់ពិតនៅ caret (`typeIntoElement` ៖ គ្រាប់ចុចដែលម៉ាស៊ីនស្កេនទប់ពេលផ្ទាំងបើក ត្រឡប់ចូលប្រអប់វិញពេលជាការវាយរបស់មនុស្ស · `insertText` ដើរលើ `type=number` · ជាមួយ undo · `input`)'],
     [REFS + ':.checked =']: [1, 'input **uncontrolled** (`defaultChecked`) — React ណែនាំ ref សម្រាប់វា (`setFieldChecked`)'],
     [REFS + ':.scrollTop =']: [2, REFS_WHY + 'ទីតាំងរមូរ (`setScrollTop` · `setElementScrollTop`)'],
-    [REFS + ':.scrollIntoView()']: [1, REFS_WHY + 'ការរមូរកូនឲ្យមើលឃើញ (`scrollChildIntoView`)'],
+    [REFS + ':.scrollIntoView()']: [2, REFS_WHY + 'ការរមូរកូនឲ្យមើលឃើញ (`scrollChildIntoView`) · ការត្រឡប់ visual viewport ដែល keyboard Chrome រំកិលទៅកំពូល (`resetVisualViewportPan` ៖ `window.scrollTo` រំកិលតែ layout viewport)'],
+    [REFS + ':.setRangeText()']: [1, REFS_WHY + 'ការបញ្ចូលអក្សរនៅ caret ដូចការវាយ (`insertFieldText` ៖ ម៉ាស៊ីនស្កេន ៖ គ្រាប់ keyboard ខ្មែរ ➜ តួអក្សរ US · ការស្កេនពេលគ្មានអ្វី focus)'],
     [REFS + ':.animate()']: [1, REFS_WHY + 'ចលនា Web Animations (FLIP របស់ផ្ទាំង · `animateElement`)'],
     [REFS + ':element.addEventListener()']: [1, 'listener `change` native (`refWithNative`) — `onChange` របស់ React ជា `input` រាល់តួអក្សរ'],
     [DOC_FX + ':.classList']: [1, '`<body>` ក្រៅ `#root` ➜ `useLayoutEffect` ពី state (លំនាំរបស់ React សម្រាប់ធាតុក្រៅ root)'],
@@ -97,7 +99,7 @@ const APP_ALLOWED = {
 };
 const APP_WRITE_METHODS = new Set(['focus', 'blur', 'click', 'select', 'setAttribute', 'removeAttribute', 'toggleAttribute',
     'appendChild', 'removeChild', 'insertBefore', 'replaceChildren', 'append', 'prepend', 'insertAdjacentHTML',
-    'scrollTo', 'scrollIntoView', 'animate', 'showPicker', 'setSelectionRange', 'createElement']);
+    'scrollTo', 'scrollIntoView', 'animate', 'showPicker', 'setSelectionRange', 'setRangeText', 'createElement']);
 const GLOBAL_TARGETS = new Set(['document', 'window', 'window.visualViewport']);
 
 
@@ -113,7 +115,7 @@ const DOM_PROPS_WRITE = new Set(['textContent', 'innerHTML', 'innerText', 'outer
 const DOM_PROPS_ANY = new Set(['classList', 'style', 'dataset']);
 const DOM_METHODS = new Set(['focus', 'blur', 'click', 'select', 'setAttribute', 'removeAttribute', 'toggleAttribute',
     'appendChild', 'removeChild', 'insertBefore', 'replaceChildren', 'append', 'prepend', 'insertAdjacentHTML',
-    'getBoundingClientRect', 'scrollTo', 'scrollIntoView', 'closest', 'matches', 'showPicker', 'setSelectionRange', 'animate',
+    'getBoundingClientRect', 'scrollTo', 'scrollIntoView', 'closest', 'matches', 'showPicker', 'setSelectionRange', 'setRangeText', 'animate',
     'getElementById', 'querySelector', 'querySelectorAll', 'getElementsByClassName', 'getElementsByTagName', 'createElement', 'elementFromPoint']);
 
 function walkDir(dir, out = []) {
@@ -201,7 +203,7 @@ for (const f of appFiles) {
     }
 }
 /* src/app ៖ ការសរសេរ DOM ត្រឹមច្រកចេញដែលមានហេតុផល (`APP_ALLOWED`) */
-const isAppWrite = (kind) => kind === '.classList' || kind === '.style' || kind === '.dataset' || / =$/.test(kind) ||
+const isAppWrite = (kind) => kind === '.classList' || kind === '.style' || kind === '.dataset' || / =$/.test(kind) || kind === 'document.execCommand' ||
     kind === 'element.addEventListener()' || (/^\.(\w+)\(\)$/.test(kind) && APP_WRITE_METHODS.has(kind.slice(1, -2)));
 const appAllowUsed = new Set();
 const appAllowCount = {};

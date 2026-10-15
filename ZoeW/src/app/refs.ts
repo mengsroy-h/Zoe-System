@@ -150,6 +150,33 @@ export function setFieldValue(name: RefName, value: string): void {
     if (el) el.value = value;
 }
 
+export function typeIntoElement(target: Element | null, text: string): boolean {
+    const el = target as HTMLInputElement | null;
+    if (!el || !text || !el.isConnected || !fieldTakesText(el)) return false;
+    if (document.activeElement === el) {
+        let typed: boolean;
+        try { typed = document.execCommand('insertText', false, text); } catch { typed = false; }
+        if (typed) return true;
+    }
+    let ranged = false;
+    try {
+        const end = el.value.length;
+        const from = typeof el.selectionStart === 'number' ? el.selectionStart : end;
+        const to = typeof el.selectionEnd === 'number' ? el.selectionEnd : from;
+        el.setRangeText(text, from, to, 'end');
+        ranged = true;
+    } catch {}
+    if (!ranged) {
+        try { el.value += text; } catch { return false; }
+    }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    return true;
+}
+
+export function insertFieldText(name: RefName, text: string): boolean {
+    return typeIntoElement(elementOf(name), text);
+}
+
 export function fieldChecked(name: RefName): boolean {
     const el = field(name) as HTMLInputElement | null;
     return !!(el && el.checked);
@@ -180,6 +207,14 @@ export function focusElementWithoutScroll(el: HTMLElement): boolean {
     return document.activeElement === el;
 }
 
+export function resetVisualViewportPan(): boolean {
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    if (!vv || !(vv.offsetTop > 0) || !root || typeof root.scrollIntoView !== 'function') return false;
+    try { root.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' }); } catch { return false; }
+    return true;
+}
+
 export function focusFieldAsIs(name: RefName): void {
     const el = elementOf(name);
     if (el) el.focus();
@@ -200,6 +235,21 @@ export function activeElementIsTextField(): boolean {
     if (!el) return false;
     const tag = el.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+const TEXT_ENTRY_TYPES = new Set(['', 'text', 'search', 'tel', 'number', 'email', 'url', 'password']);
+
+function fieldTakesText(el: HTMLInputElement): boolean {
+    if (el.disabled || el.readOnly) return false;
+    if (el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && TEXT_ENTRY_TYPES.has(String(el.type || '').toLowerCase());
+}
+
+export function activeElementTakesText(): boolean {
+    const el = document.activeElement as HTMLInputElement | null;
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return fieldTakesText(el);
+    return !!el.isContentEditable;
 }
 
 export function activeElementIsInModal(): boolean {

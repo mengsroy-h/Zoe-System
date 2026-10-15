@@ -120,6 +120,7 @@ function tap(target: EventTarget, from: Pt, to: Pt, fingers = 1) {
 }
 
 beforeEach(() => {
+    try { localStorage.removeItem('zoew_keyboard_inset_v1'); } catch {}
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = false;
     Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 844 });
     vv = Object.assign(new EventTarget(), { height: 844, offsetTop: 0 });
@@ -587,7 +588,7 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
         expect(focusCalls).toEqual([]);
     });
 
-    it('⛔ វីដេអូ iPhone ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ preventDefault · focus({ preventScroll }) ➜ ទំព័រមិនធ្លាក់ · focus ដោយកូដ (iPad) ➜ ចាប់ · keyboard បាំងប្រអប់ (ផ្តេក · keyboard ដែលធ្លាប់វាស់) ➜ iOS ធ្វើខ្លួនឯង', () => {
+    it('⛔ វីដេអូ iPhone ៖ ចុចប្រអប់វាយ Barcode (hwScannerInput · ទំព័រស្កេន) ➜ preventDefault · focus({ preventScroll }) ➜ ទំព័រមិនធ្លាក់ · ទូរស័ព្ទបញ្ឈរ (របៀបដក ៖ បាត ៥២%) ➜ ប៉ាន់ keyboard ៤៥% ➜ ចាប់ · focus ដោយកូដ (iPad) ➜ ចាប់ · keyboard បាំងប្រអប់ (ផ្តេក · keyboard ដែលធ្លាប់វាស់) ➜ iOS ធ្វើខ្លួនឯង', () => {
         setup();
         closeModal('manualAdjustModal');
         commitNow();
@@ -618,6 +619,14 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
             scanner.blur();
             top = 844 - 336 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 30 + 1;
             expect(tap(scanner, { x: 50, y: 480, t: 400 }, { x: 50, y: 480, t: 460 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 393 });
+            vv.height = 844;
+            scanner.blur();
+            top = 413;
+            expect(844 - Math.round(844 * modalKeyboard.PAGE_TAP_PHONE_KEYBOARD_RATIO)).toBeGreaterThanOrEqual(top + 30 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(844 - Math.round(844 * modalKeyboard.PAGE_TAP_KEYBOARD_RATIO)).toBeLessThan(top + 30 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(tap(scanner, { x: 50, y: 425, t: 470 }, { x: 50, y: 425, t: 490 }).defaultPrevented).toBe(true);
+            scanner.blur();
             Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 852 });
             Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 393 });
             vv.height = 393;
@@ -644,6 +653,66 @@ describe('iPhone standalone ៖ ចុចប្រអប់វាយក្នុ
             refTo('hwScannerInput')(null);
             scanner.remove();
             other.remove();
+        }
+    });
+
+    it('⛔ វីដេអូ Chrome Android (របៀបដក) ៖ ចុចប្រអប់វាយ Barcode ➜ preventDefault · focus({ preventScroll }) (Chromium រំលង ScrollFocusedEditableElementIntoView ៖ visual viewport មិនរំកិល navbar មិនបាត់ · ចុចម្តងទៀតក៏ដូច្នេះ) · focus ដោយកូដ គ្មាន keyboard ➜ ចាប់ · ប្រអប់វាយក្នុងប្រអប់ (modal) · focus រួច + keyboard · keyboard ពិតបាំង ➜ Android ធ្វើខ្លួនឯង', () => {
+        setup(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        const realWidth = window.innerWidth;
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 411 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 830 });
+        vv.height = 830;
+        const scanner = document.createElement('input');
+        scanner.type = 'text';
+        scanner.id = 'hwScannerInput';
+        let top = 361;
+        scanner.getBoundingClientRect = () => rect(top, 34);
+        const calls: any[] = [];
+        const realFocus = HTMLElement.prototype.focus;
+        scanner.focus = function (this: HTMLInputElement, options?: any) { calls.push(options); realFocus.call(this, options); } as any;
+        try {
+            expect(tap(byId('mkField'), { x: 50, y: 200, t: 0 }, { x: 50, y: 200, t: 80 }).defaultPrevented).toBe(false);
+            closeModal('manualAdjustModal');
+            commitNow();
+            document.body.append(scanner);
+            refTo('hwScannerInput')(scanner);
+            expect(830 - Math.round(830 * modalKeyboard.PAGE_TAP_PHONE_KEYBOARD_RATIO)).toBeGreaterThanOrEqual(395 + modalKeyboard.MODAL_KEYBOARD_GAP_PX);
+            expect(tap(scanner, { x: 50, y: 370, t: 100 }, { x: 51, y: 371, t: 190 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            expect(document.activeElement).toBe(scanner);
+            keyboard(407);
+            expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(407);
+            expect(tap(scanner, { x: 50, y: 370, t: 300 }, { x: 50, y: 370, t: 360 }).defaultPrevented).toBe(false);
+            expect(calls.length).toBe(1);
+            keyboard(0);
+            scanner.blur();
+            expect(tap(scanner, { x: 50, y: 370, t: 400 }, { x: 50, y: 370, t: 460 }).defaultPrevented).toBe(true);
+            expect(calls.length).toBe(2);
+            scanner.blur();
+            scanner.focus();
+            calls.length = 0;
+            expect(tap(scanner, { x: 50, y: 370, t: 470 }, { x: 50, y: 370, t: 490 }).defaultPrevented).toBe(true);
+            expect(calls).toEqual([{ preventScroll: true }]);
+            uiState.keyboardOpen = true;
+            scanner.blur();
+            scanner.focus();
+            calls.length = 0;
+            expect(tap(scanner, { x: 50, y: 370, t: 495 }, { x: 50, y: 370, t: 499 }).defaultPrevented).toBe(false);
+            uiState.keyboardOpen = false;
+            scanner.blur();
+            top = 830 - 407 - 34 - modalKeyboard.MODAL_KEYBOARD_GAP_PX + 1;
+            expect(tap(scanner, { x: 50, y: top + 5, t: 500 }, { x: 50, y: top + 5, t: 560 }).defaultPrevented).toBe(false);
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Windows' } });
+            top = 361;
+            expect(tap(scanner, { x: 50, y: 370, t: 600 }, { x: 50, y: 370, t: 660 }).defaultPrevented).toBe(false);
+            expect(calls).toEqual([]);
+        } finally {
+            uiState.keyboardOpen = false;
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+            Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
+            refTo('hwScannerInput')(null);
+            scanner.remove();
         }
     });
 
@@ -765,6 +834,123 @@ describe('ប្រអប់ ⟷ keyboard ៖ focus ដោយកូដមិន�
             closeModal('batchScanModal');
             vi.useRealTimers();
         }
+    });
+});
+
+describe('iPhone ៖ ចាំកម្ពស់ keyboard ពិត (zoew_keyboard_inset_v1) ➜ ការចុចកន្លែងវាយ Barcode សម្រេចតាម keyboard ពិត', () => {
+    const KEY = 'zoew_keyboard_inset_v1';
+    let scanner: HTMLInputElement;
+    let tel: HTMLInputElement;
+    const realWidth = window.innerWidth;
+
+    function screen(w: number, h: number) {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: w });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: h });
+        vv.height = h;
+    }
+
+    function listen() {
+        modalKeyboard.listenModalKeyboard(scope());
+    }
+
+    function relisten() {
+        disposers.splice(0).forEach((fn) => fn());
+        listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
+        listen();
+    }
+
+    const stored = () => JSON.parse(localStorage.getItem(KEY) || 'null');
+    const tapScanner = (t: number) => tap(scanner, { x: 50, y: 425, t }, { x: 50, y: 425, t: t + 60 }).defaultPrevented;
+
+    beforeEach(() => {
+        setIOSStandalone(true);
+        screen(393, 852);
+        scanner = document.createElement('input');
+        scanner.type = 'text';
+        tel = document.createElement('input');
+        tel.type = 'tel';
+        document.body.append(scanner, tel);
+        refTo('hwScannerInput')(scanner);
+        scanner.getBoundingClientRect = () => rect(413, 30);
+        listen();
+    });
+
+    afterEach(() => {
+        refTo('hwScannerInput')(null);
+        scanner.remove();
+        tel.remove();
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: realWidth });
+    });
+
+    it('⛔ វីដេអូ iPhone (របៀបដក) ៖ keyboard លោតហួស (420) ហើយស្ងប់ (365) ➜ ចាំ 365 (តម្លៃចុងក្រោយ មិនមែនធំបំផុត) ➜ បាត 443 + ៨ ≤ 487 ➜ ចាប់', () => {
+        scanner.focus({ preventScroll: true });
+        keyboard(420);
+        keyboard(365);
+        scanner.blur();
+        keyboard(0);
+        expect(stored()).toEqual({ '393x852|text': 365 });
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(365);
+        expect(tapScanner(1000)).toBe(true);
+    });
+
+    it('⛔ reload / បើក App ឡើងវិញ ➜ នៅចាំ (localStorage) · ឧបករណ៍ថ្មី (គ្មានការវាស់) ➜ ប៉ាន់ ៤៥%', () => {
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(0);
+        scanner.focus({ preventScroll: true });
+        keyboard(300);
+        scanner.blur();
+        keyboard(0);
+        relisten();
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(300);
+        scanner.getBoundingClientRect = () => rect(500, 30);
+        expect(tapScanner(1000)).toBe(true);
+        scanner.blur();
+        localStorage.removeItem(KEY);
+        relisten();
+        expect(tapScanner(2000)).toBe(false);
+    });
+
+    it('⛔ តាមប្រភេទ keyboard ៖ keyboard លេខ (tel 290) មិនធ្វើឲ្យកន្លែងវាយអក្សរគិតខុស · មិនទាន់វាស់អក្សរ ➜ ប្រើ keyboard ធំបំផុតនៃអេក្រង់នេះ · ទំហំអេក្រង់ផ្សេង (ផ្តេក) ➜ ដាច់ពីគ្នា', () => {
+        tel.focus({ preventScroll: true });
+        keyboard(290);
+        tel.blur();
+        keyboard(0);
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(290);
+        scanner.focus({ preventScroll: true });
+        keyboard(380);
+        scanner.blur();
+        keyboard(0);
+        expect(stored()).toEqual({ '393x852|tel': 290, '393x852|text': 380 });
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(380);
+        expect(modalKeyboard.rememberedKeyboardInset(tel)).toBe(290);
+        screen(852, 393);
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(0);
+    });
+
+    it('ទិសផ្ទុយ ៖ keyboard បើកដោយគ្មានកន្លែងវាយ focus (កំពុងបិទ) ➜ មិនចាំ · តម្លៃខូចក្នុង storage (មិនមែន JSON · array · អវិជ្ជមាន · ធំពេក · អក្សរ) ➜ មិនបោះ មិនប្រើ', () => {
+        keyboard(250);
+        keyboard(0);
+        expect(localStorage.getItem(KEY)).toBeNull();
+        for (const bad of ['xx', '[1,2]', '{"393x852|text":-5}', '{"393x852|text":99999}', '{"393x852|text":"abc"}']) {
+            localStorage.setItem(KEY, bad);
+            relisten();
+            expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(0);
+        }
+        localStorage.setItem(KEY, '{"393x852|text":365,"bad":-1}');
+        relisten();
+        expect(modalKeyboard.rememberedKeyboardInset(scanner)).toBe(365);
+    });
+
+    it('ពិដាន KEYBOARD_MEMORY_MAX ៖ ទំហំអេក្រង់ច្រើន ➜ ទុកតែថ្មីៗ (ចាស់ជាងគេចេញ)', () => {
+        scanner.focus({ preventScroll: true });
+        for (let i = 0; i < modalKeyboard.KEYBOARD_MEMORY_MAX + 6; i++) {
+            screen(300 + i, 852);
+            keyboard(300);
+        }
+        const keys = Object.keys(stored());
+        expect(keys.length).toBe(modalKeyboard.KEYBOARD_MEMORY_MAX);
+        expect(keys[keys.length - 1]).toBe((300 + modalKeyboard.KEYBOARD_MEMORY_MAX + 5) + 'x852|text');
+        expect(keys).not.toContain('300x852|text');
+        scanner.blur();
     });
 });
 

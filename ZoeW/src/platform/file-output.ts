@@ -1,6 +1,7 @@
 import { downloadObjectUrl } from './document-io';
 import { noteAppLockExcuse } from '../features/app-lock';
 import { isNativeApp } from './native';
+import { isMobileDevice } from '../core/timezone';
 
 export function saveWorkbook(wb: any, filename: string): Promise<void> | void {
     if (!isNativeApp()) {
@@ -70,25 +71,35 @@ function dataUrlToBlob(dataUrl: string): Blob {
     return new Blob([bytes], { type: 'image/png' });
 }
 
+function imageShareSheetPreferred(): boolean {
+    const nav = window.navigator as any;
+    return isMobileDevice() || (Number(nav.maxTouchPoints) > 1 && /Macintosh/.test(String(nav.userAgent || '')));
+}
+
 export function shareImageFiles(files: Array<{ name: string; dataUrl: string }>, title: string): Promise<ShareImagesResult> {
     if (isNativeApp()) return shareNativeImages(files, title);
     const blobs = files.map((f) => ({ name: f.name, blob: dataUrlToBlob(f.dataUrl) }));
+    const download = (): ShareImagesResult => {
+        blobs.forEach((b) => {
+            const url = URL.createObjectURL(b.blob);
+            downloadObjectUrl(url, b.name);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+        return 'saved';
+    };
     const nav = window.navigator as any;
-    try {
-        const list = blobs.map((b) => new File([b.blob], b.name, { type: 'image/png' }));
-        if (typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: list })) {
-            return Promise.resolve(nav.share({ files: list, title })).then(() => 'shared' as ShareImagesResult, (e) => {
-                if (e && e.name === 'AbortError') return 'cancelled' as ShareImagesResult;
-                throw e;
-            });
-        }
-    } catch {}
-    blobs.forEach((b) => {
-        const url = URL.createObjectURL(b.blob);
-        downloadObjectUrl(url, b.name);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
-    return Promise.resolve('saved');
+    if (imageShareSheetPreferred()) {
+        try {
+            const list = blobs.map((b) => new File([b.blob], b.name, { type: 'image/png' }));
+            if (typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: list })) {
+                return Promise.resolve(nav.share({ files: list, title })).then(() => 'shared' as ShareImagesResult, (e) => {
+                    if (e && e.name === 'AbortError') return 'cancelled' as ShareImagesResult;
+                    return download();
+                });
+            }
+        } catch {}
+    }
+    return Promise.resolve(download());
 }
 
 async function shareNativeImages(files: Array<{ name: string; dataUrl: string }>, title: string): Promise<ShareImagesResult> {

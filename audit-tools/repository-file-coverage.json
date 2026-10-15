@@ -1876,6 +1876,12 @@
     "ZoeW/tests/forbidden-zone-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/hardware-scanner.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scanner-modal-queue.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/health-advice.test.ts": {
       "policy": "zoew-self-verification"
     },

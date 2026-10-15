@@ -135,9 +135,15 @@ describe('iPhone PWA ៖ ចុចស្វែងរកលេខ ➜ ទាញ�
         expect(focusCalls).toEqual([]);
     });
 
-    it('ទិសផ្ទុយ ៖ Android/web · អេក្រង់ធំ (≥ 992px) ➜ មិនប៉ះ', () => {
+    it('ទិសផ្ទុយ ៖ Android/web · អេក្រង់ធំ (≥ 992px) ➜ មិនប៉ះ (ប្រអប់ស្វែងរកលេខលើ Android ៖ តំបន់ហាម មិនប្តូរ)', () => {
         setIOSStandalone(false);
         expect(tap(input, { x: 100, y: 450, t: 1000 }, { x: 100, y: 450, t: 1100 }).defaultPrevented).toBe(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        try {
+            expect(tap(input, { x: 100, y: 450, t: 1500 }, { x: 100, y: 450, t: 1600 }).defaultPrevented).toBe(false);
+        } finally {
+            Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: undefined });
+        }
         setIOSStandalone(true);
         setWidth(1024);
         expect(tap(input, { x: 100, y: 450, t: 2000 }, { x: 100, y: 450, t: 2100 }).defaultPrevented).toBe(false);

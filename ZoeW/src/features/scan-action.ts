@@ -3,7 +3,7 @@ import { viewState } from '../core/view-state';
 import { dataState, firebaseState, scanState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreSet } from '../core/storage';
-import { normalizeStoredPhone } from '../core/text';
+import { latinDigits, normalizeStoredPhone } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, safeFocusScanner } from '../core/timezone';
 import { applyBarcodeCloseState, generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -22,10 +22,12 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes, rejectScanAndRefocus } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 
+export const SCAN_MONEY_MAX = 100000;
+
 export function triggerScanAction(barcode) {
     if (uiState.isModalOpen) return;
 
-    let cleanBarcode = String(barcode || '').trim();
+    let cleanBarcode = latinDigits(String(barcode || '')).trim();
     if (!cleanBarcode) return;
 
     if (uiState.entryScanMode === 'locker') {
@@ -49,6 +51,7 @@ export function triggerScanAction(barcode) {
     if (navigator.vibrate) navigator.vibrate(150);
 
     scanState.pendingBarcode = cleanBarcode;
+    scanState.phoneModalTyped = false;
     viewState.modalBarcodeText = cleanBarcode;
 
     setFieldValue('modalPhoneInput', "");
@@ -70,6 +73,10 @@ export function triggerScanAction(barcode) {
     } else {
         armLookupFocus('modalPhoneInput', cleanBarcode, lookupPromise);
     }
+}
+
+export function notePhoneModalInput() {
+    if (scanState.pendingBarcode) scanState.phoneModalTyped = true;
 }
 
 export function dropOptimisticBarcode(code) {
@@ -117,6 +124,15 @@ export async function confirmPhone(isSkip = false) {
 
     if (!Number.isFinite(cod) || cod < 0) cod = 0;
     if (!Number.isFinite(dod) || dod < 0) dod = 0;
+
+    const oversized = cod > SCAN_MONEY_MAX ? 'modalCodInput' : (dod > SCAN_MONEY_MAX ? 'modalDodInput' : null);
+    if (oversized) {
+        const label = oversized === 'modalCodInput' ? 'COD' : 'DOD';
+        const amount = oversized === 'modalCodInput' ? cod : dod;
+        showToast(`⚠️ ${label} $${amount} ធំខុសធម្មតា (លើស $${SCAN_MONEY_MAX}) — ប្រហែលជាលេខ Barcode ឬលេខទូរស័ព្ទចូលខុសប្រអប់។ មិនបានរក្សាទុកទេ ៖ សូមកែ ${label} ហើយចុច «យល់ព្រម» ម្ដងទៀត។`);
+        focusField(oversized);
+        return;
+    }
 
     if (isSkip || !phone) {
         phone = "គ្មានលេខ";

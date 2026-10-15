@@ -196,6 +196,7 @@ export interface ScanState {
     currentVideoTrack: any;
     torchOn: boolean;
     pendingBarcode: string;
+    phoneModalTyped: boolean;
     lastScannedCode: string;
     lastScanTime: number;
     nativeDetector: any;
@@ -229,6 +230,7 @@ export const scanState = createStore<ScanState>('scanState', {
     currentVideoTrack: null,
     torchOn: false,
     pendingBarcode: "",
+    phoneModalTyped: false,
     lastScannedCode: "",
     lastScanTime: 0,
     nativeDetector: null,

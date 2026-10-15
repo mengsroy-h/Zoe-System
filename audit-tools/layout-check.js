@@ -312,6 +312,88 @@ async function toastTabbarLayout(browser, port) {
     await ctx.close();
 }
 
+// ⛔ តេស្តប្រើប្រចាំថ្ងៃ (A124) ៖ ទូរស័ព្ទផ្តេក (កម្ពស់ ៣០០–៤៣០ · Android APK/Chrome · iPhone PWA) ៖ ទំព័រស្កេន «📋 បញ្ចូលច្រើន» · «📁 យក Barcode ពីរូបភាព» ·
+//    (របៀបដក) កន្លែងវាយ Barcode នៅក្រោមរបា Tab ពេលទំព័រនៅកំពូល · អូស < ~១០០px ➜ snap proximity ទាញត្រឡប់ ០ (តំបន់ហាម ⛔ មិនប៉ះ) ➜ ចុចមិនបាន។
+//    ច្បាប់ ៖ គ្រប់ប៊ូតុង/កន្លែងវាយក្នុង `#entrySideSection` (៣ របៀប) ចុចត្រូវចំកណ្តាលពេល scroll ០ · របា Tab បង្ហាញ · ទិសផ្ទុយ ៖ ទូរស័ព្ទ/tablet បញ្ឈរ ៖ ផ្ទាំងជួរឈរតែមួយ ·
+//    រូប Tab នៅលើអក្សរ · ទំព័រទិន្នន័យ ៖ ប៊ូតុងតម្រងនៅចុចបាន · `--tabbar-height` = កម្ពស់របា Tab ពិតក្រោយបង្វិល (toast · កាតបញ្ជីប្រើវា) · ផ្ទៃចុច Tab ≥ ៣២px។
+const LANDSCAPE_SCAN_SIZES = [[780, 360], [756, 336], [780, 300], [640, 360], [667, 375], [844, 390], [932, 430]];
+async function landscapeScanReach(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(900);
+    const ready = await page.evaluate(() => ['switchAppPage', 'setEntryScanMode', 'openModalIds', 'closeModal'].every((f) => typeof window[f] === 'function'));
+    check(ready, 'ZoeW ផ្តេក ៖ មាន switchAppPage · setEntryScanMode (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.addStyleTag({ content: '.toast-container { display: none !important; }' });
+    const measure = (mode) => page.evaluate(async (mode) => {
+        openModalIds().slice().forEach((id) => closeModal(id));
+        switchAppPage(mode === 'data' ? 'data' : 'entry');
+        if (mode !== 'data') setEntryScanMode(mode);
+        await new Promise((r) => setTimeout(r, 250));
+        openModalIds().slice().forEach((id) => closeModal(id));
+        await new Promise((r) => setTimeout(r, 100));
+        const pages = document.getElementById('appPages');
+        pages.scrollTop = 0;
+        document.body.classList.remove('chrome-hidden');
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise((r) => setTimeout(r, 150));
+        const vis = (el) => { const cs = getComputedStyle(el); const b = el.getBoundingClientRect(); return cs.visibility !== 'hidden' && cs.display !== 'none' && b.width > 0 && b.height > 0; };
+        const side = document.getElementById(mode === 'data' ? 'dataSideSection' : 'entrySideSection');
+        const sel = mode === 'data' ? '.filter-btn, #btnFilterToday, #btnFilterYesterday, #btnFilterDayBefore, #btnFilterAll'
+            : 'button, input:not([type="file"]):not([type="hidden"]), label.file-upload-btn';
+        const ctrls = [...new Set(side.querySelectorAll(sel))].filter(vis);
+        const blocked = ctrls.filter((el) => {
+            const b = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+            return !(hit && (hit === el || el.contains(hit)));
+        }).map((el) => { const b = el.getBoundingClientRect(); const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+            return (el.id || el.className || el.tagName) + ' [' + Math.round(b.top) + '–' + Math.round(b.bottom) + '] ➜ ' + (hit ? (hit.id || hit.className || hit.tagName) : 'null'); });
+        const bar = document.getElementById('pageTabBar').getBoundingClientRect();
+        const tabs = [...document.querySelectorAll('#pageTabBar .page-tab')].map((t) => {
+            const ico = t.querySelector('.tab-ico').getBoundingClientRect(); const txt = t.lastElementChild.getBoundingClientRect(); const r = t.getBoundingClientRect();
+            return { h: Math.round(r.height), stacked: ico.bottom <= txt.top + 1 };
+        });
+        const cam = side.querySelector('.app-card'), hw = document.getElementById('hardwareScannerBox');
+        return { scroll: pages.scrollTop, count: ctrls.length, blocked, barTop: Math.round(bar.top), barH: Math.round(bar.height), vh: innerHeight,
+            barVar: document.documentElement.style.getPropertyValue('--tabbar-height') || getComputedStyle(document.documentElement).getPropertyValue('--tabbar-height'),
+            tabs, oneColumn: mode === 'data' || !cam || !hw ? null : hw.getBoundingClientRect().top >= cam.getBoundingClientRect().bottom - 1 };
+    }, mode);
+    const land = [];
+    for (const [w, h] of LANDSCAPE_SCAN_SIZES) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(400);
+        for (const mode of ['parcel', 'locker', 'remove', 'data']) land.push(Object.assign({ w, h, mode }, await measure(mode)));
+    }
+    const portrait = [];
+    for (const [w, h] of [[390, 844], [360, 780], [768, 1024]]) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(400);
+        for (const mode of ['parcel', 'remove']) portrait.push(Object.assign({ w, h, mode }, await measure(mode)));
+    }
+    await ctx.close();
+    const scan = land.filter((r) => r.mode !== 'data');
+    const floor = { parcel: 8, locker: 7, remove: 7 };
+    check(scan.length === LANDSCAPE_SCAN_SIZES.length * 3 && scan.every((r) => r.count >= floor[r.mode] && r.scroll === 0 && r.barTop > r.vh / 2 && r.barH > 20),
+        'ZoeW ផ្តេក ៖ ជាន់អប្បបរមា ៖ ' + LANDSCAPE_SCAN_SIZES.length + ' ទំហំ × ៣ របៀប · ប៊ូតុង/កន្លែងវាយគ្រប់ចំនួន · scroll ០ · របា Tab នៅបាត',
+        JSON.stringify(scan.filter((r) => !(r.count >= floor[r.mode] && r.scroll === 0 && r.barTop > r.vh / 2)).map((r) => [r.w, r.h, r.mode, r.count, r.scroll, r.barTop])));
+    check(scan.every((r) => r.blocked.length === 0),
+        '⛔ ZoeW ផ្តេក (A124) ៖ ទំព័រស្កេន ៖ គ្រប់ប៊ូតុង/កន្លែងវាយ (កញ្ចប់ · Locker · ដក) ចុចបានពេលទំព័រនៅកំពូល (មិននៅក្រោមរបា Tab)',
+        JSON.stringify(scan.filter((r) => r.blocked.length).map((r) => [r.w + '×' + r.h, r.mode, 'Tab ' + r.barTop, r.blocked])).slice(0, 1400));
+    const data = land.filter((r) => r.mode === 'data' && r.h >= 336);
+    check(data.length === LANDSCAPE_SCAN_SIZES.length - 1 && data.every((r) => r.count >= 4 && r.blocked.length === 0),
+        '⛔ ZoeW ផ្តេក (កម្ពស់ ≥ ៣៣៦) ៖ ទំព័រទិន្នន័យ ៖ ប៊ូតុងតម្រង ៤ ចុចបានពេលទំព័រនៅកំពូល (ផ្ទាំងវែង ៖ ក្រោមនោះរមូរធម្មតា)', JSON.stringify(data.filter((r) => r.count < 4 || r.blocked.length).map((r) => [r.w, r.h, r.count, r.blocked])));
+    check(land.every((r) => Math.abs(parseFloat(r.barVar) - r.barH) <= 1),
+        '⛔ ZoeW ផ្តេក ៖ `--tabbar-height` = កម្ពស់របា Tab ពិតក្រោយបង្វិល (toast · កាតបញ្ជីវាស់តាមវា)', JSON.stringify(land.filter((r) => Math.abs(parseFloat(r.barVar) - r.barH) > 1).map((r) => [r.w, r.h, r.barVar, r.barH])));
+    check(land.every((r) => r.tabs.length === 2 && r.tabs.every((t) => t.h >= 32)),
+        'ZoeW ផ្តេក ៖ ផ្ទៃចុច Tab «ទិន្នន័យ» · «ស្កេន» ≥ ៣២px', JSON.stringify(land.filter((r) => !r.tabs.every((t) => t.h >= 32)).map((r) => [r.w, r.h, r.tabs])));
+    check(portrait.length === 6 && portrait.every((r) => r.oneColumn === true && r.tabs.length === 2 && r.tabs.every((t) => t.stacked) && r.blocked.length === 0),
+        'ទិសផ្ទុយ ៖ ZoeW បញ្ឈរ (៣៩០ · ៣៦០ · ៧៦៨) ៖ ផ្ទាំងស្កេនជួរឈរតែមួយ · រូប Tab នៅលើអក្សរ · ប៊ូតុងចុចបាន',
+        JSON.stringify(portrait.filter((r) => !(r.oneColumn === true && r.tabs.every((t) => t.stacked) && r.blocked.length === 0)).map((r) => [r.w, r.h, r.mode, r.oneColumn, r.tabs, r.blocked])));
+}
+
 // ⛔ តេស្តប្រើប្រចាំថ្ងៃ ៖ ស្លាកបោះពុម្ពពិត (`LabelSheet` · `#pdfExportPrintArea` · media print) ៖ «COD $25.00 · DOD $3.50» លើស្លាក 60×40 (53.5/53.0mm) ·
 //    «COD $1234.56 · DOD $245.50» លើ 50×30 (48.8/45.0mm) ➜ ស្លាក `overflow: hidden` កាត់ចំនួនលុយលើក្រដាសពិត · 40×30 បត់លុយជា ២ បន្ទាត់ ➜ ថ្ងៃ/Locker ធ្លាក់ហួសបាតស្លាក ·
 //    A4 (៣/២ ជួរឈរ) ៖ លុយ `nowrap` ពង្រីកជួរឈរ (ស្លាកទទឹងមិនស្មើ · ជួរឈរទី ៣ ហួសក្រដាសបញ្ឈរ)។ ច្បាប់ ៖ គ្រប់ layout · A4 ផ្តេក (២៧៧mm) និងបញ្ឈរ (១៩០mm) ៖
@@ -393,8 +475,12 @@ async function printRelayoutPdf(browser, port) {
 // ⛔ សំណើម្ចាស់គម្រោង (NIIMBOT B1 ៖ Bluetooth តាម App NIIMBOT · មិនមែនម៉ាស៊ីនបោះពុម្ពរបស់ប្រព័ន្ធ) ៖ «🖼️ រក្សាទុកជារូបភាព» ➜ ស្លាកនីមួយៗជា PNG ទំហំពិត
 //   (៨ ចំណុច/mm = 203dpi ៖ 50×30 ➜ 400×240) · Barcode អានវិញបានដោយម៉ាស៊ីនស្កេនរបស់ App (ZXing ពិត) · ខ្លឹមសារមិនប៉ះគែម · ប្លង់ A4 ➜ ទំហំ 50×30 ·
 //   ចែករំលែក ៖ `navigator.share({ files })` (iPhone · Android) ជា PNG មួយស្លាកមួយឯកសារ
+const LABEL_SHARE_UA = {
+    android: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+    windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0'
+};
 async function labelImageExport(browser, port) {
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, userAgent: LABEL_SHARE_UA.android });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
@@ -455,6 +541,42 @@ async function labelImageExport(browser, port) {
     check(shared.shared.length === 1 && shared.shared[0].length === 2 && shared.shared[0].every((f) => f.type === 'image/png' && f.size > 500 && /^ZoeW_label_77100000(555|556)\.png$/.test(f.name)),
         '⛔ ZoeW ស្លាកជារូបភាព ៖ ប៊ូតុងក្នុងផ្ទាំងបោះពុម្ព ➜ navigator.share({ files }) ១ ដង · PNG មួយស្លាកមួយឯកសារ (២)', JSON.stringify(shared));
     await ctx.close();
+    // ⛔ តេស្តប្រើប្រចាំថ្ងៃ (ម្ចាស់គម្រោង ៖ «រក្សាទុកស្លាក រូបភាព niimbot អត់បានលើ កុំព្យូទ័រ លោត toast រក្សាទុករូបភាពស្លាកមិនបាន») ៖ Chrome · Edge លើ Windows/Mac
+    //    មាន Web Share ➜ App បើកផ្ទាំង Share របស់ប្រព័ន្ធ · Share បដិសេធ (NotAllowedError ៖ ឯកសារច្រើន · ផុតសកម្មភាព) ➜ ❌ ។ ច្បាប់ ៖ កុំព្យូទ័រ ➜ ទាញយក PNG ពិត (download event)
+    //    ⛔ គ្មាន Share · សារ ✅ · ទូរស័ព្ទ Share បដិសេធ ➜ ទាញយកជំនួស (ទិសផ្ទុយ AbortError ➜ គ្មានទាញយក)
+    for (const [label, ua, mobile, reject] of [['កុំព្យូទ័រ Windows (Edge មាន Web Share)', LABEL_SHARE_UA.windows, false, 'NotAllowedError'],
+        ['Android Share បដិសេធ (NotAllowedError)', LABEL_SHARE_UA.android, true, 'NotAllowedError'], ['Android បោះបង់ Share (AbortError)', LABEL_SHARE_UA.android, true, 'AbortError']]) {
+        const dctx = await browser.newContext(Object.assign({ userAgent: ua, acceptDownloads: true }, mobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } }));
+        const dpage = await dctx.newPage();
+        dpage.on('dialog', (d) => d.dismiss().catch(() => {}));
+        await dpage.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+        await dpage.addInitScript((err) => {
+            window.__shared = 0;
+            Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && d.files && d.files.length) });
+            Object.defineProperty(navigator, 'share', { configurable: true, value: () => { window.__shared++; return Promise.reject(Object.assign(new Error('Permission denied'), { name: err })); } });
+        }, reject);
+        const downloads = [];
+        dpage.on('download', (d) => downloads.push(d.suggestedFilename()));
+        await dpage.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await dpage.waitForTimeout(800);
+        const ok2 = await dpage.evaluate(() => typeof saveLabelImagesFromModal === 'function' && typeof openLabelPrintModal === 'function');
+        if (!ok2) { bad('ZoeW ស្លាកជារូបភាព ៖ ' + label + ' ៖ audit bridge'); await dctx.close(); continue; }
+        const r = await dpage.evaluate(async () => {
+            dataState.scanHistory = [{ id: 'S1', phone: '0960001111', scanDate: '2026-10-15', locker: 'A1', barcodes: [{ code: '77100000555', cod: 1, dod: 0, locker: 'A1', isClosed: false }, { code: '77100000556', cod: 0, dod: 2, locker: 'A1', isClosed: false }] }];
+            uiState.currentFilterMode = 'all';
+            openLabelPrintModal({ kind: 'item', id: 'S1' }); commitNow();
+            const done = await Promise.resolve(saveLabelImagesFromModal());
+            await new Promise((res) => setTimeout(res, 300));
+            return { done, shared: window.__shared, toasts: [...document.querySelectorAll('.toast')].map((t) => t.textContent.trim().slice(0, 60)) };
+        });
+        await dpage.waitForTimeout(800);
+        const want = reject === 'AbortError' ? 0 : 2;
+        const okFlow = r.done === true && downloads.length === want && downloads.every((n) => /^ZoeW_label_77100000(555|556)\.png$/.test(n)) &&
+            (mobile ? r.shared === 1 : r.shared === 0) && !r.toasts.some((t) => t.indexOf('❌') === 0) && (want ? r.toasts.some((t) => t.indexOf('✅ បានទាញយករូបភាពស្លាក 2') === 0) : true);
+        check(okFlow, (reject === 'AbortError' ? 'ទិសផ្ទុយ ៖ ' : '⛔ ') + 'ZoeW ស្លាកជារូបភាព ៖ ' + label + ' ➜ ' + (want ? 'ទាញយក PNG ' + want + (mobile ? ' ជំនួស' : ' (គ្មានផ្ទាំង Share)') + ' · ✅ · គ្មាន ❌' : 'គ្មានទាញយក · គ្មានសារ'),
+            JSON.stringify({ r, downloads }));
+        await dctx.close();
+    }
 }
 
 async function labelPrintFit(browser, port) {
@@ -628,8 +750,9 @@ async function phoneModalEnterNext(browser, port) {
     const at = () => page.evaluate(() => ({ active: (document.activeElement || {}).id || (document.activeElement || {}).tagName, open: openModalIds().indexOf('phoneModal') !== -1 }));
     const start = await at();
     const steps = [];
+    // ល្បឿនមនុស្ស (90ms/គ្រាប់) ៖ គ្រាប់ ≥ SCANNER_MIN_CHARS ក្នុង ≤ SCANNER_KEY_GAP_MS + Enter = ការស្កេន ➜ ចូលជួរ (scanner-modal-queue) មិនមែនការវាយ
     for (const [text, want] of [['0960000999', 'modalLockerInput'], ['A1', 'modalCodInput'], ['2.5', 'modalDodInput'], ['1', null]]) {
-        await page.keyboard.type(text);
+        await page.keyboard.type(text, { delay: 90 });
         await page.keyboard.press('Enter');
         await page.waitForTimeout(150);
         steps.push(Object.assign({ text, want }, await at()));
@@ -1486,6 +1609,7 @@ async function historyRowLayout(browser, port) {
             await notifyRowLayout(browser, port);
             await pinEnterSubmits(browser, port);
             await toastTabbarLayout(browser, port);
+            await landscapeScanReach(browser, port);
             await labelPrintFit(browser, port);
             await printRelayoutPdf(browser, port);
             await labelImageExport(browser, port);

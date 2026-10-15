@@ -427,6 +427,34 @@ try {
         check(mode.label + ' ៖ tab ស្កេន ៖ ស្វែងរក «📍 បញ្ជីទីតាំង Locker» ឡើង ➜ ចុច «ទីតាំងទាំងអស់» ➜ បញ្ជីនៅដដែល (មិនធ្លាក់) · ចាកចេញ (ទទេ) ➜ បើកវិញ',
             lockerFilter.up.collapsed && lockerFilter.up.top < lockerFilter.open - 100 && lockerFilter.picking.focused && lockerFilter.picking.collapsed
                 && Math.abs(lockerFilter.picking.top - lockerFilter.up.top) < 2 && !lockerFilter.done.collapsed && Math.abs(lockerFilter.done.top - lockerFilter.open) < 2, lockerFilter);
+        await page.evaluate(() => {
+            document.activeElement && document.activeElement.blur();
+            window.switchAppPage('entry');
+            window.setEntryScanMode('locker');
+        });
+        await page.waitForTimeout(500);
+        const lockerTap = await page.evaluate(() => {
+            document.getElementById('appPages').scrollTop = 0;
+            window.scrollTo(0, 0);
+            const input = document.getElementById('lockerListSearchInput');
+            window.__tapLog = { ends: [], focus: [] };
+            window.addEventListener('touchend', (e) => window.__tapLog.ends.push(e.defaultPrevented), { once: true });
+            const real = input.focus;
+            input.focus = function (o) { window.__tapLog.focus.push(!!(o && o.preventScroll)); return real.call(this, o); };
+            const r = input.getBoundingClientRect();
+            return { x: Math.round(r.left + 30), y: Math.round(r.top + r.height / 2), collapsed: window.uiState.entryPanelCollapsed };
+        });
+        await page.touchscreen.tap(lockerTap.x, lockerTap.y);
+        await page.waitForTimeout(700);
+        const lockerTapped = await page.evaluate(() => ({ ends: window.__tapLog.ends, focus: window.__tapLog.focus, active: (document.activeElement || {}).id,
+            collapsed: window.uiState.entryPanelCollapsed, scrollY: window.scrollY }));
+        await page.evaluate(() => { const i = document.getElementById('lockerListSearchInput'); delete i.focus; i.blur(); });
+        await page.waitForTimeout(900);
+        if (mode.ua === ANDROID_UA) check(mode.label + ' ៖ ចុចប្រអប់ស្វែងរក Locker ➜ ចាប់ការចុច · បង្រួមមុន · focus({ preventScroll }) (Chromium មិនរំកិលទំព័រពេល keyboard លោត)',
+            !lockerTap.collapsed && lockerTapped.ends[0] === true && lockerTapped.focus.length === 1 && lockerTapped.focus[0] === true
+                && lockerTapped.active === 'lockerListSearchInput' && lockerTapped.collapsed && lockerTapped.scrollY === 0, { lockerTap, lockerTapped });
+        else check(mode.label + ' (មិនមែន standalone) ៖ ចុចប្រអប់ស្វែងរក Locker ➜ ទុកឲ្យ browser (onFocus បង្រួម)',
+            lockerTapped.ends[0] === false && lockerTapped.focus.length === 0 && lockerTapped.active === 'lockerListSearchInput' && lockerTapped.collapsed, { lockerTap, lockerTapped });
         check('គ្មានកំហុស JavaScript', errors.length === 0, errors);
         await ctx.close();
     }

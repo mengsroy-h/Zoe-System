@@ -27,7 +27,7 @@
 const REACT_HELPERS = [
     'elementOf', 'field', 'fieldValue', 'setFieldValue', 'fieldChecked', 'setFieldChecked',
     'focusField', 'focusFieldAsIs', 'openFilePicker', 'isFieldFocused',
-    'activeElementIsTextField', 'blurActiveElement',
+    'activeElementIsTextField', 'activeElementIsInModal', 'blurActiveElement',
     'rectOfElement', 'elementSize', 'setScrollTop', 'setElementScrollTop', 'scrollChildIntoView',
     'animateElement', 'videoElement',
     'registerModalMeta', 'unregisterModalMeta', 'modalMeta', 'modalIsMounted', 'modalDisplay', 'setModalDisplay',

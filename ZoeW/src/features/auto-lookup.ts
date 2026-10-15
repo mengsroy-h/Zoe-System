@@ -1,4 +1,4 @@
-import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { activeElementIsInModal, activeElementIsTextField, fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { lookupState, scanState, securityState, uiState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
@@ -186,6 +186,11 @@ export function fillEmptyLookupFields(phoneVal, codVal, dodVal) {
     return { filledAny, phoneWasAutoFilled };
 }
 
+function lookupMoneyText(value) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : '—';
+}
+
 export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
     if (scanState.pendingBarcode !== barcode || !uiState.isModalOpen) return false;
     if (viewState.phoneModalBusy) {
@@ -194,10 +199,13 @@ export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
     }
 
     const { filledAny, phoneWasAutoFilled } = fillEmptyLookupFields(phoneVal, codVal, dodVal);
+    const typed = scanState.phoneModalTyped === true;
 
-    if (cfg.autoSubmit && phoneWasAutoFilled && scanState.pendingBarcode === barcode && uiState.isModalOpen) {
+    if (cfg.autoSubmit && phoneWasAutoFilled && !typed && scanState.pendingBarcode === barcode && uiState.isModalOpen) {
         showToast("⏳ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
         confirmPhone(false);
+    } else if (cfg.autoSubmit && phoneWasAutoFilled) {
+        showToast(`ℹ️ រកឃើញអតិថិជន (COD ${lookupMoneyText(codVal)} · DOD ${lookupMoneyText(dodVal)}) — អ្នកបានវាយក្នុងផ្ទាំង ដូច្នេះមិនរក្សាទុកស្វ័យប្រវត្តិ។ សូមពិនិត្យ ហើយចុច «យល់ព្រម»។`);
     } else if (filledAny) {
         showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
     }
@@ -243,6 +251,7 @@ export function armLookupFocus(phoneInputName, barcode, lookupPromise) {
         if (focused || isPinFlowPending()) return;
         if (!uiState.isModalOpen || scanState.pendingBarcode !== barcode) return;
         if (!phoneInputName || fieldValue(phoneInputName)) return;
+        if (scanState.phoneModalTyped || (activeElementIsTextField() && activeElementIsInModal())) return;
         focused = true;
         focusField(phoneInputName);
     };

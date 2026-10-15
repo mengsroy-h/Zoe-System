@@ -187,11 +187,11 @@ export function queueScannedCode(raw: string): boolean {
         }
         run.queue.push(code);
         renderBatchScanStatus();
-        showToast(`📥 Barcode (${code}) នៅក្នុងជួរ — នឹងបើកតាមលំដាប់ (នៅសល់ ${run.queue.length - run.index})។`);
+        showToast(`⏳ 📥 Barcode (${code}) នៅក្នុងជួរ — នឹងបើកតាមលំដាប់ (នៅសល់ ${run.queue.length - run.index})។`);
         pumpBatchScan();
         return true;
     }
-    showToast(`📥 Barcode (${code}) នៅក្នុងជួរ — នឹងបើកក្រោយផ្ទាំងនេះបិទ។`);
+    showToast(`⏳ 📥 Barcode (${code}) នៅក្នុងជួរ — នឹងបើកក្រោយផ្ទាំងនេះបិទ។`);
     beginRun([code], true);
     return true;
 }

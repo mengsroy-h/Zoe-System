@@ -71,11 +71,11 @@
 
 ### 🧭 ZTO Palm (Login · Lookup ➜ ពេញ)
 
-- ⏳ **Login Palm ([2.50.97])** ៖ env ៣ ក្នុង Netlify Production + Deploy Previews (`ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` ·
-  `ZTO_PALM_PASSWORD_KEY`) ➜ សាក Login + ស្កេនលើ preview · merge ដោយ **Squash** (សោ protocol នៅក្នុង commit ដើមនៃ branch PR)។
-- ⏳ **Palm ពេញ** (ម្ចាស់គម្រោងជ្រើស · PR ថ្មី) ៖ ទាញបញ្ជី = `queryDispatchList` `billStatus` `4` (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់ហាងបង្ហាញក្នុង
-  tab «បញ្ជូន») · ចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ = `billStatus` `5` · កាតាឡុក endpoint ទាំងអស់ ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) ·
-  ⛔ វាស់ចម្លើយពិត (គណនីម្ចាស់គម្រោង) មុនភ្ជាប់ auto-close · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- ⏳ **[2.50.97]** Login Palm ពិតជោគជ័យ (ម្ចាស់គម្រោង) ➜ នៅសល់ ៖ ស្កេនកញ្ចប់ពិត ➜ ផ្ទៀងលេខទូរស័ព្ទ · COD · DOD ធៀបនឹង App Palm។
+- 🗳️ PR Login Palm merge ដោយ **merge commit** ➜ commit ដើម `d509638` (សោ protocol ក្នុងកូដ · screenshot សាកល្បង) នៅក្នុង history `main` ➜ ការសម្រេចម្ចាស់គម្រោង
+  (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
+- ⏳ **[2.50.98] Palm ពេញ** ៖ សាកលើ Deploy Preview ជាមួយគណនី Palm ពិត ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្មើ tab «បញ្ជូន» · កញ្ចប់ដែលចុះហត្ថលេខាក្នុង
+  App Palm បិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
@@ -90,6 +90,29 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.98] — 2026-10-16 · ZoeW ៖ ZTO Palm ទាញបញ្ជី និងបិទតាម ZTO (Palm ពេញ)
+
+**ZoeW `2.50.98`** (`zoew-v360` ➜ `zoew-v361`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី · គ្មានកូដ Android native។
+សំណើម្ចាស់គម្រោង ៖ «ZTO Palm mode គួតែមានសមត្ថភាពខ្លាំងជាង sync Cookie» ➜ ជ្រើស «Palm ពេញ (បញ្ជី + ចុះហត្ថលេខា)» · កញ្ចប់មកដល់ហាង
+បង្ហាញក្នុង tab «បញ្ជូន» (ម្ចាស់គម្រោងបញ្ជាក់) · PR ថ្មី។ តំបន់ចាក់សោ ZTO ប្រែតាមសំណើនេះ (`zto-palm.js` · `zto-order-detail.js` ·
+`zto-list-sync.ts` · `zto-status.ts` ➜ `LOCK` ថ្មី)។
+
+- Function ៖ `?palm=1&list=1` ឆ្លើយកិច្ចសន្យាបញ្ជី Argus ពី `queryDispatchList` តែប៉ុណ្ណោះ (មកដល់ = `billStatus` `4` · `dispEmpDate*` ·
+  ចុះហត្ថលេខា = `billStatus` `5` · `signSiteDate*` · `withSigned` ស្របគ្នា · `signed=1` · `exact=1` · `pagesUnknown`)។ តែជួរ `billStatus` `5`
+  ទេជាភស្តុតាង · Palm គ្មានម៉ោងចុះហត្ថលេខា ➜ `signedRows.at` ទទេ (មិននាំចូលដោយទាយថ្ងៃ) · គណនី ZoeW ផ្ទៀងរួចសាខាផ្សេង ➜ `site:palm-other-branch`។
+  Session Palm ចងសាខា (`site` · `siteName`)។
+- App ៖ URL បញ្ជីរក្សា `palm=1` · ផ្ញើ session Palm · ☰ ZTO (ទាញបញ្ជី · បិទតាម ZTO) និងការរង់ចាំ ៨ ថ្ងៃ ដំណើរការក្នុងរបៀប Palm ·
+  មិនពិនិត្យ `/detail` ម្តងមួយៗ (`billInfoQuery` គ្មានស្ថានភាព ➜ គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា»)។ ផ្ទាំង Palm · `guide.html` ពន្យល់។
+- អ្នកយាមថ្មី ៖ `ZoeW/tests/zto-palm-list.test.tsx` (៤ ធ្លាក់លើកូដមុនកែ) · `zto-palm-server.test.ts` ផ្នែកបញ្ជី (៨ ធ្លាក់លើកូដមុនកែ ·
+  endpoint ដែលហៅត្រូវនៅក្នុងបញ្ជីអានតែប៉ុណ្ណោះ)។ test ចាស់ ៣ ដែលសន្មតថា Palm បិទមុខងារ ZTO ត្រូវប្តូរតាមសំណើ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. env Palm ៣ (មើល [2.50.97]) ត្រូវមានក្នុង Netlify Deploy Previews ដើម្បីសាក PR នេះ។
+2. លើ preview ៖ ☰ ZTO ➜ បើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ➜ ទាញថ្ងៃនេះ ➜ ធៀបនឹង tab «បញ្ជូន» ក្នុង App Palm (ចំនួន · លេខទូរស័ព្ទ · COD/DOD)។
+3. ចុះហត្ថលេខាកញ្ចប់មួយក្នុង App Palm ➜ ក្នុង ZoeW កញ្ចប់នោះបិទ «យក» ដោយស្វ័យប្រវត្តិ (ឬចុច 🔄 ក្នុងរបារ ZTO)។
+   ⛔ សាកលើ preview មុន merge ព្រោះវាប៉ះ auto-close និងការសម្អាត ៨ ថ្ងៃ (លុយ)។
 
 ### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
 
@@ -5947,6 +5970,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |

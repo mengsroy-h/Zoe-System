@@ -165,12 +165,12 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body).code).toBe('ZTO_AUTH_EXPIRED');
     });
 
-    it('does not fall back to Argus list/signed endpoints using a Palm session', async () => {
+    it('never falls back to Argus list endpoints or the Argus Cookie with a Palm session', async () => {
         const { sessionToken: session } = await login();
-        vi.stubGlobal('fetch', vi.fn());
-        const res = await call({ palm: '1', list: '1' }, session);
-        expect(JSON.parse(res.body)).toMatchObject({ enabled: false, reason: 'palm:lookup-only' });
-        expect(fetch).not.toHaveBeenCalled();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { list: [], pages: 0, total: 0 } })));
+        const res = await call({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(vi.mocked(fetch).mock.calls.map((c) => String(c[0]))).toEqual(['https://aargus-api.ztoglobal.net/zto/dispatch/v1/queryDispatchList']);
     });
 
     it.each(['fetch', 'body'])('settles a hung %s even when abort is ignored', async (phase) => {
@@ -339,5 +339,107 @@ describe('Palm follows the same server rules as /detail', () => {
             fn.setBlobsModuleForTests(null);
             fn.resetCachesForTests();
         }
+    });
+});
+
+describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the Argus list contract', () => {
+    const READ_ONLY = new Set(['/zto/system/v1/doLogin', '/zto/basic/v1/billInfoQuery', '/zto/dispatch/v1/queryDispatchList']);
+    const item = (billCode: string, billStatus: string, extra: Record<string, unknown> = {}) => ({
+        billCode, billStatus, consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: '2.5', dod: '0', dispEmpDate: '2026-10-15 09:30:00', ...extra
+    });
+    const page = (list: unknown[], extra: Record<string, unknown> = {}) => upstream({ status: true, result: { list, pages: 1, total: list.length, isLastPage: true, ...extra } });
+    function serve(byStatus: Record<string, () => Response>) {
+        const sent: Array<{ path: string; body: any }> = [];
+        vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
+            const path = new URL(String(url)).pathname;
+            const body = JSON.parse(String(init.body));
+            sent.push({ path, body });
+            expect(READ_ONLY.has(path)).toBe(true);
+            return (byStatus[body.billStatus] || (() => upstream({}, 500)))();
+        }));
+        return sent;
+    }
+    const listQuery = (extra: Record<string, string> = {}) => ({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1', ...extra });
+
+    it('arrival page ➜ dispatch list billStatus 4 over dispEmpDate with the Argus row shape', async () => {
+        const { sessionToken: session } = await login();
+        const sent = serve({ '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4', { cod: '-1', fcAmount: '1.5' })], { pages: 2, total: 150 }) });
+        const body = JSON.parse((await call(listQuery(), session)).body);
+        expect(sent).toEqual([{ path: '/zto/dispatch/v1/queryDispatchList', body: {
+            billStatus: '4', dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: '2026-10-16 23:59:59', pageNum: 1, pageSize: 100 } }]);
+        expect(body).toMatchObject({ success: true, list: true, enabled: true, kind: 'arrival', page: 1, pages: 2, total: 150,
+            site: 'KH001', siteName: 'Test branch', otherScans: 0, signedScans: 0, signed: [], signedOk: false });
+        expect(body.rows).toEqual([
+            { barcode: 'KH0000000001', phone: '012345678', cod: 2.5, dod: 0, at: '2026-10-15 09:30:00', ztoClosed: false, skip: '', from: '' },
+            { barcode: 'KH0000000002', phone: '012345678', cod: 0, dod: 1.5, at: '2026-10-15 09:30:00', ztoClosed: false, skip: '', from: '' }
+        ]);
+    });
+
+    it('withSigned=1 ➜ sign list billStatus 5 in parallel; only rows whose billStatus is 5 are evidence', async () => {
+        const { sessionToken: session } = await login();
+        const sent = serve({
+            '4': () => page([item('KH0000000001', '4')]),
+            '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5')], { pages: 3, total: 41 })
+        });
+        const body = JSON.parse((await call(listQuery({ withSigned: '1' }), session)).body);
+        expect(sent.map((c) => c.body.billStatus).sort()).toEqual(['4', '5']);
+        const signedBody = sent.find((c) => c.body.billStatus === '5')!.body;
+        expect(signedBody).toMatchObject({ signSiteDateFrom: '2026-10-10 00:00:00', pageNum: 1, pageSize: 100 });
+        expect(signedBody.signSiteDateTo.endsWith(' 23:59:59')).toBe(true);
+        expect(body).toMatchObject({ kind: 'arrival', signedOk: true, signed: ['KH0000000009'], signedPages: 3, signedTotal: 41 });
+        expect(body.signedRows).toEqual([{ barcode: 'KH0000000009', phone: '012345678', cod: 2.5, dod: 0, at: '', from: '' }]);
+    });
+
+    it('signed=1&exact=1 reads exactly the requested days; signed=1 alone reads the companion range', async () => {
+        const { sessionToken: session } = await login();
+        const sent = serve({ '5': () => page([item('KH0000000009', '5')]) });
+        const exact = JSON.parse((await call(listQuery({ signed: '1', exact: '1', from: '2026-10-12', to: '2026-10-12' }), session)).body);
+        expect(sent[0].body).toMatchObject({ billStatus: '5', signSiteDateFrom: '2026-10-12 00:00:00', signSiteDateTo: '2026-10-12 23:59:59' });
+        expect(exact).toMatchObject({ kind: 'signed', signedOk: true, signed: ['KH0000000009'], rows: [] });
+        await call(listQuery({ signed: '1', from: '2026-10-12', to: '2026-10-12' }), session);
+        expect(sent[1].body.signSiteDateTo >= '2026-10-12 23:59:59').toBe(true);
+    });
+
+    it('a failed sign list leaves the arrival page answering with signedOk false (never «complete»)', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '4': () => page([item('KH0000000001', '4')]), '5': () => upstream({ status: false, statusCode: 'SYS_BUSY' }) });
+        const body = JSON.parse((await call(listQuery({ withSigned: '1' }), session)).body);
+        expect(body).toMatchObject({ kind: 'arrival', signedOk: false });
+        expect(body.rows).toHaveLength(1);
+    });
+
+    it('expired session · ZTO refusal · bad range or page ➜ the same codes the App knows', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '4': () => upstream({}, 401) });
+        expect((await call(listQuery(), session)).statusCode).toBe(401);
+        serve({ '4': () => upstream({ status: false, statusCode: 'SYS_BUSY' }) });
+        expect(JSON.parse((await call(listQuery(), session)).body)).toEqual({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYS_BUSY' });
+        serve({});
+        expect(JSON.parse((await call(listQuery({ from: '2026-10-16', to: '2026-10-10' }), session)).body).code).toBe('ZTO_LIST_RANGE_INVALID');
+        expect(JSON.parse((await call(listQuery({ page: '9' }), session)).body).code).toBe('ZTO_LIST_PAGE_INVALID');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('a full page without ZTO pages is never the last page (pagesUnknown)', async () => {
+        const { sessionToken: session } = await login();
+        const full = Array.from({ length: 100 }, (_, i) => item('KH' + String(1000000000 + i), '4'));
+        serve({ '4': () => upstream({ status: true, result: { list: full } }) });
+        const body = JSON.parse((await call(listQuery(), session)).body);
+        expect(body).toMatchObject({ pages: 2, pagesUnknown: true });
+    });
+
+    it('a verified ZoeW account of another branch cannot read this Palm account\'s lists', async () => {
+        const { sessionToken: session } = await login({ ...ACCOUNT, siteCode: '12345' });
+        vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
+        const palm = vi.fn(async () => page([]));
+        vi.stubGlobal('fetch', withCerts(palm));
+        const other = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': session, 'x-zoe-id-token': tokenForSite('99999') },
+            queryStringParameters: listQuery() });
+        expect(JSON.parse(other.body)).toMatchObject({ enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-other-branch' });
+        expect(palm).not.toHaveBeenCalled();
+        const same = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY, 'x-zoe-palm-token': session, 'x-zoe-id-token': tokenForSite('12345') },
+            queryStringParameters: listQuery() });
+        expect(JSON.parse(same.body)).toMatchObject({ enabled: true, site: '12345' });
     });
 });

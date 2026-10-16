@@ -16,6 +16,7 @@ import { closeModal } from '../src/ui/modal';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
+import { buildZtoListApiUrl } from '../src/features/zto-list-sync';
 import { clearSensitiveModalFields } from '../src/features/session';
 import { healthLookupRow } from '../src/features/health-check';
 import { buildHealthAdvice } from '../src/features/health-advice';
@@ -181,9 +182,10 @@ describe('Palm login UI and existing lookup flow', () => {
 
     it('disconnects Palm and clears its lookup cache and session', async () => {
         await signIn();
-        expect(ztoFastModeIsOn()).toBe(false);
-        expect(ztoStatusFeatureConfig()).toBeNull();
+        expect(ztoFastModeIsOn()).toBe(true);
+        expect(ztoStatusFeatureConfig()).toMatchObject({ enabled: true });
         act(() => disconnectZtoPalm());
+        expect(ztoStatusFeatureConfig()).toBeNull();
         expect(getLookupApiConfig()).toMatchObject({ enabled: false });
         expect(getLookupApiConfig().palmTokenEnc).toBeUndefined();
         expect(viewState.palmLoginConnected).toBe(false);
@@ -216,11 +218,12 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(viewState.palmLoginStatus).toContain('palm:sign-key');
     });
 
-    it('decides Palm mode from the lookup URL alone (a config without provider still turns Argus features off)', () => {
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
-            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' }));
-        expect(ztoFastModeIsOn()).toBe(false);
-        expect(ztoStatusFeatureConfig()).toBeNull();
+    it('decides Palm mode from the lookup URL alone (a config without provider still reads ZTO lists through Palm, never the Argus Cookie)', async () => {
+        const cfg = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' };
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        expect(new URL(buildZtoListApiUrl(cfg, '2026-10-01', '2026-10-02', 1, 'signedExact')).searchParams.get('palm')).toBe('1');
+        await expect(buildLookupRequestHeaders(cfg)).rejects.toMatchObject({ lookupCode: 'ZTO_AUTH_EXPIRED' });
     });
 
     it('names the Palm problem in the auto-lookup message (ZTO rejected with a reason · session expired)', async () => {
@@ -255,9 +258,10 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('warns in the Palm form that Palm mode never closes parcels from ZTO', () => {
+    it('tells in the Palm form which ZTO lists Palm mode reads, and that the not-signed bar is absent', () => {
         const note = document.getElementById('ztoPalmModeNote');
-        expect(note && note.textContent).toContain('មិនបិទកញ្ចប់តាម ZTO');
-        expect(note && note.textContent).toContain('ដកពីចំណូល');
+        expect(note && note.textContent).toContain('«បញ្ជូន»');
+        expect(note && note.textContent).toContain('«ចុះហត្ថលេខា»');
+        expect(note && note.textContent).toContain('មិនបង្ហាញក្នុងរបៀប Palm');
     });
 });

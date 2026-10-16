@@ -15,7 +15,7 @@ import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
 import { isPinFlowPending } from './config';
-import { safeLookupReason } from './customer-table-prefetch';
+import { lookupApiIsPalm, safeLookupReason } from './customer-table-prefetch';
 import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
@@ -330,7 +330,7 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?) {
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
     const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1' : (mode === 'withSigned' ? '&withSigned=1' : ''));
-    return base + '?list=1'
+    return base + (lookupApiIsPalm(cfg) ? '?palm=1&list=1' : '?list=1')
         + '&from=' + encodeURIComponent(from)
         + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra;
 }

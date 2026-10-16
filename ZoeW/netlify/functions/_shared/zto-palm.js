@@ -8,6 +8,11 @@ const SESSION_MS = 8 * 60 * 60 * 1000;
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const UPSTREAM_CODE_RE = /^[A-Za-z0-9_.:@-]{1,60}$/;
 const AUTH_EXPIRED_RE = /^(?:401|403|not_login|token_expired|token_invalid|login_expired|login_required)$/i;
+const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
+const ARRIVAL_STATUS = '4';
+const SIGNED_STATUS = '5';
+const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
+const LIST_ROW_MAX = 200;
 
 function json(statusCode, body) {
     return { statusCode, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
@@ -165,15 +170,17 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
             }
             if (account.countryCode !== 'KH') return json(403, { code: 'ZTO_PALM_COUNTRY_UNSUPPORTED' });
             const expiresAt = Date.now() + SESSION_MS;
+            const site = String(account.siteCode || '').slice(0, 64);
+            const siteName = String(account.siteName || '').slice(0, 120);
             return json(200, {
                 success: true, provider: 'zto-palm', expiresAt,
-                sessionToken: sealSession({ token: account.token, expiresAt }, proxyKey, env),
-                account: { siteCode: String(account.siteCode || '').slice(0, 64), siteName: String(account.siteName || '').slice(0, 120) }
+                sessionToken: sealSession({ token: account.token, expiresAt, site, siteName }, proxyKey, env),
+                account: { siteCode: site, siteName }
             });
         }
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
         const session = openSession(deps.headerOf(event, SESSION_HEADER), proxyKey, env);
-        if (query.list === '1') return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'palm:lookup-only' });
+        if (query.list === '1') return await palmList(query, session, keys, deps);
         if (query.diag === '1') return json(200, { success: true, provider: 'zto-palm', configured: true });
         const barcode = String(query.barcode || '').trim();
         if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
@@ -193,6 +200,113 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (error?.name === 'AbortError') return json(504, { code: 'ZTO_TIMEOUT' });
         return json(502, { code: reason === 'upstream:unavailable' ? 'ZTO_UNAVAILABLE' : 'ZTO_INVALID_RESPONSE' });
     }
+}
+
+function listRequest(kind, range, page, deps) {
+    const body = kind === 'signed'
+        ? { billStatus: SIGNED_STATUS, signSiteDateFrom: range.start, signSiteDateTo: range.end }
+        : { billStatus: ARRIVAL_STATUS, dispEmpDateFrom: range.start, dispEmpDateTo: range.end };
+    body.pageNum = page;
+    body.pageSize = deps.listPageSize;
+    return body;
+}
+
+function listRowOf(raw, keys, deps) {
+    const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
+    const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
+    const fields = deps.project(raw);
+    const at = String(raw.dispEmpDate || '').trim();
+    return {
+        barcode, status,
+        phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
+        cod: fields.cod === null ? 0 : fields.cod,
+        dod: fields.dod === null ? 0 : fields.dod,
+        at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : ''
+    };
+}
+
+function palmListBody(kind, page, session, result, keys, deps) {
+    const container = result.result;
+    if (!container || typeof container !== 'object' || !Array.isArray(container.list)) throw new Error('upstream:json');
+    const rows = [];
+    const signed = [];
+    const seen = new Set();
+    const signedRows = [];
+    let otherScans = 0;
+    let signedScans = 0;
+    const raws = container.list.slice(0, LIST_ROW_MAX);
+    for (let i = 0; i < raws.length; i++) {
+        const raw = raws[i];
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
+        const row = listRowOf(raw, keys, deps);
+        if (!BARCODE_RE.test(row.barcode)) { otherScans++; continue; }
+        if (row.status === SIGNED_STATUS) {
+            signedScans++;
+            if (!seen.has(row.barcode)) {
+                seen.add(row.barcode);
+                signed.push(row.barcode);
+                signedRows.push({ barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: '', from: '' });
+            }
+            continue;
+        }
+        if (kind === 'signed' || row.status !== ARRIVAL_STATUS) { otherScans++; continue; }
+        rows.push({ barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: row.at, ztoClosed: false, skip: '', from: '' });
+    }
+    const pages = Number(container.pages);
+    const total = Number(container.total);
+    const counted = rows.length + otherScans + signedScans;
+    const pagesKnown = Number.isFinite(pages) && pages >= 0;
+    const pageFull = container.list.length >= deps.listPageSize;
+    const body = {
+        success: true, list: true, enabled: true, kind, page,
+        site: String(session.site || ''), siteName: String(session.siteName || ''),
+        pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
+        total: Number.isFinite(total) ? total : counted,
+        rows, otherScans, signedScans, signedMismatch: 0,
+        signed, signedOk: kind === 'signed', signedRows, provider: 'zto-palm'
+    };
+    if (!pagesKnown && pageFull) body.pagesUnknown = true;
+    return body;
+}
+
+async function palmListPage(kind, range, page, session, keys, deps) {
+    const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(kind, range, page, deps), session.token, keys, deps.upstreamMs());
+    if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return { kind: 'auth' };
+    if (upstream.status !== true) return { kind: 'rejected', reason: upstreamReason(upstream) };
+    return { kind: 'ok', body: palmListBody(kind, page, session, upstream, keys, deps) };
+}
+
+function listFailure(outcome) {
+    if (outcome.kind === 'auth') return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
+    return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: outcome.reason });
+}
+
+async function palmList(query, session, keys, deps) {
+    const range = deps.listRange(query.from, query.to);
+    if (!range) return json(400, { error: 'Invalid list date range', code: 'ZTO_LIST_RANGE_INVALID' });
+    const page = Number(String(query.page || '1').trim());
+    if (!Number.isInteger(page) || page < 1 || page > deps.listMaxPages) {
+        return json(400, { error: 'Invalid list page', code: 'ZTO_LIST_PAGE_INVALID' });
+    }
+    const access = await deps.lookupAccess();
+    if (access && access.response) return access.response;
+    const accountSite = access && access.verified ? String(access.site || '').trim().toLowerCase() : '';
+    if (accountSite && session.site && accountSite !== String(session.site).trim().toLowerCase()) {
+        return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-other-branch' });
+    }
+    const signedOnly = query.signed === '1';
+    const signedRange = signedOnly && query.exact === '1' ? range : deps.listSignedRange(range);
+    if (signedOnly) {
+        const outcome = await palmListPage('signed', signedRange, page, session, keys, deps);
+        return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);
+    }
+    const companion = query.withSigned === '1'
+        ? palmListPage('signed', signedRange, page, session, keys, deps).catch(() => null)
+        : null;
+    const outcome = await palmListPage('arrival', range, page, session, keys, deps);
+    const companionOutcome = companion ? await companion : null;
+    if (outcome.kind !== 'ok') return listFailure(outcome);
+    return json(200, companion ? deps.mergeCompanion(outcome.body, companionOutcome) : outcome.body);
 }
 
 function isPalmPreflight(query, requestedHeaders) {

@@ -6,7 +6,7 @@ method · path · field request · ប្រភេទ `result` · field response
 
 ## ⛔ ច្បាប់មុនប្រើ endpoint ណាមួយ
 
-- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` សរសេរច្បាស់ (`doLogin` · `billInfoQuery`) ។ endpoint ថ្មីចូលតែតាម
+- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` សរសេរច្បាស់ (`doLogin` · `billInfoQuery` · `queryDispatchList`) ។ endpoint ថ្មីចូលតែតាម
   PR ដែលមានអ្នកយាមធ្លាក់លើកូដមុនកែ ហើយផ្លូវលុយ (auto-close · ការរង់ចាំ ៨ ថ្ងៃ · ចំណូល) ត្រូវវាស់ជាមួយគណនីពិតជាមុន។
 - ⛔ endpoint **សរសេរ** (save · upload · add · update · cancel · pay · scan · move · leave · bind …) បង្កើតការស្កេន ការចុះហត្ថលេខា
   ឬការបង់ប្រាក់ពិតក្នុង ZTO ➜ ZoeW មិនហៅវាឡើយ។ ប្រភេទ «អាន/សរសេរ» ក្នុងតារាងកំណត់តាមឈ្មោះ endpoint ➜ ផ្ទៀងកូដ App មុនប្រើ។
@@ -42,9 +42,9 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់) | `queryDispatchList` `billStatus` `4` + `dispEmpDate*` + ទំព័រ | ផែនការ (PR ថ្មី) |
-| បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ផែនការ (PR ថ្មី) |
-| ស្ថានភាពកញ្ចប់មួយ (`/detail` `ztoClosed`) | `queryDispatchList` + `billCode` · ឬ `queryTrackInfo` | ផែនការ ៖ វាស់ចម្លើយពិតមុន |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់) | `queryDispatchList` `billStatus` `4` + `dispEmpDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1`) |
+| បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`withSigned` · `signed=1` · `exact=1`) |
+| ស្ថានភាពកញ្ចប់មួយ (`/detail` `ztoClosed`) | `queryDispatchList` + `billCode` · ឬ `queryTrackInfo` | មិនទាន់ប្រើ ៖ វាស់ចម្លើយពិតមុន (គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា» ក្នុងរបៀប Palm) |
 | រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | ជម្រើស |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |
 

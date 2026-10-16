@@ -21,7 +21,7 @@ export function LookupApiConfigModal() {
                         <label htmlFor="ztoPalmPasswordInput">ពាក្យសម្ងាត់ Palm</label>
                         <input id="ztoPalmPasswordInput" ref={refTo('ztoPalmPasswordInput')} type="password" autoComplete="off" disabled={v.palmLoginBusy} maxLength={256} />
                         <p style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>រក្សាទុកតែ session ដែលអ៊ិនគ្រីបដោយ PIN។ ពាក្យសម្ងាត់មិនត្រូវបានរក្សាទុកក្នុង ZoeW ទេ។</p>
-                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>⚠️ របៀប Palm បំពេញតែលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន — វាមិនបិទកញ្ចប់តាម ZTO ទេ។ កញ្ចប់ដែលមិនបានបិទក្នុង ZoeW ផុតកំណត់តាមច្បាប់សម្អាតស្វ័យប្រវត្តិ ហើយត្រូវដកពីចំណូល។</p>
+                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>របៀប Palm បំពេញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន · ☰ ZTO ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» អានកញ្ចប់ក្នុង tab «បញ្ជូន» · «បិទតាម ZTO» អានបញ្ជី «ចុះហត្ថលេខា» របស់គណនី Palm នេះ។ ⚠️ របារ «មិនទាន់ចុះហត្ថលេខា» មិនបង្ហាញក្នុងរបៀប Palm ទេ។</p>
                         <p role="status" aria-live="polite">{v.palmLoginStatus}</p>
                         <div className="modal-btns">
                             <div className="modal-btns-row">

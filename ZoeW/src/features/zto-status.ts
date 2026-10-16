@@ -189,14 +189,13 @@ export function rotateZtoSweepQueue(list, cursor) {
 
 export function ztoStatusFeatureConfig() {
     const cfg = getLookupApiConfig();
-    if (lookupApiIsPalm(cfg)) return null;
     if (!cfg || !cfg.enabled || !cfg.url || !lookupApiIsZto(cfg)) return null;
     return cfg;
 }
 
 export function ztoFastModeIsOn() {
     const cfg = getLookupApiConfig();
-    return !!(cfg && cfg.fastMode && !lookupApiIsPalm(cfg));
+    return !!(cfg && cfg.fastMode);
 }
 
 export function ztoStatusTrashItemCounts(item) {
@@ -744,7 +743,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     if (!cfg) return 0;
     if (ztoStatusSecretIsLocked(cfg)) return 0;
     if (ztoState.ztoStatusInFlight) return 0;
-    const detailAllowed = ztoStatusNetworkAllowed(force);
+    const detailAllowed = !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force);
     if (!detailAllowed && !ztoSignedNetworkAllowed(force)) {
         if (ztoStatusBlockIsTransient()) {
             const gap = ztoStatusSweepGapMs();

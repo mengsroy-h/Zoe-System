@@ -2044,7 +2044,12 @@ function palmDeps(event, config, startedAt) {
             dod: pickNumber([row], config.dodPaths),
             branches: config.detailBranchPaths.length ? pickTexts([row], config.detailBranchPaths, DETAIL_BRANCH_VALUES_MAX) : null
         }),
-        finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false)
+        finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false),
+        listRange,
+        listSignedRange,
+        listPageSize: config.list.pageSize,
+        listMaxPages: config.list.maxPages,
+        mergeCompanion: (body, outcome) => mergeSignedCompanion(body, outcome)
     };
 }
 

@@ -4,7 +4,7 @@
 សម្រាប់ទាញលេខទូរស័ព្ទ និង COD/DOD ដោយគណនី Palm របស់អ្នក។ មិនត្រូវការ Argus Cookie
 សម្រាប់ផ្លូវ Palm ទេ តែត្រូវការ env `ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` នៅ Netlify។
 របៀបកំណត់ server និងប្រើ៖ [docs/ZTO-PALM.md](docs/ZTO-PALM.md)។
-ការទាញបញ្ជី និងបិទតាមស្ថានភាព Argus ខាងក្រោម ជាមុខងាររបស់ផ្លូវ Argus ដដែល។
+ក្នុងរបៀប Palm «ទាញបញ្ជីកញ្ចប់ពី ZTO» និង «បិទតាម ZTO ស្វ័យប្រវត្តិ» អានបញ្ជីរបស់គណនី Palm (មើល [docs/ZTO-PALM.md](docs/ZTO-PALM.md)); ការកំណត់ Argus ខាងក្រោមសម្រាប់ផ្លូវ Argus។
 
 ZoeW ស្កេន Barcode រួចទាញ **លេខទូរស័ព្ទ · COD · DOD** ពី ZTO តាម Netlify
 Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង Token ស្ថិត

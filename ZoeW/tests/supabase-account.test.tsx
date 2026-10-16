@@ -286,6 +286,7 @@ describe('License · journal scope', () => {
     it('🩺 Supabase ៖ ជួរ License = ស្ថានភាពហាងពី server (មិនមែន Activation Key) · ស្លាក Database = Supabase', async () => {
         const getStatus = vi.fn(async () => ({ state: 'none' }));
         (window as any).ZoeLicense = { getStatus };
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ supabaseUrl: 'https://abcd.supabase.co', supabaseKey: 'sb_publishable_x' }));
         viewState.backendKind = 'supabase';
         const account: any = { tenant_id: 't1', tenant_name: 'ហាង A', branch_code: '881859', status: 'active', expires_at: new Date(Date.now() + 86400000 * 30).toISOString() };
         firebaseState.fb = { accountOf: () => account };
@@ -301,8 +302,10 @@ describe('License · journal scope', () => {
         expect(unknown.state).toBe('warn');
         expect(getStatus).not.toHaveBeenCalled();
         expect(databaseHealthLabel()).toBe('Supabase');
+        localStorage.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'A', databaseURL: 'https://x.firebaseio.com' }));
         viewState.backendKind = 'firebase';
         expect(databaseHealthLabel()).toBe('Firebase');
+        localStorage.removeItem('zoew_firebase_config');
     });
     it('journal scope ៖ Firebase = databaseURL · Supabase = URL + tenant (ហាង ២ លើឧបករណ៍ដដែលមិនលាយគ្នា) · មិនស្គាល់ tenant ➜ ទទេ', () => {
         localStorage.setItem('zoew_firebase_config', JSON.stringify({ apiKey: 'A', databaseURL: 'https://x.firebaseio.com' }));

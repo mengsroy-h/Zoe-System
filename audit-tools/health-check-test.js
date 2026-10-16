@@ -70,7 +70,9 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
     'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
-    'shopScope', 'safeStoreGet'];
+    'shopScope', 'safeStoreGet',
+    // ⛔ App ទើបដំឡើង ៖ ប្រភេទ Server ដេរីវេពី Config ដែលរក្សាទុក (គ្មាន ➜ ផ្លូវទាំង ២ · Firebase · Supabase)
+    'healthBackendKind', 'isSupabaseConfig'];
 // ⛔ ថេរដេរីវេពីកូដពិត (មិនមែន literal ក្នុង checker)
 function sliceConst(name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
@@ -78,7 +80,7 @@ function sliceConst(name) {
 }
 const NEEDED_CONSTS = ['LICENSE_NEAR_EXPIRY_DAYS', 'LICENSE_DEFINITIVE_REASONS', 'ZTO_BARCODE_RE', 'ZTO_BARCODE_SHAPE_TEXT',
     'ZTO_ID_TOKEN_TIMEOUT_MS', 'ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS', 'ZTO_IDENTITY_RETRY_REASONS',
-    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_NETWORK', 'HEALED_BY_DATABASE'];
+    'HEALTH_ADVICE_MAX_STEPS', 'HEALTH_ADVICE_LABELS', 'HEALED_BY_NETWORK', 'HEALED_BY_DATABASE', 'HEALTH_NO_BACKEND_TEXT'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -96,6 +98,14 @@ const constSrc = NEEDED_CONSTS.map((n) => {
 });
 
 const SECRET = 'super-secret-proxy-key-9911';
+
+// Config ដែលរក្សាទុក (`zoew_firebase_config`) ៖ `config: null` = App ទើបដំឡើង · `backend: 'supabase'` ➜ Config Supabase · លំនាំដើម Firebase
+function storedBackendConfig(o) {
+    if (o.config === null) return null;
+    return JSON.stringify(o.config || (o.backend === 'supabase'
+        ? { supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_TEST' }
+        : { apiKey: 'AIzaSyTEST', databaseURL: 'https://demo-zoe-default-rtdb.firebaseio.com', projectId: 'demo-zoe' }));
+}
 
 function buildRuntime(over) {
     const o = over || {};
@@ -149,7 +159,7 @@ function buildRuntime(over) {
         hasEverConnectedToDatabase: true,
         serverClockTrusted: o.clockTrusted !== false,
         serverTimeOffsetMs: o.offset === undefined ? 0 : o.offset,
-        appLocalStore: o.localStore === null ? null : {},
+        appLocalStore: o.localStore === null ? null : { getItem: (k) => (k === 'zoew_firebase_config' ? storedBackendConfig(o) : null) },
         appSessionStore: {},
         customerDataTableRows: o.rows === undefined ? null : o.rows,
         customerDataTableFetchedAt: 1,
@@ -522,6 +532,22 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ Supabase ៖ status «active» តែថ្ងៃផុតកន្លងរួច (cache ចាស់) ➜ ❌', state(stale) === 'bad', stale);
         const unknown = await buildRuntime({ backend: 'supabase', account: null }).api.healthLicenseRow();
         ok('⛔ Supabase ៖ មិនទាន់ដឹងស្ថានភាពហាង ➜ ⚠️ (មិនមែន ✅ ឬ ❌)', state(unknown) === 'warn', unknown);
+    }
+    {
+        // ⛔ App ទើបដំឡើង (គ្មាន `zoew_firebase_config`) ៖ App គាំទ្រ Server ២ ➜ ជួរ Server · 💡 ការណែនាំ រាយ Firebase និង Supabase ·
+        //    ជួរអាជ្ញាប័ណ្ណ ℹ️ (Activation Key សម្រាប់ Firebase តែប៉ុណ្ណោះ) · ទិសផ្ទុយ ៖ Config Supabase ក្នុងឃ្លាំង ➜ «Supabase» ទោះ `backendKind` នៅ firebase
+        const fresh = buildRuntime({ config: null, dbConnected: false, probe: false });
+        const freshDb = fresh.api.healthDatabaseRow();
+        ok('⛔ គ្មាន Config ➜ ជួរ Server ❌ រាយ Firebase និង Supabase', state(freshDb) === 'bad' && /Firebase/.test(freshDb) && /Supabase/.test(freshDb), freshDb);
+        const freshLic = await fresh.api.healthLicenseRow();
+        ok('⛔ គ្មាន Config ➜ ជួរអាជ្ញាប័ណ្ណ ℹ️ (Firebase ➜ Activation Key · Supabase ➜ ស្ថានភាពហាង)', state(freshLic) === 'info'
+            && /Activation Key/.test(freshLic) && /Supabase/.test(freshLic), freshLic);
+        await fresh.api.runHealthCheck();
+        const freshAdvice = vm.runInContext('uiState.healthAdvice', fresh.ctx) || { steps: [] };
+        ok('⛔ គ្មាន Config ➜ 💡 ជំហានទី ១ = Config ដែលរាយផ្លូវទាំង ២', /Config/.test(freshAdvice.steps[0] || '')
+            && /Firebase/.test(freshAdvice.steps[0] || '') && /Supabase/.test(freshAdvice.steps[0] || ''), freshAdvice.steps);
+        const sbStored = buildRuntime({ config: { supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co', supabaseKey: 'sb_publishable_TEST' } });
+        ok('ទិសផ្ទុយ ៖ Config Supabase ក្នុងឃ្លាំង (SDK មិនទាន់ផ្ទុក) ➜ ស្លាក «Supabase»', /<b>Supabase<\/b>/.test(sbStored.api.healthDatabaseRow()), sbStored.api.healthDatabaseRow());
     }
     {
         // ⛔ «ការតភ្ជាប់ងាប់ស្ងាត់» ៖ `.info/connected` = true តែ Server មិនឆ្លើយ ➜ ✅ លើអ្វីដែលមិនបានវាស់ = កុហក

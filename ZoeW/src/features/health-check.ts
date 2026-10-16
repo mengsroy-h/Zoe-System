@@ -6,7 +6,7 @@ import { firebaseState, lookupState, securityState, uiState } from '../core/stat
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { getZoneDateKey } from '../core/timezone';
-import { appLocalStore, appSessionStore } from '../core/storage';
+import { appLocalStore, appSessionStore, safeStoreGet } from '../core/storage';
 import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
@@ -21,14 +21,23 @@ import { openModalHelper } from '../ui/modal';
 import { connectionFlowSnapshot } from '../services/connection-flow';
 import { closeSideDrawer } from '../ui/page-nav';
 import { isNativeApp } from '../platform/native';
-import { buildHealthAdvice } from './health-advice';
+import { HEALTH_ADVICE_LABELS, HEALTH_NO_BACKEND_TEXT, buildHealthAdvice } from './health-advice';
+import { isSupabaseConfig } from '../services/supabase-config';
 
 export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
 
 export const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
 
+export function healthBackendKind() {
+    const saved = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+    if (!saved) return 'none';
+    try { return isSupabaseConfig(JSON.parse(saved)) ? 'supabase' : 'firebase'; } catch (e) {}
+    return viewState.backendKind === 'supabase' ? 'supabase' : 'firebase';
+}
+
 export function databaseHealthLabel() {
-    return viewState.backendKind === 'supabase' ? 'Supabase' : 'Firebase';
+    const kind = healthBackendKind();
+    return kind === 'none' ? HEALTH_ADVICE_LABELS.backend : kind === 'supabase' ? 'Supabase' : 'Firebase';
 }
 
 export function healthAgeText(mark) {
@@ -48,6 +57,7 @@ export function healthNetworkRow() {
 }
 
 export function healthDatabaseRow() {
+    if (healthBackendKind() === 'none') return healthRow('bad', HEALTH_ADVICE_LABELS.backend, HEALTH_NO_BACKEND_TEXT);
     if (!firebaseState.isDatabaseConnected) {
         return healthRow('bad', databaseHealthLabel(), firebaseState.hasEverConnectedToDatabase
             ? 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ'
@@ -111,7 +121,9 @@ export function healthKeyValidityText(status) {
 }
 
 export async function healthLicenseRow() {
-    if (viewState.backendKind === 'supabase') return healthTenantRow();
+    const backend = healthBackendKind();
+    if (backend === 'none') return healthRow('info', HEALTH_ADVICE_LABELS.license, 'អាស្រ័យលើ Server ៖ Firebase ➜ Activation Key ពីអ្នកលក់ · Supabase ➜ ស្ថានភាពហាង (គ្មាន Key) — កំណត់ Config សិន');
+    if (backend === 'supabase') return healthTenantRow();
     if (!window.ZoeLicense || typeof ZoeLicense.getStatus !== 'function') {
         return healthRow('warn', 'អាជ្ញាប័ណ្ណ', 'ម៉ូឌុល License មិនទាន់ផ្ទុក');
     }

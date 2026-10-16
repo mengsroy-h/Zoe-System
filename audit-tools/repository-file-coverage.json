@@ -1906,6 +1906,9 @@
     "ZoeW/tests/health-advice.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/health-no-backend.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/history-paging.test.tsx": {
       "policy": "zoew-self-verification"
     },

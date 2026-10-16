@@ -974,7 +974,7 @@ async function resolveListIdentity(idToken, config, startedAt, env) {
     if (site.code && bound.indexOf(site.code.toLowerCase()) === -1) {
         return { auth: auth, site: { code: '', reason: 'site:project-branch' }, binding: 'mismatch' };
     }
-    return { auth: auth, site: site, binding: 'bound' };
+    return { auth: auth, site: site, binding: 'bound', branches: bound.slice() };
 }
 
 function readProjectEntries(env) {
@@ -1332,6 +1332,45 @@ function listResponseBody(config, container, page, siteCode, kind) {
         body.signedDescExpected = config.list.signedDescs.slice();
     }
     return body;
+}
+
+function listSignedBranchSites(identity) {
+    const own = identity && identity.site ? identity.site.code : '';
+    const bound = identity && Array.isArray(identity.branches) ? identity.branches : [];
+    if (!own || bound.length < 2) return [];
+    return bound.filter((code) => code !== String(own).toLowerCase());
+}
+
+function mergeSignedBranches(body, extras) {
+    const out = Object.assign({}, body);
+    const signed = Array.isArray(out.signed) ? out.signed.slice() : [];
+    const seen = new Set(signed);
+    const signedRows = [];
+    const signedRowIndex = new Map();
+    (Array.isArray(out.signedRows) ? out.signedRows : []).forEach((row) => keepLatestSignedRow(signedRows, signedRowIndex, row));
+    const mismatchTexts = Array.isArray(out.signedMismatchTexts) ? out.signedMismatchTexts.slice() : [];
+    extras.forEach((extra) => {
+        (Array.isArray(extra.signed) ? extra.signed : []).forEach((code) => {
+            if (!seen.has(code)) { seen.add(code); signed.push(code); }
+        });
+        (Array.isArray(extra.signedRows) ? extra.signedRows : []).forEach((row) => keepLatestSignedRow(signedRows, signedRowIndex, row));
+        out.otherScans += Number(extra.otherScans) || 0;
+        out.signedScans += Number(extra.signedScans) || 0;
+        out.signedMismatch += Number(extra.signedMismatch) || 0;
+        out.total += Number(extra.total) || 0;
+        const pages = Number(extra.pages);
+        if (Number.isFinite(pages) && pages > out.pages) out.pages = pages;
+        if (extra.pagesUnknown === true) out.pagesUnknown = true;
+        (Array.isArray(extra.signedMismatchTexts) ? extra.signedMismatchTexts : []).forEach((text) => {
+            if (mismatchTexts.length < SIGNED_MISMATCH_TEXTS_MAX && mismatchTexts.indexOf(text) === -1) mismatchTexts.push(text);
+        });
+        if (!out.signedDescExpected && Array.isArray(extra.signedDescExpected)) out.signedDescExpected = extra.signedDescExpected;
+    });
+    out.signed = signed;
+    out.signedRows = signedRows;
+    if (mismatchTexts.length) out.signedMismatchTexts = mismatchTexts;
+    out.signedBranches = 1 + extras.length;
+    return out;
 }
 
 function mergeSignedCompanion(body, outcome) {
@@ -1910,7 +1949,7 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
         return null;
     }
     const companionRun = companion ? (outcome.kind === 'ok' ? rerun : companion.run) : null;
-    return { outcome: outcome, session: fresh, companionRun: companionRun };
+    return { outcome: outcome, session: fresh, companionRun: companionRun, headers: built.headers };
 }
 
 function storeCachedBody(key, body, negative) {
@@ -2249,6 +2288,7 @@ async function handleRequest(event) {
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
     let plan = null;
     let companion = null;
+    let branchPlans = [];
     if (wantsList) {
         const idToken = (event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '';
         const identity = await resolveListIdentity(idToken, config, startedAt, process.env);
@@ -2295,9 +2335,14 @@ async function handleRequest(event) {
                 reason: config.list.signedReason || 'signed:off'
             });
         }
+        const exact = signedOnly && String(query.exact || '') === '1';
         plan = signedOnly
-            ? listPlan(config, site.code, String(query.exact || '') === '1' ? range : listSignedRange(range), page, 'signed')
+            ? listPlan(config, site.code, exact ? range : listSignedRange(range), page, 'signed')
             : listPlan(config, site.code, range, page, 'arrival');
+        if (exact) {
+            branchPlans = listSignedBranchSites(identity).map((code) => listPlan(config, code, range, page, 'signed'));
+            if (branchPlans.length) plan.cacheKey += '|B' + branchPlans.map((extra) => extra.body.condition.scanSiteCode).join(',');
+        }
         if (!signedOnly && config.list.signedType && String(query.withSigned || '') === '1') {
             companion = listPlan(config, site.code, listSignedRange(range), page, 'signed');
             plan.cacheKey += '|S';
@@ -2360,12 +2405,16 @@ async function handleRequest(event) {
 
     let outcome;
     let companionRun = null;
+    let branchRuns = [];
+    const branchRunFor = (extra, runHeaders, runSession) => runSharedLookup(extra.cacheKey + '|' + (cookieFingerprint(runSession.cookie) || '-'),
+        config, runHeaders, barcode, runSession, startedAt, extra).catch(() => null);
     try {
         const primaryRun = runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
         if (companion) {
             companionRun = runSharedLookup(companion.cacheKey + '|' + (cookieFingerprint(session.cookie) || '-'),
                 config, headers, barcode, session, startedAt, companion).catch(() => null);
         }
+        branchRuns = branchPlans.map((extra) => branchRunFor(extra, headers, session));
         outcome = await primaryRun;
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
@@ -2384,6 +2433,11 @@ async function handleRequest(event) {
         session = retried.session;
         outcome = retried.outcome;
         companionRun = retried.companionRun;
+        if (branchPlans.length && outcome.kind === 'ok') {
+            branchRuns = branchRuns.map((run, i) => run.then((prior) => (prior && prior.kind === 'authRejected'
+                ? branchRunFor(branchPlans[i], retried.headers, retried.session)
+                : prior)));
+        }
         if (outcome.kind === 'authRejected') {
             session.renewal = '';
             invalidateCookieCache(session);
@@ -2397,13 +2451,19 @@ async function handleRequest(event) {
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
     const companionOutcome = companionRun ? await companionRun : null;
+    const branchOutcomes = branchRuns.length ? await Promise.all(branchRuns) : [];
 
     const storeWindowMs = cookieRenewTimeoutMs(config, startedAt);
     await Promise.all([flushCookieRenewal(session, storeWindowMs), writeCookieLife(lifeUpdate, storeWindowMs)]);
 
+    if (outcome.kind === 'ok' && branchOutcomes.some((extra) => !extra || extra.kind !== 'ok')) {
+        const failed = branchOutcomes.find((extra) => extra && extra.kind !== 'ok' && extra.response);
+        return failed ? failed.response : json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
+    }
     if (outcome.kind === 'ok') {
         let body = outcome.body;
         if (companion) body = mergeSignedCompanion(body, companionOutcome);
+        if (branchOutcomes.length) body = mergeSignedBranches(body, branchOutcomes.map((extra) => extra.body));
         const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
         if (ttlMs > 0 && (!companion || body.signedOk)) storeCachedBody(cacheKey, body);
         return json(200, plan ? Object.assign({}, body, { cached: false }) : detailResponseBody(config, access, body, barcode, false));

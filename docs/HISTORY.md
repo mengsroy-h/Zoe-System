@@ -47,8 +47,8 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.95 · ZoeKeyGen 2.24.19** (PR #324 · `de92cd9`)។
-- Branch **`claude/collected-day-scoped-tx`** (PR #325 · ពី `main` `854e3ae` + merge `de92cd9` · **មិនទាន់ merge**) ៖ [2.50.96] (កែតម្លៃកញ្ចប់បិទ ប៉ះតែថ្ងៃពាក់ព័ន្ធក្នុង «ចំណូលយករួច» · A160)។
+- `main` = **ZoeW 2.50.96 · ZoeKeyGen 2.24.19** (PR #325 · `2519a1f`)។
+- Branch **`claude/zto-audit`** (ពី `main` `2519a1f` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
@@ -3667,6 +3667,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-16 — Audit ZTO ទាំងមូល (សំណើម្ចាស់គម្រោង) ៖ គម្រោងតែមួយ សាខាច្រើន ➜ ការអានបញ្ជីចុះហត្ថលេខារបស់សាខាមួយដោះការរង់ចាំ ៨ ថ្ងៃទូទាំងហាង (ZTO-E14 · កែ Function)
+
+សំណើ ៖ «audit ផ្នែក ZTO ទាំងមូល» (Function · App · ឧបករណ៍ Cookie Sync · តំបន់ចាក់សោ ➜ អ្នកយាមមុន · សួរម្ចាស់គម្រោងមុនកែ) ➜ ZTO-E14 ➜ ម្ចាស់គម្រោងជ្រើស
+«(ក) កែ Function» ➜ កែតែ `ZoeW/netlify/functions/zto-order-detail.js` (កូដ server ➜ មិនមែនកូដ ship ➜ គ្មានការឡើងកំណែ · `CLAUDE.md` ជួរ «Versions») ·
+`LOCK` ធ្វើបច្ចុប្បន្នភាព (តែ Function · ឯកសារ App ក្នុងតំបន់ចាក់សោមិនប្រែ)។ **សកម្មភាពដោយដៃ** ៖ គ្មាន (Netlify deploy Function ពេល merge · env មិនប្រែ) ·
+គម្រោងដែលចងសាខា N ➜ ការអានចុះហត្ថលេខាជុំបិទតាម ZTO ហៅ ZTO N ដង ក្នុងការហៅ Function ដដែល (ចំនួន Netlify invocation មិនប្រែ)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A161 | **ZTO-E14 ៖ គម្រោង Firebase មួយចងសាខាច្រើន (`FIREBASE_PROJECT_IDS=zoew-v1:101\|102` — `ZTO-SETUP-KH.md` ផ្នែក ៤គ គាំទ្រ) ➜ ការរង់ចាំ ៨ ថ្ងៃលែងការពារកញ្ចប់សាខាផ្សេង** | ប្រវត្តិតែមួយកាន់កញ្ចប់សាខាទាំង ២ · Function អានបញ្ជី «ចុះហត្ថលេខា» តែសាខារបស់គណនី (`scanSiteCode` ពី email) · `closeZtoSignedBarcodes()` ចាត់ «ពេញលេញ» (`ztoSignedCompleteAt` + សញ្ញាហាង `completeAt`) ពេលគ្មានកញ្ចប់បើកណាក្នុងបញ្ជី **សាខាខ្លួន** នៅរង់ចាំ ➜ `ztoAbandonCleanupIsHeld()` ដោះ (ឧបករណ៍នេះ និងឧបករណ៍គ្មាន ZTO តាមសញ្ញាហាង) ➜ `abandon` ដកលុយកញ្ចប់សាខា 102 ដែល ZTO ចុះហត្ថលេខារួច ខណៈឧបករណ៍ 102 មិនទាន់អាន (ឧ. បិទចុងសប្តាហ៍)។ វាស់ (vitest ៖ Function ពិត + client ពិត + ZTO ក្លែង + ID token ចុះហត្ថលេខាពិត) ៖ កញ្ចប់ ១ · `ZTO_DETAIL_IDENTITY` `require`/`optional` + `ZTO_DETAIL_BRANCH_PATHS` ➜ `/detail` ឆ្លើយ `ZTO_OTHER_BRANCH` ➜ **ដកលុយ** (FAIL) · `off` (production បច្ចុប្បន្ន) ➜ `/detail` បិទវាក្នុងជុំដដែល · កញ្ចប់ ១៥ · `off` ➜ `/detail` បិទ ១០ (`ZTO_STATUS_SWEEP_BATCH`) · **ដកលុយ ៥** · ទិសផ្ទុយ ៖ គម្រោងសាខាតែមួយ · កញ្ចប់សាខាខ្លួនឯង ➜ បិទ «យករួច» (PASS) · ហាង Supabase (១ ហាង = ១ សាខា) មិនរងផល | ម្ចាស់គម្រោង ៖ «(ក) កែ Function» ➜ អ្នកយាមមុន `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` (លើ Function មុនកែ ៖ **FAIL ២/៦** ៖ សាខាផ្សេងដកលុយ · សាខាមួយ 503 ក៏ «ពេញលេញ») ➜ `listSignedBranchSites()` + `mergeSignedBranches()` ៖ `signed=1&exact=1` របស់គម្រោងដែលចងសាខា ≥ ២ អានបញ្ជីចុះហត្ថលេខាគ្រប់សាខាដែលចងស្របគ្នា (single-flight · ថវិកាដដែល · 401 ➜ រត់ឡើងវិញជាមួយ Cookie ថ្មី) ➜ សាខាណាមួយបរាជ័យ ➜ ចម្លើយបរាជ័យ (មិន cache · client backoff · មិនពេញលេញ) · cache key `\|B<សាខា>` · បញ្ជីមកដល់ និង `withSigned` នៅសាខាគណនី ➜ ក្រោយកែ **PASS ៦/៦** · vitest ZTO ២៦ ឯកសារ ៣០៩ តេស្ត PASS · checker ZTO ១១ PASS · run-all STRICT ពេញ (emulator · Postgres) ៖ PASS ២១០ · FAIL ២ (`doc-scope-test` ៖ លិបិក្រម 🔎 ខ្វះអ្នកយាមថ្មី ➜ បន្ថែម · `layout-check` អស់ពិដាន ៣០០ វិ. ក្រោម ៤ lane គ្មាន assertion ធ្លាក់) ➜ រត់ម្តងទៀត PASS ២/២ (`layout-check` ១៧១ វិ.) |
+| A162 | **Audit ZTO ៖ ផ្លូវដែលវាស់/អានហើយមិនឃើញចន្លោះថ្មី** | `RUNALL_ONLY` checker ZTO ១១ ➜ PASS ១១ (មិនពេញលេញ · គ្មាន emulator) · អាន `handleRequest()` · identity Firebase/Supabase · cache/single-flight (ការផ្ទៀងសាខាលើ cache hit និងអ្នកចូលរួម single-flight ក្នុងមួយសំណើ) · ថវិកា (certs · Cookie · upstream · retry 401 · companion ក្នុងពិដាន) · `fetchZtoListAllPages()` · `fetchZtoSignedCodes()`/`fetchZtoSignedPages()` (`pagesUnknown` · ការបំបែកតាមថ្ងៃ) · `ztoSignedSweepRange()` (`ZTO_SIGNED_SWEEP_RECENT_MS` ១២ ម៉ោង ≤ ២៤ ម៉ោង ➜ ជួរ «ម្សិលមិញ ➜ ថ្ងៃនេះ» គ្របចន្លោះអានគ្រប់ពេល) · `ztoIdentityTargetTrusted()` (origin · មិនមែន path · `{barcode}` encode) | ព្រំដែនដែលកត់ (មិនកែ) ៖ ZTO ឆ្លើយលើស `LIST_ROW_MAX` (២០០) ក្នុងមួយទំព័រ ➜ កាត់ស្ងាត់ (`pageSize` ≤ ១០០ ➜ តែពេល ZTO មិនអើពើ `pageSize`) · Termux `adb forward tcp:9222` បើកតែក្នុងពេលចាប់ Cookie (`127.0.0.1` លើទូរស័ព្ទ) · `?diag=1` `access.branch.seen` បង្ហាញលេខសាខា ≤ ៨ ដល់អ្នកមាន proxy key (មិនមែន secret) |
 ### 2026-10-16 — [2.50.96] ៖ កែតម្លៃកញ្ចប់បិទ ➜ «ចំណូលយករួច» តាមថ្ងៃ (បន្តពី A156)
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
@@ -5868,6 +5879,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-origin.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

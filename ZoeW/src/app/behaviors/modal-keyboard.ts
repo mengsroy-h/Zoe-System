@@ -12,7 +12,8 @@ import { animateElement, blurActiveElement, elementOf, focusElementWithoutScroll
 import { KEYBOARD_MIN_INSET_PX, noteKeyboardViewport } from './chrome-autohide';
 import { ENTRY_SEARCH_FIELDS, entrySearchMovesField } from './entry-search';
 import { tapEndedInPlace } from './ios-viewport';
-import { usesIOSPanelHandoff } from './panels';
+import { PANEL_SEARCH_GLIDE, beginPanelGlideSnapPause, panelGlideFrom } from './panel-motion';
+import { activePanelSections, panelIsCollapsed, usesIOSPanelHandoff } from './panels';
 
 export const MODAL_FIELD_MARGIN_PX = 12;
 export const MODAL_KEYBOARD_GAP_PX = 8;
@@ -30,6 +31,9 @@ export const MODAL_GLIDE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
 export const NATIVE_TAP_FOCUS_MS = 1000;
 export const IOS_KEYBOARD_SETTLE_MS = 400;
 export const IOS_KEYBOARD_FORECAST_MS = 1200;
+export const PAGE_RAISE_TOP_MARGIN_PX = 12;
+export const PAGE_RAISE_SNAP_CLEAR_RATIO = 0.35;
+export const PAGE_RAISE_HOLD_MAX_MS = 300000;
 const SEARCH_PULL_UP_MAX_WIDTH = 992;
 
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
@@ -70,6 +74,8 @@ let iosForecast = 0;
 let iosForecastMissed = false;
 let iosClosing = false;
 let iosKeyboardTimer: ReturnType<typeof setTimeout> | null = null;
+let pageRaise: { field: HTMLElement; by: number; page: string; release: () => void } | null = null;
+let pageRaiseTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -615,17 +621,121 @@ function modalTapField(target: EventTarget | null): HTMLElement | null {
     if (document.activeElement === el && (el === modalTapFocused || keyboardVisibleViewport())) return null;
     const modal = el.closest('.modal') as HTMLElement | null;
     if (modal) return modal.id && modalIsOpen(modal.id) ? el : null;
-    return !uiState.isModalOpen && PAGE_TAP_FIELDS.some((name) => elementOf(name) === el) && pageFieldStaysAboveKeyboard(el) ? el : null;
+    return !uiState.isModalOpen && pageTapField(el) && (pageFieldStaysAboveKeyboard(el) || pageFieldRaiseFor(el) > 0) ? el : null;
+}
+
+function pageTapField(el: Element | null): boolean {
+    return !!el && PAGE_TAP_FIELDS.some((name) => elementOf(name) === el);
+}
+
+function expectedKeyboardLine(el: HTMLElement, height: number): number {
+    const seen = rememberedKeyboardInset(el);
+    const phone = window.innerWidth < PAGE_TAP_PHONE_MAX_WIDTH && height > window.innerWidth;
+    return height - (seen > 0 ? seen : Math.round(height * (phone ? PAGE_TAP_PHONE_KEYBOARD_RATIO : PAGE_TAP_KEYBOARD_RATIO)));
 }
 
 export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
     const height = window.innerHeight;
     if (!Number.isFinite(height) || height <= 0) return false;
-    const seen = rememberedKeyboardInset(el);
-    const phone = window.innerWidth < PAGE_TAP_PHONE_MAX_WIDTH && height > window.innerWidth;
-    const inset = seen > 0 ? seen : Math.round(height * (phone ? PAGE_TAP_PHONE_KEYBOARD_RATIO : PAGE_TAP_KEYBOARD_RATIO));
     const box = el.getBoundingClientRect();
-    return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
+    return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= expectedKeyboardLine(el, height);
+}
+
+function pageRaiseNeeded(el: HTMLElement, line: number): number {
+    if (!usesIOSPanelHandoff() || window.innerWidth >= SEARCH_PULL_UP_MAX_WIDTH || uiState.isModalOpen) return 0;
+    const pages = elementOf('appPages');
+    const { side, main } = activePanelSections();
+    if (!pages || !side || !main || !side.contains(el)) return 0;
+    const box = el.getBoundingClientRect();
+    const need = Math.ceil(box.bottom + MODAL_KEYBOARD_GAP_PX - line);
+    if (!Number.isFinite(need) || need <= 0 || !(box.height > 0)) return 0;
+    const top = pages.getBoundingClientRect().top;
+    const scrolled = pages.scrollTop;
+    const snapAt = main.getBoundingClientRect().top - top + scrolled;
+    if (box.top - need < top + PAGE_RAISE_TOP_MARGIN_PX || need > pages.scrollHeight - pages.clientHeight - scrolled) return 0;
+    return snapAt - (scrolled + need) > pages.clientHeight * PAGE_RAISE_SNAP_CLEAR_RATIO ? need : 0;
+}
+
+export function pageFieldRaiseFor(el: HTMLElement): number {
+    const height = window.innerHeight;
+    return Number.isFinite(height) && height > 0 ? pageRaiseNeeded(el, expectedKeyboardLine(el, height)) : 0;
+}
+
+function glidePageScroll(to: number): number {
+    const pages = elementOf('appPages');
+    if (!pages) return 0;
+    const { side, main } = activePanelSections();
+    const from = pages.scrollTop;
+    const parts = [side, main].filter((el): el is HTMLElement => !!el).map((el) => ({ el, top: el.getBoundingClientRect().top }));
+    setElementScrollTop(pages, to);
+    const moved = pages.scrollTop - from;
+    if (moved) parts.forEach((p) => panelGlideFrom(p.el, p.top, PANEL_SEARCH_GLIDE));
+    return moved;
+}
+
+function holdPageSnap(): () => void {
+    return beginPanelGlideSnapPause(PAGE_RAISE_HOLD_MAX_MS);
+}
+
+function extendPageSnapHold(): void {
+    holdPageSnap()();
+}
+
+function raisePageField(field: HTMLElement, by: number): void {
+    const pages = elementOf('appPages');
+    if (!pages || !(by > 0)) return;
+    const current = pageRaise && pageRaise.field === field ? pageRaise : null;
+    const release = current ? current.release : holdPageSnap();
+    const moved = glidePageScroll(pages.scrollTop + by);
+    if (moved > 0) extendPageSnapHold();
+    if (moved <= 0 && !current) {
+        release();
+        return;
+    }
+    pageRaise = { field, by: (current ? current.by : 0) + Math.max(0, moved), page: uiState.currentAppPage, release };
+}
+
+function clearPageRaiseTimer(): void {
+    if (pageRaiseTimer !== null) clearTimeout(pageRaiseTimer);
+    pageRaiseTimer = null;
+}
+
+function dropPageRaise(): void {
+    const raise = pageRaise;
+    pageRaise = null;
+    clearPageRaiseTimer();
+    if (raise) raise.release();
+}
+
+function lowerPageField(): void {
+    const raise = pageRaise;
+    pageRaise = null;
+    clearPageRaiseTimer();
+    if (!raise) return;
+    const pages = elementOf('appPages');
+    const sections = activePanelSections();
+    if (pages && raise.page === uiState.currentAppPage && sections.side && !panelIsCollapsed(sections.panel)) {
+        glidePageScroll(Math.max(0, pages.scrollTop - raise.by));
+    }
+    raise.release();
+}
+
+function notePageFieldBlur(e: FocusEvent): void {
+    if (pageRaise && e.target === pageRaise.field) lowerPageField();
+}
+
+function settlePageRaise(): void {
+    pageRaiseTimer = null;
+    const field = document.activeElement as HTMLElement | null;
+    const view = pageTapField(field) ? keyboardVisibleViewport() : null;
+    if (!field || !view) return;
+    raisePageField(field, pageRaiseNeeded(field, view.top + view.height));
+}
+
+function notePageKeyboardResize(): void {
+    if (!usesIOSPanelHandoff() || !pageTapField(document.activeElement)) return;
+    clearPageRaiseTimer();
+    pageRaiseTimer = setTimeout(settlePageRaise, IOS_KEYBOARD_SETTLE_MS);
 }
 
 export function settleDocumentScroll(): void {
@@ -706,6 +816,7 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     if (focusElementWithoutScroll(tap.field)) {
         modalTapFocused = tap.field;
         if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
+        if (pageTapField(tap.field)) raisePageField(tap.field, pageFieldRaiseFor(tap.field));
     } else modalFocusRefused = true;
 }
 
@@ -739,6 +850,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     modalWatched = null;
     touchesDown = 0;
     caughtClick = null;
+    dropPageRaise();
     lastTouchEndAt = -Infinity;
     lastTouchTarget = null;
     iosForecastMissed = false;
@@ -758,6 +870,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'focus', keepKeyboardFocusInPlace, { capture: true });
     scope.listen(document, 'focusin', noteIOSFieldFocus, { capture: true });
     scope.listen(document, 'focusout', noteIOSFieldBlur, { capture: true });
+    scope.listen(document, 'focusout', notePageFieldBlur, { capture: true });
     scope.listen(document, 'mousedown', swallowCaughtClick, { capture: true });
     scope.listen(document, 'click', swallowCaughtClick, { capture: true });
     scope.onDispose(() => {
@@ -769,6 +882,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         modalRest = null;
         modalWatched = null;
         caughtClick = null;
+        dropPageRaise();
         naturalBox = null;
         modalTap = null;
         modalTapFocused = null;
@@ -784,6 +898,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(vv, 'scroll', measureModalKeyboard);
     scope.listen(vv, 'resize', measureKeyboardCover);
     scope.listen(vv, 'scroll', measureKeyboardCover);
+    scope.listen(vv, 'resize', notePageKeyboardResize);
     measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {

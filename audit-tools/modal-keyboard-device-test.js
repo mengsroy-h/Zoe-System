@@ -58,7 +58,7 @@ const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 // ⛔ `--part=k/2` (ដូច `zoew-suite-test` · `money-guardian-test`) ៖ ផ្នែកទាំងអស់រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ.
 //    («ព្យួរ — លើសពិដាន 300s» ក្រោយ (ក២)) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ run-all រត់ផ្នែកទាំង ២ (lane ផ្សេងគ្នា) · គ្មាន `--part` ➜
 //    ផ្នែកទាំងអស់ (baseline · checker-coverage) · ផ្នែកនីមួយៗត្រូវស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅចុងក្រោយ)។
-const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ', 'ញ']];
+const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ', 'ញ', 'ដ']];
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -249,7 +249,8 @@ const SCANNER_DEVICES = [
     { label: 'iPhone 393×852 · status bar 59 · របៀបកញ្ចប់', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'parcel' },
     { label: 'iPhone 393×852 · status bar 59 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
     { label: 'iPhone Pro Max 430×932 · status bar 59 · របៀបដក', w: 430, h: 932, kb: 375, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove' },
-    { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: false, byCode: false, safeTop: 20, mode: 'remove' },
+    { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក (keyboard នឹងបាំង ➜ លើក #appPages)', w: 375, h: 667, kb: 305, ua: IPHONE_UA, catch: true, raise: true, byCode: false, safeTop: 20, mode: 'remove' },
+    { label: 'iPhone 393×852 · status bar 59 · របៀបដក · keyboard អង់គ្លេស + របារ ∧∨✓ 420 (វីដេអូ ៖ ធ្លាប់បើក ➜ ចាំ 420 ➜ keyboard នឹងបាំង ➜ លើក #appPages)', w: 393, h: 852, kb: 420, ua: IPHONE_UA, catch: true, raise: true, byCode: false, safeTop: 59, mode: 'remove', learn: [420] },
     { label: 'iPhone 393×852 · status bar 59 · របៀបដក ក្រោយ keyboard បើកម្តង (លោតហួស 420 ➜ ស្ងប់ 365 ៖ ចាំ 365)', w: 393, h: 852, kb: 365, ua: IPHONE_UA, catch: true, byCode: false, safeTop: 59, mode: 'remove', learn: [420, 365] },
     { label: 'Chrome Android 411×830 · របៀបដក (វីដេអូ ៖ keyboard ខ្មែរ + របារ URL 407)', w: 411, h: 830, kb: 407, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
     { label: 'Chrome Android 360×740 · របៀបដក · keyboard 300', w: 360, h: 740, kb: 300, ua: ANDROID_UA, android: true, catch: true, byCode: false, mode: 'remove' },
@@ -502,13 +503,22 @@ const SAFE_TOP = function (px) {
                     if (first.focus.length !== 1 || !first.focus[0].preventScroll || first.focus[0].id !== 'hwScannerInput') issues.push('focus ' + JSON.stringify(first.focus));
                     if (first.focused !== 'hwScannerInput') issues.push('បាត់ focus');
                     if (first.scrollY !== 0) issues.push('document រំកិល ' + first.scrollY);
+                    const raised = await page.evaluate(() => document.getElementById('appPages').scrollTop);
+                    if (dev.raise ? !(raised > 0) : raised !== 0) issues.push('#appPages ' + raised + (dev.raise ? ' ៖ keyboard នឹងបាំង ➜ ត្រូវលើក' : ' ៖ ប្រអប់នៅពីលើ keyboard ➜ មិនត្រូវរំកិល'));
                     await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
-                    await settle(page, 160);
-                    await page.touchscreen.tap(at.x, at.y);
+                    await settle(page, dev.raise ? 700 : 160);
+                    const now = await page.evaluate(() => {
+                        const r = document.getElementById('hwScannerInput').getBoundingClientRect();
+                        const nav = document.querySelector('.app-navbar').getBoundingClientRect();
+                        return { x: Math.round(r.left + Math.min(40, r.width / 2)), y: Math.round(r.top + r.height / 2), top: Math.round(r.top), bottom: Math.round(r.bottom), navTop: Math.round(nav.top), navBottom: Math.round(nav.bottom), scrollY: window.scrollY };
+                    });
+                    if (now.scrollY !== 0 || now.navTop < 0) issues.push('navbar/document រំកិល ' + JSON.stringify(now));
+                    if (now.top < now.navBottom) issues.push('ប្រអប់ឡើងក្រោម navbar ' + JSON.stringify(now));
+                    await page.touchscreen.tap(now.x, now.y);
                     await settle(page, 120);
                     const second = await page.evaluate(() => ({ prevented: window.__touchEnds.slice(), focus: window.__focusLog.length }));
                     if (second.prevented[1] !== false || second.focus !== 1) issues.push('keyboard បើក ➜ មិនមែន iOS ' + JSON.stringify(second));
-                    if (at.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + at.bottom);
+                    if (now.bottom + 8 > at.h - dev.kb) issues.push('keyboard ពិត (' + dev.kb + ') បាំងប្រអប់ ' + now.bottom);
                 } else {
                     if (first.prevented[0] !== false) issues.push('keyboard នឹងបាំងប្រអប់ ➜ ត្រូវទុកឲ្យ ' + os + ' តែត្រូវចាប់');
                     if (first.focus.some((f) => f.preventScroll)) issues.push('focus ' + JSON.stringify(first.focus));
@@ -516,7 +526,7 @@ const SAFE_TOP = function (px) {
                 }
                 check(issues.length === 0,
                     (dev.catch ? '⛔ ' : 'ទិសផ្ទុយ ៖ ') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode (' + (dev.byCode ? 'focus ដោយកូដ · គ្មាន keyboard' : 'មិនទាន់ focus') + ') ➜ ' +
-                        (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
+                        (dev.catch ? 'ចាប់ · focus({ preventScroll }) · document ០ · ' + (dev.raise ? 'keyboard នឹងបាំង ➜ #appPages ឡើង (navbar នៅនឹង) ➜ ប្រអប់នៅពីលើ keyboard ពិត · ' : '') + 'keyboard បើក ➜ ' + os : 'keyboard នឹងបាំងប្រអប់ ➜ ' + os + ' ធ្វើខ្លួនឯង'),
                     JSON.stringify({ at, first, issues }));
                 if (dev.catch && !dev.byCode) {
                     const near = [];
@@ -1226,6 +1236,88 @@ const SAFE_TOP = function (px) {
                 check(dev.ios ? focused === 'hwScannerInput' && during === 0 && after >= 1 : during >= 1,
                     (dev.ios ? '⛔ ' : '') + dev.label + ' ៖ ' + (dev.ios ? 'keyboard លោត (' + dev.kb.join(' ➜ ') + ') ➜ scrollTo ' + during + ' ដង · keyboard បាត់ ➜ ' + (after - during) : 'visualViewport resize ➜ scrollTo ' + during + ' ដង (ដូចមុន)'),
                     JSON.stringify({ focused, during, after }));
+                await ctx.close();
+            }
+        }
+        if (inPart('ដ')) {
+            console.log('\n=== (ដ) iPhone ៖ របៀបដក ៖ ប្រអប់វាយ Barcode ដែល keyboard នឹងបាំង ➜ #appPages ឡើង (navbar នៅនឹង · document ០) ➜ ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar · ✓ ➜ ចុះវិញ ===');
+            // ⛔ វីដេអូម្ចាស់គម្រោង ៖ «ពេលកំពុង focus នៅកន្លែងវាយបញ្ចូល តែខ្ញុំសាកចុចក្នុងប្រអប់ស្វែងរក វាកាន់តែរុញទំព័រទៅលើ បាត់ navbar» ➜
+            //    iOS រំកិល document ១៤៦pt (navbar ចេញ) ➜ ផ្ទាំងបង្រួមលើ document ដែលនៅរំកិល ➜ ប្រអប់ស្វែងរកក្រោមរបាស្ថានភាព។
+            //    ទិសផ្ទុយ ៖ Chrome Android ➜ App មិនរំកិល #appPages (Chromium ធ្វើខ្លួនឯង)
+            const SPY_SCROLL = function () {
+                window.__scrollCalls = [];
+                const orig = window.scrollTo.bind(window);
+                window.scrollTo = function () { window.__scrollCalls.push(Array.from(arguments)); return orig.apply(window, arguments); };
+            };
+            for (const dev of [
+                { label: 'iPhone 393×852 · status bar 59 · របៀបដក · keyboard 420 (ធ្លាប់វាស់)', w: 393, h: 852, kb: 420, safeTop: 59, ios: true },
+                { label: 'iPhone SE 375×667 · status bar 20 · របៀបដក · keyboard 305 (មិនទាន់វាស់ ➜ ប៉ាន់ ➜ ស្ងប់ ➜ លើកបន្ថែម)', w: 375, h: 667, kb: 305, safeTop: 20, ios: true, fresh: true },
+                { label: 'ទិសផ្ទុយ ៖ Chrome Android 411×830 · របៀបដក · keyboard 460 (keyboard ពិតបាំង ៖ ច្បាប់ចាប់ Android ដដែល)', w: 411, h: 830, kb: 460, ios: false }
+            ]) {
+                const inits = dev.ios ? [IOS_FLAGS, FAKE_VIEWPORT, TAP_LOG, SPY_SCROLL] : [FAKE_VIEWPORT, TAP_LOG, SPY_SCROLL];
+                if (dev.safeTop) inits.push('(' + SAFE_TOP.toString() + ')(' + dev.safeTop + ');');
+                const { ctx, page, ready } = await openApp(browser, port, dev, inits, { userAgent: dev.ios ? IPHONE_UA : ANDROID_UA });
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
+                if (!pageReady) { bad('(ដ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                await closeAll(page);
+                if (!dev.fresh) {
+                    await page.evaluate(() => { switchAppPage('entry'); setEntryScanMode('parcel'); document.getElementById('hwScannerInput').focus({ preventScroll: true }); });
+                    await page.evaluate((v) => window.__kb.open(v), dev.kb);
+                    await settle(page, 120);
+                    await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
+                    await settle(page, 200);
+                }
+                await page.evaluate(() => { switchAppPage('entry'); setEntryScanMode('remove'); openModalIds().slice().forEach((id) => closeModal(id)); });
+                await settle(page, 400);
+                const look = () => page.evaluate(() => {
+                    const f = document.getElementById('hwScannerInput').getBoundingClientRect();
+                    const q = document.getElementById('entryListSearchInput').getBoundingClientRect();
+                    const nav = document.querySelector('.app-navbar').getBoundingClientRect();
+                    return { field: [Math.round(f.top), Math.round(f.bottom), Math.round(f.left + Math.min(40, f.width / 2))], search: [Math.round(q.top), Math.round(q.bottom), Math.round(q.left + q.width / 2)],
+                        nav: [Math.round(nav.top), Math.round(nav.bottom)], pages: document.getElementById('appPages').scrollTop, scrollY: window.scrollY,
+                        focused: document.activeElement && document.activeElement.id, collapsed: uiState.entryPanelCollapsed, scrollCalls: window.__scrollCalls.length };
+                });
+                const rest = await look();
+                const cover = rest.field[1] + 8 > dev.h - dev.kb;
+                await page.evaluate(() => { window.__touchEnds = []; window.__focusLog = []; window.__scrollCalls = []; });
+                await page.touchscreen.tap(rest.field[2], Math.round((rest.field[0] + rest.field[1]) / 2));
+                await settle(page, 60);
+                await page.evaluate((v) => window.__kb.open(v), dev.kb);
+                await settle(page, 700);
+                const up = await look();
+                const prevented = await page.evaluate(() => window.__touchEnds.slice());
+                const issues = [];
+                if (!cover) issues.push('ករណីនេះ keyboard មិនបាំងប្រអប់ (មិនមែនករណីវីដេអូ)');
+                if (dev.ios) {
+                    if (prevented[0] !== true || up.focused !== 'hwScannerInput') issues.push('ចុចមិនត្រូវចាប់ ' + JSON.stringify(prevented));
+                    if (!(up.pages > 0) || up.field[1] + 8 > dev.h - dev.kb) issues.push('#appPages មិនលើកប្រអប់ឲ្យផុត keyboard');
+                    if (up.scrollY !== 0 || up.nav[0] !== rest.nav[0] || up.scrollCalls !== 0) issues.push('navbar/document រំកិល');
+                    if (up.field[0] < up.nav[1]) issues.push('ប្រអប់ឡើងក្រោម navbar');
+                } else if (up.pages !== 0 || up.scrollCalls === 0 && up.scrollY !== 0) issues.push('Android ៖ App រំកិល #appPages ' + up.pages);
+                check(issues.length === 0, (dev.ios ? '⛔ ' : '') + dev.label + ' ៖ ចុចប្រអប់វាយ Barcode ➜ ' + (dev.ios ? '#appPages ឡើង ' + up.pages + ' · navbar នៅនឹង · document ០ · ប្រអប់នៅពីលើ keyboard' : 'App មិនប៉ះ (Chromium)'),
+                    JSON.stringify({ rest, up, prevented, issues }));
+                if (dev.ios) {
+                    await page.touchscreen.tap(up.search[2], Math.round((up.search[0] + up.search[1]) / 2));
+                    await settle(page, 900);
+                    const s1 = await look();
+                    check(s1.focused === 'entryListSearchInput' && s1.collapsed && s1.scrollY === 0 && s1.nav[0] === rest.nav[0] && s1.search[0] >= s1.nav[1] && s1.pages === 0 && s1.scrollCalls === 0,
+                        '⛔ ' + dev.label + ' ៖ (វីដេអូ) ប្រអប់វាយ focus ➜ ចុចប្រអប់ស្វែងរក ➜ ផ្ទាំងបង្រួម · ប្រអប់ស្វែងរកនៅក្រោម navbar (' + s1.search[0] + ' ≥ ' + s1.nav[1] + ') · document ០', JSON.stringify(s1));
+                    await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
+                    await settle(page, 900);
+                    await page.evaluate(() => { setEntryScanMode('remove'); });
+                    await settle(page, 400);
+                    const back = await look();
+                    await page.touchscreen.tap(back.field[2], Math.round((back.field[0] + back.field[1]) / 2));
+                    await settle(page, 60);
+                    await page.evaluate((v) => window.__kb.open(v), dev.kb);
+                    await settle(page, 700);
+                    const up2 = await look();
+                    await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.__kb.open(0); });
+                    await settle(page, 900);
+                    const down = await look();
+                    check(!back.collapsed && up2.pages > 0 && down.pages === 0 && down.field[0] === back.field[0] && down.scrollY === 0 && down.nav[0] === rest.nav[0],
+                        '⛔ ' + dev.label + ' ៖ ✓ (blur · keyboard បិទ) ➜ #appPages ចុះវិញ ' + up2.pages + ' ➜ ' + down.pages + ' · ប្រអប់ត្រឡប់ទីតាំងដើម · navbar នៅនឹង', JSON.stringify({ back, up2, down }));
+                }
                 await ctx.close();
             }
         }

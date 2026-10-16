@@ -45,7 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.89] ម្ចាស់គម្រោង ៖ កញ្ចប់បិទក្នុង ZoeW
+0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.90] វីដេអូម្ចាស់គម្រោង ៖ ស្កេនដក
+    ចុចកន្លែងវាយ ➜ iOS រំកិល document (navbar ចេញ) · ចុចស្វែងរក ➜ ក្រោមរបាស្ថានភាព ➜ លើក `#appPages` (A146) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.90])។ [2.50.89] ម្ចាស់គម្រោង ៖ កញ្ចប់បិទក្នុង ZoeW
     តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង ➜ ជ្រើស «៣ ថ្ងៃ» (A145 · តំបន់ចាក់សោ ZTO ប្រែតាមសំណើ) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.89])។ [2.50.88] «ពិនិត្យផង» ➜ ចន្លោះ iPhone SE (កម្ពស់ keyboard ដំបូង
     < `KEYBOARD_MIN_INSET_PX`) ➜ មិនទាញពេលប្រអប់វាយ focus ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។ [2.50.87] ម្ចាស់គម្រោង ៖ «Preview commit ថ្មីនៅតែធ្លាក់ទំព័រដដែល» ·
     «សូមសម្រួល iOS អោយត្រឹមត្រូវ clean up កូដមុនមុន សរសេថ្មីមក អោយឆ្លាតវៃ ដូច android ទៅ» ➜ iOS «បង្ការ មិនតទល់» (A144) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។
@@ -241,6 +242,44 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.90] — 2026-10-16 · ZoeW ៖ **iPhone ស្កេនដក ៖ កន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ ផ្ទាំងស្កេនរអិលឡើងក្នុង `#appPages` (navbar នៅនឹង ដូច Android) · ចុចស្វែងរកពេលកំពុងវាយ ➜ ប្រអប់ស្វែងរកក្រោម navbar · Android មិនប្រែ**
+
+**ZoeW `2.50.90`** (`zoew-v352` ➜ `zoew-v353`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ (ប្រើ `beginPanelGlideSnapPause()` · `panelGlideFrom()` ដែលមានស្រាប់)។
+វីដេអូម្ចាស់គម្រោង (iPhone · preview 2.50.89) ៖ «Modal pgup/pgdn គ្រាន់បើជាមុនហើយ ក្នុងវិដេអូនេះបង្ហាញទាំងអស់ ដោយលែកតែ tab ស្កេន ក្នុងកន្លែង ស្កេនដកសូមមើក្នុងវិដេអូ
+ពេលកំពុងឈfocusនៅកន្លែងវាយបញ្ចូល តែខ្ញុំសាក់ចុចក្នុងប្រអប់ស្វែងរកវាកាន់តែរុញទំព័រទៅលើបាត់ navbar ios មិនជាប់ល្អដូច android សោះ នេះជាចំណុចទើសភ្នែក»។
+
+#### មូលហេតុ (វាស់ពីវីដេអូ ៖ ស៊ុមពេញ ៤៤៤×៩៦០ ➜ pt)
+
+- របៀបដក ៖ កន្លែងវាយ Barcode ចប់ ៤៤៥pt (៥២%) ក្រោម banner ដក · keyboard អង់គ្លេស + របារ ∧∨✓ (iOS 26) ➜ បន្ទាត់ keyboard ដែលធ្លាប់វាស់នៅខាងលើវា ➜ ច្បាប់ចាស់ «keyboard នឹងបាំង ➜ ទុកឲ្យ iOS»
+  ➜ iOS រំកិល **document** ១៤៦pt (ប្រអប់នៅកណ្តាល · navbar ចេញពីអេក្រង់) គ្រប់ពេលចុច។ របៀបបញ្ចូល (ប្រអប់ចប់ ៣៨១pt ៖ ចាប់) ➜ មិនរំកិល។
+- ចុចប្រអប់ស្វែងរកខណៈនោះ ➜ ផ្ទាំងបង្រួម (ត្រឹមត្រូវ) តែ document នៅរំកិល ១៤៦pt ➜ ប្រអប់ស្វែងរកនៅក្រោមរបាស្ថានភាព (ឃើញក្នុងវីដេអូ ១៥០pt ខ្ពស់ជាងទីតាំងល្អ)។
+- Android ៖ WebView បង្រួម ➜ Chromium រំកិល `#appPages` (ធុងរមូរខាងក្នុង) ➜ navbar នៅនឹង។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 iPhone (App លើ Home Screen · ទូរស័ព្ទ < 992px) ៖ ចុចកន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ App ចាប់ (focus({ preventScroll })) ហើយរអិល `#appPages` ឡើង **ត្រឹមតែត្រូវការ**
+  (បាតប្រអប់ + ៨ ≤ បន្ទាត់ keyboard ដែលធ្លាប់វាស់) ទន្ទឹមនឹង keyboard ➜ navbar · document នៅនឹង (ដូច Android)។ keyboard ស្ងប់ខ្ពស់ជាងការប៉ាន់ ➜ ក្រោយ
+  `IOS_KEYBOARD_SETTLE_MS` លើកបន្ថែម (មិនដែលចុះ)។ ✓ / blur ➜ រអិលចុះវិញត្រឹមចំនួនដែលលើក។ ចុចស្វែងរក ➜ ផ្ទាំងបង្រួមដូចមុន · App មិនរំកិលទៀត ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar។
+- snap ៖ `#appPages` មាន `scroll-snap-type: y proximity` ➜ browser ទាញ `scrollTop` ដែល App សរសេរត្រឡប់ ០ ភ្លាម (វាស់ក្នុង Chromium ៖ ១៨ ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០)
+  ➜ App ផ្អាក snap (`panel-gliding`) ពេលលើក ហើយបើកវិញពេល blur ⛔ មិនទុកលើសពេល blur (PTR ត្រូវការ snap · ពិដាន `PAGE_RAISE_HOLD_MAX_MS`)។
+- លើកមិនបាន (ប្រអប់នឹងឡើងក្រោម navbar · ធុងរមូរមិនគ្រប់ · ជិត snap `.page-main` · iPad ផ្តេក ≥ 992px) ➜ ទុកឲ្យ iOS ដូចមុន។ Android ៖ មិនប៉ះ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-field-raise.test.ts` ១៣ (ថ្មី · គំរូ `#appPages` + snap ដូច Chromium) ៖ ចាប់ + លើក ១៩ · ស្លាក · ✓ ចុះវិញ · ស្ងប់ខ្ពស់ ➜ លើកបន្ថែម មិនចុះ ·
+  វីដេអូ (ស្វែងរកក្រោយលើក) · snap ត្រឡប់ពេលប្តូរទំព័រ · ផ្ទាំងបើក ➜ ចុះក្រោមផ្ទាំង · ទិសផ្ទុយ ៖ ប្រអប់នៅពីលើ keyboard · ក្រោម navbar · គ្មានចន្លោះ · ជិត snap · Android ·
+  ផ្ទាំងបើក — កូដ [2.50.89] FAIL ៥ · mutation ១២ ➜ ចាប់ ១២។
+- `modal-keyboard-device-test` (browser ពិត · App ពិត) ផ្នែក ២/៤ (គ) ៖ iPhone SE របៀបដក (ពីមុនជាទិសផ្ទុយ «ទុកឲ្យ iOS») + iPhone 393×852 keyboard ៤២០ ➜ ចាប់ · `#appPages` ឡើង ·
+  navbar/document នៅនឹង · ប្រអប់នៅពីលើ keyboard ពិត · ផ្នែក ៤/៤ (ដ ថ្មី) ៖ វីដេអូ ➜ ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោម navbar · ✓ ➜ ចុះវិញ ០ · ទិសផ្ទុយ Chrome Android ➜ App មិនរំកិល —
+  build 2.50.89 FAIL ៨ ➜ ឆ្លងទាំងអស់។ ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ខ្លួនឯង ➜ អ្នកយាមវាស់ថា App ចាប់ ហើយលើក (ដកមូលហេតុ) · ផ្ទៀងផ្ទាត់លើ iPhone ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.90` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. iPhone (App លើ Home Screen) ៖ របៀបស្កេនដក ➜ ចុចកន្លែងវាយ Barcode ➜ navbar នៅនឹង · ផ្ទាំងស្កេនរអិលឡើងបន្តិច · កន្លែងវាយនៅពីលើ keyboard ➜ ចុចប្រអប់ស្វែងរក ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar
+   ➜ ✓ ➜ ផ្ទាំងចុះវិញ ➜ ទាញចុះ (PTR) នៅធ្វើការ។ keyboard ខ្មែរ/អង់គ្លេស ទាំងពីរ។ បើ navbar នៅតែចេញ ➜ ផ្ញើវីដេអូ។
+2. Android ៖ របៀបដក ➜ ដូចមុន (មិនប្រែ)។
+
 ### [2.50.89] — 2026-10-16 · ZoeW ៖ **របា «ZTO មិនទាន់បិទ» រំលឹក ៣ ថ្ងៃ (មិនមែន ១២ ម៉ោង) — កញ្ចប់ដែលចូលធុងសំរាម «យករួច» ក្រោយ ២ ម៉ោង នៅតែរំលឹក**
 
 **ZoeW `2.50.89`** (`zoew-v351` ➜ `zoew-v352`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី។
@@ -272,7 +311,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.89` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.89 មិនចេញ production ដាច់ដោយឡែក)។
 1. ZTO ៖ បិទ «យក» កញ្ចប់មួយក្នុង ZoeW ដែល ZTO Palm មិនទាន់បិទ ➜ ក្រោយ ២ ម៉ោង (ចូលធុង «យករួច») ថ្ងៃបន្ទាប់ ➜ របា «ZTO មិនទាន់បិទ» នៅបង្ហាញ ➜ បិទក្នុង ZTO Palm ➜ របាដកចេញ។
 2. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87]។
 
@@ -294,7 +333,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
 1. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87] (រួមទាំង iPhone SE បើមាន)។
 
 ### [2.50.87] — 2026-10-16 · ZoeW ៖ **iPhone ៖ «បង្ការ មិនតទល់» — App លែងទាញទំព័រត្រឡប់ពេល keyboard លោត · សម្អាតកូដ iOS · Android មិនប្រែ**
@@ -320,7 +359,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយ Done) ➜ ទំព័រមិនលោតចុះ។ បើទំព័ររអិលឡើងជាមួយ keyboard ➜
    ផ្ញើវីដេអូ។ សកម្មភាពរបស់ [2.50.84] · [2.50.85] នៅដដែល។
 
@@ -345,7 +384,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
    សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
 
@@ -370,7 +409,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
 
 ### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
@@ -405,7 +444,7 @@ PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស�
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.90] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
 2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
    កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
@@ -4924,6 +4963,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A143 | **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់ (វីដេអូ preview 2.50.85)** | វីដេអូ ៣០ រូប/វិ ៖ logo navbar ១៥១px ➜ ១៤៦ (iOS ចាប់ផ្តើមរំកិលឡើង) ➜ ៤៣៤ · ៥៩០ · ៥៨៨ (ចុះ ១៣៨ · ២១៤ · ២១៣pt) ➜ ត្រឡប់ក្នុង ២០០–២៤០ms · ចំនួនស្មើ `_zoomToFocusRect` ដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard (របៀបបញ្ចូល ≈ ១៤៧ · ដក ≈ ២១៥) ➜ preventScroll បាត់ · ប្រភព WebKit ៖ `FocusController::setFocusedElement` លើធាតុដែល focus រួច ➜ `elementDidRefocus` (ជម្រើស click) ➜ `WebPage::elementDidFocus` សរសេរជាន់ព័ត៌មានរង់ចាំ ពេល `!m_isShowingInputViewForFocusedElement` ➜ `completeSyntheticClick` flush · ការទាញ ០ របស់ App (`restorePageFieldScroll`) ពេលចលនា keyboard (additive) រត់ ➜ ចុះ ហើយត្រឡប់ · `pageFieldCaught` នៅជាប់ក្រោយ blur ➜ focus ក្រោយក៏ត្រូវទាញ | `swallowCaughtClick()` (`mousedown` · `click` នៃការចុចដែលចាប់ · `CAUGHT_CLICK_MS` · ប្រអប់/ស្លាក/⚡ តែប៉ុណ្ណោះ) · `forgetPageFieldCaught()` ➜ 2.50.86 · ⚠️ ផ្លូវផ្សេងទៀតដែល iOS អាច focus (text interaction `focusTextInputContextAndPlaceCaret`) មិនទាន់វាស់ ➜ `iosPageTap` Sentry ក្រោយ merge |
 | A144 | **preview 2.50.86 នៅតែធ្លាក់ · សំណើ «clean up · សរសេរថ្មី · ឆ្លាតវៃដូច Android»** | ទំព័រចុះក្រោមកម្ពស់ធម្មតា (logo ១៥១ ➜ ៤៣៤–៥៩០px) មានតែពេល model `scrollTo(0, 0)` កាត់ចលនា UIKit (additive ៖ A47) ➜ ទាមទារការទាញរបស់ App · `boot.ts` ៖ `visualViewport` `resize` ➜ `scrollWindowToTop` គ្រប់ឧបករណ៍ (រត់ពេល keyboard ចាប់ផ្តើមលោត) · `restorePageFieldScroll` (2.50.83) · «ដូច Android» (`interactive-widget=resizes-content`) ៖ WebKit trunk `MetaViewportInteractiveWidgetEnabled` (Cocoa true) តែ Safari មិនទាន់ចេញ (bram.us · MDN bcd #29011) ➜ មិនអាចប្រើ | iOS standalone «បង្ការ មិនតទល់» ៖ `settleDocumentScroll()` (keyboard បង្ហាញ ➜ មិនទាញ) · ដក `restorePageFieldScroll` · probe `iosPageTap` ➜ 2.50.87 · ⚠️ iOS រំកិលតាមផ្លូវផ្សេងដែលមិនទាន់ដឹង ➜ ឃើញរអិលរលូន (មិនលោត) ➜ ចាំវីដេអូ |
 | A145 | **កញ្ចប់បិទក្នុង ZoeW តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង** | ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុង «យករួច» ➜ `ztoStatusTrashItemCounts()` រាប់ត្រឹម `ZTO_STATUS_TTL_MS` ១២ ម៉ោងក្រោយ `deletedAt` (≈ ១៤ ម៉ោងក្រោយបិទ) · `loadZtoPickupStatusOnce()` បោះសាលក្រមចាស់ជាង ១២ ម៉ោង · `ZTO_STATUS_MAX` ៣០០ < ៣ ថ្ងៃនៃហាងមមាញឹក · តំបន់ចាក់សោ ➜ ប្រែតែតាមសំណើ | ម្ចាស់គម្រោងជ្រើស ៣ ថ្ងៃ ➜ `ZTO_STATUS_TTL_MS` ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ២០០០ · `LOCK` ថ្មី · `zto-remind-days.test.ts` ➜ 2.50.89 · ZoeW ពិនិត្យ ZTO តែពេល App បើក (គ្មាន server sweep) |
+| A146 | **iPhone ស្កេនដក ៖ ចុចកន្លែងវាយ ➜ navbar ចេញ · ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោមរបាស្ថានភាព (វីដេអូ preview 2.50.89)** | ស៊ុមវីដេអូ ៖ ប្រអប់ចប់ ៤៤៥pt · បន្ទាត់ keyboard ដែលធ្លាប់វាស់ (អង់គ្លេស + របារ ∧∨✓ iOS 26) ខ្ពស់ជាង ➜ `pageFieldStaysAboveKeyboard()` false ➜ ទុកឲ្យ iOS ➜ document រំកិល ១៤៦pt (ប្រអប់កណ្តាល) · ស្វែងរក ➜ `glideEntryPanelCollapsed()` ត្រឹមត្រូវ តែ document នៅរំកិល ➜ ប្រអប់ស្វែងរក ១៥០pt ខ្ពស់ពេក · Android ៖ Chromium រំកិល `#appPages` · Chromium ៖ `#appPages.scrollTop = 18` ពេល snap បើក ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០ | iOS < 992px ៖ ចាប់ + `raisePageField()` ក្នុង `#appPages` (snap ផ្អាក · ចុះវិញពេល blur · ស្ងប់ ➜ លើកបន្ថែម) ➜ 2.50.90 · ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ➜ ផ្ទៀងផ្ទាត់លើ iPhone ពិត |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
@@ -7559,6 +7599,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |

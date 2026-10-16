@@ -1873,6 +1873,9 @@
     "ZoeW/tests/ios-accessory-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ios-page-field-raise.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
       "policy": "zoew-self-verification"
     },

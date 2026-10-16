@@ -95,8 +95,8 @@ let opN = 0;
 const opId = () => 'par' + process.pid + 'x' + (++opN).toString(36).padStart(12, '0');
 
 const ENGINE_MUTANTS = [
-    ['មិនរត់ .validate របស់ ancestor', "        if node ? 'v' then\n            post := private.zoe_snap_val(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx);",
-        "        if node ? 'v' and i = depth then\n            post := private.zoe_snap_val(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx);"],
+    ['មិនរត់ .validate របស់ ancestor', "        if node ? 'v' then\n            if private.zoe_snap_exists(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx)",
+        "        if node ? 'v' and i = depth then\n            if private.zoe_snap_exists(jsonb_build_object('$s', 1, 'p', to_jsonb(p_path[1:i])), p_ctx)"],
     ['null ក្នុងការប្រៀប <= ជា 0 (coercion)', "            return 'false'::jsonb;\n        end if;\n        if op = '+' and left_type = 'string'",
         "            return to_jsonb(coalesce((left_value #>> '{}')::numeric, 0) <= coalesce((right_value #>> '{}')::numeric, 0));\n        end if;\n        if op = '+' and left_type = 'string'"],
     ['.validate រត់លើកូនដែលមិនប្រែរបស់ ancestor', "        if i = depth and (node ? 'c' or node ? 'x') then",

@@ -417,6 +417,46 @@ async function body(c, rec, extra) {
     const okCount = bothCas.filter((r) => r.rows && r.rows[0].r.ok === true).length;
     const conflicts = bothCas.filter((r) => r.rows && r.rows[0].r.conflict === true).length;
     rec('cas ប្រណាំង ២ ការតភ្ជាប់លើ barcode ដដែល ➜ ជោគជ័យ ១ · conflict ១ (registry ស្ទួនមិនអាច)', okCount === 1 && conflicts === 1, bothCas.map((r) => r.rows ? r.rows[0].r : r.error));
+
+    // ⛔ ទំហំក្នុងហាង (`zoe_tenant_state.bytes` = ឯកសារ + tombstone + zoe_ops) ៖ ពិដាន `quota_bytes` ការពារហាងមួយមិនឲ្យបំពេញ Project ទាំងមូល
+    //    (ហាងទាំងអស់ចែក Postgres តែមួយ) — ការសរសេរដែលធ្វើឲ្យធំលើសពិដានត្រូវបដិសេធ · ការសរសេរដែលបង្រួម (សម្អាត) នៅឆ្លងបាន · Admin មិនជាប់ពិដាន
+    const PICK = 'zoew_daily_pickup_cod_dod';
+    const usage = async (tid) => {
+        const r = (await c.query(`select s.bytes::text as bytes, (coalesce((select sum(private.zoe_doc_bytes(z.root, z.key, z.value)) from public.zoe_docs z where z.tenant_id = s.tenant_id), 0)
+            + coalesce((select sum(private.zoe_op_bytes(o.op_id, o.result)) from public.zoe_ops o where o.tenant_id = s.tenant_id), 0))::text as real
+            from public.zoe_tenant_state s where s.tenant_id = $1`, [tid])).rows[0];
+        return { bytes: Number(r.bytes), real: Number(r.real) };
+    };
+    const uA = await usage(A.id);
+    const uB = await usage(B.id);
+    rec('bytes ក្នុងហាង = ផលបូកពិត (ឯកសារ · tombstone · ops) ក្រោយ set · cas · replace · ការសរសេរស្របគ្នា (A · B)', uA.real > 0 && uA.bytes === uA.real && uB.bytes === uB.real, { uA, uB });
+    const pickDoc = { packagesPickedUp: 20, pickedUpBarcodes: {} };
+    for (let i = 0; i < 20; i++) pickDoc.pickedUpBarcodes['QZ' + String(i).padStart(12, '0')] = '012000' + String(100 + i);
+    const pickW = await write(A.who, [{ k: 'set', p: [PICK, '2026-10-09'], v: pickDoc }]);
+    const uPick = await usage(A.id);
+    await c.query('update public.zoe_tenant_state set quota_bytes = $2 where tenant_id = $1', [A.id, uPick.real + 4000]);
+    const regMany = [];
+    for (let i = 0; i < 60; i++) regMany.push({ k: 'set', p: [REG, 'QUOTA' + String(i).padStart(8, '0')], v: true });
+    const overQuota = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify(regMany)]);
+    rec('⛔ quota ៖ ការសរសេរដែលធ្វើឲ្យហាងធំលើស quota_bytes ➜ quota_exceeded (គ្មានអ្វីផ្ទុក)', !!pickW && pickW.ok === true && !!overQuota.error
+        && overQuota.error.message === 'quota_exceeded' && (await usage(A.id)).bytes === uPick.real, overQuota);
+    const underQuota = await write(A.who, [{ k: 'set', p: [REG, 'QUOTA_ONE'], v: true }]);
+    rec('ទិសផ្ទុយ ៖ ការសរសេរតូចក្រោម quota ➜ ok', !!underQuota && underQuota.ok === true, underQuota);
+    await c.query('update public.zoe_tenant_state set quota_bytes = 1 where tenant_id = $1', [A.id]);
+    const growOver = await as(c, A.who, 'select public.zoe_write($1, $2::jsonb) as r', [newOp(), JSON.stringify([{ k: 'set', p: [REG, 'QUOTA_TWO'], v: true }])]);
+    const shrinkOver = await write(A.who, [{ k: 'set', p: [PICK, '2026-10-09'], v: null }]);
+    rec('⛔ លើស quota ៖ ការសរសេរដែលធំឡើង ➜ quota_exceeded · ការលុប (បង្រួមលើសទំហំ op) ➜ ok (ហាងសម្អាតខ្លួនឯងបាន)',
+        !!growOver.error && growOver.error.message === 'quota_exceeded' && !!shrinkOver && shrinkOver.ok === true, { growOver, shrinkOver });
+    const adminOver = await admin(A.id, [{ k: 'set', p: [REG, 'QUOTA_ADMIN'], v: true }]);
+    rec('Admin (zoe_admin_write · ការផ្លាស់ទិន្នន័យ) មិនជាប់ quota', !!adminOver && adminOver.ok === true, adminOver);
+    await c.query('update public.zoe_tenant_state set quota_bytes = default where tenant_id = $1', [A.id]);
+    const uQuota = await usage(A.id);
+    rec('bytes = ផលបូកពិត ក្រោយការបដិសេធ quota · ការលុប (tombstone) · Admin', uQuota.bytes === uQuota.real, uQuota);
+    await c.query("update public.zoe_docs set updated_at = now() - interval '8 days' where tenant_id = $1 and value is null", [A.id]);
+    await c.query("update public.zoe_ops set created_at = now() - interval '3 days' where tenant_id = $1", [A.id]);
+    await c.query('select private.zoe_housekeeping($1)', [A.id]);
+    const uHouse = await usage(A.id);
+    rec('housekeeping (tombstone ៧ ថ្ងៃ · ops ២ ថ្ងៃ) ដកចេញពី bytes ➜ bytes = ផលបូកពិត · តូចជាងមុន', uHouse.bytes === uHouse.real && uHouse.real < uQuota.real, { uHouse, uQuota });
 }
 
 async function suite(sql, stopOnFail) {
@@ -428,13 +468,15 @@ async function suite(sql, stopOnFail) {
     const { c } = await H.freshDb('default-grants');
     const extra = [];
     let applied = false;
+    let digest = null;
     try {
         try {
             await c.query(sql);
             applied = true;
+            digest = await schemaDigest(c);
         } catch (e) {
             rec('migration អនុវត្តបាន', false, e.message);
-            return { results, applied };
+            return { results, applied, digest };
         }
         await body(c, rec, extra);
     } catch (e) {
@@ -443,33 +485,36 @@ async function suite(sql, stopOnFail) {
         for (const x of extra) try { await x.end(); } catch (e) {}
         try { await c.end(); } catch (e) {}
     }
-    return { results, applied };
+    return { results, applied, digest };
 }
 
 const MUTATIONS = [
     ['policy zoe_docs ➜ using (true)', 'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (tenant_id = (select private.current_tenant_id()));',
         'create policy zoe_docs_select on public.zoe_docs for select to authenticated\n    using (true);'],
     ['zoe_read មិនច្រោះ tenant + security definer (RLS លែងការពារ)', [
-        ["create function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security invoker",
-            "create function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security definer"],
+        ["create or replace function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security invoker",
+            "create or replace function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security definer"],
         ["    from public.zoe_docs d\n    where d.tenant_id = tenant and d.root = p_root and (p_key is null or d.key = p_key)",
             "    from public.zoe_docs d\n    where d.root = p_root and (p_key is null or d.key = p_key)"]]],
     ['zoe_read ជា security definer តែនៅច្រោះ tenant (probe ទិសផ្ទុយ ៖ មិនមែនការលេចធ្លាយ)', [
-        ["create function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security invoker",
-            "create function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security definer"]], 'equivalent'],
-    ['rules lookup មិនច្រោះ tenant', "        where z.tenant_id = tenant and z.root = snap_path[1] and z.key = snap_path[2];",
-        "        where z.root = snap_path[1] and z.key = snap_path[2] order by (z.tenant_id = tenant) limit 1;"],
-    ['canon មិនបម្លែង array', "    when 'array' then\n        for child in", "    when 'array_disabled' then\n        for child in"],
-    ['canon មិនបដិសេធកូនសោហាម', "            if not private.zoe_key_ok(child_key) then\n                raise exception 'invalid_data' using errcode = '22023', detail = 'key';\n            end if;\n", ''],
-    ['canon មិនបដិសេធលេខលើស double', "        if abs((p_value #>> '{}')::numeric) > 1.7976931348623157e308 then", "        if false then"],
-    ['cas មិនប្រៀបតម្លៃ (doc)', "            current_value := coalesce((work -> doc_key) #> op_path[3:], 'null'::jsonb);\n            if current_value <> private.zoe_canon(op -> 'x') then",
-        "            current_value := coalesce((work -> doc_key) #> op_path[3:], 'null'::jsonb);\n            if false then"],
+        ["create or replace function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security invoker",
+            "create or replace function public.zoe_read(p_root text, p_key text default null) returns jsonb\nlanguage plpgsql stable security definer"]], 'equivalent'],
+    ['rules lookup មិនច្រោះ tenant', "    where z.tenant_id = tenant and z.root = snap_path[1] and z.key = snap_path[2];",
+        "    where z.root = snap_path[1] and z.key = snap_path[2] order by (z.tenant_id = tenant) limit 1;"],
+    ['canon មិនបម្លែង array', "    if kind <> 'object' and kind <> 'array' then\n        return p_value;", "    if kind <> 'object' then\n        return p_value;"],
+    ['canon មិនបដិសេធកូនសោហាម', "        if kind = 'object' and (octet_length(child_key) not between 1 and 768 or child_key ~ '[\\]\\[.#$/\\x01-\\x1f\\x7f]') then",
+        "        if false then"],
+    ['canon មិនបដិសេធលេខលើស double', [["        if abs((p_value #>> '{}')::numeric) > 1.7976931348623157e308 then", "        if false then"],
+        ["            if abs((child #>> '{}')::numeric) > 1.7976931348623157e308 then", "            if false then"]]],
+    ['cas មិនប្រៀបតម្លៃ (doc)', "            current_value := coalesce(pre #> (array[doc_key] || op_path[3:]), 'null'::jsonb);\n            if current_value <> private.zoe_canon(op -> 'x') then",
+        "            current_value := coalesce(pre #> (array[doc_key] || op_path[3:]), 'null'::jsonb);\n            if false then"],
     ['cas មិនប្រៀបតម្លៃ (node)', "                if current_value <> private.zoe_canon(op -> 'x') then", "                if false then"],
-    ['set node មិនលុបកូនចាស់', "                work := jsonb_set(work, array[doc_key], coalesce(new_value -> substr(doc_key, char_length(op_path[1]) + 2), 'null'::jsonb));",
-        "                work := jsonb_set(work, array[doc_key], coalesce(new_value -> substr(doc_key, char_length(op_path[1]) + 2), work -> doc_key));"],
-    ['canon មិនបម្លែងលេខជា double', "        return to_jsonb((p_value #>> '{}')::float8);", "        return p_value;"],
+    ['set node មិនលុបកូនចាស់', "        case when rt.r is not null then coalesce(rt.v -> split_part(e.key, '/', 2), 'null'::jsonb)",
+        "        case when rt.r is not null then coalesce(rt.v -> split_part(e.key, '/', 2), e.value)"],
+    ['canon មិនបម្លែងលេខជា double', [["        return to_jsonb((p_value #>> '{}')::float8);", "        return p_value;"],
+        ["                child := to_jsonb((child #>> '{}')::float8);", "                child := child;"]]],
     ['op_id មិន idempotent', "    if found then\n        return prior || jsonb_build_object('replayed', true, 'now', now_ms);\n    end if;", ''],
-    ['មិនពិនិត្យ path ជាន់', "            if cardinality(a) <= cardinality(b) and b[1:cardinality(a)] = a then", "            if false then"],
+    ['មិនពិនិត្យ path ជាន់', "        where x.b is not null and cardinality(x.b) <= cardinality(x.a) and x.a[1:cardinality(x.b)] = x.b", "        where false"],
     ['មិន enforce rules', "    if p_enforce then\n        rules := private.zoe_rules();", "    if false then\n        rules := private.zoe_rules();"],
     ['tombstone មិនបាន seq ថ្មី (delta ខកខានការលុប)', "            set value = excluded.value, seq = excluded.seq, updated_at = excluded.updated_at;",
         "            set value = excluded.value, seq = case when excluded.value is null then z.seq else excluded.seq end, updated_at = excluded.updated_at;"],
@@ -484,8 +529,8 @@ const MUTATIONS = [
     ['zoe_write + zoe_apply មិនបដិសេធ tenant null (Revoke · គណនីគ្មានហាង)', [
         ["    tenant uuid := private.current_tenant_id();\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);",
             "    tenant uuid := private.current_tenant_id();\nbegin\n    return private.zoe_apply(tenant, p_op_id, p_ops, true, false);"],
-        ["    b text[];\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_op_id is null",
-            "    b text[];\nbegin\n    if p_op_id is null"]]],
+        ["    overlap boolean;\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    if p_op_id is null",
+            "    overlap boolean;\nbegin\n    if p_op_id is null"]]],
     ['zoe_read មិនបដិសេធ tenant null ➜ បញ្ជីទទេ (App អាន «គ្មានទិន្នន័យ»)', "    docs jsonb;\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;",
         "    docs jsonb;\nbegin"],
     ['ទាញពេញជាទំព័រមិនស្គាល់ p_full_head (វិលចាប់ផ្តើមម្តងទៀតពេល purge)', "since < purged and full_head is null)", "since < purged)"],
@@ -494,16 +539,35 @@ const MUTATIONS = [
     ['ទំព័រ reset មិនបញ្ជូន head', "'head', head, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);", "'head', null, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);"],
     ['pull បញ្ជូន tenant ខុស (cache ហាងផ្សេងអាចចូល)', "'head', head, 'tenant', tenant, 'now', private.zoe_now_ms(), 'rows', rows_out);", "'head', head, 'tenant', null, 'now', private.zoe_now_ms(), 'rows', rows_out);"],
     ['housekeeping មិនកត់ purged_seq', "        update public.zoe_tenant_state s set purged_seq = greatest(s.purged_seq, purged) where s.tenant_id = p_tenant;\n", ''],
-    ['គ្មាន tenant lock (for update)', "    select s.seq into head from public.zoe_tenant_state s where s.tenant_id = tenant for update;",
-        "    select s.seq into head from public.zoe_tenant_state s where s.tenant_id = tenant;"],
+    ['គ្មាន tenant lock (for update)', "    select s.seq, s.bytes, s.quota_bytes into head, used, quota from public.zoe_tenant_state s where s.tenant_id = tenant for update;",
+        "    select s.seq, s.bytes, s.quota_bytes into head, used, quota from public.zoe_tenant_state s where s.tenant_id = tenant;"],
     ['broadcast topic មិនមែនតាម tenant', "'seq', 'zoe:' || new.tenant_id::text, true);", "'seq', 'zoe:all', true);"],
     ['policy broadcast មិនពិនិត្យ topic', "                and (select realtime.topic()) = 'zoe:' || (select private.current_tenant_id())::text\n", ''],
     ['zoe_write មិនពិនិត្យ tenant សកម្ម', "    tenant uuid := private.current_tenant_id();\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant,",
         "    tenant uuid := (select m.tenant_id from public.tenant_members m where m.user_id = auth.uid());\nbegin\n    if tenant is null then\n        raise exception 'forbidden' using errcode = '42501';\n    end if;\n    return private.zoe_apply(tenant,"],
-    ['inc គិតជា decimal (ឃ្លាតពី RTDB double)', "then (current_value #>> '{}')::float8 else 0::float8 end + delta);", "then (current_value #>> '{}')::numeric else 0 end + delta::numeric);"],
+    ['inc គិតជា decimal (ឃ្លាតពី RTDB double)', "then (current_value #>> '{}')::float8 else 0::float8 end + delta))", "then (current_value #>> '{}')::numeric else 0 end + delta::numeric))"],
+    ['quota មិន enforce', "    if p_enforce and grow > 0 and used + grow > quota then", "    if false then"],
+    ['housekeeping មិនដក bytes', "        update public.zoe_tenant_state s set bytes = greatest(s.bytes - freed_docs - freed_ops, 0) where s.tenant_id = p_tenant;", "        null;"],
+    ['tombstone ថ្មីមិនរាប់ key (bytes តិចជាងការពិត)', "            + case when (pre_rows ->> doc_key)::boolean then 0 else", "            + case when true then 0 else"],
     ['zoe_admin_write ឲ្យ authenticated', 'grant execute on function public.zoe_admin_write(uuid, text, jsonb, boolean) to service_role;',
         'grant execute on function public.zoe_admin_write(uuid, text, jsonb, boolean) to service_role, authenticated;']
 ];
+
+function effectiveAnchor(sql, from) {
+    const at = sql.lastIndexOf(from);
+    return at === -1 ? { problem: 'រកមិនឃើញ' } : { at };
+}
+
+async function schemaDigest(c) {
+    const r = await c.query(`select md5(coalesce((select string_agg(pg_get_functiondef(p.oid) || coalesce(p.proacl::text, ''), '|' order by p.oid::regprocedure::text)
+            from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private') and p.prokind = 'f'), '')
+        || coalesce((select string_agg(concat_ws(':', schemaname, tablename, policyname, cmd, roles::text, qual, with_check), '|' order by schemaname, tablename, policyname)
+            from pg_policies where schemaname in ('public', 'realtime')), '')
+        || coalesce((select string_agg(c.relname || coalesce(c.relacl::text, ''), '|' order by c.relname)
+            from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r'), '')
+        || coalesce((select string_agg(pg_get_triggerdef(t.oid), '|' order by t.tgname) from pg_trigger t where not t.tgisinternal), '')) as d`);
+    return r.rows[0].d;
+}
 
 function migrationHistoryProblems(base, current) {
     const problems = [];
@@ -574,6 +638,102 @@ async function rulesMigrationFreshness() {
     ok('ទិសផ្ទុយ ៖ rules ប្រែ ➜ SQL ដែលបង្កើតប្រែ (generator មិនមែនថេរ)', gen.rulesSql(gen.compileRules(probe)) !== want);
 }
 
+// ⛔ ចំណាយនៃការសរសេរ/អានត្រូវលីនេអ៊ែរតាមទំហំ (A154 ៖ ឯកសារ ៩៨ KB ចំណាយ ៨ វិ. · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ធ្លាក់ពិដាន) ៖ រូបរាងពិតរបស់ App
+//    (reconcile `update()` ចូល root ចំណូលយករួច · `runTransaction` លើ root ទាំងមូល · ទាញ/អានឯកសារធំ) ក្រោម `statement_timeout` ៨ វិ.
+//    (លំនាំដើមរបស់ role `authenticated` លើ Supabase) ➜ ត្រូវឆ្លង · ទំហំឯកសារដែលការសរសេរមួយប៉ះមានពិដាន · ទំព័រ `zoe_pull` មានពិដានបៃ
+//    (ទំព័រច្រើន · គ្រប់ជួរមកដល់)។ ទំហំត្រូវជ្រើសឲ្យមុនកែលើសពិដានឆ្ងាយ (ការ៉េ) ហើយក្រោយកែតិចជាងពិដានច្រើនដង។
+async function costGuard() {
+    console.log('\n── ៣. ចំណាយលីនេអ៊ែរ ៖ រូបរាងហាងធំ ក្រោម statement_timeout ៨ វិ. · ពិដានទំហំដែលការសរសេរប៉ះ · ទំព័រ zoe_pull តាមបៃ ──');
+    const { c } = await H.freshDb('default-grants');
+    try {
+        await c.query(migrationSql);
+        const { SERVICE, tenants } = await setupTenants(c);
+        const A = tenants.A;
+        await c.query("set statement_timeout = '8s'");
+        const timed = async (who, fn, args) => {
+            const t0 = Date.now();
+            const r = await as(c, who, 'select public.' + fn + ' as r', args);
+            return { ms: Date.now() - t0, r: r.rows ? r.rows[0].r : null, error: r.error };
+        };
+        const write = (ops) => timed(A.who, 'zoe_write($1, $2::jsonb)', [newOp(), JSON.stringify(ops)]);
+        const admin = (ops) => timed(SERVICE, 'zoe_admin_write($1, $2, $3::jsonb, false)', [A.id, newOp(), JSON.stringify(ops)]);
+        const COL = 'zoew_daily_collected_cod_dod';
+        const PICK = 'zoew_daily_pickup_cod_dod';
+        const DAYS = 4, N = 2000;
+        const day = (d) => '2026-09-' + String(10 + d);
+        const bkey = (d, i) => 'ZT' + d + String(i).padStart(11, '0');
+        const model = {};
+        for (let d = 0; d < DAYS; d++) {
+            model[day(d)] = {};
+            for (let i = 0; i < N; i++) model[day(d)][bkey(d, i)] = { c: (i % 50) + 0.25, d: i % 3 };
+        }
+        const seed = await admin(Object.keys(model).map((k) => ({ k: 'set', p: [COL, k], v: model[k] })));
+        ok('ចាប់ផ្តើម ៖ root ចំណូលយករួច ' + DAYS + ' ថ្ងៃ × ' + N + ' barcode (' + seed.ms + 'ms)', !!seed.r && seed.r.ok === true, seed.error);
+        const upd = {};
+        for (let b = 0; b < 40; b++) {
+            for (let d = 0; d < DAYS; d++) upd[day(d) + '/' + bkey(d, b)] = null;
+            upd[day(DAYS - 1) + '/' + bkey(DAYS - 1, b)] = { c: 9, d: 1 };
+        }
+        for (const [k, v] of Object.entries(upd)) {
+            const [d, b] = k.split('/');
+            if (v === null) delete model[d][b];
+            else model[d][b] = v;
+        }
+        const recon = await write(Object.entries(upd).map(([k, v]) => ({ k: 'set', p: [COL].concat(k.split('/')), v })));
+        ok('⛔ reconcile ៖ update() ' + Object.keys(upd).length + ' ផ្លូវចូល root ' + (DAYS * N) + ' key ➜ ok ក្រោម ៨ វិ. (' + recon.ms + 'ms)',
+            !!recon.r && recon.r.ok === true, recon.error);
+        const next = JSON.parse(JSON.stringify(model));
+        next[day(0)][bkey(0, 100)] = { c: 77.5, d: 2 };
+        const cas = await write([{ k: 'cas', p: [COL], x: model, v: next }]);
+        ok('⛔ runTransaction លើ root ទាំងមូល (CAS ' + (DAYS * N) + ' key) ➜ ok ក្រោម ៨ វិ. (' + cas.ms + 'ms)', !!cas.r && cas.r.ok === true, cas.error || cas.r);
+        let same = 0;
+        for (const d of Object.keys(next)) {
+            const r = await c.query('select z.value = $3::jsonb as same from public.zoe_docs z where z.tenant_id = $1 and z.root = $4 and z.key = $2', [A.id, d, JSON.stringify(next[d]), COL]);
+            if (r.rows[0] && r.rows[0].same) same++;
+        }
+        ok('ក្រោយ reconcile + CAS ៖ ឯកសារលើ server ស្មើគំរូ JS គ្រប់ថ្ងៃ (' + same + '/' + DAYS + ')', same === DAYS);
+        const bigDoc = (seedNo, n) => {
+            const o = { packagesPickedUp: n, pickedUpBarcodes: {} };
+            for (let i = 0; i < n; i++) o.pickedUpBarcodes['ZP' + seedNo + String(i).padStart(11, '0')] = '0' + String((i * 7919 + seedNo * 104729) % 1000000000).padStart(9, '0');
+            return o;
+        };
+        const big = await admin([{ k: 'set', p: [PICK, '2026-08-01'], v: bigDoc(1, 20000) }, { k: 'set', p: [PICK, '2026-08-02'], v: bigDoc(2, 20000) }]);
+        const rd = big.r && big.r.ok ? await timed(A.who, 'zoe_read($1, null)', [PICK]) : { error: 'setup' };
+        ok('⛔ ឯកសារធំ ២ (២០០០០ barcode) ៖ Admin សរសេរ (' + big.ms + 'ms) · zoe_read ➜ ok ក្រោម ៨ វិ. (' + rd.ms + 'ms)',
+            !!big.r && big.r.ok === true && !!rd.r && rd.r.docs.length === 2, big.error || rd.error);
+        const heavy = [];
+        for (let i = 0; i < 10; i++) heavy.push({ k: 'set', p: [PICK, '2026-07-' + String(10 + i)], v: bigDoc(10 + i, 30000) });
+        let heavyOk = true;
+        for (let i = 0; i < heavy.length; i += 4) {
+            const r = await admin(heavy.slice(i, i + 4));
+            heavyOk = heavyOk && !!r.r && r.r.ok === true;
+        }
+        const touchAll = await write(heavy.map((h) => ({ k: 'set', p: h.p.concat(['packagesPickedUp']), v: 1 })));
+        const touchHalf = await write(heavy.slice(0, 5).map((h) => ({ k: 'set', p: h.p.concat(['packagesPickedUp']), v: 2 })));
+        ok('⛔ ការសរសេរមួយប៉ះឯកសារសរុប > ៨ MiB (១០ ឯកសារ ~១ MB) ➜ invalid_data (size) · ទិសផ្ទុយ ៖ ៥ ឯកសារ ➜ ok (' + touchHalf.ms + 'ms)',
+            heavyOk && !!touchAll.error && touchAll.error.message === 'invalid_data' && touchAll.error.detail === 'size' && !!touchHalf.r && touchHalf.r.ok === true,
+            { heavyOk, touchAll: touchAll.error || touchAll.r, touchHalf: touchHalf.error || touchHalf.r });
+        const want = Number((await c.query('select count(*) from public.zoe_docs where tenant_id = $1 and value is not null', [A.id])).rows[0].count);
+        const seen = new Set();
+        let since = 0, pages = 0, slowest = 0, err = null;
+        for (let guard = 0; guard < 100; guard++) {
+            const p = await timed(A.who, 'zoe_pull($1, 2000)', [since]);
+            if (!p.r) { err = p.error; break; }
+            pages++;
+            slowest = Math.max(slowest, p.ms);
+            for (const row of p.r.rows) if (row.v !== null) seen.add(row.r + '/' + row.k);
+            since = p.r.seq;
+            if (!p.r.more) break;
+        }
+        ok('⛔ zoe_pull ពេញ (' + want + ' ឯកសារ ~១២ MB) ៖ ទំព័រតាមពិដានបៃ (' + pages + ' ទំព័រ · យឺតបំផុត ' + slowest + 'ms) · គ្រប់ឯកសារមកដល់',
+            !err && pages >= 2 && seen.size === want, { err, pages, seen: seen.size, want });
+    } catch (e) {
+        ok('ការវាស់ចំណាយមិនគាំង', false, String(e && e.stack || e));
+    } finally {
+        try { await c.end(); } catch (e) {}
+    }
+}
+
 async function main() {
     await rulesMigrationFreshness();
     migrationAppendOnly();
@@ -588,7 +748,7 @@ async function main() {
     await H.start();
     console.log('  (Postgres ' + H.pgBin.version.replace(/^postgres \(PostgreSQL\) /, '') + ' · ' + (Date.now() - t0) + 'ms)');
     console.log('\n── ១. migration ពិត ──');
-    const { results } = await suite(migrationSql, false);
+    const { results, digest: realDigest } = await suite(migrationSql, false);
     for (const r of results) ok(r.label, r.pass, r.pass ? undefined : r.detail);
     ok('ការអះអាង >= ៦០ (ឃើញ ' + results.length + ')', results.length >= 60, results.length);
 
@@ -598,14 +758,19 @@ async function main() {
         const label = entry[0];
         const pairs = Array.isArray(entry[1]) ? entry[1] : [[entry[1], entry[2]]];
         const equivalent = entry[2] === 'equivalent';
-        let mutated = migrationSql;
-        const badAnchor = pairs.map(([from]) => migrationSql.split(from).length - 1).find((n) => n !== 1);
-        if (badAnchor !== undefined) {
-            ok('mutation «' + label + '» ៖ anchor ត្រូវលេចម្តងគត់ (ឃើញ ' + badAnchor + ')', false);
+        const spots = pairs.map(([from, to]) => Object.assign({ from, to }, effectiveAnchor(migrationSql, from)));
+        const bad = spots.find((x) => x.problem);
+        if (bad) {
+            ok('mutation «' + label + '» ៖ anchor ត្រូវលេចម្តងគត់ក្នុងនិយមន័យដែលរស់ (' + bad.problem + ')', false);
             continue;
         }
-        for (const [from, to] of pairs) mutated = mutated.replace(from, () => to);
+        let mutated = migrationSql;
+        for (const x of spots.sort((p, q) => q.at - p.at)) mutated = mutated.slice(0, x.at) + x.to + mutated.slice(x.at + x.from.length);
         const r = await suite(mutated, !equivalent);
+        if (r.applied && r.digest === realDigest) {
+            ok('mutation «' + label + '» ៖ ប្តូរនិយមន័យដែលរស់ (anchor នៅកូដស្លាប់ ➜ digest function/policy/grant ដដែល)', false);
+            continue;
+        }
         const caught = r.results.filter((x) => !x.pass);
         if (equivalent) {
             ok('mutation «' + label + '» ➜ អ្នកយាមនៅបៃតង (ការការពារពិតនៅកន្លែងផ្សេង)', r.applied && caught.length === 0, caught.slice(0, 3).map((x) => x.label));
@@ -614,6 +779,7 @@ async function main() {
         ok('mutation «' + label + '» ➜ ' + (r.applied ? 'ចាប់ដោយ «' + (caught[0] ? caught[0].label : '—') + '»' : 'SQL អនុវត្តមិនបាន (មិនរាប់)'),
             r.applied && caught.length > 0);
     }
+    await costGuard();
     finish();
 }
 

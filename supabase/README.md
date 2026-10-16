@@ -29,7 +29,7 @@ ZoeKeyGen (គ្មាន SMS · គ្មានការបង់ប្រា�
 | `member_reset_codes` | កូដប្តូរពាក្យសម្ងាត់ (**hash តែប៉ុណ្ណោះ**) · ប្រើ ១ ដង · ថ្ងៃផុត | admin |
 | `platform_admins` | អ្នកលក់ (ZoeKeyGen) | ម្នាក់ៗឃើញតែខ្លួនឯង |
 | `member_devices` | ទូរស័ព្ទដែលចូលហាង ៖ `serial` · `model` · `platform` · គណនីចុងក្រោយ · `last_seen` (ZoeW សរសេរតាម `note_my_device` · ≤ ៣០ ក្នុងមួយហាង · សម្រាប់មើលក្នុង ZoeKeyGen) | admin |
-| `zoe_docs` · `zoe_tenant_state` | ទិន្នន័យកញ្ចប់របស់ហាង តាមរូបរាង RTDB (`root`/`key` ➜ JSON) · លេខលំដាប់ `seq` សម្រាប់ទាញតែអ្វីដែលប្រែ | សមាជិកនៃហាងនោះ |
+| `zoe_docs` · `zoe_tenant_state` | ទិន្នន័យកញ្ចប់របស់ហាង តាមរូបរាង RTDB (`root`/`key` ➜ JSON) · លេខលំដាប់ `seq` សម្រាប់ទាញតែអ្វីដែលប្រែ · ទំហំហាង `bytes` និងពិដាន `quota_bytes` | សមាជិកនៃហាងនោះ |
 
 ⛔ គ្មាន role ណាសរសេរតារាងដោយផ្ទាល់ទេ ៖ រាល់ការសរសេរឆ្លងកាត់ RPC ខាងក្រោម។ RPC ដែល authenticated ហៅ (`my_account` · `zoe_write` · `note_my_device` · `admin_*`) ក្នុង
 `public` ជា `security invoker` ដែលហៅ function `security definer` ដែលមានឈ្មោះ · argument · លទ្ធផលដូចគ្នា ក្នុង schema `private` (API មិនបើក)។
@@ -205,6 +205,19 @@ SUPABASE_STRICT=1 bash audit-tools/run-all.sh
 `supabase-rls` · `supabase-datastore` · `supabase-functions` · `keygen-supabase-admin` · `supabase-data-tools` (Postgres ពិត) និង `emu/supabase-rules-parity` ·
 `emu/supabase-adapter-parity` (RTDB emulator ពិតជា oracle) ត្រូវបៃតង **ពេញលេញ** (មិនមែន PARTIAL)។
 
+### ទំហំហាង (quota)
+
+ហាងនីមួយៗមានពិដានទំហំ `quota_bytes` (លំនាំដើម 1 GiB ៖ ឯកសារ · tombstone · កំណត់ត្រា `op_id` ២ ថ្ងៃ)។ ហាងដែលពេញ ៖ ការសរសេរដែលធ្វើឲ្យធំឡើងត្រូវបដិសេធ
+(`quota_exceeded` ➜ ការរក្សាទុកក្នុង ZoeW បរាជ័យ) · ការលុប/សម្អាតនៅដំណើរការ។ មើល និងពង្រីកក្នុង SQL Editor ៖
+
+```sql
+select t.name, t.branch_code, s.bytes, s.quota_bytes
+from public.zoe_tenant_state s join public.tenants t on t.id = s.tenant_id
+order by s.bytes desc;
+
+update public.zoe_tenant_state set quota_bytes = 2147483648 where tenant_id = '<id ហាង>';
+```
+
 ### គណនីកំព្រា
 
 ករណីកម្រ (បណ្តាញដាច់ចំពេលចុះឈ្មោះ) អាចបន្សល់គណនី auth គ្មានហាង — វា **មើលអ្វីមិនឃើញ** (RLS) តែ username នោះជាប់។ រាយវា ៖
@@ -230,6 +243,9 @@ where m.user_id is null and a.user_id is null;
   «Leaked Password Protection Disabled» នៅលើគម្រោង Free (មុខងារ Pro ៖ «ពេល Upgrade ទៅ Pro»)។
 - **ទិន្នន័យកញ្ចប់** ៖ rules ដដែលនឹង Firebase (ប្រភពតែមួយ `firebase-database.rules.json`) អនុវត្តក្នុង Postgres លើរាល់ `zoe_write` ➜ schema · fence ស្តារ/
   លុបទាំងអស់ · លុយមិនអវិជ្ជមាន ដូច Firebase បេះបិទ (វាស់ធៀប RTDB emulator)។
+- **ហាងមួយមិនធ្វើឲ្យហាងផ្សេងយឺត ឬពេញ** (ហាងទាំងអស់ចែក Postgres តែមួយ) ៖ ការសរសេរ និងការអាន ចំណាយតាមទំហំទិន្នន័យ (លីនេអ៊ែរ) ·
+  ការសរសេររបស់ហាងមួយរត់ម្តងមួយ (tenant lock) · ការសរសេរមួយប៉ះឯកសារសរុប ≤ 8 MiB (`invalid_data`) · ទំព័រ `zoe_pull` ≤ 2 MiB (មិនកាត់ការសរសេរមួយ)
+  · ពិដានទំហំក្នុងហាង (`quota_bytes`) · ការសរសេរ/អាននីមួយៗជាប់ `statement_timeout` របស់ Supabase។
 - **កូដអញ្ជើញ/កូដប្តូរពាក្យសម្ងាត់** ៖ ចៃដន្យ ១០០ bit · DB ផ្ទុកតែ SHA-256 · ប្រើបានតាម `max_uses` · មានថ្ងៃផុត · ចងនឹងហាងពេលចេញ ➜ អតិថិជនមិនអាច
   ជ្រើសលេខសាខាខ្លួនឯង។
 - **ការចុះឈ្មោះ** ៖ កូដអញ្ជើញត្រូវប្រើបាន **មុន** បង្កើតគណនី · RPC idempotent · លុបគណនីវិញតែលើការបដិសេធច្បាស់ · លទ្ធផលមិនដឹង ➜ **មិនលុប**

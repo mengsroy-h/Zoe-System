@@ -603,14 +603,18 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         [[{ mail: { mailNo: 'KH0000000001', isSign: 0 }, tracks: [
             { action: '3', siteCode: 'KH001', time: null, mailNo: 'KH0000000001' }
         ] }], 'palm:track-time']
-    ])('Palm ទាញបញ្ជីខូច ➜ កូដមូលហេតុ និង Barcode សម្រាប់ផ្ទៀង 🧪 (%s)', async (result, reason) => {
+    ])('Palm track មួយកញ្ចប់ខូច ➜ បញ្ជីនៅតែមក · Barcode នោះ «ផ្ទៀងមិនបាន» ជាមួយកូដមូលហេតុ (%s)', async (result, reason) => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')]), '5': () => page([]),
-            'track:KH0000000001': () => upstream({ status: true, result }) });
+        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4')]), '5': () => page([]),
+            'track:KH0000000001': () => upstream({ status: true, result }),
+            'track:KH0000000002': () => upstream({ status: true, result: [{ mail: { mailNo: 'KH0000000002', isSign: 0 }, tracks: [
+                { action: '3', siteCode: 'KH001', time: '2026-10-16 09:00:00', mailNo: 'KH0000000002' }] }] }) });
         const response = await call(listQuery({ signed: '0' }), session);
-        expect(response.statusCode).toBe(502);
-        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason, barcode: 'KH0000000001' });
-        expect(response.body).not.toContain('012345678');
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.rows.map((r: any) => r.barcode)).toEqual(['KH0000000002']);
+        expect(body).toMatchObject({ unverified: ['KH0000000001'], unverifiedReasons: [reason] });
+        expect(response.body).not.toContain('"phone":"012345678","cod":2.5,"dod":0,"at":"","from":""');
     });
 
     it('Palm list ខូច ➜ ប្រាប់ប្រភេទបញ្ជី និង field ខូច ដោយមិនបង្ហាញ response ដើម', async () => {
@@ -640,13 +644,47 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(JSON.parse(response.body).rows).toHaveLength(15);
     });
 
-    it('Palm track ខ្វះឬបរាជ័យ ➜ មិនឆ្លើយជាបញ្ជីពេញហើយបាត់កញ្ចប់ស្ងាត់', async () => {
+    it('Palm track ខ្វះឬបរាជ័យ ➜ មិនបាត់កញ្ចប់ស្ងាត់ ៖ Barcode ក្នុង unverified · ZTO 5xx សាកម្តងទៀតមួយដង', async () => {
         const { sessionToken: session } = await login();
-        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')]), '5': () => page([]),
-            'track:KH0000000001': () => upstream({ status: true, result: [] }) });
+        const sent = serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')]), '5': () => page([]),
+            'track:KH0000000001': () => upstream({}, 502) });
         const res = await call({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1' }, session);
-        expect(res.statusCode).toBe(502);
-        expect(JSON.parse(res.body).rows).toBeUndefined();
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ rows: [], unverified: ['KH0000000001'], unverifiedReasons: ['palm:unavailable'] });
+        expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(2);
+    });
+
+    it('Palm tabs=4 អានតែប្រភេទដែលនៅមានទំព័រ · verify អានតែ track Barcode ដែលស្នើ · តម្លៃខុស ➜ 400 មុនហៅ ZTO', async () => {
+        const { sessionToken: session } = await login();
+        const track = (code: string) => () => upstream({ status: true, result: [{ mail: { mailNo: code, isSign: 0 }, tracks: [
+            { action: '3', siteCode: 'KH001', time: '2026-10-16 09:00:00', mailNo: code }] }] });
+        const sent = serve({ '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4')], { pages: 3 }),
+            'track:KH0000000001': track('KH0000000001'), 'track:KH0000000002': track('KH0000000002') });
+        const body = JSON.parse((await call(listQuery({ signed: '0', page: '2', tabs: '4', verify: 'KH0000000002,KH0000000099' }), session)).body);
+        expect(sent.filter((r) => r.path.endsWith('/queryDispatchList')).map((r) => r.body.billStatus)).toEqual(['4']);
+        expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo')).map((r) => r.body.mailNos)).toEqual(['KH0000000002']);
+        expect(body).toMatchObject({ tabPages: { '4': 3 }, pages: 3, rows: [{ barcode: 'KH0000000002' }], unverified: ['KH0000000099'], unverifiedReasons: ['palm:moved'] });
+        sent.length = 0;
+        for (const bad of [{ tabs: '4,9' }, { tabs: '4,4' }, { verify: 'bad code' }, { verify: Array.from({ length: 16 }, (_, i) => 'KH00000000' + String(i).padStart(2, '0')).join(',') }]) {
+            expect((await call(listQuery({ signed: '0', ...bad }), session)).statusCode).toBe(400);
+        }
+        expect(sent).toEqual([]);
+    });
+
+    it('Palm សញ្ញាចុះហត្ថលេខា ៖ ស្កេន 5 សាខាខ្លួនក្រោយមកដល់ = បិទ (ដូចបញ្ជី 05 របស់ Cookie) · isSign=0 ផ្ទុយ ➜ null · សាខាផ្សេង ➜ មិនបិទ', async () => {
+        const { sessionToken: session } = await login();
+        const track = (code: string, mail: Record<string, unknown>, scans: Array<[string, string, string]>) => () => upstream({ status: true,
+            result: [{ mail: { mailNo: code, ...mail }, tracks: scans.map(([action, siteCode, time]) => ({ action, siteCode, time, mailNo: code })) }] });
+        serve({ '1': () => page([]), '5': () => page([]), '4': () => page(['KH0000000001', 'KH0000000002', 'KH0000000003', 'KH0000000004'].map((c) => item(c, '4'))),
+            'track:KH0000000001': track('KH0000000001', {}, [['3', 'KH001', '2026-10-15 09:00:00'], ['5', 'KH001', '2026-10-16 09:00:00']]),
+            'track:KH0000000002': track('KH0000000002', { isSign: 0 }, [['3', 'KH001', '2026-10-15 09:00:00'], ['5', 'KH001', '2026-10-16 09:00:00']]),
+            'track:KH0000000003': track('KH0000000003', { isSign: 1 }, [['3', 'KH001', '2026-10-15 09:00:00'], ['5', 'OTHER', '2026-10-16 09:00:00']]),
+            'track:KH0000000004': track('KH0000000004', { isSign: '0' }, [['3', 'KH001', '2026-10-15 09:00:00']]) });
+        const body = JSON.parse((await call(listQuery({ signed: '0' }), session)).body);
+        expect(body.rows.map((r: any) => [r.barcode, r.ztoClosed])).toEqual([
+            ['KH0000000001', true], ['KH0000000002', null], ['KH0000000003', null], ['KH0000000004', false]]);
+        expect(body.signed).toEqual(['KH0000000001']);
+        expect(body.signedRows).toMatchObject([{ barcode: 'KH0000000001', at: '2026-10-16 09:00:00' }]);
     });
 
     it('sign list ➜ billStatus 5 over signSiteDate · only rows whose billStatus is 5 are evidence · Argus contract', async () => {

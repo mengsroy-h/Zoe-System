@@ -2290,6 +2290,9 @@
     "ZoeW/tests/zto-pages-unknown.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-list-e2e.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-palm-list.test.tsx": {
       "policy": "zoew-self-verification"
     },

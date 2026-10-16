@@ -46,7 +46,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · អានទំព័របន្ត · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · អានតែ tab ដែលនៅមានទំព័រ · សាកម្តងទៀតពេល ZTO មិនឆ្លើយ · track មួយកញ្ចប់ខូច ➜ `unverified` (បញ្ជីនៅតែមក) · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
 | បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1&signed=1` · `exact=1`) |
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
 | ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |
@@ -1225,9 +1225,9 @@ Parent ៖ `java.lang.Enum`។
 | `tracks[]` បន្ថែម | `countryCode: String` · `problemReason: String` · `signName: String` |
 | `tracks[].id` | ចម្លើយពិតជា String ទោះ DTO ប្រកាស `int`; កុំយកវាជាចំនួនសម្រាប់គណនាលុយ |
 
-`mail` និង `isSign` ជា metadata បន្ថែមដែលអាចអវត្តមាន; បញ្ជីមកដល់ផ្ទៀងអត្តសញ្ញាណតាម envelope ឬ Barcode ក្នុង track ទាំងអស់។ ខ្វះ metadata ចុះហត្ថលេខាមិនលុបភស្តុតាងមកដល់ទេ។
+`mail` និង `isSign` ជា metadata បន្ថែមដែលអាចអវត្តមាន; បញ្ជីមកដល់ផ្ទៀងអត្តសញ្ញាណតាម envelope (`mail.mailNo` · `mailNo`) ឬ `tracks[].mailNo` ហើយយកតែ track របស់ Barcode នោះ (track ដែលមាន `mailNo` ផ្សេង · ម៉ោង/action ខូច មិនជាភស្តុតាង)។ ខ្វះ metadata ចុះហត្ថលេខាមិនលុបភស្តុតាងមកដល់ទេ។
 
-ភស្តុតាងមកដល់ ៖ `action="3"` + `siteCode` ត្រូវសាខា + `time` ក្នុងថ្ងៃដែលជ្រើស។ ភស្តុតាងចុះហត្ថលេខា ៖ `mail.isSign=1` និង `action="5"` ត្រូវ Barcode/សាខា ហើយមិននៅមុនការមកដល់ថ្មី។ Field `shipTypeId="03"` ក្នុង Lookup ជាប្រភេទដឹកជញ្ជូន; វាមិនមែនស្កេនមកដល់ `03` ទេ។
+ភស្តុតាងមកដល់ ៖ `action="3"` + `siteCode` ត្រូវសាខា + `time` ក្នុងថ្ងៃដែលជ្រើស។ ភស្តុតាងចុះហត្ថលេខា ៖ `action="5"` ត្រូវ Barcode/សាខា ហើយមិននៅមុនការមកដល់ថ្មី (ដូចស្កេន `05` របស់ Cookie) · `mail.isSign=0` ផ្ទុយ ➜ មិនច្បាស់ (`null`) · ការពិនិត្យកញ្ចប់មួយ (`status=1`) នៅតម្រូវ `mail.isSign=1`។ Field `shipTypeId="03"` ក្នុង Lookup ជាប្រភេទដឹកជញ្ជូន; វាមិនមែនស្កេនមកដល់ `03` ទេ។
 
 ## លេខប្រភេទស្កេនក្នុង APK (`ScanType`)
 

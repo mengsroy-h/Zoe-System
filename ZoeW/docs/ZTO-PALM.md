@@ -98,10 +98,16 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   តាមថ្ងៃ `signSiteDate`) ជាទំព័រ ១០០ ជួរ ➜ តែជួរដែល `billStatus` = `5` ទេជាភស្តុតាង ➜ បិទកញ្ចប់ដែលបើកក្នុង ZoeW ដូចរបៀប Argus។
 - **☰ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO** បើកសម្រាប់ Palm ៖ `queryDispatchList` ផ្តល់បេក្ខភាពពី tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ហើយ
   `queryTrackInfo` ផ្ទៀងថាមាន `action: "3"` ត្រូវ `siteCode` របស់គណនី និងថ្ងៃជ្រើស មុនបង្ហាញ។ មិនយក `dispEmpDate` ជាថ្ងៃមកដល់ទេ។
-  សំណើមួយអាន ៥ បេក្ខភាពក្នុងមួយប្រភេទ ដើម្បីផ្ទៀង track ក្នុងថវិកា Function។ ទំព័របញ្ជីត្រូវអានបន្តទោះទំព័រមុនគ្មានកញ្ចប់មកដល់; ទិន្នន័យ track ខ្វះ/បរាជ័យបង្ហាញកំហុស ជំនួសឲ្យរំលងកញ្ចប់ស្ងាត់។
-  ភស្តុតាងមកដល់មិនទាមទារ `mail.isSign` ទេ៖ `QueryTrackingRPTO` ក្នុង APK មានតែ `tracks`។ Barcode ត្រូវផ្ទៀងតាម
-  `mail.mailNo`, `mailNo` ឬ `tracks[].mailNo` ទាំងអស់ត្រូវគ្នា។ បើ metadata ចុះហត្ថលេខាខ្វះ ទុកស្ថានភាព `null` ដោយមិនបិទបញ្ជីមកដល់។
-  បញ្ជីមាន `list:null` ឬគ្មាន `list` ទទួលជាទទេពេល `total=0` ឬលេខទំព័រដែលស្នើហួស `pages` បញ្ជាក់; `pages` ទទួលតែលេខ ឬ String លេខ ដើម្បីកុំឲ្យ boolean/ទទេក្លាយជា ០។
+  សំណើមួយអាន ៥ បេក្ខភាពក្នុងមួយ tab ហើយអានតែ tab ដែលនៅមានទំព័រ (`tabs`) ➜ App អាន ២ ទំព័រក្នុងពេលតែមួយរហូតគ្រប់ទំព័រ។
+  ZTO មិនឆ្លើយ (5xx · អស់ពេល · `status:false`) ➜ Function សាកម្តងទៀតមួយដងក្នុងថវិការបស់វា · App សាកទំព័រម្តងទៀតដល់ ៣ ដង
+  និងសាក track របស់ Barcode ដែលផ្ទៀងមិនបានម្តងទៀត ២ ដង (`verify`)។ track មួយកញ្ចប់ខូច ឬមិនឆ្លើយ មិនធ្វើឲ្យបញ្ជីទាំងមូលបរាជ័យទេ ៖
+  Barcode នោះចូល `unverified` ហើយប្រអប់បង្ហាញ «⚠️ ZTO មិនឆ្លើយ track N កញ្ចប់ (Barcode …)» · ទំព័រដែលនៅតែមិនឆ្លើយបង្ហាញ
+  «⚠️ ទាញមិនបាន N ទំព័រ» ➜ ចុចទាញម្តងទៀត។ Session Palm ផុតកំណត់ពាក់កណ្តាល ➜ ឈប់ ហើយប្រាប់ឲ្យ Login ZTO Palm ម្តងទៀត។
+  track ដែលមាន `mailNo` ផ្សេង (ឧ. លេខជើងដំបូង) ឬម៉ោង/action ខូច មិនត្រូវយកជាភស្តុតាងទេ។ Barcode ត្រូវផ្ទៀងតាម
+  `mail.mailNo`, `mailNo` ឬ `tracks[].mailNo`។ `result: []` មិនមែនភស្តុតាងថាមិនទាន់មកដល់ទេ ➜ អានម្តងទៀត ហើយនៅទទេ ➜ `unverified`។
+- ស្ថានភាពបិទក្នុងបញ្ជី (ដូចបញ្ជីស្កេន `05` របស់ Cookie) ៖ ស្កេន `5` ត្រូវសាខា នៅក្រោយ ឬស្មើមកដល់ចុងក្រោយ = បិទ (`ztoClosed: true` ·
+  ម៉ោងចុះហត្ថលេខាចូល `signedRows`) លើកលែង `mail.isSign: 0` ផ្ទុយ ➜ `null` · មកដល់ហើយ `isSign: 0` គ្មានស្កេន `5` ក្រោយ = មិនទាន់បិទ ·
+  ផ្សេងពីនេះ `null` (App ពិនិត្យកញ្ចប់ចាស់តាម `status=1`)។
 - ប្រភពកញ្ចប់ VN · CN · ផ្សេងៗត្រូវរក្សាទុកពេលនាំចូល ៖ `recSite`/`customerCodeDesc` បើមាន ឬឈ្មោះកន្លែងទទួលដើមពី
   `action: "1"` ក្នុងប្រវត្តិស្កេន (`msgLoc` · `msgEng` · `siteName`)។ មិនយកសាខាដឹកបន្ត ឬប្រទេសអ្នកទទួលជាប្រភពទេ។
   ប្រភពដែល ZTO មិនផ្តល់ទុកទទេ។ ការបង្ហាញទង់ជាតិប្រើផែនទីឈ្មោះសាខាដូច Cookie។
@@ -126,15 +132,22 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 
 ## កូដកំហុសទាញបញ្ជី Palm
 
-`HTTP 502 · ZTO_INVALID_RESPONSE` ភ្ជាប់ `reason` ដើម្បីបង្ហាញកន្លែងខូច ដោយមិនបង្ហាញ response ឯកជនដើម៖
+កំហុសបញ្ជីភ្ជាប់ `reason` ដើម្បីបង្ហាញកន្លែងខូច ដោយមិនបង្ហាញ response ឯកជនដើម៖
 
 | Reason | ត្រូវផ្ទៀង |
 |---|---|
-| `palm:list-1-result/pages` (ឬ `list-4`, `list-5`) | envelope `result` និង pagination របស់ tab នោះ |
+| `palm:list-1-result/pages` (ឬ `list-4`, `list-5`) | envelope `result` និង pagination របស់ tab នោះ (HTTP 502) |
 | `palm:list-5-items-null-p1` (ឬប្រភេទ/ទំព័រផ្សេង) | បញ្ជី `list` ខូច; reason បង្ហាញ type និងលេខទំព័រ (`large` = លើសពិដានជួរ) |
-| `palm:list-1-response` (ឬ `list-4`, `list-5`) | ការទទួល/អានចម្លើយ `queryDispatchList` |
-| `palm:track-response` | ការទទួល/អាន `queryTrackInfo` |
-| `palm:track-result/empty/identity/items` | result ត្រូវមាន track របស់ Barcode នោះតែមួយក្រុម |
-| `palm:track-barcode/time/action` | track មាន Barcode ខុស, ថ្ងៃខូច ឬកូដ action ខូច |
+| `palm:list-4-unavailable` · `palm:list-4-timeout` (ឬ `list-1`, `list-5`) | `queryDispatchList` មិនឆ្លើយក្រោយសាកម្តងទៀត (HTTP 502 · 504) |
 
-ពេលកំហុស track បង្ហាញ Barcode សូមសាកលេខនោះក្នុង 🧪 ដើម្បីផ្ទៀងចម្លើយដើម។ កូដទាំងនេះជាកូដ ZoeW សម្រាប់រោគវិនិច្ឆ័យ មិនមែន `statusCode` របស់ ZTO ទេ។
+កូដក្នុង `unverifiedReasons` (Barcode នៅក្នុង `unverified` · បញ្ជីនៅតែមក)៖
+
+| Reason | ត្រូវផ្ទៀង |
+|---|---|
+| `palm:unavailable` · `palm:timeout` · `palm:rate` · `palm:<statusCode>` | `queryTrackInfo` មិនឆ្លើយ ឬ ZTO បដិសេធក្រោយសាកម្តងទៀត |
+| `palm:track-empty` | `result: []` ទាំងពីរដង |
+| `palm:track-result/identity` | result មិនមែនបញ្ជី ឬគ្មានក្រុម track របស់ Barcode នោះ |
+| `palm:track-time/action` | track របស់ Barcode នោះមានតែម៉ោង ឬ action ខូច |
+| `palm:budget` · `palm:moved` | ថវិកា Function អស់ · Barcode លែងនៅទំព័រនោះពេលសាកម្តងទៀត |
+
+សាក Barcode ក្នុង 🧪 ដើម្បីផ្ទៀងចម្លើយដើម។ កូដទាំងនេះជាកូដ ZoeW សម្រាប់រោគវិនិច្ឆ័យ មិនមែន `statusCode` របស់ ZTO ទេ (លើកលែង `palm:<statusCode>`)។

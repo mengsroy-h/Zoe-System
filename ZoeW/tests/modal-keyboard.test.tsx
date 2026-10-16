@@ -81,6 +81,7 @@ function TwoModals() {
                     <div id="mkScroll">
                         <input id="mkField" type="tel" />
                         <input id="mkDate" type="date" />
+                        <select id="mkSelect"><option>a</option><option>b</option></select>
                         <input id="mkCheck" type="checkbox" />
                         <input id="mkReadonly" type="text" readOnly />
                         <textarea id="mkArea" defaultValue="abc" />
@@ -360,6 +361,60 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
         expect(uiState.modalViewportHeight).toBe(508);
         expect(uiState.modalKeyboardFit).toBeNull();
         expect(byId('manualAdjustModal').classList.contains('modal-kb')).toBe(false);
+    });
+
+    it('⛔ iPhone ៖ ប្តូរពីប្រអប់វាយទៅ select · date (កង់ជ្រើសនៅកន្លែង keyboard) ➜ ផ្ទាំងនៅលើ មិនទម្លាក់ · ចាកចេញទៅគ្មានអ្វី ➜ ចុះតែម្តង · ទៅ checkbox ➜ ចុះ', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        try {
+            openLong();
+            await settle();
+            byId('mkField').focus();
+            keyboard(336);
+            vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+            expect(uiState.modalViewportHeight).toBe(508);
+            const between: number[] = [];
+            const note = () => between.push(uiState.modalViewportHeight);
+            document.addEventListener('focusout', note, true);
+            byId('mkSelect').focus();
+            document.removeEventListener('focusout', note, true);
+            expect(document.activeElement).toBe(byId('mkSelect'));
+            expect(between).toEqual([508]);
+            expect(uiState.modalViewportHeight).toBe(508);
+            keyboard(260);
+            expect(uiState.modalViewportHeight).toBe(584);
+            vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+            expect(uiState.modalViewportHeight).toBe(584);
+            byId('mkSelect').blur();
+            expect(uiState.modalViewportHeight).toBe(0);
+            keyboard(120);
+            expect(uiState.modalViewportHeight).toBe(0);
+            byId('mkSelect').focus();
+            expect(uiState.modalViewportHeight).toBe(724);
+            keyboard(260);
+            vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+            expect(uiState.modalViewportHeight).toBe(584);
+            byId('mkSelect').blur();
+            keyboard(0);
+            expect(uiState.modalViewportHeight).toBe(0);
+
+            byId('mkField').focus();
+            keyboard(336);
+            vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+            byId('mkDate').focus();
+            expect(uiState.modalViewportHeight).toBe(508);
+            byId('mkField').focus();
+            expect(uiState.modalViewportHeight).toBe(508);
+            keyboard(0);
+
+            byId('mkField').focus();
+            keyboard(336);
+            vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+            byId('mkCheck').focus();
+            expect(uiState.modalViewportHeight).toBe(0);
+            keyboard(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('⛔ ប្រអប់បិទ (keyboard នៅបើក) ➜ ០ · បើកប្រអប់ខណៈ keyboard បើក ➜ វាស់ក្រោយ React គូរ (microtask) · ជាន់ប្រអប់ ➜ តម្រូវតែប្រអប់ខាងលើគេ (ប្រអប់ដែលមើលឃើញ)', async () => {

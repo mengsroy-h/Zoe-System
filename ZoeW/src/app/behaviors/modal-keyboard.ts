@@ -35,6 +35,7 @@ const SEARCH_PULL_UP_MAX_WIDTH = 992;
 const PAGE_TAP_FIELDS: readonly RefName[] = ['hwScannerInput'];
 
 const MODAL_TAP_TYPES = new Set(['text', 'tel', 'number', 'password', 'email', 'search', 'url', 'textarea']);
+const PICKER_INPUT_TYPES = new Set(['date', 'time', 'datetime-local', 'month', 'week']);
 
 export interface ModalNaturalBox {
     top: number;
@@ -529,15 +530,23 @@ function forecastModalKeyboard(field: HTMLElement): void {
 }
 
 function noteIOSFieldFocus(e: FocusEvent): void {
+    if (isAndroidDevice()) return;
     const field = textEntryField(e.target);
-    if (isAndroidDevice() || !field || touchesDown > 0) return;
+    if (!field) {
+        if (iosClosing && inputViewField(e.target)) {
+            iosClosing = false;
+            if (uiState.isModalOpen) measureModalKeyboard();
+        }
+        return;
+    }
+    if (touchesDown > 0) return;
     iosClosing = false;
     const tapped = performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS;
     if (iosKeyboard || (tapped && lastTouchTarget === field)) forecastModalKeyboard(field);
 }
 
 function noteIOSFieldBlur(e: FocusEvent): void {
-    if (isAndroidDevice() || !uiState.isModalOpen || !textEntryField(e.target) || textEntryField(e.relatedTarget)) return;
+    if (isAndroidDevice() || !uiState.isModalOpen || !inputViewField(e.target) || inputViewField(e.relatedTarget)) return;
     if (!iosKeyboard && !iosForecast) return;
     iosClosing = true;
     iosForecast = 0;
@@ -724,6 +733,15 @@ function textEntryField(target: EventTarget | null): HTMLElement | null {
     return MODAL_TAP_TYPES.has(String(el.type || '').toLowerCase()) && !el.disabled && !el.readOnly ? el : null;
 }
 
+function inputViewField(target: EventTarget | null): HTMLElement | null {
+    const text = textEntryField(target);
+    if (text) return text;
+    const el = target as HTMLInputElement | HTMLSelectElement | null;
+    if (!el || typeof el.closest !== 'function') return null;
+    if (el.tagName === 'SELECT') return el;
+    return el.tagName === 'INPUT' && PICKER_INPUT_TYPES.has(String(el.type || '').toLowerCase()) && !(el as HTMLInputElement).readOnly ? el : null;
+}
+
 function keyboardFocusStaysInView(field: HTMLElement, view: { top: number; height: number }): boolean {
     const modal = field.closest('.modal') as HTMLElement | null;
     if (modal) return !!modal.id && modalIsOpen(modal.id);
@@ -736,7 +754,7 @@ function keyboardFocusStaysInView(field: HTMLElement, view: { top: number; heigh
 
 function keepKeyboardFocusInPlace(e: FocusEvent): void {
     if (touchesDown > 0 || !usesIOSPanelHandoff() || performance.now() - lastTouchEndAt < NATIVE_TAP_FOCUS_MS) return;
-    const field = textEntryField(e.target);
+    const field = inputViewField(e.target);
     const view = field ? keyboardVisibleViewport() : null;
     if (!field || !view || document.activeElement !== field || !keyboardFocusStaysInView(field, view)) return;
     focusElementWithoutScroll(field);

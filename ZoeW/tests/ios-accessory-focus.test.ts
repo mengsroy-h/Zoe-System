@@ -17,11 +17,16 @@ import { refTo } from '../src/app/refs';
 
 const listeners: Array<[EventTarget, string, any, any]> = [];
 const disposers: Array<() => void> = [];
-const realFocus = HTMLElement.prototype.focus;
+const focusProtos = Array.from(new Set(['input', 'select', 'textarea', 'button'].map((tag) => {
+    let proto = Object.getPrototypeOf(document.createElement(tag));
+    while (proto && !Object.prototype.hasOwnProperty.call(proto, 'focus')) proto = Object.getPrototypeOf(proto);
+    return proto as HTMLElement;
+})));
+const realFocus = new Map(focusProtos.map((proto) => [proto, proto.focus]));
 let box: HTMLElement;
 let vv: EventTarget & { height: number; offsetTop: number };
 let clock = 10000;
-const wk: { focused: Element | null; pending: { id: string; preventScroll: boolean } | null } = { focused: null, pending: null };
+const wk: { focused: string | null; pending: { id: string; preventScroll: boolean } | null } = { focused: null, pending: null };
 let focusEvents = 0;
 
 function scope() {
@@ -51,27 +56,31 @@ function keyboard(px: number) {
 }
 
 function installWebKitFocusModel() {
-    HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
-        const preventScroll = !!(options && options.preventScroll);
-        if (document.activeElement === this) {
-            if (wk.focused !== this) {
-                wk.focused = this;
+    for (const proto of focusProtos) {
+        const real = realFocus.get(proto)!;
+        proto.focus = function (this: HTMLElement, options?: FocusOptions) {
+            const preventScroll = !!(options && options.preventScroll);
+            const isActive = () => !!document.activeElement && document.activeElement.id === this.id;
+            if (isActive()) {
+                if (wk.focused !== this.id) {
+                    wk.focused = this.id;
+                    wk.pending = { id: this.id, preventScroll };
+                }
+                return real.call(this, options);
+            }
+            real.call(this, options);
+            if (isActive() && wk.focused !== this.id) {
+                wk.focused = this.id;
                 wk.pending = { id: this.id, preventScroll };
             }
-            return realFocus.call(this, options);
-        }
-        realFocus.call(this, options);
-        if (document.activeElement === this && wk.focused !== this) {
-            wk.focused = this;
-            wk.pending = { id: this.id, preventScroll };
-        }
-    };
+        };
+    }
     document.addEventListener('focusout', forgetWebKitFocus, true);
     document.addEventListener('focus', countFocus, true);
 }
 
 function forgetWebKitFocus(e: Event) {
-    if (wk.focused === e.target) wk.focused = null;
+    if (wk.focused === (e.target as Element).id) wk.focused = null;
 }
 
 function countFocus() {
@@ -120,11 +129,14 @@ beforeEach(() => {
         '<div id="entryMainSection"><input type="search" id="entryListSearchInput"></div></div>' +
         '<div class="modal" id="phoneModal"><div class="modal-content">' +
         '<input type="tel" id="phoneInput" value="012000111"><input type="text" id="lockerInput"><input type="number" id="codInput"><input type="number" id="dodInput">' +
+        '<select id="pickSelect"><option>a</option><option>b</option></select><input type="date" id="pickDate">' +
         '<input type="checkbox" id="fastCheck"></div></div>';
     document.body.append(box);
     el('hwScannerInput').getBoundingClientRect = () => rect(290, 30);
     el('entryListSearchInput').getBoundingClientRect = () => rect(700, 36);
     for (const [i, id] of ['phoneInput', 'lockerInput', 'codInput', 'dodInput'].entries()) el(id).getBoundingClientRect = () => rect(200 + i * 50, 40);
+    el('pickSelect').getBoundingClientRect = () => rect(400, 40);
+    el('pickDate').getBoundingClientRect = () => rect(450, 40);
     refTo('hwScannerInput')(el('hwScannerInput'));
     refTo('entryListSearchInput')(el('entryListSearchInput'));
     refTo('appPages')(el('appPages'));
@@ -135,7 +147,7 @@ beforeEach(() => {
 afterEach(() => {
     disposers.splice(0).forEach((fn) => fn());
     listeners.splice(0).forEach(([t, type, h, o]) => t.removeEventListener(type, h, o));
-    HTMLElement.prototype.focus = realFocus;
+    for (const proto of focusProtos) proto.focus = realFocus.get(proto)!;
     document.removeEventListener('focusout', forgetWebKitFocus, true);
     document.removeEventListener('focus', countFocus, true);
     refTo('hwScannerInput')(null);
@@ -171,6 +183,19 @@ describe('iPhone ៖ ∨/∧ លើ keyboard (ប្រអប់បន្ទា�
             expect(s.pending).toEqual({ id: s.id, preventScroll: true });
             expect(s.events).toBe(1);
             expect(s.caret).toBe(true);
+        }
+    });
+
+    it('⛔ ផ្ទាំង ៖ ∨ ពីប្រអប់វាយទៅ select · date (កង់ជ្រើស) ហើយ ∧ ត្រឡប់ ➜ preventScroll គ្រប់ការប្តូរ · ព្រឹត្តិការណ៍ focus ម្តង', () => {
+        openPhoneModal();
+        el('dodInput').focus({ preventScroll: true });
+        keyboard(336);
+        for (const id of ['pickSelect', 'pickDate', 'pickSelect', 'dodInput']) {
+            focusEvents = 0;
+            const pending = accessoryTo(el(id));
+            expect(document.activeElement).toBe(el(id));
+            expect(pending).toEqual({ id, preventScroll: true });
+            expect(focusEvents).toBe(1);
         }
     });
 

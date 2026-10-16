@@ -375,6 +375,17 @@ describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the
         ]);
     });
 
+    it('owner report: an arrival row carries the parcel\'s current status, not the request filter ➜ still an arrival (never «other scan»)', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '4': () => page([item('KH0000000001', '1'), item('KH0000000002', ''), { billCode: 'KH0000000003', consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: '1', dispEmpDate: '2026-10-15 09:30:00' },
+            item('KH0000000004', '5')]) });
+        const body = JSON.parse((await call(listQuery(), session)).body);
+        expect(body.rows.map((r: any) => r.barcode)).toEqual(['KH0000000001', 'KH0000000002', 'KH0000000003']);
+        expect(body.otherScans).toBe(0);
+        expect(body).toMatchObject({ signed: ['KH0000000004'], signedScans: 1 });
+        expect(body.rows.length + body.otherScans + body.signedScans).toBe(4);
+    });
+
     it('withSigned=1 ➜ sign list billStatus 5 in parallel; only rows whose billStatus is 5 are evidence', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({

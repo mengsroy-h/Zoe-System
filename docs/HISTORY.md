@@ -76,8 +76,8 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.98] Palm ពេញ** ៖ សាកលើ Deploy Preview ជាមួយគណនី Palm ពិត ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្មើ tab «បញ្ជូន» · កញ្ចប់ដែលចុះហត្ថលេខាក្នុង
   App Palm បិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
-- ⏳ **[2.50.98] ល្បឿន Lookup Palm** (ម្ចាស់គម្រោង ៖ Palm ១.២–១.៥ វិ · Cookie ០.៦–១.០ វិ · វាស់លើ preview ៖ A175) ៖ ស្កេន ៥–១០ កញ្ចប់ក្នុងរបៀបនីមួយៗ ➜
-  🩺 ជួរ Lookup ៖ «ស្កេនលើការភ្ជាប់ថ្មី / ដែលបើករួច» · «ZTO ទុកការភ្ជាប់ …» · «Function នៅ …» ➜ ផ្ញើរូបមក ដើម្បីសម្រេចជំហានកែ (ទុកការភ្ជាប់ ឬប្តូរតំបន់ Function)។
+- ⏳ **[2.50.98] ល្បឿន Lookup Palm** ៖ មូលហេតុវាស់បាន (A177 ៖ ការភ្ជាប់ថ្មីទៅ Palm ០.៩១ វិ ⟷ ការភ្ជាប់ដែលបើករួច ០.២២ វិ · ZTO គ្មាន `Keep-Alive`) ➜
+  ម្ចាស់គម្រោងសម្រេច ៖ ទុកការភ្ជាប់ Palm យូរជាង (កូដ) ឬប្តូរតំបន់ Function (Netlify)។ បញ្ជី Palm ទទេ (A176) កែរួច ➜ សាកលើ preview ម្តងទៀត។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
@@ -113,6 +113,8 @@
   (`upstreamTiming.connections`) ➜ 🩺 ជួរ Lookup បង្ហាញជាវិនាទី។ អ្នកយាមថ្មី `ZoeW/tests/zto-upstream-timing.test.ts` (៦ ធ្លាក់លើកូដមុនកែ) ·
   `zto-palm-list.test.tsx` (កម្តៅ) · `zto-palm-login.test.tsx` (🩺)។ បន្ទាប់ពីម្ចាស់គម្រោងវាស់លើ preview (A175) ៖ ពេលស្កេនបំបែកតាមការភ្ជាប់ថ្មី
   ឬការភ្ជាប់ដែលបើករួច (`upstreamTiming.scans`) · រយៈដែល ZTO ទុកការភ្ជាប់ (`keepAliveSec` · `closes`) · តំបន់ Function (`runtime.region`) ➜ 🩺 ដដែល។
+- បញ្ជី Palm ទទេ (ម្ចាស់គម្រោង ៖ «cookie ចុចបញ្ជី ZTO មានទិន្នន័យ តែ login palm មិនឃើញទិន្នន័យ» · A176) ៖ ជួរនីមួយៗនៃសំណើ `billStatus` `4` ជាកញ្ចប់មកដល់
+  លើកលែងជួរដែលស្ថានភាពខ្លួនឯង `5` (ភស្តុតាងចុះហត្ថលេខា) ⛔ លែងទាមទារស្ថានភាពជួរ `4` · បញ្ជីចុះហត្ថលេខា (`5`) មិនប្តូរ។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3748,6 +3750,8 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 | A173 | របៀប Palm មិនកម្តៅ Function (`warmZtoLookupProxyIfConfigured()` ចេញភ្លាមពេល Palm) ខណៈរបៀប Cookie កម្តៅតាមចេតនាអ្នកប្រើ និងក្រោយការស្កេន ➜ container ត្រជាក់ចំណាយ cold start លើការស្កេន | `zto-palm-list.test.tsx` ៖ Palm ➜ គ្មានសំណើកម្តៅ | `OPTIONS ?palm=1` (គ្មានសោ · គ្មាន session) ➜ Function រំលងការអាន Cookie (`isPalmPreflight()` · A168) · ទិសផ្ទុយ ៖ Cookie គ្មាន `palm=1` |
 | A174 | មូលហេតុនៅសល់វាស់មិនបាន ៖ `upstreamTiming` មិនរាប់ Palm · គ្មានការរាប់ការភ្ជាប់ TLS ថ្មី | `?diag=1` Palm គ្មានពេល | `upstreamTiming.palm` (`detail` · `list` · `signed`) + `connections` (`argus` · `palm` ៖ undici `diagnostics_channel`) ➜ 🩺 ជាវិនាទី · ⛔ ព្រឹត្តិការណ៍ `beforeConnect` និង `connected` ពិតដឹក `connectParams` **ផ្សេងគ្នា** (វាស់ ៖ `fetch` ពិត) ➜ ការផ្គូរតាម object (`WeakMap`) មិនដែលបានពេល ➜ ផ្គូរតាម host + port · test ពិតជាមួយ server ក្នុងម៉ាស៊ីន (`ZoeW/tests/zto-upstream-timing.test.ts`) ធ្លាក់លើការផ្គូរតាម object |
 | A175 | ម្ចាស់គម្រោងវាស់លើ preview (🩺) ៖ **Palm** ZTO ឆ្លើយមធ្យម ០.៥៨ វិ · ចុងក្រោយ ០.៦២ វិ (៣ ដង) · ភ្ជាប់ថ្មី ៣ ដង មធ្យម ០.៦៧ វិ ⟷ **Cookie** មធ្យម ០.៥៤ វិ · ចុងក្រោយ ០.២៤ វិ (៦ ដង) · ភ្ជាប់ថ្មី ៤ ដង មធ្យម ០.២៨ វិ ➜ មធ្យមស្ទើរស្មើ · ភាពខុសគ្នានៅការភ្ជាប់ (ការភ្ជាប់ Palm ថ្លៃជាង ២ ដង ហើយមិនឃើញការប្រើឡើងវិញ) ឬនៅ ZTO Palm ផ្ទាល់ ➜ **ចម្លើយមិនច្បាស់** ៖ ការភ្ជាប់ Palm ក៏រាប់ការអានបញ្ជីចុះហត្ថលេខា (បិទតាម ZTO) ដែរ ហើយការភ្ជាប់មធ្យម (០.៦៧) ធំជាងពេលស្កេនមធ្យម (០.៥៨) ➜ ស្កេនខ្លះប្រើការភ្ជាប់ដែលបើករួច | 🩺 preview `f05f3cd` | វាស់ម្តងទៀតមុនកែ ៖ `upstreamTiming.scans` (ស្កេនតាមការភ្ជាប់ថ្មី/បើករួច · undici `request:create` ➜ `sendHeaders` (socket ថ្មីតែសម្រាប់សំណើទីមួយរបស់វា) ➜ `request:headers`) · `keepAliveSec`/`closes` ពី header ចម្លើយ · `runtime.region` ⛔ មិនទាន់ប្តូរការភ្ជាប់ ឬតំបន់ ដោយគ្មានលេខនេះ |
+| A176 | **បញ្ជី Palm ទទេ** ៖ ZTO ផ្ញើ ៨០ ជួរ ➜ ទាញបាន ០ · «ស្កេនប្រភេទផ្សេង ៨០ ជួរ មិនរាប់» ខណៈ Cookie ទាញបាន ១៥១ | ម្ចាស់គម្រោង preview `3b23580` (🩺 + ផ្ទាំងបញ្ជី) | `palmListBody()` ទាមទារស្ថានភាពជួរ = `4` តែ `billStatus` របស់ជួរ = ស្ថានភាពបច្ចុប្បន្នរបស់កញ្ចប់ (មិនមែនតម្រងសំណើ) ➜ ជួរមកដល់ទាំងអស់ធ្លាក់ទៅ `otherScans` ➜ ជួរនៃសំណើ `4` ទាំងអស់ជាកញ្ចប់មកដល់ លើកលែងជួរស្ថានភាព `5` (ភស្តុតាង) · អ្នកយាម `zto-palm-server.test.ts` (ជួរស្ថានភាព `1` · ទទេ · គ្មានវាល ➜ មកដល់) ធ្លាក់លើកូដមុនកែ · ⛔ បញ្ជីចុះហត្ថលេខានៅទាមទារ `5` (ស្ថានភាពចុងក្រោយ · គ្មានភស្តុតាងថាខុស · ផ្លូវលុយ) |
+| A177 | **មូលហេតុល្បឿន Palm វាស់បានច្បាស់** ៖ Palm ស្កេនលើការភ្ជាប់ដែលបើករួច **០.២២ វិ** (៣) — លឿនជាង Cookie ០.៣៨ វិ (២) · លើការភ្ជាប់ថ្មី **០.៩១ វិ** (៣) ⟷ Cookie ០.៨២ វិ (៣) · ការភ្ជាប់ថ្មី Palm ០.៦៨ វិ ⟷ Cookie ០.៣២ វិ · ZTO **មិនប្រាប់រយៈទុកការភ្ជាប់** (គ្មាន header `Keep-Alive`) · Function នៅ `us-east-2` | ម្ចាស់គម្រោង preview `3b23580` | server ZTO Palm មិនយឺតទេ ៖ ពេលបន្ថែមទាំងអស់ = ការភ្ជាប់ថ្មី (TCP + TLS ទៅ host Palm ឆ្ងាយពី `us-east-2`) · ZTO គ្មាន hint ➜ undici ទុកការភ្ជាប់ទំនេរតែ ៤ វិ (លំនាំដើម) ➜ ការស្កេនដែលឃ្លាតលើស ៤ វិ ភ្ជាប់ថ្មីម្តងៗ ➜ ជំហានបន្ទាប់ ៖ ទុកការភ្ជាប់ Palm យូរជាង ឬប្តូរតំបន់ Function ទៅជិត ZTO (ការកំណត់ Netlify · ម្ចាស់គម្រោងសម្រេច) |
 
 ### 2026-10-16 — កាតាឡុក API ZTO Palm ពី APK ដែលម្ចាស់គម្រោងផ្តល់ (ឯកសារតែប៉ុណ្ណោះ)
 
@@ -5993,7 +5997,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |

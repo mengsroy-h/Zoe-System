@@ -268,7 +268,7 @@ function palmListBody(kind, page, session, result, keys, deps) {
             }
             continue;
         }
-        if (kind === 'signed' || row.status !== ARRIVAL_STATUS) { otherScans++; continue; }
+        if (kind === 'signed') { otherScans++; continue; }
         rows.push({ barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: row.at, ztoClosed: false, skip: '', from: '' });
     }
     const pages = Number(container.pages);

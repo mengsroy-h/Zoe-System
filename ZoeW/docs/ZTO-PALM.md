@@ -15,6 +15,23 @@
 `ZTO_FIELD_COD` និង `ZTO_FIELD_DOD` សម្រាប់ Cookie មិនជំនួសតម្លៃ Palm ទេ។ ការស្កេនធម្មតាអាន `billInfoQuery` តែមួយ។
 ការសាកល្បងអនុវត្តការផ្ទៀងគណនី និងសាខាដូច Lookup។
 
+## ធៀប field Cookie និង Palm
+
+| ទិន្នន័យ | Cookie `/scan/get/order/detail` | Palm `billInfoQuery` |
+|---|---|---|
+| លេខទូរស័ព្ទ | `data.consigneePhone` ឬ `data.consigneeMobile` | `result.consigneeMobile` |
+| COD | `data.agentAmount` | `result.cod` |
+| DOD | `data.fcAmount` | `result.dod` |
+| សាខាចែក | `data.dispSiteId` | `result.dispSiteId` |
+| ស្ថានភាព | `data.billStatus` | មិនមានក្នុងចម្លើយ Lookup; ផ្ទៀង track ឬបញ្ជីចុះហត្ថលេខា |
+
+Cookie ទាញបញ្ជីមកដល់តាម `/scan/page/scan` និង `ZTO_LIST_SCAN_TYPE=03`។ ក្នុង APK Palm,
+`ScanType.ARRIVE_SCAN` = `3` និង `SIGN_SCAN` = `5`; ត្រូវផ្ទៀង `queryTrackInfo.result[].tracks[]`
+ជាមួយកូដស្កេន សាខា និងម៉ោងពិត មុនប្រើជាភស្តុតាង។ `queryDispatchList` `billStatus=4`
+និង `dispEmpDate` ជាការចាត់ចែក មិនអាចជំនួសស្កេនមកដល់បាន។ ផ្ទាំងប្រវត្តិស្កេនក្នុង App Palm
+(`ScanQueryDetailPresenter.queryScanRecord`) អានពី `UploadPoolTable` របស់ឧបករណ៍;
+វាមិនផ្តល់ endpoint បញ្ជីស្កេនមកដល់ទាំងសាខាសម្រាប់ ZoeW ទេ។
+
 ## កំណត់ server មុនប្រើ
 
 Deploy source នេះទៅ Netlify site របស់ ZoeW រួមទាំង `netlify/functions/`។ ដាក់ env

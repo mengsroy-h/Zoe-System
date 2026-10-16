@@ -102,6 +102,8 @@
 
 - `zto-palm.js` ផ្ញើ `{mailType: 1, mailNos: barcode}` និងគណនា `x-sign` លើ JSON នោះ។ កែតំបន់ចាក់សោតាមរបាយការណ៍ម្ចាស់គម្រោង; `LOCK` ថ្មី។
 - តេស្ត request ពិតចាក់សោប្រភេទ String និងហត្ថលេខា; ធ្លាក់ពេលផ្ញើ array។ ឯកសារការប្រើ និងកាតាឡុក API ផ្ទៀងជាមួយ APK។
+- ផ្ទៀង `ScanType` ៖ មកដល់ `3` · ចាត់ចែក `4` · ចុះហត្ថលេខា `5`; `ScanQueryDetailPresenter.queryScanRecord` អាន
+  `UploadPoolTable` ក្នុងឧបករណ៍។ ផែនទី field Cookie (`agentAmount/fcAmount`) និង Palm (`cod/dod`) កត់ក្នុងឯកសារការប្រើ។
 - មិនដាក់ APK, កូដ decompile, សោ protocol ឬទិន្នន័យអតិថិជនក្នុង repo។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ

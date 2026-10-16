@@ -35,6 +35,10 @@ method · path · field request · ប្រភេទ `result` · field response
 | `status` (`ProblemTabFragment`) | `WorkOrderStatus` `ALL` · `NOT` · `ING` · `DONE` (ordinal ០–៣) | ស្ថានភាពការងារបញ្ហា |
 | `pageSize` (`DispatchQueryInfoQTO`) | លំនាំដើម `20` | ចម្លើយមាន `pageNum` · `pages` · `total` · `isFirstPage` · `isLastPage` |
 
+ក្នុង `ScanType` របស់ APK ៖ `ARRIVE_SCAN` = `3` · `DISPATCH_SCAN` = `4` · `SIGN_SCAN` = `5`។
+លេខប្រភេទស្កេននេះ និង `billStatus` ជាវាលពីរផ្សេងគ្នា។ ផ្ទាំងប្រវត្តិស្កេន Palm
+(`ScanQueryDetailPresenter.queryScanRecord`) អាន `UploadPoolTable` ក្នុងឧបករណ៍។
+
 `billStatus` `5` = ចុះហត្ថលេខា ក៏ស្របនឹង Argus (`ZTO_SIGNED_VALUES`) ដែរ។
 
 ## ផែនទីមុខងារ ZoeW ➜ endpoint Palm

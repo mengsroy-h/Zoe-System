@@ -395,9 +395,20 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         const parts = p.split('/').filter(Boolean);
         const key = parts.pop();
         let node = server;
+        if (value === null) {
+            // RTDB ពិត ៖ សរសេរ null លើផ្លូវដែលគ្មាន = គ្មានប្រែ · node ទទេមិនស្ថិតនៅ (មិនបង្កើតឪពុកទទេ)
+            const chain = [];
+            for (const part of parts) { if (!node || typeof node !== 'object' || !(part in node)) return; chain.push([node, part]); node = node[part]; }
+            if (!node || typeof node !== 'object') return;
+            delete node[key];
+            for (let i = chain.length - 1; i >= 0; i--) {
+                const [parent, part] = chain[i];
+                if (parent[part] && typeof parent[part] === 'object' && !Object.keys(parent[part]).length) delete parent[part];
+            }
+            return;
+        }
         for (const part of parts) node = node[part] || (node[part] = {});
-        if (value === null) delete node[key];
-        else if (value && typeof value === 'object' && '__increment' in value) node[key] = (node[key] || 0) + value.__increment;
+        if (value && typeof value === 'object' && '__increment' in value) node[key] = (node[key] || 0) + value.__increment;
         else node[key] = clone(value);
     }
     function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }

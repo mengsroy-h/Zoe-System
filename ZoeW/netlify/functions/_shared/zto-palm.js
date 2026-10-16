@@ -5,6 +5,10 @@ const crypto = require('node:crypto');
 const ORIGIN = 'https://aargus-api.ztoglobal.net';
 const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
+const PALM_KEEP_ALIVE_MS = 60000;
+const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
+const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
+let palmAgent = null;
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
@@ -75,6 +79,22 @@ function upstreamReason(result) {
     return UPSTREAM_CODE_RE.test(code) ? 'palm:' + code : 'palm:status';
 }
 
+function palmDispatcher() {
+    try {
+        const current = globalThis[GLOBAL_DISPATCHER];
+        const Agent = current ? current.constructor : null;
+        if (typeof Agent !== 'function' || Agent.name !== 'Agent') return null;
+        if (!palmAgent || palmAgent.Agent !== Agent) {
+            palmAgent = { Agent, dispatcher: new Agent({ keepAliveTimeout: PALM_KEEP_ALIVE_MS, keepAliveMaxTimeout: PALM_KEEP_ALIVE_MS }) };
+        }
+        return palmAgent.dispatcher;
+    } catch (_) { return null; }
+}
+
+function staleSocketError(error) {
+    return !!error && error.name !== 'AbortError' && STALE_SOCKET_CODES.has(String((error.cause && error.cause.code) || ''));
+}
+
 function meterFor(deps, kind) {
     if (!deps || typeof deps.noteTiming !== 'function') return null;
     return (startedAt, timedOut) => {
@@ -82,7 +102,7 @@ function meterFor(deps, kind) {
     };
 }
 
-async function requestPalm(path, payload, token, keys, timeoutMs, meter) {
+async function requestPalm(path, payload, token, keys, timeoutMs, meter, retryStale) {
     const body = JSON.stringify(payload);
     const headers = {
         'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json',
@@ -99,10 +119,19 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter) {
             reject(Object.assign(new Error('upstream:timeout'), { name: 'AbortError' }));
         }, timeoutMs);
     });
+    const init = { method: 'POST', headers, body, redirect: 'manual', signal: controller.signal };
+    const dispatcher = palmDispatcher();
+    if (dispatcher) init.dispatcher = dispatcher;
     const work = (async () => {
-        let response;
-        try { response = await fetch(ORIGIN + path, { method: 'POST', headers, body, redirect: 'manual', signal: controller.signal }); }
-        catch (error) { if (error?.name === 'AbortError') throw error; throw new Error('upstream:unavailable'); }
+        let response = null;
+        for (let attempt = 0; attempt < 2 && !response; attempt++) {
+            try { response = await fetch(ORIGIN + path, init); }
+            catch (error) {
+                if (error?.name === 'AbortError') throw error;
+                if (!retryStale || attempt > 0 || controller.signal.aborted || !staleSocketError(error)) throw new Error('upstream:unavailable');
+            }
+        }
+        if (!response) throw new Error('upstream:unavailable');
         if (response.status === 401 || response.status === 403) return { authRejected: true };
         if (response.status === 429) throw new Error('upstream:rate');
         if (response.status >= 500) throw new Error('upstream:unavailable');
@@ -205,7 +234,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         const access = await deps.lookupAccess();
         if (access && access.response) return access.response;
         const upstream = await requestPalm(BILL_INFO_PATH, { billCode: barcode }, session.token, keys, deps.upstreamMs(),
-            meterFor(deps, 'palmDetail'));
+            meterFor(deps, 'palmDetail'), true);
         if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
             return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
         }
@@ -290,7 +319,7 @@ function palmListBody(kind, page, session, result, keys, deps) {
 
 async function palmListPage(kind, range, page, session, keys, deps) {
     const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(kind, range, page, deps), session.token, keys, deps.upstreamMs(),
-        meterFor(deps, kind === 'signed' ? 'palmSigned' : 'palmArrival'));
+        meterFor(deps, kind === 'signed' ? 'palmSigned' : 'palmArrival'), true);
     if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return { kind: 'auth' };
     if (upstream.status !== true) return { kind: 'rejected', reason: upstreamReason(upstream) };
     return { kind: 'ok', body: palmListBody(kind, page, session, upstream, keys, deps) };
@@ -334,4 +363,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, PALM_HOST, BILL_INFO_PATH };
+module.exports = { handlePalm, isPalmPreflight, palmDispatcher, PALM_HOST, BILL_INFO_PATH };

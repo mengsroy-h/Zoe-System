@@ -454,3 +454,97 @@ describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the
         expect(JSON.parse(same.body)).toMatchObject({ enabled: true, site: '12345' });
     });
 });
+
+describe('Palm keeps its ZTO connection between scans (owner: Palm on a new connection 0.91 s · reused 0.22 s · ZTO sends no Keep-Alive)', () => {
+    const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
+    const scanOk = () => upstream({ status: true, result: { billCode: CODE, consigneeMobile: '012345678', cod: '1', dod: '0' } });
+    const stale = () => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }) });
+    let saved: unknown;
+    beforeEach(() => { saved = (globalThis as any)[GLOBAL_DISPATCHER]; });
+    afterEach(() => { (globalThis as any)[GLOBAL_DISPATCHER] = saved; });
+
+    it('every Palm request goes through one Agent of the runtime\'s own HTTP client that keeps an idle connection 60 s', async () => {
+        const built: any[] = [];
+        class Agent { options: any; constructor(options: any) { this.options = options; built.push(this); } }
+        (globalThis as any)[GLOBAL_DISPATCHER] = new Agent({});
+        built.length = 0;
+        const session = (await login()).sessionToken;
+        vi.stubGlobal('fetch', vi.fn(async () => scanOk()));
+        await call({ palm: '1', barcode: CODE }, session);
+        await call({ palm: '1', barcode: CODE }, session);
+        const inits = vi.mocked(fetch).mock.calls.map((c: any[]) => c[1]);
+        expect(built).toHaveLength(1);
+        expect(built[0].options).toEqual({ keepAliveTimeout: 60000, keepAliveMaxTimeout: 60000 });
+        expect(inits.every((init: any) => init.dispatcher === built[0])).toBe(true);
+    });
+
+    it('fail-open: no runtime dispatcher yet, or one that is not a plain Agent ➜ the default client, exactly as before', async () => {
+        const session = (await login()).sessionToken;
+        for (const value of [undefined, new (class ProxyAgent {})(), { constructor: null }]) {
+            (globalThis as any)[GLOBAL_DISPATCHER] = value;
+            vi.stubGlobal('fetch', vi.fn(async () => scanOk()));
+            expect((await call({ palm: '1', barcode: CODE }, session)).statusCode).toBe(200);
+            expect((vi.mocked(fetch).mock.calls[0] as any[])[1].dispatcher).toBeUndefined();
+        }
+    });
+
+    it('a kept connection ZTO already closed (UND_ERR_SOCKET) ➜ the scan and the list retry once on a new connection', async () => {
+        const session = (await login()).sessionToken;
+        let n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => { n++; if (n === 1) throw stale(); return scanOk(); }));
+        expect(JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body)).toMatchObject({ found: true, phone: '012345678' });
+        expect(fetch).toHaveBeenCalledTimes(2);
+        n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => { n++; if (n === 1) throw stale(); return upstream({ status: true, result: { list: [], pages: 1, total: 0 } }); }));
+        expect((await call({ palm: '1', list: '1', from: '2026-10-15', to: '2026-10-16', page: '1' }, session)).statusCode).toBe(200);
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('reverse: only once · never for Login · never for other failures', async () => {
+        const session = (await login()).sessionToken;
+        vi.stubGlobal('fetch', vi.fn(async () => { throw stale(); }));
+        expect(JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body).code).toBe('ZTO_UNAVAILABLE');
+        expect(fetch).toHaveBeenCalledTimes(2);
+        vi.stubGlobal('fetch', vi.fn(async () => { throw stale(); }));
+        const result = await call({ palm: 'login' }, '', KEY, { username: 'palm-user', password: PASSWORD, deviceSn: 'zoew-test-device' });
+        expect(JSON.parse(result.body).code).toBe('ZTO_UNAVAILABLE');
+        expect(fetch).toHaveBeenCalledTimes(1);
+        vi.stubGlobal('fetch', vi.fn(async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo'), { code: 'ENOTFOUND' }) }); }));
+        expect(JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body).code).toBe('ZTO_UNAVAILABLE');
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('real HTTP client: a server without Keep-Alive (like ZTO) ➜ the default pool reconnects after 4 s idle, the Palm Agent reuses the connection', async () => {
+        const diagnostics = require('node:diagnostics_channel');
+        const http = require('node:http');
+        const connects: Record<string, number> = {};
+        const onConnect = (m: any) => { const port = String(m.connectParams.port); connects[port] = (connects[port] || 0) + 1; };
+        diagnostics.channel('undici:client:connected').subscribe(onConnect);
+        const serve = () => new Promise<any>((resolve) => {
+            const server = http.createServer((req: any, res: any) => { req.resume(); req.on('end', () => { res.setHeader('Content-Length', '2'); res.end('ok'); }); });
+            server.keepAliveTimeout = 0;
+            server.listen(0, '127.0.0.1', () => resolve(server));
+        });
+        const plain = await serve();
+        const palm = await serve();
+        vi.unstubAllGlobals();
+        try {
+            const post = (server: any, init: object = {}) => fetch('http://127.0.0.1:' + server.address().port + '/x', { method: 'POST', body: '{}', ...init }).then((r) => r.text());
+            await post(plain);
+            const dispatcher = require('../netlify/functions/_shared/zto-palm').palmDispatcher();
+            expect(dispatcher).toBeTruthy();
+            await post(palm, { dispatcher });
+            await new Promise((resolve) => setTimeout(resolve, 4600));
+            const head = await fetch('http://127.0.0.1:' + plain.address().port + '/x', { method: 'POST', body: '{}' });
+            expect(head.headers.get('keep-alive')).toBeNull();
+            await head.text();
+            await post(palm, { dispatcher });
+            expect(connects[String(plain.address().port)]).toBe(2);
+            expect(connects[String(palm.address().port)]).toBe(1);
+        } finally {
+            diagnostics.channel('undici:client:connected').unsubscribe(onConnect);
+            plain.close();
+            palm.close();
+        }
+    }, 20000);
+});

@@ -1855,6 +1855,9 @@
     "ZoeW/tests/code128-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/collected-price-day-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/collected-sync-pending.test.ts": {
       "policy": "zoew-self-verification"
     },

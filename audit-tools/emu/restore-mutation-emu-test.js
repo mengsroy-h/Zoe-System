@@ -405,15 +405,19 @@ async function collectedCleanupScenario(mode) {
     const release = new Promise((resolve) => { releaseWrite = resolve; });
     const reached = new Promise((resolve) => { markReached = resolve; });
     const completedWrites = [];
+    // ទប់គ្រប់ការសរសេរក្រោម root collected (root ទាំងមូល ឬ <ថ្ងៃ>/<key>) មុន HTTP ផ្ញើ
+    const isCollectedWrite = (write) => write.path === collectedPath || write.path.startsWith(collectedPath + '/');
     const writer = tab('collected-price', {
         beforeWrite: async (write) => {
-            if (!racing || heldWrite || write.path !== collectedPath) return;
-            heldWrite = write;
-            markReached();
+            if (!racing || released || !isCollectedWrite(write)) return;
+            if (!heldWrite) {
+                heldWrite = write;
+                markReached();
+            }
             await release;
         },
         afterWrite: (write) => {
-            if (write.path === collectedPath) completedWrites.push({ ...write, released });
+            if (isCollectedWrite(write)) completedWrites.push({ ...write, released });
         }
     });
     const currentDay = writer.context.getZoneDateKey(beforeMidnight);

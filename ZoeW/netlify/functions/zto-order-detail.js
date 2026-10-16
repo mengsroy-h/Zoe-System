@@ -95,6 +95,18 @@ function upstreamConnectBucket() {
 let upstreamConnectSignal = { argus: upstreamConnectBucket(), palm: upstreamConnectBucket() };
 const ARGUS_UPSTREAM_HOSTS_MAX = 4;
 const argusUpstreamHosts = new Set();
+const argusDetailPaths = new Set();
+function upstreamScanBucket() {
+    return { count: 0, totalMs: 0, lastMs: 0 };
+}
+function upstreamScanSide() {
+    return { fresh: upstreamScanBucket(), reused: upstreamScanBucket(), keepAliveSec: 0, closes: 0, at: 0 };
+}
+let upstreamScanSignal = { argus: upstreamScanSide(), palm: upstreamScanSide() };
+const upstreamScanRequests = new WeakMap();
+const freshUpstreamSockets = new WeakSet();
+const UPSTREAM_KEEP_ALIVE_SEC_MAX = 86400;
+const RUNTIME_REGION_RE = /^[a-z]{2}(?:-[a-z]+)+-\d{1,2}$/;
 const UPSTREAM_CONNECT_PENDING_MAX = 8;
 const upstreamConnectStarts = new Map();
 const SIGNED_MISMATCH_KEYS_MAX = 1000;
@@ -1614,9 +1626,77 @@ function noteUpstreamTiming(kind, startedAt, timedOut) {
     bucket.at = Date.now();
 }
 
-function noteArgusUpstreamHost(hostname) {
+function noteArgusUpstreamHost(hostname, detailPath) {
     const host = String(hostname || '').toLowerCase();
     if (host && !argusUpstreamHosts.has(host) && argusUpstreamHosts.size < ARGUS_UPSTREAM_HOSTS_MAX) argusUpstreamHosts.add(host);
+    const path = String(detailPath || '');
+    if (path && !argusDetailPaths.has(path) && argusDetailPaths.size < ARGUS_UPSTREAM_HOSTS_MAX) argusDetailPaths.add(path);
+}
+
+function upstreamScanKind(request) {
+    if (!request || typeof request !== 'object') return '';
+    let host = '';
+    try { host = new URL(String(request.origin)).hostname.toLowerCase(); } catch (_) { return ''; }
+    const path = String(request.path || '').split('?')[0];
+    const palm = require('./_shared/zto-palm');
+    if (host === palm.PALM_HOST) return path === palm.BILL_INFO_PATH ? 'palm' : '';
+    return argusUpstreamHosts.has(host) && argusDetailPaths.has(path) ? 'argus' : '';
+}
+
+function noteUpstreamScanStart(message) {
+    try {
+        const request = message && message.request;
+        const kind = upstreamScanKind(request);
+        if (kind) upstreamScanRequests.set(request, { kind, at: Date.now(), fresh: null });
+    } catch (_) {}
+}
+
+function noteUpstreamScanSocket(message) {
+    try {
+        const socket = message && message.socket;
+        if (!socket || typeof socket !== 'object') return;
+        const fresh = freshUpstreamSockets.has(socket);
+        freshUpstreamSockets.delete(socket);
+        const entry = message.request && typeof message.request === 'object' ? upstreamScanRequests.get(message.request) : null;
+        if (entry && entry.fresh === null) entry.fresh = fresh;
+    } catch (_) {}
+}
+
+function upstreamHeaderText(headers, name) {
+    if (!Array.isArray(headers)) return '';
+    for (let i = 0; i + 1 < headers.length; i += 2) {
+        if (String(headers[i]).toLowerCase() === name) return String(headers[i + 1]);
+    }
+    return '';
+}
+
+function noteUpstreamScanAnswer(message) {
+    try {
+        const request = message && message.request;
+        const entry = request && typeof request === 'object' ? upstreamScanRequests.get(request) : null;
+        if (!entry) return;
+        upstreamScanRequests.delete(request);
+        if (entry.fresh === null) return;
+        const ms = elapsedSince(entry.at);
+        if (!Number.isFinite(ms)) return;
+        const side = upstreamScanSignal[entry.kind];
+        const bucket = entry.fresh ? side.fresh : side.reused;
+        bucket.count += 1;
+        bucket.totalMs += ms;
+        bucket.lastMs = ms;
+        const headers = message.response && message.response.headers;
+        const hint = /timeout\s*=\s*(\d{1,6})/i.exec(upstreamHeaderText(headers, 'keep-alive'));
+        side.keepAliveSec = hint ? Math.min(Number(hint[1]), UPSTREAM_KEEP_ALIVE_SEC_MAX) : 0;
+        if (/\bclose\b/i.test(upstreamHeaderText(headers, 'connection'))) side.closes += 1;
+        side.at = Date.now();
+    } catch (_) {}
+}
+
+function forgetUpstreamScan(message) {
+    try {
+        const request = message && message.request;
+        if (request && typeof request === 'object') upstreamScanRequests.delete(request);
+    } catch (_) {}
 }
 
 function upstreamConnectKind(params) {
@@ -1654,6 +1734,7 @@ function noteUpstreamConnect(message, failed) {
         if (pending && !pending.length) upstreamConnectStarts.delete(key);
         const bucket = upstreamConnectSignal[kind];
         bucket.at = Date.now();
+        if (!failed && message.socket && typeof message.socket === 'object') freshUpstreamSockets.add(message.socket);
         if (failed) {
             bucket.errors += 1;
             return;
@@ -1674,6 +1755,10 @@ function meterUpstreamConnects() {
         channels.channel('undici:client:beforeConnect').subscribe(noteUpstreamConnectStart);
         channels.channel('undici:client:connected').subscribe((message) => noteUpstreamConnect(message, false));
         channels.channel('undici:client:connectError').subscribe((message) => noteUpstreamConnect(message, true));
+        channels.channel('undici:request:create').subscribe(noteUpstreamScanStart);
+        channels.channel('undici:client:sendHeaders').subscribe(noteUpstreamScanSocket);
+        channels.channel('undici:request:headers').subscribe(noteUpstreamScanAnswer);
+        channels.channel('undici:request:error').subscribe(forgetUpstreamScan);
     } catch (_) {}
 }
 meterUpstreamConnects();
@@ -1689,6 +1774,16 @@ function upstreamConnectReport(bucket) {
     };
 }
 
+function upstreamScanReport(side) {
+    const bucket = (b) => ({ count: b.count, avgMs: b.count ? Math.round(b.totalMs / b.count) : null, lastMs: b.count ? b.lastMs : null });
+    return { fresh: bucket(side.fresh), reused: bucket(side.reused), keepAliveSec: side.at ? side.keepAliveSec : null, closes: side.closes };
+}
+
+function runtimeReport() {
+    const region = String(process.env.AWS_REGION || '').trim();
+    return { region: RUNTIME_REGION_RE.test(region) ? region : null };
+}
+
 function upstreamTimingBody() {
     return {
         detail: upstreamTimingReport(upstreamTimingSignal.detail),
@@ -1702,6 +1797,10 @@ function upstreamTimingBody() {
         connections: {
             argus: upstreamConnectReport(upstreamConnectSignal.argus),
             palm: upstreamConnectReport(upstreamConnectSignal.palm)
+        },
+        scans: {
+            argus: upstreamScanReport(upstreamScanSignal.argus),
+            palm: upstreamScanReport(upstreamScanSignal.palm)
         }
     };
 }
@@ -1853,7 +1952,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             target.searchParams.set(config.queryParam, barcode);
         }
 
-        noteArgusUpstreamHost(target.hostname);
+        noteArgusUpstreamHost(target.hostname, plan ? '' : target.pathname);
         const response = await fetch(target.href, init);
         if (controller.signal.aborted) throw abortError();
         noteUpstreamSetCookie(response);
@@ -2155,7 +2254,8 @@ function palmDeps(event, config, startedAt) {
         listMaxPages: config.list.maxPages,
         mergeCompanion: (body, outcome) => mergeSignedCompanion(body, outcome),
         noteTiming: noteUpstreamTiming,
-        timingReport: upstreamTimingBody
+        timingReport: upstreamTimingBody,
+        runtimeReport
     };
 }
 
@@ -2312,6 +2412,7 @@ function diagnosticsBody(config, headers, authKind, credential) {
             ageMs: upstreamRejectSignal.at ? elapsedSince(upstreamRejectSignal.at) : null
         },
         upstreamTiming: upstreamTimingBody(),
+        runtime: runtimeReport(),
         sessionRenewal: {
             observed: upstreamCookieSignal.seenAt > 0,
             setCookie: upstreamCookieSignal.setCookie,
@@ -2624,7 +2725,9 @@ exports.resetCachesForTests = function resetCachesForTests() {
     detailAccessSignal = detailAccessBucket();
     Object.keys(upstreamTimingSignal).forEach((kind) => { upstreamTimingSignal[kind] = upstreamTimingBucket(); });
     upstreamConnectSignal = { argus: upstreamConnectBucket(), palm: upstreamConnectBucket() };
+    upstreamScanSignal = { argus: upstreamScanSide(), palm: upstreamScanSide() };
     argusUpstreamHosts.clear();
+    argusDetailPaths.clear();
     upstreamConnectStarts.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
@@ -2665,6 +2768,6 @@ exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {
     blobsModuleForTests = blobsModule || null;
 };
 
-exports.noteArgusUpstreamHostForTests = function noteArgusUpstreamHostForTests(hostname) {
-    noteArgusUpstreamHost(hostname);
+exports.noteArgusUpstreamHostForTests = function noteArgusUpstreamHostForTests(hostname, detailPath) {
+    noteArgusUpstreamHost(hostname, detailPath);
 };

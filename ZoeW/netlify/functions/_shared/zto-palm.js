@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 
 const ORIGIN = 'https://aargus-api.ztoglobal.net';
 const PALM_HOST = new URL(ORIGIN).hostname;
+const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
@@ -196,13 +197,14 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (query.diag === '1') {
             const body = { success: true, provider: 'zto-palm', configured: true };
             if (typeof deps.timingReport === 'function') body.upstreamTiming = deps.timingReport();
+            if (typeof deps.runtimeReport === 'function') body.runtime = deps.runtimeReport();
             return json(200, body);
         }
         const barcode = String(query.barcode || '').trim();
         if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
         const access = await deps.lookupAccess();
         if (access && access.response) return access.response;
-        const upstream = await requestPalm('/zto/basic/v1/billInfoQuery', { billCode: barcode }, session.token, keys, deps.upstreamMs(),
+        const upstream = await requestPalm(BILL_INFO_PATH, { billCode: barcode }, session.token, keys, deps.upstreamMs(),
             meterFor(deps, 'palmDetail'));
         if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
             return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
@@ -332,4 +334,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, PALM_HOST };
+module.exports = { handlePalm, isPalmPreflight, PALM_HOST, BILL_INFO_PATH };

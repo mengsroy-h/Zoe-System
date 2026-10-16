@@ -152,6 +152,84 @@ describe('?diag=1 measures how long ZTO Palm takes to answer, apart from Argus (
         }
     });
 
+    it('splits scans into a new connection or a reused one, with the keep-alive ZTO announces (real fetch)', async () => {
+        const server = http.createServer((req, res) => {
+            req.resume();
+            req.on('end', () => { res.setHeader('Content-Length', '2'); res.end('ok'); });
+        });
+        server.keepAliveTimeout = 7000;
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        try {
+            const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+            fn.noteArgusUpstreamHostForTests('127.0.0.1', '/scan/get/order/detail');
+            const post = async (path: string) => (await fetch(base + path, { method: 'POST', body: '{}' })).text();
+            await post('/scan/page/scan');
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            await post('/scan/get/order/detail');
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            await post('/scan/get/order/detail?barcode=1');
+            const { scans } = await argusTiming();
+            expect(scans.argus.fresh.count).toBe(0);
+            expect(scans.argus.reused.count).toBe(2);
+            expect(scans.argus.reused.avgMs).toBeGreaterThanOrEqual(0);
+            expect(scans.argus.keepAliveSec).toBe(7);
+            expect(scans.argus.closes).toBe(0);
+            expect(scans.palm.reused.count).toBe(0);
+        } finally {
+            server.close();
+        }
+    });
+
+    it('a server that closes after each answer ➜ every scan opens a new connection and is counted as such', async () => {
+        const server = http.createServer((req, res) => {
+            req.resume();
+            req.on('end', () => { res.setHeader('Connection', 'close'); res.setHeader('Content-Length', '2'); res.end('ok'); });
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        try {
+            const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+            fn.noteArgusUpstreamHostForTests('127.0.0.1', '/scan/get/order/detail');
+            for (let i = 0; i < 2; i++) {
+                await (await fetch(base + '/scan/get/order/detail', { method: 'POST', body: '{}' })).text();
+                await new Promise((resolve) => setTimeout(resolve, 30));
+            }
+            const { scans } = await argusTiming();
+            expect(scans.argus.fresh.count).toBe(2);
+            expect(scans.argus.reused.count).toBe(0);
+            expect(scans.argus.closes).toBe(2);
+        } finally {
+            server.close();
+        }
+    });
+
+    it('Palm scans (billInfoQuery on the Palm host) are split the same way; a list request on the Palm host is not a scan', async () => {
+        const send = (path: string, socket: object, connect: boolean, headers: string[]) => {
+            const request = { origin: 'https://' + PALM_HOST, path, method: 'POST' };
+            diagnostics.channel('undici:request:create').publish({ request });
+            if (connect) diagnostics.channel('undici:client:connected').publish({ connectParams: { hostname: PALM_HOST, port: '443' }, socket });
+            diagnostics.channel('undici:client:sendHeaders').publish({ request, socket, headers: '' });
+            diagnostics.channel('undici:request:headers').publish({ request, response: { statusCode: 200, headers } });
+        };
+        const s1 = {};
+        send('/zto/dispatch/v1/queryDispatchList', s1, true, ['Connection', 'keep-alive']);
+        send('/zto/basic/v1/billInfoQuery', s1, false, ['Connection', 'keep-alive']);
+        send('/zto/basic/v1/billInfoQuery', {}, true, ['Connection', 'keep-alive']);
+        const { scans } = await argusTiming();
+        expect(scans.palm.fresh.count).toBe(1);
+        expect(scans.palm.reused.count).toBe(1);
+        expect(scans.palm.keepAliveSec).toBe(0);
+        expect(scans.argus.fresh.count + scans.argus.reused.count).toBe(0);
+    });
+
+    it('?diag=1 names the region the Function runs in (Argus and Palm); an odd value is never echoed', async () => {
+        vi.stubEnv('AWS_REGION', 'us-east-2');
+        expect(JSON.parse((await call({ diag: '1' })).body).runtime).toEqual({ region: 'us-east-2' });
+        const session = await login();
+        expect(JSON.parse((await call({ palm: '1', diag: '1' }, session)).body).runtime).toEqual({ region: 'us-east-2' });
+        vi.stubEnv('AWS_REGION', '<script>');
+        expect(JSON.parse((await call({ diag: '1' })).body).runtime).toEqual({ region: null });
+    });
+
     it('a connection before any Argus request is not guessed as Argus (the Argus host is learned from the request itself)', async () => {
         await connect(ARGUS_HOST, 5);
         expect((await argusTiming()).connections.argus.count).toBe(0);

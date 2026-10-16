@@ -67,7 +67,7 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ ជួរ ZTO ៖ អាយុ Cookie ក្រោយ Sync (`?diag=1` `cookie.life` ពី Blob `cookie-life`)
     'ztoCookieLifeText', 'lifeDurationText',
     // ⛔ ជួរ ZTO ៖ ពេល ZTO ឆ្លើយពេលស្កេន និងការភ្ជាប់ថ្មី (`?diag=1` `upstreamTiming` · Palm និង Cookie)
-    'ztoUpstreamTimingText', 'upstreamMs', 'upstreamSeconds',
+    'ztoUpstreamTimingText', 'upstreamMs', 'upstreamSeconds', 'upstreamCount', 'ztoScanConnectionText', 'ztoRuntimeText',
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`

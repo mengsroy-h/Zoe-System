@@ -76,8 +76,8 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.98] Palm ពេញ** ៖ សាកលើ Deploy Preview ជាមួយគណនី Palm ពិត ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្មើ tab «បញ្ជូន» · កញ្ចប់ដែលចុះហត្ថលេខាក្នុង
   App Palm បិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
-- ⏳ **[2.50.98] ល្បឿន Lookup Palm** (ម្ចាស់គម្រោង ៖ Palm ១.២–១.៥ វិ · Cookie ០.៦–១.០ វិ) ៖ ក្រោយ Deploy ស្កេន ៣–៥ កញ្ចប់ក្នុងរបៀបនីមួយៗ ➜ 🩺 ➜
-  ជួរ Lookup ៖ «ZTO ឆ្លើយពេលស្កេន» និង «ភ្ជាប់ថ្មីទៅ ZTO» ➜ ផ្ញើលេខមក ដើម្បីសម្រេចថាយឺតនៅ ZTO Palm ឬនៅការភ្ជាប់ (A174)។
+- ⏳ **[2.50.98] ល្បឿន Lookup Palm** (ម្ចាស់គម្រោង ៖ Palm ១.២–១.៥ វិ · Cookie ០.៦–១.០ វិ · វាស់លើ preview ៖ A175) ៖ ស្កេន ៥–១០ កញ្ចប់ក្នុងរបៀបនីមួយៗ ➜
+  🩺 ជួរ Lookup ៖ «ស្កេនលើការភ្ជាប់ថ្មី / ដែលបើករួច» · «ZTO ទុកការភ្ជាប់ …» · «Function នៅ …» ➜ ផ្ញើរូបមក ដើម្បីសម្រេចជំហានកែ (ទុកការភ្ជាប់ ឬប្តូរតំបន់ Function)។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
@@ -111,7 +111,8 @@
 - ល្បឿន Lookup Palm (ម្ចាស់គម្រោងរាយការណ៍ Palm យឺតជាង Cookie · A173–A174) ៖ របៀប Palm កម្តៅ Function ដូចរបៀប Cookie (`OPTIONS ?palm=1` ·
   គ្មានសោ · គ្មាន session · Function មិនអាន Cookie) · `?diag=1` វាស់ពេល ZTO Palm ឆ្លើយ (`upstreamTiming.palm`) និងការភ្ជាប់ TCP+TLS ថ្មីទៅ ZTO
   (`upstreamTiming.connections`) ➜ 🩺 ជួរ Lookup បង្ហាញជាវិនាទី។ អ្នកយាមថ្មី `ZoeW/tests/zto-upstream-timing.test.ts` (៦ ធ្លាក់លើកូដមុនកែ) ·
-  `zto-palm-list.test.tsx` (កម្តៅ) · `zto-palm-login.test.tsx` (🩺)។
+  `zto-palm-list.test.tsx` (កម្តៅ) · `zto-palm-login.test.tsx` (🩺)។ បន្ទាប់ពីម្ចាស់គម្រោងវាស់លើ preview (A175) ៖ ពេលស្កេនបំបែកតាមការភ្ជាប់ថ្មី
+  ឬការភ្ជាប់ដែលបើករួច (`upstreamTiming.scans`) · រយៈដែល ZTO ទុកការភ្ជាប់ (`keepAliveSec` · `closes`) · តំបន់ Function (`runtime.region`) ➜ 🩺 ដដែល។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -119,8 +120,8 @@
 2. លើ preview ៖ ☰ ZTO ➜ បើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ➜ ទាញថ្ងៃនេះ ➜ ធៀបនឹង tab «បញ្ជូន» ក្នុង App Palm (ចំនួន · លេខទូរស័ព្ទ · COD/DOD)។
 3. ចុះហត្ថលេខាកញ្ចប់មួយក្នុង App Palm ➜ ក្នុង ZoeW កញ្ចប់នោះបិទ «យក» ដោយស្វ័យប្រវត្តិ (ឬចុច 🔄 ក្នុងរបារ ZTO)។
    ⛔ សាកលើ preview មុន merge ព្រោះវាប៉ះ auto-close និងការសម្អាត ៨ ថ្ងៃ (លុយ)។
-4. ល្បឿន ៖ ស្កេន ៣–៥ កញ្ចប់ក្នុងរបៀប Palm ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Lookup អតិថិជន (ZTO Palm)» ➜ កត់ «ZTO ឆ្លើយពេលស្កេន» ·
-   «ភ្ជាប់ថ្មីទៅ ZTO» ➜ ធ្វើដូចគ្នាក្នុងរបៀប Cookie ➜ ផ្ញើលេខទាំងពីរមក។
+4. ល្បឿន ៖ ស្កេន ៥–១០ កញ្ចប់ក្នុងរបៀប Palm ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Lookup អតិថិជន (ZTO Palm)» ➜ កត់ «ស្កេនលើការភ្ជាប់ថ្មី» ·
+   «ស្កេនលើការភ្ជាប់ដែលបើករួច» · «ZTO ទុកការភ្ជាប់» · «Function នៅ» ➜ ធ្វើដូចគ្នាក្នុងរបៀប Cookie ➜ ផ្ញើរូបទាំងពីរមក។
 
 ### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
 
@@ -3746,6 +3747,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 |---|---|---|---|
 | A173 | របៀប Palm មិនកម្តៅ Function (`warmZtoLookupProxyIfConfigured()` ចេញភ្លាមពេល Palm) ខណៈរបៀប Cookie កម្តៅតាមចេតនាអ្នកប្រើ និងក្រោយការស្កេន ➜ container ត្រជាក់ចំណាយ cold start លើការស្កេន | `zto-palm-list.test.tsx` ៖ Palm ➜ គ្មានសំណើកម្តៅ | `OPTIONS ?palm=1` (គ្មានសោ · គ្មាន session) ➜ Function រំលងការអាន Cookie (`isPalmPreflight()` · A168) · ទិសផ្ទុយ ៖ Cookie គ្មាន `palm=1` |
 | A174 | មូលហេតុនៅសល់វាស់មិនបាន ៖ `upstreamTiming` មិនរាប់ Palm · គ្មានការរាប់ការភ្ជាប់ TLS ថ្មី | `?diag=1` Palm គ្មានពេល | `upstreamTiming.palm` (`detail` · `list` · `signed`) + `connections` (`argus` · `palm` ៖ undici `diagnostics_channel`) ➜ 🩺 ជាវិនាទី · ⛔ ព្រឹត្តិការណ៍ `beforeConnect` និង `connected` ពិតដឹក `connectParams` **ផ្សេងគ្នា** (វាស់ ៖ `fetch` ពិត) ➜ ការផ្គូរតាម object (`WeakMap`) មិនដែលបានពេល ➜ ផ្គូរតាម host + port · test ពិតជាមួយ server ក្នុងម៉ាស៊ីន (`ZoeW/tests/zto-upstream-timing.test.ts`) ធ្លាក់លើការផ្គូរតាម object |
+| A175 | ម្ចាស់គម្រោងវាស់លើ preview (🩺) ៖ **Palm** ZTO ឆ្លើយមធ្យម ០.៥៨ វិ · ចុងក្រោយ ០.៦២ វិ (៣ ដង) · ភ្ជាប់ថ្មី ៣ ដង មធ្យម ០.៦៧ វិ ⟷ **Cookie** មធ្យម ០.៥៤ វិ · ចុងក្រោយ ០.២៤ វិ (៦ ដង) · ភ្ជាប់ថ្មី ៤ ដង មធ្យម ០.២៨ វិ ➜ មធ្យមស្ទើរស្មើ · ភាពខុសគ្នានៅការភ្ជាប់ (ការភ្ជាប់ Palm ថ្លៃជាង ២ ដង ហើយមិនឃើញការប្រើឡើងវិញ) ឬនៅ ZTO Palm ផ្ទាល់ ➜ **ចម្លើយមិនច្បាស់** ៖ ការភ្ជាប់ Palm ក៏រាប់ការអានបញ្ជីចុះហត្ថលេខា (បិទតាម ZTO) ដែរ ហើយការភ្ជាប់មធ្យម (០.៦៧) ធំជាងពេលស្កេនមធ្យម (០.៥៨) ➜ ស្កេនខ្លះប្រើការភ្ជាប់ដែលបើករួច | 🩺 preview `f05f3cd` | វាស់ម្តងទៀតមុនកែ ៖ `upstreamTiming.scans` (ស្កេនតាមការភ្ជាប់ថ្មី/បើករួច · undici `request:create` ➜ `sendHeaders` (socket ថ្មីតែសម្រាប់សំណើទីមួយរបស់វា) ➜ `request:headers`) · `keepAliveSec`/`closes` ពី header ចម្លើយ · `runtime.region` ⛔ មិនទាន់ប្តូរការភ្ជាប់ ឬតំបន់ ដោយគ្មានលេខនេះ |
 
 ### 2026-10-16 — កាតាឡុក API ZTO Palm ពី APK ដែលម្ចាស់គម្រោងផ្តល់ (ឯកសារតែប៉ុណ្ណោះ)
 

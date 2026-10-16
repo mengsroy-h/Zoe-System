@@ -281,7 +281,32 @@ export function ztoUpstreamTimingText(body, palm) {
     const connCount = conn && typeof conn.count === 'number' && Number.isFinite(conn.count) ? Math.max(0, Math.round(conn.count)) : 0;
     const connAvg = conn ? upstreamMs(conn.avgMs) : null;
     if (connCount > 0) text += ' · ភ្ជាប់ថ្មីទៅ ZTO ' + connCount + ' ដង' + (connAvg === null ? '' : ' (មធ្យម ' + upstreamSeconds(connAvg) + ')');
-    return text;
+    return text + ztoScanConnectionText(timing.scans && typeof timing.scans === 'object' ? (palm ? timing.scans.palm : timing.scans.argus) : null)
+        + ztoRuntimeText(body.runtime);
+}
+
+function upstreamCount(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function ztoScanConnectionText(side) {
+    if (!side || typeof side !== 'object') return '';
+    let text = '';
+    for (const [key, label] of [['fresh', 'ស្កេនលើការភ្ជាប់ថ្មី'], ['reused', 'ស្កេនលើការភ្ជាប់ដែលបើករួច']]) {
+        const bucket = side[key];
+        const count = bucket ? upstreamCount(bucket.count) : 0;
+        const avg = bucket ? upstreamMs(bucket.avgMs) : null;
+        if (count && avg !== null) text += ' · ' + label + ' មធ្យម ' + upstreamSeconds(avg) + ' (' + count + ' ដង)';
+    }
+    if (!text) return '';
+    if (upstreamCount(side.closes) > 0) return text + ' · ZTO បិទការភ្ជាប់ក្រោយឆ្លើយ';
+    const keepAlive = upstreamCount(side.keepAliveSec);
+    return text + (keepAlive > 0 ? ' · ZTO ទុកការភ្ជាប់ ' + keepAlive + ' វិនាទី' : ' · ZTO មិនប្រាប់រយៈទុកការភ្ជាប់');
+}
+
+function ztoRuntimeText(runtime) {
+    const region = runtime && typeof runtime.region === 'string' ? runtime.region : '';
+    return /^[a-z]{2}(?:-[a-z]+)+-\d{1,2}$/.test(region) ? ' · Function នៅ ' + region : '';
 }
 
 function ztoAccessText(body) {

@@ -293,6 +293,27 @@ describe('🩺 ZTO response time text (owner report: Palm lookup slower than Coo
         expect(ztoUpstreamTimingText({ upstreamTiming: timing }, true)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
     });
 
+    it('splits the scan time by new or reused connection, says how long ZTO keeps it, and where the Function runs', () => {
+        const body = { runtime: { region: 'us-east-2' }, upstreamTiming: { ...timing, palm: { detail: { count: 3, timeouts: 0, lastMs: 620, avgMs: 580 } },
+            scans: { argus: { fresh: { count: 1, avgMs: 560, lastMs: 560 }, reused: { count: 3, avgMs: 240, lastMs: 230 }, keepAliveSec: 60, closes: 0 },
+                palm: { fresh: { count: 3, avgMs: 900, lastMs: 880 }, reused: { count: 0, avgMs: null, lastMs: null }, keepAliveSec: 0, closes: 2 } } } };
+        const palm = ztoUpstreamTimingText(body, true);
+        expect(palm).toContain('ស្កេនលើការភ្ជាប់ថ្មី មធ្យម 0.90 វិនាទី (3 ដង)');
+        expect(palm).not.toContain('ការភ្ជាប់ដែលបើករួច');
+        expect(palm).toContain('ZTO បិទការភ្ជាប់ក្រោយឆ្លើយ');
+        expect(palm).toContain('Function នៅ us-east-2');
+        const argus = ztoUpstreamTimingText(body, false);
+        expect(argus).toContain('ស្កេនលើការភ្ជាប់ថ្មី មធ្យម 0.56 វិនាទី (1 ដង)');
+        expect(argus).toContain('ស្កេនលើការភ្ជាប់ដែលបើករួច មធ្យម 0.24 វិនាទី (3 ដង)');
+        expect(argus).toContain('ZTO ទុកការភ្ជាប់ 60 វិនាទី');
+        expect(argus).not.toContain('បិទការភ្ជាប់');
+        const silent = ztoUpstreamTimingText({ upstreamTiming: { ...timing, scans: { argus: { fresh: { count: 1, avgMs: 500, lastMs: 500 },
+            reused: { count: 0 }, keepAliveSec: 0, closes: 0 } } } }, false);
+        expect(silent).toContain('ZTO មិនប្រាប់រយៈទុកការភ្ជាប់');
+        expect(silent).not.toContain('Function នៅ');
+        expect(ztoUpstreamTimingText({ runtime: { region: '<b>x</b>' }, upstreamTiming: timing }, false)).not.toContain('<b>');
+    });
+
     it('an older Function without the meter, or unreadable values, never print a number', () => {
         expect(ztoUpstreamTimingText({}, true)).toBe('');
         expect(ztoUpstreamTimingText(null, false)).toBe('');

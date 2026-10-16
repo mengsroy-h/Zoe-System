@@ -2027,6 +2027,27 @@ function detailAccessIsAwaited(config) {
     return config.detailIdentity === 'require' || detailBranchActive(config);
 }
 
+async function detailAccessFor(event, config, startedAt) {
+    if (detailAccessIsAwaited(config)) return resolveDetailAccess(event, config, startedAt);
+    resolveDetailAccess(event, config, startedAt).catch(() => {});
+    return null;
+}
+
+function palmDeps(event, config, startedAt) {
+    return {
+        headerOf,
+        upstreamMs: () => Math.max(1000, Math.min(config.upstreamTimeoutMs, budgetLeftMs(config, startedAt) - 200)),
+        loginAccess: () => (config.detailIdentity === 'require' ? resolveDetailAccess(event, config, startedAt) : null),
+        lookupAccess: () => detailAccessFor(event, config, startedAt),
+        project: (row) => ({
+            cod: pickNumber([row], config.codPaths),
+            dod: pickNumber([row], config.dodPaths),
+            branches: config.detailBranchPaths.length ? pickTexts([row], config.detailBranchPaths, DETAIL_BRANCH_VALUES_MAX) : null
+        }),
+        finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false)
+    };
+}
+
 function detailBranchRefusal(config, access, body) {
     if (!detailBranchActive(config) || !access || !access.verified || !body || body.found !== true) return '';
     const branches = Array.isArray(body.branches) ? body.branches : [];
@@ -2212,7 +2233,7 @@ function corsHeadersFor(event) {
     if (!NATIVE_APP_ORIGINS.has(origin)) return null;
     const out = {
         'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Max-Age': '7200',
         Vary: 'Origin'
     };
@@ -2254,10 +2275,13 @@ exports.handler = async function handler(event) {
 async function handleRequest(event) {
     const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
-        await prewarmCookieCredential(event);
-        return { statusCode: 204, headers: { Allow: 'GET, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
+        if (!require('./_shared/zto-palm').isPalmPreflight(requestQuery(event), headerOf(event, 'access-control-request-headers'))) {
+            await prewarmCookieCredential(event);
+        }
+        return { statusCode: 204, headers: { Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
-    if (event.httpMethod !== 'GET') {
+    const palmQuery = requestQuery(event);
+    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm === 'login')) {
         return json(405, { error: 'Method not allowed' });
     }
 
@@ -2278,6 +2302,10 @@ async function handleRequest(event) {
         config = readConfig(process.env);
     } catch (error) {
         return configErrorResponse(error);
+    }
+
+    if (palmQuery.palm === '1' || palmQuery.palm === 'login') {
+        return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt));
     }
 
     const query = requestQuery(event);
@@ -2355,12 +2383,8 @@ async function handleRequest(event) {
 
     let access = null;
     if (!wantsDiagnostics && !plan) {
-        if (detailAccessIsAwaited(config)) {
-            access = await resolveDetailAccess(event, config, startedAt);
-            if (access.response) return access.response;
-        } else {
-            resolveDetailAccess(event, config, startedAt).catch(() => {});
-        }
+        access = await detailAccessFor(event, config, startedAt);
+        if (access && access.response) return access.response;
     }
 
     const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();

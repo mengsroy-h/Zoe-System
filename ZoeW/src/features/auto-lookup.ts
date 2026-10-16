@@ -5,8 +5,8 @@ import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
-import { lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
-import { addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
+import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
+import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
@@ -384,6 +384,7 @@ export async function attemptAutoLookup(barcode) {
                 headers[cfg.headerName] = cfg.headerValue;
             }
         }
+        await addPalmSessionHeader(cfg, headers);
         identity = await addZtoIdentityHeader(cfg, headers);
 
         const unreadable = {};
@@ -445,14 +446,16 @@ export async function attemptAutoLookup(barcode) {
         } else if (e && e.message === 'Auto lookup timed out') {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-            setLookupStatus(barcode, 'error', '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
+            setLookupStatus(barcode, 'error', lookupApiIsPalm(cfg)
+                ? '🔒 Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
+                : '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && !identityRetry) {
             setLookupStatus(barcode, 'error', '🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត');
         } else if (e && (e.lookupCode === 'ZTO_IDENTITY_UNAVAILABLE' || identityRetry)) {
             setLookupStatus(barcode, 'error', '⚠️ ផ្ទៀងផ្ទាត់គណនីជាមួយ Server មិនបាន — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
             setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');
-        } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED')) {
+        } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED' || e.lookupCode === 'ZTO_PALM_NOT_CONFIGURED')) {
             setLookupStatus(barcode, 'error', '⚙️ Config ZTO នៅ Netlify មិនត្រឹមត្រូវ'
                 + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : ''));
         } else if (e && e.lookupCode === 'ZTO_RATE_LIMITED') {
@@ -464,6 +467,9 @@ export async function attemptAutoLookup(barcode) {
         } else if (e && e.lookupCode === 'ZTO_BARCODE_INVALID') {
             setLookupStatus(barcode, 'warn', ZTO_BARCODE_SHAPE_TEXT);
             return;
+        } else if (e && e.lookupCode === 'ZTO_UPSTREAM_REJECTED' && lookupApiIsPalm(cfg)) {
+            setLookupStatus(barcode, 'error', '⚠️ ZTO Palm បដិសេធសំណើ' + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : '')
+                + ' — សូមស្កេនម្ដងទៀត ឬ Login ZTO Palm ម្តងទៀត');
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
             setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
         } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {

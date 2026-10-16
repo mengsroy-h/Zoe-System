@@ -66,6 +66,7 @@ function lookupStep(row) {
     if (detailHas(row, 'មិនទាន់ដែលប្រើវា')) return 'Cookie មានតែមិនទាន់ផ្ទៀងផ្ទាត់ — ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀត';
     if (detailHas(row, 'ចុះហត្ថលេខា')) return 'បញ្ជី «ចុះហត្ថលេខា» ZTO ផ្ញើអត្ថបទខុសពីការកំណត់ Server — ប្រាប់អ្នកគ្រប់គ្រង Netlify ឲ្យកែ ZTO_LIST_SIGNED_SCAN_DESC (ការបិទស្វ័យប្រវត្តិរង់ចាំរហូតដល់ពេលនោះ)';
     if (detailHas(row, 'ស្រាយសោមិនបាន')) return 'ស្រាយសោ Header Lookup មិនបាន — កំណត់ Header ម្តងទៀតក្នុង API ស្វែងរកអតិថិជន';
+    if (detailHas(row, 'ZTO Palm នៅ Netlify')) return 'Server ខ្វះការកំណត់ ZTO Palm — ប្រាប់អ្នកគ្រប់គ្រង Netlify ឲ្យដាក់ ZTO_PALM_SESSION_SECRET · ZTO_PALM_SIGN_KEY · ZTO_PALM_PASSWORD_KEY ហើយ redeploy';
     return 'Lookup ៖ ' + String(row.detail || '');
 }
 

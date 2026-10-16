@@ -172,11 +172,21 @@ const settle = (page, ms) => page.evaluate((t) => new Promise((r) => setTimeout(
     return Promise.race([Promise.all(cards.map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1000))]);
 }), ms || 200);
 
+// ⛔ ផ្នែកបត់បាន (`<details>` ឧ. «🔐 Login ZTO Palm» ក្នុង lookupApiConfigModal) ៖ ប្រអប់វាយក្នុង `<details>` បិទ focus មិនបាន
+//    (content-visibility) តែ rect នៅតែមាន ➜ វាស់ដូចអ្នកប្រើដែល **បើក** ផ្នែកនោះរួច ៖ គ្រប់ `<details>` ក្នុង `.modal` បើកពេលវាចូល DOM
+//    ⛔ មិនដកប្រអប់វាយទាំងនោះចេញពីការវាស់ឡើយ (keyboard ត្រូវតែត្រឹមត្រូវពេលអ្នកប្រើបើកវា)
+const OPEN_MODAL_DETAILS = function () {
+    const openAll = () => document.querySelectorAll('.modal details:not([open])').forEach((d) => { d.open = true; });
+    new MutationObserver(openAll).observe(document, { subtree: true, childList: true });
+    document.addEventListener('DOMContentLoaded', openAll);
+};
+
 async function openApp(browser, port, size, inits, extra) {
     const ctx = await browser.newContext(Object.assign({ viewport: { width: size.w, height: size.h }, hasTouch: true, isMobile: true, serviceWorkers: 'block' }, extra || {}));
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+    await page.addInitScript(OPEN_MODAL_DETAILS);
     for (const init of inits) await page.addInitScript(init);
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForTimeout(900);

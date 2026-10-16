@@ -9,9 +9,9 @@ import { getZoneDateKey } from '../core/timezone';
 import { appLocalStore, appSessionStore, safeStoreGet } from '../core/storage';
 import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
-import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
+import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
 import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
-import { lookupApiIsAppsScript } from './lookup-api';
+import { addPalmSessionHeader, lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
 import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services/connection';
@@ -212,7 +212,7 @@ export function ztoDiagnosticsUrl(cfg) {
     const raw = String(cfg.url).trim();
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
-    return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + '?diag=1';
+    return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + (lookupApiIsPalm(cfg) ? '?palm=1&diag=1' : '?diag=1');
 }
 
 export function durationText(ms) {
@@ -320,6 +320,7 @@ export async function healthLookupRow() {
         }
         headers[cfg.headerName] = value;
     }
+    if (lookupApiIsPalm(cfg)) return healthPalmLookupRow(cfg, headers);
     try {
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
             { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
@@ -364,6 +365,38 @@ export async function healthLookupRow() {
         return healthRow(mismatchText ? 'warn' : 'ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
     } catch (e) {
         return healthRow('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
+    }
+}
+
+async function healthPalmLookupRow(cfg, headers) {
+    const title = 'Lookup អតិថិជន (ZTO Palm)';
+    try {
+        await addPalmSessionHeader(cfg, headers);
+    } catch (e) {
+        return healthRow('warn', title, 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
+    }
+    try {
+        const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
+            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
+            ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
+            (r) => r.json().catch(() => null));
+        const res = out && out.res;
+        const body = out && out.body;
+        const code = body && typeof body.code === 'string' ? body.code : '';
+        const reason = safeLookupReason(body && body.reason);
+        if (res && res.ok && body && body.provider === 'zto-palm') {
+            return healthRow('info', title, 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO');
+        }
+        if (code === 'ZTO_AUTH_EXPIRED') {
+            return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+        }
+        if (code === 'ZTO_PALM_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') {
+            return healthRow('bad', title, 'Server មិនទាន់កំណត់ ZTO Palm នៅ Netlify' + (reason ? ' — ជាប់ត្រង់ ' + reason : ''));
+        }
+        const status = Number(res && res.status);
+        return healthRow('bad', title, 'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));
+    } catch (e) {
+        return healthRow('bad', title, 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
     }
 }
 

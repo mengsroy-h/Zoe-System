@@ -45,6 +45,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
     const code = sliceFn(source, 'safeStoreSet') + '\n' + sliceFn(source, 'safeStoreRemove') + '\n'
         + sliceFn(source, 'safeStoreGet') + '\n'
         + sliceFn(source, 'lookupApiIsAppsScript') + '\n'
+        + sliceFn(source, 'lookupApiIsZto') + '\n' + sliceFn(source, 'lookupApiIsPalm') + '\n'
         + ['shopScope', 'sameShop', 'shopOwnsSetting'].map((name) => sliceFnOptional(source, name)).join('\n') + '\n'
         + sliceFn(source, 'lookupApiSendsHeader') + '\n'
         + source.slice(start, end);

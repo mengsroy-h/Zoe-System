@@ -27,7 +27,8 @@ function fakeDom(pinOpen) {
         innerText: '', innerHTML: '', classList: { add() {}, remove() {}, contains: () => false },
         setAttribute() {}, removeAttribute() {}, hasAttribute: () => false, getAttribute: () => null });
     ['pinModal', 'pinSetupModal', 'loginModal', 'configModal', 'firebaseConfigInput', 'configInput',
-     'loginEmailInput', 'rememberMeCheckbox', 'securityPinInput', 'sentryDsnInput'].forEach(mk);
+     'loginEmailInput', 'rememberMeCheckbox', 'securityPinInput', 'sentryDsnInput',
+     'ztoPalmUsernameInput', 'ztoPalmPasswordInput'].forEach(mk);
     if (pinOpen) els.pinModal.style.display = 'flex';
     return {
         getElementById: (id) => els[id] || null,
@@ -59,6 +60,8 @@ for (const app of ['ZoeW']) {
         ctx.firebaseConfig = { apiKey: 'A', databaseURL: 'https://business-b.firebaseio.com' };
         ctx.pendingRestoreId = null; ctx.pendingPermanentDeleteId = null;
         ctx.activeParentItemId = null; ctx.lookupSecretKey = 'secret';
+        ctx.document._els.ztoPalmUsernameInput.value = 'palm-user';
+        ctx.document._els.ztoPalmPasswordInput.value = 'synthetic-palm-password';
         vm.createContext(ctx);
         // ⛔ ZoeW ជា React ៖ ឃ្លាំង (`uiState` · `viewState` · `ztoState`) · `modalIsOpen()` · `blankElementById()` ជាកូដពិត
         //    ដែល `clearSensitiveModalFields()` ឆ្លងកាត់ ➜ ចូល sandbox មុនមុខងារ (stub ក្នុង ctx នៅឈ្នះ)
@@ -208,6 +211,8 @@ for (const app of ['ZoeW']) {
         ok(glideState.tokens === 0 && glideState.release === null,
             'ចាកចេញ ➜ ស្ថានភាពចលនាផ្ទាំងត្រូវសម្អាតអស់', glideState);
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        ok(ctx.document._els.ztoPalmUsernameInput.value === '' && ctx.document._els.ztoPalmPasswordInput.value === '',
+            'ចាកចេញ ➜ គណនី និងពាក្យសម្ងាត់ Palm ក្នុងផ្ទាំងត្រូវសម្អាត');
         const docsCacheDbName = docsCacheDecls[0] ? vm.runInContext('SB_DOCS_CACHE_DB', ctx) : '(none)';
         ok(deletedIdb.length >= 1 && deletedIdb.every((n) => n === docsCacheDbName),
             'ចាកចេញ ➜ លុប cache zoe_docs របស់ Supabase (IndexedDB ' + docsCacheDbName + ')', deletedIdb);

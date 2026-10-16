@@ -47,6 +47,8 @@ export const REF_NAMES = [
     'lookupApiHeaderValueInput',
     'lookupApiPhoneFieldInput',
     'lookupApiUrlInput',
+    'ztoPalmUsernameInput',
+    'ztoPalmPasswordInput',
     'manualCodChangeInput',
     'manualCountChangeInput',
     'manualDateInput',

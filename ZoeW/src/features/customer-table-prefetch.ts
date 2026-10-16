@@ -120,7 +120,13 @@ export function lookupApiIsZto(cfg) {
     return /(?:^|\/)\.netlify\/functions\/zto-order-detail\/?(?:[?#]|$)/i.test(String(cfg.url).trim());
 }
 
+export function lookupApiIsPalm(cfg) {
+    if (!lookupApiIsZto(cfg)) return false;
+    try { return new URL(cfg.url, window.location.href).searchParams.get('palm') === '1'; } catch (_) { return false; }
+}
+
 export function warmZtoLookupProxyIfConfigured(cfg) {
+    if (lookupApiIsPalm(cfg)) return false;
     if (!cfg || !cfg.enabled || !lookupApiIsZto(cfg) || lookupState.ztoWarmupInFlight || elapsedSince(lookupState.ztoWarmupAt) < ZTO_WARMUP_COOLDOWN_MS) return false;
     const raw = String(cfg.url).trim();
     const marker = '/.netlify/functions/zto-order-detail';

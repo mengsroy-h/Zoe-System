@@ -119,6 +119,9 @@ export function clearSensitiveModalFields() {
     viewState.configManual = false;
     hidePhoneSuggestions();
     setPhoneSearchPulledUp(false);
+    viewState.palmLoginBusy = false;
+    viewState.palmLoginConnected = false;
+    viewState.palmLoginStatus = '';
     clearZtoPickupStatusStore();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;
@@ -170,7 +173,7 @@ export function clearSensitiveModalFields() {
         'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
         'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
         'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
-        'editModalBarcodeText', 'lookupApiHeaderValueInput',
+        'editModalBarcodeText', 'lookupApiHeaderValueInput', 'ztoPalmUsernameInput', 'ztoPalmPasswordInput',
         'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
         'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
         'dailyStatsContainer', 'collectedStatsContainer',

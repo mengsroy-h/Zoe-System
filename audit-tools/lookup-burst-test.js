@@ -64,7 +64,7 @@ function sliceFn(name) {
 
 const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookupTimeoutNoRetry',
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse', 'noteSheetScriptVersion',
-    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'getFastLookupRow', 'setFastLookupRow', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader',
     'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient', 'attemptAutoLookup'];
 // ⛔ ថេរដែល `attemptAutoLookup()` ពិតប្រើ (ច្រកទម្រង់ barcode ZTO) ➜ ស្រង់ពីកូដពិត

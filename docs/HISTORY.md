@@ -83,6 +83,36 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
+
+**ZoeW `2.50.97`** (`zoew-v359` ➜ `zoew-v360`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី។
+សំណើម្ចាស់គម្រោង៖ បន្ថែម Login ZTO Palm ក្នុង ZoeW ដើម្បីទាញ Lookup ទៅមុខងារដែលមានស្រាប់ និងបើក PR។
+
+- ផ្ទាំងការកំណត់ Lookup មាន Login Palm និងផ្តាច់ session។ Login ជោគជ័យរៀបចំ URL និង fields ស្វ័យប្រវត្តិ។
+- ផ្ទៀងផ្ទាត់ទម្រង់ពី APK Palm `2.9.92`: password AES/ECB/PKCS5Padding, `x-sign` MD5/Base64, `x-token`,
+  login `/zto/system/v1/doLogin` និង lookup `/zto/basic/v1/billInfoQuery`។ លេខទូរស័ព្ទ encrypted ត្រូវស្រាយមុនបំពេញ។
+- Session របស់ឧបករណ៍នីមួយៗអ៊ិនគ្រីបនៅ server និងដោយ PIN នៅ App; មិនរក្សាទុក password និងមិនប្តូរ Argus Cookie។
+  ការឆ្លើយយឺតក្រោយប្តូរហាង/PIN/config ឬបិទផ្ទាំងមិនអាចរក្សាទុកជាន់បាន។ Logout សម្អាត fields និងព័ត៌មានគណនី Palm។
+- Palm ជា lookup មួយ barcode (លេខទូរស័ព្ទ/COD/DOD) សម្រាប់គណនី KH; មិនហៅ Argus list ឬផ្ញើ sign scan ទៅ ZTO។
+- អ្នកយាមថ្មី៖ `ZoeW/tests/zto-palm-server.test.ts` និង `ZoeW/tests/zto-palm-login.test.tsx` គ្រប AES/MD5 ពី Java,
+  session isolation/expiry, login failure, native origin, ការលេចធ្លាយ secret និងការបំពេញផ្ទាំងស្កេនពិត។ ស្នាមម្រាមដៃ ZTO
+  ប្តូរតែឯកសារដែលពាក់ព័ន្ធនឹងសំណើនេះ; មិនបន្ធូរការផ្ទៀងផ្ទាត់ចាស់។
+- Audit PR (សំណើម្ចាស់គម្រោង «កែទាំងអស់ដែលរកឃើញថាមានចន្លោះ» · A163–A172 ផ្នែក ២)៖ សោ protocol Palm អានតែពី env ·
+  Login/Lookup Palm អនុវត្ត `ZTO_DETAIL_IDENTITY` · `ZTO_DETAIL_BRANCH_PATHS` ដូច `/detail` · COD/DOD អានតាមវាល Argus ·
+  billCode មិនខ្វល់អក្សរធំតូច · កូដ ZTO ដែលមិនស្គាល់បង្ហាញជា `palm:<code>` · preflight Palm មិនអាន Cookie ពី Blobs ·
+  ពេលរង់ចាំ ZTO តាមថវិកា Function · App សម្រេចរបៀប Palm ពី URL តែមួយ · មិនរក្សាឈ្មោះគណនី Palm · ផ្ញើគណនី ZoeW ជាមួយ Login ·
+  🩺 ប្រាប់ពី session/env Palm · ផ្ទាំង Palm ព្រមានថាវាមិនបិទកញ្ចប់តាម ZTO។ `LOCK` ZTO ធ្វើបច្ចុប្បន្នភាពតាមសំណើនេះ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. មុនប្រើ បន្ថែមក្នុង Netlify Functions (Production និង Deploy Previews) រួច deploy ZoeW៖ `ZTO_PALM_SESSION_SECRET`
+   (ចៃដន្យយ៉ាងតិច 32 តួអក្សរ) · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` (សោ protocol ZTO Palm, 16 bytes) — ⛔ កុំ commit តម្លៃទាំងនេះ។
+   ខ្វះណាមួយ ➜ Login Palm ឆ្លើយ «Server មិនទាន់បានកំណត់ ZTO Palm (palm:…)»។
+   ប្រើ `ZTO_PROXY_KEY`/proxy keys ដែលមានស្រាប់; មិនដាក់ session secret ក្នុង frontend។ មើល `ZoeW/docs/ZTO-PALM.md`។
+2. បើកការកំណត់ API ដោយ PIN ➜ Login ZTO Palm ➜ គណនីដែលមានសិទ្ធិ ➜ ស្កេនកញ្ចប់ពិត ហើយផ្ទៀងលេខទូរស័ព្ទ និង COD/DOD។
+   Tests ប្រើគណនីសិប្បនិម្មិត និង upstream ក្លែង; មិនទាន់ផ្ទៀងផ្ទាត់ login ជាមួយ ZTO server ពិត។
+3. សាក session ផុតកំណត់, login ម្តងទៀត និងផ្តាច់ Palm លើ web និង APK។ មិន merge ឬ deploy ក្នុងការងារនេះ។
+
 ### [2.50.96] — 2026-10-16 · ZoeW ៖ **កែតម្លៃកញ្ចប់ដែលយករួច ➜ «ចំណូលយករួច» ប៉ះតែថ្ងៃពាក់ព័ន្ធ (មិនមែន root ៧ ថ្ងៃទាំងមូល)**
 
 **ZoeW `2.50.96`** (`zoew-v358` ➜ `zoew-v359`) · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · គ្មាន migration Supabase · គ្មានកូដ Android native។
@@ -3667,6 +3697,25 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-16 — Audit PR (Login ZTO Palm · [2.50.97]) ៖ ចន្លោះ identity · សោ protocol ក្នុង repo · វាល COD/DOD · checker ក្រហម ១៣
+
+សំណើ ៖ «audit មុខងារថ្មី ក្នុង PR … ប៉ះទង្គិចជាមួយ cookie ពី blob · ដំណើរការត្រឹមត្រូវ · race · លេចធ្លាយ secret» ➜ «កែទាំងអស់ដែលរកឃើញថាមានចន្លោះ»។
+វាស់ដោយ handler ពិត (`fn.handler`) + ZTO ក្លែង · App ពិតក្នុង vitest · CI ៤ ផ្នែក។ ផ្លូវ Palm មិនប៉ះ Cookie Blob ទេ (Login + Lookup ➜ ការហៅ Blob ០)។
+អ្នកយាមថ្មី ១១ (server) + ១០ (App) ធ្លាក់លើកូដមុនកែ ➜ ជាប់ក្រោយកែ។ ផ្ទៀងភាពដូចគ្នា ៖ env = តម្លៃសោដើម ➜ password AES និង `x-sign` ស្មើ oracle Java របស់ PR។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A163 | **ផ្លូវ Palm រំលង `ZTO_DETAIL_IDENTITY=require` និង `ZTO_DETAIL_BRANCH_PATHS`** | Argus 401 `ZTO_IDENTITY_REQUIRED` · Palm 200 មានលេខទូរស័ព្ទ | Palm ប្រើ `detailAccessFor()` · `detailResponseBody()` ដូច `/detail` · Login ត្រូវការគណនីពេល `require` · App ផ្ញើ `X-Zoe-Id-Token` ជាមួយ Login |
+| A164 | **សោ protocol ZTO Palm (`SIGN_KEY` · `PASSWORD_KEY`) សរសេរក្នុងកូដ** (repo ចាត់ទុកជាសាធារណៈ) | `security-guard-test` មិនចាប់ | អានតែពី env `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` · ខ្វះ ➜ 503 `ZTO_PALM_NOT_CONFIGURED` + `reason` មុនផ្ញើអ្វីទៅ ZTO · tests ប្រើសោសិប្បនិម្មិត + oracle `openssl` |
+| A165 | **COD/DOD ៖ Palm អាន `cod`/`dod` មុន `agentAmount`/`fcAmount`** (ផ្ទុយ Argus) · boolean/អវិជ្ជមាន ➜ lookup ទាំងមូល 502 | `cod:0, agentAmount:4.5` ➜ COD 0 | `pickNumber()` + `config.codPaths`/`dodPaths` របស់ Argus ➜ 4.5 · អវិជ្ជមាន ➜ 0 · មិនមែនលេខ ➜ រំលង |
+| A166 | billCode ZTO អក្សរធំ · ស្កេនអក្សរតូច ➜ 502 | `khab123456` ទល់ `KHAB123456` | ប្រៀបដោយមិនខ្វល់អក្សរធំតូច (trim) |
+| A167 | កូដ ZTO ដែលមិនស្គាល់ ➜ 502 ទទេ · Login `status:false` គ្រប់ហេតុ ➜ «ពាក្យសម្ងាត់ខុស» | `TOKEN_EXPIRE` · `VERSION_TOO_LOW` | `reason: palm:<code>` (តួអក្សរសុវត្ថិភាព) ➜ App បង្ហាញ · ⛔ មិនទាយកូដ |
+| A168 | preflight Palm (APK) អាន Cookie Argus ពី Blobs (`prewarmCookieCredential`) | OPTIONS ➜ `getStore` + read | `isPalmPreflight()` (query `palm` ឬ header `x-zoe-palm-token`) ➜ រំលង · preflight Argus នៅអានដដែល |
+| A169 | ពេលរង់ចាំ ZTO Palm ១០ វិ. ថេរ (លើសថវិកា `ZTO_REQUEST_BUDGET_MS` · ប៊ូតុង 🧪 ១១ វិ.) | ព្យួរ ➜ 504 នៅ ១០ វិ. | `upstreamMs()` = min(`upstreamTimeoutMs`, ថវិកាដែលនៅសល់) |
+| A170 | App ៖ អ្នកសម្រេចពីរ (`provider` ទល់ URL `palm=1`) · ឈ្មោះគណនី Palm ក្នុង localStorage · សារ «កំពុងចូល…» ជាប់ · 🩺 session ផុត ➜ ❌ HTTP 401 | config URL Palm គ្មាន `provider` ➜ auto-close/status sweep នៅបើក | `lookupApiIsPalm()` តែមួយ · `palmAccount` = សាខាតែប៉ុណ្ណោះ · `dropped()` · `healthPalmLookupRow()` + ជំហាន 💡 env Palm |
+| A171 | **checker ក្រហម ១៣ ក្នុង CI** (sandbox lookup ខ្វះ `lookupApiIsPalm` · `phone-search-swipe` បង្អួច ២០០ តួ · `clear-history-claim-test` កាត់តាមលំដាប់ម៉ូឌុល · ឯកសារថ្មីគ្មាន mapping · ប្រអប់វាយក្នុង `<details>` បិទ focus មិនបាន) | CI ៤ ផ្នែក | ចាក់ helper ពិតចូល sandbox · `clear-history-claim-test` អានម៉ូឌុលពី `audit-module-views.json` · mapping ៥ · `modal-keyboard*` បើក `<details>` ក្នុង `.modal` មុនវាស់ (ប្រអប់វាយ Palm ត្រូវវាស់ដូចគេ) |
+| A172 | ព្រំដែនដែលកត់ (មិនកែ) | — | Server គ្មានបញ្ជី session ➜ «ផ្តាច់ Palm» លុបតែក្នុងឧបករណ៍ (session ដែលចម្លងរួចផុតក្នុង ៨ ម៉ោង · ប្តូរ `ZTO_PALM_SESSION_SECRET` ឈប់ទាំងអស់) · របៀប Palm មិនបិទកញ្ចប់តាម ZTO ➜ ព្រមានក្នុងផ្ទាំង · `guide.html` · ZTO អាចអនុញ្ញាត session មួយក្នុងមួយគណនី (មិនទាន់វាស់ជាមួយ ZTO ពិត) |
+
 ### 2026-10-16 — Audit ZTO ទាំងមូល (សំណើម្ចាស់គម្រោង) ៖ គម្រោងតែមួយ សាខាច្រើន ➜ ការអានបញ្ជីចុះហត្ថលេខារបស់សាខាមួយដោះការរង់ចាំ ៨ ថ្ងៃទូទាំងហាង (ZTO-E14 · កែ Function)
 
 សំណើ ៖ «audit ផ្នែក ZTO ទាំងមូល» (Function · App · ឧបករណ៍ Cookie Sync · តំបន់ចាក់សោ ➜ អ្នកយាមមុន · សួរម្ចាស់គម្រោងមុនកែ) ➜ ZTO-E14 ➜ ម្ចាស់គម្រោងជ្រើស
@@ -5881,6 +5930,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |

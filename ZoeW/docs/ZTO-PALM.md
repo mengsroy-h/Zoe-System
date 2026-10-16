@@ -11,8 +11,8 @@
 `billInfoQuery` និង `queryTrackInfo` (`mailType: 1` · `mailNos: [barcode]`) ដោយ session ដែលបាន Login។
 ចម្លើយដើមពេញលេញនៅក្នុង `billInfoQuery` និង `queryTrackInfo` បង្ហាញក្នុងប្រអប់ JSON ដែលអាចអូសមើល
 និងចម្លងបាន។ វាលដើមនៅដដែល ទោះ mapping COD/DOD ដែលកំណត់សម្រាប់ Cookie មិនស្គាល់វាក៏ដោយ។
-ប្រើចម្លើយនេះដើម្បីផ្ទៀងផ្ទាត់ឈ្មោះ field របស់ Palm មុនរៀបចំ mapping; `ZTO_FIELD_*` របស់ server
-ប្រើរួមក្នុង Lookup Cookie និង Palm ដូច្នេះត្រូវផ្ទៀងផ្ទាត់ទាំងពីរ។ ការស្កេនធម្មតាអាន `billInfoQuery` តែមួយ។
+ប្រើចម្លើយនេះដើម្បីផ្ទៀងផ្ទាត់ឈ្មោះ field និងស្ថានភាពរបស់ Palm។ Palm អាន `cod` និង `dod` ផ្ទាល់;
+`ZTO_FIELD_COD` និង `ZTO_FIELD_DOD` សម្រាប់ Cookie មិនជំនួសតម្លៃ Palm ទេ។ ការស្កេនធម្មតាអាន `billInfoQuery` តែមួយ។
 ការសាកល្បងអនុវត្តការផ្ទៀងគណនី និងសាខាដូច Lookup។
 
 ## កំណត់ server មុនប្រើ
@@ -47,7 +47,7 @@ node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('h
 - `ZTO_DETAIL_IDENTITY=require` ➜ Login និង Lookup Palm ត្រូវការគណនី ZoeW ដែលកំពុងចូល (`X-Zoe-Id-Token`) មុនពេលផ្ញើទៅ ZTO;
   `optional` ➜ ផ្ទៀងពេលមាន token តែមិនបដិសេធ។
 - `ZTO_DETAIL_BRANCH_PATHS` ➜ កញ្ចប់ពីសាខាផ្សេង ឬគ្មានវាលសាខា ➜ `ZTO_OTHER_BRANCH` គ្មានលេខទូរស័ព្ទ ឬ COD/DOD។
-- COD/DOD អានតាមវាលដូច Argus (`ZTO_FIELD_COD` · `ZTO_FIELD_DOD` ឬលំនាំដើម `agentAmount` · `fcAmount` មុន)។
+- COD/DOD Palm អានពី `cod` និង `dod` ផ្ទាល់ រួមទាំងតម្លៃសូន្យ; `ZTO_FIELD_COD` និង `ZTO_FIELD_DOD` អនុវត្តលើ Cookie។
 - `ZTO_UPSTREAM_TIMEOUT_MS` · `ZTO_REQUEST_BUDGET_MS` កំណត់ពេលរង់ចាំ ZTO។
 - Config Argus ខុស (`ZTO_CONFIG_INVALID`) បិទផ្លូវ Palm ផងដែរ ព្រោះវាប្រើការកំណត់ទាំងនេះរួមគ្នា។
 

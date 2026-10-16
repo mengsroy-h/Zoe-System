@@ -125,9 +125,22 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse(res.body).queryTrackInfo).toBeUndefined();
     });
 
+    it('Palm អាន cod និង dod ផ្ទាល់ ដោយមិនយក mapping Cookie មកជំនួស', async () => {
+        const { sessionToken: session } = await login();
+        vi.stubEnv('ZTO_FIELD_COD', 'cookieCod');
+        vi.stubEnv('ZTO_FIELD_DOD', 'cookieDod');
+        for (const [cod, dod] of [['2.49', '0.00'], ['4.90', '1.25'], ['0.00', '0.00']]) {
+            vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: {
+                consigneeMobile: '012345678', cod, dod, cookieCod: 999, cookieDod: 888
+            } })));
+            const body = JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body);
+            expect(body).toMatchObject({ found: true, cod: Number(cod), dod: Number(dod) });
+        }
+    });
+
     it('decrypts Palm phone data rather than passing ciphertext to the scan form', async () => {
         const { sessionToken: session } = await login();
-        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', agentAmount: 3, fcAmount: 0.5 } })));
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: 3, dod: 0.5 } })));
         expect(JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body)).toMatchObject({ phone: '012345678', cod: 3, dod: 0.5 });
     });
 
@@ -278,11 +291,11 @@ describe('Palm follows the same server rules as /detail', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('picks COD/DOD with the Argus field order and number rules', async () => {
+    it('អាន cod/dod Palm ផ្ទាល់ និងរក្សាច្បាប់លេខ', async () => {
         const { sessionToken: session } = await login();
         const cases: Array<[Record<string, unknown>, number, number]> = [
-            [{ ...CODE_ROW, cod: 0, agentAmount: 4.5, dod: 0, fcAmount: 1.25 }, 4.5, 1.25],
-            [{ ...CODE_ROW, cod: true, codAmount: '2.5', dod: false, dodAmount: '0.75' }, 2.5, 0.75],
+            [{ ...CODE_ROW, cod: 0, agentAmount: 4.5, dod: 0, fcAmount: 1.25 }, 0, 0],
+            [{ ...CODE_ROW, cod: true, codAmount: '2.5', dod: false, dodAmount: '0.75' }, 0, 0],
             [{ ...CODE_ROW, agentAmount: -3, fcAmount: -1 }, 0, 0],
             [{ ...CODE_ROW, cod: '6.55', dod: '1.25' }, 6.55, 1.25]
         ];

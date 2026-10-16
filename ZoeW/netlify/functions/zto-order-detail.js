@@ -2242,8 +2242,8 @@ function palmDeps(event, config, startedAt) {
         loginAccess: () => (config.detailIdentity === 'require' ? resolveDetailAccess(event, config, startedAt) : null),
         lookupAccess: () => detailAccessFor(event, config, startedAt),
         project: (row) => ({
-            cod: pickNumber([row], config.codPaths),
-            dod: pickNumber([row], config.dodPaths),
+            cod: pickNumber([row], ['cod']),
+            dod: pickNumber([row], ['dod']),
             branches: config.detailBranchPaths.length ? pickTexts([row], config.detailBranchPaths, DETAIL_BRANCH_VALUES_MAX) : null
         }),
         finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false),

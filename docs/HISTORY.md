@@ -93,6 +93,22 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.101] — 2026-10-16 · ZoeW ៖ COD/DOD Palm ដាច់ពី mapping Cookie
+
+**ZoeW `2.50.101`** (`zoew-v363` ➜ `zoew-v364`) · ZoeKeyGen ដដែល · គ្មាន env, Firebase rules ឬ migration ថ្មី។
+ម្ចាស់គម្រោងផ្តល់ចម្លើយ 🧪 ពិតពីកញ្ចប់ ២ ៖ `billInfoQuery.result.cod` · `.dod` · `.consigneeMobile` និង `.dispSiteId`។
+`queryTrackInfo.result` ទទេទាំងពីរ (`[]`) ➜ មិនប្រើជាភស្តុតាងមកដល់ ឬចុះហត្ថលេខា។
+
+- `palmDeps.project` អាន `cod` និង `dod` ផ្ទាល់; mapping `ZTO_FIELD_COD/DOD` របស់ Cookie និងវាល `agentAmount/fcAmount`
+  មិនជំនួសតម្លៃ Palm ទេ។ សូន្យជាតម្លៃត្រឹមត្រូវ។ កូដ Cookie ដដែល។
+- តំបន់ចាក់សោ `zto-order-detail.js` កែតាមរបាយការណ៍ field ខុសគ្នារបស់ម្ចាស់គម្រោង; `LOCK` ថ្មី។ តេស្ត override mapping Cookie
+  និងដាក់តម្លៃផ្សេង ដើម្បីបង្ហាញថា Palm នៅតែយក `cod/dod` (តេស្តធ្លាក់លើកូដមុនកែ)។ ទិន្នន័យសាកជាសិប្បនិម្មិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Preview កំណែនេះ ៖ សាក Barcode Palm ម្តងទៀត ហើយផ្ទៀងលេខទូរស័ព្ទ និង COD/DOD ជាមួយ App Palm។
+2. បញ្ជាក់ទម្រង់ request `queryTrackInfo` ពី APK Palm; ចម្លើយ `[]` មិនទាន់អនុញ្ញាតឲ្យបើកបញ្ជីមកដល់ ឬស្ថានភាពកញ្ចប់មួយៗទេ។
+
 ### [2.50.100] — 2026-10-16 · ZoeW ៖ 🧪 Palm បង្ហាញ billInfoQuery និង queryTrackInfo ពេញ
 
 **ZoeW `2.50.100`** (`zoew-v362` ➜ `zoew-v363`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី។

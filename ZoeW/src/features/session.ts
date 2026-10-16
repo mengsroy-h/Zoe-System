@@ -114,7 +114,6 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
-    viewState.lookupTestResult = '';
     viewState.phoneModalBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;
@@ -123,6 +122,7 @@ export function clearSensitiveModalFields() {
     viewState.palmLoginBusy = false;
     viewState.palmLoginConnected = false;
     viewState.palmLoginStatus = '';
+    viewState.lookupTestResult = '';
     clearZtoPickupStatusStore();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;

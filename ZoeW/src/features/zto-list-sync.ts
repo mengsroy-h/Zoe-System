@@ -819,7 +819,7 @@ export async function runZtoListSyncPreview() {
             }
         } else if (e && e.httpStatus === 401 && lookupApiIsPalm(cfg)) {
             setZtoListSyncNote('🔑 Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
-            showToast('🔑 សូម Login ZTO Palm ម្តងទៀត');
+            showToast('⚠️ Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀត');
         } else {
             const detail = e && e.httpStatus ? ' (HTTP ' + e.httpStatus + (e.upstreamReason ? ' · ' + e.upstreamReason : '') + (e.barcode ? ' · Barcode ' + e.barcode : '') + ')' : '';
             setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន' + detail + ' — សូមសាកម្ដងទៀត');

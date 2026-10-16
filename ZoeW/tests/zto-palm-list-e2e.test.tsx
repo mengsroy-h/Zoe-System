@@ -45,7 +45,12 @@ let parcels: Record<string, Parcel> = {};
 let faults: Map<string, number> = new Map();
 let always: Set<string> = new Set();
 let authDead = '';
+let multi = false;
+let inFlight = 0;
+let peakTracks = 0;
+let functionCalls = 0;
 const zto: string[] = [];
+const palm = req('../netlify/functions/_shared/zto-palm.js');
 
 const at = (day: string, time = '09:00:00') => '2026-10-' + day + ' ' + time;
 const pickup = (origin: string): Scan => ({ action: '1', siteCode: 'ORIGIN', time: at('01', '08:00:00'), msgLoc: '【' + origin + '】បានស្កែនទទួល' });
@@ -53,8 +58,9 @@ const transit = (day: string): Scan => ({ action: '2', siteCode: 'HUB', time: at
 const arrive = (day: string, time?: string): Scan => ({ action: '3', siteCode: SITE, time: at(day, time) });
 const sign = (day: string, time = '15:30:00'): Scan => ({ action: '5', siteCode: SITE, time: at(day, time) });
 
-function dataset() {
+function dataset(bulk = 0) {
     const out: Record<string, Parcel> = {};
+    for (let i = 1; i <= bulk; i++) out['KH90000' + String(i).padStart(5, '0')] = { tab: '4', isSign: 0, scans: [pickup(CN), transit('05')] };
     for (let i = 1; i <= 8; i++) out['KH10000000' + String(i).padStart(2, '0')] = { tab: '4', isSign: 0,
         scans: [pickup(i % 2 ? CN : VN), transit('02'), arrive(String(2 + Math.min(i, 4)).padStart(2, '0'))] };
     for (let i = 1; i <= 5; i++) out['KH20000000' + String(i).padStart(2, '0')] = { tab: '4', isSign: 0, scans: [pickup(CN), transit('05')] };
@@ -74,12 +80,12 @@ function respond(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-function fault(key: string) {
-    if (always.has(key)) return respond({ message: 'gateway' }, 502);
-    const left = faults.get(key) || 0;
-    if (left <= 0) return null;
-    faults.set(key, left - 1);
-    return key.startsWith('list:5') ? respond({ status: false, statusCode: 'SYS_BUSY', message: 'busy' }) : respond({ message: 'gateway' }, 503);
+function fault(keys: string[]) {
+    if (keys.some((key) => always.has(key))) return respond({ message: 'gateway' }, 502);
+    const hit = keys.filter((key) => (faults.get(key) || 0) > 0);
+    if (!hit.length) return null;
+    hit.forEach((key) => faults.set(key, (faults.get(key) || 0) - 1));
+    return hit[0].startsWith('list:5') ? respond({ status: false, statusCode: 'SYS_BUSY', message: 'busy' }) : respond({ message: 'gateway' }, 503);
 }
 
 function dispatchList(body: any) {
@@ -96,13 +102,17 @@ function dispatchList(body: any) {
     return respond({ status: true, statusCode: 'SYS000', result: { list, pageNum: body.pageNum, pageSize: size, pages, total: codes.length } });
 }
 
-function trackInfo(code: string) {
+function trackGroup(code: string) {
     const parcel = parcels[code];
-    if (!parcel || !parcel.scans.length) return respond({ status: true, statusCode: 'SYS000', result: [] });
+    if (!parcel || !parcel.scans.length) return null;
     const mail: Record<string, unknown> = { mailNo: code };
     if (parcel.isSign !== null) mail.isSign = parcel.isSign;
-    return respond({ status: true, statusCode: 'SYS000', result: [{ mail, tracks: parcel.scans
-        .map((s) => ({ mailNo: code, actionName: 'scan', ...s })).sort((a, b) => b.time.localeCompare(a.time)) }] });
+    return { mail, tracks: parcel.scans.map((s) => ({ mailNo: code, actionName: 'scan', ...s })).sort((a, b) => b.time.localeCompare(a.time)) };
+}
+
+function trackInfo(codes: string[]) {
+    if (codes.length > 1 && !multi) return respond({ status: true, statusCode: 'SYS000', result: [] });
+    return respond({ status: true, statusCode: 'SYS000', result: codes.map(trackGroup).filter(Boolean) });
 }
 
 async function palmUpstream(href: string, init: any) {
@@ -114,13 +124,18 @@ async function palmUpstream(href: string, init: any) {
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + ':' + body.pageNum;
         zto.push(key);
-        return fault(key) || dispatchList(body);
+        return fault([key]) || dispatchList(body);
     }
     if (path === '/zto/locus/v1/queryTrackInfo') {
-        const key = 'track:' + body.mailNos;
-        zto.push(key);
-        if (authDead && body.mailNos === authDead) return respond({ status: false, statusCode: 'token_expired' });
-        return fault(key) || trackInfo(String(body.mailNos));
+        expect(typeof body.mailNos).toBe('string');
+        const codes = String(body.mailNos).split(',');
+        zto.push('track:' + body.mailNos);
+        if (authDead && codes.includes(authDead)) return respond({ status: false, statusCode: 'token_expired' });
+        inFlight++;
+        peakTracks = Math.max(peakTracks, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        inFlight--;
+        return fault(codes.map((code) => 'track:' + code)) || trackInfo(codes);
     }
     return respond({}, 500);
 }
@@ -142,10 +157,15 @@ beforeEach(async () => {
     process.env.ZTO_PALM_PASSWORD_KEY = 'zoew-test-aes-16';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
+    palm.resetPalmForTests();
     parcels = dataset();
     faults = new Map();
     always = new Set();
     authDead = '';
+    multi = false;
+    inFlight = 0;
+    peakTracks = 0;
+    functionCalls = 0;
     zto.length = 0;
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);
@@ -156,6 +176,7 @@ beforeEach(async () => {
             new URL(href).searchParams.forEach((v, k) => { q[k] = v; });
             const h: any = {};
             Object.entries((init && init.headers) || {}).forEach(([k, v]) => { h[k.toLowerCase()] = String(v); });
+            if (q.list === '1') functionCalls++;
             const r = await fn.handler({ httpMethod: 'GET', headers: h, queryStringParameters: q });
             return new Response(r.body, { status: r.statusCode });
         }
@@ -209,11 +230,16 @@ function rowsByCode() {
     return map;
 }
 
-describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie ទោះ ZTO ឆ្លើយបរាជ័យម្តងម្កាល', () => {
+const TAB4_ARRIVED = ['KH1000000001', 'KH1000000002', 'KH1000000003', 'KH1000000004', 'KH1000000005', 'KH1000000006', 'KH1000000007',
+    'KH1000000008', 'KH4000000001', 'KH5000000001'];
+
+describe.each([['ZTO អាន track ម្តងមួយលេខ', false], ['ZTO អាន track ច្រើនលេខក្នុងសំណើតែមួយ', true]])('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie (%s)', (_label, supportsMulti) => {
+    beforeEach(() => { multi = supportsMulti; });
+
     it('ZTO បរាជ័យម្តងម្កាល (503 · SYS_BUSY) ➜ បញ្ជីពេញ · ម៉ោងមកដល់ · ប្រភព · បិទរួច/មិនទាន់ ដូច Cookie', async () => {
         for (const key of ['list:5:1', 'track:KH1000000003', 'track:KH7000000002', 'track:KH2000000002']) faults.set(key, 1);
-        faults.set('list:4:2', 2);
-        faults.set('track:KH1000000006', 2);
+        faults.set('list:4:1', 2);
+        faults.set('track:KH1000000006', 3);
         await runZtoListSyncPreview();
         expect(viewState.ztoListSyncNote, viewState.ztoListSyncNote).not.toContain('ទាញបញ្ជីពី ZTO មិនបាន');
         const rows = rowsByCode();
@@ -234,6 +260,7 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie �
         expect(shown.get('KH1000000002').notes).toEqual(['📥 មកដល់ ៖ 2026-10-04 09:00:00']);
         expect(viewState.ztoListSyncNote).toContain('🔒 ថ្មីដែល ZTO បិទរួច 3');
         expect(viewState.ztoListSyncNote).toContain('✍️ ZTO ចុះហត្ថលេខាក្នុងចន្លោះ តែមកដល់មុនថ្ងៃ 2026-10-03 ៖ 1');
+        expect(viewState.ztoListSyncNote).toContain('⏱ Palm ៖ ផ្ទៀង ' + Object.keys(parcels).length + ' កញ្ចប់');
     });
 
     it('track ដែលមិនមែនរបស់ Barcode នេះ (ឧ. លេខជើងដំបូង) មិនធ្វើឲ្យបញ្ជីទាំងមូលធ្លាក់ ហើយមិនក្លាយជាភស្តុតាង', async () => {
@@ -255,16 +282,15 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie �
         expect(zto.filter((k) => k === 'track:KH1000000005').length, 'សាកម្តងទៀតមានព្រំដែន').toBeLessThanOrEqual(6);
     });
 
-    it('ទំព័រមួយ ZTO មិនឆ្លើយរហូត ➜ ទំព័រផ្សេងនៅមក · ប្រាប់ថាបញ្ជីមិនទាន់ពេញ (មិនមែនបាត់ស្ងាត់ ឬធ្លាក់ទាំងអស់)', async () => {
-        always.add('list:4:3');
+    it('ទំព័របេក្ខភាពមួយ ZTO មិនឆ្លើយរហូត ➜ ទំព័រផ្សេងនៅមក · ប្រាប់ថាបញ្ជីមិនទាន់ពេញ (មិនមែនបាត់ស្ងាត់ ឬធ្លាក់ទាំងអស់)', async () => {
+        parcels = dataset(150);
+        always.add('list:4:2');
         await runZtoListSyncPreview();
         expect(viewState.ztoListSyncNote, viewState.ztoListSyncNote).not.toContain('ទាញបញ្ជីពី ZTO មិនបាន');
-        expect(ztoState.ztoListSyncResult.failedPages).toEqual([3]);
+        expect(ztoState.ztoListSyncResult.failedPages).toEqual([2]);
         expect(viewState.ztoListSyncNote).toContain('⚠️ ទាញមិនបាន 1 ទំព័រ');
-        const rows = rowsByCode();
-        expect(rows.has('KH4000000001'), 'កញ្ចប់ក្នុងទំព័រ ៣ មិនទាន់មាន').toBe(false);
-        expect([...rows.keys()].sort()).toEqual(ARRIVED.filter((c) => c !== 'KH4000000001').sort());
-        expect(zto.filter((k) => k === 'list:4:3').length, 'សាកម្តងទៀតមានព្រំដែន').toBeLessThanOrEqual(6);
+        expect([...rowsByCode().keys()].sort(), 'កញ្ចប់ tab «បញ្ជូន» ទំព័រ ២ មិនទាន់មាន').toEqual(ARRIVED.filter((c) => !TAB4_ARRIVED.includes(c)).sort());
+        expect(zto.filter((k) => k === 'list:4:2').length, 'សាកម្តងទៀតមានព្រំដែន').toBeLessThanOrEqual(6);
     });
 
     it('Session Palm ផុតកំណត់ពាក់កណ្តាល ➜ បញ្ឈប់ ហើយប្រាប់ឲ្យ Login Palm ម្តងទៀត (មិនលាក់ជា «ផ្ទៀងមិនបាន»)', async () => {
@@ -274,14 +300,22 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie �
         expect(viewState.ztoListSyncNote).toContain('Login ZTO Palm');
     });
 
-    it('អានបញ្ជីប្រភេទដែលអស់ទំព័ររួចមិនស្ទួន · track ម្តងមួយកញ្ចប់ (កាត់ចំនួនសំណើទៅ ZTO)', async () => {
+    it('⏱ ល្បឿន (ម្ចាស់គម្រោង ៖ Palm ១–២ នាទី · Cookie ប៉ុន្មានវិនាទី) ៖ បញ្ជី ១០០ ក្នុងមួយទំព័រ · track ជាក្រុមស្របគ្នា · មិនស្ទួន', async () => {
+        parcels = dataset(150);
+        const total = Object.keys(parcels).length;
         await runZtoListSyncPreview();
-        const lists = zto.filter((k) => k.startsWith('list:'));
-        expect(lists.filter((k) => k.startsWith('list:1:')), 'tab «បញ្ហា» មាន ១ ទំព័រ').toEqual(['list:1:1']);
-        expect(lists.filter((k) => k.startsWith('list:5:')), 'tab «ចុះហត្ថលេខា» មាន ១ ទំព័រ').toEqual(['list:5:1']);
-        expect(lists.filter((k) => k.startsWith('list:4:')).sort()).toEqual(['list:4:1', 'list:4:2', 'list:4:3', 'list:4:4']);
+        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        const lists = zto.filter((k) => k.startsWith('list:')).sort();
+        expect(lists, 'tab នីមួយៗអានម្តង ១០០ ជួរ · tab ដែលអស់ទំព័រមិនអានស្ទួន').toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:5:1']);
+        expect(functionCalls, 'សំណើទៅ Function ៖ ទំព័របេក្ខភាព ២ + track ' + Math.ceil(total / 30)).toBe(2 + Math.ceil(total / 30));
         const tracks = zto.filter((k) => k.startsWith('track:'));
-        expect(tracks.length, 'track ម្តងមួយ Barcode').toBe(Object.keys(parcels).length);
-        expect(new Set(tracks).size).toBe(Object.keys(parcels).length);
+        if (supportsMulti) {
+            expect(tracks.length, 'track ច្រើនលេខ ៖ ≤ ១០ Barcode ក្នុងមួយសំណើ').toBeLessThanOrEqual(Math.ceil(total / 10) + Math.ceil(total / 30));
+        } else {
+            expect(tracks.filter((k) => !k.includes(',')).length, 'track ម្តងមួយ Barcode').toBe(total);
+            expect(peakTracks, 'track ស្របគ្នា ≥ 16').toBeGreaterThanOrEqual(16);
+        }
+        expect(peakTracks, 'មានព្រំដែន ៖ ≤ 4 សំណើ × 8').toBeLessThanOrEqual(32);
+        expect(viewState.ztoListSyncNote).toContain('(សំណើ track ' + tracks.length + ')');
     });
 });

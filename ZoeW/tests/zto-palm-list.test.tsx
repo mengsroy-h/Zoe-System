@@ -193,18 +193,23 @@ describe('Palm ៖ ទាញបញ្ជី ZTO ដូច Cookie ដោយ track
         expect(viewState.ztoListSyncNote).not.toContain('private-detail');
     });
 
-    it('Palm អានគ្រប់ទំព័រ រួមទំព័រទទេក្រោយច្រោះ និងទំព័រលើសពិដាន Cookie', async () => {
+    it('Palm អានបេក្ខភាពគ្រប់ទំព័រ (លើសពិដាន Cookie) រួចផ្ទៀង track ជាក្រុម', async () => {
         const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
-            const page = Number(new URL(url).searchParams.get('page'));
-            return json({ success: true, list: true, enabled: true, kind: 'arrival', page, pages: 5,
-                total: page === 5 ? 1 : 0, pageTotal: true, site: 'KH001', rows: page === 5
-                    ? [{ barcode: 'KH0000000501', phone: '0960007345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: false, skip: '', from: '' }] : [],
-                signed: [], signedOk: true, signedPages: 1, signedRows: [] });
+            const u = new URL(url);
+            const page = Number(u.searchParams.get('page'));
+            if (u.searchParams.get('candidates') === '1') {
+                return json({ success: true, list: true, enabled: true, kind: 'candidates', page, pages: 5, tabPages: { '4': 5 }, site: 'KH001', rows: [],
+                    candidates: page === 5 ? [{ barcode: 'KH0000000501', phone: '0960007345', cod: 2.5, dod: 0, from: '' }] : [], otherScans: 0 });
+            }
+            expect(u.searchParams.get('tracks')).toBe('KH0000000501');
+            return json({ success: true, list: true, enabled: true, kind: 'tracks', rows: [], unverified: [], unverifiedReasons: [],
+                evidence: [{ barcode: 'KH0000000501', arrivals: ['2026-10-05 09:00:00'], ztoClosed: false, signedAt: '', from: '' }] });
         });
         vi.stubGlobal('fetch', fetch);
         await runZtoListSyncPreview();
-        expect(fetch).toHaveBeenCalledTimes(5);
-        expect(fetch.mock.calls.map((c) => Number(new URL(c[0]).searchParams.get('page'))).sort()).toEqual([1, 2, 3, 4, 5]);
+        const urls = fetch.mock.calls.map((c) => new URL(c[0]));
+        expect(urls.filter((u) => u.searchParams.get('candidates') === '1').map((u) => Number(u.searchParams.get('page'))).sort()).toEqual([1, 2, 3, 4, 5]);
+        expect(urls.filter((u) => u.searchParams.get('tracks'))).toHaveLength(1);
         expect(ztoState.ztoListSyncResult).toMatchObject({ total: 1, truncated: false });
         expect(ztoState.ztoListSyncResult.rows.map((r: any) => r.barcode)).toEqual(['KH0000000501']);
     });

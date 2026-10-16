@@ -37,9 +37,10 @@ export const ZTO_LIST_CLIENT_MAX_PAGES = 3;
 
 export const ZTO_PALM_LIST_MAX_PAGES = 1000;
 export const ZTO_PALM_LIST_TABS = ['1', '4', '5'];
-export const ZTO_PALM_LIST_PAGE_CONCURRENCY = 2;
+export const ZTO_PALM_LIST_CONCURRENCY = 4;
 export const ZTO_PALM_LIST_PAGE_TRIES_MAX = 3;
-export const ZTO_PALM_LIST_VERIFY_TRIES_MAX = 2;
+export const ZTO_PALM_TRACK_BATCH = 30;
+export const ZTO_PALM_TRACK_PASSES_MAX = 3;
 export const ZTO_PALM_LIST_RETRY_MS = 1000;
 export const ZTO_PALM_UNVERIFIED_SHOWN = 5;
 
@@ -340,8 +341,9 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?, palm?) {
     const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1' : (mode === 'withSigned' ? '&withSigned=1' : ''));
     const isPalm = lookupApiIsPalm(cfg);
     let palmExtra = '';
+    if (isPalm && palm && palm.candidates === true) palmExtra += '&candidates=1';
     if (isPalm && palm && Array.isArray(palm.tabs) && palm.tabs.length) palmExtra += '&tabs=' + encodeURIComponent(palm.tabs.join(','));
-    if (isPalm && palm && Array.isArray(palm.verify) && palm.verify.length) palmExtra += '&verify=' + encodeURIComponent(palm.verify.join(','));
+    if (isPalm && palm && Array.isArray(palm.tracks) && palm.tracks.length) palmExtra += '&tracks=' + encodeURIComponent(palm.tracks.join(','));
     return base + (isPalm ? '?palm=1&list=1' : '?list=1')
         + '&from=' + encodeURIComponent(from)
         + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page)) + extra + palmExtra;
@@ -517,7 +519,7 @@ function ztoPalmWait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function fetchZtoPalmPage(cfg, from, to, page, tabs, verify, session) {
+export async function fetchZtoPalmPage(cfg, from, to, page, palm, session) {
     let failure = null;
     for (let attempt = 1; attempt <= ZTO_PALM_LIST_PAGE_TRIES_MAX; attempt++) {
         if (attempt > 1) {
@@ -525,7 +527,7 @@ export async function fetchZtoPalmPage(cfg, from, to, page, tabs, verify, sessio
             if (!session.current()) return null;
         }
         try {
-            return await fetchZtoListPage(cfg, from, to, page, undefined, { tabs: tabs, verify: verify });
+            return await fetchZtoListPage(cfg, from, to, page, undefined, palm);
         } catch (e) {
             if (!ztoPalmPageRetryable(e) || (navigator.onLine as boolean) === false) throw e;
             failure = e;
@@ -534,100 +536,147 @@ export async function fetchZtoPalmPage(cfg, from, to, page, tabs, verify, sessio
     throw failure || new Error('ZTO_LIST_FAILED');
 }
 
-function ztoPalmCodes(list) {
-    const out = [];
-    if (!Array.isArray(list)) return out;
-    for (let i = 0; i < list.length; i++) {
-        const code = typeof list[i] === 'string' ? list[i].trim() : '';
-        if (/^[A-Za-z0-9_-]{6,64}$/.test(code) && out.indexOf(code) === -1) out.push(code);
-    }
-    return out;
+function ztoPalmCode(value) {
+    const code = typeof value === 'string' ? value.trim() : '';
+    return /^[A-Za-z0-9_-]{6,64}$/.test(code) ? code : '';
+}
+
+async function ztoPalmEach(items, limit, run) {
+    let next = 0;
+    let stop = null;
+    const worker = async () => {
+        while (!stop && next < items.length) {
+            const item = items[next];
+            next++;
+            try {
+                await run(item);
+            } catch (e) {
+                stop = stop || e;
+            }
+        }
+    };
+    const workers = [];
+    for (let w = 0; w < limit && w < items.length; w++) workers.push(worker());
+    await Promise.all(workers);
+    if (stop) throw stop;
 }
 
 export async function fetchZtoPalmListAllPages(cfg, from, to) {
     const session = captureZtoSession();
+    const startedAt = Date.now();
     const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, pageLimit: ZTO_PALM_LIST_MAX_PAGES, site: '', siteName: '', otherScans: 0,
-        signedMismatch: 0, signedMismatchTexts: [], signedDescExpected: [], signedState: 'ok', unverified: [], failedPages: [], palm: true };
+        signedMismatch: 0, signedMismatchTexts: [], signedDescExpected: [], signedState: 'ok', unverified: [], failedPages: [], palm: true,
+        candidates: 0, elapsedMs: 0, trackRequests: 0 };
     const tabPages = {};
-    const unverified = new Set();
-    let read = 0;
-    const absorb = (body) => {
-        for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
-        out.total += ztoListPositiveCount(body.total);
-        out.otherScans += ztoListPositiveCount(body.otherScans);
-        absorbZtoListSigned(out, body);
+    const candidates = new Map();
+    const progress = (text) => {
+        if (session.current()) setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO Palm ៖ ' + text + '...');
     };
-    const noteTabs = (body, tabs) => {
-        const reported = body && body.tabPages && typeof body.tabPages === 'object' ? body.tabPages : null;
+    const absorbCandidates = (body, tabs) => {
+        if (!out.site && body.site) out.site = String(body.site);
+        if (!out.siteName && body.siteName) out.siteName = String(body.siteName);
+        out.otherScans += ztoListPositiveCount(body.otherScans);
+        const reported = body.tabPages && typeof body.tabPages === 'object' ? body.tabPages : null;
         for (let i = 0; i < tabs.length; i++) {
-            const pages = Number(reported ? reported[tabs[i]] : body && body.pages);
+            const pages = Number(reported ? reported[tabs[i]] : body.pages);
             if (isFinite(pages) && pages >= 0) tabPages[tabs[i]] = Math.max(Number(tabPages[tabs[i]]) || 0, Math.floor(pages));
+        }
+        const list = Array.isArray(body.candidates) ? body.candidates : [];
+        for (let i = 0; i < list.length; i++) {
+            const raw = list[i];
+            const code = ztoPalmCode(raw && raw.barcode);
+            if (code && !candidates.has(code.toUpperCase())) candidates.set(code.toUpperCase(), Object.assign({}, raw, { barcode: code }));
         }
     };
     const lastPage = () => {
         let pages = 0;
         for (let i = 0; i < ZTO_PALM_LIST_TABS.length; i++) pages = Math.max(pages, Number(tabPages[ZTO_PALM_LIST_TABS[i]]) || 0);
-        return pages;
+        return Math.min(pages, ZTO_PALM_LIST_MAX_PAGES);
     };
-    const progress = () => {
-        if (session.current()) setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO Palm ៖ ទំព័រ ' + read + '/' + Math.max(read, Math.min(lastPage(), ZTO_PALM_LIST_MAX_PAGES)) + '...');
-    };
-    const settle = async (page, body, tabs) => {
-        absorb(body);
-        let pending = ztoPalmCodes(body.unverified);
-        for (let tries = 0; pending.length && tries < ZTO_PALM_LIST_VERIFY_TRIES_MAX; tries++) {
-            await ztoPalmWait(ZTO_PALM_LIST_RETRY_MS);
-            if (!session.current()) return false;
-            let retry = null;
-            try {
-                retry = await fetchZtoPalmPage(cfg, from, to, page, tabs, pending, session);
-            } catch (e) {
-                if (!ztoPalmPageRetryable(e)) throw e;
-                break;
-            }
-            if (!retry) return false;
-            absorb(retry);
-            pending = ztoPalmCodes(retry.unverified);
-        }
-        for (let i = 0; i < pending.length; i++) unverified.add(pending[i]);
-        read++;
-        progress();
-        return true;
-    };
-    const first = await fetchZtoPalmPage(cfg, from, to, 1, null, null, session);
+    progress('អានបញ្ជីកញ្ចប់');
+    const first = await fetchZtoPalmPage(cfg, from, to, 1, { candidates: true }, session);
     if (!first) return out;
-    noteTabs(first, ZTO_PALM_LIST_TABS);
-    if (!(await settle(1, first, null))) return out;
-    let nextPage = 2;
-    const worker = async () => {
-        while (session.current()) {
-            const page = nextPage;
-            if (page > Math.min(lastPage(), ZTO_PALM_LIST_MAX_PAGES)) return;
+    absorbCandidates(first, ZTO_PALM_LIST_TABS);
+    const pages = [];
+    for (let page = 2; page <= lastPage(); page++) pages.push(page);
+    let nextPage = 0;
+    const pageWorker = async () => {
+        while (session.current() && nextPage < pages.length) {
+            const page = pages[nextPage];
             nextPage++;
             const tabs = ZTO_PALM_LIST_TABS.filter((tab) => (Number(tabPages[tab]) || 0) >= page);
             if (!tabs.length) continue;
             let body = null;
             try {
-                body = await fetchZtoPalmPage(cfg, from, to, page, tabs, null, session);
+                body = await fetchZtoPalmPage(cfg, from, to, page, { candidates: true, tabs: tabs }, session);
             } catch (e) {
                 if (!ztoPalmPageRetryable(e)) throw e;
                 out.failedPages.push(page);
                 continue;
             }
             if (!body) return;
-            noteTabs(body, tabs);
-            if (!(await settle(page, body, tabs))) return;
+            absorbCandidates(body, tabs);
+            for (let more = pages[pages.length - 1] + 1; more <= lastPage(); more++) pages.push(more);
+            progress('អានបញ្ជីកញ្ចប់ ' + candidates.size);
         }
     };
-    const workers = [];
-    for (let w = 0; w < ZTO_PALM_LIST_PAGE_CONCURRENCY; w++) workers.push(worker());
-    await Promise.all(workers);
+    const pageWorkers = [];
+    for (let w = 0; w < ZTO_PALM_LIST_CONCURRENCY; w++) pageWorkers.push(pageWorker());
+    await Promise.all(pageWorkers);
+    if (!session.current()) return out;
     out.pages = lastPage();
-    const seen = new Set();
-    for (let i = 0; i < out.rows.length; i++) seen.add(String(out.rows[i] && out.rows[i].barcode).toUpperCase());
-    for (let i = 0; i < out.signed.length; i++) seen.add(String(out.signed[i]).toUpperCase());
-    unverified.forEach((code) => { if (!seen.has(String(code).toUpperCase())) out.unverified.push(code); });
+    out.candidates = candidates.size;
+    const evidence = new Map();
+    let pending = Array.from(candidates.values()).map((c) => c.barcode);
+    for (let pass = 0; pending.length && pass < ZTO_PALM_TRACK_PASSES_MAX; pass++) {
+        if (pass > 0) {
+            await ztoPalmWait(ZTO_PALM_LIST_RETRY_MS);
+            if (!session.current()) return out;
+        }
+        const batches = [];
+        for (let i = 0; i < pending.length; i += ZTO_PALM_TRACK_BATCH) batches.push(pending.slice(i, i + ZTO_PALM_TRACK_BATCH));
+        const total = pending.length;
+        let done = 0;
+        progress((pass ? 'ផ្ទៀង track ម្តងទៀត ' : 'ផ្ទៀង track ') + '0/' + total + ' កញ្ចប់');
+        await ztoPalmEach(batches, ZTO_PALM_LIST_CONCURRENCY, async (batch) => {
+            if (!session.current()) return;
+            let body = null;
+            try {
+                body = await fetchZtoPalmPage(cfg, from, to, 1, { tracks: batch }, session);
+            } catch (e) {
+                if (!ztoPalmPageRetryable(e)) throw e;
+            }
+            const calls = body && body.trackCalls && typeof body.trackCalls === 'object' ? body.trackCalls : {};
+            out.trackRequests += ztoListPositiveCount(calls.multi) + ztoListPositiveCount(calls.single);
+            const list = body && Array.isArray(body.evidence) ? body.evidence : [];
+            for (let i = 0; i < list.length; i++) {
+                const code = ztoPalmCode(list[i] && list[i].barcode);
+                if (code && batch.indexOf(code) !== -1) evidence.set(code.toUpperCase(), list[i]);
+            }
+            done += batch.length;
+            progress((pass ? 'ផ្ទៀង track ម្តងទៀត ' : 'ផ្ទៀង track ') + done + '/' + total + ' កញ្ចប់');
+        });
+        if (!session.current()) return out;
+        pending = pending.filter((code) => !evidence.has(code.toUpperCase()));
+    }
+    candidates.forEach((candidate, key) => {
+        const found = evidence.get(key);
+        if (!found) return;
+        const from = typeof candidate.from === 'string' && candidate.from ? candidate.from : (typeof found.from === 'string' ? found.from : '');
+        const base = { barcode: candidate.barcode, phone: candidate.phone, cod: candidate.cod, dod: candidate.dod };
+        const arrivals = Array.isArray(found.arrivals) ? found.arrivals.filter((at) => typeof at === 'string' && at) : [];
+        const closed = found.ztoClosed === true ? true : (found.ztoClosed === false ? false : null);
+        for (let i = 0; i < arrivals.length; i++) out.rows.push(Object.assign({}, base, { at: arrivals[i], ztoClosed: closed, skip: '', from: from }));
+        if (!arrivals.length) out.otherScans++;
+        if (typeof found.signedAt === 'string' && found.signedAt) {
+            out.signed.push(candidate.barcode);
+            out.signedRows.push(Object.assign({}, base, { at: found.signedAt, from: from }));
+        }
+    });
+    out.total = out.rows.length;
+    out.unverified = pending;
     out.failedPages.sort((a, b) => a - b);
+    out.elapsedMs = elapsedSince(startedAt);
     return out;
 }
 
@@ -703,6 +752,10 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
     }
     const failedPages = result && Array.isArray(result.failedPages) ? result.failedPages : [];
     if (failedPages.length) parts.push('⚠️ ទាញមិនបាន ' + failedPages.length + ' ទំព័រ (ZTO មិនឆ្លើយ) ➜ បញ្ជីមិនទាន់ពេញ — សូមទាញម្តងទៀត');
+    if (result && result.palm && ztoListPositiveCount(result.candidates) > 0) {
+        parts.push('⏱ Palm ៖ ផ្ទៀង ' + ztoListPositiveCount(result.candidates) + ' កញ្ចប់ ក្នុង '
+            + (ztoListPositiveCount(result.elapsedMs) / 1000).toFixed(1) + ' វិនាទី (សំណើ track ' + ztoListPositiveCount(result.trackRequests) + ')');
+    }
     const state = result && result.signedState;
     if (state === 'partial') parts.push('⚠️ បញ្ជីចុះហត្ថលេខា ZTO ទាញបានមិនគ្រប់ ➜ ខ្លះនៅបើក (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
     else if (state === 'failed') parts.push('⚠️ ទាញបញ្ជីចុះហត្ថលេខា ZTO មិនបាន ➜ កញ្ចប់ថ្មីបញ្ចូលជា «មិនទាន់យក» (បិទតាម ZTO ស្វ័យប្រវត្តិ ពិនិត្យបន្ត)');
@@ -785,7 +838,10 @@ export async function runZtoListSyncPreview() {
             pageLimit: pulled.pageLimit,
             palm: pulled.palm === true,
             unverified: Array.isArray(pulled.unverified) ? pulled.unverified : [],
-            failedPages: Array.isArray(pulled.failedPages) ? pulled.failedPages : []
+            failedPages: Array.isArray(pulled.failedPages) ? pulled.failedPages : [],
+            candidates: ztoListPositiveCount(pulled.candidates),
+            elapsedMs: ztoListPositiveCount(pulled.elapsedMs),
+            trackRequests: ztoListPositiveCount(pulled.trackRequests)
         };
         renderZtoListSyncPreview();
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');

@@ -19,15 +19,18 @@ const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
 const SIGNED_STATUS = '5';
 const LIST_ROW_MAX = 200;
 const LIST_TABS = ['1', '4', '5'];
-const PALM_LIST_PAGE_SIZE = 5;
-const PALM_TRACK_CONCURRENCY = 6;
+const PALM_TRACK_CONCURRENCY = 8;
+const PALM_TRACKS_MAX = 30;
+const PALM_TRACK_MULTI_MAX = 10;
+const PALM_TRACK_MULTI_CONCURRENCY = 3;
+const PALM_TRACK_MULTI_RECHECK_MS = 10 * 60 * 1000;
 const PALM_READ_ATTEMPTS = 2;
 const PALM_EMPTY_TRACK_READS = 2;
 const PALM_RETRY_GAP_MS = 250;
 const PALM_RETRY_MIN_MS = 1500;
 const PALM_TRACK_MIN_MS = 1000;
-const PALM_VERIFY_MAX = 15;
 const PALM_REASONS_MAX = 5;
+let palmMultiTrack = { ok: null, at: 0 };
 
 function json(statusCode, body) {
     return { statusCode, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
@@ -384,9 +387,11 @@ function invalidPalmResponse(reason, barcode) {
     return Object.assign(new Error('upstream:json'), { palmReason: 'palm:' + reason, palmBarcode: barcode || '' });
 }
 
-function candidatePage(upstream, page, pageSize, kind) {
+function candidatePage(upstream, page, requestedSize, kind) {
     const container = upstream.result;
     if (!container || typeof container !== 'object' || Array.isArray(container)) throw invalidPalmResponse('list-' + kind + '-result');
+    const servedSize = Number(container.pageSize);
+    const pageSize = Number.isInteger(servedSize) && servedSize > 0 && servedSize < requestedSize ? servedSize : requestedSize;
     const reported = Number(container.pages);
     const numericPages = typeof container.pages === 'number' || (typeof container.pages === 'string' && /^\d+$/.test(container.pages));
     const known = numericPages && Number.isInteger(reported) && reported >= 0;
@@ -483,12 +488,12 @@ function trackSignFlag(groups) {
     return null;
 }
 
-function trackEvidence(upstream, barcode, site) {
+function trackEvidence(upstream, barcode, site, shared) {
     if (!Array.isArray(upstream.result)) return { kind: 'invalid', reason: 'palm:track-result' };
     const code = trackingCode(barcode);
     const groups = upstream.result.filter((group) => group && typeof group === 'object' && Array.isArray(group.tracks));
     let own = groups.filter((group) => trackGroupCode(group) === code);
-    if (!own.length) own = groups.filter((group) => !trackGroupCode(group) && group.tracks.some((track) => trackingCode(track?.mailNo) === code));
+    if (!own.length && !shared) own = groups.filter((group) => !trackGroupCode(group) && group.tracks.some((track) => trackingCode(track?.mailNo) === code));
     if (!own.length) return upstream.result.length ? { kind: 'invalid', reason: 'palm:track-identity' } : { kind: 'empty' };
     const here = trackingCode(site);
     const tracks = [];
@@ -498,7 +503,7 @@ function trackEvidence(upstream, barcode, site) {
         for (const track of group.tracks) {
             if (!track || typeof track !== 'object' || Array.isArray(track)) continue;
             const mailNo = trackingCode(track.mailNo);
-            if (mailNo ? mailNo !== code : identity !== code) continue;
+            if (mailNo ? mailNo !== code : (shared || identity !== code)) continue;
             const time = listTrackStamp(track.time);
             if (!time) { malformed = malformed || 'palm:track-time'; continue; }
             if (typeof track.action !== 'string' && typeof track.action !== 'number') { malformed = malformed || 'palm:track-action'; continue; }
@@ -535,24 +540,6 @@ async function palmTrackJob(barcode, session, keys, deps) {
     return { kind: 'invalid', reason: 'palm:track-empty' };
 }
 
-function evidenceRows(evidence, job, range, signedEnd, keys, deps) {
-    const raw = job.raw;
-    const fields = deps.project(raw);
-    const base = { barcode: job.barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
-        cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod };
-    const from = palmOrigin(raw, evidence.tracks.map((entry) => ({ ...entry.track, time: entry.time })));
-    const rows = [];
-    const seen = new Set();
-    for (const entry of evidence.tracks) {
-        if (!entry.here || entry.action !== '3' || entry.time < range.start || entry.time > range.end || seen.has(entry.time)) continue;
-        seen.add(entry.time);
-        rows.push({ ...base, at: entry.time, ztoClosed: evidence.ztoClosed, skip: '', from });
-    }
-    const signed = evidence.ztoClosed === true && evidence.signedAt >= range.start && evidence.signedAt <= signedEnd
-        ? { ...base, at: evidence.signedAt, from } : null;
-    return { rows, signed };
-}
-
 function arrivalTabRequest(tab, range, signedRange, page, pageSize) {
     if (tab === '1') return { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize };
     if (tab === '4') return { billStatus: '4', status: 0, pageNum: page, pageSize };
@@ -564,8 +551,8 @@ function listBillCode(raw) {
     return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
 }
 
-async function palmArrivalList(range, page, session, keys, deps, tabs, verify) {
-    const pageSize = Math.min(PALM_LIST_PAGE_SIZE, deps.listPageSize);
+async function palmCandidates(range, page, session, keys, deps, tabs) {
+    const pageSize = deps.listPageSize;
     const signedRange = deps.listSignedRange(range);
     const outcomes = await Promise.all(tabs.map((tab) => palmRead(DISPATCH_LIST_PATH,
         arrivalTabRequest(tab, range, signedRange, page, pageSize), session, keys, deps)));
@@ -573,7 +560,8 @@ async function palmArrivalList(range, page, session, keys, deps, tabs, verify) {
     const failed = auth >= 0 ? auth : outcomes.findIndex((outcome) => outcome.kind !== 'ok');
     if (failed >= 0) return listReadFailure(outcomes[failed], tabs[failed]);
     const tabPages = {};
-    const candidates = new Map();
+    const candidates = [];
+    const seen = new Set();
     let otherScans = 0;
     outcomes.forEach((outcome, index) => {
         const current = candidatePage(outcome.upstream, page, pageSize, tabs[index]);
@@ -581,57 +569,109 @@ async function palmArrivalList(range, page, session, keys, deps, tabs, verify) {
         for (const raw of current.list) {
             const barcode = listBillCode(raw);
             if (!BARCODE_RE.test(barcode)) { otherScans++; continue; }
-            if (!candidates.has(trackingCode(barcode))) candidates.set(trackingCode(barcode), { raw, barcode });
+            if (seen.has(trackingCode(barcode))) continue;
+            seen.add(trackingCode(barcode));
+            const fields = deps.project(raw);
+            candidates.push({
+                barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
+                cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod,
+                from: originText(raw.recSite) || originText(raw.customerCodeDesc)
+            });
         }
     });
+    return json(200, {
+        success: true, list: true, enabled: true, kind: 'candidates', page,
+        site: session.site, siteName: session.siteName || '', pages: Math.max(0, ...Object.values(tabPages)), tabPages,
+        candidates, rows: [], otherScans, provider: 'zto-palm'
+    });
+}
+
+function palmMultiTrackAllowed() {
+    const age = Date.now() - palmMultiTrack.at;
+    return palmMultiTrack.ok !== false || age < 0 || age > PALM_TRACK_MULTI_RECHECK_MS;
+}
+
+function notePalmMultiTrack(ok) {
+    palmMultiTrack = { ok, at: Date.now() };
+}
+
+async function eachLimited(items, limit, run) {
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const index = next++;
+            await run(items[index], index);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+async function palmMultiTrackRound(codes, session, keys, deps, found, calls) {
+    const chunks = [];
+    for (let i = 0; i < codes.length; i += PALM_TRACK_MULTI_MAX) chunks.push(codes.slice(i, i + PALM_TRACK_MULTI_MAX));
+    let authLost = false;
+    await eachLimited(chunks, PALM_TRACK_MULTI_CONCURRENCY, async (chunk) => {
+        if (authLost || !palmMultiTrackAllowed() || remainingOf(deps) < PALM_TRACK_MIN_MS + PALM_RETRY_MIN_MS) return;
+        calls.multi++;
+        let upstream;
+        try {
+            upstream = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: chunk.join(',') }, session.token, keys, deps.upstreamMs(), null, true);
+        } catch (_) { return; }
+        if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) { authLost = true; return; }
+        if (upstream.status !== true) { notePalmMultiTrack(false); return; }
+        let matched = 0;
+        for (const code of chunk) {
+            const evidence = trackEvidence(upstream, code, session.site, true);
+            if (evidence.kind !== 'ok') continue;
+            found.set(code, evidence);
+            matched++;
+        }
+        notePalmMultiTrack(matched >= 2);
+    });
+    return !authLost;
+}
+
+function trackReport(evidence, barcode, range, signedEnd) {
+    const arrivals = [];
+    for (const entry of evidence.tracks) {
+        if (!entry.here || entry.action !== '3' || entry.time < range.start || entry.time > range.end || arrivals.includes(entry.time)) continue;
+        arrivals.push(entry.time);
+    }
+    const signedAt = evidence.ztoClosed === true && evidence.signedAt >= range.start && evidence.signedAt <= signedEnd ? evidence.signedAt : '';
+    return { barcode, arrivals, ztoClosed: evidence.ztoClosed, signedAt,
+        from: palmOrigin({}, evidence.tracks.map((entry) => ({ ...entry.track, time: entry.time }))) };
+}
+
+async function palmTracks(range, codes, session, keys, deps) {
+    const signedRange = deps.listSignedRange(range);
+    const found = new Map();
+    const calls = { multi: 0, single: 0 };
+    if (codes.length > 1 && palmMultiTrackAllowed() && !(await palmMultiTrackRound(codes, session, keys, deps, found, calls))) {
+        return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
+    }
     const unverified = [];
     const reasons = new Set();
-    const wanted = verify ? new Set(verify.map(trackingCode)) : null;
-    if (verify) {
-        for (const code of verify) {
-            if (!candidates.has(trackingCode(code))) { unverified.push(code); reasons.add('palm:moved'); }
-        }
-    }
-    const jobs = Array.from(candidates.values()).filter((job) => !wanted || wanted.has(trackingCode(job.barcode)));
-    const evidence = new Array(jobs.length).fill(null);
-    let next = 0;
     let authLost = false;
-    const worker = async () => {
-        while (!authLost && next < jobs.length) {
-            const index = next++;
-            const job = jobs[index];
-            if (remainingOf(deps) < PALM_TRACK_MIN_MS) {
-                unverified.push(job.barcode);
-                reasons.add('palm:budget');
-                continue;
-            }
-            const outcome = await palmTrackJob(job.barcode, session, keys, deps);
-            if (outcome.kind === 'auth') { authLost = true; return; }
-            if (outcome.kind === 'ok') evidence[index] = outcome.evidence;
-            else { unverified.push(job.barcode); reasons.add(outcome.reason); }
+    await eachLimited(codes.filter((code) => !found.has(code)), PALM_TRACK_CONCURRENCY, async (code) => {
+        if (authLost) return;
+        if (remainingOf(deps) < PALM_TRACK_MIN_MS) {
+            unverified.push(code);
+            reasons.add('palm:budget');
+            return;
         }
-    };
-    await Promise.all(Array.from({ length: Math.min(PALM_TRACK_CONCURRENCY, jobs.length) }, worker));
+        calls.single++;
+        const outcome = await palmTrackJob(code, session, keys, deps);
+        if (outcome.kind === 'auth') { authLost = true; return; }
+        if (outcome.kind === 'ok') found.set(code, outcome.evidence);
+        else { unverified.push(code); reasons.add(outcome.reason); }
+    });
     if (authLost) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
-    const rows = [];
-    const signedRows = [];
-    for (let i = 0; i < jobs.length; i++) {
-        if (!evidence[i]) continue;
-        const out = evidenceRows(evidence[i], jobs[i], range, signedRange.end, keys, deps);
-        for (const row of out.rows) rows.push(row);
-        if (!out.rows.length) otherScans++;
-        if (out.signed) signedRows.push(out.signed);
-    }
-    const body = {
-        success: true, list: true, enabled: true, kind: 'arrival', page,
-        site: session.site, siteName: session.siteName || '', pages: Math.max(0, ...Object.values(tabPages)), tabPages,
-        total: rows.length, pageTotal: true, rows, otherScans, candidates: jobs.length,
-        unverified: unverified.filter((code, i) => unverified.findIndex((other) => trackingCode(other) === trackingCode(code)) === i),
-        unverifiedReasons: Array.from(reasons).slice(0, PALM_REASONS_MAX),
-        signed: signedRows.map((row) => row.barcode), signedRows, signedOk: true,
-        signedPages: tabPages['5'] || 0, signedMismatch: 0, provider: 'zto-palm'
-    };
-    return json(200, body);
+    return json(200, {
+        success: true, list: true, enabled: true, kind: 'tracks', site: session.site, siteName: session.siteName || '',
+        rows: [], evidence: codes.filter((code) => found.has(code)).map((code) => trackReport(found.get(code), code, range, signedRange.end)),
+        unverified: codes.filter((code) => unverified.includes(code)), unverifiedReasons: Array.from(reasons).slice(0, PALM_REASONS_MAX),
+        trackCalls: calls, provider: 'zto-palm'
+    });
 }
 
 function listTabs(text) {
@@ -641,10 +681,11 @@ function listTabs(text) {
     return LIST_TABS.filter((tab) => parts.includes(tab));
 }
 
-function listVerify(text) {
-    if (text === undefined || text === null || text === '') return undefined;
-    const parts = String(text).split(',').map((part) => part.trim());
-    if (!parts.length || parts.length > PALM_VERIFY_MAX || parts.some((part) => !BARCODE_RE.test(part))) return null;
+function listTrackCodes(text) {
+    if (typeof text !== 'string' || !text) return null;
+    const parts = text.split(',').map((part) => part.trim());
+    if (parts.length > PALM_TRACKS_MAX || parts.some((part) => !BARCODE_RE.test(part))
+        || new Set(parts.map(trackingCode)).size !== parts.length) return null;
     return parts;
 }
 
@@ -663,10 +704,14 @@ async function palmList(query, session, keys, deps) {
     }
     if (query.signed !== '1') {
         if (!trackingCode(session.site)) return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-missing' });
-        const tabs = listTabs(query.tabs);
-        const verify = listVerify(query.verify);
-        if (!tabs || verify === null) return json(400, { error: 'Invalid list request', code: 'ZTO_LIST_PAGE_INVALID' });
-        return await palmArrivalList(range, page, session, keys, deps, tabs, verify);
+        if (query.candidates === '1') {
+            const tabs = listTabs(query.tabs);
+            if (tabs) return await palmCandidates(range, page, session, keys, deps, tabs);
+        } else {
+            const codes = listTrackCodes(query.tracks);
+            if (codes) return await palmTracks(range, codes, session, keys, deps);
+        }
+        return json(400, { error: 'Invalid list request', code: 'ZTO_LIST_PAGE_INVALID' });
     }
     const outcome = await palmSignedPage(query.exact === '1' ? range : deps.listSignedRange(range), page, session, keys, deps);
     return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);
@@ -677,4 +722,8 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, palmDispatcher, PALM_HOST, BILL_INFO_PATH };
+function resetPalmForTests() {
+    palmMultiTrack = { ok: null, at: 0 };
+}
+
+module.exports = { handlePalm, isPalmPreflight, palmDispatcher, resetPalmForTests, PALM_HOST, BILL_INFO_PATH };

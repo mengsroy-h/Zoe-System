@@ -377,12 +377,17 @@ function invalidPalmResponse(reason, barcode) {
 function candidatePage(upstream, page, pageSize, kind) {
     const container = upstream.result;
     if (!container || typeof container !== 'object' || Array.isArray(container)) throw invalidPalmResponse('list-' + kind + '-result');
-    const empty = container.list === null && (container.total === 0 || container.total === '0')
-        && (container.pages === 0 || container.pages === '0');
-    const list = empty ? [] : container.list;
-    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) throw invalidPalmResponse('list-' + kind + '-items');
     const reported = Number(container.pages);
-    const known = container.pages !== null && container.pages !== undefined && Number.isInteger(reported) && reported >= 0;
+    const numericPages = typeof container.pages === 'number' || (typeof container.pages === 'string' && /^\d+$/.test(container.pages));
+    const known = numericPages && Number.isInteger(reported) && reported >= 0;
+    const zeroTotal = container.total === 0 || container.total === '0';
+    const exhausted = known && page > reported;
+    const empty = container.list == null && (zeroTotal || exhausted);
+    const list = empty ? [] : container.list;
+    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) {
+        const shape = list === null ? 'null' : Array.isArray(list) ? 'large' : typeof list;
+        throw invalidPalmResponse('list-' + kind + '-items-' + shape + '-p' + page);
+    }
     if (known && reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
     const full = list.length >= pageSize;
     return { list, pages: known ? reported : (full ? page + 1 : (list.length ? page : page - 1)), unknown: !known && full };

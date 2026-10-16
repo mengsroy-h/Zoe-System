@@ -101,7 +101,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   សំណើមួយអាន ៥ បេក្ខភាពក្នុងមួយប្រភេទ ដើម្បីផ្ទៀង track ក្នុងថវិកា Function។ ទំព័របញ្ជីត្រូវអានបន្តទោះទំព័រមុនគ្មានកញ្ចប់មកដល់; ទិន្នន័យ track ខ្វះ/បរាជ័យបង្ហាញកំហុស ជំនួសឲ្យរំលងកញ្ចប់ស្ងាត់។
   ភស្តុតាងមកដល់មិនទាមទារ `mail.isSign` ទេ៖ `QueryTrackingRPTO` ក្នុង APK មានតែ `tracks`។ Barcode ត្រូវផ្ទៀងតាម
   `mail.mailNo`, `mailNo` ឬ `tracks[].mailNo` ទាំងអស់ត្រូវគ្នា។ បើ metadata ចុះហត្ថលេខាខ្វះ ទុកស្ថានភាព `null` ដោយមិនបិទបញ្ជីមកដល់។
-  បញ្ជីមាន `list:null` ទទួលជាទទេតែពេល `total=0` និង `pages=0` បញ្ជាក់។
+  បញ្ជីមាន `list:null` ឬគ្មាន `list` ទទួលជាទទេពេល `total=0` ឬលេខទំព័រដែលស្នើហួស `pages` បញ្ជាក់; `pages` ទទួលតែលេខ ឬ String លេខ ដើម្បីកុំឲ្យ boolean/ទទេក្លាយជា ០។
 - ប្រភពកញ្ចប់ VN · CN · ផ្សេងៗត្រូវរក្សាទុកពេលនាំចូល ៖ `recSite`/`customerCodeDesc` បើមាន ឬឈ្មោះកន្លែងទទួលដើមពី
   `action: "1"` ក្នុងប្រវត្តិស្កេន (`msgLoc` · `msgEng` · `siteName`)។ មិនយកសាខាដឹកបន្ត ឬប្រទេសអ្នកទទួលជាប្រភពទេ។
   ប្រភពដែល ZTO មិនផ្តល់ទុកទទេ។ ការបង្ហាញទង់ជាតិប្រើផែនទីឈ្មោះសាខាដូច Cookie។
@@ -130,7 +130,8 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 
 | Reason | ត្រូវផ្ទៀង |
 |---|---|
-| `palm:list-1-result/items/pages` (ឬ `list-4`, `list-5`) | envelope `result`, បញ្ជី `list` និង pagination របស់ tab នោះ |
+| `palm:list-1-result/pages` (ឬ `list-4`, `list-5`) | envelope `result` និង pagination របស់ tab នោះ |
+| `palm:list-5-items-null-p1` (ឬប្រភេទ/ទំព័រផ្សេង) | បញ្ជី `list` ខូច; reason បង្ហាញ type និងលេខទំព័រ (`large` = លើសពិដានជួរ) |
 | `palm:list-1-response` (ឬ `list-4`, `list-5`) | ការទទួល/អានចម្លើយ `queryDispatchList` |
 | `palm:track-response` | ការទទួល/អាន `queryTrackInfo` |
 | `palm:track-result/empty/identity/items` | result ត្រូវមាន track របស់ Barcode នោះតែមួយក្រុម |

@@ -572,6 +572,32 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
     });
 
     it.each([
+        [{ list: null, total: 2, pages: 1 }, '2'],
+        [{ total: 2, pages: 1 }, '2'],
+        [{ list: null, total: 0, pages: 1 }, '1'],
+        [{ total: 0, pages: 1 }, '1'],
+        [{ list: null, total: '0', pages: '1' }, '1']
+    ])('Palm ចុះហត្ថលេខាអស់មុនបញ្ជីផ្សេង ➜ list ទទេមិនបិទការទាញ (%j)', async (result, requestedPage) => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')], { pages: 4 }),
+            '5': () => upstream({ status: true, result }),
+            'track:KH0000000001': () => upstream({ status: true, result: [{ mail: { mailNo: 'KH0000000001', isSign: 0 }, tracks: [
+                { mailNo: 'KH0000000001', action: '3', siteCode: 'KH001', time: '2026-10-16 09:00:00' }
+            ] }] }) });
+        const response = await call(listQuery({ signed: '0', page: requestedPage }), session);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body)).toMatchObject({ pages: 4, signed: [], signedRows: [], rows: [{ barcode: 'KH0000000001' }] });
+    });
+
+    it.each([false, ''])('Palm pagination ខូច (%j) មិនត្រូវចាត់ទុកជា pages=0 ហើយបាត់បញ្ជី', async (pages) => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => page([]), '4': () => page([]), '5': () => upstream({ status: true, result: { list: null, pages, total: 2 } }) });
+        const response = await call(listQuery({ signed: '0' }), session);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body).reason).toBe('palm:list-5-items-null-p1');
+    });
+
+    it.each([
         [[], 'palm:track-empty'],
         [[{ mail: { mailNo: 'OTHER0000001', isSign: 0 }, tracks: [] }], 'palm:track-identity'],
         [[{ mail: { mailNo: 'KH0000000001', isSign: 0 }, tracks: [
@@ -592,7 +618,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         serve({ '1': () => upstream({ status: true, result: { total: 2, list: null } }), '4': () => page([]), '5': () => page([]) });
         const response = await call(listQuery({ signed: '0' }), session);
         expect(response.statusCode).toBe(502);
-        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:list-1-items' });
+        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:list-1-items-null-p1' });
     });
 
     it('Palm បញ្ជីច្រើន និង track យឺត ១.៥ វិនាទី ➜ ទំព័រត្រូវបញ្ចប់ក្នុងថវិកា Function', async () => {

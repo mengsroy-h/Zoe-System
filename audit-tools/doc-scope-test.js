@@ -1164,5 +1164,107 @@ check(siteOffenders.length === 0,
         'រកឃើញ ' + hits.length + ' ៖\n        ' + hits.slice(0, 12).join('\n        '));
 })();
 
+// ============================================================================
+// ផ្នែក ៨ — ⛔ **គ្មានការសរសេរស្ទួន · ប្រវត្តិមានសណ្តាប់ធ្នាប់** (សំណើម្ចាស់គម្រោង ៖ «រៀបចំ ឯកសារ CLAUDE.md HISTORY.md
+// អោយមានសន្តាប់ធ្នាប់ និងការពារការសរសេរស្ទួន»)
+// ============================================================================
+//
+// វាស់បានមុនរៀបចំ ៖ ផ្នែក «📌» របស់ HISTORY.md ២០០+ បន្ទាត់ (ខ្សែ branch/PR ចាស់ · ធាតុ ⏳ ដែលបញ្ជាក់រួច) · ផ្នែក ២ មានកាលបរិច្ឆេទ
+// មិនតាមលំដាប់ (2026-10-04 ក្រោយ 2026-10-03) · ជួរ A135–A158 (2026-10-16) នៅក្នុងតារាង 2026-10-15 · លិបិក្រមមិនតម្រៀប (២ តារាង) ·
+// ច្បាប់ ZTO ដដែលសរសេរ ២ កន្លែងក្នុង CLAUDE.md (ជួរតារាងស្នូល + ផ្នែក ZTO) ➜ ច្បាប់ស្ទួនក្លាយជាច្បាប់ផ្ទុយគ្នាពេលកែតែមួយ។
+(function noDuplicateWriting() {
+    const dupsOf = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
+    const versionHeads = (t) => [...t.matchAll(/^### \[(\d+\.\d+\.\d+[^\]]*)\]/gm)].map((m) => m[1]);
+    const findingIds = (t) => [...t.matchAll(/^\| (A\d+) \|/gm)].map((m) => m[1]);
+    const semver = (s) => ((/(\d+)\.(\d+)\.(\d+)/.exec(s) || []).slice(1, 4).map(Number));
+    const newerOrEqual = (x, y) => { for (let i = 0; i < 3; i++) { if (x[i] !== y[i]) return x[i] > y[i]; } return true; };
+    function partSlice(text, startRe) {
+        const at = text.search(startRe);
+        if (at === -1) return '';
+        const next = text.slice(at + 3).search(/^## /m);
+        return next === -1 ? text.slice(at) : text.slice(at, at + 3 + next);
+    }
+    function versionOrderProblems(text) {
+        const v = versionHeads(text).map((s) => ({ s, n: semver(s) })).filter((x) => x.n.length === 3);
+        const out = [];
+        for (let i = 1; i < v.length; i++) if (!newerOrEqual(v[i - 1].n, v[i].n)) out.push(v[i - 1].s + ' ➜ ' + v[i].s);
+        return out;
+    }
+    function dateOrderProblems(text) {
+        const d = [...text.matchAll(/^### (\d{4}-\d{2}-\d{2})/gm)].map((m) => m[1]);
+        const out = [];
+        for (let i = 1; i < d.length; i++) if (d[i] > d[i - 1]) out.push(d[i - 1] + ' ➜ ' + d[i]);
+        return out;
+    }
+    function pendingLines(text) {
+        const p = partSlice(text, /^## 📌 /m);
+        return p ? p.trimEnd().split('\n').length : -1;
+    }
+    function repeatedPhrases(text) {
+        const lines = text.split('\n');
+        const seen = new Map();
+        let fence = false;
+        lines.forEach((line, i) => {
+            if (/^\s*```/.test(line)) { fence = !fence; return; }
+            if (fence || /^\|[-| ]+\|$/.test(line.trim())) return;
+            const words = line.replace(/[`*|⛔➜·()«»:;,]/g, ' ').split(/\s+/).filter(Boolean);
+            const mine = new Set();
+            for (let k = 0; k + 10 <= words.length; k++) {
+                const g = words.slice(k, k + 10).join(' ');
+                if (g.length < 60 || mine.has(g)) continue;
+                mine.add(g);
+                if (!seen.has(g)) seen.set(g, []);
+                seen.get(g).push(i + 1);
+            }
+        });
+        const out = [];
+        seen.forEach((at, g) => { if (at.length > 1) out.push(at.join(',') + ' «' + g.slice(0, 80) + '»'); });
+        return out;
+    }
+    function indexOrderProblems(text) {
+        const at = text.indexOf('## 🔎 លិបិក្រម');
+        const keys = (at === -1 ? '' : text.slice(at)).split('\n').filter((l) => l.startsWith('| `')).map((l) => l.split('`')[1]);
+        const checkers = keys.filter((k) => !k.startsWith('ZoeW/tests/'));
+        const tests = keys.filter((k) => k.startsWith('ZoeW/tests/'));
+        const want = checkers.slice().sort().concat(tests.slice().sort());
+        return keys.length && keys.join('\n') === want.join('\n') ? [] : ['លំដាប់ ' + keys.length + ' ជួរ'];
+    }
+
+    const allVersions = versionHeads(hist).concat(versionHeads(histArchive));
+    const allIds = findingIds(hist).concat(findingIds(histArchive));
+    check(versionHeads(hist).length >= 50 && allVersions.length >= 150 && dupsOf(allVersions).length === 0,
+        '⛔ ប្រវត្តិ ៖ ក្បាលកំណែ `### [X.Y.Z]` មួយក្នុងមួយកំណែ ក្នុង HISTORY.md + HISTORY-ARCHIVE.md (កុំសរសេរកំណែដដែល ២ ដង)',
+        'ស្ទួន ៖ ' + dupsOf(allVersions).join(' · ') + ' · សរុប ' + allVersions.length);
+    check(allIds.length >= 100 && dupsOf(allIds).length === 0,
+        '⛔ ប្រវត្តិ ៖ លេខការរកឃើញស៊េរី A (`| A123 |`) មួយក្នុងមួយ ក្នុងឯកសារប្រវត្តិទាំង ២ (លេខក្នុងជុំមួយៗ M1 · T1 ជាលេខមូលដ្ឋាន)',
+        'ស្ទួន ៖ ' + dupsOf(allIds).join(' · ') + ' · សរុប ' + allIds.length);
+    const p1 = partSlice(hist, /^## 📗 ផ្នែក ១/m);
+    const p2 = partSlice(hist, /^## 🐛 ផ្នែក ២/m);
+    check(p1.length > 10000 && versionOrderProblems(p1).length === 0,
+        '⛔ HISTORY.md ផ្នែក ១ ៖ កំណែថ្មីនៅលើ (លំដាប់ចុះ)', versionOrderProblems(p1).slice(0, 8).join(' · '));
+    check(p2.length > 10000 && [...p2.matchAll(/^### \d{4}-\d{2}-\d{2}/gm)].length >= 20 && dateOrderProblems(p2).length === 0,
+        '⛔ HISTORY.md ផ្នែក ២ ៖ ផ្នែកតាមកាលបរិច្ឆេទ ថ្មីនៅលើ (លំដាប់ចុះ)', dateOrderProblems(p2).slice(0, 8).join(' · '));
+    const pending = pendingLines(hist);
+    check(pending > 10 && pending <= 80,
+        '⛔ HISTORY.md «📌 ការងារដែលនៅសល់» ≤ ៨០ បន្ទាត់ — តែការងារដែលនៅបើក (ធាតុបញ្ជាក់រួច ➜ លុប · គ្មានខ្សែ branch/PR ចាស់)',
+        'បន្ទាត់ ' + pending);
+    const claudeRepeats = repeatedPhrases(claude);
+    check(claude.length > 50000 && claudeRepeats.length === 0,
+        '⛔ CLAUDE.md ៖ គ្មានឃ្លា ១០ ពាក្យដដែលលើ ២ បន្ទាត់ (ច្បាប់ ១២ ៖ ច្បាប់ស្ទួន ➜ ច្បាប់ផ្ទុយគ្នា · ផ្នែកផ្សេង *យោង* មិនចម្លង)',
+        claudeRepeats.slice(0, 6).join('\n        '));
+    check(indexOrderProblems(hist).length === 0,
+        '⛔ HISTORY.md លិបិក្រម ៖ តារាងតែមួយ តម្រៀប (checker ➜ អ្នកយាម vitest)', indexOrderProblems(hist).join(' · '));
+
+    const probeDoc = '## 📌 x\n' + 'a\n'.repeat(85) + '## 📗 ផ្នែក ១\n### [1.2.0] — x\n### [1.10.0] — y\n### [1.2.0] — z\n'
+        + '## 🐛 ផ្នែក ២\n### 2026-10-01 — a\n| A1 | x |\n### 2026-10-03 — b\n| A1 | y |\n## 🔎 លិបិក្រម\n| `b` | x |\n| `a` | x |\n';
+    const probeClaude = 'Verdicts only in localStorage never touch money and writes only via applyBarcodeCloseChange here\n'
+        + '| row | Verdicts only in localStorage never touch money and writes only via applyBarcodeCloseChange here |\n';
+    check(dupsOf(versionHeads(probeDoc)).length === 1 && dupsOf(findingIds(probeDoc)).length === 1
+        && versionOrderProblems(probeDoc).length === 1 && dateOrderProblems(probeDoc).length === 1
+        && pendingLines(probeDoc) > 80 && repeatedPhrases(probeClaude).length >= 1 && indexOrderProblems(probeDoc).length === 1
+        && repeatedPhrases('alpha beta gamma delta epsilon zeta eta theta iota kappa lambda\nmu nu\n').length === 0,
+        'ផ្នែក ៨ ៖ probe ទិសទាំង ២ (កំណែស្ទួន · លេខស្ទួន · លំដាប់ខុស · 📌 វែង · ឃ្លាស្ទួន · លិបិក្រមមិនតម្រៀប ➜ ចាប់ · អត្ថបទធម្មតា ➜ មិនចាប់)');
+})();
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

@@ -10,7 +10,6 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite**។ ឯកសារ�
 | ឯកសារ | មាតិកា |
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | ស្រទាប់ · ឃ្លាំង state · SW · ដំណើរការចាប់ផ្តើម |
-| [`MIGRATION.md`](MIGRATION.md) | ជំហានដាក់ឲ្យប្រើ និងការថយក្រោយវិញ |
 | [`TYPESCRIPT.md`](TYPESCRIPT.md) | វិន័យ type និងផ្លូវតឹងបន្តិចម្តងៗ |
 | [`EXTENDING.md`](EXTENDING.md) | កន្លែងដាក់កូដថ្មី (state · component · lifecycle · platform) |
 | [`ANDROID.md`](ANDROID.md) | App Android (Capacitor) |
@@ -113,6 +112,24 @@ npm run verify           # type + lint + test + build + smoke + SW · Android ·
 `netlify.toml` ក្នុងថតនេះផ្ទុក header · CSP · redirect រួចរាល់ហើយ។
 ⛔ **កុំដាក់ `netlify.toml` នៅ root របស់ repo** — Netlify អានវាសម្រាប់ site
 ទាំងអស់ ➜ វាបង្វែរ build របស់ App ផ្សេង។
+
+### Deploy preview · ឧបករណ៍ពិត · ការថយក្រោយ
+
+1. បើក PR ➜ Netlify សាង **deploy preview** (URL ដាច់ពីផលិតកម្ម) ➜ deploy log ត្រូវឃើញ `npm run build` · `vite build`
+   ហើយ publish ថត `dist`។
+2. ⛔ PR ដែលប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ · ផ្លូវ native ➜ សាកលើ **iPhone ពិត (PWA ដំឡើងលើអេក្រង់ដើម) និង Android
+   ពិត** មុន merge (`CLAUDE.md` ច្បាប់ ១១) ៖ checker ក្នុង `audit-tools/` វាស់ក្នុង Chromium ដែល **ធ្វើត្រាប់តាម** iOS មិនមែន
+   WebKit ពិត។
+3. ⚠️ Deploy preview មាន **origin ផ្សេង** ➜ storage ទទេ ៖ បញ្ចូល Config ហើយ **Activate** ម្តងទៀត។ ⛔ ការ Activate នោះស៊ីកៅអី
+   ឧបករណ៍ (`maxDevices`) ដូចឧបករណ៍ថ្មីមួយ ➜ ប្រើ Key សាកល្បង ឬដោះកៅអីក្នុង ZoeKeyGen ក្រោយសាករួច។ preview និងផលិតកម្មប្រើ
+   ស្របគ្នាបានដោយសុវត្ថិភាព ៖ ទាំង ២ សរសេរតាមច្បាប់ដដែល (transaction · registry · ledger) ដូចឧបករណ៍ ២។
+4. **ការថយក្រោយ** ៖ Netlify UI ➜ **Deploys** ➜ ជ្រើស deploy មុនដែលដើរល្អ ➜ **Publish deploy** (ភ្លាម · គ្មាន build) ឬ
+   `git revert` commit ដែលមានបញ្ហា ➜ build ថ្មី។
+5. **Service Worker** ៖ SW លុប cache `zoew-` ទាំងអស់ដែលមិនមែន `CACHE_VERSION` បច្ចុប្បន្ន (`src/sw/cache-version.ts`) ហើយ SW
+   ថ្មីជំនួសខ្លួនពេលដំឡើងរួច (`skipWaiting` + `clients.claim`) ➜ អ្នកប្រើនៅឃើញ App ចាស់ ៖ បិទបើក App ២ ដង។
+6. ⛔ ការ deploy មិនកែ Firebase rules ទេ — កំណែដែលបន្ថែម path ថ្មីប្រាប់ «Publish rules» ក្នុងសកម្មភាពដោយដៃរបស់វា
+   (`CLAUDE.md` ច្បាប់ ១០) · migration Supabase ចូល live តាម GitHub integration ពេល merge ចូល `main`
+   ([`../../supabase/README.md`](../../supabase/README.md))។
 
 ### `src/` ជាប្រភពការពិត
 

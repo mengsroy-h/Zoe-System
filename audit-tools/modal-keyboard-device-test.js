@@ -58,7 +58,7 @@ const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 // ⛔ `--part=k/2` (ដូច `zoew-suite-test` · `money-guardian-test`) ៖ ផ្នែកទាំងអស់រត់តាមលំដាប់ ➜ run-all ពេញ (lane ស្របគ្នា) ចំណាយ > ៣០០ វិ.
 //    («ព្យួរ — លើសពិដាន 300s» ក្រោយ (ក២)) ⛔ មិនមែនបង្កើន CHECKER_TIMEOUT ទេ ➜ run-all រត់ផ្នែកទាំង ២ (lane ផ្សេងគ្នា) · គ្មាន `--part` ➜
 //    ផ្នែកទាំងអស់ (baseline · checker-coverage) · ផ្នែកនីមួយៗត្រូវស្ថិតក្នុងក្រុមតែមួយគត់ (ពិនិត្យនៅចុងក្រោយ)។
-const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ']];
+const PART_GROUPS = [['ក', 'ខ'], ['ក២', 'គ', 'ឃ', 'ង', 'ច', 'ទិសផ្ទុយ'], ['ឆ'], ['ឈ', 'ជ', 'ញ']];
 const PART = (() => {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--part'));
     if (!arg) return { k: 1, n: 1 };
@@ -1186,6 +1186,46 @@ const SAFE_TOP = function (px) {
                     check(index >= 0 && r.fitted && Math.abs(r.card[1] - line) <= 1,
                         'ទិសផ្ទុយ ៖ iPhone (keyboard ៤០០) ➜ ប្រអប់ PIN ឡើងតែល្មមឲ្យបាតត្រឹម keyboard − ៨ (ច្បាប់ iPhone · មិនមែនកណ្តាល Android)', JSON.stringify({ r, line }));
                 } else bad('ទិសផ្ទុយ iPhone ៖ audit bridge');
+                await ctx.close();
+            }
+        }
+        if (inPart('ញ')) {
+            console.log('\n=== (ញ) iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ keyboard លោត (កម្ពស់ចន្លោះ) ➜ App មិនសរសេរ scroll document (UIKit រំកិលបន្ថែម ៖ scrollTo កណ្តាលចលនា = ទំព័រលោតចុះ) · keyboard បាត់ ➜ ទាញ ០ ===');
+            // ⛔ វីដេអូម្ចាស់គម្រោង ៖ ទំព័រលោតចុះ ១៣៨–២១៤pt ហើយរអិលត្រឡប់ = App ទាញ document ទៅ ០ កណ្តាលចលនា keyboard ➜ ពេល keyboard លោត (គ្រប់កម្ពស់ ·
+            //    រួមទាំងកម្ពស់ដំបូងក្រោម KEYBOARD_MIN_INSET_PX លើ iPhone SE) ខណៈប្រអប់វាយ focus ➜ គ្មាន window.scrollTo · keyboard បាត់ + blur ➜ ទាញ ០ ម្តង ·
+            //    ទិសផ្ទុយ ៖ Chrome Android ➜ ការទាញលើ visualViewport resize ដូចមុន
+            const SPY_SCROLL = function () {
+                window.__scrollCalls = [];
+                const orig = window.scrollTo.bind(window);
+                window.scrollTo = function () { window.__scrollCalls.push(Array.from(arguments)); return orig.apply(window, arguments); };
+            };
+            for (const dev of [
+                { label: 'iPhone 393×852 · របៀបបញ្ចូល · keyboard 336', w: 393, h: 852, kb: [134, 269, 400, 336], ios: true, mode: 'parcel' },
+                { label: 'iPhone SE 375×667 · របៀបដក · keyboard 260 (កម្ពស់ដំបូង 104)', w: 375, h: 667, kb: [104, 208, 260], ios: true, mode: 'remove' },
+                { label: 'iPhone 393×852 · Locker · keyboard 336', w: 393, h: 852, kb: [336], ios: true, mode: 'locker' },
+                { label: 'ទិសផ្ទុយ ៖ Chrome Android 412×915 · keyboard 330', w: 412, h: 915, kb: [330], ios: false, mode: 'parcel' }
+            ]) {
+                const { ctx, page, ready } = await openApp(browser, port, dev, dev.ios ? [IOS_FLAGS, FAKE_VIEWPORT, SPY_SCROLL] : [FAKE_VIEWPORT, SPY_SCROLL], { userAgent: dev.ios ? IPHONE_UA : ANDROID_UA });
+                const pageReady = ready && await page.evaluate(() => typeof switchAppPage === 'function' && typeof setEntryScanMode === 'function');
+                if (!pageReady) { bad('(ញ) ' + dev.label + ' ៖ audit bridge'); await ctx.close(); continue; }
+                await page.evaluate((m) => { switchAppPage('entry'); setEntryScanMode(m); openModalIds().slice().forEach((id) => closeModal(id)); }, dev.mode);
+                await settle(page, 400);
+                const at = await page.evaluate(() => { const e = document.getElementById('hwScannerInput').getBoundingClientRect(); return [e.left + e.width / 2, e.top + e.height / 2]; });
+                await page.evaluate(() => { window.__scrollCalls = []; });
+                await page.touchscreen.tap(at[0], at[1]);
+                await settle(page, 60);
+                const focused = await page.evaluate(() => document.activeElement && document.activeElement.id);
+                for (const px of dev.kb) {
+                    await page.evaluate((p) => { Object.defineProperty(window, 'scrollY', { configurable: true, get: () => 200 }); window.__kb.open(p); }, px);
+                    await settle(page, 40);
+                }
+                const during = await page.evaluate(() => window.__scrollCalls.length);
+                await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); window.__kb.open(0); });
+                await settle(page, 60);
+                const after = await page.evaluate(() => window.__scrollCalls.length);
+                check(dev.ios ? focused === 'hwScannerInput' && during === 0 && after >= 1 : during >= 1,
+                    (dev.ios ? '⛔ ' : '') + dev.label + ' ៖ ' + (dev.ios ? 'keyboard លោត (' + dev.kb.join(' ➜ ') + ') ➜ scrollTo ' + during + ' ដង · keyboard បាត់ ➜ ' + (after - during) : 'visualViewport resize ➜ scrollTo ' + during + ' ដង (ដូចមុន)'),
+                    JSON.stringify({ focused, during, after }));
                 await ctx.close();
             }
         }

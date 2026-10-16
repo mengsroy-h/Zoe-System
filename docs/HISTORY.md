@@ -253,6 +253,8 @@
 #### អ្នកយាម
 
 - `ZoeW/tests/ios-synthetic-click-focus.test.ts` +១ (សរុប ១២) ៖ ចុចចាប់ ➜ keyboard ១០៤ ➜ មិនទាញ · blur + keyboard ០ ➜ ទាញ — កូដ [2.50.87] FAIL ១ · mutation ២ ➜ ចាប់ ២។
+- `modal-keyboard-device-test` ផ្នែក ៤/៤ (ញ · browser ពិត · App ពិត) ៖ iPhone 393 (បញ្ចូល · keyboard ១៣៤ ➜ ២៦៩ ➜ ៤០០ ➜ ៣៣៦) · SE 375 (ដក · ១០៤ ➜ ២០៨ ➜ ២៦០) · Locker ៖ ចុចកន្លែងវាយ
+  Barcode ➜ keyboard លោត ➜ `window.scrollTo` ០ ដង · keyboard បាត់ ➜ ១ · ទិសផ្ទុយ Chrome Android ➜ ១ (ដូចមុន) — build 2.50.86 FAIL ៣ (`scrollTo` ៨ · ៣ · ២ ដង ពេល keyboard លោត) ➜ ១៧/១៧។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

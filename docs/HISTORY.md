@@ -267,6 +267,8 @@
 
 - `ZoeW/tests/modal-focus-trap.test.ts` ៥ (ថ្មី) — mutation ៤ ➜ ចាប់ ៤។
 - `modal-keyboard-test` ៖ `loginModal` · `activationModal` · `pinModal` · `pinSetupModal` ➜ Tab/Shift+Tab ×១៤ ➜ focus នៅក្នុងប្រអប់ · Enter ➜ គ្មានអ្វីខាងក្រោយរត់ (browser ពិត)។
+  build មុនការកែ (`boot.ts` គ្មាន `listenModalFocusTrap(scope)`) ➜ ធ្លាក់ ៤ (ផ្ទាំងទាំង ៤) · 2.50.91 ➜ ជោគជ័យ ៥៩។
+- `state-hygiene` (CI ផ្នែក ១ ធ្លាក់លើ `7ed6303`) ៖ `tabBackwards` (ទិស Tab ចុងក្រោយ · boolean · គ្មានទិន្នន័យអតិថិជន) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

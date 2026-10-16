@@ -733,7 +733,8 @@ const SAFE_TOP = function (px) {
         }
 
         if (inPart('ឆ')) {
-            console.log('\n=== (ឆ) សំណើម្ចាស់គម្រោង ៖ «ថែម animation សម្រាប់ modal ពេលលោតតាម keyboard ក្នុង App ទាំងមូល» ➜ កាតរអិលពីទីតាំងចាស់ទៅទីតាំងថ្មី (បើក · បិទ keyboard) · គ្មានលោតមួយជំហាន · ឈប់ត្រឹមទីតាំងត្រូវ ===');
+            console.log('\n=== (ឆ) សំណើម្ចាស់គម្រោង ៖ «ថែម animation សម្រាប់ modal ពេលលោតតាម keyboard» ➜ Android (APK · Chrome) ៖ កាតរអិលពីទីតាំងចាស់ទៅទីតាំងថ្មី (បើក · បិទ keyboard) · គ្មានលោតមួយជំហាន · ឈប់ត្រឹមទីតាំងត្រូវ · ' +
+                'iPhone · iPad ៖ «modal កន្ត្រាក់ពេល keyboard លោតឡើង · មុន merge មិនអីទេ» ➜ ទៅទីតាំងភ្លាមដូចមុន (គ្មានចលនា) ===');
             check(GLIDE_MS >= 150 && GLIDE_MS <= 400, 'MODAL_GLIDE_MS ស្រង់ពីកូដ App (' + GLIDE_MS + ') ក្នុង ១៥០–៤០០ ms (ប្រហែលល្បឿន keyboard)');
             // ថតទីតាំងកាតលើអេក្រង់ (កំពូលកាត − visualViewport.offsetTop) រាល់ស៊ុម ចាប់ពីមុនព្រឹត្តិការណ៍ ➜ ព្រឹត្តិការណ៍ (ក្នុង browser ឬពី Node) ➜ ចប់
             const RECORD = ({ id, ms }) => {
@@ -771,6 +772,8 @@ const SAFE_TOP = function (px) {
             };
             // ចម្ងាយខ្លី (< ៤០px) ៖ ខ្សែកោងបន្ថយល្បឿនដល់ ±១px មុន ➜ ពេលជាន់ទាបជាង · ស៊ុមកណ្តាល ≥ ២ ៖ runner CI (CPU ២ · tablet 1280×800) គូរ ~៣០–៥០ms/ស៊ុម
             //    ➜ ៣ ស៊ុមកណ្តាលក្នុង MODAL_GLIDE_MS (CI 780) · លោតមួយស៊ុម = ០ ស៊ុមកណ្តាល · ពេល ≈ ១ ស៊ុម ➜ នៅធ្លាក់ជានិច្ច
+            // iOS ៖ keyboard ប្រាប់កម្ពស់ច្រើនដងពេលលោត (លោតហួស ហើយស្ងប់) ➜ ចលនាចាប់ផ្តើមម្តងហើយម្តងទៀត = កន្ត្រាក់ ➜ ភ្លាម ៖ ១ ជំហាន · គ្មានស៊ុមកណ្តាល · គ្មានចលនានៅសល់
+            const instant = (g) => g.dist >= 8 && g.mid === 0 && g.maxStep >= g.dist - 1 && g.running === 0;
             const smooth = (g) => g.dist >= 8 && g.ahead <= 0.1 && g.mid >= 2 && g.back === 0 && g.over === 0 &&
                 g.span >= GLIDE_MS * (g.dist >= 40 ? 0.6 : 0.3) && g.span <= GLIDE_MS + 200 && g.running === 0;
             const GLIDE_DEVICES = [
@@ -805,7 +808,7 @@ const SAFE_TOP = function (px) {
                     const fitted = await page.evaluate(RECT, { id, index, sel: FIELD_SELECTOR });
                     if (up.dist < 8) { if (fitted.card[1] > dev.h - dev.kb + 1) problems.push(id + ' ៖ មិនផ្លាស់ទី ហើយបាំងដោយ keyboard ' + JSON.stringify(fitted.card)); continue; }
                     moved++;
-                    if (smooth(up)) glidedUp++; else problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
+                    if (dev.ios ? instant(up) : smooth(up)) glidedUp++; else problems.push(id + ' ៖ keyboard បើក ' + JSON.stringify(up));
                     if (Math.abs(up.end - fitted.card[0]) > 1 || fitted.card[1] > dev.h - dev.kb + 1 || fitted.card[0] < 0) problems.push(id + ' ៖ ចុងចលនា ' + up.end + ' ≠ ទីតាំងត្រូវ ' + JSON.stringify(fitted.card));
                     if (dev.apk) {
                         await page.evaluate(RECORD, { id, ms: 260 });
@@ -828,15 +831,15 @@ const SAFE_TOP = function (px) {
                     if (dev.apk) await page.setViewportSize({ width: dev.w, height: dev.h });
                     await page.evaluate(() => window.__kb.open(0));
                     const down = glideOf(await page.evaluate(() => window.__glide));
-                    if (smooth(down) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
+                    if ((dev.ios ? instant(down) : smooth(down)) && Math.abs(down.start - up.end) <= 1 && Math.abs(down.end - up.start) <= 1) glidedBack++; else problems.push(id + ' ៖ keyboard បិទ ' + JSON.stringify(down) + ' (ពី ' + up.end + ' ទៅ ' + up.start + ')');
                 }
                 // ប្រអប់ដែលនៅពីលើ keyboard រួចហើយ មិនផ្លាស់ទី (ច្បាប់ ៖ «untouched») ➜ ពិនិត្យតែកុំឲ្យ keyboard បាំង · ប្រអប់ដែលផ្លាស់ទីទាំងអស់ត្រូវរអិល
                 check(measured >= 12 && moved >= 4 && glidedUp === moved && glidedBack === moved && problems.length === 0 && (!dev.apk || still === moved) && (!dev.ios || panned >= 3),
-                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ (' + moved + ' ផ្លាស់ទី) ➜ keyboard បើក ➜ កាតរអិល ' + glidedUp + ' (ជំហានតាមខ្សែកោង · ស៊ុមកណ្តាលផ្លូវ · ≈ MODAL_GLIDE_MS · ឈប់ត្រឹមទីតាំងត្រូវ) · keyboard បិទ ➜ រអិលត្រឡប់ ' + glidedBack +
+                    '⛔ ' + dev.label + ' ៖ ' + measured + ' ប្រអប់ (' + moved + ' ផ្លាស់ទី) ➜ keyboard បើក ➜ ' + (dev.ios ? 'កាតទៅទីតាំងត្រូវភ្លាម (គ្មានចលនា · ដូចមុន) ' : 'កាតរអិល (ជំហានតាមខ្សែកោង · ស៊ុមកណ្តាលផ្លូវ · ≈ MODAL_GLIDE_MS · ឈប់ត្រឹមទីតាំងត្រូវ) ') + glidedUp + ' · keyboard បិទ ➜ ' + (dev.ios ? 'ត្រឡប់ភ្លាម ' : 'រអិលត្រឡប់ ') + glidedBack +
                         (dev.apk ? ' · WebView បង្រួម ➜ មិនផ្លាស់ទីម្តងទៀត ' + still : '') + (dev.ios ? ' · visual viewport រំកិល ➜ កាតនៅនឹងលើអេក្រង់ ' + panned : ''),
                     JSON.stringify({ measured, moved, glidedUp, glidedBack, still, panned, problems: problems.slice(0, 5) }));
 
-                if (!dev.apk) {
+                if (dev.android) {
                     const id = 'phoneModal';
                     await page.evaluate(() => { window.__kb.set(0); window.__kb.pan(0); });
                     await closeAll(page);
@@ -882,8 +885,8 @@ const SAFE_TOP = function (px) {
                 await waitFrame(page);
                 await page.evaluate((kb) => window.__kb.open(kb), dev.kb);
                 const up = glideOf(await page.evaluate(() => window.__glide));
-                check(index >= 0 && grow.dist >= 20 && grow.mid === 0 && grow.running === 0 && smooth(up),
-                    'ទិសផ្ទុយ ' + dev.label + ' ៖ មាតិកាប្រអប់ធំឡើង (គ្មាន keyboard) ➜ ផ្លាស់ទីភ្លាមដូចមុន (គ្មានចលនា) · keyboard បើកក្រោយ ➜ រអិលពីទីតាំងថ្មី (គ្មានលោតត្រឡប់)',
+                check(index >= 0 && grow.dist >= 20 && grow.mid === 0 && grow.running === 0 && (dev.ios ? instant(up) : smooth(up)),
+                    'ទិសផ្ទុយ ' + dev.label + ' ៖ មាតិកាប្រអប់ធំឡើង (គ្មាន keyboard) ➜ ផ្លាស់ទីភ្លាមដូចមុន (គ្មានចលនា) · keyboard បើកក្រោយ ➜ ' + (dev.ios ? 'ភ្លាម (iOS)' : 'រអិលពីទីតាំងថ្មី (គ្មានលោតត្រឡប់)'),
                     JSON.stringify({ grow, up }));
                 if (dev.rotate || dev.resize) {
                     await page.evaluate(() => { document.getElementById('__grow').remove(); window.__kb.set(0); window.__kb.fire(); document.activeElement && document.activeElement.blur(); });
@@ -899,8 +902,8 @@ const SAFE_TOP = function (px) {
                 await ctx.close();
             }
             {
-                const dev = { w: 393, h: 852, kb: 336 };
-                const { ctx, page, ready } = await openApp(browser, port, dev, [IOS_FLAGS, FAKE_VIEWPORT], { reducedMotion: 'reduce' });
+                const dev = { w: 360, h: 740, kb: 300 };
+                const { ctx, page, ready } = await openApp(browser, port, dev, [FAKE_VIEWPORT], { reducedMotion: 'reduce', userAgent: ANDROID_UA });
                 if (ready) {
                     const ids = (await modalIdsWithFields(page)).slice(0, 8);
                     const jumps = [];
@@ -919,7 +922,7 @@ const SAFE_TOP = function (px) {
                         const g = glideOf(await page.evaluate(() => window.__glide));
                         if (g.dist >= 8) jumps.push(g.maxStep >= g.dist - 1 && g.mid === 0 && g.running === 0);
                     }
-                    check(jumps.length >= 4 && jumps.every(Boolean), 'ទិសផ្ទុយ ៖ iPhone «បន្ថយចលនា» (prefers-reduced-motion) ➜ ' + jumps.length + ' ប្រអប់ ➜ កាតទៅទីតាំងថ្មីភ្លាម (គ្មានចលនា)', JSON.stringify(jumps));
+                    check(jumps.length >= 4 && jumps.every(Boolean), 'ទិសផ្ទុយ ៖ Chrome Android «បន្ថយចលនា» (prefers-reduced-motion) ➜ ' + jumps.length + ' ប្រអប់ ➜ កាតទៅទីតាំងថ្មីភ្លាម (គ្មានចលនា)', JSON.stringify(jumps));
                 } else bad('(ឆ) បន្ថយចលនា ៖ audit bridge');
                 await ctx.close();
             }

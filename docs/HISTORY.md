@@ -45,7 +45,11 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ធ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `1529f3e` = PR #320 · **មិនទាន់ merge**) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
+0ន. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.83] ម្ចាស់គម្រោងលើ 2.50.82 (production) ៖
+    «iphone ធ្លាក់ទំព័រម្តងហើយ មើល Sentry ផង និង modal ក៏កន្ត្រាក់ដែរ មុន merge មិនអីផង» (iPhone · ពេល keyboard លោតឡើង) · «modal ios មុន merge អត់អីទេ» ·
+    «android ដំណើរការ ត្រឹមត្រូវហើយ គ្មានកន្ត្រាក់ គ្រប់យ៉ាងរលូន សូមការពារកែ ios កុំអោយ android ប្រែ» ➜ iOS គ្មានចលនា (A136) · Sentry `iosPageTap caught document` ➜ ត្រឡប់ ០ (A137) ·
+    Session Replay នៅថត (A138 ៖ ⚠️ ចាំម្ចាស់គម្រោងសម្រេច) ➜ ⚠️ សាក iPhone (សកម្មភាព ១–២ របស់ [2.50.83])។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ធ. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #321 merge ចូល `main` រួច** (`2dfaa9c` · ម្ចាស់គម្រោង · CI 783 ៤/៤ · APK `zoew-android-v2.50.82`) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
     ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចុចកន្លែងវាយ Barcode · គ្រប់របៀប) · «សូមកុំកែអោយប៉ះពាល់ដល់android»
     ➜ ពង្រីក (zoom) មិនមែន keyboard (A128) · iOS ចុចស្លាក/⚡ ចាប់ដូចប្រអប់ (A129) · បន្ទាប់មក វីដេអូម្ចាស់គម្រោង Android «ពេលវាលោតតែលេខ … មានកន្ត្រាក់ពេលបើកmodal» (A131) ·
     «សូមធ្វើអោយវឆ្លាតវៃចេះវាស់ keyboard ដោយខ្លួនឯងបាន ស្វ័យប្រវត្តិ មិនថាគេប្រើ keybaord thirdparty ឬគេពង្រីកទំហំ keybaord» (A132) · «lock កុំអោយផ្តេកបានលើទូរស័ព្ទ ទាំងអស់
@@ -226,6 +230,36 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.83] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងទៅកន្លែងភ្លាមពេល keyboard លោត (មិនកន្ត្រាក់) · ចុចកន្លែងវាយ Barcode ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
+
+**ZoeW `2.50.83`** (`zoew-v345` ➜ `zoew-v346`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «iphone ធ្លាក់ទំព័រម្តងហើយ មើល Sentry ផង និង modal ក៏កន្ត្រាក់ដែរ មុន merge មិនអីផង» (ចម្លើយ ៖ iPhone · ពេល keyboard លោតឡើង) · «modal ios មុន merge អត់អីទេ» ·
+«android ដំណើរការ ត្រឹមត្រូវហើយ គ្មានកន្ត្រាក់ គ្រប់យ៉ាងរលូន សូមការពារកែ ios កុំអោយ android ប្រែ» ➜ Android (APK · Chrome) មិនប្រែមួយបន្ទាត់ (`isAndroidDevice()` ·
+`usesIOSPanelHandoff()`) ៖ `modal-keyboard-device-test` (ក) (ក២) (ឆ) Android ជាប់ដូចដើម។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone · iPad ៖ ផ្ទាំងកន្ត្រាក់ពេល keyboard លោតឡើង** (ផ្នែក ២ A136)។ ចលនារអិល [2.50.82] (`glideModalCard()`) ចាប់ផ្តើមម្តងហើយម្តងទៀត ពេល keyboard iOS ប្រាប់កម្ពស់ច្រើនដងពេលលោត
+  (លោតហួស ហើយស្ងប់) ➜ កាតឡើង ចុះ។ ឥឡូវ ចលនាតែលើ Android ៖ iOS ➜ កាតទៅទីតាំងត្រូវភ្លាមដូចមុន [2.50.82] (ទីតាំង · ការវាស់ · ការចាប់ការចុច ដដែល)។
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់ម្តងម្កាល** (ផ្នែក ២ A137 ៖ Sentry `iosPageTap caught document`)។ ការចុចត្រូវចាប់ (`focus({ preventScroll })`) ប៉ុន្តែ WebKit
+  នៅរំកិល document ២៣០px (visual viewport ២៧៧) ពេល keyboard លោត។ ឥឡូវ ក្រោយការចុចដែលចាប់បាន (`pageFieldCaught`) ខណៈប្រអប់នៅ focus ៖ document រំកិលដោយគ្មានម្រាមដៃ ➜ ត្រឡប់ ០
+  (`restorePageFieldScroll()` ➜ `scrollWindowToTop()` ដូចប្រអប់ស្វែងរក · ផ្ទាំង) · keyboard នឹងបាំងប្រអប់ (មិនចាប់) ➜ iOS បង្ហាញដដែល · blur · ផ្ទាំងបើក · Android ➜ មិនប៉ះ។
+  ឧបករណ៍វាស់ `iosPageTap` នៅដដែល ➜ បើនៅធ្លាក់ Sentry ប្រាប់ផ្លូវម្តងទៀត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-tap-probe.test.ts` +២ (ចាប់ ➜ document ២៣០ · visual viewport scroll ➜ `scrollTo(0, 0)` · នៅ focus · ០ ➜ មិនហៅទៀត · ទិសផ្ទុយ ៖ keyboard បាំង (មិនចាប់) · blur ·
+  ផ្ទាំងបើក · Android ➜ មិនប៉ះ) — កូដមុនកែ FAIL ១ ➜ ៦/៦ · `modal-keyboard-device-test` (ឆ) ៖ iPhone · iPad ➜ ភ្លាម (១ ជំហាន · គ្មានស៊ុមកណ្តាល · គ្មានចលនានៅសល់) · Android
+  APK ២ · Chrome ➜ រអិលដូចដើម · «បន្ថយចលនា» ផ្លាស់ទៅ Chrome Android · ការប្តូរកម្ពស់កណ្តាលចលនា ៖ Android តែប៉ុណ្ណោះ — build `2dfaa9c` FAIL ៣ (iPhone · iPad · iPhone មាតិកា) ➜ ១៧/១៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.83` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone ៖ ផ្ទាំង** ៖ បើក «បញ្ចូលច្រើន» · «កែលេខទូរស័ព្ទ» · ផ្ទាំង PIN ➜ ប៉ះកន្លែងវាយ ➜ keyboard លោត ➜ ផ្ទាំងទៅកន្លែងតែម្តង មិនកន្ត្រាក់ (ដូចមុន 2.50.82)។
+2. **iPhone ៖ កន្លែងវាយ Barcode** ៖ ស្កេនធម្មតា (ចុចកន្លែងវាយ · ស្លាក · ⚡ · គ្រប់របៀប) ➜ ទំព័រនៅនឹងកន្លែង។ បើនៅធ្លាក់ ➜ ប្រាប់ម៉ោង ➜ ខ្ញុំអាន Sentry (`iosPageTap …`)។
+3. **Android** ៖ គ្មានអ្វីត្រូវសាក (កូដ Android ដដែល · ផ្ទាំងនៅរអិលដូចដើម)។
 
 ### [2.50.82] — 2026-10-15 · ZoeW ៖ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល) · Android ៖ ចាំកម្ពស់ keyboard ពិត (keyboard ណាក៏បាន · ពង្រីកទំហំ) ➜ ផ្ទាំង keyboard លេខឡើងតែម្តង · ទូរស័ព្ទនៅបញ្ឈរ tablet បង្វិលបាន · iPhone ៖ ចុចស្លាក «ស្កេន Barcode…» · ⚡ ទំព័រមិនធ្លាក់ · ពង្រីកអេក្រង់ (zoom) មិនមែន keyboard**
 
@@ -4698,6 +4732,9 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A133 | **ទូរស័ព្ទបង្វិលផ្តេក (សំណើម្ចាស់គម្រោង ៖ ទូរស័ព្ទមិនផ្តេក · tablet ផ្តេកបាន)** | APK ៖ AndroidManifest គ្មាន `screenOrientation` · `MainActivity` មិនស្នើ ➜ បង្វិលតាម sensor · PWA Android ៖ manifest `portrait-primary` ចាក់សោ **tablet ផង** · iPhone/iPad ៖ WebKit មិនគោរព manifest `orientation` ហើយ `screen.orientation.lock()` មិនមាន ➜ ចាក់សោពី web មិនបាន · ប្លង់ទូរស័ព្ទផ្តេក (A124) នៅសម្រាប់ iPhone · Browser tab | APK `orientationFor(smallestScreenWidthDp)` (< ៦០០ ➜ PORTRAIT) · PWA tablet `lock('any')` · iPhone ៖ ម្ចាស់គម្រោងជ្រើស «ទុកដូចសព្វថ្ងៃ» (Control Center · ប្លង់ផ្តេក A124 នៅ · មិនបិទ App ពេលផ្តេក ៖ ស្កេនកាមេរ៉ាទូរស័ព្ទផ្អៀងមិនរំខាន) |
 | A134 | **ផ្ទាំងលោតភ្លាមតាម keyboard (សំណើម្ចាស់គម្រោង ៖ ថែមចលនា App ទាំងមូល)** | build `a9d20c6` (Chromium ពិត · ថតរាល់ស៊ុម) ៖ ១៧ ប្រអប់ × ៥ ឧបករណ៍ ➜ កាតផ្លាស់ទីក្នុង ១ ស៊ុម (ស៊ុមកណ្តាល ០ ៖ PIN iPhone ៣១២ ➜ ២៨០ · Chrome ២៥៧ ➜ ១០៧) · ការតម្រូវប្តូរ `margin-top`/`align-items` (CSS transition មិនអាចចាប់ពី `center` ➜ `flex-start` · ទោះបានក៏ layout រាល់ស៊ុម) · APK ៖ keyboard បិទ ➜ WebView ធំឡើង ➜ កាតទៅកណ្តាលថ្មីដោយ layout ផ្ទាល់ (fit បាត់តាំងពី WebView បង្រួម ៖ គ្មានការតម្រូវណាប្តូរ) | FLIP ៖ `glideModalCard()` ចាប់ទីតាំងដែលមើលឃើញ (`modalRest` + offset ចលនា) ➜ `transform` Web Animations (`composite: 'add'` · `MODAL_GLIDE_MS`) · `ResizeObserver` លើកាត (មាតិកា ➜ កត់ភ្លាម) និង `.modal` (Android viewport ➜ រអិល) · visual viewport រំកិល ➜ ទីតាំងលើអេក្រង់ដដែល ➜ គ្មានចលនា ➜ ✅ |
 | A135 | **iPhone ៖ ទំព័រធ្លាក់ម្តងម្កាល ក្រោយចុចកន្លែងវាយ Barcode (រាយការណ៍ម្ចាស់គម្រោងលើ 2.50.82)** | Chromium គ្មាន WebKit ➜ ការសាក (គ) ជាប់ទាំងអស់ · អានកូដ (មិនមែនភស្តុតាង) ៖ ផ្លូវដែលការចុចទៅ iOS ដើម ៖ អូស > `MODAL_TAP_SLOP_PX` ឬចុចយូរ > `MODAL_TAP_MAX_MS` ដែល UIKit នៅរាប់ជាការចុច · ចុចម្តងទៀតលើប្រអប់ដែល focus រួច ក្រោយ keyboard បិទ (`modalTapFocused`) · `modalFocusRefused` · ការប៉ាន់ «keyboard នឹងបាំង» (`pageFieldStaysAboveKeyboard()`) | វាស់លើឧបករណ៍ពិត ៖ `iosPageTap` (ផ្លូវ + លេខ ➜ Sentry ពេលទំព័ររំកិលក្នុង `PAGE_TAP_PROBE_MS` គ្មានម្រាមដៃ) ➜ ⚠️ ចាំទិន្នន័យ ➜ កែតែផ្លូវដែលវាស់ឃើញ (អ្នកយាមមុនកែ) |
+| A136 | **iPhone ៖ ផ្ទាំងកន្ត្រាក់ពេល keyboard លោតឡើង (2.50.82 production)** | ម្ចាស់គម្រោង ៖ iPhone · ពេល keyboard លោតឡើង · មុន merge (គ្មានចលនា) មិនអីទេ · Android រលូន · keyboard iOS ប្រាប់កម្ពស់ច្រើនដងពេលលោត (លោតហួស ហើយស្ងប់ ៖ ការចាំ keyboard ធ្លាប់ឃើញ) ➜ `glideModalCard()` ចាប់ផ្តើមម្តងហើយម្តងទៀត · ចលនាឡើងលើស ហើយចុះ | ចលនាតែលើ Android (`isAndroidDevice()`) ➜ iOS ភ្លាមដូចមុន · `modal-keyboard-device-test` (ឆ) iPhone · iPad ➜ ភ្លាម ➜ ✅ |
+| A137 | **iPhone ៖ ទំព័រធ្លាក់ក្រោយចុចកន្លែងវាយ Barcode (Sentry JAVASCRIPT-REACT-K)** | `iosPageTap caught document` ៖ dx ០ · dy ០ · ៥៩ms · មិន focus · គ្មាន keyboard · ប្រអប់ ៣៣៨–៣៦៨ លើ ៨៤៤ (keyboard ដែលចាំ ៤០៣ ➜ បន្ទាត់ ៤៤១ ៖ ចាប់) ➜ document scrollY ២៣០ · visual viewport offsetTop ២៧៧ · គ្មានម្រាមដៃ ➜ WebKit រំកិលទោះ `focus({ preventScroll })` (ប្រភព WebKit trunk ៖ `_zoomToRevealFocusedElement` គោរព `preventScroll` ➜ ផ្លូវផ្សេង · មិនទាន់ដឹងច្បាស់) | ក្រោយការចុចដែលចាប់បាន ខណៈប្រអប់នៅ focus ៖ document រំកិល ➜ `scrollWindowToTop()` (`restorePageFieldScroll()`) · `iosPageTap` នៅវាស់ ➜ ⚠️ ចាំម្ចាស់គម្រោងសាក |
+| A138 | **Sentry Session Replay នៅថត (ផ្ទុយច្បាប់ «Secret leaks»)** | `search_replays` ៖ replay ២០ ក្នុង ៣០ ថ្ងៃ (ZoeW 2.50.53 ➜ 2.50.82 · APK · iPhone · ZoeKeyGen) ទោះ `guardedOptions()` ដាក់ `replaysSessionSampleRate` · `replaysOnErrorSampleRate` = ០ · `environment` · `release` របស់ App ក្នុង replay ➜ options របស់ App ចូល ប៉ុន្តែ Replay នៅដំណើរការ (ប្រហែល Loader Script ក្នុង Sentry UI បើក Replay) | ⚠️ មិនទាន់កែ ៖ ចាំម្ចាស់គម្រោងសម្រេច (បិទ Replay ក្នុង Sentry ➜ Settings ➜ Loader Script · ឬអ្នកយាមថ្មី + កូដ) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 

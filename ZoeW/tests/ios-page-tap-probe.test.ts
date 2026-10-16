@@ -192,3 +192,50 @@ describe('iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព�
         expect(() => scrollDocument(40)).not.toThrow();
     });
 });
+
+describe('⛔ Sentry iosPageTap «caught document» (scrollY ២៣០ · visual viewport ២៧៧) ៖ ចុចកន្លែងវាយ Barcode ដែលចាប់បាន ➜ document រំកិលដោយ WebKit ពេល keyboard លោត ➜ ត្រឡប់ ០', () => {
+    let scrollTo: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+        scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+
+    it('⛔ ចាប់ (focus preventScroll) ➜ document រំកិល ២៣០ (scroll · visual viewport scroll) ➜ scrollTo(0, 0) · នៅ focus · ០ ➜ មិនហៅម្តងទៀត', () => {
+        expect(tap(scanner, { x: 50, y: 305, t: 0 }, { x: 50, y: 305, t: 59 }).defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(scanner);
+        scrollDocument(230);
+        expect(scrollTo).toHaveBeenCalledWith(0, 0);
+        const calls = scrollTo.mock.calls.length;
+        vv.offsetTop = 277;
+        vv.dispatchEvent(new Event('scroll'));
+        expect(scrollTo.mock.calls.length).toBe(calls + 1);
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+        document.dispatchEvent(new Event('scroll'));
+        expect(scrollTo.mock.calls.length).toBe(calls + 1);
+        expect(document.activeElement).toBe(scanner);
+    });
+
+    it('ទិសផ្ទុយ ៖ keyboard នឹងបាំងប្រអប់ (iOS ត្រូវបង្ហាញ ៖ មិនចាប់) · ប្រអប់ blur · ប្រអប់ (modal) បើក · Android ➜ មិនប៉ះ document', () => {
+        scanner.getBoundingClientRect = () => rect(700, 30);
+        expect(tap(scanner, { x: 50, y: 715, t: 0 }, { x: 50, y: 715, t: 60 }).defaultPrevented).toBe(false);
+        scanner.focus();
+        scrollDocument(230);
+        scanner.blur();
+        scanner.getBoundingClientRect = () => rect(290, 30);
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+        expect(tap(scanner, { x: 50, y: 305, t: 200 }, { x: 50, y: 305, t: 260 }).defaultPrevented).toBe(true);
+        scanner.blur();
+        scrollDocument(230);
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+        expect(tap(scanner, { x: 50, y: 305, t: 400 }, { x: 50, y: 305, t: 460 }).defaultPrevented).toBe(true);
+        uiState.isModalOpen = true;
+        scrollDocument(230);
+        uiState.isModalOpen = false;
+        scanner.blur();
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+        setIOSStandalone(false);
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android' } });
+        expect(tap(scanner, { x: 50, y: 305, t: 600 }, { x: 50, y: 305, t: 660 }).defaultPrevented).toBe(true);
+        scrollDocument(230);
+        expect(scrollTo).not.toHaveBeenCalled();
+    });
+});

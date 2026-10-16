@@ -2,6 +2,7 @@ import { modalIsOpen } from '../../core/modals';
 import { uiState, type ModalKeyboardFit } from '../../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../../core/storage';
 import { KEYBOARD_INSET_KEY } from '../../core/storage-keys';
+import { scrollWindowToTop } from '../../platform/document-io';
 import { isAndroidDevice, isNativeAndroid } from '../../platform/native';
 import { modalElement } from '../components/modals/Modal';
 import { commitNow } from '../flush';
@@ -58,6 +59,7 @@ let pageTapStart: { field: HTMLElement; x: number; y: number; at: number; touche
 let pageTapProbe: { path: string; until: number; pagesAt: number; numbers: Record<string, number> } | null = null;
 let pageTapReported: string[] = [];
 let touchesDown = 0;
+let pageFieldCaught: HTMLElement | null = null;
 
 export function keyboardVisibleViewport(): { top: number; height: number } | null {
     const vv = window.visualViewport;
@@ -402,7 +404,7 @@ function glideModalCard(shown: number, animate: boolean): void {
     if (modalGlide && Math.abs(modalGlide.to - to) < 1) return;
     const running = !!modalGlide;
     stopModalGlide();
-    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width) return;
+    if (!(animate || running) || !was || was.card !== now.card || was.width !== modalRest.width || !isAndroidDevice()) return;
     const from = Math.round(shown - to);
     if (!Number.isFinite(from) || Math.abs(from) < 2 || !modalMotionAllowed()) return;
     let anim: Animation | null;
@@ -586,6 +588,17 @@ function notePageMoved(e: Event): void {
     } catch (err) {}
 }
 
+function restorePageFieldScroll(): void {
+    const field = pageFieldCaught;
+    if (!field) return;
+    if (document.activeElement !== field) {
+        pageFieldCaught = null;
+        return;
+    }
+    if (uiState.isModalOpen || !usesIOSPanelHandoff() || (window.scrollY || 0) === 0) return;
+    scrollWindowToTop();
+}
+
 function noteTouchesDown(e: TouchEvent): void {
     touchesDown = e.touches ? e.touches.length : 0;
 }
@@ -625,8 +638,10 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     notePageTapEnd(e, true);
     e.preventDefault();
     if (document.activeElement === tap.field) blurActiveElement();
-    if (focusElementWithoutScroll(tap.field)) modalTapFocused = tap.field;
-    else modalFocusRefused = true;
+    if (focusElementWithoutScroll(tap.field)) {
+        modalTapFocused = tap.field;
+        if (usesIOSPanelHandoff() && !tap.field.closest('.modal')) pageFieldCaught = tap.field;
+    } else modalFocusRefused = true;
 }
 
 export function listenModalKeyboard(scope: LifecycleScope): void {
@@ -648,6 +663,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     pageTapProbe = null;
     pageTapReported = [];
     touchesDown = 0;
+    pageFieldCaught = null;
     if (modalResizeObserver) modalResizeObserver.disconnect();
     modalResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(noteModalResized) : null;
     if (uiState.modalViewportTop !== 0) uiState.modalViewportTop = 0;
@@ -661,6 +677,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'touchcancel', forgetModalTap, { capture: true, passive: true });
     scope.listen(document, 'focusin', forgetModalTapFocus, { capture: true });
     scope.listen(document, 'scroll', notePageMoved, { capture: true, passive: true });
+    scope.listen(document, 'scroll', restorePageFieldScroll, { capture: true, passive: true });
     scope.onDispose(() => {
         endKeyboardSession();
         stopModalGlide();
@@ -670,6 +687,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         modalWatched = null;
         pageTapStart = null;
         pageTapProbe = null;
+        pageFieldCaught = null;
         naturalBox = null;
         modalTap = null;
         modalTapFocused = null;
@@ -686,6 +704,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(vv, 'resize', measureKeyboardCover);
     scope.listen(vv, 'scroll', measureKeyboardCover);
     scope.listen(vv, 'scroll', notePageMoved);
+    scope.listen(vv, 'scroll', restorePageFieldScroll);
     measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {

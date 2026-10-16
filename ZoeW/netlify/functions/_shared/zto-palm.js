@@ -427,7 +427,7 @@ function arrivalTrackRows(upstream, raw, barcode, site, range, keys, deps) {
 }
 
 async function palmArrivalList(range, page, session, keys, deps) {
-    const pageSize = Math.min(20, deps.listPageSize);
+    const pageSize = Math.min(5, deps.listPageSize);
     const signedRange = deps.listSignedRange(range);
     const requests = [
         { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize },

@@ -371,6 +371,7 @@ export async function fetchZtoListPage(cfg, from, to, page, mode?) {
     if (!out.res.ok || !Array.isArray(body.rows)) {
         const err: any = new Error('ZTO_LIST_FAILED');
         err.httpStatus = out.res.status;
+        err.upstreamReason = safeLookupReason(body.reason) || safeLookupReason(body.code);
         throw err;
     }
     return body;
@@ -661,7 +662,8 @@ export async function runZtoListSyncPreview() {
                 showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
             }
         } else {
-            setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
+            const detail = e && e.httpStatus ? ' (HTTP ' + e.httpStatus + (e.upstreamReason ? ' · ' + e.upstreamReason : '') + ')' : '';
+            setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន' + detail + ' — សូមសាកម្ដងទៀត');
             showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
         }
     } finally {

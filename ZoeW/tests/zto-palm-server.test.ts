@@ -520,7 +520,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(body.signedRows[0]).toMatchObject({ barcode: 'KH0000000009', at: '2026-10-16 09:40:57' });
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(4);
         const dispatch = sent.find((r) => r.body.billStatus === '4')!.body;
-        expect(dispatch).toMatchObject({ pageNum: 1, pageSize: 20 });
+        expect(dispatch).toMatchObject({ pageNum: 1, pageSize: 5 });
         expect(dispatch.dispEmpDateFrom).toBeUndefined();
         expect(dispatch.dispEmpDateTo).toBeUndefined();
     });
@@ -548,6 +548,25 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(body.rows).toHaveLength(1);
         expect(body.rows[0].from).toBe(expected);
         expect(body.signedRows[0].from).toBe(expected);
+    });
+
+    it('Palm បញ្ជីច្រើន និង track យឺត ១.៥ វិនាទី ➜ ទំព័រត្រូវបញ្ចប់ក្នុងថវិកា Function', async () => {
+        const { sessionToken: session } = await login();
+        vi.useFakeTimers();
+        vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
+            const payload = JSON.parse(init.body);
+            const isTrack = String(url).endsWith('/queryTrackInfo');
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (!isTrack) return page(Array.from({ length: payload.pageSize }, (_, i) => item('KH' + payload.billStatus + String(i).padStart(10, '0'), payload.billStatus)), { pages: 10 });
+            return upstream({ status: true, result: [{ mail: { mailNo: payload.mailNos, isSign: 0 }, tracks: [
+                { action: '3', siteCode: 'KH001', time: '2026-10-16 09:00:00', mailNo: payload.mailNos }
+            ] }] });
+        }));
+        const pending = call(listQuery({ signed: '0' }), session);
+        await vi.advanceTimersByTimeAsync(12000);
+        const response = await pending;
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).rows).toHaveLength(15);
     });
 
     it('Palm track ខ្វះឬបរាជ័យ ➜ មិនឆ្លើយជាបញ្ជីពេញហើយបាត់កញ្ចប់ស្ងាត់', async () => {

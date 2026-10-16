@@ -177,6 +177,14 @@ describe('Palm ៖ ទាញបញ្ជី ZTO ដូច Cookie ដោយ track
         expect(ztoListSyncEnabled()).toBe(true);
     });
 
+    it('បញ្ជីបរាជ័យ ➜ បង្ហាញ HTTP និងកូដមូលហេតុសុវត្ថិភាព', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => json({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYS400', message: 'private-upstream-detail' }, 502)));
+        await runZtoListSyncPreview();
+        expect(viewState.ztoListSyncNote).toContain('HTTP 502');
+        expect(viewState.ztoListSyncNote).toContain('palm:SYS400');
+        expect(viewState.ztoListSyncNote).not.toContain('private-upstream-detail');
+    });
+
     it('Palm អានគ្រប់ទំព័រ រួមទំព័រទទេក្រោយច្រោះ និងទំព័រលើសពិដាន Cookie', async () => {
         const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
             const page = Number(new URL(url).searchParams.get('page'));

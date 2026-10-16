@@ -157,6 +157,7 @@ function buildSandbox(state) {
         elapsedSince: (m) => { if (!m) return Infinity; const d = Date.now() - m; return d >= 0 ? d : Infinity; },
         getLookupApiConfig: () => ({ enabled: true, url: 'https://x/.netlify/functions/zto-order-detail?code={barcode}' }),
         lookupApiIsZto: () => true,
+        lookupApiIsPalm: () => false,
         deletedSearchQuery: state.query || '',
         expandedTrashGroups: new Set(),
         DELETED_LIST_MAX_ROWS: 200,

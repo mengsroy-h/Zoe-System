@@ -1157,7 +1157,8 @@ function firstBody(requests) {
         const state = { on: false, cfg: {} };
         const rctx = {
             console, queueMicrotask,
-            ztoListSyncEnabled: () => state.on, ztoFastModeIsOn: () => true, ztoStatusFeatureConfig: () => state.cfg
+            ztoListSyncEnabled: () => state.on, ztoFastModeIsOn: () => true, ztoStatusFeatureConfig: () => state.cfg,
+            ztoListPalmMode: () => false
         };
         rctx.globalThis = rctx;
         let seen = null;

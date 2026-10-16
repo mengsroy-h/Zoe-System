@@ -876,10 +876,12 @@ async function sqlMutationRound() {
     section('ង១. mutation លើ migration ពិត (RPC export) ➜ សេណារីយ៉ូ ក ត្រូវក្រហម');
     const results = await pool(SQL_MUTATIONS, JOBS, async ([label, from, to]) => {
         const hits = migrationSql.split(from).length - 1;
-        if (hits !== 1) return { hits, applied: false, red: 0 };
+        if (hits < 1) return { hits, applied: false, red: 0 };
+        // ⛔ migration ក្រោយអាច `create or replace` function ដដែល ➜ mutation ទៅ occurrence ចុងក្រោយ (និយមន័យដែលរស់) · «ក្រហម» ទើបបញ្ជាក់ថាវាប៉ះកូដរស់
+        const at = migrationSql.lastIndexOf(from);
         let env = null, red = 0, applied = false;
         try {
-            env = await makeEnv(migrationSql.replace(from, () => to), {});
+            env = await makeEnv(migrationSql.slice(0, at) + to + migrationSql.slice(at + from.length), {});
             applied = true;
             await rpcScenario((l, cond) => { if (!cond) red++; }, env.D);
         } catch (e) {
@@ -891,7 +893,7 @@ async function sqlMutationRound() {
     });
     SQL_MUTATIONS.forEach(([label], i) => {
         const r = results[i];
-        if (r.hits !== 1) ok('mutation SQL «' + label + '» ៖ anchor លេចម្តងគត់ (ឃើញ ' + r.hits + ')', false);
+        if (r.hits < 1) ok('mutation SQL «' + label + '» ៖ anchor រកមិនឃើញ', false);
         else ok('mutation SQL «' + label + '» ➜ ' + (r.applied ? 'ក្រហម (' + r.red + ')' : 'SQL អនុវត្តមិនបាន (មិនរាប់)'), r.applied && r.red > 0);
     });
 }

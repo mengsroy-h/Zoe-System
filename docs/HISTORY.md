@@ -45,7 +45,10 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.93] audit សុវត្ថិភាព ➜ token ZTO · License · Push
+0ប. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `0c9c09c` = PR #322 merge រួច · **មិនទាន់ merge**) ៖ [2.50.94] ផ្ទាំងដក/បញ្ចូលច្រើនមិនបិទពេលប៉ះផ្ទៃទទេ ·
+    migration Supabase ចំណាយលីនេអ៊ែរ + quota (A156–A158) ➜ ⚠️ សកម្មភាព ១ · ៣ · ៤ របស់ [2.50.94]។
+
+0ន. **PR #322 (merge រួច ៖ `main` `0c9c09c`)** ៖ [2.50.93] audit សុវត្ថិភាព ➜ token ZTO · License · Push
     (A149–A155) ➜ ⚠️ សកម្មភាព ១–៥ របស់ [2.50.93] (env `FIREBASE_PROJECT_IDS` · `ZTO_DETAIL_IDENTITY` · GitHub Environment · ប្រវត្តិ git)។ [2.50.92] 🩺 App ទើបដំឡើង ➜ ប្រាប់ផ្លូវភ្ជាប់
     Firebase និង Supabase (A148) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.92])។ [2.50.91] ពិនិត្យសុវត្ថិភាព ➜ Tab ចេញពីផ្ទាំង PIN/Activate
     (A147) ➜ focus trap ➜ ⚠️ សាកកុំព្យូទ័រ (សកម្មភាព ១ របស់ [2.50.91])។ ✅ iPhone 2.50.90 ៖ ម្ចាស់គម្រោង «Ios ជោគជ័យហើយ» · «លែងមានធ្លាក់ឬកន្ត្រាក់ទៀតហើយ»។ [2.50.90] វីដេអូម្ចាស់គម្រោង ៖ ស្កេនដក
@@ -244,6 +247,38 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.94] — 2026-10-16 · ZoeW · migration Supabase ៖ **ផ្ទាំង «ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់» · «បញ្ចូលច្រើន» មិនបិទពេលប៉ះផ្ទៃទទេ · Supabase ចំណាយលីនេអ៊ែរ (A154) · ពិដានទំហំក្នុងហាង**
+
+**ZoeW `2.50.94`** (`zoew-v356` ➜ `zoew-v357`) · migration Supabase ថ្មី `20261016120000_zoe_linear_write.sql` · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · Android native ថ្មី។
+សំណើម្ចាស់គម្រោង ៖ «រួចធ្វើ 5» (ចំណុច ៥ នៃ audit [2.50.93] = A154 · ក្រោយ merge PR #322) · «កែ សម្រួល modal "ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់" និង "បញ្ចូលច្រើន"
+កុំអោយប៉ះផ្ទៃទទេបិទ modal អី»។ ការសម្រេចម្ចាស់គម្រោងលើសកម្មភាព [2.50.93] ៖ ១ · ៣ · ៤ «មិនបាច់ធ្វើ» · ២ (`ZTO_DETAIL_IDENTITY`) ជា env Netlify តែប៉ុណ្ណោះ (គ្មានកូដ) ·
+៥ = ជុំនេះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗑️ ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់ · 📋 បញ្ចូលច្រើន ៖ ប៉ះផ្ទៃងងឹតខាងក្រៅផ្ទាំង ➜ ផ្ទាំងនៅបើក (`BACKDROP_KEEP_MODALS`) · បិទដោយប៊ូតុងក្នុងផ្ទាំង · Back · Escape ដដែល។
+- ☁️ Supabase (server) ៖ ការសរសេរ និងការអាន ចំណាយលីនេអ៊ែរតាមទំហំ (A156 · A157) ៖ rules ឃើញឯកសារមុន/ក្រោយការសរសេរដែលបញ្ជូនម្តង (មិនសាងសង់ context ឡើងវិញ ឬអានឯកសារ
+  ពីតារាងរាល់ node) · `exists`/`hasChildren` កម្រិត root មិនប្រមូល root ទាំងមូល · ការបញ្ចូល op ទៅឯកសារមួយជុំ (`zoe_merge`) · ការពិនិត្យផ្លូវជាន់តម្រៀប · ឈប់ប្រើ
+  `jsonb_agg`/`jsonb_object_agg` លើតម្លៃឯកសារ (`zoe_write` · `zoe_read` · `zoe_pull` · `zoe_admin_export`)។ ពិដាន ៖ ការសរសេរមួយប៉ះឯកសារ ≤ 8 MiB · ទំព័រ
+  `zoe_pull` ≤ 2 MiB (មិនកាត់ការសរសេរមួយ) · ទំហំក្នុងហាង `zoe_tenant_state.bytes` ≤ `quota_bytes` (លំនាំដើម 1 GiB ៖ ការសរសេរដែលធំឡើងលើស ➜ `quota_exceeded` ·
+  ការលុប និង Admin ឆ្លងបាន)។ ច្បាប់ rules · verdict មិនប្រែ (វាស់ធៀប RTDB emulator)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-backdrop-keep.test.tsx` (+២ ផ្ទាំង) — មុនកែ ធ្លាក់ ២។
+- `supabase-datastore-test` ផ្នែក ៣ «ចំណាយលីនេអ៊ែរ» (ថ្មី ៧ ក្រោម `statement_timeout` ៨ វិ.) — មុនកែ ធ្លាក់ ៦ (reconcile ៨០០៣ms ដាច់ · CAS root · ឯកសារ ២០០០០ barcode
+  Admin សរសេរមិនរួច · គ្មានពិដានទំហំ · pull ១ ទំព័រ) · ទំហំក្នុងហាង/quota (ថ្មី ៦ ក្នុង body) + mutation ថ្មី ៣ · mutation អនុវត្តលើនិយមន័យដែលរស់ (A158)។
+- `supabase-rls-test` ចាត់ថ្នាក់ function private ថ្មី ៦ · `emu/supabase-rules-parity` anchor ថ្មី · `supabase-data-tools-test` mutation SQL ទៅ occurrence ចុងក្រោយ (`zoe_admin_export` ថ្មី)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.94` (កូដ Android ដដែល)។ Firebase rules ៖ **គ្មាន**។
+1. ⚠️ **migration Supabase** ៖ merge ចូល `main` ➜ GitHub integration អនុវត្ត `20261016120000_zoe_linear_write.sql` (ឬបិទភ្ជាប់ក្នុង SQL Editor ហើយ `migration repair`
+   តាម `supabase/README.md`) ➜ migration គណនា `bytes` របស់ហាងនីមួយៗ។
+2. ពិនិត្យទំហំហាង ៖ SQL ក្នុង `supabase/README.md` ផ្នែក «ទំហំហាង (quota)»។
+3. សាក ៖ របៀបស្កេនដក ➜ ផ្ទាំងផ្ទៀងផ្ទាត់ ➜ ប៉ះផ្ទៃងងឹត ➜ នៅបើក · «បោះបង់»/Back ➜ បិទ · «📋 បញ្ចូលច្រើន» ដូចគ្នា (iPhone · Android · កុំព្យូទ័រ)។
+4. សាកហាង Supabase ៖ ស្កេន · បិទ/បើក · កែតម្លៃ · ទាញពេញ (ឧបករណ៍ថ្មី) ដំណើរការដូចមុន។
 
 ### [2.50.93] — 2026-10-16 · ZoeW · ZoeKeyGen `2.24.19` ៖ **audit សុវត្ថិភាពគម្រោងទាំងមូល ៖ token គណនីទៅតែ ZoeW · Activation Key ចងនឹងហត្ថលេខា · កៅអីអានមិនបាន = ក្រៅបណ្ដាញ · Push គ្មាន sub កំព្រា**
 
@@ -5073,7 +5108,10 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A151 | **Push ៖ sub កំព្រាក្រោយ index រវល់ ➜ ពេញពិដានគ្រប់ហាង (audit សុវត្ថិភាព)** | `push-core.mjs` ពិត + Blobs ក្លែង ៖ ២០០ subscribe ស្របគ្នា (Key/គណនីពិត ១) ➜ ១៨៩ `sub/` · ១០ ក្នុង index · ១៧៩ កំព្រា (រាប់ក្នុង `PUSH_SUBS_TOTAL_MAX` ៥០០០ · ទទួលដំណឹងគ្រប់ដង · មិនដែលកាត់) | ដក/ស្តារ record ពេល index រវល់ ➜ 2.50.93 (server) · អ្នកយាម `ZoeW/tests/push-server.test.ts` (១២០ ស្របគ្នា ➜ គ្មានកំព្រា) |
 | A152 | **CI ៖ keystore ផលិតកម្មអាចប៉ះពី branch ណាក៏បាន (audit សុវត្ថិភាព · តាមការកំណត់)** | `android-release.yml` ៖ `workflow_dispatch` លើ branch ណាក៏រត់ workflow របស់ branch នោះជាមួយ `ZOEW_KEYSTORE_*` · `npm ci` (lifecycle) + Gradle ក្នុង job ដដែល · runner Windows self-hosted មិនមែន ephemeral | ⚠️ សកម្មភាព ៣ របស់ [2.50.93] (GitHub Environment + អ្នកអនុម័ត + តែ `main`) · កូដមិនប្រែ |
 | A153 | **ប្រវត្តិ git ៖ លេខទូរស័ព្ទដែលមើលទៅពិត (audit សុវត្ថិភាព)** | clone ពេញ ១៤២៨ commit ៖ លេខ ~១៣ (ឧ. `097415…` ១១៦ ដង · `096389…` ៧៩ ដង) ក្នុង fixture/ឯកសារចាស់ · HEAD ស្អាត (`security-guard-test` បិទផ្លូវថ្មី) · **គ្មាន secret** (token · private key · service account · cookie ពិត) | ⚠️ សកម្មភាព ៤ របស់ [2.50.93] (ម្ចាស់គម្រោងសម្រេច) |
-| A154 | **Supabase ៖ ការផ្ទៀងផ្ទាត់ rules ចំណាយការ៉េ ➜ DoS ឆ្លងហាង (audit សុវត្ថិភាព)** | Postgres ពិត ៖ សរសេរ ១ ឯកសារ `zoew_daily_collected_cod_dod` ៤០០០ keys (៩៨ KB) ➜ អស់ ៨ វិ. (`statement_timeout`) · `zoe_snap_val` អានឯកសារទាំងមូលរាល់ leaf · គ្មាន quota/rate ក្នុងហាង · **គ្មានការអាន/សរសេរឆ្លងហាង · គ្មានការឡើងសិទ្ធិ** (RLS · definer · realtime · invite/reset ល្អ) | ⚠️ ជុំបន្ទាប់ (migration ថ្មី ៖ បញ្ជូនតម្លៃក្នុង context · ពិដាន keys/ឯកសារ/bytes ក្នុងហាង) · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ក៏ប៉ះពិដាននេះ |
+| A154 | **Supabase ៖ ការផ្ទៀងផ្ទាត់ rules ចំណាយការ៉េ ➜ DoS ឆ្លងហាង (audit សុវត្ថិភាព)** | Postgres ពិត ៖ សរសេរ ១ ឯកសារ `zoew_daily_collected_cod_dod` ៤០០០ keys (៩៨ KB) ➜ អស់ ៨ វិ. (`statement_timeout`) · `zoe_snap_val` អានឯកសារទាំងមូលរាល់ leaf · គ្មាន quota/rate ក្នុងហាង · **គ្មានការអាន/សរសេរឆ្លងហាង · គ្មានការឡើងសិទ្ធិ** (RLS · definer · realtime · invite/reset ល្អ) | ✅ [2.50.94] (A156 · A157) ៖ migration `20261016120000_zoe_linear_write.sql` · ពិដាន ៨ MiB/ការសរសេរ · quota ក្នុងហាង · `supabase-datastore-test` ផ្នែក ៣ |
+| A156 | **Supabase ៖ ចំណាយការ៉េក្នុង `zoe_apply` · rules (A154 ពិនិត្យលម្អិត)** | Postgres 17 ពិត · ហាងមួយ ៖ ប្រភព ៖ `zoe_canon` (`result \|\| jsonb_build_object` មួយៗ) · ctx ផ្ទុក `pre` ចម្លងរាល់ node (`p_ctx \|\| …`) · `zoe_snap_val` អានឯកសារពីតារាងរាល់ leaf · `.validate` កម្រិត root ប្រមូល root ទាំងមូលរាល់ op · `jsonb_set` លើ `work` ទាំងមូលរាល់ op · ផ្លូវជាន់ O(n²)។ មុន ➜ ក្រោយ ៖ update ១០០ ផ្លូវចូលថ្ងៃ ២០០០ key ៨១៦៩ ➜ ៧៤ms · ១ key ចូលថ្ងៃ ២០០០ ១១២ ➜ ២៧ms · ឯកសារ ២០០០ key ២០៤១ ➜ ៣៣៩ms · ៤០០០ key (profile ៖ `zoe_eval` ៦៤០០៨ ➜ ៣៦០០៥ ហៅ) ១១៧១ ➜ ៥២៥ms · reconcile ១៦០ ផ្លូវ root ៣២០០០ key ៤៨៦ms · CAS root ៣២០០០ key ៥៦៧៦ms (នៅជិតពិដាន ៖ ហាង ~៤០០០/ថ្ងៃ កែតម្លៃកញ្ចប់បិទ ➜ `runTransaction` លើ root ទាំងមូលក្នុង App) · ឯកសារ 1 MB (៣០០០០ key · វាយប្រហារ) ៣៩៧៩ms ក្នុង `statement_timeout` (ការសរសេររបស់ហាងមួយរត់ម្តងមួយ ➜ ≤ ១ CPU) · ការសរសេរប៉ះឯកសារ ១០ MB ៣០៣០ms ➜ ពិដាន ៨ MiB | ✅ [2.50.94] · 💡 ជុំក្រោយ (បើហាងធំលើ Supabase) ៖ App `runTransaction` តាមថ្ងៃ ជំនួស root ចំណូលយករួចទាំងមូល |
+| A157 | **Postgres 17 ៖ `jsonb_agg` · `jsonb_object_agg` ចំណាយការ៉េតាមទំហំតម្លៃនីមួយៗ ➜ DoS ផ្លូវអាន · ហាងធំទាញពេញមិនរួច** | វាស់ ៖ តម្លៃមួយ ២០០០ · ៨០០០ · ៣២០០០ key ➜ ៥៧ · ៩២៨ · ១៥៩៨៨ms (`jsonb_build_object` · ការបម្លែងតាម text ៖ ២ · ៨ · ៣៨ms / ៣ · ១២ · ៦៩ms) ➜ `zoe_pull`/`zoe_read` ឯកសារ 1 MB ម្តង ≈ ១៦ វិ. (ការអានមិនជាប់ tenant lock ➜ ស្របគ្នាច្រើន CPU) · ហាង ~៤០០០ barcode/ថ្ងៃ (ឯកសារ pickup ប្រចាំថ្ងៃរក្សាទុកជានិច្ច) ៖ ទំព័រ pull ពេញលើស ៨ វិ. ➜ ឧបករណ៍ថ្មីមិនអាចទាញ។ ក្រោយ ៖ `zoe_read` ឯកសារ 1 MB ១២១ms · ឯកសារ ២០០០០ key ២ ៦៦ms · ទាញពេញ ~១២ MB ២ ទំព័រ (យឺតបំផុត < ១ វិ.) | ✅ [2.50.94] ៖ object/array សាងពី text (`zoe_json_object` · `string_agg`) · ទំព័រ `zoe_pull` ≤ 2 MiB |
+| A158 | **mutation របស់ `supabase-datastore-test` អាចធ្លាក់លើកូដស្លាប់** | `create or replace` ក្នុង migration ថ្មី ➜ anchor ចាស់នៅលេចម្តង តែប្តូរនិយមន័យដែលត្រូវជំនួស ➜ «មិនចាប់» (ឬ anchor ដូចគ្នា ២ ដង ➜ «ត្រូវលេចម្តង») · `public.zoe_write` ដើមផ្លាស់ទៅ `private` ដោយ `DO` block (ការញែកអត្ថបទមិនឃើញ) | ✅ [2.50.94] ៖ អនុវត្តនៅ occurrence ចុងក្រោយ + digest `pg_get_functiondef` · policy · ACL · trigger ត្រូវប្រែ (mutation ដែលមិនប្រែនិយមន័យរស់ ➜ FAIL) |
 | A155 | **ចំណុចតូច/ការណែនាំ (audit សុវត្ថិភាព)** | `?list=1` Project មិនចងសាខា ជឿអ៊ីមែល (ម្ចាស់គម្រោង ៖ ចង env) · `/detail` `ZTO_DETAIL_IDENTITY=off` លំនាំដើម · cache «រកមិនឃើញ» បត់អក្សរធំ/តូច (≤ ១២០ វិ.) · កូដ Setup Link ៦ ខ្ទង់ (ម្ចាស់គម្រោង ៖ ទុក) · PIN/Signing Key ៖ PBKDF2 salt ថេរ (ត្រូវចូលឧបករណ៍) · APK គ្មាន CSP · កៅអី License ៖ device ID អានបាន (ត្រូវ devtools) · admin Supabase គ្មាន MFA · FileProvider ធំជាងត្រូវការ · APK updater មិនពិនិត្យ cert ផ្ទាល់ (Android ពិនិត្យរួច) | មិនកែក្នុងជុំនេះ — ការសម្រេចម្ចាស់គម្រោង ឬជុំបន្ទាប់ (មើល PR #322) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»

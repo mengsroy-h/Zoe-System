@@ -18,6 +18,7 @@ export const MODAL_FIELD_MARGIN_PX = 12;
 export const MODAL_KEYBOARD_GAP_PX = 8;
 export const MODAL_TAP_SLOP_PX = 10;
 export const MODAL_TAP_MAX_MS = 500;
+export const CAUGHT_CLICK_MS = 800;
 export const PAGE_TAP_KEYBOARD_RATIO = 0.5;
 export const PAGE_TAP_PHONE_KEYBOARD_RATIO = 0.45;
 export const PAGE_TAP_PHONE_MAX_WIDTH = 600;
@@ -66,6 +67,7 @@ let pageTapProbe: { path: string; field: HTMLElement; at: number; until: number;
 let pageTapReported: string[] = [];
 let touchesDown = 0;
 let pageFieldCaught: HTMLElement | null = null;
+let caughtClick: { field: HTMLElement; until: number } | null = null;
 let lastTouchEndAt = -Infinity;
 let lastTouchTarget: EventTarget | null = null;
 let iosKeyboard: { inset: number; settled: boolean; applied: number } | null = null;
@@ -764,6 +766,7 @@ export function noteModalTouchStart(e: TouchEvent): void {
     noteTouchesDown(e);
     notePageTapStart(e);
     modalTap = null;
+    caughtClick = null;
     if (modalFocusRefused) return;
     const ios = usesIOSPanelHandoff();
     if (!ios && !isAndroidDevice()) return;
@@ -797,8 +800,26 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     if (document.activeElement === tap.field) blurActiveElement();
     if (focusElementWithoutScroll(tap.field)) {
         modalTapFocused = tap.field;
+        if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
         if (usesIOSPanelHandoff() && !tap.field.closest('.modal')) pageFieldCaught = tap.field;
     } else modalFocusRefused = true;
+}
+
+function swallowCaughtClick(e: Event): void {
+    const caught = caughtClick;
+    if (!caught) return;
+    if (performance.now() > caught.until || document.activeElement !== caught.field) {
+        caughtClick = null;
+        return;
+    }
+    const target = e.target as Node | null;
+    if (!target || (target !== caught.field && !caught.field.contains(target) && iosPageTapFieldOf(target) !== caught.field)) return;
+    e.preventDefault();
+    if (e.type === 'click') caughtClick = null;
+}
+
+function forgetPageFieldCaught(e: FocusEvent): void {
+    if (pageFieldCaught && e.target === pageFieldCaught) pageFieldCaught = null;
 }
 
 export function listenModalKeyboard(scope: LifecycleScope): void {
@@ -821,6 +842,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     pageTapReported = [];
     touchesDown = 0;
     pageFieldCaught = null;
+    caughtClick = null;
     lastTouchEndAt = -Infinity;
     lastTouchTarget = null;
     iosForecastMissed = false;
@@ -840,6 +862,9 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'focus', keepKeyboardFocusInPlace, { capture: true });
     scope.listen(document, 'focusin', noteIOSFieldFocus, { capture: true });
     scope.listen(document, 'focusout', noteIOSFieldBlur, { capture: true });
+    scope.listen(document, 'focusout', forgetPageFieldCaught, { capture: true });
+    scope.listen(document, 'mousedown', swallowCaughtClick, { capture: true });
+    scope.listen(document, 'click', swallowCaughtClick, { capture: true });
     scope.listen(document, 'scroll', notePageMoved, { capture: true, passive: true });
     scope.listen(document, 'scroll', restorePageFieldScroll, { capture: true, passive: true });
     scope.onDispose(() => {
@@ -853,6 +878,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         pageTapStart = null;
         pageTapProbe = null;
         pageFieldCaught = null;
+        caughtClick = null;
         naturalBox = null;
         modalTap = null;
         modalTapFocused = null;

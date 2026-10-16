@@ -45,7 +45,9 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.85] ពីប្រអប់វាយទៅប្រអប់ជ្រើស/ថ្ងៃខែក្នុងផ្ទាំង iPhone ➜
+0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.86] វីដេអូម្ចាស់គម្រោងលើ preview 2.50.85 (គ្មានអត្ថបទ) ៖
+    ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ១៣៨–២១៤pt ហើយរអិលត្រឡប់ (៣ ដង / ២៥ វិនាទី) ➜ ចុចសំយោគ WebKit លុប preventScroll (A143) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.86])។
+    [2.50.85] ពីប្រអប់វាយទៅប្រអប់ជ្រើស/ថ្ងៃខែក្នុងផ្ទាំង iPhone ➜
     ផ្ទាំងនៅលើកង់ជ្រើស · ∨/∧ ទៅប្រអប់ជ្រើស/ថ្ងៃខែ ➜ ទំព័រនៅនឹង (A142) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.85])។ [2.50.84] ម្ចាស់គម្រោងលើ preview 2.50.83 (App លើ Home Screen) ៖
     «iphone ផ្ទាំងលែងកន្ត្រាក់ តែ កន្លែងវាយbarcode នៅលោតទំព័រម្តងម្កាលដដែល និង ពេលចុចសញ្ញា ចុះមកប្រអប់បន្ទាប់របស់ keybaord PgUp/PgDn លោតទំព័រ» (ទំព័រស្កេន · ផ្ទាំងលេខទូរស័ព្ទ/COD ·
     ផ្ទាំងផ្សេង) · «ចុះios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ ∨/∧ មិនរំកិលទំព័រ (A139) · iPhone រអិលតែម្តង (A140) · `iosPageTap` លេខបន្ថែម · preview មិនផ្ញើ Sentry (A141) ➜
@@ -235,6 +237,31 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.86] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រមិនលោតចុះ (ចុចសំយោគ WebKit មិនលុប preventScroll) · Android មិនប្រែ**
+
+**ZoeW `2.50.86`** (`zoew-v348` ➜ `zoew-v349`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ (ផ្លូវ iOS standalone · `usesIOSPanelHandoff()`)។
+វីដេអូម្ចាស់គម្រោង (preview 2.50.85 · App លើ Home Screen · គ្មានអត្ថបទ) ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ (navbar រួម) លោតចុះ ហើយរអិលត្រឡប់ ៣ ដងក្នុង ២៥ វិនាទី (ផ្នែក ២ A143)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់**។ App ចាប់ការចុច (`preventScroll`) ប៉ុន្តែ WebKit នៅតែអាចផ្ញើ «ចុចសំយោគ» (`mousedown` · `click`) ពេល
+  វាមិនអាចការពារព្រឹត្តិការណ៍ touch (ឧ. ចុចភ្លាមក្រោយទំព័ររអិល · ក្រោយប្តូររបៀប) ➜ focus ប្រអប់ម្តងទៀតដោយគ្មាន `preventScroll` មុន keyboard បង្ហាញ ➜ iOS រំកិលដាក់ប្រអប់នៅកណ្តាល ➜
+  App ទាញត្រឡប់ ០ ខណៈចលនា keyboard នៅរត់ ➜ ទំព័រលោតចុះ។ ឥឡូវ App បោះចោល `mousedown` · `click` នៃការចុចដែលបានចាប់ (`CAUGHT_CLICK_MS` · លើប្រអប់ ឬស្លាក/⚡ របស់វាតែប៉ុណ្ណោះ ·
+  ការប៉ះថ្មីបញ្ចប់) ➜ iOS មិនរំកិល។ ប្រអប់ដែល App ចាប់ blur ហើយ ➜ App លែងទាញ document ត្រឡប់ (focus ក្រោយដែល iOS បង្ហាញខ្លួនឯង រអិលរលូនជាមួយ keyboard)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` ៩ (ច្បាប់ WebKit ក្លែង ៖ focus/refocus ពេល keyboard មិនទាន់បង្ហាញ ➜ ការចុងក្រោយឈ្នះ · ចុចសំយោគ ៖ `mousedown` focus ប្រអប់ · `click` ស្លាក
+  focus ប្រអប់ដែលភ្ជាប់) ៖ កន្លែងវាយ Barcode · ស្លាក · ប្រអប់ក្នុងផ្ទាំង ➜ preventScroll នៅ · ទិសផ្ទុយ ៖ ប្រអប់ក្រោយ keyboard (iOS បង្ហាញ) · Android · ក្រោយពេលកំណត់ · ការប៉ះថ្មី ·
+  ប៊ូតុង submit (iPad + mouse) · ចុចប្រអប់ដែល focus រួច (Paste) ➜ មិនប៉ះ · ទង់ចាស់ ៖ blur ➜ focus ក្រោយ ➜ មិនទាញ — កូដ [2.50.85] FAIL ៥ ➜ ៩/៩ · mutation ១០ ➜ ចាប់ ១០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.86` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
+   សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
+
 ### [2.50.85] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ពីប្រអប់វាយទៅប្រអប់ជ្រើស ឬថ្ងៃខែក្នុងផ្ទាំង ➜ ផ្ទាំងនៅពីលើកង់ជ្រើស · ∨/∧ ទៅប្រអប់ទាំងនោះ ➜ ទំព័រនៅនឹង · Android មិនប្រែ**
 
 **ZoeW `2.50.85`** (`zoew-v347` ➜ `zoew-v348`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
@@ -256,7 +283,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.85` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+0. Deploy ៖ មើល [2.50.86] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
 
 ### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
@@ -291,7 +318,7 @@ PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស�
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.85] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.86] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
 2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
    កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
@@ -4807,6 +4834,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A140 | **iPhone ៖ ចលនាផ្ទាំងតាម keyboard (សំណើ «ios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?»)** | A136 ៖ ចលនាតាមកម្ពស់នីមួយៗ ➜ កន្ត្រាក់ · `modal-keyboard-device-test` (ឈ) ៖ ចុច + លោតហួស ➜ ស្ងប់ ៖ 2.50.83 (ភ្លាម) ក៏ឡើងហួស ហើយចុះ (`back` ១ · `over` ៥) · 2.50.82 (រអិលគ្រប់កម្ពស់) `back` ៣–៨ · `over` ៩–១៣ | ផ្លូវ iOS ដាច់ពី Android (`iosModalKeyboardViewport()`) ៖ ការរំពឹងកម្ពស់ពីការចាំពេលចុច/ប្តូរប្រអប់ (`forecastModalKeyboard()`) · គ្មានការរំពឹង ➜ កម្ពស់ដំបូង · កម្ពស់ចន្លោះរំលងរហូតស្ងប់ `IOS_KEYBOARD_SETTLE_MS` · Done ➜ ចុះភ្លាម · keyboard មិនលោតក្នុង `IOS_KEYBOARD_FORECAST_MS` ➜ ត្រឡប់ ហើយឈប់រំពឹង ➜ ✅ (⚠️ ចាំម្ចាស់គម្រោងសាក ៖ ការរាយការណ៍កម្ពស់ពិតរបស់ iOS មិនអាចវាស់នៅទីនេះ) |
 | A141 | **preview មិនផ្ញើ Sentry** | `search_errors` ៖ គ្មានព្រឹត្តិការណ៍ `deploy-preview` ក្នុង ៣០ ថ្ងៃ · `find_dropped_events` (១៤ ថ្ងៃ) ៖ គ្មាន `invalid`/`filtered` នៅ server (តែ `client_discard` ៥) · កូដ App មិនបិទ Sentry តាម host ➜ ទំនង Allowed Domains/Loader នៃគម្រោង Sentry · ព្រឹត្តិការណ៍ A137 ៖ `scrollY` ២៣០ · `offsetTop` ២៧៧ ដោយគ្មាន `_zoomToRevealFocusedElement` (preventScroll) ➜ ផ្លូវផ្សេង (`_scrollToAndRevealSelectionIfNeeded` ពេល keyboard ប្តូរកម្ពស់ · UIKit `_adjustForAutomaticKeyboardInfo`) មិនទាន់ដឹង | `iosPageTap` បន្ថែម `afterMs` · `viewportHeight` · `docHeight` · `stillFocused` ➜ ⚠️ ចាំទិន្នន័យ (production ក្រោយ merge ឬ Allowed Domains) ➜ កែតែផ្លូវដែលវាស់ឃើញ |
 | A142 | **ពិនិត្យកូដ 2.50.84 ៖ focus ពីប្រអប់វាយទៅ select · date ក្នុងផ្ទាំង iPhone** | `noteIOSFieldBlur()` ប្រើ `textEntryField(e.relatedTarget)` ➜ select/date (កង់ជ្រើសនៅកន្លែង keyboard · `requiresAccessoryView`) រាប់ជា «keyboard បិទ» ➜ `iosClosing` ➜ ផ្ទាំងចុះក្រោមកង់ · `noteIOSFieldFocus()` មិនលុប `iosClosing` ពេល focus select · `keepKeyboardFocusInPlace()` មិនគ្រប select (∨ ទៅ select ➜ `_zoomToRevealFocusedElement`) · តេស្ត happy-dom ៖ `<select>` ជា Proxy ➜ `this` ≠ `document.activeElement` (គំរូ WebKit ប្រៀបធៀបតាម id) | `inputViewField()` (ប្រអប់វាយ · select · date/time) សម្រាប់ focus · blur · ∨/∧ ➜ 2.50.85 · វាស់ក្នុង vitest តែប៉ុណ្ណោះ (ផ្ទាំងពិតដែលមានប្រអប់វាយ + select មើលឃើញព្រមគ្នាពេលបើក ៖ គ្មាន ➜ device-test មិនមានគោល) |
+| A143 | **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់ (វីដេអូ preview 2.50.85)** | វីដេអូ ៣០ រូប/វិ ៖ logo navbar ១៥១px ➜ ១៤៦ (iOS ចាប់ផ្តើមរំកិលឡើង) ➜ ៤៣៤ · ៥៩០ · ៥៨៨ (ចុះ ១៣៨ · ២១៤ · ២១៣pt) ➜ ត្រឡប់ក្នុង ២០០–២៤០ms · ចំនួនស្មើ `_zoomToFocusRect` ដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard (របៀបបញ្ចូល ≈ ១៤៧ · ដក ≈ ២១៥) ➜ preventScroll បាត់ · ប្រភព WebKit ៖ `FocusController::setFocusedElement` លើធាតុដែល focus រួច ➜ `elementDidRefocus` (ជម្រើស click) ➜ `WebPage::elementDidFocus` សរសេរជាន់ព័ត៌មានរង់ចាំ ពេល `!m_isShowingInputViewForFocusedElement` ➜ `completeSyntheticClick` flush · ការទាញ ០ របស់ App (`restorePageFieldScroll`) ពេលចលនា keyboard (additive) រត់ ➜ ចុះ ហើយត្រឡប់ · `pageFieldCaught` នៅជាប់ក្រោយ blur ➜ focus ក្រោយក៏ត្រូវទាញ | `swallowCaughtClick()` (`mousedown` · `click` នៃការចុចដែលចាប់ · `CAUGHT_CLICK_MS` · ប្រអប់/ស្លាក/⚡ តែប៉ុណ្ណោះ) · `forgetPageFieldCaught()` ➜ 2.50.86 · ⚠️ ផ្លូវផ្សេងទៀតដែល iOS អាច focus (text interaction `focusTextInputContextAndPlaceCaret`) មិនទាន់វាស់ ➜ `iosPageTap` Sentry ក្រោយ merge |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
@@ -7443,6 +7471,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-page-tap-probe.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |

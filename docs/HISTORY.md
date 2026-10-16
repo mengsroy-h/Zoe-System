@@ -266,7 +266,7 @@
 
 - `ZoeW/tests/zto-remind-days.test.ts` ៥ (ថ្មី) ៖ ព្រំដែន ៣ ថ្ងៃ + `guide.html` ស្មើកូដ · ធុង «យករួច» ១៤ ម៉ោង · ២ ថ្ងៃ · ~៣ ថ្ងៃ + `false` ➜ ក្នុងរបា · លើស ៣ ថ្ងៃ ➜ ចេញ ·
   ទិសផ្ទុយ (លុប · ដក · ផុតកំណត់ · `true` ➜ មិនបង្ហាញ) · សាលក្រម ២ ថ្ងៃមុនរស់ក្រោយ reload · ១២០០ សាលក្រមនៅគ្រប់ — កូដ [2.50.88] FAIL ៤/៥ (ទិសផ្ទុយ PASS ទាំងមុនទាំងក្រោយ)។
-- `audit-tools/zto-sync-banner-test.js` ផ្នែក ១៤ ៖ ធុងចាស់ «ហួសព្រំដែន» ដកពី `ttl` (មិនមែន ១៣ ម៉ោងថេរ) · `audit-tools/empty-state-truth-test.js` អាន `ZTO_STATUS_TTL_MS`
+- `audit-tools/zto-sync-banner-test.js` ផ្នែក ៣ខ (ធុងចាស់ ៤៨ ម៉ោងថេរ ➜ `ZTO_STATUS_TTL_MS` + ១ ម៉ោង លាក់ · − ១ ម៉ោង នៅលេច) · ផ្នែក ១៤ ៖ ធុងចាស់ «ហួសព្រំដែន» ដកពី `ttl` (មិនមែន ១៣ ម៉ោងថេរ) — run-all STRICT ទី ១ ចាប់បាន ៣ខ ធ្លាក់ ➜ កែ ➜ ២០០ ok · `audit-tools/empty-state-truth-test.js` អាន `ZTO_STATUS_TTL_MS`
   ពីកូដ (`readProductConst()`) ➜ ប្តូរថេរថ្ងៃក្រោយ មិនបង្ខូចអ្នកយាម។
 - ZTO vitest ២៤ ឯកសារ ✅ · `zto-lock` ✅ (sha256 ថ្មី)។
 

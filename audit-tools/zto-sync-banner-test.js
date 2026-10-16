@@ -273,19 +273,29 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     }
 
     // ⛔ ធុងសំរាមរក្សា ៣០ ថ្ងៃ ➜ ត្រូវមានព្រំដែនអាយុ បើមិនដូច្នេះរបាដាស់តឿន
-    // កញ្ចប់ចាស់ជាសប្តាហ៍។
-    const tooOld = await page.evaluate(() => {
+    // កញ្ចប់ចាស់ជាសប្តាហ៍។ ព្រំដែនអានពី `ZTO_STATUS_TTL_MS` ក្នុងកូដពិត (ចំនួនថ្ងៃជាសំណើម្ចាស់គម្រោង)
+    // ➜ ចាស់ជាងព្រំដែន ១ ម៉ោង ➜ លាក់ · ក្មេងជាងព្រំដែន ១ ម៉ោង ➜ នៅលេច (ទិសទាំងពីរ)។
+    const BAR_TTL_MS = (function () {
+        const m = APP_SRC.match(/ZTO_STATUS_TTL_MS\s*=\s*([^;]+);/);
+        if (!m) return 0;
+        try { return Function('"use strict";return (' + m[1] + ');')(); } catch (e) { return 0; }
+    })();
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន `ZTO_STATUS_TTL_MS` ចេញពីកូដពិត', BAR_TTL_MS > 0, BAR_TTL_MS);
+    const trashAgeHidden = (ageMs) => page.evaluate((age) => {
         clearZtoPickupStatusStore();
         setZtoPickupVerdict('BAR000010', false);
         renderZtoSyncBanner([], [{
             id: 't3', phone: '011', trashReason: 'pickup',
-            deletedAt: Date.now() - (48 * 60 * 60 * 1000),
+            deletedAt: Date.now() - age,
             barcodes: [{ code: 'BAR000010', isClosed: true }]
         }]);
         const banner = document.getElementById('ztoSyncBanner');
         return banner.classList.contains('hidden');
-    });
+    }, ageMs);
+    const tooOld = await trashAgeHidden(BAR_TTL_MS + 60 * 60 * 1000);
     ok('⛔ ធុងសំរាមចាស់ជាងព្រំដែន ➜ របាលាក់', tooOld === true, tooOld);
+    const stillYoung = await trashAgeHidden(Math.max(0, BAR_TTL_MS - 60 * 60 * 1000));
+    ok('⛔ ទិសផ្ទុយ ៖ ធុងសំរាមក្មេងជាងព្រំដែន ➜ របានៅលេច', stillYoung === false, stillYoung);
 
     console.log('\n== ៤. មុខងារដេកលក់ ==');
 

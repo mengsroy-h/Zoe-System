@@ -67,7 +67,7 @@ const APPS = [
             { sel: '.search-box input', px: 14 },
             { sel: '.modal-content p', px: 11 }
         ],
-        shadowRings: [{ id: 'securityPinInput' }, { id: 'hwScannerInput', tab: '#pageTabEntry' }]
+        shadowRings: [{ id: 'securityPinInput' }, { id: 'hwScannerInput', tab: '#pageTabEntry', pageField: true }]
     },
     {
         name: 'ZoeKeyGen', desktop: 900, tabletStep: null,
@@ -203,7 +203,22 @@ async function tabSweep(page, steps) {
         check(ringed.length >= 2, app.name + '៖ ប៊ូតុងពិត ' + ringed.length + ' ទទួលរង្វង់ outline ≥ 2px');
 
         // ឃ. ប្រអប់អត្ថបទដែលធ្លាប់មាន `outline: none` ស្អាតៗ ➜ ត្រូវមានរង្វង់ box-shadow
+        //     ប្រអប់លើទំព័រ (`pageField`) ៖ App បើក `pinSetupModal` ពេល boot ហើយ focus trap (`listenModalFocusTrap()`) ត្រឡប់ focus ដែលចេញពីផ្ទាំងខាងលើ
+        //     ចូលក្នុងផ្ទាំងវិញ (ត្រូវ ៖ ប្រអប់ខាងក្រោយផ្ទាំងមិនទទួល focus) ➜ បិទផ្ទាំងទាំងអស់តាម App (`closeModal`) មុនវាស់ · លក្ខខណ្ឌមុន ៖ គ្មានផ្ទាំងបើក
         for (const ring of app.shadowRings) {
+            let reopen = [];
+            if (ring.pageField) {
+                const shownModals = () => s.page.evaluate(() => Array.from(document.querySelectorAll('.modal'))
+                    .filter((m) => getComputedStyle(m).display !== 'none').map((m) => m.id));
+                const before = await shownModals();
+                await s.page.evaluate((ids) => ids.forEach((id) => window.closeModal(id)), before).catch(() => {});
+                await s.page.waitForTimeout(250);
+                const left = await shownModals();
+                const stateOpen = await s.page.evaluate(() => window.isModalOpen);
+                check(left.length === 0 && stateOpen === false, app.name + '៖ លក្ខខណ្ឌមុន #' + ring.id + ' ៖ គ្មានផ្ទាំងបើក (បិទតាម App ៖ ' + before.join(', ') + ')',
+                    'នៅសល់ ' + left.join(', ') + ' · isModalOpen=' + stateOpen);
+                reopen = before;
+            }
             if (ring.tab) { await s.page.evaluate((sel) => document.querySelector(sel).click(), ring.tab); await s.page.waitForTimeout(450); }
             const got = await s.page.evaluate((elId) => {
                 const el = document.getElementById(elId);
@@ -228,6 +243,10 @@ async function tabSweep(page, steps) {
             }, ring.id);
             check(!got.missing && got.live && got.focused,
                 app.name + '៖ #' + ring.id + ' បង្ហាញរង្វង់ផ្តោត', got.missing ? 'រកមិនឃើញធាតុ' : JSON.stringify(got));
+            if (reopen.length) {
+                await s.page.evaluate((ids) => ids.forEach((id) => window.openModalHelper(id)), reopen).catch(() => {});
+                await s.page.waitForTimeout(250);
+            }
         }
 
         // ងខ. checkbox/radio ចុចដោយម្រាមដៃ/ម៉ៅស៍ ➜ គ្មានរង្វង់ការ៉េរបស់វាលអក្សរ (ZoeW `.modal-content input:focus` · ZoeKeyGen `input:focus` ៖

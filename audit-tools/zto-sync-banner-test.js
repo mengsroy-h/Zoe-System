@@ -1674,7 +1674,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
             skewSlow5m: counts(MIN, 5 * MIN),
             skewSlow2h: counts(MIN, 2 * HOUR),
             skewFast13h: counts(MIN, -13 * HOUR),
-            skewSlowOld: counts(13 * HOUR, 2 * HOUR),
+            skewSlowOld: counts(ttl + HOUR, 2 * HOUR),
             shapes: [undefined, null, 0, -1, 'abc', Infinity, NaN].map(shape),
             notPickup: ztoStatusTrashItemCounts({ trashReason: 'delete', deletedAt: Date.now() }),
             stampSkewMs: stampSkewMs

@@ -45,7 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.88] «ពិនិត្យផង» ➜ ចន្លោះ iPhone SE (កម្ពស់ keyboard ដំបូង
+0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.89] ម្ចាស់គម្រោង ៖ កញ្ចប់បិទក្នុង ZoeW
+    តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង ➜ ជ្រើស «៣ ថ្ងៃ» (A145 · តំបន់ចាក់សោ ZTO ប្រែតាមសំណើ) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.89])។ [2.50.88] «ពិនិត្យផង» ➜ ចន្លោះ iPhone SE (កម្ពស់ keyboard ដំបូង
     < `KEYBOARD_MIN_INSET_PX`) ➜ មិនទាញពេលប្រអប់វាយ focus ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។ [2.50.87] ម្ចាស់គម្រោង ៖ «Preview commit ថ្មីនៅតែធ្លាក់ទំព័រដដែល» ·
     «សូមសម្រួល iOS អោយត្រឹមត្រូវ clean up កូដមុនមុន សរសេថ្មីមក អោយឆ្លាតវៃ ដូច android ទៅ» ➜ iOS «បង្ការ មិនតទល់» (A144) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។
     [2.50.86] វីដេអូម្ចាស់គម្រោងលើ preview 2.50.85 (គ្មានអត្ថបទ) ៖
@@ -240,6 +241,41 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.89] — 2026-10-16 · ZoeW ៖ **របា «ZTO មិនទាន់បិទ» រំលឹក ៣ ថ្ងៃ (មិនមែន ១២ ម៉ោង) — កញ្ចប់ដែលចូលធុងសំរាម «យករួច» ក្រោយ ២ ម៉ោង នៅតែរំលឹក**
+
+**ZoeW `2.50.89`** (`zoew-v351` ➜ `zoew-v352`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី។
+សំណើម្ចាស់គម្រោង ៖ «បញ្ហាមួយទៀតកញ្ចប់មិនទាន់បិទក្នុង ZTO Palm យូម៉ោងខ្លះមិនបង្ហាញប្រាប់ ក្នុងZoeWបិទតែ ZTO Palm មិនទាន់បិទ ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង»
+➜ សំណួរ «ចង់ឲ្យរបារំលឹករយៈពេលប៉ុន្មាន?» ➜ ម្ចាស់គម្រោងជ្រើស **«៣ ថ្ងៃ»**។
+⛔ **តំបន់ចាក់សោ ZTO** ៖ `src/features/zto-status.ts` ប្រែតាមសំណើខាងលើ ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`
+(`968bad53…` ➜ `3e456891…`) · ប្រែតែថេរ ២ (`ZTO_STATUS_TTL_MS` · `ZTO_STATUS_MAX`) · ក្បួនផ្សេងមិនប៉ះ។
+
+#### មូលហេតុ (វាស់ពីកូដ)
+
+- របាអានកញ្ចប់បិទក្នុង `scanHistory` និងធុងសំរាម «យករួច» ត្រឹម `ZTO_STATUS_TTL_MS` = **១២ ម៉ោង** ក្រោយចូលធុង (ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុងសំរាម)
+  ➜ ≈ **១៤ ម៉ោង** ក្រោយចុចបិទ កញ្ចប់បាត់ពីរបា ទោះ ZTO Palm មិនទាន់បិទ។ សាលក្រម `false` ក្នុង `zoew_zto_pickup_status_v1` ក៏ផុត ១២ ម៉ោង · ទុកបាន ៣០០ ប៉ុណ្ណោះ។
+- ✅ ចម្លើយ «ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង» ៖ **មែន** — ការចូលធុង ២ ម៉ោងមិនដកចេញភ្លាម តែបើក «នាឡិកា ១២ ម៉ោង»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🟡 ធុងសំរាម «យករួច» រាប់ក្នុងរបា **៣ ថ្ងៃ** ក្រោយចូល · សាលក្រមក្នុងឧបករណ៍រស់ ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ៣០០ ➜ ២០០០ (៣ ថ្ងៃ × ~៤០០ កញ្ចប់/ថ្ងៃ ទុកបានគ្រប់ ➜ បើក App ឡើងវិញ
+  មិនសួរ ZTO ម្តងទៀត)។ ការហៅ ZTO ៖ ច្បាប់ដដែល (១ ដង/Barcode · ១០/ជុំ · sign list បិទ `false` ➜ `true` ដោយគ្មាន `/detail`)។
+- ⛔ ប្រាក់ · `isDeducted` · ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · Firebase ៖ មិនប៉ះ (សាលក្រមនៅក្នុង `localStorage` ប៉ុណ្ណោះ)។
+- `guide.html` ៖ ប្រយោគថ្មីក្រោមរបា «ZTO មិនទាន់បិទ» ប្រាប់ «៣ ថ្ងៃ» (ដកពីកូដក្នុងតេស្ត) · ZoeW ពិនិត្យ ZTO តែពេល App បើក។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-remind-days.test.ts` ៥ (ថ្មី) ៖ ព្រំដែន ៣ ថ្ងៃ + `guide.html` ស្មើកូដ · ធុង «យករួច» ១៤ ម៉ោង · ២ ថ្ងៃ · ~៣ ថ្ងៃ + `false` ➜ ក្នុងរបា · លើស ៣ ថ្ងៃ ➜ ចេញ ·
+  ទិសផ្ទុយ (លុប · ដក · ផុតកំណត់ · `true` ➜ មិនបង្ហាញ) · សាលក្រម ២ ថ្ងៃមុនរស់ក្រោយ reload · ១២០០ សាលក្រមនៅគ្រប់ — កូដ [2.50.88] FAIL ៤/៥ (ទិសផ្ទុយ PASS ទាំងមុនទាំងក្រោយ)។
+- `audit-tools/zto-sync-banner-test.js` ផ្នែក ១៤ ៖ ធុងចាស់ «ហួសព្រំដែន» ដកពី `ttl` (មិនមែន ១៣ ម៉ោងថេរ) · `audit-tools/empty-state-truth-test.js` អាន `ZTO_STATUS_TTL_MS`
+  ពីកូដ (`readProductConst()`) ➜ ប្តូរថេរថ្ងៃក្រោយ មិនបង្ខូចអ្នកយាម។
+- ZTO vitest ២៤ ឯកសារ ✅ · `zto-lock` ✅ (sha256 ថ្មី)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.89` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. ZTO ៖ បិទ «យក» កញ្ចប់មួយក្នុង ZoeW ដែល ZTO Palm មិនទាន់បិទ ➜ ក្រោយ ២ ម៉ោង (ចូលធុង «យករួច») ថ្ងៃបន្ទាប់ ➜ របា «ZTO មិនទាន់បិទ» នៅបង្ហាញ ➜ បិទក្នុង ZTO Palm ➜ របាដកចេញ។
+2. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87]។
+
 ### [2.50.88] — 2026-10-16 · ZoeW ៖ **iPhone SE ៖ keyboard ចាប់ផ្តើមលោត ➜ App មិនទាញទំព័រ (បន្ថែម [2.50.87]) · Android មិនប្រែ**
 
 **ZoeW `2.50.88`** (`zoew-v350` ➜ `zoew-v351`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ។
@@ -258,7 +294,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ ដូច [2.50.87] (APK `zoew-android-v2.50.88`)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
 1. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87] (រួមទាំង iPhone SE បើមាន)។
 
 ### [2.50.87] — 2026-10-16 · ZoeW ៖ **iPhone ៖ «បង្ការ មិនតទល់» — App លែងទាញទំព័រត្រឡប់ពេល keyboard លោត · សម្អាតកូដ iOS · Android មិនប្រែ**
@@ -284,7 +320,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.88` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយ Done) ➜ ទំព័រមិនលោតចុះ។ បើទំព័ររអិលឡើងជាមួយ keyboard ➜
    ផ្ញើវីដេអូ។ សកម្មភាពរបស់ [2.50.84] · [2.50.85] នៅដដែល។
 
@@ -309,7 +345,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.87] · [2.50.88] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
    សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
 
@@ -334,7 +370,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.87] · [2.50.88] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
 
 ### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
@@ -369,7 +405,7 @@ PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស�
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.87] · [2.50.88] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.89] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
 2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
    កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
@@ -4887,6 +4923,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A142 | **ពិនិត្យកូដ 2.50.84 ៖ focus ពីប្រអប់វាយទៅ select · date ក្នុងផ្ទាំង iPhone** | `noteIOSFieldBlur()` ប្រើ `textEntryField(e.relatedTarget)` ➜ select/date (កង់ជ្រើសនៅកន្លែង keyboard · `requiresAccessoryView`) រាប់ជា «keyboard បិទ» ➜ `iosClosing` ➜ ផ្ទាំងចុះក្រោមកង់ · `noteIOSFieldFocus()` មិនលុប `iosClosing` ពេល focus select · `keepKeyboardFocusInPlace()` មិនគ្រប select (∨ ទៅ select ➜ `_zoomToRevealFocusedElement`) · តេស្ត happy-dom ៖ `<select>` ជា Proxy ➜ `this` ≠ `document.activeElement` (គំរូ WebKit ប្រៀបធៀបតាម id) | `inputViewField()` (ប្រអប់វាយ · select · date/time) សម្រាប់ focus · blur · ∨/∧ ➜ 2.50.85 · វាស់ក្នុង vitest តែប៉ុណ្ណោះ (ផ្ទាំងពិតដែលមានប្រអប់វាយ + select មើលឃើញព្រមគ្នាពេលបើក ៖ គ្មាន ➜ device-test មិនមានគោល) |
 | A143 | **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់ (វីដេអូ preview 2.50.85)** | វីដេអូ ៣០ រូប/វិ ៖ logo navbar ១៥១px ➜ ១៤៦ (iOS ចាប់ផ្តើមរំកិលឡើង) ➜ ៤៣៤ · ៥៩០ · ៥៨៨ (ចុះ ១៣៨ · ២១៤ · ២១៣pt) ➜ ត្រឡប់ក្នុង ២០០–២៤០ms · ចំនួនស្មើ `_zoomToFocusRect` ដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard (របៀបបញ្ចូល ≈ ១៤៧ · ដក ≈ ២១៥) ➜ preventScroll បាត់ · ប្រភព WebKit ៖ `FocusController::setFocusedElement` លើធាតុដែល focus រួច ➜ `elementDidRefocus` (ជម្រើស click) ➜ `WebPage::elementDidFocus` សរសេរជាន់ព័ត៌មានរង់ចាំ ពេល `!m_isShowingInputViewForFocusedElement` ➜ `completeSyntheticClick` flush · ការទាញ ០ របស់ App (`restorePageFieldScroll`) ពេលចលនា keyboard (additive) រត់ ➜ ចុះ ហើយត្រឡប់ · `pageFieldCaught` នៅជាប់ក្រោយ blur ➜ focus ក្រោយក៏ត្រូវទាញ | `swallowCaughtClick()` (`mousedown` · `click` នៃការចុចដែលចាប់ · `CAUGHT_CLICK_MS` · ប្រអប់/ស្លាក/⚡ តែប៉ុណ្ណោះ) · `forgetPageFieldCaught()` ➜ 2.50.86 · ⚠️ ផ្លូវផ្សេងទៀតដែល iOS អាច focus (text interaction `focusTextInputContextAndPlaceCaret`) មិនទាន់វាស់ ➜ `iosPageTap` Sentry ក្រោយ merge |
 | A144 | **preview 2.50.86 នៅតែធ្លាក់ · សំណើ «clean up · សរសេរថ្មី · ឆ្លាតវៃដូច Android»** | ទំព័រចុះក្រោមកម្ពស់ធម្មតា (logo ១៥១ ➜ ៤៣៤–៥៩០px) មានតែពេល model `scrollTo(0, 0)` កាត់ចលនា UIKit (additive ៖ A47) ➜ ទាមទារការទាញរបស់ App · `boot.ts` ៖ `visualViewport` `resize` ➜ `scrollWindowToTop` គ្រប់ឧបករណ៍ (រត់ពេល keyboard ចាប់ផ្តើមលោត) · `restorePageFieldScroll` (2.50.83) · «ដូច Android» (`interactive-widget=resizes-content`) ៖ WebKit trunk `MetaViewportInteractiveWidgetEnabled` (Cocoa true) តែ Safari មិនទាន់ចេញ (bram.us · MDN bcd #29011) ➜ មិនអាចប្រើ | iOS standalone «បង្ការ មិនតទល់» ៖ `settleDocumentScroll()` (keyboard បង្ហាញ ➜ មិនទាញ) · ដក `restorePageFieldScroll` · probe `iosPageTap` ➜ 2.50.87 · ⚠️ iOS រំកិលតាមផ្លូវផ្សេងដែលមិនទាន់ដឹង ➜ ឃើញរអិលរលូន (មិនលោត) ➜ ចាំវីដេអូ |
+| A145 | **កញ្ចប់បិទក្នុង ZoeW តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង** | ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុង «យករួច» ➜ `ztoStatusTrashItemCounts()` រាប់ត្រឹម `ZTO_STATUS_TTL_MS` ១២ ម៉ោងក្រោយ `deletedAt` (≈ ១៤ ម៉ោងក្រោយបិទ) · `loadZtoPickupStatusOnce()` បោះសាលក្រមចាស់ជាង ១២ ម៉ោង · `ZTO_STATUS_MAX` ៣០០ < ៣ ថ្ងៃនៃហាងមមាញឹក · តំបន់ចាក់សោ ➜ ប្រែតែតាមសំណើ | ម្ចាស់គម្រោងជ្រើស ៣ ថ្ងៃ ➜ `ZTO_STATUS_TTL_MS` ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ២០០០ · `LOCK` ថ្មី · `zto-remind-days.test.ts` ➜ 2.50.89 · ZoeW ពិនិត្យ ZTO តែពេល App បើក (គ្មាន server sweep) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
@@ -7635,6 +7672,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |

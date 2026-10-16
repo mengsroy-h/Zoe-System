@@ -59,7 +59,7 @@ const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
-    'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
+    'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
     'ztoIdentityRefusalIsTransient'];
 const src = {};
 NEEDED.forEach((n) => {
@@ -175,7 +175,7 @@ function buildRuntime(plan) {
      'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
      'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
-     'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
+     'clearAutoLookupQueueRetries', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
      'ztoIdentityRefusalIsTransient'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });

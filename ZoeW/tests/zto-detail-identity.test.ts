@@ -18,7 +18,7 @@ import { refTo } from '../src/app/refs';
 import { checkZtoStatusForBarcode } from '../src/features/zto-status';
 import { healthLookupRow } from '../src/features/health-check';
 
-const ZTO_URL = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
+const ZTO_URL = window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}';
 const OTHER_URL = 'https://api.example.invalid/lookup?code={barcode}';
 const BARCODE = '77130500000012';
 

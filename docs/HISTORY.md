@@ -45,7 +45,8 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.92] 🩺 App ទើបដំឡើង ➜ ប្រាប់ផ្លូវភ្ជាប់
+0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.93] audit សុវត្ថិភាព ➜ token ZTO · License · Push
+    (A149–A155) ➜ ⚠️ សកម្មភាព ១–៥ របស់ [2.50.93] (env `FIREBASE_PROJECT_IDS` · `ZTO_DETAIL_IDENTITY` · GitHub Environment · ប្រវត្តិ git)។ [2.50.92] 🩺 App ទើបដំឡើង ➜ ប្រាប់ផ្លូវភ្ជាប់
     Firebase និង Supabase (A148) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.92])។ [2.50.91] ពិនិត្យសុវត្ថិភាព ➜ Tab ចេញពីផ្ទាំង PIN/Activate
     (A147) ➜ focus trap ➜ ⚠️ សាកកុំព្យូទ័រ (សកម្មភាព ១ របស់ [2.50.91])។ ✅ iPhone 2.50.90 ៖ ម្ចាស់គម្រោង «Ios ជោគជ័យហើយ» · «លែងមានធ្លាក់ឬកន្ត្រាក់ទៀតហើយ»។ [2.50.90] វីដេអូម្ចាស់គម្រោង ៖ ស្កេនដក
     ចុចកន្លែងវាយ ➜ iOS រំកិល document (navbar ចេញ) · ចុចស្វែងរក ➜ ក្រោមរបាស្ថានភាព ➜ លើក `#appPages` (A146) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.90])។ [2.50.89] ម្ចាស់គម្រោង ៖ កញ្ចប់បិទក្នុង ZoeW
@@ -244,6 +245,44 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.93] — 2026-10-16 · ZoeW · ZoeKeyGen `2.24.19` ៖ **audit សុវត្ថិភាពគម្រោងទាំងមូល ៖ token គណនីទៅតែ ZoeW · Activation Key ចងនឹងហត្ថលេខា · កៅអីអានមិនបាន = ក្រៅបណ្ដាញ · Push គ្មាន sub កំព្រា**
+
+**ZoeW `2.50.93`** (`zoew-v355` ➜ `zoew-v356`) · **ZoeKeyGen `2.24.19`** (`zoekeygen-v129` ➜ `zoekeygen-v130` ៖ `license-verify.js` ដូចគ្នាបេះបិទ) · គ្មាន rules · migration · Android native ថ្មី ·
+⛔ **តំបន់ចាក់សោ ZTO ប្រែតាមការអនុញ្ញាតម្ចាស់គម្រោង** (`lookup-api.ts` · `zto-list-sync.ts` ➜ `LOCK` ថ្មី)។
+សំណើម្ចាស់គម្រោង ៖ «ពេលការងារ ចប់ សូម audit ជុំនេះក្នុង PR នេះ ផ្តោតលើប្រព័ន្ធសុវត្ថិភាពproject ទាំងមូល ទាំង២app ពិនិត្យ ក្រែងមានលេចធ្លាយ secret និងការវាយប្រហារផ្សេង
+ធានាបានថា app ទាំង២ រឹងមាំគ្រប់គ្រាន់»។ ការសម្រេចម្ចាស់គម្រោង ៖ token ZTO ➜ «កែ» · `?list=1` Project មិនចងសាខា ➜ «ចង env តែប៉ុណ្ណោះ» · កូដ Setup Link ➜ «ទុក ៦ ខ្ទង់»។
+
+#### របៀប audit
+
+៥ ផ្នែកស្របគ្នា (អានកូដ + វាស់ពិត) ៖ Netlify Functions (module ពិត + env/fetch/Blobs ក្លែង) · Firebase rules និង License (emulator RTDB ពិត · `license-verify.js` ពិតក្នុង vm) ·
+Supabase (Postgres 17 ពិត + migrations ទាំងអស់ · វាយជា anon/authenticated ហាង A/B/admin) · App ទាំង ២ (XSS · CSP · ការផ្ទុក · KDF benchmark) ·
+CI/Android/ឧបករណ៍ + **ប្រវត្តិ git ពេញ** (១៤២៨ commit · គ្រប់ branch · refs/pull)។ បន្ថែម ៖ `npm audit` (ZoeW · supabase · firebase-provision ៖ ០) ·
+probe browser PIN · Activate · ចាក់សោ App (ឧបករណ៍ ៤ ៖ ធ្លាក់ ០ / ២៣៦)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 `X-Zoe-Id-Token` ទៅតែ origin ZoeW (web) ឬ `VITE_NATIVE_WEB_ORIGIN` (APK) — `ztoIdentityTargetTrusted()` (A149)។ host ផ្សេង ➜ `/detail` ចេញគ្មាន token · ទាញបញ្ជី ➜ បដិសេធ `host:untrusted`។
+- 🔒 License ៖ `getStatus()` ពិនិត្យ online លើ `id` ក្នុង payload ដែលបានចុះហត្ថលេខា (ពិដាន `exp` ក៏ដូចគ្នា) · អានកៅអីមិនបាន (បណ្ដាញ) មិនរំកិល `lastOnlineCheck` (A150)។
+- 🔒 Push (server) ៖ subscribe ដែល index រវល់ ➜ ដក/ស្តារ record វិញ ➜ គ្មាន `sub/` កំព្រា (A151)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-token-origin.test.ts` ៤ (ថ្មី) — មុនកែ ធ្លាក់ ៣ (token ទៅ `evil.example` · `*.supabase.co` · ទាញបញ្ជីចេញ)។ តេស្ត ZTO ១៥ ឯកសារប្តូរ URL Function ទៅ origin ZoeW
+  (ការកំណត់ពិត ៖ CSP web អនុញ្ញាតតែ `'self'`) · checker ៤ (`health-check` · `lookup-burst` · `lookup-failure-identity` · `lookup-prefetch`) បញ្ចូល helper ពិត។
+- `license-seat-test` ១១ក · ១១ខ (ថ្មី ៦) — មុនកែ ធ្លាក់ ៤ (`lastOnlineCheck` រំកិល · active ៤ ថ្ងៃ · អាន/កក់កៅអីលើ Key អ្នកផ្សេង)។
+- `ZoeW/tests/push-server.test.ts` (ថ្មី ១ ៖ index រវល់ · ១២០ ស្របគ្នា) — មុនកែ ធ្លាក់ (sub កំព្រា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** និង **ZoeKeyGen** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.93` (កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. ⚠️ **Netlify env (ការសម្រេចម្ចាស់គម្រោង ៖ ចង env)** ៖ `FIREBASE_PROJECT_IDS` ៖ ដាក់សាខាលើរាល់ Project (`projectId:881859` ឬ `projectId:881859|881860`) ➜ `?list=1` លែងជឿលេខសាខាពីអ៊ីមែល
+   (អ្នកប្រើប្តូរអ៊ីមែលខ្លួនឯងបាន) · ពិនិត្យ `?diag=1` `access.branch.unboundProjects` = ០។
+2. 💡 ណែនាំ ៖ Netlify env `ZTO_DETAIL_IDENTITY=require` (លំនាំដើម `off` ៖ អ្នកកាន់ proxy key ណាក៏យកលេខទូរស័ព្ទ/COD តាម waybill បាន) — សាកស្កេនបន្ទាប់ពីកំណត់។
+3. 💡 ណែនាំ ៖ GitHub ➜ Settings ➜ Environments ៖ ដាក់ `ZOEW_KEYSTORE_*` · `ZOE_RELEASES_TOKEN` ក្នុង Environment ដែលត្រូវការអ្នកអនុម័ត + តែ `main` ·
+   បើក «immutable releases» លើ repo Releases (A152)។
+4. 💡 ប្រវត្តិ git មានលេខទូរស័ព្ទដែលមើលទៅពិត (A153) ៖ បើពិត ➜ សម្រេចលុបប្រវត្តិ (`git filter-repo` + GitHub Support) — ខ្ញុំមិនធ្វើ (force-push `main`)។
+5. សាក ៖ ស្កេន ZTO · ទាញបញ្ជី ZTO · ការបិទស្វ័យប្រវត្តិ ដំណើរការដូចមុន (URL Function = ZoeW ដដែល) · Push បើក/បិទ · Activate Key ថ្មីលើឧបករណ៍ថ្មី។
+
 ### [2.50.92] — 2026-10-16 · ZoeW ៖ **🩺 ពិនិត្យសុខភាព ៖ App ទើបដំឡើង (មិនទាន់កំណត់ Config) ➜ ប្រាប់ផ្លូវភ្ជាប់ទាំង Firebase និង Supabase**
 
 **ZoeW `2.50.92`** (`zoew-v354` ➜ `zoew-v355`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `health-check.ts` · `health-advice.ts` · `guide.html`។
@@ -265,7 +304,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.92` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.92 មិនចេញ production ដាច់ដោយឡែក)។
 1. ឧបករណ៍ថ្មី (ឬ Browser ផ្ទាំង Private) មិនទាន់កំណត់ Config ៖ បោះបង់ផ្ទាំង Config ➜ ☰ ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Server (Firebase · Supabase)» និង 💡 រាយផ្លូវទាំង ២។
 
 ### [2.50.91] — 2026-10-16 · ZoeW ៖ **សុវត្ថិភាព ៖ ផ្ទាំង PIN · Activate · ផ្ទាំងផ្សេង ➜ Tab មិនចេញទៅប៊ូតុងទំព័រខាងក្រោយ · តេស្ត flow ឡើងវិញ · Android មិនប្រែ**
@@ -301,7 +340,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.91 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.91 មិនចេញ production ដាច់ដោយឡែក)។
 1. កុំព្យូទ័រ (keyboard) ៖ បើកផ្ទាំង PIN (ឧ. ☰ ➜ Config) ➜ ចុច Tab ច្រើនដង ➜ focus នៅក្នុងផ្ទាំង (មិនទៅ ☰ ឬប៊ូតុងខាងក្រោយ)។
 2. iPhone · Android ៖ ផ្ទាំងទាំងអស់ធ្វើការដូចមុន (ចុចប្រអប់វាយ · ∨/∧ · ផ្ទាំងរអិល)។
 
@@ -338,7 +377,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.90 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.90 មិនចេញ production ដាច់ដោយឡែក)។
 1. iPhone (App លើ Home Screen) ៖ របៀបស្កេនដក ➜ ចុចកន្លែងវាយ Barcode ➜ navbar នៅនឹង · ផ្ទាំងស្កេនរអិលឡើងបន្តិច · កន្លែងវាយនៅពីលើ keyboard ➜ ចុចប្រអប់ស្វែងរក ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar
    ➜ ✓ ➜ ផ្ទាំងចុះវិញ ➜ ទាញចុះ (PTR) នៅធ្វើការ។ keyboard ខ្មែរ/អង់គ្លេស ទាំងពីរ។ បើ navbar នៅតែចេញ ➜ ផ្ញើវីដេអូ។
 2. Android ៖ របៀបដក ➜ ដូចមុន (មិនប្រែ)។
@@ -374,7 +413,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.89 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.89 មិនចេញ production ដាច់ដោយឡែក)។
 1. ZTO ៖ បិទ «យក» កញ្ចប់មួយក្នុង ZoeW ដែល ZTO Palm មិនទាន់បិទ ➜ ក្រោយ ២ ម៉ោង (ចូលធុង «យករួច») ថ្ងៃបន្ទាប់ ➜ របា «ZTO មិនទាន់បិទ» នៅបង្ហាញ ➜ បិទក្នុង ZTO Palm ➜ របាដកចេញ។
 2. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87]។
 
@@ -396,7 +435,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
 1. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87] (រួមទាំង iPhone SE បើមាន)។
 
 ### [2.50.87] — 2026-10-16 · ZoeW ៖ **iPhone ៖ «បង្ការ មិនតទល់» — App លែងទាញទំព័រត្រឡប់ពេល keyboard លោត · សម្អាតកូដ iOS · Android មិនប្រែ**
@@ -422,7 +461,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយ Done) ➜ ទំព័រមិនលោតចុះ។ បើទំព័ររអិលឡើងជាមួយ keyboard ➜
    ផ្ញើវីដេអូ។ សកម្មភាពរបស់ [2.50.84] · [2.50.85] នៅដដែល។
 
@@ -447,7 +486,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
    សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
 
@@ -472,7 +511,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
 
 ### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
@@ -507,7 +546,7 @@ PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស�
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-0. Deploy ៖ មើល [2.50.92] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
 1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
 2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
    កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
@@ -5029,6 +5068,13 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A146 | **iPhone ស្កេនដក ៖ ចុចកន្លែងវាយ ➜ navbar ចេញ · ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោមរបាស្ថានភាព (វីដេអូ preview 2.50.89)** | ស៊ុមវីដេអូ ៖ ប្រអប់ចប់ ៤៤៥pt · បន្ទាត់ keyboard ដែលធ្លាប់វាស់ (អង់គ្លេស + របារ ∧∨✓ iOS 26) ខ្ពស់ជាង ➜ `pageFieldStaysAboveKeyboard()` false ➜ ទុកឲ្យ iOS ➜ document រំកិល ១៤៦pt (ប្រអប់កណ្តាល) · ស្វែងរក ➜ `glideEntryPanelCollapsed()` ត្រឹមត្រូវ តែ document នៅរំកិល ➜ ប្រអប់ស្វែងរក ១៥០pt ខ្ពស់ពេក · Android ៖ Chromium រំកិល `#appPages` · Chromium ៖ `#appPages.scrollTop = 18` ពេល snap បើក ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០ | iOS < 992px ៖ ចាប់ + `raisePageField()` ក្នុង `#appPages` (snap ផ្អាក · ចុះវិញពេល blur · ស្ងប់ ➜ លើកបន្ថែម) ➜ 2.50.90 · អ្នកយាម `ZoeW/tests/ios-page-field-raise.test.ts` · `modal-keyboard-device-test` (ដ) · ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ➜ ផ្ទៀងផ្ទាត់លើ iPhone ពិត |
 | A147 | **ពិនិត្យសុវត្ថិភាពក្រោយកែផ្ទាំងច្រើនដង ៖ Tab ចេញពីផ្ទាំង PIN · Activate** | probe browser ពិត ៖ ផ្ទាំង PIN ៧ × (ផ្ទៃងងឹត · Escape · ម៉ាស៊ីនស្កេន + Enter/Tab · Tab ×១២ + Enter · PIN ខុស) · Activate (Key ដកហូតពេលកំពុងប្រើ) · ចាក់សោ App ➜ តែ Tab ធ្លាក់ ៖ focus ទៅ `navMenuBtn` · `navNotifyBtn` · `btnFilterToday` · `customDateInput` · ចាក់សោ App ៖ ទំព័រ `visibility: hidden` ➜ គ្មាន · `history.back()` លើ web ➜ ចាកចេញពីទំព័រ (Back ពិត ៖ `native-back`) | `modal-focus-trap.ts` (`focusin` ➜ ត្រឡប់ចូលផ្ទាំងខាងលើ) ➜ 2.50.91 · អ្នកយាម `ZoeW/tests/modal-focus-trap.test.ts` · `modal-keyboard-test` (Tab ផ្ទាំង ៤ ៖ មុនកែ ធ្លាក់ ៤) |
 | A148 | **🩺 App ទើបដំឡើង ៖ ប្រាប់តែផ្លូវភ្ជាប់ Firebase ទោះ App គាំទ្រ Server ២ (សំណើម្ចាស់គម្រោង)** | `runHealthCheck()` ពិត គ្មាន `zoew_firebase_config` ៖ ជួរ «Firebase» ❌ «មិនទាន់ភ្ជាប់ម្តងណាទេ» · ជួរអាជ្ញាប័ណ្ណ ❌ «មិនទាន់មាន Activation Key» · 💡 «App មិនដែលភ្ជាប់ Firebase» + «សុំ Key» · Config Supabase ដែល SDK មិនទាន់ផ្ទុក ➜ ជួរ «Firebase» ដដែល (`viewState.backendKind` លំនាំដើម `firebase`) | `healthBackendKind()` ពី Config ដែលរក្សាទុក ➜ ជួរ «Server (Firebase · Supabase)» + 💡 ផ្លូវទាំង ២ · ជួរអាជ្ញាប័ណ្ណ ℹ️ ➜ 2.50.92 · អ្នកយាម `ZoeW/tests/health-no-backend.test.ts` (មុនកែ ធ្លាក់ ៣) · `health-check-test` |
+| A149 | **token គណនីហាងទៅ host ណាក៏បាន ដែលផ្លូវដូច Function ZTO (audit សុវត្ថិភាព)** | `lookupApiIsZto()` ពិនិត្យតែផ្លូវ · vitest ពិត ៖ `https://evil.example/.netlify/functions/zto-order-detail` · `https://<ref>.supabase.co/functions/v1/x/.netlify/functions/zto-order-detail` ➜ `X-Zoe-Id-Token` ចេញ · Setup Link lookup-only ជា `official` ជានិច្ច (គ្មានការព្រមាន domain) · CSP web អនុញ្ញាត `*.supabase.co` · APK គ្មាន CSP ➜ Firebase ID token = អាន/សរសេរទិន្នន័យហាងទាំងមូល (rules `auth != null`) | `ztoIdentityTargetTrusted()` ➜ 2.50.93 (ម្ចាស់គម្រោងអនុញ្ញាតតំបន់ចាក់សោ) · អ្នកយាម `ZoeW/tests/zto-token-origin.test.ts` (មុនកែ ធ្លាក់ ៣) |
+| A150 | **License ៖ record មិនចងនឹងហត្ថលេខា · អានកៅអីមិនបាន = online ល្អ (audit សុវត្ថិភាព)** | `license-verify.js` ពិតក្នុង vm ៖ record `{ keyString: Key A (Revoke ក៏បាន), id: Key B }` ➜ ពិនិត្យ online លើ B ➜ active ៣០១ ថ្ងៃ + កក់កៅអីលើ Key អ្នកផ្សេង · កៅអី 503 (URL filter) + `lastOnlineCheck` ២០ ថ្ងៃ ➜ active ហើយរំកិល `lastOnlineCheck` (ពិដាន ៣ ថ្ងៃមិនដែលចាប់ផ្តើម) | `sigCheck.payload.id`/`exp` · `seat === 'unknown'` មិនរំកិល ➜ 2.50.93 · ZoeKeyGen 2.24.19 · អ្នកយាម `license-seat-test` ១១ក · ១១ខ (មុនកែ ធ្លាក់ ៤) |
+| A151 | **Push ៖ sub កំព្រាក្រោយ index រវល់ ➜ ពេញពិដានគ្រប់ហាង (audit សុវត្ថិភាព)** | `push-core.mjs` ពិត + Blobs ក្លែង ៖ ២០០ subscribe ស្របគ្នា (Key/គណនីពិត ១) ➜ ១៨៩ `sub/` · ១០ ក្នុង index · ១៧៩ កំព្រា (រាប់ក្នុង `PUSH_SUBS_TOTAL_MAX` ៥០០០ · ទទួលដំណឹងគ្រប់ដង · មិនដែលកាត់) | ដក/ស្តារ record ពេល index រវល់ ➜ 2.50.93 (server) · អ្នកយាម `ZoeW/tests/push-server.test.ts` (១២០ ស្របគ្នា ➜ គ្មានកំព្រា) |
+| A152 | **CI ៖ keystore ផលិតកម្មអាចប៉ះពី branch ណាក៏បាន (audit សុវត្ថិភាព · តាមការកំណត់)** | `android-release.yml` ៖ `workflow_dispatch` លើ branch ណាក៏រត់ workflow របស់ branch នោះជាមួយ `ZOEW_KEYSTORE_*` · `npm ci` (lifecycle) + Gradle ក្នុង job ដដែល · runner Windows self-hosted មិនមែន ephemeral | ⚠️ សកម្មភាព ៣ របស់ [2.50.93] (GitHub Environment + អ្នកអនុម័ត + តែ `main`) · កូដមិនប្រែ |
+| A153 | **ប្រវត្តិ git ៖ លេខទូរស័ព្ទដែលមើលទៅពិត (audit សុវត្ថិភាព)** | clone ពេញ ១៤២៨ commit ៖ លេខ ~១៣ (ឧ. `097415…` ១១៦ ដង · `096389…` ៧៩ ដង) ក្នុង fixture/ឯកសារចាស់ · HEAD ស្អាត (`security-guard-test` បិទផ្លូវថ្មី) · **គ្មាន secret** (token · private key · service account · cookie ពិត) | ⚠️ សកម្មភាព ៤ របស់ [2.50.93] (ម្ចាស់គម្រោងសម្រេច) |
+| A154 | **Supabase ៖ ការផ្ទៀងផ្ទាត់ rules ចំណាយការ៉េ ➜ DoS ឆ្លងហាង (audit សុវត្ថិភាព)** | Postgres ពិត ៖ សរសេរ ១ ឯកសារ `zoew_daily_collected_cod_dod` ៤០០០ keys (៩៨ KB) ➜ អស់ ៨ វិ. (`statement_timeout`) · `zoe_snap_val` អានឯកសារទាំងមូលរាល់ leaf · គ្មាន quota/rate ក្នុងហាង · **គ្មានការអាន/សរសេរឆ្លងហាង · គ្មានការឡើងសិទ្ធិ** (RLS · definer · realtime · invite/reset ល្អ) | ⚠️ ជុំបន្ទាប់ (migration ថ្មី ៖ បញ្ជូនតម្លៃក្នុង context · ពិដាន keys/ឯកសារ/bytes ក្នុងហាង) · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ក៏ប៉ះពិដាននេះ |
+| A155 | **ចំណុចតូច/ការណែនាំ (audit សុវត្ថិភាព)** | `?list=1` Project មិនចងសាខា ជឿអ៊ីមែល (ម្ចាស់គម្រោង ៖ ចង env) · `/detail` `ZTO_DETAIL_IDENTITY=off` លំនាំដើម · cache «រកមិនឃើញ» បត់អក្សរធំ/តូច (≤ ១២០ វិ.) · កូដ Setup Link ៦ ខ្ទង់ (ម្ចាស់គម្រោង ៖ ទុក) · PIN/Signing Key ៖ PBKDF2 salt ថេរ (ត្រូវចូលឧបករណ៍) · APK គ្មាន CSP · កៅអី License ៖ device ID អានបាន (ត្រូវ devtools) · admin Supabase គ្មាន MFA · FileProvider ធំជាងត្រូវការ · APK updater មិនពិនិត្យ cert ផ្ទាល់ (Android ពិនិត្យរួច) | មិនកែក្នុងជុំនេះ — ការសម្រេចម្ចាស់គម្រោង ឬជុំបន្ទាប់ (មើល PR #322) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
@@ -7822,6 +7868,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

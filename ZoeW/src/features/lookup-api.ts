@@ -7,6 +7,7 @@ import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
 import { withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
+import { ztoIdentityTargetTrusted } from '../platform/native';
 
 export function clearZtoWarmSoon() {
     if (lookupState.ztoWarmSoonTimer) {
@@ -112,7 +113,7 @@ export function ztoAccountSignedIn() {
 }
 
 export async function addZtoIdentityHeader(cfg, headers) {
-    if (!lookupApiIsZto(cfg)) return 'none';
+    if (!lookupApiIsZto(cfg) || !ztoIdentityTargetTrusted(cfg && cfg.url)) return 'none';
     const token = await ztoIdToken(ZTO_ID_TOKEN_LOOKUP_TIMEOUT_MS);
     if (token) {
         headers['X-Zoe-Id-Token'] = token;

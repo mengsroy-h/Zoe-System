@@ -1909,6 +1909,9 @@
     "ZoeW/tests/health-no-backend.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-token-origin.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/history-paging.test.tsx": {
       "policy": "zoew-self-verification"
     },

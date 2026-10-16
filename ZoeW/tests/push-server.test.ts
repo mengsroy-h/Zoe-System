@@ -313,6 +313,28 @@ describe('ការចុះឈ្មោះ · កាលវិភាគ', () => 
         expect(await off.service.subscribe(GOOD, webSub().sub)).toMatchObject({ ok: false, status: 503, reason: 'vapid:unset' });
     });
 
+    it('⛔ index រវល់ (ETag ជាន់គ្នាគ្រប់ដង) ➜ 503 ហើយគ្មាន sub កំព្រា · ចុះឈ្មោះរាប់រយស្របគ្នា ➜ sub ទាំងអស់ក្នុង index ≤ ពិដានក្នុងមួយ Key', async () => {
+        const h = harness();
+        const subs = () => [...h.store.data.keys()].filter((k) => k.startsWith('sub/'));
+        const realSet = h.store.setJSON;
+        h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => (key.startsWith('bykey/') ? { modified: false } : realSet(key, value, opts));
+        expect(await h.service.subscribe(GOOD, webSub().sub, 'web')).toMatchObject({ ok: false, status: 503, reason: 'index:busy' });
+        expect(subs()).toHaveLength(0);
+        h.store.setJSON = realSet;
+        const moved = webSub();
+        expect(await h.service.subscribe(GOOD, moved.sub, 'web')).toMatchObject({ ok: true });
+        h.store.setJSON = async (key: string, value: unknown, opts: any = {}) => (key === 'bykey/' + OTHER_KEY ? { modified: false } : realSet(key, value, opts));
+        expect(await h.service.subscribe(OTHER, moved.sub, 'web')).toMatchObject({ ok: false, status: 503 });
+        expect(subs()).toHaveLength(1);
+        expect(JSON.parse(h.store.data.get(subs()[0])!.value).keyId).toBe(KEY_ID);
+        h.store.setJSON = realSet;
+        const burst = await Promise.all(Array.from({ length: 120 }, () => h.service.subscribe(OTHER, webSub().sub, 'web')));
+        expect(burst.some((r: any) => r.ok)).toBe(true);
+        const indexed = new Set<string>([KEY_ID, OTHER_KEY].flatMap((k) => (h.store.data.has('bykey/' + k) ? JSON.parse(h.store.data.get('bykey/' + k)!.value).subs : [])));
+        expect(subs().filter((k) => !indexed.has(k))).toEqual([]);
+        expect(subs().length).toBeLessThanOrEqual(PUSH_SUBS_PER_KEY_MAX + 1);
+    });
+
     it('unsubscribe ៖ លុបទាំង sub និង index', async () => {
         const h = harness();
         const s = webSub();

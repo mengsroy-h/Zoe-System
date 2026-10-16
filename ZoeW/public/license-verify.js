@@ -483,7 +483,8 @@
             return { state: 'required', reason: sigCheck.reason };
         }
 
-        const online = await checkOnline(appCode, record.id, { claimSeat: true });
+        const signed = sigCheck.payload && typeof sigCheck.payload === 'object' && typeof sigCheck.payload.id === 'string' ? sigCheck.payload : null;
+        const online = await checkOnline(appCode, signed ? signed.id : record.id, { claimSeat: true });
         if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (online.ok === false) {
             clearLocalRecord(appCode);
@@ -496,7 +497,7 @@
                 now = getServerNow();
                 record.seenMax = now;
             }
-            record.lastOnlineCheck = now;
+            if (online.seat !== 'unknown') record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;
             saveLocalRecord(appCode, record);
         } else if (now > recordSeenMark(record)) {
@@ -504,7 +505,7 @@
             saveLocalRecord(appCode, record);
         }
 
-        const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
+        const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : (signed && typeof signed.exp === 'number' ? signed.exp : record.exp) * 1000;
 
         if (now > ceiling) {
             if (online.ok === true) {

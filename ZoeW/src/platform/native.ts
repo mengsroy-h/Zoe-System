@@ -88,3 +88,12 @@ export function nativeWebOrigin(): string {
     if (!/^https:\/\/[^/\s?#]+$/i.test(raw.replace(/\/+$/, ''))) return '';
     return raw.replace(/\/+$/, '');
 }
+
+export function ztoIdentityTargetTrusted(rawUrl): boolean {
+    let target: URL;
+    try { target = new URL(String(rawUrl || ''), window.location.href); } catch { return false; }
+    if (!rawUrl || !/^https?:$/.test(target.protocol)) return false;
+    if (target.origin === window.location.origin) return true;
+    const web = nativeWebOrigin();
+    return !!web && isNativeApp() && target.origin === web;
+}

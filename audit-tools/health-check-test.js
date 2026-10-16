@@ -69,7 +69,7 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
-    'ztoAccessText', 'ztoIdToken', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
+    'ztoAccessText', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn', 'ztoIdentityRefusalIsTransient',
     'shopScope', 'safeStoreGet',
     // ⛔ App ទើបដំឡើង ៖ ប្រភេទ Server ដេរីវេពី Config ដែលរក្សាទុក (គ្មាន ➜ ផ្លូវទាំង ២ · Firebase · Supabase)
     'healthBackendKind', 'isSupabaseConfig'];

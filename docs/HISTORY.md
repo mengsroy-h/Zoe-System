@@ -45,7 +45,25 @@
 
 ស្ថានភាព git (វាស់ 2026-10-10 ៖ `git log origin/main` · `git merge-base --is-ancestor`) ៖
 
-0ធ. **Branch `ccr-cff7ce20-gn6c83`** (ចាប់ផ្តើមឡើងវិញពី `main` `1529f3e` = PR #320 · **មិនទាន់ merge**) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
+0ន. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #322** (ចាប់ផ្តើមឡើងវិញពី `main` `2dfaa9c` = PR #321 · **មិនទាន់ merge**) ៖ [2.50.93] audit សុវត្ថិភាព ➜ token ZTO · License · Push
+    (A149–A155) ➜ ⚠️ សកម្មភាព ១–៥ របស់ [2.50.93] (env `FIREBASE_PROJECT_IDS` · `ZTO_DETAIL_IDENTITY` · GitHub Environment · ប្រវត្តិ git)។ [2.50.92] 🩺 App ទើបដំឡើង ➜ ប្រាប់ផ្លូវភ្ជាប់
+    Firebase និង Supabase (A148) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.92])។ [2.50.91] ពិនិត្យសុវត្ថិភាព ➜ Tab ចេញពីផ្ទាំង PIN/Activate
+    (A147) ➜ focus trap ➜ ⚠️ សាកកុំព្យូទ័រ (សកម្មភាព ១ របស់ [2.50.91])។ ✅ iPhone 2.50.90 ៖ ម្ចាស់គម្រោង «Ios ជោគជ័យហើយ» · «លែងមានធ្លាក់ឬកន្ត្រាក់ទៀតហើយ»។ [2.50.90] វីដេអូម្ចាស់គម្រោង ៖ ស្កេនដក
+    ចុចកន្លែងវាយ ➜ iOS រំកិល document (navbar ចេញ) · ចុចស្វែងរក ➜ ក្រោមរបាស្ថានភាព ➜ លើក `#appPages` (A146) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.90])។ [2.50.89] ម្ចាស់គម្រោង ៖ កញ្ចប់បិទក្នុង ZoeW
+    តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង ➜ ជ្រើស «៣ ថ្ងៃ» (A145 · តំបន់ចាក់សោ ZTO ប្រែតាមសំណើ) ➜ ⚠️ សាក (សកម្មភាព ១ របស់ [2.50.89])។ [2.50.88] «ពិនិត្យផង» ➜ ចន្លោះ iPhone SE (កម្ពស់ keyboard ដំបូង
+    < `KEYBOARD_MIN_INSET_PX`) ➜ មិនទាញពេលប្រអប់វាយ focus ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។ [2.50.87] ម្ចាស់គម្រោង ៖ «Preview commit ថ្មីនៅតែធ្លាក់ទំព័រដដែល» ·
+    «សូមសម្រួល iOS អោយត្រឹមត្រូវ clean up កូដមុនមុន សរសេថ្មីមក អោយឆ្លាតវៃ ដូច android ទៅ» ➜ iOS «បង្ការ មិនតទល់» (A144) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.87])។
+    [2.50.86] វីដេអូម្ចាស់គម្រោងលើ preview 2.50.85 (គ្មានអត្ថបទ) ៖
+    ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ១៣៨–២១៤pt ហើយរអិលត្រឡប់ (៣ ដង / ២៥ វិនាទី) ➜ ចុចសំយោគ WebKit លុប preventScroll (A143) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.86])។
+    [2.50.85] ពីប្រអប់វាយទៅប្រអប់ជ្រើស/ថ្ងៃខែក្នុងផ្ទាំង iPhone ➜
+    ផ្ទាំងនៅលើកង់ជ្រើស · ∨/∧ ទៅប្រអប់ជ្រើស/ថ្ងៃខែ ➜ ទំព័រនៅនឹង (A142) ➜ ⚠️ សាក iPhone (សកម្មភាព ១ របស់ [2.50.85])។ [2.50.84] ម្ចាស់គម្រោងលើ preview 2.50.83 (App លើ Home Screen) ៖
+    «iphone ផ្ទាំងលែងកន្ត្រាក់ តែ កន្លែងវាយbarcode នៅលោតទំព័រម្តងម្កាលដដែល និង ពេលចុចសញ្ញា ចុះមកប្រអប់បន្ទាប់របស់ keybaord PgUp/PgDn លោតទំព័រ» (ទំព័រស្កេន · ផ្ទាំងលេខទូរស័ព្ទ/COD ·
+    ផ្ទាំងផ្សេង) · «ចុះios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ ∨/∧ មិនរំកិលទំព័រ (A139) · iPhone រអិលតែម្តង (A140) · `iosPageTap` លេខបន្ថែម · preview មិនផ្ញើ Sentry (A141) ➜
+    ⚠️ សាក iPhone (សកម្មភាព ១–៣ របស់ [2.50.84])។ មុននោះ [2.50.83] ម្ចាស់គម្រោងលើ 2.50.82 (production) ៖
+    «iphone ធ្លាក់ទំព័រម្តងហើយ មើល Sentry ផង និង modal ក៏កន្ត្រាក់ដែរ មុន merge មិនអីផង» (iPhone · ពេល keyboard លោតឡើង) · «modal ios មុន merge អត់អីទេ» ·
+    «android ដំណើរការ ត្រឹមត្រូវហើយ គ្មានកន្ត្រាក់ គ្រប់យ៉ាងរលូន សូមការពារកែ ios កុំអោយ android ប្រែ» ➜ iOS គ្មានចលនា (A136) · Sentry `iosPageTap caught document` ➜ ត្រឡប់ ០ (A137) ·
+    Session Replay នៅថត (A138 ៖ ⚠️ ចាំម្ចាស់គម្រោងសម្រេច) ➜ ⚠️ សាក iPhone (សកម្មភាព ១–២ របស់ [2.50.83])។ ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង។
+0ធ. **Branch `ccr-cff7ce20-gn6c83` ➜ PR #321 merge ចូល `main` រួច** (`2dfaa9c` · ម្ចាស់គម្រោង · CI 783 ៤/៤ · APK `zoew-android-v2.50.82`) ៖ [2.50.82] សំណើម្ចាស់គម្រោង «ពិនិតមើល ការវាស់ keyboard
     ដោយស្វ័យប្រវត្តិឆ្លាតវៃ មើលមានចន្លោះឬកំហុសអត់» · «តែ ios ដូចនៅទាញទំព័រម្តងម្កាល ក្នុង tab ស្កេន» (ចុចកន្លែងវាយ Barcode · គ្រប់របៀប) · «សូមកុំកែអោយប៉ះពាល់ដល់android»
     ➜ ពង្រីក (zoom) មិនមែន keyboard (A128) · iOS ចុចស្លាក/⚡ ចាប់ដូចប្រអប់ (A129) · បន្ទាប់មក វីដេអូម្ចាស់គម្រោង Android «ពេលវាលោតតែលេខ … មានកន្ត្រាក់ពេលបើកmodal» (A131) ·
     «សូមធ្វើអោយវឆ្លាតវៃចេះវាស់ keyboard ដោយខ្លួនឯងបាន ស្វ័យប្រវត្តិ មិនថាគេប្រើ keybaord thirdparty ឬគេពង្រីកទំហំ keybaord» (A132) · «lock កុំអោយផ្តេកបានលើទូរស័ព្ទ ទាំងអស់
@@ -226,6 +244,345 @@
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.93] — 2026-10-16 · ZoeW · ZoeKeyGen `2.24.19` ៖ **audit សុវត្ថិភាពគម្រោងទាំងមូល ៖ token គណនីទៅតែ ZoeW · Activation Key ចងនឹងហត្ថលេខា · កៅអីអានមិនបាន = ក្រៅបណ្ដាញ · Push គ្មាន sub កំព្រា**
+
+**ZoeW `2.50.93`** (`zoew-v355` ➜ `zoew-v356`) · **ZoeKeyGen `2.24.19`** (`zoekeygen-v129` ➜ `zoekeygen-v130` ៖ `license-verify.js` ដូចគ្នាបេះបិទ) · គ្មាន rules · migration · Android native ថ្មី ·
+⛔ **តំបន់ចាក់សោ ZTO ប្រែតាមការអនុញ្ញាតម្ចាស់គម្រោង** (`lookup-api.ts` · `zto-list-sync.ts` ➜ `LOCK` ថ្មី)។
+សំណើម្ចាស់គម្រោង ៖ «ពេលការងារ ចប់ សូម audit ជុំនេះក្នុង PR នេះ ផ្តោតលើប្រព័ន្ធសុវត្ថិភាពproject ទាំងមូល ទាំង២app ពិនិត្យ ក្រែងមានលេចធ្លាយ secret និងការវាយប្រហារផ្សេង
+ធានាបានថា app ទាំង២ រឹងមាំគ្រប់គ្រាន់»។ ការសម្រេចម្ចាស់គម្រោង ៖ token ZTO ➜ «កែ» · `?list=1` Project មិនចងសាខា ➜ «ចង env តែប៉ុណ្ណោះ» · កូដ Setup Link ➜ «ទុក ៦ ខ្ទង់»។
+
+#### របៀប audit
+
+៥ ផ្នែកស្របគ្នា (អានកូដ + វាស់ពិត) ៖ Netlify Functions (module ពិត + env/fetch/Blobs ក្លែង) · Firebase rules និង License (emulator RTDB ពិត · `license-verify.js` ពិតក្នុង vm) ·
+Supabase (Postgres 17 ពិត + migrations ទាំងអស់ · វាយជា anon/authenticated ហាង A/B/admin) · App ទាំង ២ (XSS · CSP · ការផ្ទុក · KDF benchmark) ·
+CI/Android/ឧបករណ៍ + **ប្រវត្តិ git ពេញ** (១៤២៨ commit · គ្រប់ branch · refs/pull)។ បន្ថែម ៖ `npm audit` (ZoeW · supabase · firebase-provision ៖ ០) ·
+probe browser PIN · Activate · ចាក់សោ App (ឧបករណ៍ ៤ ៖ ធ្លាក់ ០ / ២៣៦)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 `X-Zoe-Id-Token` ទៅតែ origin ZoeW (web) ឬ `VITE_NATIVE_WEB_ORIGIN` (APK) — `ztoIdentityTargetTrusted()` (A149)។ host ផ្សេង ➜ `/detail` ចេញគ្មាន token · ទាញបញ្ជី ➜ បដិសេធ `host:untrusted`។
+- 🔒 License ៖ `getStatus()` ពិនិត្យ online លើ `id` ក្នុង payload ដែលបានចុះហត្ថលេខា (ពិដាន `exp` ក៏ដូចគ្នា) · អានកៅអីមិនបាន (បណ្ដាញ) មិនរំកិល `lastOnlineCheck` (A150)។
+- 🔒 Push (server) ៖ subscribe ដែល index រវល់ ➜ ដក/ស្តារ record វិញ ➜ គ្មាន `sub/` កំព្រា (A151)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-token-origin.test.ts` ៤ (ថ្មី) — មុនកែ ធ្លាក់ ៣ (token ទៅ `evil.example` · `*.supabase.co` · ទាញបញ្ជីចេញ)។ តេស្ត ZTO ១៥ ឯកសារប្តូរ URL Function ទៅ origin ZoeW
+  (ការកំណត់ពិត ៖ CSP web អនុញ្ញាតតែ `'self'`) · checker ៤ (`health-check` · `lookup-burst` · `lookup-failure-identity` · `lookup-prefetch`) បញ្ចូល helper ពិត។
+- `license-seat-test` ១១ក · ១១ខ (ថ្មី ៦) — មុនកែ ធ្លាក់ ៤ (`lastOnlineCheck` រំកិល · active ៤ ថ្ងៃ · អាន/កក់កៅអីលើ Key អ្នកផ្សេង)។
+- `ZoeW/tests/push-server.test.ts` (ថ្មី ១ ៖ index រវល់ · ១២០ ស្របគ្នា) — មុនកែ ធ្លាក់ (sub កំព្រា)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** និង **ZoeKeyGen** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.93` (កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. ⚠️ **Netlify env (ការសម្រេចម្ចាស់គម្រោង ៖ ចង env)** ៖ `FIREBASE_PROJECT_IDS` ៖ ដាក់សាខាលើរាល់ Project (`projectId:881859` ឬ `projectId:881859|881860`) ➜ `?list=1` លែងជឿលេខសាខាពីអ៊ីមែល
+   (អ្នកប្រើប្តូរអ៊ីមែលខ្លួនឯងបាន) · ពិនិត្យ `?diag=1` `access.branch.unboundProjects` = ០។
+2. 💡 ណែនាំ ៖ Netlify env `ZTO_DETAIL_IDENTITY=require` (លំនាំដើម `off` ៖ អ្នកកាន់ proxy key ណាក៏យកលេខទូរស័ព្ទ/COD តាម waybill បាន) — សាកស្កេនបន្ទាប់ពីកំណត់។
+3. 💡 ណែនាំ ៖ GitHub ➜ Settings ➜ Environments ៖ ដាក់ `ZOEW_KEYSTORE_*` · `ZOE_RELEASES_TOKEN` ក្នុង Environment ដែលត្រូវការអ្នកអនុម័ត + តែ `main` ·
+   បើក «immutable releases» លើ repo Releases (A152)។
+4. 💡 ប្រវត្តិ git មានលេខទូរស័ព្ទដែលមើលទៅពិត (A153) ៖ បើពិត ➜ សម្រេចលុបប្រវត្តិ (`git filter-repo` + GitHub Support) — ខ្ញុំមិនធ្វើ (force-push `main`)។
+5. សាក ៖ ស្កេន ZTO · ទាញបញ្ជី ZTO · ការបិទស្វ័យប្រវត្តិ ដំណើរការដូចមុន (URL Function = ZoeW ដដែល) · Push បើក/បិទ · Activate Key ថ្មីលើឧបករណ៍ថ្មី។
+
+### [2.50.92] — 2026-10-16 · ZoeW ៖ **🩺 ពិនិត្យសុខភាព ៖ App ទើបដំឡើង (មិនទាន់កំណត់ Config) ➜ ប្រាប់ផ្លូវភ្ជាប់ទាំង Firebase និង Supabase**
+
+**ZoeW `2.50.92`** (`zoew-v354` ➜ `zoew-v355`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `health-check.ts` · `health-advice.ts` · `guide.html`។
+សំណើម្ចាស់គម្រោង ៖ «កែសម្រួលពេល app ទើបតម្លើងថ្មីមិនទាន់បានភ្ជាប់ backend server ណាមួយទេ តែក្នុង ពិនិត្យសុខភាព ប្រាប់តែពីរបៀបភ្ជាប់ firebase
+ទាំងដែល app បច្ចុប្បន្ន គាំទ្រ beckend ដល់ទៅ 2» (A148)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🩺 គ្មាន `zoew_firebase_config` ➜ ជួរ **Server (Firebase · Supabase)** ❌ «មិនទាន់កំណត់ Config — App ភ្ជាប់បាន Server ២ ប្រភេទ» · 💡 ជំហានទី ១ ៖ ☰ ➜ Config / Reconfig ៖
+  QR/Setup Link ពីអ្នកលក់ (ស្គាល់ប្រភេទ Server ដោយខ្លួនឯង) ឬបំពេញដោយដៃ ➜ Firebase (Config + Activation Key) · Supabase (Project URL + Publishable key + គណនីហាង/លេខកូដអញ្ជើញ)។
+  ជួរអាជ្ញាប័ណ្ណ ➜ ℹ️ «អាស្រ័យលើ Server» (មុន ៖ ❌ «មិនទាន់មាន Activation Key» + 💡 «សុំ Key» ដែលខុសសម្រាប់ហាង Supabase)។
+- ប្រភេទ Server ក្នុង 🩺 ដេរីវេពី Config ដែលរក្សាទុក (`healthBackendKind()`) ៖ Config Supabase ដែល SDK មិនទាន់ផ្ទុក ➜ ជួរ «Supabase» + ជួរហាង
+  (មុន ៖ `viewState.backendKind` នៅ `firebase` ➜ ជួរ «Firebase» + សុំ Activation Key)។ Config Firebase ➜ ដដែល។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/health-no-backend.test.ts` ៤ (ថ្មី · `runHealthCheck()` ពិត) — មុនកែ ធ្លាក់ ៣ (ទិសផ្ទុយ Config Firebase ជោគជ័យទាំងមុន ទាំងក្រោយ)។
+- `health-check-test` ៖ App ទើបដំឡើង (ជួរ Server · ជួរអាជ្ញាប័ណ្ណ ℹ️ · 💡 ជំហានទី ១ រាយ ២ ផ្លូវ) · Config Supabase ក្នុងឃ្លាំង ➜ «Supabase» ➜ ១៩៨/១៩៨។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.92 មិនចេញ production ដាច់ដោយឡែក)។
+1. ឧបករណ៍ថ្មី (ឬ Browser ផ្ទាំង Private) មិនទាន់កំណត់ Config ៖ បោះបង់ផ្ទាំង Config ➜ ☰ ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Server (Firebase · Supabase)» និង 💡 រាយផ្លូវទាំង ២។
+
+### [2.50.91] — 2026-10-16 · ZoeW ៖ **សុវត្ថិភាព ៖ ផ្ទាំង PIN · Activate · ផ្ទាំងផ្សេង ➜ Tab មិនចេញទៅប៊ូតុងទំព័រខាងក្រោយ · តេស្ត flow ឡើងវិញ · Android មិនប្រែ**
+
+**ZoeW `2.50.91`** (`zoew-v353` ➜ `zoew-v354`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-focus-trap.ts` ថ្មី + ១ បន្ទាត់ក្នុង `boot.ts`។
+សំណើម្ចាស់គម្រោង ៖ «សូមតេស្ត flow ឡើងវិញដូចរាល់ដង ដែលធ្លាប់តេស្តក្នុង session នេះ ហើយ ពិនិត្យប្រព័ន្ធសុវត្ថិភាពក្រែងក្រោយកែ modal ច្រើនដងអាចបង្ករចន្លោះ អាច bypass pin ឬ activate key ឬ ផ្នែកសុវត្ថិភាពផ្សេងៗ»
+(iPhone 2.50.90 ៖ «Ios ជោគជ័យហើយ» · «លែងមានធ្លាក់ឬកន្ត្រាក់ទៀតហើយ»)។
+
+#### អ្វីដែលរកឃើញ (browser ពិត · App ពិត · ការវាយប្រហារ ៧ ផ្លូវ × ផ្ទាំង PIN ៧ · Activate · ចាក់សោ App)
+
+- ✅ ចុចផ្ទៃងងឹត · Escape · ម៉ាស៊ីនស្កេន (+ Enter · + Tab) · PIN ខុស · Key ក្លែង ➜ គ្មានផ្ទាំងគោលដៅបើក · ទិន្នន័យមិនប្រែ · ផ្ទាំង Activate/ចាក់សោ គ្របគ្រប់ចំណុច ·
+  បោះបង់ PIN «Reset» ➜ PIN «Config» ត្រូវ ➜ Reset មិនរត់ (គោលដៅចាស់មិននៅ) · គោលដៅក្រោយ PIN មិននៅក្នុង `ACTION_ALLOWLIST` (ក្រៅពី ២ ដែល gate ខ្លួនឯង)។
+- 🐛 **Tab** (keyboard កុំព្យូទ័រ · Bluetooth) ពីផ្ទាំង PIN ឬ Activate ➜ focus ទៅ ☰ · 🔔 · «ថ្ងៃនេះ» · កាលបរិច្ឆេទ ខាងក្រោយផ្ទាំង ➜ Enter អាចបើក ☰ ឬចុចប៊ូតុងទំព័រ
+  (ចុច/កណ្តុរមិនបាន ៖ ផ្ទាំងគ្របគ្រប់ចំណុច)។ ធ្ងន់បំផុត ៖ Key ត្រូវដកហូតពេលកំពុងប្រើ ➜ ទិន្នន័យនៅលើទំព័រ ➜ អ្នកប្រើ keyboard បន្តប្រើខាងក្រោយផ្ទាំង Activate បាន។
+  ផ្ទាំងចាក់សោ App ៖ គ្មាន (ទំព័រ `visibility: hidden`)។ ចាប់ពីពេលណា ៖ ផ្ទាំងទាំងអស់មិនដែលមាន focus trap (មិនមែនមកពីការកែ keyboard ថ្មីៗ)។
+- ℹ️ ក្រយៅដៃ ៖ បិទផ្ទាំង PIN ខណៈការស្កេនក្រយៅដៃកំពុងរត់ ➜ ជោគជ័យយឺត ➜ បើក Config (គោលដៅលំនាំដើម) — ផ្ទាំងក្រយៅដៃ OS គ្របពីលើ App ➜ មិនអាចបិទផ្ទាំង PIN បានខណៈនោះ ➜ មិនកែ (គ្មានផ្លូវពិត)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔒 ផ្ទាំងបើក ➜ focus នៅក្នុងផ្ទាំងខាងលើបង្អស់ (`listenModalFocusTrap()` · `focusTrapLayer()` ៖ ផ្ទាំងចាក់សោពេល App ចាក់សោ · បើមិនដូច្នោះ ផ្ទាំងខាងលើ) ៖ focus ចេញ ➜ ត្រឡប់ទៅធាតុដំបូង
+  (Shift+Tab ➜ ធាតុចុងក្រោយ) ដោយ `preventScroll` · toast នៅប្រើបាន · គ្មានផ្ទាំង ➜ មិនប៉ះ។ Android · iPhone ៖ ចុចដូចមុន (មិនប្រើ Tab)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-focus-trap.test.ts` ៥ (ថ្មី) — mutation ៤ ➜ ចាប់ ៤។
+- `modal-keyboard-test` ៖ `loginModal` · `activationModal` · `pinModal` · `pinSetupModal` ➜ Tab/Shift+Tab ×១៤ ➜ focus នៅក្នុងប្រអប់ · Enter ➜ គ្មានអ្វីខាងក្រោយរត់ (browser ពិត)។
+  build មុនការកែ (`boot.ts` គ្មាន `listenModalFocusTrap(scope)`) ➜ ធ្លាក់ ៤ (ផ្ទាំងទាំង ៤) · 2.50.91 ➜ ជោគជ័យ ៥៩។
+- `state-hygiene` (CI ផ្នែក ១ ធ្លាក់លើ `7ed6303`) ៖ `tabBackwards` (ទិស Tab ចុងក្រោយ · boolean · គ្មានទិន្នន័យអតិថិជន) ➜ `ACCEPTED` ជាមួយហេតុផល ➜ PASS។
+- `fluid-type-focus-test` (CI ផ្នែក ៣ ធ្លាក់លើ `7ed6303`) ៖ App បើក `pinSetupModal` ពេល boot ➜ `#hwScannerInput.focus()` ត្រូវ focus trap ត្រឡប់ចូលផ្ទាំង (ត្រឹមត្រូវ ៖ ប្រអប់ខាងក្រោយផ្ទាំង)
+  ➜ checker បិទផ្ទាំងតាម App (`closeModal`) មុនវាស់រង្វង់ (លក្ខខណ្ឌមុន ៖ គ្មានផ្ទាំងបើក · `isModalOpen` = `false`) ហើយបើកវិញក្រោយវាស់ ➜ ៧០/៧០។
+- `doc-scope-test` (CI ផ្នែក ៣) ៖ លិបិក្រមរាយ `ios-page-field-raise.test.ts` · `modal-focus-trap.test.ts` ក្នុងផ្នែក ២ តែជួរ A146 · A147 មិនដាក់ឈ្មោះ ➜ ជួរទាំង ២ ដាក់ឈ្មោះអ្នកយាម ➜ PASS
+  (រត់ដោយផ្ទាល់គ្មាន `ZOE_REPO_ROOT` ➜ បញ្ជី vitest ទទេ ➜ បៃតងក្លែង ៖ ត្រូវរត់តាម `RUNALL_ONLY`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.91 មិនចេញ production ដាច់ដោយឡែក)។
+1. កុំព្យូទ័រ (keyboard) ៖ បើកផ្ទាំង PIN (ឧ. ☰ ➜ Config) ➜ ចុច Tab ច្រើនដង ➜ focus នៅក្នុងផ្ទាំង (មិនទៅ ☰ ឬប៊ូតុងខាងក្រោយ)។
+2. iPhone · Android ៖ ផ្ទាំងទាំងអស់ធ្វើការដូចមុន (ចុចប្រអប់វាយ · ∨/∧ · ផ្ទាំងរអិល)។
+
+### [2.50.90] — 2026-10-16 · ZoeW ៖ **iPhone ស្កេនដក ៖ កន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ ផ្ទាំងស្កេនរអិលឡើងក្នុង `#appPages` (navbar នៅនឹង ដូច Android) · ចុចស្វែងរកពេលកំពុងវាយ ➜ ប្រអប់ស្វែងរកក្រោម navbar · Android មិនប្រែ**
+
+**ZoeW `2.50.90`** (`zoew-v352` ➜ `zoew-v353`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ (ប្រើ `beginPanelGlideSnapPause()` · `panelGlideFrom()` ដែលមានស្រាប់)។
+វីដេអូម្ចាស់គម្រោង (iPhone · preview 2.50.89) ៖ «Modal pgup/pgdn គ្រាន់បើជាមុនហើយ ក្នុងវិដេអូនេះបង្ហាញទាំងអស់ ដោយលែកតែ tab ស្កេន ក្នុងកន្លែង ស្កេនដកសូមមើក្នុងវិដេអូ
+ពេលកំពុងឈfocusនៅកន្លែងវាយបញ្ចូល តែខ្ញុំសាក់ចុចក្នុងប្រអប់ស្វែងរកវាកាន់តែរុញទំព័រទៅលើបាត់ navbar ios មិនជាប់ល្អដូច android សោះ នេះជាចំណុចទើសភ្នែក»។
+
+#### មូលហេតុ (វាស់ពីវីដេអូ ៖ ស៊ុមពេញ ៤៤៤×៩៦០ ➜ pt)
+
+- របៀបដក ៖ កន្លែងវាយ Barcode ចប់ ៤៤៥pt (៥២%) ក្រោម banner ដក · keyboard អង់គ្លេស + របារ ∧∨✓ (iOS 26) ➜ បន្ទាត់ keyboard ដែលធ្លាប់វាស់នៅខាងលើវា ➜ ច្បាប់ចាស់ «keyboard នឹងបាំង ➜ ទុកឲ្យ iOS»
+  ➜ iOS រំកិល **document** ១៤៦pt (ប្រអប់នៅកណ្តាល · navbar ចេញពីអេក្រង់) គ្រប់ពេលចុច។ របៀបបញ្ចូល (ប្រអប់ចប់ ៣៨១pt ៖ ចាប់) ➜ មិនរំកិល។
+- ចុចប្រអប់ស្វែងរកខណៈនោះ ➜ ផ្ទាំងបង្រួម (ត្រឹមត្រូវ) តែ document នៅរំកិល ១៤៦pt ➜ ប្រអប់ស្វែងរកនៅក្រោមរបាស្ថានភាព (ឃើញក្នុងវីដេអូ ១៥០pt ខ្ពស់ជាងទីតាំងល្អ)។
+- Android ៖ WebView បង្រួម ➜ Chromium រំកិល `#appPages` (ធុងរមូរខាងក្នុង) ➜ navbar នៅនឹង។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 iPhone (App លើ Home Screen · ទូរស័ព្ទ < 992px) ៖ ចុចកន្លែងវាយ Barcode ដែល keyboard នឹងបាំង ➜ App ចាប់ (focus({ preventScroll })) ហើយរអិល `#appPages` ឡើង **ត្រឹមតែត្រូវការ**
+  (បាតប្រអប់ + ៨ ≤ បន្ទាត់ keyboard ដែលធ្លាប់វាស់) ទន្ទឹមនឹង keyboard ➜ navbar · document នៅនឹង (ដូច Android)។ keyboard ស្ងប់ខ្ពស់ជាងការប៉ាន់ ➜ ក្រោយ
+  `IOS_KEYBOARD_SETTLE_MS` លើកបន្ថែម (មិនដែលចុះ)។ ✓ / blur ➜ រអិលចុះវិញត្រឹមចំនួនដែលលើក។ ចុចស្វែងរក ➜ ផ្ទាំងបង្រួមដូចមុន · App មិនរំកិលទៀត ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar។
+- snap ៖ `#appPages` មាន `scroll-snap-type: y proximity` ➜ browser ទាញ `scrollTop` ដែល App សរសេរត្រឡប់ ០ ភ្លាម (វាស់ក្នុង Chromium ៖ ១៨ ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០)
+  ➜ App ផ្អាក snap (`panel-gliding`) ពេលលើក ហើយបើកវិញពេល blur ⛔ មិនទុកលើសពេល blur (PTR ត្រូវការ snap · ពិដាន `PAGE_RAISE_HOLD_MAX_MS`)។
+- លើកមិនបាន (ប្រអប់នឹងឡើងក្រោម navbar · ធុងរមូរមិនគ្រប់ · ជិត snap `.page-main` · iPad ផ្តេក ≥ 992px) ➜ ទុកឲ្យ iOS ដូចមុន។ Android ៖ មិនប៉ះ។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-field-raise.test.ts` ១៣ (ថ្មី · គំរូ `#appPages` + snap ដូច Chromium) ៖ ចាប់ + លើក ១៩ · ស្លាក · ✓ ចុះវិញ · ស្ងប់ខ្ពស់ ➜ លើកបន្ថែម មិនចុះ ·
+  វីដេអូ (ស្វែងរកក្រោយលើក) · snap ត្រឡប់ពេលប្តូរទំព័រ · ផ្ទាំងបើក ➜ ចុះក្រោមផ្ទាំង · ទិសផ្ទុយ ៖ ប្រអប់នៅពីលើ keyboard · ក្រោម navbar · គ្មានចន្លោះ · ជិត snap · Android ·
+  ផ្ទាំងបើក — កូដ [2.50.89] FAIL ៥ · mutation ១២ ➜ ចាប់ ១២។
+- `modal-keyboard-device-test` (browser ពិត · App ពិត) ផ្នែក ២/៤ (គ) ៖ iPhone SE របៀបដក (ពីមុនជាទិសផ្ទុយ «ទុកឲ្យ iOS») + iPhone 393×852 keyboard ៤២០ ➜ ចាប់ · `#appPages` ឡើង ·
+  navbar/document នៅនឹង · ប្រអប់នៅពីលើ keyboard ពិត · ផ្នែក ៤/៤ (ដ ថ្មី) ៖ វីដេអូ ➜ ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោម navbar · ✓ ➜ ចុះវិញ ០ · ទិសផ្ទុយ Chrome Android ➜ App មិនរំកិល —
+  build 2.50.89 FAIL ៨ ➜ ឆ្លងទាំងអស់។ ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ខ្លួនឯង ➜ អ្នកយាមវាស់ថា App ចាប់ ហើយលើក (ដកមូលហេតុ) · ផ្ទៀងផ្ទាត់លើ iPhone ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.90 មិនចេញ production ដាច់ដោយឡែក)។
+1. iPhone (App លើ Home Screen) ៖ របៀបស្កេនដក ➜ ចុចកន្លែងវាយ Barcode ➜ navbar នៅនឹង · ផ្ទាំងស្កេនរអិលឡើងបន្តិច · កន្លែងវាយនៅពីលើ keyboard ➜ ចុចប្រអប់ស្វែងរក ➜ ប្រអប់ស្វែងរកនៅក្រោម navbar
+   ➜ ✓ ➜ ផ្ទាំងចុះវិញ ➜ ទាញចុះ (PTR) នៅធ្វើការ។ keyboard ខ្មែរ/អង់គ្លេស ទាំងពីរ។ បើ navbar នៅតែចេញ ➜ ផ្ញើវីដេអូ។
+2. Android ៖ របៀបដក ➜ ដូចមុន (មិនប្រែ)។
+
+### [2.50.89] — 2026-10-16 · ZoeW ៖ **របា «ZTO មិនទាន់បិទ» រំលឹក ៣ ថ្ងៃ (មិនមែន ១២ ម៉ោង) — កញ្ចប់ដែលចូលធុងសំរាម «យករួច» ក្រោយ ២ ម៉ោង នៅតែរំលឹក**
+
+**ZoeW `2.50.89`** (`zoew-v351` ➜ `zoew-v352`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី។
+សំណើម្ចាស់គម្រោង ៖ «បញ្ហាមួយទៀតកញ្ចប់មិនទាន់បិទក្នុង ZTO Palm យូម៉ោងខ្លះមិនបង្ហាញប្រាប់ ក្នុងZoeWបិទតែ ZTO Palm មិនទាន់បិទ ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង»
+➜ សំណួរ «ចង់ឲ្យរបារំលឹករយៈពេលប៉ុន្មាន?» ➜ ម្ចាស់គម្រោងជ្រើស **«៣ ថ្ងៃ»**។
+⛔ **តំបន់ចាក់សោ ZTO** ៖ `src/features/zto-status.ts` ប្រែតាមសំណើខាងលើ ➜ sha256 ថ្មីក្នុង `ZoeW/tests/zto-lock.test.ts` `LOCK`
+(`968bad53…` ➜ `3e456891…`) · ប្រែតែថេរ ២ (`ZTO_STATUS_TTL_MS` · `ZTO_STATUS_MAX`) · ក្បួនផ្សេងមិនប៉ះ។
+
+#### មូលហេតុ (វាស់ពីកូដ)
+
+- របាអានកញ្ចប់បិទក្នុង `scanHistory` និងធុងសំរាម «យករួច» ត្រឹម `ZTO_STATUS_TTL_MS` = **១២ ម៉ោង** ក្រោយចូលធុង (ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុងសំរាម)
+  ➜ ≈ **១៤ ម៉ោង** ក្រោយចុចបិទ កញ្ចប់បាត់ពីរបា ទោះ ZTO Palm មិនទាន់បិទ។ សាលក្រម `false` ក្នុង `zoew_zto_pickup_status_v1` ក៏ផុត ១២ ម៉ោង · ទុកបាន ៣០០ ប៉ុណ្ណោះ។
+- ✅ ចម្លើយ «ឬមកពីកញ្ចប់នោះចូលធុងសំរាមបន្ទាប់ពី ២ម៉ោង» ៖ **មែន** — ការចូលធុង ២ ម៉ោងមិនដកចេញភ្លាម តែបើក «នាឡិកា ១២ ម៉ោង»។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🟡 ធុងសំរាម «យករួច» រាប់ក្នុងរបា **៣ ថ្ងៃ** ក្រោយចូល · សាលក្រមក្នុងឧបករណ៍រស់ ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ៣០០ ➜ ២០០០ (៣ ថ្ងៃ × ~៤០០ កញ្ចប់/ថ្ងៃ ទុកបានគ្រប់ ➜ បើក App ឡើងវិញ
+  មិនសួរ ZTO ម្តងទៀត)។ ការហៅ ZTO ៖ ច្បាប់ដដែល (១ ដង/Barcode · ១០/ជុំ · sign list បិទ `false` ➜ `true` ដោយគ្មាន `/detail`)។
+- ⛔ ប្រាក់ · `isDeducted` · ការសម្អាត ២ ម៉ោង/៨ ថ្ងៃ · Firebase ៖ មិនប៉ះ (សាលក្រមនៅក្នុង `localStorage` ប៉ុណ្ណោះ)។
+- `guide.html` ៖ ប្រយោគថ្មីក្រោមរបា «ZTO មិនទាន់បិទ» ប្រាប់ «៣ ថ្ងៃ» (ដកពីកូដក្នុងតេស្ត) · ZoeW ពិនិត្យ ZTO តែពេល App បើក។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-remind-days.test.ts` ៥ (ថ្មី) ៖ ព្រំដែន ៣ ថ្ងៃ + `guide.html` ស្មើកូដ · ធុង «យករួច» ១៤ ម៉ោង · ២ ថ្ងៃ · ~៣ ថ្ងៃ + `false` ➜ ក្នុងរបា · លើស ៣ ថ្ងៃ ➜ ចេញ ·
+  ទិសផ្ទុយ (លុប · ដក · ផុតកំណត់ · `true` ➜ មិនបង្ហាញ) · សាលក្រម ២ ថ្ងៃមុនរស់ក្រោយ reload · ១២០០ សាលក្រមនៅគ្រប់ — កូដ [2.50.88] FAIL ៤/៥ (ទិសផ្ទុយ PASS ទាំងមុនទាំងក្រោយ)។
+- `audit-tools/zto-sync-banner-test.js` ផ្នែក ៣ខ (ធុងចាស់ ៤៨ ម៉ោងថេរ ➜ `ZTO_STATUS_TTL_MS` + ១ ម៉ោង លាក់ · − ១ ម៉ោង នៅលេច) · ផ្នែក ១៤ ៖ ធុងចាស់ «ហួសព្រំដែន» ដកពី `ttl` (មិនមែន ១៣ ម៉ោងថេរ) — run-all STRICT ទី ១ ចាប់បាន ៣ខ ធ្លាក់ ➜ កែ ➜ ២០០ ok · `audit-tools/empty-state-truth-test.js` អាន `ZTO_STATUS_TTL_MS`
+  ពីកូដ (`readProductConst()`) ➜ ប្តូរថេរថ្ងៃក្រោយ មិនបង្ខូចអ្នកយាម។
+- ZTO vitest ២៤ ឯកសារ ✅ · `zto-lock` ✅ (sha256 ថ្មី)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.89 មិនចេញ production ដាច់ដោយឡែក)។
+1. ZTO ៖ បិទ «យក» កញ្ចប់មួយក្នុង ZoeW ដែល ZTO Palm មិនទាន់បិទ ➜ ក្រោយ ២ ម៉ោង (ចូលធុង «យករួច») ថ្ងៃបន្ទាប់ ➜ របា «ZTO មិនទាន់បិទ» នៅបង្ហាញ ➜ បិទក្នុង ZTO Palm ➜ របាដកចេញ។
+2. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87]។
+
+### [2.50.88] — 2026-10-16 · ZoeW ៖ **iPhone SE ៖ keyboard ចាប់ផ្តើមលោត ➜ App មិនទាញទំព័រ (បន្ថែម [2.50.87]) · Android មិនប្រែ**
+
+**ZoeW `2.50.88`** (`zoew-v350` ➜ `zoew-v351`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ មិនប៉ះ — `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «ពិនិត្យផង» (ពិនិត្យ [2.50.87])។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone SE (keyboard ទាប) ៖ ពេល keyboard ចាប់ផ្តើមលោត iOS អាចប្រាប់កម្ពស់ដំបូង ~៤០% (≈ ១០៤pt < `KEYBOARD_MIN_INSET_PX` ១២០)** ➜ [2.50.87] មិនរាប់ជា keyboard ➜ ការទាញ
+  document ទៅ ០ នៅរត់កណ្តាលចលនា។ ឥឡូវ `settleDocumentScroll()` មិនទាញ ពេលប្រអប់វាយកំពុង focus ផងដែរ (keyboard កំពុងមក ឬបង្ហាញ) · blur + keyboard បាត់ ➜ ទាញដូចមុន។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` +១ (សរុប ១២) ៖ ចុចចាប់ ➜ keyboard ១០៤ ➜ មិនទាញ · blur + keyboard ០ ➜ ទាញ — កូដ [2.50.87] FAIL ១ · mutation ២ ➜ ចាប់ ២។
+- `modal-keyboard-device-test` ផ្នែក ៤/៤ (ញ · browser ពិត · App ពិត) ៖ iPhone 393 (បញ្ចូល · keyboard ១៣៤ ➜ ២៦៩ ➜ ៤០០ ➜ ៣៣៦) · SE 375 (ដក · ១០៤ ➜ ២០៨ ➜ ២៦០) · Locker ៖ ចុចកន្លែងវាយ
+  Barcode ➜ keyboard លោត ➜ `window.scrollTo` ០ ដង · keyboard បាត់ ➜ ១ · ទិសផ្ទុយ Chrome Android ➜ ១ (ដូចមុន) — build 2.50.86 FAIL ៣ (`scrollTo` ៨ · ៣ · ២ ដង ពេល keyboard លោត) ➜ ១៧/១៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.88 មិនចេញ production ដាច់ដោយឡែក)។
+1. iPhone ៖ សកម្មភាព ១ របស់ [2.50.87] (រួមទាំង iPhone SE បើមាន)។
+
+### [2.50.87] — 2026-10-16 · ZoeW ៖ **iPhone ៖ «បង្ការ មិនតទល់» — App លែងទាញទំព័រត្រឡប់ពេល keyboard លោត · សម្អាតកូដ iOS · Android មិនប្រែ**
+
+**ZoeW `2.50.87`** (`zoew-v349` ➜ `zoew-v350`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` និង `boot.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «Preview commit ថ្មីនៅតែធ្លាក់ទំព័រដដែល» (2.50.86) · «សូមសម្រួល iOS អោយត្រឹមត្រូវ clean up កូដមុនមុន សរសេថ្មីមក អោយឆ្លាតវៃ ដូច android ទៅ»។
+«ដូច Android ពិតៗ» (`interactive-widget=resizes-content` ៖ ផ្ទៃ App បង្រួមពេល keyboard បើក) មានក្នុងប្រភព WebKit តែ Safari/iOS មិនទាន់ចេញ ➜ iOS រក្សា keyboard គ្របពីលើ ហើយប្រើក្បួនមួយ (ផ្នែក ២ A144)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់** (2.50.86 នៅតែមាន)។ ទំព័រលោតចុះក្រោមកម្ពស់ធម្មតាបាន លុះត្រា App ទាញ document ទៅ ០ ពេល keyboard
+  កំពុងលោត (UIKit រំកិលបន្ថែម ៖ A47 · A143) ៖ App មានការទាញនោះ ២ កន្លែង — `boot.ts` (រាល់ visualViewport `resize` គ្រប់ឧបករណ៍ តាំងពីសម័យមុន) និង `restorePageFieldScroll()` (2.50.83)។
+  ឥឡូវ iOS standalone ៖ ពេល keyboard បង្ហាញ App មិនសរសេរ scroll របស់ document ទាល់តែសោះ (`settleDocumentScroll()` ៖ ទាញ ០ តែពេល keyboard បាត់) · `restorePageFieldScroll()` ដកចេញ ·
+  App នៅជាអ្នក focus (ចុចដែលចាប់ · ចុចសំយោគ · ∨/∧) ដើម្បីកុំឲ្យ iOS រំកិល។ ប្រសិនបើ iOS នៅរំកិលតាមផ្លូវផ្សេង ➜ ឃើញទំព័ររអិលឡើងរលូនជាមួយ keyboard (មិនលោតចុះ) ➜ ផ្ញើវីដេអូ។
+- 🧹 **សម្អាត** ៖ ដក probe Sentry `iosPageTap` (រង្វាស់បណ្តោះអាសន្ន ៖ preview មិនផ្ញើ · មូលហេតុរកឃើញពីវីដេអូ) · ដក `pageFieldCaught` · `forgetPageFieldCaught()` — កូដ iOS ៖ ចុចចាប់ · ចុចសំយោគ ·
+  ∨/∧ · ផ្ទាំងរអិលតែម្តង · `settleDocumentScroll()`។ Android · iOS Safari (មិនមែន standalone) ៖ ការទាញលើ visualViewport `resize` ដូចមុន។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` +៣ (សរុប ១១) ៖ ចុចចាប់ ➜ document រំកិល ➜ មិនទាញ · visualViewport `resize` ៖ keyboard លោត ➜ មិនទាញ · keyboard បាត់ ➜ ទាញ ·
+  Safari browser · Android ➜ ទាញដូចមុន · boot ចង `settleDocumentScroll` — កូដ [2.50.86] FAIL ៣ · mutation ៣ ➜ ចាប់ ៣ · `ZoeW/tests/ios-page-tap-probe.test.ts` ដកចេញ (probe · ការទាញ ដកចេញ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.87 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយ Done) ➜ ទំព័រមិនលោតចុះ។ បើទំព័ររអិលឡើងជាមួយ keyboard ➜
+   ផ្ញើវីដេអូ។ សកម្មភាពរបស់ [2.50.84] · [2.50.85] នៅដដែល។
+
+### [2.50.86] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រមិនលោតចុះ (ចុចសំយោគ WebKit មិនលុប preventScroll) · Android មិនប្រែ**
+
+**ZoeW `2.50.86`** (`zoew-v348` ➜ `zoew-v349`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ (ផ្លូវ iOS standalone · `usesIOSPanelHandoff()`)។
+វីដេអូម្ចាស់គម្រោង (preview 2.50.85 · App លើ Home Screen · គ្មានអត្ថបទ) ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រ (navbar រួម) លោតចុះ ហើយរអិលត្រឡប់ ៣ ដងក្នុង ២៥ វិនាទី (ផ្នែក ២ A143)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់**។ App ចាប់ការចុច (`preventScroll`) ប៉ុន្តែ WebKit នៅតែអាចផ្ញើ «ចុចសំយោគ» (`mousedown` · `click`) ពេល
+  វាមិនអាចការពារព្រឹត្តិការណ៍ touch (ឧ. ចុចភ្លាមក្រោយទំព័ររអិល · ក្រោយប្តូររបៀប) ➜ focus ប្រអប់ម្តងទៀតដោយគ្មាន `preventScroll` មុន keyboard បង្ហាញ ➜ iOS រំកិលដាក់ប្រអប់នៅកណ្តាល ➜
+  App ទាញត្រឡប់ ០ ខណៈចលនា keyboard នៅរត់ ➜ ទំព័រលោតចុះ។ ឥឡូវ App បោះចោល `mousedown` · `click` នៃការចុចដែលបានចាប់ (`CAUGHT_CLICK_MS` · លើប្រអប់ ឬស្លាក/⚡ របស់វាតែប៉ុណ្ណោះ ·
+  ការប៉ះថ្មីបញ្ចប់) ➜ iOS មិនរំកិល។ ប្រអប់ដែល App ចាប់ blur ហើយ ➜ App លែងទាញ document ត្រឡប់ (focus ក្រោយដែល iOS បង្ហាញខ្លួនឯង រអិលរលូនជាមួយ keyboard)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-synthetic-click-focus.test.ts` ៩ (ច្បាប់ WebKit ក្លែង ៖ focus/refocus ពេល keyboard មិនទាន់បង្ហាញ ➜ ការចុងក្រោយឈ្នះ · ចុចសំយោគ ៖ `mousedown` focus ប្រអប់ · `click` ស្លាក
+  focus ប្រអប់ដែលភ្ជាប់) ៖ កន្លែងវាយ Barcode · ស្លាក · ប្រអប់ក្នុងផ្ទាំង ➜ preventScroll នៅ · ទិសផ្ទុយ ៖ ប្រអប់ក្រោយ keyboard (iOS បង្ហាញ) · Android · ក្រោយពេលកំណត់ · ការប៉ះថ្មី ·
+  ប៊ូតុង submit (iPad + mouse) · ចុចប្រអប់ដែល focus រួច (Paste) ➜ មិនប៉ះ · ទង់ចាស់ ៖ blur ➜ focus ក្រោយ ➜ មិនទាញ — កូដ [2.50.85] FAIL ៥ ➜ ៩/៩ · mutation ១០ ➜ ចាប់ ១០។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.86 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ទំព័រស្កេន ៖ ចុចកន្លែងវាយ Barcode ច្រើនដង (របៀបបញ្ចូល · ដក · Locker · ក្រោយស្វែងរក · ក្រោយប្តូររបៀប · ក្រោយចុច Done) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
+   សកម្មភាព ១–៤ របស់ [2.50.84] និង ១ របស់ [2.50.85] នៅដដែល។
+
+### [2.50.85] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ពីប្រអប់វាយទៅប្រអប់ជ្រើស ឬថ្ងៃខែក្នុងផ្ទាំង ➜ ផ្ទាំងនៅពីលើកង់ជ្រើស · ∨/∧ ទៅប្រអប់ទាំងនោះ ➜ ទំព័រនៅនឹង · Android មិនប្រែ**
+
+**ZoeW `2.50.85`** (`zoew-v347` ➜ `zoew-v348`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ (ផ្លូវ iOS · `isAndroidDevice()` ➜ ចេញមុន)។ ការពិនិត្យកូដ [2.50.84] ផ្ទាល់ (A142)។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ពីប្រអប់វាយទៅប្រអប់ជ្រើស (select) ឬថ្ងៃខែ (date) ក្នុងផ្ទាំង ➜ ផ្ទាំងធ្លាក់ចុះក្រោមកង់ជ្រើស**។ [2.50.84] គិតថា focus ចាកចេញពីប្រអប់វាយទៅធាតុដែលមិនមែនប្រអប់វាយ = keyboard
+  កំពុងបិទ ➜ ផ្ទាំងរអិលចុះ ខណៈ iPhone បង្ហាញកង់ជ្រើសនៅកន្លែង keyboard ➜ ផ្ទាំងនៅក្រោយកង់។ ឥឡូវ select · date/time = ធាតុដែលមានកង់ជ្រើស (`inputViewField()`) ៖ focus ទៅទីនោះ ➜ ផ្ទាំងនៅលើ ·
+  ចាកចេញទៅគ្មានអ្វី (Done) ➜ រអិលចុះតែម្តង · focus ទៅធាតុនោះម្តងទៀតពេលកំពុងចុះ ➜ ឈប់ចុះ ហើយវាស់ភ្លាម · checkbox/ប៊ូតុង (keyboard បិទពិត) ➜ ចុះដូចមុន។
+- 🐛 **iPhone ៖ ∨/∧ ទៅប្រអប់ជ្រើស ឬថ្ងៃខែ ➜ ទំព័រលោត** (ផ្លូវ WebKit ដូច A139 ៖ `nextAssistableElement` រាប់ select)។ ឥឡូវ focus ឡើងវិញដោយ `preventScroll` ក្នុងព្រឹត្តិការណ៍ `focus` ដូចប្រអប់វាយ
+  (ក្នុងផ្ទាំង · ទំព័រ ៖ ពីលើ keyboard ប៉ុណ្ណោះ)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/modal-keyboard.test.tsx` ៖ ប្រអប់វាយ ➜ select ➜ ផ្ទាំងនៅ (៥០៨ · ក្នុង focusout ក៏ ៥០៨ ៖ គ្មានចុះ-ឡើង) · កង់ ២៦០ ➜ ៥៨៤ · Done ➜ ០ ភ្លាម ទោះ keyboard ប្រាប់ ១២០ · focus select ពេលចុះ ➜ ៧២៤ ភ្លាម · date ➜ នៅ · checkbox ➜ ០ ·
+  `ZoeW/tests/ios-accessory-focus.test.ts` ៖ ∨ ប្រអប់វាយ ➜ select ➜ date ➜ select ➜ ∧ ប្រអប់វាយ ➜ preventScroll រាល់ការប្តូរ · focus ម្តង (គំរូ WebKit ប្រៀបធៀបតាម id ៖ happy-dom ក្តោប `<select>` ដោយ Proxy)
+  — កូដ [2.50.84] FAIL ២ ➜ ៥៥/៥៥ · mutation ៧ (`inputViewField` ↔ `textEntryField` ក្នុង ∨ · blur (ធាតុចាកចេញ · ធាតុទៅ) · focus · select ➜ null · ប្រភេទថ្ងៃខែ · មិនវាស់ពេលឈប់ចុះ) ➜ ចាប់ ៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.85 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone** ៖ ផ្ទាំងដែលមានប្រអប់វាយ និងប្រអប់ជ្រើស (ឧ. នាំចូល Excel ទៅ Sheet) ➜ ចុចប្រអប់វាយ ➜ ចុចប្រអប់ជ្រើស (ឬ ∨) ➜ ផ្ទាំងនៅពីលើកង់ · Done ➜ ចុះតែម្តង។ សកម្មភាព ១–៤ របស់ [2.50.84] នៅដដែល។
+
+### [2.50.84] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard តែម្តង · ចុច ∨/∧ (ប្រអប់បន្ទាប់/មុន) ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
+
+**ZoeW `2.50.84`** (`zoew-v346` ➜ `zoew-v347`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង (preview 2.50.83 · App លើ Home Screen) ៖ «iphone ផ្ទាំងលែងកន្ត្រាក់ តែ កន្លែងវាយbarcode នៅលោតទំព័រម្តងម្កាលដដែល និង ពេលចុចសញ្ញា ចុះមកប្រអប់បន្ទាប់របស់ keybaord
+PgUp/PgDn លោតទំព័រ» (ចម្លើយ ៖ ទំព័រស្កេន (Barcode) · ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង) · «ចុះios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?» ➜ Android (APK · Chrome) មិនប្រែ ៖
+ផ្លូវ Android ទាំងអស់ដដែល (`isAndroidDevice()` ➜ `modalKeyboardViewport()` · `usesIOSPanelHandoff()`) · `modal-keyboard-device-test` ផ្នែក ១–៣ Android ជាប់ដូចដើម · ∨/∧ Chrome Android ➜ App មិនប៉ះ។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone ៖ ចុច ∨/∧ លើ keyboard ➜ ទំព័រលោត** (ផ្នែក ២ A139)។ WebKit ប្តូរប្រអប់ដោយ `focus()` គ្មាន `preventScroll` ហើយ iPhone រំកិលទំព័រជានិច្ច (ទោះប្រអប់មើលឃើញ) ➜ App ទាញត្រឡប់។
+  ឥឡូវ App focus ប្រអប់ថ្មីឡើងវិញដោយ `preventScroll` **ក្នុងព្រឹត្តិការណ៍ `focus`** (មុន WebKit ផ្ញើព័ត៌មាន focus) ➜ ទំព័រ · navbar នៅនឹងកន្លែង ៖ ផ្ទាំងទាំងអស់ · ទំព័រស្កេន
+  (កន្លែងវាយ Barcode ⇄ ស្វែងរកក្នុងបញ្ជី) · ប្រអប់ដែល keyboard នឹងបាំង (ស្វែងរកពេលកាមេរ៉ាបើក) ➜ iOS បង្ហាញដដែល។
+- ✨ **iPhone ៖ ផ្ទាំងរអិលតាម keyboard** (ផ្នែក ២ A140)។ ចុចប្រអប់វាយ ➜ ផ្ទាំងរអិលតែម្តងទៅកន្លែងចុងក្រោយ ទន្ទឹមនឹង keyboard (កម្ពស់ keyboard ដែលចាំពីមុន) · កម្ពស់ចន្លោះដែល iOS ប្រាប់ពេល
+  keyboard កំពុងលោត (លោតហួស · កើនបន្តិចម្តងៗ) ត្រូវរំលង · keyboard ស្ងប់ (`IOS_KEYBOARD_SETTLE_MS`) ➜ កម្ពស់ពិត (រអិលម្តងទៀតតែពេលខុសពីការចាំ) · Done ➜ រអិលចុះតែម្តង ·
+  ∨ ទៅ keyboard ប្រភេទផ្សេង (លេខ ➜ អក្សរ) ➜ រអិលតែម្តង · ចុច ហើយ keyboard មិនលោត (iPad + keyboard ពិត) ➜ ត្រឡប់ម្តង ហើយលែងរំពឹង។ លើកដំបូង (មិនទាន់ចាំ) ➜ កម្ពស់ដំបូងដែល iOS ប្រាប់។
+- 🔬 **iPhone ៖ កន្លែងវាយ Barcode នៅលោតម្តងម្កាល** (ផ្នែក ២ A141)។ preview មិនផ្ញើ Sentry (គ្មានព្រឹត្តិការណ៍ preview ក្នុង ៣០ ថ្ងៃ · Sentry មិនបោះចោលអ្វីនៅ server) ➜ ការសាក
+  លើ preview គ្មានទិន្នន័យ។ `iosPageTap` បន្ថែមលេខ ៖ `afterMs` (ពេលពីលែងដៃ) · `viewportHeight` (keyboard ពេលនោះ) · `docHeight` · `stillFocused` ➜ ទិន្នន័យពី production ក្រោយ merge។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-accessory-focus.test.ts` ៧ (ច្បាប់ focus WebKit ក្លែង ៖ ព័ត៌មាន focus = ការជូនដំណឹងដំបូង · ផ្ទាំងលេខទូរស័ព្ទ/COD ៦ ការប្តូរ ➜ preventScroll · focus ម្តង · caret ដដែល ·
+  ទំព័រស្កេនទាំងពីរទិស · ទិសផ្ទុយ ៖ គ្មាន keyboard · ចុចដែល App មិនចាប់ · ម្រាមដៃនៅលើអេក្រង់ · ស្វែងរកក្រោយ keyboard ពេលកាមេរ៉ា · កន្លែងវាយ Barcode ក្រោយ keyboard · Android ·
+  checkbox/ប៊ូតុង) — កូដមុនកែ FAIL ២ ➜ ៧/៧ · mutation លក្ខខណ្ឌនីមួយៗ ៧ ➜ ចាប់ ៧។
+- `modal-keyboard-device-test` ផ្នែក ៤/៤ (ថ្មី) ៖ (ឈ) iPhone 393×852 · SE 375×667 ៖ ១៧ ផ្ទាំង ➜ ចុច (ការចុចពិត) + keyboard ប្រាប់ (លោតហួស +៦៤ ➜ ស្ងប់ · កើន ៤០% ➜ ៨០% ➜ ១០០%) ➜
+  រអិលតែម្តង (គ្មានត្រឡប់ · គ្មានហួស) · ស្ងប់ ➜ មិនផ្លាស់ទី · Done + កម្ពស់ចន្លោះពេលចុះ ➜ រអិលចុះតែម្តង · ∨ លេខ ➜ អក្សរ ➜ តែម្តង · keyboard មិនលោត ➜ ត្រឡប់ម្តង ហើយលែងរំពឹង ·
+  (ជ) ∨/∧ ៧ ផ្ទាំង × ៣០ ដង + ទំព័រស្កេន ➜ preventScroll · Chrome Android ➜ មិនប៉ះ — build 2.50.83 FAIL ៥ · build «រអិលតាមកម្ពស់នីមួយៗ» (2.50.82) FAIL ១–២ · ដក `iosForecastMissed` FAIL ២ ➜ ១៣/១៣ ·
+  (ឆ) iPhone · iPad ➜ រអិល (ដូច Android) ១៨/១៨ · `ZoeW/tests/modal-keyboard.test.tsx` ៖ កម្ពស់ប្តូរ ➜ ទីតាំងដើមរក្សា · កម្ពស់ថ្មីក្រោយ `IOS_KEYBOARD_SETTLE_MS` ·
+  `ZoeW/tests/ios-page-tap-probe.test.ts` ៖ លេខថ្មី (`afterMs` · `viewportHeight` · `docHeight` · `stillFocused`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy ៖ មើល [2.50.93] (កំណែ 2.50.84 មិនចេញ production ដាច់ដោយឡែក)។
+1. **iPhone ៖ ∨/∧** ៖ ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង · ទំព័រស្កេន (កន្លែងវាយ Barcode ➜ ∨) ➜ ទំព័រ និង navbar នៅនឹងកន្លែង។
+2. **iPhone ៖ ចលនា** ៖ ប៉ះកន្លែងវាយក្នុងផ្ទាំង (PIN · បញ្ចូលច្រើន · កែលេខទូរស័ព្ទ) ➜ ផ្ទាំងរអិលតែម្តងទន្ទឹមនឹង keyboard · Done ➜ រអិលចុះ។ លើកដំបូងក្រោយដំឡើងអាចរអិលពីរដង (App មិនទាន់ចាំ
+   កម្ពស់ keyboard) ➜ លើកទីពីរត្រូវរអិលតែម្តង។ បើនៅកន្ត្រាក់ ➜ ប្រាប់ផ្ទាំងណា ➜ ត្រឡប់ទៅ «ភ្លាម» បាន។
+3. **iPhone ៖ កន្លែងវាយ Barcode** ៖ preview មិនផ្ញើ Sentry ➜ បើចង់បានទិន្នន័យពី preview ៖ Sentry ➜ Settings ➜ Projects ➜ `javascript-react` ➜ Allowed Domains (បន្ថែម `*.netlify.app`) ·
+   បើមិនដូច្នោះ ទិន្នន័យមកក្រោយ merge (`iosPageTap …`)។
+4. **Android** ៖ គ្មានអ្វីត្រូវសាក (កូដ Android ដដែល)។
+
+### [2.50.83] — 2026-10-16 · ZoeW ៖ **iPhone ៖ ផ្ទាំងទៅកន្លែងភ្លាមពេល keyboard លោត (មិនកន្ត្រាក់) · ចុចកន្លែងវាយ Barcode ទំព័រនៅនឹងកន្លែង · Android មិនប្រែ**
+
+**ZoeW `2.50.83`** (`zoew-v345` ➜ `zoew-v346`) · ⛔ ZoeKeyGen មិនប្រែ · គ្មាន rules · env · migration · Android native ថ្មី · ⛔ ឯកសារចាក់សោ (PTR · ចលនាផ្ទាំង · `chrome-autohide.ts` ·
+`phone-search.ts` · `app.css` · ZTO) មិនប៉ះ — ការកែក្នុង `modal-keyboard.ts` តែប៉ុណ្ណោះ។
+សំណើម្ចាស់គម្រោង ៖ «iphone ធ្លាក់ទំព័រម្តងហើយ មើល Sentry ផង និង modal ក៏កន្ត្រាក់ដែរ មុន merge មិនអីផង» (ចម្លើយ ៖ iPhone · ពេល keyboard លោតឡើង) · «modal ios មុន merge អត់អីទេ» ·
+«android ដំណើរការ ត្រឹមត្រូវហើយ គ្មានកន្ត្រាក់ គ្រប់យ៉ាងរលូន សូមការពារកែ ios កុំអោយ android ប្រែ» ➜ Android (APK · Chrome) មិនប្រែមួយបន្ទាត់ (`isAndroidDevice()` ·
+`usesIOSPanelHandoff()`) ៖ `modal-keyboard-device-test` (ក) (ក២) (ឆ) Android ជាប់ដូចដើម។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🐛 **iPhone · iPad ៖ ផ្ទាំងកន្ត្រាក់ពេល keyboard លោតឡើង** (ផ្នែក ២ A136)។ ចលនារអិល [2.50.82] (`glideModalCard()`) ចាប់ផ្តើមម្តងហើយម្តងទៀត ពេល keyboard iOS ប្រាប់កម្ពស់ច្រើនដងពេលលោត
+  (លោតហួស ហើយស្ងប់) ➜ កាតឡើង ចុះ។ ឥឡូវ ចលនាតែលើ Android ៖ iOS ➜ កាតទៅទីតាំងត្រូវភ្លាមដូចមុន [2.50.82] (ទីតាំង · ការវាស់ · ការចាប់ការចុច ដដែល)។
+- 🐛 **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រធ្លាក់ម្តងម្កាល** (ផ្នែក ២ A137 ៖ Sentry `iosPageTap caught document`)។ ការចុចត្រូវចាប់ (`focus({ preventScroll })`) ប៉ុន្តែ WebKit
+  នៅរំកិល document ២៣០px (visual viewport ២៧៧) ពេល keyboard លោត។ ឥឡូវ ក្រោយការចុចដែលចាប់បាន (`pageFieldCaught`) ខណៈប្រអប់នៅ focus ៖ document រំកិលដោយគ្មានម្រាមដៃ ➜ ត្រឡប់ ០
+  (`restorePageFieldScroll()` ➜ `scrollWindowToTop()` ដូចប្រអប់ស្វែងរក · ផ្ទាំង) · keyboard នឹងបាំងប្រអប់ (មិនចាប់) ➜ iOS បង្ហាញដដែល · blur · ផ្ទាំងបើក · Android ➜ មិនប៉ះ។
+  ឧបករណ៍វាស់ `iosPageTap` នៅដដែល ➜ បើនៅធ្លាក់ Sentry ប្រាប់ផ្លូវម្តងទៀត។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/ios-page-tap-probe.test.ts` +២ (ចាប់ ➜ document ២៣០ · visual viewport scroll ➜ `scrollTo(0, 0)` · នៅ focus · ០ ➜ មិនហៅទៀត · ទិសផ្ទុយ ៖ keyboard បាំង (មិនចាប់) · blur ·
+  ផ្ទាំងបើក · Android ➜ មិនប៉ះ) — កូដមុនកែ FAIL ១ ➜ ៦/៦ · `modal-keyboard-device-test` (ឆ) ៖ iPhone · iPad ➜ ភ្លាម (១ ជំហាន · គ្មានស៊ុមកណ្តាល · គ្មានចលនានៅសល់) · Android
+  APK ២ · Chrome ➜ រអិលដូចដើម · «បន្ថយចលនា» ផ្លាស់ទៅ Chrome Android · ការប្តូរកម្ពស់កណ្តាលចលនា ៖ Android តែប៉ុណ្ណោះ — build `2dfaa9c` FAIL ៣ (iPhone · iPad · iPhone មាតិកា) ➜ ១៧/១៧។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.83` (workflow `main` · កូដ Android ដដែល)។ Firebase rules · migration Supabase ៖ **គ្មាន**។
+1. **iPhone ៖ ផ្ទាំង** ៖ បើក «បញ្ចូលច្រើន» · «កែលេខទូរស័ព្ទ» · ផ្ទាំង PIN ➜ ប៉ះកន្លែងវាយ ➜ keyboard លោត ➜ ផ្ទាំងទៅកន្លែងតែម្តង មិនកន្ត្រាក់ (ដូចមុន 2.50.82)។
+2. **iPhone ៖ កន្លែងវាយ Barcode** ៖ ស្កេនធម្មតា (ចុចកន្លែងវាយ · ស្លាក · ⚡ · គ្រប់របៀប) ➜ ទំព័រនៅនឹងកន្លែង។ បើនៅធ្លាក់ ➜ ប្រាប់ម៉ោង ➜ ខ្ញុំអាន Sentry (`iosPageTap …`)។
+3. **Android** ៖ គ្មានអ្វីត្រូវសាក (កូដ Android ដដែល · ផ្ទាំងនៅរអិលដូចដើម)។
 
 ### [2.50.82] — 2026-10-15 · ZoeW ៖ **ផ្ទាំងរអិលតាម keyboard (App ទាំងមូល) · Android ៖ ចាំកម្ពស់ keyboard ពិត (keyboard ណាក៏បាន · ពង្រីកទំហំ) ➜ ផ្ទាំង keyboard លេខឡើងតែម្តង · ទូរស័ព្ទនៅបញ្ឈរ tablet បង្វិលបាន · iPhone ៖ ចុចស្លាក «ស្កេន Barcode…» · ⚡ ទំព័រមិនធ្លាក់ · ពង្រីកអេក្រង់ (zoom) មិនមែន keyboard**
 
@@ -4698,6 +5055,26 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A133 | **ទូរស័ព្ទបង្វិលផ្តេក (សំណើម្ចាស់គម្រោង ៖ ទូរស័ព្ទមិនផ្តេក · tablet ផ្តេកបាន)** | APK ៖ AndroidManifest គ្មាន `screenOrientation` · `MainActivity` មិនស្នើ ➜ បង្វិលតាម sensor · PWA Android ៖ manifest `portrait-primary` ចាក់សោ **tablet ផង** · iPhone/iPad ៖ WebKit មិនគោរព manifest `orientation` ហើយ `screen.orientation.lock()` មិនមាន ➜ ចាក់សោពី web មិនបាន · ប្លង់ទូរស័ព្ទផ្តេក (A124) នៅសម្រាប់ iPhone · Browser tab | APK `orientationFor(smallestScreenWidthDp)` (< ៦០០ ➜ PORTRAIT) · PWA tablet `lock('any')` · iPhone ៖ ម្ចាស់គម្រោងជ្រើស «ទុកដូចសព្វថ្ងៃ» (Control Center · ប្លង់ផ្តេក A124 នៅ · មិនបិទ App ពេលផ្តេក ៖ ស្កេនកាមេរ៉ាទូរស័ព្ទផ្អៀងមិនរំខាន) |
 | A134 | **ផ្ទាំងលោតភ្លាមតាម keyboard (សំណើម្ចាស់គម្រោង ៖ ថែមចលនា App ទាំងមូល)** | build `a9d20c6` (Chromium ពិត · ថតរាល់ស៊ុម) ៖ ១៧ ប្រអប់ × ៥ ឧបករណ៍ ➜ កាតផ្លាស់ទីក្នុង ១ ស៊ុម (ស៊ុមកណ្តាល ០ ៖ PIN iPhone ៣១២ ➜ ២៨០ · Chrome ២៥៧ ➜ ១០៧) · ការតម្រូវប្តូរ `margin-top`/`align-items` (CSS transition មិនអាចចាប់ពី `center` ➜ `flex-start` · ទោះបានក៏ layout រាល់ស៊ុម) · APK ៖ keyboard បិទ ➜ WebView ធំឡើង ➜ កាតទៅកណ្តាលថ្មីដោយ layout ផ្ទាល់ (fit បាត់តាំងពី WebView បង្រួម ៖ គ្មានការតម្រូវណាប្តូរ) | FLIP ៖ `glideModalCard()` ចាប់ទីតាំងដែលមើលឃើញ (`modalRest` + offset ចលនា) ➜ `transform` Web Animations (`composite: 'add'` · `MODAL_GLIDE_MS`) · `ResizeObserver` លើកាត (មាតិកា ➜ កត់ភ្លាម) និង `.modal` (Android viewport ➜ រអិល) · visual viewport រំកិល ➜ ទីតាំងលើអេក្រង់ដដែល ➜ គ្មានចលនា ➜ ✅ |
 | A135 | **iPhone ៖ ទំព័រធ្លាក់ម្តងម្កាល ក្រោយចុចកន្លែងវាយ Barcode (រាយការណ៍ម្ចាស់គម្រោងលើ 2.50.82)** | Chromium គ្មាន WebKit ➜ ការសាក (គ) ជាប់ទាំងអស់ · អានកូដ (មិនមែនភស្តុតាង) ៖ ផ្លូវដែលការចុចទៅ iOS ដើម ៖ អូស > `MODAL_TAP_SLOP_PX` ឬចុចយូរ > `MODAL_TAP_MAX_MS` ដែល UIKit នៅរាប់ជាការចុច · ចុចម្តងទៀតលើប្រអប់ដែល focus រួច ក្រោយ keyboard បិទ (`modalTapFocused`) · `modalFocusRefused` · ការប៉ាន់ «keyboard នឹងបាំង» (`pageFieldStaysAboveKeyboard()`) | វាស់លើឧបករណ៍ពិត ៖ `iosPageTap` (ផ្លូវ + លេខ ➜ Sentry ពេលទំព័ររំកិលក្នុង `PAGE_TAP_PROBE_MS` គ្មានម្រាមដៃ) ➜ ⚠️ ចាំទិន្នន័យ ➜ កែតែផ្លូវដែលវាស់ឃើញ (អ្នកយាមមុនកែ) |
+| A136 | **iPhone ៖ ផ្ទាំងកន្ត្រាក់ពេល keyboard លោតឡើង (2.50.82 production)** | ម្ចាស់គម្រោង ៖ iPhone · ពេល keyboard លោតឡើង · មុន merge (គ្មានចលនា) មិនអីទេ · Android រលូន · keyboard iOS ប្រាប់កម្ពស់ច្រើនដងពេលលោត (លោតហួស ហើយស្ងប់ ៖ ការចាំ keyboard ធ្លាប់ឃើញ) ➜ `glideModalCard()` ចាប់ផ្តើមម្តងហើយម្តងទៀត · ចលនាឡើងលើស ហើយចុះ | ចលនាតែលើ Android (`isAndroidDevice()`) ➜ iOS ភ្លាមដូចមុន · `modal-keyboard-device-test` (ឆ) iPhone · iPad ➜ ភ្លាម ➜ ✅ |
+| A137 | **iPhone ៖ ទំព័រធ្លាក់ក្រោយចុចកន្លែងវាយ Barcode (Sentry JAVASCRIPT-REACT-K)** | `iosPageTap caught document` ៖ dx ០ · dy ០ · ៥៩ms · មិន focus · គ្មាន keyboard · ប្រអប់ ៣៣៨–៣៦៨ លើ ៨៤៤ (keyboard ដែលចាំ ៤០៣ ➜ បន្ទាត់ ៤៤១ ៖ ចាប់) ➜ document scrollY ២៣០ · visual viewport offsetTop ២៧៧ · គ្មានម្រាមដៃ ➜ WebKit រំកិលទោះ `focus({ preventScroll })` (ប្រភព WebKit trunk ៖ `_zoomToRevealFocusedElement` គោរព `preventScroll` ➜ ផ្លូវផ្សេង · មិនទាន់ដឹងច្បាស់) | ក្រោយការចុចដែលចាប់បាន ខណៈប្រអប់នៅ focus ៖ document រំកិល ➜ `scrollWindowToTop()` (`restorePageFieldScroll()`) · `iosPageTap` នៅវាស់ ➜ ⚠️ ចាំម្ចាស់គម្រោងសាក |
+| A138 | **Sentry Session Replay នៅថត (ផ្ទុយច្បាប់ «Secret leaks»)** | `search_replays` ៖ replay ២០ ក្នុង ៣០ ថ្ងៃ (ZoeW 2.50.53 ➜ 2.50.82 · APK · iPhone · ZoeKeyGen) ទោះ `guardedOptions()` ដាក់ `replaysSessionSampleRate` · `replaysOnErrorSampleRate` = ០ · `environment` · `release` របស់ App ក្នុង replay ➜ options របស់ App ចូល ប៉ុន្តែ Replay នៅដំណើរការ (ប្រហែល Loader Script ក្នុង Sentry UI បើក Replay) | ⚠️ មិនទាន់កែ ៖ ចាំម្ចាស់គម្រោងសម្រេច (បិទ Replay ក្នុង Sentry ➜ Settings ➜ Loader Script · ឬអ្នកយាមថ្មី + កូដ) |
+| A139 | **iPhone ៖ ចុច ∨/∧ លើ keyboard ➜ ទំព័រលោត (preview 2.50.83 · ទំព័រស្កេន · ផ្ទាំងលេខទូរស័ព្ទ/COD · ផ្ទាំងផ្សេង)** | ប្រភព WebKit trunk ៖ `accessoryTab:` ➜ `WebPage::focusNextFocusedElement()` ➜ `element->focus()` (គ្មាន `FocusOptions`) ➜ `PendingFocusedElementUpdate.options.preventScroll` = false ➜ `_zoomToRevealFocusedElement` (`forceScroll:[self requiresAccessoryView]` ៖ iPhone រំកិលជានិច្ច) · ព្រឹត្តិការណ៍ `focus` រត់មុនជូនដំណឹង client (`DispatchFocusEventBeforeNotifyingClient`) · `focus()` លើធាតុដែល focus រួច ➜ `elementDidRefocus` ➜ ក្លាយជាព័ត៌មាន ហើយការជូនដំណឹងដើមត្រូវបោះចោល (`m_focusedElement == element` · keyboard បង្ហាញ) · `focusin` រត់ក្រោយការជូនដំណឹង ➜ គ្មានឥទ្ធិពល | `keepKeyboardFocusInPlace()` (`focus` capture · keyboard បង្ហាញ · គ្មានម្រាមដៃ · គ្មានការលែងដៃក្នុង `NATIVE_TAP_FOCUS_MS` · ប្រអប់នៅមើលឃើញ) ➜ `focus({ preventScroll })` · អ្នកយាម vitest + `modal-keyboard-device-test` (ជ) ➜ ✅ (⚠️ ចាំម្ចាស់គម្រោងសាក) |
+| A140 | **iPhone ៖ ចលនាផ្ទាំងតាម keyboard (សំណើ «ios មិនអាចដាក់ចលនា រអិលដូច android បានទេឬ?»)** | A136 ៖ ចលនាតាមកម្ពស់នីមួយៗ ➜ កន្ត្រាក់ · `modal-keyboard-device-test` (ឈ) ៖ ចុច + លោតហួស ➜ ស្ងប់ ៖ 2.50.83 (ភ្លាម) ក៏ឡើងហួស ហើយចុះ (`back` ១ · `over` ៥) · 2.50.82 (រអិលគ្រប់កម្ពស់) `back` ៣–៨ · `over` ៩–១៣ | ផ្លូវ iOS ដាច់ពី Android (`iosModalKeyboardViewport()`) ៖ ការរំពឹងកម្ពស់ពីការចាំពេលចុច/ប្តូរប្រអប់ (`forecastModalKeyboard()`) · គ្មានការរំពឹង ➜ កម្ពស់ដំបូង · កម្ពស់ចន្លោះរំលងរហូតស្ងប់ `IOS_KEYBOARD_SETTLE_MS` · Done ➜ ចុះភ្លាម · keyboard មិនលោតក្នុង `IOS_KEYBOARD_FORECAST_MS` ➜ ត្រឡប់ ហើយឈប់រំពឹង ➜ ✅ (⚠️ ចាំម្ចាស់គម្រោងសាក ៖ ការរាយការណ៍កម្ពស់ពិតរបស់ iOS មិនអាចវាស់នៅទីនេះ) |
+| A141 | **preview មិនផ្ញើ Sentry** | `search_errors` ៖ គ្មានព្រឹត្តិការណ៍ `deploy-preview` ក្នុង ៣០ ថ្ងៃ · `find_dropped_events` (១៤ ថ្ងៃ) ៖ គ្មាន `invalid`/`filtered` នៅ server (តែ `client_discard` ៥) · កូដ App មិនបិទ Sentry តាម host ➜ ទំនង Allowed Domains/Loader នៃគម្រោង Sentry · ព្រឹត្តិការណ៍ A137 ៖ `scrollY` ២៣០ · `offsetTop` ២៧៧ ដោយគ្មាន `_zoomToRevealFocusedElement` (preventScroll) ➜ ផ្លូវផ្សេង (`_scrollToAndRevealSelectionIfNeeded` ពេល keyboard ប្តូរកម្ពស់ · UIKit `_adjustForAutomaticKeyboardInfo`) មិនទាន់ដឹង | `iosPageTap` បន្ថែម `afterMs` · `viewportHeight` · `docHeight` · `stillFocused` ➜ ⚠️ ចាំទិន្នន័យ (production ក្រោយ merge ឬ Allowed Domains) ➜ កែតែផ្លូវដែលវាស់ឃើញ |
+| A142 | **ពិនិត្យកូដ 2.50.84 ៖ focus ពីប្រអប់វាយទៅ select · date ក្នុងផ្ទាំង iPhone** | `noteIOSFieldBlur()` ប្រើ `textEntryField(e.relatedTarget)` ➜ select/date (កង់ជ្រើសនៅកន្លែង keyboard · `requiresAccessoryView`) រាប់ជា «keyboard បិទ» ➜ `iosClosing` ➜ ផ្ទាំងចុះក្រោមកង់ · `noteIOSFieldFocus()` មិនលុប `iosClosing` ពេល focus select · `keepKeyboardFocusInPlace()` មិនគ្រប select (∨ ទៅ select ➜ `_zoomToRevealFocusedElement`) · តេស្ត happy-dom ៖ `<select>` ជា Proxy ➜ `this` ≠ `document.activeElement` (គំរូ WebKit ប្រៀបធៀបតាម id) | `inputViewField()` (ប្រអប់វាយ · select · date/time) សម្រាប់ focus · blur · ∨/∧ ➜ 2.50.85 · វាស់ក្នុង vitest តែប៉ុណ្ណោះ (ផ្ទាំងពិតដែលមានប្រអប់វាយ + select មើលឃើញព្រមគ្នាពេលបើក ៖ គ្មាន ➜ device-test មិនមានគោល) |
+| A143 | **iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព័រលោតចុះ ហើយរអិលត្រឡប់ (វីដេអូ preview 2.50.85)** | វីដេអូ ៣០ រូប/វិ ៖ logo navbar ១៥១px ➜ ១៤៦ (iOS ចាប់ផ្តើមរំកិលឡើង) ➜ ៤៣៤ · ៥៩០ · ៥៨៨ (ចុះ ១៣៨ · ២១៤ · ២១៣pt) ➜ ត្រឡប់ក្នុង ២០០–២៤០ms · ចំនួនស្មើ `_zoomToFocusRect` ដាក់ប្រអប់នៅកណ្តាលផ្ទៃពីលើ keyboard (របៀបបញ្ចូល ≈ ១៤៧ · ដក ≈ ២១៥) ➜ preventScroll បាត់ · ប្រភព WebKit ៖ `FocusController::setFocusedElement` លើធាតុដែល focus រួច ➜ `elementDidRefocus` (ជម្រើស click) ➜ `WebPage::elementDidFocus` សរសេរជាន់ព័ត៌មានរង់ចាំ ពេល `!m_isShowingInputViewForFocusedElement` ➜ `completeSyntheticClick` flush · ការទាញ ០ របស់ App (`restorePageFieldScroll`) ពេលចលនា keyboard (additive) រត់ ➜ ចុះ ហើយត្រឡប់ · `pageFieldCaught` នៅជាប់ក្រោយ blur ➜ focus ក្រោយក៏ត្រូវទាញ | `swallowCaughtClick()` (`mousedown` · `click` នៃការចុចដែលចាប់ · `CAUGHT_CLICK_MS` · ប្រអប់/ស្លាក/⚡ តែប៉ុណ្ណោះ) · `forgetPageFieldCaught()` ➜ 2.50.86 · ⚠️ ផ្លូវផ្សេងទៀតដែល iOS អាច focus (text interaction `focusTextInputContextAndPlaceCaret`) មិនទាន់វាស់ ➜ `iosPageTap` Sentry ក្រោយ merge |
+| A144 | **preview 2.50.86 នៅតែធ្លាក់ · សំណើ «clean up · សរសេរថ្មី · ឆ្លាតវៃដូច Android»** | ទំព័រចុះក្រោមកម្ពស់ធម្មតា (logo ១៥១ ➜ ៤៣៤–៥៩០px) មានតែពេល model `scrollTo(0, 0)` កាត់ចលនា UIKit (additive ៖ A47) ➜ ទាមទារការទាញរបស់ App · `boot.ts` ៖ `visualViewport` `resize` ➜ `scrollWindowToTop` គ្រប់ឧបករណ៍ (រត់ពេល keyboard ចាប់ផ្តើមលោត) · `restorePageFieldScroll` (2.50.83) · «ដូច Android» (`interactive-widget=resizes-content`) ៖ WebKit trunk `MetaViewportInteractiveWidgetEnabled` (Cocoa true) តែ Safari មិនទាន់ចេញ (bram.us · MDN bcd #29011) ➜ មិនអាចប្រើ | iOS standalone «បង្ការ មិនតទល់» ៖ `settleDocumentScroll()` (keyboard បង្ហាញ ➜ មិនទាញ) · ដក `restorePageFieldScroll` · probe `iosPageTap` ➜ 2.50.87 · ⚠️ iOS រំកិលតាមផ្លូវផ្សេងដែលមិនទាន់ដឹង ➜ ឃើញរអិលរលូន (មិនលោត) ➜ ចាំវីដេអូ |
+| A145 | **កញ្ចប់បិទក្នុង ZoeW តែ ZTO Palm មិនទាន់បិទ បាត់ពីរបា «ZTO មិនទាន់បិទ» ក្រោយពីរបីម៉ោង** | ការសម្អាត ២ ម៉ោងផ្លាស់កញ្ចប់បិទទៅធុង «យករួច» ➜ `ztoStatusTrashItemCounts()` រាប់ត្រឹម `ZTO_STATUS_TTL_MS` ១២ ម៉ោងក្រោយ `deletedAt` (≈ ១៤ ម៉ោងក្រោយបិទ) · `loadZtoPickupStatusOnce()` បោះសាលក្រមចាស់ជាង ១២ ម៉ោង · `ZTO_STATUS_MAX` ៣០០ < ៣ ថ្ងៃនៃហាងមមាញឹក · តំបន់ចាក់សោ ➜ ប្រែតែតាមសំណើ | ម្ចាស់គម្រោងជ្រើស ៣ ថ្ងៃ ➜ `ZTO_STATUS_TTL_MS` ៣ ថ្ងៃ · `ZTO_STATUS_MAX` ២០០០ · `LOCK` ថ្មី · `zto-remind-days.test.ts` ➜ 2.50.89 · ZoeW ពិនិត្យ ZTO តែពេល App បើក (គ្មាន server sweep) |
+| A146 | **iPhone ស្កេនដក ៖ ចុចកន្លែងវាយ ➜ navbar ចេញ · ចុចស្វែងរក ➜ ប្រអប់ស្វែងរកក្រោមរបាស្ថានភាព (វីដេអូ preview 2.50.89)** | ស៊ុមវីដេអូ ៖ ប្រអប់ចប់ ៤៤៥pt · បន្ទាត់ keyboard ដែលធ្លាប់វាស់ (អង់គ្លេស + របារ ∧∨✓ iOS 26) ខ្ពស់ជាង ➜ `pageFieldStaysAboveKeyboard()` false ➜ ទុកឲ្យ iOS ➜ document រំកិល ១៤៦pt (ប្រអប់កណ្តាល) · ស្វែងរក ➜ `glideEntryPanelCollapsed()` ត្រឹមត្រូវ តែ document នៅរំកិល ➜ ប្រអប់ស្វែងរក ១៥០pt ខ្ពស់ពេក · Android ៖ Chromium រំកិល `#appPages` · Chromium ៖ `#appPages.scrollTop = 18` ពេល snap បើក ➜ ០ · ផ្អាក ➜ ១៨ · បើកវិញ ➜ ០ | iOS < 992px ៖ ចាប់ + `raisePageField()` ក្នុង `#appPages` (snap ផ្អាក · ចុះវិញពេល blur · ស្ងប់ ➜ លើកបន្ថែម) ➜ 2.50.90 · អ្នកយាម `ZoeW/tests/ios-page-field-raise.test.ts` · `modal-keyboard-device-test` (ដ) · ⚠️ browser មិនក្លែងការរំកិល document របស់ iOS ➜ ផ្ទៀងផ្ទាត់លើ iPhone ពិត |
+| A147 | **ពិនិត្យសុវត្ថិភាពក្រោយកែផ្ទាំងច្រើនដង ៖ Tab ចេញពីផ្ទាំង PIN · Activate** | probe browser ពិត ៖ ផ្ទាំង PIN ៧ × (ផ្ទៃងងឹត · Escape · ម៉ាស៊ីនស្កេន + Enter/Tab · Tab ×១២ + Enter · PIN ខុស) · Activate (Key ដកហូតពេលកំពុងប្រើ) · ចាក់សោ App ➜ តែ Tab ធ្លាក់ ៖ focus ទៅ `navMenuBtn` · `navNotifyBtn` · `btnFilterToday` · `customDateInput` · ចាក់សោ App ៖ ទំព័រ `visibility: hidden` ➜ គ្មាន · `history.back()` លើ web ➜ ចាកចេញពីទំព័រ (Back ពិត ៖ `native-back`) | `modal-focus-trap.ts` (`focusin` ➜ ត្រឡប់ចូលផ្ទាំងខាងលើ) ➜ 2.50.91 · អ្នកយាម `ZoeW/tests/modal-focus-trap.test.ts` · `modal-keyboard-test` (Tab ផ្ទាំង ៤ ៖ មុនកែ ធ្លាក់ ៤) |
+| A148 | **🩺 App ទើបដំឡើង ៖ ប្រាប់តែផ្លូវភ្ជាប់ Firebase ទោះ App គាំទ្រ Server ២ (សំណើម្ចាស់គម្រោង)** | `runHealthCheck()` ពិត គ្មាន `zoew_firebase_config` ៖ ជួរ «Firebase» ❌ «មិនទាន់ភ្ជាប់ម្តងណាទេ» · ជួរអាជ្ញាប័ណ្ណ ❌ «មិនទាន់មាន Activation Key» · 💡 «App មិនដែលភ្ជាប់ Firebase» + «សុំ Key» · Config Supabase ដែល SDK មិនទាន់ផ្ទុក ➜ ជួរ «Firebase» ដដែល (`viewState.backendKind` លំនាំដើម `firebase`) | `healthBackendKind()` ពី Config ដែលរក្សាទុក ➜ ជួរ «Server (Firebase · Supabase)» + 💡 ផ្លូវទាំង ២ · ជួរអាជ្ញាប័ណ្ណ ℹ️ ➜ 2.50.92 · អ្នកយាម `ZoeW/tests/health-no-backend.test.ts` (មុនកែ ធ្លាក់ ៣) · `health-check-test` |
+| A149 | **token គណនីហាងទៅ host ណាក៏បាន ដែលផ្លូវដូច Function ZTO (audit សុវត្ថិភាព)** | `lookupApiIsZto()` ពិនិត្យតែផ្លូវ · vitest ពិត ៖ `https://evil.example/.netlify/functions/zto-order-detail` · `https://<ref>.supabase.co/functions/v1/x/.netlify/functions/zto-order-detail` ➜ `X-Zoe-Id-Token` ចេញ · Setup Link lookup-only ជា `official` ជានិច្ច (គ្មានការព្រមាន domain) · CSP web អនុញ្ញាត `*.supabase.co` · APK គ្មាន CSP ➜ Firebase ID token = អាន/សរសេរទិន្នន័យហាងទាំងមូល (rules `auth != null`) | `ztoIdentityTargetTrusted()` ➜ 2.50.93 (ម្ចាស់គម្រោងអនុញ្ញាតតំបន់ចាក់សោ) · អ្នកយាម `ZoeW/tests/zto-token-origin.test.ts` (មុនកែ ធ្លាក់ ៣) |
+| A150 | **License ៖ record មិនចងនឹងហត្ថលេខា · អានកៅអីមិនបាន = online ល្អ (audit សុវត្ថិភាព)** | `license-verify.js` ពិតក្នុង vm ៖ record `{ keyString: Key A (Revoke ក៏បាន), id: Key B }` ➜ ពិនិត្យ online លើ B ➜ active ៣០១ ថ្ងៃ + កក់កៅអីលើ Key អ្នកផ្សេង · កៅអី 503 (URL filter) + `lastOnlineCheck` ២០ ថ្ងៃ ➜ active ហើយរំកិល `lastOnlineCheck` (ពិដាន ៣ ថ្ងៃមិនដែលចាប់ផ្តើម) | `sigCheck.payload.id`/`exp` · `seat === 'unknown'` មិនរំកិល ➜ 2.50.93 · ZoeKeyGen 2.24.19 · អ្នកយាម `license-seat-test` ១១ក · ១១ខ (មុនកែ ធ្លាក់ ៤) |
+| A151 | **Push ៖ sub កំព្រាក្រោយ index រវល់ ➜ ពេញពិដានគ្រប់ហាង (audit សុវត្ថិភាព)** | `push-core.mjs` ពិត + Blobs ក្លែង ៖ ២០០ subscribe ស្របគ្នា (Key/គណនីពិត ១) ➜ ១៨៩ `sub/` · ១០ ក្នុង index · ១៧៩ កំព្រា (រាប់ក្នុង `PUSH_SUBS_TOTAL_MAX` ៥០០០ · ទទួលដំណឹងគ្រប់ដង · មិនដែលកាត់) | ដក/ស្តារ record ពេល index រវល់ ➜ 2.50.93 (server) · អ្នកយាម `ZoeW/tests/push-server.test.ts` (១២០ ស្របគ្នា ➜ គ្មានកំព្រា) |
+| A152 | **CI ៖ keystore ផលិតកម្មអាចប៉ះពី branch ណាក៏បាន (audit សុវត្ថិភាព · តាមការកំណត់)** | `android-release.yml` ៖ `workflow_dispatch` លើ branch ណាក៏រត់ workflow របស់ branch នោះជាមួយ `ZOEW_KEYSTORE_*` · `npm ci` (lifecycle) + Gradle ក្នុង job ដដែល · runner Windows self-hosted មិនមែន ephemeral | ⚠️ សកម្មភាព ៣ របស់ [2.50.93] (GitHub Environment + អ្នកអនុម័ត + តែ `main`) · កូដមិនប្រែ |
+| A153 | **ប្រវត្តិ git ៖ លេខទូរស័ព្ទដែលមើលទៅពិត (audit សុវត្ថិភាព)** | clone ពេញ ១៤២៨ commit ៖ លេខ ~១៣ (ឧ. `097415…` ១១៦ ដង · `096389…` ៧៩ ដង) ក្នុង fixture/ឯកសារចាស់ · HEAD ស្អាត (`security-guard-test` បិទផ្លូវថ្មី) · **គ្មាន secret** (token · private key · service account · cookie ពិត) | ⚠️ សកម្មភាព ៤ របស់ [2.50.93] (ម្ចាស់គម្រោងសម្រេច) |
+| A154 | **Supabase ៖ ការផ្ទៀងផ្ទាត់ rules ចំណាយការ៉េ ➜ DoS ឆ្លងហាង (audit សុវត្ថិភាព)** | Postgres ពិត ៖ សរសេរ ១ ឯកសារ `zoew_daily_collected_cod_dod` ៤០០០ keys (៩៨ KB) ➜ អស់ ៨ វិ. (`statement_timeout`) · `zoe_snap_val` អានឯកសារទាំងមូលរាល់ leaf · គ្មាន quota/rate ក្នុងហាង · **គ្មានការអាន/សរសេរឆ្លងហាង · គ្មានការឡើងសិទ្ធិ** (RLS · definer · realtime · invite/reset ល្អ) | ⚠️ ជុំបន្ទាប់ (migration ថ្មី ៖ បញ្ជូនតម្លៃក្នុង context · ពិដាន keys/ឯកសារ/bytes ក្នុងហាង) · ហាងធំ ~៤០០០ barcode/ថ្ងៃ ក៏ប៉ះពិដាននេះ |
+| A155 | **ចំណុចតូច/ការណែនាំ (audit សុវត្ថិភាព)** | `?list=1` Project មិនចងសាខា ជឿអ៊ីមែល (ម្ចាស់គម្រោង ៖ ចង env) · `/detail` `ZTO_DETAIL_IDENTITY=off` លំនាំដើម · cache «រកមិនឃើញ» បត់អក្សរធំ/តូច (≤ ១២០ វិ.) · កូដ Setup Link ៦ ខ្ទង់ (ម្ចាស់គម្រោង ៖ ទុក) · PIN/Signing Key ៖ PBKDF2 salt ថេរ (ត្រូវចូលឧបករណ៍) · APK គ្មាន CSP · កៅអី License ៖ device ID អានបាន (ត្រូវ devtools) · admin Supabase គ្មាន MFA · FileProvider ធំជាងត្រូវការ · APK updater មិនពិនិត្យ cert ផ្ទាល់ (Android ពិនិត្យរួច) | មិនកែក្នុងជុំនេះ — ការសម្រេចម្ចាស់គម្រោង ឬជុំបន្ទាប់ (មើល PR #322) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
 
@@ -7332,7 +7709,9 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/ios-page-tap-probe.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
@@ -7361,6 +7740,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/merge-into-deleted-item.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-backdrop-keep.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/modal-chrome-state.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
@@ -7445,6 +7825,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7486,6 +7867,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/hardware-scanner.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 
 | `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

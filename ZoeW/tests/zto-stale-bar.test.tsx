@@ -125,7 +125,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
     h.calls.length = 0;
@@ -275,7 +275,7 @@ describe('ZTO-E6 ៖ របា «ZTO មិនទាន់បិទ» រលត�
         expect(verdictOf('ZTE6I00001')).toBe(true);
         appLocalStore.setItem('zoew_zto_autoclose_v1', '1');
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: false,
-            url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
         setZtoPickupVerdict('ZTE6I00001', false);
         ztoState.ztoStatusLastSweepAt = 0;
         await runZtoStatusSweep(false);

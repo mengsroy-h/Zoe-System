@@ -60,7 +60,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
     h.calls.length = 0;
@@ -127,7 +127,7 @@ async function runCycleMinutes(ms: number, abandonedAtStart = -1) {
 
 
 const LOCKED_CFG = JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValueEnc: 'enc',
-    url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' });
+    url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' });
 
 describe('7-day cleanup on a device whose sign-list read is blocked (ZTO-1)', () => {
     for (const [label, link] of [['Data Saver', { saveData: true, effectiveType: '4g' }], ['2g link', { saveData: false, effectiveType: '2g' }]] as const) {

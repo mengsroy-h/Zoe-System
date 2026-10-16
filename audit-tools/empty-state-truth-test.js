@@ -57,6 +57,11 @@ function readConst(name, fallback) {
     const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(SRC);
     return m ? m[1] : fallback;
 }
+function readProductConst(name, fallback) {
+    const m = new RegExp('const\\s+' + name + '\\s*=\\s*([\\d\\s*]+);').exec(SRC);
+    return m ? m[1].split('*').reduce((acc, part) => acc * parseInt(part, 10), 1) : fallback;
+}
+
 function readNumConst(name, fallback) {
     const m = new RegExp('const\\s+' + name + '\\s*=\\s*(\\d+)').exec(SRC);
     return m ? parseInt(m[1], 10) : fallback;
@@ -146,7 +151,7 @@ function buildSandbox(state) {
         ztoStatusLoaded: true,
         ztoStatusBannerSig: '', ztoStatusModalSig: '',
         ZTO_STATUS_BANNER_CODES: readNumConst('ZTO_STATUS_BANNER_CODES', 3),
-        ZTO_STATUS_TTL_MS: 12 * 60 * 60 * 1000,
+        ZTO_STATUS_TTL_MS: readProductConst('ZTO_STATUS_TTL_MS', 12 * 60 * 60 * 1000),
         ZTO_STATUS_STORE_KEY: readConst('ZTO_STATUS_STORE_KEY', 'zoew_zto_pickup_status_v1'),
         appLocalStore: null,
         elapsedSince: (m) => { if (!m) return Infinity; const d = Date.now() - m; return d >= 0 ? d : Infinity; },

@@ -23,7 +23,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date('2026-09-27T10:00:00Z'));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
     ztoState.ztoStatusInFlight = false;

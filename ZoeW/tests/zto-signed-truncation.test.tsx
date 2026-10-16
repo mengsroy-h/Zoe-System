@@ -32,7 +32,7 @@ vi.mock('../src/features/barcode-ops', () => ({
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-const CFG = { enabled: true, fastMode: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' };
+const CFG = { enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
 
 function openItem(id: string, code: string, ageMs: number) {
     return { id, phone: '0960007345', scanDate: getZoneDateKey(NOW - ageMs, 0), isClosed: false, createdAt: NOW - ageMs,

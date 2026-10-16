@@ -26,9 +26,9 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
 
-export const ZTO_STATUS_TTL_MS = 12 * 60 * 60 * 1000;
+export const ZTO_STATUS_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
-export const ZTO_STATUS_MAX = 300;
+export const ZTO_STATUS_MAX = 2000;
 
 export const ZTO_STATUS_SWEEP_DELAY_MS = 1500;
 

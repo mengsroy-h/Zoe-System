@@ -388,6 +388,35 @@ const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('អានកៅអីមិនបាន (503) ➜ **មិនលុប** record', !!h6.store[RECORD_KEY], s6);
     ok('ហើយ App នៅដំណើរការដដែល', s6 && s6.state === 'active', s6);
 
+    // ── ១១ក. ⛔ អានកៅអីមិនបាន ≠ ពិនិត្យ online ល្អ (audit សុវត្ថិភាព) ៖ ឧបករណ៍ដែលអ្នកលក់ដោះកៅអី បិទតែផ្លូវ `license_seats`
+    //    (URL filter) ➜ មុនកែ `lastOnlineCheck` រំកិលរហូត ➜ active ជារៀងរហូត។ កៅអីមិនដឹង ➜ ដូចក្រៅបណ្ដាញ (ពិដាន ៣ ថ្ងៃដំណើរការ)
+    const OLD = (days) => JSON.stringify(Object.assign(JSON.parse(RECORD()), { lastOnlineCheck: NOW - days * 86400000, seenMax: NOW - days * 86400000 }));
+    let srv6b = makeServer({ seatDown: true });
+    let h6b = build(srv6b, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: OLD(1) } });
+    let s6b = await status(h6b);
+    ok('អានកៅអីមិនបាន ➜ នៅ active ក្នុងពិដាន ៣ ថ្ងៃ', s6b && s6b.state === 'active', s6b);
+    ok('⛔ ហើយមិនរំកិល `lastOnlineCheck` (កៅអីមិនទាន់បញ្ជាក់)', JSON.parse(h6b.store[RECORD_KEY]).lastOnlineCheck === NOW - 86400000,
+        JSON.parse(h6b.store[RECORD_KEY]).lastOnlineCheck);
+    let h6c = build(makeServer({ seatDown: true }), { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: OLD(4) } });
+    let s6c = await status(h6c);
+    ok('⛔ អានកៅអីមិនបានជាប់ ៤ ថ្ងៃ ➜ offline-grace-exceeded (មិនមែន active ជារៀងរហូត)', s6c && s6c.state === 'offline-grace-exceeded', s6c);
+    ok('ហើយមិនលុប record (ផ្ទៀងផ្ទាត់មិនបាន ≠ ខុស)', !!h6c.store[RECORD_KEY]);
+    let h6d = build(makeServer({ seats: { [SLOTS[0]]: { device: DEV1, at: NOW } } }), { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: OLD(4) } });
+    let s6d = await status(h6d);
+    ok('ទិសផ្ទុយ ៖ កៅអីជារបស់ខ្លួន ➜ active ហើយ `lastOnlineCheck` រំកិលមកឥឡូវ', s6d && s6d.state === 'active'
+        && JSON.parse(h6d.store[RECORD_KEY]).lastOnlineCheck === NOW, s6d);
+
+    // ── ១១ខ. ⛔ record ចងនឹង payload ដែលបានចុះហត្ថលេខា (audit សុវត្ថិភាព) ៖ `record.id` កែដោយដៃ (Key ផ្សេង) មិនត្រូវផ្ទៀងផ្ទាត់/កក់កៅអីលើ Key នោះ
+    let srvBind = makeServer({});
+    const forgedRecord = JSON.stringify(Object.assign(JSON.parse(RECORD('OTHERCUSTOMERKEY0001')), { exp: Math.floor(SIGNED_EXP / 1000) + 300 * 86400 }));
+    let hBind = build(srvBind, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: forgedRecord } });
+    let sBind = await status(hBind);
+    const keyReads = srvBind.log.filter((l) => l.indexOf('/license_keys/') !== -1);
+    ok('⛔ ពិនិត្យ online លើ `id` ក្នុង payload ដែលបានចុះហត្ថលេខា (មិនមែន `record.id` ដែលកែបាន)', keyReads.length > 0
+        && keyReads.every((l) => l.indexOf('/KEYID1.json') !== -1), keyReads);
+    ok('⛔ ហើយមិនដែលប៉ះ Key របស់អ្នកផ្សេង (អាន ឬកក់កៅអី)', srvBind.log.every((l) => l.indexOf('OTHERCUSTOMERKEY0001') === -1), srvBind.log);
+    ok('ទិសផ្ទុយ ៖ Key ពិតនៅ active', sBind && sBind.state === 'active', sBind);
+
     // ── ១២. ទិន្នន័យចាស់ ៖ record មានស្រាប់ តែកៅអីទទេ ➜ ទទួលយកកៅអី ────
     // (ការតំឡើងដែល Activate មុនជុំនេះ ត្រូវតែបន្តដំណើរការ)
     let srv7 = makeServer({});

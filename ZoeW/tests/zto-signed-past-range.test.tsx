@@ -18,7 +18,7 @@ const KEY = 'f1-proxy-key';
 const DAY = 86400000;
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY).toISOString().slice(0, 10);
 const CFG = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key', headerValue: KEY,
-    url: 'https://fn.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' };
+    url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
 let rowsUp: any[] = [];
 const upstream: string[] = [];
 
@@ -42,7 +42,7 @@ beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);
         if (href.includes(fx.CERTS_HOST)) return new Response(JSON.stringify({ [fx.TEST_KID]: fx.TEST_CERT_PEM }), { status: 200 });
-        if (href.includes('fn.invalid')) {
+        if (href.startsWith(window.location.origin + '/.netlify/functions/zto-order-detail')) {
             const q: any = {};
             new URL(href).searchParams.forEach((v, k) => { q[k] = v; });
             const h: any = {};

@@ -1162,6 +1162,9 @@
     "ZoeW/src/app/behaviors/ios-viewport.ts": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/behaviors/modal-focus-trap.ts": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/behaviors/modal-keyboard.ts": {
       "policy": "zoew-react-ui"
     },
@@ -1870,7 +1873,16 @@
     "ZoeW/tests/orientation-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-page-tap-probe.test.ts": {
+    "ZoeW/tests/ios-accessory-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ios-page-field-raise.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-remind-days.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/firebase-loader-gate.test.ts": {
@@ -1892,6 +1904,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/health-advice.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-no-backend.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-token-origin.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/history-paging.test.tsx": {
@@ -2009,6 +2027,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-search-resnap.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/modal-focus-trap.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/modal-keyboard.test.tsx": {

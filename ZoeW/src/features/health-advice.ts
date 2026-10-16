@@ -11,8 +11,11 @@ export const HEALTH_ADVICE_LABELS = {
     script: 'កំណែ Apps Script (Lookup)',
     license: 'អាជ្ញាប័ណ្ណ',
     shop: 'ហាង (Supabase)',
-    lookup: 'Lookup អតិថិជន'
+    lookup: 'Lookup អតិថិជន',
+    backend: 'Server (Firebase · Supabase)'
 };
+
+export const HEALTH_NO_BACKEND_TEXT = 'មិនទាន់កំណត់ Config — App ភ្ជាប់បាន Server ២ ប្រភេទ ៖ Firebase ឬ Supabase (តាមអ្វីដែលអ្នកលក់ផ្តល់)';
 
 function rowKind(row) {
     const label = String(row && row.label || '');
@@ -24,7 +27,7 @@ function rowKind(row) {
     if (label === HEALTH_ADVICE_LABELS.script) return 'script';
     if (label === HEALTH_ADVICE_LABELS.license || label === HEALTH_ADVICE_LABELS.shop) return 'license';
     if (label.indexOf(HEALTH_ADVICE_LABELS.lookup) === 0) return 'lookup';
-    if (label === 'Firebase' || label === 'Supabase') return 'database';
+    if (label === 'Firebase' || label === 'Supabase' || label === HEALTH_ADVICE_LABELS.backend) return 'database';
     return '';
 }
 
@@ -33,6 +36,7 @@ function detailHas(row, text) {
 }
 
 function databaseStep(row) {
+    if (detailHas(row, HEALTH_NO_BACKEND_TEXT)) return 'បើក ☰ ➜ Config / Reconfig ៖ 📷 ស្កេន QR ឬបិទភ្ជាប់ Setup Link ពីអ្នកលក់ (App ស្គាល់ Firebase ឬ Supabase ដោយខ្លួនឯង) · ឬ «✍️ បំពេញ Config ដោយដៃ» ➜ Firebase ៖ Config ពី Firebase Console + Activation Key · Supabase ៖ Project URL + Publishable key រួចចូលគណនីហាង ឬចុះឈ្មោះដោយលេខកូដអញ្ជើញ';
     if (detailHas(row, 'មិនទាន់ភ្ជាប់ម្តងណាទេ')) return 'បើក Config (☰ ➜ Config / Reconfig) ហើយផ្ទៀងផ្ទាត់ Setup Link ឬ QR របស់អ្នកលក់ — App មិនដែលភ្ជាប់ ' + row.label + ' ម្តងណាទេ';
     if (detailHas(row, 'ងាប់ស្ងាត់')) return 'ការតភ្ជាប់ ' + row.label + ' ងាប់ស្ងាត់ — App កំពុងភ្ជាប់ឡើងវិញដោយខ្លួនឯង · បើយូរជាង ១ នាទី សូមទាញចុះ Refresh ម្តង';
     if (detailHas(row, 'មិនទាន់ផ្ទៀងផ្ទាត់')) return 'មានការសរសេរដែលផ្ទៀងផ្ទាត់មិនបាន — សូមផ្ទៀងផ្ទាត់លេខក្នុងតារាង រួចចុច «ពិនិត្យម្តងទៀត» · នៅជាប់ដដែល ➜ ☰ ឧបករណ៍ ➜ «លុបការសរសេររង់ចាំ» (PIN)';

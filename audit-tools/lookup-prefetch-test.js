@@ -522,6 +522,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         // ⛔ `attemptAutoLookup()` ពិតហៅ `addZtoIdentityHeader()` (ID token ទៅ Function ZTO) ➜ helper ពិតចូល sandbox ៖ គ្មាន `fb`/`auth` ➜
         //    `ztoIdToken()` ពិតឆ្លើយ '' ➜ សំណើចេញគ្មាន token (ការវាស់ token ៖ `ZoeW/tests/zto-detail-identity.test.ts`)
         vm.runInContext(sliceFn('ztoIdToken') || '', ctx);
+        ['bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted'].forEach((n) => vm.runInContext(sliceFn(n) || '', ctx));
         vm.runInContext(sliceFn('addZtoIdentityHeader') || '', ctx);
         vm.runInContext(sliceFn('ztoAccountSignedIn') || '', ctx);
         vm.runInContext(sliceFn('ztoIdentityRefusalIsTransient') || '', ctx);

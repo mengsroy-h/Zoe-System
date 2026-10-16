@@ -91,7 +91,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date(NOW));
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
     h.calls.length = 0;
@@ -215,7 +215,7 @@ describe('ZTO-E1 ៖ ការសម្អាត ៧ ថ្ងៃរង់ចា
 
     it('ទិសផ្ទុយ ៖ Fast Mode បិទ (កុងតាក់ ZTO លាក់) ➜ មិនរង់ចាំ', () => {
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: false,
-            url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
         dataState.scanHistory = [openItem('off2', 'ZTE4000002', 8 * DAY)];
         cleanupNow();
         expect(abandoned('off2')).toBe(true);

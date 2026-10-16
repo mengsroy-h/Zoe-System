@@ -52,7 +52,7 @@ vi.mock('../src/features/scan-action', () => ({
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const RANGE = { from: '2026-10-03', to: '2026-10-06' };
-const CFG = { enabled: true, fastMode: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' };
+const CFG = { enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 function row(barcode: string, extra: any = {}) {

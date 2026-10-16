@@ -370,7 +370,20 @@ export function createPushService(deps) {
             while (next.length > PUSH_SUBS_PER_KEY_MAX) dropped.push(next.shift());
             return next;
         });
-        if (!index) return { ok: false, status: 503, reason: 'index:busy' };
+        if (!index) {
+            let listed = false;
+            try {
+                const cur = await readJson('bykey/' + lic.keyId);
+                listed = !!(cur && cur.data && Array.isArray(cur.data.subs) && cur.data.subs.indexOf(key) !== -1);
+            } catch (e) {}
+            if (!listed) {
+                try {
+                    if (existing && existing.data) await store.setJSON(key, existing.data);
+                    else await store.delete(key);
+                } catch (e) {}
+            }
+            return { ok: false, status: 503, reason: 'index:busy' };
+        }
         await Promise.all(dropped.map((k) => store.delete(k).catch(() => {})));
         if (existing && existing.data && existing.data.keyId && existing.data.keyId !== lic.keyId) {
             await updateIndex(existing.data.keyId, (list) => list.filter((k) => k !== key));

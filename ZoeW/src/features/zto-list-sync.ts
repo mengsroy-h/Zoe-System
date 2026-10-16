@@ -17,6 +17,7 @@ import { applyBarcodeCloseChange } from './barcode-ops';
 import { isPinFlowPending } from './config';
 import { safeLookupReason } from './customer-table-prefetch';
 import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
+import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
@@ -338,6 +339,12 @@ export async function fetchZtoListPage(cfg, from, to, page, mode?) {
     const session = captureZtoSession();
     const url = buildZtoListApiUrl(cfg, from, to, page, mode);
     if (!url) return null;
+    if (!ztoIdentityTargetTrusted(url)) {
+        const untrusted: any = new Error('ZTO_LIST_NOT_CONFIGURED');
+        untrusted.listReason = 'host:untrusted';
+        untrusted.notConfigured = true;
+        throw untrusted;
+    }
     const headers = await buildLookupRequestHeaders(cfg);
     if (!session.current()) return null;
     const idToken = await ztoIdToken();

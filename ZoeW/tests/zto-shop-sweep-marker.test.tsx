@@ -48,7 +48,7 @@ const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
 const MIN = 60 * 1000;
 const PATH = 'zoew_settings/zto_signed_sweep';
-const ZTO_CFG = JSON.stringify({ enabled: true, fastMode: true, url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' });
+const ZTO_CFG = JSON.stringify({ enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const M = shop as any;
 const HOLD_MAX = zto.ZTO_ABANDON_HOLD_MAX_MS;

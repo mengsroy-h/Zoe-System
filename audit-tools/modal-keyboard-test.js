@@ -767,6 +767,25 @@ const SIZES = [
                     const still = await page.evaluate((m) => openModalIds().includes(m), id);
                     check(still, '⛔ ' + id + ' (noDismiss) ៖ ចុចផ្ទៃងងឹត (ជ្រុង · ចំហៀង · ក្រោម keyboard) និង Escape ➜ នៅបើក', String(still));
                 }
+                // ⛔ keyboard (កុំព្យូទ័រ · keyboard Bluetooth · ម៉ាស៊ីនស្កេនផ្ញើ Tab) ៖ Tab/Shift+Tab ពីប្រអប់ចាក់សោ មិនត្រូវទៅប៊ូតុងទំព័រខាងក្រោយ (☰ · 🔔 · តម្រង)
+                //    ➜ Enter មិនបើក/ធ្វើអ្វីខាងក្រោយ (ផ្ទាំង Activate ពេល Key ត្រូវដកហូត ៖ ទិន្នន័យនៅលើទំព័រ)
+                for (const id of ['loginModal', 'activationModal', 'pinModal', 'pinSetupModal']) {
+                    await openGate(id);
+                    await page.evaluate(({ id, sel }) => { const f = document.getElementById(id).querySelector(sel); if (f) f.focus({ preventScroll: true }); }, { id, sel: FIELD_SELECTOR });
+                    const outside = [];
+                    for (const key of ['Tab', 'Shift+Tab']) {
+                        for (let i = 0; i < 14; i++) {
+                            await page.keyboard.press(key);
+                            const where = await page.evaluate((m) => { const a = document.activeElement; const inside = !!a && (a === document.body || document.getElementById(m).contains(a)); return inside ? null : (a.id || a.tagName); }, id);
+                            if (where) outside.push(key + ' ' + where);
+                        }
+                    }
+                    await page.keyboard.press('Enter');
+                    await settle(page, 200);
+                    const after = await page.evaluate((m) => ({ open: openModalIds(), drawer: uiState.drawerOpen || uiState.notifyDrawerOpen, ran: window.__ran || 0, stays: openModalIds().includes(m) }), id);
+                    check(!outside.length && !after.drawer && after.ran === 0 && after.open.length === 1 && after.stays,
+                        '⛔ ' + id + ' ៖ Tab/Shift+Tab ×១៤ ➜ focus នៅក្នុងប្រអប់ (មិនទៅ ☰ · 🔔 · ប៊ូតុងទំព័រ) · Enter ➜ គ្មានអ្វីខាងក្រោយរត់', JSON.stringify({ outside: outside.slice(0, 4), after }));
+                }
                 for (const id of ['pinModal', 'pinSetupModal']) {
                     const results = [];
                     for (const how of ['tap', 'escape']) {

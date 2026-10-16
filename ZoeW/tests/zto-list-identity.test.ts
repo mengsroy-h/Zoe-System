@@ -20,7 +20,7 @@ const RETRY = 'សាកម្ដងទៀត';
 beforeEach(() => {
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
-        url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}' }));
+        url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
     clearCustomerDataTableCache();
     ztoState.ztoListSyncInFlight = false;

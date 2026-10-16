@@ -124,7 +124,11 @@ describe('iPhone ៖ ចុចកន្លែងវាយ Barcode ➜ ទំព�
         expect(capture).toHaveBeenCalledTimes(1);
         const [err, extra] = capture.mock.calls[0];
         expect(String(err.message)).toBe('iOS page moved after a barcode field tap');
-        expect(extra).toMatchObject({ zone: 'ui', context: 'iosPageTap caught document', dx: 2, dy: 1, ms: 90, fieldTop: 290, fieldBottom: 320, innerHeight: 844, scrollY: 48, viewportTop: 0, focused: 0, tapped: 0, keyboard: 0 });
+        expect(extra).toMatchObject({ zone: 'ui', context: 'iosPageTap caught document', dx: 2, dy: 1, ms: 90, fieldTop: 290, fieldBottom: 320, innerHeight: 844, scrollY: 48, viewportTop: 0, focused: 0, tapped: 0, keyboard: 0,
+            viewportHeight: 844, stillFocused: 1 });
+        expect(extra.afterMs).toBeGreaterThanOrEqual(0);
+        expect(extra.afterMs).toBeLessThanOrEqual(modalKeyboard.PAGE_TAP_PROBE_MS);
+        expect(typeof extra.docHeight).toBe('number');
         for (const value of Object.values(extra)) expect(['string', 'number']).toContain(typeof value);
         expect(JSON.stringify(extra)).not.toContain('0123456789');
     });

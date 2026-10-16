@@ -343,12 +343,16 @@ describe('ប្រអប់ ⟷ keyboard ៖ listener · state · DOM (Modal �
     });
 
     it('⛔ ទីតាំងដើមវាស់ពេលមិនទាន់តម្រូវ ហើយរក្សាទុក (keyboard ប្តូរកម្ពស់មិនវាស់ប្រអប់ដែលបានតម្រូវ) · ប្រអប់ដែលនៅពីលើ keyboard ➜ គ្មាន .modal-kb', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         const { content } = openLong();
         await settle();
         byId('mkField').focus();
         keyboard(336);
         box(content, 63, 437);
         keyboard(300);
+        expect(uiState.modalKeyboardFit!.max).toBe(844 - 336 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12);
+        vi.advanceTimersByTime(modalKeyboard.IOS_KEYBOARD_SETTLE_MS);
+        vi.useRealTimers();
         expect(uiState.modalKeyboardFit).toEqual({ id: 'manualAdjustModal', top: 12, max: 844 - 300 - modalKeyboard.MODAL_KEYBOARD_GAP_PX - 12, shift: 0 });
         keyboard(0);
         box(content, 300, 150);

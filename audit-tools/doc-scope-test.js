@@ -748,12 +748,78 @@ function readShellSources(dir, out) {
 }
 const shellText = SOURCE_DIRS.map((d) => path.join(ROOT, d))
     .reduce((acc, dir) => readShellSources(dir, acc), []).join('\n');
+// ⛔ ច្បាប់ក៏យោង function **SQL** របស់ Supabase ដែរ (ឧ. `zoe_merge()` · `zoe_json_object()` ដែលហៅតែក្នុង SQL) ➜ ស្កេន
+// `supabase/migrations/*.sql` **តាមលំដាប់ migration** ៖ migration ជា append-only ➜ ឈ្មោះដែល migration ចាស់បង្កើត ហើយ
+// migration ក្រោយ `drop function` នៅតែលេចជាអក្សរ ➜ «រស់» ត្រូវវាស់ពីស្ថានភាពចុងក្រោយ មិនមែនវត្តមានអក្សរ។ overload (ឈ្មោះដដែល
+// អាគុយម៉ង់ផ្សេង) ៖ `drop function x(a, b)` សម្លាប់តែ arity នោះ · `drop function x` គ្មានវង់ក្រចក សម្លាប់ទាំងអស់។
+function sqlTopLevelArity(args) {
+    let depth = 0;
+    let commas = 0;
+    for (const ch of args) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        else if (ch === ',' && depth === 0) commas++;
+    }
+    return args.trim() ? commas + 1 : 0;
+}
+function sqlArgsAt(text, open) {
+    let depth = 0;
+    for (let i = open; i < text.length; i++) {
+        if (text[i] === '(') depth++;
+        else if (text[i] === ')' && --depth === 0) return text.slice(open + 1, i);
+    }
+    return '';
+}
+function sqlFunctionsAliveIn(sqlTexts) {
+    const alive = new Map();
+    const re = /\b(create(?:\s+or\s+replace)?|drop)\s+function\s+(?:if\s+exists\s+)?(?:"?[A-Za-z_][A-Za-z0-9_]*"?\.)?"?([A-Za-z_][A-Za-z0-9_]*)"?\s*(\()?/gi;
+    sqlTexts.forEach((text) => {
+        let m;
+        re.lastIndex = 0;
+        while ((m = re.exec(text))) {
+            const name = m[2].toLowerCase();
+            const set = alive.get(name) || new Set();
+            const arity = m[3] ? sqlTopLevelArity(sqlArgsAt(text, m.index + m[0].length - 1)) : null;
+            if (/^create/i.test(m[1])) set.add(arity);
+            else if (arity === null) set.clear();
+            else set.delete(arity);
+            alive.set(name, set);
+        }
+    });
+    return new Set([...alive].filter(([, set]) => set.size > 0).map(([name]) => name));
+}
+const sqlMigrationDir = path.join(ROOT, 'supabase', 'migrations');
+const sqlMigrationTexts = (() => {
+    try {
+        return fs.readdirSync(sqlMigrationDir).filter((n) => /\.sql$/.test(n)).sort()
+            .map((n) => fs.readFileSync(path.join(sqlMigrationDir, n), 'utf8'));
+    } catch (_) { return []; }
+})();
+const sqlFunctionsAlive = sqlFunctionsAliveIn(sqlMigrationTexts);
 function nameIsDefined(name) {
     return new RegExp('(?:function|const|let|var|class)\\s+' + name + '\\b').test(sourceText)
         || new RegExp('\\b' + name + '\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()').test(sourceText)
         || new RegExp('\\.' + name + '\\s*\\(').test(sourceText)
-        || new RegExp('^\\s*' + name + '\\s*\\(\\)\\s*\\{', 'm').test(shellText);
+        || new RegExp('^\\s*' + name + '\\s*\\(\\)\\s*\\{', 'm').test(shellText)
+        || sqlFunctionsAlive.has(name.toLowerCase());
 }
+check(sqlMigrationTexts.length >= 10 && sqlFunctionsAlive.size >= 40,
+    'ជាន់អប្បបរមា ៖ អាន migration Supabase តាមលំដាប់ ហើយរកឃើញ function SQL រស់ពិត',
+    'migration ' + sqlMigrationTexts.length + ' · function រស់ ' + sqlFunctionsAlive.size);
+(function sqlAliveProbe() {
+    const probe = sqlFunctionsAliveIn([
+        'create or replace function private.p_gone(a jsonb) returns int as $$ select 1 $$;\n'
+        + 'create function public.p_over(a jsonb, b numeric(10,2)) returns int as $$ select 1 $$;\n'
+        + 'create function public.p_over(a jsonb) returns int as $$ select 1 $$;\n'
+        + 'create function private.p_back() returns int as $$ select 1 $$;',
+        'drop function private.p_gone(jsonb);\ndrop function if exists public.p_over(jsonb, numeric(10,2));\n'
+        + 'drop function private.p_back;',
+        'create or replace function private.p_back() returns int as $$ select 2 $$;'
+    ]);
+    check(!probe.has('p_gone') && probe.has('p_over') && probe.has('p_back') && probe.size === 2,
+        'probe SQL ទិសទាំង ២ ៖ drop ក្រោយ create ➜ ស្លាប់ · drop overload មួយ ➜ overload ផ្សេងនៅរស់ · បង្កើតឡើងវិញ ➜ រស់',
+        [...probe].join(' · '));
+})();
 // ⛔ ស្កេន **រាល់ការហៅក្នុង backtick** មិនត្រឹម `x()` ទទេ ៖ ច្បាប់ភាគច្រើន
 // សរសេរ helper ជាមួយអាគុយម៉ង់ (`emptyViewMessage(pathKeys, emptyText)`) ➜
 // ការទាមទារវង់ក្រចកទទេ បន្សល់ **៤៣** ឈ្មោះក្រៅការយាម។

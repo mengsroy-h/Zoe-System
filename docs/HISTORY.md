@@ -5112,6 +5112,7 @@ Project · Rules · គណនី Login ដោយដៃក្នុងមួយ�
 | A156 | **Supabase ៖ ចំណាយការ៉េក្នុង `zoe_apply` · rules (A154 ពិនិត្យលម្អិត)** | Postgres 17 ពិត · ហាងមួយ ៖ ប្រភព ៖ `zoe_canon` (`result \|\| jsonb_build_object` មួយៗ) · ctx ផ្ទុក `pre` ចម្លងរាល់ node (`p_ctx \|\| …`) · `zoe_snap_val` អានឯកសារពីតារាងរាល់ leaf · `.validate` កម្រិត root ប្រមូល root ទាំងមូលរាល់ op · `jsonb_set` លើ `work` ទាំងមូលរាល់ op · ផ្លូវជាន់ O(n²)។ មុន ➜ ក្រោយ ៖ update ១០០ ផ្លូវចូលថ្ងៃ ២០០០ key ៨១៦៩ ➜ ៧៤ms · ១ key ចូលថ្ងៃ ២០០០ ១១២ ➜ ២៧ms · ឯកសារ ២០០០ key ២០៤១ ➜ ៣៣៩ms · ៤០០០ key (profile ៖ `zoe_eval` ៦៤០០៨ ➜ ៣៦០០៥ ហៅ) ១១៧១ ➜ ៥២៥ms · reconcile ១៦០ ផ្លូវ root ៣២០០០ key ៤៨៦ms · CAS root ៣២០០០ key ៥៦៧៦ms (នៅជិតពិដាន ៖ ហាង ~៤០០០/ថ្ងៃ កែតម្លៃកញ្ចប់បិទ ➜ `runTransaction` លើ root ទាំងមូលក្នុង App) · ឯកសារ 1 MB (៣០០០០ key · វាយប្រហារ) ៣៩៧៩ms ក្នុង `statement_timeout` (ការសរសេររបស់ហាងមួយរត់ម្តងមួយ ➜ ≤ ១ CPU) · ការសរសេរប៉ះឯកសារ ១០ MB ៣០៣០ms ➜ ពិដាន ៨ MiB | ✅ [2.50.94] · 💡 ជុំក្រោយ (បើហាងធំលើ Supabase) ៖ App `runTransaction` តាមថ្ងៃ ជំនួស root ចំណូលយករួចទាំងមូល |
 | A157 | **Postgres 17 ៖ `jsonb_agg` · `jsonb_object_agg` ចំណាយការ៉េតាមទំហំតម្លៃនីមួយៗ ➜ DoS ផ្លូវអាន · ហាងធំទាញពេញមិនរួច** | វាស់ ៖ តម្លៃមួយ ២០០០ · ៨០០០ · ៣២០០០ key ➜ ៥៧ · ៩២៨ · ១៥៩៨៨ms (`jsonb_build_object` · ការបម្លែងតាម text ៖ ២ · ៨ · ៣៨ms / ៣ · ១២ · ៦៩ms) ➜ `zoe_pull`/`zoe_read` ឯកសារ 1 MB ម្តង ≈ ១៦ វិ. (ការអានមិនជាប់ tenant lock ➜ ស្របគ្នាច្រើន CPU) · ហាង ~៤០០០ barcode/ថ្ងៃ (ឯកសារ pickup ប្រចាំថ្ងៃរក្សាទុកជានិច្ច) ៖ ទំព័រ pull ពេញលើស ៨ វិ. ➜ ឧបករណ៍ថ្មីមិនអាចទាញ។ ក្រោយ ៖ `zoe_read` ឯកសារ 1 MB ១២១ms · ឯកសារ ២០០០០ key ២ ៦៦ms · ទាញពេញ ~១២ MB ២ ទំព័រ (យឺតបំផុត < ១ វិ.) | ✅ [2.50.94] ៖ object/array សាងពី text (`zoe_json_object` · `string_agg`) · ទំព័រ `zoe_pull` ≤ 2 MiB |
 | A158 | **mutation របស់ `supabase-datastore-test` អាចធ្លាក់លើកូដស្លាប់** | `create or replace` ក្នុង migration ថ្មី ➜ anchor ចាស់នៅលេចម្តង តែប្តូរនិយមន័យដែលត្រូវជំនួស ➜ «មិនចាប់» (ឬ anchor ដូចគ្នា ២ ដង ➜ «ត្រូវលេចម្តង») · `public.zoe_write` ដើមផ្លាស់ទៅ `private` ដោយ `DO` block (ការញែកអត្ថបទមិនឃើញ) | ✅ [2.50.94] ៖ អនុវត្តនៅ occurrence ចុងក្រោយ + digest `pg_get_functiondef` · policy · ACL · trigger ត្រូវប្រែ (mutation ដែលមិនប្រែនិយមន័យរស់ ➜ FAIL) |
+| A159 | **`doc-scope-test` ៖ function SQL ដែលហៅតែក្នុង SQL ត្រូវចាត់ថា «លែងមាន» · លិបិក្រមខ្វះផ្នែក ១ របស់ `supabase-data-tools-test`** | run-all STRICT ពេញលើ `56a3709` ➜ ឆ្លង ២១០ · មួយផ្នែក ០ · រំលង ០ · ធ្លាក់ ២ ៖ (១) `doc-scope-test` ៖ `CLAUDE.md` យោង `zoe_merge()` · `zoe_json_object()` ដែលប្រកាសតែក្នុង `supabase/migrations/*.sql` ➜ ការរកការប្រកាសអានតែ JS/shell ➜ «លែងមានក្នុងកូដ» (false positive) · ជួរលិបិក្រម `supabase-data-tools-test` ខ្វះ «ផ្នែក ១» (ឈ្មោះថ្មីក្នុង [2.50.94]) · (២) `ui-flow` ៖ Playwright «Resulting promise was garbage collected» ពេល CPU រវល់ (`toggleCloseStatus` · លំនាំ harness ដដែលនឹងផ្នែក ២ ខាងក្រោម) ➜ រត់ម្នាក់ឯង ៩០/៩០ · រត់ម្តងទៀតក្នុង run-all ➜ ឆ្លង | ការរកការប្រកាសអាន migration **តាមលំដាប់** (`sqlFunctionsAliveIn()` ៖ `create` ➜ រស់ · `drop function x(…)` សម្លាប់តែ arity នោះ · `drop function x` សម្លាប់ទាំងអស់ · បង្កើតឡើងវិញ ➜ រស់) ព្រោះ migration append-only ➜ វត្តមានអក្សរមិនមែនភស្តុតាង · ជាន់ ≥ ១០ migration · ≥ ៤០ function · probe ទិសទាំង ២ · mutation ៖ យោង `zoe_rule_true()` (drop ក្នុង migration ចុងក្រោយ) ➜ **FAIL** «លែងមានក្នុងកូដ ៖ zoe_rule_true» · ស្តារ ➜ PASS ១០១ · លិបិក្រមបង្កើតឡើងវិញ (៣៨៥ ជួរ) |
 | A155 | **ចំណុចតូច/ការណែនាំ (audit សុវត្ថិភាព)** | `?list=1` Project មិនចងសាខា ជឿអ៊ីមែល (ម្ចាស់គម្រោង ៖ ចង env) · `/detail` `ZTO_DETAIL_IDENTITY=off` លំនាំដើម · cache «រកមិនឃើញ» បត់អក្សរធំ/តូច (≤ ១២០ វិ.) · កូដ Setup Link ៦ ខ្ទង់ (ម្ចាស់គម្រោង ៖ ទុក) · PIN/Signing Key ៖ PBKDF2 salt ថេរ (ត្រូវចូលឧបករណ៍) · APK គ្មាន CSP · កៅអី License ៖ device ID អានបាន (ត្រូវ devtools) · admin Supabase គ្មាន MFA · FileProvider ធំជាងត្រូវការ · APK updater មិនពិនិត្យ cert ផ្ទាល់ (Android ពិនិត្យរួច) | មិនកែក្នុងជុំនេះ — ការសម្រេចម្ចាស់គម្រោង ឬជុំបន្ទាប់ (មើល PR #322) |
 
 ### 2026-10-15 — សំណើម្ចាស់គម្រោងលើ 2.50.81 (`b86ed08`) ៖ «ផ្ទៀងផ្ទាត់ការងារ និង តេស្តឡើងវិញ app ទាំងមូល»
@@ -7553,14 +7554,15 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `emu/money-multidevice-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `emu/license-seat-rules-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៥ |
+| `emu/money-multidevice-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/restore-deadlock-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ២ | ផ្នែក ៦ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
@@ -7644,8 +7646,8 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `react-view` | ផ្នែក ១ | ផ្នែក ៦ |
 | `reconnect-ladder-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-orphan-list` | ផ្នែក ១ | ផ្នែក ១ |
+| `registry-orphan-list-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `registry-release-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ |
@@ -7682,7 +7684,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `strip-comments` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៦ |
 | `supabase-app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `supabase-data-tools-test` | ផ្នែក ២ | — |
+| `supabase-data-tools-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-datastore-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-docs-cache-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-fake-server` | ផ្នែក ២ | — |
@@ -7723,44 +7725,60 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/activation-retry.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/adaptive-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/app-icon-logo.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/backend-switch-detach.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/batch-scan.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/barcode-origin.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/batch-scan.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-android-prf.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/biometric-no-device-mode.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/chrome-autohide-intent.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-applied-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-deduct-order.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-journal-cap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-ledger-key.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/cleanup-resume-session.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/cleanup-sweep-batch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/device-info.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-backend-switch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/exchange-rate-shop-switch.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/firebase-loader-gate.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/forbidden-zone-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/hardware-scanner.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/history-paging.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/history-patch-late-commit.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-accessory-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-entry-search-tap.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-keyboard-pan.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/ios-page-field-raise.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-pulldown.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-resnap.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/ios-search-tap-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ios-search-viewport.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ios-synthetic-click-focus.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/keyboard-tabbar.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/label-image.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/label-print.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/late-commit-stale-session.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-not-applied-retry.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-op-ring.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7781,18 +7799,24 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/modal-focus-trap.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/modal-keyboard.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/more-menu-scroll.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/app-lock-away.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/immediate-ui.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/native-back.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/native/render-crash.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/status-bar-tone.test.ts` | — | ផ្នែក ៦ |
 | `ZoeW/tests/native/zto-preflight.test.ts` | — | ផ្នែក ៦ |
+| `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/network-toast.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notifications.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/notify-apk-link.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -7806,30 +7830,35 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/search-glide-hold.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/seller-notices.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/audit-checker-outcomes.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/audit-lifecycle.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/barcode-key-encoding.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-expiry-race.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/session-switch-fuzz.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-settings.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-bound-ui-refresh.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/shop-device-note.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/shop-pending-cleanup.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-account.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-auth-unavailable.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-clock-skew.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-cross-tab-signout.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-gateway-5xx.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-notify-dirty.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-offline-restore.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-op-retention.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-pull-paging.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-realtime-ws.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-signout-offline.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-signout-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-signout-stage.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/supabase-sync-owner.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-tenant-switch.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-transport-hang.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/supabase-tx-outcome.test.ts` | ផ្នែក ១ | — |
@@ -7837,6 +7866,7 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/supabase-update-contract.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/supabase-write-bad-body.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/sw-revalidation-timeout.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/tenant-app-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-backend.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-live-expiry.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
@@ -7855,58 +7885,17 @@ mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិ�
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-list-origin.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
+| `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-shop-sweep-marker.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-cadence.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-mismatch.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-only-import.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-only-purge.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-past-range.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-signed-sync.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/setup-lookup.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/ios-history-bottom.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/auth-flow-race.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/session-expiry-race.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/supabase-realtime-race.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/supabase-sync-owner.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/tenant-app-session.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/exchange-rate-completion-race.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/supabase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-
-| `ZoeW/tests/firebase-auth-write-ownership.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-
-| `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/connection-request-owner.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/durable-connection-write.test.ts` | ផ្នែក ១ | — |
-
-| `ZoeW/tests/native-durable-write.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/native-recovery-plain-cas.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/native-receipt-retention.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/supabase-journal-recovery.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/supabase-ledger-replay-companion.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/connection-scope-discovery.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/discard-pending-writes.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/hardware-scanner.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/health-advice.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/health-no-backend.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-
-| `ZoeW/tests/ledger-native-retry-identity.test.ts` | ផ្នែក ១ | — |
-| `ZoeW/tests/network-toast-phase.test.tsx` | ផ្នែក ១ | — |

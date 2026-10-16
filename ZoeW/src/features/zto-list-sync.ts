@@ -73,14 +73,8 @@ export function ztoListSkipText(reason) {
     return Object.prototype.hasOwnProperty.call(ZTO_LIST_SKIP_TEXT, key) ? ZTO_LIST_SKIP_TEXT[key] : '';
 }
 
-export const ZTO_PALM_NO_LIST_TEXT = 'ℹ️ របៀប Palm គ្មានបញ្ជីកញ្ចប់មកដល់ទេ ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ប្រើបានតែរបៀប Cookie';
-
-export function ztoListPalmMode() {
-    return lookupApiIsPalm(ztoStatusFeatureConfig());
-}
-
 export function ztoListSyncEnabled() {
-    return ztoFastModeIsOn() && !ztoListPalmMode()
+    return ztoFastModeIsOn()
         && safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1';
 }
 
@@ -88,7 +82,7 @@ export function refreshZtoListSyncUi() {
     const on = ztoListSyncEnabled();
     viewState.ztoListSyncText = on ? 'បើក' : 'បិទ';
     viewState.ztoListSyncOn = on;
-    viewState.ztoListSyncDrawerVisible = ztoFastModeIsOn() && !ztoListPalmMode();
+    viewState.ztoListSyncDrawerVisible = ztoFastModeIsOn();
     viewState.ztoListSyncBtnVisible = !!(on && ztoStatusFeatureConfig());
 }
 
@@ -96,11 +90,6 @@ export function drawerZtoListSyncFlow() {
     drawerAction(function () {
         if (!ztoFastModeIsOn()) {
             showToast(ZTO_FAST_MODE_HINT);
-            return;
-        }
-        if (ztoListPalmMode()) {
-            refreshZtoListSyncUi();
-            showToast(ZTO_PALM_NO_LIST_TEXT);
             return;
         }
         if (!ztoListSyncEnabled()) {
@@ -400,7 +389,8 @@ export function ztoListPositiveCount(value) {
 }
 
 export async function fetchZtoListAllPages(cfg, from, to) {
-    const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
+    const pageLimit = lookupApiIsPalm(cfg) ? 1000 : ZTO_LIST_CLIENT_MAX_PAGES;
+    const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, pageLimit, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
         signedMismatchTexts: [], signedDescExpected: [], signedState: 'none' };
     let arrivalTotals = 0;
     const absorb = (body, arrival) => {
@@ -412,7 +402,8 @@ export async function fetchZtoListAllPages(cfg, from, to) {
         if (arrival) {
             for (let i = 0; i < body.rows.length; i++) out.rows.push(body.rows[i]);
             const reportedTotal = Number(body.total);
-            if (isFinite(reportedTotal) && reportedTotal > out.total) out.total = reportedTotal;
+            if (body.pageTotal === true && isFinite(reportedTotal)) out.total += Math.max(0, reportedTotal);
+            else if (isFinite(reportedTotal) && reportedTotal > out.total) out.total = reportedTotal;
             if (isFinite(reportedTotal) && reportedTotal > 0) arrivalTotals += reportedTotal;
             const other = Number(body.otherScans);
             if (isFinite(other) && other > 0) out.otherScans += other;
@@ -443,8 +434,8 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     let readSigned = first.signedOk === true ? 1 : 0;
     let signedFailed = false;
     for (;;) {
-        const last = Math.min(out.pages, ZTO_LIST_CLIENT_MAX_PAGES);
-        const signedLast = signedFailed ? readSigned : Math.min(signedPages, ZTO_LIST_CLIENT_MAX_PAGES);
+        const last = Math.min(out.pages, pageLimit, readArrival + 3);
+        const signedLast = signedFailed ? readSigned : Math.min(signedPages, pageLimit, readSigned + 3);
         if (last <= readArrival && signedLast <= readSigned) break;
         const signedFrom = Math.max(last, readSigned) + 1;
         const arrivalWork = [];
@@ -484,12 +475,13 @@ export async function fetchZtoListAllPages(cfg, from, to) {
         }
         readArrival = Math.max(readArrival, last);
         readSigned = Math.max(readSigned, signedLast);
-        if (!arrivalOpen && !signedOpen) break;
+        if (!arrivalOpen && !signedOpen && readArrival >= Math.min(out.pages, pageLimit)
+            && readSigned >= Math.min(signedPages, pageLimit)) break;
     }
     if (metaless) out.total = Math.max(out.total, arrivalTotals);
     if (first.signedOk === true) {
         out.signedState = signedFailed ? 'partial'
-            : (signedPages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok');
+            : (signedPages > pageLimit ? 'partial' : 'ok');
     } else if (first.signed === null) {
         out.signedState = 'off';
     } else if (first.signedOk === false) {
@@ -539,7 +531,7 @@ export function renderZtoListSyncPreview() {
     };
     ztoState.touch();
     const truncated = result.truncated
-        ? ' · ⚠️ បញ្ជីវែងជាង ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
+        ? ' · ⚠️ បញ្ជីមិនទាន់ពេញ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
         : '';
     const bornClosed = groups.fresh.filter((row) => row.closedAtZto === true && !row.signedOnly).length;
     const signedOnly = groups.fresh.filter((row) => row.signedOnly).length;
@@ -592,11 +584,6 @@ export async function runZtoListSyncPreview() {
         showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
         return;
     }
-    if (lookupApiIsPalm(cfg)) {
-        setZtoListSyncNote(ZTO_PALM_NO_LIST_TEXT);
-        showToast(ZTO_PALM_NO_LIST_TEXT);
-        return;
-    }
     if (ztoStatusSecretIsLocked(cfg)) {
         showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីទាញបញ្ជីពី ZTO');
         if (!isPinFlowPending()) requestPinBeforeConfig(openZtoListSyncModal, 'ztoListSync');
@@ -633,7 +620,7 @@ export async function runZtoListSyncPreview() {
             from: range.from,
             to: range.to,
             total: pulled.total || rows.length,
-            truncated: pulled.pages > ZTO_LIST_CLIENT_MAX_PAGES,
+            truncated: pulled.pages > pulled.pageLimit,
             site: pulled.site,
             siteName: pulled.siteName,
             otherScans: pulled.otherScans,
@@ -908,11 +895,6 @@ export function openZtoListSyncModal() {
     }
     if (!ztoFastModeIsOn()) {
         showToast(ZTO_FAST_MODE_HINT);
-        return;
-    }
-    if (ztoListPalmMode()) {
-        refreshZtoListSyncUi();
-        showToast(ZTO_PALM_NO_LIST_TEXT);
         return;
     }
     if (!ztoListSyncEnabled()) {

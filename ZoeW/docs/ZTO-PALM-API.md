@@ -46,10 +46,11 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | គ្មាន endpoint អានបញ្ជីស្កេនមកដល់ក្នុង App Palm (`queryTrackInfo` ម្តងមួយកញ្ចប់) | មិនប្រើ ៖ ប្រើបានតែរបៀប Cookie (`palm:no-arrival-list`) |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · អានទំព័របន្ត · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
 | បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1&signed=1` · `exact=1`) |
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
-| ស្ថានភាពកញ្ចប់មួយ (`/detail` `ztoClosed`) | `queryDispatchList` + `billCode` · ឬ `queryTrackInfo` | មិនទាន់ប្រើ ៖ វាស់ចម្លើយពិតមុន (គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា» ក្នុងរបៀប Palm) |
+| ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |
+| ប្រភព VN · CN · ផ្សេងៗ | `recSite`/`customerCodeDesc` បើមាន; បើគ្មាន ឈ្មោះទីទទួលដើម `action: "1"` ពី `msgLoc`/`msgEng`/`siteName` | រក្សា `from` ទាំងជួរមកដល់ និងចុះហត្ថលេខា · មិនច្រោះតាមប្រទេសគោលដៅ |
 | រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | ជម្រើស |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |
 
@@ -213,3 +214,1047 @@ method · path · field request · ប្រភេទ `result` · field response
 - `/zto/shopee/scan/v1/queryCount` ➜ `ShopeeScanCompareCountRPTO` ៖ `forecastQty` · `isDiff` · `overQty` · `scanQty` · `waitQty`
 - `/zto/sms/v1/querySmsConfigStatus` ➜ `List‹SmsConfigRPTO›` ៖ `countryCode` · `dataSource` · `sendType` · `status` · `userName`
 - `/zto/wcs/v1/getWCSKey` ➜ `KHSortingLineBaseInfo` ៖ `secretKey` · `time` · `timeZone` · `urlPrefix`
+
+## វាលពេញលេញនៃ request/response model ពី APK
+
+បញ្ជីនេះស្រង់ឈ្មោះ និងប្រភេទ field ដែលប្រកាសពិតពី DEX របស់ APK ហើយផ្ទៀង generic type ជាមួយកូដស្រង់។ រួមមាន package `component.http.rpto`, `component.http.rqto`, `component.http.core.base.entity` និង nested class ទាំងអស់។ Field ដែលទទួលតាម parent ត្រូវអានបន្ថែមក្នុង model parent។ `static` និង callback របស់ UI កត់សម្គាល់ដាច់ដោយឡែក; វាមិនស្មើថាជា field ក្នុង JSON របស់ server ទេ។
+
+ផ្ទៀងបាន **63 model/class · 573 field ដែលប្រកាស**។ រកឈ្មោះ model ពីតារាង endpoint ខាងលើ រួចស្វែងរក heading ខាងក្រោម។ សោ និង token កត់តែឈ្មោះ field; គ្មានតម្លៃសោ។
+
+### `core.base.entity.HttpEntity`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `message` | `String` | — |
+| `result` | `T` | — |
+| `status` | `boolean` | — |
+| `statusCode` | `String` | — |
+
+### `core.base.entity.InfoEntity`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `isFirstPage` | `boolean` | — |
+| `isLastPage` | `boolean` | — |
+| `list` | `List<T>` | — |
+| `pageNum` | `int` | — |
+| `pageSize` | `int` | — |
+| `pages` | `int` | — |
+| `total` | `int` | — |
+
+### `core.base.entity.KHSortingLineHttpEntity`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `data` | `T` | — |
+| `errorMsg` | `String` | — |
+| `success` | `boolean` | — |
+
+### `rpto.AccountBalanceRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `codAccount` | `double` | — |
+| `ordinaryAccount` | `double` | — |
+
+### `rpto.BagRecycleRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `bagCode` | `String` | — |
+| `remark` | `String` | — |
+
+### `rpto.BillCodeScanCheckKHRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `errorMessage` | `String` | — |
+| `waybillResVo` | `WaybillInfoKH` | — |
+| `whetherForce` | `boolean` | — |
+
+### `rpto.BillCodeScanCheckRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `message` | `String` | — |
+| `whetherForce` | `boolean` | — |
+
+### `rpto.BillDestinationPRTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `countryCode` | `String` | — |
+| `destinationCode` | `String` | — |
+| `destinationName` | `String` | — |
+| `destinationNameEn` | `String` | — |
+| `destinationNameLang` | `String` | — |
+| `destinationNo` | `String` | — |
+
+### `rpto.BuildPkgFinishCount`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `finishCount` | `int` | — |
+
+### `rpto.CarInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `coDriverId` | `String` | — |
+| `coDriverName` | `String` | — |
+| `coMobileNum` | `String` | — |
+| `countryCode` | `String` | — |
+| `driverId` | `String` | — |
+| `driverName` | `String` | — |
+| `licensePlate` | `String` | — |
+| `mobileNum` | `String` | — |
+| `siteCode` | `String` | — |
+| `siteName` | `String` | — |
+| `status` | `Integer` | — |
+| `vehicleBarcode` | `String` | — |
+| `vehicleType` | `String` | — |
+
+### `rpto.CheckForErrorBillWarehouseRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `retreatType` | `String` | — |
+
+### `rpto.CityRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `code` | `String` | — |
+| `name` | `String` | — |
+| `nameEn` | `String` | — |
+| `nameLang` | `String` | — |
+| `select` | `boolean` | — |
+
+### `rpto.CreatePaymentPRTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `orderCode` | `String` | — |
+| `resultCode` | `String` | — |
+| `url` | `String` | — |
+
+### `rpto.DispatchBillInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `cod` | `String` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeCity` | `String` | — |
+| `consigneeCityDialect` | `String` | — |
+| `consigneeCountry` | `String` | — |
+| `consigneeDistrict` | `String` | — |
+| `consigneeDistrictDialect` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `consigneeName` | `String` | — |
+| `consigneeProvince` | `String` | — |
+| `consigneeProvinceDialect` | `String` | — |
+| `declareGoodsName` | `String` | — |
+| `deliveryNo` | `String` | — |
+| `deliveryType` | `String` | — |
+| `deliveryTypeId` | `String` | — |
+| `destinationSiteId` | `String` | — |
+| `dod` | `String` | — |
+| `expressType` | `String` | — |
+| `expressTypeId` | `String` | — |
+| `firstWayNo` | `String` | — |
+| `freightFee` | `String` | — |
+| `packageQty` | `String` | — |
+| `packageType` | `String` | — |
+| `payType` | `String` | — |
+| `recSiteId` | `String` | — |
+| `shipType` | `String` | — |
+| `shipTypeId` | `String` | — |
+| `shipperAddress` | `String` | — |
+| `shipperAddressDialect` | `String` | — |
+| `shipperCity` | `String` | — |
+| `shipperCityDialect` | `String` | — |
+| `shipperDistrict` | `String` | — |
+| `shipperDistrictDialect` | `String` | — |
+| `shipperMobile` | `String` | — |
+| `shipperName` | `String` | — |
+| `shipperProvince` | `String` | — |
+| `shipperProvinceDialect` | `String` | — |
+| `totalGoodsAmount` | `String` | — |
+| `warehouseWeight` | `Double` | — |
+
+### `rpto.DispatchListRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `isFirstPage` | `boolean` | — |
+| `isLastPage` | `boolean` | — |
+| `list` | `List<ExpressInfo>` | — |
+| `pageNum` | `int` | — |
+| `pageSize` | `int` | — |
+| `pages` | `int` | — |
+| `total` | `int` | — |
+
+### `rpto.DispatchListRPTO.ExpressInfo`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `billInfoClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `billStatus` | `String` | — |
+| `callPhoneClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `callProblemClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `callSignClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `callSmsClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `cod` | `String` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeAddressDistrict` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `consigneeName` | `String` | — |
+| `deliveryType` | `String` | — |
+| `deliveryTypeId` | `String` | — |
+| `details` | `String` | — |
+| `discountFee` | `BigDecimal` | — |
+| `dispEmpDate` | `String` | — |
+| `dispatchCount` | `byte` | — |
+| `dod` | `String` | — |
+| `goodsName` | `String` | — |
+| `grossWeight` | `String` | — |
+| `onAddressClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onPayClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onPhoneClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `registerTime` | `String` | — |
+| `reminderNum` | `long` | — |
+| `reminderStatus` | `String` | — |
+| `shipperMobile` | `String` | — |
+
+### `rpto.DispatchListVNRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `dispatchList` | `List<DispatchListRPTO.ExpressInfo>` | — |
+| `problemList` | `List<DispatchListRPTO.ExpressInfo>` | — |
+
+### `rpto.DispatchPayRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `codAll` | `String` | — |
+| `currency` | `String` | — |
+| `dodAll` | `String` | — |
+| `paymentRecordVOList` | `List<PaymentRecord>` | — |
+| `total` | `String` | — |
+
+### `rpto.DispatchPayRPTO.PaymentRecord`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `billStatus` | `String` | — |
+| `cod` | `String` | — |
+| `dod` | `String` | — |
+| `orderCode` | `String` | — |
+| `requestAmount` | `String` | — |
+| `requestTime` | `String` | — |
+| `sendTime` | `String` | — |
+| `status` | `String` | — |
+
+### `rpto.EditResultRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `editResult` | `boolean` | — |
+
+### `rpto.EmptyRPTO`
+
+មិនប្រកាស field ផ្ទាល់; អានតាម parent។
+
+### `rpto.ExpressCountRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `codCount` | `Long` | — |
+| `codTotalMoney` | `BigDecimal` | — |
+| `collect` | `Long` | — |
+| `discountFeeTotalMoney` | `BigDecimal` | — |
+| `dispatch` | `Long` | — |
+| `dodCount` | `Long` | — |
+| `dodTotalMoney` | `BigDecimal` | — |
+| `receive` | `Long` | — |
+| `signFor` | `Long` | — |
+
+### `rpto.ExpressInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `agentAmount` | `double` | — |
+| `agentServiceCharge` | `double` | — |
+| `billCode` | `String` | — |
+| `chargeWeight` | `double` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeCity` | `String` | — |
+| `consigneeCityDialect` | `String` | — |
+| `consigneeDistrict` | `String` | — |
+| `consigneeDistrictDialect` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `consigneeName` | `String` | — |
+| `consigneeProvince` | `String` | — |
+| `consigneeProvinceDialect` | `String` | — |
+| `destination` | `String` | — |
+| `discountFee` | `double` | — |
+| `fcAmount` | `double` | — |
+| `freightFee` | `double` | — |
+| `insureFee` | `double` | — |
+| `orderNo` | `String` | — |
+| `packageCollection` | `String` | — |
+| `packageType` | `String` | — |
+| `payType` | `String` | — |
+| `payTypeId` | `String` | — |
+| `phone` | `String` | — |
+| `recordingSiteCode` | `String` | — |
+| `remark` | `String` | — |
+| `remoteFee` | `double` | — |
+| `shipperAddress` | `String` | — |
+| `shipperCity` | `String` | — |
+| `shipperDistrict` | `String` | — |
+| `shipperMobile` | `String` | — |
+| `shipperName` | `String` | — |
+| `shipperProvince` | `String` | — |
+| `totalFee` | `String` | — |
+| `totalGoodsAmout` | `double` | — |
+
+### `rpto.ExpressListRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `isFirstPage` | `boolean` | — |
+| `isLastPage` | `boolean` | — |
+| `list` | `List<ExpressInfo>` | — |
+| `pageNum` | `int` | — |
+| `pageSize` | `int` | — |
+| `pages` | `int` | — |
+| `total` | `int` | — |
+
+### `rpto.ExpressListRPTO.ExpressInfo`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `callPhoneClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `consigneeAddress` | `String` | — |
+| `expressCollectClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `expressPrintClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `hasPrint` | `boolean` | — |
+| `hasSelect` | `boolean` | — |
+| `onAbnormalClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onAddressClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onCopyPhone` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onFailReceiveClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `onRejectReceiveClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `orderCreateDate` | `String` | — |
+| `orderNo` | `String` | — |
+| `problemReasonDesc` | `String` | — |
+| `reminderStatus` | `String` | — |
+| `selectExpressClick` | `View.OnClickListener` | callback UI · ក្នុង App |
+| `shipperAddress` | `String` | — |
+| `shipperName` | `String` | — |
+| `shipperPhone` | `String` | — |
+
+### `rpto.GetProblemInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billcode` | `String` | — |
+| `describe` | `String` | — |
+| `signTime` | `String` | — |
+
+### `rpto.GetTrackInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `classes` | `String` | — |
+| `describe` | `String` | — |
+| `num` | `String` | — |
+| `scanTime` | `String` | — |
+| `uploadTime` | `String` | — |
+| `weight` | `String` | — |
+
+### `rpto.KHPayInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `amount` | `Double` | — |
+| `applyTime` | `String` | — |
+| `billCodeList` | `List<String>` | — |
+| `expireTime` | `long` | — |
+| `payInfoList` | `List<WaybillInfoKH>` | — |
+| `payNo` | `String` | — |
+| `payType` | `String` | — |
+| `url` | `String` | — |
+
+### `rpto.KHPayResult`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCodeList` | `List<String>` | — |
+| `updateResult` | `boolean` | — |
+
+### `rpto.KHPayStatus`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `amount` | `String` | — |
+| `payNo` | `String` | — |
+| `status` | `int` | — |
+
+### `rpto.KHSortingLineBaseInfo`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `secretKey` | `String` | — |
+| `time` | `long` | — |
+| `timeZone` | `String` | — |
+| `urlPrefix` | `String` | — |
+
+### `rpto.KHSortingLineGridInfo`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `deviceNo` | `String` | — |
+| `gridNor` | `String` | — |
+| `nextSiteCode` | `String` | — |
+| `packageCode` | `String` | — |
+| `result` | `Boolean` | — |
+| `resultMessage` | `String` | — |
+| `status` | `String` | — |
+
+### `rpto.KHSortingLineSimpleRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `result` | `boolean` | — |
+| `resultMessage` | `String` | — |
+
+### `rpto.LightBindRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `code` | `String` | — |
+| `message` | `String` | — |
+
+### `rpto.LoginInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `accessToken` | `String` | — |
+| `countryCode` | `String` | — |
+| `currentTime` | `String` | — |
+| `location` | `String` | — |
+| `nickName` | `String` | — |
+| `permissions` | `Set<String>` | — |
+| `siteCode` | `String` | — |
+| `siteName` | `String` | — |
+| `token` | `String` | — |
+| `userName` | `String` | — |
+
+### `rpto.MapOrder`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `billStatus` | `String` | — |
+| `city` | `String` | — |
+| `cod` | `String` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `deliveryType` | `String` | — |
+| `deliveryTypeId` | `String` | — |
+| `discountFee` | `String` | — |
+| `dispEmpId` | `String` | — |
+| `dispEmpName` | `String` | — |
+| `dispatchCount` | `String` | — |
+| `district` | `String` | — |
+| `dod` | `String` | — |
+| `goodsName` | `String` | — |
+| `grossWeight` | `String` | — |
+| `isSearchOrder` | `boolean` | — |
+| `lat` | `String` | — |
+| `lng` | `String` | — |
+| `name` | `String` | — |
+| `orderCreateDate` | `String` | — |
+| `orderNo` | `String` | — |
+| `orderStatus` | `String` | — |
+| `province` | `String` | — |
+| `recEmpId` | `String` | — |
+| `recEmpName` | `String` | — |
+| `reminderNum` | `String` | — |
+| `reminderStatus` | `String` | — |
+| `shipperAddress` | `String` | — |
+| `shipperMobile` | `String` | — |
+| `type` | `String` | — |
+
+### `rpto.MapOrderRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `assignList` | `List<MapOrder>` | — |
+| `deliveryList` | `List<MapOrder>` | — |
+| `pickupList` | `List<MapOrder>` | — |
+
+### `rpto.MetaDataRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `code` | `String` | — |
+| `countryCode` | `String` | — |
+| `id` | `Long` | — |
+| `modifyTime` | `String` | — |
+| `nameCn` | `String` | — |
+| `nameEn` | `String` | — |
+| `nameLang` | `String` | — |
+| `typeCode` | `String` | — |
+
+### `rpto.PackageInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `arriveScanTime` | `String` | — |
+| `countryCode` | `String` | — |
+| `destinationSiteCode` | `String` | — |
+| `destinationSiteName` | `String` | — |
+| `packageCode` | `String` | — |
+| `packageType` | `int` | — |
+| `sendSiteCode` | `String` | — |
+| `status` | `int` | — |
+
+### `rpto.QuerySignPicRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `aliasName` | `String` | — |
+| `billCode` | `String` | — |
+| `savePos` | `String` | — |
+
+### `rpto.QueryTrackingRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `tracks` | `List<TrackingRPTO>` | — |
+
+### `rpto.RecallInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `countryCode` | `String` | — |
+| `deliverySite` | `String` | — |
+| `destinationCode` | `String` | — |
+| `destinationNo` | `String` | — |
+| `imageUrl1` | `String` | — |
+| `imageUrl2` | `String` | — |
+| `locationNo` | `String` | — |
+| `problemWhStatus` | `int` | — |
+| `registSiteCode` | `String` | — |
+| `registTime` | `String` | — |
+| `remark` | `String` | — |
+
+### `rpto.RuleRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `modifyTime` | `String` | — |
+| `regular` | `String` | — |
+| `ruleCode` | `String` | — |
+| `ruleName` | `String` | — |
+
+### `rpto.ShopeeScanCompareCountRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `forecastQty` | `String` | — |
+| `isDiff` | `boolean` | — |
+| `overQty` | `String` | — |
+| `scanQty` | `String` | — |
+| `waitQty` | `String` | — |
+
+### `rpto.SiteInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `blCityWarehouse` | `int` | — |
+| `blWarehouse` | `int` | — |
+| `countryCode` | `String` | — |
+| `defaultCurrencyCode` | `String` | — |
+| `destinationCode` | `String` | — |
+| `destinationName` | `String` | — |
+| `destinationNameEn` | `String` | — |
+| `destinationNameLang` | `String` | — |
+| `destinationNo` | `String` | — |
+| `id` | `Long` | — |
+| `isCenter` | `boolean` | — |
+| `modifyTime` | `String` | — |
+| `provinceCode` | `String` | — |
+| `select` | `boolean` | — |
+| `siteCode` | `String` | — |
+| `siteName` | `String` | — |
+| `siteNameEn` | `String` | — |
+| `siteNameLang` | `String` | — |
+| `siteNatureCode` | `String` | — |
+| `status` | `String` | — |
+| `superiorFinanceCenterCode` | `String` | — |
+| `superiorSiteCode` | `String` | — |
+| `typeCode` | `String` | — |
+
+### `rpto.SmsConfigRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `countryCode` | `String` | — |
+| `dataSource` | `String` | — |
+| `sendType` | `String` | — |
+| `status` | `String` | — |
+| `userName` | `String` | — |
+
+### `rpto.SubOrderInfo`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `billStatus` | `int` | — |
+| `orderNo` | `String` | — |
+| `orderStatus` | `int` | — |
+| `packageSeq` | `String` | — |
+
+### `rpto.TimeZoneMetaDataRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `code` | `String` | — |
+| `countryCode` | `String` | — |
+| `id` | `Long` | — |
+| `modifyTime` | `String` | — |
+| `nameCn` | `String` | — |
+| `nameEn` | `String` | — |
+| `nameLang` | `String` | — |
+| `typeCode` | `String` | — |
+
+### `rpto.TrackingRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `action` | `String` | — |
+| `actionName` | `String` | — |
+| `carrier` | `String` | — |
+| `country` | `String` | — |
+| `customsCode` | `String` | — |
+| `deliveryCode` | `String` | — |
+| `deliveryContact` | `String` | — |
+| `deliveryName` | `String` | — |
+| `deliveryType` | `int` | — |
+| `flightCode` | `String` | — |
+| `id` | `int` | — |
+| `mailNo` | `String` | — |
+| `message` | `String` | — |
+| `msgEng` | `String` | — |
+| `msgLoc` | `String` | — |
+| `place` | `String` | — |
+| `preOrNext` | `String` | — |
+| `preOrNextID` | `String` | — |
+| `remark` | `String` | — |
+| `siteCode` | `String` | — |
+| `siteName` | `String` | — |
+| `szAction` | `String` | — |
+| `time` | `String` | — |
+| `trackSource` | `String` | — |
+| `weight` | `Double` | — |
+| `zone` | `String` | — |
+
+### `rpto.UploadResultRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `barScannerId` | `long` | — |
+| `exceptionMessage` | `String` | — |
+| `vehicleSignNo` | `String` | — |
+
+### `rpto.UserInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `employeeCode` | `String` | — |
+| `employeeName` | `String` | — |
+| `employeeNameEn` | `String` | — |
+| `employeeNameLang` | `String` | — |
+| `id` | `Long` | — |
+| `modifyTime` | `String` | — |
+| `status` | `String` | — |
+
+### `rpto.VehicleInfoRPTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `licensePlate` | `String` | — |
+| `siteCode` | `String` | — |
+| `vehicleBarcode` | `String` | — |
+| `vehicleType` | `String` | — |
+
+### `rpto.WaitOutPackage`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `check` | `boolean` | — |
+| `consigneeAddress` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `deliverySite` | `String` | — |
+| `destinationNo` | `String` | — |
+| `id` | `long` | — |
+| `imageUrl1` | `String` | — |
+| `imageUrl2` | `String` | — |
+| `locationNo` | `String` | — |
+| `problemWhStatus` | `String` | — |
+| `remark` | `String` | — |
+
+### `rpto.WaybillInfoKH`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `agentAmount` | `double` | — |
+| `billCode` | `String` | — |
+| `currencyCode` | `String` | — |
+| `discountFee` | `double` | — |
+| `fcAmount` | `double` | — |
+| `orderNo` | `String` | — |
+| `paidFee` | `double` | — |
+| `payNo` | `String` | — |
+| `paymentStatus` | `int` | — |
+| `realPayFee` | `double` | — |
+
+### `rqto.BillCodeList`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+
+### `rqto.CallLogInfoBean`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `date` | `String` | — |
+| `duration` | `long` | — |
+| `id` | `int` | — |
+| `location` | `String` | — |
+| `name` | `String` | — |
+| `number` | `String` | — |
+| `type` | `int` | — |
+
+### `rqto.DispatchQueryInfoQTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `billCode` | `String` | — |
+| `billStatus` | `String` | — |
+| `consigneeCityCode` | `String` | — |
+| `consigneeDistrictCode` | `String` | — |
+| `consigneeMobile` | `String` | — |
+| `consigneeName` | `String` | — |
+| `consigneeProvinceCode` | `String` | — |
+| `dispEmpDateFrom` | `String` | — |
+| `dispEmpDateTo` | `String` | — |
+| `isIssue` | `String` | — |
+| `pageNum` | `int` | — |
+| `pageSize` | `int` | — |
+| `signSiteDateFrom` | `String` | — |
+| `signSiteDateTo` | `String` | — |
+| `status` | `int` | — |
+
+### `rqto.DispatchQueryInfoQTO.WorkOrderStatus`
+
+Parent ៖ `java.lang.Enum`។
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `ALL` | `WorkOrderStatus` | static · ក្នុង App |
+| `DONE` | `WorkOrderStatus` | static · ក្នុង App |
+| `ING` | `WorkOrderStatus` | static · ក្នុង App |
+| `NOT` | `WorkOrderStatus` | static · ក្នុង App |
+
+### `rqto.UploadDataRQTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `barScannerId` | `long` | — |
+| `billCode` | `String` | — |
+| `classCode` | `String` | — |
+| `dataFrom` | `String` | — |
+| `dataType` | `int` | — |
+| `departure` | `String` | — |
+| `destination` | `String` | — |
+| `deviceDesc` | `String` | — |
+| `dispatchOrSendManCode` | `String` | — |
+| `goodsHigh` | `int` | — |
+| `goodsLong` | `int` | — |
+| `goodsTypeCode` | `String` | — |
+| `goodsWidth` | `int` | — |
+| `isLaPackage` | `boolean` | — |
+| `licensePlateNo` | `String` | — |
+| `listNo` | `String` | — |
+| `notifySiteCode` | `String` | — |
+| `notifySiteName` | `String` | — |
+| `packageNo` | `String` | — |
+| `preOrNextStationCode` | `String` | — |
+| `previousSiteVehicleSignNos` | `List<String>` | — |
+| `problemBillCode` | `String` | — |
+| `problemReason` | `String` | — |
+| `scanDate` | `String` | — |
+| `scanTypeCode` | `String` | — |
+| `signMan` | `String` | — |
+| `transportationCode` | `String` | — |
+| `vehicleNo` | `String` | — |
+| `vehicleNumber` | `String` | — |
+| `vehicleSignNo` | `List<String>` | — |
+| `volumeWeight` | `double` | — |
+| `weight` | `double` | — |
+| `zone` | `String` | — |
+
+### `rqto.UploadPaperReceiveBean`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `agentAmount` | `String` | — |
+| `agentServiceCharge` | `String` | — |
+| `billCode` | `String` | — |
+| `deliveryTypeId` | `String` | — |
+| `deliveryTypeIdDesc` | `String` | — |
+| `dispSiteDesc` | `String` | — |
+| `dispSiteId` | `String` | — |
+| `expressTypeId` | `Integer` | — |
+| `expressTypeIdDesc` | `String` | — |
+| `freightFee` | `String` | — |
+| `insureFee` | `String` | — |
+| `insureTypeId` | `String` | — |
+| `nextStationCode` | `String` | — |
+| `nextStationName` | `String` | — |
+| `payTypeId` | `String` | — |
+| `payTypeIdDesc` | `String` | — |
+| `prevSiteCode` | `String` | — |
+| `receiverId` | `String` | — |
+| `receiverIdDesc` | `String` | — |
+| `scanTypeCode` | `int` | — |
+| `shipTypeId` | `String` | — |
+| `shipTypeIdDesc` | `String` | — |
+| `weight` | `String` | — |
+
+### `rqto.UploadPickUpGoodsBean`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `barScannerId` | `long` | — |
+| `billCode` | `String` | — |
+| `listNo` | `String` | — |
+| `scanDate` | `String` | — |
+| `scanTypeCode` | `String` | — |
+
+### `rqto.UploadPutInWarehouseRQTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `barScannerId` | `long` | — |
+| `billCode` | `String` | — |
+| `countryCode` | `String` | — |
+| `dataFrom` | `String` | — |
+| `imageUrl1` | `String` | — |
+| `imageUrl2` | `String` | — |
+| `language` | `String` | — |
+| `locationNo` | `String` | — |
+| `scanDate` | `String` | — |
+| `scanManCode` | `String` | — |
+| `scanSiteCode` | `String` | — |
+
+### `rqto.UploadVehiclePackageDataRQTO`
+
+| Field | ប្រភេទក្នុង APK | សម្គាល់ |
+|---|---|---|
+| `bagCode` | `String` | — |
+| `barScannerId` | `long` | — |
+| `billCode` | `String` | — |
+| `classCode` | `String` | — |
+| `dataFrom` | `String` | — |
+| `dataType` | `int` | — |
+| `departure` | `String` | — |
+| `destination` | `String` | — |
+| `dispatchOrSendManCode` | `String` | — |
+| `goodsHigh` | `int` | — |
+| `goodsLong` | `int` | — |
+| `goodsTypeCode` | `String` | — |
+| `goodsWidth` | `int` | — |
+| `licensePlateNo` | `String` | — |
+| `listNo` | `String` | — |
+| `notifySiteCode` | `String` | — |
+| `notifySiteName` | `String` | — |
+| `packageNo` | `String` | — |
+| `preOrNextStationCode` | `String` | — |
+| `previousSiteVehicleSignNos` | `List<String>` | — |
+| `problemBillCode` | `String` | — |
+| `problemReason` | `String` | — |
+| `scanDate` | `String` | — |
+| `scanTypeCode` | `String` | — |
+| `signMan` | `String` | — |
+| `transportationCode` | `String` | — |
+| `vehicleNo` | `String` | — |
+| `vehicleNumber` | `String` | — |
+| `vehicleSignNo` | `String` | — |
+| `volumeWeight` | `double` | — |
+| `weight` | `double` | — |
+| `zone` | `String` | — |
+
+## Field JSON ដែលបង្កើតផ្ទាល់ក្នុង request
+
+គន្លឹះខាងក្រោមមកពី `PDARequestImpl` តាម method; គន្លឹះខ្លះនៅក្នុង object ខាងក្នុង។ Method ដែល serialize DTO ទាំងមូល ត្រូវអាន field ក្នុង request model ខាងលើ; query parameter និង header ស្ថិតនៅតារាង endpoint។
+
+| Method ក្នុង App | គន្លឹះ JSON ដែលបង្កើត |
+|---|---|
+| `addPackageProblemBill` | `billCode` · `packageCode` · `problemType` |
+| `addScanInfoToAEGS` | `actionTime` · `billCode` |
+| `addShopeeAbnormal` | `orderNo` · `problemReasonCode` · `problemReasonDesc` · `remark` |
+| `applyPayOffline` | `billCodeList` |
+| `applyPayOnline` | `billCodeList` · `methodCode` · `payChannelCode` · `productCode` |
+| `bagPutIn` | `bagCodeList` · `bagType` |
+| `bagRecycle` | `bagCodeList` · `recycleType` |
+| `bindGrid` | `deviceNo` · `gridNo` · `packageCode` |
+| `buildPackageFinish` | `bagCode` · `deviceNo` · `gridNo` · `nextSiteCode` · `packageCode` |
+| `callLogUpload` | `actionDescs` · `billCode` · `callTime` · `connectStatus` · `connectTime` · `customerPhone` · `dataFrom` · `talkTime` |
+| `cancelOutPackage` | `ids` · `modifier` |
+| `cancelPay` | `billCode` |
+| `checkForBuildPackage` | `billCode` · `packageNo` · `rfid` |
+| `checkForErrorBillWarehouse` | `billCode` |
+| `checkForPackageBill` | `billCode` · `packageNo` · `scanTypeCode` |
+| `checkPutInWPermission` | `barScannerId` |
+| `checkQrCode` | `billCode` |
+| `checkRfidCodeByRecycle` | `bagCode` · `recycleType` |
+| `checkRfidCodeForCreatePkg` | `bagCode` · `packageCode` |
+| `checkRfidExist` | `bagCode` |
+| `checkTrackInfo` | `mailNos` · `mailType` |
+| `closeGrid` | `deviceNo` · `gridNo` |
+| `confirmPayOffline` | `billCodeList` · `payType` |
+| `createPayment` | `amount` · `billStatus` · `cod` · `custId` · `dataSource` · `dod` · `retry` · `sendTime` · `ztoOrder` |
+| `delScanInfoToAEGS` | `billCodeList` · `id` |
+| `deletePay` | `billCode` |
+| `destroyOutPackage` | `billCode` · `countryCode` · `scanManCode` |
+| `deviceInfoUpload` | `appVersion` · `deviceSn` · `deviceVersion` · `equipment` · `mac` · `manufacturer` · `processor` · `runningMemory` · `screen` · `source` · `storageMemory` |
+| `getBaseCarInfo` | `currentPage` · `pageSize` |
+| `getBaseSiteInfo` | `modifyTime` · `pageNum` · `pageSize` |
+| `getBaseUserInfo` | `modifyTime` · `ownerSiteCode` · `pageNum` · `pageSize` |
+| `getBillCodeByFirstWayNo` | `firstWayNo` |
+| `getByDeliveryNo` | `deliveryNo` |
+| `getCityList` | `level` · `parentCode` |
+| `getDictionary` | `modifyTime` · `pageNum` · `pageSize` · `typeCodeList` |
+| `getExpressList` | `billCode` · `dateFrom` · `dateTo` · `isPrint` · `orderStatus` · `pageNum` · `pageSize` · `shipperName` |
+| `getExpressTypeList` | `consigneeCountryCode` |
+| `getRule` | `modifyTime` · `pageNum` · `pageSize` |
+| `getSignScanList` | `waybillList` |
+| `getSmallPackageCodeList` | `ladingNo` |
+| `hasUnload` | `packageCode` |
+| `hasWaybill` | `billCode` |
+| `khSignScanCheck` | `billCode` · `dataFrom` · `scanType` |
+| `laBusinessCheck` | `billCode` · `billCodeLists` · `dataFrom` · `ignoreCodBacklog` · `ignoreDispSiteId` · `preOrNextStationCode` · `provinceCode` · `scanType` |
+| `lightBinding` | `billCode` · `consigneeMobile` · `consigneeName` · `deliveryNo` · `firstNo` · `method` · `shipperName` · `shipperPhone` · `tagID` |
+| `lightForcedBind` | `billCode` · `consigneeMobile` · `consigneeName` · `deliveryNo` · `firstNo` · `method` · `shipperName` · `shipperPhone` · `tagID` |
+| `lightUnBind` | `billCodeList` · `method` |
+| `login` | `deviceSn` · `equipment` · `password` · `timeZone` · `userName` · `verifyId` · `version` |
+| `mapPickupDeliveryQuery` | `dateFrom` · `dateTo` |
+| `mapQuery` | `billCode` · `orderNo` |
+| `modifyPassWord` | `confirmNewPassword` · `newPassword` · `oldPassword` |
+| `newBusinessCheck` | `billCode` · `billCodeLists` · `dataFrom` · `ignoreCodBacklog` · `ignoreDispSiteId` · `preOrNextStationCode` · `provinceCode` · `scanType` |
+| `newBusinessCheckOffline` | `billCode` · `billCodeLists` · `dataFrom` · `ignoreCodBacklog` · `ignoreDispSiteId` · `preOrNextStationCode` · `provinceCode` · `scanType` |
+| `openGrid` | `deviceNo` · `gridNo` |
+| `parentBillInfoQuery` | `parentBillCode` |
+| `putOutPackage` | `billCode` · `countryCode` · `id` · `scanManCode` · `scanSiteCode` |
+| `queryAccountBalance` | `countryCode` · `siteCode` |
+| `queryBillInfo` | `billCode` |
+| `queryCollectExpressCount` | `billCollectionStatus` · `billStatus` · `dateFrom` · `dateTo` · `dispatchBillStatus` · `isSign` · `signBillStatus` |
+| `queryDestination` | `destinationCode` |
+| `queryDeviceConnectState` | `deviceNo` |
+| `queryDispExpressCount` | `billCollectionStatus` · `billStatus` · `dateFrom` · `dateTo` · `dispatchBillStatus` · `isSign` · `signBillStatus` |
+| `queryExpressCount` | `billCollectionStatus` · `billStatus` · `dateFrom` · `dateTo` · `dispatchBillStatus` · `isSign` · `signBillStatus` |
+| `queryExpressInfo` | `orderNo` |
+| `queryGridInfo` | `deviceNo` · `gridNo` |
+| `queryPackage` | `packageCode` |
+| `queryPayStatus` | `payNo` |
+| `queryPaymentRecord` | `billCode` · `sendEndTime` · `sendStartTime` |
+| `queryPreOrderByBagCode` | `billCode` |
+| `queryPreOrderByBillCode` | `billCode` · `customerNo` |
+| `querySequence` | `name` |
+| `queryShopeeQty` | `dayEnd` · `dayStart` |
+| `querySignListExpressCount` | `billCollectionStatus` · `billStatus` · `dateFrom` · `dateTo` · `dispatchBillStatus` · `isSign` · `signBillStatus` |
+| `querySignPic` | `billCode` |
+| `querySiteOwe` | `type` |
+| `querySmsConfigStatus` | `countryCode` · `userName` |
+| `queryTrackInfo` | `mailNos` · `mailType` |
+| `queryVehicleInfo` | `vehicleBarcode` |
+| `queryVehicleInfoByLicensePlate` | `licensePlate` |
+| `queryVehicleNumber` | `vehicleSignNo` |
+| `queryWaitOutPackageList` | `countryCode` · `scanSiteCode` |
+| `queryWaybillDestination` | `siteCode` |
+| `saveFailPaperOrder` | `action` · `billCode` · `optReason` · `optReasonCode` · `orderNo` |
+| `savePrintSucc` | `billCode` |
+| `searchRecallInfo` | `billCode` |
+| `sendSiteCodeCheck` | `billCode` · `nextSite` |
+| `shopeePackageScan` | `nextSiteCode` · `packageCode` |
+| `subBusinessCheck` | `billCodeLists` · `dataFrom` · `provinceCode` · `scanType` |
+| `unbindGrid` | `deviceNo` · `gridNo` |
+| `updateAddress` | `billCodeList` · `consigneeAddress` · `orderNoList` · `shipperAddress` |
+| `updateDispSite` | `billCode` · `businessRegion` · `dispSiteId` · `modifier` |
+| `updateOrder` | `billCode` · `consigneeMobile` |
+| `updateRecOrDispEmp` | `billCode` · `orderNo` |
+| `updateSmsConfigStatus` | `countryCode` · `dataSource` · `sendType` · `status` · `userName` |
+| `updateWeight` | `billCode` · `weight` |
+| `uploadImage` | `billCode` · `fileName` · `picType` |
+
+## Field បន្ថែមពីចម្លើយ server ពិត
+
+ចម្លើយ server អាចមាន field លើស DTO ក្នុង APK។ នៅ `queryTrackInfo.result[]` មាន `mail` និង `tracks`; `mail` មិនប្រកាសក្នុង `QueryTrackingRPTO` របស់ APK នេះ។ Field ដែលឃើញពិត៖
+
+| ទីតាំង | Field · ប្រភេទដែលបានផ្ទៀង |
+|---|---|
+| `billInfoQuery.result` | `dispSite: String` · `dispSiteId: String` (ឈ្មោះ និងកូដសាខាចែកចាយ; បន្ថែមលើ DTO) |
+| `mail` | `busSource: String` · `clientId: String` · `customerNo: String` · `departureName: String` · `destinationName: String` · `endNo: String` · `isSign: number (0/1)` · `mailNo: String` · `mailSource: String` · `newStatusDesc: String` · `newStatusTime: String` · `startNo: String` |
+| `mail` អាចទទេ | `consignee` · `cusDecType` (មិនទាន់ស្គាល់ប្រភេទពេលមានតម្លៃ) |
+| `tracks[]` បន្ថែម | `countryCode: String` · `problemReason: String` · `signName: String` |
+| `tracks[].id` | ចម្លើយពិតជា String ទោះ DTO ប្រកាស `int`; កុំយកវាជាចំនួនសម្រាប់គណនាលុយ |
+
+ភស្តុតាងមកដល់ ៖ `action="3"` + `siteCode` ត្រូវសាខា + `time` ក្នុងថ្ងៃដែលជ្រើស។ ភស្តុតាងចុះហត្ថលេខា ៖ `mail.isSign=1` និង `action="5"` ត្រូវ Barcode/សាខា ហើយមិននៅមុនការមកដល់ថ្មី។ Field `shipTypeId="03"` ក្នុង Lookup ជាប្រភេទដឹកជញ្ជូន; វាមិនមែនស្កេនមកដល់ `03` ទេ។
+
+## លេខប្រភេទស្កេនក្នុង APK (`ScanType`)
+
+| ឈ្មោះក្នុង App | លេខ |
+|---|---|
+| `ALL` | `0` |
+| `RECEIVE_SCAN` | `1` |
+| `SEND_SCAN` | `2` |
+| `ARRIVE_SCAN` | `3` |
+| `DISPATCH_SCAN` | `4` |
+| `SIGN_SCAN` | `5` |
+| `KEPP_HOUSE_SCAN` | `6` |
+| `PROBLEM_SCAN` | `29` |
+| `OPEN_PKG_SCAN` | `7` |
+| `CREATE_PKG_SCAN` | `70` |
+| `SEND_PKG_SCAN` | `71` |
+| `ARRIVE_PKG_SCAN` | `72` |
+| `SEND_CAR_SCAN` | `75` |
+| `UNLOAD_CAR_SCAN` | `76` |
+| `RETURN_SCAN` | `-710` |
+| `ARRIVE_SEND_SCAN` | `32` |
+| `RECEIVE_SEND_SCAN` | `12` |
+| `CALL_RECORDS` | `321` |
+| `PICK_UP_GOODS_SCAN` | `9` |
+| `CAR_ARRIVAL_SCAN` | `77` |
+| `SIGN_PHOTO_UPLOAD_SCAN` | `123` |
+| `SEND_PHOTO_UPLOAD_SCAN` | `456` |
+| `PUT_IN_WAREHOUSE_SCAN` | `789` |
+| `PUT_OUT_WAREHOUSE_SCAN` | `987` |
+| `DESTROY_OUT_WAREHOUSE_SCAN` | `987789` |
+| `ADD_PKG_SCAN` | `73` |
+| `SUB_PKG_SCAN` | `74` |

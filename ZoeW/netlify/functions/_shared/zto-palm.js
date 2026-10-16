@@ -179,6 +179,52 @@ function lookupBody(result, barcode, keys, deps, diagnostic = false) {
     return body;
 }
 
+function trackingStamp(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return '';
+    const stamp = new Date(value.replace(' ', 'T') + 'Z');
+    return Number.isFinite(stamp.getTime()) && stamp.toISOString().slice(0, 19).replace('T', ' ') === value ? value : '';
+}
+
+function trackingCode(value) {
+    return typeof value === 'string' ? value.trim().toUpperCase() : '';
+}
+
+function trackingVerdict(upstream, barcode, site) {
+    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null };
+    if (!Array.isArray(upstream.result) || !trackingCode(site)) return out;
+    const code = trackingCode(barcode);
+    const rows = upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === code);
+    if (rows.length !== 1 || !Array.isArray(rows[0].tracks)) return out;
+    let arrival = '';
+    let signed = '';
+    let complete = true;
+    for (const track of rows[0].tracks) {
+        const at = trackingStamp(track?.time);
+        if (!track || trackingCode(track.mailNo) !== code || !at
+            || (typeof track.action !== 'string' && typeof track.action !== 'number')) { complete = false; continue; }
+        if (trackingCode(track.siteCode) !== trackingCode(site)) continue;
+        const action = String(track.action);
+        if (action === '3' && at > arrival) arrival = at;
+        if (action === '5' && at > signed) signed = at;
+    }
+    out.ztoArrivalAt = arrival || null;
+    if (!complete) return out;
+    if (rows[0].mail.isSign === 1 && signed && (!arrival || signed >= arrival)) {
+        out.ztoClosed = true;
+        out.ztoSignedAt = signed;
+    } else if (rows[0].mail.isSign === 0 && arrival && (!signed || signed < arrival)) out.ztoClosed = false;
+    return out;
+}
+
+async function palmTracking(barcode, session, keys, deps) {
+    const upstream = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session.token, keys, deps.upstreamMs(), null, true);
+    if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
+        return { response: json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' }) };
+    }
+    if (upstream.status !== true) return { response: json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(upstream) }) };
+    return { upstream, verdict: trackingVerdict(upstream, barcode, session.site) };
+}
+
 async function handlePalm(event, query, proxyKey, deps, env = process.env) {
     try {
         sessionKey(env);
@@ -232,6 +278,14 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
         const access = await deps.lookupAccess();
         if (access && access.response) return access.response;
+        if (query.status === '1') {
+            if (access?.verified && trackingCode(access.site) !== trackingCode(session.site)) {
+                return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:other' });
+            }
+            const tracking = await palmTracking(barcode, session, keys, deps);
+            if (tracking.response) return tracking.response;
+            return json(200, { success: true, found: true, barcode, provider: 'zto-palm', ...tracking.verdict });
+        }
         const upstream = await requestPalm(BILL_INFO_PATH, { billCode: barcode }, session.token, keys, deps.upstreamMs(),
             meterFor(deps, 'palmDetail'), true);
         if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
@@ -241,13 +295,11 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         const diagnostic = query.track === '1';
         const body = deps.finish(access, lookupBody(upstream, barcode, keys, deps, diagnostic), barcode);
         if (!diagnostic || body.found !== true) return json(200, body);
-        const tracking = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session.token, keys, deps.upstreamMs(), null, true);
-        if (tracking.authRejected || AUTH_EXPIRED_RE.test(String(tracking.statusCode || ''))) {
-            return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
-        }
-        if (tracking.status !== true) return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(tracking) });
-        return json(200, { ...body, billInfoQuery: upstream, queryTrackInfo: tracking });
+        const tracking = await palmTracking(barcode, session, keys, deps);
+        if (tracking.response) return tracking.response;
+        return json(200, { ...body, ...tracking.verdict, billInfoQuery: upstream, queryTrackInfo: tracking.upstream });
     } catch (error) {
+        if (error?.palmResponse) return error.palmResponse;
         const reason = error?.message;
         if (reason === 'palm:config') return json(503, { code: 'ZTO_PALM_NOT_CONFIGURED', reason: error.reason });
         if (reason === 'session:invalid') return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
@@ -316,14 +368,123 @@ function listFailure(outcome) {
     return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: outcome.reason });
 }
 
-async function palmList(query, session, keys, deps) {
-    if (query.signed !== '1') {
-        return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'palm:no-arrival-list' });
+function candidatePage(upstream, page, pageSize) {
+    const container = upstream.result;
+    if (!container || !Array.isArray(container.list) || container.list.length > LIST_ROW_MAX) throw new Error('upstream:json');
+    const reported = Number(container.pages);
+    const known = container.pages !== null && container.pages !== undefined && Number.isInteger(reported) && reported >= 0;
+    if (known && reported === 0 && container.list.length) throw new Error('upstream:json');
+    const full = container.list.length >= pageSize;
+    return { list: container.list, pages: known ? reported : (full ? page + 1 : (container.list.length ? page : page - 1)), unknown: !known && full };
+}
+
+function palmResponseError(upstream) {
+    if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
+        return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
     }
+    return upstream.status === true ? null : json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(upstream) });
+}
+
+function originText(raw) {
+    return typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+}
+
+function palmOrigin(raw, tracks) {
+    const direct = originText(raw.recSite) || originText(raw.customerCodeDesc);
+    if (direct) return direct;
+    const pickups = tracks.filter((track) => String(track.action) === '1').sort((a, b) => a.time.localeCompare(b.time));
+    const pickup = pickups[0];
+    if (!pickup) return '';
+    for (const field of ['msgLoc', 'msgEng']) {
+        const label = typeof pickup[field] === 'string' ? pickup[field].match(/【([^【】]+)】/) : null;
+        const text = label ? originText(label[1]) : '';
+        if (text) return text;
+    }
+    return originText(pickup.siteName);
+}
+
+function arrivalTrackRows(upstream, raw, barcode, site, range, keys, deps) {
+    const groups = Array.isArray(upstream.result) ? upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === trackingCode(barcode)) : [];
+    if (groups.length !== 1 || !Array.isArray(groups[0].tracks) || !groups[0].tracks.length
+        || (groups[0].mail.isSign !== 0 && groups[0].mail.isSign !== 1)) throw new Error('upstream:json');
+    const tracks = groups[0].tracks;
+    if (tracks.some((track) => !track || trackingCode(track.mailNo) !== trackingCode(barcode) || !trackingStamp(track.time)
+        || (typeof track.action !== 'string' && typeof track.action !== 'number'))) throw new Error('upstream:json');
+    const verdict = trackingVerdict(upstream, barcode, site);
+    const fields = deps.project(raw);
+    const base = { barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
+        cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod };
+    const from = palmOrigin(raw, tracks);
+    const rows = [];
+    const seen = new Set();
+    for (const track of tracks) {
+        if (String(track.action) !== '3' || trackingCode(track.siteCode) !== trackingCode(site)
+            || track.time < range.start || track.time > range.end || seen.has(track.time)) continue;
+        seen.add(track.time);
+        rows.push({ ...base, at: track.time, ztoClosed: verdict.ztoClosed, skip: '', from });
+    }
+    return { rows, signed: verdict.ztoClosed === true ? { ...base, at: verdict.ztoSignedAt, from } : null };
+}
+
+async function palmArrivalList(range, page, session, keys, deps) {
+    const pageSize = Math.min(20, deps.listPageSize);
+    const signedRange = deps.listSignedRange(range);
+    const requests = [
+        { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize },
+        { billStatus: '4', status: 0, pageNum: page, pageSize },
+        { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize }
+    ];
+    const upstreams = await Promise.all(requests.map((payload) => requestPalm(DISPATCH_LIST_PATH, payload, session.token, keys, deps.upstreamMs(), null, true)));
+    for (const upstream of upstreams) {
+        const response = palmResponseError(upstream);
+        if (response) return response;
+    }
+    const pages = upstreams.map((upstream) => candidatePage(upstream, page, pageSize));
+    const candidates = new Map();
+    for (const current of pages) {
+        for (const raw of current.list) {
+            const barcode = typeof raw?.billCode === 'string' ? raw.billCode.trim() : '';
+            if (BARCODE_RE.test(barcode)) candidates.set(trackingCode(barcode), { raw, barcode });
+        }
+    }
+    const jobs = Array.from(candidates.values());
+    const results = new Array(jobs.length);
+    let next = 0;
+    let stopped = false;
+    const worker = async () => {
+        try {
+            while (!stopped && next < jobs.length) {
+                if (typeof deps.remainingMs === 'function' && deps.remainingMs() < 1000) throw Object.assign(new Error('upstream:timeout'), { name: 'AbortError' });
+                const index = next++;
+                const job = jobs[index];
+                const tracking = await palmTracking(job.barcode, session, keys, deps);
+                if (tracking.response) throw Object.assign(new Error('upstream:tracking'), { palmResponse: tracking.response });
+                results[index] = arrivalTrackRows(tracking.upstream, job.raw, job.barcode, session.site, range, keys, deps);
+            }
+        } catch (error) { stopped = true; throw error; }
+    };
+    const settled = await Promise.allSettled(Array.from({ length: Math.min(8, jobs.length) }, worker));
+    const failed = settled.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+    const rows = results.flatMap((result) => result.rows);
+    const signedRows = results.map((result) => result.signed).filter((row) => row && row.at >= range.start && row.at <= signedRange.end);
+    const body = {
+        success: true, list: true, enabled: true, kind: 'arrival', page,
+        site: session.site, siteName: session.siteName || '', pages: Math.max(...pages.map((current) => current.pages)),
+        total: rows.length, pageTotal: true, rows, otherScans: jobs.length - results.filter((result) => result.rows.length).length,
+        signed: signedRows.map((row) => row.barcode), signedRows, signedOk: true, signedPages: pages[2].pages,
+        signedMismatch: 0, provider: 'zto-palm'
+    };
+    if (pages.some((current) => current.unknown)) body.pagesUnknown = true;
+    if (pages[2].unknown) body.signedPagesUnknown = true;
+    return json(200, body);
+}
+
+async function palmList(query, session, keys, deps) {
     const range = deps.listRange(query.from, query.to);
     if (!range) return json(400, { error: 'Invalid list date range', code: 'ZTO_LIST_RANGE_INVALID' });
     const page = Number(String(query.page || '1').trim());
-    if (!Number.isInteger(page) || page < 1 || page > deps.listMaxPages) {
+    if (!Number.isInteger(page) || page < 1 || page > (query.signed === '1' ? deps.listMaxPages : 1000)) {
         return json(400, { error: 'Invalid list page', code: 'ZTO_LIST_PAGE_INVALID' });
     }
     const access = await deps.lookupAccess();
@@ -331,6 +492,10 @@ async function palmList(query, session, keys, deps) {
     const accountSite = access && access.verified ? String(access.site || '').trim().toLowerCase() : '';
     if (accountSite && session.site && accountSite !== String(session.site).trim().toLowerCase()) {
         return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-other-branch' });
+    }
+    if (query.signed !== '1') {
+        if (!trackingCode(session.site)) return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-missing' });
+        return await palmArrivalList(range, page, session, keys, deps);
     }
     const outcome = await palmSignedPage(query.exact === '1' ? range : deps.listSignedRange(range), page, session, keys, deps);
     return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);

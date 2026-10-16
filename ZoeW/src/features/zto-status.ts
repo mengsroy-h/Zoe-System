@@ -717,7 +717,12 @@ export function scheduleZtoStatusSweep(delayMs?) {
 
 export async function checkZtoStatusForBarcode(cfg, code) {
     const session = captureZtoSession();
-    const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
+    let targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
+    if (lookupApiIsPalm(cfg)) {
+        const statusUrl = new URL(targetUrl, window.location.href);
+        statusUrl.searchParams.set('status', '1');
+        targetUrl = statusUrl.href;
+    }
     const headers = await buildLookupRequestHeaders(cfg);
     await addZtoIdentityHeader(cfg, headers);
     if (!session.current()) return null;
@@ -743,7 +748,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     if (!cfg) return 0;
     if (ztoStatusSecretIsLocked(cfg)) return 0;
     if (ztoState.ztoStatusInFlight) return 0;
-    const detailAllowed = !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force);
+    const detailAllowed = ztoStatusNetworkAllowed(force);
     if (!detailAllowed && !ztoSignedNetworkAllowed(force)) {
         if (ztoStatusBlockIsTransient()) {
             const gap = ztoStatusSweepGapMs();

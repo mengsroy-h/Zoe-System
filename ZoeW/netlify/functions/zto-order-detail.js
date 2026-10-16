@@ -2249,6 +2249,7 @@ function palmDeps(event, config, startedAt) {
         finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false),
         listRange,
         listSignedRange,
+        remainingMs: () => Math.max(0, budgetLeftMs(config, startedAt) - 200),
         listPageSize: config.list.pageSize,
         listMaxPages: config.list.maxPages,
         noteTiming: noteUpstreamTiming,

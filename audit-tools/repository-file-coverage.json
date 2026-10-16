@@ -1162,6 +1162,9 @@
     "ZoeW/src/app/behaviors/ios-viewport.ts": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/behaviors/modal-focus-trap.ts": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/behaviors/modal-keyboard.ts": {
       "policy": "zoew-react-ui"
     },
@@ -2018,6 +2021,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-search-resnap.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/modal-focus-trap.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/modal-keyboard.test.tsx": {

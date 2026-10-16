@@ -27,7 +27,6 @@ export const KEYBOARD_SETTLE_MS = 400;
 export const KEYBOARD_TRUST_MS = 1000;
 export const MODAL_GLIDE_MS = 250;
 export const MODAL_GLIDE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
-export const PAGE_TAP_PROBE_MS = 1500;
 export const NATIVE_TAP_FOCUS_MS = 1000;
 export const IOS_KEYBOARD_SETTLE_MS = 400;
 export const IOS_KEYBOARD_FORECAST_MS = 1200;
@@ -62,11 +61,7 @@ let modalRest: { card: HTMLElement; top: number; width: number } | null = null;
 let modalGlide: { card: HTMLElement; to: number; anim: Animation } | null = null;
 let modalWatched: HTMLElement | null = null;
 let modalResizeObserver: ResizeObserver | null = null;
-let pageTapStart: { field: HTMLElement; x: number; y: number; at: number; touches: number; focused: boolean; tapped: boolean; keyboard: boolean; above: boolean; refused: boolean } | null = null;
-let pageTapProbe: { path: string; field: HTMLElement; at: number; until: number; pagesAt: number; numbers: Record<string, number> } | null = null;
-let pageTapReported: string[] = [];
 let touchesDown = 0;
-let pageFieldCaught: HTMLElement | null = null;
 let caughtClick: { field: HTMLElement; until: number } | null = null;
 let lastTouchEndAt = -Infinity;
 let lastTouchTarget: EventTarget | null = null;
@@ -633,92 +628,8 @@ export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
     return Number.isFinite(box.bottom) && box.height > 0 && box.top >= 0 && box.bottom + MODAL_KEYBOARD_GAP_PX <= height - inset;
 }
 
-function pageTapProbeField(target: EventTarget | null): HTMLElement | null {
-    if (!usesIOSPanelHandoff() || uiState.isModalOpen) return null;
-    const field = elementOf('hwScannerInput');
-    return field && (target === field || iosPageTapFieldOf(target) === field) ? field : null;
-}
-
-function notePageTapStart(e: TouchEvent): void {
-    pageTapStart = null;
-    const field = pageTapProbeField(e.target);
-    if (!field || !e.touches || !e.touches.length) return;
-    const t = e.touches[0];
-    pageTapStart = {
-        field, x: t.clientX, y: t.clientY, at: e.timeStamp, touches: e.touches.length,
-        focused: document.activeElement === field, tapped: modalTapFocused === field, keyboard: !!keyboardVisibleViewport(),
-        above: pageFieldStaysAboveKeyboard(field), refused: modalFocusRefused
-    };
-}
-
-function notePageTapEnd(e: TouchEvent, caught: boolean): void {
-    const start = pageTapStart;
-    pageTapStart = null;
-    if (!start || !e.changedTouches || !e.changedTouches.length) return;
-    const t = e.changedTouches[0];
-    const dx = Math.round(t.clientX - start.x);
-    const dy = Math.round(t.clientY - start.y);
-    const ms = Math.round(e.timeStamp - start.at);
-    const path = caught ? 'caught'
-        : start.refused ? 'refused'
-            : start.focused && start.keyboard ? 'focused-keyboard'
-                : start.focused && start.tapped ? 'focused-tapped'
-                    : !start.above ? 'covered'
-                        : start.touches > 1 ? 'multi'
-                            : Math.max(Math.abs(dx), Math.abs(dy)) > MODAL_TAP_SLOP_PX ? 'moved'
-                                : ms > MODAL_TAP_MAX_MS ? 'slow'
-                                    : !e.cancelable ? 'uncancelable' : 'other';
-    const box = start.field.getBoundingClientRect();
-    const pages = elementOf('appPages');
-    const at = performance.now();
-    pageTapProbe = {
-        path,
-        field: start.field,
-        at,
-        until: at + PAGE_TAP_PROBE_MS,
-        pagesAt: pages ? pages.scrollTop : 0,
-        numbers: {
-            dx, dy, ms, fieldTop: Math.round(box.top), fieldBottom: Math.round(box.bottom), innerHeight: window.innerHeight, innerWidth: window.innerWidth,
-            keyboardSeen: rememberedKeyboardInset(start.field), keyboard: start.keyboard ? 1 : 0, focused: start.focused ? 1 : 0, tapped: start.tapped ? 1 : 0
-        }
-    };
-}
-
-function notePageMoved(e: Event): void {
-    const probe = pageTapProbe;
-    if (!probe || touchesDown > 0) return;
-    if (performance.now() > probe.until) {
-        pageTapProbe = null;
-        return;
-    }
-    const vv = window.visualViewport;
-    const pages = elementOf('appPages');
-    const target = e.target;
-    const what = target === vv ? 'viewport' : target === document || target === document.documentElement || target === window ? 'document' : target === pages ? 'pages' : '';
-    if (!what) return;
-    const scrollY = Math.round(window.scrollY || 0);
-    const viewportTop = vv ? Math.round(vv.offsetTop) : 0;
-    if (what === 'pages' ? !pages || Math.abs(pages.scrollTop - probe.pagesAt) <= 1 : scrollY <= 1 && viewportTop <= 1) return;
-    pageTapProbe = null;
-    if (pageTapReported.indexOf(probe.path + ' ' + what) !== -1) return;
-    pageTapReported = pageTapReported.concat(probe.path + ' ' + what);
-    const errors = window.ZoeErrors;
-    if (!errors || typeof errors.capture !== 'function') return;
-    try {
-        errors.capture(new Error('iOS page moved after a barcode field tap'), Object.assign({ zone: 'ui', context: 'iosPageTap ' + probe.path + ' ' + what }, probe.numbers,
-            { scrollY, viewportTop, pagesMoved: pages ? Math.round(pages.scrollTop - probe.pagesAt) : 0, afterMs: Math.round(performance.now() - probe.at),
-                viewportHeight: vv ? Math.round(vv.height) : 0, docHeight: Math.round(document.documentElement.scrollHeight || 0), stillFocused: document.activeElement === probe.field ? 1 : 0 }));
-    } catch (err) {}
-}
-
-function restorePageFieldScroll(): void {
-    const field = pageFieldCaught;
-    if (!field) return;
-    if (document.activeElement !== field) {
-        pageFieldCaught = null;
-        return;
-    }
-    if (uiState.isModalOpen || !usesIOSPanelHandoff() || (window.scrollY || 0) === 0) return;
+export function settleDocumentScroll(): void {
+    if (usesIOSPanelHandoff() && softKeyboardShown()) return;
     scrollWindowToTop();
 }
 
@@ -764,7 +675,6 @@ function keepKeyboardFocusInPlace(e: FocusEvent): void {
 
 export function noteModalTouchStart(e: TouchEvent): void {
     noteTouchesDown(e);
-    notePageTapStart(e);
     modalTap = null;
     caughtClick = null;
     if (modalFocusRefused) return;
@@ -779,7 +689,6 @@ export function noteModalTouchStart(e: TouchEvent): void {
 
 export function forgetModalTap(e?: TouchEvent): void {
     modalTap = null;
-    pageTapStart = null;
     if (e) noteTouchesDown(e);
 }
 
@@ -791,17 +700,12 @@ export function focusModalFieldWithoutScroll(e: TouchEvent): void {
     noteTouchesDown(e);
     const tap = modalTap;
     modalTap = null;
-    if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) {
-        notePageTapEnd(e, false);
-        return;
-    }
-    notePageTapEnd(e, true);
+    if (!tap || modalTapField(e.target) !== tap.field || !tapEndedInPlace(e, tap, MODAL_TAP_SLOP_PX, MODAL_TAP_MAX_MS)) return;
     e.preventDefault();
     if (document.activeElement === tap.field) blurActiveElement();
     if (focusElementWithoutScroll(tap.field)) {
         modalTapFocused = tap.field;
         if (usesIOSPanelHandoff()) caughtClick = { field: tap.field, until: performance.now() + CAUGHT_CLICK_MS };
-        if (usesIOSPanelHandoff() && !tap.field.closest('.modal')) pageFieldCaught = tap.field;
     } else modalFocusRefused = true;
 }
 
@@ -816,10 +720,6 @@ function swallowCaughtClick(e: Event): void {
     if (!target || (target !== caught.field && !caught.field.contains(target) && iosPageTapFieldOf(target) !== caught.field)) return;
     e.preventDefault();
     if (e.type === 'click') caughtClick = null;
-}
-
-function forgetPageFieldCaught(e: FocusEvent): void {
-    if (pageFieldCaught && e.target === pageFieldCaught) pageFieldCaught = null;
 }
 
 export function listenModalKeyboard(scope: LifecycleScope): void {
@@ -837,11 +737,7 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     stopModalGlide();
     modalRest = null;
     modalWatched = null;
-    pageTapStart = null;
-    pageTapProbe = null;
-    pageTapReported = [];
     touchesDown = 0;
-    pageFieldCaught = null;
     caughtClick = null;
     lastTouchEndAt = -Infinity;
     lastTouchTarget = null;
@@ -862,11 +758,8 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(document, 'focus', keepKeyboardFocusInPlace, { capture: true });
     scope.listen(document, 'focusin', noteIOSFieldFocus, { capture: true });
     scope.listen(document, 'focusout', noteIOSFieldBlur, { capture: true });
-    scope.listen(document, 'focusout', forgetPageFieldCaught, { capture: true });
     scope.listen(document, 'mousedown', swallowCaughtClick, { capture: true });
     scope.listen(document, 'click', swallowCaughtClick, { capture: true });
-    scope.listen(document, 'scroll', notePageMoved, { capture: true, passive: true });
-    scope.listen(document, 'scroll', restorePageFieldScroll, { capture: true, passive: true });
     scope.onDispose(() => {
         endKeyboardSession();
         resetIOSKeyboard();
@@ -875,9 +768,6 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
         modalResizeObserver = null;
         modalRest = null;
         modalWatched = null;
-        pageTapStart = null;
-        pageTapProbe = null;
-        pageFieldCaught = null;
         caughtClick = null;
         naturalBox = null;
         modalTap = null;
@@ -894,8 +784,6 @@ export function listenModalKeyboard(scope: LifecycleScope): void {
     scope.listen(vv, 'scroll', measureModalKeyboard);
     scope.listen(vv, 'resize', measureKeyboardCover);
     scope.listen(vv, 'scroll', measureKeyboardCover);
-    scope.listen(vv, 'scroll', notePageMoved);
-    scope.listen(vv, 'scroll', restorePageFieldScroll);
     measureKeyboardCover();
     scope.listen(document, 'focusin', noteModalFocus);
     scope.onDispose(uiState.subscribe(() => {

@@ -1870,9 +1870,6 @@
     "ZoeW/tests/orientation-lock.test.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/tests/ios-page-tap-probe.test.ts": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/tests/ios-accessory-focus.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -8,9 +8,12 @@
  *    ខណៈចលនា keyboard (additive) នៅរត់ ➜ ទំព័រលោតចុះ។ ស្លាក (`label[for]`) ៖ `click` ➜ focus ប្រអប់ដែលភ្ជាប់ ដូចគ្នា។
  *    តេស្តនេះក្លែងច្បាប់នោះ (`wk` ៖ focus/refocus ពេល keyboard មិនទាន់បង្ហាញ ➜ ការចុងក្រោយឈ្នះ) លើ App ពិត ៖ ចុចដែលចាប់ ➜ ចុចសំយោគ ➜ preventScroll នៅ true។
  *    ទិសផ្ទុយ ៖ ចុចដែល App មិនចាប់ (ប្រអប់ក្រោយ keyboard ៖ iOS ត្រូវបង្ហាញ) · Android · ក្រោយពេលកំណត់ · ការចុចថ្មី ➜ មិនប៉ះ។
- *    ទង់ចាស់ ៖ ប្រអប់ដែលចាប់ blur ហើយ ➜ focus ក្រោយ (iOS បង្ហាញ) មិនត្រូវទាញ document ត្រឡប់ទេ (ការទាញនោះជាអ្វីដែលធ្វើឲ្យលោតចុះ)។
+ *    ក្បួន «បង្ការ មិនតទល់» ៖ ពេល keyboard លោត App មិនសរសេរ scroll របស់ document ទេ (UIKit រំកិលបន្ថែម ៖ `scrollTo(0, 0)` កណ្តាលចលនា = ទំព័រលោតចុះ
+ *    ហើយរអិលត្រឡប់ ៖ A47 · វីដេអូ) ➜ ការទាញ ០ លើ visualViewport `resize` រត់លើ iPhone តែពេល keyboard បាត់ (`settleDocumentScroll()`) · Android ដូចមុន។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { uiState } from '../src/core/state';
 import * as modalKeyboard from '../src/app/behaviors/modal-keyboard';
 import { refTo } from '../src/app/refs';
@@ -220,20 +223,44 @@ describe('ទិសផ្ទុយ ៖ ចុចដែល iOS ត្រូវធ
     });
 });
 
-describe('⛔ ទង់ «ប្រអប់ដែលចាប់» មិននៅជាប់ ៖ blur ហើយ ➜ focus ក្រោយ (iOS បង្ហាញខ្លួនឯង) មិនទាញ document ត្រឡប់', () => {
-    it('⛔ ចាប់ ➜ document រំកិល ➜ ត្រឡប់ ០ (ដូចមុន) · blur ➜ focus ធម្មតា ➜ document រំកិល ➜ មិនទាញ', () => {
+describe('⛔ iPhone ៖ ពេល keyboard លោត App មិនសរសេរ scroll របស់ document (UIKit រំកិលបន្ថែម ➜ ការទាញ ០ កណ្តាលចលនា = ទំព័រលោតចុះ ហើយរអិលត្រឡប់)', () => {
+    function keyboard(px: number) {
+        vv.height = 844 - px;
+        vv.dispatchEvent(new Event('resize'));
+    }
+
+    it('⛔ ចុចចាប់ ➜ document រំកិល (scroll · visual viewport scroll) ➜ App មិនទាញ', () => {
         const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
         tap(scanner, 305);
-        Object.defineProperty(window, 'scrollY', { configurable: true, value: 40 });
-        document.dispatchEvent(new Event('scroll'));
-        expect(scroll).toHaveBeenCalledTimes(1);
-        scroll.mockClear();
-        Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
-        scanner.blur();
-        clock += 3000;
-        scanner.focus();
         Object.defineProperty(window, 'scrollY', { configurable: true, value: 214 });
         document.dispatchEvent(new Event('scroll'));
+        vv.dispatchEvent(new Event('scroll'));
         expect(scroll).not.toHaveBeenCalled();
+    });
+
+    it('⛔ visualViewport resize ៖ iPhone keyboard លោត ➜ មិនទាញ · keyboard បាត់ ➜ ទាញ ០ (ការរំកិលដែលនៅសល់) · Android · Safari browser ➜ ទាញដូចមុន', () => {
+        const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 214 });
+        keyboard(336);
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).not.toHaveBeenCalled();
+        keyboard(0);
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).toHaveBeenCalledTimes(1);
+        scroll.mockClear();
+        setIOSStandalone(false);
+        keyboard(336);
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).toHaveBeenCalledTimes(1);
+        scroll.mockClear();
+        Object.defineProperty(window.navigator, 'userAgentData', { configurable: true, value: { platform: 'Android', mobile: true } });
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).toHaveBeenCalledTimes(1);
+    });
+
+    it('⛔ ខ្សែភ្ជាប់ ៖ boot ចង settleDocumentScroll លើ visualViewport resize (មិនមែន scrollWindowToTop ផ្ទាល់)', () => {
+        const boot = readFileSync(path.join(__dirname, '..', 'src', 'app', 'lifecycle', 'boot.ts'), 'utf8');
+        expect(boot).toMatch(/visualViewport, 'resize', settleDocumentScroll\)/);
+        expect(boot).not.toMatch(/'resize', scrollWindowToTop\)/);
     });
 });

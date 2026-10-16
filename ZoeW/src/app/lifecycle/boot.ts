@@ -18,7 +18,6 @@ import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
-import { scrollWindowToTop } from '../../platform/document-io';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
@@ -44,7 +43,7 @@ import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget, m
 import { setupNativeShell } from './native-shell';
 import { listenIOSDocumentScroll, listenIOSKeyboard, listenIOSSearchFocus } from '../behaviors/ios-viewport';
 import { listenEntrySearchPanel } from '../behaviors/entry-search';
-import { listenModalKeyboard } from '../behaviors/modal-keyboard';
+import { listenModalKeyboard, settleDocumentScroll } from '../behaviors/modal-keyboard';
 import { applyOrientationLock } from '../../platform/orientation';
 import { oncePerPage, type LifecycleScope } from './scope';
 
@@ -66,7 +65,7 @@ function bootShell(scope: LifecycleScope): void {
     renderAppVersionLabels();
 
     if (window.visualViewport) {
-        scope.listen(window.visualViewport, 'resize', scrollWindowToTop);
+        scope.listen(window.visualViewport, 'resize', settleDocumentScroll);
     }
     listenIOSDocumentScroll(scope);
     listenIOSSearchFocus(scope);

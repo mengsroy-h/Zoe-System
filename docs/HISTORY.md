@@ -47,15 +47,14 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.95 · ZoeKeyGen 2.24.19** (PR #324 · `de92cd9`)។
-- Branch **`claude/zto-audit`** (ពី `main` `de92cd9` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
-- Session ផ្សេងដែលកំពុងធ្វើ ៖ ចំណូលយករួច `runTransaction` តាមថ្ងៃ (`claude/collected-day-scoped-tx`) · audit ZTO ➜ PR ដែល merge ក្រោយ merge `main` ហើយឡើងកំណែម្តងទៀត
-  (កំណែ PATCH ដដែលមិនត្រូវស្ទួន · `doc-scope-test` ផ្នែក ៨)។
+- `main` = **ZoeW 2.50.96 · ZoeKeyGen 2.24.19** (PR #325 · `2519a1f`)។
+- Branch **`claude/zto-audit`** (ពី `main` `2519a1f` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
 - ✅ ម្ចាស់គម្រោង (2026-10-16) ៖ «ការកែមុននេះដំណើរការត្រឹមត្រូវល្អហើយ ទាំង pwa ios, apk, pwa android» ➜ ធាតុសាកលើឧបករណ៍ទាំងអស់រហូតដល់ [2.50.93] បិទ។
+- ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
 - ⏳ **[2.50.95]** សកម្មភាព ១ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងបញ្ជីកញ្ចប់ពី ZTO)។
 
@@ -83,6 +82,32 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.96] — 2026-10-16 · ZoeW ៖ **កែតម្លៃកញ្ចប់ដែលយករួច ➜ «ចំណូលយករួច» ប៉ះតែថ្ងៃពាក់ព័ន្ធ (មិនមែន root ៧ ថ្ងៃទាំងមូល)**
+
+**ZoeW `2.50.96`** (`zoew-v358` ➜ `zoew-v359`) · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · គ្មាន migration Supabase · គ្មានកូដ Android native។
+ការងារបន្តពី A156 (💡 «App `runTransaction` តាមថ្ងៃ ជំនួស root ចំណូលយករួចទាំងមូល») ក្រោយ merge PR #323 · merge `main` (PR #324 · [2.50.95]) ➜ ឡើងកំណែម្តងទៀត · ការវាស់ ➜ ផ្នែក ២ A160។
+
+#### អ្វីដែលខុសពីមុន
+
+- 💵 កែតម្លៃកញ្ចប់ដែលបិទរួច ➜ `syncCollectedValueForBarcode()` ➜ `reconcileCollectedHistory(…, true)` ៖ transaction លើ `zoew_daily_collected_cod_dod/<ថ្ងៃ>/<key>`
+  នីមួយៗ (ថ្ងៃក្នុងទិដ្ឋភាព + ៧ ថ្ងៃ retention + ថ្ងៃបិទរបស់ barcode · ស្របគ្នា) ជំនួស transaction មួយលើ root ទាំងមូល។ `reconcileCollectedPriceState(current, barcode, keep)`
+  សម្រេចតម្លៃ leaf ៖ គ្មាន ➜ `null` (server សម្រេច · មិនបង្កើត) · បិទ ➜ តម្លៃ server របស់ barcode · បើក ➜ លុប · ថ្ងៃចាស់ស្ទួន ➜ លុបក្រោយ (ថ្ងៃថ្មីជាងឈ្នះ)។
+  ពិដាន retry · `'pending'` (⏳ ➜ ✅) · `error.message === 'set'` ➜ អានឡើងវិញ ដដែល · ⛔ មិនប៉ះ `isDeducted` · ledger · `packagesPickedUp`។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/collected-price-day-scope.test.ts` (ថ្មី ១៦ · SDK ក្លែងន័យ Firebase + adapter Supabase ពិត) — មុនកែ ធ្លាក់ ៦ (បៃ ២៦៦ KB · ៥៣២ KB > ២ KB) · ន័យ ១០ ឆ្លងទាំងមុន
+  និងក្រោយ (បើកវិញ · ទិដ្ឋភាពចាស់ · ឧបករណ៍ ២ ៖ លុប key · សរសេរតម្លៃចាស់ · ផ្លាស់ថ្ងៃ)។
+- `daily-collected-test` ៖ fake SDK សរសេរ `null` លើផ្លូវគ្មាន ➜ គ្មានប្រែ · មិនទុក node ទទេ (ស្មើ RTDB ពិត · មិនបន្ធូរការផ្ទៀងផ្ទាត់)។
+- `emu/restore-mutation` «សម្អាតជាន់ការកែតម្លៃ» ៖ gate ទប់**គ្រប់**ការសរសេរក្រោម root collected (root ឬ `<ថ្ងៃ>/<key>`) មុន HTTP ផ្ញើ (មុន ៖ តែផ្លូវស្មើ root ➜ CI
+  `COLLECTED_WRITE_DID_NOT_REACH_GATE`) ➜ RTDB ពិត ៖ leaf ៨ ទប់ · leaf ថ្ងៃដែលសម្អាតរួចទទួល `412` ➜ រត់លើ `null` ➜ មិនបង្កើតថ្ងៃវិញ · ១៨២/១៨២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+0. Deploy **ZoeW** (merge ចូល `main` ពេលម្ចាស់គម្រោងស្នើ) ➜ APK ថ្មី `zoew-android-v2.50.96` (កូដ Android ដដែល)។ Firebase rules ៖ **គ្មាន** · migration Supabase ៖ **គ្មាន**។
+1. សាក ៖ ហាង Firebase និងហាង Supabase ➜ បិទកញ្ចប់ («យករួច») ➜ ⋯ «កែតម្លៃកញ្ចប់» ➜ «✅ បានកែប្រែទឹកប្រាក់…» · 💵 «ចំណូលប្រចាំថ្ងៃ» យករួចប្រែតាមតម្លៃថ្មី ក្នុងថ្ងៃដដែល ·
+   ឧបករណ៍ទី ២ ឃើញតម្លៃថ្មី · កញ្ចប់បើក (មិនទាន់យក) កែតម្លៃ ➜ ចំណូលយករួចមិនប្រែ។
 
 ### [2.50.95] — 2026-10-16 · ZoeW ៖ **ផ្ទាំង «📥 បញ្ជីកញ្ចប់ពី ZTO» មិនបិទពេលប៉ះផ្ទៃទទេ**
 
@@ -3651,8 +3676,13 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A160 | **ZTO-E14 ៖ គម្រោង Firebase មួយចងសាខាច្រើន (`FIREBASE_PROJECT_IDS=zoew-v1:101\|102` — `ZTO-SETUP-KH.md` ផ្នែក ៤គ គាំទ្រ) ➜ ការរង់ចាំ ៨ ថ្ងៃលែងការពារកញ្ចប់សាខាផ្សេង** | ប្រវត្តិតែមួយកាន់កញ្ចប់សាខាទាំង ២ · Function អានបញ្ជី «ចុះហត្ថលេខា» តែសាខារបស់គណនី (`scanSiteCode` ពី email) · `closeZtoSignedBarcodes()` ចាត់ «ពេញលេញ» (`ztoSignedCompleteAt` + សញ្ញាហាង `completeAt`) ពេលគ្មានកញ្ចប់បើកណាក្នុងបញ្ជី **សាខាខ្លួន** នៅរង់ចាំ ➜ `ztoAbandonCleanupIsHeld()` ដោះ (ឧបករណ៍នេះ និងឧបករណ៍គ្មាន ZTO តាមសញ្ញាហាង) ➜ `abandon` ដកលុយកញ្ចប់សាខា 102 ដែល ZTO ចុះហត្ថលេខារួច ខណៈឧបករណ៍ 102 មិនទាន់អាន (ឧ. បិទចុងសប្តាហ៍)។ វាស់ (vitest ៖ Function ពិត + client ពិត + ZTO ក្លែង + ID token ចុះហត្ថលេខាពិត) ៖ កញ្ចប់ ១ · `ZTO_DETAIL_IDENTITY` `require`/`optional` + `ZTO_DETAIL_BRANCH_PATHS` ➜ `/detail` ឆ្លើយ `ZTO_OTHER_BRANCH` ➜ **ដកលុយ** (FAIL) · `off` (production បច្ចុប្បន្ន) ➜ `/detail` បិទវាក្នុងជុំដដែល · កញ្ចប់ ១៥ · `off` ➜ `/detail` បិទ ១០ (`ZTO_STATUS_SWEEP_BATCH`) · **ដកលុយ ៥** · ទិសផ្ទុយ ៖ គម្រោងសាខាតែមួយ · កញ្ចប់សាខាខ្លួនឯង ➜ បិទ «យករួច» (PASS) · ហាង Supabase (១ ហាង = ១ សាខា) មិនរងផល | ម្ចាស់គម្រោង ៖ «(ក) កែ Function» ➜ អ្នកយាមមុន `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` (លើ Function មុនកែ ៖ **FAIL ២/៦** ៖ សាខាផ្សេងដកលុយ · សាខាមួយ 503 ក៏ «ពេញលេញ») ➜ `listSignedBranchSites()` + `mergeSignedBranches()` ៖ `signed=1&exact=1` របស់គម្រោងដែលចងសាខា ≥ ២ អានបញ្ជីចុះហត្ថលេខាគ្រប់សាខាដែលចងស្របគ្នា (single-flight · ថវិកាដដែល · 401 ➜ រត់ឡើងវិញជាមួយ Cookie ថ្មី) ➜ សាខាណាមួយបរាជ័យ ➜ ចម្លើយបរាជ័យ (មិន cache · client backoff · មិនពេញលេញ) · cache key `\|B<សាខា>` · បញ្ជីមកដល់ និង `withSigned` នៅសាខាគណនី ➜ ក្រោយកែ **PASS ៦/៦** · vitest ZTO ២៦ ឯកសារ ៣០៩ តេស្ត PASS · checker ZTO ១១ PASS · run-all STRICT ពេញ (emulator · Postgres) ៖ PASS ២១០ · FAIL ២ (`doc-scope-test` ៖ លិបិក្រម 🔎 ខ្វះអ្នកយាមថ្មី ➜ បន្ថែម · `layout-check` អស់ពិដាន ៣០០ វិ. ក្រោម ៤ lane គ្មាន assertion ធ្លាក់) ➜ រត់ម្តងទៀត PASS ២/២ (`layout-check` ១៧១ វិ.) |
-| A161 | **Audit ZTO ៖ ផ្លូវដែលវាស់/អានហើយមិនឃើញចន្លោះថ្មី** | `RUNALL_ONLY` checker ZTO ១១ ➜ PASS ១១ (មិនពេញលេញ · គ្មាន emulator) · អាន `handleRequest()` · identity Firebase/Supabase · cache/single-flight (ការផ្ទៀងសាខាលើ cache hit និងអ្នកចូលរួម single-flight ក្នុងមួយសំណើ) · ថវិកា (certs · Cookie · upstream · retry 401 · companion ក្នុងពិដាន) · `fetchZtoListAllPages()` · `fetchZtoSignedCodes()`/`fetchZtoSignedPages()` (`pagesUnknown` · ការបំបែកតាមថ្ងៃ) · `ztoSignedSweepRange()` (`ZTO_SIGNED_SWEEP_RECENT_MS` ១២ ម៉ោង ≤ ២៤ ម៉ោង ➜ ជួរ «ម្សិលមិញ ➜ ថ្ងៃនេះ» គ្របចន្លោះអានគ្រប់ពេល) · `ztoIdentityTargetTrusted()` (origin · មិនមែន path · `{barcode}` encode) | ព្រំដែនដែលកត់ (មិនកែ) ៖ ZTO ឆ្លើយលើស `LIST_ROW_MAX` (២០០) ក្នុងមួយទំព័រ ➜ កាត់ស្ងាត់ (`pageSize` ≤ ១០០ ➜ តែពេល ZTO មិនអើពើ `pageSize`) · Termux `adb forward tcp:9222` បើកតែក្នុងពេលចាប់ Cookie (`127.0.0.1` លើទូរស័ព្ទ) · `?diag=1` `access.branch.seen` បង្ហាញលេខសាខា ≤ ៨ ដល់អ្នកមាន proxy key (មិនមែន secret) |
+| A161 | **ZTO-E14 ៖ គម្រោង Firebase មួយចងសាខាច្រើន (`FIREBASE_PROJECT_IDS=zoew-v1:101\|102` — `ZTO-SETUP-KH.md` ផ្នែក ៤គ គាំទ្រ) ➜ ការរង់ចាំ ៨ ថ្ងៃលែងការពារកញ្ចប់សាខាផ្សេង** | ប្រវត្តិតែមួយកាន់កញ្ចប់សាខាទាំង ២ · Function អានបញ្ជី «ចុះហត្ថលេខា» តែសាខារបស់គណនី (`scanSiteCode` ពី email) · `closeZtoSignedBarcodes()` ចាត់ «ពេញលេញ» (`ztoSignedCompleteAt` + សញ្ញាហាង `completeAt`) ពេលគ្មានកញ្ចប់បើកណាក្នុងបញ្ជី **សាខាខ្លួន** នៅរង់ចាំ ➜ `ztoAbandonCleanupIsHeld()` ដោះ (ឧបករណ៍នេះ និងឧបករណ៍គ្មាន ZTO តាមសញ្ញាហាង) ➜ `abandon` ដកលុយកញ្ចប់សាខា 102 ដែល ZTO ចុះហត្ថលេខារួច ខណៈឧបករណ៍ 102 មិនទាន់អាន (ឧ. បិទចុងសប្តាហ៍)។ វាស់ (vitest ៖ Function ពិត + client ពិត + ZTO ក្លែង + ID token ចុះហត្ថលេខាពិត) ៖ កញ្ចប់ ១ · `ZTO_DETAIL_IDENTITY` `require`/`optional` + `ZTO_DETAIL_BRANCH_PATHS` ➜ `/detail` ឆ្លើយ `ZTO_OTHER_BRANCH` ➜ **ដកលុយ** (FAIL) · `off` (production បច្ចុប្បន្ន) ➜ `/detail` បិទវាក្នុងជុំដដែល · កញ្ចប់ ១៥ · `off` ➜ `/detail` បិទ ១០ (`ZTO_STATUS_SWEEP_BATCH`) · **ដកលុយ ៥** · ទិសផ្ទុយ ៖ គម្រោងសាខាតែមួយ · កញ្ចប់សាខាខ្លួនឯង ➜ បិទ «យករួច» (PASS) · ហាង Supabase (១ ហាង = ១ សាខា) មិនរងផល | ម្ចាស់គម្រោង ៖ «(ក) កែ Function» ➜ អ្នកយាមមុន `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` (លើ Function មុនកែ ៖ **FAIL ២/៦** ៖ សាខាផ្សេងដកលុយ · សាខាមួយ 503 ក៏ «ពេញលេញ») ➜ `listSignedBranchSites()` + `mergeSignedBranches()` ៖ `signed=1&exact=1` របស់គម្រោងដែលចងសាខា ≥ ២ អានបញ្ជីចុះហត្ថលេខាគ្រប់សាខាដែលចងស្របគ្នា (single-flight · ថវិកាដដែល · 401 ➜ រត់ឡើងវិញជាមួយ Cookie ថ្មី) ➜ សាខាណាមួយបរាជ័យ ➜ ចម្លើយបរាជ័យ (មិន cache · client backoff · មិនពេញលេញ) · cache key `\|B<សាខា>` · បញ្ជីមកដល់ និង `withSigned` នៅសាខាគណនី ➜ ក្រោយកែ **PASS ៦/៦** · vitest ZTO ២៦ ឯកសារ ៣០៩ តេស្ត PASS · checker ZTO ១១ PASS · run-all STRICT ពេញ (emulator · Postgres) ៖ PASS ២១០ · FAIL ២ (`doc-scope-test` ៖ លិបិក្រម 🔎 ខ្វះអ្នកយាមថ្មី ➜ បន្ថែម · `layout-check` អស់ពិដាន ៣០០ វិ. ក្រោម ៤ lane គ្មាន assertion ធ្លាក់) ➜ រត់ម្តងទៀត PASS ២/២ (`layout-check` ១៧១ វិ.) |
+| A162 | **Audit ZTO ៖ ផ្លូវដែលវាស់/អានហើយមិនឃើញចន្លោះថ្មី** | `RUNALL_ONLY` checker ZTO ១១ ➜ PASS ១១ (មិនពេញលេញ · គ្មាន emulator) · អាន `handleRequest()` · identity Firebase/Supabase · cache/single-flight (ការផ្ទៀងសាខាលើ cache hit និងអ្នកចូលរួម single-flight ក្នុងមួយសំណើ) · ថវិកា (certs · Cookie · upstream · retry 401 · companion ក្នុងពិដាន) · `fetchZtoListAllPages()` · `fetchZtoSignedCodes()`/`fetchZtoSignedPages()` (`pagesUnknown` · ការបំបែកតាមថ្ងៃ) · `ztoSignedSweepRange()` (`ZTO_SIGNED_SWEEP_RECENT_MS` ១២ ម៉ោង ≤ ២៤ ម៉ោង ➜ ជួរ «ម្សិលមិញ ➜ ថ្ងៃនេះ» គ្របចន្លោះអានគ្រប់ពេល) · `ztoIdentityTargetTrusted()` (origin · មិនមែន path · `{barcode}` encode) | ព្រំដែនដែលកត់ (មិនកែ) ៖ ZTO ឆ្លើយលើស `LIST_ROW_MAX` (២០០) ក្នុងមួយទំព័រ ➜ កាត់ស្ងាត់ (`pageSize` ≤ ១០០ ➜ តែពេល ZTO មិនអើពើ `pageSize`) · Termux `adb forward tcp:9222` បើកតែក្នុងពេលចាប់ Cookie (`127.0.0.1` លើទូរស័ព្ទ) · `?diag=1` `access.branch.seen` បង្ហាញលេខសាខា ≤ ៨ ដល់អ្នកមាន proxy key (មិនមែន secret) |
+### 2026-10-16 — [2.50.96] ៖ កែតម្លៃកញ្ចប់បិទ ➜ «ចំណូលយករួច» តាមថ្ងៃ (បន្តពី A156)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A160 | **កែតម្លៃកញ្ចប់បិទ ➜ `runTransaction` លើ root `zoew_daily_collected_cod_dod` ទាំងមូល (៧ ថ្ងៃ)** | SDK Firebase ពិត + RTDB emulator (proxy TCP រាប់បៃ · ឧបករណ៍ A កែ · B ស្តាប់ root) ៖ root ៧ ថ្ងៃ × ១០០ / ១០០០ / ៤០០០ key (JSON ២៦ KB · ២៥៩ KB · ១.០៤ MB) ➜ A ផ្ញើឡើង ២៦ KB · ២៥៩ KB · ១.០៤ MB ទាញមកវិញ ២ ដង (៥២ KB · ៥១៨ KB · ២.០៧ MB) · **B ទាញ root ទាំងមូលម្តងទៀត** (២៦ KB · ២៥៩ KB · ១.០៤ MB) រាល់ការកែតម្លៃមួយ · transaction លើ `<ថ្ងៃ>/<key>` ៖ ឡើង ១៦២ · ចុះ ១៧៤ · B ១១៤ បៃ (ថេរ) · Supabase (adapter ពិត) ៖ CAS root = op មួយ `x` + `v` = root ✕ ២ (៥៣២ KB នៅ ១០០០/ថ្ងៃ · Postgres ពិត CAS root ៣២០០០ key ៥៦៧៦ms ៖ A156) | ✅ [2.50.96] ៖ transaction តាម leaf `<ថ្ងៃ>/<key>` (ថ្ងៃក្នុងទិដ្ឋភាព + ៧ ថ្ងៃ + ថ្ងៃបិទ · គ្មាន ➜ `null` ឲ្យ server សម្រេច) ➜ ការកែតម្លៃមួយលើ root ៧ × ១០០០ ៖ Firebase ≈ ៣៣០ បៃ · Supabase ≈ ៦៦០ បៃ ឡើង (ក្លែង) · អ្នកយាម `ZoeW/tests/collected-price-day-scope.test.ts` (មុនកែ ធ្លាក់ ៦ · ន័យ ១០ ឆ្លងទាំងមុននិងក្រោយ) · `daily-collected-test` fake ស្មើ RTDB (null លើផ្លូវគ្មាន = គ្មានប្រែ) · `emu/restore-mutation` gate ទប់គ្រប់ការសរសេរក្រោម root collected (CI ផ្នែក 3/4 លើ `73746dc` ៖ gate ស្មើ root ➜ timeout) |
 
 ### 2026-10-16 — សំណើម្ចាស់គម្រោង ៖ រៀបចំ `CLAUDE.md` · `HISTORY.md` ឲ្យមានសណ្តាប់ធ្នាប់ · ការពារការសរសេរស្ទួន · សម្អាតឯកសារចាស់
 
@@ -5708,6 +5738,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/clear-history-foreign-slot.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/close-restamp-idempotent.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/code128-parity.test.tsx` | — | ផ្នែក ៦ |
+| `ZoeW/tests/collected-price-day-scope.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/collected-sync-pending.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/config-modal.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/connection-flow-contract.test.ts` | ផ្នែក ១ | — |

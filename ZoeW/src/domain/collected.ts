@@ -81,24 +81,9 @@ export function markCollectedRevenue(marks) {
     return list;
 }
 
-export function reconcileCollectedPriceState(current, barcodes) {
-    if (!current || typeof current !== 'object' || Array.isArray(current)) return current;
-    const next = { ...current };
-    const days = Object.keys(current).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)).sort().reverse();
-    (Array.isArray(barcodes) ? barcodes : []).forEach((barcode) => {
-        const key = pickupBarcodeKey(barcode && barcode.code);
-        if (!key) return;
-        const heldDays = days.filter((day) => current[day] && typeof current[day] === 'object'
-            && Object.prototype.hasOwnProperty.call(current[day], key));
-        heldDays.forEach((day, index) => {
-            const record = { ...next[day] };
-            if (barcode.isClosed && index === 0) record[key] = collectedMarkValueOf(barcode);
-            else delete record[key];
-            if (Object.keys(record).length) next[day] = record;
-            else delete next[day];
-        });
-    });
-    return next;
+export function reconcileCollectedPriceState(current, barcode, keep) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return null;
+    return barcode && barcode.isClosed && keep ? collectedMarkValueOf(barcode) : null;
 }
 
 export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, preserveCollectedDay?) {
@@ -108,7 +93,6 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
     const collectedAuthGeneration = firebaseState.authGeneration;
     const collectedDatabase = firebaseState.db;
     const collectedSdk = firebaseState.fb;
-    const collectedRef = firebaseState.dbRefDailyCollected;
     const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
     const isCurrent = () => collectedAuthGeneration === firebaseState.authGeneration && collectedDatabase === firebaseState.db;
     const readState = (snapshot) => {
@@ -135,11 +119,29 @@ export async function reconcileCollectedHistory(itemId, keys, attemptsLeft?, pre
             if (!barcodes.length) break;
             let applied;
             if (preserveCollectedDay) {
-                const write = collectedSdk.runTransaction(collectedRef, (current) => {
-                    if (!isCurrent()) return;
-                    return reconcileCollectedPriceState(current, barcodes);
-                }, { applyLocally: false });
-                applied = { server: write.then((result) => !!(result && result.committed)) };
+                const viewDays = new Set(Object.keys(dataState.dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
+                const now = getServerNow();
+                for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) viewDays.add(getZoneDateKey(now, -index));
+                barcodes.forEach((barcode) => { const day = collectedDayOfStamp(barcode.closedAt); if (day) viewDays.add(day); });
+                const days = [...viewDays].sort().reverse();
+                const writeLeaf = (day, key, decide) => {
+                    let held = false;
+                    return collectedSdk.runTransaction(collectedSdk.ref(collectedDatabase, `zoew_daily_collected_cod_dod/${day}/${key}`), (current) => {
+                        if (!isCurrent()) return;
+                        held = !!(current && typeof current === 'object' && !Array.isArray(current));
+                        return decide(current);
+                    }, { applyLocally: false }).then((result) => ({ committed: !!(result && result.committed), held: held, day: day }));
+                };
+                const writeBarcode = async (barcode) => {
+                    const key = pickupBarcodeKey(barcode.code);
+                    const first = await Promise.all(days.map((day) => writeLeaf(day, key, (current) => reconcileCollectedPriceState(current, barcode, true))));
+                    if (first.some((entry) => !entry.committed)) return false;
+                    const heldDays = first.filter((entry) => entry.held).map((entry) => entry.day);
+                    if (!barcode.isClosed || heldDays.length < 2) return true;
+                    const older = await Promise.all(heldDays.slice(1).map((day) => writeLeaf(day, key, (current) => reconcileCollectedPriceState(current, barcode, false))));
+                    return older.every((entry) => entry.committed);
+                };
+                applied = { server: Promise.all(barcodes.map(writeBarcode)).then((results) => results.every(Boolean)) };
             } else {
                 const days = new Set(Object.keys(dataState.dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
                 const now = getServerNow();

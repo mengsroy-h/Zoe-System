@@ -2299,6 +2299,9 @@
     "ZoeW/tests/zto-palm-server.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-upstream-timing.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {
       "policy": "zoew-self-verification"
     },

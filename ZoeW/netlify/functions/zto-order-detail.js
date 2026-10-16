@@ -85,7 +85,18 @@ const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
 function upstreamTimingBucket() {
     return { count: 0, totalMs: 0, lastMs: 0, maxMs: 0, timeouts: 0, at: 0 };
 }
-const upstreamTimingSignal = { detail: upstreamTimingBucket(), arrival: upstreamTimingBucket(), signed: upstreamTimingBucket() };
+const upstreamTimingSignal = {
+    detail: upstreamTimingBucket(), arrival: upstreamTimingBucket(), signed: upstreamTimingBucket(),
+    palmDetail: upstreamTimingBucket(), palmArrival: upstreamTimingBucket(), palmSigned: upstreamTimingBucket()
+};
+function upstreamConnectBucket() {
+    return { count: 0, timed: 0, totalMs: 0, lastMs: 0, maxMs: 0, errors: 0, at: 0 };
+}
+let upstreamConnectSignal = { argus: upstreamConnectBucket(), palm: upstreamConnectBucket() };
+const ARGUS_UPSTREAM_HOSTS_MAX = 4;
+const argusUpstreamHosts = new Set();
+const UPSTREAM_CONNECT_PENDING_MAX = 8;
+const upstreamConnectStarts = new Map();
 const SIGNED_MISMATCH_KEYS_MAX = 1000;
 const SIGNED_MISMATCH_TEXTS_MAX = 5;
 const signedMismatchSignal = { at: 0, keys: new Set(), texts: new Set() };
@@ -1603,6 +1614,98 @@ function noteUpstreamTiming(kind, startedAt, timedOut) {
     bucket.at = Date.now();
 }
 
+function noteArgusUpstreamHost(hostname) {
+    const host = String(hostname || '').toLowerCase();
+    if (host && !argusUpstreamHosts.has(host) && argusUpstreamHosts.size < ARGUS_UPSTREAM_HOSTS_MAX) argusUpstreamHosts.add(host);
+}
+
+function upstreamConnectKind(params) {
+    const host = String((params && params.hostname) || '').toLowerCase();
+    if (!host) return '';
+    if (host === require('./_shared/zto-palm').PALM_HOST) return 'palm';
+    return argusUpstreamHosts.has(host) ? 'argus' : '';
+}
+
+function upstreamConnectKey(params) {
+    return String(params.hostname).toLowerCase() + ':' + String(params.port || '');
+}
+
+function noteUpstreamConnectStart(message) {
+    try {
+        const params = message && message.connectParams;
+        if (!params || typeof params !== 'object' || !upstreamConnectKind(params)) return;
+        const key = upstreamConnectKey(params);
+        const pending = upstreamConnectStarts.get(key) || [];
+        pending.push(Date.now());
+        if (pending.length > UPSTREAM_CONNECT_PENDING_MAX) pending.shift();
+        upstreamConnectStarts.set(key, pending);
+    } catch (_) {}
+}
+
+function noteUpstreamConnect(message, failed) {
+    try {
+        const params = message && message.connectParams;
+        if (!params || typeof params !== 'object') return;
+        const kind = upstreamConnectKind(params);
+        if (!kind) return;
+        const key = upstreamConnectKey(params);
+        const pending = upstreamConnectStarts.get(key);
+        const startedAt = pending && pending.length ? pending.shift() : 0;
+        if (pending && !pending.length) upstreamConnectStarts.delete(key);
+        const bucket = upstreamConnectSignal[kind];
+        bucket.at = Date.now();
+        if (failed) {
+            bucket.errors += 1;
+            return;
+        }
+        bucket.count += 1;
+        const ms = startedAt ? elapsedSince(startedAt) : NaN;
+        if (!Number.isFinite(ms)) return;
+        bucket.timed += 1;
+        bucket.totalMs += ms;
+        bucket.lastMs = ms;
+        if (ms > bucket.maxMs) bucket.maxMs = ms;
+    } catch (_) {}
+}
+
+function meterUpstreamConnects() {
+    try {
+        const channels = require('node:diagnostics_channel');
+        channels.channel('undici:client:beforeConnect').subscribe(noteUpstreamConnectStart);
+        channels.channel('undici:client:connected').subscribe((message) => noteUpstreamConnect(message, false));
+        channels.channel('undici:client:connectError').subscribe((message) => noteUpstreamConnect(message, true));
+    } catch (_) {}
+}
+meterUpstreamConnects();
+
+function upstreamConnectReport(bucket) {
+    return {
+        count: bucket.count,
+        errors: bucket.errors,
+        lastMs: bucket.timed ? bucket.lastMs : null,
+        avgMs: bucket.timed ? Math.round(bucket.totalMs / bucket.timed) : null,
+        maxMs: bucket.timed ? bucket.maxMs : null,
+        ageMs: bucket.at ? elapsedSince(bucket.at) : null
+    };
+}
+
+function upstreamTimingBody() {
+    return {
+        detail: upstreamTimingReport(upstreamTimingSignal.detail),
+        list: upstreamTimingReport(upstreamTimingSignal.arrival),
+        signed: upstreamTimingReport(upstreamTimingSignal.signed),
+        palm: {
+            detail: upstreamTimingReport(upstreamTimingSignal.palmDetail),
+            list: upstreamTimingReport(upstreamTimingSignal.palmArrival),
+            signed: upstreamTimingReport(upstreamTimingSignal.palmSigned)
+        },
+        connections: {
+            argus: upstreamConnectReport(upstreamConnectSignal.argus),
+            palm: upstreamConnectReport(upstreamConnectSignal.palm)
+        }
+    };
+}
+
 function upstreamTimingReport(bucket) {
     return {
         count: bucket.count,
@@ -1750,6 +1853,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             target.searchParams.set(config.queryParam, barcode);
         }
 
+        noteArgusUpstreamHost(target.hostname);
         const response = await fetch(target.href, init);
         if (controller.signal.aborted) throw abortError();
         noteUpstreamSetCookie(response);
@@ -2049,7 +2153,9 @@ function palmDeps(event, config, startedAt) {
         listSignedRange,
         listPageSize: config.list.pageSize,
         listMaxPages: config.list.maxPages,
-        mergeCompanion: (body, outcome) => mergeSignedCompanion(body, outcome)
+        mergeCompanion: (body, outcome) => mergeSignedCompanion(body, outcome),
+        noteTiming: noteUpstreamTiming,
+        timingReport: upstreamTimingBody
     };
 }
 
@@ -2205,11 +2311,7 @@ function diagnosticsBody(config, headers, authKind, credential) {
             code: upstreamRejectSignal.code || null,
             ageMs: upstreamRejectSignal.at ? elapsedSince(upstreamRejectSignal.at) : null
         },
-        upstreamTiming: {
-            detail: upstreamTimingReport(upstreamTimingSignal.detail),
-            list: upstreamTimingReport(upstreamTimingSignal.arrival),
-            signed: upstreamTimingReport(upstreamTimingSignal.signed)
-        },
+        upstreamTiming: upstreamTimingBody(),
         sessionRenewal: {
             observed: upstreamCookieSignal.seenAt > 0,
             setCookie: upstreamCookieSignal.setCookie,
@@ -2521,6 +2623,9 @@ exports.resetCachesForTests = function resetCachesForTests() {
     signedMismatchSignal.texts.clear();
     detailAccessSignal = detailAccessBucket();
     Object.keys(upstreamTimingSignal).forEach((kind) => { upstreamTimingSignal[kind] = upstreamTimingBucket(); });
+    upstreamConnectSignal = { argus: upstreamConnectBucket(), palm: upstreamConnectBucket() };
+    argusUpstreamHosts.clear();
+    upstreamConnectStarts.clear();
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieLifeState = cookieLifeBucket();
@@ -2558,4 +2663,8 @@ exports.cookieReadWindowForTests = function cookieReadWindowForTests(config, sta
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {
     blobsModuleForTests = blobsModule || null;
+};
+
+exports.noteArgusUpstreamHostForTests = function noteArgusUpstreamHostForTests(hostname) {
+    noteArgusUpstreamHost(hostname);
 };

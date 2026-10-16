@@ -76,6 +76,8 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.98] Palm ពេញ** ៖ សាកលើ Deploy Preview ជាមួយគណនី Palm ពិត ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្មើ tab «បញ្ជូន» · កញ្ចប់ដែលចុះហត្ថលេខាក្នុង
   App Palm បិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- ⏳ **[2.50.98] ល្បឿន Lookup Palm** (ម្ចាស់គម្រោង ៖ Palm ១.២–១.៥ វិ · Cookie ០.៦–១.០ វិ) ៖ ក្រោយ Deploy ស្កេន ៣–៥ កញ្ចប់ក្នុងរបៀបនីមួយៗ ➜ 🩺 ➜
+  ជួរ Lookup ៖ «ZTO ឆ្លើយពេលស្កេន» និង «ភ្ជាប់ថ្មីទៅ ZTO» ➜ ផ្ញើលេខមក ដើម្បីសម្រេចថាយឺតនៅ ZTO Palm ឬនៅការភ្ជាប់ (A174)។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
@@ -106,6 +108,10 @@
   មិនពិនិត្យ `/detail` ម្តងមួយៗ (`billInfoQuery` គ្មានស្ថានភាព ➜ គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា»)។ ផ្ទាំង Palm · `guide.html` ពន្យល់។
 - អ្នកយាមថ្មី ៖ `ZoeW/tests/zto-palm-list.test.tsx` (៤ ធ្លាក់លើកូដមុនកែ) · `zto-palm-server.test.ts` ផ្នែកបញ្ជី (៨ ធ្លាក់លើកូដមុនកែ ·
   endpoint ដែលហៅត្រូវនៅក្នុងបញ្ជីអានតែប៉ុណ្ណោះ)។ test ចាស់ ៣ ដែលសន្មតថា Palm បិទមុខងារ ZTO ត្រូវប្តូរតាមសំណើ។
+- ល្បឿន Lookup Palm (ម្ចាស់គម្រោងរាយការណ៍ Palm យឺតជាង Cookie · A173–A174) ៖ របៀប Palm កម្តៅ Function ដូចរបៀប Cookie (`OPTIONS ?palm=1` ·
+  គ្មានសោ · គ្មាន session · Function មិនអាន Cookie) · `?diag=1` វាស់ពេល ZTO Palm ឆ្លើយ (`upstreamTiming.palm`) និងការភ្ជាប់ TCP+TLS ថ្មីទៅ ZTO
+  (`upstreamTiming.connections`) ➜ 🩺 ជួរ Lookup បង្ហាញជាវិនាទី។ អ្នកយាមថ្មី `ZoeW/tests/zto-upstream-timing.test.ts` (៦ ធ្លាក់លើកូដមុនកែ) ·
+  `zto-palm-list.test.tsx` (កម្តៅ) · `zto-palm-login.test.tsx` (🩺)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -113,6 +119,8 @@
 2. លើ preview ៖ ☰ ZTO ➜ បើក «ទាញបញ្ជីកញ្ចប់ពី ZTO» ➜ ទាញថ្ងៃនេះ ➜ ធៀបនឹង tab «បញ្ជូន» ក្នុង App Palm (ចំនួន · លេខទូរស័ព្ទ · COD/DOD)។
 3. ចុះហត្ថលេខាកញ្ចប់មួយក្នុង App Palm ➜ ក្នុង ZoeW កញ្ចប់នោះបិទ «យក» ដោយស្វ័យប្រវត្តិ (ឬចុច 🔄 ក្នុងរបារ ZTO)។
    ⛔ សាកលើ preview មុន merge ព្រោះវាប៉ះ auto-close និងការសម្អាត ៨ ថ្ងៃ (លុយ)។
+4. ល្បឿន ៖ ស្កេន ៣–៥ កញ្ចប់ក្នុងរបៀប Palm ➜ 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ➜ ជួរ «Lookup អតិថិជន (ZTO Palm)» ➜ កត់ «ZTO ឆ្លើយពេលស្កេន» ·
+   «ភ្ជាប់ថ្មីទៅ ZTO» ➜ ធ្វើដូចគ្នាក្នុងរបៀប Cookie ➜ ផ្ញើលេខទាំងពីរមក។
 
 ### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
 
@@ -3728,6 +3736,17 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-16 — Lookup Palm យឺតជាង Lookup Cookie (ម្ចាស់គម្រោងវាស់លើទូរស័ព្ទ)
+
+របាយការណ៍ ៖ «lookup របស់ palm 1.2-1.5 វិនាទី» · «cookie lookup លឿនជាង នៅតែ 0.6-1.0 ដដែល»។ ម៉ាស៊ីន session ភ្ជាប់ host ZTO មិនបាន
+(`aargus-api.ztoglobal.com` · `.net` ➜ បណ្ដាញបិទ) ➜ វាស់ពីទីនេះមិនបាន ➜ សង់ឧបករណ៍វាស់ក្នុង Function មុន មិនទាយ។ អានកូដ ៖ ផ្លូវ Palm ក្នុង Function
+(ស្រាយ session AES-GCM · `sessionKey()`) និងក្នុង App (ស្រាយ session ដោយសោ PIN) ចំណាយតិចជាង ms ➜ ភាពខុសគ្នានៅ ZTO ឬនៅការភ្ជាប់។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A173 | របៀប Palm មិនកម្តៅ Function (`warmZtoLookupProxyIfConfigured()` ចេញភ្លាមពេល Palm) ខណៈរបៀប Cookie កម្តៅតាមចេតនាអ្នកប្រើ និងក្រោយការស្កេន ➜ container ត្រជាក់ចំណាយ cold start លើការស្កេន | `zto-palm-list.test.tsx` ៖ Palm ➜ គ្មានសំណើកម្តៅ | `OPTIONS ?palm=1` (គ្មានសោ · គ្មាន session) ➜ Function រំលងការអាន Cookie (`isPalmPreflight()` · A168) · ទិសផ្ទុយ ៖ Cookie គ្មាន `palm=1` |
+| A174 | មូលហេតុនៅសល់វាស់មិនបាន ៖ `upstreamTiming` មិនរាប់ Palm · គ្មានការរាប់ការភ្ជាប់ TLS ថ្មី | `?diag=1` Palm គ្មានពេល | `upstreamTiming.palm` (`detail` · `list` · `signed`) + `connections` (`argus` · `palm` ៖ undici `diagnostics_channel`) ➜ 🩺 ជាវិនាទី · ⛔ ព្រឹត្តិការណ៍ `beforeConnect` និង `connected` ពិតដឹក `connectParams` **ផ្សេងគ្នា** (វាស់ ៖ `fetch` ពិត) ➜ ការផ្គូរតាម object (`WeakMap`) មិនដែលបានពេល ➜ ផ្គូរតាម host + port · test ពិតជាមួយ server ក្នុងម៉ាស៊ីន (`ZoeW/tests/zto-upstream-timing.test.ts`) ធ្លាក់លើការផ្គូរតាម object |
+
 ### 2026-10-16 — កាតាឡុក API ZTO Palm ពី APK ដែលម្ចាស់គម្រោងផ្តល់ (ឯកសារតែប៉ុណ្ណោះ)
 
 សំណើ ៖ «កត់ត្រាទុកទាំងអស់ … ថ្ងៃក្រោយខ្ញុំចង់ update មុខងារបន្ថែមចូល ZoeW អោយស្គាល់គ្រប់មុខងារផ្លូវការរបស់ ZTO»។ APK ពន្លាក្នុង folder ដាច់
@@ -5970,7 +5989,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
-| `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
@@ -5986,3 +6005,4 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-signed-truncation.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-stale-bar.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-token-origin.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-upstream-timing.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

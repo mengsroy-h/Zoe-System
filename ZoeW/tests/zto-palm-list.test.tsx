@@ -7,12 +7,14 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refTo } from '../src/app/refs';
-import { dataState, firebaseState, securityState, uiState, ztoState } from '../src/core/state';
+import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { buildZtoListApiUrl, runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
 import { encryptLookupSecret } from '../src/services/crypto';
+import { warmZtoLookupProxyIfConfigured } from '../src/features/customer-table-prefetch';
+import { getLookupApiConfig } from '../src/features/lookup-config';
 
 const h = vi.hoisted(() => ({ calls: [] as any[] }));
 vi.mock('../src/features/barcode-ops', () => ({
@@ -127,5 +129,39 @@ describe('ZTO Palm ពេញ ៖ បញ្ជី · ចុះហត្ថលេ�
         expect(u.searchParams.get('withSigned')).toBe('1');
         expect((fetch.mock.calls[0] as any[])[1].headers).toMatchObject({ 'X-Zoe-Palm-Token': SESSION });
         expect(ztoState.ztoListSyncResult.rows.map((r: any) => r.barcode)).toEqual(['KH0000000501']);
+    });
+});
+
+describe('Palm warms the Function like Cookie mode (owner report: Palm lookup slower than Cookie)', () => {
+    it('Palm ➜ OPTIONS with palm=1 (the Function skips the Argus Cookie read) · no proxy key · no session', async () => {
+        lookupState.ztoWarmupAt = 0;
+        lookupState.ztoWarmupInFlight = false;
+        const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 204 }));
+        vi.stubGlobal('fetch', fetch);
+        expect(warmZtoLookupProxyIfConfigured(getLookupApiConfig())).toBe(true);
+        await vi.waitFor(() => expect(lookupState.ztoWarmupInFlight).toBe(false));
+        expect(fetch).toHaveBeenCalledTimes(1);
+        const [url, init] = fetch.mock.calls[0] as any[];
+        const u = new URL(String(url), window.location.href);
+        expect(u.pathname).toBe('/.netlify/functions/zto-order-detail');
+        expect(u.searchParams.get('palm')).toBe('1');
+        expect(u.searchParams.get('barcode')).toBeNull();
+        expect(init.method).toBe('OPTIONS');
+        expect(JSON.stringify(init.headers || {})).not.toContain(SESSION);
+        expect(JSON.stringify(init.headers || {})).not.toContain(PROXY);
+        expect(warmZtoLookupProxyIfConfigured(getLookupApiConfig())).toBe(false);
+    });
+
+    it('reverse: Cookie (Argus) mode warms without palm=1, so the Function still reads its Cookie ahead', async () => {
+        lookupState.ztoWarmupAt = 0;
+        lookupState.ztoWarmupInFlight = false;
+        const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 204 }));
+        vi.stubGlobal('fetch', fetch);
+        const cfg = { ...getLookupApiConfig(), url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
+        expect(warmZtoLookupProxyIfConfigured(cfg)).toBe(true);
+        await vi.waitFor(() => expect(lookupState.ztoWarmupInFlight).toBe(false));
+        const u = new URL(String((fetch.mock.calls[0] as any[])[0]), window.location.href);
+        expect(u.pathname).toBe('/.netlify/functions/zto-order-detail');
+        expect(u.search).toBe('');
     });
 });

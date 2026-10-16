@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 
 const ORIGIN = 'https://aargus-api.ztoglobal.net';
+const PALM_HOST = new URL(ORIGIN).hostname;
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
@@ -73,7 +74,14 @@ function upstreamReason(result) {
     return UPSTREAM_CODE_RE.test(code) ? 'palm:' + code : 'palm:status';
 }
 
-async function requestPalm(path, payload, token, keys, timeoutMs) {
+function meterFor(deps, kind) {
+    if (!deps || typeof deps.noteTiming !== 'function') return null;
+    return (startedAt, timedOut) => {
+        try { deps.noteTiming(kind, startedAt, timedOut); } catch (_) {}
+    };
+}
+
+async function requestPalm(path, payload, token, keys, timeoutMs, meter) {
     const body = JSON.stringify(payload);
     const headers = {
         'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json',
@@ -82,6 +90,7 @@ async function requestPalm(path, payload, token, keys, timeoutMs) {
     };
     if (token) headers['x-token'] = token;
     const controller = new AbortController();
+    const startedAt = Date.now();
     let timeout;
     const budget = new Promise((_, reject) => {
         timeout = setTimeout(() => {
@@ -105,7 +114,10 @@ async function requestPalm(path, payload, token, keys, timeoutMs) {
     work.catch(() => {});
     try {
         return await Promise.race([work, budget]);
-    } finally { clearTimeout(timeout); }
+    } finally {
+        clearTimeout(timeout);
+        if (meter) meter(startedAt, controller.signal.aborted);
+    }
 }
 
 function phoneText(raw, keys) {
@@ -181,12 +193,17 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
         const session = openSession(deps.headerOf(event, SESSION_HEADER), proxyKey, env);
         if (query.list === '1') return await palmList(query, session, keys, deps);
-        if (query.diag === '1') return json(200, { success: true, provider: 'zto-palm', configured: true });
+        if (query.diag === '1') {
+            const body = { success: true, provider: 'zto-palm', configured: true };
+            if (typeof deps.timingReport === 'function') body.upstreamTiming = deps.timingReport();
+            return json(200, body);
+        }
         const barcode = String(query.barcode || '').trim();
         if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
         const access = await deps.lookupAccess();
         if (access && access.response) return access.response;
-        const upstream = await requestPalm('/zto/basic/v1/billInfoQuery', { billCode: barcode }, session.token, keys, deps.upstreamMs());
+        const upstream = await requestPalm('/zto/basic/v1/billInfoQuery', { billCode: barcode }, session.token, keys, deps.upstreamMs(),
+            meterFor(deps, 'palmDetail'));
         if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) {
             return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
         }
@@ -270,7 +287,8 @@ function palmListBody(kind, page, session, result, keys, deps) {
 }
 
 async function palmListPage(kind, range, page, session, keys, deps) {
-    const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(kind, range, page, deps), session.token, keys, deps.upstreamMs());
+    const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(kind, range, page, deps), session.token, keys, deps.upstreamMs(),
+        meterFor(deps, kind === 'signed' ? 'palmSigned' : 'palmArrival'));
     if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return { kind: 'auth' };
     if (upstream.status !== true) return { kind: 'rejected', reason: upstreamReason(upstream) };
     return { kind: 'ok', body: palmListBody(kind, page, session, upstream, keys, deps) };
@@ -314,4 +332,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight };
+module.exports = { handlePalm, isPalmPreflight, PALM_HOST };

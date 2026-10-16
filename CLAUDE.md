@@ -62,7 +62,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.99` (`zoew-v362`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.100` (`zoew-v363`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.19` (`zoekeygen-v130`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)

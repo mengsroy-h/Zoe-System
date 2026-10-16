@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const ORIGIN = 'https://aargus-api.ztoglobal.net';
 const PALM_HOST = new URL(ORIGIN).hostname;
 const BILL_INFO_PATH = '/zto/basic/v1/billInfoQuery';
+const TRACK_INFO_PATH = '/zto/locus/v1/queryTrackInfo';
 const PALM_KEEP_ALIVE_MS = 60000;
 const GLOBAL_DISPATCHER = Symbol.for('undici.globalDispatcher.1');
 const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
@@ -160,7 +161,7 @@ function phoneText(raw, keys) {
     return /^\+?[0-9 ()-]{6,32}$/.test(value) && !/^0+$/.test(value.replace(/\D/g, '')) ? value : '';
 }
 
-function lookupBody(result, barcode, keys, deps) {
+function lookupBody(result, barcode, keys, deps, diagnostic = false) {
     const row = result.result;
     if (row === null || row === undefined) return { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
     if (typeof row !== 'object' || Array.isArray(row)) throw new Error('upstream:json');
@@ -168,7 +169,7 @@ function lookupBody(result, barcode, keys, deps) {
     if (billCode && billCode.toUpperCase() !== barcode.toUpperCase()) throw new Error('upstream:barcode');
     const phone = phoneText(row.consigneeMobile || row.consigneePhone || row.phone, keys);
     const fields = deps.project(row);
-    if (!phone && fields.cod === null && fields.dod === null) throw new Error('upstream:json');
+    if (!diagnostic && !phone && fields.cod === null && fields.dod === null) throw new Error('upstream:json');
     const body = {
         success: true, found: true, barcode, phone,
         cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod,
@@ -237,7 +238,15 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
             return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
         }
         if (upstream.status !== true) return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(upstream) });
-        return json(200, deps.finish(access, lookupBody(upstream, barcode, keys, deps), barcode));
+        const diagnostic = query.track === '1';
+        const body = deps.finish(access, lookupBody(upstream, barcode, keys, deps, diagnostic), barcode);
+        if (!diagnostic || body.found !== true) return json(200, body);
+        const tracking = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: [barcode] }, session.token, keys, deps.upstreamMs(), null, true);
+        if (tracking.authRejected || AUTH_EXPIRED_RE.test(String(tracking.statusCode || ''))) {
+            return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
+        }
+        if (tracking.status !== true) return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(tracking) });
+        return json(200, { ...body, billInfoQuery: upstream, queryTrackInfo: tracking });
     } catch (error) {
         const reason = error?.message;
         if (reason === 'palm:config') return json(503, { code: 'ZTO_PALM_NOT_CONFIGURED', reason: error.reason });

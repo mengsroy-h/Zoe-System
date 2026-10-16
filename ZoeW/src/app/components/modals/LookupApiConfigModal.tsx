@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LookupApiConfigModal() {
-    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
+    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'lookupTestResult', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
     return (
         <Modal id="lookupApiConfigModal">
             <div className="modal-content">
@@ -88,6 +88,10 @@ export function LookupApiConfigModal() {
                     ឈ្មោះ Field DOD ក្នុង JSON:
                 </label>
                 <input type="text" id="lookupApiDodFieldInput" ref={refTo('lookupApiDodFieldInput')} placeholder="ឧ. dod ឬ data.dod" />
+                {v.lookupTestResult && <div style={{ textAlign: 'left' }}>
+                    <label htmlFor="lookupApiTestResult">លទ្ធផល JSON ពេញ (អូសមើល និងចម្លងដើម្បីផ្ទៀងផ្ទាត់ Field)៖</label>
+                    <textarea id="lookupApiTestResult" readOnly rows={14} value={v.lookupTestResult} style={{ width: '100%', fontFamily: 'monospace' }} />
+                </div>}
                 <div className="modal-btns" style={{ marginTop: "6px" }}>
                     <div className="modal-btns-row">
                         <button className="btn-info" disabled={v.lookupTestBusy} onClick={onAct("testLookupApiConfig", { self: true })}>🧪 សាកល្បង</button>

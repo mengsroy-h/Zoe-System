@@ -93,6 +93,25 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.100] — 2026-10-16 · ZoeW ៖ 🧪 Palm បង្ហាញ billInfoQuery និង queryTrackInfo ពេញ
+
+**ZoeW `2.50.100`** (`zoew-v362` ➜ `zoew-v363`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី។
+សំណើម្ចាស់គម្រោងក្នុង PR #328 ៖ 🧪 អាន full `queryTrackInfo` របស់ Barcode ដើម្បីរៀបចំ Palm ដូច Cookie sync;
+ម្ចាស់គម្រោងបញ្ជាក់ថា Cookie ពី Blob និង Palm ប្រើ field ខុសគ្នា ធ្វើឲ្យ mapping រួមទាញតម្លៃខុស។
+តំបន់ ZTO ចាក់សោ `zto-palm.js` កែតាមសំណើនេះ និងធ្វើបច្ចុប្បន្នភាព `LOCK`។
+
+- 🧪 ក្នុងរបៀប Palm បន្ថែម `track=1` តែសំណើសាកល្បង; Function អាន `billInfoQuery` ➜ ផ្ទៀងសាខា ➜ អាន
+  `POST /zto/locus/v1/queryTrackInfo` (`mailType: 1` · `mailNos: [barcode]`) ដោយ session និងហត្ថលេខា Palm។
+- ចម្លើយដើមទាំងពីរនៅដដែល; mapping Cookie មិនស្គាល់ COD/DOD Palm ក៏អាចពិនិត្យ field ដើមបាន។ ការស្កេនធម្មតានៅតែប្រើ lookup ដដែល។
+- ZTO JSON បង្ហាញពេញក្នុង textarea អាចអូស និងចម្លងបាន; គ្មានពិដាន ១៥០០ តួអក្សរ។ បើក Config ថ្មី សាកថ្មី ឬបិទ session ➜ លុបលទ្ធផលក្នុង memory។
+- តេស្តលើ handler និង React ពិត ៖ JSON លើស ៤០០០ តួ · session/header · field មិនស្គាល់ · សាខាផ្សេង/បាត់ · upstream 401/429/500។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. លើ Deploy Preview PR #328 ៖ Login Palm ➜ API ស្វែងរក ➜ 🧪 ➜ Barcode ពិត ➜ ចម្លង `billInfoQuery` និង `queryTrackInfo`
+   ដើម្បីផ្ទៀង field និងស្កេនមកដល់/ចុះហត្ថលេខាធៀប Cookie។ Mapping Palm ត្រូវផ្អែកលើចម្លើយពិតនេះ។
+2. មិនត្រូវការ env ថ្មី។ ការទាញបញ្ជីមកដល់ក្នុងរបៀប Palm នៅតែបិទ; ការកែនេះផ្តល់ទិន្នន័យសម្រាប់រៀបចំជំហានបន្ទាប់។
+
 ### [2.50.99] — 2026-10-16 · ZoeW ៖ របៀប Palm លែងទាញបញ្ជីកញ្ចប់មកដល់ (tab «បញ្ជូន» មិនមែនកញ្ចប់មកដល់)
 
 **ZoeW `2.50.99`** (`zoew-v361` ➜ `zoew-v362`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី · គ្មានកូដ Android native។

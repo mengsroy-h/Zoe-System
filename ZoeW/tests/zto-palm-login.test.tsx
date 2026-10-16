@@ -8,7 +8,7 @@ import { fieldValue, setFieldChecked, setFieldValue } from '../src/app/refs';
 import { firebaseState, scanState, securityState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
-import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig } from '../src/features/lookup-config';
+import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import { cancelZtoPalmLogin, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { encryptLookupSecret, decryptLookupSecret } from '../src/services/crypto';
@@ -77,6 +77,29 @@ afterEach(() => {
 });
 
 describe('Palm login UI and existing lookup flow', () => {
+    it('🧪 Palm អាន queryTrackInfo និងបង្ហាញ JSON ពេញដែលអាចចម្លងបាន', async () => {
+        await signIn();
+        act(() => openLookupApiConfigModal());
+        vi.stubGlobal('prompt', () => '77130500000012');
+        const body = { success: true, queryTrackInfo: { status: true, result: [{ tracks: [{ message: 'ក'.repeat(4000), action: '03', tail: 'ចុងចម្លើយ' }] }] } };
+        vi.stubGlobal('fetch', vi.fn(async () => response(body)));
+        await act(async () => { await testLookupApiConfig(); });
+        const [url, init] = vi.mocked(fetch).mock.calls[0];
+        const query = new URL(String(url)).searchParams;
+        expect(query.get('palm')).toBe('1');
+        expect(query.get('track')).toBe('1');
+        expect(query.get('barcode')).toBe('77130500000012');
+        expect(init?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Palm-Token': SESSION });
+        expect(document.querySelectorAll('#lookupApiTestResult')).toHaveLength(1);
+        const result = document.querySelector<HTMLTextAreaElement>('#lookupApiTestResult');
+        expect(result?.readOnly).toBe(true);
+        expect(result?.value).toContain(JSON.stringify(body, null, 2));
+        expect(result?.value).toContain('ចុងចម្លើយ');
+        expect(getLookupApiConfig().url).not.toContain('track=');
+        act(() => clearSensitiveModalFields());
+        expect(viewState.lookupTestResult).toBe('');
+    });
+
     it('renders the login fields and stores only PIN-encrypted secrets', async () => {
         const cfg = await signIn();
         expect(fieldValue('ztoPalmPasswordInput')).toBe('');

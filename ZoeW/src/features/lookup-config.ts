@@ -46,6 +46,7 @@ export async function migrateLookupSecretIfNeeded() {
 }
 
 export function openLookupApiConfigModal() {
+    viewState.lookupTestResult = '';
     refreshZtoPalmLogin();
     const cfg = getLookupApiConfig() || {};
     const setVal = (id, val) => { setFieldValue(id, val || ''); };
@@ -157,6 +158,7 @@ let lookupTestGeneration = 0;
 export async function testLookupApiConfig(btnEl?) {
     const generation = ++lookupTestGeneration;
     viewState.lookupTestBusy = false;
+    viewState.lookupTestResult = '';
     const shop = shopScope();
     const authEpoch = firebaseState.authGeneration;
     const key = securityState.lookupSecretKey;
@@ -171,7 +173,12 @@ export async function testLookupApiConfig(btnEl?) {
     let testBarcode = prompt("បញ្ចូលលេខ Barcode សាកល្បង (សម្រាប់សាកល្បង API មុននឹងរក្សាទុក):", "");
     if (!testBarcode || !testBarcode.trim()) return;
 
-    const testUrl = url.replace('{barcode}', encodeURIComponent(testBarcode.trim()));
+    let testUrl = url.replace('{barcode}', encodeURIComponent(testBarcode.trim()));
+    if (lookupApiIsPalm({ url })) {
+        const palmTestUrl = new URL(testUrl, window.location.href);
+        palmTestUrl.searchParams.set('track', '1');
+        testUrl = palmTestUrl.href;
+    }
     const headers = {};
     const hName = fieldValue('lookupApiHeaderNameInput').trim();
     const existingCfg = getLookupApiConfig() || {};
@@ -194,7 +201,13 @@ export async function testLookupApiConfig(btnEl?) {
     try {
         const out = await fetchWithTimeout(testUrl, { headers }, testTimeoutMs, 'Test API timed out', (r) => r.text());
         if (!current()) return;
-        alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
+        if (testIsZto) {
+            let body = String(out.body);
+            try { body = JSON.stringify(JSON.parse(body), null, 2); } catch (_) {}
+            viewState.lookupTestResult = "ស្ថានភាព HTTP៖ " + out.res.status + "\n\n" + body;
+        } else {
+            alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
+        }
     } catch (e) {
         if (!current()) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'testLookupApiConfig' });

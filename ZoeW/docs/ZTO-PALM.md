@@ -5,6 +5,16 @@
 ពេលស្កេន Barcode, ZoeW បំពេញលេខទូរស័ព្ទ និង COD/DOD ទៅផ្ទាំងស្កេនដែលមានស្រាប់។
 ការរក្សាទុកភ្លាមៗនៅតែអាស្រ័យលើជម្រើស auto-submit របស់អ្នក។
 
+## 🧪 ពិនិត្យ field របស់ Palm
+
+ចុច **🧪 សាកល្បង** ក្នុងការកំណត់ API រួចបញ្ចូល Barcode។ របៀប Palm អាន
+`billInfoQuery` និង `queryTrackInfo` (`mailType: 1` · `mailNos: [barcode]`) ដោយ session ដែលបាន Login។
+ចម្លើយដើមពេញលេញនៅក្នុង `billInfoQuery` និង `queryTrackInfo` បង្ហាញក្នុងប្រអប់ JSON ដែលអាចអូសមើល
+និងចម្លងបាន។ វាលដើមនៅដដែល ទោះ mapping COD/DOD ដែលកំណត់សម្រាប់ Cookie មិនស្គាល់វាក៏ដោយ។
+ប្រើចម្លើយនេះដើម្បីផ្ទៀងផ្ទាត់ឈ្មោះ field របស់ Palm មុនរៀបចំ mapping; `ZTO_FIELD_*` របស់ server
+ប្រើរួមក្នុង Lookup Cookie និង Palm ដូច្នេះត្រូវផ្ទៀងផ្ទាត់ទាំងពីរ។ ការស្កេនធម្មតាអាន `billInfoQuery` តែមួយ។
+ការសាកល្បងអនុវត្តការផ្ទៀងគណនី និងសាខាដូច Lookup។
+
 ## កំណត់ server មុនប្រើ
 
 Deploy source នេះទៅ Netlify site របស់ ZoeW រួមទាំង `netlify/functions/`។ ដាក់ env

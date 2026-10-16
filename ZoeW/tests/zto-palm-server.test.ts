@@ -78,6 +78,53 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(response.headers['Cache-Control']).toBe('no-store');
     });
 
+    it('🧪 អាន queryTrackInfo ពេញដោយ session Palm និងរក្សា lookup ធម្មតា', async () => {
+        const { sessionToken: session } = await login();
+        const tracks = { status: true, result: [{ mailNo: CODE, tracks: [{ action: '03', message: 'ក'.repeat(4000), siteCode: 'KH001', time: '2026-10-16 15:30:00', extra: { keep: true } }] }] };
+        vi.stubGlobal('fetch', vi.fn(async (url) => upstream(String(url).endsWith('/queryTrackInfo')
+            ? tracks : { status: true, result: { billCode: CODE, cod: 2 } })));
+        const ordinary = JSON.parse((await call({ palm: '1', barcode: CODE }, session)).body);
+        expect(ordinary).toMatchObject({ found: true, cod: 2, ztoClosed: null });
+        expect(ordinary.queryTrackInfo).toBeUndefined();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        vi.mocked(fetch).mockClear();
+        const res = await call({ palm: '1', barcode: CODE, track: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ found: true, cod: 2, ztoClosed: null, queryTrackInfo: tracks });
+        expect(res.headers['Cache-Control']).toBe('no-store');
+        expect(fetch).toHaveBeenCalledTimes(2);
+        const [url, init] = vi.mocked(fetch).mock.calls[1];
+        expect(url).toBe('https://aargus-api.ztoglobal.net/zto/locus/v1/queryTrackInfo');
+        expect(JSON.parse(String(init?.body))).toEqual({ mailType: 1, mailNos: [CODE] });
+        expect(init?.headers).toMatchObject({ 'x-token': TOKEN, 'User-Agent': 'PDA' });
+        const { createHash } = require('node:crypto');
+        expect(init?.headers?.['x-sign']).toBe(createHash('md5').update(String(init?.body) + SIGN_KEY).digest('base64'));
+        expect(res.body).not.toContain(TOKEN);
+    });
+
+    it('🧪 អាន field ដើមរបស់ Palm ទោះ mapping Cookie មិនស្គាល់', async () => {
+        const { sessionToken: session } = await login();
+        vi.stubEnv('ZTO_FIELD_COD', 'cookieOnlyCod');
+        vi.stubEnv('ZTO_FIELD_DOD', 'cookieOnlyDod');
+        const bill = { status: true, result: { billCode: CODE, palmAmount: 4.5, palmFreight: 1.25 } };
+        const tracks = { status: true, result: [{ tracks: [] }] };
+        vi.stubGlobal('fetch', vi.fn(async (url) => upstream(String(url).endsWith('/queryTrackInfo') ? tracks : bill)));
+        const res = await call({ palm: '1', barcode: CODE, track: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ billInfoQuery: bill, queryTrackInfo: tracks });
+        const ordinary = await call({ palm: '1', barcode: CODE }, session);
+        expect(ordinary.statusCode).toBe(502);
+    });
+
+    it.each([401, 429, 500])('🧪 queryTrackInfo ផ្តល់ស្ថានភាពកំហុស HTTP %s', async (status) => {
+        const { sessionToken: session } = await login();
+        vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('/queryTrackInfo')
+            ? upstream({}, status) : upstream({ status: true, result: { billCode: CODE, cod: 2 } })));
+        const res = await call({ palm: '1', barcode: CODE, track: '1' }, session);
+        expect(res.statusCode).toBe(status === 500 ? 502 : status);
+        expect(JSON.parse(res.body).queryTrackInfo).toBeUndefined();
+    });
+
     it('decrypts Palm phone data rather than passing ciphertext to the scan form', async () => {
         const { sessionToken: session } = await login();
         vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', agentAmount: 3, fcAmount: 0.5 } })));
@@ -309,6 +356,22 @@ describe('Palm follows the same server rules as /detail', () => {
                 expect(body.phone).toBeUndefined();
                 expect(body.cod).toBeUndefined();
             }
+        }
+    });
+
+    it('🧪 មិនអាន track ពេលកញ្ចប់ជាសាខាផ្សេង ឬគ្មានសាខា', async () => {
+        const { sessionToken: session } = await login();
+        vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT + ':12345|99999');
+        vi.stubEnv('ZTO_DETAIL_BRANCH_PATHS', 'dispSiteCode');
+        const headers = { 'x-zoe-palm-token': session, 'x-zoe-id-token': tokenForSite('12345') };
+        for (const dispSiteCode of ['99999', undefined]) {
+            const palm = vi.fn(async () => upstream({ status: true, result: { billCode: CODE, cod: 2, dispSiteCode } }));
+            vi.stubGlobal('fetch', withCerts(palm));
+            const res = await callWith({ palm: '1', barcode: CODE, track: '1' }, headers);
+            expect(JSON.parse(res.body)).toMatchObject({ code: 'ZTO_OTHER_BRANCH' });
+            expect(JSON.parse(res.body).queryTrackInfo).toBeUndefined();
+            expect(palm).toHaveBeenCalledTimes(1);
         }
     });
 

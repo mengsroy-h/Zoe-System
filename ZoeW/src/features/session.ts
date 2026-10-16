@@ -114,6 +114,7 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
+    viewState.lookupTestResult = '';
     viewState.phoneModalBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;

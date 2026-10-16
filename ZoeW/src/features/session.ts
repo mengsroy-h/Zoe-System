@@ -114,14 +114,14 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
-    viewState.palmLoginBusy = false;
-    viewState.palmLoginConnected = false;
-    viewState.palmLoginStatus = '';
     viewState.phoneModalBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;
     hidePhoneSuggestions();
     setPhoneSearchPulledUp(false);
+    viewState.palmLoginBusy = false;
+    viewState.palmLoginConnected = false;
+    viewState.palmLoginStatus = '';
     clearZtoPickupStatusStore();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;

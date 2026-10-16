@@ -17,6 +17,8 @@ import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
 import { clearSensitiveModalFields } from '../src/features/session';
+import { healthLookupRow } from '../src/features/health-check';
+import { buildHealthAdvice } from '../src/features/health-advice';
 
 const PROXY_KEY = 'synthetic-client-proxy-0123456789abcdef';
 const SESSION = 'synthetic-opaque-server-palm-session';
@@ -78,10 +80,15 @@ describe('Palm login UI and existing lookup flow', () => {
         const cfg = await signIn();
         expect(fieldValue('ztoPalmPasswordInput')).toBe('');
         const stored = appLocalStore.getItem('zoew_lookup_api_config')!;
-        for (const secret of [PASSWORD, SESSION, PROXY_KEY]) expect(stored).not.toContain(secret);
+        for (const secret of [PASSWORD, SESSION, PROXY_KEY, 'palm-user']) expect(stored).not.toContain(secret);
         expect(await decryptLookupSecret(cfg.palmTokenEnc)).toBe(SESSION);
         expect(await decryptLookupSecret(cfg.headerValueEnc)).toBe(PROXY_KEY);
-        expect(cfg).toMatchObject({ enabled: true, fastMode: true, provider: 'zto-palm', phoneField: 'phone', codField: 'cod', dodField: 'dod' });
+        expect(cfg).toMatchObject({ enabled: true, fastMode: true, phoneField: 'phone', codField: 'cod', dodField: 'dod' });
+        expect(cfg.provider).toBeUndefined();
+        expect(cfg.palmAccount).toEqual({ siteCode: 'KH001', siteName: 'Test branch' });
+        act(() => openLookupApiConfigModal());
+        expect(fieldValue('ztoPalmUsernameInput')).toBe('');
+        expect(viewState.palmLoginStatus).toContain('Test branch');
         expect(cfg.url).toContain('palm=1&barcode={barcode}');
         expect(viewState.palmLoginStatus).toContain('Test branch');
     });
@@ -127,6 +134,7 @@ describe('Palm login UI and existing lookup flow', () => {
         await act(async () => { await task; });
         expect(appLocalStore.getItem('zoew_lookup_api_config')).toBe(before);
         expect(fieldValue('ztoPalmPasswordInput')).toBe('');
+        if (change !== 'close') expect(viewState.palmLoginStatus).toContain('ការកំណត់បានប្តូរ');
     });
 
     it('keeps the old configuration after login failure', async () => {
@@ -187,5 +195,69 @@ describe('Palm login UI and existing lookup flow', () => {
         (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
         await signIn();
         expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://palm-zoew.netlify.app/.netlify/functions/zto-order-detail?palm=login');
+    });
+
+    it('sends the signed-in ZoeW account with the login so ZTO_DETAIL_IDENTITY can gate it', async () => {
+        firebaseState.auth = { currentUser: { uid: 'palm-shop-user' } } as any;
+        firebaseState.fb = { getIdTokenResult: async () => ({ token: 'synthetic-id-token' }) } as any;
+        const cfg = await signIn();
+        expect(cfg.palmTokenEnc).toBeTruthy();
+        expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Id-Token': 'synthetic-id-token' });
+    });
+
+    it('shows the reason ZTO gave when it refuses the login', async () => {
+        credentials();
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_LOGIN_REJECTED', reason: 'palm:VERSION_TOO_LOW' }, 401)));
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('palm:VERSION_TOO_LOW');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_NOT_CONFIGURED', reason: 'palm:sign-key' }, 503)));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('palm:sign-key');
+    });
+
+    it('decides Palm mode from the lookup URL alone (a config without provider still turns Argus features off)', () => {
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' }));
+        expect(ztoFastModeIsOn()).toBe(false);
+        expect(ztoStatusFeatureConfig()).toBeNull();
+    });
+
+    it('names the Palm problem in the auto-lookup message (ZTO rejected with a reason · session expired)', async () => {
+        await signIn();
+        scanState.pendingBarcode = '77130500000012';
+        uiState.isModalOpen = true;
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:TOKEN_EXPIRE' }, 502)));
+        await act(async () => { await attemptAutoLookup('77130500000012'); });
+        expect(viewState.lookupStatus.text).toContain('palm:TOKEN_EXPIRE');
+        expect(viewState.lookupStatus.text).toContain('Login ZTO Palm');
+    });
+
+    it('🩺 tells the owner what to do for a Palm session that is missing, expired or not configured on the server', async () => {
+        await signIn();
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' }, 401)));
+        const expired: any = await healthLookupRow();
+        expect(expired.state).toBe('warn');
+        expect(JSON.stringify(expired)).toContain('Login ZTO Palm');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_NOT_CONFIGURED', reason: 'palm:password-key' }, 503)));
+        const server: any = await healthLookupRow();
+        expect(server.state).toBe('bad');
+        expect(JSON.stringify(server)).toContain('palm:password-key');
+        expect(JSON.stringify(buildHealthAdvice([server]))).toContain('ZTO_PALM_PASSWORD_KEY');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true })));
+        expect(((await healthLookupRow()) as any).state).toBe('info');
+        const cfg = getLookupApiConfig();
+        delete cfg.palmTokenEnc;
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        vi.stubGlobal('fetch', vi.fn());
+        const missing: any = await healthLookupRow();
+        expect(missing.state).toBe('warn');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('warns in the Palm form that Palm mode never closes parcels from ZTO', () => {
+        const note = document.getElementById('ztoPalmModeNote');
+        expect(note && note.textContent).toContain('មិនបិទកញ្ចប់តាម ZTO');
+        expect(note && note.textContent).toContain('ដកពីចំណូល');
     });
 });

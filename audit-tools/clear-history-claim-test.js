@@ -107,11 +107,21 @@ function extractFn(src, name) {
     return '';
 }
 
+// ⛔ ប្លុកមកពីម៉ូឌុល `src/features/clear-history.ts` ផ្ទាល់ (`audit-module-views.json`) + បន្ទាត់ `CLEAR_HISTORY_CLAIM_LEASE_MS`
+//    ⛔ មិនកាត់ `app.js` ពីថេរមួយទៅអនុគមន៍មួយទៀតឡើយ ៖ លំដាប់ម៉ូឌុលក្នុង build វាស់ប្តូរពេល import ប្តូរ (ម៉ូឌុលថ្មីណាមួយ) ➜ ប្លុកនោះបាត់។
+function clearHistoryBlock(app, source) {
+    const lease = (source.match(/^ {4}const CLEAR_HISTORY_CLAIM_LEASE_MS = .*$/m) || [''])[0];
+    let views = null;
+    try { views = JSON.parse(fs.readFileSync(path.join(APP_ROOT, app, 'audit-module-views.json'), 'utf8')); } catch (_) { views = null; }
+    const view = views && typeof views['src/features/clear-history.ts'] === 'string' ? views['src/features/clear-history.ts'] : '';
+    const end = view.indexOf('    async function clearHistory()');
+    if (!lease || end === -1) throw new Error('clear history helper block not found');
+    return lease + '\n' + view.slice(0, end);
+}
+
 function makeTab(app, shared, suffix) {
     const source = fs.readFileSync(path.join(APP_ROOT, app, 'app.js'), 'utf8');
-    const start = source.indexOf('    const CLEAR_HISTORY_CLAIM_LEASE_MS =');
-    const end = source.indexOf('    async function clearHistory()', start);
-    if (start === -1 || end === -1) throw new Error('clear history helper block not found');
+    const block = clearHistoryBlock(app, source);
     // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ស្ថិត **ក្រៅ** ប្លុកនេះ
     const guardBlock = [
         (source.match(/^ *const DB_OP_TIMEOUT_MS = .*$/m) || [''])[0],
@@ -119,7 +129,7 @@ function makeTab(app, shared, suffix) {
         extractFn(source, 'dbOp'),
         extractFn(source, 'dbOpStalled')
     ].filter(Boolean).join('\n');
-    const helpers = guardBlock + '\n' + source.slice(start, end);
+    const helpers = guardBlock + '\n' + block;
     let sequence = 0;
     const context = vm.createContext({
         console,

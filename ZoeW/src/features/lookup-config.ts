@@ -136,7 +136,7 @@ export async function saveLookupApiConfig() {
     const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
     if (lookupApiIsPalm(cfg)) {
         if (!existingCfg.palmTokenEnc) { alert('សូម Login ZTO Palm ជាមុនសិន។'); return; }
-        for (const name of ['provider', 'palmTokenEnc', 'palmExpiresAt', 'palmAccount']) cfg[name] = existingCfg[name];
+        for (const name of ['palmTokenEnc', 'palmExpiresAt', 'palmAccount']) cfg[name] = existingCfg[name];
     }
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
     if (shop) cfg.shop = shop;

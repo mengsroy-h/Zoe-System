@@ -12,7 +12,7 @@ import { pickupBarcodeKey } from '../domain/pickup';
 import { ZTO_AUTO_LOOKUP_TIMEOUT_MS, autoLookupInFlight } from './auto-lookup';
 import { applyBarcodeCloseChange } from './barcode-ops';
 import { isPinFlowPending } from './config';
-import { lookupApiIsZto } from './customer-table-prefetch';
+import { lookupApiIsPalm, lookupApiIsZto } from './customer-table-prefetch';
 import { addZtoIdentityHeader, buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
@@ -189,14 +189,14 @@ export function rotateZtoSweepQueue(list, cursor) {
 
 export function ztoStatusFeatureConfig() {
     const cfg = getLookupApiConfig();
-    if (cfg?.provider === 'zto-palm') return null;
+    if (lookupApiIsPalm(cfg)) return null;
     if (!cfg || !cfg.enabled || !cfg.url || !lookupApiIsZto(cfg)) return null;
     return cfg;
 }
 
 export function ztoFastModeIsOn() {
     const cfg = getLookupApiConfig();
-    return !!(cfg && cfg.fastMode && cfg.provider !== 'zto-palm');
+    return !!(cfg && cfg.fastMode && !lookupApiIsPalm(cfg));
 }
 
 export function ztoStatusTrashItemCounts(item) {

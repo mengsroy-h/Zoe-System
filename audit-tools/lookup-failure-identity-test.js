@@ -56,7 +56,7 @@ function sliceFn(name) {
 const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'retryAsync', 'retryTransientLookupResponse', 'noteSheetScriptVersion', 'attemptAutoLookup', 'setLookupStatus',
-    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
     'lookupFailureIsDefinitive', 'ztoBarcodeShapeIsValid', 'ztoIdToken', 'bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted', 'addZtoIdentityHeader', 'ztoAccountSignedIn',
@@ -170,7 +170,7 @@ function buildRuntime(plan) {
     });
     Object.defineProperty(ctx, '__status', { configurable: true,
         value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
-    ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
+    ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
      'retryPendingLookupAfterUnlock', 'lookupResponseError', 'markLookupTimeoutNoRetry',
      'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',

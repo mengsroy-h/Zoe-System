@@ -320,8 +320,8 @@ export async function healthLookupRow() {
         }
         headers[cfg.headerName] = value;
     }
+    if (lookupApiIsPalm(cfg)) return healthPalmLookupRow(cfg, headers);
     try {
-        await addPalmSessionHeader(cfg, headers);
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
             { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
             ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
@@ -333,10 +333,6 @@ export async function healthLookupRow() {
                 'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));
         }
         const body = out.body;
-        if (lookupApiIsPalm(cfg)) {
-            return healthRow('info', 'Lookup អតិថិជន (ZTO Palm)',
-                body?.provider === 'zto-palm' ? 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' : 'សូម Login ZTO Palm ម្តងទៀត');
-        }
         const source = safeLookupReason(body && body.cookie && body.cookie.source) || 'none';
         const fingerprint = safeLookupReason(body && body.cookie && body.cookie.fingerprint);
         if (source === 'none' || !fingerprint) {
@@ -369,6 +365,38 @@ export async function healthLookupRow() {
         return healthRow(mismatchText ? 'warn' : 'ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
     } catch (e) {
         return healthRow('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
+    }
+}
+
+async function healthPalmLookupRow(cfg, headers) {
+    const title = 'Lookup អតិថិជន (ZTO Palm)';
+    try {
+        await addPalmSessionHeader(cfg, headers);
+    } catch (e) {
+        return healthRow('warn', title, 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
+    }
+    try {
+        const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
+            { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
+            ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
+            (r) => r.json().catch(() => null));
+        const res = out && out.res;
+        const body = out && out.body;
+        const code = body && typeof body.code === 'string' ? body.code : '';
+        const reason = safeLookupReason(body && body.reason);
+        if (res && res.ok && body && body.provider === 'zto-palm') {
+            return healthRow('info', title, 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO');
+        }
+        if (code === 'ZTO_AUTH_EXPIRED') {
+            return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+        }
+        if (code === 'ZTO_PALM_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') {
+            return healthRow('bad', title, 'Server មិនទាន់កំណត់ ZTO Palm នៅ Netlify' + (reason ? ' — ជាប់ត្រង់ ' + reason : ''));
+        }
+        const status = Number(res && res.status);
+        return healthRow('bad', title, 'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));
+    } catch (e) {
+        return healthRow('bad', title, 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
     }
 }
 

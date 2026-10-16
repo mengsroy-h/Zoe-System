@@ -52,7 +52,7 @@ function sliceFn(name) {
 const FNS = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
-    'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'warmZtoLookupProxyNow', 'buildCustomerListApiUrl',
+    'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'warmZtoLookupProxyNow', 'buildCustomerListApiUrl',
     'prefetchCustomerDataTableRowsIfConfigured',
     'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
     'scheduleCustomerTableSoonRefresh', 'runCustomerTableSoonRefresh',
@@ -515,6 +515,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         Object.defineProperty(ctx, '__status', { configurable: true,
             value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
         vm.runInContext(sliceFn('lookupApiIsZto'), ctx);
+        vm.runInContext(sliceFn('lookupApiIsPalm'), ctx);
         ZTO_SHAPE_DECLS.forEach((d) => vm.runInContext(d, ctx));
         vm.runInContext(sliceFn('ztoBarcodeShapeIsValid') || 'function ztoBarcodeShapeIsValid() { return true; }', ctx);
         vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
@@ -524,6 +525,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('ztoIdToken') || '', ctx);
         ['bridge', 'isNativeApp', 'nativeWebOrigin', 'ztoIdentityTargetTrusted'].forEach((n) => vm.runInContext(sliceFn(n) || '', ctx));
         vm.runInContext(sliceFn('addZtoIdentityHeader') || '', ctx);
+        vm.runInContext(sliceFn('addPalmSessionHeader') || '', ctx);
         vm.runInContext(sliceFn('ztoAccountSignedIn') || '', ctx);
         vm.runInContext(sliceFn('ztoIdentityRefusalIsTransient') || '', ctx);
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
@@ -684,7 +686,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
         ctx.window = ctx;
         vm.createContext(ctx);
         withReact(ctx);
-        ['lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+        ['lookupApiIsZto', 'lookupApiIsPalm', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
             'lookupApiSupportsList', 'buildCustomerListApiUrl',
             'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync'].forEach((name) => {
             vm.runInContext(sliceFn(name), ctx);

@@ -5,7 +5,7 @@ import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
 import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
-import { lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
+import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
@@ -446,7 +446,7 @@ export async function attemptAutoLookup(barcode) {
         } else if (e && e.message === 'Auto lookup timed out') {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-            setLookupStatus(barcode, 'error', cfg.provider === 'zto-palm'
+            setLookupStatus(barcode, 'error', lookupApiIsPalm(cfg)
                 ? '🔒 Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
                 : '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && !identityRetry) {
@@ -467,6 +467,9 @@ export async function attemptAutoLookup(barcode) {
         } else if (e && e.lookupCode === 'ZTO_BARCODE_INVALID') {
             setLookupStatus(barcode, 'warn', ZTO_BARCODE_SHAPE_TEXT);
             return;
+        } else if (e && e.lookupCode === 'ZTO_UPSTREAM_REJECTED' && lookupApiIsPalm(cfg)) {
+            setLookupStatus(barcode, 'error', '⚠️ ZTO Palm បដិសេធសំណើ' + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : '')
+                + ' — សូមស្កេនម្ដងទៀត ឬ Login ZTO Palm ម្តងទៀត');
         } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
             setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
         } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {

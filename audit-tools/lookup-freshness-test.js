@@ -68,7 +68,7 @@ function sliceFn(name) {
 
 const FNS = [
     'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed',
-    'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'setLookupStatus',
+    'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'setLookupStatus',
     'sheetImportCellToText', 'sheetImportToMoney',
     'normalizeImportedCustomerRows', 'seedCustomerTableFromImport',
     'rememberCustomerTableRow', 'findCustomerDataTableRow',

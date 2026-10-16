@@ -980,6 +980,9 @@
     "ZoeW/docs/ANDROID.md": {
       "policy": "zoew-docs"
     },
+    "ZoeW/docs/ZTO-PALM.md": {
+      "policy": "zoew-docs"
+    },
     "ZoeW/docs/ARCHITECTURE.md": {
       "policy": "zoew-docs"
     },
@@ -1009,6 +1012,9 @@
     },
     "ZoeW/netlify/functions/zto-order-detail.js": {
       "policy": "guard-27"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm.js": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/netlify/lib/push-core.mjs": {
       "policy": "zoew-self-verification"
@@ -1708,6 +1714,9 @@
     "ZoeW/src/features/zto-list-sync.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/zto-palm-login.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/zto-status.ts": {
       "policy": "zoew-app"
     },
@@ -2276,6 +2285,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-pages-unknown.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-login.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-server.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {

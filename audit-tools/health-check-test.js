@@ -49,7 +49,7 @@ function sliceFn(name) {
 const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healthDatabaseLiveRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
     'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
-    'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
+    'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsPalm', 'addPalmSessionHeader', 'healthPalmLookupRow', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
     'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs', 'lookupFailureIsDefinitive',

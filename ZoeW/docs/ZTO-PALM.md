@@ -75,6 +75,8 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 បិទកញ្ចប់ក្នុង ZoeW ពេលអតិថិជនយក ឬទុកឧបករណ៍ Argus មួយសម្រាប់ auto-close។ ZTO ឆ្លើយកូដដែល Function មិនស្គាល់ ➜ App បង្ហាញកូដនោះ
 (`palm:<code>`) ដើម្បីងាយស្រួលដោះស្រាយ។
 
+កាតាឡុក endpoint ទាំងអស់របស់ App Palm (field request/response · អាន/សរសេរ · កូដស្ថានភាព) ៖ [ZTO-PALM-API.md](ZTO-PALM-API.md)។
+
 ទម្រង់ request របស់ Palm មកពី: `PDAService`, `PDARequestImpl`,
 `HttpSignKey`, `AES`, `PDAEncodeUtils`, និង `LoginEventManage`។ Production host:
 `https://aargus-api.ztoglobal.net`; login `/zto/system/v1/doLogin`; lookup

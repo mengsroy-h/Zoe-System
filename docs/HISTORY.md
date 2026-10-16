@@ -69,6 +69,14 @@
 - ⏳ `tools/supabase-migrate/` — តែពេលអតិថិជន Firebase ចង់ប្តូរ (dry-run មុន)។
 - ⏸️ Supabase deep audit ជុំ ២ (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ»)។
 
+### 🧭 ZTO Palm (Login · Lookup ➜ ពេញ)
+
+- ⏳ **Login Palm ([2.50.97])** ៖ env ៣ ក្នុង Netlify Production + Deploy Previews (`ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` ·
+  `ZTO_PALM_PASSWORD_KEY`) ➜ សាក Login + ស្កេនលើ preview · merge ដោយ **Squash** (សោ protocol នៅក្នុង commit ដើមនៃ branch PR)។
+- ⏳ **Palm ពេញ** (ម្ចាស់គម្រោងជ្រើស · PR ថ្មី) ៖ ទាញបញ្ជី = `queryDispatchList` `billStatus` `4` (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់ហាងបង្ហាញក្នុង
+  tab «បញ្ជូន») · ចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ = `billStatus` `5` · កាតាឡុក endpoint ទាំងអស់ ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) ·
+  ⛔ វាស់ចម្លើយពិត (គណនីម្ចាស់គម្រោង) មុនភ្ជាប់ auto-close · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
 - ✅ **ZoeW គាំទ្រ backend ទាំង ២ (Firebase · Supabase) តាមជម្រើសអតិថិជន** ➜ រក្សា Config/Login · SDK · rules · provisioning · backup · ឯកសារ Firebase ·
@@ -3696,6 +3704,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-16 — កាតាឡុក API ZTO Palm ពី APK ដែលម្ចាស់គម្រោងផ្តល់ (ឯកសារតែប៉ុណ្ណោះ)
+
+សំណើ ៖ «កត់ត្រាទុកទាំងអស់ … ថ្ងៃក្រោយខ្ញុំចង់ update មុខងារបន្ថែមចូល ZoeW អោយស្គាល់គ្រប់មុខងារផ្លូវការរបស់ ZTO»។ APK ពន្លាក្នុង folder ដាច់
+(មិនរត់អ្វីពីក្នុងវា) ➜ decompile `classes4/5.dex` ➜ ស្រង់ `PDAService` (Retrofit ៖ method · path · `result`) · `PDARequestImpl` (field body) ·
+class `rpto`/`rqto` (field response) · screen ដែលហៅ ➜ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) ៖ endpoint ១១៣ (អាន ៦៥ · សរសេរ ៤៨
+តាមឈ្មោះ) · កូដស្ថានភាព (`billStatus` ១ · ៤ · ៥ · `mailType` ១) · ផែនទី ZoeW ➜ Palm។ ⛔ គ្មានសោ protocol · គ្មានកូដ decompile ក្នុង repo
+(ការដកសោពី APK ត្រូវបដិសេធដោយប្រព័ន្ធសុវត្ថិភាព session ➜ សោនៅតែ env)។ `billInfoQuery` គ្មានវាលស្ថានភាព ➜ ភស្តុតាងចុះហត្ថលេខាមកពី
+`queryDispatchList` `billStatus` `5` (tab «ចុះហត្ថលេខា» របស់ App)។ ឯកសារតែប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ។
 
 ### 2026-10-16 — Audit PR (Login ZTO Palm · [2.50.97]) ៖ ចន្លោះ identity · សោ protocol ក្នុង repo · វាល COD/DOD · checker ក្រហម ១៣
 

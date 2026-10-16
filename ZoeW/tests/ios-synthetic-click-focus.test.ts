@@ -258,6 +258,20 @@ describe('⛔ iPhone ៖ ពេល keyboard លោត App មិនសរសេ�
         expect(scroll).toHaveBeenCalledTimes(1);
     });
 
+    it('⛔ iPhone SE ៖ keyboard ចាប់ផ្តើមលោត (កម្ពស់ ៤០% < KEYBOARD_MIN_INSET_PX) ខណៈប្រអប់វាយ focus ➜ មិនទាញ · blur + keyboard បាត់ ➜ ទាញ', () => {
+        const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+        tap(scanner, 305);
+        expect(document.activeElement).toBe(scanner);
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: 150 });
+        keyboard(104);
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).not.toHaveBeenCalled();
+        scanner.blur();
+        keyboard(0);
+        modalKeyboard.settleDocumentScroll();
+        expect(scroll).toHaveBeenCalledTimes(1);
+    });
+
     it('⛔ ខ្សែភ្ជាប់ ៖ boot ចង settleDocumentScroll លើ visualViewport resize (មិនមែន scrollWindowToTop ផ្ទាល់)', () => {
         const boot = readFileSync(path.join(__dirname, '..', 'src', 'app', 'lifecycle', 'boot.ts'), 'utf8');
         expect(boot).toMatch(/visualViewport, 'resize', settleDocumentScroll\)/);

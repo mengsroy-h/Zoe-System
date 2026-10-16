@@ -629,7 +629,7 @@ export function pageFieldStaysAboveKeyboard(el: HTMLElement): boolean {
 }
 
 export function settleDocumentScroll(): void {
-    if (usesIOSPanelHandoff() && softKeyboardShown()) return;
+    if (usesIOSPanelHandoff() && (softKeyboardShown() || textEntryField(document.activeElement))) return;
     scrollWindowToTop();
 }
 

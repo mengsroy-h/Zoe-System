@@ -28,7 +28,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | វាល | តម្លៃ | អត្ថន័យក្នុង App |
 |---|---|---|
 | `billStatus` (`queryDispatchList`) | `1` | tab «បញ្ហា» (`ProblemTabFragment`) |
-| `billStatus` (`queryDispatchList`) | `4` | tab «បញ្ជូន» (`DispatchTabFragment`) · ជួរថ្ងៃ `dispEmpDateFrom` ➜ `dispEmpDateTo` · ម្ចាស់គម្រោង ៖ កញ្ចប់ដែលមកដល់ហាងបង្ហាញនៅទីនេះ |
+| `billStatus` (`queryDispatchList`) | `4` | tab «បញ្ជូន» (`DispatchTabFragment`) · ជួរថ្ងៃ `dispEmpDateFrom` ➜ `dispEmpDateTo` · កញ្ចប់ដែល ZTO ចាត់ឲ្យសាខាចែក រួមទាំងកញ្ចប់ដែលនៅតាមផ្លូវ ⛔ មិនមែនស្កេនមកដល់ (`03`) ទេ (ម្ចាស់គម្រោងវាស់ធៀបនឹងបញ្ជី Cookie) · `billStatus` របស់ជួរ = ស្ថានភាពបច្ចុប្បន្នរបស់កញ្ចប់ |
 | `billStatus` (`queryDispatchList`) | `5` | tab «ចុះហត្ថលេខា» (`SignTabFragment`) · ជួរថ្ងៃ `signSiteDateFrom` = `YYYY-MM-DD 00:00:00` ➜ `signSiteDateTo` = `YYYY-MM-DD 23:59:59` |
 | endpoint ចំនួនសង្ខេប (`queryExpressCount` …) | `isSign` `1` · `billCollectionStatus` `3` · `dispatchBillStatus` `4` · `signBillStatus` `5` | ចំនួន/ទឹកប្រាក់ (`codCount` · `codTotalMoney` · `dodTotalMoney` · `signFor` …) តាមជួរថ្ងៃ `dateFrom` ➜ `dateTo` |
 | `mailType` (`queryTrackInfo` · `checkTrackInfo`) | `1` | `mailNos` = លេខ Barcode |
@@ -42,8 +42,8 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់) | `queryDispatchList` `billStatus` `4` + `dispEmpDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1`) |
-| បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`withSigned` · `signed=1` · `exact=1`) |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | គ្មាន endpoint អានបញ្ជីស្កេនមកដល់ក្នុង App Palm (`queryTrackInfo` ម្តងមួយកញ្ចប់) | មិនប្រើ ៖ ប្រើបានតែរបៀប Cookie (`palm:no-arrival-list`) |
+| បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1&signed=1` · `exact=1`) |
 | ស្ថានភាពកញ្ចប់មួយ (`/detail` `ztoClosed`) | `queryDispatchList` + `billCode` · ឬ `queryTrackInfo` | មិនទាន់ប្រើ ៖ វាស់ចម្លើយពិតមុន (គ្មានរបារ «មិនទាន់ចុះហត្ថលេខា» ក្នុងរបៀប Palm) |
 | រូបចុះហត្ថលេខា | `querySignPic` (`billCode`) | ជម្រើស |
 | ផ្ទៀងចំនួន/ទឹកប្រាក់ប្រចាំថ្ងៃ | `querySignListExpressCount` · `queryDispExpressCount` | ជម្រើស |

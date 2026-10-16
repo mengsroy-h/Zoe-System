@@ -271,10 +271,11 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('tells in the Palm form which ZTO lists Palm mode reads, and that the not-signed bar is absent', () => {
+    it('tells in the Palm form which ZTO lists Palm mode reads, that the list pull needs Cookie mode, and that the not-signed bar is absent', () => {
         const note = document.getElementById('ztoPalmModeNote');
-        expect(note && note.textContent).toContain('«បញ្ជូន»');
+        expect(note && note.textContent).not.toContain('«បញ្ជូន»');
         expect(note && note.textContent).toContain('«ចុះហត្ថលេខា»');
+        expect(note && note.textContent).toContain('ប្រើបានតែរបៀប Cookie');
         expect(note && note.textContent).toContain('មិនបង្ហាញក្នុងរបៀប Palm');
     });
 });

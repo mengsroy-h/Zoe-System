@@ -84,19 +84,20 @@ describe('?diag=1 measures how long ZTO Palm takes to answer, apart from Argus (
         expect(timing.palm.detail).toMatchObject({ count: 1, timeouts: 0 });
         expect(timing.palm.detail.lastMs).toBeGreaterThanOrEqual(35);
         expect(timing.palm.detail.avgMs).toBeGreaterThanOrEqual(35);
-        expect(timing.palm.list.count).toBe(0);
+        expect(timing.palm.signed.count).toBe(0);
+        expect(timing.palm).not.toHaveProperty('list');
         expect(timing.detail.count).toBe(0);
         expect((await argusTiming()).palm.detail.count).toBe(1);
     });
 
-    it('Palm list pages are metered as palm.list (arrival) and palm.signed (sign list), never as Argus kinds', async () => {
+    it('Palm sign list pages are metered as palm.signed, never as Argus kinds (no Palm arrival list: A180)', async () => {
         const session = await login();
         vi.stubGlobal('fetch', slow({ status: true, result: { list: [], pages: 1, total: 0, isLastPage: true } }, 20));
         const day = '2026-10-15';
-        const res = await call({ palm: '1', list: '1', from: day, to: day, withSigned: '1' }, session);
+        const res = await call({ palm: '1', list: '1', from: day, to: day, signed: '1', exact: '1' }, session);
         expect(res.statusCode).toBe(200);
         const timing = await argusTiming();
-        expect(timing.palm.list.count).toBe(1);
+        expect(timing.palm).not.toHaveProperty('list');
         expect(timing.palm.signed.count).toBe(1);
         expect(timing.palm.signed.lastMs).toBeGreaterThanOrEqual(15);
         expect(timing.list.count).toBe(0);

@@ -73,8 +73,14 @@ export function ztoListSkipText(reason) {
     return Object.prototype.hasOwnProperty.call(ZTO_LIST_SKIP_TEXT, key) ? ZTO_LIST_SKIP_TEXT[key] : '';
 }
 
+export const ZTO_PALM_NO_LIST_TEXT = 'ℹ️ របៀប Palm គ្មានបញ្ជីកញ្ចប់មកដល់ទេ ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ប្រើបានតែរបៀប Cookie';
+
+export function ztoListPalmMode() {
+    return lookupApiIsPalm(ztoStatusFeatureConfig());
+}
+
 export function ztoListSyncEnabled() {
-    return ztoFastModeIsOn()
+    return ztoFastModeIsOn() && !ztoListPalmMode()
         && safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1';
 }
 
@@ -82,7 +88,7 @@ export function refreshZtoListSyncUi() {
     const on = ztoListSyncEnabled();
     viewState.ztoListSyncText = on ? 'បើក' : 'បិទ';
     viewState.ztoListSyncOn = on;
-    viewState.ztoListSyncDrawerVisible = ztoFastModeIsOn();
+    viewState.ztoListSyncDrawerVisible = ztoFastModeIsOn() && !ztoListPalmMode();
     viewState.ztoListSyncBtnVisible = !!(on && ztoStatusFeatureConfig());
 }
 
@@ -90,6 +96,11 @@ export function drawerZtoListSyncFlow() {
     drawerAction(function () {
         if (!ztoFastModeIsOn()) {
             showToast(ZTO_FAST_MODE_HINT);
+            return;
+        }
+        if (ztoListPalmMode()) {
+            refreshZtoListSyncUi();
+            showToast(ZTO_PALM_NO_LIST_TEXT);
             return;
         }
         if (!ztoListSyncEnabled()) {
@@ -581,6 +592,11 @@ export async function runZtoListSyncPreview() {
         showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
         return;
     }
+    if (lookupApiIsPalm(cfg)) {
+        setZtoListSyncNote(ZTO_PALM_NO_LIST_TEXT);
+        showToast(ZTO_PALM_NO_LIST_TEXT);
+        return;
+    }
     if (ztoStatusSecretIsLocked(cfg)) {
         showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីទាញបញ្ជីពី ZTO');
         if (!isPinFlowPending()) requestPinBeforeConfig(openZtoListSyncModal, 'ztoListSync');
@@ -892,6 +908,11 @@ export function openZtoListSyncModal() {
     }
     if (!ztoFastModeIsOn()) {
         showToast(ZTO_FAST_MODE_HINT);
+        return;
+    }
+    if (ztoListPalmMode()) {
+        refreshZtoListSyncUi();
+        showToast(ZTO_PALM_NO_LIST_TEXT);
         return;
     }
     if (!ztoListSyncEnabled()) {

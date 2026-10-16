@@ -15,9 +15,7 @@ const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const UPSTREAM_CODE_RE = /^[A-Za-z0-9_.:@-]{1,60}$/;
 const AUTH_EXPIRED_RE = /^(?:401|403|not_login|token_expired|token_invalid|login_expired|login_required)$/i;
 const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
-const ARRIVAL_STATUS = '4';
 const SIGNED_STATUS = '5';
-const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
 const LIST_ROW_MAX = 200;
 
 function json(statusCode, body) {
@@ -250,33 +248,13 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
     }
 }
 
-function listRequest(kind, range, page, deps) {
-    const body = kind === 'signed'
-        ? { billStatus: SIGNED_STATUS, signSiteDateFrom: range.start, signSiteDateTo: range.end }
-        : { billStatus: ARRIVAL_STATUS, dispEmpDateFrom: range.start, dispEmpDateTo: range.end };
-    body.pageNum = page;
-    body.pageSize = deps.listPageSize;
-    return body;
+function listRequest(range, page, deps) {
+    return { billStatus: SIGNED_STATUS, signSiteDateFrom: range.start, signSiteDateTo: range.end, pageNum: page, pageSize: deps.listPageSize };
 }
 
-function listRowOf(raw, keys, deps) {
-    const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
-    const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
-    const fields = deps.project(raw);
-    const at = String(raw.dispEmpDate || '').trim();
-    return {
-        barcode, status,
-        phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
-        cod: fields.cod === null ? 0 : fields.cod,
-        dod: fields.dod === null ? 0 : fields.dod,
-        at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : ''
-    };
-}
-
-function palmListBody(kind, page, session, result, keys, deps) {
+function signedListBody(page, session, result, keys, deps) {
     const container = result.result;
     if (!container || typeof container !== 'object' || !Array.isArray(container.list)) throw new Error('upstream:json');
-    const rows = [];
     const signed = [];
     const seen = new Set();
     const signedRows = [];
@@ -286,43 +264,42 @@ function palmListBody(kind, page, session, result, keys, deps) {
     for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { otherScans++; continue; }
-        const row = listRowOf(raw, keys, deps);
-        if (!BARCODE_RE.test(row.barcode)) { otherScans++; continue; }
-        if (row.status === SIGNED_STATUS) {
-            signedScans++;
-            if (!seen.has(row.barcode)) {
-                seen.add(row.barcode);
-                signed.push(row.barcode);
-                signedRows.push({ barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: '', from: '' });
-            }
-            continue;
-        }
-        if (kind === 'signed') { otherScans++; continue; }
-        rows.push({ barcode: row.barcode, phone: row.phone, cod: row.cod, dod: row.dod, at: row.at, ztoClosed: false, skip: '', from: '' });
+        const barcode = String(raw.billCode === undefined || raw.billCode === null ? '' : raw.billCode).trim();
+        const status = String(raw.billStatus === undefined || raw.billStatus === null ? '' : raw.billStatus).trim();
+        if (!BARCODE_RE.test(barcode) || status !== SIGNED_STATUS) { otherScans++; continue; }
+        signedScans++;
+        if (seen.has(barcode)) continue;
+        seen.add(barcode);
+        signed.push(barcode);
+        const fields = deps.project(raw);
+        signedRows.push({
+            barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
+            cod: fields.cod === null ? 0 : fields.cod, dod: fields.dod === null ? 0 : fields.dod, at: '', from: ''
+        });
     }
     const pages = Number(container.pages);
     const total = Number(container.total);
-    const counted = rows.length + otherScans + signedScans;
+    const counted = otherScans + signedScans;
     const pagesKnown = Number.isFinite(pages) && pages >= 0;
     const pageFull = container.list.length >= deps.listPageSize;
     const body = {
-        success: true, list: true, enabled: true, kind, page,
+        success: true, list: true, enabled: true, kind: 'signed', page,
         site: String(session.site || ''), siteName: String(session.siteName || ''),
         pages: pagesKnown ? pages : (pageFull ? page + 1 : (counted ? page : page - 1)),
         total: Number.isFinite(total) ? total : counted,
-        rows, otherScans, signedScans, signedMismatch: 0,
-        signed, signedOk: kind === 'signed', signedRows, provider: 'zto-palm'
+        rows: [], otherScans, signedScans, signedMismatch: 0,
+        signed, signedOk: true, signedRows, provider: 'zto-palm'
     };
     if (!pagesKnown && pageFull) body.pagesUnknown = true;
     return body;
 }
 
-async function palmListPage(kind, range, page, session, keys, deps) {
-    const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(kind, range, page, deps), session.token, keys, deps.upstreamMs(),
-        meterFor(deps, kind === 'signed' ? 'palmSigned' : 'palmArrival'), true);
+async function palmSignedPage(range, page, session, keys, deps) {
+    const upstream = await requestPalm(DISPATCH_LIST_PATH, listRequest(range, page, deps), session.token, keys, deps.upstreamMs(),
+        meterFor(deps, 'palmSigned'), true);
     if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return { kind: 'auth' };
     if (upstream.status !== true) return { kind: 'rejected', reason: upstreamReason(upstream) };
-    return { kind: 'ok', body: palmListBody(kind, page, session, upstream, keys, deps) };
+    return { kind: 'ok', body: signedListBody(page, session, upstream, keys, deps) };
 }
 
 function listFailure(outcome) {
@@ -331,6 +308,9 @@ function listFailure(outcome) {
 }
 
 async function palmList(query, session, keys, deps) {
+    if (query.signed !== '1') {
+        return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'palm:no-arrival-list' });
+    }
     const range = deps.listRange(query.from, query.to);
     if (!range) return json(400, { error: 'Invalid list date range', code: 'ZTO_LIST_RANGE_INVALID' });
     const page = Number(String(query.page || '1').trim());
@@ -343,19 +323,8 @@ async function palmList(query, session, keys, deps) {
     if (accountSite && session.site && accountSite !== String(session.site).trim().toLowerCase()) {
         return json(200, { success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:palm-other-branch' });
     }
-    const signedOnly = query.signed === '1';
-    const signedRange = signedOnly && query.exact === '1' ? range : deps.listSignedRange(range);
-    if (signedOnly) {
-        const outcome = await palmListPage('signed', signedRange, page, session, keys, deps);
-        return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);
-    }
-    const companion = query.withSigned === '1'
-        ? palmListPage('signed', signedRange, page, session, keys, deps).catch(() => null)
-        : null;
-    const outcome = await palmListPage('arrival', range, page, session, keys, deps);
-    const companionOutcome = companion ? await companion : null;
-    if (outcome.kind !== 'ok') return listFailure(outcome);
-    return json(200, companion ? deps.mergeCompanion(outcome.body, companionOutcome) : outcome.body);
+    const outcome = await palmSignedPage(query.exact === '1' ? range : deps.listSignedRange(range), page, session, keys, deps);
+    return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);
 }
 
 function isPalmPreflight(query, requestedHeaders) {

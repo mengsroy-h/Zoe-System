@@ -74,8 +74,10 @@
 - ⏳ **[2.50.97]** Login Palm ពិតជោគជ័យ (ម្ចាស់គម្រោង) ➜ នៅសល់ ៖ ស្កេនកញ្ចប់ពិត ➜ ផ្ទៀងលេខទូរស័ព្ទ · COD · DOD ធៀបនឹង App Palm។
 - 🗳️ PR Login Palm merge ដោយ **merge commit** ➜ commit ដើម `d509638` (សោ protocol ក្នុងកូដ · screenshot សាកល្បង) នៅក្នុង history `main` ➜ ការសម្រេចម្ចាស់គម្រោង
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
-- ⏳ **[2.50.98] Palm ពេញ** ៖ សាកលើ Deploy Preview ជាមួយគណនី Palm ពិត ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ស្មើ tab «បញ្ជូន» · កញ្ចប់ដែលចុះហត្ថលេខាក្នុង
-  App Palm បិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- ⏳ **[2.50.99] Palm** ៖ សាក «បិទតាម ZTO» លើ Deploy Preview ជាមួយគណនី Palm ពិត (កញ្ចប់ដែលចុះហត្ថលេខាក្នុង App Palm បិទក្នុង ZoeW ·
+  កញ្ចប់ tab «បញ្ជូន» នៅបើក) មុន merge · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- 🗳️ **បញ្ជី Palm ដូច Cookie ១០០%** (ម្ចាស់គម្រោង ៖ merge PR នេះសិន រួចសាកក្នុង PR ថ្មី) ៖ web Argus អានបញ្ជី `POST aargus-api.ztoglobal.com/scan/page/scan`
+  ដោយ Cookie `BOS-MAN-SESSION` (គ្មាន `Authorization`) ➜ សាកក្នុង 🩺 ថា token Login Palm បើក endpoint នេះបានឬទេ (អានតែប៉ុណ្ណោះ · មិនបង្ហាញ token ឬជួរ)។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
@@ -90,6 +92,24 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.99] — 2026-10-16 · ZoeW ៖ របៀប Palm លែងទាញបញ្ជីកញ្ចប់មកដល់ (tab «បញ្ជូន» មិនមែនកញ្ចប់មកដល់)
+
+**ZoeW `2.50.99`** (`zoew-v361` ➜ `zoew-v362`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី · គ្មានកូដ Android native។
+ម្ចាស់គម្រោងរាយការណ៍ (A180) ៖ «Palm ទាញបញ្ជី ទិន្នន័យខុស … ថ្ងៃនេះកញ្ចប់ចូលមកមានតែអតិថិជនម្នាក់គត់ … Cookie បង្ហាញត្រឹមត្រូវ» ➜ តំបន់ចាក់សោ ZTO
+ប្រែតាមរបាយការណ៍នេះ (`zto-palm.js` · `zto-order-detail.js` · `zto-list-sync.ts` ➜ `LOCK` ថ្មី)។
+
+- Function ៖ `?palm=1&list=1` ឆ្លើយតែបញ្ជីចុះហត្ថលេខា (`signed=1` · `exact=1` ➜ `queryDispatchList` `billStatus` `5`)។ សំណើបញ្ជីគ្មាន `signed=1`
+  (`withSigned` ផង) ➜ `enabled:false` `palm:no-arrival-list` មុនហៅ ZTO។ `?diag=1` លែងមាន `upstreamTiming.palm.list`។
+- App ៖ ក្នុងរបៀប Palm «ទាញបញ្ជីកញ្ចប់ពី ZTO» បិទ (`ztoListPalmMode()`) ៖ ប៊ូតុង 📥 និងកុងតាក់ ☰ លាក់ · ការទាញមិនផ្ញើសំណើ · សារ
+  `ZTO_PALM_NO_LIST_TEXT` ប្រាប់ឲ្យប្រើរបៀប Cookie · កុងតាក់ដែលរក្សាទុកនៅដដែលសម្រាប់របៀប Cookie។ «បិទតាម ZTO ស្វ័យប្រវត្តិ» និងការរង់ចាំ ៨ ថ្ងៃ
+  ដំណើរការដូចមុន។ ផ្ទាំង Palm · `guide.html` · `ZTO-PALM.md` · `ZTO-PALM-API.md` · `ZTO-SETUP-KH.md` ពន្យល់។
+- អ្នកយាម ៖ `zto-palm-server.test.ts` · `zto-palm-list.test.tsx` · `zto-upstream-timing.test.ts` · `zto-palm-login.test.tsx` (៧ ធ្លាក់លើកូដមុនកែ)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. លើ preview (របៀប Palm) ៖ ☰ ZTO គ្មាន «ទាញបញ្ជីកញ្ចប់ពី ZTO» · ប៊ូតុង 📥 លើទំព័រទិន្នន័យលាក់ · ប្តូរទៅរបៀប Cookie ➜ ទាំងពីរលេចវិញ។
+2. សាក «បិទតាម ZTO» របៀប Palm (មើល [2.50.98] សកម្មភាព ៣) មុន merge។
 
 ### [2.50.98] — 2026-10-16 · ZoeW ៖ ZTO Palm ទាញបញ្ជី និងបិទតាម ZTO (Palm ពេញ)
 
@@ -3738,6 +3758,14 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-16 — បញ្ជី Palm ខុស ៖ tab «បញ្ជូន» មិនមែនកញ្ចប់មកដល់
+
+របាយការណ៍ ៖ «Palm ទាញបញ្ជី ទិន្នន័យខុស … ថ្ងៃនេះជាក់ស្តែងកញ្ចប់ចូលមកមានតែអតិថិជនម្នាក់គត់ … Cookie បង្ហាញត្រឹមត្រូវ» · «ZTO_LIST_SCAN_TYPE = 03 (អីវ៉ាន់មកដល់)»។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A180 | **បញ្ជីមកដល់ Palm មិនមែនស្កេនមកដល់** ៖ ថ្ងៃដដែល ប្រអប់ Cookie (ស្កេន `03`) ឆ្លើយ ២៤ ជួរ (អតិថិជនម្នាក់ · មកដល់ ១៥:៣០) + ✍️ ១៤ ⟷ ប្រអប់ Palm ឆ្លើយ ៦៩ ជួរ ម៉ោង ០៧:៥៧–០៧:៥៨ អតិថិជនច្រើន ទាំង ៦៩ «ថ្មី (មិនទាន់មានក្នុង ZoeW)» · កញ្ចប់អតិថិជនដដែលមាននៅបញ្ជីទាំងពីរ ៖ Palm ០៧:៥៧ ⟷ Cookie មកដល់ ១៥:៣០ · ព័ត៌មានកញ្ចប់មួយពី web Argus ៖ `billStatus` `4` · `dispEmpDate` ព្រឹកថ្ងៃដដែល · `recSiteDate` ៤ ថ្ងៃមុន · `signSiteDate` ទទេ | រូបប្រអប់ទាំងពីរលើ preview `d4a20e7` (ជុំមើលជាមុន ៖ គ្មានការបញ្ចូល) · response web Argus | `queryDispatchList` `billStatus` `4` តាម `dispEmpDate*` = កញ្ចប់ដែល ZTO ចាត់ឲ្យសាខាចែក រួមទាំងកញ្ចប់នៅតាមផ្លូវ មិនមែនស្កេនមកដល់ `03` · `DispatchQueryInfoQTO` គ្មានប្រភេទស្កេន · កាតាឡុក App Palm គ្មាន endpoint អានបញ្ជីស្កេនមកដល់ (`queryTrackInfo` ម្តងមួយកញ្ចប់) ➜ បញ្ជីមកដល់ Palm បិទ (`palm:no-arrival-list` · App លាក់ការទាញ) ⛔ មិននាំចូលពី tab «បញ្ជូន» · A176 (ស្ថានភាពជួរ = ស្ថានភាពបច្ចុប្បន្ន) ត្រឹមត្រូវ តែការសន្មត «tab «បញ្ជូន» = មកដល់» ខុស · បញ្ជីចុះហត្ថលេខា (`5` · `signSiteDate`) រក្សា (auto-close · ការរង់ចាំ ៨ ថ្ងៃ) · ផ្លូវ ១០០% ៖ web Argus ផ្ទៀង `scan/page/scan` ដោយ Cookie `BOS-MAN-SESSION` តែប៉ុណ្ណោះ (header request ៖ គ្មាន `Authorization`) ➜ សាក token Palm ក្នុង PR ថ្មី · mutation ៖ កូដមុនកែ ➜ ៧ test ធ្លាក់ |
 
 ### 2026-10-16 — Lookup Palm យឺតជាង Lookup Cookie (ម្ចាស់គម្រោងវាស់លើទូរស័ព្ទ)
 

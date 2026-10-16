@@ -168,7 +168,7 @@ describe('Palm login and lookup through the real Netlify handler', () => {
     it('never falls back to Argus list endpoints or the Argus Cookie with a Palm session', async () => {
         const { sessionToken: session } = await login();
         vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { list: [], pages: 0, total: 0 } })));
-        const res = await call({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1' }, session);
+        const res = await call({ palm: '1', list: '1', signed: '1', from: '2026-10-10', to: '2026-10-16', page: '1' }, session);
         expect(res.statusCode).toBe(200);
         expect(vi.mocked(fetch).mock.calls.map((c) => String(c[0]))).toEqual(['https://aargus-api.ztoglobal.net/zto/dispatch/v1/queryDispatchList']);
     });
@@ -342,7 +342,7 @@ describe('Palm follows the same server rules as /detail', () => {
     });
 });
 
-describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the Argus list contract', () => {
+describe('Palm list: sign list (billStatus 5) with the Argus list contract · no arrival list (A180)', () => {
     const READ_ONLY = new Set(['/zto/system/v1/doLogin', '/zto/basic/v1/billInfoQuery', '/zto/dispatch/v1/queryDispatchList']);
     const item = (billCode: string, billStatus: string, extra: Record<string, unknown> = {}) => ({
         billCode, billStatus, consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: '2.5', dod: '0', dispEmpDate: '2026-10-15 09:30:00', ...extra
@@ -359,71 +359,48 @@ describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the
         }));
         return sent;
     }
-    const listQuery = (extra: Record<string, string> = {}) => ({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1', ...extra });
+    const listQuery = (extra: Record<string, string> = {}) => ({ palm: '1', list: '1', signed: '1', from: '2026-10-10', to: '2026-10-16', page: '1', ...extra });
 
-    it('arrival page ➜ dispatch list billStatus 4 over dispEmpDate with the Argus row shape', async () => {
+    it('owner report: Palm «បញ្ជូន» (billStatus 4 · dispEmpDate) holds parcels still on the road ➜ no arrival list, refused before ZTO', async () => {
         const { sessionToken: session } = await login();
-        const sent = serve({ '4': () => page([item('KH0000000001', '4'), item('KH0000000002', '4', { cod: '-1', fcAmount: '1.5' })], { pages: 2, total: 150 }) });
-        const body = JSON.parse((await call(listQuery(), session)).body);
-        expect(sent).toEqual([{ path: '/zto/dispatch/v1/queryDispatchList', body: {
-            billStatus: '4', dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: '2026-10-16 23:59:59', pageNum: 1, pageSize: 100 } }]);
-        expect(body).toMatchObject({ success: true, list: true, enabled: true, kind: 'arrival', page: 1, pages: 2, total: 150,
-            site: 'KH001', siteName: 'Test branch', otherScans: 0, signedScans: 0, signed: [], signedOk: false });
-        expect(body.rows).toEqual([
-            { barcode: 'KH0000000001', phone: '012345678', cod: 2.5, dod: 0, at: '2026-10-15 09:30:00', ztoClosed: false, skip: '', from: '' },
-            { barcode: 'KH0000000002', phone: '012345678', cod: 0, dod: 1.5, at: '2026-10-15 09:30:00', ztoClosed: false, skip: '', from: '' }
-        ]);
+        const sent = serve({ '4': () => page([item('KH0000000001', '4')]), '5': () => page([item('KH0000000009', '5')]) });
+        for (const extra of [{}, { withSigned: '1' }]) {
+            const res = await call({ palm: '1', list: '1', from: '2026-10-10', to: '2026-10-16', page: '1', ...extra }, session);
+            expect(res.statusCode).toBe(200);
+            expect(JSON.parse(res.body)).toEqual({ success: false, list: true, enabled: false, code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'palm:no-arrival-list' });
+        }
+        expect(sent).toEqual([]);
     });
 
-    it('owner report: an arrival row carries the parcel\'s current status, not the request filter ➜ still an arrival (never «other scan»)', async () => {
+    it('sign list ➜ billStatus 5 over signSiteDate · only rows whose billStatus is 5 are evidence · Argus contract', async () => {
         const { sessionToken: session } = await login();
-        serve({ '4': () => page([item('KH0000000001', '1'), item('KH0000000002', ''), { billCode: 'KH0000000003', consigneeMobile: 'BmhbP/Cn4387fL0qAljyew==', cod: '1', dispEmpDate: '2026-10-15 09:30:00' },
-            item('KH0000000004', '5')]) });
+        const sent = serve({ '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5'), item('bad code', '5'), null], { pages: 3, total: 41 }) });
         const body = JSON.parse((await call(listQuery(), session)).body);
-        expect(body.rows.map((r: any) => r.barcode)).toEqual(['KH0000000001', 'KH0000000002', 'KH0000000003']);
-        expect(body.otherScans).toBe(0);
-        expect(body).toMatchObject({ signed: ['KH0000000004'], signedScans: 1 });
-        expect(body.rows.length + body.otherScans + body.signedScans).toBe(4);
-    });
-
-    it('withSigned=1 ➜ sign list billStatus 5 in parallel; only rows whose billStatus is 5 are evidence', async () => {
-        const { sessionToken: session } = await login();
-        const sent = serve({
-            '4': () => page([item('KH0000000001', '4')]),
-            '5': () => page([item('KH0000000009', '5'), item('KH0000000010', '4'), item('KH0000000009', '5')], { pages: 3, total: 41 })
-        });
-        const body = JSON.parse((await call(listQuery({ withSigned: '1' }), session)).body);
-        expect(sent.map((c) => c.body.billStatus).sort()).toEqual(['4', '5']);
-        const signedBody = sent.find((c) => c.body.billStatus === '5')!.body;
-        expect(signedBody).toMatchObject({ signSiteDateFrom: '2026-10-10 00:00:00', pageNum: 1, pageSize: 100 });
-        expect(signedBody.signSiteDateTo.endsWith(' 23:59:59')).toBe(true);
-        expect(body).toMatchObject({ kind: 'arrival', signedOk: true, signed: ['KH0000000009'], signedPages: 3, signedTotal: 41 });
+        expect(sent).toHaveLength(1);
+        expect(sent[0].path).toBe('/zto/dispatch/v1/queryDispatchList');
+        expect(Object.keys(sent[0].body)).toEqual(['billStatus', 'signSiteDateFrom', 'signSiteDateTo', 'pageNum', 'pageSize']);
+        expect(sent[0].body).toMatchObject({ billStatus: '5', signSiteDateFrom: '2026-10-10 00:00:00', pageNum: 1, pageSize: 100 });
+        expect(sent[0].body.signSiteDateTo.endsWith(' 23:59:59')).toBe(true);
+        expect(body).toMatchObject({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 3, total: 41,
+            site: 'KH001', siteName: 'Test branch', rows: [], signedOk: true, signed: ['KH0000000009'], signedScans: 2, otherScans: 3, provider: 'zto-palm' });
         expect(body.signedRows).toEqual([{ barcode: 'KH0000000009', phone: '012345678', cod: 2.5, dod: 0, at: '', from: '' }]);
     });
 
     it('signed=1&exact=1 reads exactly the requested days; signed=1 alone reads the companion range', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({ '5': () => page([item('KH0000000009', '5')]) });
-        const exact = JSON.parse((await call(listQuery({ signed: '1', exact: '1', from: '2026-10-12', to: '2026-10-12' }), session)).body);
+        const exact = JSON.parse((await call(listQuery({ exact: '1', from: '2026-10-12', to: '2026-10-12' }), session)).body);
         expect(sent[0].body).toMatchObject({ billStatus: '5', signSiteDateFrom: '2026-10-12 00:00:00', signSiteDateTo: '2026-10-12 23:59:59' });
         expect(exact).toMatchObject({ kind: 'signed', signedOk: true, signed: ['KH0000000009'], rows: [] });
-        await call(listQuery({ signed: '1', from: '2026-10-12', to: '2026-10-12' }), session);
+        await call(listQuery({ from: '2026-10-12', to: '2026-10-12' }), session);
         expect(sent[1].body.signSiteDateTo >= '2026-10-12 23:59:59').toBe(true);
-    });
-
-    it('a failed sign list leaves the arrival page answering with signedOk false (never «complete»)', async () => {
-        const { sessionToken: session } = await login();
-        serve({ '4': () => page([item('KH0000000001', '4')]), '5': () => upstream({ status: false, statusCode: 'SYS_BUSY' }) });
-        const body = JSON.parse((await call(listQuery({ withSigned: '1' }), session)).body);
-        expect(body).toMatchObject({ kind: 'arrival', signedOk: false });
-        expect(body.rows).toHaveLength(1);
     });
 
     it('expired session · ZTO refusal · bad range or page ➜ the same codes the App knows', async () => {
         const { sessionToken: session } = await login();
-        serve({ '4': () => upstream({}, 401) });
+        serve({ '5': () => upstream({}, 401) });
         expect((await call(listQuery(), session)).statusCode).toBe(401);
-        serve({ '4': () => upstream({ status: false, statusCode: 'SYS_BUSY' }) });
+        serve({ '5': () => upstream({ status: false, statusCode: 'SYS_BUSY' }) });
         expect(JSON.parse((await call(listQuery(), session)).body)).toEqual({ code: 'ZTO_UPSTREAM_REJECTED', reason: 'palm:SYS_BUSY' });
         serve({});
         expect(JSON.parse((await call(listQuery({ from: '2026-10-16', to: '2026-10-10' }), session)).body).code).toBe('ZTO_LIST_RANGE_INVALID');
@@ -433,8 +410,8 @@ describe('Palm list: arrival (billStatus 4) · sign list (billStatus 5) with the
 
     it('a full page without ZTO pages is never the last page (pagesUnknown)', async () => {
         const { sessionToken: session } = await login();
-        const full = Array.from({ length: 100 }, (_, i) => item('KH' + String(1000000000 + i), '4'));
-        serve({ '4': () => upstream({ status: true, result: { list: full } }) });
+        const full = Array.from({ length: 100 }, (_, i) => item('KH' + String(1000000000 + i), '5'));
+        serve({ '5': () => upstream({ status: true, result: { list: full } }) });
         const body = JSON.parse((await call(listQuery(), session)).body);
         expect(body).toMatchObject({ pages: 2, pagesUnknown: true });
     });
@@ -496,7 +473,7 @@ describe('Palm keeps its ZTO connection between scans (owner: Palm on a new conn
         expect(fetch).toHaveBeenCalledTimes(2);
         n = 0;
         vi.stubGlobal('fetch', vi.fn(async () => { n++; if (n === 1) throw stale(); return upstream({ status: true, result: { list: [], pages: 1, total: 0 } }); }));
-        expect((await call({ palm: '1', list: '1', from: '2026-10-15', to: '2026-10-16', page: '1' }, session)).statusCode).toBe(200);
+        expect((await call({ palm: '1', list: '1', signed: '1', from: '2026-10-15', to: '2026-10-16', page: '1' }, session)).statusCode).toBe(200);
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 

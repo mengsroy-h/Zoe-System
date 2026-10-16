@@ -1,8 +1,11 @@
 /**
- * ZTO Palm ពេញ (សំណើម្ចាស់គម្រោង) ៖ «ទាញបញ្ជីកញ្ចប់ពី ZTO» និង «បិទតាម ZTO ស្វ័យប្រវត្តិ» ដំណើរការក្នុងរបៀប Palm ៖
- * - URL បញ្ជីរក្សា `palm=1` ➜ Function អាន `queryDispatchList` របស់ Palm (`billStatus` ៤ · ៥) មិនមែន Argus/Cookie
+ * ZTO Palm (សំណើម្ចាស់គម្រោង) ៖ «បិទតាម ZTO ស្វ័យប្រវត្តិ» ដំណើរការក្នុងរបៀប Palm ៖
+ * - URL បញ្ជីចុះហត្ថលេខារក្សា `palm=1` ➜ Function អាន `queryDispatchList` `billStatus` ៥ របស់ Palm មិនមែន Argus/Cookie
  * - សំណើបញ្ជីផ្ញើ session Palm (`X-Zoe-Palm-Token`) និងគណនី ZoeW (`X-Zoe-Id-Token`)
  * - ជុំបិទតាម ZTO អានបញ្ជី «ចុះហត្ថលេខា» Palm ➜ បិទកញ្ចប់ដែលមាន · ⛔ មិនហៅ `/detail` ម្តងមួយៗ (`billInfoQuery` គ្មានស្ថានភាព)
+ * - A180 (ម្ចាស់គម្រោងរាយការណ៍ ៖ Palm ទាញបាន ៦៩ ជួរ ពេល Cookie ឃើញតែអតិថិជនម្នាក់មកដល់) ៖ tab «បញ្ជូន» (`billStatus` ៤ ·
+ *   `dispEmpDate`) ជាកញ្ចប់ ZTO ចាត់ឲ្យសាខាចែក រួមទាំងកញ្ចប់នៅតាមផ្លូវ មិនមែនស្កេនមកដល់ (03) ទេ ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO»
+ *   បិទក្នុងរបៀប Palm ⛔ មិនសុំបញ្ជីមកដល់ពី Function ទេ
  */
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +13,8 @@ import { refTo } from '../src/app/refs';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
-import { buildZtoListApiUrl, runZtoListSyncPreview } from '../src/features/zto-list-sync';
+import { ZTO_PALM_NO_LIST_TEXT, buildZtoListApiUrl, drawerZtoListSyncFlow, openZtoListSyncModal, refreshZtoListSyncUi, runZtoListSyncPreview, ztoListSyncEnabled } from '../src/features/zto-list-sync';
+import { viewState } from '../src/core/view-state';
 import { clearZtoPickupStatusStore, runZtoStatusSweep, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { warmZtoLookupProxyIfConfigured } from '../src/features/customer-table-prefetch';
@@ -79,18 +83,19 @@ afterEach(() => {
     refTo('ztoListSyncTo')(null);
 });
 
-describe('ZTO Palm ពេញ ៖ បញ្ជី · ចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ', () => {
-    it('Palm config ➜ ☰ ZTO (ទាញបញ្ជី · បិទតាម ZTO) បើក ដូចរបៀប Argus', () => {
+describe('ZTO Palm ៖ ចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ', () => {
+    it('Palm config ➜ «បិទតាម ZTO» បើក ដូចរបៀប Argus', () => {
         expect(ztoFastModeIsOn()).toBe(true);
         expect(ztoStatusFeatureConfig()).toMatchObject({ url: PALM_URL });
         expect(ztoAutoCloseEnabled()).toBe(true);
     });
 
-    it('URL បញ្ជីរក្សា palm=1 ➜ Function អានបញ្ជី Palm (មិនមែន Argus)', () => {
-        const url = new URL(buildZtoListApiUrl({ url: PALM_URL }, '2026-10-03', '2026-10-06', 1, 'withSigned'));
+    it('URL បញ្ជីចុះហត្ថលេខារក្សា palm=1 ➜ Function អានបញ្ជី Palm (មិនមែន Argus)', () => {
+        const url = new URL(buildZtoListApiUrl({ url: PALM_URL }, '2026-10-03', '2026-10-06', 1, 'signedExact'));
         expect(url.searchParams.get('palm')).toBe('1');
         expect(url.searchParams.get('list')).toBe('1');
-        expect(url.searchParams.get('withSigned')).toBe('1');
+        expect(url.searchParams.get('signed')).toBe('1');
+        expect(url.searchParams.get('exact')).toBe('1');
         const argus = new URL(buildZtoListApiUrl({ url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' }, '2026-10-03', '2026-10-06', 1));
         expect(argus.searchParams.get('palm')).toBeNull();
     });
@@ -118,17 +123,50 @@ describe('ZTO Palm ពេញ ៖ បញ្ជី · ចុះហត្ថលេ�
         expect(h.calls[0]).toMatchObject({ itemId: 'a1', closed: true });
     });
 
-    it('ទាញបញ្ជី ៖ ទំព័រ ១ សុំ withSigned តាម Palm ➜ ជួរមកដល់ចូលលទ្ធផល', async () => {
+});
+
+describe('A180 ៖ Palm គ្មានបញ្ជីកញ្ចប់មកដល់ ➜ «ទាញបញ្ជីកញ្ចប់ពី ZTO» បិទក្នុងរបៀប Palm', () => {
+    it('កុងតាក់បញ្ជីបើក (1) តែរបៀប Palm ➜ មិនបើក · ប៊ូតុង 📥 និងធាតុ ☰ លាក់ · «បិទតាម ZTO» នៅដដែល', () => {
+        expect(appLocalStore.getItem('zoew_zto_listsync_v1')).toBe('1');
+        expect(ztoListSyncEnabled()).toBe(false);
+        refreshZtoListSyncUi();
+        expect(viewState.ztoListSyncBtnVisible).toBe(false);
+        expect(viewState.ztoListSyncDrawerVisible).toBe(false);
+        expect(viewState.ztoListSyncOn).toBe(false);
+        expect(ztoAutoCloseEnabled()).toBe(true);
+    });
+
+    it('ទាញបញ្ជី ៖ ⛔ គ្មានសំណើទៅ Function · គ្មានលទ្ធផល · ប្រាប់ថាប្រើបានតែរបៀប Cookie', async () => {
         const fetch = vi.fn(async (_url: string, _init?: RequestInit) => json({ success: true, list: true, enabled: true, kind: 'arrival', page: 1, pages: 1, total: 1, site: 'KH001',
             rows: [{ barcode: 'KH0000000501', phone: '0960007345', cod: 2.5, dod: 0, at: '2026-10-05 09:00:00', ztoClosed: false, skip: '', from: '' }],
             signed: [], signedOk: true, signedPages: 1, signedRows: [] }));
         vi.stubGlobal('fetch', fetch);
         await runZtoListSyncPreview();
-        const u = new URL(String(fetch.mock.calls[0][0]));
-        expect(u.searchParams.get('palm')).toBe('1');
-        expect(u.searchParams.get('withSigned')).toBe('1');
-        expect((fetch.mock.calls[0] as any[])[1].headers).toMatchObject({ 'X-Zoe-Palm-Token': SESSION });
-        expect(ztoState.ztoListSyncResult.rows.map((r: any) => r.barcode)).toEqual(['KH0000000501']);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(ztoState.ztoListSyncResult).toBeNull();
+        expect(uiState.toasts.map((t: any) => t.msg)).toContain(ZTO_PALM_NO_LIST_TEXT);
+    });
+
+    it('បើកប្រអប់បញ្ជី ឬចុចកុងតាក់ ☰ ក្នុងរបៀប Palm ➜ មិនបើក · មិនប្តូរកុងតាក់ · ប្រាប់ហេតុ', () => {
+        openZtoListSyncModal();
+        expect(uiState.modalStack).not.toContain('ztoListSyncModal');
+        expect(uiState.toasts.map((t: any) => t.msg)).toEqual([ZTO_PALM_NO_LIST_TEXT]);
+        uiState.toasts = [];
+        drawerZtoListSyncFlow();
+        expect(appLocalStore.getItem('zoew_zto_listsync_v1')).toBe('1');
+        expect(uiState.toasts.map((t: any) => t.msg)).toEqual([ZTO_PALM_NO_LIST_TEXT]);
+    });
+
+    it('reverse ៖ របៀប Cookie (Argus) + កុងតាក់បើក ➜ បញ្ជីនៅបើក', () => {
+        const cfg = JSON.parse(appLocalStore.getItem('zoew_lookup_api_config') as string);
+        cfg.url = window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}';
+        delete cfg.palmTokenEnc;
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        expect(getLookupApiConfig()).toMatchObject({ url: cfg.url });
+        expect(ztoListSyncEnabled()).toBe(true);
+        refreshZtoListSyncUi();
+        expect(viewState.ztoListSyncBtnVisible).toBe(true);
+        expect(viewState.ztoListSyncDrawerVisible).toBe(true);
     });
 });
 

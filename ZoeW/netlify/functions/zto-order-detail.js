@@ -87,7 +87,7 @@ function upstreamTimingBucket() {
 }
 const upstreamTimingSignal = {
     detail: upstreamTimingBucket(), arrival: upstreamTimingBucket(), signed: upstreamTimingBucket(),
-    palmDetail: upstreamTimingBucket(), palmArrival: upstreamTimingBucket(), palmSigned: upstreamTimingBucket()
+    palmDetail: upstreamTimingBucket(), palmSigned: upstreamTimingBucket()
 };
 function upstreamConnectBucket() {
     return { count: 0, timed: 0, totalMs: 0, lastMs: 0, maxMs: 0, errors: 0, at: 0 };
@@ -1791,7 +1791,6 @@ function upstreamTimingBody() {
         signed: upstreamTimingReport(upstreamTimingSignal.signed),
         palm: {
             detail: upstreamTimingReport(upstreamTimingSignal.palmDetail),
-            list: upstreamTimingReport(upstreamTimingSignal.palmArrival),
             signed: upstreamTimingReport(upstreamTimingSignal.palmSigned)
         },
         connections: {
@@ -2252,7 +2251,6 @@ function palmDeps(event, config, startedAt) {
         listSignedRange,
         listPageSize: config.list.pageSize,
         listMaxPages: config.list.maxPages,
-        mergeCompanion: (body, outcome) => mergeSignedCompanion(body, outcome),
         noteTiming: noteUpstreamTiming,
         timingReport: upstreamTimingBody,
         runtimeReport

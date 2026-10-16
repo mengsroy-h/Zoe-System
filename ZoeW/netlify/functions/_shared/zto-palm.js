@@ -305,7 +305,9 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (reason === 'session:invalid') return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
         if (reason === 'upstream:rate') return json(429, { code: 'ZTO_RATE_LIMITED' });
         if (error?.name === 'AbortError') return json(504, { code: 'ZTO_TIMEOUT' });
-        return json(502, { code: reason === 'upstream:unavailable' ? 'ZTO_UNAVAILABLE' : 'ZTO_INVALID_RESPONSE' });
+        const diagnostic = error?.palmReason ? { reason: error.palmReason } : {};
+        if (BARCODE_RE.test(error?.palmBarcode || '')) diagnostic.barcode = error.palmBarcode;
+        return json(502, { code: reason === 'upstream:unavailable' ? 'ZTO_UNAVAILABLE' : 'ZTO_INVALID_RESPONSE', ...diagnostic });
     }
 }
 
@@ -368,14 +370,22 @@ function listFailure(outcome) {
     return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: outcome.reason });
 }
 
-function candidatePage(upstream, page, pageSize) {
+function invalidPalmResponse(reason, barcode) {
+    return Object.assign(new Error('upstream:json'), { palmReason: 'palm:' + reason, palmBarcode: barcode || '' });
+}
+
+function candidatePage(upstream, page, pageSize, kind) {
     const container = upstream.result;
-    if (!container || !Array.isArray(container.list) || container.list.length > LIST_ROW_MAX) throw new Error('upstream:json');
+    if (!container || typeof container !== 'object' || Array.isArray(container)) throw invalidPalmResponse('list-' + kind + '-result');
+    const empty = container.list === null && (container.total === 0 || container.total === '0')
+        && (container.pages === 0 || container.pages === '0');
+    const list = empty ? [] : container.list;
+    if (!Array.isArray(list) || list.length > LIST_ROW_MAX) throw invalidPalmResponse('list-' + kind + '-items');
     const reported = Number(container.pages);
     const known = container.pages !== null && container.pages !== undefined && Number.isInteger(reported) && reported >= 0;
-    if (known && reported === 0 && container.list.length) throw new Error('upstream:json');
-    const full = container.list.length >= pageSize;
-    return { list: container.list, pages: known ? reported : (full ? page + 1 : (container.list.length ? page : page - 1)), unknown: !known && full };
+    if (known && reported === 0 && list.length) throw invalidPalmResponse('list-' + kind + '-pages');
+    const full = list.length >= pageSize;
+    return { list, pages: known ? reported : (full ? page + 1 : (list.length ? page : page - 1)), unknown: !known && full };
 }
 
 function palmResponseError(upstream) {
@@ -404,12 +414,24 @@ function palmOrigin(raw, tracks) {
 }
 
 function arrivalTrackRows(upstream, raw, barcode, site, range, keys, deps) {
-    const groups = Array.isArray(upstream.result) ? upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === trackingCode(barcode)) : [];
-    if (groups.length !== 1 || !Array.isArray(groups[0].tracks) || !groups[0].tracks.length
-        || (groups[0].mail.isSign !== 0 && groups[0].mail.isSign !== 1)) throw new Error('upstream:json');
-    const tracks = groups[0].tracks;
-    if (tracks.some((track) => !track || trackingCode(track.mailNo) !== trackingCode(barcode) || !trackingStamp(track.time)
-        || (typeof track.action !== 'string' && typeof track.action !== 'number'))) throw new Error('upstream:json');
+    const code = trackingCode(barcode);
+    if (!Array.isArray(upstream.result)) throw invalidPalmResponse('track-result', barcode);
+    if (!upstream.result.length) throw invalidPalmResponse('track-empty', barcode);
+    const groups = upstream.result.filter((row) => {
+        const identity = trackingCode(row?.mail?.mailNo) || trackingCode(row?.mailNo);
+        if (identity) return identity === code;
+        return Array.isArray(row?.tracks) && row.tracks.length && row.tracks.every((track) => trackingCode(track?.mailNo) === code);
+    });
+    if (groups.length !== 1) throw invalidPalmResponse('track-identity', barcode);
+    const group = groups[0];
+    if (!Array.isArray(group.tracks)) throw invalidPalmResponse('track-items', barcode);
+    if (!group.tracks.length) throw invalidPalmResponse('track-empty', barcode);
+    const tracks = group.tracks;
+    for (const track of tracks) {
+        if (!track || trackingCode(track.mailNo) !== code) throw invalidPalmResponse('track-barcode', barcode);
+        if (!trackingStamp(track.time)) throw invalidPalmResponse('track-time', barcode);
+        if (typeof track.action !== 'string' && typeof track.action !== 'number') throw invalidPalmResponse('track-action', barcode);
+    }
     const verdict = trackingVerdict(upstream, barcode, site);
     const fields = deps.project(raw);
     const base = { barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),
@@ -434,12 +456,15 @@ async function palmArrivalList(range, page, session, keys, deps) {
         { billStatus: '4', status: 0, pageNum: page, pageSize },
         { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize }
     ];
-    const upstreams = await Promise.all(requests.map((payload) => requestPalm(DISPATCH_LIST_PATH, payload, session.token, keys, deps.upstreamMs(), null, true)));
+    const upstreams = await Promise.all(requests.map(async (payload) => {
+        try { return await requestPalm(DISPATCH_LIST_PATH, payload, session.token, keys, deps.upstreamMs(), null, true); }
+        catch (error) { error.palmReason = 'palm:list-' + payload.billStatus + '-response'; throw error; }
+    }));
     for (const upstream of upstreams) {
         const response = palmResponseError(upstream);
         if (response) return response;
     }
-    const pages = upstreams.map((upstream) => candidatePage(upstream, page, pageSize));
+    const pages = upstreams.map((upstream, index) => candidatePage(upstream, page, pageSize, requests[index].billStatus));
     const candidates = new Map();
     for (const current of pages) {
         for (const raw of current.list) {
@@ -457,7 +482,9 @@ async function palmArrivalList(range, page, session, keys, deps) {
                 if (typeof deps.remainingMs === 'function' && deps.remainingMs() < 1000) throw Object.assign(new Error('upstream:timeout'), { name: 'AbortError' });
                 const index = next++;
                 const job = jobs[index];
-                const tracking = await palmTracking(job.barcode, session, keys, deps);
+                let tracking;
+                try { tracking = await palmTracking(job.barcode, session, keys, deps); }
+                catch (error) { error.palmReason = 'palm:track-response'; error.palmBarcode = job.barcode; throw error; }
                 if (tracking.response) throw Object.assign(new Error('upstream:tracking'), { palmResponse: tracking.response });
                 results[index] = arrivalTrackRows(tracking.upstream, job.raw, job.barcode, session.site, range, keys, deps);
             }

@@ -1225,6 +1225,8 @@ Parent ៖ `java.lang.Enum`។
 | `tracks[]` បន្ថែម | `countryCode: String` · `problemReason: String` · `signName: String` |
 | `tracks[].id` | ចម្លើយពិតជា String ទោះ DTO ប្រកាស `int`; កុំយកវាជាចំនួនសម្រាប់គណនាលុយ |
 
+`mail` និង `isSign` ជា metadata បន្ថែមដែលអាចអវត្តមាន; បញ្ជីមកដល់ផ្ទៀងអត្តសញ្ញាណតាម envelope ឬ Barcode ក្នុង track ទាំងអស់។ ខ្វះ metadata ចុះហត្ថលេខាមិនលុបភស្តុតាងមកដល់ទេ។
+
 ភស្តុតាងមកដល់ ៖ `action="3"` + `siteCode` ត្រូវសាខា + `time` ក្នុងថ្ងៃដែលជ្រើស។ ភស្តុតាងចុះហត្ថលេខា ៖ `mail.isSign=1` និង `action="5"` ត្រូវ Barcode/សាខា ហើយមិននៅមុនការមកដល់ថ្មី។ Field `shipTypeId="03"` ក្នុង Lookup ជាប្រភេទដឹកជញ្ជូន; វាមិនមែនស្កេនមកដល់ `03` ទេ។
 
 ## លេខប្រភេទស្កេនក្នុង APK (`ScanType`)

@@ -550,6 +550,51 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(body.signedRows[0].from).toBe(expected);
     });
 
+    it.each([{}, { mailNo: 'KH0000000001' }, { mail: { mailNo: 'KH0000000001' } },
+        { mail: { mailNo: 'KH0000000001', isSign: null } }])('Palm track មានភស្តុតាងមកដល់ តែ metadata ចុះហត្ថលេខាអវត្តមាន ➜ មិនបិទបញ្ជី (%j)', async (metadata) => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')]), '5': () => page([]),
+            'track:KH0000000001': () => upstream({ status: true, result: [{ ...metadata, tracks: [
+                { action: '3', siteCode: 'KH001', time: '2026-10-16 09:00:00', mailNo: 'KH0000000001' }
+            ] }] }) });
+        const response = await call(listQuery({ signed: '0' }), session);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).rows).toMatchObject([{ barcode: 'KH0000000001', at: '2026-10-16 09:00:00', ztoClosed: null }]);
+        expect(JSON.parse(response.body).signed).toEqual([]);
+    });
+
+    it('Palm បញ្ជីទទេមាន total=0/pages=0 និង list=null ➜ ទំព័រទទេត្រឹមត្រូវ', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => upstream({ status: true, result: { list: null, total: 0, pages: 0 } }), '4': () => page([]), '5': () => page([]) });
+        const response = await call(listQuery({ signed: '0' }), session);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).rows).toEqual([]);
+    });
+
+    it.each([
+        [[], 'palm:track-empty'],
+        [[{ mail: { mailNo: 'OTHER0000001', isSign: 0 }, tracks: [] }], 'palm:track-identity'],
+        [[{ mail: { mailNo: 'KH0000000001', isSign: 0 }, tracks: [
+            { action: '3', siteCode: 'KH001', time: null, mailNo: 'KH0000000001' }
+        ] }], 'palm:track-time']
+    ])('Palm ទាញបញ្ជីខូច ➜ កូដមូលហេតុ និង Barcode សម្រាប់ផ្ទៀង 🧪 (%s)', async (result, reason) => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => page([]), '4': () => page([item('KH0000000001', '4')]), '5': () => page([]),
+            'track:KH0000000001': () => upstream({ status: true, result }) });
+        const response = await call(listQuery({ signed: '0' }), session);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason, barcode: 'KH0000000001' });
+        expect(response.body).not.toContain('012345678');
+    });
+
+    it('Palm list ខូច ➜ ប្រាប់ប្រភេទបញ្ជី និង field ខូច ដោយមិនបង្ហាញ response ដើម', async () => {
+        const { sessionToken: session } = await login();
+        serve({ '1': () => upstream({ status: true, result: { total: 2, list: null } }), '4': () => page([]), '5': () => page([]) });
+        const response = await call(listQuery({ signed: '0' }), session);
+        expect(response.statusCode).toBe(502);
+        expect(JSON.parse(response.body)).toEqual({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:list-1-items' });
+    });
+
     it('Palm បញ្ជីច្រើន និង track យឺត ១.៥ វិនាទី ➜ ទំព័រត្រូវបញ្ចប់ក្នុងថវិកា Function', async () => {
         const { sessionToken: session } = await login();
         vi.useFakeTimers();

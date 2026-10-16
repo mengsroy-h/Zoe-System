@@ -185,6 +185,14 @@ describe('Palm ៖ ទាញបញ្ជី ZTO ដូច Cookie ដោយ track
         expect(viewState.ztoListSyncNote).not.toContain('private-upstream-detail');
     });
 
+    it('កំហុស track បង្ហាញ Barcode សម្រាប់សាក 🧪 ដោយមិនបង្ហាញ message ដើម', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => json({ code: 'ZTO_INVALID_RESPONSE', reason: 'palm:track-empty', barcode: 'KH0000000001', message: 'private-detail' }, 502)));
+        await runZtoListSyncPreview();
+        expect(viewState.ztoListSyncNote).toContain('palm:track-empty');
+        expect(viewState.ztoListSyncNote).toContain('KH0000000001');
+        expect(viewState.ztoListSyncNote).not.toContain('private-detail');
+    });
+
     it('Palm អានគ្រប់ទំព័រ រួមទំព័រទទេក្រោយច្រោះ និងទំព័រលើសពិដាន Cookie', async () => {
         const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
             const page = Number(new URL(url).searchParams.get('page'));

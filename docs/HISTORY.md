@@ -100,6 +100,8 @@
 - `ZoeW/tests/collected-price-day-scope.test.ts` (ថ្មី ១៦ · SDK ក្លែងន័យ Firebase + adapter Supabase ពិត) — មុនកែ ធ្លាក់ ៦ (បៃ ២៦៦ KB · ៥៣២ KB > ២ KB) · ន័យ ១០ ឆ្លងទាំងមុន
   និងក្រោយ (បើកវិញ · ទិដ្ឋភាពចាស់ · ឧបករណ៍ ២ ៖ លុប key · សរសេរតម្លៃចាស់ · ផ្លាស់ថ្ងៃ)។
 - `daily-collected-test` ៖ fake SDK សរសេរ `null` លើផ្លូវគ្មាន ➜ គ្មានប្រែ · មិនទុក node ទទេ (ស្មើ RTDB ពិត · មិនបន្ធូរការផ្ទៀងផ្ទាត់)។
+- `emu/restore-mutation` «សម្អាតជាន់ការកែតម្លៃ» ៖ gate ទប់**គ្រប់**ការសរសេរក្រោម root collected (root ឬ `<ថ្ងៃ>/<key>`) មុន HTTP ផ្ញើ (មុន ៖ តែផ្លូវស្មើ root ➜ CI
+  `COLLECTED_WRITE_DID_NOT_REACH_GATE`) ➜ RTDB ពិត ៖ leaf ៨ ទប់ · leaf ថ្ងៃដែលសម្អាតរួចទទួល `412` ➜ រត់លើ `null` ➜ មិនបង្កើតថ្ងៃវិញ · ១៨២/១៨២។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -3669,7 +3671,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A160 | **កែតម្លៃកញ្ចប់បិទ ➜ `runTransaction` លើ root `zoew_daily_collected_cod_dod` ទាំងមូល (៧ ថ្ងៃ)** | SDK Firebase ពិត + RTDB emulator (proxy TCP រាប់បៃ · ឧបករណ៍ A កែ · B ស្តាប់ root) ៖ root ៧ ថ្ងៃ × ១០០ / ១០០០ / ៤០០០ key (JSON ២៦ KB · ២៥៩ KB · ១.០៤ MB) ➜ A ផ្ញើឡើង ២៦ KB · ២៥៩ KB · ១.០៤ MB ទាញមកវិញ ២ ដង (៥២ KB · ៥១៨ KB · ២.០៧ MB) · **B ទាញ root ទាំងមូលម្តងទៀត** (២៦ KB · ២៥៩ KB · ១.០៤ MB) រាល់ការកែតម្លៃមួយ · transaction លើ `<ថ្ងៃ>/<key>` ៖ ឡើង ១៦២ · ចុះ ១៧៤ · B ១១៤ បៃ (ថេរ) · Supabase (adapter ពិត) ៖ CAS root = op មួយ `x` + `v` = root ✕ ២ (៥៣២ KB នៅ ១០០០/ថ្ងៃ · Postgres ពិត CAS root ៣២០០០ key ៥៦៧៦ms ៖ A156) | ✅ [2.50.96] ៖ transaction តាម leaf `<ថ្ងៃ>/<key>` (ថ្ងៃក្នុងទិដ្ឋភាព + ៧ ថ្ងៃ + ថ្ងៃបិទ · គ្មាន ➜ `null` ឲ្យ server សម្រេច) ➜ ការកែតម្លៃមួយលើ root ៧ × ១០០០ ៖ Firebase ≈ ៣៣០ បៃ · Supabase ≈ ៦៦០ បៃ ឡើង (ក្លែង) · អ្នកយាម `ZoeW/tests/collected-price-day-scope.test.ts` (មុនកែ ធ្លាក់ ៦ · ន័យ ១០ ឆ្លងទាំងមុននិងក្រោយ) · `daily-collected-test` fake ស្មើ RTDB (null លើផ្លូវគ្មាន = គ្មានប្រែ) |
+| A160 | **កែតម្លៃកញ្ចប់បិទ ➜ `runTransaction` លើ root `zoew_daily_collected_cod_dod` ទាំងមូល (៧ ថ្ងៃ)** | SDK Firebase ពិត + RTDB emulator (proxy TCP រាប់បៃ · ឧបករណ៍ A កែ · B ស្តាប់ root) ៖ root ៧ ថ្ងៃ × ១០០ / ១០០០ / ៤០០០ key (JSON ២៦ KB · ២៥៩ KB · ១.០៤ MB) ➜ A ផ្ញើឡើង ២៦ KB · ២៥៩ KB · ១.០៤ MB ទាញមកវិញ ២ ដង (៥២ KB · ៥១៨ KB · ២.០៧ MB) · **B ទាញ root ទាំងមូលម្តងទៀត** (២៦ KB · ២៥៩ KB · ១.០៤ MB) រាល់ការកែតម្លៃមួយ · transaction លើ `<ថ្ងៃ>/<key>` ៖ ឡើង ១៦២ · ចុះ ១៧៤ · B ១១៤ បៃ (ថេរ) · Supabase (adapter ពិត) ៖ CAS root = op មួយ `x` + `v` = root ✕ ២ (៥៣២ KB នៅ ១០០០/ថ្ងៃ · Postgres ពិត CAS root ៣២០០០ key ៥៦៧៦ms ៖ A156) | ✅ [2.50.96] ៖ transaction តាម leaf `<ថ្ងៃ>/<key>` (ថ្ងៃក្នុងទិដ្ឋភាព + ៧ ថ្ងៃ + ថ្ងៃបិទ · គ្មាន ➜ `null` ឲ្យ server សម្រេច) ➜ ការកែតម្លៃមួយលើ root ៧ × ១០០០ ៖ Firebase ≈ ៣៣០ បៃ · Supabase ≈ ៦៦០ បៃ ឡើង (ក្លែង) · អ្នកយាម `ZoeW/tests/collected-price-day-scope.test.ts` (មុនកែ ធ្លាក់ ៦ · ន័យ ១០ ឆ្លងទាំងមុននិងក្រោយ) · `daily-collected-test` fake ស្មើ RTDB (null លើផ្លូវគ្មាន = គ្មានប្រែ) · `emu/restore-mutation` gate ទប់គ្រប់ការសរសេរក្រោម root collected (CI ផ្នែក 3/4 លើ `73746dc` ៖ gate ស្មើ root ➜ timeout) |
 
 ### 2026-10-16 — សំណើម្ចាស់គម្រោង ៖ រៀបចំ `CLAUDE.md` · `HISTORY.md` ឲ្យមានសណ្តាប់ធ្នាប់ · ការពារការសរសេរស្ទួន · សម្អាតឯកសារចាស់
 

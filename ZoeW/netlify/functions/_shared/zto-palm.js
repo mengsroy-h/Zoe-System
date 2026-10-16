@@ -241,7 +241,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         const diagnostic = query.track === '1';
         const body = deps.finish(access, lookupBody(upstream, barcode, keys, deps, diagnostic), barcode);
         if (!diagnostic || body.found !== true) return json(200, body);
-        const tracking = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: [barcode] }, session.token, keys, deps.upstreamMs(), null, true);
+        const tracking = await requestPalm(TRACK_INFO_PATH, { mailType: 1, mailNos: barcode }, session.token, keys, deps.upstreamMs(), null, true);
         if (tracking.authRejected || AUTH_EXPIRED_RE.test(String(tracking.statusCode || ''))) {
             return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
         }

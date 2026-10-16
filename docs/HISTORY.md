@@ -93,6 +93,22 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.102] — 2026-10-17 · ZoeW ៖ queryTrackInfo ផ្ញើ mailNos ជា String តាម APK Palm
+
+**ZoeW `2.50.102`** (`zoew-v364` ➜ `zoew-v365`) · ZoeKeyGen ដដែល · គ្មាន env, Firebase rules ឬ migration ថ្មី។
+ម្ចាស់គម្រោងផ្តល់ `draft.7z` (APK ស្រាយ) ក្រោយ 🧪 ឆ្លើយ `queryTrackInfo.result: []` ទាំងពីរកញ្ចប់។
+ផ្ទៀង `PDARequestImpl.queryTrackInfo(String, Callback)` ពី `classes4.dex` ៖ `mailType` = លេខ `1` និង `mailNos` = String។
+កូដយើងផ្ញើ `mailNos` ជា array ➜ ខុស protocol ពិត។
+
+- `zto-palm.js` ផ្ញើ `{mailType: 1, mailNos: barcode}` និងគណនា `x-sign` លើ JSON នោះ។ កែតំបន់ចាក់សោតាមរបាយការណ៍ម្ចាស់គម្រោង; `LOCK` ថ្មី។
+- តេស្ត request ពិតចាក់សោប្រភេទ String និងហត្ថលេខា; ធ្លាក់ពេលផ្ញើ array។ ឯកសារការប្រើ និងកាតាឡុក API ផ្ទៀងជាមួយ APK។
+- មិនដាក់ APK, កូដ decompile, សោ protocol ឬទិន្នន័យអតិថិជនក្នុង repo។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Preview កំណែនេះ ៖ 🧪 សាក Barcode ពីរដដែល ➜ ផ្ញើ `queryTrackInfo` ពេញ ដើម្បីផ្ទៀង action, siteCode និង time សម្រាប់មកដល់/ចុះហត្ថលេខា។
+2. `result: []` នៅតែមិនមែនភស្តុតាងថាកញ្ចប់មិនទាន់ចុះហត្ថលេខា; មិនបើកស្ថានភាព ឬបញ្ជី Palm តាមការទាយ។
+
 ### [2.50.101] — 2026-10-16 · ZoeW ៖ COD/DOD Palm ដាច់ពី mapping Cookie
 
 **ZoeW `2.50.101`** (`zoew-v363` ➜ `zoew-v364`) · ZoeKeyGen ដដែល · គ្មាន env, Firebase rules ឬ migration ថ្មី។

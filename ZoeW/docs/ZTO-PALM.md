@@ -8,7 +8,7 @@
 ## 🧪 ពិនិត្យ field របស់ Palm
 
 ចុច **🧪 សាកល្បង** ក្នុងការកំណត់ API រួចបញ្ចូល Barcode។ របៀប Palm អាន
-`billInfoQuery` និង `queryTrackInfo` (`mailType: 1` · `mailNos: [barcode]`) ដោយ session ដែលបាន Login។
+`billInfoQuery` និង `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) ដោយ session ដែលបាន Login។
 ចម្លើយដើមពេញលេញនៅក្នុង `billInfoQuery` និង `queryTrackInfo` បង្ហាញក្នុងប្រអប់ JSON ដែលអាចអូសមើល
 និងចម្លងបាន។ វាលដើមនៅដដែល ទោះ mapping COD/DOD ដែលកំណត់សម្រាប់ Cookie មិនស្គាល់វាក៏ដោយ។
 ប្រើចម្លើយនេះដើម្បីផ្ទៀងផ្ទាត់ឈ្មោះ field និងស្ថានភាពរបស់ Palm។ Palm អាន `cod` និង `dod` ផ្ទាល់;

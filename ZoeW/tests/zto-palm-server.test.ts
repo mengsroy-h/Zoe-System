@@ -95,7 +95,7 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
         const [url, init] = vi.mocked(fetch).mock.calls[1];
         expect(url).toBe('https://aargus-api.ztoglobal.net/zto/locus/v1/queryTrackInfo');
-        expect(JSON.parse(String(init?.body))).toEqual({ mailType: 1, mailNos: [CODE] });
+        expect(JSON.parse(String(init?.body))).toEqual({ mailType: 1, mailNos: CODE });
         expect(init?.headers).toMatchObject({ 'x-token': TOKEN, 'User-Agent': 'PDA' });
         const { createHash } = require('node:crypto');
         expect(init?.headers?.['x-sign']).toBe(createHash('md5').update(String(init?.body) + SIGN_KEY).digest('base64'));

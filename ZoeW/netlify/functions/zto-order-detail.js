@@ -2212,7 +2212,7 @@ function corsHeadersFor(event) {
     if (!NATIVE_APP_ORIGINS.has(origin)) return null;
     const out = {
         'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Max-Age': '7200',
         Vary: 'Origin'
     };
@@ -2255,9 +2255,10 @@ async function handleRequest(event) {
     const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
         await prewarmCookieCredential(event);
-        return { statusCode: 204, headers: { Allow: 'GET, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
+        return { statusCode: 204, headers: { Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
-    if (event.httpMethod !== 'GET') {
+    const palmQuery = requestQuery(event);
+    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm === 'login')) {
         return json(405, { error: 'Method not allowed' });
     }
 
@@ -2271,6 +2272,10 @@ async function handleRequest(event) {
     const keyLabel = matchProxyKey(proxyKeys.keys, suppliedKey);
     if (!keyLabel) {
         return json(401, { error: 'Invalid proxy key' });
+    }
+
+    if (palmQuery.palm === '1' || palmQuery.palm === 'login') {
+        return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, headerOf);
     }
 
     let config;

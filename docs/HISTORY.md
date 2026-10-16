@@ -83,6 +83,29 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.97] — 2026-10-16 · ZoeW ៖ Login ZTO Palm សម្រាប់ Lookup
+
+**ZoeW `2.50.97`** (`zoew-v359` ➜ `zoew-v360`) · ZoeKeyGen ដដែល · គ្មាន Firebase rules ឬ migration ថ្មី។
+សំណើម្ចាស់គម្រោង៖ បន្ថែម Login ZTO Palm ក្នុង ZoeW ដើម្បីទាញ Lookup ទៅមុខងារដែលមានស្រាប់ និងបើក PR។
+
+- ផ្ទាំងការកំណត់ Lookup មាន Login Palm និងផ្តាច់ session។ Login ជោគជ័យរៀបចំ URL និង fields ស្វ័យប្រវត្តិ។
+- ផ្ទៀងផ្ទាត់ទម្រង់ពី APK Palm `2.9.92`: password AES/ECB/PKCS5Padding, `x-sign` MD5/Base64, `x-token`,
+  login `/zto/system/v1/doLogin` និង lookup `/zto/basic/v1/billInfoQuery`។ លេខទូរស័ព្ទ encrypted ត្រូវស្រាយមុនបំពេញ។
+- Session របស់ឧបករណ៍នីមួយៗអ៊ិនគ្រីបនៅ server និងដោយ PIN នៅ App; មិនរក្សាទុក password និងមិនប្តូរ Argus Cookie។
+  ការឆ្លើយយឺតក្រោយប្តូរហាង/PIN/config ឬបិទផ្ទាំងមិនអាចរក្សាទុកជាន់បាន។ Logout សម្អាត fields និងព័ត៌មានគណនី Palm។
+- Palm ជា lookup មួយ barcode (លេខទូរស័ព្ទ/COD/DOD) សម្រាប់គណនី KH; មិនហៅ Argus list ឬផ្ញើ sign scan ទៅ ZTO។
+- អ្នកយាមថ្មី៖ `ZoeW/tests/zto-palm-server.test.ts` និង `ZoeW/tests/zto-palm-login.test.tsx` គ្រប AES/MD5 ពី Java,
+  session isolation/expiry, login failure, native origin, ការលេចធ្លាយ secret និងការបំពេញផ្ទាំងស្កេនពិត។ ស្នាមម្រាមដៃ ZTO
+  ប្តូរតែឯកសារដែលពាក់ព័ន្ធនឹងសំណើនេះ; មិនបន្ធូរការផ្ទៀងផ្ទាត់ចាស់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. មុនប្រើ បន្ថែម `ZTO_PALM_SESSION_SECRET` ចៃដន្យយ៉ាងតិច 32 តួអក្សរ ក្នុង Netlify Functions / Production រួច deploy ZoeW។
+   ប្រើ `ZTO_PROXY_KEY`/proxy keys ដែលមានស្រាប់; មិនដាក់ session secret ក្នុង frontend។ មើល `ZoeW/docs/ZTO-PALM.md`។
+2. បើកការកំណត់ API ដោយ PIN ➜ Login ZTO Palm ➜ គណនីដែលមានសិទ្ធិ ➜ ស្កេនកញ្ចប់ពិត ហើយផ្ទៀងលេខទូរស័ព្ទ និង COD/DOD។
+   Tests ប្រើគណនីសិប្បនិម្មិត និង upstream ក្លែង; មិនទាន់ផ្ទៀងផ្ទាត់ login ជាមួយ ZTO server ពិត។
+3. សាក session ផុតកំណត់, login ម្តងទៀត និងផ្តាច់ Palm លើ web និង APK។ មិន merge ឬ deploy ក្នុងការងារនេះ។
+
 ### [2.50.96] — 2026-10-16 · ZoeW ៖ **កែតម្លៃកញ្ចប់ដែលយករួច ➜ «ចំណូលយករួច» ប៉ះតែថ្ងៃពាក់ព័ន្ធ (មិនមែន root ៧ ថ្ងៃទាំងមូល)**
 
 **ZoeW `2.50.96`** (`zoew-v358` ➜ `zoew-v359`) · ⛔ **ZoeKeyGen មិនប្រែ** · គ្មាន Firebase rules · គ្មាន migration Supabase · គ្មានកូដ Android native។
@@ -5881,6 +5904,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-session-race.test.ts` | ផ្នែក ២ | — |

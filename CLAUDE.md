@@ -62,7 +62,7 @@ only this text protects them.
 
 | App | Role | Current version | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.96` (`zoew-v359`) | `zoew` |
+| **ZoeW** | Business app — parcels, COD/DOD, Locker positions, stats, Export, Excel import · also an **Android app** (Capacitor) · backend **Firebase or Supabase** per Config | `2.50.97` (`zoew-v360`) | `zoew` |
 | **ZoeKeyGen** | Seller tool — create/Revoke/Extend Activation Keys, Setup Link/QR · card "🏪 ហាង Supabase" (shops · invite codes · password-reset codes · devices per shop) · **separate Firebase project** | `2.24.19` (`zoekeygen-v130`) | `zoekeygen` |
 
 - ZoeW code lives in `ZoeW/src/**` (the single hand-edited source; same function names and storage keys as vanilla ZoeW)
@@ -1072,7 +1072,8 @@ REST-only with its own helpers ➜ apply every network rule separately (`network
 
 ## ZTO Lookup
 
-- `ZoeW/netlify/functions/zto-order-detail.js` is one file with one dependency (`@netlify/blobs`) ⛔ `puppeteer-core` and
+- `ZoeW/netlify/functions/zto-order-detail.js` keeps Argus in one file with one dependency (`@netlify/blobs`);
+  explicit Palm login/lookup uses server-only `_shared/zto-palm.js` (Node crypto, per-device sessions, no password persistence). ⛔ `puppeteer-core` and
   `@sparticuz/chromium` banned ⛔ no auto-login without proof the IdP accepts foreign servers.
 - Budgets: `ZTO_UPSTREAM_TIMEOUT_MS` (6s) per request · `ZTO_REQUEST_BUDGET_MS` (9s) total (app budget; Netlify sync
   functions allow 60s, streaming 10s) · client `ZTO_AUTO_LOOKUP_TIMEOUT_MS` 13s · `ZTO_TEST_TIMEOUT_MS` 11s. Budgets via

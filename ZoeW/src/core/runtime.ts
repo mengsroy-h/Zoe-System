@@ -1,4 +1,6 @@
 export const ACTION_ALLOWLIST = [
+    "disconnectZtoPalm",
+    "submitZtoPalmLogin",
     "applySetupLinkFromInput",
     "applySheetImportHeaderRow",
     "backToLoginForm",

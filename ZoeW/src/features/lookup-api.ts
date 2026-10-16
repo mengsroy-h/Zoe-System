@@ -2,7 +2,7 @@ import { setFieldValue } from '../app/refs';
 import { firebaseState, lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { fetchCustomerDataTableRows } from './customer-table';
-import { CUSTOMER_TABLE_SOON_BUSY_MS, CUSTOMER_TABLE_SOON_MAX_WAIT_MS, customerTablePrefetchAllowed, lookupApiIsZto, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
+import { CUSTOMER_TABLE_SOON_BUSY_MS, CUSTOMER_TABLE_SOON_MAX_WAIT_MS, customerTablePrefetchAllowed, lookupApiIsPalm, lookupApiIsZto, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
 import { withTimeout } from '../services/network';
@@ -82,6 +82,7 @@ export function lookupApiSendsHeader(cfg) {
 
 export async function buildLookupRequestHeaders(cfg) {
     const headers = {};
+    if (lookupApiIsPalm(cfg) && !ztoIdentityTargetTrusted(cfg.url)) throw new Error('Palm lookup host is not trusted');
     if (lookupApiSendsHeader(cfg)) {
         if (cfg.headerValueEnc) {
             const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
@@ -90,7 +91,16 @@ export async function buildLookupRequestHeaders(cfg) {
             headers[cfg.headerName] = cfg.headerValue;
         }
     }
+    await addPalmSessionHeader(cfg, headers);
     return headers;
+}
+
+export async function addPalmSessionHeader(cfg, headers) {
+    if (!lookupApiIsPalm(cfg)) return;
+    if (!ztoIdentityTargetTrusted(cfg.url)) throw new Error('Palm lookup host is not trusted');
+    const session = cfg.palmTokenEnc ? await decryptLookupSecret(cfg.palmTokenEnc) : '';
+    if (!session) throw Object.assign(new Error('Palm login required'), { lookupCode: 'ZTO_AUTH_EXPIRED' });
+    headers['X-Zoe-Palm-Token'] = session;
 }
 
 export const ZTO_ID_TOKEN_TIMEOUT_MS = 8000;

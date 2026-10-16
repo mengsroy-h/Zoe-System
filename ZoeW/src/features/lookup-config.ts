@@ -5,8 +5,9 @@ import { shopOwnsSetting, shopScope } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
-import { lookupApiIsZto } from './customer-table-prefetch';
-import { addZtoIdentityHeader, lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
+import { lookupApiIsPalm, lookupApiIsZto } from './customer-table-prefetch';
+import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
+import { refreshZtoPalmLogin } from './zto-palm-login';
 import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
@@ -45,6 +46,7 @@ export async function migrateLookupSecretIfNeeded() {
 }
 
 export function openLookupApiConfigModal() {
+    refreshZtoPalmLogin();
     const cfg = getLookupApiConfig() || {};
     const setVal = (id, val) => { setFieldValue(id, val || ''); };
 
@@ -101,6 +103,10 @@ export async function saveLookupApiConfig() {
     };
     const existingCfg = getLookupApiConfig() || {};
     const headerValueRaw = fieldValue('lookupApiHeaderValueInput').trim();
+    if (lookupApiIsPalm({ url }) && (headerValueRaw || snapshot.headerName !== 'X-Zoe-Proxy-Key')) {
+        alert('សូមប្រើ Login ZTO Palm ដើម្បីប្តូរសោភ្ជាប់។');
+        return;
+    }
     let headerValueEnc = existingCfg.headerValueEnc || null;
     let legacyHeaderValue = existingCfg.headerValue || '';
 
@@ -128,6 +134,10 @@ export async function saveLookupApiConfig() {
 
     if (!current()) return;
     const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
+    if (lookupApiIsPalm(cfg)) {
+        if (!existingCfg.palmTokenEnc) { alert('សូម Login ZTO Palm ជាមុនសិន។'); return; }
+        for (const name of ['provider', 'palmTokenEnc', 'palmExpiresAt', 'palmAccount']) cfg[name] = existingCfg[name];
+    }
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
     if (shop) cfg.shop = shop;
 
@@ -169,6 +179,8 @@ export async function testLookupApiConfig(btnEl?) {
     const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
     if (!current()) return;
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
+    try { await addPalmSessionHeader({ ...existingCfg, url }, headers); }
+    catch (_) { if (current()) alert('សូម Login ZTO Palm ម្តងទៀត។'); return; }
     await addZtoIdentityHeader({ url: url }, headers);
     if (!current()) return;
 

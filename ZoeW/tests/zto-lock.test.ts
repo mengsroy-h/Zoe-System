@@ -18,12 +18,14 @@ import { describe, expect, it } from 'vitest';
 const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
-    'netlify/functions/zto-order-detail.js': 'a940ee416faf47b326b4d8db4571d942e8ca56162a2712fc1ac96230a1c23f67',
+    'src/features/zto-palm-login.ts': '5b8736e43525b2e314892c04c21c519343b952d964dbb9666ca286aefa755e07',
+    'netlify/functions/_shared/zto-palm.js': '0fd191c36d4c1520eea9b02d7d1e99ccd696d4b2675748606f57458832eb5e83',
+    'netlify/functions/zto-order-detail.js': '90c98e5d4dfd492d07946d9b13780951cd9aad17c966ec95fd9b5a4fa9d7e1d0',
     'src/features/zto-list-sync.ts': '1a14581f766668810aba5808c8f38db2d51e815fd7dff53f93f713f36ec00e6d',
-    'src/features/zto-status.ts': '3e456891dbdd2b1c871cf687ba571da18eeb39b0b80f3aec2377c73a8209346d',
+    'src/features/zto-status.ts': '0e8d2841c12b500ec77b21ba843773853cee53a5db44aaa988c6f169a06a8e15',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
-    'src/features/auto-lookup.ts': '738abb8c77203925b686ac381f0cfde5c4b243a3b4f41208f7ff508aab9428e6',
-    'src/features/lookup-api.ts': '42880aea47bb996742f1de4a5f66dafd78267c79d266ff198d13a4bf0d9e12e3',
+    'src/features/auto-lookup.ts': 'f588ba9a10e64cd9785b2a814c004bf1a9666dfdc5f94cfb6736b81b00647e27',
+    'src/features/lookup-api.ts': 'becc8a14319141d6d0e00736da251386a85302d57f6113ba53a24215ccfe1f55',
     'src/app/components/zto/model.ts': '7ff06f4dbcb4de0bfd8a562c26577ab93df6961b653d778d8f13bf0211b50cab',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',
     'src/app/components/modals/ZtoListSyncModal.tsx': 'c9d3c9bc49ac2d133ffefed161039040563994d4c0190a634e7bdb44cb2eb08e'

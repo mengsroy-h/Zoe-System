@@ -189,13 +189,14 @@ export function rotateZtoSweepQueue(list, cursor) {
 
 export function ztoStatusFeatureConfig() {
     const cfg = getLookupApiConfig();
+    if (cfg?.provider === 'zto-palm') return null;
     if (!cfg || !cfg.enabled || !cfg.url || !lookupApiIsZto(cfg)) return null;
     return cfg;
 }
 
 export function ztoFastModeIsOn() {
     const cfg = getLookupApiConfig();
-    return !!(cfg && cfg.fastMode);
+    return !!(cfg && cfg.fastMode && cfg.provider !== 'zto-palm');
 }
 
 export function ztoStatusTrashItemCounts(item) {

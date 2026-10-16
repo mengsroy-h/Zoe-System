@@ -9,9 +9,9 @@ import { getZoneDateKey } from '../core/timezone';
 import { appLocalStore, appSessionStore, safeStoreGet } from '../core/storage';
 import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePoints } from '../core/text';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
-import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
+import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
 import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
-import { lookupApiIsAppsScript } from './lookup-api';
+import { addPalmSessionHeader, lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
 import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services/connection';
@@ -212,7 +212,7 @@ export function ztoDiagnosticsUrl(cfg) {
     const raw = String(cfg.url).trim();
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
-    return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + '?diag=1';
+    return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + (lookupApiIsPalm(cfg) ? '?palm=1&diag=1' : '?diag=1');
 }
 
 export function durationText(ms) {
@@ -321,6 +321,7 @@ export async function healthLookupRow() {
         headers[cfg.headerName] = value;
     }
     try {
+        await addPalmSessionHeader(cfg, headers);
         const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
             { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
             ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
@@ -332,6 +333,10 @@ export async function healthLookupRow() {
                 'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));
         }
         const body = out.body;
+        if (lookupApiIsPalm(cfg)) {
+            return healthRow('info', 'Lookup អតិថិជន (ZTO Palm)',
+                body?.provider === 'zto-palm' ? 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' : 'សូម Login ZTO Palm ម្តងទៀត');
+        }
         const source = safeLookupReason(body && body.cookie && body.cookie.source) || 'none';
         const fingerprint = safeLookupReason(body && body.cookie && body.cookie.fingerprint);
         if (source === 'none' || !fingerprint) {

@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LookupApiConfigModal() {
-    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy']);
+    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
     return (
         <Modal id="lookupApiConfigModal">
             <div className="modal-content">
@@ -13,6 +13,23 @@ export function LookupApiConfigModal() {
                 <p style={{ textAlign: "left" }}>
                     ភ្ជាប់ទៅប្រព័ន្ធផ្ទាល់ខ្លួនរបស់អ្នក (Google Sheet/Apps Script, ប្រព័ន្ធក្រុមហ៊ុន...) ដើម្បីស្កេន Barcode រួចទាញយក លេខទូរស័ព្ទ/COD/DOD ដោយស្វ័យប្រវត្តិ។
                 </p>
+                <details style={{ textAlign: 'left', marginBottom: '16px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>🔐 Login ZTO Palm</summary>
+                    <form onSubmit={onAct('submitZtoPalmLogin', { evt: true })} autoComplete="off" style={{ marginTop: '12px' }}>
+                        <label htmlFor="ztoPalmUsernameInput">គណនី ZTO Palm</label>
+                        <input id="ztoPalmUsernameInput" ref={refTo('ztoPalmUsernameInput')} type="text" autoCapitalize="none" spellCheck={false} disabled={v.palmLoginBusy} maxLength={128} />
+                        <label htmlFor="ztoPalmPasswordInput">ពាក្យសម្ងាត់ Palm</label>
+                        <input id="ztoPalmPasswordInput" ref={refTo('ztoPalmPasswordInput')} type="password" autoComplete="off" disabled={v.palmLoginBusy} maxLength={256} />
+                        <p style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>រក្សាទុកតែ session ដែលអ៊ិនគ្រីបដោយ PIN។ ពាក្យសម្ងាត់មិនត្រូវបានរក្សាទុកក្នុង ZoeW ទេ។</p>
+                        <p role="status" aria-live="polite">{v.palmLoginStatus}</p>
+                        <div className="modal-btns">
+                            <div className="modal-btns-row">
+                                <button type="submit" className="btn-info" disabled={v.palmLoginBusy}>{v.palmLoginBusy ? 'កំពុងចូល…' : 'Login និងបើក Lookup'}</button>
+                                {v.palmLoginConnected && <button type="button" className="btn-cancel" disabled={v.palmLoginBusy} onClick={onAct('disconnectZtoPalm')}>ផ្តាច់ Palm</button>}
+                            </div>
+                        </div>
+                    </form>
+                </details>
                 <label className="remember-container" style={{ marginBottom: "8px" }}>
                     <input type="checkbox" id="lookupApiEnabledCheckbox" ref={refTo('lookupApiEnabledCheckbox')} />
                     <span>បើកការទាញយកទិន្នន័យស្វ័យប្រវត្តិពេលស្កេន</span>
@@ -73,7 +90,7 @@ export function LookupApiConfigModal() {
                 <div className="modal-btns" style={{ marginTop: "6px" }}>
                     <div className="modal-btns-row">
                         <button className="btn-info" disabled={v.lookupTestBusy} onClick={onAct("testLookupApiConfig", { self: true })}>🧪 សាកល្បង</button>
-                        <button className="btn-confirm" onClick={onAct("saveLookupApiConfig")}>រក្សាទុក</button>
+                        <button className="btn-confirm" disabled={v.palmLoginBusy} onClick={onAct("saveLookupApiConfig")}>រក្សាទុក</button>
                     </div>
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["lookupApiConfigModal"] })}>បោះបង់</button>
                 </div>

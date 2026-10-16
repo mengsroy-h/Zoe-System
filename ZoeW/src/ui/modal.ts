@@ -5,6 +5,7 @@ import { safeFocusScanner } from '../core/timezone';
 import { clearLookupStatus } from '../features/auto-lookup';
 import { stopCurrentStream } from '../features/daily-stats';
 import { hidePhoneSuggestions } from '../features/phone-suggest';
+import { cancelZtoPalmLogin } from '../features/zto-palm-login';
 
 export function openModalHelper(modalId) {
     uiState.isModalOpen = true;
@@ -34,6 +35,7 @@ export function onScanVideoPause() {
 }
 
 export function closeModal(modalId?) {
+    if (modalId === 'lookupApiConfigModal') cancelZtoPalmLogin();
     setModalDisplay(modalId, 'none');
     if (modalId === 'phoneModal') clearLookupStatus();
     uiState.isModalOpen = openModalIds().length > 0;

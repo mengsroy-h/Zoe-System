@@ -53,7 +53,7 @@ describe('ZTO Function ៖ CORS សម្រាប់ App Android', () => {
 
     it('web same-origin (គ្មាន Origin) ➜ header ដូចមុនបេះបិទ', async () => {
         const pre = await fn.handler(event('OPTIONS', {}));
-        expect(pre.headers).toEqual({ Allow: 'GET, OPTIONS', 'Cache-Control': 'no-store' });
+        expect(pre.headers).toEqual({ Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' });
     });
 
     it('ឈ្មោះ header ចម្លែក ➜ មិនឆ្លុះបញ្ចាំង', async () => {

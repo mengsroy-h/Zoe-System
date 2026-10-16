@@ -114,6 +114,9 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
+    viewState.palmLoginBusy = false;
+    viewState.palmLoginConnected = false;
+    viewState.palmLoginStatus = '';
     viewState.phoneModalBusy = false;
     viewState.configPendingLink = null;
     viewState.configManual = false;
@@ -170,7 +173,7 @@ export function clearSensitiveModalFields() {
         'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
         'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
         'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
-        'editModalBarcodeText', 'lookupApiHeaderValueInput',
+        'editModalBarcodeText', 'lookupApiHeaderValueInput', 'ztoPalmUsernameInput', 'ztoPalmPasswordInput',
         'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
         'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
         'dailyStatsContainer', 'collectedStatsContainer',

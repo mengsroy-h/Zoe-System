@@ -129,6 +129,14 @@ for (const app of ['ZoeW']) {
             const fn = sliceFn(src, n);
             if (fn) vm.runInContext(fn, ctx);
         });
+        // ⛔ Login ZTO Palm ឡើងវិញនៅ background ៖ ស្ថានភាពពិដាន (បរាជ័យ · បដិសេធ · ត្រូវ Login) ជារបស់គណនីនេះ ➜ មិនរស់រានក្រោយចាកចេញ
+        ['palmRefreshFailedAt', 'palmRefreshRejectedAt', 'palmRefreshDue'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        const palmResetFn = sliceFn(src, 'resetZtoPalmRefresh');
+        if (palmResetFn) vm.runInContext(palmResetFn, ctx);
+        vm.runInContext('palmRefreshFailedAt = 111; palmRefreshRejectedAt = 222; palmRefreshDue = true;', ctx);
         vm.runInContext("sheetImportKey = { fake: 'aes-key' }; sheetImportUrl = 'https://script.google.com/macros/s/SECRET/exec';"
             + " sheetImportPassword = 'import-pw'; sheetImportSignature = 'sig'; sheetImportBusy = true;", ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
@@ -234,6 +242,9 @@ for (const app of ['ZoeW']) {
             'ចាកចេញ ➜ កូនសោ AES · URL · ពាក្យសម្ងាត់នាំចូល Excel មិនរស់រានទេ', sheetImport);
         ok(sheetImport.sig === '' && sheetImport.busy === false,
             'ចាកចេញ ➜ សម័យនាំចូល Excel ត្រូវ reset អស់ (គ្មានសោជាប់)', sheetImport);
+        const palmRefresh = vm.runInContext("({ failed: palmRefreshFailedAt, rejected: palmRefreshRejectedAt, due: palmRefreshDue })", ctx);
+        ok(!!palmResetFn && palmRefresh.failed === 0 && palmRefresh.rejected === 0 && palmRefresh.due === false,
+            'ចាកចេញ ➜ ស្ថានភាព Login ZTO Palm ឡើងវិញ (ពិដាន · ត្រូវ Login) reset អស់', palmRefresh);
         // ⛔ បញ្ជី ZTO ដែលមើលជាមុន ផ្ទុក **លេខទូរស័ព្ទ និង barcode របស់អតិថិជន**
         // បូកសាលក្រម «បិទរួច» ➜ វាមិនត្រូវរស់រានក្រោយចាកចេញទេ។
         const ztoListState = vm.runInContext(

@@ -157,6 +157,9 @@ function makeEnv(opts) {
     vm.runInContext('function rememberLookupSecretKey(k) { __rememberedKeys.push(!!k); return Promise.resolve(true); }', ctx);
     sandbox.__ztoSweeps = [];
     vm.runInContext('function scheduleZtoStatusSweep() { __ztoSweeps.push(1); }', ctx);
+    // ⛔ `completePinUnlock()` ហៅ `refreshZtoPalmSession()` (Login ZTO Palm ឡើងវិញនៅ background ក្រោយសោ PIN មាន) ➜ stub ដែលរាប់
+    sandbox.__palmRefreshes = [];
+    vm.runInContext('function refreshZtoPalmSession() { __palmRefreshes.push(!!lookupSecretKey); return Promise.resolve("skipped"); }', ctx);
     [
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'purgeLegacyBiometricRecord', 'clearBiometricRecord',
@@ -208,6 +211,8 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         ok('ប៊ូតុងស្កេនលែង «កំពុងស្កេន...» ក្រោយចប់', view(e).pinBiometricBusy === false);
         ok('បិទប្រអប់ PIN', e.log.modalsClosed.indexOf('pinModal') !== -1);
         ok('រត់សកម្មភាពគោលដៅ', e.log.target.indexOf('openConfigModal') !== -1);
+        ok('⛔ ផ្លូវជីវមាត្រក៏ Login ZTO Palm ឡើងវិញដែរ (ម្តង · ក្រោយសោ PIN មាន)',
+            JSON.stringify(e.sandbox.__palmRefreshes) === '[true]', e.sandbox.__palmRefreshes);
         ok('ដោះកូនសោ Lookup API ចេញពី PIN ពិត',
             JSON.stringify(vm.runInContext('lookupSecretKey', e.ctx)) === JSON.stringify({ derivedFrom: PIN }));
         ok('សម្អាតចំនួនវាយខុស', !('zoew_pin_fail_count' in e.store));

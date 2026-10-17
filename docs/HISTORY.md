@@ -117,7 +117,8 @@
   ZTO បដិសេធ session (ស្កេន · ស្ថានភាព ZTO · ទាញបញ្ជី) ➜ Login ឡើងវិញភ្លាម (≤ ម្តងក្នុង ៦០ វិ) ហើយ «✅ Login ZTO Palm ឡើងវិញរួច» · ZTO បដិសេធគណនី ➜ ប្រាប់ម្តង · Login ដោយដៃ។
 - អ្នកយាម ៖ `zto-palm-refresh.test.tsx` (ថ្មី · ៣៤ ៖ Firebase/Supabase · ចាស់/ក្មេង · ZTO បដិសេធ session/គណនី/captcha · បណ្តាញខូច · ហៅស្របគ្នា · ពិដាន ៦០ វិ ·
   require · សាខាផ្សេង · កំពុងទាញ · ចាកចេញ/ប្តូរហាង/Login ដោយដៃ កណ្តាលផ្លូវ · ផ្តាច់ · ទ្វារ boot/PIN) · `zto-palm-server.test.ts` +១៦ · `zto-palm-list-e2e.test.tsx` +៦ ·
-  `zto-palm-login.test.tsx` +១ ➜ ៥៨ ធ្លាក់លើកូដមុនកែ។
+  `zto-palm-login.test.tsx` +១ ➜ ៥៨ ធ្លាក់លើកូដមុនកែ · sandbox checker ៖ `biometric-unlock-test` (ផ្លូវជីវមាត្រ Login ឡើងវិញម្តង) · `lookup-prefetch-test`
+  (stub ដែលរាប់) · `setup-link-logout-test` (ចាកចេញ ➜ ស្ថានភាព Login ឡើងវិញ reset · ដកការហៅ ➜ ធ្លាក់) · `clock-hygiene` (ហេតុផលនាឡិកា ៣)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -6358,6 +6359,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-palm-race.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-refresh.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

@@ -76,8 +76,8 @@
 - ✅ ម្ចាស់គម្រោង (PR #328) ៖ «បិទដោយស្វ័យប្រវត្តិតាមZTO និងប្រាប់បិទក្នុងZoeW តែZTO Palm មិនទាន់បិទដំណើរការល្អហើយ» ➜ [2.50.99] បិទ ·
   ស្កេន Palm ៖ លេខទូរស័ព្ទ · COD · DOD ត្រូវនឹង App ZTO Palm («ត្រូវ») ➜ [2.50.97] បិទ ·
   កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
-- ⏳ **[2.50.117]** Publish Firebase rules (`returned`) ➜ 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
-- ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ផុតកំណត់» + លុយដក (Palm · Cookie)។
+- ⏳ **[2.50.117]** (Firebase rules `returned` Publish រួច) 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
+- ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» + លុយដក (Palm · Cookie)។
 - ⏳ **[2.50.114]** Palm ៖ បើក App ថ្ងៃក្រោយ ➜ ស្កេន/ទាញបានដោយមិន Login ZTO Palm ម្តងទៀត · ⏱ ពិតក្នុង A189 ·
   តំបន់ Function ប្តូរបានតែក្រោយ Upgrade Netlify (ការកំណត់ Netlify ➜ គ្មានកូដ · ម្ចាស់គម្រោងសម្រេច)។
 - ✅ **ស្របគ្នា ៦៤** (ម្ចាស់គម្រោង ៖ «មិនបង្កើនបន្ទុកដល់ZTO ទេព្រោះសាខាធំៗ គេប្រើ batch scan ចូលម្តងម្តងរាប់រយbarcode») ➜ ទុក · ចំនួនសំណើ = បេក្ខភាព
@@ -123,12 +123,13 @@
   📤 «ត្រឡប់ (លើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់)» · 📲 «📦 N កញ្ចប់ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» · អត្ថបទនៅកន្លែងតែមួយ (`NOTIFY_RETURN_*`)។
 - អ្នកយាម ៖ `zto-returned-cleanup.test.ts` (`returned` ទាំង ២ ផ្លូវ · ចំនួនកញ្ចប់ · ២ ថ្ងៃ · sweep · ស្តារ · 📤 · rules គ្មាន `expired`) · `expiry-return-policy.test.tsx`
   (ថ្មី · ៥ ៖ ធ្លាក់លើ 2.50.116 ៥/៥) · `zto-returned.test.tsx` · `zto-palm-returned.test.tsx` · `push-server.test.ts` · `trash-modal-test` · `emu/app-writes-rules-test`
-  (rules ពិតទទួល `returned` · rules ចាស់បដិសេធ) · `revenue-fuzz-test` (op `returned`) · `zto-sync-banner-test` ផ្នែក ១០ (A195) · checker/តេស្តធុងសំរាមទាំងអស់ ➜ `returned`។
+  (rules ពិតទទួល `returned` · rules ចាស់បដិសេធ) · `revenue-fuzz-test` (op `returned`) · `zto-sync-banner-test` ផ្នែក ១០ (A195) · checker/តេស្តធុងសំរាមទាំងអស់ ➜ `returned` ·
+  `npm run rules:check` (`cleanup-rules-check.mjs` ៖ React ពិត web + Android · ៧ ថ្ងៃ · កញ្ចប់លាយ · ២ ថ្ងៃ ➜ `returned` · ធ្លាក់ ៨ លើ `expired` ចាស់ ➜ ៨៥ ok)។
 - CI 2.50.115–2.50.116 ៖ waybill ពិតក្នុង `docs/HISTORY.md` (`security-guard-test`) · ជួរលិបិក្រម (`doc-scope-test`) ➜ ផ្នែក ២ A194។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-1. **Firebase Console ➜ Realtime Database ➜ Rules** ➜ បិទភ្ជាប់ `firebase-database.rules.json` ➜ **Publish** (ឬ `tools/firebase-provision/deploy-rules.cmd`)
+1. ✅ (ម្ចាស់គម្រោង ៖ «Publish rules រួចហើយ») **Firebase Console ➜ Realtime Database ➜ Rules** ➜ បិទភ្ជាប់ `firebase-database.rules.json` ➜ **Publish** (ឬ `tools/firebase-provision/deploy-rules.cmd`)
    **មុន**ប្រើ 2.50.117 ៖ rules ចាស់បដិសេធ `returned` ➜ ការសម្អាតធ្លាក់ ហើយកញ្ចប់ត្រឡប់ទៅប្រវត្តិវិញ (លុយមិនខុស តែមិនដក រហូតដល់ Publish)។
 2. Supabase ៖ migration `20261017053127_zoe_rules.sql` អនុវត្តដោយស្វ័យប្រវត្តិពេល merge ទៅ `main` (ឬបិទភ្ជាប់ក្នុង SQL Editor)។
 3. App Android ៖ ដំឡើង APK 2.50.117 (APK ចាស់ស្គាល់តែ `expired`)។

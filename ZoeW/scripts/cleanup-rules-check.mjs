@@ -71,7 +71,7 @@ function item(id, phone, barcodes, { day = TODAY, createdAt = NOW - HOUR } = {})
 }
 function trash(id, phone, reason, deletedAt, code, cod) {
     const it = item(id, phone, [bc(code, cod, 0, { closed: reason === 'pickup', closedAt: deletedAt - HOUR })], { createdAt: deletedAt - DAY });
-    if (reason === 'remove' || reason === 'expired') it.barcodes.forEach((b) => { b.isDeducted = true; });
+    if (reason === 'remove' || reason === 'returned') it.barcodes.forEach((b) => { b.isDeducted = true; });
     return Object.assign(it, { trashReason: reason, deletedAt, isFromDeletion: reason === 'delete' || reason === 'pickup' });
 }
 
@@ -89,8 +89,8 @@ function seed() {
         hRem: item('hRem', '0107', [bc('MR1', 4, 0.5), bc('MR2', 6, 0)])
     };
     const deleted = {
-        tExpOut: trash('tExpOut', '0201', 'expired', NOW - EXPIRED_RETENTION - MIN, 'TEO', 1),
-        tExpIn: trash('tExpIn', '0202', 'expired', NOW - EXPIRED_RETENTION + MIN, 'TEI', 1),
+        tExpOut: trash('tExpOut', '0201', 'returned', NOW - EXPIRED_RETENTION - MIN, 'TEO', 1),
+        tExpIn: trash('tExpIn', '0202', 'returned', NOW - EXPIRED_RETENTION + MIN, 'TEI', 1),
         tDelOut: trash('tDelOut', '0203', 'delete', NOW - TRASH_RETENTION - MIN, 'TDO', 1),
         tDelIn: trash('tDelIn', '0204', 'delete', NOW - TRASH_RETENTION + MIN, 'TDI', 1),
         tRemOut: trash('tRemOut', '0205', 'remove', NOW - TRASH_RETENTION - MIN, 'TRO', 1),
@@ -249,14 +249,14 @@ function assertRules(res) {
     ok('២ ម៉ោង ៖ barcode បិទ ២ម៉ោង−១នាទី ➜ នៅក្នុងបញ្ជី', histHas(db, 'PI1') && !trashWith(db, 'PI1'));
     // ៧ ថ្ងៃ
     const eo = trashWith(db, 'EO1');
-    ok('៧ ថ្ងៃ ៖ មិនទាន់យក ៧×២៤ម៉ោង+១នាទី ➜ ធុងសំរាម «ផុតកំណត់» (expired)', !histHas(db, 'EO1') && eo && eo.trashReason === 'expired', eo && eo.trashReason);
-    ok('៧ ថ្ងៃ ៖ «ផុតកំណត់» ដកលុយ (isDeducted ពិត · isFromDeletion មិនពិត)', deducted(eo) && !eo.isFromDeletion, eo && [eo.barcodes.map((b) => b.isDeducted), eo.isFromDeletion]);
+    ok('៧ ថ្ងៃ ៖ មិនទាន់យក ៧×២៤ម៉ោង+១នាទី ➜ ធុងសំរាម «ត្រឡប់» (returned)', !histHas(db, 'EO1') && eo && eo.trashReason === 'returned', eo && eo.trashReason);
+    ok('៧ ថ្ងៃ ៖ «ត្រឡប់» ដកលុយ (isDeducted ពិត · isFromDeletion មិនពិត)', deducted(eo) && !eo.isFromDeletion, eo && [eo.barcodes.map((b) => b.isDeducted), eo.isFromDeletion]);
     ok('៧ ថ្ងៃ ៖ ៧×២៤ម៉ោង−១នាទី ➜ នៅក្នុងបញ្ជី (ថ្ងៃទី ៨ ទើបចេញ)', histHas(db, 'EI1') && !trashWith(db, 'EI1'));
     // កញ្ចប់លាយ
     const m1 = trashWith(db, 'M1');
     const m2 = trashWith(db, 'M2');
     ok('កញ្ចប់លាយ ៖ A (បិទ) ➜ «យករួច» តែឯង · មិនដកលុយ', m1 && m1.trashReason === 'pickup' && notDeducted(m1) && m1.barcodes.length === 1, m1 && [m1.trashReason, m1.barcodes.map((b) => b.isDeducted), m1.barcodes.length]);
-    ok('កញ្ចប់លាយ ៖ B (បើក) ➜ «ផុតកំណត់» តែឯង · ដកលុយ', m2 && m2.trashReason === 'expired' && deducted(m2) && m2.barcodes.length === 1, m2 && [m2.trashReason, m2.barcodes.map((b) => b.isDeducted), m2.barcodes.length]);
+    ok('កញ្ចប់លាយ ៖ B (បើក) ➜ «ត្រឡប់» តែឯង · ដកលុយ', m2 && m2.trashReason === 'returned' && deducted(m2) && m2.barcodes.length === 1, m2 && [m2.trashReason, m2.barcodes.map((b) => b.isDeducted), m2.barcodes.length]);
     // ledger
     const l15a = ledger(S, D15), l15b = ledger(db, D15);
     ok(`ledger ${D15} ៖ ដកតែ EO1 (COD −20 · DOD −2 · កញ្ចប់ −1)`,
@@ -272,8 +272,8 @@ function assertRules(res) {
     ok('ledger ខែ ៖ ដក EO1 + M2 (COD −27 · DOD −3 · កញ្ចប់ −2)', r2(190 - mo.codDollar) === 27 && r2(19 - mo.dodDollar) === 3 && (29 - mo.totalCount) === 2, mo);
     // ២ ថ្ងៃ · ៣០ ថ្ងៃ
     const present = (id) => !!(db.zoew_recently_deleted_cod_dod || {})[id];
-    ok('២ ថ្ងៃ ៖ «ផុតកំណត់» ក្នុងធុងសំរាម ២ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tExpOut'));
-    ok('២ ថ្ងៃ ៖ «ផុតកំណត់» ២ថ្ងៃ−១នាទី ➜ នៅ', present('tExpIn'));
+    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ក្នុងធុងសំរាម ២ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tExpOut'));
+    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ២ថ្ងៃ−១នាទី ➜ នៅ', present('tExpIn'));
     ok('៣០ ថ្ងៃ ៖ «លុប» ៣០ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tDelOut'));
     ok('៣០ ថ្ងៃ ៖ «លុប» ៣០ថ្ងៃ−១នាទី ➜ នៅ', present('tDelIn'));
     ok('៣០ ថ្ងៃ ៖ «ដក» ៣០ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍ · «ដក» ៣ ថ្ងៃ ➜ នៅ (មិនមែនច្បាប់ ២ ថ្ងៃ)', !present('tRemOut') && present('tRemMid'));
@@ -390,7 +390,7 @@ results.push(await run('ខ. ZoeW React — Android (bridge Capacitor ក្ល�
 await browser.close();
 fs.rmSync(OUT, { recursive: true, force: true });
 
-console.log(`ព្រំដែនដែលអានពីកូដ ៖ ២ម៉ោង=${TWO_HOURS / HOUR}h · ផុតកំណត់=${ABANDON / DAY}d · ធុងសំរាម expired=${EXPIRED_RETENTION / DAY}d · ផ្សេង=${TRASH_RETENTION / DAY}d`);
+console.log(`ព្រំដែនដែលអានពីកូដ ៖ ២ម៉ោង=${TWO_HOURS / HOUR}h · ត្រឡប់=${ABANDON / DAY}d · ធុងសំរាម returned=${EXPIRED_RETENTION / DAY}d · ផ្សេង=${TRASH_RETENTION / DAY}d`);
 for (const res of results) assertRules(res);
 
 console.log('\n── parity ៖ DB ចុងក្រោយ Android ធៀបនឹង web ──');

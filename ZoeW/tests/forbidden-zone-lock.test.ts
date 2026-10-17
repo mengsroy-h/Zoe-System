@@ -26,7 +26,7 @@ const LOCK: Record<string, string> = {
     'src/app/behaviors/phone-search.ts': 'ab48b1ea572cb857a244ad356c11bcd2e78c7f3d60e0ad4eaa334960c89c68ea',
     'src/ui/chrome-autohide.ts': '54de996080789c214a5e20725cff58a491557198e04def6f8cd1c7e823960ca9',
     'src/ui/page-nav.ts': 'cc25e1a946db5e759b2e5666b893324bd7b069e85bc6deb4ed7206072a4cd6e5',
-    'src/styles/app.css': '0e751d9c9b86a2609e22f33055d46f17dd4e95eab29fc8c3eb5566065f544389'
+    'src/styles/app.css': '504d6f5e6e1eba8686b6e93742838207f52ae2cad77d0c24db9f4e92d85ca9b7'
 };
 
 const ZONE_FUNCTIONS = ['setupIOSPullToRefresh', 'panelGlideFrom', 'beginPanelGlideSnapPause', 'endPanelGlideSnapPause', 'bindPanelSwipe',

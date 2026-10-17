@@ -78,7 +78,7 @@ function buildRunner(appFile) {
         : '';
     const ledgerCall = keyedStyle ? null : /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
     if (pendingStyle && !keyedStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
-    // ⛔ ចាប់ពីកំណែ 2.50.14 (MONEY-3) ធុងសំរាម `expired` សរសេរ `isDeducted: false` ហើយទង់ប្តូរជា `true` តែក្រោយ ledger
+    // ⛔ ចាប់ពីកំណែ 2.50.14 (MONEY-3) ធុងសំរាម `returned` សរសេរ `isDeducted: false` ហើយទង់ប្តូរជា `true` តែក្រោយ ledger
     //    ដកចុះពិត (`markCleanupTrashDeducted()`) ➜ tail ក៏អនុវត្តបន្ទាត់ flip **ដែលស្រង់ពីកូដពិត** ក្រោយការដក ·
     //    tree ចាស់ (គ្មាន `markCleanupTrashDeducted`) ➜ គ្មាន flip ដូចដើម។
     const flipStyle = src.indexOf('function markCleanupTrashDeducted(') !== -1;

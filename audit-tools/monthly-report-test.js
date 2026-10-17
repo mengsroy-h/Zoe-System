@@ -353,7 +353,7 @@ scenario('ចំណូល ៖ `isDeducted` និង `isClosed` ជាច្រ�
         JSON.stringify(one([bc(10, 5, false, false)])));
     ok('⛔ barcode បិទរួច (យករួច) មិនរាប់',
         one([bc(10, 5, true, false)]).cod === 0);
-    ok('⛔ barcode ដែលដកលុយរួច (ផុតកំណត់/ដក) មិនរាប់',
+    ok('⛔ barcode ដែលដកលុយរួច (ត្រឡប់/ដក) មិនរាប់',
         one([bc(10, 5, false, true)]).cod === 0);
     ok('barcode គ្មានវាល isDeducted = មិនទាន់ដក ➜ រាប់',
         one([bc(10, 0, false, undefined)]).cod === 10);
@@ -397,7 +397,7 @@ scenario('ចំណូល ៖ ធុងសំរាមដែល *រក្សា
     ok('ធាតុ «លុប» (លុយមិនប៉ះ) ត្រូវដកចេញ ➜ 40',
         build('2026-09').days[0].collectedTotal === 40, build('2026-09').days[0].collectedTotal);
     setLive([], [item('2026-09-02', [bc(20, 0, false, true)])]);
-    ok('⛔ ធាតុ «ដក/ផុតកំណត់» ដកលុយរួច ➜ មិនដកម្តងទៀត ➜ 60',
+    ok('⛔ ធាតុ «ដក/ត្រឡប់» ដកលុយរួច ➜ មិនដកម្តងទៀត ➜ 60',
         build('2026-09').days[0].collectedTotal === 60, build('2026-09').days[0].collectedTotal);
     setLive([], [item('2026-09-02', [bc(20, 0, true, false)])]);
     ok('ធាតុ «យករួច» ក្នុងធុងសំរាម ➜ ចំណូលនៅ 60',
@@ -409,7 +409,7 @@ scenario('ចំណូល ៖ ធុងសំរាមដែល *រក្សា
 
 scenario('ចំណូល ៖ ខែដែលដោះស្រាយចប់ ➜ ចំណូល = តម្លៃទាំងអស់', () => {
     // ⛔ មូលហេតុដែលការ **ដក** ត្រូវជាងការបូកតម្លៃ barcode ដែលបិទ ៖ ធុងសំរាម
-    // រក្សាតែ ៣០ ថ្ងៃ (ធាតុ `expired` ត្រឹម ២ ថ្ងៃ) តែ ledger រក្សា **ជានិច្ច**។
+    // រក្សាតែ ៣០ ថ្ងៃ (ធាតុ `returned` ត្រឹម ២ ថ្ងៃ) តែ ledger រក្សា **ជានិច្ច**។
     setData({
         '2026-01-04': { codDollar: 12.5, dodDollar: 7.5, totalCount: 4 },
         '2026-01-05': { codDollar: 10, dodDollar: 0, totalCount: 2 }

@@ -290,6 +290,7 @@ export interface UiState {
     phoneSuggestHideTimer: any;
     phoneSuggestOpen: boolean;
     deletedSearchQuery: string;
+    trashReasonFilter: string;
     activeLocker: any;
     entryScanMode: any;
     lockerBarcodeIndex: Record<string, any>;
@@ -398,6 +399,7 @@ export const uiState = createStore<UiState>('uiState', {
     phoneSuggestHideTimer: null,
     phoneSuggestOpen: false,
     deletedSearchQuery: '',
+    trashReasonFilter: '',
     activeLocker: safeStoreGet(appLocalStore, ACTIVE_LOCKER_KEY) || '',
     entryScanMode: safeStoreGet(appLocalStore, ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel',
     lockerBarcodeIndex: {},

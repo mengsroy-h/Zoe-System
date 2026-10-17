@@ -51,7 +51,7 @@ const readMs = (name) => {
 };
 const TWO_HOURS = readMs('TWO_HOURS_MS');
 const ABANDON = readMs('ABANDON_AGE_MS');
-const EXPIRED_RETENTION = readMs('EXPIRED_TRASH_RETENTION_MS');
+const RETURNED_RETENTION = readMs('RETURNED_TRASH_RETENTION_MS');
 const TRASH_RETENTION = readMs('TRASH_RETENTION_MS');
 
 function bc(code, cod, dod, { closed = false, closedAt, createdAt, day = TODAY } = {}) {
@@ -89,8 +89,8 @@ function seed() {
         hRem: item('hRem', '0107', [bc('MR1', 4, 0.5), bc('MR2', 6, 0)])
     };
     const deleted = {
-        tExpOut: trash('tExpOut', '0201', 'returned', NOW - EXPIRED_RETENTION - MIN, 'TEO', 1),
-        tExpIn: trash('tExpIn', '0202', 'returned', NOW - EXPIRED_RETENTION + MIN, 'TEI', 1),
+        tRetOut: trash('tRetOut', '0201', 'returned', NOW - RETURNED_RETENTION - MIN, 'TEO', 1),
+        tRetIn: trash('tRetIn', '0202', 'returned', NOW - RETURNED_RETENTION + MIN, 'TEI', 1),
         tDelOut: trash('tDelOut', '0203', 'delete', NOW - TRASH_RETENTION - MIN, 'TDO', 1),
         tDelIn: trash('tDelIn', '0204', 'delete', NOW - TRASH_RETENTION + MIN, 'TDI', 1),
         tRemOut: trash('tRemOut', '0205', 'remove', NOW - TRASH_RETENTION - MIN, 'TRO', 1),
@@ -272,8 +272,8 @@ function assertRules(res) {
     ok('ledger ខែ ៖ ដក EO1 + M2 (COD −27 · DOD −3 · កញ្ចប់ −2)', r2(190 - mo.codDollar) === 27 && r2(19 - mo.dodDollar) === 3 && (29 - mo.totalCount) === 2, mo);
     // ២ ថ្ងៃ · ៣០ ថ្ងៃ
     const present = (id) => !!(db.zoew_recently_deleted_cod_dod || {})[id];
-    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ក្នុងធុងសំរាម ២ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tExpOut'));
-    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ២ថ្ងៃ−១នាទី ➜ នៅ', present('tExpIn'));
+    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ក្នុងធុងសំរាម ២ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tRetOut'));
+    ok('២ ថ្ងៃ ៖ «ត្រឡប់» ២ថ្ងៃ−១នាទី ➜ នៅ', present('tRetIn'));
     ok('៣០ ថ្ងៃ ៖ «លុប» ៣០ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍', !present('tDelOut'));
     ok('៣០ ថ្ងៃ ៖ «លុប» ៣០ថ្ងៃ−១នាទី ➜ នៅ', present('tDelIn'));
     ok('៣០ ថ្ងៃ ៖ «ដក» ៣០ថ្ងៃ+១នាទី ➜ លុបអចិន្ត្រៃយ៍ · «ដក» ៣ ថ្ងៃ ➜ នៅ (មិនមែនច្បាប់ ២ ថ្ងៃ)', !present('tRemOut') && present('tRemMid'));
@@ -390,7 +390,7 @@ results.push(await run('ខ. ZoeW React — Android (bridge Capacitor ក្ល�
 await browser.close();
 fs.rmSync(OUT, { recursive: true, force: true });
 
-console.log(`ព្រំដែនដែលអានពីកូដ ៖ ២ម៉ោង=${TWO_HOURS / HOUR}h · ត្រឡប់=${ABANDON / DAY}d · ធុងសំរាម returned=${EXPIRED_RETENTION / DAY}d · ផ្សេង=${TRASH_RETENTION / DAY}d`);
+console.log(`ព្រំដែនដែលអានពីកូដ ៖ ២ម៉ោង=${TWO_HOURS / HOUR}h · ត្រឡប់=${ABANDON / DAY}d · ធុងសំរាម returned=${RETURNED_RETENTION / DAY}d · ផ្សេង=${TRASH_RETENTION / DAY}d`);
 for (const res of results) assertRules(res);
 
 console.log('\n── parity ៖ DB ចុងក្រោយ Android ធៀបនឹង web ──');

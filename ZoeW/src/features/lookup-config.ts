@@ -8,7 +8,7 @@ import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured } from './customer-table';
 import { lookupApiIsPalm, lookupApiIsZto } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
-import { refreshZtoPalmLogin } from './zto-palm-login';
+import { PALM_CONFIG_FIELDS, refreshZtoPalmLogin } from './zto-palm-login';
 import { refreshZtoListSyncUi } from './zto-list-sync';
 import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
@@ -138,8 +138,8 @@ export async function saveLookupApiConfig() {
     if (!current()) return;
     const cfg: any = Object.assign({}, snapshot, { enabled, url, headerValueEnc });
     if (lookupApiIsPalm(cfg)) {
-        if (!existingCfg.palmTokenEnc) { alert('សូម Login ZTO Palm ជាមុនសិន។'); return; }
-        for (const name of ['palmTokenEnc', 'palmExpiresAt', 'palmAccount', 'palmRefreshTokenEnc', 'palmLoginAt']) if (existingCfg[name] !== undefined) cfg[name] = existingCfg[name];
+        if (!existingCfg.palmTokenEnc && !existingCfg.palmShared && !lookupApiIsPalm(existingCfg)) { alert('សូម Login ZTO Palm ជាមុនសិន។'); return; }
+        for (const name of PALM_CONFIG_FIELDS) if (existingCfg[name] !== undefined) cfg[name] = existingCfg[name];
     }
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
     if (shop) cfg.shop = shop;

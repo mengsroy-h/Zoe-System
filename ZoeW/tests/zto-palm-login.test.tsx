@@ -267,7 +267,8 @@ describe('Palm login UI and existing lookup flow', () => {
             url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' };
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
         expect(new URL(buildZtoListApiUrl(cfg, '2026-10-01', '2026-10-02', 1, 'signedExact')).searchParams.get('palm')).toBe('1');
-        await expect(buildLookupRequestHeaders(cfg)).rejects.toMatchObject({ lookupCode: 'ZTO_AUTH_EXPIRED' });
+        const headers = await buildLookupRequestHeaders(cfg);
+        expect(headers, 'គ្មាន session ក្នុងទូរស័ព្ទ ➜ Server ប្រើ Login Palm របស់ហាង ឬឆ្លើយ 401').not.toHaveProperty('X-Zoe-Palm-Token');
     });
 
     it('names the Palm problem in the auto-lookup message (ZTO rejected with a reason · session expired)', async () => {
@@ -309,10 +310,20 @@ describe('Palm login UI and existing lookup flow', () => {
         const cfg = getLookupApiConfig();
         delete cfg.palmTokenEnc;
         appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
-        vi.stubGlobal('fetch', vi.fn());
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
+            session: { source: 'none', shared: false, rejected: false, site: '', loginAgeMs: null } })));
         const missing: any = await healthLookupRow();
-        expect(missing.state).toBe('warn');
-        expect(fetch).not.toHaveBeenCalled();
+        expect(missing.state, 'ទូរស័ព្ទគ្មាន session ផ្ទាល់ ➜ Server ជាអ្នកប្រាប់ថាហាងមាន Login Palm ឬអត់').toBe('warn');
+        expect(JSON.stringify(missing)).toContain('មិនទាន់មាន session Palm');
+        expect(vi.mocked(fetch).mock.calls[0][1]?.headers).not.toHaveProperty('X-Zoe-Palm-Token');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
+            session: { source: 'none', shared: false, rejected: true, site: 'KH001', loginAgeMs: null } })));
+        expect(JSON.stringify(await healthLookupRow())).toContain('ZTO បដិសេធ Login Palm របស់ហាង');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true,
+            session: { source: 'shared', shared: true, rejected: false, site: 'KH001', loginAgeMs: 60000 } })));
+        const shared: any = await healthLookupRow();
+        expect(shared.state).toBe('info');
+        expect(JSON.stringify(shared)).toContain('session Palm របស់ហាងលើ Server');
     });
 
     it('ផ្ទាំង Palm ប្រាប់ការទាញបញ្ជីមកដល់ បិទតាម ZTO និងរបាររំលឹក', () => {

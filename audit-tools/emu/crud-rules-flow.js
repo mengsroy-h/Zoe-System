@@ -54,7 +54,7 @@ let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
-    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
+    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'reconstructPickupSet',
     'collectedDayOfStamp', 'collectedDayHoldingKey', 'collectedMarkValueOf', 'collectedMarksFor',
@@ -66,7 +66,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
     'toggleCloseStatus', 'executePermanentDelete'];
 
-// ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ផុតកំណត់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
+// ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់ជាព្រឹត្តិការណ៍មានសោ (ខែ ➜ ថ្ងៃ · `ded/<trashId>` ក្នុង transaction ថ្ងៃ) ➜ ផ្ទុក function ពិត
 //    ដើម្បីឲ្យ payload `ded` ពិតទៅដល់ rules ពិត (ផ្នែក ៥)។ tree មុនកែ ➜ stub (ផ្លូវចាស់មិនហៅវា)។
 const KEYED_FNS = ['ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'ledgerOpRingOf', 'ledgerOpRing', 'ledgerOpWitness',
     'ledgerTagged', 'runLedgerTransaction', 'ledgerEventToken', 'ledgerRecordTokens', 'ledgerTokenSeen', 'ledgerPriorSeen', 'ledgerDedOf',
@@ -641,12 +641,12 @@ async function clearOrphanBeforeRetry(w, label) {
         check(expectOk ? (!bad && gone) : !gone, '✖️ ' + label + (expectOk ? ' ➜ លុបបាន' : ' ➜ ត្រូវការពារ មិនលុប'), bad ? 'បដិសេធនៅ ' + bad : '');
     }
 
-    // ---------- ផុតកំណត់ ៨ ថ្ងៃ ➜ ការដកមានសោ ----------
-    // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ផុតកំណត់សរសេរ `ded/<trashId>` ក្នុង record ថ្ងៃ (ផ្លូវសរសេរថ្មី ➜ fuzz គ្មាន op «abandon» ➜ មិនមានអ្នកវាស់
+    // ---------- «ត្រឡប់» ៨ ថ្ងៃ ➜ ការដកមានសោ ----------
+    // ⛔ 2.50.49 ៖ ការដកប្រាក់កញ្ចប់ត្រឡប់សរសេរ `ded/<trashId>` ក្នុង record ថ្ងៃ (ផ្លូវសរសេរថ្មី ➜ fuzz គ្មាន op «abandon» ➜ មិនមានអ្នកវាស់
     //    ជាមួយ rules ពិតទេ)។ ការវាស់ ៖ ការសម្អាតពិតក្នុង sandbox ➜ ចាក់ payload ពិតទៅ emulator ➜ rules ពិតទទួល ហើយលទ្ធផលលើ server = ការដកពិត
     //    · ទិសផ្ទុយ ៖ rules ដែលដក `ded` ចេញ ➜ payload ថ្ងៃដដែលត្រូវបដិសេធ (បញ្ជាក់ថា node `ded` ជាអ្នកទទួល មិនមែនបៃតងទទេ)
     //    · ទម្រង់ `ded` ខុស (អវិជ្ជមាន · វាលក្រៅ schema · គ្មាន `at`) ➜ បដិសេធ។
-    console.log('\n=== ៥. ផុតកំណត់ ៨ ថ្ងៃ ➜ ការដកមានសោ `ded/<trashId>` ➜ rules ពិតទទួល ===');
+    console.log('\n=== ៥. «ត្រឡប់» ៨ ថ្ងៃ ➜ ការដកមានសោ `ded/<trashId>` ➜ rules ពិតទទួល ===');
     {
         const day = '2026-08-26';
         const month = day.substring(0, 7);
@@ -665,9 +665,9 @@ async function clearOrphanBeforeRetry(w, label) {
         const dailyWrites = w.writes.filter((wr) => wr.path.startsWith('zoew_daily_revenue_cod_dod'));
         const keyedDaily = dailyWrites.filter((wr) => wr.value && wr.value.ded && wr.value.ded.id_e);
         check(keyedDaily.length === 1 && w.writes.some((wr) => wr.path === 'zoew_monthly_revenue_cod_dod'),
-            'ផុតកំណត់ ➜ កូដពិតសរសេរខែ ហើយសរសេរថ្ងៃដែលមាន `ded/id_e` ម្តង', JSON.stringify(w.writes.map((wr) => wr.path)));
+            '«ត្រឡប់» ➜ កូដពិតសរសេរខែ ហើយសរសេរថ្ងៃដែលមាន `ded/id_e` ម្តង', JSON.stringify(w.writes.map((wr) => wr.path)));
         await seedServer(base);
-        await replay('ផុតកំណត់ ➜ rules ពិតទទួល payload ទាំងអស់ (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ+`ded` · flip)', w.writes);
+        await replay('«ត្រឡប់» ➜ rules ពិតទទួល payload ទាំងអស់ (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ+`ded` · flip)', w.writes);
         const server = JSON.parse((await asOwner('GET', '/.json')).body || '{}');
         const dailyRec = server.zoew_daily_revenue_cod_dod && server.zoew_daily_revenue_cod_dod[day];
         const monthlyRec = server.zoew_monthly_revenue_cod_dod && server.zoew_monthly_revenue_cod_dod[month];
@@ -675,7 +675,7 @@ async function clearOrphanBeforeRetry(w, label) {
         const ded = dailyRec && dailyRec.ded ? dailyRec.ded.id_e : null;
         check(!!dailyRec && Math.abs(dailyRec.codDollar - 11.71) < 1e-9 && dailyRec.totalCount === 3 &&
             !!monthlyRec && Math.abs(monthlyRec.codDollar - 111.71) < 1e-9 && monthlyRec.totalCount === 28,
-            'ផុតកំណត់ ➜ server ៖ ថ្ងៃ និងខែ ដក 8.29 · 2 កញ្ចប់ ពិតប្រាកដ', JSON.stringify({ dailyRec, monthlyRec }));
+            '«ត្រឡប់» ➜ server ៖ ថ្ងៃ និងខែ ដក 8.29 · 2 កញ្ចប់ ពិតប្រាកដ', JSON.stringify({ dailyRec, monthlyRec }));
         check(!!ded && ded.at === trash.deletedAt && Math.abs(ded.cod - 8.29) < 1e-9 && ded.dod === 0 && ded.count === 2,
             'ត្រឡប់ ➜ server ៖ `ded/id_e` = { at: deletedAt · cod 8.29 · dod 0 · count 2 }', JSON.stringify(ded));
         check(!!trash && trash.trashReason === 'returned' && trash.barcodes.length === 2 && trash.barcodes.every((b) => b.isDeducted === true),

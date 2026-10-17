@@ -7374,7 +7374,7 @@ proxy មានថវិកាពេលផ្ទាល់ខ្លួន (និ
 - **Mutation testing លើច្បាប់លុប/ដក និងច្បាប់សម្អាត ៧ ដង ➜ ចាប់បានទាំង ៧**
   (គ្មានបៃតងក្លែងក្លាយក្នុងតំបន់លុយ)។ អ្នកចាប់ ៖ `policy-test` (៣) ·
   `partial-pickup-cleanup-test` (២) · `trash-modal-test` (២) ·
-  `expired-trash-retention-test` (១)។
+  `returned-trash-retention-test` (១)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
@@ -7879,7 +7879,7 @@ Rules មិនបានប្តូរ។
 
 - Proxy មិនបញ្ជូន upstream error វែង/តួ control ទៅ browser, បន្ថែម response
   hardening headers និងបដិសេធដំណើរការបើគ្មាន ZTO auth server-side។
-- បន្ថែម `expired-trash-retention-test.js` ដែលរត់កូដពិត និងចាក់សោព្រំដែន ២ថ្ងៃ,
+- បន្ថែម `returned-trash-retention-test.js` ដែលរត់កូដពិត និងចាក់សោព្រំដែន ២ថ្ងៃ,
   retention ៣០ថ្ងៃ, restore race និង barcode registry release។ Test ZTO ត្រូវបាន
   ពង្រីកសម្រាប់ auth មិនបានកំណត់, session expired, 429 និង official token precedence។
 - ដក `firebase-admin` និង dependency tree ដែលមាន security advisory ចេញពីឧបករណ៍
@@ -18594,7 +18594,7 @@ mutation ៦ ➜ ចាប់បានទាំង ៦)។
   **គ្មានសារវឌ្ឍនភាពឥតប្រយោជន៍** · លុយមិនប្រែ។
 
 ⚠️ **មេរៀនអំពីឧបករណ៍ ១** ៖ ការបន្ថែម helper ថ្មីបាក់ sandbox **៣**
-(`late-commit` · `partial-pickup-cleanup` · `expired-trash-retention`)។
+(`late-commit` · `partial-pickup-cleanup` · `returned-trash-retention`)។
 **នោះជាសញ្ញាល្អ** (មេរៀន 2.22.5) — វាបញ្ជាក់ថាពួកវារត់កូដ ship ពិត។ ការកែ ៖
 ចាក់ **function ពិត** ចូល sandbox ជាមួយ **ផ្លូវ stub** សម្រាប់ tree មុនកែ
 (`optionalFunction` / `optionalPart`) ➜ checker នៅតែរត់លើ `origin/main` បាន។
@@ -23490,7 +23490,7 @@ management»* · *«អោយ APK មានលេខកំណែពិតផង�
 | mutation លើ `android:check` ៖ `versionName` literal · `allowBackup` · import static ពី plugin · `package.json` ≠ `APP_VERSION` | **៤/៤ ចាប់បាន** · ថតទទេ ➜ ៥៤ FAIL |
 | Gradle ពិត ៖ មុខងារដេរីវេកំណែ | `2.38.0` ➜ `2038000` · `2.39.10` ➜ `2039010` · លេខខូច ➜ build បដិសេធ |
 | `audit-tools/` តំបន់ហាមចូល លើ tree adapter | `gesture` ១០៧ · `panel-motion` ៤៧ · `ios-panel-glide` ៣៨ — ដូចជុំមុន |
-| `audit-tools/` លុយ/សម្អាត (`trash-modal` · `partial-pickup-cleanup` · `expired-trash-retention` · `policy` · …) | **ដូច baseline HEAD បេះបិទ** — តែពួកវា **មិនអាចវាស់ React** (គាំងពេលស្រង់ `app.js`) ➜ អ្នកវាស់ពិតគឺ `rules:check` និង `parity:deep` |
+| `audit-tools/` លុយ/សម្អាត (`trash-modal` · `partial-pickup-cleanup` · `returned-trash-retention` · `policy` · …) | **ដូច baseline HEAD បេះបិទ** — តែពួកវា **មិនអាចវាស់ React** (គាំងពេលស្រង់ `app.js`) ➜ អ្នកវាស់ពិតគឺ `rules:check` និង `parity:deep` |
 | `app-lock-test` | ធ្លាក់ ១៥ = baseline (regex «ហៅ top level» ពង្រីកទទួល `oncePerPage('app-lock', initAppLock)`) |
 
 ⛔ **អ្វីដែលមិនបានវាស់** ៖ APK **មិនបាន compile** ក្នុងម៉ាស៊ីននេះ (`dl.google.com`

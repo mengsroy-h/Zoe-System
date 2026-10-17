@@ -430,7 +430,7 @@ async function scenarioCleanupAbandon(mode) {
     const trash = world.trashItems();
     check(world.getPath('zoew_scan_history_cod_dod/id_old') === null, 'កញ្ចប់ចេញពីប្រវត្តិ');
     check(trash.length === 1 && trash[0].trashReason === 'returned' && trash[0].barcodes[0].isDeducted === true,
-        '⛔ ស្នូល ៖ ធុងសំរាមមាន «ផុតកំណត់» ១ ធាតុ ជាមួយ isDeducted', trash.map((t) => t.trashReason));
+        '⛔ ស្នូល ៖ ធុងសំរាមមាន «ត្រឡប់» ១ ធាតុ ជាមួយ isDeducted', trash.map((t) => t.trashReason));
     check(world.daily().codDollar === 70 && world.daily().totalCount === 4, '⛔ លុយ ៖ ដក $30 · ១ កញ្ចប់ ម្តងគត់', world.daily());
     check(!world.context.cleanupInFlight.has('id_old'), 'សោ cleanupInFlight ដោះក្រោយបញ្ចប់', Array.from(world.context.cleanupInFlight));
 }

@@ -95,7 +95,7 @@ const DAY = '2026-09-10';
 const MONTH = '2026-09';
 
 // ⛔ ស្ថានភាពចាប់ផ្តើមត្រូវឆ្លុះបញ្ចាំងករណីពិត ៖ ថ្ងៃដែលមានកញ្ចប់ច្រើន
-//    រួចកញ្ចប់មួយ (ឬច្រើន) ផុតកំណត់។
+//    រួចកញ្ចប់មួយ (ឬច្រើន) ចូល «ត្រឡប់»។
 function runCleanup(reason, barcodes, opts) {
     opts = opts || {};
     const startCod = 236.24, startCount = 54;
@@ -185,7 +185,7 @@ const r2 = (n) => Math.round(n * 100) / 100;
 (async () => {
     console.log('=== ledger-count-integrity — ការដកលុយត្រូវដកចំនួនកញ្ចប់ជាមួយ ===');
 
-    // ── ១. ផុតកំណត់ ៨ ថ្ងៃ ៖ កញ្ចប់តែមួយ ────────────────────────────
+    // ── ១. «ត្រឡប់» ៨ ថ្ងៃ ៖ កញ្ចប់តែមួយ ────────────────────────────
     const one = await runCleanup('abandon', [{ code: 'BC1', cod: 2.71, dod: 0, isClosed: false }]);
     one.missing.forEach((n) => ok('ត្រូវមាន `' + n + '()` ក្នុងកូដ ship', false, 'អវត្តមាន'));
     ok('លក្ខខណ្ឌចាំបាច់ ៖ កញ្ចប់ចូលធុងសំរាមជា «ត្រឡប់»',
@@ -201,13 +201,13 @@ const r2 = (n) => Math.round(n * 100) / 100;
         !!one.monthly && one.monthly.totalCount === one.start.count - 1
         && r2(one.monthly.codDollar) === r2(one.start.cod - 2.71), one.monthly);
 
-    // ── ២. ផុតកំណត់លើកញ្ចប់ច្រើន ៖ ចំនួនត្រូវចុះតាមចំនួន barcode ពិត ──
+    // ── ២. «ត្រឡប់» លើកញ្ចប់ច្រើន ៖ ចំនួនត្រូវចុះតាមចំនួន barcode ពិត ──
     const many = await runCleanup('abandon', [
         { code: 'BC1', cod: 2.71, dod: 0, isClosed: false },
         { code: 'BC2', cod: 6.43, dod: 1, isClosed: false },
         { code: 'BC3', cod: 1.93, dod: 0, isClosed: false }
     ]);
-    ok('⛔ កញ្ចប់ ៣ ផុតកំណត់ ➜ ចំនួនចុះ ៣ (មិនមែន ១)',
+    ok('⛔ កញ្ចប់ ៣ ចូល «ត្រឡប់» ➜ ចំនួនចុះ ៣ (មិនមែន ១)',
         !!many.server && many.server.totalCount === many.start.count - 3, many.server);
     ok('⛔ ហើយលុយចុះតាមផលបូកពិត',
         !!many.server && r2(many.server.codDollar) === r2(many.start.cod - (2.71 + 6.43 + 1.93)), many.server);
@@ -224,7 +224,7 @@ const r2 = (n) => Math.round(n * 100) / 100;
     ok('⛔ ទិសផ្ទុយ ៖ «យករួច» ក៏មិនប៉ះចំនួនកញ្ចប់ដែរ',
         !!closed.server && closed.server.totalCount === closed.start.count, closed.server);
 
-    // ── ៤. កញ្ចប់លាយ ៖ បិទ ១ + បើក ១ ➜ ដកតែកញ្ចប់ដែលផុតកំណត់ ────────
+    // ── ៤. កញ្ចប់លាយ ៖ បិទ ១ + បើក ១ ➜ ដកតែកញ្ចប់ដែលចូល «ត្រឡប់» ────────
     const mixed = await runCleanup('abandon', [
         { code: 'BCa', cod: 4.00, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 },
         { code: 'BCb', cod: 5.00, dod: 0, isClosed: false }

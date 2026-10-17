@@ -1,6 +1,6 @@
 /**
- * ⛔ ផ្ទាំងជូនដំណឹង 🔔 (សំណើម្ចាស់គម្រោង) ៖ កញ្ចប់ជិតផុតកំណត់ · ព័ត៌មានកំណែ · សារថែទាំ · «Powered By ZoeW»។
- * ⛔ «ជិតផុតកំណត់» ត្រូវសួរ **អ្នកសម្រេចដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (`barcodeAbandonIsRipe`) ➜ គ្មានរូបមន្តព្រំដែនទី ២
+ * ⛔ ផ្ទាំងជូនដំណឹង 🔔 (សំណើម្ចាស់គម្រោង) ៖ កញ្ចប់ជិតដល់ពេលត្រឡប់ · ព័ត៌មានកំណែ · សារថែទាំ · «Powered By ZoeW»។
+ * ⛔ «ជិតដល់ពេលត្រឡប់» ត្រូវសួរ **អ្នកសម្រេចដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (`barcodeAbandonIsRipe`) ➜ គ្មានរូបមន្តព្រំដែនទី ២
  *    ដែលនិយាយផ្ទុយនឹងអ្វីដែលប្រព័ន្ធដកចេញពិត ៖ ការវាស់ចុះលើ **ព្រំដែនពិត** (៧ ថ្ងៃ ± ១ ms) មិនមែនលេខងាយ។
  * ⛔ «គ្មាន» ជាការអះអាងអំពីអាជីវកម្ម ➜ ទិដ្ឋភាពប្រវត្តិមិនស្រស់ = «វាស់មិនបាន» មិនមែន «គ្មានកញ្ចប់» (ច្បាប់ «បញ្ជីទទេ ↔ សិទ្ធិវាស់»)។
  * ⛔ សារថែទាំទៅដល់ App តាម `public/announcements.json` ដែល deploy ជាមួយ App ➜ **រាល់ PR ដែលឡើងកំណែត្រូវជំនួសធាតុ
@@ -64,7 +64,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('ជិតផុតកំណត់ ៖ ព្រំដែនដដែលនឹងការសម្អាត ៧ ថ្ងៃ', () => {
+describe('ជិតដល់ពេលត្រឡប់ ៖ ព្រំដែនដដែលនឹងការសម្អាត ៧ ថ្ងៃ', () => {
     it('ព្រំដែន ២៤ ម៉ោង និងព្រំដែនផុតកំណត់ ចុះលើ barcodeAbandonIsRipe ពិត (± ១ ms)', () => {
         const open = { code: 'B1', isClosed: false };
         expect(hoursUntilAbandon(open, NOW - ABANDON_AGE_MS, NOW)).toBe(1);
@@ -211,7 +211,7 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         expect(document.getElementById('notifyDrawer')!.querySelector('.drawer-foot')!.textContent).toContain('Powered By ZoeW');
     });
 
-    it('badge = កញ្ចប់ជិតផុតកំណត់ + សារមិនទាន់អាន + កំណែថ្មី · បិទផ្ទាំង ➜ សារបានអាន', () => {
+    it('badge = កញ្ចប់ជិតដល់ពេលត្រឡប់ + សារមិនទាន់អាន + កំណែថ្មី · បិទផ្ទាំង ➜ សារបានអាន', () => {
         stubFeed();
         dataState.scanHistory = [item('U1', Date.now() - ABANDON_AGE_MS + NOTIFY_HOUR_MS, [{ code: 'U', isClosed: false }, { code: 'V', isClosed: false }])];
         uiState.notifyFeed = [{ id: 'n1', kind: 'maintenance', title: 'ថែទាំ', body: '', points: [], version: '', date: '' }];
@@ -244,7 +244,7 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
         expect(uiState.notifyDrawerOpen).toBe(true);
     });
 
-    it('⛔ ចាកចេញ ➜ លេខទូរស័ព្ទក្នុងបញ្ជីជិតផុតកំណត់មិនសល់ក្នុង DOM', () => {
+    it('⛔ ចាកចេញ ➜ លេខទូរស័ព្ទក្នុងបញ្ជីជិតដល់ពេលត្រឡប់មិនសល់ក្នុង DOM', () => {
         stubFeed();
         dataState.scanHistory = [item('P1', Date.now() - ABANDON_AGE_MS + NOTIFY_HOUR_MS, [{ code: 'P', isClosed: false }])];
         mount(<><DrawerBackdrop /><NotifyDrawer /></>);
@@ -262,8 +262,8 @@ function trashItem(id: string, deletedAt: number, barcodes: any[], extra: any = 
     return { id, phone: '0' + id.replace(/\D/g, '').padStart(8, '2'), deletedAt, barcodes, trashReason: 'returned', isFromDeletion: false, ...extra };
 }
 
-describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរាម «ផុតកំណត់» (សំណើម្ចាស់គម្រោង)', () => {
-    it('រាប់តែ trashReasonOf() = expired · ដក/យករួច/លុប/កំពុងស្តារ/ចាស់គ្មាន trashReason មិនរាប់ · ថ្មីបំផុតមុន', () => {
+describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរាម «ត្រឡប់» (សំណើម្ចាស់គម្រោង)', () => {
+    it('រាប់តែ trashReasonOf() = returned · ដក/យករួច/លុប/កំពុងស្តារ/ចាស់គ្មាន trashReason មិនរាប់ · ថ្មីបំផុតមុន', () => {
         const deleted = [
             trashItem('T1', NOW - 5 * NOTIFY_HOUR_MS, [{ code: 'A', locker: 'L-1' }, { code: 'B' }]),
             trashItem('T2', NOW - 30 * 60 * 1000, [{ code: 'C' }]),

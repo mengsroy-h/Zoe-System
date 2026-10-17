@@ -3,7 +3,7 @@
  *    ➜ ចម្លើយ ៖ «៣ ថ្ងៃ» (របា «ZTO មិនទាន់បិទ» រំលឹករហូតដល់ ZTO បិទ ឬ ៣ ថ្ងៃ)។
  *    មុនកែ ៖ ធុងសំរាម «យករួច» រាប់តែ ១២ ម៉ោងក្រោយចូល (≈ ១៤ ម៉ោងក្រោយបិទ) · សាលក្រមក្នុង localStorage ផុត ១២ ម៉ោង · ទុកបាន ៣០០ ➜ កញ្ចប់ម្សិលមិញបាត់ពីរបា។
  *    ច្បាប់ ៖ `ZTO_STATUS_TTL_MS` = ៣ ថ្ងៃ (ធុងសំរាម «យករួច» · សាលក្រម) · `ZTO_STATUS_MAX` ទុកសាលក្រម ៣ ថ្ងៃបានគ្រប់ (មិនបណ្តេញ ➜ មិនសួរ ZTO ម្តងទៀតក្រោយបើក App)។
- *    ទិសផ្ទុយ ៖ ចាស់ជាង ៣ ថ្ងៃ · ធុងសំរាមមិនមែន «យករួច» (លុប · ដក · ផុតកំណត់) · សាលក្រម `true` ➜ មិនបង្ហាញ។
+ *    ទិសផ្ទុយ ៖ ចាស់ជាង ៣ ថ្ងៃ · ធុងសំរាមមិនមែន «យករួច» (លុប · ដក · ត្រឡប់) · សាលក្រម `true` ➜ មិនបង្ហាញ។
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -51,7 +51,7 @@ describe('⛔ របា «ZTO មិនទាន់បិទ» រំលឹក �
         expect(codes).toEqual(['ZT14H', 'ZT2D', 'ZT3D']);
     });
 
-    it('ទិសផ្ទុយ ៖ លុប · ដក · ផុតកំណត់ · សាលក្រម true ➜ មិនបង្ហាញ', () => {
+    it('ទិសផ្ទុយ ៖ លុប · ដក · ត្រឡប់ · សាលក្រម true ➜ មិនបង្ហាញ', () => {
         const trash = [trashItem('ZTDEL', 2 * DAY, 'delete'), trashItem('ZTREM', 2 * DAY, 'remove'), trashItem('ZTEXP', 2 * DAY, 'returned'), trashItem('ZTOK', 2 * DAY)];
         for (const t of trash.slice(0, 3)) setZtoPickupVerdict(t.barcodes[0].code, false);
         setZtoPickupVerdict('ZTOK', true);

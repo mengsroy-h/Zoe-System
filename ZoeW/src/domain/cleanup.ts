@@ -4,14 +4,14 @@ import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../c
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { barcodeAbandonIsRipe, barcodeCloseIsRipe, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
+import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
 import { repairPickupLedgerOnce } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge } from '../features/restore';
-import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
+import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
@@ -25,7 +25,7 @@ export const cleanupInFlight = new Set();
 export const staleRestoreMarkerSweeps = new Set();
 
 export function trashRetentionMs(item) {
-    return item && item.trashReason === 'returned' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    return item && item.trashReason === 'returned' ? RETURNED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
 }
 
 export function clearStaleRestoreMarkers(item) {
@@ -800,6 +800,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     let claimedPartial = null;
     let updatedRemainder = null;
     const forced = reason === 'abandon' && opts && Array.isArray(opts.codes) ? new Set(opts.codes) : null;
+    const forcedAt = forced && opts.returnedAt instanceof Map ? opts.returnedAt : null;
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
         claimedPartial = null;
@@ -815,7 +816,9 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             ensureBarcodeArrayForItem(currentItem);
 
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const staleOpen = currentItem.barcodes.filter(b => (forced ? !!b && !b.isClosed && forced.has(b.code) : barcodeAbandonIsRipe(b, ts, getServerNow())));
+                const staleOpen = currentItem.barcodes.filter(b => (forced
+                    ? !!b && !b.isClosed && forced.has(b.code) && (!forcedAt || barcodeReturnCounts(b, currentItem.createdAt, forcedAt.get(b.code)))
+                    : barcodeAbandonIsRipe(b, ts, getServerNow())));
                 const staleSet = new Set(staleOpen);
                 const stillActive = currentItem.barcodes.filter(b => !staleSet.has(b));
                 if (staleOpen.length === 0) return currentItem;

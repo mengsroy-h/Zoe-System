@@ -2265,11 +2265,18 @@ async function detailAccessFor(event, config, startedAt) {
     return null;
 }
 
-function palmDeps(event, config, startedAt) {
+function palmDeps(event, config, startedAt, keyLabel) {
     return {
         headerOf,
+        keyLabel,
+        blobStore: () => openCookieStore(event),
         upstreamMs: () => Math.max(1000, Math.min(config.upstreamTimeoutMs, budgetLeftMs(config, startedAt) - 200)),
         loginAccess: () => (config.detailIdentity === 'require' ? resolveDetailAccess(event, config, startedAt) : null),
+        identitySite: () => {
+            const token = detailIdentityOf(event);
+            return token ? resolveListIdentity(token, config, startedAt, process.env)
+                .then((identity) => (identity.auth.ok && identity.site.code ? identity.site.code : ''), () => '') : '';
+        },
         lookupAccess: () => detailAccessFor(event, config, startedAt),
         project: (row) => ({
             cod: pickNumber([row], ['cod']),
@@ -2521,7 +2528,7 @@ async function handleRequest(event) {
         return { statusCode: 204, headers: { Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
     const palmQuery = requestQuery(event);
-    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && (palmQuery.palm === 'login' || palmQuery.palm === 'refresh' || palmQuery.palm === 'sign'))) {
+    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm && require('./_shared/zto-palm').isPalmPost(palmQuery))) {
         return json(405, { error: 'Method not allowed' });
     }
 
@@ -2544,8 +2551,8 @@ async function handleRequest(event) {
         return configErrorResponse(error);
     }
 
-    if (palmQuery.palm === '1' || palmQuery.palm === 'login' || palmQuery.palm === 'refresh' || palmQuery.palm === 'sign') {
-        return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt));
+    if (palmQuery.palm && require('./_shared/zto-palm').isPalmQuery(palmQuery)) {
+        return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt, keyLabel));
     }
 
     const query = requestQuery(event);
@@ -2754,6 +2761,7 @@ exports.expireCookieCacheForTests = function expireCookieCacheForTests() {
 };
 
 exports.resetCachesForTests = function resetCachesForTests() {
+    require('./_shared/zto-palm').resetSharedForTests();
     resultCache.clear();
     inFlight.clear();
     certsState.at = 0;

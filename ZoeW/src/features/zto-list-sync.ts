@@ -30,7 +30,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
 import { saveBarcodeOrigins } from './barcode-origin';
-import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, refreshZtoPalmSession } from './zto-palm-login';
+import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, palmSessionLostText, refreshZtoPalmSession } from './zto-palm-login';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
 
@@ -39,7 +39,7 @@ export const ZTO_LIST_DEFAULT_DAYS = 4;
 export const ZTO_LIST_CLIENT_MAX_PAGES = 3;
 
 export const ZTO_PALM_LIST_MAX_PAGES = 1000;
-export const ZTO_PALM_LIST_TABS = ['1', '4', '5'];
+export const ZTO_PALM_LIST_TABS = ['1', '4', '4d', '5'];
 export const ZTO_PALM_LIST_CONCURRENCY = 8;
 export const ZTO_PALM_LIST_PAGE_TRIES_MAX = 3;
 export const ZTO_PALM_TRACK_BATCH = 30;
@@ -225,7 +225,8 @@ export function ztoListRowOf(raw, key) {
         returnedAt: '',
         inZoew: false,
         openInZoew: false,
-        removeInZoew: false
+        removeInZoew: false,
+        removeHeld: ''
     };
 }
 
@@ -904,10 +905,12 @@ export function renderZtoListSyncPreview() {
     }
     const openReturned = new Set();
     ztoReturnedTargets(result.returned, dataState.scanHistory, result.signed).forEach((target) => target.codes.forEach((code) => openReturned.add(pickupBarcodeKey(code))));
-    const removeReturned = ztoAutoCloseEnabled();
+    const autoClose = ztoAutoCloseEnabled();
+    const removeReturned = autoClose && result.signedState === 'ok';
     for (let i = 0; i < groups.returned.length; i++) {
         groups.returned[i].openInZoew = openReturned.has(groups.returned[i].key);
         groups.returned[i].removeInZoew = removeReturned && groups.returned[i].openInZoew;
+        groups.returned[i].removeHeld = groups.returned[i].openInZoew && !removeReturned ? (autoClose ? 'signed' : 'switch') : '';
     }
     const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     const freshTitle = stale ? '🆕 ថ្មី ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '🆕 ថ្មី (មិនទាន់មានក្នុង ZoeW)';
@@ -1049,7 +1052,7 @@ export async function runZtoListSyncPreview() {
             returnedState: pulled.returnedState
         };
         renderZtoListSyncPreview();
-        removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);
+        if (ztoState.ztoListSyncResult.signedState === 'ok') removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
     } catch (e) {
         if (!session.current()) return;
@@ -1089,8 +1092,9 @@ export async function runZtoListSyncPreview() {
             setZtoListSyncNote('🔄 Session ZTO Palm ផុតកំណត់ — កំពុង Login ឡើងវិញដោយស្វ័យប្រវត្តិ ➜ សូមទាញម្តងទៀតបន្តិចទៀត');
             showToast('ℹ️ កំពុង Login ZTO Palm ឡើងវិញ');
         } else if (e && e.httpStatus === 401 && lookupApiIsPalm(cfg)) {
-            setZtoListSyncNote('🔑 Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
-            showToast('⚠️ Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀត');
+            const lost = palmSessionLostText(cfg, e.upstreamReason);
+            setZtoListSyncNote('🔑 ' + lost + ' — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
+            showToast('⚠️ ' + lost + ' — សូម Login ZTO Palm ម្តងទៀត');
         } else {
             const detail = e && e.httpStatus ? ' (HTTP ' + e.httpStatus + (e.upstreamReason ? ' · ' + e.upstreamReason : '') + (e.barcode ? ' · Barcode ' + e.barcode : '') + ')' : '';
             setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន' + detail + ' — សូមសាកម្ដងទៀត');

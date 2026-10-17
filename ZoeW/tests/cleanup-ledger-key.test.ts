@@ -1,5 +1,5 @@
 /**
- * ⛔ Task #16 (KC-15) ៖ ការដកលុយនៃការសម្អាត ៧ ថ្ងៃ (`expired`) ត្រូវចុះ **តែម្តង** ទោះ App ស្លាប់ពាក់កណ្តាលការដក (reload · deploy)។
+ * ⛔ Task #16 (KC-15) ៖ ការដកលុយនៃការសម្អាត ៧ ថ្ងៃ (`returned`) ត្រូវចុះ **តែម្តង** ទោះ App ស្លាប់ពាក់កណ្តាលការដក (reload · deploy)។
  *    ហាង KC-15 ៖ ការដក ៣ កញ្ចប់ត្រូវកាត់នៅ stage `ledger` ➜ ការស្តារពី journal រាយការណ៍ «unverified» ហើយមិនដក ➜ «ស្កេនតាមថ្ងៃ» ≠ យករួច + នៅសល់។
  *    ច្បាប់ ៖ ការដកជា transaction ២ ជំហាន (ខែ ➜ ថ្ងៃ) ដែលផ្ទុក token កំណត់ពី (trashId · deletedAt) ក្នុង ring `ops` · ថ្ងៃផ្ទុកសោ
  *    `ded/<trashId>` ➜ ការរត់ម្តងទៀត (journal · tab ផ្សេង) ឃើញសោ/token ➜ «រួចហើយ» · token ដែលមានមុនការដកនៅតែមាន ➜ មិនទាន់ចុះ ➜ ដក ·
@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
-import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
+import { DB_LISTENER_KEY_DAILY_REVENUE, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { ABANDON_AGE_MS } from '../src/features/session';
@@ -359,6 +359,31 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(trashFlags()).toEqual([false]);
         localStorage.clear();
         reloadPage();
+        await restoreOnOtherDevice(ID);
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+    }, 20000);
+
+    it('៩គ. ដូចគ្នា តែ ledger ថ្ងៃលើឧបករណ៍ស្តារមិនទាន់ Sync (view មិនស្រស់) ➜ មិនស្តារដោយមិនបូក · ស្រស់វិញ ➜ ស្តារបូក ១០', async () => {
+        seed([expiredItem()]);
+        lab.plan = { flip: 'hang' };
+        claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        expect(trashFlags()).toEqual([false]);
+        localStorage.clear();
+        reloadPage();
+        syncLocalViewsFromServer();
+        dataState.dailyRevenueData = {};
+        dbListenerPendingPaths.add(DB_LISTENER_KEY_DAILY_REVENUE);
+        uiState.pendingRestoreId = ID;
+        await executeRestoreItem();
+        await flush();
+        expect(money(), 'លុយមិនបាត់ ៖ មិនស្តារដោយមិនបូក').toEqual({ day: [90, 9], month: [90, 9] });
+        expect(getAt(TRASH + '/' + ID), 'ធាតុនៅក្នុងធុងសំរាម').not.toBeNull();
+        expect(getAt(HISTORY + '/' + ID), 'មិនចូលប្រវត្តិ').toBeNull();
+        expect(uiState.toasts.map((t: any) => t.msg).join(' ')).toContain('Sync');
+        dbListenerPendingPaths.delete(DB_LISTENER_KEY_DAILY_REVENUE);
         await restoreOnOtherDevice(ID);
         expect(getAt(TRASH + '/' + ID)).toBeNull();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });

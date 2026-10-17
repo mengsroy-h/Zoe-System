@@ -132,6 +132,7 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoSignedSweepAt = 0;
     ztoState.ztoSignedSweepOkAt = 0;
     ztoState.ztoSignedSweepWaitMs = 0;
+    ztoState.ztoReturnedSweepAt = 0;
     ztoState.ztoSignedCompleteAt = 0;
     ztoState.ztoSignedCompleteServerAt = 0;
     ztoSignedCloseFailedAt.clear();
@@ -417,7 +418,7 @@ export function ztoSignedCloseIsHeld(key, force) {
 
 export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, pending?) {
     const session = captureZtoSession();
-    const out = { closed: 0, flipped: 0, more: false, keys: new Set() };
+    const out = { closed: 0, flipped: 0, more: false, keys: new Set(), signedCodes: null };
     const open = Array.isArray(entries) ? entries : [];
     const stale = Array.isArray(pending) ? pending : [];
     if (!open.length && !stale.length) return out;
@@ -446,6 +447,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         ztoState.ztoSignedTruncatedNoted = true;
         showToast('⚠️ បញ្ជី «ចុះហត្ថលេខា» ZTO វែងពេក (លើស ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រក្នុងមួយថ្ងៃ) ➜ កញ្ចប់ខ្លះនឹងពិនិត្យម្តងមួយ');
     }
+    if (!signed.partial && !signed.truncated) out.signedCodes = signed.codes.slice();
     const signedKeys = new Set();
     for (let i = 0; i < signed.codes.length; i++) {
         const key = pickupBarcodeKey(signed.codes[i]);
@@ -470,7 +472,7 @@ export async function closeZtoSignedBarcodes(cfg, entries, dataToScan, force?, p
         if ((navigator.onLine as boolean) === false) { finished = false; break; }
         tried++;
         const done = await autoCloseBarcodeFromZto(entries[i], dataToScan);
-        if (!session.current()) return { closed: 0, flipped: 0, more: false, keys: new Set() };
+        if (!session.current()) return { closed: 0, flipped: 0, more: false, keys: new Set(), signedCodes: null };
         if (done === undefined) { finished = false; break; }
         if (done === false && ztoSignedBarcodeStillOpen(entries[i], dataToScan)) {
             ztoSignedCloseFailedAt.set(entries[i].key, Date.now());
@@ -802,12 +804,12 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             signedMore = signed.more;
             signedKeys = signed.keys;
             if (signed.closed || signed.flipped) renderZtoSyncViews(dataToScan, trashToScan);
-            if (signedEntries.length && !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force) && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS) {
+            if (signed.signedCodes && signedEntries.length && !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force) && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS) {
                 ztoState.ztoReturnedSweepAt = Date.now();
                 const range = ztoSignedSweepRange(ztoOldestOpenStamp(dataToScan));
                 const back = await fetchZtoReturnedPages(cfg, range.from, range.to);
                 if (!session.current()) return 0;
-                removeReturnedZtoBarcodes(back.returned, dataToScan);
+                removeReturnedZtoBarcodes(back.returned, dataToScan, signed.signedCodes);
             }
         }
         for (let i = 0; i < work.length; i++) {

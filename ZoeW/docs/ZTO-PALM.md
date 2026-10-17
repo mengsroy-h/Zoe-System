@@ -87,31 +87,44 @@ node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('h
 - Config Argus ខុស (`ZTO_CONFIG_INVALID`) បិទផ្លូវ Palm ផងដែរ ព្រោះវាប្រើការកំណត់ទាំងនេះរួមគ្នា។
 
 ប្រសិនបើមិនទាន់មាន proxy key ក្នុងការកំណត់ Lookup, បញ្ចូលវាក្នុងប្រអប់
-**តម្លៃ Header / API Key / Secret** រួចចុច Login Palm។ Login ជោគជ័យនឹងរៀបចំ
+**តម្លៃ Header / API Key / Secret** រួចចុច Login Palm (ឬ «ប្រើ Login Palm របស់ហាង» ពេលហាង Login រួច)។ ជោគជ័យនឹងរៀបចំ
 URL, header និង field mapping ដោយស្វ័យប្រវត្តិ។
 
 សម្រាប់ Android, build ជាមួយ `VITE_NATIVE_WEB_ORIGIN=https://your-site.netlify.app`
 ដូចការកំណត់ native ដែលមានស្រាប់។ Browser web និង APK ផ្ញើ password ទៅតែ Function
 របស់ ZoeW ផ្ទាល់។
 
-## Session និងទិន្នន័យ
+## Session និងទិន្នន័យ (Login ម្តង ➜ ប្រើគ្រប់ទូរស័ព្ទក្នុងហាង)
 
-- Server បិទ token ក្នុង session AES-GCM ហើយ App អ៊ិនគ្រីប session ដោយសោ PIN ម្តងទៀត។
-- Login ជោគជ័យ ➜ Server ចេញ `refreshToken` ៖ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session) ចងនឹង proxy key ·
-  ផ្ទុកឈ្មោះគណនី · ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` · ផុតកំណត់ 30 ថ្ងៃ (Login ឡើងវិញម្តង ➜ ពន្យារ 30 ថ្ងៃទៀត)។ App អ៊ិនគ្រីបវាដោយសោ PIN
-  ម្តងទៀត (`palmRefreshTokenEnc`) ➜ ឧបករណ៍មិនអាចអានពាក្យសម្ងាត់ ឬឈ្មោះគណនីបានទេ។
-- Session មានអាយុអតិបរមា 8 ម៉ោង ស្របនឹង client Palm ដែលបានពិនិត្យ។ App Login ឡើងវិញនៅ background (`POST ?palm=refresh`) ពេលបើក App ·
-  ត្រឡប់មក App · ដោះសោ PIN · ជុំ 60 វិ ពេល session មានអាយុ ≥ 4 ម៉ោង · ពេល ZTO បដិសេធ session ➜ ភ្លាម (≤ ម្តងក្នុង 60 វិ) ·
-  មិនកំពុងទាញបញ្ជី (ការទាញដែលកំពុងរត់ប្រើ session ចាស់រហូតចប់) · Login តែម្តងបើហៅច្រើនដងក្នុងពេលតែមួយ។ Session ថ្មីរបស់គណនីដដែល ➜ មិនសម្អាត
-  cache Lookup ឬសាលក្រម ZTO ទេ។ ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` · `ZTO_PALM_COUNTRY_UNSUPPORTED`) ·
-  `refreshToken` ខូច/ផុតកំណត់ (`ZTO_PALM_REFRESH_INVALID`) · គណនីក្លាយជាសាខាផ្សេង ➜ App លុប `refreshToken` ប្រាប់ម្តង ហើយរង់ចាំ Login ដោយដៃ ·
-  បណ្តាញ/ZTO ខូចបណ្តោះអាសន្ន ➜ សាកម្តងទៀតក្រោយ 2 នាទី។ ចាកចេញ · ប្តូរហាង · Login ដោយដៃ កណ្តាលផ្លូវ ➜ ចម្លើយចាស់មិនសរសេរ។
-- មិនផ្លាស់ប្តូរ Argus Cookie/Token ដែលមានស្រាប់នៅ server និងមិនចែករំលែក token
-  Palm របស់អ្នកជាមួយឧបករណ៍ផ្សេង។
+- Login ជោគជ័យ ➜ Function ទុក **session Palm របស់សាខា** ក្នុង Netlify Blobs (store `zto-auth` ដដែលនឹង Cookie · key `palm-session/<label>/<សាខា>` ·
+  `<label>` = ឈ្មោះសោភ្ជាប់ក្នុង `ZTO_PROXY_KEYS`, សោ `ZTO_PROXY_KEY` = `default` · `<សាខា>` = `siteCode` របស់គណនី Palm) ៖ token ZTO · ឈ្មោះគណនី ·
+  ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` · សាខា ទាំងអស់ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session ទូរស័ព្ទ)
+  ហើយចងនឹងសោភ្ជាប់ ➜ Blob ចម្លងទៅសោផ្សេង បើកមិនបាន។ បញ្ជីសាខាដែល Login រួចរបស់សោនីមួយ (`palm-sites/<label>` ៖ លេខសាខាប៉ុណ្ណោះ) ជួយទូរស័ព្ទដែលមិនទាន់ដឹងសាខា។
+- **សាខានីមួយៗមានគណនី Palm របស់ខ្លួន** ៖ សាខាច្រើនប្រើសោភ្ជាប់ដដែលក៏បាន ➜ Login សាខា B មិនជាន់សាខា A · Login ម្តងទៀតក្នុងសាខាដដែល ➜ ជំនួស
+  session មុនរបស់សាខានោះ (Login ចុងក្រោយឈ្នះ ដូច Sync Cookie)។
+- ទូរស័ព្ទផ្ញើសាខារបស់ខ្លួន (`X-Zoe-Palm-Site` = `palmAccount.siteCode` ដែលទូរស័ព្ទចាំពេល Login ឬភ្ជាប់) ➜ Function អាន session សាខានោះ
+  (ទុកក្នុង memory ៦០ វិនាទី · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ)។ ទូរស័ព្ទមិនផ្ញើសាខា ហើយសោមានសាខាតែមួយ ➜ ប្រើសាខានោះ · ច្រើនសាខា ➜ 401 `palm:branch-unknown`
+  (មិនទាយ)។ `ZTO_DETAIL_IDENTITY=require` ➜ គណនី ZoeW សាខា A ផ្ញើសាខា B ➜ `ZTO_OTHER_BRANCH`។
+- ទូរស័ព្ទផ្សេង ៖ ចុច **«ប្រើ Login Palm របស់ហាង»** (`GET ?palm=status`) ➜ Function រកសាខាពីគណនី ZoeW ដែលកំពុងចូល (ID token ·
+  ត្រូវការ `FIREBASE_PROJECT_IDS` ឬការកំណត់ Supabase ដូចការទាញបញ្ជី) បើមិនបាន ➜ សាខាតែមួយក្នុងបញ្ជីសាខា ➜ ស្កេន · ទាញបញ្ជី · ពិនិត្យស្ថានភាព
+  ដោយមិនបាច់ពាក្យសម្ងាត់ ហើយមិនផ្ញើ session ឡើយ · ឬទទួល Setup Link API ដែល URL មាន `palm=1`។
+- Function Login ឡើងវិញដោយខ្លួនឯង ៖ session មានអាយុ ≥ 4 ម៉ោង ➜ Login នៅ background ម្តង (container ច្រើន ➜ តែមួយ ៖ lease ក្នុង Blob ដោយ ETag) ·
+  ZTO បដិសេធ token ➜ អាន Blob មុន (container ផ្សេងប្រហែលជា Login រួច) បើនៅ token ដដែល ➜ Login (ម្តង · single-flight) រួចសាកសំណើនោះម្តងទៀតក្នុងថវិកា ·
+  ការសរសេរ Blob ប្រើ ETag (`onlyIfMatch`) ➜ Login ឡើងវិញមិនសរសេរជាន់ Login ដោយដៃដែលកើតឡើងក្នុងពេលនោះ · Login ឡើងវិញមិនបានដោយបណ្ដាញ ➜ 503
+  (App សាកម្តងទៀត) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
+  `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
+- `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
+- ប៊ូតុង **ផ្តាច់ Palm** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង»
+  ដើម្បីភ្ជាប់វិញ · Function គ្មានផ្លូវលុប session របស់សាខា ➜ Login ដោយគណនីថ្មីជំនួស session ចាស់ ·
+  ប្តូរ `ZTO_PALM_SESSION_SECRET` ឬសោភ្ជាប់ ➜ session ហាងបើកមិនបាន ➜ Login ម្តងទៀត · ប្តូរពាក្យសម្ងាត់ Palm ➜ ZTO បដិសេធការ Login ឡើងវិញ ➜ Login ម្តងទៀត។
+- 401 `ZTO_AUTH_EXPIRED` មានមូលហេតុ (`reason`) ➜ App ប្រាប់មូលហេតុនោះ ៖ `palm:no-session` «Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server» · `palm:login-rejected` ·
+  `palm:unreadable` · `palm:branch-unknown` · គ្មានមូលហេតុ ឬ session ផ្ទាល់ទូរស័ព្ទ ➜ «Session ZTO Palm ផុតកំណត់»។
+- 🩺 (`?palm=1&diag=1`) ប្រាប់ប្រភព session (`shared` · `device` · `none`) · សាខា · អាយុ ដោយមិនបង្ហាញ token។
+- Blobs មិនទទួលការសរសេរពេល Login (`shared: false`) ➜ ទូរស័ព្ទនោះរក្សា session ដែល Server បិទ (AES-GCM · ចងនឹងសោភ្ជាប់ · ៨ ម៉ោង) និង `refreshToken`
+  (ផុត 30 ថ្ងៃ) អ៊ិនគ្រីបម្តងទៀតដោយសោ PIN ➜ `POST ?palm=refresh` (ពេល session មានអាយុ ≥ 4 ម៉ោង ឬ ZTO បដិសេធ) ចូលរួម session ហាងបើមាន
+  (គ្មាន Login ZTO) ឬបង្កើតវា ➜ ទូរស័ព្ទលុប session ផ្ទាល់ (`palmShared`)។ Function ប្រើ session ហាងមុន session ដែលទូរស័ព្ទផ្ញើ។
+- មិនផ្លាស់ប្តូរ Argus Cookie/Token ដែលមានស្រាប់នៅ server (key `cookie` · `cookie-life` មិនប៉ះ)។
 - គាំទ្រគណនីកម្ពុជា `KH` សម្រាប់ flow COD/DOD បច្ចុប្បន្ន។
-- ប៊ូតុង **ផ្តាច់ Palm** លុប session និង `refreshToken` ក្នុង App, បិទ Lookup និងសម្អាត cache Lookup។ Server មិនរក្សាបញ្ជី session ទេ ➜ session ដែលបានចេញ
-  (បើមាននរណាចម្លងវារួច) ផុតកំណត់ដោយខ្លួនឯងក្នុង 8 ម៉ោង · `refreshToken` ក្នុង 30 ថ្ងៃ ហើយប្រើបានតែជាមួយ proxy key ដដែល។ ប្តូរ `ZTO_PALM_SESSION_SECRET`
-  ➜ session និង `refreshToken` ទាំងអស់ឈប់ភ្លាម · ប្តូរពាក្យសម្ងាត់ Palm ➜ `refreshToken` ចាស់ ZTO បដិសេធ។
 - App រក្សាតែសាខា (`siteCode` · `siteName`) មិនរក្សាឈ្មោះគណនី Palm ទេ។
 - ប្រសិនបើ ZTO ស្នើ CAPTCHA/verification, App បង្ហាញសារឱ្យផ្ទៀងផ្ទាត់តាម ZTO ផ្លូវការ។
 
@@ -121,7 +134,8 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   (តម្លៃអវិជ្ជមាន ➜ 0 · វាលដែលមិនមែនលេខត្រូវរំលង)។ ទទួលទាំងលេខទូរស័ព្ទធម្មតា និង encrypted phone ដែល Palm ប្រើ។
 - **☰ ZTO ➜ បិទតាម ZTO ស្វ័យប្រវត្តិ** និង **ការរង់ចាំ ៨ ថ្ងៃ** ៖ អានបញ្ជី tab «ចុះហត្ថលេខា» (`queryDispatchList` `billStatus` `5`
   តាមថ្ងៃ `signSiteDate`) ជាទំព័រ ១០០ ជួរ ➜ តែជួរដែល `billStatus` = `5` ទេជាភស្តុតាង ➜ បិទកញ្ចប់ដែលបើកក្នុង ZoeW ដូចរបៀប Argus។
-- **☰ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO** បើកសម្រាប់ Palm ៖ `queryDispatchList` ផ្តល់បេក្ខភាពពី tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ហើយ
+- **☰ ZTO ➜ ទាញបញ្ជីកញ្ចប់ពី ZTO** បើកសម្រាប់ Palm ៖ `queryDispatchList` ផ្តល់បេក្ខភាពពី tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា (tab បញ្ជូនអាន ២ ដង ៖ គ្មានថ្ងៃ ·
+  និងតាម `dispEmpDateFrom`/`dispEmpDateTo` លើចន្លោះដែលជ្រើស ដូច App Palm — ZTO ឆ្លើយបញ្ជីគ្មានថ្ងៃ ខ្វះកញ្ចប់ដែលចាត់ថ្ងៃនោះ) ហើយ
   `queryTrackInfo` ផ្ទៀងថាមាន `action: "3"` ត្រូវ `siteCode` របស់គណនី និងថ្ងៃជ្រើស មុនបង្ហាញ។ មិនយក `dispEmpDate` ជាថ្ងៃមកដល់ទេ។
   ការទាញមាន ២ ដំណាក់កាល ៖ (១) `candidates=1` អានបេក្ខភាព ១០០ ជួរក្នុងមួយ tab (លេខទូរស័ព្ទ · COD/DOD · ប្រភព `recSite`) ហើយអានតែ tab
   ដែលនៅមានទំព័រ (`tabs` · `tabPages`) · (២) `tracks=A,B,…` (≤ ៣០ Barcode ក្នុងមួយសំណើ) អាន track ស្របគ្នា (៨ ក្នុង Function មួយ) ហើយ
@@ -151,7 +165,7 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 - ម៉ោងមកដល់អានពី `tracks.time` របស់ស្កេន `3`; ម៉ោងចុះហត្ថលេខាអានពីស្កេន `5` ត្រូវសាខា។
 - កញ្ចប់ត្រឡប់ទៅវិញ ៖ ស្កេន `-710` (`退货中` «ត្រឡប់ស្កេន») ត្រូវសាខា ក្រោយការមកដល់ចុងក្រោយ ➜ `tracks=` ឆ្លើយ `returnedAt` ➜
   ក្រុម «↩️ មានក្នុងបញ្ជី តែស្កេនត្រឡប់រួច» មិនបញ្ចូល (ដូច Cookie ស្កេន `-710`) · `-710` នៃសាខាផ្សេង ឬមុនការមកដល់ថ្មី មិនរាប់ ·
-  ការពិនិត្យកញ្ចប់មួយ (`status=1`) ឆ្លើយ `ztoReturnedAt` ផងដែរ (គ្មានពេល ZTO ចុះហត្ថលេខា) ➜ កញ្ចប់បើកក្នុង ZoeW ចូលធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់ ដូចផុតកំណត់)។
+  ការពិនិត្យកញ្ចប់មួយ (`status=1`) ឆ្លើយ `ztoReturnedAt` ផងដែរ (គ្មានពេល ZTO ចុះហត្ថលេខា) ➜ កញ្ចប់បើកក្នុង ZoeW ចូលធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់ ដូចច្បាប់ថ្ងៃទី ៨)។
   កញ្ចប់ដែលយករួចប្រើម៉ោងនេះក្នុងការនាំចូល និងការរង់ចាំ ៨ ថ្ងៃ ដូច Cookie។
 - របារ «ZTO មិនទាន់បិទ» និងការពិនិត្យកញ្ចប់ប្រើ `queryTrackInfo` (`status=1`) ៖ `mail.isSign: 0` ជាមួយស្កេនមកដល់ត្រូវសាខា
   = មិនទាន់ចុះហត្ថលេខា; `isSign: 1` ជាមួយស្កេនចុះហត្ថលេខាត្រូវសាខាក្រោយមកដល់ចុងក្រោយ = ចុះហត្ថលេខា។ ចម្លើយមិនច្បាស់ទុក `null`។

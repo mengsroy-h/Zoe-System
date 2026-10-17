@@ -304,6 +304,9 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .history-more-row td { border-bottom: none; }
 .history-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }
 .trash-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }
+.trash-sum-card { display: block; width: 100%; min-width: 0; margin: 0; font: inherit; line-height: inherit; color: inherit; text-align: left; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.trash-sum-deducted.trash-sum-active { border-color: #c2410c; box-shadow: inset 0 0 0 1px #c2410c; }
+.trash-sum-kept.trash-sum-active { border-color: var(--accent-blue); box-shadow: inset 0 0 0 1px var(--accent-blue); }
 .zto-sync-more { text-align: center; padding: 8px 0; }
 .zto-sync-more-btn { background: #e2e8f0; color: var(--text-main); padding: 6px 12px; min-height: 32px; font-size: calc(11 * var(--fs-unit)); font-weight: 700; }
 .zto-list-site { margin: 2px 0 4px; font-size: calc(12 * var(--fs-unit)); font-weight: 700; color: var(--text-main); overflow-wrap: anywhere; }

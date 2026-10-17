@@ -1984,6 +1984,9 @@
     "ZoeW/tests/trash-retry-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/trash-reason-filter.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-resume-session.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2329,6 +2332,12 @@
     "ZoeW/tests/zto-palm-server.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-shared-app.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-shared.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-upstream-timing.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2539,7 +2548,7 @@
     "audit-tools/exit-code-integrity.js": {
       "policy": "guard-1"
     },
-    "audit-tools/expired-trash-retention-test.js": {
+    "audit-tools/returned-trash-retention-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/export-cells-test.js": {

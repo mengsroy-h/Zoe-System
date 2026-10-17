@@ -99,8 +99,7 @@ export async function addPalmSessionHeader(cfg, headers) {
     if (!lookupApiIsPalm(cfg)) return;
     if (!ztoIdentityTargetTrusted(cfg.url)) throw new Error('Palm lookup host is not trusted');
     const session = cfg.palmTokenEnc ? await decryptLookupSecret(cfg.palmTokenEnc) : '';
-    if (!session) throw Object.assign(new Error('Palm login required'), { lookupCode: 'ZTO_AUTH_EXPIRED' });
-    headers['X-Zoe-Palm-Token'] = session;
+    if (session) headers['X-Zoe-Palm-Token'] = session;
 }
 
 export const ZTO_ID_TOKEN_TIMEOUT_MS = 8000;

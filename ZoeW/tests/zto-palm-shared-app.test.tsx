@@ -1,0 +1,148 @@
+/**
+ * ⛔ សំណើម្ចាស់គម្រោង ៖ «អោយ ZTO Palm login ដំណើរការដូច Cookie blob 100%» — ផ្លូវ App ពិត លើ backend ទាំង ២។
+ *    ទូរស័ព្ទ A ៖ Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន» ➜ Server ទុក session របស់ហាង ➜ ទូរស័ព្ទមិនទុក session/refreshToken ឡើយ ·
+ *    ទូរស័ព្ទ B ៖ មានតែសោភ្ជាប់ ➜ «ប្រើ Login Palm របស់ហាង» ➜ ទាញបញ្ជី ZTO ដោយមិន Login · ZTO បដិសេធ token ➜ Server Login ឡើងវិញដោយខ្លួនឯង ·
+ *    ទូរស័ព្ទកំណែចាស់ (មាន refreshToken) ➜ refresh ➜ ចូលរួម session ហាង ហើយលុប session ផ្ទាល់ · «ផ្តាច់ Palm» ➜ លុបពី Server។
+ *    App ពិត + Function ពិត + Blobs ក្លែង + ZTO Palm ក្លែង (`zto-palm-harness.ts`)។
+ */
+import { act } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mount, unmount } from './native/react-harness';
+import { LookupApiConfigModal } from '../src/app/components/modals/LookupApiConfigModal';
+import { setFieldValue } from '../src/app/refs';
+import { uiState } from '../src/core/state';
+import { appLocalStore } from '../src/core/storage';
+import { viewState } from '../src/core/view-state';
+import { getLookupApiConfig, openLookupApiConfigModal } from '../src/features/lookup-config';
+import { buildLookupRequestHeaders } from '../src/features/lookup-api';
+import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
+import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, refreshZtoPalmSession, resetZtoPalmRefresh, submitZtoPalmLogin, PALM_REFRESH_AGE_MS } from '../src/features/zto-palm-login';
+import { encryptLookupSecret } from '../src/services/crypto';
+import { ARRIVED, KEY, NOW, palmLoginBody, pulledRows, setupWorld, storePalmConfig, teardownWorld, useSharedBlobs, world, type Backend } from './zto-palm-harness';
+
+const BACKENDS: Backend[] = ['firebase', 'supabase'];
+const STORE = 'zoew_lookup_api_config';
+const stored = () => JSON.parse(String(appLocalStore.getItem(STORE)));
+
+afterEach(() => {
+    act(() => cancelZtoPalmLogin());
+    unmount();
+    uiState.modalDisplay = {};
+    resetZtoPalmRefresh();
+    teardownWorld();
+});
+
+async function openModal() {
+    mount(<LookupApiConfigModal />);
+    act(() => openLookupApiConfigModal());
+}
+
+async function proxyOnlyConfig(shop: string) {
+    appLocalStore.setItem(STORE, JSON.stringify({ enabled: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}',
+        headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), shop }));
+}
+
+function tokensSent() {
+    const sent: string[] = [];
+    world.gate = (_kind, _key, token) => { sent.push(token); };
+    return sent;
+}
+
+describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូរស័ព្ទក្នុងហាង (backend %s)', (backend) => {
+    it('A Login ➜ session ហាងលើ Server · ទូរស័ព្ទមិនទុក session · B ប្រើ Login ហាង ➜ ទាញបញ្ជីដោយមិន Login · token ងាប់ ➜ Server Login ឡើងវិញ', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        const shop = stored().shop;
+        await proxyOnlyConfig(shop);
+        await openModal();
+        world.logins.length = 0;
+        setFieldValue('ztoPalmUsernameInput', 'palm-user');
+        setFieldValue('ztoPalmPasswordInput', 'palm-pass');
+        await act(async () => { await submitZtoPalmLogin(); });
+        const a = stored();
+        expect(viewState.palmLoginConnected).toBe(true);
+        expect(a).toMatchObject({ palmShared: true, palmAccount: { siteCode: '881859' } });
+        for (const name of ['palmTokenEnc', 'palmRefreshTokenEnc', 'palmExpiresAt']) expect(a[name], name).toBeUndefined();
+        expect(JSON.stringify(a)).not.toContain('palm-pass');
+        expect(world.blobs!.size).toBe(1);
+        expect(world.logins).toHaveLength(1);
+
+        await proxyOnlyConfig(shop);
+        act(() => openLookupApiConfigModal());
+        expect(viewState.palmLoginConnected).toBe(false);
+        await act(async () => { await connectSharedZtoPalm(); });
+        const b = stored();
+        expect(b).toMatchObject({ palmShared: true, enabled: true, palmAccount: { siteCode: '881859', siteName: 'Test branch' } });
+        expect(b.url).toContain('palm=1');
+        expect(b.palmTokenEnc).toBeUndefined();
+        expect(await buildLookupRequestHeaders(b)).not.toHaveProperty('X-Zoe-Palm-Token');
+        act(() => { uiState.modalDisplay = {}; uiState.isModalOpen = false; });
+
+        const shopToken = world.issued[world.issued.length - 1];
+        const sent = tokensSent();
+        await runZtoListSyncPreview();
+        expect([...pulledRows().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect(world.logins, 'B មិន Login ZTO').toHaveLength(1);
+        expect(new Set(sent)).toEqual(new Set([shopToken]));
+
+        world.deadTokens.add(shopToken);
+        sent.length = 0;
+        await runZtoListSyncPreview();
+        expect([...pulledRows().keys()].sort(), 'ទាញបានបន្ទាប់ពី Server Login ឡើងវិញ').toEqual(ARRIVED.slice().sort());
+        expect(world.logins, 'Server Login ឡើងវិញតែម្តង').toHaveLength(2);
+        const renewed = world.issued[world.issued.length - 1];
+        expect(renewed).not.toBe(shopToken);
+        expect(sent.filter((t) => t === renewed).length).toBeGreaterThan(0);
+    });
+
+    it('ហាងមិនទាន់ Login ➜ «ប្រើ Login Palm របស់ហាង» ប្រាប់ឲ្យ Login · មិនប្តូរ Config', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        const shop = stored().shop;
+        await proxyOnlyConfig(shop);
+        const before = appLocalStore.getItem(STORE);
+        await openModal();
+        await act(async () => { await connectSharedZtoPalm(); });
+        expect(viewState.palmLoginStatus).toContain('មិនទាន់ Login ZTO Palm លើ Server');
+        expect(appLocalStore.getItem(STORE)).toBe(before);
+    });
+
+    it('ទូរស័ព្ទកំណែចាស់ (មាន refreshToken) ➜ refresh ចូលរួម session ហាង ➜ លុប session ផ្ទាល់ · ស្កេនប្រើ token ហាង', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        const body = await palmLoginBody('device-user');
+        await storePalmConfig(backend, body.sessionToken, undefined, {
+            palmRefreshTokenEnc: await encryptLookupSecret(body.refreshToken), palmLoginAt: NOW - PALM_REFRESH_AGE_MS - 1, palmExpiresAt: body.expiresAt
+        });
+        expect(await refreshZtoPalmSession()).toBe('renewed');
+        const cfg = stored();
+        expect(cfg.palmShared).toBe(true);
+        for (const name of ['palmTokenEnc', 'palmRefreshTokenEnc', 'palmExpiresAt']) expect(cfg[name], name).toBeUndefined();
+        expect(world.blobs!.size).toBe(1);
+        const sent = tokensSent();
+        await runZtoListSyncPreview();
+        expect([...pulledRows().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect(new Set(sent).size).toBe(1);
+    });
+
+    it('«ផ្តាច់ Palm» (session ហាង) ➜ សួរបញ្ជាក់ ➜ លុបពី Server ➜ ទូរស័ព្ទផ្សេងឈប់ប្រើ', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        const shop = stored().shop;
+        await proxyOnlyConfig(shop);
+        await openModal();
+        setFieldValue('ztoPalmUsernameInput', 'palm-user');
+        setFieldValue('ztoPalmPasswordInput', 'palm-pass');
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(world.blobs!.size).toBe(1);
+        vi.stubGlobal('confirm', vi.fn(() => false));
+        await act(async () => { await disconnectZtoPalm(); });
+        expect(world.blobs!.size, 'បោះបង់ ➜ មិនលុប').toBe(1);
+        vi.stubGlobal('confirm', vi.fn(() => true));
+        await act(async () => { await disconnectZtoPalm(); });
+        expect(world.blobs!.size).toBe(0);
+        expect(new URL(stored().url).searchParams.get('palm')).toBeNull();
+        expect(stored().palmShared).toBeUndefined();
+        expect(viewState.palmLoginConnected).toBe(false);
+    });
+});

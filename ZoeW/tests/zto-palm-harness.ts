@@ -70,8 +70,32 @@ export const world = {
     loginAnswer: null as null | ((body: any) => Response | Promise<Response>),
     deadTokens: new Set<string>(),
     issued: [] as string[],
-    loginSeq: new Map<string, number>()
+    loginSeq: new Map<string, number>(),
+    blobs: null as null | Map<string, { value: string; etag: string }>
 };
+
+const BLOB_CONTEXT = Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 't' })).toString('base64');
+let blobSeq = 0;
+
+export function useSharedBlobs() {
+    const blobs = new Map<string, { value: string; etag: string }>();
+    world.blobs = blobs;
+    fn.setBlobsModuleForTests({ connectLambda() {}, getStore() {
+        return {
+            async getWithMetadata(key: string) { const e = blobs.get(key); return e ? { data: e.value, etag: e.etag, metadata: {} } : null; },
+            async set(key: string, value: string, options: any) {
+                const e = blobs.get(key);
+                if (options && options.onlyIfMatch && (!e || e.etag !== options.onlyIfMatch)) return { modified: false };
+                if (options && options.onlyIfNew && e) return { modified: false };
+                const etag = '"e' + (++blobSeq) + '"';
+                blobs.set(key, { value, etag });
+                return { modified: true, etag };
+            },
+            async delete(key: string) { blobs.delete(key); }
+        };
+    } });
+    return blobs;
+}
 
 export function deferred<T = void>() {
     let resolve!: (value: T) => void;
@@ -183,7 +207,7 @@ export function installFetch() {
             Object.entries((init && init.headers) || {}).forEach(([k, v]) => { h[k.toLowerCase()] = String(v); });
             if (q.list === '1' || q.status === '1') world.functionQueries.push(q);
             const r = await fn.handler({ httpMethod: init && init.method === 'POST' ? 'POST' : 'GET', headers: h, queryStringParameters: q,
-                body: init && init.body });
+                body: init && init.body, ...(world.blobs ? { blobs: BLOB_CONTEXT } : {}) });
             return new Response(r.body, { status: r.statusCode });
         }
         throw new Error('unexpected fetch ' + href);
@@ -301,6 +325,8 @@ export function setRangeFields() {
 }
 
 export function teardownWorld() {
+    if (world.blobs) fn.setBlobsModuleForTests(null);
+    world.blobs = null;
     vi.useRealTimers();
     vi.unstubAllGlobals();
     appLocalStore.clear();

@@ -2332,6 +2332,12 @@
     "ZoeW/tests/zto-palm-server.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-shared-app.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-shared.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-upstream-timing.test.ts": {
       "policy": "zoew-self-verification"
     },

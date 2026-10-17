@@ -1026,7 +1026,7 @@ describe('Palm Login ឡើងវិញនៅ background (សំណើម្ច�
         const body = await login();
         vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
         vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
-        const palm = vi.fn(async () => upstream({ status: true, result: ACCOUNT }));
+        const palm = vi.fn(async () => upstream({ status: true, result: { ...ACCOUNT, siteCode: '12345' } }));
         vi.stubGlobal('fetch', withCerts(palm));
         const refused = await refresh(body.refreshToken);
         expect(JSON.parse(refused.body)).toMatchObject({ code: 'ZTO_IDENTITY_REQUIRED', reason: 'idtoken:missing' });
@@ -1034,6 +1034,10 @@ describe('Palm Login ឡើងវិញនៅ background (សំណើម្ច�
         const ok = await refresh(body.refreshToken, KEY, { 'x-zoe-id-token': tokenForSite('12345') });
         expect(ok.statusCode).toBe(200);
         expect(palm).toHaveBeenCalledTimes(1);
+        const other = await refresh(body.refreshToken, KEY, { 'x-zoe-id-token': tokenForSite('67890') });
+        expect(other.statusCode, 'គណនី Palm ជាសាខាផ្សេងពីគណនី ZoeW ➜ មិនចេញ session').toBe(403);
+        expect(JSON.parse(other.body)).toMatchObject({ code: 'ZTO_OTHER_BRANCH', reason: 'site:palm-other-branch' });
+        expect(JSON.parse(other.body).sessionToken).toBeUndefined();
     });
 
     it('preflight ?palm=refresh ជា Palm ៖ មិនអាន Cookie Argus ពី Blobs · អនុញ្ញាត POST', async () => {

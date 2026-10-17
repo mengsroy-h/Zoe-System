@@ -1,4 +1,5 @@
 export const ACTION_ALLOWLIST = [
+    "connectSharedZtoPalm",
     "disconnectZtoPalm",
     "submitZtoPalmLogin",
     "applySetupLinkFromInput",

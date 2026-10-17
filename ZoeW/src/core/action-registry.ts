@@ -19,7 +19,7 @@ import { submitActivationKey } from '../features/license';
 import { openLockerPicker, saveLockerSettings, selectCustomLocker } from '../features/locker';
 import { cancelLocationChange, confirmLocationChange } from '../features/locker-assign';
 import { saveLookupApiConfig, testLookupApiConfig } from '../features/lookup-config';
-import { disconnectZtoPalm, submitZtoPalmLogin } from '../features/zto-palm-login';
+import { connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../features/zto-palm-login';
 import { exportMonthlyReportAsExcel, exportMonthlyReportAsPDF, renderMonthlyReport } from '../features/monthly-report';
 import { decodeImageFile, searchByPhone } from '../features/phone-suggest';
 import { saveNewSecurityPin, submitSecurityPinForm, verifySecurityPin } from '../features/pin';
@@ -44,6 +44,7 @@ import { showMoreHistoryRows } from '../ui/history-render';
 import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
+    connectSharedZtoPalm,
     disconnectZtoPalm,
     submitZtoPalmLogin,
     applySetupLinkFromInput,

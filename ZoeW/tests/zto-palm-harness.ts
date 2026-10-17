@@ -142,7 +142,7 @@ async function palmUpstream(href: string, init: any) {
     }
     if (world.deadTokens.has(palmTokenOf(init))) return respond({ status: false, statusCode: 'token_expired' });
     if (path === '/zto/dispatch/v1/queryDispatchList') {
-        const key = 'list:' + body.billStatus + ':' + body.pageNum;
+        const key = 'list:' + body.billStatus + (body.dispEmpDateFrom ? 'd' : '') + ':' + body.pageNum;
         world.zto.push(key);
         if (world.gate) await world.gate('list', key, palmTokenOf(init));
         return dispatchList(body);

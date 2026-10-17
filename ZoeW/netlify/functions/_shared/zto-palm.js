@@ -20,7 +20,7 @@ const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
 const SIGNED_STATUS = '5';
 const RETURN_ACTION = '-710';
 const LIST_ROW_MAX = 200;
-const LIST_TABS = ['1', '4', '5'];
+const LIST_TABS = ['1', '4', '4d', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
 const PALM_TRACKS_MAX = 30;
 const PALM_READ_ATTEMPTS = 2;
@@ -587,6 +587,7 @@ async function palmTrackJob(barcode, session, keys, deps, tally) {
 function arrivalTabRequest(tab, range, signedRange, page, pageSize) {
     if (tab === '1') return { billStatus: '1', isIssue: '1', status: 0, pageNum: page, pageSize };
     if (tab === '4') return { billStatus: '4', status: 0, pageNum: page, pageSize };
+    if (tab === '4d') return { billStatus: '4', status: 0, dispEmpDateFrom: range.start, dispEmpDateTo: signedRange.end, pageNum: page, pageSize };
     return { billStatus: '5', status: 0, signSiteDateFrom: range.start, signSiteDateTo: signedRange.end, pageNum: page, pageSize };
 }
 
@@ -612,9 +613,9 @@ async function palmCandidates(range, page, session, keys, deps, tabs) {
         tabPages[tabs[index]] = current.pages;
         for (const raw of current.list) {
             const barcode = listBillCode(raw);
-            if (!BARCODE_RE.test(barcode)) { otherScans++; continue; }
             if (seen.has(trackingCode(barcode))) continue;
             seen.add(trackingCode(barcode));
+            if (!BARCODE_RE.test(barcode)) { otherScans++; continue; }
             const fields = deps.project(raw);
             candidates.push({
                 barcode, phone: phoneText(raw.consigneeMobile || raw.consigneePhone, keys),

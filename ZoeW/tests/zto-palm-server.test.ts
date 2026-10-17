@@ -534,16 +534,20 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         const res = await call(candidatesQuery({ withSigned: '1' }), session);
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body);
-        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
+        expect(body).toMatchObject({ enabled: true, kind: 'candidates', pages: 2, tabPages: { '1': 1, '4': 2, '4d': 2, '5': 1 }, site: 'KH001', rows: [], otherScans: 1 });
         expect(body.candidates.map((c: any) => c.barcode)).toEqual(['KH0000000002', 'KH0000000001', 'KH0000000003', 'KH0000000009']);
         expect(body.candidates[0]).toEqual({ barcode: 'KH0000000002', phone: '012345678', cod: 2.5, dod: 0, from: '' });
         expect(body.candidates[3].from).toBe('Cookie origin');
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(0);
-        const dispatch = sent.find((r) => r.body.billStatus === '4')!.body;
-        expect(dispatch).toMatchObject({ pageNum: 1, pageSize: 100 });
-        expect(dispatch.dispEmpDateFrom).toBeUndefined();
-        expect(dispatch.dispEmpDateTo).toBeUndefined();
-        expect(sent.find((r) => r.body.billStatus === '5')!.body).toMatchObject({ signSiteDateFrom: '2026-10-10 00:00:00' });
+        const dispatches = sent.filter((r) => r.body.billStatus === '4').map((r) => r.body);
+        expect(dispatches, 'tab «បញ្ជូន» ២ ៖ គ្មានថ្ងៃ (កញ្ចប់ចាត់មុនចន្លោះ) · តាម `dispEmpDate` ដូច App Palm (ម្ចាស់គម្រោង ៖ កញ្ចប់មកដល់រសៀលខ្វះ)').toHaveLength(2);
+        const undated = dispatches.find((b) => b.dispEmpDateFrom === undefined)!;
+        expect(undated).toMatchObject({ pageNum: 1, pageSize: 100 });
+        expect(undated.dispEmpDateTo).toBeUndefined();
+        const signedBody = sent.find((r) => r.body.billStatus === '5')!.body;
+        expect(signedBody).toMatchObject({ signSiteDateFrom: '2026-10-10 00:00:00' });
+        expect(dispatches.find((b) => b.dispEmpDateFrom !== undefined)).toMatchObject({ pageNum: 1, pageSize: 100,
+            dispEmpDateFrom: '2026-10-10 00:00:00', dispEmpDateTo: signedBody.signSiteDateTo });
     });
 
     it('Palm track ៖ ច្រោះ action 3 ត្រូវសាខា និងថ្ងៃ · ចុះហត្ថលេខាក្នុងចន្លោះ · ពេល ZTO ឆ្លើយ track ម្តងមួយលេខ', async () => {

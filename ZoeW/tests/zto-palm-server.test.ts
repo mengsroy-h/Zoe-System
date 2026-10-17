@@ -678,28 +678,6 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(JSON.parse(response.body).evidence).toHaveLength(30);
     });
 
-    it('⏱ Palm track ៦០ កញ្ចប់ក្នុងសំណើមួយ (App ចែកកញ្ចប់ស្មើគ្នាតាមស្លត ៖ មួយសំណើក្នុងមួយស្លត) ➜ ស្របគ្នា ≤ ៨ · គ្រប់ Barcode', async () => {
-        const { sessionToken: session } = await login();
-        let inFlight = 0;
-        let peak = 0;
-        vi.stubGlobal('fetch', vi.fn(async (_url: string, init: any) => {
-            const payload = JSON.parse(init.body);
-            inFlight++;
-            peak = Math.max(peak, inFlight);
-            await new Promise((resolve) => setTimeout(resolve, 2));
-            inFlight--;
-            return upstream({ status: true, result: [scansOf(payload.mailNos, { isSign: 0 }, [['3', 'KH001', '2026-10-16 09:00:00']])] });
-        }));
-        const codes = Array.from({ length: 60 }, (_, i) => 'KH' + String(4000000000 + i));
-        const response = await call(tracksQuery(codes), session);
-        expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.body);
-        expect(body.evidence.map((e: any) => e.barcode)).toEqual(codes);
-        expect(body.unverified).toEqual([]);
-        expect(body.trackCalls).toBe(60);
-        expect(peak).toBe(8);
-    });
-
     it('Palm track ខ្វះឬបរាជ័យ ➜ មិនបាត់កញ្ចប់ស្ងាត់ ៖ Barcode ក្នុង unverified · ZTO 5xx សាកម្តងទៀតមួយដង', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({ 'track:KH0000000001': () => upstream({}, 502) });
@@ -720,9 +698,9 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         await call(tracksQuery(['KH0000000002']), session);
         expect(sent.map((r) => r.body.mailNos)).toEqual(['KH0000000002']);
         sent.length = 0;
-        const sixtyOne = Array.from({ length: 61 }, (_, i) => 'KH' + String(3000000000 + i)).join(',');
+        const thirtyOne = Array.from({ length: 31 }, (_, i) => 'KH' + String(3000000000 + i)).join(',');
         for (const bad of [{ candidates: '1', tabs: '4,9' }, { candidates: '1', tabs: '4,4' }, { tracks: 'bad code' }, { tracks: 'KH0000000001,kh0000000001' },
-            { tracks: sixtyOne }, { tracks: '' }, {}]) {
+            { tracks: thirtyOne }, { tracks: '' }, {}]) {
             expect((await call(listQuery({ signed: '0', ...bad }), session)).statusCode).toBe(400);
         }
         expect(sent).toEqual([]);

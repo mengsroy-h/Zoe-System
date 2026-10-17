@@ -336,7 +336,8 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
         const lists = zto.filter((k) => k.startsWith('list:')).sort();
         expect(lists, 'tab នីមួយៗអានម្តង ១០០ ជួរ · tab ដែលអស់ទំព័រមិនអានស្ទួន').toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:5:1']);
-        expect(functionCalls, 'សំណើទៅ Function ៖ ទំព័របេក្ខភាព ២ + track ≤ ស្លត + ១').toBeLessThanOrEqual(2 + 8 + 1);
+        expect(functionCalls, 'សំណើទៅ Function ៖ ទំព័របេក្ខភាព ២ + track ក្រុម ៣០ (+ ចុងបញ្ជីចែកស្មើតាមស្លត)').toBeLessThanOrEqual(2 + Math.ceil(total / 30) + 8);
+        expect(Math.max(...trackBatches), 'ក្រុម track ≤ ៣០').toBeLessThanOrEqual(30);
         const tracks = zto.filter((k) => k.startsWith('track:'));
         expect(tracks.filter((k) => k.includes(',')), 'ZTO មិនឆ្លើយ mailNos ច្រើនលេខ ➜ មិនផ្ញើ').toEqual([]);
         expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
@@ -411,15 +412,15 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect(listsWhenListDone.get('list:4:1') || [], 'សាខាផ្សេង ➜ មិនស្នើទំព័រ ២ មុនទំព័រ ១').not.toContain('list:4:2');
     });
 
-    it('⏱ ចែក track ស្មើគ្នាតាមស្លត ៖ បញ្ជីដឹងគ្រប់ ➜ មួយសំណើក្នុងមួយស្លត (≤ ៦០) · បញ្ជីតូច ➜ នៅតែប្រើគ្រប់ស្លត', async () => {
+    it('⏱ ក្រុម track ≤ ៣០ (ម្ចាស់គម្រោង ៖ ក្រុម ~៥៧ របស់ 2.50.112 «មានអារម្មណ៍ថាយឺតជាងមុន») · បញ្ជីតូច ➜ ចែកស្មើគ្រប់ស្លត', async () => {
         parcels = dataset(400);
         await runZtoListSyncPreview();
         trackBatches = [];
         await runZtoListSyncPreview();
         const total = Object.keys(parcels).length;
         expect(trackBatches.reduce((a, b) => a + b, 0)).toBe(total);
-        expect(Math.max(...trackBatches)).toBeLessThanOrEqual(60);
-        expect(trackBatches.length, 'សំណើ track ' + trackBatches.join(',')).toBeLessThanOrEqual(9);
+        expect(Math.max(...trackBatches), 'ក្រុម ' + trackBatches.join(',')).toBeLessThanOrEqual(30);
+        expect(trackBatches.length, 'វឌ្ឍនភាពឡើងជាជំហានតូចៗ').toBeGreaterThanOrEqual(Math.ceil(total / 30));
         parcels = dataset(40);
         await runZtoListSyncPreview();
         trackBatches = [];

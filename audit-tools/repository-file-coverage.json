@@ -3471,6 +3471,24 @@
     },
     "supabase/migrations/20261017053127_zoe_rules.sql": {
       "policy": "supabase-db"
+    },
+    "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/app/components/modals/ZtoPalmSignModal.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/core/palm-sign-state.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/features/zto-palm-sign.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-sign-server.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-sign.test.tsx": {
+      "policy": "zoew-self-verification"
     }
   }
 }

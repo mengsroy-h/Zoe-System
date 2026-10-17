@@ -49,7 +49,7 @@ export function BarcodeListContainer() {
                     </div>
                     <div className="barcode-actions-group">
                         <button className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
-                            onClick={onAct(palmMode && !b.closed ? 'openZtoPalmSign' : 'toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
+                            onClick={palmMode && !b.closed ? onAct('openZtoPalmSign', { args: [b.itemId, b.code] }) : onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
                             {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
                         </button>
                         <button className="btn-edit-item-price"

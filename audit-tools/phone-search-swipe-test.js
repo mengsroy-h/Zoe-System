@@ -569,8 +569,10 @@ console.log('\n=== ការតភ្ជាប់ក្នុង index.html ន�
     const unplugged = src.replace(/(^|[^\w])setPhoneSearchPulledUp\((?=[^)]*\)\s*;)/g, '$1noPhoneSearchPull(');
     ok(!!onFocus && unplugged !== src && !pullChain(unplugged)(onFocus.name),
         '⛔ ទិសផ្ទុយ ៖ គ្មាន setPhoneSearchPulledUp() ក្នុងខ្សែហៅ ➜ ការវាស់ធ្លាក់', null);
-    ok(/clearSensitiveModalFields\(\)\s*\{[\s\S]{0,200}setPhoneSearchPulledUp\(false\)/.test(src),
-        'ចាកចេញ ➜ ដោះការហូតឡើងវិញ');
+    const logoutResetsPull = (source) => /\bsetPhoneSearchPulledUp\(false\)/.test(sliceFn(source, 'clearSensitiveModalFields'));
+    ok(logoutResetsPull(src), 'ចាកចេញ ➜ ដោះការហូតឡើងវិញ');
+    ok(!logoutResetsPull(src.replace(/setPhoneSearchPulledUp\(false\)/g, 'noPhoneSearchPull(false)')),
+        '⛔ ដក reset ចេញពី logout ➜ ការវាស់ធ្លាក់');
 }
 
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));

@@ -440,6 +440,21 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(calls.filter((q) => q.returned === '1')).toHaveLength(0);
     });
 
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ចាកចេញ · ប្តូរហាង · ប្តូរ Config (`clearZtoPickupStatusStore()`) ➜ វគ្គថ្មីអានបញ្ជីត្រឡប់ភ្លាម (មិនរង់ចាំ ១ ម៉ោងរបស់វគ្គមុន)', async () => {
+        seed([youngItem([['ZTKEEP000001', 5]])]);
+        const calls = zto([]);
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        expect(calls.filter((q) => q.returned === '1'), 'លក្ខខណ្ឌ ៖ វគ្គមុនអានរួច').toHaveLength(1);
+        clearZtoPickupStatusStore();
+        seed([youngItem([['ZTRET0000001', 10]])]);
+        const next = zto([{ code: 'ZTRET0000001', at: ztoStamp(getServerNow() - 3600000) }]);
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        await flush();
+        expect(next.filter((q) => q.returned === '1')).toHaveLength(1);
+        expect(trashItems().map((t: any) => t.trashReason)).toEqual(['returned']);
+        expect(ledger().codDollar).toBe(90);
+    });
+
     it('ពិនិត្យនៅខាងក្រោយ ៖ ចម្លើយ `ztoClosed: true` + `ztoReturnedAt` ➜ មិនដកជាត្រឡប់ · លុយមិនដក', async () => {
         seed([youngItem([['ZTRET0000001', 10]])]);
         zto([], () => ({ found: true, ztoClosed: true, ztoReturnedAt: ztoStamp(getServerNow() - 3600000) }));

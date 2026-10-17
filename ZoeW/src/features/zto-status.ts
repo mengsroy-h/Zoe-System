@@ -132,6 +132,7 @@ export function clearZtoPickupStatusStore() {
     ztoState.ztoSignedSweepAt = 0;
     ztoState.ztoSignedSweepOkAt = 0;
     ztoState.ztoSignedSweepWaitMs = 0;
+    ztoState.ztoReturnedSweepAt = 0;
     ztoState.ztoSignedCompleteAt = 0;
     ztoState.ztoSignedCompleteServerAt = 0;
     ztoSignedCloseFailedAt.clear();

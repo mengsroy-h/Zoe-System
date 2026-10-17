@@ -1,0 +1,150 @@
+// ផ្នែករួមនៃអ្នកយាមលុយពហុឧបករណ៍ (`emu/money-multidevice-emu-test` លើ Firebase · `supabase-money-multishop-test` លើ Supabase) ៖
+//   · `invariant()` អានទិន្នន័យ **server** (dump RTDB ឬដើមឈើ `zoe_docs` របស់ហាងមួយ) ហើយគណនាអ្វីដែល ledger · ស្ថិតិយក · registry ត្រូវតែជា
+//   · `PAGE_OPS` ដាក់ក្នុងទំព័រ App ពិត (build វាស់) ➜ `__startOp()` ហៅទ្វារលុយពិតតាមឈ្មោះ (`window.<fn>` មានតែក្នុង build វាស់)
+// ⛔ ម៉ូឌុលនេះមិនអះអាងអ្វីទេ ៖ វាជា harness តែប៉ុណ្ណោះ ➜ ការធ្លាក់ត្រូវរាយការណ៍ដោយអ្នកហៅ (ការប្រែរបស់វាត្រូវឃើញក្នុងអ្នកហៅទាំង ២)។
+'use strict';
+
+const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+const LICENSE_STUB = `window.ZoeLicense = {
+    getStatus: function () { return Promise.resolve({ state: 'active' }); },
+    setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
+    activate: function () { return Promise.resolve({ valid: true }); }, checkOnline: function () { return Promise.resolve({ ok: true }); },
+    announcementsUrl: function () { return ''; }, clearActivation: function () {}
+};`;
+
+function barcodesOf(it) {
+    const v = it && it.barcodes;
+    if (!v) return null;
+    if (Array.isArray(v)) return v.filter(Boolean);
+    if (typeof v === 'object') return Object.keys(v).sort((a, b) => (+a) - (+b)).map((k) => v[k]).filter(Boolean);
+    return null;
+}
+
+function invariant(dump, dateKey, monthKey, knownCodes) {
+    const hist = dump.zoew_scan_history_cod_dod || {};
+    const trash = dump.zoew_recently_deleted_cod_dod || {};
+    let cod = 0, dod = 0, count = 0, closed = 0;
+    const seen = {}; const dup = []; const live = {};
+    const walk = (bag, where) => Object.keys(bag).forEach((id) => {
+        const it = bag[id]; if (!it) return;
+        const bcs = barcodesOf(it) || (it.barcode ? [{ code: it.barcode, cod: it.cod, dod: it.dod, isClosed: it.isClosed, isDeducted: it.isDeducted }] : []);
+        bcs.forEach((b) => {
+            if (!b || !b.code) return;
+            if (seen[b.code]) dup.push(b.code + '@' + seen[b.code] + '+' + where); else seen[b.code] = where;
+            live[String(b.code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
+            if (it.scanDate !== dateKey) return;
+            if (b.isClosed === true) closed++;
+            if (b.isDeducted !== true) { cod += parseFloat(b.cod) || 0; dod += parseFloat(b.dod) || 0; count++; }
+        });
+    });
+    walk(hist, 'hist'); walk(trash, 'trash');
+    const rev = (dump.zoew_daily_revenue_cod_dod || {})[dateKey] || {};
+    const daily = dump.zoew_daily_revenue_cod_dod || {};
+    let mCod = 0, mDod = 0, mCount = 0;
+    Object.keys(daily).forEach((d) => { if (d.slice(0, 7) !== monthKey) return; mCod += parseFloat(daily[d].codDollar) || 0; mDod += parseFloat(daily[d].dodDollar) || 0; mCount += parseFloat(daily[d].totalCount) || 0; });
+    const month = (dump.zoew_monthly_revenue_cod_dod || {})[monthKey] || {};
+    const pick = (dump.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
+    const phones = pick.pickedUpPhones || {};
+    let phoneSum = 0; const zeroRef = [];
+    Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
+    const reg = dump.zoew_barcode_registry || {};
+    const orphans = Object.keys(reg).filter((k) => reg[k] === true && !live[k]);
+    const lost = knownCodes.filter((c) => !seen[c]);
+    const receipts = Object.keys(dump.zoew_write_receipts || {}).length;
+    return {
+        expectCod: r2(cod), gotCod: r2(parseFloat(rev.codDollar) || 0), expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
+        expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
+        monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
+        expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
+        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, phoneSum, zeroRef, dup, orphans, lost, receipts, seenCodes: seen
+    };
+}
+
+function invariantBroken(inv) {
+    if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) return 'ledger ថ្ងៃ ≠ ផលបូក barcode មិនទាន់ដក';
+    if (inv.monthCod !== inv.expectMonthCod || inv.monthDod !== inv.expectMonthDod || inv.monthCount !== inv.expectMonthCount) return 'ledger ខែ ≠ ផលបូក ledger ថ្ងៃ';
+    if (inv.pkg !== inv.expectPkg) return 'packagesPickedUp ≠ barcode បិទ';
+    if (inv.phoneSum !== inv.pkg) return 'sum(pickedUpPhones) ≠ packagesPickedUp';
+    if (inv.zeroRef.length) return 'pickedUpPhones ≤ 0';
+    if (inv.dup.length) return 'barcode ស្ថិតទាំងប្រវត្តិនិងធុងសំរាម';
+    if (inv.orphans.length) return 'កូនសោ registry កំព្រា';
+    if (inv.lost.length) return 'barcode បាត់ពីប្រព័ន្ធ (គ្មានក្នុងប្រវត្តិ · គ្មានក្នុងធុងសំរាម)';
+    return null;
+}
+
+function openBarcodeTargets(dump) {
+    const hist = dump.zoew_scan_history_cod_dod || {};
+    const out = [];
+    Object.keys(hist).sort().forEach((id) => {
+        const it = hist[id];
+        if (!it || it.clearClaim || it.restoreClaimId || it.restoreClaimToken) return;
+        (barcodesOf(it) || []).forEach((b) => { if (b && b.code && !b.isClosed) out.push({ id, code: b.code }); });
+    });
+    return out;
+}
+
+const PAGE_OPS = function () {
+    const w = window;
+    w.__ops = [];
+    w.__opResults = [];
+    const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
+    const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
+    w.__startOp = (args) => {
+        const { wanted, pick, amt, code, phone, target } = args;
+        const live = (w.scanHistory || []).filter(Boolean);
+        const trash = (w.deletedItems || []).filter(Boolean);
+        let started = null;
+        try {
+            if (wanted === 'scan') {
+                w.triggerScanAction(code);
+                const bcText = document.getElementById('modalBarcodeText');
+                const modal = document.getElementById('phoneModal');
+                const open = modal && getComputedStyle(modal).display !== 'none';
+                if (!open || !bcText || bcText.innerText !== code) return null;
+                const p = document.getElementById('modalPhoneInput'); if (p) p.value = phone;
+                const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
+                const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = String(Math.round(amt / 4 * 100) / 100);
+                started = Promise.resolve(w.confirmPhone());
+            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.toggleCloseStatus(it.id)); }
+            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
+            else if (wanted === 'removeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.removeSingleBarcode(it.id, b.code)); }
+            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.deleteSingleItem(it.id)); }
+            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return null; w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
+            else if (wanted === 'editPrice') {
+                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null;
+                w.openEditBarcodePriceModal(it.id, b.code);
+                const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
+                const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
+                started = Promise.resolve(w.saveEditedBarcodePrice());
+            } else if (wanted === 'sweep') { started = Promise.resolve(w.runAutomaticCleanupRules()); }
+            else if (wanted === 'zreturn') {
+                if (!target || !target.id || !target.code || !(target.at > 0)) return null;
+                started = Promise.resolve(w.claimAndCleanupItem(target.id, 'abandon', { codes: [target.code], returnedAt: new Map([[target.code, target.at]]) }));
+            }
+            else return null;
+        } catch (e) { w.__opResults.push({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
+        const p = started.then((r) => { w.__opResults.push({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { w.__opResults.push({ wanted, e: String(e && e.message) }); });
+        w.__ops.push(p);
+        return wanted;
+    };
+    w.__settled = () => Promise.race([Promise.allSettled(w.__ops).then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
+    w.__state = () => ({
+        status: (document.getElementById('firebaseStatusText') || {}).textContent || '',
+        phase: typeof w.connectionFlowSnapshot === 'function' ? w.connectionFlowSnapshot().phase : null,
+        pending: w.db && typeof w.db.recoveryState === 'function' ? w.db.recoveryState().pending
+            : (typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).pending : -1),
+        blocked: w.db && typeof w.db.recoveryState === 'function' ? (w.db.recoveryState().blocked ? 1 : 0)
+            : (typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).blocked : -1),
+        rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
+        cleanupJournal: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '{}')).length; } catch (e) { return -1; } })(),
+        history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
+        codes: [].concat(w.scanHistory || [], w.deletedItems || []).filter(Boolean)
+            .flatMap((it) => (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => b && b.code).concat(it.barcode ? [it.barcode] : [])).filter(Boolean),
+        results: w.__opResults.splice(0)
+    });
+};
+
+module.exports = { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS };

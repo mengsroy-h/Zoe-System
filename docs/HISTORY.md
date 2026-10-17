@@ -47,19 +47,18 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.117 · ZoeKeyGen 2.24.19** (PR #329 · `44eb093`) · PR #331 ➜ **2.50.118** + ជុំបន្ទាប់ក្នុង PR ដដែល ➜ **2.50.119** (មិនទាន់ merge)។
+- `main` (ពេលសរសេរ) = `cb082e4` **ZoeW 2.50.125 · ZoeKeyGen 2.24.19** (PR #330 · #331 merge រួច) · Deep audit ៦ ➜ **2.50.126** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ✅ ម្ចាស់គម្រោង (2026-10-16) ៖ «ការកែមុននេះដំណើរការត្រឹមត្រូវល្អហើយ ទាំង pwa ios, apk, pwa android» ➜ ធាតុសាកលើឧបករណ៍ទាំងអស់រហូតដល់ [2.50.93] បិទ។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
 - ⏳ **[2.50.95]** សកម្មភាព ១ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងបញ្ជីកញ្ចប់ពី ZTO)។
 
 ### 🔧 សកម្មភាពដោយដៃដែលនៅបើក (ម្ចាស់គម្រោង)
 
-- 💡 Netlify env `ZTO_DETAIL_IDENTITY` (`optional` ➜ `require`) — env តែប៉ុណ្ណោះ គ្មានកូដ (ការសម្រេចម្ចាស់គម្រោង · [2.50.93] សកម្មភាព ២ · [2.50.47])។
+- 💡 Netlify env `ZTO_DETAIL_IDENTITY` (`optional` ➜ `require` · Sign Palm ជា endpoint សរសេរ ➜ `require` ទើបអ្នកមានតែសោភ្ជាប់គ្មានគណនី ZoeW Sign មិនបាន) — env តែប៉ុណ្ណោះ គ្មានកូដ (ការសម្រេចម្ចាស់គម្រោង · [2.50.93] សកម្មភាព ២ · [2.50.47])។
 - ⏳ **Backup ស្វ័យប្រវត្តិ** (ពន្យារដោយចេតនា) ៖ secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ([`firebase-backup/README.md`](../firebase-backup/README.md) ជំហានទី ៦)
   ➜ Run workflow ➜ **ទាញ artifact មកសាកស្តារ**។ ⛔ run «success» ដោយគ្មាន secret ឈប់ត្រឹម «ពិនិត្យ secret» = **គ្មាន backup** · GitHub ផ្អាក schedule ក្រោយ
   repo ស្ងាត់ ៦០ ថ្ងៃ ➜ backup ឈប់ស្ងាត់ ➜ ពិនិត្យ **Actions** មុន។
@@ -72,9 +71,9 @@
 
 - 🗳️ PR Login Palm merge ដោយ **merge commit** ➜ commit ដើម `d509638` (សោ protocol ក្នុងកូដ · screenshot សាកល្បង) នៅក្នុង history `main` ➜ ការសម្រេចម្ចាស់គម្រោង
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
-- ✅ ម្ចាស់គម្រោង (PR #328) ៖ «បិទដោយស្វ័យប្រវត្តិតាមZTO និងប្រាប់បិទក្នុងZoeW តែZTO Palm មិនទាន់បិទដំណើរការល្អហើយ» ➜ [2.50.99] បិទ ·
-  ស្កេន Palm ៖ លេខទូរស័ព្ទ · COD · DOD ត្រូវនឹង App ZTO Palm («ត្រូវ») ➜ [2.50.97] បិទ ·
-  កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ផ្លូវ Sign តាមសំណើម្ចាស់គម្រោងនៅ [2.50.120]–[2.50.121]។
+- ⏳ **[2.50.126]** ហាង Firebase ដែលចងសាខាច្រើន + Palm ៖ សាខានីមួយៗ Login គណនី Palm ផ្លូវការម្តងក្នុង ZoeW ➜ កញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេងបិទ «យករួច» (មិន «ត្រឡប់») ·
+  Netlify Logs `push-cron` ពេលទូរស័ព្ទច្រើន ៖ `"reason":"partial"` រួច `"sent"` ក្នុង run បន្ទាប់។
+- 📚 កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ផ្លូវ Sign តាមសំណើម្ចាស់គម្រោងនៅ [2.50.120]–[2.50.121]។
 - ⏳ **[2.50.118]** 📥 Palm ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ · «🆕 ថ្មី» ស្មើ Cookie (A202 ៖ មិនទាន់វាស់លើ ZTO ពិត · នៅខ្វះ ➜ 🧪 track កញ្ចប់ដែលខ្វះ) ·
   🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
 - ⏳ **[2.50.119]** Login ZTO Palm តាមសាខា (A ➜ B ក្នុងសាខាដដែល · «ផ្តាច់ Palm» លើ A ➜ B នៅស្កេន/ទាញបាន ✅ ម្ចាស់គម្រោងបញ្ជាក់លើ Preview) ៖
@@ -83,8 +82,6 @@
 - ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» + លុយដក (Palm · Cookie)។
 - ⏳ **[2.50.114]** Palm ៖ បើក App ថ្ងៃក្រោយ ➜ ស្កេន/ទាញបានដោយមិន Login ZTO Palm ម្តងទៀត · ⏱ ពិតក្នុង A189 ·
   តំបន់ Function ប្តូរបានតែក្រោយ Upgrade Netlify (ការកំណត់ Netlify ➜ គ្មានកូដ · ម្ចាស់គម្រោងសម្រេច)។
-- ✅ **ស្របគ្នា ៦៤** (ម្ចាស់គម្រោង ៖ «មិនបង្កើនបន្ទុកដល់ZTO ទេព្រោះសាខាធំៗ គេប្រើ batch scan ចូលម្តងម្តងរាប់រយbarcode») ➜ ទុក · ចំនួនសំណើ = បេក្ខភាព
-  (tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា) មិនមែនចំនួនជួរ ➜ ⛔ មិនបង្កើនលើស ៦៤ ដោយគ្មានសំណើ (`CLAUDE.md`)។
 - ⏳ **[2.50.120]–[2.50.124]** ម្ចាស់គម្រោងបានអនុញ្ញាត Sign៖ ចែកចាយ ➜ ទទួល; កញ្ចប់មានបញ្ហា បង្ហាញសារ/បញ្ជាក់តាម Palm។ ម្ចាស់គម្រោងបញ្ជាក់ Preview ជោគជ័យ; សាកបន្ថែមលេខមួយច្រើនកញ្ចប់ និងឧបករណ៍នៅសកម្មភាពផ្នែក ១។
   [2.50.124] ៖ ផ្ទាំង Sign រចនាឡើងវិញ (A207–A212) ➜ ពិនិត្យលើទូរស័ព្ទពិត ·
   Preview ៖ Login Palm ម្តងទៀត ➜ «សោមិនត្រឹមត្រូវ» ទាល់តែ clear site data (A214 ៖ មិនមែន App Lock · មិនប៉ះទង្គិច App Palm · ម្ចាស់គម្រោង ៖ APK main ទុកយូរ ➜ Palm ប្រើបាន គ្មានបញ្ហាសោខុស ➜ ជាបញ្ហារបស់ Preview) ➜ [2.50.125] ពេលកើតម្តងទៀត
@@ -92,17 +89,36 @@
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
 
-- ✅ **ZoeW គាំទ្រ backend ទាំង ២ (Firebase · Supabase) តាមជម្រើសអតិថិជន** ➜ រក្សា Config/Login · SDK · rules · provisioning · backup · ឯកសារ Firebase ·
-  ការសម្អាតលុបតែកូដដែលបញ្ជាក់ថា backend ទាំង ២ មិនប្រើ។
+- ✅ backend ទាំង ២ (Firebase · Supabase) តាមជម្រើសអតិថិជន ➜ ច្បាប់ក្នុង `CLAUDE.md` «What the system is» (⛔ កុំចម្លងមកទីនេះ)។
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000`** ក្នុង Netlify env ដោយចេតនា (កូដលំនាំដើម `6000`) ➜ តម្លៃនេះក្នុង `?diag=1` មិនមែនកំហុស ·
   ⛔ កុំបង្កើន `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ។
 - ✅ **Sentry `ZTO_UPSTREAM_REJECTED` ពី barcode តេស្ត** ៖ មិនកែ · ⛔ កុំធ្វើឲ្យស្ងាត់ទាំងអស់ (បាំងការដាច់ ZTO ពិត) · `lookupReason: ""` ក្នុង breadcrumb មិនមែនកំហុស។
 - ✅ **Firebase rules Business + License Publish រួច** · Push (VAPID · FCM · `google-services.json`) កំណត់រួច ➜ ការសរសេរត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ ·
   Activate `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
-- 🗳️ សមត្ថភាពមុនដាក់ប្រើជាផ្លូវការ (Firebase Spark egress · License Project តែមួយ · Netlify Functions · Supabase realtime · ពិដាន Push) ➜ ម្ចាស់គម្រោងសម្រេច
-  (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
+- 🗳️ សមត្ថភាពមុនដាក់ប្រើជាផ្លូវការ (Firebase Spark egress · License Project តែមួយ · Netlify Functions/credit · Supabase realtime · ពិដាន Push) ➜ ម្ចាស់គម្រោងសម្រេច
+  (ផ្នែក ២ «Deep audit ៣» · «Deep audit ៦» A222 ៖ ឧបករណ៍ ZTO ៣ ក្នុងសាខាអាន ZTO ដដែល ៣ ដង ➜ ជម្រើស leader សាខា = តំបន់ LOCK ត្រូវសំណើ) ·
+  A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.126] — 2026-10-17 · ZoeW ៖ Deep audit ៦ — ហាងសាខាច្រើន (Palm) មិនដកលុយកញ្ចប់ដែលយកនៅសាខាផ្សេង · Push ដល់គ្រប់ហាង/ទូរស័ព្ទ · Sign ប្រាប់ឲ្យរង់ចាំ
+
+**ZoeW** (`zoew-v389` ➜ `zoew-v390`) · ZoeKeyGen មិនប្រែ · Function `zto-order-detail.js` + `_shared/zto-palm.js` (ឯកសារ LOCK ➜ sha256 ថ្មីក្នុង `tests/zto-lock.test.ts`) ·
+`netlify/lib/push-core.mjs`។ សំណើម្ចាស់គម្រោង ៖ «deep audit … Network, security leak, Race, duplicate listener, service worker, backendទាំង២, money … ច្បាប់លុប/ដក,
+function ZTO Palm login/Cookie … កុំជឿជាក់លើ checker … តេស្តបើថ្ងៃក្រោយ app មានអតិថិជនប្រើច្រើនសាខាច្រើន ក្នុងមួយសាខា ប្រើ2-3devices» · «សាខា នីមួយៗមានសុទ្ធតែមាន account
+ZTO Palm ផ្លូវការដែលក្រុមហ៊ុនផ្តល់អោយ» ➜ ការកែឯកសារ LOCK ផ្អែកលើសំណើនេះ + កំហុសលុយដែលវាស់បាន (A215)។ លម្អិត ៖ ផ្នែក ២ «Deep audit ៦»។
+
+- 🏢 **ហាង Firebase ដែលចងសាខាច្រើន + ZTO Palm** (A215) ៖ ការអានបញ្ជីចុះហត្ថលេខាជុំបិទតាម ZTO អានគ្រប់សាខាដែលចង តាម session Palm របស់សាខានីមួយៗ
+  (គណនីផ្លូវការរៀងៗខ្លួន) ➜ កញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង បិទជា «យករួច» មិនត្រូវ «ត្រឡប់» ដកលុយ · សាខាណាមិនទាន់ Login Palm ➜ មិន «ពេញលេញ» (រង់ចាំ)។
+- 📲 **Push** (A216 · A217) ៖ ការរំលឹកម៉ោង ៨ ព្រឹកដើរហាង ៨ ស្របគ្នា ➜ ដល់គ្រប់ហាង · ដំណឹងអ្នកលក់ផ្ញើជាចំណែក ➜ run ដែលអស់ពិដានបន្តនៅ cron បន្ទាប់ (ម្តងគត់ក្នុងមួយទូរស័ព្ទ) ·
+  Logs `push-cron` អាចឃើញ `"reason":"partial"` (ឯកសារ `ZoeW/README.md`)។
+- ✍️ **Sign** (A218) ៖ ចុច «✍️ Sign» ពេលការផ្ញើមុននៅរង់ចាំ ZTO ➜ សារ «⏳ … សូមរង់ចាំបន្តិច» (មិនស្ងាត់)។
+- 🧪 អ្នកយាមថ្មី ៖ `supabase-money-multishop-test` (គម្រោង Supabase មួយ · ហាង ២ × ឧបករណ៍ ៣ · App ពិត · Postgres ពិត) · `emu/money-multidevice-emu-test` ឧបករណ៍ ៣ +
+  «ZTO ត្រឡប់» ប្រជែង · `ZoeW/tests/zto-palm-multibranch-hold.test.tsx` · `ZoeW/tests/push-server.test.ts` (ហាង ៤០០ · ទូរស័ព្ទ ៣០០០) · `ZoeW/tests/zto-palm-sign.test.tsx`។
+
+**សកម្មភាពដោយដៃ** ៖ គ្មាន env · rules · migration ថ្មី។ Deploy ZoeW (merge ពេលម្ចាស់គម្រោងស្នើ) ➜ Function ZTO + `push-cron` ថ្មីចូលជាមួយ។ ហាង Firebase ដែលចងសាខាច្រើនក្នុង
+`FIREBASE_PROJECT_IDS` + Palm ៖ **សាខានីមួយៗ Login គណនី Palm ផ្លូវការរបស់ខ្លួនម្តងក្នុង ZoeW** (ទូរស័ព្ទណាមួយក្នុងសាខា) ➜ បើសាខាណាមិន Login ការរង់ចាំថ្ងៃទី ៨ ការពារបានតែ
+ពិដាន `ZTO_ABANDON_HOLD_MAX_MS` (៣០ នាទី) ដូចសាខា Cookie ដែលអានមិនបាន (A161)។
 
 ### [2.50.125] — 2026-10-17 · ZoeW ៖ សារ Login ZTO Palm ប្រាប់មូលហេតុពិត (ឯកសារ LOCK តាមសំណើ)
 
@@ -4307,6 +4323,27 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-17 — Deep audit ៦ (សំណើម្ចាស់គម្រោង ៖ «deep audit … កុំជឿជាក់លើ checker … ច្រើនសាខា ក្នុងមួយសាខា ប្រើ2-3devices … សម្អាត ឯកសារឈប់ប្រើ ពិនិត្យ CLAUDE.md … HISTORY.md» · គ្មាន agent) ➜ [2.50.126]
+
+វិធី ៖ run-all STRICT ពេញលើ `cb082e4` (emulator RTDB រស់ · Postgres ពិត) ៖ **២០៩ ជាប់ · ៣ ធ្លាក់ · មួយផ្នែក ០ · រំលង ០** (ធ្លាក់ = A221 · `repository-file-coverage`
+ព្រោះឯកសារថ្មីរបស់ជុំនេះលេចកណ្តាលការរត់) · អានកូដថ្មីបំផុត (Sign · session សាខា Palm · កញ្ចប់ត្រឡប់ ➜ ធុងសំរាម · Push) · ពិនិត្យថ្នេរ «គម្រោងមួយ សាខាច្រើន · ឧបករណ៍ ២–៣
+ក្នុងសាខា» លើ backend ទាំង ២ ដោយ App ពិត · តេស្តថ្មីនីមួយៗធ្លាក់លើកូដមុនកែ ហើយជាប់ក្រោយកែ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A223 | **CI ៖ `audit.yml` · `android-shell-check.yml` «រំលង» (មិនមែន «ធ្លាក់») ពេល repo Public + `ZOE_RUNNER_MODE` ≠ `github`** ➜ GitHub បង្ហាញ check skipped ដូចបៃតង (ការការពារ runner self-hosted លើ repo Public ដោយចេតនា · `docs/SELF-HOSTED-RUNNERS.md` «Audit PR skipped») | អាន `if:` ទាំង ៣ workflow (`security-guard-test` ទាមទារលក្ខខណ្ឌ private សម្រាប់ self-hosted) | មិនកែ (ការកំណត់ repo របស់ម្ចាស់គម្រោង) ➜ ពេល repo នៅ Public ត្រូវ `ZOE_RUNNER_MODE=github` ទើប CI រត់ពិត · ⛔ «skipped» ≠ «passed» |
+| A222 | **សមត្ថភាពពេលហាងច្រើន (គ្មានកូដ · បន្ថែមលើ A55–A58)** ៖ ឧបករណ៍ ZTO នីមួយៗអានបញ្ជីចុះហត្ថលេខាដោយខ្លួនឯង (`ZTO_SIGNED_SWEEP_ACTIVE_MS` ២០ វិ. ➜ ~១៨០/ម៉ោងពេលសកម្ម) និងពិនិត្យ `/detail` កញ្ចប់បើកនីមួយៗរៀងរាល់ម៉ោង (`ZTO_OPEN_RECHECK_MS` · ១០ កញ្ចប់/២០ វិ.) ➜ ឧបករណ៍ ៣ ក្នុងសាខាធ្វើការដដែល ៣ ដង (សញ្ញាហាងចែករំលែកតែ «ពេញលេញ») | កញ្ចប់បើក ៣០០ ➜ ~៣០០ + ~១៨០ ការហៅ Function/ម៉ោង/ឧបករណ៍ ➜ ឧបករណ៍ ៣ × ១០ ម៉ោង ≈ ១៤,០០០–១៨,០០០/ថ្ងៃ/សាខា · Netlify ប្តូរទៅតម្លៃ credit (compute GB-ម៉ោង + សំណើ) តាំងពី 2025 | ម្ចាស់គម្រោងសម្រេច (តំបន់ LOCK ZTO) ៖ ឧបករណ៍មួយក្នុងសាខាជាអ្នកអាន (leader) ឬពង្រីក cadence · ពិនិត្យ Usage Netlify មុនបន្ថែមសាខា |
+| A221 | **checker ញ័រពេល run-all ២ ត្រួតគ្នា** ៖ `panel-motion` (ជាន់អប្បបរមា «តំបន់ប្រៀបមានមាតិកាពិត» ៧៦៨px) · `ledger-clamp-symmetry` ផ្នែក ៦ «Resulting promise was garbage collected» (V8 inspector ៖ promise របស់ `removeSingleBarcode` មិនមានអ្នកយោង) | រត់ម្នាក់ឯង ៖ `panel-motion` ១១១/១១១ · `ledger-clamp-symmetry` ៦/៦ + ១២ ដងកាន់ promise + ១០ ដង GC បង្ខំ + CPU ៦ ស្នូលពេញ ➜ គ្មានការព្យួរ · `removeSingleBarcode` ចប់ក្នុង ~១.៦ វិ. ជានិច្ច | មិនកែកូដ (មិនទាន់បង្កើតឡើងវិញក្រៅពីបន្ទុក run-all ២ ស្របគ្នា) ➜ ⛔ កុំរត់ run-all ពីរព្រមគ្នាលើម៉ាស៊ីនតែមួយ · ធ្លាក់ម្តងទៀតក្នុង CI ➜ ស៊ើបតាម A221 (អ្វីដែល `removeSingleBarcode` រង់ចាំពេលធ្លាក់) |
+| A220 | **ឯកសារ ៖ `ZoeW/docs/ZTO-PALM.md` សរសេរថា «ZoeW មិនផ្ញើ sign scan ទៅ ZTO ទេ (endpoint សរសេររបស់ Palm មិនដែលហៅ)»** ខណៈផ្នែក «Sign ទៅ ZTO» ក្នុងឯកសារដដែល និង `CLAUDE.md` ពិពណ៌នាផ្លូវ Sign ពិត · `ZTO-PALM-API.md` ដាក់ endpoint Sign ក្រោម `_shared/zto-palm.js` (ពិតនៅ `_shared/zto-palm-sign.js`) · «📌» Handoff ៖ `main` 2.50.117 (ពិត ៖ `cb082e4` 2.50.125) | `CLAUDE.md` ៖ ឈ្មោះ function/constant ១,២៣១ និងផ្លូវឯកសារទាំងអស់មានក្នុងកូដពិត (លើកលែងឈ្មោះខាងក្រៅ ៦ ៖ `TIMED_OUT` · `__vitePreload` · Cookie ZTO · env ដែលដកចេញដោយចេតនា) · បន្ទាត់វែងស្ទួនរវាង `HISTORY.md` ↔ `HISTORY-ARCHIVE.md` = ០ | កែអត្ថបទ ២ ឯកសារ · «📌» សរសេរឡើងវិញ (Handoff · លុបធាតុ ✅ · ការសម្រេច ៦៤ ក្នុង `CLAUDE.md` រួច) |
+| A219 | **លុយពហុឧបករណ៍ ៖ គ្មានអ្នកយាមហាងច្រើនលើ Supabase · Firebase វាស់តែឧបករណ៍ ២ · ទ្វារ «ZTO ត្រឡប់ ➜ ធុងសំរាម» (ដកលុយ · ថ្មី) មិនដែលប្រជែងពីឧបករណ៍ច្រើន** | `supabase-money-multishop-test` ថ្មី (គម្រោងមួយ · ហាង ២ × ឧបករណ៍ ៣ · App ពិត · adapter · Postgres ពិត) ៖ ៦ ជុំ ➜ ជាប់ · seed ១–៤ × ១០ ជុំ ➜ ជាប់ · mutation ledger −1.5 ➜ FAIL «ledger ថ្ងៃ ≠ …» · ធាតុហាង ០ ក្នុងហាង ១ ➜ FAIL «ទិន្នន័យហាងផ្សេងលេចចូល» · `emu/money-multidevice-emu-test` ឧបករណ៍ ៣ + «ZTO ត្រឡប់» ប្រជែង ៖ PASS ៨/៨ (offline+reload ៣០ · offline+online ១៦ · ប្រជែង ZTO ត្រឡប់ ៦) · seed ២០–២៤ × ១៤ ជុំ ➜ PASS (reload ៣៧ · offline+online ៥៣ · ការសម្អាតប្រជែង ១៤ · ZTO ត្រឡប់ប្រជែង ១៦) | គ្មានការបូក/ដកស្ទួន ឬទិន្នន័យហាងលេចក្នុងការវាស់ · អ្នកយាមចូល run-all (`money-multidevice-core.js` រួម) |
+| A218 | **Sign ៖ ចុច «✍️ Sign» ពេលការផ្ញើមុននៅរង់ចាំ ZTO (បិទផ្ទាំងហើយ) ➜ គ្មានអ្វីកើតឡើង** រហូតដល់ ៤៥ វិ. (`openZtoPalmSign()` ត្រឡប់ស្ងាត់លើ `busy`) | `zto-palm-sign.test.tsx` ថ្មី ៖ មុនកែ toast `''` ➜ ក្រោយកែ «⏳ ការ Sign មុនកំពុងរង់ចាំចម្លើយ ZTO …» · ចម្លើយមកក្រោយបិទផ្ទាំងមិនបិទកញ្ចប់ · ក្រោយនោះបើកបាន | toast ប្រាប់ឲ្យរង់ចាំ |
+| A217 | **ដំណឹងអ្នកលក់ (📢) ផ្ញើទៅ subscription ទាំងអស់ក្នុង run តែមួយ** ➜ ledger `state/notices` ចាក់សោមុន ➜ run អស់ពិដាន ២០ វិ. ➜ ទូរស័ព្ទដែលនៅសល់មិនដែលទទួល | `push-server.test.ts` ថ្មី (Blobs ៤០ ms · Push ២០០ ms · ទូរស័ព្ទ ៣,០០០ · cron ៨ ដង) ៖ មុនកែ **២,៣៣២ មិនទទួល** ➜ ក្រោយកែ ០ មិនទទួល · ០ ស្ទួន · run ≤ ៣០ វិ. | ផ្ញើជាចំណែក `PUSH_NOTICE_CHUNK` (៣២) តាមលំដាប់កូនសោ · ចំណែកនីមួយៗ claim ក្នុង `carry` (id + កូនសោចុងក្រោយ) មុនផ្ញើ ➜ cron បន្ទាប់បន្ត · `"reason":"partial"` |
+| A216 | **ការរំលឹកម៉ោង ៨ ព្រឹកដើរ schedule ម្តងមួយតាមលំដាប់ដដែលរាល់ cron** (អាន schedule + ledger ២ ដងសម្រាប់ហាងដែលផ្ញើរួច) ➜ ពិដាន ២០ វិ. អស់មុនដល់ចុងបញ្ជី ➜ ហាងចុងជួរមិនដែលទទួល · ការ claim ក្បែរពិដាន ➜ ledger ចាក់សោ តែការផ្ញើត្រូវកាត់ | `push-server.test.ts` ថ្មី (ហាង ៤០០ · cron ១២ ដងក្នុងម៉ោង ៨) ៖ មុនកែ **២១២ ហាងមិនទទួល · ៥ claim តែមិនផ្ញើ** ➜ ក្រោយកែ ០ · ០ · run ≤ ៣០ វិ. | ហាង `PUSH_EXPIRY_CONCURRENCY` (៨) ស្របគ្នា · អាន ledger មុន schedule · claim តែពេលនៅសល់ `PUSH_CLAIM_RESERVE_MS` (៤ វិ.) |
+| A215 | **ZTO-E14 លើផ្លូវ Palm** ៖ គម្រោង Firebase ចងសាខាច្រើន · ការអាន `?palm=1&list=1&signed=1&exact=1` ប្រើ session សាខាឧបករណ៍ ➜ ZTO ឆ្លើយតែសាខានោះ ➜ «ពេញលេញ» ➜ ការសម្អាតថ្ងៃទី ៨ ដកលុយកញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង (Cookie កែរួចក្នុង A161 តែផ្លូវ Palm មកក្រោយ) | `zto-palm-multibranch-hold.test.tsx` ថ្មី (App ពិត + Function ពិត + Palm ក្លែងដែលឆ្លើយតែសាខាគណនី + ID token ពិត) ៖ មុនកែ ២ ធ្លាក់ (`abandon` កញ្ចប់ចុះហត្ថលេខានៅ 770022 · `ztoSignedCompleteAt` > 0) · ទិសផ្ទុយ ២ ជាប់ ➜ ក្រោយកែ ៤/៤ · `vitest tests/zto-* tests/push-*` ជាប់ | Function អានសាខាដែលចងផ្សេងទៀតតាម session សាខារៀងខ្លួន (`siblingBranches` ពី `FIREBASE_PROJECT_IDS` · `branchSession` ពី Blobs · តែលេខ barcode) · សាខាគ្មាន session/អានមិនបាន ➜ 503 `palm:branch-unread` · ព្រំដែន ៖ សាខាដែលមិនដែល Login Palm ការពារបានតែ `ZTO_ABANDON_HOLD_MAX_MS` (ដូច A161) |
+
+អានហើយមិនឃើញចន្លោះថ្មី ៖ `_shared/zto-palm-sign.js` (ភស្តុតាងចែកចាយចង token · `barScannerId` ថេរ · `runs`) · `removeReturnedZtoBarcodes()` ➜ `claimAndCleanupItem('abandon', { codes, returnedAt })`
+(ពិនិត្យលើ barcode server ក្នុង transaction · `restoredAt` ពី `executeRestoreItem()`) · ពិដាន subscription Push (`PUSH_SUBS_PER_KEY_MAX` · `PUSH_SUBS_TOTAL_MAX`) · `setInterval` ៧ (ត្រូវនឹង `CLAUDE.md`)។
+
 ### 2026-10-17 — CI PR #330 ៖ លិបិក្រមប្រវត្តិមិនទាន់តាមកំណត់ត្រាថ្មី
 
 - Audit #880 លើ `a32ec7f6` ៖ ផ្នែក ១ · ២ · ៤ ជាប់ · ផ្នែក ៣ ធ្លាក់តែ `doc-scope-test` ព្រោះលិបិក្រមខុស ៣ ជួរ ៖ `version-check` · `ZoeW/tests/zto-palm-login.test.tsx` · `ZoeW/tests/zto-palm-shared-app.test.tsx`។
@@ -6433,6 +6470,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `modal-keyboard-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `money-core` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៦ · ផ្នែក ៧ |
+| `money-multidevice-core` | ផ្នែក ២ | — |
 | `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `money-reality-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៧ |
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -6506,6 +6544,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `supabase-docs-cache-test` | ផ្នែក ២ | ផ្នែក ៧ |
 | `supabase-fake-server` | — | ផ្នែក ៧ |
 | `supabase-functions-test` | ផ្នែក ២ | ផ្នែក ៧ |
+| `supabase-money-multishop-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `supabase-pg` | — | ផ្នែក ៧ |
 | `supabase-rls-test` | ផ្នែក ១ | ផ្នែក ៧ |
 | `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -6711,12 +6750,14 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-list-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-multibranch-hold.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-race.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-refresh.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-sign.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

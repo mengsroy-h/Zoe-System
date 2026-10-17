@@ -704,8 +704,23 @@ function palmFailure(error) {
     return json(502, { code: reason === 'upstream:unavailable' ? 'ZTO_UNAVAILABLE' : 'ZTO_INVALID_RESPONSE', ...diagnostic });
 }
 
-async function palmGetShared(query, resolved, proxyKey, keys, deps, env) {
+function branchDeps(proxyKey, keys, deps, env) {
+    return Object.assign({}, deps, {
+        branchSession: async (site) => {
+            const slot = slotOf(deps, site);
+            const entry = slot ? await sharedEntry(slot, proxyKey, env, deps, true) : null;
+            return entry && entry.data && entry.data.kind === 'shared' ? sharedView(entry.data) : null;
+        },
+        renewBranch: (site, token) => {
+            const slot = slotOf(deps, site);
+            if (slot) renewShared(slot, token, proxyKey, keys, env, deps).catch(() => {});
+        }
+    });
+}
+
+async function palmGetShared(query, resolved, proxyKey, keys, rawDeps, env) {
     const session = resolved.session;
+    const deps = branchDeps(proxyKey, keys, rawDeps, env);
     let response;
     try { response = await palmGet(query, session, keys, deps); } catch (error) { response = palmFailure(error); }
     if (session.source !== 'shared') return response;
@@ -1142,8 +1157,40 @@ async function palmList(query, session, keys, deps) {
         }
         return json(400, { error: 'Invalid list request', code: 'ZTO_LIST_PAGE_INVALID' });
     }
-    const outcome = await palmSignedPage(query.exact === '1' ? range : deps.listSignedRange(range), page, session, keys, deps);
-    return outcome.kind === 'ok' ? json(200, outcome.body) : listFailure(outcome);
+    const signedRange = query.exact === '1' ? range : deps.listSignedRange(range);
+    const outcome = await palmSignedPage(signedRange, page, session, keys, deps);
+    if (outcome.kind !== 'ok') return listFailure(outcome);
+    const siblings = query.exact === '1' && typeof deps.siblingBranches === 'function' ? deps.siblingBranches(session.site) : [];
+    if (!siblings.length) return json(200, outcome.body);
+    const extras = await Promise.all(siblings.map((site) => siblingSignedPage(site, signedRange, page, keys, deps)));
+    if (extras.some((extra) => !extra)) return json(503, { code: 'ZTO_UNAVAILABLE', provider: 'zto-palm', reason: 'palm:branch-unread' });
+    return json(200, mergeSiblingSigned(outcome.body, extras));
+}
+
+async function siblingSignedPage(site, range, page, keys, deps) {
+    let sibling = null;
+    try { sibling = typeof deps.branchSession === 'function' ? await deps.branchSession(site) : null; } catch (_) { sibling = null; }
+    if (!sibling) return null;
+    let outcome;
+    try { outcome = await palmSignedPage(range, page, sibling, keys, deps); } catch (_) { return null; }
+    if (outcome.kind === 'auth' && typeof deps.renewBranch === 'function') deps.renewBranch(site, sibling.token);
+    return outcome.kind === 'ok' ? outcome.body : null;
+}
+
+function mergeSiblingSigned(body, extras) {
+    const out = Object.assign({}, body);
+    const signed = out.signed.slice();
+    const seen = new Set(signed);
+    extras.forEach((extra) => {
+        extra.signed.forEach((code) => { if (!seen.has(code)) { seen.add(code); signed.push(code); } });
+        out.signedScans += extra.signedScans;
+        out.otherScans += extra.otherScans;
+        out.total += extra.total;
+        if (extra.pages > out.pages) out.pages = extra.pages;
+        if (extra.pagesUnknown === true) out.pagesUnknown = true;
+    });
+    out.signed = signed;
+    return out;
 }
 
 function isPalmPreflight(query, requestedHeaders) {

@@ -71,7 +71,9 @@ export const world = {
     deadTokens: new Set<string>(),
     issued: [] as string[],
     loginSeq: new Map<string, number>(),
-    blobs: null as null | Map<string, { value: string; etag: string }>
+    blobs: null as null | Map<string, { value: string; etag: string }>,
+    loginSites: new Map<string, string>(),
+    tokenSites: new Map<string, string>()
 };
 
 const BLOB_CONTEXT = Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 't' })).toString('base64');
@@ -125,11 +127,11 @@ export function identityToken(backend: Backend, site = SITE, status = 'active') 
     return token;
 }
 
-function dispatchList(body: any) {
+function dispatchList(body: any, site: string) {
     const tab = String(body.billStatus);
     let codes = Object.keys(world.parcels).filter((code) => world.parcels[code].tab === tab);
     if (tab === '5') {
-        codes = codes.filter((code) => world.parcels[code].scans.some((s) => s.action === '5'
+        codes = codes.filter((code) => world.parcels[code].scans.some((s) => s.action === '5' && s.siteCode === site
             && s.time >= body.signSiteDateFrom && s.time <= body.signSiteDateTo));
     }
     const size = Number(body.pageSize) || 20;
@@ -161,15 +163,17 @@ async function palmUpstream(href: string, init: any) {
         const seen = (world.loginSeq.get(String(body.userName)) || 0) + 1;
         world.loginSeq.set(String(body.userName), seen);
         const token = 'synthetic-palm-token-' + body.userName + (seen > 1 ? '-r' + seen : '');
+        const site = world.loginSites.get(String(body.userName)) || SITE;
         world.issued.push(token);
-        return respond({ status: true, result: { token, countryCode: 'KH', siteCode: SITE, siteName: 'Test branch' } });
+        world.tokenSites.set(token, site);
+        return respond({ status: true, result: { token, countryCode: 'KH', siteCode: site, siteName: site === SITE ? 'Test branch' : 'Test branch ' + site } });
     }
     if (world.deadTokens.has(palmTokenOf(init))) return respond({ status: false, statusCode: 'token_expired' });
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + (body.dispEmpDateFrom ? 'd' : '') + ':' + body.pageNum;
         world.zto.push(key);
         if (world.gate) await world.gate('list', key, palmTokenOf(init));
-        return dispatchList(body);
+        return dispatchList(body, world.tokenSites.get(palmTokenOf(init)) || SITE);
     }
     if (path === '/zto/locus/v1/queryTrackInfo') {
         const code = String(body.mailNos);
@@ -291,6 +295,8 @@ export async function setupWorld(backend: Backend, mode: IdentityMode, opts: { s
     world.logins.length = 0;
     world.issued.length = 0;
     world.loginSeq.clear();
+    world.loginSites.clear();
+    world.tokenSites.clear();
     world.loginAnswer = null;
     world.deadTokens.clear();
     serverEnv(mode);

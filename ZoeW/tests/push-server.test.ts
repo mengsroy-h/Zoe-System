@@ -106,7 +106,7 @@ interface Harness {
     clock: { now: number };
     db: Record<string, any>;
     notices: Record<string, any> | null;
-    push: (url: string, init: any) => { status: number; body?: any };
+    push: (url: string, init: any) => { status: number; body?: any } | Promise<{ status: number; body?: any }>;
 }
 
 function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown?: boolean; sbDown?: boolean } = {}): Harness {
@@ -135,7 +135,7 @@ function harness(opts: { env?: any; notices?: Record<string, any> | null; dbDown
             const acct = SB_ACCOUNTS[auth];
             return acct === undefined ? reply(401, { message: 'JWT invalid' }) : reply(200, acct === null ? [] : [acct]);
         }
-        const r = h.push(url, init);
+        const r = await h.push(url, init);
         return reply(r.status, r.body);
     };
     h.service = createPushService({
@@ -540,6 +540,95 @@ describe('⛔ cron ៖ ពិដាន ៣០ វិ. របស់ Netlify sched
         await h.service.dispatchExpiry();
         expect(sent).toBe(1);
     });
+});
+
+describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង ៨ ព្រឹកដល់គ្រប់ហាង (ចុងជួរមិនអត់)', () => {
+    const at8 = Date.UTC(2026, 8, 29, PUSH_EXPIRY_HOUR - 7, 0, 30);
+    // ⛔ នាឡិកាពិតពង្រីក ៤០ ដង ៖ ការអាន/សរសេរ Blobs = ៤០ ms · ការផ្ញើ Push = ២០០ ms (ពេលវេលា Function) ➜ ការធ្វើស្របគ្នាក្នុង run មួយត្រួតគ្នាពិត
+    const SCALE = 40;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    function scaledHarness(shops: number) {
+        const h = harness();
+        let base = at8 - 3600e3;
+        let t0 = performance.now();
+        Object.defineProperty(h.clock, 'now', {
+            configurable: true,
+            get: () => base + Math.floor((performance.now() - t0) * SCALE),
+            set: (v: number) => { base = v; t0 = performance.now(); }
+        });
+        const store = h.store as any;
+        for (const name of ['getWithMetadata', 'setJSON', 'delete', 'list']) {
+            const real = store[name].bind(store);
+            store[name] = async (...args: any[]) => { await sleep(1); return real(...args); };
+        }
+        const sent = new Map<string, number>();
+        h.push = (url: string) => { sent.set(url, (sent.get(url) || 0) + 1); return { status: 201 }; };
+        const realSend = h.push;
+        const endpoints: string[] = [];
+        return {
+            h, sent, endpoints,
+            async seed() {
+                for (let s = 0; s < shops; s++) {
+                    const keyId = 'SHOP' + String(s).padStart(16, '0');
+                    const ua = uaKeys();
+                    const endpoint = 'https://fcm.googleapis.com/fcm/send/shop' + s;
+                    const subKey = 'sub/' + crypto.createHash('sha256').update('web|' + endpoint).digest('hex').slice(0, 40);
+                    const at = h.clock.now;
+                    h.store.data.set(subKey, { value: JSON.stringify({ kind: 'web', endpoint, p256dh: ua.p256dh, auth: ua.auth, keyId, platform: 'web', createdAt: at, seenAt: at }), etag: '"s' + s + '"' });
+                    h.store.data.set('bykey/' + keyId, { value: JSON.stringify({ subs: [subKey] }), etag: '"k' + s + '"' });
+                    h.store.data.set('sched/' + keyId, { value: JSON.stringify({ times: [at8 + 3600e3], at }), etag: '"t' + s + '"' });
+                    endpoints.push(endpoint);
+                }
+            },
+            async cronHour() {
+                h.push = async (url: string, init: any) => { await sleep(5); return realSend(url, init); };
+                const runs: any[] = [];
+                for (let k = 0; k < 12; k++) {
+                    h.clock.now = at8 + k * 5 * 60e3;
+                    const started = h.clock.now;
+                    const out = await runPushCron(h.service, () => h.clock.now);
+                    runs.push({ out, ms: h.clock.now - started });
+                }
+                return runs;
+            }
+        };
+    }
+
+    it('⛔ ដំណឹងអ្នកលក់ទៅឧបករណ៍ ៣០០០ ៖ run ដែលអស់ពិដានបន្តនៅ cron បន្ទាប់ ➜ គ្រប់ឧបករណ៍ទទួល ១ ដងគត់ · run នីមួយៗក្នុង ៣០ វិ.', async () => {
+        const t = scaledHarness(3000);
+        t.h.notices = {};
+        await t.seed();
+        t.h.clock.now = at8;
+        expect(await t.h.service.dispatchNotices()).toMatchObject({ reason: 'baseline' });
+        t.h.notices = { [noticeId(at8 - 60e3)]: { kind: 'maintenance', title: 'ថែទាំយប់នេះ', at: at8 - 60e3 } };
+        t.h.push = async (url: string) => { await sleep(5); t.sent.set(url, (t.sent.get(url) || 0) + 1); return { status: 201 }; };
+        const runs: any[] = [];
+        for (let k = 0; k < 8; k++) {
+            t.h.clock.now = at8 + 3 * 3600e3 + k * 5 * 60e3;
+            const started = t.h.clock.now;
+            runs.push({ out: await t.h.service.dispatchNotices(started), ms: t.h.clock.now - started });
+        }
+        const missing = t.endpoints.filter((url) => !t.sent.has(url)).length;
+        const twice = t.endpoints.filter((url) => (t.sent.get(url) || 0) > 1).length;
+        expect({ missing, twice }).toEqual({ missing: 0, twice: 0 });
+        expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(30000);
+        expect(await t.h.service.dispatchNotices(t.h.clock.now)).toMatchObject({ reason: 'none' });
+    }, 90000);
+
+    it('⛔ ៤០០ ហាង · cron ១២ ដងក្នុងម៉ោង ៨ ➜ គ្រប់ហាងទទួលការរំលឹក ១ ដងគត់ · គ្មាន ledger ចាក់សោដោយមិនបានផ្ញើ · run នីមួយៗក្នុង ៣០ វិ.', async () => {
+        const t = scaledHarness(400);
+        await t.seed();
+        const runs = await t.cronHour();
+        const missing = t.endpoints.filter((url) => !t.sent.has(url));
+        const twice = t.endpoints.filter((url) => (t.sent.get(url) || 0) > 1);
+        const claimedNotSent = [...t.h.store.data.keys()].filter((k) => k.startsWith('state/expiry/SHOP'))
+            .filter((k) => !t.sent.has('https://fcm.googleapis.com/fcm/send/shop' + Number(k.slice('state/expiry/SHOP'.length))));
+        expect({ missing: missing.length, twice: twice.length, claimedNotSent: claimedNotSent.length })
+            .toEqual({ missing: 0, twice: 0, claimedNotSent: 0 });
+        expect(runs.every((run) => run.out.expiry && run.out.expiry.ok)).toBe(true);
+        expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(30000);
+    }, 60000);
 });
 
 describe('⛔ អត្តសញ្ញាណ ៖ គណនីហាង Supabase (គ្មាន Activation Key)', () => {

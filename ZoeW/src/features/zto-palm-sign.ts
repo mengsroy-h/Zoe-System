@@ -25,7 +25,11 @@ export function refreshPalmSignMode() {
 }
 
 export function openZtoPalmSign(itemId: string, barcode?: string) {
-    if (palmSignState.busy || palmSignState.confirmation || !palmSignMode()) return;
+    if (!palmSignMode()) return;
+    if (palmSignState.busy || palmSignState.checking || palmSignState.confirmation) {
+        showToast('⏳ ការ Sign មុនកំពុងរង់ចាំចម្លើយ ZTO — សូមរង់ចាំបន្តិច រួចចុចម្តងទៀត។');
+        return;
+    }
     const cfg = getLookupApiConfig();
     if ((!cfg?.palmTokenEnc && !cfg?.palmShared) || !securityState.lookupSecretKey) {
         showToast('⚠️ សូមបើក API ស្វែងរកអតិថិជនដោយ PIN ហើយ Login ZTO Palm ជាមុនសិន។');

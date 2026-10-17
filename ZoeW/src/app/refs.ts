@@ -23,6 +23,7 @@ export const REF_NAMES = [
     'entryTableResponsive',
     'exchangeRateInput',
     'fileInput',
+    'palmSignPhotoInput',
     'firebaseConfigInput',
     'globalMoreMenu',
     'hwScannerInput',

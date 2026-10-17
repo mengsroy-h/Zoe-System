@@ -18,6 +18,7 @@ import { LoginModal } from './modals/LoginModal';
 import { ManualAdjustModal } from './modals/ManualAdjustModal';
 import { PhoneModal } from './modals/PhoneModal';
 import { ScanRemoveModal } from './modals/ScanRemoveModal';
+import { ZtoPalmSignModal } from './modals/ZtoPalmSignModal';
 import { ZtoSyncModal } from './modals/ZtoSyncModal';
 import { ZtoListSyncModal } from './modals/ZtoListSyncModal';
 import { EditPhoneModal } from './modals/EditPhoneModal';
@@ -69,6 +70,7 @@ export function AppShell() {
             <PhoneModal />
             <ScanRemoveModal />
             <ZtoSyncModal />
+            <ZtoPalmSignModal />
             <ZtoListSyncModal />
             <EditPhoneModal />
             <CallMarkModal />

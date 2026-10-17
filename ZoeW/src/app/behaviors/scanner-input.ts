@@ -1,3 +1,4 @@
+import { acceptPalmSignBarcode } from '../../features/zto-palm-sign';
 import { scanState, securityState, uiState } from '../../core/state';
 import { latinDigits } from '../../core/text';
 import { isMobileDevice } from '../../core/timezone';
@@ -79,6 +80,7 @@ function scannerHoldScope(): boolean {
     if (!uiState.isModalOpen || securityState.appIsLocked || (softKeyboardShown() && !isAndroidDevice())) return false;
     const stack = Array.isArray(uiState.modalStack) ? uiState.modalStack : [];
     if (stack[stack.length - 1] === 'batchScanModal') return false;
+    if (stack[stack.length - 1] === 'ztoPalmSignModal') return true;
     const active = document.activeElement;
     if (active && MODAL_HOLD_FIELDS.some((name) => elementOf(name) === active)) return true;
     return !activeElementTakesText() && !(active instanceof HTMLSelectElement);
@@ -120,7 +122,7 @@ function holdScannerKey(e: KeyboardEvent, at: number): void {
         e.preventDefault();
         e.stopPropagation();
         if (held.broken === false) {
-            queueScannedCode(held.scan);
+            if (!acceptPalmSignBarcode(held.scan)) queueScannedCode(held.scan);
             return;
         }
         if (held.broken) setFieldValue(held.broken, '');

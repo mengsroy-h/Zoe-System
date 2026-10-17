@@ -135,6 +135,7 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         'User-Agent': 'PDA', 'x-language': 'km_KH',
         'x-sign': crypto.createHash('md5').update(body + keys.sign, 'utf8').digest('base64')
     };
+    if (path === '/zto/basic/v1/saveBillPic' || path === '/zto/basic/v1/uploadKhSignScan') delete headers['x-language'];
     if (token) headers['x-token'] = token;
     const controller = new AbortController();
     const startedAt = Date.now();
@@ -305,6 +306,11 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
             if (!username || username.length > 128 || !password || password.length > 256 || /[\u0000-\u001f]/.test(username)
                 || !/^[A-Za-z0-9-]{8,80}$/.test(deviceSn)) return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
             return await palmLogin({ username, cipher: passwordCipher(password, keys), deviceSn }, proxyKey, keys, deps, env);
+        }
+        if (event.httpMethod === 'POST' && query.palm === 'sign') {
+            const session = openSession(deps.headerOf(event, SESSION_HEADER), proxyKey, env);
+            return await require('./zto-palm-sign').signPalm(event, session, deps,
+                (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs()));
         }
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
         const session = openSession(deps.headerOf(event, SESSION_HEADER), proxyKey, env);
@@ -726,7 +732,7 @@ async function palmList(query, session, keys, deps) {
 }
 
 function isPalmPreflight(query, requestedHeaders) {
-    if (query && (query.palm === '1' || query.palm === 'login' || query.palm === 'refresh')) return true;
+    if (query && (query.palm === '1' || query.palm === 'login' || query.palm === 'refresh' || query.palm === 'sign')) return true;
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 

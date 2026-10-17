@@ -1,3 +1,4 @@
+import { openZtoPalmSign, palmSignMode } from './zto-palm-sign';
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
@@ -189,6 +190,7 @@ export async function toggleCloseStatus(id?) {
     const closeIsCurrent = () => closeAuthGeneration === firebaseState.authGeneration && closeDatabase === firebaseState.db;
     const item = dataState.scanHistory.find(i => i.id === id);
     if (!item) return;
+    if (!item.isClosed && palmSignMode()) return openZtoPalmSign(id);
     const actionText = item.isClosed ? "បើក" : "បិទ";
     const desiredClosed = !item.isClosed;
     if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}បញ្ជីនេះមែនទេ?`)) return;

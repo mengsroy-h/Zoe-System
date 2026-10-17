@@ -1,3 +1,4 @@
+import { cancelZtoPalmSign } from '../features/zto-palm-sign';
 import { videoElement } from '../app/refs';
 import { modalIsOpen, openModalIds, setModalDisplay } from '../core/modals';
 import { scanState, uiState } from '../core/state';
@@ -35,6 +36,7 @@ export function onScanVideoPause() {
 }
 
 export function closeModal(modalId?) {
+    if (modalId === 'ztoPalmSignModal') cancelZtoPalmSign();
     if (modalId === 'lookupApiConfigModal') cancelZtoPalmLogin();
     setModalDisplay(modalId, 'none');
     if (modalId === 'phoneModal') clearLookupStatus();

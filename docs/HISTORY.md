@@ -100,6 +100,18 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.118] — 2026-10-17 · ZoeW ៖ Sign ទៅ ZTO Palm ពីប្រវត្តិ និង Barcode
+
+**ZoeW `2.50.118`** (`zoew-v380` ➜ `zoew-v381`) · កែពី `main` `44eb0932` តាមសំណើម្ចាស់គម្រោង។
+សំណើ៖ Palm Login ប្រើ Sign ពិតតាម APK (រូបភាព · ស្កេនកញ្ចប់ · ឈ្មោះអតិថិជន · ចុះឈ្មោះ) ហើយ Cookie ពី Blob ត្រឡប់ជា «បិទ»។
+
+- ប្រវត្តិ និង Barcode ប្តូរប៊ូតុងតាម API ដែលកំពុងប្រើ។ Sign បើកផ្ទាំងជ្រើសកញ្ចប់ រូបភាពកាមេរ៉ា និងឈ្មោះអ្នកទទួល។ Scanner Enter/Tab ក្នុងផ្ទាំងជ្រើសកញ្ចប់ Sign ផ្ទាល់។
+- អាន APK៖ `DispatchTabFragment` នាំគណនី KH ទៅ `SignScanKHActivity` · `SignScanKHPresenter` ពិនិត្យ `khSignScanCheck` · `KHSignScanDataUploadInterceptor` ទាមទារ `paymentStatus: 2` · `ImageUploadInterceptor` ផ្ញើ Base64 ទៅ `saveBillPic` ជា `picType: 1` · `uploadKhSignScan` ប្រើ `scanTypeCode: "05"`។ `UploadResultRPTO` ជាបញ្ជីកញ្ចប់បរាជ័យតាម `barScannerId` (បញ្ជីទទេ/null = គ្មានបរាជ័យ)។ សោ protocol នៅ env ដដែល។
+- ZTO បញ្ជាក់ជោគជ័យទើបហៅ `applyBarcodeCloseChange` លើ Barcode នោះ។ បដិសេធ/ចម្លើយខុស/បាត់ចម្លើយ មិនបិទ។ ចុចស្ទួនមាន single-flight និង requestId · ចម្លើយមិនច្បាស់មាន «ពិនិត្យ ZTO» · ការបិទ ZoeW មិនទាន់បាន សាកការបិទឡើងវិញដោយមិន Sign ម្តងទៀត។
+- វគ្គ/ហាង/database/API ប្តូរខណៈផ្ញើ មិនបិទកញ្ចប់ ឬផ្ញើកញ្ចប់បន្ទាប់។ សម្អាតផ្ទាំងនេះជាមួយផ្ទាំងសម្ងាត់ពេលចាកចេញ។ បន្ថែមអ្នកយាម Server/UI/scanner និងធ្វើបច្ចុប្បន្នភាពសោ ZTO សម្រាប់ទ្វារ POST Sign ដែលស្នើផ្ទាល់។
+
+**សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖ Deploy ZoeW និង Netlify Function ជាមួយគ្នា។ គ្មាន env ឬ database rules ថ្មី។ Login Palm រួចសាក Sign កញ្ចប់ពិតដែលបង់ប្រាក់រួច និងផ្ទៀងរូប/ឈ្មោះក្នុង ZTO Palm។ បន្ទាប់មកប្តូរទៅ Cookie ពី Blob ហើយផ្ទៀងប៊ូតុង «បិទ»។ មិនទាន់សាក Sign លើ ZTO ផលិតកម្មពីបរិស្ថាននេះទេ។
+
 ### [2.50.117] — 2026-10-17 · ZoeW ៖ ធុងសំរាម `returned` «ត្រឡប់» (ជំនួស «ផុតកំណត់») · ជូនដំណឹង «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» · លំដាប់ច្បាប់ ៧ ថ្ងៃ
 
 **ZoeW `2.50.117`** (`zoew-v379` ➜ `zoew-v380`) · ZoeKeyGen ដដែល · Function push ប្រែ (អត្ថបទការរំលឹកម៉ោង ៨) · **Firebase rules ថ្មី** (`trashReason` ៖ `returned` ជំនួស `expired`) ·

@@ -272,6 +272,15 @@ async function runZtoPalmRefresh() {
     }
 }
 
+export function notePalmSiteName(site, siteName) {
+    const name = typeof siteName === 'string' ? siteName.trim().slice(0, 120) : '';
+    const code = typeof site === 'string' ? site.trim() : '';
+    const cfg = getLookupApiConfig();
+    if (!name || !code || !lookupApiIsPalm(cfg) || !cfg.palmAccount || cfg.palmAccount.siteCode !== code || cfg.palmAccount.siteName) return false;
+    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
+    return storedLookupConfigWith(stored, { palmAccount: { siteCode: code, siteName: name } }, []);
+}
+
 export function resetZtoPalmRefresh() {
     palmRefreshFailedAt = 0;
     palmRefreshRejectedAt = 0;

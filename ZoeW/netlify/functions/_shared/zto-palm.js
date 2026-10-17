@@ -543,10 +543,17 @@ function trackEvidence(upstream, barcode, site) {
     if (!tracks.length) return malformed ? { kind: 'invalid', reason: malformed } : { kind: 'empty' };
     let arrival = '';
     let signed = '';
+    let siteName = '';
+    let siteNameAt = '';
     for (const entry of tracks) {
         if (!entry.here) continue;
         if (entry.action === '3' && entry.time > arrival) arrival = entry.time;
         if (entry.action === '5' && entry.time > signed) signed = entry.time;
+        const name = originText(entry.track.siteName).slice(0, 120);
+        if (name && entry.time >= siteNameAt) {
+            siteName = name;
+            siteNameAt = entry.time;
+        }
     }
     const flag = trackSignFlag(own);
     let ztoClosed = null;
@@ -555,7 +562,7 @@ function trackEvidence(upstream, barcode, site) {
     } else if (arrival && flag === 0) {
         ztoClosed = false;
     }
-    return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '' };
+    return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {
@@ -658,8 +665,10 @@ async function palmTracks(range, codes, session, keys, deps) {
         else { unverified.push(code); reasons.add(outcome.reason); }
     });
     if (authLost) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
+    const seen = codes.find((code) => found.has(code) && found.get(code).siteName);
     return json(200, {
-        success: true, list: true, enabled: true, kind: 'tracks', site: session.site, siteName: session.siteName || '',
+        success: true, list: true, enabled: true, kind: 'tracks', site: session.site,
+        siteName: session.siteName || (seen ? found.get(seen).siteName : ''),
         rows: [], evidence: codes.filter((code) => found.has(code)).map((code) => trackReport(found.get(code), code, range, signedRange.end)),
         unverified: codes.filter((code) => unverified.includes(code)), unverifiedReasons: Array.from(reasons).slice(0, PALM_REASONS_MAX),
         trackCalls: tally.calls, trackWaitMs: tally.waitMs, provider: 'zto-palm'

@@ -29,7 +29,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
 import { saveBarcodeOrigins } from './barcode-origin';
-import { noteZtoPalmSessionRejected, palmRefreshAvailable, refreshZtoPalmSession } from './zto-palm-login';
+import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, refreshZtoPalmSession } from './zto-palm-login';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
 
@@ -655,6 +655,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
         } catch (e) {
             if (!ztoPalmPageRetryable(e)) throw e;
         }
+        if (!out.siteName && body && typeof body.siteName === 'string' && body.siteName) out.siteName = body.siteName;
         const list = body && Array.isArray(body.evidence) ? body.evidence : [];
         for (let i = 0; i < list.length; i++) {
             const code = ztoPalmCode(list[i] && list[i].barcode);
@@ -938,6 +939,7 @@ export async function runZtoListSyncPreview() {
         await resolveZtoListSignedVerdicts(cfg, rows);
         if (!session.current()) return;
         if (pulled.siteName || pulled.site) viewState.ztoListSyncSite = ztoListSiteText(pulled.siteName, pulled.site);
+        if (pulled.palm === true) notePalmSiteName(pulled.site, pulled.siteName);
         ztoState.ztoListSyncResult = {
             rows: rows,
             signedRows: pulled.signedRows,

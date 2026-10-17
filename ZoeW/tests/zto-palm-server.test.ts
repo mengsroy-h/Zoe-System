@@ -678,6 +678,27 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(JSON.parse(response.body).evidence).toHaveLength(30);
     });
 
+    it('🏢 ឈ្មោះសាខា ៖ Login ឆ្លើយ siteName ទទេ ➜ tracks ឆ្លើយឈ្មោះពីស្កេនសាខាខ្លួន (ដូច scanSite របស់ Cookie) · មិនយកសាខាផ្សេង', async () => {
+        const { sessionToken: session } = await login({ ...ACCOUNT, siteName: '' });
+        const code = 'KH0000000007';
+        serve({ ['track:' + code]: () => upstream({ status: true, result: [{ mail: { mailNo: code, isSign: 0 }, tracks: [
+            { action: '2', mailNo: code, time: '2026-10-15 07:00:00', siteCode: 'HUB', siteName: 'មជ្ឈមណ្ឌលដឹកបន្ត' },
+            { action: '3', mailNo: code, time: '2026-10-16 09:00:00', siteCode: 'KH001', siteName: '  សាខាភ្នំពេញ ១ ' }
+        ] }] }) });
+        const body = JSON.parse((await call(tracksQuery([code]), session)).body);
+        expect(body.siteName).toBe('សាខាភ្នំពេញ ១');
+        const other = 'KH0000000008';
+        serve({ ['track:' + other]: () => upstream({ status: true, result: [{ mail: { mailNo: other, isSign: 0 }, tracks: [
+            { action: '2', mailNo: other, time: '2026-10-15 07:00:00', siteCode: 'HUB', siteName: 'មជ្ឈមណ្ឌលដឹកបន្ត' }
+        ] }] }) });
+        expect(JSON.parse((await call(tracksQuery([other]), session)).body).siteName).toBe('');
+        const named = await login();
+        serve({ ['track:' + code]: () => upstream({ status: true, result: [{ mail: { mailNo: code, isSign: 0 }, tracks: [
+            { action: '3', mailNo: code, time: '2026-10-16 09:00:00', siteCode: 'KH001', siteName: 'ឈ្មោះផ្សេង' }
+        ] }] }) });
+        expect(JSON.parse((await call(tracksQuery([code]), named.sessionToken)).body).siteName, 'ឈ្មោះពី Login នៅមុន').toBe('Test branch');
+    });
+
     it('Palm track ខ្វះឬបរាជ័យ ➜ មិនបាត់កញ្ចប់ស្ងាត់ ៖ Barcode ក្នុង unverified · ZTO 5xx សាកម្តងទៀតមួយដង', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({ 'track:KH0000000001': () => upstream({}, 502) });

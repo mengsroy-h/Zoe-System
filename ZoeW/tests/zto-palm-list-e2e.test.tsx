@@ -16,7 +16,7 @@ import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore } from '../src/features/zto-status';
 import { viewState } from '../src/core/view-state';
-import { encryptLookupSecret } from '../src/services/crypto';
+import { decryptLookupSecret, encryptLookupSecret } from '../src/services/crypto';
 
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {},
@@ -42,6 +42,7 @@ type Scan = { action: string; siteCode: string; time: string; mailNo?: string; m
 type Parcel = { tab: '1' | '4' | '5'; isSign: number | null; scans: Scan[] };
 
 let parcels: Record<string, Parcel> = {};
+const loginSiteName = '';
 let faults: Map<string, number> = new Map();
 let always: Set<string> = new Set();
 let authDead = '';
@@ -58,8 +59,9 @@ const zto: string[] = [];
 
 const at = (day: string, time = '09:00:00') => '2026-10-' + day + ' ' + time;
 const pickup = (origin: string): Scan => ({ action: '1', siteCode: 'ORIGIN', time: at('01', '08:00:00'), msgLoc: '【' + origin + '】បានស្កែនទទួល' });
-const transit = (day: string): Scan => ({ action: '2', siteCode: 'HUB', time: at(day, '07:00:00') });
-const arrive = (day: string, time?: string): Scan => ({ action: '3', siteCode: SITE, time: at(day, time) });
+const transit = (day: string): Scan => ({ action: '2', siteCode: 'HUB', siteName: 'មជ្ឈមណ្ឌលដឹកបន្ត', time: at(day, '07:00:00') });
+const BRANCH_NAME = 'សាខាភ្នំពេញ ១';
+const arrive = (day: string, time?: string): Scan => ({ action: '3', siteCode: SITE, siteName: BRANCH_NAME, time: at(day, time) });
 const sign = (day: string, time = '15:30:00'): Scan => ({ action: '5', siteCode: SITE, time: at(day, time) });
 
 function dataset(bulk = 0) {
@@ -123,7 +125,7 @@ async function palmUpstream(href: string, init: any) {
     const path = new URL(href).pathname;
     const body = JSON.parse(String(init.body));
     if (path === '/zto/system/v1/doLogin') {
-        return respond({ status: true, result: { token: 'synthetic-palm-token', countryCode: 'KH', siteCode: SITE, siteName: 'Test branch' } });
+        return respond({ status: true, result: { token: 'synthetic-palm-token', countryCode: 'KH', siteCode: SITE, siteName: loginSiteName } });
     }
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + ':' + body.pageNum;
@@ -209,7 +211,7 @@ beforeEach(async () => {
     securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, url: PALM_URL,
         headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), palmTokenEnc: await encryptLookupSecret(session),
-        palmAccount: { siteCode: SITE, siteName: 'Test branch' } }));
+        palmAccount: { siteCode: SITE, siteName: '' } }));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
     clearCustomerDataTableCache();
     clearZtoPickupStatusStore();
@@ -427,5 +429,18 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         await runZtoListSyncPreview();
         expect(trackBatches.length, 'កញ្ចប់ ' + Object.keys(parcels).length + ' ➜ ' + trackBatches.join(',')).toBe(8);
         expect(Math.max(...trackBatches) - Math.min(...trackBatches)).toBeLessThanOrEqual(1);
+    });
+
+    it('🏢 ឈ្មោះសាខាដូច Cookie ៖ ZTO Login ឆ្លើយ siteName ទទេ ➜ យកពីស្កេនមកដល់សាខាខ្លួន (មិនមែនសាខាដឹកបន្ត) · «ឈ្មោះ · លេខ»', async () => {
+        await runZtoListSyncPreview();
+        expect(viewState.ztoListSyncSite).toBe(BRANCH_NAME + ' · ' + SITE);
+        expect(ztoState.ztoListSyncResult.siteName).toBe(BRANCH_NAME);
+        const cfg = JSON.parse(String(appLocalStore.getItem('zoew_lookup_api_config')));
+        expect(cfg.palmAccount, 'ស្ថានភាព Login Palm ក៏បង្ហាញឈ្មោះសាខា').toEqual({ siteCode: SITE, siteName: BRANCH_NAME });
+        expect(await decryptLookupSecret(cfg.palmTokenEnc), 'session មិនប្រែ').toBeTruthy();
+        const named = JSON.stringify({ ...cfg, palmAccount: { siteCode: SITE, siteName: 'ឈ្មោះដែលមានស្រាប់' } });
+        appLocalStore.setItem('zoew_lookup_api_config', named);
+        await runZtoListSyncPreview();
+        expect(appLocalStore.getItem('zoew_lookup_api_config'), 'ឈ្មោះដែលមានស្រាប់មិនត្រូវសរសេរជាន់').toBe(named);
     });
 });

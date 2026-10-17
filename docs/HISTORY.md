@@ -47,8 +47,7 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.111 · ZoeKeyGen 2.24.19** (PR #328 · `b98c35d`)។
-- Branch **`claude/zto-audit`** (ពី `main` `2519a1f` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
+- `main` = **ZoeW 2.50.117 · ZoeKeyGen 2.24.19** (PR #329 · `44eb093`) · branch audit នេះ ➜ **2.50.118** (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
@@ -76,6 +75,9 @@
 - ✅ ម្ចាស់គម្រោង (PR #328) ៖ «បិទដោយស្វ័យប្រវត្តិតាមZTO និងប្រាប់បិទក្នុងZoeW តែZTO Palm មិនទាន់បិទដំណើរការល្អហើយ» ➜ [2.50.99] បិទ ·
   ស្កេន Palm ៖ លេខទូរស័ព្ទ · COD · DOD ត្រូវនឹង App ZTO Palm («ត្រូវ») ➜ [2.50.97] បិទ ·
   កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- ⏳ **[2.50.118]** 🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
+- 🗳️ **Login ZTO Palm «ដូច Cookie Blob»** (សំណើម្ចាស់គម្រោង [2.50.118]) ៖ ន័យដែល session នេះអាន = Login ម្តង ➜ session ទុកនៅ Server (Netlify Blobs) ➜ ទូរស័ព្ទគ្រប់គ្រឿងក្នុងហាងប្រើដោយមិន Login ·
+  ត្រូវការការសម្រេចមុនសរសេរកូដ (សោហាងមួយ = គណនី Palm មួយ? · ប៊ូតុងផ្តាច់ · ហានិភ័យសោហាងបាត់) ➜ ⛔ មិនទាន់ធ្វើ។
 - ⏳ **[2.50.117]** (Firebase rules `returned` Publish រួច) 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
 - ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» + លុយដក (Palm · Cookie)។
 - ⏳ **[2.50.114]** Palm ៖ បើក App ថ្ងៃក្រោយ ➜ ស្កេន/ទាញបានដោយមិន Login ZTO Palm ម្តងទៀត · ⏱ ពិតក្នុង A189 ·
@@ -99,6 +101,40 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.118] — 2026-10-17 · ZoeW ៖ ធុងសំរាម ចុចកាត «➖ ដក + ត្រឡប់» មើលតែប្រភេទនោះ · កញ្ចប់ត្រឡប់ដកតែពេលភស្តុតាងហត្ថលេខាគ្រប់ · Barcode ស្តាររួចមិនដកម្តងទៀត
+
+**ZoeW `2.50.118`** (`zoew-v380` ➜ `zoew-v381`) · ⛔ ZoeKeyGen មិនប្រែ · Function មិនប្រែ · rules មិនប្រែ · គ្មាន migration · គ្មាន env ថ្មី។
+ម្ចាស់គម្រោង ៖ «deep audit … ពង្រឺងល្បឿន ZTO ទាញបញ្ជី/Lookup/ស្កេនត្រឡប់ ដកចូលធុងសំរាមតាម … អានកូដរកកំហុស ឬ ចន្លោះ … កុំជឿជាក់លើ checker» ·
+«ក្នុងធុងសំរាមពេលចុច កន្លែង ដក+ត្រឡប់ អោយlistបង្ហាញតែកញ្ចប់ ដកនិងត្រឡប់» ➜ តំបន់ចាក់សោ ZTO (`zto-status.ts` · `zto-list-sync.ts` · `zto/model.ts`) កែតាមសំណើនេះ ·
+`LOCK` ថ្មី · មូលហេតុ ➜ ផ្នែក ២ A196–A200។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🗑️ **ធុងសំរាម** ៖ កាត «➖ ដក + ត្រឡប់» និង «✅ យករួច + លុប» ជាប៊ូតុង ➜ ចុច ➜ បញ្ជីតែប្រភេទនោះ (កាតមានគែមដិត · `aria-pressed`) · ចុចកាតដដែល ➜ ទាំងអស់ ·
+  ការស្វែងរកដំណើរការជាមួយ · កាតទាំង ២ នៅតួលេខពេញ · បន្ទាត់ «សរុប» រាប់តែប្រភេទដែលបង្ហាញ («បង្ហាញតែ ➖ ដក + ត្រឡប់») · បិទប្រអប់ ឬចាកចេញ ➜ តម្រងបាត់ ·
+  បង្ហាញតែប៉ុណ្ណោះ (🔄/✖️ នៅលើ id មួយ · គ្មានការសរសេរ)។
+- ↩️ **ពិនិត្យនៅខាងក្រោយ (Cookie)** ៖ ដកកញ្ចប់ត្រឡប់តែពេលអានបញ្ជី «ចុះហត្ថលេខា» បានពេញ ហើយមិនដកកញ្ចប់ណាដែលមានក្នុងបញ្ជីនោះ (មុននេះ ៖ ដករាល់ជុំ ហើយលើកលែងតែ ≤ ១០ ដែលបិទក្នុងជុំ)។
+- 📥 **ទាញបញ្ជី (Cookie)** ៖ បញ្ជីចុះហត្ថលេខាអានមិនគ្រប់ (`signedState` ≠ `ok`) ➜ មិនដកកញ្ចប់ត្រឡប់ · ជួរ «↩️» ប្រាប់ «📌 បើកក្នុង ZoeW · អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)»
+  (កុងតាក់បិទ ➜ សារកុងតាក់ដដែល)។
+- 🔄 **ស្តាររួចមិនដកម្តងទៀត** ៖ ការដកកញ្ចប់ត្រឡប់ផ្ញើម៉ោងត្រឡប់ក្នុងមួយ Barcode (`returnedAt`) ហើយ transaction ពិនិត្យជាមួយ Barcode លើ Server (`barcodeReturnCounts()` ៖ `createdAt` · `restoredAt`) ➜
+  ទូរស័ព្ទដែល view មិនទាន់ឃើញការស្តារ មិនដក Barcode នោះម្តងទៀត។
+- 💰 **ស្តារធាតុ «ត្រឡប់»** ៖ ពេលស្ថិតិចំណូលថ្ងៃលើទូរស័ព្ទនោះមិនទាន់ Sync ហើយធាតុមិនទាន់សម្គាល់ «ដករួច» ➜ «⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត»
+  (មិនស្តារដោយមិនបូកលុយវិញ) · Sync រួច ➜ ស្តារ ហើយបូកវិញធម្មតា។
+- 📄 ឯកសារ ៖ `CLAUDE.md` បញ្ជីតំបន់ចាក់សោ ZTO = គ្រប់ឯកសារក្នុង `LOCK` (`zto-palm-login.ts` · `_shared/zto-palm.js` ខ្វះ) · «📌» Handoff ៖ `main` 2.50.117 (មុន ៖ 2.50.111) · branch `claude/zto-audit`
+  merge រួចជា PR #326 (មុន ៖ «មិនទាន់ merge») · `trash-modal-test` ស្លាក «ដក + ត្រឡប់»។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/trash-reason-filter.test.tsx` (ថ្មី · ៦ ៖ ចុច · ចុចម្តងទៀត · ប្តូរកាត · ស្វែងរក + តម្រង · ទទេ · បិទប្រអប់ · ទំព័រដំបូង · id ពិត · `ACTION_ALLOWLIST`) ·
+  `ZoeW/tests/zto-returned-cleanup.test.ts` +៦ (៣ ធ្លាក់លើ 2.50.117) · `trash-modal-test` +៣ (តម្រង ៖ កាត · សរុប · `aria-pressed`) · `empty-state-truth-test` (helper ថ្មី) ·
+  `ZoeW/tests/zto-returned.test.tsx` (fixture មាន `signedState: 'ok'` ដូចការទាញពិត · ការអះអាងមិនប្រែ) · `ZoeW/tests/zto-lock.test.ts` (sha256 ថ្មី ៣) ·
+  `ZoeW/tests/cleanup-ledger-key.test.ts` «៩គ» (ធ្លាក់លើ 2.50.117) · `layout-check` ទទឹងប្រអប់វាស់ `offsetWidth` (A200 ៖ checker វាស់ចលនា មិនមែន App ខុស)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy Preview (2.50.118) ➜ 🗑️ ធុងសំរាម ➜ ចុច «➖ ដក + ត្រឡប់» ➜ បញ្ជីមានតែ «ដក» និង «ត្រឡប់» · ចុចម្តងទៀត ➜ ទាំងអស់ · «✅ យករួច + លុប» ដូចគ្នា (iPhone · Android · APK)។
+2. គ្មាន rules · env · migration។
 
 ### [2.50.117] — 2026-10-17 · ZoeW ៖ ធុងសំរាម `returned` «ត្រឡប់» (ជំនួស «ផុតកំណត់») · ជូនដំណឹង «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» · លំដាប់ច្បាប់ ៧ ថ្ងៃ
 
@@ -4132,6 +4168,20 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-17 — Deep audit ផ្លូវ «កញ្ចប់ត្រឡប់ ➜ ធុងសំរាម» ៖ ហត្ថលេខាមិនឈ្នះគ្រប់ទ្វារ · view ចាស់ដក Barcode ស្តាររួចម្តងទៀត
+
+សំណើ ៖ «deep audit … ស្កេនត្រឡប់ ដកចូលធុងសំរាមតាម … អានកូដរកកំហុស ឬ ចន្លោះវិញអោយស្អាតកុំជឿជាក់លើ checker»។ វិធី ៖ អានទ្វារទាំង ៣ នៃ `removeReturnedZtoBarcodes()`
+(ទាញបញ្ជី · ពិនិត្យនៅខាងក្រោយ Cookie · Palm `status=1`) ធៀបនឹងច្បាប់ «ZTO sign evidence wins» · សរសេរតេស្ត App ពិត + Function ពិត + ZTO ក្លែង ដែលចូលស្ថានភាពនោះ ➜ ធ្លាក់លើ 2.50.117 ➜ កែ។
+run-all STRICT លើ 2.50.117 (emulator រស់) មុនកែ ៖ ជោគជ័យ ២១១ · ធ្លាក់ ១ (`layout-check` ➜ A200)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A200 | **`layout-check` ធ្លាក់តែពេល run-all រវល់** ៖ run-all STRICT លើ 2.50.117 ៖ «modal លើ tablet/desktop មិនចង្អៀតជាងទូរស័ព្ទ» ➜ `pinSetupModal @768px 271u < 276u` · រត់តែឯង ➜ ជាប់ · ⛔ «flake» មិនមែនមូលហេតុ | រត់ ៤ ស្របគ្នា ➜ ១ ជាប់ · ១ ធ្លាក់ (លេខដដែល) · ២ លើសពិដាន · វាស់ទទឹងគ្រប់ទំហំ ៥ ដង ៖ ទំហំដដែលឲ្យលេខផ្សេងគ្នា (320 ៖ 272.3 · 278.7 · 284.1u · 768 ៖ 270.8–290.4u · 1280 ៖ 376–403u) · `.modal-content` មាន `width: 100%` + `max-width` (មិនអាស្រ័យអត្ថបទ) ➜ ទទឹងពិត 320 = 296px ÷ 1px = 296u · 768 = 353px ÷ 1.2px = 294u · 272.3 = 296 × **0.92** = `modalPopIn` ចាប់ផ្តើម (`scale(0.92)` ➜ 1 · bezier លើស ១) ➜ `getBoundingClientRect()` វាស់ទទឹងតាមដំណាក់កាលចលនា ➜ ក្រោមបន្ទុក ទំហំនីមួយៗវាស់ដំណាក់កាលផ្សេង · ⛔ App មិនខុស (ទទឹងពិត 768 = 294u ≥ 287u) | checker វាស់ `offsetWidth` (ទទឹង layout · មិនរាប់ transform) ដូចច្បាប់ «every measure stays transform-free» · App មិនប្រែ |
+| A199 | **ស្តារធាតុ «ត្រឡប់» ពេល ledger ថ្ងៃមិនទាន់ Sync ➜ លុយបាត់** ៖ ធាតុ `returned` ដែល flip មិនទាន់ដល់ (Barcode `isDeducted: false` · ledger ដករួច · សោ `ded/<trashId>`) ស្តារលើឧបករណ៍ដែល listener ledger ថ្ងៃ pending/failed ➜ `restoreLedgerKeyFor()` ត្រឡប់ `null` (អានសោមិនបាន) ➜ កញ្ចប់ត្រឡប់ចូលប្រវត្តិ **ដោយមិនបូក** ➜ គ្មាន journal លើឧបករណ៍នោះ ➜ ចំណូល · ចំនួនកញ្ចប់ ខ្វះជាអចិន្ត្រៃយ៍ | `cleanup-ledger-key.test.ts` «៩គ» ៖ flip ព្យួរ · journal បាត់ · view ledger ថ្ងៃ pending ➜ 2.50.117 ៖ ធុងសំរាមទទេ · ledger នៅ 90/9 (គួរ 100/10) | `restoreAwaitsLedgerView()` ៖ `returned` + គ្មាន Barcode `isDeducted` + view ledger ថ្ងៃមិនស្រស់ ➜ មិនស្តារ (មុន claim តាម preview · ក្រោយ claim តាម Server) ➜ «⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត» · គ្មានការសរសេរ · ស្រស់វិញ ➜ ស្តារបូក ១០ · `CLAUDE.md` ជួរ «Interrupted cleanup» |
+| A198 | **ទាញបញ្ជី (Cookie) ដកកញ្ចប់ត្រឡប់ ទោះបញ្ជីចុះហត្ថលេខាអានមិនបាន** ៖ `runZtoListSyncPreview()` ហៅ `removeReturnedZtoBarcodes(returned, …, signed)` ជានិច្ច ខណៈ `signed` មកពី companion `withSigned` ដែលអាច `signedOk: false` · `partial` ➜ កញ្ចប់ដែល ZTO ចុះហត្ថលេខា (អតិថិជនយករួច) + មានស្កេន `-710` ➜ ធុងសំរាម «ត្រឡប់» + ដកលុយ · ជួរ «↩️» សរសេរ «🗑️ … ធុងសំរាម» | `zto-returned-cleanup.test.ts` «ទាញបញ្ជី (Cookie) ៖ អានបញ្ជីចុះហត្ថលេខាមិនបាន» (ZTO `05` ឆ្លើយ 502) ៖ 2.50.117 ➜ Barcode ចេញពីប្រវត្តិ · ledger 100 ➜ 90 | ដកតែ `signedState === 'ok'` (Palm ៖ `ok` ជានិច្ច ព្រោះភស្តុតាងក្នុងមួយ Barcode) · `removeHeld` (`signed` · `switch`) ➜ «📌 … អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)» ⛔ មិនមែនសារ «កុងតាក់បិទ» · `zto-returned.test.tsx` fixture មាន `signedState: 'ok'` (ការទាញពិតមានជានិច្ច) |
+| A197 | **ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ហត្ថលេខាមិនឈ្នះ** ៖ `runZtoStatusSweep()` ហៅ `removeReturnedZtoBarcodes(back.returned, dataToScan)` **គ្មាន** កូដចុះហត្ថលេខា · `closeZtoSignedBarcodes()` បិទ ≤ `ZTO_STATUS_SWEEP_BATCH` (១០) ក្នុងមួយជុំ ហើយរំលង Barcode ដែល `ztoSignedCloseIsHeld()` ➜ Barcode ចុះហត្ថលេខាទី ១១.. នៅបើកលើ Server · transaction `abandon` `{ codes }` ឃើញ «បើក» ➜ ដក · ក៏ដកពេលបញ្ជីចុះហត្ថលេខាអានមិនបាន | តេស្ត ៖ Barcode ១១ ចុះហត្ថលេខា · Barcode ចុងក្រោយមាន `-710` ➜ 2.50.117 ៖ ធុងសំរាម «ត្រឡប់» · ledger 100 ➜ 99 · count 10 ➜ 9 · បញ្ជីចុះហត្ថលេខា 502 ➜ ដក | `closeZtoSignedBarcodes()` ត្រឡប់ `signedCodes` (គ្រប់កូដនៃការអានពេញ · `partial`/`truncated`/បរាជ័យ ➜ `null`) ➜ ការដកជាត្រឡប់រត់តែពេលមាន `signedCodes` ហើយលើកលែងពួកវា · ជុំក្រោយបិទ Barcode ទី ១១ ជា «យក» |
+| A196 | **view ចាស់ដក Barcode ដែលស្តាររួចម្តងទៀត** ៖ `ztoReturnedTargets()` ពិនិត្យ `ម៉ោងត្រឡប់ ≥ max(createdAt, restoredAt)` លើ view **ក្នុងទូរស័ព្ទ** តែ transaction `abandon` `{ codes }` ដកតាមឈ្មោះលើតម្លៃ Server ដោយមិនពិនិត្យម្តងទៀត ➜ ទូរស័ព្ទដែលក្រៅបណ្ដាញ (view មុនការស្តារ) ដក Barcode ដែលម្ចាស់គម្រោងស្តារ (`restoredAt` ក្រោយការត្រឡប់) ម្តងទៀត + ដកលុយម្តងទៀត | តេស្ត ៖ Server `restoredAt` = ១ ម៉ោងមុន · view ទូរស័ព្ទគ្មាន · ត្រឡប់ ១ ថ្ងៃមុន ➜ 2.50.117 ៖ Barcode ចេញ · ledger 100 ➜ 90 · ទិសផ្ទុយ (គ្មានការស្តារ) ➜ ដកដដែល | `opts.returnedAt` (Map កូដ ➜ ម៉ោងត្រឡប់) ➜ updater ពិនិត្យ `barcodeReturnCounts()` លើ Barcode Server · `barcodeReturnBasis()` ជារូបមន្តតែមួយ (`ztoReturnedTargets()` ប្រើដូចគ្នា) · `codes` គ្មាន `returnedAt` (តេស្តចាស់) ➜ ឥរិយាបថដើម |
+
 ### 2026-10-17 — Palm ៖ ល្បឿនជុំ ៣ (ម៉ូដែល) · Login ឡើងវិញនៅ background · អក្សរប្រអប់ខ្លី
 
 សំណើ ៖ «បើសិនជាអាចចង់បង្កើនល្បឿនថែមទៀត» · «អោយ Palm login នៅbackgroudខ្លួនឯង…» · «អក្សរវែងពេក…»។ លទ្ធផលពិត 2.50.111 ៖ 421 បេក្ខភាព ➜ 29 ជួរ ·
@@ -6129,7 +6179,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `dom-hygiene` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `empty-state-truth-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -6450,6 +6500,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/toast-live-expiry.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/toast-visibility.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/trash-reason-filter.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |

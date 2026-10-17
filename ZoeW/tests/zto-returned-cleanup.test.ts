@@ -23,6 +23,7 @@ import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restor
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
+import { ztoListGroupModel } from '../src/app/components/zto/model';
 
 const req = createRequire(import.meta.url);
 const fn = req('../netlify/functions/zto-order-detail.js');
@@ -277,6 +278,27 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
         expect(historyCodes()).toEqual(['A']);
     });
 
+    it('view ក្នុងទូរស័ព្ទចាស់ (មិនទាន់ឃើញការស្តារ) ៖ Server មាន `restoredAt` ក្រោយការត្រឡប់ ➜ transaction មិនដកម្តងទៀត · លុយមិនដក', async () => {
+        const item: any = youngItem([['A', 10], ['B', 5]]);
+        seed([item]);
+        setAt(HISTORY + '/' + ID + '/barcodes/0/restoredAt', getServerNow() - 3600000);
+        expect(dataState.scanHistory[0].barcodes[0].restoredAt, 'លក្ខខណ្ឌ ៖ view ក្នុងទូរស័ព្ទមិនទាន់ឃើញការស្តារ').toBeUndefined();
+        expect(removeReturnedZtoBarcodes([{ barcode: 'A', at: ztoStamp(getServerNow() - DAY_MS) }]), 'view ចាស់ស្នើដក').toBe(1);
+        await flush();
+        expect(historyCodes()).toEqual(['A', 'B']);
+        expect(trashItems()).toHaveLength(0);
+        expect(ledger().codDollar).toBe(100);
+        expect(ledger().totalCount).toBe(10);
+    });
+
+    it('ទិសផ្ទុយ ៖ Server គ្មានការស្តារ ➜ transaction ដកតាមម៉ោងត្រឡប់ពិត', async () => {
+        seed([youngItem([['A', 10], ['B', 5]])]);
+        expect(removeReturnedZtoBarcodes([{ barcode: 'A', at: ztoStamp(getServerNow() - DAY_MS) }])).toBe(1);
+        await flush();
+        expect(historyCodes()).toEqual(['B']);
+        expect(ledger().codDollar).toBe(90);
+    });
+
     it('កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ · នាឡិកា server មិនទុកចិត្ត ➜ មិនដក', async () => {
         seed([youngItem([['A', 10]])]);
         const back = [{ barcode: 'A', at: ztoStamp(getServerNow() - DAY_MS) }];
@@ -292,7 +314,7 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
 });
 
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY_MS).toISOString().slice(0, 10);
-function zto(returns: Array<{ code: string; at: string }>, detail?: (code: string) => any) {
+function zto(returns: Array<{ code: string; at: string }>, detail?: (code: string) => any, signs: Array<{ code: string; at: string }> = []) {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
@@ -317,8 +339,11 @@ function zto(returns: Array<{ code: string; at: string }>, detail?: (code: strin
         }
         const b = JSON.parse(String(init.body));
         const c = b.condition;
+        if (c.scanTypeCode === '05' && (globalThis as any).__signFail) return new Response('{}', { status: 502 });
         const rows = c.scanTypeCode === '-710' ? returns.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
-            consigneeMobile: '855977000111', scanTypeCode: '-710', scanTypeDesc: 'ត្រឡប់ការស្កេន', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 })) : [];
+            consigneeMobile: '855977000111', scanTypeCode: '-710', scanTypeDesc: 'ត្រឡប់ការស្កេន', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 }))
+            : (c.scanTypeCode === '05' ? signs.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
+                consigneeMobile: '855977000111', scanTypeCode: '05', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 })) : []);
         return new Response(JSON.stringify({ success: true, error: null,
             data: { pageNum: b.pageNum, pages: rows.length ? 1 : 0, total: rows.length, result: rows } }), { status: 200 });
     }));
@@ -352,6 +377,25 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(ledger().codDollar).toBe(90);
     });
 
+    it('ទាញបញ្ជី (Cookie) ៖ អានបញ្ជីចុះហត្ថលេខាមិនបាន ➜ មិនដកជាត្រឡប់ (ហត្ថលេខាឈ្នះ · មិនដឹងថាចុះហត្ថលេខាឬអត់) · ប្រអប់មិនប្រាប់ថានឹងដក', async () => {
+        seed([youngItem([['ZTRET0000001', 10], ['ZTKEEP000001', 5]])]);
+        zto([{ code: 'ZTRET0000001', at: ztoStamp(getServerNow() - 3600000) }]);
+        (globalThis as any).__signFail = true;
+        try {
+            setRange(dk(3), dk(0));
+            await runZtoListSyncPreview();
+            await flush();
+        } finally {
+            delete (globalThis as any).__signFail;
+        }
+        expect(ztoState.ztoListSyncResult && ztoState.ztoListSyncResult.signedState, 'លក្ខខណ្ឌ ៖ បញ្ជីចុះហត្ថលេខាមិនបាន').not.toBe('ok');
+        expect(historyCodes()).toEqual(['ZTRET0000001', 'ZTKEEP000001']);
+        expect(trashItems()).toHaveLength(0);
+        expect(ledger().codDollar).toBe(100);
+        const returnedGroup = (ztoState.ztoListPreview as any).groups.flatMap((g: any) => g.rows || []).filter((r: any) => r.removeInZoew);
+        expect(returnedGroup, 'ប្រអប់មិនប្រាប់ «🗑️ ដក» ពេលមិនដក').toHaveLength(0);
+    });
+
     it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ អានបញ្ជីត្រឡប់ ➜ ដក · ≤ ម្តងក្នុងមួយម៉ោង', async () => {
         seed([youngItem([['ZTRET0000001', 10], ['ZTKEEP000001', 5]])]);
         const calls = zto([{ code: 'ZTRET0000001', at: ztoStamp(getServerNow() - 3600000) }]);
@@ -362,6 +406,38 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(calls.filter((q) => q.returned === '1')).toHaveLength(1);
         await runZtoStatusSweep(true, dataState.scanHistory, []);
         expect(calls.filter((q) => q.returned === '1'), 'ម្តងក្នុងមួយម៉ោង').toHaveLength(1);
+    });
+
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ZTO ចុះហត្ថលេខា + ស្កេនត្រឡប់ ➜ ហត្ថលេខាឈ្នះ ទោះបិទមិនទាន់ដល់ (លើស batch មួយជុំ) ➜ មិនដក · លុយមិនដក', async () => {
+        const codes = Array.from({ length: 11 }, (_, i) => 'ZTSIGN' + String(i).padStart(6, '0'));
+        const items = codes.map((code, i) => youngItem([[code, 1]], 'id_s' + String(i).padStart(2, '0')));
+        seed(items);
+        const at = ztoStamp(getServerNow() - 3600000);
+        const last = codes[codes.length - 1];
+        const calls = zto([{ code: last, at }], undefined, codes.map((code) => ({ code, at })));
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        await flush();
+        expect(calls.filter((q) => q.returned === '1'), 'លក្ខខណ្ឌ ៖ ទាញបញ្ជីត្រឡប់ក្នុងជុំនេះ').toHaveLength(1);
+        expect(historyCodes('id_s10'), 'barcode ទី ១១ នៅបើក (ជុំក្រោយបិទតាមហត្ថលេខា)').toEqual([last]);
+        expect(trashItems().filter((t: any) => t.trashReason === 'returned')).toHaveLength(0);
+        expect(ledger().codDollar).toBe(100);
+        expect(ledger().totalCount).toBe(10);
+    });
+
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ អានបញ្ជីចុះហត្ថលេខាមិនបាន ➜ មិនដកជាត្រឡប់ជុំនោះ (មិនដឹងថាចុះហត្ថលេខាឬអត់)', async () => {
+        seed([youngItem([['ZTRET0000001', 10]])]);
+        const calls = zto([{ code: 'ZTRET0000001', at: ztoStamp(getServerNow() - 3600000) }]);
+        const real = (globalThis.fetch as any);
+        vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
+            const q = new URL(String(u), window.location.origin).searchParams;
+            if (q.get('list') && q.get('signed')) return new Response(JSON.stringify({ error: 'boom', code: 'ZTO_UPSTREAM_ERROR' }), { status: 502 });
+            return real(u, init);
+        }));
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        await flush();
+        expect(historyCodes()).toEqual(['ZTRET0000001']);
+        expect(ledger().codDollar).toBe(100);
+        expect(calls.filter((q) => q.returned === '1')).toHaveLength(0);
     });
 
     it('ពិនិត្យនៅខាងក្រោយ ៖ ចម្លើយ `ztoClosed: true` + `ztoReturnedAt` ➜ មិនដកជាត្រឡប់ · លុយមិនដក', async () => {
@@ -384,6 +460,19 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         await flush();
         expect(historyCodes()).toEqual(['ZTKEEP000001']);
         expect(ledger().codDollar).toBe(90);
+    });
+});
+
+describe('↩️ ប្រអប់បញ្ជី ZTO ៖ កញ្ចប់ត្រឡប់ដែលនៅបើកក្នុង ZoeW ប្រាប់ការពិត', () => {
+    const notes = (row: any) => ztoListGroupModel('t', [{ barcode: 'R1', phone: '012', at: '2026-10-17 08:00:00', returnedAt: '2026-10-17 09:00:00', ...row }], 'x').rows[0].notes;
+    it('ដក ➜ 🗑️ · កុងតាក់បិទ ➜ 📌 កុងតាក់ · បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ 📌 មិនទាន់ដក (មិនមែន «កុងតាក់បិទ»)', () => {
+        expect(notes({ openInZoew: true, removeInZoew: true, removeHeld: '' }).join(' ')).toContain('🗑️');
+        const off = notes({ openInZoew: true, removeInZoew: false, removeHeld: 'switch' }).join(' ');
+        expect(off).toContain('«បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ');
+        const held = notes({ openInZoew: true, removeInZoew: false, removeHeld: 'signed' }).join(' ');
+        expect(held).toContain('អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់');
+        expect(held).not.toContain('«បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ');
+        expect(notes({ openInZoew: false, removeInZoew: false, removeHeld: '' }).join(' ')).not.toContain('📌');
     });
 });
 

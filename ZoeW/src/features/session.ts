@@ -155,6 +155,7 @@ export function clearSensitiveModalFields() {
     securityState.appLockExcuseAt = 0;
     securityState.appLockVeiled = false;
     uiState.deletedSearchQuery = '';
+    uiState.trashReasonFilter = '';
     expandedTrashGroups.clear();
     uiState.activeParentItemId = null;
     securityState.lookupSecretKey = null;

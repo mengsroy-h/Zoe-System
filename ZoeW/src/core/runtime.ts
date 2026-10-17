@@ -147,6 +147,7 @@ export const ACTION_ALLOWLIST = [
     "toggleRememberPassword",
     "toggleTorch",
     "toggleTrashGroup",
+    "toggleTrashReasonFilter",
     "updateBatchScanCount",
     "updateLabelPrintPreview",
     "verifySecurityPin",

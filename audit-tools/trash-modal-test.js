@@ -238,6 +238,9 @@ vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
  sliceFn(src, 'trashGroupKeyOf'),
  sliceFn(src, 'buildTrashGroups'),
  sliceFn(src, 'trashGroupMatchesQuery'),
+ sliceConst(src, 'TRASH_FILTER_META'),
+ sliceFn(src, 'trashFilterOf'),
+ sliceFn(src, 'trashGroupInFilter'),
  sliceFn(src, 'buildTrashSummaryModel'),
  sliceFn(src, 'renderTrashSummary')].forEach((code, i) => {
     if (!code) { ok(false, 'ស្រង់កូដពិតបានលេខ ' + i); return; }
@@ -351,9 +354,9 @@ const bucket = (deducted) => groups.filter((g) => META[g.reason].deducted === de
             { total: 0, count: 0 });
 const ded = bucket(true);
 const kept = bucket(false);
-// ដក៖ 6.5 + 11.75 + 6 + 1 + 2 + 5 = 32.25 · ផុតកំណត់៖ 23.5  ➜ 55.75
-ok(Math.abs(ded.total - 55.75) < 0.001, 'ក្រុម «ដក + ផុតកំណត់» = $55.75', ded.total);
-ok(ded.count === 8, 'ក្រុម «ដក + ផុតកំណត់» = 8 កញ្ចប់', ded.count);
+// ដក៖ 6.5 + 11.75 + 6 + 1 + 2 + 5 = 32.25 · ត្រឡប់៖ 23.5  ➜ 55.75
+ok(Math.abs(ded.total - 55.75) < 0.001, 'ក្រុម «ដក + ត្រឡប់» = $55.75', ded.total);
+ok(ded.count === 8, 'ក្រុម «ដក + ត្រឡប់» = 8 កញ្ចប់', ded.count);
 // លុប៖ 3 · យករួច៖ 25 ➜ 28
 ok(Math.abs(kept.total - 28) < 0.001, 'ក្រុម «យករួច + លុប» = $28.00', kept.total);
 ok(kept.count === 2, 'ក្រុម «យករួច + លុប» = 2 កញ្ចប់', kept.count);
@@ -441,13 +444,13 @@ console.log('\n=== តួលេខសរុបរបស់ធុងសំរា�
 
     // 🔴 T1 ៖ ការត្រឡប់ក្រុម deducted ↔ kept
     ok(cardMoney('trash-sum-deducted') === sum(wantDeducted, 'total').toFixed(2),
-        '⛔ កាត «➖ ដក + ផុតកំណត់» = ផលបូកក្រុមដែល `META.deducted === true`',
+        '⛔ កាត «➖ ដក + ត្រឡប់» = ផលបូកក្រុមដែល `META.deducted === true`',
         cardMoney('trash-sum-deducted') + ' ≠ ' + sum(wantDeducted, 'total').toFixed(2));
     ok(cardMoney('trash-sum-kept') === sum(wantKept, 'total').toFixed(2),
         '⛔ កាត «✅ យករួច + លុប» = ផលបូកក្រុមដែល `META.deducted !== true`',
         cardMoney('trash-sum-kept') + ' ≠ ' + sum(wantKept, 'total').toFixed(2));
     ok(cardCount('trash-sum-deducted') === String(sum(wantDeducted, 'count')),
-        'ចំនួនកញ្ចប់របស់ក្រុម «ដក + ផុតកំណត់» ត្រឹមត្រូវ', cardCount('trash-sum-deducted'));
+        'ចំនួនកញ្ចប់របស់ក្រុម «ដក + ត្រឡប់» ត្រឹមត្រូវ', cardCount('trash-sum-deducted'));
     ok(cardCount('trash-sum-kept') === String(sum(wantKept, 'count')),
         'ចំនួនកញ្ចប់របស់ក្រុម «យករួច + លុប» ត្រឹមត្រូវ', cardCount('trash-sum-kept'));
 
@@ -466,6 +469,24 @@ console.log('\n=== តួលេខសរុបរបស់ធុងសំរា�
         '⛔ ការអភិរក្ស៖ ចំនួនកញ្ចប់សរុប = ក្រុម ១ + ក្រុម ២', gCount && gCount[1]);
     ok(!!gCount && Number(gCount[2]) === groups.length,
         'ចំនួនជួរ = ចំនួនក្រុមដែលបញ្ចូល', gCount && gCount[2]);
+
+    // ⛔ តម្រង «ដក + ត្រឡប់» (ម្ចាស់គម្រោង ៖ ចុចកាត ➜ បញ្ជីតែកញ្ចប់ ដក និង ត្រឡប់) ៖ កាតទាំង ២ មិនប្តូរ · សរុប = តែក្រុមដែលបង្ហាញ
+    boxHtml = null;
+    ctx.renderTrashSummary(groups, '', 'deducted');
+    paint();
+    const filtered = String(boxHtml || '');
+    const filteredCard = (cls) => {
+        const at = filtered.indexOf(cls);
+        const m = at === -1 ? null : /trash-sum-money">\$(-?[\d.]+)</.exec(filtered.slice(at));
+        return m ? m[1] : null;
+    };
+    ok(filteredCard('trash-sum-deducted') === sum(wantDeducted, 'total').toFixed(2) && filteredCard('trash-sum-kept') === sum(wantKept, 'total').toFixed(2),
+        'តម្រង «ដក + ត្រឡប់» ៖ កាតទាំង ២ នៅតួលេខពេញ', filteredCard('trash-sum-deducted') + ' / ' + filteredCard('trash-sum-kept'));
+    const fGrand = /សរុប \$(-?[\d.]+) · 📦 (\d+) កញ្ចប់ · (\d+) ជួរ/.exec(filtered);
+    ok(!!fGrand && fGrand[1] === sum(wantDeducted, 'total').toFixed(2) && Number(fGrand[2]) === sum(wantDeducted, 'count') && Number(fGrand[3]) === wantDeducted.length,
+        'តម្រង «ដក + ត្រឡប់» ៖ សរុប = តែក្រុម `META.deducted === true`', fGrand && fGrand.slice(1));
+    ok(/aria-pressed="true"/.test(filtered.slice(filtered.indexOf('trash-sum-deducted'), filtered.indexOf('trash-sum-kept'))),
+        'តម្រង «ដក + ត្រឡប់» ៖ កាតនោះសម្គាល់ថាកំពុងជ្រើស (aria-pressed)');
 
     // ⛔ ទិសផ្ទុយ ៖ គ្មានក្រុម ➜ $0.00 ទាំង ២ ខាង (មិនមែនបោះ ឬ NaN)
     boxHtml = null;

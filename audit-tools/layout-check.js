@@ -1189,8 +1189,11 @@ async function historyRowLayout(browser, port) {
                         probe.remove();
                         const ms = getComputedStyle(m);
                         const room = vw - parseFloat(ms.paddingLeft) - parseFloat(ms.paddingRight);
-                        if (unit > 0 && bb.width > 0) units = bb.width / unit;
-                        fills = bb.width >= room - 1;
+                        // ⛔ ទទឹង layout (`offsetWidth`) មិនមែន `getBoundingClientRect()` ៖ `.modal-content` រត់ `modalPopIn` (scale 0.92 ➜ 1 · bezier លើស ១)
+                        //    ពេលបង្ហាញ ➜ rect វាស់ទទឹងតាមដំណាក់កាលចលនា (0.92–1.03×) ➜ ក្រោមបន្ទុក ទំហំនីមួយៗវាស់ដំណាក់កាលផ្សេង (A200)
+                        const layoutWidth = box.offsetWidth;
+                        if (unit > 0 && layoutWidth > 0) units = layoutWidth / unit;
+                        fills = layoutWidth >= room - 1;
                     }
                     prevAll.forEach(([x, d, h]) => { x.style.display = d; if (h) x.classList.add('hidden'); });
                     if (wasHidden) m.classList.add('hidden');

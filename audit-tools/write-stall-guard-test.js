@@ -236,7 +236,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
     }
 
     // ── ២ខ. សោដក `ded` (2.50.49) ៖ purge ជោគជ័យ តែការដោះសោ `ded` ព្យួរ ➜ សោត្រូវដោះ ────────
-    // ⛔ purge ធុងសំរាម `expired` លុបសោ `ded/<trashId>` ជាមួយ (`releaseCleanupLedgerKeys()`) ក្នុង `applyPurged()` ដែលត្រូវ await ក្រោមសោ ➜
+    // ⛔ purge ធុងសំរាម `returned` លុបសោ `ded/<trashId>` ជាមួយ (`releaseCleanupLedgerKeys()`) ក្នុង `applyPurged()` ដែលត្រូវ await ក្រោមសោ ➜
     //    បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) ➜ ការសរសេរនោះព្យួរ ➜ សោ `deletedCleanupInFlight` ជាប់ ➜ purge ងាប់។
     console.log('\n== ២ខ. សោដក `ded` ៖ ការដោះសោព្យួរ មិនត្រូវជាប់សោសម្អាតធុងសំរាម ==');
     {

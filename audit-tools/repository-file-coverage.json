@@ -1984,6 +1984,9 @@
     "ZoeW/tests/trash-retry-session.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/trash-reason-filter.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/cleanup-resume-session.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -1,5 +1,5 @@
 /**
- * ⛔ ZTO-E1 (លុយ) ៖ ការសម្អាត ៧ ថ្ងៃ (`claimAndCleanupItem('abandon')` ➜ `expired` ➜ **ដកលុយ**) ត្រូវរង់ចាំការអានបញ្ជី
+ * ⛔ ZTO-E1 (លុយ) ៖ ការសម្អាត ៧ ថ្ងៃ (`claimAndCleanupItem('abandon')` ➜ `returned` ➜ **ដកលុយ**) ត្រូវរង់ចាំការអានបញ្ជី
  * «ចុះហត្ថលេខា» (ZTO Palm) ដែលពេញលេញ មុនដកកញ្ចប់ដែលអតិថិជនយករួច។
  *
  * មុនកែ ៖ បើក App ក្រោយបិទច្រើនថ្ងៃ ➜ snapshot ប្រវត្តិមកដល់ ➜ `runAutomaticCleanupRules()` រត់ភ្លាម (debounce 120ms) ➜ កញ្ចប់អាយុ ៨ ថ្ងៃ

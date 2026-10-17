@@ -225,7 +225,8 @@ export function ztoListRowOf(raw, key) {
         returnedAt: '',
         inZoew: false,
         openInZoew: false,
-        removeInZoew: false
+        removeInZoew: false,
+        removeHeld: ''
     };
 }
 
@@ -904,10 +905,12 @@ export function renderZtoListSyncPreview() {
     }
     const openReturned = new Set();
     ztoReturnedTargets(result.returned, dataState.scanHistory, result.signed).forEach((target) => target.codes.forEach((code) => openReturned.add(pickupBarcodeKey(code))));
-    const removeReturned = ztoAutoCloseEnabled();
+    const autoClose = ztoAutoCloseEnabled();
+    const removeReturned = autoClose && result.signedState === 'ok';
     for (let i = 0; i < groups.returned.length; i++) {
         groups.returned[i].openInZoew = openReturned.has(groups.returned[i].key);
         groups.returned[i].removeInZoew = removeReturned && groups.returned[i].openInZoew;
+        groups.returned[i].removeHeld = groups.returned[i].openInZoew && !removeReturned ? (autoClose ? 'signed' : 'switch') : '';
     }
     const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     const freshTitle = stale ? '🆕 ថ្មី ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '🆕 ថ្មី (មិនទាន់មានក្នុង ZoeW)';
@@ -1049,7 +1052,7 @@ export async function runZtoListSyncPreview() {
             returnedState: pulled.returnedState
         };
         renderZtoListSyncPreview();
-        removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);
+        if (ztoState.ztoListSyncResult.signedState === 'ok') removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
     } catch (e) {
         if (!session.current()) return;

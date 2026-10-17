@@ -2272,6 +2272,11 @@ function palmDeps(event, config, startedAt, keyLabel) {
         blobStore: () => openCookieStore(event),
         upstreamMs: () => Math.max(1000, Math.min(config.upstreamTimeoutMs, budgetLeftMs(config, startedAt) - 200)),
         loginAccess: () => (config.detailIdentity === 'require' ? resolveDetailAccess(event, config, startedAt) : null),
+        identitySite: () => {
+            const token = detailIdentityOf(event);
+            return token ? resolveListIdentity(token, config, startedAt, process.env)
+                .then((identity) => (identity.auth.ok && identity.site.code ? identity.site.code : ''), () => '') : '';
+        },
         lookupAccess: () => detailAccessFor(event, config, startedAt),
         project: (row) => ({
             cod: pickNumber([row], ['cod']),

@@ -98,6 +98,8 @@ export async function buildLookupRequestHeaders(cfg) {
 export async function addPalmSessionHeader(cfg, headers) {
     if (!lookupApiIsPalm(cfg)) return;
     if (!ztoIdentityTargetTrusted(cfg.url)) throw new Error('Palm lookup host is not trusted');
+    const site = cfg.palmAccount && typeof cfg.palmAccount.siteCode === 'string' ? cfg.palmAccount.siteCode.trim() : '';
+    if (/^[A-Za-z0-9_-]{1,32}$/.test(site)) headers['X-Zoe-Palm-Site'] = site;
     const session = cfg.palmTokenEnc ? await decryptLookupSecret(cfg.palmTokenEnc) : '';
     if (session) headers['X-Zoe-Palm-Token'] = session;
 }

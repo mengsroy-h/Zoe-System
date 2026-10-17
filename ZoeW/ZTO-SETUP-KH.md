@@ -3,6 +3,8 @@
 **ជម្រើស ZTO Palm:** ផ្ទាំង «API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» មាន **Login ZTO Palm**
 សម្រាប់ទាញលេខទូរស័ព្ទ និង COD/DOD ដោយគណនី Palm របស់អ្នក។ មិនត្រូវការ Argus Cookie
 សម្រាប់ផ្លូវ Palm ទេ តែត្រូវការ env `ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` នៅ Netlify។
+Login ម្តងលើទូរស័ព្ទមួយ ➜ Server ទុក session Palm របស់ហាងក្នុង Netlify Blobs ដូច Cookie ➜ ទូរស័ព្ទផ្សេងដែលមានសោភ្ជាប់ដដែលចុច
+«ប្រើ Login Palm របស់ហាង» ដោយមិនបាច់ពាក្យសម្ងាត់ (សោភ្ជាប់មួយ = ហាងមួយ = គណនី Palm មួយ ក្នុង `ZTO_PROXY_KEYS`)។
 របៀបកំណត់ server និងប្រើ៖ [docs/ZTO-PALM.md](docs/ZTO-PALM.md)។
 ក្នុងរបៀប Palm «បិទតាម ZTO ស្វ័យប្រវត្តិ» អានបញ្ជី «ចុះហត្ថលេខា» របស់គណនី Palm។ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ផ្ទៀងស្កេនមកដល់របស់សាខា និងរក្សាប្រភព VN · CN · ផ្សេងៗ ដូច Cookie (មើល [docs/ZTO-PALM.md](docs/ZTO-PALM.md)); ការកំណត់ Argus ខាងក្រោមសម្រាប់ផ្លូវ Argus។
 

@@ -106,6 +106,12 @@ function applyPalmConfig(next) {
     return true;
 }
 
+function addPalmSiteHeader(cfg, headers) {
+    const site = cfg && cfg.palmAccount && typeof cfg.palmAccount.siteCode === 'string' ? cfg.palmAccount.siteCode.trim() : '';
+    if (/^[A-Za-z0-9_-]{1,32}$/.test(site)) headers['X-Zoe-Palm-Site'] = site;
+    return headers;
+}
+
 function palmFunctionBase() {
     return new URL(resolveNativeApiUrl('/.netlify/functions/zto-order-detail'), window.location.href);
 }
@@ -239,6 +245,10 @@ export async function connectSharedZtoPalm() {
         const body = out.body;
         if (!out.res.ok || !body?.success) { viewState.palmLoginStatus = palmLoginFailureText(body, out.res.status); return; }
         if (body.otherBranch) { viewState.palmLoginStatus = PALM_LOGIN_MESSAGES.ZTO_OTHER_BRANCH; return; }
+        if (body.branchUnknown) {
+            viewState.palmLoginStatus = 'សោភ្ជាប់នេះមាន Login Palm ច្រើនសាខា ហើយ Server មិនស្គាល់សាខារបស់គណនី ZoeW នេះ — សូម Login ZTO Palm ដោយគណនីរបស់សាខានេះ។';
+            return;
+        }
         if (!body.shared) {
             viewState.palmLoginStatus = body.rejected
                 ? 'ZTO បដិសេធ Login Palm របស់ហាង — សូម Login ZTO Palm ម្តងទៀតដោយគណនី និងពាក្យសម្ងាត់។'
@@ -289,7 +299,7 @@ async function disconnectSharedZtoPalm(cfg) {
         const proxyKey = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '';
         if (!current()) return;
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
-        const headers = { 'X-Zoe-Proxy-Key': proxyKey };
+        const headers = addPalmSiteHeader(cfg, { 'X-Zoe-Proxy-Key': proxyKey });
         await addZtoIdentityHeader({ url: base.href }, headers);
         if (!current()) return;
         const out = await fetchWithTimeout(base.href, { method: 'POST', headers, cache: 'no-store' }, 15000, 'Palm logout timed out',
@@ -365,7 +375,7 @@ async function runZtoPalmRefresh() {
             palmRefreshFailedAt = Date.now();
             return 'failed';
         }
-        const headers = { 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey };
+        const headers = addPalmSiteHeader(cfg, { 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey });
         await addZtoIdentityHeader({ url: base.href }, headers);
         if (!current()) return 'skipped';
         const out = await fetchWithTimeout(base.href, { method: 'POST', headers, body: JSON.stringify({ refreshToken }), cache: 'no-store' },

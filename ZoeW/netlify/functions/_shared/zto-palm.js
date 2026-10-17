@@ -30,6 +30,9 @@ const PALM_RETRY_MIN_MS = 1500;
 const PALM_TRACK_MIN_MS = 1000;
 const PALM_REASONS_MAX = 5;
 const SHARED_KEY_PREFIX = 'palm-session/';
+const SHARED_INDEX_PREFIX = 'palm-sites/';
+const SHARED_SITES_MAX = 32;
+const SITE_HEADER = 'x-zoe-palm-site';
 const SHARED_SEAL_LABEL = 'zoew:palm:shared:v1:';
 const SHARED_TEXT_MAX = 16384;
 const SHARED_CACHE_TTL_MS = 60000;
@@ -47,6 +50,7 @@ const sharedSessions = new Map();
 const sharedRenewals = new Map();
 const sharedRenewFailedAt = new Map();
 const sharedReading = new Set();
+const sharedIndexes = new Map();
 
 function json(statusCode, body) {
     return { statusCode, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
@@ -450,18 +454,87 @@ function renewShared(label, failedToken, proxyKey, keys, env, deps, leased) {
     return flight;
 }
 
+function slotSite(value) {
+    const code = trackingCode(value);
+    return /^[A-Z0-9_-]{1,32}$/.test(code) ? code : '';
+}
+
+function slotOf(deps, site) {
+    const code = slotSite(site);
+    return deps.keyLabel && code ? deps.keyLabel + '/' + code : '';
+}
+
+function indexSites(raw) {
+    let parsed = null;
+    try { parsed = JSON.parse(String(raw || '')); } catch (_) { parsed = null; }
+    const out = [];
+    for (const site of (parsed && Array.isArray(parsed.sites) ? parsed.sites : [])) {
+        const code = slotSite(site);
+        if (code && !out.includes(code) && out.length < SHARED_SITES_MAX) out.push(code);
+    }
+    return out;
+}
+
+async function readSiteIndex(label, store, timeoutMs, force) {
+    const cached = sharedIndexes.get(label) || null;
+    const age = cached ? Date.now() - cached.readAt : -1;
+    if (!force && cached && age >= 0 && age < SHARED_CACHE_TTL_MS) return Object.assign({ ok: true }, cached);
+    if (!force && cached && store && cached.sites.length) {
+        if (!sharedReading.has('#' + label)) {
+            sharedReading.add('#' + label);
+            readSiteIndex(label, store, SHARED_READ_TIMEOUT_MS, true).catch(() => {}).then(() => sharedReading.delete('#' + label));
+        }
+        return Object.assign({ ok: true }, cached);
+    }
+    const read = store ? await settleWithin(() => store.getWithMetadata(SHARED_INDEX_PREFIX + label, { type: 'text' }), timeoutMs) : { ok: false };
+    if (!read.ok) return cached ? Object.assign({ ok: !force }, cached) : { ok: false, sites: [], etag: '', missing: false };
+    const entry = { sites: indexSites(read.value && read.value.data), etag: read.value && typeof read.value.etag === 'string' ? read.value.etag : '',
+        missing: !read.value, readAt: Date.now() };
+    sharedIndexes.set(label, entry);
+    return Object.assign({ ok: true }, entry);
+}
+
+async function changeSiteIndex(label, store, site, add) {
+    const code = slotSite(site);
+    if (!store || !label || !code) return false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const current = await readSiteIndex(label, store, SHARED_READ_TIMEOUT_MS, true);
+        if (!current.ok) return false;
+        if (current.sites.includes(code) === add) return true;
+        const sites = add ? current.sites.concat(code).slice(-SHARED_SITES_MAX) : current.sites.filter((one) => one !== code);
+        const options = current.missing ? { onlyIfNew: true } : (current.etag ? { onlyIfMatch: current.etag } : {});
+        const out = await settleWithin(() => store.set(SHARED_INDEX_PREFIX + label, JSON.stringify({ v: 1, sites }), options), SHARED_WRITE_TIMEOUT_MS);
+        if (!out.ok) return false;
+        if (out.value && out.value.modified === false) continue;
+        sharedIndexes.set(label, { sites, etag: out.value && typeof out.value.etag === 'string' ? out.value.etag : '', missing: false, readAt: Date.now() });
+        return true;
+    }
+    return false;
+}
+
+async function singleIndexedSite(deps, store) {
+    if (!store || !deps.keyLabel) return { site: '', sites: [] };
+    const index = await readSiteIndex(deps.keyLabel, store, sharedReadTimeout(deps), false);
+    return { site: index.sites.length === 1 ? index.sites[0] : '', sites: index.sites };
+}
+
 async function resolvePalmSession(event, proxyKey, env, deps) {
-    const label = deps.keyLabel || '';
     const header = deps.headerOf(event, SESSION_HEADER);
     let own = null;
     if (header) {
         try { own = Object.assign(openSession(header, proxyKey, env), { source: 'device' }); } catch (_) { own = null; }
     }
-    const entry = label ? await sharedEntry(label, proxyKey, env, deps, !own) : null;
+    const store = sharedStoreOf(deps);
+    let site = slotSite(deps.headerOf(event, SITE_HEADER)) || (own ? slotSite(own.site) : '');
+    let sites = [];
+    if (!site && !own) ({ site, sites } = await singleIndexedSite(deps, store));
+    const slot = slotOf(deps, site);
+    const entry = slot ? await sharedEntry(slot, proxyKey, env, deps, !own) : null;
     const data = entry && entry.data;
-    if (data && data.kind === 'shared') return { session: sharedView(data), entry };
-    if (own) return { session: own, entry };
-    return { reason: data && data.kind === 'rejected' ? 'palm:login-rejected' : 'palm:no-session', entry };
+    if (data && data.kind === 'shared') return { session: sharedView(data), entry, slot };
+    if (own) return { session: own, entry, slot };
+    const reason = data && data.kind === 'rejected' ? 'palm:login-rejected' : (!site && sites.length > 1 ? 'palm:branch-unknown' : 'palm:no-session');
+    return { reason, entry, slot };
 }
 
 function clearRenewFailures(label) {
@@ -501,63 +574,92 @@ function otherBranch(access, site) {
     return !!(access && access.verified && trackingCode(access.site) && trackingCode(access.site) !== trackingCode(site));
 }
 
-async function palmLogin(credential, proxyKey, keys, deps, env, joining) {
+function writeCondition(read) {
+    if (!read || !read.ok) return null;
+    return read.entry && !read.entry.missing ? { etag: read.entry.etag } : { fresh: true };
+}
+
+async function palmLogin(event, credential, proxyKey, keys, deps, env, joining) {
     const access = await deps.loginAccess();
     if (access && access.response) return access.response;
-    const label = deps.keyLabel || '';
     const store = sharedStoreOf(deps);
-    let condition = null;
+    let readSlot = '';
+    let read = null;
     if (store && joining) {
-        const read = await readShared(label, store, proxyKey, env, sharedReadTimeout(deps));
-        const data = read.ok && read.entry ? read.entry.data : null;
-        if (data && data.kind === 'shared' && !otherBranch(access, data.site)) return sessionResponse(data, credential, proxyKey, env, true);
-        condition = read.ok ? (read.entry && !read.entry.missing ? { etag: read.entry.etag } : { fresh: true }) : null;
+        readSlot = slotOf(deps, slotSite(deps.headerOf(event, SITE_HEADER)) || (await singleIndexedSite(deps, store)).site);
+        if (readSlot) {
+            read = await readShared(readSlot, store, proxyKey, env, sharedReadTimeout(deps));
+            const data = read.ok && read.entry ? read.entry.data : null;
+            if (data && data.kind === 'shared' && !otherBranch(access, data.site)) return sessionResponse(data, credential, proxyKey, env, true);
+        }
     }
     const login = await palmUpstreamLogin(credential, keys, deps.upstreamMs());
     if (login.final) return loginRefusal(login);
     if (otherBranch(access, login.site)) return json(403, { code: 'ZTO_OTHER_BRANCH', reason: 'site:palm-other-branch' });
     const data = { kind: 'shared', token: login.token, site: login.site, siteName: login.siteName, loginAt: Date.now(),
         u: credential.username, p: credential.cipher, d: credential.deviceSn };
+    const slot = slotOf(deps, login.site);
     let shared = false;
-    if (store && (!joining || condition)) {
-        shared = await writeShared(label, data, store, proxyKey, env, condition) === 'ok';
-        if (shared) clearRenewFailures(label);
+    if (store && slot) {
+        const condition = joining ? writeCondition(slot === readSlot && read ? read : await readShared(slot, store, proxyKey, env, sharedReadTimeout(deps))) : {};
+        if (condition) shared = await writeShared(slot, data, store, proxyKey, env, condition) === 'ok';
+        if (shared) {
+            clearRenewFailures(slot);
+            await changeSiteIndex(deps.keyLabel, store, login.site, true);
+        }
     }
     return sessionResponse(data, credential, proxyKey, env, shared);
 }
 
-async function palmLogout(deps) {
+async function palmLogout(event, deps) {
     const access = await deps.loginAccess();
     if (access && access.response) return access.response;
-    const label = deps.keyLabel || '';
     const store = sharedStoreOf(deps);
     if (!store) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
-    const out = await settleWithin(() => store.delete(SHARED_KEY_PREFIX + label), SHARED_WRITE_TIMEOUT_MS);
+    const site = slotSite(deps.headerOf(event, SITE_HEADER)) || (await singleIndexedSite(deps, store)).site;
+    const slot = slotOf(deps, site);
+    if (!slot) return json(400, { code: 'ZTO_PALM_BRANCH_UNKNOWN' });
+    if (otherBranch(access, site)) return json(403, { code: 'ZTO_OTHER_BRANCH', reason: 'site:palm-other-branch' });
+    const out = await settleWithin(() => store.delete(SHARED_KEY_PREFIX + slot), SHARED_WRITE_TIMEOUT_MS);
     if (!out.ok) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
-    rememberShared(label, null, '', true);
-    clearRenewFailures(label);
-    return json(200, { success: true, provider: 'zto-palm', shared: false });
+    rememberShared(slot, null, '', true);
+    clearRenewFailures(slot);
+    await changeSiteIndex(deps.keyLabel, store, site, false);
+    return json(200, { success: true, provider: 'zto-palm', shared: false, account: { siteCode: site } });
 }
 
-async function palmStatus(proxyKey, deps, env) {
+async function palmStatus(event, proxyKey, deps, env) {
     const access = await deps.loginAccess();
     if (access && access.response) return access.response;
-    const label = deps.keyLabel || '';
     const store = sharedStoreOf(deps);
-    const read = store ? await readShared(label, store, proxyKey, env, sharedReadTimeout(deps)) : { ok: false, entry: null };
+    if (!store) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
+    const identity = access && access.verified ? access.site : (typeof deps.identitySite === 'function' ? await deps.identitySite() : '');
+    let site = slotSite(identity) || slotSite(deps.headerOf(event, SITE_HEADER));
+    let sites = [];
+    if (!site) {
+        const index = await readSiteIndex(deps.keyLabel, store, sharedReadTimeout(deps), true);
+        if (!index.ok) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
+        sites = index.sites;
+        if (sites.length === 1) site = sites[0];
+    }
+    const body = { success: true, provider: 'zto-palm', shared: false, rejected: false };
+    if (!site) {
+        if (sites.length > 1) Object.assign(body, { branchUnknown: true, sites });
+        return json(200, body);
+    }
+    const read = await readShared(slotOf(deps, site), store, proxyKey, env, sharedReadTimeout(deps));
     const data = read.entry && read.entry.data;
     if (!read.ok && !data) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
-    const body = { success: true, provider: 'zto-palm', shared: !!(data && data.kind === 'shared'), rejected: !!(data && data.kind === 'rejected') };
-    if (data) body.account = { siteCode: data.site, siteName: data.siteName || '' };
-    if (data && data.kind === 'shared') {
-        body.loginAgeMs = Math.max(0, Date.now() - data.loginAt);
-        if (otherBranch(access, data.site)) body.otherBranch = true;
-    }
+    body.shared = !!(data && data.kind === 'shared');
+    body.rejected = !!(data && data.kind === 'rejected');
+    body.account = { siteCode: data ? data.site : site, siteName: data && data.siteName ? data.siteName : '' };
+    if (body.shared) body.loginAgeMs = Math.max(0, Date.now() - data.loginAt);
+    if (otherBranch(access, body.account.siteCode)) body.otherBranch = true;
     return json(200, body);
 }
 
 async function palmPost(event, query, proxyKey, keys, deps, env) {
-    if (query.palm === 'logout') return await palmLogout(deps);
+    if (query.palm === 'logout') return await palmLogout(event, deps);
     if (event.isBase64Encoded || typeof event.body !== 'string' || Buffer.byteLength(event.body) > 4096) {
         return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
     }
@@ -566,14 +668,14 @@ async function palmPost(event, query, proxyKey, keys, deps, env) {
     if (query.palm === 'refresh') {
         const sealed = openRefresh(input?.refreshToken, proxyKey, env);
         if (!sealed) return json(401, { code: 'ZTO_PALM_REFRESH_INVALID' });
-        return await palmLogin({ username: sealed.u, cipher: sealed.p, deviceSn: sealed.d }, proxyKey, keys, deps, env, true);
+        return await palmLogin(event, { username: sealed.u, cipher: sealed.p, deviceSn: sealed.d }, proxyKey, keys, deps, env, true);
     }
     const username = typeof input?.username === 'string' ? input.username.trim() : '';
     const password = typeof input?.password === 'string' ? input.password : '';
     const deviceSn = typeof input?.deviceSn === 'string' ? input.deviceSn : '';
     if (!username || username.length > 128 || !password || password.length > 256 || /[\u0000-\u001f]/.test(username)
         || !/^[A-Za-z0-9-]{8,80}$/.test(deviceSn)) return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
-    return await palmLogin({ username, cipher: passwordCipher(password, keys), deviceSn }, proxyKey, keys, deps, env, false);
+    return await palmLogin(event, { username, cipher: passwordCipher(password, keys), deviceSn }, proxyKey, keys, deps, env, false);
 }
 
 async function palmGet(query, session, keys, deps) {
@@ -582,6 +684,9 @@ async function palmGet(query, session, keys, deps) {
     if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
     const access = await deps.lookupAccess();
     if (access && access.response) return access.response;
+    if (session.source === 'shared' && otherBranch(access, session.site) && query.status !== '1') {
+        return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:palm-other-branch' });
+    }
     if (query.status === '1') {
         if (access?.verified && trackingCode(access.site) !== trackingCode(session.site)) {
             return json(200, { success: false, found: false, barcode, code: 'ZTO_OTHER_BRANCH', reason: 'branch:other' });
@@ -621,7 +726,7 @@ async function palmGetShared(query, resolved, proxyKey, keys, deps, env) {
     let response;
     try { response = await palmGet(query, session, keys, deps); } catch (error) { response = palmFailure(error); }
     if (session.source !== 'shared') return response;
-    const label = deps.keyLabel || '';
+    const label = resolved.slot;
     if (!authExpired(response)) {
         const age = Date.now() - session.loginAt;
         if (age >= SHARED_RENEW_AGE_MS || age < 0) renewShared(label, session.token, proxyKey, keys, env, deps, true).catch(() => {});
@@ -640,7 +745,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         const keys = protocolKeys(env);
         if (event.httpMethod === 'POST' && isPalmPost(query)) return await palmPost(event, query, proxyKey, keys, deps, env);
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
-        if (query.palm === 'status') return await palmStatus(proxyKey, deps, env);
+        if (query.palm === 'status') return await palmStatus(event, proxyKey, deps, env);
         const resolved = await resolvePalmSession(event, proxyKey, env, deps);
         if (query.diag === '1') {
             const body = { success: true, provider: 'zto-palm', configured: true, session: sessionReport(resolved) };
@@ -664,6 +769,7 @@ function isPalmQuery(query) {
 }
 
 function resetSharedForTests() {
+    sharedIndexes.clear();
     sharedSessions.clear();
     sharedRenewals.clear();
     sharedRenewFailedAt.clear();

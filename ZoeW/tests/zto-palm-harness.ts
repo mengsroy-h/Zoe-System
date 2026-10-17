@@ -237,7 +237,7 @@ export async function palmLoginBody(user = 'palm-user', idToken = '') {
     const headers: Record<string, string> = { 'x-zoe-proxy-key': KEY };
     if (idToken) headers['x-zoe-id-token'] = idToken;
     const res = await fn.handler({ httpMethod: 'POST', headers, queryStringParameters: { palm: 'login' },
-        body: JSON.stringify({ username: user, password: 'palm-pass', deviceSn: 'zoew-harness-device' }) });
+        body: JSON.stringify({ username: user, password: 'palm-pass', deviceSn: 'zoew-harness-device' }), ...(world.blobs ? { blobs: BLOB_CONTEXT } : {}) });
     if (res.statusCode !== 200) throw new Error('palm login ' + res.statusCode + ' ' + res.body);
     const body = JSON.parse(res.body);
     world.palmSessions.push(body.sessionToken as string);

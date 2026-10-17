@@ -69,31 +69,36 @@ node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('h
 - Config Argus ខុស (`ZTO_CONFIG_INVALID`) បិទផ្លូវ Palm ផងដែរ ព្រោះវាប្រើការកំណត់ទាំងនេះរួមគ្នា។
 
 ប្រសិនបើមិនទាន់មាន proxy key ក្នុងការកំណត់ Lookup, បញ្ចូលវាក្នុងប្រអប់
-**តម្លៃ Header / API Key / Secret** រួចចុច Login Palm។ Login ជោគជ័យនឹងរៀបចំ
+**តម្លៃ Header / API Key / Secret** រួចចុច Login Palm (ឬ «ប្រើ Login Palm របស់ហាង» ពេលហាង Login រួច)។ ជោគជ័យនឹងរៀបចំ
 URL, header និង field mapping ដោយស្វ័យប្រវត្តិ។
 
 សម្រាប់ Android, build ជាមួយ `VITE_NATIVE_WEB_ORIGIN=https://your-site.netlify.app`
 ដូចការកំណត់ native ដែលមានស្រាប់។ Browser web និង APK ផ្ញើ password ទៅតែ Function
 របស់ ZoeW ផ្ទាល់។
 
-## Session និងទិន្នន័យ
+## Session និងទិន្នន័យ (Login ម្តង ➜ ប្រើគ្រប់ទូរស័ព្ទក្នុងហាង)
 
-- Server បិទ token ក្នុង session AES-GCM ហើយ App អ៊ិនគ្រីប session ដោយសោ PIN ម្តងទៀត។
-- Login ជោគជ័យ ➜ Server ចេញ `refreshToken` ៖ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session) ចងនឹង proxy key ·
-  ផ្ទុកឈ្មោះគណនី · ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` · ផុតកំណត់ 30 ថ្ងៃ (Login ឡើងវិញម្តង ➜ ពន្យារ 30 ថ្ងៃទៀត)។ App អ៊ិនគ្រីបវាដោយសោ PIN
-  ម្តងទៀត (`palmRefreshTokenEnc`) ➜ ឧបករណ៍មិនអាចអានពាក្យសម្ងាត់ ឬឈ្មោះគណនីបានទេ។
-- Session មានអាយុអតិបរមា 8 ម៉ោង ស្របនឹង client Palm ដែលបានពិនិត្យ។ App Login ឡើងវិញនៅ background (`POST ?palm=refresh`) ពេលបើក App ·
-  ត្រឡប់មក App · ដោះសោ PIN · ជុំ 60 វិ ពេល session មានអាយុ ≥ 4 ម៉ោង · ពេល ZTO បដិសេធ session ➜ ភ្លាម (≤ ម្តងក្នុង 60 វិ) ·
-  មិនកំពុងទាញបញ្ជី (ការទាញដែលកំពុងរត់ប្រើ session ចាស់រហូតចប់) · Login តែម្តងបើហៅច្រើនដងក្នុងពេលតែមួយ។ Session ថ្មីរបស់គណនីដដែល ➜ មិនសម្អាត
-  cache Lookup ឬសាលក្រម ZTO ទេ។ ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` · `ZTO_PALM_COUNTRY_UNSUPPORTED`) ·
-  `refreshToken` ខូច/ផុតកំណត់ (`ZTO_PALM_REFRESH_INVALID`) · គណនីក្លាយជាសាខាផ្សេង ➜ App លុប `refreshToken` ប្រាប់ម្តង ហើយរង់ចាំ Login ដោយដៃ ·
-  បណ្តាញ/ZTO ខូចបណ្តោះអាសន្ន ➜ សាកម្តងទៀតក្រោយ 2 នាទី។ ចាកចេញ · ប្តូរហាង · Login ដោយដៃ កណ្តាលផ្លូវ ➜ ចម្លើយចាស់មិនសរសេរ។
-- មិនផ្លាស់ប្តូរ Argus Cookie/Token ដែលមានស្រាប់នៅ server និងមិនចែករំលែក token
-  Palm របស់អ្នកជាមួយឧបករណ៍ផ្សេង។
+- Login ជោគជ័យ ➜ Function ទុក **session Palm របស់ហាង** ក្នុង Netlify Blobs (store `zto-auth` ដដែលនឹង Cookie · key `palm-session/<label>` ·
+  `<label>` = ឈ្មោះសោភ្ជាប់ក្នុង `ZTO_PROXY_KEYS`, សោ `ZTO_PROXY_KEY` = `default`) ៖ token ZTO · ឈ្មោះគណនី · ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` ·
+  សាខា ទាំងអស់ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session ទូរស័ព្ទ) ហើយចងនឹងសោភ្ជាប់ ➜ Blob ចម្លងទៅសោផ្សេង បើកមិនបាន។
+- ⛔ **សោភ្ជាប់មួយ = ហាង/សាខាមួយ = គណនី Palm មួយ** ៖ Login ថ្មីដោយសោដដែលជំនួស session មុន (Login ចុងក្រោយឈ្នះ ដូច Sync Cookie)។
+  ហាងដែលប្រើសាខាផ្សេងគ្នា ត្រូវមានសោផ្សេងគ្នាក្នុង `ZTO_PROXY_KEYS` (🩺 បង្ហាញឈ្មោះសោដែលទូរស័ព្ទប្រើ)។
+- ទូរស័ព្ទផ្សេងដែលមានសោភ្ជាប់ដដែល ៖ ចុច **«ប្រើ Login Palm របស់ហាង»** (`GET ?palm=status`) ឬទទួល Setup Link API ដែល URL មាន `palm=1` ➜ ស្កេន ·
+  ទាញបញ្ជី · ពិនិត្យស្ថានភាព ដោយមិនផ្ញើ session ឡើយ ➜ Function អាន session ហាងពី Blob (ទុកក្នុង memory ៦០ វិនាទី · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ)។
+- Function Login ឡើងវិញដោយខ្លួនឯង ៖ session មានអាយុ ≥ 4 ម៉ោង ➜ Login នៅ background ម្តង (container ច្រើន ➜ តែមួយ ៖ lease ក្នុង Blob ដោយ ETag) ·
+  ZTO បដិសេធ token ➜ អាន Blob មុន (container ផ្សេងប្រហែលជា Login រួច) បើនៅ token ដដែល ➜ Login (ម្តង · single-flight) រួចសាកសំណើនោះម្តងទៀតក្នុងថវិកា ·
+  ការសរសេរ Blob ប្រើ ETag (`onlyIfMatch`) ➜ Login ឡើងវិញមិនសរសេរជាន់ Login ដោយដៃដែលកើតឡើងក្នុងពេលនោះ · Login ឡើងវិញមិនបានដោយបណ្ដាញ ➜ 503
+  (App សាកម្តងទៀត) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
+  `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
+- `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
+- ប៊ូតុង **ផ្តាច់ Palm** សួរបញ្ជាក់ ហើយ `POST ?palm=logout` លុប session ហាងពី Blob ➜ ទូរស័ព្ទគ្រប់គ្រឿងឈប់ (container ផ្សេងឈប់ក្នុង ≤ 60 វិ) ·
+  ប្តូរ `ZTO_PALM_SESSION_SECRET` ឬសោភ្ជាប់ ➜ session ហាងបើកមិនបាន ➜ Login ម្តងទៀត · ប្តូរពាក្យសម្ងាត់ Palm ➜ ZTO បដិសេធការ Login ឡើងវិញ ➜ Login ម្តងទៀត។
+- 🩺 (`?palm=1&diag=1`) ប្រាប់ប្រភព session (`shared` · `device` · `none`) · សាខា · អាយុ ដោយមិនបង្ហាញ token។
+- Blobs មិនទទួលការសរសេរពេល Login (`shared: false`) ➜ ទូរស័ព្ទនោះរក្សា session ដែល Server បិទ (AES-GCM · ចងនឹងសោភ្ជាប់ · ៨ ម៉ោង) និង `refreshToken`
+  (ផុត 30 ថ្ងៃ) អ៊ិនគ្រីបម្តងទៀតដោយសោ PIN ➜ `POST ?palm=refresh` (ពេល session មានអាយុ ≥ 4 ម៉ោង ឬ ZTO បដិសេធ) ចូលរួម session ហាងបើមាន
+  (គ្មាន Login ZTO) ឬបង្កើតវា ➜ ទូរស័ព្ទលុប session ផ្ទាល់ (`palmShared`)។ Function ប្រើ session ហាងមុន session ដែលទូរស័ព្ទផ្ញើ។
+- មិនផ្លាស់ប្តូរ Argus Cookie/Token ដែលមានស្រាប់នៅ server (key `cookie` · `cookie-life` មិនប៉ះ)។
 - គាំទ្រគណនីកម្ពុជា `KH` សម្រាប់ flow COD/DOD បច្ចុប្បន្ន។
-- ប៊ូតុង **ផ្តាច់ Palm** លុប session និង `refreshToken` ក្នុង App, បិទ Lookup និងសម្អាត cache Lookup។ Server មិនរក្សាបញ្ជី session ទេ ➜ session ដែលបានចេញ
-  (បើមាននរណាចម្លងវារួច) ផុតកំណត់ដោយខ្លួនឯងក្នុង 8 ម៉ោង · `refreshToken` ក្នុង 30 ថ្ងៃ ហើយប្រើបានតែជាមួយ proxy key ដដែល។ ប្តូរ `ZTO_PALM_SESSION_SECRET`
-  ➜ session និង `refreshToken` ទាំងអស់ឈប់ភ្លាម · ប្តូរពាក្យសម្ងាត់ Palm ➜ `refreshToken` ចាស់ ZTO បដិសេធ។
 - App រក្សាតែសាខា (`siteCode` · `siteName`) មិនរក្សាឈ្មោះគណនី Palm ទេ។
 - ប្រសិនបើ ZTO ស្នើ CAPTCHA/verification, App បង្ហាញសារឱ្យផ្ទៀងផ្ទាត់តាម ZTO ផ្លូវការ។
 

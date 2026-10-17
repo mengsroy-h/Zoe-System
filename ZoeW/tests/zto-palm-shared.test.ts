@@ -13,11 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const fn = require('../netlify/functions/zto-order-detail.js');
+const { tokenForSite, withCerts, TEST_PROJECT } = require('../../audit-tools/idtoken-fixture.js');
 const KEY_A = 'shop-a-proxy-key-0123456789abcdef';
 const KEY_B = 'shop-b-proxy-key-0123456789abcdef';
 const CODE = '77130500000012';
 const PASSWORD = 'shared-palm-password';
 const USER = 'shared-palm-user';
+const SLOT_A = 'palm-session/shopa/KH001';
+const SLOT_B = 'palm-session/shopb/KH001';
 const BLOBS = Buffer.from(JSON.stringify({ url: 'https://blobs.netlify.test', token: 't' })).toString('base64');
 
 type Entry = { value: string; etag: string };
@@ -78,9 +81,10 @@ function installZto() {
     }));
 }
 
-function call(query: Record<string, string>, opts: { key?: string; session?: string; method?: string; body?: unknown; blobs?: boolean } = {}) {
+function call(query: Record<string, string>, opts: { key?: string; session?: string; method?: string; body?: unknown; blobs?: boolean; site?: string } = {}) {
     const headers: Record<string, string> = { 'x-zoe-proxy-key': opts.key || KEY_A };
     if (opts.session) headers['x-zoe-palm-token'] = opts.session;
+    if (opts.site) headers['x-zoe-palm-site'] = opts.site;
     const event: any = { httpMethod: opts.method || (opts.body === undefined ? 'GET' : 'POST'), headers, queryStringParameters: query,
         body: opts.body === undefined ? '' : JSON.stringify(opts.body) };
     if (opts.blobs !== false) event.blobs = BLOBS;
@@ -88,7 +92,7 @@ function call(query: Record<string, string>, opts: { key?: string; session?: str
 }
 
 const login = (key = KEY_A, user = USER) => call({ palm: 'login' }, { key, body: { username: user, password: PASSWORD, deviceSn: 'zoew-owner-device' } });
-const scan = (opts: { key?: string; session?: string; blobs?: boolean } = {}) => call({ palm: '1', barcode: CODE }, opts);
+const scan = (opts: { key?: string; session?: string; blobs?: boolean; site?: string } = {}) => call({ palm: '1', barcode: CODE }, opts);
 const parse = (res: any) => JSON.parse(res.body);
 
 function coldContainer() {
@@ -130,8 +134,9 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         const res = await login();
         expect(res.statusCode).toBe(200);
         expect(parse(res)).toMatchObject({ success: true, shared: true, account: { siteCode: 'KH001', siteName: 'Test branch' } });
-        expect([...entries.keys()]).toEqual(['palm-session/shopa']);
-        const text = entries.get('palm-session/shopa')!.value;
+        expect([...entries.keys()].sort()).toEqual([SLOT_A, 'palm-sites/shopa']);
+        expect(JSON.parse(entries.get('palm-sites/shopa')!.value)).toEqual({ v: 1, sites: ['KH001'] });
+        const text = entries.get(SLOT_A)!.value;
         for (const secret of [PASSWORD, USER, 'zto-token-1', KEY_A]) expect(text, 'Blob គ្មានអក្សរច្បាស់ ' + secret).not.toContain(secret);
         const other = await scan();
         expect(other.statusCode).toBe(200);
@@ -156,7 +161,7 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
 
     it('Blob របស់សោមួយ ផ្ទេរទៅសោផ្សេង (ចម្លង) ➜ បើកមិនបាន (ចងនឹងសោភ្ជាប់)', async () => {
         await login();
-        entries.set('palm-session/shopb', entries.get('palm-session/shopa')!);
+        entries.set(SLOT_B, entries.get(SLOT_A)!);
         coldContainer();
         const res = await scan({ key: KEY_B });
         expect(res.statusCode).toBe(401);
@@ -179,14 +184,14 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
     it('container ផ្សេង Login ឡើងវិញរួច ➜ container នេះអាន Blob ឃើញ token ថ្មី មិន Login ម្តងទៀត', async () => {
         await login();
         await scan();
-        const own = entries.get('palm-session/shopa')!;
+        const own = entries.get(SLOT_A)!;
         coldContainer();
         await login();
-        const renewed = entries.get('palm-session/shopa')!;
-        entries.set('palm-session/shopa', own);
+        const renewed = entries.get(SLOT_A)!;
+        entries.set(SLOT_A, own);
         coldContainer();
         await scan();
-        entries.set('palm-session/shopa', renewed);
+        entries.set(SLOT_A, renewed);
         dead.add('zto-token-1');
         const res = await scan();
         expect(res.statusCode).toBe(200);
@@ -222,7 +227,7 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         const again = await scan();
         expect(again.statusCode).toBe(503);
         expect(logins, 'រង់ចាំ ៦០ វិនាទីមុនសាក Login ម្តងទៀត').toHaveLength(2);
-        expect(entries.has('palm-session/shopa')).toBe(true);
+        expect(entries.has(SLOT_A)).toBe(true);
     });
 
     it('session ចាស់ ≥ ៤ ម៉ោង ➜ ឆ្លើយភ្លាមដោយ token ចាស់ ហើយ Login ឡើងវិញនៅ background ម្តង', async () => {
@@ -328,7 +333,7 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         const seeded = await call({ palm: 'refresh' }, { body: { refreshToken: own.refreshToken } });
         expect(parse(seeded)).toMatchObject({ shared: true });
         expect(logins, 'Blob ទទេ ➜ Login ដោយគណនីទូរស័ព្ទ ហើយបង្កើត session ហាង').toHaveLength(2);
-        expect(entries.has('palm-session/shopa')).toBe(true);
+        expect(entries.has(SLOT_A)).toBe(true);
     });
 
     it('ផ្តាច់ (POST ?palm=logout) ➜ លុប Blob ➜ ស្កេនបន្ទាប់ 401 palm:no-session', async () => {
@@ -336,7 +341,8 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         expect((await scan()).statusCode).toBe(200);
         const out = await call({ palm: 'logout' }, { method: 'POST' });
         expect(out.statusCode).toBe(200);
-        expect(entries.size).toBe(0);
+        expect(entries.has(SLOT_A)).toBe(false);
+        expect(JSON.parse(entries.get('palm-sites/shopa')!.value).sites).toEqual([]);
         const res = await scan();
         expect(res.statusCode).toBe(401);
         expect(parse(res).reason).toBe('palm:no-session');
@@ -366,5 +372,54 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
             expect(pre.statusCode).toBe(204);
             expect(reads, palm).toBe(0);
         }
+    });
+
+    it('សាខាផ្សេងគ្នាប្រើសោភ្ជាប់ដដែល ➜ សាខានីមួយៗមាន Login Palm ផ្ទាល់ខ្លួន (palm-session/<សោ>/<សាខា>) · ទូរស័ព្ទប្រើសាខារបស់ខ្លួន', async () => {
+        loginAnswer = (body) => respond({ status: true, result: { token: 'token-of-' + body.userName, countryCode: 'KH',
+            siteCode: body.userName === 'branch-b-user' ? 'KH002' : 'KH001', siteName: body.userName === 'branch-b-user' ? 'Branch B' : 'Branch A' } });
+        expect(parse(await login(KEY_A, 'branch-a-user')).account).toEqual({ siteCode: 'KH001', siteName: 'Branch A' });
+        expect(parse(await login(KEY_A, 'branch-b-user')).account).toEqual({ siteCode: 'KH002', siteName: 'Branch B' });
+        expect(entries.has('palm-session/shopa/KH001') && entries.has('palm-session/shopa/KH002'), 'Login សាខា B មិនជាន់សាខា A').toBe(true);
+        expect(JSON.parse(entries.get('palm-sites/shopa')!.value).sites).toEqual(['KH001', 'KH002']);
+        coldContainer();
+        expect((await scan({ site: 'KH001' })).statusCode).toBe(200);
+        expect((await scan({ site: 'kh002' })).statusCode).toBe(200);
+        expect(seen).toEqual(['token-of-branch-a-user', 'token-of-branch-b-user']);
+        const unknown = await scan();
+        expect(unknown.statusCode).toBe(401);
+        expect(parse(unknown).reason, 'គ្មានសាខា ហើយសោមានច្រើនសាខា ➜ មិនទាយ').toBe('palm:branch-unknown');
+        expect(seen).toHaveLength(2);
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: false, branchUnknown: true, sites: ['KH001', 'KH002'] });
+        expect(parse(await call({ palm: 'status' }, { site: 'KH002' }))).toMatchObject({ shared: true, account: { siteCode: 'KH002', siteName: 'Branch B' } });
+        expect((await call({ palm: 'logout' }, { method: 'POST', site: 'KH002' })).statusCode).toBe(200);
+        expect(entries.has('palm-session/shopa/KH002')).toBe(false);
+        expect(entries.has('palm-session/shopa/KH001'), 'ផ្តាច់សាខា B មិនប៉ះសាខា A').toBe(true);
+        coldContainer();
+        expect((await scan()).statusCode, 'សល់សាខាតែមួយ ➜ ទូរស័ព្ទគ្មានសាខាប្រើសាខានោះ').toBe(200);
+        expect(seen[seen.length - 1]).toBe('token-of-branch-a-user');
+        expect((await call({ palm: 'logout' }, { method: 'POST' })).statusCode).toBe(200);
+        expect(entries.has('palm-session/shopa/KH001')).toBe(false);
+    });
+
+    it('🔐 ZTO_DETAIL_IDENTITY=require ៖ ទូរស័ព្ទសាខា A ផ្ញើសាខា B ➜ មិនប្រើ session សាខា B', async () => {
+        loginAnswer = (body) => respond({ status: true, result: { token: 'token-of-' + body.userName, countryCode: 'KH',
+            siteCode: body.userName === 'branch-b-user' ? '67890' : '12345', siteName: '' } });
+        await login(KEY_A, 'branch-a-user');
+        await login(KEY_A, 'branch-b-user');
+        vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
+        const zto = vi.mocked(fetch);
+        vi.stubGlobal('fetch', withCerts(zto));
+        coldContainer();
+        const ownBranch = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY_A, 'x-zoe-palm-site': '12345', 'x-zoe-id-token': tokenForSite('12345') },
+            queryStringParameters: { palm: '1', barcode: CODE }, blobs: BLOBS });
+        expect(parse(ownBranch)).toMatchObject({ found: true });
+        const forged = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY_A, 'x-zoe-palm-site': '67890', 'x-zoe-id-token': tokenForSite('12345') },
+            queryStringParameters: { palm: '1', barcode: CODE }, blobs: BLOBS });
+        expect(parse(forged)).toMatchObject({ found: false, code: 'ZTO_OTHER_BRANCH' });
+        expect(seen).toEqual(['token-of-branch-a-user']);
+        const status = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY_A, 'x-zoe-id-token': tokenForSite('67890') },
+            queryStringParameters: { palm: 'status' }, blobs: BLOBS });
+        expect(parse(status), 'គណនី ZoeW សាខា B ➜ ស្ថានភាព Login សាខា B (មិនមែនបញ្ជីសាខា)').toMatchObject({ shared: true, account: { siteCode: '67890' } });
     });
 });

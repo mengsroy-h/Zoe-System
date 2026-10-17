@@ -13,16 +13,17 @@ import { setFieldValue } from '../src/app/refs';
 import { uiState } from '../src/core/state';
 import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
-import { getLookupApiConfig, openLookupApiConfigModal } from '../src/features/lookup-config';
+import { openLookupApiConfigModal } from '../src/features/lookup-config';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, refreshZtoPalmSession, resetZtoPalmRefresh, submitZtoPalmLogin, PALM_REFRESH_AGE_MS } from '../src/features/zto-palm-login';
 import { encryptLookupSecret } from '../src/services/crypto';
-import { ARRIVED, KEY, NOW, palmLoginBody, pulledRows, setupWorld, storePalmConfig, teardownWorld, useSharedBlobs, world, type Backend } from './zto-palm-harness';
+import { ARRIVED, KEY, NOW, OTHER_SITE, SITE, identityToken, palmLoginBody, pulledRows, setupWorld, shopOf, signIn, storePalmConfig, teardownWorld, useSharedBlobs, world, type Backend } from './zto-palm-harness';
 
 const BACKENDS: Backend[] = ['firebase', 'supabase'];
 const STORE = 'zoew_lookup_api_config';
 const stored = () => JSON.parse(String(appLocalStore.getItem(STORE)));
+const sessionKeys = () => [...world.blobs!.keys()].filter((key) => key.startsWith('palm-session/'));
 
 afterEach(() => {
     act(() => cancelZtoPalmLogin());
@@ -64,7 +65,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         expect(a).toMatchObject({ palmShared: true, palmAccount: { siteCode: '881859' } });
         for (const name of ['palmTokenEnc', 'palmRefreshTokenEnc', 'palmExpiresAt']) expect(a[name], name).toBeUndefined();
         expect(JSON.stringify(a)).not.toContain('palm-pass');
-        expect(world.blobs!.size).toBe(1);
+        expect(sessionKeys().length).toBe(1);
         expect(world.logins).toHaveLength(1);
 
         await proxyOnlyConfig(shop);
@@ -118,7 +119,7 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         const cfg = stored();
         expect(cfg.palmShared).toBe(true);
         for (const name of ['palmTokenEnc', 'palmRefreshTokenEnc', 'palmExpiresAt']) expect(cfg[name], name).toBeUndefined();
-        expect(world.blobs!.size).toBe(1);
+        expect(sessionKeys().length).toBe(1);
         const sent = tokensSent();
         await runZtoListSyncPreview();
         expect([...pulledRows().keys()].sort()).toEqual(ARRIVED.slice().sort());
@@ -134,15 +135,33 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         setFieldValue('ztoPalmUsernameInput', 'palm-user');
         setFieldValue('ztoPalmPasswordInput', 'palm-pass');
         await act(async () => { await submitZtoPalmLogin(); });
-        expect(world.blobs!.size).toBe(1);
+        expect(sessionKeys().length).toBe(1);
         vi.stubGlobal('confirm', vi.fn(() => false));
         await act(async () => { await disconnectZtoPalm(); });
-        expect(world.blobs!.size, 'បោះបង់ ➜ មិនលុប').toBe(1);
+        expect(sessionKeys().length, 'បោះបង់ ➜ មិនលុប').toBe(1);
         vi.stubGlobal('confirm', vi.fn(() => true));
         await act(async () => { await disconnectZtoPalm(); });
-        expect(world.blobs!.size).toBe(0);
+        expect(sessionKeys().length).toBe(0);
         expect(new URL(stored().url).searchParams.get('palm')).toBeNull();
         expect(stored().palmShared).toBeUndefined();
         expect(viewState.palmLoginConnected).toBe(false);
+    });
+
+    it('សាខា ២ ប្រើសោភ្ជាប់ដដែល ➜ Login Palm នៃសាខានីមួយៗនៅដាច់ពីគ្នា · ទូរស័ព្ទសាខា B ចុច «ប្រើ Login Palm របស់ហាង» ➜ ទទួលសាខា B តាមគណនី ZoeW', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        world.loginAnswer = (body: any) => new Response(JSON.stringify({ status: true, result: { token: 'token-' + body.userName, countryCode: 'KH',
+            siteCode: body.userName === 'branch-b' ? OTHER_SITE : SITE, siteName: body.userName === 'branch-b' ? 'Branch B' : 'Branch A' } }), { status: 200 });
+        await palmLoginBody('branch-a');
+        await palmLoginBody('branch-b');
+        expect(sessionKeys().sort()).toEqual(['palm-session/default/' + OTHER_SITE, 'palm-session/default/' + SITE].sort());
+        signIn(backend, identityToken(backend, OTHER_SITE), OTHER_SITE);
+        await proxyOnlyConfig(shopOf(backend, OTHER_SITE));
+        await openModal();
+        await act(async () => { await connectSharedZtoPalm(); });
+        expect(stored(), 'គណនី ZoeW សាខា B ➜ Login Palm សាខា B').toMatchObject({ palmShared: true, palmAccount: { siteCode: OTHER_SITE, siteName: 'Branch B' } });
+        const headers = await buildLookupRequestHeaders(stored());
+        expect(headers).toMatchObject({ 'X-Zoe-Palm-Site': OTHER_SITE });
+        expect(headers).not.toHaveProperty('X-Zoe-Palm-Token');
     });
 });

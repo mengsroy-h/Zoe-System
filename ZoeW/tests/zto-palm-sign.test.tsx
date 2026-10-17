@@ -68,7 +68,7 @@ it('Palm បង្ហាញ Sign លើប្រវត្តិ និង Barcod
     mount(<><table><tbody><tr><HistoryRow row={buildHistoryRowModel(dataState.scanHistory[0], 1, false, false)} /></tr></tbody></table><BarcodeListContainer /></>);
     expect(document.querySelector('.close-btn')?.textContent).toContain('Sign');
     expect(document.querySelector('.btn-toggle-bc-close')?.textContent).toContain('Sign');
-    await act(async () => { await toggleCloseStatus('item1'); });
+    act(() => { (document.querySelector('.close-btn') as HTMLButtonElement).click(); });
     expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
     expect(confirm).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();

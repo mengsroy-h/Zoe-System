@@ -1,4 +1,3 @@
-import { openZtoPalmSign, palmSignMode } from './zto-palm-sign';
 import { modalIsOpen, setModalDisplay } from '../core/modals';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
@@ -298,7 +297,6 @@ export async function toggleIndividualBarcodeClose(itemId?, barcodeCode?) {
 
     let targetB = item.barcodes.find(b => b.code === barcodeCode);
     if (!targetB) return;
-    if (!targetB.isClosed && palmSignMode()) return openZtoPalmSign(itemId, barcodeCode);
     const actionText = targetB.isClosed ? "បើក" : "បិទ";
     const desiredClosed = !targetB.isClosed;
     if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}ស្ថានភាពកញ្ចប់អីវ៉ាន់ (${targetB.code}) នេះមែនទេ?`)) return;

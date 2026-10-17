@@ -27,12 +27,12 @@ export function openZtoPalmSign(itemId: string, barcode?: string) {
     if (palmSignState.busy || !palmSignMode()) return;
     const cfg = getLookupApiConfig();
     if (!cfg?.palmTokenEnc || !securityState.lookupSecretKey) {
-        showToast('សូមបើក API ស្វែងរកអតិថិជនដោយ PIN ហើយ Login ZTO Palm ជាមុនសិន។');
+        showToast('⚠️ សូមបើក API ស្វែងរកអតិថិជនដោយ PIN ហើយ Login ZTO Palm ជាមុនសិន។');
         return;
     }
     const item = dataState.scanHistory.find((row) => row.id === itemId);
     const codes = Array.isArray(item?.barcodes) ? item.barcodes.filter((b) => !b.isClosed && (!barcode || b.code === barcode)).map((b) => b.code) : [];
-    if (!codes.length) { showToast('រកមិនឃើញកញ្ចប់បើកដែលមាន Barcode សម្រាប់ Sign។'); return; }
+    if (!codes.length) { showToast('⚠️ រកមិនឃើញកញ្ចប់បើកដែលមាន Barcode សម្រាប់ Sign។'); return; }
     palmSignState.generation++;
     palmSignState.itemId = itemId;
     palmSignState.codes = [...new Set<string>(codes)];

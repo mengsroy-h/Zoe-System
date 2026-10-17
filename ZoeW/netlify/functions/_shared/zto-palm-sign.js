@@ -12,18 +12,19 @@ function readInput(event) {
     if (event.isBase64Encoded || typeof event.body !== 'string' || Buffer.byteLength(event.body) > 1250000) return null;
     let input;
     try { input = JSON.parse(event.body); } catch (_) { return null; }
-    const { barcode, signMan = '', photo, requestId, stage, dispatchProof = '' } = input || {};
+    const { barcode, signMan = '', photo, requestId, stage, dispatchProof = '', confirmationToken = '' } = input || {};
     if (stage === 'status') return typeof barcode === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(barcode)
         && typeof requestId === 'string' && /^[a-f0-9-]{36}$/i.test(requestId) ? { barcode, requestId, stage } : null;
     if (typeof barcode !== 'string' || !/^[A-Za-z0-9_-]{6,64}$/.test(barcode)
         || !['dispatch', 'receipt'].includes(stage) || typeof dispatchProof !== 'string' || dispatchProof.length > 4096
+        || typeof confirmationToken !== 'string' || confirmationToken.length > 8192
         || typeof signMan !== 'string' || signMan.length > 120 || /[\u0000-\u001f\u007f]/.test(signMan)
         || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)
         || typeof photo !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo) || photo.length % 4 !== 0) return null;
     const bytes = Buffer.from(photo, 'base64');
     if (bytes.length < 8 || bytes.length > MAX_PHOTO_BYTES || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255
         || bytes[bytes.length - 2] !== 255 || bytes[bytes.length - 1] !== 217 || bytes.toString('base64') !== photo) return null;
-    return { barcode, signMan: signMan.trim(), photo, requestId, stage, dispatchProof };
+    return { barcode, signMan: signMan.trim(), photo, requestId, stage, dispatchProof, confirmationToken };
 }
 
 function failure(upstream, code) {
@@ -38,9 +39,25 @@ function localStamp() {
     return new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function hash(value) {
+    return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function confirmationBinding(input, session) {
+    return hash(JSON.stringify([session.token, input.barcode, input.stage, input.requestId, input.signMan, input.photo, input.dispatchProof]));
+}
+
 async function submit(input, session, request, proof) {
     const { barcode, photo, requestId, stage } = input;
     const scanType = stage === 'dispatch' ? 4 : 5;
+    let confirmation;
+    if (input.confirmationToken) {
+        try { confirmation = proof.open(input.confirmationToken); } catch (_) {}
+        if (!confirmation || confirmation.kind !== 'scan-confirm' || confirmation.binding !== confirmationBinding(input, session)
+            || !Number.isFinite(confirmation.expiresAt) || confirmation.expiresAt <= Date.now()) {
+            return json(409, { code: 'ZTO_PALM_SIGN_INVALID', barcode });
+        }
+    }
     const signMan = input.signMan;
     if (stage === 'receipt') {
         let receipt;
@@ -64,8 +81,27 @@ async function submit(input, session, request, proof) {
     });
     const rejected = failure(checked, 'ZTO_PALM_SIGN_CHECK_REJECTED');
     if (rejected) return rejected;
-    if (checked.result && (typeof checked.result !== 'object' || Array.isArray(checked.result) || checked.result.message)) {
-        return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode });
+    if (checked.result) {
+        const result = checked.result;
+        if (typeof result !== 'object' || Array.isArray(result)
+            || result.message != null && typeof result.message !== 'string'
+            || result.whetherForce !== undefined && typeof result.whetherForce !== 'boolean') {
+            return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode });
+        }
+        if (result.message) {
+            const message = result.message;
+            if (message.length > 4000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(message)) {
+                return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode });
+            }
+            if (stage !== 'receipt' || result.whetherForce === true || /90187|90189/.test(message)) {
+                return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode, message });
+            }
+            if (!confirmation || confirmation.warningHash !== hash(message)) {
+                return json(409, { code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode, stage, message,
+                    confirmationToken: proof.seal({ kind: 'scan-confirm', binding: confirmationBinding(input, session),
+                        warningHash: hash(message), expiresAt: Date.now() + 300000 }) });
+            }
+        }
     }
     const scanDate = localStamp();
     if (stage === 'receipt') {
@@ -111,19 +147,30 @@ async function status(input, session, request, proof) {
     if (matches.length !== 1 || !Array.isArray(matches[0].tracks)) return json(409, { code: 'ZTO_PALM_STATUS_UNCONFIRMED' });
     let dispatched = '';
     let reset = '';
+    let problemScan;
+    let problemAt = '';
     for (const track of matches[0].tracks) {
         const at = proof.stamp(track?.time);
         if (!track || String(track.mailNo || '').trim().toUpperCase() !== code || !at || !String(track.siteCode || '').trim()
             || (typeof track.action !== 'string' && typeof track.action !== 'number')) return json(409, { code: 'ZTO_PALM_STATUS_UNCONFIRMED' });
         const action = String(track.action);
         if (['1', '2', '3', '5', '-710', '32', '9'].includes(action) && at > reset) reset = at;
-        if (action === '4' && String(track.siteCode).trim().toUpperCase() === session.site.trim().toUpperCase() && at > dispatched) dispatched = at;
+        if (String(track.siteCode).trim().toUpperCase() === session.site.trim().toUpperCase() && at > problemAt
+            && (['29', '-579'].includes(action) || [track.msgLoc, track.msgEng, track.message].some((value) => typeof value === 'string'
+                && /【(?:问题件|កញ្ចប់អីវ៉ាន់មានបញ្ហា)】|\[problem piece\]/i.test(value)))) {
+            const text = [track.msgLoc, track.msgEng, track.actionName].find((value) => typeof value === 'string' && value.trim()
+                && value.length <= 4000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value));
+            problemScan = { action, time: track.time, message: text || (action === '-579' ? 'ទាក់ទងអតិថិជនមិនបាន' : 'មានស្កេនកញ្ចប់បញ្ហា') };
+            problemAt = at;
+        }
+        if ((action === '4' || ['-71', '-588'].includes(action) && track.preOrNextID === '04') && String(track.siteCode).trim().toUpperCase() === session.site.trim().toUpperCase() && at > dispatched) dispatched = at;
     }
     const verdict = proof.verdict(upstream, input.barcode, session.site);
     if (verdict.ztoClosed === true) return json(200, { success: true, barcode: input.barcode, stage: 'status', ztoClosed: true, dispatched: true });
     if (matches[0].mail.isSign !== 0) return json(409, { code: 'ZTO_PALM_STATUS_UNCONFIRMED' });
     const done = !!dispatched && dispatched > reset;
     return json(200, { success: true, barcode: input.barcode, stage: 'status', ztoClosed: false, dispatched: done,
+        ...(problemScan && problemAt >= reset ? { problemScan } : {}),
         ...(done ? { dispatchProof: dispatchProof(input, session, proof) } : {}) });
 }
 
@@ -137,7 +184,7 @@ async function signPalm(event, session, deps, request, proof) {
     }
     if (input.stage === 'status') return status(input, session, request, proof);
     const key = crypto.createHash('sha256').update(session.token + '|' + input.requestId + '|' + input.stage + '|' + input.barcode).digest('hex');
-    const fingerprint = crypto.createHash('sha256').update(input.signMan + '|' + input.photo + '|' + input.dispatchProof).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([input.signMan, input.photo, input.dispatchProof, input.confirmationToken])).digest('hex');
     for (const [id, entry] of runs) if (entry.at < Date.now() - 600000 && !entry.active) runs.delete(id);
     const old = runs.get(key);
     if (old) return old.fingerprint === fingerprint ? old.promise : json(409, { code: 'ZTO_PALM_SIGN_INVALID' });

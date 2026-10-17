@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { palmSignState } from '../../../core/palm-sign-state';
 import { scanState, uiState } from '../../../core/state';
 import { noteAppLockExcuse } from '../../../features/app-lock';
-import { acceptPalmSignBarcode, advancePalmSignStage, checkZtoPalmSignStages, recheckZtoPalmSign, setPalmSignName, setPalmSignSelected, submitZtoPalmSign } from '../../../features/zto-palm-sign';
+import { acceptPalmSignBarcode, advancePalmSignStage, cancelPalmSignConfirmation, confirmPalmSignWarning, checkZtoPalmSignStages, recheckZtoPalmSign, setPalmSignName, setPalmSignSelected, submitZtoPalmSign } from '../../../features/zto-palm-sign';
 import { createScratchCanvas, loadScratchImage } from '../../../platform/document-io';
 import { decodeBarcodeFromCanvasManual } from '../../../services/scan-engine';
 import { withTimeout } from '../../../services/network';
@@ -37,7 +37,7 @@ async function preparePhoto(file: File) {
 }
 
 function SignForm() {
-    const v = useStoreFields(palmSignState, ['codes', 'selectedCodes', 'busy', 'message', 'results', 'dispatchResults', 'stage', 'photos', 'checking', 'checked', 'signMan']);
+    const v = useStoreFields(palmSignState, ['codes', 'selectedCodes', 'busy', 'message', 'results', 'dispatchResults', 'stage', 'photos', 'checking', 'checked', 'signMan', 'confirmation', 'warnings', 'problemScans']);
     const [barcode, setBarcode] = useState('');
     const [message, setMessage] = useState('');
     const [preparing, setPreparing] = useState(false);
@@ -45,7 +45,7 @@ function SignForm() {
     const results = v.stage === 'dispatch' ? v.dispatchResults : v.results;
     const available = v.stage === 'dispatch' ? v.codes : v.codes.filter((code) => v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof) || v.results.some((r) => r.code === code && r.state === 'signed'));
     const allReceived = v.codes.length > 0 && v.codes.every((code) => v.results.some((r) => r.code === code && r.state === 'signed'));
-    const disabled = v.busy || v.checking || preparing;
+    const disabled = v.busy || v.checking || preparing || !!v.confirmation;
     const canScan = !disabled && v.codes.some((code) => v.checked[code]) && !allReceived && (v.stage === 'dispatch' || !!v.signMan.trim());
     const canAdvance = v.stage === 'dispatch' && v.codes.length > 0
         && v.codes.every((code) => v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof) || v.results.some((r) => r.code === code && r.state === 'signed'));
@@ -87,7 +87,7 @@ function SignForm() {
                     return <label key={code} className="palm-sign-code">
                         <input type="checkbox" checked={v.selectedCodes.includes(code)} disabled={disabled || !v.photos[code]}
                             onChange={(event) => setPalmSignSelected(code, event.target.checked)} />
-                        <span>{code}{result ? <small role="status">{result.message}</small> : <small>{v.photos[code] ? '✅ បានស្កេន និងចាប់រូប' : 'រង់ចាំស្កេន'}</small>}</span>
+                        <span>{code}{v.problemScans[code] ? <small className="palm-sign-problem">⚠️ មានស្កេនបញ្ហា · {v.problemScans[code].time}<br />{v.problemScans[code].message}</small> : null}{v.warnings[code] ? <small className="palm-sign-warning">⚠️ សារព្រមានពី ZTO៖ {v.warnings[code]}</small> : null}{result ? <small role="status">{result.message}</small> : <small>{v.photos[code] ? '✅ បានស្កេន និងចាប់រូប' : 'រង់ចាំស្កេន'}</small>}</span>
                         {v.photos[code] ? <img className="palm-sign-thumbnail" src={'data:image/jpeg;base64,' + v.photos[code]} alt={'រូបកញ្ចប់ ' + code} /> : null}
                     </label>;
                 })}
@@ -108,6 +108,14 @@ function SignForm() {
             {preparing || message ? <p role="status" aria-live="polite">{preparing ? 'កំពុងរៀបចំរូបភាព…' : message}</p> : null}
             {v.codes.some((code) => !v.checked[code]) ? <button className="btn-info" disabled={disabled} onClick={() => void checkZtoPalmSignStages()}>ពិនិត្យស្ថានភាព ZTO ម្ដងទៀត</button> : null}
             {v.message ? <p role="status" aria-live="polite">{v.message}</p> : null}
+            {v.confirmation ? <section className="palm-sign-confirmation" role="alertdialog" aria-labelledby="palmSignWarningTitle" aria-describedby="palmSignWarningMessage">
+                <h4 id="palmSignWarningTitle">⚠️ បញ្ជាក់កញ្ចប់ · {v.confirmation.code}</h4>
+                <p id="palmSignWarningMessage">{v.confirmation.message}</p>
+                <div className="modal-btns">
+                    <button type="button" className="btn-cancel" autoFocus disabled={v.busy} onClick={cancelPalmSignConfirmation}>បោះបង់</button>
+                    <button type="button" className="btn-confirm" disabled={v.busy} onClick={() => void confirmPalmSignWarning()}>បញ្ជាក់ និងបន្ត</button>
+                </div>
+            </section> : null}
             <div className="modal-btns">
                 <button className="btn-confirm" disabled={disabled || !v.selectedCodes.some((code) => v.photos[code] && !results.some((r) => r.code === code && r.state !== 'failed'))}
                     onClick={() => void submitZtoPalmSign(v.selectedCodes)}>⬆ ផ្ញើបញ្ជី</button>

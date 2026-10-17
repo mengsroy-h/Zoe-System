@@ -171,3 +171,150 @@ it('ទូរស័ព្ទ B ប្រើ session សាខា ដោយគ្
         expect(JSON.parse(String(save[1]?.body))[0].dispatchOrSendManCode).toBe('shared-operator');
     } finally { fn.setBlobsModuleForTests(null); require('../netlify/functions/_shared/zto-palm.js').resetSharedForTests(); }
 });
+it('កញ្ចប់មានបញ្ហា៖ បង្ហាញបញ្ជាក់ មុនផ្ញើទទួល និងរូប', async () => {
+    const body = await receipt();
+    const message = 'ទំនិញនេះគឺជាទំនិញដែលមានបញ្ហា សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message, whetherForce: false }) : upstream(url)));
+    const first = JSON.parse((await call(body)).body);
+    expect(first).toMatchObject({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: CODE, stage: 'receipt', message });
+    expect(first.confirmationToken).toEqual(expect.any(String));
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+    const accepted = await call({ ...body, confirmationToken: first.confirmationToken });
+    expect(JSON.parse(accepted.body)).toMatchObject({ success: true, ztoClosed: true });
+});
+it.each([true, 'false', null])('ZTO ហាមឬ flag ខូច %j ➜ មិនមានការបញ្ជាក់ឆ្លង', async (whetherForce) => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'warning', whetherForce }) : upstream(url)));
+    const out = JSON.parse((await call({ ...body, confirmed: true })).body);
+    expect(out.code).toBe('ZTO_PALM_SIGN_CHECK_REJECTED');
+    expect(out.confirmationToken).toBeUndefined();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+});
+it.each(['90187|COD warning', '90189|site warning'])('សារត្រូវការផ្លូវ retry ផ្សេង %s ➜ មិនប្តូរ ignore ដោយខ្លួនឯង', async (message) => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message, whetherForce: false }) : upstream(url)));
+    expect(JSON.parse((await call({ ...body, confirmed: true })).body).code).toBe('ZTO_PALM_SIGN_CHECK_REJECTED');
+    const check = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith('newBusinessCheck'))!;
+    expect(JSON.parse(String(check[1]?.body))).toMatchObject({ ignoreCodBacklog: 0, ignoreDispSiteId: 0 });
+});
+it('flag មិនផ្ញើមានលំនាំដើម false ដូច APK · បញ្ជាក់ស្ទួនផ្ញើតែម្តង', async () => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'Problem parcel' }) : upstream(url)));
+    const pending = JSON.parse((await call(body)).body);
+    expect(pending.code).toBe('ZTO_PALM_SIGN_CONFIRM_REQUIRED');
+    const accepted = { ...body, confirmationToken: pending.confirmationToken };
+    const [a, b] = await Promise.all([call(accepted), call(accepted)]);
+    expect(a.statusCode).toBe(200);
+    expect(b.body).toBe(a.body);
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'))).toHaveLength(1);
+});
+it('បញ្ជាក់ចងឈ្មោះ រូប Barcode request និង session · token ក្លែងនិងផុតកំណត់មិនសរសេរ', async () => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'Problem parcel', whetherForce: false }) : upstream(url)));
+    const pending = JSON.parse((await call(body)).body);
+    for (const patch of [{ signMan: 'Changed' }, { photo: '/9j/AAECAwQG/9k=' }, { barcode: CODE + '1' }, { requestId: randomUUID() }, { stage: 'dispatch' }, { dispatchProof: 'other' }, { confirmationToken: 'forged' }]) {
+        expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken, ...patch })).body).code).toBe('ZTO_PALM_SIGN_INVALID');
+    }
+    const transport = vi.mocked(fetch);
+    vi.stubGlobal('fetch', vi.fn(async () => reply({ token: 'other-palm-token', countryCode: 'KH', siteCode: 'KH001' })));
+    const other = JSON.parse((await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'login' }, body: JSON.stringify({ username: 'other-operator', password: 'test', deviceSn: 'zoew-sign-test' }) })).body).sessionToken;
+    vi.stubGlobal('fetch', transport);
+    expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken }, other)).body).code).toBe('ZTO_PALM_SIGN_INVALID');
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 300001);
+    try { expect(JSON.parse((await call({ ...body, confirmationToken: pending.confirmationToken })).body).code).toBe('ZTO_PALM_SIGN_INVALID'); }
+    finally { clock.mockRestore(); }
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+});
+it('សារ ZTO ប្តូរ ត្រូវបញ្ជាក់ម្តងទៀត · ប្រែហាម មិនអាចបន្ត', async () => {
+    const body = await receipt();
+    let message = 'First warning';
+    let whetherForce = false;
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message, whetherForce }) : upstream(url)));
+    const first = JSON.parse((await call(body)).body);
+    message = 'Second warning';
+    const second = JSON.parse((await call({ ...body, confirmationToken: first.confirmationToken })).body);
+    expect(second).toMatchObject({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', message });
+    whetherForce = true;
+    expect(JSON.parse((await call({ ...body, confirmationToken: second.confirmationToken })).body).code).toBe('ZTO_PALM_SIGN_CHECK_REJECTED');
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+});
+it('ក្រោយបញ្ជាក់ ចម្លើយ upload បាត់ មិនផ្ញើស្ទួន និងមិនបិទ', async () => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        if (String(url).endsWith('newBusinessCheck')) return reply({ message: 'Problem parcel', whetherForce: false });
+        if (String(url).endsWith('saveScanInfo')) throw new Error('lost');
+        return upstream(url);
+    }));
+    const pending = JSON.parse((await call(body)).body);
+    const accepted = { ...body, confirmationToken: pending.confirmationToken };
+    expect(JSON.parse((await call(accepted)).body).uncertain).toBe(true);
+    const count = vi.mocked(fetch).mock.calls.length;
+    await call(accepted);
+    await call(body);
+    expect(fetch).toHaveBeenCalledTimes(count);
+});
+
+it('upstream បរាជ័យ មិនបម្លែងទៅផ្ទាំងអនុម័ត', async () => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'warning', whetherForce: false }, false) : upstream(url)));
+    const result = JSON.parse((await call(body)).body);
+    expect(result.code).toBe('ZTO_PALM_SIGN_CHECK_REJECTED');
+    expect(result.confirmationToken).toBeUndefined();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+});
+it.each([null, ''])('message ទទេ %j ដូច APK មិនទាមទារបញ្ជាក់', async (message) => {
+    const body = await receipt();
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message, whetherForce: false }) : upstream(url)));
+    expect(JSON.parse((await call(body)).body).ztoClosed).toBe(true);
+});
+it('tracking -579 សម្គាល់ស្កេនបញ្ហាមុន Sign ដោយមិនអនុម័តជំនួស ZTO', async () => {
+    const problem = { ...track('-579', '10:00:00'), msgLoc: 'ស្កេនកញ្ចប់មានបញ្ហា៖ ទាក់ទងអតិថិជនមិនបាន' };
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), track('4', '09:00:00'), problem]))));
+    const status = JSON.parse((await call({ ...input(), stage: 'status' })).body);
+    expect(status).toMatchObject({ dispatched: true, ztoClosed: false, problemScan: { action: '-579', message: problem.msgLoc, time: problem.time } });
+    expect(status.confirmationToken).toBeUndefined();
+    expect(fetch).toHaveBeenCalledOnce();
+});
+it.each([
+    { action: '-579', site: 'OTHER', later: '3' },
+    { action: '-579', site: 'KH001', later: '3' },
+    { action: '-579', site: 'KH001', later: '-710' },
+    { action: '-71', site: 'KH001', later: '' },
+    { action: '-588', site: 'KH001', later: '' }
+])('មិនដាក់ស្លាកបញ្ហាខុសសាខា វដ្តចាស់ ឬស្កេនចែកចាយ %j', async ({ action, site, later }) => {
+    const rows = [track('3', '08:00:00'), track(action, '09:00:00', site), ...(later ? [track(later, '10:00:00')] : [])];
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks(rows))));
+    expect(JSON.parse((await call({ ...input(), stage: 'status' })).body).problemScan).toBeUndefined();
+});
+it('បញ្ហាច្រើនយកស្កេនថ្មីបំផុត មិនពឹងលំដាប់ជួរ', async () => {
+    const rows = [{ ...track('29', '10:00:00'), msgLoc: 'បញ្ហាថ្មី' }, track('3', '08:00:00'), { ...track('-579', '09:00:00'), msgLoc: 'បញ្ហាចាស់' }];
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks(rows))));
+    expect(JSON.parse((await call({ ...input(), stage: 'status' })).body).problemScan.message).toBe('បញ្ហាថ្មី');
+});
+it('ប្រភេទបញ្ហាផ្សេងមាន marker ពិតពី ZTO សម្រាប់បង្ហាញ មិនមែនភស្តុតាង Sign', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), { ...track('-999', '09:00:00'), msgEng: 'Scanned for [problem piece]' }]))));
+    const result = JSON.parse((await call({ ...input(), stage: 'status' })).body);
+    expect(result.problemScan.message).toBe('Scanned for [problem piece]');
+    expect(result.ztoClosed).toBe(false);
+    expect(result.confirmationToken).toBeUndefined();
+});
+it.each(['-71', '-588'])('ស្កេនចែកចាយស្ទួន %s ដែល ZTO ចងប្រភេទ 04 អាចរំលងជំហានទី១', async (action) => {
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), { ...track(action, '09:00:00'), preOrNextID: '04' }, track('-579', '10:00:00')]))));
+    expect(JSON.parse((await call({ ...input(), stage: 'status' })).body)).toMatchObject({ dispatched: true, ztoClosed: false, dispatchProof: expect.any(String) });
+});
+it('ធ្លាប់បញ្ហា តែទទួលរួច មិនបង្ហាញជាបញ្ហាបច្ចុប្បន្ន', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), track('-579', '09:00:00'), track('5', '10:00:00')], 1))));
+    const out = JSON.parse((await call({ ...input(), stage: 'status' })).body);
+    expect(out.ztoClosed).toBe(true);
+    expect(out.problemScan).toBeUndefined();
+});
+
+it.each([
+    { site: 'OTHER', preOrNextID: '04', later: '' },
+    { site: 'KH001', preOrNextID: '', later: '' },
+    { site: 'KH001', preOrNextID: '04', later: '3' }
+])('រំលងចែកចាយស្ទួនត្រូវភស្តុតាង 04 ត្រូវសាខានិងវដ្ត %j', async ({ site, preOrNextID, later }) => {
+    vi.stubGlobal('fetch', vi.fn(async () => reply(tracks([track('3', '08:00:00'), { ...track('-71', '09:00:00', site), preOrNextID }, ...(later ? [track(later, '10:00:00')] : [])]))));
+    expect(JSON.parse((await call({ ...input(), stage: 'status' })).body).dispatched).toBe(false);
+});

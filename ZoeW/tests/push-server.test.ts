@@ -603,15 +603,21 @@ describe('⛔ ហាងច្រើន ៖ ការរំលឹកម៉ោង 
         expect(await t.h.service.dispatchNotices()).toMatchObject({ reason: 'baseline' });
         t.h.notices = { [noticeId(at8 - 60e3)]: { kind: 'maintenance', title: 'ថែទាំយប់នេះ', at: at8 - 60e3 } };
         t.h.push = async (url: string) => { await sleep(5); t.sent.set(url, (t.sent.get(url) || 0) + 1); return { status: 201 }; };
+        // ⛔ ចំនួន cron មិនថេរ ៖ ម៉ាស៊ីនយឺត (CI) ផ្ញើតិចក្នុង run មួយ ➜ រត់រហូត run លែង `partial` (ពិដាន ២៤ ម៉ោង = អាយុដំណឹង) ហើយ run `partial` នីមួយៗត្រូវផ្ញើបន្ថែម
         const runs: any[] = [];
-        for (let k = 0; k < 8; k++) {
+        for (let k = 0; k < 288; k++) {
             t.h.clock.now = at8 + 3 * 3600e3 + k * 5 * 60e3;
             const started = t.h.clock.now;
-            runs.push({ out: await t.h.service.dispatchNotices(started), ms: t.h.clock.now - started });
+            const before = t.sent.size;
+            const out = await t.h.service.dispatchNotices(started);
+            runs.push({ out, ms: t.h.clock.now - started, added: t.sent.size - before });
+            if (out.reason !== 'partial') break;
         }
         const missing = t.endpoints.filter((url) => !t.sent.has(url)).length;
         const twice = t.endpoints.filter((url) => (t.sent.get(url) || 0) > 1).length;
         expect({ missing, twice }).toEqual({ missing: 0, twice: 0 });
+        expect(runs.length, 'run ១ មិនគ្រប់ ➜ ការបន្តនៅ cron បន្ទាប់ត្រូវបានវាស់ពិត').toBeGreaterThan(1);
+        expect(runs.filter((run) => run.out.reason === 'partial' && !(run.added > 0)), 'run `partial` គ្មានការផ្ញើថ្មី = ជាប់គាំង').toEqual([]);
         expect(Math.max(...runs.map((run) => run.ms))).toBeLessThanOrEqual(30000);
         expect(await t.h.service.dispatchNotices(t.h.clock.now)).toMatchObject({ reason: 'none' });
     }, 90000);

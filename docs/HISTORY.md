@@ -71,8 +71,7 @@
 
 - 🗳️ PR Login Palm merge ដោយ **merge commit** ➜ commit ដើម `d509638` (សោ protocol ក្នុងកូដ · screenshot សាកល្បង) នៅក្នុង history `main` ➜ ការសម្រេចម្ចាស់គម្រោង
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
-- ⏳ **[2.50.126]** ហាង Firebase ដែលចងសាខាច្រើន + Palm ៖ សាខានីមួយៗ Login គណនី Palm ផ្លូវការម្តងក្នុង ZoeW ➜ កញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេងបិទ «យករួច» (មិន «ត្រឡប់») ·
-  Netlify Logs `push-cron` ពេលទូរស័ព្ទច្រើន ៖ `"reason":"partial"` រួច `"sent"` ក្នុង run បន្ទាប់។
+- ⏳ **[2.50.126]** Netlify Logs `push-cron` ពេលទូរស័ព្ទច្រើន ៖ `"reason":"partial"` រួច `"sent"` ក្នុង run បន្ទាប់ · ZoeKeyGen ផ្ទាំងហាង Supabase បង្ហាញហាង/គណនីគ្រប់។
 - 📚 កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ផ្លូវ Sign តាមសំណើម្ចាស់គម្រោងនៅ [2.50.120]–[2.50.121]។
 - ⏳ **[2.50.118]** 📥 Palm ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ · «🆕 ថ្មី» ស្មើ Cookie (A202 ៖ មិនទាន់វាស់លើ ZTO ពិត · នៅខ្វះ ➜ 🧪 track កញ្ចប់ដែលខ្វះ) ·
   🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
@@ -108,8 +107,9 @@
 function ZTO Palm login/Cookie … កុំជឿជាក់លើ checker … តេស្តបើថ្ងៃក្រោយ app មានអតិថិជនប្រើច្រើនសាខាច្រើន ក្នុងមួយសាខា ប្រើ2-3devices» · «សាខា នីមួយៗមានសុទ្ធតែមាន account
 ZTO Palm ផ្លូវការដែលក្រុមហ៊ុនផ្តល់អោយ» ➜ ការកែឯកសារ LOCK ផ្អែកលើសំណើនេះ + កំហុសលុយដែលវាស់បាន (A215)។ លម្អិត ៖ ផ្នែក ២ «Deep audit ៦»។
 
-- 🏢 **ហាង Firebase ដែលចងសាខាច្រើន + ZTO Palm** (A215) ៖ ការអានបញ្ជីចុះហត្ថលេខាជុំបិទតាម ZTO អានគ្រប់សាខាដែលចង តាម session Palm របស់សាខានីមួយៗ
-  (គណនីផ្លូវការរៀងៗខ្លួន) ➜ កញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង បិទជា «យករួច» មិនត្រូវ «ត្រឡប់» ដកលុយ · សាខាណាមិនទាន់ Login Palm ➜ មិន «ពេញលេញ» (រង់ចាំ)។
+- 🏢 **Function ZTO ៖ គម្រោង Firebase ដែល `FIREBASE_PROJECT_IDS` ចងសាខាច្រើន + Palm** (A215 · ការកំណត់ដែល `ZTO-SETUP-KH.md` ផ្នែក ៤គ អនុញ្ញាត) ៖ ការអានបញ្ជីចុះហត្ថលេខា
+  អានគ្រប់សាខាដែលចង តាម session Palm របស់សាខានីមួយៗ ➜ កញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង មិនត្រូវ «ត្រឡប់» ដកលុយ។ ⛔ ម្ចាស់គម្រោង ៖ «firebase project 1 តែឯង ក្នុង 1សាខា
+  មិនដូច supabase project មួយតែ ផ្ទុកទិន្នន័យសាខាច្រើន» ➜ ការរៀបចំពិតមិនចូលផ្លូវនេះ (គម្រោងចងសាខាតែមួយ ➜ `siblingBranches` = [] ➜ ឥរិយាបថដូចមុនបេះបិទ · តេស្តទិសផ្ទុយ)។
 - 📲 **Push** (A216 · A217) ៖ ការរំលឹកម៉ោង ៨ ព្រឹកដើរហាង ៨ ស្របគ្នា ➜ ដល់គ្រប់ហាង · ដំណឹងអ្នកលក់ផ្ញើជាចំណែក ➜ run ដែលអស់ពិដានបន្តនៅ cron បន្ទាប់ (ម្តងគត់ក្នុងមួយទូរស័ព្ទ) ·
   Logs `push-cron` អាចឃើញ `"reason":"partial"` (ឯកសារ `ZoeW/README.md`)។
 - ✍️ **Sign** (A218) ៖ ចុច «✍️ Sign» ពេលការផ្ញើមុននៅរង់ចាំ ZTO ➜ សារ «⏳ … សូមរង់ចាំបន្តិច» (មិនស្ងាត់)។
@@ -118,9 +118,9 @@ ZTO Palm ផ្លូវការដែលក្រុមហ៊ុនផ្ត�
 - 🧪 អ្នកយាមថ្មី ៖ `supabase-money-multishop-test` (គម្រោង Supabase មួយ · ហាង ២ × ឧបករណ៍ ៣ · App ពិត · Postgres ពិត) · `emu/money-multidevice-emu-test` ឧបករណ៍ ៣ +
   «ZTO ត្រឡប់» ប្រជែង · `ZoeW/tests/zto-palm-multibranch-hold.test.tsx` · `ZoeW/tests/push-server.test.ts` (ហាង ៤០០ · ទូរស័ព្ទ ៣០០០) · `ZoeW/tests/zto-palm-sign.test.tsx`។
 
-**សកម្មភាពដោយដៃ** ៖ គ្មាន env · rules · migration ថ្មី។ Deploy ZoeW (merge ពេលម្ចាស់គម្រោងស្នើ) ➜ Function ZTO + `push-cron` ថ្មីចូលជាមួយ។ ហាង Firebase ដែលចងសាខាច្រើនក្នុង
-`FIREBASE_PROJECT_IDS` + Palm ៖ **សាខានីមួយៗ Login គណនី Palm ផ្លូវការរបស់ខ្លួនម្តងក្នុង ZoeW** (ទូរស័ព្ទណាមួយក្នុងសាខា) ➜ បើសាខាណាមិន Login ការរង់ចាំថ្ងៃទី ៨ ការពារបានតែ
-ពិដាន `ZTO_ABANDON_HOLD_MAX_MS` (៣០ នាទី) ដូចសាខា Cookie ដែលអានមិនបាន (A161)។
+**សកម្មភាពដោយដៃ** ៖ គ្មាន env · rules · migration ថ្មី។ Deploy ZoeW (merge ពេលម្ចាស់គម្រោងស្នើ) ➜ Function ZTO + `push-cron` ថ្មីចូលជាមួយ។ គម្រោង Firebase មួយ = សាខាមួយ
+(ការរៀបចំពិត) ➜ គ្មានសកម្មភាពសម្រាប់ A215 · ថ្ងៃក្រោយបើចងសាខាច្រើនក្នុង `FIREBASE_PROJECT_IDS` ➜ សាខានីមួយៗត្រូវ Login គណនី Palm របស់ខ្លួនម្តង (សាខាមិន Login ➜ ការរង់ចាំថ្ងៃទី ៨
+ការពារបានតែ `ZTO_ABANDON_HOLD_MAX_MS` ៣០ នាទី ដូច A161)។
 
 ### [2.50.125] — 2026-10-17 · ZoeW ៖ សារ Login ZTO Palm ប្រាប់មូលហេតុពិត (ឯកសារ LOCK តាមសំណើ)
 
@@ -4342,7 +4342,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 | A218 | **Sign ៖ ចុច «✍️ Sign» ពេលការផ្ញើមុននៅរង់ចាំ ZTO (បិទផ្ទាំងហើយ) ➜ គ្មានអ្វីកើតឡើង** រហូតដល់ ៤៥ វិ. (`openZtoPalmSign()` ត្រឡប់ស្ងាត់លើ `busy`) | `zto-palm-sign.test.tsx` ថ្មី ៖ មុនកែ toast `''` ➜ ក្រោយកែ «⏳ ការ Sign មុនកំពុងរង់ចាំចម្លើយ ZTO …» · ចម្លើយមកក្រោយបិទផ្ទាំងមិនបិទកញ្ចប់ · ក្រោយនោះបើកបាន | toast ប្រាប់ឲ្យរង់ចាំ |
 | A217 | **ដំណឹងអ្នកលក់ (📢) ផ្ញើទៅ subscription ទាំងអស់ក្នុង run តែមួយ** ➜ ledger `state/notices` ចាក់សោមុន ➜ run អស់ពិដាន ២០ វិ. ➜ ទូរស័ព្ទដែលនៅសល់មិនដែលទទួល | `push-server.test.ts` ថ្មី (Blobs ៤០ ms · Push ២០០ ms · ទូរស័ព្ទ ៣,០០០ · cron ៨ ដង) ៖ មុនកែ **២,៣៣២ មិនទទួល** ➜ ក្រោយកែ ០ មិនទទួល · ០ ស្ទួន · run ≤ ៣០ វិ. | ផ្ញើជាចំណែក `PUSH_NOTICE_CHUNK` (៣២) តាមលំដាប់កូនសោ · ចំណែកនីមួយៗ claim ក្នុង `carry` (id + កូនសោចុងក្រោយ) មុនផ្ញើ ➜ cron បន្ទាប់បន្ត · `"reason":"partial"` |
 | A216 | **ការរំលឹកម៉ោង ៨ ព្រឹកដើរ schedule ម្តងមួយតាមលំដាប់ដដែលរាល់ cron** (អាន schedule + ledger ២ ដងសម្រាប់ហាងដែលផ្ញើរួច) ➜ ពិដាន ២០ វិ. អស់មុនដល់ចុងបញ្ជី ➜ ហាងចុងជួរមិនដែលទទួល · ការ claim ក្បែរពិដាន ➜ ledger ចាក់សោ តែការផ្ញើត្រូវកាត់ | `push-server.test.ts` ថ្មី (ហាង ៤០០ · cron ១២ ដងក្នុងម៉ោង ៨) ៖ មុនកែ **២១២ ហាងមិនទទួល · ៥ claim តែមិនផ្ញើ** ➜ ក្រោយកែ ០ · ០ · run ≤ ៣០ វិ. | ហាង `PUSH_EXPIRY_CONCURRENCY` (៨) ស្របគ្នា · អាន ledger មុន schedule · claim តែពេលនៅសល់ `PUSH_CLAIM_RESERVE_MS` (៤ វិ.) |
-| A215 | **ZTO-E14 លើផ្លូវ Palm** ៖ គម្រោង Firebase ចងសាខាច្រើន · ការអាន `?palm=1&list=1&signed=1&exact=1` ប្រើ session សាខាឧបករណ៍ ➜ ZTO ឆ្លើយតែសាខានោះ ➜ «ពេញលេញ» ➜ ការសម្អាតថ្ងៃទី ៨ ដកលុយកញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង (Cookie កែរួចក្នុង A161 តែផ្លូវ Palm មកក្រោយ) | `zto-palm-multibranch-hold.test.tsx` ថ្មី (App ពិត + Function ពិត + Palm ក្លែងដែលឆ្លើយតែសាខាគណនី + ID token ពិត) ៖ មុនកែ ២ ធ្លាក់ (`abandon` កញ្ចប់ចុះហត្ថលេខានៅ 770022 · `ztoSignedCompleteAt` > 0) · ទិសផ្ទុយ ២ ជាប់ ➜ ក្រោយកែ ៤/៤ · `vitest tests/zto-* tests/push-*` ជាប់ | Function អានសាខាដែលចងផ្សេងទៀតតាម session សាខារៀងខ្លួន (`siblingBranches` ពី `FIREBASE_PROJECT_IDS` · `branchSession` ពី Blobs · តែលេខ barcode) · សាខាគ្មាន session/អានមិនបាន ➜ 503 `palm:branch-unread` · ព្រំដែន ៖ សាខាដែលមិនដែល Login Palm ការពារបានតែ `ZTO_ABANDON_HOLD_MAX_MS` (ដូច A161) |
+| A215 | **ZTO-E14 លើផ្លូវ Palm** ៖ គម្រោង Firebase ចងសាខាច្រើន · ការអាន `?palm=1&list=1&signed=1&exact=1` ប្រើ session សាខាឧបករណ៍ ➜ ZTO ឆ្លើយតែសាខានោះ ➜ «ពេញលេញ» ➜ ការសម្អាតថ្ងៃទី ៨ ដកលុយកញ្ចប់ដែលអតិថិជនយកនៅសាខាផ្សេង (Cookie កែរួចក្នុង A161 តែផ្លូវ Palm មកក្រោយ) | `zto-palm-multibranch-hold.test.tsx` ថ្មី (App ពិត + Function ពិត + Palm ក្លែងដែលឆ្លើយតែសាខាគណនី + ID token ពិត) ៖ មុនកែ ២ ធ្លាក់ (`abandon` កញ្ចប់ចុះហត្ថលេខានៅ 770022 · `ztoSignedCompleteAt` > 0) · ទិសផ្ទុយ ២ ជាប់ ➜ ក្រោយកែ ៤/៤ · `vitest tests/zto-* tests/push-*` ជាប់ | Function អានសាខាដែលចងផ្សេងទៀតតាម session សាខារៀងខ្លួន (`siblingBranches` ពី `FIREBASE_PROJECT_IDS` · `branchSession` ពី Blobs · តែលេខ barcode) · សាខាគ្មាន session/អានមិនបាន ➜ 503 `palm:branch-unread` · ព្រំដែន ៖ សាខាដែលមិនដែល Login Palm ការពារបានតែ `ZTO_ABANDON_HOLD_MAX_MS` (ដូច A161) · ម្ចាស់គម្រោង ៖ គម្រោង Firebase មួយ = សាខាមួយ ➜ ការរៀបចំពិតមិនចូលផ្លូវនេះ (ការកែ = ឥរិយាបថដដែលពេលចងសាខាតែមួយ) |
 
 អានហើយមិនឃើញចន្លោះថ្មី ៖ `_shared/zto-palm-sign.js` (ភស្តុតាងចែកចាយចង token · `barScannerId` ថេរ · `runs`) · `removeReturnedZtoBarcodes()` ➜ `claimAndCleanupItem('abandon', { codes, returnedAt })`
 (ពិនិត្យលើ barcode server ក្នុង transaction · `restoredAt` ពី `executeRestoreItem()`) · ពិដាន subscription Push (`PUSH_SUBS_PER_KEY_MAX` · `PUSH_SUBS_TOTAL_MAX`) · `setInterval` ៧ (ត្រូវនឹង `CLAUDE.md`)។

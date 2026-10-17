@@ -53,7 +53,6 @@ function cleanupNow() {
 }
 
 async function branchWorld(projectBranches: string, siblingLogin = false) {
-    useSharedBlobs();
     await setupWorld('firebase', 'require');
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT + ':' + projectBranches;
     fn.resetCachesForTests();
@@ -100,6 +99,7 @@ afterEach(() => {
 
 describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច្រើន ៖ បញ្ជីចុះហត្ថលេខា Palm របស់សាខាមួយ ≠ ពេញលេញទូទាំងហាង', () => {
     it('⛔ សាខា 770022 Login គណនីខ្លួន ➜ ឧបករណ៍សាខា 881859 អានបញ្ជីគ្រប់សាខាដែលចង ➜ កញ្ចប់ចុះហត្ថលេខានៅ 770022 បិទ «យករួច» (មិនដកលុយ)', async () => {
+        useSharedBlobs();
         await branchWorld(SITE + '|' + OTHER_SITE, true);
         dataState.scanHistory = [openItem('p770', 'KH7700000001', 8 * DAY)];
         cleanupNow();
@@ -112,6 +112,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
     });
 
     it('⛔ សាខា 770022 មិនទាន់ Login Palm ➜ បញ្ជីមិនពេញលេញ ➜ នៅរង់ចាំ (មិនដកលុយកញ្ចប់ដែលអតិថិជនយករួច)', async () => {
+        useSharedBlobs();
         await branchWorld(SITE + '|' + OTHER_SITE);
         dataState.scanHistory = [openItem('p770', 'KH7700000001', 8 * DAY)];
         await runZtoStatusSweep(false);
@@ -121,6 +122,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
     });
 
     it('ទិសផ្ទុយ ៖ គម្រោងសាខាច្រើន · គ្រប់សាខា Login · កញ្ចប់មិនចុះហត្ថលេខានៅសាខាណាទាំងអស់ ➜ «ត្រឡប់» ធម្មតា (ការរង់ចាំមិនជាប់)', async () => {
+        useSharedBlobs();
         await branchWorld(SITE + '|' + OTHER_SITE, true);
         dataState.scanHistory = [openItem('s881', 'KH8818590009', 8 * DAY)];
         await runZtoStatusSweep(false);
@@ -130,6 +132,7 @@ describe('ZTO-E14 (Palm) ៖ គម្រោងតែមួយ សាខាច�
     });
 
     it('ទិសផ្ទុយ ៖ គម្រោងសាខាតែមួយ ➜ បញ្ជី Palm ពេញលេញ ➜ កញ្ចប់មិនចុះហត្ថលេខា ➜ «ត្រឡប់» ធម្មតា (ការរង់ចាំមិនជាប់)', async () => {
+        useSharedBlobs();
         await branchWorld(SITE);
         dataState.scanHistory = [openItem('s881', 'KH8818590009', 8 * DAY)];
         await runZtoStatusSweep(false);

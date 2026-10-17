@@ -90,6 +90,7 @@ export const ACTION_ALLOWLIST = [
     "openSideDrawer",
     "openViewListModal",
     "openZtoListSyncModal",
+    "openZtoPalmSign",
     "openZtoSyncModal",
     "pickSheetImportFile",
     "printLabelsFromModal",

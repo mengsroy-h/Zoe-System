@@ -6,10 +6,10 @@ method · path · field request · ប្រភេទ `result` · field response
 
 ## ⛔ ច្បាប់មុនប្រើ endpoint ណាមួយ
 
-- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` សរសេរច្បាស់ (`doLogin` · `billInfoQuery` · `queryDispatchList` · `queryTrackInfo`) ។ endpoint ថ្មីចូលតែតាម
+- ZoeW ហៅតែ endpoint ដែល `netlify/functions/_shared/zto-palm.js` សរសេរច្បាស់ (`doLogin` · `billInfoQuery` · `queryDispatchList` · `queryTrackInfo` · `newBusinessCheck` · `queryPreOrderByBillCode` · `saveBillPic` · `saveScanInfo` · `sign/log/v1/add` · `sign/log/v1/deleteByBillCode`) ។ endpoint ថ្មីចូលតែតាម
   PR ដែលមានអ្នកយាមធ្លាក់លើកូដមុនកែ ហើយផ្លូវលុយ (auto-close · ការរង់ចាំ ៨ ថ្ងៃ · ចំណូល) ត្រូវវាស់ជាមួយគណនីពិតជាមុន។
 - ⛔ endpoint **សរសេរ** (save · upload · add · update · cancel · pay · scan · move · leave · bind …) បង្កើតការស្កេន ការចុះហត្ថលេខា
-  ឬការបង់ប្រាក់ពិតក្នុង ZTO ➜ ZoeW មិនហៅវាឡើយ។ ប្រភេទ «អាន/សរសេរ» ក្នុងតារាងកំណត់តាមឈ្មោះ endpoint ➜ ផ្ទៀងកូដ App មុនប្រើ។
+  ឬការបង់ប្រាក់ពិតក្នុង ZTO ➜ ផ្លូវ Sign ដែលអ្នកប្រើចុចផ្ទាល់ហៅតែ `saveBillPic` · `saveScanInfo` · `sign/log/v1/add` និង `sign/log/v1/deleteByBillCode`។ Endpoint បង់ប្រាក់មិនត្រូវបានហៅ។ ប្រភេទ «អាន/សរសេរ» ក្នុងតារាងកំណត់តាមឈ្មោះ endpoint ➜ ផ្ទៀងកូដ App មុនប្រើ។
 - ⛔ សោ protocol (`x-sign` · AES) មិនសរសេរក្នុងឯកសារ ឬ repo ឡើយ — env Netlify តែប៉ុណ្ណោះ ([ZTO-PALM.md](ZTO-PALM.md))។
 - ឯកសារនេះកត់តែ **ឈ្មោះ** field ពី class របស់ App ៖ ZTO អាចផ្ញើ field បន្ថែម ឬទុកទទេ ➜ ទម្រង់ និងតម្លៃពិតត្រូវវាស់ជាមួយគណនីពិត។
 

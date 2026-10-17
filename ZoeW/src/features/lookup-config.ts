@@ -1,3 +1,4 @@
+import { refreshPalmSignMode } from './zto-palm-sign';
 import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { firebaseState, securityState } from '../core/state';
@@ -16,6 +17,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
 export function refreshShopBoundUi() {
+    refreshPalmSignMode();
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
 }

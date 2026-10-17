@@ -76,6 +76,7 @@ const REFS = 'app/refs.ts';
 const REFS_WHY = 'ច្រកចេញរបស់ React (ref) — React គ្មានទម្រង់ប្រកាស (declarative) សម្រាប់ ';
 const DOC_FX = 'app/components/shell/DocumentEffects.tsx';
 const APP_ALLOWED = {
+    [REFS + ':.srcObject =']: [1, REFS_WHY + 'ភ្ជាប់ និងដោះ MediaStream របស់វីដេអូ Sign តាម ref (`attachPalmSignStream`)'],
     [REFS + ':.focus()']: [4, REFS_WHY + 'focus (`focusField` · ការសាកម្តងទៀតក្រោយការគូរ · `focusFieldAsIs` · `focusElementWithoutScroll` ៖ ប្រអប់វាយក្នុងប្រអប់លើ iPhone)'],
     [REFS + ':.setSelectionRange()']: [1, REFS_WHY + 'caret នៅចុងអត្ថបទ មុន focus ដោយកូដ (`focusElementWithoutScroll` ៖ WebKit ជ្រើសអត្ថបទទាំងអស់ពេល focus ដោយកូដ បើគ្មាន selection ចាំទុក)'],
     [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],

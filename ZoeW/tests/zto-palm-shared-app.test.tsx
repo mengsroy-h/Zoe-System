@@ -22,7 +22,9 @@ import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { scanState } from '../src/core/state';
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, refreshZtoPalmSession, resetZtoPalmRefresh, submitZtoPalmLogin, PALM_REFRESH_AGE_MS } from '../src/features/zto-palm-login';
-import { encryptLookupSecret } from '../src/services/crypto';
+import { deriveLookupSecretKey, encryptLookupSecret, hashPin, restoreLookupSecretKey } from '../src/services/crypto';
+import { clearAppUnlockedForSession, completeAppUnlock } from '../src/features/app-lock';
+import { securityState } from '../src/core/state';
 import { ARRIVED, KEY, NOW, OTHER_SITE, SITE, fn, identityToken, noteText, palmLoginBody, pulledRows, setupWorld, shopOf, signIn, storePalmConfig, teardownWorld, toastTexts, useSharedBlobs, world, type Backend } from './zto-palm-harness';
 
 const BACKENDS: Backend[] = ['firebase', 'supabase'];
@@ -221,5 +223,49 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         const headers = await buildLookupRequestHeaders(stored());
         expect(headers).toMatchObject({ 'X-Zoe-Palm-Site': OTHER_SITE });
         expect(headers).not.toHaveProperty('X-Zoe-Palm-Token');
+    });
+});
+
+describe.each(BACKENDS)('App Lock ៖ បិទ App ជាប់សោ ២០ នាទី · ៤០ នាទី · ៥ ម៉ោង ➜ បើក ➜ PIN ➜ Palm នៅដំណើរការ (backend %s)', (backend) => {
+    it.each([20, 40, 300])('ជាប់សោ %i នាទី ➜ ទាញបញ្ជី ZTO · Login ស្វ័យប្រវត្តិ · «ប្រើ Login Palm របស់ហាង» · Login ដោយដៃ ៖ Server ទទួលសោភ្ជាប់គ្រប់ដង', async (minutes) => {
+        const PIN = '135790';
+        await setupWorld(backend, 'require');
+        useSharedBlobs();
+        appLocalStore.setItem('zoew_security_pin_hash', await hashPin(PIN));
+        securityState.lookupSecretKey = await deriveLookupSecretKey(PIN);
+        const body = await palmLoginBody('palm-user', identityToken(backend));
+        await storePalmConfig(backend, body.sessionToken, SITE, { palmRefreshTokenEnc: await encryptLookupSecret(body.refreshToken), palmLoginAt: NOW, palmExpiresAt: body.expiresAt });
+        world.logins.length = 0;
+
+        securityState.lookupSecretKey = null;
+        clearAppUnlockedForSession();
+        vi.setSystemTime(new Date(NOW + minutes * 60000));
+        signIn(backend, identityToken(backend));
+        expect(await restoreLookupSecretKey()).toBe(false);
+        await act(async () => { await completeAppUnlock(PIN); });
+
+        const rejected: number[] = [];
+        const handler = fn.handler;
+        const spy = vi.spyOn(fn, 'handler').mockImplementation(async (event: any) => {
+            const out = await handler(event);
+            if (out.statusCode === 401) rejected.push(out.statusCode);
+            return out;
+        });
+        try {
+            expect(await refreshZtoPalmSession()).toBe(minutes * 60000 >= PALM_REFRESH_AGE_MS ? 'renewed' : 'fresh');
+            await runZtoListSyncPreview();
+            expect(pulledRows().size).toBeGreaterThan(0);
+            await openModal();
+            await act(async () => { await connectSharedZtoPalm(); });
+            expect(viewState.palmLoginStatus).toContain('✅');
+            setFieldValue('ztoPalmUsernameInput', 'palm-user');
+            setFieldValue('ztoPalmPasswordInput', 'palm-pass');
+            await act(async () => { await submitZtoPalmLogin(); });
+            expect(viewState.palmLoginStatus).toContain('✅');
+            expect(viewState.palmLoginStatus).not.toContain('មិនត្រឹមត្រូវ');
+            expect(rejected).toEqual([]);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

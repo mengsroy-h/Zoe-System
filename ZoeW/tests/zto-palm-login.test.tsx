@@ -9,9 +9,10 @@ import { firebaseState, scanState, securityState, uiState } from '../src/core/st
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
-import { cancelZtoPalmLogin, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
+import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
-import { encryptLookupSecret, decryptLookupSecret } from '../src/services/crypto';
+import { encryptLookupSecret, decryptLookupSecret, deriveLookupSecretKey, hashPin, restoreLookupSecretKey } from '../src/services/crypto';
+import { clearAppUnlockedForSession, completeAppUnlock } from '../src/features/app-lock';
 import { closeModal } from '../src/ui/modal';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -377,5 +378,111 @@ describe('🩺 ZTO response time text (owner report: Palm lookup slower than Coo
         expect(ztoUpstreamTimingText({ upstreamTiming: { palm: null, connections: 'x' } }, true)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
         expect(ztoUpstreamTimingText({ upstreamTiming: { detail: { count: 1, avgMs: 500, lastMs: 500 }, connections: { argus: { count: 'x' } } } }, false))
             .not.toContain('ភ្ជាប់ថ្មី');
+    });
+});
+
+describe('សារ Login Palm ប្រាប់មូលហេតុពិត (សំណើម្ចាស់គម្រោង ៖ «សារច្បាស់» · Preview ៖ «សោមិនត្រឹមត្រូវ» ទាល់តែ clear site data)', () => {
+    async function fingerprint(text: string) {
+        const bytes = new Uint8Array(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+        return [...bytes].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    it('Server បដិសេធសោភ្ជាប់ (401 គ្មាន code) ➜ ប្រាប់ប្រភពសោ ចំនួនតួ ស្នាមម្រាម និងតួមើលមិនឃើញ · ⛔ មិនបង្ហាញសោ', async () => {
+        const typed = 'typed-proxy-key-0123456789\u200b';
+        vi.stubGlobal('fetch', vi.fn(async () => response({ error: 'Invalid proxy key' }, 401)));
+        credentials();
+        setFieldValue('lookupApiHeaderValueInput', typed);
+        await act(async () => { await submitZtoPalmLogin(); });
+        let text = viewState.palmLoginStatus;
+        expect(text).toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+        expect(text).toContain('ប្រអប់ Secret');
+        expect(text).toContain(typed.length + ' តួ');
+        expect(text).toContain(await fingerprint(typed));
+        expect(text).toContain('មើលមិនឃើញ');
+        expect(text).not.toContain('typed-proxy-key');
+        setFieldValue('lookupApiHeaderValueInput', '');
+        for (const run of [async () => { credentials(); await submitZtoPalmLogin(); }, () => connectSharedZtoPalm()]) {
+            await act(async () => { await run(); });
+            text = viewState.palmLoginStatus;
+            expect(text).toContain('សោដែលរក្សាទុក');
+            expect(text).toContain(PROXY_KEY.length + ' តួ');
+            expect(text).toContain(await fingerprint(PROXY_KEY));
+            expect(text).not.toContain('មើលមិនឃើញ');
+            expect(text).not.toContain(PROXY_KEY);
+        }
+    });
+    it('401 ដែលមាន code ផ្សេង ➜ បង្ហាញ code · ⛔ មិនហៅថាសោខុស · ZTO បដិសេធ ➜ ប្រាប់ថាសោភ្ជាប់ត្រូវ · HTTP គ្មាន code ➜ លេខ HTTP', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_AUTH_EXPIRED', reason: 'palm:no-session' }, 401)));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).not.toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+        expect(viewState.palmLoginStatus).toContain('ZTO_AUTH_EXPIRED');
+        expect(viewState.palmLoginStatus).toContain('palm:no-session');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_LOGIN_REJECTED', reason: 'palm:USER_LOCKED' }, 401)));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('Server ទទួលសោភ្ជាប់ ZoeW រួច');
+        expect(viewState.palmLoginStatus).toContain('palm:USER_LOCKED');
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('bad gateway', { status: 502 })));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('HTTP 502');
+    });
+});
+
+describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «សង្ស័យថា applock របស់ ZoeW ធ្វើអោយខូច»)', () => {
+    const PIN = '135790';
+    const sentKeys = () => vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)['X-Zoe-Proxy-Key']);
+    async function reloadLockedThenUnlock(pin = PIN) {
+        securityState.lookupSecretKey = null;
+        clearAppUnlockedForSession();
+        expect(await restoreLookupSecretKey()).toBe(false);
+        await act(async () => { await completeAppUnlock(pin); });
+        expect(securityState.lookupSecretKey).not.toBeNull();
+        act(() => openLookupApiConfigModal());
+    }
+    async function login(typed = '') {
+        credentials();
+        setFieldValue('lookupApiHeaderValueInput', typed);
+        await act(async () => { await submitZtoPalmLogin(); });
+    }
+    beforeEach(async () => {
+        appLocalStore.setItem('zoew_security_pin_hash', await hashPin(PIN));
+        securityState.lookupSecretKey = await deriveLookupSecretKey(PIN);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...JSON.parse(initialConfig), headerValueEnc: await encryptLookupSecret(PROXY_KEY) }));
+        act(() => openLookupApiConfigModal());
+    });
+    it('ចាក់សោ ➜ បើកដោយ PIN (៣ ដង) ➜ Login Palm ផ្ញើសោដែលរក្សាទុកដដែល · សោវាយផ្ញើដូចវាយ', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => success()));
+        await login();
+        for (let i = 0; i < 3; i++) {
+            await reloadLockedThenUnlock();
+            await login();
+        }
+        await login('typed-proxy-key-abcdef0123456789');
+        expect(sentKeys()).toEqual([PROXY_KEY, PROXY_KEY, PROXY_KEY, PROXY_KEY, 'typed-proxy-key-abcdef0123456789']);
+        expect(viewState.palmLoginConnected).toBe(true);
+    });
+    it('ចាក់សោម្តងទៀតពេល Login កំពុងរត់ ➜ ចម្លើយចាស់បោះចោល ហើយប្រាប់ឲ្យ Login ម្តងទៀត · ⛔ មិនមែនសារសោខុស', async () => {
+        let release!: (value: Response) => void;
+        vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
+        credentials();
+        const work = submitZtoPalmLogin();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+        await act(async () => { await completeAppUnlock(PIN); });
+        release(success());
+        await act(async () => { await work; });
+        expect(sentKeys()).toEqual([PROXY_KEY]);
+        expect(viewState.palmLoginStatus).toContain('Login ZTO Palm ម្តងទៀត');
+        expect(viewState.palmLoginStatus).not.toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+    });
+    it('ភ្លេច PIN ➜ PIN ថ្មី ៖ សោចាស់អានមិនបាន ➜ មិនផ្ញើសោខុស ហើយសុំវាយ · វាយ ➜ ផ្ញើត្រូវ', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => success()));
+        appLocalStore.setItem('zoew_security_pin_hash', await hashPin('246802'));
+        await reloadLockedThenUnlock('246802');
+        await login();
+        expect(fetch).not.toHaveBeenCalled();
+        expect(viewState.palmLoginStatus).toContain('ប្រអប់ Secret');
+        await login(PROXY_KEY);
+        expect(sentKeys()).toEqual([PROXY_KEY]);
     });
 });

@@ -92,13 +92,18 @@ function matchBrace(src, from, open, close) {
     return -1;
 }
 
+const functionSlices = new Map();
 function sliceFn(src, name) {
+    let cached = functionSlices.get(src);
+    if (!cached) { cached = new Map(); functionSlices.set(src, cached); }
+    if (cached.has(name)) return cached.get(name);
     let start = src.indexOf('function ' + name + '(');
     if (start === -1) return '';
     if (src.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
-    const end = matchBrace(src, src.indexOf('{', src.indexOf(')', start)), '{', '}');
-    if (end === -1) return '';
-    return src.slice(start, end + 1);
+    const node = require('acorn').parseExpressionAt(src, start, { ecmaVersion: 'latest' });
+    const body = src.slice(node.start, node.end);
+    cached.set(name, body);
+    return body;
 }
 
 // ⛔ ការអះអាងអំពី **ស្នាមភ្ជាប់** ត្រូវ *ដេរីវេ* មិនមែនចាក់ឈ្មោះ helper ជា
@@ -167,6 +172,14 @@ const html = readOr(path.join(APP, 'index.html'), 'ZoeW/index.html');
 const css = readOr(path.join(APP, 'style.css'), 'ZoeW/style.css');
 
 console.log('\n=== ១. រចនាសម្ព័ន្ធ ៖ សោត្រូវចាក់ពិត និងដោះបានពិត ===');
+
+const quotedRegexFunction = String.raw`function guarded() { return value.replace(/[&<>"']/g, function (c) { return c; }); }`;
+const siblingWithSession = 'function sibling() { return sessionStorage.getItem("other"); }';
+check(sliceFn(quotedRegexFunction + '\n' + siblingWithSession, 'guarded') === quotedRegexFunction,
+    '⛔ ស្រង់ function ដែលមាន quote ក្នុង regex មិនចូលដល់ function sessionStorage នៅជាប់គ្នា');
+check(/sessionStorage/.test(sliceFn(quotedRegexFunction + '\n' + siblingWithSession, 'sibling')),
+    '⛔ function ដែលអាន sessionStorage ពិត នៅតែត្រូវវាស់');
+
 
 check(html.indexOf('id="appLockScreen"') !== -1, 'index.html មានអេក្រង់ចាក់សោ');
 check(/data-act="submitAppLockForm"/.test(html), 'ទម្រង់ដោះសោភ្ជាប់ទៅ submitAppLockForm (Enter ដំណើរការ)');

@@ -826,3 +826,54 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .stat-card .label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.3; }
 .financial-row #summaryCodRiel, .financial-row #summaryDodRiel, .financial-row #summaryTotalRiel { white-space: nowrap; }
 
+
+#ztoPalmSignModal .palm-sign-content { max-width: clamp(340px, 52vw, 560px); text-align: left; }
+#ztoPalmSignModal .palm-sign-content > h3 { margin-bottom: 10px; text-align: center; }
+#ztoPalmSignModal .palm-sign-steps { display: flex; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+#ztoPalmSignModal .palm-sign-steps li { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 999px; background: #f8fafc; color: var(--text-muted); font-size: calc(11 * var(--fs-unit)); font-weight: 700; line-height: 1.4; }
+#ztoPalmSignModal .palm-sign-steps li.is-active { border-color: var(--action-primary); background: #eff6ff; color: var(--action-primary); }
+#ztoPalmSignModal .palm-sign-steps li.is-done { border-color: #a7f3d0; background: var(--success-light); color: #047857; }
+#ztoPalmSignModal .palm-sign-step-no { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--card-bg); box-shadow: inset 0 0 0 1.5px currentColor; font-size: calc(10.5 * var(--fs-unit)); }
+#ztoPalmSignModal .palm-sign-stage { margin: 0 0 2px; color: var(--text-main); font-size: calc(12.5 * var(--fs-unit)); font-weight: 800; line-height: 1.5; }
+#ztoPalmSignModal .palm-sign-hint { margin: 0 0 10px; font-size: calc(10.5 * var(--fs-unit)); line-height: 1.6; }
+#ztoPalmSignModal .palm-sign-name label,
+#ztoPalmSignModal .palm-sign-manual label { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: calc(10 * var(--fs-unit)); font-weight: 700; }
+#ztoPalmSignModal .palm-sign-name input { text-align: left; }
+#ztoPalmSignModal .palm-sign-camera { position: relative; height: clamp(170px, 48vw, 230px); margin-bottom: 10px; overflow: hidden; border-radius: var(--radius-lg); background: var(--dark-bg); }
+#ztoPalmSignModal .palm-sign-video { display: block; width: 100%; height: 100%; object-fit: cover; }
+#ztoPalmSignModal .palm-sign-frame { position: absolute; inset: 22% 12%; border: 2px solid rgba(255, 255, 255, 0.9); border-radius: var(--radius-md); box-shadow: 0 0 0 999px rgba(15, 23, 42, 0.28); pointer-events: none; }
+#ztoPalmSignModal .palm-sign-camera-idle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; color: #e2e8f0; font-size: calc(11 * var(--fs-unit)); font-weight: 700; line-height: 1.6; text-align: center; }
+#ztoPalmSignModal .palm-sign-camera-retry { position: absolute; right: 8px; bottom: 8px; min-height: 40px; padding: 6px 12px; border: 0; border-radius: 999px; background: rgba(15, 23, 42, 0.72); color: #fff; font-size: calc(10.5 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
+#ztoPalmSignModal .palm-sign-status { margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; }
+#ztoPalmSignModal .palm-sign-status p { margin: 0; color: var(--text-main); font-size: calc(10.5 * var(--fs-unit)); font-weight: 600; line-height: 1.55; overflow-wrap: anywhere; }
+#ztoPalmSignModal .palm-sign-status p + p { margin-top: 4px; }
+#ztoPalmSignModal .palm-sign-list-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: var(--text-muted); font-size: calc(10 * var(--fs-unit)); font-weight: 700; }
+#ztoPalmSignModal .palm-sign-codes { display: grid; gap: 8px; margin: 0 0 12px; }
+#ztoPalmSignModal .palm-sign-code { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; margin: 0; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); text-align: left; cursor: pointer; }
+#ztoPalmSignModal .palm-sign-code.is-selected { border-color: var(--action-primary); background: #f5f9ff; box-shadow: 0 0 0 1px var(--action-primary); }
+#ztoPalmSignModal .palm-sign-code input { flex: 0 0 20px; width: 20px; height: 20px; min-height: 0; margin: 2px 0 0; padding: 0; accent-color: var(--action-primary); }
+#ztoPalmSignModal .palm-sign-code-body { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+#ztoPalmSignModal .palm-sign-code-no { color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: calc(12 * var(--fs-unit)); font-weight: 700; letter-spacing: .4px; overflow-wrap: anywhere; }
+#ztoPalmSignModal .palm-sign-state { display: inline-block; max-width: 100%; padding: 2px 8px; border: 1px solid #cbd5e1; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: calc(10 * var(--fs-unit)); font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+#ztoPalmSignModal .palm-sign-state.is-wait { border-style: dashed; }
+#ztoPalmSignModal .palm-sign-state.is-ready { border-color: #bae6fd; background: var(--accent-blue-light); color: #075985; }
+#ztoPalmSignModal .palm-sign-state.is-ok { border-color: #a7f3d0; background: var(--success-light); color: #047857; }
+#ztoPalmSignModal .palm-sign-state.is-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+#ztoPalmSignModal .palm-sign-state.is-error { border-color: #fecdd3; background: var(--primary-light); color: #be123c; }
+#ztoPalmSignModal .palm-sign-warning,
+#ztoPalmSignModal .palm-sign-problem { display: block; align-self: stretch; padding: 6px 8px; border: 1px solid #fde68a; border-radius: var(--radius-md); background: #fffbeb; color: #92400e; font-size: calc(10 * var(--fs-unit)); font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
+#ztoPalmSignModal .palm-sign-thumbnail,
+#ztoPalmSignModal .palm-sign-thumb-empty { flex: 0 0 64px; width: 64px; height: 48px; border-radius: var(--radius-md); object-fit: cover; }
+#ztoPalmSignModal .palm-sign-thumb-empty { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #94a3b8; font-size: calc(14 * var(--fs-unit)); }
+#ztoPalmSignModal .palm-sign-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+#ztoPalmSignModal .palm-sign-soft { min-height: 44px; padding: 9px 12px; border: 1px solid #bfdbfe; border-radius: var(--radius-md); background: #eff6ff; color: var(--action-primary); font: inherit; font-size: calc(11 * var(--fs-unit)); font-weight: 700; line-height: 1.4; cursor: pointer; }
+#ztoPalmSignModal .palm-sign-soft:disabled { opacity: 0.55; cursor: not-allowed; }
+#ztoPalmSignModal .palm-sign-scan { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+#ztoPalmSignModal .palm-sign-scan input { flex: 1; min-width: 0; margin-bottom: 0; }
+#ztoPalmSignModal .palm-sign-scan button { flex: none; }
+#ztoPalmSignModal .palm-sign-wide { width: 100%; margin-bottom: 10px; }
+#ztoPalmSignModal .palm-sign-confirmation { margin: 12px 0; padding: 12px; border: 2px solid var(--action-warning); border-radius: var(--radius-md); background: #fffbeb; overflow-wrap: anywhere; }
+#ztoPalmSignModal .palm-sign-confirmation h4 { margin: 0 0 6px; color: #92400e; font-size: calc(12 * var(--fs-unit)); font-weight: 800; line-height: 1.5; }
+#ztoPalmSignModal .palm-sign-confirmation p { margin-bottom: 10px; color: var(--text-main); white-space: pre-wrap; }
+#ztoPalmSignModal .palm-sign-confirmation .modal-btns { flex-direction: row; }
+#ztoPalmSignModal .palm-sign-actions { margin-top: 8px; }

@@ -1,3 +1,5 @@
+import { palmSignState } from '../../../core/palm-sign-state';
+import { useStoreValue } from '../../hooks/useStore';
 import { memo } from 'react';
 import { onAct } from '../../actions';
 import { sameHistoryRowModel, type HistoryRowModel } from './rowModel';
@@ -58,6 +60,7 @@ function CallAction({ row }: { row: HistoryRowModel }) {
 }
 
 export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowModel }) {
+    const palmMode = useStoreValue(palmSignState, (state) => state.mode);
     return (
         <>
             <td style={{ textAlign: 'center' }}>
@@ -107,7 +110,7 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
                 <div className="action-group">
                     <CallAction row={row} />
                     <button className={`btn-sm close-btn btn-primary-action ${row.closeIsReopen ? 'is-reopen-action' : 'is-close-action'}`}
-                        onClick={onAct('toggleCloseStatus', { args: [row.id] })}>{row.closeIsReopen ? '❌ បើក' : '✅ បិទ'}</button>
+                        onClick={palmMode && !row.closeIsReopen ? onAct('openZtoPalmSign', { args: [row.id] }) : onAct('toggleCloseStatus', { args: [row.id] })}>{row.closeIsReopen ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}</button>
                 </div>
             </td>
         </>

@@ -1,3 +1,4 @@
+import { openZtoPalmSign } from '../features/zto-palm-sign';
 import { cancelLogout, confirmLogout, drawerAuthFlow, drawerBiometricFlow, drawerConfigFlow, drawerCustomerTableFlow, drawerLockerSettingsFlow, drawerLookupApiFlow, submitLoginForm, toggleDrawerGroup } from './actions';
 import { drawerAppLockFlow, forgetAppLockPin, runAppLockBiometric, submitAppLockForm } from '../features/app-lock';
 import { logoutApp } from '../features/auth';
@@ -44,6 +45,7 @@ import { showMoreHistoryRows } from '../ui/history-render';
 import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
+    openZtoPalmSign,
     connectSharedZtoPalm,
     disconnectZtoPalm,
     submitZtoPalmLogin,

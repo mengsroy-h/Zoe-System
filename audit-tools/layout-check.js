@@ -957,6 +957,77 @@ async function ztoSyncListPaging(browser, port) {
     await ctx.close();
 }
 
+// ⛔ ✍️ Sign · ZTO Palm ៖ ជួរកញ្ចប់ (`.palm-sign-code`) ដែលមានស្លាកស្កេនបញ្ហា + សារព្រមាន ZTO + លទ្ធផល ត្រូវពង្រីកតាមខ្លឹមសារ — ⛔ មិនត្រួតលើគ្នា
+//    ឬកាត់អត្ថបទ (បញ្ជី flex column មាន max-height ធ្លាប់បង្រួមជួរ ➜ អត្ថបទជួរមួយគ្របជួរបន្ទាប់ លើ Preview 390px) · ប៊ូតុងទាំងអស់នៅក្នុងប្រអប់ ·
+//    កម្ពស់ ≥ 40px · «📷 ថតរូបកញ្ចប់» និង «🖼 ជ្រើសរូបពី Gallery» ទំហំស្មើគ្នា នៅជួរតែមួយ។ វាស់ `getBoundingClientRect()` ក្នុង browser ពិត ៤ ទទឹង។
+async function palmSignLayout(browser, port) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await page.route('**', (route) => route.request().url().startsWith('http://127.0.0.1:' + port) ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(800);
+    const ready = await page.evaluate(() => typeof openModalHelper === 'function' && !!window.palmSignState);
+    check(ready, 'ZoeW Sign ZTO Palm ៖ មាន openModalHelper · palmSignState (audit build)');
+    if (!ready) { await ctx.close(); return; }
+    await page.evaluate(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64; canvas.height = 48;
+        canvas.getContext('2d').fillRect(8, 8, 48, 32);
+        const photo = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        const s = window.palmSignState;
+        const codes = ['77130500000012', '77130500000013', '77130500000014'];
+        s.codes = codes;
+        s.stage = 'receipt';
+        s.signMan = 'សុខ សុភា';
+        s.checked = Object.fromEntries(codes.map((c) => [c, true]));
+        s.dispatchResults = codes.map((c) => ({ code: c, state: 'dispatched', proof: 'p', message: '✅' }));
+        s.photos = { [codes[0]]: photo, [codes[1]]: photo };
+        s.selectedCodes = codes.slice(0, 2);
+        s.problemScans = { [codes[1]]: { action: '-579', time: '2026-10-17 09:12:40', message: 'ទាក់ទងអតិថិជនមិនបាន' } };
+        s.warnings = { [codes[1]]: 'កញ្ចប់នេះមានបញ្ហា «ទាក់ទងអតិថិជនមិនបាន»។ តើបានដោះស្រាយរួចហើយឬនៅ? សូមពិនិត្យជាមួយអតិថិជនមុនបញ្ជាក់។' };
+        s.results = [{ code: codes[0], state: 'signed', saved: false, message: '✅ ZTO Sign រួច · ការបិទក្នុង ZoeW កំពុងរង់ចាំបញ្ជាក់' },
+            { code: codes[1], state: 'failed', message: '⚠️ ZTO ស្នើឲ្យបញ្ជាក់កញ្ចប់នេះ មុនទទួល។' }];
+        s.message = 'សូមអានសារ ZTO ហើយបញ្ជាក់ ឬបោះបង់។';
+        openModalHelper('ztoPalmSignModal');
+    });
+    for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: width < 700 ? 844 : 900 });
+        await page.waitForTimeout(250);
+        const m = await page.evaluate(() => {
+            const box = document.querySelector('#ztoPalmSignModal .modal-content');
+            if (!box) return null;
+            const rows = [...box.querySelectorAll('.palm-sign-code')].map((el) => {
+                const r = el.getBoundingClientRect();
+                return { top: r.top, bottom: r.bottom, over: el.scrollHeight - el.clientHeight, wide: el.scrollWidth - el.clientWidth };
+            });
+            const br = box.getBoundingClientRect();
+            const buttons = [...box.querySelectorAll('button')].filter((b) => b.getClientRects().length).map((b) => ({ text: b.textContent.trim(), ...b.getBoundingClientRect().toJSON() }));
+            const tool = (word) => buttons.find((b) => b.text.includes(word));
+            const shot = tool('ថតរូបកញ្ចប់');
+            const gallery = tool('Gallery');
+            return {
+                rows: rows.length,
+                overlaps: rows.slice(1).filter((r, i) => r.top < rows[i].bottom - 0.5).length,
+                clipped: rows.filter((r) => r.over > 1 || r.wide > 1).length,
+                boxWide: box.scrollWidth - box.clientWidth,
+                buttons: buttons.length,
+                outside: buttons.filter((b) => b.left < br.left - 0.5 || b.right > br.right + 0.5).map((b) => b.text),
+                short: buttons.filter((b) => b.height < 40).map((b) => b.text),
+                tools: shot && gallery ? { dw: Math.abs(shot.width - gallery.width), dh: Math.abs(shot.height - gallery.height), dy: Math.abs(shot.top - gallery.top) } : null
+            };
+        });
+        const tag = 'ZoeW Sign ZTO Palm ' + width + 'px ៖ ';
+        check(!!m && m.rows === 3 && m.buttons >= 5, tag + 'ជាន់អប្បបរមា ៖ ជួរកញ្ចប់ ៣ និងប៊ូតុង ≥ ៥ ត្រូវគូរ', JSON.stringify(m));
+        if (!m) continue;
+        check(m.overlaps === 0 && m.clipped === 0, '⛔ ' + tag + 'ជួរកញ្ចប់ (ស្លាកបញ្ហា · សារព្រមាន · លទ្ធផល) មិនត្រួតលើគ្នា និងមិនកាត់អត្ថបទ', JSON.stringify(m));
+        check(m.boxWide <= 1 && m.outside.length === 0, tag + 'ប៊ូតុង និងខ្លឹមសារនៅក្នុងប្រអប់ (គ្មានរមូរផ្តេក)', JSON.stringify(m));
+        check(m.short.length === 0, tag + 'ប៊ូតុងទាំងអស់កម្ពស់ ≥ 40px', JSON.stringify(m.short));
+        check(!!m.tools && m.tools.dw <= 1 && m.tools.dh <= 1 && m.tools.dy <= 1, tag + '«📷 ថតរូបកញ្ចប់» និង «🖼 ជ្រើសរូបពី Gallery» ទំហំស្មើ នៅជួរតែមួយ', JSON.stringify(m.tools));
+    }
+    await ctx.close();
+}
+
 // ⛔ UI-3 ៖ banner «កំណែថ្មី» (`position: fixed; bottom: 0`) មិនត្រូវគ្របរបា Tab ខាងក្រោម (ទូរស័ព្ទ/ថេប្លេត < 992px) ៖ នៅពីលើរបា ·
 //    របាលាក់ (`chrome-hidden`) ➜ ចុះដល់បាត · desktop (របា Tab នៅខាងលើ) ➜ នៅបាតដដែល។ វាស់ `getBoundingClientRect()` ក្នុង browser ពិត។
 async function updateBannerLayout(browser, port) {
@@ -1609,6 +1680,7 @@ async function historyRowLayout(browser, port) {
             await historyRowLayout(browser, port);
             await updateBannerLayout(browser, port);
             await ztoSyncListPaging(browser, port);
+            await palmSignLayout(browser, port);
             await notifyRowLayout(browser, port);
             await pinEnterSubmits(browser, port);
             await toastTabbarLayout(browser, port);

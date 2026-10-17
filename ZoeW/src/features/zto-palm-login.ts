@@ -30,7 +30,7 @@ const PALM_DEVICE_FIELDS = ['palmTokenEnc', 'palmExpiresAt', 'palmRefreshTokenEn
 export const PALM_CONFIG_FIELDS = ['palmTokenEnc', 'palmExpiresAt', 'palmAccount', 'palmRefreshTokenEnc', 'palmLoginAt', 'palmShared'];
 
 const PALM_LOGIN_MESSAGES = {
-    ZTO_PALM_LOGIN_REJECTED: 'ZTO បដិសេធការចូល — គណនី ឬពាក្យសម្ងាត់ Palm មិនត្រឹមត្រូវ ឬគណនីមិនមានសិទ្ធិ។',
+    ZTO_PALM_LOGIN_REJECTED: 'Server ទទួលសោភ្ជាប់ ZoeW រួច តែ ZTO បដិសេធការចូល — គណនី ឬពាក្យសម្ងាត់ Palm មិនត្រឹមត្រូវ ឬគណនីមិនមានសិទ្ធិ។',
     ZTO_PALM_VERIFICATION_REQUIRED: 'ZTO ស្នើការផ្ទៀងផ្ទាត់បន្ថែម។ សូមផ្ទៀងផ្ទាត់តាមកម្មវិធី ZTO ផ្លូវការ។',
     ZTO_PALM_NOT_CONFIGURED: 'Server មិនទាន់បានកំណត់ការភ្ជាប់ ZTO Palm។',
     ZTO_PALM_COUNTRY_UNSUPPORTED: 'Lookup នេះគាំទ្រគណនី ZTO កម្ពុជា (KH)។',
@@ -44,10 +44,28 @@ const PALM_LOGIN_MESSAGES = {
     ZTO_PALM_STORE_UNAVAILABLE: 'Server រក្សាទុក Login Palm មិនបានឥឡូវ — សូមសាកម្ដងទៀត។'
 };
 
-function palmLoginFailureText(body, status) {
+async function proxyKeyEvidence(sent) {
+    if (!sent || !sent.key) return '';
+    let print = '—';
+    try {
+        const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sent.key)));
+        print = Array.from(bytes.slice(0, 4), (b) => b.toString(16).padStart(2, '0')).join('');
+    } catch (_) {}
+    return (sent.typed ? 'សោពីប្រអប់ Secret' : 'សោដែលរក្សាទុកក្នុងទូរស័ព្ទ') + ' · ' + sent.key.length + ' តួ · ស្នាមម្រាម ' + print
+        + (/[^\x21-\x7e]/.test(sent.key) ? ' · មានតួអក្សរមើលមិនឃើញ ឬដកឃ្លា' : '');
+}
+
+async function palmLoginFailureText(body, status, sent?) {
     const code = body && typeof body.code === 'string' ? body.code : '';
     const reason = safeLookupReason(body && body.reason);
-    const text = PALM_LOGIN_MESSAGES[code] || (status === 401 ? 'សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ។' : 'ភ្ជាប់ ZTO Palm មិនបាន។ សូមសាកម្ដងទៀត។');
+    let text = PALM_LOGIN_MESSAGES[code];
+    if (!text && code) text = 'Server ZTO ឆ្លើយ ' + safeLookupReason(code) + ' (HTTP ' + status + ')។';
+    if (!text && status === 401) {
+        const evidence = await proxyKeyEvidence(sent);
+        text = 'សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ — Server មិនស្គាល់សោដែលផ្ញើ' + (evidence ? ' (' + evidence + ')' : '')
+            + '។ សូមចម្លងសោភ្ជាប់ ZoeW ពីការកំណត់ Netlify ទៅប្រអប់ Secret ម្ដងទៀត។';
+    }
+    if (!text) text = 'ភ្ជាប់ ZTO Palm មិនបាន (HTTP ' + status + ')។ សូមសាកម្ដងទៀត។';
     return reason ? text + ' (' + reason + ')' : text;
 }
 
@@ -136,9 +154,9 @@ function palmEditSession() {
 
 async function palmProxyKey(cfg) {
     const typedKey = fieldValue('lookupApiHeaderValueInput').trim();
-    if (typedKey) return typedKey;
-    if (!cfg || String(cfg.headerName || '').toLowerCase() !== 'x-zoe-proxy-key') return '';
-    return cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : cfg.headerValue || '';
+    if (typedKey) return { key: typedKey, typed: true };
+    if (!cfg || String(cfg.headerName || '').toLowerCase() !== 'x-zoe-proxy-key') return { key: '', typed: false };
+    return { key: cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : cfg.headerValue || '', typed: false };
 }
 
 export async function submitZtoPalmLogin(event?: Event) {
@@ -162,7 +180,8 @@ export async function submitZtoPalmLogin(event?: Event) {
     try {
         const base = palmFunctionBase();
         if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const proxyKey = await palmProxyKey(cfg);
+        const sent = await palmProxyKey(cfg);
+        const proxyKey = sent.key;
         if (!current()) return dropped();
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }
         let deviceSn = safeStoreGet(appLocalStore, 'zoew_palm_device_id');
@@ -181,7 +200,9 @@ export async function submitZtoPalmLogin(event?: Event) {
         if (!current()) return dropped();
         const body = out.body;
         if (!out.res.ok || !body?.success || typeof body.sessionToken !== 'string' || !body.sessionToken || !Number.isFinite(body.expiresAt)) {
-            viewState.palmLoginStatus = palmLoginFailureText(body, out.res.status);
+            const text = await palmLoginFailureText(body, out.res.status, sent);
+            if (current()) viewState.palmLoginStatus = text;
+            else dropped();
             return;
         }
         const shared = body.shared === true;
@@ -230,7 +251,8 @@ export async function connectSharedZtoPalm() {
     try {
         const base = palmFunctionBase();
         if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const proxyKey = await palmProxyKey(cfg);
+        const sent = await palmProxyKey(cfg);
+        const proxyKey = sent.key;
         if (!current()) return;
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }
         base.search = '?palm=status';
@@ -241,7 +263,11 @@ export async function connectSharedZtoPalm() {
             (response) => response.json().catch(() => null));
         if (!current()) return;
         const body = out.body;
-        if (!out.res.ok || !body?.success) { viewState.palmLoginStatus = palmLoginFailureText(body, out.res.status); return; }
+        if (!out.res.ok || !body?.success) {
+            const text = await palmLoginFailureText(body, out.res.status, sent);
+            if (current()) viewState.palmLoginStatus = text;
+            return;
+        }
         if (body.otherBranch) { viewState.palmLoginStatus = PALM_LOGIN_MESSAGES.ZTO_OTHER_BRANCH; return; }
         if (body.branchUnknown) {
             viewState.palmLoginStatus = 'សោភ្ជាប់នេះមាន Login Palm ច្រើនសាខា ហើយ Server មិនស្គាល់សាខារបស់គណនី ZoeW នេះ — សូម Login ZTO Palm ដោយគណនីរបស់សាខានេះ។';
@@ -363,7 +389,7 @@ async function runZtoPalmRefresh() {
         if (moved || (!out.res.ok && PALM_REFRESH_FINAL_CODES.indexOf(code) !== -1)) {
             storedLookupConfigWith(stored, {}, ['palmRefreshTokenEnc']);
             palmRefreshDue = false;
-            showToast('⚠️ Login ZTO Palm ស្វ័យប្រវត្តិមិនបាន — ' + (moved ? 'គណនី Palm ជាសាខាផ្សេង។' : palmLoginFailureText(body, out.res.status))
+            showToast('⚠️ Login ZTO Palm ស្វ័យប្រវត្តិមិនបាន — ' + (moved ? 'គណនី Palm ជាសាខាផ្សេង។' : await palmLoginFailureText(body, out.res.status))
                 + ' សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
             return 'rejected';
         }

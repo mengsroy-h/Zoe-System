@@ -1,3 +1,5 @@
+import { palmSignState } from '../../../core/palm-sign-state';
+import { useStoreValue } from '../../hooks/useStore';
 import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
 import { onAct } from '../../actions';
@@ -19,6 +21,7 @@ export interface BarcodeListRow {
 
 export function BarcodeListContainer() {
     useStore(uiState);
+    const palmMode = useStoreValue(palmSignState, (state) => state.mode);
     const rows = uiState.viewListView as BarcodeListRow[] | null;
     if (!rows) return null;
     return (
@@ -46,8 +49,8 @@ export function BarcodeListContainer() {
                     </div>
                     <div className="barcode-actions-group">
                         <button className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
-                            onClick={onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
-                            {b.closed ? '❌ បើក' : '✅ បិទ'}
+                            onClick={palmMode && !b.closed ? onAct('openZtoPalmSign', { args: [b.itemId, b.code] }) : onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
+                            {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
                         </button>
                         <button className="btn-edit-item-price"
                             onClick={onAct('openEditBarcodePriceModal', { args: [b.itemId, b.code] })}>✏️ កែ</button>

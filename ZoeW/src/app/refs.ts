@@ -23,6 +23,9 @@ export const REF_NAMES = [
     'entryTableResponsive',
     'exchangeRateInput',
     'fileInput',
+    'palmSignPhotoInput',
+    'palmSignGalleryInput',
+    'palmSignVideo',
     'firebaseConfigInput',
     'globalMoreMenu',
     'hwScannerInput',
@@ -307,6 +310,13 @@ export function animateElement(el: Element | null | undefined, keyframes: Keyfra
     return (el as HTMLElement).animate(keyframes, options);
 }
 
-export function videoElement(name: 'video' | 'configQrVideo'): HTMLVideoElement | null {
+export function videoElement(name: 'video' | 'configQrVideo' | 'palmSignVideo'): HTMLVideoElement | null {
     return elementOf<HTMLVideoElement>(name);
+}
+
+export async function attachPalmSignStream(stream: MediaStream | null): Promise<void> {
+    const video = videoElement('palmSignVideo');
+    if (!video) return;
+    video.srcObject = stream;
+    if (stream) await video.play();
 }

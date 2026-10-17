@@ -78,20 +78,25 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
 
 ## Session និងទិន្នន័យ (Login ម្តង ➜ ប្រើគ្រប់ទូរស័ព្ទក្នុងហាង)
 
-- Login ជោគជ័យ ➜ Function ទុក **session Palm របស់ហាង** ក្នុង Netlify Blobs (store `zto-auth` ដដែលនឹង Cookie · key `palm-session/<label>` ·
-  `<label>` = ឈ្មោះសោភ្ជាប់ក្នុង `ZTO_PROXY_KEYS`, សោ `ZTO_PROXY_KEY` = `default`) ៖ token ZTO · ឈ្មោះគណនី · ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` ·
-  សាខា ទាំងអស់ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session ទូរស័ព្ទ) ហើយចងនឹងសោភ្ជាប់ ➜ Blob ចម្លងទៅសោផ្សេង បើកមិនបាន។
-- ⛔ **សោភ្ជាប់មួយ = ហាង/សាខាមួយ = គណនី Palm មួយ** ៖ Login ថ្មីដោយសោដដែលជំនួស session មុន (Login ចុងក្រោយឈ្នះ ដូច Sync Cookie)។
-  ហាងដែលប្រើសាខាផ្សេងគ្នា ត្រូវមានសោផ្សេងគ្នាក្នុង `ZTO_PROXY_KEYS` (🩺 បង្ហាញឈ្មោះសោដែលទូរស័ព្ទប្រើ)។
-- ទូរស័ព្ទផ្សេងដែលមានសោភ្ជាប់ដដែល ៖ ចុច **«ប្រើ Login Palm របស់ហាង»** (`GET ?palm=status`) ឬទទួល Setup Link API ដែល URL មាន `palm=1` ➜ ស្កេន ·
-  ទាញបញ្ជី · ពិនិត្យស្ថានភាព ដោយមិនផ្ញើ session ឡើយ ➜ Function អាន session ហាងពី Blob (ទុកក្នុង memory ៦០ វិនាទី · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ)។
+- Login ជោគជ័យ ➜ Function ទុក **session Palm របស់សាខា** ក្នុង Netlify Blobs (store `zto-auth` ដដែលនឹង Cookie · key `palm-session/<label>/<សាខា>` ·
+  `<label>` = ឈ្មោះសោភ្ជាប់ក្នុង `ZTO_PROXY_KEYS`, សោ `ZTO_PROXY_KEY` = `default` · `<សាខា>` = `siteCode` របស់គណនី Palm) ៖ token ZTO · ឈ្មោះគណនី ·
+  ពាក្យសម្ងាត់ក្នុងទម្រង់ដែល ZTO ទទួល · `deviceSn` · សាខា ទាំងអស់ AES-GCM ដោយសោដែលមកពី `ZTO_PALM_SESSION_SECRET` (ស្លាកផ្សេងពី session ទូរស័ព្ទ)
+  ហើយចងនឹងសោភ្ជាប់ ➜ Blob ចម្លងទៅសោផ្សេង បើកមិនបាន។ បញ្ជីសាខាដែល Login រួចរបស់សោនីមួយ (`palm-sites/<label>` ៖ លេខសាខាប៉ុណ្ណោះ) ជួយទូរស័ព្ទដែលមិនទាន់ដឹងសាខា។
+- **សាខានីមួយៗមានគណនី Palm របស់ខ្លួន** ៖ សាខាច្រើនប្រើសោភ្ជាប់ដដែលក៏បាន ➜ Login សាខា B មិនជាន់សាខា A · Login ម្តងទៀតក្នុងសាខាដដែល ➜ ជំនួស
+  session មុនរបស់សាខានោះ (Login ចុងក្រោយឈ្នះ ដូច Sync Cookie)។
+- ទូរស័ព្ទផ្ញើសាខារបស់ខ្លួន (`X-Zoe-Palm-Site` = `palmAccount.siteCode` ដែលទូរស័ព្ទចាំពេល Login ឬភ្ជាប់) ➜ Function អាន session សាខានោះ
+  (ទុកក្នុង memory ៦០ វិនាទី · Blobs ធ្លាក់/គាំង ➜ memory នៅបម្រើ)។ ទូរស័ព្ទមិនផ្ញើសាខា ហើយសោមានសាខាតែមួយ ➜ ប្រើសាខានោះ · ច្រើនសាខា ➜ 401 `palm:branch-unknown`
+  (មិនទាយ)។ `ZTO_DETAIL_IDENTITY=require` ➜ គណនី ZoeW សាខា A ផ្ញើសាខា B ➜ `ZTO_OTHER_BRANCH`។
+- ទូរស័ព្ទផ្សេង ៖ ចុច **«ប្រើ Login Palm របស់ហាង»** (`GET ?palm=status`) ➜ Function រកសាខាពីគណនី ZoeW ដែលកំពុងចូល (ID token ·
+  ត្រូវការ `FIREBASE_PROJECT_IDS` ឬការកំណត់ Supabase ដូចការទាញបញ្ជី) បើមិនបាន ➜ សាខាតែមួយក្នុងបញ្ជីសាខា ➜ ស្កេន · ទាញបញ្ជី · ពិនិត្យស្ថានភាព
+  ដោយមិនបាច់ពាក្យសម្ងាត់ ហើយមិនផ្ញើ session ឡើយ · ឬទទួល Setup Link API ដែល URL មាន `palm=1`។
 - Function Login ឡើងវិញដោយខ្លួនឯង ៖ session មានអាយុ ≥ 4 ម៉ោង ➜ Login នៅ background ម្តង (container ច្រើន ➜ តែមួយ ៖ lease ក្នុង Blob ដោយ ETag) ·
   ZTO បដិសេធ token ➜ អាន Blob មុន (container ផ្សេងប្រហែលជា Login រួច) បើនៅ token ដដែល ➜ Login (ម្តង · single-flight) រួចសាកសំណើនោះម្តងទៀតក្នុងថវិកា ·
   ការសរសេរ Blob ប្រើ ETag (`onlyIfMatch`) ➜ Login ឡើងវិញមិនសរសេរជាន់ Login ដោយដៃដែលកើតឡើងក្នុងពេលនោះ · Login ឡើងវិញមិនបានដោយបណ្ដាញ ➜ 503
   (App សាកម្តងទៀត) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
   `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
 - `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
-- ប៊ូតុង **ផ្តាច់ Palm** សួរបញ្ជាក់ ហើយ `POST ?palm=logout` លុប session ហាងពី Blob ➜ ទូរស័ព្ទគ្រប់គ្រឿងឈប់ (container ផ្សេងឈប់ក្នុង ≤ 60 វិ) ·
+- ប៊ូតុង **ផ្តាច់ Palm** សួរបញ្ជាក់ ហើយ `POST ?palm=logout` លុប session សាខាខ្លួនពី Blob ➜ ទូរស័ព្ទគ្រប់គ្រឿងនៃសាខានោះឈប់ (container ផ្សេងឈប់ក្នុង ≤ 60 វិ · សាខាផ្សេងមិនប៉ះ) ·
   ប្តូរ `ZTO_PALM_SESSION_SECRET` ឬសោភ្ជាប់ ➜ session ហាងបើកមិនបាន ➜ Login ម្តងទៀត · ប្តូរពាក្យសម្ងាត់ Palm ➜ ZTO បដិសេធការ Login ឡើងវិញ ➜ Login ម្តងទៀត។
 - 🩺 (`?palm=1&diag=1`) ប្រាប់ប្រភព session (`shared` · `device` · `none`) · សាខា · អាយុ ដោយមិនបង្ហាញ token។
 - Blobs មិនទទួលការសរសេរពេល Login (`shared: false`) ➜ ទូរស័ព្ទនោះរក្សា session ដែល Server បិទ (AES-GCM · ចងនឹងសោភ្ជាប់ · ៨ ម៉ោង) និង `refreshToken`

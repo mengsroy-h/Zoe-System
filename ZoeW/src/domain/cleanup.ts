@@ -11,7 +11,7 @@ import { repairPickupLedgerOnce } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge } from '../features/restore';
-import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
+import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
@@ -25,7 +25,7 @@ export const cleanupInFlight = new Set();
 export const staleRestoreMarkerSweeps = new Set();
 
 export function trashRetentionMs(item) {
-    return item && item.trashReason === 'returned' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    return item && item.trashReason === 'returned' ? RETURNED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
 }
 
 export function clearStaleRestoreMarkers(item) {

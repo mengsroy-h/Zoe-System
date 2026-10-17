@@ -67,9 +67,9 @@ WRITE_PATHS.forEach((p) => {
 const claimBody = sliceFn(src, 'claimAndCleanupItem');
 ok(!!claimBody, 'claimAndCleanupItem មានក្នុង app.js');
 // ⛔ ម្ចាស់គម្រោង ៖ «ដកមុខងារ ផុតកំណត់ចេញ ព្រោះវាជា ត្រឡប់» · «ដាក់ returned ទៅ» ➜ ច្បាប់ ៨ ថ្ងៃ និង ZTO ត្រឡប់ (`codes`) សរសេរ 'returned'
-const expiredHits = (claimBody.match(/trashReason = 'returned'/g) || []).length;
-ok(expiredHits === 2 && src.indexOf("trashReason = 'expired'") === -1,
-    "claimAndCleanupItem ដាក់ 'returned' («ត្រឡប់») ទាំងផ្លូវ partial និងផ្លូវ whole (៨ ថ្ងៃ · ZTO ត្រឡប់) · គ្មាន 'expired'", expiredHits);
+const returnedHits = (claimBody.match(/trashReason = 'returned'/g) || []).length;
+ok(returnedHits === 2 && src.indexOf("trashReason = 'expired'") === -1,
+    "claimAndCleanupItem ដាក់ 'returned' («ត្រឡប់») ទាំងផ្លូវ partial និងផ្លូវ whole (៨ ថ្ងៃ · ZTO ត្រឡប់) · គ្មាន 'expired'", returnedHits);
 const pickupHits = (claimBody.match(/trashReason = 'pickup'/g) || []).length;
 ok(pickupHits === 2,
     "claimAndCleanupItem ដាក់ 'pickup' ទាំងផ្លូវ partial (barcode បិទរួច ២ ម៉ោង) និងផ្លូវ whole", pickupHits);
@@ -80,19 +80,19 @@ ok(restoreBody.indexOf('delete itemToRestore.trashReason') !== -1,
     'executeRestoreItem លុប trashReason មុនសរសេរត្រឡប់ចូល scan_history');
 
 // រយៈពេលរក្សាទុក
-const EXPIRED_RETENTION_DAYS = 2;
+const RETURNED_RETENTION_DAYS = 2;
 const RETENTION_DAYS = 30;
 const KHMER_DIGITS = '\u17E0\u17E1\u17E2\u17E3\u17E4\u17E5\u17E6\u17E7\u17E8\u17E9';
 const khmerNum = (n) => String(n).split('').map((d) => KHMER_DIGITS[Number(d)]).join('');
 const retention = /const TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
 ok(!!retention && Number(retention[1]) === RETENTION_DAYS,
     'ធុងសំរាមរក្សាទុក ' + khmerNum(RETENTION_DAYS) + ' ថ្ងៃ (TRASH_RETENTION_MS)', retention && retention[1]);
-const expiredRetention = /const EXPIRED_TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
-ok(!!expiredRetention && Number(expiredRetention[1]) === EXPIRED_RETENTION_DAYS,
-    'expired រក្សាទុក ' + khmerNum(EXPIRED_RETENTION_DAYS) + ' ថ្ងៃ', expiredRetention && expiredRetention[1]);
+const returnedRetention = /const RETURNED_TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
+ok(!!returnedRetention && Number(returnedRetention[1]) === RETURNED_RETENTION_DAYS,
+    '«ត្រឡប់» រក្សាទុក ' + khmerNum(RETURNED_RETENTION_DAYS) + ' ថ្ងៃ', returnedRetention && returnedRetention[1]);
 const retentionFn = sliceFn(src, 'trashRetentionMs');
 ok(retentionFn.indexOf("trashReason === 'returned'") !== -1 &&
-    retentionFn.indexOf('EXPIRED_TRASH_RETENTION_MS') !== -1 &&
+    retentionFn.indexOf('RETURNED_TRASH_RETENTION_MS') !== -1 &&
     retentionFn.indexOf('TRASH_RETENTION_MS') !== -1,
     'trashRetentionMs បែងចែក returned («ត្រឡប់») ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
 ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('trashRetentionMs(item)') !== -1,
@@ -100,7 +100,7 @@ ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('trashRetentionMs(item)') 
 
 // អត្ថបទដែលអ្នកប្រើអាន ត្រូវត្រូវនឹងលេខថេរ — បើឃ្លាតគ្នា អ្នកប្រើរង់ចាំខុសថ្ងៃ
 const retentionLabel = khmerNum(RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
-const expiredRetentionLabel = khmerNum(EXPIRED_RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
+const returnedRetentionLabel = khmerNum(RETURNED_RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
 // ⛔ ចំនួនថ្ងៃលើស្លាក ត្រូវ **ដេរីវេចេញពីថេរ** មិនមែនសរសេរដៃ។
 //    ជំនាន់មុនចាក់លេខ ៨ ទុកជា literal ➜ **គ្មានការចងភ្ជាប់សោះ**៖ ការប្តូរថេរ
 //    ទៅ ១០ ថ្ងៃ នឹងទុកស្លាកនៅ ៨ថ្ងៃ ដោយគ្មាន checker ណាធ្លាក់។
@@ -108,7 +108,7 @@ const expiredRetentionLabel = khmerNum(EXPIRED_RETENTION_DAYS) + ' \u1790\u17d2\
 //    `> ABANDON_AGE_MS` (មិនមែន `>=`) ➜ នៅ ៧×២៤ ម៉ោងគត់ **មិនទាន់ដក** ➜
 //    ការដកកើតឡើង **ចូលថ្ងៃទី ៨**។ វាស់រួចក្នុង `partial-pickup-cleanup-test.js`
 //    (សេណារីយ៉ូ ២ ៖ `T0 + 7*DAY` ➜ ធុងសំរាមទទេ; `+ 60000` ➜ ចូលធុងសំរាម)។
-//    ⛔ កុំ «កែ» ស្លាកទៅ ៧ថ្ងៃ — នោះនឹងអះអាងថាកញ្ចប់ផុតកំណត់នៅ ៧ ថ្ងៃគត់
+//    ⛔ កុំ «កែ» ស្លាកទៅ ៧ថ្ងៃ — នោះនឹងអះអាងថាកញ្ចប់ត្រឡប់នៅ ៧ ថ្ងៃគត់
 //    ដែល **មិនពិត** (សេចក្តីបញ្ជាក់របស់អ្នកប្រើ 2026-09-01)។
 const abandonConst = /const ABANDON_AGE_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
 ok(!!abandonConst, 'រកឃើញថេរ ABANDON_AGE_MS');
@@ -183,14 +183,14 @@ const ABANDON_LABEL_DAY = ABANDON_DAYS + 1;
 const abandonLabel = '\u178f\u17d2\u179a\u17a1\u1794\u17cb (\u1790\u17d2\u1784\u17c3\u1791\u17b8 ' + khmerNum(ABANDON_LABEL_DAY) + ' \u17ac ZTO \u179f\u17d2\u1780\u17c1\u1793\u178f\u17d2\u179a\u17a1\u1794\u17cb)\u17d6 ';
 const indexHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
 const trashModalHtml = indexHtml.slice(indexHtml.indexOf('id="recentlyDeletedModal"'));
-ok(trashModalHtml.indexOf(abandonLabel + expiredRetentionLabel) !== -1 &&
+ok(trashModalHtml.indexOf(abandonLabel + returnedRetentionLabel) !== -1 &&
     trashModalHtml.indexOf('\u1794\u17d2\u179a\u1797\u17c1\u1791\u1795\u17d2\u179f\u17c1\u1784\u17d6 ' + retentionLabel) !== -1,
     'ចំណងជើងធុងសំរាមបង្ហាញថ្ងៃលំដាប់ដែលដេរីវេពីថេរ', { ABANDON_DAYS, ABANDON_LABEL_DAY });
 // ⛔ ZoeW ជា React ៖ សារ «ជួរទៀត» រស់ក្នុង JSX (`TrashTableBody.tsx`) ➜ គូរ component ពិតជាមួយ `overflow > 0`
 //    ហើយវាស់អត្ថបទដែលអ្នកប្រើអាន (មិនមែនអត្ថបទ function)
 const trashRowsFn = renderComponent(ROOT, 'src/app/components/trash/TrashTableBody.tsx', 'TrashTableBody',
     { uiState: { trashView: { empty: null, rows: [], overflow: 3 } } });
-ok(trashRowsFn.indexOf(expiredRetentionLabel) !== -1 && trashRowsFn.indexOf(retentionLabel) !== -1,
+ok(trashRowsFn.indexOf(returnedRetentionLabel) !== -1 && trashRowsFn.indexOf(retentionLabel) !== -1,
     'សារ «ជួរទៀត» បង្ហាញ retention ទាំង ២ និង ៣០ថ្ងៃ');
 ok(trashRowsFn.indexOf(abandonLabel) !== -1,
     '⛔ សារ «ជួរទៀត» ប្រើថ្ងៃលំដាប់ដែលដេរីវេពីថេរ', { ABANDON_DAYS, ABANDON_LABEL_DAY });
@@ -200,7 +200,7 @@ ok(trashRowsFn.indexOf(abandonLabel) !== -1,
 [['index.html', trashModalHtml], ['renderRecentlyDeleted', trashRowsFn]].forEach(([where, text]) => {
     const days = Array.from(text.matchAll(new RegExp('([' + KHMER_DIGITS + ']+)\\s*\\u1790\\u17d2\\u1784\\u17c3', 'g')))
         .map((m) => m[1]);
-    const allowed = [khmerNum(ABANDON_LABEL_DAY), khmerNum(EXPIRED_RETENTION_DAYS), khmerNum(RETENTION_DAYS)];
+    const allowed = [khmerNum(ABANDON_LABEL_DAY), khmerNum(RETURNED_RETENTION_DAYS), khmerNum(RETENTION_DAYS)];
     ok(days.length > 0 && days.every((d) => allowed.indexOf(d) !== -1),
         '⛔ គ្មានចំនួនថ្ងៃចាស់សល់ក្នុង ' + where, days);
 });

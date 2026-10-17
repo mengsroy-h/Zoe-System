@@ -770,7 +770,7 @@ async function phoneModalEnterNext(browser, port) {
     await ctx.close();
 }
 
-// ⛔ UI-5/UI-6 ៖ ជួរ 🔔 «ជិតផុតកំណត់» · «ដករួច» ត្រូវបង្ហាញ Locker ពេញ (ទីតាំងសម្រាប់ទៅយកកញ្ចប់ចេញពីទូ) ៖ ព័ត៌មានបត់បន្ទាត់ មិនកាត់ «…» ·
+// ⛔ UI-5/UI-6 ៖ ជួរ 🔔 «ជិតដល់ពេលត្រឡប់» · «ដករួច» ត្រូវបង្ហាញ Locker ពេញ (ទីតាំងសម្រាប់ទៅយកកញ្ចប់ចេញពីទូ) ៖ ព័ត៌មានបត់បន្ទាត់ មិនកាត់ «…» ·
 //    ជួរមិនលើសផ្ទាំង។ វាស់ `scrollWidth`/`clientWidth` ក្នុង browser ពិតលើទូរស័ព្ទ ៣២០ · ៤១២។
 async function notifyRowLayout(browser, port) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });

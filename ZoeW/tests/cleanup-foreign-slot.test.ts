@@ -7,7 +7,7 @@ import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text'
 import { ABANDON_AGE_MS, TWO_HOURS_MS } from '../src/features/session';
 
 // ⛔ «បញ្ចូលទៅក្នុងធាតុដែលបាត់» (`mergeBarcodeIntoHistoryItem()` ៖ server ឃើញ null ➜ ធាតុថ្មីក្រោម id ចាស់) បង្កើត history/<id> ម្តងទៀត
-//    ខណៈ trash/<id> នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន (លុប · ផុតកំណត់ · យករួច) ➜ slot របស់ id នោះមិនទំនេរ ហើយម្ចាស់វាមិនមែនជាការ claim ដដែលទេ
+//    ខណៈ trash/<id> នៅកាន់ច្បាប់ចម្លងនៃជីវិតមុន (លុប · ត្រឡប់ · យករួច) ➜ slot របស់ id នោះមិនទំនេរ ហើយម្ចាស់វាមិនមែនជាការ claim ដដែលទេ
 //    (barcode ខុសគ្នាទាំងស្រុង)។ ការសម្អាតមិនត្រូវបោះ barcode ដែល claim ចោល (មិននៅប្រវត្តិ · មិននៅធុងសំរាម · មិនដកលុយ) ហើយការលុបមិនត្រូវ
 //    សរសេរជាន់ច្បាប់ចម្លងចាស់ទេ។
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -179,7 +179,7 @@ afterEach(() => {
 });
 
 describe('cleanup of an item recreated under an id whose trash slot holds another lifecycle', () => {
-    it('1. abandon (8 days) · trash/<id> = the old item deleted by hand ➜ C lands in trash «expired» · deducted once · the old copy untouched', async () => {
+    it('1. abandon (8 days) · trash/<id> = the old item deleted by hand ➜ C lands in trash «returned» · deducted once · the old copy untouched', async () => {
         const { old } = install('abandon', 'delete');
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
@@ -201,7 +201,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         expect(cleanupLedgerKeyOf(copies[0])).toEqual({ scanDate: DAY });
     }, 20000);
 
-    it('2. close (2 hours) · trash/<id> = the old expired copy ➜ C lands in trash «pickup» · money untouched · the old copy untouched', async () => {
+    it('2. close (2 hours) · trash/<id> = the old returned copy ➜ C lands in trash «pickup» · money untouched · the old copy untouched', async () => {
         const { old } = install('close', 'returned');
         await claimAndCleanupItem(ID, 'close');
         await flush();
@@ -348,7 +348,7 @@ describe('whole claim whose trash write fails while history/<id> was recreated m
 });
 
 describe('Delete (លុប) of an item recreated under an id whose trash slot holds another lifecycle', () => {
-    it('7. trash/<id> = the old expired copy (deducted) ➜ the delete copy lands beside it · the old copy untouched · money untouched', async () => {
+    it('7. trash/<id> = the old returned copy (deducted) ➜ the delete copy lands beside it · the old copy untouched · money untouched', async () => {
         const { old } = install('abandon', 'returned');
         dataState.scanHistory[0].createdAt = getServerNow();
         await deleteSingleItem(ID);

@@ -425,7 +425,7 @@ function serve(dir) {
         }
         return results;
     });
-    check(legacyRemovals.length === 5, 'ករណីដក និងផុតកំណត់ទាំងមូល/មួយផ្នែក លើទិន្នន័យចាស់ 0.005 និង 0.015 រត់ក្នុង Chromium ទាំង COD និង DOD');
+    check(legacyRemovals.length === 5, 'ករណីដក និង «ត្រឡប់» ទាំងមូល/មួយផ្នែក លើទិន្នន័យចាស់ 0.005 និង 0.015 រត់ក្នុង Chromium ទាំង COD និង DOD');
     for (const result of legacyRemovals) {
         const equalMoney = (left, right) => ['codDollar', 'dodDollar', 'totalCount'].every((key) =>
             Math.round(left[key] * 100) === Math.round(right[key] * 100));

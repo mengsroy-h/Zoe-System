@@ -36,7 +36,7 @@ export const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 export const ABANDON_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
+export const RETURNED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 

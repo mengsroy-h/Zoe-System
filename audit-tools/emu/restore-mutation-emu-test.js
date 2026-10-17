@@ -306,9 +306,9 @@ async function retentionScenario(mode) {
     const final = accepted(await request('GET', '/', undefined, true));
     const live = Object.values(final.zoew_scan_history_cod_dod || {});
     check(live.some((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC')),
-        mode + '៖ ស្តារហើយ មិនផុតកំណត់វិញភ្លាម');
+        mode + '៖ ស្តារហើយ មិនចូល «ត្រឡប់» វិញភ្លាម');
     check(parent.isClosed || mode === 'fresh' || !live.some((item) => item.barcodes.some((b) => b.code === 'PARENT_BC')),
-        mode + '៖ sibling ចាស់ដែលមិនទាន់យក នៅតែផុតកំណត់តាមច្បាប់');
+        mode + '៖ sibling ចាស់ដែលមិនទាន់យក នៅតែចូល «ត្រឡប់» តាមច្បាប់');
     const daily = final.zoew_daily_revenue_cod_dod[DATE];
     check(daily.codDollar === (parent.isClosed || mode === 'fresh' ? 20 : 10) && daily.dodDollar === 2,
         mode + '៖ មិនកាត់ប្រាក់របស់ barcode ដែលទើបស្តារ', daily);
@@ -319,16 +319,16 @@ async function retentionScenario(mode) {
     await client.settle();
     const boundary = accepted(await request('GET', '/zoew_scan_history_cod_dod'));
     check(Object.values(boundary || {}).some((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC')),
-        mode + '៖ restored barcode នៅគ្រប់៧ថ្ងៃគត់ មិនទាន់ផុតកំណត់');
+        mode + '៖ restored barcode នៅគ្រប់៧ថ្ងៃគត់ មិនទាន់ចូល «ត្រឡប់»');
     client.context.getServerNow = () => NOW + 7 * 24 * 60 * 60 * 1000 + 1;
     await client.context.claimAndCleanupItem(restoredRow.id, 'abandon');
     await client.settle();
-    const expired = accepted(await request('GET', '/', undefined, true));
-    check(!Object.values(expired.zoew_scan_history_cod_dod || {}).some((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC')),
-        mode + '៖ លើស៧ថ្ងៃពីការស្តារ ទើបផុតកំណត់');
-    const endDaily = expired.zoew_daily_revenue_cod_dod[DATE];
+    const afterAbandon = accepted(await request('GET', '/', undefined, true));
+    check(!Object.values(afterAbandon.zoew_scan_history_cod_dod || {}).some((item) => item.barcodes.some((b) => b.code === 'RESTORE_BC')),
+        mode + '៖ លើស៧ថ្ងៃពីការស្តារ ទើបចូល «ត្រឡប់»');
+    const endDaily = afterAbandon.zoew_daily_revenue_cod_dod[DATE];
     check(endDaily.codDollar === (parent.isClosed ? 10 : 0) && endDaily.dodDollar === 0,
-        mode + '៖ ផុតកំណត់កាត់ប្រាក់តែម្តងគត់', endDaily);
+        mode + '៖ «ត្រឡប់» កាត់ប្រាក់តែម្តងគត់', endDaily);
 }
 async function preparedRetryScenario(mode) {
     const trash = seedItem();

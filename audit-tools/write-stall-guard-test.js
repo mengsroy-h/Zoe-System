@@ -85,7 +85,7 @@ const NEEDED = ['runAutomaticDeletedCleanup', 'purgeDeletedItemsQuietly', 'clear
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
 
-const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'TRASH_RETENTION_MS', 'EXPIRED_TRASH_RETENTION_MS',
+const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS',
     'REGISTRY_RELEASE_RETRY_MAX', 'REGISTRY_RELEASE_QUEUE_MAX', 'TRASH_WRITE_SLOW_NOTICE_MS'];
 const cmissing = NEEDED_CONSTS.filter((n) => !extractConst(src, n));
 ok('រកឃើញថេរដែលត្រូវវាស់ ' + NEEDED_CONSTS.length, cmissing.length === 0, { missing: cmissing });

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS } from '../src/features/session';
+import { ABANDON_AGE_MS, RETURNED_TRASH_RETENTION_MS } from '../src/features/session';
 import * as notifications from '../src/features/notifications';
 import { openNotifyDrawer } from '../src/features/notifications';
 import { closeSideDrawer } from '../src/ui/page-nav';
@@ -66,7 +66,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('គោលការណ៍ ៧ ថ្ងៃ ៖ ជិតផុតកំណត់ ➜ ស្កេនត្រឡប់ទៅសាខាកណ្តាល', () => {
+describe('គោលការណ៍ ៧ ថ្ងៃ ៖ ជិតដល់ពេលត្រឡប់ ➜ ស្កេនត្រឡប់ទៅសាខាកណ្តាល', () => {
     it('អត្ថបទគោលការណ៍ ៖ ៧ ថ្ងៃ = ABANDON_AGE_MS · សាខាកណ្តាល · ស្កេន «ត្រឡប់» ក្នុង ZTO', () => {
         expect(ABANDON_AGE_MS % DAY_MS).toBe(0);
         expect(typeof policyText()).toBe('string');
@@ -147,6 +147,6 @@ describe('គោលការណ៍ ៧ ថ្ងៃ ៖ ជិតផុតកំ
         expect(items[3]).toContain('ដកលុយ');
         expect(items[3]).toContain('បិទតាម ZTO ស្វ័យប្រវត្តិ');
         expect(items[4]).toContain('📤');
-        expect(items[4]).toContain(kh(EXPIRED_TRASH_RETENTION_MS / DAY_MS) + ' ថ្ងៃ');
+        expect(items[4]).toContain(kh(RETURNED_TRASH_RETENTION_MS / DAY_MS) + ' ថ្ងៃ');
     });
 });

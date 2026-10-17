@@ -3,7 +3,7 @@
  * ⛔ iPhone ទាមទារ `Notification.requestPermission()` ក្នុង **gesture ដដែល** ➜ វាត្រូវហៅ **មុន** `await` ណាមួយ (មុនទាញ config)។
  * ⛔ ស្ថានភាពត្រូវនិយាយការពិត ៖ Server គ្មាន VAPID = «server-off» (មិនមែន «បើករួច») · Key ត្រូវ Revoke = «no-license» ·
  *    APK គ្មាន google-services.json = «native-unconfigured» ហើយ **មិនផ្ទុក plugin** (FirebaseMessaging នឹងគាំង App)។
- * ⛔ កាលវិភាគផុតកំណត់ ៖ ពេលដែល `barcodeAbandonIsRipe()` ពិតប្រែជា `true` (± ១ នាទី) — គ្មានរូបមន្តព្រំដែនទី ២ ·
+ * ⛔ កាលវិភាគដល់ពេលត្រឡប់ ៖ ពេលដែល `barcodeAbandonIsRipe()` ពិតប្រែជា `true` (± ១ នាទី) — គ្មានរូបមន្តព្រំដែនទី ២ ·
  *    ផ្ញើតែម៉ោង (គ្មានលេខទូរស័ព្ទ/barcode) · ទិដ្ឋភាពមិនស្រស់ ➜ មិនផ្ញើ (កុំអះអាង «០ កញ្ចប់»)។
  */
 import fs from 'node:fs';
@@ -625,7 +625,7 @@ describe('⛔ ការព្យួរ ≠ ការធ្លាក់ ៖ ស�
     });
 });
 
-describe('កាលវិភាគផុតកំណត់ (ផ្ញើទៅ server)', () => {
+describe('កាលវិភាគដល់ពេលត្រឡប់ (ផ្ញើទៅ server)', () => {
     const NOW = Date.UTC(2026, 8, 29, 1, 0, 0);
 
     it('⛔ abandonAtOf = នាទីដំបូងដែល barcodeAbandonIsRipe() ពិត (± ១ នាទី) · barcode បិទ/ហួស/ឆ្ងាយ ➜ -1', () => {
@@ -804,7 +804,7 @@ describe('⛔ ហាង Supabase ៖ អត្តសញ្ញាណ = គណន�
         }
     });
 
-    it('កាលវិភាគផុតកំណត់ ៖ ផ្ញើ `supabase` + times · មិនទាន់ចូល ➜ មិនផ្ញើ', async () => {
+    it('កាលវិភាគដល់ពេលត្រឡប់ ៖ ផ្ញើ `supabase` + times · មិនទាន់ចូល ➜ មិនផ្ញើ', async () => {
         localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true }));
         stubServer();
         expect(await syncExpirySchedule(true)).toBe(true);

@@ -615,7 +615,7 @@ section "== តេស្តឥរិយាបថ (រត់កូដពិត �
 for t in policy-test auth-recovery-test keylist-consistency-test \
          license-grace-test license-clock-trust-test \
          license-clock-rollback-test license-record-race-test license-seat-test \
-         cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
+         cleanup-clock-guard-test returned-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
          keygen-session-security-test keygen-notice-test keygen-biometric-test \
@@ -872,7 +872,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LADDER_APP_DIR="$BASE" node audit-tools/reconnect-ladder-test.js 2>&1 | tail -1 | sed 's/^/   reconnect-ladder:/'
     LICENSECLOCK_APP_DIR="$BASE" node audit-tools/license-clock-trust-test.js 2>&1 | tail -1 | sed 's/^/   license-clock:   /'
     CLEANUPCLOCK_APP_DIR="$BASE" node audit-tools/cleanup-clock-guard-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-clock:   /'
-    EXPIREDTRASH_APP_DIR="$BASE" node audit-tools/expired-trash-retention-test.js 2>&1 | tail -1 | sed 's/^/   expired-trash:   /'
+    RETURNEDTRASH_APP_DIR="$BASE" node audit-tools/returned-trash-retention-test.js 2>&1 | tail -1 | sed 's/^/   returned-trash:  /'
     MONOGATE_APP_DIR="$BASE" node audit-tools/monotonic-gate-test.js 2>&1 | tail -1 | sed 's/^/   monotonic-gate:  /'
     KHMERTZ_APP_DIR="$BASE" node audit-tools/khmer-timezone-test.js 2>&1 | tail -1 | sed 's/^/   khmer-tz:        /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'

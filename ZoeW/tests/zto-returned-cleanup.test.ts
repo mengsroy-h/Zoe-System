@@ -16,7 +16,7 @@ import { getServerNow } from '../src/core/clock';
 import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { CLEANUP_KEY_SWEEP_GRACE_MS, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, runCleanupLedgerKeySweep, trashRetentionMs } from '../src/domain/cleanup';
-import { EXPIRED_TRASH_RETENTION_MS } from '../src/features/session';
+import { RETURNED_TRASH_RETENTION_MS } from '../src/features/session';
 import { TRASH_REASON_META, trashReasonOf } from '../src/features/trash';
 import { removedParcelsView } from '../src/features/notifications';
 import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
@@ -203,7 +203,7 @@ afterEach(() => {
     delete (window as any).ZoeErrors;
 });
 
-describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតកំណត់ ៖ `claimAndCleanupItem(id, \'abandon\', { codes })`', () => {
+describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចច្បាប់ ៨ ថ្ងៃ ៖ `claimAndCleanupItem(id, \'abandon\', { codes })`', () => {
     it('កញ្ចប់ក្មេង (២ ថ្ងៃ) ៖ ដកតែ barcode បើកដែលប្រាប់ ➜ ធុងសំរាម «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក · barcode បើកផ្សេង និងបិទ នៅដដែល · គ្មានស្លាក «ផុតកំណត់»', async () => {
         seed([youngItem([['A', 10], ['B', 5], ['C', 3, true]])]);
         await claimAndCleanupItem(ID, 'abandon', { codes: ['A', 'C'] });
@@ -222,7 +222,7 @@ describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតក
         expect(ledger().totalCount, 'ចំនួនកញ្ចប់ដក').toBe(9);
         expect(month().codDollar).toBe(90);
         expect(month().totalCount).toBe(9);
-        expect(trashRetentionMs(trash[0]), 'លុបអចិន្ត្រៃយ៍ក្រោយ ២ ថ្ងៃ ដូចផុតកំណត់').toBe(EXPIRED_TRASH_RETENTION_MS);
+        expect(trashRetentionMs(trash[0]), 'លុបអចិន្ត្រៃយ៍ក្រោយ ២ ថ្ងៃ ដូចច្បាប់ ៨ ថ្ងៃ').toBe(RETURNED_TRASH_RETENTION_MS);
     });
 
     it('barcode បើកទាំងអស់ត្រឡប់ ➜ ធុងសំរាមទាំងកញ្ចប់ (id ដដែល) · ដកលុយទាំងអស់', async () => {
@@ -516,7 +516,7 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
 
     it('តម្លៃតែមួយ `returned` ៖ ស្លាក «ត្រឡប់» · ២ ថ្ងៃ · គ្មាន `expired` ក្នុង App និង rules (ម្ចាស់គម្រោង ៖ «កែអោយស្អាត»)', () => {
         expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'pickup', 'remove', 'returned']);
-        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(EXPIRED_TRASH_RETENTION_MS);
+        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
         const rules = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'firebase-database.rules.json'), 'utf8'));
         const check = rules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason['.validate'];
         expect(check).toContain("'returned'");
@@ -552,6 +552,6 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         ], now, false, []);
         expect(view.packages).toBe(1);
         expect(view.rows.map((r: any) => r.key)).toEqual(['id_r']);
-        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(EXPIRED_TRASH_RETENTION_MS);
+        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
     });
 });

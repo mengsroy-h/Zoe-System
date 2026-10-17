@@ -256,7 +256,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('⛔ បិទរួច ➜ ចូលធុងសំរាម `pickup` ➜ របា **នៅតែលេច**',
         afterCleanup.hidden === false && afterCleanup.text.indexOf('BAR000001') !== -1, afterCleanup);
 
-    // ⛔ ទិសផ្ទុយ ៖ ធុងសំរាមប្រភេទផ្សេង **មិនរាប់** — «ដក» និង «ផុតកំណត់»
+    // ⛔ ទិសផ្ទុយ ៖ ធុងសំរាមប្រភេទផ្សេង **មិនរាប់** — «ដក» និង «ត្រឡប់»
     // ដកលុយចេញ ហើយកញ្ចប់ត្រឡប់ទៅសាខាកណ្តាល ➜ ស្ថានភាព ZTO លែងពាក់ព័ន្ធ។
     for (const reason of ['remove', 'returned', 'delete']) {
         const other = await page.evaluate((args) => {

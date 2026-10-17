@@ -18,7 +18,7 @@
 // abort លើ `if (item.clearClaim) return;` — **វត្តមាន** មិនមែនភាពរស់ ➜
 //   · claim ងាប់ ១០ នាទី  ➜ ការសម្អាតបាញ់ **០** (មូលដ្ឋាន ២)
 //   · claim ងាប់ ៣០ ថ្ងៃ  ➜ ការសម្អាតបាញ់ **០**
-//   · កញ្ចប់ផុតកំណត់ ៧ ថ្ងៃ **$12.50 មិនដែលត្រូវដក**
+//   · កញ្ចប់មិនទាន់យកលើស ៧ ថ្ងៃ («ត្រឡប់») **$12.50 មិនដែលត្រូវដក**
 // ខណៈ `isActiveClearHistoryClaim()` ត្រឡប់ `false` រួចហើយ — helper វិនិច្ឆ័យ
 // **មានស្រាប់** តែគ្មាននរណាអានវានៅផ្លូវនោះ។
 //
@@ -163,17 +163,17 @@ globalThis.__ownClaim = (id, tok) => { activeClearHistoryClaims.set(id, tok); };
     return { ctx, log, store, release: () => later.splice(0).forEach((f) => f()) };
 }
 
-// កញ្ចប់ផុតកំណត់ ៧ ថ្ងៃ (លុយត្រូវដក) + កញ្ចប់បិទហួស ២ ម៉ោង
+// កញ្ចប់មិនទាន់យកលើស ៧ ថ្ងៃ («ត្រឡប់») (លុយត្រូវដក) + កញ្ចប់បិទហួស ២ ម៉ោង
 function seedPair(w, claim) {
-    const expired = { id: 'itm_expired', scanDate: '2026-09-01', isClosed: false,
+    const abandoned = { id: 'itm_abandoned', scanDate: '2026-09-01', isClosed: false,
         createdAt: NOW - 9 * 24 * 3600 * 1000,
         barcodes: [{ code: 'BC1', cod: 12.5, dod: 0, isClosed: false }] };
     const closed = { id: 'itm_closed', scanDate: '2026-09-01', isClosed: true, closedAt: NOW - 3 * 3600 * 1000,
         barcodes: [{ code: 'BC2', cod: 4, dod: 0, isClosed: true, closedAt: NOW - 3 * 3600 * 1000 }] };
-    if (claim) { expired.clearClaim = claim; closed.clearClaim = claim; }
-    w.store['zoew_scan_history_cod_dod/itm_expired'] = JSON.parse(JSON.stringify(expired));
+    if (claim) { abandoned.clearClaim = claim; closed.clearClaim = claim; }
+    w.store['zoew_scan_history_cod_dod/itm_abandoned'] = JSON.parse(JSON.stringify(abandoned));
     w.store['zoew_scan_history_cod_dod/itm_closed'] = JSON.parse(JSON.stringify(closed));
-    w.ctx.__seed([expired, closed]);
+    w.ctx.__seed([abandoned, closed]);
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -197,11 +197,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         w.ctx.__run();
         await sleep(30);
         ok(label + ' ➜ ⛔ claim ត្រូវដោះចេញពី server',
-            !w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim,
-            w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim);
+            !w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim,
+            w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim);
         // ជុំបន្ទាប់ (វដ្ត ៦០ វិ.) ➜ ការសម្អាតត្រូវបន្ត ➜ លុយត្រូវដក
         w.ctx.__seed([
-            Object.assign({}, JSON.parse(JSON.stringify(w.store['zoew_scan_history_cod_dod/itm_expired']))),
+            Object.assign({}, JSON.parse(JSON.stringify(w.store['zoew_scan_history_cod_dod/itm_abandoned']))),
             Object.assign({}, JSON.parse(JSON.stringify(w.store['zoew_scan_history_cod_dod/itm_closed'])))
         ]);
         w.log.cleanups.length = 0;
@@ -219,7 +219,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         w.ctx.__run();
         await sleep(30);
         ok('⛔ claim រស់ ➜ **មិនត្រូវដោះ** (ឧបករណ៍ផ្សេងកំពុងលុប)',
-            !!w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim);
+            !!w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim);
         ok('⛔ claim រស់ ➜ ការសម្អាតត្រូវនៅទប់ដដែល', w.log.cleanups.length === 0, w.log.cleanups);
     }
 
@@ -229,12 +229,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const w = buildWorld('ok');
         seedPair(w, { token: 'mine', claimedAt: NOW - 10 * 60 * 1000 });
         // «លុបទាំងអស់» របស់ឧបករណ៍នេះកំពុងព្យាយាមឡើងវិញ ➜ token នៅក្នុងសតិ
-        w.ctx.__ownClaim('itm_expired', 'mine');
+        w.ctx.__ownClaim('itm_abandoned', 'mine');
         w.ctx.__ownClaim('itm_closed', 'mine');
         w.ctx.__run();
         await sleep(30);
         ok('⛔ claim របស់ឧបករណ៍នេះ ➜ **មិនត្រូវដោះ** (ការលុបកំពុងព្យាយាមឡើងវិញ)',
-            !!w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim);
+            !!w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim);
     }
 
     // ── ６. ⛔ ការសម្រេចត្រូវផ្អែកលើទិដ្ឋភាព server ─────────────────────────
@@ -243,13 +243,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const w = buildWorld('ok');
         seedPair(w, { token: 'dead', claimedAt: NOW - 10 * 60 * 1000 });
         // server ទទួល claim **ថ្មី** មុន transaction រត់ (ឧបករណ៍ផ្សេងទើប claim)
-        w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim = { token: 'fresh', claimedAt: NOW - 1000 };
+        w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim = { token: 'fresh', claimedAt: NOW - 1000 };
         w.ctx.__run();
         await sleep(30);
         ok('⛔ transaction ត្រូវអាន server ឡើងវិញ ➜ claim រស់ត្រូវរក្សា',
-            !!w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim
-            && w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim.token === 'fresh',
-            w.store['zoew_scan_history_cod_dod/itm_expired'].clearClaim);
+            !!w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim
+            && w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim.token === 'fresh',
+            w.store['zoew_scan_history_cod_dod/itm_abandoned'].clearClaim);
     }
 
     // ── ７. សោ sweep ត្រូវដោះ ក្រោមការសរសេរដែលព្យួរ ─────────────────────────

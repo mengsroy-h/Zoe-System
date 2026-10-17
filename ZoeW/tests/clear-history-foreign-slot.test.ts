@@ -103,7 +103,7 @@ function itemOf(id: string, code: string, cod: number) {
     const b = barcodeOf(code, cod, now - 3600000);
     return { id, phone: '012', scanDate: DAY, time: b.time, createdAt: b.createdAt, count: 1, cod, dod: 0, price: cod, isClosed: false, isCalled: false, barcode: code, barcodes: [b] };
 }
-function oldExpiredCopy() {
+function oldReturnedCopy() {
     const at = getServerNow() - 3 * 3600000;
     const a = barcodeOf('A', 10, at - 3600000, true);
     return { id: ID, phone: '012', scanDate: DAY, time: a.time, createdAt: a.createdAt, count: 1, cod: 10, dod: 0, price: 10, barcode: 'A', barcodes: [a],
@@ -149,8 +149,8 @@ afterEach(() => {
 });
 
 describe('«លុបទាំងអស់» ៖ slot ធុងសំរាមរបស់ id កាន់ជីវិតមុន', () => {
-    it('១. trash/<id> = ច្បាប់ចម្លង «ផុតកំណត់» ចាស់ ➜ ធាតុថ្មីចូលធុងសំរាម «លុប» ក្បែរវា · ច្បាប់ចម្លងចាស់នៅដដែល · គ្មាន clearClaim · ✅', async () => {
-        const old = oldExpiredCopy();
+    it('១. trash/<id> = ច្បាប់ចម្លង «ត្រឡប់» ចាស់ ➜ ធាតុថ្មីចូលធុងសំរាម «លុប» ក្បែរវា · ច្បាប់ចម្លងចាស់នៅដដែល · គ្មាន clearClaim · ✅', async () => {
+        const old = oldReturnedCopy();
         install([itemOf(ID, 'C', 7)], { [ID]: old });
         await clearHistory();
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
@@ -171,7 +171,7 @@ describe('«លុបទាំងអស់» ៖ slot ធុងសំរាម�
     }, 30000);
 
     it('២. ធាតុពីរ ៖ មួយ slot ជាប់ · មួយ slot ទំនេរ ➜ លុបទាំងពីរ · slot ទំនេរនៅតាមផ្លូវ finalize (trash/<id> ផ្ទាល់)', async () => {
-        const old = oldExpiredCopy();
+        const old = oldReturnedCopy();
         install([itemOf(ID, 'C', 7), itemOf(ID2, 'E', 4)], { [ID]: old });
         await clearHistory();
         expect(Object.keys(getAt(HISTORY) || {})).toEqual([]);

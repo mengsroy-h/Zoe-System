@@ -158,7 +158,7 @@ function genWorld(seed) {
             });
         }
         const item = { id: 'i' + i, scanDate: date, phone: '01' + (100 + i), barcodes: barcodes };
-        // សកម្មភាពចៃដន្យ ៖ បិទ «យក» · ដក (ដកលុយ) · លុប (មិនដកលុយ) · ផុតកំណត់ (ដកលុយ) · ស្តារ
+        // សកម្មភាពចៃដន្យ ៖ បិទ «យក» · ដក (ដកលុយ) · លុប (មិនដកលុយ) · ត្រឡប់ ៨ ថ្ងៃ (ដកលុយ) · ស្តារ
         barcodes.forEach((b) => {
             const op = rand();
             if (op < 0.35) { b.isClosed = true; }                       // យករួច

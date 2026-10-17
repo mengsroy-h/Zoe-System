@@ -390,7 +390,7 @@ describe('⛔ E1 ៖ ជុំដែលគ្មានកញ្ចប់បើ�
         expect(log.signed).toHaveLength(2);
         expect(h.calls.map((c) => c.code), 'ជួរ ៖ ' + log.signed.join(' | ')).toEqual(['ZTE6E00002']);
         cleanupNow();
-        expect(abandoned('old'), 'ចុះហត្ថលេខា ➜ បិទ «យករួច» មិនមែន expired').toBe(false);
+        expect(abandoned('old'), 'ចុះហត្ថលេខា ➜ បិទ «យករួច» មិនមែន «ត្រឡប់»').toBe(false);
     });
 
     it('ទិសផ្ទុយ ៖ ជុំដែលមានកញ្ចប់បើក ហើយអានពេញលេញ ➜ នៅតែរាប់ជាការអានពេញលេញ (ទោះមាន false ផង)', async () => {

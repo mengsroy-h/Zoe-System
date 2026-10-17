@@ -2548,7 +2548,7 @@
     "audit-tools/exit-code-integrity.js": {
       "policy": "guard-1"
     },
-    "audit-tools/expired-trash-retention-test.js": {
+    "audit-tools/returned-trash-retention-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/export-cells-test.js": {

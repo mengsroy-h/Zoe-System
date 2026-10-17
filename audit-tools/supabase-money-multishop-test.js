@@ -183,7 +183,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             page.on('pageerror', (e) => errors.push(String(e && e.message)));
             page.on('dialog', (d) => d.accept().catch(() => {}));
             const dev = { ctx, page, errors, shop, name: user.username };
-            dev.state = () => page.evaluate(() => window.__state()).catch((e) => ({ status: 'evaluate failed: ' + (e && e.message), phase: null, pending: -1, blocked: -1, rows: -1, history: -1, codes: [], results: [] }));
+            dev.opLog = [];
+            dev.state = () => page.evaluate(() => window.__state()).then((st) => {
+                if (st && Array.isArray(st.results) && st.results.length) dev.opLog = dev.opLog.concat(st.results).slice(-12);
+                return st;
+            }).catch((e) => ({ status: 'evaluate failed: ' + (e && e.message), phase: null, pending: -1, blocked: -1, rows: -1, history: -1, codes: [], results: [] }));
             dev.waitOnline = async (ms, minHistory) => {
                 const t0 = Date.now();
                 for (;;) {
@@ -334,7 +338,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 Object.keys(inv.seenCodes).forEach((code) => { if (shop.knownCodes.indexOf(code) === -1) shop.knownCodes.push(code); });
                 const why = invariantBroken(inv);
                 if (DEBUG) console.log('    #' + i + ' shop ' + shop.index + ' ' + shop.trail.slice(-DEVICES).join(' | ') + ' -> ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined })));
-                if (why) { broke = 'ហាង ' + shop.index + ' ៖ ' + why + ' ក្រោយ [' + shop.trail.join(' > ') + ']\n        ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined })); break; }
+                if (why) { broke = 'ហាង ' + shop.index + ' ៖ ' + why + ' ក្រោយ [' + shop.trail.join(' > ') + ']\n        ' + JSON.stringify(Object.assign({}, inv, { seenCodes: undefined }))
+                    + '\n        ផលប្រតិបត្តិការចុងក្រោយ ៖ ' + JSON.stringify(shop.devices.map((d) => [d.name, d.opLog])); break; }
             }
         }
         const noisy = devices.flatMap((d) => d.errors).filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError|timed out|websocket|realtime/i.test(e));

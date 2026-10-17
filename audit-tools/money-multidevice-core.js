@@ -28,6 +28,9 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     const trash = dump.zoew_recently_deleted_cod_dod || {};
     let cod = 0, dod = 0, count = 0, closed = 0;
     const seen = {}; const dup = []; const live = {};
+    // ⛔ អត្តសញ្ញាណ ៖ ពេល packagesPickedUp ≠ barcode បិទ ត្រូវប្រាប់ **កូនសោណា** លើស/ខ្វះ និង barcode នោះនៅឯណា (CI ធ្លាក់ម្តង pkg 3 ⟷ បិទ 1 ដោយគ្មានព័ត៌មាន)
+    const regKey = (code) => String(code || '').trim().toUpperCase().replace(/[%.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    const located = {}; const closedKeys = {};
     const walk = (bag, where) => Object.keys(bag).forEach((id) => {
         const it = bag[id]; if (!it) return;
         const bcs = barcodesOf(it) || (it.barcode ? [{ code: it.barcode, cod: it.cod, dod: it.dod, isClosed: it.isClosed, isDeducted: it.isDeducted }] : []);
@@ -35,8 +38,9 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
             if (!b || !b.code) return;
             if (seen[b.code]) dup.push(b.code + '@' + seen[b.code] + '+' + where); else seen[b.code] = where;
             live[String(b.code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
+            located[regKey(b.code)] = where + ':' + id + ':' + (b.isClosed === true ? 'closed' : 'open') + (it.scanDate !== dateKey ? ':' + it.scanDate : '');
             if (it.scanDate !== dateKey) return;
-            if (b.isClosed === true) closed++;
+            if (b.isClosed === true) { closed++; closedKeys[regKey(b.code)] = true; }
             if (b.isDeducted !== true) { cod += parseFloat(b.cod) || 0; dod += parseFloat(b.dod) || 0; count++; }
         });
     });
@@ -48,6 +52,9 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
     const month = (dump.zoew_monthly_revenue_cod_dod || {})[monthKey] || {};
     const pick = (dump.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
     const phones = pick.pickedUpPhones || {};
+    const pickKeys = Object.keys(pick.pickedUpBarcodes || {});
+    const pickExtra = pickKeys.filter((k) => !closedKeys[k]).slice(0, 8).map((k) => k + '@' + (located[k] || 'absent'));
+    const pickMissing = Object.keys(closedKeys).filter((k) => pickKeys.indexOf(k) === -1).slice(0, 8).map((k) => k + '@' + located[k]);
     let phoneSum = 0; const zeroRef = [];
     Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
     const reg = dump.zoew_barcode_registry || {};
@@ -59,7 +66,7 @@ function invariant(dump, dateKey, monthKey, knownCodes) {
         expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
         monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
         expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
-        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, phoneSum, zeroRef, dup, orphans, lost, receipts, seenCodes: seen
+        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, pickExtra, pickMissing, phoneSum, zeroRef, dup, orphans, lost, receipts, seenCodes: seen
     };
 }
 

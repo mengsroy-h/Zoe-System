@@ -1,4 +1,4 @@
-import { dataState, firebaseState, ztoState } from '../core/state';
+import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { CLEANUP_JOURNAL_KEY } from '../core/storage-keys';
@@ -11,7 +11,7 @@ import { repairPickupLedgerOnce } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge } from '../features/restore';
-import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS, trashReasonIsCleanupDeducted } from '../features/session';
+import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_WRITE_SLOW_NOTICE_MS, TWO_HOURS_MS } from '../features/session';
 import { ztoAbandonCleanupIsHeld } from '../features/zto-status';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
@@ -25,7 +25,7 @@ export const cleanupInFlight = new Set();
 export const staleRestoreMarkerSweeps = new Set();
 
 export function trashRetentionMs(item) {
-    return item && trashReasonIsCleanupDeducted(item.trashReason) ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    return item && item.trashReason === 'expired' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
 }
 
 export function clearStaleRestoreMarkers(item) {
@@ -409,7 +409,7 @@ export function runCleanupLedgerKeySweep() {
     let started = 0;
     for (const item of dataState.deletedItems) {
         if (started >= CLEANUP_KEY_SWEEP_BATCH) return;
-        if (!item || typeof item.id !== 'string' || !trashReasonIsCleanupDeducted(item.trashReason)) continue;
+        if (!item || typeof item.id !== 'string' || item.trashReason !== 'expired') continue;
         const at = cleanupEventAt(item);
         if (!at || now - at < CLEANUP_KEY_SWEEP_GRACE_MS) continue;
         if (journaled.indexOf(item.id) !== -1 || cleanupJournalLive.has(item.id) || cleanupKeySweepInFlight.has(item.id)) continue;
@@ -429,7 +429,7 @@ export function runCleanupLedgerKeySweep() {
 }
 
 export function cleanupLedgerKeyOf(item) {
-    if (!item || !trashReasonIsCleanupDeducted(item.trashReason) || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
+    if (!item || item.trashReason !== 'expired' || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
     const at = cleanupEventAt(item);
     const scanDate = cleanupScanDateOf(item);
     if (!at || typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate)) return null;
@@ -740,21 +740,8 @@ export function claimCleanupTrashSlot(trashItem, moved?) {
     if (!firebaseState.db || !firebaseState.fb || !trashItem || !trashItem.id || !/^[a-zA-Z0-9_-]+$/.test(trashItem.id)) {
         return Promise.reject(new Error('Trash Firebase reference unavailable'));
     }
-    const slotDb = firebaseState.db;
-    if (trashItem.trashReason === 'returned' && ztoState.ztoReturnedLabelRefusedDb === slotDb) trashItem.trashReason = 'expired';
     return firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`), (current) => (current ? undefined : trashItem))
-        .catch((slotErr) => {
-            if (trashItem.trashReason !== 'returned' || firebaseState.db !== slotDb || !/permission/i.test(String((slotErr && (slotErr.code || slotErr.message)) || slotErr))) throw slotErr;
-            ztoState.ztoReturnedLabelRefusedDb = slotDb;
-            trashItem.trashReason = 'expired';
-            try {
-                const entry = readCleanupJournal().find((e) => e.trashItem.id === trashItem.id);
-                if (entry) noteCleanupJournalEntry(Object.assign({}, entry, { trashItem }));
-            } catch (journalErr) {}
-            return { returnedRefused: true };
-        })
         .then((result) => {
-            if (result && result.returnedRefused) return claimCleanupTrashSlot(trashItem, moved);
             if (result && result.committed) return true;
             const existing = result && result.snapshot ? result.snapshot.val() : null;
             if (!existing) return false;
@@ -813,7 +800,6 @@ export async function claimAndCleanupItem(id, reason, opts?) {
     let claimedPartial = null;
     let updatedRemainder = null;
     const forced = reason === 'abandon' && opts && Array.isArray(opts.codes) ? new Set(opts.codes) : null;
-    const abandonReason = forced ? 'returned' : 'expired';
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
         claimedPartial = null;
@@ -927,7 +913,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 trashItem.isClosed = false;
                 delete trashItem.closedAt;
                 trashItem.isFromDeletion = false;
-                trashItem.trashReason = abandonReason;
+                trashItem.trashReason = 'expired';
                 revenueScanDate = cleanupScanDateOf(trashItem);
                 revenueCod = trashItem.cod;
                 revenueDod = trashItem.dod;
@@ -940,7 +926,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
             if (reason === 'abandon') {
                 trashItem.isFromDeletion = false;
-                trashItem.trashReason = abandonReason;
+                trashItem.trashReason = 'expired';
                 if (Array.isArray(trashItem.barcodes) && trashItem.barcodes.length) {
                     trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
                         cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,

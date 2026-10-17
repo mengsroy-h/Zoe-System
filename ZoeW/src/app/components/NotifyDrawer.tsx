@@ -139,7 +139,6 @@ function removedRow(row: NotifyRemovedRow) {
             <span className="notify-expiry-phone">{row.phone || '—'}</span>
             <span className="notify-expiry-meta">
                 {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
-                {row.returned ? <span className="notify-returned-tag">↩️ ត្រឡប់</span> : null}
             </span>
             <span className="notify-expiry-left">
                 {removedAgoText(row.hoursAgo)}
@@ -168,7 +167,7 @@ function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
                 <>
                     <div className="notify-summary is-warn" id="notifyRemovedSummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
-                        {' '}ប្រព័ន្ធដកចេញ (ដកលុយ) ព្រោះលើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់ ➜ បើមិនទាន់ ៖ {NOTIFY_RETURN_STEP_TEXT} ផ្ញើទៅសាខាកណ្តាល · ស្តារវិញបានពី 🗑️ ធុងសំរាម
+                        {' '}ត្រឡប់ (លើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់) ➜ ប្រព័ន្ធដកចេញ (ដកលុយ) ➜ បើមិនទាន់ ៖ {NOTIFY_RETURN_STEP_TEXT} ផ្ញើទៅសាខាកណ្តាល · ស្តារវិញបានពី 🗑️ ធុងសំរាម
                     </div>
                     <NotifyPagedList id="notifyRemovedList" rows={view.rows} renderRow={removedRow} />
                 </>

@@ -21,7 +21,7 @@ export function TrashSummaryBox() {
     return (
         <>
             <div className="trash-sum-grid">
-                <SummaryCard cls="trash-sum-deducted" head="➖ ដក + ផុតកំណត់ + ត្រឡប់" note="ដកចេញពីស្ថិតិរួចហើយ" bucket={s.deducted} />
+                <SummaryCard cls="trash-sum-deducted" head="➖ ដក + ត្រឡប់" note="ដកចេញពីស្ថិតិរួចហើយ" bucket={s.deducted} />
                 <SummaryCard cls="trash-sum-kept" head="✅ យករួច + លុប" note="មិនប៉ះស្ថិតិចំណូល" bucket={s.kept} />
             </div>
             <div className="trash-sum-total">

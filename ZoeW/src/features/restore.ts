@@ -8,7 +8,7 @@ import { reconcileCollectedHistory } from '../domain/collected';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
 import { collectItemBarcodes, releaseBarcodesInRegistry } from '../domain/registry';
-import { TRASH_WRITE_SLOW_NOTICE_MS, trashReasonIsCleanupDeducted } from './session';
+import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { openRecentlyDeletedModal, renderRecentlyDeleted } from './trash';
 import { dbListenerViewIsStale, updateRecentPhonesList } from '../services/db-listeners';
 import { deleteSingleDeletedItemFromFirebase } from '../services/history-write';
@@ -180,7 +180,7 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
 
 export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
-    if (!item || !trashReasonIsCleanupDeducted(item.trashReason) || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
+    if (!item || item.trashReason !== 'expired' || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
     const scanDate = item.scanDate || getFormattedDate(new Date(at));
     if (typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate) || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashId)) return null;
     if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE)) return null;

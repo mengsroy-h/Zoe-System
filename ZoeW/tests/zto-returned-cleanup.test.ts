@@ -1,8 +1,8 @@
 /**
  * ↩️ ម្ចាស់គម្រោង ៖ «អីវ៉ាន់ដែល ត្រលប់ អោយដកចេញពី ZoeW អោយដូច ផុតកំណត់ដែរទៅ … មិនបាច់មានច្បាប់ដក ថ្ងៃទី8 ក៏បាន … ដកលុយដូចគ្នា» ·
- * «ដកវាចេញភ្លាមទៅធុងសំរាម ស្លាក "ត្រឡប់" … ដកលុយដកចំនួនកញ្ចប់ … ដូចកញ្ចប់ផុតកំណត់បេះបិទ តែ … ព្រោះវាជាកញ្ចប់ត្រឡប់»។
- * ទ្វារតែមួយនឹងការសម្អាត ៨ ថ្ងៃ ៖ `claimAndCleanupItem(id, 'abandon', { codes })` ➜ ធុងសំរាម **«ត្រឡប់»** (`returned`) · ដកលុយ និងចំនួនកញ្ចប់
- * (journal · ledger keyed · flip · ២ ថ្ងៃ · ស្តារ) ដូច «ផុតកំណត់» · rules មិនទាន់ទទួល `returned` ➜ ស្លាក «ផុតកំណត់» (លុយដូចគ្នា · ចងចាំតាម db) ·
+ * «ដកវាចេញភ្លាមទៅធុងសំរាម ស្លាក "ត្រឡប់" … ដកលុយដកចំនួនកញ្ចប់ … ដូចកញ្ចប់ផុតកំណត់បេះបិទ» · «ដកមុខងារ ផុតកំណត់ចេញ ព្រោះវាជា ត្រឡប់»។
+ * ថ្នាក់តែមួយ ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ សរសេរធុងសំរាមដដែល (`trashReason: 'expired'` ក្នុងទិន្នន័យ · ស្លាកអ្នកប្រើ **«ត្រឡប់»**) ➜
+ * `claimAndCleanupItem(id, 'abandon', { codes })` ៖ ដកលុយ និងចំនួនកញ្ចប់ (journal · ledger keyed · flip · ២ ថ្ងៃ · ស្តារ) · គ្មាន rules ថ្មី ·
  * តែដកតែ barcode បើកដែលបានប្រាប់ ដោយមិនរង់ចាំអាយុ · barcode បិទ ឬមិនបានប្រាប់ មិនប៉ះ ·
  * `removeReturnedZtoBarcodes()` ៖ ស្កេន «ត្រឡប់» ក្រោយ barcode ចូល ZoeW (`createdAt` · `restoredAt`) · កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» · នាឡិកា server + ហាងដឹង។
  */
@@ -201,16 +201,17 @@ afterEach(() => {
 });
 
 describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតកំណត់ ៖ `claimAndCleanupItem(id, \'abandon\', { codes })`', () => {
-    it('កញ្ចប់ក្មេង (២ ថ្ងៃ) ៖ ដកតែ barcode បើកដែលប្រាប់ ➜ ធុងសំរាម «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក · barcode បើកផ្សេង និងបិទ នៅដដែល', async () => {
+    it('កញ្ចប់ក្មេង (២ ថ្ងៃ) ៖ ដកតែ barcode បើកដែលប្រាប់ ➜ ធុងសំរាម «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក · barcode បើកផ្សេង និងបិទ នៅដដែល · គ្មានស្លាក «ផុតកំណត់»', async () => {
         seed([youngItem([['A', 10], ['B', 5], ['C', 3, true]])]);
         await claimAndCleanupItem(ID, 'abandon', { codes: ['A', 'C'] });
         await flush();
         expect(historyCodes()).toEqual(['B', 'C']);
         const trash = trashItems();
         expect(trash).toHaveLength(1);
-        expect(trash[0].trashReason).toBe('returned');
-        expect(trashReasonOf(trash[0])).toBe('returned');
-        expect(TRASH_REASON_META.returned).toMatchObject({ label: 'ត្រឡប់', deducted: true });
+        expect(trash[0].trashReason, 'ថ្នាក់ដដែលនឹងច្បាប់ ៨ ថ្ងៃ (គ្មាន rules ថ្មី)').toBe('expired');
+        const meta: any = (TRASH_REASON_META as any)[trashReasonOf(trash[0])];
+        expect(meta).toMatchObject({ label: 'ត្រឡប់', deducted: true });
+        expect(Object.values(TRASH_REASON_META).map((m: any) => m.label), 'ម្ចាស់គម្រោង ៖ «ដកមុខងារ ផុតកំណត់ចេញ»').not.toContain('ផុតកំណត់');
         expect(trash[0].isFromDeletion).toBe(false);
         expect(trash[0].barcodes.map((b: any) => b.code)).toEqual(['A']);
         expect(trash[0].barcodes[0].isDeducted, 'flag ធុងសំរាមតាមលុយ').toBe(true);
@@ -226,7 +227,7 @@ describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតក
         await claimAndCleanupItem(ID, 'abandon', { codes: ['A', 'B'] });
         await flush();
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
-        expect(getAt(TRASH + '/' + ID).trashReason).toBe('returned');
+        expect(getAt(TRASH + '/' + ID).trashReason).toBe('expired');
         expect(ledger().codDollar).toBe(85);
         expect(ledger().totalCount).toBe(8);
     });
@@ -345,7 +346,7 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         await runZtoListSyncPreview();
         await flush();
         expect(historyCodes()).toEqual(['ZTKEEP000001']);
-        expect(trashItems().map((t: any) => [t.trashReason, t.barcodes.map((b: any) => b.code)])).toEqual([['returned', ['ZTRET0000001']]]);
+        expect(trashItems().map((t: any) => [t.trashReason, t.barcodes.map((b: any) => b.code)])).toEqual([['expired', ['ZTRET0000001']]]);
         expect(ledger().codDollar).toBe(90);
     });
 
@@ -384,38 +385,30 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
     });
 });
 
-describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ដូច «ផុតកំណត់» គ្រប់ផ្លូវលុយ', () => {
+describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ ជាថ្នាក់តែមួយ', () => {
     const DEL_AT = () => getServerNow() - CLEANUP_KEY_SWEEP_GRACE_MS - 60000;
     function returnedTrash(id: string) {
         return { id, phone: '012', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: NOW_AGE(), count: 1, cod: 10, dod: 0, price: 10,
-            isClosed: false, isFromDeletion: false, trashReason: 'returned', deletedAt: DEL_AT(), barcode: 'R1',
+            isClosed: false, isFromDeletion: false, trashReason: 'expired', deletedAt: DEL_AT(), barcode: 'R1',
             barcodes: [{ ...barcode('R1', 10, NOW_AGE()), isDeducted: false }] };
     }
 
-    it('rules មិនទាន់ទទួល `returned` ➜ ស្លាក «ផុតកំណត់» · លុយ និងចំនួនដកដូចគ្នា · db នោះចងចាំ (សរសេរ «ផុតកំណត់» តាំងពីដំបូង)', async () => {
-        seed([youngItem([['A', 10]]), youngItem([['B', 5]], 'id_y')]);
-        let refused = 0;
-        lab.hook = ({ path, proposed }) => {
-            if (path.startsWith(TRASH + '/') && proposed && proposed.trashReason === 'returned') {
-                refused++;
-                return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
-            }
-            return undefined;
-        };
-        await claimAndCleanupItem(ID, 'abandon', { codes: ['A'] });
+    it('ច្បាប់ ៨ ថ្ងៃ (គ្មាន `codes`) ៖ ធុងសំរាមដដែល ➜ ស្លាក «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក', async () => {
+        const old: any = youngItem([['A', 10]]);
+        const at = getServerNow() - 8 * DAY_MS;
+        old.createdAt = at;
+        old.barcodes[0].createdAt = at;
+        seed([old]);
+        await claimAndCleanupItem(ID, 'abandon');
         await flush();
-        expect(refused).toBe(1);
-        expect(getAt(TRASH + '/' + ID).trashReason).toBe('expired');
+        const trash = getAt(TRASH + '/' + ID);
+        expect(trash.trashReason).toBe('expired');
+        expect((TRASH_REASON_META as any)[trashReasonOf(trash)].label).toBe('ត្រឡប់');
         expect(ledger().codDollar).toBe(90);
         expect(ledger().totalCount).toBe(9);
-        await claimAndCleanupItem('id_y', 'abandon', { codes: ['B'] });
-        await flush();
-        expect(refused, 'db ដែលបដិសេធរួច ➜ មិនសាក `returned` ម្តងទៀត').toBe(1);
-        expect(getAt(TRASH + '/id_y').trashReason).toBe('expired');
-        expect(ledger().codDollar).toBe(85);
     });
 
-    it('sweep កូនសោ ledger ៖ ធុងសំរាម «ត្រឡប់» ដែល flag មិនទាន់ flip ➜ flip (ដូចផុតកំណត់)', async () => {
+    it('sweep កូនសោ ledger ៖ ធុងសំរាម «ត្រឡប់» ដែល flag មិនទាន់ flip ➜ flip', async () => {
         seed([]);
         const item = returnedTrash('id_r');
         setAt(TRASH + '/id_r', item);
@@ -426,24 +419,24 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ដូច �
         expect(getAt(TRASH + '/id_r').barcodes[0].isDeducted).toBe(true);
     });
 
-    it('ស្តារ ៖ ធុងសំរាម «ត្រឡប់» ដែលមានកូនសោ ledger ➜ បូកវិញតាមកូនសោ (ដូចផុតកំណត់)', () => {
+    it('ស្តារ ៖ ធុងសំរាម «ត្រឡប់» ដែលមានកូនសោ ledger ➜ បូកវិញតាមកូនសោ', () => {
         seed([]);
         const item = returnedTrash('id_r');
         dataState.dailyRevenueData = { [DAY]: { codDollar: 90, dodDollar: 0, totalCount: 9, ded: { id_r: { at: item.deletedAt, cod: 10, dod: 0, count: 1 } } } };
         const deltas: any[] = [];
-        const key = restoreLedgerKeyFor(item, 'id_r', deltas);
-        expect(key, 'កូនសោ ledger ស្គាល់ «ត្រឡប់»').not.toBeNull();
+        expect(restoreLedgerKeyFor(item, 'id_r', deltas)).not.toBeNull();
         expect(deltas).toEqual([{ scanDate: DAY, cod: 10, dod: 0, count: 1 }]);
     });
 
-    it('🔔 «📤 កញ្ចប់ដែលដករួច» ៖ «ត្រឡប់» រាប់ដូច «ផុតកំណត់» និងសម្គាល់ `returned` · ប្រភេទផ្សេងមិនរាប់', () => {
+    it('🔔 «📤 កញ្ចប់ដែលដករួច» ៖ រាប់ធុងសំរាម «ត្រឡប់» · ប្រភេទផ្សេងមិនរាប់', () => {
         const now = getServerNow();
         const view = removedParcelsView([
             { ...returnedTrash('id_r'), deletedAt: now - 3600000 },
-            { id: 'id_e', phone: '013', trashReason: 'expired', deletedAt: now - 7200000, barcodes: [{ code: 'E1' }] },
-            { id: 'id_p', phone: '014', trashReason: 'pickup', isFromDeletion: true, deletedAt: now, barcodes: [{ code: 'P1' }] }
+            { id: 'id_p', phone: '014', trashReason: 'pickup', isFromDeletion: true, deletedAt: now, barcodes: [{ code: 'P1' }] },
+            { id: 'id_d', phone: '015', trashReason: 'remove', isFromDeletion: false, deletedAt: now, barcodes: [{ code: 'D1' }] }
         ], now, false, []);
-        expect(view.packages).toBe(2);
-        expect(view.rows.map((r: any) => [r.key, r.returned])).toEqual([['id_r', true], ['id_e', false]]);
+        expect(view.packages).toBe(1);
+        expect(view.rows.map((r: any) => r.key)).toEqual(['id_r']);
+        expect(trashRetentionMs({ trashReason: 'expired' })).toBe(EXPIRED_TRASH_RETENTION_MS);
     });
 });

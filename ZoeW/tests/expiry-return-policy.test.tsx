@@ -50,7 +50,7 @@ beforeEach(() => {
             { id: 'SOON', phone: '0961000002', createdAt: now - ABANDON_AGE_MS + 5 * 60 * 60 * 1000, barcodes: [{ code: 'KH0000000002', isClosed: false }] }
         ];
         dataState.deletedItems = [
-            { id: 'BACK', phone: '0972000004', deletedAt: now - 30 * 1000, barcodes: [{ code: 'KH0000000004', locker: 'B-3' }], trashReason: 'returned', isFromDeletion: false },
+            { id: 'BACK', phone: '0972000004', deletedAt: now - 30 * 1000, barcodes: [{ code: 'KH0000000004', locker: 'B-3' }], trashReason: 'expired', isFromDeletion: false },
             { id: 'GONE', phone: '0972000003', deletedAt: now - 60 * 1000, barcodes: [{ code: 'KH0000000003', locker: 'B-2' }], trashReason: 'expired', isFromDeletion: false }
         ];
         firebaseState.isDatabaseInitialized = true;
@@ -96,16 +96,16 @@ describe('គោលការណ៍ ៧ ថ្ងៃ ៖ ជិតផុតកំ
         expect(left[1]).toMatch(/^≤ \d+ ម៉ោង$/);
     });
 
-    it('🔔 «📤» ៖ កញ្ចប់ដែលដករួច ➜ ប្រាប់ឲ្យស្កេនត្រឡប់ផ្ញើទៅសាខាកណ្តាល (បើមិនទាន់) · ធុងសំរាម «ត្រឡប់» មានស្លាក ↩️', () => {
+    it('🔔 «📤» ៖ កញ្ចប់ដែលដករួច ➜ «ត្រឡប់» · ប្រាប់ឲ្យស្កេនត្រឡប់ផ្ញើទៅសាខាកណ្តាល (បើមិនទាន់) · គ្មាន «ផុតកំណត់»', () => {
         step(() => openNotifyDrawer());
         step(() => (document.getElementById('notifyRemovedHead') as HTMLButtonElement).click());
         const summary = document.getElementById('notifyRemovedSummary')!.textContent || '';
         expect(summary).toContain(stepText());
         expect(summary).toContain('សាខាកណ្តាល');
         expect(summary).toContain('ដកលុយ');
-        const rows = Array.from(document.querySelectorAll('#notifyRemovedList .notify-expiry-row'));
-        expect(rows.map((r) => !!r.querySelector('.notify-returned-tag'))).toEqual([true, false]);
-        expect(rows[0].querySelector('.notify-returned-tag')!.textContent).toBe('↩️ ត្រឡប់');
+        expect(summary).toContain('ត្រឡប់ (លើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់)');
+        expect(document.getElementById('notifyRemovedSection')!.textContent).not.toContain('ផុតកំណត់');
+        expect(document.querySelectorAll('#notifyRemovedList .notify-expiry-row')).toHaveLength(2);
     });
 
     it('📲 ការរំលឹកម៉ោង ៨ ៖ ចំណងជើង «ត្រូវស្កេនត្រឡប់» · តួអត្ថបទ = គោលការណ៍ + ការស្កេន + ពេលទិន្នន័យ · មិនលើសពិដាន push', () => {
@@ -141,8 +141,9 @@ describe('គោលការណ៍ ៧ ថ្ងៃ ៖ ជិតផុតកំ
         expect(items[1]).toContain('ម៉ោង ៨');
         expect(items[2]).toContain('សាខាកណ្តាល');
         expect(items[2]).toContain('ស្កេន «ត្រឡប់»');
-        expect(items[3]).toContain('ផុតកំណត់');
         expect(items[3]).toContain('«ត្រឡប់»');
+        expect(items[3]).toContain('ថ្ងៃទី ' + kh(ABANDON_AGE_MS / DAY_MS + 1));
+        expect(items.join(' '), 'ម្ចាស់គម្រោង ៖ «ដកមុខងារ ផុតកំណត់ចេញ»').not.toContain('ផុតកំណត់');
         expect(items[3]).toContain('ដកលុយ');
         expect(items[3]).toContain('បិទតាម ZTO ស្វ័យប្រវត្តិ');
         expect(items[4]).toContain('📤');

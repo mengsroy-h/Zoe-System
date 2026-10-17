@@ -171,6 +171,15 @@ async function recordSigned(itemId: string, code: string, current: () => boolean
     return await applyBarcodeCloseChange(itemId, code, true, { silent: true, showModal: false }) === true;
 }
 
+function finishPalmSign(current: () => boolean) {
+    if (!current() || !palmSignState.codes.length || !palmSignState.codes.every((code) =>
+        palmSignState.results.some((row) => row.code === code && row.state === 'signed' && row.saved === true))) return false;
+    const count = palmSignState.codes.length;
+    closeModal('ztoPalmSignModal');
+    showToast('✅ ZTO Sign ជោគជ័យ ' + count + ' កញ្ចប់');
+    return true;
+}
+
 export async function submitZtoPalmSign(codes: string[]) {
     if (palmSignState.confirmation) return;
     return sendPalmSign(codes);
@@ -255,6 +264,7 @@ async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
         if (op.current()) palmSignState.message = 'ភ្ជាប់ Palm មិនបាន។ សូមពិនិត្យ Config និងបណ្ដាញ។';
     } finally {
         palmSignState.busy = false;
+        finishPalmSign(op.current);
     }
 }
 
@@ -304,7 +314,7 @@ export async function checkZtoPalmSignStages() {
     } catch (_) {
         if (op.current()) palmSignState.message = 'ពិនិត្យស្ថានភាព ZTO មិនបាន។ សូមចុចពិនិត្យម្ដងទៀត។';
     } finally {
-        if (op.generation === palmSignState.generation) { palmSignState.checking = false; if (op.current()) advancePalmSignStage(); }
+        if (op.generation === palmSignState.generation) { palmSignState.checking = false; if (op.current() && !finishPalmSign(op.current)) advancePalmSignStage(); }
     }
 }
 
@@ -333,5 +343,5 @@ export async function recheckZtoPalmSign() {
         if (op.current()) palmSignState.message = 'បានពិនិត្យ ZTO។ កញ្ចប់ដែលមិនទាន់បញ្ជាក់នៅតែបើកក្នុង ZoeW។';
     } catch (_) {
         if (op.current()) palmSignState.message = 'ពិនិត្យ ZTO មិនបាន។ សូមសាកម្ដងទៀត។';
-    } finally { palmSignState.busy = false; }
+    } finally { palmSignState.busy = false; finishPalmSign(op.current); }
 }

@@ -170,10 +170,11 @@ it('ZTO Sign រួចតែ ZoeW រក្សាទុកមិនទាន់�
     vi.mocked(applyBarcodeCloseChange).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     await submit();
     expect(palmSignState.results[0]).toMatchObject({ state: 'signed', saved: false });
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
     await recheckZtoPalmSign();
     expect(fetch).toHaveBeenCalledOnce();
     expect(closeCalls()).toHaveLength(2);
-    expect(palmSignState.results[0].saved).toBe(true);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
 });
 it('ប្រអប់ត្រូវការស្កេន និងរូប មុនផ្ញើបញ្ជី', () => {
     mount(<ZtoPalmSignModal />);
@@ -418,4 +419,94 @@ it('Gallery បើក picker រូបដោយគ្មាន capture ហើយ
     expect(input.disabled).toBe(true);
     act(() => button.click());
     expect(click).toHaveBeenCalledOnce();
+});
+it.each([2, 3])('លេខទូរស័ព្ទមួយមាន %s កញ្ចប់៖ Sign គ្រប់រួចបិទ modal ស្វ័យប្រវត្តិ', async (count) => {
+    const codes = [CODE, SECOND, '77130500000014'].slice(0, count);
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openReceipt(codes);
+    expect(palmSignState.codes).toEqual(codes);
+    await submit(codes);
+    expect(closeCalls().map((row) => row[1])).toEqual(codes);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(palmSignState.photos).toEqual({});
+});
+
+it('លេខមួយ ៣ កញ្ចប់៖ ផ្អាកសួរបញ្ហា និងរង់ចាំចម្លើយកញ្ចប់ចុងក្រោយ មុនបិទ modal', async () => {
+    const third = '77130500000014';
+    const codes = [CODE, SECOND, third];
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openReceipt(codes);
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        if (!init?.body) return signed(third);
+        const body = JSON.parse(String(init.body));
+        if (body.barcode === SECOND && !body.confirmationToken) return warning(SECOND);
+        return body.barcode === third ? json({ code: 'ZTO_PALM_SIGN_UNCONFIRMED', uncertain: true }, 504) : signed(body.barcode);
+    }));
+    await submit(codes);
+    expect(closeCalls().map((row) => row[1])).toEqual([CODE]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+    await confirmPalmSignWarning();
+    expect(closeCalls().map((row) => row[1])).toEqual([CODE, SECOND]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+    await recheckZtoPalmSign();
+    expect(closeCalls().map((row) => row[1])).toEqual(codes);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+});
+it('ជ្រើសទទួលតែមួយក្នុងពីរ មិនបិទផ្ទាំងដែលនៅមានកញ្ចប់ត្រូវបន្ត', async () => {
+    await openReceipt([CODE, SECOND]);
+    await submit([CODE]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+    expect(closeCalls().map((row) => row[1])).toEqual([CODE]);
+    await submit([SECOND]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+});
+it.each([2, 3])('ផ្លូវបិទពិត៖ លេខមួយ %s កញ្ចប់ រក្សាអត្តសញ្ញាណ Barcode និងចំនួនអតិថិជន', async (count) => {
+    const real = await vi.importActual<typeof import('../src/features/barcode-ops')>('../src/features/barcode-ops');
+    const codes = [CODE, SECOND, '77130500000014'].slice(0, count);
+    const day = (await import('../src/core/timezone')).getFormattedDate();
+    const clone = (value: any) => value == null ? null : JSON.parse(JSON.stringify(value));
+    const store: any = { zoew_scan_history_cod_dod: { item1: { id: 'item1', phone: '012345678', scanDate: day, isClosed: false,
+        barcodes: codes.map((code, i) => ({ code, cod: i + 1, dod: 0.5, isClosed: false })) } } };
+    const read = (path: string) => clone(path.split('/').filter(Boolean).reduce((value: any, part) => value?.[part], store));
+    const write = (path: string, value: any) => {
+        const parts = path.split('/').filter(Boolean); const leaf = parts.pop()!;
+        let target = store; for (const part of parts) target = target[part] ||= {};
+        if (value == null) delete target[leaf]; else target[leaf] = clone(value);
+    };
+    dataState.scanHistory = [clone(store.zoew_scan_history_cod_dod.item1)];
+    dataState.deletedItems = []; dataState.dailyCollectedData = {}; dataState.dailyPickupData = {};
+    firebaseState.serverClockTrusted = true; firebaseState.serverTimeOffsetMs = 0;
+    firebaseState.fb = {
+        ref: (_db: unknown, path: string) => ({ path }),
+        get: async (ref: any) => ({ val: () => read(ref.path), exists: () => read(ref.path) !== null }),
+        runTransaction: async (ref: any, change: (value: any) => any) => {
+            const next = change(read(ref.path)); if (next === undefined) return { committed: false };
+            write(ref.path, next); return { committed: true, snapshot: { val: () => read(ref.path) } };
+        },
+        update: async (ref: any, updates: any) => { for (const [key, value] of Object.entries(updates)) write(ref.path + '/' + key, value); }
+    } as any;
+    firebaseState.dbRefDailyPickup = { path: 'zoew_daily_pickup_cod_dod' } as any;
+    firebaseState.dbRefDailyCollected = { path: 'zoew_daily_collected_cod_dod' } as any;
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(real.applyBarcodeCloseChange);
+    try {
+        await openReceipt(codes);
+        const outcomes: boolean[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+            outcomes.push(read('zoew_scan_history_cod_dod/item1').isClosed);
+            return signed(JSON.parse(String(init?.body)).barcode);
+        }));
+        await submit(codes);
+        expect(outcomes).toEqual(codes.map(() => false));
+        expect(read('zoew_scan_history_cod_dod/item1').isClosed).toBe(true);
+        expect(read('zoew_scan_history_cod_dod/item1').barcodes.map((row: any) => [row.code, row.isClosed])).toEqual(codes.map((code) => [code, true]));
+        await vi.waitFor(() => expect(read('zoew_daily_pickup_cod_dod/' + day)?.packagesPickedUp).toBe(count));
+        expect(Object.keys(read('zoew_daily_pickup_cod_dod/' + day).pickedUpPhones)).toHaveLength(1);
+        const revenue = Object.values(read('zoew_daily_collected_cod_dod/' + day)) as { c: number; d: number }[];
+        expect(revenue.reduce((sum, row) => sum + row.c, 0)).toBe(count * (count + 1) / 2);
+        expect(revenue.reduce((sum, row) => sum + row.d, 0)).toBe(count * 0.5);
+        expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    } finally {
+        firebaseState.serverClockTrusted = false;
+        firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
+    }
 });

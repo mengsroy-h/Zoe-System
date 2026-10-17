@@ -63,7 +63,7 @@ async function palmLoginFailureText(body, status, sent?) {
     if (!text && status === 401) {
         const evidence = await proxyKeyEvidence(sent);
         text = 'សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ — Server មិនស្គាល់សោដែលផ្ញើ' + (evidence ? ' (' + evidence + ')' : '')
-            + '។ សូមចម្លង ZTO_PROXY_KEY ពី Netlify ទៅប្រអប់ Secret ម្ដងទៀត។';
+            + '។ សូមចម្លងសោភ្ជាប់ ZoeW ពីការកំណត់ Netlify ទៅប្រអប់ Secret ម្ដងទៀត។';
     }
     if (!text) text = 'ភ្ជាប់ ZTO Palm មិនបាន (HTTP ' + status + ')។ សូមសាកម្ដងទៀត។';
     return reason ? text + ' (' + reason + ')' : text;

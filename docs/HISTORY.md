@@ -115,6 +115,8 @@
   `ZTO_PALM_LOGIN_REJECTED` ➜ «Server ទទួលសោភ្ជាប់ ZoeW រួច តែ ZTO បដិសេធ…» · គ្មាន code ➜ លេខ HTTP (A213)។
 - CI លើ [2.50.124] (`d5bf1be`) ៖ ផ្នែក ១ · ២ · ៤ ជាប់ · ផ្នែក ៣ ធ្លាក់តែ `css-classes` ៖ `'palm-sign-state is-' + tone` បន្សល់ `.is-` ➜ `codeTone()` ឲ្យឈ្មោះ class ពេញ
   (វាស់ក្នុងម៉ាស៊ីន ៖ `.is-` ធ្លាក់ ➜ ជាប់ · `doc-scope-test` · `version-check` ជាប់)។
+- CI លើ `3bd3b8a` ផ្នែក ២ ៖ `security-guard` ៖ សារថ្មីដាក់ឈ្មោះ env សោ Server ក្នុង bundle client (⛔ ច្បាប់ «Public repo») ➜ សារនិយាយ «សោភ្ជាប់ ZoeW ពីការកំណត់ Netlify»
+  ជំនួសឈ្មោះ env · sha256 LOCK ធ្វើបច្ចុប្បន្នភាពម្តងទៀត (វាស់ក្នុងម៉ាស៊ីន ៖ `security-guard-test` 55 ok · 0 FAIL)។
 
 **សកម្មភាពដោយដៃ** ៖ គ្មាន env · rules។ ពេល «សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ» លើកក្រោយ ➜ ថតសារទាំងមូល (ប្រភព · ចំនួនតួ · ស្នាមម្រាម) **មុន** clear site data
 ➜ ធៀបស្នាមម្រាមជាមួយទូរស័ព្ទដែល Login បាន ➜ ដឹងថាទូរស័ព្ទផ្ញើសោខុស ឬ Server ប្រើសោផ្សេង។

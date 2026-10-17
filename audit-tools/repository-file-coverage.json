@@ -1894,6 +1894,9 @@
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-returned.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-remind-days.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2309,6 +2312,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-palm-refresh.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-returned.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-palm-server.test.ts": {

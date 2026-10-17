@@ -33,6 +33,8 @@ vi.mock('../src/features/barcode-ops', () => ({
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const returnedOff = (inner: any) => (url: any, init?: any) => (String(url).includes('returned=1')
+    ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false })) : inner(url, init));
 const CFG = { enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
 
 function row(barcode: string) {
@@ -92,7 +94,7 @@ describe('ប្រអប់បញ្ជី ZTO ៖ ជួរ «ចុះហត�
             return json(listBody({ page, pages: 2, total: 2, rows: [row('ZT000000000' + page)], signedPages: 3,
                 signedMismatch: page === 1 ? 1 : 0, signedListMismatch: page === 1 ? 2 : 3 }));
         });
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         await runZtoListSyncPreview();
         expect(fetch).toHaveBeenCalledTimes(3);
         expect(ztoState.ztoListSyncResult.signedMismatch).toBe(10);

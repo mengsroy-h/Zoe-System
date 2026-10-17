@@ -58,6 +58,8 @@ vi.mock('../src/features/scan-action', () => ({
 
 const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const returnedOff = (inner: any) => (url: any, init?: any) => (String(url).includes('returned=1')
+    ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false })) : inner(url, init));
 
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -137,7 +139,7 @@ describe('ទាញបញ្ជីលឿន ៖ ទំព័រស្របគ�
             if (page === 1) return Promise.resolve(json({ success: true, list: true, enabled: true, rows: [row('ZT0000000001')], pages: 3, total: 3 }));
             return later[page - 2].promise;
         });
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         const running = runZtoListSyncPreview();
         await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
         later[0].resolve(json({ success: true, list: true, enabled: true, rows: [row('ZT0000000002')], pages: 3, total: 3 }));
@@ -149,7 +151,7 @@ describe('ទាញបញ្ជីលឿន ៖ ទំព័រស្របគ�
 
     it('ទំព័រ ១ សុំភស្តុតាងចុះហត្ថលេខា (`withSigned=1`) ក្នុងសំណើដដែល', async () => {
         const fetch = vi.fn(async () => json({ success: true, list: true, enabled: true, rows: [row('ZT0000000001')], pages: 1, total: 1 }));
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         await runZtoListSyncPreview();
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(urlOf(fetch.mock.calls[0] as any[]).searchParams.get('withSigned')).toBe('1');
@@ -428,7 +430,7 @@ describe('ការប្រណាំង ៖ វគ្គចាស់ · កា�
         const old = deferred<Response>();
         const next = deferred<Response>();
         const fetch = vi.fn().mockImplementationOnce(() => old.promise).mockImplementationOnce(() => next.promise);
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         const oldRun = runZtoListSyncPreview();
         await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
         clearSensitiveModalFields();

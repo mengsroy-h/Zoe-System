@@ -18,6 +18,7 @@ const UPSTREAM_CODE_RE = /^[A-Za-z0-9_.:@-]{1,60}$/;
 const AUTH_EXPIRED_RE = /^(?:401|403|not_login|token_expired|token_invalid|login_expired|login_required)$/i;
 const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
 const SIGNED_STATUS = '5';
+const RETURN_ACTION = '-710';
 const LIST_ROW_MAX = 200;
 const LIST_TABS = ['1', '4', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
@@ -543,12 +544,14 @@ function trackEvidence(upstream, barcode, site) {
     if (!tracks.length) return malformed ? { kind: 'invalid', reason: malformed } : { kind: 'empty' };
     let arrival = '';
     let signed = '';
+    let returned = '';
     let siteName = '';
     let siteNameAt = '';
     for (const entry of tracks) {
         if (!entry.here) continue;
         if (entry.action === '3' && entry.time > arrival) arrival = entry.time;
         if (entry.action === '5' && entry.time > signed) signed = entry.time;
+        if (entry.action === RETURN_ACTION && entry.time > returned) returned = entry.time;
         const name = originText(entry.track.siteName).slice(0, 120);
         if (name && entry.time >= siteNameAt) {
             siteName = name;
@@ -562,7 +565,8 @@ function trackEvidence(upstream, barcode, site) {
     } else if (arrival && flag === 0) {
         ztoClosed = false;
     }
-    return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName };
+    return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
+        returnedAt: returned && returned >= arrival ? returned : '' };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {
@@ -641,7 +645,7 @@ function trackReport(evidence, barcode, range, signedEnd) {
         arrivals.push(entry.time);
     }
     const signedAt = evidence.ztoClosed === true && evidence.signedAt >= range.start && evidence.signedAt <= signedEnd ? evidence.signedAt : '';
-    return { barcode, arrivals, ztoClosed: evidence.ztoClosed, signedAt,
+    return { barcode, arrivals, ztoClosed: evidence.ztoClosed, signedAt, returnedAt: evidence.returnedAt,
         from: palmOrigin({}, evidence.tracks.map((entry) => ({ ...entry.track, time: entry.time }))) };
 }
 

@@ -220,7 +220,9 @@ export function ztoListRowOf(raw, key) {
         key: key,
         signedAt: '',
         signedOnly: false,
-        arrivedBefore: ''
+        arrivedBefore: '',
+        returnedAt: '',
+        inZoew: false
     };
 }
 
@@ -239,7 +241,7 @@ export function ztoListSignedRowIndex(signedRows) {
 }
 
 export function classifyZtoListRows(rows, historyList, trashList, signedRows?, range?, pickupData?) {
-    const out = { fresh: [], existing: [], duplicate: [], skipped: [] };
+    const out = { fresh: [], existing: [], duplicate: [], skipped: [], returned: [] };
     const list = Array.isArray(rows) ? rows : [];
     const known = new Set();
     const addKnown = (items) => {
@@ -300,9 +302,15 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
             out.duplicate.push(row);
         }
     }
+    const returnedIndex = ztoListSignedRowIndex(range && range.returned);
     for (let i = 0; i < order.length; i++) {
         const row = best.get(order[i]);
-        if (known.has(row.key)) out.existing.push(row);
+        const back = returnedIndex.get(row.key);
+        if (back && row.ztoClosed !== true && back.at >= row.at) {
+            row.returnedAt = back.at;
+            row.inZoew = known.has(row.key);
+            out.returned.push(row);
+        } else if (known.has(row.key)) out.existing.push(row);
         else out.fresh.push(row);
     }
     if (!range || typeof range.from !== 'string' || typeof range.to !== 'string') return out;
@@ -344,7 +352,8 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?, palm?) {
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
-    const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1' : (mode === 'withSigned' ? '&withSigned=1' : ''));
+    const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1'
+        : (mode === 'withSigned' ? '&withSigned=1' : (mode === 'returned' ? '&returned=1' : '')));
     const isPalm = lookupApiIsPalm(cfg);
     let palmExtra = '';
     if (isPalm && palm && palm.candidates === true) palmExtra += '&candidates=1';
@@ -435,10 +444,62 @@ export function absorbZtoListSigned(out, body) {
     }
 }
 
+export async function fetchZtoReturnedPages(cfg, from, to) {
+    const out = { returned: [], state: 'failed' };
+    const absorb = (body) => {
+        const list = Array.isArray(body.returned) ? body.returned : [];
+        for (let i = 0; i < list.length; i++) {
+            const row = list[i];
+            if (row && typeof row.barcode === 'string' && typeof row.at === 'string') out.returned.push({ barcode: row.barcode, at: row.at });
+        }
+    };
+    let first = null;
+    try {
+        first = await fetchZtoListPage(cfg, from, to, 1, 'returned');
+    } catch (_) {
+        return out;
+    }
+    if (!first) return out;
+    if (first.returned === null) {
+        out.state = 'off';
+        return out;
+    }
+    if (first.returnedOk !== true) return out;
+    absorb(first);
+    let pages = Number(first.pages);
+    if (!isFinite(pages) || pages < 1) pages = 1;
+    let open = first.pagesUnknown === true;
+    let read = 1;
+    for (;;) {
+        const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
+        if (last <= read) break;
+        const work = [];
+        for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'returned').catch(() => null));
+        const more = await Promise.all(work);
+        for (let i = 0; i < more.length; i++) {
+            if (!more[i] || more[i].returnedOk !== true) {
+                out.state = 'partial';
+                return out;
+            }
+            absorb(more[i]);
+        }
+        read = last;
+        if (!open) break;
+        const tail = more[more.length - 1];
+        const tailPages = Number(tail.pages);
+        if (isFinite(tailPages) && tailPages > 0) pages = tailPages;
+        open = tail.pagesUnknown === true;
+        if (!open && pages <= read) break;
+    }
+    out.state = pages > ZTO_LIST_CLIENT_MAX_PAGES ? 'partial' : 'ok';
+    return out;
+}
+
 export async function fetchZtoListAllPages(cfg, from, to) {
     if (lookupApiIsPalm(cfg)) return fetchZtoPalmListAllPages(cfg, from, to);
     const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, pageLimit: ZTO_LIST_CLIENT_MAX_PAGES, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
-        signedMismatchTexts: [], signedDescExpected: [], signedState: 'none' };
+        signedMismatchTexts: [], signedDescExpected: [], signedState: 'none', returned: [], returnedState: 'failed' };
+    const returnedRun = fetchZtoReturnedPages(cfg, from, to);
     let arrivalTotals = 0;
     const absorb = (body, arrival) => {
         if (!body) return;
@@ -459,6 +520,11 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     const first = await fetchZtoListPage(cfg, from, to, 1, 'withSigned');
     if (!first) return out;
     absorb(first, true);
+    const settleReturned = async () => {
+        const back = await returnedRun;
+        out.returned = back.returned;
+        out.returnedState = back.state;
+    };
     const reported = Number(first.pages);
     out.pages = isFinite(reported) && reported > 0 ? reported : 1;
     const metaless = first.pagesUnknown === true;
@@ -522,6 +588,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
     } else if (first.signedOk === false) {
         out.signedState = 'failed';
     }
+    await settleReturned();
     return out;
 }
 
@@ -617,7 +684,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
     const startedAt = Date.now();
     const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, pageLimit: ZTO_PALM_LIST_MAX_PAGES, site: '', siteName: '', otherScans: 0,
         signedMismatch: 0, signedMismatchTexts: [], signedDescExpected: [], signedState: 'ok', unverified: [], failedPages: [], palm: true,
-        candidates: 0, elapsedMs: 0 };
+        candidates: 0, elapsedMs: 0, returned: [], returnedState: 'ok' };
     const tabPages = {};
     const candidates = new Map();
     const evidence = new Map();
@@ -795,6 +862,7 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             out.signed.push(candidate.barcode);
             out.signedRows.push(Object.assign({}, base, { at: found.signedAt, from: from }));
         }
+        if (typeof found.returnedAt === 'string' && found.returnedAt) out.returned.push({ barcode: candidate.barcode, at: found.returnedAt });
     });
     out.total = out.rows.length;
     out.unverified = pending;
@@ -839,6 +907,7 @@ export function renderZtoListSyncPreview() {
         groups: [
             ztoListGroupModel(freshTitle, groups.fresh, 'zto-list-fresh'),
             ztoListGroupModel(existingTitle, groups.existing, 'zto-list-existing'),
+            ztoListGroupModel('↩️ ត្រឡប់ទៅវិញ (មិនបញ្ចូល)', groups.returned, 'zto-list-returned'),
             ztoListGroupModel('♻️ ស្ទួនក្នុងបញ្ជី ZTO', groups.duplicate, 'zto-list-dup'),
             ztoListGroupModel('⏭️ រំលង (មិនបញ្ចូល)', groups.skipped, 'zto-list-skip')
         ]
@@ -852,18 +921,21 @@ export function renderZtoListSyncPreview() {
     const pulled = Number(result.total) > result.rows.length ? ' (ZTO រាយ ' + result.total + ')' : '';
     setZtoListSyncNote('ZTO ' + result.rows.length + ' ជួរ' + pulled
         + ' · ' + result.from + ' ➜ ' + result.to + truncated
-        + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly)
+        + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly, groups.returned.length)
         + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
         + ' · 👁️ មើលជាមុន');
 }
 
-export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0) {
+export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0, returnedCount = 0) {
     const parts = [];
     const other = Number(result && result.otherScans);
     if (isFinite(other) && other > 0 && !(result && result.palm)) parts.push('⏭️ ស្កេនផ្សេង ' + other + ' មិនរាប់');
     if (bornClosed > 0) parts.push('🔒 ZTO បិទរួច ' + bornClosed + ' ➜ «យករួច»');
     if (signedOnly > 0) parts.push('✍️ ចុះហត្ថលេខា (មកដល់មុន ' + (result && result.from) + ') ' + signedOnly + ' ➜ «យករួច»');
     if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW ZTO បិទរួច ' + closeCount + ' ➜ បិទពេល «បញ្ចូល»');
+    if (returnedCount > 0) parts.push('↩️ ត្រឡប់ទៅវិញ ' + returnedCount + ' ➜ មិនបញ្ចូល');
+    const returnedState = result && result.returnedState;
+    if (returnedState === 'failed' || returnedState === 'partial') parts.push('⚠️ ពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញមិនបានគ្រប់ ➜ សូមទាញម្តងទៀត');
     const unverified = result && Array.isArray(result.unverified) ? result.unverified : [];
     if (unverified.length) {
         parts.push('⚠️ ZTO មិនឆ្លើយ track ' + unverified.length + ' កញ្ចប់ ('
@@ -960,7 +1032,9 @@ export async function runZtoListSyncPreview() {
             unverified: Array.isArray(pulled.unverified) ? pulled.unverified : [],
             failedPages: Array.isArray(pulled.failedPages) ? pulled.failedPages : [],
             candidates: ztoListPositiveCount(pulled.candidates),
-            elapsedMs: ztoListPositiveCount(pulled.elapsedMs)
+            elapsedMs: ztoListPositiveCount(pulled.elapsedMs),
+            returned: Array.isArray(pulled.returned) ? pulled.returned : [],
+            returnedState: pulled.returnedState
         };
         renderZtoListSyncPreview();
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');

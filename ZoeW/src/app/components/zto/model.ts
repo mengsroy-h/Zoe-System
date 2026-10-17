@@ -23,6 +23,8 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                     row.signedAt ? '✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ ' + row.signedAt : '',
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
+                    row.returnedAt ? '↩️ ZTO ត្រឡប់ស្កេន ៖ ' + row.returnedAt : '',
+                    row.returnedAt && row.inZoew === true ? '📌 មានក្នុង ZoeW រួច ➜ ZoeW មិនដកដោយស្វ័យប្រវត្តិ' : '',
                     ztoListSkipText(row.skip)].filter(Boolean)
             };
         })

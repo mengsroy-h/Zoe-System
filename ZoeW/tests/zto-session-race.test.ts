@@ -16,6 +16,8 @@ function deferred<T>() {
 
 const item = { id: 'session-row', phone: '011222333', barcodes: [{ code: 'ZTO123456', isClosed: true }] };
 const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+const returnedOff = (inner: any) => (url: any, init?: any) => (String(url).includes('returned=1')
+    ? Promise.resolve(response({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false })) : inner(url, init));
 const listBody = { rows: [{ barcode: 'ZTO123456', phone: '011222333', cod: 5, dod: 0, at: '2026-09-27 10:00:00' }], pages: 1 };
 
 beforeEach(() => {
@@ -86,7 +88,7 @@ describe('ZTO ៖ ចម្លើយយឺតត្រូវនៅក្នុ�
     it('សម្អាតពេលចាកចេញ ➜ បញ្ជីអតិថិជនយឺតមិនត្រឡប់មក state', async () => {
         const pending = deferred<Response>();
         const fetch = vi.fn(() => pending.promise);
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         const running = runZtoListSyncPreview();
         await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
         clearSensitiveModalFields();
@@ -100,7 +102,7 @@ describe('ZTO ៖ ចម្លើយយឺតត្រូវនៅក្នុ�
         const old = deferred<Response>();
         const next = deferred<Response>();
         const fetch = vi.fn().mockImplementationOnce(() => old.promise).mockImplementationOnce(() => next.promise);
-        vi.stubGlobal('fetch', fetch);
+        vi.stubGlobal('fetch', returnedOff(fetch));
         const oldRun = runZtoListSyncPreview();
         await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
         clearSensitiveModalFields();

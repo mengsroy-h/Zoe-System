@@ -526,7 +526,7 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
     it('2. ជួរដេកក្មេង false + ភស្តុតាង ➜ កើតមកជា «យករួច» · ចំណាំមើលជាមុនរាប់ 🔒', async () => {
         vi.stubGlobal('fetch', e2Server('ZT0000003101', false, false, ['ZT0000003101']));
         await runZtoListSyncPreview();
-        expect(viewState.ztoListSyncNote).toContain('🔒 ថ្មីដែល ZTO បិទរួច 1');
+        expect(viewState.ztoListSyncNote).toContain('🔒 ZTO បិទរួច 1 ➜ «យករួច»');
         await importZtoListRows();
         expect(h.saves).toHaveLength(1);
         expect(h.saves[0].closedAtMs).toBe(NOW);
@@ -537,7 +537,7 @@ describe('⛔ ទ្វារបញ្ចូល = ទ្វារបិទស្
         dataState.scanHistory = [openItem('ex1', 'ZT0000003201')];
         vi.stubGlobal('fetch', e2Server('ZT0000003201', false, false, ['ZT0000003201']));
         await runZtoListSyncPreview();
-        expect(viewState.ztoListSyncNote).toContain('🔒 មានក្នុង ZoeW តែ ZTO បិទរួច 1');
+        expect(viewState.ztoListSyncNote).toContain('🔒 មានក្នុង ZoeW ZTO បិទរួច 1');
         await importZtoListRows();
         expect(h.calls).toEqual([{ itemId: 'ex1', code: 'ZT0000003201', closed: true, opts: { silent: true, showModal: false } }]);
         expect(h.saves).toHaveLength(0);

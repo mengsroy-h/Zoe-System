@@ -14,6 +14,7 @@ import { forgetLoginPassword, prefillRememberedPassword } from './password-memor
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { resetBatchScan } from './batch-scan';
+import { resetZtoPalmRefresh } from './zto-palm-login';
 import { resetLabelPrint } from './label-print';
 import { expandedTrashGroups } from './locker';
 import { hidePhoneSuggestions } from './phone-suggest';
@@ -136,6 +137,7 @@ export function clearSensitiveModalFields() {
     closeModal('ztoListSyncModal');
     restoreAfterPdfExport();
     resetBatchScan();
+    resetZtoPalmRefresh();
     closeModal('batchScanModal');
     resetLabelPrint();
     closeModal('labelPrintModal');

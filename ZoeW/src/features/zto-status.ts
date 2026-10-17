@@ -14,6 +14,7 @@ import { applyBarcodeCloseChange } from './barcode-ops';
 import { isPinFlowPending } from './config';
 import { lookupApiIsPalm, lookupApiIsZto } from './customer-table-prefetch';
 import { addZtoIdentityHeader, buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
+import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
@@ -728,7 +729,10 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     if (!session.current()) return null;
     const out = await fetchWithTimeout(targetUrl, { headers }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
         'ZTO status timed out', (r) => r.json().catch(() => null));
-    if (!out.res.ok) return null;
+    if (!out.res.ok) {
+        if (out.res.status === 401 && lookupApiIsPalm(cfg) && session.current()) noteZtoPalmSessionRejected(cfg);
+        return null;
+    }
     const data = out.body;
     if (!data || typeof data !== 'object') return null;
     return { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };

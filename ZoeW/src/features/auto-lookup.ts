@@ -7,6 +7,7 @@ import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
 import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
+import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
@@ -434,9 +435,10 @@ export async function attemptAutoLookup(barcode) {
         if (myGeneration !== lookupState.customerDataTableSessionGeneration) { settleStaleLookup(); return; }
         autoLookupFailureAt.delete(lookupKey);
         const identityRetry = !!(e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && ztoIdentityRefusalIsTransient(e.lookupReason, identity));
+        const palmRenewing = !!(e && e.lookupCode === 'ZTO_AUTH_EXPIRED' && lookupApiIsPalm(cfg) && noteZtoPalmSessionRejected(cfg));
         autoLookupFailureAt.set(lookupKey, {
             at: Date.now(),
-            ms: lookupFailureCooldownMs(lookupFailureIsDefinitive(e) && !identityRetry ? 'definitive' : 'transient')
+            ms: lookupFailureCooldownMs(lookupFailureIsDefinitive(e) && !identityRetry && !palmRenewing ? 'definitive' : 'transient')
         });
         while (autoLookupFailureAt.size > AUTO_LOOKUP_FAILURE_MAX) {
             autoLookupFailureAt.delete(autoLookupFailureAt.keys().next().value);
@@ -445,6 +447,8 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'offline', '📴 បណ្ដាញបានដាច់ — សូមភ្ជាប់ ហើយស្កេនម្ដងទៀត');
         } else if (e && e.message === 'Auto lookup timed out') {
             setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
+        } else if (palmRenewing) {
+            setLookupStatus(barcode, 'error', '🔄 Session Palm ផុតកំណត់ — កំពុង Login ZTO Palm ឡើងវិញ ➜ សូមស្កេនម្ដងទៀតបន្តិចទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
             setLookupStatus(barcode, 'error', lookupApiIsPalm(cfg)
                 ? '🔒 Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'

@@ -8,6 +8,7 @@ import { clearBiometricRecord, isBiometricEnabled, refreshBiometricUi, runBiomet
 import { openConfigModal } from './config';
 import { migrateLookupSecretIfNeeded } from './lookup-config';
 import { scheduleZtoStatusSweep } from './zto-status';
+import { refreshZtoPalmSession } from './zto-palm-login';
 import { deriveLookupSecretKey, hashPin, rememberLookupSecretKey, verifyStoredPin } from '../services/crypto';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
@@ -179,5 +180,6 @@ export async function completePinUnlock(pin) {
     await migrateLookupSecretIfNeeded();
     closeModal('pinModal');
     scheduleZtoStatusSweep();
+    refreshZtoPalmSession();
     (securityState.pinTargetAction || openConfigModal)(pin);
 }

@@ -678,6 +678,28 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         expect(JSON.parse(response.body).evidence).toHaveLength(30);
     });
 
+    it('⏱ Palm track ៦០ កញ្ចប់ក្នុងសំណើមួយ (App ចែកកញ្ចប់ស្មើគ្នាតាមស្លត ៖ មួយសំណើក្នុងមួយស្លត) ➜ ស្របគ្នា ≤ ៨ · គ្រប់ Barcode', async () => {
+        const { sessionToken: session } = await login();
+        let inFlight = 0;
+        let peak = 0;
+        vi.stubGlobal('fetch', vi.fn(async (_url: string, init: any) => {
+            const payload = JSON.parse(init.body);
+            inFlight++;
+            peak = Math.max(peak, inFlight);
+            await new Promise((resolve) => setTimeout(resolve, 2));
+            inFlight--;
+            return upstream({ status: true, result: [scansOf(payload.mailNos, { isSign: 0 }, [['3', 'KH001', '2026-10-16 09:00:00']])] });
+        }));
+        const codes = Array.from({ length: 60 }, (_, i) => 'KH' + String(4000000000 + i));
+        const response = await call(tracksQuery(codes), session);
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.evidence.map((e: any) => e.barcode)).toEqual(codes);
+        expect(body.unverified).toEqual([]);
+        expect(body.trackCalls).toBe(60);
+        expect(peak).toBe(8);
+    });
+
     it('Palm track ខ្វះឬបរាជ័យ ➜ មិនបាត់កញ្ចប់ស្ងាត់ ៖ Barcode ក្នុង unverified · ZTO 5xx សាកម្តងទៀតមួយដង', async () => {
         const { sessionToken: session } = await login();
         const sent = serve({ 'track:KH0000000001': () => upstream({}, 502) });
@@ -698,9 +720,9 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         await call(tracksQuery(['KH0000000002']), session);
         expect(sent.map((r) => r.body.mailNos)).toEqual(['KH0000000002']);
         sent.length = 0;
-        const thirtyOne = Array.from({ length: 31 }, (_, i) => 'KH' + String(3000000000 + i)).join(',');
+        const sixtyOne = Array.from({ length: 61 }, (_, i) => 'KH' + String(3000000000 + i)).join(',');
         for (const bad of [{ candidates: '1', tabs: '4,9' }, { candidates: '1', tabs: '4,4' }, { tracks: 'bad code' }, { tracks: 'KH0000000001,kh0000000001' },
-            { tracks: thirtyOne }, { tracks: '' }, {}]) {
+            { tracks: sixtyOne }, { tracks: '' }, {}]) {
             expect((await call(listQuery({ signed: '0', ...bad }), session)).statusCode).toBe(400);
         }
         expect(sent).toEqual([]);
@@ -872,4 +894,148 @@ describe('Palm keeps its ZTO connection between scans (owner: Palm on a new conn
             palm.close();
         }
     }, 20000);
+});
+
+describe('Palm Login ឡើងវិញនៅ background (សំណើម្ចាស់គម្រោង ៖ «អោយ Palm login នៅ background ខ្លួនឯងពេលបើក app ZoeW ដើម្បីការពារ session»)', () => {
+    const refresh = (refreshToken: unknown, key = KEY, extra: Record<string, string> = {}) => fn.handler({
+        httpMethod: 'POST', headers: { 'x-zoe-proxy-key': key, ...extra }, queryStringParameters: { palm: 'refresh' },
+        body: JSON.stringify({ refreshToken })
+    });
+    const loginBody = () => JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+
+    it('Login ផ្តល់ refreshToken ដែល Server បិទ (AES-GCM) ៖ គ្មានពាក្យសម្ងាត់ · ឈ្មោះគណនី · token ZTO អានបាន', async () => {
+        const body = await login();
+        expect(body.refreshToken).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+        const raw = Buffer.from(body.refreshToken, 'base64url').toString('latin1');
+        for (const secret of [PASSWORD, 'palm-user', TOKEN, 'zoew-test-device', loginBody().password]) {
+            expect(body.refreshToken).not.toContain(secret);
+            expect(raw).not.toContain(secret);
+        }
+    });
+
+    it('refreshToken ➜ Login ZTO ដោយគណនីដដែល (ពាក្យសម្ងាត់អ៊ិនគ្រីបដូច Login · deviceSn ដដែល) ➜ session ថ្មីប្រើបាន · refreshToken ថ្មី', async () => {
+        const first = await login();
+        const sentAtLogin = loginBody();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { ...ACCOUNT, token: 'renewed-palm-token' } })));
+        const res = await refresh(first.refreshToken);
+        expect(res.statusCode).toBe(200);
+        const body = JSON.parse(res.body);
+        const sent = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+        expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://aargus-api.ztoglobal.net/zto/system/v1/doLogin');
+        expect(sent).toEqual(sentAtLogin);
+        expect(body).toMatchObject({ success: true, account: { siteCode: 'KH001', siteName: 'Test branch' } });
+        expect(body.refreshToken).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+        expect(body.refreshToken).not.toBe(first.refreshToken);
+        expect(JSON.stringify(body)).not.toContain('renewed-palm-token');
+        expect(JSON.stringify(body)).not.toContain('palm-user');
+        const tokens: string[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+            tokens.push(init.headers['x-token']);
+            return upstream({ status: true, result: { consigneeMobile: '012345678', cod: 1, dod: 0 } });
+        }));
+        expect((await call({ palm: '1', barcode: CODE }, body.sessionToken)).statusCode).toBe(200);
+        expect(tokens).toEqual(['renewed-palm-token']);
+    });
+
+    it('refreshToken ថ្មីពន្យារអាយុ ៣០ ថ្ងៃ ៖ ប្រើបន្តបានរហូតពេលប្រើយ៉ាងហោចម្តងក្នុង ៣០ ថ្ងៃ', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-01T00:00:00Z'));
+        let token = (await login()).refreshToken;
+        for (let day = 1; day <= 3; day++) {
+            vi.setSystemTime(new Date(Date.parse('2026-10-01T00:00:00Z') + day * 29 * 86400000));
+            vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: ACCOUNT })));
+            const res = await refresh(token);
+            expect(res.statusCode, 'ថ្ងៃ ' + day * 29).toBe(200);
+            token = JSON.parse(res.body).refreshToken;
+        }
+        vi.setSystemTime(new Date(Date.now() + 30 * 86400000 + 1));
+        vi.stubGlobal('fetch', vi.fn());
+        const stale = await refresh(token);
+        expect(stale.statusCode).toBe(401);
+        expect(JSON.parse(stale.body).code).toBe('ZTO_PALM_REFRESH_INVALID');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it.each(['other-proxy-key', 'tampered', 'session-token', 'missing', 'rotated-secret'])('refreshToken %s ➜ 401 ZTO_PALM_REFRESH_INVALID មុនផ្ញើទៅ ZTO', async (kind) => {
+        const body = await login();
+        let token = body.refreshToken;
+        let key = KEY;
+        if (kind === 'other-proxy-key') { vi.stubEnv('ZTO_PROXY_KEYS', 'other=' + OTHER_KEY); key = OTHER_KEY; }
+        if (kind === 'tampered') token = token.slice(0, -8) + 'AAAAAAAA';
+        if (kind === 'session-token') token = body.sessionToken;
+        if (kind === 'missing') token = undefined;
+        if (kind === 'rotated-secret') vi.stubEnv('ZTO_PALM_SESSION_SECRET', 'another-server-session-secret-at-least-32-characters');
+        vi.stubGlobal('fetch', vi.fn());
+        const res = await refresh(token, key);
+        expect(res.statusCode).toBe(401);
+        expect(JSON.parse(res.body).code).toBe('ZTO_PALM_REFRESH_INVALID');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('refreshToken មិនមែនជា session ៖ ប្រើជា X-Zoe-Palm-Token ➜ 401 ZTO_AUTH_EXPIRED មុនផ្ញើទៅ ZTO', async () => {
+        const body = await login();
+        vi.stubGlobal('fetch', vi.fn());
+        const res = await call({ palm: '1', barcode: CODE }, body.refreshToken);
+        expect(res.statusCode).toBe(401);
+        expect(JSON.parse(res.body).code).toBe('ZTO_AUTH_EXPIRED');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [{ status: false, statusCode: 'login_password_error' }, 401, 'ZTO_PALM_LOGIN_REJECTED'],
+        [{ status: false, statusCode: 'risk_control_account_captcha_err' }, 401, 'ZTO_PALM_VERIFICATION_REQUIRED'],
+        [{ status: true, result: { ...ACCOUNT, countryCode: 'VN' } }, 403, 'ZTO_PALM_COUNTRY_UNSUPPORTED']
+    ])('ZTO បដិសេធពេល Login ឡើងវិញ (ឧ. ប្តូរពាក្យសម្ងាត់) ➜ កូដដដែលនឹង Login (%j)', async (answer, status, code) => {
+        const body = await login();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream(answer)));
+        const res = await refresh(body.refreshToken);
+        expect(res.statusCode).toBe(status);
+        expect(JSON.parse(res.body).code).toBe(code);
+        expect(JSON.parse(res.body).sessionToken).toBeUndefined();
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('ZTO_DETAIL_IDENTITY=require ៖ Login ឡើងវិញត្រូវការគណនី ZoeW ដែលកំពុងចូល មុនផ្ញើទៅ ZTO (ដូច Login)', async () => {
+        const body = await login();
+        vi.stubEnv('ZTO_DETAIL_IDENTITY', 'require');
+        vi.stubEnv('FIREBASE_PROJECT_IDS', TEST_PROJECT);
+        const palm = vi.fn(async () => upstream({ status: true, result: ACCOUNT }));
+        vi.stubGlobal('fetch', withCerts(palm));
+        const refused = await refresh(body.refreshToken);
+        expect(JSON.parse(refused.body)).toMatchObject({ code: 'ZTO_IDENTITY_REQUIRED', reason: 'idtoken:missing' });
+        expect(palm).not.toHaveBeenCalled();
+        const ok = await refresh(body.refreshToken, KEY, { 'x-zoe-id-token': tokenForSite('12345') });
+        expect(ok.statusCode).toBe(200);
+        expect(palm).toHaveBeenCalledTimes(1);
+    });
+
+    it('preflight ?palm=refresh ជា Palm ៖ មិនអាន Cookie Argus ពី Blobs · អនុញ្ញាត POST', async () => {
+        const reads: string[] = [];
+        fn.setBlobsModuleForTests({
+            connectLambda() {},
+            getStore() { return { getWithMetadata: async () => { reads.push('read'); return null; }, get: async () => { reads.push('read'); return null; } }; }
+        });
+        try {
+            fn.resetCachesForTests();
+            const pre = await fn.handler({ httpMethod: 'OPTIONS', blobs: 'e30=', headers: { origin: 'https://localhost',
+                'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-zoe-proxy-key' }, queryStringParameters: { palm: 'refresh' } });
+            expect(pre.headers['Access-Control-Allow-Methods']).toContain('POST');
+            expect(reads).toEqual([]);
+        } finally {
+            fn.setBlobsModuleForTests(null);
+            fn.resetCachesForTests();
+        }
+    });
+
+    it('?palm=refresh តែ POST · តួធំពេក ➜ បដិសេធមុនផ្ញើទៅ ZTO', async () => {
+        const body = await login();
+        vi.stubGlobal('fetch', vi.fn());
+        const get = await fn.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'refresh' }, body: '' });
+        expect(get.statusCode).toBe(401);
+        expect(JSON.parse(get.body).sessionToken).toBeUndefined();
+        const big = await fn.handler({ httpMethod: 'POST', headers: { 'x-zoe-proxy-key': KEY }, queryStringParameters: { palm: 'refresh' },
+            body: JSON.stringify({ refreshToken: body.refreshToken, pad: 'x'.repeat(5000) }) });
+        expect(big.statusCode).toBe(400);
+        expect(fetch).not.toHaveBeenCalled();
+    });
 });

@@ -1,7 +1,8 @@
 import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
 import { modalIsOpen } from '../core/modals';
-import { firebaseState, securityState } from '../core/state';
+import { firebaseState, securityState, ztoState } from '../core/state';
 import { viewState } from '../core/view-state';
+import { elapsedSince } from '../core/elapsed';
 import { shopScope } from '../core/shop-scope';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { resolveNativeApiUrl, ztoIdentityTargetTrusted } from '../platform/native';
@@ -10,8 +11,20 @@ import { fetchWithTimeout } from '../services/network';
 import { getLookupApiConfig, refreshShopBoundUi, storeLookupApiConfig } from './lookup-config';
 import { lookupApiIsPalm, safeLookupReason } from './customer-table-prefetch';
 import { addZtoIdentityHeader } from './lookup-api';
+import { showToast } from '../ui/toast';
 
 let editGeneration = 0;
+
+export const PALM_REFRESH_AGE_MS = 4 * 60 * 60 * 1000;
+export const PALM_REFRESH_RETRY_MS = 2 * 60 * 1000;
+export const PALM_REFRESH_REJECTED_GAP_MS = 60 * 1000;
+export const PALM_REFRESH_TIMEOUT_MS = 15000;
+export const PALM_REFRESH_FINAL_CODES = ['ZTO_PALM_REFRESH_INVALID', 'ZTO_PALM_LOGIN_REJECTED', 'ZTO_PALM_VERIFICATION_REQUIRED', 'ZTO_PALM_COUNTRY_UNSUPPORTED'];
+
+let palmRefreshRun = null;
+let palmRefreshFailedAt = 0;
+let palmRefreshRejectedAt = 0;
+let palmRefreshDue = false;
 
 const PALM_LOGIN_MESSAGES = {
     ZTO_PALM_LOGIN_REJECTED: 'ZTO បដិសេធការចូល — គណនី ឬពាក្យសម្ងាត់ Palm មិនត្រឹមត្រូវ ឬគណនីមិនមានសិទ្ធិ។',
@@ -108,16 +121,19 @@ export async function submitZtoPalmLogin(event?: Event) {
             viewState.palmLoginStatus = palmLoginFailureText(body, out.res.status);
             return;
         }
-        const [palmTokenEnc, headerValueEnc] = await Promise.all([encryptLookupSecret(body.sessionToken), encryptLookupSecret(proxyKey)]);
+        const refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken : '';
+        const [palmTokenEnc, headerValueEnc, palmRefreshTokenEnc] = await Promise.all([encryptLookupSecret(body.sessionToken), encryptLookupSecret(proxyKey),
+            refreshToken ? encryptLookupSecret(refreshToken) : Promise.resolve('')]);
         if (!current()) return dropped();
-        if (!palmTokenEnc || !headerValueEnc) throw new Error('encryption');
+        if (!palmTokenEnc || !headerValueEnc || (refreshToken && !palmRefreshTokenEnc)) throw new Error('encryption');
         base.search = '?palm=1&barcode={barcode}';
         const url = base.href.replace('%7Bbarcode%7D', '{barcode}');
         const next = {
             enabled: true, fastMode: true, autoSubmit: fieldChecked('lookupApiAutoSubmitCheckbox'),
             url, headerName: 'X-Zoe-Proxy-Key', headerValueEnc, phoneField: 'phone', codField: 'cod', dodField: 'dod',
-            palmTokenEnc, palmExpiresAt: body.expiresAt, palmAccount: palmAccountOf(body.account), shop
+            palmTokenEnc, palmExpiresAt: body.expiresAt, palmAccount: palmAccountOf(body.account), shop, palmLoginAt: Date.now()
         };
+        if (palmRefreshTokenEnc) next.palmRefreshTokenEnc = palmRefreshTokenEnc;
         if (!storeLookupApiConfig(next)) return;
         setFieldChecked('lookupApiEnabledCheckbox', true);
         setFieldChecked('lookupApiFastModeCheckbox', true);
@@ -142,7 +158,7 @@ export function disconnectZtoPalm() {
     const cfg = getLookupApiConfig();
     if (!lookupApiIsPalm(cfg)) return;
     const next = { ...cfg, enabled: false };
-    for (const name of ['provider', 'palmTokenEnc', 'palmAccount', 'palmExpiresAt']) delete next[name];
+    for (const name of ['provider', 'palmTokenEnc', 'palmAccount', 'palmExpiresAt', 'palmRefreshTokenEnc', 'palmLoginAt']) delete next[name];
     const url = new URL(next.url, window.location.href);
     url.searchParams.delete('palm');
     next.url = url.href.replace('%7Bbarcode%7D', '{barcode}');
@@ -151,4 +167,113 @@ export function disconnectZtoPalm() {
     setFieldValue('lookupApiUrlInput', next.url);
     refreshZtoPalmLogin();
     refreshShopBoundUi();
+}
+
+export function palmRefreshAvailable(cfg?) {
+    const current = cfg || getLookupApiConfig();
+    return !!(current && lookupApiIsPalm(current) && current.palmRefreshTokenEnc);
+}
+
+export function noteZtoPalmSessionRejected(cfg) {
+    const current = getLookupApiConfig();
+    if (!palmRefreshAvailable(current)) return false;
+    if (cfg && JSON.stringify(cfg.palmTokenEnc) !== JSON.stringify(current.palmTokenEnc)) return true;
+    if (!palmRefreshRun) {
+        if (palmRefreshRejectedAt && elapsedSince(palmRefreshRejectedAt) < PALM_REFRESH_REJECTED_GAP_MS) return true;
+        palmRefreshRejectedAt = Date.now();
+        palmRefreshDue = true;
+        palmRefreshFailedAt = 0;
+    }
+    refreshZtoPalmSession();
+    return true;
+}
+
+function storedLookupConfigWith(stored, changes, drop) {
+    let raw = null;
+    try { raw = JSON.parse(stored); } catch (_) { raw = null; }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+    const next = Object.assign(raw, changes);
+    for (const name of drop) delete next[name];
+    return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(next));
+}
+
+export function refreshZtoPalmSession() {
+    if (palmRefreshRun) return palmRefreshRun;
+    palmRefreshRun = runZtoPalmRefresh().finally(() => { palmRefreshRun = null; });
+    return palmRefreshRun;
+}
+
+async function runZtoPalmRefresh() {
+    const cfg = getLookupApiConfig();
+    if (!palmRefreshAvailable(cfg)) return 'skipped';
+    const due = palmRefreshDue || !Number.isFinite(Number(cfg.palmLoginAt)) || elapsedSince(Number(cfg.palmLoginAt)) >= PALM_REFRESH_AGE_MS;
+    if (!due) return 'fresh';
+    if (palmRefreshFailedAt && elapsedSince(palmRefreshFailedAt) < PALM_REFRESH_RETRY_MS) return 'skipped';
+    const key = securityState.lookupSecretKey;
+    const shop = shopScope();
+    if (!key || !shop || (navigator.onLine as boolean) === false || ztoState.ztoListSyncInFlight || viewState.palmLoginBusy) return 'skipped';
+    const auth = firebaseState.authGeneration;
+    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
+    const current = () => shopScope() === shop && firebaseState.authGeneration === auth && securityState.lookupSecretKey === key
+        && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored && !viewState.palmLoginBusy;
+    const asked = palmRefreshDue;
+    try {
+        const base = new URL(String(cfg.url).replace('{barcode}', 'x'), window.location.href);
+        base.search = '?palm=refresh';
+        base.hash = '';
+        if (!ztoIdentityTargetTrusted(base.href)) return 'skipped';
+        const [proxyKey, refreshToken] = await Promise.all([cfg.headerValueEnc ? decryptLookupSecret(cfg.headerValueEnc) : Promise.resolve(''),
+            decryptLookupSecret(cfg.palmRefreshTokenEnc)]);
+        if (!current()) return 'skipped';
+        if (!proxyKey || !refreshToken) {
+            palmRefreshFailedAt = Date.now();
+            return 'failed';
+        }
+        const headers = { 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey };
+        await addZtoIdentityHeader({ url: base.href }, headers);
+        if (!current()) return 'skipped';
+        const out = await fetchWithTimeout(base.href, { method: 'POST', headers, body: JSON.stringify({ refreshToken }), cache: 'no-store' },
+            PALM_REFRESH_TIMEOUT_MS, 'Palm refresh timed out', (response) => response.json().catch(() => null));
+        if (!current()) return 'skipped';
+        const body = out.body;
+        const code = body && typeof body.code === 'string' ? body.code : '';
+        const site = cfg.palmAccount && typeof cfg.palmAccount.siteCode === 'string' ? cfg.palmAccount.siteCode : '';
+        const ok = out.res.ok && body && body.success === true && typeof body.sessionToken === 'string' && body.sessionToken
+            && typeof body.refreshToken === 'string' && body.refreshToken && Number.isFinite(body.expiresAt);
+        const moved = ok && palmAccountOf(body.account).siteCode !== site;
+        if (moved || (!out.res.ok && PALM_REFRESH_FINAL_CODES.indexOf(code) !== -1)) {
+            storedLookupConfigWith(stored, {}, ['palmRefreshTokenEnc']);
+            palmRefreshDue = false;
+            showToast('⚠️ Login ZTO Palm ស្វ័យប្រវត្តិមិនបាន — ' + (moved ? 'គណនី Palm ជាសាខាផ្សេង។' : palmLoginFailureText(body, out.res.status))
+                + ' សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+            return 'rejected';
+        }
+        if (!ok) {
+            palmRefreshFailedAt = Date.now();
+            return 'failed';
+        }
+        const [palmTokenEnc, palmRefreshTokenEnc] = await Promise.all([encryptLookupSecret(body.sessionToken), encryptLookupSecret(body.refreshToken)]);
+        if (!current()) return 'skipped';
+        if (!palmTokenEnc || !palmRefreshTokenEnc) {
+            palmRefreshFailedAt = Date.now();
+            return 'failed';
+        }
+        if (!storedLookupConfigWith(stored, { palmTokenEnc, palmRefreshTokenEnc, palmExpiresAt: body.expiresAt, palmLoginAt: Date.now() }, [])) {
+            palmRefreshFailedAt = Date.now();
+            return 'failed';
+        }
+        palmRefreshFailedAt = 0;
+        palmRefreshDue = false;
+        if (asked) showToast('✅ Login ZTO Palm ឡើងវិញរួច — សូមស្កេន ឬទាញម្តងទៀត');
+        return 'renewed';
+    } catch (_) {
+        if (current()) palmRefreshFailedAt = Date.now();
+        return current() ? 'failed' : 'skipped';
+    }
+}
+
+export function resetZtoPalmRefresh() {
+    palmRefreshFailedAt = 0;
+    palmRefreshRejectedAt = 0;
+    palmRefreshDue = false;
 }

@@ -17,6 +17,7 @@ import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
+import { refreshZtoPalmSession } from '../../features/zto-palm-login';
 import { isNativeApp } from '../../platform/native';
 import { probeDatabaseLivenessIfIdle, setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
@@ -89,6 +90,7 @@ function bootShell(scope: LifecycleScope): void {
         if (!restored || scope.disposed) return;
         renderZtoSyncViews();
         scheduleZtoStatusSweep();
+        refreshZtoPalmSession();
     }, () => {});
 
     setupNativeShell(scope);
@@ -155,6 +157,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        refreshZtoPalmSession();
         probeDatabaseLivenessIfIdle();
     });
     scope.listen(document, 'visibilitychange', () => {
@@ -164,6 +167,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        refreshZtoPalmSession();
         notifyPeriodicTick();
         resyncPush();
         syncExpirySchedule();

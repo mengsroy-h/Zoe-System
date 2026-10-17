@@ -12,6 +12,7 @@ const STALE_SOCKET_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
 let palmAgent = null;
 const SESSION_HEADER = 'x-zoe-palm-token';
 const SESSION_MS = 8 * 60 * 60 * 1000;
+const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const UPSTREAM_CODE_RE = /^[A-Za-z0-9_.:@-]{1,60}$/;
 const AUTH_EXPIRED_RE = /^(?:401|403|not_login|token_expired|token_invalid|login_expired|login_required)$/i;
@@ -20,7 +21,7 @@ const SIGNED_STATUS = '5';
 const LIST_ROW_MAX = 200;
 const LIST_TABS = ['1', '4', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
-const PALM_TRACKS_MAX = 30;
+const PALM_TRACKS_MAX = 60;
 const PALM_READ_ATTEMPTS = 2;
 const PALM_EMPTY_TRACK_READS = 2;
 const PALM_RETRY_GAP_MS = 250;
@@ -36,10 +37,14 @@ function configError(reason) {
     return Object.assign(new Error('palm:config'), { reason });
 }
 
-function sessionKey(env) {
+function sessionKey(env, label = 'zoew:palm:v1:') {
     const secret = String(env.ZTO_PALM_SESSION_SECRET || '');
     if (secret.length < 32) throw configError('palm:session-secret');
-    return crypto.createHash('sha256').update('zoew:palm:v1:').update(secret).digest();
+    return crypto.createHash('sha256').update(label).update(secret).digest();
+}
+
+function refreshKey(env) {
+    return sessionKey(env, 'zoew:palm:refresh:v1:');
 }
 
 function protocolKeys(env) {
@@ -54,27 +59,39 @@ function binding(proxyKey) {
     return crypto.createHash('sha256').update(proxyKey).digest();
 }
 
-function sealSession(value, proxyKey, env) {
+function sealSession(value, proxyKey, env, key = sessionKey(env)) {
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', sessionKey(env), iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     cipher.setAAD(binding(proxyKey));
     const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()]);
     return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
 }
 
-function openSession(value, proxyKey, env) {
-    const key = sessionKey(env);
-    if (!/^[A-Za-z0-9_-]{40,8192}$/.test(value)) throw new Error('session:invalid');
+function openSealed(value, proxyKey, key) {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{40,8192}$/.test(value)) return null;
     try {
         const raw = Buffer.from(value, 'base64url');
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
         decipher.setAAD(binding(proxyKey));
         decipher.setAuthTag(raw.subarray(12, 28));
         const data = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString('utf8'));
-        if (typeof data.token !== 'string' || !data.token || /[\r\n]/.test(data.token)
-            || !Number.isFinite(data.expiresAt) || data.expiresAt <= Date.now()) throw new Error('invalid');
-        return data;
-    } catch (_) { throw new Error('session:invalid'); }
+        return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+    } catch (_) { return null; }
+}
+
+function openSession(value, proxyKey, env) {
+    const data = openSealed(value, proxyKey, sessionKey(env));
+    if (!data || typeof data.token !== 'string' || !data.token || /[\r\n]/.test(data.token)
+        || !Number.isFinite(data.expiresAt) || data.expiresAt <= Date.now()) throw new Error('session:invalid');
+    return data;
+}
+
+function openRefresh(value, proxyKey, env) {
+    const data = openSealed(value, proxyKey, refreshKey(env));
+    if (!data || data.kind !== 'refresh' || typeof data.u !== 'string' || !data.u || data.u.length > 128 || /[\u0000-\u001f]/.test(data.u)
+        || typeof data.p !== 'string' || !data.p || data.p.length > 1024 || typeof data.d !== 'string' || !/^[A-Za-z0-9-]{8,80}$/.test(data.d)
+        || !Number.isFinite(data.exp) || data.exp <= Date.now()) return null;
+    return data;
 }
 
 function passwordCipher(password, keys) {
@@ -234,45 +251,56 @@ async function palmTracking(barcode, session, keys, deps) {
     return { upstream, verdict: trackingVerdict(upstream, barcode, session.site) };
 }
 
+async function palmLogin(credential, proxyKey, keys, deps, env) {
+    const access = await deps.loginAccess();
+    if (access && access.response) return access.response;
+    const upstream = await requestPalm('/zto/system/v1/doLogin', {
+        password: credential.cipher, equipment: 'ZoeW', timeZone: 'GMT+07:00',
+        userName: credential.username, deviceSn: credential.deviceSn, version: '2.9.92'
+    }, '', keys, deps.upstreamMs());
+    if (upstream.authRejected) return json(401, { code: 'ZTO_PALM_LOGIN_REJECTED', reason: 'palm:http-auth' });
+    if (upstream.statusCode === 'risk_control_account_captcha_err') {
+        return json(401, { code: 'ZTO_PALM_VERIFICATION_REQUIRED' });
+    }
+    if (upstream.status !== true) return json(401, { code: 'ZTO_PALM_LOGIN_REJECTED', reason: upstreamReason(upstream) });
+    const account = upstream.result;
+    if (!account || typeof account.token !== 'string' || !account.token || account.token.length > 4096 || /[\r\n]/.test(account.token)) {
+        throw new Error('upstream:json');
+    }
+    if (account.countryCode !== 'KH') return json(403, { code: 'ZTO_PALM_COUNTRY_UNSUPPORTED' });
+    const expiresAt = Date.now() + SESSION_MS;
+    const site = String(account.siteCode || '').slice(0, 64);
+    const siteName = String(account.siteName || '').slice(0, 120);
+    const refresh = { kind: 'refresh', u: credential.username, p: credential.cipher, d: credential.deviceSn, exp: Date.now() + REFRESH_MS };
+    return json(200, {
+        success: true, provider: 'zto-palm', expiresAt,
+        sessionToken: sealSession({ token: account.token, expiresAt, site, siteName }, proxyKey, env),
+        refreshToken: sealSession(refresh, proxyKey, env, refreshKey(env)),
+        account: { siteCode: site, siteName }
+    });
+}
+
 async function handlePalm(event, query, proxyKey, deps, env = process.env) {
     try {
         sessionKey(env);
         const keys = protocolKeys(env);
-        if (event.httpMethod === 'POST' && query.palm === 'login') {
+        if (event.httpMethod === 'POST' && (query.palm === 'login' || query.palm === 'refresh')) {
             if (event.isBase64Encoded || typeof event.body !== 'string' || Buffer.byteLength(event.body) > 4096) {
                 return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
             }
             let input;
             try { input = JSON.parse(event.body); } catch (_) { return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' }); }
+            if (query.palm === 'refresh') {
+                const sealed = openRefresh(input?.refreshToken, proxyKey, env);
+                if (!sealed) return json(401, { code: 'ZTO_PALM_REFRESH_INVALID' });
+                return await palmLogin({ username: sealed.u, cipher: sealed.p, deviceSn: sealed.d }, proxyKey, keys, deps, env);
+            }
             const username = typeof input?.username === 'string' ? input.username.trim() : '';
             const password = typeof input?.password === 'string' ? input.password : '';
             const deviceSn = typeof input?.deviceSn === 'string' ? input.deviceSn : '';
             if (!username || username.length > 128 || !password || password.length > 256 || /[\u0000-\u001f]/.test(username)
                 || !/^[A-Za-z0-9-]{8,80}$/.test(deviceSn)) return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
-            const access = await deps.loginAccess();
-            if (access && access.response) return access.response;
-            const upstream = await requestPalm('/zto/system/v1/doLogin', {
-                password: passwordCipher(password, keys), equipment: 'ZoeW', timeZone: 'GMT+07:00',
-                userName: username, deviceSn, version: '2.9.92'
-            }, '', keys, deps.upstreamMs());
-            if (upstream.authRejected) return json(401, { code: 'ZTO_PALM_LOGIN_REJECTED', reason: 'palm:http-auth' });
-            if (upstream.statusCode === 'risk_control_account_captcha_err') {
-                return json(401, { code: 'ZTO_PALM_VERIFICATION_REQUIRED' });
-            }
-            if (upstream.status !== true) return json(401, { code: 'ZTO_PALM_LOGIN_REJECTED', reason: upstreamReason(upstream) });
-            const account = upstream.result;
-            if (!account || typeof account.token !== 'string' || !account.token || account.token.length > 4096 || /[\r\n]/.test(account.token)) {
-                throw new Error('upstream:json');
-            }
-            if (account.countryCode !== 'KH') return json(403, { code: 'ZTO_PALM_COUNTRY_UNSUPPORTED' });
-            const expiresAt = Date.now() + SESSION_MS;
-            const site = String(account.siteCode || '').slice(0, 64);
-            const siteName = String(account.siteName || '').slice(0, 120);
-            return json(200, {
-                success: true, provider: 'zto-palm', expiresAt,
-                sessionToken: sealSession({ token: account.token, expiresAt, site, siteName }, proxyKey, env),
-                account: { siteCode: site, siteName }
-            });
+            return await palmLogin({ username, cipher: passwordCipher(password, keys), deviceSn }, proxyKey, keys, deps, env);
         }
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
         const session = openSession(deps.headerOf(event, SESSION_HEADER), proxyKey, env);
@@ -682,7 +710,7 @@ async function palmList(query, session, keys, deps) {
 }
 
 function isPalmPreflight(query, requestedHeaders) {
-    if (query && (query.palm === '1' || query.palm === 'login')) return true;
+    if (query && (query.palm === '1' || query.palm === 'login' || query.palm === 'refresh')) return true;
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 

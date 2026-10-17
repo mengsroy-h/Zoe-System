@@ -2308,6 +2308,9 @@
     "ZoeW/tests/zto-palm-race.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-refresh.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-palm-server.test.ts": {
       "policy": "zoew-self-verification"
     },

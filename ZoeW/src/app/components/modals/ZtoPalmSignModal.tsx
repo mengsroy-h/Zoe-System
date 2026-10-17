@@ -43,9 +43,9 @@ const STAGE_HINTS = {
 };
 
 function codeTone(result: PalmSignResult | undefined, photo: boolean, confirming: boolean) {
-    if (!result) return photo ? 'ready' : 'wait';
-    if (result.state === 'dispatched' || result.state === 'signed') return result.saved === false ? 'warn' : 'ok';
-    return result.state === 'unknown' || confirming ? 'warn' : 'error';
+    if (!result) return photo ? 'is-ready' : 'is-wait';
+    if (result.state === 'dispatched' || result.state === 'signed') return result.saved === false ? 'is-warn' : 'is-ok';
+    return result.state === 'unknown' || confirming ? 'is-warn' : 'is-error';
 }
 
 function SignForm() {
@@ -132,8 +132,8 @@ function SignForm() {
                             onChange={(event) => setPalmSignSelected(code, event.target.checked)} />
                         <span className="palm-sign-code-body">
                             <span className="palm-sign-code-no">{code}</span>
-                            {result ? <small role="status" className={'palm-sign-state is-' + tone}>{result.message}</small>
-                                : <small className={'palm-sign-state is-' + tone}>{v.photos[code] ? '✅ បានស្កេន និងចាប់រូប' : '⏳ រង់ចាំស្កេន'}</small>}
+                            {result ? <small role="status" className={'palm-sign-state ' + tone}>{result.message}</small>
+                                : <small className={'palm-sign-state ' + tone}>{v.photos[code] ? '✅ បានស្កេន និងចាប់រូប' : '⏳ រង់ចាំស្កេន'}</small>}
                             {v.problemScans[code] ? <small className="palm-sign-problem">⚠️ មានស្កេនបញ្ហា · {v.problemScans[code].time}<br />{v.problemScans[code].message}</small> : null}
                             {v.warnings[code] ? <small className="palm-sign-warning">⚠️ សារព្រមានពី ZTO៖ {v.warnings[code]}</small> : null}
                         </span>

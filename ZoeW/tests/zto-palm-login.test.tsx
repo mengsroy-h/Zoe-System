@@ -9,7 +9,7 @@ import { firebaseState, scanState, securityState, uiState } from '../src/core/st
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
-import { cancelZtoPalmLogin, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
+import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { encryptLookupSecret, decryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
@@ -377,5 +377,53 @@ describe('🩺 ZTO response time text (owner report: Palm lookup slower than Coo
         expect(ztoUpstreamTimingText({ upstreamTiming: { palm: null, connections: 'x' } }, true)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
         expect(ztoUpstreamTimingText({ upstreamTiming: { detail: { count: 1, avgMs: 500, lastMs: 500 }, connections: { argus: { count: 'x' } } } }, false))
             .not.toContain('ភ្ជាប់ថ្មី');
+    });
+});
+
+describe('សារ Login Palm ប្រាប់មូលហេតុពិត (សំណើម្ចាស់គម្រោង ៖ «សារច្បាស់» · Preview ៖ «សោមិនត្រឹមត្រូវ» ទាល់តែ clear site data)', () => {
+    async function fingerprint(text: string) {
+        const bytes = new Uint8Array(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+        return [...bytes].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    it('Server បដិសេធសោភ្ជាប់ (401 គ្មាន code) ➜ ប្រាប់ប្រភពសោ ចំនួនតួ ស្នាមម្រាម និងតួមើលមិនឃើញ · ⛔ មិនបង្ហាញសោ', async () => {
+        const typed = 'typed-proxy-key-0123456789\u200b';
+        vi.stubGlobal('fetch', vi.fn(async () => response({ error: 'Invalid proxy key' }, 401)));
+        credentials();
+        setFieldValue('lookupApiHeaderValueInput', typed);
+        await act(async () => { await submitZtoPalmLogin(); });
+        let text = viewState.palmLoginStatus;
+        expect(text).toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+        expect(text).toContain('ប្រអប់ Secret');
+        expect(text).toContain(typed.length + ' តួ');
+        expect(text).toContain(await fingerprint(typed));
+        expect(text).toContain('មើលមិនឃើញ');
+        expect(text).not.toContain('typed-proxy-key');
+        setFieldValue('lookupApiHeaderValueInput', '');
+        for (const run of [async () => { credentials(); await submitZtoPalmLogin(); }, () => connectSharedZtoPalm()]) {
+            await act(async () => { await run(); });
+            text = viewState.palmLoginStatus;
+            expect(text).toContain('សោដែលរក្សាទុក');
+            expect(text).toContain(PROXY_KEY.length + ' តួ');
+            expect(text).toContain(await fingerprint(PROXY_KEY));
+            expect(text).not.toContain('មើលមិនឃើញ');
+            expect(text).not.toContain(PROXY_KEY);
+        }
+    });
+    it('401 ដែលមាន code ផ្សេង ➜ បង្ហាញ code · ⛔ មិនហៅថាសោខុស · ZTO បដិសេធ ➜ ប្រាប់ថាសោភ្ជាប់ត្រូវ · HTTP គ្មាន code ➜ លេខ HTTP', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_AUTH_EXPIRED', reason: 'palm:no-session' }, 401)));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).not.toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+        expect(viewState.palmLoginStatus).toContain('ZTO_AUTH_EXPIRED');
+        expect(viewState.palmLoginStatus).toContain('palm:no-session');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ code: 'ZTO_PALM_LOGIN_REJECTED', reason: 'palm:USER_LOCKED' }, 401)));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('Server ទទួលសោភ្ជាប់ ZoeW រួច');
+        expect(viewState.palmLoginStatus).toContain('palm:USER_LOCKED');
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('bad gateway', { status: 502 })));
+        credentials();
+        await act(async () => { await submitZtoPalmLogin(); });
+        expect(viewState.palmLoginStatus).toContain('HTTP 502');
     });
 });

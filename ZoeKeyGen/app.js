@@ -3492,13 +3492,20 @@ async function sbAdminRefresh() {
     }
     if (!sbAdminIsCurrent(session)) return;
     if (tenants && tenants.status === 401) { sbAdminReset(true); return; }
-    sbTenantReadFailed = !tenants || !tenants.ok || !Array.isArray(tenants.body);
-    sbTenantCache = sbTenantReadFailed ? [] : tenants.body;
-    sbMemberReadFailed = !members || !members.ok || !Array.isArray(members.body);
-    sbMemberCache = sbMemberReadFailed ? [] : members.body;
-    sbDeviceReadFailed = !devices || !devices.ok || !Array.isArray(devices.body);
-    sbDeviceCache = sbDeviceReadFailed ? [] : devices.body;
+    const tenantRows = sbAdminRows(tenants);
+    const memberRows = sbAdminRows(members);
+    const deviceRows = sbAdminRows(devices);
+    sbTenantReadFailed = !tenantRows;
+    sbMemberReadFailed = !memberRows;
+    sbDeviceReadFailed = !deviceRows;
+    sbTenantCache = tenantRows || [];
+    sbMemberCache = memberRows || [];
+    sbDeviceCache = deviceRows || [];
     renderSbTenantList();
+}
+
+function sbAdminRows(res) {
+    return res && res.ok && Array.isArray(res.body) ? res.body : null;
 }
 
 function sbTenantState(row) {

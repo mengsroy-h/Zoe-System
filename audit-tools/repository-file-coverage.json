@@ -1720,6 +1720,9 @@
     "ZoeW/src/features/zto-palm-login.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/zto-returned.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/zto-status.ts": {
       "policy": "zoew-app"
     },
@@ -1892,6 +1895,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned-cleanup.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-returned.test.tsx": {

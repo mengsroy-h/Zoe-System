@@ -24,7 +24,8 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
                     row.returnedAt ? '↩️ ZTO ត្រឡប់ស្កេន ៖ ' + row.returnedAt : '',
-                    row.returnedAt && row.inZoew === true ? '📌 មានក្នុង ZoeW រួច ➜ ZoeW មិនដកដោយស្វ័យប្រវត្តិ' : '',
+                    row.removeInZoew === true ? '🗑️ បើកក្នុង ZoeW ➜ ដកចេញដូចផុតកំណត់ (ដកលុយ)' : '',
+                    row.openInZoew === true && row.removeInZoew !== true ? '📌 បើកក្នុង ZoeW · «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ ➜ មិនដក' : '',
                     ztoListSkipText(row.skip)].filter(Boolean)
             };
         })

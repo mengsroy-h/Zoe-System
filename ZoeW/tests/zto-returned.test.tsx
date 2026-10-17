@@ -150,7 +150,7 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(body.otherScans).toBe(1);
     });
 
-    it('ប្រអប់ ៖ ក្រុម «↩️ ត្រឡប់ទៅវិញ» ជាមួយម៉ោងត្រឡប់ និងសញ្ញា «មានក្នុង ZoeW» · អក្សរសង្ខេបរាប់', () => {
+    it('ប្រអប់ ៖ ក្រុម «↩️ ត្រឡប់ទៅវិញ» ជាមួយម៉ោងត្រឡប់ និង «ដកចេញដូចផុតកំណត់» បើបើកក្នុង ZoeW · អក្សរសង្ខេបរាប់', () => {
         dataState.scanHistory = historyWith('ZTHAVE000001') as any;
         ztoState.ztoListSyncResult = {
             rows: [{ barcode: 'ZTHAVE000001', phone: '0977000111', cod: 2, dod: 0, at: dk(2) + ' 08:00:00', skip: '' },
@@ -165,7 +165,8 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(ret.title).toContain('↩️');
         expect(ret.rows.map((r: any) => r.barcode)).toEqual(['ZTHAVE000001']);
         expect(ret.rows[0].notes.join(' ')).toContain(dk(1) + ' 09:00:00');
-        expect(ret.rows[0].notes.join(' ')).toContain('មានក្នុង ZoeW');
+        expect(ret.rows[0].notes.join(' ')).toContain('ដកចេញដូចផុតកំណត់');
         expect(String(viewState.ztoListSyncNote)).toContain('↩️ ត្រឡប់ទៅវិញ 1');
+        expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW 1');
     });
 });

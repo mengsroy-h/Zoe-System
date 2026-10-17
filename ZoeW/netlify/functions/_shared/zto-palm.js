@@ -217,13 +217,14 @@ function trackingCode(value) {
 }
 
 function trackingVerdict(upstream, barcode, site) {
-    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null };
+    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null, ztoReturnedAt: null };
     if (!Array.isArray(upstream.result) || !trackingCode(site)) return out;
     const code = trackingCode(barcode);
     const rows = upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === code);
     if (rows.length !== 1 || !Array.isArray(rows[0].tracks)) return out;
     let arrival = '';
     let signed = '';
+    let returned = '';
     let complete = true;
     for (const track of rows[0].tracks) {
         const at = trackingStamp(track?.time);
@@ -233,6 +234,7 @@ function trackingVerdict(upstream, barcode, site) {
         const action = String(track.action);
         if (action === '3' && at > arrival) arrival = at;
         if (action === '5' && at > signed) signed = at;
+        if (action === RETURN_ACTION && at > returned) returned = at;
     }
     out.ztoArrivalAt = arrival || null;
     if (!complete) return out;
@@ -240,6 +242,7 @@ function trackingVerdict(upstream, barcode, site) {
         out.ztoClosed = true;
         out.ztoSignedAt = signed;
     } else if (rows[0].mail.isSign === 0 && arrival && (!signed || signed < arrival)) out.ztoClosed = false;
+    if (returned && returned >= arrival && out.ztoClosed !== true) out.ztoReturnedAt = returned;
     return out;
 }
 

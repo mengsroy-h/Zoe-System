@@ -18,7 +18,8 @@ import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, ZTO_LIST_CLIENT_MAX_PAGES, fetchZtoReturnedPages, fetchZtoSignedCodes, ztoListPositiveCount, ztoListReasonIsDefinitive, ztoListSignedEvidence, ztoListSignedProbe } from './zto-list-sync';
+import { removeReturnedZtoBarcodes } from './zto-returned';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { markZtoShopSweep, ztoShopSweepHolds } from '../services/zto-shop-sweep';
@@ -735,7 +736,9 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     }
     const data = out.body;
     if (!data || typeof data !== 'object') return null;
-    return { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
+    const answer: any = { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
+    if (typeof data.ztoReturnedAt === 'string' && data.ztoReturnedAt) answer.returnedAt = data.ztoReturnedAt;
+    return answer;
 }
 
 function pruneZtoPickupVerdictSeen(closedAll, openAll) {
@@ -799,6 +802,13 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             signedMore = signed.more;
             signedKeys = signed.keys;
             if (signed.closed || signed.flipped) renderZtoSyncViews(dataToScan, trashToScan);
+            if (signedEntries.length && !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force) && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS) {
+                ztoState.ztoReturnedSweepAt = Date.now();
+                const range = ztoSignedSweepRange(ztoOldestOpenStamp(dataToScan));
+                const back = await fetchZtoReturnedPages(cfg, range.from, range.to);
+                if (!session.current()) return 0;
+                removeReturnedZtoBarcodes(back.returned, dataToScan);
+            }
         }
         for (let i = 0; i < work.length; i++) {
             if (signedKeys.has(work[i].key)) continue;
@@ -814,6 +824,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (!answer) continue;
             recorded++;
             setZtoPickupVerdict(work[i].code, answer.closed);
+            if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt }], dataToScan);
             if (typeof answer.closed === 'boolean') {
                 measured++;
                 if (work[i].open && answer.closed === true) {

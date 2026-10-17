@@ -22,6 +22,7 @@ import { ztoIdentityTargetTrusted } from '../platform/native';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
 import { autoCloseBarcodeFromZto, captureZtoSession, checkZtoStatusForBarcode, collectOpenBarcodesForZtoStatus, setZtoPickupVerdict, ztoAutoCloseEnabled, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
+import { removeReturnedZtoBarcodes, ztoReturnedTargets } from './zto-returned';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
 import { armLateWrite, fetchWithTimeout, withTimeout } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -222,7 +223,9 @@ export function ztoListRowOf(raw, key) {
         signedOnly: false,
         arrivedBefore: '',
         returnedAt: '',
-        inZoew: false
+        inZoew: false,
+        openInZoew: false,
+        removeInZoew: false
     };
 }
 
@@ -899,6 +902,13 @@ export function renderZtoListSyncPreview() {
     for (let i = 0; i < groups.existing.length; i++) {
         groups.existing[i].closeInZoew = closeKeys.has(groups.existing[i].key);
     }
+    const openReturned = new Set();
+    ztoReturnedTargets(result.returned, dataState.scanHistory, result.signed).forEach((target) => target.codes.forEach((code) => openReturned.add(pickupBarcodeKey(code))));
+    const removeReturned = ztoAutoCloseEnabled();
+    for (let i = 0; i < groups.returned.length; i++) {
+        groups.returned[i].openInZoew = openReturned.has(groups.returned[i].key);
+        groups.returned[i].removeInZoew = removeReturned && groups.returned[i].openInZoew;
+    }
     const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
     const freshTitle = stale ? '🆕 ថ្មី ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '🆕 ថ្មី (មិនទាន់មានក្នុង ZoeW)';
     const existingTitle = stale ? '✅ មានក្នុង ZoeW រួច ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '✅ មានក្នុង ZoeW រួច';
@@ -921,12 +931,12 @@ export function renderZtoListSyncPreview() {
     const pulled = Number(result.total) > result.rows.length ? ' (ZTO រាយ ' + result.total + ')' : '';
     setZtoListSyncNote('ZTO ' + result.rows.length + ' ជួរ' + pulled
         + ' · ' + result.from + ' ➜ ' + result.to + truncated
-        + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly, groups.returned.length)
+        + ztoListSignedNote(result, bornClosed, closeTargets.length, signedOnly, groups.returned.length, removeReturned ? openReturned.size : 0)
         + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
         + ' · 👁️ មើលជាមុន');
 }
 
-export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0, returnedCount = 0) {
+export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0, returnedCount = 0, removedCount = 0) {
     const parts = [];
     const other = Number(result && result.otherScans);
     if (isFinite(other) && other > 0 && !(result && result.palm)) parts.push('⏭️ ស្កេនផ្សេង ' + other + ' មិនរាប់');
@@ -934,6 +944,7 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
     if (signedOnly > 0) parts.push('✍️ ចុះហត្ថលេខា (មកដល់មុន ' + (result && result.from) + ') ' + signedOnly + ' ➜ «យករួច»');
     if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW ZTO បិទរួច ' + closeCount + ' ➜ បិទពេល «បញ្ចូល»');
     if (returnedCount > 0) parts.push('↩️ ត្រឡប់ទៅវិញ ' + returnedCount + ' ➜ មិនបញ្ចូល');
+    if (removedCount > 0) parts.push('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW ' + removedCount + ' (ដូចផុតកំណត់ · ដកលុយ)');
     const returnedState = result && result.returnedState;
     if (returnedState === 'failed' || returnedState === 'partial') parts.push('⚠️ ពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញមិនបានគ្រប់ ➜ សូមទាញម្តងទៀត');
     const unverified = result && Array.isArray(result.unverified) ? result.unverified : [];
@@ -1034,9 +1045,11 @@ export async function runZtoListSyncPreview() {
             candidates: ztoListPositiveCount(pulled.candidates),
             elapsedMs: ztoListPositiveCount(pulled.elapsedMs),
             returned: Array.isArray(pulled.returned) ? pulled.returned : [],
+            signed: Array.isArray(pulled.signed) ? pulled.signed : [],
             returnedState: pulled.returnedState
         };
         renderZtoListSyncPreview();
+        removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
     } catch (e) {
         if (!session.current()) return;

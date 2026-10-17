@@ -783,7 +783,7 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     return foreign ? 'elsewhere' : 'ours';
 }
 
-export async function claimAndCleanupItem(id, reason) {
+export async function claimAndCleanupItem(id, reason, opts?) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
     let journalFull = false;
     try { journalFull = cleanupInFlight.size + readCleanupJournal().length >= CLEANUP_JOURNAL_MAX; } catch (journalErr) {}
@@ -799,6 +799,7 @@ export async function claimAndCleanupItem(id, reason) {
     let claimedWhole = null;
     let claimedPartial = null;
     let updatedRemainder = null;
+    const forced = reason === 'abandon' && opts && Array.isArray(opts.codes) ? new Set(opts.codes) : null;
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
         claimedPartial = null;
@@ -810,11 +811,11 @@ export async function claimAndCleanupItem(id, reason) {
         const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
         if (reason === 'abandon') {
-            if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
+            if (currentItem.isClosed || (!forced && (getServerNow() - ts) <= ABANDON_AGE_MS)) return currentItem;
             ensureBarcodeArrayForItem(currentItem);
 
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const staleOpen = currentItem.barcodes.filter(b => barcodeAbandonIsRipe(b, ts, getServerNow()));
+                const staleOpen = currentItem.barcodes.filter(b => (forced ? !!b && !b.isClosed && forced.has(b.code) : barcodeAbandonIsRipe(b, ts, getServerNow())));
                 const staleSet = new Set(staleOpen);
                 const stillActive = currentItem.barcodes.filter(b => !staleSet.has(b));
                 if (staleOpen.length === 0) return currentItem;
@@ -839,6 +840,7 @@ export async function claimAndCleanupItem(id, reason) {
                 return updated;
             }
 
+            if (forced) return currentItem;
             claimedWhole = currentItem;
             return null;
         } else {

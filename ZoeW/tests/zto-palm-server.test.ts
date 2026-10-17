@@ -168,6 +168,30 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse(res.body).ztoClosed).toBeNull();
     });
 
+    it.each([
+        ['ត្រឡប់ក្រោយមកដល់ (លំដាប់ពិត ៖ 3 ➜ 4 ➜ -579 ➜ -585 ➜ -710 ➜ 2)', [['3', 'KH001', '2026-10-16 15:29:45'], ['4', 'KH001', '2026-10-16 15:30:16'],
+            ['-579', 'KH001', '2026-10-16 15:32:44'], ['-585', 'KH001', '2026-10-17 07:57:13'], ['-710', 'KH001', '2026-10-17 08:00:34'],
+            ['2', 'KH001', '2026-10-17 08:05:40']], '2026-10-17 08:00:34'],
+        ['ត្រឡប់ហើយមកដល់ម្តងទៀត', [['3', 'KH001', '2026-10-14 09:00:00'], ['-710', 'KH001', '2026-10-14 12:00:00'], ['3', 'KH001', '2026-10-16 09:00:00']], null],
+        ['-710 នៅសាខាផ្សេង', [['3', 'KH001', '2026-10-16 09:00:00'], ['-710', 'OTHER', '2026-10-17 09:00:00']], null]
+    ])('↩️ status=1 ៖ %s ➜ `ztoReturnedAt`', async (_name, scans: any, returnedAt) => {
+        const { sessionToken: session } = await login();
+        const tracks = (scans as string[][]).map(([action, site, time]) => ({ action, siteCode: site, mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ found: true, ztoClosed: false, ztoReturnedAt: returnedAt });
+    });
+
+    it('↩️ status=1 ៖ ZTO ចុះហត្ថលេខា (`isSign: 1`) ក្រោយមកដល់ ➜ បិទ · មិនមែនត្រឡប់ ទោះមាន -710', async () => {
+        const { sessionToken: session } = await login();
+        const tracks = [['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00'], ['5', '2026-10-17 09:00:00']]
+            .map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 1 }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(JSON.parse(res.body)).toMatchObject({ ztoClosed: true, ztoReturnedAt: null });
+    });
+
     it('Palm អាន cod និង dod ផ្ទាល់ ដោយមិនយក mapping Cookie មកជំនួស', async () => {
         const { sessionToken: session } = await login();
         vi.stubEnv('ZTO_FIELD_COD', 'cookieCod');

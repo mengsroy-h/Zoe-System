@@ -6,6 +6,7 @@
  *    ឬកំពុងស្កេនជាបន្តបន្ទាប់ មិនបោះបង់ការងារ។
  * ⛔ 📥 បញ្ជីកញ្ចប់ពី ZTO ៖ ដូចគ្នា (សំណើម្ចាស់គម្រោង ៖ «modal បញ្ជី ZTO ប៉ះផ្ទៃទទេមិនបិទ · ការពារពេលកំពុងទាញបញ្ជីប៉ះចៃដន្យ») —
  *    `closeZtoListSyncModal()` លុបបញ្ជីដែលទាញរួច ➜ ប៉ះខុសមួយបាត់បញ្ជីដែលរង់ចាំពិនិត្យ/បញ្ចូល។
+ * ⛔ ✍️ Sign · ZTO Palm ៖ ដូចគ្នា — `closeModal()` លុបរូប ឈ្មោះអតិថិជន និងជំហាន Sign ➜ ប៉ះខុសមួយបាត់ការស្កេនពេលចែកចាយ/ទទួលដែលកំពុងធ្វើ។
  *    ផ្លូវពិត ៖ `boot.ts` ស្តាប់ `click` លើ document ➜ `modalBackdropTarget(e.target)` ➜ `dismissModal(id)` (តេស្តហៅលំដាប់ដដែល)។
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,13 +17,14 @@ import { ExchangeRateModal } from '../src/app/components/modals/ExchangeRateModa
 import { ScanRemoveModal } from '../src/app/components/modals/ScanRemoveModal';
 import { BatchScanModal } from '../src/app/components/modals/BatchScanModal';
 import { ZtoListSyncModal } from '../src/app/components/modals/ZtoListSyncModal';
+import { ZtoPalmSignModal } from '../src/app/components/modals/ZtoPalmSignModal';
 import { closeTopmostLayer, modalBackdropTarget } from '../src/app/lifecycle/layers';
 import { dismissModal } from '../src/ui/modal-stack';
 import { closeModal, openModalHelper } from '../src/ui/modal';
 import { modalIsOpen } from '../src/core/modals';
 import { byId, mount, step, unmount } from './native/react-harness';
 
-const KEEP = ['configModal', 'lookupApiConfigModal', 'sheetImportModal', 'scanRemoveModal', 'batchScanModal', 'ztoListSyncModal'] as const;
+const KEEP = ['configModal', 'lookupApiConfigModal', 'sheetImportModal', 'scanRemoveModal', 'batchScanModal', 'ztoListSyncModal', 'ztoPalmSignModal'] as const;
 
 function tapBackdrop(target: Element) {
     step(() => {
@@ -33,7 +35,7 @@ function tapBackdrop(target: Element) {
 
 describe('ប៉ះផ្ទៃងងឹតខាងក្រៅប្រអប់', () => {
     beforeAll(() => {
-        mount(<><ConfigModal /><LookupApiConfigModal /><SheetImportModal /><ExchangeRateModal /><ScanRemoveModal /><BatchScanModal /><ZtoListSyncModal /></>);
+        mount(<><ConfigModal /><LookupApiConfigModal /><SheetImportModal /><ExchangeRateModal /><ScanRemoveModal /><BatchScanModal /><ZtoListSyncModal /><ZtoPalmSignModal /></>);
     });
     afterAll(() => unmount());
 

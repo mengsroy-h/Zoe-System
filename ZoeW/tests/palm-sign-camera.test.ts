@@ -64,3 +64,14 @@ it('ខ្ចី stream កាមេរ៉ាដែលបើករួច ➜ ប
     expect(noteAppLockExcuse).not.toHaveBeenCalled();
     expect(stopTrack).not.toHaveBeenCalled();
 });
+it('Barcode ដដែលនៅមុខកាមេរ៉ា ហើយមានរូបរួច ➜ មិនបង្កើត JPEG ឡើងវិញរៀងរាល់ frame', async () => {
+    scanState.nativeDetector = { detect: vi.fn(async () => [{ rawValue: '77130500000012' }]) };
+    const encoded = vi.fn(() => 'data:image/jpeg;base64,frame');
+    vi.mocked(createScratchCanvas).mockImplementation(() => ({ width: 0, height: 0, getContext: () => ({ drawImage: () => {} }), toDataURL: encoded }) as any);
+    const onScan = vi.fn();
+    const close = startPalmSignCamera(onScan, vi.fn(), (code) => code !== '77130500000012');
+    await vi.waitFor(() => expect(vi.mocked(scanState.nativeDetector.detect).mock.calls.length).toBeGreaterThan(2), { timeout: 3000 });
+    close();
+    expect(encoded).not.toHaveBeenCalled();
+    expect(onScan).not.toHaveBeenCalled();
+});

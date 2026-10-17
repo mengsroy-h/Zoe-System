@@ -25,7 +25,7 @@ export function palmSignFramePhoto(canvas = frame()) {
     return photo.startsWith('data:image/jpeg;base64,') && photo.length <= 1200000 ? photo.split(',')[1] : '';
 }
 
-export function startPalmSignCamera(onScan: (code: string, photo: string) => void, onError: () => void) {
+export function startPalmSignCamera(onScan: (code: string, photo: string) => void, onError: () => void, wants: (code: string) => boolean = () => true) {
     let cancelled = false;
     let stream: MediaStream | null = null;
     let owned = false;
@@ -39,7 +39,7 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
                 let code = '';
                 if (scanState.nativeDetector) code = (await withTimeout(scanState.nativeDetector.detect(canvas), 2000, 'Palm scan timeout'))[0]?.rawValue || '';
                 if (!code && scanState.codeReader) code = await withTimeout(decodeBarcodeFromCanvasManual(scanState.codeReader, canvas), 2000, 'Palm scan timeout') || '';
-                if (code && active()) {
+                if (code && active() && wants(code)) {
                     const photo = palmSignFramePhoto(canvas);
                     if (photo) onScan(code, photo);
                 }

@@ -510,3 +510,74 @@ it.each([2, 3])('ផ្លូវបិទពិត៖ លេខមួយ %s ក�
         firebaseState.dbRefDailyPickup = null; firebaseState.dbRefDailyCollected = null;
     }
 });
+
+it('Session Palm ប្តូរ (refresh) ពេលកំពុងផ្ញើ ➜ ចម្លើយ ZTO នៅតែកត់ក្នុង ZoeW · ប្តូរសាខា Palm ➜ បោះចោល', async () => {
+    for (const sameBranch of [true, false]) {
+        vi.mocked(applyBarcodeCloseChange).mockClear();
+        await openReceipt([CODE]);
+        const gate = deferred();
+        vi.stubGlobal('fetch', vi.fn(() => gate.promise));
+        const work = submit();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+        const renewed = sameBranch
+            ? { ...config, palmTokenEnc: await encryptLookupSecret('renewed-session'), palmRefreshTokenEnc: await encryptLookupSecret('renewed-refresh'), palmExpiresAt: Date.now() + 28800000, palmLoginAt: Date.now() }
+            : { ...config, palmAccount: { siteCode: 'KH999', siteName: '' } };
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(renewed));
+        gate.resolve(signed());
+        await work;
+        expect(closeCalls()).toEqual(sameBranch ? [['item1', CODE, true, { silent: true, showModal: false }]] : []);
+        act(() => closeModal('ztoPalmSignModal'));
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(config));
+        vi.stubGlobal('fetch', vi.fn(async (_url, init) => { const body = JSON.parse(String(init?.body)); if (body.stage === 'status') return json({ success: true, barcode: body.barcode, stage: 'status', dispatched: false, ztoClosed: false }); return body.stage === 'dispatch'
+            ? json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode }) : signed(body.barcode); }));
+    }
+});
+it('ភស្តុតាងចែកចាយចាស់ (Login Palm ប្តូរ) ➜ ពិនិត្យ ZTO ឡើងវិញស្វ័យប្រវត្តិ ហើយផ្ញើម្ដងទៀតបានដោយមិនបិទផ្ទាំង', async () => {
+    await openReceipt([CODE]);
+    const proofs: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.stage === 'status') return json({ success: true, barcode: CODE, stage: 'status', ztoClosed: false, dispatched: true, dispatchProof: 'fresh-proof' });
+        proofs.push(body.dispatchProof);
+        return body.dispatchProof === 'fresh-proof' ? signed() : json({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: CODE }, 409);
+    }));
+    await submit();
+    await vi.waitFor(() => expect(palmSignState.dispatchResults.find((row) => row.code === CODE)?.proof).toBe('fresh-proof'));
+    await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    expect(palmSignState.checked[CODE]).toBe(true);
+    expect(palmSignState.photos[CODE]).toBe(PHOTO);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+    expect(closeCalls()).toEqual([]);
+    await submit();
+    expect(proofs).toEqual(['proof-' + CODE, 'fresh-proof']);
+    expect(closeCalls()).toHaveLength(1);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+});
+it('ពិនិត្យ ZTO ឡើងវិញ ឃើញទទួលរួច ➜ ជួរកញ្ចប់មានលទ្ធផលតែមួយ (មិនស្ទួនជាមួយលទ្ធផលបរាជ័យចាស់)', async () => {
+    await openReceipt([CODE]);
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => JSON.parse(String(init?.body)).stage === 'status'
+        ? json({ success: true, barcode: CODE, stage: 'status', ztoClosed: true, dispatched: true })
+        : json({ code: 'ZTO_PALM_DISPATCH_REQUIRED', barcode: CODE }, 409)));
+    vi.mocked(applyBarcodeCloseChange).mockResolvedValue(false);
+    await submit();
+    await vi.waitFor(() => expect(palmSignState.results.some((row) => row.state === 'signed')).toBe(true));
+    await vi.waitFor(() => expect(palmSignState.checking).toBe(false));
+    expect(palmSignState.results.filter((row) => row.code === CODE)).toEqual([expect.objectContaining({ state: 'signed', saved: false })]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+});
+it('ជំហានចែកចាយមិនផ្ញើរូបទៅ Server (APK មិនភ្ជាប់រូប) · ជំហានទទួលផ្ញើរូប', async () => {
+    await openDispatch([CODE]);
+    palmSignState.requestId = REQUEST;
+    acceptPalmSignBarcode(CODE, PHOTO);
+    await submit();
+    const dispatchBody = JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)![1]?.body));
+    expect(dispatchBody).toMatchObject({ barcode: CODE, stage: 'dispatch', requestId: REQUEST });
+    expect('photo' in dispatchBody).toBe(false);
+    expect(palmSignState.dispatchResults[0]).toMatchObject({ code: CODE, state: 'dispatched' });
+    advancePalmSignStage();
+    setPalmSignName('សុខា');
+    acceptPalmSignBarcode(CODE, PHOTO);
+    vi.mocked(fetch).mockClear();
+    await submit();
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ stage: 'receipt', photo: PHOTO });
+});

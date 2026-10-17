@@ -41,7 +41,7 @@ export const MODAL_IDS = [
 
 export type ModalId = (typeof MODAL_IDS)[number];
 
-export const BACKDROP_KEEP_MODALS: readonly ModalId[] = ['configModal', 'lookupApiConfigModal', 'sheetImportModal', 'scanRemoveModal', 'batchScanModal', 'ztoListSyncModal'];
+export const BACKDROP_KEEP_MODALS: readonly ModalId[] = ['configModal', 'lookupApiConfigModal', 'sheetImportModal', 'scanRemoveModal', 'batchScanModal', 'ztoListSyncModal', 'ztoPalmSignModal'];
 
 export const ROOT_SCREEN_MODALS: readonly string[] = ['loginModal', 'activationModal'];
 

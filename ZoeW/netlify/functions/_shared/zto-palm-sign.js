@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto');
 const MAX_PHOTO_BYTES = 900000;
+const RUNS_MAX = 256;
 const runs = new Map();
 
 function json(statusCode, body) {
@@ -19,8 +20,9 @@ function readInput(event) {
         || !['dispatch', 'receipt'].includes(stage) || typeof dispatchProof !== 'string' || dispatchProof.length > 4096
         || typeof confirmationToken !== 'string' || confirmationToken.length > 8192
         || typeof signMan !== 'string' || signMan.length > 120 || /[\u0000-\u001f\u007f]/.test(signMan)
-        || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)
-        || typeof photo !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo) || photo.length % 4 !== 0) return null;
+        || typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(requestId)) return null;
+    if (stage === 'dispatch' && (photo === undefined || photo === '')) return { barcode, signMan: signMan.trim(), photo: '', requestId, stage, dispatchProof, confirmationToken };
+    if (typeof photo !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo) || photo.length % 4 !== 0) return null;
     const bytes = Buffer.from(photo, 'base64');
     if (bytes.length < 8 || bytes.length > MAX_PHOTO_BYTES || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255
         || bytes[bytes.length - 2] !== 255 || bytes[bytes.length - 1] !== 217 || bytes.toString('base64') !== photo) return null;
@@ -188,7 +190,11 @@ async function signPalm(event, session, deps, request, proof) {
     for (const [id, entry] of runs) if (entry.at < Date.now() - 600000 && !entry.active) runs.delete(id);
     const old = runs.get(key);
     if (old) return old.fingerprint === fingerprint ? old.promise : json(409, { code: 'ZTO_PALM_SIGN_INVALID' });
-    if (runs.size >= 256) return json(429, { code: 'ZTO_RATE_LIMITED' });
+    for (const [id, entry] of runs) {
+        if (runs.size < RUNS_MAX) break;
+        if (!entry.active) runs.delete(id);
+    }
+    if (runs.size >= RUNS_MAX) return json(429, { code: 'ZTO_RATE_LIMITED' });
     const entry = { fingerprint, at: Date.now(), active: true, promise: null };
     entry.promise = submit(input, session, request, proof).then((response) => {
         entry.active = false;

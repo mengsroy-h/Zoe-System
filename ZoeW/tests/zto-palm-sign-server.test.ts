@@ -73,8 +73,24 @@ it('បញ្ជី upload ជាបញ្ជីបរាជ័យតាម barS
     vi.stubGlobal('fetch', vi.fn(async (url, init) => String(url).endsWith('saveScanInfo') ? reply([{ barScannerId: JSON.parse(String(init?.body))[0].barScannerId }]) : upstream(url)));
     expect(JSON.parse((await call(input())).body).code).toBe('ZTO_PALM_SIGN_REJECTED');
 });
-it.each([{ photo: '' }, { barcode: '../bad' }, { requestId: '' }, { stage: 'sign' }])('ទិន្នន័យខុស %j ➜ មិនសរសេរ', async (patch) => {
+it.each([{ photo: 'not-a-jpeg' }, { photo: 7 }, { stage: 'receipt', photo: '' }, { stage: 'receipt', photo: undefined }, { barcode: '../bad' }, { requestId: '' }, { stage: 'sign' }])('ទិន្នន័យខុស %j ➜ មិនសរសេរ', async (patch) => {
     expect((await call({ ...input(), ...patch })).statusCode).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+});
+it.each([{ photo: undefined }, { photo: '' }])('ចែកចាយគ្មានរូប %j ➜ ទទួល (APK មិនភ្ជាប់រូបចែកចាយ · client មិនផ្ញើរូបធំ)', async (patch) => {
+    const out = await call({ ...input(), ...patch });
+    expect(JSON.parse(out.body)).toMatchObject({ success: true, stage: 'dispatch', ztoClosed: false });
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(['/zto/basic/v2/newBusinessCheck', '/zto/basic/v1/saveScanInfo']);
+});
+it('Container មួយ Sign ច្រើនជាង ២៥៦ ក្នុង ១០ នាទី (ហាងច្រើន) ➜ មិនបដិសេធ 429 · ចម្លើយចាស់ដែលចប់ត្រូវជម្រះ', async () => {
+    for (let i = 0; i < 300; i++) {
+        const out = await call({ ...input(), requestId: randomUUID() });
+        expect(out.statusCode).toBe(200);
+    }
+    const body = input();
+    const first = await call(body);
+    vi.mocked(fetch).mockClear();
+    expect((await call(body)).body).toBe(first.body);
     expect(fetch).not.toHaveBeenCalled();
 });
 it('គ្មាន session ➜ មិនសរសេរ', async () => {

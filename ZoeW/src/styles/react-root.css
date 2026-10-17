@@ -841,6 +841,6 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #ztoPalmSignModal .palm-sign-video { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #111; border-radius: 8px; }
 #ztoPalmSignModal .palm-sign-thumbnail { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; }
 
-#ztoPalmSignModal .palm-sign-warning { color: var(--text-primary); font-weight: 600; }
+#ztoPalmSignModal .palm-sign-warning { color: var(--text-main); font-weight: 600; }
 #ztoPalmSignModal .palm-sign-confirmation { border: 2px solid var(--action-primary); border-radius: var(--radius-md); padding: 12px; margin: 12px 0; overflow-wrap: anywhere; }
 #ztoPalmSignModal .palm-sign-confirmation p { white-space: pre-wrap; }

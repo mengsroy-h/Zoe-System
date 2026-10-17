@@ -122,6 +122,18 @@ function palmLookupUrl(base) {
     return base.href.replace('%7Bbarcode%7D', '{barcode}');
 }
 
+function palmEditSession(inModal: boolean) {
+    const generation = ++editGeneration;
+    const shop = shopScope();
+    const auth = firebaseState.authGeneration;
+    const key = securityState.lookupSecretKey;
+    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
+    const current = () => generation === editGeneration && shopScope() === shop && firebaseState.authGeneration === auth
+        && securityState.lookupSecretKey === key && (!inModal || modalIsOpen('lookupApiConfigModal'))
+        && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored;
+    return { generation, shop, key, current };
+}
+
 async function palmProxyKey(cfg) {
     const typedKey = fieldValue('lookupApiHeaderValueInput').trim();
     if (typedKey) return typedKey;
@@ -132,15 +144,8 @@ async function palmProxyKey(cfg) {
 export async function submitZtoPalmLogin(event?: Event) {
     event?.preventDefault();
     if (viewState.palmLoginBusy) return;
-    const generation = ++editGeneration;
-    const shop = shopScope();
-    const auth = firebaseState.authGeneration;
-    const key = securityState.lookupSecretKey;
+    const { generation, shop, key, current } = palmEditSession(true);
     const cfg = getLookupApiConfig() || {};
-    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
-    const current = () => generation === editGeneration && shopScope() === shop && firebaseState.authGeneration === auth
-        && securityState.lookupSecretKey === key && modalIsOpen('lookupApiConfigModal')
-        && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored;
     const dropped = () => {
         if (generation === editGeneration && modalIsOpen('lookupApiConfigModal')) {
             viewState.palmLoginStatus = 'ការកំណត់បានប្តូរខណៈកំពុងចូល — សូម Login ZTO Palm ម្តងទៀត។';
@@ -216,15 +221,8 @@ function disconnectZtoPalmLocally(cfg) {
 
 export async function connectSharedZtoPalm() {
     if (viewState.palmLoginBusy) return;
-    const generation = ++editGeneration;
-    const shop = shopScope();
-    const auth = firebaseState.authGeneration;
-    const key = securityState.lookupSecretKey;
+    const { generation, shop, key, current } = palmEditSession(true);
     const cfg = getLookupApiConfig() || {};
-    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
-    const current = () => generation === editGeneration && shopScope() === shop && firebaseState.authGeneration === auth
-        && securityState.lookupSecretKey === key && modalIsOpen('lookupApiConfigModal')
-        && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored;
     if (!key) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
     if (!shop) { viewState.palmLoginStatus = 'សូមចូលគណនី ZoeW ជាមុនសិន។'; return; }
     viewState.palmLoginBusy = true;
@@ -277,18 +275,12 @@ export function disconnectZtoPalm() {
         disconnectZtoPalmLocally(cfg);
         return;
     }
-    if (!window.confirm('ផ្តាច់ Login ZTO Palm របស់ហាងពី Server? ទូរស័ព្ទគ្រប់គ្រឿងក្នុងហាងនឹងឈប់ប្រើ Palm រហូតដល់ Login ម្តងទៀត។')) return;
+    if (!window.confirm('ផ្តាច់ Login ZTO Palm របស់សាខានេះពី Server? ទូរស័ព្ទគ្រប់គ្រឿងនៃសាខានេះប្រើ Palm បានវិញក្រោយ Login ZTO Palm ម្តងទៀត។')) return;
     return disconnectSharedZtoPalm(cfg);
 }
 
 async function disconnectSharedZtoPalm(cfg) {
-    const generation = ++editGeneration;
-    const shop = shopScope();
-    const auth = firebaseState.authGeneration;
-    const key = securityState.lookupSecretKey;
-    const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
-    const current = () => generation === editGeneration && shopScope() === shop && firebaseState.authGeneration === auth
-        && securityState.lookupSecretKey === key && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored;
+    const { generation, current } = palmEditSession(false);
     viewState.palmLoginBusy = true;
     viewState.palmLoginStatus = 'កំពុងផ្តាច់ Login Palm ពី Server…';
     try {

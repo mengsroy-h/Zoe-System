@@ -2528,7 +2528,7 @@ async function handleRequest(event) {
         return { statusCode: 204, headers: { Allow: 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
     const palmQuery = requestQuery(event);
-    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && require('./_shared/zto-palm').isPalmPost(palmQuery))) {
+    if (event.httpMethod !== 'GET' && !(event.httpMethod === 'POST' && palmQuery.palm && require('./_shared/zto-palm').isPalmPost(palmQuery))) {
         return json(405, { error: 'Method not allowed' });
     }
 
@@ -2551,7 +2551,7 @@ async function handleRequest(event) {
         return configErrorResponse(error);
     }
 
-    if (require('./_shared/zto-palm').isPalmQuery(palmQuery)) {
+    if (palmQuery.palm && require('./_shared/zto-palm').isPalmQuery(palmQuery)) {
         return require('./_shared/zto-palm').handlePalm(event, palmQuery, suppliedKey, palmDeps(event, config, startedAt, keyLabel));
     }
 

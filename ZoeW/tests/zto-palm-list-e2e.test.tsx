@@ -50,6 +50,8 @@ let tracksWhenListDone: Map<string, number> = new Map();
 let inFlight = 0;
 let peakTracks = 0;
 let functionCalls = 0;
+let functionInFlight = 0;
+let peakFunctions = 0;
 const zto: string[] = [];
 
 const at = (day: string, time = '09:00:00') => '2026-10-' + day + ' ' + time;
@@ -171,6 +173,8 @@ beforeEach(async () => {
     inFlight = 0;
     peakTracks = 0;
     functionCalls = 0;
+    functionInFlight = 0;
+    peakFunctions = 0;
     zto.length = 0;
     vi.stubGlobal('fetch', vi.fn(async (u: any, init: any) => {
         const href = String(u);
@@ -182,7 +186,14 @@ beforeEach(async () => {
             const h: any = {};
             Object.entries((init && init.headers) || {}).forEach(([k, v]) => { h[k.toLowerCase()] = String(v); });
             if (q.list === '1') functionCalls++;
-            const r = await fn.handler({ httpMethod: 'GET', headers: h, queryStringParameters: q });
+            const tracking = q.list === '1' && !!q.tracks;
+            if (tracking) peakFunctions = Math.max(peakFunctions, ++functionInFlight);
+            let r;
+            try {
+                r = await fn.handler({ httpMethod: 'GET', headers: h, queryStringParameters: q });
+            } finally {
+                if (tracking) functionInFlight--;
+            }
             return new Response(r.body, { status: r.statusCode });
         }
         throw new Error('unexpected fetch ' + href);
@@ -317,9 +328,22 @@ describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie',
         expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
         expect(tracksWhenListDone.get('list:4:2'), 'ផ្ទៀង track ពេលទំព័រទី ២ កំពុងមក (មិនរង់ចាំបញ្ជីគ្រប់ទំព័រ)').toBeGreaterThanOrEqual(60);
         expect(peakTracks, 'track ស្របគ្នា ≥ 16').toBeGreaterThanOrEqual(16);
-        expect(peakTracks, 'មានព្រំដែន ៖ ≤ 4 សំណើ × 8').toBeLessThanOrEqual(32);
+        expect(peakTracks, 'មានព្រំដែន ៖ ≤ 8 សំណើ × 8').toBeLessThanOrEqual(64);
         expect(viewState.ztoListSyncNote).toContain('⏱ Palm ៖ ផ្ទៀង ' + total + ' កញ្ចប់');
         expect(viewState.ztoListSyncNote).toMatch(/— បញ្ជី \d+\.\d វិ · track \d+\.\d វិ \(សំណើ track /);
         expect(viewState.ztoListSyncNote).toContain('(សំណើ track ' + tracks.length + ' · ZTO ឆ្លើយមធ្យម ');
+    });
+
+    it('⏱ ស្របគ្នា 64 (ម្ចាស់គម្រោងជ្រើសក្រោយវាស់ 17.5 វិ) ៖ សំណើ track ទៅ Function ៨ ក្នុងពេលតែមួយ × ៨ ក្នុង Function · មិនលើស', async () => {
+        parcels = dataset(400);
+        const total = Object.keys(parcels).length;
+        await runZtoListSyncPreview();
+        expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
+        expect(ztoState.ztoListSyncResult.unverified).toEqual([]);
+        const tracks = zto.filter((k) => k.startsWith('track:'));
+        expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
+        expect(peakFunctions, 'សំណើ track ទៅ Function ស្របគ្នា').toBe(8);
+        expect(peakTracks, 'track ទៅ ZTO ស្របគ្នាលើស ៣២').toBeGreaterThan(32);
+        expect(peakTracks, 'មានព្រំដែន ៖ ≤ 8 សំណើ × 8').toBeLessThanOrEqual(64);
     });
 });

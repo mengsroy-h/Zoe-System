@@ -773,6 +773,27 @@ async function behavior() {
         ok('init ៖ setInterval(expireIdleSbAdmin) · visibilitychange ➜ expireIdleSbAdmin() · pointerdown/keydown ➜ sbAdminActivity',
             /setInterval\(expireIdleSbAdmin, \d+\)/.test(src) && /expireIdleSbAdmin\(\);/.test(visBlock)
             && /addEventListener\('pointerdown', sbAdminActivity, /.test(src) && /addEventListener\('keydown', sbAdminActivity, /.test(src));
+        console.log('   · ហាង/គណនីច្រើនជាងពិដាន Max rows របស់ PostgREST (Supabase លំនាំដើម ១០០០ ➜ កាត់ស្ងាត់)');
+        const bulk = fake.maxRows + 7;
+        await c.query("insert into public.tenants (name, branch_code, expires_at) select 'Bulk ' || g, 'BK' || g, now() + interval '30 days' from generate_series(1, $1::int) g", [bulk]);
+        await c.query(`with u as (insert into auth.users (instance_id, id, aud, role, email, encrypted_password, created_at, updated_at)
+            select '00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated', 'bk' || g || '@bulk.zoe.test', 'x', now(), now()
+            from generate_series(1, $1::int) g returning id, email)
+            insert into public.tenant_members (user_id, tenant_id, username, role)
+            select u.id, t.id, split_part(u.email, '@', 1), 'owner' from u join public.tenants t on t.branch_code = upper(split_part(u.email, '@', 1))`, [bulk]);
+        const dbTenants = (await c.query('select count(*)::int as n from public.tenants')).rows[0].n;
+        const dbMembers = (await c.query('select count(*)::int as n from public.tenant_members')).rows[0].n;
+        K.relogin();
+        fill(fake.url, PUB, 'boss@admin.zoe.test', 'boss-pass-123');
+        await C.sbAdminLogin();
+        await drain();
+        await C.sbAdminRefresh();
+        await drain();
+        const lastBulk = 'bk' + bulk;
+        ok('⛔ ហាង ' + dbTenants + ' · គណនី ' + dbMembers + ' (> ' + fake.maxRows + ') ➜ ផ្ទាំងទាញគ្រប់ជួរ (មិនកាត់ស្ងាត់ត្រឹម Max rows) · គណនីថ្មីបំផុតបង្ហាញ',
+            dbTenants > fake.maxRows && dbMembers > fake.maxRows && C.sbTenantCache.length === dbTenants && C.sbMemberCache.length === dbMembers
+            && C.sbTenantReadFailed === false && el('sbTenantListBody').innerHTML.indexOf('>' + lastBulk + '<') !== -1,
+            { tenants: C.sbTenantCache.length, dbTenants, members: C.sbMemberCache.length, dbMembers });
         ok('⛔ គ្មាន console.error ពីផ្លូវខាងលើ', K.log.errors.length === 0, K.log.errors);
     } catch (e) {
         ok('ការវាស់មិនគាំង', false, String(e && e.stack || e));

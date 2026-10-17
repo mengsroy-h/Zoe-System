@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.19';
+const APP_VERSION = '2.24.20';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3226,6 +3226,8 @@ async function deleteNotice(id) {
 
 const SB_ADMIN_CONFIG_KEY = 'zoekeygen_supabase_v1';
 const SB_ADMIN_TIMEOUT_MS = 15000;
+const SB_ADMIN_PAGE_ROWS = 500;
+const SB_ADMIN_LIST_MAX_PAGES = 200;
 const SB_INVITE_VALID_HOURS = 168;
 const SB_RESET_VALID_HOURS = 24;
 const SB_TENANT_DAYS_MAX = 3650;
@@ -3307,6 +3309,18 @@ async function sbAdminRequest(session, path, method, body) {
     let parsed = null;
     try { parsed = out.body ? JSON.parse(out.body) : null; } catch (e) { parsed = null; }
     return { ok: !!out.res.ok, status: out.res.status, body: parsed };
+}
+
+async function sbAdminList(session, path) {
+    const rows = [];
+    for (let page = 0; page < SB_ADMIN_LIST_MAX_PAGES; page++) {
+        const out = await sbAdminRequest(session, path + '&limit=' + SB_ADMIN_PAGE_ROWS + '&offset=' + rows.length, 'GET');
+        if (!out.ok || !Array.isArray(out.body)) return out;
+        if (!out.body.length) return { ok: true, status: out.status, body: rows };
+        for (const row of out.body) rows.push(row);
+        if (!sbAdminIsCurrent(session)) return { ok: false, status: 0, body: null };
+    }
+    return { ok: false, status: 0, body: null };
 }
 
 function sbAdminIsCurrent(session) {
@@ -3467,9 +3481,9 @@ async function sbAdminRefresh() {
     let devices = null;
     try {
         [tenants, members, devices] = await Promise.all([
-            sbAdminRequest(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc', 'GET'),
-            sbAdminRequest(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc', 'GET'),
-            sbAdminRequest(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc', 'GET').catch(() => null)
+            sbAdminList(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc,id.asc'),
+            sbAdminList(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc,user_id.asc'),
+            sbAdminList(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc,tenant_id.asc,serial.asc').catch(() => null)
         ]);
     } catch (e) {
         tenants = null;

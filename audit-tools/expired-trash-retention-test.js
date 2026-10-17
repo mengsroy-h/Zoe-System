@@ -106,11 +106,11 @@ function build(items, ledgerDays) {
 
 (async () => {
     const seed = [
-        { id: 'expired_boundary', trashReason: 'expired', deletedAt: NOW - 2 * DAY, barcodes: [{ code: 'EB' }] },
-        { id: 'expired_old', trashReason: 'expired', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO' }] },
-        { id: 'expired_otherkey', trashReason: 'expired', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK' }] },
-        { id: 'expired_active', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA' }] },
-        { id: 'expired_stale', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES' }] },
+        { id: 'expired_boundary', trashReason: 'returned', deletedAt: NOW - 2 * DAY, barcodes: [{ code: 'EB' }] },
+        { id: 'expired_old', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 1, barcodes: [{ code: 'EO' }] },
+        { id: 'expired_otherkey', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK' }] },
+        { id: 'expired_active', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA' }] },
+        { id: 'expired_stale', trashReason: 'returned', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES' }] },
         { id: 'remove_young', trashReason: 'remove', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'RY' }] },
         { id: 'delete_young', trashReason: 'delete', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'DY' }] },
         { id: 'pickup_young', trashReason: 'pickup', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'PY' }] },
@@ -126,7 +126,7 @@ function build(items, ledgerDays) {
         pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 }
     } } };
     const world = build(seed, ledgerDays);
-    check(vm.runInContext('__retention({ trashReason: "expired" })', world.context) === 2 * DAY,
+    check(vm.runInContext('__retention({ trashReason: "returned" })', world.context) === 2 * DAY,
         'expired ប្រើ retention ២ ថ្ងៃ');
     check(vm.runInContext('__retention({ trashReason: "remove" })', world.context) === 30 * DAY,
         'remove ប្រើ retention ៣០ ថ្ងៃ');

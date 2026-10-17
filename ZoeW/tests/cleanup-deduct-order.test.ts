@@ -317,7 +317,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         const restored: any = clone(item);
         restored.barcodes[0].restoredAt = getServerNow();
         seed([restored]);
-        const trashItem = { ...clone(item), deletedAt, isFromDeletion: false, trashReason: 'expired', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), deletedAt, isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: deletedAt, stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
         expect(await resumeCleanupJournalEntry(ID)).toBe('');
@@ -329,7 +329,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     it('8. reverse ៖ stage moved ➜ trash absent and the barcode is not in history (the trash write never landed) ➜ trash rewritten · deducted once · flipped', async () => {
         const item = expiredItem();
         seed([]);
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'expired', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
@@ -343,7 +343,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         const item = expiredItem();
         seed([]);
         dataState.scanHistory = [clone(item)];
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'expired', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
+        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
         await flush();
@@ -360,7 +360,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         lab.store[DAILY][DAY].totalCount = 11;
         lab.store[MONTHLY][MONTH].codDollar = 110;
         lab.store[MONTHLY][MONTH].totalCount = 11;
-        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'expired', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: true })) };
+        const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: true })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
         syncLocalViewsFromServer();
         await resumeCleanupJournalEntry(ID);
@@ -426,7 +426,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
         const trash = getAt(TRASH + '/' + ID);
         expect(Array.isArray(trash.barcodes)).toBe(true);
         expect(trash.barcodes.map((b: any) => [b.code, b.cod, b.isDeducted, b.locker])).toEqual([['L', 7, true, 'A1']]);
-        expect(trash.trashReason).toBe('expired');
+        expect(trash.trashReason).toBe('returned');
         expect(ledger().codDollar).toBe(93);
         expect(ledger().totalCount).toBe(9);
         expect(month().codDollar).toBe(93);

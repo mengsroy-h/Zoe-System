@@ -258,7 +258,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
 
     // ⛔ ទិសផ្ទុយ ៖ ធុងសំរាមប្រភេទផ្សេង **មិនរាប់** — «ដក» និង «ផុតកំណត់»
     // ដកលុយចេញ ហើយកញ្ចប់ត្រឡប់ទៅសាខាកណ្តាល ➜ ស្ថានភាព ZTO លែងពាក់ព័ន្ធ។
-    for (const reason of ['remove', 'expired', 'delete']) {
+    for (const reason of ['remove', 'returned', 'delete']) {
         const other = await page.evaluate((args) => {
             clearZtoPickupStatusStore();
             setZtoPickupVerdict('BAR000009', false);

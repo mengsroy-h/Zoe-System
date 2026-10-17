@@ -25,7 +25,7 @@ export const cleanupInFlight = new Set();
 export const staleRestoreMarkerSweeps = new Set();
 
 export function trashRetentionMs(item) {
-    return item && item.trashReason === 'expired' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    return item && item.trashReason === 'returned' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
 }
 
 export function clearStaleRestoreMarkers(item) {
@@ -409,7 +409,7 @@ export function runCleanupLedgerKeySweep() {
     let started = 0;
     for (const item of dataState.deletedItems) {
         if (started >= CLEANUP_KEY_SWEEP_BATCH) return;
-        if (!item || typeof item.id !== 'string' || item.trashReason !== 'expired') continue;
+        if (!item || typeof item.id !== 'string' || item.trashReason !== 'returned') continue;
         const at = cleanupEventAt(item);
         if (!at || now - at < CLEANUP_KEY_SWEEP_GRACE_MS) continue;
         if (journaled.indexOf(item.id) !== -1 || cleanupJournalLive.has(item.id) || cleanupKeySweepInFlight.has(item.id)) continue;
@@ -429,7 +429,7 @@ export function runCleanupLedgerKeySweep() {
 }
 
 export function cleanupLedgerKeyOf(item) {
-    if (!item || item.trashReason !== 'expired' || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
+    if (!item || item.trashReason !== 'returned' || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id)) return null;
     const at = cleanupEventAt(item);
     const scanDate = cleanupScanDateOf(item);
     if (!at || typeof scanDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scanDate)) return null;
@@ -913,7 +913,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 trashItem.isClosed = false;
                 delete trashItem.closedAt;
                 trashItem.isFromDeletion = false;
-                trashItem.trashReason = 'expired';
+                trashItem.trashReason = 'returned';
                 revenueScanDate = cleanupScanDateOf(trashItem);
                 revenueCod = trashItem.cod;
                 revenueDod = trashItem.dod;
@@ -926,7 +926,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
             if (reason === 'abandon') {
                 trashItem.isFromDeletion = false;
-                trashItem.trashReason = 'expired';
+                trashItem.trashReason = 'returned';
                 if (Array.isArray(trashItem.barcodes) && trashItem.barcodes.length) {
                     trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
                         cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,

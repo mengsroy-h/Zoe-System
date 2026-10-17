@@ -50,8 +50,8 @@ beforeEach(() => {
             { id: 'SOON', phone: '0961000002', createdAt: now - ABANDON_AGE_MS + 5 * 60 * 60 * 1000, barcodes: [{ code: 'KH0000000002', isClosed: false }] }
         ];
         dataState.deletedItems = [
-            { id: 'BACK', phone: '0972000004', deletedAt: now - 30 * 1000, barcodes: [{ code: 'KH0000000004', locker: 'B-3' }], trashReason: 'expired', isFromDeletion: false },
-            { id: 'GONE', phone: '0972000003', deletedAt: now - 60 * 1000, barcodes: [{ code: 'KH0000000003', locker: 'B-2' }], trashReason: 'expired', isFromDeletion: false }
+            { id: 'BACK', phone: '0972000004', deletedAt: now - 30 * 1000, barcodes: [{ code: 'KH0000000004', locker: 'B-3' }], trashReason: 'returned', isFromDeletion: false },
+            { id: 'GONE', phone: '0972000003', deletedAt: now - 60 * 1000, barcodes: [{ code: 'KH0000000003', locker: 'B-2' }], trashReason: 'returned', isFromDeletion: false }
         ];
         firebaseState.isDatabaseInitialized = true;
     });

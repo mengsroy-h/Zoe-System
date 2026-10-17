@@ -3468,6 +3468,9 @@
     },
     "supabase/migrations/20261016120000_zoe_linear_write.sql": {
       "policy": "supabase-db"
+    },
+    "supabase/migrations/20261017053127_zoe_rules.sql": {
+      "policy": "supabase-db"
     }
   }
 }

@@ -685,6 +685,7 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .zto-list-origin { font-size: calc(10 * var(--fs-unit)); color: #075985; overflow-wrap: anywhere; }
 .zto-list-note { font-size: calc(9.5 * var(--fs-unit)); color: #92400e; overflow-wrap: anywhere; }
 .zto-list-returned { border-color: #fecaca; background: #fef2f2; }
+.trash-tag-returned { background: #ffedd5; color: #c2410c; }
 .zto-list-returned .zto-list-group-head { color: #b91c1c; }
 
 @media (max-width: 991px) {

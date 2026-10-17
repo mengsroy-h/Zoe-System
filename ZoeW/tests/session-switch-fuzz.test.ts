@@ -228,7 +228,7 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage moved)',
         prepare: () => {
-            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'expired' };
+            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
             noteCleanupJournalEntry({ id: ID2, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'moved', trashItem, revenue: { scanDate: lab.day, cod: 5, dod: 0, count: 1 } });
@@ -252,7 +252,7 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage ledger keyed)',
         prepare: () => {
-            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'expired' };
+            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
             lab.store[TRASH][ID2] = clone(trashItem);
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
@@ -267,7 +267,7 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'resume journal (stage flip)',
         prepare: () => {
-            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'expired' };
+            const trashItem = { ...clone(lab.store[HISTORY][ID2]), deletedAt: getServerNow() - 60000, isFromDeletion: false, trashReason: 'returned' };
             delete lab.store[HISTORY][ID2];
             dataState.scanHistory = dataState.scanHistory.filter((i: any) => i.id !== ID2);
             noteCleanupJournalEntry({ id: ID2, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'flip', ledger: 'keyed', prior: { d: [], m: [] }, trashItem,

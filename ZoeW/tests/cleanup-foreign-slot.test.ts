@@ -115,14 +115,14 @@ function recreatedItem(reason: 'abandon' | 'close') {
     if (closed) item.closedAt = closedAt;
     return item;
 }
-function oldLifecycleCopy(trashReason: 'delete' | 'expired' | 'pickup') {
+function oldLifecycleCopy(trashReason: 'delete' | 'returned' | 'pickup') {
     const at = getServerNow() - 3 * 3600000;
-    const a = barcodeOf('A', 10, { createdAt: at - 3600000, deducted: trashReason === 'expired', closedAt: trashReason === 'pickup' ? at - 60000 : undefined });
-    a.isFromDeletion = trashReason !== 'expired';
+    const a = barcodeOf('A', 10, { createdAt: at - 3600000, deducted: trashReason === 'returned', closedAt: trashReason === 'pickup' ? at - 60000 : undefined });
+    a.isFromDeletion = trashReason !== 'returned';
     return { id: ID, phone: '012', scanDate: DAY, time: a.time, createdAt: at - 3600000, count: 1, cod: 10, dod: 0, price: 10, barcode: 'A', barcodes: [a],
-        isClosed: trashReason === 'pickup', deletedAt: at, isFromDeletion: trashReason !== 'expired', trashReason };
+        isClosed: trashReason === 'pickup', deletedAt: at, isFromDeletion: trashReason !== 'returned', trashReason };
 }
-function install(reason: 'abandon' | 'close', occupant: 'delete' | 'expired' | 'pickup') {
+function install(reason: 'abandon' | 'close', occupant: 'delete' | 'returned' | 'pickup') {
     const item = recreatedItem(reason);
     const old = oldLifecycleCopy(occupant);
     lab.store = {
@@ -187,7 +187,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         const copies = trashCopiesOf('C');
         expect(copies.length).toBe(1);
         expect(copies[0].id).not.toBe(ID);
-        expect(copies[0].trashReason).toBe('expired');
+        expect(copies[0].trashReason).toBe('returned');
         expect(copies[0].barcodes[0].isDeducted).toBe(true);
         expect(getAt(TRASH + '/' + ID)).toEqual(prune(clone(old)));
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
@@ -202,7 +202,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
     }, 20000);
 
     it('2. close (2 hours) · trash/<id> = the old expired copy ➜ C lands in trash «pickup» · money untouched · the old copy untouched', async () => {
-        const { old } = install('close', 'expired');
+        const { old } = install('close', 'returned');
         await claimAndCleanupItem(ID, 'close');
         await flush();
         expect(historyCodes()).not.toContain('C');
@@ -247,7 +247,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         const { item, old } = install('abandon', 'delete');
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
-        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'expired',
+        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem, revenue: { scanDate: DAY, cod: 7, dod: 0, count: 1 } });
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
@@ -268,7 +268,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
         const fresh = { ...clone(item), barcodes: [barcodeOf('D', 3, { createdAt: getServerNow() })], barcode: 'D', cod: 3, price: 3, createdAt: getServerNow() };
         setAt(HISTORY + '/' + ID, fresh);
         dataState.scanHistory = [clone(fresh)];
-        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'expired',
+        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem, revenue: { scanDate: DAY, cod: 7, dod: 0, count: 1 } });
         expect(await resumeCleanupJournalEntry(ID)).toBe('restored');
@@ -282,7 +282,7 @@ describe('cleanup of an item recreated under an id whose trash slot holds anothe
 
     it('6. reverse ៖ the slot holds a copy of the same barcodes (an identical claim from another device) ➜ still «elsewhere» · nothing moved · no deduction', async () => {
         const { item } = install('abandon', 'delete');
-        const twin = { ...clone(item), deletedAt: getServerNow() - 1000, isFromDeletion: false, trashReason: 'expired',
+        const twin = { ...clone(item), deletedAt: getServerNow() - 1000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: true })) };
         setAt(TRASH + '/' + ID, twin);
         dataState.deletedItems = [clone(twin)];
@@ -349,7 +349,7 @@ describe('whole claim whose trash write fails while history/<id> was recreated m
 
 describe('Delete (លុប) of an item recreated under an id whose trash slot holds another lifecycle', () => {
     it('7. trash/<id> = the old expired copy (deducted) ➜ the delete copy lands beside it · the old copy untouched · money untouched', async () => {
-        const { old } = install('abandon', 'expired');
+        const { old } = install('abandon', 'returned');
         dataState.scanHistory[0].createdAt = getServerNow();
         await deleteSingleItem(ID);
         await flush();

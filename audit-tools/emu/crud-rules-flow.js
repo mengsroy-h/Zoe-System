@@ -677,9 +677,9 @@ async function clearOrphanBeforeRetry(w, label) {
             !!monthlyRec && Math.abs(monthlyRec.codDollar - 111.71) < 1e-9 && monthlyRec.totalCount === 28,
             'ផុតកំណត់ ➜ server ៖ ថ្ងៃ និងខែ ដក 8.29 · 2 កញ្ចប់ ពិតប្រាកដ', JSON.stringify({ dailyRec, monthlyRec }));
         check(!!ded && ded.at === trash.deletedAt && Math.abs(ded.cod - 8.29) < 1e-9 && ded.dod === 0 && ded.count === 2,
-            'ផុតកំណត់ ➜ server ៖ `ded/id_e` = { at: deletedAt · cod 8.29 · dod 0 · count 2 }', JSON.stringify(ded));
-        check(!!trash && trash.trashReason === 'expired' && trash.barcodes.length === 2 && trash.barcodes.every((b) => b.isDeducted === true),
-            'ផុតកំណត់ ➜ server ៖ ធុងសំរាម `expired` flip `isDeducted:true` តែក្រោយការដក', JSON.stringify(trash && trash.barcodes));
+            'ត្រឡប់ ➜ server ៖ `ded/id_e` = { at: deletedAt · cod 8.29 · dod 0 · count 2 }', JSON.stringify(ded));
+        check(!!trash && trash.trashReason === 'returned' && trash.barcodes.length === 2 && trash.barcodes.every((b) => b.isDeducted === true),
+            'ត្រឡប់ ➜ server ៖ ធុងសំរាម `returned` flip `isDeducted:true` តែក្រោយការដក', JSON.stringify(trash && trash.barcodes));
 
         const noDed = clone(realRules);
         delete noDed.rules.zoew_daily_revenue_cod_dod.$date.ded;

@@ -1,11 +1,13 @@
 /**
  * ↩️ ម្ចាស់គម្រោង ៖ «អីវ៉ាន់ដែល ត្រលប់ អោយដកចេញពី ZoeW អោយដូច ផុតកំណត់ដែរទៅ … មិនបាច់មានច្បាប់ដក ថ្ងៃទី8 ក៏បាន … ដកលុយដូចគ្នា» ·
  * «ដកវាចេញភ្លាមទៅធុងសំរាម ស្លាក "ត្រឡប់" … ដកលុយដកចំនួនកញ្ចប់ … ដូចកញ្ចប់ផុតកំណត់បេះបិទ» · «ដកមុខងារ ផុតកំណត់ចេញ ព្រោះវាជា ត្រឡប់»។
- * ថ្នាក់តែមួយ ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ សរសេរធុងសំរាមដដែល (`trashReason: 'expired'` ក្នុងទិន្នន័យ · ស្លាកអ្នកប្រើ **«ត្រឡប់»**) ➜
- * `claimAndCleanupItem(id, 'abandon', { codes })` ៖ ដកលុយ និងចំនួនកញ្ចប់ (journal · ledger keyed · flip · ២ ថ្ងៃ · ស្តារ) · គ្មាន rules ថ្មី ·
+ * «ដាក់ returned ទៅ ខ្ញុំចូលចិត្ត ពិតពិត» · «កែអោយស្អាតទៅ គ្មានទិន្នន័យអតិថិជនណាមួយឡើយ» ➜ ថ្នាក់តែមួយ ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់
+ * សរសេរ **`trashReason: 'returned'`** (ស្លាក «ត្រឡប់») · គ្មាន `expired` · ដកលុយ និងចំនួនកញ្ចប់ (journal · ledger keyed · flip · ២ ថ្ងៃ · ស្តារ) ·
  * តែដកតែ barcode បើកដែលបានប្រាប់ ដោយមិនរង់ចាំអាយុ · barcode បិទ ឬមិនបានប្រាប់ មិនប៉ះ ·
  * `removeReturnedZtoBarcodes()` ៖ ស្កេន «ត្រឡប់» ក្រោយ barcode ចូល ZoeW (`createdAt` · `restoredAt`) · កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» · នាឡិកា server + ហាងដឹង។
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { refTo } from '../src/app/refs';
@@ -208,7 +210,7 @@ describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតក
         expect(historyCodes()).toEqual(['B', 'C']);
         const trash = trashItems();
         expect(trash).toHaveLength(1);
-        expect(trash[0].trashReason, 'ថ្នាក់ដដែលនឹងច្បាប់ ៨ ថ្ងៃ (គ្មាន rules ថ្មី)').toBe('expired');
+        expect(trash[0].trashReason).toBe('returned');
         const meta: any = (TRASH_REASON_META as any)[trashReasonOf(trash[0])];
         expect(meta).toMatchObject({ label: 'ត្រឡប់', deducted: true });
         expect(Object.values(TRASH_REASON_META).map((m: any) => m.label), 'ម្ចាស់គម្រោង ៖ «ដកមុខងារ ផុតកំណត់ចេញ»').not.toContain('ផុតកំណត់');
@@ -227,7 +229,7 @@ describe('↩️ ដកកញ្ចប់ត្រឡប់ដូចផុតក
         await claimAndCleanupItem(ID, 'abandon', { codes: ['A', 'B'] });
         await flush();
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
-        expect(getAt(TRASH + '/' + ID).trashReason).toBe('expired');
+        expect(getAt(TRASH + '/' + ID).trashReason).toBe('returned');
         expect(ledger().codDollar).toBe(85);
         expect(ledger().totalCount).toBe(8);
     });
@@ -346,7 +348,7 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         await runZtoListSyncPreview();
         await flush();
         expect(historyCodes()).toEqual(['ZTKEEP000001']);
-        expect(trashItems().map((t: any) => [t.trashReason, t.barcodes.map((b: any) => b.code)])).toEqual([['expired', ['ZTRET0000001']]]);
+        expect(trashItems().map((t: any) => [t.trashReason, t.barcodes.map((b: any) => b.code)])).toEqual([['returned', ['ZTRET0000001']]]);
         expect(ledger().codDollar).toBe(90);
     });
 
@@ -389,11 +391,11 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
     const DEL_AT = () => getServerNow() - CLEANUP_KEY_SWEEP_GRACE_MS - 60000;
     function returnedTrash(id: string) {
         return { id, phone: '012', scanDate: DAY, time: '08:00:00 (' + DAY + ')', createdAt: NOW_AGE(), count: 1, cod: 10, dod: 0, price: 10,
-            isClosed: false, isFromDeletion: false, trashReason: 'expired', deletedAt: DEL_AT(), barcode: 'R1',
+            isClosed: false, isFromDeletion: false, trashReason: 'returned', deletedAt: DEL_AT(), barcode: 'R1',
             barcodes: [{ ...barcode('R1', 10, NOW_AGE()), isDeducted: false }] };
     }
 
-    it('ច្បាប់ ៨ ថ្ងៃ (គ្មាន `codes`) ៖ ធុងសំរាមដដែល ➜ ស្លាក «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក', async () => {
+    it('ច្បាប់ ៨ ថ្ងៃ (គ្មាន `codes`) ៖ `returned` ដដែល ➜ ស្លាក «ត្រឡប់» · លុយ និងចំនួនកញ្ចប់ដក', async () => {
         const old: any = youngItem([['A', 10]]);
         const at = getServerNow() - 8 * DAY_MS;
         old.createdAt = at;
@@ -402,10 +404,19 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
         const trash = getAt(TRASH + '/' + ID);
-        expect(trash.trashReason).toBe('expired');
+        expect(trash.trashReason).toBe('returned');
         expect((TRASH_REASON_META as any)[trashReasonOf(trash)].label).toBe('ត្រឡប់');
         expect(ledger().codDollar).toBe(90);
         expect(ledger().totalCount).toBe(9);
+    });
+
+    it('តម្លៃតែមួយ `returned` ៖ ស្លាក «ត្រឡប់» · ២ ថ្ងៃ · គ្មាន `expired` ក្នុង App និង rules (ម្ចាស់គម្រោង ៖ «កែអោយស្អាត»)', () => {
+        expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'pickup', 'remove', 'returned']);
+        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(EXPIRED_TRASH_RETENTION_MS);
+        const rules = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'firebase-database.rules.json'), 'utf8'));
+        const check = rules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason['.validate'];
+        expect(check).toContain("'returned'");
+        expect(check).not.toContain("'expired'");
     });
 
     it('sweep កូនសោ ledger ៖ ធុងសំរាម «ត្រឡប់» ដែល flag មិនទាន់ flip ➜ flip', async () => {
@@ -437,6 +448,6 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
         ], now, false, []);
         expect(view.packages).toBe(1);
         expect(view.rows.map((r: any) => r.key)).toEqual(['id_r']);
-        expect(trashRetentionMs({ trashReason: 'expired' })).toBe(EXPIRED_TRASH_RETENTION_MS);
+        expect(trashRetentionMs({ trashReason: 'returned' })).toBe(EXPIRED_TRASH_RETENTION_MS);
     });
 });

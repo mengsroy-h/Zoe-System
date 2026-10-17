@@ -388,7 +388,7 @@ async function scenarioMixedParcel() {
     const expiredItem = trash.id_mix;
 
     check(!live, 'ដល់ថ្ងៃទី ៨៖ B ចេញពីប្រវត្តិ');
-    check(!!expiredItem && expiredItem.trashReason === 'expired', 'B មានស្លាក expired', expiredItem && expiredItem.trashReason);
+    check(!!expiredItem && expiredItem.trashReason === 'returned', 'B មានស្លាក returned («ត្រឡប់»)', expiredItem && expiredItem.trashReason);
     check(!!expiredItem && expiredItem.barcodes.every((b) => b.isDeducted === true), 'B ត្រូវ isDeducted');
     const total = revenueTotal(world.revenueLog);
     check(total.cod === 0 && total.dod === -25 && total.count === -1,
@@ -436,7 +436,7 @@ async function scenarioAllOpen() {
     const live = world.getPath('zoew_scan_history_cod_dod/id_open');
     const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
     check(!live, 'កញ្ចប់ដែលបើកទាំងស្រុងត្រូវផ្លាស់ចេញទាំងមូល');
-    check(!!trash.id_open && trash.id_open.trashReason === 'expired', 'ស្លាក expired សម្រាប់កញ្ចប់ទាំងមូល');
+    check(!!trash.id_open && trash.id_open.trashReason === 'returned', 'ស្លាក returned («ត្រឡប់») សម្រាប់កញ្ចប់ទាំងមូល');
     check(!!trash.id_open && trash.id_open.barcodes.length === 2 && trash.id_open.barcodes.every((b) => b.isDeducted === true),
         'barcode ទាំង ២ ត្រូវ isDeducted');
     const total = revenueTotal(world.revenueLog);
@@ -525,7 +525,7 @@ async function scenarioFreshPickupAtDeadline() {
     const expired = trash[ids[0]];
     check(!!expired && expired.barcodes.map((b) => b.code).join() === 'DL222',
         '⛔ ស្នូល៖ មានតែ barcode ដែលមិនទាន់យក (DL222) ធ្លាក់ជា expired', JSON.stringify(expired && expired.barcodes.map((b) => b.code)));
-    check(!!expired && expired.trashReason === 'expired' && expired.barcodes.every((b) => b.isDeducted === true), 'DL222 ត្រូវ isDeducted');
+    check(!!expired && expired.trashReason === 'returned' && expired.barcodes.every((b) => b.isDeducted === true), 'DL222 ត្រូវ isDeducted');
     check(!!live && live.barcodes.map((b) => b.code).join() === 'DL111',
         '⛔ ស្នូល៖ DL111 ដែលទើបយករួច នៅក្នុងប្រវត្តិ មិនត្រូវផុតកំណត់តាមវា', JSON.stringify(live && live.barcodes.map((b) => b.code)));
     check(!!live && live.barcodes.every((b) => b.isDeducted !== true), '⛔ ស្នូល៖ DL111 **មិនត្រូវ** isDeducted');

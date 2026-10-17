@@ -1116,7 +1116,6 @@
         .trash-riel { font-size: calc(9 * var(--fs-unit)); color: var(--text-muted); font-weight: 600; }
         .trash-tag { padding: 1px 6px; border-radius: 4px; font-size: calc(9 * var(--fs-unit)); font-weight: 700; white-space: nowrap; }
         .trash-tag-remove { background: #fee2e2; color: #b91c1c; }
-        .trash-tag-expired { background: #ffedd5; color: #c2410c; }
         .trash-tag-pickup { background: #dcfce7; color: #15803d; }
         .trash-tag-delete { background: #e2e8f0; color: #475569; }
         .trash-row-actions { display: inline-flex; gap: 4px; justify-content: center; }

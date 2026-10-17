@@ -7,7 +7,7 @@ import { isPinFlowPending } from './config';
 import { findCustomerDataTableRow, getNestedField, rememberCustomerTableRow } from './customer-table';
 import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason, scheduleCustomerTableSoonRefresh, ztoBarcodeShapeIsValid } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiSendsHeader, ztoIdentityRefusalIsTransient } from './lookup-api';
-import { noteZtoPalmSessionRejected } from './zto-palm-login';
+import { noteZtoPalmSessionRejected, palmSessionLostText } from './zto-palm-login';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { confirmPhone } from './scan-action';
@@ -451,7 +451,7 @@ export async function attemptAutoLookup(barcode) {
             setLookupStatus(barcode, 'error', '🔄 Session Palm ផុតកំណត់ — កំពុង Login ZTO Palm ឡើងវិញ ➜ សូមស្កេនម្ដងទៀតបន្តិចទៀត');
         } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
             setLookupStatus(barcode, 'error', lookupApiIsPalm(cfg)
-                ? '🔒 Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
+                ? '🔒 ' + palmSessionLostText(cfg, e.lookupReason) + ' — សូម Login ZTO Palm ម្តងទៀតក្នុងការកំណត់ API ស្វែងរក'
                 : '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
         } else if (e && e.lookupCode === 'ZTO_IDENTITY_REQUIRED' && !identityRetry) {
             setLookupStatus(barcode, 'error', '🔒 ZTO ត្រូវការគណនីដែលកំពុងចូល — សូមចាកចេញ ហើយចូលគណនីម្តងទៀត');

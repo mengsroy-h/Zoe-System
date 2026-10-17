@@ -155,7 +155,7 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         ztoState.ztoListSyncResult = {
             rows: [{ barcode: 'ZTHAVE000001', phone: '0977000111', cod: 2, dod: 0, at: dk(2) + ' 08:00:00', skip: '' },
                 { barcode: 'ZTKEEP000001', phone: '0977000111', cod: 2, dod: 0, at: dk(2) + ' 08:00:00', skip: '' }],
-            signedRows: [], from: dk(3), to: dk(1), total: 2, returnedState: 'ok',
+            signedRows: [], from: dk(3), to: dk(1), total: 2, returnedState: 'ok', signedState: 'ok',
             returned: [{ barcode: 'ZTHAVE000001', at: dk(1) + ' 09:00:00' }]
         };
         renderZtoListSyncPreview();

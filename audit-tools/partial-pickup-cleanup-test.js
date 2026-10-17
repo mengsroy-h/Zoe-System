@@ -385,11 +385,11 @@ async function scenarioMixedParcel() {
     await world.tick(T0 + 7 * DAY + 60000);
     live = world.getPath('zoew_scan_history_cod_dod/id_mix');
     trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
-    const expiredItem = trash.id_mix;
+    const returnedItem = trash.id_mix;
 
     check(!live, 'ដល់ថ្ងៃទី ៨៖ B ចេញពីប្រវត្តិ');
-    check(!!expiredItem && expiredItem.trashReason === 'returned', 'B មានស្លាក returned («ត្រឡប់»)', expiredItem && expiredItem.trashReason);
-    check(!!expiredItem && expiredItem.barcodes.every((b) => b.isDeducted === true), 'B ត្រូវ isDeducted');
+    check(!!returnedItem && returnedItem.trashReason === 'returned', 'B មានស្លាក returned («ត្រឡប់»)', returnedItem && returnedItem.trashReason);
+    check(!!returnedItem && returnedItem.barcodes.every((b) => b.isDeducted === true), 'B ត្រូវ isDeducted');
     const total = revenueTotal(world.revenueLog);
     check(total.cod === 0 && total.dod === -25 && total.count === -1,
         '⛔ ស្នូល៖ ដកតែ B ($25 dod, ១ កញ្ចប់) — លុយរបស់ A នៅគ្រប់', JSON.stringify(total));
@@ -468,7 +468,7 @@ async function scenarioLatePickup() {
     await world.tick(T0 + 7 * DAY + 60000);
     const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
     check(!!trash.id_late && trash.id_late.barcodes.length === 2,
-        'ការមិនទាន់យកទាល់តែសោះ ➜ ទាំង ២ ផុតកំណត់ (គោលការណ៍ ៨ ថ្ងៃ)');
+        'ការមិនទាន់យកទាល់តែសោះ ➜ ទាំង ២ ចូល «ត្រឡប់» (គោលការណ៍ ៨ ថ្ងៃ)');
 }
 
 
@@ -522,12 +522,12 @@ async function scenarioFreshPickupAtDeadline() {
     const ids = Object.keys(trash);
 
     check(ids.length === 1, 'ថ្ងៃទី ៨ ➜ មានធាតុ ១ ចូលធុងសំរាម', 'ឃើញ ' + ids.length);
-    const expired = trash[ids[0]];
-    check(!!expired && expired.barcodes.map((b) => b.code).join() === 'DL222',
-        '⛔ ស្នូល៖ មានតែ barcode ដែលមិនទាន់យក (DL222) ធ្លាក់ជា expired', JSON.stringify(expired && expired.barcodes.map((b) => b.code)));
-    check(!!expired && expired.trashReason === 'returned' && expired.barcodes.every((b) => b.isDeducted === true), 'DL222 ត្រូវ isDeducted');
+    const returnedCopy = trash[ids[0]];
+    check(!!returnedCopy && returnedCopy.barcodes.map((b) => b.code).join() === 'DL222',
+        '⛔ ស្នូល៖ មានតែ barcode ដែលមិនទាន់យក (DL222) ធ្លាក់ជា «ត្រឡប់»', JSON.stringify(returnedCopy && returnedCopy.barcodes.map((b) => b.code)));
+    check(!!returnedCopy && returnedCopy.trashReason === 'returned' && returnedCopy.barcodes.every((b) => b.isDeducted === true), 'DL222 ត្រូវ isDeducted');
     check(!!live && live.barcodes.map((b) => b.code).join() === 'DL111',
-        '⛔ ស្នូល៖ DL111 ដែលទើបយករួច នៅក្នុងប្រវត្តិ មិនត្រូវផុតកំណត់តាមវា', JSON.stringify(live && live.barcodes.map((b) => b.code)));
+        '⛔ ស្នូល៖ DL111 ដែលទើបយករួច នៅក្នុងប្រវត្តិ មិនត្រូវចូល «ត្រឡប់» តាមវា', JSON.stringify(live && live.barcodes.map((b) => b.code)));
     check(!!live && live.barcodes.every((b) => b.isDeducted !== true), '⛔ ស្នូល៖ DL111 **មិនត្រូវ** isDeducted');
     const total = revenueTotal(world.revenueLog);
     check(total.cod === 0 && total.dod === -25 && total.count === -1,

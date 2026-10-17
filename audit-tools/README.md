@@ -211,7 +211,7 @@ bash audit-tools/emu/rules.sh
 | `policy-test.js` | គោលការណ៍ **លុប ទល់នឹង ដក**; `deleteSingleItem` និង `buildClearHistoryTrashItem` **មិនប៉ះលុយ** | `POLICY_APP_DIR` |
 | `trash-modal-test.js` | ស្លាកធុងសំរាម ↔ ថេរ · ការ merge · តួលេខសរុប ២ ក្រុម ⛔ **បូក ៖ រត់ `renderTrashSummary()` ពិត ➜ អានលេខចេញពី HTML** (ក្រុម ២ ដេរីវេពី `TRASH_REASON_META` · រក្សាសេន · ការអភិរក្សចំនួន) | `TRASH_APP_DIR` |
 | `partial-pickup-cleanup-test.js` | ច្បាប់ ២ ម៉ោង / ថ្ងៃទី ៨ ដើរតាម **barcode** មិនមែនកញ្ចប់ | `PARTIAL_APP_DIR` |
-| `expired-trash-retention-test.js` | ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` មិនត្រូវឃ្លាតពីគ្នា | `EXPIREDTRASH_APP_DIR` |
+| `returned-trash-retention-test.js` | ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` មិនត្រូវឃ្លាតពីគ្នា | `RETURNEDTRASH_APP_DIR` |
 | `restore-marker-hygiene-test.js` | marker របស់ប្រវត្តិ មិនធ្លាក់ចូលធុងសំរាម · ការសម្អាតមិនដណ្តើមធាតុដែលកំពុងស្តារ | `MARKER_APP_DIR` |
 | `pickup-ledger-test.js` | អតិថិជនយក ↔ កញ្ចប់យក រាប់លើ **មូលដ្ឋានតែមួយ** | `PICKUP_APP_DIR` |
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |

@@ -1,4 +1,5 @@
 export const ACTION_ALLOWLIST = [
+    "connectSharedZtoPalm",
     "disconnectZtoPalm",
     "submitZtoPalmLogin",
     "applySetupLinkFromInput",
@@ -147,6 +148,7 @@ export const ACTION_ALLOWLIST = [
     "toggleRememberPassword",
     "toggleTorch",
     "toggleTrashGroup",
+    "toggleTrashReasonFilter",
     "updateBatchScanCount",
     "updateLabelPrintPreview",
     "verifySecurityPin",

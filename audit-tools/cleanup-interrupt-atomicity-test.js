@@ -577,14 +577,14 @@ function packagePlaces(server) {
 
     // ── ៥ឃ. ⛔⛔ កញ្ចប់ *លាយ* (ការសម្អាតដោយផ្នែក) ៖ barcode ត្រូវអភិរក្ស ──
     //    ⛔ «នៅក្នុងប្រវត្តិ» មិនគ្រប់គ្រាន់ទេ ៖ ផ្លូវផ្នែកទុកសំណល់ក្នុងប្រវត្តិ
-    //    ខណៈ barcode ដែលផុតកំណត់ **បាត់** ➜ អថេរពិតគឺ **ចំនួន barcode សរុប**។
+    //    ខណៈ barcode ដែលចូល «ត្រឡប់» **បាត់** ➜ អថេរពិតគឺ **ចំនួន barcode សរុប**។
     {
         const MIXED = [
             { code: 'BCa', cod: 4.00, dod: 0, isClosed: true, closedAt: NOW - 30 * 60 * 1000 },
             { code: 'BCb', cod: 5.00, dod: 0, isClosed: false },
             { code: 'BCc', cod: 3.50, dod: 0, isClosed: false }
         ];
-        // ⛔ ផ្លូវធម្មតារបស់ **សាខាផ្នែក** ត្រូវវាស់ដែរ ៖ សេណារីយ៉ូ «ផុតកំណត់
+        // ⛔ ផ្លូវធម្មតារបស់ **សាខាផ្នែក** ត្រូវវាស់ដែរ ៖ សេណារីយ៉ូ «ត្រឡប់
         //    ទាំងអស់» ដើរតាមសាខា *ទាំងមូល* ➜ ការដកលុយស្ទួនក្នុងសាខាផ្នែក
         //    រស់រានដោយគ្មានអ្នកវាស់។
         {
@@ -629,9 +629,9 @@ function packagePlaces(server) {
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ផ្លូវផ្នែកទុកសំណល់ក្នុងប្រវត្តិ ហើយ barcode ២ បាត់',
             !!run.server.history[ITEM_ID] && barcodeCount(run.server) === 1, barcodeCount(run.server));
         const done = await replay(run);
-        ok('⛔ ស្តារ ➜ barcode ដែលផុតកំណត់ត្រឡប់ចូលធុងសំរាម',
+        ok('⛔ ស្តារ ➜ barcode ដែលចូល «ត្រឡប់»ត្រឡប់ចូលធុងសំរាម',
             barcodeCount(done.server) === 3, barcodeCount(done.server));
-        ok('⛔ ស្តារ ➜ លុយដក **តែ** តម្លៃ barcode ដែលផុតកំណត់',
+        ok('⛔ ស្តារ ➜ លុយដក **តែ** តម្លៃ barcode ដែលចូល «ត្រឡប់»',
             r2(done.server.daily[DAY].codDollar) === r2(START_COD - 8.50), done.server.daily[DAY]);
         ok('⛔ ស្តារ ➜ ចំនួនកញ្ចប់ដក ២ (មិនមែន ៣)',
             done.server.daily[DAY].totalCount === START_COUNT - 2, done.server.daily[DAY]);

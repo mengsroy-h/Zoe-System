@@ -46,7 +46,7 @@ method · path · field request · ប្រភេទ `result` · field response
 | មុខងារ ZoeW | Endpoint Palm | ស្ថានភាព |
 |---|---|---|
 | Lookup លេខទូរស័ព្ទ · COD · DOD ពេលស្កេន | `billInfoQuery` (`cod` · `dod` · `consigneeMobile`) | ប្រើរួច |
-| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · `candidates=1` (១០០ ជួរ/tab · អានតែ tab ដែលនៅមានទំព័រ) ➜ `tracks=` (≤ ៣០ Barcode · ស្របគ្នា · `mailNos` ម្តងមួយលេខ ៖ ច្រើនលេខ ZTO ឆ្លើយទទេ) · track ចាប់ពីទំព័រទី ១ · សាកម្តងទៀតពេល ZTO មិនឆ្លើយ · track មួយកញ្ចប់ខូច ➜ `unverified` (បញ្ជីនៅតែមក) · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
+| ទាញបញ្ជីកញ្ចប់ពី ZTO (កញ្ចប់មកដល់ · ស្កេន `03`) | `queryDispatchList` បេក្ខភាព tab `1`/`4`/`5` (`4` ២ ដង ៖ គ្មានថ្ងៃ · `dispEmpDate*` លើចន្លោះជ្រើស = `4d`) + `queryTrackInfo` ផ្ទៀងស្កេន `3` ត្រូវសាខា/ថ្ងៃ | ប្រើរួច · `candidates=1` (១០០ ជួរ/tab · អានតែ tab ដែលនៅមានទំព័រ) ➜ `tracks=` (≤ ៣០ Barcode · ស្របគ្នា · `mailNos` ម្តងមួយលេខ ៖ ច្រើនលេខ ZTO ឆ្លើយទទេ) · track ចាប់ពីទំព័រទី ១ · សាកម្តងទៀតពេល ZTO មិនឆ្លើយ · track មួយកញ្ចប់ខូច ➜ `unverified` (បញ្ជីនៅតែមក) · មិនយកថ្ងៃបញ្ជូនជាថ្ងៃមកដល់ |
 | បញ្ជីចុះហត្ថលេខា · បិទស្វ័យប្រវត្តិ · ការរង់ចាំ ៨ ថ្ងៃ | `queryDispatchList` `billStatus` `5` + `signSiteDate*` + ទំព័រ | ប្រើរួច (`?palm=1&list=1&signed=1` · `exact=1`) |
 | 🧪 ពិនិត្យ field ដើមពេញ | `billInfoQuery` + `queryTrackInfo` (`mailType: 1` · `mailNos: barcode`) | ប៊ូតុង 🧪 របៀប Palm · JSON ពេញ អាចចម្លងបាន |
 | ស្ថានភាពកញ្ចប់មួយ (`ztoClosed`) | `queryTrackInfo` · `mail.isSign` + `tracks.action`/`siteCode`/`time` | ប្រើរួច (`status=1`) · របារ «មិនទាន់ចុះហត្ថលេខា» · ពិនិត្យវដ្តមកដល់ចុងក្រោយ |

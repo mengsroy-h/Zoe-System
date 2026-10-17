@@ -1,5 +1,5 @@
 import { dataState } from '../../../core/state';
-import { TRASH_REASON_META, trashItemTotals, trashItemCodes } from '../../../features/trash';
+import { TRASH_FILTER_META, TRASH_REASON_META, trashGroupInFilter, trashItemTotals, trashItemCodes } from '../../../features/trash';
 import { TRASH_CODES_PREVIEW } from '../../../features/locker';
 
 export interface TrashBucket { total: number; count: number; riel: number }
@@ -11,6 +11,7 @@ export interface TrashSummaryModel {
     grandCount: number;
     groupCount: number;
     scopeNote: string;
+    filter: string;
 }
 
 export interface TrashSubRow { id: string; codes: string[]; count: number; total: number }
@@ -39,7 +40,7 @@ export interface TrashView {
     overflow: number;
 }
 
-export function buildTrashSummaryModel(groups: any[], query: string): TrashSummaryModel {
+export function buildTrashSummaryModel(groups: any[], query: string, filter = ''): TrashSummaryModel {
     const deducted = { total: 0, count: 0 };
     const kept = { total: 0, count: 0 };
     groups.forEach((group) => {
@@ -50,13 +51,16 @@ export function buildTrashSummaryModel(groups: any[], query: string): TrashSumma
     });
     deducted.total = Math.round(deducted.total * 100) / 100;
     kept.total = Math.round(kept.total * 100) / 100;
+    const shown = filter === 'deducted' ? deducted : (filter === 'kept' ? kept : null);
+    const scope = query ? 'លទ្ធផលស្វែងរក' : 'ធុងសំរាមទាំងមូល';
     return {
         deducted: { ...deducted, riel: Math.round(deducted.total * dataState.exchangeRateRiel) },
         kept: { ...kept, riel: Math.round(kept.total * dataState.exchangeRateRiel) },
-        grandTotal: Math.round((deducted.total + kept.total) * 100) / 100,
-        grandCount: deducted.count + kept.count,
-        groupCount: groups.length,
-        scopeNote: query ? 'លទ្ធផលស្វែងរក' : 'ធុងសំរាមទាំងមូល'
+        grandTotal: shown ? shown.total : Math.round((deducted.total + kept.total) * 100) / 100,
+        grandCount: shown ? shown.count : deducted.count + kept.count,
+        groupCount: shown ? groups.filter((group) => trashGroupInFilter(group, filter)).length : groups.length,
+        scopeNote: shown ? TRASH_FILTER_META[filter].note + (query ? ' · ' + scope : '') : scope,
+        filter: shown ? filter : ''
     };
 }
 

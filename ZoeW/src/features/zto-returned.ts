@@ -2,7 +2,7 @@ import { dataState, firebaseState } from '../core/state';
 import { cleanupClockIsTrustworthy } from '../core/clock';
 import { shopScopePending } from '../core/shop-scope';
 import { ztoScanStampMillis } from '../core/timezone';
-import { itemHasRestoreMarkers } from '../domain/barcode';
+import { barcodeReturnCounts, itemHasRestoreMarkers } from '../domain/barcode';
 import { claimAndCleanupItem } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ztoAutoCloseEnabled, ztoStatusFeatureConfig } from './zto-status';
@@ -24,15 +24,16 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         const item = dataToScan[i];
         if (!item || !item.id || item.clearClaim || itemHasRestoreMarkers(item) || !Array.isArray(item.barcodes)) continue;
         const codes = [];
+        const returnedAt = new Map();
         for (let j = 0; j < item.barcodes.length; j++) {
             const b = item.barcodes[j];
             if (!b || b.isClosed) continue;
             const at = backAt.get(pickupBarcodeKey(b.code));
-            if (!at) continue;
-            const since = Math.max(Number(b.createdAt) || Number(item.createdAt) || 0, Number(b.restoredAt) || 0);
-            if (at >= since) codes.push(b.code);
+            if (!barcodeReturnCounts(b, item.createdAt, at)) continue;
+            codes.push(b.code);
+            returnedAt.set(b.code, at);
         }
-        if (codes.length) out.push({ itemId: String(item.id), codes });
+        if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt });
     }
     return out;
 }
@@ -43,7 +44,7 @@ export function removeReturnedZtoBarcodes(returned, dataToScan = dataState.scanH
     const targets = ztoReturnedTargets(returned, dataToScan, signedCodes);
     let queued = 0;
     for (let i = 0; i < targets.length; i++) {
-        claimAndCleanupItem(targets[i].itemId, 'abandon', { codes: targets[i].codes });
+        claimAndCleanupItem(targets[i].itemId, 'abandon', { codes: targets[i].codes, returnedAt: targets[i].returnedAt });
         queued += targets[i].codes.length;
     }
     return queued;

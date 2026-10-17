@@ -1,7 +1,7 @@
 /**
  * ⛔ ZTO-E13 (សំណើម្ចាស់គម្រោង ៖ «ZTO កែចុះ») ៖ ZTO ឆ្លើយបញ្ជីដោយ **គ្មាន** `meta.pages`/`total` ៖ Function ធ្លាប់រាយ `pages: 1` ទោះទំព័រពេញ
  * (១០០ ជួរ) ➜ client អានតែទំព័រ ១ ហើយចាត់ទុកថា «ពេញលេញ» ➜ ភស្តុតាងចុះហត្ថលេខានៅទំព័រ ២+ បាត់ ➜ ការសម្អាត ៨ ថ្ងៃលែងរង់ចាំ ➜ កញ្ចប់ដែលយករួចអាច
- * ត្រូវកាត់ប្រាក់ជា «ផុតកំណត់»។ ឥឡូវ ទំព័រពេញ + គ្មាន `pages` = «មិនដឹង» (`pagesUnknown`) ➜ client អានបន្តដល់ពិដាន ហើយនៅតែ «មិនដឹង» ➜ `truncated`។
+ * ត្រូវកាត់ប្រាក់ជា «ត្រឡប់»។ ឥឡូវ ទំព័រពេញ + គ្មាន `pages` = «មិនដឹង» (`pagesUnknown`) ➜ client អានបន្តដល់ពិដាន ហើយនៅតែ «មិនដឹង» ➜ `truncated`។
  * Function ពិត + client ពិត + ZTO ក្លែង (ដូច `zto-signed-past-range.test.tsx`)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

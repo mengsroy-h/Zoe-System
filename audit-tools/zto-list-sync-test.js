@@ -975,7 +975,7 @@ function firstBody(requests) {
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'itemAbandonRipeAt', 'trashRetentionMs', 'ztoPickupVerdictOf', 'ztoListSignedVerdict', 'ztoListRowAgeState'];
     const CLOCK_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'ABANDON_AGE_MS',
-        'EXPIRED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'ZTO_LIST_SIGNED_PROBE_MAX'];
+        'RETURNED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'ZTO_LIST_SIGNED_PROBE_MAX'];
     const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
         .concat([extractConst(APP_SRC, 'ztoListSignedProbe')
             || 'const ztoListSignedProbe = new Map();',
@@ -1820,7 +1820,7 @@ function firstBody(requests) {
                 // ═════════════════════════════════════════════════════════
                 // កញ្ចប់ដែល ZTO **បិទបញ្ជីរួច** = អតិថិជនយករួច = **ជួរ ៧**
                 // នៃតារាងសេណារីយ៉ូ (`pickup` ➜ លុយ **មិនប៉ះ**) ចំណែក «ផុត
-                // កំណត់» = **ជួរ ៨** (`expired` ➜ **ដកលុយ**)។ អ្វីដែលបែងចែក
+                // កំណត់» = **ជួរ ៨** (`returned` ➜ **ដកលុយ**)។ អ្វីដែលបែងចែក
                 // ពួកវាគឺ **អតិថិជនបានយកឬអត់** មិនមែនអាយុទេ។
                 //
                 // ⛔ ហើយសាលក្រមមាន **៣** ៖ `true` ➜ បញ្ចូលជា «យករួច»;
@@ -1840,7 +1840,7 @@ function firstBody(requests) {
                 const closedOld = gradeOne(true);
                 ok('⛔ ចាស់ + ZTO **បិទបញ្ជីរួច** ➜ ចូលក្រុម «ថ្មី» (មិនរំលងទៀត)',
                     closedOld.fresh.length === 1 && closedOld.skipped.length === 0, closedOld);
-                ok('⛔ ហើយវាត្រូវសម្គាល់ `closedAtZto` ➜ ស្នាមភ្ជាប់ទៅ `addOrUpdateEntry()` (បញ្ចូលជា «យករួច» ⛔ មិនមែន «ផុតកំណត់»)',
+                ok('⛔ ហើយវាត្រូវសម្គាល់ `closedAtZto` ➜ ស្នាមភ្ជាប់ទៅ `addOrUpdateEntry()` (បញ្ចូលជា «យករួច» ⛔ មិនមែន «ត្រឡប់»)',
                     closedOld.fresh[0] && closedOld.fresh[0].closedAtZto === true, closedOld.fresh[0]);
                 const openOld = gradeOne(false);
                 ok('⛔ ចាស់ + ZTO **មិនទាន់បិទ** ➜ រំលង (`too-old-open`) — សំណើអ្នកប្រើ ៖ «សូមកុំបញ្ចូល»',
@@ -1915,7 +1915,7 @@ function firstBody(requests) {
                 // **១២០ ms** ហើយវាហៅ `runAutomaticCleanupRules()` ដែលច្បាប់
                 // abandon របស់វាឈរលើ `!item.isClosed && (now − createdAt >
                 // ABANDON_AGE_MS)` ➜ ដោយសារ `createdAt` = ត្រា ZTO ចាស់
-                // **ភ្លាមក្រោយ snapshot មកដល់ កញ្ចប់ចូលធុងសំរាមជា `expired`
+                // **ភ្លាមក្រោយ snapshot មកដល់ កញ្ចប់ចូលធុងសំរាមជា `returned`
                 // ហើយ *ដកលុយ*** មុនជំហានបិទរត់ទាន់ផង។ ដូច្នេះស្ថានភាពបិទ
                 // ត្រូវចុះក្នុង **ការសរសេរតែមួយដដែល** (អាគុយម៉ង់ទី ៧)។
                 reset();
@@ -2643,7 +2643,7 @@ function firstBody(requests) {
     // ➜ `withSigned=1` ៖ Function សួរ `/scan/page/scan` **២ ស្របគ្នា** ក្នុងការហៅតែមួយ ៖ `03` (មកដល់) + `05` (ចុះហត្ថលេខា)
     //    លើជួរ `from` ➜ `max(to, ថ្ងៃនេះ)` (ការចុះហត្ថលេខាកើត **ក្រោយ** មកដល់) ➜ `signed` = barcode ដែល ZTO បិទរួច។
     // ⛔ ភស្តុតាងត្រូវ **វិជ្ជមាន** ៖ កូដ `05` ហើយអត្ថបទមិនផ្ទុយ · ឬគ្មានកូដ តែអត្ថបទ «ចុះហត្ថលេខា» ➜ ក្រៅពីនេះ ➜ មិនមែនភស្តុតាង
-    //    (ការបិទខុស = កញ្ចប់មិនទាន់យកចូលស្ថិតិយក ➜ មិនដែលផុតកំណត់/ដកលុយ)។
+    //    (ការបិទខុស = កញ្ចប់មិនទាន់យកចូលស្ថិតិយក ➜ មិនដែលចូល «ត្រឡប់»/ដកលុយ)។
     // ⛔ ការហៅចាស់ (គ្មាន `withSigned`) នៅ **១ សំណើ upstream** ដដែល ➜ App ចាស់មិនបង្កើនការហៅ ZTO។
     const todayKey = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
     const signedStart = (() => {
@@ -2975,7 +2975,7 @@ function firstBody(requests) {
 
     // ⛔ E8ខ ៖ payload ពិត «ត្រឡប់ការស្កេន» (ម្ចាស់គម្រោង ៖ កញ្ចប់ត្រឡប់ទៅសាខាកណ្តាលវិញ លើស ៧ ថ្ងៃ) ៖ `scanTypeCode: "-710"` · `scanTypeDesc: "ត្រឡប់ការស្កេន"` ·
     //    `isRefund: 1`។ កញ្ចប់នេះ **មិនបានយក** ➜ ⛔ មិនត្រូវក្លាយជាភស្តុតាង «ចុះហត្ថលេខា» (បើក្លាយ ➜ ZoeW បិទ «យករួច» ➜ ការសម្អាត ៧ ថ្ងៃមិនដកលុយ) ·
-    //    មិនមែនជួរដេក «មកដល់» · ការសម្អាត ៧ ថ្ងៃ (`expired` · ដកលុយ) ជាផ្លូវត្រូវ (ច្បាប់អាជីវកម្ម ៖ កញ្ចប់មិនយកត្រឡប់ទៅសាខាកណ្តាល)។
+    //    មិនមែនជួរដេក «មកដល់» · ការសម្អាត ៧ ថ្ងៃ (`returned` · ដកលុយ) ជាផ្លូវត្រូវ (ច្បាប់អាជីវកម្ម ៖ កញ្ចប់មិនយកត្រឡប់ទៅសាខាកណ្តាល)។
     const RET_CODE = '77130500008804';
     const retRow = realRow(RET_CODE, '855960000004', '-710', 'ត្រឡប់ការស្កេន', '2026-10-06 11:49:23', { agentAmount: 8.76, customerCode: 'KH803480001',
         customerCodeDesc: 'Shopee SHPE', recSite: 'Shopee SHPE', isRefund: 1, isRefundDesc: 'ត្រូវហើយ', barScannerId: '465' });
@@ -3279,7 +3279,7 @@ function firstBody(requests) {
     // ═════════════════════════════════════════════════════════════════════
     // ⛔ ZTO-E4 ៖ `listRowIsSigned()` (ឥឡូវ `listRowSignedVerdict()`) បដិសេធជួរដែលមានកូដ `05` តែ `scanTypeDesc` ខុសពី `ZTO_LIST_SIGNED_SCAN_DESC`
     //    (ឧ. ZTO ប្តូរភាសាផ្ញើ «Delivered») ➜ ជួរនោះចូល `otherScans` ស្ងាត់ៗ ➜ **គ្មានភស្តុតាងបិទ** ➜ កញ្ចប់ដែលអតិថិជនយករួច
-    //    នៅបើក ហើយ (ក្រោយ ៧ ថ្ងៃ) ត្រូវដកលុយជា «ផុតកំណត់» ➜ App មិននិយាយអ្វីសោះ។
+    //    នៅបើក ហើយ (ក្រោយ ៧ ថ្ងៃ) ត្រូវដកលុយជា «ត្រឡប់» ➜ App មិននិយាយអ្វីសោះ។
     // ⛔ ច្បាប់ «ភស្តុតាងវិជ្ជមាន» នៅដដែល (ជួរទាំងនោះ **មិន** ក្លាយជាភស្តុតាង) — ការកែគឺ **រាប់** វាដាច់ដោយឡែក ៖
     //    `signedMismatch` = ជួរក្នុងទំព័រ upstream នេះដែលមានកូដ «ចុះហត្ថលេខា» តែអត្ថបទផ្ទុយ ⊆ `otherScans`
     //    (ការអភិរក្ស `rows + otherScans + signedScans` = ជួរ upstream នៅដដែល) · `withSigned` ➜ ចម្លើយបញ្ចូលគ្នាផ្ទុកចំនួនរបស់

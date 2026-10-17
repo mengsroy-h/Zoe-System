@@ -1,16 +1,19 @@
 import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
+import { onAct } from '../../actions';
 import type { TrashBucket, TrashSummaryModel } from './model';
 
-function SummaryCard({ cls, head, note, bucket }: { cls: string; head: string; note: string; bucket: TrashBucket }) {
+function SummaryCard({ cls, bucketKey, active, head, note, bucket }: { cls: string; bucketKey: string; active: boolean; head: string; note: string; bucket: TrashBucket }) {
     return (
-        <div className={`trash-sum-card ${cls}`}>
+        <button type="button" className={`trash-sum-card ${cls}${active ? ' trash-sum-active' : ''}`} aria-pressed={active}
+            title={active ? 'ចុចម្តងទៀត ដើម្បីបង្ហាញទាំងអស់' : 'ចុច ដើម្បីបង្ហាញតែប្រភេទនេះ'}
+            onClick={onAct('toggleTrashReasonFilter', { args: [bucketKey] })}>
             <div className="trash-sum-head">{head}</div>
             <div className="trash-sum-note">{note}</div>
             <div className="trash-sum-money">${bucket.total.toFixed(2)}</div>
             <div className="trash-sum-riel">{bucket.riel.toLocaleString()} ៛</div>
             <div className="trash-sum-count">📦 {bucket.count} កញ្ចប់</div>
-        </div>
+        </button>
     );
 }
 
@@ -21,8 +24,8 @@ export function TrashSummaryBox() {
     return (
         <>
             <div className="trash-sum-grid">
-                <SummaryCard cls="trash-sum-deducted" head="➖ ដក + ត្រឡប់" note="ដកចេញពីស្ថិតិរួចហើយ" bucket={s.deducted} />
-                <SummaryCard cls="trash-sum-kept" head="✅ យករួច + លុប" note="មិនប៉ះស្ថិតិចំណូល" bucket={s.kept} />
+                <SummaryCard cls="trash-sum-deducted" bucketKey="deducted" active={s.filter === 'deducted'} head="➖ ដក + ត្រឡប់" note="ដកចេញពីស្ថិតិរួចហើយ" bucket={s.deducted} />
+                <SummaryCard cls="trash-sum-kept" bucketKey="kept" active={s.filter === 'kept'} head="✅ យករួច + លុប" note="មិនប៉ះស្ថិតិចំណូល" bucket={s.kept} />
             </div>
             <div className="trash-sum-total">
                 <span>{s.scopeNote}</span>

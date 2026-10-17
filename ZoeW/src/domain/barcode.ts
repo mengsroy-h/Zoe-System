@@ -110,6 +110,14 @@ export function barcodeAbandonIsRipe(barcode, parentCreatedAt, now) {
     return now - barcodeAbandonBasis(barcode, parentCreatedAt) > ABANDON_AGE_MS;
 }
 
+export function barcodeReturnBasis(barcode, parentCreatedAt) {
+    return Math.max(Number(barcode && barcode.createdAt) || Number(parentCreatedAt) || 0, Number(barcode && barcode.restoredAt) || 0);
+}
+
+export function barcodeReturnCounts(barcode, parentCreatedAt, returnedAt) {
+    return !!barcode && !barcode.isClosed && typeof returnedAt === 'number' && returnedAt > 0 && returnedAt >= barcodeReturnBasis(barcode, parentCreatedAt);
+}
+
 export function itemAbandonRipeAt(item, parentCreatedAt, now) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes : [];
     let latest = 0;

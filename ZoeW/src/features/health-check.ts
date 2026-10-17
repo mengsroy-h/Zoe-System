@@ -438,7 +438,14 @@ async function healthPalmLookupRow(cfg, headers) {
         const code = body && typeof body.code === 'string' ? body.code : '';
         const reason = safeLookupReason(body && body.reason);
         if (res && res.ok && body && body.provider === 'zto-palm') {
-            return healthRow('info', title, 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' + ztoUpstreamTimingText(body, true));
+            const session = body.session && typeof body.session === 'object' ? body.session : null;
+            if (session && session.source === 'none') {
+                return healthRow('warn', title, session.rejected
+                    ? 'ZTO បដិសេធ Login Palm របស់ហាង — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»'
+                    : 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
+            }
+            return healthRow('info', title, (session && session.source === 'shared' ? 'មាន session Palm របស់ហាងលើ Server' : 'មាន session Palm')
+                + ' — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' + ztoUpstreamTimingText(body, true));
         }
         if (code === 'ZTO_AUTH_EXPIRED') {
             return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');

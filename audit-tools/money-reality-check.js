@@ -452,7 +452,7 @@ if (!collectedDays.length && !collectedBadDays.length) {
             openKey + ' កូនសោនៅសល់ ខណៈ barcode **មិនបិទ** ➜ កាតរាយលើស ' + $(openKeyMoney));
         if (ghostKey) may(ghostKey + ' កូនសោក្នុងកញ្ចក់ រកម្ចាស់មិនឃើញ',
             'ទឹកប្រាក់ ' + $(ghostMoney) + ' — ធម្មតាបន្ទាប់ពី purge ធុងសំរាម\n'
-            + '       (កញ្ចក់រស់ ៧ ថ្ងៃ · ធាតុ `expired` purge ក្នុង ២ ថ្ងៃ)');
+            + '       (កញ្ចក់រស់ ៧ ថ្ងៃ · ធាតុ `returned` purge ក្នុង ២ ថ្ងៃ)');
         const drift = missKey + missDay + twice + wrongValue + openKey;
         if (drift) notes.push('កាត «💵 ចំណូលប្រចាំថ្ងៃ» ឃ្លាតពីប្រវត្តិ ' + drift
             + ' កន្លែង ➜ លេខលើកាតខុស (ledger និង `isDeducted` មិនប៉ះ)');
@@ -514,7 +514,7 @@ else {
 // ទឹកប្រាក់»។
 //
 // លេខ «ស្កេនតាមថ្ងៃ» លើអេក្រង់ = `zoew_daily_revenue_cod_dod/<ថ្ងៃ>/totalCount`
-// ➜ វាឡើងពេលស្កេន និង **ចុះតាមផ្លូវដកលុយ** (`ដក` និង `ផុតកំណត់ ៨ ថ្ងៃ`
+// ➜ វាឡើងពេលស្កេន និង **ចុះតាមផ្លូវដកលុយ** (`ដក` និង `ត្រឡប់ ៨ ថ្ងៃ`
 // បញ្ជូន `-count` ជាមួយ `-cod`/`-dod` ក្នុងការហៅតែមួយ)។ ⛔ ផ្លូវ «យករួច»
 // និង «លុប» **មិនប៉ះវា** ដោយចេតនា។
 //

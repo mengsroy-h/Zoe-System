@@ -123,14 +123,14 @@ describe('ហាងមិនទាន់ស្គាល់ ➜ ការសម�
         expect(readCleanupJournal().length, 'journal នៅសម្រាប់ហាង A').toBe(1);
     });
 
-    it('ទិសផ្ទុយ ៖ Firebase (ហាងស្គាល់ពី databaseURL) · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃផុតកំណត់ធម្មតា', () => {
+    it('ទិសផ្ទុយ ៖ Firebase (ហាងស្គាល់ពី databaseURL) · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', () => {
         firebaseShop('https://shop-a.firebaseio.com');
         dataState.scanHistory = [openItem('old1', 'ZTE3000001', 8 * DAY)];
         cleanupNow();
         expect(abandoned('old1')).toBe(true);
     });
 
-    it('ទិសផ្ទុយ ៖ Supabase ហាងស្គាល់ · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃផុតកំណត់ធម្មតា', () => {
+    it('ទិសផ្ទុយ ៖ Supabase ហាងស្គាល់ · គ្មាន ZTO ➜ កញ្ចប់ ៨ ថ្ងៃចូលធុងសំរាម «ត្រឡប់» ធម្មតា', () => {
         supabaseTenant('tenant-b');
         dataState.scanHistory = [openItem('old2', 'ZTE4000001', 8 * DAY)];
         cleanupNow();

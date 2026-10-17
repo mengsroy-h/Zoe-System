@@ -178,6 +178,11 @@ export function appendRestoreRevenueIncrements(updates, deltas) {
     });
 }
 
+export function restoreAwaitsLedgerView(item) {
+    return !!item && item.trashReason === 'returned' && Array.isArray(item.barcodes) && item.barcodes.length > 0
+        && !item.barcodes.some((b) => b && b.isDeducted) && dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
+}
+
 export function restoreLedgerKeyFor(item, trashId, revenueDeltas) {
     const at = item ? item.deletedAt : null;
     if (!item || item.trashReason !== 'returned' || typeof at !== 'number' || !isFinite(at) || at <= 0) return null;
@@ -267,6 +272,7 @@ export async function executeRestoreItem() {
             const previewItem = cloneRestoreItem(previewSnap.val());
             if (!previewItem) throw new Error('ALREADY_RESTORED');
             stopIfSwitched();
+            if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
@@ -281,6 +287,7 @@ export async function executeRestoreItem() {
         }
 
         let itemToRestore = claimed.item;
+        if (restoreAwaitsLedgerView(itemToRestore)) throw new Error('RESTORE_LEDGER_UNSYNCED');
         const restoredTrash = { trashReason: itemToRestore.trashReason, deletedAt: itemToRestore.deletedAt, scanDate: itemToRestore.scanDate };
         const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
@@ -378,6 +385,11 @@ export async function executeRestoreItem() {
     } catch (error) {
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
+            return;
+        }
+        if (error && error.message === 'RESTORE_LEDGER_UNSYNCED') {
+            showToast('⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត');
+            openRecentlyDeletedModal();
             return;
         }
         const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));

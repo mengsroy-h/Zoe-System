@@ -74,7 +74,7 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
     'openDailyStatsModal', 'openCollectedStatsModal', 'renderMonthlyReport',
     'monthlyReportMismatchNote', 'renderHistory', 'renderRecentlyDeleted',
-    'buildTrashGroups', 'trashGroupMatchesQuery', 'renderTrashSummary', 'trashGroupRowHtml',
+    'buildTrashGroups', 'trashGroupMatchesQuery', 'trashFilterOf', 'trashGroupInFilter', 'renderTrashSummary', 'trashGroupRowHtml',
     'trashSummaryCardHtml', 'trashReasonOf', 'trashItemTotals', 'parseTimestampFromId',
     'trashGroupKeyOf', 'trashGroupSignature', 'trashItemCodes', 'trashItemPhone',
     'barcodeEntriesOf', 'formatScanStamp', 'buildHistoryRowContent', 'escapeAttr',
@@ -111,7 +111,7 @@ function sliceConstObject(name) {
     }
     return SRC.slice(at, i) + ';';
 }
-const CONSTS = ['TRASH_REASON_META'].map(sliceConstObject).join('\n');
+const CONSTS = ['TRASH_REASON_META', 'TRASH_FILTER_META'].map(sliceConstObject).join('\n');
 
 function textOf(html) {
     return String(html === undefined || html === null ? '' : html)

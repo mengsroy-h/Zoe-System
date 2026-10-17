@@ -13,7 +13,7 @@
 // ដូច្នេះទូរស័ព្ទដែលថ្ងៃលោតទៅមុខ (អស់ថ្ម ➜ boot ថ្ងៃខុស ឬអ្នកប្រើកែដោយដៃ)
 // ខណៈក្រៅបណ្តាញ៖
 //   • ច្បាប់ ៨ ថ្ងៃ  ➜ កញ្ចប់ **ដែលមិនទាន់យកទាំងអស់** មើលទៅដូចចាស់ ១ ឆ្នាំ
-//     ➜ ចូលធុងសំរាមជា `expired` ➜ ⛔ **`isDeducted: true` ➜ ដកលុយចេញ**
+//     ➜ ចូលធុងសំរាមជា `returned` ➜ ⛔ **`isDeducted: true` ➜ ដកលុយចេញ**
 //   • ច្បាប់ ២ ម៉ោង ➜ barcode ដែលបិទ «យក» ទាំងអស់ ➜ ចូលធុងសំរាម
 //   • ច្បាប់ ៣០ ថ្ងៃ ➜ ធាតុធុងសំរាម **ទាំងអស់** ➜ **លុបជាអចិន្ត្រៃយ៍**
 //
@@ -88,7 +88,7 @@ const foundFns = NEEDED_FNS.filter((n) => !!extractFn(src, n));
 ok('ជាន់អប្បបរមា ៖ រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED_FNS.length,
     foundFns.length === NEEDED_FNS.length, { missing: NEEDED_FNS.filter((n) => foundFns.indexOf(n) === -1) });
 
-const NEEDED_CONSTS = ['TWO_HOURS_MS', 'ABANDON_AGE_MS', 'EXPIRED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS'];
+const NEEDED_CONSTS = ['TWO_HOURS_MS', 'ABANDON_AGE_MS', 'RETURNED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS'];
 const foundConsts = NEEDED_CONSTS.filter((n) => !!extractConst(src, n));
 ok('ជាន់អប្បបរមា ៖ រកឃើញថេររយៈពេល ' + NEEDED_CONSTS.length,
     foundConsts.length === NEEDED_CONSTS.length, { missing: NEEDED_CONSTS.filter((n) => foundConsts.indexOf(n) === -1) });
@@ -133,7 +133,7 @@ function buildWorld(opts) {
     const code = [
         extractConst(src, 'TWO_HOURS_MS'),
         extractConst(src, 'ABANDON_AGE_MS'),
-        extractConst(src, 'EXPIRED_TRASH_RETENTION_MS'),
+        extractConst(src, 'RETURNED_TRASH_RETENTION_MS'),
         extractConst(src, 'TRASH_RETENTION_MS'),
         extractConst(src, 'DB_OP_TIMEOUT_MS'),
         extractFn(src, 'withTimeout'),

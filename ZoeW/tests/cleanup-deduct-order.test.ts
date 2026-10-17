@@ -141,7 +141,7 @@ function seed(items: any[]) {
     dataState.dailyPickupData = {};
     dataState.dailyCollectedData = {};
 }
-function expiredItem(id = ID) {
+function returnedItem(id = ID) {
     const old = getServerNow() - ABANDON_AGE_MS - 3600000;
     const a = barcode('A', 10, old);
     return { id, phone: '012', scanDate: DAY, time: a.time, createdAt: old, count: 1, cod: 10, dod: 0, price: 10, isClosed: false, isCalled: false, barcode: 'A', barcodes: [a] };
@@ -185,7 +185,7 @@ afterEach(() => {
 
 describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true only after the ledger deduction lands)', () => {
     it('1. the ledger never lands (app dies) ➜ trash holds isDeducted:false ➜ a restore elsewhere adds nothing (100) ➜ resume reports unverified, money untouched', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         lab.hook = hangLedger;
         claimAndCleanupItem(ID, 'abandon');
         await flush();
@@ -209,7 +209,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('2. reverse ៖ the normal path ends with isDeducted:true · ledger 90 · journal empty · a later restore adds the 10 back (100)', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
@@ -223,7 +223,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('3. the ledger rejects (never deducted) ➜ trash stays isDeducted:false ➜ a restore adds nothing (100)', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         lab.hook = rejectLedger;
         await claimAndCleanupItem(ID, 'abandon');
         await flush();
@@ -237,7 +237,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('4. the flip meets a live restore claim ➜ the journal waits (stage flip) ➜ the restore adds nothing ➜ resume adds the deduction back (100)', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         let injected = false;
         lab.beforeTx = (path) => {
             if (injected || path !== TRASH + '/' + ID) return;
@@ -266,7 +266,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('5. stage flip ➜ the claim was released (restore gave up) ➜ resume flips isDeducted:true · money untouched (90)', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         let injected = false;
         lab.beforeTx = (path) => {
             if (injected || path !== TRASH + '/' + ID || !getAt(path)) return;
@@ -285,7 +285,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('6. stage flip ➜ trash gone and the barcode is not back in history (purged) ➜ money stays deducted · a stale history view waits', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         let injected = false;
         lab.beforeTx = (path) => {
             if (injected || path !== TRASH + '/' + ID || !getAt(path)) return;
@@ -312,7 +312,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('7. stage moved ➜ trash absent but the barcode is back in history (restored before the ledger step) ➜ no trash rewrite · no deduction', async () => {
-        const item = expiredItem();
+        const item = returnedItem();
         const deletedAt = getServerNow() - 60000;
         const restored: any = clone(item);
         restored.barcodes[0].restoredAt = getServerNow();
@@ -327,7 +327,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('8. reverse ៖ stage moved ➜ trash absent and the barcode is not in history (the trash write never landed) ➜ trash rewritten · deducted once · flipped', async () => {
-        const item = expiredItem();
+        const item = returnedItem();
         seed([]);
         const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: getServerNow(), stage: 'moved', trashItem, revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
@@ -340,7 +340,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('8b. stage moved ➜ trash absent · the local view still holds the cleaned item without restore evidence ➜ not a restore ➜ trash rewritten · deducted once', async () => {
-        const item = expiredItem();
+        const item = returnedItem();
         seed([]);
         dataState.scanHistory = [clone(item)];
         const trashItem = { ...clone(item), deletedAt: getServerNow(), isFromDeletion: false, trashReason: 'returned', barcodes: item.barcodes.map((b) => ({ ...b, isDeducted: false })) };
@@ -352,7 +352,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('9. an entry journaled by the previous version (trash isDeducted:true) at stage moved, restored elsewhere with +10 ➜ deduct only, no duplicate trash (100)', async () => {
-        const item = expiredItem();
+        const item = returnedItem();
         const restored: any = clone(item);
         restored.barcodes[0].restoredAt = getServerNow();
         seed([restored]);
@@ -373,7 +373,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('10. partial abandon (one old barcode, one fresh) ➜ the old barcode lands in trash flipped to isDeducted:true · ledger −old only', async () => {
-        const item: any = expiredItem();
+        const item: any = returnedItem();
         const fresh: any = barcode('B', 5, getServerNow() - 3600000);
         fresh.restoredAt = getServerNow() - 3600000;
         item.barcodes.push(fresh);
@@ -393,7 +393,7 @@ describe('7-day cleanup ៖ the trash flag follows the money (isDeducted:true on
     }, 20000);
 
     it('12. localStorage full (QuotaExceededError on every setItem) ➜ the journal cannot be written ➜ the cleanup still lands once: trash flipped · ledger 90 · no throw', async () => {
-        seed([expiredItem()]);
+        seed([returnedItem()]);
         const quota = vi.spyOn(appLocalStore as Storage, 'setItem').mockImplementation(() => { throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' }); });
         let journalSeenDuringRun = 0;
         lab.beforeTx = () => { journalSeenDuringRun = Math.max(journalSeenDuringRun, readCleanupJournal().length); };

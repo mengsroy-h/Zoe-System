@@ -85,7 +85,7 @@ const NEEDED = ['runAutomaticDeletedCleanup', 'purgeDeletedItemsQuietly', 'clear
 const missing = NEEDED.filter((n) => !extractFn(src, n));
 ok('រកឃើញ function ដែលត្រូវវាស់ ' + NEEDED.length, missing.length === 0, { missing: missing });
 
-const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'TRASH_RETENTION_MS', 'EXPIRED_TRASH_RETENTION_MS',
+const NEEDED_CONSTS = ['DB_OP_TIMEOUT_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS',
     'REGISTRY_RELEASE_RETRY_MAX', 'REGISTRY_RELEASE_QUEUE_MAX', 'TRASH_WRITE_SLOW_NOTICE_MS'];
 const cmissing = NEEDED_CONSTS.filter((n) => !extractConst(src, n));
 ok('រកឃើញថេរដែលត្រូវវាស់ ' + NEEDED_CONSTS.length, cmissing.length === 0, { missing: cmissing });
@@ -236,7 +236,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
     }
 
     // ── ២ខ. សោដក `ded` (2.50.49) ៖ purge ជោគជ័យ តែការដោះសោ `ded` ព្យួរ ➜ សោត្រូវដោះ ────────
-    // ⛔ purge ធុងសំរាម `expired` លុបសោ `ded/<trashId>` ជាមួយ (`releaseCleanupLedgerKeys()`) ក្នុង `applyPurged()` ដែលត្រូវ await ក្រោមសោ ➜
+    // ⛔ purge ធុងសំរាម `returned` លុបសោ `ded/<trashId>` ជាមួយ (`releaseCleanupLedgerKeys()`) ក្នុង `applyPurged()` ដែលត្រូវ await ក្រោមសោ ➜
     //    បណ្តាញស្លាប់ចន្លោះការសរសេរទាំង ២ (ឬ socket zombie) ➜ ការសរសេរនោះព្យួរ ➜ សោ `deletedCleanupInFlight` ជាប់ ➜ purge ងាប់។
     console.log('\n== ២ខ. សោដក `ded` ៖ ការដោះសោព្យួរ មិនត្រូវជាប់សោសម្អាតធុងសំរាម ==');
     {

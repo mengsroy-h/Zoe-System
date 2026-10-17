@@ -47,8 +47,7 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.111 · ZoeKeyGen 2.24.19** (PR #328 · `b98c35d`)។
-- Branch **`claude/zto-audit`** (ពី `main` `2519a1f` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
+- `main` = **ZoeW 2.50.117 · ZoeKeyGen 2.24.19** (PR #329 · `44eb093`) · PR #331 ➜ **2.50.118** + ជុំបន្ទាប់ក្នុង PR ដដែល ➜ **2.50.119** (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
@@ -76,6 +75,10 @@
 - ✅ ម្ចាស់គម្រោង (PR #328) ៖ «បិទដោយស្វ័យប្រវត្តិតាមZTO និងប្រាប់បិទក្នុងZoeW តែZTO Palm មិនទាន់បិទដំណើរការល្អហើយ» ➜ [2.50.99] បិទ ·
   ស្កេន Palm ៖ លេខទូរស័ព្ទ · COD · DOD ត្រូវនឹង App ZTO Palm («ត្រូវ») ➜ [2.50.97] បិទ ·
   កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
+- ⏳ **[2.50.118]** 📥 Palm ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ · «🆕 ថ្មី» ស្មើ Cookie (A202 ៖ មិនទាន់វាស់លើ ZTO ពិត · នៅខ្វះ ➜ 🧪 track កញ្ចប់ដែលខ្វះ) ·
+  🗑️ ចុចកាត «➖ ដក + ត្រឡប់» ➜ បញ្ជីតែ «ដក» និង «ត្រឡប់» (iPhone · Android · APK) · ↩️ បញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ «📌 … មិនទាន់ដក»។
+- ⏳ **[2.50.119]** Login ZTO Palm តាមសាខា (A ➜ B ក្នុងសាខាដដែល · «ផ្តាច់ Palm» លើ A ➜ B នៅស្កេន/ទាញបាន ✅ ម្ចាស់គម្រោងបញ្ជាក់លើ Preview) ៖
+  សាខាផ្សេងដែលប្រើសោភ្ជាប់ដូចគ្នា Login គណនីខ្លួន ➜ មិនជាន់គ្នា · ប្រើច្រើនថ្ងៃ ៖ ZTO មិនបដិសេធ token តែមួយលើទូរស័ព្ទច្រើនព្រមគ្នា (៤២៩ · Login ឡើងវិញញឹកញាប់)។
 - ⏳ **[2.50.117]** (Firebase rules `returned` Publish រួច) 🗑️ «ត្រឡប់» (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់ · ដកលុយ · ចំនួន) · 🔔/📲 «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» ➜ ម្ចាស់គម្រោងអានថាត្រូវគោលការណ៍។
 - ⏳ **[2.50.115]–[2.50.116]** ↩️ កញ្ចប់ត្រឡប់ ៖ ទាញបញ្ជី 10-14 ➜ 10-17 ➜ កញ្ចប់ត្រឡប់ដែលបាន 🧪 ក្នុង «↩️ ត្រឡប់ទៅវិញ» · បើបើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» + លុយដក (Palm · Cookie)។
 - ⏳ **[2.50.114]** Palm ៖ បើក App ថ្ងៃក្រោយ ➜ ស្កេន/ទាញបានដោយមិន Login ZTO Palm ម្តងទៀត · ⏱ ពិតក្នុង A189 ·
@@ -99,6 +102,96 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.119] — 2026-10-17 · ZoeW ៖ Login ZTO Palm ម្តង ប្រើបានគ្រប់ទូរស័ព្ទក្នុងសាខា (session ទុកលើ Server តាមសាខា) · ដកសំណល់ `expired`
+
+**ZoeW `2.50.119`** (`zoew-v381` ➜ `zoew-v382`) · ⛔ ZoeKeyGen មិនប្រែ · Function ZTO ប្រែ (`zto-order-detail.js` · `_shared/zto-palm.js` ៖ session Palm តាមសាខាក្នុង Netlify Blobs) ·
+rules មិនប្រែ · គ្មាន migration · គ្មាន env ថ្មី (ប្រើ `ZTO_PALM_SESSION_SECRET` និង store `zto-auth` ស្រាប់)។
+ម្ចាស់គម្រោង ៖ «អោយ ZTO Palm login ដំណើរការដូច Cookie blob 100%» · «Login Palm ម្តង ប្រើគ្រប់ទូរស័ព្ទ … បើសាខាផ្សេងគ្នា មាន Account Palm សម្រាប់សាខាខ្លូនឯងគ្រប់សាខា» ·
+«ស្វែងរកពាក្យ expired ផុតកំណត់ លុបចេញអោយអស់ ព្រោះ App លែងមានមុខងារហ្នឹងទៀតហើយ» ➜ តំបន់ចាក់សោ ZTO (`zto-palm-login.ts` · `_shared/zto-palm.js` · `zto-order-detail.js` ·
+`lookup-api.ts`) និងតំបន់ហាម (`app.css` ៖ ជួរ CSS ងាប់មួយ) កែតាមសំណើទាំងនេះ · របាយការណ៍ម្ចាស់គម្រោងលើ Preview ៖ «ពេលទូរស័ព្ទមួយទៀតផ្តាច់ទូរស័ព្ទមួយទៀត
+លោត Session ZTO Palm ផុតកំណត់» (សោដដែល · សាខាតែមួយ · backend តែមួយ) ➜ `zto-list-sync.ts` · `auto-lookup.ts` កែដែរ · `LOCK` ថ្មី · មូលហេតុ ➜ ផ្នែក ២ A203–A206។
+
+#### អ្វីដែលខុសពីមុន
+
+- 🔐 **Login ZTO Palm ទុកលើ Server តាមសាខា** (ដូច Cookie Blob) ៖ Login ក្នុង «API ស្វែងរកអតិថិជន» ➜ Function ទុក token ZTO (AES-GCM ដោយសោដេរីវេពី
+  `ZTO_PALM_SESSION_SECRET` · ចងនឹងសោភ្ជាប់) ក្នុង store `zto-auth` key `palm-session/<ស្លាកសោ>/<លេខសាខា>` ➜ ទូរស័ព្ទទុកតែ `palmShared: true` + គណនី (សាខា · ឈ្មោះ) ·
+  ⛔ គ្មាន session · `refreshToken` · ពាក្យសម្ងាត់ក្នុងទូរស័ព្ទ។
+- 📱 **ទូរស័ព្ទផ្សេងក្នុងសាខាដដែល** ៖ «ប្រើ Login Palm របស់ហាង» (`?palm=status`) ➜ ភ្ជាប់ភ្លាម ➜ ស្កេន · ទាញបញ្ជី · បិទតាម ZTO ដោយមិន Login · សាខាមកពីគណនី ZoeW
+  (Firebase `@zoew<សាខា>.com` · Supabase `branch_code`) ឬពីសាខាតែមួយគត់ដែលមាន session ➜ ទូរស័ព្ទផ្ញើ `X-Zoe-Palm-Site`។
+- 🏢 **សាខាច្រើនប្រើសោភ្ជាប់ដដែល** ៖ សាខានីមួយៗ Login គណនី Palm របស់ខ្លួន ➜ session ដាច់ពីគ្នា (មិនជាន់គ្នា) · គណនី ZoeW សាខា A មិនប្រើ session សាខា B (`branch:palm-other-branch`)។
+- 🔄 **Server Login ឡើងវិញដោយខ្លួនឯង** ៖ session អាយុ ≥ ៤ ម៉ោង ➜ ឆ្លើយភ្លាម ហើយ Login នៅ background (lease រវាង container) · ZTO បដិសេធ token (401) ➜ Login ម្តង
+  (single-flight) ហើយបន្តសំណើ · ZTO បដិសេធគណនី ➜ Server ចំណាំ ➜ គ្រប់ទូរស័ព្ទប្រាប់ «Login ZTO Palm ម្តងទៀត» (មិនព្យាយាមរាល់សំណើ) · បណ្ដាញធ្លាក់ ➜ 503 (សាកម្តងទៀត)។
+- 🔌 **«ផ្តាច់ Palm»** ផ្តាច់តែទូរស័ព្ទនោះ (មិនសួរ · មិនហៅ Server) ៖ Login Palm របស់សាខានៅលើ Server ➜ ទូរស័ព្ទផ្សេងស្កេន · ទាញបញ្ជីបានដដែល · «ប្រើ Login Palm របស់ហាង» ភ្ជាប់វិញ ·
+  Server គ្មានផ្លូវលុប Login របស់សាខា (`?palm=logout` ឆ្លើយ 405) ➜ Login ដោយគណនីថ្មីជំនួស Login ចាស់។
+- 🔑 Server ឆ្លើយ 401 ដោយមូលហេតុ ➜ ទាញបញ្ជី និងស្កេនប្រាប់មូលហេតុពិត (`palmSessionLostText()`) ៖ «Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server» (`palm:no-session`) ·
+  «ZTO បដិសេធ Login Palm របស់សាខានេះ» (`palm:login-rejected`) · «Server អាន Login Palm … មិនបាន» (`palm:unreadable`) · «Server មិនស្គាល់សាខា…» (`palm:branch-unknown`) ·
+  «Session ZTO Palm ផុតកំណត់» នៅតែសម្រាប់ session ផ្ទាល់ទូរស័ព្ទ ឬ 401 ដែលគ្មានមូលហេតុ។
+- 📲 ទូរស័ព្ទដែល Login Palm លើកំណែចាស់ (មាន `refreshToken`) ➜ refresh ម្តង ➜ ចូលរួម session សាខា ហើយលុប session ផ្ទាល់ · Blobs សរសេរមិនបាន ➜ session នៅលើទូរស័ព្ទដូចមុន (`shared: false`)។
+- 🩺 ជួរ Lookup (Palm) ៖ session ហាង ➜ សួរ Server (`?palm=1&diag=1`) មិនមែនអាន session ក្នុងទូរស័ព្ទ។
+- 🧹 **ដកសំណល់ `expired`** (មុខងារ «ផុតកំណត់» ត្រូវជំនួសដោយ «ត្រឡប់» តាំងពី 2.50.117) ៖ ថេរ `EXPIRED_TRASH_RETENTION_MS` ➜ `RETURNED_TRASH_RETENTION_MS` (តម្លៃដដែល ២ ថ្ងៃ) ·
+  ជួរ CSS ងាប់ `.trash-tag-expired` (គ្មានធាតុប្រើ · ស្លាក «ត្រឡប់» ប្រើ `.trash-tag-returned` ក្នុង `react-root.css`) · checker `expired-trash-retention-test` ➜
+  `returned-trash-retention-test` · ចំណងជើងតេស្ត/checker · README ឈប់ហៅកញ្ចប់ត្រឡប់ថា «ផុតកំណត់»/`expired` · ⛔ ឥរិយាបថ App មិនប្រែ ·
+  នៅរក្សា «ផុតកំណត់» ដែលពិត ៖ Activation Key · ហាង Supabase · វគ្គ Login ៤ ម៉ោង · Session Palm · កូដអញ្ជើញ/កូដប្តូរពាក្យសម្ងាត់ · អ្នកយាមអវត្តមាន `expired`។
+- 📄 `announcements.json` ៖ ចំណុចតែជុំនេះ · `guide.html` · `ZoeW/docs/ZTO-PALM.md` · `ZoeW/ZTO-SETUP-KH.md` · `CLAUDE.md` (ជួរ «ZTO Palm lookup» · ថេរ `RETURNED_TRASH_RETENTION_MS`)។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/zto-palm-shared.test.ts` (ថ្មី · ១៩ ៖ Function ពិត + Blobs ក្លែង ៖ ទូរស័ព្ទគ្មាន session ស្កេនបាន · ហាង/សោផ្សេងមិនឃើញ · Blob ចម្លងទៅសោផ្សេងបើកមិនបាន ·
+  401 ➜ Login ម្តងទោះស្កេនព្រមគ្នា ៥ · container ច្រើន ➜ lease CAS · ការបដិសេធគណនីចំណាំក្នុង Blob · Blobs គាំង/ធ្លាក់ · `?palm=logout` ➜ 405 Blob នៅ · diag · សាខា ២ · `require` សាខាផ្សេង) ·
+  `ZoeW/tests/zto-palm-shared-app.test.tsx` (ថ្មី · ១២ = ៦ × backend ២ ៖ App ពិត A Login ➜ B ប្រើ Login ហាង ➜ ទាញបញ្ជី · token ងាប់ ➜ Server Login ឡើងវិញ · ទូរស័ព្ទកំណែចាស់ ·
+  «ផ្តាច់ Palm» លើ A ➜ B ទាញបាន · Server គ្មាន Login ➜ សារមូលហេតុពិត · សាខា B តាមគណនី ZoeW) · `ZoeW/tests/zto-palm-login.test.tsx` · `ZoeW/tests/zto-palm-server.test.ts` (គ្មាន token ក្នុងទូរស័ព្ទ ➜ Server សម្រេច) ·
+  `ZoeW/tests/zto-lock.test.ts` (sha256 ថ្មី ៦) · `ZoeW/tests/forbidden-zone-lock.test.ts` (sha256 `app.css` ថ្មី) · `returned-trash-retention-test` (ឈ្មោះថ្មី · ការអះអាងដដែល) · `zto-cookie-session-test` · `code-duplication-test` · `clock-hygiene` (ធ្លាក់លើ commit ទី ១ ➜ A205)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy Preview (2.50.119) ➜ ទូរស័ព្ទ A ៖ Login ZTO Palm ➜ ស្កេន/ទាញបាន · ទូរស័ព្ទ B (សាខាដដែល · មានតែសោភ្ជាប់) ៖ «ប្រើ Login Palm របស់ហាង» ➜ ស្កេន/ទាញបានដោយមិនវាយពាក្យសម្ងាត់ (✅ ម្ចាស់គម្រោងបញ្ជាក់លើ Preview) ·
+   ⛔ មិនទាន់វាស់លើ ZTO ពិតថា token តែមួយប្រើលើទូរស័ព្ទច្រើនព្រមគ្នា ZTO ព្រម (ZTO បដិសេធ ➜ Server Login ឡើងវិញដោយខ្លួនឯង តែបើវាបដិសេធញឹកញាប់ ➜ ប្រាប់)។
+2. ទូរស័ព្ទ A ចុច «ផ្តាច់ Palm» ➜ មិនសួរ · ទូរស័ព្ទ B (សាខាដដែល) ស្កេន/ទាញបានដដែល (មិនលោត «ផុតកំណត់») · A ចុច «ប្រើ Login Palm របស់ហាង» ➜ ភ្ជាប់វិញដោយមិនវាយពាក្យសម្ងាត់
+   (✅ ម្ចាស់គម្រោង ៖ «សាកលើ Preview រួចហើយ ដំណើរការល្អ»)។
+3. សាខាពីរប្រើសោភ្ជាប់ដដែល ➜ Login គណនី Palm នៃសាខានីមួយៗ ➜ ទាញបញ្ជី ➜ ឈ្មោះ/លេខសាខាត្រូវ។
+4. គ្មាន rules · env · migration (Function deploy ជាមួយ App · ប្រើ Netlify Blobs ស្រាប់)។
+
+### [2.50.118] — 2026-10-17 · ZoeW ៖ ZTO Palm ទាញបញ្ជីកញ្ចប់មកដល់រសៀលគ្រប់ · ធុងសំរាម ចុចកាត «➖ ដក + ត្រឡប់» មើលតែប្រភេទនោះ · កញ្ចប់ត្រឡប់ដកតែពេលភស្តុតាងហត្ថលេខាគ្រប់ · Barcode ស្តាររួចមិនដកម្តងទៀត
+
+**ZoeW `2.50.118`** (`zoew-v380` ➜ `zoew-v381`) · ⛔ ZoeKeyGen មិនប្រែ · Function ZTO ប្រែ (`_shared/zto-palm.js` ៖ tab `4d`) · rules មិនប្រែ · គ្មាន migration · គ្មាន env ថ្មី។
+ម្ចាស់គម្រោង ៖ «deep audit … ពង្រឺងល្បឿន ZTO ទាញបញ្ជី/Lookup/ស្កេនត្រឡប់ ដកចូលធុងសំរាមតាម … អានកូដរកកំហុស ឬ ចន្លោះ … កុំជឿជាក់លើ checker» ·
+«ក្នុងធុងសំរាមពេលចុច កន្លែង ដក+ត្រឡប់ អោយlistបង្ហាញតែកញ្ចប់ ដកនិងត្រឡប់» ➜ តំបន់ចាក់សោ ZTO (`zto-status.ts` · `zto-list-sync.ts` · `zto/model.ts`) កែតាមសំណើនេះ ·
+`LOCK` ថ្មី · មូលហេតុ ➜ ផ្នែក ២ A196–A202។
+
+#### អ្វីដែលខុសពីមុន
+
+- 📥 **ទាញបញ្ជី ZTO Palm** (របាយការណ៍ម្ចាស់គម្រោង ៖ ថ្ងៃ 10-17 ដដែល Cookie ៦១ ថ្មី ⟷ Palm ៤៧ · កញ្ចប់មកដល់ 13:59–14:32 ខ្វះ · App Palm ឃើញវាក្នុង tab «បញ្ជូន») ៖
+  Function អាន tab «បញ្ជូន» ២ ដង ៖ គ្មានថ្ងៃ (ដដែល) និងតាម `dispEmpDateFrom`/`dispEmpDateTo` លើចន្លោះជ្រើស ➜ max(ដល់ថ្ងៃ, ថ្ងៃនេះ) ដូច App Palm (`4d`) ·
+  track នៅតែជាភស្តុតាងមកដល់តែមួយ (ថ្ងៃចាត់មិនមែនថ្ងៃមកដល់)។
+- 🗑️ **ធុងសំរាម** ៖ កាត «➖ ដក + ត្រឡប់» និង «✅ យករួច + លុប» ជាប៊ូតុង ➜ ចុច ➜ បញ្ជីតែប្រភេទនោះ (កាតមានគែមដិត · `aria-pressed`) · ចុចកាតដដែល ➜ ទាំងអស់ ·
+  ការស្វែងរកដំណើរការជាមួយ · កាតទាំង ២ នៅតួលេខពេញ · បន្ទាត់ «សរុប» រាប់តែប្រភេទដែលបង្ហាញ («បង្ហាញតែ ➖ ដក + ត្រឡប់») · បិទប្រអប់ ឬចាកចេញ ➜ តម្រងបាត់ ·
+  បង្ហាញតែប៉ុណ្ណោះ (🔄/✖️ នៅលើ id មួយ · គ្មានការសរសេរ)។
+- ↩️ **ពិនិត្យនៅខាងក្រោយ (Cookie)** ៖ ដកកញ្ចប់ត្រឡប់តែពេលអានបញ្ជី «ចុះហត្ថលេខា» បានពេញ ហើយមិនដកកញ្ចប់ណាដែលមានក្នុងបញ្ជីនោះ (មុននេះ ៖ ដករាល់ជុំ ហើយលើកលែងតែ ≤ ១០ ដែលបិទក្នុងជុំ)។
+- 📥 **ទាញបញ្ជី (Cookie)** ៖ បញ្ជីចុះហត្ថលេខាអានមិនគ្រប់ (`signedState` ≠ `ok`) ➜ មិនដកកញ្ចប់ត្រឡប់ · ជួរ «↩️» ប្រាប់ «📌 បើកក្នុង ZoeW · អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)»
+  (កុងតាក់បិទ ➜ សារកុងតាក់ដដែល)។
+- 🔄 **ស្តាររួចមិនដកម្តងទៀត** ៖ ការដកកញ្ចប់ត្រឡប់ផ្ញើម៉ោងត្រឡប់ក្នុងមួយ Barcode (`returnedAt`) ហើយ transaction ពិនិត្យជាមួយ Barcode លើ Server (`barcodeReturnCounts()` ៖ `createdAt` · `restoredAt`) ➜
+  ទូរស័ព្ទដែល view មិនទាន់ឃើញការស្តារ មិនដក Barcode នោះម្តងទៀត។
+- ⏱ ចាកចេញ · ប្តូរហាង · ប្តូរ Config Lookup ➜ វគ្គថ្មីអានបញ្ជីត្រឡប់ (Cookie) ភ្លាម (មុននេះ ៖ រង់ចាំដល់ ១ ម៉ោងរបស់វគ្គមុន)។
+- 💰 **ស្តារធាតុ «ត្រឡប់»** ៖ ពេលស្ថិតិចំណូលថ្ងៃលើទូរស័ព្ទនោះមិនទាន់ Sync ហើយធាតុមិនទាន់សម្គាល់ «ដករួច» ➜ «⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត»
+  (មិនស្តារដោយមិនបូកលុយវិញ) · Sync រួច ➜ ស្តារ ហើយបូកវិញធម្មតា។
+- 📄 ឯកសារ ៖ `CLAUDE.md` បញ្ជីតំបន់ចាក់សោ ZTO = គ្រប់ឯកសារក្នុង `LOCK` (`zto-palm-login.ts` · `_shared/zto-palm.js` ខ្វះ) · «📌» Handoff ៖ `main` 2.50.117 (មុន ៖ 2.50.111) · branch `claude/zto-audit`
+  merge រួចជា PR #326 (មុន ៖ «មិនទាន់ merge») · `trash-modal-test` ស្លាក «ដក + ត្រឡប់»។
+
+#### អ្នកយាម
+
+- `ZoeW/tests/trash-reason-filter.test.tsx` (ថ្មី · ៦ ៖ ចុច · ចុចម្តងទៀត · ប្តូរកាត · ស្វែងរក + តម្រង · ទទេ · បិទប្រអប់ · ទំព័រដំបូង · id ពិត · `ACTION_ALLOWLIST`) ·
+  `ZoeW/tests/zto-returned-cleanup.test.ts` +៧ (៤ ធ្លាក់លើ 2.50.117) · `trash-modal-test` +៣ (តម្រង ៖ កាត · សរុប · `aria-pressed`) · `empty-state-truth-test` (helper ថ្មី) ·
+  `ZoeW/tests/zto-returned.test.tsx` (fixture មាន `signedState: 'ok'` ដូចការទាញពិត · ការអះអាងមិនប្រែ) · `ZoeW/tests/zto-lock.test.ts` (sha256 ថ្មី ៣) ·
+  `ZoeW/tests/zto-palm-list-e2e.test.tsx` «📮» (ធ្លាក់លើ 2.50.117 ៖ ៥) · `ZoeW/tests/zto-palm-server.test.ts` (សំណើ tab «បញ្ជូន» ២) ·
+  `ZoeW/tests/cleanup-ledger-key.test.ts` «៩គ» (ធ្លាក់លើ 2.50.117) · `layout-check` ទទឹងប្រអប់វាស់ `offsetWidth` (A200 ៖ checker វាស់ចលនា មិនមែន App ខុស)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy Preview (2.50.118) ➜ Login ZTO Palm ➜ 📥 ទាញថ្ងៃដូច Cookie ➜ ចំនួនជួរ និង «🆕 ថ្មី» ស្មើ Cookie (កញ្ចប់មកដល់រសៀលមាន) ·
+   បើនៅខ្វះ ➜ 🧪 Barcode ដែលខ្វះ ➜ ផ្ញើ `queryTrackInfo` (track ZTO យឺត ➜ មូលហេតុផ្សេង)។
+2. 🗑️ ធុងសំរាម ➜ ចុច «➖ ដក + ត្រឡប់» ➜ បញ្ជីមានតែ «ដក» និង «ត្រឡប់» · ចុចម្តងទៀត ➜ ទាំងអស់ · «✅ យករួច + លុប» ដូចគ្នា (iPhone · Android · APK)។
+3. គ្មាន rules · env · migration (Function deploy ជាមួយ App)។
 
 ### [2.50.117] — 2026-10-17 · ZoeW ៖ ធុងសំរាម `returned` «ត្រឡប់» (ជំនួស «ផុតកំណត់») · ជូនដំណឹង «ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ» · លំដាប់ច្បាប់ ៧ ថ្ងៃ
 
@@ -2536,7 +2629,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - `ZoeW/tests/remove-stale-session.test.ts` ៖ យុថ្កាថ្មី (`deductCleanupRevenue` · ច្រកផ្ទាល់) ➜ `stale` មុនសារ/Sentry · `supabase-update-contract` ៖ `releaseCleanupLedgerKeys` = IDEMPOTENT ·
   `finalizeClaimedRestore` + សោដក ១ = BOUNDED។
 - `write-stall-guard-test` ផ្នែក ២ខ (ថ្មី) ៖ purge ជោគជ័យ តែការលុបសោ `ded` ព្យួរ ➜ មុនកែ **FAIL** (សោ `deletedCleanupInFlight` ជាប់ក្រោយ ១៧,៥ វិ.) ➜ ក្រោយកែ ដោះក្នុងពិដាន។
-- `expired-trash-retention-test` ៖ purge ដោះសោ `ded` តែរបស់ធុងសំរាម `expired` ដែល purge ពិត និង `at` ដដែល (សោ `at` ផ្សេង · `pickup` មិនប៉ះ)។
+- `returned-trash-retention-test` ៖ purge ដោះសោ `ded` តែរបស់ធុងសំរាម `expired` ដែល purge ពិត និង `at` ដដែល (សោ `at` ផ្សេង · `pickup` មិនប៉ះ)។
 - `emu/crud-rules-flow` ផ្នែក ៥ (ថ្មី) ៖ ការសម្អាតផុតកំណត់ពិតក្នុង sandbox ➜ payload ពិត (ប្រវត្តិ · ធុងសំរាម · ខែ · ថ្ងៃ + `ded` · flip) ➜ rules ពិតលើ emulator
   ទទួល · server ៖ ថ្ងៃ/ខែដក ៨,២៩ · ២ · `ded/id_e` = `{ at · cod · dod · count }` · ទិសផ្ទុយ ៖ rules គ្មាន `ded` ➜ បដិសេធ · `ded` ខុសទម្រង់ ➜ បដិសេធ
   (mutation បិទការសរសេរ `ded` ➜ ធ្លាក់ ៣)។ មុននេះផ្លូវសរសេរ `ded` គ្មានអ្នកវាស់ជាមួយ rules ពិត (fuzz គ្មាន op ផុតកំណត់)។
@@ -4132,6 +4225,40 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-17 — Deep audit PR #331 ជុំ ២ ៖ Login ZTO Palm ដូច Cookie Blob (session តាមសាខា) · សំណល់ `expired`
+
+សំណើ ៖ «Audit project ទាំងមូលឡើងវិញក្នុង PR331 … អោយ ZTO Palm login ដំណើរការដូច Cookie blob 100% … កុំជឿជាក់លើ checker … បើថ្ងៃក្រោយ app មានអតិថិជនប្រើច្រើន» ·
+«Login Palm ម្តង ប្រើគ្រប់ទូរស័ព្ទ ដូចម្តេចទៅ? សាខាតែមួយតែឧបករណ៍ច្រើនឬយ៉ាងណា?» · «ស្វែងរកពាក្យ expired ផុតកំណត់ លុបចេញអោយអស់»។ វិធី ៖ អានទ្វារ Palm ទាំងអស់
+(Login · refresh · ស្កេន · ទាញបញ្ជី · status · 🩺) ធៀបនឹង Cookie Blob (`resolveCookieCredential()` ៖ memory ➜ Blob ➜ env · ETag CAS · 401 ➜ អានឡើងវិញ) · fuzz ក្រៅ seed លំនាំដើម
+(`FUZZ_RUN0=300 FUZZ_RUNS=20 FUZZ_OPS=60` ៖ PASS ៣/៣ · `ledgerBlip` applied ៨ · lost ១០) · `git grep` ពាក្យ `expired`/«ផុតកំណត់» គ្រប់ឯកសារ។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A206 | **ទូរស័ព្ទមួយ «ផ្តាច់ Palm» ➜ ទូរស័ព្ទមួយទៀតលោត «Session ZTO Palm ផុតកំណត់»** (របាយការណ៍ម្ចាស់គម្រោងលើ Preview · សោដដែល · សាខាតែមួយ · backend តែមួយ) ៖ `disconnectZtoPalm()` លើទូរស័ព្ទ session ហាងហៅ `POST ?palm=logout` ➜ Function លុប Blob `palm-session/<ស្លាកសោ>/<សាខា>` (Login តែមួយរបស់សាខា) ➜ ទូរស័ព្ទផ្សេងទាំងអស់គ្មាន session · Server ឆ្លើយ 401 `ZTO_AUTH_EXPIRED` + `reason: palm:no-session` តែ App ទាញបញ្ជី (`zto-list-sync.ts`) និងស្កេន (`auto-lookup.ts`) មិនអាន `reason` ➜ «ផុតកំណត់» (session មិនបានផុត ៖ វាត្រូវលុប) | តេស្តមុនកែ ៖ ធ្លាក់ ៦ លើកូដ `c1036cb` ៖ Function `?palm=logout` ➜ 200 + លុប Blob (២ ៖ សាខា ១ · សាខា ២) · App «ផ្តាច់ Palm» ហៅ `confirm` + លុប Blob (២ backend) · សារ «🔑 Session ZTO Palm ផុតកំណត់…» ពេល Server គ្មាន Login (២ backend) | «ផ្តាច់ Palm» = ផ្តាច់តែទូរស័ព្ទនេះ (`disconnectZtoPalmLocally()` · មិនសួរ · មិនហៅ Server) · ដក `palmLogout()` និង `logout` ពី `isPalmPost()` ➜ `POST ?palm=logout` ឆ្លើយ 405 មុនសោភ្ជាប់ · `changeSiteIndex()` ➜ `addSiteIndex()` (គ្មានអ្នកដក) · `palmSessionLostText(cfg, reason)` ក្នុង `zto-palm-login.ts` (តែទូរស័ព្ទ session ហាង · មូលហេតុមិនស្គាល់ ➜ «ផុតកំណត់») · `palmEditSession()` គ្មានប៉ារ៉ាម៉ែត្រ · `LOCK` sha256 ថ្មី ៤ (`zto-palm-login.ts` · `_shared/zto-palm.js` · `zto-list-sync.ts` · `auto-lookup.ts`) · ក្រោយកែ ៖ ៣១/៣១ ជាប់ · ម្ចាស់គម្រោងសាកលើ Preview ៖ «ដំណើរការល្អ» |
+| A205 | **run-all STRICT លើ commit ទី ១ នៃជុំនេះ ៖ ជោគជ័យ ២០៨ · ធ្លាក់ ៤** (គ្មាន SKIP · emulator រស់) ៖ (១) `zto-cookie-session-test` ៖ Function ហៅ `require('./_shared/zto-palm')` លើ **គ្រប់** សំណើ (`isPalmQuery()` · `isPalmPost()`) ➜ សំណើ Cookie ផ្ទុក module Palm ដែរ · checker រត់ Function ក្នុង `vm` ជាមួយ `require` របស់ខ្លួន ➜ `MODULE_NOT_FOUND` (មុនជុំនេះ មានតែសំណើ `palm=` ផ្ទុកវា) · (២) `code-duplication-test` ៖ ប្លុកពិនិត្យវគ្គ ៩ បន្ទាត់ដដែលក្នុង `submitZtoPalmLogin()` និង `connectSharedZtoPalm()` · (៣) `clock-hygiene` ៖ ត្រា `palmLoginAt` (`Date.now()`) ផ្លាស់ទៅ `palmConfigFor()` ➜ ធាតុអនុញ្ញាត `submitZtoPalmLogin` ងាប់ · (៤) `modal-keyboard-device` ៣/៤ ៖ `lookupApiConfigModal` លើ tablet APK ផ្តេក ៖ ការរអិល ២៧px វាស់បាន ៨ ស៊ុម (១៦៧ ms នៃ ២៥០) ខណៈ lane browser ៤ រត់ស្របគ្នា | រត់តែឯង ៖ (១)–(៣) ធ្លាក់ដដែល (កំណត់បាន) · (៤) ជាប់ ១៨/១៨ ពីរដង ➜ ការវាស់ស៊ុមក្រោមបន្ទុក មិនមែនប្រអប់ខុស (⛔ មិនហៅ «flake» ៖ រត់ពេញម្តងទៀតក្រោយកែ) | Function ផ្ទុក module Palm តែពេលមាន `palm=` (`palmQuery.palm && …`) · helper តែមួយ `palmEditSession()` · ធាតុអនុញ្ញាតប្តូរទៅ `palmConfigFor` (ហេតុផលដដែល) · អត្ថបទបញ្ជាក់ «ផ្តាច់ Palm» និយាយពី **សាខា** (មិនមែនហាង) · `LOCK` sha256 ថ្មី |
+| A204 | **សំណល់មុខងារ «ផុតកំណត់» ក្រោយ 2.50.117** ៖ ធុងសំរាមប្រើតម្លៃតែមួយ `returned` («ត្រឡប់») តែឈ្មោះចាស់នៅ ៖ ថេរ `EXPIRED_TRASH_RETENTION_MS` (`session.ts` · `cleanup.ts` · `cleanup-rules-check.mjs` · checker ៨) · CSS `.trash-tag-expired` ក្នុង `app.css` (តំបន់ហាម · គ្មានធាតុណាមាន class នោះ ➜ ងាប់) · checker `expired-trash-retention-test` · id/ចំណងជើងតេស្ត (`expired_old` · `itm_expired` · «ជិតផុតកំណត់» · «កាលវិភាគផុតកំណត់») · README root «`expired` ➜ ២ ថ្ងៃ» ➜ session ក្រោយ `grep expired` អាចសន្មតថាមុខងារនៅរស់ ហើយសាងឡើងវិញ | `git grep -i expired` + «ផុតកំណត់» ៖ ញែកតាមអត្ថន័យ ៖ មុខងារធុងសំរាម ⟷ License · ហាង Supabase · វគ្គ Login · Session Palm/Cookie · កូដអញ្ជើញ · lease ស្តារ · ពាក្យ «កាលបរិច្ឆេទផុតកំណត់» (បញ្ជីរឹង) · `money:core` បង្កើតឡើងវិញ ➜ មិនប្រែ (ថេរមិននៅក្នុង money core) | ប្តូរឈ្មោះ ៖ `RETURNED_TRASH_RETENTION_MS` · `returned-trash-retention-test` (`RETURNEDTRASH_APP_DIR`) · លុបជួរ CSS ងាប់ (សំណើម្ចាស់គម្រោង · `forbidden-zone-lock` sha256 ថ្មី · ⛔ PTR/ចលនា/រមូរមិនប៉ះ) · ចំណងជើង «ជិតដល់ពេលត្រឡប់» ដូច UI (`NotifyDrawer` «កញ្ចប់ជិតដល់ពេលត្រឡប់») · រក្សា ៖ អ្នកយាមអវត្តមាន (`trash-modal-test` · `zto-returned-cleanup` · `expiry-return-policy` · probe rules ចាស់ក្នុង `emu/app-writes-rules-test`) និងសម្រង់ម្ចាស់គម្រោង · ⛔ ប្រវត្តិចាស់ (archive ៖ `EXPIRED_TRASH_RETENTION_MS` សម័យ vanilla) មិនសរសេរឡើងវិញ · ឈ្មោះ checker ក្នុងប្រវត្តិទាំង ២ ប្តូរតាម (លិបិក្រម) |
+| A203 | **Login ZTO Palm ជាប់ទូរស័ព្ទមួយ ⟷ Cookie ជាប់ Server** ៖ Cookie Argus ទុកក្នុង Blob ➜ គ្រប់ទូរស័ព្ទប្រើ (Sync ម្តង) · Palm ៖ session + `refreshToken` អ៊ិនគ្រីបក្នុង `zoew_lookup_api_config` របស់ទូរស័ព្ទនីមួយៗ ➜ ទូរស័ព្ទ ៥ = Login ៥ ដង (ពាក្យសម្ងាត់ Palm ត្រូវចែកឲ្យបុគ្គលិក) · ម្ចាស់គម្រោងបញ្ជាក់ ៖ សាខានីមួយៗមានគណនី Palm ផ្ទាល់ ➜ session ហាងតែមួយក្នុងសោភ្ជាប់មួយ នឹងឲ្យសាខា B ប្រើ token សាខា A | រចនា ៖ Blob `palm-session/<ស្លាកសោ>/<សាខា>` (AES-GCM · សោដេរីវេពី `ZTO_PALM_SESSION_SECRET` ស្លាក `zoew:palm:shared:v1:` · AAD = sha256(សោភ្ជាប់) ➜ Blob ចម្លងទៅសោផ្សេងបើកមិនបាន) + បញ្ជី `palm-sites/<ស្លាកសោ>` · memory ៦០ វិ (ស្កេនធម្មតាមិនអាន Blob) · ETag CAS (`onlyIfMatch`/`onlyIfNew`) គ្រប់ការសរសេរ · lease ៣០ វិ សម្រាប់ Login តាមអាយុ · single-flight `slot#age`/`slot#auth` · ការបដិសេធចុងក្រោយ ➜ សញ្ញា `rejected` អ៊ិនគ្រីប · សាខាពី `X-Zoe-Palm-Site` ➜ session ផ្ទាល់ ➜ សាខាតែមួយក្នុងបញ្ជី · តេស្ត Function ពិត ១៩ + App ពិត ១០ (Firebase · Supabase) ៖ Login ព្រមគ្នា ៥ ➜ ZTO ឃើញ Login ១ · container ៣ ➜ ១ · ⛔ មិនទាន់វាស់លើ ZTO ពិត ៖ token តែមួយលើទូរស័ព្ទច្រើនព្រមគ្នា · អត្រាកំណត់ Login របស់ ZTO | Login ម្តងក្នុងសាខា ➜ គ្រប់ទូរស័ព្ទនៃសាខា · ទូរស័ព្ទមិនកាន់ token/ពាក្យសម្ងាត់ · Blobs ធ្លាក់ពេល Login ➜ `shared: false` (ផ្លូវទូរស័ព្ទដូចមុន · fail-open) · ទូរស័ព្ទកំណែចាស់ចូលរួមតាម `?palm=refresh` · `require` + សាខាផ្សេង ➜ `branch:palm-other-branch` (មិនផ្ញើទៅ ZTO) · «📌» ៖ ម្ចាស់គម្រោងផ្ទៀងលើ Preview |
+
+ព្រំដែនសមត្ថភាព (អតិថិជនច្រើន · មិនកែ · ម្ចាស់គម្រោងសម្រេច) ៖ សំណើ Function រាប់តាមទូរស័ព្ទ (ការអានបញ្ជីចុះហត្ថលេខា · ស្កេន) មិនមែនតាមហាង ➜ កូតា Netlify ក្នុង
+«🗳️ សមត្ថភាពមុនដាក់ប្រើជាផ្លូវការ» · session Palm មួយក្នុងមួយសាខា ➜ សំណើ ZTO ទាំងអស់នៃសាខាប្រើ token ដដែល (អត្រាកំណត់ ZTO មិនទាន់វាស់)។ ការអានលុយ · លុប/ដក · race ·
+listener · SW · backend ២ លើកូដដែលប្រែក្នុង PR នេះ ៖ គ្មានកំហុសថ្មី (fuzz ខាងលើ · តេស្តដែលមានស្រាប់ក្នុង A196–A202)។
+
+### 2026-10-17 — Deep audit ផ្លូវ «កញ្ចប់ត្រឡប់ ➜ ធុងសំរាម» ៖ ហត្ថលេខាមិនឈ្នះគ្រប់ទ្វារ · view ចាស់ដក Barcode ស្តាររួចម្តងទៀត
+
+សំណើ ៖ «deep audit … ស្កេនត្រឡប់ ដកចូលធុងសំរាមតាម … អានកូដរកកំហុស ឬ ចន្លោះវិញអោយស្អាតកុំជឿជាក់លើ checker»។ វិធី ៖ អានទ្វារទាំង ៣ នៃ `removeReturnedZtoBarcodes()`
+(ទាញបញ្ជី · ពិនិត្យនៅខាងក្រោយ Cookie · Palm `status=1`) ធៀបនឹងច្បាប់ «ZTO sign evidence wins» · សរសេរតេស្ត App ពិត + Function ពិត + ZTO ក្លែង ដែលចូលស្ថានភាពនោះ ➜ ធ្លាក់លើ 2.50.117 ➜ កែ។
+run-all STRICT លើ 2.50.117 (emulator រស់) មុនកែ ៖ ជោគជ័យ ២១១ · ធ្លាក់ ១ (`layout-check` ➜ A200)។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A202 | **ទាញបញ្ជី Palm ខ្វះកញ្ចប់មកដល់រសៀល** (របាយការណ៍ម្ចាស់គម្រោង · រូបប្រអប់ ២) ៖ ថ្ងៃ 2026-10-17 ដដែល ៖ Cookie «ZTO ៥៥ ជួរ · 🆕 ៦១» (មកដល់ 13:59–14:32) ⟷ Palm «ZTO ៤១ ជួរ · 🆕 ៤៧» (មកដល់ 08:10–08:12 តែប៉ុណ្ណោះ) · 🔒 ២១ · ✍️ ៧ ស្មើគ្នា ➜ ខ្វះ ១៤ ជួរ · ម្ចាស់គម្រោងបញ្ជាក់ ៖ កញ្ចប់ដែលខ្វះ (មកដល់ 14:32) លេចក្នុង tab «បញ្ជូន» នៃ App Palm | App Palm អាន tab «បញ្ជូន» តាម `dispEmpDateFrom`/`dispEmpDateTo` (កាតាឡុក) ⟷ Function អាន `billStatus` `4` **គ្មានថ្ងៃ** (2.50.103 ៖ «without dispatch-date filtering» ដើម្បីកុំយកថ្ងៃចាត់ជាថ្ងៃមកដល់ · A180) ➜ ZTO ឆ្លើយបញ្ជីគ្មានថ្ងៃខុសពី tab ដែល App បង្ហាញ · ⛔ មិនទាន់វាស់លើ ZTO ពិតថាបញ្ជីគ្មានថ្ងៃឆ្លើយអ្វីពិតប្រាកដ (ម្ចាស់គម្រោងមិនទាន់ 🧪 track) ➜ ការកែជា superset ៖ មិនដកការអានគ្មានថ្ងៃ | tab `4d` = `billStatus` `4` + `dispEmpDate*` លើចន្លោះជ្រើស ➜ max(ដល់ថ្ងៃ, ថ្ងៃនេះ) (ដូចបញ្ជីចុះហត្ថលេខា) · បេក្ខភាពស្ទួនរវាង tab ដកក្នុងមួយទំព័រ (ជួរខុសទម្រង់រាប់ម្តង) · track នៅជាភស្តុតាងតែមួយ · `zto-palm-list-e2e` ZTO ក្លែង ៖ បញ្ជីគ្មានថ្ងៃមិនមានកញ្ចប់ចាត់ថ្ងៃនោះ ➜ 2.50.117 ៥ ធ្លាក់ · ការអានគ្មានថ្ងៃនៅ (កញ្ចប់ចាត់មុនចន្លោះ) · កញ្ចប់នៅតាមផ្លូវមិនក្លាយជាជួរ · «📌» ៖ ម្ចាស់គម្រោងផ្ទៀងលើ Preview |
+| A201 | **វគ្គថ្មីរង់ចាំការអានបញ្ជីត្រឡប់ដល់ ១ ម៉ោង** ៖ `ztoState.ztoReturnedSweepAt` (≤ ម្តង/`ZTO_OPEN_RECHECK_MS`) មិន reset ជាមួយវគ្គ ZTO (`clearZtoPickupStatusStore()` ៖ ចាកចេញ · ប្តូរហាង · ប្តូរ Config Lookup) ខណៈម៉ោងផ្សេងទាំងអស់ reset ➜ ហាងបន្ទាប់មិនដកកញ្ចប់ត្រឡប់រហូតដល់ ១ ម៉ោង · តេស្តចាស់ reset វាដោយដៃក្នុង `beforeEach` (បាំងចន្លោះ) | `zto-returned-cleanup.test.ts` «វគ្គថ្មីអានបញ្ជីត្រឡប់ភ្លាម» ៖ 2.50.117 ➜ សំណើ `returned=1` ០ | reset ក្នុង `clearZtoPickupStatusStore()` (តំបន់ចាក់សោ · សំណើនេះ · `LOCK`) |
+| A200 | **`layout-check` ធ្លាក់តែពេល run-all រវល់** ៖ run-all STRICT លើ 2.50.117 ៖ «modal លើ tablet/desktop មិនចង្អៀតជាងទូរស័ព្ទ» ➜ `pinSetupModal @768px 271u < 276u` · រត់តែឯង ➜ ជាប់ · ⛔ «flake» មិនមែនមូលហេតុ | រត់ ៤ ស្របគ្នា ➜ ១ ជាប់ · ១ ធ្លាក់ (លេខដដែល) · ២ លើសពិដាន · វាស់ទទឹងគ្រប់ទំហំ ៥ ដង ៖ ទំហំដដែលឲ្យលេខផ្សេងគ្នា (320 ៖ 272.3 · 278.7 · 284.1u · 768 ៖ 270.8–290.4u · 1280 ៖ 376–403u) · `.modal-content` មាន `width: 100%` + `max-width` (មិនអាស្រ័យអត្ថបទ) ➜ ទទឹងពិត 320 = 296px ÷ 1px = 296u · 768 = 353px ÷ 1.2px = 294u · 272.3 = 296 × **0.92** = `modalPopIn` ចាប់ផ្តើម (`scale(0.92)` ➜ 1 · bezier លើស ១) ➜ `getBoundingClientRect()` វាស់ទទឹងតាមដំណាក់កាលចលនា ➜ ក្រោមបន្ទុក ទំហំនីមួយៗវាស់ដំណាក់កាលផ្សេង · ⛔ App មិនខុស (ទទឹងពិត 768 = 294u ≥ 287u) | checker វាស់ `offsetWidth` (ទទឹង layout · មិនរាប់ transform) ដូចច្បាប់ «every measure stays transform-free» · App មិនប្រែ |
+| A199 | **ស្តារធាតុ «ត្រឡប់» ពេល ledger ថ្ងៃមិនទាន់ Sync ➜ លុយបាត់** ៖ ធាតុ `returned` ដែល flip មិនទាន់ដល់ (Barcode `isDeducted: false` · ledger ដករួច · សោ `ded/<trashId>`) ស្តារលើឧបករណ៍ដែល listener ledger ថ្ងៃ pending/failed ➜ `restoreLedgerKeyFor()` ត្រឡប់ `null` (អានសោមិនបាន) ➜ កញ្ចប់ត្រឡប់ចូលប្រវត្តិ **ដោយមិនបូក** ➜ គ្មាន journal លើឧបករណ៍នោះ ➜ ចំណូល · ចំនួនកញ្ចប់ ខ្វះជាអចិន្ត្រៃយ៍ | `cleanup-ledger-key.test.ts` «៩គ» ៖ flip ព្យួរ · journal បាត់ · view ledger ថ្ងៃ pending ➜ 2.50.117 ៖ ធុងសំរាមទទេ · ledger នៅ 90/9 (គួរ 100/10) | `restoreAwaitsLedgerView()` ៖ `returned` + គ្មាន Barcode `isDeducted` + view ledger ថ្ងៃមិនស្រស់ ➜ មិនស្តារ (មុន claim តាម preview · ក្រោយ claim តាម Server) ➜ «⏳ ស្ថិតិចំណូលមិនទាន់ Sync — សូមរង់ចាំបន្តិច ហើយស្តារម្តងទៀត» · គ្មានការសរសេរ · ស្រស់វិញ ➜ ស្តារបូក ១០ · `CLAUDE.md` ជួរ «Interrupted cleanup» |
+| A198 | **ទាញបញ្ជី (Cookie) ដកកញ្ចប់ត្រឡប់ ទោះបញ្ជីចុះហត្ថលេខាអានមិនបាន** ៖ `runZtoListSyncPreview()` ហៅ `removeReturnedZtoBarcodes(returned, …, signed)` ជានិច្ច ខណៈ `signed` មកពី companion `withSigned` ដែលអាច `signedOk: false` · `partial` ➜ កញ្ចប់ដែល ZTO ចុះហត្ថលេខា (អតិថិជនយករួច) + មានស្កេន `-710` ➜ ធុងសំរាម «ត្រឡប់» + ដកលុយ · ជួរ «↩️» សរសេរ «🗑️ … ធុងសំរាម» | `zto-returned-cleanup.test.ts` «ទាញបញ្ជី (Cookie) ៖ អានបញ្ជីចុះហត្ថលេខាមិនបាន» (ZTO `05` ឆ្លើយ 502) ៖ 2.50.117 ➜ Barcode ចេញពីប្រវត្តិ · ledger 100 ➜ 90 | ដកតែ `signedState === 'ok'` (Palm ៖ `ok` ជានិច្ច ព្រោះភស្តុតាងក្នុងមួយ Barcode) · `removeHeld` (`signed` · `switch`) ➜ «📌 … អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)» ⛔ មិនមែនសារ «កុងតាក់បិទ» · `zto-returned.test.tsx` fixture មាន `signedState: 'ok'` (ការទាញពិតមានជានិច្ច) |
+| A197 | **ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ហត្ថលេខាមិនឈ្នះ** ៖ `runZtoStatusSweep()` ហៅ `removeReturnedZtoBarcodes(back.returned, dataToScan)` **គ្មាន** កូដចុះហត្ថលេខា · `closeZtoSignedBarcodes()` បិទ ≤ `ZTO_STATUS_SWEEP_BATCH` (១០) ក្នុងមួយជុំ ហើយរំលង Barcode ដែល `ztoSignedCloseIsHeld()` ➜ Barcode ចុះហត្ថលេខាទី ១១.. នៅបើកលើ Server · transaction `abandon` `{ codes }` ឃើញ «បើក» ➜ ដក · ក៏ដកពេលបញ្ជីចុះហត្ថលេខាអានមិនបាន | តេស្ត ៖ Barcode ១១ ចុះហត្ថលេខា · Barcode ចុងក្រោយមាន `-710` ➜ 2.50.117 ៖ ធុងសំរាម «ត្រឡប់» · ledger 100 ➜ 99 · count 10 ➜ 9 · បញ្ជីចុះហត្ថលេខា 502 ➜ ដក | `closeZtoSignedBarcodes()` ត្រឡប់ `signedCodes` (គ្រប់កូដនៃការអានពេញ · `partial`/`truncated`/បរាជ័យ ➜ `null`) ➜ ការដកជាត្រឡប់រត់តែពេលមាន `signedCodes` ហើយលើកលែងពួកវា · ជុំក្រោយបិទ Barcode ទី ១១ ជា «យក» |
+| A196 | **view ចាស់ដក Barcode ដែលស្តាររួចម្តងទៀត** ៖ `ztoReturnedTargets()` ពិនិត្យ `ម៉ោងត្រឡប់ ≥ max(createdAt, restoredAt)` លើ view **ក្នុងទូរស័ព្ទ** តែ transaction `abandon` `{ codes }` ដកតាមឈ្មោះលើតម្លៃ Server ដោយមិនពិនិត្យម្តងទៀត ➜ ទូរស័ព្ទដែលក្រៅបណ្ដាញ (view មុនការស្តារ) ដក Barcode ដែលម្ចាស់គម្រោងស្តារ (`restoredAt` ក្រោយការត្រឡប់) ម្តងទៀត + ដកលុយម្តងទៀត | តេស្ត ៖ Server `restoredAt` = ១ ម៉ោងមុន · view ទូរស័ព្ទគ្មាន · ត្រឡប់ ១ ថ្ងៃមុន ➜ 2.50.117 ៖ Barcode ចេញ · ledger 100 ➜ 90 · ទិសផ្ទុយ (គ្មានការស្តារ) ➜ ដកដដែល | `opts.returnedAt` (Map កូដ ➜ ម៉ោងត្រឡប់) ➜ updater ពិនិត្យ `barcodeReturnCounts()` លើ Barcode Server · `barcodeReturnBasis()` ជារូបមន្តតែមួយ (`ztoReturnedTargets()` ប្រើដូចគ្នា) · `codes` គ្មាន `returnedAt` (តេស្តចាស់) ➜ ឥរិយាបថដើម |
+
 ### 2026-10-17 — Palm ៖ ល្បឿនជុំ ៣ (ម៉ូដែល) · Login ឡើងវិញនៅ background · អក្សរប្រអប់ខ្លី
 
 សំណើ ៖ «បើសិនជាអាចចង់បង្កើនល្បឿនថែមទៀត» · «អោយ Palm login នៅbackgroudខ្លួនឯង…» · «អក្សរវែងពេក…»។ លទ្ធផលពិត 2.50.111 ៖ 421 បេក្ខភាព ➜ 29 ជួរ ·
@@ -4955,7 +5082,7 @@ record ខែធំជាងមុន (egress) ➜ សោតែក្នុង�
 ក្នុង record ថ្ងៃ ➜ purge ២ ថ្ងៃលុបវា។ ការសរសេរ `ded` លើ rules ចាស់ (emulator) ៖ ៤០១ ➜ ថយទៅ token គ្មានសោ ➜ ២០០។
 
 **ជុំបញ្ចប់ (session ទី ៣ · run-all STRICT ពេញលើ `d0940f9` ៖ ១៩៦ ជាប់ · ធ្លាក់ ៦)** ៖ handoff រាយការណ៍តែ checker ពាក់ព័ន្ធ ៣០ ➜ run-all ពេញរកឃើញ ៖
-(១) sandbox ៣ ខ្វះ function ថ្មី (`expired-trash-retention-test` · `write-stall-guard-test` ៖ `cleanupLedgerKeyOf` · `connection-recovery-test` ៖
+(១) sandbox ៣ ខ្វះ function ថ្មី (`returned-trash-retention-test` · `write-stall-guard-test` ៖ `cleanupLedgerKeyOf` · `connection-recovery-test` ៖
 `runCleanupLedgerKeySweep` ➜ stub ដូចការងារសម្អាតផ្សេង) · (២) **bug ពិត** ៖ `releaseCleanupLedgerKeys()` គ្មានពិដាន ហើយ purge រង់ចាំវាក្រោមសោ ➜
 អ្នកយាម `write-stall-guard-test` ផ្នែក ២ខ មុនកែ FAIL ➜ `dbOp()` · (៣) លិបិក្រមខ្វះជួរ `ZoeW/tests/cleanup-ledger-key.test.ts` ·
 (៤) `zoew-suite-test` លើសពិដាន ៣០០ វិ. (ជំហាន ១៣ តាមលំដាប់ · `native:check` · `rules:check` មិនទាន់រត់) ➜ ⛔ មិនបង្កើន `CHECKER_TIMEOUT` ➜
@@ -6129,7 +6256,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `dom-hygiene` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `duplicate-money-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `duplicate-scan-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `empty-state-truth-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/app-network-e2e-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `emu/app-writes-rules-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
 | `emu/crud-rules-flow` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
@@ -6142,7 +6269,6 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `emu/supabase-rules-parity-test` | ផ្នែក ១ | — |
 | `emu/tx-disconnect-emu-test` | — | ផ្នែក ៦ · ផ្នែក ៧ |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `expired-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `export-cells-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
@@ -6231,6 +6357,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `restore-marker-hygiene-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `restore-race-test` | ផ្នែក ១ | — |
+| `returned-trash-retention-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
 | `revenue-fuzz-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `rules-duplicate-keys` | — | ផ្នែក ៣ · ផ្នែក ៧ |
@@ -6278,7 +6405,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `sw-shell-latency-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `toast-action-truth-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `toast-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
-| `trash-modal-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
+| `trash-modal-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៦ |
 | `ts-comments` | — | ផ្នែក ៦ |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -6290,7 +6417,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
 | `zto-budget-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ · ផ្នែក ៧ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `zto-cookie-session-test` | — | ផ្នែក ២ |
+| `zto-cookie-session-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `zto-cookie-store-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `zto-cookie-sync-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `zto-list-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ · ផ្នែក ៧ |
@@ -6450,6 +6577,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/toast-live-expiry.test.tsx` | — | ផ្នែក ៧ |
 | `ZoeW/tests/toast-parity.test.tsx` | — | ផ្នែក ៦ |
 | `ZoeW/tests/toast-visibility.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/trash-reason-filter.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/trash-retry-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/tx-outcome-timeout.test.ts` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/zone-format-cache.test.ts` | ផ្នែក ១ | — |
@@ -6474,6 +6602,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-refresh.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-returned-cleanup.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

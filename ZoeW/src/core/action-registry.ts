@@ -19,7 +19,7 @@ import { submitActivationKey } from '../features/license';
 import { openLockerPicker, saveLockerSettings, selectCustomLocker } from '../features/locker';
 import { cancelLocationChange, confirmLocationChange } from '../features/locker-assign';
 import { saveLookupApiConfig, testLookupApiConfig } from '../features/lookup-config';
-import { disconnectZtoPalm, submitZtoPalmLogin } from '../features/zto-palm-login';
+import { connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../features/zto-palm-login';
 import { exportMonthlyReportAsExcel, exportMonthlyReportAsPDF, renderMonthlyReport } from '../features/monthly-report';
 import { decodeImageFile, searchByPhone } from '../features/phone-suggest';
 import { saveNewSecurityPin, submitSecurityPinForm, verifySecurityPin } from '../features/pin';
@@ -29,7 +29,7 @@ import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '.
 import { drawerDiscardPendingWritesFlow } from '../features/pending-writes';
 import { applySheetImportHeaderRow, closeSheetImportModal, drawerSheetImportFlow, editSheetImportConfig, handleSheetImportFileInput, loadSheetImportSelectedSheet, pickSheetImportFile, renderSheetImportPreview, resetSheetImportFileSelection, runSheetImport, runSheetImportClear, saveSheetImportConfig } from '../features/sheet-import';
 import { openCollectedStatsModal, openDailyStatsModal, submitManualAdjustment } from '../features/stats-modals';
-import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, showMoreTrashRows, toggleTrashGroup } from '../features/trash';
+import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, showMoreTrashRows, toggleTrashGroup, toggleTrashReasonFilter } from '../features/trash';
 import { closeZtoListSyncModal, drawerZtoListSyncFlow, importZtoListRows, openZtoListSyncModal, runZtoListSyncPreview } from '../features/zto-list-sync';
 import { closeZtoSyncModal, drawerZtoAutoCloseFlow, openZtoSyncModal, recheckZtoPickupStatus } from '../features/zto-status';
 import { requestCameraPermission, toggleTorch } from '../services/camera';
@@ -44,6 +44,7 @@ import { showMoreHistoryRows } from '../ui/history-render';
 import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
+    connectSharedZtoPalm,
     disconnectZtoPalm,
     submitZtoPalmLogin,
     applySetupLinkFromInput,
@@ -192,6 +193,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     toggleRememberPassword,
     toggleTorch,
     toggleTrashGroup,
+    toggleTrashReasonFilter,
     updateBatchScanCount,
     updateLabelPrintPreview,
     verifySecurityPin,

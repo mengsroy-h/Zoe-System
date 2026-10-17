@@ -36,7 +36,7 @@ export const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 export const ABANDON_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
+export const RETURNED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -155,6 +155,7 @@ export function clearSensitiveModalFields() {
     securityState.appLockExcuseAt = 0;
     securityState.appLockVeiled = false;
     uiState.deletedSearchQuery = '';
+    uiState.trashReasonFilter = '';
     expandedTrashGroups.clear();
     uiState.activeParentItemId = null;
     securityState.lookupSecretKey = null;

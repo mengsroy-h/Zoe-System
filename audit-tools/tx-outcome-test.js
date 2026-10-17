@@ -7,7 +7,7 @@
 // Sentry ផលិតកម្ម ៖ ៧៧ event `disconnect` (zone money) លើ «Automatic cleanup transaction failed for» ពីឧបករណ៍ពិត។
 //
 // ផលពេល server អនុវត្ត តែ App ជឿថាបរាជ័យ ៖
-//   · ការសម្អាត ៖ កញ្ចប់ចេញពីប្រវត្តិ តែ **មិនចូលធុងសំរាម** · «ផុតកំណត់» **មិនដកលុយ** (ចំណូលកើតពីអាកាសធាតុ)
+//   · ការសម្អាត ៖ កញ្ចប់ចេញពីប្រវត្តិ តែ **មិនចូលធុងសំរាម** · «ត្រឡប់» **មិនដកលុយ** (ចំណូលកើតពីអាកាសធាតុ)
 //   · `correctRevenueLedgerToActual()` ៖ សាលក្រម `null` ➜ អនុវត្ត delta **ម្តងទៀត** ➜ **ដកលុយ ២ ដង**
 //
 // ⛔ ការកែជា **ចំណុចច្របាច់តែមួយ** ៖ `withTransactionOutcomeResolution()` រុំ `runTransaction` (ដំឡើងក្នុង
@@ -394,7 +394,7 @@ function runTx(run, p, updaterSrc) {
         ok('⛔ runTransaction ដែលជំនួសក្រោយការរុំ ត្រូវបានប្រើ (wrapper អាននៅពេលហៅ)', !!(run.box.__result && run.box.__result.committed), { result: run.box.__result, error: run.box.__error });
     }
 
-    console.log('\n── ៣. ⛔⛔ ការសម្អាត «ផុតកំណត់» ៖ disconnect ក្រោយ server អនុវត្ត ──');
+    console.log('\n── ៣. ⛔⛔ ការសម្អាត «ត្រឡប់» ៖ disconnect ក្រោយ server អនុវត្ត ──');
     const BCS = [{ code: 'D1', cod: 4.5, dod: 0.5, isClosed: false, isDeducted: false, isFromDeletion: false },
         { code: 'D2', cod: 3.25, dod: 0, isClosed: false, isDeducted: false, isFromDeletion: false }];
     const seed = (run) => {

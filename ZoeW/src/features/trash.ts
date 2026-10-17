@@ -17,6 +17,21 @@ export const TRASH_REASON_META = {
     delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
 };
 
+export const TRASH_FILTER_META = {
+    deducted: { note: 'បង្ហាញតែ ➖ ដក + ត្រឡប់', empty: 'គ្មានកញ្ចប់ «ដក» ឬ «ត្រឡប់» ក្នុងធុងសំរាមទេ' },
+    kept: { note: 'បង្ហាញតែ ✅ យករួច + លុប', empty: 'គ្មានកញ្ចប់ «យករួច» ឬ «លុប» ក្នុងធុងសំរាមទេ' }
+};
+
+export function trashFilterOf(value) {
+    return value === 'deducted' || value === 'kept' ? value : '';
+}
+
+export function trashGroupInFilter(group, filter) {
+    if (!filter) return true;
+    const meta = TRASH_REASON_META[group && group.reason] || TRASH_REASON_META.delete;
+    return (meta.deducted ? 'deducted' : 'kept') === filter;
+}
+
 export function trashReasonOf(item) {
     if (!item) return 'delete';
     if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason]) return item.trashReason;
@@ -109,8 +124,16 @@ export function toggleTrashGroup(key?) {
     renderRecentlyDeleted();
 }
 
+export function toggleTrashReasonFilter(bucket?) {
+    const next = trashFilterOf(bucket);
+    uiState.trashReasonFilter = trashFilterOf(uiState.trashReasonFilter) === next ? '' : next;
+    uiState.trashRenderLimit = TRASH_PAGE_ROWS;
+    renderRecentlyDeleted();
+}
+
 export function closeRecentlyDeletedModal() {
     uiState.deletedSearchQuery = '';
+    uiState.trashReasonFilter = '';
     expandedTrashGroups.clear();
     setFieldValue('deletedSearchInput', '');
     closeModal('recentlyDeletedModal');
@@ -133,16 +156,18 @@ export function openRecentlyDeletedModal() {
     openModalHelper('recentlyDeletedModal');
 }
 
-export function renderTrashSummary(groups, query) {
-    uiState.trashSummary = buildTrashSummaryModel(groups, query);
+export function renderTrashSummary(groups, query, filter = '') {
+    uiState.trashSummary = buildTrashSummaryModel(groups, query, filter);
     uiState.touch();
 }
 
 export function renderRecentlyDeleted() {
     const query = String(uiState.deletedSearchQuery || '').trim().toLowerCase();
+    const filter = trashFilterOf(uiState.trashReasonFilter);
     const allGroups = buildTrashGroups(dataState.deletedItems);
-    const groups = query ? allGroups.filter((group) => trashGroupMatchesQuery(group, query)) : allGroups;
-    renderTrashSummary(groups, query);
+    const found = query ? allGroups.filter((group) => trashGroupMatchesQuery(group, query)) : allGroups;
+    const groups = filter ? found.filter((group) => trashGroupInFilter(group, filter)) : found;
+    renderTrashSummary(found, query, filter);
 
     const liveKeys = new Set(allGroups.map((group) => group.key));
     Array.from(expandedTrashGroups).forEach((key) => { if (!liveKeys.has(key)) expandedTrashGroups.delete(key); });
@@ -150,8 +175,8 @@ export function renderRecentlyDeleted() {
     if (groups.length === 0) {
         uiState.trashView = {
             empty: query
-                ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ'
-                : emptyViewMessage([DB_LISTENER_KEY_DELETED], 'គ្មានទិន្នន័យដែលបានលុបទេ'),
+                ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ' + (filter && found.length ? ' (' + TRASH_FILTER_META[filter].note + ')' : '')
+                : emptyViewMessage([DB_LISTENER_KEY_DELETED], filter ? TRASH_FILTER_META[filter].empty : 'គ្មានទិន្នន័យដែលបានលុបទេ'),
             rows: [],
             more: 0,
             overflow: 0

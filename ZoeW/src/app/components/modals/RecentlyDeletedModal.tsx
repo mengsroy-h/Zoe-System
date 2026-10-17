@@ -9,7 +9,7 @@ export function RecentlyDeletedModal() {
         <Modal id="recentlyDeletedModal">
             <div className="modal-content trash-modal-content">
                 <h3>🗑️ ធុងសំរាម</h3>
-                <p>ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ</p>
+                <p>ត្រឡប់ (ថ្ងៃទី ៨ ឬ ZTO ស្កេនត្រឡប់)៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ</p>
                 <div className="trash-search-box">
                     <span className="icon">🔍</span>
                     <input

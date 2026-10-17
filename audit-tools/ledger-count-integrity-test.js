@@ -188,8 +188,8 @@ const r2 = (n) => Math.round(n * 100) / 100;
     // ── ១. ផុតកំណត់ ៨ ថ្ងៃ ៖ កញ្ចប់តែមួយ ────────────────────────────
     const one = await runCleanup('abandon', [{ code: 'BC1', cod: 2.71, dod: 0, isClosed: false }]);
     one.missing.forEach((n) => ok('ត្រូវមាន `' + n + '()` ក្នុងកូដ ship', false, 'អវត្តមាន'));
-    ok('លក្ខខណ្ឌចាំបាច់ ៖ កញ្ចប់ចូលធុងសំរាមជា «ផុតកំណត់»',
-        one.trash.length === 1 && one.trash[0].reason === 'expired', one.trash);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ កញ្ចប់ចូលធុងសំរាមជា «ត្រឡប់»',
+        one.trash.length === 1 && one.trash[0].reason === 'returned', one.trash);
     ok('⛔ លុយចុះលើ server ត្រឹមត្រូវ',
         !!one.server && r2(one.server.codDollar) === r2(one.start.cod - 2.71), one.server);
     ok('⛔⛔ **ចំនួនកញ្ចប់ក៏ចុះដែរ** (លេខ «ស្កេនតាមថ្ងៃ»)',

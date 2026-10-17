@@ -117,6 +117,27 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(viewState.palmLoginStatus).toContain('Test branch');
     });
 
+    it('Login ដោយដៃរក្សា refreshToken (Server បិទ) ដែលអ៊ិនគ្រីបដោយសោ PIN សម្រាប់ Login ឡើងវិញនៅ background · រក្សាពេលរក្សាការកំណត់ · ផ្តាច់ ➜ លុប', async () => {
+        const REFRESH = 'synthetic-sealed-refresh-token-from-server';
+        credentials();
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, sessionToken: SESSION, refreshToken: REFRESH, expiresAt: Date.now() + 8 * 3600000,
+            account: { siteCode: 'KH001', siteName: 'Test branch' } })));
+        const before = Date.now();
+        await act(async () => { await submitZtoPalmLogin(); });
+        const cfg = getLookupApiConfig();
+        const stored = appLocalStore.getItem('zoew_lookup_api_config')!;
+        for (const secret of [PASSWORD, REFRESH, 'palm-user']) expect(stored).not.toContain(secret);
+        expect(await decryptLookupSecret(cfg.palmRefreshTokenEnc)).toBe(REFRESH);
+        expect(cfg.palmLoginAt).toBeGreaterThanOrEqual(before);
+        act(() => { setFieldChecked('lookupApiAutoSubmitCheckbox', true); });
+        await act(async () => { await saveLookupApiConfig(); });
+        expect(getLookupApiConfig().palmRefreshTokenEnc).toEqual(cfg.palmRefreshTokenEnc);
+        expect(getLookupApiConfig().palmLoginAt).toBe(cfg.palmLoginAt);
+        act(() => disconnectZtoPalm());
+        expect(getLookupApiConfig().palmRefreshTokenEnc).toBeUndefined();
+        expect(getLookupApiConfig().palmLoginAt).toBeUndefined();
+    });
+
     it('wires form submission to login and sends credentials only to its own Function', async () => {
         credentials();
         vi.stubGlobal('fetch', vi.fn(async () => success()));

@@ -65,7 +65,12 @@ export const world = {
     sbDown: false,
     sbCalls: 0,
     certsDown: false,
-    palmSessions: [] as string[]
+    palmSessions: [] as string[],
+    logins: [] as Array<Record<string, unknown>>,
+    loginAnswer: null as null | ((body: any) => Response | Promise<Response>),
+    deadTokens: new Set<string>(),
+    issued: [] as string[],
+    loginSeq: new Map<string, number>()
 };
 
 export function deferred<T = void>() {
@@ -126,8 +131,16 @@ async function palmUpstream(href: string, init: any) {
     const path = new URL(href).pathname;
     const body = JSON.parse(String(init.body));
     if (path === '/zto/system/v1/doLogin') {
-        return respond({ status: true, result: { token: 'synthetic-palm-token-' + body.userName, countryCode: 'KH', siteCode: SITE, siteName: 'Test branch' } });
+        world.logins.push(body);
+        if (world.gate) await world.gate('login', String(body.userName), '');
+        if (world.loginAnswer) return world.loginAnswer(body);
+        const seen = (world.loginSeq.get(String(body.userName)) || 0) + 1;
+        world.loginSeq.set(String(body.userName), seen);
+        const token = 'synthetic-palm-token-' + body.userName + (seen > 1 ? '-r' + seen : '');
+        world.issued.push(token);
+        return respond({ status: true, result: { token, countryCode: 'KH', siteCode: SITE, siteName: 'Test branch' } });
     }
+    if (world.deadTokens.has(palmTokenOf(init))) return respond({ status: false, statusCode: 'token_expired' });
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + ':' + body.pageNum;
         world.zto.push(key);
@@ -196,15 +209,19 @@ export function clearServerEnv() {
     if (fn.resetCachesForTests) fn.resetCachesForTests();
 }
 
-export async function palmLogin(user = 'palm-user', idToken = '') {
+export async function palmLoginBody(user = 'palm-user', idToken = '') {
     const headers: Record<string, string> = { 'x-zoe-proxy-key': KEY };
     if (idToken) headers['x-zoe-id-token'] = idToken;
     const res = await fn.handler({ httpMethod: 'POST', headers, queryStringParameters: { palm: 'login' },
         body: JSON.stringify({ username: user, password: 'palm-pass', deviceSn: 'zoew-harness-device' }) });
     if (res.statusCode !== 200) throw new Error('palm login ' + res.statusCode + ' ' + res.body);
-    const session = JSON.parse(res.body).sessionToken as string;
-    world.palmSessions.push(session);
-    return session;
+    const body = JSON.parse(res.body);
+    world.palmSessions.push(body.sessionToken as string);
+    return body;
+}
+
+export async function palmLogin(user = 'palm-user', idToken = '') {
+    return (await palmLoginBody(user, idToken)).sessionToken as string;
 }
 
 export function shopOf(backend: Backend, site = SITE) {
@@ -226,11 +243,11 @@ export function signIn(backend: Backend, token: string, site = SITE) {
     }
 }
 
-export async function storePalmConfig(backend: Backend, session: string, site = SITE) {
+export async function storePalmConfig(backend: Backend, session: string, site = SITE, extra: Record<string, unknown> = {}) {
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true,
         url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}',
         headerName: 'X-Zoe-Proxy-Key', headerValueEnc: await encryptLookupSecret(KEY), palmTokenEnc: await encryptLookupSecret(session),
-        palmAccount: { siteCode: SITE, siteName: 'Test branch' }, shop: shopOf(backend, site) }));
+        palmAccount: { siteCode: SITE, siteName: 'Test branch' }, shop: shopOf(backend, site), ...extra }));
     appLocalStore.setItem('zoew_zto_listsync_v1', '1');
 }
 
@@ -247,6 +264,11 @@ export async function setupWorld(backend: Backend, mode: IdentityMode, opts: { s
     world.sbCalls = 0;
     world.certsDown = false;
     world.palmSessions.length = 0;
+    world.logins.length = 0;
+    world.issued.length = 0;
+    world.loginSeq.clear();
+    world.loginAnswer = null;
+    world.deadTokens.clear();
     serverEnv(mode);
     installFetch();
     appLocalStore.clear();
@@ -284,6 +306,8 @@ export function teardownWorld() {
     appLocalStore.clear();
     securityState.lookupSecretKey = null;
     world.gate = null;
+    world.loginAnswer = null;
+    world.deadTokens.clear();
     refTo('ztoListSyncFrom')(null);
     refTo('ztoListSyncTo')(null);
     clearServerEnv();

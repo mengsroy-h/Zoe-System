@@ -429,7 +429,7 @@ function runTx(run, p, updaterSrc) {
     {
         const run = makeRun({ plan: ['applied-disconnect'] });
         seed(run);
-        run.server.zoew_recently_deleted_cod_dod[ITEM_ID] = { id: ITEM_ID, trashReason: 'expired', deletedAt: NOW - 1000, barcodes: JSON.parse(JSON.stringify(BCS)) };
+        run.server.zoew_recently_deleted_cod_dod[ITEM_ID] = { id: ITEM_ID, trashReason: 'returned', deletedAt: NOW - 1000, barcodes: JSON.parse(JSON.stringify(BCS)) };
         vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
         await settle(400);
         ok('⛔⛔ ឧបករណ៍ផ្សេងសម្អាតរួច (trash/<id> មាន) ➜ មិនដកលុយ ២ ដង (100)', r2(run.server.zoew_daily_revenue_cod_dod[DAY].codDollar) === 100, run.server.zoew_daily_revenue_cod_dod[DAY]);

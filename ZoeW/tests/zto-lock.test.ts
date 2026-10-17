@@ -18,15 +18,15 @@ import { describe, expect, it } from 'vitest';
 const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
-    'src/features/zto-palm-login.ts': '09158b167b86395add3c6d47ae2e3854741416072a58fb87c5a58b82ee691741',
-    'netlify/functions/_shared/zto-palm.js': '2255a24822b108da33e0f7004e1ccd49b08cdb72820369c3eb620da2398836ea',
-    'netlify/functions/zto-order-detail.js': 'df4b2c0dbcb5b51c7c581c98c34f27905523b2838d160bc79c3a82981074bb16',
-    'src/features/zto-list-sync.ts': '7751538f518c04c7b36cf318a1652546bf234a1a48d26289973e6871237414ed',
-    'src/features/zto-status.ts': 'eaf66c64c3a25594250717c906939352386e2318ece58eedad4bb12d35bf78a6',
+    'src/features/zto-palm-login.ts': '6c7b56f9887a909134e77284665d29e0d40555f177d7c5e3df8177f4a96fb3d9',
+    'netlify/functions/_shared/zto-palm.js': '8b505595ff6d229c5f55ab27b576d8c201ed3957e9d7b09221e31beb2fe7bab4',
+    'netlify/functions/zto-order-detail.js': 'cb1c05a46458ac645730f2c92df872cf2b6f8e88a65ea9169ffa2ba54c137032',
+    'src/features/zto-list-sync.ts': '0a6523982297f4f0718c4de3d12c0ce51764e6e792935ffb69df293cd1fcc428',
+    'src/features/zto-status.ts': 'fda45afd13293bb5413746da41535b06682b0066e83fc8e9ed2e28d4ba230583',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
-    'src/features/auto-lookup.ts': '2baa4a9d7a0508ef08c82de72a6e0e4d1ac704e2938c99a4e6b3ba796b87eba2',
+    'src/features/auto-lookup.ts': '8f485fc7bd750f0c5e17aca4020613ba914bdd991a9b9d5430ad7a352d492d22',
     'src/features/lookup-api.ts': 'becc8a14319141d6d0e00736da251386a85302d57f6113ba53a24215ccfe1f55',
-    'src/app/components/zto/model.ts': '7ff06f4dbcb4de0bfd8a562c26577ab93df6961b653d778d8f13bf0211b50cab',
+    'src/app/components/zto/model.ts': 'b1c211b37235a3b7273374b72b6266e331f321a88f9c48f79bbb58000909cd0a',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',
     'src/app/components/modals/ZtoListSyncModal.tsx': 'c9d3c9bc49ac2d133ffefed161039040563994d4c0190a634e7bdb44cb2eb08e'
 };

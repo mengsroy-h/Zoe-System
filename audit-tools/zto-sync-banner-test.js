@@ -258,7 +258,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
 
     // ⛔ ទិសផ្ទុយ ៖ ធុងសំរាមប្រភេទផ្សេង **មិនរាប់** — «ដក» និង «ផុតកំណត់»
     // ដកលុយចេញ ហើយកញ្ចប់ត្រឡប់ទៅសាខាកណ្តាល ➜ ស្ថានភាព ZTO លែងពាក់ព័ន្ធ។
-    for (const reason of ['remove', 'expired', 'delete']) {
+    for (const reason of ['remove', 'returned', 'delete']) {
         const other = await page.evaluate((args) => {
             clearZtoPickupStatusStore();
             setZtoPickupVerdict('BAR000009', false);
@@ -503,10 +503,20 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const readRe = new RegExp('data\\.' + field + '\\b');
         ok('⛔ App ត្រូវអានឈ្មោះវាល **ដដែល** នឹង Function ផលិត ៖ ' + field,
             readRe.test(APP_SRC), field);
-        ok('⛔ App មិនត្រូវអានឈ្មោះផ្សេងសម្រាប់ស្ថានភាព ZTO',
-            (APP_SRC.match(/data\.zto[A-Za-z]+/g) || [])
-                .every((m) => m === 'data.' + field),
-            (APP_SRC.match(/data\.zto[A-Za-z]+/g) || []).slice(0, 4));
+        // ⛔ វាល ZTO ផ្សេងទៀត (ឧ. `ztoReturnedAt` ពី Palm `status=1`) ក៏ឆ្លងស្នាមដដែល ➜ ដេរីវេសំណុំឈ្មោះដែល Function **និង** ម៉ូឌុល Palm
+        // របស់វាផលិតពិត (`zto…:` ក្នុង object · `.zto… =`) ហើយទាមទារឲ្យរាល់ `data.zto…` ដែល App អាន ស្ថិតក្នុងសំណុំនោះ ➜ ឈ្មោះខុសមួយតួ ➜ ធ្លាក់។
+        const PALM_PATH = path.join(APP_DIR, 'netlify', 'functions', '_shared', 'zto-palm.js');
+        const PALM_SRC = fs.existsSync(PALM_PATH) ? fs.readFileSync(PALM_PATH, 'utf8') : '';
+        const emittedNames = new Set();
+        for (const m of (FN_SRC + '\n' + PALM_SRC).matchAll(/\b(zto[A-Z][A-Za-z]*)\s*:/g)) emittedNames.add(m[1]);
+        for (const m of PALM_SRC.matchAll(/\.(zto[A-Z][A-Za-z]*)\s*=(?!=)/g)) emittedNames.add(m[1]);
+        const appReads = APP_SRC.match(/data\.zto[A-Za-z]+/g) || [];
+        const unknownReads = appReads.filter((m) => !emittedNames.has(m.slice('data.'.length)));
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ សំណុំឈ្មោះដែល Function ផលិតមាន ' + field + ' (ដេរីវេពីកូដ)', emittedNames.has(field), Array.from(emittedNames));
+        ok('⛔ App អានតែឈ្មោះវាល ZTO ដែល Function ឬម៉ូឌុល Palm ផលិតពិត', appReads.length > 0 && unknownReads.length === 0,
+            { unknown: unknownReads.slice(0, 4), emitted: Array.from(emittedNames) });
+        ok('ទិសផ្ទុយ ៖ ឈ្មោះខុសមួយតួ (`data.ztoReturnAt` · `data.ztoClose`) មិនស្ថិតក្នុងសំណុំ ➜ ត្រូវចាប់',
+            !emittedNames.has('ztoReturnAt') && !emittedNames.has('ztoClose'));
     }
 
     console.log('\n== ៨. សាលក្រម «វាស់មិនបាន» ត្រូវចងចាំ — កុំហៅជាប់រហូត ==');

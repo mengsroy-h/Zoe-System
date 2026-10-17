@@ -180,7 +180,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         expect(getAt(HISTORY + '/' + ID)).toBeNull();
         const trash = getAt(TRASH + '/' + ID);
         expect(trash).not.toBeNull();
-        expect(trash.trashReason).toBe('expired');
+        expect(trash.trashReason).toBe('returned');
         expect(trash.barcodes[0].isDeducted).toBe(true);
         expect(getAt(DAILY + '/' + DAY).codDollar).toBe(90);
         expect(getAt(DAILY + '/' + DAY).totalCount).toBe(9);
@@ -208,7 +208,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
 
     it('3. reverse ៖ another device already holds trash/<id> · applied ➜ nothing overwritten · no deduction · journal cleared · no duplicate local copy', async () => {
         install('abandon', 'supabase');
-        const foreign = { id: ID, trashReason: 'expired', deletedAt: getServerNow() - 1000, isFromDeletion: false, scanDate: DAY, phone: '012', cod: 10, dod: 0, price: 10, count: 1, barcode: 'A',
+        const foreign = { id: ID, trashReason: 'returned', deletedAt: getServerNow() - 1000, isFromDeletion: false, scanDate: DAY, phone: '012', cod: 10, dod: 0, price: 10, count: 1, barcode: 'A',
             barcodes: [{ code: 'A', cod: 10, dod: 0, isClosed: false, isDeducted: true, isFromDeletion: false, time: '08:00:00 (' + DAY + ')', locker: 'N/A' }] };
         setAt(TRASH + '/' + ID, foreign);
         lab.hook = appliedAfterLostReply;
@@ -279,7 +279,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
     }, 20000);
 
     const slotEntry = (item: any) => {
-        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'expired',
+        const trashItem = { ...clone(item), deletedAt: getServerNow() - 5000, isFromDeletion: false, trashReason: 'returned',
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: false })) };
         noteCleanupJournalEntry({ id: ID, reason: 'abandon', journalAt: trashItem.deletedAt, stage: 'slot', trashItem,
             revenue: { scanDate: DAY, cod: 10, dod: 0, count: 1 } });
@@ -291,7 +291,7 @@ describe('automatic cleanup whose claim reply was lost (txOutcome applied) decid
         setAt(HISTORY + '/' + ID, null);
         dataState.scanHistory = [];
         slotEntry(item);
-        const foreign = { ...clone(item), deletedAt: getServerNow() - 1000, trashReason: 'expired', isFromDeletion: false,
+        const foreign = { ...clone(item), deletedAt: getServerNow() - 1000, trashReason: 'returned', isFromDeletion: false,
             barcodes: item.barcodes.map((b: any) => ({ ...b, isDeducted: true })) };
         setAt(TRASH + '/' + ID, foreign);
         expect(await resumeCleanupJournalEntry(ID)).toBe('');

@@ -39,3 +39,5 @@ export const ZTO_STATUS_STORE_KEY = 'zoew_zto_pickup_status_v1';
 export const ZTO_AUTOCLOSE_KEY = 'zoew_zto_autoclose_v1';
 
 export const ZTO_LISTSYNC_KEY = 'zoew_zto_listsync_v1';
+
+export const ZTO_PALM_PAGES_KEY = 'zoew_zto_palm_pages_v1';

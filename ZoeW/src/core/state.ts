@@ -617,6 +617,7 @@ export interface ZtoState {
     ztoListSyncInFlight: boolean;
     ztoListSyncResult: any;
     ztoSignedSweepAt: number;
+    ztoReturnedSweepAt: number;
     ztoSignedSweepOkAt: number;
     ztoSignedSweepWaitMs: number;
     ztoSignedCompleteAt: number;
@@ -651,6 +652,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoListSyncInFlight: false,
     ztoListSyncResult: null,
     ztoSignedSweepAt: 0,
+    ztoReturnedSweepAt: 0,
     ztoSignedSweepOkAt: 0,
     ztoSignedSweepWaitMs: 0,
     ztoSignedCompleteAt: 0,

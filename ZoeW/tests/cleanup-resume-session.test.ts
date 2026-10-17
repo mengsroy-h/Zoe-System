@@ -103,7 +103,7 @@ function trashItemOf() {
     const deletedAt = getServerNow() - 60000;
     const c = { code: 'C', time: '08:00:00 (' + DAY + ')', cod: 7, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: deletedAt - 9 * 86400000 };
     return { id: ID, phone: '012', scanDate: DAY, time: c.time, createdAt: c.createdAt, count: 1, cod: 7, dod: 0, price: 7, isClosed: false, barcode: 'C', barcodes: [c],
-        deletedAt, isFromDeletion: false, trashReason: 'expired' };
+        deletedAt, isFromDeletion: false, trashReason: 'returned' };
 }
 function install(stage: string, trashPresent: boolean, extra: any = {}) {
     const trashItem = trashItemOf();

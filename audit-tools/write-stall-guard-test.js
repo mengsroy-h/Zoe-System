@@ -243,7 +243,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         const w = buildWorld('ded-hang');
         const at = Date.now() - 3 * 24 * 3600 * 1000;
         w.ctx.__seedLedger({ '2027-01-10': { codDollar: 5, dodDollar: 0, totalCount: 1, ded: { id_3_a: { at, cod: 4.57, dod: 0, count: 1 } } } });
-        w.ctx.__seed([{ id: 'id_3_a', scanDate: '2027-01-10', deletedAt: at, trashReason: 'expired', barcodes: [{ code: 'DK1', isDeducted: true }] }]);
+        w.ctx.__seed([{ id: 'id_3_a', scanDate: '2027-01-10', deletedAt: at, trashReason: 'returned', barcodes: [{ code: 'DK1', isDeducted: true }] }]);
         w.ctx.__runPurge();
         await sleep(400);
         const hasKeyRelease = /function releaseCleanupLedgerKeys\(/.test(src);
@@ -259,7 +259,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         const w = buildWorld('ok');
         w.ctx.__seed([
             { id: 'id_2_a', deletedAt: Date.now() - 40 * 24 * 3600 * 1000, trashReason: 'delete', barcodes: [{ code: 'AA1' }] },
-            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'expired', barcodes: [{ code: 'BB2' }] },
+            { id: 'id_2_b', deletedAt: Date.now() - 3 * 24 * 3600 * 1000, trashReason: 'returned', barcodes: [{ code: 'BB2' }] },
             { id: 'id_2_c', deletedAt: Date.now() - 1000, trashReason: 'delete', barcodes: [{ code: 'CC3' }] }
         ]);
         w.ctx.__runPurge();

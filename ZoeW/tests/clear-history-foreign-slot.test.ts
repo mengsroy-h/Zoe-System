@@ -107,7 +107,7 @@ function oldExpiredCopy() {
     const at = getServerNow() - 3 * 3600000;
     const a = barcodeOf('A', 10, at - 3600000, true);
     return { id: ID, phone: '012', scanDate: DAY, time: a.time, createdAt: a.createdAt, count: 1, cod: 10, dod: 0, price: 10, barcode: 'A', barcodes: [a],
-        isClosed: false, deletedAt: at, isFromDeletion: false, trashReason: 'expired' };
+        isClosed: false, deletedAt: at, isFromDeletion: false, trashReason: 'returned' };
 }
 function install(items: any[], trash: Record<string, any>) {
     lab.store = {

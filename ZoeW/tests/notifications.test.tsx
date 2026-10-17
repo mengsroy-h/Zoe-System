@@ -259,7 +259,7 @@ describe('ផ្ទាំង 🔔 ក្នុង UI ពិត', () => {
 });
 
 function trashItem(id: string, deletedAt: number, barcodes: any[], extra: any = {}) {
-    return { id, phone: '0' + id.replace(/\D/g, '').padStart(8, '2'), deletedAt, barcodes, trashReason: 'expired', isFromDeletion: false, ...extra };
+    return { id, phone: '0' + id.replace(/\D/g, '').padStart(8, '2'), deletedAt, barcodes, trashReason: 'returned', isFromDeletion: false, ...extra };
 }
 
 describe('📤 កញ្ចប់ដែលដករួច ៖ ធុងសំរាម «ផុតកំណត់» (សំណើម្ចាស់គម្រោង)', () => {

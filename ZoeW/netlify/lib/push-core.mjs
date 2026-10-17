@@ -617,8 +617,8 @@ export function createPushService(deps) {
         const when = zoneParts(scheduleAt);
         return {
             kind: 'expiry',
-            title: '📦 ' + count + ' កញ្ចប់ជិតផុតកំណត់',
-            body: 'នឹងផុតកំណត់ក្នុង ២៤ ម៉ោង ➜ ប្រព័ន្ធដកចេញ (ដកលុយ) បើមិនទាន់យក · តាមទិន្នន័យម៉ោង ' + when.clock + ' ' + when.short,
+            title: '📦 ' + count + ' កញ្ចប់ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ',
+            body: 'សូមធ្វើការស្កេនត្រឡប់ក្នុង ២៤ ម៉ោង ៖ យកចេញពីទូ ហើយស្កេន «ត្រឡប់» ក្នុង ZTO · គោលការណ៍ក្រុមហ៊ុន ៖ កញ្ចប់លើស ៧ ថ្ងៃ ត្រឡប់ទៅសាខាកណ្តាល · តាមទិន្នន័យម៉ោង ' + when.clock + ' ' + when.short,
             tag: 'expiry',
             url: PUSH_OPEN_URL,
             urgency: 'normal'

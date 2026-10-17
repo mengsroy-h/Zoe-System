@@ -240,11 +240,11 @@ describe('ទិសផ្ទុយ ៖ ការប្រែពិតត្រ�
         step(() => {
             uiState.entryListView = entryView('012000111');
             uiState.lockerListView = lockerView('B7');
-            uiState.trashView = trashView('ផុតកំណត់');
+            uiState.trashView = trashView('ត្រឡប់');
         });
         expect(text('entry')).toContain('012000111');
         expect(text('locker')).toContain('B7');
-        expect(text('trash')).toContain('ផុតកំណត់');
+        expect(text('trash')).toContain('ត្រឡប់');
         step(() => {
             uiState.entryListView = entryView('012000999');
             uiState.lockerListView = lockerView('C3');

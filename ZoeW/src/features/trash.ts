@@ -12,7 +12,7 @@ export const TRASH_PAGE_ROWS = 20;
 
 export const TRASH_REASON_META = {
     remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
-    expired: { label: 'ផុតកំណត់', cls: 'trash-tag-expired', deducted: true },
+    returned: { label: 'ត្រឡប់', cls: 'trash-tag-returned', deducted: true },
     pickup: { label: 'យករួច', cls: 'trash-tag-pickup', deducted: false },
     delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
 };

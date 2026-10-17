@@ -29,7 +29,7 @@ function openItem(i: number) {
 }
 
 function trashItem(i: number) {
-    return { id: 'T' + i, phone: '0972' + String(100000 + i), deletedAt: Date.now() - (i + 1) * 60 * 1000, barcodes: [{ code: 'R' + i, locker: 'A-' + i }], trashReason: 'expired', isFromDeletion: false };
+    return { id: 'T' + i, phone: '0972' + String(100000 + i), deletedAt: Date.now() - (i + 1) * 60 * 1000, barcodes: [{ code: 'R' + i, locker: 'A-' + i }], trashReason: 'returned', isFromDeletion: false };
 }
 
 const head = (id: string) => document.getElementById(id) as HTMLButtonElement | null;

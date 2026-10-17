@@ -112,7 +112,7 @@ function seedBig(n) {
     // `renderRecentlyDeleted()` **មិនដែលត្រូវវាស់សោះ** — ចន្លោះដដែលនឹងមេរៀន
     // «checker ស្កេនឯកសារណាខ្លះ» តែនៅលើទិន្នន័យ seed។
     const trash = {};
-    const TRASH_REASONS = ['delete', 'remove', 'pickup', 'expired'];
+    const TRASH_REASONS = ['delete', 'remove', 'pickup', 'returned'];
     for (let i = 0; i < n; i++) {
         const id = 'trash_' + (now - i * 1000) + '_' + i;
         const reason = TRASH_REASONS[i % 4];
@@ -120,7 +120,7 @@ function seedBig(n) {
         const bcs = [];
         for (let k = 0; k < per; k++) {
             bcs.push({ code: 'TR' + i + '_' + k, time: '10:00', cod: 5, dod: 0, locker: 'A' + (i % 40),
-                isClosed: reason === 'pickup', isDeducted: (reason === 'remove' || reason === 'expired'),
+                isClosed: reason === 'pickup', isDeducted: (reason === 'remove' || reason === 'returned'),
                 isFromDeletion: (reason === 'delete' || reason === 'pickup'), createdAt: now - i * 1000 });
         }
         trash[id] = { id, phone: '09' + String(60000000 + (i % 400)).slice(0, 8), scanDate: d,

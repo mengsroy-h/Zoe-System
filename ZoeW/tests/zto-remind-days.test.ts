@@ -52,7 +52,7 @@ describe('⛔ របា «ZTO មិនទាន់បិទ» រំលឹក �
     });
 
     it('ទិសផ្ទុយ ៖ លុប · ដក · ផុតកំណត់ · សាលក្រម true ➜ មិនបង្ហាញ', () => {
-        const trash = [trashItem('ZTDEL', 2 * DAY, 'delete'), trashItem('ZTREM', 2 * DAY, 'remove'), trashItem('ZTEXP', 2 * DAY, 'expired'), trashItem('ZTOK', 2 * DAY)];
+        const trash = [trashItem('ZTDEL', 2 * DAY, 'delete'), trashItem('ZTREM', 2 * DAY, 'remove'), trashItem('ZTEXP', 2 * DAY, 'returned'), trashItem('ZTOK', 2 * DAY)];
         for (const t of trash.slice(0, 3)) setZtoPickupVerdict(t.barcodes[0].code, false);
         setZtoPickupVerdict('ZTOK', true);
         expect(ztoStatusPendingList([], trash)).toEqual([]);

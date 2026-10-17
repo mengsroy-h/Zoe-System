@@ -1720,6 +1720,9 @@
     "ZoeW/src/features/zto-palm-login.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/zto-returned.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/zto-status.ts": {
       "policy": "zoew-app"
     },
@@ -1894,6 +1897,12 @@
     "ZoeW/tests/ios-synthetic-click-focus.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-returned-cleanup.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-returned.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-remind-days.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -2060,6 +2069,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notify-groups.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/expiry-return-policy.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/notify-apk-link.test.tsx": {
@@ -2306,6 +2318,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-palm-race.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-refresh.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-returned.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-palm-server.test.ts": {
@@ -3449,6 +3467,9 @@
       "policy": "zoew-self-verification"
     },
     "supabase/migrations/20261016120000_zoe_linear_write.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261017053127_zoe_rules.sql": {
       "policy": "supabase-db"
     }
   }

@@ -4307,6 +4307,11 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-17 — CI PR #330 ៖ លិបិក្រមប្រវត្តិមិនទាន់តាមកំណត់ត្រាថ្មី
+
+- Audit #880 លើ `a32ec7f6` ៖ ផ្នែក ១ · ២ · ៤ ជាប់ · ផ្នែក ៣ ធ្លាក់តែ `doc-scope-test` ព្រោះលិបិក្រមខុស ៣ ជួរ ៖ `version-check` · `ZoeW/tests/zto-palm-login.test.tsx` · `ZoeW/tests/zto-palm-shared-app.test.tsx`។
+- ដេរីវេលិបិក្រមឡើងវិញតាមការលេចពិតក្នុងប្រវត្តិទាំង ២ និងឯកសារតេស្តបច្ចុប្បន្ន។ កែតែឯកសារ · គ្មានការឡើងកំណែ App · គ្មានសកម្មភាពដោយដៃថ្មី។
+
 ### 2026-10-17 — Audit PR #330 ៖ Sign ZTO Palm ធៀប App · ផ្ទាំង Sign · ពេលប្រើច្រើន
 
 វិធី ៖ អានកូដ PR ទាំង ១៣ commit (`zto-palm-sign.js` · `zto-palm-sign.ts` · `ZtoPalmSignModal.tsx` · `palm-sign-camera.ts`) ធៀប `CLAUDE.md` ·
@@ -6519,7 +6524,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `user-guide-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
-| `version-check` | — | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
+| `version-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `write-stall-guard-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៦ · ផ្នែក ៧ |
@@ -6705,12 +6710,12 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-palm-backends.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-list-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-race.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-refresh.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-returned.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-shared-app.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-shared.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

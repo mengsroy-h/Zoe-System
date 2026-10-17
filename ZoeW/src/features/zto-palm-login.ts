@@ -122,14 +122,14 @@ function palmLookupUrl(base) {
     return base.href.replace('%7Bbarcode%7D', '{barcode}');
 }
 
-function palmEditSession(inModal: boolean) {
+function palmEditSession() {
     const generation = ++editGeneration;
     const shop = shopScope();
     const auth = firebaseState.authGeneration;
     const key = securityState.lookupSecretKey;
     const stored = safeStoreGet(appLocalStore, 'zoew_lookup_api_config');
     const current = () => generation === editGeneration && shopScope() === shop && firebaseState.authGeneration === auth
-        && securityState.lookupSecretKey === key && (!inModal || modalIsOpen('lookupApiConfigModal'))
+        && securityState.lookupSecretKey === key && modalIsOpen('lookupApiConfigModal')
         && safeStoreGet(appLocalStore, 'zoew_lookup_api_config') === stored;
     return { generation, shop, key, current };
 }
@@ -144,7 +144,7 @@ async function palmProxyKey(cfg) {
 export async function submitZtoPalmLogin(event?: Event) {
     event?.preventDefault();
     if (viewState.palmLoginBusy) return;
-    const { generation, shop, key, current } = palmEditSession(true);
+    const { generation, shop, key, current } = palmEditSession();
     const cfg = getLookupApiConfig() || {};
     const dropped = () => {
         if (generation === editGeneration && modalIsOpen('lookupApiConfigModal')) {
@@ -221,7 +221,7 @@ function disconnectZtoPalmLocally(cfg) {
 
 export async function connectSharedZtoPalm() {
     if (viewState.palmLoginBusy) return;
-    const { generation, shop, key, current } = palmEditSession(true);
+    const { generation, shop, key, current } = palmEditSession();
     const cfg = getLookupApiConfig() || {};
     if (!key) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
     if (!shop) { viewState.palmLoginStatus = 'សូមចូលគណនី ZoeW ជាមុនសិន។'; return; }
@@ -271,40 +271,21 @@ export function disconnectZtoPalm() {
     cancelZtoPalmLogin();
     const cfg = getLookupApiConfig();
     if (!lookupApiIsPalm(cfg)) return;
-    if (!palmIsShared(cfg)) {
-        disconnectZtoPalmLocally(cfg);
-        return;
-    }
-    if (!window.confirm('ផ្តាច់ Login ZTO Palm របស់សាខានេះពី Server? ទូរស័ព្ទគ្រប់គ្រឿងនៃសាខានេះប្រើ Palm បានវិញក្រោយ Login ZTO Palm ម្តងទៀត។')) return;
-    return disconnectSharedZtoPalm(cfg);
+    const shared = palmIsShared(cfg);
+    if (!disconnectZtoPalmLocally(cfg) || !shared) return;
+    viewState.palmLoginStatus = 'បានផ្តាច់ Palm លើទូរស័ព្ទនេះ · Login Palm របស់សាខានៅលើ Server ➜ ទូរស័ព្ទផ្សេងប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង» ដើម្បីភ្ជាប់វិញ។';
 }
 
-async function disconnectSharedZtoPalm(cfg) {
-    const { generation, current } = palmEditSession(false);
-    viewState.palmLoginBusy = true;
-    viewState.palmLoginStatus = 'កំពុងផ្តាច់ Login Palm ពី Server…';
-    try {
-        const base = new URL(String(cfg.url).replace('{barcode}', 'x'), window.location.href);
-        base.search = '?palm=logout';
-        base.hash = '';
-        if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const proxyKey = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : '';
-        if (!current()) return;
-        if (!proxyKey) { viewState.palmLoginStatus = 'សូមបើកការកំណត់នេះដោយ PIN ម្តងទៀត។'; return; }
-        const headers = addPalmSiteHeader(cfg, { 'X-Zoe-Proxy-Key': proxyKey });
-        await addZtoIdentityHeader({ url: base.href }, headers);
-        if (!current()) return;
-        const out = await fetchWithTimeout(base.href, { method: 'POST', headers, cache: 'no-store' }, 15000, 'Palm logout timed out',
-            (response) => response.json().catch(() => null));
-        if (!current()) return;
-        if (!out.res.ok || !out.body?.success) { viewState.palmLoginStatus = palmLoginFailureText(out.body, out.res.status); return; }
-        disconnectZtoPalmLocally(cfg);
-        viewState.palmLoginStatus = 'បានផ្តាច់ Login Palm របស់ហាងពី Server។';
-    } catch (_) {
-        if (current()) viewState.palmLoginStatus = 'ផ្តាច់ពី Server មិនបាន។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្ដងទៀត។';
-    } finally {
-        if (generation === editGeneration) viewState.palmLoginBusy = false;
-    }
+const PALM_SESSION_LOST_TEXTS = {
+    'palm:no-session': 'Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server',
+    'palm:login-rejected': 'ZTO បដិសេធ Login Palm របស់សាខានេះ (ពាក្យសម្ងាត់ប្តូរ ឬ ZTO ស្នើផ្ទៀងផ្ទាត់)',
+    'palm:unreadable': 'Server អាន Login Palm របស់សាខានេះមិនបាន',
+    'palm:branch-unknown': 'Server មិនស្គាល់សាខារបស់ទូរស័ព្ទនេះ (សោភ្ជាប់មាន Login Palm ច្រើនសាខា)'
+};
+
+export function palmSessionLostText(cfg, reason) {
+    const text = palmIsShared(cfg) ? PALM_SESSION_LOST_TEXTS[reason] : '';
+    return text || 'Session ZTO Palm ផុតកំណត់';
 }
 
 export function palmRefreshAvailable(cfg?) {

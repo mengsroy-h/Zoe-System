@@ -96,8 +96,11 @@ URL, header និង field mapping ដោយស្វ័យប្រវត្�
   (App សាកម្តងទៀត) ហើយមិនសាកម្តងទៀតក្នុង 60 វិ · ZTO បដិសេធគណនី (`ZTO_PALM_LOGIN_REJECTED` · `ZTO_PALM_VERIFICATION_REQUIRED` ·
   `ZTO_PALM_COUNTRY_UNSUPPORTED`) ➜ Blob ទុកសញ្ញា «បដិសេធ» ➜ គ្រប់ container ឈប់ Login ហើយឆ្លើយ 401 `palm:login-rejected` ➜ Login ដោយដៃម្តងទៀត។
 - `ZTO_DETAIL_IDENTITY=require` ➜ គណនី Palm ត្រូវជាសាខាដូចគណនី ZoeW ដែលកំពុងចូល មុន Server ទុក session (`ZTO_OTHER_BRANCH` · `site:palm-other-branch`)។
-- ប៊ូតុង **ផ្តាច់ Palm** សួរបញ្ជាក់ ហើយ `POST ?palm=logout` លុប session សាខាខ្លួនពី Blob ➜ ទូរស័ព្ទគ្រប់គ្រឿងនៃសាខានោះឈប់ (container ផ្សេងឈប់ក្នុង ≤ 60 វិ · សាខាផ្សេងមិនប៉ះ) ·
+- ប៊ូតុង **ផ្តាច់ Palm** ផ្តាច់តែទូរស័ព្ទនោះ (មិនហៅ Server) ៖ session របស់សាខានៅក្នុង Blob ➜ ទូរស័ព្ទផ្សេងនៃសាខាប្រើបានដដែល · ចុច «ប្រើ Login Palm របស់ហាង»
+  ដើម្បីភ្ជាប់វិញ · Function គ្មានផ្លូវលុប session របស់សាខា ➜ Login ដោយគណនីថ្មីជំនួស session ចាស់ ·
   ប្តូរ `ZTO_PALM_SESSION_SECRET` ឬសោភ្ជាប់ ➜ session ហាងបើកមិនបាន ➜ Login ម្តងទៀត · ប្តូរពាក្យសម្ងាត់ Palm ➜ ZTO បដិសេធការ Login ឡើងវិញ ➜ Login ម្តងទៀត។
+- 401 `ZTO_AUTH_EXPIRED` មានមូលហេតុ (`reason`) ➜ App ប្រាប់មូលហេតុនោះ ៖ `palm:no-session` «Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server» · `palm:login-rejected` ·
+  `palm:unreadable` · `palm:branch-unknown` · គ្មានមូលហេតុ ឬ session ផ្ទាល់ទូរស័ព្ទ ➜ «Session ZTO Palm ផុតកំណត់»។
 - 🩺 (`?palm=1&diag=1`) ប្រាប់ប្រភព session (`shared` · `device` · `none`) · សាខា · អាយុ ដោយមិនបង្ហាញ token។
 - Blobs មិនទទួលការសរសេរពេល Login (`shared: false`) ➜ ទូរស័ព្ទនោះរក្សា session ដែល Server បិទ (AES-GCM · ចងនឹងសោភ្ជាប់ · ៨ ម៉ោង) និង `refreshToken`
   (ផុត 30 ថ្ងៃ) អ៊ិនគ្រីបម្តងទៀតដោយសោ PIN ➜ `POST ?palm=refresh` (ពេល session មានអាយុ ≥ 4 ម៉ោង ឬ ZTO បដិសេធ) ចូលរួម session ហាងបើមាន

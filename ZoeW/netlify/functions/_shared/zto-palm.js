@@ -494,14 +494,14 @@ async function readSiteIndex(label, store, timeoutMs, force) {
     return Object.assign({ ok: true }, entry);
 }
 
-async function changeSiteIndex(label, store, site, add) {
+async function addSiteIndex(label, store, site) {
     const code = slotSite(site);
     if (!store || !label || !code) return false;
     for (let attempt = 0; attempt < 3; attempt++) {
         const current = await readSiteIndex(label, store, SHARED_READ_TIMEOUT_MS, true);
         if (!current.ok) return false;
-        if (current.sites.includes(code) === add) return true;
-        const sites = add ? current.sites.concat(code).slice(-SHARED_SITES_MAX) : current.sites.filter((one) => one !== code);
+        if (current.sites.includes(code)) return true;
+        const sites = current.sites.concat(code).slice(-SHARED_SITES_MAX);
         const options = current.missing ? { onlyIfNew: true } : (current.etag ? { onlyIfMatch: current.etag } : {});
         const out = await settleWithin(() => store.set(SHARED_INDEX_PREFIX + label, JSON.stringify({ v: 1, sites }), options), SHARED_WRITE_TIMEOUT_MS);
         if (!out.ok) return false;
@@ -605,27 +605,10 @@ async function palmLogin(event, credential, proxyKey, keys, deps, env, joining) 
         if (condition) shared = await writeShared(slot, data, store, proxyKey, env, condition) === 'ok';
         if (shared) {
             clearRenewFailures(slot);
-            await changeSiteIndex(deps.keyLabel, store, login.site, true);
+            await addSiteIndex(deps.keyLabel, store, login.site);
         }
     }
     return sessionResponse(data, credential, proxyKey, env, shared);
-}
-
-async function palmLogout(event, deps) {
-    const access = await deps.loginAccess();
-    if (access && access.response) return access.response;
-    const store = sharedStoreOf(deps);
-    if (!store) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
-    const site = slotSite(deps.headerOf(event, SITE_HEADER)) || (await singleIndexedSite(deps, store)).site;
-    const slot = slotOf(deps, site);
-    if (!slot) return json(400, { code: 'ZTO_PALM_BRANCH_UNKNOWN' });
-    if (otherBranch(access, site)) return json(403, { code: 'ZTO_OTHER_BRANCH', reason: 'site:palm-other-branch' });
-    const out = await settleWithin(() => store.delete(SHARED_KEY_PREFIX + slot), SHARED_WRITE_TIMEOUT_MS);
-    if (!out.ok) return json(503, { code: 'ZTO_PALM_STORE_UNAVAILABLE' });
-    rememberShared(slot, null, '', true);
-    clearRenewFailures(slot);
-    await changeSiteIndex(deps.keyLabel, store, site, false);
-    return json(200, { success: true, provider: 'zto-palm', shared: false, account: { siteCode: site } });
 }
 
 async function palmStatus(event, proxyKey, deps, env) {
@@ -659,7 +642,6 @@ async function palmStatus(event, proxyKey, deps, env) {
 }
 
 async function palmPost(event, query, proxyKey, keys, deps, env) {
-    if (query.palm === 'logout') return await palmLogout(event, deps);
     if (event.isBase64Encoded || typeof event.body !== 'string' || Buffer.byteLength(event.body) > 4096) {
         return json(400, { code: 'ZTO_PALM_LOGIN_INVALID' });
     }
@@ -761,7 +743,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
 }
 
 function isPalmPost(query) {
-    return !!query && (query.palm === 'login' || query.palm === 'refresh' || query.palm === 'logout');
+    return !!query && (query.palm === 'login' || query.palm === 'refresh');
 }
 
 function isPalmQuery(query) {

@@ -30,7 +30,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
 import { showToast } from '../ui/toast';
 import { saveBarcodeOrigins } from './barcode-origin';
-import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, refreshZtoPalmSession } from './zto-palm-login';
+import { notePalmSiteName, noteZtoPalmSessionRejected, palmRefreshAvailable, palmSessionLostText, refreshZtoPalmSession } from './zto-palm-login';
 
 export const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
 
@@ -1092,8 +1092,9 @@ export async function runZtoListSyncPreview() {
             setZtoListSyncNote('🔄 Session ZTO Palm ផុតកំណត់ — កំពុង Login ឡើងវិញដោយស្វ័យប្រវត្តិ ➜ សូមទាញម្តងទៀតបន្តិចទៀត');
             showToast('ℹ️ កំពុង Login ZTO Palm ឡើងវិញ');
         } else if (e && e.httpStatus === 401 && lookupApiIsPalm(cfg)) {
-            setZtoListSyncNote('🔑 Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
-            showToast('⚠️ Session ZTO Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀត');
+            const lost = palmSessionLostText(cfg, e.upstreamReason);
+            setZtoListSyncNote('🔑 ' + lost + ' — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន» រួចទាញម្តងទៀត');
+            showToast('⚠️ ' + lost + ' — សូម Login ZTO Palm ម្តងទៀត');
         } else {
             const detail = e && e.httpStatus ? ' (HTTP ' + e.httpStatus + (e.upstreamReason ? ' · ' + e.upstreamReason : '') + (e.barcode ? ' · Barcode ' + e.barcode : '') + ')' : '';
             setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន' + detail + ' — សូមសាកម្ដងទៀត');

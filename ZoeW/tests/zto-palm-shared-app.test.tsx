@@ -2,7 +2,10 @@
  * ⛔ សំណើម្ចាស់គម្រោង ៖ «អោយ ZTO Palm login ដំណើរការដូច Cookie blob 100%» — ផ្លូវ App ពិត លើ backend ទាំង ២។
  *    ទូរស័ព្ទ A ៖ Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន» ➜ Server ទុក session របស់ហាង ➜ ទូរស័ព្ទមិនទុក session/refreshToken ឡើយ ·
  *    ទូរស័ព្ទ B ៖ មានតែសោភ្ជាប់ ➜ «ប្រើ Login Palm របស់ហាង» ➜ ទាញបញ្ជី ZTO ដោយមិន Login · ZTO បដិសេធ token ➜ Server Login ឡើងវិញដោយខ្លួនឯង ·
- *    ទូរស័ព្ទកំណែចាស់ (មាន refreshToken) ➜ refresh ➜ ចូលរួម session ហាង ហើយលុប session ផ្ទាល់ · «ផ្តាច់ Palm» ➜ លុបពី Server។
+ *    ទូរស័ព្ទកំណែចាស់ (មាន refreshToken) ➜ refresh ➜ ចូលរួម session ហាង ហើយលុប session ផ្ទាល់ ·
+ *    ⛔ របាយការណ៍ម្ចាស់គម្រោង (សោដដែល · សាខាតែមួយ · backend តែមួយ) ៖ «ពេលទូរស័ព្ទមួយផ្តាច់ ទូរស័ព្ទមួយទៀតលោត Session ZTO Palm ផុតកំណត់» ➜
+ *    «ផ្តាច់ Palm» ផ្តាច់តែទូរស័ព្ទនោះ (Login របស់សាខានៅលើ Server · ទូរស័ព្ទផ្សេងប្រើបានដដែល) · Server គ្មាន Login របស់សាខា ➜ សារប្រាប់មូលហេតុពិត
+ *    (មិនមែន «ផុតកំណត់»)។
  *    App ពិត + Function ពិត + Blobs ក្លែង + ZTO Palm ក្លែង (`zto-palm-harness.ts`)។
  */
 import { act } from 'react';
@@ -16,9 +19,11 @@ import { viewState } from '../src/core/view-state';
 import { openLookupApiConfigModal } from '../src/features/lookup-config';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
+import { attemptAutoLookup } from '../src/features/auto-lookup';
+import { scanState } from '../src/core/state';
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, refreshZtoPalmSession, resetZtoPalmRefresh, submitZtoPalmLogin, PALM_REFRESH_AGE_MS } from '../src/features/zto-palm-login';
 import { encryptLookupSecret } from '../src/services/crypto';
-import { ARRIVED, KEY, NOW, OTHER_SITE, SITE, identityToken, palmLoginBody, pulledRows, setupWorld, shopOf, signIn, storePalmConfig, teardownWorld, useSharedBlobs, world, type Backend } from './zto-palm-harness';
+import { ARRIVED, KEY, NOW, OTHER_SITE, SITE, fn, identityToken, noteText, palmLoginBody, pulledRows, setupWorld, shopOf, signIn, storePalmConfig, teardownWorld, toastTexts, useSharedBlobs, world, type Backend } from './zto-palm-harness';
 
 const BACKENDS: Backend[] = ['firebase', 'supabase'];
 const STORE = 'zoew_lookup_api_config';
@@ -126,25 +131,78 @@ describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូ�
         expect(new Set(sent).size).toBe(1);
     });
 
-    it('«ផ្តាច់ Palm» (session ហាង) ➜ សួរបញ្ជាក់ ➜ លុបពី Server ➜ ទូរស័ព្ទផ្សេងឈប់ប្រើ', async () => {
+    it('«ផ្តាច់ Palm» លើទូរស័ព្ទ A ➜ ផ្តាច់តែ A (មិនសួរ · មិនហៅ Server) · Login របស់សាខានៅលើ Server · ទូរស័ព្ទ B ទាញបានដដែល · A ភ្ជាប់វិញដោយមិន Login', async () => {
         await setupWorld(backend, 'off');
         useSharedBlobs();
         const shop = stored().shop;
         await proxyOnlyConfig(shop);
         await openModal();
+        world.logins.length = 0;
         setFieldValue('ztoPalmUsernameInput', 'palm-user');
         setFieldValue('ztoPalmPasswordInput', 'palm-pass');
         await act(async () => { await submitZtoPalmLogin(); });
-        expect(sessionKeys().length).toBe(1);
-        vi.stubGlobal('confirm', vi.fn(() => false));
+        const phoneA = appLocalStore.getItem(STORE)!;
+        await proxyOnlyConfig(shop);
+        act(() => openLookupApiConfigModal());
+        await act(async () => { await connectSharedZtoPalm(); });
+        const phoneB = appLocalStore.getItem(STORE)!;
+        expect(JSON.parse(phoneB)).toMatchObject({ palmShared: true });
+
+        appLocalStore.setItem(STORE, phoneA);
+        act(() => openLookupApiConfigModal());
+        expect(viewState.palmLoginConnected).toBe(true);
+        const confirm = vi.fn(() => true);
+        vi.stubGlobal('confirm', confirm);
+        const calls = vi.mocked(fetch).mock.calls.length;
         await act(async () => { await disconnectZtoPalm(); });
-        expect(sessionKeys().length, 'បោះបង់ ➜ មិនលុប').toBe(1);
-        vi.stubGlobal('confirm', vi.fn(() => true));
-        await act(async () => { await disconnectZtoPalm(); });
-        expect(sessionKeys().length).toBe(0);
+        expect(confirm, 'ផ្តាច់តែទូរស័ព្ទនេះ ➜ មិនសួរបញ្ជាក់').not.toHaveBeenCalled();
+        expect(vi.mocked(fetch).mock.calls.slice(calls).map((c) => String(c[0])), 'មិនហៅ Server').toEqual([]);
+        expect(sessionKeys().length, 'Login Palm របស់សាខានៅលើ Server').toBe(1);
         expect(new URL(stored().url).searchParams.get('palm')).toBeNull();
         expect(stored().palmShared).toBeUndefined();
         expect(viewState.palmLoginConnected).toBe(false);
+        expect(viewState.palmLoginStatus).toContain('ទូរស័ព្ទនេះ');
+        const phoneAOff = appLocalStore.getItem(STORE)!;
+
+        appLocalStore.setItem(STORE, phoneB);
+        act(() => { uiState.modalDisplay = {}; uiState.isModalOpen = false; });
+        await runZtoListSyncPreview();
+        expect([...pulledRows().keys()].sort(), 'ទូរស័ព្ទ B ទាញបានក្រោយ A ផ្តាច់').toEqual(ARRIVED.slice().sort());
+        expect(noteText()).not.toContain('ផុតកំណត់');
+        expect(toastTexts().join(' ')).not.toContain('ផុតកំណត់');
+
+        appLocalStore.setItem(STORE, phoneAOff);
+        await openModal();
+        await act(async () => { await connectSharedZtoPalm(); });
+        expect(stored(), 'A ភ្ជាប់វិញពី Login របស់សាខា').toMatchObject({ palmShared: true, palmAccount: { siteCode: SITE } });
+        expect(world.logins, 'គ្មាន Login ZTO ថ្មី').toHaveLength(1);
+    });
+
+    it('Server គ្មាន Login Palm របស់សាខា ➜ ទូរស័ព្ទ B ប្រាប់មូលហេតុពិត (ទាញបញ្ជី · ស្កេន) មិនមែន «ផុតកំណត់»', async () => {
+        await setupWorld(backend, 'off');
+        useSharedBlobs();
+        await palmLoginBody('palm-user');
+        await proxyOnlyConfig(stored().shop);
+        await openModal();
+        await act(async () => { await connectSharedZtoPalm(); });
+        expect(stored()).toMatchObject({ palmShared: true });
+        act(() => { uiState.modalDisplay = {}; uiState.isModalOpen = false; });
+        for (const key of sessionKeys()) world.blobs!.delete(key);
+        fn.resetCachesForTests();
+
+        await runZtoListSyncPreview();
+        expect(pulledRows().size).toBe(0);
+        expect(noteText()).toContain('Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server');
+        expect(noteText()).toContain('«API ស្វែងរកអតិថិជន»');
+        expect(noteText()).not.toContain('ផុតកំណត់');
+        expect(toastTexts().join(' ')).not.toContain('ផុតកំណត់');
+
+        scanState.pendingBarcode = ARRIVED[0];
+        scanState.phoneModalTyped = false;
+        uiState.isModalOpen = true;
+        await act(async () => { await attemptAutoLookup(ARRIVED[0]); });
+        expect(viewState.lookupStatus.text).toContain('Login ZTO Palm របស់សាខានេះមិនមាននៅលើ Server');
+        expect(viewState.lookupStatus.text).not.toContain('ផុតកំណត់');
     });
 
     it('សាខា ២ ប្រើសោភ្ជាប់ដដែល ➜ Login Palm នៃសាខានីមួយៗនៅដាច់ពីគ្នា · ទូរស័ព្ទសាខា B ចុច «ប្រើ Login Palm របស់ហាង» ➜ ទទួលសាខា B តាមគណនី ZoeW', async () => {

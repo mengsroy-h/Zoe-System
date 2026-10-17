@@ -336,17 +336,19 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         expect(entries.has(SLOT_A)).toBe(true);
     });
 
-    it('ផ្តាច់ (POST ?palm=logout) ➜ លុប Blob ➜ ស្កេនបន្ទាប់ 401 palm:no-session', async () => {
+    it('⛔ «ផ្តាច់ Palm» មិនមែនផ្លូវ Server (ម្ចាស់គម្រោង ៖ ទូរស័ព្ទមួយផ្តាច់ ទូរស័ព្ទផ្សេងលោត «ផុតកំណត់») ៖ POST ?palm=logout ➜ 405 · Blob នៅ · ទូរស័ព្ទផ្សេងស្កេនបាន', async () => {
         await login();
         expect((await scan()).statusCode).toBe(200);
-        const out = await call({ palm: 'logout' }, { method: 'POST' });
-        expect(out.statusCode).toBe(200);
-        expect(entries.has(SLOT_A)).toBe(false);
-        expect(JSON.parse(entries.get('palm-sites/shopa')!.value).sites).toEqual([]);
+        const before = new Map(entries);
+        for (const site of [undefined, 'KH001']) {
+            const out = await call({ palm: 'logout' }, { method: 'POST', site });
+            expect(out.statusCode, 'logout ' + site).toBe(405);
+        }
+        expect(entries, 'Blob session និងបញ្ជីសាខាមិនប្រែ').toEqual(before);
+        coldContainer();
         const res = await scan();
-        expect(res.statusCode).toBe(401);
-        expect(parse(res).reason).toBe('palm:no-session');
-        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: false, rejected: false });
+        expect(res.statusCode, 'ទូរស័ព្ទផ្សេងស្កេនបានដដែល').toBe(200);
+        expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: true, account: { siteCode: 'KH001' } });
     });
 
     it('🩺 ?palm=1&diag=1 ប្រាប់ប្រភព session (ហាង · ទូរស័ព្ទ · គ្មាន) ដោយមិនទាមទារ session', async () => {
@@ -364,8 +366,8 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         expect(reads).toBe(0);
     });
 
-    it('preflight ?palm=status · ?palm=logout ជា Palm (មិនអាន Cookie Argus) · POST logout អនុញ្ញាត', async () => {
-        for (const palm of ['status', 'logout']) {
+    it('preflight ?palm=status ជា Palm (មិនអាន Cookie Argus)', async () => {
+        for (const palm of ['status']) {
             reads = 0;
             const pre = await fn.handler({ httpMethod: 'OPTIONS', headers: { origin: 'https://localhost', 'access-control-request-method': 'POST' },
                 queryStringParameters: { palm }, blobs: BLOBS });
@@ -391,14 +393,8 @@ describe('ZTO Palm Login ម្តង ➜ session របស់ហាងនៅល
         expect(seen).toHaveLength(2);
         expect(parse(await call({ palm: 'status' }))).toMatchObject({ shared: false, branchUnknown: true, sites: ['KH001', 'KH002'] });
         expect(parse(await call({ palm: 'status' }, { site: 'KH002' }))).toMatchObject({ shared: true, account: { siteCode: 'KH002', siteName: 'Branch B' } });
-        expect((await call({ palm: 'logout' }, { method: 'POST', site: 'KH002' })).statusCode).toBe(200);
-        expect(entries.has('palm-session/shopa/KH002')).toBe(false);
-        expect(entries.has('palm-session/shopa/KH001'), 'ផ្តាច់សាខា B មិនប៉ះសាខា A').toBe(true);
-        coldContainer();
-        expect((await scan()).statusCode, 'សល់សាខាតែមួយ ➜ ទូរស័ព្ទគ្មានសាខាប្រើសាខានោះ').toBe(200);
-        expect(seen[seen.length - 1]).toBe('token-of-branch-a-user');
-        expect((await call({ palm: 'logout' }, { method: 'POST' })).statusCode).toBe(200);
-        expect(entries.has('palm-session/shopa/KH001')).toBe(false);
+        expect((await call({ palm: 'logout' }, { method: 'POST', site: 'KH002' })).statusCode).toBe(405);
+        expect(entries.has('palm-session/shopa/KH002') && entries.has('palm-session/shopa/KH001'), 'គ្មានផ្លូវលុប Login សាខាពី Server').toBe(true);
     });
 
     it('🔐 ZTO_DETAIL_IDENTITY=require ៖ ទូរស័ព្ទសាខា A ផ្ញើសាខា B ➜ មិនប្រើ session សាខា B', async () => {

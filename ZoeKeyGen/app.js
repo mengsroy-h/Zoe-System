@@ -3254,6 +3254,7 @@ let sbTenantCache = [];
 let sbMemberCache = [];
 let sbDeviceCache = [];
 let sbDeviceReadFailed = false;
+let sbMemberReadFailed = false;
 let sbTenantReadFailed = false;
 let sbLastInvite = null;
 let sbLastResetCode = '';
@@ -3415,6 +3416,7 @@ function sbAdminReset(expired) {
     sbMemberCache = [];
     sbDeviceCache = [];
     sbDeviceReadFailed = false;
+    sbMemberReadFailed = false;
     sbTenantReadFailed = false;
     sbLastInvite = null;
     sbLastResetCode = '';
@@ -3492,7 +3494,8 @@ async function sbAdminRefresh() {
     if (tenants && tenants.status === 401) { sbAdminReset(true); return; }
     sbTenantReadFailed = !tenants || !tenants.ok || !Array.isArray(tenants.body);
     sbTenantCache = sbTenantReadFailed ? [] : tenants.body;
-    sbMemberCache = members && members.ok && Array.isArray(members.body) ? members.body : [];
+    sbMemberReadFailed = !members || !members.ok || !Array.isArray(members.body);
+    sbMemberCache = sbMemberReadFailed ? [] : members.body;
     sbDeviceReadFailed = !devices || !devices.ok || !Array.isArray(devices.body);
     sbDeviceCache = sbDeviceReadFailed ? [] : devices.body;
     renderSbTenantList();
@@ -3573,8 +3576,8 @@ function renderSbTenantList() {
     };
     body.innerHTML = sbTenantCache.map((row) => {
         const sbStatusHtml = badges[sbTenantState(row)];
-        const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-';
+        const sbMembersHtml = sbMemberReadFailed ? '<span class="sb-member">⚠️ អានបញ្ជីគណនីមិនបាន</span>' : (sbMemberCache.filter((m) => m.tenant_id === row.id)
+            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-');
         const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
@@ -3696,6 +3699,7 @@ async function sbTenantAction(tenantId, action) {
     let args = null;
     let rpc = 'admin_update_tenant';
     if (action === 'sb-invite') {
+        if (sbMemberReadFailed) { alert('អានបញ្ជីគណនីមិនបាន — សូមចុច 🔄 Refresh មុនចេញកូដអញ្ជើញ!'); return; }
         const hasOwner = sbMemberCache.some((m) => m.tenant_id === tenant.id && m.role === 'owner');
         const role = hasOwner ? 'member' : 'owner';
         if (!confirm('ចេញកូដអញ្ជើញ' + (role === 'owner' ? 'ម្ចាស់ហាង' : 'បុគ្គលិក') + 'សម្រាប់ «' + tenant.name + '»?')) return;

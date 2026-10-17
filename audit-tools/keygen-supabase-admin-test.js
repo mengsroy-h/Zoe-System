@@ -515,6 +515,17 @@ async function behavior() {
         await C.sbAdminRefresh();
         const devFailHtml = el('sbTenantListBody').innerHTML;
         await c.query('grant select on table public.member_devices to authenticated');
+        await c.query('revoke select on table public.tenant_members from authenticated');
+        await C.sbAdminRefresh();
+        const memFailHtml = el('sbTenantListBody').innerHTML;
+        const aMem = K.log.alerts.length;
+        const rMem = K.rpcCalls('admin_issue_invite');
+        await C.sbTenantAction(tRow.id, 'sb-invite');
+        await drain();
+        await c.query('grant select on table public.tenant_members to authenticated');
+        ok('⛔ អានគណនីមិនបាន ➜ «⚠️ អានបញ្ជីគណនីមិនបាន» (មិនមែន «-» ដូចគ្មានគណនី) · 🎟️ មិនចេញកូដអញ្ជើញ (តួនាទីពីបញ្ជីដែលអានមិនបាន ➜ ម្ចាស់ទី ២) ➜ សារឲ្យ Refresh',
+            /អានបញ្ជីគណនីមិនបាន/.test(memFailHtml) && memFailHtml.indexOf('>sokha<') === -1 && K.rpcCalls('admin_issue_invite') === rMem
+            && /Refresh/.test(K.log.alerts.slice(aMem).join()), { html: memFailHtml.slice(0, 300), alerts: K.log.alerts.slice(aMem) });
         ok('អានឧបករណ៍មិនបាន ➜ «⚠️ អានបញ្ជីឧបករណ៍មិនបាន» (មិនមែន «គ្មាន») · ហាង និងសមាជិកនៅបង្ហាញ',
             /អានបញ្ជីឧបករណ៍មិនបាន/.test(devFailHtml) && /sb-owner" title="ម្ចាស់ហាង">sokha</.test(devFailHtml) && devFailHtml.indexOf('a1b2c3d4e5f60718') === -1, devFailHtml.slice(0, 400));
         await C.sbAdminRefresh();

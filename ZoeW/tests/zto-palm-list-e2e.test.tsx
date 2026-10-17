@@ -45,12 +45,12 @@ let parcels: Record<string, Parcel> = {};
 let faults: Map<string, number> = new Map();
 let always: Set<string> = new Set();
 let authDead = '';
-let multi = false;
+let slowList: Map<string, number> = new Map();
+let tracksWhenListDone: Map<string, number> = new Map();
 let inFlight = 0;
 let peakTracks = 0;
 let functionCalls = 0;
 const zto: string[] = [];
-const palm = req('../netlify/functions/_shared/zto-palm.js');
 
 const at = (day: string, time = '09:00:00') => '2026-10-' + day + ' ' + time;
 const pickup = (origin: string): Scan => ({ action: '1', siteCode: 'ORIGIN', time: at('01', '08:00:00'), msgLoc: '【' + origin + '】បានស្កែនទទួល' });
@@ -111,7 +111,7 @@ function trackGroup(code: string) {
 }
 
 function trackInfo(codes: string[]) {
-    if (codes.length > 1 && !multi) return respond({ status: true, statusCode: 'SYS000', result: [] });
+    if (codes.length > 1) return respond({ status: true, statusCode: 'SYS000', result: [] });
     return respond({ status: true, statusCode: 'SYS000', result: codes.map(trackGroup).filter(Boolean) });
 }
 
@@ -124,6 +124,11 @@ async function palmUpstream(href: string, init: any) {
     if (path === '/zto/dispatch/v1/queryDispatchList') {
         const key = 'list:' + body.billStatus + ':' + body.pageNum;
         zto.push(key);
+        const wait = slowList.get(key);
+        if (wait) {
+            await new Promise((resolve) => setTimeout(resolve, wait));
+            tracksWhenListDone.set(key, zto.filter((k) => k.startsWith('track:')).length);
+        }
         return fault([key]) || dispatchList(body);
     }
     if (path === '/zto/locus/v1/queryTrackInfo') {
@@ -157,12 +162,12 @@ beforeEach(async () => {
     process.env.ZTO_PALM_PASSWORD_KEY = 'zoew-test-aes-16';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
-    palm.resetPalmForTests();
     parcels = dataset();
     faults = new Map();
     always = new Set();
     authDead = '';
-    multi = false;
+    slowList = new Map();
+    tracksWhenListDone = new Map();
     inFlight = 0;
     peakTracks = 0;
     functionCalls = 0;
@@ -233,9 +238,7 @@ function rowsByCode() {
 const TAB4_ARRIVED = ['KH1000000001', 'KH1000000002', 'KH1000000003', 'KH1000000004', 'KH1000000005', 'KH1000000006', 'KH1000000007',
     'KH1000000008', 'KH4000000001', 'KH5000000001'];
 
-describe.each([['ZTO អាន track ម្តងមួយលេខ', false], ['ZTO អាន track ច្រើនលេខក្នុងសំណើតែមួយ', true]])('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie (%s)', (_label, supportsMulti) => {
-    beforeEach(() => { multi = supportsMulti; });
-
+describe('ZTO Palm ៖ ទាញបញ្ជីមកដល់ដូច Cookie', () => {
     it('ZTO បរាជ័យម្តងម្កាល (503 · SYS_BUSY) ➜ បញ្ជីពេញ · ម៉ោងមកដល់ · ប្រភព · បិទរួច/មិនទាន់ ដូច Cookie', async () => {
         for (const key of ['list:5:1', 'track:KH1000000003', 'track:KH7000000002', 'track:KH2000000002']) faults.set(key, 1);
         faults.set('list:4:1', 2);
@@ -300,8 +303,9 @@ describe.each([['ZTO អាន track ម្តងមួយលេខ', false], ['
         expect(viewState.ztoListSyncNote).toContain('Login ZTO Palm');
     });
 
-    it('⏱ ល្បឿន (ម្ចាស់គម្រោង ៖ Palm ១–២ នាទី · Cookie ប៉ុន្មានវិនាទី) ៖ បញ្ជី ១០០ ក្នុងមួយទំព័រ · track ជាក្រុមស្របគ្នា · មិនស្ទួន', async () => {
+    it('⏱ ល្បឿន (ម្ចាស់គម្រោង ៖ Palm ១–២ នាទី · Cookie ប៉ុន្មានវិនាទី) ៖ បញ្ជី ១០០ ក្នុងមួយទំព័រ · track ម្តងមួយ Barcode ស្របគ្នា · ចាប់ផ្ទៀងពេលទំព័រទី ១ មកដល់', async () => {
         parcels = dataset(150);
+        slowList.set('list:4:2', 150);
         const total = Object.keys(parcels).length;
         await runZtoListSyncPreview();
         expect([...rowsByCode().keys()].sort()).toEqual(ARRIVED.slice().sort());
@@ -309,13 +313,13 @@ describe.each([['ZTO អាន track ម្តងមួយលេខ', false], ['
         expect(lists, 'tab នីមួយៗអានម្តង ១០០ ជួរ · tab ដែលអស់ទំព័រមិនអានស្ទួន').toEqual(['list:1:1', 'list:4:1', 'list:4:2', 'list:5:1']);
         expect(functionCalls, 'សំណើទៅ Function ៖ ទំព័របេក្ខភាព ២ + track ' + Math.ceil(total / 30)).toBe(2 + Math.ceil(total / 30));
         const tracks = zto.filter((k) => k.startsWith('track:'));
-        if (supportsMulti) {
-            expect(tracks.length, 'track ច្រើនលេខ ៖ ≤ ១០ Barcode ក្នុងមួយសំណើ').toBeLessThanOrEqual(Math.ceil(total / 10) + Math.ceil(total / 30));
-        } else {
-            expect(tracks.filter((k) => !k.includes(',')).length, 'track ម្តងមួយ Barcode').toBe(total);
-            expect(peakTracks, 'track ស្របគ្នា ≥ 16').toBeGreaterThanOrEqual(16);
-        }
+        expect(tracks.filter((k) => k.includes(',')), 'ZTO មិនឆ្លើយ mailNos ច្រើនលេខ ➜ មិនផ្ញើ').toEqual([]);
+        expect(tracks.length, 'track ម្តងមួយ Barcode · មិនស្ទួន').toBe(total);
+        expect(tracksWhenListDone.get('list:4:2'), 'ផ្ទៀង track ពេលទំព័រទី ២ កំពុងមក (មិនរង់ចាំបញ្ជីគ្រប់ទំព័រ)').toBeGreaterThanOrEqual(60);
+        expect(peakTracks, 'track ស្របគ្នា ≥ 16').toBeGreaterThanOrEqual(16);
         expect(peakTracks, 'មានព្រំដែន ៖ ≤ 4 សំណើ × 8').toBeLessThanOrEqual(32);
-        expect(viewState.ztoListSyncNote).toContain('(សំណើ track ' + tracks.length + ')');
+        expect(viewState.ztoListSyncNote).toContain('⏱ Palm ៖ ផ្ទៀង ' + total + ' កញ្ចប់');
+        expect(viewState.ztoListSyncNote).toMatch(/— បញ្ជី \d+\.\d វិ · track \d+\.\d វិ \(សំណើ track /);
+        expect(viewState.ztoListSyncNote).toContain('(សំណើ track ' + tracks.length + ' · ZTO ឆ្លើយមធ្យម ');
     });
 });

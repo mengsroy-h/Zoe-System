@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const fn = require('../netlify/functions/zto-order-detail.js');
-const palm = require('../netlify/functions/_shared/zto-palm.js');
 const KEY = 'palm-proxy-key-0123456789abcdef';
 const OTHER_KEY = 'palm-other-key-0123456789abcdef';
 const CODE = '77130500000012';
@@ -483,7 +482,6 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
     });
     const page = (list: unknown[], extra: Record<string, unknown> = {}) => upstream({ status: true, result: { list, pages: 1, total: list.length, isLastPage: true, ...extra } });
     function serve(byStatus: Record<string, () => Response>) {
-        palm.resetPalmForTests();
         const sent: Array<{ path: string; body: any }> = [];
         vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
             const path = new URL(String(url)).pathname;
@@ -501,7 +499,6 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
     const scansOf = (code: string, mail: Record<string, unknown>, scans: Array<[string, string, string]>) => ({ mail: { mailNo: code, ...mail },
         tracks: scans.map(([action, siteCode, time]) => ({ action, siteCode, time, mailNo: code })) });
     const track = (code: string, isSign: number, scans: Array<[string, string, string]>) => () => upstream({ status: true, result: [scansOf(code, { isSign }, scans)] });
-    const evidenceOf = (body: any) => new Map<string, any>(body.evidence.map((e: any) => [e.barcode, e]));
 
     it('Palm បេក្ខភាព ៖ tab បញ្ហា · បញ្ជូន · ចុះហត្ថលេខា ១០០ ជួរក្នុងមួយទំព័រ · លេខទូរស័ព្ទ/COD/DOD · គ្មាន track', async () => {
         const { sessionToken: session } = await login();
@@ -544,37 +541,33 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         ]);
         expect(JSON.stringify(body)).not.toContain('012345678');
         const tracks = sent.filter((r) => r.path.endsWith('/queryTrackInfo'));
-        expect(tracks.map((r) => r.body.mailNos).filter((m) => !m.includes(',')).sort()).toEqual(codes);
+        expect(tracks.map((r) => r.body.mailNos).sort()).toEqual(codes);
         expect(tracks.every((r) => typeof r.body.mailNos === 'string' && r.body.mailType === 1)).toBe(true);
+        expect(body.trackCalls).toBe(4);
+        expect(body.trackWaitMs).toBeGreaterThanOrEqual(0);
     });
 
-    it('Palm track ច្រើនលេខ (mailNos ជា String «A,B,C») ៖ ZTO គាំទ្រ ➜ សំណើតែមួយ · ផ្ទៀងតាម Barcode នីមួយៗ · ចងចាំក្នុង Function', async () => {
+    it('Palm track ផ្ញើម្តងមួយ Barcode ជានិច្ច (ZTO មិនឆ្លើយ mailNos ច្រើនលេខ) ៖ សំណើមិនលើស Barcode · ស្របគ្នា ≤ ៨', async () => {
         const { sessionToken: session } = await login();
-        const codes = ['KH0000000001', 'KH0000000002', 'KH0000000003'];
-        const groups = codes.map((code, i) => scansOf(code, { isSign: 0 }, [['3', 'KH001', '2026-10-1' + (i + 1) + ' 09:00:00']]));
-        const sent = serve({ ['track:' + codes.join(',')]: () => upstream({ status: true, result: groups }) });
+        const codes = Array.from({ length: 30 }, (_, i) => 'KH' + String(3000000000 + i));
+        let inFlight = 0;
+        let peak = 0;
+        const sent: string[] = [];
+        vi.stubGlobal('fetch', vi.fn(async (_url: string, init: any) => {
+            const payload = JSON.parse(init.body);
+            sent.push(String(payload.mailNos));
+            inFlight++;
+            peak = Math.max(peak, inFlight);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            inFlight--;
+            return upstream({ status: true, result: [scansOf(payload.mailNos, { isSign: 0 }, [['3', 'KH001', '2026-10-12 09:00:00']])] });
+        }));
         const body = JSON.parse((await call(tracksQuery(codes), session)).body);
-        expect(sent.map((r) => r.body.mailNos)).toEqual([codes.join(',')]);
-        expect(body.trackCalls).toEqual({ multi: 1, single: 0 });
-        expect([...evidenceOf(body).values()].map((e) => e.arrivals)).toEqual([['2026-10-11 09:00:00'], ['2026-10-12 09:00:00'], ['2026-10-13 09:00:00']]);
-    });
-
-    it.each([
-        ['ZTO ឆ្លើយទទេ', () => upstream({ status: true, result: [] })],
-        ['ZTO បដិសេធ', () => upstream({ status: false, statusCode: 'PARAM_ERROR' })],
-        ['ZTO ឆ្លើយតែលេខទីមួយ', () => upstream({ status: true, result: [scansOf('KH0000000001', { isSign: 0 }, [['3', 'KH001', '2026-10-11 09:00:00']])] })],
-        ['track គ្មាន mailNo ក្នុងក្រុមដែលគ្មានអត្តសញ្ញាណ', () => upstream({ status: true, result: [{ tracks: [{ action: '3', siteCode: 'KH001', time: '2026-10-11 09:00:00' }] }] })]
-    ])('Palm track ច្រើនលេខមិនដំណើរការ (%s) ➜ ត្រឡប់ទៅម្តងមួយលេខ · មិនទាយ · សំណើបន្ទាប់មិនសាកច្រើនលេខ', async (_label, multiAnswer) => {
-        const { sessionToken: session } = await login();
-        const codes = ['KH0000000001', 'KH0000000002'];
-        const single = (code: string, day: string) => track(code, 0, [['3', 'KH001', '2026-10-' + day + ' 09:00:00']]);
-        const sent = serve({ ['track:' + codes.join(',')]: multiAnswer, 'track:KH0000000001': single('KH0000000001', '11'), 'track:KH0000000002': single('KH0000000002', '12') });
-        const body = JSON.parse((await call(tracksQuery(codes), session)).body);
-        expect([...evidenceOf(body).values()].map((e) => [e.barcode, e.arrivals])).toEqual([['KH0000000001', ['2026-10-11 09:00:00']], ['KH0000000002', ['2026-10-12 09:00:00']]]);
-        expect(sent.filter((r) => !String(r.body.mailNos).includes(',')).length).toBeGreaterThanOrEqual(1);
-        sent.length = 0;
-        await call(tracksQuery(codes), session);
-        expect(sent.filter((r) => String(r.body.mailNos).includes(',')), 'ចងចាំ ៖ មិនសាកច្រើនលេខម្តងទៀតភ្លាម').toEqual([]);
+        expect(sent.slice().sort()).toEqual(codes);
+        expect(sent.every((m) => !m.includes(','))).toBe(true);
+        expect(peak).toBe(8);
+        expect(body.trackCalls).toBe(30);
+        expect(body.evidence).toHaveLength(30);
     });
 
     it.each([
@@ -675,7 +668,6 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         vi.stubGlobal('fetch', vi.fn(async (_url: string, init: any) => {
             const payload = JSON.parse(init.body);
             await new Promise((resolve) => setTimeout(resolve, 1500));
-            if (String(payload.mailNos).includes(',')) return upstream({ status: true, result: [] });
             return upstream({ status: true, result: [scansOf(payload.mailNos, { isSign: 0 }, [['3', 'KH001', '2026-10-16 09:00:00']])] });
         }));
         const codes = Array.from({ length: 30 }, (_, i) => 'KH' + String(2000000000 + i));
@@ -691,7 +683,7 @@ describe('Palm list: sign list (billStatus 5) with the Argus list contract · no
         const sent = serve({ 'track:KH0000000001': () => upstream({}, 502) });
         const res = await call(tracksQuery(['KH0000000001']), session);
         expect(res.statusCode).toBe(200);
-        expect(JSON.parse(res.body)).toMatchObject({ evidence: [], unverified: ['KH0000000001'], unverifiedReasons: ['palm:unavailable'] });
+        expect(JSON.parse(res.body)).toMatchObject({ evidence: [], unverified: ['KH0000000001'], unverifiedReasons: ['palm:unavailable'], trackCalls: 2 });
         expect(sent.filter((r) => r.path.endsWith('/queryTrackInfo'))).toHaveLength(2);
     });
 

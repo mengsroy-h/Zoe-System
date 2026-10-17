@@ -11,7 +11,8 @@ import { appLocalStore } from '../src/core/storage';
 import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import { cancelZtoPalmLogin, connectSharedZtoPalm, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
-import { encryptLookupSecret, decryptLookupSecret } from '../src/services/crypto';
+import { encryptLookupSecret, decryptLookupSecret, deriveLookupSecretKey, hashPin, restoreLookupSecretKey } from '../src/services/crypto';
+import { clearAppUnlockedForSession, completeAppUnlock } from '../src/features/app-lock';
 import { closeModal } from '../src/ui/modal';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
@@ -425,5 +426,63 @@ describe('សារ Login Palm ប្រាប់មូលហេតុពិត 
         credentials();
         await act(async () => { await submitZtoPalmLogin(); });
         expect(viewState.palmLoginStatus).toContain('HTTP 502');
+    });
+});
+
+describe('App Lock ↔ Login Palm (ម្ចាស់គម្រោង ៖ «សង្ស័យថា applock របស់ ZoeW ធ្វើអោយខូច»)', () => {
+    const PIN = '135790';
+    const sentKeys = () => vi.mocked(fetch).mock.calls.map(([, init]) => (init?.headers as Record<string, string>)['X-Zoe-Proxy-Key']);
+    async function reloadLockedThenUnlock(pin = PIN) {
+        securityState.lookupSecretKey = null;
+        clearAppUnlockedForSession();
+        expect(await restoreLookupSecretKey()).toBe(false);
+        await act(async () => { await completeAppUnlock(pin); });
+        expect(securityState.lookupSecretKey).not.toBeNull();
+        act(() => openLookupApiConfigModal());
+    }
+    async function login(typed = '') {
+        credentials();
+        setFieldValue('lookupApiHeaderValueInput', typed);
+        await act(async () => { await submitZtoPalmLogin(); });
+    }
+    beforeEach(async () => {
+        appLocalStore.setItem('zoew_security_pin_hash', await hashPin(PIN));
+        securityState.lookupSecretKey = await deriveLookupSecretKey(PIN);
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...JSON.parse(initialConfig), headerValueEnc: await encryptLookupSecret(PROXY_KEY) }));
+        act(() => openLookupApiConfigModal());
+    });
+    it('ចាក់សោ ➜ បើកដោយ PIN (៣ ដង) ➜ Login Palm ផ្ញើសោដែលរក្សាទុកដដែល · សោវាយផ្ញើដូចវាយ', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => success()));
+        await login();
+        for (let i = 0; i < 3; i++) {
+            await reloadLockedThenUnlock();
+            await login();
+        }
+        await login('typed-proxy-key-abcdef0123456789');
+        expect(sentKeys()).toEqual([PROXY_KEY, PROXY_KEY, PROXY_KEY, PROXY_KEY, 'typed-proxy-key-abcdef0123456789']);
+        expect(viewState.palmLoginConnected).toBe(true);
+    });
+    it('ចាក់សោម្តងទៀតពេល Login កំពុងរត់ ➜ ចម្លើយចាស់បោះចោល ហើយប្រាប់ឲ្យ Login ម្តងទៀត · ⛔ មិនមែនសារសោខុស', async () => {
+        let release!: (value: Response) => void;
+        vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
+        credentials();
+        const work = submitZtoPalmLogin();
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+        await act(async () => { await completeAppUnlock(PIN); });
+        release(success());
+        await act(async () => { await work; });
+        expect(sentKeys()).toEqual([PROXY_KEY]);
+        expect(viewState.palmLoginStatus).toContain('Login ZTO Palm ម្តងទៀត');
+        expect(viewState.palmLoginStatus).not.toContain('សោភ្ជាប់ ZoeW មិនត្រឹមត្រូវ');
+    });
+    it('ភ្លេច PIN ➜ PIN ថ្មី ៖ សោចាស់អានមិនបាន ➜ មិនផ្ញើសោខុស ហើយសុំវាយ · វាយ ➜ ផ្ញើត្រូវ', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => success()));
+        appLocalStore.setItem('zoew_security_pin_hash', await hashPin('246802'));
+        await reloadLockedThenUnlock('246802');
+        await login();
+        expect(fetch).not.toHaveBeenCalled();
+        expect(viewState.palmLoginStatus).toContain('ប្រអប់ Secret');
+        await login(PROXY_KEY);
+        expect(sentKeys()).toEqual([PROXY_KEY]);
     });
 });

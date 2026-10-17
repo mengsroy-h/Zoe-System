@@ -126,12 +126,11 @@ export function lookupApiIsPalm(cfg) {
 }
 
 export function warmZtoLookupProxyIfConfigured(cfg) {
-    if (lookupApiIsPalm(cfg)) return false;
     if (!cfg || !cfg.enabled || !lookupApiIsZto(cfg) || lookupState.ztoWarmupInFlight || elapsedSince(lookupState.ztoWarmupAt) < ZTO_WARMUP_COOLDOWN_MS) return false;
     const raw = String(cfg.url).trim();
     const marker = '/.netlify/functions/zto-order-detail';
     const markerAt = raw.toLowerCase().indexOf(marker);
-    const target = markerAt === -1 ? marker : raw.slice(0, markerAt) + marker;
+    const target = (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + (lookupApiIsPalm(cfg) ? '?palm=1' : '');
     lookupState.ztoWarmupAt = Date.now();
     lookupState.ztoWarmupInFlight = true;
     fetchWithTimeout(target, { method: 'OPTIONS', cache: 'no-store', credentials: 'same-origin' }, ZTO_WARMUP_TIMEOUT_MS, 'ZTO warmup timed out')

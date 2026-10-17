@@ -257,6 +257,58 @@ export function ztoCookieLifeText(body) {
     return parts.length ? ' · អាយុ Cookie ក្រោយ Sync ៖ ' + parts.join(' / ') : '';
 }
 
+function upstreamMs(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function upstreamSeconds(ms) {
+    return (ms / 1000).toFixed(2) + ' វិនាទី';
+}
+
+export function ztoUpstreamTimingText(body, palm) {
+    const timing = body && typeof body.upstreamTiming === 'object' ? body.upstreamTiming : null;
+    if (!timing) return '';
+    const scan = palm ? (timing.palm && timing.palm.detail) : timing.detail;
+    const count = scan && typeof scan.count === 'number' && Number.isFinite(scan.count) ? Math.max(0, Math.round(scan.count)) : 0;
+    const avg = scan ? upstreamMs(scan.avgMs) : null;
+    const last = scan ? upstreamMs(scan.lastMs) : null;
+    if (!count || avg === null || last === null) return ' · ពេល ZTO ឆ្លើយ ៖ ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ';
+    let text = ' · ZTO ឆ្លើយពេលស្កេន ៖ មធ្យម ' + upstreamSeconds(avg) + ' · ចុងក្រោយ ' + upstreamSeconds(last) + ' (' + count + ' ដង)';
+    const timeouts = typeof scan.timeouts === 'number' && Number.isFinite(scan.timeouts) ? Math.round(scan.timeouts) : 0;
+    if (timeouts > 0) text += ' · ហួសពេល ' + timeouts + ' ដង';
+    const conn = timing.connections && typeof timing.connections === 'object'
+        ? (palm ? timing.connections.palm : timing.connections.argus) : null;
+    const connCount = conn && typeof conn.count === 'number' && Number.isFinite(conn.count) ? Math.max(0, Math.round(conn.count)) : 0;
+    const connAvg = conn ? upstreamMs(conn.avgMs) : null;
+    if (connCount > 0) text += ' · ភ្ជាប់ថ្មីទៅ ZTO ' + connCount + ' ដង' + (connAvg === null ? '' : ' (មធ្យម ' + upstreamSeconds(connAvg) + ')');
+    return text + ztoScanConnectionText(timing.scans && typeof timing.scans === 'object' ? (palm ? timing.scans.palm : timing.scans.argus) : null)
+        + ztoRuntimeText(body.runtime);
+}
+
+function upstreamCount(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function ztoScanConnectionText(side) {
+    if (!side || typeof side !== 'object') return '';
+    let text = '';
+    for (const [key, label] of [['fresh', 'ស្កេនលើការភ្ជាប់ថ្មី'], ['reused', 'ស្កេនលើការភ្ជាប់ដែលបើករួច']]) {
+        const bucket = side[key];
+        const count = bucket ? upstreamCount(bucket.count) : 0;
+        const avg = bucket ? upstreamMs(bucket.avgMs) : null;
+        if (count && avg !== null) text += ' · ' + label + ' មធ្យម ' + upstreamSeconds(avg) + ' (' + count + ' ដង)';
+    }
+    if (!text) return '';
+    if (upstreamCount(side.closes) > 0) return text + ' · ZTO បិទការភ្ជាប់ក្រោយឆ្លើយ';
+    const keepAlive = upstreamCount(side.keepAliveSec);
+    return text + (keepAlive > 0 ? ' · ZTO ទុកការភ្ជាប់ ' + keepAlive + ' វិនាទី' : ' · ZTO មិនប្រាប់រយៈទុកការភ្ជាប់');
+}
+
+function ztoRuntimeText(runtime) {
+    const region = runtime && typeof runtime.region === 'string' ? runtime.region : '';
+    return /^[a-z]{2}(?:-[a-z]+)+-\d{1,2}$/.test(region) ? ' · Function នៅ ' + region : '';
+}
+
 function ztoAccessText(body) {
     const access = body && body.access;
     if (!access || typeof access !== 'object') return '';
@@ -351,6 +403,7 @@ export async function healthLookupRow() {
             + ztoRenewalText(body)
             + ztoCookieLifeText(body)
             + ztoAccessText(body)
+            + ztoUpstreamTimingText(body, false)
             + mismatchText;
         if (typeof rejectedAgeMs === 'number') {
             return healthRow('bad', 'Lookup អតិថិជន (ZTO)',
@@ -385,7 +438,7 @@ async function healthPalmLookupRow(cfg, headers) {
         const code = body && typeof body.code === 'string' ? body.code : '';
         const reason = safeLookupReason(body && body.reason);
         if (res && res.ok && body && body.provider === 'zto-palm') {
-            return healthRow('info', title, 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO');
+            return healthRow('info', title, 'មាន session Palm — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' + ztoUpstreamTimingText(body, true));
         }
         if (code === 'ZTO_AUTH_EXPIRED') {
             return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');

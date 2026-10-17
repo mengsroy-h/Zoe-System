@@ -122,6 +122,7 @@ export function clearSensitiveModalFields() {
     viewState.palmLoginBusy = false;
     viewState.palmLoginConnected = false;
     viewState.palmLoginStatus = '';
+    viewState.lookupTestResult = '';
     clearZtoPickupStatusStore();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;

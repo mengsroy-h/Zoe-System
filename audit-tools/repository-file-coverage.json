@@ -983,6 +983,9 @@
     "ZoeW/docs/ZTO-PALM.md": {
       "policy": "zoew-docs"
     },
+    "ZoeW/docs/ZTO-PALM-API.md": {
+      "policy": "zoew-docs"
+    },
     "ZoeW/docs/ARCHITECTURE.md": {
       "policy": "zoew-docs"
     },
@@ -2287,10 +2290,28 @@
     "ZoeW/tests/zto-pages-unknown.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-backends.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-harness.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-list-e2e.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-list.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-palm-login.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/zto-palm-race.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-palm-server.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-upstream-timing.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-placeholder-phone.test.tsx": {

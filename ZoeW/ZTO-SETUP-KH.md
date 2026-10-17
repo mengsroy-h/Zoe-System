@@ -4,7 +4,7 @@
 សម្រាប់ទាញលេខទូរស័ព្ទ និង COD/DOD ដោយគណនី Palm របស់អ្នក។ មិនត្រូវការ Argus Cookie
 សម្រាប់ផ្លូវ Palm ទេ តែត្រូវការ env `ZTO_PALM_SESSION_SECRET` · `ZTO_PALM_SIGN_KEY` · `ZTO_PALM_PASSWORD_KEY` នៅ Netlify។
 របៀបកំណត់ server និងប្រើ៖ [docs/ZTO-PALM.md](docs/ZTO-PALM.md)។
-ការទាញបញ្ជី និងបិទតាមស្ថានភាព Argus ខាងក្រោម ជាមុខងាររបស់ផ្លូវ Argus ដដែល។
+ក្នុងរបៀប Palm «បិទតាម ZTO ស្វ័យប្រវត្តិ» អានបញ្ជី «ចុះហត្ថលេខា» របស់គណនី Palm។ «ទាញបញ្ជីកញ្ចប់ពី ZTO» ផ្ទៀងស្កេនមកដល់របស់សាខា និងរក្សាប្រភព VN · CN · ផ្សេងៗ ដូច Cookie (មើល [docs/ZTO-PALM.md](docs/ZTO-PALM.md)); ការកំណត់ Argus ខាងក្រោមសម្រាប់ផ្លូវ Argus។
 
 ZoeW ស្កេន Barcode រួចទាញ **លេខទូរស័ព្ទ · COD · DOD** ពី ZTO តាម Netlify
 Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង Token ស្ថិត
@@ -302,6 +302,8 @@ ZTO មិនឆ្លើយក្នុងពិដាន ➜ Function ឆ្�
 ---
 
 ## ៤ខ. បើកមុខងារ «របា ZTO មិនទាន់បិទ» (ស្រេចចិត្ត)
+
+របៀប Palm ផ្ទៀងការមកដល់ និងចុះហត្ថលេខាពីប្រវត្តិស្កេនរបស់សាខា ដោយប្រើ session Login។ ការកំណត់ field ក្នុង env ខាងក្រោមសម្រាប់របៀប Cookie។
 
 > **វាធ្វើអ្វី** ៖ កញ្ចប់ដែលអ្នកបិទ «យករួច» ក្នុង ZoeW តែ **ភ្លេចបិទក្នុង
 > Palm** នឹងលេចជារបាលឿងមួយបន្ទាត់ខាងលើតារាងប្រវត្តិ ៖ «*N កញ្ចប់បិទក្នុង

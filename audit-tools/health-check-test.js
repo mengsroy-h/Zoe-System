@@ -66,6 +66,8 @@ const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow', 'healt
     'durationText', 'ztoBlobAgeText', 'ztoSignedMismatchText',
     // ⛔ ជួរ ZTO ៖ អាយុ Cookie ក្រោយ Sync (`?diag=1` `cookie.life` ពី Blob `cookie-life`)
     'ztoCookieLifeText', 'lifeDurationText',
+    // ⛔ ជួរ ZTO ៖ ពេល ZTO ឆ្លើយពេលស្កេន និងការភ្ជាប់ថ្មី (`?diag=1` `upstreamTiming` · Palm និង Cookie)
+    'ztoUpstreamTimingText', 'upstreamMs', 'upstreamSeconds', 'upstreamCount', 'ztoScanConnectionText', 'ztoRuntimeText',
     // ⛔ ច្រកទម្រង់ barcode ZTO ក្នុង `attemptAutoLookup()` · ផ្លូវបម្រុង APK ក្នុង `fetchWithTimeout()`
     'ztoBarcodeShapeIsValid', 'ztoRequestBarcodeIsRefused',
     // ⛔ ជួរ ZTO ៖ ឈ្មោះសោហាង និងរបៀបផ្ទៀងគណនីពី `?diag=1` `access` · ID token ទៅ Function ZTO ក្នុង `attemptAutoLookup()`
@@ -320,9 +322,9 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
     // ⛔ ការបន្ថែមនេះ **មិនត្រូវប្តូរសាលក្រម** ❌/⚠️/✅ ដែលជួរខាងលើចាក់សោ។
     {
         const base = { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000 };
-        const rowFor = async (cookieExtra, sessionRenewal) => {
-            const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true,
-                cookie: Object.assign({}, base, cookieExtra), sessionRenewal: sessionRenewal } });
+        const rowFor = async (cookieExtra, sessionRenewal, bodyExtra) => {
+            const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: Object.assign({ ok: true,
+                cookie: Object.assign({}, base, cookieExtra), sessionRenewal: sessionRenewal }, bodyExtra || {}) });
             return rt.api.healthLookupRow();
         };
 
@@ -362,6 +364,17 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('⛔ អាយុ cache ក្នុង container មិនរាយជា «អាយុ» Cookie ទៀត (ស្លាក «Server អានចុងក្រោយ»)',
             /Server អានចុងក្រោយ 2 នាទីមុន/.test(agedHtml) && !/អាយុ 2 នាទី/.test(agedHtml), agedHtml.slice(0, 400));
         ok('ការបន្ថែមមិនប្តូរសាលក្រម auth (នៅ ✅)', state(agedHtml) === 'ok', state(agedHtml));
+
+        // ⛔ ម្ចាស់គម្រោង ៖ Lookup Palm យឺតជាង Cookie ➜ 🩺 ត្រូវបង្ហាញពេល ZTO ឆ្លើយ **នៃរបៀបរបស់ខ្លួន** (Cookie = `detail` · មិនមែន `palm.detail`)
+        const timedHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: true, names: [], ageMs: 1000 }, { upstreamTiming: {
+            detail: { count: 4, timeouts: 0, lastMs: 820, avgMs: 760, maxMs: 900, ageMs: 1 },
+            palm: { detail: { count: 9, timeouts: 0, lastMs: 1500, avgMs: 1500, maxMs: 1500, ageMs: 1 } },
+            connections: { argus: { count: 1, errors: 0, lastMs: 300, avgMs: 300, maxMs: 300, ageMs: 1 },
+                palm: { count: 5, errors: 0, lastMs: 900, avgMs: 900, maxMs: 900, ageMs: 1 } } } });
+        ok('⛔ ពេល ZTO ឆ្លើយ (Cookie) ➜ «មធ្យម 0.76 វិនាទី · ចុងក្រោយ 0.82 វិនាទី (4 ដង)» + «ភ្ជាប់ថ្មីទៅ ZTO 1 ដង» · មិនយកលេខ Palm',
+            /មធ្យម 0\.76 វិនាទី · ចុងក្រោយ 0\.82 វិនាទី \(4 ដង\)/.test(timedHtml) && /ភ្ជាប់ថ្មីទៅ ZTO 1 ដង \(មធ្យម 0\.30 វិនាទី\)/.test(timedHtml)
+            && !/1\.50/.test(timedHtml) && !/0\.90/.test(timedHtml), timedHtml.slice(0, 600));
+        ok('⛔ ពេល ZTO ឆ្លើយមិនប្តូរសាលក្រម auth (នៅ ✅)', state(timedHtml) === 'ok', state(timedHtml));
         const daysHtml = await rowFor({ renewals: 0, blobSyncAgeMs: 3 * 86400000 + 3600000, blobRenewAgeMs: null }, { observed: false });
         ok('Sync ៣ ថ្ងៃមុន ➜ «3 ថ្ងៃមុន»', /Sync ចូល Blob 3 ថ្ងៃមុន/.test(daysHtml), daysHtml.slice(0, 400));
         const unknownHtml = await rowFor({ renewals: 0, blobSyncAgeMs: null, blobRenewAgeMs: null }, { observed: false });

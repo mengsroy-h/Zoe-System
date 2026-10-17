@@ -114,6 +114,7 @@ export interface ViewState {
 
     lookupHeaderValuePlaceholder: string;
     lookupTestBusy: boolean;
+    lookupTestResult: string;
     palmLoginBusy: boolean;
     palmLoginConnected: boolean;
     palmLoginStatus: string;
@@ -242,6 +243,7 @@ export const viewState = createStore<ViewState>('viewState', {
     healthRecheckBusy: false,
     lookupHeaderValuePlaceholder: 'ឧ. Bearer xxxxx ឬ Secret Key',
     lookupTestBusy: false,
+    lookupTestResult: '',
     palmLoginBusy: false,
     palmLoginConnected: false,
     palmLoginStatus: 'ចូលគណនី Palm ដើម្បីទាញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន។',

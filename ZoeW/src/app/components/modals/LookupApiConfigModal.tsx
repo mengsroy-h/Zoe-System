@@ -5,7 +5,7 @@ import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LookupApiConfigModal() {
-    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
+    const v = useStoreFields(viewState, ['lookupHeaderValuePlaceholder', 'lookupTestBusy', 'lookupTestResult', 'palmLoginBusy', 'palmLoginConnected', 'palmLoginStatus']);
     return (
         <Modal id="lookupApiConfigModal">
             <div className="modal-content">
@@ -21,7 +21,7 @@ export function LookupApiConfigModal() {
                         <label htmlFor="ztoPalmPasswordInput">ពាក្យសម្ងាត់ Palm</label>
                         <input id="ztoPalmPasswordInput" ref={refTo('ztoPalmPasswordInput')} type="password" autoComplete="off" disabled={v.palmLoginBusy} maxLength={256} />
                         <p style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>រក្សាទុកតែ session ដែលអ៊ិនគ្រីបដោយ PIN។ ពាក្យសម្ងាត់មិនត្រូវបានរក្សាទុកក្នុង ZoeW ទេ។</p>
-                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>⚠️ របៀប Palm បំពេញតែលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន — វាមិនបិទកញ្ចប់តាម ZTO ទេ។ កញ្ចប់ដែលមិនបានបិទក្នុង ZoeW ផុតកំណត់តាមច្បាប់សម្អាតស្វ័យប្រវត្តិ ហើយត្រូវដកពីចំណូល។</p>
+                        <p id="ztoPalmModeNote" style={{ fontSize: 'calc(11 * var(--fs-unit))' }}>របៀប Palm បំពេញលេខទូរស័ព្ទ និង COD/DOD ពេលស្កេន · ☰ ZTO ៖ ទាញបញ្ជីកញ្ចប់មកដល់ និងបិទតាម ZTO ដោយផ្ទៀងប្រវត្តិស្កេនមកដល់ និង «ចុះហត្ថលេខា» របស់សាខា។ របារ «ZTO មិនទាន់បិទ» រំលឹកកញ្ចប់ដែលបិទក្នុង ZoeW តែ ZTO មិនទាន់ចុះហត្ថលេខា។</p>
                         <p role="status" aria-live="polite">{v.palmLoginStatus}</p>
                         <div className="modal-btns">
                             <div className="modal-btns-row">
@@ -88,6 +88,10 @@ export function LookupApiConfigModal() {
                     ឈ្មោះ Field DOD ក្នុង JSON:
                 </label>
                 <input type="text" id="lookupApiDodFieldInput" ref={refTo('lookupApiDodFieldInput')} placeholder="ឧ. dod ឬ data.dod" />
+                {v.lookupTestResult && <div style={{ textAlign: 'left' }}>
+                    <label htmlFor="lookupApiTestResult">លទ្ធផល JSON ពេញ (អូសមើល និងចម្លងដើម្បីផ្ទៀងផ្ទាត់ Field)៖</label>
+                    <textarea id="lookupApiTestResult" readOnly rows={14} value={v.lookupTestResult} style={{ width: '100%', fontFamily: 'monospace' }} />
+                </div>}
                 <div className="modal-btns" style={{ marginTop: "6px" }}>
                     <div className="modal-btns-row">
                         <button className="btn-info" disabled={v.lookupTestBusy} onClick={onAct("testLookupApiConfig", { self: true })}>🧪 សាកល្បង</button>

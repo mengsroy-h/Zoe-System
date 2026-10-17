@@ -189,14 +189,13 @@ export function rotateZtoSweepQueue(list, cursor) {
 
 export function ztoStatusFeatureConfig() {
     const cfg = getLookupApiConfig();
-    if (lookupApiIsPalm(cfg)) return null;
     if (!cfg || !cfg.enabled || !cfg.url || !lookupApiIsZto(cfg)) return null;
     return cfg;
 }
 
 export function ztoFastModeIsOn() {
     const cfg = getLookupApiConfig();
-    return !!(cfg && cfg.fastMode && !lookupApiIsPalm(cfg));
+    return !!(cfg && cfg.fastMode);
 }
 
 export function ztoStatusTrashItemCounts(item) {
@@ -718,7 +717,12 @@ export function scheduleZtoStatusSweep(delayMs?) {
 
 export async function checkZtoStatusForBarcode(cfg, code) {
     const session = captureZtoSession();
-    const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
+    let targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
+    if (lookupApiIsPalm(cfg)) {
+        const statusUrl = new URL(targetUrl, window.location.href);
+        statusUrl.searchParams.set('status', '1');
+        targetUrl = statusUrl.href;
+    }
     const headers = await buildLookupRequestHeaders(cfg);
     await addZtoIdentityHeader(cfg, headers);
     if (!session.current()) return null;

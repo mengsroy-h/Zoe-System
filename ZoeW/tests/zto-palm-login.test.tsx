@@ -8,7 +8,7 @@ import { fieldValue, setFieldChecked, setFieldValue } from '../src/app/refs';
 import { firebaseState, scanState, securityState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
-import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig } from '../src/features/lookup-config';
+import { getLookupApiConfig, openLookupApiConfigModal, saveLookupApiConfig, testLookupApiConfig } from '../src/features/lookup-config';
 import { cancelZtoPalmLogin, disconnectZtoPalm, submitZtoPalmLogin } from '../src/features/zto-palm-login';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
 import { encryptLookupSecret, decryptLookupSecret } from '../src/services/crypto';
@@ -16,8 +16,9 @@ import { closeModal } from '../src/ui/modal';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { ztoFastModeIsOn, ztoStatusFeatureConfig } from '../src/features/zto-status';
+import { buildZtoListApiUrl } from '../src/features/zto-list-sync';
 import { clearSensitiveModalFields } from '../src/features/session';
-import { healthLookupRow } from '../src/features/health-check';
+import { healthLookupRow, ztoUpstreamTimingText } from '../src/features/health-check';
 import { buildHealthAdvice } from '../src/features/health-advice';
 
 const PROXY_KEY = 'synthetic-client-proxy-0123456789abcdef';
@@ -76,6 +77,29 @@ afterEach(() => {
 });
 
 describe('Palm login UI and existing lookup flow', () => {
+    it('🧪 Palm អាន queryTrackInfo និងបង្ហាញ JSON ពេញដែលអាចចម្លងបាន', async () => {
+        await signIn();
+        act(() => openLookupApiConfigModal());
+        vi.stubGlobal('prompt', () => '77130500000012');
+        const body = { success: true, queryTrackInfo: { status: true, result: [{ tracks: [{ message: 'ក'.repeat(4000), action: '03', tail: 'ចុងចម្លើយ' }] }] } };
+        vi.stubGlobal('fetch', vi.fn(async () => response(body)));
+        await act(async () => { await testLookupApiConfig(); });
+        const [url, init] = vi.mocked(fetch).mock.calls[0];
+        const query = new URL(String(url)).searchParams;
+        expect(query.get('palm')).toBe('1');
+        expect(query.get('track')).toBe('1');
+        expect(query.get('barcode')).toBe('77130500000012');
+        expect(init?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Palm-Token': SESSION });
+        expect(document.querySelectorAll('#lookupApiTestResult')).toHaveLength(1);
+        const result = document.querySelector<HTMLTextAreaElement>('#lookupApiTestResult');
+        expect(result?.readOnly).toBe(true);
+        expect(result?.value).toContain(JSON.stringify(body, null, 2));
+        expect(result?.value).toContain('ចុងចម្លើយ');
+        expect(getLookupApiConfig().url).not.toContain('track=');
+        act(() => clearSensitiveModalFields());
+        expect(viewState.lookupTestResult).toBe('');
+    });
+
     it('renders the login fields and stores only PIN-encrypted secrets', async () => {
         const cfg = await signIn();
         expect(fieldValue('ztoPalmPasswordInput')).toBe('');
@@ -181,9 +205,10 @@ describe('Palm login UI and existing lookup flow', () => {
 
     it('disconnects Palm and clears its lookup cache and session', async () => {
         await signIn();
-        expect(ztoFastModeIsOn()).toBe(false);
-        expect(ztoStatusFeatureConfig()).toBeNull();
+        expect(ztoFastModeIsOn()).toBe(true);
+        expect(ztoStatusFeatureConfig()).toMatchObject({ enabled: true });
         act(() => disconnectZtoPalm());
+        expect(ztoStatusFeatureConfig()).toBeNull();
         expect(getLookupApiConfig()).toMatchObject({ enabled: false });
         expect(getLookupApiConfig().palmTokenEnc).toBeUndefined();
         expect(viewState.palmLoginConnected).toBe(false);
@@ -216,11 +241,12 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(viewState.palmLoginStatus).toContain('palm:sign-key');
     });
 
-    it('decides Palm mode from the lookup URL alone (a config without provider still turns Argus features off)', () => {
-        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
-            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' }));
-        expect(ztoFastModeIsOn()).toBe(false);
-        expect(ztoStatusFeatureConfig()).toBeNull();
+    it('decides Palm mode from the lookup URL alone (a config without provider still reads ZTO lists through Palm, never the Argus Cookie)', async () => {
+        const cfg = { enabled: true, fastMode: true, headerName: 'X-Zoe-Proxy-Key',
+            url: window.location.origin + '/.netlify/functions/zto-order-detail?palm=1&barcode={barcode}', shop: 'https://palm-shop.firebaseio.com' };
+        appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        expect(new URL(buildZtoListApiUrl(cfg, '2026-10-01', '2026-10-02', 1, 'signedExact')).searchParams.get('palm')).toBe('1');
+        await expect(buildLookupRequestHeaders(cfg)).rejects.toMatchObject({ lookupCode: 'ZTO_AUTH_EXPIRED' });
     });
 
     it('names the Palm problem in the auto-lookup message (ZTO rejected with a reason · session expired)', async () => {
@@ -244,6 +270,19 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(server.state).toBe('bad');
         expect(JSON.stringify(server)).toContain('palm:password-key');
         expect(JSON.stringify(buildHealthAdvice([server]))).toContain('ZTO_PALM_PASSWORD_KEY');
+        vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true, upstreamTiming: {
+            detail: { count: 3, timeouts: 0, lastMs: 610, avgMs: 640, maxMs: 700, ageMs: 5 },
+            palm: { detail: { count: 2, timeouts: 1, lastMs: 1250, avgMs: 1310, maxMs: 1400, ageMs: 5 } },
+            connections: { argus: { count: 0, errors: 0, lastMs: null, avgMs: null, maxMs: null, ageMs: null },
+                palm: { count: 2, errors: 0, lastMs: 420, avgMs: 455, maxMs: 490, ageMs: 5 } } } })));
+        const timed: any = await healthLookupRow();
+        expect(timed.state).toBe('info');
+        const timedText = JSON.stringify(timed);
+        expect(timedText).toContain('មធ្យម 1.31 វិនាទី');
+        expect(timedText).toContain('ចុងក្រោយ 1.25 វិនាទី (2 ដង)');
+        expect(timedText).toContain('ហួសពេល 1 ដង');
+        expect(timedText).toContain('ភ្ជាប់ថ្មីទៅ ZTO 2 ដង (មធ្យម 0.46 វិនាទី)');
+        expect(timedText).not.toContain('0.64');
         vi.stubGlobal('fetch', vi.fn(async () => response({ success: true, provider: 'zto-palm', configured: true })));
         expect(((await healthLookupRow()) as any).state).toBe('info');
         const cfg = getLookupApiConfig();
@@ -255,9 +294,56 @@ describe('Palm login UI and existing lookup flow', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('warns in the Palm form that Palm mode never closes parcels from ZTO', () => {
+    it('ផ្ទាំង Palm ប្រាប់ការទាញបញ្ជីមកដល់ បិទតាម ZTO និងរបាររំលឹក', () => {
         const note = document.getElementById('ztoPalmModeNote');
-        expect(note && note.textContent).toContain('មិនបិទកញ្ចប់តាម ZTO');
-        expect(note && note.textContent).toContain('ដកពីចំណូល');
+        expect(note && note.textContent).not.toContain('«បញ្ជូន»');
+        expect(note && note.textContent).toContain('«ចុះហត្ថលេខា»');
+        expect(note && note.textContent).toContain('ទាញបញ្ជីកញ្ចប់មកដល់');
+        expect(note && note.textContent).toContain('ZTO មិនទាន់បិទ');
+    });
+});
+
+describe('🩺 ZTO response time text (owner report: Palm lookup slower than Cookie)', () => {
+    const timing = {
+        detail: { count: 4, timeouts: 0, lastMs: 820, avgMs: 760, maxMs: 900, ageMs: 1 },
+        palm: { detail: { count: 0, timeouts: 0, lastMs: null, avgMs: null, maxMs: null, ageMs: null } },
+        connections: { argus: { count: 1, errors: 0, lastMs: 300, avgMs: 300, maxMs: 300, ageMs: 1 },
+            palm: { count: 0, errors: 0, lastMs: null, avgMs: null, maxMs: null, ageMs: null } }
+    };
+
+    it('Cookie (Argus) mode reads the /detail meter and the Argus connections; Palm reads its own', () => {
+        expect(ztoUpstreamTimingText({ upstreamTiming: timing }, false))
+            .toBe(' · ZTO ឆ្លើយពេលស្កេន ៖ មធ្យម 0.76 វិនាទី · ចុងក្រោយ 0.82 វិនាទី (4 ដង) · ភ្ជាប់ថ្មីទៅ ZTO 1 ដង (មធ្យម 0.30 វិនាទី)');
+        expect(ztoUpstreamTimingText({ upstreamTiming: timing }, true)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
+    });
+
+    it('splits the scan time by new or reused connection, says how long ZTO keeps it, and where the Function runs', () => {
+        const body = { runtime: { region: 'us-east-2' }, upstreamTiming: { ...timing, palm: { detail: { count: 3, timeouts: 0, lastMs: 620, avgMs: 580 } },
+            scans: { argus: { fresh: { count: 1, avgMs: 560, lastMs: 560 }, reused: { count: 3, avgMs: 240, lastMs: 230 }, keepAliveSec: 60, closes: 0 },
+                palm: { fresh: { count: 3, avgMs: 900, lastMs: 880 }, reused: { count: 0, avgMs: null, lastMs: null }, keepAliveSec: 0, closes: 2 } } } };
+        const palm = ztoUpstreamTimingText(body, true);
+        expect(palm).toContain('ស្កេនលើការភ្ជាប់ថ្មី មធ្យម 0.90 វិនាទី (3 ដង)');
+        expect(palm).not.toContain('ការភ្ជាប់ដែលបើករួច');
+        expect(palm).toContain('ZTO បិទការភ្ជាប់ក្រោយឆ្លើយ');
+        expect(palm).toContain('Function នៅ us-east-2');
+        const argus = ztoUpstreamTimingText(body, false);
+        expect(argus).toContain('ស្កេនលើការភ្ជាប់ថ្មី មធ្យម 0.56 វិនាទី (1 ដង)');
+        expect(argus).toContain('ស្កេនលើការភ្ជាប់ដែលបើករួច មធ្យម 0.24 វិនាទី (3 ដង)');
+        expect(argus).toContain('ZTO ទុកការភ្ជាប់ 60 វិនាទី');
+        expect(argus).not.toContain('បិទការភ្ជាប់');
+        const silent = ztoUpstreamTimingText({ upstreamTiming: { ...timing, scans: { argus: { fresh: { count: 1, avgMs: 500, lastMs: 500 },
+            reused: { count: 0 }, keepAliveSec: 0, closes: 0 } } } }, false);
+        expect(silent).toContain('ZTO មិនប្រាប់រយៈទុកការភ្ជាប់');
+        expect(silent).not.toContain('Function នៅ');
+        expect(ztoUpstreamTimingText({ runtime: { region: '<b>x</b>' }, upstreamTiming: timing }, false)).not.toContain('<b>');
+    });
+
+    it('an older Function without the meter, or unreadable values, never print a number', () => {
+        expect(ztoUpstreamTimingText({}, true)).toBe('');
+        expect(ztoUpstreamTimingText(null, false)).toBe('');
+        expect(ztoUpstreamTimingText({ upstreamTiming: { detail: { count: 2, avgMs: 'x', lastMs: -1 } } }, false)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
+        expect(ztoUpstreamTimingText({ upstreamTiming: { palm: null, connections: 'x' } }, true)).toContain('ស្កេនកញ្ចប់ ១ រួចពិនិត្យម្តងទៀតដើម្បីឃើញ');
+        expect(ztoUpstreamTimingText({ upstreamTiming: { detail: { count: 1, avgMs: 500, lastMs: 500 }, connections: { argus: { count: 'x' } } } }, false))
+            .not.toContain('ភ្ជាប់ថ្មី');
     });
 });

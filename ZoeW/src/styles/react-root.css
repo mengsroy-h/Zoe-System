@@ -685,6 +685,8 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 .zto-list-origin { font-size: calc(10 * var(--fs-unit)); color: #075985; overflow-wrap: anywhere; }
 .zto-list-note { font-size: calc(9.5 * var(--fs-unit)); color: #92400e; overflow-wrap: anywhere; }
 .zto-list-returned { border-color: #fecaca; background: #fef2f2; }
+.trash-tag-returned { background: #fce7f3; color: #be185d; }
+.notify-returned-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #fce7f3; color: #be185d; font-weight: 700; font-size: calc(10.5 * var(--fs-unit)); }
 .zto-list-returned .zto-list-group-head { color: #b91c1c; }
 
 @media (max-width: 991px) {

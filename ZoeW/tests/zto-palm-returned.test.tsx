@@ -46,6 +46,6 @@ describe('↩️ ZTO Palm ៖ track `-710` នៃសាខាខ្លួនក�
         const codes = (tone: string) => groups.find((g: any) => g.tone === tone).rows.map((r: any) => r.barcode).sort();
         expect(codes('zto-list-returned')).toEqual(['KH5000000001']);
         expect(codes('zto-list-fresh')).toEqual(['KH5000000002', 'KH5000000003', 'KH5000000004']);
-        expect(noteText()).toContain('↩️ ត្រឡប់ទៅវិញ 1');
+        expect(noteText()).toContain('↩️ ស្កេនត្រឡប់រួច 1 ➜ រំលង');
     });
 });

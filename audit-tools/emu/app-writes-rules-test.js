@@ -184,6 +184,21 @@ async function replay(cap, rules, tag) {
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `origins`) បដិសេធការសរសេរប្រភព ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់ (`saveBarcodeOrigins`)',
         'denied=' + old.denied.length + ' originPaths=' + originPaths);
 
+    // ⛔ ធុងសំរាម «ត្រឡប់» (`trashReason: 'returned'` ៖ ZTO ស្កេនត្រឡប់ ➜ ដកដូចផុតកំណត់) ៖ តម្លៃថ្មីលើផ្លូវធុងសំរាម ➜ ការ replay ត្រូវមានការសរសេរពិត ·
+    //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules ចាស់ (តម្លៃ ៤ គ្មាន `returned`) ➜ បដិសេធ (App ធ្លាក់ទៅ «ផុតកំណត់» ពេល rules មិនទាន់ Publish)។
+    const isReturnedTrash = (v) => !!v && typeof v === 'object' && v.trashReason === 'returned';
+    const returnedTrash = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && rootOf(e.p) === 'zoew_recently_deleted_cod_dod'
+        && isReturnedTrash(e.v)).length, 0);
+    console.log('    ធុងសំរាម «ត្រឡប់» ៖ ការសរសេរ ' + returnedTrash);
+    check(returnedTrash >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរធុងសំរាម «ត្រឡប់» ≥ ១ (op `returned`)', 'returnedTrash=' + returnedTrash);
+    const noReturnedRules = JSON.parse(JSON.stringify(rules));
+    const reasonRule = noReturnedRules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason;
+    reasonRule['.validate'] = String(reasonRule['.validate']).replace(" || newData.val() === 'returned'", '');
+    const noReturned = await replay(cap.data, noReturnedRules, 'no-returned-rules');
+    check(reasonRule['.validate'].indexOf('returned') === -1 && noReturned.denied.length >= returnedTrash,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `returned`) បដិសេធធុងសំរាម «ត្រឡប់» (ការវាស់រសើប)',
+        'denied=' + noReturned.denied.length + ' returnedTrash=' + returnedTrash);
+
     // ⛔ សញ្ញាហាង ZTO (`zoew_settings/zto_signed_sweep`) ៖ ផ្លូវសរសេរថ្មី ➜ ការ replay ត្រូវមានការសរសេរពិតរបស់ `markZtoShopSweep()` ·
     //    rules ពិតទទួល (ខាងលើ) · probe ៖ rules ដែលគ្មាន node នេះ (ដូច rules ចាស់) ➜ បដិសេធ។
     const markerPath = p => p === 'zoew_settings/zto_signed_sweep' || p.startsWith('zoew_settings/zto_signed_sweep/');

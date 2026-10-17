@@ -917,7 +917,7 @@ export function renderZtoListSyncPreview() {
         groups: [
             ztoListGroupModel(freshTitle, groups.fresh, 'zto-list-fresh'),
             ztoListGroupModel(existingTitle, groups.existing, 'zto-list-existing'),
-            ztoListGroupModel('↩️ ត្រឡប់ទៅវិញ (មិនបញ្ចូល)', groups.returned, 'zto-list-returned'),
+            ztoListGroupModel('↩️ មានក្នុងបញ្ជី តែស្កេនត្រឡប់រួច (រំលង · មិនបញ្ចូល)', groups.returned, 'zto-list-returned'),
             ztoListGroupModel('♻️ ស្ទួនក្នុងបញ្ជី ZTO', groups.duplicate, 'zto-list-dup'),
             ztoListGroupModel('⏭️ រំលង (មិនបញ្ចូល)', groups.skipped, 'zto-list-skip')
         ]
@@ -943,8 +943,8 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
     if (bornClosed > 0) parts.push('🔒 ZTO បិទរួច ' + bornClosed + ' ➜ «យករួច»');
     if (signedOnly > 0) parts.push('✍️ ចុះហត្ថលេខា (មកដល់មុន ' + (result && result.from) + ') ' + signedOnly + ' ➜ «យករួច»');
     if (closeCount > 0) parts.push('🔒 មានក្នុង ZoeW ZTO បិទរួច ' + closeCount + ' ➜ បិទពេល «បញ្ចូល»');
-    if (returnedCount > 0) parts.push('↩️ ត្រឡប់ទៅវិញ ' + returnedCount + ' ➜ មិនបញ្ចូល');
-    if (removedCount > 0) parts.push('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW ' + removedCount + ' (ដូចផុតកំណត់ · ដកលុយ)');
+    if (returnedCount > 0) parts.push('↩️ ស្កេនត្រឡប់រួច ' + returnedCount + ' ➜ រំលង មិនបញ្ចូល');
+    if (removedCount > 0) parts.push('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW ' + removedCount + ' (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
     const returnedState = result && result.returnedState;
     if (returnedState === 'failed' || returnedState === 'partial') parts.push('⚠️ ពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញមិនបានគ្រប់ ➜ សូមទាញម្តងទៀត');
     const unverified = result && Array.isArray(result.unverified) ? result.unverified : [];

@@ -66,9 +66,12 @@ WRITE_PATHS.forEach((p) => {
 // `claimAndCleanupItem` មានផ្លូវ ៣ ក្នុង function តែមួយ
 const claimBody = sliceFn(src, 'claimAndCleanupItem');
 ok(!!claimBody, 'claimAndCleanupItem មានក្នុង app.js');
-const expiredHits = (claimBody.match(/trashReason = 'expired'/g) || []).length;
-ok(expiredHits === 2,
-    "claimAndCleanupItem ដាក់ 'expired' ទាំងផ្លូវ partial និងផ្លូវ whole (៨ ថ្ងៃ)", expiredHits);
+// ⛔ ផ្លូវ abandon ដាក់ស្លាកមួយ ៖ ច្បាប់អាយុ ➜ 'expired' · ZTO ត្រឡប់ (`codes`) ➜ 'returned' (ម្ចាស់គម្រោង ៖ «ស្លាក "ត្រឡប់"»)
+const abandonDecl = /const abandonReason = forced \? 'returned' : 'expired';/.test(claimBody)
+    && /const forced = reason === 'abandon' && opts && Array\.isArray\(opts\.codes\)/.test(claimBody);
+const expiredHits = (claimBody.match(/trashReason = abandonReason/g) || []).length;
+ok(abandonDecl && expiredHits === 2,
+    "claimAndCleanupItem ដាក់ 'expired' (៨ ថ្ងៃ) ឬ 'returned' (ZTO ត្រឡប់ · `codes`) ទាំងផ្លូវ partial និងផ្លូវ whole", { abandonDecl, expiredHits });
 const pickupHits = (claimBody.match(/trashReason = 'pickup'/g) || []).length;
 ok(pickupHits === 2,
     "claimAndCleanupItem ដាក់ 'pickup' ទាំងផ្លូវ partial (barcode បិទរួច ២ ម៉ោង) និងផ្លូវ whole", pickupHits);
@@ -90,10 +93,13 @@ const expiredRetention = /const EXPIRED_TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \
 ok(!!expiredRetention && Number(expiredRetention[1]) === EXPIRED_RETENTION_DAYS,
     'expired រក្សាទុក ' + khmerNum(EXPIRED_RETENTION_DAYS) + ' ថ្ងៃ', expiredRetention && expiredRetention[1]);
 const retentionFn = sliceFn(src, 'trashRetentionMs');
-ok(retentionFn.indexOf("trashReason === 'expired'") !== -1 &&
+const deductedReasons = /const CLEANUP_DEDUCTED_REASONS = \[([^\]]*)\];/.exec(src);
+ok(!!deductedReasons && deductedReasons[1].replace(/\s/g, '') === "'expired','returned'",
+    "CLEANUP_DEDUCTED_REASONS = 'expired' · 'returned' (ថ្នាក់ដែលការសម្អាតដកលុយ)", deductedReasons && deductedReasons[1]);
+ok(retentionFn.indexOf('trashReasonIsCleanupDeducted(item.trashReason)') !== -1 &&
     retentionFn.indexOf('EXPIRED_TRASH_RETENTION_MS') !== -1 &&
     retentionFn.indexOf('TRASH_RETENTION_MS') !== -1,
-    'trashRetentionMs បែងចែក expired ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
+    'trashRetentionMs បែងចែក expired · returned ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
 ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('trashRetentionMs(item)') !== -1,
     'runAutomaticDeletedCleanup ប្រើ retention តាមប្រភេទ');
 
@@ -208,9 +214,10 @@ const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rule
 const trashRule = rules.rules.zoew_recently_deleted_cod_dod.$itemId;
 ok(!!trashRule.trashReason && typeof trashRule.trashReason['.validate'] === 'string',
     'firebase rules ទទួលវាល trashReason ក្នុង zoew_recently_deleted_cod_dod');
-ok(!!trashRule.trashReason && ['delete', 'remove', 'expired', 'pickup']
-        .every((r) => trashRule.trashReason['.validate'].indexOf("'" + r + "'") !== -1),
-    'rules ចាក់សោតម្លៃត្រឹមតែ ៤ ប្រភេទដែលកូដសរសេរ');
+ok(!!trashRule.trashReason && ['delete', 'remove', 'expired', 'returned', 'pickup']
+        .every((r) => trashRule.trashReason['.validate'].indexOf("'" + r + "'") !== -1)
+        && (trashRule.trashReason['.validate'].match(/newData\.val\(\) === '/g) || []).length === 5,
+    'rules ចាក់សោតម្លៃត្រឹមតែ ៥ ប្រភេទដែលកូដសរសេរ');
 ok(!rules.rules.zoew_scan_history_cod_dod.$itemId.trashReason,
     'scan_history **មិន** ទទួល trashReason (វាជាវាលរបស់ធុងសំរាមតែប៉ុណ្ណោះ)');
 
@@ -254,6 +261,7 @@ if (!META || typeof ctx.buildTrashGroups !== 'function') {
 const CLASSIFY = [
     { item: { trashReason: 'remove', isFromDeletion: false }, want: 'remove', why: 'ស្លាកច្បាស់លាស់ឈ្នះ' },
     { item: { trashReason: 'expired', isFromDeletion: false }, want: 'expired' },
+    { item: { trashReason: 'returned', isFromDeletion: false }, want: 'returned', why: 'ZTO ស្កេនត្រឡប់' },
     { item: { trashReason: 'pickup', isFromDeletion: true, isClosed: true }, want: 'pickup' },
     { item: { trashReason: 'delete', isFromDeletion: true }, want: 'delete' },
     { item: { trashReason: 'nonsense', isFromDeletion: true }, want: 'delete', why: 'តម្លៃមិនស្គាល់ ➜ ថយទៅ fallback' },
@@ -267,8 +275,8 @@ CLASSIFY.forEach((c) => {
 });
 
 // **ចំណុចសំខាន់បំផុត**៖ ក្រុមលុយត្រូវត្រូវនឹងអ្វីដែលកូដចំណូលពិតធ្វើ
-ok(META.remove.deducted === true && META.expired.deducted === true,
-    "'remove' និង 'expired' ជាប់ក្រុម **ដករួចពីស្ថិតិ**");
+ok(META.remove.deducted === true && META.expired.deducted === true && !!META.returned && META.returned.deducted === true && META.returned.label === 'ត្រឡប់',
+    "'remove' · 'expired' · 'returned' («ត្រឡប់») ជាប់ក្រុម **ដករួចពីស្ថិតិ**");
 ok(META.pickup.deducted === false && META.delete.deducted === false,
     "'pickup' និង 'delete' ជាប់ក្រុម **មិនប៉ះស្ថិតិ**");
 

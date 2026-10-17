@@ -471,7 +471,7 @@ describe('ការរំលឹកកញ្ចប់ជិតផុតកំណ�
         expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 1, keys: 1 });
         expect(sent.map((s) => s.url)).toEqual([mine.sub.endpoint]);
         const msg = decryptWebPush(sent[0].body, mine.ua);
-        expect(msg.title).toBe('📦 2 កញ្ចប់ជិតផុតកំណត់');
+        expect(msg.title).toBe('📦 2 កញ្ចប់ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ');
         expect(msg.body).toContain('តាមទិន្នន័យម៉ោង 07:02');
         h.clock.now = at8 + 5 * 60e3;
         expect(await h.service.dispatchExpiry()).toMatchObject({ sent: 0 });

@@ -21,12 +21,12 @@ const LOCK: Record<string, string> = {
     'src/features/zto-palm-login.ts': '6c7b56f9887a909134e77284665d29e0d40555f177d7c5e3df8177f4a96fb3d9',
     'netlify/functions/_shared/zto-palm.js': '8b505595ff6d229c5f55ab27b576d8c201ed3957e9d7b09221e31beb2fe7bab4',
     'netlify/functions/zto-order-detail.js': 'cb1c05a46458ac645730f2c92df872cf2b6f8e88a65ea9169ffa2ba54c137032',
-    'src/features/zto-list-sync.ts': '83be41bf9a36423a72b5bf4fcd0e95823592ab04e0a1286b9d2781a04b220e24',
+    'src/features/zto-list-sync.ts': '0a6523982297f4f0718c4de3d12c0ce51764e6e792935ffb69df293cd1fcc428',
     'src/features/zto-status.ts': 'fda45afd13293bb5413746da41535b06682b0066e83fc8e9ed2e28d4ba230583',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
     'src/features/auto-lookup.ts': '8f485fc7bd750f0c5e17aca4020613ba914bdd991a9b9d5430ad7a352d492d22',
     'src/features/lookup-api.ts': 'becc8a14319141d6d0e00736da251386a85302d57f6113ba53a24215ccfe1f55',
-    'src/app/components/zto/model.ts': 'ba78392873504c0df7158764dac961a262378c301da5c043ec6fda59451eca47',
+    'src/app/components/zto/model.ts': 'b1c211b37235a3b7273374b72b6266e331f321a88f9c48f79bbb58000909cd0a',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',
     'src/app/components/modals/ZtoListSyncModal.tsx': 'c9d3c9bc49ac2d133ffefed161039040563994d4c0190a634e7bdb44cb2eb08e'
 };

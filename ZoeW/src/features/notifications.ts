@@ -11,6 +11,7 @@ import { barcodeAbandonIsRipe, barcodeEntriesOf, itemHasRestoreMarkers, parseTim
 import { checkApkRelease } from './apk-update';
 import { LICENSE_APP_CODE } from './license';
 import { trashReasonOf } from './trash';
+import { trashReasonIsCleanupDeducted } from './session';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal, withTimeout } from '../services/network';
@@ -38,6 +39,7 @@ export interface NotifyRemovedRow {
     count: number;
     hoursAgo: number;
     isNew: boolean;
+    returned: boolean;
 }
 
 export interface NotifyRemovedView {
@@ -78,8 +80,11 @@ export const NOTIFY_SELLER_KINDS = ['notice', 'maintenance'];
 export const NOTIFY_SELLER_CACHE_KEY = 'zoew_notify_seller_v1';
 export const NOTIFY_SELLER_ID_PREFIX = 'kg:';
 export const NOTIFY_SELLER_TITLE_MAX = 120;
-export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតផុតកំណត់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
-export const NOTIFY_REMOVED_REASON = 'expired';
+export const NOTIFY_RETURN_POLICY_TEXT = 'គោលការណ៍ក្រុមហ៊ុន ៖ កញ្ចប់លើស ៧ ថ្ងៃ ត្រឡប់ទៅសាខាកណ្តាល';
+export const NOTIFY_RETURN_STEP_TEXT = 'យកចេញពីទូ ហើយស្កេន «ត្រឡប់» ក្នុង ZTO';
+export const NOTIFY_RETURN_DUE_TEXT = '↩️ ស្កេនត្រឡប់';
+export const NOTIFY_RETURN_SOON_TEXT = 'ជិតដល់ពេលត្រឡប់ទៅសាខាកណ្តាលវិញ សូមធ្វើការស្កេនត្រឡប់';
+export const NOTIFY_EMPTY_EXPIRY_TEXT = 'គ្មានកញ្ចប់ជិតដល់ពេលត្រឡប់ក្នុង ' + NOTIFY_EXPIRY_HOURS_MAX + ' ម៉ោងខាងមុខទេ';
 export const NOTIFY_REMOVED_SEEN_KEY = 'zoew_notify_removed_seen_v1';
 export const NOTIFY_REMOVED_SEEN_MAX = 300;
 export const NOTIFY_EMPTY_REMOVED_TEXT = 'គ្មានកញ្ចប់ដែលប្រព័ន្ធដកចេញព្រោះផុតកំណត់ក្នុងធុងសំរាមទេ';
@@ -198,7 +203,8 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
     for (let i = 0; i < list.length; i++) {
         const item = list[i];
         if (!item || typeof item !== 'object' || !item.id) continue;
-        if (trashReasonOf(item) !== NOTIFY_REMOVED_REASON || item.restoreClaim) continue;
+        const reason = trashReasonOf(item);
+        if (!trashReasonIsCleanupDeducted(reason) || item.restoreClaim) continue;
         const entries = barcodeEntriesOf(item.barcodes);
         const count = entries.length || 1;
         let locker = '';
@@ -214,7 +220,7 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
         packages += count;
         if (isNew) unseen += count;
         phones.add(phone);
-        rows.push({ key, phone, locker, count, at, isNew, hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
+        rows.push({ key, phone, locker, count, at, isNew, returned: reason === 'returned', hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
     }
     rows.sort((a, b) => b.at - a.at || b.count - a.count);
     return {

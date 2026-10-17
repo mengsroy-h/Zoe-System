@@ -2071,6 +2071,9 @@
     "ZoeW/tests/notify-groups.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/expiry-return-policy.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/notify-apk-link.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -3464,6 +3467,9 @@
       "policy": "zoew-self-verification"
     },
     "supabase/migrations/20261016120000_zoe_linear_write.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261017044800_zoe_rules.sql": {
       "policy": "supabase-db"
     }
   }

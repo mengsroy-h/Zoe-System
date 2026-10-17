@@ -634,6 +634,7 @@ export interface ZtoState {
     ztoSignedMismatchFrom: string;
     ztoSignedMismatchWideAt: number;
     ztoOriginRefusedDb: any;
+    ztoReturnedLabelRefusedDb: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
     ztoListPreview: any | null;
@@ -669,6 +670,7 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoSignedMismatchFrom: '',
     ztoSignedMismatchWideAt: 0,
     ztoOriginRefusedDb: null,
+    ztoReturnedLabelRefusedDb: null,
     ztoBannerView: null,
     ztoSyncListView: null,
     ztoListPreview: null,

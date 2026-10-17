@@ -40,6 +40,12 @@ export const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
+export const CLEANUP_DEDUCTED_REASONS = ['expired', 'returned'];
+
+export function trashReasonIsCleanupDeducted(reason) {
+    return CLEANUP_DEDUCTED_REASONS.indexOf(reason) !== -1;
+}
+
 export const TRASH_WRITE_SLOW_NOTICE_MS = 15000;
 
 export function clearRememberedSession(keepEmail) {

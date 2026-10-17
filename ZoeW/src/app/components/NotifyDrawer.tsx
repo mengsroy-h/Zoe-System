@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
-import { NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_GROUP_EXPIRY, NOTIFY_GROUP_REMOVED, newerAppVersion, visibleNotifyFeed, type NotifyExpiryRow, type NotifyFeedItem, type NotifyRemovedRow, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
+import { NOTIFY_EXPIRY_HOURS_MAX, NOTIFY_GROUP_EXPIRY, NOTIFY_GROUP_REMOVED, NOTIFY_RETURN_DUE_TEXT, NOTIFY_RETURN_POLICY_TEXT, NOTIFY_RETURN_SOON_TEXT, NOTIFY_RETURN_STEP_TEXT, newerAppVersion, visibleNotifyFeed, type NotifyExpiryRow, type NotifyFeedItem, type NotifyRemovedRow, type NotifyRemovedView, type NotifyView } from '../../features/notifications';
 import { APK_ERROR_TEXT, type ApkReleaseState, type ApkUpdateState } from '../../features/apk-update';
 import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
@@ -18,7 +18,7 @@ const KIND_CLASS: Record<string, string> = {
 };
 
 function hoursText(h: number): string {
-    return h <= 0 ? 'ដល់ពេលហើយ' : '≤ ' + h + ' ម៉ោង';
+    return h <= 0 ? NOTIFY_RETURN_DUE_TEXT : '≤ ' + h + ' ម៉ោង';
 }
 
 function PushSection({ status }: { status: PushStatus }) {
@@ -107,7 +107,7 @@ function ExpirySection({ view }: { view: NotifyView | null }) {
             headId="notifyExpiryHead"
             bodyId="notifyExpirySection"
             icon="📦"
-            label="កញ្ចប់ជិតផុតកំណត់"
+            label="កញ្ចប់ជិតដល់ពេលត្រឡប់"
             className="notify-group"
             action="toggleNotifyGroup"
             lazy
@@ -117,7 +117,7 @@ function ExpirySection({ view }: { view: NotifyView | null }) {
                 <>
                     <div className="notify-summary is-warn" id="notifyExpirySummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
-                        {' '}នឹងផុតកំណត់ក្នុង {NOTIFY_EXPIRY_HOURS_MAX} ម៉ោងខាងមុខ ➜ ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ (ដកលុយ) បើមិនទាន់យក
+                        {' '}{NOTIFY_RETURN_SOON_TEXT} (ក្នុង {NOTIFY_EXPIRY_HOURS_MAX} ម៉ោង) ➜ {NOTIFY_RETURN_STEP_TEXT} · {NOTIFY_RETURN_POLICY_TEXT} · ZoeW ដកចេញ (ដកលុយ)
                     </div>
                     <NotifyPagedList id="notifyExpiryList" rows={view.rows} renderRow={expiryRow} />
                 </>
@@ -139,6 +139,7 @@ function removedRow(row: NotifyRemovedRow) {
             <span className="notify-expiry-phone">{row.phone || '—'}</span>
             <span className="notify-expiry-meta">
                 {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+                {row.returned ? <span className="notify-returned-tag">↩️ ត្រឡប់</span> : null}
             </span>
             <span className="notify-expiry-left">
                 {removedAgoText(row.hoursAgo)}
@@ -167,7 +168,7 @@ function RemovedSection({ view }: { view: NotifyRemovedView | null }) {
                 <>
                     <div className="notify-summary is-warn" id="notifyRemovedSummary">
                         <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
-                        {' '}ផុតកំណត់ ➜ ប្រព័ន្ធដកចេញ និងដកលុយ ➜ យកចេញពីទូ ហើយប្រគល់ត្រឡប់ · ស្តារវិញបានពី 🗑️ ធុងសំរាម
+                        {' '}ប្រព័ន្ធដកចេញ (ដកលុយ) ព្រោះលើស ៧ ថ្ងៃ ឬ ZTO ស្កេនត្រឡប់ ➜ បើមិនទាន់ ៖ {NOTIFY_RETURN_STEP_TEXT} ផ្ញើទៅសាខាកណ្តាល · ស្តារវិញបានពី 🗑️ ធុងសំរាម
                     </div>
                     <NotifyPagedList id="notifyRemovedList" rows={view.rows} renderRow={removedRow} />
                 </>

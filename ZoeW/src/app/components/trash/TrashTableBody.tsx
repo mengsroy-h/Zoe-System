@@ -65,7 +65,7 @@ export function TrashTableBody() {
             {view.overflow > 0 && (
                 <tr>
                     <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '8px' }}>
-                        ... និងមាន {view.overflow} ជួរទៀត (ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)
+                        ... និងមាន {view.overflow} ជួរទៀត (ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ត្រឡប់៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)
                     </td>
                 </tr>
             )}

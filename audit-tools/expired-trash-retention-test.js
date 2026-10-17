@@ -89,6 +89,9 @@ function build(items, ledgerDays) {
         balancedFunction('dbOp'),
         balancedFunction('dbOpStalled'),
         optionalFunction('armLateWrite', 'function armLateWrite() { return false; }'),
+        // ⛔ «ត្រឡប់» (`returned`) ជាថ្នាក់តែមួយនឹង «ផុតកំណត់» ➜ helper ពិត · tree មុនកែគ្មាន ➜ stub តែ `expired` (ការអះអាង «ត្រឡប់» ធ្លាក់)
+        (() => { try { return constant('CLEANUP_DEDUCTED_REASONS'); } catch (e) { return "const CLEANUP_DEDUCTED_REASONS = ['expired'];"; } })(),
+        optionalFunction('trashReasonIsCleanupDeducted', 'function trashReasonIsCleanupDeducted(r) { return CLEANUP_DEDUCTED_REASONS.indexOf(r) !== -1; }'),
         balancedFunction('trashRetentionMs'),
         optionalFunction('ledgerNumber', 'function ledgerNumber(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }'),
         optionalFunction('ledgerDedOf', 'function ledgerDedOf() { return null; }'),
@@ -111,6 +114,8 @@ function build(items, ledgerDays) {
         { id: 'expired_otherkey', trashReason: 'expired', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 5, barcodes: [{ code: 'EK' }] },
         { id: 'expired_active', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 30000 }, barcodes: [{ code: 'EA' }] },
         { id: 'expired_stale', trashReason: 'expired', deletedAt: NOW - 3 * DAY, restoreClaim: { claimedAt: NOW - 10 * 60 * 1000 }, barcodes: [{ code: 'ES' }] },
+        { id: 'returned_old', trashReason: 'returned', scanDate: '2027-01-05', deletedAt: NOW - 2 * DAY - 7, barcodes: [{ code: 'TO' }] },
+        { id: 'returned_young', trashReason: 'returned', deletedAt: NOW - DAY, barcodes: [{ code: 'TY' }] },
         { id: 'remove_young', trashReason: 'remove', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'RY' }] },
         { id: 'delete_young', trashReason: 'delete', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'DY' }] },
         { id: 'pickup_young', trashReason: 'pickup', deletedAt: NOW - 3 * DAY, barcodes: [{ code: 'PY' }] },
@@ -123,11 +128,14 @@ function build(items, ledgerDays) {
     const ledgerDays = { '2027-01-05': { codDollar: 9, dodDollar: 0, totalCount: 3, ded: {
         expired_old: { at: NOW - 2 * DAY - 1, cod: 1.25, dod: 0, count: 1 },
         expired_otherkey: { at: NOW - 9 * DAY, cod: 2, dod: 0, count: 1 },
+        returned_old: { at: NOW - 2 * DAY - 7, cod: 4, dod: 0, count: 1 },
         pickup_old: { at: NOW - 30 * DAY - 1, cod: 3, dod: 0, count: 1 }
     } } };
     const world = build(seed, ledgerDays);
     check(vm.runInContext('__retention({ trashReason: "expired" })', world.context) === 2 * DAY,
         'expired ប្រើ retention ២ ថ្ងៃ');
+    check(vm.runInContext('__retention({ trashReason: "returned" })', world.context) === 2 * DAY,
+        'returned («ត្រឡប់») ប្រើ retention ២ ថ្ងៃ ដូច expired');
     check(vm.runInContext('__retention({ trashReason: "remove" })', world.context) === 30 * DAY,
         'remove ប្រើ retention ៣០ ថ្ងៃ');
     check(vm.runInContext('__retention({})', world.context) === 30 * DAY,
@@ -138,6 +146,8 @@ function build(items, ledgerDays) {
     const purged = world.log.batches.flat().sort();
 
     check(purged.includes('expired_old'), 'expired លើស ២ ថ្ងៃត្រូវ purge', purged);
+    check(purged.includes('returned_old') && !purged.includes('returned_young') && remaining.includes('returned_young'),
+        'returned («ត្រឡប់») លើស ២ ថ្ងៃត្រូវ purge · ក្មេងជាង ២ ថ្ងៃនៅ', purged);
     check(!purged.includes('expired_boundary') && remaining.includes('expired_boundary'),
         'expired ត្រឹម ២ ថ្ងៃពេញមិនទាន់ purge');
     check(!purged.includes('expired_active') && remaining.includes('expired_active'),
@@ -154,8 +164,8 @@ function build(items, ledgerDays) {
         'registry មិនត្រូវដោះ barcode ដែលនៅរក្សាទុក', world.log.releasedBarcodes);
     // ⛔ សោដកដោះតែរបស់ព្រឹត្តិការណ៍ដដែល (`at` = `deletedAt`) របស់ធុងសំរាម `expired` ដែល purge ពិត · សោដែល `at` ផ្សេង (ព្រឹត្តិការណ៍មុន) និង `pickup` មិនប៉ះ
     const hasKeyFn = /function cleanupLedgerKeyOf\(/.test(source);
-    check(!hasKeyFn || (world.log.releasedKeys.length === 1 && world.log.releasedKeys[0] === 'expired_old@2027-01-05'),
-        'purge ➜ ដោះសោដក `ded` តែរបស់ expired ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
+    check(!hasKeyFn || world.log.releasedKeys.slice().sort().join(',') === 'expired_old@2027-01-05,returned_old@2027-01-05',
+        'purge ➜ ដោះសោដក `ded` តែរបស់ expired · returned ដែល purge ពិត ហើយ `at` ត្រូវ (មិនមែន at ផ្សេង · មិនមែន pickup)', world.log.releasedKeys);
     check(!hasKeyFn || purged.includes('expired_otherkey'), 'សោ `at` ផ្សេង មិនរារាំង purge របស់ធុងសំរាម', purged);
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');

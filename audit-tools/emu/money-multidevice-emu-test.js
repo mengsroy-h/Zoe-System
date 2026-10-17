@@ -1,6 +1,7 @@
 'use strict';
-// ថ្នាក់ ៖ **ឧបករណ៍ ២ ពិត · SDK Firebase ពិត · rules ពិត · emulator ពិត** ធ្វើប្រតិបត្តិការលុយ **ស្របគ្នា** លើទិន្នន័យតែមួយ
-// (បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ស្កេន · ការសម្អាតស្វ័យប្រវត្តិ ២h/៧ថ្ងៃ) ខណៈបណ្តាញដាច់ (`goOffline`) ហើយ
+// ថ្នាក់ ៖ **ឧបករណ៍ ៣ ពិតក្នុងសាខាមួយ (`MONEYMD_DEVICES`) · SDK Firebase ពិត · rules ពិត · emulator ពិត** ធ្វើប្រតិបត្តិការលុយ **ស្របគ្នា** លើទិន្នន័យតែមួយ
+// (បិទ · ដក · លុប · ស្តារ · កែតម្លៃ · ស្កេន · ការសម្អាតស្វ័យប្រវត្តិ ២h/៧ថ្ងៃ · ZTO ស្កេនត្រឡប់ ➜ ធុងសំរាម «ត្រឡប់» លើ barcode តែមួយពីគ្រប់ឧបករណ៍)
+// ខណៈបណ្តាញដាច់ (`goOffline`) ហើយ
 // (ក) ភ្ជាប់វិញ (queue របស់ SDK ចុះ) ឬ (ខ) **reload** (queue បាត់ ➜ journal ត្រូវសម្រេច)។
 // ⛔ `revenue-fuzz` វាស់ឧបករណ៍ ១ លើ fake SDK (ឧបករណ៍ផ្សេង = ការចាក់) · `emu/app-network-e2e` វាស់ការសរសេរ ១ ក្រោយ reload ·
 //    គ្មាន checker ណាវាស់ **transaction ពិតពីរឧបករណ៍ប្រជែងគ្នាលើ rules ពិត** និង **App ស្លាប់ពាក់កណ្តាលប្រតិបត្តិការលុយ**។
@@ -11,7 +12,10 @@
 //   ៤. barcode មិនស្ថិតទាំងប្រវត្តិនិងធុងសំរាម · កូនសោ registry មិនកំព្រា
 //   ៥. ឧបករណ៍ណាមិននៅ `blocked` · journal ទទេ · គ្មាន barcode បាត់ (ស្កេនរួច ➜ នៅប្រវត្តិ ឬធុងសំរាម)
 // ⛔ ជាន់អប្បបរមា ៖ ការចាក់ offline+reload · offline+online · ការសម្អាតប្រជែង ត្រូវបាញ់ពិត (បើមិនបាញ់ = បៃតងក្លែងក្លាយ)។
-// SKIP ≠ PASS ៖ គ្មាន emulator ➜ SKIPPED (STRICT ➜ FAIL)។ env ៖ MONEYMD_RUNS · MONEYMD_OPS · MONEYMD_RUN0 · MONEYMD_DEBUG=1
+// ⛔ ជុំទី ១ នៃលំដាប់នីមួយៗជាការប្រជែង «ZTO ត្រឡប់» ជានិច្ច (ឧបករណ៍ទាំងអស់ហៅទ្វារលុយដដែល `claimAndCleanupItem(… 'abandon', { codes, returnedAt })`
+//    លើ barcode ដដែលព្រមគ្នា ដូចពេលឧបករណ៍ ៣ ក្នុងសាខាឃើញបញ្ជីត្រឡប់ដដែល) ➜ ការដកលុយត្រូវកើតម្តងតែប៉ុណ្ណោះ។
+// អថេរ · PAGE_OPS រួមជាមួយ `supabase-money-multishop-test` ➜ `../money-multidevice-core.js`។
+// SKIP ≠ PASS ៖ គ្មាន emulator ➜ SKIPPED (STRICT ➜ FAIL)។ env ៖ MONEYMD_RUNS · MONEYMD_OPS · MONEYMD_RUN0 · MONEYMD_DEVICES · MONEYMD_DEBUG=1
 
 process.exitCode = 1;
 
@@ -19,6 +23,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { emuNamespace } = require('./ns.js');
+const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('../money-multidevice-core.js');
 
 const ROOT = process.env.MONEYMD_APP_DIR ? path.resolve(process.env.MONEYMD_APP_DIR) : path.join(__dirname, '..', '..');
 const DIR = path.join(ROOT, 'ZoeW');
@@ -28,6 +33,7 @@ const STRICT = process.env.MONEYMD_STRICT === '1' || process.env.CRUD_FLOW_STRIC
 const RUNS = parseInt(process.env.MONEYMD_RUNS || '3', 10);
 const OPS = parseInt(process.env.MONEYMD_OPS || '12', 10);
 const RUN0 = parseInt(process.env.MONEYMD_RUN0 || '0', 10);
+const DEVICES = Math.max(2, Math.min(5, parseInt(process.env.MONEYMD_DEVICES || '3', 10) || 3));
 const DEBUG = process.env.MONEYMD_DEBUG === '1';
 const ONLINE_TEXT = 'ភ្ជាប់ Server រួចរាល់';
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
@@ -39,8 +45,6 @@ const check = (c, label, detail) => {
     else { fail++; console.log('  FAIL  ' + label + (detail !== undefined ? '\n        ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
-function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
 function emulatorUp() {
     return fetch('http://127.0.0.1:' + EMU_PORT + '/.json?ns=demo-zoe-probe').then((r) => r.ok, () => false);
@@ -55,127 +59,9 @@ function unsignedToken(uid, email, projectId) {
     }) + '.';
 }
 
-const LICENSE_STUB = `window.ZoeLicense = {
-    getStatus: function () { return Promise.resolve({ state: 'active' }); },
-    setServerTimeOffset: function () {}, syncServerTime: function () { return Promise.resolve(); },
-    activate: function () { return Promise.resolve({ valid: true }); }, checkOnline: function () { return Promise.resolve({ ok: true }); },
-    announcementsUrl: function () { return ''; }, clearActivation: function () {}
-};`;
-
-// ---- invariant on the SERVER copy (REST owner dump) ----
-function invariant(dump, dateKey, monthKey, knownCodes) {
-    const hist = dump.zoew_scan_history_cod_dod || {};
-    const trash = dump.zoew_recently_deleted_cod_dod || {};
-    const bcsOf = (it) => {
-        const v = it && it.barcodes;
-        if (!v) return null;
-        if (Array.isArray(v)) return v.filter(Boolean);
-        if (typeof v === 'object') return Object.keys(v).sort((a, b) => (+a) - (+b)).map((k) => v[k]).filter(Boolean);
-        return null;
-    };
-    let cod = 0, dod = 0, count = 0, closed = 0;
-    const seen = {}; const dup = []; const live = {};
-    const walk = (bag, where) => Object.keys(bag).forEach((id) => {
-        const it = bag[id]; if (!it) return;
-        const bcs = bcsOf(it) || (it.barcode ? [{ code: it.barcode, cod: it.cod, dod: it.dod, isClosed: it.isClosed, isDeducted: it.isDeducted }] : []);
-        bcs.forEach((b) => {
-            if (!b || !b.code) return;
-            if (seen[b.code]) dup.push(b.code + '@' + seen[b.code] + '+' + where); else seen[b.code] = where;
-            live[String(b.code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_')] = true;
-            if (it.scanDate !== dateKey) return;
-            if (b.isClosed === true) closed++;
-            if (b.isDeducted !== true) { cod += parseFloat(b.cod) || 0; dod += parseFloat(b.dod) || 0; count++; }
-        });
-    });
-    walk(hist, 'hist'); walk(trash, 'trash');
-    const rev = (dump.zoew_daily_revenue_cod_dod || {})[dateKey] || {};
-    const daily = dump.zoew_daily_revenue_cod_dod || {};
-    let mCod = 0, mDod = 0, mCount = 0;
-    Object.keys(daily).forEach((d) => { if (d.slice(0, 7) !== monthKey) return; mCod += parseFloat(daily[d].codDollar) || 0; mDod += parseFloat(daily[d].dodDollar) || 0; mCount += parseFloat(daily[d].totalCount) || 0; });
-    const month = (dump.zoew_monthly_revenue_cod_dod || {})[monthKey] || {};
-    const pick = (dump.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
-    const phones = pick.pickedUpPhones || {};
-    let phoneSum = 0; const zeroRef = [];
-    Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; if (!(phones[k] > 0)) zeroRef.push(k); });
-    const reg = dump.zoew_barcode_registry || {};
-    const orphans = Object.keys(reg).filter((k) => reg[k] === true && !live[k]);
-    const lost = knownCodes.filter((c) => !seen[c]);
-    const receipts = Object.keys(dump.zoew_write_receipts || {}).length;
-    return {
-        expectCod: r2(cod), gotCod: r2(parseFloat(rev.codDollar) || 0), expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
-        expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
-        monthCod: r2(parseFloat(month.codDollar) || 0), monthDod: r2(parseFloat(month.dodDollar) || 0), monthCount: parseFloat(month.totalCount) || 0,
-        expectMonthCod: r2(mCod), expectMonthDod: r2(mDod), expectMonthCount: mCount,
-        pkg: parseFloat(pick.packagesPickedUp) || 0, expectPkg: closed, phoneSum, zeroRef, dup, orphans, lost, receipts, seenCodes: seen
-    };
-}
-function invariantBroken(inv) {
-    if (inv.expectCod !== inv.gotCod || inv.expectDod !== inv.gotDod || inv.expectCount !== inv.gotCount) return 'ledger ថ្ងៃ ≠ ផលបូក barcode មិនទាន់ដក';
-    if (inv.monthCod !== inv.expectMonthCod || inv.monthDod !== inv.expectMonthDod || inv.monthCount !== inv.expectMonthCount) return 'ledger ខែ ≠ ផលបូក ledger ថ្ងៃ';
-    if (inv.pkg !== inv.expectPkg) return 'packagesPickedUp ≠ barcode បិទ';
-    if (inv.phoneSum !== inv.pkg) return 'sum(pickedUpPhones) ≠ packagesPickedUp';
-    if (inv.zeroRef.length) return 'pickedUpPhones ≤ 0';
-    if (inv.dup.length) return 'barcode ស្ថិតទាំងប្រវត្តិនិងធុងសំរាម';
-    if (inv.orphans.length) return 'កូនសោ registry កំព្រា';
-    if (inv.lost.length) return 'barcode បាត់ពីប្រព័ន្ធ (គ្មានក្នុងប្រវត្តិ · គ្មានក្នុងធុងសំរាម)';
-    return null;
-}
-
-const PAGE_OPS = function () {
-    const w = window;
-    w.__ops = [];
-    w.__opResults = [];
-    const bcOf = (it, pick) => (it && Array.isArray(it.barcodes) && it.barcodes.length) ? it.barcodes[Math.floor(pick * it.barcodes.length) % it.barcodes.length] : null;
-    const at = (arr, pick) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
-    w.__startOp = (args) => {
-        const { wanted, pick, amt, code, phone } = args;
-        const live = (w.scanHistory || []).filter(Boolean);
-        const trash = (w.deletedItems || []).filter(Boolean);
-        let started = null;
-        try {
-            if (wanted === 'scan') {
-                w.triggerScanAction(code);
-                const bcText = document.getElementById('modalBarcodeText');
-                const modal = document.getElementById('phoneModal');
-                const open = modal && getComputedStyle(modal).display !== 'none';
-                if (!open || !bcText || bcText.innerText !== code) return null;
-                const p = document.getElementById('modalPhoneInput'); if (p) p.value = phone;
-                const c = document.getElementById('modalCodInput'); if (c) c.value = String(amt);
-                const d2 = document.getElementById('modalDodInput'); if (d2) d2.value = String(Math.round(amt / 4 * 100) / 100);
-                started = Promise.resolve(w.confirmPhone());
-            } else if (wanted === 'closeOrder') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.toggleCloseStatus(it.id)); }
-            else if (wanted === 'closeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.toggleIndividualBarcodeClose(it.id, b.code)); }
-            else if (wanted === 'removeBarcode') { const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null; started = Promise.resolve(w.removeSingleBarcode(it.id, b.code)); }
-            else if (wanted === 'deleteItem') { const it = at(live, pick); if (!it) return null; started = Promise.resolve(w.deleteSingleItem(it.id)); }
-            else if (wanted === 'restore') { const it = at(trash, pick); if (!it) return null; w.promptRestoreDeletedItem(it.id); started = Promise.resolve(w.executeRestoreItem()); }
-            else if (wanted === 'editPrice') {
-                const it = at(live, pick); const b = bcOf(it, pick); if (!it || !b) return null;
-                w.openEditBarcodePriceModal(it.id, b.code);
-                const c = document.getElementById('editBcCodInput'); if (c) c.value = String(amt);
-                const d2 = document.getElementById('editBcDodInput'); if (d2) d2.value = '0';
-                started = Promise.resolve(w.saveEditedBarcodePrice());
-            } else if (wanted === 'sweep') { started = Promise.resolve(w.runAutomaticCleanupRules()); }
-            else return null;
-        } catch (e) { w.__opResults.push({ wanted, threw: String(e && e.message) }); return 'threw:' + wanted + ':' + (e && e.message); }
-        const p = started.then((r) => { w.__opResults.push({ wanted, r: typeof r === 'object' ? 'object' : String(r) }); }, (e) => { w.__opResults.push({ wanted, e: String(e && e.message) }); });
-        w.__ops.push(p);
-        return wanted;
-    };
-    w.__settled = () => Promise.race([Promise.allSettled(w.__ops).then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
-    w.__state = () => ({
-        status: (document.getElementById('firebaseStatusText') || {}).textContent || '',
-        phase: typeof w.connectionFlowSnapshot === 'function' ? w.connectionFlowSnapshot().phase : null,
-        pending: typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).pending : -1,
-        blocked: typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).blocked : -1,
-        rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
-        cleanupJournal: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '{}')).length; } catch (e) { return -1; } })(),
-        history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
-        results: w.__opResults.splice(0)
-    });
-};
 
 (async () => {
-    console.log('=== emu/money-multidevice — ឧបករណ៍ ២ ពិត · SDK ពិត · rules ពិត · ប្រតិបត្តិការលុយស្របគ្នា · offline · reload ===');
+    console.log('=== emu/money-multidevice — ឧបករណ៍ ' + DEVICES + ' ពិត · SDK ពិត · rules ពិត · ប្រតិបត្តិការលុយស្របគ្នា · offline · reload ===');
     let sdkDir = '', chromium = null;
     try { sdkDir = path.dirname(require.resolve('firebase/package.json')); } catch (e) { check(false, 'SDK Firebase ពិតត្រូវមាន (npm ci --prefix ZoeW)', String(e && e.message)); }
     try { chromium = require('playwright-core').chromium; } catch (e) { chromium = null; }
@@ -207,7 +93,7 @@ const PAGE_OPS = function () {
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
     const dateKey = fmt.format(now);
     const monthKey = dateKey.slice(0, 7);
-    const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, concurrent: 0 };
+    const injections = { offlineOnline: 0, offlineReload: 0, sweepRace: 0, returnRace: 0, concurrent: 0 };
     let brokenRuns = 0, firstDetail = '', runsDone = 0, stuckDevices = 0;
 
     const makeDevice = async (ns, uid, email) => {
@@ -270,7 +156,7 @@ const PAGE_OPS = function () {
         return dev;
     };
 
-    const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'closeBarcode', 'removeBarcode', 'restore'];
+    const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'closeBarcode', 'removeBarcode', 'restore', 'zreturn'];
     for (let run = RUN0; run < RUN0 + RUNS; run++) {
         const NS = emuNamespace('demo-zoe-moneymd');
         const owner = (p, method, body) => fetch('http://127.0.0.1:' + EMU_PORT + '/' + p + '?ns=' + NS, {
@@ -300,7 +186,8 @@ const PAGE_OPS = function () {
             zoew_daily_revenue_cod_dod: { [dateKey]: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } },
             zoew_monthly_revenue_cod_dod: { [monthKey]: { codDollar: r2(cod), dodDollar: r2(dod), totalCount: cnt } }
         });
-        const devices = [await makeDevice(NS, 'moneymd-a-' + run, 'a@zoew1.com'), await makeDevice(NS, 'moneymd-b-' + run, 'b@zoew1.com')];
+        const devices = [];
+        for (let d = 0; d < DEVICES; d++) devices.push(await makeDevice(NS, 'moneymd-' + 'abcde'[d] + '-' + run, 'abcde'[d] + '@zoew1.com'));
         let broke = null; const trail = [];
         try {
             for (const dev of devices) { if (!(await dev.login())) { broke = 'ប្រអប់ចូលមិនលេច (' + dev.name + ')'; break; } }
@@ -308,7 +195,7 @@ const PAGE_OPS = function () {
             for (let i = 0; i < OPS && !broke; i++) {
                 const plan = devices.map((dev) => {
                     const pick = r();
-                    const wanted = OPNAMES[Math.floor(r() * OPNAMES.length)];
+                    const wanted = i === 1 ? 'zreturn' : OPNAMES[Math.floor(r() * OPNAMES.length)];
                     const mode = r() < 0.55 ? 'online' : (r() < 0.5 ? 'offline-online' : 'offline-reload');
                     const code = 'SC' + run + '_' + i + '_' + Math.floor(pick * 1e5);
                     return { dev, wanted, pick, amt: Math.round(r() * 4000) / 100, mode, code, phone: pick > 0.5 ? '0120100000' : '09' + Math.floor(pick * 1e8), reloadAfter: 150 + Math.floor(r() * 1400) };
@@ -339,8 +226,14 @@ const PAGE_OPS = function () {
                         }
                     }
                 }
+                if (plan.some((p) => p.wanted === 'zreturn')) {
+                    const open = openBarcodeTargets((await (await owner('.json')).json()) || {});
+                    const target = open.length ? Object.assign({ at: Date.now() }, open[Math.floor(r() * open.length) % open.length]) : null;
+                    plan.forEach((p) => { if (target) { p.wanted = 'zreturn'; p.target = target; } else if (p.wanted === 'zreturn') p.wanted = 'sweep'; });
+                    if (target) { trail.push('ztoReturn:' + target.code); injections.returnRace++; }
+                }
                 for (const p of plan) if (p.mode !== 'online') await p.dev.page.evaluate(() => { fb.goOffline(db); }).catch(() => {});
-                const started = await Promise.all(plan.map((p) => p.dev.page.evaluate((args) => window.__startOp(args), { wanted: p.wanted, pick: p.pick, amt: p.amt, code: p.code, phone: p.phone }).catch((e) => 'threw:evaluate:' + (e && e.message))));
+                const started = await Promise.all(plan.map((p) => p.dev.page.evaluate((args) => window.__startOp(args), { wanted: p.wanted, pick: p.pick, amt: p.amt, code: p.code, phone: p.phone, target: p.target }).catch((e) => 'threw:evaluate:' + (e && e.message))));
                 plan.forEach((p, k) => { if (started[k]) trail.push(p.dev.name.slice(8, 9) + ':' + started[k] + (p.mode === 'online' ? '' : '[' + p.mode + ']')); });
                 if (started.every((s) => s)) injections.concurrent++;
                 if (started.some((s) => String(s).indexOf('threw:') === 0)) { broke = 'op បោះកំហុស ៖ ' + started.filter((s) => String(s).indexOf('threw:') === 0).join(' · '); }
@@ -404,10 +297,11 @@ const PAGE_OPS = function () {
     }
     await browser.close().catch(() => {});
     staticServer.close();
-    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ២ ស្របគ្នា · SDK ពិត · rules ពិត)', firstDetail);
+    check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', firstDetail);
     check(stuckDevices === 0, 'គ្មានឧបករណ៍ជាប់ (blocked · journal · pending) ក្រោយ offline/reload', stuckDevices);
     check(injections.offlineReload > 0 && injections.offlineOnline > 0, 'ជាន់អប្បបរមា ៖ ការចាក់ offline+reload (' + injections.offlineReload + ') និង offline+online (' + injections.offlineOnline + ') បានបាញ់ពិត', injections);
     check(injections.sweepRace > 0, 'ជាន់អប្បបរមា ៖ ការសម្អាតស្វ័យប្រវត្តិប្រជែងពីរឧបករណ៍បានបាញ់ពិត (' + injections.sweepRace + ')', injections);
+    check(OPS < 2 || injections.returnRace >= RUNS, 'ជាន់អប្បបរមា ៖ «ZTO ត្រឡប់» ប្រជែងពី ' + DEVICES + ' ឧបករណ៍លើ barcode ដដែលបានបាញ់ពិត (' + injections.returnRace + ')', injections);
     check(injections.concurrent > 0, 'ជាន់អប្បបរមា ៖ ប្រតិបត្តិការស្របគ្នាពីរឧបករណ៍បានបាញ់ពិត (' + injections.concurrent + ')', injections);
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ok ' + pass : 'PASS ' + pass + '/' + pass));
     process.exitCode = fail ? 1 : 0;

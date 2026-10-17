@@ -5,6 +5,7 @@
 //     argument (type ពី pg_proc) ➜ scalar ➜ តម្លៃ JSON · table ➜ array · កំហុស ➜ {code, message, details, hint} + status ដូច PostgREST
 //     (42501 ➜ 403 authenticated / 401 anon · 22023/P0001/P0002 ➜ 400 · JWT ខុស/ផុត ➜ 401 PGRST301/PGRST303)
 //   · Edge Function ៖ POST /functions/v1/<name> ➜ handler ដែលអ្នកហៅផ្តល់ (ឬ 404)
+//   · `GET` តារាង ៖ `limit`/`offset` · `order` ច្រើនជួរឈរ · ពិដាន `maxRows` (១០០០ ដូច Max rows លំនាំដើមរបស់ Supabase ➜ កាត់ស្ងាត់ដូច PostgREST)
 //   · ការគ្រប់គ្រងសម្រាប់តេស្ត ៖ `setMode('down' | 'hang' | 'drop-response' | 'ok')` · `requests` · `issueToken()` · `expireTokens()` · `setAuthAge(វិ.)` (token ថ្មីរាយម៉ោងចូលប្រព័ន្ធថយក្រោយ ➜ ការផុតកំណត់ ៤ ម៉ោង)
 //   · Secret key (`opts.secretKey` · `sb_secret_…` ក្នុង header `apikey` តែប៉ុណ្ណោះ) ឬ JWT role service_role ➜ role `service_role` ·
 //     `sb_secret_…` ខុស ➜ 401 ដូច gateway · `setRpcHook(fn)` ៖ `fn({ fn, body, phase: 'before' | 'after' })` ➜ `'drop'` (បិទ socket ·
@@ -58,6 +59,7 @@ async function startFakeSupabase(opts) {
     let rpcHook = null;
     let authAge = 0;
     const signatures = new Map();
+    const maxRows = Number.isInteger(opts.maxRows) && opts.maxRows > 0 ? opts.maxRows : 1000;
     const sockets = new Set();
 
     const addUser = (email, password, id) => { users.set(email.toLowerCase(), { id, email: email.toLowerCase(), password }); };
@@ -176,16 +178,20 @@ async function startFakeSupabase(opts) {
         let order = '';
         const ord = params.get('order');
         if (ord) {
-            const m = /^([a-z_][a-z0-9_]*)\.(asc|desc)$/.exec(ord);
-            if (!m) return send(res, 400, { code: 'PGRST100', message: 'bad order' });
-            order = ' order by ' + m[1] + ' ' + m[2];
+            const parts = ord.split(',').map((x) => /^([a-z_][a-z0-9_]*)\.(asc|desc)$/.exec(x.trim()));
+            if (parts.some((m) => !m)) return send(res, 400, { code: 'PGRST100', message: 'bad order' });
+            order = ' order by ' + parts.map((m) => m[1] + ' ' + m[2]).join(', ');
         }
+        const lim = params.get('limit');
+        const off = params.get('offset');
+        if ((lim !== null && !/^\d+$/.test(lim)) || (off !== null && !/^\d+$/.test(off))) return send(res, 400, { code: 'PGRST100', message: 'bad limit/offset' });
+        const page = ' limit ' + Math.min(lim === null ? maxRows : Number(lim), maxRows) + ' offset ' + (off === null ? 0 : Number(off));
         const c = await pool.connect();
         try {
             await c.query('begin');
             await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
             await c.query('set local role ' + role);
-            const r = await c.query({ text: 'select ' + cols.join(', ') + ' from public.' + table + order, types: rowTypes });
+            const r = await c.query({ text: 'select ' + cols.join(', ') + ' from public.' + table + order + page, types: rowTypes });
             await c.query('commit');
             return send(res, 200, r.rows);
         } catch (e) {
@@ -256,6 +262,7 @@ async function startFakeSupabase(opts) {
     return {
         url,
         secret,
+        maxRows,
         requests,
         addUser,
         setMode(next) { mode = next; },

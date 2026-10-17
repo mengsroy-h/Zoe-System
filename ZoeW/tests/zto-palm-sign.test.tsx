@@ -292,6 +292,24 @@ it('status ចម្លើយពីហាងចាស់មិនអាចរំ
     expect(palmSignState.dispatchResults).toEqual([]);
     expect(closeCalls()).toEqual([]);
 });
+it('⛔ ការផ្ញើមុននៅរង់ចាំ ZTO (បិទផ្ទាំងហើយ) ➜ ចុច «✍️ Sign» ម្តងទៀតប្រាប់ឲ្យរង់ចាំ (មិនស្ងាត់) · ចម្លើយមកដល់ ➜ បើកបាន', async () => {
+    await openReceipt([CODE]);
+    const gate = deferred();
+    vi.stubGlobal('fetch', vi.fn(() => gate.promise));
+    const sending = submit();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    act(() => closeModal('ztoPalmSignModal'));
+    uiState.toasts = [];
+    act(() => openZtoPalmSign('item1', CODE));
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+    expect(uiState.toasts.map((t: any) => String(t.msg)).join(' ')).toContain('ការ Sign មុនកំពុងរង់ចាំចម្លើយ ZTO');
+    gate.resolve(signed());
+    await act(async () => { await sending; });
+    expect(closeCalls(), 'ផ្ទាំងបិទរួច ➜ ចម្លើយមិនបិទកញ្ចប់ក្នុង ZoeW').toEqual([]);
+    vi.stubGlobal('fetch', vi.fn(async () => json({ success: true, barcode: CODE, stage: 'status', dispatched: false, ztoClosed: false })));
+    act(() => openZtoPalmSign('item1', CODE));
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+});
 it('shared mode គ្មាន palmTokenEnc ក៏អាចបើក Sign និងផ្ញើ header សាខា', async () => {
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, palmTokenEnc: undefined, palmShared: true, palmAccount: { siteCode: 'KH001' } }));
     act(() => refreshShopBoundUi());

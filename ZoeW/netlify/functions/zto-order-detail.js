@@ -1394,6 +1394,19 @@ function listSignedBranchSites(identity) {
     return bound.filter((code) => code !== String(own).toLowerCase());
 }
 
+function projectSiblingBranches(site, env) {
+    const code = String(site || '').trim().toLowerCase();
+    if (!code) return [];
+    const projects = readProjectEntries(env);
+    const out = [];
+    Object.keys(projects.branches).forEach((id) => {
+        const bound = projects.branches[id];
+        if (bound.length < 2 || bound.indexOf(code) === -1) return;
+        bound.forEach((other) => { if (other !== code && out.indexOf(other) === -1) out.push(other); });
+    });
+    return out;
+}
+
 function mergeSignedBranches(body, extras) {
     const out = Object.assign({}, body);
     const signed = Array.isArray(out.signed) ? out.signed.slice() : [];
@@ -2286,6 +2299,7 @@ function palmDeps(event, config, startedAt, keyLabel) {
         finish: (access, body, barcode) => detailResponseBody(config, access, body, barcode, false),
         listRange,
         listSignedRange,
+        siblingBranches: (site) => projectSiblingBranches(site, process.env),
         remainingMs: () => Math.max(0, budgetLeftMs(config, startedAt) - 200),
         listPageSize: config.list.pageSize,
         listMaxPages: config.list.maxPages,

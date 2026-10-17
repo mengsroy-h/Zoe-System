@@ -61,10 +61,12 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // · `emu/crud-rules-flow` · `emu/license-seat-rules-test` (ការវាស់ពីរជំហានលើ emulator)។
 // `supabase-pg.js` · `supabase-fake-server.js` ជា **harness រួម** (Postgres ពិត · ម៉ាស៊ីនមេ Supabase ក្លែង) ៖ «ម៉ូឌុលនេះមិនអះអាងអ្វីទេ» ➜
 // អ្នកយាមរបស់វាគឺ checker ដែល require វា (`supabase-rls` · `supabase-datastore` · `keygen-supabase-admin` · `emu/supabase-*` ៖ មាន `*_APP_DIR`)។
+// `money-multidevice-core.js` ជា **harness រួម** (អថេរលុយលើ server · PAGE_OPS) ៖ មិនអះអាងអ្វីទេ ➜ អ្នកយាមរបស់វាគឺ checker ដែល require វា
+// (`emu/money-multidevice-emu-test` · `supabase-money-multishop-test` ៖ មាន `*_APP_DIR`)។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
     'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
     'idtoken-fixture.js', 'react-view.js', 'money-core.js', 'ts-comments.js', 'rules-shape.js',
-    'supabase-pg.js', 'supabase-fake-server.js']);
+    'supabase-pg.js', 'supabase-fake-server.js', 'money-multidevice-core.js']);
 const CLI_GUARDS = new Map([
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],

@@ -1,8 +1,9 @@
 import { createStore, registerStore } from './store';
 
-export type PalmSignResult = { code: string; state: 'signed' | 'failed' | 'unknown'; message: string; saved?: boolean };
+export type PalmSignResult = { code: string; state: 'dispatched' | 'signed' | 'failed' | 'unknown'; message: string; saved?: boolean; proof?: string };
 export const palmSignState = createStore('palmSign', {
-    mode: false, generation: 0, itemId: '', codes: [] as string[], selectedCodes: [] as string[], busy: false,
-    message: '', results: [] as PalmSignResult[]
+    mode: false, checking: false, checked: {} as Record<string, boolean>, signMan: '', generation: 0, itemId: '', stage: 'dispatch' as 'dispatch' | 'receipt', requestId: '',
+    codes: [] as string[], selectedCodes: [] as string[], photos: {} as Record<string, string>, busy: false,
+    message: '', dispatchResults: [] as PalmSignResult[], results: [] as PalmSignResult[]
 });
 registerStore(palmSignState);

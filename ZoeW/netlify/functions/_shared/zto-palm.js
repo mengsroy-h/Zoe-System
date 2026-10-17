@@ -157,6 +157,7 @@ async function requestPalm(path, payload, token, keys, timeoutMs, meter, retrySt
         'User-Agent': 'PDA', 'x-language': 'km_KH',
         'x-sign': crypto.createHash('md5').update(body + keys.sign, 'utf8').digest('base64')
     };
+    if (['/zto/basic/v1/saveBillPic', '/zto/basic/v1/saveScanInfo', '/zto/collect/v1/queryPreOrderByBillCode'].includes(path)) delete headers['x-language'];
     if (token) headers['x-token'] = token;
     const controller = new AbortController();
     const startedAt = Date.now();
@@ -339,7 +340,7 @@ function openShared(text, proxyKey, env) {
 }
 
 function sharedView(data) {
-    return { token: data.token, site: data.site, siteName: data.siteName, loginAt: data.loginAt, source: 'shared' };
+    return { token: data.token, site: data.site, siteName: data.siteName, loginAt: data.loginAt, operator: data.u, source: 'shared' };
 }
 
 function rememberShared(label, data, etag, missing) {
@@ -564,7 +565,7 @@ function sessionResponse(data, credential, proxyKey, env, shared) {
     const refresh = { kind: 'refresh', u: credential.username, p: credential.cipher, d: credential.deviceSn, exp: Date.now() + REFRESH_MS };
     return json(200, {
         success: true, provider: 'zto-palm', expiresAt, shared,
-        sessionToken: sealSession({ token: data.token, expiresAt, site: data.site, siteName: data.siteName }, proxyKey, env),
+        sessionToken: sealSession({ token: data.token, expiresAt, site: data.site, siteName: data.siteName, operator: data.u }, proxyKey, env),
         refreshToken: sealSession(refresh, proxyKey, env, refreshKey(env)),
         account: { siteCode: data.site, siteName: data.siteName }
     });
@@ -725,6 +726,19 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
     try {
         sessionKey(env);
         const keys = protocolKeys(env);
+        if (event.httpMethod === 'POST' && query.palm === 'sign') {
+            const resolved = await resolvePalmSession(event, proxyKey, env, deps);
+            if (!resolved.session) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm', reason: resolved.reason });
+            const sign = require('./zto-palm-sign');
+            const run = (session) => sign.signPalm(event, session, deps,
+                (path, payload) => requestPalm(path, payload, session.token, keys, deps.upstreamMs()),
+                { seal: (value) => sealSession(value, proxyKey, env), open: (value) => openSealed(value, proxyKey, sessionKey(env)), stamp: trackingStamp, verdict: trackingVerdict });
+            const response = await run(resolved.session);
+            if (!authExpired(response) || resolved.session.source !== 'shared' || !sign.isStatusRequest(event)) return response;
+            const waited = await settleWithin(() => renewShared(resolved.slot, resolved.session.token, proxyKey, keys, env, deps), remainingOf(deps) - 1500);
+            const renewed = waited.ok ? waited.value : null;
+            return renewed && renewed.session && remainingOf(deps) >= SHARED_RETRY_MIN_MS ? await run(renewed.session) : response;
+        }
         if (event.httpMethod === 'POST' && isPalmPost(query)) return await palmPost(event, query, proxyKey, keys, deps, env);
         if (event.httpMethod !== 'GET') return json(405, { code: 'ZTO_PALM_METHOD_INVALID' });
         if (query.palm === 'status') return await palmStatus(event, proxyKey, deps, env);
@@ -743,7 +757,7 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
 }
 
 function isPalmPost(query) {
-    return !!query && (query.palm === 'login' || query.palm === 'refresh');
+    return !!query && (query.palm === 'login' || query.palm === 'refresh' || query.palm === 'sign');
 }
 
 function isPalmQuery(query) {

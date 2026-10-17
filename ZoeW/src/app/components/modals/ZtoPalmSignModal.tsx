@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { startPalmSignCamera } from '../../../services/palm-sign-camera';
+import { useEffect, useState } from 'react';
 import { palmSignState } from '../../../core/palm-sign-state';
 import { scanState, uiState } from '../../../core/state';
 import { noteAppLockExcuse } from '../../../features/app-lock';
-import { acceptPalmSignBarcode, recheckZtoPalmSign, setPalmSignSelected, submitZtoPalmSign } from '../../../features/zto-palm-sign';
+import { acceptPalmSignBarcode, advancePalmSignStage, checkZtoPalmSignStages, recheckZtoPalmSign, setPalmSignName, setPalmSignSelected, submitZtoPalmSign } from '../../../features/zto-palm-sign';
 import { createScratchCanvas, loadScratchImage } from '../../../platform/document-io';
 import { decodeBarcodeFromCanvasManual } from '../../../services/scan-engine';
 import { withTimeout } from '../../../services/network';
@@ -36,69 +37,82 @@ async function preparePhoto(file: File) {
 }
 
 function SignForm() {
-    const v = useStoreFields(palmSignState, ['codes', 'selectedCodes', 'busy', 'message', 'results']);
-    const codes = v.selectedCodes;
-    const [name, setName] = useState('');
-    const [photo, setPhoto] = useState('');
+    const v = useStoreFields(palmSignState, ['codes', 'selectedCodes', 'busy', 'message', 'results', 'dispatchResults', 'stage', 'photos', 'checking', 'checked', 'signMan']);
     const [barcode, setBarcode] = useState('');
     const [message, setMessage] = useState('');
     const [preparing, setPreparing] = useState(false);
-    const requestId = useRef(crypto.randomUUID());
-    const photoSequence = useRef(0);
-    const frozen = v.results.some((row) => row.state !== 'failed');
-    const disabled = v.busy || preparing;
-    const addBarcode = (raw: string) => {
-        acceptPalmSignBarcode(raw);
-        setBarcode('');
-    };
+    const [cameraEpoch, setCameraEpoch] = useState(0);
+    const results = v.stage === 'dispatch' ? v.dispatchResults : v.results;
+    const available = v.stage === 'dispatch' ? v.codes : v.codes.filter((code) => v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof) || v.results.some((r) => r.code === code && r.state === 'signed'));
+    const allReceived = v.codes.length > 0 && v.codes.every((code) => v.results.some((r) => r.code === code && r.state === 'signed'));
+    const disabled = v.busy || v.checking || preparing;
+    const canScan = !disabled && v.codes.some((code) => v.checked[code]) && !allReceived && (v.stage === 'dispatch' || !!v.signMan.trim());
+    const canAdvance = v.stage === 'dispatch' && v.codes.length > 0
+        && v.codes.every((code) => v.dispatchResults.some((r) => r.code === code && r.state === 'dispatched' && r.proof) || v.results.some((r) => r.code === code && r.state === 'signed'));
+    useEffect(() => {
+        if (!canScan) return;
+        return startPalmSignCamera((code, photo) => acceptPalmSignBarcode(code, photo),
+            () => setMessage('បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬប្រើប៊ូតុងថតរូប។'));
+    }, [v.stage, cameraEpoch, canScan]);
+    const addBarcode = (raw: string) => { acceptPalmSignBarcode(raw); setBarcode(''); };
     const takePhoto = async (file: File) => {
-        const sequence = ++photoSequence.current;
+        const generation = palmSignState.generation;
+        const stage = palmSignState.stage;
+        const manualCode = barcode.trim();
         setPreparing(true);
         try {
             const prepared = await preparePhoto(file);
-            if (sequence !== photoSequence.current) return;
-            setPhoto(prepared.data);
-            setMessage('✅ រូបភាពត្រៀមរួច។');
-            if (prepared.barcode) addBarcode(prepared.barcode);
+            if (generation !== palmSignState.generation || stage !== palmSignState.stage) return;
+            const code = prepared.barcode || manualCode;
+            if (!code) { setMessage('រូបនេះមិនអាន Barcode បាន។ សូមវាយ Barcode រួចថតរូបម្ដងទៀត។'); return; }
+            acceptPalmSignBarcode(code, prepared.data.split(',')[1]);
+            setBarcode('');
         } catch { setMessage('បើករូបភាពមិនបាន។ សូមថតរូបម្ដងទៀត។'); }
-        finally { if (sequence === photoSequence.current) setPreparing(false); }
+        finally { setPreparing(false); }
     };
     return (
         <div className="modal-content palm-sign-content">
             <h3>✍️ Sign · ZTO Palm</h3>
-            <p>ជ្រើសកញ្ចប់ ថតរូប និងបញ្ចូលឈ្មោះអ្នកទទួល រួចចុច «ចុះឈ្មោះ» ដើម្បីផ្ញើទៅ ZTO។</p>
+            <h4>{v.stage === 'dispatch' ? '១. ការស្កេនពេលចែកចាយទំនិញ' : '២. ការស្កេនពេលទទួលទំនិញ'}</h4>
+            <p>ដាក់ Barcode មុខកាមេរ៉ា។ រូបភាពត្រូវបានចាប់ស្វ័យប្រវត្តិពេលស្កេនបាន រួចចុច «⬆ ផ្ញើបញ្ជី»។</p>
+            {v.stage === 'receipt' && !allReceived ? <><label htmlFor="palmSignName">ឈ្មោះអតិថិជន</label>
+                <input id="palmSignName" value={v.signMan} onChange={(event) => setPalmSignName(event.target.value)} maxLength={120} required disabled={disabled || v.results.some((r) => r.state !== 'failed')} autoComplete="off" />
+                {!v.signMan.trim() ? <p>សូមវាយឈ្មោះអតិថិជនជាមុន រួចស្កេន Barcode។</p> : null}</> : null}
+            {allReceived ? <p role="status">✅ ZTO បញ្ជាក់ការទទួលរួចហើយ។</p> : null}
+            <video id="palmSignVideo" ref={refTo('palmSignVideo')} autoPlay playsInline muted className="palm-sign-video" />
+            <button type="button" className="btn-info" disabled={!canScan} onClick={() => setCameraEpoch((value) => value + 1)}>បើកកាមេរ៉ាឡើងវិញ</button>
             <div className="palm-sign-codes">
-                {v.codes.map((code) => {
-                    const result = v.results.find((row) => row.code === code);
+                {available.map((code) => {
+                    const result = results.find((row) => row.code === code);
                     return <label key={code} className="palm-sign-code">
-                        <input type="checkbox" checked={codes.includes(code)} disabled={disabled || !!result && result.state !== 'failed'}
+                        <input type="checkbox" checked={v.selectedCodes.includes(code)} disabled={disabled || !v.photos[code]}
                             onChange={(event) => setPalmSignSelected(code, event.target.checked)} />
-                        <span>{code}{result ? <small role="status">{result.message}</small> : null}</span>
+                        <span>{code}{result ? <small role="status">{result.message}</small> : <small>{v.photos[code] ? '✅ បានស្កេន និងចាប់រូប' : 'រង់ចាំស្កេន'}</small>}</span>
+                        {v.photos[code] ? <img className="palm-sign-thumbnail" src={'data:image/jpeg;base64,' + v.photos[code]} alt={'រូបកញ្ចប់ ' + code} /> : null}
                     </label>;
                 })}
             </div>
             <form onSubmit={(event) => { event.preventDefault(); if (!disabled) addBarcode(barcode); }}>
-                <label htmlFor="palmSignBarcode">ស្កេន ឬបញ្ចូល Barcode</label>
+                <label htmlFor="palmSignBarcode">ម៉ាស៊ីនស្កេន ឬ Barcode សម្រាប់ថតរូប</label>
                 <div className="palm-sign-scan">
-                    <input id="palmSignBarcode" value={barcode} onChange={(event) => setBarcode(event.target.value)} disabled={disabled}
+                    <input id="palmSignBarcode" value={barcode} onChange={(event) => setBarcode(event.target.value)} disabled={!canScan}
                         autoComplete="off" spellCheck={false} placeholder="Barcode"
                         onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === 'Tab') && barcode.trim()) { event.preventDefault(); addBarcode(barcode); } }} />
-                    <button type="submit" className="btn-info" disabled={disabled}>ស្កេន</button>
+                    <button type="submit" className="btn-info" disabled={!canScan}>ស្កេន</button>
                 </div>
             </form>
-            <label htmlFor="palmSignName">ឈ្មោះអ្នកទទួល</label>
-            <input id="palmSignName" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} disabled={disabled || frozen} autoComplete="off" />
-            <input id="palmSignPhotoInput" ref={refTo('palmSignPhotoInput')} type="file" accept="image/*" capture="environment" hidden disabled={disabled || frozen}
+            <input id="palmSignPhotoInput" ref={refTo('palmSignPhotoInput')} type="file" accept="image/*" capture="environment" hidden disabled={!canScan}
                 onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignPhotoInput', ''); if (file) void takePhoto(file); }} />
-            <button type="button" className="btn-info" disabled={disabled || frozen}
-                onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignPhotoInput'); }}>📷 {photo ? 'ថតរូបម្ដងទៀត' : 'ថតរូបកញ្ចប់ / អ្នកទទួល'}</button>
-            {photo ? <img className="palm-sign-photo" src={photo} alt="រូបភាពសម្រាប់ ZTO Sign" /> : null}
+            <button type="button" className="btn-info" disabled={!canScan}
+                onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignPhotoInput'); }}>📷 ថតរូបកញ្ចប់</button>
             {preparing || message ? <p role="status" aria-live="polite">{preparing ? 'កំពុងរៀបចំរូបភាព…' : message}</p> : null}
+            {v.codes.some((code) => !v.checked[code]) ? <button className="btn-info" disabled={disabled} onClick={() => void checkZtoPalmSignStages()}>ពិនិត្យស្ថានភាព ZTO ម្ដងទៀត</button> : null}
             {v.message ? <p role="status" aria-live="polite">{v.message}</p> : null}
             <div className="modal-btns">
-                <button className="btn-confirm" disabled={disabled || !photo || !name.trim() || !codes.some((code) => !v.results.some((r) => r.code === code && r.state !== 'failed'))}
-                    onClick={() => void submitZtoPalmSign(codes, name, photo.split(',')[1], requestId.current)}>✍️ ចុះឈ្មោះ</button>
-                {v.results.some((row) => row.state === 'unknown' || row.state === 'signed' && !row.saved)
+                <button className="btn-confirm" disabled={disabled || !v.selectedCodes.some((code) => v.photos[code] && !results.some((r) => r.code === code && r.state !== 'failed'))}
+                    onClick={() => void submitZtoPalmSign(v.selectedCodes)}>⬆ ផ្ញើបញ្ជី</button>
+                {canAdvance ? <button className="btn-info" disabled={disabled} onClick={advancePalmSignStage}>បន្ទាប់ ➜ ស្កេនពេលទទួលទំនិញ</button> : null}
+                {v.stage === 'receipt' && v.results.some((row) => row.state === 'unknown' || row.state === 'signed' && !row.saved)
                     ? <button className="btn-info" disabled={disabled} onClick={() => void recheckZtoPalmSign()}>ពិនិត្យ ZTO</button> : null}
                 <button className="btn-cancel" disabled={v.busy} onClick={() => closeModal('ztoPalmSignModal')}>បិទ</button>
             </div>

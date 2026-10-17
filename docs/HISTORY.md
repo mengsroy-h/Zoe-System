@@ -103,6 +103,21 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.120] — 2026-10-17 · ZoeW ៖ Sign ZTO Palm ពីរជំហាន និងរំលងចែកចាយដែលធ្វើរួច
+
+**សំណើម្ចាស់គម្រោង**៖ Palm mode ប្តូរ «បិទ» ទៅ «Sign»; Cookie ពី Blob ត្រឡប់ជា «បិទ»។ តាមការបញ្ជាក់ចុងក្រោយ៖ ស្កេនចែកចាយ/ចាប់រូប/ផ្ញើបញ្ជី ➜ វាយឈ្មោះអតិថិជន ➜ ស្កេនទទួល/ចាប់រូប/ផ្ញើបញ្ជី។ ចែកចាយរួចរំលងទៅទទួល។ ទាញ `main` ថ្មី `a05af2ee` ដែលមាន shared Palm session មុនបន្ត។
+
+- ផ្ទៀង resource ខ្មែរ `dispatch_scan` និង `sign_scan` ក្នុង APK ព្រមទាំង `DispatchScanPresenter`, `SignScanPresenter`, `ScanDataUploadInterceptor` និង `ImageUploadInterceptor`។ ផ្លូវត្រឹមត្រូវប្រើ `newBusinessCheck` + `saveScanInfo` (`04`/`05`); មិនប្រើផ្លូវ KH online-payment `uploadKhSignScan` ទេ។ រូបទទួល `picType: 1`; APK មិនភ្ជាប់ bitmap ក្នុង record ចែកចាយ។
+- React media exit `attachPalmSignStream` នៅ `refs.ts` ចង `srcObject`; purity guard កំណត់ពិដានការសរសេរនេះត្រឹម ១ កន្លែង និងមានតេស្តបិទ stream ក្រោយ permission ឆ្លើយយឺត។
+- Camera ចាប់រូបពី frame ដដែលដែល decoder អាន Barcode។ ទទួលត្រូវមានឈ្មោះមុនបើកស្កេន ហើយចាប់រូបថ្មីក្រោយប្តូរជំហាន។ គាំទ្រ hardware Enter/Tab និង file capture ជាជម្រើស។ បិទផ្ទាំងឬប្តូរហាង លុបរូប និងវគ្គ Sign។
+- Server ផ្ទៀង tracking ត្រូវ Barcode/សាខា/ពេល និងចេញភស្តុតាងចែកចាយអ៊ិនគ្រីបចង session/Barcode/requestId។ ទទួលដោយគ្មានភស្តុតាងមិនអនុញ្ញាត។ ចែកចាយរួចត្រូវមិនចាស់ជាងការមកដល់ថ្មី/ត្រឡប់/ផ្ទេរសាខា។ មិនទុកចិត្ត flag ពី client។
+- ប្រើ session ទូរស័ព្ទ និង shared session របស់សាខា។ Login username ជាអ្នកចែកចាយ ដូច APK។ អាច renew និងសាកម្ដងទៀតតែការអាន status; scan write មិន replay ស្វ័យប្រវត្តិ។ លទ្ធផល upload ជាបញ្ជីបរាជ័យតាម barScannerId; បាត់ចម្លើយទុកមិនច្បាស់។ បិទ ZoeW តាម `applyBarcodeCloseChange` ក្រោយទទួលជោគជ័យប៉ុណ្ណោះ។
+- អ្នកយាម App Lock ស្រង់ function ដោយ Acorn ដើម្បីកុំឲ្យ quote ក្នុង regex ស្រង់ឆ្លង function; អ្នកយាម logout ប្រើ function ទាំងមូល និង mutation ដក reset ជំនួសចម្ងាយ ២០០ តួ។ បន្ថែម coverage mapping សម្រាប់ឯកសារ Sign។
+
+**ការផ្ទៀងផ្ទាត់**៖ តេស្ត ZTO ៤២ ឯកសារ/៦៧៤ ករណីឆ្លង; browser ទូរស័ព្ទ 390×844 ផ្ទៀងចាប់រូបស្វ័យប្រវត្តិ ស្កេនពីរជំហាន វាយឈ្មោះមុនស្កេនទទួល និង Cookie ត្រឡប់ «បិទ» ដោយគ្មាន page error។ Typecheck, lint, build, purity, wiring, CSP និងឯកសារឆ្លង។ CI ពេញត្រូវតាមដានលើ PR។
+
+**សកម្មភាពដោយដៃ**៖ ក្រោយ deploy សាក Palm និង shared Palm លើកញ្ចប់ពិតមួយមិនទាន់ចែកចាយ និងមួយចែកចាយរួច; វាយឈ្មោះ ស្កេន ចាប់រូប ផ្ញើ និងផ្ទៀងលទ្ធផលក្នុង ZTO Palm។ ប្តូរទៅ Cookie ហើយផ្ទៀង «បិទ»។ គ្មាន env ឬ database rules ថ្មី។ មិនទាន់សាកសរសេរលើ ZTO ផលិតកម្មពីបរិស្ថាននេះ។
+
 ### [2.50.119] — 2026-10-17 · ZoeW ៖ Login ZTO Palm ម្តង ប្រើបានគ្រប់ទូរស័ព្ទក្នុងសាខា (session ទុកលើ Server តាមសាខា) · ដកសំណល់ `expired`
 
 **ZoeW `2.50.119`** (`zoew-v381` ➜ `zoew-v382`) · ⛔ ZoeKeyGen មិនប្រែ · Function ZTO ប្រែ (`zto-order-detail.js` · `_shared/zto-palm.js` ៖ session Palm តាមសាខាក្នុង Netlify Blobs) ·

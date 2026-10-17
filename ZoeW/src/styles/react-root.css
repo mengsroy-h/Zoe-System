@@ -837,3 +837,6 @@ html.ios-standalone body.modal-keyboard .modal-content { overscroll-behavior-y: 
 #ztoPalmSignModal .palm-sign-scan input { min-width: 0; flex: 1; }
 #ztoPalmSignModal .btn-info { border: 0; border-radius: var(--radius-md); padding: 10px 14px; min-height: 44px; font: inherit; cursor: pointer; }
 #ztoPalmSignModal .palm-sign-photo { display: block; width: 100%; max-height: 200px; object-fit: contain; margin-top: 12px; border-radius: 8px; }
+
+#ztoPalmSignModal .palm-sign-video { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #111; border-radius: 8px; }
+#ztoPalmSignModal .palm-sign-thumbnail { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; }

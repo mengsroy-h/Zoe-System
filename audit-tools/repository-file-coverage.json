@@ -3498,6 +3498,12 @@
     },
     "ZoeW/tests/zto-palm-sign.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/services/palm-sign-camera.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/palm-sign-camera.test.ts": {
+      "policy": "zoew-self-verification"
     }
   }
 }

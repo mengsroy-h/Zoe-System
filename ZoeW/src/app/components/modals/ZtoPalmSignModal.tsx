@@ -52,7 +52,7 @@ function SignForm() {
     useEffect(() => {
         if (!canScan) return;
         return startPalmSignCamera((code, photo) => acceptPalmSignBarcode(code, photo),
-            () => setMessage('បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬប្រើប៊ូតុងថតរូប។'));
+            () => setMessage('បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬជ្រើសរូបពី Gallery។'));
     }, [v.stage, cameraEpoch, canScan]);
     const addBarcode = (raw: string) => { acceptPalmSignBarcode(raw); setBarcode(''); };
     const takePhoto = async (file: File) => {
@@ -64,8 +64,8 @@ function SignForm() {
             const prepared = await preparePhoto(file);
             if (generation !== palmSignState.generation || stage !== palmSignState.stage) return;
             const code = prepared.barcode || manualCode;
-            if (!code) { setMessage('រូបនេះមិនអាន Barcode បាន។ សូមវាយ Barcode រួចថតរូបម្ដងទៀត។'); return; }
-            acceptPalmSignBarcode(code, prepared.data.split(',')[1]);
+            if (!code) { setMessage('រូបនេះមិនអាន Barcode បាន។ សូមវាយ Barcode រួចជ្រើសរូប ឬថតរូបម្ដងទៀត។'); return; }
+            acceptPalmSignBarcode(code, prepared.data.split(',')[1], true);
             setBarcode('');
         } catch { setMessage('បើករូបភាពមិនបាន។ សូមថតរូបម្ដងទៀត។'); }
         finally { setPreparing(false); }
@@ -105,6 +105,10 @@ function SignForm() {
                 onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignPhotoInput', ''); if (file) void takePhoto(file); }} />
             <button type="button" className="btn-info" disabled={!canScan}
                 onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignPhotoInput'); }}>📷 ថតរូបកញ្ចប់</button>
+            <input id="palmSignGalleryInput" ref={refTo('palmSignGalleryInput')} type="file" accept="image/*" hidden disabled={!canScan}
+                onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignGalleryInput', ''); if (file) void takePhoto(file); }} />
+            <button type="button" className="btn-info" disabled={!canScan}
+                onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignGalleryInput'); }}>🖼 ជ្រើសរូបពី Gallery</button>
             {preparing || message ? <p role="status" aria-live="polite">{preparing ? 'កំពុងរៀបចំរូបភាព…' : message}</p> : null}
             {v.codes.some((code) => !v.checked[code]) ? <button className="btn-info" disabled={disabled} onClick={() => void checkZtoPalmSignStages()}>ពិនិត្យស្ថានភាព ZTO ម្ដងទៀត</button> : null}
             {v.message ? <p role="status" aria-live="polite">{v.message}</p> : null}

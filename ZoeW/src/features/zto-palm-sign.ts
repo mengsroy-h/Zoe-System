@@ -97,7 +97,7 @@ export function advancePalmSignStage() {
     palmSignState.message = 'សូមស្កេន Barcode ម្ដងទៀត។ រូបភាពថ្មីនឹងត្រូវចាប់ស្វ័យប្រវត្តិ។';
 }
 
-export function acceptPalmSignBarcode(raw: string, capturedPhoto?: string) {
+export function acceptPalmSignBarcode(raw: string, capturedPhoto?: string, replacePhoto = false) {
     if (!modalIsOpen('ztoPalmSignModal')) return false;
     if (palmSignState.busy || palmSignState.confirmation || palmSignState.checking) return true;
     if (palmSignState.stage === 'receipt' && !palmSignState.signMan.trim()) { palmSignState.message = 'សូមវាយឈ្មោះអតិថិជនជាមុន រួចស្កេន Barcode។'; return true; }
@@ -107,7 +107,7 @@ export function acceptPalmSignBarcode(raw: string, capturedPhoto?: string) {
     if (palmSignStageResults().some((row) => row.code === code && row.state !== 'failed')) return true;
     const photo = capturedPhoto || palmSignFramePhoto();
     if (!photo) { palmSignState.message = 'សូមបើកកាមេរ៉ាដើម្បីចាប់រូបពេលស្កេន ឬថតរូបកញ្ចប់នេះ។'; return true; }
-    if (!palmSignState.photos[code]) palmSignState.photos = { ...palmSignState.photos, [code]: photo };
+    if (replacePhoto || !palmSignState.photos[code]) palmSignState.photos = { ...palmSignState.photos, [code]: photo };
     if (!palmSignState.selectedCodes.includes(code)) palmSignState.selectedCodes = palmSignState.selectedCodes.concat(code);
     palmSignState.message = '✅ បានស្កេន និងចាប់រូប ' + code;
     return true;

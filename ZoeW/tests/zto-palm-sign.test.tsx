@@ -395,3 +395,27 @@ it('បើក Sign ស្គាល់ស្កេនបញ្ហាតាមស�
     expect(palmSignState.confirmation).toBeNull();
     expect(closeCalls()).toEqual([]);
 });
+it('រូបជ្រើសដោយដៃអាចជំនួសរូប auto capture តែ scanner មិនជំនួសរូបដដែល', async () => {
+    await openReceipt([CODE]);
+    acceptPalmSignBarcode(CODE, 'new-photo');
+    expect(palmSignState.photos[CODE]).toBe(PHOTO);
+    acceptPalmSignBarcode(CODE, 'gallery-photo', true);
+    expect(palmSignState.photos[CODE]).toBe('gallery-photo');
+});
+
+it('Gallery បើក picker រូបដោយគ្មាន capture ហើយផ្អាកពេលសួរបញ្ជាក់', async () => {
+    await openReceipt([CODE]);
+    mount(<ZtoPalmSignModal />);
+    const input = document.querySelector('#palmSignGalleryInput') as HTMLInputElement;
+    expect(input.accept).toBe('image/*');
+    expect(input.hasAttribute('capture')).toBe(false);
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+    const button = [...document.querySelectorAll('button')].find((el) => el.textContent?.includes('ជ្រើសរូបពី Gallery'))!;
+    act(() => button.click());
+    expect(click).toHaveBeenCalledOnce();
+    vi.stubGlobal('fetch', vi.fn(async () => warning()));
+    await act(async () => { await submit(); });
+    expect(input.disabled).toBe(true);
+    act(() => button.click());
+    expect(click).toHaveBeenCalledOnce();
+});

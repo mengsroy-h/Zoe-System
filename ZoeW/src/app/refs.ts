@@ -24,6 +24,7 @@ export const REF_NAMES = [
     'exchangeRateInput',
     'fileInput',
     'palmSignPhotoInput',
+    'palmSignGalleryInput',
     'palmSignVideo',
     'firebaseConfigInput',
     'globalMoreMenu',

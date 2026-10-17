@@ -76,7 +76,7 @@
   (ទុក · ឬសរសេរ history ឡើងវិញ — ⛔ មិនធ្វើដោយគ្មានសំណើ) · សោនៅតែ env (ZTO ជាអ្នកកាន់សោ ➜ ប្តូរមិនបាន)។
 - ⏳ **[2.50.99] Palm** ៖ សាក «បិទតាម ZTO» លើ Deploy Preview ជាមួយគណនី Palm ពិត (កញ្ចប់ដែលចុះហត្ថលេខាក្នុង App Palm បិទក្នុង ZoeW ·
   កញ្ចប់ tab «បញ្ជូន» នៅបើក) មុន merge · កាតាឡុក ៖ [`ZoeW/docs/ZTO-PALM-API.md`](../ZoeW/docs/ZTO-PALM-API.md) · ⛔ endpoint សរសេររបស់ ZTO មិនហៅឡើយ។
-- ⏳ **[2.50.110]** ទាញបញ្ជី Palm ស្របគ្នា ៦៤ ៖ សកម្មភាព ១–២ (2.50.109 ៖ 455 កញ្ចប់ 17.5 វិ · ZTO 0.33 វិ/សំណើ · Cookie ១–៣ វិ) ·
+- ⏳ **[2.50.111]** Palm លើ backend ទាំង ២ ៖ សកម្មភាព ១ · 2.50.110 វាស់រួច ៖ 455 កញ្ចប់ **8.3 វិ** (ZTO 0.23 វិ/សំណើ · គ្មាន track ខ្វះ) · Cookie ១–៣ វិ ·
   តំបន់ Function ប្តូរបានតែក្រោយ Upgrade Netlify (ម្ចាស់គម្រោងសម្រេច) · ម្ចាស់គម្រោងបញ្ជាក់របារ និងបិទស្វ័យប្រវត្តិដំណើរការ។
 
 ### 🗳️ ការសម្រេច និងការកំណត់ដែលនៅរស់
@@ -92,6 +92,27 @@
   (ផ្នែក ២ «Deep audit ៣») · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.111] — 2026-10-17 · ZoeW ៖ ZTO Palm ដូច Cookie លើ backend ទាំង ២ — មូលហេតុពិតពេល Server បដិសេធគណនី · តេស្ត race
+
+**ZoeW `2.50.111`** (`zoew-v373` ➜ `zoew-v374`) · ZoeKeyGen ដដែល · គ្មាន env · Firebase rules ឬ migration ថ្មី · Function មិនប្រែ។
+សំណើម្ចាស់គម្រោង ៖ «អោយpalm ដំណើរការពេញលេញដូច cookie គ្រប់ backend តេស្ត race ផង» · «សូមរៀបចំអោយមានស្តង់ដារនិងយកចិត្តទុកដាក់» ➜ តំបន់ចាក់សោ ZTO
+(`zto-list-sync.ts`) កែតាមសំណើនេះ · `LOCK` ថ្មី · មូលហេតុ ➜ ផ្នែក ២ A186។
+
+- App ៖ ការអានបញ្ជី Palm (មកដល់ · ចុះហត្ថលេខា) ដែល Function បដិសេធដោយសារគណនី ZoeW (`ZTO_IDENTITY_REQUIRED` · `ZTO_IDENTITY_UNAVAILABLE` ·
+  `ZTO_CONFIG_INVALID` ដែលមូលហេតុជាការកំណត់អត្តសញ្ញាណ) ក្លាយជា `notConfigured` + មូលហេតុ ដូចបញ្ជី Cookie ➜ សារដូចគ្នា (គណនីគ្មានសាខា · ហាងផុតកំណត់/បិទ ·
+  ផ្ទៀងផ្ទាត់មិនបាន សាកម្តងទៀត · Server មិនទាន់កំណត់) និងសាលក្រម «ស្ថាពរ ឬបណ្តោះអាសន្ន» ដូចគ្នាសម្រាប់ការរង់ចាំ ៨ ថ្ងៃ · `ZTO_IDENTITY_UNAVAILABLE` នៅសាកម្តងទៀត ·
+  `site:palm-other-branch` ➜ «🏢 គណនី ZoeW នេះជាសាខាផ្សេងពីគណនី ZTO Palm — សូម Login ZTO Palm របស់សាខានេះ» · `site:palm-missing` ➜ «🔑 គណនី ZTO Palm នេះ
+  គ្មានលេខសាខា — សូម Login ZTO Palm ម្តងទៀត» ⛔ «Session ZTO Palm ផុតកំណត់» នៅសម្រាប់តែ session Palm ផុតកំណត់ពិត (`ZTO_AUTH_EXPIRED`)។
+- អ្នកយាម ៖ `zto-palm-backends.test.tsx` (ថ្មី · ២១ ៖ App ពិត + Function ពិត · Firebase/Supabase × `ZTO_DETAIL_IDENTITY` off/optional/require ➜ ជួរដូចគ្នា ·
+  គណនីសាខាផ្សេង · token ផុតកំណត់ · Server ផ្ទៀងមិនបាន · គណនីគ្មានហាង · ហាងផុតកំណត់/បិទ · បញ្ជីចុះហត្ថលេខា និងការរង់ចាំ ៨ ថ្ងៃ — ៩ ធ្លាក់លើ `507f1d7`) ·
+  `zto-palm-race.test.tsx` (ថ្មី · ១៤ ៖ ចាកចេញ · ប្តូរហាង · Login Palm ម្តងទៀត · ចុចពីរដង · បរាជ័យយឺតរបស់វគ្គចាស់ · បញ្ជីចុះហត្ថលេខាយឺត × backend ទាំង ២ —
+  ជាប់លើកូដមុនកែ · mutation ៣ ដែលដកច្រក session ធ្លាក់) · ឧបករណ៍រួម `zto-palm-harness.ts`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. Deploy Preview (2.50.111) ➜ ពិនិត្យកំណែក្រោម ☰ ➜ ទាញបញ្ជី Palm ជួរថ្ងៃដដែល (ហាង Firebase · បើមានហាង Supabase ក៏សាកផង) ➜ ទិន្នន័យដូច 2.50.110។
+2. គ្មានការប្តូរ Netlify env · `ZTO_DETAIL_IDENTITY=require` (💡 «📌») ពេលបើកនៅថ្ងៃក្រោយ ➜ ប្រអប់ Palm ប្រាប់មូលហេតុដូច Cookie។
 
 ### [2.50.110] — 2026-10-17 · ZoeW ៖ ទាញបញ្ជី ZTO Palm ស្របគ្នា ៦៤ (ការជ្រើសរបស់ម្ចាស់គម្រោង)
 
@@ -3973,6 +3994,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-17 — Palm លើ backend ទាំង ២ ៖ Server បដិសេធគណនី ZoeW ➜ App ថា «Session Palm ផុតកំណត់»
+
+សំណើ ៖ «អោយpalm ដំណើរការពេញលេញដូច cookie គ្រប់ backend តេស្ត race ផង»។ វាស់ ៖ App ពិត + Function ពិត + ZTO Palm ក្លែង + អត្តសញ្ញាណ Firebase (ID token
+ចុះហត្ថលេខាពិត) និង Supabase (`my_account()` ក្លែង) × `ZTO_DETAIL_IDENTITY` ទាំង ៣។
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A186 | **សារខុសពេល Server បដិសេធគណនី ZoeW លើបញ្ជី Palm** ៖ បញ្ជី Cookie ទទួល `enabled:false` + `reason` (`fetchZtoListPage()` ➜ `notConfigured`) តែបញ្ជី Palm ទទួល `401 ZTO_IDENTITY_REQUIRED` / `503 ZTO_IDENTITY_UNAVAILABLE` ពី `palmList()` (`deps.lookupAccess()` ➜ `resolveDetailAccess()`) ➜ App ថា «🔑 Session ZTO Palm ផុតកំណត់ — Login ZTO Palm» (token ផុតកំណត់ · គណនីគ្មានហាង · ហាងផុតកំណត់/បិទ) ឬ «ទាញបញ្ជីពី ZTO មិនបាន (HTTP 503)» (Supabase/វិញ្ញាបនបត្រមិនឆ្លើយ) · `site:palm-other-branch` ➜ «គណនីនេះគ្មានលេខសាខា ZTO» · ផ្លូវធម្មតា ៖ ជួរដូចគ្នាគ្រប់ backend × របៀប · race ៖ ច្រក session (`captureZtoSession()` · `ownsLock()`) ដំណើរការ | `zto-palm-backends.test.tsx` ៩/២១ ធ្លាក់លើ `507f1d7` (៦ របៀប require × backend · ៣ ហាង Supabase) · `zto-palm-race.test.tsx` ១៤/១៤ ជាប់មុនកែ · mutation ៖ worker មិនពិនិត្យ session ➜ ៣ ធ្លាក់ · `finally` ដោះសោជានិច្ច ➜ ២ ធ្លាក់ · sweep មិនពិនិត្យ session ក្រោយ fetch ➜ ២ ធ្លាក់ | `fetchZtoListPage()` ៖ `ZTO_LIST_IDENTITY_CODES` + `ZTO_LIST_IDENTITY_SERVER_REASONS` ➜ `notConfigured` + `listReason` (`transient` សម្រាប់ `ZTO_IDENTITY_UNAVAILABLE` ➜ `ztoPalmPageRetryable()`) · សារ `site:palm-other-branch` · `site:palm-missing` · ការរង់ចាំ ៨ ថ្ងៃ ៖ បណ្តោះអាសន្ន ➜ នៅរង់ចាំ · ស្ថាពរ ➜ បិទមុខងារ ដូច Cookie (`ZTO_IDENTITY_REQUIRED` `site:*` មុនកែ = បរាជ័យបណ្តោះអាសន្ន) · ព្រំដែនដែលទទួល ៖ `optional`/`off` មិនផ្ទៀងគណនីលើបញ្ជី Palm (session Palm ជារបស់សាខាមួយ) · គណនី Firebase គ្មានសាខា + require ➜ បញ្ជី Palm ដើរ (ផ្ទៀងរួច តែគ្មានសាខាប្រៀប) ⟷ គណនី Supabase គ្មានហាង ➜ `site:no-account` (មិនមែនអត្តសញ្ញាណផ្ទៀងរួច · ច្បាប់ CLAUDE.md) |
+
 ### 2026-10-17 — ទាញបញ្ជី Palm 17.5 វិ ៖ ZTO ស្របគ្នាពិតត្រឹម ~១០ ក្នុង ៣២ · តំបន់ Function ជាប់ Ohio
 
 របាយការណ៍ (Preview PR #328 · 2.50.109) ៖ «⏱ Palm ៖ ផ្ទៀង 455 កញ្ចប់ ក្នុង 17.5 វិនាទី — បញ្ជី 4.4 វិ · track 14.6 វិ (សំណើ track 455 ·
@@ -3980,7 +4010,7 @@ ZTO ឆ្លើយមធ្យម 0.33 វិ/សំណើ)» · Netlify «Func
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A185 | **ZTO ស្របគ្នាពិតត្រឹម ~១០ ក្នុង ៣២** ៖ ការងារ ZTO = 455 × 0.33 = 150 វិ ➜ ស្របគ្នា ៣២ ពេញគួរ ≈ 4.7 វិ តែ track 14.6 វិ (150 ÷ 14.6 ≈ ១០) ➜ ពេលបាត់នៅការធ្វើដំណើរ App (កម្ពុជា) ↔ Function (`us-east-2`) រាល់សំណើ និងការរង់ចាំកញ្ចប់យឺតជាងគេក្នុងក្រុមនីមួយៗ · ៧ វិ (បញ្ជី + track) ជាជាន់ក្រោមរបស់ Palm ទោះស្របគ្នា ៣២ ពេញ ➜ Palm មិនដល់ Cookie (១–៣ វិ) ទេ | គំរូក្លែង (lognormal ZTO មធ្យម 0.33 វិ · RTT 0.35 វិ + Function 0.9 វិ) តម្រូវតាមលេខពិត ៖ កំណែនេះ 17.0 វិ ⟷ ពិត 17.5 · រៀបក្រុមឡើងវិញស្របគ្នា ៣២ ដដែល ៖ −3…6% · Function ៨ ក្នុងមួយ × សំណើ ៨ (៦៤) ៖ **11.2 វិ** · Function ១៦ × ៤ ៖ 15.6 វិ · App ពិត + Function ពិត + ZTO ក្លែង 455 កញ្ចប់ (ZTO 20–60ms · បញ្ជី 150ms) ៖ ស្របគ្នា ៤ **1.05 វិ** ⟷ ៨ **0.70 វិ** (−33% · ជួរដដែល) | ប្តូរតំបន់ Function ➜ ត្រូវ Upgrade Netlify (ម្ចាស់គម្រោងមិនទាន់សម្រេច) · ម្ចាស់គម្រោងជ្រើស «ស្របគ្នា 64» ➜ `ZTO_PALM_LIST_CONCURRENCY` ៨ ([2.50.110]) · ⛔ មិនទាន់វាស់លើ ZTO ពិតថាស្របគ្នា ៦៤ មិនត្រូវកំណត់ល្បឿន ➜ «📌» [2.50.110] |
+| A185 | **ZTO ស្របគ្នាពិតត្រឹម ~១០ ក្នុង ៣២** ៖ ការងារ ZTO = 455 × 0.33 = 150 វិ ➜ ស្របគ្នា ៣២ ពេញគួរ ≈ 4.7 វិ តែ track 14.6 វិ (150 ÷ 14.6 ≈ ១០) ➜ ពេលបាត់នៅការធ្វើដំណើរ App (កម្ពុជា) ↔ Function (`us-east-2`) រាល់សំណើ និងការរង់ចាំកញ្ចប់យឺតជាងគេក្នុងក្រុមនីមួយៗ · ៧ វិ (បញ្ជី + track) ជាជាន់ក្រោមរបស់ Palm ទោះស្របគ្នា ៣២ ពេញ ➜ Palm មិនដល់ Cookie (១–៣ វិ) ទេ | គំរូក្លែង (lognormal ZTO មធ្យម 0.33 វិ · RTT 0.35 វិ + Function 0.9 វិ) តម្រូវតាមលេខពិត ៖ កំណែនេះ 17.0 វិ ⟷ ពិត 17.5 · រៀបក្រុមឡើងវិញស្របគ្នា ៣២ ដដែល ៖ −3…6% · Function ៨ ក្នុងមួយ × សំណើ ៨ (៦៤) ៖ **11.2 វិ** · Function ១៦ × ៤ ៖ 15.6 វិ · App ពិត + Function ពិត + ZTO ក្លែង 455 កញ្ចប់ (ZTO 20–60ms · បញ្ជី 150ms) ៖ ស្របគ្នា ៤ **1.05 វិ** ⟷ ៨ **0.70 វិ** (−33% · ជួរដដែល) | ប្តូរតំបន់ Function ➜ ត្រូវ Upgrade Netlify (ម្ចាស់គម្រោងមិនទាន់សម្រេច) · ម្ចាស់គម្រោងជ្រើស «ស្របគ្នា 64» ➜ `ZTO_PALM_LIST_CONCURRENCY` ៨ ([2.50.110]) · ម្ចាស់គម្រោងវាស់ 2.50.110 ៖ 455 កញ្ចប់ **8.3 វិ** (បញ្ជី 3.0 · track 7.2 · ZTO 0.23 វិ/សំណើ · ជួរដដែល · គ្មាន «ZTO មិនឆ្លើយ track») ➜ −53% · ZTO មិនកំណត់ល្បឿន |
 
 ### 2026-10-17 — ទាញបញ្ជី Palm 16.4 វិ ៖ ZTO មិនឆ្លើយ `mailNos` ច្រើនលេខ · track រង់ចាំបញ្ជីគ្រប់ទំព័រ
 
@@ -6280,9 +6310,11 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-lock.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-pages-unknown.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-backends.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-list-e2e.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-list.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-login.test.tsx` | ផ្នែក ១ | — |
+| `ZoeW/tests/zto-palm-race.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-palm-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-placeholder-phone.test.tsx` | ផ្នែក ២ | — |
 | `ZoeW/tests/zto-remind-days.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |

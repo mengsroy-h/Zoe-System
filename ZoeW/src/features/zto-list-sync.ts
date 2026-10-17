@@ -49,6 +49,10 @@ export const ZTO_LIST_PREVIEW_ROWS = 12;
 export const ZTO_LIST_IMPORT_MAX = 100;
 export const ZTO_LIST_SERVER_CONFIG_REASONS = ['idtoken:aud', 'idtoken:iss', 'idtoken:project-unset'];
 
+export const ZTO_LIST_IDENTITY_CODES = ['ZTO_IDENTITY_REQUIRED', 'ZTO_IDENTITY_UNAVAILABLE'];
+
+export const ZTO_LIST_IDENTITY_SERVER_REASONS = ['idtoken:project-unset', 'idtoken:supabase-unset'];
+
 export const ZTO_LIST_SIGNED_PROBE_MAX = 20;
 
 export const ZTO_LIST_RANGE_MAX_DAYS = 31;
@@ -382,6 +386,16 @@ export async function fetchZtoListPage(cfg, from, to, page, mode?, palm?) {
         err.notConfigured = true;
         throw err;
     }
+    const identityRefusal = ZTO_LIST_IDENTITY_CODES.indexOf(body.code) !== -1
+        || (body.code === 'ZTO_CONFIG_INVALID' && ZTO_LIST_IDENTITY_SERVER_REASONS.indexOf(body.reason) !== -1);
+    if (!out.res.ok && identityRefusal) {
+        const refused: any = new Error('ZTO_LIST_NOT_CONFIGURED');
+        refused.listReason = safeLookupReason(body.reason) || 'idtoken:invalid';
+        refused.notConfigured = true;
+        refused.transient = body.code === 'ZTO_IDENTITY_UNAVAILABLE';
+        refused.httpStatus = out.res.status;
+        throw refused;
+    }
     if (!out.res.ok || !Array.isArray(body.rows)) {
         const err: any = new Error('ZTO_LIST_FAILED');
         err.httpStatus = out.res.status;
@@ -509,7 +523,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
 }
 
 export function ztoPalmPageRetryable(e) {
-    if (!e || e.notConfigured) return false;
+    if (!e || (e.notConfigured && !e.transient)) return false;
     const status = Number(e.httpStatus);
     if (!status) return true;
     return status === 429 || status >= 500;
@@ -916,6 +930,12 @@ export async function runZtoListSyncPreview() {
             } else if (reason === 'idtoken:supabase-unreachable') {
                 setZtoListSyncNote('⚠️ ផ្ទៀងផ្ទាត់ហាងជាមួយ Server មិនបាន — សូមសាកម្ដងទៀត');
                 showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
+            } else if (reason === 'site:palm-other-branch') {
+                setZtoListSyncNote('🏢 គណនី ZoeW នេះជាសាខាផ្សេងពីគណនី ZTO Palm — សូម Login ZTO Palm របស់សាខានេះក្នុង «API ស្វែងរកអតិថិជន»');
+                showToast('ℹ️ គណនី ZTO Palm ជាសាខាផ្សេងពីគណនី ZoeW នេះ');
+            } else if (reason === 'site:palm-missing') {
+                setZtoListSyncNote('🔑 គណនី ZTO Palm នេះគ្មានលេខសាខា — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
+                showToast('ℹ️ គណនី ZTO Palm នេះគ្មានលេខសាខា');
             } else if (reason === 'site:tenant-expired' || reason === 'site:tenant-revoked') {
                 setZtoListSyncNote(reason === 'site:tenant-expired' ? '🏢 ហាងនេះផុតកំណត់ — សូមទាក់ទងអ្នកលក់ដើម្បីពន្យារ' : '🏢 ហាងនេះត្រូវបានបិទ — សូមទាក់ទងអ្នកលក់');
                 showToast('ℹ️ ហាងនេះមិនអាចទាញបញ្ជី ZTO បានទេ');

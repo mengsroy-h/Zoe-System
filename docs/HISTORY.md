@@ -47,7 +47,7 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` = **ZoeW 2.50.97 · ZoeKeyGen 2.24.19** (PR #327 · `1ecd033`)។
+- `main` = **ZoeW 2.50.111 · ZoeKeyGen 2.24.19** (PR #328 · `b98c35d`)។
 - Branch **`claude/zto-audit`** (ពី `main` `2519a1f` · **មិនទាន់ merge** · Function ZTO + ឯកសារ · គ្មានការឡើងកំណែ) ៖ audit ZTO · ZTO-E14 (ផ្នែក ២ «2026-10-16 — Audit ZTO ទាំងមូល»)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 

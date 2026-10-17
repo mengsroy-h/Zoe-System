@@ -131,9 +131,9 @@ export async function submitZtoPalmLogin(event?: Event) {
         const next = {
             enabled: true, fastMode: true, autoSubmit: fieldChecked('lookupApiAutoSubmitCheckbox'),
             url, headerName: 'X-Zoe-Proxy-Key', headerValueEnc, phoneField: 'phone', codField: 'cod', dodField: 'dod',
-            palmTokenEnc, palmExpiresAt: body.expiresAt, palmAccount: palmAccountOf(body.account), shop, palmLoginAt: Date.now()
+            palmTokenEnc, palmExpiresAt: body.expiresAt, palmAccount: palmAccountOf(body.account), shop, palmLoginAt: Date.now(),
+            ...(palmRefreshTokenEnc ? { palmRefreshTokenEnc } : {})
         };
-        if (palmRefreshTokenEnc) next.palmRefreshTokenEnc = palmRefreshTokenEnc;
         if (!storeLookupApiConfig(next)) return;
         setFieldChecked('lookupApiEnabledCheckbox', true);
         setFieldChecked('lookupApiFastModeCheckbox', true);

@@ -188,17 +188,21 @@ export function confirmLiveScan(code) {
     return text;
 }
 
-export function decodeBarcodeFromCanvasManual(options, canvas) {
-    if (!scanEngineReady() || !options || scanState.scanEngineDown) return Promise.resolve('');
+export function readCanvasSymbols(options, canvas) {
+    if (!scanEngineReady() || !options || scanState.scanEngineDown) return Promise.resolve([]);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return Promise.resolve('');
+    if (!ctx) return Promise.resolve([]);
     let imageData;
     try {
         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     } catch (e) {
-        return Promise.resolve('');
+        return Promise.resolve([]);
     }
-    return ZXingWASM.readBarcodes(imageData, options).then(readResultText, () => '');
+    return ZXingWASM.readBarcodes(imageData, options).then((results) => results || [], () => []);
+}
+
+export function decodeBarcodeFromCanvasManual(options, canvas) {
+    return readCanvasSymbols(options, canvas).then(readResultText);
 }
 
 export function readResultText(results) {

@@ -184,6 +184,24 @@ async function replay(cap, rules, tag) {
         'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `origins`) បដិសេធការសរសេរប្រភព ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់ (`saveBarcodeOrigins`)',
         'denied=' + old.denied.length + ' originPaths=' + originPaths);
 
+    // ⛔ ភស្តុតាង ZTO លើ barcode (`ztoSignedAt` · `ztoReturnedAt`) ៖ ផ្លូវសរសេរថ្មី (`syncZtoFinalMarks`) ➜ ការ replay ត្រូវមានការសរសេរពិត
+    //    ក្នុងប្រវត្តិ ឬធុងសំរាម — rules ពិតទទួល (ខាងលើ) · probe ៖ rules ចាស់ (គ្មានវាលទាំង ២) ➜ បដិសេធ ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់។
+    const carriesZtoFinal = (v) => !!v && typeof v === 'object' && /"zto(Signed|Returned)At"/.test(JSON.stringify(v));
+    const ztoFinalWrites = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner
+        && (rootOf(e.p) === 'zoew_scan_history_cod_dod' || rootOf(e.p) === 'zoew_recently_deleted_cod_dod') && carriesZtoFinal(e.v)).length, 0);
+    console.log('    ភស្តុតាង ZTO ៖ ការសរសេរ ' + ztoFinalWrites);
+    check(ztoFinalWrites >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរ `ztoSignedAt`/`ztoReturnedAt` ≥ ១ (op `ztoFinal`)', 'ztoFinalWrites=' + ztoFinalWrites);
+    const oldFinalRules = JSON.parse(JSON.stringify(rules));
+    ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'].forEach((root) => {
+        const idx = oldFinalRules.rules[root].$itemId.barcodes.$idx;
+        delete idx.ztoSignedAt;
+        delete idx.ztoReturnedAt;
+    });
+    const oldFinal = await replay(cap.data, oldFinalRules, 'old-final-rules');
+    check(oldFinal.denied.length >= 1,
+        'probe ទិសផ្ទុយ ៖ rules ចាស់ (គ្មាន `ztoSignedAt`/`ztoReturnedAt`) បដិសេធការកត់ភស្តុតាង ZTO ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់ (`syncZtoFinalMarks`)',
+        'denied=' + oldFinal.denied.length);
+
     // ⛔ ធុងសំរាម «ត្រឡប់» (`trashReason: 'returned'` ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ ➜ ថ្នាក់តែមួយ) ៖ តម្លៃថ្មីលើផ្លូវធុងសំរាម ➜
     //    ការ replay ត្រូវមានការសរសេរពិត · rules ពិតទទួល (ខាងលើ) · probe ៖ rules ចាស់ (`expired` ជំនួស `returned`) ➜ បដិសេធ។
     const isReturnedTrash = (v) => !!v && typeof v === 'object' && v.trashReason === 'returned';

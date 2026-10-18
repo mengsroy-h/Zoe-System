@@ -92,6 +92,7 @@ const LOCAL_CLOCK_OK = {
         attachInfoListeners: 'ត្រាពេលដែល `.info/connected` ក្លាយជា true (round trip ថ្មី) — local វាស់តាម `elapsedSince()` · មិនប៉ះ retention ឬលុយ',
         createSupabaseDatabase: 'adapter Supabase ៖ RTT របស់ RPC (t0/t1 ➜ offset នាឡិកា server ដូច `.info/serverTimeOffset` ៖ ត្រង់នេះជាអ្នកផ្តល់ getServerNow() មិនមែនអ្នកប្រើ) · ត្រាចាប់ផ្តើមការរង់ចាំលទ្ធផល transaction វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ `unknown` ភ្លាម មិនប៉ះលុយ) — local សុទ្ធសាធ មិនប៉ះ retention ឬលុយ',
         generateUniqueId: 'salt នៃ id — មិនមែនការសម្រេច retention',
+        syncZtoFinalMarks: 'ត្រាពេលបរាជ័យ/rules បដិសេធ នៃការកត់ Sign · ត្រឡប់ ZTO លើ barcode (`ztoFinalFailedAt` · `ztoFinalRefusedAt`) — គម្លាតសាកម្តងទៀត local វាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ សាកម្តងទៀត) · តម្លៃដែលសរសេរទៅ server (`ztoSignedAt`) មកពី `getServerNow()` · មិនប៉ះ retention ឬលុយ',
         beginPickupIntent: 'អាយុធាតុ journal ស្ថិតិយករួច (`zoew_pickup_journal_v1` · ការពារការបាត់ការបិទ/បើកដែល App បិទពាក់កណ្តាល) — ត្រា local វាស់តាម `elapsedSince()` ប៉ុណ្ណោះ (ថយក្រោយ ➜ Infinity ➜ ធាតុចាស់ត្រូវបោះចោល · ការសម្រេចលុយ/retention មិនអានវា) · មិនសរសេរទៅ server',
         waitForZXingThenInitScanEngine: 'deadline ផ្ទុក script — local',
         confirmLiveScan: 'បង្អួច «២ ស៊ុមជាប់គ្នា» — local',

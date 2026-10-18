@@ -1,4 +1,5 @@
 import { openZtoPalmSign } from '../features/zto-palm-sign';
+import { explainZtoReopenLock, explainZtoRestoreBlock } from '../features/zto-final-marks';
 import { cancelLogout, confirmLogout, drawerAuthFlow, drawerBiometricFlow, drawerConfigFlow, drawerCustomerTableFlow, drawerLockerSettingsFlow, drawerLookupApiFlow, submitLoginForm, toggleDrawerGroup } from './actions';
 import { drawerAppLockFlow, forgetAppLockPin, runAppLockBiometric, submitAppLockForm } from '../features/app-lock';
 import { logoutApp } from '../features/auth';
@@ -94,6 +95,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     editSheetImportConfig,
     executePermanentDelete,
     executeRestoreItem,
+    explainZtoReopenLock,
+    explainZtoRestoreBlock,
     exportDataAsCsvForSheets,
     exportDataAsExcel,
     exportDataAsPDF,

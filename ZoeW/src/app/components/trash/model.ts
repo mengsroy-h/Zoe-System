@@ -1,6 +1,7 @@
 import { dataState } from '../../../core/state';
 import { TRASH_FILTER_META, TRASH_REASON_META, trashGroupInFilter, trashItemTotals, trashItemCodes } from '../../../features/trash';
 import { TRASH_CODES_PREVIEW } from '../../../features/locker';
+import { trashRestoreBlockOf } from '../../../features/zto-final-marks';
 
 export interface TrashBucket { total: number; count: number; riel: number }
 
@@ -14,7 +15,7 @@ export interface TrashSummaryModel {
     filter: string;
 }
 
-export interface TrashSubRow { id: string; codes: string[]; count: number; total: number }
+export interface TrashSubRow { id: string; codes: string[]; count: number; total: number; restoreBlock: string }
 
 export interface TrashRowModel {
     key: string;
@@ -28,6 +29,7 @@ export interface TrashRowModel {
     total: number;
     riel: number;
     singleId: string | null;
+    singleBlock: string;
     expanded: boolean;
     itemCount: number;
     subRows: TrashSubRow[];
@@ -80,6 +82,7 @@ export function buildTrashRowModel(group: any, expandedKeys: Set<any>): TrashRow
         total: group.total,
         riel: Math.round(group.total * dataState.exchangeRateRiel),
         singleId: group.items.length === 1 ? group.items[0].id : null,
+        singleBlock: group.items.length === 1 ? trashRestoreBlockOf(group.items[0]) : '',
         expanded,
         itemCount: group.items.length,
         subRows: expanded && group.items.length > 1
@@ -89,7 +92,8 @@ export function buildTrashRowModel(group: any, expandedKeys: Set<any>): TrashRow
                     id: item.id,
                     codes: trashItemCodes(item),
                     count: totals.count,
-                    total: Math.round((totals.cod + totals.dod) * 100) / 100
+                    total: Math.round((totals.cod + totals.dod) * 100) / 100,
+                    restoreBlock: trashRestoreBlockOf(item)
                 };
             })
             : []

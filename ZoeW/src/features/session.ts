@@ -21,6 +21,7 @@ import { hidePhoneSuggestions } from './phone-suggest';
 import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
 import { clearSheetImportSession } from './sheet-import';
 import { ztoListSignedProbe } from './zto-list-sync';
+import { resetZtoFinalMarks } from './zto-final-marks';
 import { clearZtoPickupStatusStore } from './zto-status';
 import { DB_OP_TIMEOUT_MS, withTimeout } from '../services/network';
 import { resetScanConfirm } from '../services/scan-engine';
@@ -126,6 +127,7 @@ export function clearSensitiveModalFields() {
     viewState.palmLoginStatus = '';
     viewState.lookupTestResult = '';
     clearZtoPickupStatusStore();
+    resetZtoFinalMarks();
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;
     ztoState.ztoStatusModalSig = '';

@@ -16,6 +16,7 @@ import { refreshShopBoundUi } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
+import { scheduleZtoFinalMarks } from '../../features/zto-final-marks';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { refreshZtoPalmSession } from '../../features/zto-palm-login';
 import { isNativeApp } from '../../platform/native';
@@ -157,6 +158,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        scheduleZtoFinalMarks();
         refreshZtoPalmSession();
         probeDatabaseLivenessIfIdle();
     });
@@ -167,6 +169,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        scheduleZtoFinalMarks();
         refreshZtoPalmSession();
         notifyPeriodicTick();
         resyncPush();

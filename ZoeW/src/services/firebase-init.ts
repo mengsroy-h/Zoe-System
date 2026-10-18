@@ -6,6 +6,7 @@ import { setupAuthListener } from '../features/auth';
 import { clearCustomerDataTableCache } from '../features/customer-table';
 import { refreshShopBoundUi } from '../features/lookup-config';
 import { noteShopDevice } from '../features/shop-device';
+import { resetZtoFinalMarks } from '../features/zto-final-marks';
 import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { ZTO_SHOP_SWEEP_PATH } from './zto-shop-sweep';
 import { checkPinAndOpenConfig } from '../features/config';
@@ -134,6 +135,7 @@ export async function initFirebase() {
             dataState.registryReleaseFlushInFlight = false;
             clearCustomerDataTableCache();
             clearZtoPickupStatusStore();
+            resetZtoFinalMarks();
             pendingHistoryPatches.clear();
             dataState.historyPatchFlushInFlight = false;
             dataState.exchangeRateSaveInFlight = false;

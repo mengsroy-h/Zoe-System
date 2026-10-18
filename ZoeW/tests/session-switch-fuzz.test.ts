@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dataState, firebaseState, uiState } from '../src/core/state';
+import { dataState, firebaseState, uiState, ztoState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { getFormattedDate } from '../src/core/timezone';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
@@ -10,6 +10,8 @@ import { resetPickupStats } from '../src/domain/collected';
 import { applyBarcodeCloseChange, removeSingleBarcode, saveEditedBarcodePrice } from '../src/features/barcode-ops';
 import { saveExchangeRate } from '../src/features/exchange-rate';
 import { saveBarcodeOrigins } from '../src/features/barcode-origin';
+import { resetZtoFinalMarks, syncZtoFinalMarks } from '../src/features/zto-final-marks';
+import { setZtoPickupVerdict } from '../src/features/zto-status';
 import { clearHistory, releaseStaleClearHistoryClaim } from '../src/features/clear-history';
 import { deleteSingleItem, saveEditedPhone, setCallMark, toggleCloseStatus } from '../src/features/entry-ops';
 import { buildLockerBarcodeIndex } from '../src/features/locker';
@@ -242,6 +244,7 @@ const SCENARIOS: Scenario[] = [
     { name: 'ស្កេនរក្សាទុក (addOrUpdateEntry)', run: () => addOrUpdateEntry('N1', '0960001111', 2, 0) },
     { name: 'claim registry (claimBarcodeInRegistry)', run: () => claimBarcodeInRegistry('N2') },
     { name: 'ដោះ registry (releaseBarcodesInRegistry)', run: () => releaseBarcodesInRegistry(['C']) },
+    { name: 'ភស្តុតាង ZTO (syncZtoFinalMarks)', prepare: () => { resetZtoFinalMarks(); ztoState.ztoFinalInFlight = false; setZtoPickupVerdict('F', true); }, run: () => syncZtoFinalMarks() },
     { name: 'ប្រភពកញ្ចប់ (saveBarcodeOrigins)', run: () => saveBarcodeOrigins([{ itemId: ID1, code: 'C', from: 'Shenzhen' }]) },
     { name: 'កែលេខទូរស័ព្ទ (saveEditedPhone)', prepare: () => { uiState.editingItemId = ID1; inputValue('editPhoneInput', '0960009999'); }, run: () => saveEditedPhone() },
     { name: 'សម្គាល់ការហៅ (setCallMark)', prepare: () => { uiState.markingItemId = ID1; }, run: () => setCallMark('no-answer') },

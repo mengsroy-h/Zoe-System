@@ -4,7 +4,7 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -17,7 +17,9 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
 import { itemOriginOf, originLabel } from './barcode-origin';
+import { barcodeSignedInZto } from './zto-final-marks';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -58,7 +60,8 @@ export function openViewListModal(id?) {
             moneyClass: bcMoneyClass,
             money: money,
             sum: sum,
-            closed: isBcClosed
+            closed: isBcClosed,
+            signed: isBcClosed && barcodeSignedInZto(b)
         };
     });
     uiState.touch();
@@ -318,6 +321,10 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
 
     const freshItem = dataState.scanHistory.find(i => i.id === itemId);
     const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
+    if (!desiredClosed && barcodeZtoSigned(freshB)) {
+        if (!silent) showToast(ZTO_SIGNED_REOPEN_TEXT);
+        return false;
+    }
     const previousState = freshItem && freshB
         ? { isClosed: freshB.isClosed, barcodeClosedAt: freshB.closedAt, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
         : null;
@@ -327,6 +334,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let signedRefused = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
@@ -388,7 +396,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
             revertBarcodeCloseLocally();
             pickupJournal.finish();
-            showToast(`⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
             return false;
         }
         reconcilePickupDeltaWithServer();
@@ -406,6 +414,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;
+            signedRefused = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
@@ -425,6 +434,10 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
+            if (!desiredClosed && barcodeZtoSigned(b)) {
+                signedRefused = true;
+                return;
+            }
             const stateUnchanged = !!b.isClosed === !!desiredClosed && (!desiredClosed || typeof b.closedAt === 'number');
             const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
             if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());

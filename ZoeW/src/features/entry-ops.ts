@@ -2,9 +2,9 @@ import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { normalizeStoredPhone } from '../core/text';
+import { ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { claimCleanupTrashSlot, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
 import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
@@ -207,6 +207,7 @@ export async function toggleCloseStatus(id?) {
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let signedRefused = false;
     const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
@@ -273,7 +274,7 @@ export async function toggleCloseStatus(id?) {
         if (!serverApplied || !(closeResult && closeResult.committed)) {
             revertCloseLocally();
             pickupJournal.finish();
-            showToast('⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
             return false;
         }
         reconcilePickupDeltaWithServer();
@@ -291,11 +292,16 @@ export async function toggleCloseStatus(id?) {
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;
+            signedRefused = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
             normalizeBarcodesOf(currentItem);
             const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
+            if (!desiredClosed && serverBarcodes && serverBarcodes.some(barcodeZtoSigned)) {
+                signedRefused = true;
+                return;
+            }
             serverPickupMarks = collectPickupMarks(currentItem, desiredClosed, getPickupPhoneKey(currentItem));
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
             currentItem.isClosed = desiredClosed;

@@ -1,6 +1,7 @@
 import { dataState } from '../../../core/state';
 import { formatScanStamp } from '../../../core/timezone';
 import { itemOriginSummary } from '../../../features/barcode-origin';
+import { itemReopenLockedByZto } from '../../../features/zto-final-marks';
 
 export interface HistoryRowAction {
     action: string;
@@ -36,6 +37,7 @@ export interface HistoryRowModel {
     callKind: 'none' | 'fix-phone' | 'called' | 'call';
     needsRecall: boolean;
     closeIsReopen: boolean;
+    reopenLocked: boolean;
     id: string;
 }
 
@@ -106,7 +108,8 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
         money: { hasCod: activeCod > 0, hasDod: activeDod > 0, cod: activeCod, dod: activeDod, codRiel, dodRiel, sum, sumRiel: codRiel + dodRiel },
         callKind,
         needsRecall,
-        closeIsReopen: !!item.isClosed
+        closeIsReopen: !!item.isClosed,
+        reopenLocked: itemReopenLockedByZto(item)
     };
 }
 

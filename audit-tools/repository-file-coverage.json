@@ -1618,6 +1618,9 @@
     "ZoeW/src/features/barcode-origin.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/zto-final-marks.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/biometric.ts": {
       "policy": "zoew-app"
     },
@@ -2012,6 +2015,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/pickup-interrupted-close.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-final-marks.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-signed-only-purge.test.ts": {
@@ -3491,6 +3497,9 @@
       "policy": "supabase-db"
     },
     "supabase/migrations/20261017053127_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
+    "supabase/migrations/20261018011107_zoe_rules.sql": {
       "policy": "supabase-db"
     },
     "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {

@@ -100,14 +100,30 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.127] — 2026-10-18 · ZoeW ៖ ស្ថិតិ «យករួច» ត្រឹមត្រូវ ទោះ App បិទពាក់កណ្តាលការបិទ/បើកកញ្ចប់ (A225)
+### [2.50.127] — 2026-10-18 · ZoeW ៖ ស្ថិតិ «យករួច» ត្រឹមត្រូវ ទោះ App បិទពាក់កណ្តាលការបិទ/បើកកញ្ចប់ (A225) · កញ្ចប់ Sign/ត្រឡប់ក្នុង ZTO ចាក់សោ · ធុងសំរាមថ្មីនៅលើ (A226) · Sign មួយជុំ លឿន · iOS អាន QR (A227)
 
-**ZoeW** (`zoew-v390` ➜ `zoew-v391`)។ សំណើម្ចាស់គម្រោង ៖ «ស៊ើប A225 បន្ត»។ លម្អិត ៖ ផ្នែក ២ A225។
+**ZoeW** (`zoew-v390` ➜ `zoew-v391`) · rules ថ្មី (`firebase-database.rules.json` + `supabase/migrations/20261018011107_zoe_rules.sql`)។ សំណើម្ចាស់គម្រោង ៖ «ស៊ើប A225 បន្ត» ·
+«សម្រួលធុងសំរាម អោយធាតុថ្មីៗដែលចូលក្រោយគេនៅលើគេ … កញ្ចប់ដែលស្កេនត្រឡប់រួចដាច់ខាតត្រូវតែត្រឡប់ទៅសាខាកណ្តាលវិញ … កញ្ចប់ដែល sign បិទបញ្ជីពិតពី ZTO
+ក៏មិនអាចត្រឡប់មក unsign បាន … គួតែកញ្ចប់ដែលគ្រាន់តែបិទក្នុង ZoeW អាចស្តារបាន … កែប៉ូតុងអោយស្គាល់កញ្ចប់ដែល sign ហើយពិត មិនអាចបើកវិញបានក្នុង ZoeW» ·
+សម្រេច ៖ «ហាមតែ ZTO ស្កេនត្រឡប់» (ត្រឡប់ថ្ងៃទី ៨ នៅស្តារបាន) · «កត់លើកញ្ចប់ក្នុង DB»។ Sign ៖ «អោយលឺសម្លេង និង ញ័រពេលស្កេនជោគជ័យ … ពត៍មានពី ZTO … វែងពេក … លើ ios មិន
+recognize barcode ពីរូបភាព … ធ្វើអោយ ios ស្គាល់ទាំង QR … មាន QR មួយទៀតមិនទាក់ទងនិង ZTO … បង្កើនល្បឿន flow Sign»។ លម្អិត ៖ ផ្នែក ២ A225 · A226 · A227 · A228។
 
 - ✅ **ស្ថិតិ «កញ្ចប់យករួច»** ៖ ការបិទ/បើកកញ្ចប់សរសេរស្ថិតិថ្ងៃ និងកញ្ចប់ ២ ដងដាច់ពីគ្នា ➜ App បិទ · Refresh · បណ្តាញដាច់ចន្លោះនោះ ➜ ស្ថិតិលើស ឬខ្វះជារៀងរហូត។ ឥឡូវ App កត់ប្រតិបត្តិការក្នុង journal `zoew_pickup_journal_v1` (ថ្ងៃ + កូនសោ barcode) ➜ ពេលបើកលើកក្រោយ (ទិដ្ឋភាពស្រស់ · ហាងដដែល) កំណត់កូនសោនីមួយៗតាមស្ថានភាព barcode ពិត ➜ Reset ចំនួនយករួចមិនកើតឡើងវិញ (មិនរាប់ថ្ងៃឡើងវិញទាំងមូល) · tab ផ្សេងដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) មិនត្រូវប៉ះ។
+- 🔒 **កញ្ចប់ដែលចប់ក្នុង ZTO** ៖ ភស្តុតាងកត់លើ barcode ក្នុង DB (`ztoSignedAt` ពេល ZTO ថា Sign · `ztoReturnedAt` ពេល ZTO ស្កេនត្រឡប់) ដោយការសរសេរដាច់ពីការរក្សាទុកកញ្ចប់
+  (`syncZtoFinalMarks()` ៖ rules មិនទាន់ Publish ➜ ការងារផ្សេងដើរធម្មតា) ➜ ប៊ូតុង «🔒 Sign រួច» ជំនួស «❌ បើក» · ការបើកវិញបដិសេធក្នុង transaction លើតម្លៃ server ·
+  ធុងសំរាម 🔒 ជំនួស 🔄 (ត្រឡប់ ZTO · «យករួច» ដែលគ្រប់ barcode Sign) · «ត្រឡប់» ថ្ងៃទី ៨ · «លុប» · «ដក» នៅស្តារបាន · Sign តាម «✍️ Sign» កត់ verdict ភ្លាម។
+- 🗑️ **ធុងសំរាម** ៖ ក្រុម និងធាតុក្នុងក្រុមតម្រៀបតាម `deletedAt` ថ្មីបំផុតមុន។
+- ♻️ **ស្តារ** ៖ ការស្តារដែលជោគជ័យមិនបង្ហាញ «❌ ស្តារទិន្នន័យបរាជ័យ» ទៀតពេលបណ្តាញអានយឺតភ្លាមក្រោយស្តារ (ការអានដែលគ្មានប្រយោជន៍ត្រូវដកចេញ)។
+- ✍️ **Sign មួយជុំ** ៖ បើកផ្ទាំង ➜ ពិនិត្យស្ថានភាព ZTO គ្រប់ Barcode ស្របគ្នា ➜ ស្កេនម្តង (កាមេរ៉ា · ម៉ាស៊ីនស្កេន · ថត · Gallery) ➜ សម្លេង + ញ័រ (APK · Android; iPhone web មានតែសម្លេង) ចាប់រូប ហើយស្កេនចែកចាយ `04` ភ្លាម (រំលងបើ ZTO ចែកចាយរួច) ➜ វាយឈ្មោះ ➜ «✍️ Sign (N)» ផ្ញើស្របគ្នា ·
+  សារ ZTO បត់ខ្លី (ចុចអានពេញ) · ✕ ដករូប · អាន QR លេខកញ្ចប់លើបុង (QR ផ្សព្វផ្សាយមិនរាប់) · iOS ៖ កាមេរ៉ាអានលឿនជាងមុន · រូប/Gallery អានរូបធំ (≤ 2600px) ពិដាន 10s។
 - 🧪 `ZoeW/tests/pickup-interrupted-close.test.ts` (មុនកែ ៣ ទិសធ្លាក់ ៖ បិទកញ្ចប់ ស្ថិតិ ២ ⟷ បិទ ០ · បិទ barcode ស្ថិតិ ០ ⟷ បិទ ១ · បើកវិញ ស្ថិតិ ០ ⟷ បិទ ១) · អ្នកយាមពហុឧបករណ៍ទាំង ២ រង់ចាំ journal ស្ថិតិយកទទេមុនវាស់។
 
-**សកម្មភាពដោយដៃ** ៖ គ្មាន (គ្មាន env · rules · migration)។ Deploy ZoeW ពេលម្ចាស់គម្រោងស្នើ merge។
+- 🧪 `ZoeW/tests/zto-palm-sign.test.tsx` (flow មួយជុំ · ចែកចាយពេលស្កេន · សម្លេង/ញ័រ · ✕) · `ZoeW/tests/palm-sign-camera.test.ts` (QR ផ្សេងមិនរាប់ · អានលឿន/ស៊ីជម្រៅ · រូបធំ) · `scan-engine-test` ស្គាល់ `readCanvasSymbols()`។
+- 🧪 `ZoeW/tests/zto-final-marks.test.tsx` · op `ztoFinal` ក្នុង `revenue-fuzz-test` + probe rules ចាស់ក្នុង `emu/app-writes-rules-test` · សេណារីយ៉ូ `syncZtoFinalMarks` ក្នុង `ZoeW/tests/session-switch-fuzz.test.ts`។
+
+**សកម្មភាពដោយដៃ** ៖ ⛔ **Publish rules** `firebase-database.rules.json` ទៅ **គ្រប់គម្រោង Firebase របស់អតិថិជន** (Console ➜ Realtime Database ➜ Rules ➜ Publish ឬ
+`tools/firebase-provision/deploy-rules.cmd`) — មុន Publish ការកត់ Sign/ត្រឡប់មិនចូល DB (ប៊ូតុង 🔒 ពឹង verdict ក្នុងឧបករណ៍តែប៉ុណ្ណោះ) · Supabase ៖ migration
+`20261018011107_zoe_rules.sql` ចូលពេល merge ទៅ `main` (ឬ paste ក្នុង SQL Editor)។ Deploy ZoeW ពេលម្ចាស់គម្រោងស្នើ merge។
 
 ### [2.50.126] — 2026-10-17 · ZoeW + ZoeKeyGen `2.24.20` ៖ Deep audit ៦ — ហាងសាខាច្រើន (Palm) មិនដកលុយកញ្ចប់ដែលយកនៅសាខាផ្សេង · Push ដល់គ្រប់ហាង/ទូរស័ព្ទ · ផ្ទាំងហាង Supabase លើស ១០០០ · Sign ប្រាប់ឲ្យរង់ចាំ
 
@@ -4333,6 +4349,14 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-18 — កញ្ចប់ចប់ក្នុង ZTO ៖ បើកវិញ · ស្តារ · Sign លឿន (សំណើម្ចាស់គម្រោង · A226 · A227 · A228)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A228 | **ស្តារជោគជ័យ តែ App ប្រកាស «❌ ស្តារទិន្នន័យបរាជ័យ»** (សំណើ «អានកូដផ្លូវ ស្តារឡើងវិញ … clean up») — ក្រោយ finalize `executeRestoreItem()` អានធាតុប្រវត្តិម្តងទៀត (`dbOp` ពិដាន 15s) ទៅអថេរ `resultingLiveItem` ដែលគ្មានអ្នកប្រើ ➜ ការអាននោះបរាជ័យ ឬអស់ពេល ➜ catch ៖ alert បរាជ័យ · Sentry money · មិនផ្ទុកធុងសំរាម/ប្រវត្តិឡើងវិញ ទោះកញ្ចប់ស្តាររួច និងលុយបូកវិញរួច | `ZoeW/tests/cleanup-ledger-key.test.ts` «ការអានប្រវត្តិក្រោយ finalize បរាជ័យ» (មុនកែ ៖ alert ១ ដង ➜ ធ្លាក់ · ក្រោយកែ ៖ ✅ · លុយ 100/10 ត្រឹមត្រូវ) | [2.50.127] ដកការអាន និងអថេរដែលគ្មានអ្នកប្រើ (ក្រៅពីនេះ export ទាំងអស់ក្នុង `restore.ts` មានអ្នកហៅ) · `payload-schema.js` ដកឈ្មោះអថេរនោះ |
+| A227 | **Sign យឺត និង iOS អានរូបមិនបាន** — Sign ត្រូវស្កេន ២ ជុំ (ចែកចាយ ➜ ចុចផ្ញើ ➜ ទៅជំហានទទួល ➜ ស្កេនម្តងទៀត ➜ ផ្ញើ) ហើយ status/receipt ផ្ញើម្តងមួយ · iPhone គ្មាន `BarcodeDetector` ➜ ZXing tryHarder លើ frame 1280px រៀងរាល់ 150ms · រូប/Gallery បង្រួមដល់ 1280px រួចអានក្រោមពិដាន 3s ➜ Barcode ឆ្ងាយក្នុងរូប 4032px តូចពេក ឬអស់ពេល (WASM លើ iOS) · Code128 តែមួយ ទោះបុងមាន QR លេខដូចគ្នា | ZXing ពិតក្នុង Chromium ៖ បុងសំយោគ (Code128 + QR លេខកញ្ចប់ + QR ផ្សព្វផ្សាយ) ➜ Code128+QR អានឃើញ QR លេខកញ្ចប់ និង QR ផ្សព្វផ្សាយ ➜ `palmSignPickCode()` យកតែលេខកញ្ចប់ · Code128 គ្របបិទ ➜ QR នៅអានបាន · Barcode ក្រៅកណ្តាល ➜ ការអានលឿន (គ្មាន tryHarder) មិនឃើញ ការអានស៊ីជម្រៅឃើញ (ហេតុនេះរៀងរាល់ frame ទី ៤ ស៊ីជម្រៅ) · `ZoeW/tests/zto-palm-sign.test.tsx` ៤៨ · `ZoeW/tests/palm-sign-camera.test.ts` ៨ (មុនកែ ៖ helper/flow ថ្មីមិនមាន ➜ ធ្លាក់) · ⏳ iPhone ពិតមិនអាចវាស់លើម៉ាស៊ីននេះ | [2.50.127] flow មួយជុំ ៖ status ៤ ស្របគ្នា · ស្កេន ➜ រូប + សម្លេង + ញ័រ + `04` ភ្លាម (`dispatchPalmSignCode()`) · ឈ្មោះ ➜ «✍️ Sign (N)» receipt ៣ ស្របគ្នា · ✕ ដករូប · សារ ZTO បត់ (`<details>`) · Code128 + QR (`PALM_SIGN_FORMAT_NAMES`, តែលេខកញ្ចប់) · iOS ៖ frame លឿន 960px រៀងរាល់ 60ms + ស៊ីជម្រៅ ១/៤ · រូប ៖ ស៊ីជម្រៅ 1600 ➜ 2600px ពិដាន 10s (`palmSignDecodeImage()`) · `readCanvasSymbols()` ចែករំលែកជាមួយ `decodeBarcodeFromCanvasManual()` |
+| A226 | **កញ្ចប់ Sign ឬស្កេនត្រឡប់ក្នុង ZTO រួច នៅបើកវិញ/ស្តារបានក្នុង ZoeW** — ZTO គ្មានការស្តារ ៖ ការបើកវិញធ្វើឲ្យកញ្ចប់ Sign ចូលរបា «មិនទាន់បិទ» ហើយការស្តារ «ត្រឡប់» បើកកញ្ចប់ដែលទៅសាខាកណ្តាលហើយ (បូកលុយវិញ) · ធុងសំរាមរាយតាមលំដាប់ id (ពេលស្កេន) មិនមែនពេលចូល | `ZoeW/tests/zto-final-marks.test.tsx` ១៤ (មុនកែ ៖ helper/ប៊ូតុងមិនមាន ➜ ធ្លាក់ទាំងអស់) · `emu/app-writes-rules-test` ៖ rules ពិតទទួល ៣៥៦/៣៥៦ ការសរសេរ App (ភស្តុតាង ZTO ៦) · rules ចាស់ (គ្មានវាលទាំង ២) ➜ បដិសេធ · `ZoeW/tests/session-switch-fuzz.test.ts` សេណារីយ៉ូ `syncZtoFinalMarks` (ប្តូរហាងពាក់កណ្តាល ➜ ០ ការសរសេរបន្ទាប់) · vitest ទាំងមូល ២១៧៧/២១៧៧ | [2.50.127] `ztoSignedAt` · `ztoReturnedAt` លើ barcode (rules ប្រវត្តិ + ធុងសំរាម) · `syncZtoFinalMarks()` (verdict ZTO `true` លើ barcode បិទ · ភស្តុតាងពី `removeReturnedZtoBarcodes()` ➜ transaction មួយ/ធាតុ · `permission_denied` ➜ ឈប់ `ZTO_FINAL_REFUSED_RETRY_MS`) · `barcodeZtoSigned()` ក្នុង transaction បើកវិញ (`toggleCloseStatus` · `applyBarcodeCloseChange`) · `trashZtoFinalBlock()` ក្នុង `executeRestoreItem()` · `trashRestoreBlockOf()` (ធុងសំរាម 🔒) · Palm Sign ➜ `setZtoPickupVerdict(code, true)` · `buildTrashGroups()` តម្រៀប `deletedAt` · sandbox `emu/crud-rules-flow` · `pickup-barcode-identity-test` · `connection-recovery-test` ស្គាល់ helper ថ្មី |
 
 ### 2026-10-17 — Deep audit ៦ (សំណើម្ចាស់គម្រោង ៖ «deep audit … កុំជឿជាក់លើ checker … ច្រើនសាខា ក្នុងមួយសាខា ប្រើ2-3devices … សម្អាត ឯកសារឈប់ប្រើ ពិនិត្យ CLAUDE.md … HISTORY.md» · គ្មាន agent) ➜ [2.50.126]
 

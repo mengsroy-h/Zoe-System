@@ -1,9 +1,9 @@
 import { setModalDisplay } from '../core/modals';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { DB_LISTENER_KEY_DAILY_REVENUE } from '../core/text';
+import { DB_LISTENER_KEY_DAILY_REVENUE, ZTO_RESTORE_FINAL_TEXT } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { generateUniqueId, normalizeBarcodesOf } from '../domain/barcode';
+import { generateUniqueId, normalizeBarcodesOf, trashZtoFinalBlock } from '../domain/barcode';
 import { reconcileCollectedHistory } from '../domain/collected';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { ledgerDedOf } from '../domain/ledger';
@@ -273,6 +273,7 @@ export async function executeRestoreItem() {
             if (!previewItem) throw new Error('ALREADY_RESTORED');
             stopIfSwitched();
             if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
+            if (trashZtoFinalBlock(previewItem)) throw new Error('RESTORE_ZTO_FINAL');
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
@@ -369,9 +370,6 @@ export async function executeRestoreItem() {
         activeRestoreClaims.delete(restoredId);
         await clearRestoreFinalization(restoredId, token).catch(() => {});
         stopIfSwitched();
-        const finalSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${targetId}`)));
-        stopIfSwitched();
-        const resultingLiveItem = finalSnap.exists() ? cloneRestoreItem(finalSnap.val()) : prepared.item;
         const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
             .map((restoredBc) => pickupBarcodeKey(restoredBc && restoredBc.code))
             .filter(Boolean);
@@ -385,6 +383,11 @@ export async function executeRestoreItem() {
     } catch (error) {
         if (!restoreIsCurrent()) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Restore stopped after a database switch'), { zone: 'money', context: 'executeRestoreItem session switch', itemId: restoredId });
+            return;
+        }
+        if (error && error.message === 'RESTORE_ZTO_FINAL') {
+            showToast(ZTO_RESTORE_FINAL_TEXT);
+            openRecentlyDeletedModal();
             return;
         }
         if (error && error.message === 'RESTORE_LEDGER_UNSYNCED') {

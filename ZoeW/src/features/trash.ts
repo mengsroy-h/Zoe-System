@@ -7,6 +7,7 @@ import { barcodeEntriesOf } from '../domain/barcode';
 import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
+import { explainZtoRestoreBlock, trashRestoreBlockOf } from './zto-final-marks';
 
 export const TRASH_PAGE_ROWS = 20;
 
@@ -101,8 +102,9 @@ export function buildTrashGroups(items) {
         group.cod = Math.round(group.cod * 100) / 100;
         group.dod = Math.round(group.dod * 100) / 100;
         group.total = Math.round((group.cod + group.dod) * 100) / 100;
+        group.items.sort((a, b) => (parseFloat(b.deletedAt) || 0) - (parseFloat(a.deletedAt) || 0));
     });
-    return groups;
+    return groups.sort((a, b) => b.deletedAt - a.deletedAt);
 }
 
 export function trashGroupMatchesQuery(group, query) {
@@ -197,6 +199,11 @@ export function renderRecentlyDeleted() {
 }
 
 export function promptRestoreDeletedItem(id?) {
+    const block = trashRestoreBlockOf(dataState.deletedItems.find((item) => item && item.id === id));
+    if (block) {
+        explainZtoRestoreBlock(block);
+        return;
+    }
     uiState.pendingRestoreId = id;
     setModalDisplay('recentlyDeletedModal', 'none');
     openModalHelper('restoreWarningModal');

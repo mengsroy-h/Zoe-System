@@ -310,15 +310,26 @@ export function purgeDeletedItemsQuietly(ids) {
     return firebaseState.fb.update(firebaseState.dbRefDeleted, updates);
 }
 
+function beepContext() {
+    if (!uiState.globalAudioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            uiState.globalAudioCtx = new AudioContextClass();
+        }
+    }
+    return uiState.globalAudioCtx;
+}
+
+export function primeBeep() {
+    try {
+        const ctx = beepContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    } catch (e) {}
+}
+
 export function playBeep() {
     try {
-        if (!uiState.globalAudioCtx) {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (AudioContextClass) {
-                uiState.globalAudioCtx = new AudioContextClass();
-            }
-        }
-        if (!uiState.globalAudioCtx) return;
+        if (!beepContext()) return;
 
         if (uiState.globalAudioCtx.state === 'suspended') {
             uiState.globalAudioCtx.resume().then(() => {

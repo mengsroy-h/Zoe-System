@@ -109,8 +109,11 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
                 </div>
                 <div className="action-group">
                     <CallAction row={row} />
-                    <button className={`btn-sm close-btn btn-primary-action ${row.closeIsReopen ? 'is-reopen-action' : 'is-close-action'}`}
-                        onClick={palmMode && !row.closeIsReopen ? onAct('openZtoPalmSign', { args: [row.id] }) : onAct('toggleCloseStatus', { args: [row.id] })}>{row.closeIsReopen ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}</button>
+                    {row.reopenLocked
+                        ? <button className="btn-sm close-btn btn-primary-action is-signed-lock" title="Sign ក្នុង ZTO រួច"
+                            onClick={onAct('explainZtoReopenLock', { args: [row.id] })}>🔒 Sign រួច</button>
+                        : <button className={`btn-sm close-btn btn-primary-action ${row.closeIsReopen ? 'is-reopen-action' : 'is-close-action'}`}
+                            onClick={palmMode && !row.closeIsReopen ? onAct('openZtoPalmSign', { args: [row.id] }) : onAct('toggleCloseStatus', { args: [row.id] })}>{row.closeIsReopen ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}</button>}
                 </div>
             </td>
         </>

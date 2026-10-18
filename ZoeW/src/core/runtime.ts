@@ -47,6 +47,8 @@ export const ACTION_ALLOWLIST = [
     "editSheetImportConfig",
     "executePermanentDelete",
     "executeRestoreItem",
+    "explainZtoReopenLock",
+    "explainZtoRestoreBlock",
     "exportDataAsCsvForSheets",
     "exportDataAsExcel",
     "exportDataAsPDF",

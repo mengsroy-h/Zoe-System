@@ -1775,6 +1775,7 @@ function buildContext() {
             'const viewState = { phoneModalBusy: false };',
             'function clearCustomerDataTableCache() {}',
             'function clearZtoPickupStatusStore() {}',
+            'function resetZtoFinalMarks() {}',
             'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
             'let scanHistory = [], deletedItems = [], dailyRevenueData = {}, monthlyRevenueData = {};',
             'let dailyPickupData = {}, lockerBarcodeIndex = {};',

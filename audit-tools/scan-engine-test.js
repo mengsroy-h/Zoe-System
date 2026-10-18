@@ -67,10 +67,10 @@ function serve(files) {
 
 (async () => {
     const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
-    const decodeFn = sliceFn(src, 'decodeBarcodeFromCanvasManual');
+    const decodeFn = (sliceFn(src, 'readCanvasSymbols') ? sliceFn(src, 'readCanvasSymbols') + '\n' : '') + (sliceFn(src, 'decodeBarcodeFromCanvasManual') || '');
     const initFn = sliceFn(src, 'initScanEngine');
     const cropFn = sliceFn(src, 'getCoverCropRect');
-    ok('រកឃើញ decodeBarcodeFromCanvasManual() ក្នុង app.js', !!decodeFn);
+    ok('រកឃើញ decodeBarcodeFromCanvasManual() ក្នុង app.js', !!sliceFn(src, 'decodeBarcodeFromCanvasManual'));
     ok('រកឃើញ initScanEngine() ក្នុង app.js', !!initFn);
     ok('រកឃើញ getCoverCropRect() ក្នុង app.js', !!cropFn);
     if (!decodeFn || !initFn) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }

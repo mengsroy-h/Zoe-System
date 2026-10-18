@@ -6,7 +6,6 @@ import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
 import { getFormattedClockTime, getFormattedDate, getZoneDateKey } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
 import { noteAppLockExcuse } from './app-lock';
 import { MONTHLY_REPORT_UNKNOWN, monthlyReportRiel, statsMoney } from './monthly-report';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';

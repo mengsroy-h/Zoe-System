@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createSupabaseDatabase } from '../src/services/supabase-rtdb';
+import { createSupabaseDatabase, SbNetworkError } from '../src/services/supabase-rtdb';
 import { createLocalWriteJournal } from '../src/services/write-journal';
 
 const turn = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
@@ -12,6 +12,28 @@ const makeJournal = () => {
 };
 const verdictOf = (p: Promise<any>) => p.then(() => 'sent', (e: any) => e.code || e.message);
 afterEach(() => { vi.restoreAllMocks(); });
+
+it.each([[null], [{}], [[]], [{ ok: 'true' }]])('ចម្លើយសរសេរមិនច្បាស់ %j រួច auth ដាច់ មិនប្ដូរ journal ទៅ queued ដែលអាច replay ស្ទួន', async (reply) => {
+  vi.useFakeTimers();
+  const journal = makeJournal();
+  let writes = 0;
+  const db = createSupabaseDatabase({ subscribe: () => () => {}, rpc: async (fn: string) => {
+    if (fn === 'zoe_write') {
+      if (++writes === 1) return reply;
+      throw new SbNetworkError('auth-unavailable', true);
+    }
+    return { seq: 1, more: false, reset: true, tenant: 'A', now: Date.now(), rows: [] };
+  } }, hooks(), { writeJournal: journal, retryStepsMs: [5], pollFallbackMs: 600000 });
+  try {
+    db.setTenantTopic('zoe:A'); db.setAuthed(true, 'project|user'); await turn();
+    const pending = db.set(db.ref('zoew_settings/exchange_rate'), 4200);
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(50);
+    expect(writes).toBeGreaterThanOrEqual(2);
+    expect([...journal.rows.values()]).toHaveLength(1);
+    expect([...journal.rows.values()][0]).toMatchObject({ uncertain: true, stage: 'sent' });
+  } finally { db.close('test'); vi.useRealTimers(); }
+});
 
 it('an uncertain write left by a sign-out is replayed by the same account and shop with its original op_id, then the session writes normally', async () => {
   const journal = makeJournal(); const seen: string[] = [];

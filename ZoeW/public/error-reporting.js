@@ -141,8 +141,8 @@
             } catch (e) {}
         }
         let out = url
-            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
-            .replace(/(^|[\s{])((?:set-)?cookie[ \t]*:[ \t]*)[^\r\n]*/gi, '$1$2[redacted]')
+            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')
+            .replace(/(^|[\s{"'([,;|])((?:set-)?cookie[ \t]*:[ \t]*)[^\r\n]*/gi, '$1$2[redacted]')
             .replace(/(^|[\s"'([,;{|])(["']?)([A-Za-z0-9_.%\-]{1,64})\2(\s*[:=]\s*)("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*')/g,
                 (whole, lead, quote, name, sep, value) => isSecretParamName(name)
                     ? lead + quote + name + quote + sep + value[0] + '[redacted]' + value[0] : whole);
@@ -152,7 +152,7 @@
         return out
             .replace(/(\/macros\/s\/)[^/\s"']+/g, '$1[redacted]')
             .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@')
-            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
+            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')
             .replace(/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}/g, '[redacted]');
     }
 

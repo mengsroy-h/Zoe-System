@@ -3,7 +3,6 @@ import { viewState } from '../core/view-state';
 import { lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { getFormattedClockTime } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
 import { autoLookupFailureAt, autoLookupInFlight, clearAutoLookupQueueRetries, lookupFastCache } from './auto-lookup';
 import { CUSTOMER_TABLE_CACHE_MS, CUSTOMER_TABLE_FAIL_COOLDOWN_MS, clearCustomerTableRetry, clearCustomerTableSoonRefresh, customerTablePrefetchAllowed, scheduleCustomerTableRetry, scheduleCustomerTableSoonRefresh, warmZtoLookupProxyIfConfigured } from './customer-table-prefetch';
 import { buildCustomerListApiUrl, clearZtoWarmSoon, lookupApiSendsHeader, lookupApiSupportsList, scheduleZtoWarmSoon } from './lookup-api';

@@ -271,6 +271,12 @@
     .page-tab { flex-direction: row; gap: 6px; padding: 6px; min-height: 36px; }
 }
 
+@media (max-width: 991px) and (orientation: landscape) and (max-height: 340px) {
+    #entrySideSection > .remove-scan-banner { padding: 4px 8px; }
+    #entrySideSection > .remove-scan-banner .remove-scan-copy { line-height: 1.2; }
+    #dataSideSection .financial-summary-box { padding: 4px 8px; gap: 2px; margin-bottom: 6px; }
+}
+
 @media (max-width: 991px) {
     .app-pages:has(> .app-page.active > .page-side.search-focus) { overflow-y: hidden; }
     .app-pages:has(> .app-page.active > .page-side.search-focus) > .app-page.active { height: 100%; }

@@ -345,13 +345,13 @@ async function landscapeScanReach(browser, port) {
         const sel = mode === 'data' ? '.filter-btn, #btnFilterToday, #btnFilterYesterday, #btnFilterDayBefore, #btnFilterAll'
             : 'button, input:not([type="file"]):not([type="hidden"]), label.file-upload-btn';
         const ctrls = [...new Set(side.querySelectorAll(sel))].filter(vis);
+        const bar = document.getElementById('pageTabBar').getBoundingClientRect();
         const blocked = ctrls.filter((el) => {
             const b = el.getBoundingClientRect();
             const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-            return !(hit && (hit === el || el.contains(hit)));
+            return b.top < 0 || b.bottom > bar.top + 0.5 || !(hit && (hit === el || el.contains(hit)));
         }).map((el) => { const b = el.getBoundingClientRect(); const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
             return (el.id || el.className || el.tagName) + ' [' + Math.round(b.top) + '–' + Math.round(b.bottom) + '] ➜ ' + (hit ? (hit.id || hit.className || hit.tagName) : 'null'); });
-        const bar = document.getElementById('pageTabBar').getBoundingClientRect();
         const tabs = [...document.querySelectorAll('#pageTabBar .page-tab')].map((t) => {
             const ico = t.querySelector('.tab-ico').getBoundingClientRect(); const txt = t.lastElementChild.getBoundingClientRect(); const r = t.getBoundingClientRect();
             return { h: Math.round(r.height), stacked: ico.bottom <= txt.top + 1 };

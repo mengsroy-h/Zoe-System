@@ -3,7 +3,7 @@
  * ទីនេះគ្មានបញ្ជី Barcode រំពឹងទុកដូចផ្ទាំង Sign ➜ QR ទទួលតែពេលអត្ថបទមានរាង Barcode ZTO (`ztoBarcodeShapeIsValid()`) ហើយ Code128 ក្នុងការអានដដែលឈ្នះជានិច្ច ៖
  * QR ផ្សព្វផ្សាយ (URL «SCAN TO EARN») មិនក្លាយជាកញ្ចប់ ឬលុយទេ។ Android ៖ `BarcodeDetector` ឡើងទៅ `code_128` + `qr_code` តែពេលប្រព័ន្ធគាំទ្រ។
  */
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { scanState } from '../src/core/state';
 import { NATIVE_SCAN_QR_FORMAT_NAMES, nativeScanResults, pickScanCode, scanQrReader } from '../src/services/scan-formats';
 import { upgradeNativeDetectorForQr } from '../src/services/scan-engine';

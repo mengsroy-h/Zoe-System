@@ -2,7 +2,6 @@ import { lookupAction } from '../core/action-registry';
 import { modalMeta } from '../core/modals';
 import { dataState } from '../core/state';
 import { safeFocusScanner } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
 import { collectedMoneyText, collectedRielText } from '../features/export';
 import { closeModal } from './modal';
 import { showToast } from './toast';

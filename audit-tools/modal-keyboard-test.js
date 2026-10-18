@@ -237,7 +237,7 @@ function placementProblems(base, m) {
     if (base[1] <= line + 1) {
         if (Math.abs(m.screen[0] - base[0]) > 1) problems.push('ប្រអប់នៅពីលើ keyboard រួច តែកំពូលប្តូរ ' + base[0] + ' ➜ ' + m.screen[0]);
         if (pan === 0 && Math.abs(m.screen[1] - base[1]) > 1) problems.push('ប្រអប់នៅពីលើ keyboard រួច តែបាតប្តូរ');
-    } else if (height <= line - ceil + 1) {
+    } else if (height <= line - ceil) {
         if (m.cut) problems.push('ប្រអប់ខ្លីត្រូវកាត់ (ល្មមផ្ទៃ ' + (line - ceil) + ' ≥ ' + height + ')');
         if (Math.abs(m.screen[0] - (line - height)) > 1) problems.push('ប្រអប់ខ្លី ៖ កំពូល ' + m.screen[0] + ' ≠ ' + (line - height) + ' (ឡើងតែល្មម)');
     } else {
@@ -340,7 +340,7 @@ const SIZES = [
                     if (problems.length) failures.push(Object.assign({ name: f.name, problems, base }, m));
                     const room = m.visBottom - m.visTop - GAP - Math.max(PAD, m.safe + GAP);
                     if (base[1] > m.visBottom - m.visTop - GAP + 1) {
-                        if (base[1] - base[0] <= room + 1) shortFitted++;
+                        if (base[1] - base[0] <= room) shortFitted++;
                         else longFitted++;
                     }
                     if (id === 'lookupApiConfigModal') longTop.push(problems.length === 0 && Math.abs(m.screen[0] - Math.max(PAD, m.safe + GAP)) <= 1 && m.safe === (size.safe || 0));

@@ -2,7 +2,7 @@ import { dataState, firebaseState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, cleanupClockIsTrustworthy, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_COLLECTED } from '../core/text';
 import { getZoneDateKey } from '../core/timezone';
-import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey } from './pickup';
+import { applyPickupMarksInMemory, commitPickupMarks, countPickedUpCustomers, markPickupBarcodes, pickupBarcodeKey, pickupTruthMarks, readPickupTruthViews } from './pickup';
 import { getCurrentFilterLabel, getPickupResetTargetDates } from '../features/export';
 import { statsMoney } from '../features/monthly-report';
 import { requestPinBeforeConfig } from '../features/pin';
@@ -253,9 +253,29 @@ export function reapplyPickupMarks(applied, marks, scanDateStr, seed) {
     return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null);
 }
 
-export function revertPickupMarks(applied) {
+export function revertPickupMarks(applied, truthMarks?, refreshFromServer = false) {
     if (!applied || !applied.scanDate || !applied.previous || !applied.previous.length) return null;
-    const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
+    if (refreshFromServer) {
+        const rollbackDb = firebaseState.db;
+        const rollbackGeneration = firebaseState.authGeneration;
+        const commit = readPickupTruthViews().then((views) => {
+            if (rollbackDb !== firebaseState.db || rollbackGeneration !== firebaseState.authGeneration) return null;
+            const marks = pickupTruthMarks(applied.scanDate, applied.previous.map((mark) => mark.key), views.history, views.trash);
+            const reverted = revertPickupMarks(applied, marks);
+            return reverted ? reverted.commit : null;
+        }, () => null);
+        return Object.assign({}, applied, { commit });
+    }
+    const truth = new Map<string, any>();
+    (Array.isArray(truthMarks) ? truthMarks : []).forEach((mark) => { if (mark && mark.key) truth.set(mark.key, mark); });
+    const wanted = new Map<string, any>();
+    (applied.marks || []).forEach((mark) => { if (mark && mark.key) wanted.set(mark.key, mark); });
+    const marks = applied.previous.map((p) => {
+        const requested = wanted.get(p.key);
+        const changed = requested && (!!requested.closed !== !!p.closed || requested.closed && requested.phoneKey !== p.phoneKey);
+        const current = changed ? truth.get(p.key) || p : p;
+        return { key: p.key, phoneKey: current.phoneKey, closed: !!current.closed };
+    });
     applyPickupMarksInMemory(applied.scanDate, marks, applied.seed);
     const commit = commitPickupMarks(applied.scanDate, marks, applied.seed);
     return Object.assign({}, applied, { commit: commit });

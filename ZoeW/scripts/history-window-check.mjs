@@ -192,6 +192,7 @@ try {
             const before = card.getBoundingClientRect().top;
             const samples = [];
             input.focus();
+            const initialPending = card.getAnimations().some((a) => a.pending);
             const t0 = performance.now();
             await new Promise((done) => {
                 const step = (now) => {
@@ -209,7 +210,7 @@ try {
             const after = card.getBoundingClientRect().top;
             input.blur();
             await new Promise((r) => setTimeout(r, 1000));
-            return { before, after, samples };
+            return { before, after, samples, initialPending };
         });
         const dist = Math.abs(follow.before - follow.after);
         const open = follow.samples.filter((s) => s.open);
@@ -227,7 +228,7 @@ try {
             const a = follow.samples[i - 1], b = follow.samples[i];
             if (b.t - a.t <= 20 && !a.pending) steps.push(Math.round(Math.abs(b.card - a.card) / Math.max(1, dist) * 1000) / 1000);
         }
-        const started = follow.samples.filter((s) => s.pending).length;
+        const started = Number(follow.initialPending) + follow.samples.filter((s) => s.pending).length;
         check(mode.label + ' ៖ ចលនាស្វែងរកមិនលោត ៖ ស៊ុមនីមួយៗ (≤ 20ms · ចលនាចាប់ផ្តើមរួច) ផ្លាស់ទី ≤ ២០% នៃចម្ងាយ',
             dist > 20 && started >= 1 && steps.length >= 8 && Math.max(...steps) <= 0.2, { dist, started, steps });
         const stall = await page.evaluate(async () => {

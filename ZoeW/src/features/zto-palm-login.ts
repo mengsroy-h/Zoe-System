@@ -159,6 +159,14 @@ async function palmProxyKey(cfg) {
     return { key: cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : cfg.headerValue || '', typed: false };
 }
 
+async function palmRequestCredentials(cfg) {
+    const base = palmFunctionBase();
+    if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
+    const identityHeaders = {};
+    const [sent] = await Promise.all([palmProxyKey(cfg), addZtoIdentityHeader({ url: base.href }, identityHeaders)]);
+    return { base, sent, identityHeaders };
+}
+
 export async function submitZtoPalmLogin(event?: Event) {
     event?.preventDefault();
     if (viewState.palmLoginBusy) return;
@@ -178,9 +186,7 @@ export async function submitZtoPalmLogin(event?: Event) {
     viewState.palmLoginBusy = true;
     viewState.palmLoginStatus = 'កំពុងចូល ZTO Palm…';
     try {
-        const base = palmFunctionBase();
-        if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const sent = await palmProxyKey(cfg);
+        const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
         if (!current()) return dropped();
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }
@@ -190,8 +196,7 @@ export async function submitZtoPalmLogin(event?: Event) {
             if (!safeStoreSet(appLocalStore, 'zoew_palm_device_id', deviceSn)) throw new Error('storage');
         }
         base.search = '?palm=login';
-        const headers = { 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey };
-        await addZtoIdentityHeader({ url: base.href }, headers);
+        const headers = { ...identityHeaders, 'Content-Type': 'application/json', 'X-Zoe-Proxy-Key': proxyKey };
         if (!current()) return dropped();
         const out = await fetchWithTimeout(base.href, {
             method: 'POST', headers,
@@ -249,15 +254,12 @@ export async function connectSharedZtoPalm() {
     viewState.palmLoginBusy = true;
     viewState.palmLoginStatus = 'កំពុងរក Login Palm របស់ហាងលើ Server…';
     try {
-        const base = palmFunctionBase();
-        if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const sent = await palmProxyKey(cfg);
+        const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
         if (!current()) return;
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }
         base.search = '?palm=status';
-        const headers = { 'X-Zoe-Proxy-Key': proxyKey };
-        await addZtoIdentityHeader({ url: base.href }, headers);
+        const headers = { ...identityHeaders, 'X-Zoe-Proxy-Key': proxyKey };
         if (!current()) return;
         const out = await fetchWithTimeout(base.href, { headers, cache: 'no-store' }, 15000, 'Palm status timed out',
             (response) => response.json().catch(() => null));

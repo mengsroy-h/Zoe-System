@@ -21,7 +21,7 @@
     "strictNullChecks": false,
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": false,
     "forceConsistentCasingInFileNames": true,

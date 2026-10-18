@@ -35,7 +35,7 @@ const REPO = process.env.ZOE_REPO_ROOT ? path.resolve(process.env.ZOE_REPO_ROOT)
 const DIR = path.join(ROOT, 'ZoeW');
 const CHROME = process.env.SBMONEY_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const STRICT = process.env.SBMONEY_STRICT === '1' || process.env.SUPABASE_STRICT === '1';
-const SHOPS = Math.max(2, Math.min(4, parseInt(process.env.SBMONEY_SHOPS || '2', 10) || 2));
+const SHOPS = Math.max(2, Math.min(16, parseInt(process.env.SBMONEY_SHOPS || '2', 10) || 2));
 const DEVICES = Math.max(2, Math.min(4, parseInt(process.env.SBMONEY_DEVICES || '3', 10) || 3));
 const OPS = Math.max(2, parseInt(process.env.SBMONEY_OPS || '6', 10) || 6);
 const RUN0 = parseInt(process.env.SBMONEY_RUN0 || '0', 10) || 0;

@@ -11,6 +11,7 @@ import { ledgerNumber } from './ledger';
 import { barcodeRegistryKey } from './registry';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp } from '../services/network';
+import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { showToast } from '../ui/toast';
 
 export const PICKUP_LEGACY_KEY_PREFIX = '_lg_';
@@ -308,7 +309,10 @@ export function endPickupIntent(id, settled) {
         writePickupJournal(readPickupJournal().filter((e) => e.id !== id));
         releasePickupIntent(id);
     };
-    if (settled && typeof settled.then === 'function') settled.then(finish, finish);
+    if (settled && typeof settled.then === 'function') settled.then((saved) => {
+        if (saved === true) finish();
+        else releasePickupIntent(id);
+    }, () => releasePickupIntent(id));
     else finish();
 }
 
@@ -333,7 +337,24 @@ export function pickupIntentTracker(isCurrent) {
     };
 }
 
-export function pickupTruthMarks(dateKey, keys) {
+export async function readPickupTruthViews() {
+    const readDb = firebaseState.db;
+    const readSdk = firebaseState.fb;
+    const readGeneration = firebaseState.authGeneration;
+    const read = async (path) => {
+        const ref = readSdk.ref(readDb, path);
+        const url = txRestUrl(ref);
+        if (url) return txReadServerValue(url);
+        const snapshot = await dbOp(readSdk.get(ref));
+        return snapshot.val();
+    };
+    const [history, trash] = await Promise.all([read('zoew_scan_history_cod_dod'), read('zoew_recently_deleted_cod_dod')]);
+    if (readDb !== firebaseState.db || readGeneration !== firebaseState.authGeneration) throw new Error('Pickup read context changed');
+    const items = (raw) => Object.keys(raw || {}).map((id) => Object.assign({}, raw[id], { id }));
+    return { history: items(history), trash: items(trash) };
+}
+
+export function pickupTruthMarks(dateKey, keys, historyItems = dataState.scanHistory, trashItems = dataState.deletedItems) {
     const want = {};
     (keys || []).forEach((k) => { want[k] = true; });
     const found = {};
@@ -347,8 +368,8 @@ export function pickupTruthMarks(dateKey, keys) {
             });
         });
     };
-    collect(dataState.scanHistory);
-    collect(dataState.deletedItems);
+    collect(historyItems);
+    collect(trashItems);
     return Object.keys(found).map((k) => found[k]);
 }
 
@@ -369,11 +390,12 @@ export async function resumePickupIntents() {
     const resumeGeneration = firebaseState.authGeneration;
     const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration && shopScope() === scope;
     try {
+        const truth = await readPickupTruthViews();
         for (const entry of due) {
             if (!resumeIsCurrent()) return;
             await withCleanupEntryOwnership(entry.id, async () => {
                 if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
-                const marks = pickupTruthMarks(entry.date, entry.keys);
+                const marks = pickupTruthMarks(entry.date, entry.keys, truth.history, truth.trash);
                 if (marks.length) {
                     const seed = reconstructPickupSet(entry.date);
                     const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${entry.date}`);

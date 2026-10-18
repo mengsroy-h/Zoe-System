@@ -590,6 +590,10 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     const completeSecretCases = [
         ['Authorization: Bearer opaque_test_credential_123', 'opaque_test_credential_123', 'Bearer ដែលមិនមែន JWT'],
         ['Authorization: Basic dGVzdDp0ZXN0MTIzNA==', 'dGVzdDp0ZXN0MTIzNA==', 'Basic ក្នុង header'],
+        ['Authorization: Basic YTpi', 'YTpi', 'Basic ខ្លីនៅតែជា credential ពេញលេញ'],
+        ['Authorization: Bearer abc', 'abc', 'Bearer ខ្លីមិនត្រូវលេចក្នុង log'],
+        ['header "Cookie: a=FIRST_TEST_COOKIE; other=SECOND_TEST_COOKIE"', 'SECOND_TEST_COOKIE', 'Cookie ក្នុង quote លាក់គ្រប់តម្លៃ'],
+        ["header ('Set-Cookie: sid=FIRST_TEST_COOKIE; extra=SECOND_TEST_COOKIE')", 'SECOND_TEST_COOKIE', 'Set-Cookie ក្នុងវង់ក្រចកលាក់គ្រប់តម្លៃ'],
         ['{"password":"first SECOND_TEST_PART","barcode":"SAFE"}', 'SECOND_TEST_PART', 'JSON password មានចន្លោះ'],
         ["password: 'first SECOND_TEST_PART', barcode: SAFE", 'SECOND_TEST_PART', 'password ប្រើ quote តែមួយ'],
         ['{"password":"first \\"SECOND_TEST_PART\\" last","barcode":"SAFE"}', 'SECOND_TEST_PART', 'JSON password មាន quote ដែល escape'],

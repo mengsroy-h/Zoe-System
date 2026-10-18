@@ -11,7 +11,7 @@ import { DB_LISTENER_KEYS, ztoExpectedTexts, ztoMismatchTexts, ztoTextWithCodePo
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsPalm, lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
 import { LICENSE_APP_CODE, licenseFailureMessage } from './license';
-import { addPalmSessionHeader, lookupApiIsAppsScript } from './lookup-api';
+import { addPalmSessionHeader, addZtoIdentityHeader, lookupApiIsAppsScript } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { decryptLookupSecret } from '../services/crypto';
 import { DB_LIVENESS_PROBE_TIMEOUT_MS, probeDatabaseLiveness } from '../services/connection';
@@ -424,12 +424,14 @@ export async function healthLookupRow() {
 async function healthPalmLookupRow(cfg, headers) {
     const title = 'Lookup អតិថិជន (ZTO Palm)';
     try {
-        await addPalmSessionHeader(cfg, headers);
+        const identityHeaders = {};
+        await Promise.all([addPalmSessionHeader(cfg, headers), addZtoIdentityHeader(cfg, identityHeaders)]);
+        Object.assign(headers, identityHeaders);
     } catch (e) {
         return healthRow('warn', title, 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
     }
     try {
-        const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
+        const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg) + '&verify=1',
             { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
             ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
             (r) => r.json().catch(() => null));
@@ -444,12 +446,21 @@ async function healthPalmLookupRow(cfg, headers) {
                     ? 'ZTO បដិសេធ Login Palm របស់ហាង — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»'
                     : 'មិនទាន់មាន session Palm — សូម Login ZTO Palm ក្នុង «API ស្វែងរកអតិថិជន»');
             }
+            if (body.success === true && body.configured === true && body.verified === true
+                && session && (session.source === 'shared' || session.source === 'device') && session.rejected !== true) {
+                return healthRow('ok', title, 'ZTO ទទួលយក session Palm' + (session.source === 'shared' ? ' របស់ហាងលើ Server' : '') + ztoUpstreamTimingText(body, true));
+            }
+            if (Object.prototype.hasOwnProperty.call(body, 'verified') || body.success !== true || body.configured !== true) {
+                return healthRow('warn', title, 'ចម្លើយពិនិត្យ Session Palm មិនច្បាស់ — សូមពិនិត្យម្តងទៀត។');
+            }
             return healthRow('info', title, (session && session.source === 'shared' ? 'មាន session Palm របស់ហាងលើ Server' : 'មាន session Palm')
                 + ' — សូមស្កេនកញ្ចប់ ដើម្បីផ្ទៀងផ្ទាត់ជាមួយ ZTO' + ztoUpstreamTimingText(body, true));
         }
         if (code === 'ZTO_AUTH_EXPIRED') {
             return healthRow('warn', title, 'Session Palm ផុតកំណត់ — សូម Login ZTO Palm ម្តងទៀតក្នុង «API ស្វែងរកអតិថិជន»');
         }
+        if (code === 'ZTO_OTHER_BRANCH') return healthRow('warn', title, 'Session Palm ជាសាខាផ្សេង — សូម Login ZTO Palm ដោយគណនីរបស់សាខានេះ។');
+        if (code === 'ZTO_RATE_LIMITED') return healthRow('warn', title, 'ZTO កំណត់ល្បឿន — សូមរង់ចាំបន្តិច ហើយពិនិត្យម្តងទៀត។');
         if (code === 'ZTO_PALM_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') {
             return healthRow('bad', title, 'Server មិនទាន់កំណត់ ZTO Palm នៅ Netlify' + (reason ? ' — ជាប់ត្រង់ ' + reason : ''));
         }

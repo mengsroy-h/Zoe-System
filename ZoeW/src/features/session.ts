@@ -1,6 +1,6 @@
 import { blankElementById } from '../app/slot-resets';
 import { MODAL_IDS } from '../core/modals';
-import { fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
+import { setFieldChecked, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow, pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';

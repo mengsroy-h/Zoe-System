@@ -52,7 +52,8 @@ function fakeTransport() {
                 const docs = args.p_ops.map((op: any) => ({ r: op.p[0], k: op.p[1], v: op.v, s: ++seq }));
                 return { ok: true, seq, docs, now: Date.now() };
             }
-            return { ok: 1 };
+            if (fn === 'zoe_read') return { docs: [], now: Date.now() };
+            throw new Error('Unexpected RPC: ' + fn);
         },
     };
     return { transport, queue, writeMode, holdFull, nextSeq: () => ++seq, pulls: () => pulls };

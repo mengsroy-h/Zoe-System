@@ -798,13 +798,11 @@ export async function claimAndCleanupItem(id, reason, opts?) {
 
     let claimedWhole = null;
     let claimedPartial = null;
-    let updatedRemainder = null;
     const forced = reason === 'abandon' && opts && Array.isArray(opts.codes) ? new Set(opts.codes) : null;
     const forcedAt = forced && opts.returnedAt instanceof Map ? opts.returnedAt : null;
     const cleanupUpdater = (currentItem) => {
         claimedWhole = null;
         claimedPartial = null;
-        updatedRemainder = null;
         if (!currentItem) return currentItem;
         if (currentItem.clearClaim) return currentItem;
         if (itemHasRestoreMarkers(currentItem)) return;
@@ -839,7 +837,6 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 } else {
                     delete updated.closedAt;
                 }
-                updatedRemainder = updated;
                 return updated;
             }
 
@@ -869,7 +866,6 @@ export async function claimAndCleanupItem(id, reason, opts?) {
                 } else {
                     delete updated.closedAt;
                 }
-                updatedRemainder = updated;
                 return updated;
             }
 

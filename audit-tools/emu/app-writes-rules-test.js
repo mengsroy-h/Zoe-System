@@ -186,7 +186,7 @@ async function replay(cap, rules, tag) {
 
     // ⛔ ភស្តុតាង ZTO លើ barcode (`ztoSignedAt` · `ztoReturnedAt`) ៖ ផ្លូវសរសេរថ្មី (`syncZtoFinalMarks`) ➜ ការ replay ត្រូវមានការសរសេរពិត
     //    ក្នុងប្រវត្តិ ឬធុងសំរាម — rules ពិតទទួល (ខាងលើ) · probe ៖ rules ចាស់ (គ្មានវាលទាំង ២) ➜ បដិសេធ ➜ App ត្រូវសរសេរវាដាច់ពីការរក្សាទុកកញ្ចប់។
-    const carriesZtoFinal = (v) => !!v && typeof v === 'object' && /"zto(Signed|Returned|Misplaced)At"/.test(JSON.stringify(v));
+    const carriesZtoFinal = (v) => !!v && typeof v === 'object' && /"zto(Signed|Returned|Misplaced|SentOut)At"/.test(JSON.stringify(v));
     const ztoFinalWrites = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner
         && (rootOf(e.p) === 'zoew_scan_history_cod_dod' || rootOf(e.p) === 'zoew_recently_deleted_cod_dod') && carriesZtoFinal(e.v)).length, 0);
     console.log('    ភស្តុតាង ZTO ៖ ការសរសេរ ' + ztoFinalWrites);
@@ -197,6 +197,7 @@ async function replay(cap, rules, tag) {
         delete idx.ztoSignedAt;
         delete idx.ztoReturnedAt;
         delete idx.ztoMisplacedAt;
+        delete idx.ztoSentOutAt;
     });
     const oldFinal = await replay(cap.data, oldFinalRules, 'old-final-rules');
     check(oldFinal.denied.length >= 1,
@@ -217,6 +218,21 @@ async function replay(cap, rules, tag) {
     check(noMisplaced.denied.length >= 1,
         'probe ទិសផ្ទុយ ៖ rules គ្មាន `ztoMisplacedAt` បដិសេធការកត់ខុសទីតាំង ➜ ត្រូវ Publish rules ថ្មី',
         'denied=' + noMisplaced.denied.length);
+
+    // ⛔ បញ្ជូនចេញ (`ztoSentOutAt` ៖ ZTO ស្កេនបញ្ជូនចេញក្រោយមកដល់ គ្មានស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» ➜ ធុងសំរាម «ត្រឡប់» ស្លាក «បញ្ជូនចេញ» ·
+    //    គ្មាន `ztoReturnedAt` ➜ ស្តារបាន) ៖ ការ replay ត្រូវមានការសរសេរពិត · probe ៖ rules គ្មាន `ztoSentOutAt` ➜ បដិសេធ ➜ ត្រូវ Publish rules ថ្មី។
+    const sentOutWrites = cap.data.reduce((sum, run) => sum + run.log.filter((e) => !e.owner && rootOf(e.p) === 'zoew_recently_deleted_cod_dod'
+        && !!e.v && typeof e.v === 'object' && /"ztoSentOutAt"/.test(JSON.stringify(e.v))).length, 0);
+    console.log('    បញ្ជូនចេញ ៖ ការសរសេរ ' + sentOutWrites);
+    check(sentOutWrites >= 1, 'ជាន់អប្បបរមា ៖ ការ replay មានការសរសេរ `ztoSentOutAt` ≥ ១ (op `ztoFinal` ឆ្លាស់)', 'sentOutWrites=' + sentOutWrites);
+    const noSentOutRules = JSON.parse(JSON.stringify(rules));
+    ['zoew_scan_history_cod_dod', 'zoew_recently_deleted_cod_dod'].forEach((root) => {
+        delete noSentOutRules.rules[root].$itemId.barcodes.$idx.ztoSentOutAt;
+    });
+    const noSentOut = await replay(cap.data, noSentOutRules, 'no-sent-out-rules');
+    check(noSentOut.denied.length >= 1,
+        'probe ទិសផ្ទុយ ៖ rules គ្មាន `ztoSentOutAt` បដិសេធការកត់បញ្ជូនចេញ ➜ ត្រូវ Publish rules ថ្មី',
+        'denied=' + noSentOut.denied.length);
 
     // ⛔ ធុងសំរាម «ត្រឡប់» (`trashReason: 'returned'` ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ ➜ ថ្នាក់តែមួយ) ៖ តម្លៃថ្មីលើផ្លូវធុងសំរាម ➜
     //    ការ replay ត្រូវមានការសរសេរពិត · rules ពិតទទួល (ខាងលើ) · probe ៖ rules ចាស់ (`expired` ជំនួស `returned`) ➜ បដិសេធ។

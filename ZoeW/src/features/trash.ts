@@ -7,7 +7,7 @@ import { barcodeEntriesOf } from '../domain/barcode';
 import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
-import { explainZtoRestoreBlock, trashItemMisplaced, trashRestoreBlockOf } from './zto-final-marks';
+import { explainZtoRestoreBlock, trashItemMisplaced, trashItemSentOut, trashRestoreBlockOf } from './zto-final-marks';
 
 export const TRASH_PAGE_ROWS = 20;
 
@@ -15,6 +15,7 @@ export const TRASH_REASON_META = {
     remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
     returned: { label: 'ត្រឡប់', cls: 'trash-tag-returned', deducted: true },
     misplaced: { label: 'ខុសទីតាំង', cls: 'trash-tag-returned', deducted: true },
+    sent: { label: 'បញ្ជូនចេញ', cls: 'trash-tag-returned', deducted: true },
     pickup: { label: 'យករួច', cls: 'trash-tag-pickup', deducted: false },
     delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
 };
@@ -36,14 +37,16 @@ export function trashGroupInFilter(group, filter) {
 
 export function trashReasonOf(item) {
     if (!item) return 'delete';
-    if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason] && item.trashReason !== 'misplaced') return item.trashReason;
+    if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason] && item.trashReason !== 'misplaced' && item.trashReason !== 'sent') return item.trashReason;
     if (item.isFromDeletion) return item.isClosed ? 'pickup' : 'delete';
     return 'remove';
 }
 
 export function trashDisplayReasonOf(item) {
     const reason = trashReasonOf(item);
-    return reason === 'returned' && trashItemMisplaced(item) ? 'misplaced' : reason;
+    if (reason !== 'returned') return reason;
+    if (trashItemMisplaced(item)) return 'misplaced';
+    return trashItemSentOut(item) ? 'sent' : reason;
 }
 
 export function trashItemTotals(item) {

@@ -14,6 +14,7 @@ import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJo
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
 import { trashZtoFinalBlock } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
+import { trashDisplayReasonOf } from '../src/features/trash';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
 const TRASH = 'zoew_recently_deleted_cod_dod';
@@ -445,6 +446,21 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         expect(back.barcodes.map((b: any) => [b.ztoReturnedAt, b.ztoMisplacedAt])).toEqual([[undefined, undefined]]);
         expect(trashZtoFinalBlock({ trashReason: 'returned', barcodes: back.barcodes.map((b: any) => ({ ...b, ztoReturnedAt: 9 })) }),
             'ការត្រឡប់ ZTO ពិតលើកក្រោយ ➜ 🔒 (គ្មានត្រាខុសទីតាំងចាស់)').toBe('returned');
+    }, 20000);
+
+    it('📤 បញ្ជូនចេញ ស្តារបាន ➜ បូក ១០ វិញ · `ztoSentOutAt` មិនតាមចូលបញ្ជី ➜ ច្បាប់ ៨ ថ្ងៃលើកក្រោយ ➜ «ត្រឡប់» (មិនមែន «បញ្ជូនចេញ» ចាស់)', async () => {
+        seed([expiredItem()]);
+        await claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        const trash = getAt(TRASH + '/' + ID);
+        trash.barcodes = trash.barcodes.map((b: any) => ({ ...b, ztoSentOutAt: 5, ztoSignedAt: undefined }));
+        setAt(TRASH + '/' + ID, JSON.parse(JSON.stringify(trash)));
+        expect(trashZtoFinalBlock(getAt(TRASH + '/' + ID)), 'បញ្ជូនចេញ ៖ មិន 🔒').toBe('');
+        await restoreOnOtherDevice(ID);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        const back = getAt(HISTORY + '/' + ID);
+        expect(back.barcodes.map((b: any) => b.ztoSentOutAt)).toEqual([undefined]);
+        expect(trashDisplayReasonOf({ trashReason: 'returned', barcodes: back.barcodes }), 'ច្បាប់ ៨ ថ្ងៃលើកក្រោយ ➜ «ត្រឡប់»').toBe('returned');
     }, 20000);
 
     it('១១. ទិសផ្ទុយ ៖ ស្តារ ➜ កញ្ចប់ដដែល (id ដដែល) ផុតកំណត់ម្តងទៀត ➜ ដកម្តងទៀត (សោចាស់មិនរារាំង)', async () => {

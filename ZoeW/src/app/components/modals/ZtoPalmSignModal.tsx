@@ -53,13 +53,13 @@ function SignForm() {
             () => setMessage('បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬជ្រើសរូបពី Gallery។'), palmSignWantsFrame, palmSignCodeOf);
     }, [cameraEpoch, canScan]);
     const addBarcode = (raw: string) => { acceptPalmSignBarcode(raw); setBarcode(''); };
-    const takePhoto = async (file: File) => {
+    const takePhoto = async (file: File, source: 'camera' | 'gallery') => {
         const generation = palmSignState.generation;
         const manualCode = barcode.trim();
         setPreparing(true);
         setMessage('');
         try {
-            const prepared = await palmSignPhotoFromFile(file, palmSignCodeOf);
+            const prepared = await palmSignPhotoFromFile(file, palmSignCodeOf, source);
             if (generation !== palmSignState.generation) return;
             const code = prepared.barcode || manualCode;
             if (!code) { setMessage('រូបនេះមិនអាន Barcode ឬ QR បាន។ សូមថតឲ្យជិត ច្បាស់ ឬវាយ Barcode រួចជ្រើសរូបម្ដងទៀត។'); return; }
@@ -116,11 +116,11 @@ function SignForm() {
             </div>
             <div className="palm-sign-tools">
                 <input id="palmSignPhotoInput" ref={refTo('palmSignPhotoInput')} type="file" accept="image/*" capture="environment" hidden disabled={!canScan}
-                    onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignPhotoInput', ''); if (file) void takePhoto(file); }} />
+                    onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignPhotoInput', ''); if (file) void takePhoto(file, 'camera'); }} />
                 <button type="button" className="palm-sign-soft" disabled={!canScan}
                     onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignPhotoInput'); }}>📷 ថតរូបកញ្ចប់</button>
                 <input id="palmSignGalleryInput" ref={refTo('palmSignGalleryInput')} type="file" accept="image/*" hidden disabled={!canScan}
-                    onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignGalleryInput', ''); if (file) void takePhoto(file); }} />
+                    onChange={(event) => { const file = event.target.files?.[0]; setFieldValue('palmSignGalleryInput', ''); if (file) void takePhoto(file, 'gallery'); }} />
                 <button type="button" className="palm-sign-soft" disabled={!canScan}
                     onClick={() => { noteAppLockExcuse(); openFilePicker('palmSignGalleryInput'); }}>🖼 ជ្រើសរូបពី Gallery</button>
             </div>

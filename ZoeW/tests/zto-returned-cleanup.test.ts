@@ -21,6 +21,7 @@ import { TRASH_REASON_META, buildTrashGroups, trashDisplayReasonOf, trashReasonO
 import { removedParcelsView } from '../src/features/notifications';
 import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
+import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
@@ -276,6 +277,24 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
         expect(view.rows.map((r: any) => r.misplaced)).toEqual([true]);
     });
 
+    it('📤 បញ្ជូនចេញ (គ្មានស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ») ➜ ដកដូចត្រឡប់ · 🔔 និងធុងសំរាមស្លាក «បញ្ជូនចេញ» · មិនទាន់ពិនិត្យស្កេនបញ្ហា ➜ «ត្រឡប់»', async () => {
+        seed([youngItem([['A', 10], ['B', 5], ['C', 3]])]);
+        const at = ztoStamp(getServerNow() - DAY_MS);
+        expect(removeReturnedZtoBarcodes([{ barcode: 'A', at, sentOut: true }])).toBe(1);
+        await flush();
+        expect(removeReturnedZtoBarcodes([{ barcode: 'B', at, sentOut: true, sentUnverified: true }])).toBe(1);
+        await flush();
+        expect(historyCodes()).toEqual(['C']);
+        const trash = trashItems();
+        expect(trash.map((t: any) => t.trashReason)).toEqual(['returned', 'returned']);
+        expect(ledger().codDollar).toBe(85);
+        const byCode = (code: string) => trash.find((t: any) => t.barcodes[0].code === code);
+        expect([trashDisplayReasonOf(byCode('A')), trashDisplayReasonOf(byCode('B'))]).toEqual(['sent', 'returned']);
+        expect([trashRestoreBlockOf(byCode('A')), trashRestoreBlockOf(byCode('B'))]).toEqual(['', '']);
+        const view = removedParcelsView([byCode('A'), byCode('B')], getServerNow(), false, []);
+        expect(view.rows.map((r: any) => [r.key === byCode('A').id, r.sentOut, r.misplaced]).sort()).toEqual([[false, false, false], [true, true, false]]);
+    });
+
     it('ZTO ចុះហត្ថលេខា (បញ្ជីចុះហត្ថលេខា) ➜ មិនដកជាត្រឡប់', async () => {
         seed([youngItem([['A', 10]])]);
         expect(removeReturnedZtoBarcodes([{ barcode: 'A', at: ztoStamp(getServerNow() - DAY_MS) }], dataState.scanHistory, ['A'])).toBe(0);
@@ -330,7 +349,7 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
 
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY_MS).toISOString().slice(0, 10);
 function zto(returns: Array<{ code: string; at: string }>, detail?: (code: string) => any, signs: Array<{ code: string; at: string }> = [],
-    sends: Array<{ code: string; at: string }> = []) {
+    sends: Array<{ code: string; at: string }> = [], problems: Array<{ code: string; at: string; reason?: string }> = []) {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
@@ -361,7 +380,10 @@ function zto(returns: Array<{ code: string; at: string }>, detail?: (code: strin
             : (c.scanTypeCode === '05' ? signs.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
                 consigneeMobile: '855977000111', scanTypeCode: '05', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 }))
             : (c.scanTypeCode === '02' ? sends.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
-                consigneeMobile: '855977000111', scanTypeCode: '02', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 })) : []));
+                consigneeMobile: '855977000111', scanTypeCode: '02', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 }))
+            : (c.scanTypeCode === '30' ? problems.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
+                consigneeMobile: '855977000111', scanTypeCode: '30', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0,
+                problemReason: r.reason || 'ទីតាំងមិនត្រឹមត្រូវ' })) : [])));
         return new Response(JSON.stringify({ success: true, error: null,
             data: { pageNum: b.pageNum, pages: rows.length ? 1 : 0, total: rows.length, result: rows } }), { status: 200 });
     }));
@@ -426,22 +448,59 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(calls.filter((q) => q.returned === '1'), 'ម្តងក្នុងមួយម៉ោង').toHaveLength(1);
     });
 
-    it('📍 ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ស្កេនបញ្ជូនចេញ 02 ក្រោយចូល ZoeW ➜ ធុងសំរាម «ខុសទីតាំង» · ដកលុយ · ត្រឡប់ + បញ្ជូនចេញ ➜ «ត្រឡប់»', async () => {
+    it('📍 ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ 02 ➜ «ខុសទីតាំង» · 02 តែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន · ដកលុយ · ត្រឡប់ + បញ្ជូនចេញ ➜ «ត្រឡប់»', async () => {
         seed([youngItem([['ZTMIS0000001', 10]], 'id_mis'), youngItem([['ZTRET0000001', 5]], 'id_ret'), youngItem([['ZTKEEP000001', 5]], 'id_keep'),
-            youngItem([['ZTMIX0000001', 1], ['ZTMIX0000002', 1]], 'id_mix')]);
+            youngItem([['ZTMIX0000001', 1], ['ZTMIX0000002', 1]], 'id_mix'), youngItem([['ZTSENT000001', 3]], 'id_sent')]);
         const at = ztoStamp(getServerNow() - 3600000);
         const calls = zto([{ code: 'ZTRET0000001', at }, { code: 'ZTMIX0000002', at }], undefined, [],
-            [{ code: 'ZTMIS0000001', at }, { code: 'ZTRET0000001', at }, { code: 'ZTMIX0000001', at }]);
+            [{ code: 'ZTMIS0000001', at }, { code: 'ZTRET0000001', at }, { code: 'ZTMIX0000001', at }, { code: 'ZTSENT000001', at }],
+            [{ code: 'ZTMIS0000001', at }, { code: 'ZTSENT000001', at, reason: 'ទាក់ទងអតិថិជនមិនបាន' }]);
         await runZtoStatusSweep(true, dataState.scanHistory, []);
         await flush();
         expect(historyCodes('id_keep')).toEqual(['ZTKEEP000001']);
-        expect(['id_mis', 'id_ret', 'id_mix'].map((id) => historyCodes(id))).toEqual([[], [], []]);
-        expect(ledger().codDollar, 'លុយដក ១០ + ៥ + ២').toBe(83);
+        expect(['id_mis', 'id_ret', 'id_mix', 'id_sent'].map((id) => historyCodes(id))).toEqual([[], [], [], []]);
+        expect(ledger().codDollar, 'លុយដក ១០ + ៥ + ២ + ៣').toBe(80);
         expect(calls.filter((q) => q.sent === '1')).toHaveLength(1);
+        expect(calls.filter((q) => q.problem === '1')).toHaveLength(1);
         const labels = buildTrashGroups(trashItems()).flatMap((g: any) => g.codes.map((code: string) => code + ':' + g.reason)).sort();
         expect(labels, 'ជួរតែមួយមានទាំងត្រឡប់ និងខុសទីតាំង ➜ «ត្រឡប់» (ព្រំដែនទទួលស្គាល់)')
-            .toEqual(['ZTMIS0000001:misplaced', 'ZTMIX0000001:returned', 'ZTMIX0000002:returned', 'ZTRET0000001:returned']);
+            .toEqual(['ZTMIS0000001:misplaced', 'ZTMIX0000001:returned', 'ZTMIX0000002:returned', 'ZTRET0000001:returned', 'ZTSENT000001:sent']);
         expect(trashItems().every((t: any) => t.trashReason === 'returned')).toBe(true);
+        const sent = trashItems().find((t: any) => t.barcodes[0].code === 'ZTSENT000001');
+        expect(trashRestoreBlockOf(sent), '📤 បញ្ជូនចេញ (មិនមែន -710) ➜ ស្តារបាន').toBe('');
+        expect(trashRestoreBlockOf(trashItems().find((t: any) => t.barcodes[0].code === 'ZTRET0000001'))).toBe('returned');
+    });
+
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ «ទីតាំងមិនត្រឹមត្រូវ» មុនកញ្ចប់ចូល ZoeW (វដ្តមុន) ➜ «បញ្ជូនចេញ» ស្តារបាន មិនមែន «ខុសទីតាំង»', async () => {
+        const entered = getServerNow() - 3 * 3600000;
+        const young = youngItem([['ZTCYCLE00001', 4]], 'id_cycle');
+        seed([{ ...young, createdAt: entered, barcodes: young.barcodes.map((b: any) => ({ ...b, createdAt: entered })) }]);
+        const send = ztoStamp(getServerNow() - 3600000);
+        const before = ztoStamp(getServerNow() - 4 * 3600000);
+        const calls = zto([], undefined, [], [{ code: 'ZTCYCLE00001', at: send }], [{ code: 'ZTCYCLE00001', at: before }]);
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        expect(calls.filter((q) => q.problem === '1'), 'លក្ខខណ្ឌ ៖ អានស្កេនបញ្ហា').toHaveLength(1);
+        await flush();
+        expect(historyCodes('id_cycle')).toEqual([]);
+        expect(buildTrashGroups(trashItems()).map((g: any) => g.reason)).toEqual(['sent']);
+        expect(trashRestoreBlockOf(trashItems()[0])).toBe('');
+    });
+
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ចន្លោះបញ្ជីត្រឡប់តូច (ម្សិលមិញ ➜ ថ្ងៃនេះ) តែ «ទីតាំងមិនត្រឹមត្រូវ» ស្កេនមុននោះ ក្រោយកញ្ចប់ចូល ZoeW ➜ អានបញ្ជី 30 ពីថ្ងៃកញ្ចប់បើកចាស់បំផុត ➜ «ខុសទីតាំង»', async () => {
+        const entered = getServerNow() - 4 * 24 * 3600000;
+        const young = youngItem([['ZTLONG000001', 4]], 'id_long');
+        seed([{ ...young, createdAt: entered, barcodes: young.barcodes.map((b: any) => ({ ...b, createdAt: entered })) }]);
+        const send = ztoStamp(getServerNow() - 3600000);
+        const wrong = ztoStamp(getServerNow() - 3 * 24 * 3600000);
+        const calls = zto([], undefined, [], [{ code: 'ZTLONG000001', at: send }], [{ code: 'ZTLONG000001', at: wrong }]);
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        await flush();
+        const sent = calls.find((q) => q.sent === '1');
+        const problem = calls.find((q) => q.problem === '1');
+        expect(sent && sent.from, 'លក្ខខណ្ឌ ៖ ចន្លោះតូច (ម្សិលមិញ)').toBe(dk(1));
+        expect(problem && problem.from, 'បញ្ជី 30 ពីថ្ងៃកញ្ចប់បើកចាស់បំផុត').toBe(dk(4));
+        expect(historyCodes('id_long')).toEqual([]);
+        expect(buildTrashGroups(trashItems()).map((g: any) => g.reason)).toEqual(['misplaced']);
     });
 
     it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ZTO ចុះហត្ថលេខា + ស្កេនត្រឡប់ ➜ ហត្ថលេខាឈ្នះ ទោះបិទមិនទាន់ដល់ (លើស batch មួយជុំ) ➜ មិនដក · លុយមិនដក', async () => {
@@ -525,6 +584,14 @@ describe('↩️ ប្រអប់បញ្ជី ZTO ៖ កញ្ចប់ត
         expect(held).not.toContain('«បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ');
         expect(notes({ openInZoew: false, removeInZoew: false, removeHeld: '' }).join(' ')).not.toContain('📌');
     });
+
+    it('🗑️ ឈ្មោះធុងសំរាមតាមប្រភេទ ៖ ត្រឡប់ -710 · ខុសទីតាំង · បញ្ជូនចេញ · បញ្ជូនចេញមិនទាន់ពិនិត្យស្កេនបញ្ហា ➜ «ត្រឡប់»', () => {
+        const bin = (row: any) => notes({ openInZoew: true, removeInZoew: true, removeHeld: '', ...row }).join(' ');
+        expect(bin({})).toContain('ធុងសំរាម «ត្រឡប់»');
+        expect(bin({ misplaced: true })).toContain('ធុងសំរាម «ខុសទីតាំង»');
+        expect(bin({ sentOut: true })).toContain('ធុងសំរាម «បញ្ជូនចេញ»');
+        expect(bin({ sentOut: true, sentUnverified: true })).toContain('ធុងសំរាម «ត្រឡប់»');
+    });
 });
 
 describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្បាប់ ៨ ថ្ងៃ និង ZTO ស្កេនត្រឡប់ ជាថ្នាក់តែមួយ', () => {
@@ -551,14 +618,16 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
     });
 
     it('តម្លៃតែមួយ `returned` ៖ ស្លាក «ត្រឡប់» · ២ ថ្ងៃ · គ្មាន `expired` ក្នុង App និង rules (ម្ចាស់គម្រោង ៖ «កែអោយស្អាត»)', () => {
-        expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'misplaced', 'pickup', 'remove', 'returned']);
+        expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'misplaced', 'pickup', 'remove', 'returned', 'sent']);
         expect(trashReasonOf({ trashReason: 'misplaced' })).toBe('remove');
+        expect(trashReasonOf({ trashReason: 'sent' })).toBe('remove');
         expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
         const rules = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'firebase-database.rules.json'), 'utf8'));
         const check = rules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason['.validate'];
         expect(check).toContain("'returned'");
         expect(check).not.toContain("'expired'");
         expect(check).not.toContain("'misplaced'");
+        expect(check).not.toContain("'sent'");
     });
 
     it('sweep កូនសោ ledger ៖ ធុងសំរាម «ត្រឡប់» ដែល flag មិនទាន់ flip ➜ flip', async () => {

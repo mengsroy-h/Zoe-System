@@ -47,12 +47,13 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` (ពេលសរសេរ) = `5e36a71` **ZoeW 2.50.127 · ZoeKeyGen 2.24.20** · A230–A231 ➜ **2.50.128** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
+- `main` (ពេលសរសេរ) = `c39268c` **ZoeW 2.50.128 · ZoeKeyGen 2.24.20** · A234–A240 ➜ **2.50.129** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.128]** Publish rules `ztoMisplacedAt` · រូប Sign មានម៉ោង + កូអរដោនេ (iPhone · Android · APK ៖ អនុញ្ញាតទីតាំង) · កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
+- ⏳ **[2.50.129]** (rules `ztoSentOutAt` Publish រួច) កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន លើគ្រប់ទូរស័ព្ទ (Cookie · Palm · APK ចាស់ ➜ ស្តារបាន) · រូប Sign ពី Gallery ឬរូបចាស់តាម 📷 ➜ ម៉ោងថតពិត។
+- ⏳ **[2.50.128]** (rules `ztoMisplacedAt` Publish រួច) រូប Sign មានម៉ោង + កូអរដោនេ (iPhone · Android · APK ៖ អនុញ្ញាតទីតាំង) · កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
@@ -101,6 +102,45 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.129] — 2026-10-18 · ZoeW ៖ «ខុសទីតាំង» តែពេល ZTO ស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» មុនបញ្ជូនចេញ · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន (A234) · ត្រា `ztoSentOutAt` (A239 · A240) · រូប Gallery មានម៉ោងថតពិត (A235) · ពិនិត្យឡើងវិញ (A236–A238)
+
+**ZoeW** (`zoew-v392` ➜ `zoew-v393`) · Function `zto-order-detail.js` · `_shared/zto-palm.js` (តំបន់ LOCK ZTO ៖ សំណើផ្ទាល់) · rules ថ្មី `ztoSentOutAt` (Firebase · Supabase migration `20261018144557_zoe_rules.sql`)។
+សំណើម្ចាស់គម្រោង ៖ «ធ្វើទាំងពីអោយស្អាតទៅ» — ចម្លើយលើចំណុចសម្រេច ២ ៖ ① រូប 🖼 Gallery ទទួលស្លាកម៉ោង/ទីតាំង **ពេលជ្រើស** មិនមែនពេលថត ·
+② បុគ្គលិកប្រើ «ផ្ញើចេញ» (`02`) ជំនួស «ត្រឡប់ការស្កេន» (`-710`) ➜ ZoeW ដាក់ «ខុសទីតាំង»។ លម្អិត ៖ ផ្នែក ២ A234 · A235។
+
+- 📍 **ខុសទីតាំង ត្រូវការមូលហេតុពី ZTO** ៖ ស្កេនបញ្ហានៃសាខាខ្លួនដែល `problemReason` ជា «ទីតាំងមិនត្រឹមត្រូវ» (`MISPLACED_REASONS` ៣ ភាសា ៖ ខ្មែរ · `地址不详` · `Incorrect location` · ដកតួអក្សរមើលមិនឃើញ)
+  នៅចន្លោះការមកដល់ចុងក្រោយ និងការបញ្ជូនចេញ ➜ `ztoMisplacedAt` (ដូចមុន) · បញ្ជូនចេញដោយគ្មានស្កេននោះ ➜ `ztoSentOutAt` ➜ ភស្តុតាងប្រភេទ `sent` ៖ ធុងសំរាម «បញ្ជូនចេញ» · ដកលុយ និងចំនួនកញ្ចប់ដូចគ្នា ·
+  **ស្តារបាន** (មិនមែន `-710` ➜ មិន 🔒) · ប្រអប់ទាញបញ្ជី «📤 ZTO ស្កេនបញ្ជូនចេញ» · សារសង្ខេប «📤 បញ្ជូនចេញរួច N» ·
+  🔒 នៅតែកញ្ចប់ដែល ZTO ស្កេនត្រឡប់ `-710` (`trashRestoreBlockOf()` ចាក់សោតែភស្តុតាង `returned`)។
+- 🍪 **Cookie** ៖ Function `?list=1&problem=1` អានបញ្ជី Argus `ZTO_LIST_PROBLEM_SCAN_TYPE` (លំនាំដើម `30` «ការចុះឈ្មោះបញ្ហា» · `off` បិទ) ហើយឆ្លើយតែជួរដែល `problemReason`
+  ស្ថិតក្នុង `ZTO_LIST_MISPLACED_REASONS` (លំនាំដើម ៣ ភាសា · `off` បិទ) ចុងក្រោយក្នុងមួយ Barcode (`problemScans` ចូលចំនួនរាប់) ➜ App អានជាមួយ `returned=1` · `sent=1`
+  (`fetchZtoReturnedPages()`) ៖ ស្កេនបញ្ហា ≤ ពេលបញ្ជូនចេញ ➜ «ខុសទីតាំង» · ផ្សេងទៀត ➜ «📤 បញ្ជូនចេញ» · បញ្ជី `30` អានមិនបាន ឬ `off` ➜ ដកដដែល ធុងសំរាម «ត្រឡប់» គ្មានត្រា
+  (`sentUnverified` ➜ ភស្តុតាង `left`) + ⚠️ «មិនបានគ្រប់» · ការពិនិត្យនៅខាងក្រោយអានបញ្ជី `30` ពីថ្ងៃកញ្ចប់បើកចាស់បំផុត (`ztoOpenSinceDay()`) មិនមែនតែម្សិលមិញ ➜ ថ្ងៃនេះ (A240)។
+- 📤 **ត្រា «បញ្ជូនចេញ» ក្នុង DB** (សំណើម្ចាស់គម្រោង ៖ «ហេតុអីមិនដាក់ត្រាក្នុង DB?» ➜ «ធ្វើ បន្ថែមត្រា ztoSentOutAt អោយស្អាតពេញលេញ») ៖ `syncZtoFinalMarks()` កត់ `ztoSentOutAt`
+  តែម្យ៉ាងលើធាតុធុងសំរាម `returned` (⛔ មិនកត់ `ztoReturnedAt` ➜ គ្មាន App ណា 🔒) ➜ ធុងសំរាមក្រុម «បញ្ជូនចេញ» (`TRASH_REASON_META.sent`) · 🔔 📤 «📤 បញ្ជូនចេញ» · ប្រអប់ទាញបញ្ជី «ធុងសំរាម «បញ្ជូនចេញ»» ·
+  ឃើញដូចគ្នាលើគ្រប់ទូរស័ព្ទ ទោះគ្មានភស្តុតាងក្នុងខ្លួន · ដាច់ពីច្បាប់ ៨ ថ្ងៃ (នៅ «ត្រឡប់») · តម្លៃ DB នៅ `returned` (លុយ · រក្សាទុក ២ ថ្ងៃមិនប្រែ) · ការស្តារដក `ztoSentOutAt` ·
+  App ចាស់ ៖ ត្រា «ខុសទីតាំង» របស់វាលើការបញ្ជូនចេញ ➜ `ztoSentOutAt` ឈ្នះ · `ztoReturnedAt` តែម្យ៉ាង (rules ចាស់បដិសេធ `ztoMisplacedAt`) ➜ `ztoSentOutAt` ដោះ 🔒 ·
+  ត្រាដែល App ចាស់យកតាមការស្តារ (`restoredAt` ក្រោយត្រា) ➜ មិនរាប់ · rules មិនទាន់ Publish ➜ ត្រា Sign/ត្រឡប់ផ្សេងនៅចូល ហើយស្លាកនៅតាមភស្តុតាងក្នុងឧបករណ៍ (A239)។
+- 🖼 **រូប Sign ពី Gallery** ៖ ស្លាកក្រហមពី EXIF របស់រូប (`readPhotoExif()` អាន ≤ `PALM_SIGN_EXIF_READ_BYTES` ៖ `DateTimeOriginal` + `OffsetTimeOriginal` ➜ ម៉ោងភ្នំពេញ ·
+  គ្មាន offset ➜ ម៉ោងនាឡិការូបដដែល · GPS EXIF · `0,0` ដែល Android/iOS លុបទីតាំង ➜ តែម៉ោង) · រូបគ្មានម៉ោងថត ➜ **គ្មានស្លាក** (មិនដាក់ម៉ោង/ទីតាំងពេលជ្រើស) ·
+  📷 ថតឥឡូវ និងកាមេរ៉ាផ្ទាល់ ➜ ម៉ោងឥឡូវ + ទីតាំងបច្ចុប្បន្នដូចមុន។
+- 🔎 **ពិនិត្យឡើងវិញ** (សំណើ ៖ «ផ្ទៀងផ្ទាត់ការងារឡើងវិញក្រែងមានចន្លោះ») ៖ ① **App ចាស់ (APK មិនទាន់ដំឡើងថ្មី) + Function ថ្មី** ៖ បញ្ជូនចេញតែម្យ៉ាងគ្មាន `ztoMisplacedAt` ➜ App ចាស់អានជាត្រឡប់ `-710`
+  ហើយកត់ `ztoReturnedAt` ➜ 🔒 លើគ្រប់ឧបករណ៍ (ស្តារមិនបានជារៀងរហូត) ➜ Function ទុក `ztoMisplacedAt` លើរាល់ការបញ្ជូនចេញ ហើយ `ztoSentOutAt` បញ្ជាក់ «បញ្ជូនចេញ» (App ថ្មីអានមុន) (A236) ·
+  ② 📷 ក្នុង APK គ្មានសិទ្ធិកាមេរ៉ា ➜ Capacitor បើកកម្មវិធីជ្រើសឯកសារ ➜ រូបចាស់ទទួលម៉ោងឥឡូវ ➜ រូប 📷 ចាស់ជាង `PALM_SIGN_FRESH_SHOT_MS` (១០ នាទី · EXIF ឬ `lastModified`) ➜ ច្បាប់ Gallery (A237) ·
+  ③ Cookie ៖ «ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនការមកដល់ចុងក្រោយ ឬមុនចូល/ស្តារក្នុង ZoeW) ➜ «📤 បញ្ជូនចេញ» · អានបញ្ជី `30` តែពេលមានការបញ្ជូនចេញ (សន្សំការហៅ Netlify) (A238) ·
+  ④ EXIF pointer ប្រភេទ IFD (`13`)។
+- 🧪 `ZoeW/tests/zto-palm-server.test.ts` (📍 ១៤ ករណី ៖ មុនកែធ្លាក់ទាំងអស់) · `ZoeW/tests/zto-returned.test.tsx` (Cookie ៖ `30` + `02` · `30` ធ្លាក់/`off` · Function `problem=1`) ·
+  `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-returned-cleanup.test.ts` (ពិនិត្យនៅខាងក្រោយ ៖ «ខុសទីតាំង» · «ត្រឡប់» ស្តារបាន · លុយដក ២០) · `ZoeW/tests/zto-final-marks.test.tsx`
+  (📤 គ្មានត្រា · ស្តារបាន · ធាតុចម្រុះជាមួយ `-710` ➜ 🔒) · `ZoeW/tests/palm-sign-camera.test.ts` (EXIF II/MM · offset · S/W · `0,0` · ឯកសារខូច · 🖼/📷) ·
+  `ZoeW/tests/zto-signed-cadence.test.tsx` (បញ្ជីត្រឡប់ · បញ្ជូនចេញ · ស្កេនបញ្ហា ≤ ម្តងក្នុងមួយម៉ោង) · `revenue-fuzz-test` (`ztoFinal` ៖ ៣ ប្រភេទ) · `ZoeW/tests/zto-lock.test.ts` (LOCK ថ្មី) ·
+  ត្រា `ztoSentOutAt` ៖ `ZoeW/tests/zto-final-marks.test.tsx` ៦ · `ZoeW/tests/zto-returned-cleanup.test.ts` ៤ · `ZoeW/tests/zto-returned.test.tsx` · `ZoeW/tests/cleanup-ledger-key.test.ts` ·
+  `emu/app-writes-rules-test` (ការសរសេរ `ztoSentOutAt` ≥ ១ · rules គ្មានវា ➜ បដិសេធ) · `trash-modal-test` (ក្រុម «បញ្ជូនចេញ» · ត្រាមុន `restoredAt`)។
+
+**សកម្មភាពដោយដៃ** ៖ ១. **Publish rules** `firebase-database.rules.json` (`ztoSentOutAt` ថ្មី · `ztoMisplacedAt` របស់ [2.50.128]) ក្នុង Firebase Console ➜ Realtime Database ➜ Rules
+(ឬ `tools/firebase-provision/deploy-rules.cmd`) · ហាង Supabase ៖ migration ចូលពេល merge ទៅ `main` · មុន Publish ៖ ស្លាក «បញ្ជូនចេញ» នៅតែលើទូរស័ព្ទដែលអានឃើញ (ការដក · លុយ · ការស្តារមិនប៉ះ) · ២. Netlify env ស្រេចចិត្ត ៖ `ZTO_LIST_PROBLEM_SCAN_TYPE` ·
+`ZTO_LIST_MISPLACED_REASONS` (លំនាំដើមគ្រប់គ្រាន់ · [`ZoeW/ZTO-SETUP-KH.md`](../ZoeW/ZTO-SETUP-KH.md)) · ៣. សាកលើកញ្ចប់ពិត ៖ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» ·
+បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» លើទូរស័ព្ទផ្សេងទៀតក៏ដូចគ្នា ហើយ 🔄 ស្តារបាន · ៤. ✍️ Sign ៖ 🖼 ជ្រើសរូបចាស់ ➜ ស្លាកម៉ោងថតរូបនោះ (APK ថ្មីត្រូវដំឡើង)។
 
 ### [2.50.128] — 2026-10-18 · ZoeW ៖ រូប Sign មានម៉ោង និងកូអរដោនេ ដូច ZTO Palm (A231) · កញ្ចប់ខុសទីតាំងចេញពីបញ្ជីទៅធុងសំរាម «ខុសទីតាំង» (A230)
 
@@ -4393,6 +4433,18 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-18 — «ខុសទីតាំង» តាមមូលហេតុ ZTO · រូប Gallery តាម EXIF (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីអោយស្អាតទៅ» · A234 · A235 · ពិនិត្យឡើងវិញ A236 · A237 · A238) · ត្រា «បញ្ជូនចេញ» (A239 · A240)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A240 | **ត្រា «បញ្ជូនចេញ» អចិន្ត្រៃយ៍ត្រូវការភស្តុតាងពេញ** — ការពិនិត្យនៅខាងក្រោយ (Cookie) អានបញ្ជី `30` លើចន្លោះបញ្ជីត្រឡប់ (ក្រោយជុំពេញ ៖ ម្សិលមិញ ➜ ថ្ងៃនេះ) ➜ «ទីតាំងមិនត្រឹមត្រូវ» ដែលស្កេនមុននោះ (ក្រោយកញ្ចប់ចូល ZoeW) មើលមិនឃើញ ➜ «បញ្ជូនចេញ» · បញ្ជី `30` ធ្លាក់/`off` ➜ ការបញ្ជូនចេញទាំងអស់ចាត់ជា «បញ្ជូនចេញ» · មុន A239 ភស្តុតាងនេះនៅក្នុងឧបករណ៍ (ស្លាក «ត្រឡប់» ដូចគ្នា) ➜ គ្មានផលប៉ះពាល់ · ក្រោយ A239 វាក្លាយជាត្រាលើគ្រប់ទូរស័ព្ទ | `ZoeW/tests/zto-returned-cleanup.test.ts` (ចន្លោះតូច + ស្កេនបញ្ហាមុន ៣ ថ្ងៃ ➜ «ខុសទីតាំង» · `problem=1` ពី `dk(4)` ៖ មុនកែ `dk(1)` ➜ ធ្លាក់) · `ZoeW/tests/zto-returned.test.tsx` (`30` ធ្លាក់/`off` ➜ `sentUnverified` ➜ `left` ៖ មុនកែធ្លាក់) · `ZoeW/tests/zto-final-marks.test.tsx` (`left` ➜ គ្មានត្រា ៖ មុនកែកត់ `ztoReturnedAt` ➜ ធ្លាក់) | [2.50.129] `fetchZtoReturnedPages(cfg, from, to, problemFrom)` · `ztoOpenSinceDay()` (ក៏ប្រើក្នុង `ztoSignedSweepRange()` · លទ្ធផលដូចមុន) · `sentUnverified` · ភស្តុតាង `left` · `ztoListTrashLabel()` · LOCK ថ្មី (សំណើម្ចាស់គម្រោង) |
+| A239 | **បញ្ជូនចេញតែម្យ៉ាងគ្មានត្រាក្នុង DB** (សំណើម្ចាស់គម្រោង ៖ «ហេតុអីមិនដាក់ត្រាក្នុង DB?» ➜ «ធ្វើ … អោយស្អាតពេញលេញ») — ទូរស័ព្ទដែលមិនបានអាន ZTO មិនអាចប្រាប់ «បញ្ជូនចេញ» ពី «ត្រឡប់ ៨ ថ្ងៃ» · ការរចនា ៖ `ztoSentOutAt` តែម្យ៉ាង (⛔ `ztoReturnedAt` ➜ App ចាស់ 🔒) · ផលប៉ះពាល់ App ចាស់ដែលរកឃើញពេលរចនា ៖ ① Function ទុក `ztoMisplacedAt` លើរាល់ការបញ្ជូនចេញ (A236) ➜ APK ចាស់កត់ «ខុសទីតាំង» លើការបញ្ជូនចេញ ➜ ត្រូវ `ztoSentOutAt` ឈ្នះ `ztoMisplacedAt` · ② rules ចាស់បដិសេធ `ztoMisplacedAt` ➜ APK ចាស់កត់ `ztoReturnedAt` តែម្យ៉ាង ➜ 🔒 ➜ `ztoSentOutAt` ដោះ · ③ App ចាស់ស្តារដោយមិនដក `ztoSentOutAt` ➜ ត្រាតាមចូលប្រវត្តិ ➜ ច្បាប់ ៨ ថ្ងៃលើកក្រោយជា «បញ្ជូនចេញ» ខុស ➜ ត្រាមុន `restoredAt` មិនរាប់ · ④ rules មិនទាន់ Publish ➜ ធាតុដែលចង់តែ `ztoSentOutAt` មិនត្រូវកំណត់ `ztoFinalRefusedDb` (វាឈប់ត្រា Sign/ត្រឡប់ទាំងអស់ ៣០ នាទី) | `ZoeW/tests/zto-final-marks.test.tsx` ៦ ថ្មី (ត្រា · ស្លាកលើឧបករណ៍ផ្សេង · ① · ② · ③ · `left` · rules បដិសេធ ៖ មុនកែធ្លាក់ទាំងអស់) · `ZoeW/tests/zto-returned-cleanup.test.ts` (🔔 · ធុងសំរាម «បញ្ជូនចេញ» · ឈ្មោះធុងសំរាមក្នុងប្រអប់ ៖ មុនកែធ្លាក់) · `ZoeW/tests/cleanup-ledger-key.test.ts` (ស្តារ ➜ ដក `ztoSentOutAt` ៖ មុនកែធ្លាក់) · តេស្តថ្មីសរុប ១៤ ធ្លាក់លើកូដមុនកែ · `emu/app-writes-rules-test` (rules គ្មាន `ztoSentOutAt` ➜ បដិសេធ ៖ ការរត់ដំបូង ការសរសេរ `ztoSentOutAt` = ០ ព្រោះ `revenue-fuzz-test` ជ្រើសប្រភេទតាមលេខរាប់ក្នុងទំព័រ ដែលចាប់ពីសូន្យរាល់ជុំ ➜ ជុំនីមួយៗមាន op លើ barcode បើកតិច ➜ តែ `misplaced` · ជួសជុល ៖ លេខរាប់ឆ្លងជុំ `ztoFinalOpenSeq` · ៤ ប្រភេទរួម `left`) | [2.50.129] rules `ztoSentOutAt` (ប្រវត្តិ + ធុងសំរាម) · migration `20261018144557_zoe_rules.sql` · `barcodeZtoSentOut()` · `barcodeZtoLeftKind()` · `trashItemSentOut()` · `trashItemLeftBranch()` · `TRASH_REASON_META.sent` · `ztoSentOutRefused` · ជណ្ដើរបដិសេធ `ZTO_LABEL_STAMPS` · `executeRestoreItem()` ដក `ztoSentOutAt` · 🔔 `sentOut` |
+| A238 | **Cookie ៖ «ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុនធ្វើឲ្យការបញ្ជូនចេញថ្មីជា «ខុសទីតាំង»** (បញ្ជីរក្សាស្កេនបញ្ហាចុងក្រោយ ≤ ៣១ ថ្ងៃ គ្មានការមកដល់តាម Barcode) · អានបញ្ជី `30` រៀងរាល់ម៉ោងទោះគ្មានការបញ្ជូនចេញ (ការហៅ Netlify +១/ឧបករណ៍/ម៉ោង) | `ZoeW/tests/zto-returned.test.tsx` (ទាញបញ្ជី ៖ ស្កេនបញ្ហាមុនការមកដល់ចុងក្រោយ ➜ `sentOut` ៖ មុនកែធ្លាក់ · គ្មានបញ្ជូនចេញ ➜ គ្មាន `30`) · `ZoeW/tests/zto-returned-cleanup.test.ts` (ពិនិត្យនៅខាងក្រោយ ៖ ស្កេនបញ្ហាមុនចូល ZoeW ➜ «ត្រឡប់» ស្តារបាន ៖ មុនកែធ្លាក់ · ការសាកដំបូងនៅក្រៅចន្លោះអាន ➜ ជាប់ទាំងមុនកែ ➜ ដាក់ម៉ោងក្នុងចន្លោះ «ម្សិលមិញ ➜ ថ្ងៃនេះ») · `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` · `ZoeW/tests/zto-signed-cadence.test.tsx` | [2.50.129] `problemAt` លើសញ្ញា misplaced · `classifyZtoListRows()` ប្រៀបនឹងការមកដល់ · `ztoReturnedTargets()` ប្រៀបនឹង `barcodeReturnCounts()` · `problem=1` តែពេល `sends.length` |
+| A237 | **📷 បើកកម្មវិធីជ្រើសឯកសារ ➜ រូបចាស់ទទួលម៉ោងឥឡូវ** — APK ៖ Capacitor `BridgeWebChromeClient` បើកអ្នកជ្រើសឯកសារពេលសិទ្ធិកាមេរ៉ាត្រូវបដិសេធ ទោះមាន `capture` ➜ ចន្លោះដូច A235 តាមប៊ូតុង 📷 | `ZoeW/tests/palm-sign-camera.test.ts` (📷 ៖ EXIF ចាស់ ➜ ស្លាក EXIF · ថតមុន ១ នាទី ➜ ម៉ោងឥឡូវ · គ្មាន offset ➜ ម៉ោងភ្នំពេញ · គ្មាន EXIF + ឯកសារចាស់ ➜ គ្មានស្លាក ៖ មុនកែ helper មិនមាន ➜ ធ្លាក់) | [2.50.129] `palmSignFileStampLines(file, source)` · `PALM_SIGN_FRESH_SHOT_MS` · `palmSignExifShot()` (`appZoneWallClockToMillis()` ពេលគ្មាន offset) · pointer IFD `13` |
+| A236 | **App ចាស់ (2.50.128 ក្នុង APK) + Function 2.50.129 ៖ បញ្ជូនចេញតែម្យ៉ាង ➜ 🔒 ជារៀងរហូត** — Function ថ្មីដក `ztoMisplacedAt` ពីការបញ្ជូនចេញតែម្យ៉ាង ➜ App ចាស់ (`data.ztoMisplacedAt === ztoReturnedAt` មិនពិត) ចាត់ជាត្រឡប់ `-710` ➜ `syncZtoFinalMarks()` កត់ `ztoReturnedAt` គ្មាន `ztoMisplacedAt` ➜ `trashZtoFinalBlock()` 🔒 លើគ្រប់ឧបករណ៍ · APK រក្សាកូដ web ចាស់រហូតដល់ដំឡើងថ្មី | `ZoeW/tests/zto-palm-server.test.ts` «🔁 App ដែលមិនទាន់ស្គាល់ `ztoSentOutAt`» (អានចម្លើយ Function តាមច្បាប់ App ចាស់ ៖ commit មុនកែ ➜ `returned` ធ្លាក់ · ក្រោយកែ ➜ `misplaced`) | [2.50.129] `ztoMisplacedAt` លើរាល់ការបញ្ជូនចេញ · `ztoSentOutAt` បញ្ជាក់ · App អាន `ztoSentOutAt` មុន (`zto-status.ts` · `zto-list-sync.ts`) |
+| A235 | **រូប 🖼 Gallery ក្នុង Sign ទទួលស្លាកម៉ោង និងទីតាំងពេលជ្រើស** — `palmSignPhotoFromFile()` ដាក់ `getServerNow()` + ទីតាំងបច្ចុប្បន្នលើគ្រប់រូប ➜ រូបដែលថតម្សិលមិញនៅកន្លែងផ្សេង បង្ហាញម៉ោង/ទីតាំងថ្ងៃនេះ (ភស្តុតាងខុស) | `ZoeW/tests/palm-sign-camera.test.ts` ២ ថ្មី (JPEG ពិតសាងពី byte ៖ II/MM · `OffsetTimeOriginal` · S/W · GPS `0,0` · ម៉ោង `0000:00:00` · ឯកសារខូច/កាត់ · pointer ខុស ➜ មិនបោះកំហុស · 🖼 EXIF ➜ ស្លាក EXIF · គ្មាន EXIF ➜ គ្មានស្លាក · 📷 ➜ ម៉ោងឥឡូវ ៖ មុនកែ helper មិនមាន ➜ ធ្លាក់) | [2.50.129] `readPhotoExif()` (APP1 ➜ TIFF ➜ IFD0 ➜ Exif/GPS · ព្រំដែនរាល់ការអាន · loop ≤ 64 marker · ≤ 256 entry) · `palmSignExifShot()` · `palmSignFramePhoto(canvas, lines)` · `takePhoto(file, 'camera' \| 'gallery')` |
+| A234 | **បុគ្គលិកប្រើ «ផ្ញើចេញ» (`02`/`2`) ជំនួស «ត្រឡប់ការស្កេន» (`-710`) ➜ ZoeW ដាក់ «ខុសទីតាំង»** (ការពិនិត្យឡើងវិញក្រោយ A230) — ភស្តុតាង A230 គឺការបញ្ជូនចេញតែម្យ៉ាង ➜ ស្លាកខុស (លុយត្រឹមត្រូវ) · 🧪 ពិតរបស់ម្ចាស់គម្រោង ៖ `-582` `problemReason` «ទីតាំងមិនត្រឹមត្រូវ» (`msgEng` «Incorrect location» · `message` 原因是【地址不详】) ចំណែក `actionName` 地址不详，电话联系不上 រួមទាំងមូលហេតុទូរស័ព្ទ ➜ មូលហេតុជាអ្នកបំបែក | `ZoeW/tests/zto-palm-server.test.ts` ១៤ ករណី (៣ ភាសា · U+200B · មូលហេតុផ្សេង · វដ្តមុន · ក្រោយបញ្ជូនចេញ · សាខាផ្សេង · ត្រឡប់ឈ្នះ ៖ មុនកែធ្លាក់ទាំងអស់) · `ZoeW/tests/zto-returned.test.tsx` ៣ (Cookie `30`+`02` · `30` ធ្លាក់ ➜ `partial` · `off` · Function `problem=1` ៖ ៣ ភាសា · ចុងក្រោយ · រាប់គ្រប់ ៧) · `ZoeW/tests/zto-returned-cleanup.test.ts` · `ZoeW/tests/zto-final-marks.test.tsx` · `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` (`-710` · `02` · `30` តែសាខាខ្លួន) · `ZoeW/tests/zto-signed-cadence.test.tsx` G2 (ការអានបញ្ជីត្រឡប់ធ្លាប់រាប់ជា `/detail` ➜ ដាច់ពីគ្នា + វាស់ ≤ ម្តង/ម៉ោង) | [2.50.129] `MISPLACED_REASONS` · `ztoSentOutAt` · `sentOutAt` (`_shared/zto-palm.js`) · `readListProblemConfig()` · kind `problem` (`zto-order-detail.js`) · ភស្តុតាង `{ at, kind }` (`noteZtoReturnedEvidence(code, at, kind)`) · `ztoReturnedKindOf()` · ប្រភេទ `sent` គ្មានត្រា · LOCK ថ្មី (សំណើម្ចាស់គម្រោង) |
 
 ### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ · បញ្ជាក់ពេលចែកចាយ (សំណើម្ចាស់គម្រោង · A230 · A231 · A232 · A233)
 

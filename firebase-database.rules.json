@@ -121,6 +121,9 @@
             },
             "ztoMisplacedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoSentOutAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }
         },
@@ -295,6 +298,9 @@
               ".validate": "newData.isNumber() && newData.val() > 0"
             },
             "ztoMisplacedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoSentOutAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }

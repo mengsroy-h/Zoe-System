@@ -311,9 +311,15 @@ describe('ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ quota
     function rangeServer(opts: { mismatch?: number, detailClosed?: boolean | null, detailFails?: (now: number) => boolean } = {}) {
         const signed: { at: number, from: string, to: string }[] = [];
         const detail: number[] = [];
+        const lists: string[] = [];
         vi.stubGlobal('fetch', vi.fn(async (u: string) => {
             const url = new URL(String(u));
             const now = Date.now();
+            const kind = ['returned', 'sent', 'problem'].find((k) => url.searchParams.get(k) === '1');
+            if (url.searchParams.get('list') === '1' && kind) {
+                lists.push(kind);
+                return json({ success: true, list: true, enabled: true, kind, page: 1, pages: 0, total: 0, rows: [], [kind]: [], [kind + 'Ok']: true });
+            }
             if (url.searchParams.get('signed') === '1') {
                 signed.push({ at: now, from: String(url.searchParams.get('from')), to: String(url.searchParams.get('to')) });
                 return json({ success: true, list: true, enabled: true, kind: 'signed', page: 1, pages: 1, total: 0, rows: [],
@@ -323,7 +329,7 @@ describe('ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ quota
             if (opts.detailFails && opts.detailFails(now)) return json({ error: 'ZTO HTTP 502', code: 'ZTO_UPSTREAM_UNAVAILABLE' }, 502);
             return json({ success: true, found: true, ztoClosed: opts.detailClosed === undefined ? null : opts.detailClosed });
         }));
-        return { signed, detail };
+        return { signed, detail, lists };
     }
     const dayKey = (back: number) => getZoneDateKey(T0, -back);
 
@@ -429,6 +435,7 @@ describe('ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ quota
         await runApp(20 * MIN, { signedAt: {}, active: true });
         expect(srv.signed.length).toBeGreaterThan(20);
         expect(srv.detail.length, '⛔ ២០ វិ. ➜ ៦០ ➜ ១៨០ ➜ ៦០០ វិ. ➜ ≤ ៦ ក្នុង ២០ នាទី').toBeLessThanOrEqual(6);
+        expect(srv.lists.sort(), '⛔ បញ្ជីត្រឡប់ · បញ្ជូនចេញ ≤ ម្តងក្នុងមួយម៉ោង · គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា').toEqual(['returned', 'sent']);
     });
 
     it('G3 ៖ ជួរអានដំបូងរំលងកញ្ចប់ដែលបិទទាំងស្រុង (កញ្ចប់បិទចាស់ ២៥ ថ្ងៃ មិនពង្រីកជួរ)', async () => {

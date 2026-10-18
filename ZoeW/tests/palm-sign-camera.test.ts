@@ -2,12 +2,14 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { scanState } from '../src/core/state';
 import {
     PALM_SIGN_FIX_MAX_ACCURACY_M, PALM_SIGN_FIX_MAX_AGE_MS, PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, PALM_SIGN_STAMP_COLOR, PALM_SIGN_STAMP_SIZE, notePalmSignPosition,
-    palmSignCurrentFix, palmSignDecodeImage, palmSignLocation, palmSignPickCode, palmSignStampLines, stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
+    PALM_SIGN_FRESH_SHOT_MS, palmSignCurrentFix, palmSignDecodeImage, palmSignExifShot, palmSignFileStampLines, palmSignLocation, palmSignPhotoFromFile, palmSignPickCode,
+    palmSignStampLines, readPhotoExif,
+    stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
 } from '../src/services/palm-sign-camera';
 import { readCanvasSymbols } from '../src/services/scan-engine';
 import { attachPalmSignStream, videoElement } from '../src/app/refs';
 import { noteAppLockExcuse } from '../src/features/app-lock';
-import { createScratchCanvas } from '../src/platform/document-io';
+import { createScratchCanvas, loadScratchImage } from '../src/platform/document-io';
 vi.mock('../src/features/app-lock', () => ({ noteAppLockExcuse: vi.fn() }));
 vi.mock('../src/core/clock', () => ({ getServerNow: () => Date.now() }));
 vi.mock('../src/services/network', () => ({ withTimeout: (work: Promise<unknown>) => work }));
@@ -217,4 +219,106 @@ it('📍 APK ៖ សួរសិទ្ធិទីតាំងតែក្រោ
     await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
     closeCamera();
     stopLocation();
+});
+function exifJpeg(o: { time?: string; offset?: string; gps?: [number, number]; little?: boolean; app0?: boolean; pointer?: number } = {}) {
+    const le = o.little !== false;
+    const tiff: number[] = new Array(198).fill(0);
+    const put16 = (at: number, v: number) => { const b = [v & 255, (v >> 8) & 255]; if (!le) b.reverse(); tiff[at] = b[0]; tiff[at + 1] = b[1]; };
+    const put32 = (at: number, v: number) => { const b = [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; if (!le) b.reverse(); b.forEach((x, i) => { tiff[at + i] = x; }); };
+    const entry = (at: number, tag: number, type: number, count: number, value: number) => { put16(at, tag); put16(at + 2, type); put32(at + 4, count); put32(at + 8, value); };
+    const text = (at: number, s: string) => { for (let i = 0; i < s.length; i++) tiff[at + i] = s.charCodeAt(i); };
+    const rational = (at: number, value: number) => {
+        const deg = Math.floor(value);
+        const min = Math.floor((value - deg) * 60);
+        const sec = Math.round(((value - deg) * 60 - min) * 60 * 10000);
+        [[deg, 1], [min, 1], [sec, 10000]].forEach(([n, d], i) => { put32(at + i * 8, n); put32(at + i * 8 + 4, d); });
+    };
+    text(0, le ? 'II' : 'MM');
+    put16(2, 42);
+    put32(4, 8);
+    put16(8, 2);
+    entry(10, 0x8769, o.pointer || 4, 1, 38);
+    entry(22, 0x8825, o.pointer || 4, 1, 68);
+    put16(38, 2);
+    entry(40, 0x9003, 2, 20, 122);
+    entry(52, o.offset ? 0x9011 : 0x9999, 2, 7, 142);
+    put16(68, 4);
+    const [lat, lng] = o.gps || [0, 0];
+    entry(70, 1, 2, 2, 0);
+    text(78, lat < 0 ? 'S' : 'N');
+    entry(82, 2, 5, 3, 150);
+    entry(94, 3, 2, 2, 0);
+    text(102, lng < 0 ? 'W' : 'E');
+    entry(106, 4, 5, 3, 174);
+    text(122, o.time || '');
+    text(142, o.offset || '');
+    rational(150, Math.abs(lat));
+    rational(174, Math.abs(lng));
+    const app1 = [0xff, 0xe1, ((tiff.length + 8) >> 8) & 255, (tiff.length + 8) & 255, 0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
+    const app0 = o.app0 ? [0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0] : [];
+    return new Uint8Array([0xff, 0xd8, ...app0, ...app1, 0xff, 0xda, 0, 2]).buffer;
+}
+
+const palmSignExifStampLines = (exif: any) => palmSignExifShot(exif).lines;
+
+it('🖼 រូបពី Gallery ៖ ស្លាកពីព័ត៌មានក្នុងរូប (EXIF ម៉ោងថត + GPS) មិនមែនម៉ោង/ទីតាំងពេលជ្រើស · គ្មានម៉ោងក្នុងរូប ➜ គ្មានស្លាក (មិនដាក់ម៉ោងខុស)', () => {
+    const shot = readPhotoExif(exifJpeg({ time: '2026:10:17 08:15:30', offset: '+07:00', gps: [12.300114, 105.419213], app0: true }));
+    expect(shot.time).toBe('2026:10:17 08:15:30');
+    expect(shot.offset).toBe('+07:00');
+    expect(palmSignExifStampLines(shot)).toEqual(['2026-10-17 08:15:30', '12.30011, 105.41921']);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ time: '2026:10:17 08:15:30', offset: '+00:00', gps: [12.300114, 105.419213], little: false }))),
+        'ម៉ោងតំបន់ផ្សេង ➜ ម៉ោងភ្នំពេញ · byte order MM').toEqual(['2026-10-17 15:15:30', '12.30011, 105.41921']);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ time: '2026:10:17 08:15:30', gps: [-33.5, -70.25] }))), 'គ្មាន offset ➜ ម៉ោងនាឡិការូបដដែល · S/W ➜ អវិជ្ជមាន')
+        .toEqual(['2026-10-17 08:15:30', '-33.50000, -70.25000']);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ time: '2026:10:17 08:15:30' }))), 'GPS 0,0 (Android/iOS លុបទីតាំង) ➜ តែម៉ោង').toEqual(['2026-10-17 08:15:30']);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ time: '2026:10:17 08:15:30', gps: [12.3, 105.4], pointer: 13 }))), 'pointer ប្រភេទ IFD (13)')
+        .toEqual(['2026-10-17 08:15:30', '12.30000, 105.40000']);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ time: '0000:00:00 00:00:00' })))).toEqual([]);
+    expect(palmSignExifStampLines(readPhotoExif(exifJpeg({ gps: [12.3, 105.4] }))), 'គ្មានម៉ោង ➜ គ្មានស្លាក').toEqual([]);
+    for (const bad of [new ArrayBuffer(0), new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer, exifJpeg({ time: '2026:10:17 08:15:30' }).slice(0, 40), null, undefined, 'x']) {
+        expect(palmSignExifStampLines(readPhotoExif(bad as any)), 'ឯកសារខូច ➜ គ្មានស្លាក · មិនបោះកំហុស').toEqual([]);
+    }
+    const broken = new Uint8Array(exifJpeg({ time: '2026:10:17 08:15:30', gps: [12.3, 105.4] }));
+    broken[10 + 8 + 4] = 0xff;
+    broken[10 + 8 + 5] = 0xff;
+    expect(() => readPhotoExif(broken.buffer)).not.toThrow();
+});
+
+it('🖼/📷 ៖ រូប Gallery ➜ ស្លាក EXIF · គ្មាន EXIF ➜ គ្មានស្លាក · 📷 ថតឥឡូវ ➜ ម៉ោងឥឡូវ + ទីតាំងបច្ចុប្បន្ន', async () => {
+    const texts: string[] = [];
+    const context = new Proxy({}, { get: (_t, key) => (key === 'fillText' ? (s: string) => texts.push(s) : () => {}), set: () => true });
+    vi.mocked(createScratchCanvas).mockImplementation(() => ({ width: 0, height: 0, getContext: () => context, toDataURL: () => 'data:image/jpeg;base64,x' }) as any);
+    vi.mocked(loadScratchImage).mockImplementation((_url: string, done: any) => done({ naturalWidth: 1200, naturalHeight: 900 }));
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} }));
+    palmSignLocation.fix = { lat: 11.55, lng: 104.92, at: Date.now() };
+    const file = (bytes: ArrayBuffer) => new File([bytes], 'p.jpg', { type: 'image/jpeg' });
+    const shot = exifJpeg({ time: '2026:10:01 09:00:00', offset: '+07:00', gps: [12.300114, 105.419213] });
+    await palmSignPhotoFromFile(file(shot), known, 'gallery');
+    expect(texts).toEqual(['2026-10-01 09:00:00', '12.30011, 105.41921']);
+    texts.length = 0;
+    await palmSignPhotoFromFile(file(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer), known, 'gallery');
+    expect(texts, 'គ្មាន EXIF ➜ គ្មានស្លាក').toEqual([]);
+    await palmSignPhotoFromFile(file(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer), known, 'camera');
+    expect(texts[0].slice(0, 10), '📷 ថតទើប ➜ ថ្ងៃនេះ (ម៉ោងឥឡូវ)').toBe(palmSignStampLines(Date.now(), null)[0].slice(0, 10));
+    texts.length = 0;
+    await palmSignPhotoFromFile(file(shot), known, 'camera');
+    expect(texts, '📷 ប៉ុន្តែរូបចាស់ (file chooser) ➜ ស្លាក EXIF').toEqual(['2026-10-01 09:00:00', '12.30011, 105.41921']);
+    texts.length = 0;
+    await palmSignPhotoFromFile(file(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer), known, 'camera');
+    expect(texts[1]).toBe('11.55000, 104.92000');
+});
+
+it('📷 បើក file chooser (APK គ្មានសិទ្ធិកាមេរ៉ា ➜ Capacitor បើកកម្មវិធីជ្រើសឯកសារ) ៖ រូបចាស់ ➜ ស្លាក EXIF មិនមែនម៉ោងឥឡូវ · រូបថតទើប ➜ ម៉ោងឥឡូវ + ទីតាំងបច្ចុប្បន្ន', async () => {
+    const zoneNow = (ms: number) => { const p = palmSignStampLines(ms, null)[0]; return p.slice(0, 10).replace(/-/g, ':') + p.slice(10); };
+    const file = (bytes: ArrayBuffer, lastModified = Date.now()) => new File([bytes], 'p.jpg', { type: 'image/jpeg', lastModified });
+    const old = exifJpeg({ time: '2026:10:01 09:00:00', offset: '+07:00', gps: [12.300114, 105.419213] });
+    expect(await palmSignFileStampLines(file(old), 'camera'), 'រូបចាស់តាម 📷').toEqual(['2026-10-01 09:00:00', '12.30011, 105.41921']);
+    const fresh = exifJpeg({ time: zoneNow(Date.now() - 60000), offset: '+07:00', gps: [12.3, 105.4] });
+    expect(await palmSignFileStampLines(file(fresh), 'camera'), 'ថតមុន ១ នាទី ➜ ម៉ោងឥឡូវ (undefined)').toBeUndefined();
+    const freshNoZone = exifJpeg({ time: zoneNow(Date.now() - 60000) });
+    expect(await palmSignFileStampLines(file(freshNoZone), 'camera'), 'គ្មាន offset ➜ យល់ថាម៉ោងភ្នំពេញ').toBeUndefined();
+    const plain = new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer;
+    expect(await palmSignFileStampLines(file(plain, Date.now() - 2 * PALM_SIGN_FRESH_SHOT_MS), 'camera'), 'គ្មាន EXIF · ឯកសារចាស់ ➜ គ្មានស្លាក').toEqual([]);
+    expect(await palmSignFileStampLines(file(plain), 'camera'), 'គ្មាន EXIF · ឯកសារថ្មី ➜ ម៉ោងឥឡូវ').toBeUndefined();
+    expect(await palmSignFileStampLines(file(fresh), 'gallery'), '🖼 ជានិច្ច EXIF').toEqual(palmSignExifStampLines(readPhotoExif(fresh)));
 });

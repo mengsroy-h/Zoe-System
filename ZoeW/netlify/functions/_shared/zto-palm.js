@@ -21,6 +21,7 @@ const SIGNED_STATUS = '5';
 const RETURN_ACTION = '-710';
 
 const SEND_OUT_ACTION = '2';
+const MISPLACED_REASONS = ['ទីតាំងមិនត្រឹមត្រូវ', '地址不详', 'Incorrect location'];
 const LIST_ROW_MAX = 200;
 const LIST_TABS = ['1', '4', '4d', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
@@ -241,8 +242,12 @@ function trackingCode(value) {
     return typeof value === 'string' ? value.trim().toUpperCase() : '';
 }
 
+function misplacedReason(value) {
+    return typeof value === 'string' && MISPLACED_REASONS.includes(value.replace(/\p{Cf}/gu, '').trim());
+}
+
 function trackingVerdict(upstream, barcode, site) {
-    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null, ztoReturnedAt: null, ztoMisplacedAt: null };
+    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null, ztoReturnedAt: null, ztoMisplacedAt: null, ztoSentOutAt: null };
     if (!Array.isArray(upstream.result) || !trackingCode(site)) return out;
     const code = trackingCode(barcode);
     const rows = upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === code);
@@ -251,6 +256,7 @@ function trackingVerdict(upstream, barcode, site) {
     let signed = '';
     let returned = '';
     let sentOut = '';
+    const problems = [];
     let complete = true;
     for (const track of rows[0].tracks) {
         const at = trackingStamp(track?.time);
@@ -262,6 +268,7 @@ function trackingVerdict(upstream, barcode, site) {
         if (action === '5' && at > signed) signed = at;
         if (action === RETURN_ACTION && at > returned) returned = at;
         if (action === SEND_OUT_ACTION && at > sentOut) sentOut = at;
+        if (misplacedReason(track.problemReason)) problems.push(at);
     }
     out.ztoArrivalAt = arrival || null;
     if (!complete) return out;
@@ -273,6 +280,7 @@ function trackingVerdict(upstream, barcode, site) {
     else if (sentOut && arrival && sentOut >= arrival && out.ztoClosed !== true) {
         out.ztoReturnedAt = sentOut;
         out.ztoMisplacedAt = sentOut;
+        if (!problems.some((at) => at >= arrival && at <= sentOut)) out.ztoSentOutAt = sentOut;
     }
     return out;
 }
@@ -992,6 +1000,7 @@ function trackEvidence(upstream, barcode, site) {
     let signed = '';
     let returned = '';
     let sentOut = '';
+    const problems = [];
     let siteName = '';
     let siteNameAt = '';
     for (const entry of tracks) {
@@ -1000,6 +1009,7 @@ function trackEvidence(upstream, barcode, site) {
         if (entry.action === '5' && entry.time > signed) signed = entry.time;
         if (entry.action === RETURN_ACTION && entry.time > returned) returned = entry.time;
         if (entry.action === SEND_OUT_ACTION && entry.time > sentOut) sentOut = entry.time;
+        if (misplacedReason(entry.track.problemReason)) problems.push(entry.time);
         const name = originText(entry.track.siteName).slice(0, 120);
         if (name && entry.time >= siteNameAt) {
             siteName = name;
@@ -1014,9 +1024,10 @@ function trackEvidence(upstream, barcode, site) {
         ztoClosed = false;
     }
     const back = returned && returned >= arrival ? returned : '';
-    const misplacedAt = !back && sentOut && arrival && sentOut >= arrival && ztoClosed !== true ? sentOut : '';
+    const leftAt = !back && sentOut && arrival && sentOut >= arrival && ztoClosed !== true ? sentOut : '';
+    const sentOutAt = leftAt && !problems.some((at) => at >= arrival && at <= leftAt) ? leftAt : '';
     return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
-        returnedAt: back || misplacedAt, misplacedAt };
+        returnedAt: back || leftAt, misplacedAt: leftAt, sentOutAt };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {
@@ -1097,7 +1108,7 @@ function trackReport(evidence, barcode, range, signedEnd) {
     }
     const signedAt = evidence.ztoClosed === true && evidence.signedAt >= range.start && evidence.signedAt <= signedEnd ? evidence.signedAt : '';
     return { barcode, arrivals, ztoClosed: evidence.ztoClosed, signedAt, returnedAt: evidence.returnedAt,
-        misplacedAt: evidence.misplacedAt,
+        misplacedAt: evidence.misplacedAt, sentOutAt: evidence.sentOutAt,
         from: palmOrigin({}, evidence.tracks.map((entry) => ({ ...entry.track, time: entry.time }))) };
 }
 
@@ -1211,4 +1222,4 @@ function isPalmPreflight(query, requestedHeaders) {
     return String(requestedHeaders || '').toLowerCase().split(',').some((name) => name.trim() === SESSION_HEADER);
 }
 
-module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, palmDispatcher, resetSharedForTests, PALM_HOST, BILL_INFO_PATH };
+module.exports = { handlePalm, isPalmPreflight, isPalmPost, isPalmQuery, palmDispatcher, resetSharedForTests, PALM_HOST, BILL_INFO_PATH, MISPLACED_REASONS };

@@ -11,6 +11,7 @@ import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { classifyZtoListRows, fetchZtoListAllPages, noteZtoListSignedCodes, renderZtoListSyncPreview } from '../src/features/zto-list-sync';
+import { ztoReturnedKindOf } from '../src/features/zto-returned';
 
 const req = createRequire(import.meta.url);
 const fn = req('../netlify/functions/zto-order-detail.js');
@@ -30,6 +31,8 @@ beforeEach(() => {
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     delete process.env.ZTO_LIST_RETURN_SCAN_TYPE;
     delete process.env.ZTO_LIST_SEND_SCAN_TYPE;
+    delete process.env.ZTO_LIST_PROBLEM_SCAN_TYPE;
+    delete process.env.ZTO_LIST_MISPLACED_REASONS;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
@@ -72,12 +75,16 @@ afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.ZTO_LIST_RETURN_SCAN_TYPE;
     delete process.env.ZTO_LIST_SEND_SCAN_TYPE;
+    delete process.env.ZTO_LIST_PROBLEM_SCAN_TYPE;
+    delete process.env.ZTO_LIST_MISPLACED_REASONS;
 });
 
 const arrival = (code: string, back: number, hour = '08') => ({ code, type: '03', desc: 'អីវ៉ាន់មកដល់', at: dk(back) + ' ' + hour + ':00:00' });
 const sign = (code: string, back: number) => ({ code, type: '05', desc: 'ចុះហត្ថលេខា', at: dk(back) + ' 18:00:00' });
 const back = (code: string, back: number, hour = '09') => ({ code, type: '-710', desc: 'ត្រឡប់ការស្កេន', at: dk(back) + ' ' + hour + ':00:00' });
 const send = (code: string, back: number, hour = '10') => ({ code, type: '02', desc: 'អីវ៉ាន់ផ្ញើរចេញ', at: dk(back) + ' ' + hour + ':00:00' });
+const problem = (code: string, back: number, hour = '12', reason = 'ទីតាំងមិនត្រឹមត្រូវ') => ({ code, type: '30', desc: 'ការចុះឈ្មោះបញ្ហា',
+    at: dk(back) + ' ' + hour + ':00:00', raw: { problemReason: reason } });
 const codesOf = (rows: any[]) => rows.map((row) => row.barcode).sort();
 const historyWith = (code: string) => [{ id: 'h1', phone: '0977000111', scanDate: dk(2), createdAt: Date.now() - 2 * DAY,
     barcodes: [{ code, cod: 2, dod: 0, isClosed: false }] }];
@@ -95,6 +102,7 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(out.rows.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ជួរមកដល់ ៥').toBe(5);
         expect(out.returnedState).toBe('ok');
         expect(codesOf(out.returned)).toEqual(['ZTAGAIN00001', 'ZTHAVE000001', 'ZTRET0000001', 'ZTSIGN000001']);
+        expect(upstream.some((c) => c.startsWith('30 ')), 'គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា (សន្សំការហៅ Netlify)').toBe(false);
         const retRanges = upstream.filter((c) => c.startsWith('-710 ')).map((c) => c.split(' ').slice(1, 3).join('..'));
         expect(retRanges, 'បញ្ជីត្រឡប់អានពី `from` ដល់ថ្ងៃនេះ (ត្រឡប់កើតក្រោយ `to`)').toEqual([dk(3) + '..' + dk(0)]);
         noteZtoListSignedCodes(out.signed);
@@ -170,31 +178,39 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(ret.rows[0].notes.join(' ')).toContain(dk(1) + ' 09:00:00');
         expect(ret.rows[0].notes.join(' ')).toContain('ធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់)');
         expect(String(viewState.ztoListSyncNote)).toContain('↩️ ស្កេនត្រឡប់រួច 1 ➜ រំលង');
-        expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW 1 (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
+        expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកចេញពី ZoeW 1 (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
     });
 });
 
-describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (សាខាស្កេនបញ្ជូនចេញ `02` ក្រោយមកដល់) ដូច ZTO Palm · អានតែប៉ុណ្ណោះ', () => {
-    it('បញ្ជីបញ្ជូនចេញ ➜ `misplaced` · ត្រឡប់ + បញ្ជូនចេញ ➜ ត្រឡប់ឈ្នះ · ក្រុម/សារ «📍 ខុសទីតាំង» · មិនបញ្ចូល', async () => {
+describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (ស្កេនបញ្ហា `30` «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ `02`) ដូច ZTO Palm · អានតែប៉ុណ្ណោះ', () => {
+    it('`30` «ទីតាំងមិនត្រឹមត្រូវ» មុន `02` ➜ `misplaced` · `02` គ្មានមូលហេតុនោះ ➜ `sentOut` · ត្រឡប់ + បញ្ជូនចេញ ➜ ត្រឡប់ឈ្នះ · មិនបញ្ចូល', async () => {
         rowsUp = [
-            arrival('ZTMIS0000001', 1, '08'), send('ZTMIS0000001', 1, '13'),
-            arrival('ZTRET0000001', 2), back('ZTRET0000001', 1, '09'), send('ZTRET0000001', 1, '10'),
-            arrival('ZTKEEP000001', 1)
+            arrival('ZTMIS0000001', 1, '08'), problem('ZTMIS0000001', 1, '12'), send('ZTMIS0000001', 1, '13'),
+            arrival('ZTSENT000001', 1, '08'), send('ZTSENT000001', 1, '14'),
+            arrival('ZTPHONE00001', 1, '08'), problem('ZTPHONE00001', 1, '09', 'ទាក់ទងអតិថិជនមិនបាន'), send('ZTPHONE00001', 1, '15'),
+            arrival('ZTLATE000001', 1, '08'), send('ZTLATE000001', 1, '10'), problem('ZTLATE000001', 1, '11'),
+            arrival('ZTRET0000001', 2), problem('ZTRET0000001', 1, '08'), back('ZTRET0000001', 1, '09'), send('ZTRET0000001', 1, '10'),
+            arrival('ZTKEEP000001', 1), problem('ZTKEEP000001', 1, '12')
         ];
         const out: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
         expect(out.returnedState).toBe('ok');
         expect(out.sentState).toBe('ok');
-        expect(out.returned.map((r: any) => [r.barcode, r.misplaced === true]).sort()).toEqual([['ZTMIS0000001', true], ['ZTRET0000001', false]]);
+        expect(out.returned.map((r: any) => [r.barcode, r.misplaced === true, r.sentOut === true]).sort()).toEqual([
+            ['ZTLATE000001', false, true], ['ZTMIS0000001', true, false], ['ZTPHONE00001', false, true],
+            ['ZTRET0000001', false, false], ['ZTSENT000001', false, true]]);
         expect(upstream.some((c) => c.startsWith('02 ')), 'អានបញ្ជី 02').toBe(true);
+        expect(upstream.some((c) => c.startsWith('30 ')), 'អានបញ្ជី 30').toBe(true);
         const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(3), to: dk(1), returned: out.returned });
-        expect(codesOf(groups.returned)).toEqual(['ZTMIS0000001', 'ZTRET0000001']);
-        expect(codesOf(groups.fresh)).toEqual(['ZTKEEP000001']);
-        expect(groups.returned.find((r: any) => r.barcode === 'ZTMIS0000001').misplaced).toBe(true);
-        expect(groups.returned.find((r: any) => r.barcode === 'ZTRET0000001').misplaced).toBe(false);
+        expect(codesOf(groups.returned)).toEqual(['ZTLATE000001', 'ZTMIS0000001', 'ZTPHONE00001', 'ZTRET0000001', 'ZTSENT000001']);
+        expect(codesOf(groups.fresh), 'ស្កេនបញ្ហាតែម្យ៉ាង (កញ្ចប់នៅហាង) ➜ ថ្មីធម្មតា').toEqual(['ZTKEEP000001']);
+        const row = (code: string) => groups.returned.find((r: any) => r.barcode === code);
+        expect([row('ZTMIS0000001').misplaced, row('ZTMIS0000001').sentOut]).toEqual([true, false]);
+        expect([row('ZTSENT000001').misplaced, row('ZTSENT000001').sentOut]).toEqual([false, true]);
+        expect([row('ZTRET0000001').misplaced, row('ZTRET0000001').sentOut]).toEqual([false, false]);
     });
 
-    it('`ZTO_LIST_SEND_SCAN_TYPE=off` ➜ មិនសួរ 02 · បញ្ជីបញ្ជូនចេញធ្លាក់ ➜ ត្រឡប់នៅគ្រប់ · `sentState` failed (មិនលាក់)', async () => {
-        rowsUp = [arrival('ZTMIS0000001', 1, '08'), send('ZTMIS0000001', 1, '13')];
+    it('`ZTO_LIST_SEND_SCAN_TYPE=off` ➜ មិនសួរ 02 · បញ្ជី 02 ធ្លាក់ ➜ `sentState` failed · បញ្ជី 30 ធ្លាក់ ឬ `off` ➜ ដកដដែល ជាបញ្ជូនចេញ (មិនលាក់)', async () => {
+        rowsUp = [arrival('ZTMIS0000001', 1, '08'), problem('ZTMIS0000001', 1, '12'), send('ZTMIS0000001', 1, '13')];
         process.env.ZTO_LIST_SEND_SCAN_TYPE = 'off';
         if (fn.resetCachesForTests) fn.resetCachesForTests();
         const off: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
@@ -208,6 +224,62 @@ describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (សា�
         expect(failed.returnedState).toBe('ok');
         expect(failed.sentState).toBe('failed');
         expect(failed.returned).toEqual([]);
+        failType = '30';
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        const noProblem: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(noProblem.sentState, 'បញ្ជី 30 ធ្លាក់ ➜ ⚠️ មិនគ្រប់').toBe('partial');
+        expect(noProblem.returned, 'មិនដឹងថាមានស្កេនបញ្ហាឬអត់ ➜ `sentUnverified` (គ្មានត្រា «បញ្ជូនចេញ»)')
+            .toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true, sentUnverified: true }]);
+        expect(ztoReturnedKindOf(noProblem.returned[0])).toBe('left');
+        expect(ztoReturnedKindOf({ ...noProblem.returned[0], sentUnverified: undefined })).toBe('sent');
+        failType = '';
+        process.env.ZTO_LIST_PROBLEM_SCAN_TYPE = 'off';
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        upstream.length = 0;
+        const problemOff: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(problemOff.sentState).toBe('ok');
+        expect(problemOff.returned).toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true, sentUnverified: true }]);
+        const view: any = classifyZtoListRows([{ barcode: 'ZTMIS0000001', phone: '012000111', cod: 1, dod: 0, at: dk(1) + ' 08:00:00' }], [], [], [],
+            { from: dk(3), to: dk(1), returned: problemOff.returned });
+        expect([view.returned[0].sentOut, view.returned[0].sentUnverified]).toEqual([true, true]);
+        expect(upstream.some((c) => c.startsWith('30 ')), '`off` ➜ គ្មានសំណើ 30').toBe(false);
+    });
+
+    it('«ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនការមកដល់ចុងក្រោយ) ➜ 📤 បញ្ជូនចេញ មិនមែន «ខុសទីតាំង»', async () => {
+        rowsUp = [
+            arrival('ZTCYCLE00001', 3, '08'), problem('ZTCYCLE00001', 3, '09'), send('ZTCYCLE00001', 3, '10'),
+            arrival('ZTCYCLE00001', 1, '08'), send('ZTCYCLE00001', 1, '15')
+        ];
+        const out: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(out.returned, 'ស្កេនបញ្ហា ≤ បញ្ជូនចេញចុងក្រោយ ➜ សញ្ញាជាមួយម៉ោងស្កេនបញ្ហា').toEqual([
+            { barcode: 'ZTCYCLE00001', at: dk(1) + ' 15:00:00', misplaced: true, problemAt: dk(3) + ' 09:00:00' }]);
+        const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(3), to: dk(1), returned: out.returned });
+        expect(groups.returned.map((r: any) => [r.barcode, r.misplaced, r.sentOut])).toEqual([['ZTCYCLE00001', false, true]]);
+    });
+
+    it('Function ៖ `problem=1` ➜ តែស្កេនបញ្ហាមូលហេតុ «ទីតាំងមិនត្រឹមត្រូវ» (៣ ភាសា · តួអក្សរមើលមិនឃើញ) · ចុងក្រោយក្នុងមួយ Barcode · រាប់គ្រប់', async () => {
+        rowsUp = [
+            problem('ZTMIS0000001', 1, '09'), problem('ZTMIS0000001', 1, '11'),
+            problem('ZTMIS0000002', 1, '09', 'ទីតាំង​មិន​ត្រឹមត្រូវ'), problem('ZTMIS0000003', 1, '09', 'Incorrect location'),
+            problem('ZTMIS0000004', 1, '09', '地址不详'), problem('ZTPHONE00001', 1, '09', 'ទាក់ទងអតិថិជនមិនបាន'),
+            { code: 'ZTOTHER00001', type: '31', listed: '30', desc: 'x', at: dk(1) + ' 09:00:00', raw: { problemReason: 'ទីតាំងមិនត្រឹមត្រូវ' } }
+        ];
+        const h = { 'x-zoe-proxy-key': KEY, 'x-zoe-id-token': fx.tokenForSite('777001') };
+        const ask = async () => fn.handler({ httpMethod: 'GET', headers: h, queryStringParameters: { list: '1', problem: '1', from: dk(3), to: dk(1), page: '1' } });
+        const r = await ask();
+        const body = JSON.parse(r.body);
+        expect(r.statusCode).toBe(200);
+        expect(body.kind).toBe('problem');
+        expect(body.problemOk).toBe(true);
+        expect(body.problem.map((p: any) => [p.barcode, p.at]).sort()).toEqual([['ZTMIS0000001', dk(1) + ' 11:00:00'],
+            ['ZTMIS0000002', dk(1) + ' 09:00:00'], ['ZTMIS0000003', dk(1) + ' 09:00:00'], ['ZTMIS0000004', dk(1) + ' 09:00:00']]);
+        expect(body.problemScans).toBe(6);
+        expect(body.otherScans).toBe(1);
+        expect(body.rows.length + body.otherScans + body.signedScans + body.problemScans).toBe(7);
+        process.env.ZTO_LIST_MISPLACED_REASONS = 'off';
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        const off = JSON.parse((await ask()).body);
+        expect(off).toMatchObject({ kind: 'problem', problem: null, problemOk: false, reason: 'problem:reasons-off' });
     });
 });
 
@@ -218,7 +290,7 @@ describe('📍 Cookie ៖ រាងជួរ Argus ពិត (ម្ចាស់
             isRefund: 0, isRefundDesc: 'ទេ', packageQty: 1, preOrNextStationCode: null, problemReason: '', recSite: 'សែនសុខ', remark: 'KH',
             scanMan: 'ស្រីអូន', scanSite: 'Mer SorChrey', scanSiteCode: '881859', signMan: '', signedBillCode: '', updateTime: dk(0) + ' ' + time, ...extra } });
     const CODE = 'ZTMIS0000002';
-    it('ស្កេនបញ្ហា 30 តែម្យ៉ាង ➜ មិនមែនខុសទីតាំង · 02 ក្រោយមកដល់ ➜ `misplaced` · រាងវាលពិតអានបាន', async () => {
+    it('ស្កេនបញ្ហា 30 តែម្យ៉ាង ➜ មិនមែនខុសទីតាំង · 30 «ទីតាំងមិនត្រឹមត្រូវ» ➜ 02 ក្រោយមកដល់ ➜ `misplaced` · រាងវាលពិតអានបាន', async () => {
         rowsUp = [
             real(CODE, '03', 'អីវ៉ាន់មកដល់', '13:25:26'),
             real(CODE, '04', 'ការចែកចាយអីវ៉ាន់', '13:33:04'),
@@ -231,7 +303,7 @@ describe('📍 Cookie ៖ រាងជួរ Argus ពិត (ម្ចាស់
         if (fn.resetCachesForTests) fn.resetCachesForTests();
         const out: any = await fetchZtoListAllPages(CFG, dk(1), dk(0));
         expect(out.sentState).toBe('ok');
-        expect(out.returned).toEqual([{ barcode: CODE, at: dk(0) + ' 13:34:40', misplaced: true }]);
+        expect(out.returned).toEqual([{ barcode: CODE, at: dk(0) + ' 13:34:40', misplaced: true, problemAt: dk(0) + ' 13:34:12' }]);
         const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(1), to: dk(0), returned: out.returned });
         expect(codesOf(groups.returned)).toEqual([CODE]);
         expect(groups.returned[0]).toMatchObject({ misplaced: true, returnedAt: dk(0) + ' 13:34:40', cod: 0, dod: 1.75, from: 'សែនសុខ' });

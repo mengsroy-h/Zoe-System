@@ -410,6 +410,8 @@ function seedData() {
 // deterministic PRNG so any failure reproduces from its seed
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
+const ZTO_FINAL_KINDS = ['returned', 'misplaced', 'sent', 'left'];
+let ztoFinalOpenSeq = 0;
 const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup', 'origin', 'shopSweep', 'returned', 'ztoFinal'];
 // `FUZZ_CAPTURE=<file>` ➜ សរសេរការសរសេរទាំងអស់ (seed + log តាមលំដាប់) សម្រាប់ `emu/app-writes-rules-test`
 const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
@@ -461,7 +463,7 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                 const blip = (wanted === 'scan' || wanted === 'removeBarcode' || wanted === 'editPrice') && r() < 0.4 ? (r() < 0.5 ? 'applied' : 'lost') : null;
                 const blipsBefore = blip ? await page.evaluate((mode) => { window.__ledgerBlip = mode; return window.__ledgerBlipFired.length; }, blip) : 0;
                 const done = await page.evaluate(async (args) => {
-                    const { wanted, pick, amt, isAdmin } = args;
+                    const { wanted, pick, amt, isAdmin, ztoKind } = args;
                     const live = (typeof scanHistory !== 'undefined' ? scanHistory : []).filter(Boolean);
                     const trash = (typeof deletedItems !== 'undefined' ? deletedItems : []).filter(Boolean);
                     const at = (arr) => arr.length ? arr[Math.floor(pick * arr.length) % arr.length] : null;
@@ -486,8 +488,8 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         if (wanted === 'deleteItem' && isAdmin) { const it = at(live); if (!it) return null; await window.deleteSingleItem(it.id); return 'deleteItem'; }
                         if (wanted === 'restore') { const it = at(trash); if (!it) return null; window.promptRestoreDeletedItem(it.id); await window.executeRestoreItem(); return 'restore'; }
                         if (wanted === 'origin') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.saveBarcodeOrigins !== 'function') return null; const n = await window.saveBarcodeOrigins([{ code: b.code, from: pick > 0.5 ? 'Shopee SHPE' : 'ZTO ឃ្លាំងក្វាងចូវអន្តរជាតិ' }]); return n ? 'origin' : null; }
-                        // ភស្តុតាង ZTO (Sign ➜ `ztoSignedAt` លើ barcode បិទ · ស្កេនត្រឡប់ ➜ `ztoReturnedAt` លើធុងសំរាម «ត្រឡប់» · ខុសទីតាំង (ឆ្លាស់គ្នា) ➜ `ztoMisplacedAt` បន្ថែម) ៖ ការសរសេរដាច់ដោយឡែក
-                        if (wanted === 'ztoFinal') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.syncZtoFinalMarks !== 'function') return null; if (b.isClosed) window.setZtoPickupVerdict(b.code, true); else { await window.claimAndCleanupItem(it.id, 'abandon', { codes: [b.code] }); window.__ztoFinalBack = (window.__ztoFinalBack || 0) + 1; window.noteZtoReturnedEvidence(b.code, Date.now(), window.__ztoFinalBack % 2 === 1); } const n = await window.syncZtoFinalMarks(); return n ? 'ztoFinal' : null; }
+                        // ភស្តុតាង ZTO (Sign ➜ `ztoSignedAt` លើ barcode បិទ · ស្កេនត្រឡប់ ➜ `ztoReturnedAt` លើធុងសំរាម «ត្រឡប់» · ខុសទីតាំង (ឆ្លាស់គ្នា) ➜ `ztoMisplacedAt` បន្ថែម · បញ្ជូនចេញ ➜ `ztoSentOutAt` តែម្យ៉ាង (គ្មាន `ztoReturnedAt` ➜ មិន 🔒) · `left` ➜ គ្មានត្រា) ៖ ការសរសេរដាច់ដោយឡែក
+                        if (wanted === 'ztoFinal') { const it = at(live); const b = bcOf(it); if (!it || !b || typeof window.syncZtoFinalMarks !== 'function') return null; if (b.isClosed) window.setZtoPickupVerdict(b.code, true); else { await window.claimAndCleanupItem(it.id, 'abandon', { codes: [b.code] }); window.noteZtoReturnedEvidence(b.code, Date.now(), ztoKind); } const n = await window.syncZtoFinalMarks(); return b.isClosed ? (n ? 'ztoFinal' : null) : 'ztoFinal:' + ztoKind; }
                         if (wanted === 'returned') { const it = at(live); const b = bcOf(it); if (!it || !b || b.isClosed || typeof window.claimAndCleanupItem !== 'function') return null; await window.claimAndCleanupItem(it.id, 'abandon', { codes: [b.code] }); return 'returned'; }
                         if (wanted === 'shopSweep') { if (typeof window.markZtoShopSweep !== 'function' || typeof window.getServerNow !== 'function') return null; return window.markZtoShopSweep(window.getServerNow()) ? 'shopSweep' : null; }
                         if (wanted === 'editPrice' && isAdmin) {
@@ -530,7 +532,10 @@ const CAPTURE = process.env.FUZZ_CAPTURE ? [] : null;
                         }
                     } catch (e) { return 'threw:' + wanted + ':' + (e && e.message); }
                     return null;
-                }, { wanted, pick, amt, isAdmin: true });
+                }, { wanted, pick, amt, isAdmin: true, ztoKind: ZTO_FINAL_KINDS[ztoFinalOpenSeq % ZTO_FINAL_KINDS.length] });
+                // ⛔ ប្រភេទភស្តុតាងត្រឡប់វិលឆ្លងជុំ (មិនមែនតាមទំព័រ) ៖ ជុំនីមួយៗមាន op `ztoFinal` លើ barcode បើកតិច ➜ លេខរាប់ក្នុងទំព័រ
+                //    ចាប់ពីសូន្យរាល់ជុំ ហើយ `sent` មិនដែលកើត (`emu/app-writes-rules` ៖ ការសរសេរ `ztoSentOutAt` = ០)
+                if (typeof done === 'string' && done.indexOf('ztoFinal:') === 0) ztoFinalOpenSeq++;
                 if (blip) {
                     const fired = await page.evaluate(async (before) => {
                         for (let w = 0; w < 24 && window.__ledgerBlipFired.length === before; w++) await new Promise((res) => setTimeout(res, 25));

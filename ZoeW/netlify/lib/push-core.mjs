@@ -20,6 +20,9 @@ export const PUSH_SCHEDULE_HORIZON_MS = 9 * 24 * 60 * 60 * 1000;
 export const PUSH_SUBS_PER_KEY_MAX = 10;
 export const PUSH_SUBS_TOTAL_MAX = 5000;
 export const PUSH_SEND_CONCURRENCY = 16;
+export const PUSH_EXPIRY_CONCURRENCY = 8;
+export const PUSH_CLAIM_RESERVE_MS = 4000;
+export const PUSH_NOTICE_CHUNK = 32;
 export const PUSH_SEND_TIMEOUT_MS = 6000;
 export const PUSH_READ_TIMEOUT_MS = 4000;
 export const PUSH_RUN_BUDGET_MS = 20000;
@@ -573,6 +576,10 @@ export function createPushService(deps) {
         return typeof runStartedAt === 'number' && isFinite(runStartedAt) ? runStartedAt : now();
     }
 
+    function noticeAt(notice) {
+        return notice.value && typeof notice.value.at === 'number' ? notice.value.at : Number(notice.id.slice(1, 14));
+    }
+
     async function dispatchNotices(runStartedAt) {
         const startedAt = runStart(runStartedAt);
         const notices = await readNotices();
@@ -584,22 +591,38 @@ export function createPushService(deps) {
             return { ok: true, reason: 'baseline', sent: 0 };
         }
         const lastId = ledger.data && typeof ledger.data.lastId === 'string' ? ledger.data.lastId : '';
+        const byId = new Map(notices.map((n) => [n.id, n]));
+        const live = (n) => elapsedSince(noticeAt(n), startedAt) <= PUSH_NOTICE_MAX_AGE_MS;
+        const carried = (ledger.data && Array.isArray(ledger.data.carry) ? ledger.data.carry : [])
+            .filter((c) => c && typeof c.id === 'string' && c.id <= lastId && byId.has(c.id) && live(byId.get(c.id)))
+            .map((c) => ({ id: c.id, after: typeof c.after === 'string' ? c.after : '' }));
         const fresh = notices.filter((n) => n.id > lastId);
-        if (!fresh.length) return { ok: true, reason: 'none', sent: 0 };
-        const claim = await store.setJSON('state/notices', { lastId: fresh[fresh.length - 1].id, at: startedAt }, { onlyIfMatch: ledger.etag });
-        if (!claim || !claim.modified) return { ok: true, reason: 'race', sent: 0 };
-        const due = fresh.filter((n) => {
-            const at = n.value && typeof n.value.at === 'number' ? n.value.at : Number(n.id.slice(1, 14));
-            return elapsedSince(at, startedAt) <= PUSH_NOTICE_MAX_AGE_MS;
-        }).slice(-PUSH_NOTICE_PER_RUN_MAX);
-        if (!due.length) return { ok: true, reason: 'stale', sent: 0 };
-        const keys = await allSubscriptionKeys();
-        const total = { sent: 0, gone: 0, fail: 0, skip: 0, cut: 0, notices: due.length };
-        for (const notice of due) {
-            const tally = await sendToKeys(keys, noticeMessage(notice), startedAt);
-            Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
+        if (!fresh.length && !carried.length) return { ok: true, reason: 'none', sent: 0 };
+        const nextLast = fresh.length ? fresh[fresh.length - 1].id : lastId;
+        const due = fresh.filter(live).slice(-PUSH_NOTICE_PER_RUN_MAX).map((n) => ({ id: n.id, after: '' }));
+        let pending = carried.concat(due);
+        if (!pending.length) {
+            const claim = await store.setJSON('state/notices', { lastId: nextLast, at: startedAt }, { onlyIfMatch: ledger.etag });
+            return { ok: true, reason: claim && claim.modified ? 'stale' : 'race', sent: 0 };
         }
-        return Object.assign({ ok: true, reason: 'sent' }, total);
+        const keys = (await allSubscriptionKeys()).sort();
+        const total = { sent: 0, gone: 0, fail: 0, skip: 0, cut: 0, notices: pending.length };
+        let etag = ledger.etag;
+        while (pending.length) {
+            if (elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS - PUSH_CLAIM_RESERVE_MS) break;
+            const head = pending[0];
+            const chunk = keys.filter((k) => k > head.after).slice(0, PUSH_NOTICE_CHUNK);
+            const after = chunk.length === PUSH_NOTICE_CHUNK ? [{ id: head.id, after: chunk[chunk.length - 1] }].concat(pending.slice(1)) : pending.slice(1);
+            const claim = await store.setJSON('state/notices', { lastId: nextLast, at: startedAt, carry: after }, { onlyIfMatch: etag });
+            if (!claim || !claim.modified) return Object.assign({ ok: true, reason: total.sent ? 'partial' : 'race' }, total);
+            etag = typeof claim.etag === 'string' && claim.etag ? claim.etag : ((await readJson('state/notices')) || {}).etag;
+            pending = after;
+            if (!chunk.length) continue;
+            const tally = await sendToKeys(chunk, noticeMessage(byId.get(head.id)), startedAt);
+            Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
+            if (!etag) break;
+        }
+        return Object.assign({ ok: true, reason: pending.length ? 'partial' : 'sent' }, total);
     }
 
     function zoneParts(ms) {
@@ -632,28 +655,39 @@ export function createPushService(deps) {
         const listed = await store.list({ prefix: 'sched/' });
         const scheds = listed && Array.isArray(listed.blobs) ? listed.blobs.map((b) => b.key) : [];
         const total = { ok: true, reason: 'done', sent: 0, gone: 0, fail: 0, skip: 0, cut: 0, keys: 0 };
-        for (const schedKey of scheds) {
-            if (elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS) { total.cut++; continue; }
+        const claimOpen = () => elapsedSince(startedAt, now()) <= PUSH_RUN_BUDGET_MS - PUSH_CLAIM_RESERVE_MS;
+        async function remind(schedKey) {
             const keyId = schedKey.slice('sched/'.length);
-            if (!KEY_ID_RE.test(keyId)) continue;
-            const sched = await readJson(schedKey);
-            if (!sched || !sched.data || !Array.isArray(sched.data.times)) continue;
-            if (elapsedSince(sched.data.at, startedAt) > PUSH_SCHEDULE_MAX_AGE_MS) continue;
-            const count = sched.data.times.filter((t) => typeof t === 'number' && t > startedAt && t <= startedAt + PUSH_EXPIRY_WINDOW_MS).length;
-            if (!count) continue;
+            if (!KEY_ID_RE.test(keyId)) return;
             const ledgerKey = 'state/expiry/' + keyId;
             const ledger = await readJson(ledgerKey);
-            if (ledger && ledger.data && ledger.data.day === zone.day) continue;
-            if (elapsedSince(startedAt, now()) > PUSH_RUN_BUDGET_MS) { total.cut++; continue; }
+            if (ledger && ledger.data && ledger.data.day === zone.day) return;
+            const sched = await readJson(schedKey);
+            if (!sched || !sched.data || !Array.isArray(sched.data.times)) return;
+            if (elapsedSince(sched.data.at, startedAt) > PUSH_SCHEDULE_MAX_AGE_MS) return;
+            const count = sched.data.times.filter((t) => typeof t === 'number' && t > startedAt && t <= startedAt + PUSH_EXPIRY_WINDOW_MS).length;
+            if (!count) return;
+            if (!claimOpen()) { total.cut++; return; }
             const claim = await store.setJSON(ledgerKey, { day: zone.day, at: startedAt }, ledger ? { onlyIfMatch: ledger.etag } : { onlyIfNew: true });
-            if (!claim || !claim.modified) continue;
+            if (!claim || !claim.modified) return;
             const index = await readJson('bykey/' + keyId);
             const keys = index && index.data && Array.isArray(index.data.subs) ? index.data.subs.filter((k) => typeof k === 'string') : [];
-            if (!keys.length) continue;
+            if (!keys.length) return;
             total.keys++;
             const tally = await sendToKeys(keys, expiryMessage(count, sched.data.at), startedAt);
             Object.keys(tally).forEach((k) => { total[k] = (total[k] || 0) + tally[k]; });
         }
+        let next = 0;
+        async function worker() {
+            while (next < scheds.length) {
+                if (!claimOpen()) { total.cut += scheds.length - next; next = scheds.length; return; }
+                const schedKey = scheds[next++];
+                try { await remind(schedKey); } catch (_) { total.fail++; }
+            }
+        }
+        const workers = [];
+        for (let w = 0; w < Math.min(PUSH_EXPIRY_CONCURRENCY, scheds.length); w++) workers.push(worker());
+        await Promise.all(workers);
         return total;
     }
 

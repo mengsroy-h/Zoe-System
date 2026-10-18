@@ -1,4 +1,4 @@
-const APP_VERSION = '2.24.19';
+const APP_VERSION = '2.24.20';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3226,6 +3226,8 @@ async function deleteNotice(id) {
 
 const SB_ADMIN_CONFIG_KEY = 'zoekeygen_supabase_v1';
 const SB_ADMIN_TIMEOUT_MS = 15000;
+const SB_ADMIN_PAGE_ROWS = 500;
+const SB_ADMIN_LIST_MAX_PAGES = 200;
 const SB_INVITE_VALID_HOURS = 168;
 const SB_RESET_VALID_HOURS = 24;
 const SB_TENANT_DAYS_MAX = 3650;
@@ -3252,6 +3254,7 @@ let sbTenantCache = [];
 let sbMemberCache = [];
 let sbDeviceCache = [];
 let sbDeviceReadFailed = false;
+let sbMemberReadFailed = false;
 let sbTenantReadFailed = false;
 let sbLastInvite = null;
 let sbLastResetCode = '';
@@ -3307,6 +3310,18 @@ async function sbAdminRequest(session, path, method, body) {
     let parsed = null;
     try { parsed = out.body ? JSON.parse(out.body) : null; } catch (e) { parsed = null; }
     return { ok: !!out.res.ok, status: out.res.status, body: parsed };
+}
+
+async function sbAdminList(session, path) {
+    const rows = [];
+    for (let page = 0; page < SB_ADMIN_LIST_MAX_PAGES; page++) {
+        const out = await sbAdminRequest(session, path + '&limit=' + SB_ADMIN_PAGE_ROWS + '&offset=' + rows.length, 'GET');
+        if (!out.ok || !Array.isArray(out.body)) return out;
+        if (!out.body.length) return { ok: true, status: out.status, body: rows };
+        for (const row of out.body) rows.push(row);
+        if (!sbAdminIsCurrent(session)) return { ok: false, status: 0, body: null };
+    }
+    return { ok: false, status: 0, body: null };
 }
 
 function sbAdminIsCurrent(session) {
@@ -3401,6 +3416,7 @@ function sbAdminReset(expired) {
     sbMemberCache = [];
     sbDeviceCache = [];
     sbDeviceReadFailed = false;
+    sbMemberReadFailed = false;
     sbTenantReadFailed = false;
     sbLastInvite = null;
     sbLastResetCode = '';
@@ -3467,21 +3483,29 @@ async function sbAdminRefresh() {
     let devices = null;
     try {
         [tenants, members, devices] = await Promise.all([
-            sbAdminRequest(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc', 'GET'),
-            sbAdminRequest(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc', 'GET'),
-            sbAdminRequest(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc', 'GET').catch(() => null)
+            sbAdminList(session, '/rest/v1/tenants?select=id,name,branch_code,expires_at,revoked&order=created_at.desc,id.asc'),
+            sbAdminList(session, '/rest/v1/tenant_members?select=user_id,tenant_id,username,role&order=created_at.asc,user_id.asc'),
+            sbAdminList(session, '/rest/v1/member_devices?select=tenant_id,serial,user_id,model,platform,last_seen&order=last_seen.desc,tenant_id.asc,serial.asc').catch(() => null)
         ]);
     } catch (e) {
         tenants = null;
     }
     if (!sbAdminIsCurrent(session)) return;
     if (tenants && tenants.status === 401) { sbAdminReset(true); return; }
-    sbTenantReadFailed = !tenants || !tenants.ok || !Array.isArray(tenants.body);
-    sbTenantCache = sbTenantReadFailed ? [] : tenants.body;
-    sbMemberCache = members && members.ok && Array.isArray(members.body) ? members.body : [];
-    sbDeviceReadFailed = !devices || !devices.ok || !Array.isArray(devices.body);
-    sbDeviceCache = sbDeviceReadFailed ? [] : devices.body;
+    const tenantRows = sbAdminRows(tenants);
+    const memberRows = sbAdminRows(members);
+    const deviceRows = sbAdminRows(devices);
+    sbTenantReadFailed = !tenantRows;
+    sbMemberReadFailed = !memberRows;
+    sbDeviceReadFailed = !deviceRows;
+    sbTenantCache = tenantRows || [];
+    sbMemberCache = memberRows || [];
+    sbDeviceCache = deviceRows || [];
     renderSbTenantList();
+}
+
+function sbAdminRows(res) {
+    return res && res.ok && Array.isArray(res.body) ? res.body : null;
 }
 
 function sbTenantState(row) {
@@ -3559,8 +3583,8 @@ function renderSbTenantList() {
     };
     body.innerHTML = sbTenantCache.map((row) => {
         const sbStatusHtml = badges[sbTenantState(row)];
-        const sbMembersHtml = sbMemberCache.filter((m) => m.tenant_id === row.id)
-            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-';
+        const sbMembersHtml = sbMemberReadFailed ? '<span class="sb-member">⚠️ អានបញ្ជីគណនីមិនបាន</span>' : (sbMemberCache.filter((m) => m.tenant_id === row.id)
+            .map((m) => (m.role === 'owner' ? '<span class="sb-member sb-owner" title="ម្ចាស់ហាង">' : '<span class="sb-member">') + escapeHtml(m.username) + '</span>').join('') || '-');
         const sbDevicesCell = sbDevicesHtml(row.id);
         const until = Date.parse(String(row.expires_at || ''));
         const untilText = isFinite(until) ? new Date(until).toLocaleDateString('km-KH') : '-';
@@ -3682,6 +3706,7 @@ async function sbTenantAction(tenantId, action) {
     let args = null;
     let rpc = 'admin_update_tenant';
     if (action === 'sb-invite') {
+        if (sbMemberReadFailed) { alert('អានបញ្ជីគណនីមិនបាន — សូមចុច 🔄 Refresh មុនចេញកូដអញ្ជើញ!'); return; }
         const hasOwner = sbMemberCache.some((m) => m.tenant_id === tenant.id && m.role === 'owner');
         const role = hasOwner ? 'member' : 'owner';
         if (!confirm('ចេញកូដអញ្ជើញ' + (role === 'owner' ? 'ម្ចាស់ហាង' : 'បុគ្គលិក') + 'សម្រាប់ «' + tenant.name + '»?')) return;

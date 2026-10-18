@@ -13,7 +13,7 @@ TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវ�
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.50.125`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.50.126`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។
 
 - បង្ហាញ **២ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ និងខាងក្រោមរបា Slide។ ចុចលើលេខ
@@ -439,6 +439,7 @@ Netlify ត្រូវមាន env `SUPABASE_URL` · `SUPABASE_PUBLISHABLE_KEY
 1. បើក `https://<site ZoeW>/.netlify/functions/push?op=config` ក្នុង browser ➜ ត្រូវឃើញ `"web": true` (PWA · iPhone) និង `"fcm": true`
    (App Android)។ `false` ➜ env ខ្វះ/ខុសទម្រង់ ឬមិនទាន់ Deploy ក្រោយកែ env។
 2. Netlify ➜ **Logs ➜ Functions ➜ `push-cron`** (មួយបន្ទាត់រាល់ ៥ នាទី) ៖ `"reason":"sent"` + ចំនួន `sent` · `fail` · `gone` = បានផ្ញើ ·
+   `"partial"` = ឧបករណ៍ច្រើនជាងពិដាន run មួយ ➜ run បន្ទាប់ (៥ នាទី) ផ្ញើបន្តទៅឧបករណ៍ដែលនៅសល់ (ម្តងគត់ក្នុងមួយឧបករណ៍) ·
    `"none"` = គ្មានដំណឹងថ្មី · `"stale"` = ដំណឹងចាស់ជាង ២៤ ម៉ោង (មិនផ្ញើ) · `"notices:read"` = អានដំណឹងពី License Project មិនបាន ·
    `fail` > 0 ➜ កូនសោ VAPID ឬ `FCM_SERVICE_ACCOUNT` មិនត្រូវ Project (ត្រូវជា **License Project** ដដែលនឹង `google-services.json` របស់ APK)។
 3. ផ្ញើដំណឹងសាកពី ZoeKeyGen (ដំណឹងថ្មី) ➜ ទូរស័ព្ទទទួលក្នុង ≤ ៥ នាទី (ជាធម្មតាភ្លាម)។

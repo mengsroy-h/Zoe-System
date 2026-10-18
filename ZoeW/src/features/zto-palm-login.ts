@@ -159,6 +159,14 @@ async function palmProxyKey(cfg) {
     return { key: cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : cfg.headerValue || '', typed: false };
 }
 
+async function palmRequestCredentials(cfg) {
+    const base = palmFunctionBase();
+    if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
+    const identityHeaders = {};
+    const [sent] = await Promise.all([palmProxyKey(cfg), addZtoIdentityHeader({ url: base.href }, identityHeaders)]);
+    return { base, sent, identityHeaders };
+}
+
 export async function submitZtoPalmLogin(event?: Event) {
     event?.preventDefault();
     if (viewState.palmLoginBusy) return;
@@ -178,10 +186,7 @@ export async function submitZtoPalmLogin(event?: Event) {
     viewState.palmLoginBusy = true;
     viewState.palmLoginStatus = 'កំពុងចូល ZTO Palm…';
     try {
-        const base = palmFunctionBase();
-        if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const identityHeaders = {};
-        const [sent] = await Promise.all([palmProxyKey(cfg), addZtoIdentityHeader({ url: base.href }, identityHeaders)]);
+        const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
         if (!current()) return dropped();
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }
@@ -249,10 +254,7 @@ export async function connectSharedZtoPalm() {
     viewState.palmLoginBusy = true;
     viewState.palmLoginStatus = 'កំពុងរក Login Palm របស់ហាងលើ Server…';
     try {
-        const base = palmFunctionBase();
-        if (!ztoIdentityTargetTrusted(base.href)) throw new Error('host');
-        const identityHeaders = {};
-        const [sent] = await Promise.all([palmProxyKey(cfg), addZtoIdentityHeader({ url: base.href }, identityHeaders)]);
+        const { base, sent, identityHeaders } = await palmRequestCredentials(cfg);
         const proxyKey = sent.key;
         if (!current()) return;
         if (!proxyKey) { viewState.palmLoginStatus = 'សូមបញ្ចូលសោភ្ជាប់ ZoeW ក្នុងប្រអប់ Secret ខាងក្រោម។'; return; }

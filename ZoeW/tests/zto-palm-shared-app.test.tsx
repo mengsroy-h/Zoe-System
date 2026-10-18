@@ -18,6 +18,7 @@ import { appLocalStore } from '../src/core/storage';
 import { viewState } from '../src/core/view-state';
 import { openLookupApiConfigModal } from '../src/features/lookup-config';
 import { buildLookupRequestHeaders } from '../src/features/lookup-api';
+import { healthLookupRow } from '../src/features/health-check';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { attemptAutoLookup } from '../src/features/auto-lookup';
 import { scanState } from '../src/core/state';
@@ -57,6 +58,22 @@ function tokensSent() {
 }
 
 describe.each(BACKENDS)('ZTO Palm Login ម្តង ➜ គ្រប់ទូរស័ព្ទក្នុងហាង (backend %s)', (backend) => {
+    it('🩺 Health session ហាង៖ token ងាប់ ➜ Server renew ➜ ZTO ទទួលយក ទើប ✅', async () => {
+        await setupWorld(backend, 'require');
+        useSharedBlobs();
+        const body = await palmLoginBody('health-user', identityToken(backend));
+        await storePalmConfig(backend, body.sessionToken, SITE, { palmShared: true, palmTokenEnc: undefined });
+        world.deadTokens.add(world.issued[world.issued.length - 1]);
+        world.logins.length = 0;
+        world.zto.length = 0;
+        const row = await healthLookupRow();
+        expect(row.state).toBe('ok');
+        expect(row.icon).toBe('✅');
+        expect(row.detail).toContain('របស់ហាងលើ Server');
+        expect(world.logins).toHaveLength(1);
+        expect(world.zto.filter((value) => value.startsWith('list:'))).toHaveLength(1);
+        expect(stored()).not.toHaveProperty('palmTokenEnc');
+    });
     it('A Login ➜ session ហាងលើ Server · ទូរស័ព្ទមិនទុក session · B ប្រើ Login ហាង ➜ ទាញបញ្ជីដោយមិន Login · token ងាប់ ➜ Server Login ឡើងវិញ', async () => {
         await setupWorld(backend, 'off');
         useSharedBlobs();

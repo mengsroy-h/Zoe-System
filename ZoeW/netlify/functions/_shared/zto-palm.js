@@ -677,7 +677,19 @@ async function palmPost(event, query, proxyKey, keys, deps, env) {
     return await palmLogin(event, { username, cipher: passwordCipher(password, keys), deviceSn }, proxyKey, keys, deps, env, false);
 }
 
+async function palmHealth(session, keys, deps) {
+    const access = await deps.lookupAccess();
+    if (access && access.response) return access.response;
+    if (otherBranch(access, session.site)) return json(403, { code: 'ZTO_OTHER_BRANCH', provider: 'zto-palm' });
+    const upstream = await requestPalm(DISPATCH_LIST_PATH, { billStatus: '1', status: 0, pageNum: 1, pageSize: 1 }, session.token, keys,
+        deps.upstreamMs(), null, true);
+    if (upstream.authRejected || AUTH_EXPIRED_RE.test(String(upstream.statusCode || ''))) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm' });
+    if (upstream.status !== true) return json(502, { code: 'ZTO_UPSTREAM_REJECTED', reason: upstreamReason(upstream) });
+    return json(200, { success: true, provider: 'zto-palm', verified: true });
+}
+
 async function palmGet(query, session, keys, deps) {
+    if (query.health === '1') return await palmHealth(session, keys, deps);
     if (query.list === '1') return await palmList(query, session, keys, deps);
     const barcode = String(query.barcode || '').trim();
     if (!BARCODE_RE.test(barcode)) return json(400, { code: 'ZTO_BARCODE_INVALID' });
@@ -775,7 +787,13 @@ async function handlePalm(event, query, proxyKey, deps, env = process.env) {
         if (query.palm === 'status') return await palmStatus(event, proxyKey, deps, env);
         const resolved = await resolvePalmSession(event, proxyKey, env, deps);
         if (query.diag === '1') {
+            if (query.verify === '1') {
+                if (!resolved.session) return json(401, { code: 'ZTO_AUTH_EXPIRED', provider: 'zto-palm', reason: resolved.reason });
+                const checked = await palmGetShared({ health: '1' }, resolved, proxyKey, keys, deps, env);
+                if (checked.statusCode !== 200) return checked;
+            }
             const body = { success: true, provider: 'zto-palm', configured: true, session: sessionReport(resolved) };
+            if (query.verify === '1') body.verified = true;
             if (typeof deps.timingReport === 'function') body.upstreamTiming = deps.timingReport();
             if (typeof deps.runtimeReport === 'function') body.runtime = deps.runtimeReport();
             return json(200, body);

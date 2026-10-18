@@ -46,6 +46,41 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Palm login and lookup through the real Netlify handler', () => {
+    it('🩺 verify session ប្រើ read តូចមួយ មុនបញ្ជាក់ថា Palm ដំណើរការ', async () => {
+        const { sessionToken: session } = await login();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: { list: [{ billCode: CODE, consigneeMobile: '012345678' }] } })));
+        const result = await call({ palm: '1', diag: '1', verify: '1' }, session);
+        expect(result.statusCode).toBe(200);
+        expect(JSON.parse(result.body)).toMatchObject({ success: true, provider: 'zto-palm', verified: true });
+        expect(fetch).toHaveBeenCalledOnce();
+        const [url, init] = vi.mocked(fetch).mock.calls[0];
+        expect(String(url)).toBe('https://aargus-api.ztoglobal.net/zto/dispatch/v1/queryDispatchList');
+        expect(JSON.parse(String(init?.body))).toEqual({ billStatus: '1', status: 0, pageNum: 1, pageSize: 1 });
+        expect(init?.headers).toMatchObject({ 'x-token': TOKEN });
+        expect(result.body).not.toContain(TOKEN);
+        expect(result.body).not.toContain(CODE);
+        expect(result.body).not.toContain('012345678');
+    });
+    it('🩺 verify គ្មាន session មិនអះអាងថាជោគជ័យ និងមិនហៅ ZTO', async () => {
+        vi.stubGlobal('fetch', vi.fn());
+        const result = await call({ palm: '1', diag: '1', verify: '1' });
+        expect(result.statusCode).toBe(401);
+        expect(JSON.parse(result.body)).toMatchObject({ code: 'ZTO_AUTH_EXPIRED' });
+        expect(fetch).not.toHaveBeenCalled();
+    });
+    it.each([['expired', 401], ['rate', 429], ['unavailable', 502], ['json', 502]])('🩺 verify %s មិនបៃតងក្លែងក្លាយ', async (kind, status) => {
+        const { sessionToken: session } = await login();
+        vi.stubGlobal('fetch', vi.fn(async () => {
+            if (kind === 'expired') return upstream({ status: false, statusCode: 'token_expired' });
+            if (kind === 'rate') return upstream({}, 429);
+            if (kind === 'unavailable') return upstream({}, 503);
+            return new Response('invalid JSON');
+        }));
+        const result = await call({ palm: '1', diag: '1', verify: '1' }, session);
+        expect(result.statusCode).toBe(status);
+        expect(JSON.parse(result.body).verified).not.toBe(true);
+        expect(fetch).toHaveBeenCalledOnce();
+    });
     it('matches Java AES/ECB/PKCS5Padding and preserves the Palm login shape', async () => {
         const result = await login();
         const [url, init] = vi.mocked(fetch).mock.calls[0];

@@ -101,6 +101,19 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.50.131] — 2026-10-19 · ZoeW ៖ Health Check ផ្ទៀង Session Palm ជាមួយ ZTO (A249)
+
+**ZoeW** (`zoew-v394` ➜ `zoew-v395`) · **ZoeKeyGen `2.24.21` មិនប្រែ**។ សំណើម្ចាស់គម្រោង៖ មាន Session Palm តែជួរ Health នៅតែសញ្ញាព័ត៌មាន; ម្ចាស់គម្រោងបញ្ជាក់ថា Palm លឿនជាងមុនលើ preview។
+
+- Health Palm ស្នើ `diag=1&verify=1`; Function អាន `queryDispatchList` តែ ១ ជួរ ដើម្បីបញ្ជាក់ថា ZTO ទទួល session។ ចម្លើយមិនផ្ញើ barcode/លេខទូរស័ព្ទ/token មក Health។
+- Session របស់ឧបករណ៍ ឬ shared ដែលបានផ្ទៀងផ្ទាត់ ➜ ✅; shared token ដែល ZTO បដិសេធ ➜ renew តាម single-flight/CAS ដែលមានស្រាប់ រួចសាកម្តងទៀត។ គ្មាន session, ផុតកំណត់, សាខាផ្សេង, rate limit ឬបណ្តាញខូច មិនបង្ហាញជោគជ័យ។
+- ផ្ញើ ID token ទៅតែ host ដែលទុកចិត្ត ហើយរង់ចាំរៀបចំ credential ទាំងអស់។ Function ចាស់ដែលមិនស្គាល់ verify នៅតែ ℹ️; ចម្លើយផ្ទៀងផ្ទាត់មិនច្បាស់ជា ⚠️ ហើយសេចក្តីសង្ខេបក៏មិនបៃតង។
+- រួបរួមការរៀបចំ credential របស់ Login/shared connect ទៅ `palmRequestCredentials()` បន្ទាប់ពី code-duplication guard រកឃើញប្លុកស្ទួន។
+
+**អ្នកយាម**៖ `tests/zto-palm-login.test.tsx` · `tests/zto-palm-server.test.ts` · `tests/zto-palm-backends.test.tsx` · `tests/zto-palm-shared-app.test.tsx` · `health-check-test` · `code-duplication-test`។ A249 កត់ត្រាភស្តុតាងមុន/ក្រោយកែ។
+
+**សកម្មភាពដោយដៃ**៖ deploy App និង Function ជាមួយគ្នា (PR preview ធ្វើដោយស្វ័យប្រវត្តិ) រួចបើក «ពិនិត្យប្រព័ន្ធ» ម្តងទៀត។ APK ត្រូវដំឡើង build ថ្មីដើម្បីប្រើ Health ថ្មី។ គ្មាន rules/migration/secret ថ្មី។
+
 ### [2.50.130] — 2026-10-19 · ZoeW + ZoeKeyGen `2.24.21` ៖ Deep audit — ការពារ log · លទ្ធផលសរសេរ Supabase · ផ្ទាំងស្កេនផ្តេក · Palm រៀបចំសំណើព្រមគ្នា
 
 **ZoeW** (`zoew-v393` ➜ `zoew-v394`) និង **ZoeKeyGen** (`zoekeygen-v131` ➜ `zoekeygen-v132`)។
@@ -4478,6 +4491,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 - Recheck unknown Sign ធ្លាប់អាន status ម្តងមួយ; barrier តម្រូវ ៤ in-flight ធ្លាក់ពិត។ ប្រើ pool ដែលមានស្រាប់ជាមួយពិដាន ៤; ប្រមូលចម្លើយរួច Save តាមលំដាប់ដើម ដើម្បីមិនបន្ថែម write race ក្នុង item តែមួយ។ Failure ឈប់ចែកការងារថ្មី និងរង់ចាំសំណើចាស់មុនលែង busy; auth/database/config/modal switch មិនបិទកញ្ចប់តាមចម្លើយយឺត (negative tests ៥ FAIL មុនកែ)។
 - Controlled benchmark រត់មុខងារពិតដោយ status latency សិប្បនិម្មិត ២៥ ms៖ ៨ កញ្ចប់ ២១៤ ms មុនកែ និង ៥៣ ms ក្រោយកែ; GET ចំនួន ៨ ដដែល និង Save ម្តងមួយ។ តេស្ត login/sign/token origin PASS ៩៦។ មិនបង្កើន concurrency របស់ list/track, មិនបង្កើន timeout និងមិនប្ដូរ API សរសេរ Sign ដោយគ្មាន contract ពិត។
 - មុនធ្វើបច្ចុប្បន្នភាព LOCK តែ `zto-palm-login.ts` និង `zto-list-sync.ts`៖ ZTO unit suite PASS 799 tests/43 files (លើកលែង lock ដែលកំពុងរង់ចាំ hash តាមលំដាប់ច្បាប់) និង audit ZTO ទាំង 11 ឧបករណ៍ PASS រួម `zto-list-sync` 595 និង `zto-sync-banner` 202។ Hash និង assertions ផ្សេងរក្សាដដែល។
+- Full strict លើ `c61e816b` រត់គ្រប់ 213 checker៖ 212 PASS, code-duplication FAIL 1, SKIP/PARTIAL 0។ Guard ចាប់ប្លុក credential 241 តួនៅ Login/shared connect; រួបរួម helper រួច ZTO suite 799 និង guard ZTO 11 + duplication + function-surface + doc-scope PASS។ មិនប្ដូរ runner state ឬចាត់ exit 1 ថាបៃតង។ Stress លើ commit នេះ PASS៖ Supabase 8 ហាង × 3 devices × 40 ជុំ (2408 `zoe_write`, cross-shop 27, return race 52, offline/online 191, offline/reload 151); Firebase 3 devices × 5 × 30 និង money fuzz 14 × 50។
+
+### 2026-10-19 — A249 ៖ Health Palm មាន Session តែមិនទាន់បញ្ជាក់ការភ្ជាប់
+
+- រូប Android របស់ម្ចាស់គម្រោងបង្ហាញ ℹ️ «មាន session Palm របស់ហាងលើ Server» ទោះ Lookup/ទាញបញ្ជីប្រើបាន។ Diagnostic ចាស់បញ្ជាក់តែការរក្សាទុក session ហើយ client តែងតែប្រើ `info`។ Negative tests 8 FAIL លើផ្លូវ App និង Function មុនបន្ថែម verification។
+- `verify=1` អានតែ `queryDispatchList` `{ billStatus:'1', status:0, pageNum:1, pageSize:1 }`; auth/branch gates ដូចមុខងារអានផ្សេង។ ការពិនិត្យមានតែពេលបើក Health ឬចុចពិនិត្យម្តងទៀត; មិនបន្ថែម timer ឬ plaintext cache។ Shared auth failure ប្រើការបន្ត session ដែលមានស្រាប់; timeout និង rate limit មិនត្រូវបង្កើន។
+- App + Function ពិតលើ Firebase/Supabase × identity off/optional/require វាស់ contract `session.source = device/shared` និង ✅; សាខាផ្សេងមិនហៅ ZTO។ តេស្ត shared renew លើ backend ទាំងពីរបញ្ជាក់ថា renew ម្តង ហើយទើប ✅ ក្រោយ ZTO ទទួល។
+- Envelope ខូច (`verified` string · source មិនស្គាល់ · success/configured មិនពិត) ធ្លាប់បាន info ហើយ summary បៃតង; negative controls 4 FAIL មុនកែ validation។ ឥឡូវ ⚠️ ទាំងជួរ និង summary; response ចាស់ដែលគ្មាន `verified` នៅតែ info ដោយមិនអះអាងថា session បានផ្ទៀងផ្ទាត់។ តេស្ត host មិនទុកចិត្តរក្សាការមិនផ្ញើ session/ID token។
+- មុនប្ដូរ hash តែ `zto-palm-login.ts` (helper រួម) និង `_shared/zto-palm.js` (Health verify)៖ ZTO suite PASS 822 tests/43 files និង audit ZTO 11 + health-check + code-duplication + function-surface + secret-hygiene + doc-scope PASS ទាំង 16។ Typecheck/lint PASS; មិនកែ assertions ឬពិដាន checker។
 
 
 ### 2026-10-18 — «ខុសទីតាំង» តាមមូលហេតុ ZTO · រូប Gallery តាម EXIF (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីអោយស្អាតទៅ» · A234 · A235 · ពិនិត្យឡើងវិញ A236 · A237 · A238) · ត្រា «បញ្ជូនចេញ» (A239 · A240)

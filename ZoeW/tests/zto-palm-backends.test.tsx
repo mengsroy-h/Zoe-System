@@ -9,6 +9,7 @@ import { dataState, ztoState } from '../src/core/state';
 import { getLookupApiConfig } from '../src/features/lookup-config';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { closeZtoSignedBarcodes } from '../src/features/zto-status';
+import { healthLookupRow } from '../src/features/health-check';
 import {
     ARRIVED, OTHER_SITE, SIGNED_ONLY, SITE, fn, fx, identityToken, noteText, pulledRows, setupWorld, signIn, storePalmConfig,
     supabaseToken, teardownWorld, toastTexts, world, type Backend, type IdentityMode
@@ -31,6 +32,24 @@ const SESSION_EXPIRED = 'Session ZTO Palm ផុតកំណត់';
 afterEach(() => teardownWorld());
 
 describe.each(BACKENDS)('ZTO Palm ៖ ទាញបញ្ជីលើ backend %s', (backend) => {
+    it.each(MODES)('🩺 Health %s ផ្ទៀង session តាម App និង Function ពិត រួចបង្ហាញ ✅', async (mode) => {
+        await setupWorld(backend, mode);
+        world.zto = [];
+        const row = await healthLookupRow();
+        expect(row.state).toBe('ok');
+        expect(row.icon).toBe('✅');
+        expect(row.detail).toContain('ZTO ទទួលយក');
+        expect(world.zto).toHaveLength(1);
+        expect(world.zto[0]).toContain('list:');
+    });
+    it('🩺 Health សាខាផ្សេងមិនបៃតង និងមិនហៅ ZTO', async () => {
+        await setupWorld(backend, 'require', { site: OTHER_SITE });
+        world.zto = [];
+        const row = await healthLookupRow();
+        expect(row.state).toBe('warn');
+        expect(row.detail).toContain('សាខាផ្សេង');
+        expect(world.zto).toEqual([]);
+    });
     it.each(MODES)('ZTO_DETAIL_IDENTITY=%s ៖ ជួរ · ម៉ោងមកដល់ · ប្រភព · បិទរួច/មិនទាន់ ដូចគ្នាគ្រប់ backend', async (mode) => {
         await setupWorld(backend, mode);
         await runZtoListSyncPreview();

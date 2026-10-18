@@ -26,7 +26,7 @@ const TARGETS = {
 
 // variables in app.js that hold an object destined for each node
 const ITEM_VARS = new Set(['item', 'newItem', 'entry', 'updated', 'targetItem', 'itemToRestore',
-    'resultingLiveItem', 'currentItem', 'freshItem', 'revertItem', 'existingItem']);
+    'currentItem', 'freshItem', 'revertItem', 'existingItem']);
 const TRASH_VARS = new Set(['trashItem', 'removed', 'deletedItem']);
 const BARCODE_VARS = new Set(['b', 'bc', 'barcode', 'restoredBc', 'newBarcode', 'revertB']);
 // ⛔ ZoeW ជា React ៖ view model ក្នុងឃ្លាំង (មិនមែន payload Firebase) ដែលកូដហៅថា `item` ដែរ ➜ ការសម្គាល់តាម **ប្រភពនៃ

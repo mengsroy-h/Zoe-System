@@ -1,21 +1,50 @@
 import { noteAppLockExcuse } from '../features/app-lock';
 import { attachPalmSignStream, videoElement } from '../app/refs';
 import { scanState } from '../core/state';
-import { createScratchCanvas } from '../platform/document-io';
+import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { withTimeout } from './network';
-import { decodeBarcodeFromCanvasManual, initScanEngine } from './scan-engine';
+import { initScanEngine, readCanvasSymbols } from './scan-engine';
+import { nativeScanResults, scanQrReader } from './scan-formats';
+
+export const PALM_SIGN_PHOTO_MAX_DIM = 1280;
+
+export const PALM_SIGN_LIVE_FAST_DIM = 960;
+
+export const PALM_SIGN_LIVE_GAP_MS = 60;
+
+export const PALM_SIGN_LIVE_DEEP_EVERY = 4;
+
+export const PALM_SIGN_IMAGE_DIMS = [1600, 2600];
+
+export const PALM_SIGN_IMAGE_TIMEOUT_MS = 10000;
+
+export type PalmSignMatch = (text: string) => string;
+
+export function palmSignPickCode(results, match: PalmSignMatch) {
+    const valid = (Array.isArray(results) ? results : []).filter((r) => r && r.isValid !== false && String(r.text || '').trim());
+    for (const r of valid) {
+        const known = match(String(r.text).trim());
+        if (known) return known;
+    }
+    const linear = valid.find((r) => r.format !== 'QRCode');
+    return linear ? String(linear.text).trim() : '';
+}
+
+function drawScaled(source, width: number, height: number, maxDim: number) {
+    const canvas = createScratchCanvas();
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context || !canvas.width || !canvas.height) return null;
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    return canvas;
+}
 
 function frame() {
     const video = videoElement('palmSignVideo');
     if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
-    const canvas = createScratchCanvas();
-    const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) return null;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas;
+    return drawScaled(video, video.videoWidth, video.videoHeight, PALM_SIGN_PHOTO_MAX_DIM);
 }
 
 export function palmSignFramePhoto(canvas = frame()) {
@@ -25,11 +54,51 @@ export function palmSignFramePhoto(canvas = frame()) {
     return photo.startsWith('data:image/jpeg;base64,') && photo.length <= 1200000 ? photo.split(',')[1] : '';
 }
 
-export function startPalmSignCamera(onScan: (code: string, photo: string) => void, onError: () => void, wants: (code: string) => boolean = () => true) {
+async function nativeCode(canvas, ms: number, match: PalmSignMatch) {
+    if (!scanState.nativeDetector) return '';
+    return palmSignPickCode(nativeScanResults(await withTimeout(scanState.nativeDetector.detect(canvas), ms, 'Palm scan timeout')), match);
+}
+
+async function readCode(canvas, deep: boolean, match: PalmSignMatch, ms: number) {
+    return palmSignPickCode(await withTimeout(readCanvasSymbols(scanQrReader(deep), canvas), ms, 'Palm scan timeout'), match);
+}
+
+export async function palmSignDecodeImage(img: HTMLImageElement, match: PalmSignMatch) {
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    const photoCanvas = drawScaled(img, width, height, PALM_SIGN_PHOTO_MAX_DIM);
+    if (!photoCanvas) throw new Error('canvas');
+    let code = '';
+    try { code = await nativeCode(photoCanvas, PALM_SIGN_IMAGE_TIMEOUT_MS, match); } catch {}
+    for (const dim of PALM_SIGN_IMAGE_DIMS) {
+        if (code && match(code)) break;
+        if (dim !== PALM_SIGN_IMAGE_DIMS[0] && Math.max(width, height) <= PALM_SIGN_IMAGE_DIMS[0]) break;
+        const canvas = drawScaled(img, width, height, dim);
+        if (!canvas) break;
+        try { code = await readCode(canvas, true, match, PALM_SIGN_IMAGE_TIMEOUT_MS) || code; } catch {}
+    }
+    return { canvas: photoCanvas, code };
+}
+
+export async function palmSignPhotoFromFile(file: File, match: PalmSignMatch) {
+    if (!file.type.startsWith('image/') || file.size > 20000000) throw new Error('image');
+    const url = URL.createObjectURL(file);
+    try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => loadScratchImage(url, resolve, reject));
+        const decoded = await palmSignDecodeImage(img, match);
+        const data = palmSignFramePhoto(decoded.canvas);
+        if (!data) throw new Error('size');
+        return { data, barcode: decoded.code };
+    } finally { URL.revokeObjectURL(url); }
+}
+
+export function startPalmSignCamera(onScan: (code: string, photo: string) => void, onError: () => void, wants: (code: string) => boolean = () => true,
+    match: PalmSignMatch = (text) => text) {
     let cancelled = false;
     let stream: MediaStream | null = null;
     let owned = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let round = 0;
     const active = () => !cancelled && !!videoElement('palmSignVideo');
     const scan = async () => {
         if (!active()) return;
@@ -37,15 +106,19 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
             const canvas = frame();
             if (canvas) {
                 let code = '';
-                if (scanState.nativeDetector) code = (await withTimeout(scanState.nativeDetector.detect(canvas), 2000, 'Palm scan timeout'))[0]?.rawValue || '';
-                if (!code && scanState.codeReader) code = await withTimeout(decodeBarcodeFromCanvasManual(scanState.codeReader, canvas), 2000, 'Palm scan timeout') || '';
+                if (scanState.nativeDetector) code = await nativeCode(canvas, 2000, match);
+                if (!code) {
+                    const deep = ++round % PALM_SIGN_LIVE_DEEP_EVERY === 0;
+                    const target = deep ? canvas : drawScaled(canvas, canvas.width, canvas.height, PALM_SIGN_LIVE_FAST_DIM);
+                    if (target) code = await readCode(target, deep, match, 2000);
+                }
                 if (code && active() && wants(code)) {
                     const photo = palmSignFramePhoto(canvas);
                     if (photo) onScan(code, photo);
                 }
             }
         } catch {}
-        if (active()) timer = setTimeout(() => void scan(), 150);
+        if (active()) timer = setTimeout(() => void scan(), PALM_SIGN_LIVE_GAP_MS);
     };
     void (async () => {
         try {

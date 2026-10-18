@@ -5,6 +5,7 @@ import { ztoScanStampMillis } from '../core/timezone';
 import { barcodeReturnCounts, itemHasRestoreMarkers } from '../domain/barcode';
 import { claimAndCleanupItem } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
+import { noteZtoReturnedEvidence, scheduleZtoFinalMarks } from './zto-final-marks';
 import { ztoAutoCloseEnabled, ztoStatusFeatureConfig } from './zto-status';
 
 export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory, signedCodes?) {
@@ -44,7 +45,9 @@ export function removeReturnedZtoBarcodes(returned, dataToScan = dataState.scanH
     const targets = ztoReturnedTargets(returned, dataToScan, signedCodes);
     let queued = 0;
     for (let i = 0; i < targets.length; i++) {
-        claimAndCleanupItem(targets[i].itemId, 'abandon', { codes: targets[i].codes, returnedAt: targets[i].returnedAt });
+        targets[i].returnedAt.forEach((at, code) => noteZtoReturnedEvidence(code, at));
+        Promise.resolve(claimAndCleanupItem(targets[i].itemId, 'abandon', { codes: targets[i].codes, returnedAt: targets[i].returnedAt }))
+            .then(scheduleZtoFinalMarks, scheduleZtoFinalMarks);
         queued += targets[i].codes.length;
     }
     return queued;

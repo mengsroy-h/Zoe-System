@@ -2,12 +2,12 @@ import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
-import { normalizeStoredPhone } from '../core/text';
+import { ZTO_SIGNED_REOPEN_TEXT, normalizeStoredPhone } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { claimCleanupTrashSlot, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
-import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, reconstructPickupSet } from '../domain/pickup';
+import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -207,9 +207,13 @@ export async function toggleCloseStatus(id?) {
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let signedRefused = false;
+    const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
+        pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
         pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
     if (freshItem) {
@@ -227,7 +231,10 @@ export async function toggleCloseStatus(id?) {
         }
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
-        pickupApplied = markPickupBarcodes(pickupScanDate, collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey), pickupSeed);
+        const localMarks = collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey);
+        pickupJournal.add(pickupScanDate, localMarks.map((mark) => mark.key));
+        pickupApplied = markPickupBarcodes(pickupScanDate, localMarks, pickupSeed);
+        pickupJournal.note(pickupApplied);
 
         refreshCurrentHistoryView();
     }
@@ -257,18 +264,21 @@ export async function toggleCloseStatus(id?) {
             }
         }
         if (pickupApplied) {
-            revertPickupMarks(pickupApplied);
+            const reverted = revertPickupMarks(pickupApplied);
+            pickupJournal.note(reverted);
             pickupApplied = null;
         }
     };
     const settleClose = async (closeResult, late) => {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (!serverApplied || !(closeResult && closeResult.committed)) {
             revertCloseLocally();
-            showToast('⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
+            pickupJournal.finish();
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : '⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
             return false;
         }
         reconcilePickupDeltaWithServer();
+        pickupJournal.finish();
         const collectedSaved = await reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
         if (collectedSaved === true) showToast(late
@@ -282,11 +292,16 @@ export async function toggleCloseStatus(id?) {
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;
+            signedRefused = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
             normalizeBarcodesOf(currentItem);
             const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
+            if (!desiredClosed && serverBarcodes && serverBarcodes.some(barcodeZtoSigned)) {
+                signedRefused = true;
+                return;
+            }
             serverPickupMarks = collectPickupMarks(currentItem, desiredClosed, getPickupPhoneKey(currentItem));
             if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
             currentItem.isClosed = desiredClosed;
@@ -304,10 +319,11 @@ export async function toggleCloseStatus(id?) {
         });
         return settleClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) return;
+            if (!closeIsCurrent()) { pickupJournal.finish(); return; }
             revertCloseLocally();
+            pickupJournal.finish();
             showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
         }, 'toggleCloseStatus')) {
@@ -317,6 +333,7 @@ export async function toggleCloseStatus(id?) {
         console.error("Error toggling close status: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
         revertCloseLocally();
+        pickupJournal.finish();
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

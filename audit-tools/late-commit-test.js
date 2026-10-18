@@ -136,7 +136,10 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     //    ការអះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3)។
     + (extractFn('noteCleanupJournalEntry') ? '' : '\n\nfunction noteCleanupJournalEntry() {}')
     + (extractFn('markCleanupJournalStage') ? '' : '\n\nfunction markCleanupJournalStage() {}')
-    + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}');
+    + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}')
+    // journal ស្ថិតិយករួច (zoew_pickup_journal_v1) មាន test ផ្ទាល់ខ្លួន (pickup-interrupted-close)
+    //    ➜ នៅទីនេះ stub ឥតប្រសិទ្ធិភាព ដើម្បីវាស់តែ commit យឺត។
+    + '\n\nfunction pickupIntentTracker() { return { add() {}, note() {}, finish() {} }; }';
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;

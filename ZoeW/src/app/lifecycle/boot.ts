@@ -16,6 +16,7 @@ import { refreshShopBoundUi } from '../../features/lookup-config';
 import { runSessionExpiryCheck } from '../../features/session';
 import { noteShopDevice } from '../../features/shop-device';
 import { retryZtoShopSweepListener } from '../../services/zto-shop-sweep';
+import { scheduleZtoFinalMarks } from '../../features/zto-final-marks';
 import { noteZtoUserActivity, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { refreshZtoPalmSession } from '../../features/zto-palm-login';
 import { isNativeApp } from '../../platform/native';
@@ -26,7 +27,7 @@ import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { loadDeviceInfo } from '../../features/device-info';
 import { consumePushOpenRequest, ensureNativePushListeners, handleServiceWorkerMessage, refreshPushStatus, resyncPush, syncExpirySchedule, watchPushIdentity } from '../../features/push';
-import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
+import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady, upgradeNativeDetectorForQr } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
 import { setupChromeAutoHide } from '../behaviors/chrome-autohide';
 import { sweepRecallHighlights } from '../../ui/history-refresh';
@@ -157,6 +158,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        scheduleZtoFinalMarks();
         refreshZtoPalmSession();
         probeDatabaseLivenessIfIdle();
     });
@@ -167,6 +169,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        scheduleZtoFinalMarks();
         refreshZtoPalmSession();
         notifyPeriodicTick();
         resyncPush();
@@ -190,6 +193,7 @@ function startScanEngine(): void {
         if ('BarcodeDetector' in window) {
             try {
                 scanState.nativeDetector = new BarcodeDetector({ formats: NATIVE_SCAN_FORMAT_NAMES });
+                void upgradeNativeDetectorForQr();
             } catch {
                 scanState.nativeDetector = null;
             }

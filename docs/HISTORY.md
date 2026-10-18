@@ -47,11 +47,12 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` (ពេលសរសេរ) = `cb082e4` **ZoeW 2.50.125 · ZoeKeyGen 2.24.19** (PR #330 · #331 merge រួច) · Deep audit ៦ ➜ **2.50.126** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
+- `main` (ពេលសរសេរ) = `3a943e5` **ZoeW 2.50.126 · ZoeKeyGen 2.24.20** (PR #332 merge រួច) · A225–A228 ➜ **2.50.127** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
+- ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
 - ⏳ **[2.50.95]** សកម្មភាព ១ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងបញ្ជីកញ្ចប់ពី ZTO)។
@@ -99,6 +100,33 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.127] — 2026-10-18 · ZoeW ៖ ស្ថិតិ «យករួច» ត្រឹមត្រូវ ទោះ App បិទពាក់កណ្តាលការបិទ/បើកកញ្ចប់ (A225) · កញ្ចប់ Sign/ត្រឡប់ក្នុង ZTO ចាក់សោ · ធុងសំរាមថ្មីនៅលើ (A226) · Sign មួយជុំ លឿន · iOS អាន QR (A227)
+
+**ZoeW** (`zoew-v390` ➜ `zoew-v391`) · rules ថ្មី (`firebase-database.rules.json` + `supabase/migrations/20261018011107_zoe_rules.sql`)។ សំណើម្ចាស់គម្រោង ៖ «ស៊ើប A225 បន្ត» ·
+«សម្រួលធុងសំរាម អោយធាតុថ្មីៗដែលចូលក្រោយគេនៅលើគេ … កញ្ចប់ដែលស្កេនត្រឡប់រួចដាច់ខាតត្រូវតែត្រឡប់ទៅសាខាកណ្តាលវិញ … កញ្ចប់ដែល sign បិទបញ្ជីពិតពី ZTO
+ក៏មិនអាចត្រឡប់មក unsign បាន … គួតែកញ្ចប់ដែលគ្រាន់តែបិទក្នុង ZoeW អាចស្តារបាន … កែប៉ូតុងអោយស្គាល់កញ្ចប់ដែល sign ហើយពិត មិនអាចបើកវិញបានក្នុង ZoeW» ·
+សម្រេច ៖ «ហាមតែ ZTO ស្កេនត្រឡប់» (ត្រឡប់ថ្ងៃទី ៨ នៅស្តារបាន) · «កត់លើកញ្ចប់ក្នុង DB»។ Sign ៖ «អោយលឺសម្លេង និង ញ័រពេលស្កេនជោគជ័យ … ពត៍មានពី ZTO … វែងពេក … លើ ios មិន
+recognize barcode ពីរូបភាព … ធ្វើអោយ ios ស្គាល់ទាំង QR … មាន QR មួយទៀតមិនទាក់ទងនិង ZTO … បង្កើនល្បឿន flow Sign»។ លម្អិត ៖ ផ្នែក ២ A225 · A226 · A227 · A228 · A229។
+
+- ✅ **ស្ថិតិ «កញ្ចប់យករួច»** ៖ ការបិទ/បើកកញ្ចប់សរសេរស្ថិតិថ្ងៃ និងកញ្ចប់ ២ ដងដាច់ពីគ្នា ➜ App បិទ · Refresh · បណ្តាញដាច់ចន្លោះនោះ ➜ ស្ថិតិលើស ឬខ្វះជារៀងរហូត។ ឥឡូវ App កត់ប្រតិបត្តិការក្នុង journal `zoew_pickup_journal_v1` (ថ្ងៃ + កូនសោ barcode) ➜ ពេលបើកលើកក្រោយ (ទិដ្ឋភាពស្រស់ · ហាងដដែល) កំណត់កូនសោនីមួយៗតាមស្ថានភាព barcode ពិត ➜ Reset ចំនួនយករួចមិនកើតឡើងវិញ (មិនរាប់ថ្ងៃឡើងវិញទាំងមូល) · tab ផ្សេងដែលនៅកាន់ប្រតិបត្តិការ (Web Lock) មិនត្រូវប៉ះ។
+- 🔒 **កញ្ចប់ដែលចប់ក្នុង ZTO** ៖ ភស្តុតាងកត់លើ barcode ក្នុង DB (`ztoSignedAt` ពេល ZTO ថា Sign · `ztoReturnedAt` ពេល ZTO ស្កេនត្រឡប់) ដោយការសរសេរដាច់ពីការរក្សាទុកកញ្ចប់
+  (`syncZtoFinalMarks()` ៖ rules មិនទាន់ Publish ➜ ការងារផ្សេងដើរធម្មតា) ➜ ប៊ូតុង «🔒 Sign រួច» ជំនួស «❌ បើក» · ការបើកវិញបដិសេធក្នុង transaction លើតម្លៃ server ·
+  ធុងសំរាម 🔒 ជំនួស 🔄 (ត្រឡប់ ZTO · «យករួច» ដែលគ្រប់ barcode Sign) · «ត្រឡប់» ថ្ងៃទី ៨ · «លុប» · «ដក» នៅស្តារបាន · Sign តាម «✍️ Sign» កត់ verdict ភ្លាម។
+- 🗑️ **ធុងសំរាម** ៖ ក្រុម និងធាតុក្នុងក្រុមតម្រៀបតាម `deletedAt` ថ្មីបំផុតមុន។
+- 🔳 **QR ក្នុង tab ស្កេន** ៖ ស្កេនបញ្ចូល · ដក · Locker និង «📁 យក Barcode ពីរូបភាព» អាន QR លេខកញ្ចប់លើបុងផង (iPhone · Android) · Barcode ឃើញព្រមគ្នា ➜ យក Barcode · QR ផ្សព្វផ្សាយ/link មិនរាប់។
+- ♻️ **ស្តារ** ៖ ការស្តារដែលជោគជ័យមិនបង្ហាញ «❌ ស្តារទិន្នន័យបរាជ័យ» ទៀតពេលបណ្តាញអានយឺតភ្លាមក្រោយស្តារ (ការអានដែលគ្មានប្រយោជន៍ត្រូវដកចេញ)។
+- ✍️ **Sign មួយជុំ** ៖ បើកផ្ទាំង ➜ ពិនិត្យស្ថានភាព ZTO គ្រប់ Barcode ស្របគ្នា ➜ ស្កេនម្តង (កាមេរ៉ា · ម៉ាស៊ីនស្កេន · ថត · Gallery) ➜ សម្លេង + ញ័រ (APK · Android; iPhone web មានតែសម្លេង) ចាប់រូប ហើយស្កេនចែកចាយ `04` ភ្លាម (រំលងបើ ZTO ចែកចាយរួច) ➜ វាយឈ្មោះ ➜ «✍️ Sign (N)» ផ្ញើស្របគ្នា ·
+  សារ ZTO បត់ខ្លី (ចុចអានពេញ) · ✕ ដករូប · អាន QR លេខកញ្ចប់លើបុង ទាំង iPhone និង Android (QR ផ្សព្វផ្សាយមិនរាប់) · iOS ៖ កាមេរ៉ាអានលឿនជាងមុន · រូប/Gallery អានរូបធំ (≤ 2600px) ពិដាន 10s។
+- 🧪 `ZoeW/tests/pickup-interrupted-close.test.ts` (មុនកែ ៣ ទិសធ្លាក់ ៖ បិទកញ្ចប់ ស្ថិតិ ២ ⟷ បិទ ០ · បិទ barcode ស្ថិតិ ០ ⟷ បិទ ១ · បើកវិញ ស្ថិតិ ០ ⟷ បិទ ១) · អ្នកយាមពហុឧបករណ៍ទាំង ២ រង់ចាំ journal ស្ថិតិយកទទេមុនវាស់។
+
+- 🧪 `ZoeW/tests/scan-qr.test.ts` · `ZoeW/tests/scan-image-qr.test.ts` · `scan-engine-test` ផ្នែក QR (ZXing ពិត)។
+- 🧪 `ZoeW/tests/zto-palm-sign.test.tsx` (flow មួយជុំ · ចែកចាយពេលស្កេន · សម្លេង/ញ័រ · ✕) · `ZoeW/tests/palm-sign-camera.test.ts` (QR ផ្សេងមិនរាប់ · អានលឿន/ស៊ីជម្រៅ · រូបធំ) · `scan-engine-test` ស្គាល់ `readCanvasSymbols()`។
+- 🧪 `ZoeW/tests/zto-final-marks.test.tsx` · op `ztoFinal` ក្នុង `revenue-fuzz-test` + probe rules ចាស់ក្នុង `emu/app-writes-rules-test` · សេណារីយ៉ូ `syncZtoFinalMarks` ក្នុង `ZoeW/tests/session-switch-fuzz.test.ts`។
+
+**សកម្មភាពដោយដៃ** ៖ ⛔ **Publish rules** `firebase-database.rules.json` ទៅ **គ្រប់គម្រោង Firebase របស់អតិថិជន** (Console ➜ Realtime Database ➜ Rules ➜ Publish ឬ
+`tools/firebase-provision/deploy-rules.cmd`) — មុន Publish ការកត់ Sign/ត្រឡប់មិនចូល DB (ប៊ូតុង 🔒 ពឹង verdict ក្នុងឧបករណ៍តែប៉ុណ្ណោះ) · Supabase ៖ migration
+`20261018011107_zoe_rules.sql` ចូលពេល merge ទៅ `main` (ឬ paste ក្នុង SQL Editor)។ Deploy ZoeW ពេលម្ចាស់គម្រោងស្នើ merge។
 
 ### [2.50.126] — 2026-10-17 · ZoeW + ZoeKeyGen `2.24.20` ៖ Deep audit ៦ — ហាងសាខាច្រើន (Palm) មិនដកលុយកញ្ចប់ដែលយកនៅសាខាផ្សេង · Push ដល់គ្រប់ហាង/ទូរស័ព្ទ · ផ្ទាំងហាង Supabase លើស ១០០០ · Sign ប្រាប់ឲ្យរង់ចាំ
 
@@ -4325,6 +4353,15 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### 2026-10-18 — កញ្ចប់ចប់ក្នុង ZTO ៖ បើកវិញ · ស្តារ · Sign លឿន (សំណើម្ចាស់គម្រោង · A226 · A227 · A228 · A229)
+
+| # | ចំណុច | ការវាស់ | លទ្ធផល |
+|---|---|---|---|
+| A229 | **tab ស្កេន (បញ្ចូល · ដក · Locker) · រូបភាព អានតែ Code128** — សំណើម្ចាស់គម្រោង ៖ «អោយ ការស្កេន ក្នុង tab ស្កេន … ស្គាល់ QR ដូចគ្នាផងលឿនល្អណាស់» · ហានិភ័យ ៖ គ្មានបញ្ជីរំពឹងទុក ➜ QR ផ្សព្វផ្សាយលើបុងអាចក្លាយជាកញ្ចប់ · ស៊ុម band ZXing (≤ 240px ខ្ពស់ ពង្រីកផ្តេក) បង្ខូចរាង QR | ZXing ពិត (`scan-engine-test` ផ្នែក QR) ៖ QR លេខកញ្ចប់ + QR URL ➜ លេខកញ្ចប់ (លឿន · ស៊ីជម្រៅ) · QR URL តែឯង ➜ '' · reader Code128 មិនអាន QR (ទិសផ្ទុយ) · `ZoeW/tests/scan-qr.test.ts` ៧ · `ZoeW/tests/scan-image-qr.test.ts` ២ (មុនកែ ៖ helper មិនមាន ➜ ធ្លាក់) | [2.50.127] `src/services/scan-formats.ts` (`pickScanCode()` ៖ Code128 ឈ្នះ · QR តែរាង Barcode ZTO `ztoBarcodeShapeIsValid()`) · ZXing ៖ រៀងរាល់ `LIVE_SCAN_QR_EVERY` អានស៊ុមមិនបង្ខូចរាង ≤ `LIVE_SCAN_QR_DIM` (`decodeLiveQrFrame()`) · Android ៖ `upgradeNativeDetectorForQr()` (តែពេលប្រព័ន្ធគាំទ្រ) · រូបភាព ៖ `scanQrReader(true)` · Sign ប្រើ detector ដដែល |
+| A228 | **ស្តារជោគជ័យ តែ App ប្រកាស «❌ ស្តារទិន្នន័យបរាជ័យ»** (សំណើ «អានកូដផ្លូវ ស្តារឡើងវិញ … clean up») — ក្រោយ finalize `executeRestoreItem()` អានធាតុប្រវត្តិម្តងទៀត (`dbOp` ពិដាន 15s) ទៅអថេរ `resultingLiveItem` ដែលគ្មានអ្នកប្រើ ➜ ការអាននោះបរាជ័យ ឬអស់ពេល ➜ catch ៖ alert បរាជ័យ · Sentry money · មិនផ្ទុកធុងសំរាម/ប្រវត្តិឡើងវិញ ទោះកញ្ចប់ស្តាររួច និងលុយបូកវិញរួច | `ZoeW/tests/cleanup-ledger-key.test.ts` «ការអានប្រវត្តិក្រោយ finalize បរាជ័យ» (មុនកែ ៖ alert ១ ដង ➜ ធ្លាក់ · ក្រោយកែ ៖ ✅ · លុយ 100/10 ត្រឹមត្រូវ) | [2.50.127] ដកការអាន និងអថេរដែលគ្មានអ្នកប្រើ (ក្រៅពីនេះ export ទាំងអស់ក្នុង `restore.ts` មានអ្នកហៅ) · `payload-schema.js` ដកឈ្មោះអថេរនោះ |
+| A227 | **Sign យឺត និង iOS អានរូបមិនបាន** — Sign ត្រូវស្កេន ២ ជុំ (ចែកចាយ ➜ ចុចផ្ញើ ➜ ទៅជំហានទទួល ➜ ស្កេនម្តងទៀត ➜ ផ្ញើ) ហើយ status/receipt ផ្ញើម្តងមួយ · iPhone គ្មាន `BarcodeDetector` ➜ ZXing tryHarder លើ frame 1280px រៀងរាល់ 150ms · រូប/Gallery បង្រួមដល់ 1280px រួចអានក្រោមពិដាន 3s ➜ Barcode ឆ្ងាយក្នុងរូប 4032px តូចពេក ឬអស់ពេល (WASM លើ iOS) · Code128 តែមួយ ទោះបុងមាន QR លេខដូចគ្នា | ZXing ពិតក្នុង Chromium ៖ បុងសំយោគ (Code128 + QR លេខកញ្ចប់ + QR ផ្សព្វផ្សាយ) ➜ Code128+QR អានឃើញ QR លេខកញ្ចប់ និង QR ផ្សព្វផ្សាយ ➜ `palmSignPickCode()` យកតែលេខកញ្ចប់ · Code128 គ្របបិទ ➜ QR នៅអានបាន · Barcode ក្រៅកណ្តាល ➜ ការអានលឿន (គ្មាន tryHarder) មិនឃើញ ការអានស៊ីជម្រៅឃើញ (ហេតុនេះរៀងរាល់ frame ទី ៤ ស៊ីជម្រៅ) · `ZoeW/tests/zto-palm-sign.test.tsx` ៤៨ · `ZoeW/tests/palm-sign-camera.test.ts` ១០ (មុនកែ ៖ helper/flow ថ្មីមិនមាន ➜ ធ្លាក់) · ⏳ iPhone ពិតមិនអាចវាស់លើម៉ាស៊ីននេះ | [2.50.127] flow មួយជុំ ៖ status ៤ ស្របគ្នា · ស្កេន ➜ រូប + សម្លេង + ញ័រ + `04` ភ្លាម (`dispatchPalmSignCode()`) · ឈ្មោះ ➜ «✍️ Sign (N)» receipt ៣ ស្របគ្នា · ✕ ដករូប · សារ ZTO បត់ (`<details>`) · Code128 + QR (`PALM_SIGN_FORMAT_NAMES`, តែលេខកញ្ចប់) · Android ៖ `BarcodeDetector` `code_128` + `qr_code` (`upgradeNativeDetectorForQr()`, ម្ចាស់គម្រោង ៖ «ផ្លូវ QR អស្ចារ្យ … ចង់អោយ android មានផ្លូវ QR ដែរ») · iOS ៖ frame លឿន 960px រៀងរាល់ 60ms + ស៊ីជម្រៅ ១/៤ · រូប ៖ ស៊ីជម្រៅ 1600 ➜ 2600px ពិដាន 10s (`palmSignDecodeImage()`) · `readCanvasSymbols()` ចែករំលែកជាមួយ `decodeBarcodeFromCanvasManual()` |
+| A226 | **កញ្ចប់ Sign ឬស្កេនត្រឡប់ក្នុង ZTO រួច នៅបើកវិញ/ស្តារបានក្នុង ZoeW** — ZTO គ្មានការស្តារ ៖ ការបើកវិញធ្វើឲ្យកញ្ចប់ Sign ចូលរបា «មិនទាន់បិទ» ហើយការស្តារ «ត្រឡប់» បើកកញ្ចប់ដែលទៅសាខាកណ្តាលហើយ (បូកលុយវិញ) · ធុងសំរាមរាយតាមលំដាប់ id (ពេលស្កេន) មិនមែនពេលចូល | `ZoeW/tests/zto-final-marks.test.tsx` ១៤ (មុនកែ ៖ helper/ប៊ូតុងមិនមាន ➜ ធ្លាក់ទាំងអស់) · `emu/app-writes-rules-test` ៖ rules ពិតទទួល ៣៥៦/៣៥៦ ការសរសេរ App (ភស្តុតាង ZTO ៦) · rules ចាស់ (គ្មានវាលទាំង ២) ➜ បដិសេធ · `ZoeW/tests/session-switch-fuzz.test.ts` សេណារីយ៉ូ `syncZtoFinalMarks` (ប្តូរហាងពាក់កណ្តាល ➜ ០ ការសរសេរបន្ទាប់) · vitest ទាំងមូល ២១៧៧/២១៧៧ | [2.50.127] `ztoSignedAt` · `ztoReturnedAt` លើ barcode (rules ប្រវត្តិ + ធុងសំរាម) · `syncZtoFinalMarks()` (verdict ZTO `true` លើ barcode បិទ · ភស្តុតាងពី `removeReturnedZtoBarcodes()` ➜ transaction មួយ/ធាតុ · `permission_denied` ➜ ឈប់ `ZTO_FINAL_REFUSED_RETRY_MS`) · `barcodeZtoSigned()` ក្នុង transaction បើកវិញ (`toggleCloseStatus` · `applyBarcodeCloseChange`) · `trashZtoFinalBlock()` ក្នុង `executeRestoreItem()` · `trashRestoreBlockOf()` (ធុងសំរាម 🔒) · Palm Sign ➜ `setZtoPickupVerdict(code, true)` · `buildTrashGroups()` តម្រៀប `deletedAt` · sandbox `emu/crud-rules-flow` · `pickup-barcode-identity-test` · `connection-recovery-test` ស្គាល់ helper ថ្មី |
+
 ### 2026-10-17 — Deep audit ៦ (សំណើម្ចាស់គម្រោង ៖ «deep audit … កុំជឿជាក់លើ checker … ច្រើនសាខា ក្នុងមួយសាខា ប្រើ2-3devices … សម្អាត ឯកសារឈប់ប្រើ ពិនិត្យ CLAUDE.md … HISTORY.md» · គ្មាន agent) ➜ [2.50.126]
 
 វិធី ៖ run-all STRICT ពេញលើ `cb082e4` (emulator RTDB រស់ · Postgres ពិត) ៖ **២០៩ ជាប់ · ៣ ធ្លាក់ · មួយផ្នែក ០ · រំលង ០** (ធ្លាក់ = A221 · `repository-file-coverage`
@@ -4333,7 +4370,7 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A225 | **🔓 បើក ៖ ស្ថិតិយក (`packagesPickedUp`) លើសចំនួន barcode បិទ** — `supabase-money-multishop` ក្នុង CI (`69ea205` · ផ្នែក ៣/៤) ហាង ០ ជុំ ៥ (`s0d0:restore[offline-reload]` · `s0d1:closeOrder[offline-reload]` · `s0d2:closeBarcode`) ៖ `pkg` ៣ · `phoneSum` ៣ ⟷ barcode បិទ ១ · លុយ (ថ្ងៃ · ខែ · ចំនួន) · registry · barcode ត្រឹមត្រូវទាំងអស់ ➜ ស្ថិតិ «យករួច» មិនមែនលុយ | ម៉ាស៊ីននេះ ៖ seed ដដែល (`RUN0` ០) ៣ ដង + seed ១–១០ ពេល CPU burner ២–៣ ➜ **១៣/១៣ ជាប់** (ជុំ ៥ ៖ `pkg` ៣ = បិទ ៣) · អានកូដ ៖ ទ្វារសរសេរស្ថិតិយកមានតែ បិទ/បើក (`markPickupBarcodes` មុន history tx · ត្រឡប់វិញ/`reapplyPickupMarks` ក្នុងទំព័រ) និងប្តូរលេខ · Delete · Remove · Restore · cleanup មិនប៉ះ · ការជួសជុល (`planPickupLedgerRepair`) ជួសតែពេលចំនួនស្មើ (រក្សា Reset) ➜ ចំនួនលើសមិនជាសះស្បើយដោយខ្លួនឯង · transaction របស់ adapter Supabase ពេល offline មិនចូល journal ➜ reload បោះចោលទាំង ២ | មិនទាន់កែកូដ App (មិនទាន់បង្កើតឡើងវិញ ➜ ការកែលើការស្មានហាមដោយច្បាប់) · អ្នកយាមឥឡូវប្រាប់ **កូនសោណា** លើស/ខ្វះ និង barcode នោះនៅឯណា (`pickExtra` · `pickMissing` ក្នុង `invariant()` ៖ `history|trash:<id>:open|closed` ឬ `absent`) និងផលប្រតិបត្តិការ ១២ ចុងក្រោយរបស់ឧបករណ៍នីមួយៗ (`opLog`) ➜ ធ្លាក់ម្តងទៀតក្នុង CI ➜ អានសារនោះមុនកែ (ស្ថិតិយក ≠ លុយ ៖ «ចំណូល (យករួច)» មិនពាក់ព័ន្ធ) |
+| A225 | **ស្ថិតិយក (`packagesPickedUp`) លើស/ខ្វះ barcode បិទ ក្រោយទំព័រស្លាប់ចន្លោះការសរសេរ ២ ដង** — `supabase-money-multishop` ក្នុង CI (`69ea205` · ផ្នែក ៣/៤) ហាង ០ ជុំ ៥ (`s0d0:restore[offline-reload]` · `s0d1:closeOrder[offline-reload]` · `s0d2:closeBarcode`) ៖ `pkg` ៣ ⟷ barcode បិទ ១ · លុយ (ថ្ងៃ · ខែ · ចំនួន) · registry · barcode ត្រឹមត្រូវ ➜ មូលហេតុ ៖ បិទ/បើកសរសេរ `zoew_daily_pickup_cod_dod/<ថ្ងៃ>` (`markPickupBarcodes`, **មុន**) និង `zoew_scan_history_cod_dod/<id>` ជា transaction ២ ដាច់ពីគ្នា · ការត្រឡប់វិញ (`revertPickupMarks` · `reapplyPickupMarks`) រស់តែក្នុងទំព័រ ➜ reload · បិទ App · transaction មួយព្យួរ ➜ ស្ថិតិខុសជារៀងរហូត · `planPickupLedgerRepair` ជួសតែពេលចំនួនស្មើ (រក្សា Reset) · adapter Supabase ៖ ការ sync ចប់ (`ready` ➜ `wakeWaiters()`) ដាស់ transaction ដែលរង់ចាំ link ទោះ `goOffline` ➜ transaction ស្ថិតិអាចចេញមុន ហើយ history នៅរង់ចាំរហូត reload | ម៉ាស៊ីននេះ fuzz ១៣/១៣ ជាប់ (seed ០ ៣ ដង + seed ១–១០ ពេល CPU រវល់) ➜ តេស្តកំណត់ `ZoeW/tests/pickup-interrupted-close.test.ts` (fake SDK · transaction មួយព្យួរ = ទំព័រស្លាប់ ➜ ទំព័រថ្មី) ៖ **មុនកែ ៣ ទិសធ្លាក់** (បិទកញ្ចប់ ស្ថិតិ ២ ⟷ បិទ ០ · បិទ barcode ស្ថិតិ ០ ⟷ បិទ ១ · បើកវិញ ស្ថិតិ ០ ⟷ បិទ ១) + probe journal ១ ➜ ក្រោយកែ ៧/៧ · vitest ទាំងមូល ២១៦២/២១៦២ | [2.50.127] journal `zoew_pickup_journal_v1` តាម helper តែមួយ `pickupIntentTracker()` នៃផ្លូវបិទទាំង ២ (`code-duplication-test`) (`beginPickupIntent` មុនការសរសេរស្ថិតិដំបូង · កូនសោ server បន្ថែមមុន reconcile · `endPickupIntent` ពេលការសរសេរចុងក្រោយចប់ · ប្តូរ session ➜ `releasePickupIntent` តែ) · `resumePickupIntents()` (`runScheduledCleanup` · `debouncedRenderAfterHistorySync`) បញ្ចប់ entry ដែលគ្មានប្រតិបត្តិការរស់ (`pickupIntentsLive` + Web Lock `zoew-cleanup-live-<id>`) ៖ កូនសោនីមួយៗ = ស្ថានភាព barcode ពិត (`pickupTruthMarks`) ⛔ មិនរាប់ថ្ងៃឡើងវិញ (Reset នៅ ០ · តេស្តទិសផ្ទុយ) · អ្នកយាមពហុឧបករណ៍ ២ រង់ចាំ `pickupJournal` ០ · sandbox របស់ `late-commit-test` · `emu/crud-rules-flow` · `pickup-barcode-identity-test` · `daily-collected-test` · `connection-recovery-test` ស្គាល់ journal ជា stub ឥតប្រសិទ្ធិភាព (ការវាស់ journal នៅក្នុងតេស្តខាងលើ) · `clock-hygiene` ៖ អាយុ entry ជាត្រា local វាស់តាម `elapsedSince()` · ការភ្ញាក់ `wakeWaiters()` ពេល offline មិនកែ (គ្មានផលពិត ៖ គ្មានបណ្តាញ rpc ធ្លាក់ · journal គ្របផលរបស់វា) |
 | A224 | **ZoeKeyGen ផ្ទាំង «🏪 ហាង Supabase» ទាញ `tenants` · `tenant_members` · `member_devices` ដោយ GET តែមួយ** ➜ PostgREST កាត់ត្រឹម «Max rows» (Supabase លំនាំដើម ១០០០) ដោយស្ងាត់ ➜ ហាងច្រើន (~៣៣៣ ហាង × ៣ គណនី) ➜ គណនីថ្មីៗ (`order=created_at.asc`) និងហាងចាស់ៗបាត់ពីផ្ទាំង ខណៈ «អានបាន» | `supabase-fake-server.js` អនុវត្ត `maxRows` (១០០០) + `limit`/`offset` + `order` ច្រើនជួរឈរដូច PostgREST · `keygen-supabase-admin-test` ថ្មី ៖ មុនកែ **ហាង ១០០០/១០១០ · គណនី ១០០០/១០០៨** ➜ ក្រោយកែ គ្រប់ · ១០៨/១០៨ | `sbAdminList()` ៖ `limit` `SB_ADMIN_PAGE_ROWS` (៥០០) + `offset` រហូតទំព័រទទេ (មិនពឹង page size ព្រោះ Max rows អាចតូចជាង) · order មានកូនសោពិសេស · ≤ `SB_ADMIN_LIST_MAX_PAGES` ផុត ➜ អានមិនបាន · ពិនិត្យ `sbAdminIsCurrent()` ក្រោយទំព័រនីមួយៗ · ផ្ទាំងដដែល ៖ អានគណនីមិនបាន ➜ បង្ហាញ «-» ដូចគ្មានគណនី ហើយ 🎟️ ចេញកូដ **ម្ចាស់ហាង** ទី ២ (តួនាទីយកពីបញ្ជីនោះ) ➜ `sbMemberReadFailed` ៖ «⚠️ អានបញ្ជីគណនីមិនបាន» · 🎟️ សុំ Refresh មុន (តេស្តថ្មី ៖ មុនកែ FAIL «-» ➜ ក្រោយកែ ១០៩/១០៩) · បញ្ជីទាំង ៣ សម្រេច «អានបាន» តាម `sbAdminRows()` តែមួយ (`code-duplication-test` ៖ ប្លុក ៣ ដដែល ➜ FAIL) |
 | A223 | **CI ៖ `audit.yml` · `android-shell-check.yml` «រំលង» (មិនមែន «ធ្លាក់») ពេល repo Public + `ZOE_RUNNER_MODE` ≠ `github`** ➜ GitHub បង្ហាញ check skipped ដូចបៃតង (ការការពារ runner self-hosted លើ repo Public ដោយចេតនា · `docs/SELF-HOSTED-RUNNERS.md` «Audit PR skipped») | អាន `if:` ទាំង ៣ workflow (`security-guard-test` ទាមទារលក្ខខណ្ឌ private សម្រាប់ self-hosted) | មិនកែ (ការកំណត់ repo របស់ម្ចាស់គម្រោង) ➜ ពេល repo នៅ Public ត្រូវ `ZOE_RUNNER_MODE=github` ទើប CI រត់ពិត · ⛔ «skipped» ≠ «passed» |
 | A222 | **សមត្ថភាពពេលហាងច្រើន (គ្មានកូដ · បន្ថែមលើ A55–A58)** ៖ ឧបករណ៍ ZTO នីមួយៗអានបញ្ជីចុះហត្ថលេខាដោយខ្លួនឯង (`ZTO_SIGNED_SWEEP_ACTIVE_MS` ២០ វិ. ➜ ~១៨០/ម៉ោងពេលសកម្ម) និងពិនិត្យ `/detail` កញ្ចប់បើកនីមួយៗរៀងរាល់ម៉ោង (`ZTO_OPEN_RECHECK_MS` · ១០ កញ្ចប់/២០ វិ.) ➜ ឧបករណ៍ ៣ ក្នុងសាខាធ្វើការដដែល ៣ ដង (សញ្ញាហាងចែករំលែកតែ «ពេញលេញ») | កញ្ចប់បើក ៣០០ ➜ ~៣០០ + ~១៨០ ការហៅ Function/ម៉ោង/ឧបករណ៍ ➜ ឧបករណ៍ ៣ × ១០ ម៉ោង ≈ ១៤,០០០–១៨,០០០/ថ្ងៃ/សាខា · Netlify ប្តូរទៅតម្លៃ credit (compute GB-ម៉ោង + សំណើ) តាំងពី 2025 | ម្ចាស់គម្រោងសម្រេច (តំបន់ LOCK ZTO) ៖ ឧបករណ៍មួយក្នុងសាខាជាអ្នកអាន (leader) ឬពង្រីក cadence · ពិនិត្យ Usage Netlify មុនបន្ថែមសាខា |
@@ -6488,12 +6525,12 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
+| `payload-schema` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `phone-suggest-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
-| `pickup-barcode-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `pickup-barcode-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -6677,8 +6714,10 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/print-relayout.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/push-client.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
 | `ZoeW/tests/push-server.test.ts` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៧ |
@@ -6691,6 +6730,8 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/remember-password.test.tsx` | ផ្នែក ២ | ផ្នែក ៧ |
 | `ZoeW/tests/remove-stale-session.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/scan-engine-recovery.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/scan-image-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/scan-qr.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scanner-focus-after-close.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/scanner-modal-queue.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/scroll-thumb.test.tsx` | ផ្នែក ១ | ផ្នែក ៧ |
@@ -6743,6 +6784,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-cookie-life.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |

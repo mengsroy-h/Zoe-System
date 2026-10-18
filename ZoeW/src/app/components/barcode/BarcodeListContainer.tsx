@@ -17,6 +17,7 @@ export interface BarcodeListRow {
     money: BarcodeMoneyLine[];
     sum: { cls: string; dollars: string; riel: string } | null;
     closed: boolean;
+    signed: boolean;
 }
 
 export function BarcodeListContainer() {
@@ -48,10 +49,13 @@ export function BarcodeListContainer() {
                         ) : null}
                     </div>
                     <div className="barcode-actions-group">
-                        <button className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
-                            onClick={palmMode && !b.closed ? onAct('openZtoPalmSign', { args: [b.itemId, b.code] }) : onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
-                            {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
-                        </button>
+                        {b.signed
+                            ? <button className="btn-toggle-bc-close is-signed-lock" title="Sign ក្នុង ZTO រួច"
+                                onClick={onAct('explainZtoReopenLock', { args: [] })}>🔒 Sign រួច</button>
+                            : <button className={`btn-toggle-bc-close ${b.closed ? 'is-reopen-action' : 'is-close-action'}`}
+                                onClick={palmMode && !b.closed ? onAct('openZtoPalmSign', { args: [b.itemId, b.code] }) : onAct('toggleIndividualBarcodeClose', { args: [b.itemId, b.code] })}>
+                                {b.closed ? '❌ បើក' : palmMode ? '✍️ Sign' : '✅ បិទ'}
+                            </button>}
                         <button className="btn-edit-item-price"
                             onClick={onAct('openEditBarcodePriceModal', { args: [b.itemId, b.code] })}>✏️ កែ</button>
                     </div>

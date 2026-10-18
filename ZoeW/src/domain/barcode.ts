@@ -118,6 +118,22 @@ export function barcodeReturnCounts(barcode, parentCreatedAt, returnedAt) {
     return !!barcode && !barcode.isClosed && typeof returnedAt === 'number' && returnedAt > 0 && returnedAt >= barcodeReturnBasis(barcode, parentCreatedAt);
 }
 
+export function barcodeZtoSigned(barcode) {
+    return !!barcode && typeof barcode.ztoSignedAt === 'number' && barcode.ztoSignedAt > 0;
+}
+
+export function barcodeZtoReturned(barcode) {
+    return !!barcode && typeof barcode.ztoReturnedAt === 'number' && barcode.ztoReturnedAt > 0;
+}
+
+export function trashZtoFinalBlock(item) {
+    const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    if (!barcodes.length) return '';
+    if (item.trashReason === 'returned' && barcodes.some(barcodeZtoReturned)) return 'returned';
+    if (item.trashReason === 'pickup' && barcodes.every(barcodeZtoSigned)) return 'signed';
+    return '';
+}
+
 export function itemAbandonRipeAt(item, parentCreatedAt, now) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes : [];
     let latest = 0;

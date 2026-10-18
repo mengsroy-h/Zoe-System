@@ -5,7 +5,7 @@ import { scanState, uiState } from '../core/state';
 import { noteAppLockExcuse } from '../features/app-lock';
 import { showCameraClosedBox, stopCurrentStream } from '../features/daily-stats';
 import { warmZtoLookupProxyNow } from '../features/lookup-api';
-import { LIVE_SCAN_BACKOFF, LIVE_SCAN_MAX_INTERVAL_MS, LIVE_SCAN_MIN_INTERVAL_MS, confirmLiveScan, processScannedCode, scheduleScanFrame, startZxingVideoScan, takeFreshVideoFrame } from './scan-engine';
+import { LIVE_SCAN_BACKOFF, LIVE_SCAN_MAX_INTERVAL_MS, LIVE_SCAN_MIN_INTERVAL_MS, confirmLiveScan, nativeScanResults, pickScanCode, processScannedCode, scheduleScanFrame, startZxingVideoScan, takeFreshVideoFrame } from './scan-engine';
 import { onScanVideoPause } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
@@ -175,7 +175,7 @@ export function startFastNativeScan(videoElement) {
                     const bitmap = await createImageBitmap(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight);
                     try {
                         const barcodes = await scanState.nativeDetector.detect(bitmap);
-                        const confirmed = barcodes && barcodes.length > 0 ? confirmLiveScan(barcodes[0].rawValue) : '';
+                        const confirmed = confirmLiveScan(pickScanCode(nativeScanResults(barcodes)));
                         if (confirmed && !uiState.isModalOpen && scanState.currentStream && scanState.isCameraScanning && scanState.nativeLoopActive) {
                             processScannedCode(confirmed);
                         }

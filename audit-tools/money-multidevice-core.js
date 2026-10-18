@@ -147,6 +147,7 @@ const PAGE_OPS = function () {
             : (typeof w.nativeWriteRecoveryState === 'function' && w.db ? w.nativeWriteRecoveryState(w.db).blocked : -1),
         rows: Object.keys(localStorage).filter((k) => k.startsWith('zoew_connection_writes_v1:')).length,
         cleanupJournal: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('zoew_cleanup_journal_v1') || '{}')).length; } catch (e) { return -1; } })(),
+        pickupJournal: (() => { try { return JSON.parse(localStorage.getItem('zoew_pickup_journal_v1') || '[]').length; } catch (e) { return -1; } })(),
         history: Array.isArray(w.scanHistory) ? w.scanHistory.length : -1,
         codes: [].concat(w.scanHistory || [], w.deletedItems || []).filter(Boolean)
             .flatMap((it) => (Array.isArray(it.barcodes) ? it.barcodes : []).map((b) => b && b.code).concat(it.barcode ? [it.barcode] : [])).filter(Boolean),

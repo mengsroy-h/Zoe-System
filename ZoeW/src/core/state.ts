@@ -140,6 +140,7 @@ export interface DataState {
     registryReleaseFlushInFlight: boolean;
     pickupLedgerRepairDone: boolean;
     pickupLedgerRepairRunning: boolean;
+    pickupResumeInFlight: boolean;
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
@@ -164,6 +165,7 @@ export const dataState = createStore<DataState>('dataState', {
     registryReleaseFlushInFlight: false,
     pickupLedgerRepairDone: false,
     pickupLedgerRepairRunning: false,
+    pickupResumeInFlight: false,
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,
     cleanupResumeInFlight: false,
@@ -202,6 +204,9 @@ export interface ScanState {
     nativeDetector: any;
     ownCaptureCanvas: any;
     ownCaptureCtx: any;
+    ownQrCanvas: any;
+    ownQrCtx: any;
+    liveScanRound: number;
     scanEngineDown: boolean;
     scanEngineFailures: number;
     scanEngineRetryTimer: any;
@@ -236,6 +241,9 @@ export const scanState = createStore<ScanState>('scanState', {
     nativeDetector: null,
     ownCaptureCanvas: null,
     ownCaptureCtx: null,
+    ownQrCanvas: null,
+    ownQrCtx: null,
+    liveScanRound: 0,
     scanEngineDown: false,
     scanEngineFailures: 0,
     scanEngineRetryTimer: null,
@@ -636,6 +644,10 @@ export interface ZtoState {
     ztoSignedMismatchFrom: string;
     ztoSignedMismatchWideAt: number;
     ztoOriginRefusedDb: any;
+    ztoFinalRefusedDb: any;
+    ztoFinalRefusedAt: number;
+    ztoFinalInFlight: boolean;
+    ztoFinalTimer: any;
     ztoBannerView: any | null;
     ztoSyncListView: any | null;
     ztoListPreview: any | null;
@@ -671,6 +683,10 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoSignedMismatchFrom: '',
     ztoSignedMismatchWideAt: 0,
     ztoOriginRefusedDb: null,
+    ztoFinalRefusedDb: null,
+    ztoFinalRefusedAt: 0,
+    ztoFinalInFlight: false,
+    ztoFinalTimer: null,
     ztoBannerView: null,
     ztoSyncListView: null,
     ztoListPreview: null,

@@ -112,6 +112,12 @@
             },
             "restoredAt": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "ztoSignedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoReturnedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }
         },
@@ -278,6 +284,12 @@
             },
             "restoredAt": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "ztoSignedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoReturnedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }
         },

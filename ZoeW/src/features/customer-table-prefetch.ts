@@ -5,6 +5,9 @@ import { fetchCustomerDataTableRows } from './customer-table';
 import { lookupApiSupportsList } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
+import { ZTO_BARCODE_RE, ztoBarcodeShapeIsValid } from '../services/scan-formats';
+
+export { ZTO_BARCODE_RE, ztoBarcodeShapeIsValid };
 
 export const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
 
@@ -107,12 +110,6 @@ export function runCustomerTableSoonRefresh() {
 export function safeLookupReason(raw) {
     const text = String(raw === null || raw === undefined ? '' : raw).trim();
     return /^[A-Za-z0-9_.:@-]{1,80}$/.test(text) ? text : '';
-}
-
-export const ZTO_BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
-
-export function ztoBarcodeShapeIsValid(barcode) {
-    return ZTO_BARCODE_RE.test(String(barcode == null ? '' : barcode).trim());
 }
 
 export function lookupApiIsZto(cfg) {

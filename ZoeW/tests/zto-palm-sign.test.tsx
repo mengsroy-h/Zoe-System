@@ -11,7 +11,7 @@ import { appLocalStore } from '../src/core/storage';
 import { modalIsOpen, registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { toggleCloseStatus } from '../src/features/entry-ops';
 import { refreshShopBoundUi } from '../src/features/lookup-config';
-import { openZtoPalmSign, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, advancePalmSignStage, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, setPalmSignSelected } from '../src/features/zto-palm-sign';
+import { openZtoPalmSign, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, removePalmSignScan } from '../src/features/zto-palm-sign';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
@@ -41,15 +41,13 @@ async function openDispatch(codes = [CODE, SECOND]) {
 async function openReceipt(codes: string[]) {
     await openDispatch(codes);
     palmSignState.requestId = REQUEST;
-    for (const code of codes) acceptPalmSignBarcode(code, PHOTO);
-    await submit(codes);
-    expect(closeCalls()).toEqual([]);
-    advancePalmSignStage();
-    expect(palmSignState.photos).toEqual({});
     setPalmSignName('សុខា');
     for (const code of codes) acceptPalmSignBarcode(code, PHOTO);
+    await vi.waitFor(() => expect(codes.every((code) => palmSignState.dispatchResults.some((r) => r.code === code && r.proof))).toBe(true));
+    expect(closeCalls()).toEqual([]);
     vi.mocked(fetch).mockClear();
 }
+const bodies = () => vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
 function deferred() {
     let resolve!: (value: Response) => void;
     const promise = new Promise<Response>((yes) => { resolve = yes; });
@@ -125,19 +123,19 @@ it('កញ្ចប់មួយជោគជ័យ មួយបរាជ័យ �
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => JSON.parse(String(init?.body)).barcode === CODE ? signed() : json({ code: 'ZTO_PALM_SIGN_REJECTED' }, 409)));
     await submit([CODE, SECOND]);
     expect(closeCalls().map((c) => c[1])).toEqual([CODE]);
-    expect(palmSignState.results.map((r) => r.state)).toEqual(['signed', 'failed']);
+    expect([CODE, SECOND].map((code) => palmSignState.results.find((r) => r.code === code)?.state)).toEqual(['signed', 'failed']);
     await submit([CODE, SECOND]);
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(closeCalls()).toHaveLength(1);
 });
 it.each(['throw', 'wrong-barcode', 'invalid-json'])('ចម្លើយមិនច្បាស់ %s ➜ មិនបិទ ឬផ្ញើឡើងវិញ · ពិនិត្យ ZTO បញ្ជាក់មុនបិទ', async (kind) => {
-    await openReceipt([CODE, SECOND]);
+    await openReceipt([CODE]);
     vi.stubGlobal('fetch', vi.fn(async () => {
         if (kind === 'throw') throw new Error('offline');
         if (kind === 'invalid-json') return new Response('bad', { status: 200 });
         return signed(SECOND);
     }));
-    await submit([CODE, SECOND]);
+    await submit([CODE]);
     expect(closeCalls()).toEqual([]);
     expect(palmSignState.results[0].state).toBe('unknown');
     expect(fetch).toHaveBeenCalledOnce();
@@ -153,7 +151,7 @@ it.each(['auth', 'shop', 'database', 'config', 'close'])('ប្តូរ %s ខ
     const gate = deferred();
     vi.stubGlobal('fetch', vi.fn(() => gate.promise));
     const work = submit([CODE, SECOND]);
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     if (kind === 'auth') firebaseState.authGeneration++;
     if (kind === 'shop') appLocalStore.setItem('zoew_firebase_config', JSON.stringify({ databaseURL: 'https://other.firebaseio.com' }));
     if (kind === 'database') firebaseState.db = {};
@@ -162,7 +160,7 @@ it.each(['auth', 'shop', 'database', 'config', 'close'])('ប្តូរ %s ខ
     gate.resolve(signed());
     await work;
     expect(closeCalls()).toEqual([]);
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(palmSignState.busy).toBe(false);
 });
 it('ZTO Sign រួចតែ ZoeW រក្សាទុកមិនទាន់បាន ➜ សាកការបិទ ZoeW ដោយមិន Sign ស្ទួន', async () => {
@@ -176,10 +174,10 @@ it('ZTO Sign រួចតែ ZoeW រក្សាទុកមិនទាន់�
     expect(closeCalls()).toHaveLength(2);
     expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
 });
-it('ប្រអប់ត្រូវការស្កេន និងរូប មុនផ្ញើបញ្ជី', () => {
+it('ប្រអប់ត្រូវការស្កេន និងរូប មុន Sign', () => {
     mount(<ZtoPalmSignModal />);
     act(() => openZtoPalmSign('item1', CODE));
-    expect((document.querySelector('.btn-confirm') as HTMLButtonElement).disabled).toBe(true);
+    expect((document.querySelector('.palm-sign-submit') as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector('input[type=file]')?.getAttribute('capture')).toBe('environment');
 });
 it('ម៉ាស៊ីនស្កេន Enter/Tab ក្នុងផ្ទាំង Sign ជ្រើសកញ្ចប់ ដោយមិនផ្ញើទៅជួរបញ្ចូល', async () => {
@@ -196,63 +194,89 @@ it('ម៉ាស៊ីនស្កេន Enter/Tab ក្នុងផ្ទា�
     }
     expect(palmSignState.selectedCodes).toEqual([CODE]);
     expect(palmSignState.message).toContain(CODE);
-    expect(fetch).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(palmSignState.dispatching).toEqual({}));
+    expect(bodies().map((body) => [body.stage, body.barcode])).toEqual([['dispatch', CODE]]);
 });
 
-it('ចែកចាយ 04 ជោគជ័យមិនបិទ ➜ ស្កេនរូបថ្មី ➜ ទទួល 05 ជោគជ័យទើបបិទ', async () => {
+it('⚡ ស្កេនម្តង ➜ ចែកចាយ 04 ស្វ័យប្រវត្តិ (មិនបិទ) ➜ វាយឈ្មោះ ➜ Sign 05 ទើបបិទ', async () => {
     await openDispatch([CODE]);
     await submit();
     expect(fetch).not.toHaveBeenCalled();
     acceptPalmSignBarcode(CODE, PHOTO);
-    await submit();
+    await vi.waitFor(() => expect(palmSignState.dispatchResults[0]).toMatchObject({ state: 'dispatched', proof: 'proof-' + CODE }));
     expect(closeCalls()).toEqual([]);
-    expect(palmSignState.dispatchResults[0]).toMatchObject({ state: 'dispatched', proof: 'proof-' + CODE });
-    advancePalmSignStage();
-    expect(palmSignState.stage).toBe('receipt');
-    expect(palmSignState.selectedCodes).toEqual([]);
-    expect(palmSignState.photos).toEqual({});
     await submit();
+    expect(palmSignState.message).toContain('ឈ្មោះ');
     expect(fetch).toHaveBeenCalledOnce();
     setPalmSignName('សុខា');
-    acceptPalmSignBarcode(CODE, PHOTO);
     await submit();
     expect(closeCalls()).toHaveLength(1);
-    const requests = vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
-    expect(requests.map((body) => body.stage)).toEqual(['dispatch', 'receipt']);
-    expect(requests[1].dispatchProof).toBe('proof-' + CODE);
+    expect(bodies().map((body) => body.stage)).toEqual(['dispatch', 'receipt']);
+    expect(bodies()[1].dispatchProof).toBe('proof-' + CODE);
 });
-it.each(['rejected', 'unknown'])('ចែកចាយ %s ➜ មិនចូលទទួល និងមិនបិទ', async (kind) => {
-    await openDispatch([CODE]);
+it('ស្កេនខណៈកំពុងពិនិត្យស្ថានភាព ZTO ➜ ចែកចាយក្រោយពិនិត្យរួច (មិនផ្ញើ 04 មុនដឹងស្ថានភាព)', async () => {
+    const gate = deferred();
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.stage === 'status') { await gate.promise; return json({ success: true, barcode: body.barcode, stage: 'status', dispatched: false, ztoClosed: false }); }
+        return json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'late-proof' });
+    }));
+    openZtoPalmSign('item1', CODE);
     acceptPalmSignBarcode(CODE, PHOTO);
-    vi.stubGlobal('fetch', vi.fn(async () => kind === 'unknown' ? json({ uncertain: true }, 504) : json({ code: 'ZTO_PALM_SIGN_REJECTED' }, 409)));
-    await submit();
-    advancePalmSignStage();
-    expect(palmSignState.stage).toBe('dispatch');
-    expect(closeCalls()).toEqual([]);
+    await vi.waitFor(() => expect(bodies().map((body) => body.stage)).toEqual(['status']));
+    await new Promise((done) => setTimeout(done, 20));
+    expect(bodies().map((body) => body.stage)).toEqual(['status']);
+    gate.resolve(json({}));
+    await vi.waitFor(() => expect(palmSignState.dispatchResults[0]?.proof).toBe('late-proof'));
+    expect(bodies().map((body) => body.stage)).toEqual(['status', 'dispatch']);
 });
-it('camera ស្កេនបានចាប់រូប និងចង Barcode ដោយមិនផ្ញើស្វ័យប្រវត្តិ', async () => {
+it.each(['rejected', 'unknown'])('ចែកចាយ %s ➜ មិន Sign និងមិនបិទ', async (kind) => {
+    await openDispatch([CODE]);
+    vi.stubGlobal('fetch', vi.fn(async () => kind === 'unknown' ? json({ uncertain: true }, 504) : json({ code: 'ZTO_PALM_SIGN_REJECTED' }, 409)));
+    setPalmSignName('សុខា');
+    acceptPalmSignBarcode(CODE, PHOTO);
+    await vi.waitFor(() => expect(palmSignState.dispatchResults[0]?.state).toBe(kind === 'unknown' ? 'unknown' : 'failed'));
+    await submit();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(closeCalls()).toEqual([]);
+    expect(palmSignState.checked[CODE]).toBe(kind !== 'unknown');
+});
+it('camera ស្កេនបាន ➜ ចាប់រូប · សម្លេង និងញ័រ · ចែកចាយភ្លាម · ប៊ូតុង Sign ប្រាប់ឲ្យវាយឈ្មោះ', async () => {
     const { startPalmSignCamera } = await import('../src/services/palm-sign-camera');
+    const vibrate = vi.fn(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
     mount(<ZtoPalmSignModal />);
     await act(async () => { await openDispatch([CODE]); });
     const callback = vi.mocked(startPalmSignCamera).mock.calls.at(-1)![0];
     await act(async () => callback(CODE, PHOTO));
     expect(palmSignState.photos[CODE]).toBe(PHOTO);
+    expect(vibrate).toHaveBeenCalledOnce();
     expect(document.querySelector('.palm-sign-thumbnail')?.getAttribute('src')).toBe('data:image/jpeg;base64,' + PHOTO);
-    expect((document.querySelector('.btn-confirm') as HTMLButtonElement).disabled).toBe(false);
-    expect(fetch).not.toHaveBeenCalled();
+    await act(async () => { await vi.waitFor(() => expect(palmSignState.dispatchResults[0]?.proof).toBe('proof-' + CODE)); });
+    const button = document.querySelector('.palm-sign-submit') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain('ឈ្មោះ');
+    await act(async () => setPalmSignName('សុខា'));
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toContain('Sign (1)');
+    delete (navigator as any).vibrate;
 });
-it('ចែកចាយរួចក្នុង ZTO ➜ ទៅទទួលភ្លាម ហើយត្រូវវាយឈ្មោះមុនស្កេន', async () => {
+it('✕ ដករូបកញ្ចប់ ➜ មិន Sign កញ្ចប់នោះ', async () => {
+    await openReceipt([CODE, SECOND]);
+    removePalmSignScan(SECOND);
+    await submit();
+    expect(bodies().map((body) => body.barcode)).toEqual([CODE]);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(true);
+});
+it('ចែកចាយរួចក្នុង ZTO ➜ មិនផ្ញើ 04 ម្តងទៀត · Sign ប្រើភស្តុតាងដែលមាន', async () => {
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
         const body = JSON.parse(String(init?.body));
         return json({ success: true, stage: 'status', barcode: body.barcode, dispatched: true, dispatchProof: 'known-' + body.barcode, ztoClosed: false });
     }));
     await openDispatch([CODE]);
-    expect(palmSignState.stage).toBe('receipt');
     acceptPalmSignBarcode(CODE, PHOTO);
-    expect(palmSignState.photos).toEqual({});
-    expect(palmSignState.message).toContain('ឈ្មោះ');
     setPalmSignName('សុខា');
-    acceptPalmSignBarcode(CODE, PHOTO);
+    expect(fetch).not.toHaveBeenCalled();
     vi.stubGlobal('fetch', vi.fn(async () => signed()));
     await submit();
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ stage: 'receipt', signMan: 'សុខា', dispatchProof: 'known-' + CODE });
@@ -267,14 +291,13 @@ it('កញ្ចប់ចែកចាយរួចខ្លះ ➜ ផ្ញើ 0
     await openDispatch();
     acceptPalmSignBarcode(CODE, PHOTO);
     acceptPalmSignBarcode(SECOND, PHOTO);
-    await submit([CODE, SECOND]);
-    expect(vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)).barcode)).toEqual([SECOND]);
-    advancePalmSignStage();
-    expect(palmSignState.stage).toBe('receipt');
+    await vi.waitFor(() => expect(palmSignState.dispatchResults.length).toBe(2));
+    expect(bodies().map((body) => body.barcode)).toEqual([SECOND]);
 });
 it('tracking បរាជ័យ ➜ មិនសន្មតចែកចាយ ឬផ្ញើ scan', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ code: 'ZTO_PALM_STATUS_UNCONFIRMED' }, 409)));
     await openDispatch([CODE]);
+    setPalmSignName('សុខា');
     acceptPalmSignBarcode(CODE, PHOTO);
     await submit();
     expect(palmSignState.checked[CODE]).not.toBe(true);
@@ -342,10 +365,10 @@ it('បោះបង់រក្សាសម្គាល់កញ្ចប់ម�
     mount(<ZtoPalmSignModal />);
     await act(async () => { await submit(); });
     expect(palmSignState.confirmation?.code).toBe(CODE);
-    expect(document.querySelector('.palm-sign-warning')?.textContent).toContain('សូមបញ្ជាក់');
+    expect(document.querySelector('.palm-sign-note')?.textContent).toContain('សូមបញ្ជាក់');
     const name = palmSignState.signMan;
     setPalmSignName('Changed');
-    setPalmSignSelected(CODE, false);
+    removePalmSignScan(CODE);
     acceptPalmSignBarcode(CODE, 'changed');
     expect(palmSignState.signMan).toBe(name);
     expect(palmSignState.photos[CODE]).toBe(PHOTO);
@@ -365,15 +388,18 @@ it('បញ្ជាក់តាមកញ្ចប់ មិនអនុម័ត
         return body.confirmationToken ? signed(body.barcode) : warning(body.barcode);
     }));
     await submit([CODE, SECOND]);
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(palmSignState.confirmation?.code).toBe(CODE);
     const a = confirmPalmSignWarning();
     const b = confirmPalmSignWarning();
     await Promise.all([a, b]);
     expect(closeCalls().map((c) => c[1])).toEqual([CODE]);
     expect(palmSignState.confirmation?.code).toBe(SECOND);
-    expect(vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)).confirmationToken)).toEqual([undefined, 'proof-' + CODE, undefined]);
+    const tokens = (code: string) => bodies().filter((body) => body.barcode === code).map((body) => body.confirmationToken);
+    expect(tokens(CODE)).toEqual([undefined, 'proof-' + CODE]);
+    expect(tokens(SECOND)).toEqual([undefined, undefined]);
     await confirmPalmSignWarning();
     expect(closeCalls().map((c) => c[1])).toEqual([CODE, SECOND]);
+    expect(tokens(SECOND)).toEqual([undefined, undefined, 'proof-' + SECOND]);
 });
 it.each(['close', 'shop', 'auth', 'config'])('ការបញ្ជាក់ចាស់ក្រោយ %s មិនបិទឬផ្ញើ', async (kind) => {
     await openReceipt([CODE]);
@@ -401,7 +427,7 @@ it('ZTO ហាម៖ បង្ហាញមូលហេតុពិត ហើយ�
     vi.stubGlobal('fetch', vi.fn(async () => json({ code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode: CODE, message: 'ZTO hard rejection' }, 409)));
     await submit();
     expect(palmSignState.warnings[CODE]).toBe('ZTO hard rejection');
-    expect(palmSignState.results[0].message).toBe('ZTO hard rejection');
+    expect(palmSignState.results[0].message).toContain('ZTO មិនអនុញ្ញាត');
     expect(palmSignState.confirmation).toBeNull();
     expect(closeCalls()).toEqual([]);
 });
@@ -410,7 +436,8 @@ it('បើក Sign ស្គាល់ស្កេនបញ្ហាតាមស�
         problemScan: { action: '-579', message: 'ទាក់ទងអតិថិជនមិនបាន', time: '2026-10-17 10:00:00' } })));
     mount(<ZtoPalmSignModal />);
     await act(async () => { await openDispatch([CODE]); });
-    expect(document.querySelector('.palm-sign-problem')?.textContent).toContain('ទាក់ទងអតិថិជនមិនបាន');
+    expect(document.querySelector('.palm-sign-note')?.textContent).toContain('ទាក់ទងអតិថិជនមិនបាន');
+    expect(document.querySelector('.palm-sign-note')?.hasAttribute('open')).toBe(false);
     expect(palmSignState.confirmation).toBeNull();
     expect(closeCalls()).toEqual([]);
 });
@@ -587,15 +614,12 @@ it('ជំហានចែកចាយមិនផ្ញើរូបទៅ Server
     await openDispatch([CODE]);
     palmSignState.requestId = REQUEST;
     acceptPalmSignBarcode(CODE, PHOTO);
-    await submit();
-    const dispatchBody = JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)![1]?.body));
+    await vi.waitFor(() => expect(palmSignState.dispatchResults[0]).toMatchObject({ code: CODE, state: 'dispatched' }));
+    const dispatchBody = bodies().at(-1);
     expect(dispatchBody).toMatchObject({ barcode: CODE, stage: 'dispatch', requestId: REQUEST });
     expect('photo' in dispatchBody).toBe(false);
-    expect(palmSignState.dispatchResults[0]).toMatchObject({ code: CODE, state: 'dispatched' });
-    advancePalmSignStage();
     setPalmSignName('សុខា');
-    acceptPalmSignBarcode(CODE, PHOTO);
     vi.mocked(fetch).mockClear();
     await submit();
-    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ stage: 'receipt', photo: PHOTO });
+    expect(bodies()[0]).toMatchObject({ stage: 'receipt', photo: PHOTO });
 });

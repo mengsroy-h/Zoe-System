@@ -6,10 +6,12 @@ import type { TrashRowModel, TrashView } from './model';
 
 const TRASH_VIEW_FIELDS = ['trashView'] as const;
 
-function RowActions({ id }: { id: string }) {
+function RowActions({ id, restoreBlock }: { id: string; restoreBlock: string }) {
     return (
         <div className="trash-row-actions">
-            <button className="btn-sm trash-restore-btn" title="ស្តារមកវិញ" onClick={onAct('promptRestoreDeletedItem', { args: [id] })}>🔄</button>
+            {restoreBlock
+                ? <button className="btn-sm trash-restore-btn is-zto-final" title="ចប់ក្នុង ZTO រួច" onClick={onAct('explainZtoRestoreBlock', { args: [restoreBlock] })}>🔒</button>
+                : <button className="btn-sm trash-restore-btn" title="ស្តារមកវិញ" onClick={onAct('promptRestoreDeletedItem', { args: [id] })}>🔄</button>}
             <button className="btn-sm trash-purge-btn" title="លុបជាអចិន្ត្រៃយ៍" onClick={onAct('promptPermanentDelete', { args: [id] })}>✖️</button>
         </div>
     );
@@ -38,7 +40,7 @@ function GroupRow({ row }: { row: TrashRowModel }) {
             </td>
             <td style={{ textAlign: 'center' }}>
                 {row.singleId
-                    ? <RowActions id={row.singleId} />
+                    ? <RowActions id={row.singleId} restoreBlock={row.singleBlock} />
                     : <button className="btn-sm trash-expand-btn" title="បង្ហាញធាតុនីមួយៗ"
                         onClick={onAct('toggleTrashGroup', { args: [row.key] })}>{row.expanded ? '▲' : '▼'} {row.itemCount}</button>}
             </td>
@@ -114,7 +116,7 @@ function ObservedGroup({ row }: { row: TrashRowModel }) {
                         <span className="count-badge">📦 {sub.count}</span>{' '}
                         <span className="trash-money">${sub.total.toFixed(2)}</span>
                     </td>
-                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} /></td>
+                    <td style={{ textAlign: 'center' }}><RowActions id={sub.id} restoreBlock={sub.restoreBlock} /></td>
                 </tr>
             ))}
         </>

@@ -529,3 +529,29 @@ describe('rules មិនទាន់ Publish', () => {
         expect(trashFlags()).toEqual([true]);
     }, 20000);
 });
+
+describe('ស្តារជោគជ័យ ➜ មិនប្រកាស «បរាជ័យ» ដោយសារការអានក្រោយ (ផ្លូវស្តារសម្អាត)', () => {
+    it('ការអានប្រវត្តិក្រោយ finalize បរាជ័យ ➜ ✅ ស្តារ · គ្មាន alert «ស្តារបរាជ័យ» · គ្មាន Sentry money', async () => {
+        seed([expiredItem()]);
+        claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        expect(getAt(TRASH + '/' + ID)).not.toBeNull();
+        syncLocalViewsFromServer();
+        const alerts = vi.fn();
+        vi.stubGlobal('alert', alerts);
+        const fb: any = firebaseState.fb;
+        const realGet = fb.get;
+        fb.get = async (ref: any) => {
+            if (ref.path === HISTORY + '/' + ID && !getAt(TRASH + '/' + ID)) throw new Error('network read failed');
+            return realGet(ref);
+        };
+        uiState.pendingRestoreId = ID;
+        await executeRestoreItem();
+        await flush();
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(HISTORY + '/' + ID)).not.toBeNull();
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        expect(alerts).not.toHaveBeenCalled();
+        expect(uiState.toasts.map((t: any) => t.msg).join(' ')).toContain('បានស្តារ');
+    }, 20000);
+});

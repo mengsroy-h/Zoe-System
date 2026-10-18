@@ -5,7 +5,7 @@ import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { triggerScanAction } from '../features/scan-action';
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp, retryAsync } from '../services/network';
-import { decodeBarcodeFromCanvasManual } from '../services/scan-engine';
+import { pickScanCode, readCanvasSymbols, scanQrReader } from '../services/scan-engine';
 import { showToast } from '../ui/toast';
 
 export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
@@ -29,7 +29,7 @@ export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
                 ctx.rotate(deg * Math.PI / 180);
                 ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                const text = await decodeBarcodeFromCanvasManual(scanState.codeReader, canvas);
+                const text = pickScanCode(await readCanvasSymbols(scanQrReader(true), canvas));
                 if (text) {
                     triggerScanAction(text);
                     return;

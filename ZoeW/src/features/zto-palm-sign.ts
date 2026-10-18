@@ -8,8 +8,12 @@ import { lookupApiIsPalm } from './customer-table-prefetch';
 import { addPalmSessionHeader, addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
 import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { applyBarcodeCloseChange } from './barcode-ops';
+import { scheduleZtoFinalMarks } from './zto-final-marks';
+import { setZtoPickupVerdict } from './zto-status';
 import { resolveNativeApiUrl, ztoIdentityTargetTrusted } from '../platform/native';
 import { fetchWithTimeout } from '../services/network';
+import { playBeep, primeBeep } from '../services/history-write';
+import { hapticScan } from '../platform/haptics';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
@@ -24,9 +28,34 @@ export function refreshPalmSignMode() {
     if (modalIsOpen('ztoPalmSignModal')) closeModal('ztoPalmSignModal');
 }
 
+export const PALM_SIGN_STATUS_CONCURRENCY = 4;
+
+export const PALM_SIGN_SEND_CONCURRENCY = 3;
+
+async function runPool<T>(items: T[], limit: number, work: (item: T) => Promise<boolean | void>) {
+    let next = 0;
+    let stopped = false;
+    const lane = async () => {
+        while (!stopped && next < items.length) {
+            const item = items[next++];
+            if (await work(item) === false) stopped = true;
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+}
+
+function primeScanFeedback() {
+    primeBeep();
+}
+
+function scanSuccessFeedback() {
+    playBeep();
+    hapticScan();
+}
+
 export function openZtoPalmSign(itemId: string, barcode?: string) {
     if (!palmSignMode()) return;
-    if (palmSignState.busy || palmSignState.checking || palmSignState.confirmation) {
+    if (palmSignState.busy || palmSignState.checking || palmSignState.confirmation || Object.keys(palmSignState.dispatching).length) {
         showToast('⏳ ការ Sign មុនកំពុងរង់ចាំចម្លើយ ZTO — សូមរង់ចាំបន្តិច រួចចុចម្តងទៀត។');
         return;
     }
@@ -38,17 +67,18 @@ export function openZtoPalmSign(itemId: string, barcode?: string) {
     const item = dataState.scanHistory.find((row) => row.id === itemId);
     const codes = Array.isArray(item?.barcodes) ? item.barcodes.filter((b) => !b.isClosed && (!barcode || b.code === barcode)).map((b) => b.code) : [];
     if (!codes.length) { showToast('⚠️ រកមិនឃើញកញ្ចប់បើកដែលមាន Barcode សម្រាប់ Sign។'); return; }
+    primeScanFeedback();
     palmSignState.generation++;
     palmSignState.itemId = itemId;
     palmSignState.codes = [...new Set<string>(codes)];
     palmSignState.selectedCodes = [];
     palmSignState.photos = {};
     palmSignState.checked = {};
+    palmSignState.dispatching = {};
     palmSignState.confirmation = null;
     palmSignState.warnings = {};
     palmSignState.problemScans = {};
     palmSignState.signMan = '';
-    palmSignState.stage = 'dispatch';
     palmSignState.requestId = crypto.randomUUID();
     palmSignState.dispatchResults = [];
     palmSignState.message = '';
@@ -63,6 +93,7 @@ export function cancelZtoPalmSign() {
     palmSignState.selectedCodes = [];
     palmSignState.itemId = '';
     palmSignState.checked = {};
+    palmSignState.dispatching = {};
     palmSignState.confirmation = null;
     palmSignState.warnings = {};
     palmSignState.problemScans = {};
@@ -75,50 +106,60 @@ export function cancelZtoPalmSign() {
     palmSignState.results = [];
 }
 
-export function setPalmSignSelected(code: string, selected: boolean) {
-    if (palmSignState.busy || palmSignState.confirmation || !palmSignState.codes.includes(code) || !palmSignState.photos[code]) return;
-    palmSignState.selectedCodes = selected
-        ? [...new Set(palmSignState.selectedCodes.concat(code))]
-        : palmSignState.selectedCodes.filter((value) => value !== code);
+export function palmSignCodeOf(raw: string) {
+    const wanted = String(raw || '').trim().toUpperCase();
+    return wanted ? palmSignState.codes.find((value) => value.toUpperCase() === wanted) || '' : '';
+}
+
+export function palmSignSigned(code: string) {
+    return palmSignState.results.some((row) => row.code === code && row.state === 'signed');
+}
+
+export function palmSignProof(code: string) {
+    return palmSignState.dispatchResults.find((row) => row.code === code && row.state === 'dispatched' && row.proof)?.proof || '';
+}
+
+export function palmSignReady(code: string) {
+    return !!palmSignState.photos[code] && !!palmSignProof(code) && !palmSignSigned(code)
+        && !palmSignState.results.some((row) => row.code === code && row.state === 'unknown');
+}
+
+export function palmSignReadyCodes() {
+    return palmSignState.selectedCodes.filter((code) => palmSignReady(code));
+}
+
+export function removePalmSignScan(code: string) {
+    if (palmSignState.busy || palmSignState.confirmation || !palmSignState.photos[code] || palmSignSigned(code)) return;
+    const photos = { ...palmSignState.photos };
+    delete photos[code];
+    palmSignState.photos = photos;
+    palmSignState.selectedCodes = palmSignState.selectedCodes.filter((value) => value !== code);
+    palmSignState.results = palmSignState.results.filter((row) => row.code !== code || row.state === 'unknown');
 }
 
 export function palmSignWantsFrame(code: string) {
-    const known = palmSignStageCodes().find((value) => value.toUpperCase() === String(code).trim().toUpperCase());
-    return !known || !palmSignState.photos[known];
-}
-
-export function palmSignStageResults() {
-    return palmSignState.stage === 'dispatch' ? palmSignState.dispatchResults : palmSignState.results;
-}
-
-export function palmSignStageCodes() {
-    return palmSignState.stage === 'dispatch' ? palmSignState.codes.filter((code) => !palmSignState.dispatchResults.some((row) => row.code === code && row.state === 'dispatched'))
-        : palmSignState.codes.filter((code) => palmSignState.dispatchResults.some((row) => row.code === code && row.state === 'dispatched' && row.proof));
-}
-
-export function advancePalmSignStage() {
-    if (palmSignState.busy || palmSignState.confirmation || palmSignState.checking || palmSignState.stage !== 'dispatch' || !palmSignState.codes.length
-        || !palmSignState.codes.every((code) => palmSignState.dispatchResults.some((row) => row.code === code && row.state === 'dispatched' && row.proof)
-            || palmSignState.results.some((row) => row.code === code && row.state === 'signed'))) return;
-    palmSignState.stage = 'receipt';
-    palmSignState.photos = {};
-    palmSignState.selectedCodes = [];
-    palmSignState.message = 'សូមស្កេន Barcode ម្ដងទៀត។ រូបភាពថ្មីនឹងត្រូវចាប់ស្វ័យប្រវត្តិ។';
+    const known = palmSignCodeOf(code);
+    return !known || (!palmSignSigned(known) && !palmSignState.photos[known]);
 }
 
 export function acceptPalmSignBarcode(raw: string, capturedPhoto?: string, replacePhoto = false) {
     if (!modalIsOpen('ztoPalmSignModal')) return false;
-    if (palmSignState.busy || palmSignState.confirmation || palmSignState.checking) return true;
-    if (palmSignState.stage === 'receipt' && !palmSignState.signMan.trim()) { palmSignState.message = 'សូមវាយឈ្មោះអតិថិជនជាមុន រួចស្កេន Barcode។'; return true; }
-    const code = palmSignStageCodes().find((value) => value.toUpperCase() === raw.trim().toUpperCase());
-    if (code && !palmSignState.checked[code]) { palmSignState.message = 'សូមពិនិត្យស្ថានភាព ZTO ជាមុនសិន។'; return true; }
-    if (!code) { palmSignState.message = 'Barcode នេះមិនមានក្នុងបញ្ជីសម្រាប់ជំហាននេះ។'; return true; }
-    if (palmSignStageResults().some((row) => row.code === code && row.state !== 'failed')) return true;
+    if (palmSignState.confirmation) return true;
+    const code = palmSignCodeOf(raw);
+    if (!code) { palmSignState.message = 'Barcode នេះមិនមែនរបស់កញ្ចប់នេះទេ។'; return true; }
+    if (palmSignSigned(code)) { palmSignState.message = '✅ ' + code + ' Sign រួចហើយ'; return true; }
+    if (palmSignState.photos[code] && !replacePhoto) {
+        if (!palmSignState.selectedCodes.includes(code)) palmSignState.selectedCodes = palmSignState.selectedCodes.concat(code);
+        void dispatchPalmSignCode(code);
+        return true;
+    }
     const photo = capturedPhoto || palmSignFramePhoto();
     if (!photo) { palmSignState.message = 'សូមបើកកាមេរ៉ាដើម្បីចាប់រូបពេលស្កេន ឬថតរូបកញ្ចប់នេះ។'; return true; }
-    if (replacePhoto || !palmSignState.photos[code]) palmSignState.photos = { ...palmSignState.photos, [code]: photo };
+    palmSignState.photos = { ...palmSignState.photos, [code]: photo };
     if (!palmSignState.selectedCodes.includes(code)) palmSignState.selectedCodes = palmSignState.selectedCodes.concat(code);
-    palmSignState.message = '✅ បានស្កេន និងចាប់រូប ' + code;
+    palmSignState.message = '✅ បានស្កេន ' + code;
+    scanSuccessFeedback();
+    void dispatchPalmSignCode(code);
     return true;
 }
 
@@ -159,11 +200,12 @@ function operation() {
     const generation = palmSignState.generation;
     const itemId = palmSignState.itemId;
     const signature = palmSignConfigKey(cfg);
-    const stage = palmSignState.stage;
-    const current = () => stage === palmSignState.stage && generation === palmSignState.generation && shopScope() === shop && auth === firebaseState.authGeneration
+    const current = () => generation === palmSignState.generation && shopScope() === shop && auth === firebaseState.authGeneration
         && firebaseState.db === signDatabase && securityState.lookupSecretKey === secret && modalIsOpen('ztoPalmSignModal')
         && palmSignConfigKey(getLookupApiConfig()) === signature && palmSignMode();
-    return { cfg, itemId, current, stage, generation };
+    const ready = () => (!!op.cfg?.palmTokenEnc || !!op.cfg?.palmShared) && !!securityState.lookupSecretKey && !!shopScope();
+    const op = { cfg, itemId, current, ready, generation };
+    return op;
 }
 
 async function headersFor(cfg) {
@@ -183,6 +225,8 @@ function endpoint(cfg, action: string) {
 
 async function recordSigned(itemId: string, code: string, current: () => boolean) {
     if (!current()) return false;
+    setZtoPickupVerdict(code, true);
+    scheduleZtoFinalMarks();
     const item = dataState.scanHistory.find((row) => row.id === itemId);
     const barcode = item?.barcodes?.find((b) => b.code === code);
     if (barcode?.isClosed) return true;
@@ -194,12 +238,13 @@ function finishPalmSign(current: () => boolean) {
     if (!current() || !palmSignState.codes.length || !palmSignState.codes.every((code) =>
         palmSignState.results.some((row) => row.code === code && row.state === 'signed' && row.saved === true))) return false;
     const count = palmSignState.codes.length;
+    scanSuccessFeedback();
     closeModal('ztoPalmSignModal');
     showToast('✅ ZTO Sign ជោគជ័យ ' + count + ' កញ្ចប់');
     return true;
 }
 
-export async function submitZtoPalmSign(codes: string[]) {
+export async function submitZtoPalmSign(codes: string[] = palmSignReadyCodes()) {
     if (palmSignState.confirmation) return;
     return sendPalmSign(codes);
 }
@@ -218,107 +263,158 @@ export async function confirmPalmSignWarning() {
     return sendPalmSign(pending.codes, pending);
 }
 
+function storeDispatchResult(result: PalmSignResult) {
+    palmSignState.dispatchResults = palmSignState.dispatchResults.filter((row) => row.code !== result.code).concat(result);
+}
+
+function storeResult(result: PalmSignResult) {
+    palmSignState.results = palmSignState.results.filter((row) => row.code !== result.code).concat(result);
+}
+
+function itemHoldsOpen(itemId: string, code: string) {
+    const item = dataState.scanHistory.find((row) => row.id === itemId);
+    return !!item?.barcodes?.some((b) => b.code === code && !b.isClosed);
+}
+
+export async function dispatchPalmSignCode(code: string) {
+    if (!palmSignMode() || palmSignState.confirmation || !palmSignState.checked[code] || palmSignProof(code) || palmSignSigned(code)
+        || palmSignState.dispatching[code] || !palmSignState.photos[code]) return;
+    const op = operation();
+    if (!op.ready() || !itemHoldsOpen(op.itemId, code)) return;
+    palmSignState.dispatching = { ...palmSignState.dispatching, [code]: true };
+    let result: PalmSignResult | null = null;
+    try {
+        const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
+        if (!op.current()) return;
+        const out = await fetchWithTimeout(endpoint(op.cfg, 'sign'), { method: 'POST', headers, cache: 'no-store',
+            body: JSON.stringify({ barcode: code, stage: 'dispatch', signMan: '', requestId: palmSignState.requestId }) },
+            45000, 'Palm dispatch timed out', (r) => r.json().catch(() => null));
+        if (!op.current()) return;
+        const body = out.body;
+        if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'dispatch' && body.ztoClosed === false
+            && typeof body.dispatchProof === 'string' && body.dispatchProof) {
+            result = { code, state: 'dispatched', proof: body.dispatchProof, message: '✅ ចែកចាយរួច' };
+        } else if (body?.uncertain || !body?.code || out.res.status >= 500) {
+            result = { code, state: 'unknown', message: '⏳ ការចែកចាយមិនទាន់បញ្ជាក់ — ចុច «🔄 ពិនិត្យ ZTO»។' };
+        } else {
+            result = { code, state: 'failed', message: failureMessage(body.code, body.reason) };
+            if (body.code === 'ZTO_AUTH_EXPIRED' || body.code === 'ZTO_PALM_RELOGIN_REQUIRED') noteZtoPalmSessionRejected(op.cfg);
+        }
+    } catch (_) {
+        if (op.current()) result = { code, state: 'unknown', message: '⏳ ចម្លើយចែកចាយពី ZTO មិនទាន់មក — ចុច «🔄 ពិនិត្យ ZTO»។' };
+    } finally {
+        if (op.generation === palmSignState.generation) {
+            const rest = { ...palmSignState.dispatching };
+            delete rest[code];
+            palmSignState.dispatching = rest;
+        }
+    }
+    if (!result || !op.current()) return;
+    storeDispatchResult(result);
+    if (result.state === 'unknown') palmSignState.checked = { ...palmSignState.checked, [code]: false };
+}
+
 async function sendPalmSign(codes: string[], approval?: PalmSignConfirmation) {
     if (palmSignState.busy || palmSignState.confirmation || palmSignState.checking || !palmSignMode()) return;
     const op = operation();
-    if ((!op.cfg?.palmTokenEnc && !op.cfg?.palmShared) || !securityState.lookupSecretKey || !shopScope()) return;
+    if (!op.ready()) return;
     const signMan = palmSignState.signMan.trim();
-    if (op.stage === 'receipt' && !signMan) { palmSignState.message = 'សូមវាយឈ្មោះអតិថិជនជាមុនសិន។'; return; }
-    const chosen = [...new Set(codes)].filter((code) => palmSignStageCodes().includes(code));
-    if (!chosen.length || chosen.some((code) => !palmSignState.photos[code] || !palmSignState.checked[code])) { palmSignState.message = 'សូមស្កេន Barcode ដើម្បីចាប់រូបសិន។'; return; }
+    if (!signMan) { palmSignState.message = 'សូមវាយឈ្មោះអ្នកទទួលជាមុនសិន។'; return; }
+    const chosen = [...new Set(codes)].filter((code) => palmSignReady(code) && !palmSignState.results.some((row) => row.code === code && row.state !== 'failed'));
+    if (!chosen.length) { palmSignState.message = 'សូមស្កេន Barcode ដើម្បីចាប់រូបសិន។'; return; }
     palmSignState.busy = true;
-    palmSignState.message = 'កំពុងផ្ញើទៅ ZTO…';
+    palmSignState.message = 'កំពុង Sign ក្នុង ZTO…';
     const staleProofs: string[] = [];
     try {
         const url = endpoint(op.cfg, 'sign');
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
         if (!op.current()) return;
-        for (const code of chosen) {
-            if (!op.current()) break;
-            if (palmSignStageResults().some((row) => row.code === code && row.state !== 'failed')) continue;
-            const item = dataState.scanHistory.find((row) => row.id === op.itemId);
-            if (!item?.barcodes?.some((b) => b.code === code && !b.isClosed)) continue;
+        await runPool(chosen, PALM_SIGN_SEND_CONCURRENCY, async (code) => {
+            if (!op.current() || palmSignState.confirmation && approval?.code !== code) return false;
+            if (!itemHoldsOpen(op.itemId, code)) return;
             let result: PalmSignResult;
             try {
-                const out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ barcode: code, stage: op.stage, signMan: signMan.trim(),
-                    photo: op.stage === 'receipt' ? palmSignState.photos[code] : undefined, requestId: palmSignState.requestId,
-                    confirmationToken: approval?.code === code ? approval.token : undefined,
-                    dispatchProof: op.stage === 'receipt' ? palmSignState.dispatchResults.find((row) => row.code === code)?.proof : undefined }) },
+                const out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ barcode: code, stage: 'receipt', signMan,
+                    photo: palmSignState.photos[code], requestId: palmSignState.requestId,
+                    confirmationToken: approval?.code === code ? approval.token : undefined, dispatchProof: palmSignProof(code) }) },
                     45000, 'Palm sign timed out', (r) => r.json().catch(() => null));
-                if (!op.current()) break;
+                if (!op.current()) return false;
                 const body = out.body;
-                if (out.res.status === 409 && body?.code === 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' && body.barcode === code && body.stage === op.stage && op.stage === 'receipt'
+                if (out.res.status === 409 && body?.code === 'ZTO_PALM_SIGN_CONFIRM_REQUIRED' && body.barcode === code && body.stage === 'receipt'
                     && typeof body.message === 'string' && body.message.trim() && body.message.length <= 4000
                     && typeof body.confirmationToken === 'string' && body.confirmationToken.length > 0 && body.confirmationToken.length <= 8192) {
                     palmSignState.warnings = { ...palmSignState.warnings, [code]: body.message };
-                    palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: chosen, current: op.current };
-                    palmSignState.message = 'សូមអានសារ ZTO ហើយបញ្ជាក់ ឬបោះបង់។';
+                    if (!palmSignState.confirmation) {
+                        palmSignState.confirmation = { code, message: body.message, token: body.confirmationToken, codes: chosen, current: op.current };
+                        palmSignState.message = 'សូមអានសារ ZTO ហើយបញ្ជាក់ ឬបោះបង់។';
+                    }
                     result = { code, state: 'failed', message: '⚠️ ZTO ស្នើឲ្យបញ្ជាក់កញ្ចប់នេះ មុនទទួល។' };
-                } else if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'dispatch' && op.stage === 'dispatch'
-                    && body.ztoClosed === false && typeof body.dispatchProof === 'string' && body.dispatchProof) {
-                    result = { code, state: 'dispatched', proof: body.dispatchProof, message: '✅ ផ្ញើបញ្ជីចែកចាយជោគជ័យ' };
-                } else if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'receipt' && op.stage === 'receipt' && body.ztoClosed === true) {
+                } else if (out.res.ok && body?.success === true && body.barcode === code && body.stage === 'receipt' && body.ztoClosed === true) {
                     const saved = await recordSigned(op.itemId, code, op.current);
                     result = { code, state: 'signed', saved, message: saved ? '✅ ZTO Sign ជោគជ័យ' : '✅ ZTO Sign រួច · ការបិទក្នុង ZoeW កំពុងរង់ចាំបញ្ជាក់' };
                 } else if (body?.uncertain || !body?.code || out.res.status >= 500 && body?.code !== 'ZTO_PALM_SIGN_PHOTO_REJECTED') {
-                    result = { code, state: 'unknown', message: '⏳ មិនទាន់បញ្ជាក់ Sign។ ចុច «ពិនិត្យ ZTO» មុនផ្ញើម្ដងទៀត។' };
+                    result = { code, state: 'unknown', message: '⏳ មិនទាន់បញ្ជាក់ Sign។ ចុច «🔄 ពិនិត្យ ZTO» មុនផ្ញើម្ដងទៀត។' };
                 } else {
                     const warning = body.code === 'ZTO_PALM_SIGN_CHECK_REJECTED' && typeof body.message === 'string' && body.message.length <= 4000 ? body.message : '';
                     if (warning) palmSignState.warnings = { ...palmSignState.warnings, [code]: warning };
-                    result = { code, state: 'failed', message: warning || failureMessage(body.code, body.reason) };
+                    result = { code, state: 'failed', message: warning ? '⛔ ZTO មិនអនុញ្ញាតឲ្យ Sign' : failureMessage(body.code, body.reason) };
                     if (body.code === 'ZTO_AUTH_EXPIRED' || body.code === 'ZTO_PALM_RELOGIN_REQUIRED') noteZtoPalmSessionRejected(op.cfg);
-                    if (body.code === 'ZTO_PALM_DISPATCH_REQUIRED' && op.stage === 'receipt') staleProofs.push(code);
+                    if (body.code === 'ZTO_PALM_DISPATCH_REQUIRED') staleProofs.push(code);
                 }
             } catch (_) {
-                result = { code, state: 'unknown', message: '⏳ ចម្លើយពី ZTO មិនទាន់មក។ ចុច «ពិនិត្យ ZTO»។' };
+                result = { code, state: 'unknown', message: '⏳ ចម្លើយពី ZTO មិនទាន់មក។ ចុច «🔄 ពិនិត្យ ZTO»។' };
             }
-            if (!op.current()) break;
-            if (op.stage === 'dispatch') palmSignState.dispatchResults = palmSignState.dispatchResults.filter((row) => row.code !== code).concat(result);
-            else palmSignState.results = palmSignState.results.filter((row) => row.code !== code).concat(result);
-            if (palmSignState.confirmation) break;
-            if (result.state === 'unknown') {
-                if (op.stage === 'dispatch') palmSignState.checked = { ...palmSignState.checked, [code]: false };
-                break;
-            }
-        }
-        if (op.current() && !palmSignState.confirmation) palmSignState.message = 'បានបញ្ចប់ការផ្ញើ។ សូមមើលលទ្ធផលតាម Barcode ខាងក្រោម។';
+            if (!op.current()) return false;
+            storeResult(result);
+            return result.state !== 'unknown';
+        });
+        if (op.current() && !palmSignState.confirmation) palmSignState.message = palmSignState.results.some((row) => row.state !== 'signed')
+            ? 'មានកញ្ចប់មិនទាន់ Sign — សូមមើលលទ្ធផលខាងក្រោម។' : '';
     } catch (_) {
         if (op.current()) palmSignState.message = 'ភ្ជាប់ Palm មិនបាន។ សូមពិនិត្យ Config និងបណ្ដាញ។';
     } finally {
         palmSignState.busy = false;
         if (!finishPalmSign(op.current) && staleProofs.length && op.current() && !palmSignState.confirmation) {
             palmSignState.checked = { ...palmSignState.checked, ...Object.fromEntries(staleProofs.map((code) => [code, false])) };
+            palmSignState.dispatchResults = palmSignState.dispatchResults.filter((row) => !staleProofs.includes(row.code));
             void checkZtoPalmSignStages();
         }
     }
 }
 
 export function setPalmSignName(value: string) {
-    if (palmSignState.busy || palmSignState.confirmation || palmSignState.results.some((row) => row.state !== 'failed')) return;
+    if (palmSignState.busy || palmSignState.confirmation) return;
     palmSignState.signMan = value;
 }
 
 export async function checkZtoPalmSignStages() {
     if (palmSignState.busy || palmSignState.confirmation || palmSignState.checking || !palmSignMode()) return;
     const op = operation();
+    const due = palmSignState.codes.filter((code) => !palmSignState.checked[code] && !palmSignSigned(code));
+    if (!due.length) return;
     palmSignState.checking = true;
-    palmSignState.message = 'កំពុងពិនិត្យថា ZTO បានចែកចាយរួចឬនៅ…';
+    palmSignState.message = 'កំពុងពិនិត្យស្ថានភាព ZTO…';
+    let statusFailure = '';
     try {
-        let statusFailure = '';
         const headers = { ...await headersFor(op.cfg), 'Content-Type': 'application/json' };
         const url = endpoint(op.cfg, 'sign');
-        for (const code of palmSignState.codes) {
-            if (!op.current()) return;
-            if (palmSignState.checked[code] && !palmSignState.dispatchResults.some((row) => row.code === code && row.state === 'unknown')) continue;
-            const out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ stage: 'status', barcode: code, requestId: palmSignState.requestId }) },
-                20000, 'Palm stage status timed out', (r) => r.json().catch(() => null));
-            if (!op.current()) return;
+        await runPool(due, PALM_SIGN_STATUS_CONCURRENCY, async (code) => {
+            if (!op.current()) return false;
+            let out;
+            try {
+                out = await fetchWithTimeout(url, { method: 'POST', headers, cache: 'no-store', body: JSON.stringify({ stage: 'status', barcode: code, requestId: palmSignState.requestId }) },
+                    20000, 'Palm stage status timed out', (r) => r.json().catch(() => null));
+            } catch (_) {
+                statusFailure = 'ពិនិត្យស្ថានភាព ZTO មិនបាន។ សូមចុចពិនិត្យម្ដងទៀត។';
+                return;
+            }
+            if (!op.current()) return false;
             const body = out.body;
             if (!out.res.ok || body?.success !== true || body.barcode !== code || body.stage !== 'status'
                 || typeof body.dispatched !== 'boolean' || typeof body.ztoClosed !== 'boolean'
                 || body.dispatched && !body.ztoClosed && !body.dispatchProof) {
                 statusFailure = failureMessage(body?.code, body?.reason);
-                continue;
+                return;
             }
             const problem = body.problemScan;
             if (problem && typeof problem.action === 'string' && typeof problem.time === 'string' && problem.time.length <= 32
@@ -327,24 +423,27 @@ export async function checkZtoPalmSignStages() {
             }
             if (body.ztoClosed) {
                 const saved = await recordSigned(op.itemId, code, op.current);
-                if (!op.current()) return;
-                palmSignState.results = palmSignState.results.filter((row) => row.code !== code).concat({ code, state: 'signed', saved, message: '✅ ZTO បានទទួលរួចហើយ' });
+                if (!op.current()) return false;
+                storeResult({ code, state: 'signed', saved, message: '✅ ZTO បានទទួលរួចហើយ' });
             } else if (body.dispatched) {
-                palmSignState.dispatchResults = palmSignState.dispatchResults.filter((row) => row.code !== code).concat({ code, state: 'dispatched', proof: body.dispatchProof, message: '✅ ZTO ចែកចាយរួច · រំលងជំហានទី១' });
+                storeDispatchResult({ code, state: 'dispatched', proof: body.dispatchProof, message: '✅ ចែកចាយរួច' });
             }
-            palmSignState.checked = { ...palmSignState.checked, [code]: !palmSignState.dispatchResults.some((row) => row.code === code && row.state === 'unknown') };
-        }
-        if (op.current()) palmSignState.message = palmSignState.codes.every((code) => palmSignState.checked[code])
-            ? 'បានពិនិត្យស្ថានភាព ZTO រួច។ សូមបន្តស្កេន។' : statusFailure || 'មិនទាន់បញ្ជាក់ស្ថានភាពគ្រប់កញ្ចប់។ សូមចុចពិនិត្យម្ដងទៀត។';
+            palmSignState.checked = { ...palmSignState.checked, [code]: true };
+        });
+        if (op.current()) palmSignState.message = palmSignState.codes.every((code) => palmSignState.checked[code] || palmSignSigned(code)) ? '' : statusFailure
+            || 'មិនទាន់បញ្ជាក់ស្ថានភាពគ្រប់កញ្ចប់។ សូមចុចពិនិត្យម្ដងទៀត។';
     } catch (_) {
         if (op.current()) palmSignState.message = 'ពិនិត្យស្ថានភាព ZTO មិនបាន។ សូមចុចពិនិត្យម្ដងទៀត។';
     } finally {
-        if (op.generation === palmSignState.generation) { palmSignState.checking = false; if (op.current() && !finishPalmSign(op.current)) advancePalmSignStage(); }
+        if (op.generation === palmSignState.generation) {
+            palmSignState.checking = false;
+            if (op.current() && !finishPalmSign(op.current)) palmSignState.selectedCodes.forEach((code) => { void dispatchPalmSignCode(code); });
+        }
     }
 }
 
 export async function recheckZtoPalmSign() {
-    if (palmSignState.busy || palmSignState.confirmation || !palmSignMode() || palmSignState.stage !== 'receipt') return;
+    if (palmSignState.busy || palmSignState.confirmation || !palmSignMode()) return;
     const op = operation();
     palmSignState.busy = true;
     try {
@@ -358,15 +457,18 @@ export async function recheckZtoPalmSign() {
                 const out = await fetchWithTimeout(url + '&status=1&barcode=' + encodeURIComponent(row.code), { headers, cache: 'no-store' }, 13000, 'Palm status timed out', (r) => r.json());
                 if (!op.current()) break;
                 signed = out.res.ok && out.body?.barcode === row.code && out.body?.ztoClosed === true;
+                if (!signed && out.res.ok && out.body?.barcode === row.code && out.body?.ztoClosed === false) palmSignState.results = palmSignState.results.filter((r) => r.code !== row.code);
             }
             if (signed && op.current()) {
                 const saved = await recordSigned(op.itemId, row.code, op.current);
-                if (op.current()) palmSignState.results = palmSignState.results.map((r) => r.code === row.code
-                    ? { code: row.code, state: 'signed', saved, message: saved ? '✅ ZTO Sign ជោគជ័យ' : '✅ ZTO Sign រួច · ZoeW កំពុងរង់ចាំបញ្ជាក់' } : r);
+                if (op.current()) storeResult({ code: row.code, state: 'signed', saved, message: saved ? '✅ ZTO Sign ជោគជ័យ' : '✅ ZTO Sign រួច · ZoeW កំពុងរង់ចាំបញ្ជាក់' });
             }
         }
         if (op.current()) palmSignState.message = 'បានពិនិត្យ ZTO។ កញ្ចប់ដែលមិនទាន់បញ្ជាក់នៅតែបើកក្នុង ZoeW។';
     } catch (_) {
         if (op.current()) palmSignState.message = 'ពិនិត្យ ZTO មិនបាន។ សូមសាកម្ដងទៀត។';
-    } finally { palmSignState.busy = false; finishPalmSign(op.current); }
+    } finally {
+        palmSignState.busy = false;
+        if (!finishPalmSign(op.current) && op.current()) void checkZtoPalmSignStages();
+    }
 }

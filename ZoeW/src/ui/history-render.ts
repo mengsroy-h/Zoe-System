@@ -4,6 +4,7 @@ import { dataState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
 import { FOUR_HOURS_MS } from '../features/session';
+import { scheduleZtoFinalMarks } from '../features/zto-final-marks';
 import { renderZtoSyncViews, scheduleZtoStatusSweep } from '../features/zto-status';
 import { emptyViewMessage } from '../services/db-listeners';
 import { isAndroidDevice } from '../platform/native';
@@ -40,6 +41,7 @@ export function renderHistory(dataToRender = dataState.scanHistory, viewKey = ''
 
     renderZtoSyncViews();
     scheduleZtoStatusSweep();
+    scheduleZtoFinalMarks();
 }
 
 export const CLEAR_HISTORY_CLAIM_LEASE_MS = 2 * 60 * 1000;

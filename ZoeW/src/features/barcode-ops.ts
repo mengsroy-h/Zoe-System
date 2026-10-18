@@ -4,11 +4,11 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
-import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, reconstructPickupSet } from '../domain/pickup';
+import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { saveSingleDeletedItemToFirebase } from '../services/history-write';
@@ -17,7 +17,9 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
 import { itemOriginOf, originLabel } from './barcode-origin';
+import { barcodeSignedInZto } from './zto-final-marks';
 
 export function openViewListModal(id?) {
     uiState.activeParentItemId = id;
@@ -58,7 +60,8 @@ export function openViewListModal(id?) {
             moneyClass: bcMoneyClass,
             money: money,
             sum: sum,
-            closed: isBcClosed
+            closed: isBcClosed,
+            signed: isBcClosed && barcodeSignedInZto(b)
         };
     });
     uiState.touch();
@@ -318,6 +321,10 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
 
     const freshItem = dataState.scanHistory.find(i => i.id === itemId);
     const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
+    if (!desiredClosed && barcodeZtoSigned(freshB)) {
+        if (!silent) showToast(ZTO_SIGNED_REOPEN_TEXT);
+        return false;
+    }
     const previousState = freshItem && freshB
         ? { isClosed: freshB.isClosed, barcodeClosedAt: freshB.closedAt, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
         : null;
@@ -327,9 +334,13 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let signedRefused = false;
+    const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
+        pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
         pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
     if (freshItem && freshB) {
@@ -346,7 +357,9 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
         const pickupKey = pickupBarcodeKey(barcodeCode);
+        if (pickupKey) pickupJournal.add(pickupScanDate, [pickupKey]);
         pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
+        pickupJournal.note(pickupApplied);
 
         if (showModalAfterApply) openViewListModal(itemId);
         refreshCurrentHistoryView();
@@ -373,18 +386,21 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
         }
         if (pickupApplied) {
-            revertPickupMarks(pickupApplied);
+            const reverted = revertPickupMarks(pickupApplied);
+            pickupJournal.note(reverted);
             pickupApplied = null;
         }
     };
     const settleBarcodeClose = async (barcodeCloseResult, late) => {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
             revertBarcodeCloseLocally();
-            showToast(`⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
+            pickupJournal.finish();
+            showToast(signedRefused ? ZTO_SIGNED_REOPEN_TEXT : `⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
             return false;
         }
         reconcilePickupDeltaWithServer();
+        pickupJournal.finish();
         const collectedSaved = await reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
         if (!silent && collectedSaved === true) showToast(late
@@ -398,6 +414,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             if (!closeIsCurrent()) return;
             serverApplied = false;
             serverPickupMarks = null;
+            signedRefused = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return;
             dropStaleRestoreMarkers(currentItem);
@@ -417,6 +434,10 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
             const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
             if (!b) return currentItem;
+            if (!desiredClosed && barcodeZtoSigned(b)) {
+                signedRefused = true;
+                return;
+            }
             const stateUnchanged = !!b.isClosed === !!desiredClosed && (!desiredClosed || typeof b.closedAt === 'number');
             const itemWasClosed = currentItem.isClosed === true && typeof currentItem.closedAt === 'number';
             if (!stateUnchanged) applyBarcodeCloseState(b, desiredClosed, getServerNow());
@@ -437,10 +458,11 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         });
         return settleBarcodeClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) return;
+            if (!closeIsCurrent()) { pickupJournal.finish(); return; }
             revertBarcodeCloseLocally();
+            pickupJournal.finish();
             showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
         }, 'toggleIndividualBarcodeClose')) {
@@ -450,6 +472,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         console.error("Error toggling barcode close: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
         revertBarcodeCloseLocally();
+        pickupJournal.finish();
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

@@ -7,7 +7,7 @@ import { getFormattedDate } from '../core/timezone';
 import { barcodeAbandonIsRipe, barcodeCloseIsRipe, barcodeReturnCounts, itemAbandonRipeAt, barcodeEntriesOf, ensureBarcodeArrayForItem, itemHasRestoreMarkers, normalizeBarcodeCloseStamps, normalizeBarcodesOf, parseTimestampFromId, stripHistoryOnlyMarkers } from './barcode';
 import { runAutomaticCollectedCleanup } from './collected';
 import { addRevenueToDailyAndMonthlyRecord, commitLedgerEventStep, correctRevenueLedgerToActual, ledgerDedOf, ledgerEventToken, ledgerRecordTokens } from './ledger';
-import { repairPickupLedgerOnce } from './pickup';
+import { repairPickupLedgerOnce, resumePickupIntents } from './pickup';
 import { collectItemBarcodes, flushPendingRegistryReleases, releaseBarcodesInRegistry } from './registry';
 import { releaseStaleClearHistoryClaim } from '../features/clear-history';
 import { activeRestoreClaims, cloneRestoreItem, isActiveRestoreClaim, releaseStaleRestoreClaimForPurge } from '../features/restore';
@@ -1161,4 +1161,5 @@ export function runScheduledCleanup() {
     runCleanupLedgerKeySweep();
     runAutomaticCollectedCleanup();
     repairPickupLedgerOnce();
+    resumePickupIntents();
 }

@@ -54,7 +54,7 @@ let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
-    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
+    'applyBarcodeCloseState', 'barcodeZtoSigned', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'barcodeAbandonBasis', 'barcodeReturnBasis', 'barcodeReturnCounts', 'itemAbandonRipeAt', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'reconstructPickupSet',
     'collectedDayOfStamp', 'collectedDayHoldingKey', 'collectedMarkValueOf', 'collectedMarksFor',
@@ -210,6 +210,7 @@ function makeSandbox(store, now) {
         }),
         revertRevenueLedgerDelta: (applied) => applied || null,
         revertPickupMarks: (applied) => applied || null,
+        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {} }),
         reapplyPickupMarks: (applied) => applied || null,
         dailyPickupData: {},
         dailyCollectedData: {},
@@ -222,7 +223,7 @@ function makeSandbox(store, now) {
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null
     });
     const assembled = [
-        extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
+        extractConst(src, 'ZTO_SIGNED_REOPEN_TEXT'), extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
         extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
         extractConst(src, 'PICKUP_DATE_KEY_PATTERN'), extractConst(src, 'DAILY_COLLECTED_KEEP_DAYS'),
         extractConst(src, 'PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',

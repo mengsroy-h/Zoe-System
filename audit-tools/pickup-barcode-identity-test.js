@@ -81,7 +81,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 
 const REAL_FNS = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
-    'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'normalizeBarcodeCloseStamps',
+    'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeZtoSigned', 'normalizeBarcodeCloseStamps',
     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
     'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
@@ -269,6 +269,8 @@ function makeDevice(shared, name) {
         clearTimeout: (t) => { dev.timers.delete(t); return clearTimeout(t); },
         document: { getElementById: () => null },
         confirm: () => true,
+        // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
+        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {} }),
         db: {}, authGeneration: 0, fb: fb,
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },

@@ -1,8 +1,15 @@
 import { dataState, firebaseState } from '../core/state';
-import { dbListenerPendingPaths } from '../core/text';
+import { elapsedSince } from '../core/elapsed';
+import { shopScope, shopScopePending } from '../core/shop-scope';
+import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
+import { PICKUP_JOURNAL_KEY } from '../core/storage-keys';
+import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, dbListenerPendingPaths } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
+import { markCleanupJournalLive, releaseCleanupJournalLive, withCleanupEntryOwnership } from './cleanup';
+import { generateUniqueId } from './barcode';
 import { ledgerNumber } from './ledger';
 import { barcodeRegistryKey } from './registry';
+import { dbListenerViewIsStale } from '../services/db-listeners';
 import { dbOp } from '../services/network';
 import { showToast } from '../ui/toast';
 
@@ -230,6 +237,156 @@ export function markPickupBarcodes(scanDateStr, marks, seed) {
     const list = (marks || []).filter((m) => m && m.key);
     if (!list.length) return null;
     const applied = applyPickupMarksInMemory(scanDateStr, list, seed);
-    commitPickupMarks(scanDateStr, list, seed);
-    return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed };
+    const commit = commitPickupMarks(scanDateStr, list, seed);
+    return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed, commit: commit };
+}
+
+export const PICKUP_JOURNAL_MAX = 200;
+
+export const PICKUP_JOURNAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const pickupIntentsLive = new Set<string>();
+
+export function readPickupJournal() {
+    try {
+        const raw = safeStoreGet(appLocalStore, PICKUP_JOURNAL_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((e) => e && typeof e === 'object' && typeof e.id === 'string' && typeof e.date === 'string'
+            && /^[0-9-]+$/.test(e.date) && Array.isArray(e.keys));
+    } catch (e) {
+        return [];
+    }
+}
+
+export function writePickupJournal(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) {
+        safeStoreRemove(appLocalStore, PICKUP_JOURNAL_KEY);
+        return;
+    }
+    try {
+        safeStoreSet(appLocalStore, PICKUP_JOURNAL_KEY, JSON.stringify(list));
+    } catch (e) {}
+}
+
+export function beginPickupIntent(scanDateStr, keys) {
+    const list = (keys || []).filter((k) => typeof k === 'string' && k);
+    if (!scanDateStr || !/^[0-9-]+$/.test(scanDateStr) || !list.length) return null;
+    const id = 'pk' + generateUniqueId().slice(3);
+    const kept = readPickupJournal().filter((e) => elapsedSince(e.at) <= PICKUP_JOURNAL_MAX_AGE_MS).slice(-(PICKUP_JOURNAL_MAX - 1));
+    kept.push({ id: id, scope: shopScope(), date: scanDateStr, keys: list, at: Date.now() });
+    pickupIntentsLive.add(id);
+    markCleanupJournalLive(id);
+    writePickupJournal(kept);
+    return id;
+}
+
+export function addPickupIntentKeys(id, keys) {
+    if (!id) return;
+    const extra = (keys || []).filter((k) => typeof k === 'string' && k);
+    if (!extra.length) return;
+    const list = readPickupJournal();
+    let changed = false;
+    list.forEach((e) => {
+        if (e.id !== id) return;
+        extra.forEach((k) => { if (e.keys.indexOf(k) === -1) { e.keys.push(k); changed = true; } });
+    });
+    if (changed) writePickupJournal(list);
+}
+
+export function releasePickupIntent(id) {
+    if (!id) return;
+    pickupIntentsLive.delete(id);
+    releaseCleanupJournalLive(id);
+}
+
+export function endPickupIntent(id, settled) {
+    if (!id) return;
+    const finish = () => {
+        writePickupJournal(readPickupJournal().filter((e) => e.id !== id));
+        releasePickupIntent(id);
+    };
+    if (settled && typeof settled.then === 'function') settled.then(finish, finish);
+    else finish();
+}
+
+export function pickupIntentTracker(isCurrent) {
+    let intent = null;
+    let commit = null;
+    return {
+        add: (scanDateStr, keys) => {
+            if (intent) addPickupIntentKeys(intent, keys);
+            else intent = beginPickupIntent(scanDateStr, keys);
+        },
+        note: (applied) => {
+            if (applied && applied.commit) commit = applied.commit;
+        },
+        finish: () => {
+            if (!intent) return;
+            const id = intent;
+            intent = null;
+            if (!isCurrent()) releasePickupIntent(id);
+            else endPickupIntent(id, commit);
+        }
+    };
+}
+
+export function pickupTruthMarks(dateKey, keys) {
+    const want = {};
+    (keys || []).forEach((k) => { want[k] = true; });
+    const found = {};
+    const collect = (list) => {
+        (list || []).forEach((item) => {
+            if (!item || item.scanDate !== dateKey) return;
+            collectPickupMarks(item).forEach((mark) => {
+                if (!want[mark.key]) return;
+                const prior = found[mark.key];
+                if (!prior || (mark.closed && !prior.closed)) found[mark.key] = mark;
+            });
+        });
+    };
+    collect(dataState.scanHistory);
+    collect(dataState.deletedItems);
+    return Object.keys(found).map((k) => found[k]);
+}
+
+export async function resumePickupIntents() {
+    if (dataState.pickupResumeInFlight) return;
+    if (!firebaseState.db || !firebaseState.fb || !firebaseState.auth || !firebaseState.auth.currentUser || shopScopePending()) return;
+    const views = [DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED, 'dailyPickup'];
+    if (views.some((k) => dbListenerViewIsStale(k))) return;
+    const scope = shopScope();
+    if (!scope) return;
+    const journal = readPickupJournal();
+    const fresh = journal.filter((e) => elapsedSince(e.at) <= PICKUP_JOURNAL_MAX_AGE_MS);
+    if (fresh.length !== journal.length) writePickupJournal(fresh);
+    const due = fresh.filter((e) => e.scope === scope && !pickupIntentsLive.has(e.id));
+    if (!due.length) return;
+    dataState.pickupResumeInFlight = true;
+    const resumeDb = firebaseState.db;
+    const resumeGeneration = firebaseState.authGeneration;
+    const resumeIsCurrent = () => firebaseState.db === resumeDb && firebaseState.authGeneration === resumeGeneration && shopScope() === scope;
+    try {
+        for (const entry of due) {
+            if (!resumeIsCurrent()) return;
+            await withCleanupEntryOwnership(entry.id, async () => {
+                if (!resumeIsCurrent() || !readPickupJournal().some((e) => e.id === entry.id)) return;
+                const marks = pickupTruthMarks(entry.date, entry.keys);
+                if (marks.length) {
+                    const seed = reconstructPickupSet(entry.date);
+                    const dayRef = firebaseState.fb.ref(resumeDb, `zoew_daily_pickup_cod_dod/${entry.date}`);
+                    const result = await dbOp(firebaseState.fb.runTransaction(dayRef, (current) => buildPickupRecordFromSet(
+                        applyPickupMarksToSet(pickupSetFromRecord(current && typeof current === 'object' ? current : null, seed), marks)))).catch(() => null);
+                    if (!resumeIsCurrent() || !result || !result.committed) return;
+                }
+                writePickupJournal(readPickupJournal().filter((e) => e.id !== entry.id));
+            });
+        }
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'resumePickupIntents' });
+    } finally {
+        dataState.pickupResumeInFlight = false;
+    }
 }

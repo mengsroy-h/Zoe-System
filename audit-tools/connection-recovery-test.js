@@ -308,6 +308,7 @@ function buildContext() {
         attachZtoShopSweepListener: () => false,
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
+        resumePickupIntents: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         CLEANUP_SWEEP_BATCH: 8,
         ZoeErrors: { capture: (e) => log.captures.push(e) }
@@ -1774,6 +1775,7 @@ function buildContext() {
             'const viewState = { phoneModalBusy: false };',
             'function clearCustomerDataTableCache() {}',
             'function clearZtoPickupStatusStore() {}',
+            'function resetZtoFinalMarks() {}',
             'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
             'let scanHistory = [], deletedItems = [], dailyRevenueData = {}, monthlyRevenueData = {};',
             'let dailyPickupData = {}, lockerBarcodeIndex = {};',

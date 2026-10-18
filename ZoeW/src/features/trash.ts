@@ -19,8 +19,6 @@ export const TRASH_REASON_META = {
     delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
 };
 
-export const TRASH_STORED_REASONS = ['remove', 'returned', 'pickup', 'delete'];
-
 export const TRASH_FILTER_META = {
     deducted: { note: 'បង្ហាញតែ ➖ ដក + ត្រឡប់', empty: 'គ្មានកញ្ចប់ «ដក» ឬ «ត្រឡប់» ក្នុងធុងសំរាមទេ' },
     kept: { note: 'បង្ហាញតែ ✅ យករួច + លុប', empty: 'គ្មានកញ្ចប់ «យករួច» ឬ «លុប» ក្នុងធុងសំរាមទេ' }
@@ -38,7 +36,7 @@ export function trashGroupInFilter(group, filter) {
 
 export function trashReasonOf(item) {
     if (!item) return 'delete';
-    if (TRASH_STORED_REASONS.indexOf(item.trashReason) !== -1) return item.trashReason;
+    if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason] && item.trashReason !== 'misplaced') return item.trashReason;
     if (item.isFromDeletion) return item.isClosed ? 'pickup' : 'delete';
     return 'remove';
 }

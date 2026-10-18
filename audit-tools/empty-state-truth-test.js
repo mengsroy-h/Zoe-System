@@ -86,6 +86,8 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     // ⛔ អេក្រង់ទី ៦ និងទី ៧ ៖ របា និងប្រអប់ «ZTO មិនទាន់បិទ» — ពួកវាកើតក្រោយ
     // ច្បាប់នេះ ហើយជុំមុន **stub ពួកវាចោល** ➜ ស្នាមភ្ជាប់គ្មានតេស្តសោះ។
     'barcodeRegistryKey', 'pickupBarcodeKey', 'loadZtoPickupStatusOnce',
+    // ⛔ ស្លាក «ខុសទីតាំង» ៖ `buildTrashGroups()` ដាក់ក្រុមតាម `trashDisplayReasonOf()` (ពិត · មិន stub)
+    'trashDisplayReasonOf', 'trashItemMisplaced', 'barcodeMisplacedInZto', 'barcodeZtoMisplaced',
     'ztoStatusTrashItemCounts', 'collectClosedBarcodesForZtoStatus',
     'ztoStatusPendingList', 'ztoStatusPendingCodes', 'ztoStatusUnmeasuredCount',
     'ztoStatusFeatureConfig', 'ztoSyncModalIsOpen',
@@ -181,6 +183,7 @@ function buildSandbox(state) {
         getServerNow: () => Date.parse('2026-09-09T03:00:00Z'),
         openModalHelper: () => {},
         scheduleZtoFinalMarks: () => {},
+        ztoReturnedEvidence: new Map(),
         document: { getElementById: () => null }
     };
     sandbox.ZTO_SYNC_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_HISTORY,

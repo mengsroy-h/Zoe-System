@@ -62,7 +62,7 @@ beforeEach(() => {
         const all = rowsUp.filter((r) => (r.listed || r.type) === c.scanTypeCode && r.at >= c.scanStartTime && r.at <= c.scanEndTime);
         const res = all.slice((b.pageNum - 1) * b.pageSize, b.pageNum * b.pageSize).map((r) => ({ scanBillCode: r.code,
             consigneeMobile: '855977000111', scanTypeCode: r.type, scanTypeDesc: r.desc, agentAmount: 2, fcAmount: 0, scanTime: r.at,
-            scanSite: 'MerSorChrey', isRefund: r.type === '-710' ? 1 : 0 }));
+            scanSite: 'MerSorChrey', isRefund: r.type === '-710' ? 1 : 0, ...(r.raw || {}) }));
         return new Response(JSON.stringify({ success: true, error: null,
             data: { pageNum: b.pageNum, pages: Math.ceil(all.length / b.pageSize), total: all.length, result: res } }), { status: 200 });
     }));
@@ -77,7 +77,7 @@ afterEach(() => {
 const arrival = (code: string, back: number, hour = '08') => ({ code, type: '03', desc: 'អីវ៉ាន់មកដល់', at: dk(back) + ' ' + hour + ':00:00' });
 const sign = (code: string, back: number) => ({ code, type: '05', desc: 'ចុះហត្ថលេខា', at: dk(back) + ' 18:00:00' });
 const back = (code: string, back: number, hour = '09') => ({ code, type: '-710', desc: 'ត្រឡប់ការស្កេន', at: dk(back) + ' ' + hour + ':00:00' });
-const send = (code: string, back: number, hour = '10') => ({ code, type: '02', desc: 'ផ្ញើចេញ', at: dk(back) + ' ' + hour + ':00:00' });
+const send = (code: string, back: number, hour = '10') => ({ code, type: '02', desc: 'អីវ៉ាន់ផ្ញើរចេញ', at: dk(back) + ' ' + hour + ':00:00' });
 const codesOf = (rows: any[]) => rows.map((row) => row.barcode).sort();
 const historyWith = (code: string) => [{ id: 'h1', phone: '0977000111', scanDate: dk(2), createdAt: Date.now() - 2 * DAY,
     barcodes: [{ code, cod: 2, dod: 0, isClosed: false }] }];
@@ -208,5 +208,33 @@ describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (សា�
         expect(failed.returnedState).toBe('ok');
         expect(failed.sentState).toBe('failed');
         expect(failed.returned).toEqual([]);
+    });
+});
+
+describe('📍 Cookie ៖ រាងជួរ Argus ពិត (ម្ចាស់គម្រោង inspect ៖ 03 ➜ 04 ➜ 30 «ទីតាំងមិនត្រឹមត្រូវ» ➜ 02 «អីវ៉ាន់ផ្ញើរចេញ» · លេខសំយោគ)', () => {
+    const real = (code: string, type: string, desc: string, time: string, extra: Record<string, unknown> = {}) => ({ code, type, desc, at: dk(0) + ' ' + time,
+        raw: { action: null, agentAmount: 0.0, barScannerId: '744', consigneeMobile: '+855-086000244', consigneeName: 'KC-15', customerCode: '20000',
+            customerCodeDesc: null, dataFrom: 'Astra-VN-IOS', destinationOutletName: 'Mer SorChrey', fcAmount: 1.75, goodsType: 'របស់របរទូទៅ',
+            isRefund: 0, isRefundDesc: 'ទេ', packageQty: 1, preOrNextStationCode: null, problemReason: '', recSite: 'សែនសុខ', remark: 'KH',
+            scanMan: 'ស្រីអូន', scanSite: 'Mer SorChrey', scanSiteCode: '881859', signMan: '', signedBillCode: '', updateTime: dk(0) + ' ' + time, ...extra } });
+    const CODE = 'ZTMIS0000002';
+    it('ស្កេនបញ្ហា 30 តែម្យ៉ាង ➜ មិនមែនខុសទីតាំង · 02 ក្រោយមកដល់ ➜ `misplaced` · រាងវាលពិតអានបាន', async () => {
+        rowsUp = [
+            real(CODE, '03', 'អីវ៉ាន់មកដល់', '13:25:26'),
+            real(CODE, '04', 'ការចែកចាយអីវ៉ាន់', '13:33:04'),
+            real(CODE, '30', 'ការចុះឈ្មោះបញ្ហា', '13:34:12', { problemReason: 'ទីតាំងមិនត្រឹមត្រូវ', dataFrom: 'Z10-KH-PDA' })
+        ];
+        const only: any = await fetchZtoListAllPages(CFG, dk(1), dk(0));
+        expect(only.rows.map((r: any) => r.barcode)).toEqual([CODE]);
+        expect(only.returned, 'ស្កេនបញ្ហា (30) មិនមែនភស្តុតាង').toEqual([]);
+        rowsUp.push(real(CODE, '02', 'អីវ៉ាន់ផ្ញើរចេញ', '13:34:40', { preOrNextStationCode: 'ក្រុងកំពង់ចាម KC-01' }));
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        const out: any = await fetchZtoListAllPages(CFG, dk(1), dk(0));
+        expect(out.sentState).toBe('ok');
+        expect(out.returned).toEqual([{ barcode: CODE, at: dk(0) + ' 13:34:40', misplaced: true }]);
+        const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(1), to: dk(0), returned: out.returned });
+        expect(codesOf(groups.returned)).toEqual([CODE]);
+        expect(groups.returned[0]).toMatchObject({ misplaced: true, returnedAt: dk(0) + ' 13:34:40', cod: 0, dod: 1.75, from: 'សែនសុខ' });
+        expect(groups.fresh).toEqual([]);
     });
 });

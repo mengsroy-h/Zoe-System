@@ -47,11 +47,12 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` (ពេលសរសេរ) = `cb082e4` **ZoeW 2.50.125 · ZoeKeyGen 2.24.19** (PR #330 · #331 merge រួច) · Deep audit ៦ ➜ **2.50.126** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
+- `main` (ពេលសរសេរ) = `cb082e4` **ZoeW 2.50.125 · ZoeKeyGen 2.24.19** (PR #330 · #331 merge រួច) · Deep audit ៦ ➜ **2.50.126** · A225–A228 ➜ **2.50.127** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
+- ⏳ **[2.50.127]** Publish rules (`ztoSignedAt` · `ztoReturnedAt`) ទៅគ្រប់គម្រោង Firebase · ✍️ Sign មួយជុំលើ iPhone + Android ពិត (ស្កេនកាមេរ៉ា · QR លើបុង · Gallery · សម្លេង/ញ័រ · ល្បឿនធៀប ZTO Palm)។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
 - ⏳ **[2.50.95]** សកម្មភាព ១ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងបញ្ជីកញ្ចប់ពី ZTO)។

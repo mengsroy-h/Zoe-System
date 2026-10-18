@@ -136,6 +136,8 @@ it('📍 រូប Sign មានម៉ោង (Asia/Phnom_Penh) និងកូ�
     expect(palmSignCurrentFix()).toBeNull();
     notePalmSignPosition({ coords: { latitude: 95, longitude: 105.4, accuracy: 10 } });
     expect(palmSignCurrentFix()).toBeNull();
+    notePalmSignPosition({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 2500 } });
+    expect(palmSignCurrentFix(), 'Android «ទីតាំងប្រហាក់ប្រហែល» (≈ ២–៣ គ.ម.) ➜ នៅមានកូអរដោនេ ដូច ZTO Palm').toMatchObject({ lat: 12.3, lng: 105.4 });
     notePalmSignPosition({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 10 } });
     expect(palmSignCurrentFix()).toMatchObject({ lat: 12.3, lng: 105.4 });
     palmSignLocation.fix!.at = Date.now() - PALM_SIGN_FIX_MAX_AGE_MS - 1;

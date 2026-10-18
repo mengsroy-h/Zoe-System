@@ -110,7 +110,7 @@
 លម្អិត ៖ ផ្នែក ២ A230 · A231 · A232 · A233។
 
 - 📍 **រូប Sign** ៖ ម៉ោង `YYYY-MM-DD HH:MM:SS` (Asia/Phnom_Penh · នាឡិកា server) និងកូអរដោនេ `lat, lng` (៥ ខ្ទង់) ពណ៌ក្រហម ជ្រុងក្រោមឆ្វេង ដូច ZTO Palm ·
-  ទីតាំងតាម `navigator.geolocation.watchPosition` តែពេលផ្ទាំង Sign បើក (បិទ ➜ `clearWatch`) · ទីតាំងចាស់ជាង ២ នាទី ឬភាពត្រឹមត្រូវ > 1000 m ➜ រូបមានតែម៉ោង ·
+  ទីតាំងតាម `navigator.geolocation.watchPosition` តែពេលផ្ទាំង Sign បើក (បិទ ➜ `clearWatch`) · ទីតាំងចាស់ជាង ២ នាទី ឬភាពត្រឹមត្រូវ > 5000 m ➜ រូបមានតែម៉ោង (Android «ប្រហាក់ប្រហែល» ≈ ២–៣ គ.ម. នៅមានកូអរដោនេ) ·
   កាមេរ៉ា · 📷 · 🖼 ដូចគ្នា · Netlify `Permissions-Policy` `geolocation=(self)` · APK `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` (គ្មាន background)។
 - 📍 **ខុសទីតាំង** ៖ ZTO Palm `status=1` និង `tracks=` ឆ្លើយ `ztoMisplacedAt` = ស្កេន `2` 发件 នៃសាខាខ្លួន ក្រោយការមកដល់ចុងក្រោយ (គ្មាន `-710` · មិនបិទ) ហើយ
   `ztoReturnedAt` ដដែល ➜ ផ្លូវត្រឡប់ដដែល (`removeReturnedZtoBarcodes()` ➜ ធុងសំរាម `returned` · លុយ និងចំនួនកញ្ចប់ដក) · `syncZtoFinalMarks()` កត់ `ztoMisplacedAt`

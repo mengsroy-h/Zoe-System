@@ -5,7 +5,7 @@ import { modalIsOpen } from '../core/modals';
 import { shopScope } from '../core/shop-scope';
 import { getLookupApiConfig } from './lookup-config';
 import { lookupApiIsPalm } from './customer-table-prefetch';
-import { addPalmSessionHeader, addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
+import { addZtoIdentityHeader, buildLookupRequestHeaders } from './lookup-api';
 import { noteZtoPalmSessionRejected } from './zto-palm-login';
 import { applyBarcodeCloseChange } from './barcode-ops';
 import { scheduleZtoFinalMarks } from './zto-final-marks';
@@ -209,10 +209,9 @@ function operation() {
 }
 
 async function headersFor(cfg) {
-    const headers = await buildLookupRequestHeaders(cfg);
-    await addZtoIdentityHeader(cfg, headers);
-    await addPalmSessionHeader(cfg, headers);
-    return headers;
+    const identityHeaders = {};
+    const [headers] = await Promise.all([buildLookupRequestHeaders(cfg), addZtoIdentityHeader(cfg, identityHeaders)]);
+    return { ...headers, ...identityHeaders };
 }
 
 function endpoint(cfg, action: string) {
@@ -469,22 +468,33 @@ export async function recheckZtoPalmSign() {
     try {
         const headers = await headersFor(op.cfg);
         const url = endpoint(op.cfg, '1');
-        for (const row of palmSignState.results) {
-            if (!op.current()) break;
-            if (row.state !== 'unknown' && !(row.state === 'signed' && !row.saved)) continue;
-            let signed = row.state === 'signed';
-            if (!signed) {
-                const out = await fetchWithTimeout(url + '&status=1&barcode=' + encodeURIComponent(row.code), { headers, cache: 'no-store' }, 13000, 'Palm status timed out', (r) => r.json());
-                if (!op.current()) break;
-                signed = out.res.ok && out.body?.barcode === row.code && out.body?.ztoClosed === true;
-                if (!signed && out.res.ok && out.body?.barcode === row.code && out.body?.ztoClosed === false) palmSignState.results = palmSignState.results.filter((r) => r.code !== row.code);
+        const due = palmSignState.results.filter((row) => row.state === 'unknown' || row.state === 'signed' && !row.saved);
+        const verdicts = new Map<string, boolean>();
+        let failed = false;
+        await runPool(due, PALM_SIGN_STATUS_CONCURRENCY, async (row) => {
+            if (!op.current()) return false;
+            if (row.state === 'signed') {
+                verdicts.set(row.code, true);
+                return;
             }
-            if (signed && op.current()) {
+            try {
+                const out = await fetchWithTimeout(url + '&status=1&barcode=' + encodeURIComponent(row.code), { headers, cache: 'no-store' }, 13000, 'Palm status timed out', (r) => r.json());
+                if (!op.current()) return false;
+                if (out.res.ok && out.body?.barcode === row.code && typeof out.body?.ztoClosed === 'boolean') verdicts.set(row.code, out.body.ztoClosed);
+            } catch (_) {
+                failed = true;
+                return false;
+            }
+        });
+        for (const row of due) {
+            if (!op.current()) break;
+            if (verdicts.get(row.code) === false) palmSignState.results = palmSignState.results.filter((r) => r.code !== row.code);
+            if (verdicts.get(row.code) === true) {
                 const saved = await recordSigned(op.itemId, row.code, op.current);
                 if (op.current()) storeResult({ code: row.code, state: 'signed', saved, message: saved ? '✅ ZTO Sign ជោគជ័យ' : '✅ ZTO Sign រួច · ZoeW កំពុងរង់ចាំបញ្ជាក់' });
             }
         }
-        if (op.current()) palmSignState.message = 'បានពិនិត្យ ZTO។ កញ្ចប់ដែលមិនទាន់បញ្ជាក់នៅតែបើកក្នុង ZoeW។';
+        if (op.current()) palmSignState.message = failed ? 'ពិនិត្យ ZTO មិនបាន។ សូមសាកម្ដងទៀត។' : 'បានពិនិត្យ ZTO។ កញ្ចប់ដែលមិនទាន់បញ្ជាក់នៅតែបើកក្នុង ZoeW។';
     } catch (_) {
         if (op.current()) palmSignState.message = 'ពិនិត្យ ZTO មិនបាន។ សូមសាកម្ដងទៀត។';
     } finally {

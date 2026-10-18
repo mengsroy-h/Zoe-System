@@ -75,6 +75,34 @@ afterEach(() => {
     vi.unstubAllGlobals(); vi.unstubAllEnvs();
     delete (window as any).Capacitor;
     appLocalStore.clear();
+    vi.restoreAllMocks();
+});
+
+it.each(['login', 'shared'])('Palm %s រៀបចំសោភ្ជាប់ និង ID token ព្រមគ្នា មិនផ្ញើមុនទាំងពីររួច', async (mode) => {
+    credentials();
+    const original = webcrypto.subtle.decrypt.bind(webcrypto.subtle);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const decrypt = vi.spyOn(webcrypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+        await gate;
+        return original(...args);
+    });
+    const identity = vi.fn(async () => ({ token: 'synthetic-shop-identity' }));
+    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    firebaseState.fb = { getIdTokenResult: identity } as any;
+    vi.stubGlobal('fetch', vi.fn(async () => mode === 'login' ? success() : response({ success: true, shared: true, account: { siteCode: 'KH001' } })));
+    const work = mode === 'login' ? submitZtoPalmLogin() : connectSharedZtoPalm();
+    try {
+        await vi.waitFor(() => expect(decrypt).toHaveBeenCalledOnce());
+        expect(identity).toHaveBeenCalledOnce();
+        expect(fetch).not.toHaveBeenCalled();
+        expect(appLocalStore.getItem('zoew_lookup_api_config')).toBe(initialConfig);
+    } finally {
+        await act(async () => { release(); await work; });
+    }
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({ 'X-Zoe-Proxy-Key': PROXY_KEY, 'X-Zoe-Id-Token': 'synthetic-shop-identity' });
+    expect(viewState.palmLoginConnected).toBe(true);
 });
 
 describe('Palm login UI and existing lookup flow', () => {

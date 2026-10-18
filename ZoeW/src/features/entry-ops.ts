@@ -264,7 +264,7 @@ export async function toggleCloseStatus(id?) {
             }
         }
         if (pickupApplied) {
-            const reverted = revertPickupMarks(pickupApplied);
+            const reverted = revertPickupMarks(pickupApplied, null, true);
             pickupJournal.note(reverted);
             pickupApplied = null;
         }
@@ -420,11 +420,9 @@ export async function deleteSingleItem(id, opts?) {
             console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'data', context: 'deleteSingleItem trash write failed after retries', itemId: id });
             if (!deleteIsCurrent()) return;
-            let restoredItem = null;
             let restoreOk = false;
             try {
-                const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, null);
-                restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                await restoreClaimedItemToScanHistory(id, claimedWhole, null);
                 restoreOk = true;
             } catch (restoreErr) {
                 console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);

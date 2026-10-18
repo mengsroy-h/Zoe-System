@@ -1,6 +1,6 @@
 import { fieldValue, setFieldValue, videoElement } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { dataState, scanState, securityState, uiState } from '../core/state';
+import { dataState, scanState, uiState } from '../core/state';
 import { countPickedUpCustomers, getPickupPhoneKey } from '../domain/pickup';
 import { getFilterTargetDateKey } from './export';
 import { triggerScanAction } from './scan-action';

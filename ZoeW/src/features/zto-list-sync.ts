@@ -386,9 +386,7 @@ export async function fetchZtoListPage(cfg, from, to, page, mode?, palm?) {
         untrusted.notConfigured = true;
         throw untrusted;
     }
-    const headers = await buildLookupRequestHeaders(cfg);
-    if (!session.current()) return null;
-    const idToken = await ztoIdToken();
+    const [headers, idToken] = await Promise.all([buildLookupRequestHeaders(cfg), ztoIdToken()]);
     if (!session.current()) return null;
     if (!idToken) {
         const missing: any = new Error('ZTO_LIST_NOT_CONFIGURED');

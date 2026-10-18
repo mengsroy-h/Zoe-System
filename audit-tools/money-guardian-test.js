@@ -117,8 +117,8 @@ const MUTATIONS = [
     {
         // ⛔ ថ្នាក់ ៖ ការដកវិញលែងស្តារ **ស្ថានភាពដើម** ➜ ការដកវិញក្លាយជា no-op។
         name: 'ស្ថិតិយក ៖ ការដកវិញមិនស្តារស្ថានភាពដើម',
-        from: '        const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));',
-        to: '        const marks = applied.marks;'
+        from: '            const current = changed ? truth.get(p.key) || p : p;',
+        to: '            const current = requested || p;'
     },
     {
         name: 'transaction ដែលបដិសេធ `disconnect` ចាត់ទុកជា «មិនបានអនុវត្ត» (wrapper បិទ ➜ ដកលុយ ២ ដង)',

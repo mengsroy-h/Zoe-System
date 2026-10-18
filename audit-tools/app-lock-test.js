@@ -878,15 +878,18 @@ async function withTimeout(promise, ms, label) {
 
         await group('១៦. ⛔ «📞 ខល» (`tel:`) ➜ ចាកចេញ ➜ ត្រឡប់មក ➜ **មិនចាក់សោ**', async () => {
             await unlockFresh();
+            const callPageUrl = page.url();
             await page.evaluate(() => {
                 const a = document.createElement('a');
                 a.href = 'tel:012345678';
                 a.id = 'testCallLink';
                 a.textContent = 'call';
+                a.addEventListener('click', (event) => event.preventDefault());
                 document.body.appendChild(a);
                 a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             });
             await page.waitForTimeout(150);
+            check(page.url() === callPageUrl, '⛔ browser សាកល្បងរក្សាទំព័រ App ខណៈធ្វើ lifecycle របស់ការខលក្លែង', page.url());
             await leaveApp();
             const away = await state();
             check(!away.bodyLocked, '⛔ ការចាកចេញដើម្បីខល ➜ **មិនបាំង**', away);

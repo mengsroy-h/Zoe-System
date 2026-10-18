@@ -3,7 +3,6 @@ import { elementSize, fieldValue, rectOfElement, setFieldValue } from '../app/re
 import { dataState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { getZoneDateKey } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
 import { requestPinBeforeResetPickup } from '../domain/collected';
 import { openViewListModal } from '../features/barcode-ops';
 import { requestPinBeforeClearHistory } from '../features/clear-history';

@@ -47,7 +47,6 @@
 
 - ⛔ **ផ្ទៀងផ្ទាត់ git មុនជឿអត្ថបទនេះ** (`git log --oneline -3 origin/main` · `git rev-list --count origin/main..origin/<branch>`) · ⛔ កុំ merge ដោយគ្មានសំណើម្ចាស់គម្រោង ·
   ឆ្លើយជាខ្មែរ · ⛔ ម្ចាស់គម្រោង **មិនអនុញ្ញាត agent/workflow** ដោយគ្មានការសួរ (កូតា) ➜ សួរមុនជានិច្ច។
-- `main` (ពេលសរសេរ) = `c39268c` **ZoeW 2.50.128 · ZoeKeyGen 2.24.20** · A234–A240 ➜ **2.50.129** នៅ branch `claude/pensive-lamport-6npp1l` (មិនទាន់ merge)។
 - ⛔ ច្បាប់រត់ checker ➜ `CLAUDE.md` Runbook (run-all ពេញមុន push) · ម្ចាស់គម្រោងអាចស្នើរត់តែ checker ពាក់ព័ន្ធ (`RUNALL_ONLY`) ➜ កត់ក្នុងផ្នែក ២ ថាមិនបានរត់ពេញ។
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
@@ -68,7 +67,6 @@
 - ⏳ **repo នៅ Public** (វាស់ 2026-10-16 ៖ `visibility: public`) ៖ ផែនការ Private (repo Releases ដាច់ · `ZOE_RELEASES_TOKEN` · ច្បាប់ «Public repo» ក្នុង `CLAUDE.md`)
   ➜ ម្ចាស់គម្រោង ៖ Forks · Secret scanning + Push protection · Make private។ ប្រវត្តិ git ៖ ម្ចាស់គម្រោង «មិនបាច់ធ្វើ» ([2.50.93] សកម្មភាព ៤)។
 - ⏳ `tools/supabase-migrate/` — តែពេលអតិថិជន Firebase ចង់ប្តូរ (dry-run មុន)។
-- ⏸️ Supabase deep audit ជុំ ២ (ម្ចាស់គម្រោង ៖ «ទុកធ្វើពេលក្រោយ»)។
 
 ### 🧭 ZTO Palm (Login · Lookup ➜ ពេញ)
 
@@ -102,6 +100,29 @@
   A223 ៖ repo Public ➜ `ZOE_RUNNER_MODE=github` ទើប Audit CI រត់ពិត (self-hosted ➜ «skipped» មិនមែនបៃតង) · ព្រំដែនដែលទទួលស្គាល់ និងការរកឃើញដែលបានបដិសេធ ➜ ផ្នែក ២ «Deep audit ៣–៥» (⛔ កុំរាយការណ៍ម្តងទៀត)។
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
+
+### [2.50.130] — 2026-10-19 · ZoeW + ZoeKeyGen `2.24.21` ៖ Deep audit — ការពារ log · លទ្ធផលសរសេរ Supabase · ផ្ទាំងស្កេនផ្តេក · Palm រៀបចំសំណើព្រមគ្នា
+
+**ZoeW** (`zoew-v393` ➜ `zoew-v394`) និង **ZoeKeyGen** (`zoekeygen-v131` ➜ `zoekeygen-v132`)។
+
+#### អ្វីដែលខុសពីមុន
+
+- ការរាយកំហុសលាក់ credential ខ្លីក្នុង Authorization និង cookie ទាំងមូល ទោះ header នៅក្នុង quote ឬវង់ក្រចក។
+- ZoeW មិនរាយថាសរសេរជោគជ័យត្រឹម HTTP 200 បើ JSON គ្មាន verdict ត្រឹមត្រូវ។ ចម្លើយមិនច្បាស់ប្រើ `op_id` ដើមសម្រាប់ retry ហើយ journal នៅតែចងចាំថាសំណើមុនអាចបាន commit រួច ទោះ auth ដាច់ក្នុងសំណើបន្ទាប់។
+- ទូរស័ព្ទផ្តេកកម្ពស់ខ្លី៖ banner ដកកញ្ចប់ និងប្រអប់សង្ខេបលុយបង្រួម ដើម្បីឲ្យប៊ូតុងកាមេរ៉ា និងតម្រងថ្ងៃស្ថិតពីលើរបា Tab។
+- ការ undo និង recovery អាន history/trash ពី Server មុនស្តារស្ថិតិ pickup ដើម្បីមិនប្រើ listener ចាស់។ ការអាន/Save បរាជ័យរក្សា journal; Reset នៅសូន្យដដែល បើការប្ដូរស្ថានភាពមិនបានអនុវត្ត។
+- សម្អាត import/អថេរដែលមិនប្រើ និងបើក `noUnusedLocals`។ សម្អាត handoff ដែលរាយ branch មិនទាន់ merge ខណៈ git បង្ហាញថា merge រួច។
+- Sign រៀបចំ Palm header តែម្តង។ Login/ភ្ជាប់ Palm របស់ហាង និងការទាញបញ្ជី Palm/Cookie រៀបចំ credential និង ID token ព្រមគ្នា ដោយរង់ចាំទាំងពីរ និងពិនិត្យ session មុនផ្ញើ។ «ពិនិត្យ ZTO» ក្នុងផ្ទាំង Sign អានអតិបរមា ៤ ព្រមគ្នា រួច Save ម្តងមួយតាមលំដាប់; បរាជ័យរង់ចាំសំណើកំពុងរត់ និងឈប់ចែកការងារថ្មី។
+
+#### អ្នកយាម
+
+`secret-hygiene` · `tests/supabase-write-bad-body.test.ts` · `tests/supabase-journal-recovery.test.ts` · `tests/pickup-interrupted-close.test.ts` · `layout-check` · `typecheck`។ ការសម្អាត `zto-status.ts` ប៉ះតែ import មិនប្រើ តាមសំណើម្ចាស់គម្រោង audit ZTO និង dead code; `zto-list-sync` · `zto-sync-banner` · `zto-signed-sync` PASS មុនធ្វើបច្ចុប្បន្នភាព LOCK។
+
+សំណើម្ចាស់គម្រោងបង្កើនល្បឿន Palm/Cookie អនុញ្ញាតកែ `zto-palm-login.ts` និង `zto-list-sync.ts` (A248)។ តេស្តមុនកែ FAIL ៧ សម្រាប់ duplicate decrypt/ការរង់ចាំគ្នា និង FAIL ៥ សម្រាប់ pool/session; តេស្ត login/sign/token origin ក្រោយកែ PASS ៩៦។ Benchmark សិប្បនិម្មិត status ២៥ ms × ៨ កញ្ចប់៖ ២១៤ ms ➜ ៥៣ ms; មិនមែន latency វាស់លើ ZTO ពិត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+គ្មាន SQL migration, Firebase rules ឬ secret ថ្មី។ មុន merge សូមពិនិត្យការកែ និងសាកលើទូរស័ព្ទពិត; cloud browser មិនជំនួស iPhone/Android ពិតទេ។
 
 ### [2.50.129] — 2026-10-18 · ZoeW ៖ «ខុសទីតាំង» តែពេល ZTO ស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» មុនបញ្ជូនចេញ · បញ្ជូនចេញតែម្យ៉ាង ➜ «បញ្ជូនចេញ» ស្តារបាន (A234) · ត្រា `ztoSentOutAt` (A239 · A240) · រូប Gallery មានម៉ោងថតពិត (A235) · ពិនិត្យឡើងវិញ (A236–A238)
 
@@ -4433,6 +4454,31 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 3. ពិនិត្យប្រអប់បញ្ជីបង្ហាញ «🏢 សាខា ៖ Mer SorChrey · <លេខសាខា>»។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
+
+### 2026-10-19 — Deep audit cloud ៖ ចន្លោះ checker និងលទ្ធផលសរសេរមិនច្បាស់ (A241 · A242 · A243 · A244 · A245 · A246 · A247)
+
+- **A241 — secret leak**៖ VM លើ source ពិតបង្ហាញ credential `Basic`/`Bearer` ខ្លី និង cookie ទីពីរក្នុង header ដែលមាន quote នៅសល់។ ការបន្ថែមករណីទាំងបួនទៅ `secret-hygiene` ធ្វើឲ្យ tree មុនកែ FAIL 4; source កែរួច PASS 264។ credential សាកល្បងសុទ្ធតែក្លែង មិនមាន secret ពិតក្នុង log។
+- **A242 — Supabase write verdict**៖ HTTP 200 + `{}`/`[]`/`{"ok":"false"}` អាចធ្វើឲ្យ set រាយជោគជ័យដោយគ្មាន write និង transaction រាយបរាជ័យក្រោយ commit។ ចម្លើយទទេឆ្លងចេញពី catch ដោយគ្មាន `uncertain` ក្នុង journal; retry ដែល auth មិនអាចផ្ញើអាចប្ដូរវាទៅ `queued`, បាត់ព្រំដែនអាយុ replay។ តេស្តថ្មី FAIL 6 ក្នុង bad-body និង FAIL 4 ក្នុង journal លើ source មុនកែ; កែ validation នៅក្នុង catch boundary រួច តេស្តពាក់ព័ន្ធ PASS 29។
+- **A243 — layout**៖ browser ពិតទំហំ 780×300 នៅរបៀបដក មានប៊ូតុង y=244..269 ខណៈរបា Tab ចាប់ពី y=255។ រត់ដដែលជាមួយ fontconfig distro ក៏ FAIL ដូចគ្នា; មិនមែនបញ្ហា font setup។ checker ពិនិត្យប៊ូតុងទាំងមូល ជំនួសពិនិត្យតែកណ្ដាល; កែតែ `react-root.css`, មិនប៉ះឯកសារ PTR/scroll ដែលចាក់សោ។
+- **A244–A245 — pickup race និងការបាត់ journal**៖ stress 8 ហាង × 3 devices × 40 ជុំ (2411 `zoe_write`) រកឃើញ pickup 5 ខណៈ barcode បិទ 4; COD/DOD នៅត្រឹមត្រូវ។ ប្រតិបត្តិការបើកពី cache ចាស់ abort ក្រោយឧបករណ៍ផ្សេងដក barcode បើកទៅ trash រួច ប៉ុន្តែ revert ដាក់ pickup ចាស់វិញ។ អាន history/trash ពី Server មុន revert និងរក្សា intent ពេល pickup commit មិនជោគជ័យ។ regression អប្បបរមា 3 FAIL មុនកែ; តេស្តពាក់ព័ន្ធដំបូង 18 PASS; តេស្ត listener មកយឺតបន្ថែមរកឃើញ A246។
+- **A246 — listener មកយឺត និង recovery**៖ ការប្ដូរ whole/barcode ទទួលចម្លើយមុន listener ថ្មី បង្កើត pickup ចាស់វិញ (probe FAIL 2); បើការអានបរាជ័យ រួច recovery ប្រើ listener ចាស់ ក៏ FAIL 1។ ផ្លូវទាំងពីរប្រើ `readPickupTruthViews()` រួម៖ Firebase REST `no-store` ជំនួស SDK cache; Supabase `zoe_read` ពិត។ មិនអាចអានបាន ឬប្ដូរ session ➜ មិនសរសេរតាមការសន្មត និងរក្សា journal។ តេស្ត clamp ចាប់ការកែដំបូងថាបង្កើត Reset ឡើងវិញ ➜ undo រក្សា mark ដែលមិនបានផ្លាស់ប្តូរ; lookup តាម Map ដើម្បីជៀសវាង O(n²)។ តេស្ត `pickup-interrupted-close` PASS 18 លើ main ថ្មី រួមទាំង recovery ដែល listener មិនទាន់មក។
+- **A247 — Supabase read verdict**៖ `zoe_read` HTTP 200 ដែលជា `null`/`{}`/`[]`/`{"docs":null}` ត្រូវបានចាត់ថាទិន្នន័យអវត្តមាន; probe មុនកែ FAIL 4 ខណៈ valid `docs: []` អានបានត្រឹមត្រូវ។ ឥឡូវបដិសេធ response ដែលគ្មាន docs array ដើម្បីមិនសម្រេច undo/recovery តាមទិន្នន័យទទេក្លែង។
+- **dead code និងឯកសារ**៖ compiler `noUnusedLocals` បង្ហាញ binding មិនប្រើ; លុប import/អថេរទាំងនោះ ហើយរក្សា await នៃការស្តារទិន្នន័យ។ មិនលុបឯកសារដោយគ្រាន់តែមិនឃើញ static import ព្រោះ CLI/Apps Script/native មាន entry point ផ្សេង។ Handoff ចាស់រាយ branch មិនទាន់ merge តែ `git log` បង្ហាញ merge commit `c39268c0`; លុបស្ថានភាពចាស់ និងសេចក្តីផ្អាក Supabase ដែលសំណើ audit ថ្មីបានជំនួស។
+- **stress ដំបូងក្រោយកែ មុនបញ្ចូល main ថ្មី**៖ Supabase 8 ហាង × 3 devices × 40 ជុំ PASS លើ Postgres ពិត (2420 សំណើ `zoe_write`; cross-shop concurrency 26, return race 50, offline/online 191, offline/reload 146)។ Firebase 3 devices × 5 លំដាប់ × 30 ជុំ និង fuzz seed ថ្មី 14 × 50 PASS; ដែននេះជាការសាកក្នុង cloud មូលដ្ឋាន មិនមែនការវាស់ quota/latency លើ production។
+- **ភាពត្រឹមត្រូវរបស់ checker**៖ mutation នៃ pickup revert ប្ដូរយុថ្កាទៅ body ថ្មី ដោយរក្សាកំហុស no-op ដដែល និង floor 10។ CRUD sandbox បញ្ចូល `pickupTruthMarks` ពិត ជំនួសខ្វះ dependency។ iPad reverse fixture ចាស់មាន input bottom 407 + gap 8 នៅពីលើ keyboard line 422 (820−398) ដូច្នេះមិនទាន់ចូលស្ថានភាពបាំង; fixture ប្រើ inset 430 ហើយរក្សា precondition/behavior assertions។ App-lock harness មិនអនុញ្ញាត `tel:` បើកទំព័រ error របស់ headless (storage ត្រូវបដិសេធ); click capture ពិត និង lifecycle/one-shot exemption នៅតែវាស់។ មិនប្ដូរកូដ App Lock ឬ iOS ដើម្បីឲ្យ checker បៃតង។ Feed update ទុកតែកំណែចុងក្រោយតាម guard ដែលមានស្រាប់។ `supabase-notify-dirty` fake transport កែឲ្យឆ្លើយ `zoe_read` ជា `docs` array តាម API ពិត និងបដិសេធ RPC មិនស្គាល់; ទុក assertions សម្អាតហាងចាស់ដដែល។
+- **បញ្ចូល main ថ្មី**៖ សំណើម្ចាស់គម្រោងផ្ទៀងផ្ទាត់ `63713d7d` (PR335)។ រក្សាមុខងារ ZTO/EXIF និង rules ថ្មីរបស់ main; កំណែ audit ប្ដូរទៅ 2.50.130 និងលេខ A241–A247 ដើម្បីមិនស្ទួន A234–A240 របស់ main។ Native checker ចាប់ pending ពេល focus មុន rAF ដើម្បីមិនខកខាន animation ចាប់ផ្ដើម; keyboard checker ចាត់កាតតាមទំហំល្មមពិត (390 មិនល្មម 389) ដោយរក្សា assertions ពេញលេញ។
+- **បរិស្ថាន**៖ Node 24 · Java 21 · Chromium · Postgres ពិត · RTDB emulator ដែលផ្ទៀង size/checksum។ Firebase Node SDK មិនគោរព `NO_PROXY` ពេលបើក WebSocket ទៅ loopback; ដក proxy variables តែពី process តេស្តមូលដ្ឋាន។ ការដំឡើង និង startup instructions រស់ក្នុង cloud environment settings។
+- **baseline លើ main ថ្មី**៖ full strict រត់គ្រប់ 213 checker៖ 212 PASS, 1 FAIL, 0 SKIP/PARTIAL។ មូលហេតុ fail គឺ fixture `supabase-notify-dirty` មិនឆ្លើយ `docs` array; កែ fixture រួច unit suite ទាំងមូល PASS 2,278 tests/211 files។ មិនចាត់ full run ដែល exit 1 ថាបៃតងទេ។ Stress ក្រោយបញ្ចូល main ថ្មី PASS៖ Supabase 8 ហាង × 3 devices × 40 ជុំ (2412 `zoe_write`, concurrency 26, return race 52, offline/online 195, offline/reload 144); Firebase 3 devices × 5 × 30; money fuzz 14 × 50។
+
+### 2026-10-19 — A248 ៖ ល្បឿន Palm/Cookie តាមសំណើម្ចាស់គម្រោង និង APK ឯកសារយោង
+
+- `draft.7z` មាន bytecode/resources APK មិនមែន Gradle project។ អាន archive ដោយមិនរត់ APK/DEX/native library និងមិនអនុវត្តសេចក្តីណែនាំក្នុងឯកសារ។ JADX ពី release ផ្លូវការផ្ទៀង SHA-256 មុនប្រើ; APK និងកូដ decompile នៅក្រៅ checkout។
+- `PDARequestImpl.queryTrackInfo` ផ្ញើ `mailType:1` និង `mailNos` string; មិនមានភស្តុតាងថាទទួល barcode ច្រើន។ កូដ KH Sign របស់ APK មាន payment gate, local upload queue និង batch upload ជាមួយលទ្ធផលតាម `barScannerId`; មិនយក queue success ឬ HTTP success ជំនួស Sign ជោគជ័យក្នុង ZoeW។ ការទាញ Palm នៅតែរក្សាភស្តុតាង branch/date/status មុនបញ្ចូល។
+- `headersFor()` ធ្លាប់ហៅ `addPalmSessionHeader()` ស្ទួនក្រោយ `buildLookupRequestHeaders()`; negative test decrypt ២ ជំនួស ១ FAIL ពិត។ លុបការហៅស្ទួន ហើយរៀបចំ identity ដោយឡែកព្រមគ្នា; merge trusted identity ចុងក្រោយ។ Login/ភ្ជាប់ shared និង list Palm/Cookie ក៏រៀបចំ credential + identity ព្រមគ្នា។ Barrier tests មុនកែ FAIL ៦ បន្ថែម; fetch មិនចេញមុន credential/identity រួច និង token គណនីពិតឈ្នះ config header។ គ្មាន plaintext cache ថ្មី។
+- Recheck unknown Sign ធ្លាប់អាន status ម្តងមួយ; barrier តម្រូវ ៤ in-flight ធ្លាក់ពិត។ ប្រើ pool ដែលមានស្រាប់ជាមួយពិដាន ៤; ប្រមូលចម្លើយរួច Save តាមលំដាប់ដើម ដើម្បីមិនបន្ថែម write race ក្នុង item តែមួយ។ Failure ឈប់ចែកការងារថ្មី និងរង់ចាំសំណើចាស់មុនលែង busy; auth/database/config/modal switch មិនបិទកញ្ចប់តាមចម្លើយយឺត (negative tests ៥ FAIL មុនកែ)។
+- Controlled benchmark រត់មុខងារពិតដោយ status latency សិប្បនិម្មិត ២៥ ms៖ ៨ កញ្ចប់ ២១៤ ms មុនកែ និង ៥៣ ms ក្រោយកែ; GET ចំនួន ៨ ដដែល និង Save ម្តងមួយ។ តេស្ត login/sign/token origin PASS ៩៦។ មិនបង្កើន concurrency របស់ list/track, មិនបង្កើន timeout និងមិនប្ដូរ API សរសេរ Sign ដោយគ្មាន contract ពិត។
+- មុនធ្វើបច្ចុប្បន្នភាព LOCK តែ `zto-palm-login.ts` និង `zto-list-sync.ts`៖ ZTO unit suite PASS 799 tests/43 files (លើកលែង lock ដែលកំពុងរង់ចាំ hash តាមលំដាប់ច្បាប់) និង audit ZTO ទាំង 11 ឧបករណ៍ PASS រួម `zto-list-sync` 595 និង `zto-sync-banner` 202។ Hash និង assertions ផ្សេងរក្សាដដែល។
+
 
 ### 2026-10-18 — «ខុសទីតាំង» តាមមូលហេតុ ZTO · រូប Gallery តាម EXIF (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីអោយស្អាតទៅ» · A234 · A235 · ពិនិត្យឡើងវិញ A236 · A237 · A238) · ត្រា «បញ្ជូនចេញ» (A239 · A240)
 

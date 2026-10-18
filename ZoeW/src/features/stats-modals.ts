@@ -6,7 +6,7 @@ import { getFormattedDate } from '../core/timezone';
 import { sanitizeInput } from '../domain/barcode';
 import { DAILY_COLLECTED_DAY_PATTERN, DAILY_COLLECTED_KEEP_DAYS, collectedTotalsOfDay } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual } from '../domain/ledger';
-import { collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, uncollectedValueByDate } from './export';
+import { collectedValueIsMeasurable, collectedValueOf, uncollectedValueByDate } from './export';
 import { statsCount, statsMoney } from './monthly-report';
 import { emptyViewMessage } from '../services/db-listeners';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';

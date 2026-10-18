@@ -54,6 +54,11 @@ function fakeBackend() {
         calls.push(fn);
         const args = init && init.body ? JSON.parse(String(init.body)) : {};
         if (fn === 'zoe_pull') return reply({ seq, more: false, reset: true, head: seq, tenant: 't1', now: Date.now(), rows: Array.from(docs.values()) });
+        if (fn === 'zoe_read') {
+            const fault = faults.shift();
+            if (fault) return reply(null, fault.status, fault.body);
+            return reply({ now: Date.now(), docs: Array.from(docs.values()).filter((d: any) => d.r === args.p_root && (!args.p_key || d.k === args.p_key)) });
+        }
         if (fn === 'zoe_write') {
             const fault = faults.shift();
             if (fault && !fault.afterCommit) return reply(null, fault.status, fault.body);
@@ -101,9 +106,22 @@ describe('Supabase zoe_write ៖ 2xx with an empty, cut or unreadable body after
     const shapes: Array<[string, Fault]> = [
         ['empty 200 body', { status: 200, body: '', afterCommit: true }],
         ['cut JSON 200 body', { status: 200, body: '{"ok":tr', afterCommit: true }],
+        ['JSON object គ្មាន verdict', { status: 200, body: '{}', afterCommit: true }],
+        ['JSON array គ្មាន verdict', { status: 200, body: '[]', afterCommit: true }],
+        ['JSON ដែល verdict ជា string', { status: 200, body: '{"ok":"false"}', afterCommit: true }],
         ['body stream error', { status: 200, body: '', afterCommit: true, stream: true }]
     ];
     for (const [label, fault] of shapes) {
+        it('0. set ៖ ' + label + ' មុន commit មិនរាយជោគជ័យ បើ Server មិនបានសរសេរ', async () => {
+            const backend = fakeBackend();
+            const { db } = await openDb(backend);
+            try {
+                backend.faults.push({ ...fault, afterCommit: false });
+                await db.set(db.ref('zoew_scan_history_cod_dod/p0'), { isClosed: true });
+                expect(backend.applied.length).toBe(1);
+                expect(backend.doc('zoew_scan_history_cod_dod/p0')).toEqual({ isClosed: true });
+            } finally { db.close('test'); }
+        });
         it('1. set ៖ commit ➜ ' + label + ' ➜ resolves · the server wrote once', async () => {
             const backend = fakeBackend();
             const { db } = await openDb(backend);
@@ -131,6 +149,23 @@ describe('Supabase zoe_write ៖ 2xx with an empty, cut or unreadable body after
             db.close('test');
         });
     }
+
+    it.each(['null', '{}', '[]', '{"docs":null}'])('zoe_read ៖ 200 + %s មិនអះអាងថាទិន្នន័យអវត្តមាន', async (body) => {
+        const backend = fakeBackend();
+        const { db } = await openDb(backend);
+        try {
+            backend.faults.push({ status: 200, body, afterCommit: false });
+            await expect(db.get(db.ref('zoew_scan_history_cod_dod'))).rejects.toBeDefined();
+        } finally { db.close('test'); }
+    });
+
+    it('zoe_read ៖ docs ទទេត្រឹមត្រូវនៅតែអានបានជា null', async () => {
+        const backend = fakeBackend();
+        const { db } = await openDb(backend);
+        try {
+            expect((await db.get(db.ref('zoew_scan_history_cod_dod'))).val()).toBeNull();
+        } finally { db.close('test'); }
+    });
 
     it('3. transport ៖ a response whose body cannot be read ➜ SbNetworkError (any call)', async () => {
         const backend = fakeBackend();

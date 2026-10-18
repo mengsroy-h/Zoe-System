@@ -7,7 +7,9 @@
  *    (`ztoIdentityTargetTrusted()`) · host ផ្សេង ➜ សំណើ `/detail` ចេញដោយគ្មាន token (Function សម្រេច) · ទាញបញ្ជី ➜ បដិសេធមុនចេញ (`host:untrusted`)។
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { firebaseState } from '../src/core/state';
+import { webcrypto } from 'node:crypto';
+import { firebaseState, securityState } from '../src/core/state';
+import { encryptLookupSecret } from '../src/services/crypto';
 import { addZtoIdentityHeader } from '../src/features/lookup-api';
 import { fetchZtoListPage } from '../src/features/zto-list-sync';
 import { ztoIdentityTargetTrusted } from '../src/platform/native';
@@ -31,6 +33,37 @@ afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     delete (window as any).Capacitor;
+    securityState.lookupSecretKey = null;
+    vi.restoreAllMocks();
+});
+
+it.each([false, true])('Cookie/Palm %s ៖ list រៀបចំ credential និង identity ព្រមគ្នា រក្សា token ពិតចុងក្រោយ', async (palm) => {
+    vi.stubGlobal('crypto', webcrypto);
+    securityState.lookupSecretKey = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']) as any;
+    const config = { ...cfg(window.location.origin + PATH + (palm ? '&palm=1' : '')),
+        headerName: 'X-Zoe-Id-Token', headerValueEnc: await encryptLookupSecret('untrusted-config-token'),
+        ...(palm ? { palmTokenEnc: await encryptLookupSecret('synthetic-session') } : {}) };
+    const original = webcrypto.subtle.decrypt.bind(webcrypto.subtle);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const decrypt = vi.spyOn(webcrypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+        await gate;
+        return original(...args);
+    });
+    const identity = vi.fn(async () => ({ token: ID_TOKEN }));
+    firebaseState.fb = { getIdTokenResult: identity } as any;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true, rows: [], pages: 1 }))));
+    const work = fetchZtoListPage(config, '2026-10-01', '2026-10-02', 1);
+    try {
+        await vi.waitFor(() => expect(decrypt).toHaveBeenCalled());
+        expect(identity).toHaveBeenCalledOnce();
+        expect(fetch).not.toHaveBeenCalled();
+    } finally {
+        release();
+        await work;
+    }
+    expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({ 'X-Zoe-Id-Token': ID_TOKEN,
+        ...(palm ? { 'X-Zoe-Palm-Token': 'synthetic-session' } : {}) });
 });
 
 describe('⛔ token គណនីហាង ទៅតែ origin ZoeW', () => {

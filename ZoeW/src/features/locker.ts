@@ -2,7 +2,7 @@ import { viewState } from '../core/view-state';
 import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
-import { ACTIVE_LOCKER_KEY, ENTRY_SCAN_MODE_KEY, LOCKER_COUNT_KEY, LOCKER_PREFIX_KEY } from '../core/storage-keys';
+import { ACTIVE_LOCKER_KEY, LOCKER_COUNT_KEY, LOCKER_PREFIX_KEY } from '../core/storage-keys';
 import { safeFocusScanner } from '../core/timezone';
 import { playBeep } from '../services/history-write';
 import { closeModal, openModalHelper } from '../ui/modal';

@@ -584,6 +584,8 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let data;
         try {
             data = await transport.rpc(fn, args, rpcTimeoutMs);
+            if (fn === 'zoe_write' && (!data || typeof data !== 'object' || Array.isArray(data)
+                || data.ok !== true && data.conflict !== true)) throw new SbRpcError('write reply unreadable', 'bad_response', 0, '');
         } catch (e) {
             if (journalRow) {
                 if (e instanceof SbNetworkError && e.unsent) {
@@ -601,7 +603,6 @@ export function createSupabaseDatabase(transport, hooks, options?) {
             if (fn === 'zoe_write' && e instanceof SbRpcError && e.code === 'bad_response') throw new SbNetworkError('write reply unreadable');
             throw e;
         }
-        if (fn === 'zoe_write' && (!data || typeof data !== 'object')) throw new SbNetworkError('write reply empty');
         if (journalRow && (data.ok || data.conflict && journalRow.sentAfter > 0 && Number.isFinite(data.now)
             && data.now - journalRow.sentAfter >= 0 && data.now - journalRow.sentAfter <= SB_OP_REPLAY_SAFE_MS)) {
             writeJournal.remove(journalRow.scope, journalRow.topic, journalRow.opId);
@@ -1085,6 +1086,7 @@ export function createSupabaseDatabase(transport, hooks, options?) {
         let res;
         try {
             res = await rpc('zoe_read', { p_root: path[0], p_key: path.length > 1 ? path[1] : null });
+            if (!res || !Array.isArray(res.docs)) throw new SbRpcError('bad read response', 'bad_response', 0, '');
         } catch (e) {
             if (!current()) throw disconnectError();
             if (e instanceof SbNetworkError) {

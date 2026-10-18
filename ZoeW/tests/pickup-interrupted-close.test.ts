@@ -17,6 +17,7 @@ import * as cleanup from '../src/domain/cleanup';
 import { runScheduledCleanup, resumeInterruptedCleanups } from '../src/domain/cleanup';
 import * as pickup from '../src/domain/pickup';
 import { toggleCloseStatus } from '../src/features/entry-ops';
+import { revertPickupMarks } from '../src/domain/collected';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -183,6 +184,154 @@ afterEach(() => {
     firebaseState.isDatabaseConnected = false;
     firebaseState.isDatabaseInitialized = false;
     appLocalStore.clear();
+});
+
+it.each([['whole', true], ['barcode', true], ['whole', false], ['barcode', false]])('មិនដាក់ pickup ចាស់វិញ ពេល %s បើកកញ្ចប់ដែលឧបករណ៍ផ្សេងដករួច (listener ថ្មី %s)', async (kind, listenerFresh) => {
+    const code = 'PICKUPRACE01';
+    seedItem('race', [code], [code]);
+    pickupSet([code]);
+    loadViewsFromServer();
+    const trash = getPath(HISTORY + '/race');
+    trash.id = 'race-trash'; trash.isClosed = false; delete trash.closedAt;
+    trash.barcodes.forEach((b: any) => { b.isClosed = false; delete b.closedAt; });
+    setPath(HISTORY + '/race', null);
+    setPath('zoew_recently_deleted_cod_dod/race-trash', trash);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    const fb = firebaseState.fb as any;
+    const transact = fb.runTransaction;
+    vi.spyOn(fb, 'runTransaction').mockImplementation((ref: any, updater: any) => {
+        if (listenerFresh && ref.path === HISTORY + '/race') {
+            dataState.scanHistory = [];
+            dataState.deletedItems = [structuredClone(trash)];
+        }
+        return transact(ref, updater);
+    });
+    const saved = kind === 'whole' ? await toggleCloseStatus('race')
+        : await applyBarcodeCloseChange('race', code, false, { silent: true, showModal: false });
+    await sleep(15);
+    expect(saved).toBe(false);
+    expect(recorded()).toBe(0);
+    expect(getPath('zoew_recently_deleted_cod_dod/race-trash').barcodes[0].isClosed).toBe(false);
+});
+
+it.each(['whole', 'barcode'])('rollback %s ក្រោយ Reset មិនបង្កើត pickup ចាស់ឡើងវិញ', async (kind) => {
+    const code = 'PICKUPRESET01';
+    seedItem('reset', [code], [code]);
+    loadViewsFromServer();
+    const fb = firebaseState.fb as any;
+    const transact = fb.runTransaction;
+    vi.spyOn(fb, 'runTransaction').mockImplementation((ref: any, updater: any) => {
+        if (ref.path === HISTORY + '/reset') return Promise.resolve({ committed: false, snapshot: { val: () => getPath(ref.path) } });
+        return transact(ref, updater);
+    });
+    const saved = kind === 'whole' ? await toggleCloseStatus('reset')
+        : await applyBarcodeCloseChange('reset', code, false, { silent: true, showModal: false });
+    await sleep(20);
+    expect(saved).toBe(false);
+    expect(recorded()).toBe(0);
+});
+
+it('rollback read បរាជ័យរក្សា journal ហើយស្តារតាម Server ពេល listener មកដល់', async () => {
+    const code = 'PICKUPREAD01';
+    seedItem('read', [code], [code]);
+    pickupSet([code]);
+    loadViewsFromServer();
+    const id = pickup.beginPickupIntent(DAY, [barcodeRegistryKey(code)]);
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    await applied.commit;
+    const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
+    const reverted = revertPickupMarks(applied, null, true);
+    pickup.endPickupIntent(id, reverted.commit);
+    await sleep(15);
+    expect(journal()).toHaveLength(1);
+    expect(recorded()).toBe(0);
+    broken.mockRestore();
+    loadViewsFromServer();
+    await doors();
+    expect(recorded()).toBe(1);
+    expect(journal()).toEqual([]);
+});
+
+it('journal retry ក្រោយ read បរាជ័យ មិនទុកចិត្ត listener ចាស់', async () => {
+    const code = 'PICKUPDELAYRETRY01';
+    seedItem('delayed-retry', [code], [code]);
+    pickupSet([code]);
+    loadViewsFromServer();
+    const trash = getPath(HISTORY + '/delayed-retry');
+    trash.id = 'delayed-trash'; trash.isClosed = false; delete trash.closedAt;
+    trash.barcodes.forEach((b: any) => { b.isClosed = false; delete b.closedAt; });
+    setPath(HISTORY + '/delayed-retry', null);
+    setPath('zoew_recently_deleted_cod_dod/delayed-trash', trash);
+    setPath(PICKUP + '/' + DAY, { packagesPickedUp: 0 });
+    const broken = vi.spyOn(firebaseState.fb as any, 'get').mockRejectedValue(new Error('offline'));
+    expect(await toggleCloseStatus('delayed-retry')).toBe(false);
+    await sleep(15);
+    expect(journal()).toHaveLength(1);
+    broken.mockRestore();
+    await pickup.resumePickupIntents();
+    expect(recorded()).toBe(0);
+    expect(journal()).toEqual([]);
+});
+
+it('Firebase rollback អាន REST no-store ជំនួស SDK cache ចាស់', async () => {
+    const code = 'PICKUPREST01';
+    seedItem('rest', [code], [code]);
+    pickupSet([code]);
+    loadViewsFromServer();
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    await applied.commit;
+    const fb = firebaseState.fb as any;
+    firebaseState.firebaseConfig = JSON.parse(SHOP_CONFIG);
+    firebaseState.auth.currentUser.getIdToken = async () => 'fake-test-token';
+    vi.spyOn(fb, 'ref').mockImplementation((_db: any, path: any) => ({ path, toString: () => JSON.parse(SHOP_CONFIG).databaseURL + '/' + path }));
+    const cached = vi.spyOn(fb, 'get').mockRejectedValue(new Error('must not read cached SDK snapshot'));
+    const fetch = vi.fn(async (url: string, init: any) => {
+        expect(init.cache).toBe('no-store');
+        expect(init.credentials).toBe('omit');
+        const parsed = new URL(url);
+        expect(parsed.searchParams.get('auth')).toBe('fake-test-token');
+        return new Response(JSON.stringify(getPath(parsed.pathname.slice(1).replace(/\.json$/, ''))), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const reverted = revertPickupMarks(applied, null, true);
+    expect(await reverted.commit).toBe(true);
+    expect(recorded()).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(cached).not.toHaveBeenCalled();
+});
+
+it('rollback read មកយឺតក្រោយប្ដូរ session មិនសរសេរទៅ database ថ្មី', async () => {
+    const code = 'PICKUPSWITCH01';
+    seedItem('switch', [code], [code]);
+    pickupSet([code]);
+    loadViewsFromServer();
+    const applied = pickup.markPickupBarcodes(DAY, [{ key: barcodeRegistryKey(code), phoneKey: '0960007345', closed: false }], null);
+    await applied.commit;
+    const releases: Array<() => void> = [];
+    vi.spyOn(firebaseState.fb as any, 'get').mockImplementation((ref: any) => new Promise((resolve) => {
+        const raw = getPath(ref.path);
+        releases.push(() => resolve({ val: () => raw }));
+    }));
+    const writesBefore = lab.writes.length;
+    const reverted = revertPickupMarks(applied, null, true);
+    firebaseState.authGeneration++;
+    firebaseState.db = { nextShop: true } as any;
+    releases.forEach((release) => release());
+    expect(await reverted.commit).toBeNull();
+    expect(lab.writes).toHaveLength(writesBefore);
+});
+
+it('pickup commit បរាជ័យរក្សា journal ដើម្បីស្តារជុំក្រោយ ដោយមិនរាយថា sync ចប់', async () => {
+    seedItem('retry', ['PICKUPRETRY01'], ['PICKUPRETRY01']);
+    loadViewsFromServer();
+    const id = pickup.beginPickupIntent(DAY, [barcodeRegistryKey('PICKUPRETRY01')]);
+    pickup.endPickupIntent(id, Promise.resolve(null));
+    await sleep(5);
+    expect(journal()).toHaveLength(1);
+    expect(pickup.pickupIntentsLive.has(id)).toBe(false);
+    await pickup.resumePickupIntents();
+    expect(recorded()).toBe(1);
+    expect(journal()).toEqual([]);
 });
 
 describe('A225 ៖ ការបិទ/បើកដែលទំព័រស្លាប់ចន្លោះ «ស្ថិតិយក» និង «កញ្ចប់» ➜ ជុំក្រោយបញ្ចប់តាមស្ថានភាពពិត', () => {

@@ -4,7 +4,7 @@ import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
-import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, sanitizeInput, stripHistoryOnlyMarkers } from '../domain/barcode';
+import { applyBarcodeCloseState, barcodeZtoSigned, dropStaleRestoreMarkers, ensureBarcodeArrayForItem, generateUniqueId, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
@@ -201,11 +201,9 @@ export async function removeSingleBarcode(itemId, barcodeCode, _callSiteTag?: st
             console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
             if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'removeSingleBarcode trash write failed after retries', itemId });
             if (!removeIsCurrent()) return;
-            let restoredItem = null;
             let restoreOk = false;
             try {
-                const restoreResult = await restoreClaimedItemToScanHistory(itemId, claimedWhole, claimedWhole ? null : { ...claimedParent, barcodes: [claimedBarcode] });
-                restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                await restoreClaimedItemToScanHistory(itemId, claimedWhole, claimedWhole ? null : { ...claimedParent, barcodes: [claimedBarcode] });
                 restoreOk = true;
             } catch (restoreErr) {
                 console.error('Failed to restore barcode to scan history after trash write failure for', itemId, restoreErr);
@@ -386,7 +384,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
         }
         if (pickupApplied) {
-            const reverted = revertPickupMarks(pickupApplied);
+            const reverted = revertPickupMarks(pickupApplied, null, true);
             pickupJournal.note(reverted);
             pickupApplied = null;
         }

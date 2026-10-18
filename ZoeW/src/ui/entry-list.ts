@@ -4,7 +4,7 @@ import { dataState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { sanitizePhoneNumber } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
-import { parseTimestampFromId, sanitizeInput } from '../domain/barcode';
+import { parseTimestampFromId } from '../domain/barcode';
 import { ENTRY_LIST_MAX_ROWS, LOCKER_LIST_MAX_ROWS, buildLockerBarcodeIndex } from '../features/locker';
 import { normalizePhoneDigits } from '../features/phone-suggest';
 

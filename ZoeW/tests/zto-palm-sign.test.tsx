@@ -82,6 +82,142 @@ afterEach(() => {
     unregisterModalMeta('ztoPalmSignModal');
     vi.unstubAllGlobals();
     securityState.lookupSecretKey = null;
+    vi.restoreAllMocks();
+});
+it('Sign decrypt session តែម្តងក្នុងសំណើមួយ', async () => {
+    await openReceipt([CODE]);
+    const decrypt = vi.spyOn(webcrypto.subtle, 'decrypt');
+    await submit();
+    expect(decrypt).toHaveBeenCalledOnce();
+});
+it('រៀបចំ Sign decrypt session តែម្តង និងយក ID token ព្រមគ្នា', async () => {
+    await openReceipt([CODE]);
+    const realDecrypt = webcrypto.subtle.decrypt.bind(webcrypto.subtle);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const decrypt = vi.spyOn(webcrypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+        await gate;
+        return realDecrypt(...args);
+    });
+    const identity = vi.fn(async () => ({ token: 'synthetic-identity' }));
+    firebaseState.auth = { currentUser: { uid: 'audit-user' } } as any;
+    firebaseState.fb = { getIdTokenResult: identity } as any;
+    const work = submit();
+    try {
+        await vi.waitFor(() => expect(decrypt).toHaveBeenCalledOnce());
+        expect(identity).toHaveBeenCalledOnce();
+        expect(fetch).not.toHaveBeenCalled();
+    } finally {
+        release();
+        await work;
+    }
+    expect(decrypt).toHaveBeenCalledOnce();
+    expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({
+        'X-Zoe-Palm-Token': 'synthetic-session', 'X-Zoe-Id-Token': 'synthetic-identity'
+    });
+});
+it('ពិនិត្យ Sign ឡើងវិញអាន ៤ ព្រមគ្នា ប៉ុន្តែរក្សាលំដាប់ Save និងមិនផ្ញើ Sign ស្ទួន', async () => {
+    const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openDispatch(codes);
+    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
+    const gates = codes.map(() => deferred());
+    let active = 0;
+    let peak = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+        expect(init?.method).toBeUndefined();
+        const code = new URL(String(url)).searchParams.get('barcode')!;
+        active++;
+        peak = Math.max(peak, active);
+        try { return await gates[codes.indexOf(code)].promise; } finally { active--; }
+    }));
+    let writing = 0;
+    let writePeak = 0;
+    vi.mocked(applyBarcodeCloseChange).mockImplementation(async () => {
+        writePeak = Math.max(writePeak, ++writing);
+        await Promise.resolve();
+        writing--;
+        return true;
+    });
+    const work = recheckZtoPalmSign();
+    try {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(4), { timeout: 500 });
+        expect(closeCalls()).toEqual([]);
+        expect(palmSignState.busy).toBe(true);
+        await recheckZtoPalmSign();
+        expect(fetch).toHaveBeenCalledTimes(4);
+        for (let i = 3; i >= 0; i--) gates[i].resolve(signed(codes[i]));
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(7));
+    } finally {
+        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
+        await work;
+    }
+    expect(peak).toBe(4);
+    expect(writePeak).toBe(1);
+    expect(closeCalls().map((row) => row[1])).toEqual(codes);
+    expect(modalIsOpen('ztoPalmSignModal')).toBe(false);
+});
+it('ពិនិត្យឡើងវិញបរាជ័យ៖ រង់ចាំសំណើកំពុងរត់ និងឈប់ចែកការងារថ្មី', async () => {
+    const codes = Array.from({ length: 7 }, (_, i) => String(77130500000012 + i));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openDispatch(codes);
+    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
+    const gates = codes.map(() => deferred());
+    vi.stubGlobal('fetch', vi.fn((url) => gates[codes.indexOf(new URL(String(url)).searchParams.get('barcode')!)].promise));
+    const work = recheckZtoPalmSign();
+    try {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(4), { timeout: 500 });
+        gates[0].resolve(new Response('invalid JSON'));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(palmSignState.busy).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(closeCalls()).toEqual([]);
+    } finally {
+        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
+        await work;
+    }
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(closeCalls().map((row) => row[1])).toEqual(codes.slice(1, 4));
+    expect(palmSignState.results.filter((row) => row.state === 'unknown').map((row) => row.code)).toEqual([codes[0], ...codes.slice(4)]);
+    expect(palmSignState.busy).toBe(false);
+    expect(palmSignState.message).toContain('មិនបាន');
+});
+it('វាស់ពេលពិនិត្យឡើងវិញ ៨ កញ្ចប់ ជាមួយ status latency ២៥ ms', async () => {
+    const codes = Array.from({ length: 8 }, (_, i) => String(77130500000012 + i));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openDispatch(codes);
+    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return signed(new URL(String(url)).searchParams.get('barcode')!);
+    }));
+    const started = performance.now();
+    await recheckZtoPalmSign();
+    if (process.env.ZOE_PERF_BENCH === '1') process.stdout.write(JSON.stringify({ palmRecheckCodes: codes.length, simulatedStatusMs: 25, elapsedMs: Math.round(performance.now() - started) }) + '\n');
+    expect(fetch).toHaveBeenCalledTimes(codes.length);
+    expect(closeCalls().map((row) => row[1])).toEqual(codes);
+});
+it.each(['auth', 'database', 'config', 'close'])('ពិនិត្យឡើងវិញប្តូរ %s ៖ ចម្លើយយឺតមិនបិទ និងមិនបន្តសំណើ', async (kind) => {
+    const codes = Array.from({ length: 6 }, (_, i) => String(77130500000012 + i));
+    dataState.scanHistory[0].barcodes = codes.map((code) => ({ code, isClosed: false }));
+    await openDispatch(codes);
+    palmSignState.results = codes.map((code) => ({ code, state: 'unknown', message: '' }));
+    const gates = codes.map(() => deferred());
+    vi.stubGlobal('fetch', vi.fn((url) => gates[codes.indexOf(new URL(String(url)).searchParams.get('barcode')!)].promise));
+    const work = recheckZtoPalmSign();
+    try {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(4), { timeout: 500 });
+        if (kind === 'auth') firebaseState.authGeneration++;
+        if (kind === 'database') firebaseState.db = {};
+        if (kind === 'config') appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify({ ...config, enabled: false }));
+        if (kind === 'close') closeModal('ztoPalmSignModal');
+    } finally {
+        gates.forEach((gate, i) => gate.resolve(signed(codes[i])));
+        await work;
+    }
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(closeCalls()).toEqual([]);
+    expect(palmSignState.busy).toBe(false);
 });
 it('Palm បង្ហាញ Sign លើប្រវត្តិ និង Barcode · Cookie ត្រឡប់ជា បិទ', async () => {
     uiState.viewListView = [{ itemId: 'item1', code: CODE, index: 1, locker: '', time: null, origin: '', moneyClass: '', money: [], sum: null, closed: false }];

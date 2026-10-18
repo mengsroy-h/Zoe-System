@@ -1,12 +1,8 @@
 import { uiState } from '../core/state';
 import { viewState } from '../core/view-state';
 import { dataState } from '../core/state';
-import { getServerNow } from '../core/clock';
-import { DB_LISTENER_KEY_HISTORY } from '../core/text';
-import { FOUR_HOURS_MS } from '../features/session';
 import { scheduleZtoFinalMarks } from '../features/zto-final-marks';
 import { renderZtoSyncViews, scheduleZtoStatusSweep } from '../features/zto-status';
-import { emptyViewMessage } from '../services/db-listeners';
 import { isAndroidDevice } from '../platform/native';
 
 export const HISTORY_PAGE_ROWS = 50;

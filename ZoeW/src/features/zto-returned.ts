@@ -17,6 +17,7 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
     const signed = new Set((Array.isArray(signedCodes) ? signedCodes : []).map((code) => pickupBarcodeKey(code)));
     const backAt = new Map();
     const kindOf = new Map();
+    const problemAt = new Map();
     const list = Array.isArray(returned) ? returned : [];
     for (let i = 0; i < list.length; i++) {
         const entry = list[i];
@@ -26,6 +27,7 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         if (backAt.has(key) && at <= backAt.get(key)) continue;
         backAt.set(key, at);
         kindOf.set(key, ztoReturnedKindOf(entry));
+        problemAt.set(key, typeof entry.problemAt === 'string' ? ztoScanStampMillis(entry.problemAt) : 0);
     }
     const out = [];
     if (!backAt.size || !Array.isArray(dataToScan)) return out;
@@ -42,7 +44,9 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
             if (!barcodeReturnCounts(b, item.createdAt, at)) continue;
             codes.push(b.code);
             returnedAt.set(b.code, at);
-            kinds.set(b.code, kindOf.get(pickupBarcodeKey(b.code)));
+            const kind = kindOf.get(pickupBarcodeKey(b.code));
+            const wrongPlace = problemAt.get(pickupBarcodeKey(b.code));
+            kinds.set(b.code, kind === 'misplaced' && wrongPlace && !barcodeReturnCounts(b, item.createdAt, wrongPlace) ? 'sent' : kind);
         }
         if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt, kinds });
     }

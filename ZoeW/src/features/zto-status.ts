@@ -740,8 +740,8 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     if (!data || typeof data !== 'object') return null;
     const answer: any = { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
     if (typeof data.ztoReturnedAt === 'string' && data.ztoReturnedAt) answer.returnedAt = data.ztoReturnedAt;
-    if (answer.returnedAt && data.ztoMisplacedAt === answer.returnedAt) answer.misplaced = true;
-    else if (answer.returnedAt && data.ztoSentOutAt === answer.returnedAt) answer.sentOut = true;
+    if (answer.returnedAt && data.ztoSentOutAt === answer.returnedAt) answer.sentOut = true;
+    else if (answer.returnedAt && data.ztoMisplacedAt === answer.returnedAt) answer.misplaced = true;
     return answer;
 }
 

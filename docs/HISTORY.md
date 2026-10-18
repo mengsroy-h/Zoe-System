@@ -52,7 +52,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.129]** កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «ត្រឡប់» ស្តារបាន (Cookie · Palm) · រូប Sign ពី Gallery ➜ ម៉ោងថតពិត។
+- ⏳ **[2.50.129]** កញ្ចប់ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» · បញ្ជូនចេញតែម្យ៉ាង ➜ «ត្រឡប់» ស្តារបាន (Cookie · Palm · APK ចាស់ ➜ «ខុសទីតាំង» ស្តារបាន) · រូប Sign ពី Gallery ឬរូបចាស់តាម 📷 ➜ ម៉ោងថតពិត។
 - ⏳ **[2.50.128]** Publish rules `ztoMisplacedAt` · រូប Sign មានម៉ោង + កូអរដោនេ (iPhone · Android · APK ៖ អនុញ្ញាតទីតាំង) · កញ្ចប់ខុសទីតាំងពិត ➜ ធុងសំរាម «ខុសទីតាំង» · លុយដក។
 - ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច · ✅ ម្ចាស់គម្រោង ៖ iPhone លឿន · QR iPhone ល្អ) ✍️ Sign លើ Android ពិត ៖ QR លើបុង · ល្បឿន · Gallery iPhone · សម្លេង/ញ័រ · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
@@ -103,7 +103,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.50.129] — 2026-10-18 · ZoeW ៖ «ខុសទីតាំង» តែពេល ZTO ស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» មុនបញ្ជូនចេញ · បញ្ជូនចេញតែម្យ៉ាង ➜ «ត្រឡប់» ស្តារបាន (A234) · រូប Gallery មានម៉ោងថតពិត (A235)
+### [2.50.129] — 2026-10-18 · ZoeW ៖ «ខុសទីតាំង» តែពេល ZTO ស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» មុនបញ្ជូនចេញ · បញ្ជូនចេញតែម្យ៉ាង ➜ «ត្រឡប់» ស្តារបាន (A234) · រូប Gallery មានម៉ោងថតពិត (A235) · ពិនិត្យឡើងវិញ (A236–A238)
 
 **ZoeW** (`zoew-v392` ➜ `zoew-v393`) · Function `zto-order-detail.js` · `_shared/zto-palm.js` (តំបន់ LOCK ZTO ៖ សំណើផ្ទាល់) · គ្មាន rules ថ្មី។
 សំណើម្ចាស់គម្រោង ៖ «ធ្វើទាំងពីអោយស្អាតទៅ» — ចម្លើយលើចំណុចសម្រេច ២ ៖ ① រូប 🖼 Gallery ទទួលស្លាកម៉ោង/ទីតាំង **ពេលជ្រើស** មិនមែនពេលថត ·
@@ -119,12 +119,17 @@
 - 🖼 **រូប Sign ពី Gallery** ៖ ស្លាកក្រហមពី EXIF របស់រូប (`readPhotoExif()` អាន ≤ `PALM_SIGN_EXIF_READ_BYTES` ៖ `DateTimeOriginal` + `OffsetTimeOriginal` ➜ ម៉ោងភ្នំពេញ ·
   គ្មាន offset ➜ ម៉ោងនាឡិការូបដដែល · GPS EXIF · `0,0` ដែល Android/iOS លុបទីតាំង ➜ តែម៉ោង) · រូបគ្មានម៉ោងថត ➜ **គ្មានស្លាក** (មិនដាក់ម៉ោង/ទីតាំងពេលជ្រើស) ·
   📷 ថតឥឡូវ និងកាមេរ៉ាផ្ទាល់ ➜ ម៉ោងឥឡូវ + ទីតាំងបច្ចុប្បន្នដូចមុន។
+- 🔎 **ពិនិត្យឡើងវិញ** (សំណើ ៖ «ផ្ទៀងផ្ទាត់ការងារឡើងវិញក្រែងមានចន្លោះ») ៖ ① **App ចាស់ (APK មិនទាន់ដំឡើងថ្មី) + Function ថ្មី** ៖ បញ្ជូនចេញតែម្យ៉ាងគ្មាន `ztoMisplacedAt` ➜ App ចាស់អានជាត្រឡប់ `-710`
+  ហើយកត់ `ztoReturnedAt` ➜ 🔒 លើគ្រប់ឧបករណ៍ (ស្តារមិនបានជារៀងរហូត) ➜ Function ទុក `ztoMisplacedAt` លើរាល់ការបញ្ជូនចេញ ហើយ `ztoSentOutAt` បញ្ជាក់ «បញ្ជូនចេញ» (App ថ្មីអានមុន) (A236) ·
+  ② 📷 ក្នុង APK គ្មានសិទ្ធិកាមេរ៉ា ➜ Capacitor បើកកម្មវិធីជ្រើសឯកសារ ➜ រូបចាស់ទទួលម៉ោងឥឡូវ ➜ រូប 📷 ចាស់ជាង `PALM_SIGN_FRESH_SHOT_MS` (១០ នាទី · EXIF ឬ `lastModified`) ➜ ច្បាប់ Gallery (A237) ·
+  ③ Cookie ៖ «ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនការមកដល់ចុងក្រោយ ឬមុនចូល/ស្តារក្នុង ZoeW) ➜ «📤 បញ្ជូនចេញ» · អានបញ្ជី `30` តែពេលមានការបញ្ជូនចេញ (សន្សំការហៅ Netlify) (A238) ·
+  ④ EXIF pointer ប្រភេទ IFD (`13`)។
 - 🧪 `ZoeW/tests/zto-palm-server.test.ts` (📍 ១៤ ករណី ៖ មុនកែធ្លាក់ទាំងអស់) · `ZoeW/tests/zto-returned.test.tsx` (Cookie ៖ `30` + `02` · `30` ធ្លាក់/`off` · Function `problem=1`) ·
   `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-returned-cleanup.test.ts` (ពិនិត្យនៅខាងក្រោយ ៖ «ខុសទីតាំង» · «ត្រឡប់» ស្តារបាន · លុយដក ២០) · `ZoeW/tests/zto-final-marks.test.tsx`
   (📤 គ្មានត្រា · ស្តារបាន · ធាតុចម្រុះជាមួយ `-710` ➜ 🔒) · `ZoeW/tests/palm-sign-camera.test.ts` (EXIF II/MM · offset · S/W · `0,0` · ឯកសារខូច · 🖼/📷) ·
   `ZoeW/tests/zto-signed-cadence.test.tsx` (បញ្ជីត្រឡប់ · បញ្ជូនចេញ · ស្កេនបញ្ហា ≤ ម្តងក្នុងមួយម៉ោង) · `revenue-fuzz-test` (`ztoFinal` ៖ ៣ ប្រភេទ) · `ZoeW/tests/zto-lock.test.ts` (LOCK ថ្មី)។
 
-**សកម្មភាពដោយដៃ** ៖ ១. គ្មាន rules ថ្មី (rules `ztoMisplacedAt` របស់ [2.50.128] នៅត្រូវ Publish បើមិនទាន់) · ២. Netlify env ស្រេចចិត្ត ៖ `ZTO_LIST_PROBLEM_SCAN_TYPE` ·
+**សកម្មភាពដោយដៃ** ៖ ១. គ្មាន rules ថ្មី (rules `ztoMisplacedAt` របស់ [2.50.128] នៅត្រូវ Publish បើមិនទាន់ ៖ App ចាស់ និង App ថ្មីកត់វា) · ២. Netlify env ស្រេចចិត្ត ៖ `ZTO_LIST_PROBLEM_SCAN_TYPE` ·
 `ZTO_LIST_MISPLACED_REASONS` (លំនាំដើមគ្រប់គ្រាន់ · [`ZoeW/ZTO-SETUP-KH.md`](../ZoeW/ZTO-SETUP-KH.md)) · ៣. សាកលើកញ្ចប់ពិត ៖ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ ➜ «ខុសទីតាំង» ·
 បញ្ជូនចេញតែម្យ៉ាង ➜ «ត្រឡប់» ហើយ 🔄 ស្តារបាន · ៤. ✍️ Sign ៖ 🖼 ជ្រើសរូបចាស់ ➜ ស្លាកម៉ោងថតរូបនោះ (APK ថ្មីត្រូវដំឡើង)។
 
@@ -4420,11 +4425,14 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-18 — «ខុសទីតាំង» តាមមូលហេតុ ZTO · រូប Gallery តាម EXIF (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីអោយស្អាតទៅ» · A234 · A235)
+### 2026-10-18 — «ខុសទីតាំង» តាមមូលហេតុ ZTO · រូប Gallery តាម EXIF (សំណើម្ចាស់គម្រោង «ធ្វើទាំងពីអោយស្អាតទៅ» · A234 · A235 · ពិនិត្យឡើងវិញ A236 · A237 · A238)
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
-| A235 | **រូប 🖼 Gallery ក្នុង Sign ទទួលស្លាកម៉ោង និងទីតាំងពេលជ្រើស** — `palmSignPhotoFromFile()` ដាក់ `getServerNow()` + ទីតាំងបច្ចុប្បន្នលើគ្រប់រូប ➜ រូបដែលថតម្សិលមិញនៅកន្លែងផ្សេង បង្ហាញម៉ោង/ទីតាំងថ្ងៃនេះ (ភស្តុតាងខុស) | `ZoeW/tests/palm-sign-camera.test.ts` ២ ថ្មី (JPEG ពិតសាងពី byte ៖ II/MM · `OffsetTimeOriginal` · S/W · GPS `0,0` · ម៉ោង `0000:00:00` · ឯកសារខូច/កាត់ · pointer ខុស ➜ មិនបោះកំហុស · 🖼 EXIF ➜ ស្លាក EXIF · គ្មាន EXIF ➜ គ្មានស្លាក · 📷 ➜ ម៉ោងឥឡូវ ៖ មុនកែ helper មិនមាន ➜ ធ្លាក់) | [2.50.129] `readPhotoExif()` (APP1 ➜ TIFF ➜ IFD0 ➜ Exif/GPS · ព្រំដែនរាល់ការអាន · loop ≤ 64 marker · ≤ 256 entry) · `palmSignExifStampLines()` · `palmSignFramePhoto(canvas, lines)` · `takePhoto(file, 'camera' \| 'gallery')` |
+| A238 | **Cookie ៖ «ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុនធ្វើឲ្យការបញ្ជូនចេញថ្មីជា «ខុសទីតាំង»** (បញ្ជីរក្សាស្កេនបញ្ហាចុងក្រោយ ≤ ៣១ ថ្ងៃ គ្មានការមកដល់តាម Barcode) · អានបញ្ជី `30` រៀងរាល់ម៉ោងទោះគ្មានការបញ្ជូនចេញ (ការហៅ Netlify +១/ឧបករណ៍/ម៉ោង) | `ZoeW/tests/zto-returned.test.tsx` (ទាញបញ្ជី ៖ ស្កេនបញ្ហាមុនការមកដល់ចុងក្រោយ ➜ `sentOut` ៖ មុនកែធ្លាក់ · គ្មានបញ្ជូនចេញ ➜ គ្មាន `30`) · `ZoeW/tests/zto-returned-cleanup.test.ts` (ពិនិត្យនៅខាងក្រោយ ៖ ស្កេនបញ្ហាមុនចូល ZoeW ➜ «ត្រឡប់» ស្តារបាន ៖ មុនកែធ្លាក់ · ការសាកដំបូងនៅក្រៅចន្លោះអាន ➜ ជាប់ទាំងមុនកែ ➜ ដាក់ម៉ោងក្នុងចន្លោះ «ម្សិលមិញ ➜ ថ្ងៃនេះ») · `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` · `ZoeW/tests/zto-signed-cadence.test.tsx` | [2.50.129] `problemAt` លើសញ្ញា misplaced · `classifyZtoListRows()` ប្រៀបនឹងការមកដល់ · `ztoReturnedTargets()` ប្រៀបនឹង `barcodeReturnCounts()` · `problem=1` តែពេល `sends.length` |
+| A237 | **📷 បើកកម្មវិធីជ្រើសឯកសារ ➜ រូបចាស់ទទួលម៉ោងឥឡូវ** — APK ៖ Capacitor `BridgeWebChromeClient` បើកអ្នកជ្រើសឯកសារពេលសិទ្ធិកាមេរ៉ាត្រូវបដិសេធ ទោះមាន `capture` ➜ ចន្លោះដូច A235 តាមប៊ូតុង 📷 | `ZoeW/tests/palm-sign-camera.test.ts` (📷 ៖ EXIF ចាស់ ➜ ស្លាក EXIF · ថតមុន ១ នាទី ➜ ម៉ោងឥឡូវ · គ្មាន offset ➜ ម៉ោងភ្នំពេញ · គ្មាន EXIF + ឯកសារចាស់ ➜ គ្មានស្លាក ៖ មុនកែ helper មិនមាន ➜ ធ្លាក់) | [2.50.129] `palmSignFileStampLines(file, source)` · `PALM_SIGN_FRESH_SHOT_MS` · `palmSignExifShot()` (`appZoneWallClockToMillis()` ពេលគ្មាន offset) · pointer IFD `13` |
+| A236 | **App ចាស់ (2.50.128 ក្នុង APK) + Function 2.50.129 ៖ បញ្ជូនចេញតែម្យ៉ាង ➜ 🔒 ជារៀងរហូត** — Function ថ្មីដក `ztoMisplacedAt` ពីការបញ្ជូនចេញតែម្យ៉ាង ➜ App ចាស់ (`data.ztoMisplacedAt === ztoReturnedAt` មិនពិត) ចាត់ជាត្រឡប់ `-710` ➜ `syncZtoFinalMarks()` កត់ `ztoReturnedAt` គ្មាន `ztoMisplacedAt` ➜ `trashZtoFinalBlock()` 🔒 លើគ្រប់ឧបករណ៍ · APK រក្សាកូដ web ចាស់រហូតដល់ដំឡើងថ្មី | `ZoeW/tests/zto-palm-server.test.ts` «🔁 App ដែលមិនទាន់ស្គាល់ `ztoSentOutAt`» (អានចម្លើយ Function តាមច្បាប់ App ចាស់ ៖ commit មុនកែ ➜ `returned` ធ្លាក់ · ក្រោយកែ ➜ `misplaced`) | [2.50.129] `ztoMisplacedAt` លើរាល់ការបញ្ជូនចេញ · `ztoSentOutAt` បញ្ជាក់ · App អាន `ztoSentOutAt` មុន (`zto-status.ts` · `zto-list-sync.ts`) |
+| A235 | **រូប 🖼 Gallery ក្នុង Sign ទទួលស្លាកម៉ោង និងទីតាំងពេលជ្រើស** — `palmSignPhotoFromFile()` ដាក់ `getServerNow()` + ទីតាំងបច្ចុប្បន្នលើគ្រប់រូប ➜ រូបដែលថតម្សិលមិញនៅកន្លែងផ្សេង បង្ហាញម៉ោង/ទីតាំងថ្ងៃនេះ (ភស្តុតាងខុស) | `ZoeW/tests/palm-sign-camera.test.ts` ២ ថ្មី (JPEG ពិតសាងពី byte ៖ II/MM · `OffsetTimeOriginal` · S/W · GPS `0,0` · ម៉ោង `0000:00:00` · ឯកសារខូច/កាត់ · pointer ខុស ➜ មិនបោះកំហុស · 🖼 EXIF ➜ ស្លាក EXIF · គ្មាន EXIF ➜ គ្មានស្លាក · 📷 ➜ ម៉ោងឥឡូវ ៖ មុនកែ helper មិនមាន ➜ ធ្លាក់) | [2.50.129] `readPhotoExif()` (APP1 ➜ TIFF ➜ IFD0 ➜ Exif/GPS · ព្រំដែនរាល់ការអាន · loop ≤ 64 marker · ≤ 256 entry) · `palmSignExifShot()` · `palmSignFramePhoto(canvas, lines)` · `takePhoto(file, 'camera' \| 'gallery')` |
 | A234 | **បុគ្គលិកប្រើ «ផ្ញើចេញ» (`02`/`2`) ជំនួស «ត្រឡប់ការស្កេន» (`-710`) ➜ ZoeW ដាក់ «ខុសទីតាំង»** (ការពិនិត្យឡើងវិញក្រោយ A230) — ភស្តុតាង A230 គឺការបញ្ជូនចេញតែម្យ៉ាង ➜ ស្លាកខុស (លុយត្រឹមត្រូវ) · 🧪 ពិតរបស់ម្ចាស់គម្រោង ៖ `-582` `problemReason` «ទីតាំងមិនត្រឹមត្រូវ» (`msgEng` «Incorrect location» · `message` 原因是【地址不详】) ចំណែក `actionName` 地址不详，电话联系不上 រួមទាំងមូលហេតុទូរស័ព្ទ ➜ មូលហេតុជាអ្នកបំបែក | `ZoeW/tests/zto-palm-server.test.ts` ១៤ ករណី (៣ ភាសា · U+200B · មូលហេតុផ្សេង · វដ្តមុន · ក្រោយបញ្ជូនចេញ · សាខាផ្សេង · ត្រឡប់ឈ្នះ ៖ មុនកែធ្លាក់ទាំងអស់) · `ZoeW/tests/zto-returned.test.tsx` ៣ (Cookie `30`+`02` · `30` ធ្លាក់ ➜ `partial` · `off` · Function `problem=1` ៖ ៣ ភាសា · ចុងក្រោយ · រាប់គ្រប់ ៧) · `ZoeW/tests/zto-returned-cleanup.test.ts` · `ZoeW/tests/zto-final-marks.test.tsx` · `ZoeW/tests/zto-multibranch-signed-hold.test.tsx` (`-710` · `02` · `30` តែសាខាខ្លួន) · `ZoeW/tests/zto-signed-cadence.test.tsx` G2 (ការអានបញ្ជីត្រឡប់ធ្លាប់រាប់ជា `/detail` ➜ ដាច់ពីគ្នា + វាស់ ≤ ម្តង/ម៉ោង) | [2.50.129] `MISPLACED_REASONS` · `ztoSentOutAt` · `sentOutAt` (`_shared/zto-palm.js`) · `readListProblemConfig()` · kind `problem` (`zto-order-detail.js`) · ភស្តុតាង `{ at, kind }` (`noteZtoReturnedEvidence(code, at, kind)`) · `ztoReturnedKindOf()` · ប្រភេទ `sent` គ្មានត្រា · LOCK ថ្មី (សំណើម្ចាស់គម្រោង) |
 
 ### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ · បញ្ជាក់ពេលចែកចាយ (សំណើម្ចាស់គម្រោង · A230 · A231 · A232 · A233)

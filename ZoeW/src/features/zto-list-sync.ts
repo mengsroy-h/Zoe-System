@@ -314,8 +314,9 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
         const back = returnedIndex.get(row.key);
         if (back && row.ztoClosed !== true && back.at >= row.at) {
             row.returnedAt = back.at;
-            row.misplaced = back.misplaced === true;
-            row.sentOut = !row.misplaced && back.sentOut === true;
+            const priorCycle = typeof back.problemAt === 'string' && back.problemAt < row.at;
+            row.misplaced = back.misplaced === true && !priorCycle;
+            row.sentOut = !row.misplaced && (back.sentOut === true || back.misplaced === true);
             row.inZoew = known.has(row.key);
             out.returned.push(row);
         } else if (known.has(row.key)) out.existing.push(row);
@@ -454,13 +455,14 @@ export function absorbZtoListSigned(out, body) {
 }
 
 export async function fetchZtoReturnedPages(cfg, from, to) {
-    const [back, sent, problem] = await Promise.all([fetchZtoScanPages(cfg, from, to, 'returned'), fetchZtoScanPages(cfg, from, to, 'sent'),
-        fetchZtoScanPages(cfg, from, to, 'problem')]);
+    const [back, sent] = await Promise.all([fetchZtoScanPages(cfg, from, to, 'returned'), fetchZtoScanPages(cfg, from, to, 'sent')]);
     const backKeys = new Set(back.returned.map((row) => pickupBarcodeKey(row.barcode)));
+    const sends = sent.returned.filter((row) => !backKeys.has(pickupBarcodeKey(row.barcode)));
+    const problem = sends.length ? await fetchZtoScanPages(cfg, from, to, 'problem') : { returned: [], state: 'ok' };
     const problemAt = new Map(problem.returned.map((row) => [pickupBarcodeKey(row.barcode), row.at]));
-    const left = sent.returned.filter((row) => !backKeys.has(pickupBarcodeKey(row.barcode))).map((row) => {
+    const left = sends.map((row) => {
         const wrongPlace = problemAt.get(pickupBarcodeKey(row.barcode));
-        return typeof wrongPlace === 'string' && wrongPlace <= row.at ? { ...row, misplaced: true } : { ...row, sentOut: true };
+        return typeof wrongPlace === 'string' && wrongPlace <= row.at ? { ...row, misplaced: true, problemAt: wrongPlace } : { ...row, sentOut: true };
     });
     const problemShort = problem.state === 'failed' || problem.state === 'partial';
     return { returned: back.returned.concat(left), state: back.state, sentState: sent.state === 'ok' && problemShort ? 'partial' : sent.state };
@@ -886,8 +888,10 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             out.signed.push(candidate.barcode);
             out.signedRows.push(Object.assign({}, base, { at: found.signedAt, from: from }));
         }
-        if (typeof found.returnedAt === 'string' && found.returnedAt) out.returned.push({ barcode: candidate.barcode, at: found.returnedAt,
-            misplaced: found.misplacedAt === found.returnedAt, sentOut: found.sentOutAt === found.returnedAt });
+        if (typeof found.returnedAt === 'string' && found.returnedAt) {
+            const sentOut = found.sentOutAt === found.returnedAt;
+            out.returned.push({ barcode: candidate.barcode, at: found.returnedAt, misplaced: !sentOut && found.misplacedAt === found.returnedAt, sentOut });
+        }
     });
     out.total = out.rows.length;
     out.unverified = pending;

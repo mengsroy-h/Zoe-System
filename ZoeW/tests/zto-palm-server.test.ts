@@ -195,16 +195,16 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         ['មូលហេតុភាសាចិន «地址不详» ➜ ខុសទីតាំង', [['3', 'KH001', '2026-10-16 09:00:00'],
             ['-582', 'KH001', '2026-10-16 10:00:00', '地址不详'], ['2', 'KH001', '2026-10-16 10:05:00']], '2026-10-16 10:05:00', '2026-10-16 10:05:00', null],
         ['បញ្ជូនចេញ គ្មានស្កេនបញ្ហា (បុគ្គលិកប្រើ «ផ្ញើចេញ» ជំនួស «ត្រឡប់») ➜ 📤 បញ្ជូនចេញ · មិនមែនខុសទីតាំង', [['3', 'KH001', '2026-10-16 09:00:00'],
-            ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', null, '2026-10-17 09:00:00'],
+            ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', '2026-10-17 09:00:00', '2026-10-17 09:00:00'],
         ['ស្កេនបញ្ហាមូលហេតុផ្សេង (ទូរស័ព្ទមិនលើក) ហើយបញ្ជូនចេញ ➜ 📤 បញ្ជូនចេញ', [['3', 'KH001', '2026-10-16 09:00:00'],
-            ['-582', 'KH001', '2026-10-16 10:00:00', 'ទាក់ទងអតិថិជនមិនបាន'], ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', null, '2026-10-17 09:00:00'],
+            ['-582', 'KH001', '2026-10-16 10:00:00', 'ទាក់ទងអតិថិជនមិនបាន'], ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', '2026-10-17 09:00:00', '2026-10-17 09:00:00'],
         ['«ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនមកដល់ចុងក្រោយ) ➜ 📤 បញ្ជូនចេញ', [['3', 'KH001', '2026-10-10 09:00:00'],
             ['-582', 'KH001', '2026-10-10 10:00:00', WRONG_PLACE], ['3', 'KH001', '2026-10-16 09:00:00'], ['2', 'KH001', '2026-10-17 09:00:00']],
-            '2026-10-17 09:00:00', null, '2026-10-17 09:00:00'],
+            '2026-10-17 09:00:00', '2026-10-17 09:00:00', '2026-10-17 09:00:00'],
         ['«ទីតាំងមិនត្រឹមត្រូវ» ក្រោយបញ្ជូនចេញ ➜ 📤 បញ្ជូនចេញ', [['3', 'KH001', '2026-10-16 09:00:00'], ['2', 'KH001', '2026-10-17 09:00:00'],
-            ['-582', 'KH001', '2026-10-17 10:00:00', WRONG_PLACE]], '2026-10-17 09:00:00', null, '2026-10-17 09:00:00'],
+            ['-582', 'KH001', '2026-10-17 10:00:00', WRONG_PLACE]], '2026-10-17 09:00:00', '2026-10-17 09:00:00', '2026-10-17 09:00:00'],
         ['«ទីតាំងមិនត្រឹមត្រូវ» នៅសាខាផ្សេង ➜ 📤 បញ្ជូនចេញ', [['3', 'KH001', '2026-10-16 09:00:00'],
-            ['-582', 'OTHER', '2026-10-16 10:00:00', WRONG_PLACE], ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', null, '2026-10-17 09:00:00'],
+            ['-582', 'OTHER', '2026-10-16 10:00:00', WRONG_PLACE], ['2', 'KH001', '2026-10-17 09:00:00']], '2026-10-17 09:00:00', '2026-10-17 09:00:00', '2026-10-17 09:00:00'],
         ['ស្កេនត្រឡប់ ហើយបញ្ជូនចេញ ➜ ត្រឡប់ (មិនមែនខុសទីតាំង · មិនមែនបញ្ជូនចេញ)', [['3', 'KH001', '2026-10-16 09:00:00'],
             ['-582', 'KH001', '2026-10-16 10:00:00', WRONG_PLACE], ['-710', 'KH001', '2026-10-17 08:00:00'], ['2', 'KH001', '2026-10-17 08:05:00']],
             '2026-10-17 08:00:00', null, null],
@@ -213,13 +213,24 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         ['បញ្ជូនចេញ ហើយមកដល់ម្តងទៀត ➜ មិនមែន', [['3', 'KH001', '2026-10-15 09:00:00'], ['2', 'KH001', '2026-10-15 12:00:00'], ['3', 'KH001', '2026-10-16 09:00:00']], null, null, null],
         ['មានតែស្កេនបញ្ហា «ទីតាំងមិនត្រឹមត្រូវ» (កញ្ចប់នៅហាង) ➜ មិនមែន', [['3', 'KH001', '2026-10-16 09:00:00'], ['-582', 'KH001', '2026-10-16 10:00:00', WRONG_PLACE]],
             null, null, null]
-    ])('📍 status=1 ៖ %s', async (_name, scans: any, returnedAt, misplacedAt, sentOutAt) => {
+    ])('📍 status=1 ៖ %s (`ztoMisplacedAt` នៅលើរាល់ការបញ្ជូនចេញ ៖ App ចាស់អានថាស្តារបាន · `ztoSentOutAt` បញ្ជាក់ «បញ្ជូនចេញ»)', async (_name, scans: any, returnedAt, misplacedAt, sentOutAt) => {
         const { sessionToken: session } = await login();
         const tracks = (scans as string[][]).map(([action, site, time, problemReason]) => ({ action, siteCode: site, mailNo: CODE, time, problemReason: problemReason || '' })).reverse();
         vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks }] })));
         const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
         expect(res.statusCode).toBe(200);
         expect(JSON.parse(res.body)).toMatchObject({ found: true, ztoReturnedAt: returnedAt, ztoMisplacedAt: misplacedAt, ztoSentOutAt: sentOutAt });
+    });
+
+    it('🔁 App ដែលមិនទាន់ស្គាល់ `ztoSentOutAt` (APK មិនទាន់ដំឡើងថ្មី) ៖ បញ្ជូនចេញតែម្យ៉ាង ➜ នៅអានជា «ខុសទីតាំង» (ស្តារបាន) ⛔ មិនមែនត្រឡប់ 🔒', async () => {
+        const { sessionToken: session } = await login();
+        const tracks = [['3', '2026-10-16 09:00:00'], ['2', '2026-10-17 09:00:00']].map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: CODE, time, problemReason: '' })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks }] })));
+        const data = JSON.parse((await call({ palm: '1', barcode: CODE, status: '1' }, session)).body);
+        const oldAppKind = data.ztoReturnedAt && data.ztoMisplacedAt === data.ztoReturnedAt ? 'misplaced' : 'returned';
+        expect(oldAppKind, 'App ចាស់ ៖ `returned` ➜ សរសេរ `ztoReturnedAt` គ្មាន `ztoMisplacedAt` ➜ 🔒 លើគ្រប់ឧបករណ៍').toBe('misplaced');
+        const newAppKind = data.ztoSentOutAt === data.ztoReturnedAt ? 'sent' : (data.ztoMisplacedAt === data.ztoReturnedAt ? 'misplaced' : 'returned');
+        expect(newAppKind).toBe('sent');
     });
 
     it('📍 status=1 ៖ ZTO ចុះហត្ថលេខា ក្រោយមកដល់ ➜ បិទ · មិនមែនខុសទីតាំង ទោះមានបញ្ជូនចេញ', async () => {

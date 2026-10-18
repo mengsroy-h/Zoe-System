@@ -279,8 +279,8 @@ function trackingVerdict(upstream, barcode, site) {
     if (returned && returned >= arrival && out.ztoClosed !== true) out.ztoReturnedAt = returned;
     else if (sentOut && arrival && sentOut >= arrival && out.ztoClosed !== true) {
         out.ztoReturnedAt = sentOut;
-        if (problems.some((at) => at >= arrival && at <= sentOut)) out.ztoMisplacedAt = sentOut;
-        else out.ztoSentOutAt = sentOut;
+        out.ztoMisplacedAt = sentOut;
+        if (!problems.some((at) => at >= arrival && at <= sentOut)) out.ztoSentOutAt = sentOut;
     }
     return out;
 }
@@ -1025,9 +1025,9 @@ function trackEvidence(upstream, barcode, site) {
     }
     const back = returned && returned >= arrival ? returned : '';
     const leftAt = !back && sentOut && arrival && sentOut >= arrival && ztoClosed !== true ? sentOut : '';
-    const misplacedAt = leftAt && problems.some((at) => at >= arrival && at <= leftAt) ? leftAt : '';
+    const sentOutAt = leftAt && !problems.some((at) => at >= arrival && at <= leftAt) ? leftAt : '';
     return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
-        returnedAt: back || leftAt, misplacedAt, sentOutAt: leftAt && !misplacedAt ? leftAt : '' };
+        returnedAt: back || leftAt, misplacedAt: leftAt, sentOutAt };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {

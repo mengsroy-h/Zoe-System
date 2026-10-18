@@ -453,6 +453,21 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(trashRestoreBlockOf(trashItems().find((t: any) => t.barcodes[0].code === 'ZTRET0000001'))).toBe('returned');
     });
 
+    it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ «ទីតាំងមិនត្រឹមត្រូវ» មុនកញ្ចប់ចូល ZoeW (វដ្តមុន) ➜ «ត្រឡប់» ស្តារបាន មិនមែន «ខុសទីតាំង»', async () => {
+        const entered = getServerNow() - 3 * 3600000;
+        const young = youngItem([['ZTCYCLE00001', 4]], 'id_cycle');
+        seed([{ ...young, createdAt: entered, barcodes: young.barcodes.map((b: any) => ({ ...b, createdAt: entered })) }]);
+        const send = ztoStamp(getServerNow() - 3600000);
+        const before = ztoStamp(getServerNow() - 4 * 3600000);
+        const calls = zto([], undefined, [], [{ code: 'ZTCYCLE00001', at: send }], [{ code: 'ZTCYCLE00001', at: before }]);
+        await runZtoStatusSweep(true, dataState.scanHistory, []);
+        expect(calls.filter((q) => q.problem === '1'), 'លក្ខខណ្ឌ ៖ អានស្កេនបញ្ហា').toHaveLength(1);
+        await flush();
+        expect(historyCodes('id_cycle')).toEqual([]);
+        expect(buildTrashGroups(trashItems()).map((g: any) => g.reason)).toEqual(['returned']);
+        expect(trashRestoreBlockOf(trashItems()[0])).toBe('');
+    });
+
     it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ZTO ចុះហត្ថលេខា + ស្កេនត្រឡប់ ➜ ហត្ថលេខាឈ្នះ ទោះបិទមិនទាន់ដល់ (លើស batch មួយជុំ) ➜ មិនដក · លុយមិនដក', async () => {
         const codes = Array.from({ length: 11 }, (_, i) => 'ZTSIGN' + String(i).padStart(6, '0'));
         const items = codes.map((code, i) => youngItem([[code, 1]], 'id_s' + String(i).padStart(2, '0')));

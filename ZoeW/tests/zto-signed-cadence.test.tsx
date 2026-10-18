@@ -435,7 +435,7 @@ describe('ការផ្ទៀងផ្ទាត់ឡើងវិញ ៖ quota
         await runApp(20 * MIN, { signedAt: {}, active: true });
         expect(srv.signed.length).toBeGreaterThan(20);
         expect(srv.detail.length, '⛔ ២០ វិ. ➜ ៦០ ➜ ១៨០ ➜ ៦០០ វិ. ➜ ≤ ៦ ក្នុង ២០ នាទី').toBeLessThanOrEqual(6);
-        expect(srv.lists.sort(), '⛔ បញ្ជីត្រឡប់ · បញ្ជូនចេញ · ស្កេនបញ្ហា ≤ ម្តងក្នុងមួយម៉ោង').toEqual(['problem', 'returned', 'sent']);
+        expect(srv.lists.sort(), '⛔ បញ្ជីត្រឡប់ · បញ្ជូនចេញ ≤ ម្តងក្នុងមួយម៉ោង · គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា').toEqual(['returned', 'sent']);
     });
 
     it('G3 ៖ ជួរអានដំបូងរំលងកញ្ចប់ដែលបិទទាំងស្រុង (កញ្ចប់បិទចាស់ ២៥ ថ្ងៃ មិនពង្រីកជួរ)', async () => {

@@ -3,7 +3,7 @@ import { attachPalmSignStream, videoElement } from '../app/refs';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { scanState } from '../core/state';
-import { appZoneParts } from '../core/timezone';
+import { appZoneParts, appZoneWallClockToMillis } from '../core/timezone';
 import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { withTimeout } from './network';
 import { initScanEngine, readCanvasSymbols } from './scan-engine';
@@ -32,6 +32,8 @@ export const PALM_SIGN_LOCATION_WAIT_MS = 8000;
 export const PALM_SIGN_STAMP_SIZE = 0.035;
 
 export const PALM_SIGN_EXIF_READ_BYTES = 256 * 1024;
+
+export const PALM_SIGN_FRESH_SHOT_MS = 10 * 60 * 1000;
 
 export type PalmSignMatch = (text: string) => string;
 
@@ -100,7 +102,9 @@ export function palmSignStampLines(ms: number, fix: PalmSignFix | null) {
 
 export type PalmSignExif = { time: string; offset: string; lat: number; lng: number };
 
-const EXIF_TYPE_BYTES = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+const EXIF_TYPE_BYTES = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8, 13: 4 };
+
+const EXIF_POINTER_TYPES = [4, 13];
 
 export function readPhotoExif(buffer): PalmSignExif {
     const out = { time: '', offset: '', lat: NaN, lng: NaN };
@@ -173,13 +177,13 @@ function readTiffExif(view: DataView, start: number, end: number, out: PalmSignE
     };
     const root = entries(u32(start + 4));
     const exifAt = root.get(0x8769);
-    if (exifAt && exifAt.type === 4) {
+    if (exifAt && EXIF_POINTER_TYPES.includes(exifAt.type)) {
         const exif = entries(u32(exifAt.at));
         out.time = ascii(exif.get(0x9003)) || ascii(exif.get(0x9004));
         out.offset = ascii(exif.get(0x9011)) || ascii(exif.get(0x9012));
     }
     const gpsAt = root.get(0x8825);
-    if (gpsAt && gpsAt.type === 4) {
+    if (gpsAt && EXIF_POINTER_TYPES.includes(gpsAt.type)) {
         const gps = entries(u32(gpsAt.at));
         const lat = degrees(gps.get(2)) * (ascii(gps.get(1)) === 'S' ? -1 : 1);
         const lng = degrees(gps.get(4)) * (ascii(gps.get(3)) === 'W' ? -1 : 1);
@@ -190,26 +194,31 @@ function readTiffExif(view: DataView, start: number, end: number, out: PalmSignE
     }
 }
 
-export function palmSignExifStampLines(exif: PalmSignExif) {
+export function palmSignExifShot(exif: PalmSignExif) {
     const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(exif && typeof exif.time === 'string' ? exif.time : '');
-    if (!m) return [];
+    if (!m) return { lines: [], at: 0 };
     const [year, month, day, hour, minute, second] = m.slice(1).map(Number);
-    if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return [];
+    if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return { lines: [], at: 0 };
     const fix = isFinite(exif.lat) && isFinite(exif.lng) ? { lat: exif.lat, lng: exif.lng, at: 0 } : null;
     const zone = /^([+-])(\d{2}):(\d{2})$/.exec(typeof exif.offset === 'string' ? exif.offset : '');
     if (zone) {
         const shift = (zone[1] === '-' ? -1 : 1) * (Number(zone[2]) * 60 + Number(zone[3])) * 60000;
-        return palmSignStampLines(Date.UTC(year, month - 1, day, hour, minute, second) - shift, fix);
+        const at = Date.UTC(year, month - 1, day, hour, minute, second) - shift;
+        return { lines: palmSignStampLines(at, fix), at };
     }
     const lines = [m[1] + '-' + m[2] + '-' + m[3] + ' ' + m[4] + ':' + m[5] + ':' + m[6]];
     if (fix) lines.push(fix.lat.toFixed(5) + ', ' + fix.lng.toFixed(5));
-    return lines;
+    return { lines, at: appZoneWallClockToMillis(year, month, day, hour, minute, second) };
 }
 
-async function fileExifStampLines(file: File) {
+export async function palmSignFileStampLines(file: File, source: 'camera' | 'gallery') {
+    let shot = { lines: [], at: 0 };
     try {
-        return palmSignExifStampLines(readPhotoExif(await file.slice(0, PALM_SIGN_EXIF_READ_BYTES).arrayBuffer()));
-    } catch { return []; }
+        shot = palmSignExifShot(readPhotoExif(await file.slice(0, PALM_SIGN_EXIF_READ_BYTES).arrayBuffer()));
+    } catch {}
+    if (source === 'gallery') return shot.lines;
+    const taken = shot.at || (typeof file.lastModified === 'number' && file.lastModified > 0 ? file.lastModified : 0);
+    return taken && elapsedSince(taken) > PALM_SIGN_FRESH_SHOT_MS ? shot.lines : undefined;
 }
 
 export function stampPalmSignPhoto(canvas, lines: string[]) {
@@ -300,7 +309,7 @@ export async function palmSignDecodeImage(img: HTMLImageElement, match: PalmSign
 
 export async function palmSignPhotoFromFile(file: File, match: PalmSignMatch, source: 'camera' | 'gallery' = 'camera') {
     if (!file.type.startsWith('image/') || file.size > 20000000) throw new Error('image');
-    const lines = source === 'gallery' ? await fileExifStampLines(file) : undefined;
+    const lines = await palmSignFileStampLines(file, source);
     const url = URL.createObjectURL(file);
     try {
         const img = await new Promise<HTMLImageElement>((resolve, reject) => loadScratchImage(url, resolve, reject));

@@ -101,6 +101,7 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(out.rows.length, 'លក្ខខណ្ឌចាំបាច់ ៖ ជួរមកដល់ ៥').toBe(5);
         expect(out.returnedState).toBe('ok');
         expect(codesOf(out.returned)).toEqual(['ZTAGAIN00001', 'ZTHAVE000001', 'ZTRET0000001', 'ZTSIGN000001']);
+        expect(upstream.some((c) => c.startsWith('30 ')), 'គ្មានបញ្ជូនចេញ ➜ មិនអានស្កេនបញ្ហា (សន្សំការហៅ Netlify)').toBe(false);
         const retRanges = upstream.filter((c) => c.startsWith('-710 ')).map((c) => c.split(' ').slice(1, 3).join('..'));
         expect(retRanges, 'បញ្ជីត្រឡប់អានពី `from` ដល់ថ្ងៃនេះ (ត្រឡប់កើតក្រោយ `to`)').toEqual([dk(3) + '..' + dk(0)]);
         noteZtoListSignedCodes(out.signed);
@@ -237,6 +238,18 @@ describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (ស្�
         expect(upstream.some((c) => c.startsWith('30 ')), '`off` ➜ គ្មានសំណើ 30').toBe(false);
     });
 
+    it('«ទីតាំងមិនត្រឹមត្រូវ» នៃវដ្តមុន (មុនការមកដល់ចុងក្រោយ) ➜ 📤 បញ្ជូនចេញ មិនមែន «ខុសទីតាំង»', async () => {
+        rowsUp = [
+            arrival('ZTCYCLE00001', 3, '08'), problem('ZTCYCLE00001', 3, '09'), send('ZTCYCLE00001', 3, '10'),
+            arrival('ZTCYCLE00001', 1, '08'), send('ZTCYCLE00001', 1, '15')
+        ];
+        const out: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(out.returned, 'ស្កេនបញ្ហា ≤ បញ្ជូនចេញចុងក្រោយ ➜ សញ្ញាជាមួយម៉ោងស្កេនបញ្ហា').toEqual([
+            { barcode: 'ZTCYCLE00001', at: dk(1) + ' 15:00:00', misplaced: true, problemAt: dk(3) + ' 09:00:00' }]);
+        const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(3), to: dk(1), returned: out.returned });
+        expect(groups.returned.map((r: any) => [r.barcode, r.misplaced, r.sentOut])).toEqual([['ZTCYCLE00001', false, true]]);
+    });
+
     it('Function ៖ `problem=1` ➜ តែស្កេនបញ្ហាមូលហេតុ «ទីតាំងមិនត្រឹមត្រូវ» (៣ ភាសា · តួអក្សរមើលមិនឃើញ) · ចុងក្រោយក្នុងមួយ Barcode · រាប់គ្រប់', async () => {
         rowsUp = [
             problem('ZTMIS0000001', 1, '09'), problem('ZTMIS0000001', 1, '11'),
@@ -283,7 +296,7 @@ describe('📍 Cookie ៖ រាងជួរ Argus ពិត (ម្ចាស់
         if (fn.resetCachesForTests) fn.resetCachesForTests();
         const out: any = await fetchZtoListAllPages(CFG, dk(1), dk(0));
         expect(out.sentState).toBe('ok');
-        expect(out.returned).toEqual([{ barcode: CODE, at: dk(0) + ' 13:34:40', misplaced: true }]);
+        expect(out.returned).toEqual([{ barcode: CODE, at: dk(0) + ' 13:34:40', misplaced: true, problemAt: dk(0) + ' 13:34:12' }]);
         const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(1), to: dk(0), returned: out.returned });
         expect(codesOf(groups.returned)).toEqual([CODE]);
         expect(groups.returned[0]).toMatchObject({ misplaced: true, returnedAt: dk(0) + ' 13:34:40', cod: 0, dod: 1.75, from: 'សែនសុខ' });

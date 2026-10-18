@@ -17,7 +17,9 @@ import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
 import { mount, unmount } from './native/react-harness';
 
-vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}) }));
+const stopLocation = vi.fn();
+vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
+    startPalmSignLocation: vi.fn(() => stopLocation) }));
 
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {}, removeSingleBarcode: async () => 'failed', toggleIndividualBarcodeClose: async () => false,
@@ -242,11 +244,15 @@ it.each(['rejected', 'unknown'])('ចែកចាយ %s ➜ មិន Sign ន�
     expect(palmSignState.checked[CODE]).toBe(kind !== 'unknown');
 });
 it('camera ស្កេនបាន ➜ ចាប់រូប · សម្លេង និងញ័រ · ចែកចាយភ្លាម · ប៊ូតុង Sign ប្រាប់ឲ្យវាយឈ្មោះ', async () => {
-    const { startPalmSignCamera } = await import('../src/services/palm-sign-camera');
+    const { startPalmSignCamera, startPalmSignLocation } = await import('../src/services/palm-sign-camera');
+    vi.mocked(startPalmSignLocation).mockClear();
+    stopLocation.mockClear();
     const vibrate = vi.fn(() => true);
     Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
     mount(<ZtoPalmSignModal />);
     await act(async () => { await openDispatch([CODE]); });
+    expect(startPalmSignLocation).toHaveBeenCalledOnce();
+    expect(stopLocation).not.toHaveBeenCalled();
     const callback = vi.mocked(startPalmSignCamera).mock.calls.at(-1)![0];
     await act(async () => callback(CODE, PHOTO));
     expect(palmSignState.photos[CODE]).toBe(PHOTO);

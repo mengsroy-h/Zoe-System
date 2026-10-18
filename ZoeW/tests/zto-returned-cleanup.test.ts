@@ -17,7 +17,7 @@ import { appLocalStore } from '../src/core/storage';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { CLEANUP_KEY_SWEEP_GRACE_MS, claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, runCleanupLedgerKeySweep, trashRetentionMs } from '../src/domain/cleanup';
 import { RETURNED_TRASH_RETENTION_MS } from '../src/features/session';
-import { TRASH_REASON_META, trashReasonOf } from '../src/features/trash';
+import { TRASH_REASON_META, trashDisplayReasonOf, trashReasonOf } from '../src/features/trash';
 import { removedParcelsView } from '../src/features/notifications';
 import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
@@ -259,6 +259,21 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
         expect(historyCodes()).toEqual(['B']);
         expect(trashItems().map((t: any) => t.barcodes.map((b: any) => b.code))).toEqual([['A']]);
         expect(ledger().codDollar).toBe(90);
+    });
+
+    it('📍 ខុសទីតាំង (ZTO ស្កេនបញ្ជូនចេញក្រោយមកដល់) ➜ ដកដូចត្រឡប់ (ធុងសំរាម returned · លុយដក) · 🔔 និងធុងសំរាមស្លាក «ខុសទីតាំង»', async () => {
+        seed([youngItem([['A', 10], ['B', 5]])]);
+        const queued = removeReturnedZtoBarcodes([{ barcode: 'A', at: ztoStamp(getServerNow() - DAY_MS), misplaced: true }]);
+        expect(queued).toBe(1);
+        await flush();
+        expect(historyCodes()).toEqual(['B']);
+        const trash = trashItems();
+        expect(trash.map((t: any) => t.trashReason)).toEqual(['returned']);
+        expect(ledger().codDollar).toBe(90);
+        expect(trashReasonOf(trash[0])).toBe('returned');
+        expect(trashDisplayReasonOf(trash[0])).toBe('misplaced');
+        const view = removedParcelsView(trash, getServerNow(), false, []);
+        expect(view.rows.map((r: any) => r.misplaced)).toEqual([true]);
     });
 
     it('ZTO ចុះហត្ថលេខា (បញ្ជីចុះហត្ថលេខា) ➜ មិនដកជាត្រឡប់', async () => {
@@ -515,12 +530,14 @@ describe('↩️ ធុងសំរាម «ត្រឡប់» ៖ ច្ប�
     });
 
     it('តម្លៃតែមួយ `returned` ៖ ស្លាក «ត្រឡប់» · ២ ថ្ងៃ · គ្មាន `expired` ក្នុង App និង rules (ម្ចាស់គម្រោង ៖ «កែអោយស្អាត»)', () => {
-        expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'pickup', 'remove', 'returned']);
+        expect(Object.keys(TRASH_REASON_META).sort()).toEqual(['delete', 'misplaced', 'pickup', 'remove', 'returned']);
+        expect(trashReasonOf({ trashReason: 'misplaced' })).toBe('remove');
         expect(trashRetentionMs({ trashReason: 'returned' })).toBe(RETURNED_TRASH_RETENTION_MS);
         const rules = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'firebase-database.rules.json'), 'utf8'));
         const check = rules.rules.zoew_recently_deleted_cod_dod.$itemId.trashReason['.validate'];
         expect(check).toContain("'returned'");
         expect(check).not.toContain("'expired'");
+        expect(check).not.toContain("'misplaced'");
     });
 
     it('sweep កូនសោ ledger ៖ ធុងសំរាម «ត្រឡប់» ដែល flag មិនទាន់ flip ➜ flip', async () => {

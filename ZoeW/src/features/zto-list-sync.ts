@@ -223,6 +223,7 @@ export function ztoListRowOf(raw, key) {
         signedOnly: false,
         arrivedBefore: '',
         returnedAt: '',
+        misplaced: false,
         inZoew: false,
         openInZoew: false,
         removeInZoew: false,
@@ -312,6 +313,7 @@ export function classifyZtoListRows(rows, historyList, trashList, signedRows?, r
         const back = returnedIndex.get(row.key);
         if (back && row.ztoClosed !== true && back.at >= row.at) {
             row.returnedAt = back.at;
+            row.misplaced = back.misplaced === true;
             row.inZoew = known.has(row.key);
             out.returned.push(row);
         } else if (known.has(row.key)) out.existing.push(row);
@@ -866,7 +868,8 @@ export async function fetchZtoPalmListAllPages(cfg, from, to) {
             out.signed.push(candidate.barcode);
             out.signedRows.push(Object.assign({}, base, { at: found.signedAt, from: from }));
         }
-        if (typeof found.returnedAt === 'string' && found.returnedAt) out.returned.push({ barcode: candidate.barcode, at: found.returnedAt });
+        if (typeof found.returnedAt === 'string' && found.returnedAt) out.returned.push({ barcode: candidate.barcode, at: found.returnedAt,
+            misplaced: found.misplacedAt === found.returnedAt });
     });
     out.total = out.rows.length;
     out.unverified = pending;

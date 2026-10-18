@@ -296,6 +296,14 @@ function globalHeaders(src) {
     return out;
 }
 function usesCamera(app) {
+    return usesApi(app, /getUserMedia\s*\(/);
+}
+
+function usesGeolocation(app) {
+    return usesApi(app, /navigator\.geolocation\b/);
+}
+
+function usesApi(app, re) {
     let hit = false;
     (function scan(dir) {
         let entries = [];
@@ -304,7 +312,7 @@ function usesCamera(app) {
             if (hit || e.name === 'node_modules' || e.name.startsWith('.') || e.name === 'dist' || e.name.startsWith('dist-')) continue;
             const full = path.join(dir, e.name);
             if (e.isDirectory()) scan(full);
-            else if (/\.(js|ts|tsx)$/.test(e.name) && /getUserMedia\s*\(/.test(fs.readFileSync(full, 'utf8'))) hit = true;
+            else if (/\.(js|ts|tsx)$/.test(e.name) && re.test(fs.readFileSync(full, 'utf8'))) hit = true;
         }
     })(path.join(ROOT, app));
     return hit;
@@ -327,8 +335,11 @@ EXPECTED.forEach((rel) => {
     ok(app + ' ៖ Cross-Origin-Opener-Policy same-origin (បំបែក window ពីទំព័រឆ្លង origin)', h['cross-origin-opener-policy'] === 'same-origin', h['cross-origin-opener-policy']);
     const pp = h['permissions-policy'] || '';
     const camera = usesCamera(app);
-    ok(app + ' ៖ Permissions-Policy បិទ microphone · geolocation · payment · កាមេរ៉ា ' + (camera ? '(self) ព្រោះ App ស្កេន' : '() ព្រោះ App មិនប្រើ'),
-        /microphone=\(\)/.test(pp) && /geolocation=\(\)/.test(pp) && /payment=\(\)/.test(pp) && pp.indexOf(camera ? 'camera=(self)' : 'camera=()') !== -1, pp);
+    const geo = usesGeolocation(app);
+    ok(app + ' ៖ Permissions-Policy បិទ microphone · payment · កាមេរ៉ា ' + (camera ? '(self) ព្រោះ App ស្កេន' : '() ព្រោះ App មិនប្រើ')
+        + ' · geolocation ' + (geo ? '(self) ព្រោះរូប Sign មានកូអរដោនេ' : '() ព្រោះ App មិនប្រើ'),
+        /microphone=\(\)/.test(pp) && pp.indexOf(geo ? 'geolocation=(self)' : 'geolocation=()') !== -1 && /payment=\(\)/.test(pp)
+        && pp.indexOf(camera ? 'camera=(self)' : 'camera=()') !== -1, pp);
 });
 ok('⛔ ជាន់អប្បបរមា ៖ រក header `/*` ឃើញក្នុង App ទាំង ' + EXPECTED.length, headerApps === EXPECTED.length, headerApps);
 

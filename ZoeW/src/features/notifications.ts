@@ -10,7 +10,7 @@ import { elapsedSince } from '../core/elapsed';
 import { barcodeAbandonIsRipe, barcodeEntriesOf, itemHasRestoreMarkers, parseTimestampFromId } from '../domain/barcode';
 import { checkApkRelease } from './apk-update';
 import { LICENSE_APP_CODE } from './license';
-import { trashReasonOf } from './trash';
+import { trashDisplayReasonOf, trashReasonOf } from './trash';
 import { isNativeApp, nativeWebOrigin } from '../platform/native';
 import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal, withTimeout } from '../services/network';
@@ -38,6 +38,7 @@ export interface NotifyRemovedRow {
     count: number;
     hoursAgo: number;
     isNew: boolean;
+    misplaced: boolean;
 }
 
 export interface NotifyRemovedView {
@@ -218,7 +219,7 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
         packages += count;
         if (isNew) unseen += count;
         phones.add(phone);
-        rows.push({ key, phone, locker, count, at, isNew, hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
+        rows.push({ key, phone, locker, count, at, isNew, misplaced: trashDisplayReasonOf(item) === 'misplaced', hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
     }
     rows.sort((a, b) => b.at - a.at || b.count - a.count);
     return {

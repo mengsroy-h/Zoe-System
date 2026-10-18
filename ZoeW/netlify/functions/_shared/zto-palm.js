@@ -19,6 +19,8 @@ const AUTH_EXPIRED_RE = /^(?:401|403|not_login|token_expired|token_invalid|login
 const DISPATCH_LIST_PATH = '/zto/dispatch/v1/queryDispatchList';
 const SIGNED_STATUS = '5';
 const RETURN_ACTION = '-710';
+
+const SEND_OUT_ACTION = '2';
 const LIST_ROW_MAX = 200;
 const LIST_TABS = ['1', '4', '4d', '5'];
 const PALM_TRACK_CONCURRENCY = 8;
@@ -240,7 +242,7 @@ function trackingCode(value) {
 }
 
 function trackingVerdict(upstream, barcode, site) {
-    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null, ztoReturnedAt: null };
+    const out = { ztoClosed: null, ztoArrivalAt: null, ztoSignedAt: null, ztoReturnedAt: null, ztoMisplacedAt: null };
     if (!Array.isArray(upstream.result) || !trackingCode(site)) return out;
     const code = trackingCode(barcode);
     const rows = upstream.result.filter((row) => trackingCode(row?.mail?.mailNo) === code);
@@ -248,6 +250,7 @@ function trackingVerdict(upstream, barcode, site) {
     let arrival = '';
     let signed = '';
     let returned = '';
+    let sentOut = '';
     let complete = true;
     for (const track of rows[0].tracks) {
         const at = trackingStamp(track?.time);
@@ -258,6 +261,7 @@ function trackingVerdict(upstream, barcode, site) {
         if (action === '3' && at > arrival) arrival = at;
         if (action === '5' && at > signed) signed = at;
         if (action === RETURN_ACTION && at > returned) returned = at;
+        if (action === SEND_OUT_ACTION && at > sentOut) sentOut = at;
     }
     out.ztoArrivalAt = arrival || null;
     if (!complete) return out;
@@ -266,6 +270,10 @@ function trackingVerdict(upstream, barcode, site) {
         out.ztoSignedAt = signed;
     } else if (rows[0].mail.isSign === 0 && arrival && (!signed || signed < arrival)) out.ztoClosed = false;
     if (returned && returned >= arrival && out.ztoClosed !== true) out.ztoReturnedAt = returned;
+    else if (sentOut && arrival && sentOut >= arrival && out.ztoClosed !== true) {
+        out.ztoReturnedAt = sentOut;
+        out.ztoMisplacedAt = sentOut;
+    }
     return out;
 }
 
@@ -983,6 +991,7 @@ function trackEvidence(upstream, barcode, site) {
     let arrival = '';
     let signed = '';
     let returned = '';
+    let sentOut = '';
     let siteName = '';
     let siteNameAt = '';
     for (const entry of tracks) {
@@ -990,6 +999,7 @@ function trackEvidence(upstream, barcode, site) {
         if (entry.action === '3' && entry.time > arrival) arrival = entry.time;
         if (entry.action === '5' && entry.time > signed) signed = entry.time;
         if (entry.action === RETURN_ACTION && entry.time > returned) returned = entry.time;
+        if (entry.action === SEND_OUT_ACTION && entry.time > sentOut) sentOut = entry.time;
         const name = originText(entry.track.siteName).slice(0, 120);
         if (name && entry.time >= siteNameAt) {
             siteName = name;
@@ -1003,8 +1013,10 @@ function trackEvidence(upstream, barcode, site) {
     } else if (arrival && flag === 0) {
         ztoClosed = false;
     }
+    const back = returned && returned >= arrival ? returned : '';
+    const misplacedAt = !back && sentOut && arrival && sentOut >= arrival && ztoClosed !== true ? sentOut : '';
     return { kind: 'ok', tracks, ztoClosed, signedAt: ztoClosed === true ? signed : '', siteName,
-        returnedAt: returned && returned >= arrival ? returned : '' };
+        returnedAt: back || misplacedAt, misplacedAt };
 }
 
 async function palmTrackJob(barcode, session, keys, deps, tally) {
@@ -1085,6 +1097,7 @@ function trackReport(evidence, barcode, range, signedEnd) {
     }
     const signedAt = evidence.ztoClosed === true && evidence.signedAt >= range.start && evidence.signedAt <= signedEnd ? evidence.signedAt : '';
     return { barcode, arrivals, ztoClosed: evidence.ztoClosed, signedAt, returnedAt: evidence.returnedAt,
+        misplacedAt: evidence.misplacedAt,
         from: palmOrigin({}, evidence.tracks.map((entry) => ({ ...entry.track, time: entry.time }))) };
 }
 

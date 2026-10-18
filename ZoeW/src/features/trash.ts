@@ -7,16 +7,19 @@ import { barcodeEntriesOf } from '../domain/barcode';
 import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
-import { explainZtoRestoreBlock, trashRestoreBlockOf } from './zto-final-marks';
+import { explainZtoRestoreBlock, trashItemMisplaced, trashRestoreBlockOf } from './zto-final-marks';
 
 export const TRASH_PAGE_ROWS = 20;
 
 export const TRASH_REASON_META = {
     remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
     returned: { label: 'ត្រឡប់', cls: 'trash-tag-returned', deducted: true },
+    misplaced: { label: 'ខុសទីតាំង', cls: 'trash-tag-returned', deducted: true },
     pickup: { label: 'យករួច', cls: 'trash-tag-pickup', deducted: false },
     delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
 };
+
+export const TRASH_STORED_REASONS = ['remove', 'returned', 'pickup', 'delete'];
 
 export const TRASH_FILTER_META = {
     deducted: { note: 'បង្ហាញតែ ➖ ដក + ត្រឡប់', empty: 'គ្មានកញ្ចប់ «ដក» ឬ «ត្រឡប់» ក្នុងធុងសំរាមទេ' },
@@ -35,9 +38,14 @@ export function trashGroupInFilter(group, filter) {
 
 export function trashReasonOf(item) {
     if (!item) return 'delete';
-    if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason]) return item.trashReason;
+    if (TRASH_STORED_REASONS.indexOf(item.trashReason) !== -1) return item.trashReason;
     if (item.isFromDeletion) return item.isClosed ? 'pickup' : 'delete';
     return 'remove';
+}
+
+export function trashDisplayReasonOf(item) {
+    const reason = trashReasonOf(item);
+    return reason === 'returned' && trashItemMisplaced(item) ? 'misplaced' : reason;
 }
 
 export function trashItemTotals(item) {
@@ -77,7 +85,7 @@ export function buildTrashGroups(items) {
     const byKey = new Map();
     (Array.isArray(items) ? items : []).forEach((item) => {
         if (!item || !item.id) return;
-        const reason = trashReasonOf(item);
+        const reason = trashDisplayReasonOf(item);
         const key = trashGroupKeyOf(item, reason);
         let group = byKey.get(key);
         if (!group) {

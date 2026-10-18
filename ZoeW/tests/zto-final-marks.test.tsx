@@ -22,7 +22,7 @@ import {
 import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { toggleCloseStatus } from '../src/features/entry-ops';
-import { buildTrashGroups, promptRestoreDeletedItem } from '../src/features/trash';
+import { TRASH_REASON_META, buildTrashGroups, promptRestoreDeletedItem } from '../src/features/trash';
 import { executeRestoreItem } from '../src/features/restore';
 import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
@@ -149,6 +149,30 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(server[T + 't3'].barcodes[0].ztoReturnedAt).toBeUndefined();
         expect(server[H + 'h2'].barcodes[0].ztoReturnedAt).toBeUndefined();
         expect(await syncZtoFinalMarks()).toBe(0);
+    });
+
+    it('📍 ខុសទីតាំង ៖ ភស្តុតាង misplaced ➜ ztoReturnedAt + ztoMisplacedAt (ម៉ោងដដែល) · ត្រឡប់ធម្មតា ➜ គ្មាន ztoMisplacedAt · ស្លាក «ខុសទីតាំង» · 🔒', async () => {
+        seedTrash([
+            item('m1', [bc('M1')], { trashReason: 'returned', deletedAt: 9 }),
+            item('m2', [bc('M2')], { trashReason: 'returned', deletedAt: 8 })
+        ]);
+        const back = Date.now() - 60000;
+        noteZtoReturnedEvidence('M1', back, true);
+        noteZtoReturnedEvidence('M2', back);
+        expect(buildTrashGroups(dataState.deletedItems).map((g: any) => g.reason)).toEqual(['misplaced', 'returned']);
+        expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('misplaced');
+        expect(await syncZtoFinalMarks()).toBe(2);
+        expect(server[T + 'm1'].barcodes[0]).toMatchObject({ ztoReturnedAt: back, ztoMisplacedAt: back });
+        expect(server[T + 'm2'].barcodes[0].ztoReturnedAt).toBe(back);
+        expect(server[T + 'm2'].barcodes[0].ztoMisplacedAt).toBeUndefined();
+        resetZtoFinalMarks();
+        dataState.deletedItems = [server[T + 'm1'], server[T + 'm2']];
+        const groups = buildTrashGroups(dataState.deletedItems);
+        expect(groups.map((g: any) => g.reason)).toEqual(['misplaced', 'returned']);
+        expect(trashZtoFinalBlock(server[T + 'm1'])).toBe('misplaced');
+        expect(trashZtoFinalBlock(server[T + 'm2'])).toBe('returned');
+        expect(TRASH_REASON_META.misplaced).toMatchObject({ label: 'ខុសទីតាំង', deducted: true });
+        expect(applyZtoFinalMarks(item('h9', [bc('M3')]), { M3: { returned: back, misplaced: true } }, false)).toBeUndefined();
     });
 
     it('rules មិនទាន់ Publish (permission_denied) ➜ ឈប់សាកសម្រាប់ database នោះ · មិនបោះចោល · មិនប៉ះទិន្នន័យ', async () => {

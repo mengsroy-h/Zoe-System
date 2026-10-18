@@ -3,7 +3,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { shopScopePending } from '../core/shop-scope';
 import { ZTO_SIGNED_REOPEN_TEXT } from '../core/text';
-import { barcodeZtoReturned, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, trashZtoFinalBlock } from '../domain/barcode';
+import { barcodeZtoMisplaced, barcodeZtoReturned, barcodeZtoSigned, itemHasRestoreMarkers, normalizeBarcodesOf, trashZtoFinalBlock } from '../domain/barcode';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { dbOp, dbOpStalled } from '../services/network';
 import { showToast } from '../ui/toast';
@@ -25,6 +25,7 @@ export const ZTO_SIGNED_REOPEN_PART_TEXT = ' បើក barcode ដែលមិ�
 
 export const ZTO_RESTORE_BLOCK_TEXT = {
     returned: '🔒 កញ្ចប់នេះ ZTO ស្កេនត្រឡប់រួច ហើយត្រូវត្រឡប់ទៅសាខាកណ្តាល — មិនអាចស្តារបានទេ។',
+    misplaced: '🔒 កញ្ចប់នេះខុសទីតាំង ZTO ស្កេនបញ្ជូនចេញទៅទីតាំងពិតរបស់វារួច — មិនអាចស្តារបានទេ។',
     signed: '🔒 កញ្ចប់នេះ Sign ក្នុង ZTO រួច — មិនអាចស្តារបានទេ។'
 };
 
@@ -59,8 +60,22 @@ export function trashRestoreBlockOf(item) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
     if (item.trashReason === 'pickup' && barcodes.every((b) => barcodeSignedInZto(b))) return 'signed';
-    if (item.trashReason === 'returned' && barcodes.some((b) => ztoReturnedEvidence.has(pickupBarcodeKey(b.code)))) return 'returned';
+    if (item.trashReason === 'returned' && barcodes.some((b) => ztoReturnedEvidence.has(pickupBarcodeKey(b.code)))) {
+        return trashItemMisplaced(item) ? 'misplaced' : 'returned';
+    }
     return '';
+}
+
+export function barcodeMisplacedInZto(barcode) {
+    if (barcodeZtoMisplaced(barcode)) return true;
+    if (!barcode || !barcode.code || barcodeZtoReturned(barcode)) return false;
+    const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(barcode.code));
+    return !!evidence && evidence.misplaced === true;
+}
+
+export function trashItemMisplaced(item) {
+    const barcodes = item && item.trashReason === 'returned' && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
+    return barcodes.length > 0 && barcodes.every(barcodeMisplacedInZto);
 }
 
 export function explainZtoRestoreBlock(reason) {
@@ -79,11 +94,11 @@ export function pruneZtoReturnedEvidence() {
     }
 }
 
-export function noteZtoReturnedEvidence(code, at) {
+export function noteZtoReturnedEvidence(code, at, misplaced = false) {
     const key = pickupBarcodeKey(code);
     if (!key || typeof at !== 'number' || !isFinite(at) || at <= 0) return;
     ztoReturnedEvidence.delete(key);
-    ztoReturnedEvidence.set(key, { at: at });
+    ztoReturnedEvidence.set(key, { at: at, misplaced: misplaced === true });
     pruneZtoReturnedEvidence();
 }
 
@@ -103,6 +118,7 @@ export function applyZtoFinalMarks(current, wanted, trash) {
         }
         if (want.returned && trash && current.trashReason === 'returned' && !barcodeZtoReturned(b)) {
             b.ztoReturnedAt = want.returned;
+            if (want.misplaced) b.ztoMisplacedAt = want.returned;
             changed = true;
         }
     });
@@ -126,10 +142,13 @@ export function collectZtoFinalTargets() {
             item.barcodes.forEach((b) => {
                 const key = b && b.code ? pickupBarcodeKey(b.code) : '';
                 if (!key) return;
-                const want: { signed?: number; returned?: number } = {};
+                const want: { signed?: number; returned?: number; misplaced?: boolean } = {};
                 if (b.isClosed === true && !barcodeZtoSigned(b) && barcodeVerdictSigned(b)) want.signed = signedAt;
                 const evidence = trash && item.trashReason === 'returned' && !barcodeZtoReturned(b) ? ztoReturnedEvidence.get(key) : null;
-                if (evidence) want.returned = evidence.at;
+                if (evidence) {
+                    want.returned = evidence.at;
+                    if (evidence.misplaced) want.misplaced = true;
+                }
                 if (!want.signed && !want.returned) return;
                 wanted[key] = want;
                 any = true;

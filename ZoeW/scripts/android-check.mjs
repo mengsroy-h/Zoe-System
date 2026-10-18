@@ -164,6 +164,11 @@ const createBody = javaMethodBody(mainActivity, 'void onCreate(');
 const beforeSuper = createBody.slice(0, Math.max(0, createBody.indexOf('super.onCreate(')));
 ok('MainActivity ៖ registerPlugin(ApkUpdatePlugin.class) · registerPlugin(DeviceInfoPlugin.class) មុន super.onCreate (Bridge ផ្ទុក plugin ក្នុង onCreate)',
     /registerPlugin\(ApkUpdatePlugin\.class\);/.test(beforeSuper) && /registerPlugin\(DeviceInfoPlugin\.class\);/.test(beforeSuper));
+const geoUsers = listFiles('src').filter((f) => /navigator\.geolocation\b/.test(read(f)));
+ok('⛔ សិទ្ធិ ACCESS_FINE_LOCATION + ACCESS_COARSE_LOCATION ព្រោះរូប Sign មានកូអរដោនេ (WebView ស្នើតាម BridgeWebChromeClient ៖ គ្មានសិទ្ធិ ➜ geolocation បរាជ័យជានិច្ច)',
+    geoUsers.length > 0 && manifestPermissions.has('android.permission.ACCESS_FINE_LOCATION') && manifestPermissions.has('android.permission.ACCESS_COARSE_LOCATION'),
+    'ឯកសារ ' + geoUsers.length);
+ok('⛔ គ្មានសិទ្ធិទីតាំងពេលនៅខាងក្រោយ (ACCESS_BACKGROUND_LOCATION)', !manifestPermissions.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
 ok('⛔ សិទ្ធិ REQUEST_INSTALL_PACKAGES (Android 8+ ៖ បើកផ្ទាំងដំឡើង APK ពី App)', manifestPermissions.has('android.permission.REQUEST_INSTALL_PACKAGES'));
 const probeBody = javaMethodBody(apkPluginSrc, 'void probe(');
 ok('probe ៖ HEAD · មិនតាម redirect · មាន = redirect ទៅ *.githubusercontent.com (https) · 404 = គ្មាន',

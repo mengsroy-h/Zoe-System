@@ -6502,7 +6502,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
 | `phone-suggest-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
-| `pickup-barcode-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `pickup-barcode-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
 | `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |

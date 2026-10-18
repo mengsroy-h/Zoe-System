@@ -3526,6 +3526,15 @@
     "ZoeW/tests/palm-sign-camera.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/src/services/scan-formats.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-qr.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/scan-image-qr.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "audit-tools/money-multidevice-core.js": {
       "policy": "money-multidevice-harness"
     },

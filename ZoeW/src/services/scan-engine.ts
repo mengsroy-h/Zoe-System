@@ -5,15 +5,20 @@ import { elapsedSince } from '../core/elapsed';
 import { searchByPhone } from '../features/phone-suggest';
 import { triggerScanAction } from '../features/scan-action';
 import { getCoverCropRect } from './camera';
-import { showToast } from '../ui/toast';
+import { NATIVE_SCAN_QR_FORMAT_NAMES, SCAN_FORMAT_NAMES, buildReaderOptions, nativeScanResults, pickScanCode, scanQrReader } from './scan-formats';
 
-export const SCAN_FORMAT_NAMES = ['Code128'];
+export { NATIVE_SCAN_QR_FORMAT_NAMES, SCAN_FORMAT_NAMES, buildReaderOptions, nativeScanResults, pickScanCode, scanQrReader };
+import { showToast } from '../ui/toast';
 
 export const CONFIG_QR_FORMAT_NAMES = ['QRCode'];
 
 export const CONFIG_QR_SCAN_WIDTH = 640;
 
 export const NATIVE_SCAN_FORMAT_NAMES = ['code_128'];
+
+export const LIVE_SCAN_QR_EVERY = 2;
+
+export const LIVE_SCAN_QR_DIM = 960;
 
 export const LIVE_SCAN_WIDTH_STEPS = [640, 800, 1024, 1280];
 
@@ -111,15 +116,29 @@ export function scanEngineReady() {
     return typeof ZXingWASM !== 'undefined' && typeof ZXingWASM.readBarcodes === 'function';
 }
 
-export function buildReaderOptions(tryHarder, formats?) {
-    return {
-        formats: formats || SCAN_FORMAT_NAMES,
-        tryHarder: !!tryHarder,
-        tryRotate: !!tryHarder,
-        tryInvert: !!tryHarder,
-        tryDownscale: !!tryHarder,
-        maxNumberOfSymbols: 1
-    };
+export function upgradeNativeDetectorForQr() {
+    const base = scanState.nativeDetector;
+    const Detector = (globalThis as any).BarcodeDetector;
+    if (!base || typeof Detector !== 'function' || typeof Detector.getSupportedFormats !== 'function') return Promise.resolve(base || null);
+    return Promise.resolve(Detector.getSupportedFormats()).then((formats) => {
+        if (scanState.nativeDetector !== base || !Array.isArray(formats) || !NATIVE_SCAN_QR_FORMAT_NAMES.every((name) => formats.includes(name))) return scanState.nativeDetector;
+        scanState.nativeDetector = new Detector({ formats: NATIVE_SCAN_QR_FORMAT_NAMES });
+        return scanState.nativeDetector;
+    }).catch(() => scanState.nativeDetector);
+}
+
+export function decodeLiveQrFrame(videoElement, crop) {
+    if (!scanState.ownQrCanvas) {
+        scanState.ownQrCanvas = createScratchCanvas();
+        scanState.ownQrCtx = scanState.ownQrCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    const scale = Math.min(1, LIVE_SCAN_QR_DIM / Math.max(crop.sWidth || 1, crop.sHeight || 1));
+    const width = Math.max(1, Math.round(crop.sWidth * scale));
+    const height = Math.max(1, Math.round(crop.sHeight * scale));
+    if (scanState.ownQrCanvas.width !== width) scanState.ownQrCanvas.width = width;
+    if (scanState.ownQrCanvas.height !== height) scanState.ownQrCanvas.height = height;
+    scanState.ownQrCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, width, height);
+    return readCanvasSymbols(scanQrReader(false), scanState.ownQrCanvas).then(pickScanCode);
 }
 
 export function initScanEngine() {
@@ -245,13 +264,19 @@ export function startZxingVideoScan(videoElement) {
 
                 try {
                     const crop = getCoverCropRect(videoElement, container);
-                    const size = liveScanFrameSize(crop);
-                    if (scanState.ownCaptureCanvas.width !== size.width) scanState.ownCaptureCanvas.width = size.width;
-                    if (scanState.ownCaptureCanvas.height !== size.height) scanState.ownCaptureCanvas.height = size.height;
-                    scanState.ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, size.width, size.height);
+                    let decoding;
+                    if (++scanState.liveScanRound % LIVE_SCAN_QR_EVERY === 0) {
+                        decoding = decodeLiveQrFrame(videoElement, crop);
+                    } else {
+                        const size = liveScanFrameSize(crop);
+                        if (scanState.ownCaptureCanvas.width !== size.width) scanState.ownCaptureCanvas.width = size.width;
+                        if (scanState.ownCaptureCanvas.height !== size.height) scanState.ownCaptureCanvas.height = size.height;
+                        scanState.ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, size.width, size.height);
+                        decoding = decodeLiveFrame(scanState.ownCaptureCanvas);
+                    }
 
                     liveDecodeBusy = true;
-                    decodeLiveFrame(scanState.ownCaptureCanvas).then((text) => {
+                    decoding.then((text) => {
                         settleDecode();
                         const confirmed = confirmLiveScan(text);
                         if (confirmed && !uiState.isModalOpen) {

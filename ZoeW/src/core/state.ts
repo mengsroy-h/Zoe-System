@@ -204,6 +204,9 @@ export interface ScanState {
     nativeDetector: any;
     ownCaptureCanvas: any;
     ownCaptureCtx: any;
+    ownQrCanvas: any;
+    ownQrCtx: any;
+    liveScanRound: number;
     scanEngineDown: boolean;
     scanEngineFailures: number;
     scanEngineRetryTimer: any;
@@ -238,6 +241,9 @@ export const scanState = createStore<ScanState>('scanState', {
     nativeDetector: null,
     ownCaptureCanvas: null,
     ownCaptureCtx: null,
+    ownQrCanvas: null,
+    ownQrCtx: null,
+    liveScanRound: 0,
     scanEngineDown: false,
     scanEngineFailures: 0,
     scanEngineRetryTimer: null,

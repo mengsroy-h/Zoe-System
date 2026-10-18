@@ -685,6 +685,65 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         await fctx.close(); flaky.close();
     }
 
+
+    // ⛔ QR ក្នុង tab ស្កេន (សំណើម្ចាស់គម្រោង) ៖ ZXing **ពិត** + reader / អ្នកជ្រើស **ពិត** ពី app.js (`scanQrReader()` · `pickScanCode()`)
+    //    លើបុងសំយោគ ៖ QR លេខកញ្ចប់ + QR ផ្សព្វផ្សាយ (URL) ➜ លេខកញ្ចប់ · មានតែ QR ផ្សព្វផ្សាយ ➜ '' (មិនក្លាយជាកញ្ចប់) ·
+    //    ទិសផ្ទុយ ៖ reader Code128 តែមួយ (`SCAN_FORMAT_NAMES`) មិនអាន QR ទេ ➜ តេស្តវាស់ការប្រែពិត។
+    console.log('\n=== QR លើបុង (ZXing ពិត · scanQrReader · pickScanCode) ===');
+    {
+        const qrNames = ['buildReaderOptions', 'scanQrReader', 'ztoBarcodeShapeIsValid', 'pickScanCode', 'readResultText'];
+        const qrFns = qrNames.map((n) => sliceFn(src, n));
+        ok('រកឃើញ ' + qrNames.join(' · ') + ' ក្នុង app.js', qrFns.every(Boolean));
+        const qrConsts = ['SCAN_FORMAT_NAMES', 'SCAN_QR_FORMAT_NAMES', 'SCAN_QR_MAX_SYMBOLS', 'ZTO_BARCODE_RE']
+            .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
+        const qrPage = `<!doctype html><meta charset="utf-8"><body>
+<script src="/qrcode.js"></script><script src="/zxing-wasm.js"></script>
+<script>
+${qrConsts}
+${qrFns.filter(Boolean).join('\n')}
+window.__qr = { scanQrReader, pickScanCode, buildReaderOptions, readResultText };
+</script></body>`;
+        const qrServer = await serve({
+            '/': { type: 'text/html', body: qrPage },
+            '/qrcode.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/qrcode.js')) },
+            '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
+            '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')) }
+        });
+        const qctx = await browser.newContext();
+        const qpage = await qctx.newPage();
+        await qpage.goto('http://127.0.0.1:' + qrServer.address().port + '/', { waitUntil: 'load', timeout: 30000 });
+        const qr = await qpage.evaluate(async () => {
+            if (!window.__qr || typeof qrcode !== 'function') return null;
+            ZXingWASM.prepareZXingModule({ overrides: { locateFile: (f, p) => (f.endsWith('.wasm') ? './vendor/' + f : p + f) }, fireImmediately: true });
+            const OWN = '77130500000012';
+            const frame = (texts) => {
+                const c = document.createElement('canvas'); c.width = 720; c.height = 960;
+                const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+                texts.forEach((text, i) => {
+                    const q = qrcode(0, 'M'); q.addData(text); q.make();
+                    const n = q.getModuleCount(); const cell = 6; const x = 60 + i * 340; const y = 360;
+                    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(x + k * cell, y + r * cell, cell, cell);
+                });
+                return g.getImageData(0, 0, c.width, c.height);
+            };
+            const api = window.__qr;
+            const read = async (opts, img) => api.pickScanCode(await ZXingWASM.readBarcodes(img, opts));
+            const both = frame([OWN, 'https://earn.example.com/download?ref=zto-promo']);
+            const promo = frame(['https://earn.example.com/download?ref=zto-promo']);
+            return {
+                fast: await read(api.scanQrReader(false), both),
+                deep: await read(api.scanQrReader(true), both),
+                promo: await read(api.scanQrReader(true), promo),
+                code128Only: api.readResultText(await ZXingWASM.readBarcodes(both, api.buildReaderOptions(true)))
+            };
+        });
+        console.log('    ' + JSON.stringify(qr));
+        ok('ZXing ពិត ៖ QR លេខកញ្ចប់ + QR ផ្សព្វផ្សាយ ➜ reader លឿន និងស៊ីជម្រៅ ជ្រើសលេខកញ្ចប់', !!qr && qr.fast === '77130500000012' && qr.deep === '77130500000012', JSON.stringify(qr));
+        ok('⛔ ZXing ពិត ៖ មានតែ QR ផ្សព្វផ្សាយ (URL) ➜ គ្មានលេខ (មិនក្លាយជាកញ្ចប់)', !!qr && qr.promo === '', JSON.stringify(qr));
+        ok('ទិសផ្ទុយ ៖ reader Code128 តែមួយ (SCAN_FORMAT_NAMES) មិនអាន QR ➜ ការអាន QR មកពី scanQrReader ពិត', !!qr && qr.code128Only === '', JSON.stringify(qr));
+        await qctx.close(); qrServer.close();
+    }
+
     await ctx.close(); server.close(); await browser.close();
     if (REPORT) { console.log('\n(របាយការណ៍តែប៉ុណ្ណោះ)'); process.exit(0); }
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));

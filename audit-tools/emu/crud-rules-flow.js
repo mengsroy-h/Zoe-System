@@ -210,6 +210,7 @@ function makeSandbox(store, now) {
         }),
         revertRevenueLedgerDelta: (applied) => applied || null,
         revertPickupMarks: (applied) => applied || null,
+        pickupIntentTracker: () => ({ add: () => {}, note: () => {}, finish: () => {} }),
         reapplyPickupMarks: (applied) => applied || null,
         dailyPickupData: {},
         dailyCollectedData: {},

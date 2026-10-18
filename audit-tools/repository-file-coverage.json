@@ -2011,6 +2011,9 @@
     "ZoeW/tests/cleanup-journal-cap.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/pickup-interrupted-close.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/zto-signed-only-purge.test.ts": {
       "policy": "zoew-self-verification"
     },

@@ -308,6 +308,7 @@ function buildContext() {
         attachZtoShopSweepListener: () => false,
         runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
+        resumePickupIntents: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         CLEANUP_SWEEP_BATCH: 8,
         ZoeErrors: { capture: (e) => log.captures.push(e) }

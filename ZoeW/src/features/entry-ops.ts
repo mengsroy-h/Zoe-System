@@ -7,7 +7,7 @@ import { getFormattedDate } from '../core/timezone';
 import { applyBarcodeCloseState, dropStaleRestoreMarkers, itemHasRestoreMarkers, normalizeBarcodesOf, stripHistoryOnlyMarkers } from '../domain/barcode';
 import { claimCleanupTrashSlot, restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks } from '../domain/collected';
-import { addPickupIntentKeys, beginPickupIntent, collectPickupMarks, endPickupIntent, getPickupPhoneKey, markPickupBarcodes, reconstructPickupSet, releasePickupIntent } from '../domain/pickup';
+import { collectPickupMarks, getPickupPhoneKey, markPickupBarcodes, pickupIntentTracker, reconstructPickupSet } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { applyCurrentFilter } from './monthly-report';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
@@ -207,22 +207,12 @@ export async function toggleCloseStatus(id?) {
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
-    let pickupIntent = null;
-    let pickupCommit = null;
-    const finishPickupIntent = () => {
-        if (!pickupIntent) return;
-        const intent = pickupIntent;
-        pickupIntent = null;
-        if (!closeIsCurrent()) releasePickupIntent(intent);
-        else endPickupIntent(intent, pickupCommit);
-    };
+    const pickupJournal = pickupIntentTracker(closeIsCurrent);
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
-        const serverKeys = serverPickupMarks.map((mark) => mark.key);
-        if (pickupIntent) addPickupIntentKeys(pickupIntent, serverKeys);
-        else pickupIntent = beginPickupIntent(pickupScanDate, serverKeys);
+        pickupJournal.add(pickupScanDate, serverPickupMarks.map((mark) => mark.key));
         pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
-        if (pickupApplied && pickupApplied.commit) pickupCommit = pickupApplied.commit;
+        pickupJournal.note(pickupApplied);
         refreshCurrentHistoryView();
     };
     if (freshItem) {
@@ -241,9 +231,9 @@ export async function toggleCloseStatus(id?) {
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
         const localMarks = collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey);
-        pickupIntent = beginPickupIntent(pickupScanDate, localMarks.map((mark) => mark.key));
+        pickupJournal.add(pickupScanDate, localMarks.map((mark) => mark.key));
         pickupApplied = markPickupBarcodes(pickupScanDate, localMarks, pickupSeed);
-        pickupCommit = pickupApplied && pickupApplied.commit;
+        pickupJournal.note(pickupApplied);
 
         refreshCurrentHistoryView();
     }
@@ -274,20 +264,20 @@ export async function toggleCloseStatus(id?) {
         }
         if (pickupApplied) {
             const reverted = revertPickupMarks(pickupApplied);
-            if (reverted && reverted.commit) pickupCommit = reverted.commit;
+            pickupJournal.note(reverted);
             pickupApplied = null;
         }
     };
     const settleClose = async (closeResult, late) => {
-        if (!closeIsCurrent()) { finishPickupIntent(); return false; }
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (!serverApplied || !(closeResult && closeResult.committed)) {
             revertCloseLocally();
-            finishPickupIntent();
+            pickupJournal.finish();
             showToast('⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
             return false;
         }
         reconcilePickupDeltaWithServer();
-        finishPickupIntent();
+        pickupJournal.finish();
         const collectedSaved = await reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
         if (collectedSaved === true) showToast(late
@@ -323,11 +313,11 @@ export async function toggleCloseStatus(id?) {
         });
         return settleClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) { finishPickupIntent(); return false; }
+        if (!closeIsCurrent()) { pickupJournal.finish(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) { finishPickupIntent(); return; }
+            if (!closeIsCurrent()) { pickupJournal.finish(); return; }
             revertCloseLocally();
-            finishPickupIntent();
+            pickupJournal.finish();
             showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
         }, 'toggleCloseStatus')) {
@@ -337,7 +327,7 @@ export async function toggleCloseStatus(id?) {
         console.error("Error toggling close status: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
         revertCloseLocally();
-        finishPickupIntent();
+        pickupJournal.finish();
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

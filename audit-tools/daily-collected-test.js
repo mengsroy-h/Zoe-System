@@ -459,6 +459,8 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         showToast: message => messages.push(message), refreshCurrentHistoryView() {}, closeModal() {},
         updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
         generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })(),
+        // journal ស្ថិតិយករួច (`zoew_pickup_journal_v1`) មាន test ផ្ទាល់ខ្លួន (`pickup-interrupted-close`) ➜ នៅទីនេះឥតប្រសិទ្ធិភាព
+        pickupIntentTracker: () => ({ add() {}, note() {}, finish() {} }),
         // ⛔ `dbOp` ពិតហៅវាពេលព្យួរ ➜ stub «មិនវាស់» (ការវាស់ភាពរស់ពិតរស់ក្នុង `emu/app-network-e2e-test`)
         probeDatabaseLiveness: () => Promise.resolve(null)
     });

@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { scanState } from '../src/core/state';
-import { PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, palmSignDecodeImage, palmSignPickCode, startPalmSignCamera } from '../src/services/palm-sign-camera';
+import { PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, palmSignDecodeImage, palmSignNativeDetector, palmSignPickCode, startPalmSignCamera } from '../src/services/palm-sign-camera';
 import { readCanvasSymbols } from '../src/services/scan-engine';
 import { attachPalmSignStream, videoElement } from '../src/app/refs';
 import { noteAppLockExcuse } from '../src/features/app-lock';
@@ -115,4 +115,28 @@ it('រូបពី Gallery ៖ អានជាមួយរូបធំ (≤ ' +
     vi.mocked(readCanvasSymbols).mockImplementation(async (_o, canvas: any) => { sizes.push(Math.max(canvas.width, canvas.height)); return []; });
     expect((await palmSignDecodeImage({ naturalWidth: 1200, naturalHeight: 900 } as any, known)).code).toBe('');
     expect(sizes).toEqual([1200]);
+});
+it('Android (BarcodeDetector) ៖ Sign សួរ code_128 + qr_code ពេលប្រព័ន្ធគាំទ្រ ➜ QR លេខកញ្ចប់ទទួល · QR ផ្សេងមិនរាប់', async () => {
+    const formats: string[][] = [];
+    const detect = vi.fn(async () => [{ format: 'qr_code', rawValue: 'https://earn.example/app' }, { format: 'qr_code', rawValue: OWN }]);
+    class FakeDetector {
+        static getSupportedFormats = async () => ['code_128', 'qr_code', 'ean_13'];
+        constructor(opts: { formats: string[] }) { formats.push(opts.formats); }
+        detect = detect;
+    }
+    vi.stubGlobal('BarcodeDetector', FakeDetector);
+    scanState.nativeDetector = { detect: vi.fn(async () => []) };
+    const onScan = vi.fn();
+    const close = startPalmSignCamera(onScan, vi.fn(), () => true, known);
+    await vi.waitFor(() => expect(onScan).toHaveBeenCalledWith(OWN, 'frame-1'));
+    close();
+    expect(formats).toEqual([['code_128', 'qr_code']]);
+    expect(readCanvasSymbols).not.toHaveBeenCalled();
+});
+it('Android ប្រព័ន្ធមិនគាំទ្រ qr_code ➜ ប្រើ detector Code128 ដើម (ZXing នៅជួយ QR)', async () => {
+    class OldDetector { static getSupportedFormats = async () => ['code_128']; constructor() { throw new Error('must not build'); } }
+    vi.stubGlobal('BarcodeDetector', OldDetector);
+    const base = { detect: vi.fn(async () => []) };
+    scanState.nativeDetector = base;
+    expect(await palmSignNativeDetector()).toBe(base);
 });

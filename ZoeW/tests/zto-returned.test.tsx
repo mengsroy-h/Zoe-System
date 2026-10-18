@@ -11,6 +11,7 @@ import { viewState } from '../src/core/view-state';
 import { appLocalStore } from '../src/core/storage';
 import { clearCustomerDataTableCache } from '../src/features/customer-table';
 import { classifyZtoListRows, fetchZtoListAllPages, noteZtoListSignedCodes, renderZtoListSyncPreview } from '../src/features/zto-list-sync';
+import { ztoReturnedKindOf } from '../src/features/zto-returned';
 
 const req = createRequire(import.meta.url);
 const fn = req('../netlify/functions/zto-order-detail.js');
@@ -177,7 +178,7 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(ret.rows[0].notes.join(' ')).toContain(dk(1) + ' 09:00:00');
         expect(ret.rows[0].notes.join(' ')).toContain('ធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់)');
         expect(String(viewState.ztoListSyncNote)).toContain('↩️ ស្កេនត្រឡប់រួច 1 ➜ រំលង');
-        expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW 1 (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
+        expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកចេញពី ZoeW 1 (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
     });
 });
 
@@ -227,14 +228,20 @@ describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (ស្�
         if (fn.resetCachesForTests) fn.resetCachesForTests();
         const noProblem: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
         expect(noProblem.sentState, 'បញ្ជី 30 ធ្លាក់ ➜ ⚠️ មិនគ្រប់').toBe('partial');
-        expect(noProblem.returned).toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true }]);
+        expect(noProblem.returned, 'មិនដឹងថាមានស្កេនបញ្ហាឬអត់ ➜ `sentUnverified` (គ្មានត្រា «បញ្ជូនចេញ»)')
+            .toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true, sentUnverified: true }]);
+        expect(ztoReturnedKindOf(noProblem.returned[0])).toBe('left');
+        expect(ztoReturnedKindOf({ ...noProblem.returned[0], sentUnverified: undefined })).toBe('sent');
         failType = '';
         process.env.ZTO_LIST_PROBLEM_SCAN_TYPE = 'off';
         if (fn.resetCachesForTests) fn.resetCachesForTests();
         upstream.length = 0;
         const problemOff: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
         expect(problemOff.sentState).toBe('ok');
-        expect(problemOff.returned).toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true }]);
+        expect(problemOff.returned).toEqual([{ barcode: 'ZTMIS0000001', at: dk(1) + ' 13:00:00', sentOut: true, sentUnverified: true }]);
+        const view: any = classifyZtoListRows([{ barcode: 'ZTMIS0000001', phone: '012000111', cod: 1, dod: 0, at: dk(1) + ' 08:00:00' }], [], [], [],
+            { from: dk(3), to: dk(1), returned: problemOff.returned });
+        expect([view.returned[0].sentOut, view.returned[0].sentUnverified]).toEqual([true, true]);
         expect(upstream.some((c) => c.startsWith('30 ')), '`off` ➜ គ្មានសំណើ 30').toBe(false);
     });
 

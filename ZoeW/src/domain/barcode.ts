@@ -130,10 +130,15 @@ export function barcodeZtoMisplaced(barcode) {
     return !!barcode && typeof barcode.ztoMisplacedAt === 'number' && barcode.ztoMisplacedAt > 0;
 }
 
+export function barcodeZtoSentOut(barcode) {
+    if (!barcode || typeof barcode.ztoSentOutAt !== 'number' || !(barcode.ztoSentOutAt > 0)) return false;
+    return !(typeof barcode.restoredAt === 'number' && barcode.restoredAt > barcode.ztoSentOutAt);
+}
+
 export function trashZtoFinalBlock(item) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
-    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b))) return 'returned';
+    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b) && !barcodeZtoSentOut(b))) return 'returned';
     if (item.trashReason === 'pickup' && barcodes.every(barcodeZtoSigned)) return 'signed';
     return '';
 }

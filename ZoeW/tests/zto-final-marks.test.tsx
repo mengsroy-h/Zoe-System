@@ -17,7 +17,7 @@ import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text
 import { barcodeZtoReturned, barcodeZtoSigned, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
     ZTO_FINAL_REFUSED_RETRY_MS, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
-    syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused
+    syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused, ztoSentOutRefused
 } from '../src/features/zto-final-marks';
 import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
@@ -175,7 +175,7 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(applyZtoFinalMarks(item('h9', [bc('M3')]), { M3: { returned: back, misplaced: true } }, false)).toBeUndefined();
     });
 
-    it('📤 បញ្ជូនចេញ (គ្មាន «ទីតាំងមិនត្រឹមត្រូវ») ៖ គ្មានត្រាសរសេរ · ស្លាក «ត្រឡប់» · ស្តារបាន (មិនមែន -710) · ធាតុចម្រុះជាមួយ -710 ➜ 🔒', async () => {
+    it('📤 បញ្ជូនចេញ (គ្មាន «ទីតាំងមិនត្រឹមត្រូវ») ៖ ztoSentOutAt តែម្យ៉ាង (គ្មាន ztoReturnedAt) · ស្លាក «បញ្ជូនចេញ» លើគ្រប់ឧបករណ៍ · ស្តារបាន · ធាតុចម្រុះជាមួយ -710 ➜ 🔒', async () => {
         seedTrash([
             item('s1', [bc('S1')], { trashReason: 'returned', deletedAt: 9 }),
             item('s2', [bc('S2'), bc('R9')], { trashReason: 'returned', deletedAt: 8 })
@@ -184,15 +184,103 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         noteZtoReturnedEvidence('S1', back, 'sent');
         noteZtoReturnedEvidence('S2', back, 'sent');
         noteZtoReturnedEvidence('R9', back);
-        expect(buildTrashGroups([dataState.deletedItems[0]]).map((g: any) => g.reason)).toEqual(['returned']);
+        expect(buildTrashGroups([dataState.deletedItems[0]]).map((g: any) => g.reason)).toEqual(['sent']);
         expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
         expect(trashRestoreBlockOf(dataState.deletedItems[1])).toBe('returned');
-        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(await syncZtoFinalMarks()).toBe(2);
+        expect(server[T + 's1'].barcodes[0]).toMatchObject({ ztoSentOutAt: back });
         expect(server[T + 's1'].barcodes[0].ztoReturnedAt).toBeUndefined();
         expect(server[T + 's1'].barcodes[0].ztoMisplacedAt).toBeUndefined();
-        expect(server[T + 's2'].barcodes.map((b: any) => [b.code, b.ztoReturnedAt, b.ztoMisplacedAt])).toEqual([['S2', undefined, undefined], ['R9', back, undefined]]);
+        expect(server[T + 's2'].barcodes.map((b: any) => [b.code, b.ztoReturnedAt, b.ztoMisplacedAt, b.ztoSentOutAt]))
+            .toEqual([['S2', undefined, undefined, back], ['R9', back, undefined, undefined]]);
+        expect(await syncZtoFinalMarks(), 'ត្រារួច ➜ មិនសរសេរម្តងទៀត').toBe(0);
         resetZtoFinalMarks();
-        expect(trashRestoreBlockOf(server[T + 's1']), 'ឧបករណ៍ផ្សេង (គ្មានភស្តុតាងក្នុងឧបករណ៍) ៖ ស្តារបាន').toBe('');
+        dataState.deletedItems = [server[T + 's1'], server[T + 's2']];
+        expect(buildTrashGroups([server[T + 's1']]).map((g: any) => g.reason), 'ឧបករណ៍ផ្សេង (គ្មានភស្តុតាង) ៖ ស្លាកពី DB').toEqual(['sent']);
+        expect(trashRestoreBlockOf(server[T + 's1']), 'ឧបករណ៍ផ្សេង ៖ ស្តារបាន').toBe('');
+        expect(trashZtoFinalBlock(server[T + 's1'])).toBe('');
+        expect(trashRestoreBlockOf(server[T + 's2']), 'ធាតុចម្រុះ ៖ -710 នៅ 🔒').toBe('returned');
+        expect(TRASH_REASON_META.sent).toMatchObject({ label: 'បញ្ជូនចេញ', deducted: true });
+        expect(applyZtoFinalMarks(item('h8', [bc('S3')]), { S3: { sentOut: back } }, false), 'ប្រវត្តិ ៖ មិនកត់').toBeUndefined();
+        expect(applyZtoFinalMarks(item('t8', [bc('S3')], { trashReason: 'remove' }), { S3: { sentOut: back } }, true), 'ធុងសំរាម «ដក» ៖ មិនកត់').toBeUndefined();
+    });
+
+    it('📤 App ចាស់កត់ «ខុសទីតាំង» លើការបញ្ជូនចេញ (ztoReturnedAt + ztoMisplacedAt) ➜ ភស្តុតាង «បញ្ជូនចេញ» កត់ ztoSentOutAt ➜ «បញ្ជូនចេញ» លើគ្រប់ឧបករណ៍', async () => {
+        const back = Date.now() - 60000;
+        seedTrash([item('o1', [bc('O1', { ztoReturnedAt: back, ztoMisplacedAt: back })], { trashReason: 'returned', deletedAt: 9 })]);
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason, 'លក្ខខណ្ឌ ៖ ត្រា App ចាស់ ➜ «ខុសទីតាំង»').toBe('misplaced');
+        noteZtoReturnedEvidence('O1', back, 'sent');
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason, 'ឧបករណ៍នេះ ៖ ភស្តុតាងឈ្នះ').toBe('sent');
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 'o1'].barcodes[0]).toMatchObject({ ztoReturnedAt: back, ztoMisplacedAt: back, ztoSentOutAt: back });
+        resetZtoFinalMarks();
+        expect(buildTrashGroups([server[T + 'o1']])[0].reason, 'ឧបករណ៍ផ្សេង ៖ ztoSentOutAt ឈ្នះត្រា «ខុសទីតាំង»').toBe('sent');
+        expect(trashRestoreBlockOf(server[T + 'o1'])).toBe('');
+    });
+
+    it('📤 APK ចាស់ ៖ rules ចាស់បដិសេធ ztoMisplacedAt ➜ ztoReturnedAt តែម្យ៉ាងលើការបញ្ជូនចេញ ➜ ztoSentOutAt ដោះ 🔒 (ស្តារបាន · «បញ្ជូនចេញ»)', async () => {
+        const back = Date.now() - 60000;
+        seedTrash([item('o2', [bc('O2', { ztoReturnedAt: back })], { trashReason: 'returned', deletedAt: 9 })]);
+        expect(trashRestoreBlockOf(dataState.deletedItems[0]), 'លក្ខខណ្ឌ ៖ ztoReturnedAt តែម្យ៉ាង ➜ 🔒').toBe('returned');
+        noteZtoReturnedEvidence('O2', back, 'sent');
+        expect(await syncZtoFinalMarks()).toBe(1);
+        resetZtoFinalMarks();
+        expect(trashZtoFinalBlock(server[T + 'o2'])).toBe('');
+        expect(trashRestoreBlockOf(server[T + 'o2'])).toBe('');
+        expect(buildTrashGroups([server[T + 'o2']])[0].reason).toBe('sent');
+    });
+
+    it('📤 ត្រាដែល App ចាស់យកតាមការស្តារ (`restoredAt` ក្រោយ ztoSentOutAt) ➜ មិនរាប់ ➜ «ត្រឡប់» ៨ ថ្ងៃ · ការបញ្ជូនចេញថ្មី ➜ ត្រាថ្មីជំនួស', async () => {
+        const old = Date.now() - 3 * 3600000;
+        seedTrash([item('c1', [bc('C1', { ztoSentOutAt: old, restoredAt: old + 60000 })], { trashReason: 'returned', deletedAt: 9 })]);
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason).toBe('returned');
+        const fresh = Date.now() - 60000;
+        noteZtoReturnedEvidence('C1', fresh, 'sent');
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 'c1'].barcodes[0].ztoSentOutAt).toBe(fresh);
+        resetZtoFinalMarks();
+        expect(buildTrashGroups([server[T + 'c1']])[0].reason).toBe('sent');
+    });
+
+    it('📤 ភស្តុតាង «បញ្ជូនចេញ» មិនទាន់ពិនិត្យស្កេនបញ្ហា (`left` ៖ បញ្ជី 30 អានមិនបាន ឬ off) ➜ គ្មានត្រា · ស្លាក «ត្រឡប់» · ស្តារបាន', async () => {
+        seedTrash([item('l1', [bc('L1')], { trashReason: 'returned', deletedAt: 9 })]);
+        noteZtoReturnedEvidence('L1', Date.now() - 60000, 'left');
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason).toBe('returned');
+        expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
+        expect(await syncZtoFinalMarks()).toBe(0);
+        expect(txPaths).toEqual([]);
+        expect(server[T + 'l1'].barcodes[0]).toEqual(bc('L1'));
+    });
+
+    it('📤 rules មិនទាន់មាន `ztoSentOutAt` ➜ មិនរារាំងត្រាផ្សេង (Sign · ត្រឡប់) · ស្លាកនៅតាមភស្តុតាង · សាកម្តងទៀតក្រោយ Publish', async () => {
+        seedHistory([item('hs', [bc('P2', { isClosed: true, closedAt: 5 })])]);
+        seedTrash([item('so', [bc('SO1')], { trashReason: 'returned', deletedAt: 9 }), item('sr', [bc('SR1')], { trashReason: 'returned', deletedAt: 8 })]);
+        const real = firebaseState.fb.runTransaction;
+        let published = false;
+        firebaseState.fb.runTransaction = async (ref: any, fn: (cur: any) => any) => {
+            const cur = server[ref.path] === undefined ? null : JSON.parse(JSON.stringify(server[ref.path]));
+            const next = fn(cur);
+            if (!published && next && JSON.stringify(next).includes('ztoSentOutAt')) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            return real(ref, fn);
+        };
+        const back = Date.now() - 60000;
+        setZtoPickupVerdict('P2', true);
+        noteZtoReturnedEvidence('SO1', back, 'sent');
+        noteZtoReturnedEvidence('SR1', back);
+        expect(await syncZtoFinalMarks()).toBe(2);
+        expect(ztoState.ztoFinalRefusedDb, 'មិនឈប់ត្រាទាំងអស់').toBeNull();
+        expect(server[H + 'hs'].barcodes[0].ztoSignedAt).toBeGreaterThan(0);
+        expect(server[T + 'sr'].barcodes[0].ztoReturnedAt).toBe(back);
+        expect(server[T + 'so'].barcodes[0].ztoSentOutAt).toBeUndefined();
+        dataState.deletedItems = [server[T + 'so']];
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason, 'ភស្តុតាងក្នុងឧបករណ៍រក្សាស្លាក').toBe('sent');
+        expect(await syncZtoFinalMarks(), 'ក្នុងរយៈ ZTO_FINAL_REFUSED_RETRY_MS ៖ មិនសាក').toBe(0);
+        published = true;
+        ztoSentOutRefused.at = Date.now() - ZTO_FINAL_REFUSED_RETRY_MS - 1;
+        ztoFinalFailedAt.clear();
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 'so'].barcodes[0].ztoSentOutAt).toBe(back);
+        firebaseState.fb.runTransaction = real;
     });
 
     it('📍 rules មិនទាន់មាន `ztoMisplacedAt` ➜ ការកត់ត្រឡប់ (`ztoReturnedAt` · 🔒) នៅចូល · ស្លាកខុសទីតាំងសាកម្តងទៀតក្រោយ Publish', async () => {
@@ -222,6 +310,16 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(server[T + 'mr'].barcodes[0]).toMatchObject({ ztoReturnedAt: back, ztoMisplacedAt: back });
         expect(trashZtoFinalBlock(server[T + 'mr'])).toBe('');
         firebaseState.fb.runTransaction = real;
+    });
+
+    it('📤 rules ចាស់ណាស់ (បដិសេធគ្រប់ត្រា) ➜ ធាតុដែលចង់តែ ztoSentOutAt មិនរារាំងការឈប់សាក ៣០ នាទីសម្រាប់ database នោះ', async () => {
+        seedHistory([item('hz', [bc('P3', { isClosed: true, closedAt: 5 })])]);
+        seedTrash([item('sz', [bc('SZ1')], { trashReason: 'returned', deletedAt: 9 })]);
+        setZtoPickupVerdict('P3', true);
+        noteZtoReturnedEvidence('SZ1', Date.now() - 60000, 'sent');
+        reject = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
+        expect(await syncZtoFinalMarks()).toBe(0);
+        expect(ztoState.ztoFinalRefusedDb).toBe(firebaseState.db);
     });
 
     it('rules មិនទាន់ Publish (permission_denied) ➜ ឈប់សាកសម្រាប់ database នោះ · មិនបោះចោល · មិនប៉ះទិន្នន័យ', async () => {

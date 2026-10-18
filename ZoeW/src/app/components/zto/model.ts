@@ -1,5 +1,5 @@
 import { originLabel } from '../../../features/barcode-origin';
-import { ZTO_LIST_PREVIEW_ROWS, ztoListSkipText } from '../../../features/zto-list-sync';
+import { ZTO_LIST_PREVIEW_ROWS, ztoListSkipText, ztoListTrashLabel } from '../../../features/zto-list-sync';
 import type { ZtoListGroup } from './ZtoListSyncBody';
 
 export function ztoListGroupModel(title: string, rows: any[], tone: string): ZtoListGroup {
@@ -25,7 +25,7 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
                     row.returnedAt ? (row.misplaced ? '📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ ៖ '
                         : (row.sentOut ? '📤 ZTO ស្កេនបញ្ជូនចេញ ៖ ' : '↩️ ZTO ត្រឡប់ស្កេន ៖ ')) + row.returnedAt : '',
-                    row.removeInZoew === true ? '🗑️ បើកក្នុង ZoeW ➜ ធុងសំរាម «' + (row.misplaced ? 'ខុសទីតាំង' : 'ត្រឡប់') + '» (ដកលុយ និងចំនួនកញ្ចប់)' : '',
+                    row.removeInZoew === true ? '🗑️ បើកក្នុង ZoeW ➜ ធុងសំរាម «' + ztoListTrashLabel(row) + '» (ដកលុយ និងចំនួនកញ្ចប់)' : '',
                     row.removeHeld === 'switch' ? '📌 បើកក្នុង ZoeW · «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ ➜ មិនដក' : '',
                     row.removeHeld === 'signed' ? '📌 បើកក្នុង ZoeW · អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)' : '',
                     ztoListSkipText(row.skip)].filter(Boolean)

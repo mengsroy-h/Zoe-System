@@ -353,16 +353,20 @@ export function ztoOldestOpenStamp(dataToScan) {
     return oldest;
 }
 
+export function ztoOpenSinceDay(oldestOpenAt, from) {
+    if (!(oldestOpenAt > 0)) return from;
+    const oldest = getZoneDateKey(oldestOpenAt, 0);
+    const floor = getZoneDateKey(getServerNow(), -ZTO_SIGNED_SWEEP_MAX_DAYS);
+    const day = oldest > floor ? oldest : floor;
+    return day < from ? day : from;
+}
+
 export function ztoSignedSweepRange(oldestOpenAt?, pendingOnly?) {
     const now = getServerNow();
     const recent = !!pendingOnly || (ztoState.ztoSignedSweepOkAt
         && elapsedSince(ztoState.ztoSignedSweepOkAt) < ZTO_SIGNED_SWEEP_RECENT_MS);
     let from = getZoneDateKey(now, recent ? -1 : -ZTO_SIGNED_SWEEP_LOOKBACK_DAYS);
-    if (!recent && oldestOpenAt > 0) {
-        const oldest = getZoneDateKey(oldestOpenAt, 0);
-        const floor = getZoneDateKey(now, -ZTO_SIGNED_SWEEP_MAX_DAYS);
-        if (oldest < from) from = oldest > floor ? oldest : floor;
-    }
+    if (!recent) from = ztoOpenSinceDay(oldestOpenAt, from);
     const mismatchFrom = ztoState.ztoSignedMismatchFrom;
     if (!pendingOnly && mismatchFrom && mismatchFrom < from && elapsedSince(ztoState.ztoSignedMismatchWideAt) >= ZTO_SIGNED_FRESH_MS) from = mismatchFrom;
     return { from: from, to: getZoneDateKey(now, 0) };
@@ -808,8 +812,9 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (signed.closed || signed.flipped) renderZtoSyncViews(dataToScan, trashToScan);
             if (signed.signedCodes && signedEntries.length && !lookupApiIsPalm(cfg) && ztoStatusNetworkAllowed(force) && elapsedSince(ztoState.ztoReturnedSweepAt) >= ZTO_OPEN_RECHECK_MS) {
                 ztoState.ztoReturnedSweepAt = Date.now();
-                const range = ztoSignedSweepRange(ztoOldestOpenStamp(dataToScan));
-                const back = await fetchZtoReturnedPages(cfg, range.from, range.to);
+                const oldestOpen = ztoOldestOpenStamp(dataToScan);
+                const range = ztoSignedSweepRange(oldestOpen);
+                const back = await fetchZtoReturnedPages(cfg, range.from, range.to, ztoOpenSinceDay(oldestOpen, range.from));
                 if (!session.current()) return 0;
                 removeReturnedZtoBarcodes(back.returned, dataToScan, signed.signedCodes);
             }

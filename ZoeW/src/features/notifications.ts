@@ -39,6 +39,7 @@ export interface NotifyRemovedRow {
     hoursAgo: number;
     isNew: boolean;
     misplaced: boolean;
+    sentOut: boolean;
 }
 
 export interface NotifyRemovedView {
@@ -219,7 +220,8 @@ export function removedParcelsView(deleted, now, stale, seen): NotifyRemovedView
         packages += count;
         if (isNew) unseen += count;
         phones.add(phone);
-        rows.push({ key, phone, locker, count, at, isNew, misplaced: trashDisplayReasonOf(item) === 'misplaced', hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
+        const shown = trashDisplayReasonOf(item);
+        rows.push({ key, phone, locker, count, at, isNew, misplaced: shown === 'misplaced', sentOut: shown === 'sent', hoursAgo: at > 0 ? Math.max(0, Math.floor((now - at) / NOTIFY_HOUR_MS)) : -1 });
     }
     rows.sort((a, b) => b.at - a.at || b.count - a.count);
     return {

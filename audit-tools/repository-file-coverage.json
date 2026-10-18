@@ -3505,6 +3505,9 @@
     "supabase/migrations/20261018084522_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261018144557_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
     "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {
       "policy": "zoew-self-verification"
     },

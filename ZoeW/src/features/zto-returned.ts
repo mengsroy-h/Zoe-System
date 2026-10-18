@@ -10,7 +10,8 @@ import { ztoAutoCloseEnabled, ztoStatusFeatureConfig } from './zto-status';
 
 export function ztoReturnedKindOf(entry) {
     if (entry && entry.misplaced === true) return 'misplaced';
-    return entry && entry.sentOut === true ? 'sent' : 'returned';
+    if (!entry || entry.sentOut !== true) return 'returned';
+    return entry.sentUnverified === true ? 'left' : 'sent';
 }
 
 export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory, signedCodes?) {
@@ -18,6 +19,7 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
     const backAt = new Map();
     const kindOf = new Map();
     const problemAt = new Map();
+    const unverified = new Set();
     const list = Array.isArray(returned) ? returned : [];
     for (let i = 0; i < list.length; i++) {
         const entry = list[i];
@@ -28,6 +30,8 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         backAt.set(key, at);
         kindOf.set(key, ztoReturnedKindOf(entry));
         problemAt.set(key, typeof entry.problemAt === 'string' ? ztoScanStampMillis(entry.problemAt) : 0);
+        if (entry.sentUnverified === true) unverified.add(key);
+        else unverified.delete(key);
     }
     const out = [];
     if (!backAt.size || !Array.isArray(dataToScan)) return out;
@@ -44,9 +48,11 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
             if (!barcodeReturnCounts(b, item.createdAt, at)) continue;
             codes.push(b.code);
             returnedAt.set(b.code, at);
-            const kind = kindOf.get(pickupBarcodeKey(b.code));
-            const wrongPlace = problemAt.get(pickupBarcodeKey(b.code));
-            kinds.set(b.code, kind === 'misplaced' && wrongPlace && !barcodeReturnCounts(b, item.createdAt, wrongPlace) ? 'sent' : kind);
+            const key = pickupBarcodeKey(b.code);
+            const kind = kindOf.get(key);
+            const wrongPlace = problemAt.get(key);
+            const earlier = kind === 'misplaced' && wrongPlace && !barcodeReturnCounts(b, item.createdAt, wrongPlace);
+            kinds.set(b.code, earlier ? (unverified.has(key) ? 'left' : 'sent') : kind);
         }
         if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt, kinds });
     }

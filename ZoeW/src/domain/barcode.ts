@@ -126,10 +126,14 @@ export function barcodeZtoReturned(barcode) {
     return !!barcode && typeof barcode.ztoReturnedAt === 'number' && barcode.ztoReturnedAt > 0;
 }
 
+export function barcodeZtoMisplaced(barcode) {
+    return !!barcode && typeof barcode.ztoMisplacedAt === 'number' && barcode.ztoMisplacedAt > 0;
+}
+
 export function trashZtoFinalBlock(item) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
-    if (item.trashReason === 'returned' && barcodes.some(barcodeZtoReturned)) return 'returned';
+    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b))) return 'returned';
     if (item.trashReason === 'pickup' && barcodes.every(barcodeZtoSigned)) return 'signed';
     return '';
 }

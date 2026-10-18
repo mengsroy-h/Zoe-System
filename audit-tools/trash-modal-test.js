@@ -225,7 +225,8 @@ const ctx = {
     Map, Set, Math, JSON, Number, String, Array, Object, parseFloat, isNaN,
     document: { getElementById: () => null },
     sanitizeInput: (v) => String(v === undefined || v === null ? '' : v),
-    exchangeRateRiel: 4100
+    exchangeRateRiel: 4100,
+    ztoReturnedEvidence: new Map()
 };
 vm.createContext(ctx);
 // ⛔ ZoeW ជា React ៖ `renderTrashSummary()` សរសេរ `uiState.trashSummary` (view model) ហើយ `TrashSummaryBox.tsx` គូរ
@@ -236,6 +237,12 @@ vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
  sliceFn(src, 'trashItemTotals'),
  sliceFn(src, 'trashItemCodes'),
  sliceFn(src, 'trashGroupKeyOf'),
+ sliceFn(src, 'barcodeRegistryKey'),
+ sliceFn(src, 'pickupBarcodeKey'),
+ sliceFn(src, 'barcodeZtoMisplaced'),
+ sliceFn(src, 'barcodeMisplacedInZto'),
+ sliceFn(src, 'trashItemMisplaced'),
+ sliceFn(src, 'trashDisplayReasonOf'),
  sliceFn(src, 'buildTrashGroups'),
  sliceFn(src, 'trashGroupMatchesQuery'),
  sliceConst(src, 'TRASH_FILTER_META'),
@@ -265,12 +272,26 @@ const CLASSIFY = [
     { item: { trashReason: 'nonsense', isFromDeletion: true }, want: 'delete', why: 'តម្លៃមិនស្គាល់ ➜ ថយទៅ fallback' },
     { item: { isFromDeletion: true, isClosed: true }, want: 'pickup', why: 'legacy បិទរួច' },
     { item: { isFromDeletion: true, isClosed: false }, want: 'delete', why: 'legacy លុប' },
-    { item: { isFromDeletion: false }, want: 'remove', why: 'legacy ដក' }
+    { item: { isFromDeletion: false }, want: 'remove', why: 'legacy ដក' },
+    { item: { trashReason: 'misplaced', isFromDeletion: false }, want: 'remove', why: '`misplaced` ជាស្លាកបង្ហាញ មិនមែនតម្លៃក្នុង DB' }
 ];
 CLASSIFY.forEach((c) => {
     const got = ctx.trashReasonOf(c.item);
     ok(got === c.want, 'trashReasonOf ➜ ' + c.want + (c.why ? ' (' + c.why + ')' : ''), got);
 });
+
+// 📍 ខុសទីតាំង (សំណើម្ចាស់គម្រោង) ៖ តម្លៃ DB នៅ `returned` (លុយ · រក្សាទុក ២ ថ្ងៃ ដូចត្រឡប់) · ស្លាក/ក្រុមដាច់ពី `ztoMisplacedAt`
+{
+    const mis = { id: 'm1', phone: '012', scanDate: '2026-10-18', time: '1', trashReason: 'returned', isFromDeletion: false,
+        barcodes: [{ code: 'ZTMIS0000001', cod: 2, dod: 0, isDeducted: true, ztoReturnedAt: 5, ztoMisplacedAt: 5 }] };
+    const ret = Object.assign({}, mis, { id: 'r1', barcodes: [{ code: 'ZTRET0000001', cod: 3, dod: 0, isDeducted: true, ztoReturnedAt: 5 }] });
+    const groups = ctx.buildTrashGroups([mis, ret]);
+    const reasons = groups.map((g) => g.reason).sort().join(',');
+    ok(reasons === 'misplaced,returned', '📍 ធាតុមាន ztoMisplacedAt ➜ ក្រុម «ខុសទីតាំង» ដាច់ពី «ត្រឡប់» (ទោះទូរស័ព្ទ/ថ្ងៃ/ម៉ោងដូចគ្នា)', reasons);
+    ok(ctx.trashReasonOf(mis) === 'returned', '📍 trashReasonOf នៅ `returned` (លុយ · retention មិនប្រែ)', ctx.trashReasonOf(mis));
+    const metaMis = META && META.misplaced;
+    ok(!!metaMis && metaMis.label === 'ខុសទីតាំង' && metaMis.deducted === true, '📍 ស្លាក «ខុសទីតាំង» · ក្រុមលុយ «ដក»', JSON.stringify(metaMis));
+}
 
 // **ចំណុចសំខាន់បំផុត**៖ ក្រុមលុយត្រូវត្រូវនឹងអ្វីដែលកូដចំណូលពិតធ្វើ
 ok(META.remove.deducted === true && !!META.returned && META.returned.deducted === true,

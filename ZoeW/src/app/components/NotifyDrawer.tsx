@@ -138,7 +138,7 @@ function removedRow(row: NotifyRemovedRow) {
         <>
             <span className="notify-expiry-phone">{row.phone || '—'}</span>
             <span className="notify-expiry-meta">
-                {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+                {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}{row.misplaced ? ' · 📍 ខុសទីតាំង' : ''}
             </span>
             <span className="notify-expiry-left">
                 {removedAgoText(row.hoursAgo)}

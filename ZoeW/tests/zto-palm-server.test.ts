@@ -183,6 +183,34 @@ describe('Palm login and lookup through the real Netlify handler', () => {
         expect(JSON.parse(res.body)).toMatchObject({ found: true, ztoClosed: false, ztoReturnedAt: returnedAt });
     });
 
+    it.each([
+        ['ខុសទីតាំង (លំដាប់ពិតរបស់ម្ចាស់គម្រោង ៖ 3 ➜ 4 ➜ -582 «ទីតាំងមិនត្រឹមត្រូវ» ➜ 2 ផ្ញើទៅទីតាំងពិត)', [['1', 'PP10', '2026-10-17 16:16:23'],
+            ['2', 'PP10', '2026-10-17 16:16:33'], ['3', 'KH001', '2026-10-18 13:25:26'], ['4', 'KH001', '2026-10-18 13:33:04'],
+            ['-582', 'KH001', '2026-10-18 13:34:12'], ['2', 'KH001', '2026-10-18 13:34:40']], '2026-10-18 13:34:40', '2026-10-18 13:34:40'],
+        ['ស្កេនត្រឡប់ ហើយបញ្ជូនចេញ ➜ ត្រឡប់ (មិនមែនខុសទីតាំង)', [['3', 'KH001', '2026-10-16 09:00:00'], ['-710', 'KH001', '2026-10-17 08:00:00'],
+            ['2', 'KH001', '2026-10-17 08:05:00']], '2026-10-17 08:00:00', null],
+        ['ទទួលពីអ្នកផ្ញើ ហើយបញ្ជូនចេញ (មិនដែលមកដល់) ➜ មិនមែន', [['1', 'KH001', '2026-10-16 09:00:00'], ['2', 'KH001', '2026-10-16 10:00:00']], null, null],
+        ['បញ្ជូនចេញនៅសាខាផ្សេង ➜ មិនមែន', [['3', 'KH001', '2026-10-16 09:00:00'], ['2', 'OTHER', '2026-10-17 09:00:00']], null, null],
+        ['បញ្ជូនចេញ ហើយមកដល់ម្តងទៀត ➜ មិនមែន', [['3', 'KH001', '2026-10-15 09:00:00'], ['2', 'KH001', '2026-10-15 12:00:00'], ['3', 'KH001', '2026-10-16 09:00:00']], null, null],
+        ['មានតែស្កេនបញ្ហា -582 (ទូរស័ព្ទមិនលើក · កញ្ចប់នៅហាង) ➜ មិនមែន', [['3', 'KH001', '2026-10-16 09:00:00'], ['-582', 'KH001', '2026-10-16 10:00:00']], null, null]
+    ])('📍 status=1 ៖ %s ➜ `ztoMisplacedAt`', async (_name, scans: any, returnedAt, misplacedAt) => {
+        const { sessionToken: session } = await login();
+        const tracks = (scans as string[][]).map(([action, site, time]) => ({ action, siteCode: site, mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 0 }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toMatchObject({ found: true, ztoReturnedAt: returnedAt, ztoMisplacedAt: misplacedAt });
+    });
+
+    it('📍 status=1 ៖ ZTO ចុះហត្ថលេខា ក្រោយមកដល់ ➜ បិទ · មិនមែនខុសទីតាំង ទោះមានបញ្ជូនចេញ', async () => {
+        const { sessionToken: session } = await login();
+        const tracks = [['3', '2026-10-16 09:00:00'], ['2', '2026-10-16 12:00:00'], ['5', '2026-10-17 09:00:00']]
+            .map(([action, time]) => ({ action, siteCode: 'KH001', mailNo: CODE, time })).reverse();
+        vi.stubGlobal('fetch', vi.fn(async () => upstream({ status: true, result: [{ mail: { mailNo: CODE, isSign: 1 }, tracks }] })));
+        const res = await call({ palm: '1', barcode: CODE, status: '1' }, session);
+        expect(JSON.parse(res.body)).toMatchObject({ ztoClosed: true, ztoReturnedAt: null, ztoMisplacedAt: null });
+    });
+
     it('↩️ status=1 ៖ ZTO ចុះហត្ថលេខា (`isSign: 1`) ក្រោយមកដល់ ➜ បិទ · មិនមែនត្រឡប់ ទោះមាន -710', async () => {
         const { sessionToken: session } = await login();
         const tracks = [['3', '2026-10-16 09:00:00'], ['-710', '2026-10-16 12:00:00'], ['5', '2026-10-17 09:00:00']]

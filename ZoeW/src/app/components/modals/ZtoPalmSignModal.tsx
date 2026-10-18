@@ -1,4 +1,4 @@
-import { palmSignPhotoFromFile, startPalmSignCamera } from '../../../services/palm-sign-camera';
+import { palmSignPhotoFromFile, startPalmSignCamera, startPalmSignLocation } from '../../../services/palm-sign-camera';
 import { useEffect, useState } from 'react';
 import { palmSignState, type PalmSignResult } from '../../../core/palm-sign-state';
 import { uiState } from '../../../core/state';
@@ -46,6 +46,7 @@ function SignForm() {
     const needsName = !allReceived && !v.signMan.trim();
     const idle = v.busy ? 'កំពុង Sign ក្នុង ZTO…' : preparing ? 'កំពុងអានរូបភាព…' : v.confirmation ? 'រង់ចាំការបញ្ជាក់កញ្ចប់'
         : allReceived ? '✅ ZTO បញ្ជាក់ការទទួលរួចហើយ' : 'កាមេរ៉ាផ្អាក';
+    useEffect(() => startPalmSignLocation(), []);
     useEffect(() => {
         if (!canScan) return;
         return startPalmSignCamera((code, photo) => acceptPalmSignBarcode(code, photo),

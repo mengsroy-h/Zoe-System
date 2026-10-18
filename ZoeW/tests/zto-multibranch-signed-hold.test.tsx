@@ -175,7 +175,7 @@ describe('ZTO-E14 ៖ គម្រោងតែមួយ សាខាច្រើ
         expect(abandoned('p102'), 'មុនអានបញ្ជី ➜ រង់ចាំ').toBe(false);
         await runZtoStatusSweep(false);
         expect(listSites.filter((s) => s.endsWith(':05')).sort(), 'Function អានបញ្ជីចុះហត្ថលេខាគ្រប់សាខាដែលចង').toEqual(['101:05', '102:05']);
-        expect(listSites.filter((s) => !s.endsWith(':05')), 'បញ្ជីត្រឡប់ (-710) អានតែសាខាខ្លួន').toEqual(['101:-710']);
+        expect(listSites.filter((s) => !s.endsWith(':05')), 'បញ្ជីត្រឡប់ (-710) និងបញ្ជូនចេញ (02) អានតែសាខាខ្លួន').toEqual(['101:-710', '101:02']);
         expect(h.calls.map((c) => c.code), 'កញ្ចប់សាខា 102 ក្នុងបញ្ជីចុះហត្ថលេខា ➜ បិទ «យករួច»').toEqual(['ZTM1020001']);
         cleanupNow();
         expect(abandoned('p102'), 'កញ្ចប់ចុះហត្ថលេខានៅសាខា 102 ➜ មិនត្រូវ abandon (ដកលុយ)').toBe(false);

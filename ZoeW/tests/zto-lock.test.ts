@@ -19,14 +19,14 @@ const APP = path.resolve(__dirname, '..');
 
 const LOCK: Record<string, string> = {
     'src/features/zto-palm-login.ts': 'f384efface901481f91c29060bd5bd74e7b656887160e6eaf9be85b067f809b6',
-    'netlify/functions/_shared/zto-palm.js': '859f1458f7896b6ff3b4ed82344d56f90875d50c6c5430a4e89527648ea7ebaf',
-    'netlify/functions/zto-order-detail.js': 'e3ea9e7185978070f5a0e723caa5c27f462a864bdaec321492e49c5d7fd46d9c',
-    'src/features/zto-list-sync.ts': '3479065beb16bb915efc26254ad53a92d78ec9f2572243cad2c4dba30c4343e3',
-    'src/features/zto-status.ts': 'cc92b7d9ca78330c8e7a1d1a64a9315804d0f67533950933baec03cf384eb804',
+    'netlify/functions/_shared/zto-palm.js': 'fe080847c1a6a3a6692ce4892ded60b7dba5a0e489c983024ecdf6145d947392',
+    'netlify/functions/zto-order-detail.js': '51c857749aff141af98b9ec86d66236936a3fc0e11c6481e9f5c14c4e8c7e631',
+    'src/features/zto-list-sync.ts': '3b4139dd26e165ffcd8cab4122158b0b6b94c8f66feb2925413cbf91cc9bb43c',
+    'src/features/zto-status.ts': '37bf66058c4b852c13553e2df2f7c6e398c3830bd70607ba356efaaaa69d651f',
     'src/services/zto-shop-sweep.ts': '67591d931e8e64e4aa7af2dc10b5e80cd260dad0dab5523fc4e326f63a3349f8',
     'src/features/auto-lookup.ts': '39a4b4b50966c8f00459299e23f413457384dc8c522232bc2359076cbdc9cfc7',
     'src/features/lookup-api.ts': 'cc50997115b218fc118cf69e7f9d4fd6f0f5594fe501498f93c262701b57c570',
-    'src/app/components/zto/model.ts': '80beab7d292f179119244e0c93bef05289e5f560520452aef8a86bc7b7e4cad6',
+    'src/app/components/zto/model.ts': '93415e4c3961dc36f2d7acd75d9e72ecc89d8c7187dd29b7974782278f455095',
     'src/app/components/zto/ZtoListSyncBody.tsx': 'aedfa43f7fce10a5ecc1f30ba73abb7bd9b8c02cd8ca67af70e67bb23611fe4c',
     'src/app/components/modals/ZtoListSyncModal.tsx': 'c9d3c9bc49ac2d133ffefed161039040563994d4c0190a634e7bdb44cb2eb08e'
 };

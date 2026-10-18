@@ -1,11 +1,15 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { scanState } from '../src/core/state';
-import { PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, palmSignDecodeImage, palmSignPickCode, startPalmSignCamera } from '../src/services/palm-sign-camera';
+import {
+    PALM_SIGN_FIX_MAX_ACCURACY_M, PALM_SIGN_FIX_MAX_AGE_MS, PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, PALM_SIGN_STAMP_COLOR, PALM_SIGN_STAMP_SIZE, notePalmSignPosition,
+    palmSignCurrentFix, palmSignDecodeImage, palmSignLocation, palmSignPickCode, palmSignStampLines, stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
+} from '../src/services/palm-sign-camera';
 import { readCanvasSymbols } from '../src/services/scan-engine';
 import { attachPalmSignStream, videoElement } from '../src/app/refs';
 import { noteAppLockExcuse } from '../src/features/app-lock';
 import { createScratchCanvas } from '../src/platform/document-io';
 vi.mock('../src/features/app-lock', () => ({ noteAppLockExcuse: vi.fn() }));
+vi.mock('../src/core/clock', () => ({ getServerNow: () => Date.now() }));
 vi.mock('../src/services/network', () => ({ withTimeout: (work: Promise<unknown>) => work }));
 vi.mock('../src/core/state', () => ({ scanState: { currentStream: null, codeReader: null, nativeDetector: null } }));
 vi.mock('../src/app/refs', () => ({ videoElement: vi.fn(), attachPalmSignStream: vi.fn(async () => {}) }));
@@ -122,4 +126,95 @@ it('Android (BarcodeDetector code_128 + qr_code) ៖ QR លេខកញ្ចប
     await vi.waitFor(() => expect(onScan).toHaveBeenCalledWith(OWN, 'frame-1'));
     close();
     expect(readCanvasSymbols).not.toHaveBeenCalled();
+});
+it('📍 រូប Sign មានម៉ោង (Asia/Phnom_Penh) និងកូអរដោនេ ដូច ZTO Palm ៖ ពណ៌ក្រហមនៅជ្រុងក្រោមឆ្វេង · ទីតាំងចាស់/មិនច្បាស់ ➜ តែម៉ោង', () => {
+    const at = Date.UTC(2026, 9, 15, 5, 3, 43);
+    expect(palmSignStampLines(at, { lat: 12.300114, lng: 105.419213, at: Date.now() })).toEqual(['2026-10-15 12:03:43', '12.30011, 105.41921']);
+    expect(palmSignStampLines(at, null)).toEqual(['2026-10-15 12:03:43']);
+    palmSignLocation.fix = null;
+    notePalmSignPosition({ coords: { latitude: 12.3, longitude: 105.4, accuracy: PALM_SIGN_FIX_MAX_ACCURACY_M + 1 } });
+    expect(palmSignCurrentFix()).toBeNull();
+    notePalmSignPosition({ coords: { latitude: 95, longitude: 105.4, accuracy: 10 } });
+    expect(palmSignCurrentFix()).toBeNull();
+    notePalmSignPosition({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 2500 } });
+    expect(palmSignCurrentFix(), 'Android «ទីតាំងប្រហាក់ប្រហែល» (≈ ២–៣ គ.ម.) ➜ នៅមានកូអរដោនេ ដូច ZTO Palm').toMatchObject({ lat: 12.3, lng: 105.4 });
+    notePalmSignPosition({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 10 } });
+    expect(palmSignCurrentFix()).toMatchObject({ lat: 12.3, lng: 105.4 });
+    palmSignLocation.fix!.at = Date.now() - PALM_SIGN_FIX_MAX_AGE_MS - 1;
+    expect(palmSignCurrentFix()).toBeNull();
+    const calls: any[] = [];
+    const context = new Proxy({}, { get: (_t, key) => (key in ({} as any) ? undefined : (...args: any[]) => calls.push([key, ...args])), set: (_t, key, value) => { calls.push(['set', key, value]); return true; } });
+    const canvas = { width: 1280, height: 960, getContext: () => context };
+    expect(stampPalmSignPhoto(canvas, ['2026-10-15 12:03:43', '12.30011, 105.41921'])).toBe(true);
+    const texts = calls.filter((c) => c[0] === 'fillText');
+    expect(texts.map((c) => c[1])).toEqual(['2026-10-15 12:03:43', '12.30011, 105.41921']);
+    expect(texts[0][2]).toBeLessThan(canvas.width / 4);
+    expect(texts[1][3]).toBeGreaterThan(canvas.height * 0.85);
+    expect(calls).toContainEqual(['set', 'fillStyle', PALM_SIGN_STAMP_COLOR]);
+    const font = calls.find((c) => c[0] === 'set' && c[1] === 'font')[2];
+    expect(font).toMatch(/^400 \d+px /);
+    expect(Number(/(\d+)px/.exec(font)![1])).toBe(Math.round(960 * PALM_SIGN_STAMP_SIZE));
+    expect(calls.some((c) => c[0] === 'strokeText')).toBe(false);
+    expect(stampPalmSignPhoto({ width: 10, height: 10, getContext: () => ({ drawImage: () => {} }) }, ['x'])).toBe(false);
+    expect(stampPalmSignPhoto(null, ['x'])).toBe(false);
+});
+it('📍 ទីតាំង ៖ watch តែពេលផ្ទាំង Sign បើក · បិទ ➜ clearWatch · មិនទាន់អនុញ្ញាត ➜ លើកលែងការចាក់សោ (Android ផ្អាក Activity ពេលសួរ)', async () => {
+    const watchPosition = vi.fn(() => 7);
+    const clearWatch = vi.fn();
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch }, permissions: { query: vi.fn(async () => ({ state: 'prompt' })) } });
+    palmSignLocation.watch = null;
+    palmSignLocation.users = 0;
+    const stop = startPalmSignLocation();
+    await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
+    expect(noteAppLockExcuse).toHaveBeenCalledOnce();
+    const second = startPalmSignLocation();
+    second();
+    expect(clearWatch).not.toHaveBeenCalled();
+    stop();
+    stop();
+    expect(clearWatch).toHaveBeenCalledOnce();
+    expect(clearWatch).toHaveBeenCalledWith(7);
+    vi.mocked(noteAppLockExcuse).mockClear();
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch }, permissions: { query: vi.fn(async () => ({ state: 'granted' })) } });
+    const again = startPalmSignLocation();
+    await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2));
+    expect(noteAppLockExcuse).not.toHaveBeenCalled();
+    again();
+    const closedEarly = startPalmSignLocation();
+    closedEarly();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(watchPosition).toHaveBeenCalledTimes(2);
+    vi.stubGlobal('navigator', {});
+    const none = startPalmSignLocation();
+    none();
+});
+it('📍 រូបពីកាមេរ៉ា ៖ stamp លើ frame មុនអ៊ិនកូដ JPEG', async () => {
+    const draws: string[] = [];
+    vi.mocked(createScratchCanvas).mockImplementation(() => ({ width: 0, height: 0,
+        getContext: () => ({ drawImage: () => {}, save: () => {}, restore: () => {}, strokeText: () => {}, fillText: (t: string) => draws.push(t) }),
+        toDataURL: () => 'data:image/jpeg;base64,stamped' } as any));
+    palmSignLocation.fix = { lat: 12.30011, lng: 105.41921, at: Date.now() };
+    scanState.nativeDetector = { detect: vi.fn(async () => [{ rawValue: '77130500000012' }]) };
+    const onScan = vi.fn();
+    const close = startPalmSignCamera(onScan, vi.fn());
+    await vi.waitFor(() => expect(onScan).toHaveBeenCalled());
+    close();
+    expect(draws[0]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(draws[1]).toBe('12.30011, 105.41921');
+});
+it('📍 APK ៖ សួរសិទ្ធិទីតាំងតែក្រោយការស្នើកាមេរ៉ាចប់ (Capacitor មាន permissionListener តែមួយ ៖ ស្នើព្រមគ្នា ➜ មួយបាត់)', async () => {
+    let grant!: (s: MediaStream) => void;
+    const watchPosition = vi.fn(() => 3);
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn(() => new Promise((yes) => { grant = yes; })) },
+        geolocation: { watchPosition, clearWatch: vi.fn() }, permissions: { query: vi.fn(async () => ({ state: 'prompt' })) } });
+    palmSignLocation.watch = null;
+    palmSignLocation.users = 0;
+    const stopLocation = startPalmSignLocation();
+    const closeCamera = startPalmSignCamera(vi.fn(), vi.fn());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(watchPosition, 'កាមេរ៉ាកំពុងសួរ ➜ មិនទាន់សួរទីតាំង').not.toHaveBeenCalled();
+    grant(stream);
+    await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
+    closeCamera();
+    stopLocation();
 });

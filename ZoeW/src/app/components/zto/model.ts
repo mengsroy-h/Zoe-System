@@ -23,8 +23,8 @@ export function ztoListGroupModel(title: string, rows: any[], tone: string): Zto
                     row.signedAt ? '✍️ ZTO ចុះហត្ថលេខា (បិទ) ៖ ' + row.signedAt : '',
                     row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
                     row.closeInZoew === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បិទក្នុង ZoeW ពេលចុច «បញ្ចូល»' : '',
-                    row.returnedAt ? '↩️ ZTO ត្រឡប់ស្កេន ៖ ' + row.returnedAt : '',
-                    row.removeInZoew === true ? '🗑️ បើកក្នុង ZoeW ➜ ធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់)' : '',
+                    row.returnedAt ? (row.misplaced ? '📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ ៖ ' : '↩️ ZTO ត្រឡប់ស្កេន ៖ ') + row.returnedAt : '',
+                    row.removeInZoew === true ? '🗑️ បើកក្នុង ZoeW ➜ ធុងសំរាម «' + (row.misplaced ? 'ខុសទីតាំង' : 'ត្រឡប់') + '» (ដកលុយ និងចំនួនកញ្ចប់)' : '',
                     row.removeHeld === 'switch' ? '📌 បើកក្នុង ZoeW · «បិទតាម ZTO ស្វ័យប្រវត្តិ» បិទ ➜ មិនដក' : '',
                     row.removeHeld === 'signed' ? '📌 បើកក្នុង ZoeW · អានបញ្ជីចុះហត្ថលេខាមិនគ្រប់ ➜ មិនទាន់ដក (ទាញម្តងទៀត)' : '',
                     ztoListSkipText(row.skip)].filter(Boolean)

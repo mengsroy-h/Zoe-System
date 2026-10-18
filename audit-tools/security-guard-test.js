@@ -357,7 +357,7 @@ function cspProblems(app, toml, usedHosts) {
         'X-Frame-Options DENY': /X-Frame-Options\s*=\s*"DENY"/, 'X-Content-Type-Options nosniff': /X-Content-Type-Options\s*=\s*"nosniff"/,
         'Referrer-Policy': /Referrer-Policy\s*=\s*"(strict-origin-when-cross-origin|no-referrer|same-origin|strict-origin)"/,
         'Cross-Origin-Opener-Policy same-origin': /Cross-Origin-Opener-Policy\s*=\s*"same-origin"/,
-        'Permissions-Policy (microphone · geolocation បិទ)': /Permissions-Policy\s*=\s*"[^"]*microphone=\(\)[^"]*geolocation=\(\)/
+        'Permissions-Policy (microphone បិទ · geolocation បិទ ឬតែ self)': /Permissions-Policy\s*=\s*"[^"]*microphone=\(\)[^"]*geolocation=\((self)?\)/
     };
     Object.keys(headers).filter((h) => !headers[h].test(toml)).forEach((h) => p.push('ខ្វះ header ' + h));
     const hsts = /Strict-Transport-Security\s*=\s*"max-age=(\d+)/.exec(toml);

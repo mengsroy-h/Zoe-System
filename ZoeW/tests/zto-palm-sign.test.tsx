@@ -11,13 +11,15 @@ import { appLocalStore } from '../src/core/storage';
 import { modalIsOpen, registerModalMeta, unregisterModalMeta } from '../src/core/modals';
 import { toggleCloseStatus } from '../src/features/entry-ops';
 import { refreshShopBoundUi } from '../src/features/lookup-config';
-import { openZtoPalmSign, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, removePalmSignScan } from '../src/features/zto-palm-sign';
+import { openZtoPalmSign, submitZtoPalmSign, recheckZtoPalmSign, acceptPalmSignBarcode, setPalmSignName, confirmPalmSignWarning, cancelPalmSignConfirmation, removePalmSignScan, palmSignProof } from '../src/features/zto-palm-sign';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
 import { encryptLookupSecret } from '../src/services/crypto';
 import { closeModal } from '../src/ui/modal';
 import { mount, unmount } from './native/react-harness';
 
-vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}) }));
+const stopLocation = vi.fn();
+vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
+    startPalmSignLocation: vi.fn(() => stopLocation) }));
 
 vi.mock('../src/features/barcode-ops', () => ({
     openViewListModal: () => {}, removeSingleBarcode: async () => 'failed', toggleIndividualBarcodeClose: async () => false,
@@ -242,11 +244,15 @@ it.each(['rejected', 'unknown'])('ចែកចាយ %s ➜ មិន Sign ន�
     expect(palmSignState.checked[CODE]).toBe(kind !== 'unknown');
 });
 it('camera ស្កេនបាន ➜ ចាប់រូប · សម្លេង និងញ័រ · ចែកចាយភ្លាម · ប៊ូតុង Sign ប្រាប់ឲ្យវាយឈ្មោះ', async () => {
-    const { startPalmSignCamera } = await import('../src/services/palm-sign-camera');
+    const { startPalmSignCamera, startPalmSignLocation } = await import('../src/services/palm-sign-camera');
+    vi.mocked(startPalmSignLocation).mockClear();
+    stopLocation.mockClear();
     const vibrate = vi.fn(() => true);
     Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
     mount(<ZtoPalmSignModal />);
     await act(async () => { await openDispatch([CODE]); });
+    expect(startPalmSignLocation).toHaveBeenCalledOnce();
+    expect(stopLocation).not.toHaveBeenCalled();
     const callback = vi.mocked(startPalmSignCamera).mock.calls.at(-1)![0];
     await act(async () => callback(CODE, PHOTO));
     expect(palmSignState.photos[CODE]).toBe(PHOTO);
@@ -622,4 +628,30 @@ it('ជំហានចែកចាយមិនផ្ញើរូបទៅ Server
     vi.mocked(fetch).mockClear();
     await submit();
     expect(bodies()[0]).toMatchObject({ stage: 'receipt', photo: PHOTO });
+});
+it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO Palm ពិត) ៖ ផ្ទាំងបញ្ជាក់មុន 04 · «បញ្ជាក់ និងបន្ត» ➜ ផ្ញើ token · «បោះបង់» ➜ មិនចែកចាយ · ស្កេនម្តងទៀតសួរម្តងទៀត', async () => {
+    const message = 'ទំនិញនេះគឺជាទំនិញដែលមានបញ្ហា សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
+    mount(<ZtoPalmSignModal />);
+    await act(async () => { await openDispatch([CODE]); });
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.stage === 'dispatch' && !body.confirmationToken) return json({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: body.barcode, stage: 'dispatch', message, confirmationToken: 'tok-' + body.barcode }, 409);
+        return json({ success: true, barcode: body.barcode, stage: 'dispatch', ztoClosed: false, dispatchProof: 'proof-' + body.barcode });
+    }));
+    await act(async () => { acceptPalmSignBarcode(CODE, PHOTO); });
+    await vi.waitFor(() => expect(palmSignState.confirmation).toMatchObject({ code: CODE, stage: 'dispatch', message }));
+    expect(bodies()).toEqual([expect.objectContaining({ barcode: CODE, stage: 'dispatch', signMan: '' })]);
+    expect(bodies()[0].photo).toBeUndefined();
+    expect(document.querySelector('.palm-sign-confirmation')?.textContent).toContain(message);
+    await act(async () => cancelPalmSignConfirmation());
+    expect(palmSignState.confirmation).toBeNull();
+    expect(palmSignState.message).toContain('មិនទាន់បានចែកចាយ');
+    expect(palmSignProof(CODE)).toBeFalsy();
+    await act(async () => { acceptPalmSignBarcode(CODE, PHOTO); });
+    await vi.waitFor(() => expect(palmSignState.confirmation?.stage).toBe('dispatch'));
+    await act(async () => { await confirmPalmSignWarning(); });
+    await vi.waitFor(() => expect(palmSignProof(CODE)).toBe('proof-' + CODE));
+    expect(bodies().at(-1)).toMatchObject({ barcode: CODE, stage: 'dispatch', confirmationToken: 'tok-' + CODE, signMan: '' });
+    expect(bodies().filter((b) => b.stage === 'receipt')).toEqual([]);
+    expect(closeCalls()).toEqual([]);
 });

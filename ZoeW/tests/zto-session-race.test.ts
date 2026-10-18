@@ -17,7 +17,8 @@ function deferred<T>() {
 const item = { id: 'session-row', phone: '011222333', barcodes: [{ code: 'ZTO123456', isClosed: true }] };
 const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 const returnedOff = (inner: any) => (url: any, init?: any) => (String(url).includes('returned=1')
-    ? Promise.resolve(response({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false })) : inner(url, init));
+    ? Promise.resolve(response({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false }))
+    : String(url).includes('sent=1') ? Promise.resolve(response({ success: true, list: true, enabled: true, kind: 'sent', rows: [], sent: null, sentOk: false })) : inner(url, init));
 const listBody = { rows: [{ barcode: 'ZTO123456', phone: '011222333', cod: 5, dod: 0, at: '2026-09-27 10:00:00' }], pages: 1 };
 
 beforeEach(() => {

@@ -17,6 +17,7 @@ import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
+import { trashItemMisplaced } from './zto-final-marks';
 
 export const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
 
@@ -273,7 +274,7 @@ export async function executeRestoreItem() {
             if (!previewItem) throw new Error('ALREADY_RESTORED');
             stopIfSwitched();
             if (restoreAwaitsLedgerView(previewItem)) throw new Error('RESTORE_LEDGER_UNSYNCED');
-            if (trashZtoFinalBlock(previewItem)) throw new Error('RESTORE_ZTO_FINAL');
+            if (trashZtoFinalBlock(previewItem) && !trashItemMisplaced(previewItem)) throw new Error('RESTORE_ZTO_FINAL');
             targetId = await findRestoreTargetId(previewItem);
             stopIfSwitched();
         }
@@ -314,6 +315,8 @@ export async function executeRestoreItem() {
                     restoredBc.isDeducted = false;
                 }
                 restoredBc.isFromDeletion = false;
+                delete restoredBc.ztoReturnedAt;
+                delete restoredBc.ztoMisplacedAt;
                 if (restoredBc.isClosed) restoredBc.closedAt = getServerNow();
                 else {
                     delete restoredBc.closedAt;

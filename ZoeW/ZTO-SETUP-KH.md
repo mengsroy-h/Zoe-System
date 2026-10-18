@@ -502,6 +502,7 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 | `ZTO_LIST_SIGNED_SCAN_TYPE` | `05` (ចុះហត្ថលេខា) | ស្រេចចិត្ត (លំនាំដើម) — ដាក់ `off` ដើម្បីបិទការអានបញ្ជី «ចុះហត្ថលេខា» |
 | `ZTO_LIST_SIGNED_SCAN_DESC` | `ចុះហត្ថលេខា\|签收\|Signed` | ស្រេចចិត្ត (លំនាំដើម ៣ ភាសា) — អត្ថបទច្រើនបំបែកដោយ `\|` · ដាក់ `off` ដើម្បីពឹងលើកូដតែម្យ៉ាង |
 | `ZTO_LIST_RETURN_SCAN_TYPE` | `-710` (ត្រឡប់ការស្កេន) | ស្រេចចិត្ត (លំនាំដើម) — ដាក់ `off` ដើម្បីបិទការពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញ |
+| `ZTO_LIST_SEND_SCAN_TYPE` | `02` (ផ្ញើចេញ) | ស្រេចចិត្ត (លំនាំដើម) — ពិនិត្យកញ្ចប់ខុសទីតាំង (សាខាស្កេនបញ្ជូនចេញក្រោយមកដល់) ក្នុងរបៀប Cookie · ដាក់ `off` ដើម្បីបិទ |
 | `ZTO_SITE_EMAIL_PREFIX` | `zoew` | ស្រេចចិត្ត — ប្តូរតែពេលប្តូរទម្រង់ email |
 
 **Project ID រកនៅឯណា** ៖ Firebase Console ➜ ⚙️ **Project settings** ➜ ជួរ

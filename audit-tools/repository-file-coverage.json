@@ -3502,6 +3502,9 @@
     "supabase/migrations/20261018011107_zoe_rules.sql": {
       "policy": "supabase-db"
     },
+    "supabase/migrations/20261018084522_zoe_rules.sql": {
+      "policy": "supabase-db"
+    },
     "ZoeW/netlify/functions/_shared/zto-palm-sign.js": {
       "policy": "zoew-self-verification"
     },
@@ -3518,6 +3521,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/zto-palm-sign.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-palm-sign-e2e.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/src/services/palm-sign-camera.ts": {

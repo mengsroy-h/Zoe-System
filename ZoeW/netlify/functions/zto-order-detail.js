@@ -47,6 +47,7 @@ const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 const DEFAULT_LIST_SIGNED_SCAN_TYPE = '05';
 const DEFAULT_LIST_SIGNED_SCAN_DESC = 'ចុះហត្ថលេខា|签收|Signed';
 const DEFAULT_LIST_RETURN_SCAN_TYPE = '-710';
+const DEFAULT_LIST_SEND_SCAN_TYPE = '02';
 const LIST_SITE_NAME_PATHS = ['scanSite', 'scanSiteName'];
 const LIST_ORIGIN_PATHS = ['recSite', 'customerCodeDesc'];
 const LIST_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -833,7 +834,7 @@ function readListConfig(env) {
     const out = {
         enabled: false, url: null, scanType: DEFAULT_LIST_SCAN_TYPE,
         pageSize: 100, maxPages: 3, reason: '', fingerprint: '', scanDesc: '', scanDescs: [],
-        signedType: '', signedDesc: '', signedDescs: [], signedReason: '', returnType: '', returnReason: ''
+        signedType: '', signedDesc: '', signedDescs: [], signedReason: '', returnType: '', returnReason: '', sendType: '', sendReason: ''
     };
     let url;
     try {
@@ -854,6 +855,7 @@ function readListConfig(env) {
     out.maxPages = boundedInteger(env.ZTO_LIST_MAX_PAGES, 3, 1, 20);
     readListSignedConfig(env, out);
     readListReturnConfig(env, out);
+    readListSendConfig(env, out);
     out.fingerprint = crypto.createHash('sha256')
         .update(url.href).update(FIELD_SEPARATOR)
         .update(scanType).update(FIELD_SEPARATOR)
@@ -861,7 +863,8 @@ function readListConfig(env) {
         .update(String(out.pageSize)).update(FIELD_SEPARATOR)
         .update(out.signedType).update(FIELD_SEPARATOR)
         .update(out.signedDesc).update(FIELD_SEPARATOR)
-        .update(out.returnType)
+        .update(out.returnType).update(FIELD_SEPARATOR)
+        .update(out.sendType)
         .digest('base64url')
         .slice(0, 16);
     return out;
@@ -905,6 +908,17 @@ function readListReturnConfig(env, out) {
     if (!LIST_SCAN_TYPE_RE.test(type)) { out.returnReason = 'returned-type:invalid'; return; }
     if (type === out.scanType || type === out.signedType) { out.returnReason = 'returned-type:same'; return; }
     out.returnType = type;
+}
+
+function readListSendConfig(env, out) {
+    out.sendType = '';
+    out.sendReason = '';
+    const raw = String(env.ZTO_LIST_SEND_SCAN_TYPE || '').trim();
+    if (/^off$/i.test(raw)) { out.sendReason = 'sent:off'; return; }
+    const type = raw || DEFAULT_LIST_SEND_SCAN_TYPE;
+    if (!LIST_SCAN_TYPE_RE.test(type)) { out.sendReason = 'sent-type:invalid'; return; }
+    if (type === out.scanType || type === out.signedType || type === out.returnType) { out.sendReason = 'sent-type:same'; return; }
+    out.sendType = type;
 }
 
 const ID_TOKEN_HEADER = 'x-zoe-id-token';
@@ -1189,7 +1203,8 @@ function listRequestBody(listConfig, siteCode, range, page, scanType) {
 }
 
 function listPlan(config, siteCode, range, page, kind) {
-    const scanType = kind === 'signed' ? config.list.signedType : (kind === 'returned' ? config.list.returnType : config.list.scanType);
+    const scanType = kind === 'signed' ? config.list.signedType : (kind === 'returned' ? config.list.returnType
+        : (kind === 'sent' ? config.list.sendType : config.list.scanType));
     return {
         kind: kind,
         href: config.list.url.href,
@@ -1309,6 +1324,9 @@ function listResponseBody(config, container, page, siteCode, kind) {
     let returnedScans = 0;
     const returned = [];
     const returnedIndex = new Map();
+    let sentScans = 0;
+    const sent = [];
+    const sentIndex = new Map();
     let signedMismatch = 0;
     const mismatchTexts = [];
     let siteName = '';
@@ -1346,6 +1364,14 @@ function listResponseBody(config, container, page, siteCode, kind) {
             keepLatestSignedRow(returned, returnedIndex, { barcode: back.barcode, at: back.at });
             continue;
         }
+        if (kind === 'sent') {
+            const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
+            const send = projectListRow(config, raw);
+            if (code !== config.list.sendType || !BARCODE_RE.test(send.barcode)) { otherScans++; continue; }
+            sentScans++;
+            keepLatestSignedRow(sent, sentIndex, { barcode: send.barcode, at: send.at });
+            continue;
+        }
         const row = projectListRow(config, raw);
         if (row.skip === 'scan-type') { otherScans++; continue; }
         rows.push(row);
@@ -1353,7 +1379,7 @@ function listResponseBody(config, container, page, siteCode, kind) {
     const meta = container.meta || {};
     const pages = Number(meta.pages);
     const total = Number(meta.total);
-    const counted = rows.length + otherScans + signedScans + returnedScans;
+    const counted = rows.length + otherScans + signedScans + returnedScans + sentScans;
     const pagesKnown = Number.isFinite(pages);
     const pageFull = container.rows.length >= config.list.pageSize;
     const body = {
@@ -1379,6 +1405,11 @@ function listResponseBody(config, container, page, siteCode, kind) {
         body.returned = returned;
         body.returnedScans = returnedScans;
         body.returnedOk = true;
+    }
+    if (kind === 'sent') {
+        body.sent = sent;
+        body.sentScans = sentScans;
+        body.sentOk = true;
     }
     if (mismatchTexts.length) {
         body.signedMismatchTexts = mismatchTexts;
@@ -2439,6 +2470,9 @@ function diagnosticsBody(config, headers, authKind, credential) {
             returnedEnabled: !!config.list.returnType,
             returnedReason: config.list.returnReason || null,
             returnedTypeIsDefault: config.list.returnType === DEFAULT_LIST_RETURN_SCAN_TYPE,
+            sentEnabled: !!config.list.sendType,
+            sentReason: config.list.sendReason || null,
+            sentTypeIsDefault: config.list.sendType === DEFAULT_LIST_SEND_SCAN_TYPE,
             signedMismatch: {
                 observed: signedMismatchSignal.keys.size > 0,
                 count: signedMismatchSignal.keys.size,
@@ -2633,10 +2667,20 @@ async function handleRequest(event) {
                 reason: config.list.returnReason || 'returned:off'
             });
         }
+        const sentOnly = !signedOnly && !returnedOnly && String(query.sent || '') === '1';
+        if (sentOnly && !config.list.sendType) {
+            return json(200, {
+                success: true, list: true, enabled: true, kind: 'sent', page: page,
+                site: site.code, siteName: '', pages: 0, total: 0, rows: [],
+                otherScans: 0, signedScans: 0, sentScans: 0, sent: null, sentOk: false,
+                reason: config.list.sendReason || 'sent:off'
+            });
+        }
         const exact = signedOnly && String(query.exact || '') === '1';
         plan = signedOnly
             ? listPlan(config, site.code, exact ? range : listSignedRange(range), page, 'signed')
-            : listPlan(config, site.code, returnedOnly ? listSignedRange(range) : range, page, returnedOnly ? 'returned' : 'arrival');
+            : listPlan(config, site.code, returnedOnly || sentOnly ? listSignedRange(range) : range, page,
+                returnedOnly ? 'returned' : (sentOnly ? 'sent' : 'arrival'));
         if (exact) {
             branchPlans = listSignedBranchSites(identity).map((code) => listPlan(config, code, range, page, 'signed'));
             if (branchPlans.length) plan.cacheKey += '|B' + branchPlans.map((extra) => extra.body.condition.scanSiteCode).join(',');

@@ -213,6 +213,25 @@ it.each(['90187|COD warning', '90189|site warning'])('សារត្រូវ�
     const check = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith('newBusinessCheck'))!;
     expect(JSON.parse(String(check[1]?.body))).toMatchObject({ ignoreCodBacklog: 0, ignoreDispSiteId: 0 });
 });
+it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO Palm ពិត) ៖ សួរបញ្ជាក់មុន 04 · គ្មានរូប គ្មានឈ្មោះ · បញ្ជាក់ ➜ 04 តែម្តង · token ចែកចាយមិនប្រើសម្រាប់ទទួល', async () => {
+    const message = 'ទំនិញនេះគឺជាទំនិញដែលមានបញ្ហា សូមបញ្ជាក់ថាបានដោះស្រាយបញ្ហាហើយឬនៅ';
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message, whetherForce: false }) : upstream(url)));
+    const body = { barcode: CODE, signMan: '', requestId, stage: 'dispatch' };
+    const first = JSON.parse((await call(body)).body);
+    expect(first).toMatchObject({ code: 'ZTO_PALM_SIGN_CONFIRM_REQUIRED', barcode: CODE, stage: 'dispatch', message });
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|saveScanInfo|\/add$/.test(String(url)))).toBe(false);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ scanType: 4 });
+    expect(JSON.parse((await call({ ...body, stage: 'receipt', signMan: 'សុខា', photo: PHOTO, confirmationToken: first.confirmationToken })).body).code)
+        .toBe('ZTO_PALM_SIGN_INVALID');
+    const [a, b] = await Promise.all([call({ ...body, confirmationToken: first.confirmationToken }), call({ ...body, confirmationToken: first.confirmationToken })]);
+    expect(JSON.parse(a.body)).toMatchObject({ success: true, stage: 'dispatch', ztoClosed: false, dispatchProof: expect.stringMatching(/^.{8,}$/) });
+    expect(b.body).toBe(a.body);
+    const saves = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'));
+    expect(saves).toHaveLength(1);
+    expect(JSON.parse(String(saves[0][1]?.body))[0]).toMatchObject({ scanTypeCode: '04', billCode: CODE, dispatchOrSendManCode: 'test-operator' });
+    expect(JSON.parse(String(saves[0][1]?.body))[0].signMan).toBeUndefined();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /saveBillPic|\/add$/.test(String(url)))).toBe(false);
+});
 it('flag មិនផ្ញើមានលំនាំដើម false ដូច APK · បញ្ជាក់ស្ទួនផ្ញើតែម្តង', async () => {
     const body = await receipt();
     vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('newBusinessCheck') ? reply({ message: 'Problem parcel' }) : upstream(url)));

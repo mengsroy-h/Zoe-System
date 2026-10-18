@@ -740,6 +740,7 @@ export async function checkZtoStatusForBarcode(cfg, code) {
     if (!data || typeof data !== 'object') return null;
     const answer: any = { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
     if (typeof data.ztoReturnedAt === 'string' && data.ztoReturnedAt) answer.returnedAt = data.ztoReturnedAt;
+    if (answer.returnedAt && data.ztoMisplacedAt === answer.returnedAt) answer.misplaced = true;
     return answer;
 }
 
@@ -826,7 +827,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             if (!answer) continue;
             recorded++;
             setZtoPickupVerdict(work[i].code, answer.closed);
-            if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt }], dataToScan);
+            if (work[i].open && answer.returnedAt && answer.closed !== true) removeReturnedZtoBarcodes([{ barcode: work[i].code, at: answer.returnedAt, misplaced: answer.misplaced === true }], dataToScan);
             if (typeof answer.closed === 'boolean') {
                 measured++;
                 if (work[i].open && answer.closed === true) {

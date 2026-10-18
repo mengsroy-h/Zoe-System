@@ -118,6 +118,9 @@
             },
             "ztoReturnedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoMisplacedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }
         },
@@ -289,6 +292,9 @@
               ".validate": "newData.isNumber() && newData.val() > 0"
             },
             "ztoReturnedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "ztoMisplacedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
             }
           }

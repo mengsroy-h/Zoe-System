@@ -8,10 +8,15 @@ import { pickupBarcodeKey } from '../domain/pickup';
 import { noteZtoReturnedEvidence, scheduleZtoFinalMarks } from './zto-final-marks';
 import { ztoAutoCloseEnabled, ztoStatusFeatureConfig } from './zto-status';
 
+export function ztoReturnedKindOf(entry) {
+    if (entry && entry.misplaced === true) return 'misplaced';
+    return entry && entry.sentOut === true ? 'sent' : 'returned';
+}
+
 export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory, signedCodes?) {
     const signed = new Set((Array.isArray(signedCodes) ? signedCodes : []).map((code) => pickupBarcodeKey(code)));
     const backAt = new Map();
-    const misplacedKeys = new Set();
+    const kindOf = new Map();
     const list = Array.isArray(returned) ? returned : [];
     for (let i = 0; i < list.length; i++) {
         const entry = list[i];
@@ -20,8 +25,7 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         if (!key || !at || signed.has(key)) continue;
         if (backAt.has(key) && at <= backAt.get(key)) continue;
         backAt.set(key, at);
-        if (entry.misplaced === true) misplacedKeys.add(key);
-        else misplacedKeys.delete(key);
+        kindOf.set(key, ztoReturnedKindOf(entry));
     }
     const out = [];
     if (!backAt.size || !Array.isArray(dataToScan)) return out;
@@ -30,7 +34,7 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
         if (!item || !item.id || item.clearClaim || itemHasRestoreMarkers(item) || !Array.isArray(item.barcodes)) continue;
         const codes = [];
         const returnedAt = new Map();
-        const misplaced = new Set();
+        const kinds = new Map();
         for (let j = 0; j < item.barcodes.length; j++) {
             const b = item.barcodes[j];
             if (!b || b.isClosed) continue;
@@ -38,9 +42,9 @@ export function ztoReturnedTargets(returned, dataToScan = dataState.scanHistory,
             if (!barcodeReturnCounts(b, item.createdAt, at)) continue;
             codes.push(b.code);
             returnedAt.set(b.code, at);
-            if (misplacedKeys.has(pickupBarcodeKey(b.code))) misplaced.add(b.code);
+            kinds.set(b.code, kindOf.get(pickupBarcodeKey(b.code)));
         }
-        if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt, misplaced });
+        if (codes.length) out.push({ itemId: String(item.id), codes, returnedAt, kinds });
     }
     return out;
 }
@@ -51,7 +55,7 @@ export function removeReturnedZtoBarcodes(returned, dataToScan = dataState.scanH
     const targets = ztoReturnedTargets(returned, dataToScan, signedCodes);
     let queued = 0;
     for (let i = 0; i < targets.length; i++) {
-        targets[i].returnedAt.forEach((at, code) => noteZtoReturnedEvidence(code, at, targets[i].misplaced.has(code)));
+        targets[i].returnedAt.forEach((at, code) => noteZtoReturnedEvidence(code, at, targets[i].kinds.get(code)));
         Promise.resolve(claimAndCleanupItem(targets[i].itemId, 'abandon', { codes: targets[i].codes, returnedAt: targets[i].returnedAt }))
             .then(scheduleZtoFinalMarks, scheduleZtoFinalMarks);
         queued += targets[i].codes.length;

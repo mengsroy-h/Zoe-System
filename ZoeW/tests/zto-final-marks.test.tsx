@@ -157,7 +157,7 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
             item('m2', [bc('M2')], { trashReason: 'returned', deletedAt: 8 })
         ]);
         const back = Date.now() - 60000;
-        noteZtoReturnedEvidence('M1', back, true);
+        noteZtoReturnedEvidence('M1', back, 'misplaced');
         noteZtoReturnedEvidence('M2', back);
         expect(buildTrashGroups(dataState.deletedItems).map((g: any) => g.reason)).toEqual(['misplaced', 'returned']);
         expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
@@ -175,6 +175,26 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(applyZtoFinalMarks(item('h9', [bc('M3')]), { M3: { returned: back, misplaced: true } }, false)).toBeUndefined();
     });
 
+    it('📤 បញ្ជូនចេញ (គ្មាន «ទីតាំងមិនត្រឹមត្រូវ») ៖ គ្មានត្រាសរសេរ · ស្លាក «ត្រឡប់» · ស្តារបាន (មិនមែន -710) · ធាតុចម្រុះជាមួយ -710 ➜ 🔒', async () => {
+        seedTrash([
+            item('s1', [bc('S1')], { trashReason: 'returned', deletedAt: 9 }),
+            item('s2', [bc('S2'), bc('R9')], { trashReason: 'returned', deletedAt: 8 })
+        ]);
+        const back = Date.now() - 60000;
+        noteZtoReturnedEvidence('S1', back, 'sent');
+        noteZtoReturnedEvidence('S2', back, 'sent');
+        noteZtoReturnedEvidence('R9', back);
+        expect(buildTrashGroups([dataState.deletedItems[0]]).map((g: any) => g.reason)).toEqual(['returned']);
+        expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
+        expect(trashRestoreBlockOf(dataState.deletedItems[1])).toBe('returned');
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 's1'].barcodes[0].ztoReturnedAt).toBeUndefined();
+        expect(server[T + 's1'].barcodes[0].ztoMisplacedAt).toBeUndefined();
+        expect(server[T + 's2'].barcodes.map((b: any) => [b.code, b.ztoReturnedAt, b.ztoMisplacedAt])).toEqual([['S2', undefined, undefined], ['R9', back, undefined]]);
+        resetZtoFinalMarks();
+        expect(trashRestoreBlockOf(server[T + 's1']), 'ឧបករណ៍ផ្សេង (គ្មានភស្តុតាងក្នុងឧបករណ៍) ៖ ស្តារបាន').toBe('');
+    });
+
     it('📍 rules មិនទាន់មាន `ztoMisplacedAt` ➜ ការកត់ត្រឡប់ (`ztoReturnedAt` · 🔒) នៅចូល · ស្លាកខុសទីតាំងសាកម្តងទៀតក្រោយ Publish', async () => {
         seedTrash([item('mr', [bc('MR1')], { trashReason: 'returned', deletedAt: 9 })]);
         const real = firebaseState.fb.runTransaction;
@@ -186,7 +206,7 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
             return real(ref, fn);
         };
         const back = Date.now() - 60000;
-        noteZtoReturnedEvidence('MR1', back, true);
+        noteZtoReturnedEvidence('MR1', back, 'misplaced');
         expect(await syncZtoFinalMarks()).toBe(1);
         expect(server[T + 'mr'].barcodes[0].ztoReturnedAt).toBe(back);
         expect(server[T + 'mr'].barcodes[0].ztoMisplacedAt).toBeUndefined();
@@ -311,7 +331,7 @@ describe('ស្តារពីធុងសំរាម', () => {
             txPaths = [];
             uiState.toasts = [];
             seedTrash([item(id, [bc('M' + id, extra)], { trashReason: 'returned', deletedAt: 9 })]);
-            if (evidence) noteZtoReturnedEvidence('M' + id, Date.now() - 60000, true);
+            if (evidence) noteZtoReturnedEvidence('M' + id, Date.now() - 60000, 'misplaced');
             expect(trashRestoreBlockOf(dataState.deletedItems[0])).toBe('');
             uiState.pendingRestoreId = id;
             await executeRestoreItem();

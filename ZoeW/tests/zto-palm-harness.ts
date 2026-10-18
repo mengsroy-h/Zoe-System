@@ -33,7 +33,7 @@ const VN = 'Shopee SHPE';
 
 export type Backend = 'firebase' | 'supabase';
 export type IdentityMode = 'off' | 'optional' | 'require';
-type Scan = { action: string; siteCode: string; time: string; mailNo?: string; msgLoc?: string };
+type Scan = { action: string; siteCode: string; time: string; mailNo?: string; msgLoc?: string; problemReason?: string };
 type Parcel = { tab: '1' | '4' | '5'; isSign: number | null; scans: Scan[] };
 
 const at = (day: string, time = '09:00:00') => '2026-10-' + day + ' ' + time;

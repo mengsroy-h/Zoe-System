@@ -85,7 +85,7 @@ export function trashRestoreBlockOf(item) {
     if (item.trashReason === 'pickup' && barcodes.every((b) => barcodeSignedInZto(b))) return 'signed';
     if (item.trashReason === 'returned' && barcodes.some((b) => {
         const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(b.code));
-        return !!evidence && evidence.misplaced !== true;
+        return !!evidence && evidence.kind === 'returned';
     })) return 'returned';
     return '';
 }
@@ -94,7 +94,7 @@ export function barcodeMisplacedInZto(barcode) {
     if (barcodeZtoMisplaced(barcode)) return true;
     if (!barcode || !barcode.code) return false;
     const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(barcode.code));
-    return !!evidence && evidence.misplaced === true;
+    return !!evidence && evidence.kind === 'misplaced';
 }
 
 export function trashItemMisplaced(item) {
@@ -118,11 +118,11 @@ export function pruneZtoReturnedEvidence() {
     }
 }
 
-export function noteZtoReturnedEvidence(code, at, misplaced = false) {
+export function noteZtoReturnedEvidence(code, at, kind = 'returned') {
     const key = pickupBarcodeKey(code);
     if (!key || typeof at !== 'number' || !isFinite(at) || at <= 0) return;
     ztoReturnedEvidence.delete(key);
-    ztoReturnedEvidence.set(key, { at: at, misplaced: misplaced === true });
+    ztoReturnedEvidence.set(key, { at: at, kind: kind === 'misplaced' || kind === 'sent' ? kind : 'returned' });
     pruneZtoReturnedEvidence();
 }
 
@@ -172,8 +172,9 @@ export function collectZtoFinalTargets() {
                 if (!key) return;
                 const want: { signed?: number; returned?: number; misplaced?: boolean } = {};
                 if (b.isClosed === true && !barcodeZtoSigned(b) && barcodeVerdictSigned(b)) want.signed = signedAt;
-                const evidence = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
-                const stampMisplaced = !!evidence && evidence.misplaced === true && !misplacedOff && !barcodeZtoMisplaced(b);
+                const found = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
+                const evidence = found && found.kind !== 'sent' ? found : null;
+                const stampMisplaced = !!evidence && evidence.kind === 'misplaced' && !misplacedOff && !barcodeZtoMisplaced(b);
                 if (evidence && (!barcodeZtoReturned(b) || stampMisplaced)) {
                     want.returned = evidence.at;
                     if (stampMisplaced) want.misplaced = true;

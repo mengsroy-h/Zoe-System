@@ -21,6 +21,7 @@ import { TRASH_REASON_META, buildTrashGroups, trashDisplayReasonOf, trashReasonO
 import { removedParcelsView } from '../src/features/notifications';
 import { activeRestoreClaims, restoreLedgerKeyFor } from '../src/features/restore';
 import { removeReturnedZtoBarcodes } from '../src/features/zto-returned';
+import { trashRestoreBlockOf } from '../src/features/zto-final-marks';
 import { runZtoListSyncPreview } from '../src/features/zto-list-sync';
 import { clearZtoPickupStatusStore, runZtoStatusSweep } from '../src/features/zto-status';
 import { ztoListGroupModel } from '../src/app/components/zto/model';
@@ -330,7 +331,7 @@ describe('↩️ `removeReturnedZtoBarcodes()` ៖ ស្គាល់ថាត�
 
 const dk = (back: number) => new Date(Date.now() + 7 * 3600000 - back * DAY_MS).toISOString().slice(0, 10);
 function zto(returns: Array<{ code: string; at: string }>, detail?: (code: string) => any, signs: Array<{ code: string; at: string }> = [],
-    sends: Array<{ code: string; at: string }> = []) {
+    sends: Array<{ code: string; at: string }> = [], problems: Array<{ code: string; at: string; reason?: string }> = []) {
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
@@ -361,7 +362,10 @@ function zto(returns: Array<{ code: string; at: string }>, detail?: (code: strin
             : (c.scanTypeCode === '05' ? signs.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
                 consigneeMobile: '855977000111', scanTypeCode: '05', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 }))
             : (c.scanTypeCode === '02' ? sends.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
-                consigneeMobile: '855977000111', scanTypeCode: '02', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 })) : []));
+                consigneeMobile: '855977000111', scanTypeCode: '02', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0 }))
+            : (c.scanTypeCode === '30' ? problems.filter((r) => r.at >= c.scanStartTime && r.at <= c.scanEndTime).map((r) => ({ scanBillCode: r.code,
+                consigneeMobile: '855977000111', scanTypeCode: '30', scanTime: r.at, scanSite: 'S', agentAmount: 0, fcAmount: 0,
+                problemReason: r.reason || 'ទីតាំងមិនត្រឹមត្រូវ' })) : [])));
         return new Response(JSON.stringify({ success: true, error: null,
             data: { pageNum: b.pageNum, pages: rows.length ? 1 : 0, total: rows.length, result: rows } }), { status: 200 });
     }));
@@ -426,22 +430,27 @@ describe('↩️ ទ្វារដែល App ដឹងថាកញ្ចប់�
         expect(calls.filter((q) => q.returned === '1'), 'ម្តងក្នុងមួយម៉ោង').toHaveLength(1);
     });
 
-    it('📍 ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ស្កេនបញ្ជូនចេញ 02 ក្រោយចូល ZoeW ➜ ធុងសំរាម «ខុសទីតាំង» · ដកលុយ · ត្រឡប់ + បញ្ជូនចេញ ➜ «ត្រឡប់»', async () => {
+    it('📍 ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ «ទីតាំងមិនត្រឹមត្រូវ» ➜ បញ្ជូនចេញ 02 ➜ «ខុសទីតាំង» · 02 តែម្យ៉ាង ➜ «ត្រឡប់» ស្តារបាន · ដកលុយ · ត្រឡប់ + បញ្ជូនចេញ ➜ «ត្រឡប់»', async () => {
         seed([youngItem([['ZTMIS0000001', 10]], 'id_mis'), youngItem([['ZTRET0000001', 5]], 'id_ret'), youngItem([['ZTKEEP000001', 5]], 'id_keep'),
-            youngItem([['ZTMIX0000001', 1], ['ZTMIX0000002', 1]], 'id_mix')]);
+            youngItem([['ZTMIX0000001', 1], ['ZTMIX0000002', 1]], 'id_mix'), youngItem([['ZTSENT000001', 3]], 'id_sent')]);
         const at = ztoStamp(getServerNow() - 3600000);
         const calls = zto([{ code: 'ZTRET0000001', at }, { code: 'ZTMIX0000002', at }], undefined, [],
-            [{ code: 'ZTMIS0000001', at }, { code: 'ZTRET0000001', at }, { code: 'ZTMIX0000001', at }]);
+            [{ code: 'ZTMIS0000001', at }, { code: 'ZTRET0000001', at }, { code: 'ZTMIX0000001', at }, { code: 'ZTSENT000001', at }],
+            [{ code: 'ZTMIS0000001', at }, { code: 'ZTSENT000001', at, reason: 'ទាក់ទងអតិថិជនមិនបាន' }]);
         await runZtoStatusSweep(true, dataState.scanHistory, []);
         await flush();
         expect(historyCodes('id_keep')).toEqual(['ZTKEEP000001']);
-        expect(['id_mis', 'id_ret', 'id_mix'].map((id) => historyCodes(id))).toEqual([[], [], []]);
-        expect(ledger().codDollar, 'លុយដក ១០ + ៥ + ២').toBe(83);
+        expect(['id_mis', 'id_ret', 'id_mix', 'id_sent'].map((id) => historyCodes(id))).toEqual([[], [], [], []]);
+        expect(ledger().codDollar, 'លុយដក ១០ + ៥ + ២ + ៣').toBe(80);
         expect(calls.filter((q) => q.sent === '1')).toHaveLength(1);
+        expect(calls.filter((q) => q.problem === '1')).toHaveLength(1);
         const labels = buildTrashGroups(trashItems()).flatMap((g: any) => g.codes.map((code: string) => code + ':' + g.reason)).sort();
         expect(labels, 'ជួរតែមួយមានទាំងត្រឡប់ និងខុសទីតាំង ➜ «ត្រឡប់» (ព្រំដែនទទួលស្គាល់)')
-            .toEqual(['ZTMIS0000001:misplaced', 'ZTMIX0000001:returned', 'ZTMIX0000002:returned', 'ZTRET0000001:returned']);
+            .toEqual(['ZTMIS0000001:misplaced', 'ZTMIX0000001:returned', 'ZTMIX0000002:returned', 'ZTRET0000001:returned', 'ZTSENT000001:returned']);
         expect(trashItems().every((t: any) => t.trashReason === 'returned')).toBe(true);
+        const sent = trashItems().find((t: any) => t.barcodes[0].code === 'ZTSENT000001');
+        expect(trashRestoreBlockOf(sent), '📤 បញ្ជូនចេញ (មិនមែន -710) ➜ ស្តារបាន').toBe('');
+        expect(trashRestoreBlockOf(trashItems().find((t: any) => t.barcodes[0].code === 'ZTRET0000001'))).toBe('returned');
     });
 
     it('ពិនិត្យនៅខាងក្រោយ (Cookie) ៖ ZTO ចុះហត្ថលេខា + ស្កេនត្រឡប់ ➜ ហត្ថលេខាឈ្នះ ទោះបិទមិនទាន់ដល់ (លើស batch មួយជុំ) ➜ មិនដក · លុយមិនដក', async () => {

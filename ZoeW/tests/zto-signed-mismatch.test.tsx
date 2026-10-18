@@ -35,7 +35,9 @@ const NOW = Date.UTC(2026, 9, 6, 3, 0, 0);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const returnedOff = (inner: any) => (url: any, init?: any) => (String(url).includes('returned=1')
     ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'returned', rows: [], returned: null, returnedOk: false }))
-    : String(url).includes('sent=1') ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'sent', rows: [], sent: null, sentOk: false })) : inner(url, init));
+    : String(url).includes('sent=1') ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'sent', rows: [], sent: null, sentOk: false }))
+    : String(url).includes('problem=1') ? Promise.resolve(json({ success: true, list: true, enabled: true, kind: 'problem', rows: [], problem: null, problemOk: false }))
+    : inner(url, init));
 const CFG = { enabled: true, fastMode: true, url: window.location.origin + '/.netlify/functions/zto-order-detail?barcode={barcode}' };
 
 function row(barcode: string) {

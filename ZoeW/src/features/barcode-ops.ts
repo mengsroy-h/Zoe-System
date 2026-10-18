@@ -8,7 +8,7 @@ import { applyBarcodeCloseState, dropStaleRestoreMarkers, ensureBarcodeArrayForI
 import { restoreClaimedItemToScanHistory } from '../domain/cleanup';
 import { collectedMarksFor, markCollectedRevenue, reapplyPickupMarks, reconcileCollectedHistory, revertPickupMarks, syncCollectedValueForBarcode } from '../domain/collected';
 import { addRevenueToDailyAndMonthlyRecord, correctRevenueLedgerToActual, revertRevenueLedgerDelta, ledgerDeltaCompanion } from '../domain/ledger';
-import { getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, reconstructPickupSet } from '../domain/pickup';
+import { addPickupIntentKeys, beginPickupIntent, endPickupIntent, getPickupPhoneKey, markPickupBarcodes, pickupBarcodeKey, reconstructPickupSet, releasePickupIntent } from '../domain/pickup';
 import { clearScannedRemovalInFlight } from './scan-remove';
 import { TRASH_WRITE_SLOW_NOTICE_MS } from './session';
 import { saveSingleDeletedItemToFirebase } from '../services/history-write';
@@ -327,9 +327,22 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
     let pickupApplied = null;
     let serverApplied = false;
     let serverPickupMarks = null;
+    let pickupIntent = null;
+    let pickupCommit = null;
+    const finishPickupIntent = () => {
+        if (!pickupIntent) return;
+        const intent = pickupIntent;
+        pickupIntent = null;
+        if (!closeIsCurrent()) releasePickupIntent(intent);
+        else endPickupIntent(intent, pickupCommit);
+    };
     const reconcilePickupDeltaWithServer = () => {
         if (!serverPickupMarks) return;
+        const serverKeys = serverPickupMarks.map((mark) => mark.key);
+        if (pickupIntent) addPickupIntentKeys(pickupIntent, serverKeys);
+        else pickupIntent = beginPickupIntent(pickupScanDate, serverKeys);
         pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+        if (pickupApplied && pickupApplied.commit) pickupCommit = pickupApplied.commit;
         refreshCurrentHistoryView();
     };
     if (freshItem && freshB) {
@@ -346,7 +359,9 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
 
         pickupPhoneKey = getPickupPhoneKey(freshItem);
         const pickupKey = pickupBarcodeKey(barcodeCode);
+        pickupIntent = pickupKey ? beginPickupIntent(pickupScanDate, [pickupKey]) : null;
         pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
+        pickupCommit = pickupApplied && pickupApplied.commit;
 
         if (showModalAfterApply) openViewListModal(itemId);
         refreshCurrentHistoryView();
@@ -373,18 +388,21 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
             }
         }
         if (pickupApplied) {
-            revertPickupMarks(pickupApplied);
+            const reverted = revertPickupMarks(pickupApplied);
+            if (reverted && reverted.commit) pickupCommit = reverted.commit;
             pickupApplied = null;
         }
     };
     const settleBarcodeClose = async (barcodeCloseResult, late) => {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { finishPickupIntent(); return false; }
         if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
             revertBarcodeCloseLocally();
+            finishPickupIntent();
             showToast(`⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
             return false;
         }
         reconcilePickupDeltaWithServer();
+        finishPickupIntent();
         const collectedSaved = await reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
         if (!closeIsCurrent()) return false;
         if (!silent && collectedSaved === true) showToast(late
@@ -437,10 +455,11 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         });
         return settleBarcodeClose(await dbOp(closeTx), false);
     } catch (error) {
-        if (!closeIsCurrent()) return false;
+        if (!closeIsCurrent()) { finishPickupIntent(); return false; }
         if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
-            if (!closeIsCurrent()) return;
+            if (!closeIsCurrent()) { finishPickupIntent(); return; }
             revertBarcodeCloseLocally();
+            finishPickupIntent();
             showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
         }, 'toggleIndividualBarcodeClose')) {
@@ -450,6 +469,7 @@ export async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed
         console.error("Error toggling barcode close: ", error);
         if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
         revertBarcodeCloseLocally();
+        finishPickupIntent();
         showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
         return false;
     }

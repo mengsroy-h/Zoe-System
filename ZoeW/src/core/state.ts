@@ -140,6 +140,7 @@ export interface DataState {
     registryReleaseFlushInFlight: boolean;
     pickupLedgerRepairDone: boolean;
     pickupLedgerRepairRunning: boolean;
+    pickupResumeInFlight: boolean;
     recentPhonesSignature: any;
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
@@ -164,6 +165,7 @@ export const dataState = createStore<DataState>('dataState', {
     registryReleaseFlushInFlight: false,
     pickupLedgerRepairDone: false,
     pickupLedgerRepairRunning: false,
+    pickupResumeInFlight: false,
     recentPhonesSignature: null,
     deletedCleanupInFlight: false,
     cleanupResumeInFlight: false,

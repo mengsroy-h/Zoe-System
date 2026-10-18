@@ -237,7 +237,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 const states = await Promise.all(devices.map((d) => d.state()));
                 const done = await Promise.all(devices.map((d) => d.page.evaluate(() => window.__settled()).catch(() => true)));
                 states.forEach((st, k) => { if (DEBUG && st.results.length) console.log('      ' + devices[k].name + ' ' + JSON.stringify(st.results)); });
-                if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.blocked === 0)) return null;
+                if (states.every((st, k) => done[k] && st.pending === 0 && st.rows === 0 && st.phase === 'ready' && st.cleanupJournal === 0 && st.pickupJournal === 0 && st.blocked === 0)) return null;
                 if (Date.now() - t0 > 60000) return states;
                 await sleep(300);
             }
@@ -319,7 +319,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             }
             if (stuck) {
                 broke = 'ឧបករណ៍មិនស្ងប់ក្នុង ៦០ វិ. (pending · journal · blocked · cleanup journal) ក្រោយជុំ ' + i + '\n        '
-                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal })));
+                    + JSON.stringify(stuck.map((s, k) => ({ dev: devices[k].name, status: s.status, phase: s.phase, pending: s.pending, blocked: s.blocked, rows: s.rows, cleanupJournal: s.cleanupJournal, pickupJournal: s.pickupJournal })));
                 break;
             }
             const views = await Promise.all(devices.map((d) => d.state()));

@@ -26,6 +26,8 @@ export const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
 export const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';
 
+export const PICKUP_JOURNAL_KEY = 'zoew_pickup_journal_v1';
+
 export const LOCKER_PREFIX_KEY = 'zoe_locker_prefix';
 
 export const LOCKER_COUNT_KEY = 'zoe_locker_count';

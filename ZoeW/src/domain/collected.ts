@@ -257,8 +257,8 @@ export function revertPickupMarks(applied) {
     if (!applied || !applied.scanDate || !applied.previous || !applied.previous.length) return null;
     const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
     applyPickupMarksInMemory(applied.scanDate, marks, applied.seed);
-    commitPickupMarks(applied.scanDate, marks, applied.seed);
-    return applied;
+    const commit = commitPickupMarks(applied.scanDate, marks, applied.seed);
+    return Object.assign({}, applied, { commit: commit });
 }
 
 export function requestPinBeforeResetPickup() {

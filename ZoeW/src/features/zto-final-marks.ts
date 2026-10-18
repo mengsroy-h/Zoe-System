@@ -25,7 +25,6 @@ export const ZTO_SIGNED_REOPEN_PART_TEXT = ' បើក barcode ដែលមិ�
 
 export const ZTO_RESTORE_BLOCK_TEXT = {
     returned: '🔒 កញ្ចប់នេះ ZTO ស្កេនត្រឡប់រួច ហើយត្រូវត្រឡប់ទៅសាខាកណ្តាល — មិនអាចស្តារបានទេ។',
-    misplaced: '🔒 កញ្ចប់នេះខុសទីតាំង ZTO ស្កេនបញ្ជូនចេញទៅទីតាំងពិតរបស់វារួច — មិនអាចស្តារបានទេ។',
     signed: '🔒 កញ្ចប់នេះ Sign ក្នុង ZTO រួច — មិនអាចស្តារបានទេ។'
 };
 
@@ -78,15 +77,16 @@ export function explainZtoReopenLock(itemId?) {
 }
 
 export function trashRestoreBlockOf(item) {
+    if (trashItemMisplaced(item)) return '';
     const stamped = trashZtoFinalBlock(item);
-    if (stamped === 'returned' && trashItemMisplaced(item)) return 'misplaced';
     if (stamped) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
     if (item.trashReason === 'pickup' && barcodes.every((b) => barcodeSignedInZto(b))) return 'signed';
-    if (item.trashReason === 'returned' && barcodes.some((b) => ztoReturnedEvidence.has(pickupBarcodeKey(b.code)))) {
-        return trashItemMisplaced(item) ? 'misplaced' : 'returned';
-    }
+    if (item.trashReason === 'returned' && barcodes.some((b) => {
+        const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(b.code));
+        return !!evidence && evidence.misplaced !== true;
+    })) return 'returned';
     return '';
 }
 

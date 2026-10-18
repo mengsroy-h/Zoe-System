@@ -107,22 +107,28 @@
 **ZoeW** (`zoew-v391` ➜ `zoew-v392`) · rules ថ្មី (`firebase-database.rules.json` + `supabase/migrations/20261018084522_zoe_rules.sql`) · APK សិទ្ធិទីតាំង · Netlify header។
 សំណើម្ចាស់គម្រោង ៖ «សូមអោយ app ZoeW ពេល Sign ចាប់រូបភាពមាន timestamp និង កូអរដោនេ ដូច ZTO Palm ពិត» · «កញ្ចប់ ខុសទីតាំង "ទីតាំងមិនត្រឹមត្រូវ" ហើយត្រូវ
 ស្កេនបញ្ចូនទៅទីតាំង ពិត របស់វា សូមអោយ ZoeW ស្គាល់ ហើយដកចេញពី បញ្ជី ដូចអីវ៉ាន់ត្រឡប់ដែរ តែមានស្លាក "ខុសទីតាំង" ក្នុងធុងសំរាម» (តំបន់ LOCK ZTO ៖ សំណើផ្ទាល់)។
-លម្អិត ៖ ផ្នែក ២ A230 · A231 · A232។
+លម្អិត ៖ ផ្នែក ២ A230 · A231 · A232 · A233។
 
 - 📍 **រូប Sign** ៖ ម៉ោង `YYYY-MM-DD HH:MM:SS` (Asia/Phnom_Penh · នាឡិកា server) និងកូអរដោនេ `lat, lng` (៥ ខ្ទង់) ពណ៌ក្រហម ជ្រុងក្រោមឆ្វេង ដូច ZTO Palm ·
   ទីតាំងតាម `navigator.geolocation.watchPosition` តែពេលផ្ទាំង Sign បើក (បិទ ➜ `clearWatch`) · ទីតាំងចាស់ជាង ២ នាទី ឬភាពត្រឹមត្រូវ > 1000 m ➜ រូបមានតែម៉ោង ·
   កាមេរ៉ា · 📷 · 🖼 ដូចគ្នា · Netlify `Permissions-Policy` `geolocation=(self)` · APK `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` (គ្មាន background)។
 - 📍 **ខុសទីតាំង** ៖ ZTO Palm `status=1` និង `tracks=` ឆ្លើយ `ztoMisplacedAt` = ស្កេន `2` 发件 នៃសាខាខ្លួន ក្រោយការមកដល់ចុងក្រោយ (គ្មាន `-710` · មិនបិទ) ហើយ
   `ztoReturnedAt` ដដែល ➜ ផ្លូវត្រឡប់ដដែល (`removeReturnedZtoBarcodes()` ➜ ធុងសំរាម `returned` · លុយ និងចំនួនកញ្ចប់ដក) · `syncZtoFinalMarks()` កត់ `ztoMisplacedAt`
-  លើ barcode ➜ ធុងសំរាមស្លាក «ខុសទីតាំង» (ក្រុមដាច់ពី «ត្រឡប់») · 🔔 «📤» «📍 ខុសទីតាំង» · 🔒 មិនអាចស្តារ · ប្រអប់ទាញបញ្ជី «📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ» ·
+  លើ barcode ➜ ធុងសំរាមស្លាក «ខុសទីតាំង» (ក្រុមដាច់ពី «ត្រឡប់») · 🔔 «📤» «📍 ខុសទីតាំង» · ស្តារបាន (មិន 🔒 ៖ ហាងច្រើនសាខាលើ DB តែមួយ សាខាផ្សេងទទួលកញ្ចប់ ·
+  ក្រោយស្តារ `restoredAt` ក្រោយស្កេនបញ្ជូនចេញ ➜ មិនដកម្តងទៀត) · ប្រអប់ទាញបញ្ជី «📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ» ·
   ស្កេនបញ្ហា `-582` តែម្យ៉ាង (ទូរស័ព្ទមិនលើក ក៏ប្រើកូដនេះ) ➜ មិនដក។
 - ✍️ **ចែកចាយកញ្ចប់មានបញ្ហា** (សំណើ ៖ «ZTO Palm ពេលស្កេន ចែកចាយមិនផ្ទុករូបភាពទេនិងឈ្មោះទេ តែមានសារលោតបញ្ជាក់ បញ្ហាដូចពេល Sign ដែរ … ការ Sign ដំណើរការត្រឹមត្រូវ100%ហើយ») ៖
   ការស្កេនចែកចាយ `04` ដែល ZTO ឆ្លើយសារបញ្ហា (`newBusinessCheck` · `whetherForce: false`) បង្ហាញផ្ទាំង «⚠️ បញ្ជាក់កញ្ចប់» ដូច Sign ➜ «បញ្ជាក់ និងបន្ត» ផ្ញើ `04` ជាមួយ token ·
   «បោះបង់» ➜ មិនចែកចាយ (ស្កេនម្តងទៀតសួរម្តងទៀត) · ZTO ហាម ➜ «⛔ ZTO មិនអនុញ្ញាតឲ្យចែកចាយ» + សារ · ការចែកចាយនៅតែគ្មានរូប គ្មានឈ្មោះ · ការទទួល `05` (Sign) មិនប្រែ (A232)។
+- 🍪 **Cookie ស្គាល់ «ខុសទីតាំង» ដូច Palm** (សំណើ ៖ «អោយ cookie ស្គាល់ស្ថានភាពដូច ZTO Palm login ផង cookie sync read ដូច palm ផង តែមិនអាច write») ៖ Function `?list=1&sent=1` អានបញ្ជី Argus
+  `ZTO_LIST_SEND_SCAN_TYPE` (លំនាំដើម `02` ផ្ញើចេញ · `off` បិទ) ក្នុងចន្លោះដូច `returned=1` ➜ App អានជាមួយបញ្ជីត្រឡប់ (ទាញបញ្ជី · ពិនិត្យនៅខាងក្រោយម្តងក្នុងមួយម៉ោង) ➜ Barcode បើកក្នុង ZoeW
+  ដែលសាខាស្កេនបញ្ជូនចេញក្រោយចូល ZoeW ➜ ធុងសំរាម «ខុសទីតាំង» (ដកលុយ · ចំនួន) · Barcode ដែលមានស្កេនត្រឡប់ក្នុងចន្លោះ ➜ «ត្រឡប់» · អានបញ្ជីបញ្ជូនចេញមិនបាន ➜ «⚠️ ពិនិត្យកញ្ចប់ខុសទីតាំង… មិនបានគ្រប់» ·
+  Cookie នៅតែគ្មាន Sign (អានតែប៉ុណ្ណោះ) · ព្រំដែនទទួលស្គាល់ ៖ ជួរ (អតិថិជន + ថ្ងៃ) តែមួយដែលមានទាំងត្រឡប់ និងខុសទីតាំងក្នុងជុំដដែល ➜ ធាតុធុងសំរាមមួយ ស្លាក «ត្រឡប់» (A233)។
 - 🔎 **ពិនិត្យឡើងវិញ** (សំណើ ៖ «តេស្តមុខងារថ្មី … និងការកែ ឡើងវិញមើលក្រែងមានចន្លោះ») ៖ ① rules មិនទាន់មាន `ztoMisplacedAt` ➜ ការសរសេរទាំងមូលត្រូវបដិសេធ ហើយ `ztoReturnedAt` (🔒 ស្តារ) ក៏បាត់ ➜
   ឥឡូវសរសេរម្តងទៀតដោយគ្មាន `ztoMisplacedAt` (`ztoMisplacedRefused` ៣០ នាទី) ហើយកត់ស្លាកម្តងទៀតក្រោយ Publish · ស្លាក/🔒 «ខុសទីតាំង» តាមភស្តុតាងក្នុងឧបករណ៍ ទោះ DB មានតែ `ztoReturnedAt` ·
   ② ប្រអប់ទាញបញ្ជីរាប់កញ្ចប់ខុសទីតាំងជា «ស្កេនត្រឡប់រួច» ➜ ឥឡូវ «📍 ខុសទីតាំង (បញ្ជូនចេញរួច) N» ដាច់ · ③ រូប Sign ៖ ម្ចាស់គម្រោង «Font Bold ធំពេក» ➜ អក្សរធម្មតា (`400`) · ៣.៥% នៃជ្រុងខ្លី
-  (`PALM_SIGN_STAMP_SIZE`) · គ្មានគែមខ្មៅ · ពណ៌ `#ff4444` ដូចរូប ZTO Palm ពិត (វាស់ក្នុង Chromium លើរូបពិតរបស់ម្ចាស់គម្រោង) · ④ តេស្ត App + Function ពិត `ZoeW/tests/zto-palm-sign-e2e.test.tsx`។
+  (`PALM_SIGN_STAMP_SIZE`) · គ្មានគែមខ្មៅ · ពណ៌ `#ff4444` ដូចរូប ZTO Palm ពិត (វាស់ក្នុង Chromium លើរូបពិតរបស់ម្ចាស់គម្រោង) · ④ តេស្ត App + Function ពិត `ZoeW/tests/zto-palm-sign-e2e.test.tsx` ·
+  ⑤ ហាងច្រើនសាខាលើ DB តែមួយ ៖ សាខា A ផ្ញើកញ្ចប់ទៅសាខា B នៃហាងដដែល ➜ A ដាក់ «ខុសទីតាំង» ហើយ 🔒 រារាំងការស្តារ ➜ B ស្កេនបញ្ចូលមិនបាន (registry កាន់ដោយធុងសំរាម) ➜ «ខុសទីតាំង» ស្តារបាន (`ZoeW/tests/zto-final-marks.test.tsx` ៖ មុនកែធ្លាក់)។
 - 🧪 `ZoeW/tests/zto-palm-server.test.ts` (📍 ៧ ករណី · លំដាប់ពិតរបស់ម្ចាស់គម្រោង) · `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx` ·
   `ZoeW/tests/zto-returned-cleanup.test.ts` · `ZoeW/tests/palm-sign-camera.test.ts` (ម៉ោង · កូអរដោនេ · watch/clearWatch · stamp មុន JPEG · អក្សរធម្មតា គ្មានគែម) · `ZoeW/tests/zto-palm-sign.test.tsx` ·
   `emu/app-writes-rules-test` (`ztoMisplacedAt` + probe rules គ្មានវា) · `npm run android:check` · `netlify-config-scope-test` · `security-guard-test`។
@@ -4384,10 +4390,11 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ · បញ្ជាក់ពេលចែកចាយ (សំណើម្ចាស់គម្រោង · A230 · A231 · A232)
+### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ · បញ្ជាក់ពេលចែកចាយ (សំណើម្ចាស់គម្រោង · A230 · A231 · A232 · A233)
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
+| A233 | **Cookie មិនស្គាល់កញ្ចប់ខុសទីតាំង** (ភស្តុតាងតែ Palm `tracks`) · Argus មិនផ្តល់ track តាម Barcode ក្នុងផ្លូវ Cookie ➜ ប្រើបញ្ជីស្កេនតាមប្រភេទ (ដូច `-710`) ៖ កូដ Argus ស្របនឹង action Palm (`03` មកដល់ · `05` ចុះហត្ថលេខា) ➜ ផ្ញើចេញ = `02` (env កែបាន) · ព្រោះបញ្ជីមិនដឹងការមកដល់តាម Barcode ក្នុងការពិនិត្យនៅខាងក្រោយ ➜ មូលដ្ឋានគឺពេលចូល ZoeW (`barcodeReturnCounts()`) | `ZoeW/tests/zto-returned.test.tsx` ២ ថ្មី (ទាញបញ្ជី ៖ `misplaced` · ត្រឡប់ឈ្នះ · `off` មិនសួរ `02` · បញ្ជីធ្លាក់ ➜ `sentState` failed ៖ មុនកែធ្លាក់) · `ZoeW/tests/zto-returned-cleanup.test.ts` (ពិនិត្យនៅខាងក្រោយ ៖ ខុសទីតាំង · ត្រឡប់ · ជួរចម្រុះ ➜ «ត្រឡប់» · លុយដក ១៧) | [2.50.128] `zto-order-detail.js` (`readListSendConfig()` · kind `sent`) · `fetchZtoReturnedPages()` = `fetchZtoScanPages()` ×២ · LOCK ថ្មី · ⚠️ **កូដ `02` មិនទាន់វាស់លើ Argus ពិត** ➜ 🩺 `?diag=1` `list.sentEnabled` · បើ ZTO ប្រើកូដផ្សេង ➜ កែ env |
 | A232 | **ការចែកចាយ `04` កញ្ចប់មានបញ្ហា ៖ ZoeW បដិសេធ ចំណែក ZTO Palm ពិតសួរបញ្ជាក់** — Function ទទួលការបញ្ជាក់តែ `stage === 'receipt'` (`stage !== 'receipt'` ➜ `ZTO_PALM_SIGN_CHECK_REJECTED`) ➜ កញ្ចប់ដែល ZTO អនុញ្ញាតដោយបញ្ជាក់ ចែកចាយក្នុង ZoeW មិនបាន ហើយ Sign មិនបានតាមក្រោយ | `ZoeW/tests/zto-palm-sign-server.test.ts` (ចែកចាយ ៖ សួរបញ្ជាក់ · គ្មានរូប/ឈ្មោះ · token ចែកចាយមិនប្រើសម្រាប់ទទួល · ចុចស្ទួន ➜ `04` តែម្តង ៖ មុនកែធ្លាក់) · `ZoeW/tests/zto-palm-sign.test.tsx` (ផ្ទាំងបញ្ជាក់ · បោះបង់ · ស្កេនម្តងទៀត · បញ្ជាក់ ➜ token ៖ មុនកែធ្លាក់) | [2.50.128] `_shared/zto-palm-sign.js` ៖ ហាមតែ `whetherForce: true` · `90187`/`90189` (ទាំង ២ ដំណាក់កាល) · `dispatchPalmSignCode(code, approval)` · `PalmSignConfirmation.stage` · ការទទួល `05` មិនប្រែ · `ZoeW/tests/zto-palm-sign-e2e.test.tsx` (App + Function ពិត ៖ មុនកែ ២/៣ ធ្លាក់ · «Sign មិនប្រែ» ជាប់ទាំងមុន និងក្រោយ) |
 | A231 | **រូប Sign ពី ZoeW គ្មានម៉ោង និងកូអរដោនេ** (ម្ចាស់គម្រោងផ្ញើរូប ២ ៖ ZTO Palm មាន `2026-10-15 12:03:43` · `12.30011, 105.41921` ក្រហមជ្រុងក្រោមឆ្វេង · ZoeW គ្មាន) · ឧបសគ្គ ៖ Netlify `Permissions-Policy` `geolocation=()` បិទ geolocation ក្នុង PWA · APK គ្មានសិទ្ធិទីតាំង (WebView `BridgeWebChromeClient` ស្នើតែសិទ្ធិដែលប្រកាស) · Android ផ្អាក Activity ពេលសួរ ➜ App Lock | `ZoeW/tests/palm-sign-camera.test.ts` ៣ ថ្មី (ម៉ោង Asia/Phnom_Penh · ទីតាំងចាស់/មិនច្បាស់ ➜ តែម៉ោង · watch តែពេលផ្ទាំងបើក · clearWatch ពេលបិទ · លើកលែងការចាក់សោពេលមិនទាន់អនុញ្ញាត · stamp មុន JPEG) · `npm run android:check` · `netlify-config-scope-test` (ដេរីវេ ៖ App ប្រើ `navigator.geolocation` ➜ `geolocation=(self)` · មិនប្រើ ➜ `()`) | [2.50.128] `stampPalmSignPhoto()` ក្នុង `palmSignFramePhoto()` (fail-open) · `startPalmSignLocation()` ពី `SignForm` · `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` (⛔ គ្មាន background) |
 | A230 | **កញ្ចប់ខុសទីតាំងនៅក្នុងបញ្ជីបើក** — 🧪 ពិតរបស់ម្ចាស់គម្រោង (`11600102797860`) ៖ `3` មកដល់ 13:25:26 ➜ `4` 13:33:04 ➜ `-582` «ទីតាំងមិនត្រឹមត្រូវ» 13:34:12 ➜ `2` 发件 ទៅ KC-01 13:34:40 · `ztoReturnedAt: null` ➜ ZoeW ទុកកញ្ចប់បើក (លុយមិនដក) ទោះវាចេញពីសាខាហើយ · ភស្តុតាងជ្រើស ៖ ស្កេន `2` នៃសាខាខ្លួនក្រោយមកដល់ (⛔ មិនមែន `-582` តែម្យ៉ាង ៖ `actionName` 地址不详，电话联系不上 ក៏ប្រើពេលទូរស័ព្ទមិនលើក ហើយកញ្ចប់នៅហាង) | `ZoeW/tests/zto-palm-server.test.ts` ៧ ករណី (លំដាប់ពិត · ត្រឡប់ឈ្នះ · ទទួលហើយបញ្ជូន · សាខាផ្សេង · មកដល់ម្តងទៀត · `-582` តែម្យ៉ាង · Sign ឈ្នះ ៖ មុនកែ `ztoMisplacedAt` មិនមាន ➜ ធ្លាក់) · `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx` · `ZoeW/tests/zto-returned-cleanup.test.ts` · `emu/app-writes-rules-test` (probe rules គ្មាន `ztoMisplacedAt` ➜ បដិសេធ) | [2.50.128] `_shared/zto-palm.js` (`SEND_OUT_ACTION`) · `zto-status.ts` · `zto-list-sync.ts` · `zto/model.ts` (LOCK ថ្មី) · `trashDisplayReasonOf()` · `TRASH_STORED_REASONS` (តម្លៃរក្សាទុកនៅ ៤ · `misplaced` ជាស្លាកបង្ហាញតែប៉ុណ្ណោះ) |

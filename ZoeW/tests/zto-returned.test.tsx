@@ -29,6 +29,7 @@ beforeEach(() => {
     process.env.ZTO_AUTHORIZATION = 'Bearer t';
     process.env.FIREBASE_PROJECT_IDS = fx.TEST_PROJECT;
     delete process.env.ZTO_LIST_RETURN_SCAN_TYPE;
+    delete process.env.ZTO_LIST_SEND_SCAN_TYPE;
     if (fn.resetCachesForTests) fn.resetCachesForTests();
     appLocalStore.clear();
     appLocalStore.setItem('zoew_lookup_api_config', JSON.stringify(CFG));
@@ -70,11 +71,13 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.ZTO_LIST_RETURN_SCAN_TYPE;
+    delete process.env.ZTO_LIST_SEND_SCAN_TYPE;
 });
 
 const arrival = (code: string, back: number, hour = '08') => ({ code, type: '03', desc: 'អីវ៉ាន់មកដល់', at: dk(back) + ' ' + hour + ':00:00' });
 const sign = (code: string, back: number) => ({ code, type: '05', desc: 'ចុះហត្ថលេខា', at: dk(back) + ' 18:00:00' });
 const back = (code: string, back: number, hour = '09') => ({ code, type: '-710', desc: 'ត្រឡប់ការស្កេន', at: dk(back) + ' ' + hour + ':00:00' });
+const send = (code: string, back: number, hour = '10') => ({ code, type: '02', desc: 'ផ្ញើចេញ', at: dk(back) + ' ' + hour + ':00:00' });
 const codesOf = (rows: any[]) => rows.map((row) => row.barcode).sort();
 const historyWith = (code: string) => [{ id: 'h1', phone: '0977000111', scanDate: dk(2), createdAt: Date.now() - 2 * DAY,
     barcodes: [{ code, cod: 2, dod: 0, isClosed: false }] }];
@@ -168,5 +171,42 @@ describe('↩️ Cookie ៖ កញ្ចប់ដែលសាខាស្កេ�
         expect(ret.rows[0].notes.join(' ')).toContain('ធុងសំរាម «ត្រឡប់» (ដកលុយ និងចំនួនកញ្ចប់)');
         expect(String(viewState.ztoListSyncNote)).toContain('↩️ ស្កេនត្រឡប់រួច 1 ➜ រំលង');
         expect(String(viewState.ztoListSyncNote)).toContain('🗑️ ដកកញ្ចប់ត្រឡប់ចេញពី ZoeW 1 (ធុងសំរាម «ត្រឡប់» · ដកលុយ)');
+    });
+});
+
+describe('📍 Cookie ៖ កញ្ចប់ខុសទីតាំង (សាខាស្កេនបញ្ជូនចេញ `02` ក្រោយមកដល់) ដូច ZTO Palm · អានតែប៉ុណ្ណោះ', () => {
+    it('បញ្ជីបញ្ជូនចេញ ➜ `misplaced` · ត្រឡប់ + បញ្ជូនចេញ ➜ ត្រឡប់ឈ្នះ · ក្រុម/សារ «📍 ខុសទីតាំង» · មិនបញ្ចូល', async () => {
+        rowsUp = [
+            arrival('ZTMIS0000001', 1, '08'), send('ZTMIS0000001', 1, '13'),
+            arrival('ZTRET0000001', 2), back('ZTRET0000001', 1, '09'), send('ZTRET0000001', 1, '10'),
+            arrival('ZTKEEP000001', 1)
+        ];
+        const out: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(out.returnedState).toBe('ok');
+        expect(out.sentState).toBe('ok');
+        expect(out.returned.map((r: any) => [r.barcode, r.misplaced === true]).sort()).toEqual([['ZTMIS0000001', true], ['ZTRET0000001', false]]);
+        expect(upstream.some((c) => c.startsWith('02 ')), 'អានបញ្ជី 02').toBe(true);
+        const groups: any = classifyZtoListRows(out.rows, [], [], out.signedRows, { from: dk(3), to: dk(1), returned: out.returned });
+        expect(codesOf(groups.returned)).toEqual(['ZTMIS0000001', 'ZTRET0000001']);
+        expect(codesOf(groups.fresh)).toEqual(['ZTKEEP000001']);
+        expect(groups.returned.find((r: any) => r.barcode === 'ZTMIS0000001').misplaced).toBe(true);
+        expect(groups.returned.find((r: any) => r.barcode === 'ZTRET0000001').misplaced).toBe(false);
+    });
+
+    it('`ZTO_LIST_SEND_SCAN_TYPE=off` ➜ មិនសួរ 02 · បញ្ជីបញ្ជូនចេញធ្លាក់ ➜ ត្រឡប់នៅគ្រប់ · `sentState` failed (មិនលាក់)', async () => {
+        rowsUp = [arrival('ZTMIS0000001', 1, '08'), send('ZTMIS0000001', 1, '13')];
+        process.env.ZTO_LIST_SEND_SCAN_TYPE = 'off';
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        const off: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(off.sentState).toBe('off');
+        expect(off.returned).toEqual([]);
+        expect(upstream.some((c) => c.startsWith('02 '))).toBe(false);
+        delete process.env.ZTO_LIST_SEND_SCAN_TYPE;
+        if (fn.resetCachesForTests) fn.resetCachesForTests();
+        failType = '02';
+        const failed: any = await fetchZtoListAllPages(CFG, dk(3), dk(1));
+        expect(failed.returnedState).toBe('ok');
+        expect(failed.sentState).toBe('failed');
+        expect(failed.returned).toEqual([]);
     });
 });

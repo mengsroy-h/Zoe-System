@@ -133,9 +133,7 @@ export function barcodeZtoMisplaced(barcode) {
 export function trashZtoFinalBlock(item) {
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
-    if (item.trashReason === 'returned' && barcodes.some(barcodeZtoReturned)) {
-        return barcodes.every((b) => !barcodeZtoReturned(b) || barcodeZtoMisplaced(b)) ? 'misplaced' : 'returned';
-    }
+    if (item.trashReason === 'returned' && barcodes.some((b) => barcodeZtoReturned(b) && !barcodeZtoMisplaced(b))) return 'returned';
     if (item.trashReason === 'pickup' && barcodes.every(barcodeZtoSigned)) return 'signed';
     return '';
 }

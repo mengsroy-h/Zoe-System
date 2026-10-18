@@ -359,7 +359,7 @@ export function buildZtoListApiUrl(cfg, from, to, page, mode?, palm?) {
     const markerAt = raw.toLowerCase().indexOf(marker);
     const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
     const extra = mode === 'signed' ? '&signed=1' : (mode === 'signedExact' ? '&signed=1&exact=1'
-        : (mode === 'withSigned' ? '&withSigned=1' : (mode === 'returned' ? '&returned=1' : '')));
+        : (mode === 'withSigned' ? '&withSigned=1' : (mode === 'returned' ? '&returned=1' : (mode === 'sent' ? '&sent=1' : ''))));
     const isPalm = lookupApiIsPalm(cfg);
     let palmExtra = '';
     if (isPalm && palm && palm.candidates === true) palmExtra += '&candidates=1';
@@ -451,26 +451,34 @@ export function absorbZtoListSigned(out, body) {
 }
 
 export async function fetchZtoReturnedPages(cfg, from, to) {
+    const [back, sent] = await Promise.all([fetchZtoScanPages(cfg, from, to, 'returned'), fetchZtoScanPages(cfg, from, to, 'sent')]);
+    const backKeys = new Set(back.returned.map((row) => pickupBarcodeKey(row.barcode)));
+    const misplaced = sent.returned.filter((row) => !backKeys.has(pickupBarcodeKey(row.barcode))).map((row) => ({ ...row, misplaced: true }));
+    return { returned: back.returned.concat(misplaced), state: back.state, sentState: sent.state };
+}
+
+export async function fetchZtoScanPages(cfg, from, to, kind: 'returned' | 'sent') {
     const out = { returned: [], state: 'failed' };
     const absorb = (body) => {
-        const list = Array.isArray(body.returned) ? body.returned : [];
+        const list = Array.isArray(body[kind]) ? body[kind] : [];
         for (let i = 0; i < list.length; i++) {
             const row = list[i];
             if (row && typeof row.barcode === 'string' && typeof row.at === 'string') out.returned.push({ barcode: row.barcode, at: row.at });
         }
     };
+    const okField = kind + 'Ok';
     let first = null;
     try {
-        first = await fetchZtoListPage(cfg, from, to, 1, 'returned');
+        first = await fetchZtoListPage(cfg, from, to, 1, kind);
     } catch (_) {
         return out;
     }
     if (!first) return out;
-    if (first.returned === null) {
+    if (first[kind] === null) {
         out.state = 'off';
         return out;
     }
-    if (first.returnedOk !== true) return out;
+    if (first[okField] !== true) return out;
     absorb(first);
     let pages = Number(first.pages);
     if (!isFinite(pages) || pages < 1) pages = 1;
@@ -480,10 +488,10 @@ export async function fetchZtoReturnedPages(cfg, from, to) {
         const last = Math.min(pages, ZTO_LIST_CLIENT_MAX_PAGES);
         if (last <= read) break;
         const work = [];
-        for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, 'returned').catch(() => null));
+        for (let page = read + 1; page <= last; page++) work.push(fetchZtoListPage(cfg, from, to, page, kind).catch(() => null));
         const more = await Promise.all(work);
         for (let i = 0; i < more.length; i++) {
-            if (!more[i] || more[i].returnedOk !== true) {
+            if (!more[i] || more[i][okField] !== true) {
                 out.state = 'partial';
                 return out;
             }
@@ -504,7 +512,7 @@ export async function fetchZtoReturnedPages(cfg, from, to) {
 export async function fetchZtoListAllPages(cfg, from, to) {
     if (lookupApiIsPalm(cfg)) return fetchZtoPalmListAllPages(cfg, from, to);
     const out = { rows: [], signed: [], signedRows: [], pages: 0, total: 0, pageLimit: ZTO_LIST_CLIENT_MAX_PAGES, site: '', siteName: '', otherScans: 0, signedMismatch: 0,
-        signedMismatchTexts: [], signedDescExpected: [], signedState: 'none', returned: [], returnedState: 'failed' };
+        signedMismatchTexts: [], signedDescExpected: [], signedState: 'none', returned: [], returnedState: 'failed', sentState: 'failed' };
     const returnedRun = fetchZtoReturnedPages(cfg, from, to);
     let arrivalTotals = 0;
     const absorb = (body, arrival) => {
@@ -530,6 +538,7 @@ export async function fetchZtoListAllPages(cfg, from, to) {
         const back = await returnedRun;
         out.returned = back.returned;
         out.returnedState = back.state;
+        out.sentState = back.sentState;
     };
     const reported = Number(first.pages);
     out.pages = isFinite(reported) && reported > 0 ? reported : 1;
@@ -957,6 +966,8 @@ export function ztoListSignedNote(result, bornClosed, closeCount, signedOnly = 0
     if (removedCount > 0) parts.push('🗑️ ដកកញ្ចប់' + (misplaced ? 'ត្រឡប់/ខុសទីតាំង' : 'ត្រឡប់') + 'ចេញពី ZoeW ' + removedCount + ' (ធុងសំរាម «' + (misplaced ? 'ត្រឡប់»/«ខុសទីតាំង' : 'ត្រឡប់') + '» · ដកលុយ)');
     const returnedState = result && result.returnedState;
     if (returnedState === 'failed' || returnedState === 'partial') parts.push('⚠️ ពិនិត្យកញ្ចប់ត្រឡប់ទៅវិញមិនបានគ្រប់ ➜ សូមទាញម្តងទៀត');
+    const sentState = result && result.sentState;
+    if (sentState === 'failed' || sentState === 'partial') parts.push('⚠️ ពិនិត្យកញ្ចប់ខុសទីតាំង (ស្កេនបញ្ជូនចេញ) មិនបានគ្រប់ ➜ សូមទាញម្តងទៀត');
     const unverified = result && Array.isArray(result.unverified) ? result.unverified : [];
     if (unverified.length) {
         parts.push('⚠️ ZTO មិនឆ្លើយ track ' + unverified.length + ' កញ្ចប់ ('
@@ -1056,7 +1067,8 @@ export async function runZtoListSyncPreview() {
             elapsedMs: ztoListPositiveCount(pulled.elapsedMs),
             returned: Array.isArray(pulled.returned) ? pulled.returned : [],
             signed: Array.isArray(pulled.signed) ? pulled.signed : [],
-            returnedState: pulled.returnedState
+            returnedState: pulled.returnedState,
+            sentState: pulled.sentState
         };
         renderZtoListSyncPreview();
         if (ztoState.ztoListSyncResult.signedState === 'ok') removeReturnedZtoBarcodes(ztoState.ztoListSyncResult.returned, dataState.scanHistory, ztoState.ztoListSyncResult.signed);

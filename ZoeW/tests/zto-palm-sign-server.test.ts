@@ -224,7 +224,7 @@ it('ចែកចាយកញ្ចប់មានបញ្ហា (ដូច ZTO 
     expect(JSON.parse((await call({ ...body, stage: 'receipt', signMan: 'សុខា', photo: PHOTO, confirmationToken: first.confirmationToken })).body).code)
         .toBe('ZTO_PALM_SIGN_INVALID');
     const [a, b] = await Promise.all([call({ ...body, confirmationToken: first.confirmationToken }), call({ ...body, confirmationToken: first.confirmationToken })]);
-    expect(JSON.parse(a.body)).toMatchObject({ success: true, stage: 'dispatch', ztoClosed: false, dispatchProof: expect.any(String) });
+    expect(JSON.parse(a.body)).toMatchObject({ success: true, stage: 'dispatch', ztoClosed: false, dispatchProof: expect.stringMatching(/^.{8,}$/) });
     expect(b.body).toBe(a.body);
     const saves = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('saveScanInfo'));
     expect(saves).toHaveLength(1);

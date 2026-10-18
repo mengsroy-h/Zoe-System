@@ -33,6 +33,29 @@ export const ztoReturnedEvidence = new Map();
 
 export const ztoFinalFailedAt = new Map();
 
+export const ztoMisplacedRefused: { db: unknown; at: number } = { db: null, at: 0 };
+
+function misplacedStampRefused(db) {
+    return !!db && ztoMisplacedRefused.db === db && elapsedSince(ztoMisplacedRefused.at) < ZTO_FINAL_REFUSED_RETRY_MS;
+}
+
+function withoutMisplaced(wanted) {
+    const out = {};
+    let any = false;
+    Object.keys(wanted).forEach((key) => {
+        const want = { ...wanted[key] };
+        delete want.misplaced;
+        if (!want.signed && !want.returned) return;
+        out[key] = want;
+        any = true;
+    });
+    return any ? out : null;
+}
+
+function targetWantsMisplaced(target) {
+    return Object.keys(target.wanted).some((key) => target.wanted[key].misplaced);
+}
+
 export function barcodeVerdictSigned(barcode) {
     if (!barcode || !barcode.code) return false;
     loadZtoPickupStatusOnce();
@@ -56,6 +79,7 @@ export function explainZtoReopenLock(itemId?) {
 
 export function trashRestoreBlockOf(item) {
     const stamped = trashZtoFinalBlock(item);
+    if (stamped === 'returned' && trashItemMisplaced(item)) return 'misplaced';
     if (stamped) return stamped;
     const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes.filter(Boolean) : [];
     if (!barcodes.length) return '';
@@ -68,7 +92,7 @@ export function trashRestoreBlockOf(item) {
 
 export function barcodeMisplacedInZto(barcode) {
     if (barcodeZtoMisplaced(barcode)) return true;
-    if (!barcode || !barcode.code || barcodeZtoReturned(barcode)) return false;
+    if (!barcode || !barcode.code) return false;
     const evidence = ztoReturnedEvidence.get(pickupBarcodeKey(barcode.code));
     return !!evidence && evidence.misplaced === true;
 }
@@ -118,7 +142,10 @@ export function applyZtoFinalMarks(current, wanted, trash) {
         }
         if (want.returned && trash && current.trashReason === 'returned' && !barcodeZtoReturned(b)) {
             b.ztoReturnedAt = want.returned;
-            if (want.misplaced) b.ztoMisplacedAt = want.returned;
+            changed = true;
+        }
+        if (want.misplaced && want.returned && trash && current.trashReason === 'returned' && !barcodeZtoMisplaced(b)) {
+            b.ztoMisplacedAt = want.returned;
             changed = true;
         }
     });
@@ -130,6 +157,7 @@ export function collectZtoFinalTargets() {
     pruneZtoReturnedEvidence();
     if (!ztoPickupStatus.size && !ztoReturnedEvidence.size) return [];
     const signedAt = getServerNow();
+    const misplacedOff = misplacedStampRefused(firebaseState.db);
     const out = [];
     const scan = (list, trash) => {
         (Array.isArray(list) ? list : []).forEach((item) => {
@@ -144,10 +172,11 @@ export function collectZtoFinalTargets() {
                 if (!key) return;
                 const want: { signed?: number; returned?: number; misplaced?: boolean } = {};
                 if (b.isClosed === true && !barcodeZtoSigned(b) && barcodeVerdictSigned(b)) want.signed = signedAt;
-                const evidence = trash && item.trashReason === 'returned' && !barcodeZtoReturned(b) ? ztoReturnedEvidence.get(key) : null;
-                if (evidence) {
+                const evidence = trash && item.trashReason === 'returned' ? ztoReturnedEvidence.get(key) : null;
+                const stampMisplaced = !!evidence && evidence.misplaced === true && !misplacedOff && !barcodeZtoMisplaced(b);
+                if (evidence && (!barcodeZtoReturned(b) || stampMisplaced)) {
                     want.returned = evidence.at;
-                    if (evidence.misplaced) want.misplaced = true;
+                    if (stampMisplaced) want.misplaced = true;
                 }
                 if (!want.signed && !want.returned) return;
                 wanted[key] = want;
@@ -180,9 +209,18 @@ export async function syncZtoFinalMarks() {
             if (!current()) return written;
             tried++;
             let result = null;
+            const write = (wanted) => dbOp(api.runTransaction(api.ref(targetDb, target.path),
+                (snapshotItem) => applyZtoFinalMarks(snapshotItem, wanted, target.trash)), 'ZTO final mark write stalled');
             try {
-                result = await dbOp(api.runTransaction(api.ref(targetDb, target.path),
-                    (snapshotItem) => applyZtoFinalMarks(snapshotItem, target.wanted, target.trash)), 'ZTO final mark write stalled');
+                try {
+                    result = await write(target.wanted);
+                } catch (e) {
+                    const plain = targetWantsMisplaced(target) && /permission/i.test(String((e && (e.code || e.message)) || e)) ? withoutMisplaced(target.wanted) : null;
+                    if (!plain || !current()) throw e;
+                    ztoMisplacedRefused.db = targetDb;
+                    ztoMisplacedRefused.at = Date.now();
+                    result = await write(plain);
+                }
             } catch (e) {
                 if (!current()) return written;
                 ztoFinalFailedAt.set(target.path, Date.now());
@@ -219,4 +257,6 @@ export function resetZtoFinalMarks() {
     ztoState.ztoFinalRefusedAt = 0;
     ztoReturnedEvidence.clear();
     ztoFinalFailedAt.clear();
+    ztoMisplacedRefused.db = null;
+    ztoMisplacedRefused.at = 0;
 }

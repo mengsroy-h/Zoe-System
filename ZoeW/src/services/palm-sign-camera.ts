@@ -25,7 +25,9 @@ export const PALM_SIGN_FIX_MAX_AGE_MS = 2 * 60 * 1000;
 
 export const PALM_SIGN_FIX_MAX_ACCURACY_M = 1000;
 
-export const PALM_SIGN_STAMP_COLOR = '#ff2d2d';
+export const PALM_SIGN_STAMP_COLOR = '#ff4444';
+
+export const PALM_SIGN_STAMP_SIZE = 0.035;
 
 export type PalmSignMatch = (text: string) => string;
 
@@ -94,18 +96,16 @@ export function stampPalmSignPhoto(canvas, lines: string[]) {
 function drawPalmSignStamp(canvas, lines: string[]) {
     const context = canvas && canvas.getContext ? canvas.getContext('2d') : null;
     if (!context || !canvas.width || !canvas.height || !lines.length) return false;
-    const size = Math.max(14, Math.round(Math.min(canvas.width, canvas.height) * 0.045));
-    const pad = Math.round(size * 0.6);
+    const size = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * PALM_SIGN_STAMP_SIZE));
+    const pad = Math.round(size * 0.5);
     context.save();
-    context.font = '600 ' + size + 'px sans-serif';
+    context.font = '400 ' + size + 'px sans-serif';
     context.textBaseline = 'bottom';
-    context.lineJoin = 'round';
-    context.lineWidth = Math.max(2, Math.round(size / 7));
-    context.strokeStyle = 'rgba(0, 0, 0, 0.55)';
     context.fillStyle = PALM_SIGN_STAMP_COLOR;
+    context.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    context.shadowBlur = Math.max(1, Math.round(size / 12));
     lines.forEach((line, i) => {
-        const y = canvas.height - pad - (lines.length - 1 - i) * Math.round(size * 1.25);
-        context.strokeText(line, pad, y);
+        const y = canvas.height - pad - (lines.length - 1 - i) * Math.round(size * 1.45);
         context.fillText(line, pad, y);
     });
     context.restore();

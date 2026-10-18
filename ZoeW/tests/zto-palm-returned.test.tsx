@@ -53,6 +53,8 @@ describe('↩️ ZTO Palm ៖ track `-710` នៃសាខាខ្លួនក�
         const misplacedRow = groups.find((g: any) => g.tone === 'zto-list-returned').rows.find((r: any) => r.barcode === 'KH5000000005');
         expect(misplacedRow.notes.join(' ')).toContain('📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ ៖ ' + at('05', '13:34:40'));
         expect(codes('zto-list-fresh')).toEqual(['KH5000000002', 'KH5000000003', 'KH5000000004']);
-        expect(noteText()).toContain('↩️ ស្កេនត្រឡប់រួច 2 ➜ រំលង');
+        expect(noteText()).toContain('↩️ ស្កេនត្រឡប់រួច 1 ➜ រំលង');
+        expect(noteText()).toContain('📍 ខុសទីតាំង (បញ្ជូនចេញរួច) 1 ➜ រំលង');
+        expect(groups.find((g: any) => g.tone === 'zto-list-returned').title).toContain('📍 បញ្ជូនចេញ (ខុសទីតាំង)');
     });
 });

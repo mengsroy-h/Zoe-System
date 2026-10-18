@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { scanState } from '../src/core/state';
 import {
-    PALM_SIGN_FIX_MAX_ACCURACY_M, PALM_SIGN_FIX_MAX_AGE_MS, PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, PALM_SIGN_STAMP_COLOR, notePalmSignPosition,
+    PALM_SIGN_FIX_MAX_ACCURACY_M, PALM_SIGN_FIX_MAX_AGE_MS, PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, PALM_SIGN_STAMP_COLOR, PALM_SIGN_STAMP_SIZE, notePalmSignPosition,
     palmSignCurrentFix, palmSignDecodeImage, palmSignLocation, palmSignPickCode, palmSignStampLines, stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
 } from '../src/services/palm-sign-camera';
 import { readCanvasSymbols } from '../src/services/scan-engine';
@@ -149,6 +149,10 @@ it('📍 រូប Sign មានម៉ោង (Asia/Phnom_Penh) និងកូ�
     expect(texts[0][2]).toBeLessThan(canvas.width / 4);
     expect(texts[1][3]).toBeGreaterThan(canvas.height * 0.85);
     expect(calls).toContainEqual(['set', 'fillStyle', PALM_SIGN_STAMP_COLOR]);
+    const font = calls.find((c) => c[0] === 'set' && c[1] === 'font')[2];
+    expect(font).toMatch(/^400 \d+px /);
+    expect(Number(/(\d+)px/.exec(font)![1])).toBe(Math.round(960 * PALM_SIGN_STAMP_SIZE));
+    expect(calls.some((c) => c[0] === 'strokeText')).toBe(false);
     expect(stampPalmSignPhoto({ width: 10, height: 10, getContext: () => ({ drawImage: () => {} }) }, ['x'])).toBe(false);
     expect(stampPalmSignPhoto(null, ['x'])).toBe(false);
 });

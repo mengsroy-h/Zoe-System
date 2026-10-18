@@ -17,7 +17,7 @@ import { ZTO_RESTORE_FINAL_TEXT, ZTO_SIGNED_REOPEN_TEXT } from '../src/core/text
 import { barcodeZtoReturned, barcodeZtoSigned, trashZtoFinalBlock } from '../src/domain/barcode';
 import {
     ZTO_FINAL_REFUSED_RETRY_MS, applyZtoFinalMarks, barcodeSignedInZto, itemReopenLockedByZto, noteZtoReturnedEvidence, resetZtoFinalMarks,
-    syncZtoFinalMarks, trashRestoreBlockOf
+    syncZtoFinalMarks, trashRestoreBlockOf, ztoFinalFailedAt, ztoMisplacedRefused
 } from '../src/features/zto-final-marks';
 import { ztoPickupStatus, setZtoPickupVerdict } from '../src/features/zto-status';
 import { applyBarcodeCloseChange } from '../src/features/barcode-ops';
@@ -173,6 +173,35 @@ describe('ភស្តុតាង ZTO ក្នុង DB ៖ ការសរស
         expect(trashZtoFinalBlock(server[T + 'm2'])).toBe('returned');
         expect(TRASH_REASON_META.misplaced).toMatchObject({ label: 'ខុសទីតាំង', deducted: true });
         expect(applyZtoFinalMarks(item('h9', [bc('M3')]), { M3: { returned: back, misplaced: true } }, false)).toBeUndefined();
+    });
+
+    it('📍 rules មិនទាន់មាន `ztoMisplacedAt` ➜ ការកត់ត្រឡប់ (`ztoReturnedAt` · 🔒) នៅចូល · ស្លាកខុសទីតាំងសាកម្តងទៀតក្រោយ Publish', async () => {
+        seedTrash([item('mr', [bc('MR1')], { trashReason: 'returned', deletedAt: 9 })]);
+        const real = firebaseState.fb.runTransaction;
+        let published = false;
+        firebaseState.fb.runTransaction = async (ref: any, fn: (cur: any) => any) => {
+            const cur = server[ref.path] === undefined ? null : JSON.parse(JSON.stringify(server[ref.path]));
+            const next = fn(cur);
+            if (!published && next && JSON.stringify(next).includes('ztoMisplacedAt')) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' });
+            return real(ref, fn);
+        };
+        const back = Date.now() - 60000;
+        noteZtoReturnedEvidence('MR1', back, true);
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 'mr'].barcodes[0].ztoReturnedAt).toBe(back);
+        expect(server[T + 'mr'].barcodes[0].ztoMisplacedAt).toBeUndefined();
+        expect(trashZtoFinalBlock(server[T + 'mr'])).toBe('returned');
+        expect(trashRestoreBlockOf(server[T + 'mr'])).toBe('misplaced');
+        dataState.deletedItems = [server[T + 'mr']];
+        expect(buildTrashGroups(dataState.deletedItems)[0].reason).toBe('misplaced');
+        expect(await syncZtoFinalMarks()).toBe(0);
+        published = true;
+        ztoMisplacedRefused.at = Date.now() - ZTO_FINAL_REFUSED_RETRY_MS - 1;
+        ztoFinalFailedAt.clear();
+        expect(await syncZtoFinalMarks()).toBe(1);
+        expect(server[T + 'mr'].barcodes[0]).toMatchObject({ ztoReturnedAt: back, ztoMisplacedAt: back });
+        expect(trashZtoFinalBlock(server[T + 'mr'])).toBe('misplaced');
+        firebaseState.fb.runTransaction = real;
     });
 
     it('rules មិនទាន់ Publish (permission_denied) ➜ ឈប់សាកសម្រាប់ database នោះ · មិនបោះចោល · មិនប៉ះទិន្នន័យ', async () => {

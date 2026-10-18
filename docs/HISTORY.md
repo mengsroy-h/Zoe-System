@@ -52,7 +52,7 @@
 
 ### ⏳ អ្នកប្រើមិនទាន់បញ្ជាក់
 
-- ⏳ **[2.50.127]** Publish rules (`ztoSignedAt` · `ztoReturnedAt`) ទៅគ្រប់គម្រោង Firebase · ✍️ Sign មួយជុំលើ iPhone + Android ពិត (ស្កេនកាមេរ៉ា · QR លើបុង · Gallery · សម្លេង/ញ័រ · ល្បឿនធៀប ZTO Palm)។
+- ⏳ **[2.50.127]** (rules `ztoSignedAt` · `ztoReturnedAt` Publish រួច) ✍️ Sign មួយជុំលើ iPhone + Android ពិត (ស្កេនកាមេរ៉ា · QR លើបុង · Gallery · សម្លេង/ញ័រ · ល្បឿនធៀប ZTO Palm) · 🔒 Sign រួច/ធុងសំរាម 🔒 លើកញ្ចប់ពិត។
 - ⏳ **[2.50.96]** សកម្មភាព ១ (កែតម្លៃកញ្ចប់យករួចលើហាង Firebase និង Supabase)។
 - ⏳ **[2.50.94]** សកម្មភាព ១ (migration Supabase ចូល live ពេល merge) · ៣ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងដក/បញ្ចូលច្រើន) · ៤ (ហាង Supabase)។
 - ⏳ **[2.50.95]** សកម្មភាព ១ (ប៉ះផ្ទៃងងឹតលើផ្ទាំងបញ្ជីកញ្ចប់ពី ZTO)។

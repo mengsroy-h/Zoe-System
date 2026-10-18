@@ -107,7 +107,7 @@
 **ZoeW** (`zoew-v391` ➜ `zoew-v392`) · rules ថ្មី (`firebase-database.rules.json` + `supabase/migrations/20261018084522_zoe_rules.sql`) · APK សិទ្ធិទីតាំង · Netlify header។
 សំណើម្ចាស់គម្រោង ៖ «សូមអោយ app ZoeW ពេល Sign ចាប់រូបភាពមាន timestamp និង កូអរដោនេ ដូច ZTO Palm ពិត» · «កញ្ចប់ ខុសទីតាំង "ទីតាំងមិនត្រឹមត្រូវ" ហើយត្រូវ
 ស្កេនបញ្ចូនទៅទីតាំង ពិត របស់វា សូមអោយ ZoeW ស្គាល់ ហើយដកចេញពី បញ្ជី ដូចអីវ៉ាន់ត្រឡប់ដែរ តែមានស្លាក "ខុសទីតាំង" ក្នុងធុងសំរាម» (តំបន់ LOCK ZTO ៖ សំណើផ្ទាល់)។
-លម្អិត ៖ ផ្នែក ២ A230 · A231។
+លម្អិត ៖ ផ្នែក ២ A230 · A231 · A232។
 
 - 📍 **រូប Sign** ៖ ម៉ោង `YYYY-MM-DD HH:MM:SS` (Asia/Phnom_Penh · នាឡិកា server) និងកូអរដោនេ `lat, lng` (៥ ខ្ទង់) ពណ៌ក្រហម ជ្រុងក្រោមឆ្វេង ដូច ZTO Palm ·
   ទីតាំងតាម `navigator.geolocation.watchPosition` តែពេលផ្ទាំង Sign បើក (បិទ ➜ `clearWatch`) · ទីតាំងចាស់ជាង ២ នាទី ឬភាពត្រឹមត្រូវ > 1000 m ➜ រូបមានតែម៉ោង ·
@@ -116,6 +116,9 @@
   `ztoReturnedAt` ដដែល ➜ ផ្លូវត្រឡប់ដដែល (`removeReturnedZtoBarcodes()` ➜ ធុងសំរាម `returned` · លុយ និងចំនួនកញ្ចប់ដក) · `syncZtoFinalMarks()` កត់ `ztoMisplacedAt`
   លើ barcode ➜ ធុងសំរាមស្លាក «ខុសទីតាំង» (ក្រុមដាច់ពី «ត្រឡប់») · 🔔 «📤» «📍 ខុសទីតាំង» · 🔒 មិនអាចស្តារ · ប្រអប់ទាញបញ្ជី «📍 ខុសទីតាំង · ZTO ស្កេនបញ្ជូនចេញ» ·
   ស្កេនបញ្ហា `-582` តែម្យ៉ាង (ទូរស័ព្ទមិនលើក ក៏ប្រើកូដនេះ) ➜ មិនដក។
+- ✍️ **ចែកចាយកញ្ចប់មានបញ្ហា** (សំណើ ៖ «ZTO Palm ពេលស្កេន ចែកចាយមិនផ្ទុករូបភាពទេនិងឈ្មោះទេ តែមានសារលោតបញ្ជាក់ បញ្ហាដូចពេល Sign ដែរ … ការ Sign ដំណើរការត្រឹមត្រូវ100%ហើយ») ៖
+  ការស្កេនចែកចាយ `04` ដែល ZTO ឆ្លើយសារបញ្ហា (`newBusinessCheck` · `whetherForce: false`) បង្ហាញផ្ទាំង «⚠️ បញ្ជាក់កញ្ចប់» ដូច Sign ➜ «បញ្ជាក់ និងបន្ត» ផ្ញើ `04` ជាមួយ token ·
+  «បោះបង់» ➜ មិនចែកចាយ (ស្កេនម្តងទៀតសួរម្តងទៀត) · ZTO ហាម ➜ «⛔ ZTO មិនអនុញ្ញាតឲ្យចែកចាយ» + សារ · ការចែកចាយនៅតែគ្មានរូប គ្មានឈ្មោះ · ការទទួល `05` (Sign) មិនប្រែ (A232)។
 - 🧪 `ZoeW/tests/zto-palm-server.test.ts` (📍 ៧ ករណី · លំដាប់ពិតរបស់ម្ចាស់គម្រោង) · `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx` ·
   `ZoeW/tests/zto-returned-cleanup.test.ts` · `ZoeW/tests/palm-sign-camera.test.ts` (ម៉ោង · កូអរដោនេ · watch/clearWatch · stamp មុន JPEG) · `ZoeW/tests/zto-palm-sign.test.tsx` ·
   `emu/app-writes-rules-test` (`ztoMisplacedAt` + probe rules គ្មានវា) · `npm run android:check` · `netlify-config-scope-test` · `security-guard-test`។
@@ -4377,10 +4380,11 @@ thirdparty ឬគេពង្រីកទំហំ keybaord» · «ហើយ loc
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ (សំណើម្ចាស់គម្រោង · A230 · A231)
+### 2026-10-18 — ខុសទីតាំង · រូប Sign មានម៉ោង និងកូអរដោនេ · បញ្ជាក់ពេលចែកចាយ (សំណើម្ចាស់គម្រោង · A230 · A231 · A232)
 
 | # | ចំណុច | ការវាស់ | លទ្ធផល |
 |---|---|---|---|
+| A232 | **ការចែកចាយ `04` កញ្ចប់មានបញ្ហា ៖ ZoeW បដិសេធ ចំណែក ZTO Palm ពិតសួរបញ្ជាក់** — Function ទទួលការបញ្ជាក់តែ `stage === 'receipt'` (`stage !== 'receipt'` ➜ `ZTO_PALM_SIGN_CHECK_REJECTED`) ➜ កញ្ចប់ដែល ZTO អនុញ្ញាតដោយបញ្ជាក់ ចែកចាយក្នុង ZoeW មិនបាន ហើយ Sign មិនបានតាមក្រោយ | `ZoeW/tests/zto-palm-sign-server.test.ts` (ចែកចាយ ៖ សួរបញ្ជាក់ · គ្មានរូប/ឈ្មោះ · token ចែកចាយមិនប្រើសម្រាប់ទទួល · ចុចស្ទួន ➜ `04` តែម្តង ៖ មុនកែធ្លាក់) · `ZoeW/tests/zto-palm-sign.test.tsx` (ផ្ទាំងបញ្ជាក់ · បោះបង់ · ស្កេនម្តងទៀត · បញ្ជាក់ ➜ token ៖ មុនកែធ្លាក់) | [2.50.128] `_shared/zto-palm-sign.js` ៖ ហាមតែ `whetherForce: true` · `90187`/`90189` (ទាំង ២ ដំណាក់កាល) · `dispatchPalmSignCode(code, approval)` · `PalmSignConfirmation.stage` · ការទទួល `05` មិនប្រែ |
 | A231 | **រូប Sign ពី ZoeW គ្មានម៉ោង និងកូអរដោនេ** (ម្ចាស់គម្រោងផ្ញើរូប ២ ៖ ZTO Palm មាន `2026-10-15 12:03:43` · `12.30011, 105.41921` ក្រហមជ្រុងក្រោមឆ្វេង · ZoeW គ្មាន) · ឧបសគ្គ ៖ Netlify `Permissions-Policy` `geolocation=()` បិទ geolocation ក្នុង PWA · APK គ្មានសិទ្ធិទីតាំង (WebView `BridgeWebChromeClient` ស្នើតែសិទ្ធិដែលប្រកាស) · Android ផ្អាក Activity ពេលសួរ ➜ App Lock | `ZoeW/tests/palm-sign-camera.test.ts` ៣ ថ្មី (ម៉ោង Asia/Phnom_Penh · ទីតាំងចាស់/មិនច្បាស់ ➜ តែម៉ោង · watch តែពេលផ្ទាំងបើក · clearWatch ពេលបិទ · លើកលែងការចាក់សោពេលមិនទាន់អនុញ្ញាត · stamp មុន JPEG) · `npm run android:check` · `netlify-config-scope-test` (ដេរីវេ ៖ App ប្រើ `navigator.geolocation` ➜ `geolocation=(self)` · មិនប្រើ ➜ `()`) | [2.50.128] `stampPalmSignPhoto()` ក្នុង `palmSignFramePhoto()` (fail-open) · `startPalmSignLocation()` ពី `SignForm` · `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` (⛔ គ្មាន background) |
 | A230 | **កញ្ចប់ខុសទីតាំងនៅក្នុងបញ្ជីបើក** — 🧪 ពិតរបស់ម្ចាស់គម្រោង (`11600102797860`) ៖ `3` មកដល់ 13:25:26 ➜ `4` 13:33:04 ➜ `-582` «ទីតាំងមិនត្រឹមត្រូវ» 13:34:12 ➜ `2` 发件 ទៅ KC-01 13:34:40 · `ztoReturnedAt: null` ➜ ZoeW ទុកកញ្ចប់បើក (លុយមិនដក) ទោះវាចេញពីសាខាហើយ · ភស្តុតាងជ្រើស ៖ ស្កេន `2` នៃសាខាខ្លួនក្រោយមកដល់ (⛔ មិនមែន `-582` តែម្យ៉ាង ៖ `actionName` 地址不详，电话联系不上 ក៏ប្រើពេលទូរស័ព្ទមិនលើក ហើយកញ្ចប់នៅហាង) | `ZoeW/tests/zto-palm-server.test.ts` ៧ ករណី (លំដាប់ពិត · ត្រឡប់ឈ្នះ · ទទួលហើយបញ្ជូន · សាខាផ្សេង · មកដល់ម្តងទៀត · `-582` តែម្យ៉ាង · Sign ឈ្នះ ៖ មុនកែ `ztoMisplacedAt` មិនមាន ➜ ធ្លាក់) · `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx` · `ZoeW/tests/zto-returned-cleanup.test.ts` · `emu/app-writes-rules-test` (probe rules គ្មាន `ztoMisplacedAt` ➜ បដិសេធ) | [2.50.128] `_shared/zto-palm.js` (`SEND_OUT_ACTION`) · `zto-status.ts` · `zto-list-sync.ts` · `zto/model.ts` (LOCK ថ្មី) · `trashDisplayReasonOf()` · `TRASH_STORED_REASONS` (តម្លៃរក្សាទុកនៅ ៤ · `misplaced` ជាស្លាកបង្ហាញតែប៉ុណ្ណោះ) |
 

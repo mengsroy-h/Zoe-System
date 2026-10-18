@@ -95,7 +95,7 @@ async function submit(input, session, request, proof) {
             if (message.length > 4000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(message)) {
                 return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode });
             }
-            if (stage !== 'receipt' || result.whetherForce === true || /90187|90189/.test(message)) {
+            if (result.whetherForce === true || /90187|90189/.test(message)) {
                 return json(409, { code: 'ZTO_PALM_SIGN_CHECK_REJECTED', barcode, message });
             }
             if (!confirmation || confirmation.warningHash !== hash(message)) {

@@ -200,3 +200,19 @@ it('📍 រូបពីកាមេរ៉ា ៖ stamp លើ frame មុន�
     expect(draws[0]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(draws[1]).toBe('12.30011, 105.41921');
 });
+it('📍 APK ៖ សួរសិទ្ធិទីតាំងតែក្រោយការស្នើកាមេរ៉ាចប់ (Capacitor មាន permissionListener តែមួយ ៖ ស្នើព្រមគ្នា ➜ មួយបាត់)', async () => {
+    let grant!: (s: MediaStream) => void;
+    const watchPosition = vi.fn(() => 3);
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn(() => new Promise((yes) => { grant = yes; })) },
+        geolocation: { watchPosition, clearWatch: vi.fn() }, permissions: { query: vi.fn(async () => ({ state: 'prompt' })) } });
+    palmSignLocation.watch = null;
+    palmSignLocation.users = 0;
+    const stopLocation = startPalmSignLocation();
+    const closeCamera = startPalmSignCamera(vi.fn(), vi.fn());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(watchPosition, 'កាមេរ៉ាកំពុងសួរ ➜ មិនទាន់សួរទីតាំង').not.toHaveBeenCalled();
+    grant(stream);
+    await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
+    closeCamera();
+    stopLocation();
+});

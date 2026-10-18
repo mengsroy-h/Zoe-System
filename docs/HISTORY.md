@@ -128,6 +128,10 @@
   ឥឡូវសរសេរម្តងទៀតដោយគ្មាន `ztoMisplacedAt` (`ztoMisplacedRefused` ៣០ នាទី) ហើយកត់ស្លាកម្តងទៀតក្រោយ Publish · ស្លាក/🔒 «ខុសទីតាំង» តាមភស្តុតាងក្នុងឧបករណ៍ ទោះ DB មានតែ `ztoReturnedAt` ·
   ② ប្រអប់ទាញបញ្ជីរាប់កញ្ចប់ខុសទីតាំងជា «ស្កេនត្រឡប់រួច» ➜ ឥឡូវ «📍 ខុសទីតាំង (បញ្ជូនចេញរួច) N» ដាច់ · ③ រូប Sign ៖ ម្ចាស់គម្រោង «Font Bold ធំពេក» ➜ អក្សរធម្មតា (`400`) · ៣.៥% នៃជ្រុងខ្លី
   (`PALM_SIGN_STAMP_SIZE`) · គ្មានគែមខ្មៅ · ពណ៌ `#ff4444` ដូចរូប ZTO Palm ពិត (វាស់ក្នុង Chromium លើរូបពិតរបស់ម្ចាស់គម្រោង) · ④ តេស្ត App + Function ពិត `ZoeW/tests/zto-palm-sign-e2e.test.tsx` ·
+  ⑥ ស្តារ «ខុសទីតាំង» ៖ barcode ត្រឡប់ចូលបញ្ជីនៅកាន់ `ztoReturnedAt` · `ztoMisplacedAt` ➜ ក្រោយមក ZTO ស្កេនត្រឡប់ `-710` ពិត ➜ ស្លាក «ខុសទីតាំង» ហើយស្តារបាន
+  (បំពានច្បាប់ «ត្រឡប់ ZTO 🔒») ➜ `executeRestoreItem()` ដកត្រាទាំង ២ (`ZoeW/tests/cleanup-ledger-key.test.ts` ៖ មុនកែធ្លាក់) · ⑦ APK ៖ Capacitor `BridgeWebChromeClient` មាន
+  `permissionListener` តែមួយ ➜ បើកផ្ទាំង Sign លើកដំបូង សួរកាមេរ៉ា និងទីតាំងព្រមគ្នា ➜ មួយបាត់ (កាមេរ៉ាជាប់ ឬទីតាំងបាត់) ➜ សួរទីតាំងតែក្រោយកាមេរ៉ាចប់ ឬ ៨ វិ.
+  (`ZoeW/tests/palm-sign-camera.test.ts` ៖ មុនកែធ្លាក់) · ព្រំដែន ៖ ហាង Cookie ដែលផ្ញើកញ្ចប់ចេញច្រើន (បញ្ជី `02` លើសពិដានទំព័រ) ➜ «⚠️ ពិនិត្យកញ្ចប់ខុសទីតាំង… មិនបានគ្រប់» · ដកតែអ្វីដែលអានបាន (មិនដកខុស)។
   ⑤ ហាងច្រើនសាខាលើ DB តែមួយ ៖ សាខា A ផ្ញើកញ្ចប់ទៅសាខា B នៃហាងដដែល ➜ A ដាក់ «ខុសទីតាំង» ហើយ 🔒 រារាំងការស្តារ ➜ B ស្កេនបញ្ចូលមិនបាន (registry កាន់ដោយធុងសំរាម) ➜ «ខុសទីតាំង» ស្តារបាន (`ZoeW/tests/zto-final-marks.test.tsx` ៖ មុនកែធ្លាក់)។
 - 🧪 `ZoeW/tests/zto-palm-server.test.ts` (📍 ៧ ករណី · លំដាប់ពិតរបស់ម្ចាស់គម្រោង) · `ZoeW/tests/zto-palm-returned.test.tsx` · `ZoeW/tests/zto-final-marks.test.tsx` ·
   `ZoeW/tests/zto-returned-cleanup.test.ts` · `ZoeW/tests/palm-sign-camera.test.ts` (ម៉ោង · កូអរដោនេ · watch/clearWatch · stamp មុន JPEG · អក្សរធម្មតា គ្មានគែម) · `ZoeW/tests/zto-palm-sign.test.tsx` ·

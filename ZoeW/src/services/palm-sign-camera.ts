@@ -27,6 +27,8 @@ export const PALM_SIGN_FIX_MAX_ACCURACY_M = 1000;
 
 export const PALM_SIGN_STAMP_COLOR = '#ff4444';
 
+export const PALM_SIGN_LOCATION_WAIT_MS = 8000;
+
 export const PALM_SIGN_STAMP_SIZE = 0.035;
 
 export type PalmSignMatch = (text: string) => string;
@@ -34,6 +36,8 @@ export type PalmSignMatch = (text: string) => string;
 export type PalmSignFix = { lat: number; lng: number; at: number };
 
 export const palmSignLocation: { fix: PalmSignFix | null; watch: number | null; users: number } = { fix: null, watch: null, users: 0 };
+
+export const palmSignCameraStart: { settled: Promise<void> } = { settled: Promise.resolve() };
 
 export function notePalmSignPosition(position) {
     const c = position && position.coords;
@@ -63,6 +67,11 @@ export function startPalmSignLocation() {
     const geo = typeof navigator !== 'undefined' ? navigator.geolocation : null;
     if (geo && typeof geo.watchPosition === 'function' && palmSignLocation.watch === null && palmSignLocation.users === 1) {
         void (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            let waited: ReturnType<typeof setTimeout> | undefined;
+            await Promise.race([palmSignCameraStart.settled, new Promise((resolve) => { waited = setTimeout(resolve, PALM_SIGN_LOCATION_WAIT_MS); })]);
+            clearTimeout(waited);
+            if (stopped || palmSignLocation.watch !== null) return;
             if (await locationNeedsPrompt()) noteAppLockExcuse();
             if (stopped || palmSignLocation.watch !== null) return;
             try {
@@ -213,6 +222,8 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
         } catch {}
         if (active()) timer = setTimeout(() => void scan(), PALM_SIGN_LIVE_GAP_MS);
     };
+    let settle: () => void = () => {};
+    palmSignCameraStart.settled = new Promise<void>((resolve) => { settle = resolve; });
     void (async () => {
         try {
             initScanEngine();
@@ -223,13 +234,15 @@ export function startPalmSignCamera(onScan: (code: string, photo: string) => voi
                 noteAppLockExcuse();
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
             }
+            settle();
             if (!active()) { if (owned) stream?.getTracks().forEach((track) => track.stop()); return; }
             await attachPalmSignStream(stream);
             if (active()) void scan();
-        } catch { if (owned) stream?.getTracks().forEach((track) => track.stop()); if (active()) onError(); }
+        } catch { settle(); if (owned) stream?.getTracks().forEach((track) => track.stop()); if (active()) onError(); }
     })();
     return () => {
         cancelled = true;
+        settle();
         if (timer) clearTimeout(timer);
         if (owned) stream?.getTracks().forEach((track) => track.stop());
         void attachPalmSignStream(null);

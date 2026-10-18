@@ -315,6 +315,8 @@ export async function executeRestoreItem() {
                     restoredBc.isDeducted = false;
                 }
                 restoredBc.isFromDeletion = false;
+                delete restoredBc.ztoReturnedAt;
+                delete restoredBc.ztoMisplacedAt;
                 if (restoredBc.isClosed) restoredBc.closedAt = getServerNow();
                 else {
                     delete restoredBc.closedAt;

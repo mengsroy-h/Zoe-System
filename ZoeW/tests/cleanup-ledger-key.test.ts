@@ -12,6 +12,7 @@ import { CLEANUP_JOURNAL_KEY } from '../src/core/storage-keys';
 import { DB_LISTENER_KEY_DAILY_REVENUE, dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
 import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, resumeCleanupJournalEntry, runScheduledCleanup } from '../src/domain/cleanup';
 import { activeRestoreClaims, executeRestoreItem } from '../src/features/restore';
+import { trashZtoFinalBlock } from '../src/domain/barcode';
 import { ABANDON_AGE_MS } from '../src/features/session';
 
 const HISTORY = 'zoew_scan_history_cod_dod';
@@ -427,6 +428,23 @@ describe('ការស្តារ ៖ បូកវិញតាមសោ · ម�
         await flush();
         expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
         expect(readCleanupJournal().length).toBe(0);
+    }, 20000);
+
+    it('📍 ខុសទីតាំង ស្តារបាន ➜ បូក ១០ វិញ · ភស្តុតាងត្រឡប់ (`ztoReturnedAt` · `ztoMisplacedAt`) មិនតាមចូលបញ្ជី ➜ ត្រឡប់ ZTO ពិតក្រោយមក 🔒 ម្តងទៀត', async () => {
+        seed([expiredItem()]);
+        await claimAndCleanupItem(ID, 'abandon');
+        await flush();
+        expect(money()).toEqual({ day: [90, 9], month: [90, 9] });
+        const trash = getAt(TRASH + '/' + ID);
+        trash.barcodes = trash.barcodes.map((b: any) => ({ ...b, ztoReturnedAt: 5, ztoMisplacedAt: 5, ztoSignedAt: undefined }));
+        setAt(TRASH + '/' + ID, JSON.parse(JSON.stringify(trash)));
+        expect(trashZtoFinalBlock(getAt(TRASH + '/' + ID)), 'ខុសទីតាំង ៖ មិន 🔒').toBe('');
+        await restoreOnOtherDevice(ID);
+        expect(money()).toEqual({ day: [100, 10], month: [100, 10] });
+        const back = getAt(HISTORY + '/' + ID);
+        expect(back.barcodes.map((b: any) => [b.ztoReturnedAt, b.ztoMisplacedAt])).toEqual([[undefined, undefined]]);
+        expect(trashZtoFinalBlock({ trashReason: 'returned', barcodes: back.barcodes.map((b: any) => ({ ...b, ztoReturnedAt: 9 })) }),
+            'ការត្រឡប់ ZTO ពិតលើកក្រោយ ➜ 🔒 (គ្មានត្រាខុសទីតាំងចាស់)').toBe('returned');
     }, 20000);
 
     it('១១. ទិសផ្ទុយ ៖ ស្តារ ➜ កញ្ចប់ដដែល (id ដដែល) ផុតកំណត់ម្តងទៀត ➜ ដកម្តងទៀត (សោចាស់មិនរារាំង)', async () => {

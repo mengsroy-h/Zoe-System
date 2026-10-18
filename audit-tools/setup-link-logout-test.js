@@ -49,7 +49,7 @@ for (const app of ['ZoeW']) {
             console, queueMicrotask,
             document: fakeDom(pinOpen),
             localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-            hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {}, resetBatchScan() {}, resetLabelPrint() {},
+            hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {}, resetBatchScan() {}, resetLabelPrint() {}, resetZtoFinalMarks() {},
             clearZtoPickupStatusStore() {},
             setPhoneSearchPulledUp() {},
             scheduleChromeLayoutSettle() {},

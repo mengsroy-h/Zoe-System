@@ -6522,7 +6522,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `panel-motion-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ · ផ្នែក ៧ |
 | `panel-snap-ownership-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៦ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `payload-schema` | ផ្នែក ១ | ផ្នែក ៣ · ផ្នែក ៤ |
+| `payload-schema` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៧ |
 | `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `phone-search-swipe-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៦ |
@@ -6711,6 +6711,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/notify-groups.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/notify-update-check.test.tsx` | ផ្នែក ១ | — |
 | `ZoeW/tests/orientation-lock.test.ts` | ផ្នែក ១ | — |
+| `ZoeW/tests/palm-sign-camera.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/password-save-race.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/phone-suggest-idle-scroll.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/pickup-interrupted-close.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
@@ -6778,6 +6779,7 @@ ZoeW account UI ១៣/១៣ និង typecheck ជាប់។ ការធ�
 | `ZoeW/tests/zto-born-closed-merge.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-cookie-life.test.ts` | ផ្នែក ១ | — |
 | `ZoeW/tests/zto-detail-identity.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
+| `ZoeW/tests/zto-final-marks.test.tsx` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-import-lanes.test.ts` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ZoeW/tests/zto-list-identity.test.ts` | — | ផ្នែក ៧ |
 | `ZoeW/tests/zto-list-origin-import.test.tsx` | ផ្នែក ១ | — |

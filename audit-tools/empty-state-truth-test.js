@@ -180,6 +180,7 @@ function buildSandbox(state) {
         getFormattedDate: () => '2026-09-09',
         getServerNow: () => Date.parse('2026-09-09T03:00:00Z'),
         openModalHelper: () => {},
+        scheduleZtoFinalMarks: () => {},
         document: { getElementById: () => null }
     };
     sandbox.ZTO_SYNC_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_HISTORY,

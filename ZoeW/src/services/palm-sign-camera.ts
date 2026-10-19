@@ -4,7 +4,7 @@ import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { scanState } from '../core/state';
 import { appZoneParts, appZoneWallClockToMillis } from '../core/timezone';
-import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
+import { createScratchCanvas, loadScratchFont, loadScratchImage } from '../platform/document-io';
 import { withTimeout } from './network';
 import { initScanEngine, readCanvasSymbols } from './scan-engine';
 import { nativeScanResults, scanQrReader } from './scan-formats';
@@ -38,14 +38,11 @@ export const PALM_SIGN_STAMP_FONT = 'ZoePalmStamp, Roboto, Arial, sans-serif';
 let palmSignFontLoad: Promise<void> | null = null;
 
 export function loadPalmSignStampFont() {
-    if (typeof FontFace === 'undefined' || typeof document === 'undefined' || !document.fonts) return Promise.resolve();
+    if (typeof FontFace === 'undefined') return Promise.resolve();
     if (!palmSignFontLoad) {
-        try {
-            const url = new URL('vendor/roboto-palm-latin-700.woff2', document.baseURI).href;
-            const face = new FontFace('ZoePalmStamp', 'url("' + url + '")', { weight: '700' });
-            const loading = face.load().then((font) => { document.fonts.add(font); });
-            palmSignFontLoad = withTimeout(loading, 2000, 'Palm stamp font timeout').catch(() => { palmSignFontLoad = null; });
-        } catch { return Promise.resolve(); }
+        const loading = loadScratchFont('ZoePalmStamp', 'vendor/roboto-palm-latin-700.woff2', { weight: '700' })
+            .then((loaded) => { if (!loaded) palmSignFontLoad = null; });
+        palmSignFontLoad = withTimeout(loading, 2000, 'Palm stamp font timeout').catch(() => { palmSignFontLoad = null; });
     }
     return palmSignFontLoad;
 }

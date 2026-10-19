@@ -15,7 +15,7 @@ vi.mock('../src/core/clock', () => ({ getServerNow: () => Date.now() }));
 vi.mock('../src/services/network', () => ({ withTimeout: (work: Promise<unknown>) => work }));
 vi.mock('../src/core/state', () => ({ scanState: { currentStream: null, codeReader: null, nativeDetector: null } }));
 vi.mock('../src/app/refs', () => ({ videoElement: vi.fn(), attachPalmSignStream: vi.fn(async () => {}) }));
-vi.mock('../src/platform/document-io', () => ({ createScratchCanvas: vi.fn(), loadScratchImage: vi.fn() }));
+vi.mock('../src/platform/document-io', async (actual) => ({ ...(await actual<any>()), createScratchCanvas: vi.fn(), loadScratchImage: vi.fn() }));
 vi.mock('../src/services/scan-engine', () => ({ initScanEngine: vi.fn(), readCanvasSymbols: vi.fn(async () => []) }));
 let stopTrack: ReturnType<typeof vi.fn>;
 let stream: MediaStream;
@@ -421,6 +421,8 @@ it('📍 បដិសេធ location ➜ មិនបង្កើតកូអរ
 });
 it('🖼 FontFace constructor មិនដំណើរការ ➜ ការដាក់ត្រាមិនបរាជ័យ', async () => {
     vi.stubGlobal('document', { baseURI: 'https://localhost/', fonts: { add: vi.fn() } });
-    vi.stubGlobal('FontFace', class { constructor() { throw new Error('font unavailable'); } });
+    const made = vi.fn();
+    vi.stubGlobal('FontFace', class { constructor() { made(); throw new Error('font unavailable'); } });
     await expect(loadPalmSignStampFont()).resolves.toBeUndefined();
+    expect(made).toHaveBeenCalledOnce();
 });

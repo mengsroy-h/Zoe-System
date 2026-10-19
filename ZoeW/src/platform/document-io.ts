@@ -71,3 +71,13 @@ export function downloadObjectUrl(url: string, filename: string): void {
     a.click();
     document.body.removeChild(a);
 }
+
+export async function loadScratchFont(family: string, path: string, descriptors: FontFaceDescriptors): Promise<boolean> {
+    if (typeof FontFace === 'undefined' || typeof document === 'undefined') return false;
+    const fonts = document.fonts;
+    if (!fonts) return false;
+    const url = new URL(path, document.baseURI).href;
+    const face = new FontFace(family, 'url("' + url + '")', descriptors);
+    fonts.add(await face.load());
+    return true;
+}

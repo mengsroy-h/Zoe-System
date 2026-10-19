@@ -29,6 +29,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkUpdatePlugin.class);
         registerPlugin(DeviceInfoPlugin.class);
+        registerPlugin(ScanBeepPlugin.class);
         lockPhoneToPortrait();
         super.onCreate(savedInstanceState);
         preferHighestRefreshRate();

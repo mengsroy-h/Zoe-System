@@ -1,7 +1,7 @@
 import { modalIsOpen } from '../core/modals';
 import { addPreconnectHint } from '../platform/document-io';
 import { lookupState, uiState } from '../core/state';
-import { CLEANUP_SWEEP_BATCH, runAutomaticCleanupRules } from '../domain/cleanup';
+import { CLEANUP_SWEEP_BATCH, resumeInterruptedCleanups, runAutomaticCleanupRules } from '../domain/cleanup';
 import { resumePickupIntents } from '../domain/pickup';
 import { AUTO_LOOKUP_FAIL_COOLDOWN_MS, AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS } from '../features/auto-lookup';
 import { lookupApiIsZto, safeLookupReason, ztoBarcodeShapeIsValid } from '../features/customer-table-prefetch';
@@ -69,6 +69,7 @@ export function debounce(fn, ms) {
 
 export const debouncedRenderAfterHistorySync = debounce(() => {
     runAutomaticCleanupRules(CLEANUP_SWEEP_BATCH);
+    resumeInterruptedCleanups();
     resumePickupIntents();
     refreshCurrentHistoryView();
     updateRecentPhonesList();

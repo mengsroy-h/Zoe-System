@@ -299,10 +299,13 @@ export function cleanupLedgerPrior(scanDate) {
 }
 
 export async function deductCleanupLedgerKeyed(trashItem, rev, prior) {
+    const ledgerDb = firebaseState.db;
+    const ledgerGeneration = firebaseState.authGeneration;
     const at = cleanupEventAt(trashItem);
     if (!at || !rev || !/^[a-zA-Z0-9_-]{1,64}$/.test(trashItem.id)) return 'refused';
     const amounts = cleanupEventAmounts(rev);
     const monthly: any = await commitLedgerEventStep('monthly', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.m : null);
+    if (firebaseState.db !== ledgerDb || firebaseState.authGeneration !== ledgerGeneration) return 'stale';
     if (monthly.state !== 'applied' && monthly.state !== 'already') return monthly.state;
     const daily: any = await commitLedgerEventStep('daily', rev.scanDate, trashItem.id, at, 'deduct', amounts, prior ? prior.d : null);
     if (daily.state === 'applied' || daily.state === 'already' || daily.state === 'restored') return 'deducted';
@@ -461,8 +464,9 @@ export async function resolveCleanupSlot(trashItem) {
     if (!slotIsCurrent()) return 'wait';
     if (existing && existing.deletedAt === trashItem.deletedAt) return 'ours';
     if (existing && trashSlotSharesClaim(existing, trashItem)) return 'elsewhere';
-    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return 'wait';
-    if (dataState.scanHistory.some((item) => item && item.id === trashItem.id && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
+    if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 'wait';
+    if (dataState.scanHistory.some((item) => item && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
+    if (dataState.deletedItems.some((item) => item && item.id !== trashItem.id && trashSlotSharesClaim(item, trashItem))) return 'elsewhere';
     const back = cleanupBarcodesBackInHistory(trashItem);
     if (back === null) return 'wait';
     if (back) return 'elsewhere';
@@ -783,6 +787,32 @@ export async function cleanupClaimAccountedElsewhere(id, claimedPartial) {
     return foreign ? 'elsewhere' : 'ours';
 }
 
+export function prepareCleanupClaim(id, reason, whole, partial) {
+    const trashItem = cloneRestoreItem(partial || whole);
+    trashItem.id = partial ? cleanupPartialTrashId(id, reason, partial) : id;
+    trashItem.deletedAt = getServerNow();
+    trashItem.isFromDeletion = reason === 'close';
+    trashItem.trashReason = reason === 'abandon' ? 'returned' : reason === 'remove' ? 'remove' : 'pickup';
+    if (Array.isArray(trashItem.barcodes)) {
+        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: trashItem.isFromDeletion }));
+        trashItem.count = trashItem.barcodes.length;
+        recalcItemMoneyFromBarcodes(trashItem);
+        trashItem.barcode = trashItem.barcodes[0]?.code || trashItem.barcode;
+        trashItem.isClosed = trashItem.barcodes.length > 0 && trashItem.barcodes.every(b => b.isClosed);
+    }
+    stripHistoryOnlyMarkers(trashItem);
+    const deduct = reason === 'abandon' || reason === 'remove';
+    const entry = { id, reason, journalAt: getServerNow(), stage: CLEANUP_STAGE_SLOT, trashItem,
+        revenue: deduct ? { scanDate: cleanupScanDateOf(trashItem), cod: trashItem.cod, dod: trashItem.dod, count: trashItem.count } : null };
+    markCleanupJournalLive(trashItem.id);
+    noteCleanupJournalEntry(entry);
+    if (!readCleanupJournal().some(e => e.trashItem.id === trashItem.id && e.trashItem.deletedAt === trashItem.deletedAt)) {
+        releaseCleanupJournalLive(trashItem.id);
+        throw new Error('write_journal_unavailable');
+    }
+    return entry;
+}
+
 export async function claimAndCleanupItem(id, reason, opts?) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
     let journalFull = false;
@@ -874,8 +904,21 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             return null;
         }
     };
+    let preparedEntry = null;
+    let pendingCleanup = false;
+    let cleanupFinishing = false;
+    const releasePreparedClaim = () => { if (preparedEntry) releaseCleanupJournalLive(preparedEntry.trashItem.id); };
+    const durableCleanupUpdater = (currentItem) => {
+        if (!cleanupIsCurrent()) { noteCleanupSessionSwitch('claim'); return; }
+        const next = cleanupUpdater(currentItem);
+        if (claimedWhole || claimedPartial) preparedEntry = prepareCleanupClaim(id, reason, claimedWhole, claimedPartial);
+        return next;
+    };
     const finishCleanup = async (result) => {
-        if (!result.committed || (!claimedWhole && !claimedPartial)) return;
+        if (!result.committed || (!claimedWhole && !claimedPartial)) {
+            if (preparedEntry) clearCleanupJournalEntry(preparedEntry.trashItem.id);
+            return;
+        }
         if (result.txOutcome === 'applied' && claimedPartial) {
             const owner = await cleanupClaimAccountedElsewhere(id, claimedPartial);
             if (owner !== 'ours') {
@@ -948,6 +991,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         }
 
         stripHistoryOnlyMarkers(trashItem);
+        if (preparedEntry) trashItem.deletedAt = preparedEntry.trashItem.deletedAt;
 
         try { markCleanupJournalLive(trashItem.id); } catch (liveErr) {}
         try {
@@ -1027,19 +1071,24 @@ export async function claimAndCleanupItem(id, reason, opts?) {
             try { releaseCleanupJournalLive(trashItem.id); } catch (liveErr) {}
         }
     };
+    const finishDurableCleanup = async (result) => {
+        cleanupFinishing = true;
+        try { return await finishCleanup(result); } finally { releasePreparedClaim(); }
+    };
     try {
-        const cleanupTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), cleanupUpdater);
+        const cleanupTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), durableCleanupUpdater);
         let result;
         try {
             result = await dbOp(cleanupTx);
         } catch (txError) {
             if (dbOpStalled(txError)) {
-                armLateCommit(cleanupTx, finishCleanup, null, 'claimAndCleanupItem ' + reason);
+                pendingCleanup = true;
+                armLateCommit(cleanupTx, finishDurableCleanup, releasePreparedClaim, 'claimAndCleanupItem ' + reason);
                 return;
             }
             throw txError;
         }
-        await settleLockWithin(finishCleanup(result), LOCK_STALL_RELEASE_MS, 'claimAndCleanupItem ' + reason);
+        await settleLockWithin(finishDurableCleanup(result), LOCK_STALL_RELEASE_MS, 'claimAndCleanupItem ' + reason);
     } catch (e) {
         if (e && e.txOutcome === 'not-applied') {
             console.warn('Automatic cleanup transaction was not applied (disconnect) for', id);
@@ -1049,6 +1098,7 @@ export async function claimAndCleanupItem(id, reason, opts?) {
         }
     } finally {
         cleanupInFlight.delete(id);
+        if (!pendingCleanup && !cleanupFinishing) releasePreparedClaim();
     }
 }
 

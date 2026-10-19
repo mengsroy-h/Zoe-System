@@ -684,7 +684,7 @@
     "NOTICE": {
       "policy": "guard-7",
       "encoding": "lf-text",
-      "sha256": "52587f22cd0d399277f95c13283985ed754cb20bb57b8da3543f8446e3e5da14"
+      "sha256": "58385aa010aa8217d884f170b7edbff190b93f9debc9ca5d538bece9f69f3c90"
     },
     "README.md": {
       "policy": "guard-13"
@@ -3552,6 +3552,26 @@
     },
     "ZoeW/tests/zto-palm-multibranch-hold.test.tsx": {
       "policy": "zoew-self-verification"
+    },
+    "LICENSES/OFL-Roboto.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "84044c09058803d87a241bd28abb4ce30a433d7db9c27a04da3efad6a0ca539c"
+    },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/ScanBeepPlugin.java": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/public/vendor/roboto-palm-latin-700.woff2": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/platform/scan-beep.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/native/scan-beep.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "audit-tools/money-cookie-blob.js": {
+      "policy": "money-multidevice-harness"
     }
   }
 }

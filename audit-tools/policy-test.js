@@ -49,13 +49,40 @@ function buildRunner(appFile) {
 
     // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
     const removeSource = fnBody(src, 'function removeSingleBarcode(', 'removeSingleBarcode');
+    const keyedRemove = removeSource.includes('deductCleanupRevenue(itemId, itemToTrash, revenue)');
+    let removeBlock, removeResult;
+    if (keyedRemove) {
+        const first = removeSource.indexOf('            const removedBc = { ...claimedBarcode');
+        const last = removeSource.indexOf('            const itemToTrash = stripHistoryOnlyMarkers(');
+        const event = /const revenue = \{ scanDate: revenueScanDate, cod: itemToTrash.cod, dod: itemToTrash.dod, count: 1 \};/.exec(removeSource);
+        const guard = /if \(([^\n]+)\) \{\s*const revenue = \{ scanDate: revenueScanDate/.exec(removeSource);
+        if (first < 0 || last <= first || !event || !guard) throw new Error('keyed remove deduction block not found');
+        const flip = /current\.barcodes = current\.barcodes\.map\(\(b\) => \(b && codes\.has\(b\.code\) \? \{ \.\.\.b, isDeducted: true \} : b\)\);/.exec(src);
+        if (!flip) throw new Error('keyed remove flag flip not found');
+        removeBlock = removeSource.slice(first, last) + `
+            let deductionApplied = null;
+            const itemToTrash = { id: 'policy_remove', deletedAt: NOW, cod: removedBc.cod, dod: removedBc.dod, barcodes: [removedBc] };
+            if (${guard[1]}) {
+                ${event[0]}
+                const amounts = cleanupEventAmounts(revenue);
+                const decision = ledgerEventDecision(true, 'deduct', null, itemToTrash.id, itemToTrash.deletedAt, null);
+                deductionApplied = addRevenueToDailyAndMonthlyRecord(revenue.scanDate, decision.sign * amounts.cod, decision.sign * amounts.dod, decision.sign * amounts.count);
+                const codes = new Set([removedBc.code]); const current = itemToTrash;
+                ${flip[0]}
+            }
+        `;
+        removeResult = 'itemToTrash.barcodes[0]';
+    } else {
     const removeStarts = ['            let deductionApplied = null;', '            const removedBc = { ...claimedBarcode']
         .map((marker) => removeSource.indexOf(marker));
     const removeEnd = removeSource.indexOf('            const itemToTrash = stripHistoryOnlyMarkers(');
     if (removeStarts.some((at) => at < 0) || removeEnd <= Math.max(...removeStarts)) {
         throw new Error('remove deduction block not found');
     }
-    const removeBlock = removeSource.slice(Math.min(...removeStarts), removeEnd);
+    removeBlock = removeSource.slice(Math.min(...removeStarts), removeEnd);
+
+        removeResult = 'removedBc';
+    }
 
     // ⛔ helper ពិតត្រូវស្រង់ចេញពី `app.js` — មិនចម្លងដោយដៃ (តេស្តលើកូដចម្លង
     // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា
@@ -146,7 +173,7 @@ ${claimLedgerTail}
         }
         function runRemoveBarcode(claimedParent, claimedBarcode) {
 ${removeBlock}
-            return { removedBc, deductionApplied: !!deductionApplied, deductedCod: deductionApplied ? -deductionApplied.daily.cod : 0, deductedDod: deductionApplied ? -deductionApplied.daily.dod : 0 };
+            return { removedBc: ${removeResult}, deductionApplied: !!deductionApplied, deductedCod: deductionApplied ? -deductionApplied.daily.cod : 0, deductedDod: deductionApplied ? -deductionApplied.daily.dod : 0 };
         }
         function runRestore(itemToRestore) {
             const restoredWasRemoved = itemToRestore.isFromDeletion === false;

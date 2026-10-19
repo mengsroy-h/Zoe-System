@@ -390,6 +390,7 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     const server = sharedStore || clone(initial);
     const calls = [];
     const messages = [];
+    const localStore = new Map();
     function read(p) { return p.split('/').filter(Boolean).reduce((v, key) => v && v[key], server) ?? null; }
     function write(p, value) {
         const parts = p.split('/').filter(Boolean);
@@ -422,6 +423,9 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
         pendingRestoreId: null, activeRestoreClaims: new Map(), scanRemoveInFlight: null,
         dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',
+        cleanupInFlight: new Set(), cleanupJournalLive: new Map(), restoreInFlight: new Set(),
+        appLocalStore: { getItem: k => localStore.get(k) ?? null, setItem: (k, v) => localStore.set(k, String(v)), removeItem: k => localStore.delete(k) },
+        DB_LISTENER_KEY_HISTORY: 'history', DB_LISTENER_KEY_DAILY_REVENUE: 'dailyRevenue',
         cleanupInFlightIds: new Set(), cleanupNextAttemptAt: new Map(), activeClearHistoryClaims: new Map(),
         confirm: () => true, alert: message => messages.push(message),
         fb: {
@@ -448,6 +452,8 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
     vm.createContext(box);
     vm.runInContext(fnCode, box);
     for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX', 'PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX',
+        'RESTORE_INTENTS_KEY', 'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX',
+        'CLEANUP_STAGE_SLOT', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER', 'CLEANUP_STAGE_FLIP', 'CLEANUP_STAGE_UNDO',
         'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
         'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'RETURNED_TRASH_RETENTION_MS', 'LEDGER_OP_RING_MAX']) {
         const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);

@@ -9,11 +9,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
+import { cleanupInFlight, cleanupJournalLive } from '../src/domain/cleanup';
 
 const DAY = '2026-10-07';
 type Pending = { fn: any; resolve: (v: any) => void };
 let ledgerPending: Pending[];
 let capture: ReturnType<typeof vi.fn>;
+let trashDocs: Record<string, any>;
 const savedFb = firebaseState.fb;
 const texts = () => uiState.toasts.map((t: any) => t.msg);
 const flush = async (n = 8) => { for (let i = 0; i < n; i++) await vi.advanceTimersByTimeAsync(0); };
@@ -33,6 +35,8 @@ function commitLedger() {
 beforeEach(() => {
     vi.useFakeTimers();
     ledgerPending = [];
+    trashDocs = {};
+    localStorage.clear(); cleanupInFlight.clear(); cleanupJournalLive.clear();
     uiState.toasts = [];
     uiState.scanRemoveInFlight = null;
     capture = vi.fn();
@@ -56,6 +60,11 @@ beforeEach(() => {
                 const current = dataState.scanHistory.find((i: any) => i.id === path.split('/').pop());
                 const value = fn(current ? JSON.parse(JSON.stringify(current)) : null);
                 return Promise.resolve({ committed: true, snapshot: { val: () => value } });
+            }
+            if (path.indexOf('zoew_recently_deleted_cod_dod/') === 0) {
+                const value = fn(trashDocs[path] ? structuredClone(trashDocs[path]) : null);
+                if (value !== undefined) trashDocs[path] = structuredClone(value);
+                return Promise.resolve({ committed: value !== undefined, snapshot: { val: () => value } });
             }
             return new Promise((resolve) => {
                 const entry: any = { fn, resolve };
@@ -88,12 +97,13 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
     it('ចាកចេញមុន ledger ឆ្លើយ ➜ គ្មាន «⚠️ … សូមប្រាប់ Admin» · គ្មាន Sentry លុយ', async () => {
         const run = removeSingleBarcode('item1', 'ZTX0001');
         await flush();
-        expect(ledgerPending.length).toBe(2);
+        expect(ledgerPending.length).toBe(1);
         expect(texts().some((m) => m.indexOf('⏳') === 0)).toBe(true);
         firebaseState.authGeneration++;
         commitLedger();
         await flush();
-        expect(await run).toBe('done');
+        expect(await run).toBe('pending');
+        expect(ledgerPending).toHaveLength(0);
         expect(texts().filter((m) => m.indexOf('⚠️') === 0)).toEqual([]);
         expect(texts().some((m) => m.indexOf('✅') === 0)).toBe(false);
         expect(capture).not.toHaveBeenCalled();
@@ -102,7 +112,9 @@ describe('ដក barcode ៖ ការផ្ទៀងផ្ទាត់ ledger �
     it('ទិសផ្ទុយ ៖ វគ្គដដែល ➜ ✅ កាត់ប្រាក់រួចរាល់', async () => {
         const run = removeSingleBarcode('item1', 'ZTX0001');
         await flush();
-        expect(commitLedger()).toBe(2);
+        expect(commitLedger()).toBe(1);
+        await flush();
+        expect(commitLedger()).toBe(1);
         await flush();
         expect(await run).toBe('done');
         expect(texts().some((m) => m.indexOf('✅') === 0 && /កាត់ប្រាក់/.test(m))).toBe(true);

@@ -18,7 +18,7 @@ import { closeModal } from '../src/ui/modal';
 import { mount, unmount } from './native/react-harness';
 
 const stopLocation = vi.fn();
-vi.mock('../src/services/palm-sign-camera', () => ({ palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
+vi.mock('../src/services/palm-sign-camera', () => ({ palmSignLocation: { status: 'ready' }, subscribePalmSignLocation: vi.fn(() => () => {}), capturePalmSignPhoto: vi.fn(async () => PHOTO), palmSignFramePhoto: vi.fn(() => PHOTO), startPalmSignCamera: vi.fn(() => () => {}),
     startPalmSignLocation: vi.fn(() => stopLocation) }));
 
 vi.mock('../src/features/barcode-ops', () => ({

@@ -119,8 +119,10 @@ ok('ស្កេនមិនប្រកាស success មុន ledger reconcil
     /return\s+correctRevenueLedgerToActual\s*\(/.test(fnSrc.addOrUpdateEntry)
         && /const\s+saveStatus\s*=\s*await\s+withTimeout\s*\(/.test(fnSrc.confirmPhone)
         && /saveStatus\s*!==\s*true/.test(fnSrc.confirmPhone));
-ok('ដក barcode ➜ កេះ correctRevenueLedgerToActual ក្រោយ trash ជោគជ័យ',
-    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.removeSingleBarcode));
+ok('ដក barcode ➜ keyed ledger ក្រោយ trash ឬ legacy reconcile ដែលមានភស្តុតាង server',
+    /deductCleanupRevenue\s*\(/.test(fnSrc.removeSingleBarcode)
+        ? /commitLedgerEventStep\s*\(/.test(fnSrc.deductCleanupLedgerKeyed) && /applyCleanupRevenue\s*\(/.test(fnSrc.deductCleanupRevenue) && /correctRevenueLedgerToActual\s*\(/.test(fnSrc.applyCleanupRevenue)
+        : /correctRevenueLedgerToActual\s*\(/.test(fnSrc.removeSingleBarcode));
 // ⛔ [2.50.49] ការដកនៃការសម្អាត ៧ ថ្ងៃ = ព្រឹត្តិការណ៍មានសោ (idempotent · journal ព្យាយាមម្តងទៀត) ➜ reconcile ចាស់នៅសល់តែពេល
 //    rules បដិសេធ ring (`deductCleanupRevenue` ➜ `applyCleanupRevenue` ➜ `correctRevenueLedgerToActual`)។ ការវាស់ឥរិយាបថ ៖
 //    `cleanup-interrupt-atomicity-test` ៣ខ · `ZoeW/tests/cleanup-ledger-key.test.ts`។

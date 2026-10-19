@@ -24,6 +24,8 @@ const http = require('http');
 const path = require('path');
 const { emuNamespace } = require('./ns.js');
 const { r2, rng, LICENSE_STUB, invariant, invariantBroken, openBarcodeTargets, PAGE_OPS } = require('../money-multidevice-core.js');
+const { cookieFixture, networkGate, restoreFlows } = require('../money-cookie-blob.js');
+const fx = require('../idtoken-fixture.js');
 
 const ROOT = process.env.MONEYMD_APP_DIR ? path.resolve(process.env.MONEYMD_APP_DIR) : path.join(__dirname, '..', '..');
 const DIR = path.join(ROOT, 'ZoeW');
@@ -50,14 +52,6 @@ function emulatorUp() {
     return fetch('http://127.0.0.1:' + EMU_PORT + '/.json?ns=demo-zoe-probe').then((r) => r.ok, () => false);
 }
 
-function unsignedToken(uid, email, projectId) {
-    const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-    const now = Math.floor(Date.now() / 1000);
-    return b({ alg: 'none', typ: 'JWT' }) + '.' + b({
-        iss: 'https://securetoken.google.com/' + projectId, aud: projectId, auth_time: now, user_id: uid, sub: uid,
-        iat: now, exp: now + 3600, email, email_verified: false, firebase: { identities: { email: [email] }, sign_in_provider: 'password' }
-    }) + '.';
-}
 
 
 (async () => {
@@ -74,8 +68,11 @@ function unsignedToken(uid, email, projectId) {
     }
     if (fail) { console.log('\n❌ ធ្លាក់ ' + fail + ' / ok ' + pass); return; }
 
+    const PROJECT = 'demo-zoe-moneymd';
+    const cookie = cookieFixture(ROOT, { project: PROJECT });
     const staticServer = await new Promise((res) => {
         const s = http.createServer((req, rsp) => {
+            if (req.url.startsWith('/.netlify/functions/zto-order-detail')) { void cookie.serve(req, rsp); return; }
             let p = decodeURIComponent(req.url.split('?')[0]);
             if (p === '/') p = '/index.html';
             let f = path.join(DIR, p);
@@ -86,7 +83,6 @@ function unsignedToken(uid, email, projectId) {
         s.listen(0, '127.0.0.1', () => res(s));
     });
     const origin = 'http://127.0.0.1:' + staticServer.address().port;
-    const PROJECT = 'demo-zoe-moneymd';
     const browser = await chromium.launch({ executablePath: CHROME, args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'] });
     const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
     const now = Date.now();
@@ -98,6 +94,7 @@ function unsignedToken(uid, email, projectId) {
 
     const makeDevice = async (ns, uid, email) => {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
+        const gate = await networkGate(ctx, 'firebase');
         await ctx.route('https://www.gstatic.com/firebasejs/**', (route) => {
             const file = route.request().url().split('/').pop().split('?')[0];
             const src = path.join(sdkDir, file);
@@ -109,7 +106,7 @@ function unsignedToken(uid, email, projectId) {
             const req = route.request();
             if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
             const url = req.url();
-            const token = unsignedToken(uid, email, PROJECT);
+            const token = fx.tokenFor(email, { aud: PROJECT, claims: { sub: uid, user_id: uid, auth_time: Math.floor(Date.now() / 1000), firebase: { identities: { email: [email] }, sign_in_provider: 'password' } } });
             let body;
             if (/accounts:signInWithPassword/.test(url)) body = { kind: 'identitytoolkit#VerifyPasswordResponse', localId: uid, email, displayName: '', idToken: token, registered: true, refreshToken: 'refresh-' + uid, expiresIn: '3600' };
             else if (/accounts:lookup/.test(url)) { const t = String(Date.now()); body = { kind: 'identitytoolkit#GetAccountInfoResponse', users: [{ localId: uid, email, emailVerified: false, passwordHash: 'x', passwordUpdatedAt: Number(t), providerUserInfo: [{ providerId: 'password', federatedId: email, email, rawId: email }], validSince: String(Math.floor(Number(t) / 1000)), lastLoginAt: t, createdAt: t, lastRefreshAt: new Date().toISOString() }] }; }
@@ -129,11 +126,18 @@ function unsignedToken(uid, email, projectId) {
             });
         }, JSON.stringify(config));
         await ctx.addInitScript('(' + PAGE_OPS.toString() + ')();');
-        const page = await ctx.newPage();
+        let page = await ctx.newPage();
         const errors = [];
         page.on('pageerror', (e) => errors.push(String(e && e.message)));
         page.on('dialog', (d) => d.accept().catch(() => {}));
-        const dev = { ctx, page, uid, email, errors, name: uid };
+        const dev = { ctx, page, uid, email, errors, gate, name: uid };
+        dev.reopen = async () => {
+            page = await ctx.newPage(); dev.page = page;
+            page.on('pageerror', (e) => errors.push(String(e && e.message)));
+            page.on('dialog', (d) => d.accept().catch(() => {}));
+            await page.goto(origin + '/', { waitUntil: 'load' });
+            if (await dev.waitOnline(40000) < 0) throw new Error('Cookie reopen: ' + JSON.stringify(await dev.state()));
+        };
         dev.state = () => page.evaluate(() => window.__state()).catch((e) => ({ status: 'evaluate failed: ' + (e && e.message), phase: null, pending: -1, blocked: -1, rows: -1, history: -1, results: [] }));
         dev.waitOnline = async (ms, minHistory) => {
             const t0 = Date.now();
@@ -192,6 +196,11 @@ function unsignedToken(uid, email, projectId) {
         try {
             for (const dev of devices) { if (!(await dev.login())) { broke = 'ប្រអប់ចូលមិនលេច (' + dev.name + ')'; break; } }
             if (!broke) for (const dev of devices) { if ((await dev.waitOnline(30000, 5)) < 0) { broke = 'ឧបករណ៍ ' + dev.name + ' មិនដល់ «' + ONLINE_TEXT + '» + ប្រវត្តិ ៥ ជួរ ៖ ' + JSON.stringify(await dev.state()); break; } }
+            if (!broke && run === RUN0) for (const authMode of ['cookie', 'palm']) await restoreFlows({ devices, read: async () => (await (await owner('.json')).json()) || {},
+                write: async (ops) => {
+                    const patch = Object.fromEntries(ops.map((o) => [o.p.join('/'), o.v]));
+                    const out = await owner('.json', 'PATCH', patch); if (!out.ok) throw new Error('Cookie seed: ' + out.status);
+                }, dateKey, monthKey, knownCodes, fixture: cookie, origin, site: '1', tag: 'firebase', backend: 'firebase', authMode });
             for (let i = 0; i < OPS && !broke; i++) {
                 const plan = devices.map((dev) => {
                     const pick = r();
@@ -288,6 +297,8 @@ function unsignedToken(uid, email, projectId) {
             }
             const noisy = devices.flatMap((d) => d.errors).filter((e) => !/sentry|gstatic|fonts\.googleapis|ERR_|Failed to fetch|NetworkError|timed out/i.test(e));
             if (!broke && noisy.length) broke = 'កំហុស runtime / unhandledrejection ៖ ' + noisy.slice(0, 3).join(' · ');
+        } catch (e) {
+            broke = 'Cookie flow: ' + (e && e.stack || e);
         } finally {
             for (const dev of devices) await dev.ctx.close().catch(() => {});
         }
@@ -296,7 +307,8 @@ function unsignedToken(uid, email, projectId) {
         if (broke) { brokenRuns++; if (!firstDetail) firstDetail = 'run=' + run + ' ' + broke; }
     }
     await browser.close().catch(() => {});
-    staticServer.close();
+    await new Promise((resolve) => staticServer.close(resolve));
+    cookie.close();
     check(runsDone === RUNS && brokenRuns === 0, 'អថេរលុយ · ស្ថិតិ · registry · barcode រក្សាបាន ក្នុង ' + runsDone + ' លំដាប់ × ' + OPS + ' ជុំ (ឧបករណ៍ ' + DEVICES + ' ស្របគ្នា · SDK ពិត · rules ពិត)', firstDetail);
     check(stuckDevices === 0, 'គ្មានឧបករណ៍ជាប់ (blocked · journal · pending) ក្រោយ offline/reload', stuckDevices);
     check(injections.offlineReload > 0 && injections.offlineOnline > 0, 'ជាន់អប្បបរមា ៖ ការចាក់ offline+reload (' + injections.offlineReload + ') និង offline+online (' + injections.offlineOnline + ') បានបាញ់ពិត', injections);

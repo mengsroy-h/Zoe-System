@@ -354,15 +354,18 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
         ok('parse `app.js` បាន (parse error = ការធ្លាក់)', !!ast);
         if (ast) {
             // រាល់ `await` លើការសរសេរធុងសំរាម ត្រូវរុំដោយ `notifyIfSlow(`
-            const WRITE_HELPERS = ['saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase'];
+            const WRITE_HELPERS = ['saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase', 'claimCleanupTrashSlot'];
+            const manualOwners = ['removeSingleBarcode', 'deleteSingleItem'];
             const awaited = [];
             (function walk(node, stack) {
                 if (!node || typeof node.type !== 'string') return;
+                if (node.type === 'FunctionDeclaration' && node.id) stack = stack.concat(node.id.name);
                 if (node.type === 'AwaitExpression') {
                     const inner = src.slice(node.start, node.end);
                     WRITE_HELPERS.forEach((h) => {
+                        if (h === 'claimCleanupTrashSlot' && !manualOwners.some((owner) => stack.includes(owner))) return;
                         if (inner.indexOf(h + '(') !== -1) {
-                            awaited.push({ helper: h, wrapped: /notifyIfSlow\s*\(/.test(inner) });
+                            awaited.push({ helper: h, owner: stack.find((name) => manualOwners.includes(name)), wrapped: /notifyIfSlow\s*\(/.test(inner) });
                         }
                     });
                 }
@@ -374,6 +377,7 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
                 }
             })(ast, []);
             ok('ជាន់អប្បបរមា ៖ រកឃើញ await លើការសរសេរធុងសំរាម >= ៣', awaited.length >= 3, awaited.length);
+            ok('⛔ ដក និងលុបត្រូវបានវាស់លើទ្វារសរសេរ trash ពិត', manualOwners.every((owner) => awaited.some((a) => a.owner === owner)), awaited);
             const bare = awaited.filter((a) => !a.wrapped);
             ok('⛔ រាល់ការរង់ចាំការសរសេរធុងសំរាម ត្រូវមានសារវឌ្ឍនភាព',
                 bare.length === 0, bare);

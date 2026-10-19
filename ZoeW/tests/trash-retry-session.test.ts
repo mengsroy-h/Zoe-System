@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { getServerNow } from '../src/core/clock';
 import { dbListenerFailedPaths, dbListenerPendingPaths } from '../src/core/text';
-import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, readCleanupJournal, restoreClaimedItemToScanHistory } from '../src/domain/cleanup';
+import { claimAndCleanupItem, cleanupInFlight, cleanupJournalLive, prepareCleanupClaim, readCleanupJournal, resumeCleanupJournalEntry, restoreClaimedItemToScanHistory } from '../src/domain/cleanup';
+import { activeRestoreClaims, executeRestoreItem, restoreInFlight, saveRestoreClaim } from '../src/features/restore';
 import { removeSingleBarcode } from '../src/features/barcode-ops';
 import { deleteSingleItem } from '../src/features/entry-ops';
 import { ABANDON_AGE_MS } from '../src/features/session';
@@ -140,10 +141,96 @@ beforeEach(() => {
     (window as any).ZoeErrors = { capture: vi.fn() };
     cleanupInFlight.clear();
     cleanupJournalLive.clear();
+    activeRestoreClaims.clear();
+    restoreInFlight.clear();
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
     vi.stubGlobal('confirm', () => true);
+    vi.stubGlobal('alert', () => {});
     firebaseState.authGeneration++;
+});
+
+describe('លុប/ស្តារ ៖ បាត់ ACK និង read ចាស់មកក្រោយ listener', () => {
+    it('partial claim ដែលមិនទាន់ដល់ server មិនបង្កើត trash ឬដកប្រាក់ពេលបើក App វិញ', async () => {
+        install(getServerNow() - 3600000);
+        lab.failFirstTrash = false;
+        const item = itemOf(getServerNow() - 3600000);
+        const entry = prepareCleanupClaim(ID, 'remove', null, { ...item, barcodes: [item.barcodes[0]] });
+        cleanupJournalLive.clear();
+        await resumeCleanupJournalEntry(entry.trashItem.id);
+        expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['C', 'D']);
+        expect(Object.keys(lab.store[TRASH] || {})).toHaveLength(0);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(100);
+        expect(readCleanupJournal()).toEqual([]);
+    });
+    it('រក្សា before-image មុន server លុប history ហើយអាចរកចូល trash វិញ ដោយមិនកែប្រាក់', async () => {
+        install(getServerNow() - 3600000);
+        lab.failFirstTrash = false;
+        const sdk = firebaseState.fb as any;
+        const realTx = sdk.runTransaction;
+        let release: (v: any) => void = () => {};
+        let heldResult: any;
+        sdk.runTransaction = async (ref: any, updater: any) => {
+            const result = await realTx(ref, updater);
+            if (ref.path === HISTORY + '/' + ID && !heldResult) {
+                heldResult = result;
+                return new Promise((resolve) => { release = resolve; });
+            }
+            return result;
+        };
+        const deleting = deleteSingleItem(ID, { confirmed: true, quiet: true });
+        await vi.waitFor(() => expect(heldResult).toBeTruthy());
+        expect(getAt(HISTORY + '/' + ID)).toBeNull();
+        expect(readCleanupJournal()[0]?.trashItem.barcodes.map((b: any) => b.code)).toEqual(['C', 'D']);
+        cleanupInFlight.clear(); cleanupJournalLive.clear(); dataState.scanHistory = [];
+        await resumeCleanupJournalEntry(ID);
+        expect(getAt(TRASH + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['C', 'D']);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+        release(heldResult); await deleting;
+        expect(readCleanupJournal()).toEqual([]);
+    });
+
+    it('បើក App វិញ ➜ សាក Restore ដោយ token ដើម មិនជាប់សោខ្លួនឯង', async () => {
+        install(getServerNow() - 3600000);
+        lab.failFirstTrash = false;
+        const item = itemOf(getServerNow() - 3600000);
+        const token = 'restore_saved_token';
+        setAt(HISTORY + '/' + ID, null);
+        setAt(TRASH + '/' + ID, { ...item, trashReason: 'delete', isFromDeletion: true, deletedAt: getServerNow(),
+            restoreClaim: { token, targetId: ID, claimedAt: getServerNow() } });
+        dataState.scanHistory = []; dataState.deletedItems = [getAt(TRASH + '/' + ID)];
+        saveRestoreClaim(ID, { token, targetId: ID });
+        activeRestoreClaims.clear(); uiState.pendingRestoreId = ID;
+        await executeRestoreItem();
+        expect(getAt(TRASH + '/' + ID)).toBeNull();
+        expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['C', 'D']);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(100);
+    });
+
+    it('ចម្លើយ resync ចាស់ មិនជាន់ទិដ្ឋភាពថ្មីដែល listener បានផ្តល់ក្នុងពេលរង់ចាំ', async () => {
+        install(getServerNow() - 3600000);
+        const oldTrash = itemOf(getServerNow() - 3600000);
+        dataState.deletedItems = [oldTrash];
+        const sdk = firebaseState.fb as any;
+        let hist: (v: any) => void = () => {}, trash: (v: any) => void = () => {};
+        let reads = 0;
+        sdk.get = (ref: any) => {
+            reads++;
+            if (ref.path === TRASH + '/' + ID) return Promise.reject(new Error('ALREADY_RESTORED'));
+            return new Promise((resolve) => { if (ref.path === HISTORY) hist = resolve; else trash = resolve; });
+        };
+        uiState.pendingRestoreId = ID;
+        const restoring = executeRestoreItem();
+        await vi.waitFor(() => expect(reads).toBe(3));
+        const freshHistory = [itemOf(getServerNow())];
+        const freshTrash: any[] = [];
+        dataState.scanHistory = freshHistory; dataState.deletedItems = freshTrash;
+        hist(snap(null, null)); trash(snap(null, { [ID]: oldTrash }));
+        await restoring;
+        expect(dataState.scanHistory).toBe(freshHistory);
+        expect(dataState.deletedItems).toBe(freshTrash);
+    });
 });
 
 afterEach(() => {
@@ -226,7 +313,11 @@ describe('ការសរសេរធុងសំរាមឡើងវិញក�
         install(getServerNow() - 3600000);
         await removeSingleBarcode(ID, 'C');
         await waitRetries();
-        expect(writesTo(DB_A).filter(isTrash).length).toBe(1);
+        expect(writesTo(DB_A).filter((path) => isTrash(path) && path.split('/').length === 2)).toHaveLength(2);
+        expect(Object.keys(lab.store[TRASH])).toHaveLength(1);
+        expect(Object.values(lab.store[TRASH]).flatMap((item: any) => item.barcodes).find((b: any) => b.code === 'C').isDeducted).toBe(true);
+        expect(getAt(DAILY + '/' + DAY).codDollar).toBe(93);
+        expect(getAt(MONTHLY + '/2026-09').codDollar).toBe(93);
         expect(getAt(HISTORY + '/' + ID).barcodes.map((b: any) => b.code)).toEqual(['D']);
     }, 30000);
 });

@@ -4,7 +4,7 @@ import {
     PALM_SIGN_FIX_MAX_ACCURACY_M, PALM_SIGN_FIX_MAX_AGE_MS, PALM_SIGN_IMAGE_DIMS, PALM_SIGN_LIVE_DEEP_EVERY, PALM_SIGN_STAMP_COLOR, PALM_SIGN_STAMP_SIZE, notePalmSignPosition,
     PALM_SIGN_FRESH_SHOT_MS, palmSignCurrentFix, palmSignDecodeImage, palmSignExifShot, palmSignFileStampLines, palmSignLocation, palmSignPhotoFromFile, palmSignPickCode,
     palmSignStampLines, readPhotoExif,
-    stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
+    capturePalmSignPhoto, loadPalmSignStampFont, stampPalmSignPhoto, startPalmSignCamera, startPalmSignLocation
 } from '../src/services/palm-sign-camera';
 import { readCanvasSymbols } from '../src/services/scan-engine';
 import { attachPalmSignStream, videoElement } from '../src/app/refs';
@@ -28,6 +28,7 @@ beforeEach(() => {
     scanState.codeReader = null;
     scanState.nativeDetector = null;
     frameNumber = 1;
+    palmSignLocation.fix = null; palmSignLocation.watch = null; palmSignLocation.users = 0;
     vi.mocked(videoElement).mockReturnValue({ readyState: 2, videoWidth: 1920, videoHeight: 1080 } as any);
     vi.mocked(attachPalmSignStream).mockClear();
     vi.mocked(readCanvasSymbols).mockReset().mockResolvedValue([]);
@@ -154,8 +155,8 @@ it('📍 រូប Sign មានម៉ោង (Asia/Phnom_Penh) និងកូ�
     expect(texts[1][3]).toBeGreaterThan(canvas.height * 0.85);
     expect(calls).toContainEqual(['set', 'fillStyle', PALM_SIGN_STAMP_COLOR]);
     const font = calls.find((c) => c[0] === 'set' && c[1] === 'font')[2];
-    expect(font).toMatch(/^400 \d+px /);
-    expect(Number(/(\d+)px/.exec(font)![1])).toBe(Math.round(960 * PALM_SIGN_STAMP_SIZE));
+    expect(font).toMatch(/^700 \d+(?:\.\d+)?px /);
+    expect(Number(/([\d.]+)px/.exec(font)![1])).toBeCloseTo(960 * PALM_SIGN_STAMP_SIZE);
     expect(calls.some((c) => c[0] === 'strokeText')).toBe(false);
     expect(stampPalmSignPhoto({ width: 10, height: 10, getContext: () => ({ drawImage: () => {} }) }, ['x'])).toBe(false);
     expect(stampPalmSignPhoto(null, ['x'])).toBe(false);
@@ -193,7 +194,7 @@ it('📍 ទីតាំង ៖ watch តែពេលផ្ទាំង Sign ប
 it('📍 រូបពីកាមេរ៉ា ៖ stamp លើ frame មុនអ៊ិនកូដ JPEG', async () => {
     const draws: string[] = [];
     vi.mocked(createScratchCanvas).mockImplementation(() => ({ width: 0, height: 0,
-        getContext: () => ({ drawImage: () => {}, save: () => {}, restore: () => {}, strokeText: () => {}, fillText: (t: string) => draws.push(t) }),
+        getContext: () => ({ drawImage: () => {}, save: () => {}, restore: () => {}, fillRect: () => {}, strokeText: () => {}, fillText: (t: string) => draws.push(t) }),
         toDataURL: () => 'data:image/jpeg;base64,stamped' } as any));
     palmSignLocation.fix = { lat: 12.30011, lng: 105.41921, at: Date.now() };
     scanState.nativeDetector = { detect: vi.fn(async () => [{ rawValue: '77130500000012' }]) };
@@ -284,7 +285,7 @@ it('🖼 រូបពី Gallery ៖ ស្លាកពីព័ត៌មាន�
     expect(() => readPhotoExif(broken.buffer)).not.toThrow();
 });
 
-it('🖼/📷 ៖ រូប Gallery ➜ ស្លាក EXIF · គ្មាន EXIF ➜ គ្មានស្លាក · 📷 ថតឥឡូវ ➜ ម៉ោងឥឡូវ + ទីតាំងបច្ចុប្បន្ន', async () => {
+it('🖼/📷 ៖ Gallery រក្សា EXIF ពេញលេញ · គ្មាន EXIF ➜ ពេលបញ្ចូល + GPS បច្ចុប្បន្ន · កាមេរ៉ាថ្មី ➜ ពេល/GPS បច្ចុប្បន្ន', async () => {
     const texts: string[] = [];
     const context = new Proxy({}, { get: (_t, key) => (key === 'fillText' ? (s: string) => texts.push(s) : () => {}), set: () => true });
     vi.mocked(createScratchCanvas).mockImplementation(() => ({ width: 0, height: 0, getContext: () => context, toDataURL: () => 'data:image/jpeg;base64,x' }) as any);
@@ -297,7 +298,9 @@ it('🖼/📷 ៖ រូប Gallery ➜ ស្លាក EXIF · គ្មាន 
     expect(texts).toEqual(['2026-10-01 09:00:00', '12.30011, 105.41921']);
     texts.length = 0;
     await palmSignPhotoFromFile(file(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer), known, 'gallery');
-    expect(texts, 'គ្មាន EXIF ➜ គ្មានស្លាក').toEqual([]);
+    expect(texts[0].slice(0, 10), 'Gallery គ្មាន EXIF ➜ ពេលបញ្ចូល').toBe(palmSignStampLines(Date.now(), null)[0].slice(0, 10));
+    expect(texts[1]).toBe('11.55000, 104.92000');
+    texts.length = 0;
     await palmSignPhotoFromFile(file(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer), known, 'camera');
     expect(texts[0].slice(0, 10), '📷 ថតទើប ➜ ថ្ងៃនេះ (ម៉ោងឥឡូវ)').toBe(palmSignStampLines(Date.now(), null)[0].slice(0, 10));
     texts.length = 0;
@@ -314,11 +317,110 @@ it('📷 បើក file chooser (APK គ្មានសិទ្ធិកាម�
     const old = exifJpeg({ time: '2026:10:01 09:00:00', offset: '+07:00', gps: [12.300114, 105.419213] });
     expect(await palmSignFileStampLines(file(old), 'camera'), 'រូបចាស់តាម 📷').toEqual(['2026-10-01 09:00:00', '12.30011, 105.41921']);
     const fresh = exifJpeg({ time: zoneNow(Date.now() - 60000), offset: '+07:00', gps: [12.3, 105.4] });
-    expect(await palmSignFileStampLines(file(fresh), 'camera'), 'ថតមុន ១ នាទី ➜ ម៉ោងឥឡូវ (undefined)').toBeUndefined();
+    expect(await palmSignFileStampLines(file(fresh), 'camera'), 'ថតមុន ១ នាទីមាន GPS ➜ រក្សា EXIF ដើម').toEqual(palmSignExifStampLines(readPhotoExif(fresh)));
     const freshNoZone = exifJpeg({ time: zoneNow(Date.now() - 60000) });
     expect(await palmSignFileStampLines(file(freshNoZone), 'camera'), 'គ្មាន offset ➜ យល់ថាម៉ោងភ្នំពេញ').toBeUndefined();
     const plain = new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 2]).buffer;
     expect(await palmSignFileStampLines(file(plain, Date.now() - 2 * PALM_SIGN_FRESH_SHOT_MS), 'camera'), 'គ្មាន EXIF · ឯកសារចាស់ ➜ គ្មានស្លាក').toEqual([]);
     expect(await palmSignFileStampLines(file(plain), 'camera'), 'គ្មាន EXIF · ឯកសារថ្មី ➜ ម៉ោងឥឡូវ').toBeUndefined();
     expect(await palmSignFileStampLines(file(fresh), 'gallery'), '🖼 ជានិច្ច EXIF').toEqual(palmSignExifStampLines(readPhotoExif(fresh)));
+});
+
+it('📍 ស្កេនលឿនជាង GPS ➜ រង់ចាំ fix ហើយ stamp លើ frame ដើម មុនទទួលរូប', async () => {
+    let position!: (p: unknown) => void;
+    const watchPosition = vi.fn((success) => { position = success; return 19; });
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn(async () => stream) },
+        geolocation: { watchPosition, clearWatch: vi.fn() }, permissions: { query: vi.fn(async () => ({ state: 'granted' })) } });
+    const texts: string[] = [];
+    vi.mocked(createScratchCanvas).mockImplementation(() => {
+        let shot = 0;
+        return { width: 0, height: 0, getContext: () => ({ drawImage: () => { shot = frameNumber; }, save() {}, restore() {}, fillRect() {}, fillText: (s: string) => texts.push(s) }),
+            toDataURL: () => 'data:image/jpeg;base64,frame-' + shot } as any;
+    });
+    scanState.nativeDetector = { detect: vi.fn(async () => [{ rawValue: OWN }]) };
+    const onScan = vi.fn();
+    const stopLocation = startPalmSignLocation();
+    const close = startPalmSignCamera(onScan, vi.fn());
+    try {
+        await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
+        await vi.waitFor(() => expect(scanState.nativeDetector.detect).toHaveBeenCalled());
+        expect(onScan, 'មិនទទួលរូប timestamp តែមួយមុន GPS ឆ្លើយ').not.toHaveBeenCalled();
+        frameNumber = 2;
+        position({ coords: { latitude: 12.300114, longitude: 105.419213, accuracy: 25 } });
+        await vi.waitFor(() => expect(onScan).toHaveBeenCalledWith(OWN, 'frame-1'));
+        expect(texts).toContain('12.30011, 105.41921');
+    } finally { close(); stopLocation(); }
+});
+it('📍 Permissions API ព្យួរ មិនត្រូវរារាំង watchPosition ទោះបានអនុញ្ញាត location', async () => {
+    const watchPosition = vi.fn(() => 23);
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch: vi.fn() }, permissions: { query: () => new Promise(() => {}) } });
+    const stop = startPalmSignLocation();
+    try { await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce(), { timeout: 1500 }); }
+    finally { stop(); }
+});
+it('📍 អ្នកប្រើទី១បិទមុន watch ចាប់ផ្តើម តែទី២នៅបើក ➜ GPS នៅចាប់ផ្តើមតែមួយ', async () => {
+    const watchPosition = vi.fn(() => 24);
+    const clearWatch = vi.fn();
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch }, permissions: { query: vi.fn(async () => ({ state: 'granted' })) } });
+    const first = startPalmSignLocation(); const second = startPalmSignLocation(); first();
+    try { await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce()); expect(clearWatch).not.toHaveBeenCalled(); }
+    finally { second(); }
+    expect(clearWatch).toHaveBeenCalledWith(24);
+});
+it('📷 EXIF រូបថតទើបមាន GPS ➜ រក្សាម៉ោង និងកូអរដោនេរូប ទោះ web GPS មិនទាន់ឆ្លើយ', async () => {
+    const now = palmSignStampLines(Date.now() - 60000, null)[0];
+    const bytes = exifJpeg({ time: now.slice(0, 10).replace(/-/g, ':') + now.slice(10), offset: '+07:00', gps: [12.3, 105.4] });
+    const file = new File([bytes], 'fresh.jpg', { type: 'image/jpeg' });
+    expect(await palmSignFileStampLines(file, 'camera')).toEqual([now, '12.30000, 105.40000']);
+});
+
+it('🖼 font ស្លាកដូច Palm APK ៖ ក្រហមសុទ្ធ និង bold របស់ Android ជាមួយទំហំបង្រួមតាមទទឹងរូប', () => {
+    const calls: any[] = [];
+    const context = new Proxy({}, { get: (_t, k) => k === 'measureText' ? (s: string) => ({ width: s.length * 40 }) : (...a: any[]) => calls.push([k, ...a]),
+        set: (_t, k, v) => { calls.push(['set', k, v]); return true; } });
+    expect(stampPalmSignPhoto({ width: 720, height: 1280, getContext: () => context }, ['2026-10-19 09:56:05', '12.30011,105.41921'])).toBe(true);
+    expect(calls).toContainEqual(['set', 'fillStyle', '#ff0000']);
+    const fonts = calls.filter((c) => c[0] === 'set' && c[1] === 'font').map((c) => c[2]);
+    expect(fonts.every((s) => s.startsWith('700 ') && s.includes('ZoePalmStamp'))).toBe(true);
+    expect(parseFloat(fonts.at(-1).slice(4))).toBeLessThan(0.045 * 1280);
+    expect(calls.some((c) => c[0] === 'strokeText')).toBe(false);
+});
+
+it('📍 APK high accuracy អស់ពេល ➜ coarse fallback ទទួលកូអរដោនេមុន capture ចប់', async () => {
+    let failed!: (error: { code: number }) => void;
+    let coarse!: (position: unknown) => void;
+    const watchPosition = vi.fn((_ok: unknown, no: (e: { code: number }) => void, _options: PositionOptions) => { failed = no; return 28; });
+    const getCurrentPosition = vi.fn((ok: (p: unknown) => void, _no: unknown, _options: PositionOptions) => { coarse = ok; });
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, getCurrentPosition, clearWatch: vi.fn() }, permissions: { query: async () => ({ state: 'granted' }) } });
+    const texts: string[] = [];
+    const canvas = { width: 720, height: 1280, getContext: () => ({ save() {}, restore() {}, fillRect() {}, fillText: (s: string) => texts.push(s) }), toDataURL: () => 'data:image/jpeg;base64,coarse' };
+    const stop = startPalmSignLocation();
+    try {
+        await vi.waitFor(() => expect(watchPosition).toHaveBeenCalledOnce());
+        const pending = capturePalmSignPhoto(canvas as unknown as HTMLCanvasElement);
+        failed({ code: 3 });
+        expect(getCurrentPosition).toHaveBeenCalledOnce();
+        expect(watchPosition.mock.calls[0][2].timeout).toBeLessThan(getCurrentPosition.mock.calls[0][2].timeout);
+        coarse({ coords: { latitude: 12.3, longitude: 105.4, accuracy: 2500 } });
+        await expect(pending).resolves.toBe('coarse');
+        expect(texts).toContain('12.30000, 105.40000');
+    } finally { stop(); }
+});
+it('📍 បដិសេធ location ➜ មិនបង្កើតកូអរដោនេ និងមិនសួរម្តងទៀតពី coarse fallback', async () => {
+    let failed!: (error: { code: number }) => void;
+    const getCurrentPosition = vi.fn();
+    vi.stubGlobal('navigator', { geolocation: { watchPosition: (_ok, no) => { failed = no; return 29; }, getCurrentPosition, clearWatch: vi.fn() }, permissions: { query: async () => ({ state: 'granted' }) } });
+    const stop = startPalmSignLocation();
+    try {
+        await vi.waitFor(() => expect(failed).toBeTypeOf('function'));
+        failed({ code: 1 });
+        expect(palmSignLocation.status).toBe('denied');
+        expect(palmSignCurrentFix()).toBeNull();
+        expect(getCurrentPosition).not.toHaveBeenCalled();
+    } finally { stop(); }
+});
+it('🖼 FontFace constructor មិនដំណើរការ ➜ ការដាក់ត្រាមិនបរាជ័យ', async () => {
+    vi.stubGlobal('document', { baseURI: 'https://localhost/', fonts: { add: vi.fn() } });
+    vi.stubGlobal('FontFace', class { constructor() { throw new Error('font unavailable'); } });
+    await expect(loadPalmSignStampFont()).resolves.toBeUndefined();
 });

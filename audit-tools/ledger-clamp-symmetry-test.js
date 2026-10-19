@@ -140,6 +140,7 @@ const BOOT = function (seed) {
             return Promise.resolve();
         },
         runTransaction: (r, fn) => {
+            if (window.__failTrashWrite && String(r.path).indexOf('zoew_recently_deleted_cod_dod/') === 0) return denied('trash');
             if (window.__failHistoryTx && String(r.path).indexOf('zoew_scan_history_cod_dod/') === 0) return denied('history');
             const c = getPath(r.path);
             const n = fn(c === null ? null : JSON.parse(JSON.stringify(c)));

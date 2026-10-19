@@ -454,20 +454,20 @@ export function releaseCleanupLedgerKeys(list) {
 
 export async function cleanupHistoryForRecovery(sourceId, trashItem?) {
     if (typeof sourceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(sourceId)) return null;
-    const db = firebaseState.db;
+    const recoveryDatabase = firebaseState.db;
     const generation = firebaseState.authGeneration;
-    const current = () => firebaseState.db === db && firebaseState.authGeneration === generation;
+    const current = () => firebaseState.db === recoveryDatabase && firebaseState.authGeneration === generation;
     try {
-        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(db, `zoew_scan_history_cod_dod/${sourceId}`)));
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(recoveryDatabase, `zoew_scan_history_cod_dod/${sourceId}`)));
         if (!current()) return null;
         const source = snap.exists() ? snap.val() : null;
         const fresh = new Map([[sourceId, source]]);
         if (trashItem && typeof trashItem.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(trashItem.id) && !trashSlotSharesClaim(source, trashItem)) {
-            const finalSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(db, `zoew_restore_finalizations/${trashItem.id}`)));
+            const finalSnap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(recoveryDatabase, `zoew_restore_finalizations/${trashItem.id}`)));
             if (!current()) return null;
             const targetId = finalSnap.exists() ? finalSnap.val()?.targetId : null;
             if (typeof targetId === 'string' && /^[a-zA-Z0-9_-]+$/.test(targetId)) {
-                const target = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`)));
+                const target = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(recoveryDatabase, `zoew_scan_history_cod_dod/${targetId}`)));
                 if (!current()) return null;
                 fresh.set(targetId, target.exists() ? target.val() : null);
             }
